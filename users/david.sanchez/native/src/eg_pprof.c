@@ -10,13 +10,12 @@
 
 int main() {
   Perftools__Profiles__Profile *pprof = &g_dd_pprofs[1];
-  pprof_init(pprof);
+  pprof_Init(pprof);
 
   // Add some fake samples
   pprof_sampleAdd(pprof, 100, (uint64_t[]){1000, 2000}, 2);
   pprof_sampleAdd(pprof, 150, (uint64_t[]){1000, 2000}, 2);
   pprof_sampleAdd(pprof, 125, (uint64_t[]){1000, 2000}, 2);
-
 
   // Serialize and ship
   size_t len = perftools__profiles__profile__get_packed_size(pprof);
@@ -29,6 +28,6 @@ int main() {
   close(fd);
   GZip("./test.pb.gz", buf, len);
   free(buf);
-  pprof_free(pprof);
+  pprof_Free(pprof);
   return 0;
 }

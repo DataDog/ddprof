@@ -1,3 +1,6 @@
+#ifndef  _H_dictionary
+#define _H_dictionary
+
 typedef struct DictParams {
   uint64_t (*hash_fun)(void* key);
   void* (*key_copy)(void* key);
@@ -16,3 +19,5 @@ typedef struct DictNode {
     double   d;
   };
 } DictNode;
+
+#endif

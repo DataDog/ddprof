@@ -108,19 +108,22 @@ char procfs_mapMatch(pid_t target, MapLine* ret, uint64_t addr) {
 
   FILE* procstream = fdopen(procfs_mapOpen(target), "r");
   static MapLine retbuf;
+  int rc = -1;
 
   while(0 < getline(&g_procfs_linebuffer, &g_procfs_linebuffer_sz, procstream)) {
     if(procfs_mapLineConvert(g_procfs_linebuffer , &retbuf))
       continue;
-    if(addr < retbuf.start || addr > retbuf.end)
+    if(addr && addr < retbuf.start || addr > retbuf.end)
       continue;
+
+    // If we're here, we found a valid address!
+    // Note:  0 is a special address that means "return the first entry"
+    memcpy(ret, &retbuf, sizeof(retbuf));
+    rc = 0; // set the return code to success
     break;
   }
-
-  // If we're here, we found a valid address!
-  memcpy(ret, &retbuf, sizeof(retbuf));
   fclose(procstream);
-  return 0;
+  return rc;
 }
 
 
