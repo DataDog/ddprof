@@ -21,6 +21,10 @@ typedef struct DDRequest {
   Dict* D;             // tags, etc
 } DDRequest;
 
+void ddr_addtag(DDRequest* ddr, char* tag, char* val) {
+  DictSet(ddr->D, tag, val, 1+strlen(val));
+}
+
 typedef Perftools__Profiles__Profile PProf;
 
 char apikey_isvalid(char* key) {
@@ -67,6 +71,10 @@ void DDRequestInit(DDRequest* ddr) {
 #endif
 
 void DDRequestSend(DDRequest* ddr, PProf* pprof) {
+  printf("SENDIT\n");
+  // Update pprof duration
+  pprof_durationUpdate(pprof);
+
   // Serialize and zip pprof
   char* buf;
   size_t sz_packed = perftools__profiles__profile__get_packed_size(pprof);
@@ -81,15 +89,10 @@ void DDRequestSend(DDRequest* ddr, PProf* pprof) {
 
 #ifdef DD_DBG_PROFGEN
   mkdir("./pprofs", 0777);
-  char* buf2 = calloc(1, sz_packed);
-  perftools__profiles__profile__pack(pprof, buf2);
-  GZip("./pprofs/file.pb.gz", buf2, sz_packed);
-
-  int fd = open("./pprofs/memory.pb.gz", O_RDWR | O_CREAT, 0677);
+  unlink("./pprofs/native.pb.gz");
+  int fd = open("./pprofs/native.pb.gz", O_RDWR | O_CREAT, 0677);
   write(fd, buf, sz_zipped);
-
   close(fd);
-  free(buf2);
 #endif
 
   // Send
@@ -103,6 +106,7 @@ void DDRequestSend(DDRequest* ddr, PProf* pprof) {
   DictSet(ddr->D, "pprof[0]", "", sizeof(char));
   free(buf);
   pprof_sampleClear(pprof);
+  pprof_timeUpdate(pprof);
 }
 
 

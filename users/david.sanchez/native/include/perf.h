@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <linux/perf_event.h>
 #include <poll.h>
+#include <stdlib.h>
 
 /* TODO
     - Check support/permissions by reading /proc/sys/kernel/perf_event_paranoid
@@ -23,7 +24,23 @@
 
 #define PAGE_SIZE 4096                // Concerned about hugepages?
 #define PSAMPLE_SIZE 8*PAGE_SIZE      // TODO check for high-volume
-#define PSAMPLE_DEFAULT_WAKEUP 10000   // sample frequency check
+#define PSAMPLE_DEFAULT_WAKEUP 1000   // sample frequency check
+
+// Basically copypasta from Linux v5.4 includes/linux/perf_event.h
+struct perf_callchain_entry {
+  uint64_t nr;
+  uint64_t ip[];
+};
+
+struct perf_callchain_entry_ctx {
+  struct perf_callchain_entry *entry;
+  uint32_t                    max_stack;
+  uint32_t                    nr;
+  short                       contexts;
+  char                        contexts_maxed;
+};
+//</copypasta>
+
 typedef struct PEvent {
   int fd;
   struct perf_event_mmap_page* region;
@@ -111,19 +128,19 @@ typedef struct perf_event_sample {
 //  u64    id;                         // if PERF_SAMPLE_ID
 //  u64    stream_id;                  // if PERF_SAMPLE_STREAM_ID
 //  u32    cpu, res;                   // if PERF_SAMPLE_CPU
-//  u64    period;                     // if PERF_SAMPLE_PERIOD
+  u64    period;                     // if PERF_SAMPLE_PERIOD
 //  struct read_format v;                // if PERF_SAMPLE_READ
-  u64    nr;                           // if PERF_SAMPLE_CALLCHAIN
-  u64    ips[];                        // if PERF_SAMPLE_CALLCHAIN
+//  u64    nr;                           // if PERF_SAMPLE_CALLCHAIN
+//  u64    ips[];                        // if PERF_SAMPLE_CALLCHAIN
 //  u32    size;                       // if PERF_SAMPLE_RAW
 //  char  data[size];                  // if PERF_SAMPLE_RAW
 //  u64    bnr;                        // if PERF_SAMPLE_BRANCH_STACK
 //  struct perf_branch_entry lbr[bnr]; // if PERF_SAMPLE_BRANCH_STACK
 //  u64    abi;                        // if PERF_SAMPLE_REGS_USER
 //  u64    regs[weight(mask)];         // if PERF_SAMPLE_REGS_USER
-//  u64    size;                       // if PERF_SAMPLE_STACK_USER
-//  char   data[size];                 // if PERF_SAMPLE_STACK_USER
-//  u64    dyn_size;                   // if PERF_SAMPLE_STACK_USER
+  u64    size;                       // if PERF_SAMPLE_STACK_USER
+  char   data[8192];                 // if PERF_SAMPLE_STACK_USER
+  u64    dyn_size;                   // if PERF_SAMPLE_STACK_USER
 //  u64    weight;                     // if PERF_SAMPLE_WEIGHT
 //  u64    data_src;                   // if PERF_SAMPLE_DATA_SRC
 //  u64    transaction;                // if PERF_SAMPLE_TRANSACTION
@@ -138,18 +155,19 @@ struct perf_event_attr g_dd_native_attr = {
 //    .sample_period  = 10000000,                // Who knows!
     .sample_freq    = 1000,
     .freq           = 1,
-    .sample_type    = PERF_SAMPLE_CALLCHAIN |
-                      PERF_SAMPLE_IP        |
-                      PERF_SAMPLE_TID       |
-                      PERF_SAMPLE_TIME,
-//    .sample_type =    PERF_SAMPLE_READ,
+    .sample_type    = PERF_SAMPLE_STACK_USER |
+                      PERF_SAMPLE_IP         |
+                      PERF_SAMPLE_TID        |
+                      PERF_SAMPLE_TIME       |
+                      PERF_SAMPLE_PERIOD,
     .precise_ip     = 2,                        // Change this when moving from SW->HW clock
-    .disabled       = 1,
+    .disabled       = 0,
     .inherit        = 1,
     .inherit_stat   = 1,
     .mmap           = 1,  // keep track of executable mappings
     .task           = 1,  // Follow fork/stop events
     .enable_on_exec = 1,
+    .sample_stack_user = 8192, // Is this an insane default?
 //    .read_format    = //PERF_FORMAT_TOTAL_TIME_ENABLED |
 //                      PERF_FORMAT_TOTAL_TIME_RUNNING,
 //    .exclude_kernel = 1,                        // For a start (exclude_hv???)
@@ -157,7 +175,7 @@ struct perf_event_attr g_dd_native_attr = {
 //    .exclude_hv = 1,
 //    .exclude_idle   = 0,                        // Does this matter???
     .watermark = 1,
-    .wakeup_watermark = 8192, // If we've used up 1/4 of our buffer, might as well go for it
+    .wakeup_watermark = 1   , // If we've used up 1/4 of our buffer, might as well go for it
   };
 
 char perfopen(pid_t pid, PEvent* pe, struct perf_event_attr* attr) {
@@ -209,12 +227,11 @@ void default_callback(struct perf_event_header* hdr, void* arg) {
   switch(hdr->type) {
   case PERF_RECORD_SAMPLE:
     pes = (struct perf_event_sample*)hdr;
-//    printf("PID: %d\n", pes->pid);
-    printf("NR:  %ld\n", pes->nr);
+//    printf("NR:  %ld\n", pes->nr);
     break;
   case PERF_RECORD_MMAP:
     pem = (struct perf_event_mmap*)hdr;
-    printf("MMAP filename: %s\n", pem->filename);
+//    printf("MMAP filename: %s\n", pem->filename);
   }
 }
 
@@ -244,6 +261,10 @@ void main_loop(PEvent *pe, void (*event_callback)(struct perf_event_header*, voi
   ioctl(pe->fd, PERF_EVENT_IOC_ENABLE, 1);
   while(1) {
     poll(&pfd, 1, PSAMPLE_DEFAULT_WAKEUP);
+    if(pfd.revents&POLLHUP) {
+      printf("Instrumented process died (exiting)\n");
+      exit(-1);
+    }
     void*  callstack[PAGE_SIZE] = {0}; // hilarious
     size_t n_calls = 0;
     uint64_t head = pe->region->data_head & (PSAMPLE_SIZE - 1);
@@ -254,6 +275,7 @@ void main_loop(PEvent *pe, void (*event_callback)(struct perf_event_header*, voi
     rb_init(rb, pe->region);
 
     int elems = 0;
+    printf("<%ld, %ld>\n", head, tail);
     while(head > tail) {
       elems++;
       struct perf_event_header* hdr = rb_seek(rb, tail);
@@ -263,7 +285,6 @@ void main_loop(PEvent *pe, void (*event_callback)(struct perf_event_header*, voi
       tail += hdr->size;
       tail = tail & (PSAMPLE_SIZE - 1);
     }
-    if(elems) {printf("%d ",elems); fflush(stdout);}
     pe->region->data_tail = head;
   }
 
