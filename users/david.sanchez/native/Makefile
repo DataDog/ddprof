@@ -1,5 +1,4 @@
 INCLUDE = -Iinclude
-INCLUDE += -I"/home/sanchda/dev/perf"
 CFLAGS = -ggdb3 -std=c11 -O0 -D_GNU_SOURCE
 TESTS := http perf pprof
 WARNS := -Wall -Wextra -Wpedantic -Werror #-Wfatal-errors
