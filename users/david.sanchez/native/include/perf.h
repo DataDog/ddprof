@@ -46,6 +46,11 @@ typedef struct PEvent {
   struct perf_event_mmap_page* region;
 } PEvent;
 
+// TODO, this comes from BP, SP, and IP
+// see arch/x86/include/uapi/asm/perf_regs.h in the linux sources
+// We're going to hardcode everything for now...
+#define PERF_REGS_MASK ((1<<6)|(1<<7)|(1<<8))
+
 #define u64 uint64_t
 #define u32 uint32_t
 #define u16 uint16_t
@@ -136,8 +141,8 @@ typedef struct perf_event_sample {
 //  char  data[size];                  // if PERF_SAMPLE_RAW
 //  u64    bnr;                        // if PERF_SAMPLE_BRANCH_STACK
 //  struct perf_branch_entry lbr[bnr]; // if PERF_SAMPLE_BRANCH_STACK
-//  u64    abi;                        // if PERF_SAMPLE_REGS_USER
-//  u64    regs[weight(mask)];         // if PERF_SAMPLE_REGS_USER
+  u64    abi;                        // if PERF_SAMPLE_REGS_USER
+  u64    regs[3];               // if PERF_SAMPLE_REGS_USER
   u64    size;                       // if PERF_SAMPLE_STACK_USER
   char   data[8192];                 // if PERF_SAMPLE_STACK_USER
   u64    dyn_size;                   // if PERF_SAMPLE_STACK_USER
@@ -156,6 +161,7 @@ struct perf_event_attr g_dd_native_attr = {
     .sample_freq    = 1000,
     .freq           = 1,
     .sample_type    = PERF_SAMPLE_STACK_USER |
+                      PERF_SAMPLE_REGS_USER  |
                       PERF_SAMPLE_IP         |
                       PERF_SAMPLE_TID        |
                       PERF_SAMPLE_TIME       |
@@ -168,6 +174,7 @@ struct perf_event_attr g_dd_native_attr = {
     .task           = 1,  // Follow fork/stop events
     .enable_on_exec = 1,
     .sample_stack_user = 8192, // Is this an insane default?
+    .sample_regs_user  = PERF_REGS_MASK,
 //    .read_format    = //PERF_FORMAT_TOTAL_TIME_ENABLED |
 //                      PERF_FORMAT_TOTAL_TIME_RUNNING,
 //    .exclude_kernel = 1,                        // For a start (exclude_hv???)

@@ -1,7 +1,6 @@
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
-
 #include <pthread.h>
 #include <sys/mman.h>
 
@@ -9,6 +8,7 @@
 //#include <x86intrin.h>
 
 #include "perf.h"
+#include "unwind.h"
 #include "pprof.h"
 #include "http.h"
 #include "ddog.h"
@@ -28,8 +28,10 @@ DDRequest ddr = {
   .D = &my_dict
 };
 
+const int max_stack = 1024;
 void rambutan_callback(struct perf_event_header* hdr, void* arg) {
   printf(".");
+  unw_word_t ips[max_stack]; // TODO what is the max?
   struct perf_event_sample* pes;
   struct timeval tv = {0};
   gettimeofday(&tv, NULL);
@@ -37,16 +39,20 @@ void rambutan_callback(struct perf_event_header* hdr, void* arg) {
 //  PProf* pprof = (PProf*)arg;
   switch(hdr->type) {
     case PERF_RECORD_SAMPLE:
-      pes = (struct perf_event_sample*)hdr;
+      ; // TODO
+//      pes = (struct perf_event_sample*)hdr;
 //      pprof_sampleAdd(pprof, 10000, pes->ips, pes->nr, pes->pid);
 //      pprof_sampleAdd(pprof, pes->period, pes->data, pes->dyn_size, pes->pid);
-      size_t n = pes->dyn_size/sizeof(uint64_t);
-      uint64_t* arr = (uint64_t*)pes->data;
-      for(size_t i=0; i<n; i++)
-        printf("0x%lx\n",arr[i]);
-      for(size_t i=0; i<pes->dyn_size; i++)
-        printf("%c", pes->data[i]); printf("\n");
-      pprof->period += pes->period;
+//      unwind__get_entries(cb, arg, thread, data, 8192);
+      struct UnwindState us = {
+        .pid = pes->pid,
+        .stack = pes->data,
+        .stack_sz = pes->dyn_size,
+        .regs = pes->regs
+      };
+      unwindstate_unwind(&us, ips, max_stack);
+      break;
+
     default:
       break;
   }

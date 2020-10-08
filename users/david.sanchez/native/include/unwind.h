@@ -58,12 +58,15 @@ struct Dwarf {
   const uint8_t* end;
 };
 
+// References to the inner struct of the union will fail without C99 anon structs
 struct UnwindState {
-  pid_t    pid;
-  char*    stack;     // stack dump, probably from perf sample
-  size_t   stack_sz;
+  pid_t            pid;
+  unw_addr_space_t uas;
+  char*            stack;     // stack dump, probably from perf sample
+  size_t           stack_sz;
   union {
-    uint64_t regs[3];
+    uint64_t  reg_arr[3];
+    uint64_t* regs;
     struct {
       uint64_t ebp;
       uint64_t esp;
@@ -250,5 +253,41 @@ unw_accessors_t unwAccessors = {
   .resume                 = unw_res,
   .get_proc_name          = unw_gpn
 };
+
+char unwindstate_Init(struct UnwindState* us) {
+  us->uas = unw_create_addr_space(&unwAccessors, 0);
+  if(!us->uas)
+    return 1;
+  unw_set_caching_policy(us->uas, UNW_CACHE_GLOBAL);
+  return 0;
+}
+
+int unwindstate_unwind(struct UnwindState* us, uint64_t* ips, size_t max_stack) {
+  int ret = 0, i = 0;
+  unw_cursor_t uc;
+
+  // The first IP is in the register
+  ips[i] = us->eip;
+  ret = unw_init_remote(&uc, us->uas, &us);
+  if(ret) {
+    switch(ret) {
+    case UNW_EINVAL:
+      printf("UNW_EINVAL\n"); break;
+    case UNW_EUNSPEC:
+      printf("UNW_EINVAL\n"); break;
+    case UNW_EBADREG:
+      printf("UNW_EINVAL\n"); break;
+    default:
+      printf("UNW_SOMETHING\n"); break;
+    }
+    return i;
+  }
+
+  while (!ret && (unw_step(&uc) > 0) && i < max_stack) {
+    unw_get_reg(&uc, UNW_REG_IP, &ips[i]);
+    i++;
+  }
+  return i;
+}
 
 #endif

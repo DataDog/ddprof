@@ -1,10 +1,11 @@
 INCLUDE = -Iinclude
+INCLUDE += -I"/home/sanchda/dev/perf"
 CFLAGS = -ggdb3 -std=c11 -O0 -D_GNU_SOURCE
 TESTS := http perf pprof
 WARNS := -Wall -Wextra -Wpedantic -Werror #-Wfatal-errors
 ANALYZER := -fanalyzer
 CC := gcc-10
-LDLIBS := -lunwind -lprotobuf-c -lz -lpthread
+LDLIBS := -lunwind -lprotobuf-c -lz -lpthread -lunwind -lelf
 
 ifeq ($(PREFIX),)
 	PREFIX := /usr/local

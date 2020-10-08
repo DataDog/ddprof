@@ -147,12 +147,12 @@ uint64_t pprof_mapAdd(Perftools__Profiles__Profile* pprof, uint64_t addr_start, 
 }
 
 uint64_t pprof_mapAddFromAddr(Perftools__Profiles__Profile* pprof, uint64_t addr, pid_t pid) {
-  MapLine map = {0};
-  if(procfs_mapMatch(pid, &map, addr) || !map.isFile) {
+  Map* map = procfs_MapMatch(pid, addr);
+  if(!map || !map->path) {
     // Couldn't identify the map, so we have an error
     return 0;
   }
-  return pprof_mapAdd(pprof, map.start, map.end, map.path);
+  return pprof_mapAdd(pprof, map->start, map->end, map->path);
 }
 
 char isEqualLocation(uint64_t A, Perftools__Profiles__Location* B) {

@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <gelf.h> // apt install libelf-dev
 
 
 // ISO C does not allow you to cast a function pointer to an object pointer.
@@ -254,6 +255,15 @@ int procfs_MapOpen(pid_t target) {
 
   return g_procfs_map_fd;
 }
+
+ssize_t procfs_MapRead(Map* map, void* buf, size_t off, size_t sz) {
+  int fd = open(map->path, O_RDONLY);
+  lseek(fd, off, SEEK_SET);
+  ssize_t ret = read(fd, buf, sz);
+  close(fd);
+  return ret;
+}
+
 void procfs_MapPrint(pid_t target) {
   if(!target)
     target = getpid();
