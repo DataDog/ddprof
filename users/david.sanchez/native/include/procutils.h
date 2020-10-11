@@ -99,6 +99,10 @@ void pidmap_Set(pid_t pid, PidMap* pm) {
 
 void pidmap_SetFiltered(pid_t pid, PidMap* pm, MapMode whitelist) {
   FILE* procstream = fdopen(procfs_MapOpen(pid), "r");
+  if(!procstream) {
+    printf("WTF!!! I couldn't find procfs for %d\n", pid);
+    return;
+  }
   pm->pid = pid;
 
   for(size_t i; i<PM_MAX && 0<getline(&g_procfs_linebuffer, &g_procfs_linebuffer_sz, procstream); i++) {
@@ -234,6 +238,7 @@ char procfs_LineToMapFiltered(char* line, Map* map, MapMode whitelist) {
   map->off    = offset;
   map->mode   = mask;
   map->path   = filename;
+printf("DBG: filename(%s)\n", filename);
   return 0;
 }
 

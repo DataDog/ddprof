@@ -123,6 +123,8 @@ typedef struct perf_event_mmap {
   char                     filename[];
 } perf_event_mmap;
 
+#define PERF_SAMPLE_STACK_SIZE 8192
+#define PERF_SAMPLE_STACK_REGS 3
 typedef struct perf_event_sample {
   struct perf_event_header header;
 //  u64    sample_id;                  // if PERF_SAMPLE_IDENTIFIER
@@ -142,9 +144,9 @@ typedef struct perf_event_sample {
 //  u64    bnr;                        // if PERF_SAMPLE_BRANCH_STACK
 //  struct perf_branch_entry lbr[bnr]; // if PERF_SAMPLE_BRANCH_STACK
   u64    abi;                        // if PERF_SAMPLE_REGS_USER
-  u64    regs[3];               // if PERF_SAMPLE_REGS_USER
+  u64    regs[PERF_SAMPLE_STACK_REGS];               // if PERF_SAMPLE_REGS_USER
   u64    size;                       // if PERF_SAMPLE_STACK_USER
-  char   data[8192];                 // if PERF_SAMPLE_STACK_USER
+  char   data[PERF_SAMPLE_STACK_SIZE];                 // if PERF_SAMPLE_STACK_USER
   u64    dyn_size;                   // if PERF_SAMPLE_STACK_USER
 //  u64    weight;                     // if PERF_SAMPLE_WEIGHT
 //  u64    data_src;                   // if PERF_SAMPLE_DATA_SRC
@@ -173,7 +175,7 @@ struct perf_event_attr g_dd_native_attr = {
     .mmap           = 1,  // keep track of executable mappings
     .task           = 1,  // Follow fork/stop events
     .enable_on_exec = 1,
-    .sample_stack_user = 8192, // Is this an insane default?
+    .sample_stack_user = PERF_SAMPLE_STACK_SIZE, // Is this an insane default?
     .sample_regs_user  = PERF_REGS_MASK,
 //    .read_format    = //PERF_FORMAT_TOTAL_TIME_ENABLED |
 //                      PERF_FORMAT_TOTAL_TIME_RUNNING,

@@ -28,29 +28,30 @@ DDRequest ddr = {
   .D = &my_dict
 };
 
+struct RambutanContext {
+  PProf*       pprof;
+  struct UnwindState* us;
+};
+
 const int max_stack = 1024;
 void rambutan_callback(struct perf_event_header* hdr, void* arg) {
+  struct RambutanContext* rc = arg;
   printf(".");
   unw_word_t ips[max_stack]; // TODO what is the max?
   struct perf_event_sample* pes;
   struct timeval tv = {0};
   gettimeofday(&tv, NULL);
   int64_t now_nanos = (tv.tv_sec*1000000 + tv.tv_usec)*1000;
-//  PProf* pprof = (PProf*)arg;
   switch(hdr->type) {
     case PERF_RECORD_SAMPLE:
-      ; // TODO
-//      pes = (struct perf_event_sample*)hdr;
+      pes = (struct perf_event_sample*)hdr;
 //      pprof_sampleAdd(pprof, 10000, pes->ips, pes->nr, pes->pid);
 //      pprof_sampleAdd(pprof, pes->period, pes->data, pes->dyn_size, pes->pid);
-//      unwind__get_entries(cb, arg, thread, data, 8192);
-      struct UnwindState us = {
-        .pid = pes->pid,
-        .stack = pes->data,
-        .stack_sz = pes->dyn_size,
-        .regs = pes->regs
-      };
-      unwindstate_unwind(&us, ips, max_stack);
+      rc->us->pid = pes->pid;
+      rc->us->stack = pes->data;
+      rc->us->stack_sz = pes->dyn_size;
+      memcpy(&rc->us->regs[0], pes->regs, 3*sizeof(uint64_t));
+      unwindstate_unwind(rc->us, ips, max_stack);
       break;
 
     default:
@@ -129,7 +130,11 @@ int main(int argc, char** argv) {
     pthread_barrier_wait(pb);
     munmap(pb, sizeof(pthread_barrier_t));
 //    main_loop(&pe, NULL, NULL);
-    main_loop(&pe, rambutan_callback, (void*)pprof);
+    struct RambutanContext rs = {
+      .pprof = pprof,
+      .us    = &(struct UnwindState){0}};
+    unwindstate_Init(rs.us);
+    main_loop(&pe, rambutan_callback, &rs);
   }
 
   return 0;

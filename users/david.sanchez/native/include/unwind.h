@@ -1,7 +1,6 @@
 #ifndef _H_unwind
 #define _H_unwind
 
-#define UNW_LOCAL_ONLY
 #include <libunwind.h>
 #include <gelf.h>
 #include "/usr/include/libdwarf/dwarf.h" // TODO wow... Just wow
@@ -65,8 +64,7 @@ struct UnwindState {
   char*            stack;     // stack dump, probably from perf sample
   size_t           stack_sz;
   union {
-    uint64_t  reg_arr[3];
-    uint64_t* regs;
+    uint64_t  regs[3];
     struct {
       uint64_t ebp;
       uint64_t esp;
@@ -74,6 +72,10 @@ struct UnwindState {
     };
   };
 };
+
+
+// Convenience
+#define dwarf_search_unwind_table UNW_OBJ(dwarf_search_unwind_table)
 
 // TODO wow, just wow.
 char dwarf_readEhFrameValueInt(struct Dwarf* dwarf, uint64_t* out, size_t sz) {
@@ -180,7 +182,8 @@ int unw_fpi(unw_addr_space_t as,
       .table_len = fde_count*sizeof(struct TTableEntry)/sizeof(unw_word_t)}}
   };
 
-  if(!UNW_OBJ(dwarf_search_unwind_table)(as, ip, &di, pip, NULL))
+//  if(!UNW_OBJ(dwarf_search_unwind_table)(as, ip, &di, pip, NULL))
+  if(!dwarf_search_unwind_table(as, ip, &di, pip, need_unwind_info, arg))
     return UNW_ESUCCESS;
 
   return -UNW_ESTOPUNWIND;
@@ -225,13 +228,14 @@ int unw_ar(unw_addr_space_t as,
     return -UNW_EREADONLYREG;
 
   switch(regnum) {
-  case UNW_X86_64_RBP: *valp = us->regs[0]; break;
-  case UNW_X86_64_RSP: *valp = us->regs[1]; break;
-  case UNW_X86_64_RIP: *valp = us->regs[2]; break;
+  case UNW_X86_64_RBP: *valp = us->ebp; break;
+  case UNW_X86_64_RSP: *valp = us->esp; break;
+  case UNW_X86_64_RIP: *valp = us->eip; break;
   default:
     return -UNW_EBADREG;
   }
 
+  return UNW_ESUCCESS;
 }
 int unw_af(unw_addr_space_t as,
            unw_regnum_t regnum, unw_fpreg_t *fpvalp,
@@ -270,21 +274,23 @@ int unwindstate_unwind(struct UnwindState* us, uint64_t* ips, size_t max_stack) 
   ips[i] = us->eip;
   ret = unw_init_remote(&uc, us->uas, &us);
   if(ret) {
-    switch(ret) {
-    case UNW_EINVAL:
-      printf("UNW_EINVAL\n"); break;
-    case UNW_EUNSPEC:
-      printf("UNW_EINVAL\n"); break;
-    case UNW_EBADREG:
-      printf("UNW_EINVAL\n"); break;
+    switch(-ret) {
+    case UNW_EINVAL:  printf("UNW_EINVAL\n"); break;
+    case UNW_EUNSPEC: printf("UNW_EUNSPEC\n"); break;
+    case UNW_EBADREG: printf("UNW_EBADREG\n"); break;
     default:
-      printf("UNW_SOMETHING\n"); break;
+      printf("(ret: %d) UNW_SOMETHING\n", ret); break;
     }
     return i;
   }
 
   while (!ret && (unw_step(&uc) > 0) && i < max_stack) {
     unw_get_reg(&uc, UNW_REG_IP, &ips[i]);
+    char buf[4096] = {0};
+    size_t buflen = 4096;
+    unw_word_t offp;
+    unw_get_proc_name(&uc, buf, buflen, &offp);
+    printf("  FN: %s\n", buf);
     i++;
   }
   return i;

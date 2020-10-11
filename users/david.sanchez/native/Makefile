@@ -4,7 +4,12 @@ TESTS := http perf pprof
 WARNS := -Wall -Wextra -Wpedantic -Werror #-Wfatal-errors
 ANALYZER := -fanalyzer
 CC := gcc-10
-LDLIBS := -lunwind -lprotobuf-c -lz -lpthread -lunwind -lelf
+LDLIBS := -lunwind -lprotobuf-c -lz -lpthread -lunwind -lunwind-x86_64 -lelf
+
+# NOTE
+# unwind-x86-64.a is a result of compiling libunwind, but it doesn't get installed
+# by default.  You'll need to either copy it or do something more clever than I did
+# during installation
 
 ifeq ($(PREFIX),)
 	PREFIX := /usr/local
