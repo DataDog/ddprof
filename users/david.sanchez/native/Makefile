@@ -17,7 +17,7 @@ endif
 
 .PHONY: all clean install
 
-rambutan: src/rambutan.c src/profile.pb-c.c
+dd-prof: src/dd-prof.c src/profile.pb-c.c
 	$(CC) -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 
 ddog: src/ddog.c src/profile.pb-c.c

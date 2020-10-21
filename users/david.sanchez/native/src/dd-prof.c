@@ -28,14 +28,14 @@ DDRequest ddr = {
   .D = &my_dict
 };
 
-struct RambutanContext {
+struct DDProfContext {
   PProf*       pprof;
   struct UnwindState* us;
 };
 
 const int max_stack = 1024;
 void rambutan_callback(struct perf_event_header* hdr, void* arg) {
-  struct RambutanContext* rc = arg;
+  struct DDProfContext* rc = arg;
   printf(".");
   unw_word_t ips[max_stack]; // TODO what is the max?
   struct perf_event_sample* pes;
@@ -130,7 +130,7 @@ int main(int argc, char** argv) {
     pthread_barrier_wait(pb);
     munmap(pb, sizeof(pthread_barrier_t));
 //    main_loop(&pe, NULL, NULL);
-    struct RambutanContext rs = {
+    struct DDProfContext rs = {
       .pprof = pprof,
       .us    = &(struct UnwindState){0}};
     unwindstate_Init(rs.us);
