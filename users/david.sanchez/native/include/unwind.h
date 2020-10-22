@@ -2,6 +2,7 @@
 #define _H_unwind
 
 #include <bfd.h>
+#include <errno.h>
 #include <gelf.h>
 #include <libunwind.h>
 
@@ -33,13 +34,15 @@ struct Dwarf {
 // TODO what else is needed for inline functions?
 struct FunLoc {
   uint64_t ip;    // Relative to file, not VMA
-  char* name;     // name of the function (mangled, possibly)
-  char* source;   // name of the source file, if known
-  char* file;     // name of the file where the symbol is interned (e.g., .so)
+  char* funname;  // name of the function (mangled, possibly)
+  char* srcpath;  // name of the source file, if known
+  char* sopath;   // name of the file where the symbol is interned (e.g., .so)
   uint32_t line;  // line number in file
+  uint32_t disc;  // discriminator
 };
 
 struct FunLocLookup {
+  bfd_vma pc;
   struct FunLoc* loc;
   struct bfd_symbol** symtab;
   char done;
@@ -91,82 +94,119 @@ static void slurp_symtab(struct FunLocLookup* flu) {
     return;
   }
 }
+static void find_address_in_section(bfd* abfd, asection* section, void* arg) {
+  bfd_vma vma;
+  bfd_size_type size;
+  struct FunLocLookup *flu = arg;
+  const char** filename = (const char**)&flu->loc->srcpath;
+  const char** functionname = (const char**)&flu->loc->funname;
+  unsigned int*  line = &flu->loc->line;
+  unsigned int*  discriminator = &flu->loc->disc;
+  bfd_vma pc = flu->pc;
 
-static void translate_addresses(bfd* abfd, asection* section, bfd_vma pc, uint64_t* addr, size_t naddr) {
-  int read_stdin = (naddr == 0);
-  static char found = 0;
+  if (flu->done) return;
+
+  if ((bfd_section_flags(section) & SEC_ALLOC) == 0) return;
+
+  vma = bfd_section_vma(section);
+  if (pc < vma) return;
+
+  size = bfd_section_size(section);
+  if (pc >= vma + size) return;
+
+  flu->done = bfd_find_nearest_line_discriminator(abfd, section, flu->symtab, pc - vma,
+                                                  filename, functionname,
+                                                  line, discriminator);
+}
+
+static void find_offset_in_section(bfd* abfd, asection* section, struct FunLocLookup* flu) {
+  const char** filename = (const char**)&flu->loc->srcpath;
+  const char** functionname = (const char**)&flu->loc->funname;
+  unsigned int*  line = &flu->loc->line;
+  unsigned int*  discriminator = &flu->loc->disc;
+  bfd_vma pc = flu->pc;
+  bfd_size_type size;
+
+  if ((bfd_section_flags(section) & SEC_ALLOC) == 0) return;
+
+  size = bfd_section_size(section);
+  if (pc >= size) return;
+
+  flu->done = bfd_find_nearest_line_discriminator(abfd, section, flu->symtab, pc,
+                                                  filename, functionname,
+                                                  line, discriminator);
+}
+
+static void translate_addresses(struct FunLocLookup* flu, asection* section, uint64_t* addr, size_t naddr) {
+  bfd* abfd = flu->bfd;
   for (;;) {
+    printf(".");
     if (naddr <= 0) break;
     --naddr;
-    pc = *addr++;
+    flu->pc = *addr++;
     if (bfd_get_flavour(abfd) == bfd_target_elf_flavour) {
-      const struct elf_backend_data* bed = get_elf_backend_data(abfd);
-      bfd_vma sign = (bfd_vma)1 << (bed->s->arch_size - 1);
-      pc &= (sign << 1) - 1;
-      if (bed->sign_extend_vma) pc = (pc ^ sign) - sign;
+      printf("You do have to worry about the ELF flavor stuff!\n");
+     //  const struct elf_backend_data* bed = get_elf_backend_data(abfd);
+     //  bfd_vma sign = (bfd_vma)1 << (bed->s->arch_size - 1);
+     //  pc &= (sign << 1) - 1;
+     //  if (bed->sign_extend_vma) pc = (pc ^ sign) - sign;
     }
-    if (1) {
-      printf("0x");
-      bfd_printf_vma(abfd, pc);
-      if (pretty_print)
-        printf(": ");
-      else
-        printf("\n");
-    }
-    found = FALSE;
+    flu->done = FALSE;
     if (section)
-      find_offset_in_section(abfd, section);
+      find_offset_in_section(abfd, section, flu);
     else
-      bfd_map_over_sections(abfd, find_address_in_section, NULL);
-    if (!found) {
+      bfd_map_over_sections(abfd, find_address_in_section, flu);
+    if (!flu->done) {
       if (1) printf("??\n");
       printf("??:0\n");
     } else {
       while (1) {
-        if (with_functions) {
-          const char* name;
-          char* alloc = NULL;
-          name = functionname;
-          if (name == NULL || *name == '\0')
-            name = "??";
-          else if (do_demangle) {
-            alloc = bfd_demangle(abfd, name, DMGL_ANSI | DMGL_PARAMS);
-            if (alloc != NULL) name = alloc;
+        if (1) { // with functions
+          if (!flu->loc->funname) {
+            printf("Function name came back NULL.\n");
+            flu->loc->funname = strdup("??");
+          } else if (!*flu->loc->funname) {
+            printf("Function name came back EMPTY.\n");
+            free(flu->loc->funname); // Is this OK?
+            flu->loc->funname = strdup("??");
           }
-          printf("%s", name);
-          if (pretty_print)
-            printf(_(" at "));
-          else
-            printf("\n");
-          if (alloc != NULL) free(alloc);
+          // else if (do_demangle) {
+          //   alloc = bfd_demangle(abfd, name, DMGL_ANSI | DMGL_PARAMS);
+          //   if (alloc != NULL) name = alloc;
+          // }
+          printf("%s\n", flu->loc->funname);
+          //if (alloc != NULL) free(alloc);
         }
-        if (base_names && filename != NULL) {
-          char* h;
-          h = strrchr(filename, '/');
-          if (h != NULL) filename = h + 1;
-        }
-        printf("%s:", filename ? filename : "??");
-        if (line != 0) {
-          if (discriminator != 0)
-            printf("%u (discriminator %u)\n", line, discriminator);
-          else
-            printf("%u\n", line);
+        //if (base_names && filename != NULL) {
+        //  char* h;
+        //  h = strrchr(filename, '/');
+        //  if (h != NULL) filename = h + 1;
+        //}
+        printf("%s:", flu->loc->srcpath ? flu->loc->srcpath : "??");
+        if (flu->loc->line != 0) {
+          //if (discriminator != 0)
+          //  printf("%u (discriminator %u)\n", line, discriminator);
+          //else
+          //  printf("%u\n", line);
+           printf("%u\n", flu->loc->line);
         } else
           printf("?\n");
-        if (!unwind_inlines)
-          found = FALSE;
-        else
-          found = bfd_find_inliner_info(abfd, &filename, &functionname, &line);
-        if (!found) break;
-        if (pretty_print) printf(_(" (inlined by) "));
+        //if (!unwind_inlines)
+        //  found = FALSE;
+        //else
+        //  found = bfd_find_inliner_info(abfd, &filename, &functionname, &line);
+        if (flu->done) break; // TODO what?
       }
     }
   }
 }
 
-static int process_file(const char* file_name, const char* section_name, struct FunLocLookup* flu) {
+static int process_file(struct FunLocLookup* flu, const char* section_name, uint64_t* addr, size_t naddr) {
   asection* section;
   char** matching;
+  char* file_name = flu->loc->sopath;
+  if(!file_name) return -1;
+
   flu->bfd = bfd_openr(file_name, NULL);
   if (flu->bfd == NULL) {
     printf("Couldn't open file %s\n", file_name);
@@ -182,10 +222,10 @@ static int process_file(const char* file_name, const char* section_name, struct 
 
   if (!bfd_check_format_matches(flu->bfd, bfd_object, &matching)) {
     printf("File %s is not an object.\n", bfd_get_filename(flu->bfd));
-    if (bfd_get_error() == bfd_error_file_ambiguously_recognized) {
-      list_matching_formats(matching);
-      free(matching);
-    }
+    // if (bfd_get_error() == bfd_error_file_ambiguously_recognized) {
+    //   list_matching_formats(matching);
+    //   free(matching);
+    // }
     return -1;
   }
 
@@ -199,7 +239,7 @@ static int process_file(const char* file_name, const char* section_name, struct 
     section = NULL;
   }
   slurp_symtab(flu);
-  translate_addresses(flu->bfd, section);
+  translate_addresses(flu, section, addr, naddr);
   if (flu->symtab != NULL) {
     free(flu->symtab);
     flu->symtab = NULL;
@@ -595,7 +635,7 @@ void funloclookup_Set(struct FunLocLookup* flu, uint64_t ip, pid_t pid) {
   if (!map) { } // TODO now what?
   if (!map) printf("NOMAP\n");
   flu->loc->ip = ip - map->start + map->off;
-  flu->loc->file = map->path;
+  flu->loc->srcpath = map->path;
 
   funloclookup_Init(flu, map->path);
   bfd_map_over_sections(flu->bfd, funloc_bfdmapoversections_callback, flu);

@@ -4,7 +4,7 @@ TESTS := http perf pprof
 WARNS := -Wall -Wextra -Wpedantic -Werror #-Wfatal-errors
 ANALYZER := -fanalyzer
 CC := gcc-10
-LDLIBS := -lunwind -lprotobuf-c -lz -lpthread -lunwind -lunwind-x86_64 -lelf
+LDLIBS := -lunwind -lprotobuf-c -lz -lpthread -lunwind -lunwind-x86_64 -lelf -lbfd
 
 # NOTE
 # unwind-x86-64.a is a result of compiling libunwind, but it doesn't get installed
@@ -24,6 +24,9 @@ ddog: src/ddog.c src/profile.pb-c.c
 	$(CC) -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 
 http: src/eg_http.c
+	$(CC) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o eg/$@ $^ $(LDLIBS)
+
+unwind: src/eg_unwind.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o eg/$@ $^ $(LDLIBS)
 
 perf: src/eg_perf.c

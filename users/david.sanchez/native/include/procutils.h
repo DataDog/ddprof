@@ -64,6 +64,8 @@ typedef struct MapCache {
   size_t  sz;           // How many are populated
   MapMode whitelist;    // Disallow these types
 } MapCache;
+
+// Global map cache
 MapCache g_mapcache = {0};
 
 // TODO are these even necessary anymore?
@@ -71,15 +73,16 @@ char*  g_procfs_linebuffer    = NULL;
 size_t g_procfs_linebuffer_sz = 0;
 
 
-size_t mapcache_Find(pid_t);
-void   pidmap_Set(pid_t, PidMap*);
-void   pidmap_SetFiltered(pid_t, PidMap*, MapMode);
-size_t mapcache_Set(pid_t, pid_t);
-char   procfs_LineToMap(char*, Map*);
-char   procfs_LineToMapFiltered(char*, Map*, MapMode);
-int    procfs_MapOpen(pid_t target);
-void   procfs_MapPrint(pid_t);
-Map*   procfs_MapMatch(pid_t, uint64_t);
+size_t  mapcache_Find(pid_t);
+void    pidmap_Set(pid_t, PidMap*);
+void    pidmap_SetFiltered(pid_t, PidMap*, MapMode);
+size_t  mapcache_Set(pid_t, pid_t);
+PidMap* mapcache_Get(pid_t);
+char    procfs_LineToMap(char*, Map*);
+char    procfs_LineToMapFiltered(char*, Map*, MapMode);
+int     procfs_MapOpen(pid_t target);
+void    procfs_MapPrint(Map*);
+Map*    procfs_MapMatch(pid_t, uint64_t);
 
 
 size_t mapcache_Find(pid_t pid) {
@@ -106,7 +109,7 @@ void pidmap_SetFiltered(pid_t pid, PidMap* pm, MapMode whitelist) {
   pm->pid = pid;
 
   for(size_t i; i<PM_MAX && 0<getline(&g_procfs_linebuffer, &g_procfs_linebuffer_sz, procstream); i++) {
-    if(procfs_LineToMapFiltered(g_procfs_linebuffer, &pm->map[i], whitelist)) // Couldn't process this line for some reason.  Skip it
+    if(procfs_LineToMapFiltered(g_procfs_linebuffer, &pm->map[i], whitelist))
       i--;
   }
 }
@@ -118,6 +121,8 @@ void mapcache_MaskSet(MapMode whitelist) {
 size_t mapcache_Set(pid_t pid, pid_t ppid) {
   if(!g_mapcache.whitelist)
     mapcache_MaskSet(PUMM_EXEC);
+
+//    mapcache_MaskSet(~0);
 
   size_t id = mapcache_Find(pid);
   g_mapcache.pid[id]  = pid;
@@ -150,18 +155,21 @@ pid_t procfs_ppid(pid_t pid) {
 PidMap* mapcache_Get(pid_t _pid) {
   pid_t pid = _pid;
   size_t _id = mapcache_Find(pid), id=_id;
-  do {
-    if(g_mapcache.maps[id].pid) // ASSERT: pid populated IFF map is populated
-      break;
-
-    // Didn't find it.  Try the parent
-    if(!g_mapcache.pid[id]) {
-      id = mapcache_Set(_pid, procfs_ppid(_pid)); // Does another pointless Find operation
-      break;
-    }
-    pid = g_mapcache.pid[id];
-    id = mapcache_Find(pid);
-  } while(1);
+  if(!g_mapcache.maps[id].pid) {
+    id = mapcache_Set(pid, procfs_ppid(pid));
+  }
+//  do {
+//    if(g_mapcache.maps[id].pid) // ASSERT: pid populated IFF map is populated
+//      break;
+//
+//    // Didn't find it.  Try the parent
+//    if(!g_mapcache.pid[id]) {
+//      id = mapcache_Set(_pid, procfs_ppid(_pid)); // Does another pointless Find operation
+//      break;
+//    }
+//    pid = g_mapcache.pid[id];
+//    id = mapcache_Find(pid);
+//  } while(1);
 
   return &g_mapcache.maps[id];
 }
@@ -181,7 +189,7 @@ char procfs_LineToMapFiltered(char* line, Map* map, MapMode whitelist) {
   // ASSERT:  we have a complete line, which should be guaranteed by read() from
   // the procfs interface
   uint64_t addr_start, addr_end, offset;
-  MapMode mask;
+  MapMode mask = 0;
   char* filename = NULL;
   char *p=line, *q=line; // left and right cursors
   if(!line)
@@ -203,8 +211,9 @@ char procfs_LineToMapFiltered(char* line, Map* map, MapMode whitelist) {
   }
 
   // Check that the mask has some bits in common with the whitelist
-  if(!(mask&whitelist))
+  if(!(mask&whitelist)) {
     return -1;
+  }
   p=++q; // p,q now points to first character of offset
 
   // Address offset into underlying file
@@ -221,7 +230,9 @@ char procfs_LineToMapFiltered(char* line, Map* map, MapMode whitelist) {
   } else if(strsame_right(q, "[vdso")) {
     mask |= PUMM_VDSO;
   } else if(strsame_right(q, "[vvar")) {
+    mask |= PUMM_VDSO;
   } else if(strsame_right(q, "[vsyscall")) {
+    mask |= PUMM_VDSO;
   } else if(*q != '\n') {
     filename = strdup(q);
     *strrchr(filename, '\n') = 0; // knock out trailing newline
@@ -238,7 +249,6 @@ char procfs_LineToMapFiltered(char* line, Map* map, MapMode whitelist) {
   map->off    = offset;
   map->mode   = mask;
   map->path   = filename;
-printf("DBG: filename(%s)\n", filename);
   return 0;
 }
 
@@ -261,32 +271,62 @@ int procfs_MapOpen(pid_t target) {
   return g_procfs_map_fd;
 }
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 ssize_t procfs_MapRead(Map* map, void* buf, size_t off, size_t sz) {
-  int fd = open(map->path, O_RDONLY);
-  lseek(fd, off, SEEK_SET);
-  ssize_t ret = read(fd, buf, sz);
-  close(fd);
+  ssize_t ret = 0;
+  if(PUMM_VDSO & map->mode) {
+    printf("Being asked to open a special region: %s\n", map->path);
+  } else {
+    struct stat sa = {0};
+    int fd = open(map->path, O_RDONLY);
+    if(-1 == fd) {
+      return -1;
+    }
+    ret = pread(fd, buf, sz, off);
+    close(fd);
+  }
   return ret;
 }
 
-void procfs_MapPrint(pid_t target) {
+void procfs_MapPrint(Map* map) {
+  printf("<0x%lx, 0x%lx, 0x%lx> ", map->start, map->end, map->off);
+  printf((PUMM_READ  & map->mode) ? "r" : "-");
+  printf((PUMM_WRITE & map->mode) ? "w" : "-");
+  printf((PUMM_EXEC  & map->mode) ? "x" : "-");
+  printf((PUMM_COW   & map->mode) ? "p" : "s");
+  printf(" ");
+  if(map->path)
+    printf("%s", map->path);
+  printf("\n");
+}
+
+void procfs_PidMapPrintProc(pid_t target) {
+  if(!target)
+    target = getpid();
+  char path[4096] = {0};
+  char _buf[4096] = {0}; char* buf = _buf;
+  size_t sz_buf = 4096;
+  int n = 0;
+  snprintf(path, 4095, "/proc/%d/maps", target);
+  FILE* stream = fopen(path, "r");
+  while(0<getline(&buf, &sz_buf, stream)) {
+     printf("%s", buf);
+  }
+  fclose(stream);
+
+}
+
+void procfs_PidMapPrint(pid_t target) {
   if(!target)
     target = getpid();
 
   PidMap* pm = mapcache_Get(target);
   size_t i = 0;
   while(pm->map[i].end) {
-    Map* map = &pm->map[i];
-    printf("<0x%lx, 0x%lx, 0x%lx> ", map->start, map->end, map->off);
-    printf((PUMM_READ  & map->mode) ? "r" : "-");
-    printf((PUMM_WRITE & map->mode) ? "w" : "-");
-    printf((PUMM_EXEC  & map->mode) ? "x" : "-");
-    printf((PUMM_COW   & map->mode) ? "p" : "s");
-    printf(" ");
-    if(map->path)
-      printf("%s", map->path);
-    printf("\n");
-
+    procfs_MapPrint(&pm->map[i]);
     i++;
   }
 }
