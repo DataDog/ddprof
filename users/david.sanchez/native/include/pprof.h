@@ -57,7 +57,7 @@ uint64_t pprof_mapAdd(Perftools__Profiles__Profile*, uint64_t, uint64_t, char*);
 uint64_t pprof_funAdd(Perftools__Profiles__Profile*, uint64_t);
 uint64_t pprof_locAdd(Perftools__Profiles__Profile*, uint64_t, pid_t);
 uint64_t pprof_lineAdd(Perftools__Profiles__Profile*, Perftools__Profiles__Location*, uint64_t, int64_t);
-char     pprof_sampleAdd(Perftools__Profiles__Profile*, int64_t, uint64_t*, size_t, pid_t);
+char     pprof_sampleAdd(Perftools__Profiles__Profile*, int64_t*, size_t, uint64_t*, size_t);
 void     pprof_sampleMakeStack(Perftools__Profiles__Profile*, Perftools__Profiles__Sample*, uint64_t*, size_t, pid_t);
 
 // (con/de)structors
@@ -77,6 +77,24 @@ char     pprof_sampleNew(Perftools__Profiles__Profile*, int64_t, uint64_t*, size
 #else
 #  define UNUSED(x) do {} while(0)
 #endif
+
+// Common
+#define pprofgrow(x, N, M)                                             \
+  ({                                                                   \
+    int __rc = 0;                                                      \
+    if (!(N)%(M)) {                                                    \
+      DBG_PRINT("Resizing " #x);                                       \
+      __typeof__(x) _buf = calloc((N) + (M), sizeof(__typeof__(x)));   \
+      if (!_buf) __rc = -1;                                            \
+      if (x) {                                                         \
+        memcpy(_buf, (x), (N)*sizeof(__typeof__(x)));                  \
+        free(x);                                                       \
+      }                                                                \
+      (x) = _buf;                                                      \
+    }                                                                  \
+    __rc;                                                              \
+  })
+
 Perftools__Profiles__Profile g_dd_pprofs[1] = {0};
 
 size_t pprof_strIntern(Perftools__Profiles__Profile* pprof, char* str) {
@@ -85,16 +103,9 @@ size_t pprof_strIntern(Perftools__Profiles__Profile* pprof, char* str) {
 
 uint64_t pprof_mapNew(Perftools__Profiles__Profile* pprof, uint64_t addr_start, uint64_t addr_end, char* filename) {
   uint64_t id = pprof->n_mapping;
-  if(!id%VOCAB_SZ) {
-    DBG_PRINT("Resizing pprof mapping");
-    Perftools__Profiles__Mapping** buf = calloc(pprof->n_mapping + VOCAB_SZ, sizeof(Perftools__Profiles__Mapping*));
-    if(!buf) {} // TODO wat
-    if(pprof->mapping) {
-      memcpy(buf, pprof->mapping, pprof->n_mapping*sizeof(Perftools__Profiles__Mapping*));
-      free(pprof->mapping);
-    }
-    pprof->mapping = buf;
-  }
+
+  // Resize if needed
+  pprofgrow(pprof->mapping, VOCAB_SZ, pprof->n_mapping);
 
   // Initialize this mapping
   pprof->mapping[id] = calloc(1, sizeof(Perftools__Profiles__Mapping));
@@ -157,17 +168,11 @@ char isEqualLocation(uint64_t A, Perftools__Profiles__Location* B) {
 uint64_t pprof_lineNew(Perftools__Profiles__Profile* pprof, Perftools__Profiles__Location* loc, uint64_t id_fun, int64_t line) {
 UNUSED(pprof);
   uint64_t id = loc->n_line;
-  if(!id%VOCAB_SZ) {
-    DBG_PRINT("Resizing loc lines");
 
-    Perftools__Profiles__Line** buf = calloc(id + VOCAB_SZ, sizeof(Perftools__Profiles__Line*));
-    if(!buf) {} // TODO uh what
-    if(loc->line) {
-      memcpy(buf, loc->line, id*sizeof(Perftools__Profiles__Line*));
-      free(loc->line);
-    }
-    loc->line = buf;
-  }
+  // Initialize
+  pprofgrow(loc->line, loc->n_line, VOCAB_SZ);
+
+  // Take care of this element
   loc->line[id] = calloc(1, sizeof(Perftools__Profiles__Line));
   if(!loc->line[id]) {} // TODO error
   perftools__profiles__line__init(loc->line[id]);
@@ -199,14 +204,9 @@ uint64_t pprof_lineAdd(Perftools__Profiles__Profile* pprof, Perftools__Profiles_
 // TODO:   make this more explicit...
 uint64_t pprof_funNew(Perftools__Profiles__Profile* pprof, uint64_t id_name) {
   uint64_t id = pprof->n_function;
-  if(!id%VOCAB_SZ) {
-    DBG_PRINT("Resizing pprof function.");
-    Perftools__Profiles__Function** buf = calloc(pprof->n_function + VOCAB_SZ, sizeof(Perftools__Profiles__Function*));
-    if(!buf) {} // TODO wat
-    memcpy(buf, pprof->function, pprof->n_function*sizeof(Perftools__Profiles__Function*));
-    free(pprof->function);
-    pprof->function = buf;
-  }
+
+  // Initialize or grow if needed
+  pprofgrow(pprof->function, pprof->n_function, VOCAB_SZ);
 
   // Initialize this function
   pprof->function[id] = calloc(1, sizeof(Perftools__Profiles__Function));
@@ -241,14 +241,9 @@ uint64_t pprof_funAdd(Perftools__Profiles__Profile* pprof, uint64_t addr) {
 
 uint64_t pprof_locNew(Perftools__Profiles__Profile* pprof, uint64_t addr, pid_t pid) {
   uint64_t id = pprof->n_location;
-  if(!id%VOCAB_SZ) {
-    DBG_PRINT("Resizing pprof location");
-    Perftools__Profiles__Location** buf = calloc(pprof->n_location + VOCAB_SZ, sizeof(Perftools__Profiles__Location*));
-    if(!buf) {} // TODO wat
-    memcpy(buf, pprof->location, pprof->n_location*sizeof(Perftools__Profiles__Location*));
-    free(pprof->location);
-    pprof->location = buf;
-  }
+
+  // Initialize or grow if needed
+  pprofgrow(pprof->location, pprof->n_location, VOCAB_SZ);
 
   // Initialize this location
   pprof->location[id] = calloc(1, sizeof(Perftools__Profiles__Location));
@@ -282,51 +277,37 @@ uint64_t pprof_locAdd(Perftools__Profiles__Profile* pprof, uint64_t addr, pid_t 
 }
 
 
-char isEqualSample(uint64_t A, Perftools__Profiles__Sample* B) {
-  // TODO :)
-UNUSED(A);
-UNUSED(B);
+char isEqualSample(uint64_t* loc, size_t nloc, Perftools__Profiles__Sample* B) {
+  if (nloc != B->n_location_id) return 0;
+  for (int i=0; i<=nloc; i++) {
+    if (loc[i] != B->location_id[i]) return 0;
+  }
   return 1;
 }
 
-void pprof_sampleMakeStack(Perftools__Profiles__Profile* pprof, Perftools__Profiles__Sample* sample, uint64_t* addr, size_t sz_addr, pid_t pid) {
-  sample->location_id = calloc(sz_addr, sizeof(uint64_t));
-  if(!sample->location_id) {} // TODO error
-  sample->n_location_id = sz_addr;
-
-  for(size_t i=0; i < sz_addr; i++) {
-    sample->location_id[i] = pprof_locAdd(pprof, addr[sz_addr-i-1], pid);
-  }
-}
-
-char pprof_sampleAdd(Perftools__Profiles__Profile* pprof, int64_t val, uint64_t* addr, size_t sz_addr, pid_t pid) {
+char pprof_sampleAdd(Perftools__Profiles__Profile* pprof, int64_t* val, size_t nval, uint64_t* loc, size_t nloc) {
   uint64_t id = pprof->n_sample;
+
+  // Early sanity checks
+  if (nval != pprof->n_sample_type) return -1;  // pprof and user disagree
+  if (!val) return -1; // samples are null
+  if (!nloc || !loc) return -1; // no locations
+
   // Initialize the sample, possibly expanding if needed
-  if(!pprof->n_sample%VOCAB_SZ) {
-    DBG_PRINT("Resizing pprof sample");
-    Perftools__Profiles__Sample** buf = calloc(pprof->n_sample + VOCAB_SZ, sizeof(Perftools__Profiles__Sample*));
-    if(!buf) {} // TODO wat
-    if(pprof->sample) {
-      memcpy(buf, pprof->sample, pprof->n_sample*sizeof(Perftools__Profiles__Sample*));
-      free(pprof->sample);
-    }
-    pprof->sample = buf;
-  }
+  pprofgrow(pprof->sample, pprof->n_sample, VOCAB_SZ);
 
   // Initialize this sample
   pprof->sample[id] = calloc(1, sizeof(Perftools__Profiles__Sample));
   if(!pprof->sample[id]) {} // TODO error
   perftools__profiles__sample__init(pprof->sample[id]);
 
-  // Generate and stash the location IDs
-  pprof_sampleMakeStack(pprof, pprof->sample[id], addr, sz_addr, pid);
+  // Populate the sample value.  First, validate and allocate
+  pprof->sample[id]->n_value = nval;
+  pprof->sample[id]->value = calloc(nval, sizeof(int64_t));
+  if (!pprof->sample[id]->value) {} // TODO error
 
-  // Populate the sample value
-  pprof->sample[id]->n_value = pprof->n_sample_type;
-  pprof->sample[id]->value   = calloc(pprof->n_sample_type,sizeof(int64_t));
-  if(!pprof->sample[id]->value) {} // TODO error
-  pprof->sample[id]->value[0] = 1;
-  pprof->sample[id]->value[1] = val;
+  // Assign
+  memcpy(pprof->sample[id]->value, val, nval*sizeof(*val));
 
   // We're done!
   pprof->n_sample++;
