@@ -10,12 +10,28 @@
 
 int main() {
   Perftools__Profiles__Profile *pprof = &(Perftools__Profiles__Profile){0};
-  pprof_Init(pprof);
+  pprof_Init(pprof, (char**)&(char*[]){"samples", "cpu"}, (char**)&(char*[]){"count", "nanoseconds"}, 2);
+
+  // Add some fake Mappings
+  uint64_t id_map0 = pprof_mapAdd(pprof, 2000, 2900, 0, "hello.so", "aaaa");
+  uint64_t id_map1 = pprof_mapAdd(pprof, 1000, 1900, 1000, "yikes.so", "aaaa");
+
+printf("Map IDs: %lu, %lu\n", id_map0, id_map1);
+  // Add some fake functions
+  uint64_t id_fun0 = pprof_funAdd(pprof, "recursion_fun", "recursion_fun", "Hello.c", 0);
+  uint64_t id_fun1 = pprof_funAdd(pprof, "work_fun", "work_fun", "t3st.c", 0);
+printf("Fun IDs: %lu, %lu\n", id_fun0, id_fun1);
+
+  // Add some fake locations
+  uint64_t id_loc0 = pprof_locAdd(pprof, id_map0, 50, (uint64_t[]){id_fun0}, (int64_t[]){0}, 1);
+  uint64_t id_loc1 = pprof_locAdd(pprof, id_map1, 250, (uint64_t[]){id_fun1}, (int64_t[]){0}, 1);
+printf("Loc IDs: %lu, %lu\n", id_loc0, id_loc1);
 
   // Add some fake samples
-  pprof_sampleAdd(pprof, 100, (uint64_t[]){1000, 2000}, 2);
-  pprof_sampleAdd(pprof, 150, (uint64_t[]){1000, 2000}, 2);
-  pprof_sampleAdd(pprof, 125, (uint64_t[]){1000, 2000}, 2);
+  pprof_sampleAdd(pprof, (int64_t[]){1,300}, 2, (uint64_t[]){id_loc0}, 1);
+  pprof_sampleAdd(pprof, (int64_t[]){1,300}, 2, (uint64_t[]){id_loc0, id_loc1}, 2);
+  pprof_sampleAdd(pprof, (int64_t[]){1,200}, 2, (uint64_t[]){id_loc0, id_loc1}, 2);
+  pprof_sampleAdd(pprof, (int64_t[]){1,100}, 2, (uint64_t[]){id_loc0, id_loc1}, 2);
 
   // Serialize and ship
   size_t len = perftools__profiles__profile__get_packed_size(pprof);

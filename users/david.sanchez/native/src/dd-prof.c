@@ -13,8 +13,8 @@
 #include "http.h"
 #include "ddog.h"
 
-PProf  _pprof = {0};
-PProf* pprof = &_pprof;
+PPProfile  _pprof = {0};
+PPProfile* pprof = &_pprof;
 Dict my_dict = {0};
 
 DDRequest ddr = {
@@ -29,7 +29,7 @@ DDRequest ddr = {
 };
 
 struct DDProfContext {
-  PProf*       pprof;
+  PPProfile* pprof;
   struct UnwindState* us;
 };
 
