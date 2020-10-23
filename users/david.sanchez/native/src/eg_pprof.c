@@ -9,7 +9,7 @@
 #include "pprof.h"
 
 int main() {
-  Perftools__Profiles__Profile *pprof = &g_dd_pprofs[1];
+  Perftools__Profiles__Profile *pprof = &(Perftools__Profiles__Profile){0};
   pprof_Init(pprof);
 
   // Add some fake samples

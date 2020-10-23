@@ -53,23 +53,36 @@ size_t addToVocab(char* str, char*** _st, size_t* _sz_st) {
 /******************************************************************************\
 |*                              pprof interface                               *|
 \******************************************************************************/
-uint64_t pprof_mapAdd(Perftools__Profiles__Profile*, uint64_t, uint64_t, char*);
-uint64_t pprof_funAdd(Perftools__Profiles__Profile*, uint64_t);
-uint64_t pprof_locAdd(Perftools__Profiles__Profile*, uint64_t, pid_t);
-uint64_t pprof_lineAdd(Perftools__Profiles__Profile*, Perftools__Profiles__Location*, uint64_t, int64_t);
-char     pprof_sampleAdd(Perftools__Profiles__Profile*, int64_t*, size_t, uint64_t*, size_t);
-void     pprof_sampleMakeStack(Perftools__Profiles__Profile*, Perftools__Profiles__Sample*, uint64_t*, size_t, pid_t);
+// Convenient shortnames
+#define PPSHORT(x) typedef Perftools__Profiles__##x PP##x
+PPSHORT(Profile);
+PPSHORT(ValueType);
+PPSHORT(Sample);
+PPSHORT(Label);
+PPSHORT(Mapping);
+PPSHORT(Location);
+PPSHORT(Line);
+PPSHORT(Function);
+#undef PPSHORT
+
+// Prototypes
+uint64_t pprof_mapAdd(PPProfile*, uint64_t, uint64_t, char*);
+uint64_t pprof_funAdd(PPProfile*, uint64_t);
+uint64_t pprof_locAdd(PPProfile*, uint64_t, pid_t);
+uint64_t pprof_lineAdd(PPProfile*, PPLocation*, uint64_t, int64_t);
+char     pprof_sampleAdd(PPProfile*, int64_t*, size_t, uint64_t*, size_t);
+void     pprof_sampleMakeStack(PPProfile*, PPSample*, uint64_t*, size_t, pid_t);
 
 // (con/de)structors
-char     pprof_Init(Perftools__Profiles__Profile*);
-char     pprof_Free(Perftools__Profiles__Profile*);
+char     pprof_Init(PPProfile*);
+char     pprof_Free(PPProfile*);
 
 // These should be internal
-uint64_t pprof_mapNew(Perftools__Profiles__Profile*, uint64_t, uint64_t, char*);
-uint64_t pprof_funNew(Perftools__Profiles__Profile*, uint64_t);
-uint64_t pprof_locNew(Perftools__Profiles__Profile*, uint64_t, pid_t);
-uint64_t pprof_lineNew(Perftools__Profiles__Profile*, Perftools__Profiles__Location*, uint64_t, int64_t);
-char     pprof_sampleNew(Perftools__Profiles__Profile*, int64_t, uint64_t*, size_t, pid_t);
+uint64_t pprof_mapNew(PPProfile*, uint64_t, uint64_t, char*);
+uint64_t pprof_funNew(PPProfile*, uint64_t);
+uint64_t pprof_locNew(PPProfile*, uint64_t, pid_t);
+uint64_t pprof_lineNew(PPProfile*, PPLocation*, uint64_t, int64_t);
+char     pprof_sampleNew(PPProfile*, int64_t, uint64_t*, size_t, pid_t);
 
 #define CHUNK_PPROF_LIST 1024
 #ifdef KNOCKOUT_UNUSED
@@ -78,7 +91,6 @@ char     pprof_sampleNew(Perftools__Profiles__Profile*, int64_t, uint64_t*, size
 #  define UNUSED(x) do {} while(0)
 #endif
 
-// Common
 #define pprofgrow(x, N, M)                                             \
   ({                                                                   \
     int __rc = 0;                                                      \
@@ -95,20 +107,18 @@ char     pprof_sampleNew(Perftools__Profiles__Profile*, int64_t, uint64_t*, size
     __rc;                                                              \
   })
 
-Perftools__Profiles__Profile g_dd_pprofs[1] = {0};
-
-size_t pprof_strIntern(Perftools__Profiles__Profile* pprof, char* str) {
+size_t pprof_strIntern(PPProfile* pprof, char* str) {
   return addToVocab(str, &pprof->string_table, &pprof->n_string_table);
 }
 
-uint64_t pprof_mapNew(Perftools__Profiles__Profile* pprof, uint64_t addr_start, uint64_t addr_end, char* filename) {
+uint64_t pprof_mapNew(PPProfile* pprof, uint64_t addr_start, uint64_t addr_end, char* filename) {
   uint64_t id = pprof->n_mapping;
 
   // Resize if needed
   pprofgrow(pprof->mapping, VOCAB_SZ, pprof->n_mapping);
 
   // Initialize this mapping
-  pprof->mapping[id] = calloc(1, sizeof(Perftools__Profiles__Mapping));
+  pprof->mapping[id] = calloc(1, sizeof(PPMapping));
   if(!pprof->mapping[id]) {} // TODO error
   perftools__profiles__mapping__init(pprof->mapping[id]);
 
@@ -130,7 +140,7 @@ uint64_t pprof_mapNew(Perftools__Profiles__Profile* pprof, uint64_t addr_start, 
   return id;
 }
 
-char isEqualMapping(Perftools__Profiles__Profile* pprof, uint64_t addr_start, uint64_t addr_end, char* path, Perftools__Profiles__Mapping* B) {
+char isEqualMapping(PPProfile* pprof, uint64_t addr_start, uint64_t addr_end, char* path, PPMapping* B) {
   // TODO make this more correct
   //  * safer check (especially the string part)
   //  * intern metadata about the file at time of access
@@ -145,14 +155,14 @@ char isEqualMapping(Perftools__Profiles__Profile* pprof, uint64_t addr_start, ui
 
 // Returns the ID of the mapping
 // NOTE that this is different from the index of the mapping in the pprof
-uint64_t pprof_mapAdd(Perftools__Profiles__Profile* pprof, uint64_t addr_start, uint64_t addr_end, char* filename) {
+uint64_t pprof_mapAdd(PPProfile* pprof, uint64_t addr_start, uint64_t addr_end, char* filename) {
   for(size_t i=0; i < pprof->n_mapping; i++)
     if(isEqualMapping(pprof, addr_start, addr_end, filename, pprof->mapping[i]))
       return i+1;
   return pprof_mapNew(pprof, addr_start, addr_end, filename)+1;
 }
 
-uint64_t pprof_mapAddFromAddr(Perftools__Profiles__Profile* pprof, uint64_t addr, pid_t pid) {
+uint64_t pprof_mapAddFromAddr(PPProfile* pprof, uint64_t addr, pid_t pid) {
   Map* map = procfs_MapMatch(pid, addr);
   if(!map || !map->path) {
     // Couldn't identify the map, so we have an error
@@ -161,11 +171,11 @@ uint64_t pprof_mapAddFromAddr(Perftools__Profiles__Profile* pprof, uint64_t addr
   return pprof_mapAdd(pprof, map->start, map->end, map->path);
 }
 
-char isEqualLocation(uint64_t A, Perftools__Profiles__Location* B) {
+char isEqualLocation(uint64_t A, PPLocation* B) {
   return A == B->address; // TODO laughably childish
 }
 
-uint64_t pprof_lineNew(Perftools__Profiles__Profile* pprof, Perftools__Profiles__Location* loc, uint64_t id_fun, int64_t line) {
+uint64_t pprof_lineNew(PPProfile* pprof, PPLocation* loc, uint64_t id_fun, int64_t line) {
 UNUSED(pprof);
   uint64_t id = loc->n_line;
 
@@ -173,7 +183,7 @@ UNUSED(pprof);
   pprofgrow(loc->line, loc->n_line, VOCAB_SZ);
 
   // Take care of this element
-  loc->line[id] = calloc(1, sizeof(Perftools__Profiles__Line));
+  loc->line[id] = calloc(1, sizeof(PPLine));
   if(!loc->line[id]) {} // TODO error
   perftools__profiles__line__init(loc->line[id]);
 
@@ -188,7 +198,7 @@ UNUSED(pprof);
 
 // Returns the ID of the line
 // NOTE that this is different from the index of the line in the location
-uint64_t pprof_lineAdd(Perftools__Profiles__Profile* pprof, Perftools__Profiles__Location* loc, uint64_t addr, int64_t line) {
+uint64_t pprof_lineAdd(PPProfile* pprof, PPLocation* loc, uint64_t addr, int64_t line) {
   // Figure out the calling function
   uint64_t id_fun = pprof_funAdd(pprof, addr);
 
@@ -202,14 +212,14 @@ uint64_t pprof_lineAdd(Perftools__Profiles__Profile* pprof, Perftools__Profiles_
 
 // ASSERT: funNew is never accessed directly, only by funAdd
 // TODO:   make this more explicit...
-uint64_t pprof_funNew(Perftools__Profiles__Profile* pprof, uint64_t id_name) {
+uint64_t pprof_funNew(PPProfile* pprof, uint64_t id_name) {
   uint64_t id = pprof->n_function;
 
   // Initialize or grow if needed
   pprofgrow(pprof->function, pprof->n_function, VOCAB_SZ);
 
   // Initialize this function
-  pprof->function[id] = calloc(1, sizeof(Perftools__Profiles__Function));
+  pprof->function[id] = calloc(1, sizeof(PPFunction));
   if(!pprof->function[id]) {} // TODO error
   perftools__profiles__function__init(pprof->function[id]);
 
@@ -225,11 +235,11 @@ uint64_t pprof_funNew(Perftools__Profiles__Profile* pprof, uint64_t id_name) {
   return id;
 }
 
-char isEqualFunction(int64_t A, Perftools__Profiles__Function* B) {
+char isEqualFunction(int64_t A, PPFunction* B) {
   return A == B->name;
 }
 
-uint64_t pprof_funAdd(Perftools__Profiles__Profile* pprof, uint64_t addr) {
+uint64_t pprof_funAdd(PPProfile* pprof, uint64_t addr) {
   char funname[64] = {0};
   snprintf(funname, 59, "<0x%lx>", addr);
   uint64_t id_name = pprof_strIntern(pprof, funname);
@@ -239,14 +249,14 @@ uint64_t pprof_funAdd(Perftools__Profiles__Profile* pprof, uint64_t addr) {
   return pprof_funNew(pprof, id_name)+1;
 }
 
-uint64_t pprof_locNew(Perftools__Profiles__Profile* pprof, uint64_t addr, pid_t pid) {
+uint64_t pprof_locNew(PPProfile* pprof, uint64_t addr, pid_t pid) {
   uint64_t id = pprof->n_location;
 
   // Initialize or grow if needed
   pprofgrow(pprof->location, pprof->n_location, VOCAB_SZ);
 
   // Initialize this location
-  pprof->location[id] = calloc(1, sizeof(Perftools__Profiles__Location));
+  pprof->location[id] = calloc(1, sizeof(PPLocation));
   if(!pprof->location[id]) {} // TODO error
   perftools__profiles__location__init(pprof->location[id]);
 
@@ -267,7 +277,7 @@ uint64_t pprof_locNew(Perftools__Profiles__Profile* pprof, uint64_t addr, pid_t 
   return id;
 }
 
-uint64_t pprof_locAdd(Perftools__Profiles__Profile* pprof, uint64_t addr, pid_t pid) {
+uint64_t pprof_locAdd(PPProfile* pprof, uint64_t addr, pid_t pid) {
   // TODO stop ignoring line
   for(size_t i=0; i < pprof->n_location; i++) {
     if(isEqualLocation(addr, pprof->location[i]))
@@ -277,7 +287,7 @@ uint64_t pprof_locAdd(Perftools__Profiles__Profile* pprof, uint64_t addr, pid_t 
 }
 
 
-char isEqualSample(uint64_t* loc, size_t nloc, Perftools__Profiles__Sample* B) {
+char isEqualSample(uint64_t* loc, size_t nloc, PPSample* B) {
   if (nloc != B->n_location_id) return 0;
   for (int i=0; i<=nloc; i++) {
     if (loc[i] != B->location_id[i]) return 0;
@@ -285,7 +295,7 @@ char isEqualSample(uint64_t* loc, size_t nloc, Perftools__Profiles__Sample* B) {
   return 1;
 }
 
-char pprof_sampleAdd(Perftools__Profiles__Profile* pprof, int64_t* val, size_t nval, uint64_t* loc, size_t nloc) {
+char pprof_sampleAdd(PPProfile* pprof, int64_t* val, size_t nval, uint64_t* loc, size_t nloc) {
   uint64_t id = pprof->n_sample;
 
   // Early sanity checks
@@ -297,7 +307,7 @@ char pprof_sampleAdd(Perftools__Profiles__Profile* pprof, int64_t* val, size_t n
   pprofgrow(pprof->sample, pprof->n_sample, VOCAB_SZ);
 
   // Initialize this sample
-  pprof->sample[id] = calloc(1, sizeof(Perftools__Profiles__Sample));
+  pprof->sample[id] = calloc(1, sizeof(PPSample));
   if(!pprof->sample[id]) {} // TODO error
   perftools__profiles__sample__init(pprof->sample[id]);
 
@@ -314,7 +324,7 @@ char pprof_sampleAdd(Perftools__Profiles__Profile* pprof, int64_t* val, size_t n
   return 0;
 }
 
-char pprof_sampleFree(Perftools__Profiles__Sample** sample, size_t sz) {
+char pprof_sampleFree(PPSample** sample, size_t sz) {
   if(!sample) // TODO is this an error?
     return 0;
 
@@ -340,38 +350,38 @@ char pprof_sampleFree(Perftools__Profiles__Sample** sample, size_t sz) {
   return 0;
 }
 
-void pprof_timeUpdate(Perftools__Profiles__Profile* pprof) {
+void pprof_timeUpdate(PPProfile* pprof) {
   if(!pprof) return;
   struct timeval tv = {0};
   gettimeofday(&tv, NULL);
   pprof->time_nanos = (tv.tv_sec*1000*1000 + tv.tv_usec)*1000;
 }
 
-void pprof_durationUpdate(Perftools__Profiles__Profile* pprof) {
+void pprof_durationUpdate(PPProfile* pprof) {
   if(!pprof) return;
   struct timeval tv = {0};
   gettimeofday(&tv, NULL);
   pprof->duration_nanos = (tv.tv_sec*1000*1000 + tv.tv_usec)*1000 - pprof->time_nanos;
 }
 
-char pprof_Init(Perftools__Profiles__Profile* pprof) {
+char pprof_Init(PPProfile* pprof) {
   // Initialize the top-level container and the type holders
   perftools__profiles__profile__init(pprof);
   pprof_strIntern(pprof,""); // Initialize
 
   // Initialize sample_type
-  pprof->sample_type = calloc(2,sizeof(Perftools__Profiles__ValueType*));
+  pprof->sample_type = calloc(2,sizeof(PPValueType*));
   if(!pprof->sample_type) {} // TODO error
 
   //   Initialize the time tracker
-  pprof->sample_type[0] = calloc(1,sizeof(Perftools__Profiles__ValueType));
+  pprof->sample_type[0] = calloc(1,sizeof(PPValueType));
   if(!pprof->sample_type[0]) {} // TODO error
   perftools__profiles__value_type__init(pprof->sample_type[0]);
   pprof->sample_type[0]->type = pprof_strIntern(pprof, "samples");
   pprof->sample_type[0]->unit = pprof_strIntern(pprof, "count");
 
   //   Initialize the count tracker
-  pprof->sample_type[1] = calloc(1,sizeof(Perftools__Profiles__ValueType));
+  pprof->sample_type[1] = calloc(1,sizeof(PPValueType));
   if(!pprof->sample_type[1]) {} // TODO error
   perftools__profiles__value_type__init(pprof->sample_type[1]);
   pprof->sample_type[1]->type = pprof_strIntern(pprof, "cpu");
@@ -381,7 +391,7 @@ char pprof_Init(Perftools__Profiles__Profile* pprof) {
   pprof->n_sample = 0;
 
   // Initialize period_type
-  pprof->period_type = calloc(1,sizeof(Perftools__Profiles__ValueType));
+  pprof->period_type = calloc(1,sizeof(PPValueType));
   if(!pprof->period_type) {} // TODO error
   perftools__profiles__value_type__init(pprof->period_type);
   pprof->period_type->type = pprof_strIntern(pprof, "cpu");
@@ -390,7 +400,7 @@ char pprof_Init(Perftools__Profiles__Profile* pprof) {
   return 0;
 }
 
-char pprof_mapFree(Perftools__Profiles__Mapping** map, size_t sz) {
+char pprof_mapFree(PPMapping** map, size_t sz) {
   if(!map)    // TODO err?
     return 0;
 
@@ -407,7 +417,7 @@ char pprof_mapFree(Perftools__Profiles__Mapping** map, size_t sz) {
   return 0;
 }
 
-char pprof_lineFree(Perftools__Profiles__Line** line, size_t sz) {
+char pprof_lineFree(PPLine** line, size_t sz) {
   if(!line)
     return 0;
 
@@ -423,7 +433,7 @@ char pprof_lineFree(Perftools__Profiles__Line** line, size_t sz) {
   return 0;
 }
 
-char pprof_locFree(Perftools__Profiles__Location** loc, size_t sz) {
+char pprof_locFree(PPLocation** loc, size_t sz) {
   if(!loc)
     return 0;
 
@@ -441,7 +451,7 @@ char pprof_locFree(Perftools__Profiles__Location** loc, size_t sz) {
   return 0;
 }
 
-char pprof_funFree(Perftools__Profiles__Function** fun, size_t sz) {
+char pprof_funFree(PPFunction** fun, size_t sz) {
   if(!fun)
     return 0;
 
@@ -457,7 +467,7 @@ char pprof_funFree(Perftools__Profiles__Function** fun, size_t sz) {
   return 0;
 }
 
-char pprof_sampleClear(Perftools__Profiles__Profile* pprof) {
+char pprof_sampleClear(PPProfile* pprof) {
   if(!pprof)
     return 0;
 
@@ -469,7 +479,7 @@ char pprof_sampleClear(Perftools__Profiles__Profile* pprof) {
   return 0;
 }
 
-char pprof_Free(Perftools__Profiles__Profile* pprof) {
+char pprof_Free(PPProfile* pprof) {
   if(!pprof)   // Is this an error?
     return 0;
 
@@ -536,7 +546,7 @@ void GZip(char* file, const char* data, const size_t sz_data) {
   struct stat st = {0}; stat(file, &st);
 }
 
-size_t pprof_zip(Perftools__Profiles__Profile* pprof, unsigned char* ret, const size_t sz_packed) {
+size_t pprof_zip(PPProfile* pprof, unsigned char* ret, const size_t sz_packed) {
   // Assumes the ret buffer has already been sized to at least sz_packed
   // Serialized pprof
   void* packed = malloc(sz_packed); // TODO check for err?

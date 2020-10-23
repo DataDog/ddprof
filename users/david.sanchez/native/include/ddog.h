@@ -25,8 +25,6 @@ void ddr_addtag(DDRequest* ddr, char* tag, char* val) {
   DictSet(ddr->D, tag, val, 1+strlen(val));
 }
 
-typedef Perftools__Profiles__Profile PProf;
-
 char apikey_isvalid(char* key) {
   size_t n = 0;
   if(!key)                      return 0;
@@ -70,7 +68,7 @@ void DDRequestInit(DDRequest* ddr) {
 #  include <fcntl.h>
 #endif
 
-void DDRequestSend(DDRequest* ddr, PProf* pprof) {
+void DDRequestSend(DDRequest* ddr, PPProfile* pprof) {
   printf("SENDIT\n");
   // Update pprof duration
   pprof_durationUpdate(pprof);
