@@ -262,6 +262,7 @@ static int process_file(char* file, const char* section_name, uint64_t addr, str
 
 static int process_ip(pid_t pid, uint64_t addr, struct FunLoc* loc) {
   Map* map = procfs_MapMatch(pid, addr);
+  if (!map) return -1;
   return process_file(map->path, NULL, addr - map->start + map->off, loc);
 }
 
@@ -683,7 +684,7 @@ int unwindstate_unwind(struct UnwindState* us, uint64_t* ips, size_t max_stack) 
   memset(locs, 0, i * sizeof(struct FunLoc));
   for (int j = 0; j<i; j++) {
     process_ip(us->pid, ips[j], &locs[j]);
-    printf("[0x%lx]%s (%s)\n", locs[j].ip, locs[j].funname, locs[j].sopath);
+    printf("[0x%lx] %s (%s)\n", locs[j].ip, locs[j].funname, locs[j].sopath);
   }
   return i;
 }
