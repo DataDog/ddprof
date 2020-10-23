@@ -1,4 +1,4 @@
-INCLUDE = -Iinclude
+INCLUDE = -Iinclude -I/home/sanchda/dev/binutils-gdb/include -I/home/sanchda/dev/binutils-gdb/bfd -I/home/sanchda/dev/binutils-gdb/binutils
 CFLAGS = -ggdb3 -std=c11 -O0 -D_GNU_SOURCE
 TESTS := http perf pprof
 WARNS := -Wall -Wextra -Wpedantic -Werror #-Wfatal-errors

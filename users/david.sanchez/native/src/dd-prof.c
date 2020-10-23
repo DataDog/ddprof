@@ -36,7 +36,6 @@ struct DDProfContext {
 const int max_stack = 1024;
 void rambutan_callback(struct perf_event_header* hdr, void* arg) {
   struct DDProfContext* rc = arg;
-  printf(".");
   unw_word_t ips[max_stack]; // TODO what is the max?
   struct perf_event_sample* pes;
   struct timeval tv = {0};
@@ -134,6 +133,7 @@ int main(int argc, char** argv) {
       .pprof = pprof,
       .us    = &(struct UnwindState){0}};
     unwindstate_Init(rs.us);
+    elf_version(EV_CURRENT);
     main_loop(&pe, rambutan_callback, &rs);
   }
 

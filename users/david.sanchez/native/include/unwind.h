@@ -69,19 +69,46 @@ struct UnwindState {
 /******************************************************************************\
 |*                               Symbol Lookup                                *|
 \******************************************************************************/
+//#include "sysdep.h"
+//#include "bfd.h"
+//#include "libiberty.h"
+//#include "demangle.h"
+//#include "bucomm.h"
+typedef void bfd_cleanup;
+#include "elf-bfd.h" // add binutils-gdb to include path
+enum DMGL {
+  DMGL_NO_OPTS = 0,            // For readability...
+  DMGL_PARAMS = (1 << 0),      // Include function args
+  DMGL_ANSI = (1 << 1),        // Include const, volatile, etc
+  DMGL_JAVA = (1 << 2),        // Demangle as Java rather than C++.
+  DMGL_VERBOSE = (1 << 3),     // Include implementation details.
+  DMGL_TYPES = (1 << 4),       // Also try to demangle type encodings.
+  DMGL_RET_POSTFIX = (1 << 5), // Print function return types
+  DMGL_RET_DROP = (1 << 6),    // Suppress function return types
+  DMGL_AUTO  = (1 << 8),
+  DMGL_GNU_V3 = (1 << 14),
+  DMGL_GNAT = (1 << 15),       // Ada?
+  DMGL_DLANG = (1 << 16),      // DLANG?
+  DMGL_RUST = (1 << 17),       // Rust wraps GNU_V3 style mangling.
+  DMGL_STYLE_MASK = (DMGL_AUTO|DMGL_GNU_V3|DMGL_JAVA|DMGL_GNAT|DMGL_DLANG|DMGL_RUST)
+};
+
 static void slurp_symtab(struct FunLocLookup* flu) {
   bfd* abfd = flu->bfd;
   long storage;
   long symcount;
   bfd_boolean dynamic = 0;
-  if (!(bfd_get_file_flags(abfd) & HAS_SYMS)) return;
+  if (!(bfd_get_file_flags(abfd) & HAS_SYMS)) {
+    printf("symtab has no syms\n");
+    return;
+  }
   storage = bfd_get_symtab_upper_bound(abfd);
   if (!storage) {
     storage = bfd_get_dynamic_symtab_upper_bound(abfd);
     dynamic = 1;
   }
-  if (storage < 0) {
-    printf("Storage is 0\n");
+  if (storage <= 0) {
+    printf("Storage0 is 0\n");
     return;
   }
   flu->symtab = calloc(1, storage);
@@ -89,14 +116,20 @@ static void slurp_symtab(struct FunLocLookup* flu) {
     symcount = bfd_canonicalize_dynamic_symtab(abfd, flu->symtab);
   else
     symcount = bfd_canonicalize_symtab(abfd, flu->symtab);
-  if (symcount < 0) {
-    printf("Storage is 0\n");
-    return;
+  if (symcount == 0 && !dynamic && (storage = bfd_get_dynamic_symtab_upper_bound(abfd)) > 0) {
+    free(flu->symtab);
+    flu->symtab = calloc(1, storage);
+    symcount = bfd_canonicalize_dynamic_symtab(abfd, flu->symtab);
+  }
+
+  if (symcount <= 0) {
+    printf("Storage1 is 0\n");
+    free(flu->symtab);
+    flu->symtab = NULL;
   }
 }
 static void find_address_in_section(bfd* abfd, asection* section, void* arg) {
   bfd_vma vma;
-  bfd_size_type size;
   struct FunLocLookup *flu = arg;
   const char** filename = (const char**)&flu->loc->srcpath;
   const char** functionname = (const char**)&flu->loc->funname;
@@ -111,8 +144,7 @@ static void find_address_in_section(bfd* abfd, asection* section, void* arg) {
   vma = bfd_section_vma(section);
   if (pc < vma) return;
 
-  size = bfd_section_size(section);
-  if (pc >= vma + size) return;
+  if (pc >= vma + bfd_section_size(section)) return;
 
   flu->done = bfd_find_nearest_line_discriminator(abfd, section, flu->symtab, pc - vma,
                                                   filename, functionname,
@@ -137,79 +169,55 @@ static void find_offset_in_section(bfd* abfd, asection* section, struct FunLocLo
                                                   line, discriminator);
 }
 
-static void translate_addresses(struct FunLocLookup* flu, asection* section, uint64_t* addr, size_t naddr) {
+static void translate_addresses(struct FunLocLookup* flu, asection* section, uint64_t addr) {
   bfd* abfd = flu->bfd;
-  for (;;) {
-    printf(".");
-    if (naddr <= 0) break;
-    --naddr;
-    flu->pc = *addr++;
-    if (bfd_get_flavour(abfd) == bfd_target_elf_flavour) {
-      printf("You do have to worry about the ELF flavor stuff!\n");
-     //  const struct elf_backend_data* bed = get_elf_backend_data(abfd);
-     //  bfd_vma sign = (bfd_vma)1 << (bed->s->arch_size - 1);
-     //  pc &= (sign << 1) - 1;
-     //  if (bed->sign_extend_vma) pc = (pc ^ sign) - sign;
+  const char** filename = (const char**)&flu->loc->srcpath;
+  const char** functionname = (const char**)&flu->loc->funname;
+  unsigned int*  line = &flu->loc->line;
+  unsigned int*  discriminator = &flu->loc->disc;
+  flu->pc = addr;
+  if (bfd_get_flavour(abfd) == bfd_target_elf_flavour) {
+    // As per binutils elf-bfd.h
+    const struct elf_backend_data* bed = (const struct elf_backend_data*)abfd->xvec;
+     bfd_vma sign = (bfd_vma)1 << (bed->s->arch_size - 1);
+     flu->pc &= (sign << 1) - 1;
+     if (bed->sign_extend_vma) flu->pc = (flu->pc ^ sign) - sign;
+  }
+  flu->done = FALSE;
+  if (section)
+    find_offset_in_section(abfd, section, flu);
+  else
+    bfd_map_over_sections(abfd, find_address_in_section, flu);
+  if (!flu->done) {
+    flu->loc->funname = strdup("??");
+    return;
+  } else {
+    if (!flu->loc->funname) {
+      flu->loc->funname = strdup("??");
+    } else if (!*flu->loc->funname) {
+      free(flu->loc->funname); // Is this OK?
+      flu->loc->funname = strdup("??");
     }
-    flu->done = FALSE;
-    if (section)
-      find_offset_in_section(abfd, section, flu);
-    else
-      bfd_map_over_sections(abfd, find_address_in_section, flu);
-    if (!flu->done) {
-      if (1) printf("??\n");
-      printf("??:0\n");
-    } else {
-      while (1) {
-        if (1) { // with functions
-          if (!flu->loc->funname) {
-            printf("Function name came back NULL.\n");
-            flu->loc->funname = strdup("??");
-          } else if (!*flu->loc->funname) {
-            printf("Function name came back EMPTY.\n");
-            free(flu->loc->funname); // Is this OK?
-            flu->loc->funname = strdup("??");
-          }
-          // else if (do_demangle) {
-          //   alloc = bfd_demangle(abfd, name, DMGL_ANSI | DMGL_PARAMS);
-          //   if (alloc != NULL) name = alloc;
-          // }
-          printf("%s\n", flu->loc->funname);
-          //if (alloc != NULL) free(alloc);
-        }
-        //if (base_names && filename != NULL) {
-        //  char* h;
-        //  h = strrchr(filename, '/');
-        //  if (h != NULL) filename = h + 1;
-        //}
-        printf("%s:", flu->loc->srcpath ? flu->loc->srcpath : "??");
-        if (flu->loc->line != 0) {
-          //if (discriminator != 0)
-          //  printf("%u (discriminator %u)\n", line, discriminator);
-          //else
-          //  printf("%u\n", line);
-           printf("%u\n", flu->loc->line);
-        } else
-          printf("?\n");
-        //if (!unwind_inlines)
-        //  found = FALSE;
-        //else
-        //  found = bfd_find_inliner_info(abfd, &filename, &functionname, &line);
-        if (flu->done) break; // TODO what?
-      }
+    char* buf = bfd_demangle(abfd, flu->loc->funname, DMGL_ANSI | DMGL_PARAMS);
+    if(buf) {
+      free(flu->loc->funname);
+      flu->loc->funname = buf;
     }
+
+    flu->done = bfd_find_inliner_info(abfd, filename, functionname, line);
   }
 }
 
-static int process_file(struct FunLocLookup* flu, const char* section_name, uint64_t* addr, size_t naddr) {
+static int process_file(char* file, const char* section_name, uint64_t addr, struct FunLoc* loc) {
+  struct FunLocLookup* flu = &(struct FunLocLookup){0};
+  flu->loc = loc;
   asection* section;
   char** matching;
-  char* file_name = flu->loc->sopath;
-  if(!file_name) return -1;
+  if(!file || !*file) return -1;
 
-  flu->bfd = bfd_openr(file_name, NULL);
+  flu->bfd = bfd_openr(file, NULL);
   if (flu->bfd == NULL) {
-    printf("Couldn't open file %s\n", file_name);
+    printf("Couldn't open file %s\n", file);
     return -1;
   }
 
@@ -239,13 +247,22 @@ static int process_file(struct FunLocLookup* flu, const char* section_name, uint
     section = NULL;
   }
   slurp_symtab(flu);
-  translate_addresses(flu, section, addr, naddr);
+  translate_addresses(flu, section, addr);
   if (flu->symtab != NULL) {
     free(flu->symtab);
     flu->symtab = NULL;
   }
   bfd_close(flu->bfd);
+
+  // If we're here, we succeeded.  Finish populating loc
+  loc->ip = addr;
+  loc->sopath = file;
   return 0;
+}
+
+static int process_ip(pid_t pid, uint64_t addr, struct FunLoc* loc) {
+  Map* map = procfs_MapMatch(pid, addr);
+  return process_file(map->path, NULL, addr - map->start + map->off, loc);
 }
 
 /******************************************************************************\
@@ -641,34 +658,32 @@ void funloclookup_Set(struct FunLocLookup* flu, uint64_t ip, pid_t pid) {
   bfd_map_over_sections(flu->bfd, funloc_bfdmapoversections_callback, flu);
 }
 
+const char initialized = 0;
+
 int unwindstate_unwind(struct UnwindState* us, uint64_t* ips, size_t max_stack) {
   int ret = 0, i = 0;
   unw_cursor_t uc;
 
+  if(!initialized) {
+    bfd_init();
+    bfd_set_default_target("x86_64-pc-linux-gnu");
+  }
+
   // Get the instruction pointers.  The first one is in EIP, unw for rest
-  printf("IP Addresses:\n");
-  printf(" 0x%lx\n", us->eip);
   ips[i++] = us->eip;
 
   unw_init_remote(&uc, us->uas, us);
   while (unw_step(&uc) > 0) {
     unw_word_t l_reg;
     unw_get_reg(&uc, UNW_REG_IP, &ips[i++]);
-    printf("  0x%lx\n", ips[i - 1]);
   }
 
   // Now get the information
   struct FunLoc locs[i];
   memset(locs, 0, i * sizeof(struct FunLoc));
   for (int j = 0; j<i; j++) {
-    //    struct FunLocLookup flu = {
-    //      .loc = &locs[j],
-    //      .symtab = &(struct bfd_symbol){0},
-    //      .bfd    = &(bfd){0}
-    //    };
-    //    funloclookup_Set(&flu, ips[j], us->pid);
-    //
-    //    printf("Function name: %s\n", locs[i].name);
+    process_ip(us->pid, ips[j], &locs[j]);
+    printf("[0x%lx]%s (%s)\n", locs[j].ip, locs[j].funname, locs[j].sopath);
   }
   return i;
 }
