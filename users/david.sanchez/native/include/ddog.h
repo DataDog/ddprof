@@ -86,6 +86,7 @@ void DDRequestSend(DDRequest* ddr, PPProfile* pprof) {
   DictSet(ddr->D, "pprof[0]", buf, sz_zipped); // TODO DO NOT COPY THIS.
 
 #ifdef DD_DBG_PROFGEN
+  printf("Printing a pprof!\n");
   mkdir("./pprofs", 0777);
   unlink("./pprofs/native.pb.gz");
   int fd = open("./pprofs/native.pb.gz", O_RDWR | O_CREAT, 0677);

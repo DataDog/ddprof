@@ -13,8 +13,7 @@
 #include "http.h"
 #include "ddog.h"
 
-PPProfile  _pprof = {0};
-PPProfile* pprof = &_pprof;
+PPProfile* pprof = &(PPProfile){0};
 Dict my_dict = {0};
 
 DDRequest ddr = {
@@ -44,13 +43,23 @@ void rambutan_callback(struct perf_event_header* hdr, void* arg) {
   switch(hdr->type) {
     case PERF_RECORD_SAMPLE:
       pes = (struct perf_event_sample*)hdr;
-//      pprof_sampleAdd(pprof, 10000, pes->ips, pes->nr, pes->pid);
-//      pprof_sampleAdd(pprof, pes->period, pes->data, pes->dyn_size, pes->pid);
       rc->us->pid = pes->pid;
       rc->us->stack = pes->data;
       rc->us->stack_sz = pes->dyn_size;
       memcpy(&rc->us->regs[0], pes->regs, 3*sizeof(uint64_t));
-      unwindstate_unwind(rc->us, ips, max_stack);
+      struct FunLoc* locs = calloc(max_stack, sizeof(struct FunLoc));
+      memset(locs, 0, max_stack*sizeof(*locs));
+      int n = unwindstate_unwind(rc->us, ips, max_stack, locs);
+      uint64_t* id_locs = calloc(n, sizeof(uint64_t));
+      memset(id_locs, 0, n*sizeof(uint64_t));
+      for(int i=0; i<n; i++) {
+        uint64_t id_map = pprof_mapAdd(pprof, 0, 0, 0, locs[i].sopath, "");
+        uint64_t id_fun = pprof_funAdd(pprof, locs[i].funname, locs[i].funname, locs[i].srcpath, locs[i].line);
+        uint64_t id_loc = pprof_locAdd(pprof, id_map, locs[i].ip, (uint64_t[]){id_fun}, (int64_t[]){0}, 1);
+        id_locs[i] = id_loc;
+      }
+      pprof_sampleAdd(pprof, (int64_t[]){1, pes->period}, 2, id_locs, n);
+      free(id_locs);
       break;
 
     default:
@@ -75,7 +84,7 @@ int main(int argc, char** argv) {
   }
 
   // Initialize the pprof
-  pprof_Init(pprof);
+  pprof_Init(pprof, (char**)&(char*[]){"samples", "cpu"}, (char**)&(char*[]){"count", "nanoseconds"}, 2);
   pprof_timeUpdate(pprof); // Set the time
 
   // Finish initializing the DDR

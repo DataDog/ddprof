@@ -661,7 +661,7 @@ void funloclookup_Set(struct FunLocLookup* flu, uint64_t ip, pid_t pid) {
 
 const char initialized = 0;
 
-int unwindstate_unwind(struct UnwindState* us, uint64_t* ips, size_t max_stack) {
+int unwindstate_unwind(struct UnwindState* us, uint64_t* ips, size_t max_stack, struct FunLoc* locs) {
   int ret = 0, i = 0;
   unw_cursor_t uc;
 
@@ -680,11 +680,10 @@ int unwindstate_unwind(struct UnwindState* us, uint64_t* ips, size_t max_stack) 
   }
 
   // Now get the information
-  struct FunLoc locs[i];
   memset(locs, 0, i * sizeof(struct FunLoc));
   for (int j = 0; j<i; j++) {
     process_ip(us->pid, ips[j], &locs[j]);
-    printf("[0x%lx] %s (%s)\n", locs[j].ip, locs[j].funname, locs[j].sopath);
+//    printf("[0x%lx] %s (%s)\n", locs[j].ip, locs[j].funname, locs[j].sopath);
   }
   return i;
 }
