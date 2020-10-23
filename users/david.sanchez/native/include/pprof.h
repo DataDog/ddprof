@@ -24,6 +24,7 @@ char*  d_vocab[VOCAB_SZ] = {0};
 size_t n_d_vocab         = VOCAB_SZ;
 
 size_t addToVocab(char* str, char*** _st, size_t* _sz_st) {
+  if(!str) str="";
   char** st    = *_st;
   size_t sz_st = *_sz_st;
 
