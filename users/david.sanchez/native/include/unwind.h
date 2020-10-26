@@ -33,12 +33,15 @@ struct Dwarf {
 
 // TODO what else is needed for inline functions?
 struct FunLoc {
-  uint64_t ip;    // Relative to file, not VMA
-  char* funname;  // name of the function (mangled, possibly)
-  char* srcpath;  // name of the source file, if known
-  char* sopath;   // name of the file where the symbol is interned (e.g., .so)
-  uint32_t line;  // line number in file
-  uint32_t disc;  // discriminator
+  uint64_t ip;        // Relative to file, not VMA
+  uint64_t map_start; // Start address of mapped region
+  uint64_t map_end;   // End
+  uint64_t map_off;   // Offset into file
+  char* funname;      // name of the function (mangled, possibly)
+  char* srcpath;      // name of the source file, if known
+  char* sopath;       // name of the file where the symbol is interned (e.g., .so)
+  uint32_t line;      // line number in file
+  uint32_t disc;      // discriminator
 };
 
 struct FunLocLookup {
@@ -263,6 +266,9 @@ static int process_file(char* file, const char* section_name, uint64_t addr, str
 static int process_ip(pid_t pid, uint64_t addr, struct FunLoc* loc) {
   Map* map = procfs_MapMatch(pid, addr);
   if (!map) return -1;
+  loc->map_start = map->start;
+  loc->map_end = map->end;
+  loc->map_off = map->off;
   return process_file(map->path, NULL, addr - map->start + map->off, loc);
 }
 
@@ -661,31 +667,29 @@ void funloclookup_Set(struct FunLocLookup* flu, uint64_t ip, pid_t pid) {
 
 const char initialized = 0;
 
-int unwindstate_unwind(struct UnwindState* us, uint64_t* ips, size_t max_stack, struct FunLoc* locs) {
-  int ret = 0, i = 0;
+// TODO should we get the unwind state back in here?
+int unwindstate_unwind(struct UnwindState* us, struct FunLoc* locs) {
+  int ret = 0, n = 0;
   unw_cursor_t uc;
+  static uint64_t ips[4096] = {0};
 
   if(!initialized) {
     bfd_init();
     bfd_set_default_target("x86_64-pc-linux-gnu");
   }
+  unw_init_remote(&uc, us->uas, us);
 
   // Get the instruction pointers.  The first one is in EIP, unw for rest
-  ips[i++] = us->eip;
+  ips[n++] = us->eip;
 
-  unw_init_remote(&uc, us->uas, us);
-  while (unw_step(&uc) > 0) {
-    unw_word_t l_reg;
-    unw_get_reg(&uc, UNW_REG_IP, &ips[i++]);
-  }
+  while (unw_step(&uc) > 0)
+    unw_get_reg(&uc, UNW_REG_IP, &ips[n++]);
 
   // Now get the information
-  memset(locs, 0, i * sizeof(struct FunLoc));
-  for (int j = 0; j<i; j++) {
+  memset(locs, 0, n * sizeof(struct FunLoc));
+  for (int j = 0; j < n; j++)
     process_ip(us->pid, ips[j], &locs[j]);
-//    printf("[0x%lx] %s (%s)\n", locs[j].ip, locs[j].funname, locs[j].sopath);
-  }
-  return i;
+  return n;
 }
 
 #endif

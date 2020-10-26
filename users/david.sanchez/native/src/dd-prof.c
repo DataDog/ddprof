@@ -30,12 +30,18 @@ DDRequest ddr = {
 struct DDProfContext {
   PPProfile* pprof;
   struct UnwindState* us;
+  double sample_sec;
 };
 
-const int max_stack = 1024;
+
+#define MAX_STACK 1024 // TODO what is the max?
+                       // TODO harmonize max stack between here and unwinder
 void rambutan_callback(struct perf_event_header* hdr, void* arg) {
-  struct DDProfContext* rc = arg;
-  unw_word_t ips[max_stack]; // TODO what is the max?
+  static uint64_t id_locs[MAX_STACK] = {0};
+  static struct FunLoc locs[MAX_STACK] = {0};
+
+  struct DDProfContext* pctx = arg;
+  struct UnwindState* us = pctx->us;
   struct perf_event_sample* pes;
   struct timeval tv = {0};
   gettimeofday(&tv, NULL);
@@ -43,31 +49,28 @@ void rambutan_callback(struct perf_event_header* hdr, void* arg) {
   switch(hdr->type) {
     case PERF_RECORD_SAMPLE:
       pes = (struct perf_event_sample*)hdr;
-      rc->us->pid = pes->pid;
-      rc->us->stack = pes->data;
-      rc->us->stack_sz = pes->dyn_size;
-      memcpy(&rc->us->regs[0], pes->regs, 3*sizeof(uint64_t));
-      struct FunLoc* locs = calloc(max_stack, sizeof(struct FunLoc));
-      memset(locs, 0, max_stack*sizeof(*locs));
-      int n = unwindstate_unwind(rc->us, ips, max_stack, locs);
-      uint64_t* id_locs = calloc(n, sizeof(uint64_t));
-      memset(id_locs, 0, n*sizeof(uint64_t));
+      us->pid = pes->pid;
+      us->stack = pes->data;
+      us->stack_sz = pes->dyn_size;
+      memcpy(&us->regs[0], pes->regs, 3*sizeof(uint64_t));
+      int n = unwindstate_unwind(us, locs);
       for(int i=0; i<n; i++) {
-        uint64_t id_map = pprof_mapAdd(pprof, 0, 0, 0, locs[i].sopath, "");
+        memset(locs, 0, n*sizeof(*locs));
+        memset(id_locs, 0, n*sizeof(*id_locs));
+        uint64_t id_map = pprof_mapAdd(pprof, locs[i].map_start, locs[i].map_end, locs[i].map_off, locs[i].sopath, "");
         uint64_t id_fun = pprof_funAdd(pprof, locs[i].funname, locs[i].funname, locs[i].srcpath, locs[i].line);
         uint64_t id_loc = pprof_locAdd(pprof, id_map, locs[i].ip, (uint64_t[]){id_fun}, (int64_t[]){0}, 1);
         id_locs[i] = id_loc;
       }
       pprof_sampleAdd(pprof, (int64_t[]){1, pes->period}, 2, id_locs, n);
-      free(id_locs);
       break;
 
     default:
       break;
   }
-  int64_t tdiff = (now_nanos - pprof->time_nanos)/1000000000;
+  int64_t tdiff = (now_nanos - pprof->time_nanos)/1e9;
   printf("Time stuff: %ld\n", tdiff);
-  if(10 < tdiff) {
+  if(pctx->sample_sec < tdiff) {
     DDRequestSend(&ddr, pprof);
   }
 }
