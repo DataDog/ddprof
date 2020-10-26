@@ -1,11 +1,9 @@
+#include <getopt.h>
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <sys/mman.h>
-
-//#include <immintrin.h> // for __rdtsc();
-//#include <x86intrin.h>
 
 #include "perf.h"
 #include "unwind.h"
@@ -16,22 +14,25 @@
 PPProfile* pprof = &(PPProfile){0};
 Dict my_dict = {0};
 
-DDRequest ddr = {
-  .host = "localhost",
-  .port = "8081",
-//  .port = "5555",
-  .key = "1c77adb933471605ccbe82e82a1cf5cf",
-  .env = "dev",
-  .version = "v0.1",
-  .service = "native-test-service",
-  .D = &my_dict
-};
-
 struct DDProfContext {
   PPProfile* pprof;
+  DDRequest* ddr;
   struct UnwindState* us;
   double sample_sec;
 };
+
+#define OPT_TABLE(X) \
+  X(DD_ENV,                      "environment",    'H', required_argument, "dev") \
+  X(DD_SERVICE,                  "service",        'S', required_argument, "my_profiled_service") \
+  X(DD_VERSION,                  "version",        'V', required_argument, "0.0") \
+  X(DD_TAGS,                     "tags",           'T', required_argument, "") \
+  X(DD_PROFILING_UPLOAD_TIMEOUT, "upload_timeout", 'U', required_argument, "10") \
+  X(DD_PROFILING_,               "prefix",         'P', required_argument, "") \
+  X(DD_PROFILING_ENABLED,        "enabled",        'E', required_argument, "yes") \
+  X(DD_API_KEY,                  "apikey",         'A', required_argument, "") \
+  X(DD_HOST_OVERRIDE,            "hostname",       'N', required_argument, "");
+
+
 
 
 #define MAX_STACK 1024 // TODO what is the max?
@@ -42,6 +43,7 @@ void rambutan_callback(struct perf_event_header* hdr, void* arg) {
 
   struct DDProfContext* pctx = arg;
   struct UnwindState* us = pctx->us;
+  DDRequest* ddr;
   struct perf_event_sample* pes;
   struct timeval tv = {0};
   gettimeofday(&tv, NULL);
@@ -71,11 +73,14 @@ void rambutan_callback(struct perf_event_header* hdr, void* arg) {
   int64_t tdiff = (now_nanos - pprof->time_nanos)/1e9;
   printf("Time stuff: %ld\n", tdiff);
   if(pctx->sample_sec < tdiff) {
-    DDRequestSend(&ddr, pprof);
+    DDRequestSend(ddr, pprof);
   }
 }
 
 int main(int argc, char** argv) {
+  /****************************************************************************\
+  |                          Autodetect binary name                            |
+  \****************************************************************************/
   char filename[128] = {0};
   char* fp = strrchr("/"__FILE__, '/')+1;
   memcpy(filename, fp, strlen(fp));
@@ -85,6 +90,36 @@ int main(int argc, char** argv) {
     printf("%s is a tool for getting stack samples from an application.  Please wrap your application in it.\n", filename);
     return -1;
   }
+
+  /****************************************************************************\
+  |                             Process Options                                |
+  \****************************************************************************/
+  char argdefaults_host[] = "localhost";
+  char argdefaults_port[] = "8081";
+  char argdefaults_env[] = "dev";
+  DDRequest ddr = {
+    .host = "localhost",
+    .port = "8081",
+    .key = "1c77adb933471605ccbe82e82a1cf5cf",
+    .env = "dev",
+    .version = "v0.1",
+    .service = "native-test-service",
+    .D = &my_dict
+  };
+
+  static struct option lopts[] = {
+    {"help", no_argument, 0, 'h'},
+    {"host", required_argument, 0, 'H'},
+    {"apikey", required_argument, 0, 'K'},
+    {"port", required_argument, 0, 'P'},
+    {"environment", required_argument, 0, 'E'},
+    {"service_version", required_argument, 0, 'V'},
+    {"service_name", required_argument, 0, 'S'},
+    {"service_host", required_argument, 0, 'H'}};
+
+  /****************************************************************************\
+  |                             Run the Profiler                               |
+  \****************************************************************************/
 
   // Initialize the pprof
   pprof_Init(pprof, (char**)&(char*[]){"samples", "cpu"}, (char**)&(char*[]){"count", "nanoseconds"}, 2);
