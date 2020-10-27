@@ -36,31 +36,29 @@ char apikey_isvalid(char* key) {
   return 1;
 }
 
+
+#define MCP(x) memcpy((x), buf, MIN(sizeof(x), strlen(buf)))
+#define STR(x) #x
+#define GEV(x,y) if (!ddr->x && (buf = getenv(STR(y)))) MCP(ddr->x)
 void DDRequestInit(DDRequest* ddr) {
   // TODO what to do about the dict?
-#define MCP(x) memcpy((x), buf, MIN(sizeof(x), strlen(buf)))
   char* buf = NULL;
-  if((buf = getenv("DD_AGENT_HOST")))
-    MCP(ddr->host);
-  if((buf = getenv("DD_TRACE_AGENT_PORT")))
-    MCP(ddr->port);
-  if((buf = getenv("DD_API_KEY")))
-    MCP(ddr->key);
-  if((buf = getenv("DD_SITE")))
-    MCP(ddr->site);
-  if((buf = getenv("DD_ENV")))
-    MCP(ddr->env);
-  if((buf = getenv("DD_SERVICE")))
-    MCP(ddr->service);
-  if((buf = getenv("DD_VERSION")))
-    MCP(ddr->service);
+  GEV(host, DD_AGENT_HOST);
+  GEV(port, DD_TRACE_AGENT_PORT);
+  GEV(key, DD_API_KEY);
+  GEV(site, DD_SITE);
+  GEV(env, DD_ENV);
+  GEV(service, DD_SERVICE);
+  GEV(version, DD_VERSION);
 
   if(ddr->key && !apikey_isvalid(ddr->key))
     memset(ddr->key, 0, sizeof(ddr->key));
 
   return;
-#undef MCP
 }
+#undef MCP
+#undef STR
+#undef GEV
 
 #ifdef DD_DBG_PROFGEN
 #  include <sys/types.h>

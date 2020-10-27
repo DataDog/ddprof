@@ -158,9 +158,11 @@ typedef enum HTTP_RET {
   HTTP_ECONN,
 } HTTP_RET;
 
+
+#define MISUB(x,y) ASAddMulti(&as_bod, boundary, &(MultiItem){x, NULL, (y)})
+#define MISUBD(x,y) ASAddMulti(&as_bod, boundary, &(MultiItem){x, NULL, *(char**)DictGet(payload, (y))})
 char HttpSendMultipart(const char* host, const char* port, const char* route, Dict* payload) {
   struct addrinfo* addr;
-printf("Connecting to %s:%s\n",host, port);
   if(getaddrinfo(host, port, NULL, &addr)) {
     return HTTP_EADDR;
   }
@@ -206,21 +208,21 @@ printf("Connecting to %s:%s\n",host, port);
 
 
   // Populate payload
-  ASAddMulti(&as_bod, boundary, &(MultiItem){"recording-start", NULL, time_start});
-  ASAddMulti(&as_bod, boundary, &(MultiItem){"recording-end", NULL, time_end});
-  ASAddMulti(&as_bod, boundary, &(MultiItem){"tags[]", NULL, *(char**)DictGet(payload, "tags.host")});
-  ASAddMulti(&as_bod, boundary, &(MultiItem){"tags[]", NULL, *(char**)DictGet(payload, "tags.service")});
-  ASAddMulti(&as_bod, boundary, &(MultiItem){"tags[]", NULL, *(char**)DictGet(payload, "tags.language")});
+  MISUB("recording-start", time_start);
+  MISUB("recording-end", time_end);
+  MISUBD("tags[]", "tags.host");
+  MISUBD("tags[]", "tags.service");
+  MISUBD("tags[]", "tags.language");
   if(DictGet(payload, "pprof[0]")) {
     fat* packed_pprof = (fat*)DictGet(payload, "pprof[0]");
     ASAddMulti(&as_bod, boundary, &(MultiItem){"data[0]\"; filename=\"pprof-data", "application/octet-stream", (char*)packed_pprof->ptr, packed_pprof->sz });
   }
-  ASAddMulti(&as_bod, boundary, &(MultiItem){"types[0]", NULL, "samples,cpu"}); // Don't hardcode
-  ASAddMulti(&as_bod, boundary, &(MultiItem){"format", NULL, "pprof"});
-  ASAddMulti(&as_bod, boundary, &(MultiItem){"tags[]", NULL, *(char**)DictGet(payload, "tags.runtime")});
-  ASAddMulti(&as_bod, boundary, &(MultiItem){"runtime", NULL,*(char**)DictGet(payload, "runtime")});
-  ASAddMulti(&as_bod, boundary, &(MultiItem){"tags[]", NULL, *(char**)DictGet(payload, "tags.prof_ver")});
-  ASAddMulti(&as_bod, boundary, &(MultiItem){"tags[]", NULL, *(char**)DictGet(payload, "tags.os")});
+  MISUB("types[0]", "samples,cpu"); // TODO Don't hardcode
+  MISUB("format", "pprof");
+  MISUBD("tags[]", "tags.runtime");
+  MISUBD("runtime", "runtime");
+  MISUBD("tags[]", "tags.prof_ver");
+  MISUBD("tags[]", "tags.os");
 
   // Populate headers
   char header0[1024] = {0};
@@ -242,5 +244,7 @@ printf("Connecting to %s:%s\n",host, port);
   close(fd);
   return HTTP_OK;
 }
+#undef MISUB
+#undef MISUBD
 
 #endif
