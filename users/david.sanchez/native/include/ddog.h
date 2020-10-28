@@ -7,18 +7,23 @@
 #include "pprof.h"
 #include "http.h"
 
-// Avoid double-eval
+#ifdef DD_DBG_PROFGEN
+#  include <fcntl.h>
+#  include <sys/stat.h>
+#  include <sys/types.h>
+#endif
+
 #define MIN(x,y) ({__typeof__ (x) _x = (x); __typeof__ (y) _y = (y); _x < _y ? _x : _y;})
 
 typedef struct DDRequest {
-  char  host[256];
-  char  port[6];       // max 65536+0
-  char  key[33];
-  char  env[64];
-  char  site[128];
-  char  service[128];
-  char  version[128];
-  Dict* D;             // tags, etc
+  char*  host;
+  char*  port;
+  char*  key;
+  char*  env;
+  char*  site;
+  char*  service;
+  char*  version;
+  Dict* D;
 } DDRequest;
 
 void ddr_addtag(DDRequest* ddr, char* tag, char* val) {
@@ -36,8 +41,7 @@ char apikey_isvalid(char* key) {
   return 1;
 }
 
-
-#define MCP(x) memcpy((x), buf, MIN(sizeof(x), strlen(buf)))
+#define MCP(x) if (x) free(x); strdup(buf)
 #define STR(x) #x
 #define GEV(x,y) if (!ddr->x && (buf = getenv(STR(y)))) MCP(ddr->x)
 void DDRequestInit(DDRequest* ddr) {
@@ -59,12 +63,6 @@ void DDRequestInit(DDRequest* ddr) {
 #undef MCP
 #undef STR
 #undef GEV
-
-#ifdef DD_DBG_PROFGEN
-#  include <sys/types.h>
-#  include <sys/stat.h>
-#  include <fcntl.h>
-#endif
 
 void DDRequestSend(DDRequest* ddr, PPProfile* pprof) {
   printf("SENDIT\n");

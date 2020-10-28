@@ -12,27 +12,69 @@
 #include "ddog.h"
 
 PPProfile* pprof = &(PPProfile){0};
-Dict my_dict = {0};
 
 struct DDProfContext {
   PPProfile* pprof;
-  DDRequest* ddr;
+
+  // This is pretty fragile.  One workaround is to name the DDRequest elements
+  // consistently with input options, but I *like* maintaining distinction
+  // between the two layers.  TBD, a translation layer.
+  union {
+    DDRequest* ddr;
+    struct {
+      // Parameters to pass-through underlying DDRequest (alias names)
+      char* hostname;
+      char* agent_port;
+      char* apikey;
+      char* environment;
+      char* agent_site;
+      char* service;
+      char* version;
+
+      // Parameters for interpretation
+      char* enabled;
+      char* agent_host;
+      char* prefix;
+      char* tags;
+      char* upload_timeout;
+      char* sample_rate;
+      char* upload_period;
+    } *ddr_variant;
+  };
+  struct {
+    char enabled;
+    uint32_t upload_timeout;
+    uint32_t sample_rate;
+    uint32_t upload_period;
+  } params;
+
   struct UnwindState* us;
   double sample_sec;
 };
 
-#define OPT_TABLE(X) \
-  X(DD_ENV,                      "environment",    'H', required_argument, "dev") \
-  X(DD_SERVICE,                  "service",        'S', required_argument, "my_profiled_service") \
-  X(DD_VERSION,                  "version",        'V', required_argument, "0.0") \
-  X(DD_TAGS,                     "tags",           'T', required_argument, "") \
-  X(DD_PROFILING_UPLOAD_TIMEOUT, "upload_timeout", 'U', required_argument, "10") \
-  X(DD_PROFILING_,               "prefix",         'P', required_argument, "") \
-  X(DD_PROFILING_ENABLED,        "enabled",        'E', required_argument, "yes") \
-  X(DD_API_KEY,                  "apikey",         'A', required_argument, "") \
-  X(DD_HOST_OVERRIDE,            "hostname",       'N', required_argument, "");
+// Kinda preachy, you've been warned.
+#define EXPAND_LOPT(a,b,c,d,e,f,g) {#b,e,0,c},
+#define EXPAND_ENUM(a,b,c,d,e,f,g) a;
+#define EXPAND_OSTR(a,b,c,d,e,f,g) #d ":"
+#define EXPAND_DFLT(a,b,c,d,e,f,g) DFLT_EXP(#a,b,e,g);
+#define EXPAND_CASE(a,b,c,d,e,f,g) case c: ctx->ddr_variant->b = optarg; break;
+#define EXPAND_PRNT(a,b,c,d,e,f,g) printf(#b ": %s\n", ctx->ddr_variant->b);
 
-
+#define OPT_TABLE(X)                                                                     \
+  X(DD_API_KEY,                  apikey,         'A', A, 1, NULL, NULL)                  \
+  X(DD_ENV,                      environment,    'E', E, 1, NULL, "dev")                 \
+  X(DD_AGENT_HOST,               agent_host,     'H', H, 1, NULL, "localhost")           \
+  X(DD_SITE,                     agent_site,     'I', I, 1, NULL, NULL)                  \
+  X(DD_HOST_OVERRIDE,            hostname,       'N', N, 1, NULL, NULL)                  \
+  X(DD_TRACE_AGENT_PORT,         agent_port,     'P', P, 1, NULL, "8081")                \
+  X(DD_SERVICE,                  service,        'S', S, 1, NULL, "my_profiled_service") \
+  X(DD_TAGS,                     tags,           'T', T, 1, NULL, NULL)                  \
+  X(DD_PROFILING_UPLOAD_TIMEOUT, upload_timeout, 'U', U, 1, NULL, "10")                  \
+  X(DD_VERSION,                  version,        'V', V, 1, NULL, "0.0")                 \
+  X(DD_PROFILING_ENABLED,        enabled,        'e', e, 1, NULL, "yes")                 \
+  X(DD_PROFILING_NATIVE_RATE,    sample_rate,    'r', r, 1, NULL, "1000")                \
+  X(DD_PROFILING_UPLOAD_PERIOD,  upload_period,  'u', u, 1, NULL, "60")                  \
+  X(DD_PROFILING_,               prefix,         'x', X, 1, NULL, "")
 
 
 #define MAX_STACK 1024 // TODO what is the max?
@@ -43,7 +85,7 @@ void rambutan_callback(struct perf_event_header* hdr, void* arg) {
 
   struct DDProfContext* pctx = arg;
   struct UnwindState* us = pctx->us;
-  DDRequest* ddr;
+  DDRequest* ddr = pctx->ddr;
   struct perf_event_sample* pes;
   struct timeval tv = {0};
   gettimeofday(&tv, NULL);
@@ -77,6 +119,13 @@ void rambutan_callback(struct perf_event_header* hdr, void* arg) {
   }
 }
 
+#define DFLT_EXP(evar, key, func, dfault)                                     \
+  ({                                                                          \
+   char* _buf;                                                                \
+   ctx->ddr_variant->key = (!func && (_buf = getenv(evar))) ? _buf : dfault;  \
+  })
+
+
 int main(int argc, char** argv) {
   /****************************************************************************\
   |                          Autodetect binary name                            |
@@ -86,36 +135,37 @@ int main(int argc, char** argv) {
   memcpy(filename, fp, strlen(fp));
   (strrchr(filename, '.'))[0] = 0;
 
-  if(argc==1) {
+  /****************************************************************************\
+  |                             Process Options                                |
+  \****************************************************************************/
+  int c = 0, oi = 0;
+  struct DDProfContext* ctx = &(struct DDProfContext){ .ddr = &(DDRequest){.D = &(Dict){0}}};
+  DDRequest* ddr = ctx->ddr;
+  struct option lopts[] = { OPT_TABLE(EXPAND_LOPT) };
+
+  // Populate default values
+  OPT_TABLE(EXPAND_DFLT);
+
+  char done = 0;
+  while (!done && -1 != (c=getopt_long(argc, argv, ":" OPT_TABLE(EXPAND_OSTR), lopts, &oi))) {
+    switch(c) {
+      OPT_TABLE(EXPAND_CASE)
+      default: done = 1; break;
+    }
+  }
+
+#ifdef DD_DBG_PRINTARGS
+  printf("=== PRINTING PARAMETERS ===\n");
+  OPT_TABLE(EXPAND_PRNT);
+#endif
+  if (optind == 1) {
     printf("%s is a tool for getting stack samples from an application.  Please wrap your application in it.\n", filename);
     return -1;
   }
 
-  /****************************************************************************\
-  |                             Process Options                                |
-  \****************************************************************************/
-  char argdefaults_host[] = "localhost";
-  char argdefaults_port[] = "8081";
-  char argdefaults_env[] = "dev";
-  DDRequest ddr = {
-    .host = "localhost",
-    .port = "8081",
-    .key = "1c77adb933471605ccbe82e82a1cf5cf",
-    .env = "dev",
-    .version = "v0.1",
-    .service = "native-test-service",
-    .D = &my_dict
-  };
-
-  static struct option lopts[] = {
-    {"help", no_argument, 0, 'h'},
-    {"host", required_argument, 0, 'H'},
-    {"apikey", required_argument, 0, 'K'},
-    {"port", required_argument, 0, 'P'},
-    {"environment", required_argument, 0, 'E'},
-    {"service_version", required_argument, 0, 'V'},
-    {"service_name", required_argument, 0, 'S'},
-    {"service_host", required_argument, 0, 'H'}};
+  // Adjust input parameters for execvp()
+  argv += optind-1;
+  argc -= optind;
 
   /****************************************************************************\
   |                             Run the Profiler                               |
@@ -127,17 +177,17 @@ int main(int argc, char** argv) {
 
   // Finish initializing the DDR
   // TODO generate these better
-  ddr_addtag(&ddr, "tags.host",     "host:davebox");
-  ddr_addtag(&ddr, "tags.service",  "service:native-test-service");
+//  ddr_addtag(ddr, "tags.host",     "host:davebox");
+  ddr_addtag(ddr, "tags.service",  "service:native-test-service");
 
   // Implementation stuff
-  ddr_addtag(&ddr, "tags.prof_ver", "profiler-version:v0.1");
-  ddr_addtag(&ddr, "tags.os",       "runtime-os:linux-x86_64");
+  ddr_addtag(ddr, "tags.prof_ver", "profiler-version:v0.2");
+  ddr_addtag(ddr, "tags.os",       "runtime-os:linux-x86_64");
 
   // Language/runtime stuff
-  ddr_addtag(&ddr, "tags.runtime",  "runtime:native");
-  ddr_addtag(&ddr, "tags.language", "language:native");
-  ddr_addtag(&ddr, "runtime", "native");
+  ddr_addtag(ddr, "tags.runtime",  "runtime:native");
+  ddr_addtag(ddr, "tags.language", "language:native");
+  ddr_addtag(ddr, "runtime", "native");
 
   // Set the CPU affinity so that everything is on the same CPU.  Scream about
   // it because we want to undo this later..!
