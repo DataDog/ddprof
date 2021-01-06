@@ -20,8 +20,6 @@
 |*                            String Table (Vocab)                            *|
 \******************************************************************************/
 #define VOCAB_SZ 4096
-char*  d_vocab[VOCAB_SZ] = {0};
-size_t n_d_vocab         = VOCAB_SZ;
 
 size_t addToVocab(char* str, char*** _st, size_t* _sz_st) {
   if(!str) str="";

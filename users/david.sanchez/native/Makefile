@@ -44,6 +44,9 @@ procutils-tidy: src/eg_procutils.c
 collatz: src/demo_collatz.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
 
+strings: src/demo_strings.c
+	$(CC) -DD_ALLOC_DBG -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
+
 all: rambutan http perf pprof collatz ddog
 
 clean:
