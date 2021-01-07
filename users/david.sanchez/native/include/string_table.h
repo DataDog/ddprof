@@ -1,3 +1,6 @@
+#ifndef _H_STRING_TABLE
+#define _H_STRING_TABLE
+
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <string.h>
@@ -10,7 +13,7 @@
 
 #  define P_ADBG(x) if(MAP_FAILED == (x)) printf("%d: %s\n", __LINE__, strerror(errno))
 #else
-#  define P_ADBG(x) do{}while()
+#  define P_ADBG(x) do {}while(0)
 #endif
 
 // ---- Internal hash functions
@@ -256,7 +259,7 @@ StringTable* stringtable_init() {
     _StringTable_table_init(ret);
 
     // Be explicit about options
-    ret->logging = 0;
+    ret->logging = 1;
     ret->hash_fun = wyhash_hash;
   }
   return ret; // NB NULL if borked
@@ -383,3 +386,5 @@ static inline uint64_t wyrand(uint64_t *seed){
 static inline unsigned wy32x32(unsigned a,  unsigned  b) { _wymix32(&a,&b); _wymix32(&a,&b); return a^b;  }
 static inline float wy2u01(unsigned r) { const float _wynorm=1.0f/(1ull<<23); return (r>>9)*_wynorm;}
 static inline float wy2gau(unsigned r) { const float _wynorm=1.0f/(1ull<<9); return ((r&0x3ff)+((r>>10)&0x3ff)+((r>>20)&0x3ff))*_wynorm-3.0f;}
+
+#endif

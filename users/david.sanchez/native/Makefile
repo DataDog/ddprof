@@ -33,7 +33,7 @@ perf: src/eg_perf.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o eg/$@ $^ $(LDLIBS)
 
 pprof: src/eg_pprof.c src/profile.pb-c.c
-	$(CC) -DKNOCKOUT_UNUSED $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o eg/$@ $^ $(LDLIBS)
+	$(CC) -DKNOCKOUT_UNUSED -DD_LOGGING_ENABLE $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o eg/$@ $^ $(LDLIBS)
 
 procutils: src/eg_procutils.c
 	$(CC) $(CFLAGS) $(WARNS) $(ANALYZER) $(LDFLAGS) $(INCLUDE) -o eg/$@ $^ $(LDLIBS)
