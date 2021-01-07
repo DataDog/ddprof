@@ -11,10 +11,10 @@
 #include "http.h"
 #include "ddog.h"
 
-PPProfile* pprof = &(PPProfile){0};
+DProf* dp = &(DProf){0};
 
 struct DDProfContext {
-  PPProfile* pprof;
+  DProf* dp;
 
   // This is pretty fragile.  One workaround is to name the DDRequest elements
   // consistently with input options, but I *like* maintaining distinction
@@ -101,21 +101,21 @@ void rambutan_callback(struct perf_event_header* hdr, void* arg) {
       for(int i=0; i<n; i++) {
         memset(locs, 0, n*sizeof(*locs));
         memset(id_locs, 0, n*sizeof(*id_locs));
-        uint64_t id_map = pprof_mapAdd(pprof, locs[i].map_start, locs[i].map_end, locs[i].map_off, locs[i].sopath, "");
-        uint64_t id_fun = pprof_funAdd(pprof, locs[i].funname, locs[i].funname, locs[i].srcpath, locs[i].line);
-        uint64_t id_loc = pprof_locAdd(pprof, id_map, locs[i].ip, (uint64_t[]){id_fun}, (int64_t[]){0}, 1);
+        uint64_t id_map = pprof_mapAdd(dp, locs[i].map_start, locs[i].map_end, locs[i].map_off, locs[i].sopath, "");
+        uint64_t id_fun = pprof_funAdd(dp, locs[i].funname, locs[i].funname, locs[i].srcpath, locs[i].line);
+        uint64_t id_loc = pprof_locAdd(dp, id_map, locs[i].ip, (uint64_t[]){id_fun}, (int64_t[]){0}, 1);
         id_locs[i] = id_loc;
       }
-      pprof_sampleAdd(pprof, (int64_t[]){1, pes->period}, 2, id_locs, n);
+      pprof_sampleAdd(dp, (int64_t[]){1, pes->period}, 2, id_locs, n);
       break;
 
     default:
       break;
   }
-  int64_t tdiff = (now_nanos - pprof->time_nanos)/1e9;
+  int64_t tdiff = (now_nanos - dp->pprof.time_nanos)/1e9;
   printf("Time stuff: %ld\n", tdiff);
   if(pctx->sample_sec < tdiff) {
-    DDRequestSend(ddr, pprof);
+    DDRequestSend(ddr, dp);
   }
 }
 
@@ -172,8 +172,8 @@ int main(int argc, char** argv) {
   \****************************************************************************/
 
   // Initialize the pprof
-  pprof_Init(pprof, (char**)&(char*[]){"samples", "cpu"}, (char**)&(char*[]){"count", "nanoseconds"}, 2);
-  pprof_timeUpdate(pprof); // Set the time
+  pprof_Init(dp, (char**)&(char*[]){"samples", "cpu"}, (char**)&(char*[]){"count", "nanoseconds"}, 2);
+  pprof_timeUpdate(dp); // Set the time
 
   // Finish initializing the DDR
   // TODO generate these better
@@ -227,8 +227,8 @@ int main(int argc, char** argv) {
     munmap(pb, sizeof(pthread_barrier_t));
 //    main_loop(&pe, NULL, NULL);
     struct DDProfContext rs = {
-      .pprof = pprof,
-      .us    = &(struct UnwindState){0}};
+      .dp = dp,
+      .us = &(struct UnwindState){0}};
     unwindstate_Init(rs.us);
     elf_version(EV_CURRENT);
     main_loop(&pe, rambutan_callback, &rs);

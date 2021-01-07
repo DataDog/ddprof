@@ -64,15 +64,16 @@ void DDRequestInit(DDRequest* ddr) {
 #undef STR
 #undef GEV
 
-void DDRequestSend(DDRequest* ddr, PPProfile* pprof) {
+void DDRequestSend(DDRequest* ddr, DProf* dp) {
+  PPProfile* pprof = &dp->pprof;
   printf("SENDIT\n");
   // Update pprof duration
-  pprof_durationUpdate(pprof);
+  pprof_durationUpdate(dp);
 
   // Serialize and zip pprof
   char* buf;
   size_t sz_packed = perftools__profiles__profile__get_packed_size(pprof);
-  size_t sz_zipped = pprof_zip(pprof, (buf=malloc(sz_packed)), sz_packed);
+  size_t sz_zipped = pprof_zip(dp, (buf=malloc(sz_packed)), sz_packed);
 
   // Add API key if one is provided
   if(strlen(ddr->key))
@@ -100,8 +101,8 @@ void DDRequestSend(DDRequest* ddr, PPProfile* pprof) {
   // Cleanup
   DictSet(ddr->D, "pprof[0]", "", sizeof(char));
   free(buf);
-  pprof_sampleClear(pprof);
-  pprof_timeUpdate(pprof);
+  pprof_sampleClear(dp);
+  pprof_timeUpdate(dp);
 }
 
 
