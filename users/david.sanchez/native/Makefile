@@ -1,7 +1,7 @@
 INCLUDE = -Iinclude -I/home/sanchda/dev/binutils-gdb/include -I/home/sanchda/dev/binutils-gdb/bfd -I/home/sanchda/dev/binutils-gdb/binutils
 CFLAGS = -ggdb3 -std=c11 -O0 -D_GNU_SOURCE
 TESTS := http perf pprof
-WARNS := -Wall -Wextra -Wpedantic -Werror #-Wfatal-errors
+WARNS := -Wall -Wextra -Wpedantic
 ANALYZER := -fanalyzer
 CC := gcc-10
 LDLIBS := -lunwind -lprotobuf-c -lz -lpthread -lunwind -lunwind-x86_64 -lelf -lbfd
@@ -45,7 +45,8 @@ collatz: src/demo_collatz.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
 
 strings: src/demo_strings.c
-	$(CC) -DD_ALLOC_DBG -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
+	$(CC) -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
+#	$(CC) -DD_ALLOC_DBG -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
 
 dict: src/demo_dict.c
 	$(CC) -DD_ALLOC_DBG -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^

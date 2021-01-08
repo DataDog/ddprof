@@ -8,9 +8,8 @@
 #include <stdlib.h>
 
 #ifdef D_ALLOC_DBG
-#include <errno.h>
-#include <stdio.h>
-
+#  include <errno.h>
+#  include <stdio.h>
 #  define P_ADBG(x) if(MAP_FAILED == (x)) printf("%d: %s\n", __LINE__, strerror(errno)); else printf("%d: %s\n", __LINE__, #x)
 #else
 #  define P_ADBG(x) do {}while(0)
@@ -174,7 +173,7 @@ P_ADBG(buf_entry);
     ssize_t i2 = dict->hash_fun(this_key, STR_LEN(this_key)) & mask;
 
     // Insert into new entries field.  We can keep the old arena, since the node
-    // just hangs onto pointers.
+    // just hangs onto offsets
     DictNode_add(buf_entry, dict->entry[i], i2);
   }
   munmap(dict->entry, dict->nodes_reserved*sizeof(DictNode*));

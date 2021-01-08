@@ -43,7 +43,7 @@ int64_t DictSet(Dict* D, const char* k, const void* v, const size_t sz_v) {
   if(!k || !v || !sz_v)
     return -1;
   for(i=0; i<D->n; i++)
-    if(!strcmp(k, D->key[i])) {
+    if(D->key[i] && !strcmp(k, D->key[i])) {
       if(D->val[i]) {
         free(D->val[i]);
         D->val[i] = NULL;

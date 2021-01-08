@@ -79,7 +79,7 @@ struct DDProfContext {
 
 #define MAX_STACK 1024 // TODO what is the max?
                        // TODO harmonize max stack between here and unwinder
-void rambutan_callback(struct perf_event_header* hdr, void* arg) {
+void ddprof_callback(struct perf_event_header* hdr, void* arg) {
   static uint64_t id_locs[MAX_STACK] = {0};
   static struct FunLoc locs[MAX_STACK] = {0};
 
@@ -121,9 +121,32 @@ void rambutan_callback(struct perf_event_header* hdr, void* arg) {
 
 #define DFLT_EXP(evar, key, func, dfault)                                     \
   ({                                                                          \
-   char* _buf;                                                                \
-   ctx->ddr_variant->key = (!func && (_buf = getenv(evar))) ? _buf : dfault;  \
+   char* _buf = NULL;                                                         \
+   if(evar && getenv(evar)) _buf = getenv(evar);                              \
+   else if(dfault)          _buf = strdup(dfault);                            \
+   ctx->ddr_variant->key =  _buf;                                             \
   })
+
+void print_help() {
+  char help_msg[] = ""
+" usage: dd-prof [--version] [--help] [PROFILER_OPTIONS] COMMAND [COMMAND_ARGS]\n"
+"\n"
+"  -A, --apikey:\n"
+"  -E, --environment:\n"
+"  -H, --agent_host:\n"
+"  -I, --agent_site:\n"
+"  -N, --hostname:\n"
+"  -P, --agent_port:\n"
+"  -S, --service:\n"
+"  -T, --tags:\n"
+"  -U, --upload_timeout:\n"
+"  -V, --version:\n"
+"  -e, --enabled:\n"
+"  -r, --sample_rate:\n"
+"  -u, --upload_period:\n"
+"  -x, --prefix:\n";
+  printf(help_msg);
+}
 
 
 int main(int argc, char** argv) {
@@ -141,15 +164,22 @@ int main(int argc, char** argv) {
   int c = 0, oi = 0;
   struct DDProfContext* ctx = &(struct DDProfContext){ .ddr = &(DDRequest){.D = &(Dict){0}}};
   DDRequest* ddr = ctx->ddr;
-  struct option lopts[] = { OPT_TABLE(EXPAND_LOPT) };
+
+  struct option lopts[] = {
+    OPT_TABLE(EXPAND_LOPT)
+    {"help", 0, 0, 'h'} };
 
   // Populate default values
   OPT_TABLE(EXPAND_DFLT);
 
   char done = 0;
-  while (!done && -1 != (c=getopt_long(argc, argv, ":" OPT_TABLE(EXPAND_OSTR), lopts, &oi))) {
+  while (!done && -1 != (c=getopt_long(argc, argv, ":" OPT_TABLE(EXPAND_OSTR) "h", lopts, &oi))) {
+    printf("optind: %d\n", optind);
     switch(c) {
       OPT_TABLE(EXPAND_CASE)
+      case 'h':
+        print_help();
+        return 0;
       default: done = 1; break;
     }
   }
@@ -170,7 +200,6 @@ int main(int argc, char** argv) {
   /****************************************************************************\
   |                             Run the Profiler                               |
   \****************************************************************************/
-
   // Initialize the pprof
   pprof_Init(dp, (char**)&(char*[]){"samples", "cpu"}, (char**)&(char*[]){"count", "nanoseconds"}, 2);
   pprof_timeUpdate(dp); // Set the time
@@ -231,7 +260,7 @@ int main(int argc, char** argv) {
       .us = &(struct UnwindState){0}};
     unwindstate_Init(rs.us);
     elf_version(EV_CURRENT);
-    main_loop(&pe, rambutan_callback, &rs);
+    main_loop(&pe, ddprof_callback, &rs);
   }
 
   return 0;

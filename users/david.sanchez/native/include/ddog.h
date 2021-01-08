@@ -23,6 +23,7 @@ typedef struct DDRequest {
   char*  site;
   char*  service;
   char*  version;
+  char*  __reserved[8]; // See dd-prof.c .  Sorry!
   Dict* D;
 } DDRequest;
 
@@ -32,7 +33,7 @@ void ddr_addtag(DDRequest* ddr, char* tag, char* val) {
 
 char apikey_isvalid(char* key) {
   size_t n = 0;
-  if(!key)                      return 0;
+  if(!key)                    return 0;
   if(32 != ((n=strlen(key)))) return 0;
 
   for(size_t i=0; i<n; i++)
