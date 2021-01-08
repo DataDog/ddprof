@@ -47,10 +47,13 @@ collatz: src/demo_collatz.c
 strings: src/demo_strings.c
 	$(CC) -DD_ALLOC_DBG -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
 
-all: rambutan http perf pprof collatz ddog
+dict: src/demo_dict.c
+	$(CC) -DD_ALLOC_DBG -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
+
+all: dd-prof http perf pprof collatz ddog
 
 clean:
 	-rm -rf bin/* eg/*
 
-install: rambutan
-	cp bin/rambutan $(PREFIX)/bin/rambutan
+install: dd-prof 
+	cp bin/dd-prof $(PREFIX)/bin/dd-prof

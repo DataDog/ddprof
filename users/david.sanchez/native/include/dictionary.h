@@ -11,7 +11,7 @@
 #include <errno.h>
 #include <stdio.h>
 
-#  define P_ADBG(x) if(MAP_FAILED == (x)) printf("%d: %s\n", __LINE__, strerror(errno))
+#  define P_ADBG(x) if(MAP_FAILED == (x)) printf("%d: %s\n", __LINE__, strerror(errno)); else printf("%d: %s\n", __LINE__, #x)
 #else
 #  define P_ADBG(x) do {}while(0)
 #endif
@@ -32,316 +32,266 @@ uint32_t wyhash_hash(unsigned char* str, size_t len) {
   return wyhash32((const void*)str, len, seed);
 }
 
-/*
- * A couple of notes:
- * StringTable's arena is a power-of-two.  It tries to use Linux features to
- * resize-in-place and copies if that fails.  An additional failover would be to
- * implement incremental rehashing, but punting on that for now.
- * Similarly, the nodes are power-of-two.
- *
- * THE MOST IMPORTANT NOTE OF ALL:
- * All of the strings interned by this library into the string arena are
- * prepended by a FOUR BYTE LENGTH.  Yes, you are reading this correctly.  This
- * library inserts garbage into the string table, presuming that nobody is
- * going to want to serialize the whole thing in one go.
- */
-
-typedef struct StringTableNode {
-  unsigned char* string;        // Pointer into the arena
-  ssize_t idx;                  // Index into the table
-  struct StringTableNode* next; // If this is linked, the next guy
-} StringTableNode;
+typedef struct DictNode {
+  int64_t key;           // Actually an offset from top of arena
+  int64_t val;           // Ditto
+  struct DictNode* next; // If this is linked, the next guy
+} DictNode;
 
 // ONLY FOR INTERNAL USE.  ONLY.
-#define STR_LEN_PTR(x) ((uint32_t*)&x[-4])
+#define STR_LEN_PTR(x) ((uint32_t*)&(x)[-4])
 #define STR_LEN(x) (*STR_LEN_PTR(x))
 
-typedef struct StringTable {
+typedef struct Dict {
   // Elements governing the string arena
   unsigned char* arena;      // The place where the strings live
   uint32_t arena_reserved;   // How many BYTES are reserved
   uint32_t arena_size;       // How many bytes of the arena are used
 
   // Elements governing the node arena
-  StringTableNode*  nodes;   // Arena
-  StringTableNode** entry;   // Indirection for hashing
-  uint32_t nodes_reserved;   // How many ELEMENTS are reserved
-  uint32_t nodes_size;
+  DictNode*  nodes;        // Arena
+  DictNode** entry;        // Indirection for hashing
+  uint32_t nodes_reserved; // How many ELEMENTS are reserved
+  uint32_t nodes_size;     // How many elements are used
 
-  // For convenience to prevent having to walk the table again later
-  unsigned char** table;
-  uint32_t table_reserved;  // ELEMENTS
-  uint32_t table_size;
-
-  // Governs the semantics of this string table
-  // TODO 32 or 64-bit hashing?  Common wisdom is that dictionaries benefit
-  //      from a 32-bit hash for reasons of cache-efficiency.
   uint32_t (*hash_fun)(unsigned char* key, size_t len);
-  uint8_t logging      : 1, // disabled by default
+  uint8_t logging      : 1, // UNIMPLEMENTED
           hash_type    : 2, // 0-djb2, 1-wyhash, 2-???; CURRENTLY UNUSED, good intentions etc
           __reserved_0 : 5; // Right.
-} StringTable;
+} Dict;
 
-#define ST_ARENA_SIZE 16384 // Starting number of bytes for variable-sized arenas
-#define ST_ARENA_NELEM 4096 // Starting number of elements for fixed-size arenas
+#define DICT_ARENA_SIZE 16384 // Starting number of bytes for variable-sized arenas
+#define DICT_ARENA_NELEM 4096 // Starting number of elements for fixed-size arenas
 
 // Internal functions
-static void _StringTable_arena_init(StringTable*);
-static void _StringTable_arena_resize(StringTable*);
-static void _StringTable_arena_free(StringTable*);
-static unsigned char* _StringTable_arena_add(StringTable*, unsigned char*, size_t);
-static void _StringTable_nodes_init(StringTable*);
-static void _StringTable_nodes_resize(StringTable*);
-static void _StringTable_nodes_free(StringTable*);
-static StringTableNode* _StringTable_nodes_add(StringTable*, unsigned char*, ssize_t);
-static void _StringTable_table_init(StringTable*);
-static void _StringTable_table_resize(StringTable*);
-static void _StringTable_table_free(StringTable*);
-static ssize_t _StringTable_table_add(StringTable*, unsigned char*);
+static char DictNode_add(DictNode**, DictNode*, uint32_t);
+static void _Dict_arena_init(Dict*);
+static void _Dict_arena_resize(Dict*);
+static void _Dict_arena_free(Dict*);
+static int64_t _Dict_arena_add(Dict*, unsigned char*, size_t);
+static void _Dict_nodes_init(Dict*);
+static void _Dict_nodes_resize(Dict*);
+static void _Dict_nodes_free(Dict*);
+static DictNode* _Dict_nodes_add(Dict*, int64_t, int64_t);
 
 // Public API
-StringTable* stringtable_init();
-void stringtable_free(StringTable*);
-ssize_t stringtable_lookup(StringTable*, unsigned char*, size_t);
-unsigned char* stringtable_get(StringTable*, ssize_t);
-ssize_t stringtable_add(StringTable*, unsigned char*, size_t);
-ssize_t stringtable_add_cstr(StringTable*, char*);
+Dict* dict_init();
+void dict_free(Dict*);
+unsigned char* dict_get(Dict*, unsigned char*, size_t);
+unsigned char* dict_get_1(Dict*, char*);
+char dict_add(Dict*, unsigned char*, size_t, unsigned char*, size_t);
+char dict_add_01(Dict*, unsigned char*, size_t, char*);
+char dict_add_10(Dict*, char*, unsigned char*, size_t);
+char dict_add_11(Dict*, char*, char*);
 
 // -------- Implementation
-// ---- StringTable Arena
-static void _StringTable_arena_init(StringTable* st) {
-// TODO This can be changed to allow multiple threads or processes to coordinate
-//      on the same string table.  The outline is to mmap() to a file or tmp,
-//      then during initialization make sure each StringTable has a unique name
-//      to refer to that file.  Every region needs to live in its own file
-//      (3?), so need to juggle O_CREAT with sequenced file existence checks.
-//      Obviously will be MAP_SHARED
-  st->arena = mmap(NULL, ST_ARENA_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  st->arena_reserved = ST_ARENA_SIZE;
-  st->arena_size = 0;
+// ---- Dict Arena
+static void _Dict_arena_init(Dict* dict) {
+  dict->arena = mmap(NULL, DICT_ARENA_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  dict->arena_reserved = DICT_ARENA_SIZE;
+  dict->arena_size = 0;
 
-P_ADBG(st->arena);
+P_ADBG(dict->arena);
 }
 
-static void _StringTable_arena_resize(StringTable* st) {
-  unsigned char* buf = mremap(st->arena, st->arena_reserved, 2*st->arena_reserved, MREMAP_MAYMOVE);
-P_ADBG(buf);
-  if(MAP_FAILED == buf) {} // TODO
+static void _Dict_arena_resize(Dict* dict) {
+  unsigned char* arena_resize_buf = mremap(dict->arena, dict->arena_reserved, 2*dict->arena_reserved, MREMAP_MAYMOVE);
+P_ADBG(arena_resize_buf);
+  if(MAP_FAILED == arena_resize_buf) {} // TODO
 
-  st->arena_reserved *= 2;
-  st->arena = buf;
+  dict->arena_reserved *= 2;
+  dict->arena = arena_resize_buf;
 }
 
-static void _StringTable_arena_free(StringTable* st) {
-  if(st->arena) munmap(st->arena, st->arena_reserved);
-  st->arena = NULL;
+static void _Dict_arena_free(Dict* dict) {
+  if(dict->arena) munmap(dict->arena, dict->arena_reserved);
+  dict->arena = NULL;
 }
 
-static unsigned char* _StringTable_arena_add(StringTable* st, unsigned char* str, size_t len) {
+static int64_t _Dict_arena_add(Dict* dict, unsigned char* str, size_t len) {
   // TODO, the user has no idea if their string was resized.
   // TODO, harmonize the length checks
   // TODO, detect resize errors
   // NB, the offset arena + size is always the first unused byte of the arena
-  if(len > ST_ARENA_SIZE)                      len = ST_ARENA_SIZE - 1 - sizeof(uint32_t); // I hope not!
-  if(len > (2ull<<32) - 1 - sizeof(uint32_t))  len = (2ull<<32)    - 1 - sizeof(uint32_t);
-  while(st->arena_reserved - st->arena_size < sizeof(uint32_t)+ 1 + len) _StringTable_arena_resize(st);
+  if(len > DICT_ARENA_SIZE)
+    len = DICT_ARENA_SIZE - 1 - sizeof(uint32_t); // I hope not!
+  if(len > (2ull<<32) - 1 - sizeof(uint32_t))
+    len = (2ull<<32)- 1 - sizeof(uint32_t);
+  while(dict->arena_reserved < dict->arena_size + sizeof(uint32_t) + 1 + len)
+    _Dict_arena_resize(dict);
 
   // Now we can add it
   unsigned char* ret;
-  memcpy(st->arena, (uint32_t*)&len, sizeof(uint32_t)); st->arena += sizeof(uint32_t);
-  ret = memcpy(st->arena, str, len);                    st->arena += len;
-  memset(st->arena, 0, 1);                              st->arena += 1;
-  return ret;
+  size_t i = dict->arena_size;
+  memcpy(&dict->arena[i], (uint32_t*)&len, sizeof(uint32_t)); i += sizeof(uint32_t);
+  ret = memcpy(&dict->arena[i], str, len);                    i += len;
+  memset(&dict->arena[i], 0, 1);                              i += 1;
+  dict->arena_size += sizeof(uint32_t) + len + 1;
+  return ret - dict->arena;  // Return an offset!
 }
 
-// ---- StringTable Nodes
-static void _StringTable_nodes_init(StringTable* st) {
-  st->nodes = mmap(NULL, ST_ARENA_NELEM*sizeof(StringTableNode), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  st->entry = mmap(NULL, ST_ARENA_NELEM*sizeof(StringTableNode*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  st->nodes_reserved = ST_ARENA_NELEM;
-  st->nodes_size = 0;
-P_ADBG(st->nodes);
-P_ADBG(st->entry);
+// ---- Dict Nodes
+static void _Dict_nodes_init(Dict* dict) {
+  dict->nodes = mmap(NULL, DICT_ARENA_NELEM*sizeof(DictNode), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  dict->entry = mmap(NULL, DICT_ARENA_NELEM*sizeof(DictNode*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  dict->nodes_reserved = DICT_ARENA_NELEM;
+  dict->nodes_size = 0;
+P_ADBG(dict->nodes);
+P_ADBG(dict->entry);
 
   // Especially important to clear the entries
-  memset(st->entry, 0, st->nodes_reserved*sizeof(StringTableNode*));
+  memset(dict->entry, 0, dict->nodes_reserved*sizeof(DictNode*));
 }
 
-static void _StringTable_nodes_resize(StringTable* st) {
+static void _Dict_nodes_resize(Dict* dict) {
   // NOTE, this actually oversizes the entries, since that's the array of leading nodes for each hash, and a hash may have collisions.
   //       the way to handle this is straightforward, but omitted for now.
-  StringTableNode* buf_nodes  = mremap(st->nodes, st->nodes_reserved*sizeof(StringTableNode), 2*st->nodes_reserved*sizeof(StringTableNode), MREMAP_MAYMOVE);
-  StringTableNode** buf_entry = mmap(NULL, 2*st->nodes_reserved*sizeof(StringTableNode*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);  // Have to rehash!
+  DictNode* buf_nodes  = mremap(dict->nodes, dict->nodes_reserved*sizeof(DictNode), 2*dict->nodes_reserved*sizeof(DictNode), MREMAP_MAYMOVE);
+  DictNode** buf_entry = mmap(NULL, 2*dict->nodes_reserved*sizeof(DictNode*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);  // Have to rehash!
 P_ADBG(buf_nodes);
 P_ADBG(buf_entry);
   // TODO check errors
   // TODO if we are to support incremental rehashing, this is where we set the metadata
 
   // Rehash
-  // TODO in addition to being oversized, this is actually a dubious strategy.  We're trying to make sure that the
-  //      number of slots in the hash table is roughly equivalent to the number of entries because it's the simplest
-  //      way of ensuring that conflicts remain low.  The thing is, there's a tradeoff here between rehashes and
-  //      marginally higher lookups (remember that lookups check string length, so the *expensive* case is when
-  //      multiple strings conflict AND they have equal lengths).
-  memset(buf_entry, 0, 2*st->nodes_reserved*sizeof(StringTableNode*));
-  for(ssize_t i = 0; i<st->nodes_size; i++) {
-    if(!st->entry[i]) continue;
-    ssize_t i2 = st->hash_fun(st->entry[i]->string, STR_LEN(st->entry[i]->string)) & (2*st->nodes_reserved - 1);
-    buf_entry[i2] = st->entry[i];
+  // The other way to do this is to create a flag specifying whether a given
+  // arena member is populated, then just start from the top by hashing.
+  // This could potentially terminate in far fewer steps, but with one
+  // additional hash per step.  This is a desirable strategy if the resident
+  // fraction of the hash table exceeds the time multiplier of the additional
+  // hash.  We could implement an online fraction update (if adding a top-level
+  // entry, not a child of an existing entry, increment) and toggle between the
+  // strategies independently of the underlying hash function.  We just do it
+  // the easy way here.
+  // This depends on having an arena strictly for keys, which we do not.
+  memset(buf_entry, 0, 2*dict->nodes_reserved*sizeof(DictNode*));
+  uint32_t mask = 2*dict->nodes_reserved - 1;
+  for(ssize_t i = 0; i<dict->nodes_reserved; i++) {
+    if(!dict->entry[i]) continue; // Nothing in this position, keep going
+
+    // Generate hash for resized table
+    unsigned char* this_key = dict->arena + dict->entry[i]->key;
+    ssize_t i2 = dict->hash_fun(this_key, STR_LEN(this_key)) & mask;
+
+    // Insert into new entries field.  We can keep the old arena, since the node
+    // just hangs onto pointers.
+    DictNode_add(buf_entry, dict->entry[i], i2);
   }
-  munmap(st->entry, st->nodes_reserved*sizeof(StringTableNode*));
+  munmap(dict->entry, dict->nodes_reserved*sizeof(DictNode*));
 
   // Update
-  st->nodes_reserved *= 2;
-  st->nodes = buf_nodes;
-  st->entry = buf_entry;
+  dict->nodes_reserved *= 2;
+  dict->nodes = buf_nodes;
+  dict->entry = buf_entry;
 }
 
-static void _StringTable_nodes_free(StringTable* st) {
-  if(st->nodes) munmap(st->nodes, st->nodes_reserved*sizeof(StringTableNode));
-  if(st->entry) munmap(st->entry, st->nodes_reserved*sizeof(StringTableNode*));
-  st->nodes_reserved = 0;
-  st->nodes_size = 0;
-  st->nodes = NULL;
-  st->entry = NULL;
+static void _Dict_nodes_free(Dict* dict) {
+  if(dict->nodes) munmap(dict->nodes, dict->nodes_reserved*sizeof(DictNode));
+  if(dict->entry) munmap(dict->entry, dict->nodes_reserved*sizeof(DictNode*));
+  dict->nodes_reserved = 0;
+  dict->nodes_size = 0;
+  dict->nodes = NULL;
+  dict->entry = NULL;
 }
 
-static StringTableNode* _StringTable_nodes_add(StringTable* st, unsigned char* arena_str, ssize_t idx) {
-  while(st->nodes_reserved <= st->nodes_size) _StringTable_nodes_resize(st);
+static DictNode* _Dict_nodes_add(Dict* dict, int64_t arena_key, int64_t arena_val) {
+  while(dict->nodes_reserved <= dict->nodes_size) _Dict_nodes_resize(dict);
 
-  size_t i = st->nodes_size++;
-  StringTableNode* node = &st->nodes[i];
+  size_t i = dict->nodes_size++;
+  DictNode* node = &dict->nodes[i];
 
-  node->string = arena_str;
-  node->idx = idx;
+  node->key = arena_key;
+  node->val = arena_val;
   node->next = NULL;
   return node;
 }
 
-// ---- StringTable Table
-static void _StringTable_table_init(StringTable* st) {
-  st->table = mmap(NULL, ST_ARENA_NELEM*sizeof(char*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  st->table_reserved = ST_ARENA_NELEM;
-  st->table_size = 0;
-P_ADBG(st->table);
-P_ADBG(st->nodes);
-P_ADBG(st->entry);
+
+// ---- DictNode
+static char DictNode_add(DictNode** entry, DictNode* node, uint32_t h) {
+  // assume h fits
+  if(!entry || !node) return -1;
+
+  if(!entry[h]) {
+    entry[h] = node;
+  } else {
+    DictNode* parent = entry[h];
+    while(parent->next) parent = parent->next;
+    parent->next = node;
+  }
+  return 0;
 }
 
-static void _StringTable_table_resize(StringTable* st) {
-  unsigned char** buf = mremap(st->table, st->table_reserved*sizeof(char*), 2*st->table_reserved*sizeof(char*), MREMAP_MAYMOVE);
-P_ADBG(buf);
-  // TODO errors
-
-  st->table = buf;
-  st->table_reserved *= 2;
-}
-
-static void _StringTable_table_free(StringTable* st) {
-  if(st->table) munmap(st->table, st->table_reserved*sizeof(char*));
-  st->table = NULL;
-}
-
-static ssize_t _StringTable_table_add(StringTable* st, unsigned char* arena_str) {
-  while(st->table_reserved <= st->table_size) _StringTable_table_resize(st);
-
-  ssize_t idx = st->table_size++;
-  st->table[idx] = arena_str;
-  return idx;
-}
-
-// ---- StringTable
-StringTable* stringtable_init() {
-  StringTable* ret = calloc(1, sizeof(StringTable));
+// ---- Dict
+Dict* dict_init() {
+  Dict* ret = calloc(1, sizeof(Dict));
   if(ret) {
-    _StringTable_arena_init(ret);
-    _StringTable_nodes_init(ret);
-    _StringTable_table_init(ret);
+    _Dict_arena_init(ret);
+    _Dict_nodes_init(ret);
 
     // Be explicit about options
-    ret->logging = 1;
+    ret->logging = 0; // UNIMPLEMENTED
     ret->hash_fun = wyhash_hash;
   }
   return ret; // NB NULL if borked
 }
 
-void stringtable_free(StringTable* st) {
-  _StringTable_arena_free(st);
-  _StringTable_nodes_free(st);
-  _StringTable_table_free(st);
-
-  free(st); st = NULL;
+void dict_free(Dict* dict) {
+  // Caller must free dict, since it might be allocated on the stack
+  _Dict_arena_free(dict);
+  _Dict_nodes_free(dict);
 }
 
-// Gives -1 if string is not interned, the index if it is
-ssize_t stringtable_lookup(StringTable* st, unsigned char* str, size_t len) {
-  ssize_t h = st->hash_fun(str, len) & (st->nodes_reserved - 1);
-  StringTableNode* node = st->entry[h];
-  if(!node) return -1; // Not found!
+// Gives NULL if key is not populated, ptr to arena val if it is
+unsigned char* dict_get(Dict* dict, unsigned char* key, size_t len) {
+  ssize_t h = dict->hash_fun(key, len) & (dict->nodes_reserved - 1);
+  DictNode* node = dict->entry[h];
+  if(!node) return NULL; // Not found!
 
-  while(len != STR_LEN(node->string) && memcmp(str, node->string, len)) {
+  while(len != STR_LEN(dict->arena + node->key) &&
+        memcmp(key, dict->arena + node->key, len)) {
     if(!node->next)
-      return -1;
+      return NULL;
     node = node->next;
   }
-  return node->idx;
+  return node->val + dict->arena;
 }
 
-unsigned char* stringtable_get(StringTable* st, ssize_t idx) {
-  if(idx < 0 || idx > st->table_size) return NULL;
-  return st->table[idx];
+unsigned char* dict_get_1(Dict* dict, char* key) {
+  return dict_get(dict, (unsigned char*)key, strlen(key));
 }
 
-ssize_t stringtable_add(StringTable* st, unsigned char* str, size_t len) {
-  ssize_t idx = stringtable_lookup(st, str, len);
-  if(-1 == idx) {
+char dict_add(Dict* dict, unsigned char* key, size_t key_sz, unsigned char* val, size_t val_sz) {
+  unsigned char* found = dict_get(dict, key, key_sz);
+  if(!found) {
     // TODO, the mask can overrun.  :)
-    unsigned char* arena_str = _StringTable_arena_add(st, str, len); // Add to the arena
-
-    // Register in the string table
-    idx = _StringTable_table_add(st, arena_str);
+    int64_t arena_key = _Dict_arena_add(dict, key, key_sz);
+    if(!arena_key) return -1;
+    int64_t arena_val = _Dict_arena_add(dict, val, val_sz);
+    if(!arena_val) return -1;
 
     // Add to the nodes
-    StringTableNode* node = _StringTable_nodes_add(st, arena_str, idx);
+    DictNode* node = _Dict_nodes_add(dict, arena_key, arena_val);
 
     // Compute the hash and update the entries
-    uint32_t h = st->hash_fun(str, len) & (st->nodes_reserved - 1);
-    if(!st->entry[h]) {
-      st->entry[h] = node;
-    } else {
-      StringTableNode* entry = st->entry[h];
-      while(entry->next) entry = entry->next;
-      entry->next = node;
-    }
-
-    // If we were compiled with logging support AND logging is enabled, then
-    // write to a newline-delimited file for later analysis.
-#ifdef D_LOGGING_ENABLE
-#include <unistd.h>
-    static char tmp_name[32] = "/tmp/stringtableXXXXXX" ".log";
-    static int tmp_fd = -111;
-    if(st->logging) {
-      if(tmp_fd == -111) {
-        tmp_fd = mkstemps(tmp_name, strlen(".log"));
-        printf("Saving log to %s\n", tmp_name);
-      }
-      write(tmp_fd, arena_str, STR_LEN(arena_str));
-      write(tmp_fd, "\n", 1);
-    }
-#endif
+    uint32_t h = dict->hash_fun(key, key_sz) & (dict->nodes_reserved - 1);
+    if(DictNode_add(dict->entry, node, h)) return -1; // TODO better interface
   }
 
-  return idx;
+  return 0;
 }
 
-ssize_t stringtable_lookup_cstr(StringTable* st, char* str) {
-  return stringtable_lookup(st, (unsigned char*)str, strlen(str));
+char dict_add_01(Dict* dict, unsigned char* key, size_t key_sz, char* val) {
+  return dict_add(dict, key, key_sz, (unsigned char*)val, strlen(val));
 }
 
-ssize_t stringtable_add_cstr(StringTable* st, char* str) {
-  return stringtable_add(st, (unsigned char*)str, strlen(str));
+char dict_add_10(Dict* dict, char* key, unsigned char* val, size_t val_sz) {
+  return dict_add(dict, (unsigned char*)key, strlen(key), val, val_sz);
 }
 
+char dict_add_11(Dict* dict, char* key, char* val) {
+  return dict_add(dict, (unsigned char*)key, strlen(key), (unsigned char*)val, strlen(val));
+}
 
 // Let's make the world a safer place by disabling these
 #undef STR_LEN
