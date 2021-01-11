@@ -48,6 +48,13 @@ typedef struct StringTableNode {
 #define STR_LEN_PTR(x) ((uint32_t*)&(x)[-4])
 #define STR_LEN(x) (*STR_LEN_PTR(x))
 
+typedef struct StringTableOptions {
+  uint64_t hash    : 2, // 0 - djb2, 1 - wyhash, 2 - ???
+           alloc   : 2, // 0 - resized, 1 - chained, 2 - ???
+           logging : 1, // 0 - no, 1 - yes
+           _reserved : 3;
+} StringTableOptions;
+
 typedef struct StringTable {
   // Elements governing the string arena
   unsigned char* arena;      // The place where the strings live
@@ -109,7 +116,7 @@ static void _StringTable_table_free(StringTable*);
 static ssize_t _StringTable_table_add(StringTable*, unsigned char*);
 
 // Public API
-StringTable* stringtable_init();
+StringTable* stringtable_init(StringTableOptions* opts);
 void stringtable_free(StringTable*);
 ssize_t stringtable_lookup(StringTable*, unsigned char*, size_t);
 unsigned char* stringtable_get(StringTable*, ssize_t);
@@ -366,20 +373,24 @@ static char StringTableNode_add(StringTableNode** entry, StringTableNode* node, 
 }
 
 // ---- StringTable
-StringTable* stringtable_init() {
+StringTable* stringtable_init(StringTableOptions * opts) {
+  static StringTableOptions default_opts = {.hash=1, .alloc=1, .logging=0};
+  if(!opts) opts = &default_opts;
   StringTable* ret = calloc(1, sizeof(StringTable));
   if(!ret)
     return NULL;
 
+  // Set options
+  ret->logging = opts->logging;
+  ret->hash_fun = opts->hash ? wyhash_hash : djb2_hash;
+  ret->mode = opts->alloc;
+
+  // Run internal initializers
   if(_StringTable_arena_init(ret) ||
      _StringTable_nodes_init(ret) ||
      _StringTable_table_init(ret))
     return NULL;
 
-  // Be explicit about options
-  ret->logging = 1;
-  ret->hash_fun = wyhash_hash;
-  ret->mode = 1; // Default to use chained allocator
   return ret;
 }
 
