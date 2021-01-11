@@ -374,7 +374,7 @@ char pprof_Init(DProf* dp, char** sample_names, char** sample_units, size_t n_sa
       dp->intern_string     = pprof_stringtable_intern;
       dp->string_table      = pprof_stringtable_gettable;
       dp->string_table_size = pprof_stringtable_size;
-      dp->string_table_data = stringtable_init();
+      dp->string_table_data = stringtable_init(&(StringTableOptions){.hash=1, .alloc=1, .logging=0});
       ((StringTable*)dp->string_table_data)->logging = 1; // TODO make this configurable
       break;
   }
