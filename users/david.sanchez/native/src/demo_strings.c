@@ -3,7 +3,7 @@
 #include "string_table.h"
 
 int main() {
-  StringTable* st = stringtable_init();
+  StringTable* st = stringtable_init(NULL);
   if(!st) return -1;
 
   FILE* fs = fopen("./words.txt", "r");
