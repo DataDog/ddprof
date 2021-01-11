@@ -32,7 +32,7 @@ unwind: src/eg_unwind.c
 perf: src/eg_perf.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o eg/$@ $^ $(LDLIBS)
 
-pprof: src/eg_pprof.c src/profile.pb-c.c
+pprof: src/eg_pprof.c src/string_table.c src/pprof.c src/profile.pb-c.c
 	$(CC) -DKNOCKOUT_UNUSED -DD_LOGGING_ENABLE $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o eg/$@ $^ $(LDLIBS)
 
 procutils: src/eg_procutils.c
@@ -44,9 +44,8 @@ procutils-tidy: src/eg_procutils.c
 collatz: src/demo_collatz.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
 
-strings: src/demo_strings.c
+strings: src/demo_strings.c src/string_table.c
 	$(CC) -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
-#	$(CC) -DD_ALLOC_DBG -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
 
 dict: src/demo_dict.c
 	$(CC) -DD_ALLOC_DBG -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^

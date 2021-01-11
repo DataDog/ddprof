@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <x86intrin.h>
+#include <zlib.h>
 
 #include "pprof.h"
 
