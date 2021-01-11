@@ -32,13 +32,6 @@ uint32_t wyhash_hash(unsigned char* str, size_t len) {
 }
 
 /*
- * A couple of notes:
- * StringTable's arena is a power-of-two.  It tries to use Linux features to
- * resize-in-place and copies if that fails.  An additional failover would be to
- * implement incremental rehashing, but punting on that for now.
- * Similarly, the nodes are power-of-two.
- *
- * THE MOST IMPORTANT NOTE OF ALL:
  * All of the strings interned by this library into the string arena are
  * prepended by a FOUR BYTE LENGTH.  Yes, you are reading this correctly.  This
  * library inserts garbage into the string table, presuming that nobody is
@@ -66,6 +59,16 @@ typedef struct StringTable {
   StringTableNode** entry;   // Indirection for hashing
   uint32_t nodes_reserved;   // How many ELEMENTS are reserved
   uint32_t nodes_size;
+  uint8_t mode;              // 0 - mmap/resize, 1 - alloc/chained
+  union {
+    struct {
+      uint64_t _reserved[33];   // No state necessary for resize arena
+    };
+    struct {
+      uint64_t chained_idx;
+      StringTableNode* chained_arenas[32]; // Stores state for chained allocator
+    };
+  };
 
   // For convenience to prevent having to walk the table again later
   unsigned char** table;
@@ -86,8 +89,14 @@ typedef struct StringTable {
 
 // Internal functions
 static char StringTableNode_add(StringTableNode**, StringTableNode*, uint32_t);
+static char _StringTable_arena_init_resized(StringTable*);
+static char _StringTable_arena_init_chained(StringTable*);
 static char _StringTable_arena_init(StringTable*);
+static char _StringTable_arena_resize_resized(StringTable*);
+static char _StringTable_arena_resize_chained(StringTable*);
 static char _StringTable_arena_resize(StringTable*);
+static void _StringTable_arena_free_resized(StringTable*);
+static void _StringTable_arena_free_chained(StringTable*);
 static void _StringTable_arena_free(StringTable*);
 static unsigned char*_StringTable_arena_add(StringTable*, unsigned char*, size_t);
 static char _StringTable_nodes_init(StringTable*);
@@ -109,7 +118,7 @@ ssize_t stringtable_add_cstr(StringTable*, char*);
 
 // -------- Implementation
 // ---- StringTable Arena
-static char _StringTable_arena_init(StringTable* st) {
+static char _StringTable_arena_init_resized(StringTable* st) {
 // TODO This can be changed to allow multiple threads or processes to coordinate
 //      on the same string table.  The outline is to mmap() to a file or tmp,
 //      then during initialization make sure each StringTable has a unique name
@@ -126,7 +135,21 @@ P_ADBG(st->arena);
   return 0;
 }
 
-static char _StringTable_arena_resize(StringTable* st) {
+static char _StringTable_arena_init_chained(StringTable* st) {
+  return _StringTable_arena_resize_chained(st);
+}
+
+static char _StringTable_arena_init(StringTable* st) {
+  switch(st->mode) {
+  case 0:
+    return _StringTable_arena_init_resized(st);
+  case 1:
+    return _StringTable_arena_init_chained(st);
+  }
+  return -1;
+}
+
+static char _StringTable_arena_resize_resized(StringTable* st) {
   unsigned char* arena_buf = mremap(st->arena, st->arena_reserved, 2*st->arena_reserved, MREMAP_MAYMOVE);
 P_ADBG(arena_buf);
   if(MAP_FAILED == arena_buf) {
@@ -134,8 +157,7 @@ P_ADBG(arena_buf);
     return -1;
   }
 
-  // We need to go through and adjust the old pointers.  This is trivially solved
-  // by allocating a new region rather than resizing.
+  // We need to go through and adjust the old pointers.
   if(arena_buf != st->arena) {
     int64_t offset = arena_buf - st->arena; // no
     for(uint64_t i=0; i < st->table_size; i++) {
@@ -150,9 +172,44 @@ P_ADBG(arena_buf);
   return 0;
 }
 
-static void _StringTable_arena_free(StringTable* st) {
+static char _StringTable_arena_resize_chained(StringTable *st) {
+  StringTableNode* arena_buf_chained = calloc(2, st->arena_reserved);
+P_ADBG(arena_buf_chained);
+  if(!arena_buf_chained) return -1;
+
+  st->chained_arenas[st->chained_idx++] = arena_buf_chained;
+  st->nodes = arena_buf_chained;
+  return 0;
+}
+
+static char _StringTable_arena_resize(StringTable *st) {
+  switch(st->mode) {
+  case 0:
+    return _StringTable_arena_resize_resized(st);
+  case 1:
+    return _StringTable_arena_resize_chained(st);
+  }
+  return -1;
+}
+
+static void _StringTable_arena_free_resized(StringTable* st) {
   if(st->arena) munmap(st->arena, st->arena_reserved);
   st->arena = NULL;
+}
+
+static void _StringTable_arena_free_chained(StringTable* st) {
+  for(uint64_t i=0; i<st->chained_idx; i++)
+    if(st->chained_arenas[i]) {
+      free(st->chained_arenas[i]);
+      st->chained_arenas[i] = NULL;
+    }
+}
+
+
+static void _StringTable_arena_free(StringTable* st) {
+  if(0 == st->mode) _StringTable_arena_free_resized(st);
+  if(1 == st->mode) _StringTable_arena_free_chained(st);
+  return;
 }
 
 static unsigned char* _StringTable_arena_add(StringTable* st, unsigned char* str, size_t len) {
@@ -322,6 +379,7 @@ StringTable* stringtable_init() {
   // Be explicit about options
   ret->logging = 1;
   ret->hash_fun = wyhash_hash;
+  ret->mode = 1; // Default to use chained allocator
   return ret;
 }
 
