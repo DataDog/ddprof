@@ -1,30 +1,58 @@
+#include <stdlib.h>
+#include <stdio.h>
+
 #include "dictionary.h"
 
 int main() {
-  Dict* dict = dict_init();
-  if(!dict) return -1;
+  Dictionary* dict = dictionary_init(NULL, NULL);
+  if(!dict) return -1; // error
+  char key1[] = "HELLO";
+  dictionary_put_cstr(dict, key1, "5\0", 2);
 
+  printf("String: %s\n", (char*)dictionary_get_cstr(dict, key1));
+
+  dictionary_del_cstr(dict, key1);
+
+  if(DICT_NA == dictionary_get_cstr(dict, key1))
+    printf((DICT_NA == dictionary_get_cstr(dict, key1)) ? "SUCCESS\n" : "FAILURE\n");
+
+  dictionary_add_cstr(dict, key1, "1234\0", 5);
+  printf("String: %s\n", (char*)dictionary_get_cstr(dict, key1));
+
+  if(-1==dictionary_add_cstr(dict, key1, "1234\0", 5))
+    printf("SUCCESS\n");
+
+  dictionary_put_cstr(dict, key1, "4321\0", 5);
+  printf("String: %s\n", (char*)dictionary_get_cstr(dict, key1));
+
+  // Cool!  Now try stuffing it
   FILE* fs = fopen("./words.txt", "r");
   char* line = NULL; size_t len = 0;
-  ssize_t n;
-  while(-1 != (n=getline(&line, &len, fs))) {
-    if(-1 == dict_add(dict, (unsigned char*)line, len, (unsigned char*)line, len)) {
+  size_t lines=0;
+  while(-1 != getline(&line, &len, fs)) {
+    line[4] = 0;
+    if(-1 == dictionary_add_cstr(dict, line, "foo\0", 4)) {
       printf("FAILURE\n");
       return -1;
     }
+    lines++;
   }
   fclose(fs);
 
-  // Validate
+  // Now do another scan and make sure after resizing that all entries can be
+  // obtained
   fs = fopen("./words.txt", "r");
-  n=0;
-  while(-1 != (n=getline(&line, &len, fs))) {
-    unsigned char* val = dict_get(dict, (unsigned char*)line, len-1);
-    if(!val)
-      continue;
-    if(memcmp(val, line, len-1)) {
-      printf("[FAIL] %s != %s\n", dict_get(dict, (unsigned char*)line, len-1), line);
+  while(-1 != getline(&line, &len, fs)) {
+    line[4] = 0;
+    if(!dictionary_get_cstr(dict, line)) {
+      printf("FAILURE\n");
+      return -1;
     }
+    lines++;
   }
+  fclose(fs);
+
+  dictionary_free(dict);
+  free(dict);
   return 0;
 }
