@@ -47,5 +47,6 @@ int main() {
 
   }
   fclose(fs);
+  stringtable_free(st);
   return 0;
 }
