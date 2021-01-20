@@ -1,27 +1,51 @@
 #include <stdio.h>
+#include <signal.h>
 
 #include "string_table.h"
 
 int main() {
-  StringTable* st = stringtable_init(NULL);
+  StringTable* st = stringtable_init(NULL, NULL);
   if(!st) return -1;
 
   FILE* fs = fopen("./words.txt", "r");
   char* line = NULL; size_t len = 0;
-  ssize_t n;
-  size_t lines=0;
-  while(-1 != (n=getline(&line, &len, fs))) {
-    line[4] = 0;
-    if(-1 == stringtable_add(st, (unsigned char*)line, 4)) { // hardcoded length
-      printf("FAILURE\n");
+  ssize_t this_line, that_line;
+
+  // Do one pass with back-to-back insert and check.  This verifies a few things
+  //  * Allocation-time metadata is set properly
+  //  * Allocations don't mess up incremental metadata
+  //  * Referenes are propagated to nodes
+  while(-1 != getline(&line, &len, fs)) {
+    this_line =  stringtable_add(st, (unsigned char*)line, 4); // Hardcode length since these are newline-delimited
+    if(-1 == this_line) {
+      printf("ADD FAILURE\n");
+      raise(SIGINT);
       return -1;
     }
-    lines++;
+    that_line = stringtable_lookup(st, (unsigned char*)line, 4, NULL);
+    if(that_line != this_line) {
+      line[4] = 0;
+      printf("LOOKUP FAILURE: %s: %ld/%ld\n", line, this_line, that_line);
+      raise(SIGINT);
+      return -1;
+    }
   }
   fclose(fs);
 
-  // And return everything
-  printf("Processed %ld lines\n", lines);
-  stringtable_free(st);
+  // Do one pass with just checks of the already-inserted data.  This is to
+  // verify that resizing operations properly maintain metadata
+  fs = fopen("./words.txt", "r");
+  while(-1 != getline(&line, &len, fs)) {
+    this_line = stringtable_lookup(st, (unsigned char*)line, 4, NULL);
+    if(memcmp(line, (char*)stringtable_get(st, this_line), 4)) {
+      line[4] = 0;
+      printf("RESIZE FAILURE: %s\n", line);
+      raise(SIGINT);
+      stringtable_lookup(st, (unsigned char*)line, 4, NULL);
+      return -1;
+    }
+
+  }
+  fclose(fs);
   return 0;
 }

@@ -1,9 +1,10 @@
 INCLUDE = -Iinclude -I/home/sanchda/dev/binutils-gdb/include -I/home/sanchda/dev/binutils-gdb/bfd -I/home/sanchda/dev/binutils-gdb/binutils
-CFLAGS = -ggdb3 -std=c11 -O0 -D_GNU_SOURCE
+CFLAGS = -ggdb3 -std=c11 -O3 -D_GNU_SOURCE
 TESTS := http perf pprof
 WARNS := -Wall -Wextra -Wpedantic
-ANALYZER := -fanalyzer
+#ANALYZER := -fanalyzer
 CC := gcc-10
+CC := clang-11
 LDLIBS := -lunwind -lprotobuf-c -lz -lpthread -lunwind -lunwind-x86_64 -lelf -lbfd
 
 # NOTE
@@ -44,11 +45,14 @@ procutils-tidy: src/eg_procutils.c
 collatz: src/demo_collatz.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
 
-strings: src/demo_strings.c src/string_table.c
-	$(CC) -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
+#strings: src/demo_strings.c src/string_table.c
+#	$(CC) -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
 
-dict: src/demo_dict.c
-	$(CC) -DD_ALLOC_DBG -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
+strings: src/demo_strings.c src/string_table.c
+	$(CC) -DD_LOGGING_ENABLE -DD_SANITY_CHECKS $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
+
+dictionary: src/demo_dict.c src/string_table.c src/dictionary.c
+	$(CC) -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
 
 all: dd-prof http perf pprof collatz ddog
 
