@@ -18,8 +18,8 @@ endif
 
 .PHONY: all clean install
 
-dd-prof: src/dd-prof.c src/profile.pb-c.c
-	$(CC) -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
+dd-prof: src/dd-prof.c src/profile.pb-c.c src/string_table.c src/dictionary.c src/pprof.c
+	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 
 ddog: src/ddog.c src/profile.pb-c.c
 	$(CC) -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)

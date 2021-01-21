@@ -24,11 +24,11 @@ typedef struct DDRequest {
   char*  service;
   char*  version;
   char*  __reserved[8]; // See dd-prof.c .  Sorry!
-  Dict* D;
+  Dictionary* D;
 } DDRequest;
 
 void ddr_addtag(DDRequest* ddr, char* tag, char* val) {
-  DictSet(ddr->D, tag, val, 1+strlen(val));
+  dictionary_put_cstr(ddr->D, tag, val, 1+strlen(val));
 }
 
 char apikey_isvalid(char* key) {
@@ -57,7 +57,7 @@ void DDRequestInit(DDRequest* ddr) {
   GEV(version, DD_VERSION);
 
   if(ddr->key && !apikey_isvalid(ddr->key))
-    memset(ddr->key, 0, sizeof(ddr->key));
+    memset(ddr->key, 0, strlen(ddr->key));
 
   return;
 }
@@ -72,16 +72,18 @@ void DDRequestSend(DDRequest* ddr, DProf* dp) {
   pprof_durationUpdate(dp);
 
   // Serialize and zip pprof
-  char* buf;
+  unsigned char* buf;
   size_t sz_packed = perftools__profiles__profile__get_packed_size(pprof);
   size_t sz_zipped = pprof_zip(dp, (buf=malloc(sz_packed)), sz_packed);
 
   // Add API key if one is provided
   if(strlen(ddr->key))
-    DictSet(ddr->D, "DD_API_KEY", ddr->key, strlen(ddr->key)+1);
+    dictionary_put_cstr(ddr->D, "DD_API_KEY", ddr->key, strlen(ddr->key));
 
-  // Add zipped payload to dictionary
-  DictSet(ddr->D, "pprof[0]", buf, sz_zipped); // TODO DO NOT COPY THIS.
+  // Add zipped payload to dictionary.  This stashes the pointer to the buffer,
+  // so note that it still needs to be freed!
+  dictionary_put_cstr(ddr->D, "pprof[0]", &buf, sizeof(unsigned char*));
+  dictionary_put_cstr(ddr->D, "pprof[0].length", (void*)sz_zipped, sizeof(size_t));
 
 #ifdef DD_DBG_PROFGEN
   printf("Printing a pprof!\n");
@@ -100,7 +102,7 @@ void DDRequestSend(DDRequest* ddr, DProf* dp) {
   }
 
   // Cleanup
-  DictSet(ddr->D, "pprof[0]", "", sizeof(char));
+  dictionary_put_cstr(ddr->D, "pprof[0]", "", sizeof(char));
   free(buf);
   pprof_sampleClear(dp);
   pprof_timeUpdate(dp);

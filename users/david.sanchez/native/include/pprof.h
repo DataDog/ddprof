@@ -234,4 +234,15 @@ static inline void pprof_durationSet(DProf* dp, int64_t duration_nanos) {
   dp->pprof.duration_nanos = duration_nanos;
 }
 
+/*******************************************************************************
+ * Clears the sample list from a pprof
+ *
+ * Clears the samples from a pprof without clearing the underlying locations,
+ * mappings, string table, or other metadata.  This is useful when the
+ * functions, etc, are assumed to be common between sampling periods.
+ *
+ * @param dp An initialized DProf object
+ ******************************************************************************/
+char pprof_sampleClear(DProf*);
+
 #endif

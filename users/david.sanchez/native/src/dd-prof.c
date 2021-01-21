@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <sys/mman.h>
+#include <sys/time.h>
 
 #include "perf.h"
 #include "unwind.h"
@@ -145,7 +146,7 @@ void print_help() {
 "  -r, --sample_rate:\n"
 "  -u, --upload_period:\n"
 "  -x, --prefix:\n";
-  printf(help_msg);
+  printf("%s\n", help_msg);
 }
 
 
@@ -162,7 +163,8 @@ int main(int argc, char** argv) {
   |                             Process Options                                |
   \****************************************************************************/
   int c = 0, oi = 0;
-  struct DDProfContext* ctx = &(struct DDProfContext){ .ddr = &(DDRequest){.D = &(Dict){0}}};
+  struct DDProfContext* ctx = &(struct DDProfContext){ .ddr = &(DDRequest){.D = &(Dictionary){0}}};
+  dictionary_init(ctx->ddr->D, NULL);
   DDRequest* ddr = ctx->ddr;
 
   struct option lopts[] = {

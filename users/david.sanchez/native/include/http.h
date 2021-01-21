@@ -14,65 +14,7 @@
 #include <time.h>
 #include <unistd.h>
 
-// fat pointer that decays into the underlying void pointer
-typedef struct fat {
-  void*  ptr;
-  size_t sz;
-} fat;
-
-// Done dirt cheap
-// TODO fine for now, but do a dictionary correctly
-#define DICT_SIZE 128
-typedef struct Dict {
-  size_t n;
-  void* key[DICT_SIZE];
-  fat*  val[DICT_SIZE];
-} Dict;
-
-// This is cute until malloc fails.
-void* fatdup(const void* A, const size_t sz_A) {
-  return memcpy(malloc(sz_A), A, sz_A);
-}
-
-int64_t DictSet(Dict* D, const char* k, const void* v, const size_t sz_v) {
-  // TODO we need to be more formal about whether the caller is allowed to
-  //      clear the value.  I guess they can currently unset a value by
-  //      setting it with something empty.  shrug.jpeg
-  size_t i=0;
-  if(D->n > DICT_SIZE) {} // TODO
-  if(!k || !v || !sz_v)
-    return -1;
-  for(i=0; i<D->n; i++)
-    if(D->key[i] && !strcmp(k, D->key[i])) {
-      if(D->val[i]) {
-        free(D->val[i]);
-        D->val[i] = NULL;
-      }
-      break;
-    }
-
-  // If we're here, we either matched an entry and i is set accordingly, or
-  // we did not and i is the length.
-  D->key[i] = strdup(k);
-  D->val[i] = malloc(sizeof(fat));
-  D->val[i]->ptr = memcpy(malloc(sz_v), v, sz_v);
-  D->val[i]->sz  = sz_v;
-  return (i==D->n) ? D->n++ : i;
-}
-
-void* DictGet(Dict* D, const char* k) {
-  for(int i=0; i<D->n; i++)
-    if(!strcmp(k, D->key[i]))
-      return D->val[i];
-  return NULL;
-}
-
-void DictClear(Dict* D) {
-  for(int i=0; i<D->n; i++) {
-    if(D->key[i]) free(D->key[i]);
-    if(D->val[i]) free(D->val[i]);
-  }
-}
+#include "dictionary.h"
 
 char* RandomNameMake(char* s, int n) {
   static char tokens[] = "0123456789abcdef";
@@ -159,9 +101,14 @@ typedef enum HTTP_RET {
 } HTTP_RET;
 
 
+// string_table copypasta, replace with functions
+#define STR_LEN_PTR(x) ((uint32_t*)&(x)[-4])
+#define STR_LEN(x) (*STR_LEN_PTR(x))
+
+#define DG(x) dictionary_get_cstr(payload, (x))
 #define MISUB(x,y) ASAddMulti(&as_bod, boundary, &(MultiItem){x, NULL, (y)})
-#define MISUBD(x,y) ASAddMulti(&as_bod, boundary, &(MultiItem){x, NULL, *(char**)DictGet(payload, (y))})
-char HttpSendMultipart(const char* host, const char* port, const char* route, Dict* payload) {
+#define MISUBD(x,y) ASAddMulti(&as_bod, boundary, &(MultiItem){x, NULL, (char*)DG(y)})
+char HttpSendMultipart(const char* host, const char* port, const char* route, Dictionary* payload) {
   struct addrinfo* addr;
   if(getaddrinfo(host, port, NULL, &addr)) {
     return HTTP_EADDR;
@@ -180,16 +127,17 @@ char HttpSendMultipart(const char* host, const char* port, const char* route, Di
   char boundary[60+4];
   RandomNameMake(boundary, 62);
   boundary[0] = boundary[1] = '-';
-  char hdr_host[256] = {0}; snprintf(hdr_host, 256, "Host: %s:%s\r\n", host, port);
-  char hdr_agent[] = "User-Agent: Native-http-client/0.1\r\n"; // TODO version header
-  char hdr_accept[] = "Accept: */*\r\n";
-  char hdr_apikey[256];
-  char hdr_content[256] = {0}; snprintf(hdr_content, 256, "Content-Type: multipart/form-data; boundary=%s\r\n", &boundary[2]);
-  char hdr_encoding[] = "Accept-Encoding: gzip\r\n";
+  static char hdr_host[256] = {0}; snprintf(hdr_host, 256, "Host: %s:%s\r\n", host, port);
+  static char hdr_agent[] = "User-Agent: Native-http-client/0.1\r\n"; // TODO version header
+  static char hdr_accept[] = "Accept: */*\r\n";
+  static char hdr_apikey[256];
+  static char hdr_content[256] = {0}; snprintf(hdr_content, 256, "Content-Type: multipart/form-data; boundary=%s\r\n", &boundary[2]);
+  static char hdr_encoding[] = "Accept-Encoding: gzip\r\n";
 
   // If an API key is defined, use it
-  if(DictGet(payload, "DD_API_KEY"))
-    snprintf(hdr_apikey,256,"DD-API-KEY:%s\r\n", *(char**)DictGet(payload, "DD_API_KEY"));
+  unsigned char* val;
+  if((val = DG("DD_API_KEY")))
+    snprintf(hdr_apikey,256,"DD-API-KEY:%s\r\n", (char*)val);
 
   // Put together the payload and compute the length
   AppendString as_hdr = {0}; ASInit(&as_hdr);
@@ -213,10 +161,8 @@ char HttpSendMultipart(const char* host, const char* port, const char* route, Di
   MISUBD("tags[]", "tags.host");
   MISUBD("tags[]", "tags.service");
   MISUBD("tags[]", "tags.language");
-  if(DictGet(payload, "pprof[0]")) {
-    fat* packed_pprof = (fat*)DictGet(payload, "pprof[0]");
-    ASAddMulti(&as_bod, boundary, &(MultiItem){"data[0]\"; filename=\"pprof-data", "application/octet-stream", (char*)packed_pprof->ptr, packed_pprof->sz });
-  }
+  if((val=DG("pprof[0]")))
+    ASAddMulti(&as_bod, boundary, &(MultiItem){"data[0]\"; filename=\"pprof-data", "application/octet-stream", (char*)val, STR_LEN(val)});
   MISUB("types[0]", "samples,cpu"); // TODO Don't hardcode
   MISUB("format", "pprof");
   MISUBD("tags[]", "tags.runtime");
