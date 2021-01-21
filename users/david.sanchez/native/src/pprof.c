@@ -94,11 +94,11 @@ uint64_t pprof_stringtable_intern(void* state, char* str) {
 }
 
 char** pprof_stringtable_gettable(void* state) {
-  return (char**)((StringTable*)state)->table;
+  return (char**)((StringTable*)state)->arena->entry;
 }
 
 size_t pprof_stringtable_size(void* state) {
-  return (size_t)((StringTable*)state)->table_size;
+  return ((StringTable*)state)->arena->entry_idx;
 }
 
 size_t pprof_strIntern(DProf* dp, char* str) {
@@ -351,19 +351,17 @@ char pprof_sampleFree(PPSample** sample, size_t sz) {
 }
 
 void pprof_timeUpdate(DProf* dp) {
-  PPProfile* pprof = &dp->pprof;
-  if(!pprof) return;
+  if(!dp) return;
   struct timeval tv = {0};
   gettimeofday(&tv, NULL);
-  pprof->time_nanos = (tv.tv_sec*1000*1000 + tv.tv_usec)*1000;
+  pprof_timeSet(dp, (tv.tv_sec*1000*1000 + tv.tv_usec)*1000);
 }
 
 void pprof_durationUpdate(DProf* dp) {
-  PPProfile* pprof = &dp->pprof;
-  if(!pprof) return;
+  if(!dp) return;
   struct timeval tv = {0};
   gettimeofday(&tv, NULL);
-  pprof->duration_nanos = (tv.tv_sec*1000*1000 + tv.tv_usec)*1000 - pprof->time_nanos;
+  pprof_durationSet(dp, (tv.tv_sec*1000*1000 + tv.tv_usec)*1000 - dp->pprof.time_nanos);
 }
 
 char pprof_Init(DProf* dp, char** sample_names, char** sample_units, size_t n_sampletypes) {
@@ -384,7 +382,7 @@ char pprof_Init(DProf* dp, char** sample_names, char** sample_units, size_t n_sa
       dp->intern_string     = pprof_stringtable_intern;
       dp->string_table      = pprof_stringtable_gettable;
       dp->string_table_size = pprof_stringtable_size;
-      dp->string_table_data = stringtable_init(&(StringTableOptions){.hash=1, .alloc=1, .logging=0});
+      dp->string_table_data = stringtable_init(NULL, &(StringTableOptions){.hash=1, .logging=0});
       ((StringTable*)dp->string_table_data)->logging = 1; // TODO make this configurable
       break;
   }
@@ -595,5 +593,3 @@ size_t pprof_zip(DProf* dp, unsigned char* ret, const size_t sz_packed) {
 
   return zs.total_out;
 }
-
-
