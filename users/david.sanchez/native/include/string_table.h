@@ -21,7 +21,7 @@
  * going to want to serialize the whole thing in one go.
  */
 
-typedef uint32_t (*HashFun)(unsigned char*, size_t);
+typedef uint32_t (*HashFun)(const unsigned char*, size_t);
 
 typedef union HashRet {
   struct{
@@ -75,7 +75,7 @@ typedef struct StringTable {
   // Governs the semantics of this string table
   // TODO 32 or 64-bit hashing?  Common wisdom is that dictionaries benefit
   //      from a 32-bit hash for reasons of cache-efficiency.
-  uint32_t (*hash_fun)(unsigned char* key, size_t len);
+  uint32_t (*hash_fun)(const unsigned char* key, size_t len);
   uint8_t logging      : 1, // disabled by default
           hash_type    : 2, // 0-djb2, 1-wyhash, 2-???; CURRENTLY UNUSED, good intentions etc
           __reserved_0 : 5; // Right.
@@ -126,7 +126,7 @@ void stringtable_free(StringTable*);
  *
  * @param hash Pointer to a valid hash or NULL.  If NULL, hash will be computed
  ******************************************************************************/
-ssize_t stringtable_lookup(StringTable*, unsigned char*, size_t, uint32_t*);
+ssize_t stringtable_lookup(StringTable*, const unsigned char*, size_t, uint32_t*);
 
 /*******************************************************************************
  * Checks whether the specified string is interned in the StringTable.
@@ -148,8 +148,8 @@ ssize_t stringtable_lookup(StringTable*, unsigned char*, size_t, uint32_t*);
  *
  * @param hash Pointer to a valid hash or NULL.  If NULL, hash will be computed
  ******************************************************************************/
-ssize_t stringtable_add(StringTable*, unsigned char*, size_t);
-ssize_t stringtable_add_cstr(StringTable*, char*);
+ssize_t stringtable_add(StringTable*, const unsigned char*, size_t);
+ssize_t stringtable_add_cstr(StringTable*, const char*);
 
 /*******************************************************************************
  *

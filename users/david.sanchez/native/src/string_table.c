@@ -26,7 +26,7 @@
 \******************************************************************************/
 // ---- djb2
 // NB, this is not a sophisticated hashing strategy.
-uint32_t djb2_hash(unsigned char* str, size_t len) {
+uint32_t djb2_hash(const unsigned char* str, size_t len) {
   uint32_t ret = 5381;
 
   for(;len;len--)
@@ -36,6 +36,7 @@ uint32_t djb2_hash(unsigned char* str, size_t len) {
 
 
 // The below section as per https://github.com/wangyi-fudan/wyhash
+// Commented lines are modifications to original source
 /******************************************************************************\
 |*                      Inlined wyhash32 Implementation                       *|
 \******************************************************************************/
@@ -62,18 +63,18 @@ static inline unsigned wyhash32(const void *key, uint64_t len, unsigned seed) {
   if(i>=4){ seed^=_wyr32(p); see1^=_wyr32(p+i-4); } else if (i) seed^=_wyr24(p,i);
   _wymix32(&seed, &see1); _wymix32(&seed, &see1); return seed^see1;
 }
-static inline uint64_t wyrand(uint64_t *seed){
-  *seed+=0xa0761d6478bd642full;
-  uint64_t  see1=*seed^0xe7037ed1a0b428dbull;
-  see1*=(see1>>32)|(see1<<32);
-  return  (*seed*((*seed>>32)|(*seed<<32)))^((see1>>32)|(see1<<32));
-}
-static inline unsigned wy32x32(unsigned a,  unsigned  b) { _wymix32(&a,&b); _wymix32(&a,&b); return a^b;  }
-static inline float wy2u01(unsigned r) { const float _wynorm=1.0f/(1ull<<23); return (r>>9)*_wynorm;}
-static inline float wy2gau(unsigned r) { const float _wynorm=1.0f/(1ull<<9); return ((r&0x3ff)+((r>>10)&0x3ff)+((r>>20)&0x3ff))*_wynorm-3.0f;}
+//static inline uint64_t wyrand(uint64_t *seed){
+//  *seed+=0xa0761d6478bd642full;
+//  uint64_t  see1=*seed^0xe7037ed1a0b428dbull;
+//  see1*=(see1>>32)|(see1<<32);
+//  return  (*seed*((*seed>>32)|(*seed<<32)))^((see1>>32)|(see1<<32));
+//}
+//static inline unsigned wy32x32(unsigned a,  unsigned  b) { _wymix32(&a,&b); _wymix32(&a,&b); return a^b;  }
+//static inline float wy2u01(unsigned r) { const float _wynorm=1.0f/(1ull<<23); return (r>>9)*_wynorm;}
+//static inline float wy2gau(unsigned r) { const float _wynorm=1.0f/(1ull<<9); return ((r&0x3ff)+((r>>10)&0x3ff)+((r>>20)&0x3ff))*_wynorm-3.0f;}
 
 static inline unsigned wyhash32(const void*, uint64_t, unsigned);
-uint32_t wyhash_hash(unsigned char* str, size_t len) {
+uint32_t wyhash_hash(const unsigned char* str, size_t len) {
   static unsigned seed = 3913693727; // random large 32-bit prime
   return wyhash32((const void*)str, len, seed);
 }
@@ -86,22 +87,13 @@ uint32_t wyhash_hash(unsigned char* str, size_t len) {
 |*                           Internal Declarations                            *|
 \******************************************************************************/
 static StringTableArena* _StringTableArena_init(StringTableArena*);
-//static char _StringTableArena_expand(StringTableArena*);
 static void _StringTableArena_free(StringTableArena*);
 static char _StringTableArena_reserve(StringTableArena*, size_t);
-//static unsigned char*_StringTableArena_insert(StringTableArena*, unsigned char*, size_t);
 
 static StringTableNodes* _StringTableNodes_init(StringTableNodes*);
-//static char _StringTableNodes_expand(StringTableNodes*);
 static void _StringTableNodes_free(StringTableNodes*);
 static char _StringTableNodes_reserve(StringTableNodes*);
-//static char _StringTableNodes_insert(StringTableNodes*, unsigned char*, ssize_t);
-static StringTableNode* _StringTableNodes_get(StringTableNodes*, unsigned char*, size_t, uint32_t*, HashFun);
-
-//static char _StringTable_table_init(StringTable*);
-//static char _StringTable_table_expand(StringTable*);
-//static void _StringTable_table_free(StringTable*);
-//static ssize_t _StringTable_table_add(StringTable*, unsigned char*);
+static StringTableNode* _StringTableNodes_get(StringTableNodes*, const unsigned char*, size_t, uint32_t*, HashFun);
 
 
 /******************************************************************************\
@@ -261,7 +253,7 @@ static char _StringTableArena_reserve(StringTableArena* sta, size_t length) {
  * @param sz_val the size of the value in bytes.  Does not need to be aligned
  *        size, as that is handled during append
  ******************************************************************************/
-static ssize_t _StringTableArena_append(StringTableArena* sta, unsigned char* val, size_t sz_val) {
+static ssize_t _StringTableArena_append(StringTableArena* sta, const unsigned char* val, size_t sz_val) {
   // If the total size exceeds the minimum arena size, then we could either
   // silently truncate or we could throw an error.  Right now, we silently
   // truncate.  TODO OOB logs
@@ -472,7 +464,7 @@ static char _StringTableNodes_reserve(StringTableNodes* stn) {
  *            underlying function is not currently a property of the
  *            StringTableNodes object, but rather the containing struct.
  *****************************************************************************/
-inline static StringTableNode* _StringTableNodes_get(StringTableNodes* stn, unsigned char* val, size_t sz_val, uint32_t* hash, HashFun fun) {
+inline static StringTableNode* _StringTableNodes_get(StringTableNodes* stn, const unsigned char* val, size_t sz_val, uint32_t* hash, HashFun fun) {
   uint32_t hash_val;
 
   if(hash)
@@ -497,7 +489,7 @@ inline static StringTableNode* _StringTableNodes_get(StringTableNodes* stn, unsi
 /******************************************************************************\
 |*                                 Public API                                 *|
 \******************************************************************************/
-ssize_t stringtable_add(StringTable* st, unsigned char* val, size_t sz_val) {
+ssize_t stringtable_add(StringTable* st, const unsigned char* val, size_t sz_val) {
   // Compute hash
   uint32_t hash_val;
   uint64_t stashed_capacity = st->nodes->entry_capacity;
@@ -609,7 +601,7 @@ void stringtable_free(StringTable* st) {
     free(st);
 }
 
-ssize_t stringtable_lookup(StringTable* st, unsigned char* val, size_t sz_val, uint32_t* hash) {
+ssize_t stringtable_lookup(StringTable* st, const unsigned char* val, size_t sz_val, uint32_t* hash) {
   StringTableNode* node = _StringTableNodes_get(st->nodes, val, sz_val, hash, st->hash_fun);
 
   return (!node) ? -1 : node->idx;
@@ -619,10 +611,10 @@ unsigned char* stringtable_get(StringTable* st, ssize_t idx) {
   return st->arena->entry[idx];
 }
 
-ssize_t stringtable_lookup_cstr(StringTable* st, char* str) {
-  return stringtable_lookup(st, (unsigned char*)str, strlen(str), NULL);
+ssize_t stringtable_lookup_cstr(StringTable* st, const char* str) {
+  return stringtable_lookup(st, (const unsigned char*)str, strlen(str), NULL);
 }
 
-ssize_t stringtable_add_cstr(StringTable* st, char* str){
-  return stringtable_add(st, (unsigned char*)str, strlen(str));
+ssize_t stringtable_add_cstr(StringTable* st, const char* str){
+  return stringtable_add(st, (const unsigned char*)str, strlen(str));
 }

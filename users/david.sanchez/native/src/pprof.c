@@ -45,7 +45,7 @@
 //    here as a horrible baseline.
 #define VOCAB_SZ 4096
 
-size_t addToVocab(char* str, char*** _st, size_t* _sz_st) {
+size_t addToVocab(const char* str, char*** _st, size_t* _sz_st) {
   if(!str) str="";
   char** st    = *_st;
   size_t sz_st = *_sz_st;
@@ -70,7 +70,7 @@ size_t addToVocab(char* str, char*** _st, size_t* _sz_st) {
   return sz_st;
 }
 
-uint64_t vocab_intern(void* state, char* str) {
+uint64_t vocab_intern(void* state, const char* str) {
   PPProfile* pprof = (PPProfile*)state;
   return addToVocab(str, &pprof->string_table, &pprof->n_string_table);
 }
@@ -89,7 +89,7 @@ size_t vocab_get_size(void* state) {
 /******************************************************************************\
 |*                       String Table (string_table.h)                        *|
 \******************************************************************************/
-uint64_t pprof_stringtable_intern(void* state, char* str) {
+uint64_t pprof_stringtable_intern(void* state, const char* str) {
   return stringtable_add_cstr((StringTable*)state, str);
 }
 
@@ -101,7 +101,7 @@ size_t pprof_stringtable_size(void* state) {
   return ((StringTable*)state)->arena->entry_idx;
 }
 
-size_t pprof_strIntern(DProf* dp, char* str) {
+size_t pprof_strIntern(DProf* dp, const char* str) {
   return dp->intern_string(dp->string_table_data, str);
 }
 
@@ -156,7 +156,7 @@ char isEqualMapping(uint64_t map_start, uint64_t map_end, uint64_t map_off, int6
 
 // Returns the ID of the mapping
 // NOTE that this is different from the index of the mapping in the pprof
-uint64_t pprof_mapAdd(DProf* dp, uint64_t map_start, uint64_t map_end, uint64_t map_off, char* filename, char* build) {
+uint64_t pprof_mapAdd(DProf* dp, uint64_t map_start, uint64_t map_end, uint64_t map_off, const char* filename, const char* build) {
   PPProfile* pprof = &dp->pprof;
   uint64_t id_filename = pprof_strIntern(dp, filename);
   uint64_t id_build = pprof_strIntern(dp, build);
@@ -226,7 +226,7 @@ static uint64_t _pprof_funNew(DProf* dp, int64_t id_name, int64_t id_system_name
   return id;
 }
 
-uint64_t pprof_funAdd(DProf* dp, char* name, char* system_name, char* filename, int64_t start_line) {
+uint64_t pprof_funAdd(DProf* dp, const char* name, const char* system_name, const char* filename, int64_t start_line) {
   PPProfile* pprof = &dp->pprof;
   int64_t id_name = pprof_strIntern(dp, name);
   int64_t id_system_name = pprof_strIntern(dp, system_name);
@@ -364,7 +364,7 @@ void pprof_durationUpdate(DProf* dp) {
   pprof_durationSet(dp, (tv.tv_sec*1000*1000 + tv.tv_usec)*1000 - dp->pprof.time_nanos);
 }
 
-char pprof_Init(DProf* dp, char** sample_names, char** sample_units, size_t n_sampletypes) {
+char pprof_Init(DProf* dp, const char** sample_names, const char** sample_units, size_t n_sampletypes) {
   PPProfile* pprof = &dp->pprof;
   // Early sanity checks
   if (!sample_names || !sample_units || 2>n_sampletypes) return -1;

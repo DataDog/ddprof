@@ -12,7 +12,7 @@
 int main() {
   DProf* dp = &(DProf){0};
   dp->table_type = 1; // use string_table.h
-  pprof_Init(dp, (char**)&(char*[]){"samples", "cpu"}, (char**)&(char*[]){"count", "nanoseconds"}, 2);
+  pprof_Init(dp, (const char**)&(const char*[]){"samples", "cpu"}, (const char**)&(const char*[]){"count", "nanoseconds"}, 2);
 
   // Add some fake Mappings
   uint64_t id_map0 = pprof_mapAdd(dp, 2000, 2900, 0, "hello.so", "aaaa");
