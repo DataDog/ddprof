@@ -72,6 +72,7 @@ struct UnwindState {
 /******************************************************************************\
 |*                               Symbol Lookup                                *|
 \******************************************************************************/
+// Forward decl
 //#include "sysdep.h"
 //#include "bfd.h"
 //#include "libiberty.h"
@@ -152,6 +153,7 @@ static void find_address_in_section(bfd* abfd, asection* section, void* arg) {
   flu->done = bfd_find_nearest_line_discriminator(abfd, section, flu->symtab, pc - vma,
                                                   filename, functionname,
                                                   line, discriminator);
+printf("FindAddr: %s\n", functionname);
 }
 
 static void find_offset_in_section(bfd* abfd, asection* section, struct FunLocLookup* flu) {
@@ -170,14 +172,14 @@ static void find_offset_in_section(bfd* abfd, asection* section, struct FunLocLo
   flu->done = bfd_find_nearest_line_discriminator(abfd, section, flu->symtab, pc,
                                                   filename, functionname,
                                                   line, discriminator);
+printf("FindOffset: %s\n", functionname);
 }
 
 static void translate_addresses(struct FunLocLookup* flu, asection* section, uint64_t addr) {
   bfd* abfd = flu->bfd;
   const char** filename = (const char**)&flu->loc->srcpath;
-  const char** functionname = (const char**)&flu->loc->funname;
   unsigned int*  line = &flu->loc->line;
-  unsigned int*  discriminator = &flu->loc->disc;
+//  unsigned int*  discriminator = &flu->loc->disc;
   flu->pc = addr;
   if (bfd_get_flavour(abfd) == bfd_target_elf_flavour) {
     // As per binutils elf-bfd.h
@@ -207,8 +209,9 @@ static void translate_addresses(struct FunLocLookup* flu, asection* section, uin
       flu->loc->funname = buf;
     }
 
-    flu->done = bfd_find_inliner_info(abfd, filename, functionname, line);
+    flu->done = bfd_find_inliner_info(abfd, filename, (const char**)&flu->loc->funname, line);
   }
+printf("Translate: %s\n", flu->loc->funname);
 }
 
 static int process_file(char* file, const char* section_name, uint64_t addr, struct FunLoc* loc) {
@@ -281,6 +284,7 @@ static int process_ip(pid_t pid, uint64_t addr, struct FunLoc* loc) {
   case x:            \
     printf(#x "\n"); \
     break;
+extern int dwarf_search_unwind_table(unw_addr_space_t, unw_word_t, unw_dyn_info_t*, unw_proc_info_t*, int, void*);
 
 // TODO wow, just wow.
 char dwarf_readEhFrameValueInt(struct Dwarf* dwarf, uint64_t* out, size_t sz) {
@@ -419,7 +423,6 @@ int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t* pip, int need_u
   struct UnwindState* us = arg;
   Map* map = procfs_MapMatch(us->pid, ip);
   if (!map) {
-    printf("No map.  IP is 0x%lx\n", ip);
     return -UNW_EINVALIDIP;  // probably [vdso] or something
   }
 
@@ -501,11 +504,12 @@ int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t* pip, int need_u
   return -UNW_ESTOPUNWIND;
 }
 
-void unw_pui(unw_addr_space_t as, unw_proc_info_t* pip, void* arg) {}
+void unw_pui(unw_addr_space_t as, unw_proc_info_t* pip, void* arg) { (void)as; (void)pip; (void)arg;}
 
-int unw_gdila(unw_addr_space_t as, unw_word_t* dilap, void* arg) { return -UNW_ENOINFO; }  // punt
+int unw_gdila(unw_addr_space_t as, unw_word_t* dilap, void* arg) {(void)as; (void)dilap; (void)arg; return -UNW_ENOINFO; }  // punt
 
 int unw_am(unw_addr_space_t as, unw_word_t addr, unw_word_t* valp, int write, void* arg) {
+  (void)as;
   // libunwind will use this function to read a word of memory
   struct UnwindState* us = arg;
   if (write || !us->stack) return -UNW_EINVAL;  // not supported
@@ -523,10 +527,9 @@ int unw_am(unw_addr_space_t as, unw_word_t addr, unw_word_t* valp, int write, vo
   // Since we build all of the offsets from procfs, we may actually want to read
   // from a non-executable page (or an executable page that hasn't been loaded
   // into the target process).
-  // Accordingly, we generate a map by opening according to the current value of
-  // the instruction pointer, then treat `addr` relative to that.
   Map* map = procfs_MapMatch(us->pid, us->eip);
   if (map) {
+//    printf("A: %ld, S: %ld, O: %ld, T: %ld --- %s\n", addr, map->start, map->off, addr - map->start + map->off, map->path);
     if (-1 == procfs_MapRead(map, valp, addr - map->start + map->off, sizeof(*valp))) {
       printf("Something went wrong processing %s\n", map->path);
       return -UNW_EINVALIDIP;
@@ -545,6 +548,7 @@ int unw_am(unw_addr_space_t as, unw_word_t addr, unw_word_t* valp, int write, vo
 }
 
 int unw_ar(unw_addr_space_t as, unw_regnum_t regnum, unw_word_t* valp, int write, void* arg) {
+(void)as;
   struct UnwindState* us = arg;
   if (write) return -UNW_EREADONLYREG;
 
@@ -565,13 +569,11 @@ int unw_ar(unw_addr_space_t as, unw_regnum_t regnum, unw_word_t* valp, int write
   return UNW_ESUCCESS;
 }
 
-int unw_af(unw_addr_space_t as, unw_regnum_t regnum, unw_fpreg_t* fpvalp, int write, void* arg) { return -UNW_EINVAL; }
+int unw_af(unw_addr_space_t as, unw_regnum_t regnum, unw_fpreg_t* fpvalp, int write, void* arg) { (void)as; (void)regnum; (void)fpvalp; (void)write; (void)arg; return -UNW_EINVAL; }
 
-int unw_res(unw_addr_space_t as, unw_cursor_t* cp, void* arg) { return -UNW_EINVAL; }
+int unw_res(unw_addr_space_t as, unw_cursor_t* cp, void* arg) { (void)as; (void)cp; (void)arg; return -UNW_EINVAL; }
 
-int unw_gpn(unw_addr_space_t as, unw_word_t addr, char* bufp, size_t buf_len, unw_word_t* offp, void* arg) {
-  return -UNW_EINVAL;
-}
+int unw_gpn(unw_addr_space_t as, unw_word_t addr, char* bufp, size_t buf_len, unw_word_t* offp, void* arg) { (void)as; (void)addr; (void)bufp; (void)buf_len; (void)offp; (void)arg; return -UNW_EINVAL; }
 
 unw_accessors_t unwAccessors = {.find_proc_info = unw_fpi,
                                 .put_unwind_info = unw_pui,
@@ -586,15 +588,13 @@ char unwindstate_Init(struct UnwindState* us) {
   us->uas = unw_create_addr_space(&unwAccessors, 0);
   if (!us->uas) return 1;
   unw_set_caching_policy(us->uas, UNW_CACHE_GLOBAL);
+  bfd_init();
+  bfd_set_default_target("x86_64-pc-linux-gnu");
   return 0;
 }
 
 
 void funloclookup_Init(struct FunLocLookup* flu, char* file) {
-  static char initialized = 0;
-  bfd* bfd;
-  if (!initialized) bfd_init(), initialized = 1;
-
   flu->bfd = bfd_openr(file, NULL);
   if (!flu->bfd) {
     printf("I could not open the file.  Bummer.\n");
@@ -602,13 +602,12 @@ void funloclookup_Init(struct FunLocLookup* flu, char* file) {
 
   if (bfd_check_format(flu->bfd, bfd_archive)) {
     printf("Hey, I got an archive.\n");
-    bfd = bfd_openr_next_archived_file(flu->bfd, NULL);
+    flu->bfd = bfd_openr_next_archived_file(flu->bfd, NULL);
   } else if (bfd_check_format(flu->bfd, bfd_object)) {
     printf("Hey, I got a straight object.\n");
-    bfd = flu->bfd;
   } else {
     printf("Hey, I did not get an object nor an archive... WTF?\n");
-    bfd_close(bfd);
+    bfd_close(flu->bfd);
     return;
   }
 
@@ -623,11 +622,13 @@ void funloclookup_Init(struct FunLocLookup* flu, char* file) {
     //    }
     slurp_symtab(flu);
   }
-  if (bfd != flu->bfd) bfd_close(bfd);
   bfd_close(flu->bfd);
 }
 
 void funloc_bfdmapoversections_callback(bfd* bf, asection* sec, void* arg) {
+(void)bf;
+(void)sec;
+(void)arg;
   //  struct FunLocLookup *lu = arg;
   //  struct FunLoc* loc = lu->loc;
   //
@@ -665,30 +666,49 @@ void funloclookup_Set(struct FunLocLookup* flu, uint64_t ip, pid_t pid) {
   bfd_map_over_sections(flu->bfd, funloc_bfdmapoversections_callback, flu);
 }
 
-const char initialized = 0;
-
 // TODO should we get the unwind state back in here?
 int unwindstate_unwind(struct UnwindState* us, struct FunLoc* locs) {
-  int ret = 0, n = 0;
+  int n = 0;
   unw_cursor_t uc;
   static uint64_t ips[4096] = {0};
 
-  if(!initialized) {
-    bfd_init();
-    bfd_set_default_target("x86_64-pc-linux-gnu");
-  }
   unw_init_remote(&uc, us->uas, us);
 
   // Get the instruction pointers.  The first one is in EIP, unw for rest
   ips[n++] = us->eip;
 
-  while (unw_step(&uc) > 0)
+  int ret;
+  while ((ret = unw_step(&uc)) > 0) {
+    printf(".");
     unw_get_reg(&uc, UNW_REG_IP, &ips[n++]);
+  }
+  if(ret < 0) {
+    unw_word_t ip;
+    unw_get_reg(&uc, UNW_REG_IP, &ip);
+    switch(-ret) {
+     unwcase(UNW_EUNSPEC)
+     unwcase(UNW_ENOMEM)
+     unwcase(UNW_EINVAL)
+     unwcase(UNW_ENOINFO)
+     unwcase(UNW_EBADVERSION)
+     unwcase(UNW_EBADREG)
+     unwcase(UNW_EREADONLYREG)
+     unwcase(UNW_EINVALIDIP)
+     unwcase(UNW_EBADFRAME)
+     unwcase(UNW_ESTOPUNWIND)
+    }
+    printf("unw_step returned %d for ip=%lx\n", ret, ip);
+  }
+  printf("\n");
 
   // Now get the information
   memset(locs, 0, n * sizeof(struct FunLoc));
-  for (int j = 0; j < n; j++)
+  printf("Looking through %d functions\n", n);
+  for (int j = 0; j < n; j++) {
     process_ip(us->pid, ips[j], &locs[j]);
+    printf("  %s\n", locs[j].funname);
+  }
+  printf("------\n\n");
   return n;
 }
 
