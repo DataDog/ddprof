@@ -2,6 +2,7 @@
 #define _H_procutils
 
 #include <ctype.h>
+#include <errno.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -108,7 +109,7 @@ void pidmap_SetFiltered(pid_t pid, PidMap* pm, MapMode whitelist) {
   }
   pm->pid = pid;
 
-  for(size_t i; i<PM_MAX && 0<getline(&g_procfs_linebuffer, &g_procfs_linebuffer_sz, procstream); i++) {
+  for(size_t i = 0; i<PM_MAX && 0<getline(&g_procfs_linebuffer, &g_procfs_linebuffer_sz, procstream); i++) {
     if(procfs_LineToMapFiltered(g_procfs_linebuffer, &pm->map[i], whitelist))
       i--;
   }
@@ -182,7 +183,7 @@ inline static char strsame_right(char* l, char* r) {
 }
 
 char procfs_LineToMap(char* line, Map* map) {
-  return procfs_LineToMapFiltered(line, map, 0x0);
+  return procfs_LineToMapFiltered(line, map, ~0x0);
 }
 
 char procfs_LineToMapFiltered(char* line, Map* map, MapMode whitelist) {
@@ -274,18 +275,22 @@ int procfs_MapOpen(pid_t target) {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <signal.h>
 
-ssize_t procfs_MapRead(Map* map, void* buf, size_t off, size_t sz) {
+ssize_t procfs_MapRead(Map* map, void* buf, size_t sz, size_t off) {
   ssize_t ret = 0;
   if(PUMM_VDSO & map->mode) {
     printf("Being asked to open a special region: %s\n", map->path);
   } else {
-    struct stat sa = {0};
     int fd = open(map->path, O_RDONLY);
     if(-1 == fd) {
+      printf("Couldn't open the map: %s\n", strerror(errno));
       return -1;
     }
     ret = pread(fd, buf, sz, off);
+    if(-1 == ret) {
+      printf("Couldn't read the map: %s\n", strerror(errno));
+    }
     close(fd);
   }
   return ret;
@@ -309,7 +314,6 @@ void procfs_PidMapPrintProc(pid_t target) {
   char path[4096] = {0};
   char _buf[4096] = {0}; char* buf = _buf;
   size_t sz_buf = 4096;
-  int n = 0;
   snprintf(path, 4095, "/proc/%d/maps", target);
   FILE* stream = fopen(path, "r");
   while(0<getline(&buf, &sz_buf, stream)) {
@@ -335,14 +339,50 @@ Map* procfs_MapMatch(pid_t target, uint64_t addr) {
   if(!target)
     target = getpid();
 
-  PidMap* pm = mapcache_Get(target);
-  size_t i = 0;
-  while(pm->map[i].end) {
-    if(addr >= pm->map[i].start && addr <= pm->map[i].end)
-      return &pm->map[i];
-    i++;
+  int n_passes = 1;
+  while(n_passes > 0) {
+    n_passes--;
+    PidMap* pm = mapcache_Get(target);
+    size_t i = 0;
+    while(pm->map[i].end) {
+      if(addr >= pm->map[i].start && addr <= pm->map[i].end) {
+        //printf("<%ld> is in [%ld, %ld] -- %s\n", addr, pm->map[i].start, pm->map[i].end, pm->map[i].path);
+        return &pm->map[i];
+      }
+      i++;
+    }
+
+    // If we've failed to find it, then refresh the cache for that mapping and
+    // try again.  Ideally, we'd only check potentially new regions, but
+    // we haven't inlined all the code that much.
+    //printf("Retrying!\n");
+    mapcache_Set(target, procfs_ppid(target));
   }
+  //printf("<%ld> is not anywhere.\n", addr);
   return NULL;
+}
+
+Map* procfs_MapMatchSlow(pid_t target, uint64_t addr) {
+  Map* map = calloc(1,sizeof(Map));
+  Map* ret = NULL;
+  if(!target)
+    target = getpid();
+
+  FILE* procstream = fdopen(procfs_MapOpen(target), "r");
+
+  while(0 < getline(&g_procfs_linebuffer, &g_procfs_linebuffer_sz, procstream)) {
+    if(procfs_LineToMapFiltered(g_procfs_linebuffer, map, ~0x0))
+      continue;
+
+    if(map->start > addr || map->end <= addr)
+      continue;
+
+    // Got'em
+    ret = map;
+    break;
+  }
+  fclose(procstream);
+  return ret;
 }
 
 #endif
