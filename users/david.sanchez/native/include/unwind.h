@@ -163,7 +163,6 @@ static void find_address_in_section(bfd* abfd, asection* section, void* arg) {
   flu->done = bfd_find_nearest_line_discriminator(abfd, section, flu->symtab, pc - vma,
                                                   filename, functionname,
                                                   line, discriminator);
-//printf("FindAddr: %s\n", functionname);
 }
 
 static void find_offset_in_section(bfd* abfd, asection* section, struct FunLocLookup* flu) {
@@ -182,7 +181,6 @@ static void find_offset_in_section(bfd* abfd, asection* section, struct FunLocLo
   flu->done = bfd_find_nearest_line_discriminator(abfd, section, flu->symtab, pc,
                                                   filename, functionname,
                                                   line, discriminator);
-//printf("FindOffset: %s\n", functionname);
 }
 
 static void translate_addresses(struct FunLocLookup* flu, asection* section, uint64_t addr) {
@@ -221,7 +219,6 @@ static void translate_addresses(struct FunLocLookup* flu, asection* section, uin
 
     flu->done = bfd_find_inliner_info(abfd, filename, (const char**)&flu->loc->funname, line);
   }
-//printf("Translate: %s\n", flu->loc->funname);
 }
 
 static int process_file(char* file, const char* section_name, uint64_t addr, struct FunLoc* loc) {
@@ -365,7 +362,6 @@ out:
 // TODO clean these up
 // Based mostly on perf's util/unwind-libunwind-local.c
 int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t* pip, int need_unwind_info, void* arg) {
-printf("------- NEW UNW_FPI -------- \n");
   struct UnwindState* us = arg;
   uint64_t offset = 0, table_data = 0, fde_count = 0;
   int fd;
@@ -380,7 +376,7 @@ printf("------- NEW UNW_FPI -------- \n");
     return -UNW_EINVALIDIP;  // probably [vdso] or something
   }
 
-printf("ip: 0x%lx, rel: 0x%lx in %s\n", ip, ip - (map->start - map->off), map->path);
+  DBGLOG("ip: 0x%lx, rel: 0x%lx in %s\n", ip, ip - (map->start - map->off), map->path);
 
   // This is horrible, but right now we cache the current map.  The reason for
   // this is because downstream analysis may require us to read segments which
@@ -424,7 +420,7 @@ printf("ip: 0x%lx, rel: 0x%lx in %s\n", ip, ip - (map->start - map->off), map->p
     gelf_getshdr(sec, shdr);
     if (!strcmp(".eh_frame_hdr", elf_strptr(elf, ehdr->e_shstrndx, shdr->sh_name))) {
       offset = shdr->sh_offset;
-printf("--> Offset: %lx\n", offset);
+      DBGLOG("--> Offset: %lx\n", offset);
       break;
     }
   }
@@ -439,14 +435,12 @@ printf("--> Offset: %lx\n", offset);
       dw_read_encoded_value(enc, end, efh.eh_frame_ptr_enc);
       fde_count = dw_read_encoded_value(enc, end, efh.fde_count_enc);
       table_data = (enc - (uint8_t*)&efh) + offset;
-printf("--> Table Data: %lx (%ld)\n", table_data, fde_count);
+      DBGLOG("--> Table Data: %lx (%ld)\n", table_data, fde_count);
     }
   }
 
   // Attempt to unwind
   DBGLOG("map.start: %ld, offset: %ld, map->off: %ld\n", map->start, offset, map->off);
-printf("Going into the unwinder\n");
-  procfs_MapPrint(map);
   struct unw_dyn_info di = {.format = UNW_INFO_FORMAT_REMOTE_TABLE,
                             .start_ip = map->start,
                             .end_ip = map->end,
@@ -459,7 +453,6 @@ printf("Going into the unwinder\n");
   switch(-dwarf_search_unwind_table(as, ip, &di, pip, need_unwind_info, arg)) {
   case UNW_ESUCCESS:
     // Done with the map, the file, etc
-    printf("Success!!!\n");
     us->map = NULL;
     free(map);
     elf_end(elf);
@@ -485,12 +478,12 @@ printf("Going into the unwinder\n");
   int ret = -1;
   char is_exec = 0;
   if(strcmp(".so", &map->path[strlen(map->path)-3])) {
-    printf("I think %s does not end in .so\n", map->path);
+    DBGLOG("I think %s does not end in .so\n", map->path);
     is_exec = 1;
   }
   if (dwarf_find_debug_frame(0, &di, ip, map->start - map->off, map->path, map->start, map->end)) {
     ret = dwarf_search_unwind_table(as, ip, &di, pip, need_unwind_info, arg);
-    printf("Found debug frame, checking return:\n");
+    DBGLOG("Found debug frame, checking return:\n");
     switch(ret) {
     unwcase(UNW_ESUCCESS)
     unwcase(UNW_EUNSPEC)
@@ -511,7 +504,7 @@ printf("Going into the unwinder\n");
     return ret;
   }
 
-  printf("Failure and no debug frame...\n");
+  DBGLOG("Failure and no debug frame...\n");
   us->map = NULL;
   free(map);
   elf_end(elf);
@@ -519,9 +512,9 @@ printf("Going into the unwinder\n");
   return -UNW_ESTOPUNWIND;
 }
 
-void unw_pui(unw_addr_space_t as, unw_proc_info_t* pip, void* arg) { (void)as; (void)pip; (void)arg; /*printf("--unw_fpi\n");*/}
+void unw_pui(unw_addr_space_t as, unw_proc_info_t* pip, void* arg) { (void)as; (void)pip; (void)arg;}
 
-int unw_gdila(unw_addr_space_t as, unw_word_t* dilap, void* arg) {(void)as; (void)dilap; (void)arg; /*printf("--unw_gdila\n");*/ return -UNW_ENOINFO; }  // punt
+int unw_gdila(unw_addr_space_t as, unw_word_t* dilap, void* arg) {(void)as; (void)dilap; (void)arg; return -UNW_ENOINFO; }  // punt
 
 int unw_am(unw_addr_space_t as, unw_word_t addr, unw_word_t* valp, int write, void* arg) {
 (void)as;
@@ -544,22 +537,22 @@ int unw_am(unw_addr_space_t as, unw_word_t addr, unw_word_t* valp, int write, vo
   }
 
   Map* map;
-  if(us->map) {map = us->map; printf("AM: have map.\n");}
+  if(us->map) map = us->map;
   else map = procfs_MapMatchSlow(us->pid, us->eip);
 
-  // Now try to read, given the map.  This assumes that the address is in the 
+  // Now try to read, given the map.  This assumes that the address is in the
   // scope of the instrumented process.
   if (map) {
     if (addr <= map->start) {
       // addr should be further in process IP space than the start of the mmap
-      printf("Bad address!\n");
+      DBGLOG("Bad address!\n");
       if(!us->map) free(map);
       return -UNW_EINVALIDIP;
     }
 
-printf("[AM] Reading address 0x%lx from 0x%lx\n", addr, addr - map->start);
-    if (-1 == procfs_MapRead(map, valp, sizeof(*valp), addr - map->start)) {
-      printf("Reading failed!\n");
+    DBGLOG("[AM] Reading address 0x%lx from 0x%lx\n", addr, addr - (map->start - map->off));
+    if (-1 == procfs_MapRead(map, valp, sizeof(*valp), addr - (map->start - map->off))) {
+      DBGLOG("Reading failed!\n");
       *valp = 0; // Reset whatever valp is
       if(!us->map) free(map);
       return -UNW_EINVALIDIP;
@@ -593,11 +586,11 @@ int unw_ar(unw_addr_space_t as, unw_regnum_t regnum, unw_word_t* valp, int write
   return UNW_ESUCCESS;
 }
 
-int unw_af(unw_addr_space_t as, unw_regnum_t regnum, unw_fpreg_t* fpvalp, int write, void* arg) { (void)as; (void)regnum; (void)fpvalp; (void)write; (void)arg; printf("--unw_af\n"); return -UNW_EINVAL; }
+int unw_af(unw_addr_space_t as, unw_regnum_t regnum, unw_fpreg_t* fpvalp, int write, void* arg) { (void)as; (void)regnum; (void)fpvalp; (void)write; (void)arg; return -UNW_EINVAL; }
 
-int unw_res(unw_addr_space_t as, unw_cursor_t* cp, void* arg) { (void)as; (void)cp; (void)arg; printf("--unw_res\n"); return -UNW_EINVAL; }
+int unw_res(unw_addr_space_t as, unw_cursor_t* cp, void* arg) { (void)as; (void)cp; (void)arg; return -UNW_EINVAL; }
 
-int unw_gpn(unw_addr_space_t as, unw_word_t addr, char* bufp, size_t buf_len, unw_word_t* offp, void* arg) { (void)as; (void)addr; (void)bufp; (void)buf_len; (void)offp; (void)arg; printf("--unw_gpn\n"); return -UNW_EINVAL; }
+int unw_gpn(unw_addr_space_t as, unw_word_t addr, char* bufp, size_t buf_len, unw_word_t* offp, void* arg) { (void)as; (void)addr; (void)bufp; (void)buf_len; (void)offp; (void)arg; return -UNW_EINVAL; }
 
 unw_accessors_t unwAccessors = {.find_proc_info = unw_fpi,
                                 .put_unwind_info = unw_pui,
@@ -726,10 +719,10 @@ int unwindstate_unwind(struct UnwindState* us, struct FunLoc* locs, int max_stac
   }
 
   // Now get the information into the output container
-//  memset(locs, 0, n * sizeof(struct FunLoc));
-//  for (int i = 0; i < n; i++) {
-//    process_ip(us->pid, ips[i], &locs[i]);
-//  }
+  memset(locs, 0, n * sizeof(struct FunLoc));
+  for (int i = 0; i < n; i++) {
+    process_ip(us->pid, ips[i], &locs[i]);
+  }
   return n;
 }
 
