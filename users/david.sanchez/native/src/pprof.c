@@ -1,6 +1,8 @@
+#include <fcntl.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <zlib.h>
 
@@ -225,9 +227,21 @@ static uint64_t _pprof_funNew(DProf* dp, int64_t id_name, int64_t id_system_name
   pprof->n_function++;
   return id;
 }
+#include <ctype.h>
 
 uint64_t pprof_funAdd(DProf* dp, const char* name, const char* system_name, const char* filename, int64_t start_line) {
   PPProfile* pprof = &dp->pprof;
+  if(!name) name = "??";
+  for(unsigned long i=0; i<strlen(name); i++)
+    if(!isgraph(name[i])) { name = "??"; break;}
+  if(!system_name) system_name = "??";
+  for(unsigned long i=0; i<strlen(system_name); i++)
+    if(!isgraph(system_name[i])) { system_name = "??"; break;}
+  if(!filename) filename = "??";
+  for(unsigned long i=0; i<strlen(filename); i++)
+    if(!isgraph(filename[i])) { filename = "??"; break;}
+
+
   int64_t id_name = pprof_strIntern(dp, name);
   int64_t id_system_name = pprof_strIntern(dp, system_name);
   int64_t id_filename = pprof_strIntern(dp, filename);
@@ -370,6 +384,7 @@ char pprof_Init(DProf* dp, const char** sample_names, const char** sample_units,
   if (!sample_names || !sample_units || 2>n_sampletypes) return -1;
 
   // Define the appropriate internment strategy
+  dp->table_type = 1; // aggressively!
   switch(dp->table_type) {
     case 0:
       dp->intern_string     = vocab_intern;
@@ -563,6 +578,52 @@ char pprof_Free(DProf* dp) {
 }
 
 
+inline static void pretty_print(char c) {
+  printf( isgraph(c) || isspace(c) ? "%c" : "//%o", c);
+}
+#define STR_LEN_PTR(x) ((uint32_t*)&(x)[-4])
+#define STR_LEN(x) (*STR_LEN_PTR(x))
+void pprof_print(DProf*dp) {
+  PPProfile* pprof = &dp->pprof;
+  char** ST = dp->string_table(dp->string_table_data);
+  size_t SZ = dp->string_table_size(dp->string_table_data);
+
+  // Print ValueType
+
+  // print samples
+  for(size_t i=0; i<pprof->n_sample; i++) {
+    printf("smplID: %ld\n", i);
+    printf("  nloc: %zu\n", pprof->sample[i]->n_location_id);
+    for(size_t j=0; j<pprof->sample[i]->n_location_id; j++) {
+      printf("  locID: %ld\n", pprof->sample[i]->location_id[j]);
+    }
+  }
+  // print mapping
+  // Print locations
+  for(size_t i=0; i<pprof->n_location; i++) {
+    printf("locID: %ld\n", i);
+    printf("  MapID: %ld\n", pprof->location[i]->mapping_id);
+    printf("  Addr: %lx\n", pprof->location[i]->address);
+    for(size_t j=0; j<pprof->location[i]->n_line; j++) {
+      printf("    LineID: %ld\n", j);
+      printf("    FunID: %ld\n", pprof->location[i]->line[j]->function_id);
+    }
+  }
+  // print line
+  // print functions
+
+  for(size_t i=0; i<SZ; i++) {
+    printf("Str %ld(%u): ", i, STR_LEN(ST[i]));
+    for(size_t j=0; j<STR_LEN(ST[i]); j++)
+      pretty_print(ST[i][j]);
+    printf("\n");
+  }
+
+}
+#undef STR_LEN_PTR
+#undef STR_LEN
+
+
 /******************************************************************************\
 |*                        Compression Helper Functions                        *|
 \******************************************************************************/
@@ -592,4 +653,48 @@ size_t pprof_zip(DProf* dp, unsigned char* ret, const size_t sz_packed) {
   free(packed);
 
   return zs.total_out;
+}
+
+unsigned char* pprof_flush(DProf* dp, size_t* sz) {
+  // Update the string table parameters and anything else that isn't auto-
+  // matically up-to-spec with pprof
+  dp->pprof.string_table = dp->string_table(dp->string_table_data);
+  dp->pprof.n_string_table = dp->string_table_size(dp->string_table_data);
+
+  // Update pprof timing details
+  pprof_durationUpdate(dp);
+
+  // Serialize and zip pprof
+  unsigned char* buf;
+  size_t sz_packed = perftools__profiles__profile__get_packed_size(&dp->pprof);
+  size_t sz_zipped = pprof_zip(dp, (buf=malloc(sz_packed)), sz_packed);
+
+#ifdef DD_DBG_PROFGEN
+  // Optionally for debug purposes, emit a pprof to disk
+  mkdir("./pprofs", 0777);
+  unlink("./pprofs/test.pb.gz");
+  int fd = open("./pprofs/test.pb.gz", O_RDWR | O_CREAT, 0677);
+  write(fd, buf, sz_zipped);
+  close(fd);
+
+  unsigned char* thisbuf = malloc(sz_packed);
+  size_t thislen = perftools__profiles__profile__pack(&dp->pprof, thisbuf);
+  GZip("./pprofs/test.pb", (const char*)thisbuf, thislen);
+  free(thisbuf);
+#endif
+
+  // Reset the pprof according to the clearing semantics set in the dp
+  switch(dp->flushmode) {
+  case 0:
+  case 1:
+  case 2:
+  case 3:
+  default:
+    pprof_sampleClear(dp);
+    break;
+  }
+
+  // Wrap up.  It's up to the caller to free.
+  if(sz) *sz = sz_zipped;
+  return buf;
 }

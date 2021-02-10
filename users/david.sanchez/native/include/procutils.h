@@ -13,7 +13,9 @@
 #include <unistd.h>
 
 // TODO
-// procfs will only cache segments that have been
+// procfs will only cache segments that have been marked LOAD--obviously things
+// like the DWARF .debug_frame do not follow this convention, even if they
+// all formally belong to the same map.
 
 // ISO C does not allow you to cast a function pointer to an object pointer.
 // But it DOES allow you to cast a function pointer to a different, incompatible
@@ -161,7 +163,7 @@ inline static char strsame_right(char* l, char* r) {
 
 int procfs_MapOpen(pid_t target) {
   if(target != g_procfs_map_pid) {
-    close(g_procfs_map_fd);  // doesn't matter if -1, since we ignore
+    if(-1 != g_procfs_map_fd) close(g_procfs_map_fd);  // doesn't matter if -1, since we ignore
     g_procfs_map_fd = -1;
   }
   if(-1 == g_procfs_map_fd) {

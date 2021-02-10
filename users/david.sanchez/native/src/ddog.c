@@ -1,11 +1,14 @@
 #include "ddog.h"
 
-int main() {
-  PProf* pprof = &(PProf){0};
-  pprof_Init(pprof);
-  pprof_timeUpdate(pprof);
-  pprof->period = 10000000;
+typedef union hackptr {
+  void (*fun)(void);
+  uint64_t num;
+} hackptr;
 
+int main() {
+  DProf* dp = &(DProf){0};
+  dp->table_type = 1; // use string_table.h
+  pprof_Init(dp, (const char**)&(const char*[]){"samples", "cpu"}, (const char**)&(const char*[]){"count", "nanoseconds"}, 2);
 
   // Add some mapping stuff
   hackptr ptr[] = {
@@ -13,9 +16,9 @@ int main() {
     {.fun = (void(*)(void))open},
     {.fun = (void(*)(void))read}};
 
-  pprof_sampleAdd(pprof, 100, (uint64_t[]){ptr[0].num, ptr[1].num, ptr[2].num}, 3, 0);
-  pprof_sampleAdd(pprof, 1000, (uint64_t[]){ptr[0].num, ptr[1].num, ptr[2].num}, 3, 0);
-  pprof_sampleAdd(pprof, 10000, (uint64_t[]){ptr[0].num}, 1, 0);
+  pprof_sampleAdd(dp, (int64_t*)(int64_t[]){1, 100}, 2, (uint64_t[]){ptr[0].num, ptr[1].num, ptr[2].num}, 3);
+  pprof_sampleAdd(dp, (int64_t*)(int64_t[]){1, 100}, 2, (uint64_t[]){ptr[0].num, ptr[1].num, ptr[2].num}, 3);
+  pprof_sampleAdd(dp, (int64_t*)(int64_t[]){1, 100}, 2, (uint64_t[]){ptr[0].num}, 1);
 
   // Connect and ship.  Don't initialize the DDRequest normally...
   DDRequest ddr = {
@@ -25,7 +28,7 @@ int main() {
     .env  = "dev",
     .version = "v0.1",
     .service = "native-test-service",
-    .D = &(Dict){0}
+    .D = &(Dictionary){0}
   };
 
   // TODO generate these better
@@ -42,11 +45,11 @@ int main() {
   ddr_addtag(&ddr, "runtime", "native");
 
   // Ship it!
-  DDRequestSend(&ddr, pprof);
+  DDRequestSend(&ddr, dp);
 
   // Add more samples and redo
-  pprof_sampleAdd(pprof, 100000, (uint64_t[]){ptr[0].num, ptr[1].num}, 2, 0);
-  pprof_sampleAdd(pprof, 1000000, (uint64_t[]){ptr[0].num, ptr[1].num, ptr[2].num}, 3, 0);
-  DDRequestSend(&ddr, pprof);
+//  pprof_sampleAdd(dp, (int64_t*)(int64_t[]){1, 100}, 2, (uint64_t[]){ptr[0].num, ptr[1].num}, 2);
+//  pprof_sampleAdd(dp, (int64_t*)(int64_t[]){1, 100}, 2, (uint64_t[]){ptr[0].num, ptr[1].num, ptr[2].num}, 3);
+//  DDRequestSend(&ddr, dp);
   return 0;
 }

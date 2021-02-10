@@ -253,6 +253,7 @@ static char _StringTableArena_reserve(StringTableArena* sta, size_t length) {
  * @param sz_val the size of the value in bytes.  Does not need to be aligned
  *        size, as that is handled during append
  ******************************************************************************/
+#include <stdio.h>
 static ssize_t _StringTableArena_append(StringTableArena* sta, const unsigned char* val, size_t sz_val) {
   // If the total size exceeds the minimum arena size, then we could either
   // silently truncate or we could throw an error.  Right now, we silently
@@ -283,6 +284,7 @@ static ssize_t _StringTableArena_append(StringTableArena* sta, const unsigned ch
 
   // Copy the string (either whole or truncated)
   memcpy(dst, val, sz_val);
+printf("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++STRING: %.*s\n", (int)sz_val, val);
 
   // ASSERT:
   // dst - &sta->arena[sta->arena_off] is in [1,8]
@@ -616,5 +618,6 @@ ssize_t stringtable_lookup_cstr(StringTable* st, const char* str) {
 }
 
 ssize_t stringtable_add_cstr(StringTable* st, const char* str){
+  if(!str) str="";
   return stringtable_add(st, (const unsigned char*)str, strlen(str));
 }

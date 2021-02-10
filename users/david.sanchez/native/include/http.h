@@ -50,7 +50,7 @@ void ASGrow(AppendString* as, size_t addtl) {
 // Doesn't assume that str is null-terminated, since it may actually be binary
 // Conventionally this would be an unsigned char, but this is temporary
 void ASAdd(AppendString* as, char* str, size_t sz) {
-  ASGrow(as, sz);
+  ASGrow(as, sz+1);
   memcpy(&as->str[as->n], str, sz);
   as->n += sz;
 }
@@ -137,7 +137,7 @@ char HttpSendMultipart(const char* host, const char* port, const char* route, Di
   // If an API key is defined, use it
   unsigned char* val;
   if((val = DG("DD_API_KEY")))
-    snprintf(hdr_apikey,256,"DD-API-KEY:%s\r\n", (char*)val);
+    snprintf(hdr_apikey,255,"DD-API-KEY:%s\r\n", (char*)val);
 
   // Put together the payload and compute the length
   AppendString as_hdr = {0}; ASInit(&as_hdr);
@@ -161,8 +161,10 @@ char HttpSendMultipart(const char* host, const char* port, const char* route, Di
   MISUBD("tags[]", "tags.host");
   MISUBD("tags[]", "tags.service");
   MISUBD("tags[]", "tags.language");
-  if((val=DG("pprof[0]")))
-    ASAddMulti(&as_bod, boundary, &(MultiItem){"data[0]\"; filename=\"pprof-data", "application/octet-stream", (char*)val, STR_LEN(val)});
+  if((val=DG("pprof[0]"))) {
+    size_t val_len = *(size_t*)DG("pprof[0].length");
+    ASAddMulti(&as_bod, boundary, &(MultiItem){"data[0]\"; filename=\"pprof-data", "application/octet-stream", (char*)val, val_len});
+  }
   MISUB("types[0]", "samples,cpu"); // TODO Don't hardcode
   MISUB("format", "pprof");
   MISUBD("tags[]", "tags.runtime");

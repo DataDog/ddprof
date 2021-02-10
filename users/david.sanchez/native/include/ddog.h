@@ -66,33 +66,17 @@ void DDRequestInit(DDRequest* ddr) {
 #undef GEV
 
 void DDRequestSend(DDRequest* ddr, DProf* dp) {
-  PPProfile* pprof = &dp->pprof;
-  printf("SENDIT\n");
-  // Update pprof duration
-  pprof_durationUpdate(dp);
-
-  // Serialize and zip pprof
-  unsigned char* buf;
-  size_t sz_packed = perftools__profiles__profile__get_packed_size(pprof);
-  size_t sz_zipped = pprof_zip(dp, (buf=malloc(sz_packed)), sz_packed);
-
   // Add API key if one is provided
   if(strlen(ddr->key))
     dictionary_put_cstr(ddr->D, "DD_API_KEY", ddr->key, strlen(ddr->key));
 
   // Add zipped payload to dictionary.  This stashes the pointer to the buffer,
   // so note that it still needs to be freed!
-  dictionary_put_cstr(ddr->D, "pprof[0]", &buf, sizeof(unsigned char*));
-  dictionary_put_cstr(ddr->D, "pprof[0].length", (void*)sz_zipped, sizeof(size_t));
+  size_t sz = 0;
+  unsigned char* buf = pprof_flush(dp, &sz);
+  dictionary_put_cstr(ddr->D, "pprof[0]", buf, sizeof(unsigned char*));
+  dictionary_put_cstr(ddr->D, "pprof[0].length", (void*)&sz, sizeof(size_t));
 
-#ifdef DD_DBG_PROFGEN
-  printf("Printing a pprof!\n");
-  mkdir("./pprofs", 0777);
-  unlink("./pprofs/native.pb.gz");
-  int fd = open("./pprofs/native.pb.gz", O_RDWR | O_CREAT, 0677);
-  write(fd, buf, sz_zipped);
-  close(fd);
-#endif
 
   // Send
   if(HttpSendMultipart(ddr->host, ddr->port, "/v1/input", ddr->D)) {
@@ -104,7 +88,6 @@ void DDRequestSend(DDRequest* ddr, DProf* dp) {
   // Cleanup
   dictionary_put_cstr(ddr->D, "pprof[0]", "", sizeof(char));
   free(buf);
-  pprof_sampleClear(dp);
   pprof_timeUpdate(dp);
 }
 

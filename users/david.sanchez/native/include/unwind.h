@@ -52,6 +52,13 @@ struct FunLoc {
   uint32_t disc;      // discriminator
 };
 
+void funloc_clear(struct FunLoc* loc) {
+  if(loc->funname) free(loc->funname);
+  if(loc->srcpath) free(loc->srcpath);
+  if(loc->sopath)  free(loc->sopath);
+  memset(loc, 0, sizeof(*loc));
+}
+
 struct FunLocLookup {
   bfd_vma pc;
   struct FunLoc* loc;
@@ -170,6 +177,10 @@ static void find_address_in_section(bfd* abfd, asection* section, void* arg) {
   flu->done = bfd_find_nearest_line_discriminator(abfd, section, flu->symtab, pc - vma,
                                                   filename, functionname,
                                                   line, discriminator);
+
+  // Stash these
+  if(flu->loc->funname) flu->loc->funname = strdup(flu->loc->funname);
+  if(flu->loc->srcpath) flu->loc->srcpath= strdup(flu->loc->srcpath);
 }
 
 static void find_offset_in_section(bfd* abfd, asection* section, struct FunLocLookup* flu) {
@@ -188,6 +199,10 @@ static void find_offset_in_section(bfd* abfd, asection* section, struct FunLocLo
   flu->done = bfd_find_nearest_line_discriminator(abfd, section, flu->symtab, pc,
                                                   filename, functionname,
                                                   line, discriminator);
+
+  // Stash these
+  if(flu->loc->funname) flu->loc->funname = strdup(flu->loc->funname);
+  if(flu->loc->srcpath) flu->loc->srcpath= strdup(flu->loc->srcpath);
 }
 
 static void translate_addresses(struct FunLocLookup* flu, asection* section, uint64_t addr) {
@@ -201,9 +216,9 @@ static void translate_addresses(struct FunLocLookup* flu, asection* section, uin
   if (bfd_get_flavour(abfd) == bfd_target_elf_flavour) {
     // As per binutils elf-bfd.h
     const struct elf_backend_data* bed = (const struct elf_backend_data*)abfd->xvec;
-     bfd_vma sign = (bfd_vma)1 << (bed->s->arch_size - 1);
-     flu->pc &= (sign << 1) - 1;
-     if (bed->sign_extend_vma) flu->pc = (flu->pc ^ sign) - sign;
+    bfd_vma sign = (bfd_vma)1 << (bed->s->arch_size - 1);
+    flu->pc &= (sign << 1) - 1;
+    if (bed->sign_extend_vma) flu->pc = (flu->pc ^ sign) - sign;
   }
   flu->done = FALSE;
   if (section) {
@@ -226,7 +241,7 @@ static void translate_addresses(struct FunLocLookup* flu, asection* section, uin
     }
     char* buf = bfd_demangle(abfd, flu->loc->funname, DMGL_ANSI | DMGL_PARAMS);
     if(buf) {
-      free(flu->loc->funname);
+      if(flu->loc->funname) free(flu->loc->funname);
       flu->loc->funname = buf;
     }
 
@@ -273,7 +288,7 @@ static int process_file(char* file, uint64_t addr, struct FunLoc* loc) {
 
   // If we're here, we succeeded.  Finish populating loc
   loc->ip = addr;
-  loc->sopath = file;
+  loc->sopath = strdup(file);
   return 0;
 }
 
@@ -728,14 +743,12 @@ int unwindstate_unwind(struct UnwindState* us, struct FunLoc* locs, int max_stac
     if(unw_is_signal_frame(&uc) <= 0) --ips[n];
     n++;
   }
-  printf("Got %d IPs\n", n);
 
   // Now get the information into the output container
-  memset(locs, 0, n * sizeof(struct FunLoc));
   for (int i = 0; i < n; i++) {
+    funloc_clear(&locs[i]);
     DBGLOG("Processing step %d, ip = %lx\n", i, ips[i]);
     process_ip(us->pid, ips[i], &locs[i]);
-    DBGLOG("Found location: %s\n", locs[i].funname);
   }
   return n;
 }

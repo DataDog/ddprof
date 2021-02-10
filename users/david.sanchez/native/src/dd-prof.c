@@ -12,14 +12,10 @@
 #include "http.h"
 #include "ddog.h"
 
-DProf* dp = &(DProf){0};
-
 struct DDProfContext {
   DProf* dp;
 
-  // This is pretty fragile.  One workaround is to name the DDRequest elements
-  // consistently with input options, but I *like* maintaining distinction
-  // between the two layers.  TBD, a translation layer.
+  // TODO this is superfragile
   union {
     DDRequest* ddr;
     struct {
@@ -53,7 +49,6 @@ struct DDProfContext {
   double sample_sec;
 };
 
-// Kinda preachy, you've been warned.
 #define EXPAND_LOPT(a,b,c,d,e,f,g) {#b,e,0,c},
 #define EXPAND_ENUM(a,b,c,d,e,f,g) a;
 #define EXPAND_OSTR(a,b,c,d,e,f,g) #d ":"
@@ -87,6 +82,7 @@ void ddprof_callback(struct perf_event_header* hdr, void* arg) {
   struct DDProfContext* pctx = arg;
   struct UnwindState* us = pctx->us;
   DDRequest* ddr = pctx->ddr;
+  DProf* dp = pctx->dp;
   struct perf_event_sample* pes;
   struct timeval tv = {0};
   gettimeofday(&tv, NULL);
@@ -96,26 +92,29 @@ void ddprof_callback(struct perf_event_header* hdr, void* arg) {
       pes = (struct perf_event_sample*)hdr;
       us->pid = pes->pid;
       us->stack = pes->data;
-      us->stack_sz = pes->dyn_size;
+      us->stack_sz = pes->size; // TODO should be dyn_size, but it's corrupted?
       memcpy(&us->regs[0], pes->regs, 3*sizeof(uint64_t));
-      int n = unwindstate_unwind(us, locs);
-      for(int i=0; i<n; i++) {
-        memset(locs, 0, n*sizeof(*locs));
-        memset(id_locs, 0, n*sizeof(*id_locs));
+      int n = unwindstate_unwind(us, &*locs, 4096); // TODO get a common value from perf.h
+      memset(id_locs, 0, n*sizeof(*id_locs));
+      for(int i=0,j=0; i<n; i++,j++) {
         uint64_t id_map = pprof_mapAdd(dp, locs[i].map_start, locs[i].map_end, locs[i].map_off, locs[i].sopath, "");
         uint64_t id_fun = pprof_funAdd(dp, locs[i].funname, locs[i].funname, locs[i].srcpath, locs[i].line);
         uint64_t id_loc = pprof_locAdd(dp, id_map, locs[i].ip, (uint64_t[]){id_fun}, (int64_t[]){0}, 1);
-        id_locs[i] = id_loc;
+        if (id_loc > 0)
+          id_locs[j] = id_loc;
+        else
+          j--;
       }
-      pprof_sampleAdd(dp, (int64_t[]){1, pes->period}, 2, id_locs, n);
+      if(n > 0)
+        pprof_sampleAdd(dp, (int64_t[]){2, pes->period}, 2, id_locs, n);
       break;
 
     default:
       break;
   }
   int64_t tdiff = (now_nanos - dp->pprof.time_nanos)/1e9;
-  printf("Time stuff: %ld\n", tdiff);
   if(pctx->sample_sec < tdiff) {
+//  if(0 < tdiff) {
     DDRequestSend(ddr, dp);
   }
 }
@@ -163,7 +162,12 @@ int main(int argc, char** argv) {
   |                             Process Options                                |
   \****************************************************************************/
   int c = 0, oi = 0;
-  struct DDProfContext* ctx = &(struct DDProfContext){ .ddr = &(DDRequest){.D = &(Dictionary){0}}};
+  struct DDProfContext* ctx = &(struct DDProfContext){
+                          .ddr = &(DDRequest){.D = &(Dictionary){0}},
+                          .dp = &(DProf){0},
+                          .us = &(struct UnwindState){0},
+                          .sample_sec = 2.0
+                        };
   dictionary_init(ctx->ddr->D, NULL);
   DDRequest* ddr = ctx->ddr;
 
@@ -176,7 +180,6 @@ int main(int argc, char** argv) {
 
   char done = 0;
   while (!done && -1 != (c=getopt_long(argc, argv, ":" OPT_TABLE(EXPAND_OSTR) "h", lopts, &oi))) {
-    printf("optind: %d\n", optind);
     switch(c) {
       OPT_TABLE(EXPAND_CASE)
       case 'h':
@@ -190,7 +193,8 @@ int main(int argc, char** argv) {
   printf("=== PRINTING PARAMETERS ===\n");
   OPT_TABLE(EXPAND_PRNT);
 #endif
-  if (optind == 1) {
+  if (optind == argc) {
+    printf("O: %d, A: %d\n", optind, argc);
     printf("%s is a tool for getting stack samples from an application.  Please wrap your application in it.\n", filename);
     return -1;
   }
@@ -203,12 +207,15 @@ int main(int argc, char** argv) {
   |                             Run the Profiler                               |
   \****************************************************************************/
   // Initialize the pprof
-  pprof_Init(dp, (char**)&(char*[]){"samples", "cpu"}, (char**)&(char*[]){"count", "nanoseconds"}, 2);
-  pprof_timeUpdate(dp); // Set the time
+  pprof_Init(ctx->dp, (const char**)&(const char*[]){"samples", "cpu-time"}, (const char**)&(const char*[]){"count", "nanoseconds"}, 2);
+  pprof_timeUpdate(ctx->dp); // Set the time
 
   // Finish initializing the DDR
   // TODO generate these better
-//  ddr_addtag(ddr, "tags.host",     "host:davebox");
+  ddr->host = strdup("localhost");
+  ddr->key = strdup("1c77adb933471605ccbe82e82a1cf5cf");
+
+  ddr_addtag(ddr, "tags.host",     "host:davebox");
   ddr_addtag(ddr, "tags.service",  "service:native-test-service");
 
   // Implementation stuff
@@ -256,13 +263,9 @@ int main(int argc, char** argv) {
     }
     pthread_barrier_wait(pb);
     munmap(pb, sizeof(pthread_barrier_t));
-//    main_loop(&pe, NULL, NULL);
-    struct DDProfContext rs = {
-      .dp = dp,
-      .us = &(struct UnwindState){0}};
-    unwindstate_Init(rs.us);
+    unwindstate_Init(ctx->us);
     elf_version(EV_CURRENT);
-    main_loop(&pe, ddprof_callback, &rs);
+    main_loop(&pe, ddprof_callback, ctx);
   }
 
   return 0;

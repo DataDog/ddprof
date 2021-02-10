@@ -135,25 +135,31 @@ typedef struct perf_event_sample {
 //  u64    id;                         // if PERF_SAMPLE_ID
 //  u64    stream_id;                  // if PERF_SAMPLE_STREAM_ID
 //  u32    cpu, res;                   // if PERF_SAMPLE_CPU
-  u64    period;                     // if PERF_SAMPLE_PERIOD
-//  struct read_format v;                // if PERF_SAMPLE_READ
-//  u64    nr;                           // if PERF_SAMPLE_CALLCHAIN
-//  u64    ips[];                        // if PERF_SAMPLE_CALLCHAIN
+  u64    period;                       // if PERF_SAMPLE_PERIOD
+//  struct read_format v;              // if PERF_SAMPLE_READ
+//  u64    nr;                         // if PERF_SAMPLE_CALLCHAIN
+//  u64    ips[];                      // if PERF_SAMPLE_CALLCHAIN
 //  u32    size;                       // if PERF_SAMPLE_RAW
 //  char  data[size];                  // if PERF_SAMPLE_RAW
 //  u64    bnr;                        // if PERF_SAMPLE_BRANCH_STACK
 //  struct perf_branch_entry lbr[bnr]; // if PERF_SAMPLE_BRANCH_STACK
-  u64    abi;                        // if PERF_SAMPLE_REGS_USER
-  u64    regs[PERF_SAMPLE_STACK_REGS];               // if PERF_SAMPLE_REGS_USER
-  u64    size;                       // if PERF_SAMPLE_STACK_USER
-  char   data[PERF_SAMPLE_STACK_SIZE];                 // if PERF_SAMPLE_STACK_USER
-  u64    dyn_size;                   // if PERF_SAMPLE_STACK_USER
+  u64    abi;                          // if PERF_SAMPLE_REGS_USER
+  u64    regs[PERF_SAMPLE_STACK_REGS]; // if PERF_SAMPLE_REGS_USER
+  u64    size;                         // if PERF_SAMPLE_STACK_USER
+  char   data[PERF_SAMPLE_STACK_SIZE]; // if PERF_SAMPLE_STACK_USER
+  u64    dyn_size;                     // if PERF_SAMPLE_STACK_USER
 //  u64    weight;                     // if PERF_SAMPLE_WEIGHT
 //  u64    data_src;                   // if PERF_SAMPLE_DATA_SRC
 //  u64    transaction;                // if PERF_SAMPLE_TRANSACTION
 //  u64    abi;                        // if PERF_SAMPLE_REGS_INTR
 //  u64    regs[weight(mask)];         // if PERF_SAMPLE_REGS_INTR
 } perf_event_sample;
+
+typedef struct perf_samplestacku {
+  u64    size;
+  char   data[];
+// u64    dyn_size;   // Don't forget!
+} perf_samplestacku;
 
 struct perf_event_attr g_dd_native_attr = {
     .size           = sizeof(struct perf_event_attr),
@@ -231,6 +237,7 @@ char perfopen(pid_t pid, PEvent* pe, struct perf_event_attr* attr) {
 }
 
 void default_callback(struct perf_event_header* hdr, void* arg) {
+  (void)arg; // no idea how to use this!
   struct perf_event_sample* pes;
   struct perf_event_mmap* pem;
   switch(hdr->type) {
@@ -274,8 +281,6 @@ void main_loop(PEvent *pe, void (*event_callback)(struct perf_event_header*, voi
       printf("Instrumented process died (exiting)\n");
       exit(-1);
     }
-    void*  callstack[PAGE_SIZE] = {0}; // hilarious
-    size_t n_calls = 0;
     uint64_t head = pe->region->data_head & (PSAMPLE_SIZE - 1);
     uint64_t tail = pe->region->data_tail & (PSAMPLE_SIZE - 1);
     rmb();
@@ -284,7 +289,6 @@ void main_loop(PEvent *pe, void (*event_callback)(struct perf_event_header*, voi
     rb_init(rb, pe->region);
 
     int elems = 0;
-    printf("<%ld, %ld>\n", head, tail);
     while(head > tail) {
       elems++;
       struct perf_event_header* hdr = rb_seek(rb, tail);
