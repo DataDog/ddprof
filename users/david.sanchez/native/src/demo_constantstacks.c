@@ -24,8 +24,8 @@ void backtrace() {
 }
 
 int cmp() {
-  procfs_PidMapPrintProc(getpid());
 #ifdef D_LOCAL
+  procfs_PidMapPrintProc(getpid());
   backtrace();
 #else
   while(1) {}
@@ -47,13 +47,11 @@ int foo() {
 int main() {
   Map* map;
   hackptr foo_ptr = {.fun=(void(*)(void))foo};
-  map = procfs_MapMatchSlow(getpid(), foo_ptr.num);
+  map = procfs_MapMatch(0, foo_ptr.num);
   printf("foo: 0x%lx, 0x%lx, 0x%lx, 0x%lx\n", foo_ptr.num, map->start, map->end, map->off);
-  free(map);
   hackptr bar_ptr = {.fun=(void(*)(void))bar};
-  map = procfs_MapMatchSlow(getpid(), bar_ptr.num);
+  map = procfs_MapMatch(0, bar_ptr.num);
   printf("bar: 0x%lx, 0x%lx, 0x%lx, 0x%lx\n", bar_ptr.num, map->start, map->end, map->off);
-  free(map);
 
   // Set up libunwind
   unw_getcontext(context);

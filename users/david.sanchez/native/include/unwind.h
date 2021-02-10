@@ -443,7 +443,7 @@ int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t* pip, int need_u
   }
 
   // Attempt to unwind
-  DBGLOG("map.start: %ld, offset: %ld, map->off: %ld\n", map->start, offset, map->off);
+  DBGLOG("map.start: 0x%lx, offset: 0x%lx, map->off: 0x%lx\n", map->start, offset, map->off);
   struct unw_dyn_info di = {.format = UNW_INFO_FORMAT_REMOTE_TABLE,
                             .start_ip = map->start,
                             .end_ip = map->end,
@@ -588,6 +588,7 @@ int unw_ar(unw_addr_space_t as, unw_regnum_t regnum, unw_word_t* valp, int write
       return -UNW_EBADREG;
   }
 
+  DBGLOG("reg: %d = 0x%lx\n", regnum, *valp);
   return UNW_ESUCCESS;
 }
 
@@ -726,6 +727,7 @@ int unwindstate_unwind(struct UnwindState* us, struct FunLoc* locs, int max_stac
   // Get the instruction pointers.  The first one is in EIP, unw for rest
   ips[n++] = us->eip;
 
+  procfs_PidMapPrint(us->pid);
   while (0 < (ret = unw_step(&uc)) && n < max_stack) {
     unw_get_reg(&uc, UNW_REG_IP, &ips[n]);
     if(unw_is_signal_frame(&uc) <= 0) --ips[n];
