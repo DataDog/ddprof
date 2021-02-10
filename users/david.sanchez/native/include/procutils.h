@@ -11,8 +11,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <gelf.h> // apt install libelf-dev
 
+// TODO
+// procfs will only cache segments that have been
 
 // ISO C does not allow you to cast a function pointer to an object pointer.
 // But it DOES allow you to cast a function pointer to a different, incompatible
