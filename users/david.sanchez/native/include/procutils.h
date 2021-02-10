@@ -41,6 +41,7 @@ typedef struct Map {
   uint64_t off;
   char*    path;
   MapMode  mode;
+  void*    map;
 } Map;
 
 #define PM_MAX 128
@@ -181,23 +182,31 @@ int procfs_MapOpen(pid_t target) {
 #include <unistd.h>
 #include <signal.h>
 
-ssize_t procfs_MapRead(Map* map, void* buf, size_t sz, size_t off) {
-  ssize_t ret = 0;
-  if(PUMM_VDSO & map->mode) {
-    printf("Being asked to open a special region: %s\n", map->path);
-  } else {
+ssize_t procfs_MapRead(Map* map, void* buf, size_t sz, size_t addr) {
+  // If this segment hasn't been cached, then cache it.
+  // TODO evict stale ones
+  if (!map->map) {
     int fd = open(map->path, O_RDONLY);
-    if(-1 == fd) {
-      printf("Couldn't open the map: %s\n", strerror(errno));
+    if (-1 == fd) {
+      printf("I couldn't open the map!\n");
       return -1;
     }
-    ret = pread(fd, buf, sz, off);
-    if(-1 == ret) {
-      printf("Couldn't read the map: %s\n", strerror(errno));
-    }
+    map->map = mmap(NULL, map->end - map->start, PROT_READ, MAP_PRIVATE, fd, map->off);
     close(fd);
+    if (!map->map) {
+      printf("I couldn't map the map!\n");
+      return -1;
+    }
   }
-  return ret;
+
+  // If map is clearly NOT in the file-segment, but IS in the memory-segment,
+  // adjust it back down.  It could easily be that the address is relative the
+  // top of the file, which is erroneous, but there's no clear way to
+  // disambiguate that case.
+  if (addr >= (map->start - map->off) && addr >= map->start && addr < map->end)
+    addr -= map->start;  // convert to segment-space
+  memcpy(buf, map->map + addr, sz);
+  return 0;
 }
 
 void procfs_MapPrint(Map* map) {

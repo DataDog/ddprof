@@ -500,7 +500,6 @@ int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t* pip, int need_u
     unwcase(UNW_EBADFRAME)
     unwcase(UNW_ESTOPUNWIND)
     }
-    us->map = NULL;
     elf_end(elf);
     close(fd);
     return ret;
@@ -538,25 +537,22 @@ int unw_am(unw_addr_space_t as, unw_word_t _addr, unw_word_t* valp, int write, v
     return UNW_ESUCCESS;
   }
 
-  Map* map;
-  if(us->map) map = us->map;
-  else {
-    map = procfs_MapMatch(us->pid, us->eip);
-//    DBGLOG("No global map cache.  Got %s\n", map->path);
-  }
+  // We need to find a map for this address.  The best-case scenario is that
+  // this address is within a segment (although there are cases where it looks
+  // to be in a segment, but is relative some other marker).  If that fails,
+  // then perhaps we can consider it relative the global context (in which
+  // case, procfs_MapRead() can possibly adjust to the segment.  If all else
+  // fails, then try using the current value of the IP, but that will probably
+  // not succeed...
+  Map* map = NULL;
+  if(!(map = procfs_MapMatch(us->pid, addr)))
+    if(!(map = us->map))
+      map = procfs_MapMatch(us->pid, us->eip);
 
   // Now try to read, given the map.  This assumes that the address is in the
   // scope of the instrumented process.
   if (map) {
-    if (addr < (map->start - map->off)) {
-      // I don't really understand how it's possible that an IP isn't adjusted,
-      // to the filespace, but I suppose this is true if libunwind ever pushes
-      // a direct file address back into unw_am.  We can fix it.
-      DBGLOG("[AM: EADJUST] addr = %lx, map_start = %lx, map_off = %lx, segbase = %lx!\n", addr, map->start,  map->off, map->start - map->off);
-      addr += (map->start - map->off);
-    }
-
-    if (-1 == procfs_MapRead(map, valp, sizeof(*valp), addr - (map->start - map->off))) {
+    if (-1 == procfs_MapRead(map, valp, sizeof(*valp), addr)) {
       DBGLOG("Reading failed!\n");
       *valp = 0; // Reset whatever valp is
       return -UNW_EINVALIDIP;
@@ -727,12 +723,12 @@ int unwindstate_unwind(struct UnwindState* us, struct FunLoc* locs, int max_stac
   // Get the instruction pointers.  The first one is in EIP, unw for rest
   ips[n++] = us->eip;
 
-  procfs_PidMapPrint(us->pid);
   while (0 < (ret = unw_step(&uc)) && n < max_stack) {
     unw_get_reg(&uc, UNW_REG_IP, &ips[n]);
     if(unw_is_signal_frame(&uc) <= 0) --ips[n];
     n++;
   }
+  printf("Got %d IPs\n", n);
 
   // Now get the information into the output container
   memset(locs, 0, n * sizeof(struct FunLoc));
