@@ -1,10 +1,10 @@
 INCLUDE = -Iinclude -I/home/sanchda/dev/binutils-gdb/include -I/home/sanchda/dev/binutils-gdb/bfd -I/home/sanchda/dev/binutils-gdb/binutils -I/home/sanchda/dev/libunwind/include
-CFLAGS = -gdwarf -g1 -std=c11 -O0 -D_GNU_SOURCE
+CFLAGS = -gdwarf -g3 -ggdb3 -std=c11 -O0 -D_GNU_SOURCE
 TESTS := http perf pprof
 WARNS := -Wall -Wextra -Wpedantic -Wno-missing-braces -Wno-missing-field-initializers -Wno-gnu-statement-expression -Wno-pointer-arith
-#ANALYZER := -fanalyzer
+ANALYZER := -fanalyzer
 CC := gcc-10
-CC := clang-11
+#CC := clang-11
 LDFLAGS += -L/home/sanchda/dev/libunwind/src/.libs
 LDLIBS := -lunwind -lprotobuf-c -lz -lpthread -lelf -lbfd -llzma
 UNWDIR := /home/sanchda/dev/libunwind
@@ -23,12 +23,16 @@ endif
 
 dd-prof: src/dd-prof.c src/profile.pb-c.c src/string_table.c src/dictionary.c src/pprof.c $(UNWLIBS)
 	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
+#	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DD_UWDBG $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 
 ddog: src/ddog.c src/profile.pb-c.c src/string_table.c src/dictionary.c src/pprof.c
 	$(CC) -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 
-http: src/eg_http.c
-	$(CC) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o eg/$@ $^ $(LDLIBS)
+http: src/eg_http.c src/append_string.c src/string_table.c src/profile.pb-c.c src/pprof.c
+	$(CC) -DKNOCKOUT_UNUSED -DD_LOGGING_ENABLE -DD_SANITY_CHECKS $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
+
+appendstring: src/eg_appendstring.c src/append_string.c
+	$(CC) -DKNOCKOUT_UNUSED -DD_LOGGING_ENABLE -DD_SANITY_CHECKS $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
 
 unwind: src/eg_unwind.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o eg/$@ $^ $(LDLIBS)
@@ -59,6 +63,9 @@ cstacks: src/demo_constantstacks.c $(UNWLIBS)
 #	$(CC) -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
 
 strings: src/demo_strings.c src/string_table.c
+	$(CC) -DD_LOGGING_ENABLE -DD_SANITY_CHECKS $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
+
+appendstring: src/eg_appendstring.c
 	$(CC) -DD_LOGGING_ENABLE -DD_SANITY_CHECKS $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
 
 dictionary: src/demo_dict.c src/string_table.c src/dictionary.c
