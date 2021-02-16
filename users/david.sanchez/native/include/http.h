@@ -18,7 +18,7 @@
 
 char *RandomNameMake(char *s, int n) {
   static char tokens[] = "0123456789abcdef";
-  s[n]                 = 0;
+  s[n] = 0;
   for (int i = 0; i < n; i++)
     s[i] = tokens[rand() % (sizeof(tokens) - 1)];
   return s;
@@ -40,7 +40,7 @@ void ASGrow(AppendString *as, size_t addtl) {
   size_t sz = as->n + addtl;
   if (as->sz < sz) {
     size_t chunks = 1 + (sz + 1) / AS_CHUNK;
-    char *buf     = calloc(chunks * AS_CHUNK, sizeof(char));
+    char *buf = calloc(chunks * AS_CHUNK, sizeof(char));
     memcpy(buf, as->str, as->n);
     free(as->str);
     as->str = buf;
@@ -152,7 +152,7 @@ char HttpSendMultipart(const char *host, const char *port, const char *route,
 
   // Put together the time strings
   char time_start[128] = {0};
-  char time_end[128]   = {0};
+  char time_end[128] = {0};
   time_t now;
   time(&now);
   now -= 60;

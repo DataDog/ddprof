@@ -95,19 +95,19 @@ struct UnwindState {
 typedef void bfd_cleanup;
 #include "elf-bfd.h" // add binutils-gdb to include path
 enum DMGL {
-  DMGL_NO_OPTS     = 0,        // For readability...
-  DMGL_PARAMS      = (1 << 0), // Include function args
-  DMGL_ANSI        = (1 << 1), // Include const, volatile, etc
-  DMGL_JAVA        = (1 << 2), // Demangle as Java rather than C++.
-  DMGL_VERBOSE     = (1 << 3), // Include implementation details.
-  DMGL_TYPES       = (1 << 4), // Also try to demangle type encodings.
+  DMGL_NO_OPTS = 0,            // For readability...
+  DMGL_PARAMS = (1 << 0),      // Include function args
+  DMGL_ANSI = (1 << 1),        // Include const, volatile, etc
+  DMGL_JAVA = (1 << 2),        // Demangle as Java rather than C++.
+  DMGL_VERBOSE = (1 << 3),     // Include implementation details.
+  DMGL_TYPES = (1 << 4),       // Also try to demangle type encodings.
   DMGL_RET_POSTFIX = (1 << 5), // Print function return types
-  DMGL_RET_DROP    = (1 << 6), // Suppress function return types
-  DMGL_AUTO        = (1 << 8),
-  DMGL_GNU_V3      = (1 << 14),
-  DMGL_GNAT        = (1 << 15), // Ada?
-  DMGL_DLANG       = (1 << 16), // DLANG?
-  DMGL_RUST        = (1 << 17), // Rust wraps GNU_V3 style mangling.
+  DMGL_RET_DROP = (1 << 6),    // Suppress function return types
+  DMGL_AUTO = (1 << 8),
+  DMGL_GNU_V3 = (1 << 14),
+  DMGL_GNAT = (1 << 15),  // Ada?
+  DMGL_DLANG = (1 << 16), // DLANG?
+  DMGL_RUST = (1 << 17),  // Rust wraps GNU_V3 style mangling.
   DMGL_STYLE_MASK =
       (DMGL_AUTO | DMGL_GNU_V3 | DMGL_JAVA | DMGL_GNAT | DMGL_DLANG | DMGL_RUST)
 };
@@ -142,7 +142,7 @@ static void slurp_symtab(struct FunLocLookup *flu) {
       (storage = bfd_get_dynamic_symtab_upper_bound(abfd)) > 0) {
     free(flu->symtab);
     flu->symtab = calloc(1, storage);
-    symcount    = bfd_canonicalize_dynamic_symtab(abfd, flu->symtab);
+    symcount = bfd_canonicalize_dynamic_symtab(abfd, flu->symtab);
   }
 
   if (symcount <= 0) {
@@ -153,12 +153,12 @@ static void slurp_symtab(struct FunLocLookup *flu) {
 }
 static void find_address_in_section(bfd *abfd, asection *section, void *arg) {
   bfd_vma vma;
-  struct FunLocLookup *flu    = arg;
-  const char **filename       = (const char **)&flu->loc->srcpath;
-  const char **functionname   = (const char **)&flu->loc->funname;
-  unsigned int *line          = &flu->loc->line;
+  struct FunLocLookup *flu = arg;
+  const char **filename = (const char **)&flu->loc->srcpath;
+  const char **functionname = (const char **)&flu->loc->funname;
+  unsigned int *line = &flu->loc->line;
   unsigned int *discriminator = &flu->loc->disc;
-  bfd_vma pc                  = flu->pc;
+  bfd_vma pc = flu->pc;
 
   if (flu->done)
     return;
@@ -193,11 +193,11 @@ static void find_address_in_section(bfd *abfd, asection *section, void *arg) {
 
 static void find_offset_in_section(bfd *abfd, asection *section,
                                    struct FunLocLookup *flu) {
-  const char **filename       = (const char **)&flu->loc->srcpath;
-  const char **functionname   = (const char **)&flu->loc->funname;
-  unsigned int *line          = &flu->loc->line;
+  const char **filename = (const char **)&flu->loc->srcpath;
+  const char **functionname = (const char **)&flu->loc->funname;
+  unsigned int *line = &flu->loc->line;
   unsigned int *discriminator = &flu->loc->disc;
-  bfd_vma pc                  = flu->pc;
+  bfd_vma pc = flu->pc;
   bfd_size_type size;
 
   if ((bfd_section_flags(section) & SEC_ALLOC) == 0)
@@ -220,9 +220,9 @@ static void find_offset_in_section(bfd *abfd, asection *section,
 
 static void translate_addresses(struct FunLocLookup *flu, asection *section,
                                 uint64_t addr) {
-  bfd *abfd             = flu->bfd;
+  bfd *abfd = flu->bfd;
   const char **filename = (const char **)&flu->loc->srcpath;
-  unsigned int *line    = &flu->loc->line;
+  unsigned int *line = &flu->loc->line;
   //  unsigned int*  discriminator = &flu->loc->disc;
   flu->pc = addr;
 
@@ -269,7 +269,7 @@ static void translate_addresses(struct FunLocLookup *flu, asection *section,
 
 static int process_file(char *file, uint64_t addr, struct FunLoc *loc) {
   struct FunLocLookup *flu = &(struct FunLocLookup){0};
-  flu->loc                 = loc;
+  flu->loc = loc;
   char **matching;
   if (!file || !*file)
     return -1;
@@ -306,7 +306,7 @@ static int process_file(char *file, uint64_t addr, struct FunLoc *loc) {
   bfd_close(flu->bfd);
 
   // If we're here, we succeeded.  Finish populating loc
-  loc->ip     = addr;
+  loc->ip = addr;
   loc->sopath = strdup(file);
   return 0;
 }
@@ -349,7 +349,7 @@ extern int UNW_OBJ(dwarf_find_debug_frame)(int, unw_dyn_info_t *, unw_word_t,
 static int __dw_read_encoded_value(uint8_t **p, uint8_t *end, uint64_t *val,
                                    uint8_t encoding) {
   uint8_t *cur = *p;
-  *val         = 0;
+  *val = 0;
 
   switch (encoding) {
   case DW_EH_PE_omit:
@@ -416,7 +416,7 @@ int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pip,
   Elf *elf;
   GElf_Ehdr *ehdr = &(GElf_Ehdr){0};
   GElf_Shdr *shdr = &(GElf_Shdr){0};
-  Elf_Scn *sec    = NULL;
+  Elf_Scn *sec = NULL;
 
   if (!(map = procfs_MapMatch(us->pid, ip))) {
     return -UNW_EINVALIDIP; // probably [vdso] or something
@@ -481,7 +481,7 @@ int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pip,
     uint8_t *end = (uint8_t *)&efh.data;
     if (sizeof(efh) == pread(fd, &efh, sizeof(efh), offset)) {
       dw_read_encoded_value(enc, end, efh.eh_frame_ptr_enc);
-      fde_count  = dw_read_encoded_value(enc, end, efh.fde_count_enc);
+      fde_count = dw_read_encoded_value(enc, end, efh.fde_count_enc);
       table_data = (enc - (uint8_t *)&efh) + offset;
       DBGLOG("--> Table Data: %lx (%ld)\n", table_data, fde_count);
     }
@@ -491,12 +491,12 @@ int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pip,
   DBGLOG("map.start: 0x%lx, offset: 0x%lx, map->off: 0x%lx\n", map->start,
          offset, map->off);
   struct unw_dyn_info di = {
-      .format   = UNW_INFO_FORMAT_REMOTE_TABLE,
+      .format = UNW_INFO_FORMAT_REMOTE_TABLE,
       .start_ip = map->start,
-      .end_ip   = map->end,
-      .u        = {.rti = {.segbase    = (map->start - map->off) + offset,
+      .end_ip = map->end,
+      .u = {.rti = {.segbase = (map->start - map->off) + offset,
                     .table_data = (map->start - map->off) + table_data,
-                    .table_len  = fde_count * sizeof(struct table_entry) /
+                    .table_len = fde_count * sizeof(struct table_entry) /
                         sizeof(unw_word_t)}}};
 
   switch (-dwarf_search_unwind_table(as, ip, &di, pip, need_unwind_info, arg)) {
@@ -519,7 +519,7 @@ int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pip,
   //      checking build-id and poking around the filesystem and stuff
   //      For now, only check self-same file as IP
   //      When that happens, also need  to update the strategy for unw_am()
-  int ret      = -1;
+  int ret = -1;
   char is_exec = 0;
   if (strcmp(".so", &map->path[strlen(map->path) - 3])) {
     DBGLOG("I think %s does not end in .so\n", map->path);
@@ -566,7 +566,7 @@ int unw_am(unw_addr_space_t as, unw_word_t _addr, unw_word_t *valp, int write,
            void *arg) {
   (void)as;
   struct UnwindState *us = arg;
-  unw_word_t addr        = _addr;
+  unw_word_t addr = _addr;
   if (write || !us->stack) {
     *valp = 0;
     return -UNW_EINVAL; // not supported
@@ -574,7 +574,7 @@ int unw_am(unw_addr_space_t as, unw_word_t _addr, unw_word_t *valp, int write,
 
   // Start and end of stack addresses
   const uint64_t sp_start = us->esp;
-  const uint64_t sp_end   = sp_start + us->stack_sz;
+  const uint64_t sp_end = sp_start + us->stack_sz;
 
   // Check overflow, like perf
   if (addr + sizeof(unw_word_t) < addr)
@@ -666,14 +666,14 @@ int unw_gpn(unw_addr_space_t as, unw_word_t addr, char *bufp, size_t buf_len,
   return -UNW_EINVAL;
 }
 
-unw_accessors_t unwAccessors = {.find_proc_info         = unw_fpi,
-                                .put_unwind_info        = unw_pui,
+unw_accessors_t unwAccessors = {.find_proc_info = unw_fpi,
+                                .put_unwind_info = unw_pui,
                                 .get_dyn_info_list_addr = unw_gdila,
-                                .access_mem             = unw_am,
-                                .access_reg             = unw_ar,
-                                .access_fpreg           = unw_af,
-                                .resume                 = unw_res,
-                                .get_proc_name          = unw_gpn};
+                                .access_mem = unw_am,
+                                .access_reg = unw_ar,
+                                .access_fpreg = unw_af,
+                                .resume = unw_res,
+                                .get_proc_name = unw_gpn};
 
 char unwindstate_Init(struct UnwindState *us) {
   us->uas = unw_create_addr_space(&unwAccessors, 0);
@@ -755,7 +755,7 @@ void funloclookup_Set(struct FunLocLookup *flu, uint64_t ip, pid_t pid) {
     printf("NOMAP\n");
     return;
   }
-  flu->loc->ip      = ip - map->start + map->off;
+  flu->loc->ip = ip - map->start + map->off;
   flu->loc->srcpath = map->path;
 
   funloclookup_Init(flu, map->path);
@@ -772,8 +772,8 @@ static int process_ip(pid_t pid, uint64_t addr, struct FunLoc *loc) {
     return -1;
   }
   loc->map_start = map->start;
-  loc->map_end   = map->end;
-  loc->map_off   = map->off;
+  loc->map_end = map->end;
+  loc->map_off = map->off;
 
   // I'm not quite sure what I did to make this necessary, but I sure need to
   // figure out why

@@ -84,7 +84,7 @@ void DDRequestSend(DDRequest *ddr, DProf *dp) {
 
   // Add zipped payload to dictionary.  This stashes the pointer to the buffer,
   // so note that it still needs to be freed!
-  size_t sz          = 0;
+  size_t sz = 0;
   unsigned char *buf = pprof_flush(dp, &sz);
   dictionary_put_cstr(ddr->D, "pprof[0]", buf, sizeof(unsigned char *));
   dictionary_put_cstr(ddr->D, "pprof[0].length", (void *)&sz, sizeof(size_t));

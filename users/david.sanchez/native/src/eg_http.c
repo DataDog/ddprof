@@ -1,22 +1,26 @@
 #include "dd_send.h"
 
 int main() {
+  int ret = 0;
+
   // Even though the req object represents top-level keys in a uniform space,
   // internally the library knows whether to represent the key as an HTTP
   // header, a named HTTP multipart segment, or a tags[]-encoded HTTP multipart
   // segment
+  // TODO, at some point accept a URI--although not much reason to do that until
+  //       we actually use something more than just host and port
   DDReq *req = &(DDReq){
-      .port            = "1234",
-      .host            = "localhost", // recipient of request
-      .user_agent      = "MY AGENT",
-      .apikey          = "yesthisisanapikey",
+      .port = "1234",
+      .host = "localhost", // recipient of request
+      .user_agent = "MY AGENT",
+      .apikey = "yesthisisanapikey",
       .accept_encoding = "gzip",
-      .accept          = "*/*",
+      .accept = "*/*",
       .host_tag = "sharedlib_test", // client host tag (local mach hostname)
       .language = "AMERICAN, BABY PEW PEW PEW",
-      .runtime  = "0630",
+      .runtime = "0630",
       .profiler_version = "2.71828",
-      .runtime_os       = "Sunway RaiseOS 2.0.5"};
+      .runtime_os = "Sunway RaiseOS 2.0.5"};
   DDR_init(req);
 
   // A DDReq object gets initialized on first use, so you don't need a special
@@ -24,7 +28,7 @@ int main() {
   // It works by pushing data into the multipart segments.  For instance, here's
   // how you hardcode the inclusion of a pprof
   const unsigned char *buf = (unsigned char *)"THIS IS ACTUALLY A VALID PPROF";
-  size_t sz_buf            = strlen((char *)buf);
+  size_t sz_buf = strlen((char *)buf);
   DDR_push(req, "name=\"data[0]\"; filename=\"pprof.data\"",
            "application/octet-stream", buf, sz_buf);
   DDR_push(req, "name=\"types[0]\"", NULL, (unsigned char *)"samples,cpu",
@@ -49,8 +53,10 @@ int main() {
   // Finalizing flushes the rest of the headers and multipart elements.
   // Send returns immediately, without blocking.
   DDR_finalize(req);
-  if (DDR_send(req)) {
+  if ((ret = DDR_send(req))) {
     // A nonzero return is an error, such as being unable to connect
+    printf("Tried to send() with error (%s), but I'm ignoring it.\n",
+           DDR_code2str(ret));
   }
 
   // You can reap the current status of the DDReq.
@@ -65,7 +71,6 @@ int main() {
   // The timeout is specified in integral milliseconds, where 0 is effectively
   // the same as DDR_check().  You can also block indefinitely by giving a
   // negative value.
-  int ret = 0;
   if (0 > (ret = DDR_watch(req, 100))) {
     printf("The result was %s\n", DDR_code2str(ret)); // You can also convert an
                                                       // rc into a string

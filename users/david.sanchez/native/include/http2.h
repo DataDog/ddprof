@@ -1,6 +1,7 @@
 #ifndef _H_HTTP
 #define _H_HTTP
 
+#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -20,14 +21,6 @@
 #include <unistd.h>
 
 #include "append_string.h"
-
-char *_HTTP_RandomNameMake(char *s, int n) {
-  static char tokens[] = "0123456789abcdef";
-  s[n]                 = 0;
-  for (int i = 0; i < n; i++)
-    s[i] = tokens[rand() % (sizeof(tokens) - 1)];
-  return s;
-}
 
 /******************************************************************************\
 |*                                Socket Stuff                                *|
@@ -103,6 +96,11 @@ typedef struct HttpConn {
 } HttpConn;
 
 int HttpConnect(HttpConn *conn, const char *host, const char *port) {
+  // The underlying machinery is a bit permissive, so these NULL pointers may
+  // not bubble up during debuggin
+  assert(host);
+  assert(port);
+
   // If we are trying to connect but we're already connected, don't connect.
   if (conn->state == HCS_CONNECTED || conn->state == HCS_SENDREC)
     return HTTP_EALREADYCONNECTED;
@@ -110,7 +108,7 @@ int HttpConnect(HttpConn *conn, const char *host, const char *port) {
   // TODO validate DNS cache?
   if (!conn->addr_cached) {
     if (getaddrinfo(host, port, NULL, &conn->addr)) {
-      memset(conn->addr, 0, sizeof(*conn->addr));
+      conn->addr = NULL;
       return HTTP_EADDR;
     }
     conn->addr_cached = true;
@@ -130,6 +128,8 @@ int HttpConnect(HttpConn *conn, const char *host, const char *port) {
 }
 
 /******************************   HTTP Request  *******************************/
+// TODO who frees the host and port?  Since we have no (con/de)structor, it's
+//      up to the caller to figure it out
 typedef struct HttpReq {
   unsigned char *host;
   unsigned char *port;
@@ -140,6 +140,7 @@ typedef struct HttpReq {
 
 int HttpSend(HttpReq *req, const void *payload, size_t sz_payload) {
   int ret;
+  assert(req->conn);
   if (req->conn->state != HCS_CONNECTED && req->conn->state != HCS_SENDREC)
     if ((ret = HttpConnect(req->conn, (const char *)req->host,
                            (const char *)req->port)))
@@ -209,7 +210,7 @@ bool HRESFun_content_length(HttpRes *res, char *val) {
 ssize_t HttpResProcess(HttpRes *res) {
   char *p, *q; // current, end of current scope, next line
   uint64_t ret_uint = 0;
-  p                 = res->as->str;
+  p = res->as->str;
 
   // Extract the Status-Line
   if (!(p = strstr(p, "\r\n")))
@@ -261,7 +262,7 @@ ssize_t HttpResProcess(HttpRes *res) {
 }
 
 ssize_t HttpResRecv(HttpRes *res) {
-  ssize_t n       = 0;
+  ssize_t n = 0;
   AppendString *A = res->as;
   as_grow(A, 256);
 
@@ -308,7 +309,7 @@ int HttpResRecvTimedwait(HttpRes *res, int timeout) {
       if (errno == EINTR || errno == EWOULDBLOCK)
         break; // Retry
       close(res->conn->fd);
-      res->conn->fd    = -1;
+      res->conn->fd = -1;
       res->conn->state = HCS_INIT;
       return HTTP_ECONN;
     }

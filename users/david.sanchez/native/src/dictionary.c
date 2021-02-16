@@ -24,7 +24,7 @@ Dictionary *dictionary_init(Dictionary *dict, DictionaryOptions *opts) {
     opts = &default_opts;
   if (!dict) {
     clear_dict = 1;
-    dict       = calloc(1, sizeof(Dictionary));
+    dict = calloc(1, sizeof(Dictionary));
     if (!dict)
       return NULL;
   }
@@ -36,7 +36,7 @@ Dictionary *dictionary_init(Dictionary *dict, DictionaryOptions *opts) {
   // case there's no way to know the disposition of the previous dictionary, so
   // focus on initializing it in a referentially safe way
   dict->values_reserved = DIC_ARENA_NELEM;
-  dict->values          = calloc(dict->values_reserved, sizeof(void *));
+  dict->values = calloc(dict->values_reserved, sizeof(void *));
   if (!dict->values) {
     dict->values = NULL;
     if (clear_dict)

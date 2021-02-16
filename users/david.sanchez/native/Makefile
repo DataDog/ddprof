@@ -30,7 +30,7 @@ ddog: src/ddog.c src/profile.pb-c.c src/string_table.c src/dictionary.c src/ppro
 	$(CC) -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 
 http: src/eg_http.c src/append_string.c src/string_table.c src/profile.pb-c.c src/pprof.c
-	$(CC) -DKNOCKOUT_UNUSED -DD_LOGGING_ENABLE -DD_SANITY_CHECKS $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
+	$(CC) -DKNOCKOUT_UNUSED -DD_LOGGING_ENABLE -DD_SANITY_CHECKS -fsanitize=undefined $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 
 appendstring: src/eg_appendstring.c src/append_string.c
 	$(CC) -DKNOCKOUT_UNUSED -DD_LOGGING_ENABLE -DD_SANITY_CHECKS $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^

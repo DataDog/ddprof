@@ -8,7 +8,7 @@ int main() {
   if (!st)
     return -1;
 
-  FILE *fs   = fopen("./words.txt", "r");
+  FILE *fs = fopen("./words.txt", "r");
   char *line = NULL;
   size_t len = 0;
   ssize_t this_line, that_line;

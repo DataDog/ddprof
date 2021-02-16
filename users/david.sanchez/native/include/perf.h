@@ -181,25 +181,25 @@ typedef struct perf_samplestacku {
 } perf_samplestacku;
 
 struct perf_event_attr g_dd_native_attr = {
-    .size   = sizeof(struct perf_event_attr),
-    .type   = PERF_TYPE_SOFTWARE,
+    .size = sizeof(struct perf_event_attr),
+    .type = PERF_TYPE_SOFTWARE,
     .config = PERF_COUNT_SW_TASK_CLOCK, // If it's good enough for perf(1), it's
                                         // good enough for me!
     //    .sample_period  = 10000000,                // Who knows!
     .sample_freq = 1000,
-    .freq        = 1,
+    .freq = 1,
     .sample_type = PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER |
         PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME |
         PERF_SAMPLE_PERIOD,
-    .precise_ip        = 2, // Change this when moving from SW->HW clock
-    .disabled          = 0,
-    .inherit           = 1,
-    .inherit_stat      = 1,
-    .mmap              = 1, // keep track of executable mappings
-    .task              = 1, // Follow fork/stop events
-    .enable_on_exec    = 1,
+    .precise_ip = 2, // Change this when moving from SW->HW clock
+    .disabled = 0,
+    .inherit = 1,
+    .inherit_stat = 1,
+    .mmap = 1, // keep track of executable mappings
+    .task = 1, // Follow fork/stop events
+    .enable_on_exec = 1,
     .sample_stack_user = PERF_SAMPLE_STACK_SIZE, // Is this an insane default?
-    .sample_regs_user  = PERF_REGS_MASK,
+    .sample_regs_user = PERF_REGS_MASK,
     //    .read_format    = //PERF_FORMAT_TOTAL_TIME_ENABLED |
     //                      PERF_FORMAT_TOTAL_TIME_RUNNING,
     //    .exclude_kernel = 1,                        // For a start

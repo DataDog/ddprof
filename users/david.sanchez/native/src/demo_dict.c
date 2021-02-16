@@ -28,9 +28,9 @@ int main() {
   printf("String: %s\n", (char *)dictionary_get_cstr(dict, key1));
 
   // Cool!  Now try stuffing it
-  FILE *fs     = fopen("./words.txt", "r");
-  char *line   = NULL;
-  size_t len   = 0;
+  FILE *fs = fopen("./words.txt", "r");
+  char *line = NULL;
+  size_t len = 0;
   size_t lines = 0;
   while (-1 != getline(&line, &len, fs)) {
     line[4] = 0;

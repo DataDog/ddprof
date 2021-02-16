@@ -73,8 +73,8 @@ static inline void _wymix32(unsigned *A, unsigned *B) {
 }
 static inline unsigned wyhash32(const void *key, uint64_t len, unsigned seed) {
   const uint8_t *p = (const uint8_t *)key;
-  uint64_t i       = len;
-  unsigned see1    = (unsigned)len;
+  uint64_t i = len;
+  unsigned see1 = (unsigned)len;
   seed ^= (unsigned)(len >> 32);
   _wymix32(&seed, &see1);
   for (; i > 8; i -= 8, p += 8) {
@@ -157,15 +157,15 @@ static StringTableArena *_StringTableArena_init(StringTableArena *sta) {
     sta->ownership = 1;
   }
 
-  sta->arena          = sta_buf;
-  sta->regions[0]     = sta_buf;
-  sta->capacity       = ST_ARENA_SIZE;
-  sta->arena_off      = 0;
+  sta->arena = sta_buf;
+  sta->regions[0] = sta_buf;
+  sta->capacity = ST_ARENA_SIZE;
+  sta->arena_off = 0;
   sta->filled_regions = 1; // Points to the next region to fill
 
-  sta->entry          = entry_buf;
+  sta->entry = entry_buf;
   sta->entry_capacity = ST_ARENA_NELEM;
-  sta->entry_idx      = 0;
+  sta->entry_idx = 0;
 
   return sta;
 
@@ -194,12 +194,12 @@ static void _StringTableArena_free(StringTableArena *sta) {
   free(sta->entry);
 
   sta->filled_regions = 0;
-  sta->arena          = NULL;
-  sta->capacity       = 0;
-  sta->arena_off      = 0;
-  sta->entry          = NULL;
+  sta->arena = NULL;
+  sta->capacity = 0;
+  sta->arena_off = 0;
+  sta->entry = NULL;
   sta->entry_capacity = 0;
-  sta->entry_idx      = 0;
+  sta->entry_idx = 0;
 
   if (sta->ownership)
     free(sta);
@@ -217,7 +217,7 @@ static char _StringTableArena_expandar(StringTableArena *sta) {
   if (!buf)
     return -1;
 
-  sta->arena                          = buf;
+  sta->arena = buf;
   sta->regions[sta->filled_regions++] = buf;
   sta->capacity *= 2;
   sta->arena_off = 0;
@@ -309,9 +309,9 @@ static ssize_t _StringTableArena_append(StringTableArena *sta,
     return -1;
 
   // Compute several constants related to setting up the arena
-  unsigned char *dst       = &sta->arena[sta->arena_off]; // Top of the object
-  unsigned char *arena_ptr = dst + sizeof(uint32_t);      // What we return
-  uint32_t write_len       = sz_val;                      // Size after padding
+  unsigned char *dst = &sta->arena[sta->arena_off];  // Top of the object
+  unsigned char *arena_ptr = dst + sizeof(uint32_t); // What we return
+  uint32_t write_len = sz_val;                       // Size after padding
 
 #ifdef D_SANITY_CHECKS
   if (STA_ALIGN(dst) != dst)
@@ -326,10 +326,6 @@ static ssize_t _StringTableArena_append(StringTableArena *sta,
 
   // Copy the string (either whole or truncated)
   memcpy(dst, val, sz_val);
-  printf("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-         "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-         "++++++++++++++STRING: %.*s\n",
-         (int)sz_val, val);
 
   // ASSERT:
   // dst - &sta->arena[sta->arena_off] is in [1,8]
@@ -337,7 +333,7 @@ static ssize_t _StringTableArena_append(StringTableArena *sta,
   sta->arena_off += sz_total;
 
   // Now also add this to the entries
-  ssize_t ret     = sta->entry_idx++;
+  ssize_t ret = sta->entry_idx++;
   sta->entry[ret] = arena_ptr;
   return ret;
 }
@@ -369,16 +365,16 @@ static StringTableNodes *_StringTableNodes_init(StringTableNodes *stn) {
     stn->ownership = 1;
   }
 
-  stn->arena          = stn_buf;
-  stn->sz_region[0]   = ST_ARENA_NELEM;
-  stn->regions[0]     = stn_buf;
-  stn->capacity       = ST_ARENA_NELEM;
-  stn->arena_off      = 0;
+  stn->arena = stn_buf;
+  stn->sz_region[0] = ST_ARENA_NELEM;
+  stn->regions[0] = stn_buf;
+  stn->capacity = ST_ARENA_NELEM;
+  stn->arena_off = 0;
   stn->filled_regions = 1;
 
-  stn->entry          = entry_buf;
+  stn->entry = entry_buf;
   stn->entry_capacity = ST_ARENA_NELEM;
-  stn->entry_count    = 0;
+  stn->entry_count = 0;
 
   return stn;
 
@@ -406,12 +402,12 @@ static void _StringTableNodes_free(StringTableNodes *stn) {
   free(stn->entry);
 
   stn->filled_regions = 0;
-  stn->arena          = NULL;
-  stn->capacity       = 0;
-  stn->arena_off      = 0;
-  stn->entry          = NULL;
+  stn->arena = NULL;
+  stn->capacity = 0;
+  stn->arena_off = 0;
+  stn->entry = NULL;
   stn->entry_capacity = 0;
-  stn->entry_count    = 0;
+  stn->entry_count = 0;
 
   if (stn->ownership)
     free(stn);
@@ -431,7 +427,7 @@ static char _StringTableNodes_expandar(StringTableNodes *stn) {
   stn->capacity *= 2;
   stn->sz_region[stn->filled_regions] = stn->capacity;
   stn->regions[stn->filled_regions++] = buf;
-  stn->arena_off                      = 0;
+  stn->arena_off = 0;
   return 0;
 }
 
@@ -461,8 +457,8 @@ static char _StringTableNodes_expandcap(StringTableNodes *stn) {
       node = &stn->regions[i][j];
       if (!node->value)
         continue;
-      node->next   = NULL;
-      hash_val     = wyhash_hash(node->value, STR_LEN(node->value));
+      node->next = NULL;
+      hash_val = wyhash_hash(node->value, STR_LEN(node->value));
       uint32_t idx = hash_val & (stn->entry_capacity - 1);
       StringTableNode *that_node = buf[idx];
 
@@ -551,7 +547,7 @@ _StringTableNodes_get(StringTableNodes *stn, const unsigned char *val,
 \******************************************************************************/
 ssize_t stringtable_add(StringTable *st, const unsigned char *_val,
                         size_t sz_val) {
-  assert(!_val && !sz_val); // if _val is NULL, its size should be 0
+  assert(_val != NULL || sz_val == 0);
 
   // Input sanitization
   const unsigned char *val = _val ? _val : 0;
@@ -573,7 +569,7 @@ ssize_t stringtable_add(StringTable *st, const unsigned char *_val,
     if (sz_val == STR_LEN(node->value) && !memcmp(val, node->value, sz_val))
       return node->idx;
     node_prev = node;
-    node      = node->next;
+    node = node->next;
   }
 
   // Node doesn't exist, which means the value is novel in the arena and thus
@@ -587,7 +583,7 @@ ssize_t stringtable_add(StringTable *st, const unsigned char *_val,
   // It's possible that we rehashed in the last step, so refresh the lookup
   // because the capacity may have changed
   if (stashed_capacity != st->nodes->entry_capacity) {
-    node      = st->nodes->entry[hash_val & (st->nodes->entry_capacity - 1)];
+    node = st->nodes->entry[hash_val & (st->nodes->entry_capacity - 1)];
     node_prev = NULL;
 
     // Either find a matching node and return the index or run into an empty
@@ -596,7 +592,7 @@ ssize_t stringtable_add(StringTable *st, const unsigned char *_val,
       if (sz_val == STR_LEN(node->value) && !memcmp(val, node->value, sz_val))
         return node->idx;
       node_prev = node;
-      node      = node->next;
+      node = node->next;
     }
   }
 
@@ -610,10 +606,10 @@ ssize_t stringtable_add(StringTable *st, const unsigned char *_val,
 
   // At this point, we have what we need to populate a node and we've reserved
   // the space necessary to actually do so.
-  node        = &st->nodes->arena[st->nodes->arena_off++];
+  node = &st->nodes->arena[st->nodes->arena_off++];
   node->value = arena_ptr;
-  node->idx   = arena_idx;
-  node->next  = NULL;
+  node->idx = arena_idx;
+  node->next = NULL;
 
   // Now we need to either add the node to the entries or as a child of a
   // different node.  When we looked it up, we kept track of whether we
@@ -642,7 +638,7 @@ StringTable *stringtable_init(StringTable *ret, StringTableOptions *opts) {
   }
 
   // Set options
-  ret->logging  = opts->logging;
+  ret->logging = opts->logging;
   ret->hash_fun = opts->hash ? wyhash_hash : djb2_hash;
 
   // Run internal initializers

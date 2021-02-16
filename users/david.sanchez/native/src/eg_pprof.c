@@ -10,7 +10,7 @@
 #include "pprof.h"
 
 int main() {
-  DProf *dp      = &(DProf){0};
+  DProf *dp = &(DProf){0};
   dp->table_type = 1; // use string_table.h
   pprof_Init(dp, (const char **)&(const char *[]){"samples", "cpu"},
              (const char **)&(const char *[]){"count", "nanoseconds"}, 2);
@@ -43,10 +43,10 @@ int main() {
                   2);
 
   // Serialize and ship
-  dp->pprof.string_table   = dp->string_table(dp->string_table_data);
+  dp->pprof.string_table = dp->string_table(dp->string_table_data);
   dp->pprof.n_string_table = dp->string_table_size(dp->string_table_data);
   size_t len = perftools__profiles__profile__get_packed_size(&dp->pprof);
-  void *buf  = calloc(1, len);
+  void *buf = calloc(1, len);
   perftools__profiles__profile__pack(&dp->pprof, buf);
   printf("I have %ld bytes.\n", len);
   int fd = open("./test.pb", O_WRONLY | O_CREAT, 0777);

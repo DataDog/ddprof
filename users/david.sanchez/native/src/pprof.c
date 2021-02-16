@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -57,7 +58,7 @@
 size_t addToVocab(const char *str, char ***_st, size_t *_sz_st) {
   if (!str)
     str = "";
-  char **st    = *_st;
+  char **st = *_st;
   size_t sz_st = *_sz_st;
 
   // Does this string already exist in the table?
@@ -135,8 +136,8 @@ size_t pprof_strIntern(DProf *dp, const char *str) {
 static uint64_t _pprof_mapNew(DProf *, uint64_t, uint64_t, uint64_t, uint64_t,
                               int64_t);
 static uint64_t _pprof_funNew(DProf *, int64_t, int64_t, int64_t, int64_t);
-static uint64_t _pprof_locNew(DProf *, uint64_t, uint64_t, uint64_t *,
-                              int64_t *, size_t);
+static uint64_t _pprof_locNew(DProf *, uint64_t, uint64_t, const uint64_t *,
+                              const int64_t *, size_t);
 static uint64_t _pprof_lineNew(DProf *, PPLocation *, uint64_t, int64_t);
 static char _pprof_mapFree(PPMapping **, size_t);
 
@@ -145,7 +146,7 @@ static uint64_t _pprof_mapNew(DProf *dp, uint64_t map_start, uint64_t map_end,
                               uint64_t map_off, uint64_t id_filename,
                               int64_t build) {
   PPProfile *pprof = &dp->pprof;
-  uint64_t id      = pprof->n_mapping;
+  uint64_t id = pprof->n_mapping;
 
   // Resize if needed
   pprofgrow(pprof->mapping, pprof->n_mapping, DPROF_CHUNK_SZ);
@@ -156,12 +157,12 @@ static uint64_t _pprof_mapNew(DProf *dp, uint64_t map_start, uint64_t map_end,
   perftools__profiles__mapping__init(pprof->mapping[id]);
 
   // Populate specific mapping
-  pprof->mapping[id]->id           = id + 1;
+  pprof->mapping[id]->id = id + 1;
   pprof->mapping[id]->memory_start = map_start;
   pprof->mapping[id]->memory_limit = map_end;
-  pprof->mapping[id]->file_offset  = map_off;
-  pprof->mapping[id]->filename     = id_filename;
-  pprof->mapping[id]->build_id     = build;
+  pprof->mapping[id]->file_offset = map_off;
+  pprof->mapping[id]->filename = id_filename;
+  pprof->mapping[id]->build_id = build;
 
   // TODO, distinguish between these
   pprof->mapping[id]->has_filenames = 1;
@@ -184,9 +185,9 @@ char isEqualMapping(uint64_t map_start, uint64_t map_end, uint64_t map_off,
 uint64_t pprof_mapAdd(DProf *dp, uint64_t map_start, uint64_t map_end,
                       uint64_t map_off, const char *filename,
                       const char *build) {
-  PPProfile *pprof     = &dp->pprof;
+  PPProfile *pprof = &dp->pprof;
   uint64_t id_filename = pprof_strIntern(dp, filename);
-  uint64_t id_build    = pprof_strIntern(dp, build);
+  uint64_t id_build = pprof_strIntern(dp, build);
 
   for (size_t i = 0; i < pprof->n_mapping; i++)
     if (isEqualMapping(map_start, map_end, map_off, id_filename, id_build,
@@ -210,7 +211,7 @@ static uint64_t _pprof_lineNew(DProf *dp, PPLocation *loc, uint64_t id_function,
   perftools__profiles__line__init(loc->line[id]);
 
   // Populate this entry
-  loc->line[id]->line        = line;
+  loc->line[id]->line = line;
   loc->line[id]->function_id = id_function;
 
   // Done!
@@ -239,7 +240,7 @@ static uint64_t _pprof_funNew(DProf *dp, int64_t id_name,
                               int64_t id_system_name, int64_t id_filename,
                               int64_t start_line) {
   PPProfile *pprof = &dp->pprof;
-  uint64_t id      = pprof->n_function;
+  uint64_t id = pprof->n_function;
 
   // Initialize or grow if needed
   pprofgrow(pprof->function, pprof->n_function, DPROF_CHUNK_SZ);
@@ -250,11 +251,11 @@ static uint64_t _pprof_funNew(DProf *dp, int64_t id_name,
   perftools__profiles__function__init(pprof->function[id]);
 
   // Populate a new function
-  pprof->function[id]->id          = id + 1;
-  pprof->function[id]->name        = id_name;
+  pprof->function[id]->id = id + 1;
+  pprof->function[id]->name = id_name;
   pprof->function[id]->system_name = id_system_name;
-  pprof->function[id]->filename    = id_filename;
-  pprof->function[id]->start_line  = start_line;
+  pprof->function[id]->filename = id_filename;
+  pprof->function[id]->start_line = start_line;
 
   // Done!
   pprof->n_function++;
@@ -287,9 +288,9 @@ uint64_t pprof_funAdd(DProf *dp, const char *name, const char *system_name,
       break;
     }
 
-  int64_t id_name        = pprof_strIntern(dp, name);
+  int64_t id_name = pprof_strIntern(dp, name);
   int64_t id_system_name = pprof_strIntern(dp, system_name);
-  int64_t id_filename    = pprof_strIntern(dp, filename);
+  int64_t id_filename = pprof_strIntern(dp, filename);
 
   for (size_t i = 0; i < pprof->n_function; i++)
     if (isEqualFunction(id_name, id_system_name, id_filename,
@@ -304,10 +305,10 @@ char isEqualLocation(uint64_t id_mapping, uint64_t addr, PPLocation *B) {
 }
 
 static uint64_t _pprof_locNew(DProf *dp, uint64_t id_mapping, uint64_t addr,
-                              uint64_t *functions, int64_t *lines,
+                              const uint64_t *functions, const int64_t *lines,
                               size_t n_functions) {
   PPProfile *pprof = &dp->pprof;
-  uint64_t id      = pprof->n_location;
+  uint64_t id = pprof->n_location;
 
   // Early sanity checks
   if (!n_functions)
@@ -326,9 +327,9 @@ static uint64_t _pprof_locNew(DProf *dp, uint64_t id_mapping, uint64_t addr,
   perftools__profiles__location__init(pprof->location[id]);
 
   // Populate
-  pprof->location[id]->id         = id + 1;
+  pprof->location[id]->id = id + 1;
   pprof->location[id]->mapping_id = id_mapping;
-  pprof->location[id]->address    = addr;
+  pprof->location[id]->address = addr;
 
   for (size_t i = 0; i < n_functions; i++)
     pprof_lineAdd(dp, pprof->location[id], functions[i], lines[i]);
@@ -338,38 +339,85 @@ static uint64_t _pprof_locNew(DProf *dp, uint64_t id_mapping, uint64_t addr,
   return id;
 }
 
-uint64_t pprof_locAdd(DProf *dp, uint64_t id_mapping, uint64_t addr,
-                      uint64_t *functions, int64_t *lines, size_t n_functions) {
-  PPProfile *pprof = &dp->pprof;
-  for (size_t i = 0; i < pprof->n_location; i++) {
-    if (isEqualLocation(id_mapping, addr, pprof->location[i]))
-      return i + 1;
-  }
-  return _pprof_locNew(dp, id_mapping, addr, functions, lines, n_functions) + 1;
+static bool isEqualLine(const PPLine *line, uint64_t function_id, int64_t lineno) {
+  uint64_t fid_a = line->function_id, fid_b = function_id;
+  int64_t line_a = line->line, line_b = lineno;
+  return !((fid_a ^ fid_b) | (line_a ^ line_b));
 }
 
-char isEqualSample(uint64_t *loc, size_t nloc, PPSample *B) {
-  if (nloc != B->n_location_id)
-    return 0;
-  for (size_t i = 0; i <= nloc; i++) {
-    if (loc[i] != B->location_id[i])
-      return 0;
+static bool isEqualLocation(const PPLocation *location, uint64_t mapping_id,
+                            uint64_t addr, const uint64_t *functions,
+                            const int64_t *lines, size_t n_functions) {
+  if (location->mapping_id != mapping_id) return false;
+  if (location->address != addr) return false;
+  if (location->n_line != n_functions) return false;
+
+  for (size_t i = 0; i < n_functions; ++i) {
+    if (!isEqualLine(location->line[i], functions[i], lines[i])) {
+      return false;
+    }
   }
-  return 1;
+
+  return true;
 }
 
-char pprof_sampleAdd(DProf *dp, int64_t *val, size_t nval, uint64_t *loc,
-                     size_t nloc) {
+static PPLocation *findLocation(DProf* dp, uint64_t id_mapping, uint64_t addr,
+                                const uint64_t *functions, const int64_t *lines,
+                                size_t n_functions) {
   PPProfile *pprof = &dp->pprof;
-  uint64_t id      = pprof->n_sample;
+  for (size_t i = 0; i < pprof->n_location; ++i) {
+    PPLocation *location = pprof->location[i];
+    if (isEqualLocation(location, id_mapping, addr, functions, lines, n_functions)) {
+      return location;
+  }
+  return NULL;
+}
+
+uint64_t pprof_locAdd(DProf* dp, uint64_t id_mapping, uint64_t addr,
+                      const uint64_t *functions, const int64_t *lines,
+                      size_t n_functions) {
+  PPLocation *location = findLocation(dp, id_mapping, addr, functions, lines, n_functions);
+  return (location)
+    ? location->id
+    : _pprof_locNew(dp, id_mapping, addr, functions, lines, n_functions) + 1;
+}
+
+static bool isEqualSample(const PPSample *B, const uint64_t *loc, size_t nloc) {
+  if (nloc != B->n_location_id) return false;
+  for (size_t i = 0; i != nloc; i++) {
+    if (loc[i] != B->location_id[i]) return false;
+  }
+  return true;
+}
+
+static PPSample *findSample(DProf* dp, uint64_t* loc, size_t nloc) {
+  PPProfile* pprof = &dp->pprof;
+  for (size_t i = 0; i != pprof->n_sample; ++i) {
+    PPSample *sample = pprof->sample[i];
+    if (isEqualSample(sample, loc, nloc)) {
+      return sample;
+    }
+  }
+  return NULL;
+}
+
+char pprof_sampleAdd(DProf* dp, int64_t* val, size_t nval, uint64_t* loc, size_t nloc) {
+  PPProfile* pprof = &dp->pprof;
+  uint64_t id = pprof->n_sample;
 
   // Early sanity checks
-  if (nval != pprof->n_sample_type)
-    return -1; // pprof and user disagree
-  if (!val)
-    return -1; // samples are null
-  if (!nloc || !loc)
-    return -1; // no locations
+  if (nval != pprof->n_sample_type) return -1;  // pprof and user disagree
+  if (!val) return -1; // samples are null
+  if (!nloc || !loc) return -1; // no locations
+
+  PPSample *sample = findSample(dp, loc, nloc);
+  if (sample) {
+    for (size_t j = 0; j != sample->n_value; ++j) {
+      // todo: do different sample types need to be handled differently?
+      sample->value[j] += val[j];
+    }
+    return 0;
+  }
 
   // Initialize the sample, possibly expanding if needed
   pprofgrow(pprof->sample, pprof->n_sample, DPROF_CHUNK_SZ);
@@ -381,15 +429,15 @@ char pprof_sampleAdd(DProf *dp, int64_t *val, size_t nval, uint64_t *loc,
 
   // Populate the sample value.  First, validate and allocate
   pprof->sample[id]->n_value = nval;
-  pprof->sample[id]->value   = calloc(nval, sizeof(int64_t));
+  pprof->sample[id]->value = calloc(nval, sizeof(int64_t));
   if (!pprof->sample[id]->value) {} // TODO error
-  memcpy(pprof->sample[id]->value, val, nval * sizeof(*val));
+  memcpy(pprof->sample[id]->value, val, nval*sizeof(*val));
 
   // Populate the location IDs
   pprof->sample[id]->n_location_id = nloc;
-  pprof->sample[id]->location_id   = calloc(nloc, sizeof(uint64_t));
+  pprof->sample[id]->location_id = calloc(nloc, sizeof(uint64_t));
   if (!pprof->sample[id]->location_id) {} // TODO error
-  memcpy(pprof->sample[id]->location_id, loc, nloc * sizeof(*loc));
+  memcpy(pprof->sample[id]->location_id, loc, nloc*sizeof(*loc));
 
   // We're done!
   pprof->n_sample++;
@@ -457,17 +505,17 @@ DProf *pprof_Init(DProf *dp, const char **sample_names,
   dp->table_type = 1; // aggressively!
   switch (dp->table_type) {
   case 0:
-    dp->intern_string     = vocab_intern;
-    dp->string_table      = vocab_get_table;
+    dp->intern_string = vocab_intern;
+    dp->string_table = vocab_get_table;
     dp->string_table_size = vocab_get_size;
-    dp->string_table_get  = NULL; // TODO, this is an error!!!
+    dp->string_table_get = NULL; // TODO, this is an error!!!
     dp->string_table_data = pprof;
     break;
   default: // Error, default to best implementation so far
   case 1:
-    dp->intern_string     = pprof_stringtable_intern;
-    dp->string_table      = pprof_stringtable_gettable;
-    dp->string_table_get  = pprof_stringtable_get;
+    dp->intern_string = pprof_stringtable_intern;
+    dp->string_table = pprof_stringtable_gettable;
+    dp->string_table_get = pprof_stringtable_get;
     dp->string_table_size = pprof_stringtable_size;
     dp->string_table_data =
         stringtable_init(NULL, &(StringTableOptions){.hash = 1, .logging = 0});
@@ -484,7 +532,7 @@ DProf *pprof_Init(DProf *dp, const char **sample_names,
   pprof->sample_type = calloc(n_sampletypes, sizeof(PPValueType *));
   if (!pprof->sample_type) {} // TODO error
   pprof->n_sample_type = n_sampletypes;
-  pprof->n_sample      = 0;
+  pprof->n_sample = 0;
 
   // Populate individual sample values
   for (size_t i = 0; i < n_sampletypes; i++) {
@@ -585,7 +633,7 @@ char pprof_sampleClear(DProf *dp) {
 
   if (pprof->sample)
     pprof_sampleFree(pprof->sample, pprof->n_sample);
-  pprof->sample   = NULL;
+  pprof->sample = NULL;
   pprof->n_sample = 0;
 
   return 0;
@@ -670,7 +718,7 @@ inline static void pretty_print(char c) {
 }
 void pprof_print(DProf *dp) {
   PPProfile *pprof = &dp->pprof;
-  size_t SZ        = dp->string_table_size(dp->string_table_data);
+  size_t SZ = dp->string_table_size(dp->string_table_data);
 
   // Print ValueType
 
@@ -699,7 +747,7 @@ void pprof_print(DProf *dp) {
   // print strings
   for (size_t i = 0; i < SZ; i++) {
     unsigned char *str = pprof_getstr(dp, i, NULL);
-    size_t sz          = STR_LEN(str);
+    size_t sz = STR_LEN(str);
     printf("Str %ld(%lu): ", i, sz);
     for (size_t j = 0; j < sz; j++)
       pretty_print(str[i]);
@@ -727,10 +775,10 @@ size_t pprof_zip(DProf *dp, unsigned char *ret, const size_t sz_packed) {
   memset(ret, 0, sz_packed);
 
   // Compress
-  z_stream zs = {.avail_in  = sz_packed,
+  z_stream zs = {.avail_in = sz_packed,
                  .avail_out = sz_packed,
-                 .next_in   = packed,
-                 .next_out  = ret};
+                 .next_in = packed,
+                 .next_out = ret};
   deflateInit2(&zs, Z_BEST_COMPRESSION, Z_DEFLATED, 15 + 16, 8,
                Z_DEFAULT_STRATEGY);
   deflate(&zs, Z_FINISH);
@@ -743,7 +791,7 @@ size_t pprof_zip(DProf *dp, unsigned char *ret, const size_t sz_packed) {
 unsigned char *pprof_flush(DProf *dp, size_t *sz) {
   // Update the string table parameters and anything else that isn't auto-
   // matically up-to-spec with pprof
-  dp->pprof.string_table   = dp->string_table(dp->string_table_data);
+  dp->pprof.string_table = dp->string_table(dp->string_table_data);
   dp->pprof.n_string_table = dp->string_table_size(dp->string_table_data);
 
   // Update pprof timing details

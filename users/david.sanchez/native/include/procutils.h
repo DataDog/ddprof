@@ -28,14 +28,14 @@ typedef union hackptr {
 } hackptr;
 
 typedef enum MapMode {
-  PUMM_READ    = 1 << 0,
-  PUMM_WRITE   = 1 << 1,
-  PUMM_EXEC    = 1 << 2,
-  PUMM_COW     = 1 << 3, // 0 if private (CoW), 1 if shared
-  PUMM_HEAP    = 1 << 4,
-  PUMM_STACK   = 1 << 5,
-  PUMM_VDSO    = 1 << 6,
-  PUMM_ANON    = 1 << 7, // Not a file and not special
+  PUMM_READ = 1 << 0,
+  PUMM_WRITE = 1 << 1,
+  PUMM_EXEC = 1 << 2,
+  PUMM_COW = 1 << 3, // 0 if private (CoW), 1 if shared
+  PUMM_HEAP = 1 << 4,
+  PUMM_STACK = 1 << 5,
+  PUMM_VDSO = 1 << 6,
+  PUMM_ANON = 1 << 7, // Not a file and not special
   PUMM_SPECIAL = PUMM_STACK | PUMM_HEAP | PUMM_VDSO
 } MapMode;
 
@@ -73,7 +73,7 @@ typedef struct MapCache {
 MapCache g_mapcache = {0};
 
 // TODO are these even necessary anymore?
-char *g_procfs_linebuffer     = NULL;
+char *g_procfs_linebuffer = NULL;
 size_t g_procfs_linebuffer_sz = 0;
 
 size_t mapcache_Find(pid_t);
@@ -115,7 +115,7 @@ void pidmap_Set(pid_t pid, PidMap *pm) {
 void mapcache_MaskSet(MapMode whitelist) { g_mapcache.whitelist = whitelist; }
 
 size_t mapcache_Set(pid_t pid) {
-  size_t id          = mapcache_Find(pid);
+  size_t id = mapcache_Find(pid);
   g_mapcache.pid[id] = pid;
 
   pidmap_Set(pid, &g_mapcache.maps[id]);
@@ -152,7 +152,7 @@ PidMap *mapcache_Get(pid_t _pid) {
   return &g_mapcache.maps[id];
 }
 
-int g_procfs_map_fd    = -1; // Probably do not want this...
+int g_procfs_map_fd = -1; // Probably do not want this...
 pid_t g_procfs_map_pid = 0;
 
 inline static char strsame_right(char *l, char *r) {
@@ -231,8 +231,8 @@ void procfs_PidMapPrintProc(pid_t target) {
     target = getpid();
   char path[4096] = {0};
   char _buf[4096] = {0};
-  char *buf       = _buf;
-  size_t sz_buf   = 4096;
+  char *buf = _buf;
+  size_t sz_buf = 4096;
   snprintf(path, 4095, "/proc/%d/maps", target);
   FILE *stream = fopen(path, "r");
   while (0 < getline(&buf, &sz_buf, stream)) {
@@ -246,7 +246,7 @@ void procfs_PidMapPrint(pid_t target) {
     target = getpid();
 
   PidMap *pm = mapcache_Get(target);
-  size_t i   = 0;
+  size_t i = 0;
   while (pm->map[i].end) {
     procfs_MapPrint(&pm->map[i]);
     i++;
@@ -273,10 +273,10 @@ Map *procfs_MapMatch(pid_t target, uint64_t addr) {
 
 Map *procfs_MapScan(char *line, Map *map) {
   uint64_t m_start = 0;
-  uint64_t m_end   = 0;
-  uint64_t m_off   = 0;
-  char m_mode[4]   = {0};
-  int m_p          = 0; // index into the line where the name starts
+  uint64_t m_end = 0;
+  uint64_t m_off = 0;
+  char m_mode[4] = {0};
+  int m_p = 0; // index into the line where the name starts
 
   if (4 !=
       sscanf(line, "%lx-%lx %4c %lx %*x:%*x %*d%n", &m_start, &m_end,
@@ -303,9 +303,9 @@ Map *procfs_MapScan(char *line, Map *map) {
   }
 
   map->start = m_start;
-  map->end   = m_end;
-  map->off   = m_off;
-  map->mode  = 0;
+  map->end = m_end;
+  map->off = m_off;
+  map->mode = 0;
   for (int i = 0; i < 4; i++)
     switch (m_mode[i]) {
     case 'r':
