@@ -1,42 +1,42 @@
 #include <getopt.h>
-#include <string.h>
-#include <sys/types.h>
-#include <unistd.h>
 #include <pthread.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-#include "perf.h"
-#include "unwind.h"
-#include "pprof.h"
-#include "http.h"
 #include "ddog.h"
+#include "http.h"
+#include "perf.h"
+#include "pprof.h"
+#include "unwind.h"
 
 struct DDProfContext {
-  DProf* dp;
+  DProf *dp;
 
   // TODO this is superfragile
   union {
-    DDRequest* ddr;
+    DDRequest *ddr;
     struct {
       // Parameters to pass-through underlying DDRequest (alias names)
-      char* hostname;
-      char* agent_port;
-      char* apikey;
-      char* environment;
-      char* agent_site;
-      char* service;
-      char* version;
+      char *hostname;
+      char *agent_port;
+      char *apikey;
+      char *environment;
+      char *agent_site;
+      char *service;
+      char *version;
 
       // Parameters for interpretation
-      char* enabled;
-      char* agent_host;
-      char* prefix;
-      char* tags;
-      char* upload_timeout;
-      char* sample_rate;
-      char* upload_period;
-    } *ddr_variant;
+      char *enabled;
+      char *agent_host;
+      char *prefix;
+      char *tags;
+      char *upload_timeout;
+      char *sample_rate;
+      char *upload_period;
+    } * ddr_variant;
   };
   struct {
     char enabled;
@@ -45,116 +45,127 @@ struct DDProfContext {
     uint32_t upload_period;
   } params;
 
-  struct UnwindState* us;
+  struct UnwindState *us;
   double sample_sec;
 };
 
-#define EXPAND_LOPT(a,b,c,d,e,f,g) {#b,e,0,c},
-#define EXPAND_ENUM(a,b,c,d,e,f,g) a;
-#define EXPAND_OSTR(a,b,c,d,e,f,g) #d ":"
-#define EXPAND_DFLT(a,b,c,d,e,f,g) DFLT_EXP(#a,b,e,g);
-#define EXPAND_CASE(a,b,c,d,e,f,g) case c: ctx->ddr_variant->b = optarg; break;
-#define EXPAND_PRNT(a,b,c,d,e,f,g) printf(#b ": %s\n", ctx->ddr_variant->b);
+#define EXPAND_LOPT(a, b, c, d, e, f, g) {#b, e, 0, c},
+#define EXPAND_ENUM(a, b, c, d, e, f, g) a;
+#define EXPAND_OSTR(a, b, c, d, e, f, g) #d ":"
+#define EXPAND_DFLT(a, b, c, d, e, f, g) DFLT_EXP(#a, b, e, g);
+#define EXPAND_CASE(a, b, c, d, e, f, g)                                       \
+  case c:                                                                      \
+    ctx->ddr_variant->b = optarg;                                              \
+    break;
+#define EXPAND_PRNT(a, b, c, d, e, f, g)                                       \
+  printf(#b ": %s\n", ctx->ddr_variant->b);
 
-#define OPT_TABLE(X)                                                                     \
-  X(DD_API_KEY,                  apikey,         'A', A, 1, NULL, NULL)                  \
-  X(DD_ENV,                      environment,    'E', E, 1, NULL, "dev")                 \
-  X(DD_AGENT_HOST,               agent_host,     'H', H, 1, NULL, "localhost")           \
-  X(DD_SITE,                     agent_site,     'I', I, 1, NULL, NULL)                  \
-  X(DD_HOST_OVERRIDE,            hostname,       'N', N, 1, NULL, NULL)                  \
-  X(DD_TRACE_AGENT_PORT,         agent_port,     'P', P, 1, NULL, "8081")                \
+// clang-format off
+#define OPT_TABLE(X)                                                           \
+  X(DD_API_KEY,                  apikey,         'A', A, 1, NULL, NULL)        \
+  X(DD_ENV,                      environment,    'E', E, 1, NULL, "dev")       \
+  X(DD_AGENT_HOST,               agent_host,     'H', H, 1, NULL, "localhost") \
+  X(DD_SITE,                     agent_site,     'I', I, 1, NULL, NULL)        \
+  X(DD_HOST_OVERRIDE,            hostname,       'N', N, 1, NULL, NULL)        \
+  X(DD_TRACE_AGENT_PORT,         agent_port,     'P', P, 1, NULL, "8081")      \
   X(DD_SERVICE,                  service,        'S', S, 1, NULL, "my_profiled_service") \
-  X(DD_TAGS,                     tags,           'T', T, 1, NULL, NULL)                  \
-  X(DD_PROFILING_UPLOAD_TIMEOUT, upload_timeout, 'U', U, 1, NULL, "10")                  \
-  X(DD_VERSION,                  version,        'V', V, 1, NULL, "0.0")                 \
-  X(DD_PROFILING_ENABLED,        enabled,        'e', e, 1, NULL, "yes")                 \
-  X(DD_PROFILING_NATIVE_RATE,    sample_rate,    'r', r, 1, NULL, "1000")                \
-  X(DD_PROFILING_UPLOAD_PERIOD,  upload_period,  'u', u, 1, NULL, "60")                  \
+  X(DD_TAGS,                     tags,           'T', T, 1, NULL, NULL)        \
+  X(DD_PROFILING_UPLOAD_TIMEOUT, upload_timeout, 'U', U, 1, NULL, "10")        \
+  X(DD_VERSION,                  version,        'V', V, 1, NULL, "0.0")       \
+  X(DD_PROFILING_ENABLED,        enabled,        'e', e, 1, NULL, "yes")       \
+  X(DD_PROFILING_NATIVE_RATE,    sample_rate,    'r', r, 1, NULL, "1000")      \
+  X(DD_PROFILING_UPLOAD_PERIOD,  upload_period,  'u', u, 1, NULL, "60")        \
   X(DD_PROFILING_,               prefix,         'x', X, 1, NULL, "")
-
+// clang-format off
 
 #define MAX_STACK 1024 // TODO what is the max?
-                       // TODO harmonize max stack between here and unwinder
-void ddprof_callback(struct perf_event_header* hdr, void* arg) {
-  static uint64_t id_locs[MAX_STACK] = {0};
+void ddprof_callback(struct perf_event_header *hdr, void *arg) {
+  static uint64_t id_locs[MAX_STACK]   = {0};
   static struct FunLoc locs[MAX_STACK] = {0};
 
-  struct DDProfContext* pctx = arg;
-  struct UnwindState* us = pctx->us;
-  DDRequest* ddr = pctx->ddr;
-  DProf* dp = pctx->dp;
-  struct perf_event_sample* pes;
+  struct DDProfContext *pctx = arg;
+  struct UnwindState *us     = pctx->us;
+  DDRequest *ddr             = pctx->ddr;
+  DProf *dp                  = pctx->dp;
+  struct perf_event_sample *pes;
   struct timeval tv = {0};
   gettimeofday(&tv, NULL);
-  int64_t now_nanos = (tv.tv_sec*1000000 + tv.tv_usec)*1000;
-  switch(hdr->type) {
-    case PERF_RECORD_SAMPLE:
-      pes = (struct perf_event_sample*)hdr;
-      us->pid = pes->pid;
-      us->stack = pes->data;
-      us->stack_sz = pes->size; // TODO should be dyn_size, but it's corrupted?
-      memcpy(&us->regs[0], pes->regs, 3*sizeof(uint64_t));
-      int n = unwindstate_unwind(us, &*locs, 4096); // TODO get a common value from perf.h
-      memset(id_locs, 0, n*sizeof(*id_locs));
-      for(int i=0,j=0; i<n; i++,j++) {
-        uint64_t id_map = pprof_mapAdd(dp, locs[i].map_start, locs[i].map_end, locs[i].map_off, locs[i].sopath, "");
-        uint64_t id_fun = pprof_funAdd(dp, locs[i].funname, locs[i].funname, locs[i].srcpath, locs[i].line);
-        uint64_t id_loc = pprof_locAdd(dp, id_map, locs[i].ip, (uint64_t[]){id_fun}, (int64_t[]){0}, 1);
-        if (id_loc > 0)
-          id_locs[j] = id_loc;
-        else
-          j--;
-      }
-      if(n > 0)
-        pprof_sampleAdd(dp, (int64_t[]){2, pes->period}, 2, id_locs, n);
-      break;
+  int64_t now_nanos = (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
+  switch (hdr->type) {
+  case PERF_RECORD_SAMPLE:
+    pes          = (struct perf_event_sample *)hdr;
+    us->pid      = pes->pid;
+    us->stack    = pes->data;
+    us->stack_sz = pes->size; // TODO should be dyn_size, but it's corrupted?
+    memcpy(&us->regs[0], pes->regs, 3 * sizeof(uint64_t));
+    int n = unwindstate_unwind(us, &*locs,
+                               4096); // TODO get a common value from perf.h
+    memset(id_locs, 0, n * sizeof(*id_locs));
+    for (int i = 0, j = 0; i < n; i++, j++) {
+      uint64_t id_map = pprof_mapAdd(dp, locs[i].map_start, locs[i].map_end,
+                                     locs[i].map_off, locs[i].sopath, "");
+      uint64_t id_fun = pprof_funAdd(dp, locs[i].funname, locs[i].funname,
+                                     locs[i].srcpath, locs[i].line);
+      uint64_t id_loc = pprof_locAdd(dp, id_map, locs[i].ip,
+                                     (uint64_t[]){id_fun}, (int64_t[]){0}, 1);
+      if (id_loc > 0)
+        id_locs[j] = id_loc;
+      else
+        j--;
+    }
+    if (n > 0)
+      pprof_sampleAdd(dp, (int64_t[]){2, pes->period}, 2, id_locs, n);
+    break;
 
-    default:
-      break;
+  default:
+    break;
   }
-  int64_t tdiff = (now_nanos - dp->pprof.time_nanos)/1e9;
-  if(pctx->sample_sec < tdiff) {
-//  if(0 < tdiff) {
+  int64_t tdiff = (now_nanos - dp->pprof.time_nanos) / 1e9;
+  if (pctx->sample_sec < tdiff) {
+    //  if(0 < tdiff) {
+    //    pprof_print(dp);
     DDRequestSend(ddr, dp);
   }
 }
 
-#define DFLT_EXP(evar, key, func, dfault)                                     \
-  ({                                                                          \
-   char* _buf = NULL;                                                         \
-   if(evar && getenv(evar)) _buf = getenv(evar);                              \
-   else if(dfault)          _buf = strdup(dfault);                            \
-   ctx->ddr_variant->key =  _buf;                                             \
+#define DFLT_EXP(evar, key, func, dfault)                                      \
+  ({                                                                           \
+    char *_buf = NULL;                                                         \
+    if (evar && getenv(evar))                                                  \
+      _buf = getenv(evar);                                                     \
+    else if (dfault)                                                           \
+      _buf = strdup(dfault);                                                   \
+    ctx->ddr_variant->key = _buf;                                              \
   })
 
 void print_help() {
   char help_msg[] = ""
-" usage: dd-prof [--version] [--help] [PROFILER_OPTIONS] COMMAND [COMMAND_ARGS]\n"
-"\n"
-"  -A, --apikey:\n"
-"  -E, --environment:\n"
-"  -H, --agent_host:\n"
-"  -I, --agent_site:\n"
-"  -N, --hostname:\n"
-"  -P, --agent_port:\n"
-"  -S, --service:\n"
-"  -T, --tags:\n"
-"  -U, --upload_timeout:\n"
-"  -V, --version:\n"
-"  -e, --enabled:\n"
-"  -r, --sample_rate:\n"
-"  -u, --upload_period:\n"
-"  -x, --prefix:\n";
+                    " usage: dd-prof [--version] [--help] [PROFILER_OPTIONS] "
+                    "COMMAND [COMMAND_ARGS]\n"
+                    "\n"
+                    "  -A, --apikey:\n"
+                    "  -E, --environment:\n"
+                    "  -H, --agent_host:\n"
+                    "  -I, --agent_site:\n"
+                    "  -N, --hostname:\n"
+                    "  -P, --agent_port:\n"
+                    "  -S, --service:\n"
+                    "  -T, --tags:\n"
+                    "  -U, --upload_timeout:\n"
+                    "  -V, --version:\n"
+                    "  -e, --enabled:\n"
+                    "  -r, --sample_rate:\n"
+                    "  -u, --upload_period:\n"
+                    "  -x, --prefix:\n";
   printf("%s\n", help_msg);
 }
 
-
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   /****************************************************************************\
   |                          Autodetect binary name                            |
   \****************************************************************************/
   char filename[128] = {0};
-  char* fp = strrchr("/"__FILE__, '/')+1;
+  char *fp           = strrchr("/"__FILE__, '/') + 1;
   memcpy(filename, fp, strlen(fp));
   (strrchr(filename, '.'))[0] = 0;
 
@@ -162,30 +173,32 @@ int main(int argc, char** argv) {
   |                             Process Options                                |
   \****************************************************************************/
   int c = 0, oi = 0;
-  struct DDProfContext* ctx = &(struct DDProfContext){
-                          .ddr = &(DDRequest){.D = &(Dictionary){0}},
-                          .dp = &(DProf){0},
-                          .us = &(struct UnwindState){0},
-                          .sample_sec = 2.0
-                        };
+  struct DDProfContext *ctx =
+      &(struct DDProfContext){.ddr        = &(DDRequest){.D = &(Dictionary){0}},
+                              .dp         = &(DProf){0},
+                              .us         = &(struct UnwindState){0},
+                              .sample_sec = 2.0};
   dictionary_init(ctx->ddr->D, NULL);
-  DDRequest* ddr = ctx->ddr;
+  DDRequest *ddr = ctx->ddr;
 
-  struct option lopts[] = {
-    OPT_TABLE(EXPAND_LOPT)
-    {"help", 0, 0, 'h'} };
+  struct option lopts[] = {OPT_TABLE(EXPAND_LOPT){"help", 0, 0, 'h'}};
 
   // Populate default values
   OPT_TABLE(EXPAND_DFLT);
 
   char done = 0;
-  while (!done && -1 != (c=getopt_long(argc, argv, ":" OPT_TABLE(EXPAND_OSTR) "h", lopts, &oi))) {
-    switch(c) {
+  while (!done &&
+         -1 !=
+             (c = getopt_long(argc, argv, ":" OPT_TABLE(EXPAND_OSTR) "h", lopts,
+                              &oi))) {
+    switch (c) {
       OPT_TABLE(EXPAND_CASE)
-      case 'h':
-        print_help();
-        return 0;
-      default: done = 1; break;
+    case 'h':
+      print_help();
+      return 0;
+    default:
+      done = 1;
+      break;
     }
   }
 
@@ -195,35 +208,38 @@ int main(int argc, char** argv) {
 #endif
   if (optind == argc) {
     printf("O: %d, A: %d\n", optind, argc);
-    printf("%s is a tool for getting stack samples from an application.  Please wrap your application in it.\n", filename);
+    printf("%s is a tool for getting stack samples from an application.  "
+           "Please wrap your application in it.\n",
+           filename);
     return -1;
   }
 
   // Adjust input parameters for execvp()
-  argv += optind-1;
+  argv += optind - 1;
   argc -= optind;
 
   /****************************************************************************\
   |                             Run the Profiler                               |
   \****************************************************************************/
   // Initialize the pprof
-  pprof_Init(ctx->dp, (const char**)&(const char*[]){"samples", "cpu-time"}, (const char**)&(const char*[]){"count", "nanoseconds"}, 2);
+  pprof_Init(ctx->dp, (const char **)&(const char *[]){"samples", "cpu-time"},
+             (const char **)&(const char *[]){"count", "nanoseconds"}, 2);
   pprof_timeUpdate(ctx->dp); // Set the time
 
   // Finish initializing the DDR
   // TODO generate these better
   ddr->host = strdup("localhost");
-  ddr->key = strdup("1c77adb933471605ccbe82e82a1cf5cf");
+  ddr->key  = strdup("1c77adb933471605ccbe82e82a1cf5cf");
 
-  ddr_addtag(ddr, "tags.host",     "host:davebox");
-  ddr_addtag(ddr, "tags.service",  "service:native-test-service");
+  ddr_addtag(ddr, "tags.host", "host:davebox");
+  ddr_addtag(ddr, "tags.service", "service:native-test-service");
 
   // Implementation stuff
   ddr_addtag(ddr, "tags.prof_ver", "profiler-version:v0.2");
-  ddr_addtag(ddr, "tags.os",       "runtime-os:linux-x86_64");
+  ddr_addtag(ddr, "tags.os", "runtime-os:linux-x86_64");
 
   // Language/runtime stuff
-  ddr_addtag(ddr, "tags.runtime",  "runtime:native");
+  ddr_addtag(ddr, "tags.runtime", "runtime:native");
   ddr_addtag(ddr, "tags.language", "language:native");
   ddr_addtag(ddr, "runtime", "native");
 
@@ -231,7 +247,7 @@ int main(int argc, char** argv) {
   // it because we want to undo this later..!
   cpu_set_t cpu_mask = {0};
   CPU_SET(0, &cpu_mask);
-  if(!sched_setaffinity(getpid(), sizeof(cpu_set_t), &cpu_mask)) {
+  if (!sched_setaffinity(getpid(), sizeof(cpu_set_t), &cpu_mask)) {
     printf("Successfully set the CPU mask.\n");
   } else {
     printf("Failed to set the CPU mask.\n");
@@ -240,7 +256,9 @@ int main(int argc, char** argv) {
 
   // Setup a shared barrier for timing
   pthread_barrierattr_t bat = {0};
-  pthread_barrier_t *pb = mmap(NULL, sizeof(pthread_barrier_t), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+  pthread_barrier_t *pb =
+      mmap(NULL, sizeof(pthread_barrier_t), PROT_READ | PROT_WRITE,
+           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 
   pthread_barrierattr_init(&bat);
   pthread_barrierattr_setpshared(&bat, 1);
@@ -248,16 +266,16 @@ int main(int argc, char** argv) {
 
   // Fork, then run the child
   pid_t pid = fork();
-  if(!pid) {
+  if (!pid) {
     pthread_barrier_wait(pb);
     munmap(pb, sizeof(pthread_barrier_t));
-    execvp(argv[1], argv+1);
+    execvp(argv[1], argv + 1);
     printf("Hey, this shouldn't happen!\n");
     return -1;
   } else {
     PEvent pe = {0};
-    char err =  perfopen(pid, &pe, NULL);
-    if(-1 == err) {
+    char err  = perfopen(pid, &pe, NULL);
+    if (-1 == err) {
       printf("Couldn't set up perf_event_open\n");
       return -1;
     }

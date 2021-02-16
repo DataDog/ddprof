@@ -20,5 +20,5 @@ for f in $(find . -name '*.h'   -o -name '*.cpp' -o -name '*.cxx' -o \
                   -name '*.txx' -o -name '*.tpp' -o -name '*.tcc' -o \
                   -name '*.tpl')
 do
-  ${CLANG_FORMAT} -style=file -i $f
+  ${CLANG_FORMAT} -style=file "$@" $f
 done
