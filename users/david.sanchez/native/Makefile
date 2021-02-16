@@ -2,9 +2,10 @@ INCLUDE = -Iinclude -I/home/sanchda/dev/binutils-gdb/include -I/home/sanchda/dev
 CFLAGS = -gdwarf -g3 -ggdb3 -std=c11 -O0 -D_GNU_SOURCE
 TESTS := http perf pprof
 WARNS := -Wall -Wextra -Wpedantic -Wno-missing-braces -Wno-missing-field-initializers -Wno-gnu-statement-expression -Wno-pointer-arith
-ANALYZER := -fanalyzer
+ANALYZER := -fanalyzer -fanalyzer-verbosity=2
+ANALYZER :=
 CC := gcc-10
-#CC := clang-11
+CC := clang-11
 LDFLAGS += -L/home/sanchda/dev/libunwind/src/.libs
 LDLIBS := -lunwind -lprotobuf-c -lz -lpthread -lelf -lbfd -llzma
 UNWDIR := /home/sanchda/dev/libunwind
@@ -65,9 +66,6 @@ cstacks: src/demo_constantstacks.c $(UNWLIBS)
 strings: src/demo_strings.c src/string_table.c
 	$(CC) -DD_LOGGING_ENABLE -DD_SANITY_CHECKS $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
 
-appendstring: src/eg_appendstring.c
-	$(CC) -DD_LOGGING_ENABLE -DD_SANITY_CHECKS $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
-
 dictionary: src/demo_dict.c src/string_table.c src/dictionary.c
 	$(CC) -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
 
@@ -78,3 +76,9 @@ clean:
 
 install: dd-prof 
 	cp bin/dd-prof $(PREFIX)/bin/dd-prof
+
+format:
+	.build_tools/clang_formatter.sh --verbose -i --dry-run
+
+format-commit:
+	.build_tools/clang_formatter.sh --verbose -i
