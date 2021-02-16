@@ -87,8 +87,8 @@ typedef struct DDReq {
   struct HttpConn conn;
   struct HttpReq req;
   struct HttpRes res;
-  char* host;
-  char* port;
+  char *host;
+  char *port;
   char boundary[DDR_BLEN];
   union {
     struct {
@@ -127,7 +127,7 @@ DDReq *DDR_init(DDReq *req) {
   req->res.conn = &req->conn;
 
   // As a final step, make sure the boundary is populated
-  _HTTP_RandomNameMake(req->boundary, DDR_BLEN-1);
+  _HTTP_RandomNameMake(req->boundary, DDR_BLEN - 1);
   return req;
 }
 
@@ -236,8 +236,10 @@ int DDR_finalize(DDReq *req) {
   size_t sz = 0;
 
   // Validate info for connection
-  if(!req->host || !req->port) return DDRC_EINVAL;
-  as_sprintf(req->as_header, "POST http://%s%s HTTP/1.1\r\n", req->host, "/v1/input");
+  if (!req->host || !req->port)
+    return DDRC_EINVAL;
+  as_sprintf(req->as_header, "POST http://%s%s HTTP/1.1\r\n", req->host,
+             "/v1/input");
   as_sprintf(req->as_header, "Host: %s:%s\r\n", req->host, req->port);
 
   // Populate the boundary
@@ -283,9 +285,11 @@ int DDR_finalize(DDReq *req) {
   }
 
   // Wrap up by populating the boundary
-  as_sprintf(req->as_header, "Content-Type: multipart/form-data; "
-                             "boundary=%s\r\n", req->boundary);
-  
+  as_sprintf(req->as_header,
+             "Content-Type: multipart/form-data; "
+             "boundary=%s\r\n",
+             req->boundary);
+
   return DDRC_ESUCCESS;
 }
 
@@ -315,8 +319,8 @@ int DDR_send(DDReq *req) {
   as_sprintf(req->as_header, "Content-Length: %ld\r\n\r\n", req->as_body->n);
 
   // JIT population, as HttpSend() will perform a connect under-the-hood
-  req->req.host = (unsigned char*)req->host;
-  req->req.port = (unsigned char*)req->port;
+  req->req.host = (unsigned char *)req->host;
+  req->req.port = (unsigned char *)req->port;
   if ((ret = HttpSend(&req->req, req->as_header->str, req->as_header->n)))
     return DDR_http2ddr(ret);
   if ((ret = HttpSend(&req->req, req->as_body->str, req->as_body->n)))

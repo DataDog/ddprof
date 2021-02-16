@@ -174,8 +174,8 @@ uint64_t pprof_funAdd(DProf *, const char *, const char *, const char *,
  * @param n_functions
  *
  ******************************************************************************/
-uint64_t pprof_locAdd(DProf *, uint64_t, uint64_t, uint64_t *, int64_t *,
-                      size_t);
+uint64_t pprof_locAdd(DProf *, uint64_t, uint64_t, const uint64_t *,
+                      const int64_t *, size_t);
 
 /*******************************************************************************
  * Adds a line to an initialized DProf object

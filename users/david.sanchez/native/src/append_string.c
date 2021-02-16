@@ -81,19 +81,19 @@ char as_add(AppendString *as, const unsigned char *str, size_t sz) {
 
 char as_sprintf(AppendString *as, const char *format, ...) {
   va_list arg;
-  unsigned char* buf = NULL;
+  unsigned char *buf = NULL;
   size_t sz = 0;
 
   va_start(arg, format);
-  sz = 1 + vsnprintf(NULL, 0, format, arg);  // doesn't return size of \0, add
+  sz = 1 + vsnprintf(NULL, 0, format, arg); // doesn't return size of \0, add
   va_end(arg);
 
-  buf = malloc(sz);  // Room for string and trailing \0
+  buf = malloc(sz); // Room for string and trailing \0
   va_start(arg, format);
   vsnprintf((char *)buf, sz, format, arg); // Call arg _includes_ the \0
   va_end(arg);
 
-  char ret = as_add(as, buf, sz-1); // Omit trailing \0 during write
+  char ret = as_add(as, buf, sz - 1); // Omit trailing \0 during write
   free(buf);
   return ret;
 }
