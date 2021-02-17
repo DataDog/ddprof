@@ -29,7 +29,7 @@ dd-prof: src/dd-prof.c src/profile.pb-c.c src/string_table.c src/dictionary.c sr
 ddog: src/ddog.c src/profile.pb-c.c src/string_table.c src/dictionary.c src/pprof.c
 	$(CC) -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 
-http: src/eg_http.c src/append_string.c src/string_table.c src/profile.pb-c.c src/pprof.c
+http: eg/eg_http.c src/append_string.c src/string_table.c src/http.c src/dd_send.c src/profile.pb-c.c src/pprof.c
 	$(CC) -DKNOCKOUT_UNUSED -DD_LOGGING_ENABLE -DD_SANITY_CHECKS -fsanitize=undefined $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 
 appendstring: src/eg_appendstring.c src/append_string.c
