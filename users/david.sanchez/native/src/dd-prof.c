@@ -88,11 +88,13 @@ struct DDProfContext {
 #define DFLT_EXP(evar, key, targ, func, dfault)                                \
   ({                                                                           \
     char *_buf = NULL;                                                         \
-    if (evar && getenv(evar))                                                  \
-      _buf = getenv(evar);                                                     \
-    else if (dfault)                                                           \
-      _buf = strdup(dfault);                                                   \
-    (targ)->key = _buf;                                                        \
+    if (!((targ)->key)) {                                                      \
+      if (evar && getenv(evar))                                                \
+        _buf = getenv(evar);                                                   \
+      else if (dfault)                                                         \
+        _buf = strdup(dfault);                                                 \
+      (targ)->key = _buf;                                                      \
+    }                                                                          \
   })
 
 
@@ -139,15 +141,18 @@ void ddprof_callback(struct perf_event_header *hdr, void *arg) {
   default:
     break;
   }
+
   int64_t tdiff = (now_nanos - dp->pprof.time_nanos) / 1e9;
   if (pctx->sample_sec < tdiff) {
-    //  if(0 < tdiff) {
-    //    pprof_print(dp);
-    DDR_pprof(ddr, dp);
-    DDR_finalize(ddr);
-    DDR_send(ddr);
-    int ret = DDR_watch(ddr, -1);
-    if(ret) printf("Got an error (%s)\n", DDR_code2str(ret));
+    int ret = 0;
+    if ((ret = DDR_pprof(ddr, dp)))
+      printf("Got an error (%s)\n", DDR_code2str(ret));
+    if ((ret = DDR_finalize(ddr)))
+      printf("Got an error (%s)\n", DDR_code2str(ret));
+    if ((ret = DDR_send(ddr)))
+      printf("Got an error (%s)\n", DDR_code2str(ret));
+    if ((ret = DDR_watch(ddr, -1)))
+      printf("Got an error (%s)\n", DDR_code2str(ret));
     DDR_clear(ddr);
   }
 }
