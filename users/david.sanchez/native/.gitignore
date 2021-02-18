@@ -1,2 +1,8 @@
 .gdb_history
 pprofs/
+*.i
+*.o
+*.s
+*.bc
+*.swp
+*.dump

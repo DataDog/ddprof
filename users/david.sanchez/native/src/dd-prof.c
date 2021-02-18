@@ -6,7 +6,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "ddog.h"
+#include "dd_send.h"
 #include "http.h"
 #include "perf.h"
 #include "pprof.h"
@@ -14,30 +14,16 @@
 
 struct DDProfContext {
   DProf *dp;
+  DDReq *ddr;
 
-  // TODO this is superfragile
-  union {
-    DDRequest *ddr;
-    struct {
-      // Parameters to pass-through underlying DDRequest (alias names)
-      char *hostname;
-      char *agent_port;
-      char *apikey;
-      char *environment;
-      char *agent_site;
-      char *service;
-      char *version;
-
-      // Parameters for interpretation
-      char *enabled;
-      char *agent_host;
-      char *prefix;
-      char *tags;
-      char *upload_timeout;
-      char *sample_rate;
-      char *upload_period;
-    } * ddr_variant;
-  };
+  // Parameters for interpretation
+  char *enabled;
+  char *agent_host;
+  char *prefix;
+  char *tags;
+  char *upload_timeout;
+  char *sample_rate;
+  char *upload_period;
   struct {
     char enabled;
     uint32_t upload_timeout;
@@ -49,35 +35,68 @@ struct DDProfContext {
   double sample_sec;
 };
 
-#define EXPAND_LOPT(a, b, c, d, e, f, g) {#b, e, 0, c},
-#define EXPAND_ENUM(a, b, c, d, e, f, g) a;
-#define EXPAND_OSTR(a, b, c, d, e, f, g) #d ":"
-#define EXPAND_DFLT(a, b, c, d, e, f, g) DFLT_EXP(#a, b, e, g);
-#define EXPAND_CASE(a, b, c, d, e, f, g)                                       \
-  case c:                                                                      \
-    ctx->ddr_variant->b = optarg;                                              \
-    break;
-#define EXPAND_PRNT(a, b, c, d, e, f, g)                                       \
-  printf(#b ": %s\n", ctx->ddr_variant->b);
-
 // clang-format off
-#define OPT_TABLE(X)                                                           \
-  X(DD_API_KEY,                  apikey,         'A', A, 1, NULL, NULL)        \
-  X(DD_ENV,                      environment,    'E', E, 1, NULL, "dev")       \
-  X(DD_AGENT_HOST,               agent_host,     'H', H, 1, NULL, "localhost") \
-  X(DD_SITE,                     agent_site,     'I', I, 1, NULL, NULL)        \
-  X(DD_HOST_OVERRIDE,            hostname,       'N', N, 1, NULL, NULL)        \
-  X(DD_TRACE_AGENT_PORT,         agent_port,     'P', P, 1, NULL, "8081")      \
-  X(DD_SERVICE,                  service,        'S', S, 1, NULL, "my_profiled_service") \
-  X(DD_TAGS,                     tags,           'T', T, 1, NULL, NULL)        \
-  X(DD_PROFILING_UPLOAD_TIMEOUT, upload_timeout, 'U', U, 1, NULL, "10")        \
-  X(DD_VERSION,                  version,        'V', V, 1, NULL, "0.0")       \
-  X(DD_PROFILING_ENABLED,        enabled,        'e', e, 1, NULL, "yes")       \
-  X(DD_PROFILING_NATIVE_RATE,    sample_rate,    'r', r, 1, NULL, "1000")      \
-  X(DD_PROFILING_UPLOAD_PERIOD,  upload_period,  'u', u, 1, NULL, "60")        \
-  X(DD_PROFILING_,               prefix,         'x', X, 1, NULL, "")
+/*
+    This table is used for a variety of things, but primarily for dispatching
+    input in a consistent way across the application.  Values may come from one
+    of several places, with defaulting in the following order:
+      1. Commandline argument
+      2. Configuration file
+      3. Environment variable
+      4. Application default
+
+    And input may go to one of many places
+      1. Profiling parameters
+      2. User data annotations
+      3. Upload parameters
+
+  A - The enum for this value.  Also doubles as an environment variable whenever
+      appropriate
+  B - The field name.  It is the responsibility of other conumsers to combine
+      this value with context to use the right struct
+  C - Short option for input processing
+  D - Long option
+  E - Destination struct (WOW, THIS IS HORRIBLE)
+  F - defaulting function (or NULL)
+  G - Fallback value, if any
+*/
+#define X_LOPT(a, b, c, d, e, f, g) {#b, d, 0, *#c},
+#define X_ENUM(a, b, c, d, e, f, g) a;
+#define X_OSTR(a, b, c, d, e, f, g) #c ":"
+#define X_DFLT(a, b, c, d, e, f, g) DFLT_EXP(#a, b, e, f, g);
+#define X_CASE(a, b, c, d, e, f, g) case *#c: (e)->b = optarg; break;
+#define X_PRNT(a, b, c, d, e, f, g) printf(#b ": %s\n", (e)->b);
+
+//  A                            B               C  D  E         F     G
+#define OPT_TABLE(X)                                                                \
+  X(DD_API_KEY,                  apikey,         A, 1, ctx->ddr, NULL, NULL)        \
+  X(DD_ENV,                      environment,    E, 1, ctx->ddr, NULL, "dev")       \
+  X(DD_AGENT_HOST,               agent_host,     H, 1, ctx,      NULL, "localhost") \
+  X(DD_SITE,                     site,           I, 1, ctx->ddr, NULL, NULL)        \
+  X(DD_HOST_OVERRIDE,            host,           N, 1, ctx->ddr, NULL, "localhost") \
+  X(DD_TRACE_AGENT_PORT,         port,           P, 1, ctx->ddr, NULL, "8081")      \
+  X(DD_SERVICE,                  service,        S, 1, ctx->ddr, NULL, "my_profiled_service") \
+  X(DD_TAGS,                     tags,           T, 1, ctx,      NULL, NULL)        \
+  X(DD_PROFILING_UPLOAD_TIMEOUT, upload_timeout, U, 1, ctx,      NULL, "10")        \
+  X(DD_VERSION,                  profiler_version,V,1, ctx->ddr, NULL, "0.0")       \
+  X(DD_PROFILING_ENABLED,        enabled,        e, 1, ctx,      NULL, "yes")       \
+  X(DD_PROFILING_NATIVE_RATE,    sample_rate,    r, 1, ctx,      NULL, "1000")      \
+  X(DD_PROFILING_UPLOAD_PERIOD,  upload_period,  u, 1, ctx,      NULL, "60")        \
+  X(DD_PROFILING_,               prefix,         X, 1, ctx,      NULL, "")
 // clang-format off
 
+#define DFLT_EXP(evar, key, targ, func, dfault)                                \
+  ({                                                                           \
+    char *_buf = NULL;                                                         \
+    if (evar && getenv(evar))                                                  \
+      _buf = getenv(evar);                                                     \
+    else if (dfault)                                                           \
+      _buf = strdup(dfault);                                                   \
+    (targ)->key = _buf;                                                        \
+  })
+
+
+/******************************  Perf Callback  *******************************/
 #define MAX_STACK 1024 // TODO what is the max?
 void ddprof_callback(struct perf_event_header *hdr, void *arg) {
   static uint64_t id_locs[MAX_STACK]   = {0};
@@ -85,7 +104,7 @@ void ddprof_callback(struct perf_event_header *hdr, void *arg) {
 
   struct DDProfContext *pctx = arg;
   struct UnwindState *us     = pctx->us;
-  DDRequest *ddr             = pctx->ddr;
+  DDReq *ddr                 = pctx->ddr;
   DProf *dp                  = pctx->dp;
   struct perf_event_sample *pes;
   struct timeval tv = {0};
@@ -124,19 +143,14 @@ void ddprof_callback(struct perf_event_header *hdr, void *arg) {
   if (pctx->sample_sec < tdiff) {
     //  if(0 < tdiff) {
     //    pprof_print(dp);
-    DDRequestSend(ddr, dp);
+    DDR_pprof(ddr, dp);
+    DDR_finalize(ddr);
+    DDR_send(ddr);
+    int ret = DDR_watch(ddr, -1);
+    if(ret) printf("Got an error (%s)\n", DDR_code2str(ret));
+    DDR_clear(ddr);
   }
 }
-
-#define DFLT_EXP(evar, key, func, dfault)                                      \
-  ({                                                                           \
-    char *_buf = NULL;                                                         \
-    if (evar && getenv(evar))                                                  \
-      _buf = getenv(evar);                                                     \
-    else if (dfault)                                                           \
-      _buf = strdup(dfault);                                                   \
-    ctx->ddr_variant->key = _buf;                                              \
-  })
 
 void print_help() {
   char help_msg[] = ""
@@ -161,38 +175,40 @@ void print_help() {
 }
 
 int main(int argc, char **argv) {
-  /****************************************************************************\
-  |                          Autodetect binary name                            |
-  \****************************************************************************/
+  //---- Autodetect binary name
   char filename[128] = {0};
   char *fp           = strrchr("/"__FILE__, '/') + 1;
   memcpy(filename, fp, strlen(fp));
   (strrchr(filename, '.'))[0] = 0;
 
-  /****************************************************************************\
-  |                             Process Options                                |
-  \****************************************************************************/
+  //---- Inititiate structs
   int c = 0, oi = 0;
   struct DDProfContext *ctx =
-      &(struct DDProfContext){.ddr        = &(DDRequest){.D = &(Dictionary){0}},
+      &(struct DDProfContext){.ddr        = &(DDReq){.apikey = "1c77adb933471605ccbe82e82a1cf5cf",
+                                                     .profiler_version = "v0.1",
+                                                     .runtime_os = "linux-x86_64",
+                                                     .host = "localhost",
+                                                     .port = "10534",
+                                                     .language = "native",
+                                                     .runtime = "native"},
                               .dp         = &(DProf){0},
                               .us         = &(struct UnwindState){0},
                               .sample_sec = 2.0};
-  dictionary_init(ctx->ddr->D, NULL);
-  DDRequest *ddr = ctx->ddr;
+  DDReq *ddr = ctx->ddr;
+  DDR_init(ddr);
 
-  struct option lopts[] = {OPT_TABLE(EXPAND_LOPT){"help", 0, 0, 'h'}};
+  struct option lopts[] = {OPT_TABLE(X_LOPT){"help", 0, 0, 'h'}};
 
-  // Populate default values
-  OPT_TABLE(EXPAND_DFLT);
+  //---- Populate default values
+  OPT_TABLE(X_DFLT);
 
+  //---- Process Options
   char done = 0;
-  while (!done &&
-         -1 !=
-             (c = getopt_long(argc, argv, ":" OPT_TABLE(EXPAND_OSTR) "h", lopts,
-                              &oi))) {
+  while (!done && -1 != (c = getopt_long(argc, argv,
+                                         ":" OPT_TABLE(X_OSTR) "h",
+                                         lopts, &oi))) {
     switch (c) {
-      OPT_TABLE(EXPAND_CASE)
+      OPT_TABLE(X_CASE)
     case 'h':
       print_help();
       return 0;
@@ -204,7 +220,7 @@ int main(int argc, char **argv) {
 
 #ifdef DD_DBG_PRINTARGS
   printf("=== PRINTING PARAMETERS ===\n");
-  OPT_TABLE(EXPAND_PRNT);
+  OPT_TABLE(X_PRNT);
 #endif
   if (optind == argc) {
     printf("O: %d, A: %d\n", optind, argc);
@@ -225,23 +241,6 @@ int main(int argc, char **argv) {
   pprof_Init(ctx->dp, (const char **)&(const char *[]){"samples", "cpu-time"},
              (const char **)&(const char *[]){"count", "nanoseconds"}, 2);
   pprof_timeUpdate(ctx->dp); // Set the time
-
-  // Finish initializing the DDR
-  // TODO generate these better
-  ddr->host = strdup("localhost");
-  ddr->key  = strdup("1c77adb933471605ccbe82e82a1cf5cf");
-
-  ddr_addtag(ddr, "tags.host", "host:davebox");
-  ddr_addtag(ddr, "tags.service", "service:native-test-service");
-
-  // Implementation stuff
-  ddr_addtag(ddr, "tags.prof_ver", "profiler-version:v0.2");
-  ddr_addtag(ddr, "tags.os", "runtime-os:linux-x86_64");
-
-  // Language/runtime stuff
-  ddr_addtag(ddr, "tags.runtime", "runtime:native");
-  ddr_addtag(ddr, "tags.language", "language:native");
-  ddr_addtag(ddr, "runtime", "native");
 
   // Set the CPU affinity so that everything is on the same CPU.  Scream about
   // it because we want to undo this later..!
