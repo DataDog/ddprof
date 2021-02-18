@@ -8,9 +8,9 @@
 #include "pprof.h"
 
 #ifdef DD_DBG_PROFGEN
-#  include <fcntl.h>
-#  include <sys/stat.h>
-#  include <sys/types.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #endif
 
 void DDRequestSend(DDRequest *ddr, DProf *dp) {

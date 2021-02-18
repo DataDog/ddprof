@@ -31,8 +31,8 @@ struct DDProfContext {
     uint32_t upload_period;
   } params;
 
-  struct  UnwindState *us;
-  double  sample_sec;
+  struct UnwindState *us;
+  double sample_sec;
   int64_t send_nanos;
 };
 

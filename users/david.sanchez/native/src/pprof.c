@@ -507,8 +507,8 @@ void pprof_durationUpdate(DProf *dp) {
     return;
   struct timeval tv = {0};
   gettimeofday(&tv, NULL);
-  int64_t duration = (tv.tv_sec * 1000 * 1000 + tv.tv_usec) * 1000
-                     - dp->pprof.time_nanos + dp->pprof.duration_nanos;
+  int64_t duration = (tv.tv_sec * 1000 * 1000 + tv.tv_usec) * 1000 -
+      dp->pprof.time_nanos + dp->pprof.duration_nanos;
   _pprof_durationSet(dp, duration);
 }
 

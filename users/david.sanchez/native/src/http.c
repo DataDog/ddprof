@@ -191,8 +191,8 @@ ssize_t HttpResRecv(HttpRes *res) {
 
   // If this recv() was interrupted by a signal, do it over again
   while (true) {
-    if (-1 == (n = recv(res->conn->fd,
-                        &A->str[A->n], A->sz - A->n, MSG_DONTWAIT))) {
+    if (-1 ==
+        (n = recv(res->conn->fd, &A->str[A->n], A->sz - A->n, MSG_DONTWAIT))) {
       if (errno == EWOULDBLOCK) {
         // -1 return with ewouldblock means there's no data to read
         return 0;
@@ -227,12 +227,12 @@ int HttpResRecvTimedwait(HttpRes *res, int timeout) {
     switch (poll(&fds, 1, timeout)) {
     case 1: // Something is up with the FD we submitted
       if ((ret = HttpResRecv(res)))
-        if( -1 == ret)
+        if (-1 == ret)
           return HTTP_ERES;
       int ret = HttpResProcess(res);
       if (-1 == ret)
         return HTTP_EPARSE;
-      if (res->code < 200 || res->code >=300)
+      if (res->code < 200 || res->code >= 300)
         return HTTP_ENOT200;
       return HTTP_ESUCCESS;
     case 0: // timed out

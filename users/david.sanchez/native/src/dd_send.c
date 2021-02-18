@@ -48,8 +48,8 @@ DDReq *DDR_init(DDReq *req) {
   }
 
   req->as_header = as_init(NULL);
-  req->as_body   = as_init(NULL);
-  req->res.as   = as_init(NULL);
+  req->as_body = as_init(NULL);
+  req->res.as = as_init(NULL);
   req->req.conn = &req->conn;
   req->res.conn = &req->conn;
 
@@ -104,7 +104,7 @@ int DDR_pprof(DDReq *req, DProf *dp) {
   }
 
   // Create the string holding the types
-  char *types_str = calloc(1,sz_vt + 1);
+  char *types_str = calloc(1, sz_vt + 1);
   for (i = 0; i + 1 < dp->pprof.n_sample_type; i++) {
     idx = dp->pprof.sample_type[i]->type;
     strcat(types_str, (char *)pprof_getstr(dp, idx, NULL));
@@ -143,8 +143,9 @@ int DDR_pprof(DDReq *req, DProf *dp) {
                  strlen(types_str));
 
   // Emit exactly one format section
-  if(0 == req->pprof_count)
-    DDR_push(req, "name=\"format\"", NULL, (const unsigned char*)"format", strlen("format"));
+  if (0 == req->pprof_count)
+    DDR_push(req, "name=\"format\"", NULL, (const unsigned char *)"format",
+             strlen("format"));
 
   // Cleanup
   req->pprof_count++;
@@ -154,7 +155,7 @@ int DDR_pprof(DDReq *req, DProf *dp) {
 }
 
 void DDR_setTimeNano(DDReq *req, int64_t ti, int64_t tf) {
-  ti /= 1000000000;  // time_t is in seconds
+  ti /= 1000000000; // time_t is in seconds
   tf /= 1000000000;
   char time_start[128] = {0};
   char time_end[128] = {0};
@@ -165,8 +166,10 @@ void DDR_setTimeNano(DDReq *req, int64_t ti, int64_t tf) {
   strftime(time_start, 128, "%Y-%m-%dT%H:%M:%SZ", tm_start);
   strftime(time_end, 128, "%Y-%m-%dT%H:%M:%SZ", tm_end);
 
-  DDR_push(req, "name=\"recording-start\"", NULL, (const unsigned char*)time_start, strlen(time_start));
-  DDR_push(req, "name=\"recording-end\"", NULL, (const unsigned char*)time_end, strlen(time_end));
+  DDR_push(req, "name=\"recording-start\"", NULL,
+           (const unsigned char *)time_start, strlen(time_start));
+  DDR_push(req, "name=\"recording-end\"", NULL, (const unsigned char *)time_end,
+           strlen(time_end));
 }
 
 int DDR_finalize(DDReq *req) {
@@ -183,8 +186,8 @@ int DDR_finalize(DDReq *req) {
   // Validate info for connection
   if (!req->host || !req->port)
     return DDRC_EINVAL;
-//  as_sprintf(req->as_header, "POST http://%s%s HTTP/1.1\r\n", req->host,
-//             "/v1/input");
+  //  as_sprintf(req->as_header, "POST http://%s%s HTTP/1.1\r\n", req->host,
+  //             "/v1/input");
   as_sprintf(req->as_header, "POST %s HTTP/1.1\r\n", "/v1/input");
   as_sprintf(req->as_header, "Host: %s:%s\r\n", req->host, req->port);
 
@@ -284,7 +287,8 @@ int DDR_watch(DDReq *req, int timeout) {
 
 int DDR_clear(DDReq *req) {
   req->pprof_count = 0;
-  if (as_clear(req->as_body) || as_clear(req->as_header) || as_clear(req->res.as)) {
+  if (as_clear(req->as_body) || as_clear(req->as_header) ||
+      as_clear(req->res.as)) {
     printf("Failed to clear\n");
     return DDRC_EFAILED;
   }
