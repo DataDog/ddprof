@@ -6,10 +6,10 @@
 #include <fcntl.h>
 #include <linux/perf_event.h>
 #include <poll.h>
-#include <signal.h>
 #include <stdint.h> // Why do I suddenly need this?
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>

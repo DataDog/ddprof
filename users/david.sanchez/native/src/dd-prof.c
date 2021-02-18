@@ -31,8 +31,9 @@ struct DDProfContext {
     uint32_t upload_period;
   } params;
 
-  struct UnwindState *us;
-  double sample_sec;
+  struct  UnwindState *us;
+  double  sample_sec;
+  int64_t send_nanos;
 };
 
 // clang-format off
@@ -99,6 +100,12 @@ struct DDProfContext {
 
 
 /******************************  Perf Callback  *******************************/
+static inline int64_t now_nanos() {
+  static struct timeval tv = {0};
+  gettimeofday(&tv, NULL);
+  return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
+}
+
 #define MAX_STACK 1024 // TODO what is the max?
 void ddprof_callback(struct perf_event_header *hdr, void *arg) {
   static uint64_t id_locs[MAX_STACK]   = {0};
@@ -109,9 +116,6 @@ void ddprof_callback(struct perf_event_header *hdr, void *arg) {
   DDReq *ddr                 = pctx->ddr;
   DProf *dp                  = pctx->dp;
   struct perf_event_sample *pes;
-  struct timeval tv = {0};
-  gettimeofday(&tv, NULL);
-  int64_t now_nanos = (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
   switch (hdr->type) {
   case PERF_RECORD_SAMPLE:
     pes          = (struct perf_event_sample *)hdr;
@@ -142,11 +146,14 @@ void ddprof_callback(struct perf_event_header *hdr, void *arg) {
     break;
   }
 
-  int64_t tdiff = (now_nanos - dp->pprof.time_nanos) / 1e9;
-  if (pctx->sample_sec < tdiff) {
+  // Click the timer at the end of processing, since we always add the sampling
+  // rate to the last time.
+  int64_t now = now_nanos();
+  if (now > pctx->send_nanos) {
     int ret = 0;
     if ((ret = DDR_pprof(ddr, dp)))
       printf("Got an error (%s)\n", DDR_code2str(ret));
+    DDR_setTimeNano(ddr, dp->pprof.time_nanos, now);
     if ((ret = DDR_finalize(ddr)))
       printf("Got an error (%s)\n", DDR_code2str(ret));
     if ((ret = DDR_send(ddr)))
@@ -154,6 +161,7 @@ void ddprof_callback(struct perf_event_header *hdr, void *arg) {
     if ((ret = DDR_watch(ddr, -1)))
       printf("Got an error (%s)\n", DDR_code2str(ret));
     DDR_clear(ddr);
+    pctx->send_nanos += pctx->sample_sec*1000000000;
   }
 }
 
@@ -194,6 +202,7 @@ int main(int argc, char **argv) {
                                                      .runtime_os = "linux-x86_64",
                                                      .host = "localhost",
                                                      .port = "10534",
+                                                     .user_agent = "Native-http-client/0.1",
                                                      .language = "native",
                                                      .runtime = "native"},
                               .dp         = &(DProf){0},
@@ -284,6 +293,9 @@ int main(int argc, char **argv) {
       return -1;
     }
     pthread_barrier_wait(pb);
+
+    // If we're here, the child just launched.  Start the timer
+    ctx->send_nanos = now_nanos() + ctx->sample_sec*1000000000;
     munmap(pb, sizeof(pthread_barrier_t));
     unwindstate_Init(ctx->us);
     elf_version(EV_CURRENT);

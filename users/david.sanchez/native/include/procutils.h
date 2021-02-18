@@ -179,7 +179,6 @@ int procfs_MapOpen(pid_t target) {
   return g_procfs_map_fd;
 }
 
-#include <signal.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
