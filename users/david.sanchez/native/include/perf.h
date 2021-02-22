@@ -185,9 +185,9 @@ struct perf_event_attr g_dd_native_attr = {
     .type = PERF_TYPE_SOFTWARE,
     .config = PERF_COUNT_SW_TASK_CLOCK, // If it's good enough for perf(1), it's
                                         // good enough for me!
-    //    .sample_period  = 10000000,                // Who knows!
-    .sample_freq = 1000,
-    .freq = 1,
+    .sample_period  = 10000000,         // Who knows!
+//    .sample_freq = 1000,
+//    .freq = 1,
     .sample_type = PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER |
         PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME |
         PERF_SAMPLE_PERIOD,

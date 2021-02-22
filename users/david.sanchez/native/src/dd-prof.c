@@ -127,19 +127,18 @@ void ddprof_callback(struct perf_event_header *hdr, void *arg) {
                                4096); // TODO get a common value from perf.h
     memset(id_locs, 0, n * sizeof(*id_locs));
     for (int i = 0, j = 0; i < n; i++, j++) {
-      uint64_t id_map = pprof_mapAdd(dp, locs[i].map_start, locs[i].map_end,
-                                     locs[i].map_off, locs[i].sopath, "");
-      uint64_t id_fun = pprof_funAdd(dp, locs[i].funname, locs[i].funname,
-                                     locs[i].srcpath, locs[i].line);
-      uint64_t id_loc = pprof_locAdd(dp, id_map, locs[i].ip,
-                                     (uint64_t[]){id_fun}, (int64_t[]){0}, 1);
+      uint64_t id_map, id_fun, id_loc;
+      id_map = pprof_mapAdd(dp, locs[i].map_start, locs[i].map_end, locs[i].map_off, locs[i].sopath, "");
+      id_fun = pprof_funAdd(dp, locs[i].funname, locs[i].funname, locs[i].srcpath, locs[i].line);
+      id_loc = pprof_locAdd(dp, id_map, locs[i].ip, (uint64_t[]){id_fun}, (int64_t[]){0}, 1);
       if (id_loc > 0)
         id_locs[j] = id_loc;
       else
         j--;
     }
     if (n > 0)
-      pprof_sampleAdd(dp, (int64_t[]){2, pes->period}, 2, id_locs, n);
+      pprof_sampleAdd(dp, (int64_t[]){1, pes->period, 1000000}, 3, id_locs, n);
+    printf("The period was %ld\n", pes->period);
     break;
 
   default:
@@ -252,8 +251,8 @@ int main(int argc, char **argv) {
   |                             Run the Profiler                               |
   \****************************************************************************/
   // Initialize the pprof
-  pprof_Init(ctx->dp, (const char **)&(const char *[]){"samples", "cpu-time"},
-             (const char **)&(const char *[]){"count", "nanoseconds"}, 2);
+  pprof_Init(ctx->dp, (const char **)&(const char *[]){"samples", "cpu-time", "wall-time"},
+             (const char **)&(const char *[]){"count", "nanoseconds", "nanoseconds"}, 2);
   pprof_timeUpdate(ctx->dp); // Set the time
 
   // Set the CPU affinity so that everything is on the same CPU.  Scream about

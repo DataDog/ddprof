@@ -2,7 +2,14 @@
 #define _H_unwind
 
 #include "libunwind.h"
+#include <sysdep.h> // libbfd sysdep
 #include <bfd.h>
+// It's probably a mistake that this is needed
+// TODO ????
+typedef void (*bfd_cleanup) (bfd *);
+#include <elf-bfd.h> // add binutils-gdb to include path
+#include <bfdlink.h>
+#include <libbfd.h>
 #include <errno.h>
 #include <gelf.h>
 
@@ -92,8 +99,6 @@ struct UnwindState {
 |*                               Symbol Lookup                                *|
 \******************************************************************************/
 // Forward decl
-typedef void bfd_cleanup;
-#include "elf-bfd.h" // add binutils-gdb to include path
 enum DMGL {
   DMGL_NO_OPTS = 0,            // For readability...
   DMGL_PARAMS = (1 << 0),      // Include function args
@@ -132,10 +137,8 @@ static void slurp_symtab(struct FunLocLookup *flu) {
   }
   flu->symtab = calloc(1, storage);
   if (dynamic) {
-    DBGLOG("Dynamic symtab\n");
     symcount = bfd_canonicalize_dynamic_symtab(abfd, flu->symtab);
   } else {
-    DBGLOG("Static symtab\n");
     symcount = bfd_canonicalize_symtab(abfd, flu->symtab);
   }
   if (symcount == 0 && !dynamic &&
@@ -268,8 +271,7 @@ static void translate_addresses(struct FunLocLookup *flu, asection *section,
 }
 
 static int process_file(char *file, uint64_t addr, struct FunLoc *loc) {
-  struct FunLocLookup *flu = &(struct FunLocLookup){0};
-  flu->loc = loc;
+  struct FunLocLookup *flu = &(struct FunLocLookup){.loc = loc};
   char **matching;
   if (!file || !*file)
     return -1;
@@ -433,6 +435,50 @@ int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pip,
   // processing, but whatever
   us->map = map;
 
+  bfd *abfd = NULL;
+  asection *section = NULL;
+  char** matching;
+
+  abfd = bfd_openr(map->path, NULL);
+  bfd_check_format_matches(abfd, bfd_object, &matching);
+  section = bfd_get_section_by_name(abfd, ".eh_frame_hdr");
+
+  uint64_t offset_bfd = section->filepos;
+
+  /*
+     We only worry about DWARF-compatible eh_frame_hdr
+     uint8_t version
+     uint8_t eh_frame_ptr_enc (DW_EH_PE_* enc. of ptr to start of section)
+     uint8_t fde_count_enc (DW_EH_PE_* enc. of table)
+     [encoded] eh_frame_ptr (pointer to start of .eh_frame)
+     [encoded] fde_count (
+  */
+  uint64_t tabledata_bfd = 0;
+  uint64_t fdecount_bfd = 0;
+
+  // We have to read .eh_frame_hdr in order to find the bsearch table defined
+  // in .eh_frame.
+  // TODO - don't assume DWARF-type eh_frame?
+  struct eh_frame_hdr ef;
+  uint64_t old_offset = abfd->where;
+  if (bfd_seek(abfd, offset_bfd, SEEK_SET))
+    printf("BFD_BSEEK FAIL\n");
+  if (sizeof(ef) != bfd_bread((void*)&ef, sizeof(ef), abfd))
+    printf("BFD_BREAD FAIL\n");
+  if (bfd_seek(abfd, old_offset, SEEK_SET))
+    printf("BFD RESTORE FAIL\n");
+  uint8_t *eenc = (uint8_t *)&ef.enc;
+  uint8_t *eend = (uint8_t *)&ef.data;
+  dw_read_encoded_value(eenc, eend, ef.eh_frame_ptr_enc);
+  fdecount_bfd = dw_read_encoded_value(eenc, eend, ef.fde_count_enc);
+  tabledata_bfd = (eenc - (uint8_t *)&ef) + offset_bfd;
+
+
+printf("Offset according to the BFD: 0x%lx\n", offset_bfd);
+printf("FDE count accoridng to BFD: %ld\n",  fdecount_bfd);
+printf("Table data according to BFD: 0x%lx\n", tabledata_bfd);
+//  bfd_close(abfd);
+
   // Get the ELF info.  We'll cache this later
   if (!(fd = open(map->path, O_RDONLY))) {
     printf("Couldn't open.  Path is %s\n", map->path);
@@ -487,6 +533,10 @@ int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pip,
     }
   }
 
+printf("Offset according to ELF: 0x%lx\n", offset);
+printf("FDE count according to ELF: %ld\n", fde_count);
+printf("table according to ELF: 0x%lx\n", table_data);
+
   // Attempt to unwind
   DBGLOG("map.start: 0x%lx, offset: 0x%lx, map->off: 0x%lx\n", map->start,
          offset, map->off);
@@ -499,6 +549,7 @@ int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pip,
                     .table_len = fde_count * sizeof(struct table_entry) /
                         sizeof(unw_word_t)}}};
 
+  // clang-format off
   switch (-dwarf_search_unwind_table(as, ip, &di, pip, need_unwind_info, arg)) {
   case UNW_ESUCCESS:
     // Done with the map, the file, etc
@@ -508,11 +559,18 @@ int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pip,
     elf_end(elf);
     close(fd);
     return UNW_ESUCCESS;
-    unwcase(UNW_EUNSPEC) unwcase(UNW_ENOMEM) unwcase(UNW_EINVAL)
-        unwcase(UNW_ENOINFO) unwcase(UNW_EBADVERSION) unwcase(UNW_EBADREG)
-            unwcase(UNW_EREADONLYREG) unwcase(UNW_EINVALIDIP)
-                unwcase(UNW_EBADFRAME) unwcase(UNW_ESTOPUNWIND)
+  unwcase(UNW_EUNSPEC)
+  unwcase(UNW_ENOMEM)
+  unwcase(UNW_EINVAL)
+  unwcase(UNW_ENOINFO)
+  unwcase(UNW_EBADVERSION)
+  unwcase(UNW_EBADREG)
+  unwcase(UNW_EREADONLYREG)
+  unwcase(UNW_EINVALIDIP)
+  unwcase(UNW_EBADFRAME)
+  unwcase(UNW_ESTOPUNWIND)
   }
+  // clang-format on
 
   // Now try to unwind with the debug frame
   // TODO need to find the equivalent of what perf calls symsrc_filename, by
@@ -529,13 +587,22 @@ int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pip,
                              map->start, map->end)) {
     ret = dwarf_search_unwind_table(as, ip, &di, pip, need_unwind_info, arg);
     DBGLOG("Found debug frame, checking return:\n");
+
+    // clang-format off
     switch (ret) {
-      unwcase(UNW_ESUCCESS) unwcase(UNW_EUNSPEC) unwcase(UNW_ENOMEM)
-          unwcase(UNW_EINVAL) unwcase(UNW_ENOINFO) unwcase(UNW_EBADVERSION)
-              unwcase(UNW_EBADREG) unwcase(UNW_EREADONLYREG)
-                  unwcase(UNW_EINVALIDIP) unwcase(UNW_EBADFRAME)
-                      unwcase(UNW_ESTOPUNWIND)
+    unwcase(UNW_ESUCCESS)
+    unwcase(UNW_EUNSPEC)
+    unwcase(UNW_ENOMEM)
+    unwcase(UNW_EINVAL)
+    unwcase(UNW_ENOINFO)
+    unwcase(UNW_EBADVERSION)
+    unwcase(UNW_EBADREG)
+    unwcase(UNW_EREADONLYREG)
+    unwcase(UNW_EINVALIDIP)
+    unwcase(UNW_EBADFRAME)
+    unwcase(UNW_ESTOPUNWIND)
     }
+    // clang-format on
     elf_end(elf);
     close(fd);
     return ret;
@@ -692,60 +759,58 @@ void funloclookup_Init(struct FunLocLookup *flu, char *file) {
   }
 
   if (bfd_check_format(flu->bfd, bfd_archive)) {
-    printf("Hey, I got an archive.\n");
     flu->bfd = bfd_openr_next_archived_file(flu->bfd, NULL);
   } else if (bfd_check_format(flu->bfd, bfd_object)) {
-    printf("Hey, I got a straight object.\n");
+    // Nothing to do here
   } else {
-    printf("Hey, I did not get an object nor an archive... WTF?\n");
     bfd_close(flu->bfd);
     return;
   }
 
+  slurp_symtab(flu);
   if (bfd_get_file_flags(flu->bfd) & HAS_SYMS) {
-    //    uint32_t sz;
-    //    uint32_t cnt = bfd_read_minisymbols(flu->bfd, 0, (void**)flu->symtab,
-    //    &sz); if (cnt<0)
-    //      cnt = bfd_read_minisymbols(flu->bfd, 1, (void**)flu->symtab, &sz);
-    //
-    //    if (cnt<0) {
-    //      printf("Failed at reading the minisymbols\n");
-    //    }
-    slurp_symtab(flu);
+    uint32_t sz;
+    uint32_t cnt = bfd_read_minisymbols(flu->bfd, 0, (void**)flu->symtab,
+    &sz); if (cnt<0)
+      cnt = bfd_read_minisymbols(flu->bfd, 1, (void**)flu->symtab, &sz);
+
+    if (cnt<0) {
+      printf("Failed at reading the minisymbols\n");
+    }
   }
-  bfd_close(flu->bfd);
+//  bfd_close(flu->bfd);
 }
 
 void funloc_bfdmapoversections_callback(bfd *bf, asection *sec, void *arg) {
   (void)bf;
   (void)sec;
   (void)arg;
-  //  struct FunLocLookup *lu = arg;
-  //  struct FunLoc* loc = lu->loc;
-  //
-  //
-  //  // If we're done, we're done...  TODO, can we short-circuit the caller?!
-  //  if (lu->done)
-  //    return;
-  //
-  //  // If the section isn't allocated, we're not in a VMA... Done!
-  //  if (!(bfd_section_flags(sec) & SEC_ALLOC))
-  //    return;
-  //
-  //  // If the IP isn't in this VMA, we're done.
-  //  bfd_vma sec_vma = bfd_section_vma(sec);
-  //  printf("%d %d\n", loc->ip < sec_vma , loc->ip >= sec_vma +
-  //  bfd_section_size(sec)); if (loc->ip < sec_vma || loc->ip >= sec_vma +
-  //  bfd_section_size(sec))
-  //    return;
-  //
-  //  // If we're here, then we're going to be done soon!  But we're not done
-  //  yet const char* funcname = NULL; const char* filename = NULL; static
-  //  unsigned int discriminator;
-  ////  lu->done = bfd_find_nearest_line(bf, sec, &lu->symtab, loc->ip -
-  /// sec_vma, (const char**)&loc->file, (const char**)&loc->name, &loc->line);
-  //  lu->done = bfd_find_nearest_line_discriminator(bf, sec, &lu->symtab,
-  //  loc->ip - sec_vma, &filename, &funcname, &loc->line, &discriminator);
+    struct FunLocLookup *lu = arg;
+    struct FunLoc* loc = lu->loc;
+
+
+    // If we're done, we're done...  TODO, can we short-circuit the caller?!
+    if (lu->done)
+      return;
+
+    // If the section isn't allocated, we're not in a VMA... Done!
+    if (!(bfd_section_flags(sec) & SEC_ALLOC))
+      return;
+
+    // If the IP isn't in this VMA, we're done.
+    bfd_vma sec_vma = bfd_section_vma(sec);
+//    printf("%d %d\n", loc->ip < sec_vma , loc->ip >= sec_vma +
+//    bfd_section_size(sec));
+    if (loc->ip < sec_vma || loc->ip >= sec_vma + bfd_section_size(sec))
+      return;
+
+    // If we're here, then we're going to be done soon!  But we're not done
+    const char* funcname = NULL; const char* filename = NULL; static
+    unsigned int discriminator;
+    lu->done = bfd_find_nearest_line(bf, sec, lu->symtab, loc->ip -
+               sec_vma, (const char**)&loc->srcpath, (const char**)&loc->funname, &loc->line);
+    lu->done = bfd_find_nearest_line_discriminator(bf, sec, lu->symtab,
+    loc->ip - sec_vma, &filename, &funcname, &loc->line, &discriminator);
 }
 
 void funloclookup_Set(struct FunLocLookup *flu, uint64_t ip, pid_t pid) {
@@ -755,16 +820,44 @@ void funloclookup_Set(struct FunLocLookup *flu, uint64_t ip, pid_t pid) {
     printf("NOMAP\n");
     return;
   }
-  flu->loc->ip = ip - map->start + map->off;
-  flu->loc->srcpath = map->path;
-
   funloclookup_Init(flu, map->path);
+
+  int flags = bfd_get_file_flags(flu->bfd);
+//  if(flags & HAS_RELOC) printf("Has reloc\n");
+//  if(flags & EXEC_P) printf("Has exec\n");
+//  if(flags & HAS_LINENO) printf("Has lineno\n");
+//  if(flags & HAS_DEBUG) printf("Has debug\n");
+//  if(flags & HAS_SYMS) printf("Has syms\n");
+//  if(flags & HAS_LOCALS) printf("Has locals\n");
+//  if(flags & DYNAMIC) printf("is dynamic\n");
+//  if(flags & BFD_LINKER_CREATED) printf("is linker created\n");
+
+  if (flags & EXEC_P)
+    flu->loc->ip = ip;
+  else if (flags & DYNAMIC)
+    flu->loc->ip = ip - map->start + map->off;
+  else {
+    printf("I don't know what to do.\n");
+    flu->loc->ip = ip - map->start + map->off;
+  }
+
   bfd_map_over_sections(flu->bfd, funloc_bfdmapoversections_callback, flu);
+
+  // I think loc should have stuff now
+  if(flu->loc->funname) {
+    flu->loc->funname = strdup(flu->loc->funname);
+  } else {
+    printf("NOSYM!\n");
+  }
+  if(flu->loc->sopath) flu->loc->sopath = strdup(flu->loc->sopath);
+  if(flu->loc->srcpath) flu->loc->srcpath = strdup(flu->loc->srcpath);
+  bfd_close(flu->bfd);
+  flu->bfd = NULL;
 }
 
 static int process_ip(pid_t pid, uint64_t addr, struct FunLoc *loc) {
   int ret = -1;
-  DBGLOG("Processing IP = %lx\n", addr);
+  DBGLOG("Processing IP = 0x%lx\n", addr);
   Map *map = procfs_MapMatch(pid, addr);
   if (!map) {
     DBGLOG("Failed to find map\n");
@@ -778,7 +871,7 @@ static int process_ip(pid_t pid, uint64_t addr, struct FunLoc *loc) {
   // I'm not quite sure what I did to make this necessary, but I sure need to
   // figure out why
   //  if(!strcmp(".so", &map->path[strlen(map->path)-3]))
-  ret = process_file(map->path, addr - (map->start - map->off), loc);
+  ret = process_file(map->path, addr, loc);
   //  else
   //    ret = process_file(map->path, addr, loc);
   return ret;
@@ -808,8 +901,11 @@ int unwindstate_unwind(struct UnwindState *us, struct FunLoc *locs,
   // Now get the information into the output container
   for (int i = 0; i < n; i++) {
     funloc_clear(&locs[i]);
-    DBGLOG("Processing step %d, ip = %lx\n", i, ips[i]);
-    process_ip(us->pid, ips[i], &locs[i]);
+    DBGLOG("Processing step %d, ip = 0x%lx\n", i, ips[i]);
+//    process_ip(us->pid, ips[i], &locs[i]);
+    struct FunLocLookup *flu = &(struct FunLocLookup){.loc = &locs[i],
+                                                      .pc = ips[i]};
+    funloclookup_Set(flu, ips[i], us->pid);
   }
   return n;
 }
