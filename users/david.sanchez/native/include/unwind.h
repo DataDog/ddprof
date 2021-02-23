@@ -407,43 +407,23 @@ out:
     __v;                                                                       \
   })
 
-// TODO clean these up
-// Based mostly on perf's util/unwind-libunwind-local.c
-int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pip,
-            int need_unwind_info, void *arg) {
-  struct UnwindState *us = arg;
-  uint64_t offset = 0, table_data = 0, fde_count = 0;
-  int fd;
-  Map *map;
-  Elf *elf;
-  GElf_Ehdr *ehdr = &(GElf_Ehdr){0};
-  GElf_Shdr *shdr = &(GElf_Shdr){0};
-  Elf_Scn *sec = NULL;
-
-  if (!(map = procfs_MapMatch(us->pid, ip))) {
-    return -UNW_EINVALIDIP; // probably [vdso] or something
-  }
-
-  DBGLOG("ip: 0x%lx, rel: 0x%lx in %s\n", ip, ip - (map->start - map->off),
-         map->path);
-
-  // This is horrible, but right now we cache the current map.  The reason for
-  // this is because downstream analysis may require us to read segments which
-  // were never mapped in the target process, so inspecting procfs will fail.
-  // Instead, now that we know the map currently being accessed, we pass it
-  // downstream.  The main problem is actually if the map might change during
-  // processing, but whatever
-  us->map = map;
-
+int get_dwarf_table(Map* map, uint64_t* offset, uint64_t* table_data, uint64_t* fde_count) {
+  // TODO support lookup of debug symbols
   bfd *abfd = NULL;
   asection *section = NULL;
+  struct eh_frame_hdr ef;               // Used for parsing eh_frame_hdr
+  uint64_t offset_old = 0;              // Snapshot of the libbfd cursor
+  uint64_t offset_file = 0;             // Offset into the BFD
   char** matching;
 
+  // Open the thingy
   abfd = bfd_openr(map->path, NULL);
   bfd_check_format_matches(abfd, bfd_object, &matching);
-  section = bfd_get_section_by_name(abfd, ".eh_frame_hdr");
-
-  uint64_t offset_bfd = section->filepos;
+  if (!(section = bfd_get_section_by_name(abfd, ".eh_frame_hdr"))) {
+    printf("Did not find section!\n");
+    bfd_close(abfd);
+    return -1;
+  }
 
   /*
      We only worry about DWARF-compatible eh_frame_hdr
@@ -453,111 +433,102 @@ int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pip,
      [encoded] eh_frame_ptr (pointer to start of .eh_frame)
      [encoded] fde_count (
   */
-  uint64_t tabledata_bfd = 0;
-  uint64_t fdecount_bfd = 0;
+  offset_old = abfd->where;
+  offset_file = section->filepos;
+  *offset = section->vma;
 
   // We have to read .eh_frame_hdr in order to find the bsearch table defined
   // in .eh_frame.
   // TODO - don't assume DWARF-type eh_frame?
-  struct eh_frame_hdr ef;
-  uint64_t old_offset = abfd->where;
-  if (bfd_seek(abfd, offset_bfd, SEEK_SET))
+  if (bfd_seek(abfd, offset_file, SEEK_SET)) {
+    bfd_close(abfd);
     printf("BFD_BSEEK FAIL\n");
-  if (sizeof(ef) != bfd_bread((void*)&ef, sizeof(ef), abfd))
+    return -1;
+  }
+  if (sizeof(ef) != bfd_bread((void*)&ef, sizeof(ef), abfd)) {
+    bfd_close(abfd);
     printf("BFD_BREAD FAIL\n");
-  if (bfd_seek(abfd, old_offset, SEEK_SET))
+    return -1;
+  }
+  if (bfd_seek(abfd, offset_old, SEEK_SET)) {
+    bfd_close(abfd);
     printf("BFD RESTORE FAIL\n");
-  uint8_t *eenc = (uint8_t *)&ef.enc;
-  uint8_t *eend = (uint8_t *)&ef.data;
-  dw_read_encoded_value(eenc, eend, ef.eh_frame_ptr_enc);
-  fdecount_bfd = dw_read_encoded_value(eenc, eend, ef.fde_count_enc);
-  tabledata_bfd = (eenc - (uint8_t *)&ef) + offset_bfd;
-
-
-printf("Offset according to the BFD: 0x%lx\n", offset_bfd);
-printf("FDE count accoridng to BFD: %ld\n",  fdecount_bfd);
-printf("Table data according to BFD: 0x%lx\n", tabledata_bfd);
-//  bfd_close(abfd);
-
-  // Get the ELF info.  We'll cache this later
-  if (!(fd = open(map->path, O_RDONLY))) {
-    printf("Couldn't open.  Path is %s\n", map->path);
-    return -UNW_EINVALIDIP;
-  }
-  if (!(elf = elf_begin(fd, ELF_C_READ_MMAP, NULL))) {
-    int err = elf_errno();
-    printf("<ERR> %s (%s)\n", elf_errmsg(err), map->path);
-    printf("Not a valid ELF header?\n");
-    close(fd);
-    return -UNW_EINVALIDIP;
+    return -1;
   }
 
-  if (!gelf_getehdr(elf, ehdr)) {
-    int err = elf_errno();
-    printf("<ERR> %s (%s)\n", elf_errmsg(err), map->path);
-    printf("Not a valid ELF header?\n");
-    close(fd);
-    return -UNW_EINVAL;
+  // Get the location of the table (and the number of FDEs)
+  uint8_t *enc = (uint8_t *)&ef.enc;
+  uint8_t *end = (uint8_t *)&ef.data;
+  dw_read_encoded_value(enc, end, ef.eh_frame_ptr_enc);
+  *fde_count = dw_read_encoded_value(enc, end, ef.fde_count_enc);
+  *table_data = (enc - (uint8_t *)&ef) + *offset;
+  bfd_close(abfd);
+
+  return 0;
+}
+
+int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pip,
+            int need_unwind_info, void *arg) {
+  struct UnwindState *us = arg;
+  uint64_t offset = 0;                  // FILE offset of eh_frame_hdr
+  uint64_t table_data = 0;              // FILE offset of eh_frame table
+  uint64_t fde_count = 0;               // count of FDEs in the table
+  Map *map;
+
+  printf("Unwinding at IP: 0x%lx\n", ip);
+
+  // libbfd isn't useful for in-memory addresses, so we have to fall back to our
+  // own representation of the foreign process maps.  This will give us the
+  // name of the file backing the current position of the instruction pointer,
+  // which will help us locate the unwind table, but we may still need to
+  // reacquire this map later (or even push new segments to the pidmap!) in
+  // order to do the unwinding.
+  if (!(map = procfs_MapMatch(us->pid, ip)))
+    return -UNW_EINVALIDIP; // probably [vdso] or something ???
+
+  if (get_dwarf_table(map, &offset, &table_data, &fde_count)) {
+    printf("GDT ERROR\n");
+    return UNW_EINVALIDIP;
+  }
+  printf("IP: 0x%lx, OFF: 0x%lx, TD: 0x%lx, FDE: %ld\n", ip, offset, table_data, fde_count);
+
+  // The strategy here is to take the original IP and inspect the unwind table
+  // in order to find the next IP.  For that process, we'll either check some
+  // address in the stack (via unw_am()) or we'll walk the table/data in the
+  // .eh_frame segment (ALSO via unw_am(), with no further decoration).  It may
+  // also be possible that we'll check the .debug_frame segment, which poses
+  // an additional challenge, since it is typically not loaded by the
+  // instrumented process if it exists (and it may be in a different file
+  // from the IP altogether!!)
+  printf("map.start: 0x%lx, offset: 0x%lx, map->off: 0x%lx\n", map->start, offset, map->off);
+  Map *map_buf;
+  if(!(map_buf = procfs_MapMatch(us->pid, table_data))) {
+    printf("What the fuck?\n");
+    map = map_buf;
   }
 
-  if (!elf_rawdata(elf_getscn(elf, ehdr->e_shstrndx), NULL)) {
-    int err = elf_errno();
-    printf("<ERR> %s (%s)\n", elf_errmsg(err), map->path);
-    printf("ELF is corrupted?\n");
-    close(fd);
-    return -UNW_EINVAL;
-  }
+  printf("map.start: 0x%lx, offset: 0x%lx, map->off: 0x%lx\n", map->start, offset, map->off);
 
-  // Iterate through the ELF sections until the .eh_frame_hdr is found
-  while ((sec = elf_nextscn(elf, sec))) {
-    gelf_getshdr(sec, shdr);
-    if (!strcmp(".eh_frame_hdr",
-                elf_strptr(elf, ehdr->e_shstrndx, shdr->sh_name))) {
-      offset = shdr->sh_offset;
-      DBGLOG("--> Offset: %lx\n", offset);
-      break;
-    }
-  }
-
-  // Read the ELF segment corresponding to .eh_frame_hdr (GNU_EH_FRAME)
-  // in order to find the unwind table address
-  if (offset) {
-    struct eh_frame_hdr efh;
-    uint8_t *enc = (uint8_t *)&efh.enc;
-    uint8_t *end = (uint8_t *)&efh.data;
-    if (sizeof(efh) == pread(fd, &efh, sizeof(efh), offset)) {
-      dw_read_encoded_value(enc, end, efh.eh_frame_ptr_enc);
-      fde_count = dw_read_encoded_value(enc, end, efh.fde_count_enc);
-      table_data = (enc - (uint8_t *)&efh) + offset;
-      DBGLOG("--> Table Data: %lx (%ld)\n", table_data, fde_count);
-    }
-  }
-
-printf("Offset according to ELF: 0x%lx\n", offset);
-printf("FDE count according to ELF: %ld\n", fde_count);
-printf("table according to ELF: 0x%lx\n", table_data);
-
-  // Attempt to unwind
   DBGLOG("map.start: 0x%lx, offset: 0x%lx, map->off: 0x%lx\n", map->start,
          offset, map->off);
   struct unw_dyn_info di = {
       .format = UNW_INFO_FORMAT_REMOTE_TABLE,
       .start_ip = map->start,
       .end_ip = map->end,
-      .u = {.rti = {.segbase = (map->start - map->off) + offset,
-                    .table_data = (map->start - map->off) + table_data,
+      .u = {.rti = {.segbase = map->start,
+                    .table_data = table_data,
                     .table_len = fde_count * sizeof(struct table_entry) /
                         sizeof(unw_word_t)}}};
 
   // clang-format off
+  printf("Heading into the unwinding process\n");
+  us->map = map;            // Cache the current map
   switch (-dwarf_search_unwind_table(as, ip, &di, pip, need_unwind_info, arg)) {
   case UNW_ESUCCESS:
     // Done with the map, the file, etc
     DBGLOG("Succeeded with eh_frame dwarf_search_unwind_table: 0x%lx\n",
            pip->start_ip);
     us->map = NULL;
-    elf_end(elf);
-    close(fd);
     return UNW_ESUCCESS;
   unwcase(UNW_EUNSPEC)
   unwcase(UNW_ENOMEM)
@@ -570,6 +541,7 @@ printf("table according to ELF: 0x%lx\n", table_data);
   unwcase(UNW_EBADFRAME)
   unwcase(UNW_ESTOPUNWIND)
   }
+  printf("Going to try debuginfo now.\n");
   // clang-format on
 
   // Now try to unwind with the debug frame
@@ -603,15 +575,11 @@ printf("table according to ELF: 0x%lx\n", table_data);
     unwcase(UNW_ESTOPUNWIND)
     }
     // clang-format on
-    elf_end(elf);
-    close(fd);
     return ret;
   }
 
-  DBGLOG("Failure and no debug frame...\n");
+  printf("Failure and no debug frame...\n");
   us->map = NULL;
-  elf_end(elf);
-  close(fd);
   return -UNW_ESTOPUNWIND;
 }
 
@@ -632,6 +600,14 @@ int unw_gdila(unw_addr_space_t as, unw_word_t *dilap, void *arg) {
 int unw_am(unw_addr_space_t as, unw_word_t _addr, unw_word_t *valp, int write,
            void *arg) {
   (void)as;
+
+  /*
+     It's a little tough to reason about unw_am() in our context.  This function
+     is called by libunwind() to access the stack OR the unwind table entries.
+     Stack walking is necessarily going to be rooted in the address space of the
+     instrumented process, whereas it is absolutely not necessary for the unwind
+     table to be mapped (.eh_frame, sure, but .debug_frame, no).
+  */
   struct UnwindState *us = arg;
   unw_word_t addr = _addr;
   if (write || !us->stack) {
@@ -639,25 +615,24 @@ int unw_am(unw_addr_space_t as, unw_word_t _addr, unw_word_t *valp, int write,
     return -UNW_EINVAL; // not supported
   }
 
+Map* maptemp = procfs_MapMatch(us->pid, addr);
+printf("0x%lx : %s\n", _addr, maptemp->path);
+
   // Start and end of stack addresses
   const uint64_t sp_start = us->esp;
   const uint64_t sp_end = sp_start + us->stack_sz;
 
   // Check overflow, like perf
-  if (addr + sizeof(unw_word_t) < addr)
+  if (addr + sizeof(unw_word_t) < addr) {
+    printf("OVERFLOW!\n");
     return -EINVAL;
+  }
   if (sp_start <= addr && addr + sizeof(unw_word_t) < sp_end) {
+    printf("STACK!\n");
     *valp = *(unw_word_t *)(&us->stack[addr - sp_start]);
     return UNW_ESUCCESS;
   }
 
-  // We need to find a map for this address.  The best-case scenario is that
-  // this address is within a segment (although there are cases where it looks
-  // to be in a segment, but is relative some other marker).  If that fails,
-  // then perhaps we can consider it relative the global context (in which
-  // case, procfs_MapRead() can possibly adjust to the segment.  If all else
-  // fails, then try using the current value of the IP, but that will probably
-  // not succeed...
   Map *map = NULL;
   if (!(map = procfs_MapMatch(us->pid, addr)))
     if (!(map = us->map))
@@ -668,6 +643,7 @@ int unw_am(unw_addr_space_t as, unw_word_t _addr, unw_word_t *valp, int write,
   if (map) {
     if (-1 == procfs_MapRead(map, valp, sizeof(*valp), addr)) {
       DBGLOG("Reading failed!\n");
+      printf("Reading failed!\n");
       *valp = 0; // Reset whatever valp is
       return -UNW_EINVALIDIP;
     }
@@ -676,6 +652,7 @@ int unw_am(unw_addr_space_t as, unw_word_t _addr, unw_word_t *valp, int write,
   }
 
   // We land here if we didn't have a map.
+  printf("We got nothing\n");
   return -UNW_EINVAL;
 }
 

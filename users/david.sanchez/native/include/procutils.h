@@ -205,10 +205,10 @@ ssize_t procfs_MapRead(Map *map, void *buf, size_t sz, size_t addr) {
 //  // adjust it back down.  It could easily be that the address is relative the
 //  // top of the file, which is erroneous, but there's no clear way to
 //  // disambiguate that case.
-//  if (addr >= (map->start - map->off) && addr >= map->start &&
-//      addr < map->end) {
-//    addr -= map->start; // convert to segment-space
-//  }
+  if (addr >= (map->start - map->off) && addr >= map->start &&
+      addr < map->end) {
+    addr -= map->start; // convert to segment-space
+  }
   memcpy(buf, map->map + addr, sz);
   return 0;
 }
