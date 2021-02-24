@@ -1,4 +1,5 @@
 #include <getopt.h>
+#include <libelf.h>
 #include <pthread.h>
 #include <string.h>
 #include <sys/mman.h>

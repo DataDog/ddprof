@@ -1,6 +1,8 @@
 BINUTILS = /home/sanchda/dev/binutils-gdb
-INCLUDE = -Iinclude -I$(BINUTILS)/include -I$(BINUTILS)/bfd -I$(BINUTILS)/binutils -I/home/sanchda/dev/libunwind/include
-CFLAGS = -O0 -g -std=c11 -D_GNU_SOURCE
+LIBUNWIND = /home/sanchda/dev/libunwind
+ELFUTILS = /home/sanchda/dev/elfutils
+INCLUDE = -Iinclude -I$(BINUTILS)/include -I$(BINUTILS)/bfd -I$(BINUTILS)/binutils -I$(LIBUNWIND)/include -I$(ELFUTILS)/libelf
+CFLAGS = -O0 -g -std=c11 -D_GNU_SOURCE -DDEBUG
 TESTS := http perf pprof
 WARNS := -Wall -Wextra -Wpedantic -Wno-missing-braces -Wno-missing-field-initializers -Wno-gnu-statement-expression -Wno-pointer-arith -Wno-gnu-folding-constant
 ANALYZER := -fanalyzer -fanalyzer-verbosity=2
@@ -58,8 +60,7 @@ collatz: src/demo_collatz.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
 
 cstacks: eg/demo_constantstacks.c $(UNWLIBS)
-	$(CC) $(LIBDIRS) $(CFLAGS) $(WARNS) -Wno-macro-redefined $(LDFLAGS) $(INCLUDE) -o bin/$@.remote $^ $(LDLIBS)
-	$(CC) $(LIBDIRS) $(CFLAGS) $(WARNS) -DD_LOCAL -Wno-macro-redefined $(LDFLAGS) $(INCLUDE) -o bin/$@.local $^ $(LDLIBS)
+	$(CC) $(LIBDIRS) $(CFLAGS) $(WARNS) -Wno-macro-redefined $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 
 #strings: src/demo_strings.c src/string_table.c
 #	$(CC) -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^

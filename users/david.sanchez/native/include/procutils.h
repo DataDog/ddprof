@@ -2,6 +2,7 @@
 #define _H_procutils
 
 #include <ctype.h>
+#include <elf.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
@@ -12,11 +13,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-
-// TODO
-// procfs will only cache segments that have been marked LOAD--obviously things
-// like the DWARF .debug_frame do not follow this convention, even if they
-// all formally belong to the same map.
 
 // ISO C does not allow you to cast a function pointer to an object pointer.
 // But it DOES allow you to cast a function pointer to a different, incompatible
@@ -40,12 +36,12 @@ typedef enum MapMode {
 } MapMode;
 
 typedef struct Map {
-  uint64_t start;
-  uint64_t end;
-  uint64_t off;
-  char *path;
+  uint64_t start; // Start of the segment in virtual memory
+  uint64_t end;   // End of the segment in virtual memory
+  uint64_t off;   // Offset into the file of the segment
+  char *path;     // path WITHIN THE PID MNT NS; has to be readjusted to caller
   MapMode mode;
-  void *map;
+  void *map;      // an mmap() of the segment
 } Map;
 
 #define PM_MAX 128
@@ -183,7 +179,16 @@ int procfs_MapOpen(pid_t target) {
 #include <sys/types.h>
 #include <unistd.h>
 
-ssize_t procfs_MapRead(Map *map, void *buf, size_t sz, size_t addr) {
+// TODO, we're going to want a function that takes a path relative to a given
+//       PID and returns the path in the mount namespace of the calling process.
+char procfs_currentroot[sizeof("/proc/32768/root")] = {0};
+char* procfs_RootGet(pid_t pid) {
+  memset(procfs_currentroot, 0, sizeof(procfs_currentroot));
+  snprintf(procfs_currentroot, sizeof(procfs_currentroot), "/proc/%d/root", pid);
+  return procfs_currentroot;
+}
+
+char procfs_MmapGet(Map *map) {
   // If this segment hasn't been cached, then cache it.
   // TODO evict stale ones
   if (!map->map) {
@@ -192,14 +197,20 @@ ssize_t procfs_MapRead(Map *map, void *buf, size_t sz, size_t addr) {
       printf("I couldn't open the map!\n");
       return -1;
     }
-    map->map =
-        mmap(NULL, map->end - map->start, PROT_READ, MAP_PRIVATE, fd, map->off);
+    uint64_t mapsz = map->end - map->start + 1; //e.g., if start=end, map "1"b
+    map->map = mmap(0, mapsz, PROT_READ, MAP_PRIVATE, fd, map->off);
     close(fd);
     if (!map->map) {
       printf("I couldn't map the map!\n");
       return -1;
     }
   }
+  return 0;
+}
+
+ssize_t procfs_MapRead(Map *map, void *buf, size_t sz, size_t addr) {
+  if (procfs_MmapGet(map))
+    return -1;
 
 //  // If map is clearly NOT in the file-segment, but IS in the memory-segment,
 //  // adjust it back down.  It could easily be that the address is relative the

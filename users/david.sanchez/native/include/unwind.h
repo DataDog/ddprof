@@ -10,8 +10,8 @@ typedef void (*bfd_cleanup) (bfd *);
 #include <elf-bfd.h> // add binutils-gdb to include path
 #include <bfdlink.h>
 #include <libbfd.h>
-#include <errno.h>
 #include <gelf.h>
+#include <errno.h>
 
 #include "/usr/include/libdwarf/dwarf.h" // TODO wow... Just wow
 #include "procutils.h"
@@ -316,13 +316,33 @@ static int process_file(char *file, uint64_t addr, struct FunLoc *loc) {
 /******************************************************************************\
 |*                               DWARF and ELF                                *|
 \******************************************************************************/
+struct elf_image
+  {
+    void *image;                /* pointer to mmap'd image */
+    size_t size;                /* (file-) size of the image */
+  };
+
+struct elf_dyn_info
+  {
+    struct elf_image ei;
+    unw_dyn_info_t di_cache;
+    unw_dyn_info_t di_debug;    /* additional table info for .debug_frame */
+#if UNW_TARGET_IA64
+    unw_dyn_info_t ktab;
+#endif
+#if UNW_TARGET_ARM
+    unw_dyn_info_t di_arm;      /* additional table info for .ARM.exidx */
+#endif
+  };
 extern int UNW_OBJ(dwarf_search_unwind_table)(unw_addr_space_t, unw_word_t,
                                               unw_dyn_info_t *,
                                               unw_proc_info_t *, int, void *);
+extern int UNW_OBJ(dwarf_find_unwind_table)(struct elf_dyn_info *, unw_addr_space_t, char *, unw_word_t, unw_word_t, unw_word_t);
 extern int UNW_OBJ(dwarf_find_debug_frame)(int, unw_dyn_info_t *, unw_word_t,
                                            unw_word_t, const char *, unw_word_t,
                                            unw_word_t);
 #define dwarf_search_unwind_table UNW_OBJ(dwarf_search_unwind_table)
+#define dwarf_find_unwind_table UNW_OBJ(dwarf_find_unwind_table)
 #define dwarf_find_debug_frame UNW_OBJ(dwarf_find_debug_frame)
 #define unwcase(x)                                                             \
   case x:                                                                      \
@@ -473,59 +493,77 @@ int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pip,
   uint64_t offset = 0;                  // FILE offset of eh_frame_hdr
   uint64_t table_data = 0;              // FILE offset of eh_frame table
   uint64_t fde_count = 0;               // count of FDEs in the table
-  Map *map;
+  Map *map = NULL;
+  Elf *elf = NULL;
+  struct elf_dyn_info *edi = &(struct elf_dyn_info){0};
+  GElf_Phdr phdr;
+  int fd = -1;
 
   printf("Unwinding at IP: 0x%lx\n", ip);
-
-  // libbfd isn't useful for in-memory addresses, so we have to fall back to our
-  // own representation of the foreign process maps.  This will give us the
-  // name of the file backing the current position of the instruction pointer,
-  // which will help us locate the unwind table, but we may still need to
-  // reacquire this map later (or even push new segments to the pidmap!) in
-  // order to do the unwinding.
-  if (!(map = procfs_MapMatch(us->pid, ip)))
+  if (!(map = procfs_MapMatch(us->pid, ip))) {
+    printf("Couldn't get a map\n");
     return -UNW_EINVALIDIP; // probably [vdso] or something ???
-
-  if (get_dwarf_table(map, &offset, &table_data, &fde_count)) {
-    printf("GDT ERROR\n");
-    return UNW_EINVALIDIP;
-  }
-  printf("IP: 0x%lx, OFF: 0x%lx, TD: 0x%lx, FDE: %ld\n", ip, offset, table_data, fde_count);
-
-  // The strategy here is to take the original IP and inspect the unwind table
-  // in order to find the next IP.  For that process, we'll either check some
-  // address in the stack (via unw_am()) or we'll walk the table/data in the
-  // .eh_frame segment (ALSO via unw_am(), with no further decoration).  It may
-  // also be possible that we'll check the .debug_frame segment, which poses
-  // an additional challenge, since it is typically not loaded by the
-  // instrumented process if it exists (and it may be in a different file
-  // from the IP altogether!!)
-  printf("map.start: 0x%lx, offset: 0x%lx, map->off: 0x%lx\n", map->start, offset, map->off);
-  Map *map_buf;
-  if(!(map_buf = procfs_MapMatch(us->pid, table_data))) {
-    printf("What the fuck?\n");
-    map = map_buf;
   }
 
-  printf("map.start: 0x%lx, offset: 0x%lx, map->off: 0x%lx\n", map->start, offset, map->off);
+  if (procfs_MmapGet(map)) {
+    printf("Couldn't get mmap\n");
+    return -UNW_EINVALIDIP; // No clue!
+  }
 
-  DBGLOG("map.start: 0x%lx, offset: 0x%lx, map->off: 0x%lx\n", map->start,
-         offset, map->off);
-  struct unw_dyn_info di = {
-      .format = UNW_INFO_FORMAT_REMOTE_TABLE,
-      .start_ip = map->start,
-      .end_ip = map->end,
-      .u = {.rti = {.segbase = map->start,
-                    .table_data = table_data,
-                    .table_len = fde_count * sizeof(struct table_entry) /
-                        sizeof(unw_word_t)}}};
+  // Get the ELF info.  We'll cache this later
+  // TODO cache this
+  if (!(fd = open(map->path, O_RDONLY))) {
+    printf("Couldn't open.  Path is %s\n", map->path);
+    return -UNW_EINVALIDIP;
+  }
+
+  struct stat st = {0};
+  fstat(fd, &st);
+  void* buf = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+  elf = elf_memory(buf, st.st_size);
+  if(!(gelf_getphdr(elf, 0, &phdr))) {
+    printf("<ERR> %s (%s)\n", elf_errmsg(elf_errno()), map->path);
+    printf("Not a valid ELF header?\n");
+    close(fd);
+    return -UNW_EINVALIDIP;
+  }
+
+  printf(
+"p_type: %u\n"
+"p_flags: %u\n"
+"p_offset: %ld\n"
+"p_vaddr: 0x%lx\n"
+"p_padder: 0x%lx\n"
+"p_filesz: %ld\n"
+"p_memsz: %ld\n"
+"p_align: %ld\n",
+phdr.p_type,
+phdr.p_flags,
+phdr.p_offset,
+phdr.p_vaddr,
+phdr.p_paddr,
+phdr.p_filesz,
+phdr.p_memsz,
+phdr.p_align);
+
+  edi = &(struct elf_dyn_info){.ei = {.image = buf, .size = st.st_size}};
+  if (!dwarf_find_unwind_table(edi, as, map->path, phdr.p_vaddr, map->off, ip)) {
+    printf("Couldn't find it with the buf\n");
+    return UNW_EINVAL;
+  }
 
   // clang-format off
-  printf("Heading into the unwinding process\n");
+  printf("Map starts at 0x%lx\n", buf);
+  printf("Using segbase=0x%lx, fde_count=%ld, gp=0x%lx, table_data=0x%lx\n",
+      edi->di_cache.u.rti.segbase,
+      edi->di_cache.u.rti.table_len,
+      edi->di_cache.gp,
+      edi->di_cache.u.rti.table_data);
   us->map = map;            // Cache the current map
-  switch (-dwarf_search_unwind_table(as, ip, &di, pip, need_unwind_info, arg)) {
+  switch (-dwarf_search_unwind_table(as, ip, &edi->di_cache, pip, need_unwind_info, arg)) {
   case UNW_ESUCCESS:
     // Done with the map, the file, etc
+printf("I guess that was good, right?\n");
     DBGLOG("Succeeded with eh_frame dwarf_search_unwind_table: 0x%lx\n",
            pip->start_ip);
     us->map = NULL;
@@ -555,30 +593,7 @@ int unw_fpi(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pip,
     DBGLOG("I think %s does not end in .so\n", map->path);
     is_exec = 1;
   }
-  if (dwarf_find_debug_frame(0, &di, ip, map->start - map->off, map->path,
-                             map->start, map->end)) {
-    ret = dwarf_search_unwind_table(as, ip, &di, pip, need_unwind_info, arg);
-    DBGLOG("Found debug frame, checking return:\n");
 
-    // clang-format off
-    switch (ret) {
-    unwcase(UNW_ESUCCESS)
-    unwcase(UNW_EUNSPEC)
-    unwcase(UNW_ENOMEM)
-    unwcase(UNW_EINVAL)
-    unwcase(UNW_ENOINFO)
-    unwcase(UNW_EBADVERSION)
-    unwcase(UNW_EBADREG)
-    unwcase(UNW_EREADONLYREG)
-    unwcase(UNW_EINVALIDIP)
-    unwcase(UNW_EBADFRAME)
-    unwcase(UNW_ESTOPUNWIND)
-    }
-    // clang-format on
-    return ret;
-  }
-
-  printf("Failure and no debug frame...\n");
   us->map = NULL;
   return -UNW_ESTOPUNWIND;
 }
@@ -633,10 +648,23 @@ printf("0x%lx : %s\n", _addr, maptemp->path);
     return UNW_ESUCCESS;
   }
 
-  Map *map = NULL;
-  if (!(map = procfs_MapMatch(us->pid, addr)))
-    if (!(map = us->map))
-      map = procfs_MapMatch(us->pid, us->eip);
+  Map *map = us->map;
+  if (!map || map->start > addr || addr + sizeof(unw_word_t) >= map->end) {
+    if (!map && !(map = procfs_MapMatch(us->pid, addr))) {
+      printf("Did not find map in procfs\n");
+
+      // Try to force the us->map here if it's available.
+      if (!(map = us->map)) {
+        printf("No cached map.\n");
+
+        // If all else fails, fallback to something, anything
+        if (!(map = procfs_MapMatch(us->pid, us->eip))) {
+          printf("All is lost, cannot find map.\n");
+          return -EINVAL;
+        }
+      }
+    }
+  }
 
   // Now try to read, given the map.  This assumes that the address is in the
   // scope of the instrumented process.
