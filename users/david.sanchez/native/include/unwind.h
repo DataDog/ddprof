@@ -547,13 +547,24 @@ phdr.p_memsz,
 phdr.p_align);
 
   edi = &(struct elf_dyn_info){.ei = {.image = buf, .size = st.st_size}};
-  if (!dwarf_find_unwind_table(edi, as, map->path, phdr.p_vaddr, map->off, ip)) {
+//  if (!dwarf_find_unwind_table(edi, as, map->path, map->start-map->off, 0, ip)) {
+//  if (!dwarf_find_unwind_table(edi, as, map->path, map->start, map->off, ip)) {
+  if (!dwarf_find_unwind_table(edi, as, map->path, map->start - 96, map->off, ip)) {
     printf("Couldn't find it with the buf\n");
-    return UNW_EINVAL;
   }
+printf(
+"start_ip:   0x%lx\n"
+"end_ip:     0x%lx\n"
+"segbase:    0x%lx\n"
+"table_data: 0x%lx\n",
+edi->di_cache.start_ip,
+edi->di_cache.end_ip,
+edi->di_cache.u.rti.segbase,
+edi->di_cache.u.rti.table_data);
+
 
   // clang-format off
-  printf("Map starts at 0x%lx\n", buf);
+  printf("Map starts at 0x%lx\n", (uint64_t)buf);
   printf("Using segbase=0x%lx, fde_count=%ld, gp=0x%lx, table_data=0x%lx\n",
       edi->di_cache.u.rti.segbase,
       edi->di_cache.u.rti.table_len,
@@ -567,6 +578,7 @@ printf("I guess that was good, right?\n");
     DBGLOG("Succeeded with eh_frame dwarf_search_unwind_table: 0x%lx\n",
            pip->start_ip);
     us->map = NULL;
+    munmap(buf, st.st_size);
     return UNW_ESUCCESS;
   unwcase(UNW_EUNSPEC)
   unwcase(UNW_ENOMEM)
@@ -595,6 +607,7 @@ printf("I guess that was good, right?\n");
   }
 
   us->map = NULL;
+  munmap(buf, st.st_size);
   return -UNW_ESTOPUNWIND;
 }
 
@@ -612,7 +625,7 @@ int unw_gdila(unw_addr_space_t as, unw_word_t *dilap, void *arg) {
   return -UNW_ENOINFO;
 } // punt
 
-int unw_am(unw_addr_space_t as, unw_word_t _addr, unw_word_t *valp, int write,
+int unw_am(unw_addr_space_t as, unw_word_t addr, unw_word_t *valp, int write,
            void *arg) {
   (void)as;
 
@@ -624,14 +637,10 @@ int unw_am(unw_addr_space_t as, unw_word_t _addr, unw_word_t *valp, int write,
      table to be mapped (.eh_frame, sure, but .debug_frame, no).
   */
   struct UnwindState *us = arg;
-  unw_word_t addr = _addr;
   if (write || !us->stack) {
     *valp = 0;
     return -UNW_EINVAL; // not supported
   }
-
-Map* maptemp = procfs_MapMatch(us->pid, addr);
-printf("0x%lx : %s\n", _addr, maptemp->path);
 
   // Start and end of stack addresses
   const uint64_t sp_start = us->esp;
@@ -676,6 +685,7 @@ printf("0x%lx : %s\n", _addr, maptemp->path);
       return -UNW_EINVALIDIP;
     }
     DBGLOG("mem[%016lx] -> %lx (%50s)\n", addr, *valp, map->path);
+    printf("mem[%016lx] -> %lx (%50s)\n", addr, *valp, map->path);
     return UNW_ESUCCESS;
   }
 

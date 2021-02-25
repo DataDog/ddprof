@@ -25,6 +25,9 @@ struct UnwindState {
     };
   };
   Map *map;
+  int max_stack; // ???
+  uint64_t *ips;
+  uint64_t idx;
 };
 
 struct FunLoc {
@@ -44,7 +47,10 @@ struct FunLoc {
   fprintf(stderr, __VA_ARGS__); \
   fprintf(stderr, "\n")
 
-int debuginfo_get(Dwfl_Module *mod, void **arg, const char *modname, Dwarf_Addr base, const char *file_name, const char*debuglink_file, GElf_Word debuglink_crc, char **debuginfo_file_name) {
+int debuginfo_get(Dwfl_Module *mod, void **arg, const char *modname,
+                  Dwarf_Addr base, const char *file_name,
+                  const char*debuglink_file, GElf_Word debuglink_crc,
+                  char **debuginfo_file_name) {
 (void)mod;
 (void)arg;
 (void)modname;
@@ -88,8 +94,9 @@ int report_module(struct UnwindState *us, uint64_t ip) {
   }
 
   if (!mod) {
-    mod = dwfl_report_elf(us->dwfl, "WTF?", map->path, -1, map->start - map->off, false);
-    D("First check didn't work, the second check is %p:%s", (void*)mod, mod->name);
+    char* short_name = strdup(strrchr(map->path, '/')+1);
+    mod = dwfl_report_elf(us->dwfl, short_name, map->path, -1, map->start - map->off, false);
+    free(short_name);
   }
 
   if (!mod) {
@@ -98,17 +105,97 @@ int report_module(struct UnwindState *us, uint64_t ip) {
     return -1;
   }
 
-  if(mod) {
-    Dwfl_Module *mod2 = dwfl_addrmodule(us->dwfl, ip);
-    D("mod2: %p", (void*)mod2);
-  }
-
   return mod && dwfl_addrmodule(us->dwfl, ip) == mod ? 0 : -1;
 }
 
-int unwindstate__unwind(struct UnwindState *us, struct FunLoc *locs, int max_stack) {
-  uint64_t ips[max_stack];
-  int n = 0;
+pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
+  if (*thread_argp != NULL)
+    return 0;
+  *thread_argp = arg;
+  return dwfl_pid(dwfl);
+}
+
+bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
+  struct UnwindState *us = arg;
+  Dwarf_Word regs[3] = {0};
+
+  // I only save three lol
+  for(int i=0; i<3; i++)
+    regs[i] = us->regs[i];
+
+  return dwfl_thread_state_registers(thread, 0, 3, regs);
+}
+
+bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg) {
+(void)dwfl;
+  struct UnwindState *us = arg;
+
+  uint64_t sp_start = us->esp;
+  uint64_t sp_end = sp_start + us->stack_sz;
+
+  // Check for overflow, like perf
+  if (addr + sizeof(Dwarf_Word) < addr)
+    return false;
+
+  if (addr < sp_start || addr + sizeof(Dwarf_Word) > sp_end) {
+    // If we're here, we're not in the stack.  We should interpet addr as an
+    // address in VM, not as a file offset.  This also rather strongly assumes
+    // that `addr` is an address in the instrumented process' space--in other
+    // words, it represents a segment that was actually mapped into the
+    // given page.  If, for instance, a segment could have been mapped, but
+    // wasn't, we fail (does this even make sense?)
+    Map* map = procfs_MapMatch(us->pid, addr);
+
+    // I didn't read past dso.c:dso__data_read_offset(), but it doesn't look
+    // like perf will do anything to try to correct the address.
+    // TODO verify?
+    if(!map)
+      return false;
+
+    if (-1 == procfs_MapRead(map, result, sizeof(Dwarf_Word), addr))
+      return false;
+    return true;
+  }
+
+  *result = *(Dwarf_Word *)(&us->stack[addr - sp_start]);
+  return true;
+}
+
+int frame_cb(Dwfl_Frame *state, void *arg) {
+  struct UnwindState* us = arg;
+  Dwarf_Addr pc;
+  bool isactivation;
+
+  if (!dwfl_frame_pc(state, &pc, NULL)) {
+    D("%s", dwfl_errmsg(-1));
+    return DWARF_CB_ABORT;
+  }
+
+  report_module(us, pc);
+
+  if (!dwfl_frame_pc(state, &pc, &isactivation)) {
+    D("%s", dwfl_errmsg(-1));
+    return DWARF_CB_ABORT;
+  }
+
+  if (!isactivation)
+    --pc;
+
+  // Store the pc for later
+  us->ips[us->idx++] = pc;
+  return DWARF_CB_OK;
+}
+
+int unwindstate__unwind(struct UnwindState *us, struct FunLoc *locs) {
+  static const Dwfl_Thread_Callbacks dwfl_callbacks = {
+    .next_thread = next_thread,
+    .memory_read = memory_read,
+    .set_initial_registers = set_initial_registers,
+  };
+  int max_stack = us->max_stack;
+  uint64_t ips[us->max_stack];
+  us->ips = ips;
+  memset(us->ips, 0, sizeof(uint64_t)*us->max_stack);
 
   // Initialize ELF
   D("Gonna unwind at %d (my PID is %d)\n", us->pid, getpid());
@@ -119,12 +206,29 @@ int unwindstate__unwind(struct UnwindState *us, struct FunLoc *locs, int max_sta
     return -1;
   }
 
-  ips[n++] = us->eip;
-  if(report_module(us, *ips)) {
+  us->ips[us->idx++] = us->eip;
+  if(report_module(us, *us->ips)) {
     D("There was a problem reporting the module.");
     return -1;
   }
 
+  // TODO, thread-level?
+  if (!dwfl_attach_state(us->dwfl, EM_NONE, us->pid, &dwfl_callbacks, us)) {
+    D("Could not attach.");
+    return -1;
+  }
+
+  if (dwfl_getthread_frames(us->dwfl, us->pid, frame_cb, us) && us->max_stack != max_stack) {
+    D("Could not get thread frames.");
+    return -1;
+  }
+
+  printf(" * 0x%lx\n", us->ips[0]);
+  for(uint64_t i=1; i<us->idx; i++) {
+    printf("   0x%lx\n", us->ips[i]);
+  }
+
+  dwfl_end(us->dwfl);
   return 0;
 }
 

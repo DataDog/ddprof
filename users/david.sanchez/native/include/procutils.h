@@ -212,12 +212,13 @@ ssize_t procfs_MapRead(Map *map, void *buf, size_t sz, size_t addr) {
   if (procfs_MmapGet(map))
     return -1;
 
-//  // If map is clearly NOT in the file-segment, but IS in the memory-segment,
-//  // adjust it back down.  It could easily be that the address is relative the
-//  // top of the file, which is erroneous, but there's no clear way to
-//  // disambiguate that case.
+// If map is clearly NOT in the file-segment, but IS in the memory-segment,
+// adjust it back down.  It could easily be that the address is relative the
+// top of the file, which is erroneous, but there's no clear way to
+// disambiguate that case.
   if (addr >= (map->start - map->off) && addr >= map->start &&
       addr < map->end) {
+    printf("OUT OF BOUNDS\n");
     addr -= map->start; // convert to segment-space
   }
   memcpy(buf, map->map + addr, sz);
