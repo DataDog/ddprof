@@ -11,7 +11,7 @@
 #include "http.h"
 #include "perf.h"
 #include "pprof.h"
-#include "unwind.h"
+#include "unwind2.h"
 
 struct DDProfContext {
   DProf *dp;
@@ -121,13 +121,17 @@ void ddprof_callback(struct perf_event_header *hdr, void *arg) {
   case PERF_RECORD_SAMPLE:
     pes          = (struct perf_event_sample *)hdr;
     us->pid      = pes->pid;
+    us->idx      = 0;
     us->stack    = pes->data;
     us->stack_sz = pes->size; // TODO should be dyn_size, but it's corrupted?
     memcpy(&us->regs[0], pes->regs, 3 * sizeof(uint64_t));
-    int n = unwindstate_unwind(us, &*locs,
-                               4096); // TODO get a common value from perf.h
-    memset(id_locs, 0, n * sizeof(*id_locs));
-    for (int i = 0, j = 0; i < n; i++, j++) {
+    us->max_stack = MAX_STACK;
+    if (-1 == unwindstate__unwind(us, &*locs)) {
+      printf("There was a bad error during unwinding.\n");
+      return;
+    }
+    memset(id_locs, 0, us->idx * sizeof(*id_locs));
+    for (uint64_t i = 0, j = 0; i < us->idx; i++, j++) {
       uint64_t id_map, id_fun, id_loc;
       id_map = pprof_mapAdd(dp, locs[i].map_start, locs[i].map_end, locs[i].map_off, locs[i].sopath, "");
       id_fun = pprof_funAdd(dp, locs[i].funname, locs[i].funname, locs[i].srcpath, locs[i].line);
@@ -137,8 +141,7 @@ void ddprof_callback(struct perf_event_header *hdr, void *arg) {
       else
         j--;
     }
-    if (n > 0)
-      pprof_sampleAdd(dp, (int64_t[]){1, pes->period, 1000000}, 3, id_locs, n);
+    pprof_sampleAdd(dp, (int64_t[]){1, pes->period, 1000000}, 3, id_locs, us->idx);
     printf("The period was %ld\n", pes->period);
     break;
 
@@ -297,7 +300,6 @@ int main(int argc, char **argv) {
     // If we're here, the child just launched.  Start the timer
     ctx->send_nanos = now_nanos() + ctx->sample_sec*1000000000;
     munmap(pb, sizeof(pthread_barrier_t));
-    unwindstate_Init(ctx->us);
     elf_version(EV_CURRENT);
     main_loop(&pe, ddprof_callback, ctx);
   }

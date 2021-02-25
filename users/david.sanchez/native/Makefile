@@ -28,7 +28,7 @@ endif
 .PHONY: all install
 
 # -DD_UWDBG is useful here, just set the UNW_DEBUG_LEVEL environment variable
-dd-prof: src/dd-prof.c $(SRC) $(UNWLIBS)
+dd-prof: src/dd-prof.c $(SRC) $(ELFLIBS)
 	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DD_UNWDBG -fsanitize=address $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 #	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -fsanitize=undefined $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 #	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DD_UWDBG $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
