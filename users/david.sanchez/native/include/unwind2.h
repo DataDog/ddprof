@@ -11,6 +11,19 @@
 #include "dwfl_internals.h"
 #include "procutils.h"
 
+#define MAX_STACK 1024
+typedef struct FunLoc {
+  uint64_t ip;        // Relative to file, not VMA
+  uint64_t map_start; // Start address of mapped region
+  uint64_t map_end;   // End
+  uint64_t map_off;   // Offset into file
+  char *funname;      // name of the function (mangled, possibly)
+  char *srcpath;      // name of the source file, if known
+  char *sopath;       // name of the file where the symbol is interned (e.g., .so)
+  uint32_t line;      // line number in file
+  uint32_t disc;      // discriminator
+} FunLoc;
+
 struct UnwindState {
   Dwfl *dwfl;
   pid_t pid;
@@ -26,26 +39,19 @@ struct UnwindState {
   };
   Map *map;
   int max_stack; // ???
-  uint64_t *ips;
+  uint64_t ips[MAX_STACK];
+  FunLoc locs[MAX_STACK];
   uint64_t idx;
-};
-
-struct FunLoc {
-  uint64_t ip;        // Relative to file, not VMA
-  uint64_t map_start; // Start address of mapped region
-  uint64_t map_end;   // End
-  uint64_t map_off;   // Offset into file
-  char *funname;      // name of the function (mangled, possibly)
-  char *srcpath;      // name of the source file, if known
-  char *sopath;       // name of the file where the symbol is interned (e.g., .so)
-  uint32_t line;      // line number in file
-  uint32_t disc;      // discriminator
 };
 
 #define D(...) \
   fprintf(stderr, "<%s:%d> ", __FUNCTION__, __LINE__); \
   fprintf(stderr, __VA_ARGS__); \
   fprintf(stderr, "\n")
+
+int indent = 0;
+#define IGR D("\n%*s",(indent+=2),">")
+#define EGR D("\n%*s",(indent-=2)+2,"<")
 
 int debuginfo_get(Dwfl_Module *mod, void **arg, const char *modname,
                   Dwarf_Addr base, const char *file_name,
@@ -64,22 +70,28 @@ int debuginfo_get(Dwfl_Module *mod, void **arg, const char *modname,
 }
 
 Dwfl* dwfl_start() {
+IGR;
   static char *debuginfo_path;
   static const Dwfl_Callbacks proc_callbacks = {
     .find_debuginfo = dwfl_standard_find_debuginfo,  // TODO, update this for containers?
     .debuginfo_path = &debuginfo_path,
     .find_elf = dwfl_linux_proc_find_elf,
   };
+EGR;
   return dwfl_begin(&proc_callbacks);
 }
 
 int report_module(struct UnwindState *us, uint64_t ip) {
+IGR;
   Dwfl_Module *mod;
   Map* map = procfs_MapMatch(us->pid, ip);
   if(!map) {
     D("Could not get the map for this process!");
+EGR;
     return -1;
   }
+
+D("Map: %s [%ld - %ld] - %ld", map->path, map->start, map->end, ip);
 
   if ((mod = dwfl_addrmodule(us->dwfl, ip))) {
     D("That worked!");
@@ -94,48 +106,64 @@ int report_module(struct UnwindState *us, uint64_t ip) {
   }
 
   if (!mod) {
-    char* short_name = strdup(strrchr(map->path, '/')+1);
-    mod = dwfl_report_elf(us->dwfl, short_name, map->path, -1, map->start - map->off, false);
-    free(short_name);
+    char* name = strdup(strrchr(map->path, '/')+1);
+    mod = dwfl_report_elf(us->dwfl, name, map->path, -1, map->start - map->off, false);
+    free(name);
+    if (!mod) {
+    }
   }
 
   if (!mod) {
     // TODO this is where I would put my build-id failover IF I HAD ONE
-    D("This is awful, I couldn't report elf.");
+    D("This is awful, I couldn't report elf: %s", dwfl_errmsg(-1));
+EGR;
     return -1;
   }
 
+EGR;
   return mod && dwfl_addrmodule(us->dwfl, ip) == mod ? 0 : -1;
 }
 
 pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
-  if (*thread_argp != NULL)
+(void)dwfl;
+IGR;
+  if (*thread_argp != NULL) {
+EGR;
     return 0;
+}
+  struct UnwindState* us = arg;
   *thread_argp = arg;
-  return dwfl_pid(dwfl);
+EGR;
+  return us->pid;
 }
 
 bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
+IGR;
   struct UnwindState *us = arg;
-  Dwarf_Word regs[3] = {0};
+  Dwarf_Word regs[17] = {0};
 
   // I only save three lol
-  for(int i=0; i<3; i++)
-    regs[i] = us->regs[i];
+  regs[6] = us->ebp;
+  regs[7] = us->esp;
+  regs[16] = us->eip;
 
-  return dwfl_thread_state_registers(thread, 0, 3, regs);
+EGR;
+  return dwfl_thread_state_registers(thread, 0, 17, regs);
 }
 
 bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg) {
 (void)dwfl;
+IGR;
   struct UnwindState *us = arg;
 
   uint64_t sp_start = us->esp;
   uint64_t sp_end = sp_start + us->stack_sz;
 
   // Check for overflow, like perf
-  if (addr + sizeof(Dwarf_Word) < addr)
+  if (addr + sizeof(Dwarf_Word) < addr) {
+EGR;
     return false;
+  }
 
   if (addr < sp_start || addr + sizeof(Dwarf_Word) > sp_end) {
     // If we're here, we're not in the stack.  We should interpet addr as an
@@ -149,77 +177,120 @@ bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg) {
     // I didn't read past dso.c:dso__data_read_offset(), but it doesn't look
     // like perf will do anything to try to correct the address.
     // TODO verify?
-    if(!map)
+    if(!map) {
+EGR;
       return false;
+    }
 
-    if (-1 == procfs_MapRead(map, result, sizeof(Dwarf_Word), addr))
+    if (-1 == procfs_MapRead(map, result, sizeof(Dwarf_Word), addr)) {
+EGR;
       return false;
+    }
+EGR;
     return true;
   }
 
   *result = *(Dwarf_Word *)(&us->stack[addr - sp_start]);
+EGR;
   return true;
 }
 
 int frame_cb(Dwfl_Frame *state, void *arg) {
+IGR;
   struct UnwindState* us = arg;
-  Dwarf_Addr pc;
-  bool isactivation;
-
-  if (!dwfl_frame_pc(state, &pc, NULL)) {
-    D("%s", dwfl_errmsg(-1));
-    return DWARF_CB_ABORT;
-  }
-
-  report_module(us, pc);
+(void)us;
+  Dwarf_Addr pc = 0;
+  bool isactivation = false;
 
   if (!dwfl_frame_pc(state, &pc, &isactivation)) {
     D("%s", dwfl_errmsg(-1));
+EGR;
     return DWARF_CB_ABORT;
   }
 
-  if (!isactivation)
-    --pc;
+  Dwarf_Addr newpc = pc - !!isactivation;
 
-  // Store the pc for later
-  us->ips[us->idx++] = pc;
+  Dwfl_Thread *thread = dwfl_frame_thread(state);
+  if (!thread) {
+    D("dwfl_frame_thread was zero: (%s)", dwfl_errmsg(-1));
+  }
+  Dwfl *dwfl = dwfl_thread_dwfl(thread);
+  if (!dwfl) {
+    D("dwfl_thread_dwfl was zero: (%s)", dwfl_errmsg(-1));
+  }
+  Dwfl_Module *mod = dwfl_addrmodule(dwfl, newpc);
+  const char * symname = NULL;
+
+  // Now we register
+  if (mod) {
+    symname = dwfl_module_addrinfo(mod, newpc, &goff, &gsym, &shndxp);
+
+// TODO
+    us->locs[us->idx].ip = pc;
+    us->locs[us->idx].map_start = ;
+    us->locs[us->idx].map_end= ;
+    us->locs[us->idx].map_off= ;
+    us->locs[us->idx].funname = ;
+    us->locs[us->idx].srcpath = ;
+    us->locs[us->idx].sopath = ;
+    printf ("0x%lx -- %s\n", pc, symname);
+  } else {
+    D("dwfl_addrmodule was zero: (%s)", dwfl_errmsg(-1));
+  }
+EGR;
   return DWARF_CB_OK;
 }
 
-int unwindstate__unwind(struct UnwindState *us, struct FunLoc *locs) {
+
+int tid_cb(Dwfl_Thread *thread, void* targ) {
+IGR;
+  dwfl_thread_getframes (thread, frame_cb, targ);
+EGR;
+  return DWARF_CB_OK;
+}
+
+int unwindstate__unwind(struct UnwindState *us) {
+IGR;
   static const Dwfl_Thread_Callbacks dwfl_callbacks = {
     .next_thread = next_thread,
     .memory_read = memory_read,
     .set_initial_registers = set_initial_registers,
   };
-  int max_stack = us->max_stack;
-  uint64_t ips[us->max_stack];
-  us->ips = ips;
   memset(us->ips, 0, sizeof(uint64_t)*us->max_stack);
+  memset(us->locs, 0, sizeof(uint64_t)*us->max_stack);
 
   // Initialize ELF
   D("Gonna unwind at %d (my PID is %d)\n", us->pid, getpid());
   elf_version(EV_CURRENT);
 
-  if (!(us->dwfl = dwfl_start())) {
+  // TODO, probably need to cache this on a pid-by-pid basis
+  if (!us->dwfl && !(us->dwfl = dwfl_start())) {
     D("There was a problem getting the Dwfl");
+EGR;
     return -1;
   }
 
-  us->ips[us->idx++] = us->eip;
-  if(report_module(us, *us->ips)) {
+  if(dwfl_linux_proc_report(us->dwfl, us->pid)) {
     D("There was a problem reporting the module.");
+EGR;
     return -1;
   }
 
-  // TODO, thread-level?
-  if (!dwfl_attach_state(us->dwfl, EM_NONE, us->pid, &dwfl_callbacks, us)) {
+  if (dwfl_report_end(us->dwfl, NULL, NULL)) {
+    D("dwfl_end was nonzero (%s)", dwfl_errmsg(-1));
+EGR;
+    return -1;
+  }
+
+  if (!dwfl_attach_state(us->dwfl, NULL, us->pid, &dwfl_callbacks, us)) {
     D("Could not attach.");
+EGR;
     return -1;
   }
 
-  if (dwfl_getthread_frames(us->dwfl, us->pid, frame_cb, us) && us->max_stack != max_stack) {
+  if (dwfl_getthreads(us->dwfl, tid_cb, us)) {
     D("Could not get thread frames.");
+EGR;
     return -1;
   }
 
@@ -227,8 +298,9 @@ int unwindstate__unwind(struct UnwindState *us, struct FunLoc *locs) {
   for(uint64_t i=1; i<us->idx; i++) {
     printf("   0x%lx\n", us->ips[i]);
   }
-
   dwfl_end(us->dwfl);
+
+EGR;
   return 0;
 }
 

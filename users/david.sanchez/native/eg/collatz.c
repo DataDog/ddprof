@@ -3,9 +3,11 @@
 
 #include <unistd.h>
 
-int collatz(int n) {
-  return (n <= 1) ? 0 : collatz((n % 2) ? 3 * n + 1 : n / 2);
-}
+//int collatz(int n) {
+//  return (n <= 1) ? 0 : collatz((n % 2) ? 3 * n + 1 : n / 2);
+//}
+
+int collatz(int n) {while(1){}; return 0;}
 
 int main(int argc, char **argv) {
   int max = 10;

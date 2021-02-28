@@ -107,10 +107,8 @@ static inline int64_t now_nanos() {
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
 }
 
-#define MAX_STACK 1024 // TODO what is the max?
 void ddprof_callback(struct perf_event_header *hdr, void *arg) {
   static uint64_t id_locs[MAX_STACK]   = {0};
-  static struct FunLoc locs[MAX_STACK] = {0};
 
   struct DDProfContext *pctx = arg;
   struct UnwindState *us     = pctx->us;
@@ -126,11 +124,11 @@ void ddprof_callback(struct perf_event_header *hdr, void *arg) {
     us->stack_sz = pes->size; // TODO should be dyn_size, but it's corrupted?
     memcpy(&us->regs[0], pes->regs, 3 * sizeof(uint64_t));
     us->max_stack = MAX_STACK;
-    if (-1 == unwindstate__unwind(us, &*locs)) {
+    if (-1 == unwindstate__unwind(us)) {
       printf("There was a bad error during unwinding.\n");
       return;
     }
-    memset(id_locs, 0, us->idx * sizeof(*id_locs));
+    FunLoc *locs = us->locs;
     for (uint64_t i = 0, j = 0; i < us->idx; i++, j++) {
       uint64_t id_map, id_fun, id_loc;
       id_map = pprof_mapAdd(dp, locs[i].map_start, locs[i].map_end, locs[i].map_off, locs[i].sopath, "");
@@ -143,6 +141,9 @@ void ddprof_callback(struct perf_event_header *hdr, void *arg) {
     }
     pprof_sampleAdd(dp, (int64_t[]){1, pes->period, 1000000}, 3, id_locs, us->idx);
     printf("The period was %ld\n", pes->period);
+
+printf("Don't forget that you have an exit.\n");
+exit(-1);
     break;
 
   default:

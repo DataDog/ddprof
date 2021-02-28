@@ -11,7 +11,7 @@ ANALYZER :=
 CC := gcc-10
 CC := clang-11
 LDFLAGS += -L/home/sanchda/dev/libunwind/src/.libs
-LDLIBS := -lunwind -lprotobuf-c -lz -lpthread -lelf -lbfd -llzma
+LDLIBS := -lprotobuf-c -lz -lpthread -lelf -lbfd -llzma -ldl 
 UNWLIBS := $(LIBUNWIND)/src/.libs/libunwind-x86_64.a $(LIBUNWIND)/src/.libs/libunwind.a
 ELFLIBS := $(ELFUTILS)/libdwfl/libdwfl.a $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libebl/libebl.a
 SRC := src/string_table.c src/profile.pb-c.c src/pprof.c src/http.c src/dd_send.c src/append_string.c
@@ -29,7 +29,8 @@ endif
 
 # -DD_UWDBG is useful here, just set the UNW_DEBUG_LEVEL environment variable
 dd-prof: src/dd-prof.c $(SRC) $(ELFLIBS)
-	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DD_UNWDBG -fsanitize=address $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
+	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DD_UNWDBG $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
+#	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DD_UNWDBG -fsanitize=address $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 #	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -fsanitize=undefined $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 #	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DD_UWDBG $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 
