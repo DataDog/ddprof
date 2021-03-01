@@ -53,53 +53,17 @@ struct UnwindState {
 #define D(...) do{}while(0);
 #endif
 
-int indent = 0;
-#define IGR D("\n%*s",(indent+=2),">")
-#define EGR D("\n%*s",(indent-=2)+2,"<")
-
-int debuginfo_get(Dwfl_Module *mod, void **arg, const char *modname,
-                  Dwarf_Addr base, const char *file_name,
-                  const char*debuglink_file, GElf_Word debuglink_crc,
-                  char **debuginfo_file_name) {
-(void)mod;
-(void)arg;
-(void)modname;
-(void)base;
-(void)file_name;
-(void)debuglink_file;
-(void)debuglink_crc;
-(void)debuginfo_file_name;
-  // This is a big TODO
-  return -1;
-}
-
-Dwfl* dwfl_start() {
-IGR;
-  static char *debuginfo_path;
-  static const Dwfl_Callbacks proc_callbacks = {
-    .find_debuginfo = dwfl_standard_find_debuginfo,  // TODO, update this for containers?
-    .debuginfo_path = &debuginfo_path,
-    .find_elf = dwfl_linux_proc_find_elf,
-  };
-EGR;
-  return dwfl_begin(&proc_callbacks);
-}
-
 pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
 (void)dwfl;
-IGR;
   if (*thread_argp != NULL) {
-EGR;
     return 0;
 }
   struct UnwindState* us = arg;
   *thread_argp = arg;
-EGR;
   return us->pid;
 }
 
 bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
-IGR;
   struct UnwindState *us = arg;
   Dwarf_Word regs[17] = {0};
 
@@ -108,13 +72,11 @@ IGR;
   regs[7] = us->esp;
   regs[16] = us->eip;
 
-EGR;
   return dwfl_thread_state_registers(thread, 0, 17, regs);
 }
 
 bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg) {
 (void)dwfl;
-IGR;
   struct UnwindState *us = arg;
 
   uint64_t sp_start = us->esp;
@@ -122,7 +84,6 @@ IGR;
 
   // Check for overflow, like perf
   if (addr + sizeof(Dwarf_Word) < addr) {
-EGR;
     return false;
   }
 
@@ -139,33 +100,26 @@ EGR;
     // like perf will do anything to try to correct the address.
     // TODO verify?
     if(!map) {
-EGR;
       return false;
     }
 
     if (-1 == procfs_MapRead(map, result, sizeof(Dwarf_Word), addr)) {
-EGR;
       return false;
     }
-EGR;
     return true;
   }
 
   *result = *(Dwarf_Word *)(&us->stack[addr - sp_start]);
-EGR;
   return true;
 }
 
 int frame_cb(Dwfl_Frame *state, void *arg) {
-IGR;
   struct UnwindState* us = arg;
-(void)us;
   Dwarf_Addr pc = 0;
   bool isactivation = false;
 
   if (!dwfl_frame_pc(state, &pc, &isactivation)) {
     D("%s", dwfl_errmsg(-1));
-EGR;
     return DWARF_CB_ABORT;
   }
 
@@ -205,24 +159,26 @@ EGR;
   } else {
     D("dwfl_addrmodule was zero: (%s)", dwfl_errmsg(-1));
   }
-EGR;
   return DWARF_CB_OK;
 }
 
 
 int tid_cb(Dwfl_Thread *thread, void* targ) {
-IGR;
   dwfl_thread_getframes (thread, frame_cb, targ);
-EGR;
   return DWARF_CB_OK;
 }
 
 int unwindstate__unwind(struct UnwindState *us) {
-IGR;
   static const Dwfl_Thread_Callbacks dwfl_callbacks = {
     .next_thread = next_thread,
     .memory_read = memory_read,
     .set_initial_registers = set_initial_registers,
+  };
+  static char *debuginfo_path;
+  static const Dwfl_Callbacks proc_callbacks = {
+    .find_debuginfo = dwfl_standard_find_debuginfo,  // TODO, update this for containers?
+    .debuginfo_path = &debuginfo_path,
+    .find_elf = dwfl_linux_proc_find_elf,
   };
   for (int i=0; i<MAX_STACK; i++) {
     if(us->locs[i].funname) free(us->locs[i].funname);
@@ -236,43 +192,38 @@ IGR;
   elf_version(EV_CURRENT);
 
   // TODO, probably need to cache this on a pid-by-pid basis
-  if (!us->dwfl && !(us->dwfl = dwfl_start())) {
+  if (!us->dwfl && !(us->dwfl = dwfl_begin(&proc_callbacks))) {
     D("There was a problem getting the Dwfl");
-EGR;
     return -1;
   }
 
   if(dwfl_linux_proc_report(us->dwfl, us->pid)) {
     D("There was a problem reporting the module.");
-EGR;
     return -1;
   }
 
+// TODO, all of this needs to go in a PID cache, until then we're not going
+//      to cleanup since it doesn't matter
 //  if (dwfl_report_end(us->dwfl, NULL, NULL)) {
 //    D("dwfl_end was nonzero (%s)", dwfl_errmsg(-1));
-//EGR;
 //    return -1;
 //  }
 
   if (!dwfl_attach_state(us->dwfl, NULL, us->pid, &dwfl_callbacks, us)) {
+//    TODO, same as above, no reason to care if attaching fails since we
+//          never detach and the first time always seems to work so far.
 //    D("Could not attach (%s)", dwfl_errmsg(-1));
-EGR;
 //    return -1;
   }
 
   if (dwfl_getthreads(us->dwfl, tid_cb, us)) {
     D("Could not get thread frames.");
-EGR;
     return -1;
   }
 
-  printf(" * 0x%lx%*s\n", us->locs[0].ip,20,us->locs[0].funname);
-  for(uint64_t i=1; i<us->idx; i++) {
-    printf("   0x%lx%*s\n", us->locs[i].ip,20,us->locs[i].funname);
-  }
+  // TODO same as above
   //dwfl_end(us->dwfl);
 
-EGR;
   return 0;
 }
 
