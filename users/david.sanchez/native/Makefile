@@ -73,7 +73,7 @@ strings: eg/strings.c src/string_table.c
 dictionary: eg/dict.c src/string_table.c src/dictionary.c
 	$(CC) -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
 
-unwind2: eg/unwind2.c $(ELFLIBS)
+unwind: eg/unwind.c $(ELFLIBS)
 	$(CC) -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DD_UNWDBG $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS) -ldl
 
 all: dd-prof http perf pprof collatz ddog

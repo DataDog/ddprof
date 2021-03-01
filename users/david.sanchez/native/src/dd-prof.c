@@ -11,7 +11,7 @@
 #include "http.h"
 #include "perf.h"
 #include "pprof.h"
-#include "unwind2.h"
+#include "unwind.h"
 
 struct DDProfContext {
   DProf *dp;
