@@ -44,10 +44,14 @@ struct UnwindState {
   uint64_t idx;
 };
 
+#ifdef D_UNWDBG
 #define D(...) \
   fprintf(stderr, "<%s:%d> ", __FUNCTION__, __LINE__); \
   fprintf(stderr, __VA_ARGS__); \
   fprintf(stderr, "\n")
+#else
+#define D(...) do{}while(0);
+#endif
 
 int indent = 0;
 #define IGR D("\n%*s",(indent+=2),">")
@@ -79,49 +83,6 @@ IGR;
   };
 EGR;
   return dwfl_begin(&proc_callbacks);
-}
-
-int report_module(struct UnwindState *us, uint64_t ip) {
-IGR;
-  Dwfl_Module *mod;
-  Map* map = procfs_MapMatch(us->pid, ip);
-  if(!map) {
-    D("Could not get the map for this process!");
-EGR;
-    return -1;
-  }
-
-D("Map: %s [%ld - %ld] - %ld", map->path, map->start, map->end, ip);
-
-  if ((mod = dwfl_addrmodule(us->dwfl, ip))) {
-    D("That worked!");
-    Dwarf_Addr s;
-    void **userdatap;
-    dwfl_module_info(mod, &userdatap, &s, NULL, NULL, NULL, NULL, NULL);
-    *userdatap = map;
-    if (s != map->start - map->off) {
-      D("Something didn't match. %ld != %ld - %ld", s, map->start, map->off);
-    }
-
-  }
-
-  if (!mod) {
-    char* name = strdup(strrchr(map->path, '/')+1);
-    mod = dwfl_report_elf(us->dwfl, name, map->path, -1, map->start - map->off, false);
-    free(name);
-    if (!mod) {
-    }
-  }
-
-  if (!mod) {
-    // TODO this is where I would put my build-id failover IF I HAD ONE
-    D("This is awful, I couldn't report elf: %s", dwfl_errmsg(-1));
-EGR;
-    return -1;
-  }
-
-EGR;
-  return mod && dwfl_addrmodule(us->dwfl, ip) == mod ? 0 : -1;
 }
 
 pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
@@ -223,17 +184,24 @@ EGR;
 
   // Now we register
   if (mod) {
-    symname = dwfl_module_addrinfo(mod, newpc, &goff, &gsym, &shndxp);
+    GElf_Off offset = {0};
+    GElf_Sym sym = {0};
+    GElf_Word shndxp = {0};
+    Elf *elfp = NULL;
+    Dwarf_Addr bias = {0};
+
+    symname = dwfl_module_addrinfo(mod, newpc, &offset, &sym, &shndxp, &elfp, &bias);
 
 // TODO
     us->locs[us->idx].ip = pc;
-    us->locs[us->idx].map_start = ;
-    us->locs[us->idx].map_end= ;
-    us->locs[us->idx].map_off= ;
-    us->locs[us->idx].funname = ;
-    us->locs[us->idx].srcpath = ;
-    us->locs[us->idx].sopath = ;
-    printf ("0x%lx -- %s\n", pc, symname);
+    us->locs[us->idx].map_start = mod->low_addr;
+    us->locs[us->idx].map_end = mod->high_addr;;
+    us->locs[us->idx].map_off= offset;
+    us->locs[us->idx].funname = strdup(symname ? symname : "??");
+//    us->locs[us->idx].srcpath = ;
+    char* sname = strrchr(mod->name, '/');
+    us->locs[us->idx].sopath = strdup(sname ? sname+1 : mod->name);
+    us->idx++;
   } else {
     D("dwfl_addrmodule was zero: (%s)", dwfl_errmsg(-1));
   }
@@ -256,7 +224,11 @@ IGR;
     .memory_read = memory_read,
     .set_initial_registers = set_initial_registers,
   };
-  memset(us->ips, 0, sizeof(uint64_t)*us->max_stack);
+  for (int i=0; i<MAX_STACK; i++) {
+    if(us->locs[i].funname) free(us->locs[i].funname);
+    if(us->locs[i].sopath) free(us->locs[i].sopath);
+    if(us->locs[i].srcpath) free(us->locs[i].srcpath);
+  }
   memset(us->locs, 0, sizeof(uint64_t)*us->max_stack);
 
   // Initialize ELF
@@ -276,16 +248,16 @@ EGR;
     return -1;
   }
 
-  if (dwfl_report_end(us->dwfl, NULL, NULL)) {
-    D("dwfl_end was nonzero (%s)", dwfl_errmsg(-1));
-EGR;
-    return -1;
-  }
+//  if (dwfl_report_end(us->dwfl, NULL, NULL)) {
+//    D("dwfl_end was nonzero (%s)", dwfl_errmsg(-1));
+//EGR;
+//    return -1;
+//  }
 
   if (!dwfl_attach_state(us->dwfl, NULL, us->pid, &dwfl_callbacks, us)) {
-    D("Could not attach.");
+//    D("Could not attach (%s)", dwfl_errmsg(-1));
 EGR;
-    return -1;
+//    return -1;
   }
 
   if (dwfl_getthreads(us->dwfl, tid_cb, us)) {
@@ -294,11 +266,11 @@ EGR;
     return -1;
   }
 
-  printf(" * 0x%lx\n", us->ips[0]);
+  printf(" * 0x%lx%*s\n", us->locs[0].ip,20,us->locs[0].funname);
   for(uint64_t i=1; i<us->idx; i++) {
-    printf("   0x%lx\n", us->ips[i]);
+    printf("   0x%lx%*s\n", us->locs[i].ip,20,us->locs[i].funname);
   }
-  dwfl_end(us->dwfl);
+  //dwfl_end(us->dwfl);
 
 EGR;
   return 0;

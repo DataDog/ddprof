@@ -141,9 +141,6 @@ void ddprof_callback(struct perf_event_header *hdr, void *arg) {
     }
     pprof_sampleAdd(dp, (int64_t[]){1, pes->period, 1000000}, 3, id_locs, us->idx);
     printf("The period was %ld\n", pes->period);
-
-printf("Don't forget that you have an exit.\n");
-exit(-1);
     break;
 
   default:
