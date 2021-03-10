@@ -5,5 +5,5 @@ LOCAL_DIR=${HOME}/dev/native
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 
 for f in $(cat ${SCRIPT_DIR}/mapping.txt); do
-  vmdiff -c wqa! ${REMOTE_DIR}/${f} ${LOCAL_DIR}/${f}
+  vimdiff ${REMOTE_DIR}/${f} ${LOCAL_DIR}/${f}
 done
