@@ -103,10 +103,8 @@ bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg) {
       return false;
     }
 
-    if (-1 == procfs_MapRead(map, result, sizeof(Dwarf_Word), addr)) {
-      return false;
-    }
-    return true;
+    // TODO, signify end of stack?  dd false stack?
+    return -1 != procfs_MapRead(map, result, sizeof(Dwarf_Word), addr);
   }
 
   *result = *(Dwarf_Word *)(&us->stack[addr - sp_start]);

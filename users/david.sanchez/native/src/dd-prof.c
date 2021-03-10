@@ -69,22 +69,22 @@ struct DDProfContext {
 #define X_CASE(a, b, c, d, e, f, g) case *#c: (e)->b = optarg; break;
 #define X_PRNT(a, b, c, d, e, f, g) printf(#b ": %s\n", (e)->b);
 
-//  A                            B               C  D  E         F     G
-#define OPT_TABLE(X)                                                                \
-  X(DD_API_KEY,                  apikey,         A, 1, ctx->ddr, NULL, NULL)        \
-  X(DD_ENV,                      environment,    E, 1, ctx->ddr, NULL, "dev")       \
-  X(DD_AGENT_HOST,               agent_host,     H, 1, ctx,      NULL, "localhost") \
-  X(DD_SITE,                     site,           I, 1, ctx->ddr, NULL, NULL)        \
-  X(DD_HOST_OVERRIDE,            host,           N, 1, ctx->ddr, NULL, "localhost") \
-  X(DD_TRACE_AGENT_PORT,         port,           P, 1, ctx->ddr, NULL, "8081")      \
-  X(DD_SERVICE,                  service,        S, 1, ctx->ddr, NULL, "my_profiled_service") \
-  X(DD_TAGS,                     tags,           T, 1, ctx,      NULL, NULL)        \
-  X(DD_PROFILING_UPLOAD_TIMEOUT, upload_timeout, U, 1, ctx,      NULL, "10")        \
-  X(DD_VERSION,                  profiler_version,V,1, ctx->ddr, NULL, "0.0")       \
-  X(DD_PROFILING_ENABLED,        enabled,        e, 1, ctx,      NULL, "yes")       \
-  X(DD_PROFILING_NATIVE_RATE,    sample_rate,    r, 1, ctx,      NULL, "1000")      \
-  X(DD_PROFILING_UPLOAD_PERIOD,  upload_period,  u, 1, ctx,      NULL, "60")        \
-  X(DD_PROFILING_,               prefix,         X, 1, ctx,      NULL, "")
+//  A                            B                C  D  E         F     G
+#define OPT_TABLE(X)                                                                 \
+  X(DD_API_KEY,                  apikey,          A, 1, ctx->ddr, NULL, NULL)        \
+  X(DD_ENV,                      environment,     E, 1, ctx->ddr, NULL, NULL)        \
+  X(DD_AGENT_HOST,               agent_host,      H, 1, ctx,      NULL, "localhost") \
+  X(DD_SITE,                     site,            I, 1, ctx->ddr, NULL, NULL)        \
+  X(DD_HOST_OVERRIDE,            host,            N, 1, ctx->ddr, NULL, "localhost") \
+  X(DD_TRACE_AGENT_PORT,         port,            P, 1, ctx->ddr, NULL, "8081")      \
+  X(DD_SERVICE,                  service,         S, 1, ctx->ddr, NULL, "my_profiled_service") \
+  X(DD_TAGS,                     tags,            T, 1, ctx,      NULL, NULL)        \
+  X(DD_PROFILING_UPLOAD_TIMEOUT, upload_timeout,  U, 1, ctx,      NULL, "10")        \
+  X(DD_VERSION,                  profiler_version,V, 1, ctx->ddr, NULL, NULL)        \
+  X(DD_PROFILING_ENABLED,        enabled,         e, 1, ctx,      NULL, "yes")       \
+  X(DD_PROFILING_NATIVE_RATE,    sample_rate,     r, 1, ctx,      NULL, "1000")      \
+  X(DD_PROFILING_UPLOAD_PERIOD,  upload_period,   u, 1, ctx,      NULL, "60")        \
+  X(DD_PROFILING_,               prefix,          X, 1, ctx,      NULL, "")
 // clang-format off
 
 #define DFLT_EXP(evar, key, targ, func, dfault)                                \
@@ -110,6 +110,10 @@ static inline int64_t now_nanos() {
 void ddprof_callback(struct perf_event_header *hdr, void *arg) {
   static uint64_t id_locs[MAX_STACK]   = {0};
 
+  // TODO this time stuff needs to go into the struct
+  static int64_t last_time = 0;
+  if(!last_time) last_time = now_nanos();
+
   struct DDProfContext *pctx = arg;
   struct UnwindState *us     = pctx->us;
   DDReq *ddr                 = pctx->ddr;
@@ -125,7 +129,7 @@ void ddprof_callback(struct perf_event_header *hdr, void *arg) {
     memcpy(&us->regs[0], pes->regs, 3 * sizeof(uint64_t));
     us->max_stack = MAX_STACK;
     if (-1 == unwindstate__unwind(us)) {
-      printf("There was a bad error during unwinding.\n");
+      printf("There was a bad error during unwinding (0x%lx).\n", us->eip);
       return;
     }
     FunLoc *locs = us->locs;
@@ -138,9 +142,11 @@ void ddprof_callback(struct perf_event_header *hdr, void *arg) {
         id_locs[j] = id_loc;
       else
         j--;
+
+//      printf("   %s\n", locs[i].funname);
     }
-    pprof_sampleAdd(dp, (int64_t[]){1, pes->period, 1000000}, 3, id_locs, us->idx);
-    printf("The period was %ld\n", pes->period);
+    int64_t this_time = now_nanos();
+    pprof_sampleAdd(dp, (int64_t[]){1, pes->period, this_time-last_time}, 3, id_locs, us->idx);
     break;
 
   default:
@@ -163,6 +169,9 @@ void ddprof_callback(struct perf_event_header *hdr, void *arg) {
       printf("Got an error (%s)\n", DDR_code2str(ret));
     DDR_clear(ddr);
     pctx->send_nanos += pctx->sample_sec*1000000000;
+
+    // Prepare pprof for next window
+    pprof_timeUpdate(dp);
   }
 }
 
@@ -199,16 +208,15 @@ int main(int argc, char **argv) {
   int c = 0, oi = 0;
   struct DDProfContext *ctx =
       &(struct DDProfContext){.ddr        = &(DDReq){.apikey = "1c77adb933471605ccbe82e82a1cf5cf",
-                                                     .profiler_version = "v0.1",
-                                                     .runtime_os = "linux-x86_64",
                                                      .host = "localhost",
                                                      .port = "10534",
                                                      .user_agent = "Native-http-client/0.1",
                                                      .language = "native",
-                                                     .runtime = "native"},
+                                                     .family = "native"},
+//                                                     .runtime = "native"},
                               .dp         = &(DProf){0},
                               .us         = &(struct UnwindState){0},
-                              .sample_sec = 2.0};
+                              .sample_sec = 5.0};
   DDReq *ddr = ctx->ddr;
   DDR_init(ddr);
 
@@ -246,15 +254,16 @@ int main(int argc, char **argv) {
   }
 
   // Adjust input parameters for execvp()
-  argv += optind - 1;
-  argc -= optind;
+printf("HEY DUMMY, REMEMBER TO FIX THE OPTARG STUFF!\n");
+//  argv += optind - 1;
+//  argc -= optind;
 
   /****************************************************************************\
   |                             Run the Profiler                               |
   \****************************************************************************/
   // Initialize the pprof
   pprof_Init(ctx->dp, (const char **)&(const char *[]){"samples", "cpu-time", "wall-time"},
-             (const char **)&(const char *[]){"count", "nanoseconds", "nanoseconds"}, 2);
+             (const char **)&(const char *[]){"count", "nanoseconds", "nanoseconds"}, 3);
   pprof_timeUpdate(ctx->dp); // Set the time
 
   // Set the CPU affinity so that everything is on the same CPU.  Scream about

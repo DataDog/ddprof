@@ -55,7 +55,6 @@ typedef struct PEvent {
 #define u32 uint32_t
 #define u16 uint16_t
 #define u8 uint8_t
-#define bool char
 #define MAX_INSN 16
 typedef struct read_format {
   u64 value;        // The value of the event
@@ -193,13 +192,15 @@ struct perf_event_attr g_dd_native_attr = {
         PERF_SAMPLE_PERIOD,
     .precise_ip = 2, // Change this when moving from SW->HW clock
     .disabled = 0,
-    .inherit = 1,
+    .inherit = 0,  // TODO temp
     .inherit_stat = 1,
-    .mmap = 1, // keep track of executable mappings
-    .task = 1, // Follow fork/stop events
+    .mmap = 0, // keep track of executable mappings
+    .task = 0, // Follow fork/stop events
     .enable_on_exec = 1,
     .sample_stack_user = PERF_SAMPLE_STACK_SIZE, // Is this an insane default?
     .sample_regs_user = PERF_REGS_MASK,
+    .exclude_kernel = 1,
+    .exclude_hv = 1,
     //    .read_format    = //PERF_FORMAT_TOTAL_TIME_ENABLED |
     //                      PERF_FORMAT_TOTAL_TIME_RUNNING,
     //    .exclude_kernel = 1,                        // For a start
@@ -257,9 +258,11 @@ char perfopen(pid_t pid, PEvent *pe, struct perf_event_attr *attr) {
 }
 
 void default_callback(struct perf_event_header *hdr, void *arg) {
-  (void)arg; // no idea how to use this!
   struct perf_event_sample *pes;
   struct perf_event_mmap *pem;
+  (void)arg;
+  (void)pes;
+  (void)pem;
   switch (hdr->type) {
   case PERF_RECORD_SAMPLE:
     pes = (struct perf_event_sample *)hdr;

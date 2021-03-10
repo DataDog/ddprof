@@ -64,17 +64,20 @@ extern const char *DDRC_table[];
   X(ACCEPT,          accept,           1, "Accept",           0, "*/*")        \
   X(APIKEY,          apikey,           1, "DD-API-KEY",       0, NULL)         \
   X(ACCEPTENCODING,  accept_encoding,  0, "Accept-Encoding",  0, "gzip")       \
-  X(RECORDINGSTART,  recording_start,  2, "recording-start",  0, NULL)         \
-  X(RECORDINGEND,    recording_end,    2, "recording-end",    0, NULL)         \
+  X(RECORDINGSTART,  start,            2, "start",            0, NULL)         \
+  X(RECORDINGEND,    end,              2, "end",              0, NULL)         \
   X(HOSTTAG,         host_tag,         3, "host",             1, "localhost")  \
   X(SERVICE,         service,          3, "service",          0, "myservice")  \
-  X(SITE,            site,             3, "site",             0, NULL)         \
   X(LANGUAGE,        language,         3, "language",         1, "ILLEGAL")    \
-  X(RUNTIME,         runtime,          2, "runtime",          1, "ILLEGAL")    \
+  X(SITE,            site,             3, "site",             0, NULL)         \
   X(ENVIRONMENT,     environment,      3, "environment",      0, "prod-test")  \
   X(PROFILERVERSION, profiler_version, 3, "profiler-version", 0, NULL)         \
-  X(RUNTIMEOS,       runtime_os,       0, "runtime-os",       0, NULL)
+  X(RUNTIMEOS,       runtime_os,       0, "runtime-os",       0, NULL)         \
+  X(INTAKEVERSION,   intake_version,   2, "version",          0, "3")          \
+  X(FAMILY,          family,           2, "family",           0, "unknown")
 // clang-format on
+
+//  X(RUNTIME,         runtime,          2, "runtime",          1, "ILLEGAL")
 
 typedef enum DDRVals {
   DDR_PARAMS(DDRP_ENUM) DDR_VAL_LEN,

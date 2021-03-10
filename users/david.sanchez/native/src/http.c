@@ -97,10 +97,20 @@ int HttpSend(HttpReq *req, const void *payload, size_t sz_payload) {
                            (const char *)req->port)))
       return ret;
 
-  while (-1 == (ret = send(req->conn->fd, payload, sz_payload, MSG_DONTWAIT)))
+  while (-1 == (ret = send(req->conn->fd, payload, sz_payload, MSG_DONTWAIT | MSG_NOSIGNAL)))
     if (errno == EAGAIN) {
       req->conn->state = HCS_SENDREC;
       return HTTP_ESUCCESS;
+    } else if (errno == EPIPE) {
+      // Although the spec dictates what servers *should* do when keeping the
+      // connection is opened is specified, we need to handle SIGPIPE anyway, so
+      // rather than relying on the header, let's rely on the dynamic behavior
+      // of the server
+      req->conn->state = HCS_INIT;
+      close(req->conn->fd);
+      req->conn->fd = -1;
+      if ((ret = HttpConnect(req->conn, (const char *)req->host, (const char*)req->port)))
+        return ret;
     } else if (errno != EINTR) {
       return ret;
     }
@@ -192,13 +202,17 @@ ssize_t HttpResRecv(HttpRes *res) {
   // If this recv() was interrupted by a signal, do it over again
   while (true) {
     if (-1 ==
-        (n = recv(res->conn->fd, &A->str[A->n], A->sz - A->n, MSG_DONTWAIT))) {
+        (n = recv(res->conn->fd, &A->str[A->n], A->sz - A->n, MSG_DONTWAIT | MSG_NOSIGNAL))) {
       if (errno == EWOULDBLOCK) {
         // -1 return with ewouldblock means there's no data to read
         return 0;
       } else if (errno == EINTR) {
         continue;
       } else {
+        // Whatever happened is bad news for us; shut the connection down
+        close(res->conn->fd);
+        res->conn->fd = -1;
+        res->conn->state = HCS_INIT;
         return -1;
       }
     }

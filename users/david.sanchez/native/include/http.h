@@ -42,7 +42,7 @@ typedef enum HTTP_RET {
 typedef struct HttpConn {
   int fd;                // The file descriptor underneath this connection
   HttpConnState state;   // socket rather than HTTP
-  char mode;             // 0 - async, 1 - forced sync (blocking)tt
+  char mode;             // 0 - async, 1 - forced sync (blocking)
   struct addrinfo *addr; // cache
   bool addr_cached;
 } HttpConn;
