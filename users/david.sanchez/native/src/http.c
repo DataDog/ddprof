@@ -58,9 +58,17 @@ bool SocketSetNonblocking(int fd, bool is_nonblocking) {
 /********************************  HTTP Stuff  ********************************/
 int HttpConnect(HttpConn *conn, const char *host, const char *port) {
   // The underlying machinery is a bit permissive, so these NULL pointers may
-  // not bubble up during debuggin
+  // not bubble up during debugging
   assert(host);
   assert(port);
+
+  // If the connection state is new, then initialize it
+  // TODO, if the HttpReq object ever gets an initializer, then let's just
+  //       set this there.
+  if (conn->state == HCS_FRESH) {
+    conn->fd = -1;
+    conn->state = HCS_INIT;
+  }
 
   // If we are trying to connect but we're already connected, don't connect.
   if (conn->state == HCS_CONNECTED || conn->state == HCS_SENDREC)
@@ -76,8 +84,9 @@ int HttpConnect(HttpConn *conn, const char *host, const char *port) {
   }
 
   // Cleanup potential old sockets
-  if (-1 != conn->fd)
+  if (-1 != conn->fd) {
     close(conn->fd), conn->fd = -1;
+  }
 
   // We have a valid Addr, now connect
   if (-1 == (conn->fd = TcpSockNew()))

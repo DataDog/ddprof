@@ -19,7 +19,7 @@ bool SocketSetNonblocking(int, bool);
 \******************************************************************************/
 /*****************************  HTTP Connection  ******************************/
 typedef enum HttpConnState {
-  HCS_FREE,
+  HCS_FRESH,
   HCS_INIT,
   HCS_CONNECTED,
   HCS_SENDREC,
