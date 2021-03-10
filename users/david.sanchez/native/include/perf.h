@@ -184,15 +184,15 @@ struct perf_event_attr g_dd_native_attr = {
     .type = PERF_TYPE_SOFTWARE,
     .config = PERF_COUNT_SW_TASK_CLOCK, // If it's good enough for perf(1), it's
                                         // good enough for me!
-    .sample_period  = 10000000,         // Who knows!
-//    .sample_freq = 1000,
-//    .freq = 1,
+    .sample_period = 10000000,          // Who knows!
+                                        //    .sample_freq = 1000,
+                                        //    .freq = 1,
     .sample_type = PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER |
         PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME |
         PERF_SAMPLE_PERIOD,
     .precise_ip = 2, // Change this when moving from SW->HW clock
     .disabled = 0,
-    .inherit = 0,  // TODO temp
+    .inherit = 0, // TODO temp
     .inherit_stat = 1,
     .mmap = 0, // keep track of executable mappings
     .task = 0, // Follow fork/stop events

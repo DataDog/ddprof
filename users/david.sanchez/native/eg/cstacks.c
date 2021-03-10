@@ -27,14 +27,13 @@ void backtrace() {
     else
       printf("-- no symbol name found\n");
 
-
     // TODO - right now we're only interested in the top frame
     break;
   }
 }
 
 int cmp() {
-  if(local) {
+  if (local) {
     procfs_PidMapPrintProc(getpid());
     backtrace();
     return 0;
@@ -53,7 +52,7 @@ int foo() {
   return 0;
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   Map *map;
   hackptr foo_ptr = {.fun = (void (*)(void))foo};
   map = procfs_MapMatch(0, foo_ptr.num);
@@ -64,7 +63,7 @@ int main(int argc, char** argv) {
   printf("bar: 0x%lx, 0x%lx, 0x%lx, 0x%lx\n", bar_ptr.num, map->start, map->end,
          map->off);
 
-  if(argc > 1 && 'L' == *argv[1]) {
+  if (argc > 1 && 'L' == *argv[1]) {
     printf("Running in local mode\n");
     local = 1;
   }

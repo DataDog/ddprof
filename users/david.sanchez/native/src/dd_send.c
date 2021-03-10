@@ -85,7 +85,8 @@ int DDR_push(DDReq *req, const char *disposition, const char *type,
 
 // Allocation can fail, so have to return state
 int DDR_pprof(DDReq *req, DProf *dp) {
-  static char pprof_disp[] = "name=\"data[auto.pprof]\"; filename=\"auto.pb.gz\"";
+  static char pprof_disp[] =
+      "name=\"data[auto.pprof]\"; filename=\"auto.pb.gz\"";
   static char pprof_type[] = "application/octet-stream";
 
   // Extract the value information
@@ -138,8 +139,8 @@ void DDR_setTimeNano(DDReq *req, int64_t ti, int64_t tf) {
   strftime(time_start, 128, "%Y-%m-%dT%H:%M:%SZ", tm_start);
   strftime(time_end, 128, "%Y-%m-%dT%H:%M:%SZ", tm_end);
 
-  DDR_push(req, "name=\"start\"", NULL,
-           (const unsigned char *)time_start, strlen(time_start));
+  DDR_push(req, "name=\"start\"", NULL, (const unsigned char *)time_start,
+           strlen(time_start));
   DDR_push(req, "name=\"end\"", NULL, (const unsigned char *)time_end,
            strlen(time_end));
 }

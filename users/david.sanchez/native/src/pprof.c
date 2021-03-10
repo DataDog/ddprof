@@ -849,7 +849,7 @@ unsigned char *pprof_flush(DProf *dp, size_t *sz) {
   close(fd);
 
   // my_pprof_nozip
-  void* buf_nozip = malloc(sz_packed);
+  void *buf_nozip = malloc(sz_packed);
   perftools__profiles__profile__pack(&dp->pprof, buf_nozip);
   fd = open(my_pprof_nozip, O_RDWR | O_CREAT, 0677);
   write(fd, buf_nozip, sz_packed);

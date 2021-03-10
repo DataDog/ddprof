@@ -7,7 +7,7 @@ IFS=$'\n\t'
 CLANG_FORMAT=""
 if   command -v clang-format-11 >/dev/null 2>&1; then CLANG_FORMAT=clang-format-11
 elif command -v clang-format-10 >/dev/null 2>&1; then CLANG_FORMAT=clang-format-10
-elif command -v clang-format-10 >/dev/null 2>&1; then CLANG_FORMAT=clang-format-9
+elif command -v clang-format-9  >/dev/null 2>&1; then CLANG_FORMAT=clang-format-9
 else echo "No suitable clang-format found." && exit -1
 fi
 

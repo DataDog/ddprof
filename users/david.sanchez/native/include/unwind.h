@@ -19,15 +19,15 @@ typedef struct FunLoc {
   uint64_t map_off;   // Offset into file
   char *funname;      // name of the function (mangled, possibly)
   char *srcpath;      // name of the source file, if known
-  char *sopath;       // name of the file where the symbol is interned (e.g., .so)
-  uint32_t line;      // line number in file
-  uint32_t disc;      // discriminator
+  char *sopath;  // name of the file where the symbol is interned (e.g., .so)
+  uint32_t line; // line number in file
+  uint32_t disc; // discriminator
 } FunLoc;
 
 struct UnwindState {
   Dwfl *dwfl;
   pid_t pid;
-  char* stack;
+  char *stack;
   size_t stack_sz;
   union {
     uint64_t regs[3];
@@ -45,20 +45,22 @@ struct UnwindState {
 };
 
 #ifdef D_UNWDBG
-#define D(...) \
-  fprintf(stderr, "<%s:%d> ", __FUNCTION__, __LINE__); \
-  fprintf(stderr, __VA_ARGS__); \
+#define D(...)                                                                 \
+  fprintf(stderr, "<%s:%d> ", __FUNCTION__, __LINE__);                         \
+  fprintf(stderr, __VA_ARGS__);                                                \
   fprintf(stderr, "\n")
 #else
-#define D(...) do{}while(0);
+#define D(...)                                                                 \
+  do {                                                                         \
+  } while (0);
 #endif
 
 pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
-(void)dwfl;
+  (void)dwfl;
   if (*thread_argp != NULL) {
     return 0;
-}
-  struct UnwindState* us = arg;
+  }
+  struct UnwindState *us = arg;
   *thread_argp = arg;
   return us->pid;
 }
@@ -76,7 +78,7 @@ bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
 }
 
 bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg) {
-(void)dwfl;
+  (void)dwfl;
   struct UnwindState *us = arg;
 
   uint64_t sp_start = us->esp;
@@ -94,12 +96,12 @@ bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg) {
     // words, it represents a segment that was actually mapped into the
     // given page.  If, for instance, a segment could have been mapped, but
     // wasn't, we fail (does this even make sense?)
-    Map* map = procfs_MapMatch(us->pid, addr);
+    Map *map = procfs_MapMatch(us->pid, addr);
 
     // I didn't read past dso.c:dso__data_read_offset(), but it doesn't look
     // like perf will do anything to try to correct the address.
     // TODO verify?
-    if(!map) {
+    if (!map) {
       return false;
     }
 
@@ -112,7 +114,7 @@ bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg) {
 }
 
 int frame_cb(Dwfl_Frame *state, void *arg) {
-  struct UnwindState* us = arg;
+  struct UnwindState *us = arg;
   Dwarf_Addr pc = 0;
   bool isactivation = false;
 
@@ -132,7 +134,7 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
     D("dwfl_thread_dwfl was zero: (%s)", dwfl_errmsg(-1));
   }
   Dwfl_Module *mod = dwfl_addrmodule(dwfl, newpc);
-  const char * symname = NULL;
+  const char *symname = NULL;
 
   // Now we register
   if (mod) {
@@ -142,17 +144,19 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
     Elf *elfp = NULL;
     Dwarf_Addr bias = {0};
 
-    symname = dwfl_module_addrinfo(mod, newpc, &offset, &sym, &shndxp, &elfp, &bias);
+    symname =
+        dwfl_module_addrinfo(mod, newpc, &offset, &sym, &shndxp, &elfp, &bias);
 
-// TODO
+    // TODO
     us->locs[us->idx].ip = pc;
     us->locs[us->idx].map_start = mod->low_addr;
-    us->locs[us->idx].map_end = mod->high_addr;;
-    us->locs[us->idx].map_off= offset;
+    us->locs[us->idx].map_end = mod->high_addr;
+    ;
+    us->locs[us->idx].map_off = offset;
     us->locs[us->idx].funname = strdup(symname ? symname : "??");
-//    us->locs[us->idx].srcpath = ;
-    char* sname = strrchr(mod->name, '/');
-    us->locs[us->idx].sopath = strdup(sname ? sname+1 : mod->name);
+    //    us->locs[us->idx].srcpath = ;
+    char *sname = strrchr(mod->name, '/');
+    us->locs[us->idx].sopath = strdup(sname ? sname + 1 : mod->name);
     us->idx++;
   } else {
     D("dwfl_addrmodule was zero: (%s)", dwfl_errmsg(-1));
@@ -160,30 +164,33 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
   return DWARF_CB_OK;
 }
 
-
-int tid_cb(Dwfl_Thread *thread, void* targ) {
-  dwfl_thread_getframes (thread, frame_cb, targ);
+int tid_cb(Dwfl_Thread *thread, void *targ) {
+  dwfl_thread_getframes(thread, frame_cb, targ);
   return DWARF_CB_OK;
 }
 
 int unwindstate__unwind(struct UnwindState *us) {
   static const Dwfl_Thread_Callbacks dwfl_callbacks = {
-    .next_thread = next_thread,
-    .memory_read = memory_read,
-    .set_initial_registers = set_initial_registers,
+      .next_thread = next_thread,
+      .memory_read = memory_read,
+      .set_initial_registers = set_initial_registers,
   };
   static char *debuginfo_path;
   static const Dwfl_Callbacks proc_callbacks = {
-    .find_debuginfo = dwfl_standard_find_debuginfo,  // TODO, update this for containers?
-    .debuginfo_path = &debuginfo_path,
-    .find_elf = dwfl_linux_proc_find_elf,
+      .find_debuginfo =
+          dwfl_standard_find_debuginfo, // TODO, update this for containers?
+      .debuginfo_path = &debuginfo_path,
+      .find_elf = dwfl_linux_proc_find_elf,
   };
-  for (int i=0; i<MAX_STACK; i++) {
-    if(us->locs[i].funname) free(us->locs[i].funname);
-    if(us->locs[i].sopath) free(us->locs[i].sopath);
-    if(us->locs[i].srcpath) free(us->locs[i].srcpath);
+  for (int i = 0; i < MAX_STACK; i++) {
+    if (us->locs[i].funname)
+      free(us->locs[i].funname);
+    if (us->locs[i].sopath)
+      free(us->locs[i].sopath);
+    if (us->locs[i].srcpath)
+      free(us->locs[i].srcpath);
   }
-  memset(us->locs, 0, sizeof(uint64_t)*us->max_stack);
+  memset(us->locs, 0, sizeof(uint64_t) * us->max_stack);
 
   // Initialize ELF
   D("Gonna unwind at %d (my PID is %d)\n", us->pid, getpid());
@@ -195,23 +202,23 @@ int unwindstate__unwind(struct UnwindState *us) {
     return -1;
   }
 
-  if(dwfl_linux_proc_report(us->dwfl, us->pid)) {
+  if (dwfl_linux_proc_report(us->dwfl, us->pid)) {
     D("There was a problem reporting the module.");
     return -1;
   }
 
-// TODO, all of this needs to go in a PID cache, until then we're not going
-//      to cleanup since it doesn't matter
-//  if (dwfl_report_end(us->dwfl, NULL, NULL)) {
-//    D("dwfl_end was nonzero (%s)", dwfl_errmsg(-1));
-//    return -1;
-//  }
+  // TODO, all of this needs to go in a PID cache, until then we're not going
+  //      to cleanup since it doesn't matter
+  //  if (dwfl_report_end(us->dwfl, NULL, NULL)) {
+  //    D("dwfl_end was nonzero (%s)", dwfl_errmsg(-1));
+  //    return -1;
+  //  }
 
   if (!dwfl_attach_state(us->dwfl, NULL, us->pid, &dwfl_callbacks, us)) {
-//    TODO, same as above, no reason to care if attaching fails since we
-//          never detach and the first time always seems to work so far.
-//    D("Could not attach (%s)", dwfl_errmsg(-1));
-//    return -1;
+    //    TODO, same as above, no reason to care if attaching fails since we
+    //          never detach and the first time always seems to work so far.
+    //    D("Could not attach (%s)", dwfl_errmsg(-1));
+    //    return -1;
   }
 
   if (dwfl_getthreads(us->dwfl, tid_cb, us)) {
@@ -220,7 +227,7 @@ int unwindstate__unwind(struct UnwindState *us) {
   }
 
   // TODO same as above
-  //dwfl_end(us->dwfl);
+  // dwfl_end(us->dwfl);
 
   return 0;
 }

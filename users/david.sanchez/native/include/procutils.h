@@ -41,7 +41,7 @@ typedef struct Map {
   uint64_t off;   // Offset into the file of the segment
   char *path;     // path WITHIN THE PID MNT NS; has to be readjusted to caller
   MapMode mode;
-  void *map;      // an mmap() of the segment
+  void *map; // an mmap() of the segment
 } Map;
 
 #define PM_MAX 128
@@ -182,9 +182,10 @@ int procfs_MapOpen(pid_t target) {
 // TODO, we're going to want a function that takes a path relative to a given
 //       PID and returns the path in the mount namespace of the calling process.
 char procfs_currentroot[sizeof("/proc/32768/root")] = {0};
-char* procfs_RootGet(pid_t pid) {
+char *procfs_RootGet(pid_t pid) {
   memset(procfs_currentroot, 0, sizeof(procfs_currentroot));
-  snprintf(procfs_currentroot, sizeof(procfs_currentroot), "/proc/%d/root", pid);
+  snprintf(procfs_currentroot, sizeof(procfs_currentroot), "/proc/%d/root",
+           pid);
   return procfs_currentroot;
 }
 
@@ -197,7 +198,7 @@ char procfs_MmapGet(Map *map) {
       printf("I couldn't open the map!\n");
       return -1;
     }
-    uint64_t mapsz = map->end - map->start + 1; //e.g., if start=end, map "1"b
+    uint64_t mapsz = map->end - map->start + 1; // e.g., if start=end, map "1"b
     map->map = mmap(0, mapsz, PROT_READ, MAP_PRIVATE, fd, map->off);
     close(fd);
     if (!map->map) {
