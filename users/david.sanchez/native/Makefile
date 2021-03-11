@@ -14,7 +14,7 @@ LDFLAGS += -L/home/sanchda/dev/libunwind/src/.libs
 LDLIBS := -lprotobuf-c -lz -lpthread -lelf -lbfd -llzma -ldl 
 UNWLIBS := $(LIBUNWIND)/src/.libs/libunwind-x86_64.a $(LIBUNWIND)/src/.libs/libunwind.a
 ELFLIBS := $(ELFUTILS)/libdwfl/libdwfl.a $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libebl/libebl.a
-SRC := src/string_table.c src/profile.pb-c.c src/pprof.c src/http.c src/dd_send.c src/append_string.c
+SRC := src/string_table.c src/proto/profile.pb-c.c src/pprof.c src/http.c src/dd_send.c src/append_string.c
 
 # NOTE
 # unwind-x86-64.a is a result of compiling libunwind, but it doesn't get installed
