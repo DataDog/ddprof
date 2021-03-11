@@ -1,5 +1,4 @@
 include/http.h
-include/proto/profile.pb-c.h
 include/dd_send.h
 include/pprof.h
 include/string_table.h
@@ -8,8 +7,6 @@ include/append_string.h
 src/dictionary.c
 src/string_table.c
 src/pprof.c
-src/proto/profile.pb-c.c
 src/append_string.c
 src/http.c
-src/eg_http.c
 src/dd_send.c
