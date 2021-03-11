@@ -24,14 +24,14 @@ rm -f $tmpfile
 tmpfile="/dev/fd/5"
 
 # Look for matching extensions and try to diff them.
-for f in $(git ls-files -m | grep -E '.*\.(c|cc|cp|cpp|cxx|c++|h|hh|hp|hpp|hxx|h++)$'); do
-  echo CHECKING $f
-  if [ ${APPLY} == "YES" ]; then
+pushd $(git rev-parse --show-toplevel) >/dev/null
+for f in $(git diff --name-only --cached | grep -E '.*\.(c|cc|cp|cpp|cxx|c++|h|hh|hp|hpp|hxx|h++)$'); do
+  if [ ${APPLY,,} == "YES" ]; then
     ${CLANG_FORMAT} -style=file -i $f
   else
     ${CLANG_FORMAT} -style=file $f > $tmpfile
     if ! cmp -s $f /dev/fd/5; then
-      diff --color=always $f $tmpfile
+      diff -u --color=always $f $tmpfile
       RC=1
     fi
   fi

@@ -5,5 +5,9 @@ LOCAL_DIR=${HOME}/dev/native
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 
 for f in $(cat ${SCRIPT_DIR}/mapping.txt); do
-  vimdiff ${REMOTE_DIR}/${f} ${LOCAL_DIR}/${f}
+  fr=${REMOTE_DIR}/$f
+  fl=${LOCAL_DIR}/$f1
+  if cmp -s $fr $fl; then
+    vimdiff $fr $fl
+  fi
 done
