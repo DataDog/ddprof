@@ -285,7 +285,7 @@ int main(int argc, char **argv) {
   if (!pid) {
     pthread_barrier_wait(pb);
     munmap(pb, sizeof(pthread_barrier_t));
-    execvp(argv[1], argv + 1);
+    execvp(argv[0], argv);
     printf("Hey, this shouldn't happen!\n");
     return -1;
   } else {
