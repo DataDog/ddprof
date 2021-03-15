@@ -208,7 +208,7 @@ int main(int argc, char **argv) {
   int c = 0, oi = 0;
   struct DDProfContext *ctx =
       &(struct DDProfContext){.ddr        = &(DDReq){.apikey = "1c77adb933471605ccbe82e82a1cf5cf",
-                                                     .host = "localhost",
+                                                     .host = "host.docker.internal",
                                                      .port = "10534",
                                                      .user_agent = "Native-http-client/0.1",
                                                      .language = "native",
@@ -216,7 +216,7 @@ int main(int argc, char **argv) {
 //                                                     .runtime = "native"},
                               .dp         = &(DProf){0},
                               .us         = &(struct UnwindState){0},
-                              .sample_sec = 5.0};
+                              .sample_sec = 60.0};
   DDReq *ddr = ctx->ddr;
   DDR_init(ddr);
 
@@ -226,18 +226,15 @@ int main(int argc, char **argv) {
   OPT_TABLE(X_DFLT);
 
   //---- Process Options
-  char done = 0;
-  while (!done && -1 != (c = getopt_long(argc, argv,
-                                         ":" OPT_TABLE(X_OSTR) "h",
-                                         lopts, &oi))) {
+  while (-1 != (c = getopt_long(argc, argv, "+" OPT_TABLE(X_OSTR) "h", lopts, &oi))) {
     switch (c) {
       OPT_TABLE(X_CASE)
     case 'h':
       print_help();
       return 0;
     default:
-      done = 1;
-      break;
+      printf("Non-recoverable error processing options.\n");
+      exit(-1);
     }
   }
 
@@ -245,18 +242,14 @@ int main(int argc, char **argv) {
   printf("=== PRINTING PARAMETERS ===\n");
   OPT_TABLE(X_PRNT);
 #endif
-  if (optind == argc) {
-    printf("O: %d, A: %d\n", optind, argc);
-    printf("%s is a tool for getting stack samples from an application.  "
-           "Please wrap your application in it.\n",
-           filename);
-    return -1;
-  }
-
   // Adjust input parameters for execvp()
-printf("HEY DUMMY, REMEMBER TO FIX THE OPTARG STUFF!\n");
-//  argv += optind - 1;
-//  argc -= optind;
+  argv += optind;
+  argc -= optind;
+
+  if (argc <= 0) {
+    printf("No program specified, exiting.\n");
+    exit(-1);
+  }
 
   /****************************************************************************\
   |                             Run the Profiler                               |

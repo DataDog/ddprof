@@ -3,7 +3,7 @@ LIBUNWIND = /home/sanchda/dev/libunwind
 ELFUTILS = /home/sanchda/dev/elfutils
 INCLUDE = -Iinclude -I$(BINUTILS)/include -I$(BINUTILS)/bfd -I$(BINUTILS)/binutils -I$(LIBUNWIND)/include -I$(ELFUTILS) -I$(ELFUTILS)/libdw
 INCLUDE = -Iinclude -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
-CFLAGS = -O0 -g -std=c11 -D_GNU_SOURCE -DDEBUG
+CFLAGS = -O2 -g -std=c11 -D_GNU_SOURCE -DDEBUG
 TESTS := http perf pprof
 WARNS := -Wall -Wextra -Wpedantic -Wno-missing-braces -Wno-missing-field-initializers -Wno-gnu-statement-expression -Wno-pointer-arith -Wno-gnu-folding-constant
 ANALYZER := -fanalyzer -fanalyzer-verbosity=2
@@ -11,9 +11,9 @@ ANALYZER :=
 CC := gcc-10
 CC := clang-11
 LDFLAGS += -L/home/sanchda/dev/libunwind/src/.libs
-LDLIBS := -lprotobuf-c -lz -lpthread -lelf -lbfd -llzma -ldl 
+LDLIBS := /usr/lib/x86_64-linux-gnu/libprotobuf-c.a /usr/local/lib/libelf.a -lz -lpthread -llzma -ldl 
 UNWLIBS := $(LIBUNWIND)/src/.libs/libunwind-x86_64.a $(LIBUNWIND)/src/.libs/libunwind.a
-ELFLIBS := $(ELFUTILS)/libdwfl/libdwfl.a $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libebl/libebl.a
+ELFLIBS := $(ELFUTILS)/libdwfl/libdwfl.a $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libebl/libebl.a /usr/lib/x86_64-linux-gnu/libbfd.a
 SRC := src/string_table.c src/proto/profile.pb-c.c src/pprof.c src/http.c src/dd_send.c src/append_string.c
 
 # NOTE
@@ -28,8 +28,9 @@ endif
 .PHONY: all install
 
 # -DD_UWDBG is useful here (prints unwinding diagnostics), just set the UNW_DEBUG_LEVEL environment variable
-dd-prof: src/dd-prof.c $(SRC) $(ELFLIBS)
-	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -fsanitize=address,undefined $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
+dd-prof: src/dd-prof.c $(SRC) $(ELFLIBS) /usr/lib/x86_64-linux-gnu/libprotobuf-c.a
+	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
+#	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -fsanitize=address,undefined $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 #	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 #	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -fsanitize=undefined $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 #	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DD_UWDBG $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
@@ -39,9 +40,6 @@ http: eg/http.c $(SRC)
 
 appendstring: eg/appendstring.c $(SRC)
 	$(CC) -DKNOCKOUT_UNUSED -DD_LOGGING_ENABLE -DD_SANITY_CHECKS $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
-
-unwind: eg/unwind.c
-	$(CC) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 
 perfunwind: eg/perfunwind.c
 	$(CC) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS) 

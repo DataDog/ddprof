@@ -179,6 +179,8 @@ typedef struct perf_samplestacku {
   // u64    dyn_size;   // Don't forget!
 } perf_samplestacku;
 
+// NB, PERF_COUNT_SW_TASK_CLOCK is CPU-time
+//    PERF_COUNT_SW_CPU_CLOCK is wall-time
 struct perf_event_attr g_dd_native_attr = {
     .size = sizeof(struct perf_event_attr),
     .type = PERF_TYPE_SOFTWARE,
