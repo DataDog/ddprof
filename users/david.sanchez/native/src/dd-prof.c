@@ -83,7 +83,7 @@ struct DDProfContext {
   X(DD_VERSION,                  profiler_version,V, 1, ctx->ddr, NULL, NULL)        \
   X(DD_PROFILING_ENABLED,        enabled,         e, 1, ctx,      NULL, "yes")       \
   X(DD_PROFILING_NATIVE_RATE,    sample_rate,     r, 1, ctx,      NULL, "1000")      \
-  X(DD_PROFILING_UPLOAD_PERIOD,  upload_period,   u, 1, ctx,      NULL, "60")        \
+  X(DD_PROFILING_UPLOAD_PERIOD,  upload_period,   u, 1, ctx,      NULL, "60.0")      \
   X(DD_PROFILING_,               prefix,          X, 1, ctx,      NULL, "")
 // clang-format off
 
@@ -208,12 +208,11 @@ int main(int argc, char **argv) {
   int c = 0, oi = 0;
   struct DDProfContext *ctx =
       &(struct DDProfContext){.ddr        = &(DDReq){.apikey = "1c77adb933471605ccbe82e82a1cf5cf",
-                                                     .host = "host.docker.internal",
+                                                     .host = "localhost",
                                                      .port = "10534",
                                                      .user_agent = "Native-http-client/0.1",
                                                      .language = "native",
                                                      .family = "native"},
-//                                                     .runtime = "native"},
                               .dp         = &(DProf){0},
                               .us         = &(struct UnwindState){0},
                               .sample_sec = 60.0};
@@ -226,6 +225,10 @@ int main(int argc, char **argv) {
   OPT_TABLE(X_DFLT);
 
   //---- Process Options
+  if (argc <= 1) {
+    print_help();
+    return 0;
+  }
   while (-1 != (c = getopt_long(argc, argv, "+" OPT_TABLE(X_OSTR) "h", lopts, &oi))) {
     switch (c) {
       OPT_TABLE(X_CASE)
@@ -234,13 +237,17 @@ int main(int argc, char **argv) {
       return 0;
     default:
       printf("Non-recoverable error processing options.\n");
-      exit(-1);
+      return -1;
     }
   }
+
+  // Replace string-type args
+  ctx->sample_sec = strtod(ctx->upload_period, NULL);
 
 #ifdef DD_DBG_PRINTARGS
   printf("=== PRINTING PARAMETERS ===\n");
   OPT_TABLE(X_PRNT);
+  printf("sample_sec: %f\n", ctx->sample_sec);
 #endif
   // Adjust input parameters for execvp()
   argv += optind;
@@ -248,7 +255,7 @@ int main(int argc, char **argv) {
 
   if (argc <= 0) {
     printf("No program specified, exiting.\n");
-    exit(-1);
+    return -1;
   }
 
   /****************************************************************************\
