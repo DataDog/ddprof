@@ -15,7 +15,7 @@ fi
 
 RC=0
 APPLY="NO"
-[[ "$#" -ge "1" && "${1,,}" == "apply" ]] && APPLY="YES"
+[[ "$#" -ge "1" && "${1,,}" == "apply" ]] && APPLY="yes"
 
 # Setup a tmpfile 
 tmpfile=$(mktemp /tmp/clang-format-diff.XXXXXX)

@@ -35,6 +35,9 @@ dd-prof: src/dd-prof.c $(SRC) $(ELFLIBS) /usr/lib/x86_64-linux-gnu/libprotobuf-c
 #	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -fsanitize=undefined $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 #	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DD_UWDBG $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 
+sharefd: eg/sharefd.c
+	$(CC) $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^
+
 http: eg/http.c $(SRC)
 	$(CC) -DKNOCKOUT_UNUSED -DD_LOGGING_ENABLE -DD_SANITY_CHECKS -fsanitize=undefined $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o bin/$@ $^ $(LDLIBS)
 

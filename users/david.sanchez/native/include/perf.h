@@ -7,11 +7,13 @@
 #include <linux/perf_event.h>
 #include <poll.h>
 #include <signal.h>
-#include <stdint.h> // Why do I suddenly need this?
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/socket.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -25,21 +27,9 @@
 #define PAGE_SIZE 4096              // Concerned about hugepages?
 #define PSAMPLE_SIZE 8 * PAGE_SIZE  // TODO check for high-volume
 #define PSAMPLE_DEFAULT_WAKEUP 1000 // sample frequency check
-
-// Basically copypasta from Linux v5.4 includes/linux/perf_event.h
-struct perf_callchain_entry {
-  uint64_t nr;
-  uint64_t ip[];
-};
-
-struct perf_callchain_entry_ctx {
-  struct perf_callchain_entry *entry;
-  uint32_t max_stack;
-  uint32_t nr;
-  short contexts;
-  char contexts_maxed;
-};
-//</copypasta>
+#define PERF_SAMPLE_STACK_SIZE 4096
+#define PERF_SAMPLE_STACK_REGS 3
+#define MAX_INSN 16
 
 typedef struct PEvent {
   int fd;
@@ -51,67 +41,20 @@ typedef struct PEvent {
 // We're going to hardcode everything for now...
 #define PERF_REGS_MASK ((1 << 6) | (1 << 7) | (1 << 8))
 
-#define u64 uint64_t
-#define u32 uint32_t
-#define u16 uint16_t
-#define u8 uint8_t
-#define MAX_INSN 16
 typedef struct read_format {
-  u64 value;        // The value of the event
-  u64 time_enabled; // if PERF_FORMAT_TOTAL_TIME_ENABLED
-  u64 time_running; // if PERF_FORMAT_TOTAL_TIME_RUNNING
-  //  u64 id;            // if PERF_FORMAT_ID
+  uint64_t value;        // The value of the event
+  uint64_t time_enabled; // if PERF_FORMAT_TOTAL_TIME_ENABLED
+  uint64_t time_running; // if PERF_FORMAT_TOTAL_TIME_RUNNING
+  //  uint64_t id;            // if PERF_FORMAT_ID
 } read_format;
 
-// Here are some defines to help automatically generate a parametrized family of
-// structs for use in parsing samples.  This is largely irrelevant right now,
-// but maybe having it here will save someone the headache later.
-// counterpoint: no reason to do this since many modes encode a variable-length
-// array...
-#define PS_X_IDENTIFIER uint64_t sample_id;
-#define PS_X_IP uint64_t ip;
-#define PS_X_TID uint32_t pid, tid;
-#define PS_X_TIME uint64_t time;
-#define PS_X_ADDR uint64_t addr;
-#define PS_X_ID uint64_t id;
-#define PS_X_STREAM_ID uint64_t stream_id;
-#define PS_X_CPU uint32_t cpu, res;
-#define PS_X_PERIOD uint64_t period;
-#define PS_X_READ                                                              \
-  struct {                                                                     \
-    ...                                                                        \
-  };                                                                           \
-  \\ TODO
-#define PS_X_CALLCHAIN                                                         \
-  uint64_t nr;                                                                 \
-  uint64_t ips[1];
-#define PS_X_RAW                                                               \
-  uint32_t size;                                                               \
-  char data[1];
-#define PS_X_BRANCH_STACK                                                      \
-  uint64_t bnr;                                                                \
-  struct perf_brancH_entry lbr[1]; // TODO
-#define PS_X_REGS_USER                                                         \
-  uint64_t abi;                                                                \
-  uint64_t regs[0];
-#define PS_X_STACK_USER                                                        \
-  uint64_t size;                                                               \
-  char data[0];                                                                \
-  uint64_t dyn_size;
-#define PS_X_WEIGHT uint64_t weight;
-#define PS_X_DATA_SRC uint64_t data_src;
-#define PS_X_TRANSACTION uint64_t transaction;
-#define PS_X_REGS_INTR                                                         \
-  uint64_t abi;                                                                \
-  uint64_t regs[0];
-
 typedef struct sample_id {
-  u32 pid, tid; /* if PERF_SAMPLE_TID set */
-  u64 time;     /* if PERF_SAMPLE_TIME set */
-  //  u64 id;         /* if PERF_SAMPLE_ID set */
-  //  u64 stream_id;  /* if PERF_SAMPLE_STREAM_ID set  */
-  //  u32 cpu, res;   /* if PERF_SAMPLE_CPU set */
-  //  u64 id;         /* if PERF_SAMPLE_IDENTIFIER set */
+  uint32_t pid, tid; /* if PERF_SAMPLE_TID set */
+  uint64_t time;     /* if PERF_SAMPLE_TIME set */
+  //  uint64_t id;         /* if PERF_SAMPLE_ID set */
+  //  uint64_t stream_id;  /* if PERF_SAMPLE_STREAM_ID set  */
+  //  uint32_t cpu, res;   /* if PERF_SAMPLE_CPU set */
+  //  uint64_t id;         /* if PERF_SAMPLE_IDENTIFIER set */
 } sample_id;
 
 typedef struct perf_event_exit {
@@ -124,63 +67,59 @@ typedef struct perf_event_exit {
 
 typedef struct perf_event_fork {
   struct perf_event_header header;
-  u32 pid, ppid;
-  u32 tid, ptid;
-  u64 time;
+  uint32_t pid, ppid;
+  uint32_t tid, ptid;
+  uint64_t time;
   struct sample_id sample_id;
 } perf_event_fork;
 
 typedef struct perf_event_mmap {
   struct perf_event_header header;
-  u32 pid, tid;
-  u64 addr;
-  u64 len;
-  u64 pgoff;
+  uint32_t pid, tid;
+  uint64_t addr;
+  uint64_t len;
+  uint64_t pgoff;
   char filename[];
 } perf_event_mmap;
 
-#define PERF_SAMPLE_STACK_SIZE 4096
-#define PERF_SAMPLE_STACK_REGS 3
 // clang-format off
 typedef struct perf_event_sample {
   struct perf_event_header header;
-  //  u64    sample_id;                  // if PERF_SAMPLE_IDENTIFIER
-  u64 ip;       // if PERF_SAMPLE_IP
-  u32 pid, tid; // if PERF_SAMPLE_TID
-  u64 time;     // if PERF_SAMPLE_TIME
-//  u64    addr;                       // if PERF_SAMPLE_ADDR
-//  u64    id;                         // if PERF_SAMPLE_ID
-  //  u64    stream_id;                  // if PERF_SAMPLE_STREAM_ID
-  //  u32    cpu, res;                   // if PERF_SAMPLE_CPU
-  u64 period; // if PERF_SAMPLE_PERIOD
+  //  uint64_t    sample_id;                  // if PERF_SAMPLE_IDENTIFIER
+  uint64_t ip;       // if PERF_SAMPLE_IP
+  uint32_t pid, tid; // if PERF_SAMPLE_TID
+  uint64_t time;     // if PERF_SAMPLE_TIME
+//  uint64_t    addr;                       // if PERF_SAMPLE_ADDR
+//  uint64_t    id;                         // if PERF_SAMPLE_ID
+  //  uint64_t    stream_id;                  // if PERF_SAMPLE_STREAM_ID
+  //  uint32_t    cpu, res;                   // if PERF_SAMPLE_CPU
+  uint64_t period; // if PERF_SAMPLE_PERIOD
 //  struct read_format v;              // if PERF_SAMPLE_READ
-//  u64    nr;                         // if PERF_SAMPLE_CALLCHAIN
-//  u64    ips[];                      // if PERF_SAMPLE_CALLCHAIN
-//  u32    size;                       // if PERF_SAMPLE_RAW
+//  uint64_t    nr;                         // if PERF_SAMPLE_CALLCHAIN
+//  uint64_t    ips[];                      // if PERF_SAMPLE_CALLCHAIN
+//  uint32_t    size;                       // if PERF_SAMPLE_RAW
 //  char  data[size];                  // if PERF_SAMPLE_RAW
-  //  u64    bnr;                        // if PERF_SAMPLE_BRANCH_STACK
+  //  uint64_t    bnr;                        // if PERF_SAMPLE_BRANCH_STACK
   //  struct perf_branch_entry lbr[bnr]; // if PERF_SAMPLE_BRANCH_STACK
-  u64 abi;                           // if PERF_SAMPLE_REGS_USER
-  u64 regs[PERF_SAMPLE_STACK_REGS];  // if PERF_SAMPLE_REGS_USER
-  u64 size;                          // if PERF_SAMPLE_STACK_USER
+  uint64_t abi;                           // if PERF_SAMPLE_REGS_USER
+  uint64_t regs[PERF_SAMPLE_STACK_REGS];  // if PERF_SAMPLE_REGS_USER
+  uint64_t size;                          // if PERF_SAMPLE_STACK_USER
   char data[PERF_SAMPLE_STACK_SIZE]; // if PERF_SAMPLE_STACK_USER
-  u64 dyn_size;                      // if PERF_SAMPLE_STACK_USER
-  //  u64    weight;                     // if PERF_SAMPLE_WEIGHT
-  //  u64    data_src;                   // if PERF_SAMPLE_DATA_SRC
-  //  u64    transaction;                // if PERF_SAMPLE_TRANSACTION
-  //  u64    abi;                        // if PERF_SAMPLE_REGS_INTR
-  //  u64    regs[weight(mask)];         // if PERF_SAMPLE_REGS_INTR
+  uint64_t dyn_size;                      // if PERF_SAMPLE_STACK_USER
+  //  uint64_t    weight;                     // if PERF_SAMPLE_WEIGHT
+  //  uint64_t    data_src;                   // if PERF_SAMPLE_DATA_SRC
+  //  uint64_t    transaction;                // if PERF_SAMPLE_TRANSACTION
+  //  uint64_t    abi;                        // if PERF_SAMPLE_REGS_INTR
+  //  uint64_t    regs[weight(mask)];         // if PERF_SAMPLE_REGS_INTR
 } perf_event_sample;
 // clang-format on
 
 typedef struct perf_samplestacku {
-  u64 size;
+  uint64_t size;
   char data[];
-  // u64    dyn_size;   // Don't forget!
+  // uint64_t    dyn_size;   // Don't forget!
 } perf_samplestacku;
 
-// NB, PERF_COUNT_SW_TASK_CLOCK is CPU-time
-//    PERF_COUNT_SW_CPU_CLOCK is wall-time
 struct perf_event_attr g_dd_native_attr = {
     .size = sizeof(struct perf_event_attr),
     .type = PERF_TYPE_SOFTWARE,
@@ -203,15 +142,36 @@ struct perf_event_attr g_dd_native_attr = {
     .sample_regs_user = PERF_REGS_MASK,
     .exclude_kernel = 1,
     .exclude_hv = 1,
-    //    .read_format    = //PERF_FORMAT_TOTAL_TIME_ENABLED |
-    //                      PERF_FORMAT_TOTAL_TIME_RUNNING,
-    //    .exclude_kernel = 1,                        // For a start
-    //    (exclude_hv???) .exclude_callchain_kernel = 1, .exclude_hv = 1,
-    //    .exclude_idle   = 0,                        // Does this matter???
     .watermark = 1,
-    .wakeup_watermark =
-        1, // If we've used up 1/4 of our buffer, might as well go for it
+    .wakeup_watermark = 1,
 };
+
+int sendfd(int sfd, int fd) {
+  struct msghdr msg = {
+      .msg_iov = &(struct iovec){.iov_base = "T", .iov_len = 1},
+      .msg_iovlen = 1,
+      .msg_control = (char *)(char[CMSG_SPACE(sizeof(int))]){0},
+      .msg_controllen = CMSG_SPACE(sizeof(int))};
+  CMSG_FIRSTHDR(&msg)->cmsg_level = SOL_SOCKET;
+  CMSG_FIRSTHDR(&msg)->cmsg_type = SCM_RIGHTS;
+  CMSG_FIRSTHDR(&msg)->cmsg_len = CMSG_LEN(sizeof(int));
+  *((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg))) = fd;
+
+  msg.msg_controllen = CMSG_SPACE(sizeof(int));
+
+  return -1 == sendmsg(sfd, &msg, 0) ? -1 : 0;
+}
+
+int getfd(int sfd) {
+  struct msghdr msg = {.msg_iov = &(struct iovec){.iov_base = (char[256]){0},
+                                                  .iov_len = sizeof(char[256])},
+                       .msg_iovlen = 1,
+                       .msg_control = (char *)(char[256]){0},
+                       .msg_controllen = sizeof(char[256])};
+  if (0 > recvmsg(sfd, &msg, 0))
+    return -1;
+  return *((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg)));
+}
 
 char perfopen(pid_t pid, PEvent *pe, struct perf_event_attr *attr) {
   if (!attr)
