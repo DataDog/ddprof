@@ -207,8 +207,7 @@ int main(int argc, char **argv) {
   //---- Inititiate structs
   int c = 0, oi = 0;
   struct DDProfContext *ctx =
-      &(struct DDProfContext){.ddr        = &(DDReq){.apikey = "1c77adb933471605ccbe82e82a1cf5cf",
-                                                     .host = "localhost",
+      &(struct DDProfContext){.ddr        = &(DDReq){.host = "localhost",
                                                      .port = "10534",
                                                      .user_agent = "Native-http-client/0.1",
                                                      .language = "native",
