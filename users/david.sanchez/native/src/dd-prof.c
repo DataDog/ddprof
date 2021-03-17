@@ -18,22 +18,28 @@ struct DDProfContext {
   DDReq *ddr;
 
   // Parameters for interpretation
-  char *enabled;
   char *agent_host;
   char *prefix;
   char *tags;
-  char *upload_timeout;
-  char *sample_rate;
+
+  // Input parameters
+  char *enabled;
   char *upload_period;
+  char *profprofiler;
   struct {
-    char enabled;
-    uint32_t upload_timeout;
-    uint32_t sample_rate;
-    uint32_t upload_period;
+    bool enabled;
+    double upload_period;
+    bool profprofiler;
   } params;
 
+  int num_watchers;
+  struct watchers {
+    int type;
+    int config;
+    uint64_t sample_period;
+  } watchers[10]; // NB hardcoded limit
+
   struct UnwindState *us;
-  double sample_sec;
   int64_t send_nanos;
 };
 
@@ -79,11 +85,10 @@ struct DDProfContext {
   X(DD_TRACE_AGENT_PORT,         port,            P, 1, ctx->ddr, NULL, "8081")      \
   X(DD_SERVICE,                  service,         S, 1, ctx->ddr, NULL, "my_profiled_service") \
   X(DD_TAGS,                     tags,            T, 1, ctx,      NULL, NULL)        \
-  X(DD_PROFILING_UPLOAD_TIMEOUT, upload_timeout,  U, 1, ctx,      NULL, "10")        \
   X(DD_VERSION,                  profiler_version,V, 1, ctx->ddr, NULL, NULL)        \
   X(DD_PROFILING_ENABLED,        enabled,         e, 1, ctx,      NULL, "yes")       \
-  X(DD_PROFILING_NATIVE_RATE,    sample_rate,     r, 1, ctx,      NULL, "1000")      \
   X(DD_PROFILING_UPLOAD_PERIOD,  upload_period,   u, 1, ctx,      NULL, "60.0")      \
+  X(DD_PROFILE_NATIVEPROFILER,   profprofiler,    p, 0, ctx,      NULL, NULL)        \
   X(DD_PROFILING_,               prefix,          X, 1, ctx,      NULL, "")
 // clang-format off
 
@@ -168,7 +173,7 @@ void ddprof_callback(struct perf_event_header *hdr, void *arg) {
     if ((ret = DDR_watch(ddr, -1)))
       printf("Got an error (%s)\n", DDR_code2str(ret));
     DDR_clear(ddr);
-    pctx->send_nanos += pctx->sample_sec*1000000000;
+    pctx->send_nanos += pctx->params.upload_period*1000000000;
 
     // Prepare pprof for next window
     pprof_timeUpdate(dp);
@@ -190,8 +195,6 @@ void print_help() {
                     "  -T, --tags:\n"
                     "  -U, --upload_timeout:\n"
                     "  -V, --version:\n"
-                    "  -e, --enabled:\n"
-                    "  -r, --sample_rate:\n"
                     "  -u, --upload_period:\n"
                     "  -x, --prefix:\n";
   printf("%s\n", help_msg);
@@ -213,8 +216,7 @@ int main(int argc, char **argv) {
                                                      .language = "native",
                                                      .family = "native"},
                               .dp         = &(DProf){0},
-                              .us         = &(struct UnwindState){0},
-                              .sample_sec = 60.0};
+                              .us         = &(struct UnwindState){0}};
   DDReq *ddr = ctx->ddr;
   DDR_init(ddr);
 
@@ -241,12 +243,26 @@ int main(int argc, char **argv) {
   }
 
   // Replace string-type args
-  ctx->sample_sec = strtod(ctx->upload_period, NULL);
+  ctx->params.enabled = true;
+  ctx->params.upload_period = 60.0;
+
+  // Process perf watchers
+  ctx->num_watchers = 1;
+  ctx->watchers[0].type = PERF_TYPE_SOFTWARE;
+  ctx->watchers[0].config = PERF_COUNT_SW_TASK_CLOCK;
+  ctx->watchers[0].sample_period = 10000000;
+
+  // process upload_period
+  if (ctx->upload_period) {
+    double x = strtod(ctx->upload_period, NULL);
+    if (x > 0.0)
+      ctx->params.upload_period = x;
+  }
 
 #ifdef DD_DBG_PRINTARGS
   printf("=== PRINTING PARAMETERS ===\n");
   OPT_TABLE(X_PRNT);
-  printf("sample_sec: %f\n", ctx->sample_sec);
+  printf("upload_period: %f\n", ctx->params.upload_period);
 #endif
   // Adjust input parameters for execvp()
   argv += optind;
@@ -261,8 +277,13 @@ int main(int argc, char **argv) {
   |                             Run the Profiler                               |
   \****************************************************************************/
   // Initialize the pprof
-  pprof_Init(ctx->dp, (const char **)&(const char *[]){"samples", "cpu-time", "wall-time"},
-             (const char **)&(const char *[]){"count", "nanoseconds", "nanoseconds"}, 3);
+  char *pprof_labels[10];
+  char *pprof_units[10];
+
+  pprof_labels[0] = "samples"; pprof_units[0] = "count";
+  pprof_labels[1] = "cpu-time"; pprof_units[1] = "nanoseconds";
+  pprof_labels[2] = "wall-time"; pprof_units[2] = "nanoseconds";
+  pprof_Init(ctx->dp, (const char**)pprof_labels, (const char**)pprof_units, 3);
   pprof_timeUpdate(ctx->dp); // Set the time
 
   // Set the CPU affinity so that everything is on the same CPU.  Scream about
@@ -276,39 +297,92 @@ int main(int argc, char **argv) {
     return -1;
   }
 
-  // Setup a shared barrier for timing
+  // Setup a shared barrier for coordination
   pthread_barrierattr_t bat = {0};
-  pthread_barrier_t *pb =
-      mmap(NULL, sizeof(pthread_barrier_t), PROT_READ | PROT_WRITE,
-           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  pthread_barrier_t *pb = mmap(NULL, sizeof(pthread_barrier_t),
+      PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  if (MAP_FAILED == pb) {
+    // TODO log here.  Nothing else to do, since we're not halting the target 
+    ctx->params.enabled = false;
+  } else {
+    pthread_barrierattr_init(&bat);
+    pthread_barrierattr_setpshared(&bat, 1);
+    pthread_barrier_init(pb, &bat, 2);
+  }
 
-  pthread_barrierattr_init(&bat);
-  pthread_barrierattr_setpshared(&bat, 1);
-  pthread_barrier_init(pb, &bat, 2);
+  // Instrument the profiler
+  // 1.   Setup pipes
+  // 2.   fork()
+  // 3p.  I am the original process.  If prof profiling, instrument now
+  // 3c.  I am the child.  Fork again and die.
+  // 4p.  If not instrumenting profiler, instrument now.
+  // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
+  // 5p.  Send the instrumentation FD.  Repeat for each instrumentation point.
+  // 5cc. Receive.  Repeat.  This is known before time of fork.
+  // 6p.  close fd, teardown pipe, execvp() to target process.
+  // 6cc. teardown pipe, create mmap regions and enter event loop
 
-  // Fork, then run the child
+  // 1. Setup pipes (really unix domain socket pair)
+  int sfd[2] = {-1, -1};
+  if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sfd)) {
+    // TODO log here
+    ctx->params.enabled = false;
+  }
+
+  // 2. fork()
   pid_t pid = fork();
   if (!pid) {
-    pthread_barrier_wait(pb);
-    munmap(pb, sizeof(pthread_barrier_t));
-    execvp(argv[0], argv);
-    printf("Hey, this shouldn't happen!\n");
-    return -1;
-  } else {
-    PEvent pe = {0};
-    char err  = perfopen(pid, &pe, NULL);
-    if (-1 == err) {
-      printf("Couldn't set up perf_event_open\n");
-      return -1;
-    }
-    pthread_barrier_wait(pb);
+    // 3c. I am the child.  Fork again
+    if (fork()) exit(0); // no need to use _exit, since we still own the proc
 
-    // If we're here, the child just launched.  Start the timer
-    ctx->send_nanos = now_nanos() + ctx->sample_sec*1000000000;
-    munmap(pb, sizeof(pthread_barrier_t));
-    elf_version(EV_CURRENT);
-    main_loop(&pe, ddprof_callback, ctx);
+    // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
+    struct PEvent pes[10] = {0};
+    for (int i = 0; i < ctx->num_watchers; i++) {
+      pes[i].fd = getfd(sfd[0]);
+      pthread_barrier_wait(pb); // Tell the other guy I have his FD
+    }
+
+  } else {
+    // 3p.  I am the original process.  If prof profiling, instrument now
+    // TODO: Deadlock city!  Add some timeouts here for chrissake
+    for (int i = 0; i < ctx->num_watchers && ctx->params.enabled; i++) {
+      int fd = perfopen(getpid(), ctx->watchers[i].type, ctx->watchers[i].config, ctx->watchers[i].sample_period);
+      if (-1 == fd || sendfd(sfd[1], fd)) {
+        // TODO this is an error, so log it later
+        ctx->params.enabled = false;
+      }
+      pthread_barrier_wait(pb); // Did the other guy get my FD yet?
+      close(fd);
+    }
+
+    // Cleanup
+    close(sfd[0]);
+    close(sfd[1]);
   }
+
+  // Fork, then run the child
+//  pid_t pid = fork();
+//  if (!pid) {
+//    pthread_barrier_wait(pb);
+//    munmap(pb, sizeof(pthread_barrier_t));
+//    execvp(argv[0], argv);
+//    printf("Hey, this shouldn't happen!\n");
+//    return -1;
+//  } else {
+//    PEvent pe = {0};
+//    char err  = perfopen(pid, &pe, NULL);
+//    if (-1 == err) {
+//      printf("Couldn't set up perf_event_open\n");
+//      return -1;
+//    }
+//    pthread_barrier_wait(pb);
+//
+//    // If we're here, the child just launched.  Start the timer
+//    ctx->send_nanos = now_nanos() + ctx->params.upload_period*1000000000;
+//    munmap(pb, sizeof(pthread_barrier_t));
+//    elf_version(EV_CURRENT);
+//    main_loop(&pe, ddprof_callback, ctx);
+//  }
 
   return 0;
 }

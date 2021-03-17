@@ -122,12 +122,6 @@ typedef struct perf_samplestacku {
 
 struct perf_event_attr g_dd_native_attr = {
     .size = sizeof(struct perf_event_attr),
-    .type = PERF_TYPE_SOFTWARE,
-    .config = PERF_COUNT_SW_TASK_CLOCK, // If it's good enough for perf(1), it's
-                                        // good enough for me!
-    .sample_period = 10000000,          // Who knows!
-                                        //    .sample_freq = 1000,
-                                        //    .freq = 1,
     .sample_type = PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER |
         PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME |
         PERF_SAMPLE_PERIOD,
@@ -173,33 +167,43 @@ int getfd(int sfd) {
   return *((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg)));
 }
 
-char perfopen(pid_t pid, PEvent *pe, struct perf_event_attr *attr) {
-  if (!attr)
-    attr = &g_dd_native_attr;
-  pe->fd =
-      syscall(__NR_perf_event_open, attr, pid, 0, -1, PERF_FLAG_FD_CLOEXEC);
-  if (-1 == pe->fd && EACCES == errno) {
+int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd, unsigned long flags) {
+  return syscall(__NR_perf_event_open, attr, pid, cpu, gfd, flags);
+}
+
+int perfopen(pid_t pid, int type, int config, uint64_t sample_period) {
+  struct perf_event_attr *attr = &(struct perf_event_attr){0};
+  memcpy(attr, &g_dd_native_attr, sizeof(g_dd_native_attr));
+  attr->type = type;
+  attr->config = config;
+  attr->sample_period = sample_period;
+
+  int fd = perf_event_open(attr, pid, -1, -1, PERF_FLAG_FD_CLOEXEC);
+  if (-1 == fd && EACCES == errno) {
     printf("EACCESS error when calling perf_event_open.\n");
     return -1;
-  } else if (-1 == pe->fd) {
+  } else if (-1 == fd) {
     printf("Unspecified error when calling perf_event_open.\n");
     return -1;
   }
 
-  // OK, now populate the page.  TODO what happens when hugepages is enabled,
-  // though?
-  pe->region = mmap(NULL, PAGE_SIZE + PSAMPLE_SIZE, PROT_READ | PROT_WRITE,
-                    MAP_SHARED, pe->fd, 0);
-  if (MAP_FAILED == pe->region) {
+  return fd;
+}
+
+void* perfown(int fd) {
+  // Probably assumes it is being called by the profiler!
+  void* region;
+  // TODO how to deal with hugepages?
+  region = mmap(NULL, PAGE_SIZE + PSAMPLE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  if (!region || MAP_FAILED == region) {
     printf("mmap error when initiating the perf_event region.\n");
-    return -1;
+    return NULL;
   }
 
   // Make sure that SIGPROF is delivered to me instead of the called application
-  fcntl(pe->fd, F_SETFL, O_ASYNC);
-  fcntl(pe->fd, F_SETSIG, SIGPROF);
-  fcntl(pe->fd, F_SETOWN_EX, &(struct f_owner_ex){F_OWNER_TID, getpid()});
-  //  fcntl(pe->fd, F_SETOWN, (int){gettid()});
+  fcntl(fd, F_SETFL, O_ASYNC);
+  fcntl(fd, F_SETSIG, SIGPROF);
+  fcntl(fd, F_SETOWN_EX, &(struct f_owner_ex){F_OWNER_TID, getpid()});
 
   // Ignore the signal
   sigaction(SIGPROF, &(struct sigaction){SIG_IGN}, NULL);
@@ -211,12 +215,10 @@ char perfopen(pid_t pid, PEvent *pe, struct perf_event_attr *attr) {
   sigprocmask(SIG_BLOCK, &sigmask, NULL);
 
   // Enable the event
-  ioctl(pe->fd, PERF_EVENT_IOC_RESET, 0);
-  ioctl(pe->fd, PERF_EVENT_IOC_ENABLE, 1);
+  ioctl(fd, PERF_EVENT_IOC_RESET, 0);
+  ioctl(fd, PERF_EVENT_IOC_ENABLE, 1);
 
-  //  ioctl(fd, PERF_EVENT_IOC_REFRESH, 1);
-
-  return 0;
+  return region;
 }
 
 void default_callback(struct perf_event_header *hdr, void *arg) {

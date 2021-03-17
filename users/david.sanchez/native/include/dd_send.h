@@ -68,14 +68,14 @@ extern const char *DDRC_table[];
   X(RECORDINGEND,    end,              2, "end",              0, NULL)         \
   X(HOSTTAG,         host_tag,         3, "host",             1, "localhost")  \
   X(SERVICE,         service,          3, "service",          0, "myservice")  \
-  X(LANGUAGE,        language,         3, "language",         1, "ILLEGAL")    \
+  X(LANGUAGE,        language,         3, "language",         1, NULL)         \
   X(RUNTIME,         runtime,          2, "runtime",          0, NULL)         \
   X(SITE,            site,             3, "site",             0, NULL)         \
   X(ENVIRONMENT,     environment,      3, "environment",      0, "prod-test")  \
   X(PROFILERVERSION, profiler_version, 3, "profiler-version", 0, NULL)         \
   X(RUNTIMEOS,       runtime_os,       0, "runtime-os",       0, NULL)         \
   X(INTAKEVERSION,   intake_version,   2, "version",          0, "3")          \
-  X(FAMILY,          family,           2, "family",           0, "unknown")
+  X(FAMILY,          family,           2, "family",           1, NULL)
 // clang-format on
 
 typedef enum DDRVals {

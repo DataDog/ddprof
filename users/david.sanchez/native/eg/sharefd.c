@@ -7,8 +7,8 @@ int main(void) {
   }
 
   int pid = fork();
-  if(pid) {
-    int fd = open("/tmp/foo", O_RDWR|O_CREAT, 0777);
+  if (pid) {
+    int fd = open("/tmp/foo", O_RDWR | O_CREAT, 0777);
     if (sendfd(sfd[1], fd)) {
       printf("Error sending.\n");
     }

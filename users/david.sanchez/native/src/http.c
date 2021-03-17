@@ -18,7 +18,7 @@
 
 // We want to prevent the OS from sending us completely unnecessary signals.
 #ifdef __APPLE__
-#  define MSG_NOSIGNAL 0
+#define MSG_NOSIGNAL 0
 #endif
 
 int SockSetBit(int fd, int bit, bool v) {
@@ -47,7 +47,8 @@ int TcpSockNew() {
     return close(fd), -1;
 #endif
 #if __APPLE__
-  if (-1 == setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, (void*)*(int){1}, sizeof(int)))
+  if (-1 ==
+      setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, (void *)&(int){1}, sizeof(int)))
     return close(fd), -1;
 #endif
   return fd;
@@ -286,4 +287,3 @@ int HttpResRecvTimedwait(HttpRes *res, int timeout) {
   }
   return HTTP_EPARADOX;
 }
-
