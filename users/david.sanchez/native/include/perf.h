@@ -167,7 +167,8 @@ int getfd(int sfd) {
   return *((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg)));
 }
 
-int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd, unsigned long flags) {
+int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
+                    unsigned long flags) {
   return syscall(__NR_perf_event_open, attr, pid, cpu, gfd, flags);
 }
 
@@ -190,11 +191,12 @@ int perfopen(pid_t pid, int type, int config, uint64_t sample_period) {
   return fd;
 }
 
-void* perfown(int fd) {
+void *perfown(int fd) {
   // Probably assumes it is being called by the profiler!
-  void* region;
+  void *region;
   // TODO how to deal with hugepages?
-  region = mmap(NULL, PAGE_SIZE + PSAMPLE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  region = mmap(NULL, PAGE_SIZE + PSAMPLE_SIZE, PROT_READ | PROT_WRITE,
+                MAP_SHARED, fd, 0);
   if (!region || MAP_FAILED == region) {
     printf("mmap error when initiating the perf_event region.\n");
     return NULL;
