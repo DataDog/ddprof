@@ -313,7 +313,7 @@ int main(int argc, char **argv) {
   // Instrument the profiler
   // 1.   Setup pipes
   // 2.   fork()
-  // 3p.  I am the original process.  If prof profiling, instrument now
+  // 3p.  I am the original process.  If not prof profiling, instrument now
   // 3c.  I am the child.  Fork again and die.
   // 4p.  If not instrumenting profiler, instrument now.
   // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
@@ -342,8 +342,16 @@ int main(int argc, char **argv) {
       pthread_barrier_wait(pb); // Tell the other guy I have his FD
     }
 
+    // Cleanup and enter event loop
+    close(sfd[0]);
+    close(sfd[1]);
+    munmap(pb, sizeof(pthread_barrier_t));
+
+    ctx->send_nanos = now_nanos() + ctx->params.upload_period*1000000000;
+    elf_version(EV_CURRENT); // Initialize libelf
+    main_loop(&pe, ddprof_callback, ctx);
   } else {
-    // 3p.  I am the original process.  If prof profiling, instrument now
+    // 3p.  I am the original process.  If not prof profiling, instrument now
     // TODO: Deadlock city!  Add some timeouts here for chrissake
     for (int i = 0; i < ctx->num_watchers && ctx->params.enabled; i++) {
       int fd = perfopen(getpid(), ctx->watchers[i].type, ctx->watchers[i].config, ctx->watchers[i].sample_period);
@@ -351,38 +359,19 @@ int main(int argc, char **argv) {
         // TODO this is an error, so log it later
         ctx->params.enabled = false;
       }
-      pthread_barrier_wait(pb); // Did the other guy get my FD yet?
+      pthread_barrier_wait(pb); // Did the profiler get the FD?
       close(fd);
     }
 
-    // Cleanup
+    // Cleanup and become desired process image
     close(sfd[0]);
     close(sfd[1]);
+    munmap(pb, sizeof(pthread_barrier_t));
+
+    execvp(argv[0], argv);
+    printf("Hey, this shouldn't happen!\n");
   }
 
-  // Fork, then run the child
-//  pid_t pid = fork();
-//  if (!pid) {
-//    pthread_barrier_wait(pb);
-//    munmap(pb, sizeof(pthread_barrier_t));
-//    execvp(argv[0], argv);
-//    printf("Hey, this shouldn't happen!\n");
-//    return -1;
-//  } else {
-//    PEvent pe = {0};
-//    char err  = perfopen(pid, &pe, NULL);
-//    if (-1 == err) {
-//      printf("Couldn't set up perf_event_open\n");
-//      return -1;
-//    }
-//    pthread_barrier_wait(pb);
-//
-//    // If we're here, the child just launched.  Start the timer
-//    ctx->send_nanos = now_nanos() + ctx->params.upload_period*1000000000;
-//    munmap(pb, sizeof(pthread_barrier_t));
-//    elf_version(EV_CURRENT);
-//    main_loop(&pe, ddprof_callback, ctx);
-//  }
-
-  return 0;
+  // Neither the profiler nor the instrumented process should get here
+  return -1;
 }
