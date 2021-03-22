@@ -149,14 +149,29 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
 
     // TODO
     us->locs[us->idx].ip = pc;
-    us->locs[us->idx].map_start = mod->low_addr;
-    us->locs[us->idx].map_end = mod->high_addr;
-    ;
-    us->locs[us->idx].map_off = offset;
-    us->locs[us->idx].funname = strdup(symname ? symname : "??");
-    //    us->locs[us->idx].srcpath = ;
+
+    // Figure out mapping
+    Map *map = procfs_MapMatch(us->pid, pc);
+    if (map) {
+      us->locs[us->idx].map_start = map->start;
+      us->locs[us->idx].map_end = map->end;
+      us->locs[us->idx].map_off = map->off;
+    } else {
+      // Try to rely on the data we have at hand, but it's certainly wrong
+      us->locs[us->idx].map_start = mod->low_addr;
+      us->locs[us->idx].map_end = mod->high_addr;
+      us->locs[us->idx].map_off = offset;
+    }
+    if (symname) {
+      us->locs[us->idx].funname = strdup(symname);
+    } else {
+      char tmpname[1024] = {0};
+      snprintf(tmpname, 1020, "0x%lx", mod->low_addr);
+      us->locs[us->idx].funname = strdup(tmpname);
+    }
     char *sname = strrchr(mod->name, '/');
     us->locs[us->idx].sopath = strdup(sname ? sname + 1 : mod->name);
+    us->locs[us->idx].srcpath = strdup(us->locs[us->idx].sopath);
     us->idx++;
   } else {
     D("dwfl_addrmodule was zero: (%s)", dwfl_errmsg(-1));

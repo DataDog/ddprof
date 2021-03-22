@@ -212,9 +212,10 @@ char procfs_MmapGet(Map *map) {
 ssize_t procfs_MapRead(Map *map, void *buf, size_t sz, size_t addr) {
   if (procfs_MmapGet(map))
     return -1;
+  assert(map->map);
 
   // Out of bounds, don't even retry
-  if (addr < (map->start - map->off) || addr >= map->end) {
+  if (addr < (map->start - map->off) || addr >= (map->end - map->off - sz)) {
     return -1;
   }
   memcpy(buf, map->map + addr, sz);

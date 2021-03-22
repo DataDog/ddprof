@@ -33,7 +33,7 @@
 
 typedef struct PEvent {
   int fd;
-  int type;
+  int config;
   struct perf_event_mmap_page *region;
 } PEvent;
 
@@ -276,14 +276,14 @@ struct perf_event_header *rb_seek(RingBuffer *rb, uint64_t offset) {
 void main_loop(PEvent *pes, int pe_len,
                void (*event_callback)(struct perf_event_header *, int, void *),
                void *callback_arg) {
-  struct pollfd pfd[10];
+  struct pollfd pfd[100];
 
   // Set to default callback if needed
   // TODO is this really a great idea?
   if (!event_callback)
     event_callback = default_callback;
-  if (pe_len > 10)
-    pe_len = 10;
+  if (pe_len > 100)
+    pe_len = 100;
 
   // Setup poll() to watch perf_event file descriptors
   for (int i = 0; i < pe_len; i++) {
@@ -314,7 +314,7 @@ void main_loop(PEvent *pes, int pe_len,
         elems++;
         struct perf_event_header *hdr = rb_seek(rb, tail);
 
-        event_callback(hdr, pes[i].type, callback_arg);
+        event_callback(hdr, pes[i].config, callback_arg);
 
         tail += hdr->size;
         tail = tail & (PSAMPLE_SIZE - 1);

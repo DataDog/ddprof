@@ -61,9 +61,8 @@ int num_cpu = 0;
     input in a consistent way across the application.  Values may come from one
     of several places, with defaulting in the following order:
       1. Commandline argument
-      2. Configuration file
-      3. Environment variable
-      4. Application default
+      2. Environment variable
+      3. Application default
 
     And input may go to one of many places
       1. Profiling parameters
@@ -123,7 +122,7 @@ static inline int64_t now_nanos() {
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
 }
 
-void ddprof_callback(struct perf_event_header *hdr, int type, void *arg) {
+void ddprof_callback(struct perf_event_header *hdr, int config, void *arg) {
   static uint64_t id_locs[MAX_STACK]   = {0};
 
   // TODO this time stuff needs to go into the struct
@@ -142,27 +141,27 @@ void ddprof_callback(struct perf_event_header *hdr, int type, void *arg) {
     us->idx      = 0;
     us->stack    = pes->data;
     us->stack_sz = pes->size; // TODO should be dyn_size, but it's corrupted?
-    memcpy(&us->regs[0], pes->regs, 3 * sizeof(uint64_t));
+    memcpy(&us->regs[0], pes->regs, 3 * sizeof(uint64_t)); // TODO hardcoded reg count?
     us->max_stack = MAX_STACK;
     if (-1 == unwindstate__unwind(us)) {
-      printf("There was a bad error during unwinding (0x%lx).\n", us->eip);
+      Map* map = procfs_MapMatch(us->pid, us->eip);
+      printf("There was a bad error during unwinding %s (0x%lx).\n", map->path, us->eip);
       return;
     }
     FunLoc *locs = us->locs;
-    for (uint64_t i = 0, j = 0; i < us->idx; i++, j++) {
+    for (uint64_t i = 0, j = 0; i < us->idx; i++) {
       uint64_t id_map, id_fun, id_loc;
       id_map = pprof_mapAdd(dp, locs[i].map_start, locs[i].map_end, locs[i].map_off, locs[i].sopath, "");
       id_fun = pprof_funAdd(dp, locs[i].funname, locs[i].funname, locs[i].srcpath, locs[i].line);
       id_loc = pprof_locAdd(dp, id_map, locs[i].ip, (uint64_t[]){id_fun}, (int64_t[]){0}, 1);
       if (id_loc > 0)
-        id_locs[j] = id_loc;
-      else
-        j--;
+        id_locs[j++] = id_loc;
     }
-    if (type == PERF_COUNT_SW_TASK_CLOCK)
-      pprof_sampleAdd(dp, (int64_t[]){1, pes->period, 0}, 3, id_locs, us->idx);
-    else if (type == PERF_COUNT_SW_CPU_CLOCK)
-      pprof_sampleAdd(dp, (int64_t[]){1, 0, pes->period}, 3, id_locs, us->idx);
+    if (config == PERF_COUNT_SW_TASK_CLOCK) {
+      pprof_sampleAdd(dp, (int64_t[]){pes->period, 0}, pctx->num_watchers, id_locs, us->idx);
+    } else if (config == PERF_COUNT_SW_CPU_CLOCK) {
+      pprof_sampleAdd(dp, (int64_t[]){0, pes->period}, pctx->num_watchers, id_locs, us->idx);
+    }
 
     break;
 
@@ -194,7 +193,7 @@ void ddprof_callback(struct perf_event_header *hdr, int type, void *arg) {
 
 void print_help() {
   char help_msg[] = ""
-                    " usage: dd-prof [--version] [--help] [PROFILER_OPTIONS] "
+                    " usage: dd-prof [--help] [PROFILER_OPTIONS] "
                     "COMMAND [COMMAND_ARGS]\n"
                     "\n"
                     "  -A, --apikey:\n"
@@ -206,8 +205,8 @@ void print_help() {
                     "  -S, --service:\n"
                     "  -T, --tags:\n"
                     "  -U, --upload_timeout:\n"
-                    "  -V, --version:\n"
                     "  -u, --upload_period:\n"
+                    "  -v, --version:\n"
                     "  -x, --prefix:\n";
   printf("%s\n", help_msg);
 }
@@ -230,7 +229,9 @@ int main(int argc, char **argv) {
   DDReq *ddr = ctx->ddr;
   DDR_init(ddr);
 
-  struct option lopts[] = {OPT_TABLE(X_LOPT){"help", 0, 0, 'h'}};
+  struct option lopts[] = { OPT_TABLE(X_LOPT)
+                           {"help", 0, 0, 'h'},
+                           {"version", 0, 0, 'v'}};
 
   //---- Populate default values
   OPT_TABLE(X_DFLT);
@@ -246,6 +247,8 @@ int main(int argc, char **argv) {
     case 'h':
       print_help();
       return 0;
+    case 'v':
+      return 0;
     default:
       printf("Non-recoverable error processing options.\n");
       return -1;
@@ -260,11 +263,11 @@ int main(int argc, char **argv) {
   ctx->num_watchers = 2;
   ctx->watchers[0].type = PERF_TYPE_SOFTWARE;
   ctx->watchers[0].config = PERF_COUNT_SW_TASK_CLOCK;
-  ctx->watchers[0].sample_period = 10000000;
+  ctx->watchers[0].sample_period = 9999999;
 
   ctx->watchers[1].type = PERF_TYPE_SOFTWARE;
   ctx->watchers[1].config = PERF_COUNT_SW_CPU_CLOCK;
-  ctx->watchers[1].sample_period = 10000000;
+  ctx->watchers[1].sample_period = 9999999;
 
   // process upload_period
   if (ctx->upload_period) {
@@ -294,10 +297,9 @@ int main(int argc, char **argv) {
   char *pprof_labels[10];
   char *pprof_units[10];
 
-  pprof_labels[0] = "samples"; pprof_units[0] = "count";
-  pprof_labels[1] = "cpu-time"; pprof_units[1] = "nanoseconds";
-  pprof_labels[2] = "wall-time"; pprof_units[2] = "nanoseconds";
-  pprof_Init(ctx->dp, (const char**)pprof_labels, (const char**)pprof_units, 3);
+  pprof_labels[0] = "cpu-time"; pprof_units[0] = "nanoseconds";
+  pprof_labels[1] = "wall-time"; pprof_units[1] = "nanoseconds";
+  pprof_Init(ctx->dp, (const char**)pprof_labels, (const char**)pprof_units, ctx->num_watchers);
   pprof_timeUpdate(ctx->dp); // Set the time
 
   // Get the number of CPUs
@@ -352,7 +354,7 @@ int main(int argc, char **argv) {
       for (int j = 0; j < num_cpu; j++) {
         int k = i*num_cpu + j;
         pes[k].fd = getfd(sfd[0]);
-        pes[k].type = ctx->watchers[i].type;
+        pes[k].config = ctx->watchers[i].config;
         if (!(pes[k].region = perfown(pes[k].fd))) {
           startup_errors = true;
         }
