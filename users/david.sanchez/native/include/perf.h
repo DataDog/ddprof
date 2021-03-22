@@ -33,6 +33,7 @@
 
 typedef struct PEvent {
   int fd;
+  int type;
   struct perf_event_mmap_page *region;
 } PEvent;
 
@@ -127,7 +128,7 @@ struct perf_event_attr g_dd_native_attr = {
         PERF_SAMPLE_PERIOD,
     .precise_ip = 2, // Change this when moving from SW->HW clock
     .disabled = 0,
-    .inherit = 0, // TODO temp
+    .inherit = 1,
     .inherit_stat = 1,
     .mmap = 0, // keep track of executable mappings
     .task = 0, // Follow fork/stop events
@@ -142,9 +143,9 @@ struct perf_event_attr g_dd_native_attr = {
 
 int sendfd(int sfd, int fd) {
   struct msghdr msg = {
-      .msg_iov = &(struct iovec){.iov_base = "T", .iov_len = 1},
+      .msg_iov = &(struct iovec){.iov_base = (char[2]){"  "}, .iov_len = 2},
       .msg_iovlen = 1,
-      .msg_control = (char *)(char[CMSG_SPACE(sizeof(int))]){0},
+      .msg_control = (char[CMSG_SPACE(sizeof(int))]){0},
       .msg_controllen = CMSG_SPACE(sizeof(int))};
   CMSG_FIRSTHDR(&msg)->cmsg_level = SOL_SOCKET;
   CMSG_FIRSTHDR(&msg)->cmsg_type = SCM_RIGHTS;
@@ -153,18 +154,30 @@ int sendfd(int sfd, int fd) {
 
   msg.msg_controllen = CMSG_SPACE(sizeof(int));
 
-  return -1 == sendmsg(sfd, &msg, 0) ? -1 : 0;
+  while (sizeof(char[2]) != sendmsg(sfd, &msg, MSG_NOSIGNAL)) {
+    if (errno != EINTR)
+      return -1;
+  }
+  return 0;
 }
 
 int getfd(int sfd) {
-  struct msghdr msg = {.msg_iov = &(struct iovec){.iov_base = (char[256]){0},
-                                                  .iov_len = sizeof(char[256])},
-                       .msg_iovlen = 1,
-                       .msg_control = (char *)(char[256]){0},
-                       .msg_controllen = sizeof(char[256])};
-  if (0 > recvmsg(sfd, &msg, 0))
-    return -1;
-  return *((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg)));
+  struct msghdr msg = {
+      .msg_iov = &(struct iovec){.iov_base = (char[2]){"  "}, .iov_len = 2},
+      .msg_iovlen = 1,
+      .msg_control = (char[CMSG_SPACE(sizeof(int))]){0},
+      .msg_controllen = CMSG_SPACE(sizeof(int))};
+  while (sizeof(char[2]) != recvmsg(sfd, &msg, MSG_NOSIGNAL)) {
+    if (errno != EINTR)
+      return -1;
+  }
+
+  // Check
+  if (CMSG_FIRSTHDR(&msg) && CMSG_FIRSTHDR(&msg)->cmsg_level == SOL_SOCKET &&
+      CMSG_FIRSTHDR(&msg)->cmsg_type == SCM_RIGHTS) {
+    return *((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg)));
+  }
+  return -1;
 }
 
 int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
@@ -172,14 +185,14 @@ int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
   return syscall(__NR_perf_event_open, attr, pid, cpu, gfd, flags);
 }
 
-int perfopen(pid_t pid, int type, int config, uint64_t sample_period) {
+int perfopen(pid_t pid, int type, int config, uint64_t sample_period, int cpu) {
   struct perf_event_attr *attr = &(struct perf_event_attr){0};
   memcpy(attr, &g_dd_native_attr, sizeof(g_dd_native_attr));
   attr->type = type;
   attr->config = config;
   attr->sample_period = sample_period;
 
-  int fd = perf_event_open(attr, pid, -1, -1, PERF_FLAG_FD_CLOEXEC);
+  int fd = perf_event_open(attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC);
   if (-1 == fd && EACCES == errno) {
     printf("EACCESS error when calling perf_event_open.\n");
     return -1;
@@ -223,12 +236,13 @@ void *perfown(int fd) {
   return region;
 }
 
-void default_callback(struct perf_event_header *hdr, void *arg) {
+void default_callback(struct perf_event_header *hdr, int type, void *arg) {
   struct perf_event_sample *pes;
   struct perf_event_mmap *pem;
   (void)arg;
   (void)pes;
   (void)pem;
+  (void)type;
   switch (hdr->type) {
   case PERF_RECORD_SAMPLE:
     pes = (struct perf_event_sample *)hdr;
@@ -259,37 +273,54 @@ struct perf_event_header *rb_seek(RingBuffer *rb, uint64_t offset) {
   return (struct perf_event_header *)(rb->start + rb->offset);
 }
 
-void main_loop(PEvent *pe,
-               void (*event_callback)(struct perf_event_header *, void *),
+void main_loop(PEvent *pes, int pe_len,
+               void (*event_callback)(struct perf_event_header *, int, void *),
                void *callback_arg) {
-  struct pollfd pfd = {.fd = pe->fd, .events = POLLIN | POLLERR | POLLHUP};
+  struct pollfd pfd[10];
+
+  // Set to default callback if needed
+  // TODO is this really a great idea?
   if (!event_callback)
     event_callback = default_callback;
-  ioctl(pe->fd, PERF_EVENT_IOC_ENABLE, 1);
+  if (pe_len > 10)
+    pe_len = 10;
+
+  // Setup poll() to watch perf_event file descriptors
+  for (int i = 0; i < pe_len; i++) {
+    pfd[i].fd = pes[i].fd;
+    pfd[i].events = POLLIN | POLLERR | POLLHUP;
+  }
   while (1) {
-    poll(&pfd, 1, PSAMPLE_DEFAULT_WAKEUP);
-    if (pfd.revents & POLLHUP) {
-      printf("Instrumented process died (exiting)\n");
-      exit(-1);
+    int n = poll(pfd, pe_len, PSAMPLE_DEFAULT_WAKEUP);
+    if (-1 == n) {
+      return;
     }
-    uint64_t head = pe->region->data_head & (PSAMPLE_SIZE - 1);
-    uint64_t tail = pe->region->data_tail & (PSAMPLE_SIZE - 1);
-    rmb();
+    for (int i = 0; i < pe_len; i++) {
+      if (!pfd[i].revents)
+        continue;
+      if (pfd[i].revents & POLLHUP) {
+        return;
+      }
+      uint64_t head = pes[i].region->data_head & (PSAMPLE_SIZE - 1);
+      uint64_t tail = pes[i].region->data_tail & (PSAMPLE_SIZE - 1);
 
-    RingBuffer *rb = &(RingBuffer){0};
-    rb_init(rb, pe->region);
+      rmb();
 
-    int elems = 0;
-    while (head > tail) {
-      elems++;
-      struct perf_event_header *hdr = rb_seek(rb, tail);
+      RingBuffer *rb = &(RingBuffer){0};
+      rb_init(rb, pes[i].region);
 
-      event_callback(hdr, callback_arg);
+      int elems = 0;
+      while (head > tail) {
+        elems++;
+        struct perf_event_header *hdr = rb_seek(rb, tail);
 
-      tail += hdr->size;
-      tail = tail & (PSAMPLE_SIZE - 1);
+        event_callback(hdr, pes[i].type, callback_arg);
+
+        tail += hdr->size;
+        tail = tail & (PSAMPLE_SIZE - 1);
+      }
+      pes[i].region->data_tail = head;
     }
-    pe->region->data_tail = head;
   }
 }
 
