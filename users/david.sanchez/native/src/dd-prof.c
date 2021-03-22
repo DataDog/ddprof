@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/sysinfo.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -43,6 +44,17 @@ struct DDProfContext {
   int64_t send_nanos;
 };
 
+typedef struct PerfOption {
+  char key;
+  int type;
+  int config;
+} PerfOption;
+
+PerfOption perfoptions[] = {{'c', PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK},
+                            {'w', PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK}};
+
+int num_cpu = 0;
+
 // clang-format off
 /*
     This table is used for a variety of things, but primarily for dispatching
@@ -79,9 +91,8 @@ struct DDProfContext {
 #define OPT_TABLE(X)                                                                 \
   X(DD_API_KEY,                  apikey,          A, 1, ctx->ddr, NULL, NULL)        \
   X(DD_ENV,                      environment,     E, 1, ctx->ddr, NULL, NULL)        \
-  X(DD_AGENT_HOST,               agent_host,      H, 1, ctx,      NULL, "localhost") \
+  X(DD_AGENT_HOST,               host,            H, 1, ctx->ddr, NULL, "localhost") \
   X(DD_SITE,                     site,            I, 1, ctx->ddr, NULL, NULL)        \
-  X(DD_HOST_OVERRIDE,            host,            N, 1, ctx->ddr, NULL, "localhost") \
   X(DD_TRACE_AGENT_PORT,         port,            P, 1, ctx->ddr, NULL, "8081")      \
   X(DD_SERVICE,                  service,         S, 1, ctx->ddr, NULL, "my_profiled_service") \
   X(DD_TAGS,                     tags,            T, 1, ctx,      NULL, NULL)        \
@@ -112,7 +123,7 @@ static inline int64_t now_nanos() {
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
 }
 
-void ddprof_callback(struct perf_event_header *hdr, void *arg) {
+void ddprof_callback(struct perf_event_header *hdr, int type, void *arg) {
   static uint64_t id_locs[MAX_STACK]   = {0};
 
   // TODO this time stuff needs to go into the struct
@@ -147,11 +158,12 @@ void ddprof_callback(struct perf_event_header *hdr, void *arg) {
         id_locs[j] = id_loc;
       else
         j--;
-
-//      printf("   %s\n", locs[i].funname);
     }
-    int64_t this_time = now_nanos();
-    pprof_sampleAdd(dp, (int64_t[]){1, pes->period, this_time-last_time}, 3, id_locs, us->idx);
+    if (type == PERF_COUNT_SW_TASK_CLOCK)
+      pprof_sampleAdd(dp, (int64_t[]){1, pes->period, 0}, 3, id_locs, us->idx);
+    else if (type == PERF_COUNT_SW_CPU_CLOCK)
+      pprof_sampleAdd(dp, (int64_t[]){1, 0, pes->period}, 3, id_locs, us->idx);
+
     break;
 
   default:
@@ -164,14 +176,14 @@ void ddprof_callback(struct perf_event_header *hdr, void *arg) {
   if (now > pctx->send_nanos) {
     int ret = 0;
     if ((ret = DDR_pprof(ddr, dp)))
-      printf("Got an error (%s)\n", DDR_code2str(ret));
+      printf("Got an error adding pprof (%s)\n", DDR_code2str(ret));
     DDR_setTimeNano(ddr, dp->pprof.time_nanos, now);
     if ((ret = DDR_finalize(ddr)))
-      printf("Got an error (%s)\n", DDR_code2str(ret));
+      printf("Got an error finalizing (%s)\n", DDR_code2str(ret));
     if ((ret = DDR_send(ddr)))
-      printf("Got an error (%s)\n", DDR_code2str(ret));
+      printf("Got an error sending (%s)\n", DDR_code2str(ret));
     if ((ret = DDR_watch(ddr, -1)))
-      printf("Got an error (%s)\n", DDR_code2str(ret));
+      printf("Got an error watching (%s)\n", DDR_code2str(ret));
     DDR_clear(ddr);
     pctx->send_nanos += pctx->params.upload_period*1000000000;
 
@@ -210,9 +222,7 @@ int main(int argc, char **argv) {
   //---- Inititiate structs
   int c = 0, oi = 0;
   struct DDProfContext *ctx =
-      &(struct DDProfContext){.ddr        = &(DDReq){.host = "localhost",
-                                                     .port = "10534",
-                                                     .user_agent = "Native-http-client/0.1",
+      &(struct DDProfContext){.ddr        = &(DDReq){ .user_agent = "Native-http-client/0.1",
                                                      .language = "native",
                                                      .family = "native"},
                               .dp         = &(DProf){0},
@@ -247,10 +257,14 @@ int main(int argc, char **argv) {
   ctx->params.upload_period = 60.0;
 
   // Process perf watchers
-  ctx->num_watchers = 1;
+  ctx->num_watchers = 2;
   ctx->watchers[0].type = PERF_TYPE_SOFTWARE;
   ctx->watchers[0].config = PERF_COUNT_SW_TASK_CLOCK;
   ctx->watchers[0].sample_period = 10000000;
+
+  ctx->watchers[1].type = PERF_TYPE_SOFTWARE;
+  ctx->watchers[1].config = PERF_COUNT_SW_CPU_CLOCK;
+  ctx->watchers[1].sample_period = 10000000;
 
   // process upload_period
   if (ctx->upload_period) {
@@ -286,23 +300,15 @@ int main(int argc, char **argv) {
   pprof_Init(ctx->dp, (const char**)pprof_labels, (const char**)pprof_units, 3);
   pprof_timeUpdate(ctx->dp); // Set the time
 
-  // Set the CPU affinity so that everything is on the same CPU.  Scream about
-  // it because we want to undo this later..!
-  cpu_set_t cpu_mask = {0};
-  CPU_SET(0, &cpu_mask);
-  if (!sched_setaffinity(getpid(), sizeof(cpu_set_t), &cpu_mask)) {
-    printf("Successfully set the CPU mask.\n");
-  } else {
-    printf("Failed to set the CPU mask.\n");
-    return -1;
-  }
+  // Get the number of CPUs
+  num_cpu = get_nprocs();
 
   // Setup a shared barrier for coordination
   pthread_barrierattr_t bat = {0};
   pthread_barrier_t *pb = mmap(NULL, sizeof(pthread_barrier_t),
       PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   if (MAP_FAILED == pb) {
-    // TODO log here.  Nothing else to do, since we're not halting the target 
+    // TODO log here.  Nothing else to do, since we're not halting the target
     ctx->params.enabled = false;
   } else {
     pthread_barrierattr_init(&bat);
@@ -322,6 +328,10 @@ int main(int argc, char **argv) {
   // 6p.  close fd, teardown pipe, execvp() to target process.
   // 6cc. teardown pipe, create mmap regions and enter event loop
 
+  // TODO
+  // * Multiple file descriptors can be sent in one push.  I don't know how much
+  //   this matters, but if every microsecond counts at startup, it's an option.
+
   // 1. Setup pipes (really unix domain socket pair)
   int sfd[2] = {-1, -1};
   if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sfd)) {
@@ -336,10 +346,18 @@ int main(int argc, char **argv) {
     if (fork()) exit(0); // no need to use _exit, since we still own the proc
 
     // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
-    struct PEvent pes[10] = {0};
+    bool startup_errors = false;
+    struct PEvent pes[100] = {0};
     for (int i = 0; i < ctx->num_watchers; i++) {
-      pes[i].fd = getfd(sfd[0]);
-      pthread_barrier_wait(pb); // Tell the other guy I have his FD
+      for (int j = 0; j < num_cpu; j++) {
+        int k = i*num_cpu + j;
+        pes[k].fd = getfd(sfd[0]);
+        pes[k].type = ctx->watchers[i].type;
+        if (!(pes[k].region = perfown(pes[k].fd))) {
+          startup_errors = true;
+        }
+        pthread_barrier_wait(pb); // Tell the other guy I have his FD
+      }
     }
 
     // Cleanup and enter event loop
@@ -349,18 +367,25 @@ int main(int argc, char **argv) {
 
     ctx->send_nanos = now_nanos() + ctx->params.upload_period*1000000000;
     elf_version(EV_CURRENT); // Initialize libelf
-    main_loop(&pe, ddprof_callback, ctx);
+    if (!startup_errors)
+      main_loop(pes, ctx->num_watchers*num_cpu, ddprof_callback, ctx);
+    else
+      printf("Started with errors\n");
   } else {
     // 3p.  I am the original process.  If not prof profiling, instrument now
     // TODO: Deadlock city!  Add some timeouts here for chrissake
+    pid_t mypid = getpid();
     for (int i = 0; i < ctx->num_watchers && ctx->params.enabled; i++) {
-      int fd = perfopen(getpid(), ctx->watchers[i].type, ctx->watchers[i].config, ctx->watchers[i].sample_period);
-      if (-1 == fd || sendfd(sfd[1], fd)) {
-        // TODO this is an error, so log it later
-        ctx->params.enabled = false;
+      for(int j=0; j<num_cpu; j++) {
+        int fd = perfopen(mypid, ctx->watchers[i].type, ctx->watchers[i].config, ctx->watchers[i].sample_period, j);
+        if (-1 == fd || sendfd(sfd[1], fd)) {
+          // TODO this is an error, so log it later
+          printf("Had an error.\n");
+          ctx->params.enabled = false;
+        }
+        pthread_barrier_wait(pb); // Did the profiler get the FD?
+        close(fd);
       }
-      pthread_barrier_wait(pb); // Did the profiler get the FD?
-      close(fd);
     }
 
     // Cleanup and become desired process image
