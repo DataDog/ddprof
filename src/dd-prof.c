@@ -54,6 +54,8 @@ struct DDProfContext {
   int64_t send_nanos;
 };
 
+
+// clang-format off
 PerfOption perfoptions[] = {
   // Hardware
   {'C', PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              1e6, "cpu-cycle",    "cycles"},
@@ -68,13 +70,22 @@ PerfOption perfoptions[] = {
   {'S', PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1e3, "bus-stb",      "cycles"},
 
   // Software
-  {'c', PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,              1e6, "cpu-time",     "nanoseconds"},
+  {'c', PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK, 1e6, "cpu-time",  "nanoseconds"},
   {'w', PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,  1e6, "wall-time", "nanoseconds"},
 
   // Kernel tracepoints
-  {'r', PERF_TYPE_TRACEPOINT, 1132,                   1,   "wall-time", "nanoseconds"},
+  // I don't think there's any commitment that these IDs are unchanging between installations of the same kernel version,
+  // let alone between kernel releases.  You'll have to scrape them at runtime.  This is actually nice because access
+  // to the sysfs endpoint precludes permissions, so you can emit a helpful error if something goes wrong before
+  // instrumenting with perf
+  // To generate the hack: for f in $(find /sys/kernel/tracing/events/block -name id); do echo $f; cat $f; done
+  {'1', PERF_TYPE_TRACEPOINT, 1133,  1, "block-insert",   "events"},
+  {'2', PERF_TYPE_TRACEPOINT, 1132,  1, "block-issue",    "events"},
+  {'3', PERF_TYPE_TRACEPOINT, 1134,  1, "block-complete", "events"},
 };
+// clang-format on
 
+int num_perfs = sizeof(perfoptions) / sizeof(*perfoptions);
 int num_cpu = 0;
 
 // clang-format off
@@ -163,7 +174,7 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
     us->idx      = 0;
     us->stack    = pes->data;
     us->stack_sz = pes->size; // TODO should be dyn_size, but it's corrupted?
-    memcpy(&us->regs[0], pes->regs, 3 * sizeof(uint64_t)); // TODO hardcoded reg count?
+    memcpy(&us->regs[0], pes->regs,  3 * sizeof(uint64_t)); // TODO hardcoded reg count?
     us->max_stack = MAX_STACK;
     if (-1 == unwindstate__unwind(us)) {
       Map* map = procfs_MapMatch(us->pid, us->eip);
@@ -180,6 +191,9 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
         id_locs[j++] = id_loc;
     }
     int64_t sample_val[max_watchers] = {0};
+    if (pos>0) {
+      printf("Got a desirable sample.  Its value is %ld\n", pes->period);
+    }
     sample_val[pos] = pes->period;
     pprof_sampleAdd(dp, sample_val, pctx->num_watchers, id_locs, us->idx);
     break;
@@ -241,11 +255,11 @@ int main(int argc, char **argv) {
   //---- Inititiate structs
   int c = 0, oi = 0;
   struct DDProfContext *ctx =
-      &(struct DDProfContext){.ddr        = &(DDReq){ .user_agent = "Native-http-client/0.1",
-                                                     .language = "native",
-                                                     .family = "native"},
-                              .dp         = &(DProf){0},
-                              .us         = &(struct UnwindState){0}};
+      &(struct DDProfContext){.ddr  = &(DDReq){.user_agent = "Native-http-client/0.1",
+                                               .language = "native",
+                                               .family = "native"},
+                              .dp   = &(DProf){0},
+                              .us   = &(struct UnwindState){0}};
   DDReq *ddr = ctx->ddr;
   DDR_init(ddr);
 
@@ -256,6 +270,7 @@ int main(int argc, char **argv) {
 
   //---- Populate default values
   OPT_TABLE(X_DFLT);
+  bool default_watchers = true;
   ctx->num_watchers = 2;
   ctx->watchers[0].opt = &perfoptions[10];
   ctx->watchers[0].sample_period = 9999999;   // Once per millisecond
@@ -272,7 +287,27 @@ int main(int argc, char **argv) {
   while (-1 != (c = getopt_long(argc, argv, "+" OPT_TABLE(X_OSTR) "e:h", lopts, &oi))) {
     switch (c) {
       OPT_TABLE(X_CASE)
-    case 'e':
+    case 'e':;
+      int n = strlen(optarg);
+      for (int i = 0; i < n; i++) {
+        for (int j = 0; j < num_perfs; j++) {
+          if (perfoptions[j].key == optarg[i]) {
+            if (default_watchers) {
+              default_watchers = false;
+              ctx->num_watchers = 0;
+
+              // We're going to overwrite 0, so just handle 1
+              ctx->watchers[1].opt = NULL;
+              ctx->watchers[1].sample_period = 0;
+            }
+
+            ctx->watchers[ctx->num_watchers].opt = &perfoptions[j];
+            ctx->watchers[ctx->num_watchers].sample_period = perfoptions[j].base_rate;
+            ctx->num_watchers++;
+          }
+        }
+      }
+      break;
     case 'h':
       print_help();
       return 0;
@@ -300,6 +335,15 @@ int main(int argc, char **argv) {
   printf("=== PRINTING PARAMETERS ===\n");
   OPT_TABLE(X_PRNT);
   printf("upload_period: %f\n", ctx->params.upload_period);
+
+  printf("Instrumented with %d watchers.\n", ctx->num_watchers);
+  for (int i=0; i < ctx->num_watchers; i++) {
+    printf("ID: %c, Pos: %d, Index: %d, Label: %s\n",
+        ctx->watchers[i].opt->key,
+        i,
+        ctx->watchers[i].opt->config,
+        ctx->watchers[i].opt->label);
+  }
 #endif
   // Adjust input parameters for execvp()
   argv += optind;
