@@ -3,7 +3,7 @@ LIBUNWIND = /home/sanchda/dev/libunwind
 ELFUTILS = /home/sanchda/dev/elfutils
 INCLUDE = -Iinclude -I$(BINUTILS)/include -I$(BINUTILS)/bfd -I$(BINUTILS)/binutils -I$(LIBUNWIND)/include -I$(ELFUTILS) -I$(ELFUTILS)/libdw
 INCLUDE = -Iinclude -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
-CFLAGS = -O2 -std=c11 -D_GNU_SOURCE -DDEBUG
+CFLAGS = -g -O2 -std=c11 -D_GNU_SOURCE -DDEBUG
 TESTS := http perf pprof
 WARNS := -Wall -Wextra -Wpedantic -Wno-missing-braces -Wno-missing-field-initializers -Wno-gnu-statement-expression -Wno-pointer-arith -Wno-gnu-folding-constant
 ANALYZER := -fanalyzer -fanalyzer-verbosity=2
