@@ -32,8 +32,8 @@
 #define MAX_INSN 16
 
 typedef struct PEvent {
-  int fd;
-  int config;
+  int pos;      // Index into the sample
+  int fd;       // Underlying perf event FD
   struct perf_event_mmap_page *region;
 } PEvent;
 
@@ -126,10 +126,10 @@ struct perf_event_attr g_dd_native_attr = {
     .sample_type = PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER |
         PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME |
         PERF_SAMPLE_PERIOD,
-    .precise_ip = 2, // Change this when moving from SW->HW clock
+    .precise_ip = 2,
     .disabled = 0,
     .inherit = 1,
-    .inherit_stat = 1,
+    .inherit_stat = 0,
     .mmap = 0, // keep track of executable mappings
     .task = 0, // Follow fork/stop events
     .enable_on_exec = 1,
@@ -137,8 +137,6 @@ struct perf_event_attr g_dd_native_attr = {
     .sample_regs_user = PERF_REGS_MASK,
     .exclude_kernel = 1,
     .exclude_hv = 1,
-    .watermark = 1,
-    .wakeup_watermark = 1,
 };
 
 int sendfd(int sfd, int fd) {
@@ -314,7 +312,7 @@ void main_loop(PEvent *pes, int pe_len,
         elems++;
         struct perf_event_header *hdr = rb_seek(rb, tail);
 
-        event_callback(hdr, pes[i].config, callback_arg);
+        event_callback(hdr, pes[i].pos, callback_arg);
 
         tail += hdr->size;
         tail = tail & (PSAMPLE_SIZE - 1);

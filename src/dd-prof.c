@@ -14,6 +14,18 @@
 #include "pprof.h"
 #include "unwind.h"
 
+
+#define max_watchers 10
+
+typedef struct PerfOption {
+  char key;
+  int type;
+  int config;
+  int base_rate;
+  char* label;
+  char* unit;
+} PerfOption;
+
 struct DDProfContext {
   DProf *dp;
   DDReq *ddr;
@@ -32,26 +44,36 @@ struct DDProfContext {
     double upload_period;
     bool profprofiler;
   } params;
-
-  int num_watchers;
   struct watchers {
-    int type;
-    int config;
+    PerfOption* opt;
     uint64_t sample_period;
-  } watchers[10]; // NB hardcoded limit
+  } watchers[max_watchers];
+  int num_watchers;
 
   struct UnwindState *us;
   int64_t send_nanos;
 };
 
-typedef struct PerfOption {
-  char key;
-  int type;
-  int config;
-} PerfOption;
+PerfOption perfoptions[] = {
+  // Hardware
+  {'C', PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              1e6, "cpu-cycle",    "cycles"},
+  {'R', PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES,          1e6, "cpu-cycle",    "cycles"},
+  {'I', PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,            1e6, "cpu-instr",    "instructions"},
+  {'H', PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES,        1e3, "cache-ref",    "events"},
+  {'M', PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES,            1e3, "cache-miss",   "events"},
+  {'P', PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     1e3, "branch-instr", "events"},
+  {'Q', PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES,           1e3, "branch-miss",  "events"},
+  {'B', PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,              1e3, "bus-cycle",    "cycles"},
+  {'F', PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1e3, "bus-stf",      "cycles"},
+  {'S', PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1e3, "bus-stb",      "cycles"},
 
-PerfOption perfoptions[] = {{'c', PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK},
-                            {'w', PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK}};
+  // Software
+  {'c', PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,              1e6, "cpu-time",     "nanoseconds"},
+  {'w', PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,  1e6, "wall-time", "nanoseconds"},
+
+  // Kernel tracepoints
+  {'r', PERF_TYPE_TRACEPOINT, 1132,                   1,   "wall-time", "nanoseconds"},
+};
 
 int num_cpu = 0;
 
@@ -96,7 +118,7 @@ int num_cpu = 0;
   X(DD_SERVICE,                  service,         S, 1, ctx->ddr, NULL, "my_profiled_service") \
   X(DD_TAGS,                     tags,            T, 1, ctx,      NULL, NULL)        \
   X(DD_VERSION,                  profiler_version,V, 1, ctx->ddr, NULL, NULL)        \
-  X(DD_PROFILING_ENABLED,        enabled,         e, 1, ctx,      NULL, "yes")       \
+  X(DD_PROFILING_ENABLED,        enabled,         d, 1, ctx,      NULL, "yes")       \
   X(DD_PROFILING_UPLOAD_PERIOD,  upload_period,   u, 1, ctx,      NULL, "60.0")      \
   X(DD_PROFILE_NATIVEPROFILER,   profprofiler,    p, 0, ctx,      NULL, NULL)        \
   X(DD_PROFILING_,               prefix,          X, 1, ctx,      NULL, "")
@@ -122,7 +144,7 @@ static inline int64_t now_nanos() {
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
 }
 
-void ddprof_callback(struct perf_event_header *hdr, int config, void *arg) {
+void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   static uint64_t id_locs[MAX_STACK]   = {0};
 
   // TODO this time stuff needs to go into the struct
@@ -157,12 +179,9 @@ void ddprof_callback(struct perf_event_header *hdr, int config, void *arg) {
       if (id_loc > 0)
         id_locs[j++] = id_loc;
     }
-    if (config == PERF_COUNT_SW_TASK_CLOCK) {
-      pprof_sampleAdd(dp, (int64_t[]){pes->period, 0}, pctx->num_watchers, id_locs, us->idx);
-    } else if (config == PERF_COUNT_SW_CPU_CLOCK) {
-      pprof_sampleAdd(dp, (int64_t[]){0, pes->period}, pctx->num_watchers, id_locs, us->idx);
-    }
-
+    int64_t sample_val[max_watchers] = {0};
+    sample_val[pos] = pes->period;
+    pprof_sampleAdd(dp, sample_val, pctx->num_watchers, id_locs, us->idx);
     break;
 
   default:
@@ -206,6 +225,7 @@ void print_help() {
                     "  -T, --tags:\n"
                     "  -U, --upload_timeout:\n"
                     "  -u, --upload_period:\n"
+                    "  -e, --event:\n"
                     "  -v, --version:\n"
                     "  -x, --prefix:\n";
   printf("%s\n", help_msg);
@@ -230,20 +250,29 @@ int main(int argc, char **argv) {
   DDR_init(ddr);
 
   struct option lopts[] = { OPT_TABLE(X_LOPT)
+                           {"event", 1, 0, 'e'},
                            {"help", 0, 0, 'h'},
                            {"version", 0, 0, 'v'}};
 
   //---- Populate default values
   OPT_TABLE(X_DFLT);
+  ctx->num_watchers = 2;
+  ctx->watchers[0].opt = &perfoptions[10];
+  ctx->watchers[0].sample_period = 9999999;   // Once per millisecond
+
+  ctx->watchers[1].opt = &perfoptions[12];
+  ctx->watchers[1].sample_period = 9999999;
+  ctx->watchers[1].sample_period = 1;
 
   //---- Process Options
   if (argc <= 1) {
     print_help();
     return 0;
   }
-  while (-1 != (c = getopt_long(argc, argv, "+" OPT_TABLE(X_OSTR) "h", lopts, &oi))) {
+  while (-1 != (c = getopt_long(argc, argv, "+" OPT_TABLE(X_OSTR) "e:h", lopts, &oi))) {
     switch (c) {
       OPT_TABLE(X_CASE)
+    case 'e':
     case 'h':
       print_help();
       return 0;
@@ -259,15 +288,6 @@ int main(int argc, char **argv) {
   ctx->params.enabled = true;
   ctx->params.upload_period = 60.0;
 
-  // Process perf watchers
-  ctx->num_watchers = 2;
-  ctx->watchers[0].type = PERF_TYPE_SOFTWARE;
-  ctx->watchers[0].config = PERF_COUNT_SW_TASK_CLOCK;
-  ctx->watchers[0].sample_period = 9999999;
-
-  ctx->watchers[1].type = PERF_TYPE_SOFTWARE;
-  ctx->watchers[1].config = PERF_COUNT_SW_CPU_CLOCK;
-  ctx->watchers[1].sample_period = 9999999;
 
   // process upload_period
   if (ctx->upload_period) {
@@ -294,11 +314,13 @@ int main(int argc, char **argv) {
   |                             Run the Profiler                               |
   \****************************************************************************/
   // Initialize the pprof
-  char *pprof_labels[10];
-  char *pprof_units[10];
+  char *pprof_labels[max_watchers];
+  char *pprof_units[max_watchers];
+  for (int i=0; i<ctx->num_watchers; i++) {
+    pprof_labels[i] = ctx->watchers[i].opt->label;
+    pprof_units[i] = ctx->watchers[i].opt->unit;
+  }
 
-  pprof_labels[0] = "cpu-time"; pprof_units[0] = "nanoseconds";
-  pprof_labels[1] = "wall-time"; pprof_units[1] = "nanoseconds";
   pprof_Init(ctx->dp, (const char**)pprof_labels, (const char**)pprof_units, ctx->num_watchers);
   pprof_timeUpdate(ctx->dp); // Set the time
 
@@ -353,8 +375,8 @@ int main(int argc, char **argv) {
     for (int i = 0; i < ctx->num_watchers; i++) {
       for (int j = 0; j < num_cpu; j++) {
         int k = i*num_cpu + j;
+        pes[k].pos = i;  // watcher index is the sample index
         pes[k].fd = getfd(sfd[0]);
-        pes[k].config = ctx->watchers[i].config;
         if (!(pes[k].region = perfown(pes[k].fd))) {
           startup_errors = true;
         }
@@ -379,7 +401,7 @@ int main(int argc, char **argv) {
     pid_t mypid = getpid();
     for (int i = 0; i < ctx->num_watchers && ctx->params.enabled; i++) {
       for(int j=0; j<num_cpu; j++) {
-        int fd = perfopen(mypid, ctx->watchers[i].type, ctx->watchers[i].config, ctx->watchers[i].sample_period, j);
+        int fd = perfopen(mypid, ctx->watchers[i].opt->type, ctx->watchers[i].opt->config, ctx->watchers[i].sample_period, j);
         if (-1 == fd || sendfd(sfd[1], fd)) {
           // TODO this is an error, so log it later
           printf("Had an error.\n");
