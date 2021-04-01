@@ -80,7 +80,8 @@ PerfOption perfoptions[] = {
   // instrumenting with perf
   // To generate the hack: for f in $(find /sys/kernel/tracing/events/block -name id); do echo $f; cat $f; done
   {'1', PERF_TYPE_TRACEPOINT, 1133,  1, "block-insert",   "events"},
-  {'2', PERF_TYPE_TRACEPOINT, 1132,  1, "block-issue",    "events"},
+//  {'2', PERF_TYPE_TRACEPOINT, 1132,  1, "block-issue",    "events"},
+  {'2', PERF_TYPE_TRACEPOINT, 1132,  1, "wall-time",    "nanoseconds"},
   {'3', PERF_TYPE_TRACEPOINT, 1134,  1, "block-complete", "events"},
 };
 // clang-format on
@@ -224,24 +225,77 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   }
 }
 
+#define MYNAME "DDPROF"
 void print_help() {
   char help_msg[] = ""
-                    " usage: dd-prof [--help] [PROFILER_OPTIONS] "
-                    "COMMAND [COMMAND_ARGS]\n"
-                    "\n"
-                    "  -A, --apikey:\n"
-                    "  -E, --environment:\n"
-                    "  -H, --agent_host:\n"
-                    "  -I, --agent_site:\n"
-                    "  -N, --hostname:\n"
-                    "  -P, --agent_port:\n"
-                    "  -S, --service:\n"
-                    "  -T, --tags:\n"
-                    "  -U, --upload_timeout:\n"
-                    "  -u, --upload_period:\n"
-                    "  -e, --event:\n"
-                    "  -v, --version:\n"
-                    "  -x, --prefix:\n";
+" usage: dd-prof [--help] [PROFILER_OPTIONS] COMMAND [COMMAND_ARGS]\n"
+" eg: dd-prof -A hunter2 -H localhost -P 8192 redis-server /etc/redis/redis.conf\n"
+"\n"
+"Options\n"
+"  -A, --apikey:\n"
+"    A valid Datadog API key.  Passing the API key will cause "MYNAME" to bypass\n"
+"    the Datadog agent.  Erroneously adding this key might break an otherwise\n"
+"    function deployment!\n"
+"  -E, --environment:\n"
+"    The name of the environment to use in the Datadog UI.\n"
+"  -H, --host:\n"
+"    The hostname to use for intake.  This is either the hostname for the agent\n"
+"    or the backend endpoint, if bypassing the agent.\n"
+"  -P, --port:\n"
+"    The intake port for the Datadog agent or backend system.\n"
+"  -I, --site:\n"
+"  -N, --hostname:\n"
+"    The hostname for this service.  Attempts to automatically detect a valid\n"
+"    hostname if this is not provided.\n"
+"  -S, --service:\n"
+"    The name of this service\n"
+"  -T, --tags:\n"
+"    TBD\n"
+"  -u, --upload_period:\n"
+"    In seconds, how frequently to upload gathered data to Datadog.\n"
+"    Currently, it is recommended to keep this value to 60 seconds, which is\n"
+"    also the default.\n"
+"  -e, --event:\n"
+"    A string representing the events to sample.  Defaults to `cw`\n"
+"    See the `events` section below for more details.\n"
+"    eg: --event CRc1\n"
+"  -v, --version:\n"
+"    Prints the version of "MYNAME" and exits.\n"
+"  -x, --prefix:\n"
+"    TBD\n"
+"\n"
+"\n"
+"Events\n"
+MYNAME" can register to various machine events in order to customize the\n"
+"information retrieved during profiling.  Note that certain events can add\n"
+"more overhead during profiling; be sure to test your service under a realistic\n"
+"load simulation to ensure the desired forms of profiling are acceptable.\n"
+"\n"
+"The listing below gives the character to pass to the --event string, a\n"
+"brief description of the event, the name of the event as it will appear in\n"
+"the Datadog UI, and the units.\n"
+"Events with the same name in the UI conflict with each other; be sure to pick\n"
+"only one such event!\n"
+"\n"
+"  Hardware events\n"
+"    C - CPU Cycles (cpu-cycle, cycles)\n"
+"    R - Reference CPU Cycles (no frequency scaling) (cpu-cycle, cycles)\n"
+"    I - CPU Instructions (cpu-instr, instructions)\n" 
+"    H - Cache references (cache-ref, events)\n"
+"    M - Cache misses (cache-miss, events)\n"
+"    P - Branches (branch-instr, events)\n"
+"    Q - Branch misses (branch-miss, events)\n"
+"    B - Bus cycles (bus-cyle, cycles)\n"
+"    F - Bus cycles stalled, frontend (bus-stf, cycles)\n"
+"    S - Bus cycles stalled; backend (bus-stb, cycles\n"
+" Software events\n"
+"    c - Task clock (cpu-time, nanoseconds)\n"
+"    w - CPU clock (wall-time, nanoseconds)\n"
+" Kernel Tracepoints\n"
+"    1 - IO scheduler block insertions (block-insert, events)\n"
+"    2 - IO scheduler block issues (block-issue, events)\n"
+"    3 - IO scheduler block completions, events)\n";
+
   printf("%s\n", help_msg);
 }
 
