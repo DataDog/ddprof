@@ -225,11 +225,11 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   }
 }
 
-#define MYNAME "DDPROF"
+#define MYNAME "dd-prof"
 void print_help() {
   char help_msg[] = ""
-" usage: dd-prof [--help] [PROFILER_OPTIONS] COMMAND [COMMAND_ARGS]\n"
-" eg: dd-prof -A hunter2 -H localhost -P 8192 redis-server /etc/redis/redis.conf\n"
+" usage: "MYNAME" [--help] [PROFILER_OPTIONS] COMMAND [COMMAND_ARGS]\n"
+" eg: "MYNAME" -A hunter2 -H localhost -P 8192 redis-server /etc/redis/redis.conf\n"
 "\n"
 "Options\n"
 "  -A, --apikey:\n"
