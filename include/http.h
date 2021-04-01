@@ -14,6 +14,15 @@ int TcpSockNew();
 bool SocketSetFcntlBit(int, int, bool);
 bool SocketSetNonblocking(int, bool);
 
+// Right now this only defines the connection (and perhaps reconnect/resolve)
+// semantics of the socket.  Since the agent and intake only support a common
+// HTTP API, this point is slightly irrelevant right now.
+typedef enum HttpProtocol {
+  HCP_NOPROTO = 0,
+  HCP_HTTP,
+  HCP_UNIX,
+} HttpProtocol;
+
 /******************************************************************************\
 |*                                 HTTP Stuff                                 *|
 \******************************************************************************/

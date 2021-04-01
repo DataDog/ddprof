@@ -17,6 +17,7 @@
   X(ERES,              "failed to receive response")                           \
   X(EDISCO,            "disconnected during operation")                        \
   X(EINVAL,            "invalid input value")                                  \
+  X(EBADURI,           "invalid URI")                                          \
   X(ETOOMANYPPROFS,    "too many pprofs (max 10)")                             \
   X(ESERIAL,           "couldn't serialize payload")                           \
   X(ENOT200,           "HTTP did not return 200 code")                         \
@@ -89,6 +90,7 @@ typedef struct DDReq {
   struct HttpRes res;
   char *host;
   char *port;
+  int protocol;
   char boundary[DDR_BLEN];
   union {
     struct {
@@ -115,6 +117,7 @@ extern const bool DDR_reqd[];
 
 DDReq *DDR_init(DDReq *);
 void DDR_free(DDReq *);
+int DDR_setFromUri(DDReq *, char *, size_t);
 int DDR_push(DDReq *, const char *, const char *, const unsigned char *,
              size_t);
 int DDR_pprof(DDReq *, DProf *);

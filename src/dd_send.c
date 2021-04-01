@@ -4,6 +4,11 @@
 
 #include "dd_send.h"
 
+// TODO
+//  * When no protocol is specified, maybe failover to trying http and then unix
+//  * When no port is specified, fallback to some standard ports
+//  * When no host is specified... uh, I don't know.
+
 /********************************  Constants  *********************************/
 const char *DDRC_table[] = {DDRC_PARAMS(DDRCP_ELOOK) "Invalid code"};
 const char *DDR_keys[] = {DDR_PARAMS(DDRP_KEYS)};
@@ -59,6 +64,105 @@ DDReq *DDR_init(DDReq *req) {
   // As a final step, make sure the boundary is populated
   HTTP_RandomNameMake(req->boundary, DDR_BLEN - 1);
   return req;
+}
+
+#define MAX(x,y) ({                                                            \
+  __typeof__ (x) _x = (x);                                                     \
+  __typeof__ (y) _y = (y);                                                     \
+  _x > _y ? _x : _y;                                                           \
+})
+
+#define MIN(x,y) ({                                                            \
+  __typeof__ (x) _x = (x);                                                     \
+  __typeof__ (y) _y = (y);                                                     \
+  _x < _y ? _x : _y;                                                           \
+})
+
+// Loosely follows RFC-3986 part 3, but does not implement encoding.
+// Will only fill in the following req values:
+//   host
+//   port
+//   protocol
+//   route
+// if they are NULL.  It is up to the caller to clear out values in order to
+// implement the desired defaulting strategy.
+// I suppose that it might be valuable to lookahead at some point so the user
+// doesn't need to stash/restore req elements in the case of an error, but
+// this is left unimplemented.
+// NB
+//  * This check inlines the enum for the req protocol, which is a little silly
+//    but whatever
+int DDR_setFromUri(DDReq *req, char *uri, size_t len) {
+  if (!uri || !*uri || !len)
+    return DDRC_EBADURI;
+
+  char *p = uri, *q = uri;
+
+  // These are the concepts from the RFC
+  char authority[1024];  size_t len_authority = 0;
+  char scheme[1024];     size_t len_scheme = 0;
+  char *path; (void)path; // unused for now
+
+  // These are derived concepts.  Pointers are allocated on the heap until we
+  // have a better mechanism intrinsic to the request object.
+  char *host;
+  char *port;
+  int protocol;
+
+  // decode the scheme (if it's at least one char)
+  if ((p = memchr(uri, len,  ':')) && p != uri) {
+    len_scheme = MIN((unsigned long)(p - uri), (sizeof(scheme) / sizeof(*scheme))-1);
+    memcpy(scheme, uri, len_scheme);
+  }
+
+  // Decode the authority (if it's at least one char)
+  if (len - (p - uri) > 3 && p[1] == '/' && p[2] == '/') { // advance past //
+    p += 3;
+    if ((q = memchr(p, len - (p - uri), '/')) && q != p) { // drop cursor at /
+      len_authority = MIN((unsigned long)(q - p), (sizeof(authority) / sizeof(*authority)) - 1);
+      memcpy(authority, p, len_authority);
+    }
+  }
+
+  // This is where the gaps start to show in our defaulting behavior.
+  if (req->protocol) {
+    protocol = req->protocol;
+  } else if (*scheme) {
+    if (!strcasecmp(scheme, "https"))
+      protocol = HCP_HTTP;  // not a typo, we don't support HTTPS yet
+    if (!strcasecmp(scheme, "http"))
+      protocol = HCP_HTTP;
+    if (!strcasecmp(scheme, "unix"))
+      protocol = HCP_UNIX;
+    if (!strcasecmp(scheme, "unix+http"))
+      protocol = HCP_UNIX;
+    if (!strcasecmp(scheme, "http+unix"))
+      protocol = HCP_UNIX;
+  }
+
+  // Extract host and port from authority
+  // Note that we can't do this until we know the protocol
+  if (*authority && (!req->host || !req->port)) {
+    if ((p = memchr(authority, len_authority, ':'))) {
+      if (p[1]) { // remember, p is null-terminated by construction
+        q = p + 1;
+        while (*q && isdigit(*q))
+          q++;
+
+        // If we didn't reach the null terminator, then it's because the string
+        // had a non-digital character, which is disallowed.  Quit trying to
+        // stash the port
+        if(!*q)
+          port = strdup(&p[1]);
+
+        // Regardless of whether or not we had a valid port, we probably have an
+        // invalid host if it contains a ':'.  We'll truncate.
+        *p = 0;
+        host = strdup(p);
+      }
+    }
+  }
+
 }
 
 void DDR_free(DDReq *req) {
