@@ -12,7 +12,7 @@
 #define MYNAME "collatz"
 #define VER_MAJ 1
 #define VER_MIN 3
-#define VER_PATCH 1
+#define VER_PATCH 2
 #ifndef VER_REV
 #  define VER_REV "custom"
 #endif
@@ -131,8 +131,10 @@ int main (int c, char** v) {
   start_tick[me] = __rdtsc();
   pthread_barrier_wait(pb);
   for (int j=0; j<ki; j++)
-    for (int i=0; i<kj; i++)
-      funs[0](t ? t : i);
+    for (int i=0; i<kj; i++) {
+      int arg = t ? t : i;
+      funs[arg%funlen](arg);
+    }
 
   // Wait for everyone to be done
   __sync_add_and_fetch(counter,*my_counter);
