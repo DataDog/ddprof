@@ -172,7 +172,7 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   case PERF_RECORD_SAMPLE:
     pes          = (struct perf_event_sample *)hdr;
     us->pid      = pes->pid;
-    us->idx      = 0;
+    us->idx      = 0;         // Modified during unwinding; has stack depth
     us->stack    = pes->data;
     us->stack_sz = pes->size; // TODO should be dyn_size, but it's corrupted?
     memcpy(&us->regs[0], pes->regs,  3 * sizeof(uint64_t)); // TODO hardcoded reg count?
@@ -192,9 +192,6 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
         id_locs[j++] = id_loc;
     }
     int64_t sample_val[max_watchers] = {0};
-    if (pos>0) {
-      printf("Got a desirable sample.  Its value is %ld\n", pes->period);
-    }
     sample_val[pos] = pes->period;
     pprof_sampleAdd(dp, sample_val, pctx->num_watchers, id_locs, us->idx);
     break;
@@ -235,7 +232,7 @@ void print_help() {
 "  -A, --apikey:\n"
 "    A valid Datadog API key.  Passing the API key will cause "MYNAME" to bypass\n"
 "    the Datadog agent.  Erroneously adding this key might break an otherwise\n"
-"    function deployment!\n"
+"    functioning deployment!\n"
 "  -E, --environment:\n"
 "    The name of the environment to use in the Datadog UI.\n"
 "  -H, --host:\n"
@@ -325,13 +322,9 @@ int main(int argc, char **argv) {
   //---- Populate default values
   OPT_TABLE(X_DFLT);
   bool default_watchers = true;
-  ctx->num_watchers = 2;
+  ctx->num_watchers = 1;
   ctx->watchers[0].opt = &perfoptions[10];
   ctx->watchers[0].sample_period = 9999999;   // Once per millisecond
-
-  ctx->watchers[1].opt = &perfoptions[12];
-  ctx->watchers[1].sample_period = 9999999;
-  ctx->watchers[1].sample_period = 1;
 
   //---- Process Options
   if (argc <= 1) {
@@ -349,10 +342,6 @@ int main(int argc, char **argv) {
             if (default_watchers) {
               default_watchers = false;
               ctx->num_watchers = 0;
-
-              // We're going to overwrite 0, so just handle 1
-              ctx->watchers[1].opt = NULL;
-              ctx->watchers[1].sample_period = 0;
             }
 
             ctx->watchers[ctx->num_watchers].opt = &perfoptions[j];
@@ -419,7 +408,10 @@ int main(int argc, char **argv) {
     pprof_units[i] = ctx->watchers[i].opt->unit;
   }
 
-  pprof_Init(ctx->dp, (const char**)pprof_labels, (const char**)pprof_units, ctx->num_watchers);
+  if(!pprof_Init(ctx->dp, (const char**)pprof_labels, (const char**)pprof_units, ctx->num_watchers)) {
+    printf("Failed to initialize pprof\n");
+    return -1;
+  }
   pprof_timeUpdate(ctx->dp); // Set the time
 
   // Get the number of CPUs
