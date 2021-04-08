@@ -82,6 +82,9 @@ int main (int c, char** v) {
       printf("      C -- (703; 170)\n");
       printf("      D -- (2463; 208)\n");
       printf("      E -- (6171; 261)\n");
+      printf("      F -- (77031; 350) (from Wikipedia)\n");
+      printf("      G -- (837799; 524) (from Wikipedia)\n");
+      printf("      H -- (780657630; 1132) (from Wikipedia)\n");
       printf("    These values are from https://oeis.org/A006577/b006577.txt (table.txt)\n");
       return 0;
     }
@@ -94,11 +97,14 @@ int main (int c, char** v) {
     P(v[3], kj);
   if (c > 4) {
     switch(*v[4]) {
-      case 'A': case 'a': t = 7;    break;
-      case 'B': case 'b': t = 27;   break;
-      case 'C': case 'c': t = 703;  break;
-      case 'D': case 'd': t = 2463; break;
-      case 'E': case 'e': t = 6171; break;
+      case 'A': case 'a': t = 7;         break;
+      case 'B': case 'b': t = 27;        break;
+      case 'C': case 'c': t = 703;       break;
+      case 'D': case 'd': t = 2463;      break;
+      case 'E': case 'e': t = 6171;      break;
+      case 'F': case 'f': t = 77031;     break;
+      case 'G': case 'g': t = 837799;    break;
+      case 'H': case 'h': t = 780657630; break;
       default:
         P(v[4], t);
     }
