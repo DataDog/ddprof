@@ -414,103 +414,103 @@ int main(int argc, char **argv) {
   }
   pprof_timeUpdate(ctx->dp); // Set the time
 
-  // Get the number of CPUs
-  num_cpu = get_nprocs();
-
-  // Setup a shared barrier for coordination
-  pthread_barrierattr_t bat = {0};
-  pthread_barrier_t *pb = mmap(NULL, sizeof(pthread_barrier_t),
-      PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-  if (MAP_FAILED == pb) {
-    // TODO log here.  Nothing else to do, since we're not halting the target
-    ctx->params.enabled = false;
-  } else {
-    pthread_barrierattr_init(&bat);
-    pthread_barrierattr_setpshared(&bat, 1);
-    pthread_barrier_init(pb, &bat, 2);
-  }
-
-  // Instrument the profiler
-  // 1.   Setup pipes
-  // 2.   fork()
-  // 3p.  I am the original process.  If not prof profiling, instrument now
-  // 3c.  I am the child.  Fork again and die.
-  // 4p.  If not instrumenting profiler, instrument now.
-  // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
-  // 5p.  Send the instrumentation FD.  Repeat for each instrumentation point.
-  // 5cc. Receive.  Repeat.  This is known before time of fork.
-  // 6p.  close fd, teardown pipe, execvp() to target process.
-  // 6cc. teardown pipe, create mmap regions and enter event loop
-
-  // TODO
-  // * Multiple file descriptors can be sent in one push.  I don't know how much
-  //   this matters, but if every microsecond counts at startup, it's an option.
-
-  // 1. Setup pipes (really unix domain socket pair)
-  int sfd[2] = {-1, -1};
-  if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sfd)) {
-    // TODO log here
-    ctx->params.enabled = false;
-  }
-
-  // 2. fork()
-  pid_t pid = fork();
-  if (!pid) {
-    // 3c. I am the child.  Fork again
-    if (fork()) exit(0); // no need to use _exit, since we still own the proc
-
-    // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
-    bool startup_errors = false;
-    struct PEvent pes[100] = {0};
-    for (int i = 0; i < ctx->num_watchers; i++) {
-      for (int j = 0; j < num_cpu; j++) {
-        int k = i*num_cpu + j;
-        pes[k].pos = i;  // watcher index is the sample index
-        pes[k].fd = getfd(sfd[0]);
-        if (!(pes[k].region = perfown(pes[k].fd))) {
-          startup_errors = true;
-        }
-        pthread_barrier_wait(pb); // Tell the other guy I have his FD
-      }
+    // Get the number of CPUs
+    num_cpu = get_nprocs();
+  
+    // Setup a shared barrier for coordination
+    pthread_barrierattr_t bat = {0};
+    pthread_barrier_t *pb = mmap(NULL, sizeof(pthread_barrier_t),
+        PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (MAP_FAILED == pb) {
+      // TODO log here.  Nothing else to do, since we're not halting the target
+      ctx->params.enabled = false;
+    } else {
+      pthread_barrierattr_init(&bat);
+      pthread_barrierattr_setpshared(&bat, 1);
+      pthread_barrier_init(pb, &bat, 2);
     }
-
-    // Cleanup and enter event loop
-    close(sfd[0]);
-    close(sfd[1]);
-    munmap(pb, sizeof(pthread_barrier_t));
-
-    ctx->send_nanos = now_nanos() + ctx->params.upload_period*1000000000;
-    elf_version(EV_CURRENT); // Initialize libelf
-    if (!startup_errors)
-      main_loop(pes, ctx->num_watchers*num_cpu, ddprof_callback, ctx);
-    else
-      printf("Started with errors\n");
-  } else {
+  
+    // Instrument the profiler
+    // 1.   Setup pipes
+    // 2.   fork()
     // 3p.  I am the original process.  If not prof profiling, instrument now
-    // TODO: Deadlock city!  Add some timeouts here for chrissake
-    pid_t mypid = getpid();
-    for (int i = 0; i < ctx->num_watchers && ctx->params.enabled; i++) {
-      for(int j=0; j<num_cpu; j++) {
-        int fd = perfopen(mypid, ctx->watchers[i].opt->type, ctx->watchers[i].opt->config, ctx->watchers[i].sample_period, j);
-        if (-1 == fd || sendfd(sfd[1], fd)) {
-          // TODO this is an error, so log it later
-          printf("Had an error.\n");
-          ctx->params.enabled = false;
-        }
-        pthread_barrier_wait(pb); // Did the profiler get the FD?
-        close(fd);
-      }
+    // 3c.  I am the child.  Fork again and die.
+    // 4p.  If not instrumenting profiler, instrument now.
+    // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
+    // 5p.  Send the instrumentation FD.  Repeat for each instrumentation point.
+    // 5cc. Receive.  Repeat.  This is known before time of fork.
+    // 6p.  close fd, teardown pipe, execvp() to target process.
+    // 6cc. teardown pipe, create mmap regions and enter event loop
+  
+    // TODO
+    // * Multiple file descriptors can be sent in one push.  I don't know how much
+    //   this matters, but if every microsecond counts at startup, it's an option.
+  
+    // 1. Setup pipes (really unix domain socket pair)
+    int sfd[2] = {-1, -1};
+    if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sfd)) {
+      // TODO log here
+      ctx->params.enabled = false;
     }
-
-    // Cleanup and become desired process image
-    close(sfd[0]);
-    close(sfd[1]);
-    munmap(pb, sizeof(pthread_barrier_t));
-
-    execvp(argv[0], argv);
-    printf("Hey, this shouldn't happen!\n");
-  }
-
-  // Neither the profiler nor the instrumented process should get here
-  return -1;
+  
+    // 2. fork()
+    pid_t pid = fork();
+    if (!pid) {
+      // 3c. I am the child.  Fork again
+      if (fork()) exit(0); // no need to use _exit, since we still own the proc
+  
+      // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
+      bool startup_errors = false;
+      struct PEvent pes[100] = {0};
+      for (int i = 0; i < ctx->num_watchers; i++) {
+        for (int j = 0; j < num_cpu; j++) {
+          int k = i*num_cpu + j;
+          pes[k].pos = i;  // watcher index is the sample index
+          pes[k].fd = getfd(sfd[0]);
+          if (!(pes[k].region = perfown(pes[k].fd))) {
+            startup_errors = true;
+          }
+          pthread_barrier_wait(pb); // Tell the other guy I have his FD
+        }
+      }
+  
+      // Cleanup and enter event loop
+      close(sfd[0]);
+      close(sfd[1]);
+      munmap(pb, sizeof(pthread_barrier_t));
+  
+      ctx->send_nanos = now_nanos() + ctx->params.upload_period*1000000000;
+      elf_version(EV_CURRENT); // Initialize libelf
+      if (!startup_errors)
+        main_loop(pes, ctx->num_watchers*num_cpu, ddprof_callback, ctx);
+      else
+        printf("Started with errors\n");
+    } else {
+      // 3p.  I am the original process.  If not prof profiling, instrument now
+      // TODO: Deadlock city!  Add some timeouts here for chrissake
+      pid_t mypid = getpid();
+      for (int i = 0; i < ctx->num_watchers && ctx->params.enabled; i++) {
+        for(int j=0; j<num_cpu; j++) {
+          int fd = perfopen(mypid, ctx->watchers[i].opt->type, ctx->watchers[i].opt->config, ctx->watchers[i].sample_period, j);
+          if (-1 == fd || sendfd(sfd[1], fd)) {
+            // TODO this is an error, so log it later
+            printf("Had an error.\n");
+            ctx->params.enabled = false;
+          }
+          pthread_barrier_wait(pb); // Did the profiler get the FD?
+          close(fd);
+        }
+      }
+  
+      // Cleanup and become desired process image
+      close(sfd[0]);
+      close(sfd[1]);
+      munmap(pb, sizeof(pthread_barrier_t));
+  
+      execvp(argv[0], argv);
+      printf("Hey, this shouldn't happen!\n");
+    }
+  
+    // Neither the profiler nor the instrumented process should get here
+    return -1;
 }

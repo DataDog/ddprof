@@ -3,24 +3,26 @@ Instrumentation Sequence
 
 Problem
 ==
-dd-prof needs to enable instrumentation for the process it wraps, and it needs
-to do so in a way that isolates the target as much as possible in order to
-best enforce resource sandboxing within the profiler and to protect production
-infrastructure from Naughty Profiler Things.  To be explicit, consider the
-following goals
+dd-prof needs to enable instrumentation for the process it wraps.  If this
+fails, we want the target process to get launched anyway.  It would also
+be great if instrumentation happened after the profiler gets launched
+(i.e., don't profile the profiler in the common case).  Basically, we'd
+like to:
 
 * Minimize the permissions escalations required to instrument an application
 * Ensure that hierarchical resource sandboxing interfaces, such as cgroups,
   can be easily used in a large number of kernel versions to clamp dd-prof
-* Facilitate self-instrumentation, with metric collection handled in a separate
-  container altogether
+  (i.e., don't rely on cool new cgroups v2 kernel v5.bignum features)
+* Have an instrumentation sequence that could allow profiles to be collected
+  in a separate container entirely
 * Suppress SIGCHLD in instrumented application if the profiler dies (SIGCHLD
   can be used as a job control mechanism; we don't want to interfere, but
   sometimes we can't help dying)
 * A higher-order executor (for example, `strace dd-prof app`) must receive the
   PID of the _application_ and not the PID of dd-prof through fork().  In other
-  words, the PID of the process must be the PID of the service, not the wrapper.
-* Isolate the instrumented application from hierarchical limits
+  words, the PID of the process must be the PID of the service, not the wrapper
+* Isolate the instrumented application from hierarchical limits (e.g.,
+  those in `getrlimit()`
 
 Of these goals, the first five are satisfied in the current implementation of
 dd-prof, with the last one being tricky to implement on containerized
