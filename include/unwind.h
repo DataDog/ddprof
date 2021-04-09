@@ -197,13 +197,20 @@ int unwindstate__unwind(struct UnwindState *us) {
       .debuginfo_path = &debuginfo_path,
       .find_elf = dwfl_linux_proc_find_elf,
   };
-  for (int i = 0; i < MAX_STACK; i++) {
-    if (us->locs[i].funname)
+  int i = 0;
+  for (; i < MAX_STACK; i++) {
+    if (us->locs[i].funname) {
       free(us->locs[i].funname);
-    if (us->locs[i].sopath)
+      us->locs[i].funname = NULL;
+    }
+    if (us->locs[i].sopath) {
       free(us->locs[i].sopath);
-    if (us->locs[i].srcpath)
+      us->locs[i].sopath = NULL;
+    }
+    if (us->locs[i].srcpath) {
       free(us->locs[i].srcpath);
+      us->locs[i].srcpath = NULL;
+    }
   }
   memset(us->locs, 0, sizeof(uint64_t) * us->max_stack);
 
@@ -244,7 +251,7 @@ int unwindstate__unwind(struct UnwindState *us) {
   // TODO same as above
   // dwfl_end(us->dwfl);
 
-  return 0;
+  return i;
 }
 
 #endif
