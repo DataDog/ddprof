@@ -149,16 +149,16 @@ struct perf_event_attr g_dd_native_attr = {
     CMSG_FIRSTHDR(&msg)->cmsg_type = SCM_RIGHTS;
     CMSG_FIRSTHDR(&msg)->cmsg_len = CMSG_LEN(sizeof(int));
     *((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg))) = fd;
-  
+
     msg.msg_controllen = CMSG_SPACE(sizeof(int));
-  
+
     while (sizeof(char[2]) != sendmsg(sfd, &msg, MSG_NOSIGNAL)) {
       if (errno != EINTR)
         return -1;
     }
     return 0;
   }
-  
+
   int getfd(int sfd) {
     struct msghdr msg = {
         .msg_iov = &(struct iovec){.iov_base = (char[2]){"  "}, .iov_len = 2},
@@ -169,7 +169,7 @@ struct perf_event_attr g_dd_native_attr = {
       if (errno != EINTR)
         return -1;
     }
-  
+
     // Check
     if (CMSG_FIRSTHDR(&msg) && CMSG_FIRSTHDR(&msg)->cmsg_level == SOL_SOCKET &&
         CMSG_FIRSTHDR(&msg)->cmsg_type == SCM_RIGHTS) {
