@@ -32,10 +32,11 @@
 #endif
 
 // NB.  This allocates the objects, not just an array of pointers.
-#define pprofgrow(x, N, M)                                                     \
+#define DPROF_CHUNK_SZ 4096
+#define _pprofgrow(x, N, M)                                                    \
   __extension__({                                                              \
     int __rc = 0;                                                              \
-    if (!(N) % (M)) {                                                          \
+    if (!(x) || !(N) % (M)) {                                                  \
       DBG_PRINT("Resizing " #x);                                               \
       __typeof__(x) _buf = calloc((N) + (M), sizeof(__typeof__(x)));           \
       if (!_buf)                                                               \
@@ -48,6 +49,7 @@
     }                                                                          \
     __rc;                                                                      \
   })
+#define pprofgrow(x, N) _pprofgrow(x, N, DPROF_CHUNK_SZ)
 
 /******************************************************************************\
 |*                            String Table (Vocab)                            *|
@@ -150,7 +152,7 @@ static uint64_t _pprof_mapNew(DProf *dp, uint64_t map_start, uint64_t map_end,
   uint64_t id = pprof->n_mapping;
 
   // Resize if needed
-  pprofgrow(pprof->mapping, pprof->n_mapping, DPROF_CHUNK_SZ);
+  pprofgrow(pprof->mapping, 1 + pprof->n_mapping);
 
   // Initialize this mapping
   pprof->mapping[id] = calloc(1, sizeof(PPMapping));
@@ -204,7 +206,7 @@ static uint64_t _pprof_lineNew(DProf *dp, PPLocation *loc, uint64_t id_function,
   uint64_t id = loc->n_line;
 
   // Initialize
-  pprofgrow(loc->line, loc->n_line, DPROF_CHUNK_SZ);
+  pprofgrow(loc->line, 1 + loc->n_line);
 
   // Take care of this element
   loc->line[id] = calloc(1, sizeof(PPLine));
@@ -244,7 +246,7 @@ static uint64_t _pprof_funNew(DProf *dp, int64_t id_name,
   uint64_t id = pprof->n_function;
 
   // Initialize or grow if needed
-  pprofgrow(pprof->function, pprof->n_function, DPROF_CHUNK_SZ);
+  pprofgrow(pprof->function, 1 + pprof->n_function);
 
   // Initialize this function
   pprof->function[id] = calloc(1, sizeof(PPFunction));
@@ -316,7 +318,8 @@ static uint64_t _pprof_locNew(DProf *dp, uint64_t id_mapping, uint64_t addr,
     return 0;
 
   // Initialize or grow if needed
-  pprofgrow(pprof->location, pprof->n_location, DPROF_CHUNK_SZ);
+  // id is an index, so we need one more capacity because 0-indexing
+  pprofgrow(pprof->location, 1 + id);
 
   // Initialize this location
   pprof->location[id] = calloc(1, sizeof(PPLocation));
@@ -429,7 +432,7 @@ char pprof_sampleAdd(DProf *dp, int64_t *val, size_t nval, uint64_t *loc,
   }
 
   // Initialize the sample, possibly expanding if needed
-  pprofgrow(pprof->sample, pprof->n_sample, DPROF_CHUNK_SZ);
+  pprofgrow(pprof->sample, pprof->n_sample);
 
   // Initialize this sample
   pprof->sample[id] = calloc(1, sizeof(PPSample));
@@ -515,6 +518,7 @@ void pprof_durationUpdate(DProf *dp) {
 
 DProf *pprof_Init(DProf *dp, const char **sample_names,
                   const char **sample_units, size_t n_sampletypes) {
+  assert(sample_names && sample_units && n_sampletypes);
   if (!dp) {
     dp = calloc(1, sizeof(*dp));
     if (!dp)
@@ -526,31 +530,18 @@ DProf *pprof_Init(DProf *dp, const char **sample_names,
 
   PPProfile *pprof = &dp->pprof;
   // Early sanity checks
-  if (!sample_names || !sample_units || 2 > n_sampletypes)
+  if (!sample_names || !sample_units || !n_sampletypes)
     goto dpi_cleanup01;
 
   // Define the appropriate internment strategy
-  dp->table_type = 1; // aggressively!
-  switch (dp->table_type) {
-  case 0:
-    dp->intern_string = vocab_intern;
-    dp->string_table = vocab_get_table;
-    dp->string_table_size = vocab_get_size;
-    dp->string_table_get = NULL; // TODO, this is an error!!!
-    dp->string_table_data = pprof;
-    break;
-  default: // Error, default to best implementation so far
-  case 1:
-    dp->intern_string = pprof_stringtable_intern;
-    dp->string_table = pprof_stringtable_gettable;
-    dp->string_table_get = pprof_stringtable_get;
-    dp->string_table_size = pprof_stringtable_size;
-    dp->string_table_data =
-        stringtable_init(NULL, &(StringTableOptions){.hash = 1, .logging = 0});
-    ((StringTable *)dp->string_table_data)->logging =
-        1; // TODO make this configurable
-    break;
-  }
+  dp->intern_string = pprof_stringtable_intern;
+  dp->string_table = pprof_stringtable_gettable;
+  dp->string_table_get = pprof_stringtable_get;
+  dp->string_table_size = pprof_stringtable_size;
+  dp->string_table_data =
+      stringtable_init(NULL, &(StringTableOptions){.hash = 1, .logging = 0});
+  ((StringTable *)dp->string_table_data)->logging =
+      1; // TODO make this configurable
 
   // Initialize the top-level container and the type holders
   perftools__profiles__profile__init(pprof);
@@ -565,19 +556,25 @@ DProf *pprof_Init(DProf *dp, const char **sample_names,
   // Populate individual sample values
   for (size_t i = 0; i < n_sampletypes; i++) {
     pprof->sample_type[i] = calloc(1, sizeof(PPValueType));
-    if (!pprof->sample_type[i]) {} // TODO error
+    if (!pprof->sample_type[i]) {
+      // TODO cleanup
+      return NULL;
+    }
     perftools__profiles__value_type__init(pprof->sample_type[i]);
 
     pprof->sample_type[i]->type = pprof_strIntern(dp, sample_names[i]);
     pprof->sample_type[i]->unit = pprof_strIntern(dp, sample_units[i]);
   }
 
-  // Initialize period_type
+  // Initialize period_type (this is just the first one)
   pprof->period_type = calloc(1, sizeof(PPValueType));
-  if (!pprof->period_type) {} // TODO error
+  if (!pprof->period_type) {
+    // TODO cleanup!
+    return NULL;
+  }
   perftools__profiles__value_type__init(pprof->period_type);
-  pprof->period_type->type = pprof->sample_type[1]->type;
-  pprof->period_type->unit = pprof->sample_type[1]->unit;
+  pprof->period_type->type = pprof->sample_type[0]->type;
+  pprof->period_type->unit = pprof->sample_type[0]->unit;
 
   return dp;
 
