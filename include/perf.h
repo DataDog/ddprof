@@ -32,8 +32,8 @@
 #define MAX_INSN 16
 
 typedef struct PEvent {
-  int pos;      // Index into the sample
-  int fd;       // Underlying perf event FD
+  int pos; // Index into the sample
+  int fd;  // Underlying perf event FD
   struct perf_event_mmap_page *region;
 } PEvent;
 
@@ -139,44 +139,44 @@ struct perf_event_attr g_dd_native_attr = {
     .exclude_hv = 1,
 };
 
-  int sendfd(int sfd, int fd) {
-    struct msghdr msg = {
-        .msg_iov = &(struct iovec){.iov_base = (char[2]){"  "}, .iov_len = 2},
-        .msg_iovlen = 1,
-        .msg_control = (char[CMSG_SPACE(sizeof(int))]){0},
-        .msg_controllen = CMSG_SPACE(sizeof(int))};
-    CMSG_FIRSTHDR(&msg)->cmsg_level = SOL_SOCKET;
-    CMSG_FIRSTHDR(&msg)->cmsg_type = SCM_RIGHTS;
-    CMSG_FIRSTHDR(&msg)->cmsg_len = CMSG_LEN(sizeof(int));
-    *((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg))) = fd;
+int sendfd(int sfd, int fd) {
+  struct msghdr msg = {
+      .msg_iov = &(struct iovec){.iov_base = (char[2]){"  "}, .iov_len = 2},
+      .msg_iovlen = 1,
+      .msg_control = (char[CMSG_SPACE(sizeof(int))]){0},
+      .msg_controllen = CMSG_SPACE(sizeof(int))};
+  CMSG_FIRSTHDR(&msg)->cmsg_level = SOL_SOCKET;
+  CMSG_FIRSTHDR(&msg)->cmsg_type = SCM_RIGHTS;
+  CMSG_FIRSTHDR(&msg)->cmsg_len = CMSG_LEN(sizeof(int));
+  *((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg))) = fd;
 
-    msg.msg_controllen = CMSG_SPACE(sizeof(int));
+  msg.msg_controllen = CMSG_SPACE(sizeof(int));
 
-    while (sizeof(char[2]) != sendmsg(sfd, &msg, MSG_NOSIGNAL)) {
-      if (errno != EINTR)
-        return -1;
-    }
-    return 0;
+  while (sizeof(char[2]) != sendmsg(sfd, &msg, MSG_NOSIGNAL)) {
+    if (errno != EINTR)
+      return -1;
+  }
+  return 0;
+}
+
+int getfd(int sfd) {
+  struct msghdr msg = {
+      .msg_iov = &(struct iovec){.iov_base = (char[2]){"  "}, .iov_len = 2},
+      .msg_iovlen = 1,
+      .msg_control = (char[CMSG_SPACE(sizeof(int))]){0},
+      .msg_controllen = CMSG_SPACE(sizeof(int))};
+  while (sizeof(char[2]) != recvmsg(sfd, &msg, MSG_NOSIGNAL)) {
+    if (errno != EINTR)
+      return -1;
   }
 
-  int getfd(int sfd) {
-    struct msghdr msg = {
-        .msg_iov = &(struct iovec){.iov_base = (char[2]){"  "}, .iov_len = 2},
-        .msg_iovlen = 1,
-        .msg_control = (char[CMSG_SPACE(sizeof(int))]){0},
-        .msg_controllen = CMSG_SPACE(sizeof(int))};
-    while (sizeof(char[2]) != recvmsg(sfd, &msg, MSG_NOSIGNAL)) {
-      if (errno != EINTR)
-        return -1;
-    }
-
-    // Check
-    if (CMSG_FIRSTHDR(&msg) && CMSG_FIRSTHDR(&msg)->cmsg_level == SOL_SOCKET &&
-        CMSG_FIRSTHDR(&msg)->cmsg_type == SCM_RIGHTS) {
-      return *((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg)));
-    }
-    return -1;
+  // Check
+  if (CMSG_FIRSTHDR(&msg) && CMSG_FIRSTHDR(&msg)->cmsg_level == SOL_SOCKET &&
+      CMSG_FIRSTHDR(&msg)->cmsg_type == SCM_RIGHTS) {
+    return *((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg)));
   }
+  return -1;
+}
 
 int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
                     unsigned long flags) {
