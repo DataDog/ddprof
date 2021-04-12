@@ -1,0 +1,5 @@
+#!/bin/bash
+# because this guy always lives in .git/hooks, go back two more
+SCRIPT_DIR=$(dirname $(dirname $(dirname "$(readlink -f "$0")")))
+
+${SCRIPT_DIR}/build_tools/style-check.sh
