@@ -1,6 +1,8 @@
+#include <execinfo.h>
 #include <getopt.h>
 #include <libelf.h>
 #include <pthread.h>
+#include <signal.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/sysinfo.h>
@@ -13,7 +15,7 @@
 #include "perf.h"
 #include "pprof.h"
 #include "unwind.h"
-
+#include "version.h"
 
 #define max_watchers 10
 
@@ -36,10 +38,12 @@ struct DDProfContext {
   char *tags;
 
   // Input parameters
+  char *count_samples;
   char *enabled;
   char *upload_period;
   char *profprofiler;
   struct {
+    bool count_samples;
     bool enabled;
     double upload_period;
     bool profprofiler;
@@ -83,6 +87,9 @@ PerfOption perfoptions[] = {
 //  {'2', PERF_TYPE_TRACEPOINT, 1132,  1, "block-issue",    "events"},
   {'2', PERF_TYPE_TRACEPOINT, 1132,  1, "wall-time",    "nanoseconds"},
   {'3', PERF_TYPE_TRACEPOINT, 1134,  1, "block-complete", "events"},
+
+  // Fake watchers
+  {'\0', 0, 0, 1, "samples", "count"},
 };
 // clang-format on
 
@@ -114,26 +121,27 @@ int num_cpu = 0;
   G - Fallback value, if any
 */
 #define X_LOPT(a, b, c, d, e, f, g) {#b, d, 0, *#c},
-#define X_ENUM(a, b, c, d, e, f, g) a;
+#define X_ENUM(a, b, c, d, e, f, g) a,
 #define X_OSTR(a, b, c, d, e, f, g) #c ":"
 #define X_DFLT(a, b, c, d, e, f, g) DFLT_EXP(#a, b, e, f, g);
 #define X_CASE(a, b, c, d, e, f, g) case *#c: (e)->b = optarg; break;
 #define X_PRNT(a, b, c, d, e, f, g) printf(#b ": %s\n", (e)->b);
 
 //  A                            B                C  D  E         F     G
-#define OPT_TABLE(X)                                                                 \
-  X(DD_API_KEY,                  apikey,          A, 1, ctx->ddr, NULL, NULL)        \
-  X(DD_ENV,                      environment,     E, 1, ctx->ddr, NULL, NULL)        \
-  X(DD_AGENT_HOST,               host,            H, 1, ctx->ddr, NULL, "localhost") \
-  X(DD_SITE,                     site,            I, 1, ctx->ddr, NULL, NULL)        \
-  X(DD_TRACE_AGENT_PORT,         port,            P, 1, ctx->ddr, NULL, "8081")      \
-  X(DD_SERVICE,                  service,         S, 1, ctx->ddr, NULL, "my_profiled_service") \
-  X(DD_TAGS,                     tags,            T, 1, ctx,      NULL, NULL)        \
-  X(DD_VERSION,                  profiler_version,V, 1, ctx->ddr, NULL, NULL)        \
-  X(DD_PROFILING_ENABLED,        enabled,         d, 1, ctx,      NULL, "yes")       \
-  X(DD_PROFILING_UPLOAD_PERIOD,  upload_period,   u, 1, ctx,      NULL, "60.0")      \
-  X(DD_PROFILE_NATIVEPROFILER,   profprofiler,    p, 0, ctx,      NULL, NULL)        \
-  X(DD_PROFILING_,               prefix,          X, 1, ctx,      NULL, "")
+#define OPT_TABLE(XX)                                                                \
+  XX(DD_API_KEY,                  apikey,          A, 1, ctx->ddr, NULL, NULL)        \
+  XX(DD_ENV,                      environment,     E, 1, ctx->ddr, NULL, NULL)        \
+  XX(DD_AGENT_HOST,               host,            H, 1, ctx->ddr, NULL, "localhost") \
+  XX(DD_SITE,                     site,            I, 1, ctx->ddr, NULL, NULL)        \
+  XX(DD_TRACE_AGENT_PORT,         port,            P, 1, ctx->ddr, NULL, "8081")      \
+  XX(DD_SERVICE,                  service,         S, 1, ctx->ddr, NULL, "my_profiled_service") \
+  XX(DD_TAGS,                     tags,            T, 1, ctx,      NULL, NULL)        \
+  XX(DD_VERSION,                  profiler_version,V, 1, ctx->ddr, NULL, NULL)        \
+  XX(DD_PROFILING_ENABLED,        enabled,         d, 1, ctx,      NULL, "yes")       \
+  XX(DD_PROFILING_COUNTSAMPLES,   count_samples,   c, 1, ctx,      NULL, "yes")       \
+  XX(DD_PROFILING_UPLOAD_PERIOD,  upload_period,   u, 1, ctx,      NULL, "60.0")      \
+  XX(DD_PROFILE_NATIVEPROFILER,   profprofiler,    p, 0, ctx,      NULL, NULL)        \
+  XX(DD_PROFILING_,               prefix,          X, 1, ctx,      NULL, "")
 // clang-format off
 
 #define DFLT_EXP(evar, key, targ, func, dfault)                                \
@@ -147,6 +155,12 @@ int num_cpu = 0;
       (targ)->key = _buf;                                                      \
     }                                                                          \
   })
+
+typedef enum DDKeys {
+  OPT_TABLE(X_ENUM)
+  DD_KLEN
+} DDKeys;
+
 
 
 /******************************  Perf Callback  *******************************/
@@ -222,46 +236,59 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   }
 }
 
-#define MYNAME "dd-prof"
-void print_help() {
-  char help_msg[] = ""
-" usage: "MYNAME" [--help] [PROFILER_OPTIONS] COMMAND [COMMAND_ARGS]\n"
-" eg: "MYNAME" -A hunter2 -H localhost -P 8192 redis-server /etc/redis/redis.conf\n"
-"\n"
-"Options\n"
-"  -A, --apikey:\n"
+
+/*********************************  Printers  *********************************/
+#define X_HLPK(a, b, c, d, e, f, g) "  -"#c", --"#b", (envvar: "#a")",
+#define STR_UNDF (char*)&(int){0}
+char* help_str[DD_KLEN] = {
+  [DD_API_KEY] =
 "    A valid Datadog API key.  Passing the API key will cause "MYNAME" to bypass\n"
 "    the Datadog agent.  Erroneously adding this key might break an otherwise\n"
-"    functioning deployment!\n"
-"  -E, --environment:\n"
-"    The name of the environment to use in the Datadog UI.\n"
-"  -H, --host:\n"
+"    functioning deployment!\n",
+  [DD_ENV] =
+"    The name of the environment to use in the Datadog UI.\n",
+  [DD_AGENT_HOST] =
 "    The hostname to use for intake.  This is either the hostname for the agent\n"
-"    or the backend endpoint, if bypassing the agent.\n"
-"  -P, --port:\n"
-"    The intake port for the Datadog agent or backend system.\n"
-"  -I, --site:\n"
-"  -N, --hostname:\n"
-"    The hostname for this service.  Attempts to automatically detect a valid\n"
-"    hostname if this is not provided.\n"
-"  -S, --service:\n"
-"    The name of this service\n"
-"  -T, --tags:\n"
-"    TBD\n"
-"  -u, --upload_period:\n"
+"    or the backend endpoint, if bypassing the agent.\n",
+  [DD_SITE] = STR_UNDF,
+  [DD_TRACE_AGENT_PORT] =
+"    The intake port for the Datadog agent or backend system.\n",
+  [DD_SERVICE] =
+"    The name of this service\n",
+  [DD_TAGS] = STR_UNDF,
+  [DD_VERSION] = STR_UNDF,
+  [DD_PROFILING_ENABLED] = STR_UNDF,
+  [DD_PROFILING_COUNTSAMPLES] = STR_UNDF,
+  [DD_PROFILING_UPLOAD_PERIOD] =
 "    In seconds, how frequently to upload gathered data to Datadog.\n"
 "    Currently, it is recommended to keep this value to 60 seconds, which is\n"
-"    also the default.\n"
+"    also the default.\n",
+  [DD_PROFILE_NATIVEPROFILER] = STR_UNDF,
+  [DD_PROFILING_] = STR_UNDF,
+};
+
+char* help_key[DD_KLEN] = {
+  OPT_TABLE(X_HLPK)
+};
+
+void print_version() {
+  printf(MYNAME" v%d.%d.%d-%s\n", VER_MAJ, VER_MIN, VER_PATCH, VER_REV);
+}
+
+void print_help() {
+  char help_hdr[] = ""
+" usage: "MYNAME" [--help] [PROFILER_OPTIONS] COMMAND [COMMAND_ARGS]\n"
+" eg: "MYNAME" -A hunter2 -H localhost -P 8192 redis-server /etc/redis/redis.conf\n\n";
+
+  char help_opts_extra[] =
 "  -e, --event:\n"
 "    A string representing the events to sample.  Defaults to `cw`\n"
 "    See the `events` section below for more details.\n"
 "    eg: --event CRc1\n"
 "  -v, --version:\n"
-"    Prints the version of "MYNAME" and exits.\n"
-"  -x, --prefix:\n"
-"    TBD\n"
-"\n"
-"\n"
+"    Prints the version of "MYNAME" and exits.\n";
+
+  char help_events[] =
 "Events\n"
 MYNAME" can register to various machine events in order to customize the\n"
 "information retrieved during profiling.  Note that certain events can add\n"
@@ -277,7 +304,7 @@ MYNAME" can register to various machine events in order to customize the\n"
 "  Hardware events\n"
 "    C - CPU Cycles (cpu-cycle, cycles)\n"
 "    R - Reference CPU Cycles (no frequency scaling) (cpu-cycle, cycles)\n"
-"    I - CPU Instructions (cpu-instr, instructions)\n" 
+"    I - CPU Instructions (cpu-instr, instructions)\n"
 "    H - Cache references (cache-ref, events)\n"
 "    M - Cache misses (cache-miss, events)\n"
 "    P - Branches (branch-instr, events)\n"
@@ -293,9 +320,33 @@ MYNAME" can register to various machine events in order to customize the\n"
 "    2 - IO scheduler block issues (block-issue, events)\n"
 "    3 - IO scheduler block completions, events)\n";
 
-  printf("%s\n", help_msg);
+  printf("%s", help_hdr);
+  printf("Options:\n");
+  for (int i=0; i<DD_KLEN; i++) {
+    if (*help_str[i]) {  // Actually char undefined I guess
+      printf("%s\n", help_key[i]);
+      printf("%s\n", help_str[i]);
+    }
+  }
+  printf("%s", help_opts_extra);
+  printf("%s", help_events);
 }
 
+
+/*****************************  SIGSEGV Handler *******************************/
+void sigsegv_handler(int sig) {
+  // TODO should this print the version
+(void)sig;
+  static void *buf[16] = {0};
+  static char errmsg[] = MYNAME" has encountered an unrecoverable error and will now exit.\n";
+  size_t sz = backtrace(buf, 16);
+  write(STDERR_FILENO, errmsg, strlen(errmsg));
+  backtrace_symbols_fd(buf, sz, STDERR_FILENO);
+  exit(-1);
+}
+
+
+/******************************  Entrypoint  **********************************/
 int main(int argc, char **argv) {
   //---- Autodetect binary name
   char filename[128] = {0};
@@ -315,8 +366,8 @@ int main(int argc, char **argv) {
   DDR_init(ddr);
 
   struct option lopts[] = { OPT_TABLE(X_LOPT)
-                           {"event", 1, 0, 'e'},
-                           {"help", 0, 0, 'h'},
+                           {"event",   1, 0, 'e'},
+                           {"help",    0, 0, 'h'},
                            {"version", 0, 0, 'v'}};
 
   //---- Populate default values
@@ -324,14 +375,14 @@ int main(int argc, char **argv) {
   bool default_watchers = true;
   ctx->num_watchers = 1;
   ctx->watchers[0].opt = &perfoptions[10];
-  ctx->watchers[0].sample_period = 9999999;   // Once per millisecond
+  ctx->watchers[0].sample_period = perfoptions[10].base_rate;
 
   //---- Process Options
   if (argc <= 1) {
     print_help();
     return 0;
   }
-  while (-1 != (c = getopt_long(argc, argv, "+" OPT_TABLE(X_OSTR) "e:h", lopts, &oi))) {
+  while (-1 != (c = getopt_long(argc, argv, "+" OPT_TABLE(X_OSTR) "e:hv", lopts, &oi))) {
     switch (c) {
       OPT_TABLE(X_CASE)
     case 'e':;
@@ -355,6 +406,7 @@ int main(int argc, char **argv) {
       print_help();
       return 0;
     case 'v':
+      print_version();
       return 0;
     default:
       printf("Non-recoverable error processing options.\n");
@@ -366,12 +418,17 @@ int main(int argc, char **argv) {
   ctx->params.enabled = true;
   ctx->params.upload_period = 60.0;
 
-
   // process upload_period
   if (ctx->upload_period) {
     double x = strtod(ctx->upload_period, NULL);
     if (x > 0.0)
       ctx->params.upload_period = x;
+  }
+
+  // process count_samples
+  if (ctx->count_samples) {
+    if (!strcmp(ctx->count_samples, "yes") || strcmp(ctx->count_samples, "true"))
+      ctx->params.count_samples = true;
   }
 
 #ifdef DD_DBG_PRINTARGS
@@ -416,7 +473,7 @@ int main(int argc, char **argv) {
 
     // Get the number of CPUs
     num_cpu = get_nprocs();
-  
+
     // Setup a shared barrier for coordination
     pthread_barrierattr_t bat = {0};
     pthread_barrier_t *pb = mmap(NULL, sizeof(pthread_barrier_t),
@@ -429,7 +486,7 @@ int main(int argc, char **argv) {
       pthread_barrierattr_setpshared(&bat, 1);
       pthread_barrier_init(pb, &bat, 2);
     }
-  
+
     // Instrument the profiler
     // 1.   Setup pipes
     // 2.   fork()
@@ -441,24 +498,24 @@ int main(int argc, char **argv) {
     // 5cc. Receive.  Repeat.  This is known before time of fork.
     // 6p.  close fd, teardown pipe, execvp() to target process.
     // 6cc. teardown pipe, create mmap regions and enter event loop
-  
+
     // TODO
     // * Multiple file descriptors can be sent in one push.  I don't know how much
     //   this matters, but if every microsecond counts at startup, it's an option.
-  
+
     // 1. Setup pipes (really unix domain socket pair)
     int sfd[2] = {-1, -1};
     if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sfd)) {
       // TODO log here
       ctx->params.enabled = false;
     }
-  
+
     // 2. fork()
     pid_t pid = fork();
     if (!pid) {
       // 3c. I am the child.  Fork again
       if (fork()) exit(0); // no need to use _exit, since we still own the proc
-  
+
       // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
       bool startup_errors = false;
       struct PEvent pes[100] = {0};
@@ -473,14 +530,15 @@ int main(int argc, char **argv) {
           pthread_barrier_wait(pb); // Tell the other guy I have his FD
         }
       }
-  
+
       // Cleanup and enter event loop
       close(sfd[0]);
       close(sfd[1]);
       munmap(pb, sizeof(pthread_barrier_t));
-  
+
       ctx->send_nanos = now_nanos() + ctx->params.upload_period*1000000000;
       elf_version(EV_CURRENT); // Initialize libelf
+      signal(SIGSEGV, sigsegv_handler);
       if (!startup_errors)
         main_loop(pes, ctx->num_watchers*num_cpu, ddprof_callback, ctx);
       else
@@ -501,16 +559,19 @@ int main(int argc, char **argv) {
           close(fd);
         }
       }
-  
+
       // Cleanup and become desired process image
       close(sfd[0]);
       close(sfd[1]);
       munmap(pb, sizeof(pthread_barrier_t));
-  
+
       execvp(argv[0], argv);
       printf("Hey, this shouldn't happen!\n");
     }
-  
+
     // Neither the profiler nor the instrumented process should get here
     return -1;
 }
+
+// Cleanup after yourself
+#undef STR_UNDF
