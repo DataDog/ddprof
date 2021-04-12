@@ -9,8 +9,6 @@
 /******************************************************************************\
 |*                              pprof interface                               *|
 \******************************************************************************/
-// Governs the chunk size for various pprof resizing operations
-#define DPROF_CHUNK_SZ 4096
 // Generate convenient shortnames from the ProtoBuf header
 #define PPSHORT(x) typedef Perftools__Profiles__##x PP##x
 PPSHORT(Profile);
