@@ -1,6 +1,9 @@
 # Collatz 
 *Collatz* is a benchmarking tool for native profilers.  It spawns a configurable number of processes which traverse a data-driven callgraph consisting of 1000 native functions.  Call depth can vary, with some modes exceeding 1000 calls.  Each function consists of small timing code and not much else.
 
+## Scope
+I expect the primary use of *collatz* will be performance tuning the *dd-prof* native profiler.  That said, one of the main questions fielded by folks selling software is, "how does it compare to \[competing product\]?"  As such, I tried to come up with a framing that would allow me to quantify--even roughly--the user experience of running a process under different levels of instrumentation, sources-unseen.
+
 ## In practice
 From a resource perspective, many important CPU consumables are shared between processes; it's close to impossible to run truly isolated workloads.  Inferring even just the important ones (such as cache hit ratio, branches, instructions per cycle, etc) is beyond the scope of this tool.  Rather, this tool attempts to report two derived quantities--latency and overhead--which can be useful in framing the end-user experience when engaging a profiler.
 
