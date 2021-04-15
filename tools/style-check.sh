@@ -26,6 +26,9 @@ tmpfile="/dev/fd/5"
 # Look for matching extensions and try to diff them.
 pushd $(git rev-parse --show-toplevel) >/dev/null
 for f in $(git diff --name-only --cached | grep -E '.*\.(c|cc|cp|cpp|cxx|c++|h|hh|hp|hpp|hxx|h++)$'); do
+  if [ ! -f $f ]; then
+    continue
+  fi
   if [ ${APPLY} == "yes" ]; then
     ${CLANG_FORMAT} -style=file -i $f
   else
