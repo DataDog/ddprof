@@ -1,94 +1,117 @@
-BINUTILS = /home/sanchda/dev/binutils-gdb
-LIBUNWIND = /home/sanchda/dev/libunwind
-ELFUTILS = /home/sanchda/dev/elfutils
-INCLUDE = -Iinclude -I$(BINUTILS)/include -I$(BINUTILS)/bfd -I$(BINUTILS)/binutils -I$(LIBUNWIND)/include -I$(ELFUTILS) -I$(ELFUTILS)/libdw
-INCLUDE = -Iinclude -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
-CFLAGS = -g -O2 -std=c11 -D_GNU_SOURCE -DDEBUG
-TESTS := http perf pprof
-WARNS := -Wall -Wextra -Wpedantic -Wno-missing-braces -Wno-missing-field-initializers -Wno-gnu-statement-expression -Wno-pointer-arith -Wno-gnu-folding-constant
-ANALYZER := -fanalyzer -fanalyzer-verbosity=2
-ANALYZER :=
-CC := gcc-10
+## Flag parameters
+# DEBUG
+#   0 - Release; don't include debugmode features like snapshotting pprofs,
+#       checking assertions, etc
+#   1 - Do those things
+# SAFETY
+#   0 - Don't add sanitizers
+#   1 - Add address sanitization
+#   2 - Add undefined sanitization
+#   3 - Add both
+# ANALYSIS
+#   0 - Don't add static analysis passes
+#   1 - -fanalyzer -fanalyzer-verbosity=2 (GCC only?; engage static for clang)
+# GNU_TOOLS
+#   0 - Use clang
+#   1 - Use GCC and co
+DEBUG ?= 1
+SAFETY ?= 3
+ANALYSIS ?= 1
+GNU_TOOLS ?= 0
+
+## Build parameters
 CC := clang-11
-LDFLAGS += -L/home/sanchda/dev/libunwind/src/.libs
-LDLIBS := /usr/lib/x86_64-linux-gnu/libprotobuf-c.a /usr/local/lib/libelf.a -lz -lpthread -llzma -ldl 
-UNWLIBS := $(LIBUNWIND)/src/.libs/libunwind-x86_64.a $(LIBUNWIND)/src/.libs/libunwind.a
-ELFLIBS := $(ELFUTILS)/libdwfl/libdwfl.a $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libebl/libebl.a /usr/lib/x86_64-linux-gnu/libbfd.a
-SRC := src/string_table.c src/proto/profile.pb-c.c src/pprof.c src/http.c src/dd_send.c src/append_string.c
+CFLAGS = -g -O2 -std=c11 -D_GNU_SOURCE
+WARNS := -Wall -Wextra -Wpedantic -Wno-missing-braces -Wno-missing-field-initializers -Wno-gnu-statement-expression -Wno-pointer-arith -Wno-gnu-folding-constant
+BUILDCHECK := 0  # Do we check the build with CLANG tooling afterward?
+DDARGS :=
+SANS :=
 
-VMAJ := 0
-VMIN := 1
-
-# NOTE
-# unwind-x86-64.a is a result of compiling libunwind, but it doesn't get installed
-# by default.  You'll need to either copy it or do something more clever than I did
-# during installation
-
-ifeq ($(PREFIX),)
-	PREFIX := /usr/local
+## Mode overrides
+ifeq ($(DEBUG),1)
+	DDARGS += -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DDEBUG
 endif
 
-.PHONY: all install
+ifeq ($(SAFETY),1)
+	SANS += -fsanitize=address
+endif
+ifeq ($(SAFETY),2)
+	SANS += -fsanitize=undefined
+endif
+ifeq ($(SAFETY),3)
+	SANS += -fsanitize=address,undefined
+endif
 
-# -DD_UWDBG is useful here (prints unwinding diagnostics), just set the UNW_DEBUG_LEVEL environment variable
-dd-prof: src/dd-prof.c $(SRC) $(ELFLIBS) /usr/lib/x86_64-linux-gnu/libprotobuf-c.a
-	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o build/$@ $^ $(LDLIBS)
-	tar -cf build/dd-prof-$(VMAJ).$(VMIN).tar.gz build/dd-prof lib/x86_64-linux-gnu/elfutils/libebl_x86_64.so
-#	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -fsanitize=address,undefined $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o build/$@ $^ $(LDLIBS)
-#	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o build/$@ $^ $(LDLIBS)
-#	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -fsanitize=undefined $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o build/$@ $^ $(LDLIBS)
-#	$(CC) -Wno-macro-redefined -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DD_UWDBG $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o build/$@ $^ $(LDLIBS)
+ifeq ($(ANALYSIS),1)
+	ifeq ($(GNU_TOOLS),1)
+		CFLAGS += -fanalyzer -fanalyzer-verbosity=2
+	else
+		BUILDCHECK := 1
+	endif
+endif
 
-sharefd: eg/sharefd.c
-	$(CC) $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o build/$@ $^
+## Other parameters
+# Directory structure and constants
+TARGETDIR := release
+VENDIR := vendor
 
-http: eg/http.c $(SRC)
-	$(CC) -DKNOCKOUT_UNUSED -DD_LOGGING_ENABLE -DD_SANITY_CHECKS -fsanitize=undefined $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o build/$@ $^ $(LDLIBS)
+## Elfutils build parameters
+# We can't use the repo elfutils because:
+#  * Support for static libebpl backends
+#  * Support for debuginfod
+MD5_ELF := 6f58aa1b9af1a5681b1cbf63e0da2d67 # You need to generate this manually
+VER_ELF := 0.183
+TAR_ELF := elfutils-$(VER_ELF).tar.bz2
+URL_ELF := https://sourceware.org/elfutils/ftp/$(VER_ELF)/$(TAR_ELF)
+ELFUTILS = $(VENDIR)/elfutils
+ELFLIBS := $(ELFUTILS)/libdwfl/libdwfl.a $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libebl/libebl.a
 
-appendstring: eg/appendstring.c $(SRC)
-	$(CC) -DKNOCKOUT_UNUSED -DD_LOGGING_ENABLE -DD_SANITY_CHECKS $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o build/$@ $^
+# Global aggregates
+INCLUDE = -Iinclude -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
+LDLIBS := -l:libprotobuf-c.a -l:libelf.a -l:libbfd.a -lz -lpthread -llzma -ldl 
+SRC := src/string_table.c src/proto/profile.pb-c.c src/pprof.c src/http.c src/dd_send.c src/append_string.c
 
-perfunwind: eg/perfunwind.c
-	$(CC) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o build/$@ $^ $(LDLIBS) 
+.PHONY: all install nagscreen
 
-perf: eg/perf.c
-	$(CC) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o build/$@ $^ $(LDLIBS)
+nagscreen:
+	@echo "Using $(CC)"
+	@echo "Building ddprof with debug=$(DEBUG), analysis=$(ANALYSIS), safety=$(SAFETY)"
+	@echo "elfutils $(VER_ELF)"
+	@git submodule
+	@echo 
+	@echo =============== BEGIN BUILD ===============
 
-pprof: eg/pprof.c $(SRC)
-	$(CC) -DKNOCKOUT_UNUSED -DD_LOGGING_ENABLE $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o build/$@ $^ $(LDLIBS)
+ddprof: src/ddprof.c $(SRC) | nagscreen $(TARGETDIR) $(VENDIR)/elfutils
+	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o $(TARGETDIR)/$@ $^ $(ELFLIBS) $(LDLIBS)
 
-procutils: eg/procutils.c
-	$(CC) $(CFLAGS) $(WARNS) $(ANALYZER) $(LDFLAGS) $(INCLUDE) -o build/$@ $^ $(LDLIBS)
+$(TARGETDIR):
+	mkdir $@
 
-procutils-tidy: src/procutils.c
-	clang-tidy src/procutils.c -header-filter=.* -checks=* -- -std=c11 $(INCLUDE)
+publish: ddprof
+	$(eval BIN_NAME := $(shell $(TARGETDIR)/ddprof -v | sed 's/ /_/g'))
+	$(eval TAR_NAME := $(BIN_NAME).tar.gz)
+	tar -cf $(TARGETDIR)/$(TAR_NAME) $(TARGETDIR)/ddprof lib/x86_64-linux-gnu/elfutils/libebl_x86_64.so
+	tools/upload.sh $(TAR_NAME)
 
-collatz: eg/collatz.c
-	$(CC) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o build/$@ $^
-
-cstacks: eg/cstacks.c $(UNWLIBS)
-	$(CC) $(LIBDIRS) $(CFLAGS) $(WARNS) -Wno-macro-redefined $(LDFLAGS) $(INCLUDE) -o build/$@ $^ $(LDLIBS)
-
-#strings: eg/strings.c src/string_table.c
-#	$(CC) -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o build/$@ $^
-
-strings: eg/strings.c src/string_table.c
-	$(CC) -DD_LOGGING_ENABLE -DD_SANITY_CHECKS $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o build/$@ $^
-
-dictionary: eg/dict.c src/string_table.c src/dictionary.c
-	$(CC) -DD_LOGGING_ENABLE $(WARNS) $(ANALYZER) $(CFLAGS) $(LDFLAGS) $(INCLUDE) -o build/$@ $^
-
-unwind: eg/unwind.c $(ELFLIBS)
-	$(CC) -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DD_UNWDBG $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o build/$@ $^ $(LDLIBS) -ldl
-
-all: dd-prof http perf pprof collatz ddog
-
-install: dd-prof 
-	cp build/dd-prof $(PREFIX)/build/dd-prof
+$(VENDIR)/elfutils:
+	cd $(VENDIR) && \
+		mkdir elfutils && \
+		curl -L --remote-name-all $(URL_ELF) && \
+		echo $(MD5_ELF)  $(TAR_ELF) > elfutils.md5 && \
+		md5sum --status -c elfutils.md5 && \
+		tar --no-same-owner -C elfutils --strip-components 1 -xf $(TAR_ELF) && \
+		rm -rf $(TAR_ELF) && \
+		cd elfutils && \
+		./configure --disable-debuginfod --disable-libdebuginfod && \
+		make
 
 format:
-	.build_tools/clang_formatter.sh --verbose -i --dry-run
+	tools/clang_formatter.sh
 
 format-commit:
-	.build_tools/clang_formatter.sh --verbose -i
+	tools/clang_formatter.sh apply
 
+clean_deps:
+	rm -rf vendor
+
+all: ddprof

@@ -1,3 +1,4 @@
+tmp/*
 pprofs/*
 release/*
 vendor/*
