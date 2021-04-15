@@ -3,4 +3,5 @@ BasedOnStyle: LLVM
 AlignOperands: DontAlign
 AllowShortBlocksOnASingleLine: true
 AlignConsecutiveBitFields: true
+IndentPPDirectives: AfterHash
 ---
