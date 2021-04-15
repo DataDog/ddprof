@@ -66,10 +66,13 @@ URL_ELF := https://sourceware.org/elfutils/ftp/$(VER_ELF)/$(TAR_ELF)
 ELFUTILS = $(VENDIR)/elfutils
 ELFLIBS := $(ELFUTILS)/libdwfl/libdwfl.a $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libebl/libebl.a
 
+## libddprof build parameters
+LIBDDPROF := $(VENDIR)/libddprof
+
 # Global aggregates
-INCLUDE = -Iinclude -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
+INCLUDE = -I $(LIBDDPROF)/src -I$(LIBDDPROF)/include -Iinclude -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
 LDLIBS := -l:libprotobuf-c.a -l:libelf.a -l:libbfd.a -lz -lpthread -llzma -ldl 
-SRC := src/string_table.c src/proto/profile.pb-c.c src/pprof.c src/http.c src/dd_send.c src/append_string.c
+SRC := $(addprefix $(LIBDDPROF)/src/, string_table.c pprof.c http.c dd_send.c append_string.c) src/proto/profile.pb-c.c
 
 # If we're here, then we've done all the optional processing stuff, so export
 # some variables to sub-makes
@@ -96,8 +99,8 @@ $(VENDIR)/elfutils:
 		make
 
 ## Actual build targets
-ddprof: src/ddprof.c $(SRC) | nagscreen $(TARGETDIR) $(VENDIR)/elfutils
-	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o $(TARGETDIR)/$@ $^ $(ELFLIBS) $(LDLIBS)
+ddprof: src/ddprof.c | nagscreen $(TARGETDIR) $(VENDIR)/elfutils
+	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o $(TARGETDIR)/$@ $(SRC) $^ $(ELFLIBS) $(LDLIBS)
 
 # kinda phony
 bench: 
