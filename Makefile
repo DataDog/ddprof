@@ -52,8 +52,8 @@ endif
 
 ## Other parameters
 # Directory structure and constants
-TARGETDIR := release
-VENDIR := vendor
+TARGETDIR := $(abspath release)
+VENDIR := $(abspath vendor)
 
 ## Elfutils build parameters
 # We can't use the repo elfutils because:
@@ -71,27 +71,17 @@ INCLUDE = -Iinclude -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(
 LDLIBS := -l:libprotobuf-c.a -l:libelf.a -l:libbfd.a -lz -lpthread -llzma -ldl 
 SRC := src/string_table.c src/proto/profile.pb-c.c src/pprof.c src/http.c src/dd_send.c src/append_string.c
 
-.PHONY: all install nagscreen
+# If we're here, then we've done all the optional processing stuff, so export
+# some variables to sub-makes
+export CC
+export CFLAGS
+export TARGETDIR
 
-nagscreen:
-	@echo "Using $(CC)"
-	@echo "Building ddprof with debug=$(DEBUG), analysis=$(ANALYSIS), safety=$(SAFETY)"
-	@echo "elfutils $(VER_ELF)"
-	@git submodule
-	@echo 
-	@echo =============== BEGIN BUILD ===============
+.PHONY: bench nagscreen format format-commit clean_deps publish all
 
-ddprof: src/ddprof.c $(SRC) | nagscreen $(TARGETDIR) $(VENDIR)/elfutils
-	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o $(TARGETDIR)/$@ $^ $(ELFLIBS) $(LDLIBS)
-
+## Intermediate build targets (dependencies)
 $(TARGETDIR):
 	mkdir $@
-
-publish: ddprof
-	$(eval BIN_NAME := $(shell $(TARGETDIR)/ddprof -v | sed 's/ /_/g'))
-	$(eval TAR_NAME := $(BIN_NAME).tar.gz)
-	tar -cf $(TARGETDIR)/$(TAR_NAME) $(TARGETDIR)/ddprof lib/x86_64-linux-gnu/elfutils/libebl_x86_64.so
-	tools/upload.sh $(TAR_NAME)
 
 $(VENDIR)/elfutils:
 	cd $(VENDIR) && \
@@ -105,6 +95,23 @@ $(VENDIR)/elfutils:
 		./configure --disable-debuginfod --disable-libdebuginfod && \
 		make
 
+## Actual build targets
+ddprof: src/ddprof.c $(SRC) | nagscreen $(TARGETDIR) $(VENDIR)/elfutils
+	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o $(TARGETDIR)/$@ $^ $(ELFLIBS) $(LDLIBS)
+
+# kinda phony
+bench: 
+	$(MAKE) -C bench/collatz
+
+## Phony helper-targets
+nagscreen:
+	@echo "Using $(CC)"
+	@echo "Building ddprof with debug=$(DEBUG), analysis=$(ANALYSIS), safety=$(SAFETY)"
+	@echo "elfutils $(VER_ELF)"
+	@git submodule
+	@echo 
+	@echo =============== BEGIN BUILD ===============
+
 format:
 	tools/clang_formatter.sh
 
@@ -112,6 +119,12 @@ format-commit:
 	tools/clang_formatter.sh apply
 
 clean_deps:
-	rm -rf vendor
+	rm -rf vendor/elfutils
 
-all: ddprof
+publish: ddprof
+	$(eval BIN_NAME := $(shell $(TARGETDIR)/ddprof -v | sed 's/ /_/g'))
+	$(eval TAR_NAME := $(BIN_NAME).tar.gz)
+	tar -cf $(TARGETDIR)/$(TAR_NAME) $(TARGETDIR)/ddprof lib/x86_64-linux-gnu/elfutils/libebl_x86_64.so
+	tools/upload.sh $(TAR_NAME)
+
+all: ddprof bench

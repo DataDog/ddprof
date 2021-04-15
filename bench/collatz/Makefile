@@ -1,8 +1,7 @@
-CC := clang-10
-CFLAGS := -g -O1
+TARGETDIR ?= "../../release"
 
 collatz: collatz.c
-	$(CC) $(CFLAGS) -o ../../build/$@ $^ -lpthread
+	$(CC) $(CFLAGS) -o $(TARGETDIR)/$@ $^ -lpthread
 
 sleeptest: %.c
 	$(CC) - -O
