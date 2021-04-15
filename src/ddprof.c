@@ -24,8 +24,8 @@ typedef struct PerfOption {
   int type;
   int config;
   int base_rate;
-  char* label;
-  char* unit;
+  char *label;
+  char *unit;
 } PerfOption;
 
 struct DDProfContext {
@@ -49,7 +49,7 @@ struct DDProfContext {
     bool profprofiler;
   } params;
   struct watchers {
-    PerfOption* opt;
+    PerfOption *opt;
     uint64_t sample_period;
   } watchers[max_watchers];
   int num_watchers;
@@ -57,7 +57,6 @@ struct DDProfContext {
   struct UnwindState *us;
   int64_t send_nanos;
 };
-
 
 // clang-format off
 PerfOption perfoptions[] = {
@@ -239,7 +238,11 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
 
 /*********************************  Printers  *********************************/
 #define X_HLPK(a, b, c, d, e, f, g) "  -"#c", --"#b", (envvar: "#a")",
-#define STR_UNDF (char*)&(int){0}
+
+// We use a non-NULL definition for an undefined string, because it's important
+// that this table is always populated intentionally.  This is checked in the
+// loop inside print_help()
+#define STR_UNDF (char*)1
 char* help_str[DD_KLEN] = {
   [DD_API_KEY] =
 "    A valid Datadog API key.  Passing the API key will cause "MYNAME" to bypass\n"
@@ -326,7 +329,8 @@ MYNAME" can register to various machine events in order to customize the\n"
   printf("%s", help_hdr);
   printf("Options:\n");
   for (int i=0; i<DD_KLEN; i++) {
-    if (*help_str[i]) {  // Actually char undefined I guess
+    assert(help_str[i]);
+    if (help_str[i] && STR_UNDF != help_str[i]) {
       printf("%s\n", help_key[i]);
       printf("%s\n", help_str[i]);
     }
