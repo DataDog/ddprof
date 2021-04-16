@@ -4,6 +4,8 @@ Native profiler from Datadog
 
 # Quick Start
 
+We only start slowly around here.  Section pending :)
+
 # Overview
 
 *ddprof* is a commandline utility for engaging kernel-mediated telemetry of an
