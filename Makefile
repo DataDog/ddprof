@@ -21,7 +21,7 @@ GNU_TOOLS ?= 0
 
 ## Build parameters
 CC := clang-11
-CFLAGS = -g -O2 -std=c11 -D_GNU_SOURCE
+CFLAGS = -O2 -std=c11 -D_GNU_SOURCE
 WARNS := -Wall -Wextra -Wpedantic -Wno-missing-braces -Wno-missing-field-initializers -Wno-gnu-statement-expression -Wno-pointer-arith -Wno-gnu-folding-constant
 BUILDCHECK := 0  # Do we check the build with CLANG tooling afterward?
 DDARGS :=
@@ -30,6 +30,7 @@ SANS :=
 ## Mode overrides
 ifeq ($(DEBUG),1)
 	DDARGS += -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DDEBUG
+	CFLAGS += -g
 endif
 
 ifeq ($(SAFETY),1)
@@ -80,7 +81,7 @@ export CC
 export CFLAGS
 export TARGETDIR
 
-.PHONY: bench nagscreen format format-commit clean_deps publish all
+.PHONY: bench ddprof_banner format format-commit clean_deps publish all
 
 ## Intermediate build targets (dependencies)
 $(TARGETDIR):
@@ -99,7 +100,7 @@ $(VENDIR)/elfutils:
 		make
 
 ## Actual build targets
-ddprof: src/ddprof.c | nagscreen $(TARGETDIR) $(VENDIR)/elfutils
+ddprof: src/ddprof.c | ddprof_banner $(TARGETDIR) $(VENDIR)/elfutils
 	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o $(TARGETDIR)/$@ $(SRC) $^ $(ELFLIBS) $(LDLIBS)
 
 # kinda phony
@@ -107,7 +108,7 @@ bench:
 	$(MAKE) -C bench/collatz
 
 ## Phony helper-targets
-nagscreen:
+ddprof_banner:
 	@echo "Using $(CC)"
 	@echo "Building ddprof with debug=$(DEBUG), analysis=$(ANALYSIS), safety=$(SAFETY)"
 	@echo "elfutils $(VER_ELF)"
