@@ -63,6 +63,10 @@ In order to take advantage of *ddprof*, you need a few things
 * Access to `perf events`.  See below.
 
 
+## seccomp
+
+By default, *seccomp* disables the `perf_event_open()` API.  You'll need to make sure you can access it.
+
 ## perf_event_paranoid
 
 CPU profiling is available even with the strictest `perf_event_paranoid` mode
