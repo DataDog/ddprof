@@ -75,6 +75,7 @@ PerfOption perfoptions[] = {
   // Software
   {'c', PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK, 1e6, "cpu-time",  "nanoseconds"},
   {'w', PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,  1e6, "wall-time", "nanoseconds"},
+  {'s', PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES, 1, "switches", "events"},
 
   // Kernel tracepoints
   // I don't think there's any commitment that these IDs are unchanging between installations of the same kernel version,
@@ -321,6 +322,7 @@ MYNAME" can register to various machine events in order to customize the\n"
 " Software events\n"
 "    c - Task clock (cpu-time, nanoseconds)\n"
 "    w - CPU clock (wall-time, nanoseconds)\n"
+"    s - context switches (switches, events)\n"
 " Kernel Tracepoints\n"
 "    1 - IO scheduler block insertions (block-insert, events)\n"
 "    2 - IO scheduler block issues (block-issue, events)\n"
