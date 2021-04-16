@@ -36,7 +36,7 @@ Architectural showpieces and such will always be available in the `docs/` folder
 
 In order to take advantage of *ddprof*, you need a few things
 
-* Linux kernel 4.17 or later (if you need to support an earlier kernel, create an issue outlining your need!)
+* Linux kernel 4.15 or later (if you need to support an earlier kernel, create an issue outlining your need!  If you're blocked in a *libc* issue, also create an issue and we'll resolve it even sooner)
 * Your desired application or libraries must have debuginfo.  This means they either have a `.eh_frame` or `.debug_info`.  *ddprof* will, but does not currently, support split debuginfo.
 * Access to `perf events`.  See below.
 
