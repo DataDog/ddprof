@@ -56,7 +56,7 @@ Unfortunately, due to the rich and storied history of the perf events subsystem,
 
 In 2016, Debian and Android began running a kernel [patch][https://patchwork.kernel.org/project/kernel-hardening/patch/1469630746-32279-1-git-send-email-jeffv@google.com/] which implemented a new `perf_event_paranoid == 3` sysctl setting, which disables the `perf_event_open()` syscall for processes without `CAP_SYS_ADMIN`.  This patch was contemporary with the emergence of at least four CVE (security issues) stemming from the `perf_event_open()` syscall (mostly around privileged data access).
 
-This patch was rejected in fairly strong terms.  There were a few different themes in the thread.  Locking system-wide disablement behind `CAP_SYS_ADMIN` was seen as too big a hammer; on a system with the interface disabled, the only way to enable it is via a capability which widens the attack surface substantially (in kernel 5.4, there are hundreds of checks for `CAP_SYS_ADMIN`--which is also known as "root 2.0").  Moreover, from the perspective of kernel development, it's problematic to admit that an interface is unsafe and should ever be totally disabled; it's more scalable to either remove such features entirely or subject them to the testing necessary to ensure they are safe.
+This patch was rejected in fairly strong terms.  There were a few different themes in the thread.  Locking system-wide disablement behind `CAP_SYS_ADMIN` was seen as too big a hammer; on a system with the interface disabled, the only way to enable it is via a capability which widens the attack surface substantially (in kernel 5.4, there are hundreds of checks for `CAP_SYS_ADMIN`--which is also known as "root 2.0").  Moreover, from the perspective of kernel development, it's problematic to admit that an interface is unsafe and should ever be disabled when the underlying subsystem can't be removed; it's more scalable to allow the subsystem to be removed at build-time or subject such components to the testing necessary to ensure they are safe.
 
 Given the historical status of `perf_event_open()`, one valid concern is, how safe is it to run `perf_event_paranoid == 2` in prod?  This is difficult to qualify fully, but one category of insights comes from the rate at which long-running targeted fuzzing campaigns succeed in finding new bugs.  There has been some [excellent work][http://web.eece.maine.edu/~vweaver/projects/perf_events/fuzzer/bugs_found.html] in this regard (see [here][http://web.eece.maine.edu/~vweaver/projects/perf_events/fuzzer/2019_perf_fuzzer_tr.pdf] as well).  The rate of serious issues and security-related bugs has decreased substantially during the v4 kernel series, and those issues have become increasingly specific.
 
@@ -69,7 +69,26 @@ My opinion?  If you're running a kernel dated from late 2017 or later, just enab
 
 Possibly.
 
-One idea would be to offer a new commandline argument to *ddprof*.  When this argument is set, detect `CAP_SYS_ADMIN` on startup, perform the instrumentation, then *drop* the capability in both the profiling daemon and the target application.  This will ensure that the instrumentation can be enabled, but denies attackers the benefit of actually using it.
+##### Capability Downgrade
+
+One idea would be to offer a new commandline argument to *ddprof*.  When this argument is set, detect `CAP_SYS_ADMIN` on startup, perform the instrumentation, then *drop* the capability in both the profiling daemon and the target application.  This will ensure that the instrumentation can be enabled, but denies attackers the benefit of using it directly.
+
+##### Alternative timing mode
+
+For a variety of reasons, we thought of launching with `perf_event_open()`.  We could also measure time using the standard `set_itimer()` approach.  There are a few unfortunate consequences to this:
+ * itimers are mediated through Unix signals, which steal execution from the instrumented process (adds latency)
+ * signals have more skid than the kernel code, sometimes by a truly significant margin
+ * signals can interrupt syscalls, which can break client code
+ * signals don't follow forks
+ * have to implement new message passing system to bring samples up from children
+ * signal delivery is non-uniform through a thread pool--this isn't an academic point, sampling hugely favors the earliest-spawned thread
+ * users can over-write signal handlers
+
+Some of this can be controlled for by implementing an LD_PRELOAD-type trick inside of a wrapper, which could catch `fork()` calls into libc and implement some other niceties, but I'm not sure how much effort this will be to support both glibc/musl across the major versions we have to support.
+
+##### Sidecar Mode
+
+In this distribution, the customer would install `ddprof` as a daemon in a sidecar container.  We'd have to implement a new mode which will watch all processes on all CPUs, which has some issues for finding mappings and debug symbols (but nothing major).  I don't anticipate this to add more latency, but it may erode performance by adding a lot of noise, which will add garbage to our unwinding caches.
 
 
 # Things we don't know

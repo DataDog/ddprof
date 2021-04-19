@@ -114,6 +114,9 @@ ddprof: src/ddprof.c | ddprof_banner $(TARGETDIR) $(VENDIR)/elfutils
 bench: 
 	$(MAKE) -C bench/collatz
 
+help: $(TARGETDIR)/ddprof 
+	tools/help_generate.sh
+
 ## Phony helper-targets
 ddprof_banner:
 	@echo "Using $(CC)"
