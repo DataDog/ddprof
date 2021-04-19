@@ -32,7 +32,7 @@ Options:
   -e, --event:
     A string representing the events to sample.  Defaults to `cw`
     See the `events` section below for more details.
-    eg: --event CRc1
+    eg: --event sCPU --event hREF
   -v, --version:
     Prints the version of ddprof and exits.
 
