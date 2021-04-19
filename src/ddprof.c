@@ -290,7 +290,7 @@ void print_help() {
 "  -e, --event:\n"
 "    A string representing the events to sample.  Defaults to `cw`\n"
 "    See the `events` section below for more details.\n"
-"    eg: --event CRc1\n"
+"    eg: --event sCPU --event hREF\n"
 "  -v, --version:\n"
 "    Prints the version of "MYNAME" and exits.\n";
 
