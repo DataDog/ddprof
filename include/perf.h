@@ -122,7 +122,7 @@ typedef struct perf_samplestacku {
 } perf_samplestacku;
 
 typedef enum PEMode {
-  PE_KERNEL_INCLUDE = 0 << 1,
+  PE_KERNEL_INCLUDE = 1 << 0,
 } PEMode;
 
 struct perf_event_attr g_dd_native_attr = {
