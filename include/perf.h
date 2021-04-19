@@ -121,6 +121,10 @@ typedef struct perf_samplestacku {
   // uint64_t    dyn_size;   // Don't forget!
 } perf_samplestacku;
 
+typedef enum PEMode {
+  PE_KERNEL_INCLUDE = 0 << 1,
+} PEMode;
+
 struct perf_event_attr g_dd_native_attr = {
     .size = sizeof(struct perf_event_attr),
     .sample_type = PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER |
@@ -183,12 +187,16 @@ int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
   return syscall(__NR_perf_event_open, attr, pid, cpu, gfd, flags);
 }
 
-int perfopen(pid_t pid, int type, int config, uint64_t sample_period, int cpu) {
+int perfopen(pid_t pid, int type, int config, uint64_t per, int mode, int cpu) {
   struct perf_event_attr *attr = &(struct perf_event_attr){0};
   memcpy(attr, &g_dd_native_attr, sizeof(g_dd_native_attr));
   attr->type = type;
   attr->config = config;
-  attr->sample_period = sample_period;
+  attr->sample_period = per;
+
+  // Overrides
+  // TODO split this out into an enum as soon as there is more than one
+  attr->exclude_kernel = !(mode & PE_KERNEL_INCLUDE);
 
   int fd = perf_event_open(attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC);
   if (-1 == fd && EACCES == errno) {
