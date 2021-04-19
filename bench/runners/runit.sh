@@ -1,6 +1,11 @@
 #!/bin/bash
+# http://redsymbol.net/articles/unofficial-bash-strict-mode/
+set -euo pipefail
+IFS=$'\n\t'
+
+DIR=$(git rev-parse --show-toplevel)
 ASAN_SYMBOLIZER_PATH=$(which llvm-symbolizer)
-CMD_BASE=release/ddprof
+CMD_BASE=${DIR}/release/ddprof
 CMD=${CMD_BASE}
 JOB="./redis-runner.sh"
 for arg in "$@"; do
@@ -29,4 +34,4 @@ ${CMD} \
   -e sCPU \
   -e sCI \
   -e kBLKS \
-  ${JOB}
+  ${DIR}/bench/runners/${JOB}
