@@ -20,9 +20,8 @@ ANALYSIS ?= 1
 GNU_TOOLS ?= 0
 
 ## Build parameters
-CC := clang-11
 CFLAGS = -O2 -std=c11 -D_GNU_SOURCE
-WARNS := -Wall -Wextra -Wpedantic -Wno-missing-braces -Wno-missing-field-initializers -Wno-gnu-statement-expression -Wno-pointer-arith -Wno-gnu-folding-constant
+WARNS := -Wall -Wextra -Wpedantic -Wno-missing-braces -Wno-missing-field-initializers -Wno-gnu-statement-expression -Wno-pointer-arith -Wno-gnu-folding-constant -Wno-zero-length-array
 BUILDCHECK := 0  # Do we check the build with CLANG tooling afterward?
 DDARGS :=
 SANS :=
@@ -42,6 +41,14 @@ endif
 ifeq ($(SAFETY),3)
 	SANS += -fsanitize=address,undefined
 endif
+
+# TODO this is probably not what you want
+ifeq ($(GNU_TOOLS),1)
+	CC := $(shell /bin/bash -c 'command -v gcc{-11,-10,,-9,-8,-7} | head -n 1')
+else
+	CC := $(shell /bin/bash -c 'command -v clang{-12,-11,,-10,-9,-8} | head -n 1')
+endif
+CC := $(if $(strip $(CC)), $(CC),clang)
 
 ifeq ($(ANALYSIS),1)
 	ifeq ($(GNU_TOOLS),1)
@@ -110,7 +117,7 @@ bench:
 ## Phony helper-targets
 ddprof_banner:
 	@echo "Using $(CC)"
-	@echo "Building ddprof with debug=$(DEBUG), analysis=$(ANALYSIS), safety=$(SAFETY)"
+	@echo "Building ddprof with debug=$(DEBUG), analysis=$(ANALYSIS), safety=$(SAFETY), GNU_TOOLS=$(GNU_TOOLS)"
 	@echo "elfutils $(VER_ELF)"
 	@git submodule
 	@echo 
