@@ -27,7 +27,7 @@ typedef struct PerfOption {
   int base_rate;
   char *label;
   char *unit;
-  bool mode;
+  int mode;
 } PerfOption;
 
 struct DDProfContext {
@@ -53,7 +53,6 @@ struct DDProfContext {
   struct watchers {
     PerfOption *opt;
     uint64_t sample_period;
-    int mode;
   } watchers[max_watchers];
   int num_watchers;
 
@@ -205,7 +204,6 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
     }
     int64_t sample_val[max_watchers] = {0};
     sample_val[pos] = pes->period;
-    if(pos) printf("POS is %d\n", pos);
     pprof_sampleAdd(dp, sample_val, pctx->num_watchers, id_locs, us->idx);
     break;
 
@@ -376,7 +374,8 @@ int main(int argc, char **argv) {
   while (-1 != (c = getopt_long(argc, argv, "+" OPT_TABLE(X_OSTR) "e:hv", lopts, &oi))) {
     switch (c) {
       OPT_TABLE(X_CASE)
-    case 'e':
+    case 'e':;
+      bool event_matched = false;
       for (int i = 0; i < num_perfs; i++) {
         if (!strncmp(perfoptions[i].key, optarg, strlen(perfoptions[i].desc))) {
 
@@ -391,7 +390,14 @@ int main(int argc, char **argv) {
           // TODO, here check for a comma to determine the sampling rate
           ctx->watchers[ctx->num_watchers].sample_period = perfoptions[i].base_rate;
           ctx->num_watchers++;
+
+          // Early exit
+          event_matched = true;
+          break;
         }
+      }
+      if (!event_matched) {
+        printf("Event %s did not match any events.\n", optarg);
       }
       break;
     case 'h':
@@ -430,11 +436,12 @@ int main(int argc, char **argv) {
 
   printf("Instrumented with %d watchers.\n", ctx->num_watchers);
   for (int i=0; i < ctx->num_watchers; i++) {
-    printf("ID: %s, Pos: %d, Index: %d, Label: %s\n",
+    printf("ID: %s, Pos: %d, Index: %d, Label: %s, Mode: %d\n",
         ctx->watchers[i].opt->key,
         i,
         ctx->watchers[i].opt->config,
-        ctx->watchers[i].opt->label);
+        ctx->watchers[i].opt->label,
+        ctx->watchers[i].opt->mode);
   }
 #endif
   // Adjust input parameters for execvp()
@@ -541,7 +548,7 @@ int main(int argc, char **argv) {
       pid_t mypid = getpid();
       for (int i = 0; i < ctx->num_watchers && ctx->params.enabled; i++) {
         for(int j=0; j<num_cpu; j++) {
-          int fd = perfopen(mypid, ctx->watchers[i].opt->type, ctx->watchers[i].opt->config, ctx->watchers[i].sample_period, ctx->watchers[i].mode, j);
+          int fd = perfopen(mypid, ctx->watchers[i].opt->type, ctx->watchers[i].opt->config, ctx->watchers[i].sample_period, ctx->watchers[i].opt->mode, j);
           if (-1 == fd || sendfd(sfd[1], fd)) {
             // TODO this is an error, so log it later
             printf("Had an error.\n");
