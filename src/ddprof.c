@@ -20,12 +20,14 @@
 #define max_watchers 10
 
 typedef struct PerfOption {
-  char key;
+  char *desc;
+  char *key;
   int type;
   int config;
   int base_rate;
   char *label;
   char *unit;
+  bool mode;
 } PerfOption;
 
 struct DDProfContext {
@@ -51,6 +53,7 @@ struct DDProfContext {
   struct watchers {
     PerfOption *opt;
     uint64_t sample_period;
+    int mode;
   } watchers[max_watchers];
   int num_watchers;
 
@@ -58,38 +61,33 @@ struct DDProfContext {
   int64_t send_nanos;
 };
 
+// RE: kernel tracepoints
+// I don't think there's any commitment that these IDs are unchanging between
+// installations of the same kernel version, let alone between kernel releases.
+// You'll have to scrape them at runtime.  This is actually nice because access
+// to the sysfs endpoint precludes permissions, so you can emit a helpful error
+// if something goes wrong before instrumenting with perf To generate the hack:
+// for f in $(find /sys/kernel/tracing/events/block -name id); do echo $f; cat
+// $f; done
 // clang-format off
 PerfOption perfoptions[] = {
   // Hardware
-  {'C', PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              1e6, "cpu-cycle",    "cycles"},
-  {'R', PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES,          1e6, "cpu-cycle",    "cycles"},
-  {'I', PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,            1e6, "cpu-instr",    "instructions"},
-  {'H', PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES,        1e3, "cache-ref",    "events"},
-  {'M', PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES,            1e3, "cache-miss",   "events"},
-  {'P', PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     1e3, "branch-instr", "events"},
-  {'Q', PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES,           1e3, "branch-miss",  "events"},
-  {'B', PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,              1e3, "bus-cycle",    "cycles"},
-  {'F', PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1e3, "bus-stf",      "cycles"},
-  {'S', PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1e3, "bus-stb",      "cycles"},
-
-  // Software
-  {'c', PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK, 1e6, "cpu-time",  "nanoseconds"},
-  {'w', PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,  1e6, "wall-time", "nanoseconds"},
-  {'s', PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES, 1, "switches", "events"},
-
-  // Kernel tracepoints
-  // I don't think there's any commitment that these IDs are unchanging between installations of the same kernel version,
-  // let alone between kernel releases.  You'll have to scrape them at runtime.  This is actually nice because access
-  // to the sysfs endpoint precludes permissions, so you can emit a helpful error if something goes wrong before
-  // instrumenting with perf
-  // To generate the hack: for f in $(find /sys/kernel/tracing/events/block -name id); do echo $f; cat $f; done
-  {'1', PERF_TYPE_TRACEPOINT, 1133,  1, "block-insert",   "events"},
-//  {'2', PERF_TYPE_TRACEPOINT, 1132,  1, "block-issue",    "events"},
-  {'2', PERF_TYPE_TRACEPOINT, 1132,  1, "wall-time",    "nanoseconds"},
-  {'3', PERF_TYPE_TRACEPOINT, 1134,  1, "block-complete", "events"},
-
-  // Fake watchers
-  {'\0', 0, 0, 1, "samples", "count"},
+  {"CPU Cycles",      "hCPU",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              1e6, "cpu-cycle",      "cycles",       0},
+  {"Ref. CPU Cycles", "hREF",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES,          1e6, "ref-cycle",      "cycles",       0},
+  {"Instr. Count",    "hINSTR",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,            1e6, "cpu-instr",      "instructions", 0},
+  {"Cache Ref.",      "hCREF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES,        1e3, "cache-ref",      "events",       0},
+  {"Cache Miss",      "hCMISS",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES,            1e3, "cache-miss",     "events",       0},
+  {"Branche Instr.",  "hBRANCH", PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     1e3, "branch-instr",   "events",       0},
+  {"Branch Miss",     "hBMISS",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES,           1e3, "branch-miss",    "events",       0},
+  {"Bus Cycles",      "hBUS",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,              1e3, "bus-cycle",      "cycles",       0},
+  {"Bus Stalls(F)",   "hBSTF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1e3, "bus-stf",        "cycles",       0},
+  {"Bus Stalls(B)",   "hBSTB",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1e3, "bus-stb",        "cycles",       0},
+  {"CPU Time",        "sCPU",    PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,              1e6, "cpu-time",       "nanoseconds",  0},
+  {"Wall? Time",      "sWALL",   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,               1e6, "wall-time",      "nanoseconds",  0},
+  {"Ctext Switches",  "sCI",     PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES,        1,   "switches",       "events",       PE_KERNEL_INCLUDE},
+  {"Block-Insert",    "kBLKI",   PERF_TYPE_TRACEPOINT, 1133,                                1,   "block-insert",   "events",       PE_KERNEL_INCLUDE},
+  {"Block-Issue",     "kBLKS",   PERF_TYPE_TRACEPOINT, 1132,                                1,   "block-issue",    "events",       PE_KERNEL_INCLUDE},
+  {"Block-Complete",  "kBLKC",   PERF_TYPE_TRACEPOINT, 1134,                                1,   "block-complete", "events",       PE_KERNEL_INCLUDE},
 };
 // clang-format on
 
@@ -207,6 +205,7 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
     }
     int64_t sample_val[max_watchers] = {0};
     sample_val[pos] = pes->period;
+    if(pos) printf("POS is %d\n", pos);
     pprof_sampleAdd(dp, sample_val, pctx->num_watchers, id_locs, us->idx);
     break;
 
@@ -297,36 +296,17 @@ void print_help() {
 
   char help_events[] =
 "Events\n"
-MYNAME" can register to various machine events in order to customize the\n"
+MYNAME" can register to various system events in order to customize the\n"
 "information retrieved during profiling.  Note that certain events can add\n"
 "more overhead during profiling; be sure to test your service under a realistic\n"
 "load simulation to ensure the desired forms of profiling are acceptable.\n"
 "\n"
-"The listing below gives the character to pass to the --event string, a\n"
+"The listing below gives the string to pass to the --event argument, a\n"
 "brief description of the event, the name of the event as it will appear in\n"
 "the Datadog UI, and the units.\n"
 "Events with the same name in the UI conflict with each other; be sure to pick\n"
 "only one such event!\n"
-"\n"
-"  Hardware events\n"
-"    C - CPU Cycles (cpu-cycle, cycles)\n"
-"    R - Reference CPU Cycles (no frequency scaling) (cpu-cycle, cycles)\n"
-"    I - CPU Instructions (cpu-instr, instructions)\n"
-"    H - Cache references (cache-ref, events)\n"
-"    M - Cache misses (cache-miss, events)\n"
-"    P - Branches (branch-instr, events)\n"
-"    Q - Branch misses (branch-miss, events)\n"
-"    B - Bus cycles (bus-cyle, cycles)\n"
-"    F - Bus cycles stalled, frontend (bus-stf, cycles)\n"
-"    S - Bus cycles stalled; backend (bus-stb, cycles\n"
-" Software events\n"
-"    c - Task clock (cpu-time, nanoseconds)\n"
-"    w - CPU clock (wall-time, nanoseconds)\n"
-"    s - context switches (switches, events)\n"
-" Kernel Tracepoints\n"
-"    1 - IO scheduler block insertions (block-insert, events)\n"
-"    2 - IO scheduler block issues (block-issue, events)\n"
-"    3 - IO scheduler block completions, events)\n";
+"\n";
 
   printf("%s", help_hdr);
   printf("Options:\n");
@@ -337,8 +317,10 @@ MYNAME" can register to various machine events in order to customize the\n"
       printf("%s\n", help_str[i]);
     }
   }
-  printf("%s", help_opts_extra);
+  printf("%s\n", help_opts_extra);
   printf("%s", help_events);
+  for (int i = 0; i < num_perfs; i++)
+    printf("%-10s - %-15s (%s, %s)\n", perfoptions[i].key, perfoptions[i].desc, perfoptions[i].label, perfoptions[i].unit);
 }
 
 
@@ -394,20 +376,21 @@ int main(int argc, char **argv) {
   while (-1 != (c = getopt_long(argc, argv, "+" OPT_TABLE(X_OSTR) "e:hv", lopts, &oi))) {
     switch (c) {
       OPT_TABLE(X_CASE)
-    case 'e':;
-      int n = strlen(optarg);
-      for (int i = 0; i < n; i++) {
-        for (int j = 0; j < num_perfs; j++) {
-          if (perfoptions[j].key == optarg[i]) {
-            if (default_watchers) {
-              default_watchers = false;
-              ctx->num_watchers = 0;
-            }
+    case 'e':
+      for (int i = 0; i < num_perfs; i++) {
+        if (!strncmp(perfoptions[i].key, optarg, strlen(perfoptions[i].desc))) {
 
-            ctx->watchers[ctx->num_watchers].opt = &perfoptions[j];
-            ctx->watchers[ctx->num_watchers].sample_period = perfoptions[j].base_rate;
-            ctx->num_watchers++;
+          // If we got a match, then we need to use non-default accounting
+          if (default_watchers) {
+            default_watchers = false;
+            ctx->num_watchers = 0;
           }
+
+          ctx->watchers[ctx->num_watchers].opt = &perfoptions[i];
+
+          // TODO, here check for a comma to determine the sampling rate
+          ctx->watchers[ctx->num_watchers].sample_period = perfoptions[i].base_rate;
+          ctx->num_watchers++;
         }
       }
       break;
@@ -447,7 +430,7 @@ int main(int argc, char **argv) {
 
   printf("Instrumented with %d watchers.\n", ctx->num_watchers);
   for (int i=0; i < ctx->num_watchers; i++) {
-    printf("ID: %c, Pos: %d, Index: %d, Label: %s\n",
+    printf("ID: %s, Pos: %d, Index: %d, Label: %s\n",
         ctx->watchers[i].opt->key,
         i,
         ctx->watchers[i].opt->config,
@@ -558,7 +541,7 @@ int main(int argc, char **argv) {
       pid_t mypid = getpid();
       for (int i = 0; i < ctx->num_watchers && ctx->params.enabled; i++) {
         for(int j=0; j<num_cpu; j++) {
-          int fd = perfopen(mypid, ctx->watchers[i].opt->type, ctx->watchers[i].opt->config, ctx->watchers[i].sample_period, j);
+          int fd = perfopen(mypid, ctx->watchers[i].opt->type, ctx->watchers[i].opt->config, ctx->watchers[i].sample_period, ctx->watchers[i].mode, j);
           if (-1 == fd || sendfd(sfd[1], fd)) {
             // TODO this is an error, so log it later
             printf("Had an error.\n");
