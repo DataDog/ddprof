@@ -1,0 +1,13 @@
+variables:
+  KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
+  BUILD_DEPS_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build-deps
+
+build deps:
+  stage: build
+  when: manual
+  tags: ["runner:docker", "size:large"]
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
+  script:
+  - set -euo pipefail
+  - docker build --tag $BUILD_DEPS_IMG app/build-env
+  - docker push $BUILD_DEPS_IMG
