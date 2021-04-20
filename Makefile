@@ -76,41 +76,39 @@ TAR_ELF := elfutils-$(VER_ELF).tar.bz2
 URL_ELF := https://sourceware.org/elfutils/ftp/$(VER_ELF)/$(TAR_ELF)
 ELFUTILS = $(VENDIR)/elfutils
 ELFTMP   = $(TMP)/elftemp
-ELFLIBS := $(ELFUTILS)/libdwfl/libdwfl.a $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libebl/libebl.a
+ELFLIBS := $(ELFUTILS)/libdwfl/libdwfl.a $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libebl/libebl.a $(ELFUTILS)/libelf/libelf.a
 
 ## libddprof build parameters
 LIBDDPROF := $(VENDIR)/libddprof
 
 # Global aggregates
 INCLUDE = -I $(LIBDDPROF)/src -I$(LIBDDPROF)/include -Iinclude -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
-LDLIBS := -l:libprotobuf-c.a -l:libelf.a -l:libbfd.a -lz -lpthread -llzma -ldl 
+LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -lz -lpthread -llzma -ldl 
 SRC := $(addprefix $(LIBDDPROF)/src/, string_table.c pprof.c http.c dd_send.c append_string.c) src/proto/profile.pb-c.c
 DIRS := $(TARGETDIR) $(TMP) $(ELFTMP)
 
-# If we're here, then we've done all the optional processing stuff, so export
-# some variables to sub-makes
-export CC
-export CFLAGS
-export TARGETDIR
-
 .PHONY: bench ddprof_banner format format-commit clean_deps publish all
-DELETE_ON_ERROR:
+.DELETE_ON_ERROR:
 
 ## Intermediate build targets (dependencies)
 $(DIRS):
 	mkdir -p $@
 
-$(ELFLIBS): $(ELFUTILS)
-	$(MAKE) -C $(ELFUTILS)
+$(ELFTMP).dir: $(ELFTMP)
 
-$(ELFUTILS): $(ELFTMP)
+$(ELFLIBS): $(ELFUTILS)
+	$(MAKE) -j4 -C $(ELFUTILS)
+
+$(ELFUTILS): $(ELFTMP).dir
 	cd $(TMP) && curl -L --remote-name-all $(URL_ELF)
 	echo $(MD5_ELF) $(TMP)/$(TAR_ELF) > $(TMP)/elfutils.md5
 	md5sum --status -c $(TMP)/elfutils.md5
 	tar --no-same-owner -C $(ELFTMP) --strip-components 1 -xf $(TMP)/$(TAR_ELF)
 	rm -rf $(TMP)/$(TAR_ELF)
 	cd $(ELFTMP) && ./configure CC=$(abspath $(GNU_LATEST)) --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning
-	mv $(ELFTMP) $@
+	rm -rf $@
+	mv -f $(ELFTMP) $@
+	touch $<
 
 $(LIBDDPROF):
 	git submodule update --init
@@ -121,7 +119,7 @@ ddprof: src/ddprof.c | $(TARGETDIR) $(ELFLIBS) $(LIBDDPROF) ddprof_banner
 
 # kinda phony
 bench: 
-	$(MAKE) -C bench/collatz
+	$(MAKE) CC=$(strip $(CC)) CFLAGS="$(CFLAGS)" TARGETDIR=$(strip $(TARGETDIR)) -C bench/collatz
 
 help: $(TARGETDIR)/ddprof 
 	tools/help_generate.sh
@@ -143,6 +141,10 @@ format-commit:
 
 clean_deps:
 	rm -rf vendor/elfutils
+	rm -rf tmp/*
+
+clean: clean_deps
+	rm $(TARGETDIR)/*
 
 publish: ddprof
 	$(eval BIN_NAME := $(shell $(TARGETDIR)/ddprof -v | sed 's/ /_/g'))

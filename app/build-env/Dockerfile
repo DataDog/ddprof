@@ -4,4 +4,14 @@
 FROM ubuntu:20.04 as base
 
 RUN apt update \
-  && apt install -y make clang-11 gcc-10 git curl zlib1g-dev
+  && apt install -y \
+    make \
+    clang-11 \
+    gcc-10 \
+    git \
+    curl \
+    m4 \
+    binutils-dev \
+    libprotobuf-c-dev \
+    liblzma-dev \
+    zlib1g-dev
