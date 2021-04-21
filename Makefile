@@ -28,39 +28,39 @@ SANS :=
 
 ## Mode overrides
 ifeq ($(DEBUG),1)
-	DDARGS += -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DDEBUG
-	CFLAGS += -g
+  DDARGS += -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DDEBUG
+  CFLAGS += -g
 else
-	DDARGS += -DVER_REV=\"release\"
-	CFLAGS += -O2
+  DDARGS += -DVER_REV=\"release\"
+  CFLAGS += -O2
 endif
 
 ifeq ($(SAFETY),1)
-	SANS += -fsanitize=address
+  SANS += -fsanitize=address
 endif
 ifeq ($(SAFETY),2)
-	SANS += -fsanitize=undefined
+  SANS += -fsanitize=undefined
 endif
 ifeq ($(SAFETY),3)
-	SANS += -fsanitize=address,undefined
+  SANS += -fsanitize=address,undefined
 endif
 
 # TODO this is probably not what you want
 GNU_LATEST := $(shell /bin/bash -c 'command -v gcc{-11,-10,,-9,-8,-7} | head -n 1')
 CLANG_LATEST := $(shell /bin/bash -c 'command -v clang{-12,-11,,-10,-9,-8} | head -n 1')
 ifeq ($(GNU_TOOLS),1)
-	CC := $(GNU_LATEST)
+  CC := $(GNU_LATEST)
 else
-	CC := $(CLANG_LATEST)
+  CC := $(CLANG_LATEST)
 endif
 CC := $(if $(strip $(CC)), $(CC),clang)
 
 ifeq ($(ANALYSIS),1)
-	ifeq ($(GNU_TOOLS),1)
-		CFLAGS += -fanalyzer -fanalyzer-verbosity=2
-	else
-		BUILDCHECK := 1
-	endif
+  ifeq ($(GNU_TOOLS),1)
+    CFLAGS += -fanalyzer -fanalyzer-verbosity=2
+  else
+    BUILDCHECK := 1
+  endif
 endif
 
 ## Other parameters
@@ -89,7 +89,7 @@ LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -lz -lpthread -llzma -ldl
 SRC := $(addprefix $(LIBDDPROF)/src/, string_table.c pprof.c http.c dd_send.c append_string.c) src/proto/profile.pb-c.c
 DIRS := $(TARGETDIR) $(TMP)
 
-.PHONY: build bench ddprof_banner format format-commit clean_deps publish all
+.PHONY: build deps bench ddprof_banner format format-commit clean_deps publish all
 .DELETE_ON_ERROR:
 
 ## Intermediate build targets (dependencies)
@@ -108,10 +108,11 @@ $(ELFUTILS):
 	rm -rf $(VENDIR)/$(TAR_ELF)
 	cd $(ELFUTILS) && ./configure CC=$(abspath $(GNU_LATEST)) --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning
 
-$(LIBDDPROF):
+$(LIBDDPROF)/src:
 	git submodule update --init
 
 build: $(TARGETDIR)/ddprof
+deps: $(ELFLIBS) $(LIBDDPROF)/src
 
 
 ## Actual build targets

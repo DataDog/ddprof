@@ -1,13 +1,43 @@
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
-  BUILD_DEPS_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build-deps
+  BASE_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
+  BUILD_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build
+  S3_PREFIX: s3://binaries.ddbuild.io/ddprof/release
 
-build deps:
+# This is the base repo (apt, system configuration, etc)
+build base:
   stage: build
   when: manual
   tags: ["runner:docker", "size:large"]
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
   script:
   - set -euo pipefail
-  - docker build --tag $BUILD_DEPS_IMG app/build-env
-  - docker push $BUILD_DEPS_IMG
+  - docker pull $BASE_IMG || true
+  - docker build --tag $BASE_IMG app/base-env
+  - docker push $BASE_IMG
+
+# This is a cache of compile-time dependencies, like elfutils and libddprof.
+# This needs to be updated whenever these dependencies change and it matters,
+# but it may be more constructive to defer the libddprof pull until a more
+build deps:
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+  stage: build
+  when: manual
+  tags: ["runner:docker", "size:large"]
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
+  script:
+  - set -euo pipefail
+  - docker build --tag $BUILD_IMG -f app/build-env/Dockerfile .
+  - docker push $BUILD_IMG
+
+deploy ddprof:
+  image: $BUILD_IMG
+  stage: deploy
+  tags: ["runner:docker", "size:large"]
+  script:
+  - set -euo pipefail
+  - rm -rf vendor
+  - ln -s /app/vendor vendor
+  - make DEBUG=0 ANALYSIS=0 build
+  - tools/upload.sh
