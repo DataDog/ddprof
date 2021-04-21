@@ -30,6 +30,9 @@ SANS :=
 ifeq ($(DEBUG),1)
 	DDARGS += -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DDEBUG
 	CFLAGS += -g
+else
+	DDARGS += -DVER_REV=\"release\"
+	CFLAGS += -O2
 endif
 
 ifeq ($(SAFETY),1)
@@ -75,47 +78,45 @@ VER_ELF := 0.183
 TAR_ELF := elfutils-$(VER_ELF).tar.bz2
 URL_ELF := https://sourceware.org/elfutils/ftp/$(VER_ELF)/$(TAR_ELF)
 ELFUTILS = $(VENDIR)/elfutils
-ELFTMP   = $(TMP)/elftemp
 ELFLIBS := $(ELFUTILS)/libdwfl/libdwfl.a $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libebl/libebl.a $(ELFUTILS)/libelf/libelf.a
 
 ## libddprof build parameters
 LIBDDPROF := $(VENDIR)/libddprof
 
 # Global aggregates
-INCLUDE = -I $(LIBDDPROF)/src -I$(LIBDDPROF)/include -Iinclude -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
+INCLUDE = -I$(LIBDDPROF)/src -I$(LIBDDPROF)/include -Iinclude -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
 LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -lz -lpthread -llzma -ldl 
 SRC := $(addprefix $(LIBDDPROF)/src/, string_table.c pprof.c http.c dd_send.c append_string.c) src/proto/profile.pb-c.c
-DIRS := $(TARGETDIR) $(TMP) $(ELFTMP)
+DIRS := $(TARGETDIR) $(TMP)
 
-.PHONY: bench ddprof_banner format format-commit clean_deps publish all
+.PHONY: build bench ddprof_banner format format-commit clean_deps publish all
 .DELETE_ON_ERROR:
 
 ## Intermediate build targets (dependencies)
 $(DIRS):
 	mkdir -p $@
 
-$(ELFTMP).dir: $(ELFTMP)
-
 $(ELFLIBS): $(ELFUTILS)
 	$(MAKE) -j4 -C $(ELFUTILS)
 
-$(ELFUTILS): $(ELFTMP).dir
-	cd $(TMP) && curl -L --remote-name-all $(URL_ELF)
-	echo $(MD5_ELF) $(TMP)/$(TAR_ELF) > $(TMP)/elfutils.md5
-	md5sum --status -c $(TMP)/elfutils.md5
-	tar --no-same-owner -C $(ELFTMP) --strip-components 1 -xf $(TMP)/$(TAR_ELF)
-	rm -rf $(TMP)/$(TAR_ELF)
-	cd $(ELFTMP) && ./configure CC=$(abspath $(GNU_LATEST)) --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning
-	rm -rf $@
-	mv -f $(ELFTMP) $@
-	touch $<
+$(ELFUTILS):
+	cd $(VENDIR) && curl -L --remote-name-all $(URL_ELF)
+	echo $(MD5_ELF) $(VENDIR)/$(TAR_ELF) > $(VENDIR)/elfutils.md5
+	md5sum --status -c $(VENDIR)/elfutils.md5
+	mkdir -p $(ELFUTILS)
+	tar --no-same-owner -C $(ELFUTILS) --strip-components 1 -xf $(VENDIR)/$(TAR_ELF)
+	rm -rf $(VENDIR)/$(TAR_ELF)
+	cd $(ELFUTILS) && ./configure CC=$(abspath $(GNU_LATEST)) --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning
 
 $(LIBDDPROF):
 	git submodule update --init
 
+build: $(TARGETDIR)/ddprof
+
+
 ## Actual build targets
-ddprof: src/ddprof.c | $(TARGETDIR) $(ELFLIBS) $(LIBDDPROF) ddprof_banner
-	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o $(TARGETDIR)/$@ $(SRC) $^ $(ELFLIBS) $(LDLIBS)
+$(TARGETDIR)/ddprof: src/ddprof.c | $(TARGETDIR) $(ELFLIBS) $(LIBDDPROF) ddprof_banner
+	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o $@ $< $(SRC) $(ELFLIBS) $(LDLIBS)
 
 # kinda phony
 bench: 
