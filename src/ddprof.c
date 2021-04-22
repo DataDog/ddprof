@@ -273,10 +273,10 @@ char* help_key[DD_KLEN] = {
 };
 
 void print_version() {
-  if (!strcmp("release", VER_REV))
-    printf(MYNAME" v%d.%d.%d\n", VER_MAJ, VER_MIN, VER_PATCH);
-  else
-    printf(MYNAME" v%d.%d.%d+%s\n", VER_MAJ, VER_MIN, VER_PATCH, VER_REV);
+  printf(MYNAME" %d.%d.%d", VER_MAJ, VER_MIN, VER_PATCH);
+  if (*VER_REV)
+    printf("+%s", VER_REV);
+  printf("\n");
 }
 
 void print_help() {

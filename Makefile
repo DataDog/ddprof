@@ -23,7 +23,7 @@ GNU_TOOLS ?= 0
 CFLAGS = -O2 -std=c11 -D_GNU_SOURCE
 WARNS := -Wall -Wextra -Wpedantic -Wno-missing-braces -Wno-missing-field-initializers -Wno-gnu-statement-expression -Wno-pointer-arith -Wno-gnu-folding-constant -Wno-zero-length-array
 BUILDCHECK := 0  # Do we check the build with CLANG tooling afterward?
-DDARGS :=
+DDARGS := -DVER_REV=\"$(shell git rev-parse --short HEAD)\"
 SANS :=
 
 ## Mode overrides
@@ -31,7 +31,6 @@ ifeq ($(DEBUG),1)
   DDARGS += -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DDEBUG
   CFLAGS += -g
 else
-  DDARGS += -DVER_REV=\"release\"
   CFLAGS += -O2
 endif
 
@@ -61,6 +60,13 @@ ifeq ($(ANALYSIS),1)
   else
     BUILDCHECK := 1
   endif
+endif
+
+# If this is happening in CI, name accordingly
+ifeq ($(origin CI_PIPELINE_IID), undefined)
+  DDARGS += -DVER_REV=\"$(shell git rev-parse --short HEAD)\"
+else
+  DDARGS += -DVER_REV=\"$(CI_PIPELINE_IID)-$(shell git rev-parse --short HEAD)\"
 endif
 
 ## Other parameters
