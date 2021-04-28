@@ -29,6 +29,11 @@ Options:
     Currently, it is recommended to keep this value to 60 seconds, which is
     also the default.
 
+  -s, --faultinfo, (envvar: DD_PROFILING_NATIVEFAULTINFO)
+    If ddprof encounters a critical error, print a backtrace of internal
+    functions for diagnostic purposes.  Values are `on` or `off`
+    (default: off)
+
   -o, --logmode, (envvar: DD_PROFILING_NATIVELOGMODE)
     One of `stdout`, `stderr`, `syslog`, or `disabled`.  Default is `stdout`.
     If a value is given but it does not match the above, it is treated as a

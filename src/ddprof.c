@@ -44,6 +44,7 @@ struct DDProfContext {
   char *agent_host;
   char *prefix;
   char *tags;
+  char *faultinfo;
   char *logmode;
   char *loglevel;
 
@@ -134,23 +135,24 @@ int num_cpu = 0;
 #define X_CASE(a, b, c, d, e, f, g, h) case d: (f)->b = optarg; break;
 #define X_PRNT(a, b, c, d, e, f, g, h) printf(#b ": %s\n", (f)->b);
 
-//  A                            B                 C   D   E  F         G     H
-#define OPT_TABLE(XX)                                                                      \
-  XX(DD_API_KEY,                  apikey,          A, 'A', 1, ctx->ddr, NULL, "")          \
-  XX(DD_ENV,                      environment,     E, 'E', 1, ctx->ddr, NULL, "")          \
-  XX(DD_AGENT_HOST,               host,            H, 'H', 1, ctx->ddr, NULL, "localhost") \
-  XX(DD_SITE,                     site,            I, 'I', 1, ctx->ddr, NULL, "")          \
-  XX(DD_TRACE_AGENT_PORT,         port,            P, 'P', 1, ctx->ddr, NULL, "8081")      \
-  XX(DD_SERVICE,                  service,         S, 'S', 1, ctx->ddr, NULL, "myservice") \
-  XX(DD_TAGS,                     tags,            T, 'T', 1, ctx,      NULL, "")          \
-  XX(DD_VERSION,                  profiler_version,V, 'V', 1, ctx->ddr, NULL, "")          \
-  XX(DD_PROFILING_ENABLED,        enabled,         d, 'd', 1, ctx,      NULL, "yes")       \
-  XX(DD_PROFILING_COUNTSAMPLES,   count_samples,   c, 'c', 1, ctx,      NULL, "yes")       \
-  XX(DD_PROFILING_UPLOAD_PERIOD,  upload_period,   u, 'u', 1, ctx,      NULL, "60.0")      \
-  XX(DD_PROFILE_NATIVEPROFILER,   profprofiler,    p, 'p', 0, ctx,      NULL, "")          \
-  XX(DD_PROFILING_,               prefix,          X, 'X', 1, ctx,      NULL, "")          \
-  XX(DD_PROFILING_NATIVELOGMODE,  logmode,         o, 'o', 1, ctx,      NULL, "stdout")    \
-  XX(DD_PROFILING_NATIVELOGLEVEL, loglevel,        l, 'l', 1, ctx,      NULL, "warn")
+//  A                              B                C   D   E  F         G     H
+#define OPT_TABLE(XX)                                                                       \
+  XX(DD_API_KEY,                   apikey,          A, 'A', 1, ctx->ddr, NULL, "")          \
+  XX(DD_ENV,                       environment,     E, 'E', 1, ctx->ddr, NULL, "")          \
+  XX(DD_AGENT_HOST,                host,            H, 'H', 1, ctx->ddr, NULL, "localhost") \
+  XX(DD_SITE,                      site,            I, 'I', 1, ctx->ddr, NULL, "")          \
+  XX(DD_TRACE_AGENT_PORT,          port,            P, 'P', 1, ctx->ddr, NULL, "8081")      \
+  XX(DD_SERVICE,                   service,         S, 'S', 1, ctx->ddr, NULL, "myservice") \
+  XX(DD_TAGS,                      tags,            T, 'T', 1, ctx,      NULL, "")          \
+  XX(DD_VERSION,                   profiler_version,V, 'V', 1, ctx->ddr, NULL, "")          \
+  XX(DD_PROFILING_ENABLED,         enabled,         d, 'd', 1, ctx,      NULL, "yes")       \
+  XX(DD_PROFILING_COUNTSAMPLES,    count_samples,   c, 'c', 1, ctx,      NULL, "yes")       \
+  XX(DD_PROFILING_UPLOAD_PERIOD,   upload_period,   u, 'u', 1, ctx,      NULL, "60.0")      \
+  XX(DD_PROFILE_NATIVEPROFILER,    profprofiler,    p, 'p', 0, ctx,      NULL, "")          \
+  XX(DD_PROFILING_,                prefix,          X, 'X', 1, ctx,      NULL, "")          \
+  XX(DD_PROFILING_NATIVEFAULTINFO, faultinfo,       s, 's', 1, ctx,      NULL, "")          \
+  XX(DD_PROFILING_NATIVELOGMODE,   logmode,         o, 'o', 1, ctx,      NULL, "stdout")    \
+  XX(DD_PROFILING_NATIVELOGLEVEL,  loglevel,        l, 'l', 1, ctx,      NULL, "warn")
 // clang-format on
 
 #define DFLT_EXP(evar, key, targ, func, dfault)                                \
@@ -286,6 +288,10 @@ char* help_str[DD_KLEN] = {
 "    also the default.\n",
   [DD_PROFILE_NATIVEPROFILER] = STR_UNDF,
   [DD_PROFILING_] = STR_UNDF,
+  [DD_PROFILING_NATIVEFAULTINFO] =
+"    If "MYNAME" encounters a critical error, print a backtrace of internal\n"
+"    functions for diagnostic purposes.  Values are `on` or `off`\n"
+"    (default: off)\n",
   [DD_PROFILING_NATIVELOGMODE] =
 "    One of `stdout`, `stderr`, `syslog`, or `disabled`.  Default is `stdout`.\n"
 "    If a value is given but it does not match the above, it is treated as a\n"
@@ -363,12 +369,6 @@ void sigsegv_handler(int sig) {
 
 /******************************  Entrypoint  **********************************/
 int main(int argc, char **argv) {
-  //---- Autodetect binary name
-  char filename[128] = {0};
-  char *fp = strrchr("/"__FILE__, '/') + 1;
-  memcpy(filename, fp, strlen(fp));
-  (strrchr(filename, '.'))[0] = 0;
-
   //---- Inititiate structs
   int c = 0, oi = 0;
   struct DDProfContext *ctx = &(struct DDProfContext){
@@ -386,6 +386,7 @@ int main(int argc, char **argv) {
   //---- Populate default values
   OPT_TABLE(X_DFLT);
   bool default_watchers = true;
+  bool explain_sigseg = true;
   ctx->num_watchers = 1;
   ctx->watchers[0].opt = &perfoptions[10];
   ctx->watchers[0].sample_period = perfoptions[10].base_rate;
@@ -453,6 +454,10 @@ int main(int argc, char **argv) {
     if (x > 0.0)
       ctx->params.upload_period = x;
   }
+
+  // Process faultinfo
+  if (!ctx->faultinfo || !*ctx->faultinfo || !strcasecmp(ctx->faultinfo, "off"))
+    explain_sigseg = false;
 
   // Process logging mode
   if (!ctx->logmode || !*ctx->logmode)
@@ -610,7 +615,9 @@ int main(int argc, char **argv) {
 
     ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
     elf_version(EV_CURRENT); // Initialize libelf
-    signal(SIGSEGV, sigsegv_handler);
+
+    if (explain_sigseg)
+      signal(SIGSEGV, sigsegv_handler);
     if (!startup_errors) {
       DBG("Entering main loop");
       main_loop(pes, ctx->num_watchers * num_cpu, ddprof_callback, ctx);
