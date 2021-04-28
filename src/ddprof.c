@@ -147,7 +147,7 @@ int num_cpu = 0;
   XX(DD_VERSION,                   profiler_version,V, 'V', 1, ctx->ddr, NULL, "")          \
   XX(DD_PROFILING_ENABLED,         enabled,         d, 'd', 1, ctx,      NULL, "yes")       \
   XX(DD_PROFILING_COUNTSAMPLES,    count_samples,   c, 'c', 1, ctx,      NULL, "yes")       \
-  XX(DD_PROFILING_UPLOAD_PERIOD,   upload_period,   u, 'u', 1, ctx,      NULL, "60.0")      \
+  XX(DD_PROFILING_UPLOAD_PERIOD,   upload_period,   u, 'u', 1, ctx,      NULL, "60.5")      \
   XX(DD_PROFILE_NATIVEPROFILER,    profprofiler,    p, 'p', 0, ctx,      NULL, "")          \
   XX(DD_PROFILING_,                prefix,          X, 'X', 1, ctx,      NULL, "")          \
   XX(DD_PROFILING_NATIVEFAULTINFO, faultinfo,       s, 's', 1, ctx,      NULL, "")          \
@@ -446,7 +446,7 @@ int main(int argc, char **argv) {
 
   // Replace string-type args
   ctx->params.enabled = true;
-  ctx->params.upload_period = 60.0;
+  ctx->params.upload_period = 60.5;
 
   // process upload_period
   if (ctx->upload_period) {
