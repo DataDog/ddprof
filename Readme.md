@@ -22,12 +22,10 @@ This is a *pre-beta* release.  It should not be destructive, but it may be usele
 * Profiling backend does not currently colorize flamegraphs according to code source
 * `ddprof` does not support framepointers
 * `ddprof` does not support split debuginfo
-* `ddprof` writes errors to a combination of stderr or stdout; syslog support incoming Soon
 * `ddprof` nonoptionally writes a stacktrace to stdout if it encounters a nonrecoverable state
 * `ddprof` supports a stack depth of ~1000 native calls, but this depends greatly on the stack consumption behavior of your application.  It might be much lower, around 250 calls, in practice
 * `ddprof` does not furnish overhead numbers to end users
 * `ddprof` does not yet implement retry if intake is unreachable
-* `ddprof` will close, but currently does no runtime checking to explain why it closed, if it cannot instrument the target process.  This is especially confusing when the user has an AppArmor profile or `sysctl` parameter which disallows a process from calling `perf_event_open()` on itself
 
 # Overview
 
