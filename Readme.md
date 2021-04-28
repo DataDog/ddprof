@@ -22,8 +22,6 @@ This is a *pre-beta* release.  It should not be destructive, but it may be usele
 * Profiling backend does not currently colorize flamegraphs according to code source
 * `ddprof` does not support framepointers
 * `ddprof` does not support split debuginfo
-* `ddprof` nonoptionally writes a stacktrace to stdout if it encounters a nonrecoverable state
-* `ddprof` supports a stack depth of ~1000 native calls, but this depends greatly on the stack consumption behavior of your application.  It might be much lower, around 250 calls, in practice
 * `ddprof` does not furnish overhead numbers to end users
 * `ddprof` does not yet implement retry if intake is unreachable
 
