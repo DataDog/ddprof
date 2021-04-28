@@ -252,10 +252,12 @@ void default_callback(struct perf_event_header *hdr, int type, void *arg) {
   switch (hdr->type) {
   case PERF_RECORD_SAMPLE:
     pes = (struct perf_event_sample *)hdr;
+    (void)pes;
     //    printf("NR:  %ld\n", pes->nr);
     break;
   case PERF_RECORD_MMAP:
     pem = (struct perf_event_mmap *)hdr;
+    (void)pem;
     //    printf("MMAP filename: %s\n", pem->filename);
   }
 }

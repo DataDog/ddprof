@@ -20,7 +20,7 @@ ANALYSIS ?= 1
 GNU_TOOLS ?= 0
 
 ## Build parameters
-CFLAGS = -O2 -std=c11 -D_GNU_SOURCE
+CFLAGS = -march=nehalem -O2 -std=c11 -D_GNU_SOURCE
 WARNS := -Wall -Wextra -Wpedantic -Wno-missing-braces -Wno-missing-field-initializers -Wno-gnu-statement-expression -Wno-pointer-arith -Wno-gnu-folding-constant -Wno-zero-length-array
 BUILDCHECK := 0  # Do we check the build with CLANG tooling afterward?
 DDARGS := -DVER_REV=\"$(shell git rev-parse --short HEAD)\"
@@ -30,6 +30,8 @@ SANS :=
 ifeq ($(DEBUG),1)
   DDARGS += -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDD_DBG_PRINTARGS -DDEBUG
   CFLAGS += -g
+  CFLAGS += -O0
+  CFLAGS := $(filter-out -O2, $(CFLAGS))
 else
   CFLAGS += -O2
 endif
@@ -92,7 +94,7 @@ LIBDDPROF := $(VENDIR)/libddprof
 # Global aggregates
 INCLUDE = -I$(LIBDDPROF)/src -I$(LIBDDPROF)/include -Iinclude -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
 LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -lz -lpthread -llzma -ldl 
-SRC := $(addprefix $(LIBDDPROF)/src/, string_table.c pprof.c http.c dd_send.c append_string.c) src/proto/profile.pb-c.c
+SRC := $(addprefix $(LIBDDPROF)/src/, string_table.c pprof.c http.c dd_send.c append_string.c) src/proto/profile.pb-c.c src/logger.c
 DIRS := $(TARGETDIR) $(TMP)
 
 .PHONY: build deps bench ddprof_banner format format-commit clean_deps publish all
@@ -117,13 +119,15 @@ $(ELFUTILS):
 $(LIBDDPROF)/src:
 	git submodule update --init
 
-build: $(TARGETDIR)/ddprof
+build: |$(TARGETDIR)/ddprof help
 deps: $(ELFLIBS) $(LIBDDPROF)/src
-
 
 ## Actual build targets
 $(TARGETDIR)/ddprof: src/ddprof.c | $(TARGETDIR) $(ELFLIBS) $(LIBDDPROF) ddprof_banner
-	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) $(WARNS) $(LDFLAGS) $(INCLUDE) -o $@ $< $(SRC) $(ELFLIBS) $(LDLIBS)
+	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) $(WARNS) $(SANS) $(LDFLAGS) $(INCLUDE) -o $@ $< $(SRC) $(ELFLIBS) $(LDLIBS)
+
+logger: src/eg/logger.c src/logger.c
+	$(CC) $(CFLAGS) $(WARNS) $(SANS) -DPID_OVERRIDE -Iinclude -o $(TARGETDIR)/$@ $^
 
 # kinda phony
 bench: 

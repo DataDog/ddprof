@@ -195,7 +195,7 @@ char procfs_MmapGet(Map *map) {
   if (!map->map) {
     int fd = open(map->path, O_RDONLY);
     if (-1 == fd) {
-      printf("I couldn't open the map!\n");
+      printf("I couldn't open the map (%s)!\n", map->path);
       return -1;
     }
     uint64_t mapsz = map->end - map->start + 1; // e.g., if start=end, map "1"b

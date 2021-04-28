@@ -29,10 +29,20 @@ Options:
     Currently, it is recommended to keep this value to 60 seconds, which is
     also the default.
 
+  -o, --logmode, (envvar: DD_PROFILING_NATIVELOGMODE)
+    One of `stdout`, `stderr`, `syslog`, or `disabled`.  Default is `stdout`.
+    If a value is given but it does not match the above, it is treated as a
+    filesystem path and a log will be appended there.  Log files are not
+    cleared between runs and a service restart is needed for log rotation.
+
+  -l, --loglevel, (envvar: DD_PROFILING_NATIVELOGLEVEL)
+    One of `debug`, `warn`, `error`.  Default is `warn`.
+
   -e, --event:
     A string representing the events to sample.  Defaults to `cw`
     See the `events` section below for more details.
     eg: --event sCPU --event hREF
+
   -v, --version:
     Prints the version of ddprof and exits.
 
