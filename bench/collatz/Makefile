@@ -1,5 +1,11 @@
 TARGETDIR ?= "../../release"
-CFLAGS := -O1
+ifeq ($(origin CI_PIPELINE_ID), undefined)
+	DDARGS := -DVER_REV=\"$(shell git rev-parse --short HEAD)\"
+else
+	DDARGS := -DVER_REV=\"$(CI_PIPELINE_ID)-$(shell git rev-parse --short HEAD)\"
+endif
 
 collatz: collatz.c
-	$(CC) $(CFLAGS) -o $(TARGETDIR)/$@ $^ -lpthread
+	mkdir -p $(TARGETDIR)
+	$(CC) $(CFLAGS) $(DDARGS) -o $(TARGETDIR)/$@ $^ -lpthread
+

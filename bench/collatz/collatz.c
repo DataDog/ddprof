@@ -11,8 +11,8 @@
 
 #define MYNAME "collatz"
 #define VER_MAJ 1
-#define VER_MIN 3
-#define VER_PATCH 2
+#define VER_MIN 4
+#define VER_PATCH 0
 #ifndef VER_REV
 #  define VER_REV "custom"
 #endif
@@ -58,6 +58,12 @@ const int funlen = sizeof(funs) / sizeof(*funs);
 // Define the functions
 COLLATZ(DEFN)
 
+void print_version() {
+  printf(MYNAME " %d.%d.%d", VER_MAJ, VER_MIN, VER_PATCH);
+  if (*VER_REV)
+    printf("+%s", VER_REV);
+  printf("\n");
+}
 
 #define MAX_PROCS 1000
 // Program entrypoint
@@ -69,7 +75,7 @@ int main (int c, char** v) {
   int n = 1+get_nprocs()/2;
   if (c > 1) {
     if (!strcmp(v[1], "-v") || !strcmp(v[1], "--version")) {
-      printf(MYNAME" v%d.%d.%d-%s\n", VER_MAJ, VER_MIN, VER_PATCH, VER_REV);
+      print_version();
       return 0;
     } else if (!strcmp(v[1], "-h") || !strcmp(v[1], "--help")) {
       printf("collatz <CPUs> <outer index> <inner index> <target value>\n");

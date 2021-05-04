@@ -3,6 +3,7 @@ variables:
   BASE_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
   BUILD_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build
   S3_PREFIX: s3://binaries.ddbuild.io/ddprof/release
+  RELPATH: ddprof/release
 
 # This is the base repo (apt, system configuration, etc)
 build base:
@@ -35,9 +36,32 @@ deploy ddprof:
   image: $BUILD_IMG
   stage: deploy
   tags: ["runner:docker", "size:large"]
+  variables:
+    ANAME: ddprof
+    BINPATH: release/${ANAME}
+  rules:
+  - if: '$CI_COMMIT_BRANCH == "main"'
+    when: always
+  - if: '$CI_COMMIT_BRANCH != "main"'
+    when: manual
   script:
   - set -euo pipefail
   - rm -rf vendor
   - ln -s /app/vendor vendor
-  - make DEBUG=0 ANALYSIS=0 build
-  - tools/upload.sh
+  - make DEBUG=0 ANALYSIS=0 SAFETY=0 build
+  - tools/ci_upload.sh
+
+deploy collatz:
+  image: $BUILD_IMG
+  stage: deploy
+  tags: ["runner:docker", "size:large"]
+  when: manual
+  variables:
+    ANAME: collatz
+    BINPATH: release/${ANAME}
+  script:
+  - set -euo pipefail
+  - rm -rf vendor
+  - ln -s /app/vendor vendor
+  - make DEBUG=0 ANALYSIS=0 bench
+  - tools/ci_upload.sh

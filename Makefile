@@ -20,10 +20,10 @@ ANALYSIS ?= 1
 GNU_TOOLS ?= 0
 
 ## Build parameters
-CFLAGS = -march=nehalem -O2 -std=c11 -D_GNU_SOURCE
+CFLAGS = -O2 -std=c11 -D_GNU_SOURCE
 WARNS := -Wall -Wextra -Wpedantic -Wno-missing-braces -Wno-missing-field-initializers -Wno-gnu-statement-expression -Wno-pointer-arith -Wno-gnu-folding-constant -Wno-zero-length-array
 BUILDCHECK := 0  # Do we check the build with CLANG tooling afterward?
-DDARGS := -DVER_REV=\"$(shell git rev-parse --short HEAD)\"
+DDARGS :=
 SANS :=
 
 ## Mode overrides
@@ -65,10 +65,10 @@ ifeq ($(ANALYSIS),1)
 endif
 
 # If this is happening in CI, name accordingly
-ifeq ($(origin CI_PIPELINE_IID), undefined)
+ifeq ($(origin CI_PIPELINE_ID), undefined)
   DDARGS += -DVER_REV=\"$(shell git rev-parse --short HEAD)\"
 else
-  DDARGS += -DVER_REV=\"$(CI_PIPELINE_IID)-$(shell git rev-parse --short HEAD)\"
+  DDARGS += -DVER_REV=\"$(CI_PIPELINE_ID)-$(shell git rev-parse --short HEAD)\"
 endif
 
 ## Other parameters
