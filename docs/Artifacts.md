@@ -13,11 +13,11 @@ aws-vault exec build-stable-developer -- aws s3 ls s3://binaries.ddbuild.io/ddpr
 Base Image
 ===
 
-*where*: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
+**where**: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
 
-*how*: app/base-env
+**how**: app/base-env
 
-*when*: manual job in CI
+**when**: manual job in CI
 
 This image contains the system-level requirements for building `ddprof`.
 
@@ -25,11 +25,11 @@ This image contains the system-level requirements for building `ddprof`.
 Build Image
 ===
 
-*where*: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build
+**where**: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build
 
-*how*: app/base-env
+**how**: app/base-env
 
-*when*: manual job in CI
+**when**: manual job in CI
 
 This image layers the base, adding intermediate build artifacts from dependencies.  Since `ddprof` has a one-shot build system, the artifacts represent code and build resources rather than binary objects.  Dependencies are currently only `elfutils` and `libddprof`.
 
@@ -37,11 +37,11 @@ This image layers the base, adding intermediate build artifacts from dependencie
 ddprof
 ===
 
-*where*: binaries.ddbuild.io/ddprof/release/ddprof
+**where**: binaries.ddbuild.io/ddprof/release/ddprof
 
-*how*: `make build`
+**how**: `make build`
 
-]*when*: automatic job in CI, executing when `branch == main`
+**when*: automatic job in CI, executing when `branch == main`
 
 This is the native profiler.  It is shipped as a binary.
 
@@ -49,11 +49,11 @@ This is the native profiler.  It is shipped as a binary.
 collatz
 ===
 
-*where*: binaries.ddbuild.io/ddprof/release/collatz
+**where**: binaries.ddbuild.io/ddprof/release/collatz
 
-*how*: `make bench`
+**how**: `make bench`
 
-*when*: manual job in CI
+**when**: manual job in CI
 
 This is a benchmarking tool for the native profiler.
 
