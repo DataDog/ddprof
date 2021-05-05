@@ -53,11 +53,13 @@ struct DDProfContext {
   char *enabled;
   char *upload_period;
   char *profprofiler;
+  char *sendfinal;
   struct {
     bool count_samples;
     bool enabled;
     double upload_period;
     bool profprofiler;
+    bool sendfinal;
   } params;
   struct watchers {
     PerfOption *opt;
@@ -151,6 +153,7 @@ int num_cpu = 0;
   XX(DD_PROFILE_NATIVEPROFILER,    profprofiler,    p, 'p', 0, ctx,      NULL, "")          \
   XX(DD_PROFILING_,                prefix,          X, 'X', 1, ctx,      NULL, "")          \
   XX(DD_PROFILING_NATIVEFAULTINFO, faultinfo,       s, 's', 1, ctx,      NULL, "")          \
+  XX(DD_PROFILING_NATIVESENDFINAL, sendfinal,       f, 'f', 1, ctx,      NULL, "")          \
   XX(DD_PROFILING_NATIVELOGMODE,   logmode,         o, 'o', 1, ctx,      NULL, "stdout")    \
   XX(DD_PROFILING_NATIVELOGLEVEL,  loglevel,        l, 'l', 1, ctx,      NULL, "warn")
 // clang-format on
@@ -183,6 +186,28 @@ static inline int64_t now_nanos() {
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
 }
 
+void export(struct DDProfContext *pctx, int64_t now) {
+  DDReq *ddr = pctx->ddr;
+  DProf *dp = pctx->dp;
+
+  DBG("Pushed samples to backend");
+  int ret = 0;
+  if ((ret = DDR_pprof(ddr, dp)))
+    ERR("Error enqueuing pprof (%s)", DDR_code2str(ret));
+  DDR_setTimeNano(ddr, dp->pprof.time_nanos, now);
+  if ((ret = DDR_finalize(ddr)))
+    ERR("Error finalizing export (%s)", DDR_code2str(ret));
+  if ((ret = DDR_send(ddr)))
+    ERR("Error sending export (%s)", DDR_code2str(ret));
+  if ((ret = DDR_watch(ddr, -1)))
+    ERR("Error watching (%s)", DDR_code2str(ret));
+  DDR_clear(ddr);
+  pctx->send_nanos += pctx->params.upload_period * 1000000000;
+
+  // Prepare pprof for next window
+  pprof_timeUpdate(dp);
+}
+
 void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   static uint64_t id_locs[MAX_STACK] = {0};
 
@@ -193,7 +218,6 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
 
   struct DDProfContext *pctx = arg;
   struct UnwindState *us = pctx->us;
-  DDReq *ddr = pctx->ddr;
   DProf *dp = pctx->dp;
   struct perf_event_sample *pes;
   switch (hdr->type) {
@@ -235,24 +259,8 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   // Click the timer at the end of processing, since we always add the sampling
   // rate to the last time.
   int64_t now = now_nanos();
-  if (now > pctx->send_nanos) {
-    DBG("Pushed samples to backend");
-    int ret = 0;
-    if ((ret = DDR_pprof(ddr, dp)))
-      ERR("Error enqueuing pprof (%s)", DDR_code2str(ret));
-    DDR_setTimeNano(ddr, dp->pprof.time_nanos, now);
-    if ((ret = DDR_finalize(ddr)))
-      ERR("Error finalizing export (%s)", DDR_code2str(ret));
-    if ((ret = DDR_send(ddr)))
-      ERR("Error sending export (%s)", DDR_code2str(ret));
-    if ((ret = DDR_watch(ddr, -1)))
-      ERR("Error watching (%s)", DDR_code2str(ret));
-    DDR_clear(ddr);
-    pctx->send_nanos += pctx->params.upload_period * 1000000000;
-
-    // Prepare pprof for next window
-    pprof_timeUpdate(dp);
-  }
+  if (now > pctx->send_nanos)
+    export(pctx, now);
 }
 
 /*********************************  Printers  *********************************/
@@ -299,6 +307,9 @@ char* help_str[DD_KLEN] = {
 "    cleared between runs and a service restart is needed for log rotation.\n",
   [DD_PROFILING_NATIVELOGLEVEL] =
 "    One of `debug`, `warn`, `error`.  Default is `warn`.\n",
+  [DD_PROFILING_NATIVESENDFINAL] =
+"    Determines whether to emit the last partial export if the instrumented\n"
+"    process ends.  This is almost never useful.  Default is `no`.\n"
 };
 // clang-format on
 
@@ -460,6 +471,10 @@ int main(int argc, char **argv) {
   if (!ctx->faultinfo || !*ctx->faultinfo || !strcasecmp(ctx->faultinfo, "off"))
     explain_sigseg = false;
 
+  // Process sendfinal
+  if (ctx->sendfinal && ctx->sendfinal && !strcasecmp(ctx->sendfinal, "on"))
+    ctx->params.sendfinal = true;
+
   // Process logging mode
   if (!ctx->logmode || !*ctx->logmode)
     LOG_open(LOG_STDERR, "");
@@ -507,14 +522,9 @@ int main(int argc, char **argv) {
 
   if (argc <= 0) {
     OPT_TABLE(X_FREE);
-    ERR("No target specified, exiting.");
+    ERR("No target specified");
     return -1;
   }
-
-  /****************************************************************************\
-  |                         Preflight Safety Checks                            |
-  \****************************************************************************/
-  // None yet!
 
   /****************************************************************************\
   |                             Run the Profiler                               |
@@ -541,16 +551,6 @@ int main(int argc, char **argv) {
 
   // Get the number of CPUs
   num_cpu = get_nprocs();
-
-  // Setup a semaphore for messaging
-  int *sem = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
-                  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-  if (MAP_FAILED == sem) {
-    ERR("Failure instantiating message passing subsystem.  Profiling halting.");
-    ctx->params.enabled = false;
-  } else {
-    *sem = 0;
-  }
 
   // Setup a shared barrier for coordination
   pthread_barrierattr_t bat = {0};
@@ -602,34 +602,19 @@ int main(int argc, char **argv) {
     struct PEvent pes[100] = {0};
     for (int i = 0; i < ctx->num_watchers; i++) {
       for (int j = 0; j < num_cpu; j++) {
-        DBG("Reciving watcher %d on CPU %d", i, j);
         int k = i * num_cpu + j;
         pes[k].pos = i; // watcher index is the sample index
 
-        // Before I try to collect the other file descriptor, wait for the other
-        // process to have attempted instrumentation and set the semaphore
-        pthread_barrier_wait(pb);
-        if (*sem) {
-          // If I'm here, there was a failure setting the watchpoint.  Skip this
-          // file descriptor
+        DBG("Receiving watcher %d.%d", i, j);
+        pes[k].fd = getfd(sfd[0]);
+        if (0 > pes[k].fd || !(pes[k].region = perfown(pes[k].fd))) {
+          close(pes[k].fd);
           pes[k].fd = -1;
-          *sem = 0; // harvested
+          ERR("Could not finalize watcher %d.%d", i, j);
         } else {
-          DBG("Receiving instrumentation for watcher %d, CPU %d", i, j);
-          pes[k].fd = getfd(sfd[0]);
-          if (!(pes[k].region = perfown(pes[k].fd)))
-            ERR("Could not finalize instrumentation on watcher %d CPU %d",i, j);
-          else
-            instrumented_any_watchers = true;
-
-          // We finalize by synchronizing one more time, since I'm not sure what
-          // happens if the other process closes the file descriptor before we
-          // finish getting it from the UDS.  It could be that sendfd() ensures
-          // this process can receive it, but we block for now to be safe.
-          // TODO validate necessity
-          pthread_barrier_wait(pb); // Tell the other guy I have his FD
+          instrumented_any_watchers = true;
         }
-
+        pthread_barrier_wait(pb);
       }
     }
 
@@ -637,7 +622,6 @@ int main(int argc, char **argv) {
     close(sfd[0]);
     close(sfd[1]);
     munmap(pb, sizeof(pthread_barrier_t));
-    munmap(sem, sizeof(int));
 
     ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
     elf_version(EV_CURRENT); // Initialize libelf
@@ -647,6 +631,14 @@ int main(int argc, char **argv) {
     if (instrumented_any_watchers) {
       DBG("Entering main loop");
       main_loop(pes, ctx->num_watchers * num_cpu, ddprof_callback, ctx);
+
+      // If we're here, the main loop closed--probably the profilee closed
+      WRN("Profiling context no longer valid");
+      int64_t now = now_nanos();
+      if (now > ctx->send_nanos || ctx->sendfinal) {
+        WRN("Sending final export");
+        export(ctx, now);
+      }
     } else {
       ERR("Failed to install any watchers, profiling disabled");
     }
@@ -658,22 +650,17 @@ int main(int argc, char **argv) {
         int fd = perfopen(
             mypid, ctx->watchers[i].opt->type, ctx->watchers[i].opt->config,
             ctx->watchers[i].sample_period, ctx->watchers[i].opt->mode, j);
-        if (-1 == fd) {
-          ERR("Could not instrument watcher %d on CPU %d", i, j);
-          *sem = 1;
-        }
 
-        // Before we transmit the file descriptor, synchronize so that the other
-        // process can reap the semaphore before continuing.  After the send,
-        // block again so we can close safely (see TODO above)
-        pthread_barrier_wait(pb);
-        if (-1 != fd) {
-          DBG("Sending instrumentation for watcher %d, CPU %d", i, j);
+        if (-1 == fd) {
+          WRN("Failed to setup watcher %d.%d", i, j);
+          if (sendfail(sfd[1]))
+            ERR("Could not pass failure for watcher %d.%d", i, j);
+        } else {
+          DBG("Sending instrumentation for watcher %d.%d", i, j);
           if (sendfd(sfd[1], fd))
-            ERR("Could not pass instrumentation for watcher %d, CPU %d", i, j);
-          pthread_barrier_wait(pb);
-          close(fd);
+            ERR("Could not pass instrumentation for watcher %d.%d", i, j);
         }
+        pthread_barrier_wait(pb);
       }
     }
 
@@ -683,14 +670,15 @@ int main(int argc, char **argv) {
     close(sfd[0]);
     close(sfd[1]);
 
-EXECUTE:
+  EXECUTE:
     munmap(pb, sizeof(pthread_barrier_t));
-    munmap(sem, sizeof(int));
 
     execvp(argv[0], argv);
-    ERR("Could not execute target %s.  This may be because the file couldn't "
-        "be located or some other reason.  Please check your configuration.",
-        argv[0]);
+    if (errno == ENOENT)
+      ERR("%s: file not found", argv[0]);
+    else if (errno == EACCES)
+      ERR("%s: permission denied", argv[0]);
+    return -1;
   }
 
   // Neither the profiler nor the instrumented process should get here

@@ -34,6 +34,10 @@ Options:
     functions for diagnostic purposes.  Values are `on` or `off`
     (default: off)
 
+  -f, --sendfinal, (envvar: DD_PROFILING_NATIVESENDFINAL)
+    Determines whether to emit the last partial export if the instrumented
+    process ends.  This is almost never useful.  Default is `no`.
+
   -o, --logmode, (envvar: DD_PROFILING_NATIVELOGMODE)
     One of `stdout`, `stderr`, `syslog`, or `disabled`.  Default is `stdout`.
     If a value is given but it does not match the above, it is treated as a

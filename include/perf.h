@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/perf_event.h>
+#include <netinet/in.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdint.h>
@@ -143,6 +144,29 @@ struct perf_event_attr g_dd_native_attr = {
     .exclude_hv = 1,
 };
 
+int sendfail(int sfd) {
+  // The call to getfd() checks message metadata upon receipt, so to send a
+  // failure it suffices to merely not send SOL_SOCKET with SCM_RIGHTS.
+  // This may be a little confusing...  TODO is there a paradoxical setting?
+  struct msghdr msg = {
+      .msg_iov = &(struct iovec){.iov_base = (char[2]){"  "}, .iov_len = 2},
+      .msg_iovlen = 1,
+      .msg_control = (char[CMSG_SPACE(sizeof(int))]){0},
+      .msg_controllen = CMSG_SPACE(sizeof(int))};
+  CMSG_FIRSTHDR(&msg)->cmsg_level = IPPROTO_IP;
+  CMSG_FIRSTHDR(&msg)->cmsg_type = IP_PKTINFO;
+  CMSG_FIRSTHDR(&msg)->cmsg_len = CMSG_LEN(sizeof(int));
+  *((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg))) = -1;
+
+  msg.msg_controllen = CMSG_SPACE(sizeof(int));
+
+  while (sizeof(char[2]) != sendmsg(sfd, &msg, MSG_NOSIGNAL)) {
+    if (errno != EINTR)
+      return -1;
+  }
+  return 0;
+}
+
 int sendfd(int sfd, int fd) {
   struct msghdr msg = {
       .msg_iov = &(struct iovec){.iov_base = (char[2]){"  "}, .iov_len = 2},
@@ -179,7 +203,7 @@ int getfd(int sfd) {
       CMSG_FIRSTHDR(&msg)->cmsg_type == SCM_RIGHTS) {
     return *((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg)));
   }
-  return -1;
+  return -2;
 }
 
 int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
@@ -214,10 +238,8 @@ void *perfown(int fd) {
   // TODO how to deal with hugepages?
   region = mmap(NULL, PAGE_SIZE + PSAMPLE_SIZE, PROT_READ | PROT_WRITE,
                 MAP_SHARED, fd, 0);
-  if (!region || MAP_FAILED == region) {
-    printf("mmap error when initiating the perf_event region.\n");
+  if (!region || MAP_FAILED == region)
     return NULL;
-  }
 
   // Make sure that SIGPROF is delivered to me instead of the called application
   fcntl(fd, F_SETFL, O_ASYNC);

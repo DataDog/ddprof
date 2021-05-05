@@ -94,10 +94,8 @@ size_t mapcache_Find(pid_t pid) {
 
 void pidmap_Set(pid_t pid, PidMap *pm) {
   FILE *procstream = fdopen(procfs_MapOpen(pid), "r");
-  if (!procstream) {
-    printf("WTF!!! I couldn't find procfs for %d\n", pid);
+  if (!procstream)
     return;
-  }
   pm->pid = pid;
 
   for (size_t i = 0; i < PM_MAX &&
