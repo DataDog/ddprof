@@ -673,12 +673,22 @@ int main(int argc, char **argv) {
   EXECUTE:
     munmap(pb, sizeof(pthread_barrier_t));
 
-    execvp(argv[0], argv);
-    if (errno == ENOENT)
-      ERR("%s: file not found", argv[0]);
-    else if (errno == EACCES)
-      ERR("%s: permission denied", argv[0]);
-    return -1;
+    if (-1 == execvp(argv[0], argv)) {
+      switch(errno) {
+      case ENOENT:
+        ERR("%s: file not found", argv[0]);
+        break;
+      case ENOEXEC:
+      case EACCES:
+        ERR("%s: permission denied", argv[0]);
+        break;
+      default:
+        WRN("execvp() returned due to %s", strerror(errno));
+        break;
+      }
+
+      return -1;
+    }
   }
 
   // Neither the profiler nor the instrumented process should get here
