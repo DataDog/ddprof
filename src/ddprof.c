@@ -543,8 +543,14 @@ int main(int argc, char **argv) {
   num_cpu = get_nprocs();
 
   // Setup a semaphore for messaging
-  int *sem =  mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-  *sem = 0;
+  int *sem = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE,
+                  MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  if (MAP_FAILED == sem) {
+    ERR("Failure instantiating message passing subsystem.  Profiling halting.");
+    ctx->params.enabled = false;
+  } else {
+    *sem = 0;
+  }
 
   // Setup a shared barrier for coordination
   pthread_barrierattr_t bat = {0};
@@ -553,6 +559,7 @@ int main(int argc, char **argv) {
            MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   if (MAP_FAILED == pb) {
     // TODO log here.  Nothing else to do, since we're not halting the target
+    ERR("Failure instantiating message passing subsystem.  Profiling halting.");
     ctx->params.enabled = false;
   } else {
     pthread_barrierattr_init(&bat);
@@ -579,8 +586,8 @@ int main(int argc, char **argv) {
   // 1. Setup pipes (really unix domain socket pair)
   int sfd[2] = {-1, -1};
   if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sfd)) {
-    // TODO log here
-    ctx->params.enabled = false;
+    ERR("Could not instantiate message passing system, profiling disabled");
+    goto EXECUTE;
   }
 
   // 2. fork()
@@ -591,18 +598,38 @@ int main(int argc, char **argv) {
       exit(0); // no need to use _exit, since we still own the proc
 
     // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
-    bool startup_errors = false;
+    bool instrumented_any_watchers = false;
     struct PEvent pes[100] = {0};
     for (int i = 0; i < ctx->num_watchers; i++) {
-      DBG("Instrumenting watcher %d", i);
       for (int j = 0; j < num_cpu; j++) {
+        DBG("Reciving watcher %d on CPU %d", i, j);
         int k = i * num_cpu + j;
         pes[k].pos = i; // watcher index is the sample index
-        pes[k].fd = getfd(sfd[0]);
-        if (-1 != pes[k].fd || !(pes[k].region = perfown(pes[k].fd))) {
-          startup_errors = true;
+
+        // Before I try to collect the other file descriptor, wait for the other
+        // process to have attempted instrumentation and set the semaphore
+        pthread_barrier_wait(pb);
+        if (*sem) {
+          // If I'm here, there was a failure setting the watchpoint.  Skip this
+          // file descriptor
+          pes[k].fd = -1;
+          *sem = 0; // harvested
+        } else {
+          DBG("Receiving instrumentation for watcher %d, CPU %d", i, j);
+          pes[k].fd = getfd(sfd[0]);
+          if (!(pes[k].region = perfown(pes[k].fd)))
+            ERR("Could not finalize instrumentation on watcher %d CPU %d",i, j);
+          else
+            instrumented_any_watchers = true;
+
+          // We finalize by synchronizing one more time, since I'm not sure what
+          // happens if the other process closes the file descriptor before we
+          // finish getting it from the UDS.  It could be that sendfd() ensures
+          // this process can receive it, but we block for now to be safe.
+          // TODO validate necessity
+          pthread_barrier_wait(pb); // Tell the other guy I have his FD
         }
-        pthread_barrier_wait(pb); // Tell the other guy I have his FD
+
       }
     }
 
@@ -610,36 +637,43 @@ int main(int argc, char **argv) {
     close(sfd[0]);
     close(sfd[1]);
     munmap(pb, sizeof(pthread_barrier_t));
+    munmap(sem, sizeof(int));
 
     ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
     elf_version(EV_CURRENT); // Initialize libelf
 
     if (explain_sigseg)
       signal(SIGSEGV, sigsegv_handler);
-    if (!startup_errors) {
+    if (instrumented_any_watchers) {
       DBG("Entering main loop");
       main_loop(pes, ctx->num_watchers * num_cpu, ddprof_callback, ctx);
     } else {
-      ERR("Encountered error during startup, exiting");
+      ERR("Failed to install any watchers, profiling disabled");
     }
   } else {
     // 3p.  I am the original process.  If not prof profiling, instrument now
-    // TODO: Deadlock city!  Add some timeouts here for chrissake
     pid_t mypid = getpid();
     for (int i = 0; i < ctx->num_watchers && ctx->params.enabled; i++) {
-      bool watchpoint_failed = false;
-      for (int j = 0; j < num_cpu && !watchpoint_failed; j++) {
+      for (int j = 0; j < num_cpu; j++) {
         int fd = perfopen(
             mypid, ctx->watchers[i].opt->type, ctx->watchers[i].opt->config,
             ctx->watchers[i].sample_period, ctx->watchers[i].opt->mode, j);
         if (-1 == fd) {
           ERR("Could not instrument watcher %d on CPU %d", i, j);
+          *sem = 1;
         }
-        if (sendfd(sfd[1], fd)) {
-          // TODO
+
+        // Before we transmit the file descriptor, synchronize so that the other
+        // process can reap the semaphore before continuing.  After the send,
+        // block again so we can close safely (see TODO above)
+        pthread_barrier_wait(pb);
+        if (-1 != fd) {
+          DBG("Sending instrumentation for watcher %d, CPU %d", i, j);
+          if (sendfd(sfd[1], fd))
+            ERR("Could not pass instrumentation for watcher %d, CPU %d", i, j);
+          pthread_barrier_wait(pb);
+          close(fd);
         }
-        pthread_barrier_wait(pb); // Did the profiler get the FD?
-        close(fd);
       }
     }
 
@@ -648,7 +682,10 @@ int main(int argc, char **argv) {
     LOG_close();
     close(sfd[0]);
     close(sfd[1]);
+
+EXECUTE:
     munmap(pb, sizeof(pthread_barrier_t));
+    munmap(sem, sizeof(int));
 
     execvp(argv[0], argv);
     ERR("Could not execute target %s.  This may be because the file couldn't "
@@ -659,6 +696,6 @@ int main(int argc, char **argv) {
   // Neither the profiler nor the instrumented process should get here
   OPT_TABLE(X_FREE);
   DDR_free(ddr);
-  ERR("Failed to initialize profiling storage");
+  WRN("Profiling terminated");
   return -1;
 }
