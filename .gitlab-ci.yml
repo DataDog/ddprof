@@ -30,8 +30,6 @@ build:deps:
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
   stage: build
-  rules:
-  - if: 
   when: manual
   tags: ["runner:docker", "size:large"]
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
