@@ -1,6 +1,4 @@
 stages:
-  - base
-  - deps
   - build
   - test
   - deploy
@@ -14,7 +12,7 @@ variables:
 
 # This is the base repo (apt, system configuration, etc)
 build:base:
-  stage: base 
+  stage: build
   when: manual
   tags: ["runner:docker", "size:large"]
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
@@ -28,8 +26,7 @@ build:base:
 # This needs to be updated whenever these dependencies change and it matters,
 # but it may be more constructive to defer the libddprof pull until a more
 build:deps:
-  stage: deps
-  needs: ["build:base"]
+  stage: build
   allow_failure: true
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
@@ -44,7 +41,6 @@ build:deps:
 deploy:ddprof:
   image: $BUILD_IMG
   stage: deploy
-  needs: ["build:deps"]
   tags: ["runner:docker", "size:large"]
   variables:
     ANAME: ddprof
@@ -64,7 +60,6 @@ deploy:ddprof:
 deploy:collatz:
   image: $BUILD_IMG
   stage: deploy
-  needs: ["build:deps"]
   tags: ["runner:docker", "size:large"]
   when: manual
   variables:
