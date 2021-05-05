@@ -375,7 +375,7 @@ int main(int argc, char **argv) {
       .ddr = &(DDReq){.user_agent = "Native-http-client/0.1",
                       .language = "native",
                       .family = "native",
-                      .http_close = false},
+                      .http_close = true},
       .dp = &(DProf){0},
       .us = &(struct UnwindState){0}};
   DDReq *ddr = ctx->ddr;
@@ -514,14 +514,7 @@ int main(int argc, char **argv) {
   /****************************************************************************\
   |                         Preflight Safety Checks                            |
   \****************************************************************************/
-  {
-    struct stat sa = {0};
-    if (stat(argv[0], &sa)) {
-      OPT_TABLE(X_FREE);
-      ERR("Could not find target (%s)", argv[0]);
-      return -1;
-    }
-  }
+  // None yet!
 
   /****************************************************************************\
   |                             Run the Profiler                               |
@@ -548,6 +541,10 @@ int main(int argc, char **argv) {
 
   // Get the number of CPUs
   num_cpu = get_nprocs();
+
+  // Setup a semaphore for messaging
+  int *sem =  mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  *sem = 0;
 
   // Setup a shared barrier for coordination
   pthread_barrierattr_t bat = {0};
@@ -602,7 +599,7 @@ int main(int argc, char **argv) {
         int k = i * num_cpu + j;
         pes[k].pos = i; // watcher index is the sample index
         pes[k].fd = getfd(sfd[0]);
-        if (!(pes[k].region = perfown(pes[k].fd))) {
+        if (-1 != pes[k].fd || !(pes[k].region = perfown(pes[k].fd))) {
           startup_errors = true;
         }
         pthread_barrier_wait(pb); // Tell the other guy I have his FD
@@ -636,7 +633,10 @@ int main(int argc, char **argv) {
             mypid, ctx->watchers[i].opt->type, ctx->watchers[i].opt->config,
             ctx->watchers[i].sample_period, ctx->watchers[i].opt->mode, j);
         if (-1 == fd) {
-        } else if (sendfd(sfd[1], fd)) {
+          ERR("Could not instrument watcher %d on CPU %d", i, j);
+        }
+        if (sendfd(sfd[1], fd)) {
+          // TODO
         }
         pthread_barrier_wait(pb); // Did the profiler get the FD?
         close(fd);
@@ -644,6 +644,7 @@ int main(int argc, char **argv) {
     }
 
     // Cleanup and become desired process image
+    pthread_barrier_destroy(pb);
     LOG_close();
     close(sfd[0]);
     close(sfd[1]);

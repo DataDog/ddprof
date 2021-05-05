@@ -1,3 +1,8 @@
+stages:
+  - build
+  - test
+  - deploy
+
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
   BASE_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
@@ -6,7 +11,7 @@ variables:
   RELPATH: ddprof/release
 
 # This is the base repo (apt, system configuration, etc)
-build base:
+build:base:
   stage: build
   when: manual
   tags: ["runner:docker", "size:large"]
@@ -20,10 +25,13 @@ build base:
 # This is a cache of compile-time dependencies, like elfutils and libddprof.
 # This needs to be updated whenever these dependencies change and it matters,
 # but it may be more constructive to defer the libddprof pull until a more
-build deps:
+build:deps:
+  needs: ["build:base"]
   variables:
     GIT_SUBMODULE_STRATEGY: recursive
   stage: build
+  rules:
+  - if: 
   when: manual
   tags: ["runner:docker", "size:large"]
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
@@ -32,7 +40,7 @@ build deps:
   - docker build --tag $BUILD_IMG -f app/build-env/Dockerfile .
   - docker push $BUILD_IMG
 
-deploy ddprof:
+deploy:ddprof:
   image: $BUILD_IMG
   stage: deploy
   tags: ["runner:docker", "size:large"]
@@ -51,7 +59,7 @@ deploy ddprof:
   - make DEBUG=0 ANALYSIS=0 SAFETY=0 build
   - tools/ci_upload.sh
 
-deploy collatz:
+deploy:collatz:
   image: $BUILD_IMG
   stage: deploy
   tags: ["runner:docker", "size:large"]

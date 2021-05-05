@@ -200,10 +200,8 @@ int perfopen(pid_t pid, int type, int config, uint64_t per, int mode, int cpu) {
 
   int fd = perf_event_open(attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC);
   if (-1 == fd && EACCES == errno) {
-    printf("EACCESS error when calling perf_event_open.\n");
     return -1;
   } else if (-1 == fd) {
-    printf("Unspecified error when calling perf_event_open.\n");
     return -1;
   }
 
@@ -295,6 +293,7 @@ void main_loop(PEvent *pes, int pe_len,
 
   // Setup poll() to watch perf_event file descriptors
   for (int i = 0; i < pe_len; i++) {
+    // NOTE: if fd is negative, it will be ignored
     pfd[i].fd = pes[i].fd;
     pfd[i].events = POLLIN | POLLERR | POLLHUP;
   }
