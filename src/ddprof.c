@@ -132,7 +132,7 @@ int num_cpu = 0;
 #define X_OSTR(a, b, c, d, e, f, g, h) #c ":"
 #define X_DFLT(a, b, c, d, e, f, g, h) DFLT_EXP(#a, b, f, g, h);
 #define X_FREE(a, b, c, d, e, f, g, h) FREE_EXP(b, f);
-#define X_CASE(a, b, c, d, e, f, g, h) case d: (f)->b = optarg; break;
+#define X_CASE(a, b, c, d, e, f, g, h) case d: (f)->b = strdup(optarg); break;
 #define X_PRNT(a, b, c, d, e, f, g, h) printf(#b ": %s\n", (f)->b);
 
 //  A                              B                C   D   E  F         G     H
@@ -160,7 +160,7 @@ int num_cpu = 0;
     char *_buf = NULL;                                                         \
     if (!((targ)->key)) {                                                      \
       if (evar && getenv(evar))                                                \
-        _buf = getenv(evar);                                                   \
+        _buf = strdup(getenv(evar));                                           \
       else if (*dfault)                                                        \
         _buf = strdup(dfault);                                                 \
       (targ)->key = _buf;                                                      \
@@ -374,7 +374,8 @@ int main(int argc, char **argv) {
   struct DDProfContext *ctx = &(struct DDProfContext){
       .ddr = &(DDReq){.user_agent = "Native-http-client/0.1",
                       .language = "native",
-                      .family = "native"},
+                      .family = "native",
+                      .http_close = false},
       .dp = &(DProf){0},
       .us = &(struct UnwindState){0}};
   DDReq *ddr = ctx->ddr;
