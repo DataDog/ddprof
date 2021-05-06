@@ -34,6 +34,10 @@ Options:
     functions for diagnostic purposes.  Values are `on` or `off`
     (default: off)
 
+  -a, --printargs, (envvar: DD_PROFILING_NATIVEPRINTARGS)
+    Whether or not to print configuration parameters to the trace log.  Can
+    be `yes` or `no` (default: `no`).
+
   -f, --sendfinal, (envvar: DD_PROFILING_NATIVESENDFINAL)
     Determines whether to emit the last partial export if the instrumented
     process ends.  This is almost never useful.  Default is `no`.
@@ -45,7 +49,7 @@ Options:
     cleared between runs and a service restart is needed for log rotation.
 
   -l, --loglevel, (envvar: DD_PROFILING_NATIVELOGLEVEL)
-    One of `debug`, `warn`, `error`.  Default is `warn`.
+    One of `debug`, `notice`, `warn`, `error`.  Default is `warn`.
 
   -e, --event:
     A string representing the events to sample.  Defaults to `cw`

@@ -24,12 +24,10 @@ VER=$((VER+1))
 echo ${VER} > ${VERFILE}
 
 # Run it!
+export DD_API_KEY=***REMOVED***
+export DD_SERVICE=ivoanjo-native-testing
+export DD_AGENT_HOST=intake.profile.datad0g.com
 eval ${CMD} \
-  -A ***REMOVED*** \
-  -H intake.profile.datad0g.com \
-  -P 80 \
-  -S native-testservice${VER}\
-  -E "test-staging" \
   -u 2.0 \
   -l debug \
   -o debuglog.out \

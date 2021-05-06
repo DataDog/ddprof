@@ -31,6 +31,8 @@ void LOG_setlevel(int lvl) {
     log_ctx->level = lvl;
 }
 
+int LOG_getlevel() { return log_ctx->level; }
+
 void LOG_setfacility(int fac) {
   assert(fac >= LF_KERNEL && fac <= LF_LOCAL7);
   if (fac >= LF_KERNEL && fac <= LF_LOCAL7)

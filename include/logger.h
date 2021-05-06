@@ -56,6 +56,7 @@ bool LOG_open(int, char *);
 void LOG_lfprintf(int, int, char *, const char *, ...);
 bool LOG_setname(char *);
 void LOG_setlevel(int);
+int LOG_getlevel();
 void LOG_setfacility(int);
 
 #endif

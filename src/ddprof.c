@@ -21,6 +21,7 @@
 /******************************* Logging Macros *******************************/
 #define ERR(...) LOG_lfprintf(LL_ERROR, -1, MYNAME, __VA_ARGS__)
 #define WRN(...) LOG_lfprintf(LL_WARNING, -1, MYNAME, __VA_ARGS__)
+#define NTC(...) LOG_lfprintf(LL_NOTICE, -1, MYNAME, __VA_ARGS__)
 #define DBG(...) LOG_lfprintf(LL_DEBUG, -1, MYNAME, __VA_ARGS__)
 
 #define max_watchers 10
@@ -49,6 +50,7 @@ struct DDProfContext {
   char *loglevel;
 
   // Input parameters
+  char *printargs;
   char *count_samples;
   char *enabled;
   char *upload_period;
@@ -135,7 +137,7 @@ int num_cpu = 0;
 #define X_DFLT(a, b, c, d, e, f, g, h) DFLT_EXP(#a, b, f, g, h);
 #define X_FREE(a, b, c, d, e, f, g, h) FREE_EXP(b, f);
 #define X_CASE(a, b, c, d, e, f, g, h) case d: (f)->b = strdup(optarg); break;
-#define X_PRNT(a, b, c, d, e, f, g, h) printf(#b ": %s\n", (f)->b);
+#define X_PRNT(a, b, c, d, e, f, g, h) if((f)->b) NTC("  "#b ": %s", (f)->b);
 
 //  A                              B                C   D   E  F         G     H
 #define OPT_TABLE(XX)                                                                       \
@@ -143,7 +145,7 @@ int num_cpu = 0;
   XX(DD_ENV,                       environment,     E, 'E', 1, ctx->ddr, NULL, "")          \
   XX(DD_AGENT_HOST,                host,            H, 'H', 1, ctx->ddr, NULL, "localhost") \
   XX(DD_SITE,                      site,            I, 'I', 1, ctx->ddr, NULL, "")          \
-  XX(DD_TRACE_AGENT_PORT,          port,            P, 'P', 1, ctx->ddr, NULL, "8081")      \
+  XX(DD_TRACE_AGENT_PORT,          port,            P, 'P', 1, ctx->ddr, NULL, "80")        \
   XX(DD_SERVICE,                   service,         S, 'S', 1, ctx->ddr, NULL, "myservice") \
   XX(DD_TAGS,                      tags,            T, 'T', 1, ctx,      NULL, "")          \
   XX(DD_VERSION,                   profiler_version,V, 'V', 1, ctx->ddr, NULL, "")          \
@@ -152,7 +154,8 @@ int num_cpu = 0;
   XX(DD_PROFILING_UPLOAD_PERIOD,   upload_period,   u, 'u', 1, ctx,      NULL, "60.5")      \
   XX(DD_PROFILE_NATIVEPROFILER,    profprofiler,    p, 'p', 0, ctx,      NULL, "")          \
   XX(DD_PROFILING_,                prefix,          X, 'X', 1, ctx,      NULL, "")          \
-  XX(DD_PROFILING_NATIVEFAULTINFO, faultinfo,       s, 's', 1, ctx,      NULL, "")          \
+  XX(DD_PROFILING_NATIVEFAULTINFO, faultinfo,       s, 's', 1, ctx,      NULL, "yes")       \
+  XX(DD_PROFILING_NATIVEPRINTARGS, printargs,       a, 'a', 1, ctx,      NULL, "no")        \
   XX(DD_PROFILING_NATIVESENDFINAL, sendfinal,       f, 'f', 1, ctx,      NULL, "")          \
   XX(DD_PROFILING_NATIVELOGMODE,   logmode,         o, 'o', 1, ctx,      NULL, "stdout")    \
   XX(DD_PROFILING_NATIVELOGLEVEL,  loglevel,        l, 'l', 1, ctx,      NULL, "warn")
@@ -190,7 +193,7 @@ void export(struct DDProfContext *pctx, int64_t now) {
   DDReq *ddr = pctx->ddr;
   DProf *dp = pctx->dp;
 
-  DBG("Pushed samples to backend");
+  NTC("Pushed samples to backend");
   int ret = 0;
   if ((ret = DDR_pprof(ddr, dp)))
     ERR("Error enqueuing pprof (%s)", DDR_code2str(ret));
@@ -296,6 +299,9 @@ char* help_str[DD_KLEN] = {
 "    also the default.\n",
   [DD_PROFILE_NATIVEPROFILER] = STR_UNDF,
   [DD_PROFILING_] = STR_UNDF,
+  [DD_PROFILING_NATIVEPRINTARGS] =
+"    Whether or not to print configuration parameters to the trace log.  Can\n"
+"    be `yes` or `no` (default: `no`).\n",
   [DD_PROFILING_NATIVEFAULTINFO] =
 "    If "MYNAME" encounters a critical error, print a backtrace of internal\n"
 "    functions for diagnostic purposes.  Values are `on` or `off`\n"
@@ -306,7 +312,7 @@ char* help_str[DD_KLEN] = {
 "    filesystem path and a log will be appended there.  Log files are not\n"
 "    cleared between runs and a service restart is needed for log rotation.\n",
   [DD_PROFILING_NATIVELOGLEVEL] =
-"    One of `debug`, `warn`, `error`.  Default is `warn`.\n",
+"    One of `debug`, `notice`, `warn`, `error`.  Default is `warn`.\n",
   [DD_PROFILING_NATIVESENDFINAL] =
 "    Determines whether to emit the last partial export if the instrumented\n"
 "    process ends.  This is almost never useful.  Default is `no`.\n"
@@ -386,7 +392,7 @@ int main(int argc, char **argv) {
       .ddr = &(DDReq){.user_agent = "Native-http-client/0.1",
                       .language = "native",
                       .family = "native",
-                      .http_close = true},
+                      .http_close = false},
       .dp = &(DProf){0},
       .us = &(struct UnwindState){0}};
   DDReq *ddr = ctx->ddr;
@@ -492,6 +498,8 @@ int main(int argc, char **argv) {
   // Process logging level
   if (!strcasecmp(ctx->loglevel, "debug"))
     LOG_setlevel(LL_DEBUG);
+  if (!strcasecmp(ctx->loglevel, "notice"))
+    LOG_setlevel(LL_NOTICE);
   if (!strcasecmp(ctx->loglevel, "warn"))
     LOG_setlevel(LL_WARNING);
   if (!strcasecmp(ctx->loglevel, "error"))
@@ -504,25 +512,28 @@ int main(int argc, char **argv) {
       ctx->params.count_samples = true;
   }
 
-#ifdef DD_DBG_PRINTARGS
-  printf("=== PRINTING PARAMETERS ===\n");
-  OPT_TABLE(X_PRNT);
-  printf("upload_period: %f\n", ctx->params.upload_period);
+  // Process input printer (do this last!)
+  if (ctx->printargs && *ctx->printargs && !strcasecmp(ctx->printargs, "yes")) {
+    if (LOG_getlevel() < LL_DEBUG)
+      WRN("printarg specified, but loglevel too low to emit parameters");
+    DBG("Printing parameters");
+    OPT_TABLE(X_PRNT);
 
-  printf("Instrumented with %d watchers.\n", ctx->num_watchers);
-  for (int i = 0; i < ctx->num_watchers; i++) {
-    printf("ID: %s, Pos: %d, Index: %d, Label: %s, Mode: %d\n",
-           ctx->watchers[i].opt->key, i, ctx->watchers[i].opt->config,
-           ctx->watchers[i].opt->label, ctx->watchers[i].opt->mode);
+    DBG("Instrumented with %d watchers:", ctx->num_watchers);
+    for (int i = 0; i < ctx->num_watchers; i++) {
+      DBG("  ID: %s, Pos: %d, Index: %d, Label: %s, Mode: %d",
+          ctx->watchers[i].opt->key, i, ctx->watchers[i].opt->config,
+          ctx->watchers[i].opt->label, ctx->watchers[i].opt->mode);
+      DBG("Done printing parameters");
+    }
   }
-#endif
   // Adjust input parameters for execvp()
   argv += optind;
   argc -= optind;
 
   if (argc <= 0) {
     OPT_TABLE(X_FREE);
-    ERR("No target specified");
+    ERR("No target specified, exiting");
     return -1;
   }
 
@@ -605,7 +616,7 @@ int main(int argc, char **argv) {
         int k = i * num_cpu + j;
         pes[k].pos = i; // watcher index is the sample index
 
-        DBG("Receiving watcher %d.%d", i, j);
+        NTC("Receiving watcher %d.%d", i, j);
         pes[k].fd = getfd(sfd[0]);
         if (0 > pes[k].fd || !(pes[k].region = perfown(pes[k].fd))) {
           close(pes[k].fd);
@@ -629,7 +640,7 @@ int main(int argc, char **argv) {
     if (explain_sigseg)
       signal(SIGSEGV, sigsegv_handler);
     if (instrumented_any_watchers) {
-      DBG("Entering main loop");
+      NTC("Entering main loop");
       main_loop(pes, ctx->num_watchers * num_cpu, ddprof_callback, ctx);
 
       // If we're here, the main loop closed--probably the profilee closed
@@ -656,7 +667,7 @@ int main(int argc, char **argv) {
           if (sendfail(sfd[1]))
             ERR("Could not pass failure for watcher %d.%d", i, j);
         } else {
-          DBG("Sending instrumentation for watcher %d.%d", i, j);
+          NTC("Sending instrumentation for watcher %d.%d", i, j);
           if (sendfd(sfd[1], fd))
             ERR("Could not pass instrumentation for watcher %d.%d", i, j);
         }
@@ -674,7 +685,7 @@ int main(int argc, char **argv) {
     munmap(pb, sizeof(pthread_barrier_t));
 
     if (-1 == execvp(argv[0], argv)) {
-      switch(errno) {
+      switch (errno) {
       case ENOENT:
         ERR("%s: file not found", argv[0]);
         break;
