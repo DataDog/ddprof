@@ -149,7 +149,7 @@ int sendfail(int sfd) {
   // failure it suffices to merely not send SOL_SOCKET with SCM_RIGHTS.
   // This may be a little confusing...  TODO is there a paradoxical setting?
   struct msghdr msg = {
-      .msg_iov = &(struct iovec){.iov_base = (char[2]){"  "}, .iov_len = 2},
+      .msg_iov = &(struct iovec){.iov_base = (char[8]){"!"}, .iov_len = 8},
       .msg_iovlen = 1,
       .msg_control = (char[CMSG_SPACE(sizeof(int))]){0},
       .msg_controllen = CMSG_SPACE(sizeof(int))};
@@ -168,19 +168,19 @@ int sendfail(int sfd) {
 }
 
 int sendfd(int sfd, int fd) {
-  struct msghdr msg = {
-      .msg_iov = &(struct iovec){.iov_base = (char[2]){"  "}, .iov_len = 2},
+  struct msghdr *msg = &(struct msghdr){
+      .msg_iov = &(struct iovec){.iov_base = (char[8]){"!"}, .iov_len = 8},
       .msg_iovlen = 1,
       .msg_control = (char[CMSG_SPACE(sizeof(int))]){0},
       .msg_controllen = CMSG_SPACE(sizeof(int))};
-  CMSG_FIRSTHDR(&msg)->cmsg_level = SOL_SOCKET;
-  CMSG_FIRSTHDR(&msg)->cmsg_type = SCM_RIGHTS;
-  CMSG_FIRSTHDR(&msg)->cmsg_len = CMSG_LEN(sizeof(int));
-  *((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg))) = fd;
+  CMSG_FIRSTHDR(msg)->cmsg_level = SOL_SOCKET;
+  CMSG_FIRSTHDR(msg)->cmsg_type = SCM_RIGHTS;
+  CMSG_FIRSTHDR(msg)->cmsg_len = CMSG_LEN(sizeof(int));
+  *((int *)CMSG_DATA(CMSG_FIRSTHDR(msg))) = fd;
 
-  msg.msg_controllen = CMSG_SPACE(sizeof(int));
+  msg->msg_controllen = CMSG_SPACE(sizeof(int));
 
-  while (sizeof(char[2]) != sendmsg(sfd, &msg, MSG_NOSIGNAL)) {
+  while (sizeof(char[2]) != sendmsg(sfd, msg, MSG_NOSIGNAL)) {
     if (errno != EINTR)
       return -1;
   }
@@ -189,7 +189,7 @@ int sendfd(int sfd, int fd) {
 
 int getfd(int sfd) {
   struct msghdr msg = {
-      .msg_iov = &(struct iovec){.iov_base = (char[2]){"  "}, .iov_len = 2},
+      .msg_iov = &(struct iovec){.iov_base = (char[8]){"!"}, .iov_len = 8},
       .msg_iovlen = 1,
       .msg_control = (char[CMSG_SPACE(sizeof(int))]){0},
       .msg_controllen = CMSG_SPACE(sizeof(int))};
