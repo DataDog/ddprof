@@ -131,12 +131,12 @@ int num_cpu = 0;
   G - defaulting function (or NULL)
   H - Fallback value, if any
 */
-#define X_LOPT(a, b, c, d, e, f, g, h) {#b, e, 0, *#c},
+#define X_LOPT(a, b, c, d, e, f, g, h) {#b, e, 0, d},
 #define X_ENUM(a, b, c, d, e, f, g, h) a,
 #define X_OSTR(a, b, c, d, e, f, g, h) #c ":"
 #define X_DFLT(a, b, c, d, e, f, g, h) DFLT_EXP(#a, b, f, g, h);
 #define X_FREE(a, b, c, d, e, f, g, h) FREE_EXP(b, f);
-#define X_CASE(a, b, c, d, e, f, g, h) case d: (f)->b = strdup(optarg); break;
+#define X_CASE(a, b, c, d, e, f, g, h) CASE_EXP(d, f, b)
 #define X_PRNT(a, b, c, d, e, f, g, h) if((f)->b) NTC("  "#b ": %s", (f)->b);
 
 //  A                              B                C   D   E  F         G     H
@@ -172,6 +172,13 @@ int num_cpu = 0;
       (targ)->key = _buf;                                                      \
     }                                                                          \
   })
+
+#define CASE_EXP(casechar, targ, key)                                          \
+  case casechar:                                                               \
+    if ((targ)->key)                                                           \
+      free((targ)->key);                                                       \
+    (targ)->key = strdup(optarg);                                              \
+    break;
 
 #define FREE_EXP(key, targ)                                                    \
   __extension__({                                                              \
@@ -242,11 +249,12 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
     for (uint64_t i = 0, j = 0; i < us->idx; i++) {
       FunLoc L = locs[i];
       uint64_t id_map, id_fun, id_loc;
-      id_map =
-          pprof_mapAdd(dp, L.map_start, L.map_end, L.map_off, L.sopath, "");
-      id_fun = pprof_funAdd(dp, L.funname, L.funname, L.srcpath, L.line);
+
+      // Using the sopath instead of srcpath in locAdd for the DD UI
+      id_map = pprof_mapAdd(dp, L.map_start, L.map_end, L.map_off, "", "");
+      id_fun = pprof_funAdd(dp, L.funname, L.funname, L.srcpath, 0);
       id_loc = pprof_locAdd(dp, id_map, L.ip, (uint64_t[]){id_fun},
-                            (int64_t[]){0}, 1);
+                            (int64_t[]){L.line}, 1);
       if (id_loc > 0)
         id_locs[j++] = id_loc;
     }
@@ -391,8 +399,8 @@ int main(int argc, char **argv) {
   struct DDProfContext *ctx = &(struct DDProfContext){
       .ddr = &(DDReq){.user_agent = "Native-http-client/0.1",
                       .language = "native",
-                      .family = "native",
-                      .http_close = false},
+                      .family = "native"},
+      //                      .http_close = false},
       .dp = &(DProf){0},
       .us = &(struct UnwindState){0}};
   DDReq *ddr = ctx->ddr;
@@ -618,10 +626,14 @@ int main(int argc, char **argv) {
 
         NTC("Receiving watcher %d.%d", i, j);
         pes[k].fd = getfd(sfd[0]);
-        if (0 > pes[k].fd || !(pes[k].region = perfown(pes[k].fd))) {
+        if (-1 == pes[k].fd) {
+          ERR("Could not finalize watcher %d.%d: transport error");
+        } else if (-2 == pes[k].fd) {
+          ERR("Could not finalize watcher %d.%d: received fail notice");
+        } else if (!(pes[k].region = perfown(pes[k].fd))) {
           close(pes[k].fd);
           pes[k].fd = -1;
-          ERR("Could not finalize watcher %d.%d", i, j);
+          ERR("Could not finalize watcher %d.%d: registration", i, j);
         } else {
           instrumented_any_watchers = true;
         }
@@ -682,6 +694,11 @@ int main(int argc, char **argv) {
     close(sfd[1]);
 
   EXECUTE:
+    // These are freed by execvp(), but we remove them now since static analysis
+    // evidently doesn't care whether a syscall might change the process image.
+    OPT_TABLE(X_FREE);
+    DDR_free(ddr);
+    pthread_barrier_destroy(pb);
     munmap(pb, sizeof(pthread_barrier_t));
 
     if (-1 == execvp(argv[0], argv)) {

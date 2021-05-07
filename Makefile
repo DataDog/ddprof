@@ -5,9 +5,13 @@
 #   1 - Do those things
 # SAFETY
 #   0 - Don't add sanitizers
-#   1 - Add address sanitization
-#   2 - Add undefined sanitization
-#   3 - Add both
+#   1 - Add address
+#   2 - Add undefined
+#   3 - A+U
+#   4 - Add thread
+#   5 - ILLEGAL (can't do A+T)
+#   6 - U+T
+#   7 - ILLEGAL (can't do A+T)
 # ANALYSIS
 #   0 - Don't add static analysis passes
 #   1 - -fanalyzer -fanalyzer-verbosity=2 (GCC only?; engage static for clang)
@@ -44,6 +48,12 @@ ifeq ($(SAFETY),2)
 endif
 ifeq ($(SAFETY),3)
   SANS += -fsanitize=address,undefined
+endif
+ifeq ($(SAFETY),4)
+  SANS += -fsanitize=thread
+endif
+ifeq ($(SAFETY),6)
+  SANS += -fsanitize=undefined,thread
 endif
 
 # TODO this is probably not what you want

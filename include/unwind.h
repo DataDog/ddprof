@@ -45,14 +45,14 @@ struct UnwindState {
 };
 
 #ifdef D_UNWDBG
-#define D(...)                                                                 \
-  fprintf(stderr, "<%s:%d> ", __FUNCTION__, __LINE__);                         \
-  fprintf(stderr, __VA_ARGS__);                                                \
-  fprintf(stderr, "\n")
+#  define D(...)                                                               \
+    fprintf(stderr, "<%s:%d> ", __FUNCTION__, __LINE__);                       \
+    fprintf(stderr, __VA_ARGS__);                                              \
+    fprintf(stderr, "\n")
 #else
-#define D(...)                                                                 \
-  do {                                                                         \
-  } while (0);
+#  define D(...)                                                               \
+    do {                                                                       \
+    } while (0);
 #endif
 
 pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
@@ -147,8 +147,18 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
     symname =
         dwfl_module_addrinfo(mod, newpc, &offset, &sym, &shndxp, &elfp, &bias);
 
+    Dwfl_Line *line = dwfl_module_getsrc(mod, newpc);
+
     // TODO
     us->locs[us->idx].ip = pc;
+
+    int lineno = 0;
+    us->locs[us->idx].line = 0;
+    char *srcpath = dwfl_lineinfo(line, &newpc, &lineno, NULL, NULL, NULL);
+    if (srcpath) {
+      us->locs[us->idx].srcpath = strdup(srcpath);
+      us->locs[us->idx].line = lineno;
+    }
 
     // Figure out mapping
     Map *map = procfs_MapMatch(us->pid, pc);
@@ -171,7 +181,6 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
     }
     char *sname = strrchr(mod->name, '/');
     us->locs[us->idx].sopath = strdup(sname ? sname + 1 : mod->name);
-    us->locs[us->idx].srcpath = strdup(us->locs[us->idx].sopath);
     us->idx++;
   } else {
     D("dwfl_addrmodule was zero: (%s)", dwfl_errmsg(-1));

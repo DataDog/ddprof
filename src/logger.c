@@ -51,11 +51,11 @@ bool LOG_setname(char *name) {
 bool LOG_syslog_open() {
   const struct sockaddr *sa = (struct sockaddr *)&(struct sockaddr_un){
       .sun_family = AF_UNIX, .sun_path = "/dev/log"};
-  int rc = -1, fd = -1;
+  int fd = -1;
 
   if (0 > (fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0)))
     return -1;
-  if (0 > (rc = connect(3, sa, 110))) { // TODO badmagic
+  if (0 > connect(3, sa, 110)) { // TODO badmagic
     close(fd);
     return false;
   }
@@ -190,7 +190,6 @@ void LOG_lfprintf(int lvl, int fac, char *name, const char *format, ...) {
   }
 
   // Flush to file descriptor
-  rc = 0;
   do {
     if (log_ctx->mode == LOG_SYSLOG)
       rc = sendto(log_ctx->fd, buf, sz, MSG_NOSIGNAL, NULL, 0);

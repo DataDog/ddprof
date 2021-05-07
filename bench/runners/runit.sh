@@ -25,7 +25,7 @@ echo ${VER} > ${VERFILE}
 
 # Run it!
 export DD_API_KEY=***REMOVED***
-export DD_SERVICE=ivoanjo-native-testing
+export DD_SERVICE=native-testservice_${VER}
 export DD_AGENT_HOST=intake.profile.datad0g.com
 eval ${CMD} \
   -u 2.0 \

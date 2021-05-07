@@ -144,7 +144,7 @@ struct perf_event_attr g_dd_native_attr = {
     .exclude_hv = 1,
 };
 
-int sendfail(int sfd) {
+bool sendfail(int sfd) {
   // The call to getfd() checks message metadata upon receipt, so to send a
   // failure it suffices to merely not send SOL_SOCKET with SCM_RIGHTS.
   // This may be a little confusing...  TODO is there a paradoxical setting?
@@ -162,12 +162,12 @@ int sendfail(int sfd) {
 
   while (sizeof(char[2]) != sendmsg(sfd, &msg, MSG_NOSIGNAL)) {
     if (errno != EINTR)
-      return -1;
+      return false;
   }
-  return 0;
+  return true;
 }
 
-int sendfd(int sfd, int fd) {
+bool sendfd(int sfd, int fd) {
   struct msghdr *msg = &(struct msghdr){
       .msg_iov = &(struct iovec){.iov_base = (char[8]){"!"}, .iov_len = 8},
       .msg_iovlen = 1,
@@ -182,9 +182,9 @@ int sendfd(int sfd, int fd) {
 
   while (sizeof(char[2]) != sendmsg(sfd, msg, MSG_NOSIGNAL)) {
     if (errno != EINTR)
-      return -1;
+      return false;
   }
-  return 0;
+  return true;
 }
 
 int getfd(int sfd) {
@@ -193,7 +193,7 @@ int getfd(int sfd) {
       .msg_iovlen = 1,
       .msg_control = (char[CMSG_SPACE(sizeof(int))]){0},
       .msg_controllen = CMSG_SPACE(sizeof(int))};
-  while (sizeof(char[2]) != recvmsg(sfd, &msg, MSG_NOSIGNAL)) {
+  while (sizeof(char[8]) != recvmsg(sfd, &msg, MSG_NOSIGNAL)) {
     if (errno != EINTR)
       return -1;
   }
