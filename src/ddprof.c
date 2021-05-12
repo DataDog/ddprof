@@ -240,9 +240,13 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
     memcpy(&us->regs[0], pes->regs,
            3 * sizeof(uint64_t)); // TODO hardcoded reg count?
     us->max_stack = MAX_STACK;
+    FunLoc_clear(us->locs);
     if (-1 == unwindstate__unwind(us)) {
       Map *map = procfs_MapMatch(us->pid, us->eip);
-      WRN("Error unwinding %s [%d](0x%lx)", map->path, us->pid, us->eip);
+      if (!map)
+        WRN("Error getting map for [%d](0x%lx)", us->pid, us->eip);
+      else
+        WRN("Error unwinding %s [%d](0x%lx)", map->path, us->pid, us->eip);
       return;
     }
     FunLoc *locs = us->locs;
@@ -253,7 +257,7 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
       // Using the sopath instead of srcpath in locAdd for the DD UI
       id_map = pprof_mapAdd(dp, L.map_start, L.map_end, L.map_off, "", "");
       id_fun = pprof_funAdd(dp, L.funname, L.funname, L.srcpath, 0);
-      id_loc = pprof_locAdd(dp, id_map, L.ip, (uint64_t[]){id_fun},
+      id_loc = pprof_locAdd(dp, id_map, 0, (uint64_t[]){id_fun},
                             (int64_t[]){L.line}, 1);
       if (id_loc > 0)
         id_locs[j++] = id_loc;
@@ -270,6 +274,7 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   // Click the timer at the end of processing, since we always add the sampling
   // rate to the last time.
   int64_t now = now_nanos();
+
   if (now > pctx->send_nanos)
     export(pctx, now);
 }
@@ -431,7 +436,9 @@ int main(int argc, char **argv) {
     case 'e':;
       bool event_matched = false;
       for (int i = 0; i < num_perfs; i++) {
-        if (!strncmp(perfoptions[i].key, optarg, strlen(perfoptions[i].desc))) {
+        size_t sz_opt = strlen(optarg);
+        size_t sz_key = strlen(perfoptions[i].key);
+        if (!strncmp(perfoptions[i].key, optarg, sz_key)) {
 
           // If we got a match, then we need to use non-default accounting
           if (default_watchers) {
@@ -441,9 +448,12 @@ int main(int argc, char **argv) {
 
           ctx->watchers[ctx->num_watchers].opt = &perfoptions[i];
 
-          // TODO, here check for a comma to determine the sampling rate
-          ctx->watchers[ctx->num_watchers].sample_period =
-              perfoptions[i].base_rate;
+          double sample_period = 0;
+          if (sz_opt > sz_key && optarg[sz_opt] == ',')
+            sample_period = strtod(&optarg[sz_key + 1], NULL);
+          if (1 > sample_period)
+            sample_period = perfoptions[i].base_rate;
+          ctx->watchers[ctx->num_watchers].sample_period = sample_period;
           ctx->num_watchers++;
 
           // Early exit
@@ -647,6 +657,7 @@ int main(int argc, char **argv) {
     munmap(pb, sizeof(pthread_barrier_t));
 
     ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
+    unwind_init(ctx->us);
     elf_version(EV_CURRENT); // Initialize libelf
 
     if (explain_sigseg)
@@ -660,7 +671,7 @@ int main(int argc, char **argv) {
       int64_t now = now_nanos();
       if (now > ctx->send_nanos || ctx->sendfinal) {
         WRN("Sending final export");
-        export(ctx, now);
+        //        export(ctx, now);
       }
     } else {
       ERR("Failed to install any watchers, profiling disabled");
@@ -722,6 +733,9 @@ int main(int argc, char **argv) {
   // Neither the profiler nor the instrumented process should get here
   OPT_TABLE(X_FREE);
   DDR_free(ddr);
+  unwind_free(ctx->us);
+  pprof_Free(ctx->dp);
+
   WRN("Profiling terminated");
   return -1;
 }

@@ -193,12 +193,16 @@ int tid_cb(Dwfl_Thread *thread, void *targ) {
   return DWARF_CB_OK;
 }
 
-int unwindstate__unwind(struct UnwindState *us) {
-  static const Dwfl_Thread_Callbacks dwfl_callbacks = {
-      .next_thread = next_thread,
-      .memory_read = memory_read,
-      .set_initial_registers = set_initial_registers,
-  };
+void FunLoc_clear(FunLoc *locs) {
+  for (int i = 0; i < MAX_STACK; i++) {
+    free(locs[i].funname);
+    free(locs[i].sopath);
+    free(locs[i].srcpath);
+  }
+  memset(locs, 0, sizeof(*locs) * MAX_STACK);
+}
+
+bool unwind_init(struct UnwindState *us) {
   static char *debuginfo_path;
   static const Dwfl_Callbacks proc_callbacks = {
       .find_debuginfo =
@@ -206,32 +210,28 @@ int unwindstate__unwind(struct UnwindState *us) {
       .debuginfo_path = &debuginfo_path,
       .find_elf = dwfl_linux_proc_find_elf,
   };
-  int i = 0;
-  for (; i < MAX_STACK; i++) {
-    if (us->locs[i].funname) {
-      free(us->locs[i].funname);
-      us->locs[i].funname = NULL;
-    }
-    if (us->locs[i].sopath) {
-      free(us->locs[i].sopath);
-      us->locs[i].sopath = NULL;
-    }
-    if (us->locs[i].srcpath) {
-      free(us->locs[i].srcpath);
-      us->locs[i].srcpath = NULL;
-    }
-  }
-  memset(us->locs, 0, sizeof(uint64_t) * us->max_stack);
 
-  // Initialize ELF
-  D("Gonna unwind at %d (my PID is %d)\n", us->pid, getpid());
   elf_version(EV_CURRENT);
-
-  // TODO, probably need to cache this on a pid-by-pid basis
   if (!us->dwfl && !(us->dwfl = dwfl_begin(&proc_callbacks))) {
     D("There was a problem getting the Dwfl");
-    return -1;
+    return false;
   }
+  return true;
+}
+
+void unwind_free(struct UnwindState *us) {
+  FunLoc_clear(us->locs);
+  dwfl_end(us->dwfl);
+}
+
+int unwindstate__unwind(struct UnwindState *us) {
+  static const Dwfl_Thread_Callbacks dwfl_callbacks = {
+      .next_thread = next_thread,
+      .memory_read = memory_read,
+      .set_initial_registers = set_initial_registers,
+  };
+
+  D("Gonna unwind at %d (my PID is %d)\n", us->pid, getpid());
 
   if (dwfl_linux_proc_report(us->dwfl, us->pid)) {
     D("There was a problem reporting the module.");
@@ -257,10 +257,8 @@ int unwindstate__unwind(struct UnwindState *us) {
     return -1;
   }
 
-  // TODO same as above
-  // dwfl_end(us->dwfl);
-
-  return i;
+  // TODO return actual stack size
+  return MAX_STACK;
 }
 
 #endif

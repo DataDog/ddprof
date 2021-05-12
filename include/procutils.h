@@ -44,7 +44,7 @@ typedef struct Map {
   void *map; // an mmap() of the segment
 } Map;
 
-#define PM_MAX 128
+#define PM_MAX 512
 typedef struct PidMap {
   pid_t pid;
   Map map[PM_MAX]; // TODO make this dynamic
@@ -265,7 +265,7 @@ Map *procfs_MapMatch(pid_t target, uint64_t addr) {
   if (!target)
     target = getpid();
   PidMap *pm = mapcache_Get(target);
-  while (pm->map[i].end) {
+  while (pm->map[i].end && i < PM_MAX) {
     if (addr < pm->map[i].end) // Within bounds!
       return &pm->map[i];
     if (addr < pm->map[i].start)
