@@ -38,13 +38,40 @@ build:deps:
   - docker build --tag $BUILD_IMG -f app/build-env/Dockerfile .
   - docker push $BUILD_IMG
 
+build:ddprof:
+  image: $BUILD_IMG
+  stage: build
+  tags: ["runner:docker", "size:large"]
+  variables:
+    ANAME: ddprof
+    BINPATH: release
+    RELEASEBIN: $BINPATH/release/$ANAME
+    DEBUGBIN: $BINPATH/debug/$ANAME
+  artifacts:
+    paths:
+    - $RELEASEBIN
+    - $DEBUGBIN
+    expire_in: 1 day
+  script:
+  - set -euo pipefail
+  - rm -rf vendor
+  - ln -s /app/vendor vendor
+  - mkdir -p release/release
+  - mkdir -p release/debug
+  - make ANALYSIS=0 build
+  - mv $BINPATH/$ANAME $DEBUGBIN
+  - make DEBUG=0 ANALYSIS=0 SAFETY=0 build
+  - cp $BINPATH/$ANAME $RELEASEBIN
+
 deploy:ddprof:
   image: $BUILD_IMG
   stage: deploy
   tags: ["runner:docker", "size:large"]
   variables:
     ANAME: ddprof
-    BINPATH: release/${ANAME}
+    BINPATH: release
+    RELEASEBIN: $BINPATH/release/$ANAME
+    DEBUGBIN: $BINPATH/debug/$ANAME
   rules:
   - if: '$CI_COMMIT_BRANCH == "main"'
     when: always
@@ -52,10 +79,28 @@ deploy:ddprof:
     when: manual
   script:
   - set -euo pipefail
+  - tools/ci_upload.sh
+
+build:collatz:
+  image: $BUILD_IMG
+  stage: build
+  tags: ["runner:docker", "size:large"]
+  when: manual
+  artifacts:
+    paths:
+    - $RELEASEBIN
+    - $DEBUGBIN
+    expire_in: 1 day
+  variables:
+    ANAME: collatz
+    BINPATH: release
+    RELEASEBIN: $BINPATH/release
+    DEBUGBIN: $BINPATH/debug
+  script:
+  - set -euo pipefail
   - rm -rf vendor
   - ln -s /app/vendor vendor
-  - make DEBUG=0 ANALYSIS=0 SAFETY=0 build
-  - tools/ci_upload.sh
+  - make DEBUG=0 ANALYSIS=0 bench
 
 deploy:collatz:
   image: $BUILD_IMG
@@ -64,10 +109,9 @@ deploy:collatz:
   when: manual
   variables:
     ANAME: collatz
-    BINPATH: release/${ANAME}
+    BINPATH: release
+    RELEASEBIN: $BINPATH/release
+    DEBUGBIN: $BINPATH/debug
   script:
   - set -euo pipefail
-  - rm -rf vendor
-  - ln -s /app/vendor vendor
-  - make DEBUG=0 ANALYSIS=0 bench
   - tools/ci_upload.sh

@@ -38,6 +38,7 @@ ifeq ($(DEBUG),1)
   CFLAGS := $(filter-out -O2, $(CFLAGS))
 else
   CFLAGS += -O2
+  DDARGS += -DNDEBUG
 endif
 
 ifeq ($(SAFETY),1)
@@ -75,11 +76,17 @@ ifeq ($(ANALYSIS),1)
 endif
 
 # If this is happening in CI, name accordingly
+VERNAME :=
 ifeq ($(origin CI_PIPELINE_ID), undefined)
-  DDARGS += -DVER_REV=\"$(shell git rev-parse --short HEAD)\"
+  VERNAME :=$(shell git rev-parse --short HEAD)
 else
-  DDARGS += -DVER_REV=\"$(CI_PIPELINE_ID)-$(shell git rev-parse --short HEAD)\"
+  VERNAME :=$(CI_PIPELINE_ID)-$(shell git rev-parse --short HEAD)
 endif
+
+ifeq ($(DEBUG), 1)
+  VERNAME := $(VERNAME)\(debug\)
+endif
+DDARGS += -DVER_REV=\"$(VERNAME)\"
 
 ## Other parameters
 # Directory structure and constants

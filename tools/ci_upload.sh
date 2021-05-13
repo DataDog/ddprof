@@ -11,6 +11,14 @@ DIR=$(git rev-parse --show-toplevel)
 # This script strongly assumes that the binary is executable and ships a version
 # string of the exactly correct format
 # Also rather strongly assumes this is running in CI... sorry!
-$DIR/tools/upload.sh -p ${RELPATH} -f ${BINPATH} -n $(${BINPATH} --version | sed -e 's/ /_/g' -e 's/\+/_/g')
-$DIR/tools/upload.sh -p ${RELPATH} -f ${BINPATH} -n $(${BINPATH} --version | sed -e 's/ /_/g' -e 's/\+.*//g')
-$DIR/tools/upload.sh -p ${RELPATH} -f ${BINPATH} -n $(${BINPATH} --version | sed -e 's/ .*//g')
+
+if [ ! -z "${RELEASEBIN}" ]; then 
+  $DIR/tools/upload.sh -p ${ANAME}/release -f ${RELEASEBIN} -n $(${RELEASEBIN} --version | sed -e 's/ /_/g' -e 's/\+/_/g')
+  $DIR/tools/upload.sh -p ${ANAME}/release -f ${RELEASEBIN} -n $(${RELEASEBIN} --version | sed -e 's/ /_/g' -e 's/\+.*//g')
+  $DIR/tools/upload.sh -p ${ANAME}/release -f ${RELEASEBIN} -n $(${RELEASEBIN} --version | sed -e 's/ .*//g')
+fi
+
+# No need to emit so many debug builds; just the patch is fine; for anything else we can grab it from CI
+if [ ! -z "${DEBUGBIN}" ]; then
+  $DIR/tools/upload.sh -p ${ANAME}/debug -f ${DEBUGBIN} -n $(${DEBUGBIN} --version | sed -e 's/ /_/g' -e 's/\+.*//g')
+fi
