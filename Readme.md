@@ -17,8 +17,7 @@ Refer to docs/Commands.md for the commands supported by `ddprof`.  This document
 
 This is a list of things we don't have fully operational yet, which may impact onboarding or quality-of-life.
 
-This is a *pre-beta* release.  It should not be destructive, but it may be useless.  Still--please only deploy in production if you have a very high risk tolerance, a great reversion strategy, and you've taped your pager to your face.  If you do it anyway, please don't @ me in your postmortem :)
-
+This is a *pre-beta* release.  It should not be destructive, but it may be useless.  Still--e only deploy in production if you have a very high risk tolerance, a great reversion strategy, and you've taped your pager to your face.  If you do it anyway, please don't @ me in your postmortem :)
 * Profiling backend does not currently colorize flamegraphs according to code source
 * `ddprof` does not support framepointers
 * `ddprof` does not support split debuginfo
@@ -66,23 +65,7 @@ By default, *seccomp* disables the `perf_event_open()` API.  You'll need to make
 
 ## perf_event_paranoid
 
-CPU profiling is available even with the strictest `perf_event_paranoid` mode offered by the Linux kernel--*ddprof* registers self-instrumentation for a process, which is always allowed (a process can look at its own stack and registers), then it steps out of the way.  However, it is possible that something like SELinux or AppArmor implements a further line of defense.  Detecting such configurations is currently outside of the scope of this document, but will be provided eventually.
-
-Unfortunately, due to the rich and storied history of the perf events subsystem, (read:  it's been the originator of security bugs), some distros are shipped with a kernel patch that offers a `perf_event_paranoid == 3` configuration, which shuts down access to the interface (unless a process has `CAP_SYS_ADMIN` or possibly `CAP_PERFMON` on suitably recent kernels).  To use *ddprof* in such a scenario, you're going to have to run at a higher level of permission--either `CAP_SYS_ADMIN` (you can set a capability directly in Docker or through the container`securityContext`/`capabilities` in K8s) will have to be set or you'll need to figure out how to lower the `perf_event_paranoid` sysctl.
-
-
-### Forward Considerations
-
-In 2016, Debian and Android began running a kernel [patch](https://patchwork.kernel.org/project/kernel-hardening/patch/1469630746-32279-1-git-send-email-jeffv@google.com/) which implemented a new `perf_event_paranoid == 3` sysctl setting, which would totally disable the `perf_event_open()` syscall for processes without `CAP_SYS_ADMIN`.  This patch was contemporary with the emergence of at least four CVE (security issues) stemming from the `perf_event_open()` syscall (mostly around privileged data access).
-
-This patch was rejected in fairly strong terms.  There were a few different themes in the thread.  Locking system-wide disablement behind `CAP_SYS_ADMIN` was seen as too big a hammer; on a system with the interface disabled, the only way to enable it is via a capability which widens the attack surface substantially (in kernel 5.4, there are hundreds of checks for `CAP_SYS_ADMIN`--which is also known as "root 2.0").  Moreover, from the perspective of kernel development, it's problematic to admit that an interface is unsafe and should ever be disabled when the underlying subsystem can't be removed; it's more scalable to allow the subsystem to be removed at build-time or subject such components to the testing necessary to ensure they are safe.
-
-Given the historical status of `perf_event_open()`, one valid concern is, how safe is it to run `perf_event_paranoid == 2` in prod?  This is difficult to qualify fully, but one category of insights comes from the rate at which long-running targeted fuzzing campaigns succeed in finding new bugs.  There has been some [excellent work](http://web.eece.maine.edu/~vweaver/projects/perf_events/fuzzer/bugs_found.html) in this regard (see [here](http://web.eece.maine.edu/~vweaver/projects/perf_events/fuzzer/2019_perf_fuzzer_tr.pdf) as well).  The rate of serious issues and security-related bugs has decreased substantially during the v4 kernel series, and those issues have become increasingly specific.
-
-With the v5.8 kernel, a [new capability](https://lwn.net/Articles/812719/]=) was added for granting heightened access to `perf_event_open()`.  Morevoer, [hooks](https://github.com/torvalds/linux/commit/da97e18458fb42d7c00fac5fd1c56a3896ec666e) for LSM have been added in v5.12, which will allow administrators even more granular control over the consumption of the subsystem.  Unfortunately, mainline LTS distros are barely using v5.4 at the time of writing, so it will be some time before either of these improvements has been fully standardized.  The question remains--in the tradeoff between security and observability, on a contemporary distro, when does it make sense to run `perf_event_paranoid < 3`?
-
-My opinion?  If you're running a kernel dated from late 2017 or later, just enable `perf_events`.
-
+CPU profiling is available even with the strictest `perf_event_paranoid` mode offered by the Linux kernel.  Unfortunately, some distros (notably, Ubuntu) take it a step further.  See docs/PerfEventParanoid.md for a more complete discussion of this topic.
 
 #### Can we do better?
 
