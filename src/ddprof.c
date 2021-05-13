@@ -209,8 +209,9 @@ void export(struct DDProfContext *pctx, int64_t now) {
     ERR("Error finalizing export (%s)", DDR_code2str(ret));
   if ((ret = DDR_send(ddr)))
     ERR("Error sending export (%s)", DDR_code2str(ret));
-  if ((ret = DDR_watch(ddr, -1)))
-    ERR("Error watching (%s)", DDR_code2str(ret));
+  if ((ret = DDR_watch(ddr, -1))) {
+    ERR("Error(%d) watching (%s)", ddr->res.code, DDR_code2str(ret));
+  }
   DDR_clear(ddr);
   pctx->send_nanos += pctx->params.upload_period * 1000000000;
 
