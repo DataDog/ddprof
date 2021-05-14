@@ -403,343 +403,340 @@ int main(int argc, char **argv) {
   //---- Inititiate structs
   int c = 0, oi = 0;
   struct DDProfContext *ctx =
-                           &(struct DDProfContext){
-                               .ddr = &(DDReq){.user_agent =
-                                                   "Native-http-client/0.1",
-                                               .language = "native",
-                                               .family = "native"},
-                               .http_close = false},
-                       .dp = &(DProf){0}, .us = &(struct UnwindState) {
-    0
-  }
-};
-DDReq *ddr = ctx->ddr;
+      &(struct DDProfContext){.ddr = &(DDReq){.user_agent = "libddprof001",
+                                              .language = "native",
+                                              .family = "native",
+                                              .http_close = false},
+                              .dp = &(DProf){0},
+                              .us = &(struct UnwindState){0}};
+  DDReq *ddr = ctx->ddr;
 
-struct option lopts[] = {OPT_TABLE(X_LOPT){"event", 1, 0, 'e'},
-                         {"help", 0, 0, 'h'},
-                         {"version", 0, 0, 'v'}};
+  struct option lopts[] = {OPT_TABLE(X_LOPT){"event", 1, 0, 'e'},
+                           {"help", 0, 0, 'h'},
+                           {"version", 0, 0, 'v'}};
 
-//---- Populate default values
-OPT_TABLE(X_DFLT);
-bool default_watchers = true;
-bool explain_sigseg = true;
-ctx->num_watchers = 1;
-ctx->watchers[0].opt = &perfoptions[10];
-ctx->watchers[0].sample_period = perfoptions[10].base_rate;
+  //---- Populate default values
+  OPT_TABLE(X_DFLT);
+  bool default_watchers = true;
+  bool explain_sigseg = true;
+  ctx->num_watchers = 1;
+  ctx->watchers[0].opt = &perfoptions[10];
+  ctx->watchers[0].sample_period = perfoptions[10].base_rate;
 
-//---- Process Options
-if (argc <= 1) {
-  OPT_TABLE(X_FREE);
-  print_help();
-  return 0;
-}
-while (
-    -1 !=
-    (c = getopt_long(argc, argv, "+" OPT_TABLE(X_OSTR) "e:hv", lopts, &oi))) {
-  switch (c) {
-    OPT_TABLE(X_CASE)
-  case 'e':;
-    bool event_matched = false;
-    for (int i = 0; i < num_perfs; i++) {
-      size_t sz_opt = strlen(optarg);
-      size_t sz_key = strlen(perfoptions[i].key);
-      if (!strncmp(perfoptions[i].key, optarg, sz_key)) {
-
-        // If we got a match, then we need to use non-default accounting
-        if (default_watchers) {
-          default_watchers = false;
-          ctx->num_watchers = 0;
-        }
-
-        ctx->watchers[ctx->num_watchers].opt = &perfoptions[i];
-
-        double sample_period = 0;
-        if (sz_opt > sz_key && optarg[sz_opt] == ',')
-          sample_period = strtod(&optarg[sz_key + 1], NULL);
-        if (1 > sample_period)
-          sample_period = perfoptions[i].base_rate;
-        ctx->watchers[ctx->num_watchers].sample_period = sample_period;
-        ctx->num_watchers++;
-
-        // Early exit
-        event_matched = true;
-        break;
-      }
-    }
-    if (!event_matched) {
-      WRN("Event %s did not match any events", optarg);
-    }
-    break;
-  case 'h':;
+  //---- Process Options
+  if (argc <= 1) {
     OPT_TABLE(X_FREE);
     print_help();
     return 0;
-  case 'v':;
-    OPT_TABLE(X_FREE);
-    print_version();
-    return 0;
-  default:;
-    OPT_TABLE(X_FREE);
-    ERR("Invalid option %c", c);
-    return -1;
   }
-}
+  while (
+      -1 !=
+      (c = getopt_long(argc, argv, "+" OPT_TABLE(X_OSTR) "e:hv", lopts, &oi))) {
+    switch (c) {
+      OPT_TABLE(X_CASE)
+    case 'e':;
+      bool event_matched = false;
+      for (int i = 0; i < num_perfs; i++) {
+        size_t sz_opt = strlen(optarg);
+        size_t sz_key = strlen(perfoptions[i].key);
+        if (!strncmp(perfoptions[i].key, optarg, sz_key)) {
 
-// Replace string-type args
-ctx->params.enabled = true;
-ctx->params.upload_period = 60.5;
+          // If we got a match, then we need to use non-default accounting
+          if (default_watchers) {
+            default_watchers = false;
+            ctx->num_watchers = 0;
+          }
 
-// process upload_period
-if (ctx->upload_period) {
-  double x = strtod(ctx->upload_period, NULL);
-  if (x > 0.0)
-    ctx->params.upload_period = x;
-}
+          ctx->watchers[ctx->num_watchers].opt = &perfoptions[i];
 
-// Process faultinfo
-if (!ctx->faultinfo || !*ctx->faultinfo || !strcasecmp(ctx->faultinfo, "off"))
-  explain_sigseg = false;
+          double sample_period = 0;
+          if (sz_opt > sz_key && optarg[sz_opt] == ',')
+            sample_period = strtod(&optarg[sz_key + 1], NULL);
+          if (1 > sample_period)
+            sample_period = perfoptions[i].base_rate;
+          ctx->watchers[ctx->num_watchers].sample_period = sample_period;
+          ctx->num_watchers++;
 
-// Process sendfinal
-if (ctx->sendfinal && ctx->sendfinal && !strcasecmp(ctx->sendfinal, "on"))
-  ctx->params.sendfinal = true;
-
-// Process logging mode
-if (!ctx->logmode || !*ctx->logmode)
-  LOG_open(LOG_STDERR, "");
-else if (!strcasecmp(ctx->logmode, "stdout"))
-  LOG_open(LOG_STDOUT, "");
-else if (!strcasecmp(ctx->logmode, "stderr"))
-  LOG_open(LOG_STDERR, "");
-else if (!strcasecmp(ctx->logmode, "syslog"))
-  LOG_open(LOG_SYSLOG, "");
-else if (!strcasecmp(ctx->logmode, "disabled"))
-  LOG_open(LOG_DISABLE, "");
-else
-  LOG_open(LOG_FILE, ctx->logmode);
-
-// Process logging level
-if (!strcasecmp(ctx->loglevel, "debug"))
-  LOG_setlevel(LL_DEBUG);
-if (!strcasecmp(ctx->loglevel, "notice"))
-  LOG_setlevel(LL_NOTICE);
-if (!strcasecmp(ctx->loglevel, "warn"))
-  LOG_setlevel(LL_WARNING);
-if (!strcasecmp(ctx->loglevel, "error"))
-  LOG_setlevel(LL_ERROR);
-
-// process count_samples
-if (ctx->count_samples) {
-  if (!strcmp(ctx->count_samples, "yes") || strcmp(ctx->count_samples, "true"))
-    ctx->params.count_samples = true;
-}
-
-// Process input printer (do this last!)
-if (ctx->printargs && *ctx->printargs && !strcasecmp(ctx->printargs, "yes")) {
-  if (LOG_getlevel() < LL_DEBUG)
-    WRN("printarg specified, but loglevel too low to emit parameters");
-  DBG("Printing parameters");
-  OPT_TABLE(X_PRNT);
-
-  DBG("Instrumented with %d watchers:", ctx->num_watchers);
-  for (int i = 0; i < ctx->num_watchers; i++) {
-    DBG("  ID: %s, Pos: %d, Index: %d, Label: %s, Mode: %d",
-        ctx->watchers[i].opt->key, i, ctx->watchers[i].opt->config,
-        ctx->watchers[i].opt->label, ctx->watchers[i].opt->mode);
-    DBG("Done printing parameters");
-  }
-}
-// Adjust input parameters for execvp()
-argv += optind;
-argc -= optind;
-
-if (argc <= 0) {
-  OPT_TABLE(X_FREE);
-  ERR("No target specified, exiting");
-  return -1;
-}
-
-/****************************************************************************\
-|                             Run the Profiler                               |
-\****************************************************************************/
-// Initialize the request object
-DDR_init(ddr);
-
-// Initialize the pprof
-char *pprof_labels[max_watchers];
-char *pprof_units[max_watchers];
-for (int i = 0; i < ctx->num_watchers; i++) {
-  pprof_labels[i] = ctx->watchers[i].opt->label;
-  pprof_units[i] = ctx->watchers[i].opt->unit;
-}
-
-if (!pprof_Init(ctx->dp, (const char **)pprof_labels,
-                (const char **)pprof_units, ctx->num_watchers)) {
-  OPT_TABLE(X_FREE);
-  DDR_free(ddr);
-  ERR("Failed to initialize profiling storage");
-  return -1;
-}
-pprof_timeUpdate(ctx->dp); // Set the time
-
-// Get the number of CPUs
-num_cpu = get_nprocs();
-
-// Setup a shared barrier for coordination
-pthread_barrierattr_t bat = {0};
-pthread_barrier_t *pb =
-    mmap(NULL, sizeof(pthread_barrier_t), PROT_READ | PROT_WRITE,
-         MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-if (MAP_FAILED == pb) {
-  // TODO log here.  Nothing else to do, since we're not halting the target
-  ERR("Failure instantiating message passing subsystem.  Profiling halting.");
-  ctx->params.enabled = false;
-} else {
-  pthread_barrierattr_init(&bat);
-  pthread_barrierattr_setpshared(&bat, 1);
-  pthread_barrier_init(pb, &bat, 2);
-}
-
-// Instrument the profiler
-// 1.   Setup pipes
-// 2.   fork()
-// 3p.  I am the original process.  If not prof profiling, instrument now
-// 3c.  I am the child.  Fork again and die.
-// 4p.  If not instrumenting profiler, instrument now.
-// 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
-// 5p.  Send the instrumentation FD.  Repeat for each instrumentation point.
-// 5cc. Receive.  Repeat.  This is known before time of fork.
-// 6p.  close fd, teardown pipe, execvp() to target process.
-// 6cc. teardown pipe, create mmap regions and enter event loop
-
-// TODO
-// * Multiple file descriptors can be sent in one push.  I don't know how much
-//   this matters, but if every microsecond counts at startup, it's an option.
-
-// 1. Setup pipes (really unix domain socket pair)
-int sfd[2] = {-1, -1};
-if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sfd)) {
-  ERR("Could not instantiate message passing system, profiling disabled");
-  goto EXECUTE;
-}
-
-// 2. fork()
-pid_t pid = fork();
-if (!pid) {
-  // 3c. I am the child.  Fork again
-  if (fork())
-    exit(0); // no need to use _exit, since we still own the proc
-
-  // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
-  bool instrumented_any_watchers = false;
-  struct PEvent pes[100] = {0};
-  for (int i = 0; i < ctx->num_watchers; i++) {
-    for (int j = 0; j < num_cpu; j++) {
-      int k = i * num_cpu + j;
-      pes[k].pos = i; // watcher index is the sample index
-
-      NTC("Receiving watcher %d.%d", i, j);
-      pes[k].fd = getfd(sfd[0]);
-      if (-1 == pes[k].fd) {
-        ERR("Could not finalize watcher %d.%d: transport error");
-      } else if (-2 == pes[k].fd) {
-        ERR("Could not finalize watcher %d.%d: received fail notice");
-      } else if (!(pes[k].region = perfown(pes[k].fd))) {
-        close(pes[k].fd);
-        pes[k].fd = -1;
-        ERR("Could not finalize watcher %d.%d: registration", i, j);
-      } else {
-        instrumented_any_watchers = true;
+          // Early exit
+          event_matched = true;
+          break;
+        }
       }
-      pthread_barrier_wait(pb);
+      if (!event_matched) {
+        WRN("Event %s did not match any events", optarg);
+      }
+      break;
+    case 'h':;
+      OPT_TABLE(X_FREE);
+      print_help();
+      return 0;
+    case 'v':;
+      OPT_TABLE(X_FREE);
+      print_version();
+      return 0;
+    default:;
+      OPT_TABLE(X_FREE);
+      ERR("Invalid option %c", c);
+      return -1;
     }
   }
 
-  // Cleanup and enter event loop
-  close(sfd[0]);
-  close(sfd[1]);
-  munmap(pb, sizeof(pthread_barrier_t));
+  // Replace string-type args
+  ctx->params.enabled = true;
+  ctx->params.upload_period = 60.5;
 
-  ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
-  unwind_init(ctx->us);
-  elf_version(EV_CURRENT); // Initialize libelf
+  // process upload_period
+  if (ctx->upload_period) {
+    double x = strtod(ctx->upload_period, NULL);
+    if (x > 0.0)
+      ctx->params.upload_period = x;
+  }
 
-  if (explain_sigseg)
-    signal(SIGSEGV, sigsegv_handler);
-  if (instrumented_any_watchers) {
-    NTC("Entering main loop");
-    main_loop(pes, ctx->num_watchers * num_cpu, ddprof_callback, ctx);
+  // Process faultinfo
+  if (!ctx->faultinfo || !*ctx->faultinfo || !strcasecmp(ctx->faultinfo, "off"))
+    explain_sigseg = false;
 
-    // If we're here, the main loop closed--probably the profilee closed
-    WRN("Profiling context no longer valid");
-    int64_t now = now_nanos();
-    if (now > ctx->send_nanos || ctx->sendfinal) {
-      WRN("Sending final export");
-      //        export(ctx, now);
+  // Process sendfinal
+  if (ctx->sendfinal && ctx->sendfinal && !strcasecmp(ctx->sendfinal, "on"))
+    ctx->params.sendfinal = true;
+
+  // Process logging mode
+  if (!ctx->logmode || !*ctx->logmode)
+    LOG_open(LOG_STDERR, "");
+  else if (!strcasecmp(ctx->logmode, "stdout"))
+    LOG_open(LOG_STDOUT, "");
+  else if (!strcasecmp(ctx->logmode, "stderr"))
+    LOG_open(LOG_STDERR, "");
+  else if (!strcasecmp(ctx->logmode, "syslog"))
+    LOG_open(LOG_SYSLOG, "");
+  else if (!strcasecmp(ctx->logmode, "disabled"))
+    LOG_open(LOG_DISABLE, "");
+  else
+    LOG_open(LOG_FILE, ctx->logmode);
+
+  // Process logging level
+  if (!strcasecmp(ctx->loglevel, "debug"))
+    LOG_setlevel(LL_DEBUG);
+  if (!strcasecmp(ctx->loglevel, "notice"))
+    LOG_setlevel(LL_NOTICE);
+  if (!strcasecmp(ctx->loglevel, "warn"))
+    LOG_setlevel(LL_WARNING);
+  if (!strcasecmp(ctx->loglevel, "error"))
+    LOG_setlevel(LL_ERROR);
+
+  // process count_samples
+  if (ctx->count_samples) {
+    if (!strcmp(ctx->count_samples, "yes") ||
+        strcmp(ctx->count_samples, "true"))
+      ctx->params.count_samples = true;
+  }
+
+  // Process input printer (do this last!)
+  if (ctx->printargs && *ctx->printargs && !strcasecmp(ctx->printargs, "yes")) {
+    if (LOG_getlevel() < LL_DEBUG)
+      WRN("printarg specified, but loglevel too low to emit parameters");
+    DBG("Printing parameters");
+    OPT_TABLE(X_PRNT);
+
+    DBG("Instrumented with %d watchers:", ctx->num_watchers);
+    for (int i = 0; i < ctx->num_watchers; i++) {
+      DBG("  ID: %s, Pos: %d, Index: %d, Label: %s, Mode: %d",
+          ctx->watchers[i].opt->key, i, ctx->watchers[i].opt->config,
+          ctx->watchers[i].opt->label, ctx->watchers[i].opt->mode);
+      DBG("Done printing parameters");
+    }
+  }
+  // Adjust input parameters for execvp()
+  argv += optind;
+  argc -= optind;
+
+  if (argc <= 0) {
+    OPT_TABLE(X_FREE);
+    ERR("No target specified, exiting");
+    return -1;
+  }
+
+  /****************************************************************************\
+  |                             Run the Profiler                               |
+  \****************************************************************************/
+  // Initialize the request object
+  DDR_init(ddr);
+
+  // Initialize the pprof
+  char *pprof_labels[max_watchers];
+  char *pprof_units[max_watchers];
+  for (int i = 0; i < ctx->num_watchers; i++) {
+    pprof_labels[i] = ctx->watchers[i].opt->label;
+    pprof_units[i] = ctx->watchers[i].opt->unit;
+  }
+
+  if (!pprof_Init(ctx->dp, (const char **)pprof_labels,
+                  (const char **)pprof_units, ctx->num_watchers)) {
+    OPT_TABLE(X_FREE);
+    DDR_free(ddr);
+    ERR("Failed to initialize profiling storage");
+    return -1;
+  }
+  pprof_timeUpdate(ctx->dp); // Set the time
+
+  // Get the number of CPUs
+  num_cpu = get_nprocs();
+
+  // Setup a shared barrier for coordination
+  pthread_barrierattr_t bat = {0};
+  pthread_barrier_t *pb =
+      mmap(NULL, sizeof(pthread_barrier_t), PROT_READ | PROT_WRITE,
+           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  if (MAP_FAILED == pb) {
+    // TODO log here.  Nothing else to do, since we're not halting the target
+    ERR("Failure instantiating message passing subsystem.  Profiling halting.");
+    ctx->params.enabled = false;
+  } else {
+    pthread_barrierattr_init(&bat);
+    pthread_barrierattr_setpshared(&bat, 1);
+    pthread_barrier_init(pb, &bat, 2);
+  }
+
+  // Instrument the profiler
+  // 1.   Setup pipes
+  // 2.   fork()
+  // 3p.  I am the original process.  If not prof profiling, instrument now
+  // 3c.  I am the child.  Fork again and die.
+  // 4p.  If not instrumenting profiler, instrument now.
+  // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
+  // 5p.  Send the instrumentation FD.  Repeat for each instrumentation point.
+  // 5cc. Receive.  Repeat.  This is known before time of fork.
+  // 6p.  close fd, teardown pipe, execvp() to target process.
+  // 6cc. teardown pipe, create mmap regions and enter event loop
+
+  // TODO
+  // * Multiple file descriptors can be sent in one push.  I don't know how much
+  //   this matters, but if every microsecond counts at startup, it's an option.
+
+  // 1. Setup pipes (really unix domain socket pair)
+  int sfd[2] = {-1, -1};
+  if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sfd)) {
+    ERR("Could not instantiate message passing system, profiling disabled");
+    goto EXECUTE;
+  }
+
+  // 2. fork()
+  pid_t pid = fork();
+  if (!pid) {
+    // 3c. I am the child.  Fork again
+    if (fork())
+      exit(0); // no need to use _exit, since we still own the proc
+
+    // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
+    bool instrumented_any_watchers = false;
+    struct PEvent pes[100] = {0};
+    for (int i = 0; i < ctx->num_watchers; i++) {
+      for (int j = 0; j < num_cpu; j++) {
+        int k = i * num_cpu + j;
+        pes[k].pos = i; // watcher index is the sample index
+
+        NTC("Receiving watcher %d.%d", i, j);
+        pes[k].fd = getfd(sfd[0]);
+        if (-1 == pes[k].fd) {
+          ERR("Could not finalize watcher %d.%d: transport error");
+        } else if (-2 == pes[k].fd) {
+          ERR("Could not finalize watcher %d.%d: received fail notice");
+        } else if (!(pes[k].region = perfown(pes[k].fd))) {
+          close(pes[k].fd);
+          pes[k].fd = -1;
+          ERR("Could not finalize watcher %d.%d: registration", i, j);
+        } else {
+          instrumented_any_watchers = true;
+        }
+        pthread_barrier_wait(pb);
+      }
+    }
+
+    // Cleanup and enter event loop
+    close(sfd[0]);
+    close(sfd[1]);
+    munmap(pb, sizeof(pthread_barrier_t));
+
+    ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
+    unwind_init(ctx->us);
+    elf_version(EV_CURRENT); // Initialize libelf
+
+    if (explain_sigseg)
+      signal(SIGSEGV, sigsegv_handler);
+    if (instrumented_any_watchers) {
+      NTC("Entering main loop");
+      main_loop(pes, ctx->num_watchers * num_cpu, ddprof_callback, ctx);
+
+      // If we're here, the main loop closed--probably the profilee closed
+      WRN("Profiling context no longer valid");
+      int64_t now = now_nanos();
+      if (now > ctx->send_nanos || ctx->sendfinal) {
+        WRN("Sending final export");
+        //        export(ctx, now);
+      }
+    } else {
+      ERR("Failed to install any watchers, profiling disabled");
     }
   } else {
-    ERR("Failed to install any watchers, profiling disabled");
-  }
-} else {
-  // 3p.  I am the original process.  If not prof profiling, instrument now
-  pid_t mypid = getpid();
-  for (int i = 0; i < ctx->num_watchers && ctx->params.enabled; i++) {
-    for (int j = 0; j < num_cpu; j++) {
-      int fd = perfopen(
-          mypid, ctx->watchers[i].opt->type, ctx->watchers[i].opt->config,
-          ctx->watchers[i].sample_period, ctx->watchers[i].opt->mode, j);
+    // 3p.  I am the original process.  If not prof profiling, instrument now
+    pid_t mypid = getpid();
+    for (int i = 0; i < ctx->num_watchers && ctx->params.enabled; i++) {
+      for (int j = 0; j < num_cpu; j++) {
+        int fd = perfopen(
+            mypid, ctx->watchers[i].opt->type, ctx->watchers[i].opt->config,
+            ctx->watchers[i].sample_period, ctx->watchers[i].opt->mode, j);
 
-      if (-1 == fd) {
-        WRN("Failed to setup watcher %d.%d", i, j);
-        if (sendfail(sfd[1]))
-          ERR("Could not pass failure for watcher %d.%d", i, j);
-      } else {
-        NTC("Sending instrumentation for watcher %d.%d", i, j);
-        if (sendfd(sfd[1], fd))
-          ERR("Could not pass instrumentation for watcher %d.%d", i, j);
+        if (-1 == fd) {
+          WRN("Failed to setup watcher %d.%d", i, j);
+          if (sendfail(sfd[1]))
+            ERR("Could not pass failure for watcher %d.%d", i, j);
+        } else {
+          NTC("Sending instrumentation for watcher %d.%d", i, j);
+          if (sendfd(sfd[1], fd))
+            ERR("Could not pass instrumentation for watcher %d.%d", i, j);
+        }
+        pthread_barrier_wait(pb);
       }
-      pthread_barrier_wait(pb);
+    }
+
+    // Cleanup and become desired process image
+    pthread_barrier_destroy(pb);
+    LOG_close();
+    close(sfd[0]);
+    close(sfd[1]);
+
+  EXECUTE:
+    // These are freed by execvp(), but we remove them now since static analysis
+    // evidently doesn't care whether a syscall might change the process image.
+    OPT_TABLE(X_FREE);
+    DDR_free(ddr);
+    pthread_barrier_destroy(pb);
+    munmap(pb, sizeof(pthread_barrier_t));
+
+    if (-1 == execvp(argv[0], argv)) {
+      switch (errno) {
+      case ENOENT:
+        ERR("%s: file not found", argv[0]);
+        break;
+      case ENOEXEC:
+      case EACCES:
+        ERR("%s: permission denied", argv[0]);
+        break;
+      default:
+        WRN("execvp() returned due to %s", strerror(errno));
+        break;
+      }
+
+      return -1;
     }
   }
 
-  // Cleanup and become desired process image
-  pthread_barrier_destroy(pb);
-  LOG_close();
-  close(sfd[0]);
-  close(sfd[1]);
-
-EXECUTE:
-  // These are freed by execvp(), but we remove them now since static analysis
-  // evidently doesn't care whether a syscall might change the process image.
+  // Neither the profiler nor the instrumented process should get here
   OPT_TABLE(X_FREE);
   DDR_free(ddr);
-  pthread_barrier_destroy(pb);
-  munmap(pb, sizeof(pthread_barrier_t));
+  unwind_free(ctx->us);
+  pprof_Free(ctx->dp);
 
-  if (-1 == execvp(argv[0], argv)) {
-    switch (errno) {
-    case ENOENT:
-      ERR("%s: file not found", argv[0]);
-      break;
-    case ENOEXEC:
-    case EACCES:
-      ERR("%s: permission denied", argv[0]);
-      break;
-    default:
-      WRN("execvp() returned due to %s", strerror(errno));
-      break;
-    }
-
-    return -1;
-  }
-}
-
-// Neither the profiler nor the instrumented process should get here
-OPT_TABLE(X_FREE);
-DDR_free(ddr);
-unwind_free(ctx->us);
-pprof_Free(ctx->dp);
-
-WRN("Profiling terminated");
-return -1;
+  WRN("Profiling terminated");
+  return -1;
 }
