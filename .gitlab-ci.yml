@@ -54,8 +54,8 @@ build:ddprof:
     expire_in: 1 day
   script:
   - set -euo pipefail
-  - rm -rf vendor
-  - ln -s /app/vendor vendor
+  - rm -rf vendor/elfutils
+  - ln -s /app/vendor/elfutils vendor/elfutils
   - mkdir -p release/release
   - mkdir -p release/debug
   - make ANALYSIS=0 build
