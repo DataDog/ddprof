@@ -190,6 +190,8 @@ char *procfs_RootGet(pid_t pid) {
 char procfs_MmapGet(Map *map) {
   // If this segment hasn't been cached, then cache it.
   // TODO evict stale ones
+  if (!map)
+    return -1;
   if (!map->map) {
     int fd = open(map->path, O_RDONLY);
     if (-1 == fd) {
@@ -209,6 +211,8 @@ char procfs_MmapGet(Map *map) {
 Map *current_map = NULL;
 size_t current_addr = 0;
 ssize_t procfs_MapRead(Map *map, void *buf, size_t sz, size_t addr) {
+  if (!map)
+    return -1;
   if (procfs_MmapGet(map))
     return -1;
   assert(map->map);
