@@ -148,10 +148,10 @@ int num_cpu = 0;
   XX(DD_TRACE_AGENT_PORT,          port,            P, 'P', 1, ctx->ddr, NULL, "80")        \
   XX(DD_SERVICE,                   service,         S, 'S', 1, ctx->ddr, NULL, "myservice") \
   XX(DD_TAGS,                      tags,            T, 'T', 1, ctx,      NULL, "")          \
-  XX(DD_VERSION,                   profiler_version,V, 'V', 1, ctx->ddr, NULL, "")          \
+  XX(DD_VERSION,                   serviceversion,  V, 'V', 1, ctx->ddr, NULL, "")          \
   XX(DD_PROFILING_ENABLED,         enabled,         d, 'd', 1, ctx,      NULL, "yes")       \
   XX(DD_PROFILING_COUNTSAMPLES,    count_samples,   c, 'c', 1, ctx,      NULL, "yes")       \
-  XX(DD_PROFILING_UPLOAD_PERIOD,   upload_period,   u, 'u', 1, ctx,      NULL, "60.5")      \
+  XX(DD_PROFILING_UPLOAD_PERIOD,   upload_period,   u, 'u', 1, ctx,      NULL, "60")        \
   XX(DD_PROFILE_NATIVEPROFILER,    profprofiler,    p, 'p', 0, ctx,      NULL, "")          \
   XX(DD_PROFILING_,                prefix,          X, 'X', 1, ctx,      NULL, "")          \
   XX(DD_PROFILING_NATIVEFAULTINFO, faultinfo,       s, 's', 1, ctx,      NULL, "yes")       \
@@ -335,12 +335,17 @@ char* help_str[DD_KLEN] = {
 
 char *help_key[DD_KLEN] = {OPT_TABLE(X_HLPK)};
 
-void print_version() {
-  printf(MYNAME " %d.%d.%d", VER_MAJ, VER_MIN, VER_PATCH);
+const char *str_version() {
+  static char version[1024] = {0};
   if (*VER_REV)
-    printf("+%s", VER_REV);
-  printf("\n");
+    snprintf(version, 1024, "%d.%d.%d+%s", VER_MAJ, VER_MIN, VER_PATCH,
+             VER_REV);
+  else
+    snprintf(version, 1024, "%d.%d.%d", VER_MAJ, VER_MIN, VER_PATCH);
+  return version;
 }
+
+void print_version() { printf(MYNAME " %s\n", str_version()); }
 
 // clang-format off
 void print_help() {
@@ -387,14 +392,21 @@ MYNAME" can register to various system events in order to customize the\n"
 // clang-format on
 
 /*****************************  SIGSEGV Handler *******************************/
-void sigsegv_handler(int sig) {
-  // TODO should this print the version
-  (void)sig;
-  static void *buf[16] = {0};
-  static char errmsg[] = MYNAME " encountered an error and will now exit.\n";
-  size_t sz = backtrace(buf, 16);
-  write(STDERR_FILENO, errmsg, strlen(errmsg));
+void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
+  // TODO this really shouldn't call printf-family functions...
+  (void)uc;
+  static void *buf[4096] = {0};
+  size_t sz = backtrace(buf, 4096);
+  fprintf(stderr, "[DDPROF]<%s> has encountered an error and will exit\n",
+          str_version());
+  if (sig == SIGSEGV)
+    printf("[DDPROF] Fault address: %p\n", si->si_addr);
   backtrace_symbols_fd(buf, sz, STDERR_FILENO);
+  if (current_map) {
+    Map *map = current_map;
+    printf("[DDPROF] map is %s [%ld:%ld @ %ld]\n", map->path, map->start,
+           map->end, map->off);
+  }
   exit(-1);
 }
 
@@ -483,7 +495,7 @@ int main(int argc, char **argv) {
 
   // Replace string-type args
   ctx->params.enabled = true;
-  ctx->params.upload_period = 60.5;
+  ctx->params.upload_period = 60.0;
 
   // process upload_period
   if (ctx->upload_period) {
@@ -662,7 +674,10 @@ int main(int argc, char **argv) {
     elf_version(EV_CURRENT); // Initialize libelf
 
     if (explain_sigseg)
-      signal(SIGSEGV, sigsegv_handler);
+      sigaction(SIGSEGV,
+                &(struct sigaction){.sa_sigaction = sigsegv_handler,
+                                    .sa_flags = SA_SIGINFO},
+                NULL);
     if (instrumented_any_watchers) {
       NTC("Entering main loop");
       main_loop(pes, ctx->num_watchers * num_cpu, ddprof_callback, ctx);
