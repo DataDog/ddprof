@@ -39,14 +39,13 @@ build:deps:
 build:ddprof:
   image: $BUILD_IMG
   stage: build
-  variables:
-    GIT_SUBMODULE_STRATEGY: recursive
   tags: ["runner:docker", "size:large"]
   variables:
     ANAME: ddprof
     BINPATH: release
     RELEASEBIN: $BINPATH/release/$ANAME
     DEBUGBIN: $BINPATH/debug/$ANAME
+    GIT_SUBMODULE_STRATEGY: recursive
   artifacts:
     paths:
     - $RELEASEBIN
