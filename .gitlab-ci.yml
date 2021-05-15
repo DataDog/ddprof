@@ -28,8 +28,6 @@ build:base:
 build:deps:
   stage: build
   allow_failure: true
-  variables:
-    GIT_SUBMODULE_STRATEGY: recursive
   when: manual
   tags: ["runner:docker", "size:large"]
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
@@ -41,6 +39,8 @@ build:deps:
 build:ddprof:
   image: $BUILD_IMG
   stage: build
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
   tags: ["runner:docker", "size:large"]
   variables:
     ANAME: ddprof
