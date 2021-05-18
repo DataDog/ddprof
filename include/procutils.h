@@ -206,17 +206,26 @@ char procfs_MmapGet(Map *map) {
   }
   return 0;
 }
-
+Map *current_map = NULL;
+size_t current_addr = 0;
 ssize_t procfs_MapRead(Map *map, void *buf, size_t sz, size_t addr) {
   if (procfs_MmapGet(map))
     return -1;
   assert(map->map);
+
+  // Checkpoint globals, to inspect during segfaults
+  current_map = map;
+  current_addr = addr;
 
   // Out of bounds, don't even retry
   if (addr < (map->start - map->off) || addr >= (map->end - map->off - sz)) {
     return -1;
   }
   memcpy(buf, map->map + addr, sz);
+
+  // Restore globals
+  current_map = NULL;
+  current_addr = 0;
   return 0;
 }
 

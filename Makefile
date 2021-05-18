@@ -34,6 +34,7 @@ SANS :=
 ifeq ($(DEBUG),1)
   DDARGS += -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDEBUG
   CFLAGS += -g
+  CFLAGS += -rdynamic
   CFLAGS += -O0
   CFLAGS := $(filter-out -O2, $(CFLAGS))
 else
@@ -84,7 +85,7 @@ else
 endif
 
 ifeq ($(DEBUG), 1)
-  VERNAME := $(VERNAME)\(debug\)
+  VERNAME := $(VERNAME)debug
 endif
 DDARGS += -DVER_REV=\"$(VERNAME)\"
 
@@ -136,7 +137,8 @@ $(ELFUTILS):
 $(LIBDDPROF)/src:
 	git submodule update --init
 
-build: |$(TARGETDIR)/ddprof help
+ddprof: $(TARGETDIR)/ddprof
+build: |ddprof help
 deps: $(ELFLIBS) $(LIBDDPROF)/src
 
 ## Actual build targets
