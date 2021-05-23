@@ -154,14 +154,6 @@ typedef struct PerfOption {
   char bp_type;
 } PerfOption;
 
-typedef enum PEMode {
-  PE_KERNEL_INCLUDE = 1 << 0,
-  PE_HARDWARE_X = 1 << 1,
-  PE_HARDWARE_R = 1 << 2,
-  PE_HARDWARE_W = 1 << 3,
-  PE_HARDWARE_RW = 1 << 4,
-} PEMode;
-
 struct perf_event_attr g_dd_native_attr = {
     .size = sizeof(struct perf_event_attr),
     .sample_type = PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER |
