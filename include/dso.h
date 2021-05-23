@@ -3,6 +3,9 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/types.h>
 
 #include "string_table.h"
 
@@ -20,7 +23,7 @@ typedef struct Dso {
   uint64_t end;
   uint64_t pgoff; // offset in _bytes_ of a page; not an offset in pages
   uint32_t filename;
-  Dso *next;
+  struct Dso *next;
 } Dso;
 
 typedef struct PidList {
@@ -36,10 +39,14 @@ typedef struct DsoCache {
 
 PidList pids = {0};
 
+StringTable stab_dso = {0};
+
+void libdso_init() { stringtable_init(&stab_dso, NULL); }
+
 void pid_free(int pid) {
   assert(pid > 0 && pid <= PID_MAX);
-  Dso *dso = pids->dsos[pid];
-  pids->dsos[pid] = NULL;
+  Dso *dso = pids.dsos[pid];
+  pids.dsos[pid] = NULL;
 
   while (dso) {
     Dso *next = dso->next;
@@ -54,20 +61,22 @@ void pid_add(int pid, DsoIn *in) {
   // If we already have a PID in this slot, then we'll assume for now that the
   // old PID is invalid and needs to be cleaned up.  It's very possible that
   // the two registrations occurred in separate PID namespaces.  For later.
-  if (pids->dsos[pid])
+  if (pids.dsos[pid])
     pid_free(pid);
 
-  Dso *dso = pids->dsos[pid];
+  // Skip to last DSO
+  Dso *dso = pids.dsos[pid];
   while (dso->next)
-    dso = next;
+    dso = dso->next;
+
+  // Allocate and populate
   dso->next = malloc(sizeof(Dso));
   dso->next->next = NULL;
   dso->next->start = in->addr;
   dso->next->end = in->addr + in->len;
   dso->next->pgoff = in->pgoff;
 
-  ssize_t id_str =
-      stringtable_add_cstr(stab_dso, (const unsigned char *)in->filename);
+  ssize_t id_str = stringtable_add_cstr(&stab_dso, (const char *)in->filename);
   if (id_str >= 0)
     dso->next->filename = id_str;
 }
@@ -75,16 +84,16 @@ void pid_add(int pid, DsoIn *in) {
 void pid_fork(int ppid, int pid) {
   assert(pid > 0 && pid <= PID_MAX);
   assert(ppid > 0 && ppid <= PID_MAX);
-  assert(pids->dsos[ppid]);
+  assert(pids.dsos[ppid]);
 
   // See disclaimer in pid_add()--shouldn't happen, but might.
-  if (pids->dsos[pid])
+  if (pids.dsos[pid])
     pid_free(pid);
-  Dso *pdso = pids->dsos[ppid];
+  Dso *pdso = pids.dsos[ppid];
   Dso *dso = malloc(sizeof(Dso));
 
   // Initialize root dso for child
-  pids->dsos[pid] = dso;
+  pids.dsos[pid] = dso;
   memcpy(dso, pdso, sizeof(Dso));
 
   // Iterate and alloc + copy.
@@ -99,7 +108,7 @@ void pid_fork(int ppid, int pid) {
 
 char *dso_path(Dso *dso) {
   assert(dso);
-  return (char *)stringtable_get(stab_dso, dso->filename);
+  return (char *)stringtable_get(&stab_dso, dso->filename);
 }
 
 Dso *dso_find(int pid, uint64_t addr) {
@@ -107,10 +116,10 @@ Dso *dso_find(int pid, uint64_t addr) {
   assert(addr > 4095); // Zero page is a thing
 
   // Check anyway
-  if (pid <= 0 || pid > PID_MAX || !pids->dsos[pid] || !addr)
+  if (pid <= 0 || pid > PID_MAX || !pids.dsos[pid] || !addr)
     return NULL;
 
-  Dso *dso = pids->dsos[pid];
+  Dso *dso = pids.dsos[pid];
   while (dso) {
     if (addr >= dso->start && addr < dso->end)
       break;
@@ -121,7 +130,7 @@ Dso *dso_find(int pid, uint64_t addr) {
 
 #define DSO_CACHE_MAX 256
 DsoCache dso_cache[DSO_CACHE_MAX] = {0};
-unsigned int i_dci = 0; // Insertion pointer
+unsigned int i_dc = 0; // Insertion pointer
 
 DsoCache *dso_cache_add(Dso *dso) {
   assert(dso);
@@ -130,16 +139,16 @@ DsoCache *dso_cache_add(Dso *dso) {
 
   // Try to open the region
   size_t sz = 1 + dso->end - dso->start;
-  int fd = open(dso_path(dso, O_RDONLY);
-  void * region = mmap(0, sz, PROT_READ, MAP_PRIVATE, fd, dso->pgoff);
+  int fd = open(dso_path(dso), O_RDONLY);
+  void *region = mmap(0, sz, PROT_READ, MAP_PRIVATE, fd, dso->pgoff);
   close(fd);
   if (MAP_FAILED == region)
     return NULL;
 
   // If there's already a region in the current position, close it
-  if (dso_cache[i_dci].region) {
+  if (dso_cache[i_dc].region) {
     munmap(dso_cache[i_dc].region, dso_cache[i_dc].sz);
-    memset(dso_cache[i_dc], 0, sizeof(DsoCache));
+    memset(&dso_cache[i_dc], 0, sizeof(DsoCache));
   }
 
   // Add it to the cache
@@ -149,21 +158,18 @@ DsoCache *dso_cache_add(Dso *dso) {
   dso_cache[i_dc].region = region;
 
   // Iterate
-  i_dci = (i_dci + 1) & ~DSO_CACHE_MAX;
+  i_dc = (i_dc + 1) & ~DSO_CACHE_MAX;
 
   return &dso_cache[i_dc];
 }
 
 DsoCache *dso_cache_find(Dso *dso) {
   assert(dso);
-
   if (!dso)
     return NULL;
 
-  unsigned int i = (i_dci - 1) & ~DSO_CACHE_MAX; // Go backwards
-  size_t sz = 1 + dso->end - dso->start;
-
-  while (i != i_dci) {
+  unsigned int i = (i_dc - 1) & ~DSO_CACHE_MAX; // Go backwards
+  while (i != i_dc) {
     if (!memcmp(&dso->pgoff, &dso_cache[i],
                 sizeof(uint32_t) + sizeof(uint64_t))) {
       // assert: sz and cache sz are the same because pgoff is a file-level
@@ -212,7 +218,7 @@ bool pid_read(int pid, void *buf, size_t sz, uint64_t addr) {
   //  Adjusted addr to be a segment-offset
   //  Confirmed that the segment has the capacity to support our read
   // So let's read it!
-  memcpy(&region[addr], buf, sz);
+  memcpy(dc->region + addr, buf, sz);
   return true;
 }
 
