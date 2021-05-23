@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <linux/hw_breakpoint.h>
 #include <linux/perf_event.h>
 #include <netinet/in.h>
 #include <poll.h>
@@ -25,9 +26,9 @@
 
 #define rmb() __asm__ volatile("lfence" ::: "memory")
 
-#define PAGE_SIZE 4096              // Concerned about hugepages?
-#define PSAMPLE_SIZE 8 * PAGE_SIZE  // TODO check for high-volume
-#define PSAMPLE_DEFAULT_WAKEUP 1000 // sample frequency check
+#define PAGE_SIZE 4096               // Concerned about hugepages?
+#define PSAMPLE_SIZE 128 * PAGE_SIZE // TODO check for high-volume
+#define PSAMPLE_DEFAULT_WAKEUP 1000  // sample frequency check
 #define PERF_SAMPLE_STACK_SIZE 16384
 #define PERF_SAMPLE_STACK_REGS 3
 #define MAX_INSN 16
@@ -84,6 +85,13 @@ typedef struct perf_event_mmap {
   char filename[];
 } perf_event_mmap;
 
+typedef struct perf_event_comm {
+  struct perf_event_header header;
+  uint32_t pid;
+  uint32_t tid;
+  char comm[];
+} perf_event_comm;
+
 // clang-format off
 typedef struct perf_event_sample {
   struct perf_event_header header;
@@ -122,8 +130,36 @@ typedef struct perf_samplestacku {
   // uint64_t    dyn_size;   // Don't forget!
 } perf_samplestacku;
 
+typedef struct BPDef {
+  uint64_t bp_addr;
+  uint64_t bp_len;
+} BPDef;
+
+typedef struct PerfOption {
+  char *desc;
+  char *key;
+  int type;
+  union {
+    unsigned long config;
+    BPDef *bp;
+  };
+  union {
+    uint64_t sample_period;
+    uint64_t sample_frequency;
+  };
+  char *label;
+  char *unit;
+  int mode;
+  bool include_kernel;
+  char bp_type;
+} PerfOption;
+
 typedef enum PEMode {
   PE_KERNEL_INCLUDE = 1 << 0,
+  PE_HARDWARE_X = 1 << 1,
+  PE_HARDWARE_R = 1 << 2,
+  PE_HARDWARE_W = 1 << 3,
+  PE_HARDWARE_RW = 1 << 4,
 } PEMode;
 
 struct perf_event_attr g_dd_native_attr = {
@@ -211,18 +247,27 @@ int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
   return syscall(__NR_perf_event_open, attr, pid, cpu, gfd, flags);
 }
 
-int perfopen(pid_t pid, int type, int config, uint64_t per, int mode, int cpu) {
-  struct perf_event_attr *attr = &(struct perf_event_attr){0};
-  memcpy(attr, &g_dd_native_attr, sizeof(g_dd_native_attr));
-  attr->type = type;
-  attr->config = config;
-  attr->sample_period = per;
+int perfopen(pid_t pid, PerfOption *opt, int cpu, bool extras) {
+  struct perf_event_attr attr = g_dd_native_attr;
+  attr.type = opt->type;
+  attr.config = opt->config;
+  attr.sample_period = opt->sample_period;
+  attr.exclude_kernel = !(opt->include_kernel);
 
-  // Overrides
-  // TODO split this out into an enum as soon as there is more than one
-  attr->exclude_kernel = !(mode & PE_KERNEL_INCLUDE);
+  // Breakpoint
+  if (opt->type & PERF_TYPE_BREAKPOINT) {
+    attr.config = 0; // as per perf_event_open() manpage
+    attr.bp_type = opt->bp_type;
+  }
 
-  int fd = perf_event_open(attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC);
+  // Extras
+  if (extras) {
+    attr.mmap = 1;
+    attr.task = 1;
+    attr.comm = 1;
+  }
+
+  int fd = perf_event_open(&attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC);
   if (-1 == fd && EACCES == errno) {
     return -1;
   } else if (-1 == fd) {

@@ -29,8 +29,8 @@ rm -rf debuglog.out
 export DD_API_KEY=***REMOVED***
 export DD_SERVICE=native-testservice_${VER}
 export DD_AGENT_HOST=intake.profile.datad0g.com
-export MALLOC_TRACE=/tmp/foo
-export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so
+#export MALLOC_TRACE=/tmp/foo
+#export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so
 #export MALLOC_CONF=prof:true,lg_prof_interval:25,lg_prof_sample:17
 eval ${CMD} \
   -u 60.0 \

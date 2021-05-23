@@ -26,17 +26,6 @@
 
 #define max_watchers 10
 
-typedef struct PerfOption {
-  char *desc;
-  char *key;
-  int type;
-  int config;
-  int base_rate;
-  char *label;
-  char *unit;
-  int mode;
-} PerfOption;
-
 struct DDProfContext {
   DProf *dp;
   DDReq *ddr;
@@ -63,10 +52,7 @@ struct DDProfContext {
     bool profprofiler;
     bool sendfinal;
   } params;
-  struct watchers {
-    PerfOption *opt;
-    uint64_t sample_period;
-  } watchers[max_watchers];
+  PerfOption watchers[max_watchers];
   int num_watchers;
 
   struct UnwindState *us;
@@ -84,22 +70,23 @@ struct DDProfContext {
 // clang-format off
 PerfOption perfoptions[] = {
   // Hardware
-  {"CPU Cycles",      "hCPU",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              1e6, "cpu-cycle",      "cycles",       0},
-  {"Ref. CPU Cycles", "hREF",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES,          1e6, "ref-cycle",      "cycles",       0},
-  {"Instr. Count",    "hINSTR",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,            1e6, "cpu-instr",      "instructions", 0},
-  {"Cache Ref.",      "hCREF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES,        1e3, "cache-ref",      "events",       0},
-  {"Cache Miss",      "hCMISS",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES,            1e3, "cache-miss",     "events",       0},
-  {"Branche Instr.",  "hBRANCH", PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     1e3, "branch-instr",   "events",       0},
-  {"Branch Miss",     "hBMISS",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES,           1e3, "branch-miss",    "events",       0},
-  {"Bus Cycles",      "hBUS",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,              1e3, "bus-cycle",      "cycles",       0},
-  {"Bus Stalls(F)",   "hBSTF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1e3, "bus-stf",        "cycles",       0},
-  {"Bus Stalls(B)",   "hBSTB",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1e3, "bus-stb",        "cycles",       0},
-  {"CPU Time",        "sCPU",    PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,              1e6, "cpu-time",       "nanoseconds",  0},
-  {"Wall? Time",      "sWALL",   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,               1e6, "wall-time",      "nanoseconds",  0},
-  {"Ctext Switches",  "sCI",     PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES,        1,   "switches",       "events",       PE_KERNEL_INCLUDE},
-  {"Block-Insert",    "kBLKI",   PERF_TYPE_TRACEPOINT, 1133,                                1,   "block-insert",   "events",       PE_KERNEL_INCLUDE},
-  {"Block-Issue",     "kBLKS",   PERF_TYPE_TRACEPOINT, 1132,                                1,   "block-issue",    "events",       PE_KERNEL_INCLUDE},
-  {"Block-Complete",  "kBLKC",   PERF_TYPE_TRACEPOINT, 1134,                                1,   "block-complete", "events",       PE_KERNEL_INCLUDE},
+  {"CPU Cycles",      "hCPU",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              1e6, "cpu-cycle",      "cycles"},
+  {"Ref. CPU Cycles", "hREF",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES,          1e6, "ref-cycle",      "cycles"},
+  {"Instr. Count",    "hINSTR",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,            1e6, "cpu-instr",      "instructions"},
+  {"Cache Ref.",      "hCREF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES,        1e3, "cache-ref",      "events"},
+  {"Cache Miss",      "hCMISS",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES,            1e3, "cache-miss",     "events"},
+  {"Branche Instr.",  "hBRANCH", PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     1e3, "branch-instr",   "events"},
+  {"Branch Miss",     "hBMISS",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES,           1e3, "branch-miss",    "events"},
+  {"Bus Cycles",      "hBUS",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,              1e3, "bus-cycle",      "cycles"},
+  {"Bus Stalls(F)",   "hBSTF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1e3, "bus-stf",        "cycles"},
+  {"Bus Stalls(B)",   "hBSTB",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1e3, "bus-stb",        "cycles"},
+  {"CPU Time",        "sCPU",    PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,              1e6, "cpu-time",       "nanoseconds"},
+  {"Wall? Time",      "sWALL",   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,               1e6, "wall-time",      "nanoseconds"},
+  {"Ctext Switches",  "sCI",     PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES,        1,   "switches",       "events", .include_kernel = true},
+  {"Block-Insert",    "kBLKI",   PERF_TYPE_TRACEPOINT, 1133,                                1,   "block-insert",   "events", .include_kernel = true},
+  {"Block-Issue",     "kBLKS",   PERF_TYPE_TRACEPOINT, 1132,                                1,   "block-issue",    "events", .include_kernel = true},
+  {"Block-Complete",  "kBLKC",   PERF_TYPE_TRACEPOINT, 1134,                                1,   "block-complete", "events", .include_kernel = true},
+  {"Malloc",          "bMalloc", PERF_TYPE_BREAKPOINT, 0,                                   1,   "malloc",         "events", .bp_type = HW_BREAKPOINT_X},
 };
 // clang-format on
 
@@ -238,8 +225,7 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
     us->idx = 0; // Modified during unwinding; has stack depth
     us->stack = pes->data;
     us->stack_sz = pes->size; // TODO should be dyn_size, but it's corrupted?
-    memcpy(&us->regs[0], pes->regs,
-           3 * sizeof(uint64_t)); // TODO hardcoded reg count?
+    memcpy(&us->regs[0], pes->regs, 3 * sizeof(uint64_t));
     us->max_stack = MAX_STACK;
     FunLoc_clear(us->locs);
     if (-1 == unwindstate__unwind(us)) {
@@ -266,6 +252,32 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
     int64_t sample_val[max_watchers] = {0};
     sample_val[pos] = pes->period;
     pprof_sampleAdd(dp, sample_val, pctx->num_watchers, id_locs, us->idx);
+    break;
+
+  case PERF_RECORD_MMAP:;
+    perf_event_mmap *map = (perf_event_mmap *)hdr;
+    if (!(map->header.misc & PERF_RECORD_MISC_MMAP_DATA) &&
+        '[' != map->filename[0]) {
+      printf("[%d](mmap) %s\n", map->pid, map->filename);
+    }
+    break;
+  case PERF_RECORD_LOST:
+    break;
+  case PERF_RECORD_COMM:;
+    perf_event_comm *comm = (perf_event_comm *)hdr;
+    if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC)
+      printf("[%d](execve) %s\n", comm->pid, comm->comm);
+    break;
+  case PERF_RECORD_EXIT:;
+    perf_event_exit *ext = (perf_event_exit *)hdr;
+    printf("[%d](exit)\n", ext->pid);
+    break;
+  case PERF_RECORD_FORK:;
+    perf_event_fork *frk = (perf_event_fork *)hdr;
+    if (frk->ppid == frk->pid)
+      printf("[%d](thread) %d -> %d\n", frk->ppid, frk->ptid, frk->tid);
+    else
+      printf("[%d](fork) %d\n", frk->ppid, frk->pid);
     break;
 
   default:
@@ -418,7 +430,7 @@ int main(int argc, char **argv) {
       &(struct DDProfContext){.ddr = &(DDReq){.user_agent = "libddprof001",
                                               .language = "native",
                                               .family = "native",
-                                              .http_close = false},
+                                              .http_close = true},
                               .dp = &(DProf){0},
                               .us = &(struct UnwindState){0}};
   DDReq *ddr = ctx->ddr;
@@ -432,8 +444,7 @@ int main(int argc, char **argv) {
   bool default_watchers = true;
   bool explain_sigseg = true;
   ctx->num_watchers = 1;
-  ctx->watchers[0].opt = &perfoptions[10];
-  ctx->watchers[0].sample_period = perfoptions[10].base_rate;
+  ctx->watchers[0] = perfoptions[10];
 
   //---- Process Options
   if (argc <= 1) {
@@ -459,14 +470,13 @@ int main(int argc, char **argv) {
             ctx->num_watchers = 0;
           }
 
-          ctx->watchers[ctx->num_watchers].opt = &perfoptions[i];
+          ctx->watchers[ctx->num_watchers] = perfoptions[i];
 
           double sample_period = 0;
           if (sz_opt > sz_key && optarg[sz_opt] == ',')
             sample_period = strtod(&optarg[sz_key + 1], NULL);
-          if (1 > sample_period)
-            sample_period = perfoptions[i].base_rate;
-          ctx->watchers[ctx->num_watchers].sample_period = sample_period;
+          if (sample_period > 0)
+            ctx->watchers[ctx->num_watchers].sample_period = sample_period;
           ctx->num_watchers++;
 
           // Early exit
@@ -553,8 +563,8 @@ int main(int argc, char **argv) {
     DBG("Instrumented with %d watchers:", ctx->num_watchers);
     for (int i = 0; i < ctx->num_watchers; i++) {
       DBG("  ID: %s, Pos: %d, Index: %d, Label: %s, Mode: %d",
-          ctx->watchers[i].opt->key, i, ctx->watchers[i].opt->config,
-          ctx->watchers[i].opt->label, ctx->watchers[i].opt->mode);
+          ctx->watchers[i].key, i, ctx->watchers[i].config,
+          ctx->watchers[i].label, ctx->watchers[i].mode);
       DBG("Done printing parameters");
     }
   }
@@ -578,8 +588,8 @@ int main(int argc, char **argv) {
   char *pprof_labels[max_watchers];
   char *pprof_units[max_watchers];
   for (int i = 0; i < ctx->num_watchers; i++) {
-    pprof_labels[i] = ctx->watchers[i].opt->label;
-    pprof_units[i] = ctx->watchers[i].opt->unit;
+    pprof_labels[i] = ctx->watchers[i].label;
+    pprof_units[i] = ctx->watchers[i].unit;
   }
 
   if (!pprof_Init(ctx->dp, (const char **)pprof_labels,
@@ -697,9 +707,9 @@ int main(int argc, char **argv) {
     pid_t mypid = getpid();
     for (int i = 0; i < ctx->num_watchers && ctx->params.enabled; i++) {
       for (int j = 0; j < num_cpu; j++) {
-        int fd = perfopen(
-            mypid, ctx->watchers[i].opt->type, ctx->watchers[i].opt->config,
-            ctx->watchers[i].sample_period, ctx->watchers[i].opt->mode, j);
+        // If this is the first watcher, then enable extras.  This ensures we
+        // have at least one monitor per CPU
+        int fd = perfopen(mypid, &ctx->watchers[i], j, !i);
 
         if (-1 == fd) {
           WRN("Failed to setup watcher %d.%d", i, j);
