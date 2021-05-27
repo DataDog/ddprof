@@ -417,8 +417,7 @@ int main(int argc, char **argv) {
   struct DDProfContext *ctx =
       &(struct DDProfContext){.ddr = &(DDReq){.user_agent = "libddprof001",
                                               .language = "native",
-                                              .family = "native",
-                                              .http_close = false},
+                                              .family = "native"},
                               .dp = &(DProf){0},
                               .us = &(struct UnwindState){0}};
   DDReq *ddr = ctx->ddr;

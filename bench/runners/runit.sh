@@ -5,7 +5,7 @@ IFS=$'\n\t'
 
 DIR=$(git rev-parse --show-toplevel)
 ASAN_SYMBOLIZER_PATH=$(which llvm-symbolizer)
-CMD_BASE=${DIR}/release/ddprof
+if [[ -z "${CMD_BASE:-}" ]]; then CMD_BASE=${DIR}/release/ddprof; fi
 CMD=${CMD_BASE}
 JOB="redis-runner.sh"
 for arg in "$@"; do
@@ -33,7 +33,7 @@ export MALLOC_TRACE=/tmp/foo
 export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so
 #export MALLOC_CONF=prof:true,lg_prof_interval:25,lg_prof_sample:17
 eval ${CMD} \
-  -u 60.0 \
+  -u 10.0 \
   -l debug \
   -o debuglog.out \
   ${DIR}/bench/runners/${JOB}
