@@ -20,15 +20,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-/* TODO
-    - Check support/permissions by reading /proc/sys/kernel/perf_event_paranoid
-*/
-
 #define rmb() __asm__ volatile("lfence" ::: "memory")
 
-#define PAGE_SIZE 4096               // Concerned about hugepages?
-#define PSAMPLE_SIZE 128 * PAGE_SIZE // TODO check for high-volume
-#define PSAMPLE_DEFAULT_WAKEUP 1000  // sample frequency check
+#define PAGE_SIZE 4096              // Concerned about hugepages?
+#define PSAMPLE_SIZE 64 * PAGE_SIZE // TODO check for high-volume
+#define PSAMPLE_DEFAULT_WAKEUP 1000 // sample frequency check
 #define PERF_SAMPLE_STACK_SIZE 16384
 #define PERF_SAMPLE_STACK_REGS 3
 #define MAX_INSN 16
@@ -92,6 +88,13 @@ typedef struct perf_event_comm {
   char comm[];
 } perf_event_comm;
 
+typedef struct perf_event_lost {
+  struct perf_event_header header;
+  uint64_t id;
+  uint64_t lost;
+  struct sample_id sample_id;
+} perf_event_lost;
+
 // clang-format off
 typedef struct perf_event_sample {
   struct perf_event_header header;
@@ -151,6 +154,7 @@ typedef struct PerfOption {
   char *unit;
   int mode;
   bool include_kernel;
+  bool freq;
   char bp_type;
 } PerfOption;
 
@@ -243,8 +247,9 @@ int perfopen(pid_t pid, PerfOption *opt, int cpu, bool extras) {
   struct perf_event_attr attr = g_dd_native_attr;
   attr.type = opt->type;
   attr.config = opt->config;
-  attr.sample_period = opt->sample_period;
+  attr.sample_period = opt->sample_period; // Equivalently, freq
   attr.exclude_kernel = !(opt->include_kernel);
+  attr.freq = opt->freq;
 
   // Breakpoint
   if (opt->type & PERF_TYPE_BREAKPOINT) {
@@ -275,7 +280,7 @@ void *perfown(int fd) {
   // TODO how to deal with hugepages?
   region = mmap(NULL, PAGE_SIZE + PSAMPLE_SIZE, PROT_READ | PROT_WRITE,
                 MAP_SHARED, fd, 0);
-  if (!region || MAP_FAILED == region)
+  if (MAP_FAILED == region || !region)
     return NULL;
 
   // Make sure that SIGPROF is delivered to me instead of the called application
@@ -358,15 +363,21 @@ void main_loop(PEvent *pes, int pe_len,
   }
   while (1) {
     int n = poll(pfd, pe_len, PSAMPLE_DEFAULT_WAKEUP);
-    if (-1 == n) {
+    if (-1 == n && errno == EINTR)
+      continue;
+    else if (-1 == n)
       return;
-    }
+
+    // Iterate through the FDs to find the hot ones
     for (int i = 0; i < pe_len; i++) {
       if (!pfd[i].revents)
         continue;
       if (pfd[i].revents & POLLHUP) {
+        // TODO is this an overreaction?
         return;
       }
+
+      // If we're here, then we have a valid file descriptor
       uint64_t head = pes[i].region->data_head & (PSAMPLE_SIZE - 1);
       uint64_t tail = pes[i].region->data_tail & (PSAMPLE_SIZE - 1);
 

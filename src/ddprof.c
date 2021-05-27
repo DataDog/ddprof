@@ -70,18 +70,18 @@ struct DDProfContext {
 // clang-format off
 PerfOption perfoptions[] = {
   // Hardware
-  {"CPU Cycles",      "hCPU",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              1e6, "cpu-cycle",      "cycles"},
-  {"Ref. CPU Cycles", "hREF",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES,          1e6, "ref-cycle",      "cycles"},
-  {"Instr. Count",    "hINSTR",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,            1e6, "cpu-instr",      "instructions"},
+  {"CPU Cycles",      "hCPU",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              1e3, "cpu-cycle",      "cycles", .freq = true},
+  {"Ref. CPU Cycles", "hREF",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES,          1e3, "ref-cycle",      "cycles", .freq = true},
+  {"Instr. Count",    "hINSTR",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,            1e3, "cpu-instr",      "instructions", .freq = true},
   {"Cache Ref.",      "hCREF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES,        1e3, "cache-ref",      "events"},
   {"Cache Miss",      "hCMISS",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES,            1e3, "cache-miss",     "events"},
   {"Branche Instr.",  "hBRANCH", PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     1e3, "branch-instr",   "events"},
   {"Branch Miss",     "hBMISS",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES,           1e3, "branch-miss",    "events"},
-  {"Bus Cycles",      "hBUS",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,              1e3, "bus-cycle",      "cycles"},
-  {"Bus Stalls(F)",   "hBSTF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1e3, "bus-stf",        "cycles"},
-  {"Bus Stalls(B)",   "hBSTB",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1e3, "bus-stb",        "cycles"},
-  {"CPU Time",        "sCPU",    PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,              1e6, "cpu-time",       "nanoseconds"},
-  {"Wall? Time",      "sWALL",   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,               1e6, "wall-time",      "nanoseconds"},
+  {"Bus Cycles",      "hBUS",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,              1e3, "bus-cycle",      "cycles", .freq = true},
+  {"Bus Stalls(F)",   "hBSTF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1e3, "bus-stf",        "cycles", .freq = true},
+  {"Bus Stalls(B)",   "hBSTB",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1e3, "bus-stb",        "cycles", .freq = true},
+  {"CPU Time",        "sCPU",    PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,              1e2, "cpu-time",       "nanoseconds", . freq = true},
+  {"Wall? Time",      "sWALL",   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,               1e3, "wall-time",      "nanoseconds", . freq = true},
   {"Ctext Switches",  "sCI",     PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES,        1,   "switches",       "events", .include_kernel = true},
   {"Block-Insert",    "kBLKI",   PERF_TYPE_TRACEPOINT, 1133,                                1,   "block-insert",   "events", .include_kernel = true},
   {"Block-Issue",     "kBLKS",   PERF_TYPE_TRACEPOINT, 1132,                                1,   "block-issue",    "events", .include_kernel = true},
@@ -229,11 +229,11 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
     us->max_stack = MAX_STACK;
     FunLoc_clear(us->locs);
     if (-1 == unwindstate__unwind(us)) {
-      Map *map = procfs_MapMatch(us->pid, us->eip);
-      if (!map)
+      Dso *dso = dso_find(us->pid, us->eip);
+      if (!dso)
         WRN("Error getting map for [%d](0x%lx)", us->pid, us->eip);
       else
-        WRN("Error unwinding %s [%d](0x%lx)", map->path, us->pid, us->eip);
+        WRN("Error unwinding %s [%d](0x%lx)", dso_path(dso), us->pid, us->eip);
       return;
     }
     FunLoc *locs = us->locs;
@@ -242,7 +242,7 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
       uint64_t id_map, id_fun, id_loc;
 
       // Using the sopath instead of srcpath in locAdd for the DD UI
-      id_map = pprof_mapAdd(dp, L.map_start, L.map_end, L.map_off, "", "");
+      id_map = pprof_mapAdd(dp, L.map_start, L.map_end, L.map_off, L.sopath, "");
       id_fun = pprof_funAdd(dp, L.funname, L.funname, L.srcpath, 0);
       id_loc = pprof_locAdd(dp, id_map, 0, (uint64_t[]){id_fun},
                             (int64_t[]){L.line}, 1);
@@ -258,26 +258,36 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
     perf_event_mmap *map = (perf_event_mmap *)hdr;
     if (!(map->header.misc & PERF_RECORD_MISC_MMAP_DATA) &&
         '[' != map->filename[0]) {
-      printf("[%d](mmap) %s\n", map->pid, map->filename);
+      printf("[%d] MAP: %s (%lx/%lx/%lx)\n", map->pid, map->filename, map->addr, map->len, map->pgoff);
+      DsoIn in = *(DsoIn*)&map->addr;
+      in.filename = map->filename;
+      pid_add(map->pid, &in);
     }
     break;
-  case PERF_RECORD_LOST:
+  case PERF_RECORD_LOST:;
+    perf_event_lost *lost = (perf_event_lost *)hdr;
+    printf("[XXX] LOST (%ld)\n", lost->lost);
     break;
   case PERF_RECORD_COMM:;
     perf_event_comm *comm = (perf_event_comm *)hdr;
-    if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC)
-      printf("[%d](execve) %s\n", comm->pid, comm->comm);
+    if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC) {
+      printf("[%d] COMM\n", comm->pid);
+      pid_free(comm->pid);
+    }
     break;
   case PERF_RECORD_EXIT:;
     perf_event_exit *ext = (perf_event_exit *)hdr;
-    printf("[%d](exit)\n", ext->pid);
+    printf("[%d] EXIT\n", ext->pid);
+    pid_free(ext->pid);
     break;
   case PERF_RECORD_FORK:;
     perf_event_fork *frk = (perf_event_fork *)hdr;
     if (frk->ppid == frk->pid)
-      printf("[%d](thread) %d -> %d\n", frk->ppid, frk->ptid, frk->tid);
-    else
-      printf("[%d](fork) %d\n", frk->ppid, frk->pid);
+      ; // TODO
+    else {
+      printf("[%d] FORK (%d)\n", frk->ppid, frk->pid);
+      pid_fork(frk->ppid, frk->pid);
+    }
     break;
 
   default:
@@ -399,7 +409,8 @@ MYNAME" can register to various system events in order to customize the\n"
   printf("%s", help_opts_extra);
   printf("%s", help_events);
   for (int i = 0; i < num_perfs; i++)
-    printf("%-10s - %-15s (%s, %s)\n", perfoptions[i].key, perfoptions[i].desc, perfoptions[i].label, perfoptions[i].unit);
+    printf("%-10s - %-15s (%s, %s)\n", perfoptions[i].key,
+           perfoptions[i].desc, perfoptions[i].label, perfoptions[i].unit);
 }
 // clang-format on
 
@@ -414,11 +425,6 @@ void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   if (sig == SIGSEGV)
     printf("[DDPROF] Fault address: %p\n", si->si_addr);
   backtrace_symbols_fd(buf, sz, STDERR_FILENO);
-  if (current_map) {
-    Map *map = current_map;
-    printf("[DDPROF] map is %s [%ld:%ld @ %ld]\n", map->path, map->start,
-           map->end, map->off);
-  }
   exit(-1);
 }
 
@@ -653,24 +659,43 @@ int main(int argc, char **argv) {
     bool instrumented_any_watchers = false;
     struct PEvent pes[100] = {0};
     for (int i = 0; i < ctx->num_watchers; i++) {
-      for (int j = 0; j < num_cpu; j++) {
-        int k = i * num_cpu + j;
-        pes[k].pos = i; // watcher index is the sample index
+      if (-1 == num_cpu) {
+        pes[i].pos = i; // watcher index is the sample index
 
-        NTC("Receiving watcher %d.%d", i, j);
-        pes[k].fd = getfd(sfd[0]);
-        if (-1 == pes[k].fd) {
-          ERR("Could not finalize watcher %d.%d: transport error");
-        } else if (-2 == pes[k].fd) {
-          ERR("Could not finalize watcher %d.%d: received fail notice");
-        } else if (!(pes[k].region = perfown(pes[k].fd))) {
-          close(pes[k].fd);
-          pes[k].fd = -1;
-          ERR("Could not finalize watcher %d.%d: registration", i, j);
+        NTC("Receiving watcher %d", i);
+        pes[i].fd = getfd(sfd[0]);
+        if (-1 == pes[i].fd) {
+          ERR("Could not finalize watcher %d: transport error", i);
+        } else if (-2 == pes[i].fd) {
+          ERR("Could not finalize watcher %d: received fail notice", i);
+        } else if (!(pes[i].region = perfown(pes[i].fd))) {
+          close(pes[i].fd);
+          pes[i].fd = -1;
+          ERR("Could not finalize watcher %d: registration", i);
         } else {
           instrumented_any_watchers = true;
         }
         pthread_barrier_wait(pb);
+      } else {
+        for (int j = 0; j < num_cpu; j++) {
+          int k = i * num_cpu + j;
+          pes[k].pos = i; // watcher index is the sample index
+
+          NTC("Receiving watcher %d.%d", i, j);
+          pes[k].fd = getfd(sfd[0]);
+          if (-1 == pes[k].fd) {
+            ERR("Could not finalize watcher %d.%d: transport error", i, j);
+          } else if (-2 == pes[k].fd) {
+            ERR("Could not finalize watcher %d.%d: received fail notice", i, j);
+          } else if (!(pes[k].region = perfown(pes[k].fd))) {
+            close(pes[k].fd);
+            pes[k].fd = -1;
+            ERR("Could not finalize watcher %d.%d: registration", i, j);
+          } else {
+            instrumented_any_watchers = true;
+          }
+          pthread_barrier_wait(pb);
+        }
       }
     }
 
@@ -681,7 +706,6 @@ int main(int argc, char **argv) {
 
     ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
     unwind_init(ctx->us);
-    elf_version(EV_CURRENT); // Initialize libelf
 
     if (explain_sigseg)
       sigaction(SIGSEGV,
@@ -690,6 +714,12 @@ int main(int argc, char **argv) {
                 NULL);
     if (instrumented_any_watchers) {
       NTC("Entering main loop");
+
+      // If num_cpu is -1, it means that we tried to instrument all CPUs.  At
+      // this point we no longer need the special value, so set it to 1 to make
+      // the math correct (at the level of file descriptors)
+      if (-1 == num_cpu)
+        num_cpu = 1;
       main_loop(pes, ctx->num_watchers * num_cpu, ddprof_callback, ctx);
 
       // If we're here, the main loop closed--probably the profilee closed
@@ -705,22 +735,39 @@ int main(int argc, char **argv) {
   } else {
     // 3p.  I am the original process.  If not prof profiling, instrument now
     pid_t mypid = getpid();
-    for (int i = 0; i < ctx->num_watchers && ctx->params.enabled; i++) {
-      for (int j = 0; j < num_cpu; j++) {
-        // If this is the first watcher, then enable extras.  This ensures we
-        // have at least one monitor per CPU
-        int fd = perfopen(mypid, &ctx->watchers[i], j, !i);
+    if (-1 == num_cpu) {
+      for (int i = 0; i < ctx->num_watchers && ctx->params.enabled; i++) {
+        int fd = perfopen(mypid, &ctx->watchers[i], -1, !i);
 
         if (-1 == fd) {
-          WRN("Failed to setup watcher %d.%d", i, j);
+          WRN("Failed to setup watcher %d", i);
           if (sendfail(sfd[1]))
-            ERR("Could not pass failure for watcher %d.%d", i, j);
+            ERR("Could not pass failure for watcher %d", i);
         } else {
-          NTC("Sending instrumentation for watcher %d.%d", i, j);
+          NTC("Sending instrumentation for watcher %d", i);
           if (sendfd(sfd[1], fd))
-            ERR("Could not pass instrumentation for watcher %d.%d", i, j);
+            ERR("Could not pass instrumentation for watcher %d", i);
         }
         pthread_barrier_wait(pb);
+      }
+    } else {
+      for (int i = 0; i < ctx->num_watchers && ctx->params.enabled; i++) {
+        for (int j = 0; j < num_cpu; j++) {
+          // If this is the first watcher, then enable extras.  This ensures we
+          // have at least one monitor per CPU
+          int fd = perfopen(mypid, &ctx->watchers[i], j, !i);
+
+          if (-1 == fd) {
+            WRN("Failed to setup watcher %d.%d", i, j);
+            if (sendfail(sfd[1]))
+              ERR("Could not pass failure for watcher %d.%d", i, j);
+          } else {
+            NTC("Sending instrumentation for watcher %d.%d", i, j);
+            if (sendfd(sfd[1], fd))
+              ERR("Could not pass instrumentation for watcher %d.%d", i, j);
+          }
+          pthread_barrier_wait(pb);
+        }
       }
     }
 

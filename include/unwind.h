@@ -8,8 +8,8 @@
 #include <stdbool.h>
 
 // TODO select dwfl_internals based on preproc directive
+#include "dso.h"
 #include "dwfl_internals.h"
-#include "procutils.h"
 
 #define MAX_STACK 1024
 typedef struct FunLoc {
@@ -37,7 +37,7 @@ struct UnwindState {
       uint64_t eip;
     };
   };
-  Map *map;
+  Dso *dso;
   int max_stack; // ???
   uint64_t ips[MAX_STACK];
   FunLoc locs[MAX_STACK];
@@ -91,22 +91,9 @@ bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg) {
 
   if (addr < sp_start || addr + sizeof(Dwarf_Word) > sp_end) {
     // If we're here, we're not in the stack.  We should interpet addr as an
-    // address in VM, not as a file offset.  This also rather strongly assumes
-    // that `addr` is an address in the instrumented process' space--in other
-    // words, it represents a segment that was actually mapped into the
-    // given page.  If, for instance, a segment could have been mapped, but
-    // wasn't, we fail (does this even make sense?)
-    Map *map = procfs_MapMatch(us->pid, addr);
-
-    // I didn't read past dso.c:dso__data_read_offset(), but it doesn't look
-    // like perf will do anything to try to correct the address.
-    // TODO verify?
-    if (!map) {
-      return false;
-    }
-
-    // TODO, signify end of stack?  dd false stack?
-    return -1 != procfs_MapRead(map, result, sizeof(Dwarf_Word), addr);
+    // address in VM, not as a file offset.
+    // Strongly assumes we're also in an executable region?
+    return pid_read_dso(us->pid, result, sizeof(Dwarf_Word), addr);
   }
 
   *result = *(Dwarf_Word *)(&us->stack[addr - sp_start]);
@@ -161,16 +148,27 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
     }
 
     // Figure out mapping
-    Map *map = procfs_MapMatch(us->pid, pc);
-    if (map) {
-      us->locs[us->idx].map_start = map->start;
-      us->locs[us->idx].map_end = map->end;
-      us->locs[us->idx].map_off = map->off;
+    Dso *dso = dso_find(us->pid, pc);
+
+    // If we failed, then try backpopulating and do it again
+    if (!dso) {
+      pid_backpopulate(us->pid);
+      dso = dso_find(us->pid, pc);
+    }
+    if (dso) {
+      us->locs[us->idx].map_start = dso->start;
+      us->locs[us->idx].map_end = dso->end;
+      us->locs[us->idx].map_off = dso->pgoff;
+      us->locs[us->idx].sopath = strdup(dso_path(dso));
     } else {
       // Try to rely on the data we have at hand, but it's certainly wrong
+      printf("Couldn't get dso for [%d] %ld\n", us->pid, pc);
       us->locs[us->idx].map_start = mod->low_addr;
       us->locs[us->idx].map_end = mod->high_addr;
       us->locs[us->idx].map_off = offset;
+      char *sname = strrchr(mod->name, '/');
+      us->locs[us->idx].sopath = strdup(sname ? sname + 1 : mod->name);
+      printf("  soname: %s\n", us->locs[us->idx].sopath);
     }
     if (symname) {
       us->locs[us->idx].funname = strdup(symname);
@@ -179,8 +177,6 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
       snprintf(tmpname, 1020, "0x%lx", mod->low_addr);
       us->locs[us->idx].funname = strdup(tmpname);
     }
-    char *sname = strrchr(mod->name, '/');
-    us->locs[us->idx].sopath = strdup(sname ? sname + 1 : mod->name);
     us->idx++;
   } else {
     D("dwfl_addrmodule was zero: (%s)", dwfl_errmsg(-1));
@@ -216,6 +212,8 @@ bool unwind_init(struct UnwindState *us) {
     D("There was a problem getting the Dwfl");
     return false;
   }
+
+  libdso_init();
   return true;
 }
 

@@ -11,6 +11,7 @@ JOB="redis-runner.sh"
 for arg in "$@"; do
   if [[ ${arg} == "debug" ]]; then CMD="gdb -ex run -ex 'set follow-fork-mode child' -ex 'set print pretty on' --args ${CMD_BASE}"; fi
   if [[ ${arg} == "strace" ]]; then CMD="strace -f -o /tmp/test.out -s 2500 -v ${CMD_BASE}"; fi
+  if [[ ${arg} == "network" ]]; then CMD="strace -etrace=%network -f -o /tmp/test.out -s 2500 -v ${CMD_BASE}"; fi
   if [[ ${arg} == "ltrace" ]]; then CMD="ltrace -f -o /tmp/test.out -s 2500 -n 2 -x '*' -e malloc+free ${CMD_BASE}"; fi
   if [[ ${arg} == "redis" ]]; then JOB="redis-runner.sh"; fi
   if [[ ${arg} == "collatz" ]]; then JOB="collrunner.sh"; fi
@@ -35,5 +36,5 @@ export DD_AGENT_HOST=intake.profile.datad0g.com
 eval ${CMD} \
   -u 60.0 \
   -l debug \
-  -o debuglog.out \
+  -o stderr \
   ${DIR}/bench/runners/${JOB}
