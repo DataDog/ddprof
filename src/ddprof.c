@@ -242,7 +242,8 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
       uint64_t id_map, id_fun, id_loc;
 
       // Using the sopath instead of srcpath in locAdd for the DD UI
-      id_map = pprof_mapAdd(dp, L.map_start, L.map_end, L.map_off, L.sopath, "");
+      id_map =
+          pprof_mapAdd(dp, L.map_start, L.map_end, L.map_off, L.sopath, "");
       id_fun = pprof_funAdd(dp, L.funname, L.funname, L.srcpath, 0);
       id_loc = pprof_locAdd(dp, id_map, 0, (uint64_t[]){id_fun},
                             (int64_t[]){L.line}, 1);
@@ -258,8 +259,9 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
     perf_event_mmap *map = (perf_event_mmap *)hdr;
     if (!(map->header.misc & PERF_RECORD_MISC_MMAP_DATA) &&
         '[' != map->filename[0]) {
-      printf("[%d] MAP: %s (%lx/%lx/%lx)\n", map->pid, map->filename, map->addr, map->len, map->pgoff);
-      DsoIn in = *(DsoIn*)&map->addr;
+      printf("[%d] MAP: %s (%lx/%lx/%lx)\n", map->pid, map->filename, map->addr,
+             map->len, map->pgoff);
+      DsoIn in = *(DsoIn *)&map->addr;
       in.filename = map->filename;
       pid_add(map->pid, &in);
     }
