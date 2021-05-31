@@ -2,6 +2,7 @@ tmp/*
 pprofs/*
 release/*
 vendor/*
+redis/*
 compile_commands.json
 .gdb_history
 *.i
