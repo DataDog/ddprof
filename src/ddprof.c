@@ -257,8 +257,7 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
 
   case PERF_RECORD_MMAP:;
     perf_event_mmap *map = (perf_event_mmap *)hdr;
-    if (!(map->header.misc & PERF_RECORD_MISC_MMAP_DATA) &&
-        '[' != map->filename[0]) {
+    if (!(map->header.misc & PERF_RECORD_MISC_MMAP_DATA)) {
       printf("[%d] MAP: %s (%lx/%lx/%lx)\n", map->pid, map->filename, map->addr,
              map->len, map->pgoff);
       DsoIn in = *(DsoIn *)&map->addr;

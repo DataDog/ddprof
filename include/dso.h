@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <fcntl.h>
+#include <sys/auxv.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 
@@ -42,9 +43,22 @@ PidList pids = {0};
 
 StringTable stab_dso = {0};
 
+int dso_errno = 0;
+typedef enum DsoErr {
+  DSO_OK = 0,
+  DSO_EPID,
+  DSO_EADDR,
+  DSO_NOTFOUND,
+} DsoErr;
+
 void libdso_init() { stringtable_init(&stab_dso, NULL); }
 
 char *dso_path(Dso *dso) {
+  assert(dso);
+  return (char *)stringtable_get(&stab_dso, dso->filename);
+}
+
+char *dsocache_path(DsoCache *dso) {
   assert(dso);
   return (char *)stringtable_get(&stab_dso, dso->filename);
 }
@@ -102,14 +116,17 @@ bool pid_add(int pid, DsoIn *in) {
     dso = pids.dsos[pid];
   } else {
     while (dso->next) {
-      // If we're overlapping, then we have an invalid state.  The only thing
-      // we can do now is return an error.  It's up to the user to determine
-      // whether to invalidate and retry.
-      if (dso_overlap(dso, in))
-        return false;
       // If we already have this one, skip
       if (dso_isequal(dso, in))
         return true;
+
+      // If we're overlapping, then we have an invalid state.  The only thing
+      // we can do now is return an error.  It's up to the user to determine
+      // whether to invalidate and retry.
+      if (dso_overlap(dso, in)) {
+        printf("DSO overlap\n");
+        return false;
+      }
       dso = dso->next;
     }
     dso->next = malloc(sizeof(Dso));
@@ -146,12 +163,12 @@ DsoIn *dso_from_procline(char *line) {
   char m_mode[4] = {0};
   int m_p = 0;
 
-  if (4 != sscanf(line, spec, &m_start, &m_end, m_mode, &m_off, &m_p))
+  if (4 != sscanf(line, spec, &m_start, &m_end, m_mode, &m_off, &m_p)) {
+    printf("Failed in sscanf\n");
     return NULL;
+  }
 
-  // Check that it was executable
-  if ('x' != m_mode[2])
-    return NULL;
+  printf("  [0x%lx, 0x%lx] %s", m_start, m_end, &line[m_p]);
 
   // Make sure the name index points to a valid char
   char *p = &line[m_p], *q;
@@ -160,7 +177,8 @@ DsoIn *dso_from_procline(char *line) {
   if ((q = strchr(p, '\n')))
     *q = '\0';
 
-  if ('[' == *p || !*p)
+  // Check that it was executable OR the stack
+  if ('x' != m_mode[2] && strcmp(p, "[stack]"))
     return NULL;
 
   // OK, looks good
@@ -173,15 +191,22 @@ DsoIn *dso_from_procline(char *line) {
 }
 
 bool pid_backpopulate(int pid) {
+  printf("Backpopulating %d\n", pid);
   FILE *mpf = procfs_map_open(pid);
+  if (!mpf)
+    printf("Failed to open proc for %d\n", pid);
   if (!mpf)
     return false;
 
   char *buf = NULL;
   size_t sz_buf = 0;
-  while (getline(&buf, &sz_buf, mpf)) {
+  while (-1 != getline(&buf, &sz_buf, mpf)) {
+
+    // TODO dso_from_procline should differentiate failures.  Non-ex is fine,
+    //      parse error is bad
     DsoIn *out = dso_from_procline(buf);
-    if (!out || !pid_add(pid, out)) {
+    if (out && !pid_add(pid, out)) {
+      printf("Couldn't add procline to pid\n");
       fclose(mpf);
       return false;
     }
@@ -198,8 +223,11 @@ bool pid_fork(int ppid, int pid) {
   // If we haven't seen the parent before, try to populate it and continue.  If
   // we can't do that, then try to just populate the child and return.
   if (!pids.dsos[ppid]) {
-    if (!pid_backpopulate(ppid))
+    printf("  [FORK] No ppid found, backpopulating\n");
+    if (!pid_backpopulate(ppid)) {
+      printf("  [FORK] No pid found, backpopulating\n");
       return pid_backpopulate(pid);
+    }
   }
 
   // If the child already exists, then clear it
@@ -228,19 +256,61 @@ Dso *dso_find(int pid, uint64_t addr) {
   assert(pid > 0);
   assert(pid <= PID_MAX);
 
-  if (pid <= 0 || pid > PID_MAX || !pids.dsos[pid] || addr < 4095)
+  if (pid <= 0 || pid > PID_MAX) {
+    dso_errno = DSO_EPID;
     return NULL;
+  }
+  if (!pids.dsos[pid]) {
+    dso_errno = DSO_NOTFOUND;
+    return NULL;
+  }
+  if (addr < 4095) {
+    dso_errno = DSO_EADDR;
+    return NULL;
+  }
 
   Dso *dso = pids.dsos[pid];
+  bool addr_gt = true;
   while (dso) {
     if (addr >= dso->start && addr < dso->end)
       break;
+    if (addr <= dso->end)
+      addr_gt = false;
+
     dso = dso->next;
   }
+
+  // We need to be rather careful here.  perf events will give us executable
+  // mappings, but sometimes DWARF unwinding seems to request data from
+  // non-executable regions (error?).  Since perf events will drop events
+  // under contention (can this be fixed for MMAP events?), we don't know a
+  // priori whether
+  // * An address is valid and cached
+  // * An address is invalid (e.g., in the stack)
+  // * An address is valid (executable), but hasn't been cached yet (dropped
+  //   or out-of-order exec)
+  // * An address WAS valid but is no longer (we'll give bad unwinding data)
+  //
+  // If we're here, we don't have an address.  We make the following simplifying
+  // assumptions.
+  // * It is very unlikely for a new region to be mapped below existing regions,
+  //   since it is unlikely for regions to be unmapped (this assumption breaks
+  //   down immediately for JIT...)
+  // * If an address is within 1 GB of the top (well, bottom...) of the stack,
+  //   we assume the address is in the stack
+  //
+  // Here we'll check for address monotonicity; in the caller we check for
+  // stack
+  if (!dso && addr_gt) {
+    dso_errno = DSO_NOTFOUND;
+    return NULL;
+  }
+
+  dso_errno = DSO_OK;
   return dso;
 }
 
-#define DSO_CACHE_MAX 256
+#define DSO_CACHE_MAX 256 // Actually a max ID
 DsoCache dso_cache[DSO_CACHE_MAX] = {0};
 unsigned int i_dc = 0; // Insertion pointer
 
@@ -249,19 +319,43 @@ DsoCache *dso_cache_add(Dso *dso) {
   if (!dso)
     return NULL;
 
-  // Try to open the region
-  size_t sz = 1 + dso->end - dso->start;
-  int fd = open(dso_path(dso), O_RDONLY);
-  void *region = mmap(0, sz, PROT_READ, MAP_PRIVATE, fd, dso->pgoff);
-  close(fd);
-  if (MAP_FAILED == region)
-    return NULL;
+  void *region = NULL;
+  size_t sz = 0;
+  // Is this a universal region?
+  // TODO if we get more of these, refactor to lookup
+  if ('[' == *dso_path(dso)) {
+    if (!strcmp(dso_path(dso), "[vdso]")) {
+      // So, I could parse procfs to figure out the vdso size and I could cache
+      // it, but I notice on 5.4 `readelf` shows the dynamic section only has
+      // size 0x4c0, so I'll just pretend it's a page.
+      printf("Found VDSO\n");
+      region = (uintptr_t)getauxval(AT_SYSINFO_EHDR);
+      sz = 4096;
+    } else if (!strcmp(dso_path(dso), "[vsyscall]")) {
+      // See Documentation/x86/x86_64/mm.rst
+      region = 0xffffffffff600000;
+      sz = 4096;
+    } else {
+      return NULL;
+    }
+  } else {
+    // Try to open the region
+    sz = 1 + dso->end - dso->start;
+    int fd = open(dso_path(dso), O_RDONLY);
+    region = mmap(0, sz, PROT_READ, MAP_PRIVATE, fd, dso->pgoff);
+    close(fd);
+    if (MAP_FAILED == region)
+      return NULL;
+  }
 
   // If there's already a region in the current position, close it
   if (dso_cache[i_dc].region) {
-    printf("[CACHE] clearing %d\n", i_dc);
-    munmap(dso_cache[i_dc].region, dso_cache[i_dc].sz);
-    memset(&dso_cache[i_dc], 0, sizeof(DsoCache));
+    if ('[' != *dsocache_path(&dso_cache[i_dc])) {
+      printf("[CACHE] clearing %d\n", i_dc);
+      munmap(dso_cache[i_dc].region, dso_cache[i_dc].sz);
+      memset(&dso_cache[i_dc], 0, sizeof(DsoCache));
+    }
+    memset(&dso_cache[i_dc], 0, sizeof(DsoCache)); // unnecessary
   }
 
   // Add it to the cache
@@ -281,7 +375,7 @@ DsoCache *dso_cache_find(Dso *dso) {
   if (!dso)
     return NULL;
 
-  unsigned int i = (i_dc - 1) & ~DSO_CACHE_MAX; // Go backwards
+  unsigned int i = (i_dc + DSO_CACHE_MAX - 1) & ~DSO_CACHE_MAX; // Go backwards
   while (i != i_dc) {
     if (!memcmp(&dso->pgoff, &dso_cache[i],
                 sizeof(uint32_t) + sizeof(uint64_t))) {
@@ -290,8 +384,13 @@ DsoCache *dso_cache_find(Dso *dso) {
       //         If I'm wrong and these are variable-sized, then we should
       //         munmap this entry and add the larger size
       return &dso_cache[i];
+    } else if (!dso_cache[i].region) {
+      // Optimized processes won't have many regions mapped, so also check that
+      // we haven't run out of ringbuffer
+      break;
     }
-    i = (i - 1) & ~DSO_CACHE_MAX;
+
+    i = (i + DSO_CACHE_MAX - 1) & ~DSO_CACHE_MAX; // Go backwards
   }
 
   // If we didn't find it, let's populate the cache
@@ -310,8 +409,16 @@ bool pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
   // read is conducted in file-space, the DSO lookup is in VM-space
   Dso *dso = dso_find(pid, addr);
   if (!dso) {
+    if (dso_errno == DSO_NOTFOUND) {
+      printf("Couldn't find DSO for [%d](0x%lx), quitting\n", pid, addr);
+      return false;
+    }
+
     // If we didn't find it, then try full population
-    pid_backpopulate(pid);
+    printf("Couldn't find DSO for [%d](0x%lx), backpopulating.\n", pid, addr);
+    if (!pid_backpopulate(pid)) {
+      printf("Backpop failed!\n");
+    }
     if (!(dso = dso_find(pid, addr)))
       return false;
   }

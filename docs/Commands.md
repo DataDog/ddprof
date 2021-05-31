@@ -87,4 +87,5 @@ sCI        - Ctext Switches  (switches, events)
 kBLKI      - Block-Insert    (block-insert, events)
 kBLKS      - Block-Issue     (block-issue, events)
 kBLKC      - Block-Complete  (block-complete, events)
+bMalloc    - Malloc          (malloc, events)
 ```

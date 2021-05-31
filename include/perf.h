@@ -25,7 +25,7 @@
 #define PAGE_SIZE 4096              // Concerned about hugepages?
 #define PSAMPLE_SIZE 64 * PAGE_SIZE // TODO check for high-volume
 #define PSAMPLE_DEFAULT_WAKEUP 1000 // sample frequency check
-#define PERF_SAMPLE_STACK_SIZE 16384
+#define PERF_SAMPLE_STACK_SIZE (4096 * 15)
 #define PERF_SAMPLE_STACK_REGS 3
 #define MAX_INSN 16
 

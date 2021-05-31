@@ -152,8 +152,12 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
 
     // If we failed, then try backpopulating and do it again
     if (!dso) {
+      printf("Failed to find DSO for [%d] 0x%lx, backpopulating\n", us->pid,
+             pc);
       pid_backpopulate(us->pid);
       dso = dso_find(us->pid, pc);
+      if (dso)
+        printf("  DSO was %s\n", dso_path(dso));
     }
     if (dso) {
       us->locs[us->idx].map_start = dso->start;
