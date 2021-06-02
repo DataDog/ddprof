@@ -655,7 +655,8 @@ int main(int argc, char **argv) {
         } else if (!(pes[k].region = perfown(pes[k].fd))) {
           close(pes[k].fd);
           pes[k].fd = -1;
-          ERR("Could not finalize watcher %d.%d: registration", i, j);
+          ERR("Could not finalize watcher %d.%d: registration (%s)", i, j,
+              strerror(errno));
         } else {
           instrumented_any_watchers = true;
         }
