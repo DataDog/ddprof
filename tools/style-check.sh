@@ -14,8 +14,8 @@ else echo "No suitable clang-format found." && exit 1
 fi
 
 RC=0
-APPLY="NO"
-[[ "$#" -ge "1" && "${1,,}" == "apply" ]] && APPLY="yes"
+[[ -z "${APPLY:-}" ]] && APPLY="no"
+[[ "${1:-,,}" == "apply" ]] && APPLY="yes"
 
 # Setup a tmpfile 
 tmpfile=$(mktemp /tmp/clang-format-diff.XXXXXX)
@@ -29,7 +29,7 @@ for f in $(git diff --name-only --cached | grep -E '.*\.(c|cc|cp|cpp|cxx|c++|h|h
   if [ ! -f $f ]; then
     continue
   fi
-  if [ ${APPLY} == "yes" ]; then
+  if [ ${APPLY,,} == "yes" ]; then
     ${CLANG_FORMAT} -style=file -i $f
   else
     ${CLANG_FORMAT} -style=file $f > $tmpfile
