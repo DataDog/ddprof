@@ -25,9 +25,9 @@
 
 #define rmb() __asm__ volatile("lfence" ::: "memory")
 
-#define PAGE_SIZE 4096              // Concerned about hugepages?
-#define PSAMPLE_SIZE 8 * PAGE_SIZE  // TODO check for high-volume
-#define PSAMPLE_DEFAULT_WAKEUP 1000 // sample frequency check
+#define PAGE_SIZE 4096               // Concerned about hugepages?
+#define PSAMPLE_SIZE 128 * PAGE_SIZE // Default for perf
+#define PSAMPLE_DEFAULT_WAKEUP 1000  // sample frequency check
 #define PERF_SAMPLE_STACK_SIZE 16384
 #define PERF_SAMPLE_STACK_REGS 3
 #define MAX_INSN 16
@@ -132,7 +132,7 @@ struct perf_event_attr g_dd_native_attr = {
         PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME |
         PERF_SAMPLE_PERIOD,
     .precise_ip = 2,
-    .disabled = 0,
+    .disabled = 1,
     .inherit = 1,
     .inherit_stat = 0,
     .mmap = 0, // keep track of executable mappings
@@ -242,22 +242,8 @@ void *perfown(int fd) {
     return NULL;
 
   // Make sure that SIGPROF is delivered to me instead of the called application
-  fcntl(fd, F_SETFL, O_ASYNC);
-  fcntl(fd, F_SETSIG, SIGPROF);
+  fcntl(fd, F_SETFL, O_RDONLY | O_NONBLOCK);
   fcntl(fd, F_SETOWN_EX, &(struct f_owner_ex){F_OWNER_TID, getpid()});
-
-  // Ignore the signal
-  sigaction(SIGPROF, &(struct sigaction){SIG_IGN}, NULL);
-
-  // Block the signal
-  sigset_t sigmask = {0};
-  sigemptyset(&sigmask);
-  sigaddset(&sigmask, SIGPROF);
-  sigprocmask(SIG_BLOCK, &sigmask, NULL);
-
-  // Enable the event
-  ioctl(fd, PERF_EVENT_IOC_RESET, 0);
-  ioctl(fd, PERF_EVENT_IOC_ENABLE, 1);
 
   return region;
 }

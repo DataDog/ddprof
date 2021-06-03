@@ -728,13 +728,14 @@ int main(int argc, char **argv) {
         NTC("Receiving watcher %d.%d", i, j);
         pes[k].fd = getfd(sfd[0]);
         if (-1 == pes[k].fd) {
-          ERR("Could not finalize watcher %d.%d: transport error");
+          ERR("Could not finalize watcher %d.%d: transport error", i, j);
         } else if (-2 == pes[k].fd) {
-          ERR("Could not finalize watcher %d.%d: received fail notice");
+          ERR("Could not finalize watcher %d.%d: received fail notice", i, j);
         } else if (!(pes[k].region = perfown(pes[k].fd))) {
           close(pes[k].fd);
           pes[k].fd = -1;
-          ERR("Could not finalize watcher %d.%d: registration", i, j);
+          ERR("Could not finalize watcher %d.%d: registration (%s)", i, j,
+              strerror(errno));
         } else {
           instrumented_any_watchers = true;
         }
@@ -780,7 +781,7 @@ int main(int argc, char **argv) {
             ctx->watchers[i].sample_period, ctx->watchers[i].opt->mode, j);
 
         if (-1 == fd) {
-          WRN("Failed to setup watcher %d.%d", i, j);
+          WRN("Failed to setup watcher %d.%d (%s)", i, j, strerror(errno));
           if (sendfail(sfd[1]))
             ERR("Could not pass failure for watcher %d.%d", i, j);
         } else {
