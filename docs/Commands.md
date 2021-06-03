@@ -24,6 +24,18 @@ Options:
   -S, --service, (envvar: DD_SERVICE)
     The name of this service
 
+  -d, --enable, (envvar: DD_PROFILING_ENABLED)
+    Whether to enable DataDog profiling.  If this is true, then ddprof as well
+    as any other DataDog profilers are enabled.  If false, they are all disabled.
+    Note: if this is set, the native profiler will set the DD_PROFILING_ENABLED
+    environment variable in all sub-environments, thereby enabling DataDog profilers.
+    default: on
+
+  -n, --native_enable, (envvar: DD_PROFILING_NATIVE_ENABLED)
+    Whether to enable ddprof specifically, without altering how other DataDog
+    profilers are run.  For example, DD_PROFILING_ENABLED can be used to disable
+    an inner profile, whilst setting DD_PROFILING_NATIVE_ENABLED to enable ddprof
+
   -u, --upload_period, (envvar: DD_PROFILING_UPLOAD_PERIOD)
     In seconds, how frequently to upload gathered data to Datadog.
     Currently, it is recommended to keep this value to 60 seconds, which is
