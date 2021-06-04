@@ -1,7 +1,6 @@
 # ddprof Commands
 
-
-```
+```bash
  usage: ddprof [--help] [PROFILER_OPTIONS] COMMAND [COMMAND_ARGS]
  eg: ddprof -A hunter2 -H localhost -P 8192 redis-server /etc/redis/redis.conf
 
