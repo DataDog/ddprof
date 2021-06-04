@@ -53,7 +53,8 @@ typedef enum LOG_FACILITY {
 bool LOG_syslog_open();
 void LOG_close();
 bool LOG_open(int, char *);
-void LOG_lfprintf(int, int, char *, const char *, ...);
+__attribute__((format(printf, 4, 5))) void LOG_lfprintf(int, int, char *,
+                                                        const char *, ...);
 bool LOG_setname(char *);
 void LOG_setlevel(int);
 int LOG_getlevel();

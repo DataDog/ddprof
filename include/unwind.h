@@ -154,7 +154,7 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
 
     int lineno = 0;
     us->locs[us->idx].line = 0;
-    char *srcpath = dwfl_lineinfo(line, &newpc, &lineno, NULL, NULL, NULL);
+    const char *srcpath = dwfl_lineinfo(line, &newpc, &lineno, 0, 0, 0);
     if (srcpath) {
       us->locs[us->idx].srcpath = strdup(srcpath);
       us->locs[us->idx].line = lineno;
