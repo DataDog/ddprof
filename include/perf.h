@@ -145,6 +145,7 @@ struct perf_event_attr g_dd_native_attr = {
     .inherit_stat = 0,
     .mmap = 0, // keep track of executable mappings
     .task = 0, // Follow fork/stop events
+    .comm = 0, // Follow exec()
     .enable_on_exec = 1,
     .sample_stack_user = PERF_SAMPLE_STACK_SIZE, // Is this an insane default?
     .sample_regs_user = PERF_REGS_MASK,

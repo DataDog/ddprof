@@ -15,7 +15,9 @@ for arg in "$@"; do
   if [[ ${arg} == "ltrace" ]]; then CMD="ltrace -f -o /tmp/test.out -s 2500 -n 2 -x '*' -e malloc+free ${CMD_BASE}"; fi
   if [[ ${arg} == "redis" ]]; then JOB="redis-runner.sh"; fi
   if [[ ${arg} == "collatz" ]]; then JOB="collrunner.sh"; fi
-  if [[ ${arg} == "sleep" ]]; then JOB="/usr/bin/sleep 130"; fi
+  if [[ ${arg} == "sleep" ]]; then JOB="sleep.sh"; fi
+  if [[ ${arg} == "noexist" ]]; then JOB="fakejob.sh"; fi
+  if [[ ${arg} == "noexec" ]]; then JOB="non_executable_job.sh"; fi
 done
 
 # Do service version stuff
@@ -38,4 +40,5 @@ eval ${CMD} \
   -u 60.0 \
   -l debug \
   -o stderr \
+  -a yes \
   ${DIR}/bench/runners/${JOB}

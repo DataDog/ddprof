@@ -691,11 +691,15 @@ int main(int argc, char **argv) {
       main_loop(pes, ctx->num_watchers * num_cpu, &perf_funs, ctx);
 
       // If we're here, the main loop closed--probably the profilee closed
-      WRN("Profiling context no longer valid (%s)", strerror(errno));
+      if (errno)
+        WRN("Profiling context no longer valid (%s)", strerror(errno));
+      else
+        WRN("Profiling context no longer valid");
+
       int64_t now = now_nanos();
       if (now > ctx->send_nanos || ctx->sendfinal) {
         WRN("Sending final export");
-        //        export(ctx, now);
+        export(ctx, now);
       }
     } else {
       ERR("Failed to install any watchers, profiling disabled");
@@ -724,7 +728,7 @@ int main(int argc, char **argv) {
 
     // Cleanup and become desired process image
     pthread_barrier_destroy(pb);
-    LOG_close();
+    munmap(pb, sizeof(pthread_barrier_t));
     close(sfd[0]);
     close(sfd[1]);
     goto EXECUTE;
@@ -740,14 +744,10 @@ int main(int argc, char **argv) {
   return -1;
 
 EXECUTE:
-  // These are freed by execvp(), but we remove them now since static analysis
-  // evidently doesn't care whether a syscall might change the process image.
-  OPT_TABLE(X_FREE);
-  DDR_free(ddr);
-  pthread_barrier_destroy(pb);
-  munmap(pb, sizeof(pthread_barrier_t));
-
-  if (-1 == execvp(argv[0], argv)) {
+  // NB we don't LOG_close() here because we might still need to report error
+  //    and all the logging modes either remain open (stdio) or are cloexec'd
+  //    (syslog, file)
+  if (-1 == execvp(*argv, argv)) {
     switch (errno) {
     case ENOENT:
       ERR("%s: file not found", argv[0]);
@@ -757,9 +757,15 @@ EXECUTE:
       ERR("%s: permission denied", argv[0]);
       break;
     default:
-      WRN("execvp() returned due to %s", strerror(errno));
+      WRN("%s: failed to execute (%s)", argv[0], strerror(errno));
       break;
     }
   }
+
+  // These are cleaned by execvp(), but we remove them here since this is the
+  // error path and we don't want static analysis to report leaks.
+  OPT_TABLE(X_FREE);
+  DDR_free(ddr);
+  pprof_Free(ctx->dp);
   return -1;
 }
