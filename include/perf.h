@@ -126,6 +126,14 @@ typedef enum PEMode {
   PE_KERNEL_INCLUDE = 1 << 0,
 } PEMode;
 
+// Architecturally, it's probably simpler to split this out into callbacks for
+// sample, lost, mmap, comm, etc type events; but for now we'll absorb all
+// of that into msg_fun
+typedef struct perfopen_attr {
+  void (*msg_fun)(struct perf_event_header *, int, void *);
+  void (*timeout_fun)(void *);
+} perfopen_attr;
+
 struct perf_event_attr g_dd_native_attr = {
     .size = sizeof(struct perf_event_attr),
     .sample_type = PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER |
@@ -242,31 +250,13 @@ void *perfown(int fd) {
     return NULL;
 
   // Make sure that SIGPROF is delivered to me instead of the called application
-  fcntl(fd, F_SETFL, O_RDONLY | O_NONBLOCK);
-  fcntl(fd, F_SETOWN_EX, &(struct f_owner_ex){F_OWNER_TID, getpid()});
+  fcntl(fd, F_SETFL, O_RDWR | O_NONBLOCK);
+  //  fcntl(fd, F_SETOWN_EX, &(struct f_owner_ex){F_OWNER_TID, getpid()});
 
   return region;
 }
 
-void default_callback(struct perf_event_header *hdr, int type, void *arg) {
-  struct perf_event_sample *pes;
-  struct perf_event_mmap *pem;
-  (void)arg;
-  (void)pes;
-  (void)pem;
-  (void)type;
-  switch (hdr->type) {
-  case PERF_RECORD_SAMPLE:
-    pes = (struct perf_event_sample *)hdr;
-    (void)pes;
-    //    printf("NR:  %ld\n", pes->nr);
-    break;
-  case PERF_RECORD_MMAP:
-    pem = (struct perf_event_mmap *)hdr;
-    (void)pem;
-    //    printf("MMAP filename: %s\n", pem->filename);
-  }
-}
+void perfstart(int fd) { ioctl(fd, PERF_EVENT_IOC_ENABLE, 0); }
 
 typedef struct RingBuffer {
   const char *start;
@@ -287,15 +277,10 @@ struct perf_event_header *rb_seek(RingBuffer *rb, uint64_t offset) {
   return (struct perf_event_header *)(rb->start + rb->offset);
 }
 
-void main_loop(PEvent *pes, int pe_len,
-               void (*event_callback)(struct perf_event_header *, int, void *),
-               void *callback_arg) {
+void main_loop(PEvent *pes, int pe_len, perfopen_attr *attr, void *arg) {
   struct pollfd pfd[100];
+  assert(attr->msg_fun);
 
-  // Set to default callback if needed
-  // TODO is this really a great idea?
-  if (!event_callback)
-    event_callback = default_callback;
   if (pe_len > 100)
     pe_len = 100;
 
@@ -307,15 +292,23 @@ void main_loop(PEvent *pes, int pe_len,
   }
   while (1) {
     int n = poll(pfd, pe_len, PSAMPLE_DEFAULT_WAKEUP);
-    if (-1 == n) {
+
+    // If there was an issue, return and let the caller check errno
+    if (-1 == n)
       return;
+
+    // If no file descriptors, call timed out
+    if (0 == n && attr->timeout_fun) {
+      attr->timeout_fun(arg);
+      continue;
     }
+
     for (int i = 0; i < pe_len; i++) {
       if (!pfd[i].revents)
         continue;
-      if (pfd[i].revents & POLLHUP) {
+      if (pfd[i].revents & POLLHUP)
         return;
-      }
+
       uint64_t head = pes[i].region->data_head & (PSAMPLE_SIZE - 1);
       uint64_t tail = pes[i].region->data_tail & (PSAMPLE_SIZE - 1);
 
@@ -329,7 +322,7 @@ void main_loop(PEvent *pes, int pe_len,
         elems++;
         struct perf_event_header *hdr = rb_seek(rb, tail);
 
-        event_callback(hdr, pes[i].pos, callback_arg);
+        attr->msg_fun(hdr, pes[i].pos, arg);
 
         tail += hdr->size;
         tail = tail & (PSAMPLE_SIZE - 1);

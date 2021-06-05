@@ -70,7 +70,7 @@ struct DDProfContext {
   int num_watchers;
 
   struct UnwindState *us;
-  int64_t send_nanos;
+  int64_t send_nanos; // Last time an export was sent
 };
 
 // RE: kernel tracepoints
@@ -219,18 +219,22 @@ void export(struct DDProfContext *pctx, int64_t now) {
   pprof_timeUpdate(dp);
 }
 
+void ddprof_timeout(void *arg) {
+  struct DDProfContext *pctx = arg;
+  int64_t now = now_nanos();
+
+  if (now > pctx->send_nanos)
+    export(pctx, now);
+}
+
 void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   static uint64_t id_locs[MAX_STACK] = {0};
-
-  // TODO this time stuff needs to go into the struct
-  static int64_t last_time = 0;
-  if (!last_time)
-    last_time = now_nanos();
 
   struct DDProfContext *pctx = arg;
   struct UnwindState *us = pctx->us;
   DProf *dp = pctx->dp;
   struct perf_event_sample *pes;
+
   switch (hdr->type) {
   case PERF_RECORD_SAMPLE:
     pes = (struct perf_event_sample *)hdr;
@@ -581,6 +585,10 @@ int main(int argc, char **argv) {
     pprof_units[i] = ctx->watchers[i].opt->unit;
   }
 
+  // Initialize the callback object for the main loop
+  perfopen_attr perf_funs = {.msg_fun = ddprof_callback,
+                             .timeout_fun = ddprof_timeout};
+
   if (!pprof_Init(ctx->dp, (const char **)pprof_labels,
                   (const char **)pprof_units, ctx->num_watchers)) {
     OPT_TABLE(X_FREE);
@@ -680,10 +688,10 @@ int main(int argc, char **argv) {
                 NULL);
     if (instrumented_any_watchers) {
       NTC("Entering main loop");
-      main_loop(pes, ctx->num_watchers * num_cpu, ddprof_callback, ctx);
+      main_loop(pes, ctx->num_watchers * num_cpu, &perf_funs, ctx);
 
       // If we're here, the main loop closed--probably the profilee closed
-      WRN("Profiling context no longer valid");
+      WRN("Profiling context no longer valid (%s)", strerror(errno));
       int64_t now = now_nanos();
       if (now > ctx->send_nanos || ctx->sendfinal) {
         WRN("Sending final export");
@@ -719,31 +727,7 @@ int main(int argc, char **argv) {
     LOG_close();
     close(sfd[0]);
     close(sfd[1]);
-
-  EXECUTE:
-    // These are freed by execvp(), but we remove them now since static analysis
-    // evidently doesn't care whether a syscall might change the process image.
-    OPT_TABLE(X_FREE);
-    DDR_free(ddr);
-    pthread_barrier_destroy(pb);
-    munmap(pb, sizeof(pthread_barrier_t));
-
-    if (-1 == execvp(argv[0], argv)) {
-      switch (errno) {
-      case ENOENT:
-        ERR("%s: file not found", argv[0]);
-        break;
-      case ENOEXEC:
-      case EACCES:
-        ERR("%s: permission denied", argv[0]);
-        break;
-      default:
-        WRN("execvp() returned due to %s", strerror(errno));
-        break;
-      }
-
-      return -1;
-    }
+    goto EXECUTE;
   }
 
   // Neither the profiler nor the instrumented process should get here
@@ -753,5 +737,29 @@ int main(int argc, char **argv) {
   pprof_Free(ctx->dp);
 
   WRN("Profiling terminated");
+  return -1;
+
+EXECUTE:
+  // These are freed by execvp(), but we remove them now since static analysis
+  // evidently doesn't care whether a syscall might change the process image.
+  OPT_TABLE(X_FREE);
+  DDR_free(ddr);
+  pthread_barrier_destroy(pb);
+  munmap(pb, sizeof(pthread_barrier_t));
+
+  if (-1 == execvp(argv[0], argv)) {
+    switch (errno) {
+    case ENOENT:
+      ERR("%s: file not found", argv[0]);
+      break;
+    case ENOEXEC:
+    case EACCES:
+      ERR("%s: permission denied", argv[0]);
+      break;
+    default:
+      WRN("execvp() returned due to %s", strerror(errno));
+      break;
+    }
+  }
   return -1;
 }
