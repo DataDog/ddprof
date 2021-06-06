@@ -153,6 +153,12 @@ struct perf_event_attr g_dd_native_attr = {
     .exclude_hv = 1,
 };
 
+// Used by rb_init() and friends
+typedef struct RingBuffer {
+  const char *start;
+  unsigned long offset;
+} RingBuffer;
+
 bool sendfail(int sfd) {
   // The call to getfd() checks message metadata upon receipt, so to send a
   // failure it suffices to merely not send SOL_SOCKET with SCM_RIGHTS.
@@ -242,27 +248,23 @@ int perfopen(pid_t pid, int type, int config, uint64_t per, int mode, int cpu) {
 }
 
 void *perfown(int fd) {
-  // Probably assumes it is being called by the profiler!
   void *region;
-  // TODO how to deal with hugepages?
+
+  // Check that the file descriptor is valid
+  if (fcntl(fd, F_GETFD, 0))
+    return NULL;
+
+  // Map in the region representing the ring buffer
+  // TODO what to do about hugepages?
   region = mmap(NULL, PAGE_SIZE + PSAMPLE_SIZE, PROT_READ | PROT_WRITE,
                 MAP_SHARED, fd, 0);
   if (!region || MAP_FAILED == region)
     return NULL;
 
-  // Make sure that SIGPROF is delivered to me instead of the called application
   fcntl(fd, F_SETFL, O_RDWR | O_NONBLOCK);
-  //  fcntl(fd, F_SETOWN_EX, &(struct f_owner_ex){F_OWNER_TID, getpid()});
 
   return region;
 }
-
-void perfstart(int fd) { ioctl(fd, PERF_EVENT_IOC_ENABLE, 0); }
-
-typedef struct RingBuffer {
-  const char *start;
-  unsigned long offset;
-} RingBuffer;
 
 void rb_init(RingBuffer *rb, struct perf_event_mmap_page *page) {
   rb->start = (const char *)page + PAGE_SIZE;
