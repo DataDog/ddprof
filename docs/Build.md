@@ -14,20 +14,16 @@ You will need your ssh keys configured to retrieve dependencies.
 ### Docker
 
 Docker can be used if you are not already on a linux environment. You need an ssh configuration as some repositories are private.
-Warning : do not push this image or you will compromise your ssh keys. LOCAL USAGE ONLY.
+The following commands create a docker container based on ubuntu to build while using your current ssh configuration.
 
 ```bash
 cd ./app/base-env
-docker build -t base . # having another base image might clash
-cd ../build-local
-docker build -t local_builder --build-arg "SSH_PRIVATE_KEY=`cat ~/.ssh/id_rsa`" --build-arg "SSH_PUBLIC_KEY=`cat ~/.ssh/id_rsa.pub`" --build-arg "SSH_KNOWN_HOSTS=`cat ~/.ssh/known_hosts`" .
+docker build -t base_ddprof .
+# You can choose different repos to mount (example with ~dd) 
+docker run -it -v $(dirname $SSH_AUTH_SOCK) -v ~/dd:/app  -e SSH_AUTH_SOCK=$SSH_AUTH_SOCK --name ddprof_build base_ddprof:latest /bin/bash
 ```
 
-Run the built container. You can share a directory to edit from macos and build inside docker.
-Attach to the container with /bin/bash.
-You can run build or test commands from this terminal. You will need to enter your ssh passphrases for the first build.
-
-*Under construction : simplify* :building_construction:
+:warning: if you use worktrees you will have to mount extra folders (as the build uses `git rev-parse --short HEAD` to define version name).
 
 ### Native linux
 
