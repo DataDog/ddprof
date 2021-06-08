@@ -52,13 +52,14 @@ struct DDProfContext {
   // Input parameters
   char *printargs;
   char *count_samples;
-  char *enabled;
+  char *enable;
+  char *native_enable;
   char *upload_period;
   char *profprofiler;
   char *sendfinal;
   struct {
     bool count_samples;
-    bool enabled;
+    bool enable;
     double upload_period;
     bool profprofiler;
     bool sendfinal;
@@ -149,7 +150,8 @@ int num_cpu = 0;
   XX(DD_SERVICE,                   service,         S, 'S', 1, ctx->ddr, NULL, "myservice") \
   XX(DD_TAGS,                      tags,            T, 'T', 1, ctx,      NULL, "")          \
   XX(DD_VERSION,                   serviceversion,  V, 'V', 1, ctx->ddr, NULL, "")          \
-  XX(DD_PROFILING_ENABLED,         enabled,         d, 'd', 1, ctx,      NULL, "yes")       \
+  XX(DD_PROFILING_ENABLED,         enable,          d, 'd', 1, ctx,      NULL, "yes")       \
+  XX(DD_PROFILING_NATIVE_ENABLED,  native_enable,   n, 'n', 1, ctx,      NULL, "yes")       \
   XX(DD_PROFILING_COUNTSAMPLES,    count_samples,   c, 'c', 1, ctx,      NULL, "yes")       \
   XX(DD_PROFILING_UPLOAD_PERIOD,   upload_period,   u, 'u', 1, ctx,      NULL, "60")        \
   XX(DD_PROFILE_NATIVEPROFILER,    profprofiler,    p, 'p', 0, ctx,      NULL, "")          \
@@ -161,6 +163,7 @@ int num_cpu = 0;
   XX(DD_PROFILING_NATIVELOGLEVEL,  loglevel,        l, 'l', 1, ctx,      NULL, "warn")
 // clang-format on
 
+// TODO das210603 I don't think this needs to be inlined as a macro anymore
 #define DFLT_EXP(evar, key, targ, func, dfault)                                \
   __extension__({                                                              \
     char *_buf = NULL;                                                         \
@@ -180,6 +183,7 @@ int num_cpu = 0;
     (targ)->key = strdup(optarg);                                              \
     break;
 
+// TODO das210603 I don't think this needs to be inlined as a macro anymore
 #define FREE_EXP(key, targ)                                                    \
   __extension__({                                                              \
     if ((targ)->key)                                                           \
@@ -305,7 +309,16 @@ char* help_str[DD_KLEN] = {
 "    The name of this service\n",
   [DD_TAGS] = STR_UNDF,
   [DD_VERSION] = STR_UNDF,
-  [DD_PROFILING_ENABLED] = STR_UNDF,
+  [DD_PROFILING_ENABLED] =
+"    Whether to enable DataDog profiling.  If this is true, then "MYNAME" as well\n"
+"    as any other DataDog profilers are enabled.  If false, they are all disabled.\n"
+"    Note: if this is set, the native profiler will set the DD_PROFILING_ENABLED\n"
+"    environment variable in all sub-environments, thereby enabling DataDog profilers.\n"
+"    default: on\n",
+  [DD_PROFILING_NATIVE_ENABLED] =
+"    Whether to enable "MYNAME" specifically, without altering how other DataDog\n"
+"    profilers are run.  For example, DD_PROFILING_ENABLED can be used to disable\n"
+"    an inner profile, whilst setting DD_PROFILING_NATIVE_ENABLED to enable "MYNAME"\n",
   [DD_PROFILING_COUNTSAMPLES] = STR_UNDF,
   [DD_PROFILING_UPLOAD_PERIOD] =
 "    In seconds, how frequently to upload gathered data to Datadog.\n"
@@ -410,6 +423,41 @@ void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   exit(-1);
 }
 
+/**************************** Cmdline Helpers *********************************/
+// Helper functions for processing commandline arguments.
+//
+// Note that `arg_yesno(,1)` is not the same as `!arg(,0)` or vice-versa.  This
+// is mostly because a parameter whose default value is true needs to check
+// very specifically for disablement, but the failover is to retain enable
+//
+// That said, it might be better to be more correct and only accept input of
+// the specified form, returning error otherwise.
+int arg_which(char *str, char **set, int sz_set) {
+  if (!str)
+    return -1;
+  for (int i = 0; i < sz_set; i++) {
+    if (!strcasecmp(str, set[i]))
+      return i;
+  }
+  return sz_set;
+}
+
+#define arg_whichmember(str, set)                                              \
+  arg_which(str, set, sizeof(set) / sizeof(*set))
+
+bool arg_inset(char *str, char **set, int sz_set) {
+  int ret = arg_which(str, set, sz_set);
+  return !(-1 == ret || sz_set == ret);
+}
+
+bool arg_yesno(char *str, int mode) {
+  static char *yes_set[] = {"yes", "true", "on"}; // mode = 1
+  static char *no_set[] = {"no", "false", "off"}; // mode = 0
+  assert(0 == mode || 1 == mode);
+  char **set = (!!mode) ? no_set : yes_set;
+  return arg_whichmember(str, set);
+}
+
 /******************************  Entrypoint  **********************************/
 int main(int argc, char **argv) {
   //---- Inititiate structs
@@ -492,9 +540,24 @@ int main(int argc, char **argv) {
     }
   }
 
-  // Replace string-type args
-  ctx->params.enabled = true;
+  /****************************************************************************\
+  |                            Process Arguments                               |
+  \****************************************************************************/
+  // Set defaults
+  ctx->params.enable = true;
   ctx->params.upload_period = 60.0;
+
+  // Process enable.  Note that we want the effect to hit an inner profile.
+  // TODO das210603 do the semantics of this enablement match those used by
+  //                other profilers?
+  ctx->params.enable = !arg_yesno(ctx->enable, 0); // default yes
+  if (ctx->params.enable)
+    setenv("DD_PROFILING_ENABLED", "true", true);
+  else
+    setenv("DD_PROFILING_ENABLED", "false", true);
+
+  // Process native profiler enablement override
+  ctx->params.enable = !arg_yesno(ctx->native_enable, 0);
 
   // process upload_period
   if (ctx->upload_period) {
@@ -504,50 +567,61 @@ int main(int argc, char **argv) {
   }
 
   // Process faultinfo
-  if (!ctx->faultinfo || !*ctx->faultinfo || !strcasecmp(ctx->faultinfo, "off"))
-    explain_sigseg = false;
+  explain_sigseg = arg_yesno(ctx->faultinfo, 1); // default no
 
   // Process sendfinal
-  if (ctx->sendfinal && ctx->sendfinal && !strcasecmp(ctx->sendfinal, "on"))
-    ctx->params.sendfinal = true;
+  ctx->params.sendfinal = arg_yesno(ctx->sendfinal, 1);
 
   // Process logging mode
-  if (!ctx->logmode || !*ctx->logmode)
-    LOG_open(LOG_STDERR, "");
-  else if (!strcasecmp(ctx->logmode, "stdout"))
+  char *logpattern[] = {"stdout", "stderr", "syslog", "disabled"};
+  switch (arg_whichmember(ctx->logmode, logpattern)) {
+  case -1:
+  case 0:
     LOG_open(LOG_STDOUT, "");
-  else if (!strcasecmp(ctx->logmode, "stderr"))
+    break;
+  case 1:
     LOG_open(LOG_STDERR, "");
-  else if (!strcasecmp(ctx->logmode, "syslog"))
+    break;
+  case 2:
     LOG_open(LOG_SYSLOG, "");
-  else if (!strcasecmp(ctx->logmode, "disabled"))
+    break;
+  case 3:
     LOG_open(LOG_DISABLE, "");
-  else
+    break;
+  default:
     LOG_open(LOG_FILE, ctx->logmode);
-
-  // Process logging level
-  if (!strcasecmp(ctx->loglevel, "debug"))
-    LOG_setlevel(LL_DEBUG);
-  if (!strcasecmp(ctx->loglevel, "notice"))
-    LOG_setlevel(LL_NOTICE);
-  if (!strcasecmp(ctx->loglevel, "warn"))
-    LOG_setlevel(LL_WARNING);
-  if (!strcasecmp(ctx->loglevel, "error"))
-    LOG_setlevel(LL_ERROR);
-
-  // process count_samples
-  if (ctx->count_samples) {
-    if (!strcmp(ctx->count_samples, "yes") ||
-        strcmp(ctx->count_samples, "true"))
-      ctx->params.count_samples = true;
+    break;
   }
 
+  // Process logging level
+  char *loglpattern[] = {"debug", "notice", "warn", "error"};
+  switch (arg_whichmember(ctx->loglevel, loglpattern)) {
+  case 0:
+    LOG_setlevel(LL_DEBUG);
+    break;
+  case 1:
+    LOG_setlevel(LL_NOTICE);
+    break;
+  case -1:
+  case 2:
+    LOG_setlevel(LL_WARNING);
+    break;
+  case 3:
+    LOG_setlevel(LL_ERROR);
+    break;
+  }
+
+  // process count_samples
+  ctx->params.count_samples = arg_yesno(ctx->count_samples, 1); // default no
+
   // Process input printer (do this last!)
-  if (ctx->printargs && *ctx->printargs && !strcasecmp(ctx->printargs, "yes")) {
+  if (ctx->printargs && arg_yesno(ctx->printargs, 1)) {
     if (LOG_getlevel() < LL_DEBUG)
       WRN("printarg specified, but loglevel too low to emit parameters");
     DBG("Printing parameters");
     OPT_TABLE(X_PRNT);
+
+    DBG("Native profiler enabled: %s", ctx->params.enable ? "true" : "false");
 
     DBG("Instrumented with %d watchers:", ctx->num_watchers);
     for (int i = 0; i < ctx->num_watchers; i++) {
@@ -570,6 +644,11 @@ int main(int argc, char **argv) {
   /****************************************************************************\
   |                             Run the Profiler                               |
   \****************************************************************************/
+  // If the profiler was disabled, just skip ahead
+  if (!ctx->params.enable) {
+    NTC("Profiling disabled");
+    goto EXECUTE_DIRECT;
+  }
   // Initialize the request object
   DDR_init(ddr);
 
@@ -601,7 +680,7 @@ int main(int argc, char **argv) {
   if (MAP_FAILED == pb) {
     // TODO log here.  Nothing else to do, since we're not halting the target
     ERR("Failure instantiating message passing subsystem.  Profiling halting.");
-    ctx->params.enabled = false;
+    ctx->params.enable = false;
   } else {
     pthread_barrierattr_init(&bat);
     pthread_barrierattr_setpshared(&bat, 1);
@@ -695,7 +774,7 @@ int main(int argc, char **argv) {
   } else {
     // 3p.  I am the original process.  If not prof profiling, instrument now
     pid_t mypid = getpid();
-    for (int i = 0; i < ctx->num_watchers && ctx->params.enabled; i++) {
+    for (int i = 0; i < ctx->num_watchers && ctx->params.enable; i++) {
       for (int j = 0; j < num_cpu; j++) {
         int fd = perfopen(
             mypid, ctx->watchers[i].opt->type, ctx->watchers[i].opt->config,
@@ -728,6 +807,7 @@ int main(int argc, char **argv) {
     pthread_barrier_destroy(pb);
     munmap(pb, sizeof(pthread_barrier_t));
 
+  EXECUTE_DIRECT:
     if (-1 == execvp(argv[0], argv)) {
       switch (errno) {
       case ENOENT:
