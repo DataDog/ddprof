@@ -1,24 +1,33 @@
 #!/bin/bash
 # http://redsymbol.net/articles/unofficial-bash-strict-mode/
+
 set -euo pipefail
 IFS=$'\n\t'
 
-DIR=$(git rev-parse --show-toplevel)
+# Set directory names
+BASEDIR=$(dirname "$0")
+cd $BASEDIR
+cd ../../
+TOP_LVL_DIR=`pwd`
+
+# Default intake address
+INTAKE_ADD=intake.profile.datad0g.com
 
 # We need to make sure this is set if we want ASAN to return symbol names
 # instead of VM addresses
 if [[ -z "${ASAN_SYMBOLIZER_PATH:-}" ]]; then
   if command -v llvm-symbolizer; then
-    ASAN_SYMBOLIZER_PATH=$(which llvm-symbolizer)
+    export ASAN_SYMBOLIZER_PATH=$(which llvm-symbolizer)
   else
-    ASAN_SYMBOLIZER_PATH=""
+    export ASAN_SYMBOLIZER_PATH=""
   fi
 fi
 
 # Overrides
-if [[ -z "${CMD_BASE:-}" ]]; then CMD_BASE=${DIR}/release/ddprof; fi
+if [[ -z "${CMD_BASE:-}" ]]; then CMD_BASE=${TOP_LVL_DIR}/release/ddprof; fi
 if [[ -z "${USE_JEMALLOC:-}" ]]; then USE_JEMALLOC=""; fi
 CMD=${CMD_BASE}
+
 JOB="redis-runner.sh"
 
 # Check for parameters
@@ -36,7 +45,7 @@ for arg in "$@"; do
 done
 
 # Do service version stuff
-VERFILE="tmp/runner.ver"
+VERFILE="${TOP_LVL_DIR}/tmp/runner.ver"
 mkdir -p $(dirname ${VERFILE})
 VER=0
 if [[ -f ${VERFILE} ]]; then VER=$(cat ${VERFILE}); fi
@@ -50,14 +59,18 @@ if [[ "yes" == "${USE_JEMALLOC,,}" ]]; then
   export MALLOC_CONF=prof:true,lg_prof_interval:25,lg_prof_sample:17
 fi
 
-# Run it!
 rm -rf debuglog.out
-export DD_API_KEY=***REMOVED***
+
+# Set the environment variables useful for ddprof
+export DD_API_KEY=`$BASEDIR/get_datad0g_key.sh`
 export DD_SERVICE=native-testservice_${VER}
-export DD_AGENT_HOST=intake.profile.datad0g.com
+export DD_AGENT_HOST=${INTAKE_ADD}
+
 eval ${CMD} \
   -u 60.0 \
   -l debug \
   -o stderr \
   -a yes \
-  ${DIR}/bench/runners/${JOB}
+  ${TOP_LVL_DIR}/bench/runners/${JOB}
+
+exit 0

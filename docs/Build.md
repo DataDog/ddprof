@@ -17,10 +17,13 @@ Docker can be used if you are not already on a linux environment. You need an ss
 The following commands create a docker container based on ubuntu to build while using your current ssh configuration.
 
 ```bash
+#Use the ubuntu CI with dependencies to build
 cd ./app/base-env
 docker build -t base_ddprof .
-# You can choose different repos to mount (example with ~dd) 
-docker run -it -v $(dirname $SSH_AUTH_SOCK) -v ~/dd:/app  -e SSH_AUTH_SOCK=$SSH_AUTH_SOCK --name ddprof_build base_ddprof:latest /bin/bash
+#Check if agent is runing (or add it if needed : ssh-add ~/.ssh/id_rsa):
+ssh-add -L
+# The container is cleared on exit : do not store things in it
+docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -v ~/dd:/app -e SSH_AUTH_SOCK=/ssh-agent --name ddprof_build ddprof_base:latest /bin/bash
 ```
 
 :warning: if you use worktrees you will have to mount extra folders (as the build uses `git rev-parse --short HEAD` to define version name).
@@ -42,6 +45,37 @@ make deps
 ```bash
 make build
 ./release/ddprof --help
+```
+
+## Run commands
+
+*Under construction* :building_construction:
+
+### Setup
+
+Write your datadog keys in a .env file in the root of the repository. For now only the DD_API_DATAD0G_KEY is necessary.
+
+```bash
+DD_API_PROD_KEY=<prod key>
+DD_API_EU_KEY=<europe key (not used for now)>
+DD_API_STAGING_KEY=<staging key>
+DD_API_DATAD0G_KEY=<datad0g key>
+```
+
+### Run examples
+
+A stress test examples is available (you need to build the bench/collatz folder first)
+
+```bash
+./bench/runners/runit.sh collatz 
+```
+
+### Troubleshooting
+
+Can you reach the intake service ? Check if you get a 400 error code. Check it also from the docker container.
+
+```bash
+curl -XPOST -i https://intake.profile.datad0g.com/v1/input
 ```
 
 ## Artifacts

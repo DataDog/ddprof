@@ -112,7 +112,7 @@ LIBDDPROF := $(VENDIR)/libddprof
 # Global aggregates
 INCLUDE = -I$(LIBDDPROF)/src -I$(LIBDDPROF)/include -Iinclude -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
 LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl 
-SRC := $(addprefix $(LIBDDPROF)/src/, string_table.c pprof.c http.c dd_send.c append_string.c) src/proto/profile.pb-c.c src/logger.c
+SRC := $(addprefix $(LIBDDPROF)/src/, string_table.c pprof.c http.c dd_send.c append_string.c) src/proto/profile.pb-c.c src/cmdline.c src/logger.c 
 DIRS := $(TARGETDIR) $(TMP)
 
 .PHONY: build deps bench ddprof_banner format format-commit clean_deps publish all
