@@ -5,8 +5,12 @@ stages:
 
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
+  # Cache of the valid images to start build steps faster
+  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:cd88cf8f817360dfa2152fae9abfe28e12697f4ebf881ae18bb2f4a4860139c3
+  # When build images are built, publish them with following tags
   BASE_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
   BUILD_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build
+  # Deployment paths
   S3_PREFIX: s3://binaries.ddbuild.io/ddprof/release
   RELPATH: ddprof/release
 
@@ -36,8 +40,32 @@ build:deps:
   - docker build --tag $BUILD_IMG -f app/build-env/Dockerfile .
   - docker push $BUILD_IMG
 
+.light-job-resource-allocation:
+  variables:
+    KUBERNETES_CPU_REQUEST: 2
+    KUBERNETES_CPU_LIMIT: 2
+    KUBERNETES_MEMORY_REQUEST: 4Gi
+    KUBERNETES_MEMORY_LIMIT: 4Gi
+
+# Migrating to a cmake build system. Both co-exist for now
+build:ddprof_cmake:
+  extends:
+    - .light-job-resource-allocation
+  image: $BUILD_IMG_STICKY
+  stage: build
+  tags: ["runner:docker", "size:large"]
+  variables:
+    TESTPATH: test
+    TESTBUILD: ${TESTPATH}/build
+  script:
+  - set -euxo pipefail
+  - mkdir -p ${TESTBUILD} && cd ${TESTBUILD}
+  - cmake ../
+  - make -j ${KUBERNETES_CPU_LIMIT}
+  - ctest --repeat until-fail:5 --output-on-failure | tee test-output.log
+
 build:ddprof:
-  image: $BUILD_IMG
+  image: $BUILD_IMG_STICKY
   stage: build
   tags: ["runner:docker", "size:large"]
   variables:
@@ -65,7 +93,7 @@ build:ddprof:
   - cp $BINPATH/$ANAME $RELEASEBIN
 
 deploy:ddprof:
-  image: $BUILD_IMG
+  image: $BUILD_IMG_STICKY
   stage: deploy
   tags: ["runner:docker", "size:large"]
   variables:
@@ -83,7 +111,7 @@ deploy:ddprof:
   - tools/ci_upload.sh
 
 build:collatz:
-  image: $BUILD_IMG
+  image: $BUILD_IMG_STICKY
   stage: build
   tags: ["runner:docker", "size:large"]
   when: manual
@@ -104,7 +132,7 @@ build:collatz:
   - make DEBUG=0 ANALYSIS=0 bench
 
 deploy:collatz:
-  image: $BUILD_IMG
+  image: $BUILD_IMG_STICKY
   stage: deploy
   tags: ["runner:docker", "size:large"]
   when: manual

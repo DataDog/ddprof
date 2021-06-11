@@ -10,8 +10,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "cmdline.h"
 #include "dd_send.h"
+#include "ddprofcmdline.h"
 #include "http.h"
 #include "logger.h"
 #include "perf.h"
@@ -543,8 +543,9 @@ int main(int argc, char **argv) {
   ctx->params.sendfinal = arg_yesno(ctx->sendfinal, 1);
 
   // Process logging mode
-  char *logpattern[] = {"stdout", "stderr", "syslog", "disabled"};
-  switch (arg_whichmember(ctx->logmode, logpattern)) {
+  char const *logpattern[] = {"stdout", "stderr", "syslog", "disabled"};
+  const int sizeOfLogpattern = 4;
+  switch (arg_which(ctx->logmode, logpattern, sizeOfLogpattern)) {
   case -1:
   case 0:
     LOG_open(LOG_STDOUT, "");
@@ -564,8 +565,9 @@ int main(int argc, char **argv) {
   }
 
   // Process logging level
-  char *loglpattern[] = {"debug", "notice", "warn", "error"};
-  switch (arg_whichmember(ctx->loglevel, loglpattern)) {
+  char const *loglpattern[] = {"debug", "notice", "warn", "error"};
+  const int sizeOfLoglpattern = 4;
+  switch (arg_which(ctx->loglevel, loglpattern, sizeOfLoglpattern)) {
   case 0:
     LOG_setlevel(LL_DEBUG);
     break;

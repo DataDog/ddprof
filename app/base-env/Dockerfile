@@ -8,6 +8,8 @@ RUN apt update \
     make \
     clang-11 \
     gcc-10 \
+    gcc \
+    g++ \
     git \
     ssh-client \
     curl \

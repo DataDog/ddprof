@@ -22,8 +22,8 @@ cd ./app/base-env
 docker build -t base_ddprof .
 #Check if agent is runing (or add it if needed : ssh-add ~/.ssh/id_rsa):
 ssh-add -L
-# The container is cleared on exit : do not store things in it
-docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -v ~/dd:/app -e SSH_AUTH_SOCK=/ssh-agent --name ddprof_build ddprof_base:latest /bin/bash
+# The container is cleared on exit : do not store things in it. The ~dd folder is mounted to enable developments in that folder.
+docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -v ~/dd:/app -e SSH_AUTH_SOCK=/ssh-agent --name ddprof_build base_ddprof:latest /bin/bash
 ```
 
 :warning: if you use worktrees you will have to mount extra folders (as the build uses `git rev-parse --short HEAD` to define version name).
