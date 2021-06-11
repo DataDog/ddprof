@@ -428,7 +428,6 @@ void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   exit(-1);
 }
 
-
 /******************************  Entrypoint  **********************************/
 int main(int argc, char **argv) {
   //---- Inititiate structs

@@ -1,6 +1,6 @@
 #pragma once
 
-//c99
+// c99
 #include <stdbool.h>
 
 int arg_which(char *str, char **set, int sz_set);
