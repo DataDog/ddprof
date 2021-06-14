@@ -795,13 +795,13 @@ int main(int argc, char **argv) {
       DDR_free(ddr);
       unwind_free(ctx->us);
       pprof_Free(ctx->dp);
-      exit(0);
+      return 0;
     }
 
     // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
     instrument_prof(ctx, sfd, pb);
 
-    // If the profiler fails, we need to cleanup before exiting
+    // We are only here if the profiler fails or exits
     OPT_TABLE(X_FREE);
     DDR_free(ddr);
     unwind_free(ctx->us);
