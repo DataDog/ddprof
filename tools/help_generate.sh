@@ -3,11 +3,13 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# Set directory names
-BASEDIR=$(dirname "$0")
-cd $BASEDIR
-cd ../
-TOP_LVL_DIR=`pwd`
+### Set directory names
+CURRENTDIR=$PWD
+SCRIPTPATH=$(readlink -f "$0")
+SCRIPTDIR=$(dirname $SCRIPTPATH)
+cd $SCRIPTDIR/../
+TOP_LVL_DIR=$PWD
+cd $CURRENTDIR
 
 FILE=${TOP_LVL_DIR}/docs/Commands.md
 echo "# ddprof Commands" > ${FILE}

@@ -17,13 +17,7 @@ Docker can be used if you are not already on a linux environment. You need an ss
 The following commands create a docker container based on ubuntu to build while using your current ssh configuration.
 
 ```bash
-#Use the ubuntu CI with dependencies to build
-cd ./app/base-env
-docker build -t base_ddprof .
-#Check if agent is runing (or add it if needed : ssh-add ~/.ssh/id_rsa):
-ssh-add -L
-# The container is cleared on exit : do not store things in it. The ~dd folder is mounted to enable developments in that folder.
-docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -v ~/dd:/app -e SSH_AUTH_SOCK=/ssh-agent --name ddprof_build base_ddprof:latest /bin/bash
+./tools/launch_local_build.sh
 ```
 
 :warning: if you use worktrees you will have to mount extra folders (as the build uses `git rev-parse --short HEAD` to define version name).

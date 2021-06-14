@@ -4,10 +4,12 @@ set -euo pipefail
 IFS=$'\n\t'
 
 ### Set directory names
-BASEDIR=$(dirname "$0")
-cd $BASEDIR
-cd ../../
-TOP_LVL_DIR=`pwd`
+CURRENTDIR=$PWD
+SCRIPTPATH=$(readlink -f "$0")
+SCRIPTDIR=$(dirname $SCRIPTPATH)
+cd $SCRIPTDIR/../../
+TOP_LVL_DIR=$PWD
+cd $CURRENTDIR
 
 export ASAN_SYMBOLIZER_PATH=$(which llvm-symbolizer)
 CMD_BASE=${TOP_LVL_DIR}/release/ddprof
@@ -21,7 +23,7 @@ if [[ -f ${VERFILE} ]]; then VER=$(cat ${VERFILE}); fi
 VER=$((VER+1))
 echo ${VER} > ${VERFILE}
 
-DD_API_KEY=`$BASEDIR/get_datad0g_key.sh`
+DD_API_KEY=`$SCRIPTDIR/get_datad0g_key.sh`
 
 # Run it!
 eval ${CMD} \
@@ -29,6 +31,7 @@ eval ${CMD} \
   -H intake.profile.datad0g.com \
   -P 80 \
   -S native-testservice${VER}\
+  -u 5 \
   -E "test-staging" \
   "$@"
 

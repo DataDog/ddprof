@@ -4,11 +4,14 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# Set directory names
-BASEDIR=$(dirname "$0")
-cd $BASEDIR
-cd ../../
-TOP_LVL_DIR=`pwd`
+### Set directory names
+CURRENTDIR=$PWD
+SCRIPTPATH=$(readlink -f "$0")
+SCRIPTDIR=$(dirname $SCRIPTPATH)
+cd $SCRIPTDIR/../../
+TOP_LVL_DIR=$PWD
+cd $CURRENTDIR
+
 
 # Default intake address
 INTAKE_ADD=intake.profile.datad0g.com
@@ -62,7 +65,7 @@ fi
 rm -rf debuglog.out
 
 # Set the environment variables useful for ddprof
-export DD_API_KEY=`$BASEDIR/get_datad0g_key.sh`
+export DD_API_KEY=`$SCRIPTDIR/get_datad0g_key.sh`
 export DD_SERVICE=native-testservice_${VER}
 export DD_AGENT_HOST=${INTAKE_ADD}
 
