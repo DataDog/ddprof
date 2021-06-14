@@ -38,7 +38,7 @@ typedef struct PerfOption {
   int mode;
 } PerfOption;
 
-struct DDProfContext {
+typedef struct DDProfContext {
   DProf *dp;
   DDReq *ddr;
 
@@ -46,7 +46,6 @@ struct DDProfContext {
   char *agent_host;
   char *prefix;
   char *tags;
-  char *faultinfo;
   char *logmode;
   char *loglevel;
 
@@ -57,12 +56,14 @@ struct DDProfContext {
   char *native_enable;
   char *upload_period;
   char *profprofiler;
+  char *faultinfo;
   char *sendfinal;
   struct {
     bool count_samples;
     bool enable;
     double upload_period;
     bool profprofiler;
+    bool faultinfo;
     bool sendfinal;
   } params;
   struct watchers {
@@ -73,7 +74,7 @@ struct DDProfContext {
 
   struct UnwindState *us;
   int64_t send_nanos; // Last time an export was sent
-};
+} DDProfContext;
 
 // RE: kernel tracepoints
 // I don't think there's any commitment that these IDs are unchanging between
@@ -201,7 +202,7 @@ static inline int64_t now_nanos() {
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
 }
 
-void export(struct DDProfContext *pctx, int64_t now) {
+void export(DDProfContext *pctx, int64_t now) {
   DDReq *ddr = pctx->ddr;
   DProf *dp = pctx->dp;
 
@@ -225,7 +226,7 @@ void export(struct DDProfContext *pctx, int64_t now) {
 }
 
 void ddprof_timeout(void *arg) {
-  struct DDProfContext *pctx = arg;
+  DDProfContext *pctx = arg;
   int64_t now = now_nanos();
 
   if (now > pctx->send_nanos)
@@ -235,7 +236,7 @@ void ddprof_timeout(void *arg) {
 void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   static uint64_t id_locs[MAX_STACK] = {0};
 
-  struct DDProfContext *pctx = arg;
+  DDProfContext *pctx = arg;
   struct UnwindState *us = pctx->us;
   DProf *dp = pctx->dp;
   struct perf_event_sample *pes;
@@ -428,16 +429,119 @@ void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   exit(-1);
 }
 
+/*************************  Instrumentation Helpers  **************************/
+void instrument_self(DDProfContext *ctx, int sfd[2], pthread_barrier_t *pb) {
+  pid_t mypid = getpid();
+  for (int i = 0; i < ctx->num_watchers && ctx->params.enable; i++) {
+    for (int j = 0; j < num_cpu; j++) {
+      int fd = perfopen(
+          mypid, ctx->watchers[i].opt->type, ctx->watchers[i].opt->config,
+          ctx->watchers[i].sample_period, ctx->watchers[i].opt->mode, j);
+
+      if (-1 == fd) {
+        WRN("Failed to setup watcher %d.%d (%s)", i, j, strerror(errno));
+        if (sendfail(sfd[1]))
+          ERR("Could not pass failure for watcher %d.%d", i, j);
+      } else {
+        NTC("Sending instrumentation for watcher %d.%d", i, j);
+        if (sendfd(sfd[1], fd))
+          ERR("Could not pass instrumentation for watcher %d.%d", i, j);
+      }
+      pthread_barrier_wait(pb);
+    }
+  }
+
+  // Cleanup and become desired process image
+  pthread_barrier_destroy(pb);
+  munmap(pb, sizeof(pthread_barrier_t));
+  close(sfd[0]);
+  close(sfd[1]);
+}
+
+void instrument_prof(DDProfContext *ctx, int sfd[2], pthread_barrier_t *pb) {
+  bool instrumented_any_watchers = false;
+  perfopen_attr perf_funs = {.msg_fun = ddprof_callback,
+                             .timeout_fun = ddprof_timeout};
+  struct PEvent pes[100] = {0};
+
+  // Iterate through watchers and CPUs, attaching to perf_event_open()
+  for (int i = 0; i < ctx->num_watchers; i++) {
+    for (int j = 0; j < num_cpu; j++) {
+      int k = i * num_cpu + j;
+      pes[k].pos = i; // watcher index is the sample index
+
+      NTC("Receiving watcher %d.%d", i, j);
+      pes[k].fd = getfd(sfd[0]);
+      if (-1 == pes[k].fd) {
+        ERR("Could not finalize watcher %d.%d: transport error", i, j);
+      } else if (-2 == pes[k].fd) {
+        ERR("Could not finalize watcher %d.%d: received fail notice", i, j);
+      } else if (!(pes[k].region = perfown(pes[k].fd))) {
+        close(pes[k].fd);
+        pes[k].fd = -1;
+        ERR("Could not finalize watcher %d.%d: registration (%s)", i, j,
+            strerror(errno));
+      } else {
+        instrumented_any_watchers = true;
+      }
+      pthread_barrier_wait(pb);
+    }
+  }
+
+  // Cleanup and enter event loop
+  pthread_barrier_destroy(pb);
+  close(sfd[0]);
+  close(sfd[1]);
+  munmap(pb, sizeof(pthread_barrier_t));
+
+  if (ctx->params.faultinfo)
+    sigaction(SIGSEGV,
+              &(struct sigaction){.sa_sigaction = sigsegv_handler,
+                                  .sa_flags = SA_SIGINFO},
+              NULL);
+
+  // Early return if we can't do anything.
+  // NOTE: this is common if the system isn't configured to allow perf events
+  if (!instrumented_any_watchers) {
+    ERR("Failed to install any watchers, profiling disabled");
+    return;
+  }
+
+  NTC("Entering main loop");
+
+  // Perform initialization operations
+  ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
+  unwind_init(ctx->us);
+  elf_version(EV_CURRENT); // Initialize libelf
+
+  // Enter the main loop -- this will not return unless there is an error.
+  main_loop(pes, ctx->num_watchers * num_cpu, &perf_funs, ctx);
+
+  // If we're here, the main loop closed--probably the profilee closed
+  if (errno)
+    WRN("Profiling context no longer valid (%s)", strerror(errno));
+  else
+    WRN("Profiling context no longer valid");
+
+  // We're going to close down, but first check whether we have a valid export
+  // to send (or if we requested the last partial export with sendfinal)
+  int64_t now = now_nanos();
+  if (now > ctx->send_nanos || ctx->sendfinal) {
+    WRN("Sending final export");
+    export(ctx, now);
+  }
+}
+
 /******************************  Entrypoint  **********************************/
 int main(int argc, char **argv) {
   //---- Inititiate structs
   int c = 0, oi = 0;
-  struct DDProfContext *ctx =
-      &(struct DDProfContext){.ddr = &(DDReq){.user_agent = "libddprof001",
-                                              .language = "native",
-                                              .family = "native"},
-                              .dp = &(DProf){0},
-                              .us = &(struct UnwindState){0}};
+  DDProfContext *ctx =
+      &(DDProfContext){.ddr = &(DDReq){.user_agent = "libddprof001",
+                                       .language = "native",
+                                       .family = "native"},
+                       .dp = &(DProf){0},
+                       .us = &(struct UnwindState){0}};
   DDReq *ddr = ctx->ddr;
 
   struct option lopts[] = {OPT_TABLE(X_LOPT){"event", 1, 0, 'e'},
@@ -447,7 +551,6 @@ int main(int argc, char **argv) {
   //---- Populate default values
   OPT_TABLE(X_DFLT);
   bool default_watchers = true;
-  bool explain_sigseg = true;
   ctx->num_watchers = 1;
   ctx->watchers[0].opt = &perfoptions[10];
   ctx->watchers[0].sample_period = perfoptions[10].base_rate;
@@ -537,7 +640,7 @@ int main(int argc, char **argv) {
   }
 
   // Process faultinfo
-  explain_sigseg = arg_yesno(ctx->faultinfo, 1); // default no
+  ctx->params.faultinfo = arg_yesno(ctx->faultinfo, 1); // default no
 
   // Process sendfinal
   ctx->params.sendfinal = arg_yesno(ctx->sendfinal, 1);
@@ -632,10 +735,6 @@ int main(int argc, char **argv) {
     pprof_units[i] = ctx->watchers[i].opt->unit;
   }
 
-  // Initialize the callback object for the main loop
-  perfopen_attr perf_funs = {.msg_fun = ddprof_callback,
-                             .timeout_fun = ddprof_timeout};
-
   if (!pprof_Init(ctx->dp, (const char **)pprof_labels,
                   (const char **)pprof_units, ctx->num_watchers)) {
     OPT_TABLE(X_FREE);
@@ -690,110 +789,35 @@ int main(int argc, char **argv) {
   pid_t pid = fork();
   if (!pid) {
     // 3c. I am the child.  Fork again
-    if (fork())
-      exit(0); // no need to use _exit, since we still own the proc
+    if (fork()) {
+      // Still have to cleanup, though...
+      OPT_TABLE(X_FREE);
+      DDR_free(ddr);
+      unwind_free(ctx->us);
+      pprof_Free(ctx->dp);
+      return 0;
+    }
 
     // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
-    bool instrumented_any_watchers = false;
-    struct PEvent pes[100] = {0};
-    for (int i = 0; i < ctx->num_watchers; i++) {
-      for (int j = 0; j < num_cpu; j++) {
-        int k = i * num_cpu + j;
-        pes[k].pos = i; // watcher index is the sample index
+    instrument_prof(ctx, sfd, pb);
 
-        NTC("Receiving watcher %d.%d", i, j);
-        pes[k].fd = getfd(sfd[0]);
-        if (-1 == pes[k].fd) {
-          ERR("Could not finalize watcher %d.%d: transport error", i, j);
-        } else if (-2 == pes[k].fd) {
-          ERR("Could not finalize watcher %d.%d: received fail notice", i, j);
-        } else if (!(pes[k].region = perfown(pes[k].fd))) {
-          close(pes[k].fd);
-          pes[k].fd = -1;
-          ERR("Could not finalize watcher %d.%d: registration (%s)", i, j,
-              strerror(errno));
-        } else {
-          instrumented_any_watchers = true;
-        }
-        pthread_barrier_wait(pb);
-      }
-    }
+    // We are only here if the profiler fails or exits
+    OPT_TABLE(X_FREE);
+    DDR_free(ddr);
+    unwind_free(ctx->us);
+    pprof_Free(ctx->dp);
 
-    // Cleanup and enter event loop
-    close(sfd[0]);
-    close(sfd[1]);
-    munmap(pb, sizeof(pthread_barrier_t));
-
-    ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
-    unwind_init(ctx->us);
-    elf_version(EV_CURRENT); // Initialize libelf
-
-    if (explain_sigseg)
-      sigaction(SIGSEGV,
-                &(struct sigaction){.sa_sigaction = sigsegv_handler,
-                                    .sa_flags = SA_SIGINFO},
-                NULL);
-    if (instrumented_any_watchers) {
-      NTC("Entering main loop");
-      main_loop(pes, ctx->num_watchers * num_cpu, &perf_funs, ctx);
-
-      // If we're here, the main loop closed--probably the profilee closed
-      if (errno)
-        WRN("Profiling context no longer valid (%s)", strerror(errno));
-      else
-        WRN("Profiling context no longer valid");
-
-      int64_t now = now_nanos();
-      if (now > ctx->send_nanos || ctx->sendfinal) {
-        WRN("Sending final export");
-        export(ctx, now);
-      }
-    } else {
-      ERR("Failed to install any watchers, profiling disabled");
-    }
-  } else {
-    // 3p.  I am the original process.  If not prof profiling, instrument now
-    pid_t mypid = getpid();
-    for (int i = 0; i < ctx->num_watchers && ctx->params.enable; i++) {
-      for (int j = 0; j < num_cpu; j++) {
-        int fd = perfopen(
-            mypid, ctx->watchers[i].opt->type, ctx->watchers[i].opt->config,
-            ctx->watchers[i].sample_period, ctx->watchers[i].opt->mode, j);
-
-        if (-1 == fd) {
-          WRN("Failed to setup watcher %d.%d (%s)", i, j, strerror(errno));
-          if (sendfail(sfd[1]))
-            ERR("Could not pass failure for watcher %d.%d", i, j);
-        } else {
-          NTC("Sending instrumentation for watcher %d.%d", i, j);
-          if (sendfd(sfd[1], fd))
-            ERR("Could not pass instrumentation for watcher %d.%d", i, j);
-        }
-        pthread_barrier_wait(pb);
-      }
-    }
-
-    // Cleanup and become desired process image
-    pthread_barrier_destroy(pb);
-    munmap(pb, sizeof(pthread_barrier_t));
-    close(sfd[0]);
-    close(sfd[1]);
-    goto EXECUTE;
+    WRN("Profiling terminated");
+    return -1;
   }
 
-  // Neither the profiler nor the instrumented process should get here
-  OPT_TABLE(X_FREE);
-  DDR_free(ddr);
-  unwind_free(ctx->us);
-  pprof_Free(ctx->dp);
+  // 3p.  I am the original process.  If not prof profiling, instrument now
+  instrument_self(ctx, sfd, pb);
 
-  WRN("Profiling terminated");
-  return -1;
-
-EXECUTE:
   // NB we don't LOG_close() here because we might still need to report error
   //    and all the logging modes either remain open (stdio) or are cloexec'd
   //    (syslog, file)
+EXECUTE:
   if (-1 == execvp(*argv, argv)) {
     switch (errno) {
     case ENOENT:
