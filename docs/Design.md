@@ -5,37 +5,42 @@ Design discussions.
 ## Architecture
 
 Roughly speaking, the profiler performs the following operations in sequence.
- * Instantiated by OS
- * Processes options, environment variables, etc
- * Initializes global objects and memory
- * Creates a pipe (two linked sockets), setting the socket type to be a Unix
-   Domain Socket.  This will be used for transferring file descriptors
- * Sets up a pthreads barrier in a shared-memory region, with a shared
-   disposition (otherwise pthreads fails to use it properly) for coordination
- * Calls fork() to create a child
- * The child calls fork() and dies
- * The original process iteratively calls `perf_event_open()` and sends the
-   resulting file descriptor to the grandchild using a unix domain socket, then
-   enters the pthread barrier.  Iteration is done for each watcher, on each
-   CPU, since the `perf_event_open()` context is restricted.
- * Grandchild receives the file descriptors, clears the thread barrier
- * Original process closes the file descriptor and repeats until all watchers
-   have been enabled on all CPUs.
- * Both processes close their unix domain sockets
- * Grandchild creates one mmap() region to receive the `perf_event_open()`
-   ringbuffer
- * Original process calls `execvp()` to become the target process with args
- * Grandchild `poll()`s on received file descriptors to listen for events in
-   ringbuffer
+
+* Instantiated by OS
+* Processes options, environment variables, etc
+* Initializes global objects and memory
+* Creates a pipe (two linked sockets), setting the socket type to be a Unix
+  Domain Socket.  This will be used for transferring file descriptors
+* Sets up a pthreads barrier in a shared-memory region, with a shared
+  disposition (otherwise pthreads fails to use it properly) for coordination
+* Calls fork() to create a child
+* The child calls fork() and dies
+* The original process iteratively calls `perf_event_open()` and sends the
+  resulting file descriptor to the grandchild using a unix domain socket, then
+  enters the pthread barrier.  Iteration is done for each watcher, on each
+  CPU, since the `perf_event_open()` context is restricted.
+* Grandchild receives the file descriptors, clears the thread barrier
+* Original process closes the file descriptor and repeats until all watchers
+  have been enabled on all CPUs.
+* Both processes close their unix domain sockets
+* Grandchild creates one mmap() region to receive the `perf_event_open()`
+  ringbuffer
+* Original process calls `execvp()` to become the target process with args
+* Grandchild `poll()`s on received file descriptors to listen for events in
+  ringbuffer
+
+## Fork strategy
+
+![img_fork_strategy](./ddprof_fork_strategy.svg)
 
 ### Notes
 
- * the grandchild does not read from stdio, so it should not be necessary to
-   close any of the underlying streams.  But we could once we have better
-   logging facilities.
- * We don't do anything to set the signal disposition of the grandchild or
-   original process.
- * We should, but do not, do any resource isolation or limiting yet.
+* the grandchild does not read from stdio, so it should not be necessary to
+  close any of the underlying streams.  But we could once we have better
+  logging facilities.
+* We don't do anything to set the signal disposition of the grandchild or
+  original process.
+* We should, but do not, do any resource isolation or limiting yet.
 
 ## Architecture painpoints
 
