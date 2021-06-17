@@ -5,21 +5,22 @@ FROM ubuntu:20.04 as base
 
 RUN apt update \
   && DEBIAN_FRONTEND=noninteractive apt install -y \
-    make \
-    clang-11 \
-    gcc-10 \
-    gcc \
-    g++ \
-    git \
-    ssh-client \
-    curl \
-    m4 \
-    awscli \
-    binutils-dev \
-    libprotobuf-c-dev \
-    liblzma-dev \
-    zlib1g-dev \
-    cmake
+  awscli \
+  binutils-dev \
+  clang-11 \
+  cmake \
+  gcc-10 \
+  gcc \
+  g++ \
+  git \
+  curl \
+  make \
+  m4 \
+  libprotobuf-c-dev \
+  liblzma-dev \
+  pkg-config \
+  ssh-client \
+  zlib1g-dev
 
 # Provides the llvm-symbolizer (better debug information in case of sanitizer issue)
 ENV PATH="/usr/lib/llvm-11/bin/:$PATH"
