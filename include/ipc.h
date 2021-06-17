@@ -2,8 +2,8 @@
 #define _H_ipc
 
 #include <netinet/in.h>
-#include <sys/socket.h>
 #include <stdbool.h>
+#include <sys/socket.h>
 
 #define DDPF_MAX_FD 253 // minimum value of SCM_MAX_FD?
 
@@ -23,12 +23,12 @@ bool sendfd(int sfd, int *fd, int sz) {
   struct msghdr *msg = &(struct msghdr){
       .msg_iov = &(struct iovec){.iov_base = &sz, .iov_len = sizeof(sz)},
       .msg_iovlen = 1,
-      .msg_control = (char[CMSG_SPACE(DDPF_MAX_FD*sizeof(int))]){0},
-      .msg_controllen = CMSG_SPACE(sz*sizeof(int))};
+      .msg_control = (char[CMSG_SPACE(DDPF_MAX_FD * sizeof(int))]){0},
+      .msg_controllen = CMSG_SPACE(sz * sizeof(int))};
   CMSG_FIRSTHDR(msg)->cmsg_level = SOL_SOCKET;
   CMSG_FIRSTHDR(msg)->cmsg_type = SCM_RIGHTS;
-  CMSG_FIRSTHDR(msg)->cmsg_len = CMSG_LEN(sz*sizeof(int));
-  memcpy(CMSG_DATA(CMSG_FIRSTHDR(msg)), fd, sz*sizeof(int));
+  CMSG_FIRSTHDR(msg)->cmsg_len = CMSG_LEN(sz * sizeof(int));
+  memcpy(CMSG_DATA(CMSG_FIRSTHDR(msg)), fd, sz * sizeof(int));
 
   if (sizeof(sz) != sendmsg(sfd, msg, MSG_NOSIGNAL))
     return false;
@@ -38,12 +38,12 @@ bool sendfd(int sfd, int *fd, int sz) {
 
 // TODO right now this allocates memory which has to be freed by the caller,
 //      maybe we can do a bit better with some refactoring.
-int* getfd(int sfd, int* sz) {
+int *getfd(int sfd, int *sz) {
   struct msghdr msg = {
       .msg_iov = &(struct iovec){.iov_base = &(int){0}, .iov_len = sizeof(int)},
       .msg_iovlen = 1,
-      .msg_control = (char[CMSG_SPACE(DDPF_MAX_FD*sizeof(int))]){0},
-      .msg_controllen = CMSG_SPACE(DDPF_MAX_FD*sizeof(int))};
+      .msg_control = (char[CMSG_SPACE(DDPF_MAX_FD * sizeof(int))]){0},
+      .msg_controllen = CMSG_SPACE(DDPF_MAX_FD * sizeof(int))};
   while (sizeof(int) != recvmsg(sfd, &msg, MSG_NOSIGNAL)) {
     if (errno != EINTR) {
       *sz = -1;
@@ -52,7 +52,7 @@ int* getfd(int sfd, int* sz) {
   }
 
   // Check, then copy in an alignment-safe way.
-  *sz = *(int*)msg.msg_iov[0].iov_base;
+  *sz = *(int *)msg.msg_iov[0].iov_base;
   int num_fd = 0;
   struct cmsghdr *cmsg = NULL;
   int *fd = calloc(*sz, sizeof(int));

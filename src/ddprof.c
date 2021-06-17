@@ -13,9 +13,9 @@
 #include "dd_send.h"
 #include "ddprofcmdline.h"
 #include "http.h"
+#include "ipc.h"
 #include "logger.h"
 #include "perf.h"
-#include "ipc.h"
 #include "pprof.h"
 #include "unwind.h"
 #include "version.h"
@@ -450,9 +450,10 @@ void instrument_pid(DDProfContext *ctx, pid_t pid) {
   int k = 0;
   for (int i = 0; i < ctx->num_watchers && ctx->params.enable; i++) {
     for (int j = 0; j < num_cpu; j++) {
-      pes[k].fd = perfopen(
-          pid, ctx->watchers[i].opt->type, ctx->watchers[i].opt->config,
-          ctx->watchers[i].sample_period, ctx->watchers[i].opt->mode | PE_NODISABLE, j);
+      pes[k].fd =
+          perfopen(pid, ctx->watchers[i].opt->type,
+                   ctx->watchers[i].opt->config, ctx->watchers[i].sample_period,
+                   ctx->watchers[i].opt->mode | PE_NODISABLE, j);
       pes[k].pos = i;
       if (!(pes[k].region = perfown(pes[k].fd))) {
         close(pes[k].fd);
@@ -471,7 +472,6 @@ void instrument_pid(DDProfContext *ctx, pid_t pid) {
               &(struct sigaction){.sa_sigaction = sigsegv_handler,
                                   .sa_flags = SA_SIGINFO},
               NULL);
-
 
   // Perform initialization operations
   ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
@@ -570,7 +570,6 @@ void instrument_prof(DDProfContext *ctx, int sfd[2]) {
               &(struct sigaction){.sa_sigaction = sigsegv_handler,
                                   .sa_flags = SA_SIGINFO},
               NULL);
-
 
   // Perform initialization operations
   ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
