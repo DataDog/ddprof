@@ -20,8 +20,6 @@ The following commands create a docker container based on ubuntu to build while 
 ./tools/launch_local_build.sh
 ```
 
-:warning: if you use worktrees you will have to mount extra folders (as the build uses `git rev-parse --short HEAD` to define version name).
-
 ### Native linux
 
 Check the required libraries described in the [app/base-env/Dockerfile](app/base-env/Dockerfile).
@@ -39,6 +37,20 @@ make deps
 ```bash
 make build
 ./release/ddprof --help
+```
+
+### Make the unit tests
+
+Unit tests are build through the cmake build system (unifying builds is ongoing).
+
+```bash
+#At the top level, within the build image
+mkdir build
+cd build
+cmake ../
+make -j 4
+cd test
+ctest
 ```
 
 ## Run commands

@@ -9,4 +9,8 @@
 #  define VER_REV "custom"
 #endif
 
+const char *str_version();
+
+void print_version();
+
 #endif
