@@ -113,7 +113,6 @@ build:collatz:
   image: $BUILD_IMG_STICKY
   stage: build
   tags: ["runner:docker", "size:large"]
-  when: manual
   artifacts:
     paths:
       - $RELEASEBIN
@@ -128,18 +127,25 @@ build:collatz:
     - set -euo pipefail
     - rm -rf vendor
     - ln -s /app/vendor vendor
-    - make DEBUG=0 ANALYSIS=0 bench
+    - mkdir -p release/release
+    - mkdir -p release/debug
+    - make ANALYSIS=0 bench
+    - mv $BINPATH/$ANAME $DEBUGBIN
+    - make DEBUG=0 ANALYSIS=0 SAFETY=0 bench
+    - mv $BINPATH/$ANAME $RELEASEBIN
 
 deploy:collatz:
   image: $BUILD_IMG_STICKY
   stage: deploy
   tags: ["runner:docker", "size:large"]
-  when: manual
   variables:
     ANAME: collatz
     BINPATH: release
-    RELEASEBIN: $BINPATH/release
-    DEBUGBIN: $BINPATH/debug
+    RELEASEBIN: $BINPATH/release/collatz
+    DEBUGBIN: $BINPATH/debug/collatz
+    PROMOTE: none
   script:
-    - set -euo pipefail
+    - set -euxo pipefail
+    - if [ $CI_COMMIT_BRANCH = "main" ];then
+    - PROMOTE=MAJOR;fi
     - tools/ci_upload.sh
