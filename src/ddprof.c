@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <execinfo.h>
 #include <getopt.h>
 #include <libelf.h>
