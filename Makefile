@@ -24,7 +24,7 @@ ANALYSIS ?= 1
 GNU_TOOLS ?= 0
 
 ## Build parameters
-CFLAGS = -O2 -std=c11 -D_GNU_SOURCE
+CFLAGS = -O2 -std=c11 -D_GNU_SOURCE -DMYNAME=\"ddprof\"
 WARNS := -Wall -Wextra -Wpedantic -Wno-missing-braces -Wno-missing-field-initializers -Wno-gnu-statement-expression -Wno-pointer-arith -Wno-gnu-folding-constant -Wno-zero-length-array
 BUILDCHECK := 0  # Do we check the build with CLANG tooling afterward?
 DDARGS :=
@@ -112,7 +112,7 @@ LIBDDPROF := $(VENDIR)/libddprof
 # Global aggregates
 INCLUDE = -I$(LIBDDPROF)/src -I$(LIBDDPROF)/include -Iinclude -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
 LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl 
-SRC := $(addprefix $(LIBDDPROF)/src/, string_table.c pprof.c http.c dd_send.c append_string.c) src/proto/profile.pb-c.c src/ddprofcmdline.c src/logger.c src/version.c
+SRC := $(addprefix $(LIBDDPROF)/src/, string_table.c pprof.c http.c dd_send.c append_string.c) src/proto/profile.pb-c.c src/ddprofcmdline.c src/logger.c src/signal_helper.c src/version.c
 DIRS := $(TARGETDIR) $(TMP)
 
 .PHONY: build deps bench ddprof_banner format format-commit clean_deps publish all
