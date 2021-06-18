@@ -60,4 +60,10 @@ void LOG_setlevel(int);
 int LOG_getlevel();
 void LOG_setfacility(int);
 
+/******************************* Logging Macros *******************************/
+#define LG_ERR(...) LOG_lfprintf(LL_ERROR, -1, MYNAME, __VA_ARGS__)
+#define LG_WRN(...) LOG_lfprintf(LL_WARNING, -1, MYNAME, __VA_ARGS__)
+#define LG_NTC(...) LOG_lfprintf(LL_NOTICE, -1, MYNAME, __VA_ARGS__)
+#define LG_DBG(...) LOG_lfprintf(LL_DEBUG, -1, MYNAME, __VA_ARGS__)
+
 #endif

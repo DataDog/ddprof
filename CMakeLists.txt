@@ -12,6 +12,7 @@ project(DDProf
   LANGUAGES CXX C
   VERSION 0.1
 )
+add_compile_definitions("MYNAME=\"${CMAKE_PROJECT_NAME}\"")
 
 ## Allow to easily import external libraries
 include(FetchContent)

@@ -1,7 +1,9 @@
 #ifndef _H_VERSION
 #define _H_VERSION
 
-#define MYNAME "ddprof"
+#ifndef MYNAME
+#  define MYNAME "ddprof"
+#endif
 #define VER_MAJ 0
 #define VER_MIN 4
 #define VER_PATCH 7

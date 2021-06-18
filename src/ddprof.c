@@ -21,12 +21,6 @@
 #include "unwind.h"
 #include "version.h"
 
-/******************************* Logging Macros *******************************/
-#define ERR(...) LOG_lfprintf(LL_ERROR, -1, MYNAME, __VA_ARGS__)
-#define WRN(...) LOG_lfprintf(LL_WARNING, -1, MYNAME, __VA_ARGS__)
-#define NTC(...) LOG_lfprintf(LL_NOTICE, -1, MYNAME, __VA_ARGS__)
-#define DBG(...) LOG_lfprintf(LL_DEBUG, -1, MYNAME, __VA_ARGS__)
-
 #define max_watchers 10
 
 typedef struct PerfOption {
@@ -146,7 +140,7 @@ int num_cpu = 0;
 #define X_DFLT(a, b, c, d, e, f, g, h) DFLT_EXP(#a, b, f, g, h);
 #define X_FREE(a, b, c, d, e, f, g, h) FREE_EXP(b, f);
 #define X_CASE(a, b, c, d, e, f, g, h) CASE_EXP(d, f, b)
-#define X_PRNT(a, b, c, d, e, f, g, h) if((f)->b) NTC("  "#b ": %s", (f)->b);
+#define X_PRNT(a, b, c, d, e, f, g, h) if((f)->b) LG_NTC("  "#b ": %s", (f)->b);
 
 //  A                              B                C   D   E  F         G     H
 #define OPT_TABLE(XX)                                                                       \
@@ -214,17 +208,17 @@ void export(DDProfContext *pctx, int64_t now) {
   DDReq *ddr = pctx->ddr;
   DProf *dp = pctx->dp;
 
-  NTC("Pushed samples to backend");
+  LG_NTC("Pushed samples to backend");
   int ret = 0;
   if ((ret = DDR_pprof(ddr, dp)))
-    ERR("Error enqueuing pprof (%s)", DDR_code2str(ret));
+    LG_ERR("Error enqueuing pprof (%s)", DDR_code2str(ret));
   DDR_setTimeNano(ddr, dp->pprof.time_nanos, now);
   if ((ret = DDR_finalize(ddr)))
-    ERR("Error finalizing export (%s)", DDR_code2str(ret));
+    LG_ERR("Error finalizing export (%s)", DDR_code2str(ret));
   if ((ret = DDR_send(ddr)))
-    ERR("Error sending export (%s)", DDR_code2str(ret));
+    LG_ERR("Error sending export (%s)", DDR_code2str(ret));
   if ((ret = DDR_watch(ddr, -1))) {
-    ERR("Error(%d) watching (%s)", ddr->res.code, DDR_code2str(ret));
+    LG_ERR("Error(%d) watching (%s)", ddr->res.code, DDR_code2str(ret));
   }
   DDR_clear(ddr);
   pctx->send_nanos += pctx->params.upload_period * 1000000000;
@@ -261,12 +255,7 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
     us->max_stack = MAX_STACK;
     FunLoc_clear(us->locs);
     if (-1 == unwindstate__unwind(us)) {
-      Map *map = procfs_MapMatch(us->pid, us->eip);
-      if (!map)
-        WRN("Error getting map for [%d](0x%lx)", us->pid, us->eip);
-      else
-        WRN("Error unwinding %s [%d](0x%lx)", map->path, us->pid, us->eip);
-      return;
+      analyze_unwinding_error(us->pid, us->eip);
     }
     FunLoc *locs = us->locs;
     for (uint64_t i = 0, j = 0; i < us->idx; i++) {
@@ -275,6 +264,7 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
 
       // Using the sopath instead of srcpath in locAdd for the DD UI
       id_map = pprof_mapAdd(dp, L.map_start, L.map_end, L.map_off, "", "");
+      // demangled and mangled function names should be dropped in here
       id_fun = pprof_funAdd(dp, L.funname, L.funname, L.srcpath, 0);
       id_loc = pprof_locAdd(dp, id_map, 0, (uint64_t[]){id_fun},
                             (int64_t[]){L.line}, 1);
@@ -447,14 +437,14 @@ void instrument_pid(DDProfContext *ctx, pid_t pid) {
       if (!(pes[k].region = perfown(pes[k].fd))) {
         close(pes[k].fd);
         pes[k].fd = -1;
-        ERR("Could not finalize watcher %d.%d: registration (%s)", i, j,
-            strerror(errno));
+        LG_ERR("Could not finalize watcher %d.%d: registration (%s)", i, j,
+               strerror(errno));
       }
       k++;
     }
   }
 
-  NTC("Entering main loop");
+  LG_NTC("Entering main loop");
   // Setup signal handler if defined
   if (ctx->params.faultinfo)
     sigaction(SIGSEGV,
@@ -472,15 +462,15 @@ void instrument_pid(DDProfContext *ctx, pid_t pid) {
 
   // If we're here, the main loop closed--probably the profilee closed
   if (errno)
-    WRN("Profiling context no longer valid (%s)", strerror(errno));
+    LG_WRN("Profiling context no longer valid (%s)", strerror(errno));
   else
-    WRN("Profiling context no longer valid");
+    LG_WRN("Profiling context no longer valid");
 
   // We're going to close down, but first check whether we have a valid export
   // to send (or if we requested the last partial export with sendfinal)
   int64_t now = now_nanos();
   if (now > ctx->send_nanos || ctx->sendfinal) {
-    WRN("Sending final export");
+    LG_WRN("Sending final export");
     export(ctx, now);
   }
 }
@@ -495,7 +485,7 @@ void instrument_self(DDProfContext *ctx, int sfd[2], pid_t pid) {
           ctx->watchers[i].sample_period, ctx->watchers[i].opt->mode, j);
 
       if (-1 == fd[k]) {
-        WRN("Failed to setup watcher %d.%d (%s)", i, j, strerror(errno));
+        LG_WRN("Failed to setup watcher %d.%d (%s)", i, j, strerror(errno));
       } else {
         k++;
       }
@@ -503,7 +493,7 @@ void instrument_self(DDProfContext *ctx, int sfd[2], pid_t pid) {
   }
 
   if (!sendfd(sfd[1], fd, k)) {
-    ERR("Could not pass profiling context to profiler");
+    LG_ERR("Could not pass profiling context to profiler");
   }
 
   // Cleanup and become desired process image
@@ -519,7 +509,7 @@ void instrument_prof(DDProfContext *ctx, int sfd[2]) {
   int sz = 0;
   int *fds = getfd(sfd[0], &sz);
   if (sz < num_cpu * ctx->num_watchers) {
-    ERR("Received fewer than expected contexts");
+    LG_ERR("Received fewer than expected contexts");
     sz = 0;
   }
 
@@ -530,7 +520,7 @@ void instrument_prof(DDProfContext *ctx, int sfd[2]) {
   // Early return if we can't do anything.
   // NOTE: this is common if the system isn't configured to allow perf events
   if (sz < num_cpu * ctx->num_watchers) {
-    ERR("Failed to install any watchers, profiling disabled");
+    LG_ERR("Failed to install any watchers, profiling disabled");
     free(fds);
     return;
   } else {
@@ -542,8 +532,8 @@ void instrument_prof(DDProfContext *ctx, int sfd[2]) {
         if (!(pes[k].region = perfown(pes[k].fd))) {
           close(pes[k].fd);
           pes[k].fd = -1;
-          ERR("Could not finalize watcher %d.%d: registration (%s)", i, j,
-              strerror(errno));
+          LG_ERR("Could not finalize watcher %d.%d: registration (%s)", i, j,
+                 strerror(errno));
         }
         k++;
       }
@@ -551,7 +541,7 @@ void instrument_prof(DDProfContext *ctx, int sfd[2]) {
     free(fds);
   }
 
-  NTC("Entering main loop");
+  LG_NTC("Entering main loop");
 
   // Setup signal handler if defined
   if (ctx->params.faultinfo)
@@ -570,15 +560,15 @@ void instrument_prof(DDProfContext *ctx, int sfd[2]) {
 
   // If we're here, the main loop closed--probably the profilee closed
   if (errno)
-    WRN("Profiling context no longer valid (%s)", strerror(errno));
+    LG_WRN("Profiling context no longer valid (%s)", strerror(errno));
   else
-    WRN("Profiling context no longer valid");
+    LG_WRN("Profiling context no longer valid");
 
   // We're going to close down, but first check whether we have a valid export
   // to send (or if we requested the last partial export with sendfinal)
   int64_t now = now_nanos();
   if (now > ctx->send_nanos || ctx->sendfinal) {
-    WRN("Sending final export");
+    LG_WRN("Sending final export");
     export(ctx, now);
   }
 }
@@ -646,7 +636,7 @@ int main(int argc, char **argv) {
         }
       }
       if (!event_matched) {
-        WRN("Event %s did not match any events", optarg);
+        LG_WRN("Event %s did not match any events", optarg);
       }
       break;
     case 'h':;
@@ -659,7 +649,7 @@ int main(int argc, char **argv) {
       return 0;
     default:;
       OPT_TABLE(X_FREE);
-      ERR("Invalid option %c", c);
+      LG_ERR("Invalid option %c", c);
       return -1;
     }
   }
@@ -743,18 +733,19 @@ int main(int argc, char **argv) {
   // Process input printer (do this last!)
   if (ctx->printargs && arg_yesno(ctx->printargs, 1)) {
     if (LOG_getlevel() < LL_DEBUG)
-      WRN("printarg specified, but loglevel too low to emit parameters");
-    DBG("Printing parameters");
+      LG_WRN("printarg specified, but loglevel too low to emit parameters");
+    LG_DBG("Printing parameters");
     OPT_TABLE(X_PRNT);
 
-    DBG("Native profiler enabled: %s", ctx->params.enable ? "true" : "false");
+    LG_DBG("Native profiler enabled: %s",
+           ctx->params.enable ? "true" : "false");
 
-    DBG("Instrumented with %d watchers:", ctx->num_watchers);
+    LG_DBG("Instrumented with %d watchers:", ctx->num_watchers);
     for (int i = 0; i < ctx->num_watchers; i++) {
-      DBG("  ID: %s, Pos: %d, Index: %d, Label: %s, Mode: %d",
-          ctx->watchers[i].opt->key, i, ctx->watchers[i].opt->config,
-          ctx->watchers[i].opt->label, ctx->watchers[i].opt->mode);
-      DBG("Done printing parameters");
+      LG_DBG("  ID: %s, Pos: %d, Index: %d, Label: %s, Mode: %d",
+             ctx->watchers[i].opt->key, i, ctx->watchers[i].opt->config,
+             ctx->watchers[i].opt->label, ctx->watchers[i].opt->mode);
+      LG_DBG("Done printing parameters");
     }
   }
 
@@ -776,12 +767,12 @@ int main(int argc, char **argv) {
   // Only throw an error if we needed the user to pass an arg
   if (ctx->params.pid) {
     if (ctx->params.pid == -1)
-      NTC("Instrumenting whole system");
+      LG_NTC("Instrumenting whole system");
     else
-      NTC("Instrumenting PID %d", ctx->params.pid);
+      LG_NTC("Instrumenting PID %d", ctx->params.pid);
   } else if (argc <= 0) {
     OPT_TABLE(X_FREE);
-    ERR("No target specified, exiting");
+    LG_ERR("No target specified, exiting");
     return -1;
   }
 
@@ -790,7 +781,7 @@ int main(int argc, char **argv) {
   \****************************************************************************/
   // If the profiler was disabled, just skip ahead
   if (!ctx->params.enable) {
-    NTC("Profiling disabled");
+    LG_NTC("Profiling disabled");
     goto EXECUTE;
   }
   // Initialize the request object
@@ -808,7 +799,7 @@ int main(int argc, char **argv) {
                   (const char **)pprof_units, ctx->num_watchers)) {
     OPT_TABLE(X_FREE);
     DDR_free(ddr);
-    ERR("Failed to initialize profiling storage");
+    LG_ERR("Failed to initialize profiling storage");
     return -1;
   }
   pprof_timeUpdate(ctx->dp); // Set the time
@@ -845,7 +836,7 @@ int main(int argc, char **argv) {
   // 1. Setup pipes (really unix domain socket pair)
   int sfd[2] = {-1, -1};
   if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sfd)) {
-    ERR("Could not instantiate message passing system, profiling disabled");
+    LG_ERR("Could not instantiate message passing system, profiling disabled");
     goto EXECUTE;
   }
 
@@ -871,7 +862,7 @@ int main(int argc, char **argv) {
     unwind_free(ctx->us);
     pprof_Free(ctx->dp);
 
-    WRN("Profiling terminated");
+    LG_WRN("Profiling terminated");
     return -1;
   }
 
@@ -885,14 +876,14 @@ EXECUTE:
   if (-1 == execvp(*argv, argv)) {
     switch (errno) {
     case ENOENT:
-      ERR("%s: file not found", argv[0]);
+      LG_ERR("%s: file not found", argv[0]);
       break;
     case ENOEXEC:
     case EACCES:
-      ERR("%s: permission denied", argv[0]);
+      LG_ERR("%s: permission denied", argv[0]);
       break;
     default:
-      WRN("%s: failed to execute (%s)", argv[0], strerror(errno));
+      LG_WRN("%s: failed to execute (%s)", argv[0], strerror(errno));
       break;
     }
   }

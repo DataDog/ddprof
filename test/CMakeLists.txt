@@ -59,6 +59,12 @@ add_unit_test(
 )
 
 add_unit_test(
+    signal_helper-ut
+    ../src/signal_helper.c 
+    signal_helper-ut.cc
+)
+
+add_unit_test(
     version-ut
     ../src/version.c 
     version-ut.cc
