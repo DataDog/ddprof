@@ -19,5 +19,5 @@ endif
 
 collatz: collatz.c
 	mkdir -p $(TARGETDIR)
-	$(CC) $(CFLAGS) -O0 -g $(DDARGS) -o $(TARGETDIR)/$@ $^ -lpthread
+	$(CC) $(CFLAGS) $(DDARGS) -o $(TARGETDIR)/$@ $^ -lpthread
 
