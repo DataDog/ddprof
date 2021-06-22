@@ -1,6 +1,8 @@
 # TODO to be unified with switch to different build management system
 GNU_LATEST := $(shell /bin/bash -c 'command -v gcc{-11,-10,,-9,-8,-7} | head -n 1')
 CLANG_LATEST := $(shell /bin/bash -c 'command -v clang{-12,-11,,-10,-9,-8} | head -n 1')
+CFLAGS := $(filter-out -O2, $(CFLAGS))
+CFLAGS := $(filter-out -O1, $(CFLAGS))
 ifeq ($(GNU_TOOLS),1)
   CC := $(GNU_LATEST)
 else
