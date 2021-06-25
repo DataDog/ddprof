@@ -1,4 +1,6 @@
-#include <errno.h>
+#include <ddprof/dd_send.h>
+#include <ddprof/http.h>
+#include <ddprof/pprof.h>
 #include <execinfo.h>
 #include <getopt.h>
 #include <libelf.h>
@@ -11,13 +13,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "dd_send.h"
 #include "ddprofcmdline.h"
-#include "http.h"
 #include "ipc.h"
 #include "logger.h"
 #include "perf.h"
-#include "pprof.h"
 #include "unwind.h"
 #include "version.h"
 

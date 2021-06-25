@@ -1,6 +1,7 @@
 #ifndef _H_ipc
 #define _H_ipc
 
+#include <errno.h>
 #include <netinet/in.h>
 #include <stdbool.h>
 #include <sys/socket.h>

@@ -5,14 +5,16 @@ stages:
 
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
-  # Cache of the valid images to start build steps faster
-  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:709d1a8560d8cdbe53768249f9782f39df6a0588a74c3e0d198aac8a5cfe17c5
+  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/72823563
+  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:f61ea9a4535911a054db96bfa19421d9cfe22a6746fc54ddb1232025e22e52fd
   # When build images are built, publish them with following tags
   BASE_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
   BUILD_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build
   # Deployment paths
   S3_PREFIX: s3://binaries.ddbuild.io/ddprof/release
   RELPATH: ddprof/release
+  BINPATH: release
+  S3ROOT: ddprof
 
 # This is the base repo (apt, system configuration, etc)
 build:base:
@@ -36,7 +38,7 @@ build:deps:
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
   script:
     - set -euo pipefail
-    - docker build --tag $BUILD_IMG -f app/build-env/Dockerfile .
+    - docker build --tag $BUILD_IMG --build-arg CI=${CI} -f app/build-env/Dockerfile .
     - docker push $BUILD_IMG
 
 .light-job-resource-allocation:
@@ -59,21 +61,28 @@ build:ddprof_cmake:
     BUILDPATH: build_${BUILD_TYPE}
   script:
     - set -euxo pipefail
+    - mkdir -p vendor
+    #Build image dependencies were stored in app, avoid rebuilding vendor content
+    - ln -s /app/vendor/elfutils vendor/elfutils
+    - ln -s /app/vendor/libddprof vendor/libddprof
     - mkdir -p ${BUILDPATH} && cd ${BUILDPATH}
     - cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} ../
     - make -j ${KUBERNETES_CPU_LIMIT}
     - cd ${TESTPATH} && ctest --repeat-until-fail 5 --output-on-failure | tee test-output.log
 
-build:ddprof:
+.ddprof_job:
+  variables:
+    BINNAME: ddprof
+    RELEASEBIN: $BINPATH/release/$BINNAME
+    DEBUGBIN: $BINPATH/debug/$BINNAME
+    GIT_SUBMODULE_STRATEGY: recursive
+    PROMOTE: NONE
   image: $BUILD_IMG_STICKY
+
+build:ddprof:
+  extends: .ddprof_job
   stage: build
   tags: ["runner:docker", "size:large"]
-  variables:
-    ANAME: ddprof
-    BINPATH: release
-    RELEASEBIN: $BINPATH/release/$ANAME
-    DEBUGBIN: $BINPATH/debug/$ANAME
-    GIT_SUBMODULE_STRATEGY: recursive
   artifacts:
     paths:
       - $RELEASEBIN
@@ -82,64 +91,67 @@ build:ddprof:
   script:
     - set -euo pipefail
     - rm -rf vendor/elfutils
+    #Build image dependencies were stored in app, avoid rebuilding vendor content
+    - mkdir -p vendor
     - ln -s /app/vendor/elfutils vendor/elfutils
+    - ln -s /app/vendor/libddprof vendor/libddprof
     - ls -l vendor
     - ls -l vendor/libddprof
     - mkdir -p release/release
     - mkdir -p release/debug
     - make ANALYSIS=0 build
-    - mv $BINPATH/$ANAME $DEBUGBIN
+    - mv $BINPATH/$BINNAME $DEBUGBIN
     - make DEBUG=0 ANALYSIS=0 SAFETY=0 build
-    - cp $BINPATH/$ANAME $RELEASEBIN
+    - cp $BINPATH/$BINNAME $RELEASEBIN
 
 deploy:ddprof:
+  extends: .ddprof_job
   when: always
   image: $BUILD_IMG_STICKY
   stage: deploy
   tags: ["runner:docker", "size:large"]
-  variables:
-    ANAME: ddprof
-    BINPATH: release
-    RELEASEBIN: $BINPATH/release/$ANAME
-    DEBUGBIN: $BINPATH/debug/$ANAME
-    PROMOTE: MINOR
   script:
     - set -euo pipefail
-    - if [ $CI_COMMIT_BRANCH = "main" ];then
-    - PROMOTE=MAJOR;fi
+    - if [ $CI_COMMIT_BRANCH = "main" ];then PROMOTE=MAJOR;fi
     - tools/ci_upload.sh
+  dependencies:
+    - build:ddprof
+
+.collatz_job:
+  variables:
+    BINNAME: collatz
+    RELEASEBIN: $BINPATH/release/$BINNAME
+    DEBUGBIN: $BINPATH/debug/$BINNAME
+    GIT_SUBMODULE_STRATEGY: recursive
+    PROMOTE: NONE
+  image: $BUILD_IMG_STICKY
 
 build:collatz:
-  image: $BUILD_IMG_STICKY
+  extends: .collatz_job
   stage: build
   tags: ["runner:docker", "size:large"]
-  when: manual
   artifacts:
     paths:
       - $RELEASEBIN
       - $DEBUGBIN
     expire_in: 1 day
-  variables:
-    ANAME: collatz
-    BINPATH: release
-    RELEASEBIN: $BINPATH/release
-    DEBUGBIN: $BINPATH/debug
   script:
     - set -euo pipefail
     - rm -rf vendor
     - ln -s /app/vendor vendor
-    - make DEBUG=0 ANALYSIS=0 bench
+    - mkdir -p release/release
+    - mkdir -p release/debug
+    - make ANALYSIS=0 bench
+    - mv $BINPATH/$BINNAME $DEBUGBIN
+    - make DEBUG=0 ANALYSIS=0 SAFETY=0 bench
+    - mv $BINPATH/$BINNAME $RELEASEBIN
 
 deploy:collatz:
+  extends: .collatz_job
   image: $BUILD_IMG_STICKY
   stage: deploy
   tags: ["runner:docker", "size:large"]
-  when: manual
-  variables:
-    ANAME: collatz
-    BINPATH: release
-    RELEASEBIN: $BINPATH/release
-    DEBUGBIN: $BINPATH/debug
   script:
-    - set -euo pipefail
+    - set -euxo pipefail
+    - if [ $CI_COMMIT_BRANCH = "main" ];then PROMOTE=MAJOR;fi
     - tools/ci_upload.sh
