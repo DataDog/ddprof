@@ -79,7 +79,7 @@ endif
 # If this is happening in CI, name accordingly
 VERNAME :=
 ifeq ($(origin CI_PIPELINE_ID), undefined)
-  VERNAME :=$(shell git rev-parse --short HEAD)
+  VERNAME :=$(shell git rev-parse --short HEAD 2> /dev/null || echo "local"| xargs)
 else
   VERNAME :=$(CI_PIPELINE_ID)-$(shell git rev-parse --short HEAD)
 endif
@@ -106,13 +106,17 @@ URL_ELF := https://sourceware.org/elfutils/ftp/$(VER_ELF)/$(TAR_ELF)
 ELFUTILS = $(VENDIR)/elfutils
 ELFLIBS := $(ELFUTILS)/libdwfl/libdwfl.a $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libebl/libebl.a $(ELFUTILS)/libelf/libelf.a
 
-## libddprof build parameters
+## https://gitlab.ddbuild.io/DataDog/libddprof/-/jobs/72495950
+VER_LIBDDPROF := eeac2cfa #Short commit number from CI (used in export job of libddprof)
+SHA256_LIBDDPROF := c41ce4abe39c478409a09a9f7fbc53817ca61b60ef5cdc3dd401175024ee19f2 # You need to generate this manually
+
 LIBDDPROF := $(VENDIR)/libddprof
+LIBDDPROF_LIB := $(LIBDDPROF)/RelWithDebInfo/lib64/libddprof.a
 
 # Global aggregates
-INCLUDE = -I$(LIBDDPROF)/src -I$(LIBDDPROF)/include -Iinclude -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
-LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl 
-SRC := $(addprefix $(LIBDDPROF)/src/, string_table.c pprof.c http.c dd_send.c append_string.c) src/proto/profile.pb-c.c src/ddprofcmdline.c src/logger.c src/signal_helper.c src/version.c
+INCLUDE = -I$(LIBDDPROF)/RelWithDebInfo/include -Iinclude -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
+LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl
+SRC := src/proto/profile.pb-c.c src/ddprofcmdline.c src/logger.c src/signal_helper.c src/version.c
 DIRS := $(TARGETDIR) $(TMP)
 
 .PHONY: build deps bench ddprof_banner format format-commit clean_deps publish all
@@ -126,6 +130,7 @@ $(ELFLIBS): $(ELFUTILS)
 	$(MAKE) -j4 -C $(ELFUTILS)
 
 $(ELFUTILS):
+	mkdir -p $(VENDIR)
 	cd $(VENDIR) && curl -L --remote-name-all $(URL_ELF)
 	echo $(MD5_ELF) $(VENDIR)/$(TAR_ELF) > $(VENDIR)/elfutils.md5
 	md5sum --status -c $(VENDIR)/elfutils.md5
@@ -134,16 +139,16 @@ $(ELFUTILS):
 	rm -rf $(VENDIR)/$(TAR_ELF)
 	cd $(ELFUTILS) && ./configure CC=$(abspath $(GNU_LATEST)) --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning
 
-$(LIBDDPROF)/src:
-	git submodule update --init
+$(LIBDDPROF):
+	./tools/fetch_libddprof.sh ${VER_LIBDDPROF} ${SHA256_LIBDDPROF} $(VENDIR)
 
 ddprof: $(TARGETDIR)/ddprof
 build: |ddprof help
-deps: $(ELFLIBS) $(LIBDDPROF)/src
+deps: $(LIBDDPROF) $(ELFLIBS) 
 
 ## Actual build targets
-$(TARGETDIR)/ddprof: src/ddprof.c | $(TARGETDIR) $(ELFLIBS) $(LIBDDPROF) ddprof_banner
-	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) $(WARNS) $(SANS) $(LDFLAGS) $(INCLUDE) -o $@ $< $(SRC) $(ELFLIBS) $(LDLIBS)
+$(TARGETDIR)/ddprof: src/ddprof.c | $(TARGETDIR) $(ELFLIBS) $(LIBDDPROF) ddprof_banner $(LIBDDPROF_LIB)
+	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) $(WARNS) $(SANS) $(LDFLAGS) $(INCLUDE) -o $@ $< $(SRC) $(ELFLIBS) $(LDLIBS) $(LIBDDPROF_LIB)
 
 logger: src/eg/logger.c src/logger.c
 	$(CC) $(CFLAGS) $(WARNS) $(SANS) -DPID_OVERRIDE -Iinclude -o $(TARGETDIR)/$@ $^
@@ -160,18 +165,18 @@ ddprof_banner:
 	@echo "Using $(CC)"
 	@echo "Building ddprof with debug=$(DEBUG), analysis=$(ANALYSIS), safety=$(SAFETY), GNU_TOOLS=$(GNU_TOOLS)"
 	@echo "elfutils $(VER_ELF)"
-	@git submodule
 	@echo 
 	@echo =============== BEGIN BUILD ===============
 
 format:
-	tools/clang_formatter.sh
+	tools/style-check.sh
 
 format-commit:
-	tools/clang_formatter.sh apply
+	tools/style-check.sh apply
 
 clean_deps:
 	rm -rf vendor/elfutils
+	rm -rf vendor/libddprof*
 	rm -rf tmp/*
 
 clean: clean_deps

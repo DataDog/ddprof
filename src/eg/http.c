@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "dd_send.h"
+#include <ddprof/dd_send.h>
 
 int main() {
   int ret = 0;

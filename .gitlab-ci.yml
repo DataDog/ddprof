@@ -5,8 +5,8 @@ stages:
 
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
-  # Cache of the valid images to start build steps faster
-  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:709d1a8560d8cdbe53768249f9782f39df6a0588a74c3e0d198aac8a5cfe17c5
+  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/72823563
+  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:f61ea9a4535911a054db96bfa19421d9cfe22a6746fc54ddb1232025e22e52fd
   # When build images are built, publish them with following tags
   BASE_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
   BUILD_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build
@@ -38,7 +38,7 @@ build:deps:
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
   script:
     - set -euo pipefail
-    - docker build --tag $BUILD_IMG -f app/build-env/Dockerfile .
+    - docker build --tag $BUILD_IMG --build-arg CI=${CI} -f app/build-env/Dockerfile .
     - docker push $BUILD_IMG
 
 .light-job-resource-allocation:
@@ -61,6 +61,10 @@ build:ddprof_cmake:
     BUILDPATH: build_${BUILD_TYPE}
   script:
     - set -euxo pipefail
+    - mkdir -p vendor
+    #Build image dependencies were stored in app, avoid rebuilding vendor content
+    - ln -s /app/vendor/elfutils vendor/elfutils
+    - ln -s /app/vendor/libddprof vendor/libddprof
     - mkdir -p ${BUILDPATH} && cd ${BUILDPATH}
     - cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} ../
     - make -j ${KUBERNETES_CPU_LIMIT}
@@ -87,7 +91,10 @@ build:ddprof:
   script:
     - set -euo pipefail
     - rm -rf vendor/elfutils
+    #Build image dependencies were stored in app, avoid rebuilding vendor content
+    - mkdir -p vendor
     - ln -s /app/vendor/elfutils vendor/elfutils
+    - ln -s /app/vendor/libddprof vendor/libddprof
     - ls -l vendor
     - ls -l vendor/libddprof
     - mkdir -p release/release
@@ -107,6 +114,8 @@ deploy:ddprof:
     - set -euo pipefail
     - if [ $CI_COMMIT_BRANCH = "main" ];then PROMOTE=MAJOR;fi
     - tools/ci_upload.sh
+  dependencies:
+    - build:ddprof
 
 .collatz_job:
   variables:
