@@ -27,7 +27,7 @@ rm -f $tmpfile
 tmpfile="/dev/fd/5"
 
 # Look for matching extensions and try to diff them.
-for f in $(find . -regextype posix-egrep -iregex '.*\.(c|cc|cp|cpp|cxx|c++|h|hh|hp|hpp|hxx|h++)$' | grep -v '^\./vendor'); do
+for f in $(find . -regextype posix-egrep -iregex '.*\.(c|cc|cp|cpp|cxx|c++|h|hh|hp|hpp|hxx|h++)$' | grep -v '^\./vendor' | grep -v 'CMakeFiles'); do
   if [ ! -f $f ]; then
     continue
   fi
