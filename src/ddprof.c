@@ -751,8 +751,10 @@ int main(int argc, char **argv) {
            ctx->params.enable ? "true" : "false");
 
     // Tell the user what mode is being used
-    LG_DBG("Profiling mode: %s", -1 == ctx->params.pid ? "global" :
-                                 pid_tmp ? "target" : "wrapper");
+    LG_DBG("Profiling mode: %s",
+           -1 == ctx->params.pid ? "global"
+               : pid_tmp         ? "target"
+                                 : "wrapper");
 
     // Show watchers
     LG_DBG("Instrumented with %d watchers:", ctx->num_watchers);
@@ -872,7 +874,6 @@ int main(int argc, char **argv) {
 
   // 3p.  I am the original process.  If not prof profiling, instrument now
   instrument_self(ctx, sfd, getpid());
-
 
   // Wait until the child process is cleaned up; this ensures a very rare race
   // condition doesn't occur.
