@@ -35,6 +35,7 @@ JOB="redis-runner.sh"
 
 # Check for parameters
 for arg in "$@"; do
+  if [[ ${arg} == "global" ]]; then CMD="${CMD_BASE} -g yes"; CMD_BASE="${CMD_BASE} -g yes"; fi
   if [[ ${arg} == "debug" ]]; then CMD="gdb -ex run -ex 'set follow-fork-mode child' -ex 'set print pretty on' --args ${CMD_BASE}"; fi
   if [[ ${arg} == "strace" ]]; then CMD="strace -f -o /tmp/test.out -s 2500 -v ${CMD_BASE}"; fi
   if [[ ${arg} == "network" ]]; then CMD="strace -etrace=%network -f -o /tmp/test.out -s 2500 -v ${CMD_BASE}"; fi
