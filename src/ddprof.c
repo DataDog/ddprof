@@ -12,6 +12,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <wait.h>
 
 #include "ddprofcmdline.h"
 #include "ipc.h"
@@ -729,7 +730,17 @@ int main(int argc, char **argv) {
   // process count_samples
   ctx->params.count_samples = arg_yesno(ctx->count_samples, 1); // default no
 
-  // Process input printer (do this last!)
+  // Adjust target PID
+  pid_t pid_tmp = 0;
+  if (ctx->pid && (pid_tmp = strtol(ctx->pid, NULL, 10)))
+    ctx->params.pid = pid_tmp;
+
+  // Adjust global mode
+  ctx->params.global = arg_yesno(ctx->global, 1); // default no
+  if (ctx->params.global)
+    ctx->params.pid = -1;
+
+  // Process input printer (do this right before argv/c modification)
   if (ctx->printargs && arg_yesno(ctx->printargs, 1)) {
     if (LOG_getlevel() < LL_DEBUG)
       LG_WRN("printarg specified, but loglevel too low to emit parameters");
@@ -739,6 +750,11 @@ int main(int argc, char **argv) {
     LG_DBG("Native profiler enabled: %s",
            ctx->params.enable ? "true" : "false");
 
+    // Tell the user what mode is being used
+    LG_DBG("Profiling mode: %s", -1 == ctx->params.pid ? "global" :
+                                 pid_tmp ? "target" : "wrapper");
+
+    // Show watchers
     LG_DBG("Instrumented with %d watchers:", ctx->num_watchers);
     for (int i = 0; i < ctx->num_watchers; i++) {
       LG_DBG("  ID: %s, Pos: %d, Index: %d, Label: %s, Mode: %d",
@@ -747,17 +763,6 @@ int main(int argc, char **argv) {
       LG_DBG("Done printing parameters");
     }
   }
-
-  // Adjust target PID
-  pid_t pid_tmp = 0;
-  if (ctx->pid && (pid_tmp = strtol(ctx->pid, NULL, 10)))
-    ctx->params.pid = pid_tmp;
-
-  // Adjust global mode
-  ctx->params.global = arg_yesno(ctx->global, 1); // default no
-  printf("global : %s (%d)\n", ctx->global, arg_yesno(ctx->global, 1));
-  if (ctx->params.global)
-    ctx->params.pid = -1;
 
   // Adjust input parameters for execvp() (we do this even if unnecessary)
   argv += optind;
@@ -840,8 +845,8 @@ int main(int argc, char **argv) {
   }
 
   // 2. fork()
-  pid_t pid = fork();
-  if (!pid) {
+  pid_t child_pid = fork();
+  if (!child_pid) {
     // 3c. I am the child.  Fork again
     if (fork()) {
       // Still have to cleanup, though...
@@ -852,7 +857,7 @@ int main(int argc, char **argv) {
       return 0;
     }
 
-    // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
+    // 4cc. I am the grandchild.  Sit and listen for an FD
     instrument_prof(ctx, sfd);
 
     // We are only here if the profiler fails or exits
@@ -867,6 +872,17 @@ int main(int argc, char **argv) {
 
   // 3p.  I am the original process.  If not prof profiling, instrument now
   instrument_self(ctx, sfd, getpid());
+
+
+  // Wait until the child process is cleaned up; this ensures a very rare race
+  // condition doesn't occur.
+  // The race condition is that the child doesn't exit until *after* I call
+  // excecve().  Many services use SIGCHLD handlers, and the concern is that
+  // such a handler would be called despite the child not having been spawned
+  // by application logic.  Worse-case scenario:  segfault.
+  // We don't care about the return status, since if the PID is already invalid,
+  // then we've satisfied our requirements.
+  waitpid(child_pid, NULL, 0);
 
   // NB we don't LOG_close() here because we might still need to report error
   //    and all the logging modes either remain open (stdio) or are cloexec'd
