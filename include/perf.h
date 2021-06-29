@@ -5,7 +5,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/perf_event.h>
-#include <netinet/in.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdint.h>
@@ -124,6 +123,7 @@ typedef struct perf_samplestacku {
 
 typedef enum PEMode {
   PE_KERNEL_INCLUDE = 1 << 0,
+  PE_NODISABLE = 2 << 0,
 } PEMode;
 
 // Architecturally, it's probably simpler to split this out into callbacks for
@@ -159,68 +159,6 @@ typedef struct RingBuffer {
   unsigned long offset;
 } RingBuffer;
 
-bool sendfail(int sfd) {
-  // The call to getfd() checks message metadata upon receipt, so to send a
-  // failure it suffices to merely not send SOL_SOCKET with SCM_RIGHTS.
-  // This may be a little confusing...  TODO is there a paradoxical setting?
-  struct msghdr msg = {
-      .msg_iov = &(struct iovec){.iov_base = (char[8]){"!"}, .iov_len = 8},
-      .msg_iovlen = 1,
-      .msg_control = (char[CMSG_SPACE(sizeof(int))]){0},
-      .msg_controllen = CMSG_SPACE(sizeof(int))};
-  CMSG_FIRSTHDR(&msg)->cmsg_level = IPPROTO_IP;
-  CMSG_FIRSTHDR(&msg)->cmsg_type = IP_PKTINFO;
-  CMSG_FIRSTHDR(&msg)->cmsg_len = CMSG_LEN(sizeof(int));
-  *((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg))) = -1;
-
-  msg.msg_controllen = CMSG_SPACE(sizeof(int));
-
-  while (sizeof(char[2]) != sendmsg(sfd, &msg, MSG_NOSIGNAL)) {
-    if (errno != EINTR)
-      return false;
-  }
-  return true;
-}
-
-bool sendfd(int sfd, int fd) {
-  struct msghdr *msg = &(struct msghdr){
-      .msg_iov = &(struct iovec){.iov_base = (char[8]){"!"}, .iov_len = 8},
-      .msg_iovlen = 1,
-      .msg_control = (char[CMSG_SPACE(sizeof(int))]){0},
-      .msg_controllen = CMSG_SPACE(sizeof(int))};
-  CMSG_FIRSTHDR(msg)->cmsg_level = SOL_SOCKET;
-  CMSG_FIRSTHDR(msg)->cmsg_type = SCM_RIGHTS;
-  CMSG_FIRSTHDR(msg)->cmsg_len = CMSG_LEN(sizeof(int));
-  *((int *)CMSG_DATA(CMSG_FIRSTHDR(msg))) = fd;
-
-  msg->msg_controllen = CMSG_SPACE(sizeof(int));
-
-  while (sizeof(char[2]) != sendmsg(sfd, msg, MSG_NOSIGNAL)) {
-    if (errno != EINTR)
-      return false;
-  }
-  return true;
-}
-
-int getfd(int sfd) {
-  struct msghdr msg = {
-      .msg_iov = &(struct iovec){.iov_base = (char[8]){"!"}, .iov_len = 8},
-      .msg_iovlen = 1,
-      .msg_control = (char[CMSG_SPACE(sizeof(int))]){0},
-      .msg_controllen = CMSG_SPACE(sizeof(int))};
-  while (sizeof(char[8]) != recvmsg(sfd, &msg, MSG_NOSIGNAL)) {
-    if (errno != EINTR)
-      return -1;
-  }
-
-  // Check
-  if (CMSG_FIRSTHDR(&msg) && CMSG_FIRSTHDR(&msg)->cmsg_level == SOL_SOCKET &&
-      CMSG_FIRSTHDR(&msg)->cmsg_type == SCM_RIGHTS) {
-    return *((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg)));
-  }
-  return -2;
-}
-
 int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
                     unsigned long flags) {
   return syscall(__NR_perf_event_open, attr, pid, cpu, gfd, flags);
@@ -236,6 +174,7 @@ int perfopen(pid_t pid, int type, int config, uint64_t per, int mode, int cpu) {
   // Overrides
   // TODO split this out into an enum as soon as there is more than one
   attr->exclude_kernel = !(mode & PE_KERNEL_INCLUDE);
+  attr->disabled = !(mode & PE_NODISABLE);
 
   int fd = perf_event_open(attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC);
   if (-1 == fd && EACCES == errno) {
@@ -249,10 +188,6 @@ int perfopen(pid_t pid, int type, int config, uint64_t per, int mode, int cpu) {
 
 void *perfown(int fd) {
   void *region;
-
-  // Check that the file descriptor is valid
-  if (fcntl(fd, F_GETFD, 0))
-    return NULL;
 
   // Map in the region representing the ring buffer
   // TODO what to do about hugepages?

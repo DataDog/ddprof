@@ -62,6 +62,12 @@ Options:
   -l, --loglevel, (envvar: DD_PROFILING_NATIVELOGLEVEL)
     One of `debug`, `notice`, `warn`, `error`.  Default is `warn`.
 
+  -p, --pid, (envvar: DD_PROFILING_NATIVETARGET)
+    Instrument the given PID rather than launching a new process.
+
+  -g, --global, (envvar: DD_PROFILING_NATIVEGLOBAL)
+    Instruments the whole system.  Overrides DD_PROFILING_NATIVETARGET.
+
   -e, --event:
     A string representing the events to sample.  Defaults to `cw`
     See the `events` section below for more details.
