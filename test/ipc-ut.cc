@@ -27,7 +27,7 @@ TEST(IPCTest, Positive) {
     close(sockets[kParentIdx]);
     // delete files if it exists
     unlink(fileName.c_str());
-    int fileFd = open(fileName.c_str(), O_CREAT | O_RDWR);
+    int fileFd = open(fileName.c_str(), O_CREAT | O_RDWR, 0600);
     // Send something from child
     size_t writeRet = write(fileFd, payload.c_str(), payload.size());
     EXPECT_GT(writeRet, 0);

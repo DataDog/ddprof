@@ -1,7 +1,7 @@
 #ifndef _H_DICTIONARY
 #define _H_DICTIONARY
 
-#include "string_table.h"
+#include <ddprof/string_table.h>
 
 typedef struct DictionaryOptions {
   uint64_t hash   : 2, // passthrough (copypasta from string_table.h)

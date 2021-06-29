@@ -1,6 +1,7 @@
 #ifndef _H_procutils
 #define _H_procutils
 
+#include <assert.h>
 #include <ctype.h>
 #include <elf.h>
 #include <errno.h>

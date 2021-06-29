@@ -10,6 +10,10 @@ cd $SCRIPTDIR/../
 TOP_LVL_DIR=$PWD
 cd $CURRENTDIR
 
+if [ $# != 0 ] && [ $1 == "clean" ]; then
+    docker image rm ${DEFAULT_BASE_NAME}
+fi
+
 if [ -e ${TOP_LVL_DIR}/.env ]; then
     source ${TOP_LVL_DIR}/.env
 fi

@@ -1,6 +1,7 @@
-#include <stdlib.h>
-
 #include "dictionary.h"
+
+#include <stdlib.h>
+#include <string.h>
 
 // Globals
 void *dictionary_dflt_na =

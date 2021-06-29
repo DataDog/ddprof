@@ -1,7 +1,7 @@
 #include <signal.h>
 #include <stdio.h>
 
-#include "string_table.h"
+#include <ddprof/string_table.h>
 
 int main() {
   StringTable *st = stringtable_init(NULL, NULL);
