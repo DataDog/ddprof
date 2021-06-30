@@ -115,14 +115,19 @@ if (NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
    message(STATUS "BUILD WILL FAIL : NON LINUX SYSTEMS NOT HANDLED")
 endif()
 
+
 # Zlib
-find_package(ZLIB)
+# Slightly hacky way of finding static libraries. Unable to find static library using CMAKE_FIND_LIBRARY_SUFFIXES.
+find_package(ZLIB REQUIRED)
+get_filename_component(LIB_DIRNAME_ZLIB ${ZLIB_LIBRARIES} DIRECTORY)
+message(STATUS "zlib found in following folder : " ${LIB_DIRNAME_ZLIB})
+link_directories(${LIB_DIRNAME_ZLIB})
 
 # Lzma
-## No option is offered to force static library
 find_package(LibLZMA)
 list(APPEND DDPROF_INCLUDE_LIST ${LIBLZMA_INCLUDE_DIRS})
 get_filename_component(LIB_DIRNAME_LZMA ${LIBLZMA_LIBRARIES} DIRECTORY)
+message(STATUS "LibLZMA found in following folder : " ${LIB_DIRNAME_LZMA})
 link_directories(${LIB_DIRNAME_LZMA})
 
 #protoc
@@ -155,7 +160,7 @@ set(DDPROF_GLOBAL_SRC
 # It is important to force most libraries as static
 add_exe(ddprof
         ${DDPROF_GLOBAL_SRC}
-        LIBRARIES libddprof dw.a elf.a ZLIB::ZLIB Threads::Threads libprotobuf-c.a liblzma.a)
+        LIBRARIES libddprof dw.a elf.a libz.a Threads::Threads libprotobuf-c.a liblzma.a)
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 
 install(TARGETS ddprof)
