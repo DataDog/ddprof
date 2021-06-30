@@ -107,8 +107,8 @@ ELFUTILS = $(VENDIR)/elfutils
 ELFLIBS := $(ELFUTILS)/libdwfl/libdwfl.a $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libebl/libebl.a $(ELFUTILS)/libelf/libelf.a
 
 ## https://gitlab.ddbuild.io/DataDog/libddprof/-/jobs/72495950
-VER_LIBDDPROF := eeac2cfa #Short commit number from CI (used in export job of libddprof)
-SHA256_LIBDDPROF := c41ce4abe39c478409a09a9f7fbc53817ca61b60ef5cdc3dd401175024ee19f2 # You need to generate this manually
+VER_LIBDDPROF := 79bbf4a2 #Short commit number from CI (used in export job of libddprof)
+SHA256_LIBDDPROF := dbd67207af1bd090ad34a30b15afe7da3ec3c7ed1c56762a5f7764565ef8f1b8 # You need to generate this manually
 
 LIBDDPROF := $(VENDIR)/libddprof
 LIBDDPROF_LIB := $(LIBDDPROF)/RelWithDebInfo/lib64/libddprof.a
