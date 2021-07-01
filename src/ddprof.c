@@ -4,6 +4,7 @@
 #include <execinfo.h>
 #include <getopt.h>
 #include <libelf.h>
+#include <poll.h>
 #include <pthread.h>
 #include <signal.h>
 #include <string.h>
@@ -457,103 +458,12 @@ void instrument_pid(DDProfContext *ctx, pid_t pid) {
   unwind_init(ctx->us);
   elf_version(EV_CURRENT); // Initialize libelf
 
-  // Enter the main loop -- this will not return unless there is an error.
-  main_loop(pes, ctx->num_watchers * num_cpu, &perf_funs, ctx);
-
-  // If we're here, the main loop closed--probably the profilee closed
-  if (errno)
-    LG_WRN("Profiling context no longer valid (%s)", strerror(errno));
-  else
-    LG_WRN("Profiling context no longer valid");
-
-  // We're going to close down, but first check whether we have a valid export
-  // to send (or if we requested the last partial export with sendfinal)
-  int64_t now = now_nanos();
-  if (now > ctx->send_nanos || ctx->sendfinal) {
-    LG_WRN("Sending final export");
-    export(ctx, now);
+  // Just before we enter the main loop, force the enablement of the perf
+  // contexts
+  for (int i = 0; i < ctx->num_watchers * num_cpu; i++) {
+    if (-1 == ioctl(pes[i].fd, PERF_EVENT_IOC_ENABLE))
+      LG_WRN("Couldn't enable watcher %d", i);
   }
-}
-
-void instrument_self(DDProfContext *ctx, int sfd[2], pid_t pid) {
-  int fd[DDPF_MAX_FD] = {0};
-  int k = 0;
-  for (int i = 0; i < ctx->num_watchers && ctx->params.enable; i++) {
-    for (int j = 0; j < num_cpu; j++) {
-      fd[k] = perfopen(
-          pid, ctx->watchers[i].opt->type, ctx->watchers[i].opt->config,
-          ctx->watchers[i].sample_period, ctx->watchers[i].opt->mode, j);
-
-      if (-1 == fd[k]) {
-        LG_WRN("Failed to setup watcher %d.%d (%s)", i, j, strerror(errno));
-      } else {
-        k++;
-      }
-    }
-  }
-
-  if (!sendfd(sfd[1], fd, k)) {
-    LG_ERR("Could not pass profiling context to profiler");
-  }
-
-  // Cleanup and become desired process image
-  close(sfd[0]);
-  close(sfd[1]);
-}
-
-void instrument_prof(DDProfContext *ctx, int sfd[2]) {
-  perfopen_attr perf_funs = {.msg_fun = ddprof_callback,
-                             .timeout_fun = ddprof_timeout};
-  struct PEvent pes[100] = {0};
-
-  int sz = 0;
-  int *fds = getfd(sfd[0], &sz);
-  if (sz < num_cpu * ctx->num_watchers) {
-    LG_ERR("Received fewer than expected contexts");
-    sz = 0;
-  }
-
-  // Cleanup
-  close(sfd[0]);
-  close(sfd[1]);
-
-  // Early return if we can't do anything.
-  // NOTE: this is common if the system isn't configured to allow perf events
-  if (sz < num_cpu * ctx->num_watchers) {
-    LG_ERR("Failed to install any watchers, profiling disabled");
-    free(fds);
-    return;
-  } else {
-    int k = 0;
-    for (int i = 0; i < ctx->num_watchers; i++)
-      for (int j = 0; j < num_cpu; j++) {
-        pes[k].fd = fds[k];
-        pes[k].pos = i;
-        if (!(pes[k].region = perfown(pes[k].fd))) {
-          close(pes[k].fd);
-          pes[k].fd = -1;
-          LG_ERR("Could not finalize watcher %d.%d: registration (%s)", i, j,
-                 strerror(errno));
-        }
-        k++;
-      }
-
-    free(fds);
-  }
-
-  LG_NTC("Entering main loop");
-
-  // Setup signal handler if defined
-  if (ctx->params.faultinfo)
-    sigaction(SIGSEGV,
-              &(struct sigaction){.sa_sigaction = sigsegv_handler,
-                                  .sa_flags = SA_SIGINFO},
-              NULL);
-
-  // Perform initialization operations
-  ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
-  unwind_init(ctx->us);
-  elf_version(EV_CURRENT); // Initialize libelf
 
   // Enter the main loop -- this will not return unless there is an error.
   main_loop(pes, ctx->num_watchers * num_cpu, &perf_funs, ctx);
@@ -824,32 +734,15 @@ int main(int argc, char **argv) {
   }
 
   // Instrument the profiler
-  // 1.   Setup pipes
-  // 2.   fork()
-  // 3p.  I am the original process.  If not prof profiling, instrument now
-  // 3c.  I am the child.  Fork again and die.
-  // 4p.  If not instrumenting profiler, instrument now.
-  // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
-  // 5p.  Send the instrumentation FD.  Repeat for each instrumentation point.
-  // 5cc. Receive.  Repeat.  This is known before time of fork.
-  // 6p.  close fd, teardown pipe, execvp() to target process.
-  // 6cc. teardown pipe, create mmap regions and enter event loop
+  // 1.  fork()
+  // 2.  I am the original process.  Turn into target right away
+  // 3.  I am the child.  Fork again and die
+  // 4.  Instrument the original pid
 
-  // TODO
-  // * Multiple file descriptors can be sent in one push.  I don't know how much
-  //   this matters, but if every microsecond counts at startup, it's an option.
-
-  // 1. Setup pipes (really unix domain socket pair)
-  int sfd[2] = {-1, -1};
-  if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sfd)) {
-    LG_ERR("Could not instantiate message passing system, profiling disabled");
-    goto EXECUTE;
-  }
-
-  // 2. fork()
+  pid_t pid_target = getpid();
   pid_t child_pid = fork();
   if (!child_pid) {
-    // 3c. I am the child.  Fork again
+    // 3.  I am the child
     if (fork()) {
       // Still have to cleanup, though...
       OPT_TABLE(X_FREE);
@@ -859,8 +752,10 @@ int main(int argc, char **argv) {
       return 0;
     }
 
-    // 4cc. I am the grandchild.  Sit and listen for an FD
-    instrument_prof(ctx, sfd);
+    // In the future, we can probably harmonize the various exit paths by using
+    // the same instrument_pid for global mode, targeted PID mode, and regular
+    // instrumentation.
+    instrument_pid(ctx, pid_target);
 
     // We are only here if the profiler fails or exits
     OPT_TABLE(X_FREE);
@@ -870,24 +765,11 @@ int main(int argc, char **argv) {
 
     LG_WRN("Profiling terminated");
     return -1;
+  } else {
+    // 2.  I am the target process.  Wait for my immediate child to close
+    waitpid(child_pid, NULL, 0);
   }
 
-  // 3p.  I am the original process.  If not prof profiling, instrument now
-  instrument_self(ctx, sfd, getpid());
-
-  // Wait until the child process is cleaned up; this ensures a very rare race
-  // condition doesn't occur.
-  // The race condition is that the child doesn't exit until *after* I call
-  // excecve().  Many services use SIGCHLD handlers, and the concern is that
-  // such a handler would be called despite the child not having been spawned
-  // by application logic.  Worse-case scenario:  segfault.
-  // We don't care about the return status, since if the PID is already invalid,
-  // then we've satisfied our requirements.
-  waitpid(child_pid, NULL, 0);
-
-  // NB we don't LOG_close() here because we might still need to report error
-  //    and all the logging modes either remain open (stdio) or are cloexec'd
-  //    (syslog, file)
 EXECUTE:
   if (-1 == execvp(*argv, argv)) {
     switch (errno) {
