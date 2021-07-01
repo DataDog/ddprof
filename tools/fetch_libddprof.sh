@@ -11,7 +11,7 @@ usage() {
     echo "  $0 645a3ebd 5384319ab8dec373ad06e24c288522b3af464ddfd1dbd4d2ba03870312b635ba ./vendor"
 }
 
-if [ $# -eq 0 ] || [ $1 = "-h" ]; then
+if [ $# != 3 ] || [ $1 == "-h" ]; then
     usage
     exit 0
 fi

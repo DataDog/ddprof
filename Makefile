@@ -104,7 +104,7 @@ VER_ELF := 0.183
 TAR_ELF := elfutils-$(VER_ELF).tar.bz2
 URL_ELF := https://sourceware.org/elfutils/ftp/$(VER_ELF)/$(TAR_ELF)
 ELFUTILS = $(VENDIR)/elfutils
-ELFLIBS := $(ELFUTILS)/libdwfl/libdwfl.a $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libebl/libebl.a $(ELFUTILS)/libelf/libelf.a
+ELFLIBS := $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libelf/libelf.a
 
 ## https://gitlab.ddbuild.io/DataDog/libddprof/-/jobs/72495950
 VER_LIBDDPROF := 79bbf4a2 #Short commit number from CI (used in export job of libddprof)

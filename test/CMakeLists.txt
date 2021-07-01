@@ -1,22 +1,12 @@
-## Get gtest libraries
-FetchContent_Declare(
-  googletest
-  GIT_REPOSITORY https://github.com/google/googletest.git
-  GIT_TAG        master
-)
-FetchContent_MakeAvailable(googletest)
+find_package(GTest REQUIRED)
 
 enable_testing()
 
 #### Define level of static checks ####
 message(STATUS "Build type set to " ${CMAKE_BUILD_TYPE})
 message(STATUS "Activate asan by default for unit tests")
-
-set(ASAN_FLAGS "-g -fsanitize=address -fsanitize=undefined -fsanitize=leak -fsanitize=float-divide-by-zero -fno-sanitize-recover")
-set(STACK_FLAGS "-fno-omit-frame-pointer -fstack-protector-all")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ASAN_FLAGS} ${STACK_FLAGS}")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${ASAN_FLAGS} ${STACK_FLAGS}")
-
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ASAN_FLAGS} ${STACK_FLAGS} ${FRAME_PTR_FLAG}")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${ASAN_FLAGS} ${STACK_FLAGS} ${FRAME_PTR_FLAG}")
 
 #### Define functions ####
 
@@ -40,8 +30,8 @@ function(add_unit_test name)
 
    ## Create exe with sources 
    add_exe(${name} ${MY_UNPARSED_ARGUMENTS})
-   target_link_libraries(${name} PRIVATE gtest gmock gmock_main)
-   target_include_directories(${name} PRIVATE ../include)
+   target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
+   target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS})
 
    add_test(NAME ${name} COMMAND ${name})
    set_tests_properties(${name} PROPERTIES
@@ -49,7 +39,6 @@ function(add_unit_test name)
                         LSAN_OPTIONS=detect_leaks=1 malloc_context_size=2 print_suppressions=0")
 
 endfunction()
-
 
 #### Definition of unit tests ####
 add_unit_test(
