@@ -3,7 +3,7 @@
 #include <cassert>
 #include <cstring>
 
-extern "C" void demangle(char* str, char* buf, size_t sz_buf) {
+extern "C" void demangle(char *str, char *buf, size_t sz_buf) {
   assert(str);
   assert(buf);
   assert(sz_buf);

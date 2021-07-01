@@ -2,7 +2,7 @@
 extern "C" {
 #endif
 
-void demangle(char*, char*, size_t);
+void demangle(char *, char *, size_t);
 
 #ifdef __cplusplus
 }
