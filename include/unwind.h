@@ -9,6 +9,7 @@
 #include <stdbool.h>
 
 // TODO select dwfl_internals based on preproc directive
+#include "demangle.h"
 #include "dwfl_internals.h"
 #include "procutils.h"
 #include "signal_helper.h"
@@ -178,7 +179,9 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
       us->locs[us->idx].map_off = offset;
     }
     if (symname) {
-      us->locs[us->idx].funname = strdup(symname);
+      char tmpname[1024] = {0};
+      demangle((char *)symname, tmpname, 1024);
+      us->locs[us->idx].funname = strdup(tmpname);
     } else {
       char tmpname[1024] = {0};
       snprintf(tmpname, 1020, "0x%lx", mod->low_addr);

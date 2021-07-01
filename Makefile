@@ -113,9 +113,12 @@ SHA256_LIBDDPROF := dbd67207af1bd090ad34a30b15afe7da3ec3c7ed1c56762a5f7764565ef8
 LIBDDPROF := $(VENDIR)/libddprof
 LIBDDPROF_LIB := $(LIBDDPROF)/RelWithDebInfo/lib64/libddprof.a
 
+LIBLLVM := $(VENDIR)/llvm/include
+LIBLLVM_SRC := $(VENDIR)/llvm/lib
+
 # Global aggregates
 INCLUDE = -I$(LIBDDPROF)/RelWithDebInfo/include -Iinclude -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
-LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl
+LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl -l:libstdc++.a
 SRC := src/proto/profile.pb-c.c src/ddprofcmdline.c src/ipc.c src/logger.c src/signal_helper.c src/version.c
 DIRS := $(TARGETDIR) $(TMP)
 
@@ -142,13 +145,21 @@ $(ELFUTILS):
 $(LIBDDPROF):
 	./tools/fetch_libddprof.sh ${VER_LIBDDPROF} ${SHA256_LIBDDPROF} $(VENDIR)
 
+$(LIBLLVM):
+	./tools/fetch_llvm_demangler.sh 
+
+demangle.a: $(LIBLLVM)
+	$(CXX) $(WARNS) $(INCLUDE) -I$(LIBLLVM) -c src/demangle.cpp $(LIBLLVM_SRC)/Demangle/*.cpp
+	ar rcs tmp/$@ Demangle.o demangle.o ItaniumDemangle.o MicrosoftDemangleNodes.o MicrosoftDemangle.o RustDemangle.o
+	rm -f Demangle.o demangle.o ItaniumDemangle.o MicrosoftDemangleNodes.o MicrosoftDemangle.o RustDemangle.o
+
 ddprof: $(TARGETDIR)/ddprof
 build: |ddprof help
-deps: $(LIBDDPROF) $(ELFLIBS) 
+deps: $(LIBDDPROF) $(LIBLLVM) $(ELFLIBS) 
 
 ## Actual build targets
-$(TARGETDIR)/ddprof: src/ddprof.c | $(TARGETDIR) $(ELFLIBS) $(LIBDDPROF) ddprof_banner $(LIBDDPROF_LIB)
-	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) $(WARNS) $(SANS) $(LDFLAGS) $(INCLUDE) -o $@ $< $(SRC) $(ELFLIBS) $(LDLIBS) $(LIBDDPROF_LIB)
+$(TARGETDIR)/ddprof: src/ddprof.c demangle.a| $(TARGETDIR) $(ELFLIBS) $(LIBDDPROF) ddprof_banner $(LIBDDPROF_LIB)
+	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) -static-libgcc $(WARNS) $(SANS) $(LDFLAGS) $(INCLUDE) -o $@ tmp/demangle.a $< $(SRC) tmp/demangle.a $(ELFLIBS) $(LDLIBS) $(LIBDDPROF_LIB)
 
 logger: src/eg/logger.c src/logger.c
 	$(CC) $(CFLAGS) $(WARNS) $(SANS) -DPID_OVERRIDE -Iinclude -o $(TARGETDIR)/$@ $^
