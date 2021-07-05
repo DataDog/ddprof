@@ -141,11 +141,11 @@ link_directories(${PROTOBUF_C_LIBDIR})
 set(LLVM_DEMANGLE_PATH ${CMAKE_SOURCE_DIR}/vendor/llvm CACHE STRING "Path to the llvm-demangle directory")
 set(LLVM_DEMANGLE_SVNROOT https://github.com/llvm/llvm-project/trunk/llvm CACHE STRING "GitHub URL for LLVM")
 FetchContent_Declare(LLVMDemangleHeaders
-  SVN_REPOSITORY_URL    ${LLVM_DEMANGLE_SVNROOT}/include/llvm/Demangle
+  SVN_REPOSITORY        ${LLVM_DEMANGLE_SVNROOT}/include/llvm/Demangle
   SOURCE_DIR            ${LLVM_DEMANGLE_PATH}/include/llvm/Demangle
 )
 FetchContent_Declare(LLVMDemangleSources
-  SVN_REPOSITORY_URL    ${LLVM_DEMANGLE_SVNROOT}/lib/llvm/Demangle
+  SVN_REPOSITORY        ${LLVM_DEMANGLE_SVNROOT}/lib/Demangle
   SOURCE_DIR            ${LLVM_DEMANGLE_PATH}/lib/Demangle
 )
 if(NOT LLVMDemangleHeaders_POPULATED)
