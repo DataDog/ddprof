@@ -136,9 +136,37 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(PROTOBUF_C REQUIRED IMPORTED_TARGET libprotobuf-c)
 link_directories(${PROTOBUF_C_LIBDIR})
 
-set(ELFUTILS_PATH ${CMAKE_SOURCE_DIR}/vendor/elfutils CACHE STRING "Path to the elfutils directory")
+# llvm-demangle
+#set_directory_properties(PROPERTIES EP_UPDATE_DISCONNECTED true)
+set(LLVM_DEMANGLE_PATH ${CMAKE_SOURCE_DIR}/vendor/llvm CACHE STRING "Path to the llvm-demangle directory")
+set(LLVM_DEMANGLE_SVNROOT https://github.com/llvm/llvm-project/trunk/llvm CACHE STRING "GitHub URL for LLVM")
+FetchContent_Declare(LLVMDemangleHeaders
+  SVN_REPOSITORY_URL    ${LLVM_DEMANGLE_SVNROOT}/include/llvm/Demangle
+  SOURCE_DIR            ${LLVM_DEMANGLE_PATH}/include/llvm/Demangle
+)
+FetchContent_Declare(LLVMDemangleSources
+  SVN_REPOSITORY_URL    ${LLVM_DEMANGLE_SVNROOT}/lib/llvm/Demangle
+  SOURCE_DIR            ${LLVM_DEMANGLE_PATH}/lib/Demangle
+)
+if(NOT LLVMDemangleHeaders_POPULATED)
+  FetchContent_Populate(LLVMDemangleHeaders)
+endif()
+if(NOT LLVMDemangleSources_POPULATED)
+  FetchContent_Populate(LLVMDemangleSources)
+  aux_source_directory(${LLVM_DEMANGLE_PATH}/lib/Demangle LLVM_DEMANGLE_SOURCES)
+endif()
+add_library(libllvm-demangle STATIC
+  src/demangle.cpp
+  ${LLVM_DEMANGLE_SOURCES}
+)
+target_include_directories(libllvm-demangle PUBLIC
+  ${LLVM_DEMANGLE_PATH}/include
+)
+list(APPEND DDPROF_INCLUDE_LIST ${LLVM_DEMANGLE_PATH}/include)
+
 
 ## Elf utils
+set(ELFUTILS_PATH ${CMAKE_SOURCE_DIR}/vendor/elfutils CACHE STRING "Path to the elfutils directory")
 list(APPEND DDPROF_INCLUDE_LIST ${ELFUTILS_PATH} ${ELFUTILS_PATH}/libdwfl ${ELFUTILS_PATH}/libdw ${ELFUTILS_PATH}/libebl ${ELFUTILS_PATH}/libelf)
 
 # Add directories to look for libraries
@@ -160,7 +188,7 @@ set(DDPROF_GLOBAL_SRC
 # It is important to force most libraries as static
 add_exe(ddprof
         ${DDPROF_GLOBAL_SRC}
-        LIBRARIES libddprof dw.a elf.a libz.a Threads::Threads libprotobuf-c.a liblzma.a)
+        LIBRARIES libddprof libllvm-demangle dw.a elf.a libz.a Threads::Threads libprotobuf-c.a liblzma.a)
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 
 install(TARGETS ddprof)

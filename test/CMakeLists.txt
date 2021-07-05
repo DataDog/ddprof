@@ -30,8 +30,8 @@ function(add_unit_test name)
 
    ## Create exe with sources 
    add_exe(${name} ${MY_UNPARSED_ARGUMENTS})
-   target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
-   target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS})
+   target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock libllvm-demangle)
+   target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS} ../vendor/llvm/include)
 
    add_test(NAME ${name} COMMAND ${name})
    set_tests_properties(${name} PROPERTIES
@@ -57,6 +57,12 @@ add_unit_test(
     version-ut
     ../src/version.c 
     version-ut.cc
+)
+
+add_unit_test(
+    demangle-ut
+    ../src/demangle.cpp
+    demangle-ut.cc
 )
 
 add_compile_definitions("IPC_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")

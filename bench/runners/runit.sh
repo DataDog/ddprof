@@ -42,6 +42,7 @@ for arg in "$@"; do
   if [[ ${arg} == "ltrace" ]]; then CMD="ltrace -f -o /tmp/test.out -s 2500 -n 2 -x '*' -e malloc+free ${CMD_BASE}"; fi
   if [[ ${arg} == "jemalloc" ]]; then USE_JEMALLOC="yes"; fi
   if [[ ${arg} == "redis" ]]; then JOB="redis-runner.sh"; fi
+  if [[ ${arg} == "compile" ]]; then JOB="compile-runner.sh"; fi
   if [[ ${arg} == "collatz" ]]; then JOB="collrunner.sh"; fi
   if [[ ${arg} == "sleep" ]]; then JOB="sleep.sh"; fi
   if [[ ${arg} == "noexist" ]]; then JOB="fakejob.sh"; fi
@@ -71,7 +72,7 @@ export DD_SERVICE=native-testservice_${VER}
 export DD_AGENT_HOST=${INTAKE_ADD}
 
 eval ${CMD} \
-  -u 60.0 \
+  -u 10.0 \
   -l debug \
   -o stderr \
   -a yes \

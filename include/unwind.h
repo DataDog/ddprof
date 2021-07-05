@@ -178,13 +178,13 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
       us->locs[us->idx].map_end = mod->high_addr;
       us->locs[us->idx].map_off = offset;
     }
+
+    char tmpname[1024] = {0};
     if (symname) {
-      char tmpname[1024] = {0};
-      demangle((char *)symname, tmpname, 1024);
+      demangle((char *)symname, tmpname, 1023);
       us->locs[us->idx].funname = strdup(tmpname);
     } else {
-      char tmpname[1024] = {0};
-      snprintf(tmpname, 1020, "0x%lx", mod->low_addr);
+      snprintf(tmpname, 1016, "0x%lx", mod->low_addr);
       us->locs[us->idx].funname = strdup(tmpname);
     }
     char *sname = strrchr(mod->name, '/');

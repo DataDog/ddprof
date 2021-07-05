@@ -3,7 +3,7 @@
 #include <cassert>
 #include <cstring>
 
-extern "C" void demangle(char *str, char *buf, size_t sz_buf) {
+extern "C" void demangle(const char *str, char *buf, size_t sz_buf) {
   assert(str);
   assert(buf);
   assert(sz_buf);
@@ -11,4 +11,5 @@ extern "C" void demangle(char *str, char *buf, size_t sz_buf) {
   sz_buf = sz_buf > demangled.size() ? demangled.size() : sz_buf;
 
   memcpy(buf, demangled.c_str(), sz_buf);
+  buf[sz_buf] = '\0';
 }
