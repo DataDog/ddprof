@@ -107,8 +107,8 @@ ELFUTILS = $(VENDIR)/elfutils
 ELFLIBS := $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libelf/libelf.a
 
 ## https://gitlab.ddbuild.io/DataDog/libddprof/-/jobs/72495950
-VER_LIBDDPROF := eeac2cfa #Short commit number from CI (used in export job of libddprof)
-SHA256_LIBDDPROF := c41ce4abe39c478409a09a9f7fbc53817ca61b60ef5cdc3dd401175024ee19f2 # You need to generate this manually
+VER_LIBDDPROF := 79bbf4a2 #Short commit number from CI (used in export job of libddprof)
+SHA256_LIBDDPROF := dbd67207af1bd090ad34a30b15afe7da3ec3c7ed1c56762a5f7764565ef8f1b8 # You need to generate this manually
 
 LIBDDPROF := $(VENDIR)/libddprof
 LIBDDPROF_LIB := $(LIBDDPROF)/RelWithDebInfo/lib64/libddprof.a
@@ -141,6 +141,7 @@ $(ELFUTILS):
 	cd $(VENDIR) && curl -L --remote-name-all $(URL_ELF)
 	echo $(MD5_ELF) $(VENDIR)/$(TAR_ELF) > $(VENDIR)/elfutils.md5
 	md5sum --status -c $(VENDIR)/elfutils.md5
+	+if [ ! -d $(ELFUTILS) || -L $(ELFUTILS) ]; then rm -rf $(ELFUTILS); done
 	mkdir -p $(ELFUTILS)
 	ls -l $(ELFUTILS)
 	tar --no-same-owner -C $(ELFUTILS) --strip-components 1 -xf $(VENDIR)/$(TAR_ELF)
@@ -160,11 +161,11 @@ demangle.a: $(LIBLLVM) $(TMP)
 
 ddprof: $(TARGETDIR)/ddprof
 build: |ddprof help
-deps: $(LIBDDPROF) $(LIBLLVM) $(ELFLIBS) 
+deps: $(LIBDDPROF) $(ELFLIBS) $(LIBLLVM)
 
 ## Actual build targets
 $(TARGETDIR)/ddprof: src/ddprof.c demangle.a| $(TARGETDIR) $(ELFLIBS) $(LIBDDPROF) ddprof_banner $(LIBDDPROF_LIB)
-	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) -static-libgcc $(WARNS) $(SANS) $(LDFLAGS) $(INCLUDE) -o $@ tmp/demangle.a $< $(SRC) tmp/demangle.a $(ELFLIBS) $(LDLIBS) $(LIBDDPROF_LIB)
+	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) -static-libgcc $(WARNS) $(SANS) $(LDFLAGS) $(INCLUDE) -o $@ $< $(SRC) tmp/demangle.a $(ELFLIBS) $(LDLIBS) $(LIBDDPROF_LIB)
 
 logger: src/eg/logger.c src/logger.c
 	$(CC) $(CFLAGS) $(WARNS) $(SANS) -DPID_OVERRIDE -Iinclude -o $(TARGETDIR)/$@ $^
