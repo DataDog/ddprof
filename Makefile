@@ -120,12 +120,15 @@ LIBLLVM_SRC := $(VENDIR)/llvm/lib
 INCLUDE = -I$(LIBDDPROF)/RelWithDebInfo/include -Iinclude -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
 LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl -l:libstdc++.a
 SRC := src/proto/profile.pb-c.c src/ddprofcmdline.c src/ipc.c src/logger.c src/signal_helper.c src/version.c
-DIRS := $(TARGETDIR) $(TMP)
+DIRS := $(TARGETDIR)
 
 .PHONY: build deps bench ddprof_banner format format-commit clean_deps publish all
 .DELETE_ON_ERROR:
 
 ## Intermediate build targets (dependencies)
+$(TMP):
+	mkdir -p $@
+
 $(DIRS):
 	mkdir -p $@
 
@@ -148,8 +151,7 @@ $(LIBDDPROF):
 $(LIBLLVM):
 	./tools/fetch_llvm_demangler.sh 
 
-demangle.a: $(LIBLLVM)
-	mkdir -p $(TMP)
+demangle.a: $(LIBLLVM) $(TMP)
 	$(CXX) $(WARNS) $(INCLUDE) -I$(LIBLLVM) -c src/demangle.cpp $(LIBLLVM_SRC)/Demangle/*.cpp
 	ar rcs tmp/$@ Demangle.o demangle.o ItaniumDemangle.o MicrosoftDemangleNodes.o MicrosoftDemangle.o RustDemangle.o
 	rm -f Demangle.o demangle.o ItaniumDemangle.o MicrosoftDemangleNodes.o MicrosoftDemangle.o RustDemangle.o
