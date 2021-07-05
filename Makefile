@@ -127,10 +127,10 @@ DIRS := $(TARGETDIR)
 
 ## Intermediate build targets (dependencies)
 $(TMP):
-	mkdir -p $@
+	-mkdir -p $@
 
 $(DIRS):
-	mkdir -p $@
+	-mkdir -p $@
 
 $(ELFLIBS): $(ELFUTILS)
 	$(MAKE) -j4 -C $(ELFUTILS)
