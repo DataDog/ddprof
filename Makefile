@@ -128,19 +128,23 @@ DIRS := $(TARGETDIR)
 ## Intermediate build targets (dependencies)
 $(TMP):
 	-mkdir -p $@
+	ls -l $@
 
 $(DIRS):
 	-mkdir -p $@
+	ls -l $@
 
 $(ELFLIBS): $(ELFUTILS)
 	$(MAKE) -j4 -C $(ELFUTILS)
 
 $(ELFUTILS):
 	-mkdir -p $(VENDIR)
+	ls -l $(VENDIR)
 	cd $(VENDIR) && curl -L --remote-name-all $(URL_ELF)
 	echo $(MD5_ELF) $(VENDIR)/$(TAR_ELF) > $(VENDIR)/elfutils.md5
 	md5sum --status -c $(VENDIR)/elfutils.md5
 	-mkdir -p $(ELFUTILS)
+	ls -l $(ELFUTILS)
 	tar --no-same-owner -C $(ELFUTILS) --strip-components 1 -xf $(VENDIR)/$(TAR_ELF)
 	rm -rf $(VENDIR)/$(TAR_ELF)
 	cd $(ELFUTILS) && ./configure CC=$(abspath $(GNU_LATEST)) --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning
