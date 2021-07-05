@@ -141,7 +141,11 @@ $(ELFUTILS):
 	cd $(VENDIR) && curl -L --remote-name-all $(URL_ELF)
 	echo $(MD5_ELF) $(VENDIR)/$(TAR_ELF) > $(VENDIR)/elfutils.md5
 	md5sum --status -c $(VENDIR)/elfutils.md5
-	+if [[ ! -d $(ELFUTILS) || -L $(ELFUTILS) ]]; then rm -rf $(ELFUTILS); fi 
+	if [ ! -d $(ELFUTILS) ]; then \
+		if [ -L $(ELFUTILS) ]; then \
+		  rm -rf $(ELFUTILS); \
+		fi \
+	fi
 	mkdir -p $(ELFUTILS)
 	ls -l $(ELFUTILS)
 	tar --no-same-owner -C $(ELFUTILS) --strip-components 1 -xf $(VENDIR)/$(TAR_ELF)
