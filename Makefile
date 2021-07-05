@@ -149,6 +149,7 @@ $(LIBLLVM):
 	./tools/fetch_llvm_demangler.sh 
 
 demangle.a: $(LIBLLVM)
+	mkdir -p $(TMP)
 	$(CXX) $(WARNS) $(INCLUDE) -I$(LIBLLVM) -c src/demangle.cpp $(LIBLLVM_SRC)/Demangle/*.cpp
 	ar rcs tmp/$@ Demangle.o demangle.o ItaniumDemangle.o MicrosoftDemangleNodes.o MicrosoftDemangle.o RustDemangle.o
 	rm -f Demangle.o demangle.o ItaniumDemangle.o MicrosoftDemangleNodes.o MicrosoftDemangle.o RustDemangle.o
