@@ -106,6 +106,9 @@ list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include/proto)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 find_package(libddprof REQUIRED)
+if(NOT LIBDDPROF_INCLUDE_DIR)
+  set(LIBDDPROF_INCLUDE_DIR, "${CMAKE_SOURCE_DIR}/vendor/libddprof/RelWithDebInfo/include")
+endif()
 message(STATUS "Libddprof Include directory " ${LIBDDPROF_INCLUDE_DIR})
 list(APPEND DDPROF_INCLUDE_LIST ${LIBDDPROF_INCLUDE_DIR})
 
