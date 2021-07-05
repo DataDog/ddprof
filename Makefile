@@ -107,8 +107,8 @@ ELFUTILS = $(VENDIR)/elfutils
 ELFLIBS := $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libelf/libelf.a
 
 ## https://gitlab.ddbuild.io/DataDog/libddprof/-/jobs/72495950
-VER_LIBDDPROF := 79bbf4a2 #Short commit number from CI (used in export job of libddprof)
-SHA256_LIBDDPROF := dbd67207af1bd090ad34a30b15afe7da3ec3c7ed1c56762a5f7764565ef8f1b8 # You need to generate this manually
+VER_LIBDDPROF := eeac2cfa #Short commit number from CI (used in export job of libddprof)
+SHA256_LIBDDPROF := c41ce4abe39c478409a09a9f7fbc53817ca61b60ef5cdc3dd401175024ee19f2 # You need to generate this manually
 
 LIBDDPROF := $(VENDIR)/libddprof
 LIBDDPROF_LIB := $(LIBDDPROF)/RelWithDebInfo/lib64/libddprof.a
@@ -120,7 +120,7 @@ LIBLLVM_SRC := $(VENDIR)/llvm/lib
 INCLUDE = -I$(LIBDDPROF)/RelWithDebInfo/include -Iinclude -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
 LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl -l:libstdc++.a
 SRC := src/proto/profile.pb-c.c src/ddprofcmdline.c src/ipc.c src/logger.c src/signal_helper.c src/version.c
-DIRS := $(TARGETDIR)
+DIRS := $(TARGETDIR) $(TMP)
 
 .PHONY: build deps bench ddprof_banner format format-commit clean_deps publish all
 .DELETE_ON_ERROR:
@@ -129,7 +129,7 @@ DIRS := $(TARGETDIR)
 $(TMP):
 	mkdir -p $@
 
-$(DIRS):
+$(TARGETDIR):
 	mkdir -p $@
 
 $(ELFLIBS): $(ELFUTILS)
