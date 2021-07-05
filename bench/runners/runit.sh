@@ -72,7 +72,6 @@ export DD_SERVICE=native-testservice_${VER}
 export DD_AGENT_HOST=${INTAKE_ADD}
 
 eval ${CMD} \
-  -u 10.0 \
   -l debug \
   -o stderr \
   -a yes \
