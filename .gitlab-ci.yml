@@ -65,6 +65,7 @@ build:ddprof_cmake:
     #Build image dependencies were stored in app, avoid rebuilding vendor content
     - ln -s /app/vendor/elfutils vendor/elfutils
     - ln -s /app/vendor/libddprof vendor/libddprof
+    - ln -s /app/vendor/llvm vendor/llvm
     - mkdir -p ${BUILDPATH} && cd ${BUILDPATH}
     - cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} ../
     - make -j ${KUBERNETES_CPU_LIMIT}
@@ -95,6 +96,7 @@ build:ddprof:
     - mkdir -p vendor
     - ln -s /app/vendor/elfutils vendor/elfutils
     - ln -s /app/vendor/libddprof vendor/libddprof
+    - ln -s /app/vendor/llvm vendor/llvm
     - ls -l vendor
     - ls -l vendor/libddprof
     - mkdir -p release/release
