@@ -106,7 +106,6 @@ list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include/proto)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # libddprof
-message(STATUS "NO LIBDDPROF")
 set(FETCH_LIBDDPROF_SHORT "79bbf4a2")
 set(FETCH_LIBDDPROF_SHA "dbd67207af1bd090ad34a30b15afe7da3ec3c7ed1c56762a5f7764565ef8f1b8")
 execute_process(COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_libddprof.sh" ${FETCH_LIBDDPROF_SHORT} ${FETCH_LIBDDPROF_SHA} ${CMAKE_SOURCE_DIR}/vendor
@@ -146,7 +145,7 @@ link_directories(${PROTOBUF_C_LIBDIR})
 
 # llvm-demangle
 #set_directory_properties(PROPERTIES EP_UPDATE_DISCONNECTED true)
-set(LLVM_DEMANGLE_PATH ${CMAKE_SOURCE_DIR}/vendor/llvm CACHE STRING "Path to the llvm-demangle directory")
+set(LLVM_DEMANGLE_PATH ${CMAKE_SOURCE_DIR}/vendor/llvm-demangle CACHE STRING "Path to the llvm-demangle directory")
 set(LLVM_DEMANGLE_SVNROOT https://github.com/llvm/llvm-project/trunk/llvm CACHE STRING "GitHub URL for LLVM")
 FetchContent_Declare(LLVMDemangleHeaders
   SVN_REPOSITORY        ${LLVM_DEMANGLE_SVNROOT}/include/llvm/Demangle
