@@ -106,12 +106,6 @@ list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include/proto)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # libddprof
-set(FETCH_LIBDDPROF_SHORT "79bbf4a2")
-set(FETCH_LIBDDPROF_SHA "dbd67207af1bd090ad34a30b15afe7da3ec3c7ed1c56762a5f7764565ef8f1b8")
-execute_process(COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_libddprof.sh" ${FETCH_LIBDDPROF_SHORT} ${FETCH_LIBDDPROF_SHA} ${CMAKE_SOURCE_DIR}/vendor
-                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                ERROR_VARIABLE PRINTOUT
-)
 include(Findlibddprof)
 message(STATUS "Libddprof Include directory " ${LIBDDPROF_INCLUDE_DIR})
 list(APPEND DDPROF_INCLUDE_LIST ${LIBDDPROF_INCLUDE_DIR})
@@ -144,33 +138,17 @@ pkg_check_modules(PROTOBUF_C REQUIRED IMPORTED_TARGET libprotobuf-c)
 link_directories(${PROTOBUF_C_LIBDIR})
 
 # llvm-demangle
-#set_directory_properties(PROPERTIES EP_UPDATE_DISCONNECTED true)
-set(LLVM_DEMANGLE_PATH ${CMAKE_SOURCE_DIR}/vendor/llvm-demangle CACHE STRING "Path to the llvm-demangle directory")
-set(LLVM_DEMANGLE_SVNROOT https://github.com/llvm/llvm-project/trunk/llvm CACHE STRING "GitHub URL for LLVM")
-FetchContent_Declare(LLVMDemangleHeaders
-  SVN_REPOSITORY        ${LLVM_DEMANGLE_SVNROOT}/include/llvm/Demangle
-  SOURCE_DIR            ${LLVM_DEMANGLE_PATH}/include/llvm/Demangle
-)
-FetchContent_Declare(LLVMDemangleSources
-  SVN_REPOSITORY        ${LLVM_DEMANGLE_SVNROOT}/lib/Demangle
-  SOURCE_DIR            ${LLVM_DEMANGLE_PATH}/lib/Demangle
-)
-if(NOT LLVMDemangleHeaders_POPULATED)
-  FetchContent_Populate(LLVMDemangleHeaders)
-endif()
-if(NOT LLVMDemangleSources_POPULATED)
-  FetchContent_Populate(LLVMDemangleSources)
-  aux_source_directory(${LLVM_DEMANGLE_PATH}/lib/Demangle LLVM_DEMANGLE_SOURCES)
-endif()
-add_library(libllvm-demangle STATIC
-  src/demangle.cpp
-  ${LLVM_DEMANGLE_SOURCES}
-)
-target_include_directories(libllvm-demangle PUBLIC
-  ${LLVM_DEMANGLE_PATH}/include
-)
+include(FindLibLlvmDemangle)
+aux_source_directory(${LLVM_DEMANGLE_PATH}/lib/Demangle LLVM_DEMANGLE_SOURCES)
 list(APPEND DDPROF_INCLUDE_LIST ${LLVM_DEMANGLE_PATH}/include)
 
+# libstdcxx
+# DAS - I have reservations about statically linking the c++ standard library,
+#       but couldn't put together a more competent solution in a short amount
+#       of time.  I suspect that it's fairly rare for customers to not have a
+#       c++ runtime as part of their distro core, but containers can get pretty
+#       small so who knows.  Either way, this is more about linking C++ from C.
+include(Findlibstdcxx)
 
 ## Elf utils
 set(ELFUTILS_PATH ${CMAKE_SOURCE_DIR}/vendor/elfutils CACHE STRING "Path to the elfutils directory")
@@ -195,7 +173,7 @@ set(DDPROF_GLOBAL_SRC
 # It is important to force most libraries as static
 add_exe(ddprof
         ${DDPROF_GLOBAL_SRC}
-        LIBRARIES libddprof libllvm-demangle dw.a elf.a libz.a Threads::Threads libprotobuf-c.a liblzma.a)
+        LIBRARIES libddprof llvm-demangle.a libstdc++.a dw.a elf.a libz.a Threads::Threads libprotobuf-c.a liblzma.a)
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 
 install(TARGETS ddprof)
