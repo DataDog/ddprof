@@ -147,7 +147,8 @@ list(APPEND DDPROF_INCLUDE_LIST ${LLVM_DEMANGLE_PATH}/include)
 #       but couldn't put together a more competent solution in a short amount
 #       of time.  I suspect that it's fairly rare for customers to not have a
 #       c++ runtime as part of their distro core, but containers can get pretty
-#       small so who knows.  Either way, this is more about linking C++ from C.
+#       small so who knows.  Either way, this is more about linking C++ from C
+#       than it is about statically linking libc++/libstdc++
 include(Findlibstdcxx)
 
 ## Elf utils
