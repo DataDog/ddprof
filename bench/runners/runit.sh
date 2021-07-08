@@ -41,6 +41,7 @@ for arg in "$@"; do
   if [[ ${arg} == "network" ]]; then CMD="strace -etrace=%network -f -o /tmp/test.out -s 2500 -v ${CMD_BASE}"; fi
   if [[ ${arg} == "ltrace" ]]; then CMD="ltrace -f -o /tmp/test.out -s 2500 -n 2 -x '*' -e malloc+free ${CMD_BASE}"; fi
   if [[ ${arg} == "jemalloc" ]]; then USE_JEMALLOC="yes"; fi
+  if [[ ${arg} == "envoy" ]]; then JOB="envoy-runner.sh"; fi
   if [[ ${arg} == "redis" ]]; then JOB="redis-runner.sh"; fi
   if [[ ${arg} == "compile" ]]; then JOB="compile-runner.sh"; fi
   if [[ ${arg} == "collatz" ]]; then JOB="collrunner.sh"; fi
