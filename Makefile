@@ -30,6 +30,13 @@ BUILDCHECK := 0  # Do we check the build with CLANG tooling afterward?
 DDARGS :=
 SANS :=
 
+# Because ddprof uses C11, which is *not* a subset of any C++ standard, it is
+# necessary to link against the C++ runtime from C.  In GCC this is easy, but
+# in clang this is too hard for David to figure out.  Since we presume at this
+# time that both the GNU and llvm C/C++ build environments are available, we
+# find the latest instance of the static GCC libstdc++ library
+LIBSTDCXX := $(shell tools/find_libstdcxx.sh)
+
 ## Mode overrides
 ifeq ($(DEBUG),1)
   DDARGS += -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDEBUG
@@ -118,11 +125,11 @@ LIBLLVM_SRC := $(VENDIR)/llvm/lib
 
 # Global aggregates
 INCLUDE = -I$(LIBDDPROF)/RelWithDebInfo/include -Iinclude -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
-LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl -l:libstdc++.a
+LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl $(LIBSTDCXX)
 SRC := src/proto/profile.pb-c.c src/ddprofcmdline.c src/ipc.c src/logger.c src/signal_helper.c src/version.c
 DIRS := $(TARGETDIR) $(TMP)
 
-.PHONY: build deps bench ddprof_banner format format-commit clean_deps publish all
+.PHONY: build deps elfutils demangle bench ddprof_banner format format-commit clean_deps publish all
 .DELETE_ON_ERROR:
 
 ## Intermediate build targets (dependencies)
@@ -133,6 +140,7 @@ $(TARGETDIR):
 	mkdir -p $@
 
 $(ELFLIBS): $(ELFUTILS)
+	cd $(ELFUTILS) && ./configure CC=$(abspath $(GNU_LATEST)) --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning
 	$(MAKE) -j4 -C $(ELFUTILS)
 
 $(ELFUTILS):
@@ -145,26 +153,42 @@ $(ELFUTILS):
 	ls -l $(ELFUTILS)
 	tar --no-same-owner -C $(ELFUTILS) --strip-components 1 -xf $(VENDIR)/$(TAR_ELF)
 	rm -rf $(VENDIR)/$(TAR_ELF)
-	cd $(ELFUTILS) && ./configure CC=$(abspath $(GNU_LATEST)) --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning
 
 $(LIBDDPROF):
 	./tools/fetch_libddprof.sh ${VER_LIBDDPROF} ${SHA256_LIBDDPROF} $(VENDIR)
 
+LLVM_TMP := $(TMP)/demangle
+_LLVM_OBJS := RustDemangle.o ItaniumDemangle.o MicrosoftDemangleNodes.o MicrosoftDemangle.o Demangle.o llvmdemangle.o
+LLVM_OBJS := $(patsubst %,$(LLVM_TMP)/%,$(_LLVM_OBJS))
+
 $(LIBLLVM):
 	./tools/fetch_llvm_demangler.sh 
 
-demangle.a: $(LIBLLVM) $(TMP)
-	$(CXX) $(WARNS) $(INCLUDE) -I$(LIBLLVM) -c src/demangle.cpp $(LIBLLVM_SRC)/Demangle/*.cpp
-	ar rcs tmp/$@ Demangle.o demangle.o ItaniumDemangle.o MicrosoftDemangleNodes.o MicrosoftDemangle.o RustDemangle.o
-	rm -f Demangle.o demangle.o ItaniumDemangle.o MicrosoftDemangleNodes.o MicrosoftDemangle.o RustDemangle.o
+$(LLVM_TMP):
+	mkdir -p $(LLVM_TMP)
+
+$(LLVM_TMP)/%.o: $(LIBLLVM_SRC)/Demangle/%.cpp $(LIBLLVM) | $(LLVM_TMP)
+	$(CXX) $(WARNS) -Wno-unused-parameter $(INCLUDE) -I$(LIBLLVM) -c -o $@ $<
+
+$(LLVM_TMP)/llvmdemangle.o: $(LIBLLVM) | $(LLVM_TMP)
+	$(CXX) $(WARNS) $(INCLUDE) -I$(LIBLLVM) -c -o $@ src/demangle.cpp
+
+$(TMP)/demangle.a: $(LLVM_OBJS)
+	ar rvcs $@ $^
+
+demangle: $(TMP)/demangle.a
 
 ddprof: $(TARGETDIR)/ddprof
 build: |ddprof help
 deps: $(LIBDDPROF) $(ELFLIBS) $(LIBLLVM)
 
+# HACK: For some reason HTTP doesn't work in David's local containers, but
+# pulling down dependencies outside and then compiling works
+pull: $(LIBDDPROF) $(ELFUTILS) $(LIBLLVM)
+
 ## Actual build targets
-$(TARGETDIR)/ddprof: src/ddprof.c demangle.a| $(TARGETDIR) $(ELFLIBS) $(LIBDDPROF) ddprof_banner $(LIBDDPROF_LIB)
-	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) -static-libgcc $(WARNS) $(SANS) $(LDFLAGS) $(INCLUDE) -o $@ $< $(SRC) tmp/demangle.a $(ELFLIBS) $(LDLIBS) $(LIBDDPROF_LIB)
+$(TARGETDIR)/ddprof: src/ddprof.c $(TMP)/demangle.a| $(TARGETDIR) $(ELFLIBS) $(LIBDDPROF) ddprof_banner $(LIBDDPROF_LIB)
+	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) -static-libgcc $(WARNS) $(SANS) $(LDFLAGS) $(INCLUDE) -o $@ $< $(SRC) $(TMP)/demangle.a $(ELFLIBS) $(LDLIBS) $(LIBDDPROF_LIB)
 
 logger: src/eg/logger.c src/logger.c
 	$(CC) $(CFLAGS) $(WARNS) $(SANS) -DPID_OVERRIDE -Iinclude -o $(TARGETDIR)/$@ $^
@@ -193,7 +217,7 @@ format-commit:
 clean_deps:
 	rm -rf vendor/elfutils
 	rm -rf vendor/libddprof*
-	rm -rf tmp/*
+	rm -rf $(TMP)/*
 
 clean: clean_deps
 	rm $(TARGETDIR)/*
