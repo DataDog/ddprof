@@ -5,8 +5,8 @@ stages:
 
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
-  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/73038293
-  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:93505d6ea819aaaa57b5eb30ae9d2280eb4dfc5d2ea11be7ffe45887a72f3b00
+  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/74484756
+  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:5f586a14189e417de29a3266c1040c1678eeb3b9f855ae37e27ecf738b818524
   # When build images are built, publish them with following tags
   BASE_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
   BUILD_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build
@@ -65,6 +65,7 @@ build:ddprof_cmake:
     #Build image dependencies were stored in app, avoid rebuilding vendor content
     - ln -s /app/vendor/elfutils vendor/elfutils
     - ln -s /app/vendor/libddprof vendor/libddprof
+    - ln -s /app/vendor/llvm vendor/llvm
     - mkdir -p ${BUILDPATH} && cd ${BUILDPATH}
     - cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} ../
     - make -j ${KUBERNETES_CPU_LIMIT}
@@ -90,11 +91,12 @@ build:ddprof:
     expire_in: 1 day
   script:
     - set -euo pipefail
-    - rm -rf vendor/elfutils
+    - rm -rf vendor
     #Build image dependencies were stored in app, avoid rebuilding vendor content
     - mkdir -p vendor
     - ln -s /app/vendor/elfutils vendor/elfutils
     - ln -s /app/vendor/libddprof vendor/libddprof
+    - ln -s /app/vendor/llvm vendor/llvm
     - ls -l vendor
     - ls -l vendor/libddprof
     - mkdir -p release/release

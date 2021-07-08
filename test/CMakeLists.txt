@@ -59,6 +59,14 @@ add_unit_test(
     version-ut.cc
 )
 
+add_unit_test(
+    demangle-ut
+    ../src/demangle.cpp
+    demangle-ut.cc
+    LIBRARIES llvm-demangle libstdc++.a
+)
+target_include_directories(demangle-ut PRIVATE ${LLVM_DEMANGLE_PATH}/include)
+
 add_compile_definitions("IPC_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 
 add_unit_test(

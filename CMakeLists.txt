@@ -105,7 +105,8 @@ list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include/proto)
 # Define the scripts to help find the libraries
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
-find_package(libddprof REQUIRED)
+# libddprof
+include(Findlibddprof)
 message(STATUS "Libddprof Include directory " ${LIBDDPROF_INCLUDE_DIR})
 list(APPEND DDPROF_INCLUDE_LIST ${LIBDDPROF_INCLUDE_DIR})
 
@@ -136,9 +137,22 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(PROTOBUF_C REQUIRED IMPORTED_TARGET libprotobuf-c)
 link_directories(${PROTOBUF_C_LIBDIR})
 
-set(ELFUTILS_PATH ${CMAKE_SOURCE_DIR}/vendor/elfutils CACHE STRING "Path to the elfutils directory")
+# llvm-demangle
+include(FindLibLlvmDemangle)
+aux_source_directory(${LLVM_DEMANGLE_PATH}/lib/Demangle LLVM_DEMANGLE_SOURCES)
+list(APPEND DDPROF_INCLUDE_LIST ${LLVM_DEMANGLE_PATH}/include)
+
+# libstdcxx
+# DAS - I have reservations about statically linking the c++ standard library,
+#       but couldn't put together a more competent solution in a short amount
+#       of time.  I suspect that it's fairly rare for customers to not have a
+#       c++ runtime as part of their distro core, but containers can get pretty
+#       small so who knows.  Either way, this is more about linking C++ from C
+#       than it is about statically linking libc++/libstdc++
+include(Findlibstdcxx)
 
 ## Elf utils
+set(ELFUTILS_PATH ${CMAKE_SOURCE_DIR}/vendor/elfutils CACHE STRING "Path to the elfutils directory")
 list(APPEND DDPROF_INCLUDE_LIST ${ELFUTILS_PATH} ${ELFUTILS_PATH}/libdwfl ${ELFUTILS_PATH}/libdw ${ELFUTILS_PATH}/libebl ${ELFUTILS_PATH}/libelf)
 
 # Add directories to look for libraries
@@ -160,7 +174,7 @@ set(DDPROF_GLOBAL_SRC
 # It is important to force most libraries as static
 add_exe(ddprof
         ${DDPROF_GLOBAL_SRC}
-        LIBRARIES libddprof dw.a elf.a libz.a Threads::Threads libprotobuf-c.a liblzma.a)
+        LIBRARIES libddprof llvm-demangle libstdc++.a dw.a elf.a libz.a Threads::Threads libprotobuf-c.a liblzma.a)
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 
 install(TARGETS ddprof)

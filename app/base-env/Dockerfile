@@ -20,6 +20,7 @@ RUN apt update \
   liblzma-dev \
   pkg-config \
   ssh-client \
+  subversion \
   zlib1g-dev \
   libgtest-dev \
   libgmock-dev
