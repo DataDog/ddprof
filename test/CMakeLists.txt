@@ -30,7 +30,7 @@ function(add_unit_test name)
 
    ## Create exe with sources 
    add_exe(${name} ${MY_UNPARSED_ARGUMENTS})
-   target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock llvm-demangle.a)
+   target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock llvm-demangle)
    target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS} ${LLVM_DEMANGLE_PATH}/include)
 
    add_test(NAME ${name} COMMAND ${name})
