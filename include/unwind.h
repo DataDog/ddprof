@@ -181,7 +181,7 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
 
     char tmpname[1024];
     if (symname) {
-      demangle(symname, tmpname, sizeof(tmpname)/sizeof(*tmpname));
+      demangle(symname, tmpname, sizeof(tmpname) / sizeof(*tmpname));
       us->locs[us->idx].funname = strdup(tmpname);
     } else {
       snprintf(tmpname, 1016, "0x%lx", mod->low_addr);
