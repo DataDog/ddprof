@@ -19,6 +19,7 @@
 #include "ipc.h"
 #include "logger.h"
 #include "perf.h"
+#include "statsd.h"
 #include "unwind.h"
 #include "version.h"
 
@@ -197,6 +198,15 @@ int num_cpu = 0;
   })
 
 typedef enum DDKeys { OPT_TABLE(X_ENUM) DD_KLEN } DDKeys;
+
+// This is the socket used to report things over statsd, if available
+int fd_statsd = -1;
+
+void statsd_init() {
+  char *path_statsd = NULL;
+  if ((path_statsd = getenv("DD_DOGSTATSD_SOCKET")))
+    fd_statsd = statsd_open(path_statsd, strlen(path_statsd));
+}
 
 /******************************  Perf Callback  *******************************/
 static inline int64_t now_nanos() {
@@ -457,6 +467,7 @@ void instrument_pid(DDProfContext *ctx, pid_t pid) {
   ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
   unwind_init(ctx->us);
   elf_version(EV_CURRENT); // Initialize libelf
+  statsd_init();
 
   // Just before we enter the main loop, force the enablement of the perf
   // contexts

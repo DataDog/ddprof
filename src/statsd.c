@@ -46,8 +46,7 @@ int statsd_open(char *path, size_t sz_path) {
   return fd_sock;
 }
 
-bool statsd_send(int fd_sock, char *key, size_t sz_key, void *val, int type) {
-  (void)type; // ignored for now
+bool statsd_send(int fd_sock, char *key, void *val, int type) {
   char buf[1024] = {0};
   size_t sz = -1;
   switch (type) {
@@ -72,7 +71,7 @@ bool statsd_send(int fd_sock, char *key, size_t sz_key, void *val, int type) {
     return false;
 
   // Nothing to do if the write fails
-  if (sz != write(fd_sock, buf, sz))
+  if (sz != (size_t)write(fd_sock, buf, sz))
     return false;
   return true;
 }

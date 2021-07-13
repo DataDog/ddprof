@@ -128,7 +128,7 @@ CWD := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 SOURCE_DIR := $(CWD)
 INCLUDE = -I$(LIBDDPROF)/RelWithDebInfo/include -I$(CWD)/include -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
 LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl $(LIBSTDCXX)
-SRC := $(CWD)/src/proto/profile.pb-c.c $(CWD)/src/ddprofcmdline.c $(CWD)/src/ipc.c $(CWD)/src/logger.c $(CWD)/src/signal_helper.c $(CWD)/src/version.c
+SRC := $(CWD)/src/proto/profile.pb-c.c $(CWD)/src/ddprofcmdline.c $(CWD)/src/ipc.c $(CWD)/src/logger.c $(CWD)/src/signal_helper.c $(CWD)/src/version.c $(CWD)/src/statsd.c
 DIRS := $(TARGETDIR) $(TMP)
 
 .PHONY: build deps elfutils demangle bench ddprof_banner format format-commit clean_deps publish all
