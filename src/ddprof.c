@@ -208,6 +208,18 @@ void statsd_init() {
     fd_statsd = statsd_open(path_statsd, strlen(path_statsd));
 }
 
+void statsd_upload_globals() {
+  static char key_rss[] = "datadog.profiler.native.rss";
+  static char key_user[] = "datadog.profiler.native.utime";
+  if (-1 == fd_statsd)
+    return;
+  ProcStatus *procstat = proc_read();
+  if (procstat) {
+    statsd_send(fd_statsd, key_rss, &procstat->rss, STAT_GAUGE);
+    statsd_send(fd_statsd, key_user, &procstat->utime, STAT_GAUGE);
+  }
+}
+
 /******************************  Perf Callback  *******************************/
 static inline int64_t now_nanos() {
   static struct timeval tv = {0};
@@ -295,8 +307,10 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   // rate to the last time.
   int64_t now = now_nanos();
 
-  if (now > pctx->send_nanos)
+  if (now > pctx->send_nanos) {
     export(pctx, now);
+    statsd_upload_globals();
+  }
 }
 
 /*********************************  Printers  *********************************/
