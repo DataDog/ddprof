@@ -172,9 +172,9 @@ int main (int c, char** v) {
       static char key_ticks[] = "app.collatz.ticks";
       static char key_stacks[] = "app.collatz.stacks";
       static char key_funs[] = "app.collatz.functions";
-      statsd_send(fd_statsd, key_ticks, sizeof(key_ticks), &(long){work_end - work_start}, STAT_GAUGE);
-      statsd_send(fd_statsd, key_stacks, sizeof(key_stacks), &kj, STAT_GAUGE);
-      statsd_send(fd_statsd, key_funs, sizeof(key_funs), &my_counter, STAT_GAUGE); // technicall can overflow, but whatever
+      statsd_send(fd_statsd, key_ticks, &(long){work_end - work_start}, STAT_GAUGE);
+      statsd_send(fd_statsd, key_stacks, &kj, STAT_GAUGE);
+      statsd_send(fd_statsd, key_funs, my_counter, STAT_GAUGE); // technically can overflow, but whatever
     }
   }
 
