@@ -215,8 +215,8 @@ void statsd_upload_globals() {
     return;
   ProcStatus *procstat = proc_read();
   if (procstat) {
-    statsd_send(fd_statsd, key_rss, &procstat->rss, STAT_GAUGE);
-    statsd_send(fd_statsd, key_user, &procstat->utime, STAT_GAUGE);
+    statsd_send(fd_statsd, key_rss, &(long){procstat->rss}, STAT_GAUGE);
+    statsd_send(fd_statsd, key_user, &(long){procstat->utime}, STAT_GAUGE);
   }
 }
 
