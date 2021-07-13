@@ -127,6 +127,7 @@ int main (int c, char** v) {
 
   // Setup
   static __thread unsigned long work_start, work_end;
+  static __thread unsigned long last_counter = 0;
   unsigned long *start_tick = mmap(NULL, MAX_PROCS*sizeof(unsigned long), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   unsigned long *end_tick = mmap(NULL, MAX_PROCS*sizeof(unsigned long), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   pid_t pids[MAX_PROCS] = {0};
@@ -165,10 +166,11 @@ int main (int c, char** v) {
       int arg = t ? t : i;
       funs[arg%funlen](arg);
     }
-    work_end = __rdtsc();
 
     // Print to statsd, if configured
     if (-1 != fd_statsd) {
+      work_end = __rdtsc();
+      last_counter = *my_counter;
       static char key_ticks[] = "app.collatz.ticks";
       static char key_stacks[] = "app.collatz.stacks";
       static char key_funs[] = "app.collatz.functions";
