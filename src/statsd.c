@@ -11,7 +11,7 @@ int statsd_open(char *path, size_t sz_path) {
   assert(path);
   assert(sz_path);
 
-  char template[] = "/tmp/XXXXXX.tmp";
+  char template[] = "/tmp/statsd.XXXXXX";
   struct sockaddr_un addr_bind = {.sun_family = AF_UNIX};
   struct sockaddr_un addr_peer = {.sun_family = AF_UNIX};
   int fd_tmp = -1;

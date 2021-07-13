@@ -140,15 +140,15 @@ int main (int c, char** v) {
   pthread_barrierattr_setpshared(&bat, 1);
   pthread_barrier_init(pb, &bat, n);
 
+  // Set up a statsd connection in the main process
+  int fd_statsd = -1;
+  char *path_statsd = NULL;
+  if ((path_statsd = getenv("DD_DOGSTATSD_SOCKET")))
+    fd_statsd = statsd_open(path_statsd, strlen(path_statsd));
+
   // Execute
   int me = 0;
   for (int i=1; i<n && (pids[i] = fork()); i++) {me = i;}
-
-  // Right now we have each fork set up its own statsd connection, if applicable
-  int fd_statsd = -1;
-  char *path_statsd = NULL;
-  if (getpid() == pids[0] && (path_statsd = getenv("DD_DOGSTATSD_SOCKET")))
-    fd_statsd = statsd_open(path_statsd, strlen(path_statsd));
 
   // OK, so we want to wait until everyone has started, but if we have more
   // work than we have cores, we might realistically start after other workers
