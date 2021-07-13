@@ -8,6 +8,7 @@ typedef enum STAT_TYPES {
   STAT_MS_LONG,
   STAT_MS_FLOAT,
   STAT_COUNT,
+  STAT_GAUGE,
 } STAT_TYPES;
 
 int statsd_open(char *, size_t);

@@ -126,6 +126,7 @@ int main (int c, char** v) {
   printf("%d, %d, %d, %d, ", n, ki, kj, t); fflush(stdout);
 
   // Setup
+  static __thread unsigned long work_start, work_end;
   unsigned long *start_tick = mmap(NULL, MAX_PROCS*sizeof(unsigned long), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   unsigned long *end_tick = mmap(NULL, MAX_PROCS*sizeof(unsigned long), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   pid_t pids[MAX_PROCS] = {0};
@@ -140,15 +141,16 @@ int main (int c, char** v) {
   pthread_barrierattr_setpshared(&bat, 1);
   pthread_barrier_init(pb, &bat, n);
 
-  // Set up a statsd connection in the main process
-  int fd_statsd = -1;
-  char *path_statsd = NULL;
-  if ((path_statsd = getenv("DD_DOGSTATSD_SOCKET")))
-    fd_statsd = statsd_open(path_statsd, strlen(path_statsd));
 
   // Execute
   int me = 0;
   for (int i=1; i<n && (pids[i] = fork()); i++) {me = i;}
+
+  // Now that we're in a fork, set up my local statsd socket
+  int fd_statsd = -1;
+  char *path_statsd = NULL;
+  if ((path_statsd = getenv("DD_DOGSTATSD_SOCKET")))
+    fd_statsd = statsd_open(path_statsd, strlen(path_statsd));
 
   // OK, so we want to wait until everyone has started, but if we have more
   // work than we have cores, we might realistically start after other workers
@@ -156,11 +158,25 @@ int main (int c, char** v) {
   pthread_barrier_wait(pb);
   start_tick[me] = __rdtsc();
   pthread_barrier_wait(pb);
-  for (int j=0; j<ki; j++)
+  for (int j=0; j<ki; j++) {
+
+    work_start = __rdtsc();
     for (int i=0; i<kj; i++) {
       int arg = t ? t : i;
       funs[arg%funlen](arg);
     }
+    work_end = __rdtsc();
+
+    // Print to statsd, if configured
+    if (-1 != fd_statsd) {
+      static char key_ticks[] = "app.collatz.ticks";
+      static char key_stacks[] = "app.collatz.stacks";
+      static char key_funs[] = "app.collatz.functions";
+      statsd_send(fd_statsd, key_ticks, sizeof(key_ticks), &(long){work_end - work_start}, STAT_GAUGE);
+      statsd_send(fd_statsd, key_stacks, sizeof(key_stacks), &kj, STAT_GAUGE);
+      statsd_send(fd_statsd, key_funs, sizeof(key_funs), &my_counter, STAT_GAUGE); // technicall can overflow, but whatever
+    }
+  }
 
   // Wait for everyone to be done
   __sync_add_and_fetch(counter,*my_counter);
@@ -171,16 +187,6 @@ int main (int c, char** v) {
   unsigned long long ticks = 0;
   for (int i=0; i<n; i++)
     ticks += end_tick[i] - start_tick[i];
-
-  // Print to statsd, if configured
-  if (getpid() == pids[0] && -1 != fd_statsd) {
-    static char key_ticks[] = "app.collatz.ticks";
-    static char key_stacks[] = "app.collatz.stacks";
-    static char key_funs[] = "app.collatz.functions";
-    statsd_send(fd_statsd, key_ticks, sizeof(key_ticks), &ticks, STAT_COUNT);
-    statsd_send(fd_statsd, key_stacks, sizeof(key_stacks), &kj, STAT_COUNT);
-    statsd_send(fd_statsd, key_funs, sizeof(key_funs), &counter, STAT_COUNT);
-  }
 
   // Print results
   if (getpid() == pids[0]) {

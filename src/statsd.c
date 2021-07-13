@@ -48,31 +48,31 @@ int statsd_open(char *path, size_t sz_path) {
 
 bool statsd_send(int fd_sock, char *key, size_t sz_key, void *val, int type) {
   (void)type; // ignored for now
-  char payload[1024] = {0};
+  char buf[1024] = {0};
   size_t sz = -1;
   switch (type) {
   default:
   case STAT_MS_LONG:
-    sz = snprintf(payload, sizeof(payload), "%s:%ld|%s", key, *(long *)val,
-                  "ms");
+    sz = snprintf(buf, sizeof(buf), "%s:%ld|%s", key, *(long *)val, "ms");
     break;
   case STAT_MS_FLOAT:
-    sz = snprintf(payload, sizeof(payload), "%s:%f|%s", key, *(float *)val,
-                  "ms");
+    sz = snprintf(buf, sizeof(buf), "%s:%f|%s", key, *(float *)val, "ms");
     break;
   case STAT_COUNT:
-    sz =
-        snprintf(payload, sizeof(payload), "%s:%ld|%s", key, *(long *)val, "c");
+    sz = snprintf(buf, sizeof(buf), "%s:%ld|%s", key, *(long *)val, "c");
+    break;
+  case STAT_GAUGE:
+    sz = snprintf(buf, sizeof(buf), "%s:%ld|%s", key, *(long *)val, "g");
     break;
   }
 
   // Nothing to do if serialization failed or was short, but we don't return
   // granular result
-  if (sz <= 0 || sz >= sizeof(payload))
+  if (sz <= 0 || sz >= sizeof(buf))
     return false;
 
   // Nothing to do if the write fails
-  if (sz != write(fd_sock, payload, sz))
+  if (sz != write(fd_sock, buf, sz))
     return false;
   return true;
 }
