@@ -170,13 +170,13 @@ int main (int c, char** v) {
     // Print to statsd, if configured
     if (-1 != fd_statsd) {
       work_end = __rdtsc();
-      last_counter = *my_counter;
       static char key_ticks[] = "app.collatz.ticks";
       static char key_stacks[] = "app.collatz.stacks";
       static char key_funs[] = "app.collatz.functions";
       statsd_send(fd_statsd, key_ticks, &(long){work_end - work_start}, STAT_GAUGE);
       statsd_send(fd_statsd, key_stacks, &kj, STAT_GAUGE);
-      statsd_send(fd_statsd, key_funs, my_counter, STAT_GAUGE); // technically can overflow, but whatever
+      statsd_send(fd_statsd, key_funs, &(long){*my_counter-last_counter}, STAT_GAUGE); // technically can overflow, but whatever
+      last_counter = *my_counter;
     }
   }
 
