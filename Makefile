@@ -124,9 +124,11 @@ LIBLLVM := $(VENDIR)/llvm/include
 LIBLLVM_SRC := $(VENDIR)/llvm/lib
 
 # Global aggregates
-INCLUDE = -I$(LIBDDPROF)/RelWithDebInfo/include -Iinclude -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
+CWD := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+SOURCE_DIR := $(CWD)
+INCLUDE = -I$(LIBDDPROF)/RelWithDebInfo/include -I$(CWD)/include -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
 LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl $(LIBSTDCXX)
-SRC := src/proto/profile.pb-c.c src/ddprofcmdline.c src/ipc.c src/logger.c src/signal_helper.c src/version.c
+SRC := $(CWD)/src/proto/profile.pb-c.c $(CWD)/src/ddprofcmdline.c $(CWD)/src/ipc.c $(CWD)/src/logger.c $(CWD)/src/signal_helper.c $(CWD)/src/version.c
 DIRS := $(TARGETDIR) $(TMP)
 
 .PHONY: build deps elfutils demangle bench ddprof_banner format format-commit clean_deps publish all
@@ -195,7 +197,7 @@ logger: src/eg/logger.c src/logger.c
 
 # kinda phony
 bench: 
-	$(MAKE) CC=$(strip $(CC)) CFLAGS="$(CFLAGS)" TARGETDIR=$(strip $(TARGETDIR)) -C bench/collatz
+	$(MAKE) CC=$(strip $(CC)) CFLAGS="$(CFLAGS)" INCLUDE="$(INCLUDE)" DDPROF_DIR=$(CWD) TARGETDIR=$(strip $(TARGETDIR)) -C bench/collatz
 
 help: $(TARGETDIR)/ddprof 
 	tools/help_generate.sh

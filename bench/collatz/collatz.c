@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <x86intrin.h>
 
+#include "statsd.h"
+
 #ifdef MYNAME
 #undef MYNAME
 #define MYNAME "collatz"
@@ -142,6 +144,12 @@ int main (int c, char** v) {
   int me = 0;
   for (int i=1; i<n && (pids[i] = fork()); i++) {me = i;}
 
+  // Right now we have each fork set up its own statsd connection, if applicable
+  int fd_statsd = -1;
+  char *path_statsd = NULL;
+  if (getpid() == pids[0] && (path_statsd = getenv("DD_DOGSTATSD_SOCKET")))
+    fd_statsd = statsd_open(path_statsd, strlen(path_statsd));
+
   // OK, so we want to wait until everyone has started, but if we have more
   // work than we have cores, we might realistically start after other workers
   // have started.  So need to double-tap the barrier.
@@ -163,6 +171,16 @@ int main (int c, char** v) {
   unsigned long long ticks = 0;
   for (int i=0; i<n; i++)
     ticks += end_tick[i] - start_tick[i];
+
+  // Print to statsd, if configured
+  if (getpid() == pids[0] && -1 != fd_statsd) {
+    static char key_ticks[] = "app.collatz.ticks";
+    static char key_stacks[] = "app.collatz.stacks";
+    static char key_funs[] = "app.collatz.functions";
+    statsd_send(fd_statsd, key_ticks, sizeof(key_ticks), &ticks, STAT_COUNT);
+    statsd_send(fd_statsd, key_stacks, sizeof(key_stacks), &kj, STAT_COUNT);
+    statsd_send(fd_statsd, key_funs, sizeof(key_funs), &counter, STAT_COUNT);
+  }
 
   // Print results
   if (getpid() == pids[0]) {

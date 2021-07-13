@@ -19,5 +19,4 @@ endif
 
 collatz: collatz.c
 	mkdir -p $(TARGETDIR)
-	$(CC) $(CFLAGS) $(DDARGS) -o $(TARGETDIR)/$@ $^ -lpthread
-
+	$(CC) $(CFLAGS) $(DDARGS) $(INCLUDE) -o $(TARGETDIR)/$@ $^ $(DDPROF_DIR)/src/statsd.c -lpthread
