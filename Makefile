@@ -24,11 +24,18 @@ ANALYSIS ?= 1
 GNU_TOOLS ?= 0
 
 ## Build parameters
-CFLAGS = -O2 -std=c11 -D_GNU_SOURCE
+CFLAGS = -O2 -std=c11 -D_GNU_SOURCE -DMYNAME=\"ddprof\"
 WARNS := -Wall -Wextra -Wpedantic -Wno-missing-braces -Wno-missing-field-initializers -Wno-gnu-statement-expression -Wno-pointer-arith -Wno-gnu-folding-constant -Wno-zero-length-array
 BUILDCHECK := 0  # Do we check the build with CLANG tooling afterward?
 DDARGS :=
 SANS :=
+
+# Because ddprof uses C11, which is *not* a subset of any C++ standard, it is
+# necessary to link against the C++ runtime from C.  In GCC this is easy, but
+# in clang this is too hard for David to figure out.  Since we presume at this
+# time that both the GNU and llvm C/C++ build environments are available, we
+# find the latest instance of the static GCC libstdc++ library
+LIBSTDCXX := $(shell tools/find_libstdcxx.sh)
 
 ## Mode overrides
 ifeq ($(DEBUG),1)
@@ -79,7 +86,7 @@ endif
 # If this is happening in CI, name accordingly
 VERNAME :=
 ifeq ($(origin CI_PIPELINE_ID), undefined)
-  VERNAME :=$(shell git rev-parse --short HEAD)
+  VERNAME :=$(shell git rev-parse --short HEAD 2> /dev/null || echo "local"| xargs)
 else
   VERNAME :=$(CI_PIPELINE_ID)-$(shell git rev-parse --short HEAD)
 endif
@@ -104,46 +111,84 @@ VER_ELF := 0.183
 TAR_ELF := elfutils-$(VER_ELF).tar.bz2
 URL_ELF := https://sourceware.org/elfutils/ftp/$(VER_ELF)/$(TAR_ELF)
 ELFUTILS = $(VENDIR)/elfutils
-ELFLIBS := $(ELFUTILS)/libdwfl/libdwfl.a $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libebl/libebl.a $(ELFUTILS)/libelf/libelf.a
+ELFLIBS := $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libelf/libelf.a
 
-## libddprof build parameters
+## https://gitlab.ddbuild.io/DataDog/libddprof/-/jobs/72495950
+VER_LIBDDPROF := 79bbf4a2 #Short commit number from CI (used in export job of libddprof)
+SHA256_LIBDDPROF := dbd67207af1bd090ad34a30b15afe7da3ec3c7ed1c56762a5f7764565ef8f1b8 # You need to generate this manually
+
 LIBDDPROF := $(VENDIR)/libddprof
+LIBDDPROF_LIB := $(LIBDDPROF)/RelWithDebInfo/lib64/libddprof.a
+
+LIBLLVM := $(VENDIR)/llvm/include
+LIBLLVM_SRC := $(VENDIR)/llvm/lib
 
 # Global aggregates
-INCLUDE = -I$(LIBDDPROF)/src -I$(LIBDDPROF)/include -Iinclude -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
-LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl 
-SRC := $(addprefix $(LIBDDPROF)/src/, string_table.c pprof.c http.c dd_send.c append_string.c) src/proto/profile.pb-c.c src/logger.c
+INCLUDE = -I$(LIBDDPROF)/RelWithDebInfo/include -Iinclude -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
+LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl $(LIBSTDCXX)
+SRC := src/proto/profile.pb-c.c src/ddprofcmdline.c src/ipc.c src/logger.c src/signal_helper.c src/version.c
 DIRS := $(TARGETDIR) $(TMP)
 
-.PHONY: build deps bench ddprof_banner format format-commit clean_deps publish all
+.PHONY: build deps elfutils demangle bench ddprof_banner format format-commit clean_deps publish all
 .DELETE_ON_ERROR:
 
 ## Intermediate build targets (dependencies)
-$(DIRS):
+$(TMP):
+	mkdir -p $@
+
+$(TARGETDIR):
 	mkdir -p $@
 
 $(ELFLIBS): $(ELFUTILS)
+	cd $(ELFUTILS) && ./configure CC=$(abspath $(GNU_LATEST)) --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning
 	$(MAKE) -j4 -C $(ELFUTILS)
 
 $(ELFUTILS):
+	mkdir -p $(VENDIR)
+	ls -l $(VENDIR)
 	cd $(VENDIR) && curl -L --remote-name-all $(URL_ELF)
 	echo $(MD5_ELF) $(VENDIR)/$(TAR_ELF) > $(VENDIR)/elfutils.md5
 	md5sum --status -c $(VENDIR)/elfutils.md5
 	mkdir -p $(ELFUTILS)
+	ls -l $(ELFUTILS)
 	tar --no-same-owner -C $(ELFUTILS) --strip-components 1 -xf $(VENDIR)/$(TAR_ELF)
 	rm -rf $(VENDIR)/$(TAR_ELF)
-	cd $(ELFUTILS) && ./configure CC=$(abspath $(GNU_LATEST)) --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning
 
-$(LIBDDPROF)/src:
-	git submodule update --init
+$(LIBDDPROF):
+	./tools/fetch_libddprof.sh ${VER_LIBDDPROF} ${SHA256_LIBDDPROF} $(VENDIR)
+
+LLVM_TMP := $(TMP)/demangle
+_LLVM_OBJS := RustDemangle.o ItaniumDemangle.o MicrosoftDemangleNodes.o MicrosoftDemangle.o Demangle.o llvmdemangle.o
+LLVM_OBJS := $(patsubst %,$(LLVM_TMP)/%,$(_LLVM_OBJS))
+
+$(LIBLLVM):
+	./tools/fetch_llvm_demangler.sh 
+
+$(LLVM_TMP):
+	mkdir -p $(LLVM_TMP)
+
+$(LLVM_TMP)/%.o: $(LIBLLVM_SRC)/Demangle/%.cpp $(LIBLLVM) | $(LLVM_TMP)
+	$(CXX) $(WARNS) -Wno-unused-parameter $(INCLUDE) -I$(LIBLLVM) -c -o $@ $<
+
+$(LLVM_TMP)/llvmdemangle.o: $(LIBLLVM) | $(LLVM_TMP)
+	$(CXX) $(WARNS) $(INCLUDE) -I$(LIBLLVM) -c -o $@ src/demangle.cpp
+
+$(TMP)/demangle.a: $(LLVM_OBJS)
+	ar rvcs $@ $^
+
+demangle: $(TMP)/demangle.a
 
 ddprof: $(TARGETDIR)/ddprof
 build: |ddprof help
-deps: $(ELFLIBS) $(LIBDDPROF)/src
+deps: $(LIBDDPROF) $(ELFLIBS) $(LIBLLVM)
+
+# HACK: For some reason HTTP doesn't work in David's local containers, but
+# pulling down dependencies outside and then compiling works
+pull: $(LIBDDPROF) $(ELFUTILS) $(LIBLLVM)
 
 ## Actual build targets
-$(TARGETDIR)/ddprof: src/ddprof.c | $(TARGETDIR) $(ELFLIBS) $(LIBDDPROF) ddprof_banner
-	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) $(WARNS) $(SANS) $(LDFLAGS) $(INCLUDE) -o $@ $< $(SRC) $(ELFLIBS) $(LDLIBS)
+$(TARGETDIR)/ddprof: src/ddprof.c $(TMP)/demangle.a| $(TARGETDIR) $(ELFLIBS) $(LIBDDPROF) ddprof_banner $(LIBDDPROF_LIB)
+	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) -static-libgcc $(WARNS) $(SANS) $(LDFLAGS) $(INCLUDE) -o $@ $< $(SRC) $(TMP)/demangle.a $(ELFLIBS) $(LDLIBS) $(LIBDDPROF_LIB)
 
 logger: src/eg/logger.c src/logger.c
 	$(CC) $(CFLAGS) $(WARNS) $(SANS) -DPID_OVERRIDE -Iinclude -o $(TARGETDIR)/$@ $^
@@ -160,19 +205,19 @@ ddprof_banner:
 	@echo "Using $(CC)"
 	@echo "Building ddprof with debug=$(DEBUG), analysis=$(ANALYSIS), safety=$(SAFETY), GNU_TOOLS=$(GNU_TOOLS)"
 	@echo "elfutils $(VER_ELF)"
-	@git submodule
 	@echo 
 	@echo =============== BEGIN BUILD ===============
 
 format:
-	tools/clang_formatter.sh
+	tools/style-check.sh
 
 format-commit:
-	tools/clang_formatter.sh apply
+	tools/style-check.sh apply
 
 clean_deps:
 	rm -rf vendor/elfutils
-	rm -rf tmp/*
+	rm -rf vendor/libddprof*
+	rm -rf $(TMP)/*
 
 clean: clean_deps
 	rm $(TARGETDIR)/*

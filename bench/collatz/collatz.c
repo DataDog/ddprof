@@ -9,7 +9,10 @@
 #include <unistd.h>
 #include <x86intrin.h>
 
+#ifdef MYNAME
+#undef MYNAME
 #define MYNAME "collatz"
+#endif
 #define VER_MAJ 1
 #define VER_MIN 4
 #define VER_PATCH 0
@@ -80,6 +83,8 @@ int main (int c, char** v) {
     } else if (!strcmp(v[1], "-h") || !strcmp(v[1], "--help")) {
       printf("collatz <CPUs> <outer index> <inner index> <target value>\n");
       printf("  CPUs -- number of CPUs to use (defaults to 1/2 + 1 of total)\n");
+      printf("    0 -- use 1/2 + 1 CPUs\n");
+      printf("   -1 -- use all cpus\n");
       printf("  outer/inner indices -- outer*inner = total loops\n");
       printf("  target -- value for collatz conjecture; otherwise uses every index from inner loop\n");
       printf("    Also supports the following special values (val; depth):\n");
@@ -95,6 +100,7 @@ int main (int c, char** v) {
       return 0;
     }
     P(v[1], n);
+    if (n < 0) n = get_nprocs();
     if (n > MAX_PROCS) n = MAX_PROCS;
   }
   if (c > 2)

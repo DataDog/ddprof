@@ -4,12 +4,19 @@
 #include "libdw.h"
 #include "libdwfl.h"
 #include "libebl.h"
+#include "logger.h"
 #include <dwarf.h>
 #include <stdbool.h>
 
 // TODO select dwfl_internals based on preproc directive
+#include "demangle.h"
 #include "dso.h"
 #include "dwfl_internals.h"
+#include "procutils.h"
+#include "signal_helper.h"
+
+//#define D_UNWDBG
+#define UNUSED(x) (void)(x)
 
 #define MAX_STACK 1024
 typedef struct FunLoc {
@@ -45,12 +52,12 @@ struct UnwindState {
 };
 
 #ifdef D_UNWDBG
-#  define D(...)                                                               \
+#  define DFUNC_PRINT(...)                                                     \
     fprintf(stderr, "<%s:%d> ", __FUNCTION__, __LINE__);                       \
     fprintf(stderr, __VA_ARGS__);                                              \
     fprintf(stderr, "\n")
 #else
-#  define D(...)                                                               \
+#  define DFUNC_PRINT(...)                                                     \
     do {                                                                       \
     } while (0);
 #endif
@@ -106,7 +113,7 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
   bool isactivation = false;
 
   if (!dwfl_frame_pc(state, &pc, &isactivation)) {
-    D("%s", dwfl_errmsg(-1));
+    DFUNC_PRINT("%s", dwfl_errmsg(-1));
     return DWARF_CB_ABORT;
   }
 
@@ -114,11 +121,11 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
 
   Dwfl_Thread *thread = dwfl_frame_thread(state);
   if (!thread) {
-    D("dwfl_frame_thread was zero: (%s)", dwfl_errmsg(-1));
+    DFUNC_PRINT("dwfl_frame_thread was zero: (%s)", dwfl_errmsg(-1));
   }
   Dwfl *dwfl = dwfl_thread_dwfl(thread);
   if (!dwfl) {
-    D("dwfl_thread_dwfl was zero: (%s)", dwfl_errmsg(-1));
+    DFUNC_PRINT("dwfl_thread_dwfl was zero: (%s)", dwfl_errmsg(-1));
   }
   Dwfl_Module *mod = dwfl_addrmodule(dwfl, newpc);
   const char *symname = NULL;
@@ -141,7 +148,7 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
 
     int lineno = 0;
     us->locs[us->idx].line = 0;
-    char *srcpath = (char *)dwfl_lineinfo(line, &newpc, &lineno, 0, 0, 0);
+    const char *srcpath = dwfl_lineinfo(line, &newpc, &lineno, 0, 0, 0);
     if (srcpath) {
       us->locs[us->idx].srcpath = strdup(srcpath);
       us->locs[us->idx].line = lineno;
@@ -174,16 +181,18 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
       us->locs[us->idx].sopath = strdup(sname ? sname + 1 : mod->name);
       printf("  soname: %s\n", us->locs[us->idx].sopath);
     }
+
+    char tmpname[1024];
     if (symname) {
-      us->locs[us->idx].funname = strdup(symname);
+      demangle(symname, tmpname, sizeof(tmpname) / sizeof(*tmpname));
+      us->locs[us->idx].funname = strdup(tmpname);
     } else {
-      char tmpname[1024] = {0};
-      snprintf(tmpname, 1020, "0x%lx", mod->low_addr);
+      snprintf(tmpname, 1016, "0x%lx", mod->low_addr);
       us->locs[us->idx].funname = strdup(tmpname);
     }
     us->idx++;
   } else {
-    D("dwfl_addrmodule was zero: (%s)", dwfl_errmsg(-1));
+    DFUNC_PRINT("dwfl_addrmodule was zero: (%s)", dwfl_errmsg(-1));
   }
   return DWARF_CB_OK;
 }
@@ -213,7 +222,7 @@ bool unwind_init(struct UnwindState *us) {
 
   elf_version(EV_CURRENT);
   if (!us->dwfl && !(us->dwfl = dwfl_begin(&proc_callbacks))) {
-    D("There was a problem getting the Dwfl");
+    DFUNC_PRINT("There was a problem getting the Dwfl");
     return false;
   }
 
@@ -233,10 +242,10 @@ int unwindstate__unwind(struct UnwindState *us) {
       .set_initial_registers = set_initial_registers,
   };
 
-  D("Gonna unwind at %d (my PID is %d)\n", us->pid, getpid());
+  DFUNC_PRINT("Gonna unwind at %d (my PID is %d)\n", us->pid, getpid());
 
   if (dwfl_linux_proc_report(us->dwfl, us->pid)) {
-    D("There was a problem reporting the module.");
+    DFUNC_PRINT("There was a problem reporting the module.");
     return -1;
   }
 
@@ -255,12 +264,32 @@ int unwindstate__unwind(struct UnwindState *us) {
   }
 
   if (dwfl_getthreads(us->dwfl, tid_cb, us)) {
-    D("Could not get thread frames.");
+    DFUNC_PRINT("Could not get thread frames.");
     return -1;
   }
 
   // TODO return actual stack size
   return MAX_STACK;
+}
+
+void analyze_unwinding_error(pid_t pid, uint64_t eip) {
+  // expensive operations should not be executed with NDEBUG
+#ifndef NDEBUG
+  Map *map = procfs_MapMatch(pid, eip);
+  // kill 0 to check if the process has finished protected by NDEBUG
+  if (!map)
+    LG_WRN("Error getting map for [%d](0x%lx)", pid, eip);
+  else {
+    if (process_is_alive(pid)) {
+      LG_WRN("Error unwinding %s [%d](0x%lx)", map->path, pid, eip);
+    } else {
+      LG_NTC("Process ended before we could unwind [%d]", pid);
+    }
+  }
+#else
+  UNUSED(pid);
+  UNUSED(eip);
+#endif
 }
 
 #endif

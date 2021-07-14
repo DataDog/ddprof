@@ -1,7 +1,6 @@
 # ddprof Commands
 
-
-```
+```bash
  usage: ddprof [--help] [PROFILER_OPTIONS] COMMAND [COMMAND_ARGS]
  eg: ddprof -A hunter2 -H localhost -P 8192 redis-server /etc/redis/redis.conf
 
@@ -23,6 +22,18 @@ Options:
 
   -S, --service, (envvar: DD_SERVICE)
     The name of this service
+
+  -d, --enable, (envvar: DD_PROFILING_ENABLED)
+    Whether to enable DataDog profiling.  If this is true, then ddprof as well
+    as any other DataDog profilers are enabled.  If false, they are all disabled.
+    Note: if this is set, the native profiler will set the DD_PROFILING_ENABLED
+    environment variable in all sub-environments, thereby enabling DataDog profilers.
+    default: on
+
+  -n, --native_enable, (envvar: DD_PROFILING_NATIVE_ENABLED)
+    Whether to enable ddprof specifically, without altering how other DataDog
+    profilers are run.  For example, DD_PROFILING_ENABLED can be used to disable
+    an inner profile, whilst setting DD_PROFILING_NATIVE_ENABLED to enable ddprof
 
   -u, --upload_period, (envvar: DD_PROFILING_UPLOAD_PERIOD)
     In seconds, how frequently to upload gathered data to Datadog.
@@ -50,6 +61,12 @@ Options:
 
   -l, --loglevel, (envvar: DD_PROFILING_NATIVELOGLEVEL)
     One of `debug`, `notice`, `warn`, `error`.  Default is `warn`.
+
+  -p, --pid, (envvar: DD_PROFILING_NATIVETARGET)
+    Instrument the given PID rather than launching a new process.
+
+  -g, --global, (envvar: DD_PROFILING_NATIVEGLOBAL)
+    Instruments the whole system.  Overrides DD_PROFILING_NATIVETARGET.
 
   -e, --event:
     A string representing the events to sample.  Defaults to `cw`

@@ -13,12 +13,14 @@ DIR=$(git rev-parse --show-toplevel)
 # Also rather strongly assumes this is running in CI... sorry!
 
 if [ ! -z "${RELEASEBIN}" ]; then 
-  $DIR/tools/upload.sh -p ${ANAME}/release -f ${RELEASEBIN} -n $(${RELEASEBIN} --version | sed -e 's/ /_/g' -e 's/\+/_/g')
-  $DIR/tools/upload.sh -p ${ANAME}/release -f ${RELEASEBIN} -n $(${RELEASEBIN} --version | sed -e 's/ /_/g' -e 's/\+.*//g')
-  $DIR/tools/upload.sh -p ${ANAME}/release -f ${RELEASEBIN} -n $(${RELEASEBIN} --version | sed -e 's/ .*//g')
+  $DIR/tools/upload.sh -p ${S3ROOT}/release -f ${RELEASEBIN} -n $(${RELEASEBIN} --version | sed -e 's/ /_/g' -e 's/\+/_/g')
+  $DIR/tools/upload.sh -p ${S3ROOT}/release -f ${RELEASEBIN} -n $(${RELEASEBIN} --version | sed -e 's/ /_/g' -e 's/\+.*//g')
+  if [ ! -z $PROMOTE ] && [ $PROMOTE = "MAJOR" ]; then
+    $DIR/tools/upload.sh -p ${S3ROOT}/release -f ${RELEASEBIN} -n $(${RELEASEBIN} --version | sed -e 's/ .*//g')
+  fi
 fi
 
 if [ ! -z "${DEBUGBIN}" ]; then
-  $DIR/tools/upload.sh -p ${ANAME}/debug -f ${DEBUGBIN} -n $(${DEBUGBIN} --version | sed -e 's/ /_/g' -e 's/\+/_/g')
-  $DIR/tools/upload.sh -p ${ANAME}/debug -f ${DEBUGBIN} -n $(${DEBUGBIN} --version | sed -e 's/ /_/g' -e 's/\+.*//g')
+  $DIR/tools/upload.sh -p ${S3ROOT}/debug -f ${DEBUGBIN} -n $(${DEBUGBIN} --version | sed -e 's/ /_/g' -e 's/\+/_/g')
+  $DIR/tools/upload.sh -p ${S3ROOT}/debug -f ${DEBUGBIN} -n $(${DEBUGBIN} --version | sed -e 's/ /_/g' -e 's/\+.*//g')
 fi

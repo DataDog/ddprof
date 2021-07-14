@@ -1,5 +1,6 @@
 #!/bin/bash
 # http://redsymbol.net/articles/unofficial-bash-strict-mode/
+
 set -euo pipefail
 IFS=$'\n\t'
 
@@ -7,13 +8,13 @@ IFS=$'\n\t'
 CURRENTDIR=$PWD
 SCRIPTPATH=$(readlink -f "$0")
 SCRIPTDIR=$(dirname $SCRIPTPATH)
-cd $SCRIPTDIR/../
+cd $SCRIPTDIR/../../
 TOP_LVL_DIR=$PWD
 cd $CURRENTDIR
 
-FILE=${TOP_LVL_DIR}/docs/Commands.md
-echo "# ddprof Commands" > ${FILE}
-echo "" >> ${FILE}
-echo '```bash' >> ${FILE}
-release/ddprof >> ${FILE}
-echo '```' >> ${FILE}
+# Tell the user what to run
+echo "while true;do curl -s -o /dev/null http://localhost:10000; done"
+
+# Presumes envoy is installed
+envoy --config-path $TOP_LVL_DIR/demos/envoy-demo.yaml
+

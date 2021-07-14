@@ -1,3 +1,4 @@
+#include <ddprof/pprof.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,8 +7,6 @@
 #include <unistd.h>
 #include <x86intrin.h>
 #include <zlib.h>
-
-#include "pprof.h"
 
 int main() {
   DProf *dp = &(DProf){0};

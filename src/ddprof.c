@@ -1,6 +1,10 @@
+#include <ddprof/dd_send.h>
+#include <ddprof/http.h>
+#include <ddprof/pprof.h>
 #include <execinfo.h>
 #include <getopt.h>
 #include <libelf.h>
+#include <poll.h>
 #include <pthread.h>
 #include <signal.h>
 #include <string.h>
@@ -9,24 +13,29 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <wait.h>
 
-#include "dd_send.h"
-#include "http.h"
+#include "ddprofcmdline.h"
+#include "ipc.h"
 #include "logger.h"
 #include "perf.h"
-#include "pprof.h"
 #include "unwind.h"
 #include "version.h"
 
-/******************************* Logging Macros *******************************/
-#define ERR(...) LOG_lfprintf(LL_ERROR, -1, MYNAME, __VA_ARGS__)
-#define WRN(...) LOG_lfprintf(LL_WARNING, -1, MYNAME, __VA_ARGS__)
-#define NTC(...) LOG_lfprintf(LL_NOTICE, -1, MYNAME, __VA_ARGS__)
-#define DBG(...) LOG_lfprintf(LL_DEBUG, -1, MYNAME, __VA_ARGS__)
-
 #define max_watchers 10
 
-struct DDProfContext {
+typedef struct PerfOption {
+  char *desc;
+  char *key;
+  int type;
+  int config;
+  int base_rate;
+  char *label;
+  char *unit;
+  int mode;
+} PerfOption;
+
+typedef struct DDProfContext {
   DProf *dp;
   DDReq *ddr;
 
@@ -34,30 +43,36 @@ struct DDProfContext {
   char *agent_host;
   char *prefix;
   char *tags;
-  char *faultinfo;
   char *logmode;
   char *loglevel;
 
   // Input parameters
   char *printargs;
   char *count_samples;
-  char *enabled;
+  char *enable;
+  char *native_enable;
   char *upload_period;
   char *profprofiler;
+  char *faultinfo;
   char *sendfinal;
+  char *pid;
+  char *global;
   struct {
     bool count_samples;
-    bool enabled;
+    bool enable;
     double upload_period;
     bool profprofiler;
+    bool faultinfo;
     bool sendfinal;
+    pid_t pid;
+    bool global;
   } params;
   PerfOption watchers[max_watchers];
   int num_watchers;
 
   struct UnwindState *us;
-  int64_t send_nanos;
-};
+  int64_t send_nanos; // Last time an export was sent
+} DDProfContext;
 
 // RE: kernel tracepoints
 // I don't think there's any commitment that these IDs are unchanging between
@@ -124,7 +139,7 @@ int num_cpu = 0;
 #define X_DFLT(a, b, c, d, e, f, g, h) DFLT_EXP(#a, b, f, g, h);
 #define X_FREE(a, b, c, d, e, f, g, h) FREE_EXP(b, f);
 #define X_CASE(a, b, c, d, e, f, g, h) CASE_EXP(d, f, b)
-#define X_PRNT(a, b, c, d, e, f, g, h) if((f)->b) NTC("  "#b ": %s", (f)->b);
+#define X_PRNT(a, b, c, d, e, f, g, h) if((f)->b) LG_NTC("  "#b ": %s", (f)->b);
 
 //  A                              B                C   D   E  F         G     H
 #define OPT_TABLE(XX)                                                                       \
@@ -136,18 +151,22 @@ int num_cpu = 0;
   XX(DD_SERVICE,                   service,         S, 'S', 1, ctx->ddr, NULL, "myservice") \
   XX(DD_TAGS,                      tags,            T, 'T', 1, ctx,      NULL, "")          \
   XX(DD_VERSION,                   serviceversion,  V, 'V', 1, ctx->ddr, NULL, "")          \
-  XX(DD_PROFILING_ENABLED,         enabled,         d, 'd', 1, ctx,      NULL, "yes")       \
+  XX(DD_PROFILING_ENABLED,         enable,          d, 'd', 1, ctx,      NULL, "yes")       \
+  XX(DD_PROFILING_NATIVE_ENABLED,  native_enable,   n, 'n', 1, ctx,      NULL, "yes")       \
   XX(DD_PROFILING_COUNTSAMPLES,    count_samples,   c, 'c', 1, ctx,      NULL, "yes")       \
   XX(DD_PROFILING_UPLOAD_PERIOD,   upload_period,   u, 'u', 1, ctx,      NULL, "60")        \
-  XX(DD_PROFILE_NATIVEPROFILER,    profprofiler,    p, 'p', 0, ctx,      NULL, "")          \
+  XX(DD_PROFILE_NATIVEPROFILER,    profprofiler,    r, 'r', 0, ctx,      NULL, "")          \
   XX(DD_PROFILING_,                prefix,          X, 'X', 1, ctx,      NULL, "")          \
   XX(DD_PROFILING_NATIVEFAULTINFO, faultinfo,       s, 's', 1, ctx,      NULL, "yes")       \
   XX(DD_PROFILING_NATIVEPRINTARGS, printargs,       a, 'a', 1, ctx,      NULL, "no")        \
   XX(DD_PROFILING_NATIVESENDFINAL, sendfinal,       f, 'f', 1, ctx,      NULL, "")          \
   XX(DD_PROFILING_NATIVELOGMODE,   logmode,         o, 'o', 1, ctx,      NULL, "stdout")    \
-  XX(DD_PROFILING_NATIVELOGLEVEL,  loglevel,        l, 'l', 1, ctx,      NULL, "warn")
+  XX(DD_PROFILING_NATIVELOGLEVEL,  loglevel,        l, 'l', 1, ctx,      NULL, "warn")      \
+  XX(DD_PROFILING_NATIVETARGET,    pid,             p, 'p', 1, ctx,      NULL, "")          \
+  XX(DD_PROFILING_NATIVEGLOBAL,    global,          g, 'g', 1, ctx,      NULL, "")
 // clang-format on
 
+// TODO das210603 I don't think this needs to be inlined as a macro anymore
 #define DFLT_EXP(evar, key, targ, func, dfault)                                \
   __extension__({                                                              \
     char *_buf = NULL;                                                         \
@@ -167,6 +186,7 @@ int num_cpu = 0;
     (targ)->key = strdup(optarg);                                              \
     break;
 
+// TODO das210603 I don't think this needs to be inlined as a macro anymore
 #define FREE_EXP(key, targ)                                                    \
   __extension__({                                                              \
     if ((targ)->key)                                                           \
@@ -183,21 +203,21 @@ static inline int64_t now_nanos() {
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
 }
 
-void export(struct DDProfContext *pctx, int64_t now) {
+void export(DDProfContext *pctx, int64_t now) {
   DDReq *ddr = pctx->ddr;
   DProf *dp = pctx->dp;
 
-  NTC("Pushed samples to backend");
+  LG_NTC("Pushed samples to backend");
   int ret = 0;
   if ((ret = DDR_pprof(ddr, dp)))
-    ERR("Error enqueuing pprof (%s)", DDR_code2str(ret));
+    LG_ERR("Error enqueuing pprof (%s)", DDR_code2str(ret));
   DDR_setTimeNano(ddr, dp->pprof.time_nanos, now);
   if ((ret = DDR_finalize(ddr)))
-    ERR("Error finalizing export (%s)", DDR_code2str(ret));
+    LG_ERR("Error finalizing export (%s)", DDR_code2str(ret));
   if ((ret = DDR_send(ddr)))
-    ERR("Error sending export (%s)", DDR_code2str(ret));
+    LG_ERR("Error sending export (%s)", DDR_code2str(ret));
   if ((ret = DDR_watch(ddr, -1))) {
-    ERR("Error(%d) watching (%s)", ddr->res.code, DDR_code2str(ret));
+    LG_ERR("Error(%d) watching (%s)", ddr->res.code, DDR_code2str(ret));
   }
   DDR_clear(ddr);
   pctx->send_nanos += pctx->params.upload_period * 1000000000;
@@ -206,18 +226,22 @@ void export(struct DDProfContext *pctx, int64_t now) {
   pprof_timeUpdate(dp);
 }
 
+void ddprof_timeout(void *arg) {
+  DDProfContext *pctx = arg;
+  int64_t now = now_nanos();
+
+  if (now > pctx->send_nanos)
+    export(pctx, now);
+}
+
 void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   static uint64_t id_locs[MAX_STACK] = {0};
 
-  // TODO this time stuff needs to go into the struct
-  static int64_t last_time = 0;
-  if (!last_time)
-    last_time = now_nanos();
-
-  struct DDProfContext *pctx = arg;
+  DDProfContext *pctx = arg;
   struct UnwindState *us = pctx->us;
   DProf *dp = pctx->dp;
   struct perf_event_sample *pes;
+
   switch (hdr->type) {
   case PERF_RECORD_SAMPLE:
     pes = (struct perf_event_sample *)hdr;
@@ -230,10 +254,12 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
     FunLoc_clear(us->locs);
     if (-1 == unwindstate__unwind(us)) {
       Dso *dso = dso_find(us->pid, us->eip);
-      if (!dso)
+      if (!dso) {
         WRN("Error getting map for [%d](0x%lx)", us->pid, us->eip);
-      else
+        analyze_unwinding_error(us->pid, us->eip);
+      } else {
         WRN("Error unwinding %s [%d](0x%lx)", dso_path(dso), us->pid, us->eip);
+      }
       return;
     }
     FunLoc *locs = us->locs;
@@ -328,7 +354,16 @@ char* help_str[DD_KLEN] = {
 "    The name of this service\n",
   [DD_TAGS] = STR_UNDF,
   [DD_VERSION] = STR_UNDF,
-  [DD_PROFILING_ENABLED] = STR_UNDF,
+  [DD_PROFILING_ENABLED] =
+"    Whether to enable DataDog profiling.  If this is true, then "MYNAME" as well\n"
+"    as any other DataDog profilers are enabled.  If false, they are all disabled.\n"
+"    Note: if this is set, the native profiler will set the DD_PROFILING_ENABLED\n"
+"    environment variable in all sub-environments, thereby enabling DataDog profilers.\n"
+"    default: on\n",
+  [DD_PROFILING_NATIVE_ENABLED] =
+"    Whether to enable "MYNAME" specifically, without altering how other DataDog\n"
+"    profilers are run.  For example, DD_PROFILING_ENABLED can be used to disable\n"
+"    an inner profile, whilst setting DD_PROFILING_NATIVE_ENABLED to enable "MYNAME"\n",
   [DD_PROFILING_COUNTSAMPLES] = STR_UNDF,
   [DD_PROFILING_UPLOAD_PERIOD] =
 "    In seconds, how frequently to upload gathered data to Datadog.\n"
@@ -352,23 +387,15 @@ char* help_str[DD_KLEN] = {
 "    One of `debug`, `notice`, `warn`, `error`.  Default is `warn`.\n",
   [DD_PROFILING_NATIVESENDFINAL] =
 "    Determines whether to emit the last partial export if the instrumented\n"
-"    process ends.  This is almost never useful.  Default is `no`.\n"
+"    process ends.  This is almost never useful.  Default is `no`.\n",
+  [DD_PROFILING_NATIVETARGET] =
+"    Instrument the given PID rather than launching a new process.\n",
+  [DD_PROFILING_NATIVEGLOBAL] =
+"    Instruments the whole system.  Overrides DD_PROFILING_NATIVETARGET.\n",
 };
 // clang-format on
 
 char *help_key[DD_KLEN] = {OPT_TABLE(X_HLPK)};
-
-const char *str_version() {
-  static char version[1024] = {0};
-  if (*VER_REV)
-    snprintf(version, 1024, "%d.%d.%d+%s", VER_MAJ, VER_MIN, VER_PATCH,
-             VER_REV);
-  else
-    snprintf(version, 1024, "%d.%d.%d", VER_MAJ, VER_MIN, VER_PATCH);
-  return version;
-}
-
-void print_version() { printf(MYNAME " %s\n", str_version()); }
 
 // clang-format off
 void print_help() {
@@ -429,16 +456,79 @@ void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   exit(-1);
 }
 
+/*************************  Instrumentation Helpers  **************************/
+// This is a quick-and-dirty implementation.  Ideally, we'll harmonize this
+// with the other functions.
+void instrument_pid(DDProfContext *ctx, pid_t pid) {
+  perfopen_attr perf_funs = {.msg_fun = ddprof_callback,
+                             .timeout_fun = ddprof_timeout};
+  struct PEvent pes[100] = {0};
+  int k = 0;
+  for (int i = 0; i < ctx->num_watchers && ctx->params.enable; i++) {
+    for (int j = 0; j < num_cpu; j++) {
+      pes[k].fd =
+          perfopen(pid, ctx->watchers[i].opt->type,
+                   ctx->watchers[i].opt->config, ctx->watchers[i].sample_period,
+                   ctx->watchers[i].opt->mode | PE_NODISABLE, j);
+      pes[k].pos = i;
+      if (!(pes[k].region = perfown(pes[k].fd))) {
+        close(pes[k].fd);
+        pes[k].fd = -1;
+        LG_ERR("Could not finalize watcher %d.%d: registration (%s)", i, j,
+               strerror(errno));
+      }
+      k++;
+    }
+  }
+
+  LG_NTC("Entering main loop");
+  // Setup signal handler if defined
+  if (ctx->params.faultinfo)
+    sigaction(SIGSEGV,
+              &(struct sigaction){.sa_sigaction = sigsegv_handler,
+                                  .sa_flags = SA_SIGINFO},
+              NULL);
+
+  // Perform initialization operations
+  ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
+  unwind_init(ctx->us);
+  elf_version(EV_CURRENT); // Initialize libelf
+
+  // Just before we enter the main loop, force the enablement of the perf
+  // contexts
+  for (int i = 0; i < ctx->num_watchers * num_cpu; i++) {
+    if (-1 == ioctl(pes[i].fd, PERF_EVENT_IOC_ENABLE))
+      LG_WRN("Couldn't enable watcher %d", i);
+  }
+
+  // Enter the main loop -- this will not return unless there is an error.
+  main_loop(pes, ctx->num_watchers * num_cpu, &perf_funs, ctx);
+
+  // If we're here, the main loop closed--probably the profilee closed
+  if (errno)
+    LG_WRN("Profiling context no longer valid (%s)", strerror(errno));
+  else
+    LG_WRN("Profiling context no longer valid");
+
+  // We're going to close down, but first check whether we have a valid export
+  // to send (or if we requested the last partial export with sendfinal)
+  int64_t now = now_nanos();
+  if (now > ctx->send_nanos || ctx->sendfinal) {
+    LG_WRN("Sending final export");
+    export(ctx, now);
+  }
+}
+
 /******************************  Entrypoint  **********************************/
 int main(int argc, char **argv) {
   //---- Inititiate structs
   int c = 0, oi = 0;
-  struct DDProfContext *ctx =
-      &(struct DDProfContext){.ddr = &(DDReq){.user_agent = "libddprof001",
-                                              .language = "native",
-                                              .family = "native"},
-                              .dp = &(DProf){0},
-                              .us = &(struct UnwindState){0}};
+  DDProfContext *ctx =
+      &(DDProfContext){.ddr = &(DDReq){.user_agent = "libddprof001",
+                                       .language = "native",
+                                       .family = "native"},
+                       .dp = &(DProf){0},
+                       .us = &(struct UnwindState){0}};
   DDReq *ddr = ctx->ddr;
 
   struct option lopts[] = {OPT_TABLE(X_LOPT){"event", 1, 0, 'e'},
@@ -448,7 +538,6 @@ int main(int argc, char **argv) {
   //---- Populate default values
   OPT_TABLE(X_DFLT);
   bool default_watchers = true;
-  bool explain_sigseg = true;
   ctx->num_watchers = 1;
   ctx->watchers[0] = perfoptions[10];
 
@@ -491,7 +580,7 @@ int main(int argc, char **argv) {
         }
       }
       if (!event_matched) {
-        WRN("Event %s did not match any events", optarg);
+        LG_WRN("Event %s did not match any events", optarg);
       }
       break;
     case 'h':;
@@ -504,14 +593,29 @@ int main(int argc, char **argv) {
       return 0;
     default:;
       OPT_TABLE(X_FREE);
-      ERR("Invalid option %c", c);
+      LG_ERR("Invalid option %c", c);
       return -1;
     }
   }
 
-  // Replace string-type args
-  ctx->params.enabled = true;
+  /****************************************************************************\
+  |                            Process Arguments                               |
+  \****************************************************************************/
+  // Set defaults
+  ctx->params.enable = true;
   ctx->params.upload_period = 60.0;
+
+  // Process enable.  Note that we want the effect to hit an inner profile.
+  // TODO das210603 do the semantics of this enablement match those used by
+  //                other profilers?
+  ctx->params.enable = !arg_yesno(ctx->enable, 0); // default yes
+  if (ctx->params.enable)
+    setenv("DD_PROFILING_ENABLED", "true", true);
+  else
+    setenv("DD_PROFILING_ENABLED", "false", true);
+
+  // Process native profiler enablement override
+  ctx->params.enable = !arg_yesno(ctx->native_enable, 0);
 
   // process upload_period
   if (ctx->upload_period) {
@@ -521,52 +625,83 @@ int main(int argc, char **argv) {
   }
 
   // Process faultinfo
-  if (!ctx->faultinfo || !*ctx->faultinfo || !strcasecmp(ctx->faultinfo, "off"))
-    explain_sigseg = false;
+  ctx->params.faultinfo = arg_yesno(ctx->faultinfo, 1); // default no
 
   // Process sendfinal
-  if (ctx->sendfinal && ctx->sendfinal && !strcasecmp(ctx->sendfinal, "on"))
-    ctx->params.sendfinal = true;
+  ctx->params.sendfinal = arg_yesno(ctx->sendfinal, 1);
 
   // Process logging mode
-  if (!ctx->logmode || !*ctx->logmode)
-    LOG_open(LOG_STDERR, "");
-  else if (!strcasecmp(ctx->logmode, "stdout"))
+  char const *logpattern[] = {"stdout", "stderr", "syslog", "disabled"};
+  const int sizeOfLogpattern = 4;
+  switch (arg_which(ctx->logmode, logpattern, sizeOfLogpattern)) {
+  case -1:
+  case 0:
     LOG_open(LOG_STDOUT, "");
-  else if (!strcasecmp(ctx->logmode, "stderr"))
+    break;
+  case 1:
     LOG_open(LOG_STDERR, "");
-  else if (!strcasecmp(ctx->logmode, "syslog"))
+    break;
+  case 2:
     LOG_open(LOG_SYSLOG, "");
-  else if (!strcasecmp(ctx->logmode, "disabled"))
+    break;
+  case 3:
     LOG_open(LOG_DISABLE, "");
-  else
+    break;
+  default:
     LOG_open(LOG_FILE, ctx->logmode);
-
-  // Process logging level
-  if (!strcasecmp(ctx->loglevel, "debug"))
-    LOG_setlevel(LL_DEBUG);
-  if (!strcasecmp(ctx->loglevel, "notice"))
-    LOG_setlevel(LL_NOTICE);
-  if (!strcasecmp(ctx->loglevel, "warn"))
-    LOG_setlevel(LL_WARNING);
-  if (!strcasecmp(ctx->loglevel, "error"))
-    LOG_setlevel(LL_ERROR);
-
-  // process count_samples
-  if (ctx->count_samples) {
-    if (!strcmp(ctx->count_samples, "yes") ||
-        strcmp(ctx->count_samples, "true"))
-      ctx->params.count_samples = true;
+    break;
   }
 
-  // Process input printer (do this last!)
-  if (ctx->printargs && *ctx->printargs && !strcasecmp(ctx->printargs, "yes")) {
+  // Process logging level
+  char const *loglpattern[] = {"debug", "notice", "warn", "error"};
+  const int sizeOfLoglpattern = 4;
+  switch (arg_which(ctx->loglevel, loglpattern, sizeOfLoglpattern)) {
+  case 0:
+    LOG_setlevel(LL_DEBUG);
+    break;
+  case 1:
+    LOG_setlevel(LL_NOTICE);
+    break;
+  case -1:
+  case 2:
+    LOG_setlevel(LL_WARNING);
+    break;
+  case 3:
+    LOG_setlevel(LL_ERROR);
+    break;
+  }
+
+  // process count_samples
+  ctx->params.count_samples = arg_yesno(ctx->count_samples, 1); // default no
+
+  // Adjust target PID
+  pid_t pid_tmp = 0;
+  if (ctx->pid && (pid_tmp = strtol(ctx->pid, NULL, 10)))
+    ctx->params.pid = pid_tmp;
+
+  // Adjust global mode
+  ctx->params.global = arg_yesno(ctx->global, 1); // default no
+  if (ctx->params.global)
+    ctx->params.pid = -1;
+
+  // Process input printer (do this right before argv/c modification)
+  if (ctx->printargs && arg_yesno(ctx->printargs, 1)) {
     if (LOG_getlevel() < LL_DEBUG)
-      WRN("printarg specified, but loglevel too low to emit parameters");
-    DBG("Printing parameters");
+      LG_WRN("printarg specified, but loglevel too low to emit parameters");
+    LG_DBG("Printing parameters");
     OPT_TABLE(X_PRNT);
 
-    DBG("Instrumented with %d watchers:", ctx->num_watchers);
+    LG_DBG("Native profiler enabled: %s",
+           ctx->params.enable ? "true" : "false");
+
+    // Tell the user what mode is being used
+    LG_DBG("Profiling mode: %s",
+           -1 == ctx->params.pid ? "global"
+               : pid_tmp         ? "target"
+                                 : "wrapper");
+
+    // Show watchers
+    LG_DBG("Instrumented with %d watchers:", ctx->num_watchers);
     for (int i = 0; i < ctx->num_watchers; i++) {
       DBG("  ID: %s, Pos: %d, Index: %d, Label: %s, Mode: %d",
           ctx->watchers[i].key, i, ctx->watchers[i].config,
@@ -574,19 +709,31 @@ int main(int argc, char **argv) {
       DBG("Done printing parameters");
     }
   }
-  // Adjust input parameters for execvp()
+
+  // Adjust input parameters for execvp() (we do this even if unnecessary)
   argv += optind;
   argc -= optind;
 
-  if (argc <= 0) {
+  // Only throw an error if we needed the user to pass an arg
+  if (ctx->params.pid) {
+    if (ctx->params.pid == -1)
+      LG_NTC("Instrumenting whole system");
+    else
+      LG_NTC("Instrumenting PID %d", ctx->params.pid);
+  } else if (argc <= 0) {
     OPT_TABLE(X_FREE);
-    ERR("No target specified, exiting");
+    LG_ERR("No target specified, exiting");
     return -1;
   }
 
   /****************************************************************************\
   |                             Run the Profiler                               |
   \****************************************************************************/
+  // If the profiler was disabled, just skip ahead
+  if (!ctx->params.enable) {
+    LG_NTC("Profiling disabled");
+    goto EXECUTE;
+  }
   // Initialize the request object
   DDR_init(ddr);
 
@@ -602,7 +749,7 @@ int main(int argc, char **argv) {
                   (const char **)pprof_units, ctx->num_watchers)) {
     OPT_TABLE(X_FREE);
     DDR_free(ddr);
-    ERR("Failed to initialize profiling storage");
+    LG_ERR("Failed to initialize profiling storage");
     return -1;
   }
   pprof_timeUpdate(ctx->dp); // Set the time
@@ -610,205 +757,73 @@ int main(int argc, char **argv) {
   // Get the number of CPUs
   num_cpu = get_nprocs();
 
-  // Setup a shared barrier for coordination
-  pthread_barrierattr_t bat = {0};
-  pthread_barrier_t *pb =
-      mmap(NULL, sizeof(pthread_barrier_t), PROT_READ | PROT_WRITE,
-           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-  if (MAP_FAILED == pb) {
-    // TODO log here.  Nothing else to do, since we're not halting the target
-    ERR("Failure instantiating message passing subsystem.  Profiling halting.");
-    ctx->params.enabled = false;
-  } else {
-    pthread_barrierattr_init(&bat);
-    pthread_barrierattr_setpshared(&bat, 1);
-    pthread_barrier_init(pb, &bat, 2);
+  // If I'm not being called as a wrapper, don't act like a wrapper.
+  if (ctx->params.pid) {
+    instrument_pid(ctx, ctx->params.pid);
+    OPT_TABLE(X_FREE);
+    DDR_free(ddr);
+    unwind_free(ctx->us);
+    pprof_Free(ctx->dp);
+    return 0;
   }
 
   // Instrument the profiler
-  // 1.   Setup pipes
-  // 2.   fork()
-  // 3p.  I am the original process.  If not prof profiling, instrument now
-  // 3c.  I am the child.  Fork again and die.
-  // 4p.  If not instrumenting profiler, instrument now.
-  // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
-  // 5p.  Send the instrumentation FD.  Repeat for each instrumentation point.
-  // 5cc. Receive.  Repeat.  This is known before time of fork.
-  // 6p.  close fd, teardown pipe, execvp() to target process.
-  // 6cc. teardown pipe, create mmap regions and enter event loop
+  // 1.  fork()
+  // 2.  I am the original process.  Turn into target right away
+  // 3.  I am the child.  Fork again and die
+  // 4.  Instrument the original pid
 
-  // TODO
-  // * Multiple file descriptors can be sent in one push.  I don't know how much
-  //   this matters, but if every microsecond counts at startup, it's an option.
-
-  // 1. Setup pipes (really unix domain socket pair)
-  int sfd[2] = {-1, -1};
-  if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sfd)) {
-    ERR("Could not instantiate message passing system, profiling disabled");
-    goto EXECUTE;
-  }
-
-  // 2. fork()
-  pid_t pid = fork();
-  if (!pid) {
-    // 3c. I am the child.  Fork again
-    if (fork())
-      exit(0); // no need to use _exit, since we still own the proc
-
-    // 4cc. I am the grandchild.  I will profile.  Sit and listen for an FD
-    bool instrumented_any_watchers = false;
-    struct PEvent pes[100] = {0};
-    for (int i = 0; i < ctx->num_watchers; i++) {
-      if (-1 == num_cpu) {
-        pes[i].pos = i; // watcher index is the sample index
-
-        NTC("Receiving watcher %d", i);
-        pes[i].fd = getfd(sfd[0]);
-        if (-1 == pes[i].fd) {
-          ERR("Could not finalize watcher %d: transport error", i);
-        } else if (-2 == pes[i].fd) {
-          ERR("Could not finalize watcher %d: received fail notice", i);
-        } else if (!(pes[i].region = perfown(pes[i].fd))) {
-          close(pes[i].fd);
-          pes[i].fd = -1;
-          ERR("Could not finalize watcher %d: registration", i);
-        } else {
-          instrumented_any_watchers = true;
-        }
-        pthread_barrier_wait(pb);
-      } else {
-        for (int j = 0; j < num_cpu; j++) {
-          int k = i * num_cpu + j;
-          pes[k].pos = i; // watcher index is the sample index
-
-          NTC("Receiving watcher %d.%d", i, j);
-          pes[k].fd = getfd(sfd[0]);
-          if (-1 == pes[k].fd) {
-            ERR("Could not finalize watcher %d.%d: transport error", i, j);
-          } else if (-2 == pes[k].fd) {
-            ERR("Could not finalize watcher %d.%d: received fail notice", i, j);
-          } else if (!(pes[k].region = perfown(pes[k].fd))) {
-            close(pes[k].fd);
-            pes[k].fd = -1;
-            ERR("Could not finalize watcher %d.%d: registration", i, j);
-          } else {
-            instrumented_any_watchers = true;
-          }
-          pthread_barrier_wait(pb);
-        }
-      }
+  pid_t pid_target = getpid();
+  pid_t child_pid = fork();
+  if (!child_pid) {
+    // 3.  I am the child
+    if (fork()) {
+      // Still have to cleanup, though...
+      OPT_TABLE(X_FREE);
+      DDR_free(ddr);
+      unwind_free(ctx->us);
+      pprof_Free(ctx->dp);
+      return 0;
     }
 
-    // Cleanup and enter event loop
-    close(sfd[0]);
-    close(sfd[1]);
-    munmap(pb, sizeof(pthread_barrier_t));
+    // In the future, we can probably harmonize the various exit paths by using
+    // the same instrument_pid for global mode, targeted PID mode, and regular
+    // instrumentation.
+    instrument_pid(ctx, pid_target);
 
-    ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
-    unwind_init(ctx->us);
-
-    if (explain_sigseg)
-      sigaction(SIGSEGV,
-                &(struct sigaction){.sa_sigaction = sigsegv_handler,
-                                    .sa_flags = SA_SIGINFO},
-                NULL);
-    if (instrumented_any_watchers) {
-      NTC("Entering main loop");
-
-      // If num_cpu is -1, it means that we tried to instrument all CPUs.  At
-      // this point we no longer need the special value, so set it to 1 to make
-      // the math correct (at the level of file descriptors)
-      if (-1 == num_cpu)
-        num_cpu = 1;
-      main_loop(pes, ctx->num_watchers * num_cpu, ddprof_callback, ctx);
-
-      // If we're here, the main loop closed--probably the profilee closed
-      WRN("Profiling context no longer valid");
-      int64_t now = now_nanos();
-      if (now > ctx->send_nanos || ctx->sendfinal) {
-        WRN("Sending final export");
-        //        export(ctx, now);
-      }
-    } else {
-      ERR("Failed to install any watchers, profiling disabled");
-    }
-  } else {
-    // 3p.  I am the original process.  If not prof profiling, instrument now
-    pid_t mypid = getpid();
-    if (-1 == num_cpu) {
-      for (int i = 0; i < ctx->num_watchers && ctx->params.enabled; i++) {
-        int fd = perfopen(mypid, &ctx->watchers[i], -1, !i);
-
-        if (-1 == fd) {
-          WRN("Failed to setup watcher %d", i);
-          if (sendfail(sfd[1]))
-            ERR("Could not pass failure for watcher %d", i);
-        } else {
-          NTC("Sending instrumentation for watcher %d", i);
-          if (sendfd(sfd[1], fd))
-            ERR("Could not pass instrumentation for watcher %d", i);
-        }
-        pthread_barrier_wait(pb);
-      }
-    } else {
-      for (int i = 0; i < ctx->num_watchers && ctx->params.enabled; i++) {
-        for (int j = 0; j < num_cpu; j++) {
-          // If this is the first watcher, then enable extras.  This ensures we
-          // have at least one monitor per CPU
-          int fd = perfopen(mypid, &ctx->watchers[i], j, !i);
-
-          if (-1 == fd) {
-            WRN("Failed to setup watcher %d.%d", i, j);
-            if (sendfail(sfd[1]))
-              ERR("Could not pass failure for watcher %d.%d", i, j);
-          } else {
-            NTC("Sending instrumentation for watcher %d.%d", i, j);
-            if (sendfd(sfd[1], fd))
-              ERR("Could not pass instrumentation for watcher %d.%d", i, j);
-          }
-          pthread_barrier_wait(pb);
-        }
-      }
-    }
-
-    // Cleanup and become desired process image
-    pthread_barrier_destroy(pb);
-    LOG_close();
-    close(sfd[0]);
-    close(sfd[1]);
-
-  EXECUTE:
-    // These are freed by execvp(), but we remove them now since static analysis
-    // evidently doesn't care whether a syscall might change the process image.
+    // We are only here if the profiler fails or exits
     OPT_TABLE(X_FREE);
     DDR_free(ddr);
-    pthread_barrier_destroy(pb);
-    munmap(pb, sizeof(pthread_barrier_t));
+    unwind_free(ctx->us);
+    pprof_Free(ctx->dp);
 
-    if (-1 == execvp(argv[0], argv)) {
-      switch (errno) {
-      case ENOENT:
-        ERR("%s: file not found", argv[0]);
-        break;
-      case ENOEXEC:
-      case EACCES:
-        ERR("%s: permission denied", argv[0]);
-        break;
-      default:
-        WRN("execvp() returned due to %s", strerror(errno));
-        break;
-      }
+    LG_WRN("Profiling terminated");
+    return -1;
+  } else {
+    // 2.  I am the target process.  Wait for my immediate child to close
+    waitpid(child_pid, NULL, 0);
+  }
 
-      return -1;
+EXECUTE:
+  if (-1 == execvp(*argv, argv)) {
+    switch (errno) {
+    case ENOENT:
+      LG_ERR("%s: file not found", argv[0]);
+      break;
+    case ENOEXEC:
+    case EACCES:
+      LG_ERR("%s: permission denied", argv[0]);
+      break;
+    default:
+      LG_WRN("%s: failed to execute (%s)", argv[0], strerror(errno));
+      break;
     }
   }
 
-  // Neither the profiler nor the instrumented process should get here
+  // These are cleaned by execvp(), but we remove them here since this is the
+  // error path and we don't want static analysis to report leaks.
   OPT_TABLE(X_FREE);
   DDR_free(ddr);
-  unwind_free(ctx->us);
   pprof_Free(ctx->dp);
-
-  WRN("Profiling terminated");
   return -1;
 }

@@ -1,33 +1,32 @@
 #ifndef _H_perf
-#define _H_perf
+#  define _H_perf
 
-#include <ctype.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <linux/hw_breakpoint.h>
-#include <linux/perf_event.h>
-#include <netinet/in.h>
-#include <poll.h>
-#include <signal.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <sys/socket.h>
-#include <sys/syscall.h>
-#include <sys/types.h>
-#include <unistd.h>
+#  include <ctype.h>
+#  include <errno.h>
+#  include <fcntl.h>
+#  include <linux/hw_breakpoint.h>
+#  include <linux/perf_event.h>
+#  include <poll.h>
+#  include <signal.h>
+#  include <stdint.h>
+#  include <stdio.h>
+#  include <stdlib.h>
+#  include <string.h>
+#  include <sys/ioctl.h>
+#  include <sys/mman.h>
+#  include <sys/socket.h>
+#  include <sys/syscall.h>
+#  include <sys/types.h>
+#  include <unistd.h>
 
-#define rmb() __asm__ volatile("lfence" ::: "memory")
+#  define rmb() __asm__ volatile("lfence" ::: "memory")
 
-#define PAGE_SIZE 4096              // Concerned about hugepages?
-#define PSAMPLE_SIZE 64 * PAGE_SIZE // TODO check for high-volume
-#define PSAMPLE_DEFAULT_WAKEUP 1000 // sample frequency check
-#define PERF_SAMPLE_STACK_SIZE (4096 * 15)
-#define PERF_SAMPLE_STACK_REGS 3
-#define MAX_INSN 16
+#  define PAGE_SIZE 4096              // Concerned about hugepages?
+#  define PSAMPLE_SIZE 64 * PAGE_SIZE // TODO check for high-volume
+#  define PSAMPLE_DEFAULT_WAKEUP 1000 // sample frequency check
+#  define PERF_SAMPLE_STACK_SIZE (4096 * 15)
+#  define PERF_SAMPLE_STACK_REGS 3
+#  define MAX_INSN 16
 
 typedef struct PEvent {
   int pos; // Index into the sample
@@ -38,7 +37,7 @@ typedef struct PEvent {
 // TODO, this comes from BP, SP, and IP
 // see arch/x86/include/uapi/asm/perf_regs.h in the linux sources
 // We're going to hardcode everything for now...
-#define PERF_REGS_MASK ((1 << 6) | (1 << 7) | (1 << 8))
+#  define PERF_REGS_MASK ((1 << 6) | (1 << 7) | (1 << 8))
 
 typedef struct read_format {
   uint64_t value;        // The value of the event
@@ -133,6 +132,7 @@ typedef struct perf_samplestacku {
   // uint64_t    dyn_size;   // Don't forget!
 } perf_samplestacku;
 
+<<<<<<< HEAD
 typedef struct BPDef {
   uint64_t bp_addr;
   uint64_t bp_len;
@@ -158,17 +158,26 @@ typedef struct PerfOption {
   char bp_type;
 } PerfOption;
 
+// Architecturally, it's probably simpler to split this out into callbacks for
+// sample, lost, mmap, comm, etc type events; but for now we'll absorb all
+// of that into msg_fun
+typedef struct perfopen_attr {
+  void (*msg_fun)(struct perf_event_header *, int, void *);
+  void (*timeout_fun)(void *);
+} perfopen_attr;
+
 struct perf_event_attr g_dd_native_attr = {
     .size = sizeof(struct perf_event_attr),
     .sample_type = PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER |
         PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME |
         PERF_SAMPLE_PERIOD,
     .precise_ip = 2,
-    .disabled = 0,
+    .disabled = 1,
     .inherit = 1,
     .inherit_stat = 0,
     .mmap = 0, // keep track of executable mappings
     .task = 0, // Follow fork/stop events
+    .comm = 0, // Follow exec()
     .enable_on_exec = 1,
     .sample_stack_user = PERF_SAMPLE_STACK_SIZE, // Is this an insane default?
     .sample_regs_user = PERF_REGS_MASK,
@@ -176,67 +185,11 @@ struct perf_event_attr g_dd_native_attr = {
     .exclude_hv = 1,
 };
 
-bool sendfail(int sfd) {
-  // The call to getfd() checks message metadata upon receipt, so to send a
-  // failure it suffices to merely not send SOL_SOCKET with SCM_RIGHTS.
-  // This may be a little confusing...  TODO is there a paradoxical setting?
-  struct msghdr msg = {
-      .msg_iov = &(struct iovec){.iov_base = (char[8]){"!"}, .iov_len = 8},
-      .msg_iovlen = 1,
-      .msg_control = (char[CMSG_SPACE(sizeof(int))]){0},
-      .msg_controllen = CMSG_SPACE(sizeof(int))};
-  CMSG_FIRSTHDR(&msg)->cmsg_level = IPPROTO_IP;
-  CMSG_FIRSTHDR(&msg)->cmsg_type = IP_PKTINFO;
-  CMSG_FIRSTHDR(&msg)->cmsg_len = CMSG_LEN(sizeof(int));
-  *((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg))) = -1;
-
-  msg.msg_controllen = CMSG_SPACE(sizeof(int));
-
-  while (sizeof(char[2]) != sendmsg(sfd, &msg, MSG_NOSIGNAL)) {
-    if (errno != EINTR)
-      return false;
-  }
-  return true;
-}
-
-bool sendfd(int sfd, int fd) {
-  struct msghdr *msg = &(struct msghdr){
-      .msg_iov = &(struct iovec){.iov_base = (char[8]){"!"}, .iov_len = 8},
-      .msg_iovlen = 1,
-      .msg_control = (char[CMSG_SPACE(sizeof(int))]){0},
-      .msg_controllen = CMSG_SPACE(sizeof(int))};
-  CMSG_FIRSTHDR(msg)->cmsg_level = SOL_SOCKET;
-  CMSG_FIRSTHDR(msg)->cmsg_type = SCM_RIGHTS;
-  CMSG_FIRSTHDR(msg)->cmsg_len = CMSG_LEN(sizeof(int));
-  *((int *)CMSG_DATA(CMSG_FIRSTHDR(msg))) = fd;
-
-  msg->msg_controllen = CMSG_SPACE(sizeof(int));
-
-  while (sizeof(char[2]) != sendmsg(sfd, msg, MSG_NOSIGNAL)) {
-    if (errno != EINTR)
-      return false;
-  }
-  return true;
-}
-
-int getfd(int sfd) {
-  struct msghdr msg = {
-      .msg_iov = &(struct iovec){.iov_base = (char[8]){"!"}, .iov_len = 8},
-      .msg_iovlen = 1,
-      .msg_control = (char[CMSG_SPACE(sizeof(int))]){0},
-      .msg_controllen = CMSG_SPACE(sizeof(int))};
-  while (sizeof(char[8]) != recvmsg(sfd, &msg, MSG_NOSIGNAL)) {
-    if (errno != EINTR)
-      return -1;
-  }
-
-  // Check
-  if (CMSG_FIRSTHDR(&msg) && CMSG_FIRSTHDR(&msg)->cmsg_level == SOL_SOCKET &&
-      CMSG_FIRSTHDR(&msg)->cmsg_type == SCM_RIGHTS) {
-    return *((int *)CMSG_DATA(CMSG_FIRSTHDR(&msg)));
-  }
-  return -2;
-}
+// Used by rb_init() and friends
+typedef struct RingBuffer {
+  const char *start;
+  unsigned long offset;
+} RingBuffer;
 
 int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
                     unsigned long flags) {
@@ -275,59 +228,19 @@ int perfopen(pid_t pid, PerfOption *opt, int cpu, bool extras) {
 }
 
 void *perfown(int fd) {
-  // Probably assumes it is being called by the profiler!
   void *region;
-  // TODO how to deal with hugepages?
+
+  // Map in the region representing the ring buffer
+  // TODO what to do about hugepages?
   region = mmap(NULL, PAGE_SIZE + PSAMPLE_SIZE, PROT_READ | PROT_WRITE,
                 MAP_SHARED, fd, 0);
   if (MAP_FAILED == region || !region)
     return NULL;
 
-  // Make sure that SIGPROF is delivered to me instead of the called application
-  fcntl(fd, F_SETFL, O_ASYNC);
-  fcntl(fd, F_SETSIG, SIGPROF);
-  fcntl(fd, F_SETOWN_EX, &(struct f_owner_ex){F_OWNER_TID, getpid()});
-
-  // Ignore the signal
-  sigaction(SIGPROF, &(struct sigaction){SIG_IGN}, NULL);
-
-  // Block the signal
-  sigset_t sigmask = {0};
-  sigemptyset(&sigmask);
-  sigaddset(&sigmask, SIGPROF);
-  sigprocmask(SIG_BLOCK, &sigmask, NULL);
-
-  // Enable the event
-  ioctl(fd, PERF_EVENT_IOC_RESET, 0);
-  ioctl(fd, PERF_EVENT_IOC_ENABLE, 1);
+  fcntl(fd, F_SETFL, O_RDWR | O_NONBLOCK);
 
   return region;
 }
-
-void default_callback(struct perf_event_header *hdr, int type, void *arg) {
-  struct perf_event_sample *pes;
-  struct perf_event_mmap *pem;
-  (void)arg;
-  (void)pes;
-  (void)pem;
-  (void)type;
-  switch (hdr->type) {
-  case PERF_RECORD_SAMPLE:
-    pes = (struct perf_event_sample *)hdr;
-    (void)pes;
-    //    printf("NR:  %ld\n", pes->nr);
-    break;
-  case PERF_RECORD_MMAP:
-    pem = (struct perf_event_mmap *)hdr;
-    (void)pem;
-    //    printf("MMAP filename: %s\n", pem->filename);
-  }
-}
-
-typedef struct RingBuffer {
-  const char *start;
-  unsigned long offset;
-} RingBuffer;
 
 void rb_init(RingBuffer *rb, struct perf_event_mmap_page *page) {
   rb->start = (const char *)page + PAGE_SIZE;
@@ -343,15 +256,10 @@ struct perf_event_header *rb_seek(RingBuffer *rb, uint64_t offset) {
   return (struct perf_event_header *)(rb->start + rb->offset);
 }
 
-void main_loop(PEvent *pes, int pe_len,
-               void (*event_callback)(struct perf_event_header *, int, void *),
-               void *callback_arg) {
+void main_loop(PEvent *pes, int pe_len, perfopen_attr *attr, void *arg) {
   struct pollfd pfd[100];
+  assert(attr->msg_fun);
 
-  // Set to default callback if needed
-  // TODO is this really a great idea?
-  if (!event_callback)
-    event_callback = default_callback;
   if (pe_len > 100)
     pe_len = 100;
 
@@ -363,21 +271,25 @@ void main_loop(PEvent *pes, int pe_len,
   }
   while (1) {
     int n = poll(pfd, pe_len, PSAMPLE_DEFAULT_WAKEUP);
-    if (-1 == n && errno == EINTR)
+
+    // If there was an issue, return and let the caller check errno
+    if (-1 == n &&errno = EINTR)
       continue;
     else if (-1 == n)
       return;
 
-    // Iterate through the FDs to find the hot ones
+    // If no file descriptors, call timed out
+    if (0 == n && attr->timeout_fun) {
+      attr->timeout_fun(arg);
+      continue;
+    }
+
     for (int i = 0; i < pe_len; i++) {
       if (!pfd[i].revents)
         continue;
-      if (pfd[i].revents & POLLHUP) {
-        // TODO is this an overreaction?
+      if (pfd[i].revents & POLLHUP)
         return;
-      }
 
-      // If we're here, then we have a valid file descriptor
       uint64_t head = pes[i].region->data_head & (PSAMPLE_SIZE - 1);
       uint64_t tail = pes[i].region->data_tail & (PSAMPLE_SIZE - 1);
 
@@ -391,7 +303,7 @@ void main_loop(PEvent *pes, int pe_len,
         elems++;
         struct perf_event_header *hdr = rb_seek(rb, tail);
 
-        event_callback(hdr, pes[i].pos, callback_arg);
+        attr->msg_fun(hdr, pes[i].pos, arg);
 
         tail += hdr->size;
         tail = tail & (PSAMPLE_SIZE - 1);
@@ -401,4 +313,4 @@ void main_loop(PEvent *pes, int pe_len,
   }
 }
 
-#endif // _H_perf
+#  endif // _H_perf

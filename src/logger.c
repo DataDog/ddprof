@@ -93,7 +93,7 @@ bool LOG_open(int mode, char *opts) {
     log_ctx->fd = STDERR_FILENO;
     break;
   case LOG_FILE:;
-    int fd = open(opts, O_RDWR | O_APPEND | O_CREAT, 0777);
+    int fd = open(opts, O_RDWR | O_APPEND | O_CREAT | O_CLOEXEC, 0777);
     if (-1 == fd)
       return false;
     log_ctx->fd = fd;

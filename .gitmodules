@@ -1,3 +1,0 @@
-[submodule "vendor/libddprof"]
-	path = vendor/libddprof
-	url = ../libddprof.git
