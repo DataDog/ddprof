@@ -8,7 +8,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 
-#include "string_table.h"
+#include "ddprof/string_table.h"
 
 // TODO this isn't good
 #define PID_MAX 4194304
@@ -326,14 +326,16 @@ DsoCache *dso_cache_add(Dso *dso) {
   if ('[' == *dso_path(dso)) {
     if (!strcmp(dso_path(dso), "[vdso]")) {
       // So, I could parse procfs to figure out the vdso size and I could cache
-      // it, but I notice on 5.4 `readelf` shows the dynamic section only has
-      // size 0x4c0, so I'll just pretend it's a page.
+      // it, but I notice on v5.4 `readelf` shows the dynamic section only has
+      // size 0x4c0, so I'll round up to a page.  I checked multiple different
+      // vDSO-enabled kernel distros and all of them were well under 4096B
       printf("Found VDSO\n");
-      region = (uintptr_t)getauxval(AT_SYSINFO_EHDR);
+      region = (void *)(uintptr_t)getauxval(AT_SYSINFO_EHDR);
       sz = 4096;
     } else if (!strcmp(dso_path(dso), "[vsyscall]")) {
-      // See Documentation/x86/x86_64/mm.rst
-      region = 0xffffffffff600000;
+      // See Linux kernel sources at Documentation/x86/x86_64/mm.rst; this is a
+      // totally standard value
+      region = (void *)0xffffffffff600000;
       sz = 4096;
     } else {
       return NULL;

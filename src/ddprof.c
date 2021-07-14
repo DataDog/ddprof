@@ -24,17 +24,6 @@
 
 #define max_watchers 10
 
-typedef struct PerfOption {
-  char *desc;
-  char *key;
-  int type;
-  int config;
-  int base_rate;
-  char *label;
-  char *unit;
-  int mode;
-} PerfOption;
-
 typedef struct DDProfContext {
   DProf *dp;
   DDReq *ddr;
@@ -255,10 +244,11 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
     if (-1 == unwindstate__unwind(us)) {
       Dso *dso = dso_find(us->pid, us->eip);
       if (!dso) {
-        WRN("Error getting map for [%d](0x%lx)", us->pid, us->eip);
+        LG_WRN("Error getting map for [%d](0x%lx)", us->pid, us->eip);
         analyze_unwinding_error(us->pid, us->eip);
       } else {
-        WRN("Error unwinding %s [%d](0x%lx)", dso_path(dso), us->pid, us->eip);
+        LG_WRN("Error unwinding %s [%d](0x%lx)", dso_path(dso), us->pid,
+               us->eip);
       }
       return;
     }
@@ -466,10 +456,7 @@ void instrument_pid(DDProfContext *ctx, pid_t pid) {
   int k = 0;
   for (int i = 0; i < ctx->num_watchers && ctx->params.enable; i++) {
     for (int j = 0; j < num_cpu; j++) {
-      pes[k].fd =
-          perfopen(pid, ctx->watchers[i].opt->type,
-                   ctx->watchers[i].opt->config, ctx->watchers[i].sample_period,
-                   ctx->watchers[i].opt->mode | PE_NODISABLE, j);
+      pes[k].fd = perfopen(pid, &ctx->watchers[i], j, false);
       pes[k].pos = i;
       if (!(pes[k].region = perfown(pes[k].fd))) {
         close(pes[k].fd);
@@ -703,10 +690,10 @@ int main(int argc, char **argv) {
     // Show watchers
     LG_DBG("Instrumented with %d watchers:", ctx->num_watchers);
     for (int i = 0; i < ctx->num_watchers; i++) {
-      DBG("  ID: %s, Pos: %d, Index: %d, Label: %s, Mode: %d",
-          ctx->watchers[i].key, i, ctx->watchers[i].config,
-          ctx->watchers[i].label, ctx->watchers[i].mode);
-      DBG("Done printing parameters");
+      LG_DBG("  ID: %s, Pos: %d, Index: %lu, Label: %s, Mode: %d",
+             ctx->watchers[i].key, i, ctx->watchers[i].config,
+             ctx->watchers[i].label, ctx->watchers[i].mode);
+      LG_DBG("Done printing parameters");
     }
   }
 

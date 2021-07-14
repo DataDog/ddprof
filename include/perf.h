@@ -1,32 +1,32 @@
 #ifndef _H_perf
-#  define _H_perf
+#define _H_perf
 
-#  include <ctype.h>
-#  include <errno.h>
-#  include <fcntl.h>
-#  include <linux/hw_breakpoint.h>
-#  include <linux/perf_event.h>
-#  include <poll.h>
-#  include <signal.h>
-#  include <stdint.h>
-#  include <stdio.h>
-#  include <stdlib.h>
-#  include <string.h>
-#  include <sys/ioctl.h>
-#  include <sys/mman.h>
-#  include <sys/socket.h>
-#  include <sys/syscall.h>
-#  include <sys/types.h>
-#  include <unistd.h>
+#include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <linux/hw_breakpoint.h>
+#include <linux/perf_event.h>
+#include <poll.h>
+#include <signal.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <sys/socket.h>
+#include <sys/syscall.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-#  define rmb() __asm__ volatile("lfence" ::: "memory")
+#define rmb() __asm__ volatile("lfence" ::: "memory")
 
-#  define PAGE_SIZE 4096              // Concerned about hugepages?
-#  define PSAMPLE_SIZE 64 * PAGE_SIZE // TODO check for high-volume
-#  define PSAMPLE_DEFAULT_WAKEUP 1000 // sample frequency check
-#  define PERF_SAMPLE_STACK_SIZE (4096 * 15)
-#  define PERF_SAMPLE_STACK_REGS 3
-#  define MAX_INSN 16
+#define PAGE_SIZE 4096              // Concerned about hugepages?
+#define PSAMPLE_SIZE 64 * PAGE_SIZE // TODO check for high-volume
+#define PSAMPLE_DEFAULT_WAKEUP 1000 // sample frequency check
+#define PERF_SAMPLE_STACK_SIZE (4096 * 15)
+#define PERF_SAMPLE_STACK_REGS 3
+#define MAX_INSN 16
 
 typedef struct PEvent {
   int pos; // Index into the sample
@@ -37,7 +37,7 @@ typedef struct PEvent {
 // TODO, this comes from BP, SP, and IP
 // see arch/x86/include/uapi/asm/perf_regs.h in the linux sources
 // We're going to hardcode everything for now...
-#  define PERF_REGS_MASK ((1 << 6) | (1 << 7) | (1 << 8))
+#define PERF_REGS_MASK ((1 << 6) | (1 << 7) | (1 << 8))
 
 typedef struct read_format {
   uint64_t value;        // The value of the event
@@ -132,7 +132,6 @@ typedef struct perf_samplestacku {
   // uint64_t    dyn_size;   // Don't forget!
 } perf_samplestacku;
 
-<<<<<<< HEAD
 typedef struct BPDef {
   uint64_t bp_addr;
   uint64_t bp_len;
@@ -273,7 +272,7 @@ void main_loop(PEvent *pes, int pe_len, perfopen_attr *attr, void *arg) {
     int n = poll(pfd, pe_len, PSAMPLE_DEFAULT_WAKEUP);
 
     // If there was an issue, return and let the caller check errno
-    if (-1 == n &&errno = EINTR)
+    if (-1 == n && errno == EINTR)
       continue;
     else if (-1 == n)
       return;
@@ -313,4 +312,4 @@ void main_loop(PEvent *pes, int pe_len, perfopen_attr *attr, void *arg) {
   }
 }
 
-#  endif // _H_perf
+#endif // _H_perf
