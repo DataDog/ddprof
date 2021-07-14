@@ -70,6 +70,17 @@ rm -rf debuglog.out
 # Set the environment variables useful for ddprof
 export DD_API_KEY=`$SCRIPTDIR/get_datad0g_key.sh`
 export DD_SERVICE=native-testservice_${VER}
+<<<<<<< HEAD
+export DD_AGENT_HOST=intake.profile.datad0g.com
+#export MALLOC_TRACE=/tmp/foo
+#export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so
+#export MALLOC_CONF=prof:true,lg_prof_interval:25,lg_prof_sample:17
+eval ${CMD} \
+  -u 10.0 \
+  -l debug \
+  -o stderr \
+  ${DIR}/bench/runners/${JOB}
+=======
 export DD_AGENT_HOST=${INTAKE_ADD}
 
 eval ${CMD} \
@@ -79,3 +90,4 @@ eval ${CMD} \
   ${TOP_LVL_DIR}/bench/runners/${JOB}
 
 exit 0
+>>>>>>> main
