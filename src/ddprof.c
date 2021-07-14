@@ -264,11 +264,6 @@ void export(DDProfContext *pctx, int64_t now) {
     LG_ERR("Error(%d) watching (%s)", ddr->res.code, DDR_code2str(ret));
   DDR_clear(ddr);
 
-  // Free the pprof
-  pprof_Free(pctx->dp);
-  pprof_Init(pctx->dp, (const char **)pprof_labels, (const char **)pprof_units,
-             pctx->num_watchers);
-
   // Update the time last sent
   pctx->send_nanos += pctx->params.upload_period * 1000000000;
 
@@ -334,8 +329,8 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   int64_t now = now_nanos();
 
   if (now > pctx->send_nanos) {
-    export(pctx, now);
     statsd_upload_globals(pctx);
+    export(pctx, now);
   }
 }
 
