@@ -214,7 +214,7 @@ struct BrittleStringTable {
   size_t capacity;
 };
 
-void statsd_upload_globals(DDProfContext *ctx) {
+void statsd_upload_globals(DDProfContext* ctx) {
   static char key_rss[] = "datadog.profiler.native.rss";
   static char key_user[] = "datadog.profiler.native.utime";
   static char key_st_elements[] = "datadog.profiler.native.pprof.st_elements";
@@ -222,10 +222,15 @@ void statsd_upload_globals(DDProfContext *ctx) {
     return;
 
   // Upload some procfs values
+  static unsigned long last_utime = 0;
   ProcStatus *procstat = proc_read();
   if (procstat) {
-    statsd_send(fd_statsd, key_rss, &(long){1024 * procstat->rss}, STAT_GAUGE);
-    statsd_send(fd_statsd, key_user, &(long){procstat->utime}, STAT_GAUGE);
+    statsd_send(fd_statsd, key_rss, &(long){1024*procstat->rss}, STAT_GAUGE);
+    if (procstat->utime) {
+      long this_time = procstat->utime - last_utime;
+      statsd_send(fd_statsd, key_user, &(long){this_time}, STAT_GAUGE);
+      last_utime = procstat->utime;
+    }
   }
 
   // Upload some internal stats
@@ -234,6 +239,8 @@ void statsd_upload_globals(DDProfContext *ctx) {
 }
 
 /******************************  Perf Callback  *******************************/
+char *pprof_labels[max_watchers];
+char *pprof_units[max_watchers];
 static inline int64_t now_nanos() {
   static struct timeval tv = {0};
   gettimeofday(&tv, NULL);
@@ -253,10 +260,15 @@ void export(DDProfContext *pctx, int64_t now) {
     LG_ERR("Error finalizing export (%s)", DDR_code2str(ret));
   if ((ret = DDR_send(ddr)))
     LG_ERR("Error sending export (%s)", DDR_code2str(ret));
-  if ((ret = DDR_watch(ddr, -1))) {
+  if ((ret = DDR_watch(ddr, -1)))
     LG_ERR("Error(%d) watching (%s)", ddr->res.code, DDR_code2str(ret));
-  }
   DDR_clear(ddr);
+
+  // Free the pprof
+  pprof_Free(pctx->dp);
+  pprof_Init(pctx->dp, (const char **)pprof_labels, (const char **)pprof_units, pctx->num_watchers);
+
+  // Update the time last sent
   pctx->send_nanos += pctx->params.upload_period * 1000000000;
 
   // Prepare pprof for next window
@@ -742,8 +754,6 @@ int main(int argc, char **argv) {
   DDR_init(ddr);
 
   // Initialize the pprof
-  char *pprof_labels[max_watchers];
-  char *pprof_units[max_watchers];
   for (int i = 0; i < ctx->num_watchers; i++) {
     pprof_labels[i] = ctx->watchers[i].opt->label;
     pprof_units[i] = ctx->watchers[i].opt->unit;
