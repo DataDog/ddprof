@@ -89,7 +89,7 @@ typedef struct DDProfContext {
 // clang-format off
 PerfOption perfoptions[] = {
   // Hardware
-  {"CPU Cycles",      "hCPU",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              1e6, "cpu-cycle",      "cycles",       0},
+  {"CPU Cycles",      "hCPU",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              1e5, "cpu-cycle",      "cycles",       0},
   {"Ref. CPU Cycles", "hREF",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES,          1e6, "ref-cycle",      "cycles",       0},
   {"Instr. Count",    "hINSTR",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,            1e6, "cpu-instr",      "instructions", 0},
   {"Cache Ref.",      "hCREF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES,        1e3, "cache-ref",      "events",       0},
@@ -99,8 +99,8 @@ PerfOption perfoptions[] = {
   {"Bus Cycles",      "hBUS",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,              1e3, "bus-cycle",      "cycles",       0},
   {"Bus Stalls(F)",   "hBSTF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1e3, "bus-stf",        "cycles",       0},
   {"Bus Stalls(B)",   "hBSTB",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1e3, "bus-stb",        "cycles",       0},
-  {"CPU Time",        "sCPU",    PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,              1e6, "cpu-time",       "nanoseconds",  0},
-  {"Wall? Time",      "sWALL",   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,               1e6, "wall-time",      "nanoseconds",  0},
+  {"CPU Time",        "sCPU",    PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,              1e5, "cpu-time",       "nanoseconds",  0},
+  {"Wall? Time",      "sWALL",   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,               1e5, "wall-time",      "nanoseconds",  0},
   {"Ctext Switches",  "sCI",     PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES,        1,   "switches",       "events",       PE_KERNEL_INCLUDE},
   {"Block-Insert",    "kBLKI",   PERF_TYPE_TRACEPOINT, 1133,                                1,   "block-insert",   "events",       PE_KERNEL_INCLUDE},
   {"Block-Issue",     "kBLKS",   PERF_TYPE_TRACEPOINT, 1132,                                1,   "block-issue",    "events",       PE_KERNEL_INCLUDE},
@@ -214,7 +214,7 @@ struct BrittleStringTable {
   size_t capacity;
 };
 
-void statsd_upload_globals(DDProfContext* ctx) {
+void statsd_upload_globals(DDProfContext *ctx) {
   static char key_rss[] = "datadog.profiler.native.rss";
   static char key_user[] = "datadog.profiler.native.utime";
   static char key_st_elements[] = "datadog.profiler.native.pprof.st_elements";
@@ -225,7 +225,7 @@ void statsd_upload_globals(DDProfContext* ctx) {
   static unsigned long last_utime = 0;
   ProcStatus *procstat = proc_read();
   if (procstat) {
-    statsd_send(fd_statsd, key_rss, &(long){1024*procstat->rss}, STAT_GAUGE);
+    statsd_send(fd_statsd, key_rss, &(long){1024 * procstat->rss}, STAT_GAUGE);
     if (procstat->utime) {
       long this_time = procstat->utime - last_utime;
       statsd_send(fd_statsd, key_user, &(long){this_time}, STAT_GAUGE);
@@ -266,7 +266,8 @@ void export(DDProfContext *pctx, int64_t now) {
 
   // Free the pprof
   pprof_Free(pctx->dp);
-  pprof_Init(pctx->dp, (const char **)pprof_labels, (const char **)pprof_units, pctx->num_watchers);
+  pprof_Init(pctx->dp, (const char **)pprof_labels, (const char **)pprof_units,
+             pctx->num_watchers);
 
   // Update the time last sent
   pctx->send_nanos += pctx->params.upload_period * 1000000000;
