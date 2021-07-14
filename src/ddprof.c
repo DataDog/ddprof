@@ -208,16 +208,29 @@ void statsd_init() {
     fd_statsd = statsd_open(path_statsd, strlen(path_statsd));
 }
 
-void statsd_upload_globals() {
+struct BrittleStringTable {
+  unsigned char *regions[32];
+  unsigned char *arena;
+  size_t capacity;
+};
+
+void statsd_upload_globals(DDProfContext *ctx) {
   static char key_rss[] = "datadog.profiler.native.rss";
   static char key_user[] = "datadog.profiler.native.utime";
+  static char key_st_elements[] = "datadog.profiler.native.pprof.st_elements";
   if (-1 == fd_statsd)
     return;
+
+  // Upload some procfs values
   ProcStatus *procstat = proc_read();
   if (procstat) {
-    statsd_send(fd_statsd, key_rss, &(long){procstat->rss}, STAT_GAUGE);
+    statsd_send(fd_statsd, key_rss, &(long){1024 * procstat->rss}, STAT_GAUGE);
     statsd_send(fd_statsd, key_user, &(long){procstat->utime}, STAT_GAUGE);
   }
+
+  // Upload some internal stats
+  uint64_t st_size = ctx->dp->string_table_size(ctx->dp->string_table_data);
+  statsd_send(fd_statsd, key_st_elements, &(long){st_size}, STAT_GAUGE);
 }
 
 /******************************  Perf Callback  *******************************/
@@ -309,7 +322,7 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
 
   if (now > pctx->send_nanos) {
     export(pctx, now);
-    statsd_upload_globals();
+    statsd_upload_globals(pctx);
   }
 }
 
