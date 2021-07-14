@@ -101,7 +101,7 @@ typedef struct ProcStatus {
 } ProcStatus;
 
 static char StatusLine[] =
-    "%d (%s) %c %d %d %d %d %u %lu %lu %lu %lu %lu %ld %ld %ld %ld %ld %ld "
+    "%d %s %c %d %d %d %d %u %lu %lu %lu %lu %lu %ld %ld %ld %ld %ld %ld "
     "%llu %lu %ld %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %d %d %u "
     "%u %llu %lu %ld %lu %lu %lu %lu %lu %lu %d";
 
