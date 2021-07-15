@@ -7,9 +7,11 @@ variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
   # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/74484756
   BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:5f586a14189e417de29a3266c1040c1678eeb3b9f855ae37e27ecf738b818524
+  TEST_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:e4a0853a0eebf83f3f32281fb8836b40fe281cc29c0c7cb67791ccb0e7c1fd6e
   # When build images are built, publish them with following tags
   BASE_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
   BUILD_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build
+  TEST_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:test
   # Deployment paths
   S3_PREFIX: s3://binaries.ddbuild.io/ddprof/release
   RELPATH: ddprof/release
@@ -41,6 +43,18 @@ build:deps:
     - docker build --tag $BUILD_IMG --build-arg CI=${CI} -f app/build-env/Dockerfile .
     - docker push $BUILD_IMG
 
+# This is a cache of compile-time dependencies, test image
+build:testing:
+  stage: build
+  allow_failure: true
+  when: manual
+  tags: ["runner:docker", "size:large"]
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
+  script:
+    - set -euo pipefail
+    - docker build --tag $TEST_IMG --build-arg CI=${CI} -f app/test-env/Dockerfile .
+    - docker push $TEST_IMG
+
 .light-job-resource-allocation:
   variables:
     KUBERNETES_CPU_REQUEST: 2
@@ -55,21 +69,44 @@ build:ddprof_cmake:
   image: $BUILD_IMG_STICKY
   stage: build
   tags: ["runner:docker", "size:large"]
+  parallel:
+    matrix:
+      - BUILD_TYPE: ["Release", "Debug", "SanitizedDebug"]
   variables:
-    TESTPATH: test
-    BUILD_TYPE: Debug
     BUILDPATH: build_${BUILD_TYPE}
   script:
     - set -euxo pipefail
+    - export DELIVERY_PATH="${CI_PROJECT_DIR}/deliverables/${BUILD_TYPE}"
     - mkdir -p vendor
     #Build image dependencies were stored in app, avoid rebuilding vendor content
     - ln -s /app/vendor/elfutils vendor/elfutils
     - ln -s /app/vendor/libddprof vendor/libddprof
     - ln -s /app/vendor/llvm vendor/llvm
     - mkdir -p ${BUILDPATH} && cd ${BUILDPATH}
-    - cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} ../
+    - cmake -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+      -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
     - make -j ${KUBERNETES_CPU_LIMIT}
-    - cd ${TESTPATH} && ctest --repeat-until-fail 5 --output-on-failure | tee test-output.log
+    - ctest --repeat-until-fail 5 --output-on-failure | tee test-output.log
+    - make install
+  artifacts:
+    paths:
+      - ${CI_PROJECT_DIR}/deliverables/
+    expire_in: 1 week
+
+test:ddprof_cmake:
+  extends:
+    - .light-job-resource-allocation
+  image: $TEST_IMG_STICKY
+  stage: test
+  tags: ["runner:docker", "size:large"]
+  parallel:
+    matrix:
+      - BUILD_TYPE: ["Release"]
+  script:
+    - set -euxo pipefail
+    - ./tools/check_dependencies.sh deliverables/${BUILD_TYPE}/bin/ddprof test/data/expected_deps.txt
+  dependencies:
+    - build:ddprof_cmake
 
 .ddprof_job:
   variables:

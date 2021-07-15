@@ -1,0 +1,5 @@
+linux-vdso
+libgcc, To be removed
+libpthread
+libc
+ld-linux-x86-64.so.2
