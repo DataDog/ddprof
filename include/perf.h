@@ -24,7 +24,7 @@
 #define PAGE_SIZE 4096              // Concerned about hugepages?
 #define PSAMPLE_SIZE 64 * PAGE_SIZE // TODO check for high-volume
 #define PSAMPLE_DEFAULT_WAKEUP 1000 // sample frequency check
-#define PERF_SAMPLE_STACK_SIZE (4096 * 15)
+#define PERF_SAMPLE_STACK_SIZE (4096 * 8)
 #define PERF_SAMPLE_STACK_REGS 3
 #define MAX_INSN 16
 
@@ -289,25 +289,29 @@ void main_loop(PEvent *pes, int pe_len, perfopen_attr *attr, void *arg) {
       if (pfd[i].revents & POLLHUP)
         return;
 
-      uint64_t head = pes[i].region->data_head & (PSAMPLE_SIZE - 1);
-      uint64_t tail = pes[i].region->data_tail & (PSAMPLE_SIZE - 1);
-
+      // Drain the ringbuffer and dispatch to callback, as needed
+      // The head and tail are taken literally (without wraparound), since they
+      // don't wrap in the underlying object.  Instead, the rb_* interfaces
+      // wrap when accessing.
+      uint64_t head = pes[i].region->data_head;
       rmb();
-
+      uint64_t tail = pes[i].region->data_tail;
       RingBuffer *rb = &(RingBuffer){0};
       rb_init(rb, pes[i].region);
 
-      int elems = 0;
       while (head > tail) {
-        elems++;
         struct perf_event_header *hdr = rb_seek(rb, tail);
-
         attr->msg_fun(hdr, pes[i].pos, arg);
-
         tail += hdr->size;
-        tail = tail & (PSAMPLE_SIZE - 1);
       }
+
+      // We tell the kernel how much we read.  This *should* be the same as
+      // the current tail, but in the case of an error head will be a safe
+      // restart position.
       pes[i].region->data_tail = head;
+
+      if (head != tail)
+        LG_NTC("Head/tail buffer mismatch");
     }
   }
 }

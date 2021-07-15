@@ -147,6 +147,7 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
     // If we failed, then try backpopulating and do it again
     if (!dso) {
       LG_WRN("[UNWIND] Failed to locate DSO for [%d] 0x%lx, get", us->pid, pc);
+      pid_find_ip(us->pid, pc);
       pid_backpopulate(us->pid);
       dso = dso_find(us->pid, pc);
       if (dso)
@@ -160,6 +161,7 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
     } else {
       // Try to rely on the data we have at hand, but it's certainly wrong
       LG_WRN("[UNWIND] Failed to locate DSO for [%d] 0x%lx again", us->pid, pc);
+      pid_find_ip(us->pid, pc);
       us->locs[us->idx].map_start = mod->low_addr;
       us->locs[us->idx].map_end = mod->high_addr;
       us->locs[us->idx].map_off = offset;
@@ -252,8 +254,7 @@ int unwindstate__unwind(struct UnwindState *us) {
     return -1;
   }
 
-  // TODO return actual stack size
-  return MAX_STACK;
+  return 0;
 }
 
 void analyze_unwinding_error(pid_t pid, uint64_t eip) {

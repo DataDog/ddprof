@@ -501,7 +501,7 @@ void instrument_pid(DDProfContext *ctx, pid_t pid) {
   int k = 0;
   for (int i = 0; i < ctx->num_watchers && ctx->params.enable; i++) {
     for (int j = 0; j < num_cpu; j++) {
-      pes[k].fd = perfopen(pid, &ctx->watchers[i], j, false);
+      pes[k].fd = perfopen(pid, &ctx->watchers[i], j, true);
       pes[k].pos = i;
       if (!(pes[k].region = perfown(pes[k].fd))) {
         close(pes[k].fd);
@@ -836,6 +836,7 @@ int main(int argc, char **argv) {
   }
 
 EXECUTE:
+  usleep(100000);
   if (-1 == execvp(*argv, argv)) {
     switch (errno) {
     case ENOENT:

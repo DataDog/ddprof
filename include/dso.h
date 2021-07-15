@@ -154,6 +154,48 @@ FILE *procfs_map_open(int pid) {
   return fopen(buf, "r");
 }
 
+bool ip_in_procline(char *line, uint64_t ip) {
+  static char spec[] = "%lx-%lx %4c %lx %*x:%*x %*d%n";
+  uint64_t m_start = 0;
+  uint64_t m_end = 0;
+  uint64_t m_off = 0;
+  char m_mode[4] = {0};
+  int m_p = 0;
+
+  if (4 != sscanf(line, spec, &m_start, &m_end, m_mode, &m_off, &m_p)) {
+    LG_WRN("[DSO] Failed to scan mapfile line (search)");
+    return false;
+  }
+
+  return ip >= m_start && ip <= m_end;
+}
+
+void pid_find_ip(int pid, uint64_t ip) {
+  FILE *mpf = procfs_map_open(pid);
+  if (!mpf) {
+    if (process_is_alive(pid))
+      LG_DBG("[DSO] Couldn't find ip:0x%lx for %d, process is dead", ip, pid);
+    else
+      LG_DBG("[DSO] Couldn't find ip:0x%lx for %d, mysteriously", ip, pid);
+    return;
+  }
+
+  char *buf = NULL;
+  size_t sz_buf = 0;
+  while (-1 != getline(&buf, &sz_buf, mpf)) {
+    if (ip_in_procline(buf, ip)) {
+      LG_DBG("[DSO] Found ip:0x%lx for %d", ip, pid);
+      LG_DBG("[DSO] %s", buf);
+      fclose(mpf);
+      return;
+    }
+  }
+
+  LG_DBG("[DSO] Couldn't find ip:0x%lx for %d", ip, pid);
+  fclose(mpf);
+  return;
+}
+
 // Note that return could be invalidated if `line` changes
 DsoIn *dso_from_procline(char *line) {
   static DsoIn out = {0};
@@ -421,8 +463,10 @@ bool pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
 
     // If we didn't find it, then try full population
     LG_WRN("[DSO] Couldn't find DSO for [%d](0x%lx)", pid, addr);
-    if (!(dso = dso_find(pid, addr)))
+    if (!(dso = dso_find(pid, addr))) {
+      pid_find_ip(pid, addr);
       return false;
+    }
   }
 
   // Find the cached segment
