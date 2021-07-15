@@ -476,6 +476,7 @@ void instrument_pid(DDProfContext *ctx, pid_t pid) {
     setpriority(PRIO_PROCESS, 0, ctx->params.nice);
     if (errno) {
       LG_WRN("Requested nice level (%d) could not be set", ctx->params.nice);
+    }
   }
 
   // Perform initialization operations
