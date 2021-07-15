@@ -9,6 +9,8 @@
 #include <sys/types.h>
 
 #include "ddprof/string_table.h"
+#include "logger.h"
+#include "signal_helper.h"
 
 // TODO this isn't good
 #define PID_MAX 4194304
@@ -124,7 +126,7 @@ bool pid_add(int pid, DsoIn *in) {
       // we can do now is return an error.  It's up to the user to determine
       // whether to invalidate and retry.
       if (dso_overlap(dso, in)) {
-        printf("DSO overlap\n");
+        LG_WRN("[DSO] invalid DSO overlap detected");
         return false;
       }
       dso = dso->next;
@@ -164,11 +166,9 @@ DsoIn *dso_from_procline(char *line) {
   int m_p = 0;
 
   if (4 != sscanf(line, spec, &m_start, &m_end, m_mode, &m_off, &m_p)) {
-    printf("Failed in sscanf\n");
+    LG_WRN("[DSO] Failed to scan mapfile line");
     return NULL;
   }
-
-  printf("  [0x%lx, 0x%lx] %s", m_start, m_end, &line[m_p]);
 
   // Make sure the name index points to a valid char
   char *p = &line[m_p], *q;
@@ -191,12 +191,14 @@ DsoIn *dso_from_procline(char *line) {
 }
 
 bool pid_backpopulate(int pid) {
-  printf("Backpopulating %d\n", pid);
+  LG_NTC("[DSO] Backpopulating PID %d", pid);
   FILE *mpf = procfs_map_open(pid);
-  if (!mpf)
-    printf("Failed to open proc for %d\n", pid);
-  if (!mpf)
+  if (!mpf) {
+    LG_WRN("[DSO] Failed to open procfs for %d", pid);
+    if (process_is_alive(pid))
+      LG_WRN("[DSO] Process nonexistant");
     return false;
+  }
 
   char *buf = NULL;
   size_t sz_buf = 0;
@@ -206,7 +208,7 @@ bool pid_backpopulate(int pid) {
     //      parse error is bad
     DsoIn *out = dso_from_procline(buf);
     if (out && !pid_add(pid, out)) {
-      printf("Couldn't add procline to pid\n");
+      LG_WRN("[DSO] Failed to add procline to PID %d", pid);
       fclose(mpf);
       return false;
     }
@@ -223,9 +225,9 @@ bool pid_fork(int ppid, int pid) {
   // If we haven't seen the parent before, try to populate it and continue.  If
   // we can't do that, then try to just populate the child and return.
   if (!pids.dsos[ppid]) {
-    printf("  [FORK] No ppid found, backpopulating\n");
+    LG_WRN("[DSO](FORK) No PPID found");
     if (!pid_backpopulate(ppid)) {
-      printf("  [FORK] No pid found, backpopulating\n");
+      LG_WRN("[DSO](FORK) No PID found either");
       return pid_backpopulate(pid);
     }
   }
@@ -329,12 +331,13 @@ DsoCache *dso_cache_add(Dso *dso) {
       // it, but I notice on v5.4 `readelf` shows the dynamic section only has
       // size 0x4c0, so I'll round up to a page.  I checked multiple different
       // vDSO-enabled kernel distros and all of them were well under 4096B
-      printf("Found VDSO\n");
+      LG_DBG("[DSO] Found a VDSO region");
       region = (void *)(uintptr_t)getauxval(AT_SYSINFO_EHDR);
       sz = 4096;
     } else if (!strcmp(dso_path(dso), "[vsyscall]")) {
       // See Linux kernel sources at Documentation/x86/x86_64/mm.rst; this is a
       // totally standard value
+      LG_DBG("[DSO] Found a VSYSCALL region");
       region = (void *)0xffffffffff600000;
       sz = 4096;
     } else {
@@ -353,7 +356,7 @@ DsoCache *dso_cache_add(Dso *dso) {
   // If there's already a region in the current position, close it
   if (dso_cache[i_dc].region) {
     if ('[' != *dsocache_path(&dso_cache[i_dc])) {
-      printf("[CACHE] clearing %d\n", i_dc);
+      LG_WRN("[DSO] clearing %d", i_dc);
       munmap(dso_cache[i_dc].region, dso_cache[i_dc].sz);
       memset(&dso_cache[i_dc], 0, sizeof(DsoCache));
     }
@@ -412,15 +415,12 @@ bool pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
   Dso *dso = dso_find(pid, addr);
   if (!dso) {
     if (dso_errno == DSO_NOTFOUND) {
-      printf("Couldn't find DSO for [%d](0x%lx), quitting\n", pid, addr);
+      LG_WRN("[DSO] Couldn't find DSO for [%d](0x%lx), stopping", pid, addr);
       return false;
     }
 
     // If we didn't find it, then try full population
-    printf("Couldn't find DSO for [%d](0x%lx), backpopulating.\n", pid, addr);
-    if (!pid_backpopulate(pid)) {
-      printf("Backpop failed!\n");
-    }
+    LG_WRN("[DSO] Couldn't find DSO for [%d](0x%lx)", pid, addr);
     if (!(dso = dso_find(pid, addr)))
       return false;
   }

@@ -4,18 +4,16 @@
 #include "libdw.h"
 #include "libdwfl.h"
 #include "libebl.h"
-#include "logger.h"
 #include <dwarf.h>
 #include <stdbool.h>
 
-// TODO select dwfl_internals based on preproc directive
 #include "demangle.h"
 #include "dso.h"
 #include "dwfl_internals.h"
+#include "logger.h"
 #include "procutils.h"
 #include "signal_helper.h"
 
-//#define D_UNWDBG
 #define UNUSED(x) (void)(x)
 
 #define MAX_STACK 1024
@@ -50,17 +48,6 @@ struct UnwindState {
   FunLoc locs[MAX_STACK];
   uint64_t idx;
 };
-
-#ifdef D_UNWDBG
-#  define DFUNC_PRINT(...)                                                     \
-    fprintf(stderr, "<%s:%d> ", __FUNCTION__, __LINE__);                       \
-    fprintf(stderr, __VA_ARGS__);                                              \
-    fprintf(stderr, "\n")
-#else
-#  define DFUNC_PRINT(...)                                                     \
-    do {                                                                       \
-    } while (0);
-#endif
 
 pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
   (void)dwfl;
@@ -113,7 +100,7 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
   bool isactivation = false;
 
   if (!dwfl_frame_pc(state, &pc, &isactivation)) {
-    DFUNC_PRINT("%s", dwfl_errmsg(-1));
+    LG_WRN("[UNWIND] %s", dwfl_errmsg(-1));
     return DWARF_CB_ABORT;
   }
 
@@ -121,11 +108,11 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
 
   Dwfl_Thread *thread = dwfl_frame_thread(state);
   if (!thread) {
-    DFUNC_PRINT("dwfl_frame_thread was zero: (%s)", dwfl_errmsg(-1));
+    LG_WRN("[UNWIND] dwfl_frame_thread was zero: (%s)", dwfl_errmsg(-1));
   }
   Dwfl *dwfl = dwfl_thread_dwfl(thread);
   if (!dwfl) {
-    DFUNC_PRINT("dwfl_thread_dwfl was zero: (%s)", dwfl_errmsg(-1));
+    LG_WRN("[UNWIND] dwfl_thread_dwfl was zero: (%s)", dwfl_errmsg(-1));
   }
   Dwfl_Module *mod = dwfl_addrmodule(dwfl, newpc);
   const char *symname = NULL;
@@ -159,12 +146,11 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
 
     // If we failed, then try backpopulating and do it again
     if (!dso) {
-      printf("Failed to find DSO for [%d] 0x%lx, backpopulating\n", us->pid,
-             pc);
+      LG_WRN("[UNWIND] Failed to locate DSO for [%d] 0x%lx, get", us->pid, pc);
       pid_backpopulate(us->pid);
       dso = dso_find(us->pid, pc);
       if (dso)
-        printf("  DSO was %s\n", dso_path(dso));
+        LG_DBG("[UNWIND] Located DSO (%s)", dso_path(dso));
     }
     if (dso) {
       us->locs[us->idx].map_start = dso->start;
@@ -173,13 +159,13 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
       us->locs[us->idx].sopath = strdup(dso_path(dso));
     } else {
       // Try to rely on the data we have at hand, but it's certainly wrong
-      printf("Couldn't get dso for [%d] %ld\n", us->pid, pc);
+      LG_WRN("[UNWIND] Failed to locate DSO for [%d] 0x%lx again", us->pid, pc);
       us->locs[us->idx].map_start = mod->low_addr;
       us->locs[us->idx].map_end = mod->high_addr;
       us->locs[us->idx].map_off = offset;
       char *sname = strrchr(mod->name, '/');
       us->locs[us->idx].sopath = strdup(sname ? sname + 1 : mod->name);
-      printf("  soname: %s\n", us->locs[us->idx].sopath);
+      LG_DBG("[UNWIND] Located DSO at path %s", us->locs[us->idx].sopath);
     }
 
     char tmpname[1024];
@@ -192,7 +178,7 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
     }
     us->idx++;
   } else {
-    DFUNC_PRINT("dwfl_addrmodule was zero: (%s)", dwfl_errmsg(-1));
+    LG_WRN("[UNWIND] dwfl_addrmodule was zero: (%s)", dwfl_errmsg(-1));
   }
   return DWARF_CB_OK;
 }
@@ -222,7 +208,7 @@ bool unwind_init(struct UnwindState *us) {
 
   elf_version(EV_CURRENT);
   if (!us->dwfl && !(us->dwfl = dwfl_begin(&proc_callbacks))) {
-    DFUNC_PRINT("There was a problem getting the Dwfl");
+    LG_WRN("[UNWIND] There was a problem getting the Dwfl");
     return false;
   }
 
@@ -242,10 +228,8 @@ int unwindstate__unwind(struct UnwindState *us) {
       .set_initial_registers = set_initial_registers,
   };
 
-  DFUNC_PRINT("Gonna unwind at %d (my PID is %d)\n", us->pid, getpid());
-
   if (dwfl_linux_proc_report(us->dwfl, us->pid)) {
-    DFUNC_PRINT("There was a problem reporting the module.");
+    LG_WRN("[UNWIND] Could not report module for 0x%lx", us->eip);
     return -1;
   }
 
@@ -264,7 +248,7 @@ int unwindstate__unwind(struct UnwindState *us) {
   }
 
   if (dwfl_getthreads(us->dwfl, tid_cb, us)) {
-    DFUNC_PRINT("Could not get thread frames.");
+    LG_WRN("[UNWIND] Could not get thread frames for 0x%lx", us->eip);
     return -1;
   }
 

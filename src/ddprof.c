@@ -317,8 +317,8 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   case PERF_RECORD_MMAP:;
     perf_event_mmap *map = (perf_event_mmap *)hdr;
     if (!(map->header.misc & PERF_RECORD_MISC_MMAP_DATA)) {
-      printf("[%d] MAP: %s (%lx/%lx/%lx)\n", map->pid, map->filename, map->addr,
-             map->len, map->pgoff);
+      LG_DBG("[PERF]<%d>(MAP)%d: %s (%lx/%lx/%lx)", pos, map->pid,
+             map->filename, map->addr, map->len, map->pgoff);
       DsoIn in = *(DsoIn *)&map->addr;
       in.filename = map->filename;
       pid_add(map->pid, &in);
@@ -326,18 +326,18 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
     break;
   case PERF_RECORD_LOST:;
     perf_event_lost *lost = (perf_event_lost *)hdr;
-    printf("[XXX] LOST (%ld)\n", lost->lost);
+    LG_DBG("[PERF]<%d>(LOST) %ld", pos, lost->lost);
     break;
   case PERF_RECORD_COMM:;
     perf_event_comm *comm = (perf_event_comm *)hdr;
     if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC) {
-      printf("[%d] COMM\n", comm->pid);
+      LG_DBG("[PERF]<%d>(COMM)%d", pos, comm->pid);
       pid_free(comm->pid);
     }
     break;
   case PERF_RECORD_EXIT:;
     perf_event_exit *ext = (perf_event_exit *)hdr;
-    printf("[%d] EXIT\n", ext->pid);
+    LG_DBG("[PERF]<%d>(EXIT)%d", pos, ext->pid);
     pid_free(ext->pid);
     break;
   case PERF_RECORD_FORK:;
@@ -345,7 +345,7 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
     if (frk->ppid == frk->pid)
       ; // TODO
     else {
-      printf("[%d] FORK (%d)\n", frk->ppid, frk->pid);
+      LG_DBG("[PERF]<%d>(FORK)%d -> %d", pos, frk->ppid, frk->pid);
       pid_fork(frk->ppid, frk->pid);
     }
     break;
