@@ -9,6 +9,7 @@
 #include <signal.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/resource.h>
 #include <sys/sysinfo.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -54,6 +55,8 @@ typedef struct DDProfContext {
   char *upload_period;
   char *profprofiler;
   char *faultinfo;
+  char *coredumps;
+  char *nice;
   char *sendfinal;
   char *pid;
   char *global;
@@ -63,6 +66,8 @@ typedef struct DDProfContext {
     double upload_period;
     bool profprofiler;
     bool faultinfo;
+    bool coredumps;
+    int nice;
     bool sendfinal;
     pid_t pid;
     bool global;
@@ -160,6 +165,8 @@ int num_cpu = 0;
   XX(DD_PROFILE_NATIVEPROFILER,    profprofiler,    r, 'r', 0, ctx,      NULL, "")          \
   XX(DD_PROFILING_,                prefix,          X, 'X', 1, ctx,      NULL, "")          \
   XX(DD_PROFILING_NATIVEFAULTINFO, faultinfo,       s, 's', 1, ctx,      NULL, "yes")       \
+  XX(DD_PROFILING_NATIVEDUMPS,     coredumps,       m, 'm', 1, ctx,      NULL, "no")        \
+  XX(DD_PROFILING_NATIVENICE,      nice,            i, 'i', 1, ctx,      NULL, "")          \
   XX(DD_PROFILING_NATIVEPRINTARGS, printargs,       a, 'a', 1, ctx,      NULL, "no")        \
   XX(DD_PROFILING_NATIVESENDFINAL, sendfinal,       f, 'f', 1, ctx,      NULL, "")          \
   XX(DD_PROFILING_NATIVELOGMODE,   logmode,         o, 'o', 1, ctx,      NULL, "stdout")    \
@@ -338,6 +345,13 @@ char* help_str[DD_KLEN] = {
 "    If "MYNAME" encounters a critical error, print a backtrace of internal\n"
 "    functions for diagnostic purposes.  Values are `on` or `off`\n"
 "    (default: off)\n",
+  [DD_PROFILING_NATIVEDUMPS] =
+"    Whether "MYNAME" is able to emit coredumps on failure.\n"
+"    (default: off)\n",
+  [DD_PROFILING_NATIVENICE] =
+"    Sets the nice level of "MYNAME" without affecting any instrumented\n"
+"    processes.  This is useful on small containers with spiky workloads.\n"
+"    If this parameter isn't given, then the nice level is unchanged.\n",
   [DD_PROFILING_NATIVELOGMODE] =
 "    One of `stdout`, `stderr`, `syslog`, or `disabled`.  Default is `stdout`.\n"
 "    If a value is given but it does not match the above, it is treated as a\n"
@@ -452,6 +466,18 @@ void instrument_pid(DDProfContext *ctx, pid_t pid) {
               &(struct sigaction){.sa_sigaction = sigsegv_handler,
                                   .sa_flags = SA_SIGINFO},
               NULL);
+
+  // Disable core dumps (unless enabled)
+  if (!ctx->params.coredumps)
+    setrlimit(RLIMIT_CORE, 0);
+
+  // Set the nice level, but only if it was overridden because 0 is valid
+  if (ctx->nice) {
+    setpriority(PRIO_PROCESS, 0, ctx->params.nice);
+    if (errno) {
+      LG_WRN("Requested nice level (%d) could not be set", ctx->params.nice);
+    }
+  }
 
   // Perform initialization operations
   ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
@@ -592,6 +618,19 @@ int main(int argc, char **argv) {
 
   // Process faultinfo
   ctx->params.faultinfo = arg_yesno(ctx->faultinfo, 1); // default no
+
+  // Process coredumps
+  // This probably makes no sense with faultinfo enabled, but considering that
+  // there are other dumpable signals, we ignore
+  ctx->params.coredumps = arg_yesno(ctx->coredumps, 1); // default no
+
+  // Process nice level
+  if (ctx->nice) {
+    char *ptr_nice = ctx->nice;
+    int tmp_nice = strtol(ctx->nice, &ptr_nice, 10);
+    if (ptr_nice != ctx->nice)
+      ctx->params.nice = tmp_nice;
+  }
 
   // Process sendfinal
   ctx->params.sendfinal = arg_yesno(ctx->sendfinal, 1);
