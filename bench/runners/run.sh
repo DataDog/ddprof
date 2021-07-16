@@ -11,9 +11,63 @@ cd $SCRIPTDIR/../../
 TOP_LVL_DIR=$PWD
 cd $CURRENTDIR
 
+DEFAULT_CONFIG_FILE="${TOP_LVL_DIR}/test/configs/perso.yml" 
+if [ ! -e ${DEFAULT_CONFIG_FILE} ]; then
+  DEFAULT_CONFIG_FILE="${TOP_LVL_DIR}/test/configs/default.yml"
+fi 
+
+# Get global configurations 
+ENV_FILE=${TOP_LVL_DIR}/.env_perso.yml
+if [ ! -e ${ENV_FILE} ]; then
+  ENV_FILE=${TOP_LVL_DIR}/.env.yml
+fi
+
+usage() {
+    echo "$0 [-f configfile.yml] command arg1 arg2 ..."
+    echo ""
+    echo "Wrapper around ddprof to launch the tool on a given executable."
+    echo "Reads a configuration file to check what ddprof / keys / parameters to use."
+    echo ""
+    echo "      -f : override the config file"
+    echo ""
+    echo "      keys & env : for environment (keys / ddprof version)"
+    echo "                   ${ENV_FILE}"
+    echo "      ddprof config : the following file is loaded by default:"
+    echo "                     ${DEFAULT_CONFIG_FILE}"
+}
+
+if [ $# == 0 ] || [ $1 == "-h" ]; then
+    usage
+    exit 0
+fi
+
+# Parse parameters 
+if [ $# != 0 ] && [ $1 == "-f" ]; then
+    shift
+    DEFAULT_CONFIG_FILE=$1
+    shift
+    continue
+fi
+
+if [ ! -e ${DEFAULT_CONFIG_FILE} ]; then
+  echo "Error - Unable to find ${DEFAULT_CONFIG_FILE}"
+  exit 1
+else 
+  echo "Use config from : ${DEFAULT_CONFIG_FILE}"
+fi
+
+# Get configurations for ddprof from yml file
+source ${TOP_LVL_DIR}/tools/yamlparser.sh
+config_vars=$(parse_yaml "${DEFAULT_CONFIG_FILE}" "cfg_")
+#echo $config_vars
+eval $config_vars
+
+config_vars=$(parse_yaml "${ENV_FILE}" "env_")
+#echo "$config_vars"
+eval $config_vars
+
 export ASAN_SYMBOLIZER_PATH=$(which llvm-symbolizer)
-CMD_BASE=${TOP_LVL_DIR}/release/ddprof
-CMD=${CMD_BASE}
+CMD="${TOP_LVL_DIR}/${env_ddprof_directory}/ddprof"
 
 # Do service version stuff
 VERFILE="tmp/run.ver"
@@ -23,16 +77,15 @@ if [[ -f ${VERFILE} ]]; then VER=$(cat ${VERFILE}); fi
 VER=$((VER+1))
 echo ${VER} > ${VERFILE}
 
-DD_API_KEY=`$SCRIPTDIR/get_datad0g_key.sh`
-
 # Run it!
 eval ${CMD} \
-  -A $DD_API_KEY \
-  -H intake.profile.datad0g.com \
-  -P 80 \
-  -S native-testservice${VER}\
-  -u 5 \
-  -E "test-staging" \
+  -A ${env_ddog_api_key_staging0} \
+  -H ${cfg_ddprof_intake_url} \
+  -P ${cfg_ddprof_intake_port} \
+  -S "${cfg_ddprof_service_name}_${VER}"\
+  -u ${cfg_ddprof_upload_period} \
+  -E ${cfg_ddprof_environment}"test-staging" \
+  -l ${cfg_ddprof_loglevel} \
   "$@"
 
 exit 0

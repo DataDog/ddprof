@@ -12,10 +12,6 @@ cd $SCRIPTDIR/../../
 TOP_LVL_DIR=$PWD
 cd $CURRENTDIR
 
-
-# Default intake address
-INTAKE_ADD=intake.profile.datad0g.com
-
 # We need to make sure this is set if we want ASAN to return symbol names
 # instead of VM addresses
 if [[ -z "${ASAN_SYMBOLIZER_PATH:-}" ]]; then
@@ -67,15 +63,6 @@ fi
 
 rm -rf debuglog.out
 
-# Set the environment variables useful for ddprof
-export DD_API_KEY=`$SCRIPTDIR/get_datad0g_key.sh`
-export DD_SERVICE=native-testservice_${VER}
-export DD_AGENT_HOST=${INTAKE_ADD}
-
-eval ${CMD} \
-  -l debug \
-  -o stderr \
-  -a yes \
-  ${TOP_LVL_DIR}/bench/runners/${JOB}
+eval ${SCRIPTDIR}/run.sh ${TOP_LVL_DIR}/bench/runners/${JOB}
 
 exit 0

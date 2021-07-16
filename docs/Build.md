@@ -59,14 +59,9 @@ ctest
 
 ### Setup
 
-Write your datadog keys in a .env file in the root of the repository. For now only the DD_API_DATAD0G_KEY is necessary.
+Write your datadog keys in a .env_perso.yml file in the root of the repository. For now only the staging0 is necessary. Refer to the .env.yml file
 
-```bash
-DD_API_PROD_KEY=<prod key>
-DD_API_EU_KEY=<europe key (not used for now)>
-DD_API_STAGING_KEY=<staging key>
-DD_API_DATAD0G_KEY=<datad0g key>
-```
+Configurations are taken from the test/configs folder.
 
 ### Run examples
 
