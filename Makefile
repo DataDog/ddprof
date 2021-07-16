@@ -46,6 +46,7 @@ ifeq ($(DEBUG),1)
   CFLAGS := $(filter-out -O2, $(CFLAGS))
 else
   CFLAGS += -O2
+  CFLAGS += -g
   DDARGS += -DNDEBUG
 endif
 

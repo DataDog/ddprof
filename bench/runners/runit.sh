@@ -73,7 +73,7 @@ export DD_SERVICE=native-testservice_${VER}
 export DD_AGENT_HOST=${INTAKE_ADD}
 
 eval ${CMD} \
-  -l debug \
+  -l warn \
   -o stderr \
   -a yes \
   ${TOP_LVL_DIR}/bench/runners/${JOB}

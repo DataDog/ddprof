@@ -87,9 +87,24 @@ bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg) {
     // If we're here, we're not in the stack.  We should interpet addr as an
     // address in VM, not as a file offset.
     // Strongly assumes we're also in an executable region?
-    return pid_read_dso(us->pid, result, sizeof(Dwarf_Word), addr);
+    bool ret = pid_read_dso(us->pid, result, sizeof(Dwarf_Word), addr);
+    if (!ret) {
+      LG_NTC("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+             "+++++++++++++++");
+      LG_NTC("[UNWIND] Couldn't get read 0x%lx from "
+             "%d++++++++++++++++++++++++++++++++++++++",
+             addr, us->pid);
+      LG_NTC("[UNWIND] stack is 0x%lx:0x%lx", sp_start, sp_end);
+    }
+    return ret;
   }
 
+  if (addr >= sp_end) {
+    LG_NTC("[UNWIND] Address might be in stack, but exceeds buffer");
+    return false;
+  }
+
+  // We're probably safe to read
   *result = *(Dwarf_Word *)(&us->stack[addr - sp_start]);
   return true;
 }
@@ -104,84 +119,89 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
     return DWARF_CB_ABORT;
   }
 
-  Dwarf_Addr newpc = pc - !!isactivation;
+  Dwarf_Addr newpc = pc - !isactivation;
 
   Dwfl_Thread *thread = dwfl_frame_thread(state);
   if (!thread) {
     LG_WRN("[UNWIND] dwfl_frame_thread was zero: (%s)", dwfl_errmsg(-1));
+    return DWARF_CB_ABORT;
   }
   Dwfl *dwfl = dwfl_thread_dwfl(thread);
   if (!dwfl) {
     LG_WRN("[UNWIND] dwfl_thread_dwfl was zero: (%s)", dwfl_errmsg(-1));
+    return DWARF_CB_ABORT;
   }
   Dwfl_Module *mod = dwfl_addrmodule(dwfl, newpc);
-  const char *symname = NULL;
+  if (!mod) {
+    LG_WRN("[UNWIND] dwfl_addrmodule was zero: (%s)", dwfl_errmsg(-1));
+    return DWARF_CB_ABORT;
+  }
 
   // Now we register
-  if (mod) {
-    GElf_Off offset = {0};
-    GElf_Sym sym = {0};
-    GElf_Word shndxp = {0};
-    Elf *elfp = NULL;
-    Dwarf_Addr bias = {0};
+  const char *symname = NULL;
+  GElf_Off offset = {0};
+  GElf_Sym sym = {0};
+  GElf_Word shndxp = {0};
+  Elf *elfp = NULL;
+  Dwarf_Addr bias = {0};
 
-    symname =
-        dwfl_module_addrinfo(mod, newpc, &offset, &sym, &shndxp, &elfp, &bias);
+  symname =
+      dwfl_module_addrinfo(mod, newpc, &offset, &sym, &shndxp, &elfp, &bias);
 
-    Dwfl_Line *line = dwfl_module_getsrc(mod, newpc);
+  Dwfl_Line *line = dwfl_module_getsrc(mod, newpc);
 
-    // TODO
-    us->locs[us->idx].ip = pc;
+  // TODO
+  us->locs[us->idx].ip = pc;
 
-    int lineno = 0;
-    us->locs[us->idx].line = 0;
-    const char *srcpath = dwfl_lineinfo(line, &newpc, &lineno, 0, 0, 0);
-    if (srcpath) {
-      us->locs[us->idx].srcpath = strdup(srcpath);
-      us->locs[us->idx].line = lineno;
-    }
-
-    // Figure out mapping
-    Dso *dso = dso_find(us->pid, pc);
-
-    // If we failed, then try backpopulating and do it again
-    if (!dso) {
-      LG_WRN("[UNWIND] Failed to locate DSO for [%d] 0x%lx, get", us->pid, pc);
-      pid_find_ip(us->pid, pc);
-      pid_backpopulate(us->pid);
-      dso = dso_find(us->pid, pc);
-      if (dso)
-        LG_DBG("[UNWIND] Located DSO (%s)", dso_path(dso));
-    }
-    if (dso) {
-      us->locs[us->idx].map_start = dso->start;
-      us->locs[us->idx].map_end = dso->end;
-      us->locs[us->idx].map_off = dso->pgoff;
-      us->locs[us->idx].sopath = strdup(dso_path(dso));
-    } else {
-      // Try to rely on the data we have at hand, but it's certainly wrong
-      LG_WRN("[UNWIND] Failed to locate DSO for [%d] 0x%lx again", us->pid, pc);
-      pid_find_ip(us->pid, pc);
-      us->locs[us->idx].map_start = mod->low_addr;
-      us->locs[us->idx].map_end = mod->high_addr;
-      us->locs[us->idx].map_off = offset;
-      char *sname = strrchr(mod->name, '/');
-      us->locs[us->idx].sopath = strdup(sname ? sname + 1 : mod->name);
-      LG_DBG("[UNWIND] Located DSO at path %s", us->locs[us->idx].sopath);
-    }
-
-    char tmpname[1024];
-    if (symname) {
-      demangle(symname, tmpname, sizeof(tmpname) / sizeof(*tmpname));
-      us->locs[us->idx].funname = strdup(tmpname);
-    } else {
-      snprintf(tmpname, 1016, "0x%lx", mod->low_addr);
-      us->locs[us->idx].funname = strdup(tmpname);
-    }
-    us->idx++;
-  } else {
-    LG_WRN("[UNWIND] dwfl_addrmodule was zero: (%s)", dwfl_errmsg(-1));
+  int lineno = 0;
+  us->locs[us->idx].line = 0;
+  const char *srcpath = dwfl_lineinfo(line, &newpc, &lineno, 0, 0, 0);
+  if (srcpath) {
+    us->locs[us->idx].srcpath = strdup(srcpath);
+    us->locs[us->idx].line = lineno;
   }
+
+  // Figure out mapping
+  Dso *dso = dso_find(us->pid, pc);
+
+  // If we failed, then try backpopulating and do it again
+  if (!dso) {
+    LG_WRN("[UNWIND] Failed to locate DSO for [%d] 0x%lx, get", us->pid, pc);
+    pid_backpopulate(us->pid);
+    if ((dso = dso_find(us->pid, pc)))
+      LG_DBG("[UNWIND] Located DSO (%s)", dso_path(dso));
+    else
+      pid_find_ip(us->pid, pc);
+  }
+  if (dso) {
+    us->locs[us->idx].map_start = dso->start;
+    us->locs[us->idx].map_end = dso->end;
+    us->locs[us->idx].map_off = dso->pgoff;
+    us->locs[us->idx].sopath = strdup(dso_path(dso));
+  } else {
+    // Try to rely on the data we have at hand, but it's certainly wrong
+    LG_WRN("[UNWIND] Failed to locate DSO for [%d] 0x%lx again", us->pid, pc);
+    pid_find_ip(us->pid, pc);
+    us->locs[us->idx].map_start = mod->low_addr;
+    us->locs[us->idx].map_end = mod->high_addr;
+    us->locs[us->idx].map_off = offset;
+    char *sname = strrchr(mod->name, '/');
+    us->locs[us->idx].sopath = strdup(sname ? sname + 1 : mod->name);
+    LG_DBG("[UNWIND] Located DSO at path %s", us->locs[us->idx].sopath);
+  }
+
+  char tmpname[1024];
+  if (symname) {
+    demangle(symname, tmpname, sizeof(tmpname) / sizeof(*tmpname));
+    us->locs[us->idx].funname = strdup(tmpname);
+  } else {
+    snprintf(tmpname, 1016, "0x%lx", mod->low_addr);
+    us->locs[us->idx].funname = strdup(tmpname);
+  }
+
+  LG_DBG("[UNWIND] (%s):(%d)", us->locs[us->idx].funname,
+         us->locs[us->idx].line);
+  us->idx++;
   return DWARF_CB_OK;
 }
 
@@ -202,8 +222,7 @@ void FunLoc_clear(FunLoc *locs) {
 bool unwind_init(struct UnwindState *us) {
   static char *debuginfo_path;
   static const Dwfl_Callbacks proc_callbacks = {
-      .find_debuginfo =
-          dwfl_standard_find_debuginfo, // TODO, update this for containers?
+      .find_debuginfo = dwfl_standard_find_debuginfo,
       .debuginfo_path = &debuginfo_path,
       .find_elf = dwfl_linux_proc_find_elf,
   };
@@ -230,23 +249,22 @@ int unwindstate__unwind(struct UnwindState *us) {
       .set_initial_registers = set_initial_registers,
   };
 
+  LG_DBG("Beginning unwinding for %d:0x%lx-------------------------", us->pid,
+         us->eip);
   if (dwfl_linux_proc_report(us->dwfl, us->pid)) {
     LG_WRN("[UNWIND] Could not report module for 0x%lx", us->eip);
     return -1;
   }
 
-  // TODO, all of this needs to go in a PID cache, until then we're not going
-  //      to cleanup since it doesn't matter
-  //  if (dwfl_report_end(us->dwfl, NULL, NULL)) {
-  //    D("dwfl_end was nonzero (%s)", dwfl_errmsg(-1));
-  //    return -1;
-  //  }
+  if (dwfl_report_end(us->dwfl, NULL, NULL)) {
+    // Not an error, since it means the report context has nothing left to do
+    LG_WRN("[UNWIND] dwfl_end was nonzero (%s)", dwfl_errmsg(-1));
+    return 0;
+  }
 
   if (!dwfl_attach_state(us->dwfl, NULL, us->pid, &dwfl_callbacks, us)) {
-    //    TODO, same as above, no reason to care if attaching fails since we
-    //          never detach and the first time always seems to work so far.
-    //    D("Could not attach (%s)", dwfl_errmsg(-1));
-    //    return -1;
+    //    LG_WRN("[UNWIND] dwfl_attach_state was nonzero (%s)",
+    //    dwfl_errmsg(-1));
   }
 
   if (dwfl_getthreads(us->dwfl, tid_cb, us)) {

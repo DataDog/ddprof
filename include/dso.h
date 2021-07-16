@@ -185,7 +185,7 @@ void pid_find_ip(int pid, uint64_t ip) {
   while (-1 != getline(&buf, &sz_buf, mpf)) {
     if (ip_in_procline(buf, ip)) {
       LG_DBG("[DSO] Found ip:0x%lx for %d", ip, pid);
-      LG_DBG("[DSO] %s", buf);
+      LG_DBG("[DSO] %.*s", (int)strlen(buf) - 1, buf);
       fclose(mpf);
       return;
     }

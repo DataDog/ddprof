@@ -85,8 +85,8 @@ PerfOption perfoptions[] = {
   {"Bus Cycles",      "hBUS",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,              1e3, "bus-cycle",      "cycles", .freq = true},
   {"Bus Stalls(F)",   "hBSTF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1e3, "bus-stf",        "cycles", .freq = true},
   {"Bus Stalls(B)",   "hBSTB",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1e3, "bus-stb",        "cycles", .freq = true},
-  {"CPU Time",        "sCPU",    PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,              1e2, "cpu-time",       "nanoseconds", . freq = true},
-  {"Wall? Time",      "sWALL",   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,               1e2, "wall-time",      "nanoseconds", . freq = true},
+  {"CPU Time",        "sCPU",    PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,              1e2, "cpu-time",       "nanoseconds", .freq = true},
+  {"Wall? Time",      "sWALL",   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,               1e2, "wall-time",      "nanoseconds", .freq = true},
   {"Ctext Switches",  "sCI",     PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES,        1,   "switches",       "events", .include_kernel = true},
   {"Block-Insert",    "kBLKI",   PERF_TYPE_TRACEPOINT, 1133,                                1,   "block-insert",   "events", .include_kernel = true},
   {"Block-Issue",     "kBLKS",   PERF_TYPE_TRACEPOINT, 1132,                                1,   "block-issue",    "events", .include_kernel = true},
@@ -189,26 +189,31 @@ typedef enum DDKeys { OPT_TABLE(X_ENUM) DD_KLEN } DDKeys;
 // This is the socket used to report things over statsd, if available
 int fd_statsd = -1;
 
+// Accounting globals
+unsigned long ticks_unwind = 0;
+unsigned long events_lost = 0;
+unsigned long samples_recv = 0;
+
 void statsd_init() {
   char *path_statsd = NULL;
   if ((path_statsd = getenv("DD_DOGSTATSD_SOCKET")))
     fd_statsd = statsd_open(path_statsd, strlen(path_statsd));
 }
 
-struct BrittleStringTable {
-  unsigned char *regions[32];
-  unsigned char *arena;
-  size_t capacity;
-};
-
+#define DDPN "datadog.profiler.native."
 void statsd_upload_globals(DDProfContext *ctx) {
-  static char key_rss[] = "datadog.profiler.native.rss";
-  static char key_user[] = "datadog.profiler.native.utime";
-  static char key_st_elements[] = "datadog.profiler.native.pprof.st_elements";
+  static char key_rss[] = DDPN "rss";
+  static char key_user[] = DDPN "utime";
+  static char key_st_elements[] = DDPN "pprof.st_elements";
+  static char key_ticks_unwind[] = DDPN "unwind.ticks";
+  static char key_events_lost[] = DDPN "events.lost";
+  static char key_samples_recv[] = DDPN "samples.recv";
+
+  // If there's nothing that can be done, then there's nothing to do.
   if (-1 == fd_statsd)
     return;
 
-  // Upload some procfs values
+  // Upload ddprof's procfs values
   static unsigned long last_utime = 0;
   ProcStatus *procstat = proc_read();
   if (procstat) {
@@ -220,9 +225,18 @@ void statsd_upload_globals(DDProfContext *ctx) {
     }
   }
 
-  // Upload some internal stats
+  // Upload global gauges
   uint64_t st_size = ctx->dp->string_table_size(ctx->dp->string_table_data);
   statsd_send(fd_statsd, key_st_elements, &(long){st_size}, STAT_GAUGE);
+  statsd_send(fd_statsd, key_ticks_unwind, &(long){ticks_unwind}, STAT_GAUGE);
+  statsd_send(fd_statsd, key_events_lost, &(long){events_lost}, STAT_GAUGE);
+  statsd_send(fd_statsd, key_samples_recv, &(long){samples_recv}, STAT_GAUGE);
+}
+
+void print_diagnostics() {
+  LG_NTC("[STATS] ticks_unwind: %lu", ticks_unwind);
+  LG_NTC("[STATS] events_lost: %lu", events_lost);
+  LG_NTC("[STATS] samples_recv: %lu", samples_recv);
 }
 
 /******************************  Perf Callback  *******************************/
@@ -237,6 +251,12 @@ static inline int64_t now_nanos() {
 void export(DDProfContext *pctx, int64_t now) {
   DDReq *ddr = pctx->ddr;
   DProf *dp = pctx->dp;
+
+  // Before any state gets reset, export metrics to statsd
+  statsd_upload_globals(pctx);
+
+  // And emit diagnostic output (if it's enabled)
+  print_diagnostics();
 
   LG_NTC("Pushed samples to backend");
   int ret = 0;
@@ -256,6 +276,11 @@ void export(DDProfContext *pctx, int64_t now) {
 
   // Prepare pprof for next window
   pprof_timeUpdate(dp);
+
+  // We're done exporting, so finish by clearing out any global gauges
+  ticks_unwind = 0;
+  events_lost = 0;
+  samples_recv = 0;
 }
 
 void ddprof_timeout(void *arg) {
@@ -276,6 +301,7 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
 
   switch (hdr->type) {
   case PERF_RECORD_SAMPLE:
+    ++samples_recv;
     pes = (struct perf_event_sample *)hdr;
     us->pid = pes->pid;
     us->idx = 0; // Modified during unwinding; has stack depth
@@ -284,6 +310,7 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
     memcpy(&us->regs[0], pes->regs, 3 * sizeof(uint64_t));
     us->max_stack = MAX_STACK;
     FunLoc_clear(us->locs);
+    unsigned long this_ticks_unwind = __rdtsc();
     if (-1 == unwindstate__unwind(us)) {
       Dso *dso = dso_find(us->pid, us->eip);
       if (!dso) {
@@ -295,6 +322,7 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
       }
       return;
     }
+    ticks_unwind += __rdtsc() - this_ticks_unwind;
     FunLoc *locs = us->locs;
     for (uint64_t i = 0, j = 0; i < us->idx; i++) {
       FunLoc L = locs[i];
@@ -326,7 +354,7 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
     break;
   case PERF_RECORD_LOST:;
     perf_event_lost *lost = (perf_event_lost *)hdr;
-    LG_DBG("[PERF]<%d>(LOST) %ld", pos, lost->lost);
+    events_lost += lost->lost;
     break;
   case PERF_RECORD_COMM:;
     perf_event_comm *comm = (perf_event_comm *)hdr;
@@ -359,7 +387,6 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   int64_t now = now_nanos();
 
   if (now > pctx->send_nanos) {
-    statsd_upload_globals(pctx);
     export(pctx, now);
   }
 }
