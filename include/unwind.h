@@ -29,7 +29,7 @@ typedef struct FunLoc {
   uint32_t disc; // discriminator
 } FunLoc;
 
-struct UnwindState {
+typedef struct UnwindState {
   Dwfl *dwfl;
   pid_t pid;
   char *stack;
@@ -47,7 +47,7 @@ struct UnwindState {
   uint64_t ips[MAX_STACK];
   FunLoc locs[MAX_STACK];
   uint64_t idx;
-};
+} UnwindState;
 
 pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
   (void)dwfl;
@@ -89,8 +89,8 @@ bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg) {
     // Strongly assumes we're also in an executable region?
     bool ret = pid_read_dso(us->pid, result, sizeof(Dwarf_Word), addr);
     if (!ret) {
-      LG_NTC("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-             "+++++++++++++++");
+      LG_NTC(
+          "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
       LG_NTC("[UNWIND] Couldn't get read 0x%lx from "
              "%d++++++++++++++++++++++++++++++++++++++",
              addr, us->pid);
@@ -119,7 +119,15 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
     return DWARF_CB_ABORT;
   }
 
-  Dwarf_Addr newpc = pc - !isactivation;
+  // If this is not an activation frame, then it was a frame which was in an op
+  // like CALL.  The convention is to advance the stored IP past the CALL, so on
+  // return there is no ambiguity about the state of the IP.  That means, for
+  // the purpose of unwinding, the stated value of the IP is misleading and must
+  // be corrected.  Formally, I sense that this needs to be decremented back
+  // to the CALL, but I see a lot of code merely decrementing by one, so we
+  // follow that convention here.  DAS - TODO am I missing something?
+  if (!isactivation)
+    --pc;
 
   Dwfl_Thread *thread = dwfl_frame_thread(state);
   if (!thread) {
@@ -131,9 +139,10 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
     LG_WRN("[UNWIND] dwfl_thread_dwfl was zero: (%s)", dwfl_errmsg(-1));
     return DWARF_CB_ABORT;
   }
-  Dwfl_Module *mod = dwfl_addrmodule(dwfl, newpc);
+  Dwfl_Module *mod = dwfl_addrmodule(dwfl, pc);
   if (!mod) {
-    LG_WRN("[UNWIND] dwfl_addrmodule was zero: (%s)", dwfl_errmsg(-1));
+    LG_WRN("[UNWIND] dwfl_addrmodule for 0x:%lx was zero: (%s)", pc,
+           dwfl_errmsg(-1));
     return DWARF_CB_ABORT;
   }
 
@@ -145,17 +154,16 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
   Elf *elfp = NULL;
   Dwarf_Addr bias = {0};
 
-  symname =
-      dwfl_module_addrinfo(mod, newpc, &offset, &sym, &shndxp, &elfp, &bias);
+  symname = dwfl_module_addrinfo(mod, pc, &offset, &sym, &shndxp, &elfp, &bias);
 
-  Dwfl_Line *line = dwfl_module_getsrc(mod, newpc);
+  Dwfl_Line *line = dwfl_module_getsrc(mod, pc);
 
   // TODO
   us->locs[us->idx].ip = pc;
 
   int lineno = 0;
   us->locs[us->idx].line = 0;
-  const char *srcpath = dwfl_lineinfo(line, &newpc, &lineno, 0, 0, 0);
+  const char *srcpath = dwfl_lineinfo(line, &pc, &lineno, 0, 0, 0);
   if (srcpath) {
     us->locs[us->idx].srcpath = strdup(srcpath);
     us->locs[us->idx].line = lineno;

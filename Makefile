@@ -129,7 +129,7 @@ CWD := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 SOURCE_DIR := $(CWD)
 INCLUDE = -I$(LIBDDPROF)/RelWithDebInfo/include -I$(CWD)/include -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
 LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl $(LIBSTDCXX)
-SRC := $(CWD)/src/proto/profile.pb-c.c $(CWD)/src/ddprofcmdline.c $(CWD)/src/ipc.c $(CWD)/src/logger.c $(CWD)/src/signal_helper.c $(CWD)/src/version.c $(CWD)/src/statsd.c
+SRC := $(CWD)/src/proto/profile.pb-c.c $(CWD)/src/ddprofcmdline.c $(CWD)/src/ipc.c $(CWD)/src/logger.c $(CWD)/src/signal_helper.c $(CWD)/src/version.c $(CWD)/src/statsd.c $(CWD)/src/perf.c $(CWD)/src/ddprof.c
 DIRS := $(TARGETDIR) $(TMP)
 
 .PHONY: build deps elfutils demangle bench ddprof_banner format format-commit clean_deps publish all
@@ -190,7 +190,7 @@ deps: $(LIBDDPROF) $(ELFLIBS) $(LIBLLVM)
 pull: $(LIBDDPROF) $(ELFUTILS) $(LIBLLVM)
 
 ## Actual build targets
-$(TARGETDIR)/ddprof: src/ddprof.c $(TMP)/demangle.a| $(TARGETDIR) $(ELFLIBS) $(LIBDDPROF) ddprof_banner $(LIBDDPROF_LIB)
+$(TARGETDIR)/ddprof: src/main.c $(TMP)/demangle.a| $(TARGETDIR) $(ELFLIBS) $(LIBDDPROF) ddprof_banner $(LIBDDPROF_LIB)
 	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) -static-libgcc $(WARNS) $(SANS) $(LDFLAGS) $(INCLUDE) -o $@ $< $(SRC) $(TMP)/demangle.a $(ELFLIBS) $(LDLIBS) $(LIBDDPROF_LIB)
 
 logger: src/eg/logger.c src/logger.c
