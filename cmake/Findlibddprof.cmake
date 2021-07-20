@@ -1,13 +1,13 @@
-add_library(libddprof STATIC IMPORTED)
+add_library(libddprof-c STATIC IMPORTED)
 #/usr/local/lib64/ on centos
 find_library(LIBDDPROF_LIBRARY_PATH 
-                ddprof
+                ddprof-c
               HINTS 
                 ${CMAKE_SOURCE_DIR}/vendor/libddprof/RelWithDebInfo/lib64
               PATHS
                 ${CMAKE_SOURCE_DIR}/vendor/libddprof/RelWithDebInfo/lib64)
 
-set_target_properties(libddprof PROPERTIES IMPORTED_LOCATION "${LIBDDPROF_LIBRARY_PATH}")
+set_target_properties(libddprof-c PROPERTIES IMPORTED_LOCATION "${LIBDDPROF_LIBRARY_PATH}")
 
 find_path (LIBDDPROF_INCLUDE_DIR
         NAMES

@@ -179,7 +179,7 @@ set(DDPROF_GLOBAL_SRC
 # It is important to force most libraries as static
 add_exe(ddprof
         ${DDPROF_GLOBAL_SRC}
-        LIBRARIES libddprof llvm-demangle libstdc++.a dw.a elf.a libz.a Threads::Threads libprotobuf-c.a liblzma.a)
+        LIBRARIES libddprof-c llvm-demangle libstdc++.a dw.a elf.a libz.a Threads::Threads libprotobuf-c.a liblzma.a)
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 
 message(STATUS "Install destination " ${CMAKE_INSTALL_PREFIX})
