@@ -89,11 +89,7 @@ bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg) {
     // Strongly assumes we're also in an executable region?
     bool ret = pid_read_dso(us->pid, result, sizeof(Dwarf_Word), addr);
     if (!ret) {
-      LG_NTC(
-          "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++");
-      LG_NTC("[UNWIND] Couldn't get read 0x%lx from "
-             "%d++++++++++++++++++++++++++++++++++++++",
-             addr, us->pid);
+      LG_NTC("[UNWIND] Couldn't get read 0x%lx from %d" addr, us->pid);
       LG_NTC("[UNWIND] stack is 0x%lx:0x%lx", sp_start, sp_end);
     }
     return ret;
