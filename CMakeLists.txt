@@ -14,7 +14,6 @@ project(DDProf
   LANGUAGES C
   VERSION 0.1
 )
-add_compile_definitions("MYNAME=\"${CMAKE_PROJECT_NAME}\"")
 
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release;SanitizedDebug" CACHE STRING
     "Available build-types: Debug, Release and SanitizedDebug")
@@ -93,6 +92,12 @@ endif()
 ### Declaration of DDProf   ###
 ###############################
 # Known limitation : lib elf is not built with cmake for now (makefile)
+
+# Compile time definitions
+add_compile_definitions("MYNAME=\"${CMAKE_PROJECT_NAME}\"")
+
+set(BUILD_REV "custom" CACHE STRING "Revision appended to the version information")
+add_compile_definitions("VER_REV=\"${BUILD_REV}\"")
 
 # Leave frame pointers to help with profiling
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${FRAME_PTR_FLAG}")
@@ -174,7 +179,8 @@ set(DDPROF_GLOBAL_SRC
 # It is important to force most libraries as static
 add_exe(ddprof
         ${DDPROF_GLOBAL_SRC}
-        LIBRARIES libddprof llvm-demangle libstdc++.a dw.a elf.a libz.a Threads::Threads libprotobuf-c.a liblzma.a)
+        LIBRARIES libddprof-c llvm-demangle libstdc++.a dw.a elf.a libz.a Threads::Threads libprotobuf-c.a liblzma.a)
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 
+message(STATUS "Install destination " ${CMAKE_INSTALL_PREFIX})
 install(TARGETS ddprof)

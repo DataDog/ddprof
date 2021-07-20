@@ -31,6 +31,8 @@ typedef struct DDProfContext {
   char *upload_period;
   char *profprofiler;
   char *faultinfo;
+  char *coredumps;
+  char *nice;
   char *sendfinal;
   char *pid;
   char *global;
@@ -40,6 +42,8 @@ typedef struct DDProfContext {
     double upload_period;
     bool profprofiler;
     bool faultinfo;
+    bool coredumps;
+    int nice;
     bool sendfinal;
     pid_t pid;
     bool global;
@@ -101,6 +105,8 @@ typedef struct DDProfContext {
   XX(DD_PROFILE_NATIVEPROFILER,    profprofiler,    r, 'r', 0, ctx,      NULL, "")          \
   XX(DD_PROFILING_,                prefix,          X, 'X', 1, ctx,      NULL, "")          \
   XX(DD_PROFILING_NATIVEFAULTINFO, faultinfo,       s, 's', 1, ctx,      NULL, "yes")       \
+  XX(DD_PROFILING_NATIVEDUMPS,     coredumps,       m, 'm', 1, ctx,      NULL, "no")        \
+  XX(DD_PROFILING_NATIVENICE,      nice,            i, 'i', 1, ctx,      NULL, "")          \
   XX(DD_PROFILING_NATIVEPRINTARGS, printargs,       a, 'a', 1, ctx,      NULL, "no")        \
   XX(DD_PROFILING_NATIVESENDFINAL, sendfinal,       f, 'f', 1, ctx,      NULL, "")          \
   XX(DD_PROFILING_NATIVELOGMODE,   logmode,         o, 'o', 1, ctx,      NULL, "stdout")    \
@@ -125,7 +131,7 @@ typedef struct DDProfContext {
 #define CASE_EXP(casechar, targ, key)                                          \
 case casechar:                                                                 \
   if ((targ)->key)                                                             \
-    free((targ)->key);                                                         \
+    free((void *)(targ)->key);                                                 \
   (targ)->key = strdup(optarg);                                                \
   break;
 
@@ -133,7 +139,7 @@ case casechar:                                                                 \
 #define FREE_EXP(key, targ)                                                    \
   __extension__({                                                              \
     if ((targ)->key)                                                           \
-      free((targ)->key);                                                       \
+      free((void *)(targ)->key);                                               \
     (targ)->key = NULL;                                                        \
   })
 

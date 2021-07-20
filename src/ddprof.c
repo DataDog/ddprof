@@ -2,9 +2,12 @@
 
 #include <ddprof/pprof.h>
 #include <sys/ioctl.h>
+#include <sys/resource.h>
 #include <unistd.h>
+#include <x86intrin.h>
 
 #include "ddprofcmdline.h"
+#include "procutils.h"
 #include "statsd.h"
 #include "unwind.h"
 
@@ -322,6 +325,13 @@ char* help_str[DD_KLEN] = {
 "    If "MYNAME" encounters a critical error, print a backtrace of internal\n"
 "    functions for diagnostic purposes.  Values are `on` or `off`\n"
 "    (default: off)\n",
+  [DD_PROFILING_NATIVEDUMPS] =
+"    Whether "MYNAME" is able to emit coredumps on failure.\n"
+"    (default: off)\n",
+  [DD_PROFILING_NATIVENICE] =
+"    Sets the nice level of "MYNAME" without affecting any instrumented\n"
+"    processes.  This is useful on small containers with spiky workloads.\n"
+"    If this parameter isn't given, then the nice level is unchanged.\n",
   [DD_PROFILING_NATIVELOGMODE] =
 "    One of `stdout`, `stderr`, `syslog`, or `disabled`.  Default is `stdout`.\n"
 "    If a value is given but it does not match the above, it is treated as a\n"
@@ -432,6 +442,18 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
                                   .sa_flags = SA_SIGINFO},
               NULL);
 
+  // Disable core dumps (unless enabled)
+  if (!ctx->params.coredumps)
+    setrlimit(RLIMIT_CORE, 0);
+
+  // Set the nice level, but only if it was overridden because 0 is valid
+  if (ctx->nice) {
+    setpriority(PRIO_PROCESS, 0, ctx->params.nice);
+    if (errno) {
+      LG_WRN("Requested nice level (%d) could not be set", ctx->params.nice);
+    }
+  }
+
   // Perform initialization operations
   ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
   unwind_init(ctx->us);
@@ -518,6 +540,19 @@ void ddprof_setctx(DDProfContext *ctx) {
 
   // Process faultinfo
   ctx->params.faultinfo = arg_yesno(ctx->faultinfo, 1); // default no
+
+  // Process coredumps
+  // This probably makes no sense with faultinfo enabled, but considering that
+  // there are other dumpable signals, we ignore
+  ctx->params.coredumps = arg_yesno(ctx->coredumps, 1); // default no
+
+  // Process nice level
+  if (ctx->nice) {
+    char *ptr_nice = ctx->nice;
+    int tmp_nice = strtol(ctx->nice, &ptr_nice, 10);
+    if (ptr_nice != ctx->nice)
+      ctx->params.nice = tmp_nice;
+  }
 
   // Process sendfinal
   ctx->params.sendfinal = arg_yesno(ctx->sendfinal, 1);

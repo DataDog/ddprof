@@ -12,6 +12,7 @@ redis
 .ccls-cache
 .idea
 .cache
+temp
 
 #==============================================================================#
 # Editor auto-saving
@@ -43,3 +44,6 @@ compile_commands.json
 *.swp
 *.dump
 .env
+.env_perso.yml
+test/configs/perso.yml
+.editorconfig
