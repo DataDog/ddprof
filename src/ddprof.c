@@ -191,7 +191,7 @@ int num_cpu = 0;
 #define CASE_EXP(casechar, targ, key)                                          \
   case casechar:                                                               \
     if ((targ)->key)                                                           \
-      free((targ)->key);                                                       \
+      free((void *)(targ)->key);                                               \
     (targ)->key = strdup(optarg);                                              \
     break;
 
@@ -199,7 +199,7 @@ int num_cpu = 0;
 #define FREE_EXP(key, targ)                                                    \
   __extension__({                                                              \
     if ((targ)->key)                                                           \
-      free((targ)->key);                                                       \
+      free((void *)(targ)->key);                                               \
     (targ)->key = NULL;                                                        \
   })
 
