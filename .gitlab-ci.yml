@@ -101,10 +101,13 @@ test:ddprof_cmake:
   tags: ["runner:docker", "size:large"]
   parallel:
     matrix:
-      - BUILD_TYPE: ["Release"]
+      - BUILD_TYPE: ["Release", "SanitizedDebug"]
   script:
     - set -euxo pipefail
-    - ./tools/check_dependencies.sh deliverables/${BUILD_TYPE}/bin/ddprof test/data/expected_deps.txt
+    - source setup_env.sh
+    - check_dependencies.sh deliverables/${BUILD_TYPE}/bin/ddprof test/data/expected_deps_${BUILD_TYPE}.txt
+    # Run toy project for 5 seconds
+    - run.sh -b ./deliverables/${BUILD_TYPE}/bin BadBoggleSolver_run 5
   dependencies:
     - build:ddprof_cmake
 

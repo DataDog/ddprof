@@ -5,6 +5,6 @@ ddprof:
   service:
     name: native-testservice
   upload:
-    period: 60
+    period: 2
   environment: test-staging
-  loglevel: warn
+  loglevel: notice
