@@ -400,6 +400,7 @@ bool pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
   assert(buf);
   assert(sz > 0);
 
+  // Can skip the zero page
   if (addr < 4095)
     return false;
 

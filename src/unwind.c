@@ -203,10 +203,6 @@ void FunLoc_clear(FunLoc *locs) {
 bool unwind_init(struct UnwindState *us) {
   (void)us;
   elf_version(EV_CURRENT);
-  //  if (!us->dwfl && !(us->dwfl = dwfl_begin(&proc_callbacks))) {
-  //    LG_WRN("[UNWIND] There was a problem getting the Dwfl");
-  //    return false;
-  //  }
 
   libdso_init();
   return true;
@@ -233,37 +229,8 @@ int unwindstate__unwind(struct UnwindState *us) {
     return -1;
   }
 
-  Dwfl_Module *mod = dwfl_addrmodule(us->dwfl, us->eip);
-  Dso *dso = dso_find(us->pid, us->eip);
-  if (!dso) {
-    pid_backpopulate(us->pid);
-    dso = dso_find(us->pid, us->eip);
-    if (!dso) {
-      LG_WRN("[UNWIND] Could not get DSO for %d at 0x%lx", us->pid, us->eip);
-      dwfl_end(us->dwfl);
-      return -1;
-    }
-  }
-  if (mod) {
-    Dwarf_Addr s;
-    dwfl_module_info(mod, 0, &s, 0, 0, 0, 0, 0);
-    if (s != dso->start - dso->pgoff)
-      mod = NULL;
-  }
-  if (!mod) {
-    char *dso_filepath = dso_path(dso);
-    if (dso && '[' != *dso_filepath) {
-      char *dso_name = strrchr(dso_filepath, '/') + 1;
-      mod = dwfl_report_elf(us->dwfl, dso_name, dso_filepath, -1,
-                            dso->start - dso->pgoff, false);
-    }
-  }
-  if (!mod) {
-    LG_WRN("[UNWIND] couldn't initialize unwinding %d at 0x%lx", us->pid,
-           us->eip);
-    dwfl_end(us->dwfl);
-    return -1;
-  }
+  // Update modules at the top
+  update_mod(us->dwfl, us->pid, us->eip);
 
   if (!dwfl_attach_state(us->dwfl, EM_NONE, us->pid, &dwfl_callbacks, us)) {
     LG_WRN("[UNWIND] dwfl_attach_state was nonzero (%s)", dwfl_errmsg(-1));
