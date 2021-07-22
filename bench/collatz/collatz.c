@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <x86intrin.h>
 
+#include "statsd.h"
+
 #ifdef MYNAME
 #undef MYNAME
 #define MYNAME "collatz"
@@ -124,6 +126,8 @@ int main (int c, char** v) {
   printf("%d, %d, %d, %d, ", n, ki, kj, t); fflush(stdout);
 
   // Setup
+  static __thread unsigned long work_start, work_end;
+  static __thread unsigned long last_counter = 0;
   unsigned long *start_tick = mmap(NULL, MAX_PROCS*sizeof(unsigned long), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   unsigned long *end_tick = mmap(NULL, MAX_PROCS*sizeof(unsigned long), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   pid_t pids[MAX_PROCS] = {0};
@@ -138,9 +142,16 @@ int main (int c, char** v) {
   pthread_barrierattr_setpshared(&bat, 1);
   pthread_barrier_init(pb, &bat, n);
 
+
   // Execute
   int me = 0;
   for (int i=1; i<n && (pids[i] = fork()); i++) {me = i;}
+
+  // Now that we're in a fork, set up my local statsd socket
+  int fd_statsd = -1;
+  char *path_statsd = NULL;
+  if ((path_statsd = getenv("DD_DOGSTATSD_SOCKET")))
+    fd_statsd = statsd_open(path_statsd, strlen(path_statsd));
 
   // OK, so we want to wait until everyone has started, but if we have more
   // work than we have cores, we might realistically start after other workers
@@ -148,11 +159,26 @@ int main (int c, char** v) {
   pthread_barrier_wait(pb);
   start_tick[me] = __rdtsc();
   pthread_barrier_wait(pb);
-  for (int j=0; j<ki; j++)
+  for (int j=0; j<ki; j++) {
+
+    work_start = __rdtsc();
     for (int i=0; i<kj; i++) {
       int arg = t ? t : i;
       funs[arg%funlen](arg);
     }
+
+    // Print to statsd, if configured
+    if (-1 != fd_statsd) {
+      work_end = __rdtsc();
+      static char key_ticks[] = "app.collatz.ticks";
+      static char key_stacks[] = "app.collatz.stacks";
+      static char key_funs[] = "app.collatz.functions";
+      statsd_send(fd_statsd, key_ticks, &(long){work_end - work_start}, STAT_GAUGE);
+      statsd_send(fd_statsd, key_stacks, &kj, STAT_GAUGE);
+      statsd_send(fd_statsd, key_funs, &(long){*my_counter-last_counter}, STAT_GAUGE); // technically can overflow, but whatever
+      last_counter = *my_counter;
+    }
+  }
 
   // Wait for everyone to be done
   __sync_add_and_fetch(counter,*my_counter);

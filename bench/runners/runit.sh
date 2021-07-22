@@ -56,9 +56,9 @@ echo ${VER} > ${VERFILE}
 
 # Set any switchable environment variables
 if [[ "yes" == "${USE_JEMALLOC,,}" ]]; then
-  export MALLOC_TRACE=/tmp/foo
-  export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so
-  export MALLOC_CONF=prof:true,lg_prof_interval:25,lg_prof_sample:17
+  echo "Using jemalloc-based allocation profiling"
+  export LD_PRELOAD='/usr/lib/x86_64-linux-gnu/libjemalloc.so'
+  export MALLOC_CONF='prof:true,lg_prof_interval:26,lg_prof_sample:20,prof_prefix:jeprof.out'
 fi
 
 rm -rf debuglog.out

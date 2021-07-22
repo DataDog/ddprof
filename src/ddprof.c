@@ -1,220 +1,133 @@
-#include <ddprof/dd_send.h>
-#include <ddprof/http.h>
+#include "ddprof.h"
+
 #include <ddprof/pprof.h>
-#include <execinfo.h>
-#include <getopt.h>
-#include <libelf.h>
-#include <poll.h>
-#include <pthread.h>
-#include <signal.h>
-#include <string.h>
-#include <sys/mman.h>
+#include <sys/ioctl.h>
 #include <sys/resource.h>
-#include <sys/sysinfo.h>
-#include <sys/time.h>
-#include <sys/types.h>
 #include <unistd.h>
-#include <wait.h>
+#include <x86intrin.h>
 
 #include "ddprofcmdline.h"
-#include "ipc.h"
-#include "logger.h"
-#include "perf.h"
+#include "procutils.h"
+#include "statsd.h"
 #include "unwind.h"
-#include "version.h"
 
-#define max_watchers 10
+#define USERAGENT_DEFAULT "libddprof"
+#define LANGUAGE_DEFAULT "native"
+#define FAMILY_DEFAULT "native"
 
-typedef struct PerfOption {
-  char *desc;
-  char *key;
-  int type;
-  int config;
-  int base_rate;
-  char *label;
-  char *unit;
-  int mode;
-} PerfOption;
-
-typedef struct DDProfContext {
-  DProf *dp;
-  DDReq *ddr;
-
-  // Parameters for interpretation
-  char *agent_host;
-  char *prefix;
-  char *tags;
-  char *logmode;
-  char *loglevel;
-
-  // Input parameters
-  char *printargs;
-  char *count_samples;
-  char *enable;
-  char *native_enable;
-  char *upload_period;
-  char *profprofiler;
-  char *faultinfo;
-  char *coredumps;
-  char *nice;
-  char *sendfinal;
-  char *pid;
-  char *global;
-  struct {
-    bool count_samples;
-    bool enable;
-    double upload_period;
-    bool profprofiler;
-    bool faultinfo;
-    bool coredumps;
-    int nice;
-    bool sendfinal;
-    pid_t pid;
-    bool global;
-  } params;
-  struct watchers {
-    PerfOption *opt;
-    uint64_t sample_period;
-  } watchers[max_watchers];
-  int num_watchers;
-
-  struct UnwindState *us;
-  int64_t send_nanos; // Last time an export was sent
-} DDProfContext;
-
-// RE: kernel tracepoints
-// I don't think there's any commitment that these IDs are unchanging between
-// installations of the same kernel version, let alone between kernel releases.
-// You'll have to scrape them at runtime.  This is actually nice because access
-// to the sysfs endpoint precludes permissions, so you can emit a helpful error
-// if something goes wrong before instrumenting with perf To generate the hack:
-// for f in $(find /sys/kernel/tracing/events/block -name id); do echo $f; cat
-// $f; done
 // clang-format off
 PerfOption perfoptions[] = {
   // Hardware
-  {"CPU Cycles",      "hCPU",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              1e6, "cpu-cycle",      "cycles",       0},
-  {"Ref. CPU Cycles", "hREF",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES,          1e6, "ref-cycle",      "cycles",       0},
-  {"Instr. Count",    "hINSTR",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,            1e6, "cpu-instr",      "instructions", 0},
-  {"Cache Ref.",      "hCREF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES,        1e3, "cache-ref",      "events",       0},
-  {"Cache Miss",      "hCMISS",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES,            1e3, "cache-miss",     "events",       0},
-  {"Branche Instr.",  "hBRANCH", PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     1e3, "branch-instr",   "events",       0},
-  {"Branch Miss",     "hBMISS",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES,           1e3, "branch-miss",    "events",       0},
-  {"Bus Cycles",      "hBUS",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,              1e3, "bus-cycle",      "cycles",       0},
-  {"Bus Stalls(F)",   "hBSTF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1e3, "bus-stf",        "cycles",       0},
-  {"Bus Stalls(B)",   "hBSTB",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1e3, "bus-stb",        "cycles",       0},
-  {"CPU Time",        "sCPU",    PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,              1e6, "cpu-time",       "nanoseconds",  0},
-  {"Wall? Time",      "sWALL",   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,               1e6, "wall-time",      "nanoseconds",  0},
-  {"Ctext Switches",  "sCI",     PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES,        1,   "switches",       "events",       PE_KERNEL_INCLUDE},
-  {"Block-Insert",    "kBLKI",   PERF_TYPE_TRACEPOINT, 1133,                                1,   "block-insert",   "events",       PE_KERNEL_INCLUDE},
-  {"Block-Issue",     "kBLKS",   PERF_TYPE_TRACEPOINT, 1132,                                1,   "block-issue",    "events",       PE_KERNEL_INCLUDE},
-  {"Block-Complete",  "kBLKC",   PERF_TYPE_TRACEPOINT, 1134,                                1,   "block-complete", "events",       PE_KERNEL_INCLUDE},
+  {"CPU Cycles",      "hCPU",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              1e2, "cpu-cycle",      "cycles", .freq = true},
+  {"Ref. CPU Cycles", "hREF",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES,          1e3, "ref-cycle",      "cycles", .freq = true},
+  {"Instr. Count",    "hINSTR",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,            1e3, "cpu-instr",      "instructions", .freq = true},
+  {"Cache Ref.",      "hCREF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES,        1e3, "cache-ref",      "events"},
+  {"Cache Miss",      "hCMISS",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES,            1e3, "cache-miss",     "events"},
+  {"Branche Instr.",  "hBRANCH", PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     1e3, "branch-instr",   "events"},
+  {"Branch Miss",     "hBMISS",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES,           1e3, "branch-miss",    "events"},
+  {"Bus Cycles",      "hBUS",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,              1e3, "bus-cycle",      "cycles", .freq = true},
+  {"Bus Stalls(F)",   "hBSTF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1e3, "bus-stf",        "cycles", .freq = true},
+  {"Bus Stalls(B)",   "hBSTB",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1e3, "bus-stb",        "cycles", .freq = true},
+  {"CPU Time",        "sCPU",    PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,              1e2, "cpu-time",       "nanoseconds", .freq = true},
+  {"Wall? Time",      "sWALL",   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,               1e2, "wall-time",      "nanoseconds", .freq = true},
+  {"Ctext Switches",  "sCI",     PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES,        1,   "switches",       "events", .include_kernel = true},
+  {"Block-Insert",    "kBLKI",   PERF_TYPE_TRACEPOINT, 1133,                                1,   "block-insert",   "events", .include_kernel = true},
+  {"Block-Issue",     "kBLKS",   PERF_TYPE_TRACEPOINT, 1132,                                1,   "block-issue",    "events", .include_kernel = true},
+  {"Block-Complete",  "kBLKC",   PERF_TYPE_TRACEPOINT, 1134,                                1,   "block-complete", "events", .include_kernel = true},
+  {"Malloc",          "bMalloc", PERF_TYPE_BREAKPOINT, 0,                                   1,   "malloc",         "events", .bp_type = HW_BREAKPOINT_X},
 };
 // clang-format on
 
-int num_perfs = sizeof(perfoptions) / sizeof(*perfoptions);
-int num_cpu = 0;
+// This is pretty bad if we ever need two ddprof contexts!
+DDProfContext *ddprof_ctx_init() {
+  static DDProfContext ctx = {0};
+  static DDReq ddr = {0};
+  static UnwindState us = {0};
+  static DProf dp = {0};
 
-// clang-format off
-/*
-    This table is used for a variety of things, but primarily for dispatching
-    input in a consistent way across the application.  Values may come from one
-    of several places, with defaulting in the following order:
-      1. Commandline argument
-      2. Environment variable
-      3. Application default
+  ddr.user_agent = USERAGENT_DEFAULT;
+  ddr.language = LANGUAGE_DEFAULT;
+  ddr.family = FAMILY_DEFAULT;
+  ctx.ddr = &ddr;
+  ctx.dp = &dp;
+  ctx.us = &us;
+  return &ctx;
+}
 
-    And input may go to one of many places
-      1. Profiling parameters
-      2. User data annotations
-      3. Upload parameters
+void ddprof_ctx_free(DDProfContext *ctx) {
+  DDR_free(ctx->ddr);
+  pprof_Free(ctx->dp);
+  unwind_free(ctx->us);
+}
 
-  A - The enum for this value.  Also doubles as an environment variable whenever
-      appropriate
-  B - The field name.  It is the responsibility of other conumsers to combine
-      this value with context to use the right struct
-  C - Short option for input processing
-  D - Short option character
-  E - Long option
-  F - Destination struct (WOW, THIS IS HORRIBLE)
-  G - defaulting function (or NULL)
-  H - Fallback value, if any
-*/
-#define X_LOPT(a, b, c, d, e, f, g, h) {#b, e, 0, d},
-#define X_ENUM(a, b, c, d, e, f, g, h) a,
-#define X_OSTR(a, b, c, d, e, f, g, h) #c ":"
-#define X_DFLT(a, b, c, d, e, f, g, h) DFLT_EXP(#a, b, f, g, h);
-#define X_FREE(a, b, c, d, e, f, g, h) FREE_EXP(b, f);
-#define X_CASE(a, b, c, d, e, f, g, h) CASE_EXP(d, f, b)
-#define X_PRNT(a, b, c, d, e, f, g, h) if((f)->b) LG_NTC("  "#b ": %s", (f)->b);
+// Account globals
+unsigned long events_lost = 0;
+unsigned long samples_recv = 0;
+unsigned long ticks_unwind = 0;
 
-//  A                              B                C   D   E  F         G     H
-#define OPT_TABLE(XX)                                                                       \
-  XX(DD_API_KEY,                   apikey,          A, 'A', 1, ctx->ddr, NULL, "")          \
-  XX(DD_ENV,                       environment,     E, 'E', 1, ctx->ddr, NULL, "")          \
-  XX(DD_AGENT_HOST,                host,            H, 'H', 1, ctx->ddr, NULL, "localhost") \
-  XX(DD_SITE,                      site,            I, 'I', 1, ctx->ddr, NULL, "")          \
-  XX(DD_TRACE_AGENT_PORT,          port,            P, 'P', 1, ctx->ddr, NULL, "80")        \
-  XX(DD_SERVICE,                   service,         S, 'S', 1, ctx->ddr, NULL, "myservice") \
-  XX(DD_TAGS,                      tags,            T, 'T', 1, ctx,      NULL, "")          \
-  XX(DD_VERSION,                   serviceversion,  V, 'V', 1, ctx->ddr, NULL, "")          \
-  XX(DD_PROFILING_ENABLED,         enable,          d, 'd', 1, ctx,      NULL, "yes")       \
-  XX(DD_PROFILING_NATIVE_ENABLED,  native_enable,   n, 'n', 1, ctx,      NULL, "yes")       \
-  XX(DD_PROFILING_COUNTSAMPLES,    count_samples,   c, 'c', 1, ctx,      NULL, "yes")       \
-  XX(DD_PROFILING_UPLOAD_PERIOD,   upload_period,   u, 'u', 1, ctx,      NULL, "60")        \
-  XX(DD_PROFILE_NATIVEPROFILER,    profprofiler,    r, 'r', 0, ctx,      NULL, "")          \
-  XX(DD_PROFILING_,                prefix,          X, 'X', 1, ctx,      NULL, "")          \
-  XX(DD_PROFILING_NATIVEFAULTINFO, faultinfo,       s, 's', 1, ctx,      NULL, "yes")       \
-  XX(DD_PROFILING_NATIVEDUMPS,     coredumps,       m, 'm', 1, ctx,      NULL, "no")        \
-  XX(DD_PROFILING_NATIVENICE,      nice,            i, 'i', 1, ctx,      NULL, "")          \
-  XX(DD_PROFILING_NATIVEPRINTARGS, printargs,       a, 'a', 1, ctx,      NULL, "no")        \
-  XX(DD_PROFILING_NATIVESENDFINAL, sendfinal,       f, 'f', 1, ctx,      NULL, "")          \
-  XX(DD_PROFILING_NATIVELOGMODE,   logmode,         o, 'o', 1, ctx,      NULL, "stdout")    \
-  XX(DD_PROFILING_NATIVELOGLEVEL,  loglevel,        l, 'l', 1, ctx,      NULL, "warn")      \
-  XX(DD_PROFILING_NATIVETARGET,    pid,             p, 'p', 1, ctx,      NULL, "")          \
-  XX(DD_PROFILING_NATIVEGLOBAL,    global,          g, 'g', 1, ctx,      NULL, "")
-// clang-format on
+int fd_statsd = -1;
+void statsd_init() {
+  char *path_statsd = NULL;
+  if ((path_statsd = getenv("DD_DOGSTATSD_SOCKET")))
+    fd_statsd = statsd_open(path_statsd, strlen(path_statsd));
+}
 
-// TODO das210603 I don't think this needs to be inlined as a macro anymore
-#define DFLT_EXP(evar, key, targ, func, dfault)                                \
-  __extension__({                                                              \
-    char *_buf = NULL;                                                         \
-    if (!((targ)->key)) {                                                      \
-      if (evar && getenv(evar))                                                \
-        _buf = strdup(getenv(evar));                                           \
-      else if (*dfault)                                                        \
-        _buf = strdup(dfault);                                                 \
-      (targ)->key = _buf;                                                      \
-    }                                                                          \
-  })
+#define DDPN "datadog.profiler.native."
+void statsd_upload_globals(DDProfContext *ctx) {
+  static char key_rss[] = DDPN "rss";
+  static char key_user[] = DDPN "utime";
+  static char key_st_elements[] = DDPN "pprof.st_elements";
+  static char key_ticks_unwind[] = DDPN "unwind.ticks";
+  static char key_events_lost[] = DDPN "events.lost";
+  static char key_samples_recv[] = DDPN "samples.recv";
 
-#define CASE_EXP(casechar, targ, key)                                          \
-  case casechar:                                                               \
-    if ((targ)->key)                                                           \
-      free((void *)(targ)->key);                                               \
-    (targ)->key = strdup(optarg);                                              \
-    break;
+  // If there's nothing that can be done, then there's nothing to do.
+  if (-1 == fd_statsd)
+    return;
 
-// TODO das210603 I don't think this needs to be inlined as a macro anymore
-#define FREE_EXP(key, targ)                                                    \
-  __extension__({                                                              \
-    if ((targ)->key)                                                           \
-      free((void *)(targ)->key);                                               \
-    (targ)->key = NULL;                                                        \
-  })
+  // Upload ddprof's procfs values
+  static unsigned long last_utime = 0;
+  ProcStatus *procstat = proc_read();
+  if (procstat) {
+    statsd_send(fd_statsd, key_rss, &(long){1024 * procstat->rss}, STAT_GAUGE);
+    if (procstat->utime) {
+      long this_time = procstat->utime - last_utime;
+      statsd_send(fd_statsd, key_user, &(long){this_time}, STAT_GAUGE);
+      last_utime = procstat->utime;
+    }
+  }
 
-typedef enum DDKeys { OPT_TABLE(X_ENUM) DD_KLEN } DDKeys;
+  // Upload global gauges
+  uint64_t st_size = ctx->dp->string_table_size(ctx->dp->string_table_data);
+  statsd_send(fd_statsd, key_st_elements, &(long){st_size}, STAT_GAUGE);
+  statsd_send(fd_statsd, key_ticks_unwind, &(long){ticks_unwind}, STAT_GAUGE);
+  statsd_send(fd_statsd, key_events_lost, &(long){events_lost}, STAT_GAUGE);
+  statsd_send(fd_statsd, key_samples_recv, &(long){samples_recv}, STAT_GAUGE);
+}
 
-/******************************  Perf Callback  *******************************/
+void print_diagnostics() {
+  LG_NTC("[STATS] ticks_unwind: %lu", ticks_unwind);
+  LG_NTC("[STATS] events_lost: %lu", events_lost);
+  LG_NTC("[STATS] samples_recv: %lu", samples_recv);
+}
+
+// Internal functions
 static inline int64_t now_nanos() {
   static struct timeval tv = {0};
   gettimeofday(&tv, NULL);
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
 }
 
-void export(DDProfContext *pctx, int64_t now) {
-  DDReq *ddr = pctx->ddr;
-  DProf *dp = pctx->dp;
+/******************************  Perf Callback  *******************************/
+void export(DDProfContext *ctx, int64_t now) {
+  DDReq *ddr = ctx->ddr;
+  DProf *dp = ctx->dp;
+
+  // Before any state gets reset, export metrics to statsd
+  statsd_upload_globals(ctx);
+
+  // And emit diagnostic output (if it's enabled)
+  print_diagnostics();
 
   LG_NTC("Pushed samples to backend");
   int ret = 0;
@@ -225,65 +138,215 @@ void export(DDProfContext *pctx, int64_t now) {
     LG_ERR("Error finalizing export (%s)", DDR_code2str(ret));
   if ((ret = DDR_send(ddr)))
     LG_ERR("Error sending export (%s)", DDR_code2str(ret));
-  if ((ret = DDR_watch(ddr, -1))) {
+  if ((ret = DDR_watch(ddr, -1)))
     LG_ERR("Error(%d) watching (%s)", ddr->res.code, DDR_code2str(ret));
-  }
   DDR_clear(ddr);
-  pctx->send_nanos += pctx->params.upload_period * 1000000000;
+
+  // Update the time last sent
+  ctx->send_nanos += ctx->params.upload_period * 1000000000;
 
   // Prepare pprof for next window
   pprof_timeUpdate(dp);
+
+  // We're done exporting, so finish by clearing out any global gauges
+  ticks_unwind = 0;
+  events_lost = 0;
+  samples_recv = 0;
 }
 
 void ddprof_timeout(void *arg) {
-  DDProfContext *pctx = arg;
+  DDProfContext *ctx = arg;
   int64_t now = now_nanos();
 
-  if (now > pctx->send_nanos)
-    export(pctx, now);
+  if (now > ctx->send_nanos)
+    export(ctx, now);
+}
+
+typedef union flipper {
+  uint64_t full;
+  uint32_t half[2];
+} flipper;
+
+perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
+  static perf_event_sample sample = {0};
+  memset(&sample, 0, sizeof(sample));
+
+  uint64_t *buf = (uint64_t *)(hdr + 1);
+
+  if (PERF_SAMPLE_IDENTIFIER & DEFAULT_SAMPLE_TYPE) {
+    sample.sample_id = (uint64_t)*buf++;
+  }
+  if (PERF_SAMPLE_IP & DEFAULT_SAMPLE_TYPE) {
+    sample.ip = (uint64_t)*buf++;
+  }
+  if (PERF_SAMPLE_TID & DEFAULT_SAMPLE_TYPE) {
+    sample.pid = ((flipper *)buf)->half[0];
+    sample.tid = ((flipper *)buf)->half[1];
+    buf++;
+  }
+  if (PERF_SAMPLE_TIME & DEFAULT_SAMPLE_TYPE) {
+    sample.time = *(uint64_t *)buf++;
+  }
+  if (PERF_SAMPLE_ADDR & DEFAULT_SAMPLE_TYPE) {
+    sample.addr = *(uint64_t *)buf++;
+  }
+  if (PERF_SAMPLE_ID & DEFAULT_SAMPLE_TYPE) {
+    sample.id = *(uint64_t *)buf++;
+  }
+  if (PERF_SAMPLE_STREAM_ID & DEFAULT_SAMPLE_TYPE) {
+    sample.stream_id = *(uint64_t *)buf++;
+  }
+  if (PERF_SAMPLE_CPU & DEFAULT_SAMPLE_TYPE) {
+    sample.cpu = ((flipper *)buf)->half[0];
+    sample.res = ((flipper *)buf)->half[1];
+    buf++;
+  }
+  if (PERF_SAMPLE_PERIOD & DEFAULT_SAMPLE_TYPE) {
+    sample.period = *(uint64_t *)buf++;
+  }
+  if (PERF_SAMPLE_READ & DEFAULT_SAMPLE_TYPE) {
+    // sizeof(uint64_t) == sizeof(ptr)
+    sample.v = (struct read_format *)buf++;
+  }
+  if (PERF_SAMPLE_CALLCHAIN & DEFAULT_SAMPLE_TYPE) {
+    sample.nr = *(uint64_t *)buf++;
+    sample.ips = (uint64_t *)buf;
+    buf += sample.nr;
+  }
+  if (PERF_SAMPLE_RAW & DEFAULT_SAMPLE_TYPE) {}
+  if (PERF_SAMPLE_BRANCH_STACK & DEFAULT_SAMPLE_TYPE) {}
+  if (PERF_SAMPLE_REGS_USER & DEFAULT_SAMPLE_TYPE) {
+    sample.abi = *(uint64_t *)buf++;
+    sample.regs = (uint64_t *)buf;
+    buf += 3; // TODO make this more generic?
+  }
+  if (PERF_SAMPLE_STACK_USER & DEFAULT_SAMPLE_TYPE) {
+    sample.size_stack = *(uint64_t *)buf++;
+    if (sample.size_stack) {
+      sample.data_stack = (char *)buf;
+      buf = (void *)buf + sample.size_stack;
+    } else {
+      // Not sure
+    }
+  }
+  if (PERF_SAMPLE_WEIGHT & DEFAULT_SAMPLE_TYPE) {}
+  if (PERF_SAMPLE_DATA_SRC & DEFAULT_SAMPLE_TYPE) {}
+  if (PERF_SAMPLE_TRANSACTION & DEFAULT_SAMPLE_TYPE) {}
+  if (PERF_SAMPLE_REGS_INTR & DEFAULT_SAMPLE_TYPE) {}
+
+  return &sample;
+}
+
+void ddprof_pr_sample(DDProfContext *ctx, struct perf_event_header *hdr,
+                      int pos) {
+  // Before we do anything else, copy the perf_event_header into a sample
+  perf_event_sample *sample = hdr2samp(hdr);
+  static uint64_t id_locs[MAX_STACK] = {0};
+  struct UnwindState *us = ctx->us;
+  DProf *dp = ctx->dp;
+  ++samples_recv;
+  us->pid = sample->pid;
+  us->idx = 0; // Modified during unwinding; has stack depth
+  us->stack = NULL;
+  us->stack_sz = sample->size_stack;
+  us->stack = sample->data_stack;
+  memcpy(&us->regs[0], sample->regs, 3 * sizeof(uint64_t));
+  us->max_stack = MAX_STACK;
+  FunLoc_clear(us->locs);
+  unsigned long this_ticks_unwind = __rdtsc();
+  if (-1 == unwindstate__unwind(us)) {
+    Dso *dso = dso_find(us->pid, us->eip);
+    if (!dso) {
+      LG_WRN("Error getting map for [%d](0x%lx)", us->pid, us->eip);
+      analyze_unwinding_error(us->pid, us->eip);
+    } else {
+      LG_WRN("Error unwinding %s [%d](0x%lx)", dso_path(dso), us->pid, us->eip);
+    }
+    return;
+  }
+  ticks_unwind += __rdtsc() - this_ticks_unwind;
+  FunLoc *locs = us->locs;
+  for (uint64_t i = 0, j = 0; i < us->idx; i++) {
+    FunLoc L = locs[i];
+    uint64_t id_map, id_fun, id_loc;
+
+    // Using the sopath instead of srcpath in locAdd for the DD UI
+    id_map = pprof_mapAdd(dp, L.map_start, L.map_end, L.map_off, L.sopath, "");
+    id_fun = pprof_funAdd(dp, L.funname, L.funname, L.srcpath, 0);
+    id_loc = pprof_locAdd(dp, id_map, 0, (uint64_t[]){id_fun},
+                          (int64_t[]){L.line}, 1);
+    if (id_loc > 0)
+      id_locs[j++] = id_loc;
+  }
+  int64_t sample_val[max_watchers] = {0};
+  sample_val[pos] = sample->period;
+  pprof_sampleAdd(dp, sample_val, ctx->num_watchers, id_locs, us->idx);
+}
+
+void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int pos) {
+  (void)ctx;
+  if (!(map->header.misc & PERF_RECORD_MISC_MMAP_DATA)) {
+    LG_DBG("[PERF]<%d>(MAP)%d: %s (%lx/%lx/%lx)", pos, map->pid, map->filename,
+           map->addr, map->len, map->pgoff);
+    DsoIn in = *(DsoIn *)&map->addr;
+    in.filename = map->filename;
+    pid_add(map->pid, &in);
+  }
+}
+
+void ddprof_pr_lost(DDProfContext *ctx, perf_event_lost *lost, int pos) {
+  (void)ctx;
+  (void)pos;
+  events_lost += lost->lost;
+}
+
+void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm, int pos) {
+  (void)ctx;
+  if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC) {
+    LG_DBG("[PERF]<%d>(COMM)%d", pos, comm->pid);
+    pid_free(comm->pid);
+  }
+}
+
+void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int pos) {
+  (void)ctx;
+  LG_DBG("[PERF]<%d>(FORK)%d -> %d", pos, frk->ppid, frk->pid);
+  if (frk->ppid != frk->pid) {
+    pid_fork(frk->ppid, frk->pid);
+  } else {
+    pid_free(frk->pid);
+    pid_backpopulate(frk->pid);
+  }
+}
+
+void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int pos) {
+  (void)ctx;
+  LG_DBG("[PERF]<%d>(EXIT)%d", pos, ext->pid);
+  pid_free(ext->pid);
 }
 
 void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
-  static uint64_t id_locs[MAX_STACK] = {0};
-
-  DDProfContext *pctx = arg;
-  struct UnwindState *us = pctx->us;
-  DProf *dp = pctx->dp;
-  struct perf_event_sample *pes;
+  DDProfContext *ctx = arg;
 
   switch (hdr->type) {
   case PERF_RECORD_SAMPLE:
-    pes = (struct perf_event_sample *)hdr;
-    us->pid = pes->pid;
-    us->idx = 0; // Modified during unwinding; has stack depth
-    us->stack = pes->data;
-    us->stack_sz = pes->size; // TODO should be dyn_size, but it's corrupted?
-    memcpy(&us->regs[0], pes->regs,
-           3 * sizeof(uint64_t)); // TODO hardcoded reg count?
-    us->max_stack = MAX_STACK;
-    FunLoc_clear(us->locs);
-    if (-1 == unwindstate__unwind(us)) {
-      analyze_unwinding_error(us->pid, us->eip);
-    }
-    FunLoc *locs = us->locs;
-    for (uint64_t i = 0, j = 0; i < us->idx; i++) {
-      FunLoc L = locs[i];
-      uint64_t id_map, id_fun, id_loc;
-
-      // Using the sopath instead of srcpath in locAdd for the DD UI
-      id_map = pprof_mapAdd(dp, L.map_start, L.map_end, L.map_off, "", "");
-      // demangled and mangled function names should be dropped in here
-      id_fun = pprof_funAdd(dp, L.funname, L.funname, L.srcpath, 0);
-      id_loc = pprof_locAdd(dp, id_map, 0, (uint64_t[]){id_fun},
-                            (int64_t[]){L.line}, 1);
-      if (id_loc > 0)
-        id_locs[j++] = id_loc;
-    }
-    int64_t sample_val[max_watchers] = {0};
-    sample_val[pos] = pes->period;
-    pprof_sampleAdd(dp, sample_val, pctx->num_watchers, id_locs, us->idx);
+    ddprof_pr_sample(ctx, hdr, pos);
     break;
-
+  case PERF_RECORD_MMAP:
+    ddprof_pr_mmap(ctx, (perf_event_mmap *)hdr, pos);
+    break;
+  case PERF_RECORD_LOST:
+    ddprof_pr_lost(ctx, (perf_event_lost *)hdr, pos);
+    break;
+  case PERF_RECORD_COMM:
+    ddprof_pr_comm(ctx, (perf_event_comm *)hdr, pos);
+    break;
+  case PERF_RECORD_EXIT:
+    ddprof_pr_exit(ctx, (perf_event_exit *)hdr, pos);
+    break;
+  case PERF_RECORD_FORK:
+    ddprof_pr_fork(ctx, (perf_event_fork *)hdr, pos);
+    break;
   default:
     break;
   }
@@ -292,8 +355,9 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   // rate to the last time.
   int64_t now = now_nanos();
 
-  if (now > pctx->send_nanos)
-    export(pctx, now);
+  if (now > ctx->send_nanos) {
+    export(ctx, now);
+  }
 }
 
 /*********************************  Printers  *********************************/
@@ -410,8 +474,11 @@ MYNAME" can register to various system events in order to customize the\n"
   }
   printf("%s", help_opts_extra);
   printf("%s", help_events);
+
+  static int num_perfs = sizeof(perfoptions) / sizeof(*perfoptions);
   for (int i = 0; i < num_perfs; i++)
-    printf("%-10s - %-15s (%s, %s)\n", perfoptions[i].key, perfoptions[i].desc, perfoptions[i].label, perfoptions[i].unit);
+    printf("%-10s - %-15s (%s, %s)\n", perfoptions[i].key,
+           perfoptions[i].desc, perfoptions[i].label, perfoptions[i].unit);
 }
 // clang-format on
 
@@ -426,28 +493,20 @@ void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   if (sig == SIGSEGV)
     printf("[DDPROF] Fault address: %p\n", si->si_addr);
   backtrace_symbols_fd(buf, sz, STDERR_FILENO);
-  if (current_map) {
-    Map *map = current_map;
-    printf("[DDPROF] map is %s [%ld:%ld @ %ld]\n", map->path, map->start,
-           map->end, map->off);
-  }
   exit(-1);
 }
 
 /*************************  Instrumentation Helpers  **************************/
 // This is a quick-and-dirty implementation.  Ideally, we'll harmonize this
 // with the other functions.
-void instrument_pid(DDProfContext *ctx, pid_t pid) {
+void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   perfopen_attr perf_funs = {.msg_fun = ddprof_callback,
                              .timeout_fun = ddprof_timeout};
   struct PEvent pes[100] = {0};
   int k = 0;
   for (int i = 0; i < ctx->num_watchers && ctx->params.enable; i++) {
     for (int j = 0; j < num_cpu; j++) {
-      pes[k].fd =
-          perfopen(pid, ctx->watchers[i].opt->type,
-                   ctx->watchers[i].opt->config, ctx->watchers[i].sample_period,
-                   ctx->watchers[i].opt->mode | PE_NODISABLE, j);
+      pes[k].fd = perfopen(pid, &ctx->watchers[i], j, true);
       pes[k].pos = i;
       if (!(pes[k].region = perfown(pes[k].fd))) {
         close(pes[k].fd);
@@ -483,6 +542,7 @@ void instrument_pid(DDProfContext *ctx, pid_t pid) {
   ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
   unwind_init(ctx->us);
   elf_version(EV_CURRENT); // Initialize libelf
+  statsd_init();
 
   // Just before we enter the main loop, force the enablement of the perf
   // contexts
@@ -509,97 +569,43 @@ void instrument_pid(DDProfContext *ctx, pid_t pid) {
   }
 }
 
-/******************************  Entrypoint  **********************************/
-int main(int argc, char **argv) {
-  //---- Inititiate structs
-  int c = 0, oi = 0;
-  DDProfContext *ctx =
-      &(DDProfContext){.ddr = &(DDReq){.user_agent = "libddprof001",
-                                       .language = "native",
-                                       .family = "native"},
-                       .dp = &(DProf){0},
-                       .us = &(struct UnwindState){0}};
-  DDReq *ddr = ctx->ddr;
+/****************************  Argument Processor  ***************************/
+bool ddprof_ctx_watcher_process(DDProfContext *ctx, char *str) {
+  static int num_perfs = sizeof(perfoptions) / sizeof(*perfoptions);
+  size_t sz_str = strlen(str);
 
-  struct option lopts[] = {OPT_TABLE(X_LOPT){"event", 1, 0, 'e'},
-                           {"help", 0, 0, 'h'},
-                           {"version", 0, 0, 'v'}};
+  for (int i = 0; i < num_perfs; ++i) {
+    size_t sz_key = strlen(perfoptions[i].key);
+    if (!strncmp(perfoptions[i].key, str, sz_key)) {
+      ctx->watchers[ctx->num_watchers] = perfoptions[i];
 
-  //---- Populate default values
-  OPT_TABLE(X_DFLT);
-  bool default_watchers = true;
-  ctx->num_watchers = 1;
-  ctx->watchers[0].opt = &perfoptions[10];
-  ctx->watchers[0].sample_period = perfoptions[10].base_rate;
+      double sample_period = 0.0;
+      if (sz_str > sz_key && str[sz_str] == ',')
+        sample_period = strtod(&str[sz_key + 1], NULL);
+      if (sample_period > 0)
+        ctx->watchers[ctx->num_watchers].sample_period = sample_period;
 
-  //---- Process Options
-  if (argc <= 1) {
-    OPT_TABLE(X_FREE);
-    print_help();
-    return 0;
-  }
-  while (
-      -1 !=
-      (c = getopt_long(argc, argv, "+" OPT_TABLE(X_OSTR) "e:hv", lopts, &oi))) {
-    switch (c) {
-      OPT_TABLE(X_CASE)
-    case 'e':;
-      bool event_matched = false;
-      for (int i = 0; i < num_perfs; i++) {
-        size_t sz_opt = strlen(optarg);
-        size_t sz_key = strlen(perfoptions[i].key);
-        if (!strncmp(perfoptions[i].key, optarg, sz_key)) {
-
-          // If we got a match, then we need to use non-default accounting
-          if (default_watchers) {
-            default_watchers = false;
-            ctx->num_watchers = 0;
-          }
-
-          ctx->watchers[ctx->num_watchers].opt = &perfoptions[i];
-
-          double sample_period = 0;
-          if (sz_opt > sz_key && optarg[sz_opt] == ',')
-            sample_period = strtod(&optarg[sz_key + 1], NULL);
-          if (1 > sample_period)
-            sample_period = perfoptions[i].base_rate;
-          ctx->watchers[ctx->num_watchers].sample_period = sample_period;
-          ctx->num_watchers++;
-
-          // Early exit
-          event_matched = true;
-          break;
-        }
-      }
-      if (!event_matched) {
-        LG_WRN("Event %s did not match any events", optarg);
-      }
-      break;
-    case 'h':;
-      OPT_TABLE(X_FREE);
-      print_help();
-      return 0;
-    case 'v':;
-      OPT_TABLE(X_FREE);
-      print_version();
-      return 0;
-    default:;
-      OPT_TABLE(X_FREE);
-      LG_ERR("Invalid option %c", c);
-      return -1;
+      ++ctx->num_watchers;
+      return true;
     }
   }
 
-  /****************************************************************************\
-  |                            Process Arguments                               |
-  \****************************************************************************/
+  return false;
+}
+
+void ddprof_setctx(DDProfContext *ctx) {
+  // If events are set, install default watcher
+  if (!ctx->num_watchers) {
+    ctx->num_watchers = 1;
+    ctx->watchers[0] = perfoptions[10];
+  }
+
   // Set defaults
   ctx->params.enable = true;
   ctx->params.upload_period = 60.0;
 
   // Process enable.  Note that we want the effect to hit an inner profile.
-  // TODO das210603 do the semantics of this enablement match those used by
-  //                other profilers?
+  // TODO das210603 do the semantics of this match other profilers?
   ctx->params.enable = !arg_yesno(ctx->enable, 0); // default yes
   if (ctx->params.enable)
     setenv("DD_PROFILING_ENABLED", "true", true);
@@ -708,127 +714,10 @@ int main(int argc, char **argv) {
     // Show watchers
     LG_DBG("Instrumented with %d watchers:", ctx->num_watchers);
     for (int i = 0; i < ctx->num_watchers; i++) {
-      LG_DBG("  ID: %s, Pos: %d, Index: %d, Label: %s, Mode: %d",
-             ctx->watchers[i].opt->key, i, ctx->watchers[i].opt->config,
-             ctx->watchers[i].opt->label, ctx->watchers[i].opt->mode);
+      LG_DBG("  ID: %s, Pos: %d, Index: %lu, Label: %s, Mode: %d",
+             ctx->watchers[i].key, i, ctx->watchers[i].config,
+             ctx->watchers[i].label, ctx->watchers[i].mode);
       LG_DBG("Done printing parameters");
     }
   }
-
-  // Adjust input parameters for execvp() (we do this even if unnecessary)
-  argv += optind;
-  argc -= optind;
-
-  // Only throw an error if we needed the user to pass an arg
-  if (ctx->params.pid) {
-    if (ctx->params.pid == -1)
-      LG_NTC("Instrumenting whole system");
-    else
-      LG_NTC("Instrumenting PID %d", ctx->params.pid);
-  } else if (argc <= 0) {
-    OPT_TABLE(X_FREE);
-    LG_ERR("No target specified, exiting");
-    return -1;
-  }
-
-  /****************************************************************************\
-  |                             Run the Profiler                               |
-  \****************************************************************************/
-  // If the profiler was disabled, just skip ahead
-  if (!ctx->params.enable) {
-    LG_NTC("Profiling disabled");
-    goto EXECUTE;
-  }
-  // Initialize the request object
-  DDR_init(ddr);
-
-  // Initialize the pprof
-  char *pprof_labels[max_watchers];
-  char *pprof_units[max_watchers];
-  for (int i = 0; i < ctx->num_watchers; i++) {
-    pprof_labels[i] = ctx->watchers[i].opt->label;
-    pprof_units[i] = ctx->watchers[i].opt->unit;
-  }
-
-  if (!pprof_Init(ctx->dp, (const char **)pprof_labels,
-                  (const char **)pprof_units, ctx->num_watchers)) {
-    OPT_TABLE(X_FREE);
-    DDR_free(ddr);
-    LG_ERR("Failed to initialize profiling storage");
-    return -1;
-  }
-  pprof_timeUpdate(ctx->dp); // Set the time
-
-  // Get the number of CPUs
-  num_cpu = get_nprocs();
-
-  // If I'm not being called as a wrapper, don't act like a wrapper.
-  if (ctx->params.pid) {
-    instrument_pid(ctx, ctx->params.pid);
-    OPT_TABLE(X_FREE);
-    DDR_free(ddr);
-    unwind_free(ctx->us);
-    pprof_Free(ctx->dp);
-    return 0;
-  }
-
-  // Instrument the profiler
-  // 1.  fork()
-  // 2.  I am the original process.  Turn into target right away
-  // 3.  I am the child.  Fork again and die
-  // 4.  Instrument the original pid
-
-  pid_t pid_target = getpid();
-  pid_t child_pid = fork();
-  if (!child_pid) {
-    // 3.  I am the child
-    if (fork()) {
-      // Still have to cleanup, though...
-      OPT_TABLE(X_FREE);
-      DDR_free(ddr);
-      unwind_free(ctx->us);
-      pprof_Free(ctx->dp);
-      return 0;
-    }
-
-    // In the future, we can probably harmonize the various exit paths by using
-    // the same instrument_pid for global mode, targeted PID mode, and regular
-    // instrumentation.
-    instrument_pid(ctx, pid_target);
-
-    // We are only here if the profiler fails or exits
-    OPT_TABLE(X_FREE);
-    DDR_free(ddr);
-    unwind_free(ctx->us);
-    pprof_Free(ctx->dp);
-
-    LG_WRN("Profiling terminated");
-    return -1;
-  } else {
-    // 2.  I am the target process.  Wait for my immediate child to close
-    waitpid(child_pid, NULL, 0);
-  }
-
-EXECUTE:
-  if (-1 == execvp(*argv, argv)) {
-    switch (errno) {
-    case ENOENT:
-      LG_ERR("%s: file not found", argv[0]);
-      break;
-    case ENOEXEC:
-    case EACCES:
-      LG_ERR("%s: permission denied", argv[0]);
-      break;
-    default:
-      LG_WRN("%s: failed to execute (%s)", argv[0], strerror(errno));
-      break;
-    }
-  }
-
-  // These are cleaned by execvp(), but we remove them here since this is the
-  // error path and we don't want static analysis to report leaks.
-  OPT_TABLE(X_FREE);
-  DDR_free(ddr);
-  pprof_Free(ctx->dp);
-  return -1;
 }
