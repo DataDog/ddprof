@@ -68,7 +68,7 @@ build:ddprof_cmake:
     - .light-job-resource-allocation
   image: $BUILD_IMG_STICKY
   stage: build
-  tags: ["runner:docker", "size:large"]
+  tags: ["runner:k8s"]
   parallel:
     matrix:
       - BUILD_TYPE: ["Release", "Debug", "SanitizedDebug"]
@@ -98,13 +98,17 @@ test:ddprof_cmake:
     - .light-job-resource-allocation
   image: $TEST_IMG_STICKY
   stage: test
-  tags: ["runner:docker", "size:large"]
+  tags: ["runner:k8s"]
   parallel:
     matrix:
-      - BUILD_TYPE: ["Release"]
+      - BUILD_TYPE: ["Release", "SanitizedDebug"]
   script:
     - set -euxo pipefail
-    - ./tools/check_dependencies.sh deliverables/${BUILD_TYPE}/bin/ddprof test/data/expected_deps.txt
+    - source setup_env.sh
+    - echo "CHECK SETTING ON PERF EVENT PARANOID" && cat /proc/sys/kernel/perf_event_paranoid
+    - check_dependencies.sh deliverables/${BUILD_TYPE}/bin/ddprof test/data/expected_deps_${BUILD_TYPE}.txt
+    # Run toy project for 5 seconds
+    - run.sh -b ./deliverables/${BUILD_TYPE}/bin BadBoggleSolver_run 5
   dependencies:
     - build:ddprof_cmake
 
@@ -120,7 +124,7 @@ test:ddprof_cmake:
 build:ddprof:
   extends: .ddprof_job
   stage: build
-  tags: ["runner:docker", "size:large"]
+  tags: ["runner:k8s"]
   artifacts:
     paths:
       - $RELEASEBIN
@@ -148,7 +152,7 @@ deploy:ddprof:
   when: always
   image: $BUILD_IMG_STICKY
   stage: deploy
-  tags: ["runner:docker", "size:large"]
+  tags: ["runner:k8s"]
   script:
     - set -euo pipefail
     - if [ $CI_COMMIT_BRANCH = "main" ];then PROMOTE=MAJOR;fi
@@ -168,7 +172,7 @@ deploy:ddprof:
 build:collatz:
   extends: .collatz_job
   stage: build
-  tags: ["runner:docker", "size:large"]
+  tags: ["runner:k8s"]
   artifacts:
     paths:
       - $RELEASEBIN
@@ -189,7 +193,7 @@ deploy:collatz:
   extends: .collatz_job
   image: $BUILD_IMG_STICKY
   stage: deploy
-  tags: ["runner:docker", "size:large"]
+  tags: ["runner:k8s"]
   script:
     - set -euxo pipefail
     - if [ $CI_COMMIT_BRANCH = "main" ];then PROMOTE=MAJOR;fi
