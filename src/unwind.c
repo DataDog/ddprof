@@ -62,23 +62,73 @@ bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg) {
   return true;
 }
 
+Dwfl_Module *update_mod(Dwfl *dwfl, int pid, uint64_t pc) {
+  Dwfl_Module *mod;
+  if (!dwfl)
+    return NULL;
+
+  // Lookup DSO
+  Dso *dso = dso_find(pid, pc);
+  if (!dso) {
+    pid_backpopulate(pid); // Update and try again
+    if ((dso = dso_find(pid, pc))) {
+      LG_DBG("[UNWIND] Located DSO (%s)", dso_path(dso));
+    } else {
+      LG_DBG("[UNWIND] Did not locate DSO");
+      return NULL;
+    }
+  }
+
+  // Now that we've confirmed a separate lookup for the DSO based on procfs
+  // and/or perf_event_open() "extra" events, we do two things
+  // 1. Check that dwfl has a cache for this PID/pc combination
+  // 2. Check that the given cache is accurate to the DSO
+  mod = dwfl_addrmodule(dwfl, pc);
+  if (mod) {
+    Dwarf_Addr vm_addr;
+    dwfl_module_info(mod, 0, &vm_addr, 0, 0, 0, 0, 0);
+    if (vm_addr != dso->start - dso->pgoff)
+      mod = NULL;
+  }
+
+  // Try again if either of the criteria above were false
+  if (!mod) {
+    char *dso_filepath = dso_path(dso);
+    if (dso && '[' != *dso_filepath) {
+      char *dso_name = strrchr(dso_filepath, '/') + 1;
+      mod = dwfl_report_elf(dwfl, dso_name, dso_filepath, -1,
+                            dso->start - dso->pgoff, false);
+    }
+  }
+  if (!mod) {
+    LG_WRN(
+        "[UNWIND] couldn't addrmodule (%s)[0x%lx], but got DSO %s[0x%lx:0x%lx]",
+        dwfl_errmsg(-1), pc, dso_path(dso), dso->start, dso->end);
+    return NULL;
+  }
+
+  return mod;
+}
+
 int frame_cb(Dwfl_Frame *state, void *arg) {
   struct UnwindState *us = arg;
   Dwarf_Addr pc = 0;
   bool isactivation = false;
 
+  // Query the frame state to get the PC.  We skip the expensive check for
+  // activation frame because the underlying DSO (module) may not have been
+  // cached yet (but we need the PC to generate/check such a cache
+  if (!dwfl_frame_pc(state, &pc, NULL)) {
+    LG_WRN("[UNWIND] dwfl_frame_pc NULL (%s)", dwfl_errmsg(-1));
+    return DWARF_CB_ABORT;
+  }
+
+  Dwfl_Module *mod = update_mod(us->dwfl, us->pid, pc);
+
   if (!dwfl_frame_pc(state, &pc, &isactivation)) {
     LG_WRN("[UNWIND] %s", dwfl_errmsg(-1));
     return DWARF_CB_ABORT;
   }
-
-  // If this is not an activation frame, then it was a frame which was in an op
-  // like CALL.  The convention is to advance the stored IP past the CALL, so on
-  // return there is no ambiguity about the state of the IP.  That means, for
-  // the purpose of unwinding, the stated value of the IP is misleading and must
-  // be corrected.  Formally, I sense that this needs to be decremented back
-  // to the CALL, but I see a lot of code merely decrementing by one, so we
-  // follow that convention here.  DAS - TODO am I missing something?
   if (!isactivation)
     --pc;
 
@@ -90,12 +140,6 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
   Dwfl *dwfl = dwfl_thread_dwfl(thread);
   if (!dwfl) {
     LG_WRN("[UNWIND] dwfl_thread_dwfl was zero: (%s)", dwfl_errmsg(-1));
-    return DWARF_CB_ABORT;
-  }
-  Dwfl_Module *mod = dwfl_addrmodule(dwfl, pc);
-  if (!mod) {
-    LG_WRN("[UNWIND] dwfl_addrmodule for 0x:%lx was zero: (%s)", pc,
-           dwfl_errmsg(-1));
     return DWARF_CB_ABORT;
   }
 
@@ -122,34 +166,12 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
     us->locs[us->idx].line = lineno;
   }
 
-  // Figure out mapping
-  Dso *dso = dso_find(us->pid, pc);
-
-  // If we failed, then try backpopulating and do it again
-  if (!dso) {
-    LG_WRN("[UNWIND] Failed to locate DSO for [%d] 0x%lx, get", us->pid, pc);
-    pid_backpopulate(us->pid);
-    if ((dso = dso_find(us->pid, pc)))
-      LG_DBG("[UNWIND] Located DSO (%s)", dso_path(dso));
-    else
-      pid_find_ip(us->pid, pc);
-  }
-  if (dso) {
-    us->locs[us->idx].map_start = dso->start;
-    us->locs[us->idx].map_end = dso->end;
-    us->locs[us->idx].map_off = dso->pgoff;
-    us->locs[us->idx].sopath = strdup(dso_path(dso));
-  } else {
-    // Try to rely on the data we have at hand, but it's certainly wrong
-    LG_WRN("[UNWIND] Failed to locate DSO for [%d] 0x%lx again", us->pid, pc);
-    pid_find_ip(us->pid, pc);
-    us->locs[us->idx].map_start = mod->low_addr;
-    us->locs[us->idx].map_end = mod->high_addr;
-    us->locs[us->idx].map_off = offset;
-    char *sname = strrchr(mod->name, '/');
-    us->locs[us->idx].sopath = strdup(sname ? sname + 1 : mod->name);
-    LG_DBG("[UNWIND] Located DSO at path %s", us->locs[us->idx].sopath);
-  }
+  char *mod_name = strrchr(mod->name, '/');
+  mod_name = mod_name ? mod_name + 1 : mod->name;
+  us->locs[us->idx].map_start = mod->low_addr;
+  us->locs[us->idx].map_end = mod->high_addr;
+  us->locs[us->idx].map_off = offset;
+  us->locs[us->idx].sopath = strdup(mod_name);
 
   char tmpname[1024];
   if (symname) {
@@ -160,8 +182,6 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
     us->locs[us->idx].funname = strdup(tmpname);
   }
 
-  LG_DBG("[UNWIND] (%s):(%d)", us->locs[us->idx].funname,
-         us->locs[us->idx].line);
   us->idx++;
   return DWARF_CB_OK;
 }
@@ -181,57 +201,105 @@ void FunLoc_clear(FunLoc *locs) {
 }
 
 bool unwind_init(struct UnwindState *us) {
+  (void)us;
+  elf_version(EV_CURRENT);
+  //  if (!us->dwfl && !(us->dwfl = dwfl_begin(&proc_callbacks))) {
+  //    LG_WRN("[UNWIND] There was a problem getting the Dwfl");
+  //    return false;
+  //  }
+
+  libdso_init();
+  return true;
+}
+
+void unwind_free(struct UnwindState *us) { FunLoc_clear(us->locs); }
+
+int unwindstate__unwind(struct UnwindState *us) {
   static char *debuginfo_path;
   static const Dwfl_Callbacks proc_callbacks = {
       .find_debuginfo = dwfl_standard_find_debuginfo,
       .debuginfo_path = &debuginfo_path,
       .find_elf = dwfl_linux_proc_find_elf,
   };
-
-  elf_version(EV_CURRENT);
-  if (!us->dwfl && !(us->dwfl = dwfl_begin(&proc_callbacks))) {
-    LG_WRN("[UNWIND] There was a problem getting the Dwfl");
-    return false;
-  }
-
-  libdso_init();
-  return true;
-}
-
-void unwind_free(struct UnwindState *us) {
-  FunLoc_clear(us->locs);
-  dwfl_end(us->dwfl);
-}
-
-int unwindstate__unwind(struct UnwindState *us) {
   static const Dwfl_Thread_Callbacks dwfl_callbacks = {
       .next_thread = next_thread,
       .memory_read = memory_read,
       .set_initial_registers = set_initial_registers,
   };
 
-  LG_DBG("Beginning unwinding for %d:0x%lx-------------------------", us->pid,
-         us->eip);
-  if (dwfl_linux_proc_report(us->dwfl, us->pid)) {
-    LG_WRN("[UNWIND] Could not report module for 0x%lx", us->eip);
+  us->dwfl = dwfl_begin(&proc_callbacks);
+  if (!us->dwfl) {
+    LG_WRN("[UNWIND] dwfl_begin was zero (%s)", dwfl_errmsg(-1));
     return -1;
   }
 
-  if (dwfl_report_end(us->dwfl, NULL, NULL)) {
-    // Not an error, since it means the report context has nothing left to do
-    LG_WRN("[UNWIND] dwfl_end was nonzero (%s)", dwfl_errmsg(-1));
-    return 0;
+  Dwfl_Module *mod = dwfl_addrmodule(us->dwfl, us->eip);
+  Dso *dso = dso_find(us->pid, us->eip);
+  if (!dso) {
+    pid_backpopulate(us->pid);
+    dso = dso_find(us->pid, us->eip);
+    if (!dso) {
+      LG_WRN("[UNWIND] Could not get DSO for %d at 0x%lx", us->pid, us->eip);
+      dwfl_end(us->dwfl);
+      return -1;
+    }
   }
-
-  if (!dwfl_attach_state(us->dwfl, NULL, us->pid, &dwfl_callbacks, us)) {
-    //    LG_WRN("[UNWIND] dwfl_attach_state was nonzero (%s)",
-    //    dwfl_errmsg(-1));
+  if (mod) {
+    Dwarf_Addr s;
+    dwfl_module_info(mod, 0, &s, 0, 0, 0, 0, 0);
+    if (s != dso->start - dso->pgoff)
+      mod = NULL;
   }
-
-  if (dwfl_getthreads(us->dwfl, tid_cb, us)) {
-    LG_WRN("[UNWIND] Could not get thread frames for 0x%lx", us->eip);
+  if (!mod) {
+    char *dso_filepath = dso_path(dso);
+    if (dso && '[' != *dso_filepath) {
+      char *dso_name = strrchr(dso_filepath, '/') + 1;
+      mod = dwfl_report_elf(us->dwfl, dso_name, dso_filepath, -1,
+                            dso->start - dso->pgoff, false);
+    }
+  }
+  if (!mod) {
+    LG_WRN("[UNWIND] couldn't initialize unwinding %d at 0x%lx", us->pid,
+           us->eip);
+    dwfl_end(us->dwfl);
     return -1;
   }
+
+  if (!dwfl_attach_state(us->dwfl, EM_NONE, us->pid, &dwfl_callbacks, us)) {
+    LG_WRN("[UNWIND] dwfl_attach_state was nonzero (%s)", dwfl_errmsg(-1));
+    dwfl_end(us->dwfl);
+    return -1;
+  }
+
+  if (!dwfl_getthread_frames(us->dwfl, us->pid, frame_cb, us)) {
+    LG_DBG("[UNWIND] dwfl_getthread_frames was nonzero (%s)", dwfl_errmsg(-1));
+    dwfl_end(us->dwfl);
+    return us->idx > 0 ? 0 : -1;
+  }
+
+  dwfl_end(us->dwfl);
+
+  //
+  //  if (dwfl_linux_proc_report(us->dwfl, us->pid)) {
+  //    LG_WRN("[UNWIND] Could not report module for 0x%lx", us->eip);
+  //    return -1;
+  //  }
+  //
+  //  if (dwfl_report_end(us->dwfl, NULL, NULL)) {
+  //    // Not an error, since it means the report context has nothing left to
+  //    do LG_WRN("[UNWIND] dwfl_end was nonzero (%s)", dwfl_errmsg(-1)); return
+  //    0;
+  //  }
+  //
+  //  if (!dwfl_attach_state(us->dwfl, NULL, us->pid, &dwfl_callbacks, us)) {
+  //    //    LG_WRN("[UNWIND] dwfl_attach_state was nonzero (%s)",
+  //    //    dwfl_errmsg(-1));
+  //  }
+  //
+  //  if (dwfl_getthreads(us->dwfl, tid_cb, us)) {
+  //    LG_WRN("[UNWIND] Could not get thread frames for 0x%lx", us->eip);
+  //    return -1;
+  //  }
 
   return 0;
 }

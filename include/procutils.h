@@ -100,7 +100,6 @@ typedef struct ProcStatus {
   int exit_code;
 } ProcStatus;
 
-
 #define PM_MAX 512
 typedef struct PidMap {
   pid_t pid;

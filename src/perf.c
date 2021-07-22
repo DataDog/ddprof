@@ -21,9 +21,7 @@
 
 struct perf_event_attr g_dd_native_attr = {
     .size = sizeof(struct perf_event_attr),
-    .sample_type = PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER |
-        PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME |
-        PERF_SAMPLE_PERIOD,
+    .sample_type = DEFAULT_SAMPLE_TYPE,
     .precise_ip = 2,
     .disabled = 1,
     .inherit = 1,
@@ -149,7 +147,12 @@ void main_loop(PEvent *pes, int pe_len, perfopen_attr *attr, void *arg) {
 
       while (head > tail) {
         struct perf_event_header *hdr = rb_seek(rb, tail);
-        attr->msg_fun(hdr, pes[i].pos, arg);
+        if ((void *)pes[i].region + PAGE_SIZE + PSAMPLE_SIZE <
+            (void *)hdr + hdr->size) {
+          // LG_WRN("[UNWIND] OUT OF BOUNDS");
+        } else {
+          attr->msg_fun(hdr, pes[i].pos, arg);
+        }
         tail += hdr->size;
       }
 

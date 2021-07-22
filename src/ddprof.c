@@ -162,15 +162,94 @@ void ddprof_timeout(void *arg) {
     export(ctx, now);
 }
 
-void ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
+typedef union flipper {
+  uint64_t full;
+  uint32_t half[2];
+} flipper;
+
+perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
+  static perf_event_sample sample = {0};
+  memset(&sample, 0, sizeof(sample));
+
+  uint64_t *buf = (uint64_t *)(hdr + 1);
+
+  if (PERF_SAMPLE_IDENTIFIER & DEFAULT_SAMPLE_TYPE) {
+    sample.sample_id = (uint64_t)*buf++;
+  }
+  if (PERF_SAMPLE_IP & DEFAULT_SAMPLE_TYPE) {
+    sample.ip = (uint64_t)*buf++;
+  }
+  if (PERF_SAMPLE_TID & DEFAULT_SAMPLE_TYPE) {
+    sample.pid = ((flipper *)buf)->half[0];
+    sample.tid = ((flipper *)buf)->half[1];
+    buf++;
+  }
+  if (PERF_SAMPLE_TIME & DEFAULT_SAMPLE_TYPE) {
+    sample.time = *(uint64_t *)buf++;
+  }
+  if (PERF_SAMPLE_ADDR & DEFAULT_SAMPLE_TYPE) {
+    sample.addr = *(uint64_t *)buf++;
+  }
+  if (PERF_SAMPLE_ID & DEFAULT_SAMPLE_TYPE) {
+    sample.id = *(uint64_t *)buf++;
+  }
+  if (PERF_SAMPLE_STREAM_ID & DEFAULT_SAMPLE_TYPE) {
+    sample.stream_id = *(uint64_t *)buf++;
+  }
+  if (PERF_SAMPLE_CPU & DEFAULT_SAMPLE_TYPE) {
+    sample.cpu = ((flipper *)buf)->half[0];
+    sample.res = ((flipper *)buf)->half[1];
+    buf++;
+  }
+  if (PERF_SAMPLE_PERIOD & DEFAULT_SAMPLE_TYPE) {
+    sample.period = *(uint64_t *)buf++;
+  }
+  if (PERF_SAMPLE_READ & DEFAULT_SAMPLE_TYPE) {
+    // sizeof(uint64_t) == sizeof(ptr)
+    sample.v = (struct read_format *)buf++;
+  }
+  if (PERF_SAMPLE_CALLCHAIN & DEFAULT_SAMPLE_TYPE) {
+    sample.nr = *(uint64_t *)buf++;
+    sample.ips = (uint64_t *)buf;
+    buf += sample.nr;
+  }
+  if (PERF_SAMPLE_RAW & DEFAULT_SAMPLE_TYPE) {}
+  if (PERF_SAMPLE_BRANCH_STACK & DEFAULT_SAMPLE_TYPE) {}
+  if (PERF_SAMPLE_REGS_USER & DEFAULT_SAMPLE_TYPE) {
+    sample.abi = *(uint64_t *)buf++;
+    sample.regs = (uint64_t *)buf;
+    buf += 3; // TODO make this more generic?
+  }
+  if (PERF_SAMPLE_STACK_USER & DEFAULT_SAMPLE_TYPE) {
+    sample.size_stack = *(uint64_t *)buf++;
+    if (sample.size_stack) {
+      sample.data_stack = (char *)buf;
+      buf = (void *)buf + sample.size_stack;
+    } else {
+      // Not sure
+    }
+  }
+  if (PERF_SAMPLE_WEIGHT & DEFAULT_SAMPLE_TYPE) {}
+  if (PERF_SAMPLE_DATA_SRC & DEFAULT_SAMPLE_TYPE) {}
+  if (PERF_SAMPLE_TRANSACTION & DEFAULT_SAMPLE_TYPE) {}
+  if (PERF_SAMPLE_REGS_INTR & DEFAULT_SAMPLE_TYPE) {}
+
+  return &sample;
+}
+
+void ddprof_pr_sample(DDProfContext *ctx, struct perf_event_header *hdr,
+                      int pos) {
+  // Before we do anything else, copy the perf_event_header into a sample
+  perf_event_sample *sample = hdr2samp(hdr);
   static uint64_t id_locs[MAX_STACK] = {0};
   struct UnwindState *us = ctx->us;
   DProf *dp = ctx->dp;
   ++samples_recv;
   us->pid = sample->pid;
   us->idx = 0; // Modified during unwinding; has stack depth
-  us->stack = sample->data;
-  us->stack_sz = sample->size; // TODO should be dyn_size, but it's corrupted?
+  us->stack = NULL;
+  us->stack_sz = sample->size_stack;
+  us->stack = sample->data_stack;
   memcpy(&us->regs[0], sample->regs, 3 * sizeof(uint64_t));
   us->max_stack = MAX_STACK;
   FunLoc_clear(us->locs);
@@ -232,7 +311,12 @@ void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm, int pos) {
 void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int pos) {
   (void)ctx;
   LG_DBG("[PERF]<%d>(FORK)%d -> %d", pos, frk->ppid, frk->pid);
-  pid_fork(frk->ppid, frk->pid);
+  if (frk->ppid != frk->pid) {
+    pid_fork(frk->ppid, frk->pid);
+  } else {
+    pid_free(frk->pid);
+    pid_backpopulate(frk->pid);
+  }
 }
 
 void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int pos) {
@@ -246,7 +330,7 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
 
   switch (hdr->type) {
   case PERF_RECORD_SAMPLE:
-    ddprof_pr_sample(ctx, (perf_event_sample *)hdr, pos);
+    ddprof_pr_sample(ctx, hdr, pos);
     break;
   case PERF_RECORD_MMAP:
     ddprof_pr_mmap(ctx, (perf_event_mmap *)hdr, pos);

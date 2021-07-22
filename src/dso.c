@@ -220,7 +220,7 @@ bool pid_fork(int ppid, int pid) {
   if (!pids.dsos[ppid]) {
     LG_WRN("[DSO](FORK) No PPID found");
     if (!pid_backpopulate(ppid)) {
-      LG_WRN("[DSO](FORK) No PID found either");
+      LG_WRN("[DSO](FORK) No PID found");
       return pid_backpopulate(pid);
     }
   }
@@ -414,6 +414,7 @@ bool pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
 
     // If we didn't find it, then try full population
     LG_WRN("[DSO] Couldn't find DSO for [%d](0x%lx)", pid, addr);
+    pid_backpopulate(pid);
     if (!(dso = dso_find(pid, addr))) {
       pid_find_ip(pid, addr);
       return false;

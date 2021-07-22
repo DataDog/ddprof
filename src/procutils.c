@@ -297,7 +297,7 @@ ProcStatus *proc_read() {
                  &procstat.cguest_time, &procstat.start_data,
                  &procstat.end_data, &procstat.start_brk, &procstat.arg_start,
                  &procstat.arg_end, &procstat.env_start, &procstat.env_end))
-      ret = NULL;
+    ret = NULL;
 
   fclose(ststream);
   return ret;
