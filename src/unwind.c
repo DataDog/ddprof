@@ -278,29 +278,6 @@ int unwindstate__unwind(struct UnwindState *us) {
   }
 
   dwfl_end(us->dwfl);
-
-  //
-  //  if (dwfl_linux_proc_report(us->dwfl, us->pid)) {
-  //    LG_WRN("[UNWIND] Could not report module for 0x%lx", us->eip);
-  //    return -1;
-  //  }
-  //
-  //  if (dwfl_report_end(us->dwfl, NULL, NULL)) {
-  //    // Not an error, since it means the report context has nothing left to
-  //    do LG_WRN("[UNWIND] dwfl_end was nonzero (%s)", dwfl_errmsg(-1)); return
-  //    0;
-  //  }
-  //
-  //  if (!dwfl_attach_state(us->dwfl, NULL, us->pid, &dwfl_callbacks, us)) {
-  //    //    LG_WRN("[UNWIND] dwfl_attach_state was nonzero (%s)",
-  //    //    dwfl_errmsg(-1));
-  //  }
-  //
-  //  if (dwfl_getthreads(us->dwfl, tid_cb, us)) {
-  //    LG_WRN("[UNWIND] Could not get thread frames for 0x%lx", us->eip);
-  //    return -1;
-  //  }
-
   return 0;
 }
 
