@@ -54,7 +54,7 @@ bool memory_read(Dwfl *, Dwarf_Addr, Dwarf_Word *, void *);
 int frame_cb(Dwfl_Frame *, void *);
 int tid_cb(Dwfl_Thread *, void *);
 void FunLoc_clear(FunLoc *);
-bool dwfl_refresh(struct UnwindState *);
+bool dwfl_caches_clear(struct UnwindState *);
 bool unwind_init(struct UnwindState *);
 void unwind_free(struct UnwindState *);
 int unwindstate__unwind(struct UnwindState *);

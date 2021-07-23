@@ -578,7 +578,7 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   if (now > ctx->send_nanos || ctx->sendfinal) {
     LG_WRN("Sending final export");
     export(ctx, now);
-    dwfl_refresh(ctx->us);
+    dwfl_caches_clear(ctx->us);
   }
   unwind_free(ctx->us);
 }
