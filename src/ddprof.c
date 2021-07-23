@@ -28,7 +28,7 @@ PerfOption perfoptions[] = {
   {"Bus Cycles",      "hBUS",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,              1e3, "bus-cycle",      "cycles", .freq = true},
   {"Bus Stalls(F)",   "hBSTF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1e3, "bus-stf",        "cycles", .freq = true},
   {"Bus Stalls(B)",   "hBSTB",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1e3, "bus-stb",        "cycles", .freq = true},
-  {"CPU Time",        "sCPU",    PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,              1e2, "cpu-time",       "nanoseconds", .freq = true},
+  {"CPU Time",        "sCPU",    PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,              1e3, "cpu-time",       "nanoseconds", .freq = true},
   {"Wall? Time",      "sWALL",   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,               1e2, "wall-time",      "nanoseconds", .freq = true},
   {"Ctext Switches",  "sCI",     PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES,        1,   "switches",       "events", .include_kernel = true},
   {"Block-Insert",    "kBLKI",   PERF_TYPE_TRACEPOINT, 1133,                                1,   "block-insert",   "events", .include_kernel = true},
@@ -57,7 +57,6 @@ DDProfContext *ddprof_ctx_init() {
 void ddprof_ctx_free(DDProfContext *ctx) {
   DDR_free(ctx->ddr);
   pprof_Free(ctx->dp);
-  unwind_free(ctx->us);
 }
 
 // Account globals
@@ -65,11 +64,17 @@ unsigned long events_lost = 0;
 unsigned long samples_recv = 0;
 unsigned long ticks_unwind = 0;
 
-int fd_statsd = -1;
-void statsd_init() {
+static int fd_statsd = -1;
+
+int statsd_init() {
   char *path_statsd = NULL;
-  if ((path_statsd = getenv("DD_DOGSTATSD_SOCKET")))
+  if ((path_statsd = getenv("DD_DOGSTATSD_SOCKET"))) {
     fd_statsd = statsd_open(path_statsd, strlen(path_statsd));
+    if (-1 == fd_statsd) {
+      return fd_statsd;
+    }
+  }
+  return 0;
 }
 
 #define DDPN "datadog.profiler.native."
@@ -540,9 +545,16 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
 
   // Perform initialization operations
   ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
-  unwind_init(ctx->us);
-  elf_version(EV_CURRENT); // Initialize libelf
-  statsd_init();
+
+  bool statusOK = unwind_init(ctx->us);
+  if (!statusOK) {
+    LG_ERR("Error when initializing unwinding");
+    return;
+  }
+
+  if (statsd_init() == -1) {
+    LG_WRN("Error from statsd_init");
+  }
 
   // Just before we enter the main loop, force the enablement of the perf
   // contexts
@@ -568,6 +580,7 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
     export(ctx, now);
     dwfl_refresh(ctx->us);
   }
+  unwind_free(ctx->us);
 }
 
 /****************************  Argument Processor  ***************************/
