@@ -200,32 +200,47 @@ void FunLoc_clear(FunLoc *locs) {
   memset(locs, 0, sizeof(*locs) * MAX_STACK);
 }
 
-bool unwind_init(struct UnwindState *us) {
-  (void)us;
-  elf_version(EV_CURRENT);
-
-  libdso_init();
-  return true;
-}
-
-void unwind_free(struct UnwindState *us) { FunLoc_clear(us->locs); }
-
-int unwindstate__unwind(struct UnwindState *us) {
+bool dwfl_refresh(struct UnwindState *us) {
   static char *debuginfo_path;
   static const Dwfl_Callbacks proc_callbacks = {
       .find_debuginfo = dwfl_standard_find_debuginfo,
       .debuginfo_path = &debuginfo_path,
       .find_elf = dwfl_linux_proc_find_elf,
   };
+  if (us->dwfl)
+    dwfl_end(us->dwfl);
+  us->dwfl = NULL;
+  us->dwfl = dwfl_begin(&proc_callbacks);
+
+  return NULL != us->dwfl;
+}
+
+bool unwind_init(struct UnwindState *us) {
+  elf_version(EV_CURRENT);
+  libdso_init();
+  if (!dwfl_refresh(us))
+    return false;
+  return true;
+}
+
+void unwind_free(struct UnwindState *us) {
+  FunLoc_clear(us->locs);
+  if (us->dwfl)
+    dwfl_end(us->dwfl);
+}
+
+int unwindstate__unwind(struct UnwindState *us) {
   static const Dwfl_Thread_Callbacks dwfl_callbacks = {
       .next_thread = next_thread,
       .memory_read = memory_read,
       .set_initial_registers = set_initial_registers,
   };
 
-  us->dwfl = dwfl_begin(&proc_callbacks);
   if (!us->dwfl) {
-    LG_WRN("[UNWIND] dwfl_begin was zero (%s)", dwfl_errmsg(-1));
+    // DAS - it's easy to refresh dwfl here, but I think it's more important to
+    //       ensure all code paths manage dwfl lifetime correctly rather than
+    //       adding too many last-second failovers
+    LG_WRN("dwfl uninitialized");
     return -1;
   }
 
@@ -244,7 +259,6 @@ int unwindstate__unwind(struct UnwindState *us) {
     return us->idx > 0 ? 0 : -1;
   }
 
-  dwfl_end(us->dwfl);
   return 0;
 }
 
