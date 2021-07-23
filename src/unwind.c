@@ -208,7 +208,8 @@ static void unwind_dwfl_end(struct UnwindState *us) {
 }
 
 bool dwfl_caches_clear(struct UnwindState *us) {
-  dwflmod_cache_hdr_clear(us->cache_hdr);
+  if (!dwflmod_cache_hdr_clear(us->cache_hdr))
+    return false;
   unwind_dwfl_end(us);
   return unwind_dwfl_begin(us);
 }
