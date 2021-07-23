@@ -29,3 +29,26 @@ bool arg_yesno(const char *str, int mode) {
   }
   return false;
 }
+
+bool process_event(const char *str, char **lookup, size_t sz_lookup,
+                   size_t *idx, int *value) {
+  size_t sz_str = strlen(str);
+
+  for (int i = 0; i < sz_lookup; ++i) {
+    size_t sz_key = strlen(perfoptions[i].key);
+    if (!strncmp(perfoptions[i].key, str, sz_key)) {
+      ctx->watchers[ctx->num_watchers] = perfoptions[i];
+
+      double sample_period = 0.0;
+      if (sz_str > sz_key && str[sz_str] == ',')
+        sample_period = strtod(&str[sz_key + 1], NULL);
+      if (sample_period > 0)
+        ctx->watchers[ctx->num_watchers].sample_period = sample_period;
+
+      ++ctx->num_watchers;
+      return true;
+    }
+  }
+
+  return false;
+}
