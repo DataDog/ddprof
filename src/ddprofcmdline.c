@@ -1,7 +1,11 @@
 #include "ddprofcmdline.h"
 
 #include <assert.h>
-#include <strings.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define ABS(x) (x < 0 ? -x : x)
 
 int arg_which(const char *str, char const *const *set, int sz_set) {
   if (!str || !set)
@@ -30,22 +34,25 @@ bool arg_yesno(const char *str, int mode) {
   return false;
 }
 
-bool process_event(const char *str, char **lookup, size_t sz_lookup,
-                   size_t *idx, int *value) {
+#include <stdio.h>
+bool process_event(const char *str, const char **lookup, size_t sz_lookup,
+                   size_t *idx, uint64_t *value) {
   size_t sz_str = strlen(str);
 
-  for (int i = 0; i < sz_lookup; ++i) {
-    size_t sz_key = strlen(perfoptions[i].key);
-    if (!strncmp(perfoptions[i].key, str, sz_key)) {
-      ctx->watchers[ctx->num_watchers] = perfoptions[i];
+  for (size_t i = 0; i < sz_lookup; ++i) {
+    size_t sz_key = strlen(lookup[i]);
+    if (!strncmp(lookup[i], str, sz_key)) {
+      *idx = i;
 
-      double sample_period = 0.0;
-      if (sz_str > sz_key && str[sz_str] == ',')
-        sample_period = strtod(&str[sz_key + 1], NULL);
-      if (sample_period > 0)
-        ctx->watchers[ctx->num_watchers].sample_period = sample_period;
+      // perf_event_open() expects unsigned 64-bit integers, but it's somewhat
+      // annoying to process unsigned ints using the standard interface.  We
+      // take what we can get and convert to unsigned via absolute value.
+      uint64_t value_tmp = 0;
+      if (sz_str > sz_key && str[sz_key] == ',')
+        value_tmp = strtoll(&str[sz_key + 1], NULL, 10);
+      if (value_tmp != 0)
+        *value = ABS(value_tmp);
 
-      ++ctx->num_watchers;
       return true;
     }
   }

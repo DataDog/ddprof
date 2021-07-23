@@ -1,4 +1,5 @@
 #include "ddprof.h"
+#include "ddprofcmdline.h"
 
 #include <errno.h>
 #include <getopt.h>
@@ -36,9 +37,19 @@ int main(int argc, char **argv) {
   while (-1 != (c = getopt_long(argc, argv, opt_short, lopts, &oi))) {
     switch (c) {
       OPT_TABLE(X_CASE)
-    case 'e':
-      if (!ddprof_ctx_watcher_process(ctx, optarg))
+    case 'e':;
+      size_t idx;
+      uint64_t sampling_value = 0;
+      if (process_event(optarg, perfoptions_lookup, perfoptions_sz, &idx,
+                        &sampling_value)) {
+        ctx->watchers[ctx->num_watchers] = perfoptions[idx];
+        if (sampling_value)
+          ctx->watchers[ctx->num_watchers].sample_period = sampling_value;
+
+        ++ctx->num_watchers;
+      } else {
         LG_WRN("Ignoring invalid event (%s)", optarg);
+      }
       break;
     case 'h':;
       OPT_TABLE(X_FREE);
@@ -84,8 +95,8 @@ int main(int argc, char **argv) {
     DDR_init(ctx->ddr);
 
     // Initialize the pprof
-    char *pprof_labels[max_watchers];
-    char *pprof_units[max_watchers];
+    const char *pprof_labels[max_watchers];
+    const char *pprof_units[max_watchers];
     for (int i = 0; i < ctx->num_watchers; i++) {
       pprof_labels[i] = ctx->watchers[i].label;
       pprof_units[i] = ctx->watchers[i].unit;
