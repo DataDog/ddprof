@@ -209,7 +209,6 @@ bool dwfl_refresh(struct UnwindState *us) {
   };
   if (us->dwfl)
     dwfl_end(us->dwfl);
-  us->dwfl = NULL;
   us->dwfl = dwfl_begin(&proc_callbacks);
 
   return NULL != us->dwfl;
