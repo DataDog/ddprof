@@ -11,9 +11,22 @@ cd $SCRIPTDIR/../
 TOP_LVL_DIR=$PWD
 cd $CURRENTDIR
 
+BUILD_FOLDER="build_Release"
+# Parse parameters 
+if [ $# != 0 ] && [ $1 == "-b" ]; then
+    shift
+    cd $1
+    BUILD_FOLDER="$PWD"
+    cd $CURRENTDIR
+    shift
+    PARAM_FOUND=1
+    continue
+fi
+
+
 FILE=${TOP_LVL_DIR}/docs/Commands.md
 echo "# ddprof Commands" > ${FILE}
 echo "" >> ${FILE}
 echo '```bash' >> ${FILE}
-release/ddprof >> ${FILE}
+${BUILD_FOLDER}/ddprof >> ${FILE}
 echo '```' >> ${FILE}
