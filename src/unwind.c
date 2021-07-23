@@ -124,6 +124,10 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
   }
 
   Dwfl_Module *mod = update_mod(us->dwfl, us->pid, pc);
+  if (!mod) {
+    LG_WRN("[UNWIND] Unable to retrieve the Dwfl_Module");
+    return DWARF_CB_ABORT;
+  }
 
   if (!dwfl_frame_pc(state, &pc, &isactivation)) {
     LG_WRN("[UNWIND] %s", dwfl_errmsg(-1));
@@ -144,42 +148,26 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
   }
 
   // Now we register
-  const char *symname = NULL;
   GElf_Off offset = {0};
-  GElf_Sym sym = {0};
-  GElf_Word shndxp = {0};
-  Elf *elfp = NULL;
-  Dwarf_Addr bias = {0};
 
-  symname = dwfl_module_addrinfo(mod, pc, &offset, &sym, &shndxp, &elfp, &bias);
-
-  Dwfl_Line *line = dwfl_module_getsrc(mod, pc);
-
-  // TODO
-  us->locs[us->idx].ip = pc;
-
-  int lineno = 0;
-  us->locs[us->idx].line = 0;
-  const char *srcpath = dwfl_lineinfo(line, &pc, &lineno, 0, 0, 0);
-  if (srcpath) {
-    us->locs[us->idx].srcpath = strdup(srcpath);
-    us->locs[us->idx].line = lineno;
+  dwflmod_cache_status cache_status = dwfl_module_cache_getinfo(
+      us->cache_hdr, mod, pc, us->pid, &offset, &us->locs[us->idx].funname,
+      &us->locs[us->idx].line, &us->locs[us->idx].srcpath);
+  if (cache_status != K_DWFLMOD_CACHE_OK) {
+    LG_ERR("Error from dwflmod_cache_status");
+    return DWARF_CB_ABORT;
   }
 
-  char *mod_name = strrchr(mod->name, '/');
-  mod_name = mod_name ? mod_name + 1 : mod->name;
+  us->locs[us->idx].ip = pc;
   us->locs[us->idx].map_start = mod->low_addr;
   us->locs[us->idx].map_end = mod->high_addr;
   us->locs[us->idx].map_off = offset;
-  us->locs[us->idx].sopath = strdup(mod_name);
 
-  char tmpname[1024];
-  if (symname) {
-    demangle(symname, tmpname, sizeof(tmpname) / sizeof(*tmpname));
-    us->locs[us->idx].funname = strdup(tmpname);
-  } else {
-    snprintf(tmpname, 1016, "0x%lx", mod->low_addr);
-    us->locs[us->idx].funname = strdup(tmpname);
+  cache_status = dwfl_module_cache_getsname(us->cache_hdr, mod,
+                                            &(us->locs[us->idx].sopath));
+  if (cache_status != K_DWFLMOD_CACHE_OK) {
+    LG_ERR("Error from dwfl_module_cache_getsname");
+    return DWARF_CB_ABORT;
   }
 
   us->idx++;
@@ -191,60 +179,83 @@ int tid_cb(Dwfl_Thread *thread, void *targ) {
   return DWARF_CB_OK;
 }
 
-void FunLoc_clear(FunLoc *locs) {
-  for (int i = 0; i < MAX_STACK; i++) {
-    free(locs[i].funname);
-    free(locs[i].sopath);
-    free(locs[i].srcpath);
-  }
-  memset(locs, 0, sizeof(*locs) * MAX_STACK);
-}
+void FunLoc_clear(FunLoc *locs) { memset(locs, 0, sizeof(*locs) * MAX_STACK); }
 
-bool unwind_init(struct UnwindState *us) {
-  (void)us;
-  elf_version(EV_CURRENT);
-
-  libdso_init();
-  return true;
-}
-
-void unwind_free(struct UnwindState *us) { FunLoc_clear(us->locs); }
-
-int unwindstate__unwind(struct UnwindState *us) {
+static int unwind_dwfl_begin(struct UnwindState *us) {
   static char *debuginfo_path;
+
   static const Dwfl_Callbacks proc_callbacks = {
       .find_debuginfo = dwfl_standard_find_debuginfo,
       .debuginfo_path = &debuginfo_path,
       .find_elf = dwfl_linux_proc_find_elf,
   };
+  us->dwfl = dwfl_begin(&proc_callbacks);
+  if (!us->dwfl) {
+    LG_WRN("[UNWIND] dwfl_begin was zero (%s)", dwfl_errmsg(-1));
+    return false;
+  }
+  us->attached = false;
+
+  return true;
+}
+
+static void unwind_dwfl_end(struct UnwindState *us) {
+  dwfl_end(us->dwfl);
+  us->dwfl = 0;
+  us->attached = false;
+}
+
+static bool unwind_attach(struct UnwindState *us) {
   static const Dwfl_Thread_Callbacks dwfl_callbacks = {
       .next_thread = next_thread,
       .memory_read = memory_read,
       .set_initial_registers = set_initial_registers,
   };
 
-  us->dwfl = dwfl_begin(&proc_callbacks);
-  if (!us->dwfl) {
-    LG_WRN("[UNWIND] dwfl_begin was zero (%s)", dwfl_errmsg(-1));
-    return -1;
+  if (us->attached) {
+    return true;
   }
+  if (!!dwfl_attach_state(us->dwfl, NULL, us->pid, &dwfl_callbacks, us)) {
+    LG_WRN("[UNWIND] dwfl_attach_state was nonzero (%s)", dwfl_errmsg(-1));
+    return false;
+  }
+  us->attached = true;
+  return true;
+}
+
+bool unwind_init(struct UnwindState *us) {
+  if (dwflmod_cache_hdr_init(&(us->cache_hdr)) != K_DWFLMOD_CACHE_OK) {
+    us->cache_hdr = NULL;
+    return false;
+  }
+
+  elf_version(EV_CURRENT);
+  if (!unwind_dwfl_begin(us))
+    return false;
+  libdso_init();
+  return true;
+}
+
+void unwind_free(struct UnwindState *us) {
+  dwflmod_cache_hdr_free(us->cache_hdr);
+  unwind_dwfl_end(us);
+  us->cache_hdr = NULL;
+}
+
+int unwindstate__unwind(struct UnwindState *us) {
 
   // Update modules at the top
   update_mod(us->dwfl, us->pid, us->eip);
 
-  if (!dwfl_attach_state(us->dwfl, EM_NONE, us->pid, &dwfl_callbacks, us)) {
-    LG_WRN("[UNWIND] dwfl_attach_state was nonzero (%s)", dwfl_errmsg(-1));
-    dwfl_end(us->dwfl);
+  if (!unwind_attach(us)) {
     return -1;
   }
 
   if (!dwfl_getthread_frames(us->dwfl, us->pid, frame_cb, us)) {
     LG_DBG("[UNWIND] dwfl_getthread_frames was nonzero (%s)", dwfl_errmsg(-1));
-    dwfl_end(us->dwfl);
     return us->idx > 0 ? 0 : -1;
   }
 
-  dwfl_end(us->dwfl);
   return 0;
 }
 

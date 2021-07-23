@@ -145,7 +145,7 @@ case casechar:                                                                 \
 
 typedef enum DDKeys { OPT_TABLE(X_ENUM) DD_KLEN } DDKeys;
 
-void statsd_init();
+int statsd_init();
 void statsd_upload_globals(DDProfContext *);
 void print_diagnostics();
 
