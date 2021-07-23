@@ -22,6 +22,9 @@ dwflmod_cache_hdr_init(struct dwflmod_cache_hdr **cache_hdr);
 
 void dwflmod_cache_hdr_free(struct dwflmod_cache_hdr *cache_hdr);
 
+dwflmod_cache_status
+dwflmod_cache_hdr_clear(struct dwflmod_cache_hdr *cache_hdr);
+
 // Takes a dwarf module and an instruction pointer, returns associated symbols
 // Checks in cache to see if there is already this symbol name
 // Returns K_DWFLMOD_CACHE_OK if the process ran OK

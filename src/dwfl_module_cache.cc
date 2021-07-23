@@ -84,6 +84,11 @@ typedef std::unordered_map<GElf_Addr, std::string> sname_hashmap;
 
 struct dwflmod_cache_stats {
   dwflmod_cache_stats() : _hit(0), _calls(0), _errors(0) {}
+  void reset() {
+    _hit = 0;
+    _calls = 0;
+    _errors = 0;
+  }
   void display() {
     LG_NTC("dwflmod_cache_stats : Hit / calls = [%d/%d] = %d", _hit, _calls,
            (_hit * 100) / _calls);
@@ -332,6 +337,17 @@ dwfl_module_cache_getsname(struct dwflmod_cache_hdr *cache_hdr,
            cache_hdr->_stats._hit);
     return K_DWFLMOD_CACHE_KO;
   }
+  return K_DWFLMOD_CACHE_OK;
+}
+
+dwflmod_cache_status
+dwflmod_cache_hdr_clear(struct dwflmod_cache_hdr *cache_hdr) {
+  try {
+    cache_hdr->_info_cache.clear();
+    cache_hdr->_sname_map.clear();
+    cache_hdr->_stats.display();
+    cache_hdr->_stats.reset();
+  } catch (...) { return K_DWFLMOD_CACHE_KO; }
   return K_DWFLMOD_CACHE_OK;
 }
 
