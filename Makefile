@@ -117,9 +117,9 @@ URL_ELF := https://sourceware.org/elfutils/ftp/$(VER_ELF)/$(TAR_ELF)
 ELFUTILS = $(VENDIR)/elfutils
 ELFLIBS := $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libelf/libelf.a
 
-## https://gitlab.ddbuild.io/DataDog/libddprof/-/jobs/72495950
-VER_LIBDDPROF := 4b95cd70 #Short commit number from CI (used in export job of libddprof)
-SHA256_LIBDDPROF := 0bbb93a41a2579d5021e698f967a433ef3f7b3a72af2b7fc11d7b2c6071addb2 # You need to generate this manually
+## https://gitlab.ddbuild.io/DataDog/libddprof/-/jobs/76775503
+VER_LIBDDPROF := 9ca82807 #Short commit number from CI (used in export job of libddprof)
+SHA256_LIBDDPROF := b9ef0822818b86e8d7d498eecb828328175a8c8e524d7793276c9547d491fee9 # You need to generate this manually
 
 LIBDDPROF := $(VENDIR)/libddprof
 LIBDDPROF_LIB := $(LIBDDPROF)/RelWithDebInfo/lib64/libddprof-c.a

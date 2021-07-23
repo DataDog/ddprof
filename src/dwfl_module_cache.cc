@@ -170,10 +170,6 @@ static void dwfl_module_get_info(Dwfl_Module *mod, Dwarf_Addr newpc,
   } else {
     info._demangle_name = "0x" + std::to_string(mod->low_addr);
   }
-  // The max size from libddprof export is 1023 (constant to be updated)
-  if (info._demangle_name.size() > 1023) {
-    info._demangle_name.resize(1023);
-  }
 
   Dwfl_Line *line = dwfl_module_getsrc(mod, newpc);
   // srcpath
