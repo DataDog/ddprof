@@ -181,7 +181,7 @@ int tid_cb(Dwfl_Thread *thread, void *targ) {
 
 void FunLoc_clear(FunLoc *locs) { memset(locs, 0, sizeof(*locs) * MAX_STACK); }
 
-static int unwind_dwfl_begin(struct UnwindState *us) {
+static bool unwind_dwfl_begin(struct UnwindState *us) {
   static char *debuginfo_path;
 
   static const Dwfl_Callbacks proc_callbacks = {
@@ -200,9 +200,18 @@ static int unwind_dwfl_begin(struct UnwindState *us) {
 }
 
 static void unwind_dwfl_end(struct UnwindState *us) {
-  dwfl_end(us->dwfl);
-  us->dwfl = 0;
+  if (us->dwfl) {
+    dwfl_end(us->dwfl);
+    us->dwfl = 0;
+  }
   us->attached = false;
+}
+
+bool dwfl_caches_clear(struct UnwindState *us) {
+  if (!dwflmod_cache_hdr_clear(us->cache_hdr))
+    return false;
+  unwind_dwfl_end(us);
+  return unwind_dwfl_begin(us);
 }
 
 static bool unwind_attach(struct UnwindState *us) {
@@ -243,7 +252,6 @@ void unwind_free(struct UnwindState *us) {
 }
 
 int unwindstate__unwind(struct UnwindState *us) {
-
   // Update modules at the top
   update_mod(us->dwfl, us->pid, us->eip);
 

@@ -578,6 +578,15 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   if (now > ctx->send_nanos || ctx->sendfinal) {
     LG_WRN("Sending final export");
     export(ctx, now);
+
+    // The cache-clearing code should be fairly robust, but in the chance that
+    // it fails (perhaps if it includes dealloc->alloc in a library), then
+    // we can no longer provide service.  All we can do is emit an error and
+    // cleanup
+    if (!dwfl_caches_clear(ctx->us)) {
+      LG_ERR("[DDPROF] Error refreshing unwinding module, profiling shutdown");
+      return;
+    }
   }
   unwind_free(ctx->us);
 }
