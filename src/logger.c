@@ -120,7 +120,7 @@ char *name_default = "libddprof";
 // LOG_MSG_CAP compile-time parameter.  The accessible storage amount shall be
 // this region minus room for the following template:
 // `<XXX> MMM DD hh:mm:ss DDPROF[32768]: `  -- let's call this 38 chars
-void LOG_lfprintf(int lvl, int fac, char *name, const char *format, ...) {
+void LOG_lfprintf(int lvl, int fac, const char *name, const char *format, ...) {
   static char *levels[LL_LENGTH] = {
       [LL_EMERGENCY] = "EMERGENCY",
       [LL_ALERT] = "ALERT",

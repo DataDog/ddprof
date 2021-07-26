@@ -1,3 +1,7 @@
+##
+## Warning : This makefile is only to build the dependencies. Look to CMake to build ddprof 
+##
+
 ## Flag parameters
 # DEBUG
 #   0 - Release; don't include debugmode features like snapshotting pprofs,
@@ -24,7 +28,7 @@ ANALYSIS ?= 1
 GNU_TOOLS ?= 0
 
 ## Build parameters
-CFLAGS = -O2 -std=c11 -D_GNU_SOURCE -DMYNAME=\"ddprof\"
+CFLAGS = -O2 -std=c11 -D_GNU_SOURCE -DMYNAME=\"collatz\"
 WARNS := -Wall -Wextra -Wpedantic -Wno-missing-braces -Wno-missing-field-initializers -Wno-gnu-statement-expression -Wno-pointer-arith -Wno-gnu-folding-constant -Wno-zero-length-array
 BUILDCHECK := 0  # Do we check the build with CLANG tooling afterward?
 DDARGS :=
@@ -95,11 +99,10 @@ endif
 ifeq ($(DEBUG), 1)
   VERNAME := $(VERNAME)debug
 endif
-DDARGS += -DVER_REV=\"$(VERNAME)\"
 
 ## Other parameters
 # Directory structure and constants
-TARGETDIR := $(abspath release)
+TARGETDIR := $(abspath deliverables)
 VENDIR := $(abspath vendor)
 TMP := $(abspath tmp)
 
@@ -114,9 +117,9 @@ URL_ELF := https://sourceware.org/elfutils/ftp/$(VER_ELF)/$(TAR_ELF)
 ELFUTILS = $(VENDIR)/elfutils
 ELFLIBS := $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libelf/libelf.a
 
-## https://gitlab.ddbuild.io/DataDog/libddprof/-/jobs/72495950
-VER_LIBDDPROF := 4b95cd70 #Short commit number from CI (used in export job of libddprof)
-SHA256_LIBDDPROF := 0bbb93a41a2579d5021e698f967a433ef3f7b3a72af2b7fc11d7b2c6071addb2 # You need to generate this manually
+## https://gitlab.ddbuild.io/DataDog/libddprof/-/jobs/76775503
+VER_LIBDDPROF := 9ca82807 #Short commit number from CI (used in export job of libddprof)
+SHA256_LIBDDPROF := b9ef0822818b86e8d7d498eecb828328175a8c8e524d7793276c9547d491fee9 # You need to generate this manually
 
 LIBDDPROF := $(VENDIR)/libddprof
 LIBDDPROF_LIB := $(LIBDDPROF)/RelWithDebInfo/lib64/libddprof-c.a
@@ -132,7 +135,7 @@ LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl $
 SRC := $(CWD)/src/proto/profile.pb-c.c $(CWD)/src/ddprofcmdline.c $(CWD)/src/ipc.c $(CWD)/src/logger.c $(CWD)/src/signal_helper.c $(CWD)/src/version.c $(CWD)/src/statsd.c $(CWD)/src/perf.c $(CWD)/src/ddprof.c $(CWD)/src/unwind.c $(CWD)/src/dso.c $(CWD)/src/procutils.c
 DIRS := $(TARGETDIR) $(TMP)
 
-.PHONY: build deps elfutils demangle bench ddprof_banner format format-commit clean_deps publish all
+.PHONY: build deps elfutils demangle bench format format-commit clean_deps publish all
 .DELETE_ON_ERROR:
 
 ## Intermediate build targets (dependencies)
@@ -160,56 +163,23 @@ $(ELFUTILS):
 $(LIBDDPROF):
 	./tools/fetch_libddprof.sh ${VER_LIBDDPROF} ${SHA256_LIBDDPROF} $(VENDIR)
 
-LLVM_TMP := $(TMP)/demangle
-_LLVM_OBJS := RustDemangle.o ItaniumDemangle.o MicrosoftDemangleNodes.o MicrosoftDemangle.o Demangle.o llvmdemangle.o
-LLVM_OBJS := $(patsubst %,$(LLVM_TMP)/%,$(_LLVM_OBJS))
-
 $(LIBLLVM):
 	./tools/fetch_llvm_demangler.sh 
 
-$(LLVM_TMP):
-	mkdir -p $(LLVM_TMP)
-
-$(LLVM_TMP)/%.o: $(LIBLLVM_SRC)/Demangle/%.cpp $(LIBLLVM) | $(LLVM_TMP)
-	$(CXX) $(WARNS) -Wno-unused-parameter $(INCLUDE) -I$(LIBLLVM) -c -o $@ $<
-
-$(LLVM_TMP)/llvmdemangle.o: $(LIBLLVM) | $(LLVM_TMP)
-	$(CXX) $(WARNS) $(INCLUDE) -I$(LIBLLVM) -c -o $@ src/demangle.cpp
-
-$(TMP)/demangle.a: $(LLVM_OBJS)
-	ar rvcs $@ $^
-
-demangle: $(TMP)/demangle.a
-
-ddprof: $(TARGETDIR)/ddprof
-build: |ddprof help
 deps: $(LIBDDPROF) $(ELFLIBS) $(LIBLLVM)
 
 # HACK: For some reason HTTP doesn't work in David's local containers, but
 # pulling down dependencies outside and then compiling works
 pull: $(LIBDDPROF) $(ELFUTILS) $(LIBLLVM)
 
-## Actual build targets
-$(TARGETDIR)/ddprof: src/main.c $(TMP)/demangle.a| $(TARGETDIR) $(ELFLIBS) $(LIBDDPROF) ddprof_banner $(LIBDDPROF_LIB)
-	$(CC) -Wno-macro-redefined $(DDARGS) $(LIBDIRS) $(CFLAGS) -static-libgcc $(WARNS) $(SANS) $(LDFLAGS) $(INCLUDE) -o $@ $< $(SRC) $(TMP)/demangle.a $(ELFLIBS) $(LDLIBS) $(LIBDDPROF_LIB)
-
-logger: src/eg/logger.c src/logger.c
-	$(CC) $(CFLAGS) $(WARNS) $(SANS) -DPID_OVERRIDE -Iinclude -o $(TARGETDIR)/$@ $^
-
 # kinda phony
-bench: 
-	$(MAKE) CC=$(strip $(CC)) CFLAGS="$(CFLAGS)" INCLUDE="$(INCLUDE)" DDPROF_DIR=$(CWD) TARGETDIR=$(strip $(TARGETDIR)) -C bench/collatz
-
-help: $(TARGETDIR)/ddprof 
-	tools/help_generate.sh
-
-## Phony helper-targets
-ddprof_banner:
+bench:
 	@echo "Using $(CC)"
-	@echo "Building ddprof with debug=$(DEBUG), analysis=$(ANALYSIS), safety=$(SAFETY), GNU_TOOLS=$(GNU_TOOLS)"
+	@echo "Building bench with debug=$(DEBUG), analysis=$(ANALYSIS), safety=$(SAFETY), GNU_TOOLS=$(GNU_TOOLS)"
 	@echo "elfutils $(VER_ELF)"
 	@echo 
 	@echo =============== BEGIN BUILD ===============
+	$(MAKE) CC=$(strip $(CC)) CFLAGS="$(CFLAGS)" INCLUDE="$(INCLUDE)" DDPROF_DIR=$(CWD) TARGETDIR=$(strip $(TARGETDIR)) -C bench/collatz
 
 format:
 	tools/style-check.sh
@@ -225,10 +195,4 @@ clean_deps:
 clean: clean_deps
 	rm $(TARGETDIR)/*
 
-publish: ddprof
-	$(eval BIN_NAME := $(shell $(TARGETDIR)/ddprof -v | sed 's/ /_/g'))
-	$(eval TAR_NAME := $(BIN_NAME).tar.gz)
-	tar -cf $(TARGETDIR)/$(TAR_NAME) $(TARGETDIR)/ddprof lib/x86_64-linux-gnu/elfutils/libebl_x86_64.so
-	tools/upload.sh $(TAR_NAME)
-
-all: ddprof bench
+all: bench

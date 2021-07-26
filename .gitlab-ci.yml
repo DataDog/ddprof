@@ -15,7 +15,7 @@ variables:
   # Deployment paths
   S3_PREFIX: s3://binaries.ddbuild.io/ddprof/release
   RELPATH: ddprof/release
-  BINPATH: release
+  BINPATH: deliverables
   S3ROOT: ddprof
 
 # This is the base repo (apt, system configuration, etc)
@@ -76,7 +76,7 @@ build:ddprof_cmake:
     BUILDPATH: build_${BUILD_TYPE}
   script:
     - set -euxo pipefail
-    - export DELIVERY_PATH="${CI_PROJECT_DIR}/deliverables/${BUILD_TYPE}"
+    - export DELIVERY_PATH="${CI_PROJECT_DIR}/${BINPATH}/${BUILD_TYPE}"
     - mkdir -p vendor
     #Build image dependencies were stored in app, avoid rebuilding vendor content
     - ln -s /app/vendor/elfutils vendor/elfutils
@@ -90,7 +90,7 @@ build:ddprof_cmake:
     - make install
   artifacts:
     paths:
-      - ${CI_PROJECT_DIR}/deliverables/
+      - ${CI_PROJECT_DIR}/${BINPATH}/
     expire_in: 1 week
 
 test:ddprof_cmake:
@@ -106,46 +106,20 @@ test:ddprof_cmake:
     - set -euxo pipefail
     - source setup_env.sh
     - echo "CHECK SETTING ON PERF EVENT PARANOID" && cat /proc/sys/kernel/perf_event_paranoid
-    - check_dependencies.sh deliverables/${BUILD_TYPE}/bin/ddprof test/data/expected_deps_${BUILD_TYPE}.txt
+    - check_dependencies.sh ${BINPATH}/${BUILD_TYPE}/bin/ddprof test/data/expected_deps_${BUILD_TYPE}.txt
     # Run toy project for 5 seconds
-    - run.sh -b ./deliverables/${BUILD_TYPE}/bin BadBoggleSolver_run 5
+    - run.sh -b ./${BINPATH}/${BUILD_TYPE}/bin BadBoggleSolver_run 5
   dependencies:
     - build:ddprof_cmake
 
 .ddprof_job:
   variables:
     BINNAME: ddprof
-    RELEASEBIN: $BINPATH/release/$BINNAME
-    DEBUGBIN: $BINPATH/debug/$BINNAME
+    RELEASEBIN: ${BINPATH}/Release/bin/$BINNAME
+    DEBUGBIN: ${BINPATH}/Debug/bin/$BINNAME
     GIT_SUBMODULE_STRATEGY: recursive
     PROMOTE: NONE
   image: $BUILD_IMG_STICKY
-
-build:ddprof:
-  extends: .ddprof_job
-  stage: build
-  tags: ["runner:k8s"]
-  artifacts:
-    paths:
-      - $RELEASEBIN
-      - $DEBUGBIN
-    expire_in: 1 day
-  script:
-    - set -euo pipefail
-    - rm -rf vendor
-    #Build image dependencies were stored in app, avoid rebuilding vendor content
-    - mkdir -p vendor
-    - ln -s /app/vendor/elfutils vendor/elfutils
-    - ln -s /app/vendor/libddprof vendor/libddprof
-    - ln -s /app/vendor/llvm vendor/llvm
-    - ls -l vendor
-    - ls -l vendor/libddprof
-    - mkdir -p release/release
-    - mkdir -p release/debug
-    - make ANALYSIS=0 build
-    - mv $BINPATH/$BINNAME $DEBUGBIN
-    - make DEBUG=0 ANALYSIS=0 SAFETY=0 build
-    - cp $BINPATH/$BINNAME $RELEASEBIN
 
 deploy:ddprof:
   extends: .ddprof_job
@@ -158,7 +132,7 @@ deploy:ddprof:
     - if [ $CI_COMMIT_BRANCH = "main" ];then PROMOTE=MAJOR;fi
     - tools/ci_upload.sh
   dependencies:
-    - build:ddprof
+    - build:ddprof_cmake
 
 .collatz_job:
   variables:
@@ -182,8 +156,8 @@ build:collatz:
     - set -euo pipefail
     - rm -rf vendor
     - ln -s /app/vendor vendor
-    - mkdir -p release/release
-    - mkdir -p release/debug
+    - mkdir -p $BINPATH/release
+    - mkdir -p $BINPATH/debug
     - make ANALYSIS=0 bench
     - mv $BINPATH/$BINNAME $DEBUGBIN
     - make DEBUG=0 ANALYSIS=0 SAFETY=0 bench
