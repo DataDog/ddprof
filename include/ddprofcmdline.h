@@ -1,6 +1,8 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h> // size_t
+#include <stdint.h> // uint64_t
 
 /**************************** Cmdline Helpers *********************************/
 // Helper functions for processing commandline arguments.
@@ -18,3 +20,6 @@ int arg_which(const char *str, char const *const *set, int sz_set);
 bool arg_inset(const char *str, char const *const *set, int sz_set);
 
 bool arg_yesno(const char *str, int mode);
+
+bool process_event(const char *str, const char **lookup, size_t sz_lookup,
+                   size_t *idx, uint64_t *value);

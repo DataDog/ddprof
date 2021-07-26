@@ -15,29 +15,6 @@
 #define LANGUAGE_DEFAULT "native"
 #define FAMILY_DEFAULT "native"
 
-// clang-format off
-PerfOption perfoptions[] = {
-  // Hardware
-  {"CPU Cycles",      "hCPU",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              1e2, "cpu-cycle",      "cycles", .freq = true},
-  {"Ref. CPU Cycles", "hREF",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES,          1e3, "ref-cycle",      "cycles", .freq = true},
-  {"Instr. Count",    "hINSTR",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,            1e3, "cpu-instr",      "instructions", .freq = true},
-  {"Cache Ref.",      "hCREF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES,        1e3, "cache-ref",      "events"},
-  {"Cache Miss",      "hCMISS",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES,            1e3, "cache-miss",     "events"},
-  {"Branche Instr.",  "hBRANCH", PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     1e3, "branch-instr",   "events"},
-  {"Branch Miss",     "hBMISS",  PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES,           1e3, "branch-miss",    "events"},
-  {"Bus Cycles",      "hBUS",    PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,              1e3, "bus-cycle",      "cycles", .freq = true},
-  {"Bus Stalls(F)",   "hBSTF",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1e3, "bus-stf",        "cycles", .freq = true},
-  {"Bus Stalls(B)",   "hBSTB",   PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1e3, "bus-stb",        "cycles", .freq = true},
-  {"CPU Time",        "sCPU",    PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,              1e3, "cpu-time",       "nanoseconds", .freq = true},
-  {"Wall? Time",      "sWALL",   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,               1e2, "wall-time",      "nanoseconds", .freq = true},
-  {"Ctext Switches",  "sCI",     PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES,        1,   "switches",       "events", .include_kernel = true},
-  {"Block-Insert",    "kBLKI",   PERF_TYPE_TRACEPOINT, 1133,                                1,   "block-insert",   "events", .include_kernel = true},
-  {"Block-Issue",     "kBLKS",   PERF_TYPE_TRACEPOINT, 1132,                                1,   "block-issue",    "events", .include_kernel = true},
-  {"Block-Complete",  "kBLKC",   PERF_TYPE_TRACEPOINT, 1134,                                1,   "block-complete", "events", .include_kernel = true},
-  {"Malloc",          "bMalloc", PERF_TYPE_BREAKPOINT, 0,                                   1,   "malloc",         "events", .bp_type = HW_BREAKPOINT_X},
-};
-// clang-format on
-
 // This is pretty bad if we ever need two ddprof contexts!
 DDProfContext *ddprof_ctx_init() {
   static DDProfContext ctx = {0};
@@ -482,7 +459,7 @@ MYNAME" can register to various system events in order to customize the\n"
 
   static int num_perfs = sizeof(perfoptions) / sizeof(*perfoptions);
   for (int i = 0; i < num_perfs; i++)
-    printf("%-10s - %-15s (%s, %s)\n", perfoptions[i].key,
+    printf("%-10s - %-15s (%s, %s)\n", perfoptions_lookup[i],
            perfoptions[i].desc, perfoptions[i].label, perfoptions[i].unit);
 }
 // clang-format on
@@ -592,29 +569,6 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
 }
 
 /****************************  Argument Processor  ***************************/
-bool ddprof_ctx_watcher_process(DDProfContext *ctx, char *str) {
-  static int num_perfs = sizeof(perfoptions) / sizeof(*perfoptions);
-  size_t sz_str = strlen(str);
-
-  for (int i = 0; i < num_perfs; ++i) {
-    size_t sz_key = strlen(perfoptions[i].key);
-    if (!strncmp(perfoptions[i].key, str, sz_key)) {
-      ctx->watchers[ctx->num_watchers] = perfoptions[i];
-
-      double sample_period = 0.0;
-      if (sz_str > sz_key && str[sz_str] == ',')
-        sample_period = strtod(&str[sz_key + 1], NULL);
-      if (sample_period > 0)
-        ctx->watchers[ctx->num_watchers].sample_period = sample_period;
-
-      ++ctx->num_watchers;
-      return true;
-    }
-  }
-
-  return false;
-}
-
 void ddprof_setctx(DDProfContext *ctx) {
   // If events are set, install default watcher
   if (!ctx->num_watchers) {
@@ -737,7 +691,7 @@ void ddprof_setctx(DDProfContext *ctx) {
     LG_DBG("Instrumented with %d watchers:", ctx->num_watchers);
     for (int i = 0; i < ctx->num_watchers; i++) {
       LG_DBG("  ID: %s, Pos: %d, Index: %lu, Label: %s, Mode: %d",
-             ctx->watchers[i].key, i, ctx->watchers[i].config,
+             ctx->watchers[i].desc, i, ctx->watchers[i].config,
              ctx->watchers[i].label, ctx->watchers[i].mode);
       LG_DBG("Done printing parameters");
     }
