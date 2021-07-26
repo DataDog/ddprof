@@ -83,8 +83,7 @@ build:ddprof_cmake:
     - ln -s /app/vendor/libddprof vendor/libddprof
     - ln -s /app/vendor/llvm vendor/llvm
     - mkdir -p ${BUILDPATH} && cd ${BUILDPATH}
-    - cmake -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
-      -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
+    - cmake -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
     - make -j ${KUBERNETES_CPU_LIMIT}
     - ctest --repeat-until-fail 5 --output-on-failure | tee test-output.log
     - make install
