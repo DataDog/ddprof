@@ -40,6 +40,10 @@ int main(int argc, char **argv) {
     case 'e':;
       size_t idx;
       uint64_t sampling_value = 0;
+
+      // Iterate through the specified events and define new watchers if any
+      // of them are valid.  If the user specifies a '0' value, then that's
+      // the same as using the default (equivalently, the ',0' could be omitted)
       if (process_event(optarg, perfoptions_lookup, perfoptions_sz, &idx,
                         &sampling_value)) {
         ctx->watchers[ctx->num_watchers] = perfoptions[idx];
