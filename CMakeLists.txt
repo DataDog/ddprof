@@ -94,7 +94,8 @@ endif()
 # Known limitation : lib elf is not built with cmake for now (makefile)
 
 # Compile time definitions
-add_compile_definitions("MYNAME=\"${CMAKE_PROJECT_NAME}\"")
+string(TOLOWER ${CMAKE_PROJECT_NAME} CMAKE_PROJECT_NAME_LC)
+add_compile_definitions("MYNAME=\"${CMAKE_PROJECT_NAME_LC}\"")
 
 set(BUILD_REV "custom" CACHE STRING "Revision appended to the version information")
 add_compile_definitions("VER_REV=\"${BUILD_REV}\"")
