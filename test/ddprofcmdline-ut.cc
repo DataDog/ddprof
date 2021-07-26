@@ -66,11 +66,26 @@ TEST(CmdLineTst, LiteralEventWithGoodValue) {
   ASSERT_EQ(val, 555); // value changed
 }
 
-TEST(CmdLineTst, LiteralEventWithBadValue) {
+// An event without a separator is invalid, even if the components are valid.
+// This is because we may wish to have event types which end in a number at some
+// point.
+TEST(CmdLineTst, LiteralEventWithNoComma) {
+  char const *str = "hCPU1";
+  size_t i = 999999;
+  uint64_t v = 0;
+  ASSERT_FALSE(process_event(str, perfoptions_lookup, perfoptions_sz, &i, &v));
+}
+
+TEST(CmdLineTst, LiteralEventWithVeryBadValue) {
   char const *str = "hCPU,apples";
   size_t i = 999999;
-  uint64_t val = 1;
-  ASSERT_TRUE(process_event(str, perfoptions_lookup, perfoptions_sz, &i, &val));
-  ASSERT_EQ(i, 0);
-  ASSERT_EQ(val, 1); // value unchanged
+  uint64_t v = 1;
+  ASSERT_FALSE(process_event(str, perfoptions_lookup, perfoptions_sz, &i, &v));
+}
+
+TEST(CmdLineTst, LiteralEventWithKindaBadValue) {
+  char const *str = "hCPU,123apples";
+  size_t i = 999999;
+  uint64_t v = 1;
+  ASSERT_FALSE(process_event(str, perfoptions_lookup, perfoptions_sz, &i, &v));
 }

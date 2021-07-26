@@ -33,22 +33,42 @@ bool arg_yesno(const char *str, int mode) {
 
 bool process_event(const char *str, const char **lookup, size_t sz_lookup,
                    size_t *idx, uint64_t *value) {
+  size_t idx_tmp = SIZE_MAX; // sentinel value
   size_t sz_str = strlen(str);
 
   for (size_t i = 0; i < sz_lookup; ++i) {
     size_t sz_key = strlen(lookup[i]);
     if (!strncmp(lookup[i], str, sz_key)) {
-      *idx = i;
+      idx_tmp = i;
+
+      // If the user didn't specify anything else, we're done.
+      if (sz_str == sz_key) {
+        *idx = idx_tmp;
+        return true;
+      }
 
       // perf_event_open() expects unsigned 64-bit integers, but it's somewhat
       // annoying to process unsigned ints using the standard interface.  We
       // take what we can get and convert to unsigned via absolute value.
       uint64_t value_tmp = 0;
-      if (sz_str > sz_key && str[sz_key] == ',')
-        value_tmp = strtoll(&str[sz_key + 1], NULL, 10);
-      if (value_tmp != 0)
-        *value = abs(value_tmp);
+      char *str_tmp = (char *)&str[sz_key];
+      char *str_chk = str_tmp;
 
+      // We use a comma as a separator; if it doesn't immediately precede the
+      // label, then any subsequent processing is invalid.
+      if (*str_tmp != ',')
+        return false;
+
+      // Currently, we demand that the entire numeric portion of the event
+      // specifier is valid.  This is the place to add code for suffix support,
+      // probably :)
+      value_tmp = strtoll(&str_tmp[1], &str_chk, 10);
+      if (*str_chk)
+        return false;
+
+      // If we're here, we received a valid event and a valid numeric portion.
+      *idx = idx_tmp;
+      *value = value_tmp;
       return true;
     }
   }
