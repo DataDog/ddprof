@@ -1,11 +1,8 @@
 #include "ddprofcmdline.h"
 
 #include <assert.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
-#define ABS(x) (x < 0 ? -x : x)
 
 int arg_which(const char *str, char const *const *set, int sz_set) {
   if (!str || !set)
@@ -34,7 +31,6 @@ bool arg_yesno(const char *str, int mode) {
   return false;
 }
 
-#include <stdio.h>
 bool process_event(const char *str, const char **lookup, size_t sz_lookup,
                    size_t *idx, uint64_t *value) {
   size_t sz_str = strlen(str);
@@ -51,7 +47,7 @@ bool process_event(const char *str, const char **lookup, size_t sz_lookup,
       if (sz_str > sz_key && str[sz_key] == ',')
         value_tmp = strtoll(&str[sz_key + 1], NULL, 10);
       if (value_tmp != 0)
-        *value = ABS(value_tmp);
+        *value = abs(value_tmp);
 
       return true;
     }

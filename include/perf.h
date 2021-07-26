@@ -154,7 +154,7 @@ static const char *perfoptions_lookup[] = {
     "sCI",    "kBLKI", "kBLKS",  "kBLKC", "bMalloc"};
 
 // clang-format off
-static PerfOption perfoptions[] = {
+static const PerfOption perfoptions[] = {
   // Hardware
   {"CPU Cycles",      PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              99,   "cpu-cycle",      "cycles", .freq = true},
   {"Ref. CPU Cycles", PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES,          1000, "ref-cycle",      "cycles", .freq = true},
