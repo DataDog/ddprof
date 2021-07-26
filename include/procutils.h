@@ -125,7 +125,6 @@ size_t mapcache_Find(pid_t);
 void pidmap_Set(pid_t, PidMap *);
 void mapcache_MaskSet(MapMode);
 size_t mapcache_Set(pid_t);
-pid_t procfs_ppid(pid_t);
 PidMap *mapcache_Get(pid_t);
 int procfs_MapOpen(pid_t);
 char *procfs_RootGet(pid_t);

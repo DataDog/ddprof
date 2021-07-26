@@ -45,26 +45,6 @@ size_t mapcache_Set(pid_t pid) {
   return id;
 }
 
-pid_t procfs_ppid(pid_t pid) {
-  // NOTE, returns 0 on failure
-  char filepath[1024] = {0};
-  snprintf(filepath, 1023, "/proc/%d/status", pid);
-  FILE *procstream = fopen(filepath, "r");
-  if (!procstream)
-    return 0;
-
-  // TODO lol...
-  getline(&g_procfs_linebuffer, &g_procfs_linebuffer_sz, procstream); // name
-  getline(&g_procfs_linebuffer, &g_procfs_linebuffer_sz, procstream); // umask
-  getline(&g_procfs_linebuffer, &g_procfs_linebuffer_sz, procstream); // state
-  getline(&g_procfs_linebuffer, &g_procfs_linebuffer_sz, procstream); // tgid
-  getline(&g_procfs_linebuffer, &g_procfs_linebuffer_sz, procstream); // ngid
-  getline(&g_procfs_linebuffer, &g_procfs_linebuffer_sz, procstream); // pid
-  getline(&g_procfs_linebuffer, &g_procfs_linebuffer_sz, procstream); // ppid
-
-  return strtoull(g_procfs_linebuffer + strlen("ppid:"), NULL, 10);
-}
-
 PidMap *mapcache_Get(pid_t _pid) {
   pid_t pid = _pid;
   size_t id = mapcache_Find(pid);
