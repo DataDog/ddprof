@@ -48,7 +48,7 @@ TEST(StatsDTest, Format) {
   // In order to valid, we have to use lower-level socket interfaces, since
   // obviously we have no need to imeplement a statsd server :)
   char buf[1024] = {0};
-  EXPECT_TRUE(1 >= read(fd_listener, buf, 1024));
+  EXPECT_TRUE(1 <= read(fd_listener, buf, 1024));
   EXPECT_EQ(0, strcmp(buf, answer));
 
   // Cleanup
