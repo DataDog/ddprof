@@ -46,12 +46,12 @@ static int fd_statsd = -1;
 int statsd_init() {
   char *path_statsd = NULL;
   if ((path_statsd = getenv("DD_DOGSTATSD_SOCKET"))) {
-    fd_statsd = statsd_open(path_statsd, strlen(path_statsd));
-    if (-1 == fd_statsd) {
+    fd_statsd = statsd_connect(path_statsd, strlen(path_statsd));
+    if (-1 != fd_statsd) {
       return fd_statsd;
     }
   }
-  return 0;
+  return -1;
 }
 
 #define DDPN "datadog.profiler.native."

@@ -60,6 +60,12 @@ add_unit_test(
 )
 
 add_unit_test(
+    statsd-ut
+    ../src/statsd.c 
+    statsd-ut.cc
+)
+
+add_unit_test(
     demangle-ut
     ../src/demangle.cpp
     demangle-ut.cc
