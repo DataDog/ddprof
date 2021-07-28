@@ -13,6 +13,7 @@
 #include <sys/socket.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include "logger.h"
@@ -114,6 +115,47 @@ void main_loop(PEvent *pes, int pe_len, perfopen_attr *attr, void *arg) {
     pfd[i].fd = pes[i].fd;
     pfd[i].events = POLLIN | POLLERR | POLLHUP;
   }
+
+  // Handle the processing in a fork, so we can clean up unfreeable state.
+  // TODO we probably lose events when we switch workers.  It's only a blip,
+  //      but it's still slightly annoying...
+  pid_t child_pid;
+  volatile bool *continue_profiling =
+      mmap(0, sizeof(bool), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED,
+           -1, 0);
+
+  // If the malloc fails, then try to profile without resetting the worker
+  if (!continue_profiling) {
+    LG_ERR("[PERF] Could not initialize worker process coordinator, profiling "
+           "will probably fail");
+  } else {
+    while ((child_pid = fork())) {
+      LG_WRN("[PERF] Created child %d", child_pid);
+      waitpid(child_pid, NULL, 0);
+
+      // Harvest the exit state of the child process.  We will always reset it
+      // to false so that a child who segfaults or exits erroneously does not
+      // cause a pointless loop of spawning
+      if (!*continue_profiling) {
+        LG_WRN("[PERF] Stop profiling!");
+        return;
+      } else
+        *continue_profiling = false;
+      LG_NTC("[PERF] Refreshing worker process");
+    }
+  }
+
+  // If we're here, then we are a child spawned during the previous operation.
+  // That means we need to iterate through the perf_event_open() handles and
+  // get the mmaps
+  for (int k = 0; k < pe_len; k++) {
+    if (!(pes[k].region = perfown(pes[k].fd))) {
+      close(pes[k].fd);
+      pes[k].fd = -1;
+      LG_ERR("Worker could not register handle %d (%s)", k, strerror(errno));
+    }
+  }
+
   while (1) {
     int n = poll(pfd, pe_len, PSAMPLE_DEFAULT_WAKEUP);
 
@@ -123,10 +165,25 @@ void main_loop(PEvent *pes, int pe_len, perfopen_attr *attr, void *arg) {
     else if (-1 == n)
       return;
 
-    // If no file descriptors, call timed out
+    // If no file descriptors, call time-out
     if (0 == n && attr->timeout_fun) {
-      if (!attr->timeout_fun(arg))
-        return;
+
+      // We don't return from here, only exit, since we don't want to log
+      // shutdown messages (if we're shutting down, the outer process will
+      // emit those loglines)
+      if (!attr->timeout_fun(continue_profiling, arg)) {
+
+        // Cleanup the regions, since the next worker will use them
+        for (int k = 0; k < pe_len; k++) {
+          if (!pes[k].region)
+            continue;
+          munmap(pes[k].region, PAGE_SIZE + PSAMPLE_SIZE);
+          pes[k].region = NULL;
+        }
+        exit(0);
+      }
+
+      // If we didn't have to shut down, then go back to poll()
       continue;
     }
 
@@ -152,8 +209,17 @@ void main_loop(PEvent *pes, int pe_len, perfopen_attr *attr, void *arg) {
             (void *)hdr + hdr->size) {
           // LG_WRN("[UNWIND] OUT OF BOUNDS");
         } else {
-          if (!attr->msg_fun(hdr, pes[i].pos, arg))
-            return;
+
+          // Same deal as the call to timeout_fun
+          if (!attr->msg_fun(hdr, pes[i].pos, continue_profiling, arg)) {
+            for (int k = 0; k < pe_len; k++) {
+              if (!pes[k].region)
+                continue;
+              munmap(pes[k].region, PAGE_SIZE + PSAMPLE_SIZE);
+              pes[k].region = NULL;
+            }
+            exit(0);
+          }
         }
         tail += hdr->size;
       }

@@ -8,6 +8,7 @@
 #include "ipc.h"
 #include "logger.h"
 #include "perf.h"
+#include "procutils.h"
 #include "version.h"
 
 #define max_watchers 10
@@ -52,6 +53,7 @@ typedef struct DDProfContext {
   int num_watchers;
 
   struct UnwindState *us;
+  ProcStatus *last_status;
   int64_t send_nanos; // Last time an export was sent
 } DDProfContext;
 
@@ -155,10 +157,12 @@ void ddprof_ctx_free(DDProfContext *);
 bool ddprof_ctx_watcher_process(DDProfContext *, char *);
 
 /******************************  Perf Callback  *******************************/
-bool reset_state(DDProfContext *);
+#define WORKER_MAX_RSS_KB (1024 * 50)    // 50 megabytes
+#define WORKER_REFRESH_RSS_KB (1024 * 8) // 8 megabytes
+bool reset_state(DDProfContext *, volatile bool *continue_profiling);
 void export(DDProfContext *, int64_t);
-bool ddprof_timeout(void *);
-bool ddprof_callback(struct perf_event_header *, int, void *);
+bool ddprof_timeout(volatile bool *, void *);
+bool ddprof_callback(struct perf_event_header *, int, volatile bool *, void *);
 
 /*********************************  Printers  *********************************/
 void print_help();

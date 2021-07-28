@@ -7,7 +7,6 @@
 #include <x86intrin.h>
 
 #include "ddprofcmdline.h"
-#include "procutils.h"
 #include "statsd.h"
 #include "unwind.h"
 
@@ -63,13 +62,15 @@ void statsd_upload_globals(DDProfContext *ctx) {
   static char key_events_lost[] = DDPN "events.lost";
   static char key_samples_recv[] = DDPN "samples.recv";
 
+  // Upload ddprof's procfs values.  We harvest the values no matter what, since
+  // they're used to observe memory limits
+  static unsigned long last_utime = 0;
+  ProcStatus *procstat = proc_read();
+  ctx->last_status = procstat;
+
   // If there's nothing that can be done, then there's nothing to do.
   if (-1 == fd_statsd)
     return;
-
-  // Upload ddprof's procfs values
-  static unsigned long last_utime = 0;
-  ProcStatus *procstat = proc_read();
   if (procstat) {
     statsd_send(fd_statsd, key_rss, &(long){1024 * procstat->rss}, STAT_GAUGE);
     if (procstat->utime) {
@@ -138,41 +139,54 @@ void export(DDProfContext *ctx, int64_t now) {
   return;
 }
 
-bool reset_state(DDProfContext *ctx) {
-  // The cache-clearing code should be fairly robust, but in the chance that
-  // it fails (perhaps if it includes dealloc->alloc in a library), then
-  // we can no longer provide service.  All we can do is emit an error and
-  // cleanup
-  if (!dwfl_caches_clear(ctx->us)) {
-    LG_ERR("[DDPROF] Error refreshing unwinding module, profiling shutdown");
+bool reset_state(DDProfContext *ctx, volatile bool *continue_profiling) {
+  // NOTE: strongly assumes reset_state is called after the last status has
+  //       been updated.  Otherwiset his is kind of a no-op.
+  if (!ctx)
+    return false;
+
+  // Check to see whether we need to clear the whole worker.  Potentially we
+  // could defer this a little longer by clearing the caches and then checking
+  // RSS, but if we've already grown to this point, might as well reset now.
+  if (ctx->last_status && WORKER_MAX_RSS_KB <= ctx->last_status->rss) {
+    *continue_profiling = true;
+    LG_ERR("Leaving to reset worker");
     return false;
   }
 
-  // Clear and re-initialize the pprof
-  const char *pprof_labels[max_watchers];
-  const char *pprof_units[max_watchers];
-  pprof_Free(ctx->dp);
-  for (int i = 0; i < ctx->num_watchers; i++) {
-    pprof_labels[i] = ctx->watchers[i].label;
-    pprof_units[i] = ctx->watchers[i].unit;
-  }
+  // If we haven't hit the hard cap, have we hit the soft cap?
+  if (ctx->last_status && WORKER_REFRESH_RSS_KB <= ctx->last_status->rss) {
+    if (!dwfl_caches_clear(ctx->us)) {
+      LG_ERR("[DDPROF] Error refreshing unwinding module, profiling shutdown");
+      return false;
+    }
 
-  if (!pprof_Init(ctx->dp, (const char **)pprof_labels,
-                  (const char **)pprof_units, ctx->num_watchers)) {
-    LG_ERR("[DDPROF] Error refreshing profile storage");
-    return false;
+    // Clear and re-initialize the pprof
+    const char *pprof_labels[max_watchers];
+    const char *pprof_units[max_watchers];
+    pprof_Free(ctx->dp);
+    for (int i = 0; i < ctx->num_watchers; i++) {
+      pprof_labels[i] = ctx->watchers[i].label;
+      pprof_units[i] = ctx->watchers[i].unit;
+    }
+
+    if (!pprof_Init(ctx->dp, (const char **)pprof_labels,
+                    (const char **)pprof_units, ctx->num_watchers)) {
+      LG_ERR("[DDPROF] Error refreshing profile storage");
+      return false;
+    }
   }
 
   return true;
 }
 
-bool ddprof_timeout(void *arg) {
+bool ddprof_timeout(volatile bool *continue_profiling, void *arg) {
   DDProfContext *ctx = arg;
   int64_t now = now_nanos();
 
   if (now > ctx->send_nanos) {
     export(ctx, now);
-    if (!reset_state(ctx))
+    if (!reset_state(ctx, continue_profiling))
       return false;
   }
   return true;
@@ -341,7 +355,8 @@ void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int pos) {
   pid_free(ext->pid);
 }
 
-bool ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
+bool ddprof_callback(struct perf_event_header *hdr, int pos,
+                     volatile bool *continue_profiling, void *arg) {
   DDProfContext *ctx = arg;
 
   switch (hdr->type) {
@@ -373,7 +388,7 @@ bool ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
 
   if (now > ctx->send_nanos) {
     export(ctx, now);
-    if (!reset_state(ctx))
+    if (!reset_state(ctx, continue_profiling))
       return false;
   }
 
@@ -508,8 +523,8 @@ void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   (void)uc;
   static void *buf[4096] = {0};
   size_t sz = backtrace(buf, 4096);
-  fprintf(stderr, "[DDPROF]<%s> has encountered an error and will exit\n",
-          str_version());
+  fprintf(stderr, "ddprof[%d]: <%s> has encountered an error and will exit\n",
+          getpid(), str_version());
   if (sig == SIGSEGV)
     printf("[DDPROF] Fault address: %p\n", si->si_addr);
   backtrace_symbols_fd(buf, sz, STDERR_FILENO);
@@ -536,6 +551,16 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
       }
       k++;
     }
+  }
+
+  // We checked that perfown would work, now we free the regions so the worker
+  // can get them back.  This is slightly wasteful, but these mappings don't
+  // work in the child for some reason.
+  for (int k = 0; k < num_cpu * ctx->num_watchers; k++) {
+    if (!pes[k].region)
+      continue;
+    munmap(pes[k].region, PAGE_SIZE + PSAMPLE_SIZE);
+    pes[k].region = NULL;
   }
 
   LG_NTC("Entering main loop");
