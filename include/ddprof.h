@@ -157,8 +157,8 @@ void ddprof_ctx_free(DDProfContext *);
 bool ddprof_ctx_watcher_process(DDProfContext *, char *);
 
 /******************************  Perf Callback  *******************************/
-#define WORKER_MAX_RSS_KB (1024 * 50)    // 50 megabytes
-#define WORKER_REFRESH_RSS_KB (1024 * 8) // 8 megabytes
+#define WORKER_MAX_RSS_KB (1024 * 10)    // 50 megabytes
+#define WORKER_REFRESH_RSS_KB (1024 * 4) // 8 megabytes
 bool reset_state(DDProfContext *, volatile bool *continue_profiling);
 void export(DDProfContext *, int64_t);
 bool ddprof_timeout(volatile bool *, void *);
