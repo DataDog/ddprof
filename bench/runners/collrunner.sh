@@ -8,8 +8,7 @@ cd $SCRIPTDIR/../../
 TOP_LVL_DIR=$PWD
 cd $CURRENTDIR
 
-for i in {1..10}; do
-  $TOP_LVL_DIR/release/collatz 4 20000 5000 G
-  $TOP_LVL_DIR/release/collatz 4 20000 5000 G
-  $TOP_LVL_DIR/release/collatz 4 20000 5000 G
+for i in {1..100}; do
+  $TOP_LVL_DIR/deliverables/collatz 2 200000 500000 A
+  $TOP_LVL_DIR/deliverables/collatz 2 200000 500000 A
 done

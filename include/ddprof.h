@@ -155,6 +155,7 @@ void ddprof_ctx_free(DDProfContext *);
 bool ddprof_ctx_watcher_process(DDProfContext *, char *);
 
 /******************************  Perf Callback  *******************************/
+bool reset_state(DDProfContext *);
 void export(DDProfContext *, int64_t);
 void ddprof_timeout(void *);
 void ddprof_callback(struct perf_event_header *, int, void *);

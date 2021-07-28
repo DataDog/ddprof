@@ -224,7 +224,7 @@ static bool unwind_attach(struct UnwindState *us) {
   if (us->attached) {
     return true;
   }
-  if (!!dwfl_attach_state(us->dwfl, NULL, us->pid, &dwfl_callbacks, us)) {
+  if (dwfl_attach_state(us->dwfl, NULL, us->pid, &dwfl_callbacks, us)) {
     LG_WRN("[UNWIND] dwfl_attach_state was nonzero (%s)", dwfl_errmsg(-1));
     return false;
   }

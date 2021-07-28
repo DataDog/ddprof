@@ -134,14 +134,47 @@ void export(DDProfContext *ctx, int64_t now) {
   ticks_unwind = 0;
   events_lost = 0;
   samples_recv = 0;
+
+  return;
+}
+
+bool reset_state(DDProfContext *ctx) {
+  // The cache-clearing code should be fairly robust, but in the chance that
+  // it fails (perhaps if it includes dealloc->alloc in a library), then
+  // we can no longer provide service.  All we can do is emit an error and
+  // cleanup
+  if (!dwfl_caches_clear(ctx->us)) {
+    LG_ERR("[DDPROF] Error refreshing unwinding module, profiling shutdown");
+    return false;
+  }
+
+  // Clear and re-initialize the pprof
+  const char *pprof_labels[max_watchers];
+  const char *pprof_units[max_watchers];
+  pprof_Free(ctx->dp);
+  for (int i = 0; i < ctx->num_watchers; i++) {
+    pprof_labels[i] = ctx->watchers[i].label;
+    pprof_units[i] = ctx->watchers[i].unit;
+  }
+
+  if (!pprof_Init(ctx->dp, (const char **)pprof_labels,
+                  (const char **)pprof_units, ctx->num_watchers)) {
+    LG_ERR("[DDPROF] Error refreshing profile storage");
+    return false;
+  }
+
+  return true;
 }
 
 void ddprof_timeout(void *arg) {
   DDProfContext *ctx = arg;
   int64_t now = now_nanos();
 
-  if (now > ctx->send_nanos)
+  if (now > ctx->send_nanos) {
     export(ctx, now);
+    if (!reset_state(ctx))
+      return;
+  }
 }
 
 typedef union flipper {
@@ -339,6 +372,8 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
 
   if (now > ctx->send_nanos) {
     export(ctx, now);
+    if (!reset_state(ctx))
+      return;
   }
 }
 
@@ -555,15 +590,6 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   if (now > ctx->send_nanos || ctx->sendfinal) {
     LG_WRN("Sending final export");
     export(ctx, now);
-
-    // The cache-clearing code should be fairly robust, but in the chance that
-    // it fails (perhaps if it includes dealloc->alloc in a library), then
-    // we can no longer provide service.  All we can do is emit an error and
-    // cleanup
-    if (!dwfl_caches_clear(ctx->us)) {
-      LG_ERR("[DDPROF] Error refreshing unwinding module, profiling shutdown");
-      return;
-    }
   }
   unwind_free(ctx->us);
 }
