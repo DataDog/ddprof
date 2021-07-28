@@ -75,6 +75,13 @@ function(add_exe name)
    target_include_directories(${name} PRIVATE ${exe_include_dirs} ${all_includes})
 endfunction()
 
+#######################
+### Static analysis ###
+#######################
+
+#Cpp Check
+include("${CMAKE_SOURCE_DIR}/cmake/Cppcheckconfig.cmake")
+
 ####################
 ### Unit tests   ###
 ####################

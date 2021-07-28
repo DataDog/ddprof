@@ -9,6 +9,7 @@ RUN apt update \
   binutils-dev \
   clang-11 \
   cmake \
+  cppcheck \
   gcc-10 \
   gcc \
   g++ \

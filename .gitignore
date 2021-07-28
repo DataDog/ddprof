@@ -1,18 +1,19 @@
 #==============================================================================#
 # Directories to ignore (do not add trailing '/'s, they skip symlinks).
 #==============================================================================#
-build
-tmp
+build*
+deliverables
 pprofs
-release
-vendor
 redis
-.vscode
-.vs
+release
+temp
+tmp
+vendor
+.cache
 .ccls-cache
 .idea
-.cache
-temp
+.vs
+.vscode
 
 #==============================================================================#
 # Editor auto-saving

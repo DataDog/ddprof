@@ -1,0 +1,6 @@
+// All of the warnings should be fixed : initial PR to start putting in place cppchecks in CI
+*:*/pprof.c:50
+*:*/procutils.c:182
+arithOperationsOnVoidPointer:*/ddprof.c
+arithOperationsOnVoidPointer:*/perf.c
+missingInclude
