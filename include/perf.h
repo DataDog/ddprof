@@ -179,8 +179,8 @@ static const PerfOption perfoptions[] = {
 #define perfoptions_sz (sizeof(perfoptions) / sizeof(*perfoptions))
 
 typedef struct perfopen_attr {
-  void (*msg_fun)(struct perf_event_header *, int, void *);
-  void (*timeout_fun)(void *);
+  bool (*msg_fun)(struct perf_event_header *, int, void *);
+  bool (*timeout_fun)(void *);
 } perfopen_attr;
 
 // Used by rb_init() and friends

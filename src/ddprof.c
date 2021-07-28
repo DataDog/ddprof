@@ -166,15 +166,16 @@ bool reset_state(DDProfContext *ctx) {
   return true;
 }
 
-void ddprof_timeout(void *arg) {
+bool ddprof_timeout(void *arg) {
   DDProfContext *ctx = arg;
   int64_t now = now_nanos();
 
   if (now > ctx->send_nanos) {
     export(ctx, now);
     if (!reset_state(ctx))
-      return;
+      return false;
   }
+  return true;
 }
 
 typedef union flipper {
@@ -340,7 +341,7 @@ void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int pos) {
   pid_free(ext->pid);
 }
 
-void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
+bool ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   DDProfContext *ctx = arg;
 
   switch (hdr->type) {
@@ -373,8 +374,10 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   if (now > ctx->send_nanos) {
     export(ctx, now);
     if (!reset_state(ctx))
-      return;
+      return false;
   }
+
+  return true;
 }
 
 /*********************************  Printers  *********************************/

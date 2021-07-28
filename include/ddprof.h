@@ -157,8 +157,8 @@ bool ddprof_ctx_watcher_process(DDProfContext *, char *);
 /******************************  Perf Callback  *******************************/
 bool reset_state(DDProfContext *);
 void export(DDProfContext *, int64_t);
-void ddprof_timeout(void *);
-void ddprof_callback(struct perf_event_header *, int, void *);
+bool ddprof_timeout(void *);
+bool ddprof_callback(struct perf_event_header *, int, void *);
 
 /*********************************  Printers  *********************************/
 void print_help();

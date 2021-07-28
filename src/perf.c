@@ -125,7 +125,8 @@ void main_loop(PEvent *pes, int pe_len, perfopen_attr *attr, void *arg) {
 
     // If no file descriptors, call timed out
     if (0 == n && attr->timeout_fun) {
-      attr->timeout_fun(arg);
+      if (!attr->timeout_fun(arg))
+        return;
       continue;
     }
 
@@ -151,7 +152,8 @@ void main_loop(PEvent *pes, int pe_len, perfopen_attr *attr, void *arg) {
             (void *)hdr + hdr->size) {
           // LG_WRN("[UNWIND] OUT OF BOUNDS");
         } else {
-          attr->msg_fun(hdr, pes[i].pos, arg);
+          if (!attr->msg_fun(hdr, pes[i].pos, arg))
+            return;
         }
         tail += hdr->size;
       }
