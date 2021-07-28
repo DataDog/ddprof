@@ -208,8 +208,11 @@ static void unwind_dwfl_end(struct UnwindState *us) {
 }
 
 bool dwfl_caches_clear(struct UnwindState *us) {
-  if (!dwflmod_cache_hdr_clear(us->cache_hdr))
+  dwflmod_cache_status cache_status = dwflmod_cache_hdr_clear(us->cache_hdr);
+  if (cache_status != K_DWFLMOD_CACHE_OK) {
+    LG_WRN("[UNWIND] Unable to clear intermediate unwinding cache");
     return false;
+  }
   unwind_dwfl_end(us);
   return unwind_dwfl_begin(us);
 }
