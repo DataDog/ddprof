@@ -83,7 +83,7 @@ endfunction()
 #######################
 
 #Cpp Check
-include("${CMAKE_SOURCE_DIR}/cmake/Cppcheckconfig.cmake")
+include(Cppcheckconfig)
 
 ##################################
 ### Libraries (needed by ut)   ###

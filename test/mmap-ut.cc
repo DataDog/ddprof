@@ -35,10 +35,6 @@ TEST(MMapTest, MMap32K) {
   close(fileFd);
 }
 
-static size_t perf_mmap_size(int buf_size_shift) {
-  return ((1U << buf_size_shift) + 1) * sysconf(_SC_PAGESIZE);
-}
-
 TEST(MMapTest, PerfOpen) {
   int pid = getpid();
   std::cerr << "Pid number" << pid << std::endl;
@@ -61,17 +57,12 @@ TEST(MMapTest, PerfOpen) {
                 << std::endl;
       continue;
     }
-    std::cerr << "SUCCESS" << std::endl;
-    // default perfown is 4k * 64
-    void *region = perfown(perf_fd);
-    int buf_size_shift = 10;
+    // default perfown is 4k * (64 + 1)
     size_t mmap_size = 0;
-
-    // size_t mmap_size = region ? 0 : 64 * 1024;
-    while (region == nullptr && buf_size_shift > 0) {
-      --buf_size_shift;
+    void *region = NULL;
+    int buf_size_shift = 10;
+    while (region == nullptr && --buf_size_shift > 0) {
       mmap_size = perf_mmap_size(buf_size_shift);
-
       std::cerr << "mmap size attempt --> " << mmap_size << "("
                 << buf_size_shift << ")";
 
@@ -83,6 +74,9 @@ TEST(MMapTest, PerfOpen) {
       }
       std::cerr << " = SUCCESS !!!" << std::endl;
       break;
+    }
+    if (region) {
+      std::cerr << "FULL SUCCESS (size=" << mmap_size << ")" << std::endl;
     }
     ASSERT_TRUE(region);
     perfdisown(region, mmap_size);

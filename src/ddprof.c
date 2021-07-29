@@ -478,29 +478,76 @@ void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   exit(-1);
 }
 
+// returns the number of successful setups
+static int setup_watchers(DDProfContext *ctx, pid_t pid, int num_cpu,
+                          struct PEvent *pes) {
+  int k = 0;
+  int nb_success = 0;
+  size_t size;
+  for (int i = 0; i < ctx->num_watchers && ctx->params.enable; ++i) {
+    for (int j = 0; j < num_cpu; ++j) {
+      pes[k].pos = i;
+      pes[k].fd = perfopen(pid, &ctx->watchers[i], j, true);
+      if (pes[k].fd == -1) {
+        LG_ERR("Error calling perfopen on watcher %d.%d (%s)", i, j,
+               strerror(errno));
+      } else if (!(pes[k].region = perfown(pes[k].fd, &pes[k].reg_size))) {
+        close(pes[k].fd);
+        pes[k].fd = -1;
+        LG_ERR("Could not finalize watcher %d.%d: registration (%s)", i, j,
+               strerror(errno));
+      } else {
+        ++nb_success;
+      }
+      ++k;
+      if (k >= MAX_NB_WATCHERS) {
+        LG_WRN("Reached max number of watchers (%d)", MAX_NB_WATCHERS);
+        return nb_success;
+      }
+    }
+  }
+  return nb_success;
+}
+
+// returns the number of successful cleans
+static int cleanup_watchers(DDProfContext *ctx, struct PEvent *pes,
+                            int num_cpu) {
+  int k = 0;
+  int nb_clean = 0;
+
+  for (int i = 0; i < ctx->num_watchers && ctx->params.enable; ++i) {
+    for (int j = 0; j < num_cpu; ++j) {
+      if (pes[k].region) {
+        if (perfdisown(pes[k].region, pes[k].reg_size) != 0) {
+          LG_WRN("Error when using perfdisown %d.%d", i, j);
+        } else {
+          pes[k].region = NULL;
+          ++nb_clean;
+        }
+      }
+      if (pes[k].fd != -1) {
+        close(pes[k].fd);
+        pes[k].fd = -1;
+      }
+      ++k;
+      if (k >= MAX_NB_WATCHERS) {
+        return nb_clean;
+      }
+    }
+  }
+  return nb_clean;
+}
+
 /*************************  Instrumentation Helpers  **************************/
 // This is a quick-and-dirty implementation.  Ideally, we'll harmonize this
 // with the other functions.
 void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   perfopen_attr perf_funs = {.msg_fun = ddprof_callback,
                              .timeout_fun = ddprof_timeout};
-  struct PEvent pes[100] = {0};
-  int k = 0;
-  for (int i = 0; i < ctx->num_watchers && ctx->params.enable; i++) {
-    for (int j = 0; j < num_cpu; j++) {
-      pes[k].pos = i;
-      pes[k].fd = perfopen(pid, &ctx->watchers[i], j, true);
-      if (pes[k].fd == -1) {
-        LG_ERR("Error calling perfopen on watcher %d.%d (%s)", i, j,
-               strerror(errno));
-      } else if (!(pes[k].region = perfown(pes[k].fd))) {
-        close(pes[k].fd);
-        pes[k].fd = -1;
-        LG_ERR("Could not finalize watcher %d.%d: registration (%s)", i, j,
-               strerror(errno));
-      }
-      k++;
-    }
+  struct PEvent pes[MAX_NB_WATCHERS] = {0};
+  if (!setup_watchers(ctx, pid, num_cpu, pes)) {
+    LG_ERR("Error when attaching to perf_event buffers.");
+    return;
   }
 
   LG_NTC("Entering main loop");
@@ -567,6 +614,9 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
       LG_ERR("[DDPROF] Error refreshing unwinding module, profiling shutdown");
       return;
     }
+  }
+  if (!cleanup_watchers(ctx, pes, num_cpu)) {
+    LG_ERR("Error when calling cleanup_watchers.");
   }
   unwind_free(ctx->us);
 }

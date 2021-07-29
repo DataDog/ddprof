@@ -7,17 +7,17 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define PAGE_SIZE 4096              // Concerned about hugepages?
-#define PSAMPLE_SIZE 64 * PAGE_SIZE // TODO check for high-volume
 #define PSAMPLE_DEFAULT_WAKEUP 1000 // sample frequency check
 #define PERF_SAMPLE_STACK_SIZE (4096 * 8)
 #define PERF_SAMPLE_STACK_REGS 3
 #define MAX_INSN 16
+#define MAX_NB_WATCHERS 100
 
 typedef struct PEvent {
   int pos; // Index into the sample
   int fd;  // Underlying perf event FD
   struct perf_event_mmap_page *region;
+  size_t reg_size; // size of region
 } PEvent;
 
 // TODO, probably make this part of the unwinding context or ddprof ctx
@@ -187,14 +187,17 @@ typedef struct perfopen_attr {
 typedef struct RingBuffer {
   const char *start;
   unsigned long offset;
+  size_t size;
+  size_t mask;
 } RingBuffer;
 
 int perf_event_open(struct perf_event_attr *, pid_t, int, int, unsigned long);
 int perfopen(pid_t pid, const PerfOption *opt, int cpu, bool extras);
+size_t perf_mmap_size(int buf_size_shift);
 void *perfown_sz(int fd, size_t size_of_buffer);
-void *perfown(int);
+void *perfown(int fd, size_t *size);
 int perfdisown(void *region, size_t size);
-void rb_init(RingBuffer *, struct perf_event_mmap_page *);
+void rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size);
 uint64_t rb_next(RingBuffer *);
 struct perf_event_header *rb_seek(RingBuffer *, uint64_t);
 void main_loop(PEvent *, int, perfopen_attr *, void *);
