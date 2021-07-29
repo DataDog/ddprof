@@ -80,3 +80,13 @@ add_unit_test(
     ../src/ipc.c
     ipc-ut.cc
 )
+
+add_unit_test(
+    mmap-ut
+    ../src/perf.c
+    ../src/logger.c
+    mmap-ut.cc
+    LIBRARIES libddprof-c
+    DEFINITIONS MYNAME="ipc-ut"
+)
+target_include_directories(mmap-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})

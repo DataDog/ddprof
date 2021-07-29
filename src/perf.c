@@ -41,7 +41,7 @@ int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
   return syscall(__NR_perf_event_open, attr, pid, cpu, gfd, flags);
 }
 
-int perfopen(pid_t pid, PerfOption *opt, int cpu, bool extras) {
+int perfopen(pid_t pid, const PerfOption *opt, int cpu, bool extras) {
   struct perf_event_attr attr = g_dd_native_attr;
   attr.type = opt->type;
   attr.config = opt->config;
@@ -72,19 +72,29 @@ int perfopen(pid_t pid, PerfOption *opt, int cpu, bool extras) {
   return fd;
 }
 
-void *perfown(int fd) {
+void *perfown_sz(int fd, size_t size_of_buffer) {
   void *region;
 
   // Map in the region representing the ring buffer
   // TODO what to do about hugepages?
-  region = mmap(NULL, PAGE_SIZE + PSAMPLE_SIZE, PROT_READ | PROT_WRITE,
-                MAP_SHARED, fd, 0);
+  region =
+      mmap(NULL, size_of_buffer, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (MAP_FAILED == region || !region)
     return NULL;
 
   fcntl(fd, F_SETFL, O_RDWR | O_NONBLOCK);
 
   return region;
+}
+
+void *perfown(int fd) { return perfown_sz(fd, PAGE_SIZE + PSAMPLE_SIZE); }
+
+int perfdisown(void *region, size_t size) {
+  if (size == 0) {
+    return munmap(region, PAGE_SIZE + PSAMPLE_SIZE);
+  } else {
+    return munmap(region, size);
+  }
 }
 
 void rb_init(RingBuffer *rb, struct perf_event_mmap_page *page) {

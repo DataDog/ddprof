@@ -488,9 +488,12 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   int k = 0;
   for (int i = 0; i < ctx->num_watchers && ctx->params.enable; i++) {
     for (int j = 0; j < num_cpu; j++) {
-      pes[k].fd = perfopen(pid, &ctx->watchers[i], j, true);
       pes[k].pos = i;
-      if (!(pes[k].region = perfown(pes[k].fd))) {
+      pes[k].fd = perfopen(pid, &ctx->watchers[i], j, true);
+      if (pes[k].fd == -1) {
+        LG_ERR("Error calling perfopen on watcher %d.%d (%s)", i, j,
+               strerror(errno));
+      } else if (!(pes[k].region = perfown(pes[k].fd))) {
         close(pes[k].fd);
         pes[k].fd = -1;
         LG_ERR("Could not finalize watcher %d.%d: registration (%s)", i, j,

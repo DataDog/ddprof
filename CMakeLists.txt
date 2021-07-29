@@ -15,6 +15,9 @@ project(DDProf
   VERSION 0.1
 )
 
+# Define the include path of cmake scripts
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
+
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release;SanitizedDebug" CACHE STRING
     "Available build-types: Debug, Release and SanitizedDebug")
 
@@ -82,6 +85,15 @@ endfunction()
 #Cpp Check
 include("${CMAKE_SOURCE_DIR}/cmake/Cppcheckconfig.cmake")
 
+##################################
+### Libraries (needed by ut)   ###
+##################################
+find_package(PkgConfig REQUIRED)
+
+# libddprof
+include(Findlibddprof)
+message(STATUS "Libddprof Include directory " ${LIBDDPROF_INCLUDE_DIR})
+
 ####################
 ### Unit tests   ###
 ####################
@@ -110,17 +122,10 @@ add_compile_definitions("VER_REV=\"${BUILD_REV}\"")
 # Leave frame pointers to help with profiling
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${FRAME_PTR_FLAG}")
 
-find_package(PkgConfig REQUIRED)
-
 set(DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/include/proto)
 list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include/proto)
 
-# Define the scripts to help find the libraries
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
-
-# libddprof
-include(Findlibddprof)
-message(STATUS "Libddprof Include directory " ${LIBDDPROF_INCLUDE_DIR})
+#libddprof
 list(APPEND DDPROF_INCLUDE_LIST ${LIBDDPROF_INCLUDE_DIR})
 
 # Check that we are on a linux system

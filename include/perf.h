@@ -190,8 +190,10 @@ typedef struct RingBuffer {
 } RingBuffer;
 
 int perf_event_open(struct perf_event_attr *, pid_t, int, int, unsigned long);
-int perfopen(pid_t, PerfOption *, int, bool);
+int perfopen(pid_t pid, const PerfOption *opt, int cpu, bool extras);
+void *perfown_sz(int fd, size_t size_of_buffer);
 void *perfown(int);
+int perfdisown(void *region, size_t size);
 void rb_init(RingBuffer *, struct perf_event_mmap_page *);
 uint64_t rb_next(RingBuffer *);
 struct perf_event_header *rb_seek(RingBuffer *, uint64_t);

@@ -90,6 +90,8 @@ build:ddprof_cmake:
     - if [ ! $(./ddprof --version | sed 's/.*+//g') == "${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA}" ]; then exit 1; fi
     - ctest --repeat-until-fail 5 --output-on-failure | tee test-output.log
     - make install
+      # This job gives useful info on the config of CI (perfopen allowed sizes)
+    - cd test && ./mmap-ut
   artifacts:
     paths:
       - ${CI_PROJECT_DIR}/${BINPATH}/
@@ -108,6 +110,12 @@ test:ddprof_cmake:
     - set -euxo pipefail
     - source setup_env.sh
     - echo "CHECK SETTING ON PERF EVENT PARANOID" && cat /proc/sys/kernel/perf_event_paranoid
+    - echo "CHECK SETTING ON PINNED MEMORY" && ulimit -l
+    - echo "CHECK SETTING on PERF EVEN OPEN" && cat /proc/sys/kernel/perf_event_mlock_kb
+    - echo ""
+    - echo "CHECK SETTING ON CPUs" && lscpu
+    - echo ""
+    - echo "CHECK SETTING ON EFFECTIVE CPUs" && find /sys/fs/cgroup/cpuset -type f -printf "%f\n" -exec cat {} \;
     - check_dependencies.sh ${BINPATH}/${BUILD_TYPE}/bin/ddprof test/data/expected_deps_${BUILD_TYPE}.txt
     # Run toy project for 5 seconds
     - run.sh -b ./${BINPATH}/${BUILD_TYPE}/bin BadBoggleSolver_run 5
