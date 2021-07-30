@@ -90,14 +90,19 @@ struct dwflmod_cache_stats {
     _errors = 0;
   }
   void display() {
-    LG_NTC("dwflmod_cache_stats : Hit / calls = [%d/%d] = %d", _hit, _calls,
-           (_hit * 100) / _calls);
-    LG_NTC("                   Errors / calls = [%d/%d] = %d", _errors, _calls,
-           (_errors * 100) / _calls);
-    // Estimate of cache size
-    LG_NTC("                   Size of cache = %lu (nb el %d)",
-           (_calls - _hit) * (sizeof(dwfl_addr_info) + sizeof(dwfl_mod_pc_key)),
-           _calls - _hit);
+    if (_calls) {
+      LG_NTC("dwflmod_cache_stats : Hit / calls = [%d/%d] = %d", _hit, _calls,
+             (_hit * 100) / _calls);
+      LG_NTC("                   Errors / calls = [%d/%d] = %d", _errors,
+             _calls, (_errors * 100) / _calls);
+      // Estimate of cache size
+      LG_NTC("                   Size of cache = %lu (nb el %d)",
+             (_calls - _hit) *
+                 (sizeof(dwfl_addr_info) + sizeof(dwfl_mod_pc_key)),
+             _calls - _hit);
+    } else {
+      LG_NTC("dwflmod_cache_stats : 0 calls");
+    }
   }
   int _hit;
   int _calls;
