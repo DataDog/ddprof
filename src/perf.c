@@ -189,7 +189,7 @@ void main_loop(PEvent *pes, int pe_len, perfopen_attr *attr, void *arg) {
 
       while (head > tail) {
         struct perf_event_header *hdr = rb_seek(rb, tail);
-        if ((void *)pes[i].region + pes[i].reg_size < (void *)hdr + hdr->size) {
+        if ((char *)pes[i].region + pes[i].reg_size < (char *)hdr + hdr->size) {
           // LG_WRN("[UNWIND] OUT OF BOUNDS");
         } else {
           attr->msg_fun(hdr, pes[i].pos, arg);

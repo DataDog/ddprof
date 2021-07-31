@@ -33,17 +33,14 @@ bool arg_yesno(const char *str, int mode) {
 
 bool process_event(const char *str, const char **lookup, size_t sz_lookup,
                    size_t *idx, uint64_t *value) {
-  size_t idx_tmp = SIZE_MAX; // sentinel value
   size_t sz_str = strlen(str);
 
   for (size_t i = 0; i < sz_lookup; ++i) {
     size_t sz_key = strlen(lookup[i]);
     if (!strncmp(lookup[i], str, sz_key)) {
-      idx_tmp = i;
-
       // If the user didn't specify anything else, we're done.
       if (sz_str == sz_key) {
-        *idx = idx_tmp;
+        *idx = i;
         return true;
       }
 
@@ -67,7 +64,7 @@ bool process_event(const char *str, const char **lookup, size_t sz_lookup,
         return false;
 
       // If we're here, we received a valid event and a valid numeric portion.
-      *idx = idx_tmp;
+      *idx = i;
       *value = value_tmp;
       return true;
     }

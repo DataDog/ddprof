@@ -1,6 +1,11 @@
 // All of the warnings should be fixed : initial PR to start putting in place cppchecks in CI
-*:*/pprof.c:50
-*:*/procutils.c:182
-arithOperationsOnVoidPointer:*/ddprof.c
-arithOperationsOnVoidPointer:*/perf.c
+//example :
+//arithOperationsOnVoidPointer:*/ddprof.c:12
+//static variables
+variableScope:*/ddprof.c
+//buf not used (but should be in future version of code)
+unreadVariable:*/ddprof.c
+//static variable levels
+variableScope:*/logger.c:124
+// config of cpp checks needs more includes
 missingInclude

@@ -15,7 +15,7 @@ if (CPP_CHECK_COMMAND)
    # "-i${CMAKE_SOURCE_DIR}/build_Release")
 
    list(APPEND CPP_CHECK_COMMAND 
-         "--enable=warning,performance,portability,information,missingInclude"
+         "--enable=warning,performance,portability,information,style"
          "--template=${CPPCHECK_TEMPLATE}"
          "--quiet" 
          # "--verbose"

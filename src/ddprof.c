@@ -206,7 +206,7 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
     sample.size_stack = *(uint64_t *)buf++;
     if (sample.size_stack) {
       sample.data_stack = (char *)buf;
-      buf = (void *)buf + sample.size_stack;
+      buf = (char *)buf + sample.size_stack;
     } else {
       // Not sure
     }
@@ -483,7 +483,6 @@ static int setup_watchers(DDProfContext *ctx, pid_t pid, int num_cpu,
                           struct PEvent *pes) {
   int k = 0;
   int nb_success = 0;
-  size_t size;
   for (int i = 0; i < ctx->num_watchers && ctx->params.enable; ++i) {
     for (int j = 0; j < num_cpu; ++j) {
       pes[k].pos = i;

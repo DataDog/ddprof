@@ -61,7 +61,7 @@ int statsd_connect(const char *path, size_t sz_path) {
 
 bool statsd_send(int fd_sock, const char *key, void *val, int type) {
   char buf[1024] = {0};
-  size_t sz = -1;
+  size_t sz = 0;
   switch (type) {
   default:
   case STAT_MS_LONG:
@@ -80,7 +80,7 @@ bool statsd_send(int fd_sock, const char *key, void *val, int type) {
 
   // Nothing to do if serialization failed or was short, but we don't return
   // granular result
-  if (sz <= 0 || sz >= sizeof(buf))
+  if (sz == 0 || sz >= sizeof(buf))
     return false;
 
   // Nothing to do if the write fails

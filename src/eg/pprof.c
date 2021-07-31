@@ -47,7 +47,6 @@ int main() {
   size_t len = perftools__profiles__profile__get_packed_size(&dp->pprof);
   void *buf = calloc(1, len);
   perftools__profiles__profile__pack(&dp->pprof, buf);
-  printf("I have %ld bytes.\n", len);
   int fd = open("./test.pb", O_WRONLY | O_CREAT, 0777);
   ftruncate(fd, 0);
   write(fd, buf, len);

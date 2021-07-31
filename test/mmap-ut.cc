@@ -32,6 +32,7 @@ TEST(MMapTest, MMap32K) {
       mmap(NULL, alloc_size, PROT_READ | PROT_WRITE, MAP_SHARED, fileFd, 0);
   EXPECT_TRUE(reg);
   int ret = munmap(reg, alloc_size);
+  EXPECT_TRUE(ret == 0);
   close(fileFd);
 }
 
