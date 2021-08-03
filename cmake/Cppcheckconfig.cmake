@@ -6,7 +6,6 @@ if (CPP_CHECK_COMMAND)
 
    # One strategy is to list the files to check
    file(GLOB_RECURSE ALL_SOURCE_FILES src/*.c include/*.hpp src/*.cpp src/*.cc include/*.h test/*.cc test/*.h)
-
    set(CPPCHECK_TEMPLATE "cppcheck:{id}:{file}:{line}:{severity}:{message}")
 
    # Another one is to exclude all the irrelevant errors (harder to know which build folders to exclude)
@@ -20,6 +19,7 @@ if (CPP_CHECK_COMMAND)
          "--quiet" 
          # "--verbose"
          "--suppressions-list=${CMAKE_SOURCE_DIR}/CppCheckSuppressions.txt"
+         #"--cppcheck-build-dir=${CMAKE_BINARY_DIR}" #does not work well with suppressions
          )
 
    add_custom_target(
