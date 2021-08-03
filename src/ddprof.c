@@ -11,6 +11,10 @@
 #include "statsd.h"
 #include "unwind.h"
 
+#ifdef DBG_JEMALLOC
+#include <jemalloc/jemalloc.h>
+#endif
+
 #define USERAGENT_DEFAULT "libddprof"
 #define LANGUAGE_DEFAULT "native"
 #define FAMILY_DEFAULT "native"
@@ -91,6 +95,11 @@ void print_diagnostics() {
   LG_NTC("[STATS] ticks_unwind: %lu", ticks_unwind);
   LG_NTC("[STATS] events_lost: %lu", events_lost);
   LG_NTC("[STATS] samples_recv: %lu", samples_recv);
+
+#ifdef DBG_JEMALLOC
+  // jemalloc stats
+  malloc_stats_print(NULL, NULL, "");
+#endif
 }
 
 // Internal functions

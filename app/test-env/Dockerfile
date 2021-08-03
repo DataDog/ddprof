@@ -9,13 +9,17 @@ RUN apt update \
     g++ \
     flex \
     bison \
-    strace
+    strace \
+    libjemalloc-dev \
+    graphviz \
+    valgrind \
+    subversion
 
-#Install perf tool (check kernel version and remove trailing 0 that do not exist in git branch)
-RUN KERNEL_VERSION=$(uname -r | awk -F '-' '{print $1}' | sed 's/\.0//') && \
+#Install perf tool (check kernel version and remove minor revision part), use svn as it is faster than git (with partial checkout)
+RUN KERNEL_VERSION=$(uname -r | awk -F '[-\.]' '{print "v"$1"."$2}') && \
     echo "Kernel version : ${KERNEL_VERSION}" && \
-    git clone --depth 1 --branch "v${KERNEL_VERSION}" git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git && \
-    cd linux-stable/tools/perf/ && \
+    svn export --quiet  https://github.com/torvalds/linux/tags/${KERNEL_VERSION}/tools && \
+    cd tools/perf && \
     make && \
     cp perf /usr/local/bin
 

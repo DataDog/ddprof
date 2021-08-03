@@ -94,6 +94,14 @@ find_package(PkgConfig REQUIRED)
 include(Findlibddprof)
 message(STATUS "Libddprof Include directory " ${LIBDDPROF_INCLUDE_DIR})
 
+option(JEMALLOC "Enable jemalloc stats" OFF)
+if (${JEMALLOC})
+   #jemalloc for debug
+   include(Jemalloc)
+   message(STATUS "Adding jemalloc for DBG purpose" ${JEMALLOC_ROOT_DIR})
+   add_compile_definitions("DBG_JEMALLOC")
+endif()
+
 ####################
 ### Unit tests   ###
 ####################
@@ -189,10 +197,16 @@ set(DDPROF_GLOBAL_SRC
    ${MAIN_SRC}
    ${PROTO_SRC})
 
+set(DDPROF_LIBRARY_LIST libddprof-c llvm-demangle libstdc++.a dw.a elf.a libz.a Threads::Threads libprotobuf-c.a liblzma.a)
+
+if (${JEMALLOC})
+   list(PREPEND DDPROF_LIBRARY_LIST jemalloc)
+endif()
+
 # It is important to force most libraries as static
 add_exe(ddprof
         ${DDPROF_GLOBAL_SRC}
-        LIBRARIES libddprof-c llvm-demangle libstdc++.a dw.a elf.a libz.a Threads::Threads libprotobuf-c.a liblzma.a)
+        LIBRARIES ${DDPROF_LIBRARY_LIST})
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 
 message(STATUS "Install destination " ${CMAKE_INSTALL_PREFIX})

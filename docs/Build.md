@@ -71,14 +71,6 @@ A stress test examples is available (you need to build the bench/collatz folder 
 ./bench/runners/runit.sh collatz 
 ```
 
-### Troubleshooting
-
-Can you reach the intake service ? Check if you get a 400 error code. Check it also from the docker container.
-
-```bash
-curl -XPOST -i https://intake.profile.datad0g.com/v1/input
-```
-
 ## Artifacts
 
 You can always check out the available `ddprof` and `collatz` binaries with something like:

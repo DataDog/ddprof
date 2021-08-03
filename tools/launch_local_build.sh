@@ -18,8 +18,8 @@ usage() {
     echo "    Add this line to the file --> DEFAULT_DEV_WORKSPACE=<some path you want to mount>"
     echo ""
     echo " Optional parameters "
-    echo "    -t : launch the test image."
-    echo "    clean : rebuild the image before creating it."
+    echo "    --test/-t : launch the test image."
+    echo "    --clean/-c : rebuild the image before creating it."
 }
 
 if [ $# != 0 ] && [ $1 == "-h" ]; then
@@ -29,18 +29,19 @@ fi
 
 PERFORM_CLEAN=0
 while [ $# != 0 ]; do 
-    if [ $# != 0 ] && [ $1 == "-t" ]; then
+    if [ $# != 0 ] && [ $1 == "-t" -o $1 == "--test" ]; then
         DEFAULT_BASE_NAME=test_ddprof
         BASE_DOCKERFILE="./app/test-env/Dockerfile"
         shift
         continue
     fi
 
-    if [ $# != 0 ] && [ $1 == "clean" ]; then
+    if [ $# != 0 ] && [ $1 == "--clean" -o $1 == "-c" ]; then
         PERFORM_CLEAN=1
         shift
         continue
     fi
+
     echo "Error : unhandled parameter"
     usage
     exit 1

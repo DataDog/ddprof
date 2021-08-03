@@ -23,27 +23,32 @@ if [[ -z "${ASAN_SYMBOLIZER_PATH:-}" ]]; then
 fi
 
 # Overrides
-if [[ -z "${CMD_BASE:-}" ]]; then CMD_BASE=${TOP_LVL_DIR}/release/ddprof; fi
-if [[ -z "${USE_JEMALLOC:-}" ]]; then USE_JEMALLOC=""; fi
+if [[ -z "${CMD_BASE:-}" ]]; then CMD_BASE=${SCRIPTDIR}/run.sh; fi
 CMD=${CMD_BASE}
 
 JOB="redis-runner.sh"
+DEFAULT_JOB_PATH="${TOP_LVL_DIR}/bench/runners/"
 
-# Check for parameters
+# Check for parameters (order matters)
 for arg in "$@"; do
-  if [[ ${arg} == "global" ]]; then CMD="${CMD_BASE} -g yes"; CMD_BASE="${CMD_BASE} -g yes"; fi
-  if [[ ${arg} == "debug" ]]; then CMD="gdb -ex run -ex 'set follow-fork-mode child' -ex 'set print pretty on' --args ${CMD_BASE}"; fi
-  if [[ ${arg} == "strace" ]]; then CMD="strace -f -o /tmp/test.out -s 2500 -v ${CMD_BASE}"; fi
-  if [[ ${arg} == "network" ]]; then CMD="strace -etrace=%network -f -o /tmp/test.out -s 2500 -v ${CMD_BASE}"; fi
-  if [[ ${arg} == "ltrace" ]]; then CMD="ltrace -f -o /tmp/test.out -s 2500 -n 2 -x '*' -e malloc+free ${CMD_BASE}"; fi
-  if [[ ${arg} == "jemalloc" ]]; then USE_JEMALLOC="yes"; fi
-  if [[ ${arg} == "envoy" ]]; then JOB="envoy-runner.sh"; fi
-  if [[ ${arg} == "redis" ]]; then JOB="redis-runner.sh"; fi
-  if [[ ${arg} == "compile" ]]; then JOB="compile-runner.sh"; fi
-  if [[ ${arg} == "collatz" ]]; then JOB="collrunner.sh"; fi
-  if [[ ${arg} == "sleep" ]]; then JOB="sleep.sh"; fi
-  if [[ ${arg} == "noexist" ]]; then JOB="fakejob.sh"; fi
-  if [[ ${arg} == "noexec" ]]; then JOB="non_executable_job.sh"; fi
+  # first run.sh params
+  if [[ ${arg} == "jemalloc" ]]; then CMD="${CMD} -j 26 20"; fi
+  # Then ddprof params
+  if [[ ${arg} == "global" ]]; then CMD="${CMD} -g yes"; fi
+  # Analysis tooling
+  if [[ ${arg} == "debug" ]]; then CMD="gdb -ex run -ex 'set follow-fork-mode child' -ex 'set print pretty on' --args ${CMD}"; fi
+  if [[ ${arg} == "strace" ]]; then CMD="strace -f -o /tmp/test.out -s 2500 -v ${CMD}"; fi
+  if [[ ${arg} == "network" ]]; then CMD="strace -etrace=%network -f -o /tmp/test.out -s 2500 -v ${CMD}"; fi
+  if [[ ${arg} == "ltrace" ]]; then CMD="ltrace -f -o /tmp/test.out -s 2500 -n 2 -x '*' -e malloc+free ${CMD}"; fi
+  # Jobs and toy apps to run 
+  if [[ ${arg} == "boggle" ]]; then JOB="BadBoggleSolver_run 1000"; fi #1000 seconds
+  if [[ ${arg} == "envoy" ]]; then JOB="${DEFAULT_JOB_PATH}envoy-runner.sh"; fi
+  if [[ ${arg} == "redis" ]]; then JOB="${DEFAULT_JOB_PATH}redis-runner.sh"; fi
+  if [[ ${arg} == "compile" ]]; then JOB="${DEFAULT_JOB_PATH}compile-runner.sh"; fi
+  if [[ ${arg} == "collatz" ]]; then JOB="${DEFAULT_JOB_PATH}collrunner.sh"; fi
+  if [[ ${arg} == "sleep" ]]; then JOB="${DEFAULT_JOB_PATH}sleep.sh"; fi
+  if [[ ${arg} == "noexist" ]]; then JOB="${DEFAULT_JOB_PATH}fakejob.sh"; fi
+  if [[ ${arg} == "noexec" ]]; then JOB="${DEFAULT_JOB_PATH}non_executable_job.sh"; fi
 done
 
 # Do service version stuff
@@ -54,15 +59,10 @@ if [[ -f ${VERFILE} ]]; then VER=$(cat ${VERFILE}); fi
 VER=$((VER+1))
 echo ${VER} > ${VERFILE}
 
-# Set any switchable environment variables
-if [[ "yes" == "${USE_JEMALLOC,,}" ]]; then
-  echo "Using jemalloc-based allocation profiling"
-  export LD_PRELOAD='/usr/lib/x86_64-linux-gnu/libjemalloc.so'
-  export MALLOC_CONF='prof:true,lg_prof_interval:26,lg_prof_sample:20,prof_prefix:jeprof.out'
-fi
-
 rm -rf debuglog.out
 
-eval ${SCRIPTDIR}/run.sh ${TOP_LVL_DIR}/bench/runners/${JOB}
+echo "${CMD} ${JOB}"
+echo "##################################################"
+eval ${CMD} ${JOB}
 
 exit 0
