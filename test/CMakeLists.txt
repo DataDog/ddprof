@@ -90,3 +90,12 @@ add_unit_test(
     DEFINITIONS MYNAME="ipc-ut"
 )
 target_include_directories(mmap-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
+
+add_unit_test(
+    ddres-ut
+    ../src/logger.c
+    ddres-ut.cc
+    LIBRARIES libddprof-c
+    DEFINITIONS MYNAME="ddres-ut"
+)
+target_include_directories(ddres-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})

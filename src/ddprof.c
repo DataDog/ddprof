@@ -215,7 +215,7 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
     sample.size_stack = *(uint64_t *)buf++;
     if (sample.size_stack) {
       sample.data_stack = (char *)buf;
-      buf = (char *)buf + sample.size_stack;
+      buf = (uint64_t *)((char *)buf + sample.size_stack);
     } else {
       // Not sure
     }

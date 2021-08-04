@@ -16,6 +16,7 @@ if (CPP_CHECK_COMMAND)
    list(APPEND CPP_CHECK_COMMAND 
          "--enable=warning,performance,portability,information,style"
          "--template=${CPPCHECK_TEMPLATE}"
+         "--library=googletest"
          "--quiet" 
          # "--verbose"
          "--suppressions-list=${CMAKE_SOURCE_DIR}/CppCheckSuppressions.txt"
