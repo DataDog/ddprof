@@ -25,7 +25,8 @@ RUN apt update \
   zlib1g-dev \
   libgtest-dev \
   libgmock-dev \
-  libjemalloc-dev
+  libjemalloc-dev \
+  libcap-dev
 
 # Newer CMake
 FROM base as cmake

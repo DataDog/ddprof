@@ -11,6 +11,7 @@ enum DDRes_Where {
   DD_LOC_UNWIND = 1,
   DD_LOC_UW_CACHE = 2,
   DD_LOC_UNITTEST = 3,
+  DD_LOC_CAP_DISP = 4,
   // max
   DD_LOC_MAX = SHRT_MAX,
 };
@@ -27,6 +28,7 @@ enum DDRes_What {
   DD_WHAT_STDEXCEPT,
   DD_WHAT_UKNWEXCEPT,
   DD_WHAT_MIN_NATIVE = DD_NATIVE_START_RANGE,
+  DD_WHAT_CAPLIB,
   // native errors
   DD_WHAT_UNITTEST,
   // max

@@ -260,7 +260,10 @@ int unwindstate__unwind(struct UnwindState *us) {
   }
 
   if (!dwfl_getthread_frames(us->dwfl, us->pid, frame_cb, us)) {
-    LG_DBG("[UNWIND] dwfl_getthread_frames was nonzero (%s)", dwfl_errmsg(-1));
+    /* This should be investigated - when all errors are solved we can
+     * reactivate the log (it is too verbose for now) */
+    // LG_DBG("[UNWIND] dwfl_getthread_frames was nonzero (%s)",
+    // dwfl_errmsg(-1));
     return us->idx > 0 ? 0 : -1;
   }
 

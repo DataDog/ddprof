@@ -6,13 +6,14 @@
 #include <unistd.h>
 #include <x86intrin.h>
 
+#include "cap_display.h"
 #include "ddprofcmdline.h"
 #include "procutils.h"
 #include "statsd.h"
 #include "unwind.h"
 
 #ifdef DBG_JEMALLOC
-#include <jemalloc/jemalloc.h>
+#  include <jemalloc/jemalloc.h>
 #endif
 
 #define USERAGENT_DEFAULT "libddprof"
@@ -553,6 +554,12 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   perfopen_attr perf_funs = {.msg_fun = ddprof_callback,
                              .timeout_fun = ddprof_timeout};
   struct PEvent pes[MAX_NB_WATCHERS] = {0};
+
+  // Don't stop if error as this is only for debug purpose
+  if (IsDDResNotOK(log_capabilities(false))) {
+    LG_ERR("Error when printing capabilities, continuing...");
+  }
+
   if (!setup_watchers(ctx, pid, num_cpu, pes)) {
     LG_ERR("Error when attaching to perf_event buffers.");
     return;

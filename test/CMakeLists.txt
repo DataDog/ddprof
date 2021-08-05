@@ -99,3 +99,14 @@ add_unit_test(
     DEFINITIONS MYNAME="ddres-ut"
 )
 target_include_directories(ddres-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
+
+
+add_unit_test(
+    cap-ut
+    ../src/cap_display.c
+    ../src/logger.c
+    cap-ut.cc
+    LIBRARIES libddprof-c libcap
+    DEFINITIONS MYNAME="cap-ut"
+)
+target_include_directories(cap-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR} ${LIBCAP_INCLUDE_DIR})

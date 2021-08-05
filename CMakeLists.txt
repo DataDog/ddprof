@@ -102,6 +102,9 @@ if (${JEMALLOC})
    add_compile_definitions("DBG_JEMALLOC")
 endif()
 
+# Install lib cap to retrieve capabilities
+include(Findlibcap)
+
 ####################
 ### Unit tests   ###
 ####################
@@ -202,6 +205,10 @@ set(DDPROF_LIBRARY_LIST libddprof-c llvm-demangle libstdc++.a dw.a elf.a libz.a 
 if (${JEMALLOC})
    list(PREPEND DDPROF_LIBRARY_LIST jemalloc)
 endif()
+
+# libcap, can be removed from version distributed to client 
+list(APPEND DDPROF_LIBRARY_LIST libcap)
+list(APPEND DDPROF_INCLUDE_LIST ${LIBCAP_INCLUDE_DIR})
 
 # It is important to force most libraries as static
 add_exe(ddprof

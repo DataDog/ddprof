@@ -3,7 +3,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
 #include <ddprof/unlikely.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #define DD_SEVOK 0
@@ -40,27 +42,30 @@ typedef struct DDRes {
   FillDDRes(res, DD_SEVERROR, where, what)
 
 /******** STANDARD APIs TO USE BELLOW **********/
+// In C you should be careful of static inline vs extern inline vs inline
 
 /// sev, where, what (in that order ! no relevant type checking)
-inline DDRes ddres_create(int16_t sev, int16_t where, int32_t what) {
+static inline DDRes ddres_create(int16_t sev, int16_t where, int32_t what) {
   DDRes ddres;
   FillDDRes(ddres, sev, where, what);
   return ddres;
 }
 
 /// where, what (in that order)
-inline DDRes ddres_fatal(int16_t where, int32_t what) {
+static inline DDRes ddres_fatal(int16_t where, int32_t what) {
   return ddres_create(DD_SEVERROR, where, what);
 }
 
 /// create an empty ddres with an OK sev
-inline DDRes ddres_init(void) {
+static inline DDRes ddres_init(void) {
   DDRes ddres = {0};
   return ddres;
 }
 
 /// returns a bool : true if they are equal
-inline bool ddres_equal(DDRes lhs, DDRes rhs) { return lhs._val == rhs._val; }
+static inline bool ddres_equal(DDRes lhs, DDRes rhs) {
+  return lhs._val == rhs._val;
+}
 
 // Assumption behind these is that SEVERROR does not occur often
 
@@ -74,7 +79,7 @@ inline bool ddres_equal(DDRes lhs, DDRes rhs) { return lhs._val == rhs._val; }
 #define IsDDResFatal(res) unlikely(res._sev == DD_SEVERROR)
 
 #ifdef __cplusplus
-}
+} // extern "C"
 
 inline bool operator==(DDRes lhs, DDRes rhs) { return ddres_equal(lhs, rhs); }
 #endif
