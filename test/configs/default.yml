@@ -5,6 +5,7 @@ ddprof:
   service:
     name: native-testservice
   upload:
-    period: 2
+    period: 5
   environment: test-staging
   loglevel: notice
+  event: sCPU,1000

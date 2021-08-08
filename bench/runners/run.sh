@@ -166,7 +166,8 @@ fi
 
 if [[ "yes" == "${USE_PERFSTAT,,}" ]]; then
   empty_or_exit ${PREPEND_CMD}
-  PREPEND_CMD="perf stat"
+  # -x allows for csv format
+  PREPEND_CMD="perf stat -x ','"
 fi
 
 export ASAN_SYMBOLIZER_PATH=$(which llvm-symbolizer)
@@ -178,7 +179,7 @@ if [ ! -z ${BUILD_FOLDER} ] && [ -d ${BUILD_FOLDER} ]; then
   echo "Override ddprof folder to ${BUILD_FOLDER}..."
   CMD="${PREPEND_CMD} ${BUILD_FOLDER}/ddprof"
 fi
-echo "Use ddprof from : ${CMD}"
+echo "ddprof:${BUILD_FOLDER}/ddprof"
 
 # Do service version stuff
 VERFILE="tmp/run.ver"
@@ -201,6 +202,8 @@ if [[ "yes" == "${USE_JEMALLOC,,}" ]]; then
   export MALLOC_CONF="prof:true,lg_prof_interval:${JEMALLOC_INTERVALS},lg_prof_sample:${JEMALLOC_SAMPLES},prof_prefix:jeprof.out"
 fi
 
+echo "Events: ${cfg_ddprof_event}"
+
 # Run it!
 eval ${CMD} \
   -H ${cfg_ddprof_intake_url} \
@@ -209,6 +212,7 @@ eval ${CMD} \
   -u ${cfg_ddprof_upload_period} \
   -E ${cfg_ddprof_environment}"test-staging" \
   -l ${cfg_ddprof_loglevel} \
+  -e ${cfg_ddprof_event} \
   "$@"
 
 # Helps find the relevant trace in the UI
