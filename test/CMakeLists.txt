@@ -53,10 +53,12 @@ add_unit_test(
     signal_helper-ut.cc
 )
 
+include(Version)
 add_unit_test(
     version-ut
     ../src/version.c 
     version-ut.cc
+    DEFINITIONS ${DDPROF_DEFINITION_LIST}
 )
 
 add_unit_test(

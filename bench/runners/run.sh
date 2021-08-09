@@ -203,6 +203,7 @@ if [[ "yes" == "${USE_JEMALLOC,,}" ]]; then
 fi
 
 echo "Events: ${cfg_ddprof_event}"
+echo "Running: $@"
 
 # Run it!
 eval ${CMD} \
@@ -212,7 +213,8 @@ eval ${CMD} \
   -u ${cfg_ddprof_upload_period} \
   -E ${cfg_ddprof_environment}"test-staging" \
   -l ${cfg_ddprof_loglevel} \
-  -e ${cfg_ddprof_event} \
+  -e "${cfg_ddprof_event}" \
+  -s on \
   "$@"
 
 # Helps find the relevant trace in the UI

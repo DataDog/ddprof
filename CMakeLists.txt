@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.19)
+
 ############################
 ### Global definitions   ###
 ############################
@@ -11,8 +12,9 @@ set(CMAKE_CXX_COMPILER g++ CACHE STRING "C++ compiler")
 set(CMAKE_C_COMPILER gcc CACHE STRING "C compiler")
  
 project(DDProf
-  LANGUAGES C
-  VERSION 0.1
+  LANGUAGES C CXX
+  VERSION 0.5.1
+  DESCRIPTION "Datadog's native profiler"
 )
 
 # Define the include path of cmake scripts
@@ -123,15 +125,15 @@ endif()
 ###############################
 # Known limitation : lib elf is not built with cmake for now (makefile)
 
-# Compile time definitions
+# Compile time definitions 
 string(TOLOWER ${CMAKE_PROJECT_NAME} CMAKE_PROJECT_NAME_LC)
-add_compile_definitions("MYNAME=\"${CMAKE_PROJECT_NAME_LC}\"")
+list(APPEND DDPROF_DEFINITION_LIST "MYNAME=\"${CMAKE_PROJECT_NAME_LC}\"")
 
-set(BUILD_REV "custom" CACHE STRING "Revision appended to the version information")
-add_compile_definitions("VER_REV=\"${BUILD_REV}\"")
+include(Version)
 
 # Leave frame pointers to help with profiling
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${FRAME_PTR_FLAG}")
+list(APPEND CMAKE_C_FLAGS ${FRAME_PTR_FLAG})
+list(APPEND CMAKE_CXX_FLAGS ${FRAME_PTR_FLAG})
 
 set(DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/include/proto)
 list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include/proto)
@@ -144,7 +146,6 @@ message(STATUS "SYSTEM NAME " ${CMAKE_SYSTEM_NAME})
 if (NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
    message(STATUS "BUILD WILL FAIL : NON LINUX SYSTEMS NOT HANDLED")
 endif()
-
 
 # Zlib
 # Slightly hacky way of finding static libraries. Unable to find static library using CMAKE_FIND_LIBRARY_SUFFIXES.
@@ -213,7 +214,8 @@ list(APPEND DDPROF_INCLUDE_LIST ${LIBCAP_INCLUDE_DIR})
 # It is important to force most libraries as static
 add_exe(ddprof
         ${DDPROF_GLOBAL_SRC}
-        LIBRARIES ${DDPROF_LIBRARY_LIST})
+        LIBRARIES ${DDPROF_LIBRARY_LIST}
+        DEFINITIONS ${DDPROF_DEFINITION_LIST})
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 
 message(STATUS "Install destination " ${CMAKE_INSTALL_PREFIX})
