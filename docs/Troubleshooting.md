@@ -66,3 +66,15 @@ Retrieve CPU value
 CPU DIFF : 0.999 vs 1.075 
 COMPUTATION DIFF: 17778 vs 16452
 ```
+
+## Code coverage
+
+The CI uses gcov.
+
+### GCov html generation
+
+From the root of directory
+
+```bash
+gcovr -r . --html -o ddprof-coverage.html
+```

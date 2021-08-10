@@ -13,7 +13,7 @@ extern "C" {
 
 // Simple test to see if mlock fails for large sizes
 TEST(MMapTest, Mlock32KB) {
-  const int alloc_size = 32 * 1024 * 1024; // 32 MB
+  const int alloc_size = 32 * 1024; // 32 KB
   char *memory = (char *)malloc(alloc_size);
   ASSERT_TRUE(memory);
   int ret = mlock(memory, alloc_size);
@@ -45,7 +45,7 @@ TEST(MMapTest, PerfOpen) {
 
   int cpu = 0;
 
-  for (int i = 0; i < perfoptions_sz; ++i) {
+  for (unsigned i = 0; i < perfoptions_sz; ++i) {
     std::cerr << "#######################################" << std::endl;
     std::cerr << "-->" << i << " " << perfoptions[i].desc << std::endl;
 

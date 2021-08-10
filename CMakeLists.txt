@@ -17,20 +17,17 @@ project(DDProf
   DESCRIPTION "Datadog's native profiler"
 )
 
+# Debug command to get gcc command lines
+# set( CMAKE_VERBOSE_MAKEFILE on )
+
 # Define the include path of cmake scripts
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
-set(CMAKE_CONFIGURATION_TYPES "Debug;Release;SanitizedDebug" CACHE STRING
-    "Available build-types: Debug, Release and SanitizedDebug")
+include(ExtendBuildTypes)
 
-## Frame pointers
-set(FRAME_PTR_FLAG "-fno-omit-frame-pointer")
-
-## Sanitizer setup
-set(ASAN_FLAGS "-g -fsanitize=address -fsanitize=undefined -fsanitize=leak -fsanitize=float-divide-by-zero -fno-sanitize-recover")
-set(STACK_FLAGS "-fstack-protector-all")
-set(CMAKE_CXX_FLAGS_SANITIZEDDEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${ASAN_FLAGS} ${STACK_FLAGS}")
-set(CMAKE_C_FLAGS_SANITIZEDDEBUG "${CMAKE_C_FLAGS_DEBUG} ${ASAN_FLAGS} ${STACK_FLAGS}")
+# Default value
+option(CMAKE_BUILD_TYPE "Build type" Debug)
+message(STATUS "Build type set to " ${CMAKE_BUILD_TYPE})
 
 ## Allow to easily import external libraries
 include(FetchContent)
@@ -39,46 +36,24 @@ include(FetchContent)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-#[[ Create an executable
-Syntax:
-add_exe(<name> src1 [src2 ...] [LIBRARIES lib1 lib2 ...] [DEFINITIONS def1 def2])
-will compile an executable named <name> from source files src1 src2...
-with pre-processor definitions def1 def2 (-Ddef1 -Ddef2 ... will be added to compile command)
-and link against lib1 lib2 ...and libm
+#helper functions
+include(Helperfunc)
 
-Examples:
-add_exe(myexe src1.cpp)
-add_exe(myexe src1.cpp
-   LIBRARIES ${CMAKE_SOURCE_DIR}/myLib
-   DEFINITIONS UNIT_TEST)
-#]]
-function(add_exe name)
-   set(cur_var "sources")
-   set(exe_sources "")
-   set(exe_libraries "")
-   set(exe_definitions "")
-   set(exe_include_dirs "")
-   foreach(arg IN LISTS ARGN)
-      if (arg STREQUAL "LIBRARIES")
-         set(cur_var "libraries")
-      elseif (arg STREQUAL "DEFINITIONS")
-         set(cur_var "definitions")
-      else()
-         list(APPEND exe_${cur_var} ${arg})
-         if (cur_var STREQUAL "sources")
-            get_filename_component(src_dir ${arg} DIRECTORY)
-            list(APPEND exe_include_dirs ${src_dir})
-         endif()
-      endif()
-   endforeach()
-   add_executable(${name} ${exe_sources})
-   set_target_properties(${name} PROPERTIES
-       COMPILE_DEFINITIONS "${exe_definitions}"
-       BUILD_RPATH "${runtime_path}")
-   target_link_libraries(${name} PRIVATE ${exe_libraries})
-   list(REMOVE_DUPLICATES exe_include_dirs)
-   target_include_directories(${name} PRIVATE ${exe_include_dirs} ${all_includes})
-endfunction()
+##############
+### Deps   ###
+##############
+# Define a dependency target to fetch all dependencies ahead of time (CI build time optim)
+
+# libddprof
+include(Findlibddprof)
+message(STATUS "Libddprof Include directory " ${LIBDDPROF_INCLUDE_DIR})
+
+# llvm-demangle
+include(FindLibLlvmDemangle)
+
+add_custom_target(deps
+                  DEPENDS codecov-deps llvm-deps)
+
 
 #######################
 ### Static analysis ###
@@ -91,10 +66,6 @@ include(Cppcheckconfig)
 ### Libraries (needed by ut)   ###
 ##################################
 find_package(PkgConfig REQUIRED)
-
-# libddprof
-include(Findlibddprof)
-message(STATUS "Libddprof Include directory " ${LIBDDPROF_INCLUDE_DIR})
 
 option(JEMALLOC "Enable jemalloc stats" OFF)
 if (${JEMALLOC})
@@ -167,9 +138,6 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(PROTOBUF_C REQUIRED IMPORTED_TARGET libprotobuf-c)
 link_directories(${PROTOBUF_C_LIBDIR})
 
-# llvm-demangle
-include(FindLibLlvmDemangle)
-aux_source_directory(${LLVM_DEMANGLE_PATH}/lib/Demangle LLVM_DEMANGLE_SOURCES)
 list(APPEND DDPROF_INCLUDE_LIST ${LLVM_DEMANGLE_PATH}/include)
 
 # libstdcxx

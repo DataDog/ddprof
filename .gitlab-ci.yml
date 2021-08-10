@@ -5,8 +5,8 @@ stages:
 
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
-  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/78440110
-  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:f7199cabe53a0d9f9e58b1bce79e4c9649e7a79a3d0be1ee890c3e220c65c790
+  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/79006357
+  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:80c1e4d5001c1c3b2c78c61e89146d171a035a3a357b8a8ca47ec307729fab63
   # https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/78136292
   TEST_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:98d26ab6ca3f8f1e3ae770418e4ac732d153d3eabc4e20d58104b34bc3f9546a
   # When build images are built, publish them with following tags
@@ -72,17 +72,14 @@ build:ddprof_cmake:
   tags: ["runner:k8s"]
   parallel:
     matrix:
-      - BUILD_TYPE: ["Release", "Debug", "SanitizedDebug"]
+      - BUILD_TYPE: ["Release", "Debug", "SanitizedDebug", "Coverage"]
   variables:
     BUILDPATH: build_${BUILD_TYPE}
   script:
     - set -euxo pipefail
     - export DELIVERY_PATH="${CI_PROJECT_DIR}/${BINPATH}/${BUILD_TYPE}"
-    - mkdir -p vendor
     #Build image dependencies were stored in app, avoid rebuilding vendor content
-    - ln -s /app/vendor/elfutils vendor/elfutils
-    - ln -s /app/vendor/libddprof vendor/libddprof
-    - ln -s /app/vendor/llvm vendor/llvm
+    - ln -s /app/vendor vendor
     - mkdir -p ${BUILDPATH} && cd ${BUILDPATH}
     - cmake -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
     # Static checks
@@ -91,7 +88,12 @@ build:ddprof_cmake:
     - if [ ! $(./ddprof --version | sed 's/.*+//g') == "${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA}" ]; then exit 1; fi
     - ctest --repeat-until-fail 5 --output-on-failure | tee test-output.log
     - make install
-      # This job gives useful info on the config of CI (perfopen allowed sizes)
+    - if [ ${BUILD_TYPE} == "Coverage" ]; then
+    - make ctest_coverage
+    - export CODECOV_TOKEN=$(aws ssm get-parameter --region us-east-1 --name ci.ddprof.codecov-token --with-decryption --query "Parameter.Value" --out text)
+    - ${CI_PROJECT_DIR}/tools/codecov.sh -Z
+    - fi
+      # This job gives useful info on the mmap/mlock/perfopen capabilities in CI
     - cd test && ./mmap-ut
   artifacts:
     paths:

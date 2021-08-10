@@ -2,11 +2,16 @@ find_package(GTest REQUIRED)
 
 enable_testing()
 
-#### Define level of static checks ####
-message(STATUS "Build type set to " ${CMAKE_BUILD_TYPE})
-message(STATUS "Activate asan by default for unit tests")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ASAN_FLAGS} ${STACK_FLAGS} ${FRAME_PTR_FLAG}")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${ASAN_FLAGS} ${STACK_FLAGS} ${FRAME_PTR_FLAG}")
+### Code coverage
+if(DEFINED CMAKE_BUILD_TYPE AND ${CMAKE_BUILD_TYPE} STREQUAL Coverage)
+    message(STATUS "Activating code coverage in tests")
+    include(CodeCoverage)
+    set(COVERAGE_EXCLUDES "vendor/*")
+    setup_target_for_coverage_gcovr_xml(
+        NAME ctest_coverage
+        EXECUTABLE ctest -j ${PROCESSOR_COUNT} # Executable in PROJECT_BINARY_DIR
+    )
+endif()
 
 #### Define functions ####
 
@@ -101,7 +106,6 @@ add_unit_test(
     DEFINITIONS MYNAME="ddres-ut"
 )
 target_include_directories(ddres-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
-
 
 add_unit_test(
     cap-ut
