@@ -99,8 +99,8 @@ int main(int argc, char **argv) {
     DDR_init(ctx->ddr);
 
     // Initialize the pprof
-    const char *pprof_labels[max_watchers];
-    const char *pprof_units[max_watchers];
+    const char *pprof_labels[MAX_TYPE_WATCHER];
+    const char *pprof_units[MAX_TYPE_WATCHER];
     for (int i = 0; i < ctx->num_watchers; i++) {
       pprof_labels[i] = ctx->watchers[i].label;
       pprof_units[i] = ctx->watchers[i].unit;

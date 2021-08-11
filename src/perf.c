@@ -144,8 +144,12 @@ struct perf_event_header *rb_seek(RingBuffer *rb, uint64_t offset) {
   return (struct perf_event_header *)(rb->start + rb->offset);
 }
 
-void main_loop(PEvent *pes, int pe_len, perfopen_attr *attr, void *arg) {
+#warning adapt to usage of pevent_hdr and split perf.c
+
+void main_loop(PEventHdr *pevent_hdr, int pe_len, perfopen_attr *attr,
+               void *arg) {
   struct pollfd pfd[100];
+  PEvent *pes = pevent_hdr->pes;
   assert(attr->msg_fun);
 
   if (pe_len > 100)
@@ -191,7 +195,7 @@ void main_loop(PEvent *pes, int pe_len, perfopen_attr *attr, void *arg) {
   // That means we need to iterate through the perf_event_open() handles and
   // get the mmaps
   for (int k = 0; k < pe_len; k++) {
-    if (!(pes[k].region = perfown(pes[k].fd))) {
+    if (!(pes[k].region = perfown(pes[k].fd, &pes[k].reg_size))) {
       close(pes[k].fd);
       pes[k].fd = -1;
       LG_ERR("Worker could not register handle %d (%s)", k, strerror(errno));
@@ -219,7 +223,7 @@ void main_loop(PEvent *pes, int pe_len, perfopen_attr *attr, void *arg) {
         for (int k = 0; k < pe_len; k++) {
           if (!pes[k].region)
             continue;
-          munmap(pes[k].region, PAGE_SIZE + PSAMPLE_SIZE);
+          perfdisown(pes[k].region, pes[k].reg_size);
           pes[k].region = NULL;
         }
         exit(0);
@@ -256,7 +260,7 @@ void main_loop(PEvent *pes, int pe_len, perfopen_attr *attr, void *arg) {
             for (int k = 0; k < pe_len; k++) {
               if (!pes[k].region)
                 continue;
-              munmap(pes[k].region, PAGE_SIZE + PSAMPLE_SIZE);
+              munmap(pes[k].region, pes[k].reg_size);
               pes[k].region = NULL;
             }
             exit(0);

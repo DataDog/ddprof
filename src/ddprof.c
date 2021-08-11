@@ -9,8 +9,10 @@
 #include "cap_display.h"
 #include "ddprofcmdline.h"
 #include "ddres.h"
+#include "procutils.h"
 #include "statsd.h"
 #include "unwind.h"
+#include "watchers.h"
 
 //clang-format off
 #ifdef DBG_JEMALLOC
@@ -175,8 +177,8 @@ bool reset_state(DDProfContext *ctx, volatile bool *continue_profiling) {
     }
 
     // Clear and re-initialize the pprof
-    const char *pprof_labels[max_watchers];
-    const char *pprof_units[max_watchers];
+    const char *pprof_labels[MAX_TYPE_WATCHER];
+    const char *pprof_units[MAX_TYPE_WATCHER];
     pprof_Free(ctx->dp);
     for (int i = 0; i < ctx->num_watchers; i++) {
       pprof_labels[i] = ctx->watchers[i].label;
@@ -321,7 +323,7 @@ void ddprof_pr_sample(DDProfContext *ctx, struct perf_event_header *hdr,
     if (id_loc > 0)
       id_locs[j++] = id_loc;
   }
-  int64_t sample_val[max_watchers] = {0};
+  int64_t sample_val[MAX_TYPE_WATCHER] = {0};
   sample_val[pos] = sample->period;
   pprof_sampleAdd(dp, sample_val, ctx->num_watchers, id_locs, us->idx);
 }
@@ -544,79 +546,21 @@ void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   exit(-1);
 }
 
-// returns the number of successful setups
-static int setup_watchers(DDProfContext *ctx, pid_t pid, int num_cpu,
-                          struct PEvent *pes) {
-  int k = 0;
-  int nb_success = 0;
-  for (int i = 0; i < ctx->num_watchers && ctx->params.enable; ++i) {
-    for (int j = 0; j < num_cpu; ++j) {
-      pes[k].pos = i;
-      pes[k].fd = perfopen(pid, &ctx->watchers[i], j, true);
-      if (pes[k].fd == -1) {
-        LG_ERR("Error calling perfopen on watcher %d.%d (%s)", i, j,
-               strerror(errno));
-      } else if (!(pes[k].region = perfown(pes[k].fd, &pes[k].reg_size))) {
-        close(pes[k].fd);
-        pes[k].fd = -1;
-        LG_ERR("Could not finalize watcher %d.%d: registration (%s)", i, j,
-               strerror(errno));
-      } else {
-        ++nb_success;
-      }
-      ++k;
-      if (k >= MAX_NB_WATCHERS) {
-        LG_WRN("Reached max number of watchers (%d)", MAX_NB_WATCHERS);
-        return nb_success;
-      }
-    }
-  }
-  return nb_success;
-}
-
-// returns the number of successful cleans
-static int cleanup_watchers(DDProfContext *ctx, struct PEvent *pes,
-                            int num_cpu) {
-  int k = 0;
-  int nb_clean = 0;
-
-  for (int i = 0; i < ctx->num_watchers && ctx->params.enable; ++i) {
-    for (int j = 0; j < num_cpu; ++j) {
-      if (pes[k].region) {
-        if (perfdisown(pes[k].region, pes[k].reg_size) != 0) {
-          LG_WRN("Error when using perfdisown %d.%d", i, j);
-        } else {
-          pes[k].region = NULL;
-          ++nb_clean;
-        }
-      }
-      if (pes[k].fd != -1) {
-        close(pes[k].fd);
-        pes[k].fd = -1;
-      }
-      ++k;
-      if (k >= MAX_NB_WATCHERS) {
-        return nb_clean;
-      }
-    }
-  }
-  return nb_clean;
-}
-
 /*************************  Instrumentation Helpers  **************************/
 // This is a quick-and-dirty implementation.  Ideally, we'll harmonize this
 // with the other functions.
 void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   perfopen_attr perf_funs = {.msg_fun = ddprof_callback,
                              .timeout_fun = ddprof_timeout};
-  struct PEvent pes[MAX_NB_WATCHERS] = {0};
+  PEventHdr pevent_hdr;
+  init_pevent(&pevent_hdr);
 
   // Don't stop if error as this is only for debug purpose
   if (IsDDResNotOK(log_capabilities(false))) {
     LG_ERR("Error when printing capabilities, continuing...");
   }
 
-  if (!setup_watchers(ctx, pid, num_cpu, pes)) {
+  if (IsDDResNotOK(setup_watchers(ctx, pid, num_cpu, &pevent_hdr))) {
     LG_ERR("Error when attaching to perf_event buffers.");
     return;
   }
@@ -624,11 +568,9 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   // We checked that perfown would work, now we free the regions so the worker
   // can get them back.  This is slightly wasteful, but these mappings don't
   // work in the child for some reason.
-  for (int k = 0; k < num_cpu * ctx->num_watchers; k++) {
-    if (!pes[k].region)
-      continue;
-    munmap(pes[k].region, PAGE_SIZE + PSAMPLE_SIZE);
-    pes[k].region = NULL;
+  if (IsDDResNotOK(cleanup_watchers(&pevent_hdr))) {
+    LG_ERR("Error when cleaning watchers.");
+    return;
   }
 
   LG_NTC("Entering main loop");
@@ -664,15 +606,13 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
     LG_WRN("Error from statsd_init");
   }
 
-  // Just before we enter the main loop, force the enablement of the perf
-  // contexts
-  for (int i = 0; i < ctx->num_watchers * num_cpu; i++) {
-    if (-1 == ioctl(pes[i].fd, PERF_EVENT_IOC_ENABLE))
-      LG_WRN("Couldn't enable watcher %d", i);
+  if (IsDDResNotOK(enable_watchers(&pevent_hdr))) {
+    LG_ERR("Error when enabling watchers");
+    return;
   }
 
   // Enter the main loop -- this will not return unless there is an error.
-  main_loop(pes, ctx->num_watchers * num_cpu, &perf_funs, ctx);
+  main_loop(&pevent_hdr, ctx->num_watchers * num_cpu, &perf_funs, ctx);
 
   // If we're here, the main loop closed--probably the profilee closed
   if (errno)
@@ -687,7 +627,7 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
     LG_WRN("Sending final export");
     export(ctx, now);
   }
-  if (!cleanup_watchers(ctx, pes, num_cpu)) {
+  if (IsDDResNotOK(cleanup_watchers(&pevent_hdr))) {
     LG_ERR("Error when calling cleanup_watchers.");
   }
   unwind_free(ctx->us);

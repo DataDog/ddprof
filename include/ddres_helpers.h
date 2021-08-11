@@ -20,7 +20,7 @@ extern "C" {
 /// Evaluate function and return error if -1 (add an error log)
 #define DDRES_CHECK_INT(eval, what, ...)                                       \
   do {                                                                         \
-    if (eval == -1) {                                                          \
+    if (unlikely(eval == -1)) {                                                \
       DDRES_RETURN_ERROR_LOG(what, __VA_ARGS__);                               \
     }                                                                          \
   } while (0)
@@ -28,7 +28,7 @@ extern "C" {
 /// Check boolean and log
 #define DDRES_CHECK_BOOL(eval, what, ...)                                      \
   do {                                                                         \
-    if (!eval) {                                                               \
+    if (unlikely(!eval)) {                                                     \
       DDRES_RETURN_ERROR_LOG(what, __VA_ARGS__);                               \
     }                                                                          \
   } while (0)

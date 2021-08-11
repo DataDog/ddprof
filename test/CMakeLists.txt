@@ -51,6 +51,7 @@ add_unit_test(
     ../src/ddprofcmdline.c 
     ddprofcmdline-ut.cc
 )
+target_include_directories(ddprofcmdline-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
 
 add_unit_test(
     signal_helper-ut
@@ -78,7 +79,7 @@ add_unit_test(
     demangle-ut.cc
     LIBRARIES llvm-demangle libstdc++.a
 )
-target_include_directories(demangle-ut PRIVATE ${LLVM_DEMANGLE_PATH}/include)
+target_include_directories(demangle-ut PRIVATE ${LLVM_DEMANGLE_PATH}/include ${LIBDDPROF_INCLUDE_DIR})
 
 add_compile_definitions("IPC_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 

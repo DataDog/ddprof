@@ -5,57 +5,12 @@
 #include <execinfo.h>
 #include <sys/time.h>
 
+#include "ddprof_context.h"
 #include "ipc.h"
 #include "logger.h"
 #include "perf.h"
 #include "procutils.h"
 #include "version.h"
-
-#define max_watchers 10
-
-typedef struct DDProfContext {
-  DProf *dp;
-  DDReq *ddr;
-
-  // Parameters for interpretation
-  char *agent_host;
-  char *prefix;
-  char *tags;
-  char *logmode;
-  char *loglevel;
-
-  // Input parameters
-  char *printargs;
-  char *count_samples;
-  char *enable;
-  char *native_enable;
-  char *upload_period;
-  char *profprofiler;
-  char *faultinfo;
-  char *coredumps;
-  char *nice;
-  char *sendfinal;
-  char *pid;
-  char *global;
-  struct {
-    bool count_samples;
-    bool enable;
-    double upload_period;
-    bool profprofiler;
-    bool faultinfo;
-    bool coredumps;
-    int nice;
-    bool sendfinal;
-    pid_t pid;
-    bool global;
-  } params;
-  PerfOption watchers[max_watchers];
-  int num_watchers;
-
-  struct UnwindState *us;
-  ProcStatus *last_status;
-  int64_t send_nanos; // Last time an export was sent
-} DDProfContext;
 
 /*
     This table is used for a variety of things, but primarily for dispatching

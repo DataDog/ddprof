@@ -23,6 +23,9 @@ enum DDRes_What {
   DD_WHAT_DWFL_LIB_ERROR, // external lib error
   DD_WHAT_UW_CACHE_ERROR,
   DD_WHAT_CAPLIB,
+  DD_WHAT_PERFOPEN,
+  DD_WHAT_IOCTL,
+  DD_WHAT_PERFMMAP,
   // native errors
   DD_WHAT_UNITTEST,
   // max
