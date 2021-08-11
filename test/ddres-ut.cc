@@ -21,7 +21,7 @@ public:
 
 TEST(DDRes, Size) {
   DDRes ddres = {0};
-  ASSERT_TRUE(sizeof(ddres) == sizeof(int64_t));
+  ASSERT_TRUE(sizeof(ddres) == sizeof(int32_t));
 }
 
 TEST(DDRes, InitOK) {
@@ -44,19 +44,23 @@ static int s_call_counter = 0;
 
 DDRes mock_fatal_generator() {
   ++s_call_counter;
-  RETURN_FATAL_LOG(DD_LOC_UNITTEST, DD_WHAT_UNITTEST,
-                   "Test the log and return function %d", 42);
+  DDRES_RETURN_ERROR_LOG(DD_WHAT_UNITTEST,
+                         "Test the log and return function %d", 42);
 }
 
 DDRes dderr_wrapper() {
-  DDERR_CHECK_FWD(mock_fatal_generator());
+  DDRES_CHECK_FWD(mock_fatal_generator());
   return ddres_init();
 }
+
+int minus_one_generator(void) { return -1; }
+
+bool false_generator(void) { return false; }
 }
 
 TEST(DDRes, FillFatal) {
   {
-    DDRes ddres = ddres_fatal(DD_LOC_UKNW, DD_WHAT_UNITTEST);
+    DDRes ddres = ddres_error(DD_WHAT_UNITTEST);
     ASSERT_TRUE(IsDDResNotOK(ddres));
     ASSERT_TRUE(IsDDResFatal(ddres));
   }
@@ -64,23 +68,19 @@ TEST(DDRes, FillFatal) {
     LogHandle handle;
     {
       DDRes ddres = mock_fatal_generator();
-      ASSERT_TRUE(
-          ddres_equal(ddres, ddres_fatal(DD_LOC_UNITTEST, DD_WHAT_UNITTEST)));
+      ASSERT_TRUE(ddres_equal(ddres, ddres_error(DD_WHAT_UNITTEST)));
     }
     EXPECT_EQ(s_call_counter, 1);
 
     {
       DDRes ddres = dderr_wrapper();
-      ASSERT_TRUE(
-          ddres_equal(ddres, ddres_fatal(DD_LOC_UNITTEST, DD_WHAT_UNITTEST)));
+      ASSERT_TRUE(ddres_equal(ddres, ddres_error(DD_WHAT_UNITTEST)));
     }
     EXPECT_EQ(s_call_counter, 2);
   }
 }
 
-void mock_except1() {
-  throw DDException(DD_SEVERROR, DD_LOC_UNITTEST, DD_WHAT_UNITTEST);
-}
+void mock_except1() { throw DDException(DD_SEVERROR, DD_WHAT_UNITTEST); }
 
 void mock_except2() { throw std::bad_alloc(); }
 
@@ -90,9 +90,17 @@ DDRes mock_wrapper(int idx) {
       mock_except1();
     } else if (idx == 2) {
       mock_except2();
+    } else if (idx == 3) {
+      DDRES_CHECK_INT(minus_one_generator(), DD_WHAT_UNITTEST,
+                      "minus one returned");
+    } else if (idx == 4) {
+      LG_NTC("all good");
+    } else if (idx == 5) {
+      DDRES_CHECK_BOOL(false_generator(), DD_WHAT_UNITTEST,
+                       "False returned from generator");
     }
   }
-  CatchExcept2DDRes(DD_LOC_UNITTEST);
+  CatchExcept2DDRes();
   return ddres_init();
 }
 
@@ -101,11 +109,16 @@ TEST(DDRes, ConvertException) {
   LogHandle handle;
   try {
     DDRes ddres = mock_wrapper(1);
-    ASSERT_EQ(ddres,
-              ddres_create(DD_SEVERROR, DD_LOC_UNITTEST, DD_WHAT_UNITTEST));
+    ASSERT_EQ(ddres, ddres_create(DD_SEVERROR, DD_WHAT_UNITTEST));
     ddres = mock_wrapper(2);
-    ASSERT_EQ(ddres,
-              ddres_create(DD_SEVERROR, DD_LOC_UNITTEST, DD_WHAT_BADALLOC));
+    ASSERT_EQ(ddres, ddres_create(DD_SEVERROR, DD_WHAT_BADALLOC));
+    ddres = mock_wrapper(3);
+    ASSERT_EQ(ddres, ddres_create(DD_SEVERROR, DD_WHAT_UNITTEST));
+    ddres = mock_wrapper(4);
+    ASSERT_TRUE(IsDDResOK(ddres));
+
+    ddres = mock_wrapper(5);
+    ASSERT_EQ(ddres, ddres_create(DD_SEVERROR, DD_WHAT_UNITTEST));
 
   } catch (...) { ASSERT_TRUE(false); }
 }

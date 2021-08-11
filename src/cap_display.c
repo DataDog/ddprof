@@ -32,12 +32,9 @@ DDRes log_capabilities(bool verbose) {
       char *lcap = cap_to_name(i);
       cap_flag_value_t value;
       for (int flag_idx = 0; flag_idx < SZ_CAP_2_TEXT; ++flag_idx) {
-        int ret = cap_get_flag(cap_struct, i, s_cap_flag_text[flag_idx]._value,
-                               &value);
-        if (ret == -1) {
-          RETURN_FATAL_LOG(DD_LOC_CAP_DISP, DD_WHAT_CAPLIB,
-                           "Error retrieving capabilities.");
-        }
+        DDRES_CHECK_INT(cap_get_flag(cap_struct, i,
+                                     s_cap_flag_text[flag_idx]._value, &value),
+                        DD_WHAT_CAPLIB, "Error retrieving capabilities.");
         LG_NTC("Cap=%s, flag=%s --> %s", lcap, s_cap_flag_text[flag_idx]._text,
                value == CAP_SET ? "ON" : "OFF");
       }

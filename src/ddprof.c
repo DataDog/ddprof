@@ -8,13 +8,16 @@
 
 #include "cap_display.h"
 #include "ddprofcmdline.h"
+#include "ddres.h"
 #include "procutils.h"
 #include "statsd.h"
 #include "unwind.h"
 
+//clang-format off
 #ifdef DBG_JEMALLOC
 #  include <jemalloc/jemalloc.h>
 #endif
+//clang-format on
 
 #define USERAGENT_DEFAULT "libddprof"
 #define LANGUAGE_DEFAULT "native"
@@ -246,7 +249,7 @@ void ddprof_pr_sample(DDProfContext *ctx, struct perf_event_header *hdr,
   us->max_stack = MAX_STACK;
   FunLoc_clear(us->locs);
   unsigned long this_ticks_unwind = __rdtsc();
-  if (-1 == unwindstate__unwind(us)) {
+  if (IsDDResNotOK(unwindstate__unwind(us))) {
     Dso *dso = dso_find(us->pid, us->eip);
     if (!dso) {
       LG_WRN("Error getting map for [%d](0x%lx)", us->pid, us->eip);
@@ -588,8 +591,8 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   // Perform initialization operations
   ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
 
-  bool statusOK = unwind_init(ctx->us);
-  if (!statusOK) {
+  DDRes ddres = unwind_init(ctx->us);
+  if (IsDDResNotOK(ddres)) {
     LG_ERR("Error when initializing unwinding");
     return;
   }
@@ -625,7 +628,7 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
     // it fails (perhaps if it includes dealloc->alloc in a library), then
     // we can no longer provide service.  All we can do is emit an error and
     // cleanup
-    if (!dwfl_caches_clear(ctx->us)) {
+    if (IsDDResNotOK(dwfl_caches_clear(ctx->us))) {
       LG_ERR("[DDPROF] Error refreshing unwinding module, profiling shutdown");
       return;
     }

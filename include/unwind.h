@@ -7,6 +7,7 @@
 #include <dwarf.h>
 #include <stdbool.h>
 
+#include "ddres_def.h"
 #include "dso.h"
 #include "dwfl_internals.h"
 #include "dwfl_module_cache.h"
@@ -50,14 +51,13 @@ typedef struct UnwindState {
 
 pid_t next_thread(Dwfl *, void *, void **);
 bool set_initial_registers(Dwfl_Thread *, void *);
-bool memory_read(Dwfl *, Dwarf_Addr, Dwarf_Word *, void *);
 int frame_cb(Dwfl_Frame *, void *);
 int tid_cb(Dwfl_Thread *, void *);
 void FunLoc_clear(FunLoc *);
-bool dwfl_caches_clear(struct UnwindState *);
-bool unwind_init(struct UnwindState *);
+DDRes dwfl_caches_clear(struct UnwindState *);
+DDRes unwind_init(struct UnwindState *);
 void unwind_free(struct UnwindState *);
-int unwindstate__unwind(struct UnwindState *);
+DDRes unwindstate__unwind(struct UnwindState *us);
 void analyze_unwinding_error(pid_t, uint64_t);
 
 #endif

@@ -13,23 +13,21 @@ extern "C" {
 #define DD_SEVWARN 2
 #define DD_SEVERROR 3
 
-/// Result structure containing a what / where / severity
+/// Result structure containing a what / severity
 typedef struct DDRes {
   union {
     // Not Enums as I could not specify size (except with gcc or c++)
     struct {
-      int32_t _what;  // Type of result (define your lisqt of results)
-      int16_t _where; // Module ID / where did it happen
-      int16_t _sev;   // fatal, warn, OK...
+      int16_t _what; // Type of result (define your lisqt of results)
+      int16_t _sev;  // fatal, warn, OK...
     };
-    int64_t _val;
+    int32_t _val;
   };
 } DDRes;
 
-#define FillDDRes(res, sev, where, what)                                       \
+#define FillDDRes(res, sev, what)                                              \
   do {                                                                         \
     res._sev = sev;                                                            \
-    res._where = where;                                                        \
     res._what = what;                                                          \
   } while (0)
 
@@ -38,25 +36,24 @@ typedef struct DDRes {
     res._val = 0;                                                              \
   } while (0)
 
-#define FillDDResFatal(res, where, what)                                       \
-  FillDDRes(res, DD_SEVERROR, where, what)
+#define FillDDResFatal(res, what) FillDDRes(res, DD_SEVERROR, what)
 
 /******** STANDARD APIs TO USE BELLOW **********/
 // In C you should be careful of static inline vs extern inline vs inline
 
-/// sev, where, what (in that order ! no relevant type checking)
-static inline DDRes ddres_create(int16_t sev, int16_t where, int32_t what) {
+/// sev, what
+static inline DDRes ddres_create(int16_t sev, int16_t what) {
   DDRes ddres;
-  FillDDRes(ddres, sev, where, what);
+  FillDDRes(ddres, sev, what);
   return ddres;
 }
 
-/// where, what (in that order)
-static inline DDRes ddres_fatal(int16_t where, int32_t what) {
-  return ddres_create(DD_SEVERROR, where, what);
+/// Creates a DDRes taking an error code (what)
+static inline DDRes ddres_error(int16_t what) {
+  return ddres_create(DD_SEVERROR, what);
 }
 
-/// create an empty ddres with an OK sev
+/// Create an OK DDRes
 static inline DDRes ddres_init(void) {
   DDRes ddres = {0};
   return ddres;

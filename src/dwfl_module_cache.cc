@@ -12,6 +12,7 @@ extern "C" {
 #include "logger.h"
 }
 
+#include "ddres.h"
 #include "llvm/Demangle/Demangle.h"
 
 #include <cassert>
@@ -301,11 +302,11 @@ void dwfl_module_cache_getsname(struct dwflmod_cache_hdr *cache_hdr,
 ////////////////
 
 extern "C" {
-dwflmod_cache_status
-dwfl_module_cache_getinfo(struct dwflmod_cache_hdr *cache_hdr,
-                          struct Dwfl_Module *mod, Dwarf_Addr newpc, pid_t pid,
-                          GElf_Off *offset, const char **demangle_name,
-                          uint32_t *lineno, const char **srcpath) {
+DDRes dwfl_module_cache_getinfo(struct dwflmod_cache_hdr *cache_hdr,
+                                struct Dwfl_Module *mod, Dwarf_Addr newpc,
+                                pid_t pid, GElf_Off *offset,
+                                const char **demangle_name, uint32_t *lineno,
+                                const char **srcpath) {
   try {
     const char *symname; // for error checking
     ddprof::dwfl_module_cache_addrinfo(cache_hdr, mod, newpc, pid, offset,
@@ -317,49 +318,42 @@ dwfl_module_cache_getinfo(struct dwflmod_cache_hdr *cache_hdr,
         ++(cache_hdr->_stats._errors);
         LG_ERR("Error from ddprof::error_cache_values (hit nb %d)",
                cache_hdr->_stats._hit);
-        return K_DWFLMOD_CACHE_KO;
+        return ddres_error(DD_WHAT_UW_CACHE_ERROR);
       }
     }
-
-  } catch (...) {
-    LG_ERR("Error from ddprof::dwfl_module_cache_addrinfo (hit nb %d)",
-           cache_hdr->_stats._hit);
-    return K_DWFLMOD_CACHE_KO;
   }
-
-  return K_DWFLMOD_CACHE_OK;
+  CatchExcept2DDRes();
+  return ddres_init();
 }
 
-dwflmod_cache_status
-dwfl_module_cache_getsname(struct dwflmod_cache_hdr *cache_hdr,
-                           const Dwfl_Module *mod, const char **sname) {
+DDRes dwfl_module_cache_getsname(struct dwflmod_cache_hdr *cache_hdr,
+                                 const Dwfl_Module *mod, const char **sname) {
   try {
     ddprof::dwfl_module_cache_getsname(cache_hdr, mod, sname);
-  } catch (...) {
-    LG_ERR("Error from ddprof::dwfl_module_cache_getsname (hit nb %d)",
-           cache_hdr->_stats._hit);
-    return K_DWFLMOD_CACHE_KO;
   }
-  return K_DWFLMOD_CACHE_OK;
+  CatchExcept2DDRes();
+  return ddres_init();
 }
 
-dwflmod_cache_status
-dwflmod_cache_hdr_clear(struct dwflmod_cache_hdr *cache_hdr) {
+DDRes dwflmod_cache_hdr_clear(struct dwflmod_cache_hdr *cache_hdr) {
   try {
     cache_hdr->_info_cache.clear();
     cache_hdr->_sname_map.clear();
     cache_hdr->_stats.display();
     cache_hdr->_stats.reset();
-  } catch (...) { return K_DWFLMOD_CACHE_KO; }
-  return K_DWFLMOD_CACHE_OK;
+  }
+  CatchExcept2DDRes();
+  return ddres_init();
 }
 
-dwflmod_cache_status
-dwflmod_cache_hdr_init(struct dwflmod_cache_hdr **cache_hdr) {
+DDRes dwflmod_cache_hdr_init(struct dwflmod_cache_hdr **cache_hdr) {
   try {
+    // considering we manipulate an opaque pointer, we need to dynamically
+    // allocate the cache (in full c++ you would avoid doing this)
     *cache_hdr = new dwflmod_cache_hdr();
-  } catch (...) { return K_DWFLMOD_CACHE_KO; }
-  return K_DWFLMOD_CACHE_OK;
+  }
+  CatchExcept2DDRes();
+  return ddres_init();
 }
 
 // Warning this should not throw
@@ -371,7 +365,7 @@ void dwflmod_cache_hdr_free(struct dwflmod_cache_hdr *cache_hdr) {
     }
     // Should never throw
   } catch (...) {
-    LG_ERR("Error from dwflmod_cache_hdr_free");
+    LG_ERR("Unexpected exception (code should not throw on destruction)");
     assert(false);
   }
 }
