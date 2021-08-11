@@ -12,6 +12,7 @@ extern "C" {
 #include "logger.h"
 }
 
+#include "ddres.h"
 #include "llvm/Demangle/Demangle.h"
 
 #include <cassert>
@@ -35,7 +36,7 @@ typedef struct dwfl_addr_info {
   std::string _demangle_name;
 
   // OUTPUT OF LINE INFO
-  int _lineno;
+  uint32_t _lineno;
   std::string _srcpath;
 } dwfl_addr_info;
 
@@ -90,14 +91,19 @@ struct dwflmod_cache_stats {
     _errors = 0;
   }
   void display() {
-    LG_NTC("dwflmod_cache_stats : Hit / calls = [%d/%d] = %d", _hit, _calls,
-           (_hit * 100) / _calls);
-    LG_NTC("                   Errors / calls = [%d/%d] = %d", _errors, _calls,
-           (_errors * 100) / _calls);
-    // Estimate of cache size
-    LG_NTC("                   Size of cache = %lu (nb el %d)",
-           (_calls - _hit) * (sizeof(dwfl_addr_info) + sizeof(dwfl_mod_pc_key)),
-           _calls - _hit);
+    if (_calls) {
+      LG_NTC("dwflmod_cache_stats : Hit / calls = [%d/%d] = %d", _hit, _calls,
+             (_hit * 100) / _calls);
+      LG_NTC("                   Errors / calls = [%d/%d] = %d", _errors,
+             _calls, (_errors * 100) / _calls);
+      // Estimate of cache size
+      LG_NTC("                   Size of cache = %lu (nb el %d)",
+             (_calls - _hit) *
+                 (sizeof(dwfl_addr_info) + sizeof(dwfl_mod_pc_key)),
+             _calls - _hit);
+    } else {
+      LG_NTC("dwflmod_cache_stats : 0 calls");
+    }
   }
   int _hit;
   int _calls;
@@ -130,7 +136,7 @@ namespace ddprof {
 // Write the info from internal structure to output parameters
 static void map_info(const dwfl_addr_info &info, GElf_Off *offset,
                      const char **symname, const char **demangle_name,
-                     int *lineno, const char **srcpath) {
+                     uint32_t *lineno, const char **srcpath) {
 
   *offset = info._offset;
 
@@ -173,8 +179,10 @@ static void dwfl_module_get_info(Dwfl_Module *mod, Dwarf_Addr newpc,
 
   Dwfl_Line *line = dwfl_module_getsrc(mod, newpc);
   // srcpath
+  int linep;
   const char *localsrcpath =
-      dwfl_lineinfo(line, &newpc, &info._lineno, 0, 0, 0);
+      dwfl_lineinfo(line, &newpc, static_cast<int *>(&linep), 0, 0, 0);
+  info._lineno = static_cast<uint32_t>(linep);
   if (localsrcpath) {
     info._srcpath = std::string(localsrcpath);
   }
@@ -186,8 +194,8 @@ static void dwfl_module_cache_addrinfo(struct dwflmod_cache_hdr *cache_hdr,
                                        Dwfl_Module *mod, Dwarf_Addr newpc,
                                        pid_t pid, GElf_Off *offset,
                                        const char **symname,
-                                       const char **demangle_name, int *lineno,
-                                       const char **srcpath) {
+                                       const char **demangle_name,
+                                       uint32_t *lineno, const char **srcpath) {
   *demangle_name = NULL;
   assert(cache_hdr);
 #ifdef DEBUG
@@ -224,7 +232,7 @@ static void dwfl_module_cache_addrinfo(struct dwflmod_cache_hdr *cache_hdr,
   }
 #ifdef DEBUG
   printf("DBG: demangled name = %s \n", *demangle_name);
-  printf("     line = %d \n", *lineno);
+  printf("     line = %u \n", *lineno);
   printf("     srcpath = %s \n", *srcpath);
   printf("     symname = %s \n ", *symname);
 #endif
@@ -294,11 +302,11 @@ void dwfl_module_cache_getsname(struct dwflmod_cache_hdr *cache_hdr,
 ////////////////
 
 extern "C" {
-dwflmod_cache_status
-dwfl_module_cache_getinfo(struct dwflmod_cache_hdr *cache_hdr,
-                          struct Dwfl_Module *mod, Dwarf_Addr newpc, pid_t pid,
-                          GElf_Off *offset, const char **demangle_name,
-                          int *lineno, const char **srcpath) {
+DDRes dwfl_module_cache_getinfo(struct dwflmod_cache_hdr *cache_hdr,
+                                struct Dwfl_Module *mod, Dwarf_Addr newpc,
+                                pid_t pid, GElf_Off *offset,
+                                const char **demangle_name, uint32_t *lineno,
+                                const char **srcpath) {
   try {
     const char *symname; // for error checking
     ddprof::dwfl_module_cache_addrinfo(cache_hdr, mod, newpc, pid, offset,
@@ -310,49 +318,42 @@ dwfl_module_cache_getinfo(struct dwflmod_cache_hdr *cache_hdr,
         ++(cache_hdr->_stats._errors);
         LG_ERR("Error from ddprof::error_cache_values (hit nb %d)",
                cache_hdr->_stats._hit);
-        return K_DWFLMOD_CACHE_KO;
+        return ddres_error(DD_WHAT_UW_CACHE_ERROR);
       }
     }
-
-  } catch (...) {
-    LG_ERR("Error from ddprof::dwfl_module_cache_addrinfo (hit nb %d)",
-           cache_hdr->_stats._hit);
-    return K_DWFLMOD_CACHE_KO;
   }
-
-  return K_DWFLMOD_CACHE_OK;
+  CatchExcept2DDRes();
+  return ddres_init();
 }
 
-dwflmod_cache_status
-dwfl_module_cache_getsname(struct dwflmod_cache_hdr *cache_hdr,
-                           const Dwfl_Module *mod, const char **sname) {
+DDRes dwfl_module_cache_getsname(struct dwflmod_cache_hdr *cache_hdr,
+                                 const Dwfl_Module *mod, const char **sname) {
   try {
     ddprof::dwfl_module_cache_getsname(cache_hdr, mod, sname);
-  } catch (...) {
-    LG_ERR("Error from ddprof::dwfl_module_cache_getsname (hit nb %d)",
-           cache_hdr->_stats._hit);
-    return K_DWFLMOD_CACHE_KO;
   }
-  return K_DWFLMOD_CACHE_OK;
+  CatchExcept2DDRes();
+  return ddres_init();
 }
 
-dwflmod_cache_status
-dwflmod_cache_hdr_clear(struct dwflmod_cache_hdr *cache_hdr) {
+DDRes dwflmod_cache_hdr_clear(struct dwflmod_cache_hdr *cache_hdr) {
   try {
     cache_hdr->_info_cache.clear();
     cache_hdr->_sname_map.clear();
     cache_hdr->_stats.display();
     cache_hdr->_stats.reset();
-  } catch (...) { return K_DWFLMOD_CACHE_KO; }
-  return K_DWFLMOD_CACHE_OK;
+  }
+  CatchExcept2DDRes();
+  return ddres_init();
 }
 
-dwflmod_cache_status
-dwflmod_cache_hdr_init(struct dwflmod_cache_hdr **cache_hdr) {
+DDRes dwflmod_cache_hdr_init(struct dwflmod_cache_hdr **cache_hdr) {
   try {
+    // considering we manipulate an opaque pointer, we need to dynamically
+    // allocate the cache (in full c++ you would avoid doing this)
     *cache_hdr = new dwflmod_cache_hdr();
-  } catch (...) { return K_DWFLMOD_CACHE_KO; }
-  return K_DWFLMOD_CACHE_OK;
+  }
+  CatchExcept2DDRes();
+  return ddres_init();
 }
 
 // Warning this should not throw
@@ -364,7 +365,7 @@ void dwflmod_cache_hdr_free(struct dwflmod_cache_hdr *cache_hdr) {
     }
     // Should never throw
   } catch (...) {
-    LG_ERR("Error from dwflmod_cache_hdr_free");
+    LG_ERR("Unexpected exception (code should not throw on destruction)");
     assert(false);
   }
 }

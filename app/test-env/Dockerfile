@@ -6,7 +6,22 @@ RUN apt update \
     cmake \
     git \
     gcc \
-    g++
+    g++ \
+    flex \
+    bison \
+    strace \
+    libjemalloc-dev \
+    graphviz \
+    valgrind \
+    subversion
+
+#Install perf tool (check kernel version and remove minor revision part), use svn as it is faster than git (with partial checkout)
+RUN KERNEL_VERSION=$(uname -r | awk -F '[-\.]' '{print "v"$1"."$2}') && \
+    echo "Kernel version : ${KERNEL_VERSION}" && \
+    svn export --quiet  https://github.com/torvalds/linux/tags/${KERNEL_VERSION}/tools && \
+    cd tools/perf && \
+    make && \
+    cp perf /usr/local/bin
 
 #Retrieve a program to run
 RUN git clone --depth 1 --branch ddprof_ci https://github.com/DataDog/bad-boggle-solver.git

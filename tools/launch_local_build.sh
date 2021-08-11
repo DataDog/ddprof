@@ -18,8 +18,8 @@ usage() {
     echo "    Add this line to the file --> DEFAULT_DEV_WORKSPACE=<some path you want to mount>"
     echo ""
     echo " Optional parameters "
-    echo "    -t : launch the test image."
-    echo "    clean : rebuild the image before creating it."
+    echo "    --test/-t : launch the test image."
+    echo "    --clean/-c : rebuild the image before creating it."
 }
 
 if [ $# != 0 ] && [ $1 == "-h" ]; then
@@ -29,18 +29,19 @@ fi
 
 PERFORM_CLEAN=0
 while [ $# != 0 ]; do 
-    if [ $# != 0 ] && [ $1 == "-t" ]; then
+    if [ $# != 0 ] && [ $1 == "-t" -o $1 == "--test" ]; then
         DEFAULT_BASE_NAME=test_ddprof
         BASE_DOCKERFILE="./app/test-env/Dockerfile"
         shift
         continue
     fi
 
-    if [ $# != 0 ] && [ $1 == "clean" ]; then
+    if [ $# != 0 ] && [ $1 == "--clean" -o $1 == "-c" ]; then
         PERFORM_CLEAN=1
         shift
         continue
     fi
+
     echo "Error : unhandled parameter"
     usage
     exit 1
@@ -86,7 +87,7 @@ if [ -z `echo $OSTYPE|grep darwin` ]; then
 fi 
 
 echo "Launch docker image, DO NOT STORE ANYTHING outside of mounted directory (container is erased on exit)."
-echo "Store changes in binded directory : /app"
-docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent --cap-add SYS_ADMIN -v ${DEFAULT_DEV_WORKSPACE}:/app -e SSH_AUTH_SOCK=/ssh-agent ${DEFAULT_BASE_NAME}:latest /bin/bash
+echo "Binded directory : /app  <--> ${DEFAULT_DEV_WORKSPACE}"
+docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -w /app --cap-add SYS_ADMIN -v ${DEFAULT_DEV_WORKSPACE}:/app -e SSH_AUTH_SOCK=/ssh-agent ${DEFAULT_BASE_NAME}:latest /bin/bash
 
 exit 0

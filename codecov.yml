@@ -1,0 +1,32 @@
+codecov:
+  max_report_age: off
+
+coverage:
+  flags:
+    default:
+      carryforward: true
+  status:
+    project:
+      default:
+        # compare coverage to the base commit (on the prod branch)
+        target: auto
+        # how much code coverage can drop
+        threshold: 0%
+        # the status will fail if there is no report for the head
+        if_not_found: error
+        # will set the status to success only if the CI is successful
+        if_ci_failed: error
+        # dry-run mode
+        informational: true
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false
+  require_base: no
+  require_head: no
+  branches: null
+  show_carryforward_flags: true
+
+github_checks:
+  annotations: false

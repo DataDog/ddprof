@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/DataDog/ddprof/branch/main/graph/badge.svg?token=K8N03GBATD)](https://codecov.io/gh/DataDog/ddprof)
+
 # ddprof
 
 Native profiler from Datadog

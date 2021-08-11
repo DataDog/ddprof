@@ -11,8 +11,9 @@ typedef enum STAT_TYPES {
   STAT_GAUGE,
 } STAT_TYPES;
 
-int statsd_open(char *, size_t);
-bool statsd_send(int, char *, void *, int);
+int statsd_listen(const char *, size_t);
+int statsd_connect(const char *, size_t);
+bool statsd_send(int, const char *, void *, int);
 bool statsd_close(int);
 
 #endif

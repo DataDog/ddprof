@@ -2,11 +2,16 @@ find_package(GTest REQUIRED)
 
 enable_testing()
 
-#### Define level of static checks ####
-message(STATUS "Build type set to " ${CMAKE_BUILD_TYPE})
-message(STATUS "Activate asan by default for unit tests")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ASAN_FLAGS} ${STACK_FLAGS} ${FRAME_PTR_FLAG}")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${ASAN_FLAGS} ${STACK_FLAGS} ${FRAME_PTR_FLAG}")
+### Code coverage
+if(DEFINED CMAKE_BUILD_TYPE AND ${CMAKE_BUILD_TYPE} STREQUAL Coverage)
+    message(STATUS "Activating code coverage in tests")
+    include(CodeCoverage)
+    set(COVERAGE_EXCLUDES "vendor/*")
+    setup_target_for_coverage_gcovr_xml(
+        NAME ctest_coverage
+        EXECUTABLE ctest -j ${PROCESSOR_COUNT} # Executable in PROJECT_BINARY_DIR
+    )
+endif()
 
 #### Define functions ####
 
@@ -53,10 +58,18 @@ add_unit_test(
     signal_helper-ut.cc
 )
 
+include(Version)
 add_unit_test(
     version-ut
     ../src/version.c 
     version-ut.cc
+    DEFINITIONS ${DDPROF_DEFINITION_LIST}
+)
+
+add_unit_test(
+    statsd-ut
+    ../src/statsd.c 
+    statsd-ut.cc
 )
 
 add_unit_test(
@@ -74,3 +87,32 @@ add_unit_test(
     ../src/ipc.c
     ipc-ut.cc
 )
+
+add_unit_test(
+    mmap-ut
+    ../src/perf.c
+    ../src/logger.c
+    mmap-ut.cc
+    LIBRARIES libddprof-c
+    DEFINITIONS MYNAME="ipc-ut"
+)
+target_include_directories(mmap-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
+
+add_unit_test(
+    ddres-ut
+    ../src/logger.c
+    ddres-ut.cc
+    LIBRARIES libddprof-c
+    DEFINITIONS MYNAME="ddres-ut"
+)
+target_include_directories(ddres-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
+
+add_unit_test(
+    cap-ut
+    ../src/cap_display.c
+    ../src/logger.c
+    cap-ut.cc
+    LIBRARIES libddprof-c libcap
+    DEFINITIONS MYNAME="cap-ut"
+)
+target_include_directories(cap-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR} ${LIBCAP_INCLUDE_DIR})

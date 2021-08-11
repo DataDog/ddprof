@@ -124,9 +124,6 @@ SHA256_LIBDDPROF := b35a2977e0b279ae709d051e600de1741cbc6da64eceea0c643dfd0b0903
 LIBDDPROF := $(VENDIR)/libddprof
 LIBDDPROF_LIB := $(LIBDDPROF)/RelWithDebInfo/lib64/libddprof-c.a
 
-LIBLLVM := $(VENDIR)/llvm/include
-LIBLLVM_SRC := $(VENDIR)/llvm/lib
-
 # Global aggregates
 CWD := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 SOURCE_DIR := $(CWD)
@@ -163,14 +160,11 @@ $(ELFUTILS):
 $(LIBDDPROF):
 	./tools/fetch_libddprof.sh ${VER_LIBDDPROF} ${SHA256_LIBDDPROF} $(VENDIR)
 
-$(LIBLLVM):
-	./tools/fetch_llvm_demangler.sh 
-
-deps: $(LIBDDPROF) $(ELFLIBS) $(LIBLLVM)
+deps: $(LIBDDPROF) $(ELFLIBS)
 
 # HACK: For some reason HTTP doesn't work in David's local containers, but
 # pulling down dependencies outside and then compiling works
-pull: $(LIBDDPROF) $(ELFUTILS) $(LIBLLVM)
+pull: $(LIBDDPROF) $(ELFUTILS)
 
 # kinda phony
 bench:

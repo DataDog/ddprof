@@ -20,6 +20,13 @@
 
 #define rmb() __asm__ volatile("lfence" ::: "memory")
 
+#define DEFAULT_PAGE_SIZE 4096 // Concerned about hugepages?
+
+#define DEFAULT_BUFF_SIZE_SHIFT 6
+#define RETRY_BUFF_SIZE_SHIFT 3
+
+static long s_page_size = 0;
+
 struct perf_event_attr g_dd_native_attr = {
     .size = sizeof(struct perf_event_attr),
     .sample_type = DEFAULT_SAMPLE_TYPE,
@@ -37,12 +44,22 @@ struct perf_event_attr g_dd_native_attr = {
     .exclude_hv = 1,
 };
 
+static long get_page_size(void) {
+  if (!s_page_size) {
+    s_page_size = sysconf(_SC_PAGESIZE);
+    // log if we have an unusual page size
+    if (s_page_size != DEFAULT_PAGE_SIZE)
+      LG_WRN("Page size is %ld", s_page_size);
+  }
+  return s_page_size;
+}
+
 int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
                     unsigned long flags) {
   return syscall(__NR_perf_event_open, attr, pid, cpu, gfd, flags);
 }
 
-int perfopen(pid_t pid, PerfOption *opt, int cpu, bool extras) {
+int perfopen(pid_t pid, const PerfOption *opt, int cpu, bool extras) {
   struct perf_event_attr attr = g_dd_native_attr;
   attr.type = opt->type;
   attr.config = opt->config;
@@ -73,13 +90,23 @@ int perfopen(pid_t pid, PerfOption *opt, int cpu, bool extras) {
   return fd;
 }
 
-void *perfown(int fd) {
+size_t perf_mmap_size(int buf_size_shift) {
+  // size of buffers are constrained to a power of 2 + 1
+  return ((1U << buf_size_shift) + 1) * get_page_size();
+}
+
+size_t get_mask_from_size(size_t size) {
+  // assumption is that we used a (power of 2) + 1 (refer to perf_mmap_size)
+  return (size - get_page_size() - 1);
+}
+
+void *perfown_sz(int fd, size_t size_of_buffer) {
   void *region;
 
   // Map in the region representing the ring buffer
   // TODO what to do about hugepages?
-  region = mmap(NULL, PAGE_SIZE + PSAMPLE_SIZE, PROT_READ | PROT_WRITE,
-                MAP_SHARED, fd, 0);
+  region =
+      mmap(NULL, size_of_buffer, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (MAP_FAILED == region || !region)
     return NULL;
 
@@ -88,17 +115,32 @@ void *perfown(int fd) {
   return region;
 }
 
-void rb_init(RingBuffer *rb, struct perf_event_mmap_page *page) {
-  rb->start = (const char *)page + PAGE_SIZE;
+// returns region, size is updated with the attempted size
+// On failure, returns NULL
+void *perfown(int fd, size_t *size) {
+  *size = perf_mmap_size(DEFAULT_BUFF_SIZE_SHIFT);
+  void *reg = perfown_sz(fd, *size);
+  if (reg)
+    return reg;
+  *size = perf_mmap_size(RETRY_BUFF_SIZE_SHIFT);
+  return perfown_sz(fd, *size);
+}
+
+int perfdisown(void *region, size_t size) { return munmap(region, size); }
+
+void rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size) {
+  rb->start = (const char *)page + get_page_size();
+  rb->size = size;
+  rb->mask = get_mask_from_size(size);
 }
 
 uint64_t rb_next(RingBuffer *rb) {
-  rb->offset = (rb->offset + sizeof(uint64_t)) & (PSAMPLE_SIZE - 1);
+  rb->offset = (rb->offset + sizeof(uint64_t)) & (rb->mask);
   return *(uint64_t *)(rb->start + rb->offset);
 }
 
 struct perf_event_header *rb_seek(RingBuffer *rb, uint64_t offset) {
-  rb->offset = (unsigned long)offset & (PSAMPLE_SIZE - 1);
+  rb->offset = (unsigned long)offset & (rb->mask);
   return (struct perf_event_header *)(rb->start + rb->offset);
 }
 
@@ -201,12 +243,11 @@ void main_loop(PEvent *pes, int pe_len, perfopen_attr *attr, void *arg) {
       rmb();
       uint64_t tail = pes[i].region->data_tail;
       RingBuffer *rb = &(RingBuffer){0};
-      rb_init(rb, pes[i].region);
+      rb_init(rb, pes[i].region, pes[i].reg_size);
 
       while (head > tail) {
         struct perf_event_header *hdr = rb_seek(rb, tail);
-        if ((void *)pes[i].region + PAGE_SIZE + PSAMPLE_SIZE <
-            (void *)hdr + hdr->size) {
+        if ((char *)pes[i].region + pes[i].reg_size < (char *)hdr + hdr->size) {
           // LG_WRN("[UNWIND] OUT OF BOUNDS");
         } else {
 

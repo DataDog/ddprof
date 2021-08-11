@@ -2,6 +2,12 @@
 # provided in the LLVM demangling source dir, but I can't be bothered to mock
 # their add_llvm_component cmake definition
 
+# Defines :
+# target : llvm-demangle
+# variable :
+#    LLVM_DEMANGLE_SOURCES
+#    LLVM_DEMANGLE_PATH
+
 set(LLVM_DEMANGLE_PATH ${CMAKE_SOURCE_DIR}/vendor/llvm CACHE STRING " Path to the llvm-demangle directory")
 set(LLVM_DEMANGLE_SVNROOT https://github.com/llvm/llvm-project/trunk/llvm CACHE STRING " GitHub URL for LLVM")
 set(LLVM_DEMANGLE_SRC ${CMAKE_SOURCE_DIR}/vendor/llvm/lib/Demangle CACHE STRING "Path to the llvm-demangle sources")
@@ -29,3 +35,4 @@ add_dependencies(llvm-demangle llvm-deps)
 target_include_directories(llvm-demangle PUBLIC
   ${LLVM_DEMANGLE_PATH}/include
 )
+aux_source_directory(${LLVM_DEMANGLE_PATH}/lib/Demangle LLVM_DEMANGLE_SOURCES)

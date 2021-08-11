@@ -45,6 +45,15 @@ Options:
     functions for diagnostic purposes.  Values are `on` or `off`
     (default: off)
 
+  -m, --coredumps, (envvar: DD_PROFILING_NATIVEDUMPS)
+    Whether ddprof is able to emit coredumps on failure.
+    (default: off)
+
+  -i, --nice, (envvar: DD_PROFILING_NATIVENICE)
+    Sets the nice level of ddprof without affecting any instrumented
+    processes.  This is useful on small containers with spiky workloads.
+    If this parameter isn't given, then the nice level is unchanged.
+
   -a, --printargs, (envvar: DD_PROFILING_NATIVEPRINTARGS)
     Whether or not to print configuration parameters to the trace log.  Can
     be `yes` or `no` (default: `no`).

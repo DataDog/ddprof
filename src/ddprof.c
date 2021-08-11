@@ -6,9 +6,17 @@
 #include <unistd.h>
 #include <x86intrin.h>
 
+#include "cap_display.h"
 #include "ddprofcmdline.h"
+#include "ddres.h"
 #include "statsd.h"
 #include "unwind.h"
+
+//clang-format off
+#ifdef DBG_JEMALLOC
+#  include <jemalloc/jemalloc.h>
+#endif
+//clang-format on
 
 #define USERAGENT_DEFAULT "libddprof"
 #define LANGUAGE_DEFAULT "native"
@@ -45,12 +53,12 @@ static int fd_statsd = -1;
 int statsd_init() {
   char *path_statsd = NULL;
   if ((path_statsd = getenv("DD_DOGSTATSD_SOCKET"))) {
-    fd_statsd = statsd_open(path_statsd, strlen(path_statsd));
-    if (-1 == fd_statsd) {
+    fd_statsd = statsd_connect(path_statsd, strlen(path_statsd));
+    if (-1 != fd_statsd) {
       return fd_statsd;
     }
   }
-  return 0;
+  return -1;
 }
 
 #define DDPN "datadog.profiler.native."
@@ -92,6 +100,11 @@ void print_diagnostics() {
   LG_NTC("[STATS] ticks_unwind: %lu", ticks_unwind);
   LG_NTC("[STATS] events_lost: %lu", events_lost);
   LG_NTC("[STATS] samples_recv: %lu", samples_recv);
+
+#ifdef DBG_JEMALLOC
+  // jemalloc stats
+  malloc_stats_print(NULL, NULL, "");
+#endif
 }
 
 // Internal functions
@@ -156,7 +169,7 @@ bool reset_state(DDProfContext *ctx, volatile bool *continue_profiling) {
 
   // If we haven't hit the hard cap, have we hit the soft cap?
   if (ctx->last_status && WORKER_REFRESH_RSS_KB <= ctx->last_status->rss) {
-    if (!dwfl_caches_clear(ctx->us)) {
+    if (IsDDResNotOK(dwfl_caches_clear(ctx->us))) {
       LG_ERR("[DDPROF] Error refreshing unwinding module, profiling shutdown");
       return false;
     }
@@ -254,7 +267,7 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
     sample.size_stack = *(uint64_t *)buf++;
     if (sample.size_stack) {
       sample.data_stack = (char *)buf;
-      buf = (void *)buf + sample.size_stack;
+      buf = (uint64_t *)((char *)buf + sample.size_stack);
     } else {
       // Not sure
     }
@@ -284,7 +297,7 @@ void ddprof_pr_sample(DDProfContext *ctx, struct perf_event_header *hdr,
   us->max_stack = MAX_STACK;
   FunLoc_clear(us->locs);
   unsigned long this_ticks_unwind = __rdtsc();
-  if (-1 == unwindstate__unwind(us)) {
+  if (IsDDResNotOK(unwindstate__unwind(us))) {
     Dso *dso = dso_find(us->pid, us->eip);
     if (!dso) {
       LG_WRN("Error getting map for [%d](0x%lx)", us->pid, us->eip);
@@ -531,26 +544,81 @@ void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   exit(-1);
 }
 
+// returns the number of successful setups
+static int setup_watchers(DDProfContext *ctx, pid_t pid, int num_cpu,
+                          struct PEvent *pes) {
+  int k = 0;
+  int nb_success = 0;
+  for (int i = 0; i < ctx->num_watchers && ctx->params.enable; ++i) {
+    for (int j = 0; j < num_cpu; ++j) {
+      pes[k].pos = i;
+      pes[k].fd = perfopen(pid, &ctx->watchers[i], j, true);
+      if (pes[k].fd == -1) {
+        LG_ERR("Error calling perfopen on watcher %d.%d (%s)", i, j,
+               strerror(errno));
+      } else if (!(pes[k].region = perfown(pes[k].fd, &pes[k].reg_size))) {
+        close(pes[k].fd);
+        pes[k].fd = -1;
+        LG_ERR("Could not finalize watcher %d.%d: registration (%s)", i, j,
+               strerror(errno));
+      } else {
+        ++nb_success;
+      }
+      ++k;
+      if (k >= MAX_NB_WATCHERS) {
+        LG_WRN("Reached max number of watchers (%d)", MAX_NB_WATCHERS);
+        return nb_success;
+      }
+    }
+  }
+  return nb_success;
+}
+
+// returns the number of successful cleans
+static int cleanup_watchers(DDProfContext *ctx, struct PEvent *pes,
+                            int num_cpu) {
+  int k = 0;
+  int nb_clean = 0;
+
+  for (int i = 0; i < ctx->num_watchers && ctx->params.enable; ++i) {
+    for (int j = 0; j < num_cpu; ++j) {
+      if (pes[k].region) {
+        if (perfdisown(pes[k].region, pes[k].reg_size) != 0) {
+          LG_WRN("Error when using perfdisown %d.%d", i, j);
+        } else {
+          pes[k].region = NULL;
+          ++nb_clean;
+        }
+      }
+      if (pes[k].fd != -1) {
+        close(pes[k].fd);
+        pes[k].fd = -1;
+      }
+      ++k;
+      if (k >= MAX_NB_WATCHERS) {
+        return nb_clean;
+      }
+    }
+  }
+  return nb_clean;
+}
+
 /*************************  Instrumentation Helpers  **************************/
 // This is a quick-and-dirty implementation.  Ideally, we'll harmonize this
 // with the other functions.
 void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   perfopen_attr perf_funs = {.msg_fun = ddprof_callback,
                              .timeout_fun = ddprof_timeout};
-  struct PEvent pes[100] = {0};
-  int k = 0;
-  for (int i = 0; i < ctx->num_watchers && ctx->params.enable; i++) {
-    for (int j = 0; j < num_cpu; j++) {
-      pes[k].fd = perfopen(pid, &ctx->watchers[i], j, true);
-      pes[k].pos = i;
-      if (!(pes[k].region = perfown(pes[k].fd))) {
-        close(pes[k].fd);
-        pes[k].fd = -1;
-        LG_ERR("Could not finalize watcher %d.%d: registration (%s)", i, j,
-               strerror(errno));
-      }
-      k++;
-    }
+  struct PEvent pes[MAX_NB_WATCHERS] = {0};
+
+  // Don't stop if error as this is only for debug purpose
+  if (IsDDResNotOK(log_capabilities(false))) {
+    LG_ERR("Error when printing capabilities, continuing...");
+  }
+
+  if (!setup_watchers(ctx, pid, num_cpu, pes)) {
+    LG_ERR("Error when attaching to perf_event buffers.");
+    return;
   }
 
   // We checked that perfown would work, now we free the regions so the worker
@@ -586,8 +654,8 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   // Perform initialization operations
   ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
 
-  bool statusOK = unwind_init(ctx->us);
-  if (!statusOK) {
+  DDRes ddres = unwind_init(ctx->us);
+  if (IsDDResNotOK(ddres)) {
     LG_ERR("Error when initializing unwinding");
     return;
   }
@@ -618,6 +686,9 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   if (now > ctx->send_nanos || ctx->sendfinal) {
     LG_WRN("Sending final export");
     export(ctx, now);
+  }
+  if (!cleanup_watchers(ctx, pes, num_cpu)) {
+    LG_ERR("Error when calling cleanup_watchers.");
   }
   unwind_free(ctx->us);
 }

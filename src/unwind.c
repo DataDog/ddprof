@@ -1,5 +1,6 @@
 #include "unwind.h"
 
+#include "ddres.h"
 #include "demangle.h"
 #include "logger.h"
 #include "signal_helper.h"
@@ -28,7 +29,9 @@ bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
   return dwfl_thread_state_registers(thread, 0, 17, regs);
 }
 
-bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg) {
+/// memory_read as per prototype define in libdwfl
+static bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
+                        void *arg) {
   (void)dwfl;
   struct UnwindState *us = arg;
 
@@ -150,10 +153,10 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
   // Now we register
   GElf_Off offset = {0};
 
-  dwflmod_cache_status cache_status = dwfl_module_cache_getinfo(
+  DDRes cache_status = dwfl_module_cache_getinfo(
       us->cache_hdr, mod, pc, us->pid, &offset, &us->locs[us->idx].funname,
       &us->locs[us->idx].line, &us->locs[us->idx].srcpath);
-  if (cache_status != K_DWFLMOD_CACHE_OK) {
+  if (IsDDResNotOK(cache_status)) {
     LG_ERR("Error from dwflmod_cache_status");
     return DWARF_CB_ABORT;
   }
@@ -165,7 +168,7 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
 
   cache_status = dwfl_module_cache_getsname(us->cache_hdr, mod,
                                             &(us->locs[us->idx].sopath));
-  if (cache_status != K_DWFLMOD_CACHE_OK) {
+  if (IsDDResNotOK(cache_status)) {
     LG_ERR("Error from dwfl_module_cache_getsname");
     return DWARF_CB_ABORT;
   }
@@ -181,7 +184,7 @@ int tid_cb(Dwfl_Thread *thread, void *targ) {
 
 void FunLoc_clear(FunLoc *locs) { memset(locs, 0, sizeof(*locs) * MAX_STACK); }
 
-static bool unwind_dwfl_begin(struct UnwindState *us) {
+static DDRes unwind_dwfl_begin(struct UnwindState *us) {
   static char *debuginfo_path;
 
   static const Dwfl_Callbacks proc_callbacks = {
@@ -192,11 +195,11 @@ static bool unwind_dwfl_begin(struct UnwindState *us) {
   us->dwfl = dwfl_begin(&proc_callbacks);
   if (!us->dwfl) {
     LG_WRN("[UNWIND] dwfl_begin was zero (%s)", dwfl_errmsg(-1));
-    return false;
+    return ddres_error(DD_WHAT_DWFL_LIB_ERROR);
   }
   us->attached = false;
 
-  return true;
+  return ddres_init();
 }
 
 static void unwind_dwfl_end(struct UnwindState *us) {
@@ -207,17 +210,13 @@ static void unwind_dwfl_end(struct UnwindState *us) {
   us->attached = false;
 }
 
-bool dwfl_caches_clear(struct UnwindState *us) {
-  dwflmod_cache_status cache_status = dwflmod_cache_hdr_clear(us->cache_hdr);
-  if (cache_status != K_DWFLMOD_CACHE_OK) {
-    LG_WRN("[UNWIND] Unable to clear intermediate unwinding cache");
-    return false;
-  }
+DDRes dwfl_caches_clear(struct UnwindState *us) {
+  DDRES_CHECK_FWD(dwflmod_cache_hdr_clear(us->cache_hdr));
   unwind_dwfl_end(us);
   return unwind_dwfl_begin(us);
 }
 
-static bool unwind_attach(struct UnwindState *us) {
+static DDRes unwind_attach(struct UnwindState *us) {
   static const Dwfl_Thread_Callbacks dwfl_callbacks = {
       .next_thread = next_thread,
       .memory_read = memory_read,
@@ -225,27 +224,22 @@ static bool unwind_attach(struct UnwindState *us) {
   };
 
   if (us->attached) {
-    return true;
+    return ddres_init();
   }
   if (dwfl_attach_state(us->dwfl, NULL, us->pid, &dwfl_callbacks, us)) {
-    LG_WRN("[UNWIND] dwfl_attach_state was nonzero (%s)", dwfl_errmsg(-1));
-    return false;
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_DWFL_LIB_ERROR,
+                           "[UNWIND] Error while calling dwfl_attach_state");
   }
   us->attached = true;
-  return true;
+  return ddres_init();
 }
 
-bool unwind_init(struct UnwindState *us) {
-  if (dwflmod_cache_hdr_init(&(us->cache_hdr)) != K_DWFLMOD_CACHE_OK) {
-    us->cache_hdr = NULL;
-    return false;
-  }
-
+DDRes unwind_init(struct UnwindState *us) {
+  DDRES_CHECK_FWD(dwflmod_cache_hdr_init(&(us->cache_hdr)));
   elf_version(EV_CURRENT);
-  if (!unwind_dwfl_begin(us))
-    return false;
+  DDRES_CHECK_FWD(unwind_dwfl_begin(us));
   libdso_init();
-  return true;
+  return ddres_init();
 }
 
 void unwind_free(struct UnwindState *us) {
@@ -254,20 +248,21 @@ void unwind_free(struct UnwindState *us) {
   us->cache_hdr = NULL;
 }
 
-int unwindstate__unwind(struct UnwindState *us) {
+DDRes unwindstate__unwind(struct UnwindState *us) {
   // Update modules at the top
   update_mod(us->dwfl, us->pid, us->eip);
 
-  if (!unwind_attach(us)) {
-    return -1;
-  }
+  DDRES_CHECK_FWD(unwind_attach(us));
 
   if (!dwfl_getthread_frames(us->dwfl, us->pid, frame_cb, us)) {
-    // TODO this is not an error, so investigate more completely
-    return us->idx > 0 ? 0 : -1;
+    /* This should be investigated - when all errors are solved we can
+     * reactivate the log (it is too verbose for now) */
+    // LG_DBG("[UNWIND] dwfl_getthread_frames was nonzero (%s)",
+    // dwfl_errmsg(-1));
+    return us->idx > 0 ? ddres_init() : ddres_error(DD_WHAT_DWFL_LIB_ERROR);
   }
 
-  return 0;
+  return ddres_init();
 }
 
 void analyze_unwinding_error(pid_t pid, uint64_t eip) {

@@ -3,6 +3,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <ddprof/string_table.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,7 +13,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "ddprof/string_table.h"
 #include "logger.h"
 #include "signal_helper.h"
 

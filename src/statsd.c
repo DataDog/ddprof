@@ -7,30 +7,43 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-int statsd_open(char *path, size_t sz_path) {
+int statsd_listen(const char *path, size_t sz_path) {
+  struct sockaddr_un addr_bind = {.sun_family = AF_UNIX};
+  int fd_sock = -1;
+
+  // Open the socket
+  memcpy(addr_bind.sun_path, path, sz_path);
+  if (-1 == (fd_sock = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0))) {
+    return -1;
+  }
+
+  // Attempt to bind to the given address
+  if (bind(fd_sock, (struct sockaddr *)&addr_bind, sizeof(addr_bind))) {
+    close(fd_sock);
+    return -1;
+  }
+
+  return fd_sock;
+}
+
+int statsd_connect(const char *path, size_t sz_path) {
   assert(path);
   assert(sz_path);
 
   char template[] = "/tmp/statsd.XXXXXX";
-  struct sockaddr_un addr_bind = {.sun_family = AF_UNIX};
   struct sockaddr_un addr_peer = {.sun_family = AF_UNIX};
-  int fd_tmp = -1;
   int fd_sock = -1;
+  int fd_tmp = -1;
 
   // We bind to a temporary file, since that's needed for the interface
   if (-1 == (fd_tmp = mkstemp(template))) {
     return -1;
   }
+
   unlink(template);
-  if (-1 == (fd_sock = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0))) {
-    close(fd_tmp);
-    return -1;
-  }
-  memcpy(addr_bind.sun_path, template, sizeof(template) - 1);
   memcpy(addr_peer.sun_path, path, sz_path);
-  if (bind(fd_sock, (struct sockaddr *)&addr_bind, sizeof(addr_bind))) {
+  if (-1 == (fd_sock = statsd_listen(template, sizeof(template) - 1))) {
     close(fd_tmp);
-    close(fd_sock);
     return -1;
   }
 
@@ -46,9 +59,9 @@ int statsd_open(char *path, size_t sz_path) {
   return fd_sock;
 }
 
-bool statsd_send(int fd_sock, char *key, void *val, int type) {
+bool statsd_send(int fd_sock, const char *key, void *val, int type) {
   char buf[1024] = {0};
-  size_t sz = -1;
+  size_t sz = 0;
   switch (type) {
   default:
   case STAT_MS_LONG:
@@ -67,7 +80,7 @@ bool statsd_send(int fd_sock, char *key, void *val, int type) {
 
   // Nothing to do if serialization failed or was short, but we don't return
   // granular result
-  if (sz <= 0 || sz >= sizeof(buf))
+  if (sz == 0 || sz >= sizeof(buf))
     return false;
 
   // Nothing to do if the write fails

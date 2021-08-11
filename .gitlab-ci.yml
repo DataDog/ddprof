@@ -5,9 +5,10 @@ stages:
 
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
-  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/76992478
-  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:0f977c2a8c71393c3ea07b225586b21123ba0c8facc230700c88121cf62dc1fe
-  TEST_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:e4a0853a0eebf83f3f32281fb8836b40fe281cc29c0c7cb67791ccb0e7c1fd6e
+  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/79006357
+  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:80c1e4d5001c1c3b2c78c61e89146d171a035a3a357b8a8ca47ec307729fab63
+  # https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/78136292
+  TEST_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:98d26ab6ca3f8f1e3ae770418e4ac732d153d3eabc4e20d58104b34bc3f9546a
   # When build images are built, publish them with following tags
   BASE_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
   BUILD_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build
@@ -71,23 +72,29 @@ build:ddprof_cmake:
   tags: ["runner:k8s"]
   parallel:
     matrix:
-      - BUILD_TYPE: ["Release", "Debug", "SanitizedDebug"]
+      - BUILD_TYPE: ["Release", "Debug", "SanitizedDebug", "Coverage"]
   variables:
     BUILDPATH: build_${BUILD_TYPE}
   script:
     - set -euxo pipefail
     - export DELIVERY_PATH="${CI_PROJECT_DIR}/${BINPATH}/${BUILD_TYPE}"
-    - mkdir -p vendor
     #Build image dependencies were stored in app, avoid rebuilding vendor content
-    - ln -s /app/vendor/elfutils vendor/elfutils
-    - ln -s /app/vendor/libddprof vendor/libddprof
-    - ln -s /app/vendor/llvm vendor/llvm
+    - ln -s /app/vendor vendor
     - mkdir -p ${BUILDPATH} && cd ${BUILDPATH}
     - cmake -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
+    # Static checks
+    - make cppcheck
     - make -j ${KUBERNETES_CPU_LIMIT}
     - if [ ! $(./ddprof --version | sed 's/.*+//g') == "${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA}" ]; then exit 1; fi
     - ctest --repeat-until-fail 5 --output-on-failure | tee test-output.log
     - make install
+    - if [ ${BUILD_TYPE} == "Coverage" ]; then
+    - make ctest_coverage
+    - export CODECOV_TOKEN=$(aws ssm get-parameter --region us-east-1 --name ci.ddprof.codecov-token --with-decryption --query "Parameter.Value" --out text)
+    - ${CI_PROJECT_DIR}/tools/codecov.sh -Z
+    - fi
+      # This job gives useful info on the mmap/mlock/perfopen capabilities in CI
+    - cd test && ./mmap-ut
   artifacts:
     paths:
       - ${CI_PROJECT_DIR}/${BINPATH}/
@@ -106,6 +113,9 @@ test:ddprof_cmake:
     - set -euxo pipefail
     - source setup_env.sh
     - echo "CHECK SETTING ON PERF EVENT PARANOID" && cat /proc/sys/kernel/perf_event_paranoid
+    - echo "CHECK SETTING ON PINNED MEMORY" && ulimit -l
+    - echo "CHECK SETTING on PERF EVEN OPEN" && cat /proc/sys/kernel/perf_event_mlock_kb
+    - echo ""
     - check_dependencies.sh ${BINPATH}/${BUILD_TYPE}/bin/ddprof test/data/expected_deps_${BUILD_TYPE}.txt
     # Run toy project for 5 seconds
     - run.sh -b ./${BINPATH}/${BUILD_TYPE}/bin BadBoggleSolver_run 5

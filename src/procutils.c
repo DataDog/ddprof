@@ -179,7 +179,7 @@ Map *procfs_MapMatch(pid_t target, uint64_t addr) {
   if (!target)
     target = getpid();
   PidMap *pm = mapcache_Get(target);
-  while (pm->map[i].end && i < PM_MAX) {
+  while (i < PM_MAX && pm->map[i].end) {
     if (addr < pm->map[i].end) // Within bounds!
       return &pm->map[i];
     if (addr < pm->map[i].start)

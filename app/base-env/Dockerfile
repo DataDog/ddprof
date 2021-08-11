@@ -9,6 +9,7 @@ RUN apt update \
   binutils-dev \
   clang-11 \
   cmake \
+  cppcheck \
   gcc-10 \
   gcc \
   g++ \
@@ -23,7 +24,11 @@ RUN apt update \
   subversion \
   zlib1g-dev \
   libgtest-dev \
-  libgmock-dev
+  libgmock-dev \
+  libjemalloc-dev \
+  libcap-dev \
+  gcovr
+
 
 # Newer CMake
 FROM base as cmake
@@ -33,7 +38,6 @@ RUN CMAKE_VERSION="3.20.1" \
   && (printf "${CMAKE_SHA256}  cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz" | sha256sum --check --strict --status) \
   && tar --no-same-owner -C /usr/local --strip-components=1 -xf cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz \
   && rm cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz
-
 
 # Provides the llvm-symbolizer (better debug information in case of sanitizer issue)
 ENV PATH="/usr/lib/llvm-11/bin/:$PATH"

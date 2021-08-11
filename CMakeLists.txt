@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.19)
+
 ############################
 ### Global definitions   ###
 ############################
@@ -11,21 +12,22 @@ set(CMAKE_CXX_COMPILER g++ CACHE STRING "C++ compiler")
 set(CMAKE_C_COMPILER gcc CACHE STRING "C compiler")
  
 project(DDProf
-  LANGUAGES C
-  VERSION 0.1
+  LANGUAGES C CXX
+  VERSION 0.5.1
+  DESCRIPTION "Datadog's native profiler"
 )
 
-set(CMAKE_CONFIGURATION_TYPES "Debug;Release;SanitizedDebug" CACHE STRING
-    "Available build-types: Debug, Release and SanitizedDebug")
+# Debug command to get gcc command lines
+# set( CMAKE_VERBOSE_MAKEFILE on )
 
-## Frame pointers
-set(FRAME_PTR_FLAG "-fno-omit-frame-pointer")
+# Define the include path of cmake scripts
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
-## Sanitizer setup
-set(ASAN_FLAGS "-g -fsanitize=address -fsanitize=undefined -fsanitize=leak -fsanitize=float-divide-by-zero -fno-sanitize-recover")
-set(STACK_FLAGS "-fstack-protector-all")
-set(CMAKE_CXX_FLAGS_SANITIZEDDEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${ASAN_FLAGS} ${STACK_FLAGS}")
-set(CMAKE_C_FLAGS_SANITIZEDDEBUG "${CMAKE_C_FLAGS_DEBUG} ${ASAN_FLAGS} ${STACK_FLAGS}")
+include(ExtendBuildTypes)
+
+# Default value
+option(CMAKE_BUILD_TYPE "Build type" Debug)
+message(STATUS "Build type set to " ${CMAKE_BUILD_TYPE})
 
 ## Allow to easily import external libraries
 include(FetchContent)
@@ -34,46 +36,47 @@ include(FetchContent)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-#[[ Create an executable
-Syntax:
-add_exe(<name> src1 [src2 ...] [LIBRARIES lib1 lib2 ...] [DEFINITIONS def1 def2])
-will compile an executable named <name> from source files src1 src2...
-with pre-processor definitions def1 def2 (-Ddef1 -Ddef2 ... will be added to compile command)
-and link against lib1 lib2 ...and libm
+#helper functions
+include(Helperfunc)
 
-Examples:
-add_exe(myexe src1.cpp)
-add_exe(myexe src1.cpp
-   LIBRARIES ${CMAKE_SOURCE_DIR}/myLib
-   DEFINITIONS UNIT_TEST)
-#]]
-function(add_exe name)
-   set(cur_var "sources")
-   set(exe_sources "")
-   set(exe_libraries "")
-   set(exe_definitions "")
-   set(exe_include_dirs "")
-   foreach(arg IN LISTS ARGN)
-      if (arg STREQUAL "LIBRARIES")
-         set(cur_var "libraries")
-      elseif (arg STREQUAL "DEFINITIONS")
-         set(cur_var "definitions")
-      else()
-         list(APPEND exe_${cur_var} ${arg})
-         if (cur_var STREQUAL "sources")
-            get_filename_component(src_dir ${arg} DIRECTORY)
-            list(APPEND exe_include_dirs ${src_dir})
-         endif()
-      endif()
-   endforeach()
-   add_executable(${name} ${exe_sources})
-   set_target_properties(${name} PROPERTIES
-       COMPILE_DEFINITIONS "${exe_definitions}"
-       BUILD_RPATH "${runtime_path}")
-   target_link_libraries(${name} PRIVATE ${exe_libraries})
-   list(REMOVE_DUPLICATES exe_include_dirs)
-   target_include_directories(${name} PRIVATE ${exe_include_dirs} ${all_includes})
-endfunction()
+##############
+### Deps   ###
+##############
+# Define a dependency target to fetch all dependencies ahead of time (CI build time optim)
+
+# libddprof
+include(Findlibddprof)
+message(STATUS "Libddprof Include directory " ${LIBDDPROF_INCLUDE_DIR})
+
+# llvm-demangle
+include(FindLibLlvmDemangle)
+
+add_custom_target(deps
+                  DEPENDS codecov-deps llvm-deps)
+
+
+#######################
+### Static analysis ###
+#######################
+
+#Cpp Check
+include(Cppcheckconfig)
+
+##################################
+### Libraries (needed by ut)   ###
+##################################
+find_package(PkgConfig REQUIRED)
+
+option(JEMALLOC "Enable jemalloc stats" OFF)
+if (${JEMALLOC})
+   #jemalloc for debug
+   include(Jemalloc)
+   message(STATUS "Adding jemalloc for DBG purpose" ${JEMALLOC_ROOT_DIR})
+   add_compile_definitions("DBG_JEMALLOC")
+endif()
+
+# Install lib cap to retrieve capabilities
+include(Findlibcap)
 
 ####################
 ### Unit tests   ###
@@ -93,27 +96,20 @@ endif()
 ###############################
 # Known limitation : lib elf is not built with cmake for now (makefile)
 
-# Compile time definitions
+# Compile time definitions 
 string(TOLOWER ${CMAKE_PROJECT_NAME} CMAKE_PROJECT_NAME_LC)
-add_compile_definitions("MYNAME=\"${CMAKE_PROJECT_NAME_LC}\"")
+list(APPEND DDPROF_DEFINITION_LIST "MYNAME=\"${CMAKE_PROJECT_NAME_LC}\"")
 
-set(BUILD_REV "custom" CACHE STRING "Revision appended to the version information")
-add_compile_definitions("VER_REV=\"${BUILD_REV}\"")
+include(Version)
 
 # Leave frame pointers to help with profiling
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${FRAME_PTR_FLAG}")
-
-find_package(PkgConfig REQUIRED)
+list(APPEND CMAKE_C_FLAGS ${FRAME_PTR_FLAG})
+list(APPEND CMAKE_CXX_FLAGS ${FRAME_PTR_FLAG})
 
 set(DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/include/proto)
 list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include/proto)
 
-# Define the scripts to help find the libraries
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
-
-# libddprof
-include(Findlibddprof)
-message(STATUS "Libddprof Include directory " ${LIBDDPROF_INCLUDE_DIR})
+#libddprof
 list(APPEND DDPROF_INCLUDE_LIST ${LIBDDPROF_INCLUDE_DIR})
 
 # Check that we are on a linux system
@@ -121,7 +117,6 @@ message(STATUS "SYSTEM NAME " ${CMAKE_SYSTEM_NAME})
 if (NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
    message(STATUS "BUILD WILL FAIL : NON LINUX SYSTEMS NOT HANDLED")
 endif()
-
 
 # Zlib
 # Slightly hacky way of finding static libraries. Unable to find static library using CMAKE_FIND_LIBRARY_SUFFIXES.
@@ -143,9 +138,6 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(PROTOBUF_C REQUIRED IMPORTED_TARGET libprotobuf-c)
 link_directories(${PROTOBUF_C_LIBDIR})
 
-# llvm-demangle
-include(FindLibLlvmDemangle)
-aux_source_directory(${LLVM_DEMANGLE_PATH}/lib/Demangle LLVM_DEMANGLE_SOURCES)
 list(APPEND DDPROF_INCLUDE_LIST ${LLVM_DEMANGLE_PATH}/include)
 
 # libstdcxx
@@ -177,10 +169,21 @@ set(DDPROF_GLOBAL_SRC
    ${MAIN_SRC}
    ${PROTO_SRC})
 
+set(DDPROF_LIBRARY_LIST libddprof-c llvm-demangle libstdc++.a dw.a elf.a libz.a Threads::Threads libprotobuf-c.a liblzma.a)
+
+if (${JEMALLOC})
+   list(PREPEND DDPROF_LIBRARY_LIST jemalloc)
+endif()
+
+# libcap, can be removed from version distributed to client 
+list(APPEND DDPROF_LIBRARY_LIST libcap)
+list(APPEND DDPROF_INCLUDE_LIST ${LIBCAP_INCLUDE_DIR})
+
 # It is important to force most libraries as static
 add_exe(ddprof
         ${DDPROF_GLOBAL_SRC}
-        LIBRARIES libddprof-c llvm-demangle libstdc++.a dw.a elf.a libz.a Threads::Threads libprotobuf-c.a liblzma.a)
+        LIBRARIES ${DDPROF_LIBRARY_LIST}
+        DEFINITIONS ${DDPROF_DEFINITION_LIST})
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 
 message(STATUS "Install destination " ${CMAKE_INSTALL_PREFIX})

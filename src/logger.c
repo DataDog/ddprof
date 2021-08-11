@@ -54,7 +54,7 @@ bool LOG_syslog_open() {
   int fd = -1;
 
   if (0 > (fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0)))
-    return -1;
+    return false;
   if (0 > connect(3, sa, 110)) { // TODO badmagic
     close(fd);
     return false;
@@ -161,9 +161,7 @@ void LOG_lfprintf(int lvl, int fac, const char *name, const char *format, ...) {
 
   // Get the PID; overriding if necessary (allow for testing overflow)
   pid_t pid = getpid();
-#ifdef TEST_PID_OVERRIDE
-  pid = 32768;
-#endif
+
   if (log_ctx->mode == LOG_SYSLOG)
     sz_h = snprintf(buf, LOG_MSG_CAP, "<%d>%s %s[%d]: ", lvl + fac * 8, tm_str,
                     name, pid);
