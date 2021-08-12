@@ -11,8 +11,8 @@
 #include <sys/mman.h>
 #include <sys/sysinfo.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
-#include <wait.h>
 
 int main(int argc, char **argv) {
   //---- Inititiate structs

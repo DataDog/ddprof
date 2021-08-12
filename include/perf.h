@@ -7,7 +7,6 @@
 #include <stdint.h>
 
 #include "perf_option.h"
-#include "watchers.h"
 
 #define PSAMPLE_DEFAULT_WAKEUP 1000 // sample frequency check
 #define PERF_SAMPLE_STACK_SIZE (4096 * 8)
@@ -170,4 +169,3 @@ int perfdisown(void *region, size_t size);
 void rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size);
 uint64_t rb_next(RingBuffer *);
 struct perf_event_header *rb_seek(RingBuffer *, uint64_t);
-void main_loop(PEventHdr *pevent_hdr, int, perfopen_attr *, void *);

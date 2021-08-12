@@ -9,10 +9,11 @@
 #include "cap_display.h"
 #include "ddprofcmdline.h"
 #include "ddres.h"
+#include "main_loop.h"
+#include "pevent_lib.h"
 #include "procutils.h"
 #include "statsd.h"
 #include "unwind.h"
-#include "watchers.h"
 
 //clang-format off
 #ifdef DBG_JEMALLOC
@@ -553,14 +554,14 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   perfopen_attr perf_funs = {.msg_fun = ddprof_callback,
                              .timeout_fun = ddprof_timeout};
   PEventHdr pevent_hdr;
-  init_pevent(&pevent_hdr);
+  pevent_init(&pevent_hdr);
 
   // Don't stop if error as this is only for debug purpose
   if (IsDDResNotOK(log_capabilities(false))) {
     LG_ERR("Error when printing capabilities, continuing...");
   }
 
-  if (IsDDResNotOK(setup_watchers(ctx, pid, num_cpu, &pevent_hdr))) {
+  if (IsDDResNotOK(pevent_setup(ctx, pid, num_cpu, &pevent_hdr))) {
     LG_ERR("Error when attaching to perf_event buffers.");
     return;
   }
@@ -568,7 +569,7 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   // We checked that perfown would work, now we free the regions so the worker
   // can get them back.  This is slightly wasteful, but these mappings don't
   // work in the child for some reason.
-  if (IsDDResNotOK(cleanup_mmap(&pevent_hdr))) {
+  if (IsDDResNotOK(pevent_munmap(&pevent_hdr))) {
     LG_ERR("Error when cleaning watchers.");
     return;
   }
@@ -606,13 +607,13 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
     LG_WRN("Error from statsd_init");
   }
 
-  if (IsDDResNotOK(enable_watchers(&pevent_hdr))) {
+  if (IsDDResNotOK(pevent_enable(&pevent_hdr))) {
     LG_ERR("Error when enabling watchers");
     return;
   }
 
   // Enter the main loop -- this will not return unless there is an error.
-  main_loop(&pevent_hdr, ctx->num_watchers * num_cpu, &perf_funs, ctx);
+  main_loop(&pevent_hdr, &perf_funs, ctx);
 
   // If we're here, the main loop closed--probably the profilee closed
   if (errno)
@@ -627,8 +628,8 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
     LG_WRN("Sending final export");
     export(ctx, now);
   }
-  if (IsDDResNotOK(cleanup_watchers(&pevent_hdr))) {
-    LG_ERR("Error when calling cleanup_watchers.");
+  if (IsDDResNotOK(pevent_cleanup(&pevent_hdr))) {
+    LG_ERR("Error when calling pevent_cleanup.");
   }
   unwind_free(ctx->us);
 }
