@@ -21,7 +21,6 @@ if [ $# == 0 ] || [ $1 == "-h" ]; then
     usage
 fi
 
-
 RECORD_STATS="no"
 if [ $# == 0 ] || [ $1 == "-r" ]; then
     RECORD_STATS="yes"
