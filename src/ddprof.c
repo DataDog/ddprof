@@ -568,7 +568,7 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   // We checked that perfown would work, now we free the regions so the worker
   // can get them back.  This is slightly wasteful, but these mappings don't
   // work in the child for some reason.
-  if (IsDDResNotOK(cleanup_watchers(&pevent_hdr))) {
+  if (IsDDResNotOK(cleanup_mmap(&pevent_hdr))) {
     LG_ERR("Error when cleaning watchers.");
     return;
   }
