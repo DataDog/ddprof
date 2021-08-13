@@ -120,6 +120,7 @@ test:ddprof_cmake:
     - check_dependencies.sh ${BINPATH}/${BUILD_TYPE}/bin/ddprof test/data/expected_deps_${BUILD_TYPE}.txt
     # Run toy project for 5 seconds
     - run.sh -b ./${BINPATH}/${BUILD_TYPE}/bin BadBoggleSolver_run 5
+    - get_perf.sh -b ./${BINPATH}/${BUILD_TYPE}/bin
   dependencies:
     - build:ddprof_cmake
 
