@@ -34,6 +34,5 @@ RUN cd bad-boggle-solver \
     && make -j 4 \
     && make install
 
-# A specific user is required to get access to perf event ressources
-RUN useradd -ms /bin/bash ddbuild
-USER ddbuild
+RUN useradd -ms /bin/bash ddtest
+USER ddtest

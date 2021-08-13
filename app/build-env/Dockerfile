@@ -11,9 +11,4 @@ RUN cd /app && mkdir build_Release && \
 
 RUN cd /app && make deps
 
-# A specific user is required to get access to perf event ressources. 
-# This enables unit testing using perf-event ressources
-RUN useradd -ms /bin/bash ddbuild
-USER ddbuild
-
 WORKDIR /app
