@@ -8,7 +8,7 @@ variables:
   # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/79006357
   BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:80c1e4d5001c1c3b2c78c61e89146d171a035a3a357b8a8ca47ec307729fab63
   # https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/78136292
-  TEST_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:98d26ab6ca3f8f1e3ae770418e4ac732d153d3eabc4e20d58104b34bc3f9546a
+  TEST_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:c112f86c2bf3fb65903475f2011501a0a2a3f5414ba6425d8fb4bbcf74d64871
   # When build images are built, publish them with following tags
   BASE_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
   BUILD_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build
@@ -112,6 +112,7 @@ test:ddprof_cmake:
   script:
     - set -euxo pipefail
     - source setup_env.sh
+    - echo "CHECK USER" && id
     - echo "CHECK SETTING ON PERF EVENT PARANOID" && cat /proc/sys/kernel/perf_event_paranoid
     - echo "CHECK SETTING ON PINNED MEMORY" && ulimit -l
     - echo "CHECK SETTING on PERF EVEN OPEN" && cat /proc/sys/kernel/perf_event_mlock_kb
@@ -119,6 +120,7 @@ test:ddprof_cmake:
     - check_dependencies.sh ${BINPATH}/${BUILD_TYPE}/bin/ddprof test/data/expected_deps_${BUILD_TYPE}.txt
     # Run toy project for 5 seconds
     - run.sh -b ./${BINPATH}/${BUILD_TYPE}/bin BadBoggleSolver_run 5
+    - get_perf.sh -b ./${BINPATH}/${BUILD_TYPE}/bin
   dependencies:
     - build:ddprof_cmake
 

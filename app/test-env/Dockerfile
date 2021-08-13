@@ -33,3 +33,6 @@ RUN cd bad-boggle-solver \
     && cmake -DCMAKE_BUILD_TYPE=Release ../ \
     && make -j 4 \
     && make install
+
+RUN useradd -ms /bin/bash ddtest
+USER ddtest

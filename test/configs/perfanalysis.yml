@@ -1,0 +1,11 @@
+ddprof:
+  intake:
+    url: intake.profile.datad0g.com
+    port: 80
+  service:
+    name: native-testservice
+  upload:
+    period: 4
+  environment: test-staging
+  loglevel: notice
+  event: sCPU,1000
