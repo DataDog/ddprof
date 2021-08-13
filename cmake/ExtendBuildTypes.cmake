@@ -25,12 +25,24 @@ SET(CMAKE_SHARED_LINKER_FLAGS_SANITIZEDDEBUG
     ""
     CACHE STRING "Flags used by the shared libraries linker during sanitized builds."
     FORCE )
+
+string (REPLACE ";" " " LD_FLAGS_STR "${LD_FLAGS}")
+
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    # In clang static link is the default
+    # lsan is combined with asan
+    # CMake: Avoid usage of list to make sure we have spaces (not ;)
+    # static ubsan is giving link errors : to be investigated
+    set(CMAKE_EXE_LINKER_FLAGS_SANITIZEDDEBUG "${CMAKE_EXE_LINKER_FLAGS_SANITIZEDDEBUG} -static-libasan")
+    set(CMAKE_SHARED_LINKER_FLAGS_SANITIZEDDEBUG "${CMAKE_SHARED_LINKER_FLAGS_SANITIZEDDEBUG} -static-libasan")
+endif()
+
 MARK_AS_ADVANCED(
     CMAKE_CXX_FLAGS_SANITIZEDDEBUG
     CMAKE_C_FLAGS_SANITIZEDDEBUG
     CMAKE_EXE_LINKER_FLAGS_SANITIZEDDEBUG
     CMAKE_SHARED_LINKER_FLAGS_SANITIZEDDEBUG )
-
 
 list(APPEND CMAKE_CONFIGURATION_TYPES Coverage)
 
@@ -51,6 +63,7 @@ SET(CMAKE_SHARED_LINKER_FLAGS_COVERAGE
     ""
     CACHE STRING "Flags used by the shared libraries linker during coverage builds."
     FORCE )
+
 MARK_AS_ADVANCED(
     CMAKE_CXX_FLAGS_COVERAGE
     CMAKE_C_FLAGS_COVERAGE

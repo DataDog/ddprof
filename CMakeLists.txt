@@ -4,18 +4,20 @@ cmake_minimum_required(VERSION 3.19)
 ### Global definitions   ###
 ############################
 
+ project(DDProf
+  LANGUAGES C CXX
+  VERSION 0.5.1
+  DESCRIPTION "Datadog's native profiler"
+)
+
 ## Compiler definition 
 # Set if not already set (no force option) : cmake -D CMAKE_C_COMPILER="/path/to/your/c/compiler/executable" will override this
 # cmake -DCMAKE_CXX_COMPILER="clang-cpp-11"  -DCMAKE_C_COMPILER="clang-11" ../
 # Alternatively you can use the CC and CXX env variables
 set(CMAKE_CXX_COMPILER g++ CACHE STRING "C++ compiler")
 set(CMAKE_C_COMPILER gcc CACHE STRING "C compiler")
- 
-project(DDProf
-  LANGUAGES C CXX
-  VERSION 0.5.1
-  DESCRIPTION "Datadog's native profiler"
-)
+
+message(STATUS "Compiler ID : ${CMAKE_C_COMPILER_ID}")
 
 # Debug command to get gcc command lines
 # set( CMAKE_VERBOSE_MAKEFILE on )
