@@ -7,20 +7,52 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
+#include "ddres.h"
 #include "logger.h"
 #include "pevent_lib.h"
+#include "unwind.h"
 
 #define rmb() __asm__ volatile("lfence" ::: "memory")
 
 #define WORKER_SHUTDOWN() exit(0)
 
-void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, void *arg) {
+void ddres_check_or_shutdown(DDRes res) {
+  if (IsDDResNotOK(res)) {
+    LG_ERR("[PERF] Shut down worker (error=%d).", res._what);
+    WORKER_SHUTDOWN();
+  }
+}
+
+void ddres_gracefull_shutdown(void) {
+  LG_NTC("Shutting down worker gracefully");
+  WORKER_SHUTDOWN();
+}
+
+static DDRes worker_init(PEventHdr *pevent_hdr, UnwindState *us) {
+  // If we're here, then we are a child spawned during the previous operation.
+  // That means we need to iterate through the perf_event_open() handles and
+  // get the mmaps
+  DDRES_CHECK_FWD(pevent_mmap(pevent_hdr));
+  DDRES_CHECK_FWD(unwind_init(us));
+  return ddres_init();
+}
+
+static DDRes worker_free(PEventHdr *pevent_hdr, UnwindState *us) {
+  unwind_free(us);
+  DDRES_CHECK_FWD(pevent_munmap(pevent_hdr));
+  return ddres_init();
+}
+
+void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, DDProfContext *arg) {
   int pe_len = pevent_hdr->size;
   struct pollfd pfd[MAX_NB_WATCHERS];
   PEvent *pes = pevent_hdr->pes;
   assert(attr->msg_fun);
+  UnwindState *us = arg->us;
 
   // Setup poll() to watch perf_event file descriptors
   for (int i = 0; i < pe_len; i++) {
@@ -42,7 +74,7 @@ void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, void *arg) {
     LG_ERR("[PERF] Could not initialize worker process coordinator, profiling "
            "will probably fail");
   } else {
-    // ## Respawn point ##
+    // ## Respawn point for workers ##
     while ((child_pid = fork())) {
       LG_WRN("[PERF] Created child %d", child_pid);
       waitpid(child_pid, NULL, 0);
@@ -59,14 +91,8 @@ void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, void *arg) {
     }
   }
 
-  // If we're here, then we are a child spawned during the previous operation.
-  // That means we need to iterate through the perf_event_open() handles and
-  // get the mmaps
-  if (IsDDResNotOK(pevent_mmap(pevent_hdr))) {
-    LG_WRN("[PERF] Error setting up mmaps");
-#warning test exit flow
-    WORKER_SHUTDOWN();
-  }
+  // Init new worker objects
+  ddres_check_or_shutdown(worker_init(pevent_hdr, us));
 
   while (1) {
     int n = poll(pfd, pe_len, PSAMPLE_DEFAULT_WAKEUP);
@@ -75,7 +101,7 @@ void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, void *arg) {
     if (-1 == n && errno == EINTR)
       continue;
     else if (-1 == n)
-      WORKER_SHUTDOWN();
+      ddres_check_or_shutdown(ddres_error(DD_WHAT_UKNW));
 
     // If no file descriptors, call time-out
     if (0 == n && attr->timeout_fun) {
@@ -83,9 +109,10 @@ void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, void *arg) {
       // We don't return from here, only exit, since we don't want to log
       // shutdown messages (if we're shutting down, the outer process will
       // emit those loglines)
-      if (!attr->timeout_fun(continue_profiling, arg)) {
-        pevent_munmap(pevent_hdr);
-        WORKER_SHUTDOWN();
+      DDRes res = attr->timeout_fun(continue_profiling, arg);
+      if (IsDDResNotOK(res)) {
+        worker_free(pevent_hdr, us);
+        ddres_check_or_shutdown(res);
       }
 
       // If we didn't have to shut down, then go back to poll()
@@ -96,8 +123,8 @@ void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, void *arg) {
       if (!pfd[i].revents)
         continue;
       if (pfd[i].revents & POLLHUP) {
-        pevent_munmap(pevent_hdr);
-        WORKER_SHUTDOWN();
+        worker_free(pevent_hdr, us);
+        ddres_gracefull_shutdown();
       }
       // Drain the ringbuffer and dispatch to callback, as needed
       // The head and tail are taken literally (without wraparound), since they
@@ -115,9 +142,10 @@ void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, void *arg) {
           // LG_WRN("[UNWIND] OUT OF BOUNDS");
         } else {
           // Same deal as the call to timeout_fun
-          if (!attr->msg_fun(hdr, pes[i].pos, continue_profiling, arg)) {
-            pevent_munmap(pevent_hdr);
-            WORKER_SHUTDOWN();
+          DDRes res = attr->msg_fun(hdr, pes[i].pos, continue_profiling, arg);
+          if (IsDDResNotOK(res)) {
+            worker_free(pevent_hdr, us);
+            ddres_check_or_shutdown(res);
           }
         }
         tail += hdr->size;

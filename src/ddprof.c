@@ -196,16 +196,16 @@ bool reset_state(DDProfContext *ctx, volatile bool *continue_profiling) {
   return true;
 }
 
-bool ddprof_timeout(volatile bool *continue_profiling, void *arg) {
+DDRes ddprof_timeout(volatile bool *continue_profiling, void *arg) {
   DDProfContext *ctx = arg;
   int64_t now = now_nanos();
 
   if (now > ctx->send_nanos) {
     export(ctx, now);
     if (!reset_state(ctx, continue_profiling))
-      return false;
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW, "Error in reset_state");
   }
-  return true;
+  return ddres_init();
 }
 
 typedef union flipper {
@@ -283,6 +283,7 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
   return &sample;
 }
 
+/// Entry point for unwinding
 void ddprof_pr_sample(DDProfContext *ctx, struct perf_event_header *hdr,
                       int pos) {
   // Before we do anything else, copy the perf_event_header into a sample
@@ -371,12 +372,13 @@ void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int pos) {
   pid_free(ext->pid);
 }
 
-bool ddprof_callback(struct perf_event_header *hdr, int pos,
-                     volatile bool *continue_profiling, void *arg) {
+DDRes ddprof_callback(struct perf_event_header *hdr, int pos,
+                      volatile bool *continue_profiling, void *arg) {
   DDProfContext *ctx = arg;
 
   switch (hdr->type) {
   case PERF_RECORD_SAMPLE:
+#warning bad error management
     ddprof_pr_sample(ctx, hdr, pos);
     break;
   case PERF_RECORD_MMAP:
@@ -405,10 +407,10 @@ bool ddprof_callback(struct perf_event_header *hdr, int pos,
   if (now > ctx->send_nanos) {
     export(ctx, now);
     if (!reset_state(ctx, continue_profiling))
-      return false;
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW, "Error in reset_state");
   }
 
-  return true;
+  return ddres_init();
 }
 
 /*********************************  Printers  *********************************/
@@ -597,12 +599,6 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   // Perform initialization operations
   ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
 
-  DDRes ddres = unwind_init(ctx->us);
-  if (IsDDResNotOK(ddres)) {
-    LG_ERR("Error when initializing unwinding");
-    return;
-  }
-
   if (statsd_init() == -1) {
     LG_WRN("Error from statsd_init");
   }
@@ -631,7 +627,6 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   if (IsDDResNotOK(pevent_cleanup(&pevent_hdr))) {
     LG_ERR("Error when calling pevent_cleanup.");
   }
-  unwind_free(ctx->us);
 }
 
 /****************************  Argument Processor  ***************************/

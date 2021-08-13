@@ -116,8 +116,8 @@ bool ddprof_ctx_watcher_process(DDProfContext *, char *);
 #define WORKER_REFRESH_RSS_KB (1024 * 4) // 8 megabytes
 bool reset_state(DDProfContext *, volatile bool *continue_profiling);
 void export(DDProfContext *, int64_t);
-bool ddprof_timeout(volatile bool *, void *);
-bool ddprof_callback(struct perf_event_header *, int, volatile bool *, void *);
+DDRes ddprof_timeout(volatile bool *, void *);
+DDRes ddprof_callback(struct perf_event_header *, int, volatile bool *, void *);
 
 /*********************************  Printers  *********************************/
 void print_help();

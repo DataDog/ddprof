@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "ddres_def.h"
 #include "perf_option.h"
 
 #define PSAMPLE_DEFAULT_WAKEUP 1000 // sample frequency check
@@ -148,8 +149,8 @@ static const PerfOption perfoptions[] = {
 #define perfoptions_sz (sizeof(perfoptions) / sizeof(*perfoptions))
 
 typedef struct perfopen_attr {
-  bool (*msg_fun)(struct perf_event_header *, int, volatile bool *, void *);
-  bool (*timeout_fun)(volatile bool *, void *);
+  DDRes (*msg_fun)(struct perf_event_header *, int, volatile bool *, void *);
+  DDRes (*timeout_fun)(volatile bool *, void *);
 } perfopen_attr;
 
 // Used by rb_init() and friends
