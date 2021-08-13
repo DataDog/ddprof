@@ -166,7 +166,7 @@ bool reset_state(DDProfContext *ctx, volatile bool *continue_profiling) {
   // RSS, but if we've already grown to this point, might as well reset now.
   if (ctx->last_status && WORKER_MAX_RSS_KB <= ctx->last_status->rss) {
     *continue_profiling = true;
-    LG_ERR("Leaving to reset worker");
+    LG_WRN("%s: Leaving to reset worker", __FUNCTION__);
     return false;
   }
 
@@ -199,11 +199,14 @@ bool reset_state(DDProfContext *ctx, volatile bool *continue_profiling) {
 DDRes ddprof_timeout(volatile bool *continue_profiling, void *arg) {
   DDProfContext *ctx = arg;
   int64_t now = now_nanos();
-
   if (now > ctx->send_nanos) {
     export(ctx, now);
-    if (!reset_state(ctx, continue_profiling))
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW, "Error in reset_state");
+    if (!reset_state(ctx, continue_profiling)) {
+      DDRES_RETURN_WARN_LOG(
+          DD_WHAT_WORKER_RESET,
+          "%s: reset_state indicates we should stop worker (continue?%s)",
+          __FUNCTION__, (*continue_profiling) ? "yes" : "no");
+    }
   }
   return ddres_init();
 }
@@ -406,8 +409,11 @@ DDRes ddprof_callback(struct perf_event_header *hdr, int pos,
 
   if (now > ctx->send_nanos) {
     export(ctx, now);
-    if (!reset_state(ctx, continue_profiling))
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW, "Error in reset_state");
+    if (!reset_state(ctx, continue_profiling)) {
+      DDRES_RETURN_WARN_LOG(DD_WHAT_UKNW,
+                            "%s: reset_state indicates we should reset worker",
+                            __FUNCTION__);
+    }
   }
 
   return ddres_init();

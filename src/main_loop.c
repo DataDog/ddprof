@@ -22,7 +22,7 @@
 
 void ddres_check_or_shutdown(DDRes res) {
   if (IsDDResNotOK(res)) {
-    LG_ERR("[PERF] Shut down worker (error=%d).", res._what);
+    LG_WRN("[PERF] Shut down worker (error=%d).", res._what);
     WORKER_SHUTDOWN();
   }
 }

@@ -17,6 +17,13 @@ extern "C" {
     return ddres_error(what);                                                  \
   } while (0)
 
+/// Returns a warning ddres with the appropriate LG_WRN message
+#define DDRES_RETURN_WARN_LOG(what, ...)                                       \
+  do {                                                                         \
+    LG_WRN(__VA_ARGS__);                                                       \
+    return ddres_warn(what);                                                   \
+  } while (0)
+
 /// Evaluate function and return error if -1 (add an error log)
 #define DDRES_CHECK_INT(eval, what, ...)                                       \
   do {                                                                         \

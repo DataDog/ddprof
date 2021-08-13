@@ -29,6 +29,7 @@ enum DDRes_What {
   DD_WHAT_PERFMMAP,
   DD_WHAT_POLLTIMEOUT,
   DD_WHAT_POLLHANGUP,
+  DD_WHAT_WORKER_RESET,
   // native errors
   DD_WHAT_UNITTEST,
   // max
