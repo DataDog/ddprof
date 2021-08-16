@@ -41,3 +41,7 @@ RUN CMAKE_VERSION="3.20.1" \
 
 # Provides the llvm-symbolizer (better debug information in case of sanitizer issue)
 ENV PATH="/usr/lib/llvm-11/bin/:$PATH"
+
+# A specific user is required to get access to perf event ressources. 
+# This enables unit testing using perf-event ressources
+RUN useradd -ms /bin/bash ddbuild

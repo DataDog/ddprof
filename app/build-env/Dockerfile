@@ -5,8 +5,8 @@ ENV CI=${CI:-false}
 ADD . /app/
 
 RUN cd /app && mkdir build_Release && \
-    cd build_Release \
-    cmake -DCMAKE_BUILD_MODE=Release \
+    cd build_Release && \
+    cmake -DCMAKE_BUILD_TYPE=Release ../ && \
     make deps
 
 RUN cd /app && make deps

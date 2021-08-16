@@ -117,17 +117,10 @@ URL_ELF := https://sourceware.org/elfutils/ftp/$(VER_ELF)/$(TAR_ELF)
 ELFUTILS = $(VENDIR)/elfutils
 ELFLIBS := $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libelf/libelf.a
 
-## https://gitlab.ddbuild.io/DataDog/libddprof/-/jobs/76775503
-VER_LIBDDPROF := ff9bd540 #Short commit number from CI (used in export job of libddprof)
-SHA256_LIBDDPROF := b35a2977e0b279ae709d051e600de1741cbc6da64eceea0c643dfd0b0903ee77 # You need to generate this manually
-
-LIBDDPROF := $(VENDIR)/libddprof
-LIBDDPROF_LIB := $(LIBDDPROF)/RelWithDebInfo/lib64/libddprof-c.a
-
 # Global aggregates
 CWD := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 SOURCE_DIR := $(CWD)
-INCLUDE = -I$(LIBDDPROF)/RelWithDebInfo/include -I$(CWD)/include -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
+INCLUDE = -I$(CWD)/include -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
 LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl $(LIBSTDCXX)
 SRC := $(CWD)/src/proto/profile.pb-c.c $(CWD)/src/ddprofcmdline.c $(CWD)/src/ipc.c $(CWD)/src/logger.c $(CWD)/src/signal_helper.c $(CWD)/src/version.c $(CWD)/src/statsd.c $(CWD)/src/perf.c $(CWD)/src/ddprof.c $(CWD)/src/unwind.c $(CWD)/src/dso.c $(CWD)/src/procutils.c
 DIRS := $(TARGETDIR) $(TMP)
@@ -157,14 +150,12 @@ $(ELFUTILS):
 	tar --no-same-owner -C $(ELFUTILS) --strip-components 1 -xf $(VENDIR)/$(TAR_ELF)
 	rm -rf $(VENDIR)/$(TAR_ELF)
 
-$(LIBDDPROF):
-	./tools/fetch_libddprof.sh ${VER_LIBDDPROF} ${SHA256_LIBDDPROF} $(VENDIR)
 
-deps: $(LIBDDPROF) $(ELFLIBS)
+deps: $(ELFLIBS)
 
 # HACK: For some reason HTTP doesn't work in David's local containers, but
 # pulling down dependencies outside and then compiling works
-pull: $(LIBDDPROF) $(ELFUTILS)
+pull: $(ELFUTILS)
 
 # kinda phony
 bench:
@@ -183,7 +174,6 @@ format-commit:
 
 clean_deps:
 	rm -rf vendor/elfutils
-	rm -rf vendor/libddprof*
 	rm -rf $(TMP)/*
 
 clean: clean_deps
