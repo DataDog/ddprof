@@ -3,7 +3,7 @@ find_package(GTest REQUIRED)
 enable_testing()
 
 ### Code coverage
-if(DEFINED CMAKE_BUILD_TYPE AND ${CMAKE_BUILD_TYPE} STREQUAL Coverage)
+if("${CMAKE_BUILD_TYPE}" STREQUAL "Coverage")
     message(STATUS "Activating code coverage in tests")
     include(CodeCoverage)
     set(COVERAGE_EXCLUDES "vendor/*")
@@ -93,7 +93,7 @@ add_unit_test(
     ../src/perf.c
     ../src/logger.c
     mmap-ut.cc
-    LIBRARIES libddprof-c
+    LIBRARIES ddprof-c
     DEFINITIONS MYNAME="ipc-ut"
 )
 target_include_directories(mmap-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
@@ -102,7 +102,7 @@ add_unit_test(
     ddres-ut
     ../src/logger.c
     ddres-ut.cc
-    LIBRARIES libddprof-c
+    LIBRARIES ddprof-c
     DEFINITIONS MYNAME="ddres-ut"
 )
 target_include_directories(ddres-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
@@ -112,7 +112,7 @@ add_unit_test(
     ../src/cap_display.c
     ../src/logger.c
     cap-ut.cc
-    LIBRARIES libddprof-c libcap
+    LIBRARIES ddprof-c libcap
     DEFINITIONS MYNAME="cap-ut"
 )
 target_include_directories(cap-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR} ${LIBCAP_INCLUDE_DIR})

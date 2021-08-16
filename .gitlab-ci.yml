@@ -5,10 +5,10 @@ stages:
 
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
-  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/79006357
-  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:80c1e4d5001c1c3b2c78c61e89146d171a035a3a357b8a8ca47ec307729fab63
-  # https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/78136292
-  TEST_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:c112f86c2bf3fb65903475f2011501a0a2a3f5414ba6425d8fb4bbcf74d64871
+  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/79878895
+  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:b6b9f9283f9a45b120ed10a8346659c47d195ac334346367e2e0e010b6cc7ceb
+  # https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/79832541
+  TEST_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:502842598506cd5306ad9217b45bd2a6d10abf5ab157982373080feba8948d47
   # When build images are built, publish them with following tags
   BASE_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
   BUILD_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build
@@ -77,6 +77,7 @@ build:ddprof_cmake:
     BUILDPATH: build_${BUILD_TYPE}
   script:
     - set -euxo pipefail
+    - source setup_env.sh
     - export DELIVERY_PATH="${CI_PROJECT_DIR}/${BINPATH}/${BUILD_TYPE}"
     #Build image dependencies were stored in app, avoid rebuilding vendor content
     - ln -s /app/vendor vendor
@@ -93,8 +94,8 @@ build:ddprof_cmake:
     - export CODECOV_TOKEN=$(aws ssm get-parameter --region us-east-1 --name ci.ddprof.codecov-token --with-decryption --query "Parameter.Value" --out text)
     - ${CI_PROJECT_DIR}/tools/codecov.sh -Z
     - fi
-      # This job gives useful info on the mmap/mlock/perfopen capabilities in CI
-    - cd test && ./mmap-ut
+      # This job gives useful info on the mmap/mlock/perfopen capabilities in CI / different user
+    - cd test && RunDDBuild ./mmap-ut
   artifacts:
     paths:
       - ${CI_PROJECT_DIR}/${BINPATH}/

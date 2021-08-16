@@ -54,8 +54,7 @@ message(STATUS "Libddprof Include directory " ${LIBDDPROF_INCLUDE_DIR})
 include(FindLibLlvmDemangle)
 
 add_custom_target(deps
-                  DEPENDS codecov-deps llvm-deps)
-
+                  DEPENDS llvm-deps ddprof-deps)
 
 #######################
 ### Static analysis ###
@@ -171,7 +170,7 @@ set(DDPROF_GLOBAL_SRC
    ${MAIN_SRC}
    ${PROTO_SRC})
 
-set(DDPROF_LIBRARY_LIST libddprof-c llvm-demangle libstdc++.a dw.a elf.a libz.a Threads::Threads libprotobuf-c.a liblzma.a)
+set(DDPROF_LIBRARY_LIST ddprof-c llvm-demangle libstdc++.a dw.a elf.a libz.a Threads::Threads libprotobuf-c.a liblzma.a)
 
 if (${JEMALLOC})
    list(PREPEND DDPROF_LIBRARY_LIST jemalloc)

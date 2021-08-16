@@ -17,3 +17,8 @@ SanCMake() {
 CovCMake() {
     cmake -DCMAKE_BUILD_TYPE=Coverage "$@"
 }
+
+RunDDBuild() {
+    # run command as ddbuild user
+    su ddbuild su -s /bin/bash -c "$@" ddbuild
+}
