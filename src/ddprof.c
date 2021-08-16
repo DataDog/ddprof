@@ -154,27 +154,27 @@ DDRes export(DDProfContext *ctx, int64_t now) {
   return ddres_init();
 }
 
-bool reset_state(DDProfContext *ctx, volatile bool *continue_profiling) {
+DDRes reset_state(DDProfContext *ctx, volatile bool *continue_profiling) {
   // NOTE: strongly assumes reset_state is called after the last status has
   //       been updated.  Otherwiset his is kind of a no-op.
-  if (!ctx)
-    return false;
-
+  if (!ctx) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW, "[DDPROF] Invalid context in %s",
+                           __FUNCTION__);
+  }
   // Check to see whether we need to clear the whole worker.  Potentially we
   // could defer this a little longer by clearing the caches and then checking
   // RSS, but if we've already grown to this point, might as well reset now.
   if (WORKER_MAX_RSS_KB <= ctx->proc_state.last_status.rss) {
     *continue_profiling = true;
-    LG_WRN("%s: Leaving to reset worker", __FUNCTION__);
-    return false;
+    DDRES_RETURN_WARN_LOG(DD_WHAT_WORKER_RESET,
+                          "%s: rss=%lu - stop worker (continue?%s)",
+                          __FUNCTION__, ctx->proc_state.last_status.rss,
+                          (*continue_profiling) ? "yes" : "no");
   }
 
   // If we haven't hit the hard cap, have we hit the soft cap?
   if (WORKER_REFRESH_RSS_KB <= ctx->proc_state.last_status.rss) {
-    if (IsDDResNotOK(dwfl_caches_clear(ctx->us))) {
-      LG_ERR("[DDPROF] Error refreshing unwinding module, profiling shutdown");
-      return false;
-    }
+    DDRES_CHECK_FWD(dwfl_caches_clear(ctx->us));
 
     // Clear and re-initialize the pprof
     const char *pprof_labels[MAX_TYPE_WATCHER];
@@ -187,12 +187,12 @@ bool reset_state(DDProfContext *ctx, volatile bool *continue_profiling) {
 
     if (!pprof_Init(ctx->dp, (const char **)pprof_labels,
                     (const char **)pprof_units, ctx->num_watchers)) {
-      LG_ERR("[DDPROF] Error refreshing profile storage");
-      return false;
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW,
+                             "[DDPROF] Error refreshing profile storage");
     }
   }
 
-  return true;
+  return ddres_init();
 }
 
 DDRes ddprof_timeout(volatile bool *continue_profiling, void *arg) {
@@ -200,12 +200,8 @@ DDRes ddprof_timeout(volatile bool *continue_profiling, void *arg) {
   int64_t now = now_nanos();
   if (now > ctx->send_nanos) {
     DDRES_CHECK_FWD(export(ctx, now));
-    if (!reset_state(ctx, continue_profiling)) {
-      DDRES_RETURN_WARN_LOG(
-          DD_WHAT_WORKER_RESET,
-          "%s: reset_state indicates we should stop worker (continue?%s)",
-          __FUNCTION__, (*continue_profiling) ? "yes" : "no");
-    }
+    // reset state defines if we should reboot the worker
+    return reset_state(ctx, continue_profiling);
   }
   return ddres_init();
 }
@@ -407,11 +403,8 @@ DDRes ddprof_callback(struct perf_event_header *hdr, int pos,
 
   if (now > ctx->send_nanos) {
     DDRES_CHECK_FWD(export(ctx, now));
-    if (!reset_state(ctx, continue_profiling)) {
-      DDRES_RETURN_WARN_LOG(DD_WHAT_UKNW,
-                            "%s: reset_state indicates we should reset worker",
-                            __FUNCTION__);
-    }
+    // reset state defines if we should reboot the worker
+    return reset_state(ctx, continue_profiling);
   }
 
   return ddres_init();
