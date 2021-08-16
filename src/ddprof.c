@@ -381,7 +381,6 @@ DDRes ddprof_callback(struct perf_event_header *hdr, int pos,
 
   switch (hdr->type) {
   case PERF_RECORD_SAMPLE:
-#warning bad error management
     ddprof_pr_sample(ctx, hdr, pos);
     break;
   case PERF_RECORD_MMAP:

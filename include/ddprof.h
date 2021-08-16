@@ -9,7 +9,6 @@
 #include "ipc.h"
 #include "logger.h"
 #include "perf.h"
-#include "procutils.h"
 #include "version.h"
 
 /*

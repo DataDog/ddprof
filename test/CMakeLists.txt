@@ -35,8 +35,10 @@ function(add_unit_test name)
 
    ## Create exe with sources 
    add_exe(${name} ${MY_UNPARSED_ARGUMENTS})
+   add_dependencies(${name} ddprof-deps)
    target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
-   target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS})
+   # libddprof almost always required (unlikely file from libddprof)
+   target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS} ${LIBDDPROF_INCLUDE_DIR})
 
    add_test(NAME ${name} COMMAND ${name})
    set_tests_properties(${name} PROPERTIES
@@ -51,7 +53,6 @@ add_unit_test(
     ../src/ddprofcmdline.c 
     ddprofcmdline-ut.cc
 )
-target_include_directories(ddprofcmdline-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
 
 add_unit_test(
     signal_helper-ut
@@ -79,7 +80,7 @@ add_unit_test(
     demangle-ut.cc
     LIBRARIES llvm-demangle libstdc++.a
 )
-target_include_directories(demangle-ut PRIVATE ${LLVM_DEMANGLE_PATH}/include ${LIBDDPROF_INCLUDE_DIR})
+target_include_directories(demangle-ut PRIVATE ${LLVM_DEMANGLE_PATH}/include)
 
 add_compile_definitions("IPC_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 
@@ -97,7 +98,7 @@ add_unit_test(
     LIBRARIES ddprof-c
     DEFINITIONS MYNAME="ipc-ut"
 )
-target_include_directories(mmap-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
+target_include_directories(mmap-ut PRIVATE)
 
 add_unit_test(
     ddres-ut
@@ -106,7 +107,6 @@ add_unit_test(
     LIBRARIES ddprof-c
     DEFINITIONS MYNAME="ddres-ut"
 )
-target_include_directories(ddres-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
 
 add_unit_test(
     cap-ut
@@ -116,4 +116,4 @@ add_unit_test(
     LIBRARIES ddprof-c libcap
     DEFINITIONS MYNAME="cap-ut"
 )
-target_include_directories(cap-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR} ${LIBCAP_INCLUDE_DIR})
+target_include_directories(cap-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
