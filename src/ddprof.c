@@ -79,22 +79,22 @@ DDRes statsd_upload_globals(DDProfContext *ctx) {
   ProcStatus *procstat = &ctx->proc_state.last_status;
 
   // If there's nothing that can be done, then there's nothing to do.
-  if (-1 == fd_statsd)
-    return ddres_init();
+  if (-1 != fd_statsd) {
+    statsd_send(fd_statsd, key_rss, &(long){1024 * procstat->rss}, STAT_GAUGE);
+    if (procstat->utime) {
+      long this_time = procstat->utime - ctx->proc_state.last_utime;
+      statsd_send(fd_statsd, key_user, &(long){this_time}, STAT_GAUGE);
+    }
 
-  statsd_send(fd_statsd, key_rss, &(long){1024 * procstat->rss}, STAT_GAUGE);
-  if (procstat->utime) {
-    long this_time = procstat->utime - ctx->proc_state.last_utime;
-    statsd_send(fd_statsd, key_user, &(long){this_time}, STAT_GAUGE);
-    ctx->proc_state.last_utime = procstat->utime;
+    // Upload global gauges
+    uint64_t st_size = ctx->dp->string_table_size(ctx->dp->string_table_data);
+    statsd_send(fd_statsd, key_st_elements, &(long){st_size}, STAT_GAUGE);
+    statsd_send(fd_statsd, key_ticks_unwind, &(long){ticks_unwind}, STAT_GAUGE);
+    statsd_send(fd_statsd, key_events_lost, &(long){events_lost}, STAT_GAUGE);
+    statsd_send(fd_statsd, key_samples_recv, &(long){samples_recv}, STAT_GAUGE);
   }
+  ctx->proc_state.last_utime = procstat->utime;
 
-  // Upload global gauges
-  uint64_t st_size = ctx->dp->string_table_size(ctx->dp->string_table_data);
-  statsd_send(fd_statsd, key_st_elements, &(long){st_size}, STAT_GAUGE);
-  statsd_send(fd_statsd, key_ticks_unwind, &(long){ticks_unwind}, STAT_GAUGE);
-  statsd_send(fd_statsd, key_events_lost, &(long){events_lost}, STAT_GAUGE);
-  statsd_send(fd_statsd, key_samples_recv, &(long){samples_recv}, STAT_GAUGE);
   return ddres_init();
 }
 
