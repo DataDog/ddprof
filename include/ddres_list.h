@@ -30,6 +30,7 @@ enum DDRes_What {
   DD_WHAT_POLLTIMEOUT,
   DD_WHAT_POLLHANGUP,
   DD_WHAT_WORKER_RESET,
+  DD_WHAT_PROCSTATE,
   // native errors
   DD_WHAT_UNITTEST,
   // max

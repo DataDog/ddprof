@@ -117,3 +117,13 @@ add_unit_test(
     DEFINITIONS MYNAME="cap-ut"
 )
 target_include_directories(cap-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
+
+add_unit_test(
+    procutils-ut
+    ../src/procutils.c
+    ../src/logger.c
+    procutils-ut.cc
+    LIBRARIES ddprof-c
+    DEFINITIONS MYNAME="procutils-ut"
+)
+target_include_directories(cap-ut PRIVATE ${LIBCAP_INCLUDE_DIR})

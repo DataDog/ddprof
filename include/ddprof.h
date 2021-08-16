@@ -102,7 +102,7 @@ case casechar:                                                                 \
 typedef enum DDKeys { OPT_TABLE(X_ENUM) DD_KLEN } DDKeys;
 
 int statsd_init();
-void statsd_upload_globals(DDProfContext *);
+DDRes statsd_upload_globals(DDProfContext *);
 void print_diagnostics();
 
 // Initialize a ctx
@@ -114,7 +114,7 @@ bool ddprof_ctx_watcher_process(DDProfContext *, char *);
 #define WORKER_MAX_RSS_KB (1024 * 10)    // 50 megabytes
 #define WORKER_REFRESH_RSS_KB (1024 * 4) // 8 megabytes
 bool reset_state(DDProfContext *, volatile bool *continue_profiling);
-void export(DDProfContext *, int64_t);
+DDRes export(DDProfContext *, int64_t);
 DDRes ddprof_timeout(volatile bool *, void *);
 DDRes ddprof_callback(struct perf_event_header *, int, volatile bool *, void *);
 

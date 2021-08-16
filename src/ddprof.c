@@ -65,7 +65,7 @@ int statsd_init() {
 }
 
 #define DDPN "datadog.profiler.native."
-void statsd_upload_globals(DDProfContext *ctx) {
+DDRes statsd_upload_globals(DDProfContext *ctx) {
   static char key_rss[] = DDPN "rss";
   static char key_user[] = DDPN "utime";
   static char key_st_elements[] = DDPN "pprof.st_elements";
@@ -75,20 +75,18 @@ void statsd_upload_globals(DDProfContext *ctx) {
 
   // Upload ddprof's procfs values.  We harvest the values no matter what, since
   // they're used to observe memory limits
-  static unsigned long last_utime = 0;
-  ProcStatus *procstat = proc_read();
-  ctx->last_status = procstat;
+  DDRES_CHECK_FWD(proc_read(&ctx->proc_state.last_status));
+  ProcStatus *procstat = &ctx->proc_state.last_status;
 
   // If there's nothing that can be done, then there's nothing to do.
   if (-1 == fd_statsd)
-    return;
-  if (procstat) {
-    statsd_send(fd_statsd, key_rss, &(long){1024 * procstat->rss}, STAT_GAUGE);
-    if (procstat->utime) {
-      long this_time = procstat->utime - last_utime;
-      statsd_send(fd_statsd, key_user, &(long){this_time}, STAT_GAUGE);
-      last_utime = procstat->utime;
-    }
+    return ddres_init();
+
+  statsd_send(fd_statsd, key_rss, &(long){1024 * procstat->rss}, STAT_GAUGE);
+  if (procstat->utime) {
+    long this_time = procstat->utime - ctx->proc_state.last_utime;
+    statsd_send(fd_statsd, key_user, &(long){this_time}, STAT_GAUGE);
+    ctx->proc_state.last_utime = procstat->utime;
   }
 
   // Upload global gauges
@@ -97,6 +95,7 @@ void statsd_upload_globals(DDProfContext *ctx) {
   statsd_send(fd_statsd, key_ticks_unwind, &(long){ticks_unwind}, STAT_GAUGE);
   statsd_send(fd_statsd, key_events_lost, &(long){events_lost}, STAT_GAUGE);
   statsd_send(fd_statsd, key_samples_recv, &(long){samples_recv}, STAT_GAUGE);
+  return ddres_init();
 }
 
 void print_diagnostics() {
@@ -118,12 +117,12 @@ static inline int64_t now_nanos() {
 }
 
 /******************************  Perf Callback  *******************************/
-void export(DDProfContext *ctx, int64_t now) {
+DDRes export(DDProfContext *ctx, int64_t now) {
   DDReq *ddr = ctx->ddr;
   DProf *dp = ctx->dp;
 
   // Before any state gets reset, export metrics to statsd
-  statsd_upload_globals(ctx);
+  DDRES_CHECK_FWD(statsd_upload_globals(ctx));
 
   // And emit diagnostic output (if it's enabled)
   print_diagnostics();
@@ -152,7 +151,7 @@ void export(DDProfContext *ctx, int64_t now) {
   events_lost = 0;
   samples_recv = 0;
 
-  return;
+  return ddres_init();
 }
 
 bool reset_state(DDProfContext *ctx, volatile bool *continue_profiling) {
@@ -164,14 +163,14 @@ bool reset_state(DDProfContext *ctx, volatile bool *continue_profiling) {
   // Check to see whether we need to clear the whole worker.  Potentially we
   // could defer this a little longer by clearing the caches and then checking
   // RSS, but if we've already grown to this point, might as well reset now.
-  if (ctx->last_status && WORKER_MAX_RSS_KB <= ctx->last_status->rss) {
+  if (WORKER_MAX_RSS_KB <= ctx->proc_state.last_status.rss) {
     *continue_profiling = true;
     LG_WRN("%s: Leaving to reset worker", __FUNCTION__);
     return false;
   }
 
   // If we haven't hit the hard cap, have we hit the soft cap?
-  if (ctx->last_status && WORKER_REFRESH_RSS_KB <= ctx->last_status->rss) {
+  if (WORKER_REFRESH_RSS_KB <= ctx->proc_state.last_status.rss) {
     if (IsDDResNotOK(dwfl_caches_clear(ctx->us))) {
       LG_ERR("[DDPROF] Error refreshing unwinding module, profiling shutdown");
       return false;
@@ -200,7 +199,7 @@ DDRes ddprof_timeout(volatile bool *continue_profiling, void *arg) {
   DDProfContext *ctx = arg;
   int64_t now = now_nanos();
   if (now > ctx->send_nanos) {
-    export(ctx, now);
+    DDRES_CHECK_FWD(export(ctx, now));
     if (!reset_state(ctx, continue_profiling)) {
       DDRES_RETURN_WARN_LOG(
           DD_WHAT_WORKER_RESET,
@@ -407,7 +406,7 @@ DDRes ddprof_callback(struct perf_event_header *hdr, int pos,
   int64_t now = now_nanos();
 
   if (now > ctx->send_nanos) {
-    export(ctx, now);
+    DDRES_CHECK_FWD(export(ctx, now));
     if (!reset_state(ctx, continue_profiling)) {
       DDRES_RETURN_WARN_LOG(DD_WHAT_UKNW,
                             "%s: reset_state indicates we should reset worker",
@@ -627,7 +626,9 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   int64_t now = now_nanos();
   if (now > ctx->send_nanos || ctx->sendfinal) {
     LG_WRN("Sending final export");
-    export(ctx, now);
+    if (IsDDResNotOK(export(ctx, now))) {
+      LG_ERR("Error when exporting.");
+    }
   }
   if (IsDDResNotOK(pevent_cleanup(&pevent_hdr))) {
     LG_ERR("Error when calling pevent_cleanup.");

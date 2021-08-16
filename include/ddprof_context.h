@@ -1,6 +1,7 @@
 #pragma once
 
 #include "perf_option.h"
+#include "proc_state.h"
 #include <sys/types.h>
 
 /// Maximum number of different watcher types
@@ -9,7 +10,6 @@
 // forward declarations
 typedef struct DDReq DDReq;
 typedef struct DProf DProf;
-typedef struct ProcStatus ProcStatus;
 
 typedef struct DDProfContext {
   DProf *dp;
@@ -49,8 +49,7 @@ typedef struct DDProfContext {
   } params;
   PerfOption watchers[MAX_TYPE_WATCHER];
   int num_watchers;
-
   struct UnwindState *us;
-  ProcStatus *last_status;
+  ProcState proc_state;
   int64_t send_nanos; // Last time an export was sent
 } DDProfContext;
