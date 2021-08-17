@@ -7,12 +7,11 @@ RUN apt update \
   && DEBIAN_FRONTEND=noninteractive apt install -y \
   awscli \
   binutils-dev \
-  clang-11 \
+  clang-12 \
   cmake \
   cppcheck \
-  gcc-10 \
-  gcc \
-  g++ \
+  gcc-11 \
+  g++-11 \
   git \
   curl \
   make \
@@ -29,6 +28,10 @@ RUN apt update \
   libcap-dev \
   gcovr
 
+# Set the default gcc/g++/clang to the specified version
+RUN update-alternatives --install /usr/bin/gcc gcc $(which gcc-11) 11 &&
+    update-alternatives --install /usr/bin/g++ g++ $(which g++-11) 11 &&
+    update-alternatives --install /usr/bin/clang clang $(which clang-12) 12
 
 # Newer CMake
 FROM base as cmake
