@@ -515,10 +515,11 @@ MYNAME" can register to various system events in order to customize the\n"
 "Events with the same name in the UI conflict with each other; be sure to pick\n"
 "only one such event!\n"
 "\n";
+  // clang-format on
 
   printf("%s", help_hdr);
   printf("Options:\n");
-  for (int i=0; i<DD_KLEN; i++) {
+  for (int i = 0; i < DD_KLEN; i++) {
     assert(help_str[i]);
     if (help_str[i] && STR_UNDF != help_str[i]) {
       printf("%s\n", help_key[i]);
@@ -528,12 +529,12 @@ MYNAME" can register to various system events in order to customize the\n"
   printf("%s", help_opts_extra);
   printf("%s", help_events);
 
-  static int num_perfs = sizeof(perfoptions) / sizeof(*perfoptions);
-  for (int i = 0; i < num_perfs; i++)
-    printf("%-10s - %-15s (%s, %s)\n", perfoptions_lookup[i],
-           perfoptions[i].desc, perfoptions[i].label, perfoptions[i].unit);
+  for (int i = 0; i < perfoptions_nb_presets(); i++) {
+    printf("%-10s - %-15s (%s, %s)\n", perfoptions_lookup_idx(i),
+           perfoptions_preset(i)->desc, perfoptions_preset(i)->label,
+           perfoptions_preset(i)->unit);
+  }
 }
-// clang-format on
 
 /*****************************  SIGSEGV Handler *******************************/
 void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
@@ -636,7 +637,7 @@ void ddprof_setctx(DDProfContext *ctx) {
   // If events are set, install default watcher
   if (!ctx->num_watchers) {
     ctx->num_watchers = 1;
-    ctx->watchers[0] = perfoptions[10];
+    ctx->watchers[0] = *perfoptions_preset(10);
   }
 
   // Set defaults

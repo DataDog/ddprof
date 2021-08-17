@@ -51,6 +51,7 @@ endfunction()
 add_unit_test(
     ddprofcmdline-ut
     ../src/ddprofcmdline.c 
+    ../src/perf_option.c
     ddprofcmdline-ut.cc
 )
 
@@ -92,11 +93,12 @@ add_unit_test(
 
 add_unit_test(
     mmap-ut
-    ../src/perf.c
     ../src/logger.c
+    ../src/perf.c
+    ../src/perf_option.c
     mmap-ut.cc
     LIBRARIES ddprof-c
-    DEFINITIONS MYNAME="ipc-ut"
+    DEFINITIONS MYNAME="mmap-ut"
 )
 target_include_directories(mmap-ut PRIVATE)
 
@@ -127,3 +129,15 @@ add_unit_test(
     DEFINITIONS MYNAME="procutils-ut"
 )
 target_include_directories(cap-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
+
+add_unit_test(
+    pevent-ut
+    ../src/pevent_lib.c
+    ../src/logger.c
+    ../src/perf.c
+    ../src/perf_option.c
+    pevent-ut.cc
+    LIBRARIES ddprof-c
+    DEFINITIONS MYNAME="pevent-ut"
+)
+target_include_directories(pevent-ut PRIVATE ${LIBCAP_INCLUDE_DIR})

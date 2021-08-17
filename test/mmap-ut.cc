@@ -45,11 +45,11 @@ TEST(MMapTest, PerfOpen) {
 
   int cpu = 0;
 
-  for (unsigned i = 0; i < perfoptions_sz; ++i) {
+  for (int i = 0; i < perfoptions_nb_presets(); ++i) {
     std::cerr << "#######################################" << std::endl;
-    std::cerr << "-->" << i << " " << perfoptions[i].desc << std::endl;
+    std::cerr << "-->" << i << " " << perfoptions_preset(i)->desc << std::endl;
 
-    int perf_fd = perfopen(pid, &perfoptions[i], cpu, false);
+    int perf_fd = perfopen(pid, perfoptions_preset(i), cpu, false);
     if (i == 10 || i == 11) { // Expected not to fail
       EXPECT_TRUE(perf_fd != -1);
     }

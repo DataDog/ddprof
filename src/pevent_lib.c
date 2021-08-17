@@ -10,8 +10,6 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-#warning write unit test for this
-
 void pevent_init(PEventHdr *pevent_hdr) {
   PEvent *pes = pevent_hdr->pes;
   pevent_hdr->max_size = MAX_NB_WATCHERS;
