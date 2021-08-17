@@ -113,13 +113,6 @@ void ddprof_ctx_free(DDProfContext *);
 bool ddprof_ctx_watcher_process(DDProfContext *, char *);
 
 /******************************  Perf Callback  *******************************/
-// In the typical case, an export happens once per minute.  The values below are
-// empirically derived from long-running profiling campaigns to more-or-less
-// fix memory usage under ~50 (hopefully 30) megabytes.  At this point we are
-// trying to control unbounded growth rather than provide a strongly controlled
-// memory overhead.
-#define REFRESH_COUNT_CACHE 15   // Clear unwinding caches after 15 exports
-#define REFRESH_COUNT_WORKER 240 // Kill and respawn workers after 240 exports
 DDRes reset_state(DDProfContext *, volatile bool *continue_profiling);
 DDRes export(DDProfContext *, int64_t);
 DDRes ddprof_timeout(volatile bool *, void *);
