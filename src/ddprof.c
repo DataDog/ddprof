@@ -404,9 +404,12 @@ DDRes ddprof_callback(struct perf_event_header *hdr, int pos,
   if (now > ctx->send_nanos) {
     DDRES_CHECK_FWD(export(ctx, now));
     // reset state defines if we should reboot the worker
-    return reset_state(ctx, continue_profiling);
+    DDRes res = reset_state(ctx, continue_profiling);
+    // A warning can be returned for a reset and should not be ignored
+    if (IsDDResNotOK(res)) {
+      return res;
+    }
   }
-
   return ddres_init();
 }
 
