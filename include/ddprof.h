@@ -58,6 +58,8 @@
   XX(DD_PROFILING_NATIVE_ENABLED,  native_enable,   n, 'n', 1, ctx,      NULL, "yes")       \
   XX(DD_PROFILING_COUNTSAMPLES,    count_samples,   c, 'c', 1, ctx,      NULL, "yes")       \
   XX(DD_PROFILING_UPLOAD_PERIOD,   upload_period,   u, 'u', 1, ctx,      NULL, "60")        \
+  XX(DD_PROFILING_WORKER_PERIOD,   worker_period,   w, 'w', 1, ctx,      NULL, "15")        \
+  XX(DD_PROFILING_CACHE_PERIOD,    cache_period,    k, 'k', 1, ctx,      NULL, "240")       \
   XX(DD_PROFILE_NATIVEPROFILER,    profprofiler,    r, 'r', 0, ctx,      NULL, "")          \
   XX(DD_PROFILING_,                prefix,          X, 'X', 1, ctx,      NULL, "")          \
   XX(DD_PROFILING_NATIVEFAULTINFO, faultinfo,       s, 's', 1, ctx,      NULL, "yes")       \
@@ -111,8 +113,13 @@ void ddprof_ctx_free(DDProfContext *);
 bool ddprof_ctx_watcher_process(DDProfContext *, char *);
 
 /******************************  Perf Callback  *******************************/
-#define WORKER_MAX_RSS_KB (1024 * 10)    // 50 megabytes
-#define WORKER_REFRESH_RSS_KB (1024 * 4) // 8 megabytes
+// In the typical case, an export happens once per minute.  The values below are
+// empirically derived from long-running profiling campaigns to more-or-less
+// fix memory usage under ~50 (hopefully 30) megabytes.  At this point we are
+// trying to control unbounded growth rather than provide a strongly controlled
+// memory overhead.
+#define REFRESH_COUNT_CACHE 15   // Clear unwinding caches after 15 exports
+#define REFRESH_COUNT_WORKER 240 // Kill and respawn workers after 240 exports
 DDRes reset_state(DDProfContext *, volatile bool *continue_profiling);
 DDRes export(DDProfContext *, int64_t);
 DDRes ddprof_timeout(volatile bool *, void *);

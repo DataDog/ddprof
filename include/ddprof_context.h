@@ -35,6 +35,8 @@ typedef struct DDProfContext {
   char *sendfinal;
   char *pid;
   char *global;
+  char *worker_period;
+  char *cache_period;
   struct {
     bool count_samples;
     bool enable;
@@ -46,10 +48,14 @@ typedef struct DDProfContext {
     bool sendfinal;
     pid_t pid;
     bool global;
+    uint32_t worker_period; // exports between worker refreshes
+    uint32_t cache_period;  // exports between cache clears
   } params;
   PerfOption watchers[MAX_TYPE_WATCHER];
   int num_watchers;
   struct UnwindState *us;
   ProcState proc_state;
-  int64_t send_nanos; // Last time an export was sent
+  int64_t send_nanos;    // Last time an export was sent
+  uint32_t count_worker; // exports since last cache clear
+  uint32_t count_cache;  // exports since worker was spawned
 } DDProfContext;

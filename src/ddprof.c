@@ -146,6 +146,10 @@ DDRes export(DDProfContext *ctx, int64_t now) {
   // Prepare pprof for next window
   pprof_timeUpdate(dp);
 
+  // Increase the counts of exports
+  ctx->count_worker += 1;
+  ctx->count_cache += 1;
+
   // We're done exporting, so finish by clearing out any global gauges
   ticks_unwind = 0;
   events_lost = 0;
@@ -155,25 +159,27 @@ DDRes export(DDProfContext *ctx, int64_t now) {
 }
 
 DDRes reset_state(DDProfContext *ctx, volatile bool *continue_profiling) {
-  // NOTE: strongly assumes reset_state is called after the last status has
-  //       been updated.  Otherwiset his is kind of a no-op.
   if (!ctx) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW, "[DDPROF] Invalid context in %s",
                            __FUNCTION__);
   }
-  // Check to see whether we need to clear the whole worker.  Potentially we
-  // could defer this a little longer by clearing the caches and then checking
-  // RSS, but if we've already grown to this point, might as well reset now.
-  if (WORKER_MAX_RSS_KB <= ctx->proc_state.last_status.rss) {
+
+  // Check to see whether we need to clear the whole worker
+  // NOTE: we do not reset the counters here, since clearing the worker
+  //       1. is nonlocalized to this function; we just send a return value
+  //          which informs the caller to refresh the worker
+  //       2. new worker should be initialized with a fresh state, so clearing
+  //          it here is irrelevant anyway
+  if (ctx->params.worker_period <= ctx->count_worker) {
     *continue_profiling = true;
-    DDRES_RETURN_WARN_LOG(DD_WHAT_WORKER_RESET,
-                          "%s: rss=%lu - stop worker (continue?%s)",
-                          __FUNCTION__, ctx->proc_state.last_status.rss,
-                          (*continue_profiling) ? "yes" : "no");
+    DDRES_RETURN_WARN_LOG(DD_WHAT_WORKER_RESET, "%s: cnt=%u - stop worker (%s)",
+                          __FUNCTION__, ctx->count_worker,
+                          (*continue_profiling) ? "continue" : "stop");
   }
 
   // If we haven't hit the hard cap, have we hit the soft cap?
-  if (WORKER_REFRESH_RSS_KB <= ctx->proc_state.last_status.rss) {
+  if (ctx->params.cache_period <= ctx->count_cache) {
+    ctx->count_cache = 0;
     DDRES_CHECK_FWD(dwfl_caches_clear(ctx->us));
 
     // Clear and re-initialize the pprof
@@ -447,9 +453,18 @@ char* help_str[DD_KLEN] = {
 "    an inner profile, whilst setting DD_PROFILING_NATIVE_ENABLED to enable "MYNAME"\n",
   [DD_PROFILING_COUNTSAMPLES] = STR_UNDF,
   [DD_PROFILING_UPLOAD_PERIOD] =
-"    In seconds, how frequently to upload gathered data to Datadog.\n"
-"    Currently, it is recommended to keep this value to 60 seconds, which is\n"
-"    also the default.\n",
+"    In seconds, how frequently to upload gathered data to Datadog.  Defaults to 60\n"
+"    This value almost never needs to be changed.\n",
+  [DD_PROFILING_WORKER_PERIOD] =
+"    The number of uploads after which the current worker process is retired.\n"
+"    This gives the user some ability to control the tradeoff between memory and\n"
+"    performance.  If default values are used for this and the upload period, then\n"
+"    workers are retired every four hours.\n"
+"    This value almost never needs to be changed.\n",
+  [DD_PROFILING_CACHE_PERIOD] =
+"    The number of uploads after which to clear unwinding caches.  The default\n"
+"    value is 15.\n"
+"    This value almost never needs to be changed.\n",
   [DD_PROFILE_NATIVEPROFILER] = STR_UNDF,
   [DD_PROFILING_] = STR_UNDF,
   [DD_PROFILING_NATIVEPRINTARGS] =
@@ -656,6 +671,26 @@ void ddprof_setctx(DDProfContext *ctx) {
     double x = strtod(ctx->upload_period, NULL);
     if (x > 0.0)
       ctx->params.upload_period = x;
+  }
+
+  // process worker_period
+  ctx->params.worker_period = 240;
+  if (ctx->worker_period) {
+    char *ptr_period = ctx->worker_period;
+    int tmp_period = strtol(ctx->worker_period, &ptr_period, 10);
+    if (ptr_period != ctx->worker_period && tmp_period > 0)
+      ctx->params.worker_period = tmp_period;
+  }
+
+  // process cache_period
+  // NOTE: we don't do anything to protect the scenario where cache_period >
+  //       worker_period, even though the former clobbers the latter.
+  ctx->params.cache_period = 15;
+  if (ctx->cache_period) {
+    char *ptr_period = ctx->cache_period;
+    int tmp_period = strtol(ctx->cache_period, &ptr_period, 10);
+    if (ptr_period != ctx->cache_period && tmp_period > 0)
+      ctx->params.cache_period = tmp_period;
   }
 
   // Process faultinfo
