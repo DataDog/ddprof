@@ -35,8 +35,10 @@ function(add_unit_test name)
 
    ## Create exe with sources 
    add_exe(${name} ${MY_UNPARSED_ARGUMENTS})
+   add_dependencies(${name} ddprof-deps)
    target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
-   target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS})
+   # libddprof almost always required (unlikely file from libddprof)
+   target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS} ${LIBDDPROF_INCLUDE_DIR})
 
    add_test(NAME ${name} COMMAND ${name})
    set_tests_properties(${name} PROPERTIES
@@ -49,6 +51,7 @@ endfunction()
 add_unit_test(
     ddprofcmdline-ut
     ../src/ddprofcmdline.c 
+    ../src/perf_option.c
     ddprofcmdline-ut.cc
 )
 
@@ -90,13 +93,14 @@ add_unit_test(
 
 add_unit_test(
     mmap-ut
-    ../src/perf.c
     ../src/logger.c
+    ../src/perf.c
+    ../src/perf_option.c
     mmap-ut.cc
     LIBRARIES ddprof-c
-    DEFINITIONS MYNAME="ipc-ut"
+    DEFINITIONS MYNAME="mmap-ut"
 )
-target_include_directories(mmap-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
+target_include_directories(mmap-ut PRIVATE)
 
 add_unit_test(
     ddres-ut
@@ -105,7 +109,6 @@ add_unit_test(
     LIBRARIES ddprof-c
     DEFINITIONS MYNAME="ddres-ut"
 )
-target_include_directories(ddres-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
 
 add_unit_test(
     cap-ut
@@ -115,4 +118,26 @@ add_unit_test(
     LIBRARIES ddprof-c libcap
     DEFINITIONS MYNAME="cap-ut"
 )
-target_include_directories(cap-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR} ${LIBCAP_INCLUDE_DIR})
+target_include_directories(cap-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
+
+add_unit_test(
+    procutils-ut
+    ../src/procutils.c
+    ../src/logger.c
+    procutils-ut.cc
+    LIBRARIES ddprof-c
+    DEFINITIONS MYNAME="procutils-ut"
+)
+target_include_directories(cap-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
+
+add_unit_test(
+    pevent-ut
+    ../src/pevent_lib.c
+    ../src/logger.c
+    ../src/perf.c
+    ../src/perf_option.c
+    pevent-ut.cc
+    LIBRARIES ddprof-c
+    DEFINITIONS MYNAME="pevent-ut"
+)
+target_include_directories(pevent-ut PRIVATE ${LIBCAP_INCLUDE_DIR})

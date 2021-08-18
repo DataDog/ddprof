@@ -11,8 +11,8 @@
 #include <sys/mman.h>
 #include <sys/sysinfo.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
-#include <wait.h>
 
 int main(int argc, char **argv) {
   //---- Inititiate structs
@@ -44,9 +44,9 @@ int main(int argc, char **argv) {
       // Iterate through the specified events and define new watchers if any
       // of them are valid.  If the user specifies a '0' value, then that's
       // the same as using the default (equivalently, the ',0' could be omitted)
-      if (process_event(optarg, perfoptions_lookup, perfoptions_sz, &idx,
-                        &sampling_value)) {
-        ctx->watchers[ctx->num_watchers] = perfoptions[idx];
+      if (process_event(optarg, perfoptions_lookup(), perfoptions_nb_presets(),
+                        &idx, &sampling_value)) {
+        ctx->watchers[ctx->num_watchers] = *(perfoptions_preset(idx));
         if (sampling_value)
           ctx->watchers[ctx->num_watchers].sample_period = sampling_value;
 
@@ -99,8 +99,8 @@ int main(int argc, char **argv) {
     DDR_init(ctx->ddr);
 
     // Initialize the pprof
-    const char *pprof_labels[max_watchers];
-    const char *pprof_units[max_watchers];
+    const char *pprof_labels[MAX_TYPE_WATCHER];
+    const char *pprof_units[MAX_TYPE_WATCHER];
     for (int i = 0; i < ctx->num_watchers; i++) {
       pprof_labels[i] = ctx->watchers[i].label;
       pprof_units[i] = ctx->watchers[i].unit;

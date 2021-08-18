@@ -253,32 +253,33 @@ static char StatusLine[] =
     "%llu %lu %ld %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %d %d %u "
     "%u %llu %lu %ld %lu %lu %lu %lu %lu %lu %d";
 
-ProcStatus *proc_read() {
+DDRes proc_read(ProcStatus *procstat) {
   FILE *ststream = fopen("/proc/self/stat", "r");
-  static ProcStatus procstat = {0};
-  ProcStatus *ret = &procstat;
-  if (!ststream)
-    return NULL;
-  if (0 > fscanf(ststream, StatusLine, &procstat.pid, &procstat.comm,
-                 &procstat.state, &procstat.ppid, &procstat.pgrp,
-                 &procstat.session, &procstat.tty_nr, &procstat.tpgid,
-                 &procstat.flags, &procstat.minflt, &procstat.cminflt,
-                 &procstat.majflt, &procstat.cmajflt, &procstat.utime,
-                 &procstat.stime, &procstat.cutime, &procstat.cstime,
-                 &procstat.priority, &procstat.nice, &procstat.num_threads,
-                 &procstat.itrealvalue, &procstat.starttime, &procstat.vsize,
-                 &procstat.rss, &procstat.rsslim, &procstat.startcode,
-                 &procstat.endcode, &procstat.startstack, &procstat.kstkesp,
-                 &procstat.kstkeip, &procstat.signal, &procstat.blocked,
-                 &procstat.sigignore, &procstat.sigcatch, &procstat.wchan,
-                 &procstat.nswap, &procstat.cnswap, &procstat.exit_signal,
-                 &procstat.processor, &procstat.rt_priority, &procstat.policy,
-                 &procstat.delayacct_blkio_ticks, &procstat.guest_time,
-                 &procstat.cguest_time, &procstat.start_data,
-                 &procstat.end_data, &procstat.start_brk, &procstat.arg_start,
-                 &procstat.arg_end, &procstat.env_start, &procstat.env_end))
-    ret = NULL;
+  if (!ststream) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PROCSTATE, "Failed to open /proc/self/stat");
+  }
 
+  if (0 > fscanf(ststream, StatusLine, &procstat->pid, &procstat->comm,
+                 &procstat->state, &procstat->ppid, &procstat->pgrp,
+                 &procstat->session, &procstat->tty_nr, &procstat->tpgid,
+                 &procstat->flags, &procstat->minflt, &procstat->cminflt,
+                 &procstat->majflt, &procstat->cmajflt, &procstat->utime,
+                 &procstat->stime, &procstat->cutime, &procstat->cstime,
+                 &procstat->priority, &procstat->nice, &procstat->num_threads,
+                 &procstat->itrealvalue, &procstat->starttime, &procstat->vsize,
+                 &procstat->rss, &procstat->rsslim, &procstat->startcode,
+                 &procstat->endcode, &procstat->startstack, &procstat->kstkesp,
+                 &procstat->kstkeip, &procstat->signal, &procstat->blocked,
+                 &procstat->sigignore, &procstat->sigcatch, &procstat->wchan,
+                 &procstat->nswap, &procstat->cnswap, &procstat->exit_signal,
+                 &procstat->processor, &procstat->rt_priority,
+                 &procstat->policy, &procstat->delayacct_blkio_ticks,
+                 &procstat->guest_time, &procstat->cguest_time,
+                 &procstat->start_data, &procstat->end_data,
+                 &procstat->start_brk, &procstat->arg_start, &procstat->arg_end,
+                 &procstat->env_start, &procstat->env_end)) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PROCSTATE, "Failed to read /proc/self/stat");
+  }
   fclose(ststream);
-  return ret;
+  return ddres_init();
 }

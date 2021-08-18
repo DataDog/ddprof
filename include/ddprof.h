@@ -5,55 +5,11 @@
 #include <execinfo.h>
 #include <sys/time.h>
 
+#include "ddprof_context.h"
 #include "ipc.h"
 #include "logger.h"
 #include "perf.h"
 #include "version.h"
-
-#define max_watchers 10
-
-typedef struct DDProfContext {
-  DProf *dp;
-  DDReq *ddr;
-
-  // Parameters for interpretation
-  char *agent_host;
-  char *prefix;
-  char *tags;
-  char *logmode;
-  char *loglevel;
-
-  // Input parameters
-  char *printargs;
-  char *count_samples;
-  char *enable;
-  char *native_enable;
-  char *upload_period;
-  char *profprofiler;
-  char *faultinfo;
-  char *coredumps;
-  char *nice;
-  char *sendfinal;
-  char *pid;
-  char *global;
-  struct {
-    bool count_samples;
-    bool enable;
-    double upload_period;
-    bool profprofiler;
-    bool faultinfo;
-    bool coredumps;
-    int nice;
-    bool sendfinal;
-    pid_t pid;
-    bool global;
-  } params;
-  PerfOption watchers[max_watchers];
-  int num_watchers;
-
-  struct UnwindState *us;
-  int64_t send_nanos; // Last time an export was sent
-} DDProfContext;
 
 /*
     This table is used for a variety of things, but primarily for dispatching
@@ -102,6 +58,8 @@ typedef struct DDProfContext {
   XX(DD_PROFILING_NATIVE_ENABLED,  native_enable,   n, 'n', 1, ctx,      NULL, "yes")       \
   XX(DD_PROFILING_COUNTSAMPLES,    count_samples,   c, 'c', 1, ctx,      NULL, "yes")       \
   XX(DD_PROFILING_UPLOAD_PERIOD,   upload_period,   u, 'u', 1, ctx,      NULL, "60")        \
+  XX(DD_PROFILING_WORKER_PERIOD,   worker_period,   w, 'w', 1, ctx,      NULL, "15")        \
+  XX(DD_PROFILING_CACHE_PERIOD,    cache_period,    k, 'k', 1, ctx,      NULL, "240")       \
   XX(DD_PROFILE_NATIVEPROFILER,    profprofiler,    r, 'r', 0, ctx,      NULL, "")          \
   XX(DD_PROFILING_,                prefix,          X, 'X', 1, ctx,      NULL, "")          \
   XX(DD_PROFILING_NATIVEFAULTINFO, faultinfo,       s, 's', 1, ctx,      NULL, "yes")       \
@@ -146,7 +104,7 @@ case casechar:                                                                 \
 typedef enum DDKeys { OPT_TABLE(X_ENUM) DD_KLEN } DDKeys;
 
 int statsd_init();
-void statsd_upload_globals(DDProfContext *);
+DDRes statsd_upload_globals(DDProfContext *);
 void print_diagnostics();
 
 // Initialize a ctx
@@ -155,9 +113,10 @@ void ddprof_ctx_free(DDProfContext *);
 bool ddprof_ctx_watcher_process(DDProfContext *, char *);
 
 /******************************  Perf Callback  *******************************/
-void export(DDProfContext *, int64_t);
-void ddprof_timeout(void *);
-void ddprof_callback(struct perf_event_header *, int, void *);
+DDRes reset_state(DDProfContext *, volatile bool *continue_profiling);
+DDRes export(DDProfContext *, int64_t);
+DDRes ddprof_timeout(volatile bool *, void *);
+DDRes ddprof_callback(struct perf_event_header *, int, volatile bool *, void *);
 
 /*********************************  Printers  *********************************/
 void print_help();

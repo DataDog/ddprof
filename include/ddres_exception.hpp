@@ -31,7 +31,6 @@ private:
     return ddres_error(DD_WHAT_BADALLOC);                                      \
   }                                                                            \
   catch (const std::exception &e) {                                            \
-    DDRes ddres = {0};                                                         \
     LG_ERR("Caught standard exception at %s:%u", __FILE__, __LINE__);          \
     return ddres_error(DD_WHAT_STDEXCEPT);                                     \
   }                                                                            \

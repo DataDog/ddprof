@@ -1,24 +1,17 @@
-#ifndef _H_perf
-#define _H_perf
+#pragma once
 
-#include <linux/hw_breakpoint.h>
 #include <linux/perf_event.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "ddres_def.h"
+#include "perf_option.h"
+
 #define PSAMPLE_DEFAULT_WAKEUP 1000 // sample frequency check
 #define PERF_SAMPLE_STACK_SIZE (4096 * 8)
 #define PERF_SAMPLE_STACK_REGS 3
 #define MAX_INSN 16
-#define MAX_NB_WATCHERS 100
-
-typedef struct PEvent {
-  int pos; // Index into the sample
-  int fd;  // Underlying perf event FD
-  struct perf_event_mmap_page *region;
-  size_t reg_size; // size of region
-} PEvent;
 
 // TODO, probably make this part of the unwinding context or ddprof ctx
 #define DEFAULT_SAMPLE_TYPE                                                    \
@@ -122,65 +115,9 @@ typedef struct perf_samplestacku {
   // uint64_t    dyn_size;   // Don't forget!
 } perf_samplestacku;
 
-typedef struct BPDef {
-  uint64_t bp_addr;
-  uint64_t bp_len;
-} BPDef;
-
-typedef struct PerfOption {
-  const char *desc;
-  int type;
-  union {
-    unsigned long config;
-    BPDef *bp;
-  };
-  union {
-    uint64_t sample_period;
-    uint64_t sample_frequency;
-  };
-  const char *label;
-  const char *unit;
-  int mode;
-  bool include_kernel;
-  bool freq;
-  char bp_type;
-} PerfOption;
-
-// There's a strong assumption here that these elements match up perfectly with
-// the table below.  This will be a bit of a pain to maintain.
-static const char *perfoptions_lookup[] = {
-    "hCPU",   "hREF",  "hINSTR", "hCREF", "hCMISS", "hBRANCH",
-    "hBMISS", "hBUS",  "hBSTF",  "hBSTB", "sCPU",   "sWALL",
-    "sCI",    "kBLKI", "kBLKS",  "kBLKC", "bMalloc"};
-
-// clang-format off
-static const PerfOption perfoptions[] = {
-  // Hardware
-  {"CPU Cycles",      PERF_TYPE_HARDWARE, {PERF_COUNT_HW_CPU_CYCLES},              {99},   "cpu-cycle",      "cycles", .freq = true},
-  {"Ref. CPU Cycles", PERF_TYPE_HARDWARE, {PERF_COUNT_HW_REF_CPU_CYCLES},          {1000}, "ref-cycle",      "cycles", .freq = true},
-  {"Instr. Count",    PERF_TYPE_HARDWARE, {PERF_COUNT_HW_INSTRUCTIONS},            {1000}, "cpu-instr",      "instructions", .freq = true},
-  {"Cache Ref.",      PERF_TYPE_HARDWARE, {PERF_COUNT_HW_CACHE_REFERENCES},        {1000}, "cache-ref",      "events"},
-  {"Cache Miss",      PERF_TYPE_HARDWARE, {PERF_COUNT_HW_CACHE_MISSES},            {1000}, "cache-miss",     "events"},
-  {"Branche Instr.",  PERF_TYPE_HARDWARE, {PERF_COUNT_HW_BRANCH_INSTRUCTIONS},     {1000}, "branch-instr",   "events"},
-  {"Branch Miss",     PERF_TYPE_HARDWARE, {PERF_COUNT_HW_BRANCH_MISSES},           {1000}, "branch-miss",    "events"},
-  {"Bus Cycles",      PERF_TYPE_HARDWARE, {PERF_COUNT_HW_BUS_CYCLES},              {1000}, "bus-cycle",      "cycles", .freq = true},
-  {"Bus Stalls(F)",   PERF_TYPE_HARDWARE, {PERF_COUNT_HW_STALLED_CYCLES_FRONTEND}, {1000}, "bus-stf",        "cycles", .freq = true},
-  {"Bus Stalls(B)",   PERF_TYPE_HARDWARE, {PERF_COUNT_HW_STALLED_CYCLES_BACKEND},  {1000}, "bus-stb",        "cycles", .freq = true},
-  {"CPU Time",        PERF_TYPE_SOFTWARE, {PERF_COUNT_SW_TASK_CLOCK},              {99},   "cpu-time",       "nanoseconds", .freq = true},
-  {"Wall? Time",      PERF_TYPE_SOFTWARE, {PERF_COUNT_SW_CPU_CLOCK},               {99},   "wall-time",      "nanoseconds", .freq = true},
-  {"Ctext Switches",  PERF_TYPE_SOFTWARE, {PERF_COUNT_SW_CONTEXT_SWITCHES},        {1},    "switches",       "events", .include_kernel = true},
-  {"Block-Insert",    PERF_TYPE_TRACEPOINT, {1133},                                {1},    "block-insert",   "events", .include_kernel = true},
-  {"Block-Issue",     PERF_TYPE_TRACEPOINT, {1132},                                {1},    "block-issue",    "events", .include_kernel = true},
-  {"Block-Complete",  PERF_TYPE_TRACEPOINT, {1134},                                {1},    "block-complete", "events", .include_kernel = true},
-  {"Malloc",          PERF_TYPE_BREAKPOINT, {0},                                   {1},    "malloc",         "events", .bp_type = HW_BREAKPOINT_X},
-};
-// clang-format on
-
-#define perfoptions_sz (sizeof(perfoptions) / sizeof(*perfoptions))
-
 typedef struct perfopen_attr {
-  void (*msg_fun)(struct perf_event_header *, int, void *);
-  void (*timeout_fun)(void *);
+  DDRes (*msg_fun)(struct perf_event_header *, int, volatile bool *, void *);
+  DDRes (*timeout_fun)(volatile bool *, void *);
 } perfopen_attr;
 
 // Used by rb_init() and friends
@@ -200,6 +137,3 @@ int perfdisown(void *region, size_t size);
 void rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size);
 uint64_t rb_next(RingBuffer *);
 struct perf_event_header *rb_seek(RingBuffer *, uint64_t);
-void main_loop(PEvent *, int, perfopen_attr *, void *);
-
-#endif // _H_perf

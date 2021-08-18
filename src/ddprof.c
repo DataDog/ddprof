@@ -9,6 +9,8 @@
 #include "cap_display.h"
 #include "ddprofcmdline.h"
 #include "ddres.h"
+#include "main_loop.h"
+#include "pevent_lib.h"
 #include "procutils.h"
 #include "statsd.h"
 #include "unwind.h"
@@ -63,7 +65,7 @@ int statsd_init() {
 }
 
 #define DDPN "datadog.profiler.native."
-void statsd_upload_globals(DDProfContext *ctx) {
+DDRes statsd_upload_globals(DDProfContext *ctx) {
   static char key_rss[] = DDPN "rss";
   static char key_user[] = DDPN "utime";
   static char key_st_elements[] = DDPN "pprof.st_elements";
@@ -71,28 +73,29 @@ void statsd_upload_globals(DDProfContext *ctx) {
   static char key_events_lost[] = DDPN "events.lost";
   static char key_samples_recv[] = DDPN "samples.recv";
 
-  // If there's nothing that can be done, then there's nothing to do.
-  if (-1 == fd_statsd)
-    return;
+  // Upload ddprof's procfs values.  We harvest the values no matter what, since
+  // they're used to observe memory limits
+  DDRES_CHECK_FWD(proc_read(&ctx->proc_state.last_status));
+  ProcStatus *procstat = &ctx->proc_state.last_status;
 
-  // Upload ddprof's procfs values
-  static unsigned long last_utime = 0;
-  ProcStatus *procstat = proc_read();
-  if (procstat) {
+  // If there's nothing that can be done, then there's nothing to do.
+  if (-1 != fd_statsd) {
     statsd_send(fd_statsd, key_rss, &(long){1024 * procstat->rss}, STAT_GAUGE);
     if (procstat->utime) {
-      long this_time = procstat->utime - last_utime;
+      long this_time = procstat->utime - ctx->proc_state.last_utime;
       statsd_send(fd_statsd, key_user, &(long){this_time}, STAT_GAUGE);
-      last_utime = procstat->utime;
     }
-  }
 
-  // Upload global gauges
-  uint64_t st_size = ctx->dp->string_table_size(ctx->dp->string_table_data);
-  statsd_send(fd_statsd, key_st_elements, &(long){st_size}, STAT_GAUGE);
-  statsd_send(fd_statsd, key_ticks_unwind, &(long){ticks_unwind}, STAT_GAUGE);
-  statsd_send(fd_statsd, key_events_lost, &(long){events_lost}, STAT_GAUGE);
-  statsd_send(fd_statsd, key_samples_recv, &(long){samples_recv}, STAT_GAUGE);
+    // Upload global gauges
+    uint64_t st_size = ctx->dp->string_table_size(ctx->dp->string_table_data);
+    statsd_send(fd_statsd, key_st_elements, &(long){st_size}, STAT_GAUGE);
+    statsd_send(fd_statsd, key_ticks_unwind, &(long){ticks_unwind}, STAT_GAUGE);
+    statsd_send(fd_statsd, key_events_lost, &(long){events_lost}, STAT_GAUGE);
+    statsd_send(fd_statsd, key_samples_recv, &(long){samples_recv}, STAT_GAUGE);
+  }
+  ctx->proc_state.last_utime = procstat->utime;
+
+  return ddres_init();
 }
 
 void print_diagnostics() {
@@ -114,12 +117,12 @@ static inline int64_t now_nanos() {
 }
 
 /******************************  Perf Callback  *******************************/
-void export(DDProfContext *ctx, int64_t now) {
+DDRes export(DDProfContext *ctx, int64_t now) {
   DDReq *ddr = ctx->ddr;
   DProf *dp = ctx->dp;
 
   // Before any state gets reset, export metrics to statsd
-  statsd_upload_globals(ctx);
+  DDRES_CHECK_FWD(statsd_upload_globals(ctx));
 
   // And emit diagnostic output (if it's enabled)
   print_diagnostics();
@@ -143,18 +146,70 @@ void export(DDProfContext *ctx, int64_t now) {
   // Prepare pprof for next window
   pprof_timeUpdate(dp);
 
+  // Increase the counts of exports
+  ctx->count_worker += 1;
+  ctx->count_cache += 1;
+
   // We're done exporting, so finish by clearing out any global gauges
   ticks_unwind = 0;
   events_lost = 0;
   samples_recv = 0;
+
+  return ddres_init();
 }
 
-void ddprof_timeout(void *arg) {
+DDRes reset_state(DDProfContext *ctx, volatile bool *continue_profiling) {
+  if (!ctx) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW, "[DDPROF] Invalid context in %s",
+                           __FUNCTION__);
+  }
+
+  // Check to see whether we need to clear the whole worker
+  // NOTE: we do not reset the counters here, since clearing the worker
+  //       1. is nonlocalized to this function; we just send a return value
+  //          which informs the caller to refresh the worker
+  //       2. new worker should be initialized with a fresh state, so clearing
+  //          it here is irrelevant anyway
+  if (ctx->params.worker_period <= ctx->count_worker) {
+    *continue_profiling = true;
+    DDRES_RETURN_WARN_LOG(DD_WHAT_WORKER_RESET, "%s: cnt=%u - stop worker (%s)",
+                          __FUNCTION__, ctx->count_worker,
+                          (*continue_profiling) ? "continue" : "stop");
+  }
+
+  // If we haven't hit the hard cap, have we hit the soft cap?
+  if (ctx->params.cache_period <= ctx->count_cache) {
+    ctx->count_cache = 0;
+    DDRES_CHECK_FWD(dwfl_caches_clear(ctx->us));
+
+    // Clear and re-initialize the pprof
+    const char *pprof_labels[MAX_TYPE_WATCHER];
+    const char *pprof_units[MAX_TYPE_WATCHER];
+    pprof_Free(ctx->dp);
+    for (int i = 0; i < ctx->num_watchers; i++) {
+      pprof_labels[i] = ctx->watchers[i].label;
+      pprof_units[i] = ctx->watchers[i].unit;
+    }
+
+    if (!pprof_Init(ctx->dp, (const char **)pprof_labels,
+                    (const char **)pprof_units, ctx->num_watchers)) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW,
+                             "[DDPROF] Error refreshing profile storage");
+    }
+  }
+
+  return ddres_init();
+}
+
+DDRes ddprof_timeout(volatile bool *continue_profiling, void *arg) {
   DDProfContext *ctx = arg;
   int64_t now = now_nanos();
-
-  if (now > ctx->send_nanos)
-    export(ctx, now);
+  if (now > ctx->send_nanos) {
+    DDRES_CHECK_FWD(export(ctx, now));
+    // reset state defines if we should reboot the worker
+    return reset_state(ctx, continue_profiling);
+  }
+  return ddres_init();
 }
 
 typedef union flipper {
@@ -232,6 +287,7 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
   return &sample;
 }
 
+/// Entry point for unwinding
 void ddprof_pr_sample(DDProfContext *ctx, struct perf_event_header *hdr,
                       int pos) {
   // Before we do anything else, copy the perf_event_header into a sample
@@ -273,7 +329,7 @@ void ddprof_pr_sample(DDProfContext *ctx, struct perf_event_header *hdr,
     if (id_loc > 0)
       id_locs[j++] = id_loc;
   }
-  int64_t sample_val[max_watchers] = {0};
+  int64_t sample_val[MAX_TYPE_WATCHER] = {0};
   sample_val[pos] = sample->period;
   pprof_sampleAdd(dp, sample_val, ctx->num_watchers, id_locs, us->idx);
 }
@@ -320,7 +376,8 @@ void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int pos) {
   pid_free(ext->pid);
 }
 
-void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
+DDRes ddprof_callback(struct perf_event_header *hdr, int pos,
+                      volatile bool *continue_profiling, void *arg) {
   DDProfContext *ctx = arg;
 
   switch (hdr->type) {
@@ -351,8 +408,15 @@ void ddprof_callback(struct perf_event_header *hdr, int pos, void *arg) {
   int64_t now = now_nanos();
 
   if (now > ctx->send_nanos) {
-    export(ctx, now);
+    DDRES_CHECK_FWD(export(ctx, now));
+    // reset state defines if we should reboot the worker
+    DDRes res = reset_state(ctx, continue_profiling);
+    // A warning can be returned for a reset and should not be ignored
+    if (IsDDResNotOK(res)) {
+      return res;
+    }
   }
+  return ddres_init();
 }
 
 /*********************************  Printers  *********************************/
@@ -392,9 +456,18 @@ char* help_str[DD_KLEN] = {
 "    an inner profile, whilst setting DD_PROFILING_NATIVE_ENABLED to enable "MYNAME"\n",
   [DD_PROFILING_COUNTSAMPLES] = STR_UNDF,
   [DD_PROFILING_UPLOAD_PERIOD] =
-"    In seconds, how frequently to upload gathered data to Datadog.\n"
-"    Currently, it is recommended to keep this value to 60 seconds, which is\n"
-"    also the default.\n",
+"    In seconds, how frequently to upload gathered data to Datadog.  Defaults to 60\n"
+"    This value almost never needs to be changed.\n",
+  [DD_PROFILING_WORKER_PERIOD] =
+"    The number of uploads after which the current worker process is retired.\n"
+"    This gives the user some ability to control the tradeoff between memory and\n"
+"    performance.  If default values are used for this and the upload period, then\n"
+"    workers are retired every four hours.\n"
+"    This value almost never needs to be changed.\n",
+  [DD_PROFILING_CACHE_PERIOD] =
+"    The number of uploads after which to clear unwinding caches.  The default\n"
+"    value is 15.\n"
+"    This value almost never needs to be changed.\n",
   [DD_PROFILE_NATIVEPROFILER] = STR_UNDF,
   [DD_PROFILING_] = STR_UNDF,
   [DD_PROFILING_NATIVEPRINTARGS] =
@@ -457,10 +530,11 @@ MYNAME" can register to various system events in order to customize the\n"
 "Events with the same name in the UI conflict with each other; be sure to pick\n"
 "only one such event!\n"
 "\n";
+  // clang-format on
 
   printf("%s", help_hdr);
   printf("Options:\n");
-  for (int i=0; i<DD_KLEN; i++) {
+  for (int i = 0; i < DD_KLEN; i++) {
     assert(help_str[i]);
     if (help_str[i] && STR_UNDF != help_str[i]) {
       printf("%s\n", help_key[i]);
@@ -470,12 +544,12 @@ MYNAME" can register to various system events in order to customize the\n"
   printf("%s", help_opts_extra);
   printf("%s", help_events);
 
-  static int num_perfs = sizeof(perfoptions) / sizeof(*perfoptions);
-  for (int i = 0; i < num_perfs; i++)
-    printf("%-10s - %-15s (%s, %s)\n", perfoptions_lookup[i],
-           perfoptions[i].desc, perfoptions[i].label, perfoptions[i].unit);
+  for (int i = 0; i < perfoptions_nb_presets(); i++) {
+    printf("%-10s - %-15s (%s, %s)\n", perfoptions_lookup_idx(i),
+           perfoptions_preset(i)->desc, perfoptions_preset(i)->label,
+           perfoptions_preset(i)->unit);
+  }
 }
-// clang-format on
 
 /*****************************  SIGSEGV Handler *******************************/
 void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
@@ -483,71 +557,12 @@ void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   (void)uc;
   static void *buf[4096] = {0};
   size_t sz = backtrace(buf, 4096);
-  fprintf(stderr, "[DDPROF]<%s> has encountered an error and will exit\n",
-          str_version());
+  fprintf(stderr, "ddprof[%d]: <%s> has encountered an error and will exit\n",
+          getpid(), str_version());
   if (sig == SIGSEGV)
     printf("[DDPROF] Fault address: %p\n", si->si_addr);
   backtrace_symbols_fd(buf, sz, STDERR_FILENO);
   exit(-1);
-}
-
-// returns the number of successful setups
-static int setup_watchers(DDProfContext *ctx, pid_t pid, int num_cpu,
-                          struct PEvent *pes) {
-  int k = 0;
-  int nb_success = 0;
-  for (int i = 0; i < ctx->num_watchers && ctx->params.enable; ++i) {
-    for (int j = 0; j < num_cpu; ++j) {
-      pes[k].pos = i;
-      pes[k].fd = perfopen(pid, &ctx->watchers[i], j, true);
-      if (pes[k].fd == -1) {
-        LG_ERR("Error calling perfopen on watcher %d.%d (%s)", i, j,
-               strerror(errno));
-      } else if (!(pes[k].region = perfown(pes[k].fd, &pes[k].reg_size))) {
-        close(pes[k].fd);
-        pes[k].fd = -1;
-        LG_ERR("Could not finalize watcher %d.%d: registration (%s)", i, j,
-               strerror(errno));
-      } else {
-        ++nb_success;
-      }
-      ++k;
-      if (k >= MAX_NB_WATCHERS) {
-        LG_WRN("Reached max number of watchers (%d)", MAX_NB_WATCHERS);
-        return nb_success;
-      }
-    }
-  }
-  return nb_success;
-}
-
-// returns the number of successful cleans
-static int cleanup_watchers(DDProfContext *ctx, struct PEvent *pes,
-                            int num_cpu) {
-  int k = 0;
-  int nb_clean = 0;
-
-  for (int i = 0; i < ctx->num_watchers && ctx->params.enable; ++i) {
-    for (int j = 0; j < num_cpu; ++j) {
-      if (pes[k].region) {
-        if (perfdisown(pes[k].region, pes[k].reg_size) != 0) {
-          LG_WRN("Error when using perfdisown %d.%d", i, j);
-        } else {
-          pes[k].region = NULL;
-          ++nb_clean;
-        }
-      }
-      if (pes[k].fd != -1) {
-        close(pes[k].fd);
-        pes[k].fd = -1;
-      }
-      ++k;
-      if (k >= MAX_NB_WATCHERS) {
-        return nb_clean;
-      }
-    }
-  }
-  return nb_clean;
 }
 
 /*************************  Instrumentation Helpers  **************************/
@@ -556,15 +571,24 @@ static int cleanup_watchers(DDProfContext *ctx, struct PEvent *pes,
 void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   perfopen_attr perf_funs = {.msg_fun = ddprof_callback,
                              .timeout_fun = ddprof_timeout};
-  struct PEvent pes[MAX_NB_WATCHERS] = {0};
+  PEventHdr pevent_hdr;
+  pevent_init(&pevent_hdr);
 
   // Don't stop if error as this is only for debug purpose
   if (IsDDResNotOK(log_capabilities(false))) {
     LG_ERR("Error when printing capabilities, continuing...");
   }
 
-  if (!setup_watchers(ctx, pid, num_cpu, pes)) {
+  if (IsDDResNotOK(pevent_setup(ctx, pid, num_cpu, &pevent_hdr))) {
     LG_ERR("Error when attaching to perf_event buffers.");
+    return;
+  }
+
+  // We checked that perfown would work, now we free the regions so the worker
+  // can get them back.  This is slightly wasteful, but these mappings don't
+  // work in the child for some reason.
+  if (IsDDResNotOK(pevent_munmap(&pevent_hdr))) {
+    LG_ERR("Error when cleaning watchers.");
     return;
   }
 
@@ -591,25 +615,17 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   // Perform initialization operations
   ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
 
-  DDRes ddres = unwind_init(ctx->us);
-  if (IsDDResNotOK(ddres)) {
-    LG_ERR("Error when initializing unwinding");
-    return;
-  }
-
   if (statsd_init() == -1) {
     LG_WRN("Error from statsd_init");
   }
 
-  // Just before we enter the main loop, force the enablement of the perf
-  // contexts
-  for (int i = 0; i < ctx->num_watchers * num_cpu; i++) {
-    if (-1 == ioctl(pes[i].fd, PERF_EVENT_IOC_ENABLE))
-      LG_WRN("Couldn't enable watcher %d", i);
+  if (IsDDResNotOK(pevent_enable(&pevent_hdr))) {
+    LG_ERR("Error when enabling watchers");
+    return;
   }
 
   // Enter the main loop -- this will not return unless there is an error.
-  main_loop(pes, ctx->num_watchers * num_cpu, &perf_funs, ctx);
+  main_loop(&pevent_hdr, &perf_funs, ctx);
 
   // If we're here, the main loop closed--probably the profilee closed
   if (errno)
@@ -622,21 +638,13 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   int64_t now = now_nanos();
   if (now > ctx->send_nanos || ctx->sendfinal) {
     LG_WRN("Sending final export");
-    export(ctx, now);
-
-    // The cache-clearing code should be fairly robust, but in the chance that
-    // it fails (perhaps if it includes dealloc->alloc in a library), then
-    // we can no longer provide service.  All we can do is emit an error and
-    // cleanup
-    if (IsDDResNotOK(dwfl_caches_clear(ctx->us))) {
-      LG_ERR("[DDPROF] Error refreshing unwinding module, profiling shutdown");
-      return;
+    if (IsDDResNotOK(export(ctx, now))) {
+      LG_ERR("Error when exporting.");
     }
   }
-  if (!cleanup_watchers(ctx, pes, num_cpu)) {
-    LG_ERR("Error when calling cleanup_watchers.");
+  if (IsDDResNotOK(pevent_cleanup(&pevent_hdr))) {
+    LG_ERR("Error when calling pevent_cleanup.");
   }
-  unwind_free(ctx->us);
 }
 
 /****************************  Argument Processor  ***************************/
@@ -644,7 +652,7 @@ void ddprof_setctx(DDProfContext *ctx) {
   // If events are set, install default watcher
   if (!ctx->num_watchers) {
     ctx->num_watchers = 1;
-    ctx->watchers[0] = perfoptions[10];
+    ctx->watchers[0] = *perfoptions_preset(10);
   }
 
   // Set defaults
@@ -667,6 +675,26 @@ void ddprof_setctx(DDProfContext *ctx) {
     double x = strtod(ctx->upload_period, NULL);
     if (x > 0.0)
       ctx->params.upload_period = x;
+  }
+
+  // process worker_period
+  ctx->params.worker_period = 240;
+  if (ctx->worker_period) {
+    char *ptr_period = ctx->worker_period;
+    int tmp_period = strtol(ctx->worker_period, &ptr_period, 10);
+    if (ptr_period != ctx->worker_period && tmp_period > 0)
+      ctx->params.worker_period = tmp_period;
+  }
+
+  // process cache_period
+  // NOTE: we don't do anything to protect the scenario where cache_period >
+  //       worker_period, even though the former clobbers the latter.
+  ctx->params.cache_period = 15;
+  if (ctx->cache_period) {
+    char *ptr_period = ctx->cache_period;
+    int tmp_period = strtol(ctx->cache_period, &ptr_period, 10);
+    if (ptr_period != ctx->cache_period && tmp_period > 0)
+      ctx->params.cache_period = tmp_period;
   }
 
   // Process faultinfo
