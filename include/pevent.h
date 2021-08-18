@@ -2,7 +2,7 @@
 
 #include <sys/types.h>
 
-#define MAX_NB_WATCHERS 200
+#define MAX_NB_WATCHERS 450
 
 typedef struct PEvent {
   int pos; // Index into the sample
