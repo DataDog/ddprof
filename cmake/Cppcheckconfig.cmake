@@ -13,6 +13,8 @@ if (CPP_CHECK_COMMAND)
    # "-i${CMAKE_SOURCE_DIR}/vendor"
    # "-i${CMAKE_SOURCE_DIR}/build_Release")
 
+   list(APPEND CPPCHECK_DIRS "-I${CMAKE_SOURCE_DIR}/include/"  "-I${CMAKE_SOURCE_DIR}/src/"  "-I${CMAKE_SOURCE_DIR}/test/")
+
    list(APPEND CPP_CHECK_COMMAND 
          "--enable=warning,performance,portability,information,style"
          "--template=${CPPCHECK_TEMPLATE}"
@@ -21,6 +23,7 @@ if (CPP_CHECK_COMMAND)
          # "--verbose"
          "--suppressions-list=${CMAKE_SOURCE_DIR}/CppCheckSuppressions.txt"
          #"--cppcheck-build-dir=${CMAKE_BINARY_DIR}" #does not work well with suppressions
+         ${CPPCHECK_DIRS}
          )
 
    add_custom_target(

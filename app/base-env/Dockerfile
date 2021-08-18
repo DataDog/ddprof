@@ -1,17 +1,19 @@
-# I'd much rather use a newer compiler with better tooling than an old version
-# We'll implement libc version sanitization in the code itself rather than
-# just building on an old, crusty distro
+# Using a recent compiler version and recent OS (better tooling)
+# We'll implement libc version sanitization in the code itself
 FROM ubuntu:20.04 as base
+
+RUN apt update \
+  && DEBIAN_FRONTEND=noninteractive apt install -y \
+  software-properties-common
 
 RUN apt update \
   && DEBIAN_FRONTEND=noninteractive apt install -y \
   awscli \
   binutils-dev \
+  gcc \
+  g++ \
   clang-12 \
-  cmake \
   cppcheck \
-  gcc-11 \
-  g++-11 \
   git \
   curl \
   make \
@@ -29,9 +31,7 @@ RUN apt update \
   gcovr
 
 # Set the default gcc/g++/clang to the specified version
-RUN update-alternatives --install /usr/bin/gcc gcc $(which gcc-11) 11 &&
-    update-alternatives --install /usr/bin/g++ g++ $(which g++-11) 11 &&
-    update-alternatives --install /usr/bin/clang clang $(which clang-12) 12
+RUN update-alternatives --install /usr/bin/clang clang $(which clang-12) 12
 
 # Newer CMake
 FROM base as cmake
