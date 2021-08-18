@@ -126,7 +126,7 @@ ssize_t procfs_MapRead(Map *map, void *buf, size_t sz, size_t addr) {
   if (addr < (map->start - map->off) || addr >= (map->end - map->off - sz)) {
     return -1;
   }
-  memcpy(buf, map->map + addr, sz);
+  memcpy(buf, (char *)map->map + addr, sz);
 
   // Restore globals
   current_map = NULL;

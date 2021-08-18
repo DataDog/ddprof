@@ -10,7 +10,6 @@ extern "C" {
 }
 
 void mock_ddprof_context(DDProfContext *ctx) {
-  memset(ctx, 0, sizeof(DDProfContext));
   ctx->num_watchers = 1;
   ctx->params.enable = true;
   ctx->watchers[0] = *perfoptions_preset(10); // 10 is cpu time
