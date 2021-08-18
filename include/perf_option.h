@@ -26,3 +26,15 @@ typedef struct PerfOption {
   bool freq;
   char bp_type;
 } PerfOption;
+
+/// Get preset matching index, returns NULL if out of bound
+const PerfOption *perfoptions_preset(int idx);
+
+int perfoptions_nb_presets(void);
+
+const char *perfoptions_lookup_idx(int idx);
+
+const char **perfoptions_lookup(void);
+
+/// pure test function
+bool perfoptions_match_size(void);

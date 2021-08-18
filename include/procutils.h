@@ -1,6 +1,5 @@
 #pragma once
 
-#include "proc_state.h"
 #include <assert.h>
 #include <ctype.h>
 #include <elf.h>
@@ -16,6 +15,7 @@
 #include <unistd.h>
 
 #include "ddres.h"
+#include "proc_state.h"
 
 // ISO C does not allow you to cast a function pointer to an object pointer.
 // But it DOES allow you to cast a function pointer to a different, incompatible

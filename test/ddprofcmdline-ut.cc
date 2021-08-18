@@ -7,6 +7,8 @@ extern "C" {
 
 static char const *const sTestPaterns[] = {"cAn", "yUo", "eVen", "tYpe"};
 
+TEST(CmdLineTst, PerfoptionMatchSize) { ASSERT_TRUE(perfoptions_match_size()); }
+
 TEST(CmdLineTst, ArgWhich) {
   ASSERT_EQ(arg_which("tYpe", sTestPaterns, 4), 3);
   ASSERT_EQ(arg_which("type", sTestPaterns, 4), 3);
@@ -42,26 +44,29 @@ TEST(CmdLineTst, NullPatterns) {
 }
 
 TEST(CmdLineTst, FirstEventHit) {
-  char const *str = perfoptions_lookup[0];
+  char const *str = perfoptions_lookup_idx(0);
   size_t i = 999999;
   uint64_t val = 0;
-  ASSERT_TRUE(process_event(str, perfoptions_lookup, perfoptions_sz, &i, &val));
+  ASSERT_TRUE(process_event(str, perfoptions_lookup(), perfoptions_nb_presets(),
+                            &i, &val));
   ASSERT_EQ(i, 0);
 }
 
 TEST(CmdLineTst, LastEventHit) {
-  char const *str = perfoptions_lookup[perfoptions_sz - 1];
+  char const *str = perfoptions_lookup_idx(perfoptions_nb_presets() - 1);
   size_t i = 999999;
   uint64_t val = 0;
-  ASSERT_TRUE(process_event(str, perfoptions_lookup, perfoptions_sz, &i, &val));
-  ASSERT_EQ(i, perfoptions_sz - 1);
+  ASSERT_TRUE(process_event(str, perfoptions_lookup(), perfoptions_nb_presets(),
+                            &i, &val));
+  ASSERT_EQ(i, perfoptions_nb_presets() - 1);
 }
 
 TEST(CmdLineTst, LiteralEventWithGoodValue) {
   char const *str = "hCPU,555";
   size_t i = 999999;
   uint64_t val = 0;
-  ASSERT_TRUE(process_event(str, perfoptions_lookup, perfoptions_sz, &i, &val));
+  ASSERT_TRUE(process_event(str, perfoptions_lookup(), perfoptions_nb_presets(),
+                            &i, &val));
   ASSERT_EQ(i, 0);
   ASSERT_EQ(val, 555); // value changed
 }
@@ -73,19 +78,22 @@ TEST(CmdLineTst, LiteralEventWithNoComma) {
   char const *str = "hCPU1";
   size_t i = 999999;
   uint64_t v = 0;
-  ASSERT_FALSE(process_event(str, perfoptions_lookup, perfoptions_sz, &i, &v));
+  ASSERT_FALSE(process_event(str, perfoptions_lookup(),
+                             perfoptions_nb_presets(), &i, &v));
 }
 
 TEST(CmdLineTst, LiteralEventWithVeryBadValue) {
   char const *str = "hCPU,apples";
   size_t i = 999999;
   uint64_t v = 1;
-  ASSERT_FALSE(process_event(str, perfoptions_lookup, perfoptions_sz, &i, &v));
+  ASSERT_FALSE(process_event(str, perfoptions_lookup(),
+                             perfoptions_nb_presets(), &i, &v));
 }
 
 TEST(CmdLineTst, LiteralEventWithKindaBadValue) {
   char const *str = "hCPU,123apples";
   size_t i = 999999;
   uint64_t v = 1;
-  ASSERT_FALSE(process_event(str, perfoptions_lookup, perfoptions_sz, &i, &v));
+  ASSERT_FALSE(process_event(str, perfoptions_lookup(),
+                             perfoptions_nb_presets(), &i, &v));
 }
