@@ -223,16 +223,18 @@ DDRes ddprof_worker_init(void *arg) {
   return ddres_init();
 }
 
-DDRes ddprof_worker_finish(void *arg) {
+DDRes ddprof_worker_finish(void *arg, bool is_final) {
   DDProfContext *ctx = arg;
 
   // We're going to close down, but first check whether we have a valid export
   // to send (or if we requested the last partial export with sendfinal)
-  int64_t now = now_nanos();
-  if (now > ctx->send_nanos || ctx->sendfinal) {
-    LG_WRN("Sending final export");
-    if (IsDDResNotOK(export(ctx, now))) {
-      LG_ERR("Error when exporting.");
+  if (is_final) {
+    int64_t now = now_nanos();
+    if (now > ctx->send_nanos || ctx->sendfinal) {
+      LG_WRN("Sending final export");
+      if (IsDDResNotOK(export(ctx, now))) {
+        LG_ERR("Error when exporting.");
+      }
     }
   }
 }

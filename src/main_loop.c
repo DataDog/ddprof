@@ -83,9 +83,10 @@ void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, DDProfContext *arg) {
       // cause a pointless loop of spawning
       if (!*continue_profiling) {
         LG_WRN("[PERF] Stop profiling!");
-        attr->finish_fun(arg);
+        attr->finish_fun(arg, true);
         return;
       } else {
+        attr->finish_fun(arg, false);
         *continue_profiling = false;
       }
       LG_NTC("[PERF] Refreshing worker process");
