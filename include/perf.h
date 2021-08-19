@@ -116,6 +116,8 @@ typedef struct perf_samplestacku {
 } perf_samplestacku;
 
 typedef struct perfopen_attr {
+  DDRes (*init_fun)(void *);
+  DDRes (*finish_fun)(void *);
   DDRes (*msg_fun)(struct perf_event_header *, int, volatile bool *, void *);
   DDRes (*timeout_fun)(volatile bool *, void *);
 } perfopen_attr;

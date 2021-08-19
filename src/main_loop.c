@@ -27,7 +27,7 @@ void ddres_check_or_shutdown(DDRes res) {
   }
 }
 
-void ddres_gracefull_shutdown(void) {
+void ddres_graceful_shutdown(void) {
   LG_NTC("Shutting down worker gracefully");
   WORKER_SHUTDOWN();
 }
@@ -37,7 +37,6 @@ static DDRes worker_init(PEventHdr *pevent_hdr, UnwindState *us) {
   // That means we need to iterate through the perf_event_open() handles and
   // get the mmaps
   DDRES_CHECK_FWD(pevent_mmap(pevent_hdr));
-  DDRES_CHECK_FWD(unwind_init(us));
   return ddres_init();
 }
 
@@ -84,9 +83,11 @@ void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, DDProfContext *arg) {
       // cause a pointless loop of spawning
       if (!*continue_profiling) {
         LG_WRN("[PERF] Stop profiling!");
+        attr->finish_fun(arg);
         return;
-      } else
+      } else {
         *continue_profiling = false;
+      }
       LG_NTC("[PERF] Refreshing worker process");
     }
   }
@@ -94,6 +95,10 @@ void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, DDProfContext *arg) {
   // Init new worker objects
   ddres_check_or_shutdown(worker_init(pevent_hdr, us));
 
+  // Perform user-provided initialization
+  ddres_check_or_shutdown(attr->init_fun(arg));
+
+  // Worker poll loop
   while (1) {
     int n = poll(pfd, pe_len, PSAMPLE_DEFAULT_WAKEUP);
 
@@ -124,7 +129,7 @@ void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, DDProfContext *arg) {
         continue;
       if (pfd[i].revents & POLLHUP) {
         worker_free(pevent_hdr, us);
-        ddres_gracefull_shutdown();
+        ddres_graceful_shutdown();
       }
       // Drain the ringbuffer and dispatch to callback, as needed
       // The head and tail are taken literally (without wraparound), since they

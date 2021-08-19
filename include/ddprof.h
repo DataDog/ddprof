@@ -58,8 +58,8 @@
   XX(DD_PROFILING_NATIVE_ENABLED,  native_enable,   n, 'n', 1, ctx,      NULL, "yes")       \
   XX(DD_PROFILING_COUNTSAMPLES,    count_samples,   c, 'c', 1, ctx,      NULL, "yes")       \
   XX(DD_PROFILING_UPLOAD_PERIOD,   upload_period,   u, 'u', 1, ctx,      NULL, "60")        \
-  XX(DD_PROFILING_WORKER_PERIOD,   worker_period,   w, 'w', 1, ctx,      NULL, "15")        \
-  XX(DD_PROFILING_CACHE_PERIOD,    cache_period,    k, 'k', 1, ctx,      NULL, "240")       \
+  XX(DD_PROFILING_WORKER_PERIOD,   worker_period,   w, 'w', 1, ctx,      NULL, "240")       \
+  XX(DD_PROFILING_CACHE_PERIOD,    cache_period,    k, 'k', 1, ctx,      NULL, "15")        \
   XX(DD_PROFILE_NATIVEPROFILER,    profprofiler,    r, 'r', 0, ctx,      NULL, "")          \
   XX(DD_PROFILING_,                prefix,          X, 'X', 1, ctx,      NULL, "")          \
   XX(DD_PROFILING_NATIVEFAULTINFO, faultinfo,       s, 's', 1, ctx,      NULL, "yes")       \

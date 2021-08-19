@@ -127,7 +127,7 @@ DDRes export(DDProfContext *ctx, int64_t now) {
   // And emit diagnostic output (if it's enabled)
   print_diagnostics();
 
-  LG_NTC("Pushed samples to backend");
+  LG_NTC("Pushing samples to backend");
   int ret = 0;
   if ((ret = DDR_pprof(ddr, dp)))
     LG_ERR("Error enqueuing pprof (%s)", DDR_code2str(ret));
@@ -137,7 +137,7 @@ DDRes export(DDProfContext *ctx, int64_t now) {
   if ((ret = DDR_send(ddr)))
     LG_ERR("Error sending export (%s)", DDR_code2str(ret));
   if ((ret = DDR_watch(ddr, -1)))
-    LG_ERR("Error(%d) watching (%s)", ddr->res.code, DDR_code2str(ret));
+    LG_ERR("Error watching (%d : %s)", ddr->res.code, DDR_code2str(ret));
   DDR_clear(ddr);
 
   // Update the time last sent
@@ -210,6 +210,31 @@ DDRes ddprof_timeout(volatile bool *continue_profiling, void *arg) {
     return reset_state(ctx, continue_profiling);
   }
   return ddres_init();
+}
+
+DDRes ddprof_worker_init(void *arg) {
+  DDProfContext *ctx = arg;
+
+  // Set the initial time
+  ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
+
+  // Initialize the unwind state and library
+  DDRES_CHECK_FWD(unwind_init(ctx->us));
+  return ddres_init();
+}
+
+DDRes ddprof_worker_finish(void *arg) {
+  DDProfContext *ctx = arg;
+
+  // We're going to close down, but first check whether we have a valid export
+  // to send (or if we requested the last partial export with sendfinal)
+  int64_t now = now_nanos();
+  if (now > ctx->send_nanos || ctx->sendfinal) {
+    LG_WRN("Sending final export");
+    if (IsDDResNotOK(export(ctx, now))) {
+      LG_ERR("Error when exporting.");
+    }
+  }
 }
 
 typedef union flipper {
@@ -569,7 +594,9 @@ void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
 // This is a quick-and-dirty implementation.  Ideally, we'll harmonize this
 // with the other functions.
 void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
-  perfopen_attr perf_funs = {.msg_fun = ddprof_callback,
+  perfopen_attr perf_funs = {.init_fun = ddprof_worker_init,
+                             .finish_fun = ddprof_worker_finish,
+                             .msg_fun = ddprof_callback,
                              .timeout_fun = ddprof_timeout};
   PEventHdr pevent_hdr;
   pevent_init(&pevent_hdr);
@@ -633,15 +660,6 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   else
     LG_WRN("Profiling context no longer valid");
 
-  // We're going to close down, but first check whether we have a valid export
-  // to send (or if we requested the last partial export with sendfinal)
-  int64_t now = now_nanos();
-  if (now > ctx->send_nanos || ctx->sendfinal) {
-    LG_WRN("Sending final export");
-    if (IsDDResNotOK(export(ctx, now))) {
-      LG_ERR("Error when exporting.");
-    }
-  }
   if (IsDDResNotOK(pevent_cleanup(&pevent_hdr))) {
     LG_ERR("Error when calling pevent_cleanup.");
   }
