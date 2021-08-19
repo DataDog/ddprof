@@ -68,10 +68,10 @@ void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, DDProfContext *arg) {
       mmap(0, sizeof(bool), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED,
            -1, 0);
 
-  // If the malloc fails, then try to profile without resetting the worker
   if (!continue_profiling) {
-    LG_ERR("[PERF] Could not initialize worker process coordinator, profiling "
-           "will probably fail");
+    // Allocation failure : stop the profiling
+    LG_ERR("[PERF] Could not initialize worker process coordinator");
+    return;
   } else {
     // ## Respawn point for workers ##
     while ((child_pid = fork())) {

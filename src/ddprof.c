@@ -232,11 +232,10 @@ DDRes ddprof_worker_finish(void *arg, bool is_final) {
     int64_t now = now_nanos();
     if (now > ctx->send_nanos || ctx->sendfinal) {
       LG_WRN("Sending final export");
-      if (IsDDResNotOK(export(ctx, now))) {
-        LG_ERR("Error when exporting.");
-      }
+      DDRES_CHECK_FWD(export(ctx, now));
     }
   }
+  return ddres_init();
 }
 
 typedef union flipper {
