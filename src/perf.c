@@ -13,6 +13,7 @@
 #include <unistd.h>
 
 #include "logger.h"
+#include "user_override.h"
 
 #define DEFAULT_PAGE_SIZE 4096 // Concerned about hugepages?
 
@@ -101,10 +102,13 @@ void *perfown_sz(int fd, size_t size_of_buffer) {
   // TODO what to do about hugepages?
   region =
       mmap(NULL, size_of_buffer, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+
   if (MAP_FAILED == region || !region)
     return NULL;
 
-  fcntl(fd, F_SETFL, O_RDWR | O_NONBLOCK);
+  if (fcntl(fd, F_SETFL, O_RDWR | O_NONBLOCK) == -1) {
+    LG_WRN("Unable to run fcntl on %d", fd);
+  }
 
   return region;
 }

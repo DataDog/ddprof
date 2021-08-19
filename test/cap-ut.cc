@@ -3,6 +3,8 @@
 #include <array>
 #include <iostream>
 
+#include "loghandle.hpp"
+
 extern "C" {
 #include "cap_display.h"
 #include "logger.h"
@@ -11,15 +13,6 @@ extern "C" {
 }
 
 namespace ddprof {
-
-class LogHandle {
-public:
-  LogHandle() {
-    LOG_open(LOG_STDERR, nullptr);
-    LOG_setlevel(LL_DEBUG);
-  }
-  ~LogHandle() { LOG_close(); }
-};
 
 TEST(CapTest, capabilities) {
   LogHandle handle;

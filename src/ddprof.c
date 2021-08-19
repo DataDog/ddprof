@@ -14,6 +14,7 @@
 #include "procutils.h"
 #include "statsd.h"
 #include "unwind.h"
+#include "user_override.h"
 
 //clang-format off
 #ifdef DBG_JEMALLOC
@@ -579,16 +580,8 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
     LG_ERR("Error when printing capabilities, continuing...");
   }
 
-  if (IsDDResNotOK(pevent_setup(ctx, pid, num_cpu, &pevent_hdr))) {
+  if (IsDDResNotOK(pevent_open(ctx, pid, num_cpu, &pevent_hdr))) {
     LG_ERR("Error when attaching to perf_event buffers.");
-    return;
-  }
-
-  // We checked that perfown would work, now we free the regions so the worker
-  // can get them back.  This is slightly wasteful, but these mappings don't
-  // work in the child for some reason.
-  if (IsDDResNotOK(pevent_munmap(&pevent_hdr))) {
-    LG_ERR("Error when cleaning watchers.");
     return;
   }
 

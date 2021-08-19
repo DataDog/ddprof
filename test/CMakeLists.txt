@@ -121,6 +121,15 @@ add_unit_test(
 target_include_directories(cap-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
 
 add_unit_test(
+    user_id-ut
+    user_id-ut.cc
+    ../src/logger.c
+    ../src/user_override.c
+    LIBRARIES ddprof-c
+    DEFINITIONS MYNAME="userid-ut"
+)
+
+add_unit_test(
     procutils-ut
     ../src/procutils.c
     ../src/logger.c
@@ -134,6 +143,7 @@ add_unit_test(
     pevent-ut
     ../src/pevent_lib.c
     ../src/logger.c
+    ../src/user_override.c
     ../src/perf.c
     ../src/perf_option.c
     pevent-ut.cc

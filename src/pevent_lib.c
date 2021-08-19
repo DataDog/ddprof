@@ -2,6 +2,7 @@
 
 #include "ddres.h"
 #include "perf.h"
+#include "user_override.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -45,6 +46,10 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
 }
 
 DDRes pevent_mmap(PEventHdr *pevent_hdr) {
+  // Switch user if needed (when root switch to nobody user)
+  UIDInfo info;
+  DDRES_CHECK_FWD(user_override(&info));
+
   PEvent *pes = pevent_hdr->pes;
   for (int k = 0; k < pevent_hdr->size; ++k) {
     if (pes[k].fd != -1) {
@@ -56,6 +61,9 @@ DDRes pevent_mmap(PEventHdr *pevent_hdr) {
       }
     }
   }
+
+  // Revert user
+  DDRES_CHECK_FWD(revert_override(&info));
   return ddres_init();
 }
 

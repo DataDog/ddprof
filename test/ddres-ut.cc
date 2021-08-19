@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "ddres.h"
+#include "loghandle.hpp"
 
 #include <iostream>
 
@@ -9,15 +10,6 @@ extern "C" {
 }
 
 namespace ddprof {
-
-class LogHandle {
-public:
-  LogHandle() {
-    LOG_open(LOG_STDERR, nullptr);
-    LOG_setlevel(LL_DEBUG);
-  }
-  ~LogHandle() { LOG_close(); }
-};
 
 TEST(DDRes, Size) {
   DDRes ddres = {0};
