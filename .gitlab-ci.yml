@@ -5,8 +5,8 @@ stages:
 
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
-  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/80739579
-  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:ca2b3e941c156bf5e5a99f01be3b58c71e1020f7eb070ab8e3bef0a79216f541
+  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/80964502
+  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:3321d4784d26ce28bf135291fcff8b3b45126cbaac4cfa0d5a7a350fe2467b50
   # https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/79832541
   TEST_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:18bebf938f6e898a27b4510c07ddc759f2f9709ebb02e2cce725305e9a2c3e09
   # When build images are built, publish them with following tags
@@ -83,6 +83,7 @@ build:ddprof_cmake:
     - cmake -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
     # Static checks
     - make cppcheck
+    - make format
     - make -j ${KUBERNETES_CPU_LIMIT}
     - if [ ! $(./ddprof --version | sed 's/.*+//g') == "${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA}" ]; then exit 1; fi
     - ctest --repeat-until-fail 5 --output-on-failure | tee test-output.log

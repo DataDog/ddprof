@@ -96,46 +96,21 @@ endif
 ## Other parameters
 # Directory structure and constants
 TARGETDIR := $(abspath deliverables)
-TMP := $(abspath tmp)
-
 
 # Global aggregates
 CWD := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-SOURCE_DIR := $(CWD)
-INCLUDE = -I$(CWD)/include -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
-SRC := $(CWD)/src/proto/profile.pb-c.c $(CWD)/src/ddprofcmdline.c $(CWD)/src/ipc.c $(CWD)/src/logger.c $(CWD)/src/signal_helper.c $(CWD)/src/version.c $(CWD)/src/statsd.c $(CWD)/src/perf.c $(CWD)/src/ddprof.c $(CWD)/src/unwind.c $(CWD)/src/dso.c $(CWD)/src/procutils.c
-DIRS := $(TARGETDIR) $(TMP)
+INCLUDE = -I$(CWD)/include
+DIRS := $(TARGETDIR)
 
-.PHONY: build bench format format-commit clean_deps all
+.PHONY: bench all
 .DELETE_ON_ERROR:
-
-## Intermediate build targets (dependencies)
-$(TMP):
-	mkdir -p $@
-
-$(TARGETDIR):
-	mkdir -p $@
 
 # kinda phony
 bench:
 	@echo "Using $(CC)"
 	@echo "Building bench with debug=$(DEBUG), analysis=$(ANALYSIS), safety=$(SAFETY), GNU_TOOLS=$(GNU_TOOLS)"
-	@echo "elfutils $(VER_ELF)"
 	@echo 
 	@echo =============== BEGIN BUILD ===============
 	$(MAKE) CC=$(strip $(CC)) CFLAGS="$(CFLAGS)" INCLUDE="$(INCLUDE)" DDPROF_DIR=$(CWD) TARGETDIR=$(strip $(TARGETDIR)) -C bench/collatz
-
-format:
-	tools/style-check.sh
-
-format-commit:
-	tools/style-check.sh apply
-
-clean_deps:
-	rm -rf vendor/elfutils
-	rm -rf $(TMP)/*
-
-clean: clean_deps
-	rm $(TARGETDIR)/*
 
 all: bench

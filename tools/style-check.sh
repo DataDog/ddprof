@@ -1,12 +1,15 @@
 #!/bin/bash
 # http://redsymbol.net/articles/unofficial-bash-strict-mode/
-set -euo pipefail
-IFS=$'\n\t'
+# set -euo pipefail
+# IFS=$'\n\t'
 
-# Set directory names
-BASEDIR=$(dirname "$0")
-cd ${BASEDIR}
-cd ../
+### Set directory names
+CURRENTDIR=$PWD
+SCRIPTPATH=$(readlink -f "$0")
+SCRIPTDIR=$(dirname $SCRIPTPATH)
+cd $SCRIPTDIR/../
+TOP_LVL_DIR=$PWD
+cd $CURRENTDIR
 
 # Find most recent clang-format, defaulting to an unqualified default
 CLANG_FORMAT=$(command -v clang-format{-12,-11,-10,-9,} | head -n 1)
@@ -22,24 +25,27 @@ RC=0
 
 # Setup a tmpfile 
 tmpfile=$(mktemp /tmp/clang-format-diff.XXXXXX)
-exec 5<>$tmpfile
-rm -f $tmpfile
-tmpfile="/dev/fd/5"
 
-# Look for matching extensions and try to diff them.
-for f in $(find . -regextype posix-egrep -iregex '.*\.(c|cc|cp|cpp|cxx|c++|h|hh|hp|hpp|hxx|h++)$' | grep -v '^\./vendor' | grep -v 'CMakeFiles'); do
-  if [ ! -f $f ]; then
-    continue
+CLANG_OPTION="--dry-run"
+if [ ${APPLY,,} == yes ];then 
+  #inplace
+  CLANG_OPTION="-i"
+fi
+
+declare -a arr_folders=("src" "test" "include")
+
+FILES_TO_FORMAT="*.cpp *.cc *.c *.cxx *.h *.hpp"
+
+for folder in "${arr_folders[@]}"
+do
+  cd ${TOP_LVL_DIR}/${folder}
+  echo "### Applying to : $PWD ###"
+  ${CLANG_FORMAT} ${CLANG_OPTION} ${FILES_TO_FORMAT} &> ${tmpfile}
+  NB_LINES=$(cat ${tmpfile} | grep -v "No such file or directory" | wc -l)
+  if [ ${NB_LINES} -gt 1 ]; then
+    RC=1
   fi
-  if [ ${APPLY,,} == "yes" ]; then
-    ${CLANG_FORMAT} -style=file -i $f
-  else
-    ${CLANG_FORMAT} -style=file $f > $tmpfile
-    if ! cmp -s $f /dev/fd/5; then
-      diff -u --color=always $f $tmpfile
-      RC=1
-    fi
-  fi
+  cat ${tmpfile} | grep -v "No such file or directory"
 done
 
 exit $RC

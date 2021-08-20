@@ -12,7 +12,6 @@ RUN apt update \
   binutils-dev \
   gcc \
   g++ \
-  clang-12 \
   cppcheck \
   git \
   curl \
@@ -28,10 +27,25 @@ RUN apt update \
   libgmock-dev \
   libjemalloc-dev \
   libcap-dev \
-  gcovr
+  gcovr \
+  wget
 
-# Set the default gcc/g++/clang to the specified version
-RUN update-alternatives --install /usr/bin/clang clang $(which clang-12) 12
+# llvm installer
+RUN bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+
+# To install a specific version of LLVM:
+RUN wget https://apt.llvm.org/llvm.sh && \
+  chmod +x llvm.sh && \
+  ./llvm.sh 12
+
+# Clang format not installed by default
+RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key| apt-key add -
+RUN apt update \
+  && DEBIAN_FRONTEND=noninteractive apt install -y \
+  clang-format-12
+
+# Provides the llvm-symbolizer (better debug information in case of sanitizer issue)
+ENV PATH="/usr/lib/llvm-12/bin/:$PATH"
 
 # Newer CMake
 FROM base as cmake
@@ -42,8 +56,6 @@ RUN CMAKE_VERSION="3.20.1" \
   && tar --no-same-owner -C /usr/local --strip-components=1 -xf cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz \
   && rm cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz
 
-# Provides the llvm-symbolizer (better debug information in case of sanitizer issue)
-ENV PATH="/usr/lib/llvm-11/bin/:$PATH"
 
 # A specific user is required to get access to perf event ressources. 
 # This enables unit testing using perf-event ressources

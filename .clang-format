@@ -1,7 +1,8 @@
 ---
 BasedOnStyle: LLVM
-AlignOperands: DontAlign
+AlignOperands: false
 AllowShortBlocksOnASingleLine: true
-AlignConsecutiveBitFields: true
+AlignConsecutiveBitFields: AcrossComments
 IndentPPDirectives: AfterHash
 ---
+

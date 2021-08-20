@@ -61,6 +61,7 @@ add_custom_target(deps
 
 #Cpp Check
 include(Cppcheckconfig)
+include(Format)
 
 ##################################
 ### Libraries (needed by ut)   ###
