@@ -4,8 +4,6 @@
 set(VER_LIBDDPROF "ff9bd540" CACHE STRING "libddprof version")
 set(SHA256_LIBDDPROF "b35a2977e0b279ae709d051e600de1741cbc6da64eceea0c643dfd0b0903ee77" CACHE STRING "libddprof sha256")
 
-set(VENDOR_PATH ${CMAKE_SOURCE_DIR}/vendor CACHE STRING " Path to the vendor directory")
-
 set(LIBDDPROF_REL_LIB ${CMAKE_SOURCE_DIR}/vendor/libddprof/RelWithDebInfo/lib64/libddprof-c.a)
 set(LIBDDPROF_INCLUDE_DIR
     ${CMAKE_SOURCE_DIR}/vendor/libddprof/RelWithDebInfo/include)

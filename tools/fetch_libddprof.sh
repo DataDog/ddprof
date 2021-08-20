@@ -13,7 +13,7 @@ usage() {
 
 if [ $# != 3 ] || [ $1 == "-h" ]; then
     usage
-    exit 0
+    exit 1
 fi
 
 ### Set directory names

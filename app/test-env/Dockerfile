@@ -26,7 +26,7 @@ RUN KERNEL_VERSION=$(uname -r | awk -F '[-\.]' '{print "v"$1"."$2}') && \
 #Retrieve a program to run
 RUN git clone --depth 1 --branch ddprof_ci https://github.com/DataDog/bad-boggle-solver.git
 
-#Build the runtime that we will profile
+#Build and install toy project
 RUN cd bad-boggle-solver \ 
     && mkdir build \
     && cd build \

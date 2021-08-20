@@ -34,6 +34,10 @@ find_package(Threads REQUIRED)
 #helper functions
 include(Helperfunc)
 
+# path to external dependencies
+set(VENDOR_PATH ${CMAKE_SOURCE_DIR}/vendor CACHE FILEPATH " Path to the vendor directory")
+
+
 ##############
 ### Deps   ###
 ##############
@@ -43,11 +47,13 @@ include(Helperfunc)
 include(Findlibddprof)
 message(STATUS "Libddprof Include directory " ${LIBDDPROF_INCLUDE_DIR})
 
+include(Findelfutils)
+
 # llvm-demangle
 include(FindLibLlvmDemangle)
 
 add_custom_target(deps
-                  DEPENDS llvm-deps ddprof-deps)
+                  DEPENDS llvm-deps ddprof-deps elfutils-deps)
 
 #######################
 ### Static analysis ###
@@ -88,8 +94,6 @@ endif()
 ###############################
 ### Declaration of DDProf   ###
 ###############################
-# Known limitation : lib elf is not built with cmake for now (makefile)
-
 # Compile time definitions 
 string(TOLOWER ${CMAKE_PROJECT_NAME} CMAKE_PROJECT_NAME_LC)
 list(APPEND DDPROF_DEFINITION_LIST "MYNAME=\"${CMAKE_PROJECT_NAME_LC}\"")
@@ -144,14 +148,7 @@ list(APPEND DDPROF_INCLUDE_LIST ${LLVM_DEMANGLE_PATH}/include)
 include(Findlibstdcxx)
 
 ## Elf utils
-set(ELFUTILS_PATH ${CMAKE_SOURCE_DIR}/vendor/elfutils CACHE STRING "Path to the elfutils directory")
-list(APPEND DDPROF_INCLUDE_LIST ${ELFUTILS_PATH} ${ELFUTILS_PATH}/libdwfl ${ELFUTILS_PATH}/libdw ${ELFUTILS_PATH}/libebl ${ELFUTILS_PATH}/libelf)
-
-# Add directories to look for libraries
-link_directories(${ELFUTILS_PATH}/libdwfl)
-link_directories(${ELFUTILS_PATH}/libdw)
-link_directories(${ELFUTILS_PATH}/libebl)
-link_directories(${ELFUTILS_PATH}/libelf)
+list(APPEND DDPROF_INCLUDE_LIST ${ELFUTILS_INCLUDE_LIST})
 
 # Find the source files
 aux_source_directory(src MAIN_SRC)
@@ -163,7 +160,7 @@ set(DDPROF_GLOBAL_SRC
    ${MAIN_SRC}
    ${PROTO_SRC})
 
-set(DDPROF_LIBRARY_LIST ddprof-c llvm-demangle libstdc++.a dw.a elf.a libz.a Threads::Threads libprotobuf-c.a liblzma.a)
+set(DDPROF_LIBRARY_LIST ddprof-c llvm-demangle libstdc++.a dw elf libz.a Threads::Threads libprotobuf-c.a liblzma.a)
 
 if (${JEMALLOC})
    list(PREPEND DDPROF_LIBRARY_LIST jemalloc)

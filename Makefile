@@ -34,13 +34,6 @@ BUILDCHECK := 0  # Do we check the build with CLANG tooling afterward?
 DDARGS :=
 SANS :=
 
-# Because ddprof uses C11, which is *not* a subset of any C++ standard, it is
-# necessary to link against the C++ runtime from C.  In GCC this is easy, but
-# in clang this is too hard for David to figure out.  Since we presume at this
-# time that both the GNU and llvm C/C++ build environments are available, we
-# find the latest instance of the static GCC libstdc++ library
-LIBSTDCXX := $(shell tools/find_libstdcxx.sh)
-
 ## Mode overrides
 ifeq ($(DEBUG),1)
   DDARGS += -DKNOCKOUT_UNUSED -DDD_DBG_PROFGEN -DDEBUG
@@ -103,29 +96,17 @@ endif
 ## Other parameters
 # Directory structure and constants
 TARGETDIR := $(abspath deliverables)
-VENDIR := $(abspath vendor)
 TMP := $(abspath tmp)
 
-## Elfutils build parameters
-# We can't use the repo elfutils because:
-#  * Support for static libebpl backends
-#  * Support for debuginfod
-MD5_ELF := 6f58aa1b9af1a5681b1cbf63e0da2d67 # You need to generate this manually
-VER_ELF := 0.183
-TAR_ELF := elfutils-$(VER_ELF).tar.bz2
-URL_ELF := https://sourceware.org/elfutils/ftp/$(VER_ELF)/$(TAR_ELF)
-ELFUTILS = $(VENDIR)/elfutils
-ELFLIBS := $(ELFUTILS)/libdw/libdw.a $(ELFUTILS)/libelf/libelf.a
 
 # Global aggregates
 CWD := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 SOURCE_DIR := $(CWD)
 INCLUDE = -I$(CWD)/include -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
-LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl $(LIBSTDCXX)
 SRC := $(CWD)/src/proto/profile.pb-c.c $(CWD)/src/ddprofcmdline.c $(CWD)/src/ipc.c $(CWD)/src/logger.c $(CWD)/src/signal_helper.c $(CWD)/src/version.c $(CWD)/src/statsd.c $(CWD)/src/perf.c $(CWD)/src/ddprof.c $(CWD)/src/unwind.c $(CWD)/src/dso.c $(CWD)/src/procutils.c
 DIRS := $(TARGETDIR) $(TMP)
 
-.PHONY: build deps elfutils demangle bench format format-commit clean_deps publish all
+.PHONY: build bench format format-commit clean_deps all
 .DELETE_ON_ERROR:
 
 ## Intermediate build targets (dependencies)
@@ -134,28 +115,6 @@ $(TMP):
 
 $(TARGETDIR):
 	mkdir -p $@
-
-$(ELFLIBS): $(ELFUTILS)
-	cd $(ELFUTILS) && ./configure CC=$(abspath $(GNU_LATEST)) --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning
-	$(MAKE) -j4 -C $(ELFUTILS)
-
-$(ELFUTILS):
-	mkdir -p $(VENDIR)
-	ls -l $(VENDIR)
-	cd $(VENDIR) && curl -L --remote-name-all $(URL_ELF)
-	echo $(MD5_ELF) $(VENDIR)/$(TAR_ELF) > $(VENDIR)/elfutils.md5
-	md5sum --status -c $(VENDIR)/elfutils.md5
-	mkdir -p $(ELFUTILS)
-	ls -l $(ELFUTILS)
-	tar --no-same-owner -C $(ELFUTILS) --strip-components 1 -xf $(VENDIR)/$(TAR_ELF)
-	rm -rf $(VENDIR)/$(TAR_ELF)
-
-
-deps: $(ELFLIBS)
-
-# HACK: For some reason HTTP doesn't work in David's local containers, but
-# pulling down dependencies outside and then compiling works
-pull: $(ELFUTILS)
 
 # kinda phony
 bench:
