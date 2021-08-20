@@ -1,5 +1,6 @@
 #include "ddprof.h"
-#include "ddprofcmdline.h"
+#include "ddprof_cmdline.h"
+#include "unwind.h"
 
 #include <errno.h>
 #include <getopt.h>
@@ -14,10 +15,23 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#define X_FREE(a, b, c, d, e, f, g, h) FREE_EXP(b, f);
+#define X_LOPT(a, b, c, d, e, f, g, h) {#b, e, 0, d},
+#define X_DFLT(a, b, c, d, e, f, g, h) DFLT_EXP(#a, b, f, g, h);
+#define X_OSTR(a, b, c, d, e, f, g, h) #c ":"
+#define X_CASE(a, b, c, d, e, f, g, h) CASE_EXP(d, f, b)
+
 int main(int argc, char **argv) {
   //---- Inititiate structs
   int c = 0, oi = 0, ret = 0;
-  DDProfContext *ctx = ddprof_ctx_init();
+  DDProfContext *ctx = &(DDProfContext){0};
+  DDReq *ddr = &(DDReq){0};
+  DProf *dp = &(DProf){0};
+  UnwindState *us = &(UnwindState){0};
+  ctx->ddr = ddr;
+  ctx->dp = dp;
+  ctx->us = us;
+  ddprof_ctx_init(ctx);
 
   struct option lopts[] = {OPT_TABLE(X_LOPT){"event", 1, 0, 'e'},
                            {"help", 0, 0, 'h'},

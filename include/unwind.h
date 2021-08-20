@@ -1,5 +1,4 @@
-#ifndef _H_unwind
-#define _H_unwind
+#pragma once
 
 #include "libdw.h"
 #include "libdwfl.h"
@@ -59,5 +58,3 @@ DDRes unwind_init(struct UnwindState *);
 void unwind_free(struct UnwindState *);
 DDRes unwindstate__unwind(struct UnwindState *us);
 void analyze_unwinding_error(pid_t, uint64_t);
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef _H_ddprof
-#define _H_ddprof
+#pragma once
 
 #include <ddprof/dd_send.h>
 #include <execinfo.h>
@@ -36,13 +35,7 @@
   H - Fallback value, if any
 */
 // clang-format off
-#define X_LOPT(a, b, c, d, e, f, g, h) {#b, e, 0, d},
 #define X_ENUM(a, b, c, d, e, f, g, h) a,
-#define X_OSTR(a, b, c, d, e, f, g, h) #c ":"
-#define X_DFLT(a, b, c, d, e, f, g, h) DFLT_EXP(#a, b, f, g, h);
-#define X_FREE(a, b, c, d, e, f, g, h) FREE_EXP(b, f);
-#define X_CASE(a, b, c, d, e, f, g, h) CASE_EXP(d, f, b)
-#define X_PRNT(a, b, c, d, e, f, g, h) if((f)->b) LG_NTC("  "#b ": %s", (f)->b);
 
 //  A                              B                C   D   E  F         G     H
 #define OPT_TABLE(XX)                                                                       \
@@ -50,7 +43,7 @@
   XX(DD_ENV,                       environment,     E, 'E', 1, ctx->ddr, NULL, "")          \
   XX(DD_AGENT_HOST,                host,            H, 'H', 1, ctx->ddr, NULL, "localhost") \
   XX(DD_SITE,                      site,            I, 'I', 1, ctx->ddr, NULL, "")          \
-  XX(DD_TRACE_AGENT_PORT,          port,            P, 'P', 1, ctx->ddr, NULL, "80")        \
+  XX(DD_TRACE_AGENT_PORT,          port,            P, 'P', 1, ctx->ddr, NULL, "8126")      \
   XX(DD_SERVICE,                   service,         S, 'S', 1, ctx->ddr, NULL, "myservice") \
   XX(DD_TAGS,                      tags,            T, 'T', 1, ctx,      NULL, "")          \
   XX(DD_VERSION,                   serviceversion,  V, 'V', 1, ctx->ddr, NULL, "")          \
@@ -87,11 +80,11 @@
   })
 
 #define CASE_EXP(casechar, targ, key)                                          \
-case casechar:                                                                 \
-  if ((targ)->key)                                                             \
-    free((void *)(targ)->key);                                                 \
-  (targ)->key = strdup(optarg);                                                \
-  break;
+  case casechar:                                                               \
+    if ((targ)->key)                                                           \
+      free((void *)(targ)->key);                                               \
+    (targ)->key = strdup(optarg);                                              \
+    break;
 
 // TODO das210603 I don't think this needs to be inlined as a macro anymore
 #define FREE_EXP(key, targ)                                                    \
@@ -102,13 +95,14 @@ case casechar:                                                                 \
   })
 
 typedef enum DDKeys { OPT_TABLE(X_ENUM) DD_KLEN } DDKeys;
+#undef X_ENUM
 
 int statsd_init();
 DDRes statsd_upload_globals(DDProfContext *);
 void print_diagnostics();
 
 // Initialize a ctx
-DDProfContext *ddprof_ctx_init();
+bool ddprof_ctx_init(DDProfContext *ctx);
 void ddprof_ctx_free(DDProfContext *);
 bool ddprof_ctx_watcher_process(DDProfContext *, char *);
 
@@ -127,5 +121,3 @@ void sigsegv_handler(int, siginfo_t *, void *);
 /*************************  Instrumentation Helpers  **************************/
 void instrument_pid(DDProfContext *, pid_t, int);
 void ddprof_setctx(DDProfContext *);
-
-#endif

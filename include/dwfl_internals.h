@@ -1,3 +1,5 @@
+#pragma once
+
 typedef struct Dwfl_Process Dwfl_Process;
 #define _(Str) dgettext("elfutils", Str)
 

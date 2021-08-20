@@ -143,11 +143,11 @@ fi
 # Get configurations for ddprof from yml file
 source ${TOP_LVL_DIR}/tools/yamlparser.sh
 config_vars=$(parse_yaml "${DEFAULT_CONFIG_FILE}" "cfg_")
-#echo $config_vars
+echo $config_vars
 eval $config_vars
 
 config_vars=$(parse_yaml "${ENV_FILE}" "env_")
-#echo "$config_vars"
+echo "$config_vars"
 eval $config_vars
 
 PREPEND_CMD=""
@@ -215,6 +215,8 @@ eval ${CMD} \
   -l ${cfg_ddprof_loglevel} \
   -e "${cfg_ddprof_event}" \
   -s on \
+  -w 2 \
+  -a yes \
   "$@"
 
 # Helps find the relevant trace in the UI

@@ -1,4 +1,4 @@
-#include "ddprofcmdline.h"
+#include "ddprof_cmdline.h"
 
 #include <assert.h>
 #include <stdlib.h>
@@ -20,12 +20,12 @@ bool arg_inset(const char *str, char const *const *set, int sz_set) {
 }
 
 bool arg_yesno(const char *str, int mode) {
-  const int sizeOfPaterns = 3;
+  const int sizeOfPatterns = 3;
   static const char *yes_set[] = {"yes", "true", "on"}; // mode = 1
   static const char *no_set[] = {"no", "false", "off"}; // mode = 0
   assert(0 == mode || 1 == mode);
   char const *const *set = (!mode) ? no_set : yes_set;
-  if (arg_which(str, set, sizeOfPaterns) != -1) {
+  if (arg_which(str, set, sizeOfPatterns) != -1) {
     return true;
   }
   return false;

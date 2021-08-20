@@ -50,7 +50,7 @@ endfunction()
 #### Definition of unit tests ####
 add_unit_test(
     ddprofcmdline-ut
-    ../src/ddprofcmdline.c 
+    ../src/ddprof_cmdline.c 
     ../src/perf_option.c
     ddprofcmdline-ut.cc
 )

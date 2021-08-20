@@ -139,3 +139,4 @@ int perfdisown(void *region, size_t size);
 void rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size);
 uint64_t rb_next(RingBuffer *);
 struct perf_event_header *rb_seek(RingBuffer *, uint64_t);
+perf_event_sample *hdr2samp(struct perf_event_header *hdr);

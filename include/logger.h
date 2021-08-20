@@ -1,7 +1,8 @@
-#ifndef LOGGER_H
-#define LOGGER_H
+#pragma once
 
 #include <stdbool.h>
+
+#include "version.h"
 
 typedef enum LOG_OPTS {
   LOG_DISABLE = 0,
@@ -65,5 +66,3 @@ void LOG_setfacility(int);
 #define LG_WRN(...) LOG_lfprintf(LL_WARNING, -1, MYNAME, __VA_ARGS__)
 #define LG_NTC(...) LOG_lfprintf(LL_NOTICE, -1, MYNAME, __VA_ARGS__)
 #define LG_DBG(...) LOG_lfprintf(LL_DEBUG, -1, MYNAME, __VA_ARGS__)
-
-#endif

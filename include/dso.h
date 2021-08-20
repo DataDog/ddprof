@@ -1,5 +1,4 @@
-#ifndef _H_dso
-#define _H_dso
+#pragma once
 
 #include <assert.h>
 #include <ctype.h>
@@ -69,5 +68,3 @@ Dso *dso_find(int, uint64_t);
 DsoCache *dso_cache_add(Dso *);
 DsoCache *dso_cache_find(Dso *);
 bool pid_read_dso(int, void *, size_t, uint64_t);
-
-#endif

@@ -122,7 +122,7 @@ CWD := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 SOURCE_DIR := $(CWD)
 INCLUDE = -I$(CWD)/include -Iinclude/proto -I$(ELFUTILS) -I$(ELFUTILS)/libdw -I$(ELFUTILS)/libdwfl -I$(ELFUTILS)/libebl -I$(ELFUTILS)/libelf
 LDLIBS := -l:libprotobuf-c.a -l:libbfd.a -l:libz.a -lpthread -l:liblzma.a -ldl $(LIBSTDCXX)
-SRC := $(CWD)/src/proto/profile.pb-c.c $(CWD)/src/ddprofcmdline.c $(CWD)/src/ipc.c $(CWD)/src/logger.c $(CWD)/src/signal_helper.c $(CWD)/src/version.c $(CWD)/src/statsd.c $(CWD)/src/perf.c $(CWD)/src/ddprof.c $(CWD)/src/unwind.c $(CWD)/src/dso.c $(CWD)/src/procutils.c
+SRC := $(CWD)/src/proto/profile.pb-c.c $(CWD)/src/ddprof_cmdline.c $(CWD)/src/ipc.c $(CWD)/src/logger.c $(CWD)/src/signal_helper.c $(CWD)/src/version.c $(CWD)/src/statsd.c $(CWD)/src/perf.c $(CWD)/src/ddprof.c $(CWD)/src/unwind.c $(CWD)/src/dso.c $(CWD)/src/procutils.c
 DIRS := $(TARGETDIR) $(TMP)
 
 .PHONY: build deps elfutils demangle bench format format-commit clean_deps publish all

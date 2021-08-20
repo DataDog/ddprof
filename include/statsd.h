@@ -1,5 +1,4 @@
-#ifndef _H_statsd
-#define _H_statsd
+#pragma once
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -15,5 +14,3 @@ int statsd_listen(const char *, size_t);
 int statsd_connect(const char *, size_t);
 bool statsd_send(int, const char *, void *, int);
 bool statsd_close(int);
-
-#endif
