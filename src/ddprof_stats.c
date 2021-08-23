@@ -8,16 +8,18 @@
 // Expand the statsd paths
 #define X_PATH(a, b, c) "datadog.profiling.native." b,
 static const char *stats_paths[] = {STATS_TABLE(X_PATH)};
+#undef X_PATH
 
-// Expand the types for each stat
-#define X_TYPE(a, b, c) c,
-static const STAT_TYPES stats_types[] = {STATS_TABLE(X_TYPE)};
-#undef X_TYPE
+// Expand the types
+#define X_TYPES(a, b, c) c,
+static const unsigned int stats_types[] = {STATS_TABLE(X_TYPES)};
+#undef X_TYPES
 
 // File descriptor for statsd
 static int fd_statsd = -1;
 
-StatsValue *ddprof_stats = NULL;
+// Region (to be mmap'd here) for backend store
+long *ddprof_stats = NULL;
 
 // Helper function for getting statsd connection
 DDRes statsd_init() {
@@ -38,9 +40,8 @@ DDRes ddprof_stats_init() {
   if (ddprof_stats)
     return ddres_init();
 
-  ddprof_stats =
-      mmap(NULL, sizeof(StatsValue) * STATS_LEN, PROT_READ | PROT_WRITE,
-           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  ddprof_stats = mmap(NULL, sizeof(long) * STATS_LEN, PROT_READ | PROT_WRITE,
+                      MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   if (MAP_FAILED == ddprof_stats) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_DDPROF_STATS, "Unable to mmap for stats");
   }
@@ -61,100 +62,66 @@ DDRes ddprof_stats_free() {
   return ddres_init();
 }
 
-long ddprof_stats_addl(unsigned int stat, long n) {
+DDRes ddprof_stats_add(unsigned int stat, long in, long *out) {
   if (!ddprof_stats)
-    return 0;
+    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Stats backend uninitialized");
   if (stat >= STATS_LEN)
-    return 0;
-  return __sync_add_and_fetch(&ddprof_stats[stat].l, n);
+    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Invalid stat");
+
+  long retval = __sync_add_and_fetch(&ddprof_stats[stat], in);
+
+  if (out)
+    *out = retval;
+  return ddres_init();
 }
 
-double ddprof_stats_addf(unsigned int stat, double x) {
+DDRes ddprof_stats_set(unsigned int stat, long n) {
   if (!ddprof_stats)
-    return 0;
+    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Stats backend uninitialized");
   if (stat >= STATS_LEN)
-    return 0.0;
-
-  double *oldval;
-  double *newval;
-  *oldval = ddprof_stats[stat].d;
-  *newval = *oldval + x;
-
-  int spinlock_count = 3 + 1;
-  while (!__sync_bool_compare_and_swap(&ddprof_stats[stat].l, *(long *)oldval,
-                                       *(long *)newval) &&
-         --spinlock_count) {
-    *oldval = ddprof_stats[stat].d;
-    *newval = *oldval + x;
-  }
-
-  if (!spinlock_count)
-    return 0.0;
-
-  return *newval;
+    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Invalid stat");
+  ddprof_stats[stat] = n;
+  return ddres_init();
 }
 
-long ddprof_stats_setl(unsigned int stat, long n) {
-  if (!ddprof_stats)
-    return 0;
-  if (stat >= STATS_LEN)
-    return 0;
-  ddprof_stats[stat].l = n;
-  return n;
+DDRes ddprof_stats_clear(unsigned int stat) {
+  return ddprof_stats_set(stat, 0);
 }
 
-double ddprof_stats_setf(unsigned int stat, double x) {
+DDRes ddprof_stats_clear_all() {
   if (!ddprof_stats)
-    return 0;
-  if (stat >= STATS_LEN)
-    return 0.0;
-  ddprof_stats[stat].d = x;
-  return x;
-}
+    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Stats backend uninitialized");
 
-// IEEE-754 0 is the same as integral 0
-void ddprof_stats_clear(unsigned int stat) { ddprof_stats_setl(stat, 0); }
-
-void ddprof_stats_clear_all() {
-  if (!ddprof_stats)
-    return;
+  // Note:  we leave the DDRes returns here uncollected, since the loop bounds
+  //        are strongly within the ddprof_stats bounds and we've already
+  //        verified the presence of the backend store.  These are the only two
+  //        non-success criteria for the individual clear operations.
   for (int i = 0; i < STATS_LEN; i++)
     ddprof_stats_clear(i);
+
+  return ddres_init();
 }
 
-long ddprof_stats_getl(unsigned int stat) {
+DDRes ddprof_stats_get(unsigned int stat, long *out) {
   if (!ddprof_stats)
-    return 0;
+    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Stats backend uninitialized");
   if (stat >= STATS_LEN)
-    return 0;
-  return ddprof_stats[stat].l;
-}
+    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Invalid stat");
 
-long ddprof_stats_getf(unsigned int stat) {
-  if (!ddprof_stats)
-    return 0;
-  if (stat >= STATS_LEN)
-    return 0.0;
-  return ddprof_stats[stat].d;
+  if (out)
+    *out = ddprof_stats[stat];
+  return ddres_init();
 }
 
 DDRes ddprof_stats_send(void) {
   for (unsigned int i = 0; i < STATS_LEN; i++) {
-    DDRES_CHECK_FWD(statsd_send(fd_statsd, stats_paths[i], &ddprof_stats[i].l,
+    DDRES_CHECK_FWD(statsd_send(fd_statsd, stats_paths[i], &ddprof_stats[i],
                                 stats_types[i]));
   }
   return ddres_init();
 }
 
-STAT_TYPES ddprof_stats_gettype(DDPROF_STATS stats) {
-  return stats_types[stats];
-}
-
 void ddprof_stats_print() {
-  for (unsigned int i = 0; i < STATS_LEN; i++) {
-    if (stats_types[i] == STAT_MS_FLOAT)
-      LG_NTC("[STATS] %s: %f", stats_paths[i], ddprof_stats[i].d);
-    else
-      LG_NTC("[STATS] %s: %ld", stats_paths[i], ddprof_stats[i].l);
-  }
+  for (unsigned int i = 0; i < STATS_LEN; i++)
+    LG_NTC("[STATS] %s: %ld", stats_paths[i], ddprof_stats[i]);
 }

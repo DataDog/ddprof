@@ -6,13 +6,6 @@
 #include "logger.h"
 #include "statsd.h"
 
-typedef union StatsValue {
-  long l;
-  long Long;
-  double d;
-  double Double;
-} StatsValue;
-
 #define X_ENUM(a, b, c) STATS_##a,
 #define STATS_TABLE(X)                                                         \
   X(EVENT_COUNT, "event.count", STAT_GAUGE)                                    \
@@ -38,35 +31,17 @@ DDRes ddprof_stats_init();
 // important)
 DDRes ddprof_stats_free();
 
-// The add operator is multithread- and multiprocess-safe, even though the
-// library doesn't really use either as a form of concurrency.
-// Negative values are allowable.
-long ddprof_stats_addl(unsigned int stat, long n);
-double ddprof_stats_addf(unsigned int stat, double x);
-
-// This is a gcc statement expression in order to perform the correct ADD
-// operation for the specified type, returning the correct type.  Compatible
-// with clang
-#define ddprof_stats_add(stat, v)                                              \
-  __extension__({                                                              \
-    __typeof__(v) ret;                                                         \
-    if (stat > STATS_LEN)                                                      \
-      ret = 0;                                                                 \
-    else                                                                       \
-      ret = STAT_MS_FLOAT == ddprof_stats_gettype(stat)                        \
-          ? ddprof_stats_addf(stat, v)                                         \
-          : ddprof_stats_addl(stat, v);                                        \
-    ret;                                                                       \
-  })
+// The add operator is multithread- and multiprocess-safe.  `out` can be NULL.
+DDRes ddprof_stats_add(unsigned int stat, long in, long *out);
 
 // Setting and clearing are last-through-the-gate operations with ties broken
-// by whatever the CPU is executing at that time.  This is pretty standard, but
-// it's worth noting that these operations propagate to all consumers.
-long ddprof_stats_set(unsigned int stat, long n);
-void ddprof_stats_clear(unsigned int stat);
+// by whatever the CPU is executing at that time.
+DDRes ddprof_stats_set(unsigned int stat, long in);
+DDRes ddprof_stats_clear(unsigned int stat);
 
 // Merely gets the value of the statistic.
-long ddprof_stats_get(unsigned int stat);
+DDRes ddprof_stats_get(unsigned int stat, long *out);
+
 // Send all the registered values
 DDRes ddprof_stats_send(void);
 

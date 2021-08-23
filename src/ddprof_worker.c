@@ -26,7 +26,7 @@ void ddprof_pr_sample(DDProfContext *ctx, struct perf_event_sample *sample,
   static uint64_t id_locs[MAX_STACK] = {0};
   struct UnwindState *us = ctx->us;
   DProf *dp = ctx->dp;
-  ddprof_stats_add(STATS_SAMPLE_COUNT, 1);
+  ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
   us->pid = sample->pid;
   us->idx = 0; // Modified during unwinding; has stack depth
   us->stack = NULL;
@@ -46,7 +46,7 @@ void ddprof_pr_sample(DDProfContext *ctx, struct perf_event_sample *sample,
     }
     return;
   }
-  ddprof_stats_add(STATS_UNWIND_TICKS, __rdtsc() - this_ticks_unwind);
+  ddprof_stats_add(STATS_UNWIND_TICKS, __rdtsc() - this_ticks_unwind, NULL);
   FunLoc *locs = us->locs;
   for (uint64_t i = 0, j = 0; i < us->idx; i++) {
     FunLoc L = locs[i];
@@ -79,7 +79,7 @@ void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int pos) {
 void ddprof_pr_lost(DDProfContext *ctx, perf_event_lost *lost, int pos) {
   (void)ctx;
   (void)pos;
-  ddprof_stats_add(STATS_EVENT_LOST, lost->lost);
+  ddprof_stats_add(STATS_EVENT_LOST, lost->lost, NULL);
 }
 
 void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm, int pos) {
