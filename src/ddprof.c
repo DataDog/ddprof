@@ -117,8 +117,9 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
     }
   }
 
-  if (!ddprof_stats_init()) {
+  if (IsDDResFatal(ddprof_stats_init())) {
     LG_WRN("Error from statsd_init");
+    return;
   }
 
   if (IsDDResNotOK(pevent_enable(&pevent_hdr))) {
@@ -137,6 +138,11 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
 
   if (IsDDResNotOK(pevent_cleanup(&pevent_hdr))) {
     LG_ERR("Error when calling pevent_cleanup.");
+  }
+
+  if (IsDDResFatal(ddprof_stats_free())) {
+    LG_ERR("Error from ddprof_stats_free");
+    return;
   }
 }
 

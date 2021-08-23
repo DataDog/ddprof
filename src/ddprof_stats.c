@@ -20,41 +20,45 @@ int fd_statsd = -1;
 StatsValue *ddprof_stats = NULL;
 
 // Helper function for getting statsd connection
-int statsd_init() {
+DDRes statsd_init() {
   char *path_statsd = NULL;
   if ((path_statsd = getenv("DD_DOGSTATSD_SOCKET"))) {
     fd_statsd = statsd_connect(path_statsd, strlen(path_statsd));
     if (-1 != fd_statsd) {
-      return fd_statsd;
+      DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS,
+                            "Unable to establish statsd connection");
     }
   }
-  return -1;
+  return ddres_init();
 }
 
-bool ddprof_stats_init() {
+DDRes ddprof_stats_init() {
   // This interface cannot be used to reset the existing mapping; to do so free
   // and then re-initialize.
   if (ddprof_stats)
-    return true;
+    return ddres_init();
 
   ddprof_stats =
       mmap(NULL, sizeof(StatsValue) * STATS_LEN, PROT_READ | PROT_WRITE,
            MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   if (MAP_FAILED == ddprof_stats) {
-    // error handling here
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_DDPROF_STATS, "Unable to mmap for stats");
   }
-
-  fd_statsd = statsd_init();
-  if (-1 == fd_statsd) {
-    // error handling here
-  }
-  return true;
+  DDRES_CHECK_FWD(statsd_init());
+  return ddres_init();
 }
 
-void ddprof_stats_free() {
+DDRes ddprof_stats_free() {
   if (ddprof_stats)
-    munmap(ddprof_stats, sizeof(long) * STATS_LEN);
+    DDRES_CHECK_INT(munmap(ddprof_stats, sizeof(long) * STATS_LEN),
+                    DD_WHAT_DDPROF_STATS, "Error from munmap");
   ddprof_stats = NULL;
+
+  if (fd_statsd != -1) {
+    DDRES_CHECK_FWD(statsd_close(fd_statsd));
+    fd_statsd = -1;
+  }
+  return ddres_init();
 }
 
 long ddprof_stats_addl(unsigned int stat, long n) {
@@ -134,14 +138,12 @@ long ddprof_stats_getf(unsigned int stat) {
   return ddprof_stats[stat].d;
 }
 
-bool ddprof_stats_send() {
+DDRes ddprof_stats_send(void) {
   for (unsigned int i = 0; i < STATS_LEN; i++) {
-    if (statsd_send(fd_statsd, stats_paths[i], &ddprof_stats[i].l,
-                    stats_types[i])) {
-      // error handling here
-    }
+    DDRES_CHECK_FWD(statsd_send(fd_statsd, stats_paths[i], &ddprof_stats[i].l,
+                                stats_types[i]));
   }
-  return true;
+  return ddres_init();
 }
 
 STAT_TYPES ddprof_stats_gettype(DDPROF_STATS stats) {

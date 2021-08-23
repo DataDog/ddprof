@@ -31,6 +31,8 @@ enum DDRes_What {
   DD_WHAT_POLLHANGUP,
   DD_WHAT_WORKER_RESET,
   DD_WHAT_PROCSTATE,
+  DD_WHAT_STATSD,       // <-- NEW take this to solve conflict with main
+  DD_WHAT_DDPROF_STATS, // <-- NEW take this to solve conflict with main
   // native errors
   DD_WHAT_UNITTEST,
   // max

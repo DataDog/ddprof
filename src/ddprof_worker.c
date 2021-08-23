@@ -187,6 +187,7 @@ DDRes ddprof_worker_finish(void *arg, bool is_final) {
       }
     }
   }
+  return ddres_init();
 }
 
 DDRes ddprof_worker(struct perf_event_header *hdr, int pos,

@@ -7,6 +7,8 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include "ddres.h"
+
 int statsd_listen(const char *path, size_t sz_path) {
   struct sockaddr_un addr_bind = {.sun_family = AF_UNIX};
   int fd_sock = -1;
@@ -59,7 +61,7 @@ int statsd_connect(const char *path, size_t sz_path) {
   return fd_sock;
 }
 
-bool statsd_send(int fd_sock, const char *key, void *val, int type) {
+DDRes statsd_send(int fd_sock, const char *key, void *val, int type) {
   char buf[1024] = {0};
   size_t sz = 0;
   switch (type) {
@@ -80,13 +82,20 @@ bool statsd_send(int fd_sock, const char *key, void *val, int type) {
 
   // Nothing to do if serialization failed or was short, but we don't return
   // granular result
-  if (sz == 0 || sz >= sizeof(buf))
-    return false;
+  if (sz == 0 || sz >= sizeof(buf)) {
+    // Not fatal
+    DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Serialization failed");
+  }
 
   // Nothing to do if the write fails
-  if (sz != (size_t)write(fd_sock, buf, sz))
-    return false;
-  return true;
+  if (sz != (size_t)write(fd_sock, buf, sz)) {
+    // Don't consider this as fatal.
+    DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Write failed");
+  }
+  return ddres_init();
 }
 
-bool statsd_close(int fd_sock) { return !close(fd_sock); }
+DDRes statsd_close(int fd_sock) {
+  DDRES_CHECK_INT(close(fd_sock), DD_WHAT_STATSD, "Error while closing socket");
+  return ddres_init();
+}
