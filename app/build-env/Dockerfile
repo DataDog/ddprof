@@ -9,6 +9,4 @@ RUN cd /app && mkdir build_Release && \
     cmake -DCMAKE_BUILD_TYPE=Release ../ && \
     make deps
 
-RUN cd /app && make deps
-
 WORKDIR /app

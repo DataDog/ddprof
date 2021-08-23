@@ -27,14 +27,14 @@ private:
     DDRES_CHECK_FWD(e.get_DDRes());                                            \
   }                                                                            \
   catch (const std::bad_alloc &ba) {                                           \
-    LG_ERR("Caught bad_alloc at %s:%u", __FILE__, __LINE__);                   \
+    LOG_ERROR_DETAILS(LG_ERR, DD_WHAT_BADALLOC);                               \
     return ddres_error(DD_WHAT_BADALLOC);                                      \
   }                                                                            \
   catch (const std::exception &e) {                                            \
-    LG_ERR("Caught standard exception at %s:%u", __FILE__, __LINE__);          \
+    LOG_ERROR_DETAILS(LG_ERR, DD_WHAT_STDEXCEPT);                              \
     return ddres_error(DD_WHAT_STDEXCEPT);                                     \
   }                                                                            \
   catch (...) {                                                                \
-    LG_ERR("Caught unknown exception at %s:%u", __FILE__, __LINE__);           \
+    LOG_ERROR_DETAILS(LG_ERR, DD_WHAT_UKNWEXCEPT);                             \
     return ddres_error(DD_WHAT_UKNWEXCEPT);                                    \
   }

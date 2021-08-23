@@ -110,7 +110,6 @@ bool ddprof_ctx_watcher_process(DDProfContext *, char *);
 DDRes reset_state(DDProfContext *, volatile bool *continue_profiling);
 DDRes export(DDProfContext *, int64_t);
 DDRes ddprof_timeout(volatile bool *, void *);
-DDRes ddprof_callback(struct perf_event_header *, int, volatile bool *, void *);
 
 /*********************************  Printers  *********************************/
 void print_help();

@@ -2,22 +2,23 @@
 //example :
 //arithOperationsOnVoidPointer:*/ddprof.c:12
 //static variables
-variableScope:*/ddprof.c
 //buf not used (but should be in future version of code)
-unreadVariable:*/ddprof.c
 //static variable levels
 variableScope:*/logger.c:124
 // config of cpp checks needs more includes
 missingInclude
 
-// To be fixed in next PR
+// rewrite dso logic to use simple c++ container
 arrayIndexOutOfBoundsCond:*/dso.c:258
 arithOperationsOnVoidPointer:*/dso.c:446
+
+// Unable to understand the macro behaviour
 incorrectStringBooleanError:*/main.c:34
-arithOperationsOnVoidPointer:*/procutils.c:129
-memsetClassFloat:*/pevent-ut.cc:13
-invalidPrintfArgType_sint:*/procutils-ut.cc:13
-invalidPrintfArgType_sint:*/procutils-ut.cc:14
-invalidPrintfArgType_sint:*/procutils-ut.cc:15
+
+// To be fixed
 ctunullpointer:*/procutils.c:138
-unmatchedSuppression:*/main.c:36:information:Unmatched suppression: unknownMacro
+
+// Due to the usage of __VA_OPT__ I am removing syntax errors for now
+// https://github.com/danmar/simplecpp/issues/191
+// when ticket is fixed we can put it back
+syntaxError:*

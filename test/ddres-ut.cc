@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "ddres.h"
+#include "loghandle.hpp"
 
 #include <iostream>
 
@@ -9,15 +10,6 @@ extern "C" {
 }
 
 namespace ddprof {
-
-class LogHandle {
-public:
-  LogHandle() {
-    LOG_open(LOG_STDERR, nullptr);
-    LOG_setlevel(LL_DEBUG);
-  }
-  ~LogHandle() { LOG_close(); }
-};
 
 TEST(DDRes, Size) {
   DDRes ddres = {0};
@@ -46,6 +38,11 @@ DDRes mock_fatal_generator() {
   ++s_call_counter;
   DDRES_RETURN_ERROR_LOG(DD_WHAT_UNITTEST,
                          "Test the log and return function %d", 42);
+}
+
+DDRes mock_fatal_default_message() {
+  ++s_call_counter;
+  DDRES_RETURN_ERROR_LOG(DD_WHAT_UNITTEST);
 }
 
 DDRes dderr_wrapper() {
@@ -77,6 +74,11 @@ TEST(DDRes, FillFatal) {
       ASSERT_TRUE(ddres_equal(ddres, ddres_error(DD_WHAT_UNITTEST)));
     }
     EXPECT_EQ(s_call_counter, 2);
+    {
+      DDRes ddres = mock_fatal_default_message();
+      ASSERT_TRUE(ddres_equal(ddres, ddres_error(DD_WHAT_UNITTEST)));
+    }
+    EXPECT_EQ(s_call_counter, 3);
   }
 }
 
@@ -121,5 +123,24 @@ TEST(DDRes, ConvertException) {
     ASSERT_EQ(ddres, ddres_create(DD_SEVERROR, DD_WHAT_UNITTEST));
 
   } catch (...) { ASSERT_TRUE(false); }
+}
+
+TEST(DDRes, ErrorMessageCheck) {
+  LogHandle handle;
+  for (int i = DD_COMMON_START_RANGE; i < COMMON_ERROR_SIZE; ++i) {
+    printf("Id = %d \n", i);
+    LOG_ERROR_DETAILS(LG_NTC, i);
+  }
+
+  EXPECT_TRUE(strcmp(ddres_error_message(DD_WHAT_BADALLOC),
+                     "BADALLOC: Allocation error") == 0);
+
+  for (int i = DD_NATIVE_START_RANGE; i < NATIVE_ERROR_SIZE; ++i) {
+    printf("Id = %d \n", i);
+    LOG_ERROR_DETAILS(LG_NTC, i);
+  }
+
+  EXPECT_TRUE(strcmp(ddres_error_message(DD_WHAT_UNITTEST),
+                     "UNITTEST: unit test error") == 0);
 }
 } // namespace ddprof

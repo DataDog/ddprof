@@ -8,12 +8,12 @@ usage() {
     echo "$0 <version> <sha256> <path>"
     echo ""
     echo "Example"
-    echo "  $0 645a3ebd 5384319ab8dec373ad06e24c288522b3af464ddfd1dbd4d2ba03870312b635ba ./vendor"
+    echo "  $0 645a3ebd 66b5d20c03ea8ea9579b86b243efecf28046660bbe2cfe37db705dcfc53f9d79 ./vendor"
 }
 
 if [ $# != 3 ] || [ $1 == "-h" ]; then
     usage
-    exit 0
+    exit 1
 fi
 
 ### Set directory names
@@ -40,6 +40,8 @@ if [ -e ${TARGET_EXTRACT} ]; then
     exit 1
 fi
 
+mkdir -p ${TARGET_EXTRACT}
+
 IS_CI=${CI:-false}
 if [ ! -e  ${TAR_LIBDDPROF} ]; then
     if [ ${IS_CI} == "false" ]; then
@@ -65,8 +67,8 @@ fi
 tmp_dir=$(mktemp -d -t deliverables-XXXXXXXXXX)
 echo "Extract to $tmp_dir"
 cd $tmp_dir
-tar -xvf ${DOWNLOAD_PATH}/${TAR_LIBDDPROF} deliverables
-mv deliverables ${TARGET_EXTRACT}
+tar xvfz ${DOWNLOAD_PATH}/${TAR_LIBDDPROF}
+mv * ${TARGET_EXTRACT}
 rmdir $tmp_dir
 cd -
 exit 0

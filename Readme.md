@@ -35,8 +35,10 @@ Refer to [commands](docs/Commands.md) for the commands supported by `ddprof`. Ex
 If you are running on a linux distribution, run :
 
 ```bash
-make build
-./release/ddprof --help
+mkdir -p build_Release
+cd build_Release
+cmake -DCMAKE_BUILD_TYPE=Release ../
+make -j 4 .
 ```
 
 More information [here](./docs/Build.md).

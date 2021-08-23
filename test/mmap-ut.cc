@@ -50,7 +50,7 @@ TEST(MMapTest, PerfOpen) {
     std::cerr << "-->" << i << " " << perfoptions_preset(i)->desc << std::endl;
 
     int perf_fd = perfopen(pid, perfoptions_preset(i), cpu, false);
-    if (i == 10 || i == 11) { // Expected not to fail
+    if (i == 10 || i == 11) { // Expected not to fail for CPU / WALL profiling
       EXPECT_TRUE(perf_fd != -1);
     }
     if (perf_fd == -1) {

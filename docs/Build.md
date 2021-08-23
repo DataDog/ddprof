@@ -26,31 +26,21 @@ Check the required libraries described in the [app/base-env/Dockerfile](app/base
 
 ## Build commands
 
-### Make dependencies
+### Building the native profiler 
 
 ```bash
-make deps
+mkdir -p build_Release
+cd build_Release
+cmake -DCMAKE_BUILD_TYPE=Release ../
+make -j 4 .
 ```
 
-### Make the project
+### Building the benchmark (collatz)
+
+The benchmark tool is not yet built through cmake
 
 ```bash
-make build
-./release/ddprof --help
-```
-
-### Make the unit tests
-
-Unit tests are build through the cmake build system (unifying builds is ongoing).
-
-```bash
-#At the top level, within the build image
-mkdir build
-cd build
-cmake ../
-make -j 4
-cd test
-ctest
+make ANALYSIS=0 bench
 ```
 
 ## Run commands
