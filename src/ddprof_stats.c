@@ -9,6 +9,11 @@
 #define X_PATH(a, b, c) "datadog.profiling.native." b,
 char *stats_paths[] = {STATS_TABLE(X_PATH)};
 
+// Expand the types for each stat
+#define X_TYPE(a, b, c) c,
+static const STAT_TYPES stats_types[] = {STATS_TABLE(X_TYPE)};
+#undef X_TYPE
+
 // File descriptor for statsd
 int fd_statsd = -1;
 
@@ -43,6 +48,7 @@ bool ddprof_stats_init() {
   if (-1 == fd_statsd) {
     // error handling here
   }
+  return true;
 }
 
 void ddprof_stats_free() {
@@ -135,6 +141,11 @@ bool ddprof_stats_send() {
       // error handling here
     }
   }
+  return true;
+}
+
+STAT_TYPES ddprof_stats_gettype(DDPROF_STATS stats) {
+  return stats_types[stats];
 }
 
 void ddprof_stats_print() {
