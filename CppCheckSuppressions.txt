@@ -2,9 +2,7 @@
 //example :
 //arithOperationsOnVoidPointer:*/ddprof.c:12
 //static variables
-variableScope:*/ddprof.c
 //buf not used (but should be in future version of code)
-unreadVariable:*/ddprof.c
 //static variable levels
 variableScope:*/logger.c:124
 // config of cpp checks needs more includes
@@ -19,3 +17,8 @@ incorrectStringBooleanError:*/main.c:34
 
 // To be fixed
 ctunullpointer:*/procutils.c:138
+
+// Due to the usage of __VA_OPT__ I am removing syntax errors for now
+// https://github.com/danmar/simplecpp/issues/191
+// when ticket is fixed we can put it back
+syntaxError:*

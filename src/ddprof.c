@@ -194,8 +194,7 @@ DDRes reset_state(DDProfContext *ctx, volatile bool *continue_profiling) {
 
     if (!pprof_Init(ctx->dp, (const char **)pprof_labels,
                     (const char **)pprof_units, ctx->num_watchers)) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW,
-                             "[DDPROF] Error refreshing profile storage");
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF);
     }
   }
 

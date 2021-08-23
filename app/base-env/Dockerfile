@@ -2,6 +2,9 @@
 # We'll implement libc version sanitization in the code itself
 FROM ubuntu:20.04 as base
 
+# Tell docker to use bash as the default
+SHELL ["/bin/bash", "-c"]
+
 RUN apt update \
   && DEBIAN_FRONTEND=noninteractive apt install -y \
   software-properties-common

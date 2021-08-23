@@ -33,8 +33,11 @@ function(add_unit_test name)
    cmake_parse_arguments(PARSE_ARGV 1 MY "${options}" "${oneValueArgs}" "${multiValueArgs}")
    message(STATUS "Creating unit test : " ${name})
 
-   ## Create exe with sources 
-   add_exe(${name} ${MY_UNPARSED_ARGUMENTS})
+   ## Create exe with sources. Always add logger and error management in the unit tests
+   add_exe(${name} 
+        ../src/ddres_list.c
+        ../src/logger.c
+        ${MY_UNPARSED_ARGUMENTS})
    add_dependencies(${name} ddprof-deps)
    target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
    # libddprof almost always required (unlikely file from libddprof)
@@ -93,7 +96,6 @@ add_unit_test(
 
 add_unit_test(
     mmap-ut
-    ../src/logger.c
     ../src/perf.c
     ../src/perf_option.c
     mmap-ut.cc
@@ -104,7 +106,6 @@ target_include_directories(mmap-ut PRIVATE)
 
 add_unit_test(
     ddres-ut
-    ../src/logger.c
     ddres-ut.cc
     LIBRARIES ddprof-c
     DEFINITIONS MYNAME="ddres-ut"
@@ -113,7 +114,6 @@ add_unit_test(
 add_unit_test(
     cap-ut
     ../src/cap_display.c
-    ../src/logger.c
     cap-ut.cc
     LIBRARIES ddprof-c libcap
     DEFINITIONS MYNAME="cap-ut"
@@ -132,7 +132,6 @@ add_unit_test(
 add_unit_test(
     procutils-ut
     ../src/procutils.c
-    ../src/logger.c
     procutils-ut.cc
     LIBRARIES ddprof-c
     DEFINITIONS MYNAME="procutils-ut"
@@ -142,7 +141,6 @@ target_include_directories(cap-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
 add_unit_test(
     pevent-ut
     ../src/pevent_lib.c
-    ../src/logger.c
     ../src/user_override.c
     ../src/perf.c
     ../src/perf_option.c
