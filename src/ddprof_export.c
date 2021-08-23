@@ -1,8 +1,8 @@
 #include "stdlib.h"
 #include "string.h"
 
-#include "ddprof.h"
 #include "ddprof/dd_send.h"
+#include "ddprof_export.h"
 #include "ddprof_stats.h"
 #include "ddres.h"
 #include "procutils.h"

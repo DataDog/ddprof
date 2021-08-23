@@ -7,10 +7,10 @@
 
 // Expand the statsd paths
 #define X_PATH(a, b, c) "datadog.profiling.native." b,
-char *stats_paths[] = {STATS_TABLE(X_PATH)};
+static const char *stats_paths[] = {STATS_TABLE(X_PATH)};
 
 // File descriptor for statsd
-int fd_statsd = -1;
+static int fd_statsd = -1;
 
 StatsValue *ddprof_stats = NULL;
 
