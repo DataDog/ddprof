@@ -71,6 +71,7 @@ add_unit_test(
 
 add_unit_test(
     statsd-ut
+    ../src/logger.c
     ../src/statsd.c 
     statsd-ut.cc
 )
