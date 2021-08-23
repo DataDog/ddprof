@@ -151,6 +151,7 @@ DDRes reset_state(DDProfContext *ctx, volatile bool *continue_profiling) {
   return ddres_init();
 }
 
+/********************************** callbacks *********************************/
 DDRes ddprof_timeout(volatile bool *continue_profiling, void *arg) {
   DDProfContext *ctx = arg;
   int64_t now = now_nanos();
