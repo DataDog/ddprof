@@ -6,7 +6,7 @@ stages:
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
   # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/80964502
-  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:3321d4784d26ce28bf135291fcff8b3b45126cbaac4cfa0d5a7a350fe2467b50
+  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:7bc23edb4316f255f02cfda3d7aa1d42655a473cd9fbdb9ccb4928294c9010ea
   # https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/79832541
   TEST_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:18bebf938f6e898a27b4510c07ddc759f2f9709ebb02e2cce725305e9a2c3e09
   # When build images are built, publish them with following tags

@@ -1,4 +1,5 @@
-# defines 
+# Fetch elfutilities and build them according to the compiler used in the project
+# The following variables and targets are defined as result : 
 # - ELFUTILS_INCLUDE_LIST
 # - static lib : elf
 # - static lib : dw
@@ -16,8 +17,7 @@ set(ELFUTILS_LIBS
 list(APPEND ELFUTILS_INCLUDE_LIST ${ELFUTILS_PATH} ${ELFUTILS_PATH}/libdwfl ${ELFUTILS_PATH}/libdw ${ELFUTILS_PATH}/libebl ${ELFUTILS_PATH}/libelf)
 
 add_custom_command(OUTPUT ${ELFUTILS_LIBS}
-                    COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_elfutils.sh"
-                    ARGS "${VER_ELF}" "${MD5_ELF}" ${VENDOR_PATH} ${CMAKE_C_COMPILER}
+                    COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_elfutils.sh" "${VER_ELF}" "${MD5_ELF}" ${VENDOR_PATH} ${CMAKE_C_COMPILER}
                     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
                     COMMENT "Fetching elfutils")
 add_custom_target(elfutils-deps DEPENDS ${ELFUTILS_LIBS})
