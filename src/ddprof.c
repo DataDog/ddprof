@@ -48,7 +48,7 @@ bool ddprof_ctx_init(DDProfContext *ctx) {
   ctx->ddr->user_agent = USERAGENT_DEFAULT;
   ctx->ddr->language = LANGUAGE_DEFAULT;
   ctx->ddr->family = FAMILY_DEFAULT;
-  return &ctx;
+  return true;
 }
 
 void ddprof_ctx_free(DDProfContext *ctx) {
