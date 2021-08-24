@@ -42,7 +42,7 @@ DDRes mock_fatal_generator() {
 
 DDRes mock_fatal_default_message() {
   ++s_call_counter;
-  DDRES_RETURN_ERROR_LOG(DD_WHAT_UNITTEST);
+  DDRES_RETURN_ERROR_LOG(DD_WHAT_UNITTEST, DDRES_NOLOG);
 }
 
 DDRes dderr_wrapper() {

@@ -251,7 +251,7 @@ Dso *dso_find(int pid, uint64_t addr) {
   assert(pid > 0);
   assert(pid <= PID_MAX);
 
-  if (pid <= 0 || pid > PID_MAX) {
+  if (pid <= 0 || pid >= PID_MAX) {
     dso_errno = DSO_EPID;
     return NULL;
   }
@@ -443,6 +443,7 @@ bool pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
   //  Adjusted addr to be a segment-offset
   //  Confirmed that the segment has the capacity to support our read
   // So let's read it!
-  memcpy(dc->region + addr, buf, sz);
+  unsigned char *src = (unsigned char *)dc->region;
+  memcpy(src + addr, buf, sz);
   return true;
 }

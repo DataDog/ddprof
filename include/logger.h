@@ -4,6 +4,7 @@
 
 #include "version.h"
 
+extern char *LOG_IGNORE;
 typedef enum LOG_OPTS {
   LOG_DISABLE = 0,
   LOG_SYSLOG = 1,

@@ -135,6 +135,10 @@ ssize_t procfs_MapRead(Map *map, void *buf, size_t sz, size_t addr) {
 }
 
 void procfs_MapPrint(Map *map) {
+  if (!map) {
+    printf("INVALID MAP\n");
+    return;
+  }
   printf("<0x%lx, 0x%lx, 0x%lx> ", map->start, map->end, map->off);
   printf((PUMM_READ & map->mode) ? "r" : "-");
   printf((PUMM_WRITE & map->mode) ? "w" : "-");

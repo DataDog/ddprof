@@ -216,5 +216,10 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
   if (PERF_SAMPLE_TRANSACTION & DEFAULT_SAMPLE_TYPE) {}
   if (PERF_SAMPLE_REGS_INTR & DEFAULT_SAMPLE_TYPE) {}
 
+  // Ensure buf can be used in a semantically correct way without worrying
+  // whether we've implemented the next consumer.  This is to keep static
+  // analysis and checkers happy.
+  (void)buf;
+
   return &sample;
 }

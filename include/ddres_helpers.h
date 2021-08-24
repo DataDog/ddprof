@@ -9,15 +9,21 @@ extern "C" {
 #include "ddres_list.h"
 #include "logger.h"
 
+/// Replacement for variadic macro niladic expansion via `__VA_OPT__`, which
+/// is unsupported (boo!) in standards-compliant C static analysis tools and
+/// checkers.
+#define DDRES_NOLOG NULL
+
 /// Standardized way of formating error log
 #define LOG_ERROR_DETAILS(log_func, what)                                      \
   log_func("%s at %s:%u", ddres_error_message(what), __FILE__, __LINE__);
 
 /// Returns a fatal ddres while using the LG_ERR API
-/// The variadic arguments to log are optional
+/// To suppress printing logs, pass NULL in place of the variadic arguments or
+/// DDRES_NOLOG
 #define DDRES_RETURN_ERROR_LOG(what, ...)                                      \
   do {                                                                         \
-    __VA_OPT__(LG_ERR(__VA_ARGS__);)                                           \
+    LG_ERR(__VA_ARGS__);                                                       \
     LOG_ERROR_DETAILS(LG_ERR, what);                                           \
     return ddres_error(what);                                                  \
   } while (0)
@@ -26,7 +32,7 @@ extern "C" {
 /// The variadic arguments to log are optional
 #define DDRES_RETURN_WARN_LOG(what, ...)                                       \
   do {                                                                         \
-    __VA_OPT__(LG_WRN(__VA_ARGS__);)                                           \
+    LG_WRN(__VA_ARGS__);                                                       \
     LOG_ERROR_DETAILS(LG_WRN, what);                                           \
     return ddres_warn(what);                                                   \
   } while (0)
@@ -36,9 +42,6 @@ extern "C" {
 // if (A)
 //   macro()
 // you want to have the full content of the macro in the if statement
-//
-// 2- __VA_OPT__ is available from clang 6
-// (https://isocpp.org/blog/2018/03/clang-6.0.0-released) and in GCC
 
 /// Evaluate function and return error if -1 (add an error log)
 #define DDRES_CHECK_INT(eval, what, ...)                                       \

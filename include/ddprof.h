@@ -66,34 +66,6 @@
   XX(DD_PROFILING_NATIVEGLOBAL,    global,          g, 'g', 1, ctx,      NULL, "")
 // clang-format on
 
-// TODO das210603 I don't think this needs to be inlined as a macro anymore
-#define DFLT_EXP(evar, key, targ, func, dfault)                                \
-  __extension__({                                                              \
-    char *_buf = NULL;                                                         \
-    if (!((targ)->key)) {                                                      \
-      if (evar && getenv(evar))                                                \
-        _buf = strdup(getenv(evar));                                           \
-      else if (*dfault)                                                        \
-        _buf = strdup(dfault);                                                 \
-      (targ)->key = _buf;                                                      \
-    }                                                                          \
-  })
-
-#define CASE_EXP(casechar, targ, key)                                          \
-  case casechar:                                                               \
-    if ((targ)->key)                                                           \
-      free((void *)(targ)->key);                                               \
-    (targ)->key = strdup(optarg);                                              \
-    break;
-
-// TODO das210603 I don't think this needs to be inlined as a macro anymore
-#define FREE_EXP(key, targ)                                                    \
-  __extension__({                                                              \
-    if ((targ)->key)                                                           \
-      free((void *)(targ)->key);                                               \
-    (targ)->key = NULL;                                                        \
-  })
-
 typedef enum DDKeys { OPT_TABLE(X_ENUM) DD_KLEN } DDKeys;
 #undef X_ENUM
 

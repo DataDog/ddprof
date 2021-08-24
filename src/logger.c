@@ -121,16 +121,6 @@ char *name_default = "libddprof";
 // this region minus room for the following template:
 // `<XXX> MMM DD hh:mm:ss DDPROF[32768]: `  -- let's call this 38 chars
 void LOG_lfprintf(int lvl, int fac, const char *name, const char *format, ...) {
-  static char *levels[LL_LENGTH] = {
-      [LL_EMERGENCY] = "EMERGENCY",
-      [LL_ALERT] = "ALERT",
-      [LL_CRITICAL] = "CRITICAL",
-      [LL_ERROR] = "ERROR",
-      [LL_WARNING] = "WARNING",
-      [LL_NOTICE] = "NOTICE",
-      [LL_INFORMATIONAL] = "INFORMATIONAL",
-      [LL_DEBUG] = "DEBUG",
-  };
 
   static __thread char buf[LOG_MSG_CAP];
   ssize_t sz = -1;
@@ -150,6 +140,8 @@ void LOG_lfprintf(int lvl, int fac, const char *name, const char *format, ...) {
     return;
   if (lvl > log_ctx->level || lvl < 0)
     return;
+  if (!format)
+    return;
 
   // Get the time
   // Note that setting the time on most syslog daemons is probably unnecessary,
@@ -162,12 +154,23 @@ void LOG_lfprintf(int lvl, int fac, const char *name, const char *format, ...) {
   // Get the PID; overriding if necessary (allow for testing overflow)
   pid_t pid = getpid();
 
-  if (log_ctx->mode == LOG_SYSLOG)
+  if (log_ctx->mode == LOG_SYSLOG) {
     sz_h = snprintf(buf, LOG_MSG_CAP, "<%d>%s %s[%d]: ", lvl + fac * 8, tm_str,
                     name, pid);
-  else
+  } else {
+    char *levels[LL_LENGTH] = {
+        [LL_EMERGENCY] = "EMERGENCY",
+        [LL_ALERT] = "ALERT",
+        [LL_CRITICAL] = "CRITICAL",
+        [LL_ERROR] = "ERROR",
+        [LL_WARNING] = "WARNING",
+        [LL_NOTICE] = "NOTICE",
+        [LL_INFORMATIONAL] = "INFORMATIONAL",
+        [LL_DEBUG] = "DEBUG",
+    };
     sz_h = snprintf(buf, LOG_MSG_CAP, "<%s>%s %s[%d]: ", levels[lvl], tm_str,
                     name, pid);
+  }
 
   // Write the body into the buffer
   va_list arg;
