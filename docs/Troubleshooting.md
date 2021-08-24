@@ -61,7 +61,7 @@ You can then analyse results with qcachgrind (MAC) or kcachegrind (Linux).
 This tool allows you a quick overview of the performance used by the native profiler. It also measures how much the profiled application is slowed.
 
 ```bash
-get_perf.sh -r 
+native_bench.sh -r 
 Retrieve CPU value
 CPU DIFF : 0.999 vs 1.075 
 COMPUTATION DIFF: 17778 vs 16452

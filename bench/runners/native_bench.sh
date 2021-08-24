@@ -78,31 +78,35 @@ echo "Retrieve CPU value"
 CPU_PRIME=$(get_cpu_from_file ${output_prime})
 CPU_SECOND=$(get_cpu_from_file ${output_second})
 
-COMPUTATION_PRIME=$(get_computations_from_file ${output_prime})
-COMPUTATION_SECOND=$(get_computations_from_file ${output_second})
+WORKLOAD_PRIME=$(get_computations_from_file ${output_prime})
+WORKLOAD_SECOND=$(get_computations_from_file ${output_second})
 
 echo "CPU DIFF : $CPU_PRIME vs $CPU_SECOND "
-echo "COMPUTATION DIFF: $COMPUTATION_PRIME vs $COMPUTATION_SECOND"
+echo "WORKLOAD DIFF: $WORKLOAD_PRIME vs $WORKLOAD_SECOND"
 
 if [ ${RECORD_STATS} == "yes" ]; then
     echo "Recording stats in ${RECORD_FILE}"
     DATE=$(date)
-    echo "BadBoggleSolver_run, ${DATE}, ${CPU_PRIME}, ${CPU_SECOND}, ${COMPUTATION_PRIME}, ${COMPUTATION_SECOND}" >> ${TOP_LVL_DIR}/test/data/perf_local_results.csv
-fi
+    echo "BadBoggleSolver_run, ${DATE}, ${CPU_PRIME}, ${CPU_SECOND}, ${WORKLOAD_PRIME}, ${WORKLOAD_SECOND}" >> ${TOP_LVL_DIR}/test/data/perf_local_results.csv
 
-# Record if we have a statsd socket
-TAG_STATS=""
 
-if [ ! -z ${STATSD_URL:-""} ]; then
-  STATS_PREFIX="datadog.profiling.ddprof."
-  #<TAG_KEY_1>:<TAG_VALUE_1>,<TAG_2>
-  if [ ! -z ${CI_BUILD_ID:-""} ]; then
-    TAG_STATS="#ci_build_id:${CI_BUILD_ID}"
+  # Record with statsd if socket is available
+  TAG_STATS=""
+
+  if [ ! -z ${STATSD_URL:-""} ]; then
+    # Datadog.profiling is a common namespace to avoid billing customers for metrics, but in the context of this benchmark, it is less important
+    # I will keep it nonetheless as a convention
+    # These metrics are not part of the standard metrics exported by the profiler (as they result of this bench app)
+    STATS_PREFIX="datadog.profiling.native_bench."
+    #<TAG_KEY_1>:<TAG_VALUE_1>,<TAG_2>
+    if [ ! -z ${CI_BUILD_ID:-""} ]; then
+      TAG_STATS="#ci_build_id:${CI_BUILD_ID}"
+    fi
+    echo "Saving results to ${STATS_PREFIX}..."
+    SOCKET_STATSD=$(echo ${STATSD_URL} | sed 's/unix:\/\///')
+    echo -n "${STATS_PREFIX}ref.cpu:${CPU_PRIME}|g|${TAG_STATS}" | nc -U -u -w1 ${SOCKET_STATSD}
+    echo -n "${STATS_PREFIX}profiled.cpu:${CPU_SECOND}|g|${TAG_STATS}" | nc -U -u -w1 ${SOCKET_STATSD}
+    echo -n "${STATS_PREFIX}ref.workload:${WORKLOAD_PRIME}|g|${TAG_STATS}" | nc -U -u -w1 ${SOCKET_STATSD}
+    echo -n "${STATS_PREFIX}profiled.workload:${WORKLOAD_SECOND}|g|${TAG_STATS}" | nc -U -u -w1 ${SOCKET_STATSD}
   fi
-
-  SOCKET_STATSD=$(echo ${STATSD_URL} | sed 's/unix:\/\///')
-  echo -n "${STATS_PREFIX}toy_ref.cpu:${CPU_PRIME}|g|${TAG_STATS}" | nc -U -u -w1 ${SOCKET_STATSD}
-  echo -n "${STATS_PREFIX}toy_profiled.cpu:${CPU_SECOND}|g|${TAG_STATS}" | nc -U -u -w1 ${SOCKET_STATSD}
-  echo -n "${STATS_PREFIX}toy_ref.computation:${COMPUTATION_PRIME}|g|${TAG_STATS}" | nc -U -u -w1 ${SOCKET_STATSD}
-  echo -n "${STATS_PREFIX}toy_profiled.computation:${COMPUTATION_SECOND}|g|${TAG_STATS}" | nc -U -u -w1 ${SOCKET_STATSD}
 fi

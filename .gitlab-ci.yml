@@ -120,7 +120,11 @@ test:ddprof:
     - check_dependencies.sh ${BINPATH}/${BUILD_TYPE}/bin/ddprof test/data/expected_deps_${BUILD_TYPE}.txt
     # Run toy project for 5 seconds
     - run.sh -b ./${BINPATH}/${BUILD_TYPE}/bin BadBoggleSolver_run 5
-    - get_perf.sh -b ./${BINPATH}/${BUILD_TYPE}/bin
+    - if [ ${BUILD_TYPE} == "Release" ]; then # record only in release mode
+    - native_bench.sh -r -b ./${BINPATH}/${BUILD_TYPE}/bin
+    - else
+    - native_bench.sh -b ./${BINPATH}/${BUILD_TYPE}/bin
+    - fi
   dependencies:
     - build:ddprof
 
