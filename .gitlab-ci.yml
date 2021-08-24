@@ -7,8 +7,8 @@ variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
   # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/80964502
   BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:7bc23edb4316f255f02cfda3d7aa1d42655a473cd9fbdb9ccb4928294c9010ea
-  # https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/79832541
-  TEST_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:18bebf938f6e898a27b4510c07ddc759f2f9709ebb02e2cce725305e9a2c3e09
+  # https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/81425357
+  TEST_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:1565b429f9266dc10f98d615fcaf06941a1281292467820961364aff1376ef34
   # When build images are built, publish them with following tags
   BASE_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
   BUILD_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build
@@ -61,8 +61,7 @@ build:testing:
     KUBERNETES_MEMORY_REQUEST: 4Gi
     KUBERNETES_MEMORY_LIMIT: 4Gi
 
-# Migrating to a cmake build system. Both co-exist for now
-build:ddprof_cmake:
+build:ddprof:
   extends:
     - .light-job-resource-allocation
   image: $BUILD_IMG_STICKY
@@ -100,7 +99,7 @@ build:ddprof_cmake:
       - ${CI_PROJECT_DIR}/${BINPATH}/
     expire_in: 1 week
 
-test:ddprof_cmake:
+test:ddprof:
   extends:
     - .light-job-resource-allocation
   image: $TEST_IMG_STICKY
@@ -112,6 +111,7 @@ test:ddprof_cmake:
   script:
     - set -euxo pipefail
     - source setup_env.sh
+    # Add a key to export metrics and profiles
     - echo "CHECK USER" && id
     - echo "CHECK SETTING ON PERF EVENT PARANOID" && cat /proc/sys/kernel/perf_event_paranoid
     - echo "CHECK SETTING ON PINNED MEMORY" && ulimit -l
@@ -122,7 +122,7 @@ test:ddprof_cmake:
     - run.sh -b ./${BINPATH}/${BUILD_TYPE}/bin BadBoggleSolver_run 5
     - get_perf.sh -b ./${BINPATH}/${BUILD_TYPE}/bin
   dependencies:
-    - build:ddprof_cmake
+    - build:ddprof
 
 .ddprof_job:
   variables:
@@ -144,7 +144,7 @@ deploy:ddprof:
     - if [ $CI_COMMIT_BRANCH = "main" ];then PROMOTE=MAJOR;fi
     - tools/ci_upload.sh
   dependencies:
-    - build:ddprof_cmake
+    - build:ddprof
 
 .collatz_job:
   variables:

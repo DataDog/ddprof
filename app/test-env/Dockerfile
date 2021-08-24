@@ -1,5 +1,8 @@
 FROM ubuntu:20.04 as base
 
+# Tell docker to use bash as the default
+SHELL ["/bin/bash", "-c"]
+
 RUN apt update \
     && DEBIAN_FRONTEND=noninteractive apt install -y \
     awscli \
@@ -13,7 +16,8 @@ RUN apt update \
     libjemalloc-dev \
     graphviz \
     valgrind \
-    subversion
+    subversion \
+    netcat
 
 #Install perf tool (check kernel version and remove minor revision part), use svn as it is faster than git (with partial checkout)
 RUN KERNEL_VERSION=$(uname -r | awk -F '[-\.]' '{print "v"$1"."$2}') && \

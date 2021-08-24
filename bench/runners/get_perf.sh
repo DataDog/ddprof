@@ -89,3 +89,20 @@ if [ ${RECORD_STATS} == "yes" ]; then
     DATE=$(date)
     echo "BadBoggleSolver_run, ${DATE}, ${CPU_PRIME}, ${CPU_SECOND}, ${COMPUTATION_PRIME}, ${COMPUTATION_SECOND}" >> ${TOP_LVL_DIR}/test/data/perf_local_results.csv
 fi
+
+# Record if we have a statsd socket
+TAG_STATS=""
+
+if [ ! -z ${STATSD_URL:-""} ]; then
+  STATS_PREFIX="datadog.profiling.ddprof."
+  #<TAG_KEY_1>:<TAG_VALUE_1>,<TAG_2>
+  if [ ! -z ${CI_BUILD_ID:-""} ]; then
+    TAG_STATS="#ci_build_id:${CI_BUILD_ID}"
+  fi
+
+  SOCKET_STATSD=$(echo ${STATSD_URL} | sed 's/unix:\/\///')
+  echo -n "${STATS_PREFIX}toy_ref.cpu:${CPU_PRIME}|g|${TAG_STATS}" | nc -U -u -w1 ${SOCKET_STATSD}
+  echo -n "${STATS_PREFIX}toy_profiled.cpu:${CPU_SECOND}|g|${TAG_STATS}" | nc -U -u -w1 ${SOCKET_STATSD}
+  echo -n "${STATS_PREFIX}toy_ref.computation:${COMPUTATION_PRIME}|g|${TAG_STATS}" | nc -U -u -w1 ${SOCKET_STATSD}
+  echo -n "${STATS_PREFIX}toy_profiled.computation:${COMPUTATION_SECOND}|g|${TAG_STATS}" | nc -U -u -w1 ${SOCKET_STATSD}
+fi
