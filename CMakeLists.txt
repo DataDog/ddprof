@@ -31,7 +31,7 @@ include(FetchContent)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-#helper functions
+#helper functions (defines add_exe)
 include(Helperfunc)
 
 # path to external dependencies
@@ -87,9 +87,16 @@ include(Findlibcap)
 # Add infrastructure for enabling tests
 option(BUILD_DDPROF_TESTING "Enable tests" ON)
 if (${BUILD_DDPROF_TESTING})
-  enable_language(CXX)
   enable_testing()
   add_subdirectory(test)
+endif()
+
+###################
+### Benchmarks  ###
+###################
+option(BUILD_BENCHMARKS "Enable tests" OFF)
+if (${BUILD_BENCHMARKS})
+  add_subdirectory(bench/collatz)
 endif()
 
 ###############################

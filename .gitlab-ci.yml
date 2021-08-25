@@ -79,7 +79,7 @@ build:ddprof:
     #Build image dependencies were stored in app, avoid rebuilding vendor content
     - ln -s /app/vendor vendor
     - mkdir -p ${BUILDPATH} && cd ${BUILDPATH}
-    - cmake -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
+    - cmake -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_BENCHMARKS=ON -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
     # Static checks
     - make cppcheck
     - make format
@@ -153,31 +153,11 @@ deploy:ddprof:
 .collatz_job:
   variables:
     BINNAME: collatz
-    RELEASEBIN: $BINPATH/release/$BINNAME
-    DEBUGBIN: $BINPATH/debug/$BINNAME
+    RELEASEBIN: ${BINPATH}/Release/bin/$BINNAME
+    DEBUGBIN: ${BINPATH}/Debug/bin/$BINNAME
     GIT_SUBMODULE_STRATEGY: recursive
     PROMOTE: NONE
   image: $BUILD_IMG_STICKY
-
-build:collatz:
-  extends: .collatz_job
-  stage: build
-  tags: ["runner:k8s"]
-  artifacts:
-    paths:
-      - $RELEASEBIN
-      - $DEBUGBIN
-    expire_in: 1 day
-  script:
-    - set -euo pipefail
-    - rm -rf vendor
-    - ln -s /app/vendor vendor
-    - mkdir -p $BINPATH/release
-    - mkdir -p $BINPATH/debug
-    - make ANALYSIS=0 bench
-    - mv $BINPATH/$BINNAME $DEBUGBIN
-    - make DEBUG=0 ANALYSIS=0 SAFETY=0 bench
-    - mv $BINPATH/$BINNAME $RELEASEBIN
 
 deploy:collatz:
   extends: .collatz_job
