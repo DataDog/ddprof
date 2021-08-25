@@ -54,8 +54,3 @@ typedef struct ProcStatus {
   unsigned long env_end;
   int exit_code;
 } ProcStatus;
-
-typedef struct ProcState {
-  ProcStatus last_status;
-  unsigned long last_utime;
-} ProcState;

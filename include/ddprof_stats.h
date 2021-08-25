@@ -45,5 +45,5 @@ DDRes ddprof_stats_get(unsigned int stat, long *out);
 // Send all the registered values
 DDRes ddprof_stats_send(void);
 
-// Retrieve the type behind this stat
-STAT_TYPES ddprof_stats_gettype(DDPROF_STATS stats);
+// Print all known stats to the configured log
+void ddprof_stats_print();

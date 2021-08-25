@@ -8,12 +8,25 @@
 #include "ddprof_consts.h"
 #include "ddprof_stats.h"
 #include "ddres.h"
+#include "procutils.h"
 
 void print_diagnostics() {
+
+  ddprof_stats_print();
 #ifdef DBG_JEMALLOC
   // jemalloc stats
   malloc_stats_print(NULL, NULL, "");
 #endif
+}
+
+void ddprof_procfs_scrape(DDProfContext *ctx) {
+  DDRes lddres = proc_read(&ctx->proc_status);
+  if (!IsDDResFatal(lddres)) {
+    ProcStatus *procstat = &ctx->proc_status;
+
+    ddprof_stats_set(STATS_PROCFS_RSS, 1024 * procstat->rss);
+    ddprof_stats_set(STATS_PROCFS_UTIME, procstat->utime);
+  }
 }
 
 DDRes ddprof_export(DDProfContext *ctx, int64_t now) {

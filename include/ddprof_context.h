@@ -4,7 +4,7 @@
 
 #include "ddprof_consts.h"
 #include "perf_option.h"
-#include "proc_state.h"
+#include "proc_status.h"
 
 // forward declarations
 typedef struct DDReq DDReq;
@@ -53,7 +53,7 @@ typedef struct DDProfContext {
   PerfOption watchers[MAX_TYPE_WATCHER];
   int num_watchers;
   struct UnwindState *us;
-  ProcState proc_state;
+  ProcStatus proc_status;
   int64_t send_nanos;    // Last time an export was sent
   uint32_t count_worker; // exports since last cache clear
   uint32_t count_cache;  // exports since worker was spawned
