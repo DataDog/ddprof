@@ -14,7 +14,7 @@ TOY_EXE="BadBoggleSolver_run"
 
 ### TRACES TO FIND IN EXECUTION ###
 # fragile but simple pattern : check for traces to make sure we followed expected flow
-declare -a arr_expected=("Entering main loop" "ticks_unwind")
+declare -a arr_expected=("Entering main loop" "unwind.ticks")
 
 usage() {
     echo "Launchs ddprof with a toy project and gather performance results."
