@@ -1,11 +1,10 @@
 #pragma once
 
-#include "perf_option.h"
-#include "proc_state.h"
 #include <sys/types.h>
 
-/// Maximum number of different watcher types
-#define MAX_TYPE_WATCHER 10
+#include "ddprof_consts.h"
+#include "perf_option.h"
+#include "proc_state.h"
 
 // forward declarations
 typedef struct DDReq DDReq;

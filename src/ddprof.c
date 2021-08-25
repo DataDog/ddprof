@@ -1,12 +1,12 @@
 #include "ddprof.h"
 
-#include <ddprof/pprof.h>
 #include <sys/ioctl.h>
 #include <sys/resource.h>
 #include <unistd.h>
 #include <x86intrin.h>
 
 #include "cap_display.h"
+#include "ddexp.h"
 #include "ddprofcmdline.h"
 #include "ddres.h"
 #include "main_loop.h"
@@ -128,24 +128,10 @@ DDRes export(DDProfContext *ctx, int64_t now) {
   // And emit diagnostic output (if it's enabled)
   print_diagnostics();
 
-  LG_NTC("Pushed samples to backend");
-  int ret = 0;
-  if ((ret = DDR_pprof(ddr, dp)))
-    LG_ERR("Error enqueuing pprof (%s)", DDR_code2str(ret));
-  DDR_setTimeNano(ddr, dp->pprof.time_nanos, now);
-  if ((ret = DDR_finalize(ddr)))
-    LG_ERR("Error finalizing export (%s)", DDR_code2str(ret));
-  if ((ret = DDR_send(ddr)))
-    LG_ERR("Error sending export (%s)", DDR_code2str(ret));
-  if ((ret = DDR_watch(ddr, -1)))
-    LG_ERR("Error(%d) watching (%s)", ddr->res.code, DDR_code2str(ret));
-  DDR_clear(ddr);
+  DDRES_CHECK_FWD(ddexp_export(ddr, dp, now));
 
   // Update the time last sent
   ctx->send_nanos += ctx->params.upload_period * 1000000000;
-
-  // Prepare pprof for next window
-  pprof_timeUpdate(dp);
 
   // Increase the counts of exports
   ctx->count_worker += 1;
@@ -292,18 +278,18 @@ void ddprof_pr_sample(DDProfContext *ctx, struct perf_event_header *hdr,
                       int pos) {
   // Before we do anything else, copy the perf_event_header into a sample
   perf_event_sample *sample = hdr2samp(hdr);
-  static uint64_t id_locs[MAX_STACK] = {0};
   struct UnwindState *us = ctx->us;
   DProf *dp = ctx->dp;
   ++samples_recv;
   us->pid = sample->pid;
-  us->idx = 0; // Modified during unwinding; has stack depth
+
   us->stack = NULL;
   us->stack_sz = sample->size_stack;
   us->stack = sample->data_stack;
   memcpy(&us->regs[0], sample->regs, 3 * sizeof(uint64_t));
-  us->max_stack = MAX_STACK;
-  FunLoc_clear(us->locs);
+
+  uw_output_clear(&us->output);
+
   unsigned long this_ticks_unwind = __rdtsc();
   if (IsDDResNotOK(unwindstate__unwind(us))) {
     Dso *dso = dso_find(us->pid, us->eip);
@@ -316,22 +302,8 @@ void ddprof_pr_sample(DDProfContext *ctx, struct perf_event_header *hdr,
     return;
   }
   ticks_unwind += __rdtsc() - this_ticks_unwind;
-  FunLoc *locs = us->locs;
-  for (uint64_t i = 0, j = 0; i < us->idx; i++) {
-    FunLoc L = locs[i];
-    uint64_t id_map, id_fun, id_loc;
 
-    // Using the sopath instead of srcpath in locAdd for the DD UI
-    id_map = pprof_mapAdd(dp, L.map_start, L.map_end, L.map_off, L.sopath, "");
-    id_fun = pprof_funAdd(dp, L.funname, L.funname, L.srcpath, 0);
-    id_loc = pprof_locAdd(dp, id_map, 0, (uint64_t[]){id_fun},
-                          (int64_t[]){L.line}, 1);
-    if (id_loc > 0)
-      id_locs[j++] = id_loc;
-  }
-  int64_t sample_val[MAX_TYPE_WATCHER] = {0};
-  sample_val[pos] = sample->period;
-  pprof_sampleAdd(dp, sample_val, ctx->num_watchers, id_locs, us->idx);
+  ddexp_write_sample(&us->output, sample->period, pos, ctx->num_watchers, dp);
 }
 
 void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int pos) {

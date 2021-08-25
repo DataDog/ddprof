@@ -12,20 +12,7 @@
 #include "dwfl_internals.h"
 #include "dwfl_module_cache.h"
 #include "procutils.h"
-
-#define MAX_STACK 1024
-typedef struct FunLoc {
-  uint64_t ip;         // Relative to file, not VMA
-  uint64_t map_start;  // Start address of mapped region
-  uint64_t map_end;    // End
-  uint64_t map_off;    // Offset into file
-  const char *funname; // name of the function (mangled, possibly)
-  const char *srcpath; // name of the source file, if known
-  const char
-      *sopath;   // name of the file where the symbol is interned (e.g., .so)
-  uint32_t line; // line number in file
-  uint32_t disc; // discriminator
-} FunLoc;
+#include "unwind_output.h"
 
 typedef struct UnwindState {
   Dwfl *dwfl;
@@ -42,18 +29,14 @@ typedef struct UnwindState {
     };
   };
   Dso *dso;
-  int max_stack; // ???
-  uint64_t ips[MAX_STACK];
-  FunLoc locs[MAX_STACK];
-  uint64_t idx;
   bool attached;
+  UnwindOutput output;
 } UnwindState;
 
 pid_t next_thread(Dwfl *, void *, void **);
 bool set_initial_registers(Dwfl_Thread *, void *);
 int frame_cb(Dwfl_Frame *, void *);
 int tid_cb(Dwfl_Thread *, void *);
-void FunLoc_clear(FunLoc *);
 DDRes dwfl_caches_clear(struct UnwindState *);
 DDRes unwind_init(struct UnwindState *);
 void unwind_free(struct UnwindState *);

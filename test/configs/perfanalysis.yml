@@ -1,7 +1,7 @@
 ddprof:
   intake:
-    url: localhost
-    port: 8126
+    url: intake.profile.datad0g.com
+    port: 80
   service:
     name: native-ci_boggle
   upload:
