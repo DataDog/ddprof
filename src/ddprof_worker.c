@@ -1,16 +1,16 @@
+#include "ddprof_worker.h"
+
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/time.h>
 #include <time.h>
 #include <x86intrin.h>
 
-#include "ddprof/pprof.h"
 #include "ddprof_context.h"
 #include "ddprof_export.h"
 #include "ddprof_stats.h"
 #include "unwind.h"
-
-#include "ddprof_worker.h"
+#include "unwind_output.h"
 
 static inline int64_t now_nanos() {
   static struct timeval tv = {0};
@@ -23,46 +23,29 @@ static inline int64_t now_nanos() {
 void ddprof_pr_sample(DDProfContext *ctx, struct perf_event_sample *sample,
                       int pos) {
   // Before we do anything else, copy the perf_event_header into a sample
-  static uint64_t id_locs[MAX_STACK] = {0};
   struct UnwindState *us = ctx->us;
   DProf *dp = ctx->dp;
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
   us->pid = sample->pid;
-  us->idx = 0; // Modified during unwinding; has stack depth
   us->stack = NULL;
   us->stack_sz = sample->size_stack;
   us->stack = sample->data_stack;
   memcpy(&us->regs[0], sample->regs, 3 * sizeof(uint64_t));
-  us->max_stack = MAX_STACK;
-  FunLoc_clear(us->locs);
+  uw_output_clear(&us->output);
   unsigned long this_ticks_unwind = __rdtsc();
   if (IsDDResNotOK(unwindstate__unwind(us))) {
     Dso *dso = dso_find(us->pid, us->eip);
     if (!dso) {
-      LG_WRN("Error getting map for [%d](0x%lx)", us->pid, us->eip);
+      LG_WRN("Could not localize top-level IP: [%d](0x%lx)", us->pid, us->eip);
       analyze_unwinding_error(us->pid, us->eip);
     } else {
-      LG_WRN("Error unwinding %s [%d](0x%lx)", dso_path(dso), us->pid, us->eip);
+      LG_WRN("Failed unwind: %s [%d](0x%lx)", dso_path(dso), us->pid, us->eip);
     }
     return;
   }
   ddprof_stats_add(STATS_UNWIND_TICKS, __rdtsc() - this_ticks_unwind, NULL);
-  FunLoc *locs = us->locs;
-  for (uint64_t i = 0, j = 0; i < us->idx; i++) {
-    FunLoc L = locs[i];
-    uint64_t id_map, id_fun, id_loc;
 
-    // Using the sopath instead of srcpath in locAdd for the DD UI
-    id_map = pprof_mapAdd(dp, L.map_start, L.map_end, L.map_off, L.sopath, "");
-    id_fun = pprof_funAdd(dp, L.funname, L.funname, L.srcpath, 0);
-    id_loc = pprof_locAdd(dp, id_map, 0, (uint64_t[]){id_fun},
-                          (int64_t[]){L.line}, 1);
-    if (id_loc > 0)
-      id_locs[j++] = id_loc;
-  }
-  int64_t sample_val[MAX_TYPE_WATCHER] = {0};
-  sample_val[pos] = sample->period;
-  pprof_sampleAdd(dp, sample_val, ctx->num_watchers, id_locs, us->idx);
+  ddprof_aggregate(&us->output, sample->period, pos, ctx->num_watchers, dp);
 }
 
 void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int pos) {
@@ -156,7 +139,7 @@ DDRes ddprof_timeout(volatile bool *continue_profiling, void *arg) {
   DDProfContext *ctx = arg;
   int64_t now = now_nanos();
   if (now > ctx->send_nanos) {
-    DDRES_CHECK_FWD(export(ctx, now));
+    DDRES_CHECK_FWD(ddprof_export(ctx, now));
     // reset state defines if we should reboot the worker
     return reset_state(ctx, continue_profiling);
   }
@@ -183,7 +166,7 @@ DDRes ddprof_worker_finish(void *arg, bool is_final) {
     int64_t now = now_nanos();
     if (now > ctx->send_nanos || ctx->sendfinal) {
       LG_WRN("Sending final export");
-      if (IsDDResNotOK(export(ctx, now))) {
+      if (IsDDResNotOK(ddprof_export(ctx, now))) {
         LG_ERR("Error when exporting.");
       }
     }
@@ -223,7 +206,7 @@ DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
   int64_t now = now_nanos();
 
   if (now > ctx->send_nanos) {
-    DDRES_CHECK_FWD(export(ctx, now));
+    DDRES_CHECK_FWD(ddprof_export(ctx, now));
     // reset state defines if we should reboot the worker
     DDRes res = reset_state(ctx, continue_profiling);
     // A warning can be returned for a reset and should not be ignored

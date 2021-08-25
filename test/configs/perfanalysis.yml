@@ -3,9 +3,9 @@ ddprof:
     url: intake.profile.datad0g.com
     port: 80
   service:
-    name: native-testservice
+    name: native-ci_boggle
   upload:
     period: 4
-  environment: test-staging
+  environment: us1.prod.dog
   loglevel: notice
   event: sCPU,1000

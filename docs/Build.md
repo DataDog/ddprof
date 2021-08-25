@@ -26,7 +26,7 @@ Check the required libraries described in the [app/base-env/Dockerfile](app/base
 
 ## Build commands
 
-### Building the native profiler 
+### Building the native profiler
 
 ```bash
 mkdir -p build_Release
@@ -37,11 +37,7 @@ make -j 4 .
 
 ### Building the benchmark (collatz)
 
-The benchmark tool is not yet built through cmake
-
-```bash
-make ANALYSIS=0 bench
-```
+Add the argument `-DBUILD_BENCHMARKS=ON` to the cmake command line.
 
 ## Run commands
 

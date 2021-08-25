@@ -152,28 +152,31 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
 
   // Now we register
   GElf_Off offset = {0};
+  UnwindOutput *output = &us->output;
+  int64_t current_idx = output->idx;
 
   DDRes cache_status = dwfl_module_cache_getinfo(
-      us->cache_hdr, mod, pc, us->pid, &offset, &us->locs[us->idx].funname,
-      &us->locs[us->idx].line, &us->locs[us->idx].srcpath);
+      us->cache_hdr, mod, pc, us->pid, &offset,
+      &output->locs[current_idx].funname, &output->locs[current_idx].line,
+      &output->locs[current_idx].srcpath);
   if (IsDDResNotOK(cache_status)) {
     LG_ERR("Error from dwflmod_cache_status");
     return DWARF_CB_ABORT;
   }
 
-  us->locs[us->idx].ip = pc;
-  us->locs[us->idx].map_start = mod->low_addr;
-  us->locs[us->idx].map_end = mod->high_addr;
-  us->locs[us->idx].map_off = offset;
+  output->locs[current_idx].ip = pc;
+  output->locs[current_idx].map_start = mod->low_addr;
+  output->locs[current_idx].map_end = mod->high_addr;
+  output->locs[current_idx].map_off = offset;
 
-  cache_status = dwfl_module_cache_getsname(us->cache_hdr, mod,
-                                            &(us->locs[us->idx].sopath));
+  cache_status = dwfl_module_cache_getsname(
+      us->cache_hdr, mod, &(output->locs[current_idx].sopath));
   if (IsDDResNotOK(cache_status)) {
     LG_ERR("Error from dwfl_module_cache_getsname");
     return DWARF_CB_ABORT;
   }
 
-  us->idx++;
+  output->idx++;
   return DWARF_CB_OK;
 }
 
@@ -181,8 +184,6 @@ int tid_cb(Dwfl_Thread *thread, void *targ) {
   dwfl_thread_getframes(thread, frame_cb, targ);
   return DWARF_CB_OK;
 }
-
-void FunLoc_clear(FunLoc *locs) { memset(locs, 0, sizeof(*locs) * MAX_STACK); }
 
 static DDRes unwind_dwfl_begin(struct UnwindState *us) {
   static char *debuginfo_path;
@@ -259,7 +260,8 @@ DDRes unwindstate__unwind(struct UnwindState *us) {
      * reactivate the log (it is too verbose for now) */
     // LG_DBG("[UNWIND] dwfl_getthread_frames was nonzero (%s)",
     // dwfl_errmsg(-1));
-    return us->idx > 0 ? ddres_init() : ddres_error(DD_WHAT_DWFL_LIB_ERROR);
+    return us->output.idx > 0 ? ddres_init()
+                              : ddres_error(DD_WHAT_DWFL_LIB_ERROR);
   }
 
   return ddres_init();

@@ -1,6 +1,5 @@
 #include "ddprof.h"
 
-#include <ddprof/pprof.h>
 #include <sys/ioctl.h>
 #include <sys/resource.h>
 #include <unistd.h>

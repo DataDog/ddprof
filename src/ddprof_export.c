@@ -1,11 +1,13 @@
-#include "stdlib.h"
-#include "string.h"
-
-#include "ddprof/dd_send.h"
 #include "ddprof_export.h"
+
+#include <x86intrin.h>
+
+#include <ddprof/dd_send.h>
+#include <ddprof/pprof.h>
+
+#include "ddprof_consts.h"
 #include "ddprof_stats.h"
 #include "ddres.h"
-#include "procutils.h"
 
 void print_diagnostics() {
 #ifdef DBG_JEMALLOC
@@ -14,7 +16,7 @@ void print_diagnostics() {
 #endif
 }
 
-DDRes export(DDProfContext *ctx, int64_t now) {
+DDRes ddprof_export(DDProfContext *ctx, int64_t now) {
   DDReq *ddr = ctx->ddr;
   DProf *dp = ctx->dp;
 
@@ -53,4 +55,28 @@ DDRes export(DDProfContext *ctx, int64_t now) {
   ddprof_stats_clear(STATS_SAMPLE_COUNT);
 
   return ddres_init();
+}
+
+void ddprof_aggregate(const UnwindOutput *uw_output, uint64_t sample_period,
+                      int pos, int num_watchers, DProf *dp) {
+  uint64_t id_locs[DD_MAX_STACK] = {0};
+
+  const FunLoc *locs = uw_output->locs;
+  for (uint64_t i = 0, j = 0; i < uw_output->idx; i++) {
+    const FunLoc *current_loc = &locs[i];
+    uint64_t id_map, id_fun, id_loc;
+
+    // Using the sopath instead of srcpath in locAdd for the DD UI
+    id_map = pprof_mapAdd(dp, current_loc->map_start, current_loc->map_end,
+                          current_loc->map_off, current_loc->sopath, "");
+    id_fun = pprof_funAdd(dp, current_loc->funname, current_loc->funname,
+                          current_loc->srcpath, 0);
+    id_loc = pprof_locAdd(dp, id_map, 0, (uint64_t[]){id_fun},
+                          (int64_t[]){current_loc->line}, 1);
+    if (id_loc > 0)
+      id_locs[j++] = id_loc;
+  }
+  int64_t sample_val[MAX_TYPE_WATCHER] = {0};
+  sample_val[pos] = sample_period;
+  pprof_sampleAdd(dp, sample_val, num_watchers, id_locs, uw_output->idx);
 }

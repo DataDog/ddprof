@@ -39,6 +39,9 @@ usage() {
     echo "      -b : override build folder (ddprof folder), default is read from ${ENV_FILE} file"
     echo "      -j <N> <M>: Use jemalloc capturing samples. N and M are optional.  N=lg_prof_interval, M=lg_prof_sample "
     echo "" 
+    echo "Environment variables considered"
+    echo "      - DD_API_KEY: overrides the API key value picked up from the config file."
+    echo ""
     echo " Mutually exclusif perf analysis options :"
     echo "      --callgrind : use callgrind"
     echo "      --massif : use massif"
@@ -189,10 +192,16 @@ if [[ -f ${VERFILE} ]]; then VER=$(cat ${VERFILE}); fi
 VER=$((VER+1))
 echo ${VER} > ${VERFILE}
 
-if [ ! -z ${env_ddog_api_key_staging0:-""} ]; then
-  CMD="${CMD} -A ${env_ddog_api_key_staging0}"
-else 
-  echo "WARNING : Running without a valid API key."
+# API Key setting
+if [ ! -z ${DD_API_KEY:-""} ]; then
+  echo "Using env var DD_API_KEY as key"
+  CMD="${CMD} -A ${DD_API_KEY}"
+else # No env var, check file for key
+  if [ ! -z ${env_ddog_api_key_staging0:-""} ]; then
+    CMD="${CMD} -A ${env_ddog_api_key_staging0}"
+    else
+      echo "WARNING : Running without a valid API key."
+  fi
 fi
 
 # Set any switchable environment variables
