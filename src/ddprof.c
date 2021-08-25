@@ -10,7 +10,7 @@
 #include "ddprof_stats.h"
 #include "ddprof_worker.h"
 #include "ddres.h"
-#include "main_loop.h"
+#include "perf_mainloop.h"
 #include "pevent_lib.h"
 #include "procutils.h"
 #include "statsd.h"
