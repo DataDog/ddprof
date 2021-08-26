@@ -23,12 +23,13 @@ long *ddprof_stats = NULL;
 
 // Helper function for getting statsd connection
 DDRes statsd_init() {
-  char *path_statsd = NULL;
-  if ((path_statsd = getenv("DD_DOGSTATSD_SOCKET"))) {
-    fd_statsd = statsd_connect(path_statsd, strlen(path_statsd));
-    if (-1 != fd_statsd) {
+  char *path_statsd = getenv("DD_DOGSTATSD_SOCKET");
+  if (path_statsd) {
+    DDRES_CHECK_FWD(
+        statsd_connect(path_statsd, strlen(path_statsd), &fd_statsd));
+    if (-1 == fd_statsd) {
       DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS,
-                            "Unable to establish statsd connection");
+                            "Unhandled statsd initialization error");
     }
   }
   return ddres_init();

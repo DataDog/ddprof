@@ -12,8 +12,9 @@ typedef enum STAT_TYPES {
   STAT_GAUGE,
 } STAT_TYPES;
 
-/// connect to a socket, returns -1 on failure, file descriptor on success
-int statsd_connect(const char *, size_t);
+/// Connect to a statsd server, returning a ddres and populating the passed
+/// pointer on success
+DDRes statsd_connect(const char *, size_t, int *);
 
 /// Send the stats in a statsd format, returns a ddres
 DDRes statsd_send(int, const char *, void *, int);
@@ -22,4 +23,4 @@ DDRes statsd_send(int, const char *, void *, int);
 DDRes statsd_close(int);
 
 /* Private */
-int statsd_listen(const char *path, size_t sz_path);
+DDRes statsd_listen(const char *path, size_t sz_path, int *fd);
