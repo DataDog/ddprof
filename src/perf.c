@@ -156,10 +156,10 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
   uint64_t *buf = (uint64_t *)(hdr + 1);
 
   if (PERF_SAMPLE_IDENTIFIER & DEFAULT_SAMPLE_TYPE) {
-    sample.sample_id = (uint64_t)*buf++;
+    sample.sample_id = *buf++;
   }
   if (PERF_SAMPLE_IP & DEFAULT_SAMPLE_TYPE) {
-    sample.ip = (uint64_t)*buf++;
+    sample.ip = *buf++;
   }
   if (PERF_SAMPLE_TID & DEFAULT_SAMPLE_TYPE) {
     sample.pid = ((flipper *)buf)->half[0];
@@ -167,16 +167,16 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
     buf++;
   }
   if (PERF_SAMPLE_TIME & DEFAULT_SAMPLE_TYPE) {
-    sample.time = *(uint64_t *)buf++;
+    sample.time = *buf++;
   }
   if (PERF_SAMPLE_ADDR & DEFAULT_SAMPLE_TYPE) {
-    sample.addr = *(uint64_t *)buf++;
+    sample.addr = *buf++;
   }
   if (PERF_SAMPLE_ID & DEFAULT_SAMPLE_TYPE) {
-    sample.id = *(uint64_t *)buf++;
+    sample.id = *buf++;
   }
   if (PERF_SAMPLE_STREAM_ID & DEFAULT_SAMPLE_TYPE) {
-    sample.stream_id = *(uint64_t *)buf++;
+    sample.stream_id = *buf++;
   }
   if (PERF_SAMPLE_CPU & DEFAULT_SAMPLE_TYPE) {
     sample.cpu = ((flipper *)buf)->half[0];
@@ -184,29 +184,29 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
     buf++;
   }
   if (PERF_SAMPLE_PERIOD & DEFAULT_SAMPLE_TYPE) {
-    sample.period = *(uint64_t *)buf++;
+    sample.period = *buf++;
   }
   if (PERF_SAMPLE_READ & DEFAULT_SAMPLE_TYPE) {
     // sizeof(uint64_t) == sizeof(ptr)
     sample.v = (struct read_format *)buf++;
   }
   if (PERF_SAMPLE_CALLCHAIN & DEFAULT_SAMPLE_TYPE) {
-    sample.nr = *(uint64_t *)buf++;
-    sample.ips = (uint64_t *)buf;
+    sample.nr = *buf++;
+    sample.ips = buf;
     buf += sample.nr;
   }
   if (PERF_SAMPLE_RAW & DEFAULT_SAMPLE_TYPE) {}
   if (PERF_SAMPLE_BRANCH_STACK & DEFAULT_SAMPLE_TYPE) {}
   if (PERF_SAMPLE_REGS_USER & DEFAULT_SAMPLE_TYPE) {
-    sample.abi = *(uint64_t *)buf++;
-    sample.regs = (uint64_t *)buf;
+    sample.abi = *buf++;
+    sample.regs = buf;
     buf += 3; // TODO make this more generic?
   }
   if (PERF_SAMPLE_STACK_USER & DEFAULT_SAMPLE_TYPE) {
-    sample.size_stack = *(uint64_t *)buf++;
+    sample.size_stack = *buf++;
     if (sample.size_stack) {
       sample.data_stack = (char *)buf;
-      buf = (uint64_t *)((char *)buf + sample.size_stack);
+      buf = (uint64_t *)(sample.data_stack + sample.size_stack);
     } else {
       // Not sure
     }
