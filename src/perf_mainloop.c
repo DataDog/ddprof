@@ -126,7 +126,10 @@ void worker(void *arg, PEventHdr *pevent_hdr, perfopen_attr *attr,
       while (head > tail) {
         struct perf_event_header *hdr = rb_seek(rb, tail);
         if ((char *)pes[i].region + pes[i].reg_size < (char *)hdr + hdr->size) {
-          // LG_WRN("[UNWIND] OUT OF BOUNDS");
+          // We don't handle the case when the object in the ringbuffer is
+          // wrapped around the end.  In such a case, we might copy into a
+          // single contiguous object or update the hdr2sample code to account
+          // for wrapping, but for now skip it.
         } else {
           // Same deal as the call to timeout_fun
           DDRes res = attr->msg_fun(hdr, pes[i].pos, continue_profiling, arg);
