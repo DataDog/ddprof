@@ -32,48 +32,42 @@ void ddres_graceful_shutdown(void) {
   WORKER_SHUTDOWN();
 }
 
-void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, DDProfContext *arg) {
+DDRes spawn_workers(volatile bool *continue_profiling) {
+  pid_t child_pid;
+
+  while ((child_pid = fork())) {
+    LG_WRN("[PERF] Created child %d", child_pid);
+    waitpid(child_pid, NULL, 0);
+
+    // Harvest the exit state of the child process.  We will always reset it
+    // to false so that a child who segfaults or exits erroneously does not
+    // cause a pointless loop of spawning
+    if (!*continue_profiling) {
+      DDRES_RETURN_WARN_LOG(DD_WHAT_MAINLOOP, "Stop profiling");
+    } else {
+      *continue_profiling = false;
+    }
+    LG_NTC("Refreshing worker process");
+  }
+
+  return ddres_init();
+}
+
+void worker(void *arg, PEventHdr *pevent_hdr, perfopen_attr *attr,
+            volatile bool *continue_profiling) {
   int pe_len = pevent_hdr->size;
-  struct pollfd pfd[MAX_NB_WATCHERS];
   PEvent *pes = pevent_hdr->pes;
-  assert(attr->msg_fun);
+
+  // Until a restartable terminal condition is met, the worker will set its
+  // disposition so that profiling is halted upon its termination
+  *continue_profiling = false;
 
   // Setup poll() to watch perf_event file descriptors
+  struct pollfd pfd[MAX_NB_WATCHERS];
   for (int i = 0; i < pe_len; i++) {
     // NOTE: if fd is negative, it will be ignored
     pfd[i].fd = pes[i].fd;
     pfd[i].events = POLLIN | POLLERR | POLLHUP;
-  }
-
-  // Handle the processing in a fork, so we can clean up unfreeable state.
-  // TODO we probably lose events when we switch workers.  It's only a blip,
-  //      but it's still slightly annoying...
-  pid_t child_pid;
-  volatile bool *continue_profiling =
-      mmap(0, sizeof(bool), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED,
-           -1, 0);
-
-  if (!continue_profiling) {
-    // Allocation failure : stop the profiling
-    LG_ERR("[PERF] Could not initialize worker process coordinator");
-    return;
-  } else {
-    // ## Respawn point for workers ##
-    while ((child_pid = fork())) {
-      LG_WRN("[PERF] Created child %d", child_pid);
-      waitpid(child_pid, NULL, 0);
-
-      // Harvest the exit state of the child process.  We will always reset it
-      // to false so that a child who segfaults or exits erroneously does not
-      // cause a pointless loop of spawning
-      if (!*continue_profiling) {
-        LG_WRN("[PERF] Stop profiling!");
-        return;
-      } else {
-        *continue_profiling = false;
-      }
-      LG_NTC("[PERF] Refreshing worker process");
-    }
   }
 
   // Perform user-provided initialization
@@ -90,30 +84,35 @@ void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, DDProfContext *arg) {
       attr->finish_fun(pevent_hdr, arg);
       ddres_check_or_shutdown(ddres_error(DD_WHAT_POLLERROR));
     }
-    // If no file descriptors, call time-out
-    if (0 == n && attr->timeout_fun) {
 
-      // We don't return from here, only exit, since we don't want to log
-      // shutdown messages (if we're shutting down, the outer process will
-      // emit those loglines)
-      DDRes res = attr->timeout_fun(continue_profiling, arg);
-      if (IsDDResNotOK(res)) {
-        // ignoring possible errors from finish as we are closing
-        attr->finish_fun(pevent_hdr, arg);
-        ddres_check_or_shutdown(res);
+    // If no file descriptors, call time-out
+    if (0 == n) {
+      if (attr->timeout_fun) {
+        DDRes res = attr->timeout_fun(continue_profiling, arg);
+        if (IsDDResNotOK(res)) {
+          attr->finish_fun(pevent_hdr, arg);
+          ddres_check_or_shutdown(res);
+        }
       }
 
-      // If we didn't have to shut down, then go back to poll()
       continue;
     }
 
+    // If we're here, we have at least one file descriptor active.  That means
+    // the underyling ringbuffers can be checked.
     for (int i = 0; i < pe_len; i++) {
       if (!pfd[i].revents)
         continue;
+
+      // Even though pollhup might mean that multiple file descriptors (hence,
+      // ringbuffers) are still active, in the typical case, `perf_event_open`
+      // shuts down either all or nothing.  Accordingly, when it shuts down one
+      // file descriptor, we shut down profiling.
       if (pfd[i].revents & POLLHUP) {
         ddres_check_or_shutdown(attr->finish_fun(pevent_hdr, arg));
         ddres_graceful_shutdown();
       }
+
       // Drain the ringbuffer and dispatch to callback, as needed
       // The head and tail are taken literally (without wraparound), since they
       // don't wrap in the underlying object.  Instead, the rb_* interfaces
@@ -149,4 +148,28 @@ void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, DDProfContext *arg) {
         LG_NTC("Head/tail buffer mismatch");
     }
   }
+}
+
+void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, DDProfContext *arg) {
+  assert(attr->msg_fun);
+
+  // Setup a shared memory region between the parent and child processes.  This
+  // is used to communicate terminal profiling state
+  int mmap_prot = PROT_READ | PROT_WRITE;
+  int mmap_flags = MAP_ANONYMOUS | MAP_SHARED;
+  volatile bool *continue_profiling;
+  continue_profiling = mmap(0, sizeof(bool), mmap_prot, mmap_flags, -1, 0);
+  if (MAP_FAILED == continue_profiling) {
+    // Allocation failure : stop the profiling
+    LG_ERR("[PERF] Could not initialize worker process coordinator");
+    return;
+  }
+
+  // Create worker processes to fulfill poll loop.  Only the parent process
+  // can exit with an error code, which signals the termination of profiling.
+  if (IsDDResNotOK(spawn_workers(continue_profiling))) {
+    return;
+  }
+
+  worker(arg, pevent_hdr, attr, continue_profiling);
 }
