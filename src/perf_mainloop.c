@@ -21,7 +21,8 @@
 
 void ddres_check_or_shutdown(DDRes res) {
   if (IsDDResNotOK(res)) {
-    LG_WRN("[PERF] Shut down worker (error=%d).", res._what);
+    LG_WRN("[PERF] Shut down worker (error:%s).",
+           ddres_error_message(res._what));
     WORKER_SHUTDOWN();
   }
 }
