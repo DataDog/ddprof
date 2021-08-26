@@ -31,7 +31,6 @@ static DDRes ddprof_procfs_scrape(DDProfContext *ctx) {
   ProcStatus *procstat = &ctx->proc_status;
 
   ddprof_stats_set(STATS_PROCFS_RSS, 1024 * procstat->rss);
-#warning fix utime
   ddprof_stats_set(STATS_PROCFS_UTIME, procstat->utime);
   return ddres_init();
 }
@@ -141,7 +140,8 @@ void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int pos) {
 }
 
 /****************************** other functions *******************************/
-DDRes reset_state(DDProfContext *ctx, volatile bool *continue_profiling) {
+static DDRes reset_state(DDProfContext *ctx,
+                         volatile bool *continue_profiling) {
   if (!ctx) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW, "[DDPROF] Invalid context in %s",
                            __FUNCTION__);
@@ -185,7 +185,7 @@ DDRes reset_state(DDProfContext *ctx, volatile bool *continue_profiling) {
 }
 
 /********************************** callbacks *********************************/
-DDRes ddprof_timeout(volatile bool *continue_profiling, void *arg) {
+DDRes ddprof_worker_timeout(volatile bool *continue_profiling, void *arg) {
   DDProfContext *ctx = arg;
   int64_t now = now_nanos();
   if (now > ctx->send_nanos) {

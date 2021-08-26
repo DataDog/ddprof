@@ -68,7 +68,7 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
   perfopen_attr perf_funs = {.init_fun = ddprof_worker_init,
                              .finish_fun = ddprof_worker_finish,
                              .msg_fun = ddprof_worker,
-                             .timeout_fun = ddprof_timeout};
+                             .timeout_fun = ddprof_worker_timeout};
   PEventHdr pevent_hdr;
   pevent_init(&pevent_hdr);
 

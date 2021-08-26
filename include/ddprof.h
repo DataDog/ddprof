@@ -72,14 +72,9 @@ typedef enum DDKeys { OPT_TABLE(X_ENUM) DD_KLEN } DDKeys;
 int statsd_init();
 
 // Initialize a ctx
-bool ddprof_ctx_init(DDProfContext *ctx);
+bool ddprof_ctx_init(DDProfContext *);
+void ddprof_setctx(DDProfContext *);
 void ddprof_ctx_free(DDProfContext *);
-bool ddprof_ctx_watcher_process(DDProfContext *, char *);
-
-/******************************  Perf Callback  *******************************/
-DDRes reset_state(DDProfContext *, volatile bool *continue_profiling);
-DDRes export(DDProfContext *, int64_t);
-DDRes ddprof_timeout(volatile bool *, void *);
 
 /*********************************  Printers  *********************************/
 void print_help();
@@ -89,4 +84,3 @@ void sigsegv_handler(int, siginfo_t *, void *);
 
 /*************************  Instrumentation Helpers  **************************/
 void instrument_pid(DDProfContext *, pid_t, int);
-void ddprof_setctx(DDProfContext *);
