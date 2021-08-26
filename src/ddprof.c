@@ -16,12 +16,6 @@
 #include "statsd.h"
 #include "unwind.h"
 
-//clang-format off
-#ifdef DBG_JEMALLOC
-#  include <jemalloc/jemalloc.h>
-#endif
-//clang-format on
-
 // Helpers for exapnding the OPT_TABLE here
 #define X_PRNT(a, b, c, d, e, f, g, h)                                         \
   if ((f)->b)                                                                  \

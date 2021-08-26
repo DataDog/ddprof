@@ -52,20 +52,8 @@ DDRes ddprof_export(DDProfContext *ctx, int64_t now) {
     LG_ERR("Error watching (%d : %s)", ddr->res.code, DDR_code2str(ret));
   DDR_clear(ddr);
 
-  // Update the time last sent
-  ctx->send_nanos += ctx->params.upload_period * 1000000000;
-
   // Prepare pprof for next window
   pprof_timeUpdate(dp);
-
-  // Increase the counts of exports
-  ctx->count_worker += 1;
-  ctx->count_cache += 1;
-
-  // We're done exporting, so finish by clearing out any global gauges
-  ddprof_stats_clear(STATS_UNWIND_TICKS);
-  ddprof_stats_clear(STATS_EVENT_LOST);
-  ddprof_stats_clear(STATS_SAMPLE_COUNT);
 
   return ddres_init();
 }

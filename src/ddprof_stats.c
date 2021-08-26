@@ -114,6 +114,8 @@ DDRes ddprof_stats_get(unsigned int stat, long *out) {
 }
 
 DDRes ddprof_stats_send(void) {
+  if (fd_statsd == -1) // statsd client not available
+    return ddres_init();
   for (unsigned int i = 0; i < STATS_LEN; i++) {
     DDRES_CHECK_FWD(statsd_send(fd_statsd, stats_paths[i], &ddprof_stats[i],
                                 stats_types[i]));

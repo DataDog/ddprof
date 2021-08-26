@@ -12,6 +12,30 @@
 #include "unwind.h"
 #include "unwind_output.h"
 
+#ifdef DBG_JEMALLOC
+#  include <jemalloc/jemalloc.h>
+#endif
+
+/// Human readable runtime information
+static void print_diagnostics() {
+  ddprof_stats_print();
+#ifdef DBG_JEMALLOC
+  // jemalloc stats
+  malloc_stats_print(NULL, NULL, "");
+#endif
+}
+
+/// Retrieve cpu / memory info
+static DDRes ddprof_procfs_scrape(DDProfContext *ctx) {
+  DDRES_CHECK_FWD(proc_read(&ctx->proc_status));
+  ProcStatus *procstat = &ctx->proc_status;
+
+  ddprof_stats_set(STATS_PROCFS_RSS, 1024 * procstat->rss);
+#warning fix utime
+  ddprof_stats_set(STATS_PROCFS_UTIME, procstat->utime);
+  return ddres_init();
+}
+
 static inline int64_t now_nanos() {
   static struct timeval tv = {0};
   gettimeofday(&tv, NULL);
@@ -46,6 +70,32 @@ void ddprof_pr_sample(DDProfContext *ctx, struct perf_event_sample *sample,
   ddprof_stats_add(STATS_UNWIND_TICKS, __rdtsc() - this_ticks_unwind, NULL);
 
   ddprof_aggregate(&us->output, sample->period, pos, ctx->num_watchers, dp);
+}
+
+/// Cycle operations : export, sync metrics, update counters
+static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
+
+  ddprof_procfs_scrape(ctx);
+
+  // And emit diagnostic output (if it's enabled)
+  print_diagnostics();
+  DDRES_CHECK_FWD(ddprof_stats_send());
+
+  DDRES_CHECK_FWD(ddprof_export(ctx, now));
+
+  // Increase the counts of exports
+  ctx->count_worker += 1;
+  ctx->count_cache += 1;
+
+  // Update the time last sent
+  ctx->send_nanos += ctx->params.upload_period * 1000000000;
+
+  // We're done exporting, so finish by clearing out any global gauges
+  ddprof_stats_clear(STATS_UNWIND_TICKS);
+  ddprof_stats_clear(STATS_EVENT_LOST);
+  ddprof_stats_clear(STATS_SAMPLE_COUNT);
+
+  return ddres_init();
 }
 
 void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int pos) {
@@ -139,7 +189,7 @@ DDRes ddprof_timeout(volatile bool *continue_profiling, void *arg) {
   DDProfContext *ctx = arg;
   int64_t now = now_nanos();
   if (now > ctx->send_nanos) {
-    DDRES_CHECK_FWD(ddprof_export(ctx, now));
+    DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now));
     // reset state defines if we should reboot the worker
     return reset_state(ctx, continue_profiling);
   }
@@ -166,7 +216,7 @@ DDRes ddprof_worker_finish(void *arg, bool is_final) {
     int64_t now = now_nanos();
     if (now > ctx->send_nanos || ctx->sendfinal) {
       LG_WRN("Sending final export");
-      if (IsDDResNotOK(ddprof_export(ctx, now))) {
+      if (IsDDResNotOK(ddprof_worker_cycle(ctx, now))) {
         LG_ERR("Error when exporting.");
       }
     }
@@ -206,7 +256,7 @@ DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
   int64_t now = now_nanos();
 
   if (now > ctx->send_nanos) {
-    DDRES_CHECK_FWD(ddprof_export(ctx, now));
+    DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now));
     // reset state defines if we should reboot the worker
     DDRes res = reset_state(ctx, continue_profiling);
     // A warning can be returned for a reset and should not be ignored
