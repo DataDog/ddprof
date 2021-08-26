@@ -79,7 +79,7 @@ void ddprof_pr_sample(DDProfContext *ctx, struct perf_event_sample *sample,
   us->stack = NULL;
   us->stack_sz = sample->size_stack;
   us->stack = sample->data_stack;
-  memcpy(&us->regs[0], sample->regs, 3 * sizeof(uint64_t));
+  memcpy(&us->regs[0], sample->regs, PERF_REGS_COUNT * sizeof(uint64_t));
   uw_output_clear(&us->output);
   unsigned long this_ticks_unwind = __rdtsc();
   if (IsDDResNotOK(unwindstate__unwind(us))) {

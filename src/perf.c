@@ -200,7 +200,7 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
   if (PERF_SAMPLE_REGS_USER & DEFAULT_SAMPLE_TYPE) {
     sample.abi = *buf++;
     sample.regs = buf;
-    buf += 3; // TODO make this more generic?
+    buf += PERF_REGS_COUNT;
   }
   if (PERF_SAMPLE_STACK_USER & DEFAULT_SAMPLE_TYPE) {
     sample.size_stack = *buf++;

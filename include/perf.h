@@ -24,6 +24,10 @@
 // We're going to hardcode everything for now...
 #define PERF_REGS_MASK ((1 << 6) | (1 << 7) | (1 << 8))
 
+// This is a human-hardcoded number given the mask above; update it if the mask
+// gets more bits
+#define PERF_REGS_COUNT 3
+
 typedef struct read_format {
   uint64_t value;        // The value of the event
   uint64_t time_enabled; // if PERF_FORMAT_TOTAL_TIME_ENABLED
