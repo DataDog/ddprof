@@ -242,20 +242,7 @@ DDRes ddprof_worker_init(PEventHdr *pevent_hdr, void *arg) {
 
 DDRes ddprof_worker_finish(PEventHdr *pevent_hdr, void *arg) {
   DDProfContext *ctx = arg;
-
-  // We're going to close down, but first check whether we have a valid export
-  // to send (or if we requested the last partial export with sendfinal)
-  if (ctx->sendfinal) {
-    int64_t now = now_nanos();
-    if (now > ctx->send_nanos) {
-      LG_WRN("Sending final export");
-      if (IsDDResNotOK(ddprof_worker_cycle(ctx, now))) {
-        LG_ERR("Error when exporting.");
-      }
-    }
-  }
   DDRES_CHECK_FWD(worker_free(pevent_hdr, ctx->us));
-
   return ddres_init();
 }
 
