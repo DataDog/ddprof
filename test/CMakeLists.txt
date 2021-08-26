@@ -74,7 +74,6 @@ add_unit_test(
 
 add_unit_test(
     statsd-ut
-    ../src/logger.c
     ../src/statsd.c 
     statsd-ut.cc
 )
@@ -124,7 +123,6 @@ target_include_directories(cap-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
 add_unit_test(
     user_id-ut
     user_id-ut.cc
-    ../src/logger.c
     ../src/user_override.c
     LIBRARIES ddprof-c
     DEFINITIONS MYNAME="userid-ut"

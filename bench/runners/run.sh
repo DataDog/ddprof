@@ -223,9 +223,9 @@ eval ${CMD} \
   -E ${cfg_ddprof_environment}"test-staging" \
   -l ${cfg_ddprof_loglevel} \
   -e "${cfg_ddprof_event}" \
-  -s on \
-  -w 2 \
-  -a yes \
+  -s ${cfg_ddprof_faultinfo} \
+  -w ${cfg_ddprof_worker_period} \
+  -a ${cfg_ddprof_printargs} \
   "$@"
 
 # Helps find the relevant trace in the UI

@@ -88,6 +88,6 @@ fi
 
 echo "Launch docker image, DO NOT STORE ANYTHING outside of mounted directory (container is erased on exit)."
 echo "Binded directory : /app  <--> ${DEFAULT_DEV_WORKSPACE}"
-docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -w /app --cap-add SYS_ADMIN -v ${DEFAULT_DEV_WORKSPACE}:/app -e SSH_AUTH_SOCK=/ssh-agent ${DEFAULT_BASE_NAME}:latest /bin/bash
+docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -w /app  --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN -v ${DEFAULT_DEV_WORKSPACE}:/app -e SSH_AUTH_SOCK=/ssh-agent ${DEFAULT_BASE_NAME}:latest /bin/bash
 
 exit 0

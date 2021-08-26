@@ -28,6 +28,7 @@ extern "C" {
   X(DD_WHAT_IOCTL, "PERFOPEN: error during perf_event_open")                   \
   X(DD_WHAT_PERFMMAP, "PERFMMAP: error in mmap operations")                    \
   X(DD_WHAT_POLLTIMEOUT, "POLLTIMEOUT: timeout when polling perf events")      \
+  X(DD_WHAT_POLLERROR, "POLLERROR: Unknown poll error")                        \
   X(DD_WHAT_POLLHANGUP, "POLLHANGUP: perf event file descriptor hang up")      \
   X(DD_WHAT_WORKER_RESET,                                                      \
     "WORKER_RESET: worker reset requested (not a fatal error)")                \
