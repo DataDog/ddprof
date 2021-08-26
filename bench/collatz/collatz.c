@@ -150,8 +150,9 @@ int main (int c, char** v) {
   // Now that we're in a fork, set up my local statsd socket
   int fd_statsd = -1;
   char *path_statsd = NULL;
-  if ((path_statsd = getenv("DD_DOGSTATSD_SOCKET")))
-    fd_statsd = statsd_connect(path_statsd, strlen(path_statsd));
+  if ((path_statsd = getenv("DD_DOGSTATSD_SOCKET"))) {
+   statsd_connect(path_statsd, strlen(path_statsd), &fd_statsd);
+  }
 
   // OK, so we want to wait until everyone has started, but if we have more
   // work than we have cores, we might realistically start after other workers
