@@ -5,7 +5,10 @@ ddprof:
   service:
     name: native-ci_boggle
   upload:
-    period: 4
+    period: 3
   environment: us1.prod.dog
   loglevel: notice
   event: sCPU,1000
+  faultinfo: on
+  worker_period: 2
+  printargs: yes
