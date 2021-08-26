@@ -32,10 +32,11 @@ static void print_diagnostics() {
 }
 
 static DDRes worker_init(PEventHdr *pevent_hdr, UnwindState *us) {
-  // If we're here, then we are a child spawned during the previous operation.
+  // If we're here, then we are a child spawned during the startup operation.
   // That means we need to iterate through the perf_event_open() handles and
   // get the mmaps
   DDRES_CHECK_FWD(pevent_mmap(pevent_hdr));
+
   // Initialize the unwind state and library
   DDRES_CHECK_FWD(unwind_init(us));
   return ddres_init();
@@ -65,6 +66,16 @@ static inline int64_t now_nanos() {
   static struct timeval tv = {0};
   gettimeofday(&tv, NULL);
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
+}
+
+static inline long export_time_increment(DDProfContext *ctx) {
+  assert(ctx);
+  return ctx->params.upload_period * 1000000000;
+}
+
+static inline void export_time_set(DDProfContext *ctx) {
+  assert(ctx);
+  ctx->send_nanos = now_nanos() + export_time_increment(ctx);
 }
 
 /************************* perf_event_open() helpers **************************/
@@ -106,12 +117,15 @@ static void ddprof_cycle_stats() {
 /// Cycle operations : export, sync metrics, update counters
 static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
 
+  // Scrape procfs for process usage statistics
   ddprof_procfs_scrape(ctx);
 
   // And emit diagnostic output (if it's enabled)
   print_diagnostics();
   DDRES_CHECK_FWD(ddprof_stats_send());
 
+  // Take the current pprof contents and ship them to the backend.  This also
+  // clears the pprof for reuse
   DDRES_CHECK_FWD(ddprof_export(ctx, now));
 
   // Increase the counts of exports
@@ -119,7 +133,16 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
   ctx->count_cache += 1;
 
   // Update the time last sent
-  ctx->send_nanos += ctx->params.upload_period * 1000000000;
+  ctx->send_nanos += export_time_increment(ctx);
+
+  // If the clock was frozen for some reason, we need to detect situations
+  // where we'll have catchup windows and reset the export timer.  This can
+  // easily happen under temporary load when the profiler is off-CPU, if the
+  // process is put in the cgroup freezer, or if we're being emulated.
+  if (now > ctx->send_nanos) {
+    LG_WRN("Timer skew detected; frequent warnings may suggest system issue");
+    export_time_set(ctx);
+  }
 
   // Reset stats relevant to a single cycle
   ddprof_cycle_stats();
@@ -234,7 +257,11 @@ DDRes ddprof_worker_init(PEventHdr *pevent_hdr, void *arg) {
   DDProfContext *ctx = arg;
 
   // Set the initial time
-  ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
+  export_time_set(ctx);
+
+  // Make sure worker-related counters are reset
+  ctx->count_worker = 0;
+  ctx->count_cache = 0;
 
   DDRES_CHECK_FWD(worker_init(pevent_hdr, ctx->us));
   return ddres_init();
