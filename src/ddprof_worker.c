@@ -9,6 +9,7 @@
 #include "ddprof_context.h"
 #include "ddprof_export.h"
 #include "ddprof_stats.h"
+#include "pevent_lib.h"
 #include "unwind.h"
 #include "unwind_output.h"
 
@@ -28,6 +29,22 @@ static void print_diagnostics() {
   // jemalloc stats
   malloc_stats_print(NULL, NULL, "");
 #endif
+}
+
+static DDRes worker_init(PEventHdr *pevent_hdr, UnwindState *us) {
+  // If we're here, then we are a child spawned during the previous operation.
+  // That means we need to iterate through the perf_event_open() handles and
+  // get the mmaps
+  DDRES_CHECK_FWD(pevent_mmap(pevent_hdr));
+  // Initialize the unwind state and library
+  DDRES_CHECK_FWD(unwind_init(us));
+  return ddres_init();
+}
+
+static DDRes worker_free(PEventHdr *pevent_hdr, UnwindState *us) {
+  unwind_free(us);
+  DDRES_CHECK_FWD(pevent_munmap(pevent_hdr));
+  return ddres_init();
 }
 
 /// Retrieve cpu / memory info
@@ -200,36 +217,41 @@ DDRes ddprof_worker_timeout(volatile bool *continue_profiling, void *arg) {
   if (now > ctx->send_nanos) {
     DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now));
     // reset state defines if we should reboot the worker
-    return reset_state(ctx, continue_profiling);
+    DDRes res = reset_state(ctx, continue_profiling);
+    // A warning can be returned for a reset and should not be ignored
+    if (IsDDResNotOK(res)) {
+      return res;
+    }
   }
   return ddres_init();
 }
 
-DDRes ddprof_worker_init(void *arg) {
+DDRes ddprof_worker_init(PEventHdr *pevent_hdr, void *arg) {
   DDProfContext *ctx = arg;
 
   // Set the initial time
   ctx->send_nanos = now_nanos() + ctx->params.upload_period * 1000000000;
 
-  // Initialize the unwind state and library
-  DDRES_CHECK_FWD(unwind_init(ctx->us));
+  DDRES_CHECK_FWD(worker_init(pevent_hdr, ctx->us));
   return ddres_init();
 }
 
-DDRes ddprof_worker_finish(void *arg, bool is_final) {
+DDRes ddprof_worker_finish(PEventHdr *pevent_hdr, void *arg) {
   DDProfContext *ctx = arg;
 
   // We're going to close down, but first check whether we have a valid export
   // to send (or if we requested the last partial export with sendfinal)
-  if (is_final) {
+  if (ctx->sendfinal) {
     int64_t now = now_nanos();
-    if (now > ctx->send_nanos || ctx->sendfinal) {
+    if (now > ctx->send_nanos) {
       LG_WRN("Sending final export");
       if (IsDDResNotOK(ddprof_worker_cycle(ctx, now))) {
         LG_ERR("Error when exporting.");
       }
     }
   }
+  DDRES_CHECK_FWD(worker_free(pevent_hdr, ctx->us));
+
   return ddres_init();
 }
 
