@@ -16,6 +16,11 @@
 #  include <jemalloc/jemalloc.h>
 #endif
 
+static const DDPROF_STATS s_cycled_stats[] = {
+    STATS_UNWIND_TICKS, STATS_EVENT_LOST, STATS_SAMPLE_COUNT};
+
+#define cycled_stats_sz (sizeof(s_cycled_stats) / sizeof(DDPROF_STATS))
+
 /// Human readable runtime information
 static void print_diagnostics() {
   ddprof_stats_print();
@@ -71,6 +76,12 @@ void ddprof_pr_sample(DDProfContext *ctx, struct perf_event_sample *sample,
   ddprof_aggregate(&us->output, sample->period, pos, ctx->num_watchers, dp);
 }
 
+static void ddprof_cycle_stats() {
+  for (int i = 0; i < cycled_stats_sz; ++i) {
+    ddprof_stats_clear(s_cycled_stats[i]);
+  }
+}
+
 /// Cycle operations : export, sync metrics, update counters
 static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
 
@@ -89,10 +100,8 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
   // Update the time last sent
   ctx->send_nanos += ctx->params.upload_period * 1000000000;
 
-  // We're done exporting, so finish by clearing out any global gauges
-  ddprof_stats_clear(STATS_UNWIND_TICKS);
-  ddprof_stats_clear(STATS_EVENT_LOST);
-  ddprof_stats_clear(STATS_SAMPLE_COUNT);
+  // Reset stats relevant to a single cycle
+  ddprof_cycle_stats();
 
   return ddres_init();
 }
