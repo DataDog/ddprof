@@ -84,11 +84,12 @@ void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, DDProfContext *arg) {
     int n = poll(pfd, pe_len, PSAMPLE_DEFAULT_WAKEUP);
 
     // If there was an issue, return and let the caller check errno
-    if (-1 == n && errno == EINTR)
+    if (-1 == n && errno == EINTR) {
       continue;
-    else if (-1 == n)
-      ddres_check_or_shutdown(ddres_error(DD_WHAT_UKNW));
-
+    } else if (-1 == n) {
+      attr->finish_fun(pevent_hdr, arg);
+      ddres_check_or_shutdown(ddres_error(DD_WHAT_POLLERROR));
+    }
     // If no file descriptors, call time-out
     if (0 == n && attr->timeout_fun) {
 
