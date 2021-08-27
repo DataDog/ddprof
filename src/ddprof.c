@@ -102,7 +102,7 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
     }
   }
 
-  if (IsDDResFatal(ddprof_stats_init())) {
+  if (IsDDResFatal(ddprof_stats_init(ctx->statspath))) {
     LG_WRN("Error from statsd_init");
     return;
   }
