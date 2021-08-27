@@ -53,7 +53,7 @@ endfunction()
 #### Definition of unit tests ####
 add_unit_test(
     ddprofcmdline-ut
-    ../src/ddprofcmdline.c 
+    ../src/ddprof_cmdline.c 
     ../src/perf_option.c
     ddprofcmdline-ut.cc
 )
@@ -123,7 +123,6 @@ target_include_directories(cap-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
 add_unit_test(
     user_id-ut
     user_id-ut.cc
-    ../src/logger.c
     ../src/user_override.c
     LIBRARIES ddprof-c
     DEFINITIONS MYNAME="userid-ut"

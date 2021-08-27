@@ -16,10 +16,12 @@ TEST(StatsDTest, Connection) {
   const char path_listen[] = "/tmp/my_statsd_listener";
   unlink(path_listen); // Make sure the default listening path is available
 
-  int fd_listener = statsd_listen(path_listen, strlen(path_listen));
-  int fd_client = statsd_connect(path_listen, strlen(path_listen));
-  EXPECT_NE(-1, fd_client);
-  EXPECT_NE(-1, fd_listener);
+  int fd_listener;
+  DDRes lres = statsd_listen(path_listen, strlen(path_listen), &fd_listener);
+  int fd_client;
+  DDRes cres = statsd_connect(path_listen, strlen(path_listen), &fd_client);
+  EXPECT_TRUE(IsDDResOK(lres));
+  EXPECT_TRUE(IsDDResOK(cres));
 
   // Cleanup
   close(fd_listener);
@@ -34,16 +36,19 @@ TEST(StatsDTest, Format) {
   const char answer[] = "foo:9999|g";
   unlink(path_listen); // Make sure the default listening path is available
 
-  int fd_listener = statsd_listen(path_listen, strlen(path_listen));
-  int fd_client = statsd_connect(path_listen, strlen(path_listen));
+  int fd_listener;
+  DDRes lres = statsd_listen(path_listen, strlen(path_listen), &fd_listener);
+  int fd_client;
+  DDRes cres = statsd_connect(path_listen, strlen(path_listen), &fd_client);
 
   // This should pass if the previous test passed, but we check anyway
-  EXPECT_NE(-1, fd_client);
-  EXPECT_NE(-1, fd_listener);
+  EXPECT_TRUE(IsDDResOK(lres));
+  EXPECT_TRUE(IsDDResOK(cres));
 
   // Now try sending
   long value = 9999;
-  statsd_send(fd_client, "foo", &value, STAT_GAUGE);
+  DDRes sres = statsd_send(fd_client, "foo", &value, STAT_GAUGE);
+  EXPECT_TRUE(IsDDResOK(sres));
 
   // In order to valid, we have to use lower-level socket interfaces, since
   // obviously we have no need to imeplement a statsd server :)

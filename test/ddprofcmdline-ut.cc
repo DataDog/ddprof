@@ -1,5 +1,5 @@
 extern "C" {
-#include "ddprofcmdline.h"
+#include "ddprof_cmdline.h"
 #include "perf.h" // perfoptions_lookup
 }
 

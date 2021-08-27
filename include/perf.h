@@ -7,6 +7,7 @@
 
 #include "ddres_def.h"
 #include "perf_option.h"
+#include "pevent.h"
 
 #define PSAMPLE_DEFAULT_WAKEUP 1000 // sample frequency check
 #define PERF_SAMPLE_STACK_SIZE (4096 * 8)
@@ -22,6 +23,10 @@
 // see arch/x86/include/uapi/asm/perf_regs.h in the linux sources
 // We're going to hardcode everything for now...
 #define PERF_REGS_MASK ((1 << 6) | (1 << 7) | (1 << 8))
+
+// This is a human-hardcoded number given the mask above; update it if the mask
+// gets more bits
+#define PERF_REGS_COUNT 3
 
 typedef struct read_format {
   uint64_t value;        // The value of the event
@@ -116,6 +121,8 @@ typedef struct perf_samplestacku {
 } perf_samplestacku;
 
 typedef struct perfopen_attr {
+  DDRes (*init_fun)(PEventHdr *, void *);
+  DDRes (*finish_fun)(PEventHdr *, void *);
   DDRes (*msg_fun)(struct perf_event_header *, int, volatile bool *, void *);
   DDRes (*timeout_fun)(volatile bool *, void *);
 } perfopen_attr;
@@ -137,3 +144,4 @@ int perfdisown(void *region, size_t size);
 void rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size);
 uint64_t rb_next(RingBuffer *);
 struct perf_event_header *rb_seek(RingBuffer *, uint64_t);
+perf_event_sample *hdr2samp(struct perf_event_header *hdr);

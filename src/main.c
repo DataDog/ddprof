@@ -1,5 +1,6 @@
 #include "ddprof.h"
-#include "ddprofcmdline.h"
+#include "ddprof_cmdline.h"
+#include "unwind.h"
 
 #include <errno.h>
 #include <getopt.h>
@@ -14,10 +15,53 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+/************************ Options Table Helper Macros *************************/
+#define X_FREE(a, b, c, d, e, f, g, h) FREE_EXP(b, f);
+#define X_LOPT(a, b, c, d, e, f, g, h) {#b, e, 0, d},
+#define X_DFLT(a, b, c, d, e, f, g, h) DFLT_EXP(#a, b, f, g, h);
+#define X_OSTR(a, b, c, d, e, f, g, h) #c ":"
+#define X_CASE(a, b, c, d, e, f, g, h) CASE_EXP(d, f, b)
+
+// TODO das210603 I don't think this needs to be inlined as a macro anymore
+#define DFLT_EXP(evar, key, targ, func, dfault)                                \
+  __extension__({                                                              \
+    char *_buf = NULL;                                                         \
+    if (!((targ)->key)) {                                                      \
+      if (getenv(evar))                                                        \
+        _buf = strdup(getenv(evar));                                           \
+      else if (*dfault)                                                        \
+        _buf = strdup(dfault);                                                 \
+      (targ)->key = _buf;                                                      \
+    }                                                                          \
+  })
+
+#define CASE_EXP(casechar, targ, key)                                          \
+  case casechar:                                                               \
+    if ((targ)->key)                                                           \
+      free((void *)(targ)->key);                                               \
+    (targ)->key = strdup(optarg);                                              \
+    break;
+
+// TODO das210603 I don't think this needs to be inlined as a macro anymore
+#define FREE_EXP(key, targ)                                                    \
+  __extension__({                                                              \
+    if ((targ)->key)                                                           \
+      free((void *)(targ)->key);                                               \
+    (targ)->key = NULL;                                                        \
+  })
+
+/**************************** Program Entry Point *****************************/
 int main(int argc, char **argv) {
   //---- Inititiate structs
   int c = 0, oi = 0, ret = 0;
-  DDProfContext *ctx = ddprof_ctx_init();
+  DDProfContext *ctx = &(DDProfContext){0};
+  DDReq *ddr = &(DDReq){0};
+  DProf *dp = &(DProf){0};
+  UnwindState *us = &(UnwindState){0};
+  ctx->ddr = ddr;
+  ctx->dp = dp;
+  ctx->us = us;
+  ddprof_ctx_init(ctx);
 
   struct option lopts[] = {OPT_TABLE(X_LOPT){"event", 1, 0, 'e'},
                            {"help", 0, 0, 'h'},

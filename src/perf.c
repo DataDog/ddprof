@@ -141,3 +141,85 @@ struct perf_event_header *rb_seek(RingBuffer *rb, uint64_t offset) {
   rb->offset = (unsigned long)offset & (rb->mask);
   return (struct perf_event_header *)(rb->start + rb->offset);
 }
+
+// This union is an implementation trick to make splitting apart an 8-byte
+// aligned block into two 4-byte blocks easier
+typedef union flipper {
+  uint64_t full;
+  uint32_t half[2];
+} flipper;
+
+perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
+  static perf_event_sample sample = {0};
+  memset(&sample, 0, sizeof(sample));
+
+  uint64_t *buf = (uint64_t *)(hdr + 1);
+
+  if (PERF_SAMPLE_IDENTIFIER & DEFAULT_SAMPLE_TYPE) {
+    sample.sample_id = *buf++;
+  }
+  if (PERF_SAMPLE_IP & DEFAULT_SAMPLE_TYPE) {
+    sample.ip = *buf++;
+  }
+  if (PERF_SAMPLE_TID & DEFAULT_SAMPLE_TYPE) {
+    sample.pid = ((flipper *)buf)->half[0];
+    sample.tid = ((flipper *)buf)->half[1];
+    buf++;
+  }
+  if (PERF_SAMPLE_TIME & DEFAULT_SAMPLE_TYPE) {
+    sample.time = *buf++;
+  }
+  if (PERF_SAMPLE_ADDR & DEFAULT_SAMPLE_TYPE) {
+    sample.addr = *buf++;
+  }
+  if (PERF_SAMPLE_ID & DEFAULT_SAMPLE_TYPE) {
+    sample.id = *buf++;
+  }
+  if (PERF_SAMPLE_STREAM_ID & DEFAULT_SAMPLE_TYPE) {
+    sample.stream_id = *buf++;
+  }
+  if (PERF_SAMPLE_CPU & DEFAULT_SAMPLE_TYPE) {
+    sample.cpu = ((flipper *)buf)->half[0];
+    sample.res = ((flipper *)buf)->half[1];
+    buf++;
+  }
+  if (PERF_SAMPLE_PERIOD & DEFAULT_SAMPLE_TYPE) {
+    sample.period = *buf++;
+  }
+  if (PERF_SAMPLE_READ & DEFAULT_SAMPLE_TYPE) {
+    // sizeof(uint64_t) == sizeof(ptr)
+    sample.v = (struct read_format *)buf++;
+  }
+  if (PERF_SAMPLE_CALLCHAIN & DEFAULT_SAMPLE_TYPE) {
+    sample.nr = *buf++;
+    sample.ips = buf;
+    buf += sample.nr;
+  }
+  if (PERF_SAMPLE_RAW & DEFAULT_SAMPLE_TYPE) {}
+  if (PERF_SAMPLE_BRANCH_STACK & DEFAULT_SAMPLE_TYPE) {}
+  if (PERF_SAMPLE_REGS_USER & DEFAULT_SAMPLE_TYPE) {
+    sample.abi = *buf++;
+    sample.regs = buf;
+    buf += PERF_REGS_COUNT;
+  }
+  if (PERF_SAMPLE_STACK_USER & DEFAULT_SAMPLE_TYPE) {
+    sample.size_stack = *buf++;
+    if (sample.size_stack) {
+      sample.data_stack = (char *)buf;
+      buf = (uint64_t *)(sample.data_stack + sample.size_stack);
+    } else {
+      // Not sure
+    }
+  }
+  if (PERF_SAMPLE_WEIGHT & DEFAULT_SAMPLE_TYPE) {}
+  if (PERF_SAMPLE_DATA_SRC & DEFAULT_SAMPLE_TYPE) {}
+  if (PERF_SAMPLE_TRANSACTION & DEFAULT_SAMPLE_TYPE) {}
+  if (PERF_SAMPLE_REGS_INTR & DEFAULT_SAMPLE_TYPE) {}
+
+  // Ensure buf can be used in a semantically correct way without worrying
+  // whether we've implemented the next consumer.  This is to keep static
+  // analysis and checkers happy.
+  (void)buf;
+
+  return &sample;
+}

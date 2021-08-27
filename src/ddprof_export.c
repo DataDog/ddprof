@@ -1,4 +1,4 @@
-#include "ddexp.h"
+#include "ddprof_export.h"
 
 #include <x86intrin.h>
 
@@ -6,10 +6,38 @@
 #include <ddprof/pprof.h>
 
 #include "ddprof_consts.h"
+#include "ddprof_stats.h"
 #include "ddres.h"
+#include "procutils.h"
 
-void ddexp_write_sample(const UnwindOutput *uw_output, uint64_t sample_period,
-                        int pos, int num_watchers, DProf *dp) {
+DDRes ddprof_export(DDProfContext *ctx, int64_t now) {
+  DDReq *ddr = ctx->ddr;
+  DProf *dp = ctx->dp;
+
+  // Before any state gets reset, export metrics to statsd
+  // TODO actually do that
+
+  LG_NTC("Pushing samples to backend");
+  int ret = 0;
+  if ((ret = DDR_pprof(ddr, dp)))
+    LG_ERR("Error enqueuing pprof (%s)", DDR_code2str(ret));
+  DDR_setTimeNano(ddr, dp->pprof.time_nanos, now);
+  if ((ret = DDR_finalize(ddr)))
+    LG_ERR("Error finalizing export (%s)", DDR_code2str(ret));
+  if ((ret = DDR_send(ddr)))
+    LG_ERR("Error sending export (%s)", DDR_code2str(ret));
+  if ((ret = DDR_watch(ddr, -1)))
+    LG_ERR("Error watching (%d : %s)", ddr->res.code, DDR_code2str(ret));
+  DDR_clear(ddr);
+
+  // Prepare pprof for next window
+  pprof_timeUpdate(dp);
+
+  return ddres_init();
+}
+
+void ddprof_aggregate(const UnwindOutput *uw_output, uint64_t sample_period,
+                      int pos, int num_watchers, DProf *dp) {
   uint64_t id_locs[DD_MAX_STACK] = {0};
 
   const FunLoc *locs = uw_output->locs;
@@ -30,24 +58,4 @@ void ddexp_write_sample(const UnwindOutput *uw_output, uint64_t sample_period,
   int64_t sample_val[MAX_TYPE_WATCHER] = {0};
   sample_val[pos] = sample_period;
   pprof_sampleAdd(dp, sample_val, num_watchers, id_locs, uw_output->idx);
-}
-
-DDRes ddexp_export(DDReq *ddr, DProf *dp, int64_t now) {
-  // Error management is not yet handled : pending next version of exporter
-  LG_NTC("Pushed samples to backend");
-  int ret = 0;
-  if ((ret = DDR_pprof(ddr, dp)))
-    LG_ERR("Error enqueuing pprof (%s)", DDR_code2str(ret));
-  DDR_setTimeNano(ddr, dp->pprof.time_nanos, now);
-  if ((ret = DDR_finalize(ddr)))
-    LG_ERR("Error finalizing export (%s)", DDR_code2str(ret));
-  if ((ret = DDR_send(ddr)))
-    LG_ERR("Error sending export (%s)", DDR_code2str(ret));
-  if ((ret = DDR_watch(ddr, -1)))
-    LG_ERR("Error(%d) watching (%s)", ddr->res.code, DDR_code2str(ret));
-  DDR_clear(ddr);
-
-  // Prepare pprof for next window
-  pprof_timeUpdate(dp);
-  return ddres_init();
 }

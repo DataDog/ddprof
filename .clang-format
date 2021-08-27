@@ -2,7 +2,7 @@
 BasedOnStyle: LLVM
 AlignOperands: false
 AllowShortBlocksOnASingleLine: true
-AlignConsecutiveBitFields: AcrossComments
+AlignConsecutiveBitFields: true
 IndentPPDirectives: AfterHash
 ---
 
