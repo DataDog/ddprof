@@ -36,7 +36,7 @@ typedef struct DDProfContext {
   char *global;
   char *worker_period;
   char *cache_period;
-  char *statspath;
+  char *internalstats;
   struct {
     bool count_samples;
     bool enable;
