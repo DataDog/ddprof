@@ -29,9 +29,9 @@ Roughly speaking, the profiler performs the following operations in sequence.
 * Grandchild `poll()`s on received file descriptors to listen for events in
   ringbuffer
 
-## Fork strategy
+## Overview
 
-![img_fork_strategy](./ddprof_fork_strategy.svg)
+![img_fork_strategy](ddprof_archi_20210830.svg)
 
 ### Notes
 
