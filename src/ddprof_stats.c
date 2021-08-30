@@ -22,22 +22,27 @@ static int fd_statsd = -1;
 long *ddprof_stats = NULL;
 
 // Helper function for getting statsd connection
-DDRes statsd_init() {
-  char *path_statsd = getenv("DD_DOGSTATSD_SOCKET");
-  if (path_statsd) {
-    DDRES_CHECK_FWD(
-        statsd_connect(path_statsd, strlen(path_statsd), &fd_statsd));
-    if (-1 == fd_statsd) {
-      DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS,
-                            "Unhandled statsd initialization error");
-    }
+DDRes statsd_init(const char *path_statsd) {
+  if (!path_statsd) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_DDPROF_STATS, "Invalid path");
+  }
+  DDRES_CHECK_FWD(statsd_connect(path_statsd, strlen(path_statsd), &fd_statsd));
+  if (-1 == fd_statsd) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_DDPROF_STATS,
+                           "Unhandled statsd initialization error");
   }
   return ddres_init();
 }
 
-DDRes ddprof_stats_init() {
+DDRes ddprof_stats_init(const char *path_statsd) {
   // This interface cannot be used to reset the existing mapping; to do so free
   // and then re-initialize.
+
+  // Early check, before mmap()
+  if (!path_statsd) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_DDPROF_STATS, "Invalid path");
+  }
+
   if (ddprof_stats)
     return ddres_init();
 
@@ -46,7 +51,12 @@ DDRes ddprof_stats_init() {
   if (MAP_FAILED == ddprof_stats) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_DDPROF_STATS, "Unable to mmap for stats");
   }
-  DDRES_CHECK_FWD(statsd_init());
+
+  // When we initialize the stats, we should zero out the region
+  memset(ddprof_stats, 0, sizeof(long) * STATS_LEN);
+
+  // Perform other initialization
+  DDRES_CHECK_FWD(statsd_init(path_statsd));
   return ddres_init();
 }
 

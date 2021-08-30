@@ -6,6 +6,8 @@
 
 // clang-format off
 #ifdef __cplusplus
+extern "C++" {
 #include "ddres_exception.hpp"
+}
 #endif
 //clang-format on

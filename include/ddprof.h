@@ -63,7 +63,8 @@
   XX(DD_PROFILING_NATIVELOGMODE,   logmode,         o, 'o', 1, ctx,      NULL, "stdout")    \
   XX(DD_PROFILING_NATIVELOGLEVEL,  loglevel,        l, 'l', 1, ctx,      NULL, "warn")      \
   XX(DD_PROFILING_NATIVETARGET,    pid,             p, 'p', 1, ctx,      NULL, "")          \
-  XX(DD_PROFILING_NATIVEGLOBAL,    global,          g, 'g', 1, ctx,      NULL, "")
+  XX(DD_PROFILING_NATIVEGLOBAL,    global,          g, 'g', 1, ctx,      NULL, "")          \
+  XX(DD_PROFILING_INTERNALSTATS,   internalstats,   b, 'b', 1, ctx,      NULL, "/var/run/datadog-agent/statsd.sock")
 // clang-format on
 
 typedef enum DDKeys { OPT_TABLE(X_ENUM) DD_KLEN } DDKeys;
