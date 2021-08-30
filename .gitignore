@@ -13,6 +13,7 @@ vendor
 .idea
 .vs
 .vscode
+docker-sync.yml
 
 #==============================================================================#
 # Directories to ignore only in root directory
