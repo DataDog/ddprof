@@ -79,6 +79,13 @@ add_unit_test(
 )
 
 add_unit_test(
+    ddprof_stats-ut
+    ../src/ddprof_stats.c
+    ../src/statsd.c 
+    ddprof_stats-ut.cc
+)
+
+add_unit_test(
     demangle-ut
     ../src/demangle.cpp
     demangle-ut.cc
