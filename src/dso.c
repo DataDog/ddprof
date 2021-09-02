@@ -106,7 +106,7 @@ FILE *procfs_map_open(int pid) {
 }
 
 bool ip_in_procline(char *line, uint64_t ip) {
-  static char spec[] = "%lx-%lx %4c %lx %*x:%*x %*d%n";
+  static const char spec[] = "%lx-%lx %4c %lx %*x:%*x %*d%n";
   uint64_t m_start = 0;
   uint64_t m_end = 0;
   uint64_t m_off = 0;
@@ -137,9 +137,13 @@ void pid_find_ip(int pid, uint64_t ip) {
     if (ip_in_procline(buf, ip)) {
       LG_DBG("[DSO] Found ip:0x%lx for %d", ip, pid);
       LG_DBG("[DSO] %.*s", (int)strlen(buf) - 1, buf);
+      free(buf);
       fclose(mpf);
       return;
     }
+  }
+  if (buf != NULL) {
+    free(buf);
   }
 
   LG_DBG("[DSO] Couldn't find ip:0x%lx for %d", ip, pid);
@@ -147,11 +151,11 @@ void pid_find_ip(int pid, uint64_t ip) {
   return;
 }
 
-// Note that return could be invalidated if `line` changes
-DsoIn *dso_from_procline(char *line) {
-  static DsoIn out = {0};
-  static char spec[] = "%lx-%lx %4c %lx %*x:%*x %*d%n";
-  memset(&out, 0, sizeof(out));
+// Return false in case of parsing error
+// Return true only if entry is executable or stack
+// Be careful : out->filename depend on line argument
+bool dso_from_procline(DsoIn *out, char *line) {
+  static const char spec[] = "%lx-%lx %4c %lx %*x:%*x %*d%n";
   uint64_t m_start = 0;
   uint64_t m_end = 0;
   uint64_t m_off = 0;
@@ -160,7 +164,7 @@ DsoIn *dso_from_procline(char *line) {
 
   if (4 != sscanf(line, spec, &m_start, &m_end, m_mode, &m_off, &m_p)) {
     LG_WRN("[DSO] Failed to scan mapfile line");
-    return NULL;
+    return false;
   }
 
   // Make sure the name index points to a valid char
@@ -172,15 +176,15 @@ DsoIn *dso_from_procline(char *line) {
 
   // Check that it was executable OR the stack
   if ('x' != m_mode[2] && strcmp(p, "[stack]"))
-    return NULL;
+    return false;
 
   // OK, looks good
-  out.addr = m_start;
-  out.len = m_end - m_start;
-  out.pgoff = m_off;
-  out.filename = p;
+  out->addr = m_start;
+  out->len = m_end - m_start;
+  out->pgoff = m_off;
+  out->filename = p;
 
-  return &out;
+  return true;
 }
 
 bool pid_backpopulate(int pid) {
@@ -199,12 +203,17 @@ bool pid_backpopulate(int pid) {
 
     // TODO dso_from_procline should differentiate failures.  Non-ex is fine,
     //      parse error is bad
-    DsoIn *out = dso_from_procline(buf);
-    if (out && !pid_add(pid, out)) {
+    DsoIn out = {0};
+    bool dso_exec_stack = dso_from_procline(&out, buf);
+    if (dso_exec_stack == true && !pid_add(pid, &out)) {
       LG_WRN("[DSO] Failed to add procline to PID %d", pid);
+      free(buf);
       fclose(mpf);
       return false;
     }
+  }
+  if (buf != NULL) {
+    free(buf);
   }
 
   fclose(mpf);

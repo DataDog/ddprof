@@ -61,7 +61,7 @@ bool pid_add(int, DsoIn *);
 FILE *procfs_map_open(int);
 bool ip_in_procline(char *, uint64_t);
 void pid_find_ip(int, uint64_t);
-DsoIn *dso_from_procline(char *);
+bool dso_from_procline(DsoIn *out, char *line);
 bool pid_backpopulate(int);
 bool pid_fork(int, int);
 Dso *dso_find(int, uint64_t);
