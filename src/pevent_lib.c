@@ -12,13 +12,11 @@
 #include <unistd.h>
 
 void pevent_init(PEventHdr *pevent_hdr) {
-  PEvent *pes = pevent_hdr->pes;
+  memset(pevent_hdr, 0, sizeof(PEventHdr));
   pevent_hdr->max_size = MAX_NB_WATCHERS;
   for (int k = 0; k < pevent_hdr->max_size; ++k) {
-    pes[k].region = NULL;
-    pes[k].fd = -1;
+    pevent_hdr->pes[k].fd = -1;
   }
-  pevent_hdr->size = 0;
 }
 
 DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
