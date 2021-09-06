@@ -150,7 +150,7 @@ echo $config_vars
 eval $config_vars
 
 config_vars=$(parse_yaml "${ENV_FILE}" "env_")
-echo "$config_vars"
+#echo "$config_vars"
 eval $config_vars
 
 PREPEND_CMD=""
@@ -227,6 +227,7 @@ eval ${CMD} \
   -w ${cfg_ddprof_worker_period} \
   -a ${cfg_ddprof_printargs} \
   "$@"
+
 
 # Helps find the relevant trace in the UI
 echo "Uploaded to ${cfg_ddprof_service_name}_${VER}"

@@ -55,11 +55,7 @@ int main(int argc, char **argv) {
   //---- Inititiate structs
   int c = 0, oi = 0, ret = 0;
   DDProfContext *ctx = &(DDProfContext){0};
-  DDReq *ddr = &(DDReq){0};
-  DProf *dp = &(DProf){0};
   UnwindState *us = &(UnwindState){0};
-  ctx->ddr = ddr;
-  ctx->dp = dp;
   ctx->us = us;
   ddprof_ctx_init(ctx);
 
@@ -139,26 +135,6 @@ int main(int argc, char **argv) {
   if (!ctx->params.enable) {
     LG_WRN("Profiling disabled");
   } else {
-    // Initialize the request object
-    DDR_init(ctx->ddr);
-
-    // Initialize the pprof
-    const char *pprof_labels[MAX_TYPE_WATCHER];
-    const char *pprof_units[MAX_TYPE_WATCHER];
-    for (int i = 0; i < ctx->num_watchers; i++) {
-      pprof_labels[i] = ctx->watchers[i].label;
-      pprof_units[i] = ctx->watchers[i].unit;
-    }
-    if (!pprof_Init(ctx->dp, (const char **)pprof_labels,
-                    (const char **)pprof_units, ctx->num_watchers)) {
-      LG_ERR("Failed to initialize profiling storage, profiling disabled");
-
-      // If we were going to run the command, then run it now
-      if (!ctx->params.pid)
-        goto EXECUTE;
-    }
-    pprof_timeUpdate(ctx->dp); // Set the time
-
     // Initialize profiling.
     // If no PID was specified earlier, we autodaemonize and launch command
     if (!ctx->params.pid) {

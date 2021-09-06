@@ -1,6 +1,7 @@
-#include <stdio.h>
-
 #include "ddprof.h"
+
+#include <assert.h>
+#include <stdio.h>
 
 #define X_HLPK(a, b, c, d, e, f, g, h) "  -" #c ", --" #b ", (envvar: " #a ")",
 

@@ -2,3 +2,4 @@ run_title, date, cpu_prime, cpu_second, comp_prime, comp_second
 BadBoggleSolver_run, Fri Aug  6 12:17:46 UTC 2021, 0.999, 1.082, 17774, 15571
 BadBoggleSolver_run, Fri Aug  6 12:22:06 UTC 2021, 0.999, 1.075, 17778, 16452
 BadBoggleSolver_run, Thu Aug 12 12:39:05 UTC 2021, 0.999, 1.082, 11104, 10506
+BadBoggleSolver_run, Fri Sep  3 11:43:20 UTC 2021, 0.998, 1.045, 12084, 11705

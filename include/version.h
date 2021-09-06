@@ -1,5 +1,7 @@
 #pragma once
 
+#include "string_view.h"
+
 // Name and versions are defined in build system
 #ifndef MYNAME
 #  define MYNAME "ddprof"
@@ -19,6 +21,6 @@
 #endif
 
 /// Versions are updated in cmake files
-const char *str_version();
+string_view str_version();
 
 void print_version();

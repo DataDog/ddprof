@@ -1,6 +1,5 @@
 #pragma once
 
-#include <ddprof/dd_send.h>
 #include <execinfo.h>
 #include <sys/time.h>
 
@@ -39,14 +38,14 @@
 
 //  A                              B                C   D   E  F         G     H
 #define OPT_TABLE(XX)                                                                       \
-  XX(DD_API_KEY,                   apikey,          A, 'A', 1, ctx->ddr, NULL, "")          \
-  XX(DD_ENV,                       environment,     E, 'E', 1, ctx->ddr, NULL, "")          \
-  XX(DD_AGENT_HOST,                host,            H, 'H', 1, ctx->ddr, NULL, "localhost") \
-  XX(DD_SITE,                      site,            I, 'I', 1, ctx->ddr, NULL, "")          \
-  XX(DD_TRACE_AGENT_PORT,          port,            P, 'P', 1, ctx->ddr, NULL, "8126")      \
-  XX(DD_SERVICE,                   service,         S, 'S', 1, ctx->ddr, NULL, "myservice") \
+  XX(DD_API_KEY,                   apikey,          A, 'A', 1, (&ctx->exporter_input), NULL, "")          \
+  XX(DD_ENV,                       environment,     E, 'E', 1, (&ctx->exporter_input), NULL, "")          \
+  XX(DD_AGENT_HOST,                host,            H, 'H', 1, (&ctx->exporter_input), NULL, "localhost") \
+  XX(DD_SITE,                      site,            I, 'I', 1, (&ctx->exporter_input), NULL, "")          \
+  XX(DD_TRACE_AGENT_PORT,          port,            P, 'P', 1, (&ctx->exporter_input), NULL, "8126")      \
+  XX(DD_SERVICE,                   service,         S, 'S', 1, (&ctx->exporter_input), NULL, "myservice") \
   XX(DD_TAGS,                      tags,            T, 'T', 1, ctx,      NULL, "")          \
-  XX(DD_VERSION,                   serviceversion,  V, 'V', 1, ctx->ddr, NULL, "")          \
+  XX(DD_VERSION,                   serviceversion,  V, 'V', 1, (&ctx->exporter_input), NULL, "")          \
   XX(DD_PROFILING_ENABLED,         enable,          d, 'd', 1, ctx,      NULL, "yes")       \
   XX(DD_PROFILING_NATIVE_ENABLED,  native_enable,   n, 'n', 1, ctx,      NULL, "yes")       \
   XX(DD_PROFILING_COUNTSAMPLES,    count_samples,   c, 'c', 1, ctx,      NULL, "yes")       \

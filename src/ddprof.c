@@ -26,28 +26,20 @@
 #define FAMILY_DEFAULT "native"
 
 bool ddprof_ctx_init(DDProfContext *ctx) {
-  if (!ctx->ddr)
-    return false;
-  memset(ctx->ddr, 0, sizeof(*ctx->ddr));
-
-  if (!ctx->dp)
-    return false;
-  memset(ctx->dp, 0, sizeof(*ctx->dp));
 
   if (!ctx->us)
     return false;
   memset(ctx->us, 0, sizeof(*ctx->us));
 
-  ctx->ddr->user_agent = USERAGENT_DEFAULT;
-  ctx->ddr->language = LANGUAGE_DEFAULT;
-  ctx->ddr->family = FAMILY_DEFAULT;
+  ctx->exporter_input.family = STRING_VIEW_LITERAL(FAMILY_DEFAULT);
+  ctx->exporter_input.language = STRING_VIEW_LITERAL(LANGUAGE_DEFAULT);
+  ctx->exporter_input.user_agent = STRING_VIEW_LITERAL(USERAGENT_DEFAULT);
+  ctx->exporter_input.profiler_version = str_version();
+
   return true;
 }
 
-void ddprof_ctx_free(DDProfContext *ctx) {
-  DDR_free(ctx->ddr);
-  pprof_Free(ctx->dp);
-}
+void ddprof_ctx_free(DDProfContext *ctx) {}
 
 /*****************************  SIGSEGV Handler *******************************/
 void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
@@ -56,7 +48,7 @@ void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   static void *buf[4096] = {0};
   size_t sz = backtrace(buf, 4096);
   fprintf(stderr, "ddprof[%d]: <%s> has encountered an error and will exit\n",
-          getpid(), str_version());
+          getpid(), str_version().ptr);
   if (sig == SIGSEGV)
     printf("[DDPROF] Fault address: %p\n", si->si_addr);
   backtrace_symbols_fd(buf, sz, STDERR_FILENO);

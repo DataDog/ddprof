@@ -1,4 +1,4 @@
-#include "pprofs/ddprof_pprofs.h"
+#include "pprof/ddprof_pprof.h"
 
 #include "ddres.h"
 
@@ -25,8 +25,8 @@ static ddprof_ffi_Slice_c_char ffi_empty_char_slice(void) {
   return (struct ddprof_ffi_Slice_c_char){.ptr = (NULL), 0};
 }
 
-DDRes pprofs_init(DDProfPProfs *pprofs) {
-  memset(pprofs, 0, sizeof(DDProfPProfs));
+DDRes pprof_init(DDProfPProf *pprof) {
+  memset(pprof, 0, sizeof(DDProfPProf));
   return ddres_init();
 }
 
@@ -45,8 +45,8 @@ static const struct ddprof_ffi_ValueType s_cpu_sample = {
     .unit = SLICE_LITERAL("count"),
 };
 
-DDRes pprofs_create_profile(DDProfPProfs *pprofs, const PerfOption *options,
-                            int nbOptions) {
+DDRes pprof_create_profile(DDProfPProf *pprof, const PerfOption *options,
+                           int nbOptions) {
   // Create one value
   struct ddprof_ffi_ValueType perf_value_type[MAX_TYPE_WATCHER + 1];
   int value_index = 0;
@@ -62,7 +62,7 @@ DDRes pprofs_create_profile(DDProfPProfs *pprofs, const PerfOption *options,
     perf_value_type[value_index].type_ = perf_value_slice;
     perf_value_type[value_index].unit = perf_unit;
   }
-  pprofs->_nb_values = value_index;
+  pprof->_nb_values = value_index;
   struct ddprof_ffi_Slice_value_type sample_types = {.ptr = perf_value_type,
                                                      .len = value_index};
   struct ddprof_ffi_Period period;
@@ -74,17 +74,17 @@ DDRes pprofs_create_profile(DDProfPProfs *pprofs, const PerfOption *options,
     period.value = options->sample_period;
   }
 
-  pprofs->_profile = ddprof_ffi_Profile_new(sample_types, &period);
-  if (!pprofs->_profile) {
+  pprof->_profile = ddprof_ffi_Profile_new(sample_types, &period);
+  if (!pprof->_profile) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to allocate profiles");
   }
   return ddres_init();
 }
 
-DDRes pprofs_free_profile(DDProfPProfs *pprofs) {
-  ddprof_ffi_Profile_free(pprofs->_profile);
-  pprofs->_profile = NULL;
-  pprofs->_nb_values = 0;
+DDRes pprof_free_profile(DDProfPProf *pprof) {
+  ddprof_ffi_Profile_free(pprof->_profile);
+  pprof->_profile = NULL;
+  pprof->_nb_values = 0;
   return ddres_init();
 }
 
@@ -123,10 +123,10 @@ static void write_line(const FunLoc *loc, ddprof_ffi_Line *ffi_line) {
 }
 
 // Assumption of API is that sample is valid in a single type
-DDRes pprofs_aggregate(const UnwindOutput *uw_output, uint64_t value,
-                       int watcher_idx, DDProfPProfs *pprofs) {
+DDRes pprof_aggregate(const UnwindOutput *uw_output, uint64_t value,
+                      int watcher_idx, DDProfPProf *pprof) {
 
-  ddprof_ffi_Profile *profile = pprofs->_profile;
+  ddprof_ffi_Profile *profile = pprof->_profile;
 
   int64_t values[MAX_TYPE_WATCHER + 1] = {0};
   // Counted a single time
@@ -147,7 +147,7 @@ DDRes pprofs_aggregate(const UnwindOutput *uw_output, uint64_t value,
   }
 
   struct ddprof_ffi_Sample sample = {
-      .value = {.ptr = values, .len = pprofs->_nb_values},
+      .value = {.ptr = values, .len = pprof->_nb_values},
       .label = {.ptr = NULL, 0},
       .locations = {.ptr = locations_buff, uw_output->idx},
   };
@@ -160,25 +160,9 @@ DDRes pprofs_aggregate(const UnwindOutput *uw_output, uint64_t value,
   return ddres_init();
 }
 
-/// Write pprof to a valid file descriptor : allows to use pprof tools
-DDRes ddprof_write_profile(const DDProfPProfs *pprofs, int fd) {
-
-  const ddprof_ffi_Profile *profile = pprofs->_profile;
-  struct ddprof_ffi_EncodedProfile *encoded_profile =
-      ddprof_ffi_Profile_serialize(profile);
-
-  if (!encoded_profile) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to encode buffer");
-  } else {
-    ddprof_ffi_Buffer *buffer = &encoded_profile->buffer;
-    LG_NTC("Writting encoded buffer = %lu \n", buffer->len);
-    if (write(fd, buffer->ptr, buffer->len) == 0) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF,
-                             "Failed to write byte buffer to stdout! %s\n",
-                             strerror(errno));
-    }
-    ddprof_ffi_Buffer_reset(buffer);
+DDRes pprof_reset(DDProfPProf *pprof) {
+  if (!ddprof_ffi_Profile_reset(pprof->_profile)) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile");
   }
-  ddprof_ffi_EncodedProfile_delete(encoded_profile);
   return ddres_init();
 }

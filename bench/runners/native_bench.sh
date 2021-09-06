@@ -26,7 +26,6 @@ usage() {
 RECORD_STATS="no"
 BUILD_OPT=""
 
-if [ $# -eq 0 ]; then print_help && exit 0; fi
 while getopts "b:hr" arg; do
   case $arg in
     b)

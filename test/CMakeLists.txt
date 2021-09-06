@@ -155,11 +155,22 @@ add_unit_test(
 )
 
 add_unit_test(
-    ddprof_pprofs-ut
-    ../src/pprofs/ddprof_pprofs.c
+    ddprof_pprof-ut
+    ../src/pprof/ddprof_pprof.c
     ../src/unwind_output.c
     ../src/perf_option.c
-    ddprof_pprofs-ut.cc
+    ddprof_pprof-ut.cc
     LIBRARIES ddprof-ffi ${CMAKE_DL_LIBS}
-    DEFINITIONS MYNAME="ddprof_pprofs-ut"
+    DEFINITIONS MYNAME="ddprof_pprof-ut"
+)
+
+add_unit_test(
+    ddprof_exporter-ut
+    ../src/exporter/ddprof_exporter.c
+    ../src/pprof/ddprof_pprof.c
+    ../src/unwind_output.c
+    ../src/perf_option.c
+    ddprof_exporter-ut.cc
+    LIBRARIES ddprof-ffi ${CMAKE_DL_LIBS}
+    DEFINITIONS MYNAME="ddprof_exporter-ut"
 )

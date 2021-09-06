@@ -1,6 +1,5 @@
 #include "ddprof_worker.h"
 
-#include <ddprof/pprof.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/time.h>
@@ -8,10 +7,11 @@
 #include <x86intrin.h>
 
 #include "ddprof_context.h"
-#include "ddprof_export.h"
 #include "ddprof_stats.h"
+#include "exporter/ddprof_exporter.h"
 #include "perf.h"
 #include "pevent_lib.h"
+#include "pprof/ddprof_pprof.h"
 #include "unwind.h"
 #include "unwind_output.h"
 
@@ -82,15 +82,16 @@ static inline void export_time_set(DDProfContext *ctx) {
 
 /************************* perf_event_open() helpers **************************/
 /// Entry point for sample aggregation
-void ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
+DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   // Before we do anything else, copy the perf_event_header into a sample
   struct UnwindState *us = ctx->us;
-  DProf *dp = ctx->dp;
+  DDProfPProf *pprof = ctx->pprof;
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
   us->pid = sample->pid;
   us->stack = NULL;
   us->stack_sz = sample->size_stack;
   us->stack = sample->data_stack;
+
   memcpy(&us->regs[0], sample->regs, PERF_REGS_COUNT * sizeof(uint64_t));
   uw_output_clear(&us->output);
   unsigned long this_ticks_unwind = __rdtsc();
@@ -102,11 +103,13 @@ void ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
     } else {
       LG_WRN("Failed unwind: %s [%d](0x%lx)", dso_path(dso), us->pid, us->eip);
     }
-    return;
+    DDRES_RETURN_WARN_LOG(DD_WHAT_UW_ERROR, "Error unwinding sample.");
   }
-  ddprof_stats_add(STATS_UNWIND_TICKS, __rdtsc() - this_ticks_unwind, NULL);
+  DDRES_CHECK_FWD(ddprof_stats_add(STATS_UNWIND_TICKS,
+                                   __rdtsc() - this_ticks_unwind, NULL));
 
-  ddprof_aggregate(&us->output, sample->period, pos, ctx->num_watchers, dp);
+  DDRES_CHECK_FWD(pprof_aggregate(&us->output, sample->period, pos, pprof));
+  return ddres_init();
 }
 
 static void ddprof_cycle_stats() {
@@ -127,7 +130,7 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
 
   // Take the current pprof contents and ship them to the backend.  This also
   // clears the pprof for reuse
-  DDRES_CHECK_FWD(ddprof_export(ctx, now));
+  DDRES_CHECK_FWD(ddprof_exporter_export(ctx->pprof->_profile, ctx->exp));
 
   // Increase the counts of exports
   ctx->count_worker += 1;
@@ -147,6 +150,8 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
 
   // Reset stats relevant to a single cycle
   ddprof_cycle_stats();
+
+  DDRES_CHECK_FWD(pprof_reset(ctx->pprof));
 
   return ddres_init();
 }
@@ -218,21 +223,6 @@ static DDRes reset_state(DDProfContext *ctx,
   if (ctx->params.cache_period <= ctx->count_cache) {
     ctx->count_cache = 0;
     DDRES_CHECK_FWD(dwfl_caches_clear(ctx->us));
-
-    // Clear and re-initialize the pprof
-    const char *pprof_labels[MAX_TYPE_WATCHER];
-    const char *pprof_units[MAX_TYPE_WATCHER];
-    pprof_Free(ctx->dp);
-    for (int i = 0; i < ctx->num_watchers; i++) {
-      pprof_labels[i] = ctx->watchers[i].label;
-      pprof_units[i] = ctx->watchers[i].unit;
-    }
-
-    if (!pprof_Init(ctx->dp, (const char **)pprof_labels,
-                    (const char **)pprof_units, ctx->num_watchers)) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW,
-                             "[DDPROF] Error refreshing profile storage");
-    }
   }
 
   return ddres_init();
@@ -263,14 +253,31 @@ DDRes ddprof_worker_init(PEventHdr *pevent_hdr, void *arg) {
   // Make sure worker-related counters are reset
   ctx->count_worker = 0;
   ctx->count_cache = 0;
-
+  ctx->exp = malloc(sizeof(DDProfExporter));
+  if (!ctx->exp) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error when creating exporter");
+  }
+  DDRES_CHECK_FWD(ddprof_exporter_init(&ctx->exporter_input, ctx->exp));
+  DDRES_CHECK_FWD(ddprof_exporter_new(ctx->exp));
   DDRES_CHECK_FWD(worker_init(pevent_hdr, ctx->us));
+  ctx->pprof = malloc(sizeof(DDProfPProf));
+  if (!ctx->pprof) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
+                           "Error when creating pprof structure");
+  }
+  DDRES_CHECK_FWD(pprof_init(ctx->pprof));
+  DDRES_CHECK_FWD(
+      pprof_create_profile(ctx->pprof, ctx->watchers, ctx->num_watchers));
   return ddres_init();
 }
 
 DDRes ddprof_worker_finish(PEventHdr *pevent_hdr, void *arg) {
   DDProfContext *ctx = arg;
+  DDRES_CHECK_FWD(ddprof_exporter_free(ctx->exp));
   DDRES_CHECK_FWD(worker_free(pevent_hdr, ctx->us));
+  DDRES_CHECK_FWD(pprof_free_profile(ctx->pprof));
+  free(ctx->pprof);
+  free(ctx->exp);
   return ddres_init();
 }
 
@@ -280,7 +287,7 @@ DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
 
   switch (hdr->type) {
   case PERF_RECORD_SAMPLE:
-    ddprof_pr_sample(ctx, hdr2samp(hdr), pos);
+    DDRES_CHECK_FWD(ddprof_pr_sample(ctx, hdr2samp(hdr), pos));
     break;
   case PERF_RECORD_MMAP:
     ddprof_pr_mmap(ctx, (perf_event_mmap *)hdr, pos);

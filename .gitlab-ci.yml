@@ -5,7 +5,7 @@ stages:
 
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
-  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/83426777
+  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/83432904
   BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:760a194491c1eb31f30891e625a87c802b447a9d7328408b7e3bf66da010842d
   # https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/81425357
   TEST_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:1565b429f9266dc10f98d615fcaf06941a1281292467820961364aff1376ef34
@@ -119,7 +119,10 @@ test:ddprof:
     - echo ""
     - check_dependencies.sh ${BINPATH}/${BUILD_TYPE}/bin/ddprof test/data/expected_deps_${BUILD_TYPE}.txt
     # Run toy project for 5 seconds
+    - mkdir pprofs && export DDPROF_PPROFS_FOLDER="$PWD/pprofs"
     - run.sh -b ./${BINPATH}/${BUILD_TYPE}/bin BadBoggleSolver_run 5
+    - ls ${DDPROF_PPROFS_FOLDER} # todo : add a check on pprofs
+    - unset DDPROF_PPROFS_FOLDER
     - if [ ${BUILD_TYPE} == "Release" ]; then # record only in release mode
     - native_bench.sh -r -b ./${BINPATH}/${BUILD_TYPE}/bin
     - else

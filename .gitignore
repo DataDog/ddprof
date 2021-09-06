@@ -54,3 +54,4 @@ compile_commands.json
 .env_perso.yml
 test/configs/perso.yml
 .editorconfig
+test/data/*.pprof

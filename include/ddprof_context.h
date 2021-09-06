@@ -3,16 +3,17 @@
 #include <sys/types.h>
 
 #include "ddprof_consts.h"
+#include "exporter_input.h"
 #include "perf_option.h"
 #include "proc_status.h"
 
 // forward declarations
-typedef struct DDReq DDReq;
-typedef struct DProf DProf;
+typedef struct DDProfExporter DDProfExporter;
+typedef struct DDProfPProf DDProfPProf;
 
 typedef struct DDProfContext {
-  DProf *dp;
-  DDReq *ddr;
+  DDProfExporter *exp; // wrapper around rust exporter
+  DDProfPProf *pprof;  // wrapper around rust exporter
 
   // Parameters for interpretation
   char *agent_host;
@@ -37,6 +38,7 @@ typedef struct DDProfContext {
   char *worker_period;
   char *cache_period;
   char *internalstats;
+  ExporterInput exporter_input;
   struct {
     bool count_samples;
     bool enable;

@@ -1,6 +1,6 @@
 ddprof:
   intake:
-    url: intake.profile.datad0g.com
+    url: datad0g.com
     port: 80
   service:
     name: native-ci_boggle

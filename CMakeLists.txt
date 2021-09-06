@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.19)
 
  project(DDProf
   LANGUAGES C CXX
-  VERSION 0.6.0
+  VERSION 0.6.1
   DESCRIPTION "Datadog's native profiler"
 )
 
@@ -162,16 +162,20 @@ list(APPEND DDPROF_INCLUDE_LIST ${ELFUTILS_INCLUDE_LIST})
 # Find the source files
 aux_source_directory(src MAIN_SRC)
 aux_source_directory(src/proto PROTO_SRC)
+aux_source_directory(src/exporter EXPORTER_SRC)
+aux_source_directory(src/pprof PPROF_SRC)
 
 # Define all sources
 set(DDPROF_GLOBAL_SRC
    ${DDPROF_GLOBAL_SRC}
    ${MAIN_SRC}
-   ${PROTO_SRC})
+   ${PROTO_SRC}
+   ${PPROF_SRC}
+   ${EXPORTER_SRC})
 
 set(DDPROF_LIBRARY_LIST ddprof-c llvm-demangle libstdc++.a dw elf libz.a Threads::Threads libprotobuf-c.a liblzma.a)
 
-if (OFF)
+if (ON)
    # Add the rust library - Refactoring ongoing. OFF for now
    list(PREPEND DDPROF_LIBRARY_LIST DDProf::FFI)
    list(APPEND DDPROF_LIBRARY_LIST ${CMAKE_DL_LIBS})
