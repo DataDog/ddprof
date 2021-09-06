@@ -37,6 +37,7 @@ extern "C" {
   X(DD_WHAT_PPROF, "PPROF: error in pprof manipulations")                      \
   X(DD_WHAT_STATSD, "STATSD: error in statsd interface")                       \
   X(DD_WHAT_DDPROF_STATS, "DDPROF_STATS: error in stats module")               \
+  X(DD_WHAT_EXPORTER, "EXPORTER")                                              \
   X(DD_WHAT_UNITTEST, "UNITTEST: unit test error")
 
 // generic erno errors available from /usr/include/asm-generic/errno.h

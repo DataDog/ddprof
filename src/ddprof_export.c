@@ -6,16 +6,12 @@
 #include <ddprof/pprof.h>
 
 #include "ddprof_consts.h"
-#include "ddprof_stats.h"
 #include "ddres.h"
 #include "procutils.h"
 
 DDRes ddprof_export(DDProfContext *ctx, int64_t now) {
   DDReq *ddr = ctx->ddr;
   DProf *dp = ctx->dp;
-
-  // Before any state gets reset, export metrics to statsd
-  // TODO actually do that
 
   LG_NTC("Pushing samples to backend");
   int ret = 0;
@@ -47,9 +43,10 @@ void ddprof_aggregate(const UnwindOutput *uw_output, uint64_t sample_period,
 
     // Using the sopath instead of srcpath in locAdd for the DD UI
     id_map = pprof_mapAdd(dp, current_loc->map_start, current_loc->map_end,
-                          current_loc->map_off, current_loc->sopath, "");
-    id_fun = pprof_funAdd(dp, current_loc->funname, current_loc->funname,
-                          current_loc->srcpath, 0);
+                          current_loc->map_off, current_loc->sopath.ptr, "");
+    id_fun =
+        pprof_funAdd(dp, current_loc->funname.ptr, current_loc->funname.ptr,
+                     current_loc->srcpath.ptr, 0);
     id_loc = pprof_locAdd(dp, id_map, 0, (uint64_t[]){id_fun},
                           (int64_t[]){current_loc->line}, 1);
     if (id_loc > 0)

@@ -2,6 +2,8 @@
 
 #include <stdint.h>
 
+#include "string_view.h"
+
 #define DD_MAX_STACK 1024
 
 typedef struct FunLoc {
@@ -9,12 +11,11 @@ typedef struct FunLoc {
   uint64_t map_start;  // Start address of mapped region
   uint64_t map_end;    // End
   uint64_t map_off;    // Offset into file
-  const char *funname; // name of the function (mangled, possibly)
-  const char *srcpath; // name of the source file, if known
-  const char
-      *sopath;   // name of the file where the symbol is interned (e.g., .so)
-  uint32_t line; // line number in file
-  uint32_t disc; // discriminator
+  string_view funname; // name of the function (mangled, possibly)
+  string_view srcpath; // name of the source file, if known
+  string_view sopath;  // name of the file where the symbol resides (e.g. .so)
+  uint32_t line;       // line number in file
+  uint32_t disc;       // discriminator
 } FunLoc;
 
 typedef struct UnwindOutput {

@@ -79,6 +79,8 @@ endif()
 # Install lib cap to retrieve capabilities
 include(Findlibcap)
 
+SET(PROTO_HEADER_INCLUDE ${CMAKE_SOURCE_DIR}/include/proto)
+
 ####################
 ### Unit tests   ###
 ####################
@@ -112,8 +114,7 @@ include(Version)
 list(APPEND CMAKE_C_FLAGS ${FRAME_PTR_FLAG})
 list(APPEND CMAKE_CXX_FLAGS ${FRAME_PTR_FLAG})
 
-set(DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/include/proto)
-list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include/proto)
+list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include ${PROTO_HEADER_INCLUDE})
 
 #libddprof
 list(APPEND DDPROF_INCLUDE_LIST ${LIBDDPROF_INCLUDE_DIR})
@@ -169,6 +170,13 @@ set(DDPROF_GLOBAL_SRC
    ${PROTO_SRC})
 
 set(DDPROF_LIBRARY_LIST ddprof-c llvm-demangle libstdc++.a dw elf libz.a Threads::Threads libprotobuf-c.a liblzma.a)
+
+if (OFF)
+   # Add the rust library - Refactoring ongoing. OFF for now
+   list(PREPEND DDPROF_LIBRARY_LIST DDProf::FFI)
+   list(APPEND DDPROF_LIBRARY_LIST ${CMAKE_DL_LIBS})
+endif()
+
 
 if (${JEMALLOC})
    list(PREPEND DDPROF_LIBRARY_LIST jemalloc)

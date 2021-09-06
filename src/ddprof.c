@@ -21,7 +21,7 @@
   if ((f)->b)                                                                  \
     LG_NTC("  " #b ": %s", (f)->b);
 
-#define USERAGENT_DEFAULT "libddprof"
+#define USERAGENT_DEFAULT "ddprof"
 #define LANGUAGE_DEFAULT "native"
 #define FAMILY_DEFAULT "native"
 

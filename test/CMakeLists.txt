@@ -142,7 +142,6 @@ add_unit_test(
     LIBRARIES ddprof-c
     DEFINITIONS MYNAME="procutils-ut"
 )
-target_include_directories(cap-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
 
 add_unit_test(
     pevent-ut
@@ -154,4 +153,13 @@ add_unit_test(
     LIBRARIES ddprof-c
     DEFINITIONS MYNAME="pevent-ut"
 )
-target_include_directories(pevent-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
+
+add_unit_test(
+    ddprof_pprofs-ut
+    ../src/pprofs/ddprof_pprofs.c
+    ../src/unwind_output.c
+    ../src/perf_option.c
+    ddprof_pprofs-ut.cc
+    LIBRARIES ddprof-ffi ${CMAKE_DL_LIBS}
+    DEFINITIONS MYNAME="ddprof_pprofs-ut"
+)

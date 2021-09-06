@@ -135,26 +135,32 @@ namespace ddprof {
 
 // Write the info from internal structure to output parameters
 static void map_info(const dwfl_addr_info &info, GElf_Off *offset,
-                     const char **symname, const char **demangle_name,
-                     uint32_t *lineno, const char **srcpath) {
+                     string_view *symname, string_view *demangle_name,
+                     uint32_t *lineno, string_view *srcpath) {
 
   *offset = info._offset;
 
   if (info._symname.empty()) {
-    *symname = nullptr;
+    symname->ptr = nullptr;
+    symname->len = 0;
   } else {
-    *symname = info._symname.c_str();
+    symname->ptr = info._symname.c_str();
+    symname->len = info._symname.length();
   }
 
   // Demangle mapping
-  *demangle_name = info._demangle_name.c_str();
+  demangle_name->ptr = info._demangle_name.c_str();
+  demangle_name->len = info._demangle_name.length();
 
   // Line info mapping
   *lineno = info._lineno;
   if (info._srcpath.empty()) {
-    *srcpath = nullptr;
+    srcpath->ptr = nullptr;
+    srcpath->len = 0;
+
   } else {
-    *srcpath = info._srcpath.c_str();
+    srcpath->ptr = info._srcpath.c_str();
+    srcpath->len = info._srcpath.length();
   }
 }
 
@@ -193,10 +199,9 @@ static void dwfl_module_get_info(Dwfl_Module *mod, Dwarf_Addr newpc,
 static void dwfl_module_cache_addrinfo(struct dwflmod_cache_hdr *cache_hdr,
                                        Dwfl_Module *mod, Dwarf_Addr newpc,
                                        pid_t pid, GElf_Off *offset,
-                                       const char **symname,
-                                       const char **demangle_name,
-                                       uint32_t *lineno, const char **srcpath) {
-  *demangle_name = NULL;
+                                       string_view *symname,
+                                       string_view *demangle_name,
+                                       uint32_t *lineno, string_view *srcpath) {
   assert(cache_hdr);
 #ifdef DEBUG
   printf("DBG: associate ");
@@ -270,16 +275,18 @@ bool error_cache_values(struct Dwfl_Module *mod, Dwarf_Addr newpc,
 }
 
 void dwfl_module_cache_mapsname(const std::string &sname_str,
-                                const char **sname) {
+                                string_view *sname) {
   if (sname_str.empty()) {
-    *sname = nullptr;
+    sname->ptr = nullptr;
+    sname->len = 0;
   } else {
-    *sname = sname_str.c_str();
+    sname->ptr = sname_str.c_str();
+    sname->len = 0;
   }
 }
 
 void dwfl_module_cache_getsname(struct dwflmod_cache_hdr *cache_hdr,
-                                const Dwfl_Module *mod, const char **sname) {
+                                const Dwfl_Module *mod, string_view *sname) {
 
   GElf_Addr key_addr = mod->low_addr;
   auto const it = cache_hdr->_sname_map.find(key_addr);
@@ -305,16 +312,16 @@ extern "C" {
 DDRes dwfl_module_cache_getinfo(struct dwflmod_cache_hdr *cache_hdr,
                                 struct Dwfl_Module *mod, Dwarf_Addr newpc,
                                 pid_t pid, GElf_Off *offset,
-                                const char **demangle_name, uint32_t *lineno,
-                                const char **srcpath) {
+                                string_view *demangle_name, uint32_t *lineno,
+                                string_view *srcpath) {
   try {
-    const char *symname; // for error checking
+    string_view symname; // for error checking
     ddprof::dwfl_module_cache_addrinfo(cache_hdr, mod, newpc, pid, offset,
                                        &symname, demangle_name, lineno,
                                        srcpath);
 
     if (cache_hdr->_setting == K_CACHE_VALIDATE) {
-      if (ddprof::error_cache_values(mod, newpc, *offset, symname)) {
+      if (ddprof::error_cache_values(mod, newpc, *offset, symname.ptr)) {
         ++(cache_hdr->_stats._errors);
         LG_ERR("Error from ddprof::error_cache_values (hit nb %d)",
                cache_hdr->_stats._hit);
@@ -327,7 +334,7 @@ DDRes dwfl_module_cache_getinfo(struct dwflmod_cache_hdr *cache_hdr,
 }
 
 DDRes dwfl_module_cache_getsname(struct dwflmod_cache_hdr *cache_hdr,
-                                 const Dwfl_Module *mod, const char **sname) {
+                                 const Dwfl_Module *mod, string_view *sname) {
   try {
     ddprof::dwfl_module_cache_getsname(cache_hdr, mod, sname);
   }

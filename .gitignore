@@ -2,7 +2,6 @@
 # Directories to ignore (do not add trailing '/'s, they skip symlinks).
 #==============================================================================#
 deliverables
-pprofs
 redis
 release
 temp
@@ -19,7 +18,8 @@ docker-sync.yml
 # Directories to ignore only in root directory
 #==============================================================================#
 /build*
-
+/.docker-sync
+/pprofs
 
 #==============================================================================#
 # Editor auto-saving

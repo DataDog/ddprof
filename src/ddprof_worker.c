@@ -1,5 +1,6 @@
 #include "ddprof_worker.h"
 
+#include <ddprof/pprof.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/time.h>
@@ -9,6 +10,7 @@
 #include "ddprof_context.h"
 #include "ddprof_export.h"
 #include "ddprof_stats.h"
+#include "perf.h"
 #include "pevent_lib.h"
 #include "unwind.h"
 #include "unwind_output.h"
@@ -80,8 +82,7 @@ static inline void export_time_set(DDProfContext *ctx) {
 
 /************************* perf_event_open() helpers **************************/
 /// Entry point for sample aggregation
-void ddprof_pr_sample(DDProfContext *ctx, struct perf_event_sample *sample,
-                      int pos) {
+void ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   // Before we do anything else, copy the perf_event_header into a sample
   struct UnwindState *us = ctx->us;
   DProf *dp = ctx->dp;

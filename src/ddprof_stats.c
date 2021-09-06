@@ -26,12 +26,7 @@ DDRes statsd_init(const char *path_statsd) {
   if (!path_statsd) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_DDPROF_STATS, "Invalid path");
   }
-  DDRES_CHECK_FWD(statsd_connect(path_statsd, strlen(path_statsd), &fd_statsd));
-  if (-1 == fd_statsd) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_DDPROF_STATS,
-                           "Unhandled statsd initialization error");
-  }
-  return ddres_init();
+  return statsd_connect(path_statsd, strlen(path_statsd), &fd_statsd);
 }
 
 DDRes ddprof_stats_init(const char *path_statsd) {
@@ -55,9 +50,8 @@ DDRes ddprof_stats_init(const char *path_statsd) {
   // When we initialize the stats, we should zero out the region
   memset(ddprof_stats, 0, sizeof(long) * STATS_LEN);
 
-  // Perform other initialization
-  DDRES_CHECK_FWD(statsd_init(path_statsd));
-  return ddres_init();
+  // Perform other initialization (returns warnings on statsd failure)
+  return statsd_init(path_statsd);
 }
 
 DDRes ddprof_stats_free() {
