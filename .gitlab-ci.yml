@@ -147,10 +147,22 @@ deploy:ddprof:
   when: always
   image: $BUILD_IMG_STICKY
   stage: deploy
-  tags: ["runner:k8s"]
+  tags: ["runner:docker"]
   script:
     - set -euo pipefail
-    - if [ $CI_COMMIT_BRANCH = "main" ];then PROMOTE=MAJOR;fi
+    - tools/ci_upload.sh
+  dependencies:
+    - build:ddprof
+
+promote:ddprof:
+  extends: .ddprof_job
+  when: manual
+  image: $BUILD_IMG_STICKY
+  stage: deploy
+  tags: ["runner:docker"]
+  script:
+    - set -euo pipefail
+    - export PROMOTE=YES
     - tools/ci_upload.sh
   dependencies:
     - build:ddprof
