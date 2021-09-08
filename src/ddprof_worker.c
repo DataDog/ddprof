@@ -257,15 +257,20 @@ DDRes ddprof_worker_init(PEventHdr *pevent_hdr, void *arg) {
   if (!ctx->exp) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error when creating exporter");
   }
-  DDRES_CHECK_FWD(ddprof_exporter_init(&ctx->exporter_input, ctx->exp));
-  DDRES_CHECK_FWD(ddprof_exporter_new(ctx->exp));
-  DDRES_CHECK_FWD(worker_init(pevent_hdr, ctx->us));
+  ctx->us = calloc(1, sizeof(UnwindState));
+  if (!ctx->us) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
+                           "Error when creating unwinding state");
+  }
   ctx->pprof = malloc(sizeof(DDProfPProf));
   if (!ctx->pprof) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
                            "Error when creating pprof structure");
   }
-  DDRES_CHECK_FWD(pprof_init(ctx->pprof));
+
+  DDRES_CHECK_FWD(ddprof_exporter_init(&ctx->exp_input, ctx->exp));
+  DDRES_CHECK_FWD(ddprof_exporter_new(ctx->exp));
+  DDRES_CHECK_FWD(worker_init(pevent_hdr, ctx->us));
   DDRES_CHECK_FWD(
       pprof_create_profile(ctx->pprof, ctx->watchers, ctx->num_watchers));
   return ddres_init();
@@ -277,6 +282,7 @@ DDRes ddprof_worker_finish(PEventHdr *pevent_hdr, void *arg) {
   DDRES_CHECK_FWD(worker_free(pevent_hdr, ctx->us));
   DDRES_CHECK_FWD(pprof_free_profile(ctx->pprof));
   free(ctx->pprof);
+  free(ctx->us);
   free(ctx->exp);
   return ddres_init();
 }

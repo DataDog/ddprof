@@ -75,8 +75,6 @@ TEST(DDProfExporter, simple) {
     fill_mock_exporter_input(&exporter_input, url);
   }
   DDProfPProf pprofs;
-  pprof_init(&pprofs);
-
   DDProfExporter exporter;
   DDRes res = ddprof_exporter_init(&exporter_input, &exporter);
   EXPECT_TRUE(IsDDResOK(res));

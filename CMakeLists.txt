@@ -160,18 +160,21 @@ include(Findlibstdcxx)
 list(APPEND DDPROF_INCLUDE_LIST ${ELFUTILS_INCLUDE_LIST})
 
 # Find the source files
-aux_source_directory(src MAIN_SRC)
+aux_source_directory(src COMMON_SRC)
 aux_source_directory(src/proto PROTO_SRC)
 aux_source_directory(src/exporter EXPORTER_SRC)
 aux_source_directory(src/pprof PPROF_SRC)
+aux_source_directory(src/exe EXE_SRC)
+
 
 # Define all sources
 set(DDPROF_GLOBAL_SRC
    ${DDPROF_GLOBAL_SRC}
-   ${MAIN_SRC}
+   ${COMMON_SRC}
    ${PROTO_SRC}
    ${PPROF_SRC}
-   ${EXPORTER_SRC})
+   ${EXPORTER_SRC}
+   ${EXE_SRC})
 
 set(DDPROF_LIBRARY_LIST ddprof-c llvm-demangle libstdc++.a dw elf libz.a Threads::Threads libprotobuf-c.a liblzma.a)
 

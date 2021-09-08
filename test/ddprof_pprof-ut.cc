@@ -17,7 +17,6 @@ extern "C" {
 
 TEST(DDProfPProf, init_profiles) {
   DDProfPProf pprofs;
-  pprof_init(&pprofs);
   const PerfOption *perf_option_cpu = perfoptions_preset(10);
   DDRes res = pprof_create_profile(&pprofs, perf_option_cpu, 1);
   EXPECT_TRUE(IsDDResOK(res));
@@ -56,7 +55,6 @@ TEST(DDProfPProf, aggregate) {
   UnwindOutput mock_output;
   fill_unwind_output_1(&mock_output);
   DDProfPProf pprofs;
-  pprof_init(&pprofs);
   const PerfOption *perf_option_cpu = perfoptions_preset(10);
 
   DDRes res = pprof_create_profile(&pprofs, perf_option_cpu, 1);

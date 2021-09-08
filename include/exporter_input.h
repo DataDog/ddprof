@@ -5,12 +5,9 @@
 
 #include <stdlib.h>
 
-/*
-Extract of things to support :
-#define DDR_PARAMS(X) \
-  \
-  X(PROFILERVERSION, profiler_version, 3, "profiler-version", 0, NULL) \
-*/
+#define USERAGENT_DEFAULT "ddprof"
+#define LANGUAGE_DEFAULT "native"
+#define FAMILY_DEFAULT "native"
 
 typedef struct ExporterInput {
   const char *apikey;      // Datadog api key
@@ -19,7 +16,8 @@ typedef struct ExporterInput {
   const char *site;        // not used for now
   const char *port; // port appended to the host IP (ignored in agentless)
   const char
-      *service; // service to identify the profiles (ex:prof-probe-native)
+      *service;     // service to identify the profiles (ex:prof-probe-native)
+  const char *tags; // not used for now
   const char *serviceversion; // appended to tags (example: 1.2.1)
   string_view user_agent;     // ignored for now (override in shared lib)
   string_view language;       // appended to the tags (set to native)
@@ -31,6 +29,7 @@ typedef struct ExporterInput {
 // - intake version : Not handled (set inside libddprof)
 // - runtime
 // - OS
+// - tags
 
 // Possible improvement : create X table to factorize this code
 
@@ -43,6 +42,13 @@ typedef struct ExporterInput {
   } else                                                                       \
     dest->key_name = NULL;
 
+static inline void exporter_input_dflt(ExporterInput *exp_input) {
+  exp_input->family = STRING_VIEW_LITERAL(FAMILY_DEFAULT);
+  exp_input->language = STRING_VIEW_LITERAL(LANGUAGE_DEFAULT);
+  exp_input->user_agent = STRING_VIEW_LITERAL(USERAGENT_DEFAULT);
+  exp_input->profiler_version = str_version();
+}
+
 static inline DDRes exporter_input_copy(const ExporterInput *src,
                                         ExporterInput *dest) {
   DUP_PARAM(apikey);
@@ -51,6 +57,7 @@ static inline DDRes exporter_input_copy(const ExporterInput *src,
   DUP_PARAM(site);
   DUP_PARAM(port);
   DUP_PARAM(service);
+  DUP_PARAM(tags);
   DUP_PARAM(serviceversion);
   dest->user_agent = src->user_agent;
   dest->language = src->language;

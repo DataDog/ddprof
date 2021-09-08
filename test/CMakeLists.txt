@@ -144,6 +144,16 @@ add_unit_test(
 )
 
 add_unit_test(
+    ddprof_input-ut
+    ../src/ddprof_cmdline.c 
+    ../src/ddprof_input.c
+    ../src/perf_option.c
+    ddprof_input-ut.cc
+    LIBRARIES ddprof-c
+    DEFINITIONS MYNAME="ddprof_input-ut"
+)
+
+add_unit_test(
     pevent-ut
     ../src/pevent_lib.c
     ../src/user_override.c

@@ -1,13 +1,14 @@
-#include <gtest/gtest.h>
 
 extern "C" {
+#include "pevent_lib.h"
+
 #include "ddprof_context.h"
 #include "perf_option.h"
-#include "pevent_lib.h"
 
 #include <sys/sysinfo.h>
 #include <unistd.h>
 }
+#include <gtest/gtest.h>
 
 void mock_ddprof_context(DDProfContext *ctx) {
   ctx->num_watchers = 1;

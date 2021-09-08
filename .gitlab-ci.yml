@@ -111,13 +111,15 @@ test:ddprof:
   script:
     - set -euxo pipefail
     - source setup_env.sh
-    # Add a key to export metrics and profiles
+    # Print the k8 runner settings
     - echo "CHECK USER" && id
     - echo "CHECK SETTING ON PERF EVENT PARANOID" && cat /proc/sys/kernel/perf_event_paranoid
     - echo "CHECK SETTING ON PINNED MEMORY" && ulimit -l
     - echo "CHECK SETTING on PERF EVEN OPEN" && cat /proc/sys/kernel/perf_event_mlock_kb
     - echo ""
     - check_dependencies.sh ${BINPATH}/${BUILD_TYPE}/bin/ddprof test/data/expected_deps_${BUILD_TYPE}.txt
+    # Print help (checks that we have the correct help associated to params)
+    - ./${BINPATH}/${BUILD_TYPE}/bin/ddprof -h
     # Run toy project for 5 seconds
     - mkdir pprofs && export DDPROF_PPROFS_FOLDER="$PWD/pprofs"
     - run.sh -b ./${BINPATH}/${BUILD_TYPE}/bin BadBoggleSolver_run 5

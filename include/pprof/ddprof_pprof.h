@@ -13,8 +13,6 @@ typedef struct DDProfPProf {
   int _nb_values;
 } DDProfPProf;
 
-DDRes pprof_init(DDProfPProf *pprof);
-
 DDRes pprof_create_profile(DDProfPProf *pprof, const PerfOption *options,
                            int nbOptions);
 

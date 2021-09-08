@@ -10,40 +10,12 @@
 // forward declarations
 typedef struct DDProfExporter DDProfExporter;
 typedef struct DDProfPProf DDProfPProf;
+typedef struct UnwindState UnwindState;
 
 typedef struct DDProfContext {
-  DDProfExporter *exp; // wrapper around rust exporter
-  DDProfPProf *pprof;  // wrapper around rust exporter
-
-  // Parameters for interpretation
-  char *agent_host;
-  char *prefix;
-  char *tags;
-  char *logmode;
-  char *loglevel;
-
-  // Input parameters
-  char *printargs;
-  char *count_samples;
-  char *enable;
-  char *native_enable;
-  char *upload_period;
-  char *profprofiler;
-  char *faultinfo;
-  char *coredumps;
-  char *nice;
-  char *sendfinal;
-  char *pid;
-  char *global;
-  char *worker_period;
-  char *cache_period;
-  char *internalstats;
-  ExporterInput exporter_input;
   struct {
-    bool count_samples;
     bool enable;
     double upload_period;
-    bool profprofiler;
     bool faultinfo;
     bool coredumps;
     int nice;
@@ -52,10 +24,16 @@ typedef struct DDProfContext {
     bool global;
     uint32_t worker_period; // exports between worker refreshes
     uint32_t cache_period;  // exports between cache clears
+    const char *internalstats;
   } params;
+
+  ExporterInput exp_input;
+  DDProfExporter *exp; // wrapper around rust exporter
+  DDProfPProf *pprof;  // wrapper around rust exporter
+
   PerfOption watchers[MAX_TYPE_WATCHER];
   int num_watchers;
-  struct UnwindState *us;
+  UnwindState *us;
   ProcStatus proc_status;
   int64_t send_nanos;    // Last time an export was sent
   uint32_t count_worker; // exports since last cache clear

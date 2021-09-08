@@ -25,11 +25,6 @@ static ddprof_ffi_Slice_c_char ffi_empty_char_slice(void) {
   return (struct ddprof_ffi_Slice_c_char){.ptr = (NULL), 0};
 }
 
-DDRes pprof_init(DDProfPProf *pprof) {
-  memset(pprof, 0, sizeof(DDProfPProf));
-  return ddres_init();
-}
-
 static const struct ddprof_ffi_ValueType s_sample_count = {
     .type_ = SLICE_LITERAL("sample"),
     .unit = SLICE_LITERAL("count"),

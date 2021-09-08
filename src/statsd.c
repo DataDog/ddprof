@@ -17,7 +17,7 @@ DDRes statsd_listen(const char *path, size_t sz_path, int *fd) {
   // Open the socket
   memcpy(addr_bind.sun_path, path, sz_path);
   if (-1 == (fd_sock = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0))) {
-    DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Creating UDS failed (%s)",
+    DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "[STATSD] Creating UDS failed (%s)",
                           strerror(errno));
   }
 
@@ -53,7 +53,8 @@ DDRes statsd_connect(const char *path, size_t sz_path, int *fd) {
 
   // We bind to a temporary file, since that's needed for the interface
   if (-1 == (fd_tmp = mkstemp(template))) {
-    DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Creating temporary file failed (%s)",
+    DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD,
+                          "[STATSD] Creating temporary file failed (%s)",
                           strerror(errno));
   }
 
@@ -70,7 +71,8 @@ DDRes statsd_connect(const char *path, size_t sz_path, int *fd) {
   if (connect(fd_sock, (struct sockaddr *)&addr_peer, sizeof(addr_peer))) {
     close(fd_tmp);
     close(fd_sock);
-    DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Connecting to host failed (%s)",
+    DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD,
+                          "[STATSD] Connecting to host failed (%s)",
                           strerror(errno));
   }
 
