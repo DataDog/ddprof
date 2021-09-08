@@ -1,21 +1,19 @@
 #pragma once
 
-#include "libdw.h"
-#include "libdwfl.h"
-#include "libebl.h"
 #include <dwarf.h>
 #include <stdbool.h>
 
 #include "ddres_def.h"
-#include "dso.h"
 #include "dwfl_internals.h"
-#include "dwfl_module_cache.h"
 #include "procutils.h"
+#include "unwind_cache.h"
 #include "unwind_output.h"
+
+typedef struct Dso Dso;
 
 typedef struct UnwindState {
   Dwfl *dwfl;
-  struct dwflmod_cache_hdr *cache_hdr;
+  struct unwind_cache_hdr *cache_hdr;
   pid_t pid;
   char *stack;
   size_t stack_sz;

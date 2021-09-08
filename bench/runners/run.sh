@@ -182,7 +182,7 @@ if [ ! -z ${BUILD_FOLDER} ] && [ -d ${BUILD_FOLDER} ]; then
   echo "Override ddprof folder to ${BUILD_FOLDER}..."
   CMD="${PREPEND_CMD} ${BUILD_FOLDER}/ddprof"
 fi
-echo "ddprof:${BUILD_FOLDER}/ddprof"
+echo "ddprof cmd:${CMD}"
 
 # Do service version stuff
 VERFILE="tmp/run.ver"

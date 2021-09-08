@@ -17,10 +17,10 @@ static const char *s_so_paths[] = {"/app/lib/bar.0.so"};
 static inline void fill_unwind_output_1(UnwindOutput *uw_output) {
 
   uw_output_clear(uw_output);
-  uw_output->idx = K_MOCK_LOC_SIZE;
+  uw_output->nb_locs = K_MOCK_LOC_SIZE;
 
   FunLoc *locs = uw_output->locs;
-  for (unsigned i = 0; i < uw_output->idx; ++i) {
+  for (unsigned i = 0; i < uw_output->nb_locs; ++i) {
     locs[i].funname = string_view_create_strlen(s_func_names[i]);
     locs[i].srcpath = string_view_create_strlen(s_src_paths[i]);
     locs[i].sopath = string_view_create_strlen(s_so_paths[0]);
@@ -29,6 +29,5 @@ static inline void fill_unwind_output_1(UnwindOutput *uw_output) {
     locs[i].map_end = 200 + i;
     locs[i].map_off = 300 + i;
     locs[i].line = 10 * i;
-    locs[i].disc = 1 + i;
   }
 }

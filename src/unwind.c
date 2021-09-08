@@ -2,6 +2,7 @@
 
 #include "ddres.h"
 #include "demangle.h"
+#include "dso.h"
 #include "logger.h"
 #include "signal_helper.h"
 
@@ -153,9 +154,9 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
   // Now we register
   GElf_Off offset = {0};
   UnwindOutput *output = &us->output;
-  int64_t current_idx = output->idx;
+  int64_t current_idx = output->nb_locs;
 
-  DDRes cache_status = dwfl_module_cache_getinfo(
+  DDRes cache_status = pcinfo_cache_get(
       us->cache_hdr, mod, pc, us->pid, &offset,
       &output->locs[current_idx].funname, &output->locs[current_idx].line,
       &output->locs[current_idx].srcpath);
@@ -169,14 +170,14 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
   output->locs[current_idx].map_end = mod->high_addr;
   output->locs[current_idx].map_off = offset;
 
-  cache_status = dwfl_module_cache_getsname(
-      us->cache_hdr, mod, &(output->locs[current_idx].sopath));
+  cache_status = mapinfo_cache_get(us->cache_hdr, mod,
+                                   &(output->locs[current_idx].sopath));
   if (IsDDResNotOK(cache_status)) {
-    LG_ERR("Error from dwfl_module_cache_getsname");
+    LG_ERR("Error from mapinfo_cache_get");
     return DWARF_CB_ABORT;
   }
 
-  output->idx++;
+  output->nb_locs++;
   return DWARF_CB_OK;
 }
 
@@ -212,7 +213,7 @@ static void unwind_dwfl_end(struct UnwindState *us) {
 }
 
 DDRes dwfl_caches_clear(struct UnwindState *us) {
-  DDRES_CHECK_FWD(dwflmod_cache_hdr_clear(us->cache_hdr));
+  DDRES_CHECK_FWD(unwind_cache_hdr_clear(us->cache_hdr));
   unwind_dwfl_end(us);
   return unwind_dwfl_begin(us);
 }
@@ -236,7 +237,7 @@ static DDRes unwind_attach(struct UnwindState *us) {
 }
 
 DDRes unwind_init(struct UnwindState *us) {
-  DDRES_CHECK_FWD(dwflmod_cache_hdr_init(&(us->cache_hdr)));
+  DDRES_CHECK_FWD(unwind_cache_hdr_init(&(us->cache_hdr)));
   elf_version(EV_CURRENT);
   DDRES_CHECK_FWD(unwind_dwfl_begin(us));
   libdso_init();
@@ -244,7 +245,7 @@ DDRes unwind_init(struct UnwindState *us) {
 }
 
 void unwind_free(struct UnwindState *us) {
-  dwflmod_cache_hdr_free(us->cache_hdr);
+  unwind_cache_hdr_free(us->cache_hdr);
   unwind_dwfl_end(us);
   us->cache_hdr = NULL;
 }
@@ -260,8 +261,8 @@ DDRes unwindstate__unwind(struct UnwindState *us) {
      * reactivate the log (it is too verbose for now) */
     // LG_DBG("[UNWIND] dwfl_getthread_frames was nonzero (%s)",
     // dwfl_errmsg(-1));
-    return us->output.idx > 0 ? ddres_init()
-                              : ddres_error(DD_WHAT_DWFL_LIB_ERROR);
+    return us->output.nb_locs > 0 ? ddres_init()
+                                  : ddres_error(DD_WHAT_DWFL_LIB_ERROR);
   }
 
   return ddres_init();

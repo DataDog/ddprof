@@ -8,6 +8,7 @@
 
 #include "ddprof_context.h"
 #include "ddprof_stats.h"
+#include "dso.h"
 #include "exporter/ddprof_exporter.h"
 #include "perf.h"
 #include "pevent_lib.h"

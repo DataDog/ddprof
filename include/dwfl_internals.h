@@ -1,5 +1,9 @@
 #pragma once
 
+#include "libdw.h"
+#include "libdwfl.h"
+#include "libebl.h"
+
 typedef struct Dwfl_Process Dwfl_Process;
 #define _(Str) dgettext("elfutils", Str)
 

@@ -9,5 +9,5 @@ static void FunLoc_clear(FunLoc *locs) {
 
 void uw_output_clear(UnwindOutput *output) {
   FunLoc_clear(output->locs);
-  output->idx = 0;
+  output->nb_locs = 0;
 }

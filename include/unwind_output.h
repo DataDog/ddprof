@@ -15,12 +15,11 @@ typedef struct FunLoc {
   string_view srcpath; // name of the source file, if known
   string_view sopath;  // name of the file where the symbol resides (e.g. .so)
   uint32_t line;       // line number in file
-  uint32_t disc;       // discriminator
 } FunLoc;
 
 typedef struct UnwindOutput {
   FunLoc locs[DD_MAX_STACK];
-  uint64_t idx;
+  uint64_t nb_locs;
 } UnwindOutput;
 
 void uw_output_clear(UnwindOutput *);

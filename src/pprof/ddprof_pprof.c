@@ -134,7 +134,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output, uint64_t value,
   ddprof_ffi_Line line_buff[DD_MAX_STACK];
 
   const FunLoc *locs = uw_output->locs;
-  for (int i = 0; i < uw_output->idx; ++i) {
+  for (int i = 0; i < uw_output->nb_locs; ++i) {
     // possibly several lines to handle inlined function (not handled for now)
     ddprof_ffi_Slice_line lines = {.ptr = &line_buff[i], .len = 1};
     write_line(&locs[i], &line_buff[i]);
@@ -144,7 +144,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output, uint64_t value,
   struct ddprof_ffi_Sample sample = {
       .value = {.ptr = values, .len = pprof->_nb_values},
       .label = {.ptr = NULL, 0},
-      .locations = {.ptr = locations_buff, uw_output->idx},
+      .locations = {.ptr = locations_buff, uw_output->nb_locs},
   };
 
   uint64_t id_sample = ddprof_ffi_Profile_add(profile, sample);
