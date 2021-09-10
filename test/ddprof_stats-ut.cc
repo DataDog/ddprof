@@ -19,7 +19,7 @@ TEST(ddprof_statsTest, Connect) {
       IsDDResOK(statsd_listen(path_listen, strlen(path_listen), &fd_listener)));
 
   // Connect to server using ddprof_stats rather than statsd directly
-  EXPECT_TRUE(IsDDResOK(ddprof_stats_init(path_listen)));
+  EXPECT_TRUE(IsDDResOK(ddprof_stats_init()));
 
   // Can we teardown correctly?
   EXPECT_TRUE(IsDDResOK(ddprof_stats_free()));
@@ -38,13 +38,13 @@ TEST(ddprof_statsTest, Reconnect) {
       IsDDResOK(statsd_listen(path_listen, strlen(path_listen), &fd_listener)));
 
   // Connect to server using ddprof_stats rather than statsd directly
-  EXPECT_TRUE(IsDDResOK(ddprof_stats_init(path_listen)));
+  EXPECT_TRUE(IsDDResOK(ddprof_stats_init()));
 
   // Can we teardown correctly?
   EXPECT_TRUE(IsDDResOK(ddprof_stats_free()));
 
   // Can we connect and teardown again safely?
-  EXPECT_TRUE(IsDDResOK(ddprof_stats_init(path_listen)));
+  EXPECT_TRUE(IsDDResOK(ddprof_stats_init()));
   EXPECT_TRUE(IsDDResOK(ddprof_stats_free()));
 
   // We're done
@@ -61,7 +61,7 @@ TEST(ddprof_statsTest, ConnectAndSet) {
       IsDDResOK(statsd_listen(path_listen, strlen(path_listen), &fd_listener)));
 
   // Connect to server using ddprof_stats rather than statsd directly
-  EXPECT_TRUE(IsDDResOK(ddprof_stats_init(path_listen)));
+  EXPECT_TRUE(IsDDResOK(ddprof_stats_init()));
 
   // Set a valid stat
   const long stats_test_val = 12345;
@@ -78,7 +78,7 @@ TEST(ddprof_statsTest, ConnectAndSet) {
 }
 
 TEST(ddprof_statsTest, Arithmetic) {
-  const char path_listen[] = "/tmp/my_statsd_listener";
+  const char path_listen[] = IPC_TEST_DATA "my_statsd_listener.sock";
   unlink(path_listen); // make sure node is available, OK if this fails
 
   // Initiate "server"
@@ -87,7 +87,7 @@ TEST(ddprof_statsTest, Arithmetic) {
       IsDDResOK(statsd_listen(path_listen, strlen(path_listen), &fd_listener)));
 
   // Connect to server using ddprof_stats rather than statsd directly
-  EXPECT_TRUE(IsDDResOK(ddprof_stats_init(path_listen)));
+  EXPECT_TRUE(IsDDResOK(ddprof_stats_init()));
 
   // Set a valid stat
   const long stats_test_val = 12345;
@@ -102,6 +102,8 @@ TEST(ddprof_statsTest, Arithmetic) {
   EXPECT_TRUE(IsDDResOK(
       ddprof_stats_add(STATS_EVENT_COUNT, stats_test_val, &stats_check_val)));
   EXPECT_EQ(2 * stats_test_val, stats_check_val);
+
+  EXPECT_TRUE(IsDDResOK(ddprof_stats_send(path_listen)));
 
   // Disconnect and close
   EXPECT_TRUE(IsDDResOK(ddprof_stats_free()));
@@ -118,9 +120,11 @@ TEST(ddprof_statsTest, BadConnection) {
   int fd_listener;
   EXPECT_TRUE(
       IsDDResOK(statsd_listen(path_listen, strlen(path_listen), &fd_listener)));
+  EXPECT_TRUE(IsDDResOK(ddprof_stats_init()));
+  EXPECT_TRUE(IsDDResOK(ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL)));
 
-  // Connect to the wrong server, should fail
-  EXPECT_FALSE(IsDDResOK(ddprof_stats_init(path_try)));
+  EXPECT_FALSE(IsDDResOK(ddprof_stats_send(path_try)));
+
   close(fd_listener);
 }
 
@@ -132,7 +136,7 @@ TEST(ddprof_statsTest, MiscellaneousStats) {
   int fd_listener;
   EXPECT_TRUE(
       IsDDResOK(statsd_listen(path_listen, strlen(path_listen), &fd_listener)));
-  EXPECT_TRUE(IsDDResOK(ddprof_stats_init(path_listen)));
+  EXPECT_TRUE(IsDDResOK(ddprof_stats_init()));
 
   // Submit a bad metric
   EXPECT_FALSE(IsDDResOK(ddprof_stats_set(STATS_LEN, 404)));

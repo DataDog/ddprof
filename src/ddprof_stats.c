@@ -15,28 +15,12 @@ static const char *stats_paths[] = {STATS_TABLE(X_PATH)};
 static const unsigned int stats_types[] = {STATS_TABLE(X_TYPES)};
 #undef X_TYPES
 
-// File descriptor for statsd
-static int fd_statsd = -1;
-
 // Region (to be mmap'd here) for backend store
 long *ddprof_stats = NULL;
 
-// Helper function for getting statsd connection
-DDRes statsd_init(const char *path_statsd) {
-  if (!path_statsd) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_DDPROF_STATS, "Invalid path");
-  }
-  return statsd_connect(path_statsd, strlen(path_statsd), &fd_statsd);
-}
-
-DDRes ddprof_stats_init(const char *path_statsd) {
+DDRes ddprof_stats_init(void) {
   // This interface cannot be used to reset the existing mapping; to do so free
   // and then re-initialize.
-
-  // Early check, before mmap()
-  if (!path_statsd) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_DDPROF_STATS, "Invalid path");
-  }
 
   if (ddprof_stats)
     return ddres_init();
@@ -51,7 +35,7 @@ DDRes ddprof_stats_init(const char *path_statsd) {
   memset(ddprof_stats, 0, sizeof(long) * STATS_LEN);
 
   // Perform other initialization (returns warnings on statsd failure)
-  return statsd_init(path_statsd);
+  return ddres_init();
 }
 
 DDRes ddprof_stats_free() {
@@ -60,10 +44,6 @@ DDRes ddprof_stats_free() {
                     DD_WHAT_DDPROF_STATS, "Error from munmap");
   ddprof_stats = NULL;
 
-  if (fd_statsd != -1) {
-    DDRES_CHECK_FWD(statsd_close(fd_statsd));
-    fd_statsd = -1;
-  }
   return ddres_init();
 }
 
@@ -118,14 +98,22 @@ DDRes ddprof_stats_get(unsigned int stat, long *out) {
   return ddres_init();
 }
 
-DDRes ddprof_stats_send(void) {
-  if (fd_statsd == -1) // statsd client not available
+DDRes ddprof_stats_send(const char *statsd_socket) {
+  if (!statsd_socket) {
+    LG_NTC("[STATS] No statsd socket provided");
     return ddres_init();
+  }
+  int fd_statsd = -1;
+
+  DDRES_CHECK_FWD(
+      statsd_connect(statsd_socket, strlen(statsd_socket), &fd_statsd));
+
   for (unsigned int i = 0; i < STATS_LEN; i++) {
     DDRES_CHECK_FWD(statsd_send(fd_statsd, stats_paths[i], &ddprof_stats[i],
                                 stats_types[i]));
   }
-  return ddres_init();
+
+  return statsd_close(fd_statsd);
 }
 
 void ddprof_stats_print() {

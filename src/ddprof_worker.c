@@ -127,7 +127,7 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
 
   // And emit diagnostic output (if it's enabled)
   print_diagnostics();
-  DDRES_CHECK_FWD(ddprof_stats_send());
+  DDRES_CHECK_FWD(ddprof_stats_send(ctx->params.internalstats));
 
   // Take the current pprof contents and ship them to the backend.  This also
   // clears the pprof for reuse

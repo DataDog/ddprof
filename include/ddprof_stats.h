@@ -23,7 +23,7 @@ typedef enum DDPROF_STATS { STATS_TABLE(X_ENUM) STATS_LEN } DDPROF_STATS;
 // Necessary for initializing the backend store for stats.  It's necessary that
 // this is called prior to any fork() calls where the children might want to use
 // stats, but it's fine to call this after forks have spawned.
-DDRes ddprof_stats_init(const char *path_statsd);
+DDRes ddprof_stats_init(void);
 
 // Whereas the regions are inherited by forks, freeing the backend store is not.
 // That means that free() must be called from every process wishing to clean
@@ -43,7 +43,7 @@ DDRes ddprof_stats_clear(unsigned int stat);
 DDRes ddprof_stats_get(unsigned int stat, long *out);
 
 // Send all the registered values
-DDRes ddprof_stats_send(void);
+DDRes ddprof_stats_send(const char *statsd_socket);
 
 // Print all known stats to the configured log
 void ddprof_stats_print();
