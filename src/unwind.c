@@ -5,6 +5,7 @@
 #include "dso.h"
 #include "logger.h"
 #include "signal_helper.h"
+#include "unwind_symbols.h"
 
 #define UNUSED(x) (void)(x)
 
@@ -152,28 +153,23 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
   }
 
   // Now we register
-  GElf_Off offset = {0};
   UnwindOutput *output = &us->output;
   int64_t current_idx = output->nb_locs;
 
-  DDRes cache_status = pcinfo_cache_get(
-      us->cache_hdr, mod, pc, us->pid, &offset,
-      &output->locs[current_idx].funname, &output->locs[current_idx].line,
-      &output->locs[current_idx].srcpath);
+  DDRes cache_status =
+      ipinfo_lookup_get(us->symbols_hdr, mod, pc, us->pid,
+                        &output->locs[current_idx]._ipinfo_idx);
   if (IsDDResNotOK(cache_status)) {
     LG_ERR("Error from dwflmod_cache_status");
     return DWARF_CB_ABORT;
   }
 
   output->locs[current_idx].ip = pc;
-  output->locs[current_idx].map_start = mod->low_addr;
-  output->locs[current_idx].map_end = mod->high_addr;
-  output->locs[current_idx].map_off = offset;
 
-  cache_status = mapinfo_cache_get(us->cache_hdr, mod,
-                                   &(output->locs[current_idx].sopath));
+  cache_status = mapinfo_lookup_get(us->symbols_hdr, mod,
+                                    &(output->locs[current_idx]._map_info_idx));
   if (IsDDResNotOK(cache_status)) {
-    LG_ERR("Error from mapinfo_cache_get");
+    LG_ERR("Error from mapinfo_lookup_get");
     return DWARF_CB_ABORT;
   }
 
@@ -213,7 +209,7 @@ static void unwind_dwfl_end(struct UnwindState *us) {
 }
 
 DDRes dwfl_caches_clear(struct UnwindState *us) {
-  DDRES_CHECK_FWD(unwind_cache_hdr_clear(us->cache_hdr));
+  DDRES_CHECK_FWD(unwind_symbols_hdr_clear(us->symbols_hdr));
   unwind_dwfl_end(us);
   return unwind_dwfl_begin(us);
 }
@@ -237,7 +233,7 @@ static DDRes unwind_attach(struct UnwindState *us) {
 }
 
 DDRes unwind_init(struct UnwindState *us) {
-  DDRES_CHECK_FWD(unwind_cache_hdr_init(&(us->cache_hdr)));
+  DDRES_CHECK_FWD(unwind_symbols_hdr_init(&(us->symbols_hdr)));
   elf_version(EV_CURRENT);
   DDRES_CHECK_FWD(unwind_dwfl_begin(us));
   libdso_init();
@@ -245,9 +241,9 @@ DDRes unwind_init(struct UnwindState *us) {
 }
 
 void unwind_free(struct UnwindState *us) {
-  unwind_cache_hdr_free(us->cache_hdr);
+  unwind_symbols_hdr_free(us->symbols_hdr);
   unwind_dwfl_end(us);
-  us->cache_hdr = NULL;
+  us->symbols_hdr = NULL;
 }
 
 DDRes unwindstate__unwind(struct UnwindState *us) {

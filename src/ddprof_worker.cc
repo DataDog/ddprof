@@ -1,3 +1,4 @@
+extern "C" {
 #include "ddprof_worker.h"
 
 #include <stddef.h>
@@ -15,6 +16,7 @@
 #include "pprof/ddprof_pprof.h"
 #include "unwind.h"
 #include "unwind_output.h"
+}
 
 #ifdef DBG_JEMALLOC
 #  include <jemalloc/jemalloc.h>
@@ -34,7 +36,7 @@ static void print_diagnostics() {
 #endif
 }
 
-static DDRes worker_init(PEventHdr *pevent_hdr, UnwindState *us) {
+static DDRes worker_unwind_init(PEventHdr *pevent_hdr, UnwindState *us) {
   // If we're here, then we are a child spawned during the startup operation.
   // That means we need to iterate through the perf_event_open() handles and
   // get the mmaps
@@ -45,21 +47,18 @@ static DDRes worker_init(PEventHdr *pevent_hdr, UnwindState *us) {
   return ddres_init();
 }
 
-static DDRes worker_free(PEventHdr *pevent_hdr, UnwindState *us) {
+static DDRes worker_unwind_free(PEventHdr *pevent_hdr, UnwindState *us) {
   unwind_free(us);
   DDRES_CHECK_FWD(pevent_munmap(pevent_hdr));
   return ddres_init();
 }
 
 /// Retrieve cpu / memory info
-static DDRes ddprof_procfs_scrape(DDProfContext *ctx) {
-  DDRES_CHECK_FWD(proc_read(&ctx->proc_status));
-
+static DDRes ddprof_procfs_scrape(ProcStatus *procstat) {
+  DDRES_CHECK_FWD(proc_read(procstat));
   // Update the procstats, but first snapshot the utime so we can compute the
   // diff for the utime metric
-  long utime_old = ctx->proc_status.utime;
-  ProcStatus *procstat = &ctx->proc_status;
-
+  long utime_old = procstat->utime;
   ddprof_stats_set(STATS_PROCFS_RSS, 1024 * procstat->rss);
   ddprof_stats_set(STATS_PROCFS_UTIME, procstat->utime - utime_old);
   return ddres_init();
@@ -71,22 +70,22 @@ static inline int64_t now_nanos() {
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
 }
 
-static inline long export_time_increment(DDProfContext *ctx) {
-  assert(ctx);
-  return ctx->params.upload_period * 1000000000;
+static inline long export_time_convert(double upload_period) {
+  return upload_period * 1000000000;
 }
 
 static inline void export_time_set(DDProfContext *ctx) {
   assert(ctx);
-  ctx->send_nanos = now_nanos() + export_time_increment(ctx);
+  ctx->worker_ctx.send_nanos =
+      now_nanos() + export_time_convert(ctx->params.upload_period);
 }
 
 /************************* perf_event_open() helpers **************************/
 /// Entry point for sample aggregation
 DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   // Before we do anything else, copy the perf_event_header into a sample
-  struct UnwindState *us = ctx->us;
-  DDProfPProf *pprof = ctx->pprof;
+  struct UnwindState *us = ctx->worker_ctx.us;
+  DDProfPProf *pprof = ctx->worker_ctx.pprof;
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
   us->pid = sample->pid;
   us->stack = NULL;
@@ -109,12 +108,13 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   DDRES_CHECK_FWD(ddprof_stats_add(STATS_UNWIND_TICKS,
                                    __rdtsc() - this_ticks_unwind, NULL));
 
-  DDRES_CHECK_FWD(pprof_aggregate(&us->output, sample->period, pos, pprof));
+  DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbols_hdr, sample->period,
+                                  pos, pprof));
   return ddres_init();
 }
 
 static void ddprof_cycle_stats() {
-  for (int i = 0; i < cycled_stats_sz; ++i) {
+  for (unsigned i = 0; i < cycled_stats_sz; ++i) {
     ddprof_stats_clear(s_cycled_stats[i]);
   }
 }
@@ -123,7 +123,7 @@ static void ddprof_cycle_stats() {
 static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
 
   // Scrape procfs for process usage statistics
-  ddprof_procfs_scrape(ctx);
+  DDRES_CHECK_FWD(ddprof_procfs_scrape(&ctx->worker_ctx.proc_status));
 
   // And emit diagnostic output (if it's enabled)
   print_diagnostics();
@@ -131,20 +131,21 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
 
   // Take the current pprof contents and ship them to the backend.  This also
   // clears the pprof for reuse
-  DDRES_CHECK_FWD(ddprof_exporter_export(ctx->pprof->_profile, ctx->exp));
+  DDRES_CHECK_FWD(ddprof_exporter_export(ctx->worker_ctx.pprof->_profile,
+                                         ctx->worker_ctx.exp));
 
   // Increase the counts of exports
-  ctx->count_worker += 1;
-  ctx->count_cache += 1;
+  ctx->worker_ctx.count_worker += 1;
+  ctx->worker_ctx.count_cache += 1;
 
   // Update the time last sent
-  ctx->send_nanos += export_time_increment(ctx);
+  ctx->worker_ctx.send_nanos += export_time_convert(ctx->params.upload_period);
 
   // If the clock was frozen for some reason, we need to detect situations
   // where we'll have catchup windows and reset the export timer.  This can
   // easily happen under temporary load when the profiler is off-CPU, if the
   // process is put in the cgroup freezer, or if we're being emulated.
-  if (now > ctx->send_nanos) {
+  if (now > ctx->worker_ctx.send_nanos) {
     LG_WRN("Timer skew detected; frequent warnings may suggest system issue");
     export_time_set(ctx);
   }
@@ -152,7 +153,7 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
   // Reset stats relevant to a single cycle
   ddprof_cycle_stats();
 
-  DDRES_CHECK_FWD(pprof_reset(ctx->pprof));
+  DDRES_CHECK_FWD(pprof_reset(ctx->worker_ctx.pprof));
 
   return ddres_init();
 }
@@ -213,17 +214,17 @@ static DDRes reset_state(DDProfContext *ctx,
   //          which informs the caller to refresh the worker
   //       2. new worker should be initialized with a fresh state, so clearing
   //          it here is irrelevant anyway
-  if (ctx->params.worker_period <= ctx->count_worker) {
+  if (ctx->params.worker_period <= ctx->worker_ctx.count_worker) {
     *continue_profiling = true;
     DDRES_RETURN_WARN_LOG(DD_WHAT_WORKER_RESET, "%s: cnt=%u - stop worker (%s)",
-                          __FUNCTION__, ctx->count_worker,
+                          __FUNCTION__, ctx->worker_ctx.count_worker,
                           (*continue_profiling) ? "continue" : "stop");
   }
 
   // If we haven't hit the hard cap, have we hit the soft cap?
-  if (ctx->params.cache_period <= ctx->count_cache) {
-    ctx->count_cache = 0;
-    DDRES_CHECK_FWD(dwfl_caches_clear(ctx->us));
+  if (ctx->params.cache_period <= ctx->worker_ctx.count_cache) {
+    ctx->worker_ctx.count_cache = 0;
+    DDRES_CHECK_FWD(dwfl_caches_clear(ctx->worker_ctx.us));
   }
 
   return ddres_init();
@@ -231,9 +232,9 @@ static DDRes reset_state(DDProfContext *ctx,
 
 /********************************** callbacks *********************************/
 DDRes ddprof_worker_timeout(volatile bool *continue_profiling, void *arg) {
-  DDProfContext *ctx = arg;
+  DDProfContext *ctx = (DDProfContext *)arg;
   int64_t now = now_nanos();
-  if (now > ctx->send_nanos) {
+  if (now > ctx->worker_ctx.send_nanos) {
     DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now));
     // reset state defines if we should reboot the worker
     DDRes res = reset_state(ctx, continue_profiling);
@@ -245,52 +246,55 @@ DDRes ddprof_worker_timeout(volatile bool *continue_profiling, void *arg) {
   return ddres_init();
 }
 
-DDRes ddprof_worker_init(PEventHdr *pevent_hdr, void *arg) {
-  DDProfContext *ctx = arg;
+DDRes ddprof_worker_init(void *arg) {
+  DDProfContext *ctx = (DDProfContext *)arg;
+  PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
 
   // Set the initial time
   export_time_set(ctx);
 
   // Make sure worker-related counters are reset
-  ctx->count_worker = 0;
-  ctx->count_cache = 0;
-  ctx->exp = malloc(sizeof(DDProfExporter));
-  if (!ctx->exp) {
+  ctx->worker_ctx.count_worker = 0;
+  ctx->worker_ctx.count_cache = 0;
+  ctx->worker_ctx.exp = (DDProfExporter *)malloc(sizeof(DDProfExporter));
+  if (!ctx->worker_ctx.exp) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error when creating exporter");
   }
-  ctx->us = calloc(1, sizeof(UnwindState));
-  if (!ctx->us) {
+  ctx->worker_ctx.us = (UnwindState *)calloc(1, sizeof(UnwindState));
+  if (!ctx->worker_ctx.us) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
                            "Error when creating unwinding state");
   }
-  ctx->pprof = malloc(sizeof(DDProfPProf));
-  if (!ctx->pprof) {
+  ctx->worker_ctx.pprof = (DDProfPProf *)malloc(sizeof(DDProfPProf));
+  if (!ctx->worker_ctx.pprof) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
                            "Error when creating pprof structure");
   }
 
-  DDRES_CHECK_FWD(ddprof_exporter_init(&ctx->exp_input, ctx->exp));
-  DDRES_CHECK_FWD(ddprof_exporter_new(ctx->exp));
-  DDRES_CHECK_FWD(worker_init(pevent_hdr, ctx->us));
-  DDRES_CHECK_FWD(
-      pprof_create_profile(ctx->pprof, ctx->watchers, ctx->num_watchers));
+  DDRES_CHECK_FWD(ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp));
+  DDRES_CHECK_FWD(ddprof_exporter_new(ctx->worker_ctx.exp));
+  DDRES_CHECK_FWD(worker_unwind_init(pevent_hdr, ctx->worker_ctx.us));
+  DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof, ctx->watchers,
+                                       ctx->num_watchers));
   return ddres_init();
 }
 
-DDRes ddprof_worker_finish(PEventHdr *pevent_hdr, void *arg) {
-  DDProfContext *ctx = arg;
-  DDRES_CHECK_FWD(ddprof_exporter_free(ctx->exp));
-  DDRES_CHECK_FWD(worker_free(pevent_hdr, ctx->us));
-  DDRES_CHECK_FWD(pprof_free_profile(ctx->pprof));
-  free(ctx->pprof);
-  free(ctx->us);
-  free(ctx->exp);
+DDRes ddprof_worker_finish(void *arg) {
+  DDProfContext *ctx = (DDProfContext *)arg;
+  PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
+
+  DDRES_CHECK_FWD(ddprof_exporter_free(ctx->worker_ctx.exp));
+  DDRES_CHECK_FWD(worker_unwind_free(pevent_hdr, ctx->worker_ctx.us));
+  DDRES_CHECK_FWD(pprof_free_profile(ctx->worker_ctx.pprof));
+  free(ctx->worker_ctx.pprof);
+  free(ctx->worker_ctx.us);
+  free(ctx->worker_ctx.exp);
   return ddres_init();
 }
 
 DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
                     volatile bool *continue_profiling, void *arg) {
-  DDProfContext *ctx = arg;
+  DDProfContext *ctx = (DDProfContext *)arg;
 
   switch (hdr->type) {
   case PERF_RECORD_SAMPLE:
@@ -319,7 +323,7 @@ DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
   // rate to the last time.
   int64_t now = now_nanos();
 
-  if (now > ctx->send_nanos) {
+  if (now > ctx->worker_ctx.send_nanos) {
     DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now));
     // reset state defines if we should reboot the worker
     DDRes res = reset_state(ctx, continue_profiling);

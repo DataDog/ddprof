@@ -6,14 +6,15 @@
 #include "ddres_def.h"
 #include "dwfl_internals.h"
 #include "procutils.h"
-#include "unwind_cache.h"
 #include "unwind_output.h"
 
 typedef struct Dso Dso;
 
+typedef struct UnwindSymbolsHdr UnwindSymbolsHdr;
+
 typedef struct UnwindState {
   Dwfl *dwfl;
-  struct unwind_cache_hdr *cache_hdr;
+  struct UnwindSymbolsHdr *symbols_hdr;
   pid_t pid;
   char *stack;
   size_t stack_sz;

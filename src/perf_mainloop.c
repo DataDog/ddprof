@@ -53,50 +53,59 @@ DDRes spawn_workers(volatile bool *continue_profiling) {
   return ddres_init();
 }
 
-void worker(void *arg, PEventHdr *pevent_hdr, perfopen_attr *attr,
-            volatile bool *continue_profiling) {
-  int pe_len = pevent_hdr->size;
-  PEvent *pes = pevent_hdr->pes;
+static void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
+                         int *pfd_len) {
+  *pfd_len = pevent_hdr->size;
+  const PEvent *pes = pevent_hdr->pes;
+  // Setup poll() to watch perf_event file descriptors
+  for (int i = 0; i < *pfd_len; i++) {
+    // NOTE: if fd is negative, it will be ignored
+    pfd[i].fd = pes[i].fd;
+    pfd[i].events = POLLIN | POLLERR | POLLHUP;
+  }
+}
 
+static void worker(DDProfContext *ctx, const perfopen_attr *attr,
+                   volatile bool *continue_profiling) {
   // Until a restartable terminal condition is met, the worker will set its
   // disposition so that profiling is halted upon its termination
   *continue_profiling = false;
 
   // Setup poll() to watch perf_event file descriptors
   struct pollfd pfd[MAX_NB_WATCHERS];
-  for (int i = 0; i < pe_len; i++) {
-    // NOTE: if fd is negative, it will be ignored
-    pfd[i].fd = pes[i].fd;
-    pfd[i].events = POLLIN | POLLERR | POLLHUP;
-  }
+  int pfd_len = 0;
+  pollfd_setup(&ctx->worker_ctx.pevent_hdr, pfd, &pfd_len);
 
   // Perform user-provided initialization
-  ddres_check_or_shutdown(attr->init_fun(pevent_hdr, arg));
+  ddres_check_or_shutdown(attr->init_fun(ctx));
 
   // Worker poll loop
   while (1) {
-    int n = poll(pfd, pe_len, PSAMPLE_DEFAULT_WAKEUP);
+    int n = poll(pfd, pfd_len, PSAMPLE_DEFAULT_WAKEUP);
 
     // If there was an issue, return and let the caller check errno
     if (-1 == n && errno == EINTR) {
       continue;
     } else if (-1 == n) {
-      attr->finish_fun(pevent_hdr, arg);
+      attr->finish_fun(ctx);
       ddres_check_or_shutdown(ddres_error(DD_WHAT_POLLERROR));
     }
 
     // If no file descriptors, call time-out
     if (0 == n) {
       if (attr->timeout_fun) {
-        DDRes res = attr->timeout_fun(continue_profiling, arg);
+        DDRes res = attr->timeout_fun(continue_profiling, ctx);
         if (IsDDResNotOK(res)) {
-          attr->finish_fun(pevent_hdr, arg);
+          attr->finish_fun(ctx);
           ddres_check_or_shutdown(res);
         }
       }
 
       continue;
     }
+
+    int pe_len = ctx->worker_ctx.pevent_hdr.size;
+    PEvent *pes = ctx->worker_ctx.pevent_hdr.pes;
 
     // If we're here, we have at least one file descriptor active.  That means
     // the underyling ringbuffers can be checked.
@@ -109,7 +118,7 @@ void worker(void *arg, PEventHdr *pevent_hdr, perfopen_attr *attr,
       // shuts down either all or nothing.  Accordingly, when it shuts down one
       // file descriptor, we shut down profiling.
       if (pfd[i].revents & POLLHUP) {
-        ddres_check_or_shutdown(attr->finish_fun(pevent_hdr, arg));
+        ddres_check_or_shutdown(attr->finish_fun(ctx));
         ddres_graceful_shutdown();
       }
 
@@ -132,10 +141,10 @@ void worker(void *arg, PEventHdr *pevent_hdr, perfopen_attr *attr,
           // for wrapping, but for now skip it.
         } else {
           // Same deal as the call to timeout_fun
-          DDRes res = attr->msg_fun(hdr, pes[i].pos, continue_profiling, arg);
+          DDRes res = attr->msg_fun(hdr, pes[i].pos, continue_profiling, ctx);
           if (IsDDResNotOK(res)) {
             // ignoring possible errors from finish as we are closing
-            attr->finish_fun(pevent_hdr, arg);
+            attr->finish_fun(ctx);
             ddres_check_or_shutdown(res);
           }
         }
@@ -153,7 +162,7 @@ void worker(void *arg, PEventHdr *pevent_hdr, perfopen_attr *attr,
   }
 }
 
-void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, DDProfContext *arg) {
+void main_loop(const perfopen_attr *attr, DDProfContext *ctx) {
   assert(attr->msg_fun);
 
   // Setup a shared memory region between the parent and child processes.  This
@@ -174,5 +183,5 @@ void main_loop(PEventHdr *pevent_hdr, perfopen_attr *attr, DDProfContext *arg) {
     return;
   }
 
-  worker(arg, pevent_hdr, attr, continue_profiling);
+  worker(ctx, attr, continue_profiling);
 }

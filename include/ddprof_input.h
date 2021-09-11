@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ddprof_consts.h"
+#include "ddprof_defs.h"
 #include "ddres_def.h"
 #include "exporter_input.h"
 
@@ -31,7 +31,6 @@ typedef struct DDProfInput {
   watcher_index_t watchers[MAX_TYPE_WATCHER];
   uint64_t sampling_value[MAX_TYPE_WATCHER];
   int num_watchers;
-
   ExporterInput exp_input;
 } DDProfInput;
 

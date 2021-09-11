@@ -12,4 +12,5 @@ DDRes ddprof_ctx_set(const DDProfInput *input, DDProfContext *);
 void ddprof_ctx_free(DDProfContext *);
 
 /*************************  Instrumentation Helpers  **************************/
-void instrument_pid(DDProfContext *, pid_t, int);
+// Attach a profiler exporting results from a different fork
+void ddprof_attach_profiler(DDProfContext *, pid_t, int);

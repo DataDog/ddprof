@@ -1,13 +1,15 @@
 extern "C" {
 #include "exporter/ddprof_exporter.h"
 #include "pprof/ddprof_pprof.h"
-#include "unwind_output_mock.h"
 }
 #include "loghandle.hpp"
+#include "unwind_output_mock.hpp"
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <string>
 #include <utility>
+
+#include "unwind_symbols.hpp"
 
 namespace ddprof {
 
@@ -46,8 +48,6 @@ std::pair<std::string, std::string> get_receptor_host_port() {
   }
 }
 
-} // namespace ddprof
-
 void fill_mock_exporter_input(ExporterInput *exporter_input,
                               std::pair<std::string, std::string> &url) {
   exporter_input->apikey = "abc"; // agent for local tests (not taken as key)
@@ -84,12 +84,17 @@ TEST(DDProfExporter, simple) {
   }
 
   { // Aggregate pprofs
+    UnwindSymbolsHdr symbols_hdr;
     UnwindOutput mock_output;
-    fill_unwind_output_1(&mock_output);
+    IPInfoTable &table = symbols_hdr._ipinfo_table;
+    MapInfoTable &mapinfo_table = symbols_hdr._mapinfo_table;
+
+    fill_unwind_symbols(table, mapinfo_table, mock_output);
+
     const PerfOption *perf_option_cpu = perfoptions_preset(10);
     res = pprof_create_profile(&pprofs, perf_option_cpu, 1);
     EXPECT_TRUE(IsDDResOK(res));
-    res = pprof_aggregate(&mock_output, 1000, 0, &pprofs);
+    res = pprof_aggregate(&mock_output, &symbols_hdr, 1000, 0, &pprofs);
     EXPECT_TRUE(IsDDResOK(res));
   }
   {
@@ -108,5 +113,7 @@ TEST(DDProfExporter, simple) {
   res = pprof_free_profile(&pprofs);
   EXPECT_TRUE(IsDDResOK(res));
 }
+
+} // namespace ddprof
 
 // todo very long url

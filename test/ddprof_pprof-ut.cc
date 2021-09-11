@@ -1,8 +1,8 @@
+
 extern "C" {
 #include "pprof/ddprof_pprof.h"
 
 #include "perf_option.h"
-#include "unwind_output_mock.h"
 
 #include <ddprof/ffi.h>
 #include <fcntl.h>
@@ -11,10 +11,13 @@ extern "C" {
 }
 #include "loghandle.hpp"
 
+#include "unwind_output_mock.hpp"
+#include "unwind_symbols.hpp"
 #include <cstdlib>
 #include <gtest/gtest.h>
 #include <string>
 
+namespace ddprof {
 TEST(DDProfPProf, init_profiles) {
   DDProfPProf pprofs;
   const PerfOption *perf_option_cpu = perfoptions_preset(10);
@@ -52,15 +55,19 @@ void test_pprof(const DDProfPProf *pprofs) {
 
 TEST(DDProfPProf, aggregate) {
   LogHandle handle;
+  UnwindSymbolsHdr symbols_hdr;
   UnwindOutput mock_output;
-  fill_unwind_output_1(&mock_output);
+  IPInfoTable &table = symbols_hdr._ipinfo_table;
+  MapInfoTable &mapinfo_table = symbols_hdr._mapinfo_table;
+
+  fill_unwind_symbols(table, mapinfo_table, mock_output);
   DDProfPProf pprofs;
   const PerfOption *perf_option_cpu = perfoptions_preset(10);
 
   DDRes res = pprof_create_profile(&pprofs, perf_option_cpu, 1);
   EXPECT_TRUE(IsDDResOK(res));
 
-  res = pprof_aggregate(&mock_output, 1000, 0, &pprofs);
+  res = pprof_aggregate(&mock_output, &symbols_hdr, 1000, 0, &pprofs);
   EXPECT_TRUE(IsDDResOK(res));
 
   test_pprof(&pprofs);
@@ -68,3 +75,5 @@ TEST(DDProfPProf, aggregate) {
   res = pprof_free_profile(&pprofs);
   EXPECT_TRUE(IsDDResOK(res));
 }
+
+} // namespace ddprof

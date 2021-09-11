@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Attach the profiler
-    instrument_pid(ctx, ctx->params.pid, get_nprocs());
+    ddprof_attach_profiler(ctx, ctx->params.pid, get_nprocs());
     LG_WRN("Profiling terminated");
     goto CLEANUP_ERR;
   }

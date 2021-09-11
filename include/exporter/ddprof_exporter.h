@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ddprof_consts.h"
+#include "ddprof_defs.h"
 #include "ddres_def.h"
 #include "exporter_input.h"
 #include "perf_option.h"

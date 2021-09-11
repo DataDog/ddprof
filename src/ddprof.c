@@ -39,24 +39,16 @@ static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   exit(-1);
 }
 
-/*************************  Instrumentation Helpers  **************************/
-void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
-  perfopen_attr perf_funs = {.init_fun = ddprof_worker_init,
-                             .finish_fun = ddprof_worker_finish,
-                             .msg_fun = ddprof_worker,
-                             .timeout_fun = ddprof_worker_timeout};
-  PEventHdr pevent_hdr;
-  pevent_init(&pevent_hdr);
+static DDRes ddprof_setup(DDProfContext *ctx, pid_t pid, int num_cpu) {
+  PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
+  pevent_init(pevent_hdr);
 
   // Don't stop if error as this is only for debug purpose
   if (IsDDResNotOK(log_capabilities(false))) {
     LG_ERR("Error when printing capabilities, continuing...");
   }
 
-  if (IsDDResNotOK(pevent_open(ctx, pid, num_cpu, &pevent_hdr))) {
-    LG_ERR("Error when attaching to perf_event buffers.");
-    return;
-  }
+  DDRES_CHECK_FWD(pevent_open(ctx, pid, num_cpu, pevent_hdr));
 
   LG_NTC("Entering main loop");
   // Setup signal handler if defined
@@ -78,33 +70,48 @@ void instrument_pid(DDProfContext *ctx, pid_t pid, int num_cpu) {
     }
   }
 
-  if (IsDDResFatal(ddprof_stats_init())) {
-    LG_WRN("Error from statsd_init");
-    return;
+  DDRES_CHECK_FWD(ddprof_stats_init());
+
+  DDRES_CHECK_FWD(pevent_enable(pevent_hdr));
+
+  return ddres_init();
+}
+
+static DDRes ddprof_breakdown(DDProfContext *ctx) {
+  PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
+
+  if (IsDDResNotOK(pevent_cleanup(pevent_hdr))) {
+    LG_ERR("Error when calling pevent_cleanup.");
   }
 
-  if (IsDDResNotOK(pevent_enable(&pevent_hdr))) {
-    LG_ERR("Error when enabling watchers");
+  DDRES_CHECK_FWD(ddprof_stats_free());
+
+  return ddres_init();
+}
+
+/*************************  Instrumentation Helpers  **************************/
+void ddprof_attach_profiler(DDProfContext *ctx, pid_t pid, int num_cpu) {
+
+  const perfopen_attr perf_funs = {.init_fun = ddprof_worker_init,
+                                   .finish_fun = ddprof_worker_finish,
+                                   .msg_fun = ddprof_worker,
+                                   .timeout_fun = ddprof_worker_timeout};
+  if (IsDDResNotOK(ddprof_setup(ctx, pid, num_cpu))) {
+    LG_ERR("Error seting up ddprof.");
     return;
   }
 
   // Enter the main loop -- this will not return unless there is an error.
-  main_loop(&pevent_hdr, &perf_funs, ctx);
-
+  main_loop(&perf_funs, ctx);
   // If we're here, the main loop closed--probably the profilee closed
   if (errno)
     LG_WRN("Profiling context no longer valid (%s)", strerror(errno));
   else
     LG_WRN("Profiling context no longer valid");
 
-  if (IsDDResNotOK(pevent_cleanup(&pevent_hdr))) {
-    LG_ERR("Error when calling pevent_cleanup.");
-  }
-
-  if (IsDDResFatal(ddprof_stats_free())) {
-    LG_ERR("Error from ddprof_stats_free");
-    return;
-  }
+  if (IsDDResNotOK(ddprof_breakdown(ctx)))
+    LG_ERR("Error when calling ddprof_breakdown.");
+  return;
 }
 
 /****************************  Argument Processor  ***************************/
@@ -189,7 +196,6 @@ DDRes ddprof_ctx_set(const DDProfInput *input, DDProfContext *ctx) {
       ctx->params.upload_period = x;
   }
 
-  // process worker_period
   ctx->params.worker_period = 240;
   if (input->worker_period) {
     char *ptr_period = input->worker_period;

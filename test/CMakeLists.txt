@@ -166,7 +166,7 @@ add_unit_test(
 
 add_unit_test(
     ddprof_pprof-ut
-    ../src/pprof/ddprof_pprof.c
+    ../src/pprof/ddprof_pprof.cc
     ../src/unwind_output.c
     ../src/perf_option.c
     ddprof_pprof-ut.cc
@@ -177,7 +177,7 @@ add_unit_test(
 add_unit_test(
     ddprof_exporter-ut
     ../src/exporter/ddprof_exporter.c
-    ../src/pprof/ddprof_pprof.c
+    ../src/pprof/ddprof_pprof.cc
     ../src/unwind_output.c
     ../src/perf_option.c
     ddprof_exporter-ut.cc

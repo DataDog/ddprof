@@ -15,4 +15,4 @@
  *
  * @return
  */
-void main_loop(PEventHdr *pevent_hdr, perfopen_attr *, DDProfContext *);
+void main_loop(const perfopen_attr *, DDProfContext *);

@@ -125,13 +125,6 @@ if (NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
    message(STATUS "BUILD WILL FAIL : NON LINUX SYSTEMS NOT HANDLED")
 endif()
 
-# Zlib
-# Slightly hacky way of finding static libraries. Unable to find static library using CMAKE_FIND_LIBRARY_SUFFIXES.
-find_package(ZLIB REQUIRED)
-get_filename_component(LIB_DIRNAME_ZLIB ${ZLIB_LIBRARIES} DIRECTORY)
-message(STATUS "zlib found in following folder : " ${LIB_DIRNAME_ZLIB})
-link_directories(${LIB_DIRNAME_ZLIB})
-
 # Lzma
 find_package(LibLZMA)
 list(APPEND DDPROF_INCLUDE_LIST ${LIBLZMA_INCLUDE_DIRS})
@@ -162,14 +155,13 @@ list(APPEND DDPROF_INCLUDE_LIST ${ELFUTILS_INCLUDE_LIST})
 # Find the source files
 aux_source_directory(src COMMON_SRC)
 aux_source_directory(src/proto PROTO_SRC)
-aux_source_directory(src/exporter EXPORTER_SRC)
 aux_source_directory(src/pprof PPROF_SRC)
+aux_source_directory(src/exporter EXPORTER_SRC)
 aux_source_directory(src/exe EXE_SRC)
 
 
 # Define all sources
 set(DDPROF_GLOBAL_SRC
-   ${DDPROF_GLOBAL_SRC}
    ${COMMON_SRC}
    ${PROTO_SRC}
    ${PPROF_SRC}
@@ -202,3 +194,46 @@ target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 
 message(STATUS "Install destination " ${CMAKE_INSTALL_PREFIX})
 install(TARGETS ddprof)
+
+
+#######################################
+### Declaration of native library   ###
+#######################################
+option(BUILD_NATIVE_LIB "Build a library out of the native profiler" OFF)
+   if (${BUILD_NATIVE_LIB})
+
+   # Define all sources
+   set(DDPROF_LIB_SRC
+      ${COMMON_SRC}
+      ${PROTO_SRC}
+      ${EXE_SRC})
+
+   ## Libs to link
+   set(NATIVE_LIB_LIBRARY_LIST ddprof-c llvm-demangle dw elf libz.a Threads::Threads libprotobuf-c.a liblzma.a)
+   list(APPEND NATIVE_LIB_INCLUDE_LIST ${LIBDDPROF_INCLUDE_DIR} ${PROTO_HEADER_INCLUDE}) # to be removed (unlikely.h)
+   list(APPEND NATIVE_LIB_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include ${ELFUTILS_INCLUDE_LIST}) # legit includes
+
+
+   ## Create the lib
+   add_library(ddprof-native
+               ${DDPROF_LIB_SRC})
+
+   set_target_properties(ddprof-native PROPERTIES VERSION ${PROJECT_VERSION})
+
+   # libcap, can be removed from version distributed to client 
+   list(APPEND NATIVE_LIB_LIBRARY_LIST libcap)
+   list(APPEND NATIVE_LIB_INCLUDE_LIST ${LIBCAP_INCLUDE_DIR})
+
+   ## Headers we publish
+   set(LIB_HEADERS include/ddprof.h include/ddprof_input.h)
+   set_target_properties(ddprof-native PROPERTIES PUBLIC_HEADER "${LIB_HEADERS}")
+
+   ## Public directories : TODO : remove some of them
+   target_include_directories(ddprof-native PRIVATE ${NATIVE_LIB_INCLUDE_LIST})
+
+   target_link_libraries(ddprof-native PRIVATE ${NATIVE_LIB_LIBRARY_LIST})
+   target_compile_features(ddprof-native
+                           INTERFACE c_std_11)
+
+   install(TARGETS ddprof-native)
+endif()

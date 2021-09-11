@@ -7,7 +7,6 @@
 
 #include "ddres_def.h"
 #include "perf_option.h"
-#include "pevent.h"
 
 #define PSAMPLE_DEFAULT_WAKEUP 1000 // sample frequency check
 #define PERF_SAMPLE_STACK_SIZE (4096 * 8)
@@ -121,8 +120,8 @@ typedef struct perf_samplestacku {
 } perf_samplestacku;
 
 typedef struct perfopen_attr {
-  DDRes (*init_fun)(PEventHdr *, void *);
-  DDRes (*finish_fun)(PEventHdr *, void *);
+  DDRes (*init_fun)(void *);
+  DDRes (*finish_fun)(void *);
   DDRes (*msg_fun)(struct perf_event_header *, int, volatile bool *, void *);
   DDRes (*timeout_fun)(volatile bool *, void *);
 } perfopen_attr;

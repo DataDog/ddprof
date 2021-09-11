@@ -2,15 +2,30 @@
 
 #include <sys/types.h>
 
-#include "ddprof_consts.h"
+#include "ddprof_defs.h"
 #include "exporter_input.h"
 #include "perf_option.h"
+#include "pevent.h"
 #include "proc_status.h"
 
 // forward declarations
 typedef struct DDProfExporter DDProfExporter;
 typedef struct DDProfPProf DDProfPProf;
 typedef struct UnwindState UnwindState;
+typedef struct PEventHdr PEventHdr;
+
+// Mutable states within a worker
+typedef struct DDProfWorkerContext {
+  PEventHdr pevent_hdr; // perf_event buffer holder
+  DDProfExporter *exp;  // wrapper around rust exporter
+  DDProfPProf *pprof;   // wrapper around rust exporter
+
+  UnwindState *us;
+  ProcStatus proc_status;
+  int64_t send_nanos;    // Last time an export was sent
+  uint32_t count_worker; // exports since last cache clear
+  uint32_t count_cache;  // exports since worker was spawned
+} DDProfWorkerContext;
 
 typedef struct DDProfContext {
   struct {
@@ -28,14 +43,8 @@ typedef struct DDProfContext {
   } params;
 
   ExporterInput exp_input;
-  DDProfExporter *exp; // wrapper around rust exporter
-  DDProfPProf *pprof;  // wrapper around rust exporter
-
   PerfOption watchers[MAX_TYPE_WATCHER];
   int num_watchers;
-  UnwindState *us;
-  ProcStatus proc_status;
-  int64_t send_nanos;    // Last time an export was sent
-  uint32_t count_worker; // exports since last cache clear
-  uint32_t count_cache;  // exports since worker was spawned
+
+  DDProfWorkerContext worker_ctx;
 } DDProfContext;
