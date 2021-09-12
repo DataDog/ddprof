@@ -105,8 +105,11 @@ DDRes ddprof_stats_send(const char *statsd_socket) {
   }
   int fd_statsd = -1;
 
-  DDRES_CHECK_FWD(
-      statsd_connect(statsd_socket, strlen(statsd_socket), &fd_statsd));
+  if (IsDDResNotOK(
+          statsd_connect(statsd_socket, strlen(statsd_socket), &fd_statsd))) {
+    // Invalid socket. No use trying to send data (and avoid flood of logs).
+    return ddres_init();
+  }
 
   for (unsigned int i = 0; i < STATS_LEN; i++) {
     DDRES_CHECK_FWD(statsd_send(fd_statsd, stats_paths[i], &ddprof_stats[i],

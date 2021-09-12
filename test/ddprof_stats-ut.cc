@@ -123,7 +123,8 @@ TEST(ddprof_statsTest, BadConnection) {
   EXPECT_TRUE(IsDDResOK(ddprof_stats_init()));
   EXPECT_TRUE(IsDDResOK(ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL)));
 
-  EXPECT_FALSE(IsDDResOK(ddprof_stats_send(path_try)));
+  // Only prints a log
+  EXPECT_TRUE(IsDDResOK(ddprof_stats_send(path_try)));
 
   close(fd_listener);
 }
