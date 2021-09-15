@@ -47,6 +47,6 @@ typedef struct DDProfContext {
   const StackHandler *stack_handler;
   PerfOption watchers[MAX_TYPE_WATCHER];
   int num_watchers;
-
+  void *callback_ctx; // user state to be used in callback
   DDProfWorkerContext worker_ctx;
 } DDProfContext;

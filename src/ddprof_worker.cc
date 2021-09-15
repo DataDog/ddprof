@@ -134,7 +134,8 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
 
 #else
   if (ctx->stack_handler) {
-    if (!ctx->stack_handler->apply(&us->output, ctx, pos)) {
+    if (!ctx->stack_handler->apply(&us->output, ctx,
+                                   ctx->stack_handler->callback_ctx, pos)) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_STACK_HANDLE,
                              "Stack handler returning errors");
     }
