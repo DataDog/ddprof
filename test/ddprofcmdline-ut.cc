@@ -1,6 +1,6 @@
 extern "C" {
 #include "ddprof_cmdline.h"
-#include "perf.h" // perfoptions_lookup
+#include "perf_option.h"
 }
 
 #include <gtest/gtest.h>

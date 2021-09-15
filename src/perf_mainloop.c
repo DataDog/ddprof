@@ -11,26 +11,33 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "ddprof_worker.h"
 #include "ddres.h"
 #include "logger.h"
+#include "perf.h"
+#include "pevent.h"
 #include "unwind.h"
 
 #define rmb() __asm__ volatile("lfence" ::: "memory")
 
-#define WORKER_SHUTDOWN() exit(0)
+#ifdef DDPROF_NATIVE_LIB
+#  define WORKER_SHUTDOWN() return;
+#else
+#  define WORKER_SHUTDOWN() exit(0)
+#endif
 
-void ddres_check_or_shutdown(DDRes res) {
-  if (IsDDResNotOK(res)) {
-    LG_WRN("[PERF] Shut down worker (error:%s).",
-           ddres_error_message(res._what));
-    WORKER_SHUTDOWN();
+#define DDRES_CHECK_OR_SHUTDOWN(res)                                           \
+  if (IsDDResNotOK(res)) {                                                     \
+    LG_WRN("[PERF] Shut down worker (error:%s).",                              \
+           ddres_error_message(res._what));                                    \
+    WORKER_SHUTDOWN();                                                         \
   }
-}
 
-void ddres_graceful_shutdown(void) {
-  LG_NTC("Shutting down worker gracefully");
-  WORKER_SHUTDOWN();
-}
+#define DDRES_GRACEFUL_SHUTDOWN()                                              \
+  do {                                                                         \
+    LG_NTC("Shutting down worker gracefully");                                 \
+    WORKER_SHUTDOWN();                                                         \
+  } while (0)
 
 DDRes spawn_workers(volatile bool *continue_profiling) {
   pid_t child_pid;
@@ -65,7 +72,7 @@ static void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
   }
 }
 
-static void worker(DDProfContext *ctx, const perfopen_attr *attr,
+static void worker(DDProfContext *ctx, const WorkerAttr *attr,
                    volatile bool *continue_profiling) {
   // Until a restartable terminal condition is met, the worker will set its
   // disposition so that profiling is halted upon its termination
@@ -77,7 +84,7 @@ static void worker(DDProfContext *ctx, const perfopen_attr *attr,
   pollfd_setup(&ctx->worker_ctx.pevent_hdr, pfd, &pfd_len);
 
   // Perform user-provided initialization
-  ddres_check_or_shutdown(attr->init_fun(ctx));
+  DDRES_CHECK_OR_SHUTDOWN(attr->init_fun(ctx));
 
   // Worker poll loop
   while (1) {
@@ -88,19 +95,16 @@ static void worker(DDProfContext *ctx, const perfopen_attr *attr,
       continue;
     } else if (-1 == n) {
       attr->finish_fun(ctx);
-      ddres_check_or_shutdown(ddres_error(DD_WHAT_POLLERROR));
+      DDRES_CHECK_OR_SHUTDOWN(ddres_error(DD_WHAT_POLLERROR));
     }
 
     // If no file descriptors, call time-out
     if (0 == n) {
-      if (attr->timeout_fun) {
-        DDRes res = attr->timeout_fun(continue_profiling, ctx);
-        if (IsDDResNotOK(res)) {
-          attr->finish_fun(ctx);
-          ddres_check_or_shutdown(res);
-        }
+      DDRes res = ddprof_worker_timeout(continue_profiling, ctx);
+      if (IsDDResNotOK(res)) {
+        attr->finish_fun(ctx);
+        DDRES_CHECK_OR_SHUTDOWN(res);
       }
-
       continue;
     }
 
@@ -118,8 +122,8 @@ static void worker(DDProfContext *ctx, const perfopen_attr *attr,
       // shuts down either all or nothing.  Accordingly, when it shuts down one
       // file descriptor, we shut down profiling.
       if (pfd[i].revents & POLLHUP) {
-        ddres_check_or_shutdown(attr->finish_fun(ctx));
-        ddres_graceful_shutdown();
+        DDRES_CHECK_OR_SHUTDOWN(attr->finish_fun(ctx));
+        DDRES_GRACEFUL_SHUTDOWN();
       }
 
       // Drain the ringbuffer and dispatch to callback, as needed
@@ -140,12 +144,11 @@ static void worker(DDProfContext *ctx, const perfopen_attr *attr,
           // single contiguous object or update the hdr2sample code to account
           // for wrapping, but for now skip it.
         } else {
-          // Same deal as the call to timeout_fun
-          DDRes res = attr->msg_fun(hdr, pes[i].pos, continue_profiling, ctx);
+          DDRes res = ddprof_worker(hdr, pes[i].pos, continue_profiling, ctx);
           if (IsDDResNotOK(res)) {
             // ignoring possible errors from finish as we are closing
             attr->finish_fun(ctx);
-            ddres_check_or_shutdown(res);
+            WORKER_SHUTDOWN();
           }
         }
         tail += hdr->size;
@@ -162,9 +165,7 @@ static void worker(DDProfContext *ctx, const perfopen_attr *attr,
   }
 }
 
-void main_loop(const perfopen_attr *attr, DDProfContext *ctx) {
-  assert(attr->msg_fun);
-
+void main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
   // Setup a shared memory region between the parent and child processes.  This
   // is used to communicate terminal profiling state
   int mmap_prot = PROT_READ | PROT_WRITE;
@@ -184,4 +185,13 @@ void main_loop(const perfopen_attr *attr, DDProfContext *ctx) {
   }
 
   worker(ctx, attr, continue_profiling);
+}
+
+void main_loop_lib(const WorkerAttr *attr, DDProfContext *ctx) {
+  bool continue_profiling;
+  // no fork. TODO : handle lifetime
+  worker(ctx, attr, &continue_profiling);
+  if (!continue_profiling) {
+    LG_ERR("[PERF] request to exit");
+  }
 }

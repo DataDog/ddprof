@@ -13,6 +13,7 @@ typedef struct DDProfExporter DDProfExporter;
 typedef struct DDProfPProf DDProfPProf;
 typedef struct UnwindState UnwindState;
 typedef struct PEventHdr PEventHdr;
+typedef struct StackHandler StackHandler;
 
 // Mutable states within a worker
 typedef struct DDProfWorkerContext {
@@ -43,6 +44,7 @@ typedef struct DDProfContext {
   } params;
 
   ExporterInput exp_input;
+  const StackHandler *stack_handler;
   PerfOption watchers[MAX_TYPE_WATCHER];
   int num_watchers;
 

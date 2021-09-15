@@ -119,13 +119,6 @@ typedef struct perf_samplestacku {
   // uint64_t    dyn_size;   // Don't forget!
 } perf_samplestacku;
 
-typedef struct perfopen_attr {
-  DDRes (*init_fun)(void *);
-  DDRes (*finish_fun)(void *);
-  DDRes (*msg_fun)(struct perf_event_header *, int, volatile bool *, void *);
-  DDRes (*timeout_fun)(volatile bool *, void *);
-} perfopen_attr;
-
 // Used by rb_init() and friends
 typedef struct RingBuffer {
   const char *start;

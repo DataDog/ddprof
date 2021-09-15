@@ -5,8 +5,8 @@ stages:
 
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
-  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/83432904
-  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:760a194491c1eb31f30891e625a87c802b447a9d7328408b7e3bf66da010842d
+  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/84800328
+  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:944d9b5501fd0c8586188791419dabc59515166275b41466bc9c96c13358cbca
   # https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/81425357
   TEST_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:1565b429f9266dc10f98d615fcaf06941a1281292467820961364aff1376ef34
   # When build images are built, publish them with following tags
@@ -79,7 +79,7 @@ build:ddprof:
     #Build image dependencies were stored in app, avoid rebuilding vendor content
     - ln -s /app/vendor vendor
     - mkdir -p ${BUILDPATH} && cd ${BUILDPATH}
-    - cmake -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_BENCHMARKS=ON -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
+    - cmake -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_BENCHMARKS=ON -DBUILD_NATIVE_LIB=ON -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
     # Static checks
     - make cppcheck
     - make format
@@ -112,24 +112,27 @@ test:ddprof:
     - set -euxo pipefail
     - source setup_env.sh
     # Print the k8 runner settings
+    - export BINDIR="./${BINPATH}/${BUILD_TYPE}/bin"
     - echo "CHECK USER" && id
     - echo "CHECK SETTING ON PERF EVENT PARANOID" && cat /proc/sys/kernel/perf_event_paranoid
     - echo "CHECK SETTING ON PINNED MEMORY" && ulimit -l
     - echo "CHECK SETTING on PERF EVEN OPEN" && cat /proc/sys/kernel/perf_event_mlock_kb
     - echo ""
-    - check_dependencies.sh ${BINPATH}/${BUILD_TYPE}/bin/ddprof test/data/expected_deps_${BUILD_TYPE}.txt
+    - check_dependencies.sh ${BINDIR}/ddprof test/data/expected_deps_${BUILD_TYPE}.txt
     # Print help (checks that we have the correct help associated to params)
-    - ./${BINPATH}/${BUILD_TYPE}/bin/ddprof -h
+    - ${BINDIR}/ddprof -h
     # Run toy project for 5 seconds
     - mkdir pprofs && export DDPROF_PPROFS_FOLDER="$PWD/pprofs"
-    - run.sh -b ./${BINPATH}/${BUILD_TYPE}/bin BadBoggleSolver_run 5
+    - run.sh -b ${BINDIR} BadBoggleSolver_run 5
     - ls ${DDPROF_PPROFS_FOLDER} # todo : add a check on pprofs
     - unset DDPROF_PPROFS_FOLDER
     - if [ ${BUILD_TYPE} == "Release" ]; then # record only in release mode
-    - native_bench.sh -r -b ./${BINPATH}/${BUILD_TYPE}/bin
+    - native_bench.sh -r -b ${BINDIR}
     - else
-    - native_bench.sh -b ./${BINPATH}/${BUILD_TYPE}/bin
+    - native_bench.sh -b ${BINDIR}
     - fi
+    # Accuracy check for unwinding
+    - ${BINDIR}/selfuw ${CI_PROJECT_DIR}/test/self_unwind/data
   dependencies:
     - build:ddprof
 

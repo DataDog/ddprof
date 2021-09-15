@@ -1,6 +1,5 @@
 #pragma once
 
-#include <assert.h>
 #include <ctype.h>
 #include <elf.h>
 #include <errno.h>

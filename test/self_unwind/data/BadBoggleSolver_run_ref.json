@@ -1,0 +1,142 @@
+[
+  {
+    "demangle_name": "std::istream::sentry::sentry(std::istream&, bool)",
+    "offset": 130
+  },
+  {
+    "demangle_name": "tng::Boggle::Node::createChildren(std::array<std::array<bool, 4ul>, 4ul> const&)",
+    "offset": 127
+  },
+  {
+    "demangle_name": "srandom",
+    "offset": 44
+  },
+  {
+    "demangle_name": "srandom_r",
+    "offset": 275
+  },
+  {
+    "demangle_name": "malloc",
+    "offset": 115
+  },
+  {
+    "demangle_name": "_int_malloc",
+    "offset": 2946
+  },
+  {
+    "demangle_name": "__memmove_avx_unaligned_erms",
+    "offset": 135
+  },
+  {
+    "demangle_name": "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_create(unsigned long&, unsigned long)",
+    "offset": 35
+  },
+  {
+    "demangle_name": "void std::__adjust_heap<__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, long, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, __gnu_cxx::__ops::_Iter_less_iter>(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, long, long, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, __gnu_cxx::__ops::_Iter_less_iter)",
+    "offset": 840
+  },
+  {
+    "demangle_name": "_IO_file_close_it@@GLIBC_2.2.5",
+    "offset": 111
+  },
+  {
+    "demangle_name": "void std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >::_M_realloc_insert<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&&)",
+    "offset": 255
+  },
+  {
+    "demangle_name": "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_append(char const*, unsigned long)",
+    "offset": 63
+  },
+  {
+    "demangle_name": "tng::InvalidChar(char)",
+    "offset": 0
+  },
+  {
+    "demangle_name": "_start",
+    "offset": 45
+  },
+  {
+    "demangle_name": "unlink_chunk.isra.0",
+    "offset": 25
+  },
+  {
+    "demangle_name": "tng::main(int, char**)",
+    "offset": 931
+  },
+  {
+    "demangle_name": "std::basic_istream<char, std::char_traits<char> >& std::getline<char, std::char_traits<char>, std::allocator<char> >(std::basic_istream<char, std::char_traits<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, char)",
+    "offset": 228
+  },
+  {
+    "demangle_name": "std::__basic_file<char>::close()",
+    "offset": 47
+  },
+  {
+    "demangle_name": "void std::__introsort_loop<__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, long, __gnu_cxx::__ops::_Iter_less_iter>(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, long, __gnu_cxx::__ops::_Iter_less_iter) (.isra.0)",
+    "offset": 743
+  },
+  {
+    "demangle_name": "__libc_start_main",
+    "offset": 242
+  },
+  {
+    "demangle_name": "malloc_consolidate",
+    "offset": 92
+  },
+  {
+    "demangle_name": "void std::__unguarded_linear_insert<__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__ops::_Val_less_iter>(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__ops::_Val_less_iter)",
+    "offset": 634
+  },
+  {
+    "demangle_name": "__memcmp_avx2_movbe",
+    "offset": 276
+  },
+  {
+    "demangle_name": "_IO_file_close",
+    "offset": 0
+  },
+  {
+    "demangle_name": "__gnu_cxx::__normal_iterator<char*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > std::__find_if<__gnu_cxx::__normal_iterator<char*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, __gnu_cxx::__ops::_Iter_pred<bool (*)(char)> >(__gnu_cxx::__normal_iterator<char*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, __gnu_cxx::__normal_iterator<char*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, __gnu_cxx::__ops::_Iter_pred<bool (*)(char)>, std::random_access_iterator_tag)",
+    "offset": 67
+  },
+  {
+    "demangle_name": "toupper",
+    "offset": 35
+  },
+  {
+    "demangle_name": "__memchr_avx2",
+    "offset": 32
+  },
+  {
+    "demangle_name": "std::basic_filebuf<char, std::char_traits<char> >::close()",
+    "offset": 170
+  },
+  {
+    "demangle_name": "fclose@@GLIBC_2.2.5",
+    "offset": 357
+  },
+  {
+    "demangle_name": "void std::__make_heap<__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__ops::_Iter_less_iter>(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__ops::_Iter_less_iter&)",
+    "offset": 218
+  },
+  {
+    "demangle_name": "_int_free",
+    "offset": 1951
+  },
+  {
+    "demangle_name": "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_mutate(unsigned long, unsigned long, char const*, unsigned long)",
+    "offset": 20
+  },
+  {
+    "demangle_name": "operator new(unsigned long)",
+    "offset": 24
+  },
+  {
+    "demangle_name": "tng::Boggle::ExpandNode(tng::Boggle::Node&, std::array<std::array<bool, 4ul>, 4ul> const&, tng::WordDict const&, std::array<std::array<char, 4ul>, 4ul> const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >&)",
+    "offset": 833
+  },
+  {
+    "demangle_name": "tng::Boggle::FindAllWords[abi:cxx11](std::array<std::array<char, 4ul>, 4ul> const&, tng::WordDict const&)",
+    "offset": 216
+  }
+]

@@ -71,7 +71,7 @@ typedef struct DDProfInput {
   XX(DD_SITE,                      site,                      I, 'I', 1, input, NULL, "",           exp_input.)  \
   XX(DD_TRACE_AGENT_PORT,          port,                      P, 'P', 1, input, NULL, "8126",       exp_input.)  \
   XX(DD_SERVICE,                   service,                   S, 'S', 1, input, NULL, "myservice",  exp_input.) \
-  XX(DD_TAGS,                      service,                   T, 'T', 1, input, NULL, "",           exp_input.) \
+  XX(DD_TAGS,                      tags,                      T, 'T', 1, input, NULL, "",           exp_input.) \
   XX(DD_VERSION,                   serviceversion,            V, 'V', 1, input, NULL, "",           exp_input.) \
   XX(DD_PROFILING_ENABLED,         enable,                    d, 'd', 1, input, NULL, "yes", )                   \
   XX(DD_PROFILING_NATIVE_ENABLED,  native_enable,             n, 'n', 1, input, NULL, "yes", )                   \
@@ -97,7 +97,7 @@ typedef enum DDKeys { OPT_TABLE(X_ENUM) DD_KLEN } DDKeys;
 
 // Fill a ddprof input
 DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
-                         bool *print_help_exit);
+                         bool *continue_exec);
 
 // fills the default parameters for the input structure
 DDRes ddprof_input_default(DDProfInput *input);

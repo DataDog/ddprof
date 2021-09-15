@@ -124,7 +124,8 @@ char* help_str[DD_KLEN] = {
   [DD_PROFILING_NATIVETARGET] =
 "    Instrument the given PID rather than launching a new process.\n",
   [DD_PROFILING_NATIVEGLOBAL] =
-"    Instruments the whole system.  Overrides DD_PROFILING_NATIVETARGET.\n",
+"    Instruments the whole system.  Overrides DD_PROFILING_NATIVETARGET.\n"
+"    Requires specific permissions or a perf_event_paranoid value of less than 1.\n",
   [DD_PROFILING_INTERNALSTATS] =
 "    Statsd socket to send internal profiler stats.\n",
 };
@@ -142,7 +143,7 @@ void ddprof_print_help() {
 "  -e, --event:\n"
 "    A string representing the events to sample.  Defaults to `cw`\n"
 "    See the `events` section below for more details.\n"
-"    eg: --event sCPU --event hREF\n\n"
+"    eg: --event sCPU,1000 --event hREF\n\n"
 "  -v, --version:\n"
 "    Prints the version of "MYNAME" and exits.\n\n";
 

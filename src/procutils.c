@@ -1,5 +1,6 @@
 #include "procutils.h"
 
+#include <assert.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>

@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
   //---- Inititiate structs
   int ret = 0;
   DDProfInput input;
-  DDProfContext *ctx = &(DDProfContext){0};
+  DDProfContext ctx;
   // Set temporary logger for argument parsing
   LOG_open(LOG_STDERR, NULL);
   LOG_setlevel(LL_DEBUG);
@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
   LOG_close();
 
   // cmdline args have been processed.  Set the ctx
-  if (IsDDResNotOK(ddprof_ctx_set(&input, ctx))) {
+  if (IsDDResNotOK(ddprof_ctx_set(&input, &ctx))) {
     LG_ERR("Error setting up profiling context, exiting");
     goto CLEANUP_ERR;
   }
@@ -49,11 +49,11 @@ int main(int argc, char *argv[]) {
   argc -= input.nb_parsed_params;
 
   // Only throw an error if we needed the user to pass an arg
-  if (ctx->params.pid) {
-    if (ctx->params.pid == -1)
+  if (ctx.params.pid) {
+    if (ctx.params.pid == -1)
       LG_NTC("Instrumenting whole system");
     else
-      LG_NTC("Instrumenting PID %d", ctx->params.pid);
+      LG_NTC("Instrumenting PID %d", ctx.params.pid);
   } else if (argc <= 0) {
     LG_ERR("No target specified, exiting");
     goto CLEANUP_ERR;
@@ -63,13 +63,13 @@ int main(int argc, char *argv[]) {
   |                             Run the Profiler                               |
   \****************************************************************************/
   // If the profiler was disabled, just skip ahead
-  if (!ctx->params.enable) {
+  if (!ctx.params.enable) {
     LG_WRN("Profiling disabled");
   } else {
     // Initialize profiling.
     // If no PID was specified earlier, we autodaemonize and launch command
-    if (!ctx->params.pid) {
-      ctx->params.pid = getpid();
+    if (!ctx.params.pid) {
+      ctx.params.pid = getpid();
       pid_t child_pid = fork();
 
       // child_pid 0 if child.  Fork again and return to autodaemonize
@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Attach the profiler
-    ddprof_attach_profiler(ctx, ctx->params.pid, get_nprocs());
+    ddprof_attach_profiler(&ctx, get_nprocs());
     LG_WRN("Profiling terminated");
     goto CLEANUP_ERR;
   }
@@ -111,6 +111,6 @@ CLEANUP:
   // These are cleaned by execvp(), but we remove them here since this is the
   // error path and we don't want static analysis to report leaks.
   ddprof_input_free(&input);
-  ddprof_ctx_free(ctx);
+  ddprof_ctx_free(&ctx);
   return ret;
 }

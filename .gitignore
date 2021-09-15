@@ -55,3 +55,4 @@ compile_commands.json
 test/configs/perso.yml
 .editorconfig
 test/data/*.pprof
+test/self_unwind/data/BadBoggleSolver_run.json

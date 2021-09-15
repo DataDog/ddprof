@@ -50,7 +50,6 @@ static DDRes ddprof_setup(DDProfContext *ctx, pid_t pid, int num_cpu) {
 
   DDRES_CHECK_FWD(pevent_open(ctx, pid, num_cpu, pevent_hdr));
 
-  LG_NTC("Entering main loop");
   // Setup signal handler if defined
   if (ctx->params.faultinfo)
     sigaction(SIGSEGV,
@@ -89,18 +88,21 @@ static DDRes ddprof_breakdown(DDProfContext *ctx) {
   return ddres_init();
 }
 
+#ifndef DDPROF_NATIVE_LIB
 /*************************  Instrumentation Helpers  **************************/
-void ddprof_attach_profiler(DDProfContext *ctx, pid_t pid, int num_cpu) {
+void ddprof_attach_profiler(DDProfContext *ctx, int num_cpu) {
 
-  const perfopen_attr perf_funs = {.init_fun = ddprof_worker_init,
-                                   .finish_fun = ddprof_worker_finish,
-                                   .msg_fun = ddprof_worker,
-                                   .timeout_fun = ddprof_worker_timeout};
+  pid_t pid = ctx->params.pid;
+  const WorkerAttr perf_funs = {
+      .init_fun = ddprof_worker_init,
+      .finish_fun = ddprof_worker_finish,
+  };
   if (IsDDResNotOK(ddprof_setup(ctx, pid, num_cpu))) {
     LG_ERR("Error seting up ddprof.");
     return;
   }
 
+  LG_NTC("Entering main loop");
   // Enter the main loop -- this will not return unless there is an error.
   main_loop(&perf_funs, ctx);
   // If we're here, the main loop closed--probably the profilee closed
@@ -113,9 +115,38 @@ void ddprof_attach_profiler(DDProfContext *ctx, pid_t pid, int num_cpu) {
     LG_ERR("Error when calling ddprof_breakdown.");
   return;
 }
+#endif
+
+void ddprof_attach_handler(DDProfContext *ctx,
+                           const StackHandler *stack_handler, int num_cpu) {
+  const WorkerAttr perf_funs = {
+      .init_fun = worker_unwind_init,
+      .finish_fun = worker_unwind_free,
+  };
+  pid_t pid = ctx->params.pid;
+
+  if (IsDDResNotOK(ddprof_setup(ctx, pid, num_cpu))) {
+    LG_ERR("Error seting up ddprof.");
+    return;
+  }
+  // User defined handler
+  ctx->stack_handler = stack_handler;
+  // Enter the main loop -- returns after a number of cycles.
+  LG_NTC("Entering main loop");
+  main_loop_lib(&perf_funs, ctx);
+  if (errno)
+    LG_WRN("Profiling context no longer valid (%s)", strerror(errno));
+  else
+    LG_WRN("Profiling context no longer valid");
+
+  if (IsDDResNotOK(ddprof_breakdown(ctx)))
+    LG_ERR("Error when calling ddprof_breakdown.");
+  return;
+}
 
 /****************************  Argument Processor  ***************************/
 DDRes ddprof_ctx_set(const DDProfInput *input, DDProfContext *ctx) {
+  memset(ctx, 0, sizeof(DDProfContext));
   // Process logging mode
   char const *logpattern[] = {"stdout", "stderr", "syslog", "disabled"};
   const int sizeOfLogpattern = 4;
@@ -242,8 +273,13 @@ DDRes ddprof_ctx_set(const DDProfInput *input, DDProfContext *ctx) {
 
   // Adjust global mode
   ctx->params.global = arg_yesno(input->global, 1); // default no
-  if (ctx->params.global)
+  if (ctx->params.global) {
+    if (ctx->params.pid) {
+      LG_WRN("[INPUT] Ignoring PID (%d) in param due to global mode",
+             ctx->params.pid);
+    }
     ctx->params.pid = -1;
+  }
 
   if (input->internalstats) {
     ctx->params.internalstats = strdup(input->internalstats);

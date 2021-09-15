@@ -19,7 +19,6 @@ RUN apt update \
   curl \
   make \
   m4 \
-  libprotobuf-c-dev \
   liblzma-dev \
   pkg-config \
   ssh-client \
@@ -69,6 +68,13 @@ RUN wget https://github.com/danmar/cppcheck/archive/refs/tags/2.5.tar.gz \
   && cd build \
   && cmake ../ \
   && cmake --build .  \
+  && make install
+
+# json library
+RUN git clone --depth 1 --branch v3.10.2 https://github.com/nlohmann/json.git \
+  && cd json \
+  && mkdir build && cd build \
+  && cmake DJSON_BuildTests=Off ../  \
   && make install
 
 # A specific user is required to get access to perf event ressources. 

@@ -4,7 +4,8 @@
 extern "C" {
 #endif
 
-#include <ddprof/unlikely.h>
+#include "unlikely.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 

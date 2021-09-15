@@ -74,5 +74,6 @@ static inline void exporter_input_free(ExporterInput *exporter_input) {
   free((char *)exporter_input->site);
   free((char *)exporter_input->port);
   free((char *)exporter_input->service);
+  free((char *)exporter_input->tags);
   free((char *)exporter_input->serviceversion);
 }

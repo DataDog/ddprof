@@ -6,9 +6,16 @@
 #include "ddres.h"
 #include "pevent.h"
 
-DDRes ddprof_timeout(volatile bool *continue_profiling, void *arg);
-DDRes ddprof_worker_init(void *arg);
-DDRes ddprof_worker_finish(void *);
-DDRes ddprof_worker_timeout(volatile bool *continue_profiling, void *arg);
+typedef struct DDProfContext DDProfContext;
+
+DDRes ddprof_timeout(volatile bool *continue_profiling, DDProfContext *arg);
+DDRes ddprof_worker_init(DDProfContext *arg);
+DDRes ddprof_worker_finish(DDProfContext *);
+DDRes ddprof_worker_timeout(volatile bool *continue_profiling,
+                            DDProfContext *arg);
 DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
-                    volatile bool *continue_profiling, void *arg);
+                    volatile bool *continue_profiling, DDProfContext *arg);
+
+// Only init unwinding elements
+DDRes worker_unwind_init(DDProfContext *ctx);
+DDRes worker_unwind_free(DDProfContext *ctx);
