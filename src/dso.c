@@ -436,15 +436,13 @@ bool pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
   if (!dc)
     return false;
 
-  // Ensure we have enough headroom to read the requested amount
-  if (addr + sz > dc->sz)
+  // Bounds check -- courtesy of @r1viollet
+  if (addr < dso->start || addr + sz > dso->end) {
     return false;
+  }
 
   // Since addr is assumed in VM-space, convert it to segment-space, which is
   // file space minus the offset into the leading page of the segment
-  if (addr < (dso->start + dso->pgoff)) {
-    return false;
-  }
   addr = addr - (dso->start + dso->pgoff);
 
   // At this point, we've
