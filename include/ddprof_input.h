@@ -87,7 +87,7 @@ typedef struct DDProfInput {
   XX(DD_PROFILING_NATIVELOGLEVEL,  loglevel,                  l, 'l', 1, input, NULL, "error", )                 \
   XX(DD_PROFILING_NATIVETARGET,    pid,                       p, 'p', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_NATIVEGLOBAL,    global,                    g, 'g', 1, input, NULL, "", )                      \
-  XX(DD_PROFILING_INTERNALSTATS,   internalstats,             b, 'b', 1, input, NULL, "/var/run/datadog-agent/statsd.sock")
+  XX(DD_PROFILING_INTERNALSTATS,   internalstats,             b, 'b', 1, input, NULL, "/var/run/datadog-agent/statsd.sock", )
 // clang-format on
 
 #define X_ENUM(a, b, c, d, e, f, g, h, i) a,
