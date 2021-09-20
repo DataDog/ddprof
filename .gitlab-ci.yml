@@ -13,6 +13,8 @@ variables:
   BASE_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
   BUILD_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build
   TEST_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:test
+  # bare centos image
+  CENTOS_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:centos
   # Deployment paths
   S3_PREFIX: s3://binaries.ddbuild.io/ddprof/release
   RELPATH: ddprof/release
@@ -51,8 +53,19 @@ build:testing:
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
   script:
     - set -euo pipefail
-    - docker build --tag $TEST_IMG --build-arg CI=${CI} -f app/test-env/Dockerfile .
+    - docker build --tag $TEST_IMG -f app/test-env/Dockerfile .
     - docker push $TEST_IMG
+
+# This is a cache of compile-time dependencies, test image
+build:centos:
+  stage: build
+  when: manual
+  tags: ["runner:docker", "size:large"]
+  image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
+  script:
+    - set -euo pipefail
+    - docker build --tag $CENTOS_IMG -f app/centos/Dockerfile .
+    - docker push $CENTOS_IMG
 
 .light-job-resource-allocation:
   variables:
@@ -133,6 +146,25 @@ test:ddprof:
     - fi
     # Accuracy check for unwinding
     - ${BINDIR}/selfuw ${CI_PROJECT_DIR}/test/self_unwind/data
+  dependencies:
+    - build:ddprof
+
+test:centos:
+  extends:
+    - .light-job-resource-allocation
+  image: $CENTOS_IMG
+  stage: test
+  tags: ["runner:k8s"]
+  parallel:
+    matrix:
+      - BUILD_TYPE: ["Release"]
+  script:
+    - set -euxo pipefail
+    - source setup_env.sh
+    - export BINDIR="./${BINPATH}/${BUILD_TYPE}/bin"
+    # Check libc version
+    - ldd --version
+    - run.sh -b ${BINDIR} ${BINDIR}/collatz 1 20000 5000 A
   dependencies:
     - build:ddprof
 

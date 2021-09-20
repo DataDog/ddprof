@@ -20,6 +20,7 @@ usage() {
     echo ""
     echo " Optional parameters "
     echo "    --test/-t : launch the test image."
+    echo "    --centos/-C : launch the test image."
     echo "    --clean/-c : rebuild the image before creating it."
 }
 
@@ -33,6 +34,12 @@ while [ $# != 0 ]; do
     if [ $# != 0 ] && [ $1 == "-t" -o $1 == "--test" ]; then
         DEFAULT_BASE_NAME=test_ddprof
         BASE_DOCKERFILE="./app/test-env/Dockerfile"
+        shift
+        continue
+    fi
+    if [ $# != 0 ] && [ $1 == "-C" -o $1 == "--centos" ]; then
+        DEFAULT_BASE_NAME=test_centos
+        BASE_DOCKERFILE="./app/centos/Dockerfile"
         shift
         continue
     fi
