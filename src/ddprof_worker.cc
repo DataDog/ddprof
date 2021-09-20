@@ -90,10 +90,11 @@ DDRes worker_unwind_free(DDProfContext *ctx) {
 
 /// Retrieve cpu / memory info
 static DDRes ddprof_procfs_scrape(ProcStatus *procstat) {
-  DDRES_CHECK_FWD(proc_read(procstat));
   // Update the procstats, but first snapshot the utime so we can compute the
   // diff for the utime metric
   long utime_old = procstat->utime;
+  DDRES_CHECK_FWD(proc_read(procstat));
+
   ddprof_stats_set(STATS_PROCFS_RSS, 1024 * procstat->rss);
   ddprof_stats_set(STATS_PROCFS_UTIME, procstat->utime - utime_old);
   return ddres_init();

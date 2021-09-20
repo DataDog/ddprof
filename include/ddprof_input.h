@@ -77,14 +77,14 @@ typedef struct DDProfInput {
   XX(DD_PROFILING_NATIVE_ENABLED,  native_enable,             n, 'n', 1, input, NULL, "yes", )                   \
   XX(DD_PROFILING_UPLOAD_PERIOD,   upload_period,             u, 'u', 1, input, NULL, "60", )                    \
   XX(DD_PROFILING_WORKER_PERIOD,   worker_period,             w, 'w', 1, input, NULL, "240", )                   \
-  XX(DD_PROFILING_CACHE_PERIOD,    cache_period,              k, 'k', 1, input, NULL, "15", )                    \
+  XX(DD_PROFILING_CACHE_PERIOD,    cache_period,              k, 'k', 1, input, NULL, "490", )                   \
   XX(DD_PROFILING_NATIVEFAULTINFO, faultinfo,                 s, 's', 1, input, NULL, "yes", )                   \
   XX(DD_PROFILING_NATIVEDUMPS,     coredumps,                 m, 'm', 1, input, NULL, "no", )                    \
   XX(DD_PROFILING_NATIVENICE,      nice,                      i, 'i', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_NATIVEPRINTARGS, printargs,                 a, 'a', 1, input, NULL, "no", )                    \
   XX(DD_PROFILING_NATIVESENDFINAL, sendfinal,                 f, 'f', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_NATIVELOGMODE,   logmode,                   o, 'o', 1, input, NULL, "stdout", )                \
-  XX(DD_PROFILING_NATIVELOGLEVEL,  loglevel,                  l, 'l', 1, input, NULL, "warn", )                  \
+  XX(DD_PROFILING_NATIVELOGLEVEL,  loglevel,                  l, 'l', 1, input, NULL, "error", )                 \
   XX(DD_PROFILING_NATIVETARGET,    pid,                       p, 'p', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_NATIVEGLOBAL,    global,                    g, 'g', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_INTERNALSTATS,   internalstats,             b, 'b', 1, input, NULL, "/var/run/datadog-agent/statsd.sock", )
