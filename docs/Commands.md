@@ -24,14 +24,14 @@ Options:
     The name of this service
 
   -d, --enable, (envvar: DD_PROFILING_ENABLED)
-    Whether to enable DataDog profiling.  If this is true, then ddprof as well
-    as any other DataDog profilers are enabled.  If false, they are all disabled.
+    Whether to enable Datadog profiling.  If this is true, then ddprof as well
+    as any other Datadog profilers are enabled.  If false, they are all disabled.
     Note: if this is set, the native profiler will set the DD_PROFILING_ENABLED
-    environment variable in all sub-environments, thereby enabling DataDog profilers.
+    environment variable in all sub-environments, thereby enabling Datadog profilers.
     default: on
 
   -n, --native_enable, (envvar: DD_PROFILING_NATIVE_ENABLED)
-    Whether to enable ddprof specifically, without altering how other DataDog
+    Whether to enable ddprof specifically, without altering how other Datadog
     profilers are run.  For example, DD_PROFILING_ENABLED can be used to disable
     an inner profile, whilst setting DD_PROFILING_NATIVE_ENABLED to enable ddprof
 
