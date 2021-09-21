@@ -75,13 +75,13 @@ char* help_str[DD_KLEN] = {
   [DD_VERSION] = 
 "    Version of the service being profiled. Added to the tags during export.\n",
   [DD_PROFILING_ENABLED] =
-"    Whether to enable DataDog profiling.  If this is true, then "MYNAME" as well\n"
-"    as any other DataDog profilers are enabled.  If false, they are all disabled.\n"
+"    Whether to enable Datadog profiling.  If this is true, then "MYNAME" as well\n"
+"    as any other Datadog profilers are enabled.  If false, they are all disabled.\n"
 "    Note: if this is set, the native profiler will set the DD_PROFILING_ENABLED\n"
-"    environment variable in all sub-environments, thereby enabling DataDog profilers.\n"
+"    environment variable in all sub-environments, thereby enabling Datadog profilers.\n"
 "    default: on\n",
   [DD_PROFILING_NATIVE_ENABLED] =
-"    Whether to enable "MYNAME" specifically, without altering how other DataDog\n"
+"    Whether to enable "MYNAME" specifically, without altering how other Datadog\n"
 "    profilers are run.  For example, DD_PROFILING_ENABLED can be used to disable\n"
 "    an inner profile, whilst setting DD_PROFILING_NATIVE_ENABLED to enable "MYNAME"\n",
   [DD_PROFILING_UPLOAD_PERIOD] =
