@@ -79,8 +79,7 @@ Dwfl_Module *update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, uint64_t pc) {
     BackpopulateState &bp_state = dso_hdr->_backpopulate_state_map[pid];
     ++bp_state._nbUnfoundDsos;
     if (bp_state._perm == kAllowed) { // retry
-      bp_state._perm = kForbiden;
-      bp_state._perm = kForbiden;
+      bp_state._perm = kForbidden;    // ... but only once per cycle
       dso_hdr->pid_backpopulate(pid); // Update and try again
       dso_find_res = dso_hdr->dso_find_closest(pid, pc);
       if (dso_find_res.second) {
