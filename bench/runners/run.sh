@@ -44,9 +44,10 @@ usage() {
     echo ""
     echo " Mutually exclusif perf analysis options :"
     echo "      --callgrind : use callgrind"
-    echo "      --massif : use massif"
-    echo "      --perfstat : use perf with the stat option"
-    echo "      --valgrind : use valgrind"
+    echo "      --massif    : use massif"
+    echo "      --perfstat  : use perf with the stat option"
+    echo "      --valgrind  : use valgrind"
+    echo "      --ddprof    : use ddprof"
     echo ""
     echo "      keys & env : for environment (keys / ddprof version)"
     echo "                   ${ENV_FILE}"
@@ -65,7 +66,7 @@ USE_MASSIF="no"
 USE_CALLGRIND="no"
 USE_PERFSTAT="no"
 USE_VALGRIND="no"
-
+USE_DDPROF="no"
 
 while [ $# != 0 ] && [ ${PARAM_FOUND} == 1 ] ; do 
   if [ $# == 0 ] || [ $1 == "-h" ]; then
@@ -130,6 +131,12 @@ while [ $# != 0 ] && [ ${PARAM_FOUND} == 1 ] ; do
     USE_VALGRIND="yes"
     continue
   fi
+  if [ $# != 0 ] && [ $1 == "--ddprof" ]; then
+    shift
+    USE_DDPROF="yes"
+    continue
+  fi
+
   # reach here only if we did not find params
   PARAM_FOUND=0
 
@@ -153,6 +160,17 @@ config_vars=$(parse_yaml "${ENV_FILE}" "env_")
 #echo "$config_vars"
 eval $config_vars
 
+export ASAN_SYMBOLIZER_PATH=$(which llvm-symbolizer)
+
+### Define ddprof executable
+CMD="${TOP_LVL_DIR}/${env_ddprof_directory}/ddprof"
+
+if [ ! -z ${BUILD_FOLDER} ] && [ -d ${BUILD_FOLDER} ]; then
+  echo "Override ddprof folder to ${BUILD_FOLDER}..."
+  CMD="${BUILD_FOLDER}/ddprof"
+fi
+
+### Define analyzers
 PREPEND_CMD=""
 if [[ "yes" == "${USE_MASSIF,,}" ]]; then
   empty_or_exit ${PREPEND_CMD}
@@ -173,15 +191,7 @@ if [[ "yes" == "${USE_PERFSTAT,,}" ]]; then
   PREPEND_CMD="perf stat -x ','"
 fi
 
-export ASAN_SYMBOLIZER_PATH=$(which llvm-symbolizer)
-
-CMD="${PREPEND_CMD} ${TOP_LVL_DIR}/${env_ddprof_directory}/ddprof"
-
-
-if [ ! -z ${BUILD_FOLDER} ] && [ -d ${BUILD_FOLDER} ]; then
-  echo "Override ddprof folder to ${BUILD_FOLDER}..."
-  CMD="${PREPEND_CMD} ${BUILD_FOLDER}/ddprof"
-fi
+CMD="${PREPEND_CMD} ${CMD}"
 echo "ddprof cmd:${CMD}"
 
 # Do service version stuff
@@ -204,6 +214,17 @@ else # No env var, check file for key
   fi
 fi
 
+DDPROF_CMD="${CMD} \
+  -H ${cfg_ddprof_intake_url} \
+  -P ${cfg_ddprof_intake_port} \
+  -u ${cfg_ddprof_upload_period} \
+  -E ${cfg_ddprof_environment}test-staging \
+  -l ${cfg_ddprof_loglevel} \
+  -e ${cfg_ddprof_event} \
+  -s ${cfg_ddprof_faultinfo} \
+  -w ${cfg_ddprof_worker_period} \
+  -a ${cfg_ddprof_printargs}"
+
 # Set any switchable environment variables
 if [[ "yes" == "${USE_JEMALLOC,,}" ]]; then
   echo "Using jemalloc-based allocation profiling. Profile every ${JEMALLOC_INTERVALS}"
@@ -214,21 +235,23 @@ fi
 echo "Events: ${cfg_ddprof_event}"
 echo "Running: $@"
 
-# Run it!
-eval ${CMD} \
-  -H ${cfg_ddprof_intake_url} \
-  -P ${cfg_ddprof_intake_port} \
-  -S "${cfg_ddprof_service_name}_${VER}"\
-  -u ${cfg_ddprof_upload_period} \
-  -E ${cfg_ddprof_environment}"test-staging" \
-  -l ${cfg_ddprof_loglevel} \
-  -e "${cfg_ddprof_event}" \
-  -s ${cfg_ddprof_faultinfo} \
-  -w ${cfg_ddprof_worker_period} \
-  -a ${cfg_ddprof_printargs} \
-  "$@"
+SERVICE_OPTION="-S ${cfg_ddprof_service_name}_${VER}"
 
+### ddprof under ddprof (with same options)
+if [[ "yes" == "${USE_DDPROF,,}" ]]; then
+  empty_or_exit ${PREPEND_CMD}
+  SERVICE_DDPROF_OPTION="-S ddprof_profile_${VER}"
+  DDPROF_CMD="${DDPROF_CMD} ${SERVICE_DDPROF_OPTION} ${DDPROF_CMD}"
+fi
+
+# Run it!
+echo "${DDPROF_CMD} ${SERVICE_OPTION} $@"
+# exit 1
+eval "${DDPROF_CMD} ${SERVICE_OPTION} $@"
 
 # Helps find the relevant trace in the UI
-echo "Uploaded to ${cfg_ddprof_service_name}_${VER}"
+echo "###### Uploaded to ${cfg_ddprof_service_name}_${VER} ######"
+if [[ "yes" == "${USE_DDPROF,,}" ]]; then
+  echo "###### Uploaded ddprof analysis to ddprof_profile_${VER} ######"
+fi
 exit 0

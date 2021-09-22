@@ -41,6 +41,8 @@ extern "C" {
   X(DD_WHAT_ARGUMENT, "ARGUMENT: Error writing arguments")                     \
   X(DD_WHAT_INPUT_PROCESS, "DD_WHAT_INPUT_PROCESS")                            \
   X(DD_WHAT_STACK_HANDLE, "DD_WHAT_STACK_HANDLE")                              \
+  X(DD_WHAT_DSO, "DD_WHAT_DSO")                                                \
+  X(DD_WHAT_UNHANDLED_DSO, "UNHANDLED_DSO: ignore dso type")                   \
   X(DD_WHAT_UNITTEST, "UNITTEST: unit test error")
 
 // generic erno errors available from /usr/include/asm-generic/errno.h

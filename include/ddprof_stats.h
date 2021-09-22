@@ -14,7 +14,11 @@
   X(UNWIND_TICKS, "unwind.ticks", STAT_GAUGE)                                  \
   X(PROCFS_RSS, "procfs.rss", STAT_GAUGE)                                      \
   X(PROCFS_UTIME, "procfs.utime", STAT_GAUGE)                                  \
-  X(PPROF_ST_ELEMS, "pprof.st_elements", STAT_GAUGE)
+  X(PPROF_ST_ELEMS, "pprof.st_elements", STAT_GAUGE)                           \
+  X(DSO_UNHANDLED_SECTIONS, "dso.unhandled_sections", STAT_GAUGE)              \
+  X(DSO_NEW_DSO, "dso.new", STAT_GAUGE)                                        \
+  X(DSO_SIZE, "dso.size", STAT_GAUGE)                                          \
+  X(DSO_MAPPED, "dso.mapped", STAT_GAUGE)
 
 // Expand the enum/index for the individual stats
 typedef enum DDPROF_STATS { STATS_TABLE(X_ENUM) STATS_LEN } DDPROF_STATS;

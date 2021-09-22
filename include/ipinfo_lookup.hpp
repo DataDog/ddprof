@@ -5,6 +5,7 @@ extern "C" {
 }
 
 #include "ddprof_defs.h"
+#include "hash_helper.hpp"
 #include "ipinfo_table.hpp"
 
 #include <unordered_map>
@@ -28,10 +29,6 @@ typedef struct IPInfoKey {
   // Addresses are valid in the context of a pid
   pid_t _pid;
 } IPInfoKey;
-
-static inline std::size_t hash_combine(std::size_t lhs, std::size_t rhs) {
-  return rhs + 0x9e3779b9 + (lhs << 6) + (lhs >> 2);
-}
 
 } // namespace ddprof
 

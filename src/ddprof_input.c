@@ -194,7 +194,7 @@ DDRes ddprof_input_default(DDProfInput *input) {
 DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
                          bool *continue_exec) {
   DDRes res = ddres_init();
-  LG_NTC("Start parsing args");
+  LG_DBG("Start parsing args");
   int c = 0, oi = 0;
   *continue_exec = true;
   struct option lopts[] = {OPT_TABLE(X_LOPT){"event", 1, 0, 'e'},

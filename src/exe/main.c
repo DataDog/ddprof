@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
   DDProfContext ctx;
   // Set temporary logger for argument parsing
   LOG_open(LOG_STDERR, NULL);
-  LOG_setlevel(LL_DEBUG);
+  LOG_setlevel(LL_WARNING);
 
   {
     bool continue_exec;
@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
       goto CLEANUP_ERR;
     }
     if (!continue_exec) {
-      LG_WRN("Exiting");
+      LG_DBG("Exiting");
       goto CLEANUP;
     }
   }

@@ -3,7 +3,6 @@
 set(VER_LIBDDPROF "121aaffb" CACHE STRING "libddprof version")
 set(SHA256_LIBDDPROF "6a225ebc925d1773f84eb32bc98811d3316403c2f104692618f42b11d4bb85c0" CACHE STRING "libddprof sha256")
 
-set(LIBDDPROF_REL_C_LIB ${CMAKE_SOURCE_DIR}/vendor/libddprof/deliverables/RelWithDebInfo/lib64/libddprof-c.a)
 set(LIBDDPROF_REL_FFI_LIB ${CMAKE_SOURCE_DIR}/vendor/libddprof/x86_64-unknown-linux-gnu/lib/libddprof_ffi.a)
 set(LIBDDPROF_CMAKE_SCRIPT ${CMAKE_SOURCE_DIR}/vendor/libddprof/x86_64-unknown-linux-gnu/cmake/DDProfConfig.cmake)
 
@@ -15,7 +14,6 @@ set(LIBDDPROF_VERSION_FILE ${CMAKE_SOURCE_DIR}/vendor/libddprof/version.txt)
 
 # Expected files
 set(LIBDDPROF_FILES
-  ${LIBDDPROF_REL_C_LIB}
   ${LIBDDPROF_REL_FFI_LIB}
   ${LIBDDPROF_VERSION_FILE}
   ${LIBDDPROF_CMAKE_SCRIPT}
@@ -38,11 +36,6 @@ add_custom_command(OUTPUT ${LIBDDPROF_VERSION_CHECK_FILE}
                    DEPENDS ddprof-deps
                    ARGS ${LIBDDPROF_VERSION_FILE})
 add_custom_target(ddprof-version DEPENDS ${LIBDDPROF_VERSION_CHECK_FILE})
-
-add_library(ddprof-c STATIC IMPORTED)
-set_property(TARGET ddprof-c PROPERTY
-             IMPORTED_LOCATION ${LIBDDPROF_REL_C_LIB})
-add_dependencies(ddprof-c ddprof-version)
 
 # To be replaced by the import of the cmake script
 add_library(ddprof-ffi STATIC IMPORTED)

@@ -11,6 +11,7 @@ extern "C" {
 #include "ddprof_stats.h"
 #include "dso.h"
 #include "exporter/ddprof_exporter.h"
+#include "logger.h"
 #include "perf.h"
 #include "pevent_lib.h"
 #include "pprof/ddprof_pprof.h"
@@ -19,18 +20,26 @@ extern "C" {
 #include "unwind_output.h"
 }
 
+#include "dso.hpp"
+
+#include <cassert>
+
 #ifdef DBG_JEMALLOC
 #  include <jemalloc/jemalloc.h>
 #endif
 
+using ddprof::DsoStats;
+
 static const DDPROF_STATS s_cycled_stats[] = {
-    STATS_UNWIND_TICKS, STATS_EVENT_LOST, STATS_SAMPLE_COUNT};
+    STATS_UNWIND_TICKS, STATS_EVENT_LOST, STATS_SAMPLE_COUNT,
+    STATS_DSO_UNHANDLED_SECTIONS};
 
 #define cycled_stats_sz (sizeof(s_cycled_stats) / sizeof(DDPROF_STATS))
 
 /// Human readable runtime information
-static void print_diagnostics() {
+static void print_diagnostics(const DsoHdr *dso_hdr) {
   ddprof_stats_print();
+  dso_hdr->_stats.log();
 #ifdef DBG_JEMALLOC
   // jemalloc stats
   malloc_stats_print(NULL, NULL, "");
@@ -73,7 +82,6 @@ DDRes worker_unwind_init(DDProfContext *ctx) {
   // That means we need to iterate through the perf_event_open() handles and
   // get the mmaps
   DDRES_CHECK_FWD(pevent_mmap(pevent_hdr));
-
   // Initialize the unwind state and library
   DDRES_CHECK_FWD(unwind_init(ctx->worker_ctx.us));
   return ddres_init();
@@ -81,7 +89,6 @@ DDRes worker_unwind_init(DDProfContext *ctx) {
 
 DDRes worker_unwind_free(DDProfContext *ctx) {
   PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
-
   unwind_free(ctx->worker_ctx.us);
   DDRES_CHECK_FWD(pevent_munmap(pevent_hdr));
   free(ctx->worker_ctx.us);
@@ -89,7 +96,7 @@ DDRes worker_unwind_free(DDProfContext *ctx) {
 }
 
 /// Retrieve cpu / memory info
-static DDRes ddprof_procfs_scrape(ProcStatus *procstat) {
+static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr) {
   // Update the procstats, but first snapshot the utime so we can compute the
   // diff for the utime metric
   long utime_old = procstat->utime;
@@ -97,6 +104,12 @@ static DDRes ddprof_procfs_scrape(ProcStatus *procstat) {
 
   ddprof_stats_set(STATS_PROCFS_RSS, 1024 * procstat->rss);
   ddprof_stats_set(STATS_PROCFS_UTIME, procstat->utime - utime_old);
+  ddprof_stats_set(STATS_DSO_UNHANDLED_SECTIONS,
+                   dso_hdr->_stats.sum_event_metric(DsoStats::kUnhandledDso));
+  ddprof_stats_set(STATS_DSO_NEW_DSO,
+                   dso_hdr->_stats.sum_event_metric(DsoStats::kNewDso));
+  ddprof_stats_set(STATS_DSO_SIZE, dso_hdr->_set.size());
+  ddprof_stats_set(STATS_DSO_MAPPED, dso_hdr->_region_map.size());
   return ddres_init();
 }
 
@@ -114,51 +127,47 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   memcpy(&us->regs[0], sample->regs, PERF_REGS_COUNT * sizeof(uint64_t));
   uw_output_clear(&us->output);
   unsigned long this_ticks_unwind = __rdtsc();
-  if (IsDDResNotOK(unwindstate__unwind(us))) {
-    Dso *dso = dso_find(us->pid, us->eip);
-    if (!dso) {
-      LG_WRN("Could not localize top-level IP: [%d](0x%lx)", us->pid, us->eip);
-      analyze_unwinding_error(us->pid, us->eip);
-    } else {
-      LG_WRN("Failed unwind: %s [%d](0x%lx)", dso_path(dso), us->pid, us->eip);
-    }
-    DDRES_RETURN_WARN_LOG(DD_WHAT_UW_ERROR, "Error unwinding sample.");
-  }
-  DDRES_CHECK_FWD(ddprof_stats_add(STATS_UNWIND_TICKS,
-                                   __rdtsc() - this_ticks_unwind, NULL));
+  // Aggregate if unwinding went well
+  if (IsDDResOK(unwindstate__unwind(us))) {
+    DDRES_CHECK_FWD(ddprof_stats_add(STATS_UNWIND_TICKS,
+                                     __rdtsc() - this_ticks_unwind, NULL));
 
-  // in lib mode we don't aggregate (protect to avoid link failures)
+    // in lib mode we don't aggregate (protect to avoid link failures)
 #ifndef DDPROF_NATIVE_LIB
-  DDProfPProf *pprof = ctx->worker_ctx.pprof;
-  DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbols_hdr, sample->period,
-                                  pos, pprof));
+    DDProfPProf *pprof = ctx->worker_ctx.pprof;
+    DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbols_hdr,
+                                    sample->period, pos, pprof));
 
 #else
-  if (ctx->stack_handler) {
-    if (!ctx->stack_handler->apply(&us->output, ctx,
-                                   ctx->stack_handler->callback_ctx, pos)) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_STACK_HANDLE,
-                             "Stack handler returning errors");
+    if (ctx->stack_handler) {
+      if (!ctx->stack_handler->apply(&us->output, ctx,
+                                     ctx->stack_handler->callback_ctx, pos)) {
+        DDRES_RETURN_ERROR_LOG(DD_WHAT_STACK_HANDLE,
+                               "Stack handler returning errors");
+      }
     }
-  }
 #endif
+  }
+
   return ddres_init();
 }
 
-static void ddprof_cycle_stats() {
+static void ddprof_reset_worker_stats(DsoHdr *dso_hdr) {
   for (unsigned i = 0; i < cycled_stats_sz; ++i) {
     ddprof_stats_clear(s_cycled_stats[i]);
   }
+  dso_hdr->_stats.reset();
 }
 
 /// Cycle operations : export, sync metrics, update counters
 static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
 
   // Scrape procfs for process usage statistics
-  DDRES_CHECK_FWD(ddprof_procfs_scrape(&ctx->worker_ctx.proc_status));
+  DDRES_CHECK_FWD(worker_update_stats(&ctx->worker_ctx.proc_status,
+                                      ctx->worker_ctx.us->dso_hdr));
 
   // And emit diagnostic output (if it's enabled)
-  print_diagnostics();
+  print_diagnostics(ctx->worker_ctx.us->dso_hdr);
   DDRES_CHECK_FWD(ddprof_stats_send(ctx->params.internalstats));
 
 #ifndef DDPROF_NATIVE_LIB
@@ -187,7 +196,7 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
   }
 
   // Reset stats relevant to a single cycle
-  ddprof_cycle_stats();
+  ddprof_reset_worker_stats(ctx->worker_ctx.us->dso_hdr);
 
   return ddres_init();
 }
@@ -197,9 +206,9 @@ void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int pos) {
   if (!(map->header.misc & PERF_RECORD_MISC_MMAP_DATA)) {
     LG_DBG("[PERF]<%d>(MAP)%d: %s (%lx/%lx/%lx)", pos, map->pid, map->filename,
            map->addr, map->len, map->pgoff);
-    DsoIn in = *(DsoIn *)&map->addr;
-    in.filename = map->filename;
-    pid_add(map->pid, &in);
+    ddprof::Dso new_dso(map->pid, map->addr, map->addr + map->len - 1,
+                        map->pgoff, std::string(map->filename));
+    ctx->worker_ctx.us->dso_hdr->insert_erase_overlap(std::move(new_dso));
   }
 }
 
@@ -211,9 +220,10 @@ void ddprof_pr_lost(DDProfContext *ctx, perf_event_lost *lost, int pos) {
 
 void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm, int pos) {
   (void)ctx;
+  // Change in process name (assuming exec) : clear all associated dso
   if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC) {
-    LG_DBG("[PERF]<%d>(COMM)%d", pos, comm->pid);
-    pid_free(comm->pid);
+    LG_DBG("[PERF]<%d>(COMM)%d -> %s", pos, comm->pid, comm->comm);
+    ctx->worker_ctx.us->dso_hdr->pid_free(comm->pid);
   }
 }
 
@@ -221,17 +231,15 @@ void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int pos) {
   (void)ctx;
   LG_DBG("[PERF]<%d>(FORK)%d -> %d", pos, frk->ppid, frk->pid);
   if (frk->ppid != frk->pid) {
-    pid_fork(frk->ppid, frk->pid);
-  } else {
-    pid_free(frk->pid);
-    pid_backpopulate(frk->pid);
+    ctx->worker_ctx.us->dso_hdr->pid_fork(frk->ppid, frk->pid);
   }
 }
 
 void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int pos) {
   (void)ctx;
   LG_DBG("[PERF]<%d>(EXIT)%d", pos, ext->pid);
-  pid_free(ext->pid);
+  // Although pid dies, we do not know how many threads remain alive on this pid
+  // (backpopulation will repopulate and fix things if needed)
 }
 
 /****************************** other functions *******************************/
@@ -314,42 +322,45 @@ DDRes ddprof_worker_finish(DDProfContext *ctx) {
 
 DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
                     volatile bool *continue_profiling, DDProfContext *ctx) {
+  // global try catch to avoid leaking exceptions to main loop
+  try {
+    switch (hdr->type) {
+    case PERF_RECORD_SAMPLE:
+      DDRES_CHECK_FWD(ddprof_pr_sample(ctx, hdr2samp(hdr), pos));
+      break;
+    case PERF_RECORD_MMAP:
+      ddprof_pr_mmap(ctx, (perf_event_mmap *)hdr, pos);
+      break;
+    case PERF_RECORD_LOST:
+      ddprof_pr_lost(ctx, (perf_event_lost *)hdr, pos);
+      break;
+    case PERF_RECORD_COMM:
+      ddprof_pr_comm(ctx, (perf_event_comm *)hdr, pos);
+      break;
+    case PERF_RECORD_EXIT:
+      ddprof_pr_exit(ctx, (perf_event_exit *)hdr, pos);
+      break;
+    case PERF_RECORD_FORK:
+      ddprof_pr_fork(ctx, (perf_event_fork *)hdr, pos);
+      break;
+    default:
+      break;
+    }
 
-  switch (hdr->type) {
-  case PERF_RECORD_SAMPLE:
-    DDRES_CHECK_FWD(ddprof_pr_sample(ctx, hdr2samp(hdr), pos));
-    break;
-  case PERF_RECORD_MMAP:
-    ddprof_pr_mmap(ctx, (perf_event_mmap *)hdr, pos);
-    break;
-  case PERF_RECORD_LOST:
-    ddprof_pr_lost(ctx, (perf_event_lost *)hdr, pos);
-    break;
-  case PERF_RECORD_COMM:
-    ddprof_pr_comm(ctx, (perf_event_comm *)hdr, pos);
-    break;
-  case PERF_RECORD_EXIT:
-    ddprof_pr_exit(ctx, (perf_event_exit *)hdr, pos);
-    break;
-  case PERF_RECORD_FORK:
-    ddprof_pr_fork(ctx, (perf_event_fork *)hdr, pos);
-    break;
-  default:
-    break;
-  }
+    // Click the timer at the end of processing, since we always add the
+    // sampling rate to the last time.
+    int64_t now = now_nanos();
 
-  // Click the timer at the end of processing, since we always add the sampling
-  // rate to the last time.
-  int64_t now = now_nanos();
-
-  if (now > ctx->worker_ctx.send_nanos) {
-    DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now));
-    // reset state defines if we should reboot the worker
-    DDRes res = reset_state(ctx, continue_profiling);
-    // A warning can be returned for a reset and should not be ignored
-    if (IsDDResNotOK(res)) {
-      return res;
+    if (now > ctx->worker_ctx.send_nanos) {
+      DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now));
+      // reset state defines if we should reboot the worker
+      DDRes res = reset_state(ctx, continue_profiling);
+      // A warning can be returned for a reset and should not be ignored
+      if (IsDDResNotOK(res)) {
+        return res;
+      }
     }
   }
+  CatchExcept2DDRes();
   return ddres_init();
 }

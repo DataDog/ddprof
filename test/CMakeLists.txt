@@ -106,7 +106,6 @@ add_unit_test(
     ../src/perf.c
     ../src/perf_option.c
     mmap-ut.cc
-    LIBRARIES ddprof-c
     DEFINITIONS MYNAME="mmap-ut"
 )
 target_include_directories(mmap-ut PRIVATE)
@@ -114,7 +113,6 @@ target_include_directories(mmap-ut PRIVATE)
 add_unit_test(
     ddres-ut
     ddres-ut.cc
-    LIBRARIES ddprof-c
     DEFINITIONS MYNAME="ddres-ut"
 )
 
@@ -122,7 +120,7 @@ add_unit_test(
     cap-ut
     ../src/cap_display.c
     cap-ut.cc
-    LIBRARIES ddprof-c libcap
+    LIBRARIES libcap
     DEFINITIONS MYNAME="cap-ut"
 )
 target_include_directories(cap-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
@@ -131,7 +129,6 @@ add_unit_test(
     user_id-ut
     user_id-ut.cc
     ../src/user_override.c
-    LIBRARIES ddprof-c
     DEFINITIONS MYNAME="userid-ut"
 )
 
@@ -139,7 +136,6 @@ add_unit_test(
     procutils-ut
     ../src/procutils.c
     procutils-ut.cc
-    LIBRARIES ddprof-c
     DEFINITIONS MYNAME="procutils-ut"
 )
 
@@ -149,7 +145,6 @@ add_unit_test(
     ../src/ddprof_input.c
     ../src/perf_option.c
     ddprof_input-ut.cc
-    LIBRARIES ddprof-c
     DEFINITIONS MYNAME="ddprof_input-ut"
 )
 
@@ -160,7 +155,6 @@ add_unit_test(
     ../src/perf.c
     ../src/perf_option.c
     pevent-ut.cc
-    LIBRARIES ddprof-c
     DEFINITIONS MYNAME="pevent-ut"
 )
 
@@ -184,3 +178,12 @@ add_unit_test(
     LIBRARIES ddprof-ffi ${CMAKE_DL_LIBS}
     DEFINITIONS MYNAME="ddprof_exporter-ut"
 )
+
+add_unit_test(
+    dso-ut
+    ../src/dso.cc 
+    ../src/signal_helper.c
+    ../src/region_holder.cc
+    dso-ut.cc 
+    DEFINITIONS MYNAME="dso-ut")
+target_include_directories(dso-ut PRIVATE ${LIBCAP_INCLUDE_DIR})

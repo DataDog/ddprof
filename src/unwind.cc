@@ -1,3 +1,4 @@
+extern "C" {
 #include "unwind.h"
 
 #include "ddres.h"
@@ -6,21 +7,29 @@
 #include "logger.h"
 #include "signal_helper.h"
 #include "unwind_symbols.h"
+}
+
+#include "dso.hpp"
 
 #define UNUSED(x) (void)(x)
+
+using ddprof::Dso;
+using ddprof::DsoSetConstIt;
+using ddprof::DsoSetIt;
+using ddprof::DsoStats;
 
 pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
   (void)dwfl;
   if (*thread_argp != NULL) {
     return 0;
   }
-  struct UnwindState *us = arg;
+  struct UnwindState *us = (UnwindState *)arg;
   *thread_argp = arg;
   return us->pid;
 }
 
 bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
-  struct UnwindState *us = arg;
+  struct UnwindState *us = (UnwindState *)arg;
   Dwarf_Word regs[17] = {0};
 
   // I only save three lol
@@ -35,31 +44,23 @@ bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
 static bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
                         void *arg) {
   (void)dwfl;
-  struct UnwindState *us = arg;
+  struct UnwindState *us = (UnwindState *)arg;
 
   uint64_t sp_start = us->esp;
   uint64_t sp_end = sp_start + us->stack_sz;
-
-  // Check for overflow, like perf
-  if (addr + sizeof(Dwarf_Word) < addr) {
-    return false;
-  }
 
   if (addr < sp_start || addr + sizeof(Dwarf_Word) > sp_end) {
     // If we're here, we're not in the stack.  We should interpet addr as an
     // address in VM, not as a file offset.
     // Strongly assumes we're also in an executable region?
-    bool ret = pid_read_dso(us->pid, result, sizeof(Dwarf_Word), addr);
-    if (!ret) {
-      LG_NTC("[UNWIND] Couldn't get read 0x%lx from %d", addr, us->pid);
-      LG_NTC("[UNWIND] stack is 0x%lx:0x%lx", sp_start, sp_end);
+    DsoFindRes find_res =
+        us->dso_hdr->pid_read_dso(us->pid, result, sizeof(Dwarf_Word), addr);
+    if (!find_res.second) {
+      // Some regions are not handled
+      LG_DBG("[UNWIND] Couldn't get read 0x%lx from %d", addr, us->pid);
+      LG_DBG("[UNWIND] stack is 0x%lx:0x%lx", sp_start, sp_end);
     }
-    return ret;
-  }
-
-  if (addr >= sp_end) {
-    LG_NTC("[UNWIND] Address might be in stack, but exceeds buffer");
-    return false;
+    return find_res.second;
   }
 
   // We're probably safe to read
@@ -67,21 +68,33 @@ static bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
   return true;
 }
 
-Dwfl_Module *update_mod(Dwfl *dwfl, int pid, uint64_t pc) {
+Dwfl_Module *update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, uint64_t pc) {
   Dwfl_Module *mod;
   if (!dwfl)
     return NULL;
 
   // Lookup DSO
-  Dso *dso = dso_find(pid, pc);
-  if (!dso) {
-    pid_backpopulate(pid); // Update and try again
-    if ((dso = dso_find(pid, pc))) {
-      LG_DBG("[UNWIND] Located DSO (%s)", dso_path(dso));
+  DsoFindRes dso_find_res = dso_hdr->dso_find_closest(pid, pc);
+  if (!dso_find_res.second) {
+    dso_hdr->pid_backpopulate(pid); // Update and try again
+    dso_find_res = dso_hdr->dso_find_closest(pid, pc);
+    if (dso_find_res.second) {
+      LG_DBG("[UNWIND] Located DSO after backpopulate (%s)",
+             dso_find_res.first->_filename.c_str());
     } else {
       LG_DBG("[UNWIND] Did not locate DSO");
       return NULL;
     }
+  }
+
+  const Dso &dso = *dso_find_res.first;
+  dso_hdr->_stats.incr_metric(DsoStats::kTargetDso, dso._type);
+
+  if (!dso_hdr->dso_handled_type(dso) || dso.errored()) {
+    LG_DBG("[UNWIND] Unhandled Dso Type / previous error (%s) - not fetching "
+           "mod (%s)",
+           dso.errored() ? "true" : "false", dso._filename.c_str());
+    return NULL;
   }
 
   // Now that we've confirmed a separate lookup for the DSO based on procfs
@@ -92,23 +105,26 @@ Dwfl_Module *update_mod(Dwfl *dwfl, int pid, uint64_t pc) {
   if (mod) {
     Dwarf_Addr vm_addr;
     dwfl_module_info(mod, 0, &vm_addr, 0, 0, 0, 0, 0);
-    if (vm_addr != dso->start - dso->pgoff)
+    if (vm_addr != dso._start - dso._pgoff) {
+      LG_NTC("[UNWIND] Incoherent dso <--> dwfl_module");
       mod = NULL;
+    }
   }
 
   // Try again if either of the criteria above were false
   if (!mod) {
-    char *dso_filepath = dso_path(dso);
-    if (dso && '[' != *dso_filepath) {
-      char *dso_name = strrchr(dso_filepath, '/') + 1;
+    const char *dso_filepath = dso._filename.c_str();
+    if (dso._type == ddprof::dso::kStandard) {
+      const char *dso_name = strrchr(dso_filepath, '/') + 1;
       mod = dwfl_report_elf(dwfl, dso_name, dso_filepath, -1,
-                            dso->start - dso->pgoff, false);
+                            dso._start - dso._pgoff, false);
     }
   }
   if (!mod) {
+    dso.flag_error();
     LG_WRN(
         "[UNWIND] couldn't addrmodule (%s)[0x%lx], but got DSO %s[0x%lx:0x%lx]",
-        dwfl_errmsg(-1), pc, dso_path(dso), dso->start, dso->end);
+        dwfl_errmsg(-1), pc, dso._filename.c_str(), dso._start, dso._end);
     return NULL;
   }
 
@@ -116,7 +132,7 @@ Dwfl_Module *update_mod(Dwfl *dwfl, int pid, uint64_t pc) {
 }
 
 int frame_cb(Dwfl_Frame *state, void *arg) {
-  struct UnwindState *us = arg;
+  struct UnwindState *us = (UnwindState *)arg;
   Dwarf_Addr pc = 0;
   bool isactivation = false;
 
@@ -124,18 +140,18 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
   // activation frame because the underlying DSO (module) may not have been
   // cached yet (but we need the PC to generate/check such a cache
   if (!dwfl_frame_pc(state, &pc, NULL)) {
-    LG_WRN("[UNWIND] dwfl_frame_pc NULL (%s)", dwfl_errmsg(-1));
+    LG_DBG("[UNWIND] dwfl_frame_pc NULL (%s)", dwfl_errmsg(-1));
     return DWARF_CB_ABORT;
   }
 
-  Dwfl_Module *mod = update_mod(us->dwfl, us->pid, pc);
+  Dwfl_Module *mod = update_mod(us->dso_hdr, us->dwfl, us->pid, pc);
   if (!mod) {
-    LG_WRN("[UNWIND] Unable to retrieve the Dwfl_Module");
+    LG_DBG("[UNWIND] Unable to retrieve the Dwfl_Module");
     return DWARF_CB_ABORT;
   }
 
   if (!dwfl_frame_pc(state, &pc, &isactivation)) {
-    LG_WRN("[UNWIND] %s", dwfl_errmsg(-1));
+    LG_DBG("[UNWIND] %s", dwfl_errmsg(-1));
     return DWARF_CB_ABORT;
   }
   if (!isactivation)
@@ -143,12 +159,12 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
 
   Dwfl_Thread *thread = dwfl_frame_thread(state);
   if (!thread) {
-    LG_WRN("[UNWIND] dwfl_frame_thread was zero: (%s)", dwfl_errmsg(-1));
+    LG_DBG("[UNWIND] dwfl_frame_thread was zero: (%s)", dwfl_errmsg(-1));
     return DWARF_CB_ABORT;
   }
   Dwfl *dwfl = dwfl_thread_dwfl(thread);
   if (!dwfl) {
-    LG_WRN("[UNWIND] dwfl_thread_dwfl was zero: (%s)", dwfl_errmsg(-1));
+    LG_DBG("[UNWIND] dwfl_thread_dwfl was zero: (%s)", dwfl_errmsg(-1));
     return DWARF_CB_ABORT;
   }
 
@@ -160,7 +176,7 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
       ipinfo_lookup_get(us->symbols_hdr, mod, pc, us->pid,
                         &output->locs[current_idx]._ipinfo_idx);
   if (IsDDResNotOK(cache_status)) {
-    LG_ERR("Error from dwflmod_cache_status");
+    LG_DBG("Error from dwflmod_cache_status");
     return DWARF_CB_ABORT;
   }
 
@@ -169,7 +185,7 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
   cache_status = mapinfo_lookup_get(us->symbols_hdr, mod,
                                     &(output->locs[current_idx]._map_info_idx));
   if (IsDDResNotOK(cache_status)) {
-    LG_ERR("Error from mapinfo_lookup_get");
+    LG_DBG("Error from mapinfo_lookup_get");
     return DWARF_CB_ABORT;
   }
 
@@ -186,9 +202,9 @@ static DDRes unwind_dwfl_begin(struct UnwindState *us) {
   static char *debuginfo_path;
 
   static const Dwfl_Callbacks proc_callbacks = {
+      .find_elf = dwfl_linux_proc_find_elf,
       .find_debuginfo = dwfl_standard_find_debuginfo,
       .debuginfo_path = &debuginfo_path,
-      .find_elf = dwfl_linux_proc_find_elf,
   };
   us->dwfl = dwfl_begin(&proc_callbacks);
   if (!us->dwfl) {
@@ -234,34 +250,55 @@ static DDRes unwind_attach(struct UnwindState *us) {
 
 DDRes unwind_init(struct UnwindState *us) {
   DDRES_CHECK_FWD(unwind_symbols_hdr_init(&(us->symbols_hdr)));
+  DDRES_CHECK_FWD(libdso_init(&us->dso_hdr));
   elf_version(EV_CURRENT);
   DDRES_CHECK_FWD(unwind_dwfl_begin(us));
-  libdso_init();
   return ddres_init();
 }
 
 void unwind_free(struct UnwindState *us) {
   unwind_symbols_hdr_free(us->symbols_hdr);
+  libdso_free(us->dso_hdr);
   unwind_dwfl_end(us);
   us->symbols_hdr = NULL;
 }
 
 DDRes unwindstate__unwind(struct UnwindState *us) {
+  DDRes res;
   // Update modules at the top
-  update_mod(us->dwfl, us->pid, us->eip);
+  Dwfl_Module *mod = update_mod(us->dso_hdr, us->dwfl, us->pid, us->eip);
+  if (mod != NULL) {
+    res = unwind_attach(us);
+    if (!IsDDResOK(res)) { // frequent errors, avoid flooding logs
+      LOG_ERROR_DETAILS(LG_DBG, res._what);
+    }
 
-  DDRES_CHECK_FWD(unwind_attach(us));
-
-  if (!dwfl_getthread_frames(us->dwfl, us->pid, frame_cb, us)) {
-    /* This should be investigated - when all errors are solved we can
-     * reactivate the log (it is too verbose for now) */
-    // LG_DBG("[UNWIND] dwfl_getthread_frames was nonzero (%s)",
-    // dwfl_errmsg(-1));
-    return us->output.nb_locs > 0 ? ddres_init()
-                                  : ddres_error(DD_WHAT_DWFL_LIB_ERROR);
+    if (!dwfl_getthread_frames(us->dwfl, us->pid, frame_cb, us)) {
+      /* This should be investigated - when all errors are solved we can
+       * reactivate the log (it is too verbose for now) */
+      // LG_DBG("[UNWIND] dwfl_getthread_frames was nonzero (%s)",
+      // dwfl_errmsg(-1));
+      res = us->output.nb_locs > 0 ? ddres_init()
+                                   : ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
+    }
+  } else {
+    res = ddres_warn(DD_WHAT_UNHANDLED_DSO);
   }
+  if (IsDDResNotOK(res)) {
+    // analyse unwinding error
+    DsoFindRes find_res = us->dso_hdr->dso_find_closest(us->pid, us->eip);
+    if (!find_res.second) {
+      LG_DBG("Could not localize top-level IP: [%d](0x%lx)", us->pid, us->eip);
+      analyze_unwinding_error(us->pid, us->eip);
+    } else {
+      LG_DBG("Failed unwind: %s [%d](0x%lx)", find_res.first->_filename.c_str(),
+             us->pid, us->eip);
 
-  return ddres_init();
+      us->dso_hdr->_stats.incr_metric(DsoStats::kUnwindFailure,
+                                      find_res.first->_type);
+    }
+  }
+  return res;
 }
 
 void analyze_unwinding_error(pid_t pid, uint64_t eip) {

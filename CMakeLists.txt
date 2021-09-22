@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.19)
 
  project(DDProf
   LANGUAGES C CXX
-  VERSION 0.6.1
+  VERSION 0.6.2
   DESCRIPTION "Datadog's native profiler"
 )
 
@@ -78,6 +78,9 @@ endif()
 
 # Install lib cap to retrieve capabilities
 include(Findlibcap)
+
+# c++ containers (MIT license) without pulling in boost (mainly flat set)
+find_package(amc)
 
 ####################
 ### Unit tests   ###
@@ -158,7 +161,7 @@ set(DDPROF_GLOBAL_SRC
    ${EXPORTER_SRC}
    ${EXE_SRC})
 
-set(DDPROF_LIBRARY_LIST ddprof-c llvm-demangle libstdc++.a dw elf libz.a Threads::Threads liblzma.a)
+set(DDPROF_LIBRARY_LIST llvm-demangle libstdc++.a dw elf libz.a Threads::Threads liblzma.a amc::amc)
 
 if (ON)
    # Add the rust library - Refactoring ongoing. OFF for now
@@ -200,7 +203,7 @@ option(BUILD_NATIVE_LIB "Build a library out of the native profiler" OFF)
       ${LIB_SRC})
 
    ## Libs to link
-   set(NATIVE_LIB_LIBRARY_LIST ddprof-c llvm-demangle dw elf libz.a Threads::Threads liblzma.a)
+   set(NATIVE_LIB_LIBRARY_LIST llvm-demangle dw elf libz.a Threads::Threads liblzma.a amc::amc)
    list(APPEND NATIVE_LIB_INCLUDE_LIST ${LIBDDPROF_INCLUDE_DIR} ) # to be removed (unlikely.h)
    list(APPEND NATIVE_LIB_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include ${ELFUTILS_INCLUDE_LIST}) # legit includes
 

@@ -122,6 +122,6 @@ DDRes ddprof_stats_send(const char *statsd_socket) {
 void ddprof_stats_print() {
   if (!ddprof_stats)
     return;
-  for (unsigned int i = 0; i < STATS_LEN; i++)
+  for (unsigned int i = 0; i < STATS_LEN; ++i)
     LG_NTC("[STATS] %s: %ld", stats_paths[i], ddprof_stats[i]);
 }

@@ -11,16 +11,16 @@
 // forward declarations
 typedef struct DDProfExporter DDProfExporter;
 typedef struct DDProfPProf DDProfPProf;
-typedef struct UnwindState UnwindState;
+typedef struct StackHandler StackHandler;
 typedef struct PEventHdr PEventHdr;
 typedef struct StackHandler StackHandler;
+typedef struct UnwindState UnwindState;
 
 // Mutable states within a worker
 typedef struct DDProfWorkerContext {
   PEventHdr pevent_hdr; // perf_event buffer holder
   DDProfExporter *exp;  // wrapper around rust exporter
   DDProfPProf *pprof;   // wrapper around rust exporter
-
   UnwindState *us;
   ProcStatus proc_status;
   int64_t send_nanos;    // Last time an export was sent
@@ -36,7 +36,7 @@ typedef struct DDProfContext {
     bool coredumps;
     int nice;
     bool sendfinal;
-    pid_t pid;
+    pid_t pid; // ! only use for perf attach (can be -1 in global mode)
     bool global;
     uint32_t worker_period; // exports between worker refreshes
     uint32_t cache_period;  // exports between cache clears

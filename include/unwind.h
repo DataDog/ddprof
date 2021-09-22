@@ -8,12 +8,12 @@
 #include "procutils.h"
 #include "unwind_output.h"
 
-typedef struct Dso Dso;
-
 typedef struct UnwindSymbolsHdr UnwindSymbolsHdr;
+typedef struct DsoHdr DsoHdr;
 
 typedef struct UnwindState {
   Dwfl *dwfl;
+  DsoHdr *dso_hdr;
   struct UnwindSymbolsHdr *symbols_hdr;
   pid_t pid;
   char *stack;
@@ -26,7 +26,6 @@ typedef struct UnwindState {
       uint64_t eip;
     };
   };
-  Dso *dso;
   bool attached;
   UnwindOutput output;
 } UnwindState;
