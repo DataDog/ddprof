@@ -78,7 +78,7 @@ Dwfl_Module *update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, uint64_t pc) {
   if (!dso_find_res.second) {
     BackpopulateState &bp_state = _backpopulate_state_map[pid];
     ++bp_state._nbUnfoundDsos;
-    if (bp_state._perm == kAllowed) {
+    if (bp_state._perm == kAllowed) { // retry
       dso_hdr->pid_backpopulate(pid); // Update and try again
       dso_find_res = dso_hdr->dso_find_closest(pid, pc);
       if (dso_find_res.second) {
@@ -88,8 +88,9 @@ Dwfl_Module *update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, uint64_t pc) {
         LG_DBG("[UNWIND] %s - Did not locate DSO", __FUNCTION__);
         return NULL;
       }
+    } else { // no retry :-(
+      return NULL;
     }
-    return NULL;
   }
 
   const Dso &dso = *dso_find_res.first;

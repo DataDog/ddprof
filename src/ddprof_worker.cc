@@ -349,6 +349,8 @@ DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
     default:
       break;
     }
+    // backpopulate if needed
+    ctx->worker_ctx.us->dso_hdr->process_backpopulate_requests();
 
     // Click the timer at the end of processing, since we always add the
     // sampling rate to the last time.

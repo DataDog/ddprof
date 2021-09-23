@@ -416,7 +416,7 @@ DsoFindRes DsoHdr::pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
   if (!find_res.second) {
     BackpopulateState &bp_state = _backpopulate_state_map[pid];
     ++bp_state._nbUnfoundDsos;
-    if (bp_state._perm == kAllowed) {
+    if (bp_state._perm == kAllowed) { // retry
       // If we didn't find it, then try full population
       LG_NTC("[DSO] Couldn't find DSO for [%d](0x%lx). backpopulate", pid,
              addr);
@@ -426,11 +426,11 @@ DsoFindRes DsoHdr::pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
 #ifndef NDEBUG
         pid_find_ip(pid, addr);
 #endif
+        return find_res;
       }
+    } else { // not allowed to retry
       return find_res;
     }
-
-    return find_res;
   }
   const Dso &dso = *find_res.first;
   if (!dso_handled_type(dso)) {
