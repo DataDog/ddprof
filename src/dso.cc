@@ -414,10 +414,22 @@ DsoFindRes DsoHdr::pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
 
   find_res = dso_find_closest(pid, addr);
   if (!find_res.second) {
-    ++_backpopulate_state_map[pid]._nbUnfoundDsos;
+    BackpopulateState &bp_state = _backpopulate_state_map[pid];
+    ++bp_state._nbUnfoundDsos;
+    if (bp_state._perm == kAllowed) {
+      // If we didn't find it, then try full population
+      LG_NTC("[DSO] Couldn't find DSO for [%d](0x%lx). backpopulate", pid,
+             addr);
+      pid_backpopulate(pid);
+      find_res = dso_find_closest(pid, addr);
+      if (!find_res.second) { // still not found
 #ifndef NDEBUG
-    pid_find_ip(pid, addr);
+        pid_find_ip(pid, addr);
 #endif
+      }
+      return find_res;
+    }
+
     return find_res;
   }
   const Dso &dso = *find_res.first;
