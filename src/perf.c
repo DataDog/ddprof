@@ -207,8 +207,11 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
     if (sample.size_stack) {
       sample.data_stack = (char *)buf;
       buf = (uint64_t *)(sample.data_stack + sample.size_stack);
+
+      // If the size was specified, we also have a dyn_size
+      sample.size_stack = *buf++;
     } else {
-      // Not sure
+      sample.data_stack = NULL;
     }
   }
   if (PERF_SAMPLE_WEIGHT & DEFAULT_SAMPLE_TYPE) {}
