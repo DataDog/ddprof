@@ -106,7 +106,7 @@ private:
 typedef std::pair<ddprof::DsoSetConstIt, bool> DsoFindRes;
 
 enum BackpopulatePermission {
-  kForbiden,
+  kForbidden,
   kAllowed,
 };
 

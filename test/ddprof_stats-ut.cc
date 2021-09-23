@@ -66,10 +66,11 @@ TEST(ddprof_statsTest, ConnectAndSet) {
   // Set a valid stat
   const long stats_test_val = 12345;
   long stats_check_val = 0;
-  EXPECT_TRUE(IsDDResOK(ddprof_stats_set(STATS_EVENT_COUNT, stats_test_val)));
+  EXPECT_TRUE(IsDDResOK(ddprof_stats_set(STATS_SAMPLE_COUNT, stats_test_val)));
 
   // Make sure it actually got set!
-  EXPECT_TRUE(IsDDResOK(ddprof_stats_get(STATS_EVENT_COUNT, &stats_check_val)));
+  EXPECT_TRUE(
+      IsDDResOK(ddprof_stats_get(STATS_SAMPLE_COUNT, &stats_check_val)));
   EXPECT_EQ(stats_test_val, stats_check_val);
 
   // Disconnect and close
@@ -92,15 +93,16 @@ TEST(ddprof_statsTest, Arithmetic) {
   // Set a valid stat
   const long stats_test_val = 12345;
   long stats_check_val = 0;
-  EXPECT_TRUE(IsDDResOK(ddprof_stats_set(STATS_EVENT_COUNT, stats_test_val)));
+  EXPECT_TRUE(IsDDResOK(ddprof_stats_set(STATS_SAMPLE_COUNT, stats_test_val)));
 
   // Make sure it actually got set!
-  EXPECT_TRUE(IsDDResOK(ddprof_stats_get(STATS_EVENT_COUNT, &stats_check_val)));
+  EXPECT_TRUE(
+      IsDDResOK(ddprof_stats_get(STATS_SAMPLE_COUNT, &stats_check_val)));
   EXPECT_EQ(stats_test_val, stats_check_val);
 
   // Increment and compare
   EXPECT_TRUE(IsDDResOK(
-      ddprof_stats_add(STATS_EVENT_COUNT, stats_test_val, &stats_check_val)));
+      ddprof_stats_add(STATS_SAMPLE_COUNT, stats_test_val, &stats_check_val)));
   EXPECT_EQ(2 * stats_test_val, stats_check_val);
 
   EXPECT_TRUE(IsDDResOK(ddprof_stats_send(path_listen)));
@@ -143,11 +145,11 @@ TEST(ddprof_statsTest, MiscellaneousStats) {
   EXPECT_FALSE(IsDDResOK(ddprof_stats_set(STATS_LEN, 404)));
 
   // Set a value, receiving into NULL
-  EXPECT_TRUE(IsDDResOK(ddprof_stats_set(STATS_EVENT_COUNT, 1)));
-  EXPECT_TRUE(IsDDResOK(ddprof_stats_get(STATS_EVENT_COUNT, NULL)));
+  EXPECT_TRUE(IsDDResOK(ddprof_stats_set(STATS_SAMPLE_COUNT, 1)));
+  EXPECT_TRUE(IsDDResOK(ddprof_stats_get(STATS_SAMPLE_COUNT, NULL)));
 
   // Increment a value, receiving into NULL
-  EXPECT_TRUE(IsDDResOK(ddprof_stats_add(STATS_EVENT_COUNT, 1, NULL)));
+  EXPECT_TRUE(IsDDResOK(ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL)));
 
   // We're done
   EXPECT_TRUE(IsDDResOK(ddprof_stats_free()));

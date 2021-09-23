@@ -31,7 +31,7 @@ extern "C" {
 using ddprof::DsoStats;
 
 static const DDPROF_STATS s_cycled_stats[] = {
-    STATS_UNWIND_TICKS, STATS_EVENT_LOST, STATS_SAMPLE_COUNT,
+    STATS_UNWIND_TICKS, STATS_SAMPLE_LOST, STATS_SAMPLE_COUNT,
     STATS_DSO_UNHANDLED_SECTIONS};
 
 #define cycled_stats_sz (sizeof(s_cycled_stats) / sizeof(DDPROF_STATS))
@@ -218,7 +218,7 @@ void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int pos) {
 void ddprof_pr_lost(DDProfContext *ctx, perf_event_lost *lost, int pos) {
   ctx->worker_ctx.us->dso_hdr->reset_backpopulate_requests();
   (void)pos;
-  ddprof_stats_add(STATS_EVENT_LOST, lost->lost, NULL);
+  ddprof_stats_add(STATS_SAMPLE_LOST, lost->lost, NULL);
 }
 
 void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm, int pos) {

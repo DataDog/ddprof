@@ -8,8 +8,7 @@
 
 #define X_ENUM(a, b, c) STATS_##a,
 #define STATS_TABLE(X)                                                         \
-  X(EVENT_COUNT, "event.count", STAT_GAUGE)                                    \
-  X(EVENT_LOST, "event.lost", STAT_GAUGE)                                      \
+  X(SAMPLE_LOST, "event.lost", STAT_GAUGE)                                     \
   X(SAMPLE_COUNT, "sample.count", STAT_GAUGE)                                  \
   X(UNWIND_TICKS, "unwind.ticks", STAT_GAUGE)                                  \
   X(PROCFS_RSS, "procfs.rss", STAT_GAUGE)                                      \
