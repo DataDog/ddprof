@@ -417,7 +417,7 @@ DsoFindRes DsoHdr::pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
     BackpopulateState &bp_state = _backpopulate_state_map[pid];
     ++bp_state._nbUnfoundDsos;
     if (bp_state._perm == kAllowed) { // retry
-      // If we didn't find it, then try full population
+      bp_state._perm = kForbidden;    // ... but only once
       LG_NTC("[DSO] Couldn't find DSO for [%d](0x%lx). backpopulate", pid,
              addr);
       pid_backpopulate(pid);
