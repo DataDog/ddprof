@@ -105,6 +105,20 @@ private:
 // Out of namespace to be linked from C code
 typedef std::pair<ddprof::DsoSetConstIt, bool> DsoFindRes;
 
+enum BackpopulatePermission {
+  kForbiden,
+  kAllowed,
+};
+
+struct BackpopulateState {
+  BackpopulateState() : _nbUnfoundDsos(), _perm(kAllowed) {}
+  int _nbUnfoundDsos;
+  BackpopulatePermission _perm;
+};
+
+// Associate pid to a backpopulation state
+typedef std::unordered_map<pid_t, BackpopulateState> BackpopulateStateMap;
+
 struct DsoHdr {
   DsoHdr() {}
 
@@ -128,6 +142,10 @@ struct DsoHdr {
 
   bool dso_handled_type(const ddprof::Dso &dso);
 
+  // check for errors per pid and backpopulate when allowed
+  bool process_backpopulate_requests();
+
+  void reset_backpopulate_requests() { _backpopulate_state_map.clear(); }
   /******* HELPERS **********/
   // Find the dso if same
   DsoFindRes dso_find_same_or_smaller(const ddprof::Dso &dso);
@@ -147,4 +165,5 @@ struct DsoHdr {
   ddprof::DsoSet _set;
   ddprof::RegionMap _region_map;
   struct ddprof::DsoStats _stats;
+  BackpopulateStateMap _backpopulate_state_map;
 };
