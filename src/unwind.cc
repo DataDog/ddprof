@@ -76,15 +76,9 @@ Dwfl_Module *update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, uint64_t pc) {
   // Lookup DSO
   DsoFindRes dso_find_res = dso_hdr->dso_find_closest(pid, pc);
   if (!dso_find_res.second) {
-    dso_hdr->pid_backpopulate(pid); // Update and try again
-    dso_find_res = dso_hdr->dso_find_closest(pid, pc);
-    if (dso_find_res.second) {
-      LG_DBG("[UNWIND] Located DSO after backpopulate (%s)",
-             dso_find_res.first->_filename.c_str());
-    } else {
-      LG_DBG("[UNWIND] Did not locate DSO");
-      return NULL;
-    }
+    ++dso_hdr->_backpopulate_state_map[pid]._nbUnfoundDsos;
+    LG_DBG("[UNWIND] %s - Did not locate DSO", __FUNCTION__);
+    return NULL;
   }
 
   const Dso &dso = *dso_find_res.first;

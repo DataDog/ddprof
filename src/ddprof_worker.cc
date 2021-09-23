@@ -183,6 +183,9 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
   ctx->worker_ctx.count_worker += 1;
   ctx->worker_ctx.count_cache += 1;
 
+  // allow new backpopulates
+  ctx->worker_ctx.us->dso_hdr->reset_backpopulate_requests();
+
   // Update the time last sent
   ctx->worker_ctx.send_nanos += export_time_convert(ctx->params.upload_period);
 
@@ -213,7 +216,7 @@ void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int pos) {
 }
 
 void ddprof_pr_lost(DDProfContext *ctx, perf_event_lost *lost, int pos) {
-  (void)ctx;
+  ctx->worker_ctx.us->dso_hdr->reset_backpopulate_requests();
   (void)pos;
   ddprof_stats_add(STATS_EVENT_LOST, lost->lost, NULL);
 }
@@ -346,6 +349,8 @@ DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
     default:
       break;
     }
+    // backpopulate if needed
+    ctx->worker_ctx.us->dso_hdr->process_backpopulate_requests();
 
     // Click the timer at the end of processing, since we always add the
     // sampling rate to the last time.
