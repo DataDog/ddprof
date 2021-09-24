@@ -140,7 +140,7 @@ struct DsoHdr {
   // Find the closest dso to this pid and addr
   DsoFindRes dso_find_closest(pid_t pid, ElfAddress_t addr);
 
-  bool dso_handled_type(const ddprof::Dso &dso);
+  bool dso_handled_type_read_dso(const ddprof::Dso &dso);
 
   // check for errors per pid and backpopulate when allowed
   bool process_backpopulate_requests();

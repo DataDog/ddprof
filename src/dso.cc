@@ -290,7 +290,7 @@ DsoFindRes DsoHdr::dso_find_closest(pid_t pid, ElfAddress_t addr) {
                                                      std::move(is_within));
 }
 
-bool DsoHdr::dso_handled_type(const Dso &dso) {
+bool DsoHdr::dso_handled_type_read_dso(const Dso &dso) {
   if (dso._type != ddprof::dso::kStandard) {
     // only handle standard path for now
     _stats.incr_metric(DsoStats::kUnhandledDso, dso._type);
@@ -433,8 +433,9 @@ DsoFindRes DsoHdr::pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
     }
   }
   const Dso &dso = *find_res.first;
-  if (!dso_handled_type(dso)) {
-    LG_DBG("[DSO] Unhandled DSO %s", dso.to_string().c_str());
+  if (!dso_handled_type_read_dso(dso)) {
+    // We can not mmap if we do not have a file
+    LG_DBG("[DSO] Read DSO : Unhandled DSO %s", dso.to_string().c_str());
     find_res.second = false;
     return find_res;
   }

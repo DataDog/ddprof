@@ -97,10 +97,8 @@ Dwfl_Module *update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, uint64_t pc) {
   const Dso &dso = *dso_find_res.first;
   dso_hdr->_stats.incr_metric(DsoStats::kTargetDso, dso._type);
 
-  if (!dso_hdr->dso_handled_type(dso) || dso.errored()) {
-    LG_DBG("[UNWIND] Unhandled Dso Type / previous error (%s) - not fetching "
-           "mod (%s)",
-           dso.errored() ? "true" : "false", dso._filename.c_str());
+  if (dso.errored()) {
+    LG_DBG("[UNWIND] DSO Previously errored - mod (%s)", dso._filename.c_str());
     return NULL;
   }
 
