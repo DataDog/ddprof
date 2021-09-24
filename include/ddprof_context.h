@@ -23,9 +23,10 @@ typedef struct DDProfWorkerContext {
   DDProfPProf *pprof;   // wrapper around rust exporter
   UnwindState *us;
   ProcStatus proc_status;
-  int64_t send_nanos;    // Last time an export was sent
-  uint32_t count_worker; // exports since last cache clear
-  uint32_t count_cache;  // exports since worker was spawned
+  int64_t send_nanos;     // Last time an export was sent
+  uint32_t count_worker;  // exports since last cache clear
+  uint32_t count_cache;   // exports since worker was spawned
+  uint32_t count_samples; // sample count to avoid bouncing on backpopulates
 } DDProfWorkerContext;
 
 typedef struct DDProfContext {

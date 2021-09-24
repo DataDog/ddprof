@@ -142,10 +142,9 @@ struct DsoHdr {
 
   bool dso_handled_type_read_dso(const ddprof::Dso &dso);
 
-  // check for errors per pid and backpopulate when allowed
-  bool process_backpopulate_requests();
+  DsoFindRes dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr);
 
-  void reset_backpopulate_requests() { _backpopulate_state_map.clear(); }
+  void reset_backpopulate_state() { _backpopulate_state_map.clear(); }
   /******* HELPERS **********/
   // Find the dso if same
   DsoFindRes dso_find_same_or_smaller(const ddprof::Dso &dso);

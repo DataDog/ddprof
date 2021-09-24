@@ -277,4 +277,26 @@ TEST(DSOTest, fork) {
   DsoFindRes find_res = dso_hdr.dso_find_same_or_smaller(dso_forked);
   EXPECT_EQ(dso_forked, *find_res.first);
 }
+
+// Retrieves instruction pointer
+#define _THIS_IP_                                                              \
+  ({                                                                           \
+    __label__ __here;                                                          \
+  __here:                                                                      \
+    (unsigned long)&&__here;                                                   \
+  })
+
+// backpopulate on this unit test making sure we find the associated dso
+TEST(DSOTest, backpopulate) {
+  LogHandle loghandle;
+  ElfAddress_t ip = _THIS_IP_;
+  DsoHdr dso_hdr;
+  DsoFindRes find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
+  ASSERT_TRUE(find_res.second);
+  // check that string dso-ut is contained in the dso
+  EXPECT_TRUE(find_res.first->_filename.find(MYNAME) != std::string::npos);
+  dso_hdr._set.erase(find_res.first);
+  find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
+  EXPECT_FALSE(find_res.second);
+}
 } // namespace ddprof
