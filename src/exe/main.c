@@ -28,11 +28,11 @@ int main(int argc, char *argv[]) {
     if (IsDDResNotOK(
             ddprof_input_parse(argc, (char **)argv, &input, &continue_exec))) {
       LG_WRN("Unable to parse parameters");
-      goto CLEANUP_ERR;
+      goto CLEANUP_INPUT;
     }
     if (!continue_exec) {
       LG_DBG("Exiting");
-      goto CLEANUP;
+      goto CLEANUP_INPUT;
     }
   }
   // logger can be closed (as it is opened in ddprof_ctx_set)
@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
     // Attach the profiler
     ddprof_attach_profiler(&ctx, get_nprocs());
     LG_WRN("Profiling terminated");
-    goto CLEANUP_ERR;
+    goto CLEANUP; // todo : propagate errors
   }
 
 EXECUTE:
@@ -108,9 +108,10 @@ EXECUTE:
 CLEANUP_ERR:
   ret = -1;
 CLEANUP:
+  ddprof_ctx_free(&ctx);
+CLEANUP_INPUT:
   // These are cleaned by execvp(), but we remove them here since this is the
   // error path and we don't want static analysis to report leaks.
   ddprof_input_free(&input);
-  ddprof_ctx_free(&ctx);
   return ret;
 }

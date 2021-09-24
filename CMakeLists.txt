@@ -37,6 +37,13 @@ include(Helperfunc)
 # path to external dependencies
 set(VENDOR_PATH ${CMAKE_SOURCE_DIR}/vendor CACHE FILEPATH " Path to the vendor directory")
 
+include(CheckIPOSupported)
+check_ipo_supported(RESULT LTO_SUPPORTED OUTPUT error)
+if( LTO_SUPPORTED )
+   message(STATUS "IPO / LTO supported")
+else()
+   message(STATUS "IPO / LTO not supported: <${error}>")
+endif()
 
 ##############
 ### Deps   ###
@@ -184,6 +191,10 @@ add_exe(ddprof
         LIBRARIES ${DDPROF_LIBRARY_LIST}
         DEFINITIONS ${DDPROF_DEFINITION_LIST})
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
+
+if( LTO_SUPPORTED AND "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+   set_property(TARGET ddprof PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
 
 message(STATUS "Install destination " ${CMAKE_INSTALL_PREFIX})
 install(TARGETS ddprof)
