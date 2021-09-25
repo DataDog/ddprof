@@ -36,10 +36,8 @@ static char *alloc_url_agent(const char *protocol, const char *host,
 
   if (expected_size + 1 > K_URL_ALLOC_ATTEMPT_SIZE) {
     char *new_url = (char *)realloc(url, expected_size + 1);
-    if (unlikely(!new_url)) {
-      free(url);
+    if (unlikely(!new_url))
       return new_url;
-    }
     snprintf(new_url, expected_size + 1, "%s%s:%s", protocol, host, port);
     return new_url;
   }
