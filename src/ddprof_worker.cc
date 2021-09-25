@@ -331,6 +331,9 @@ DDRes ddprof_worker_finish(DDProfContext *ctx) {
 }
 #endif
 
+// Simple wrapper over perf_event_hdr in order to filter by PID in a uniform
+// way.  Whenver PID is a valid concept for the given event type, the interface
+// uniformly presents PID as the element immediately after the header.
 struct perf_event_hdr_wpid : perf_event_header {
   uint32_t pid, tid;
 };
