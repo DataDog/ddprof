@@ -372,9 +372,7 @@ void DsoHdr::erase_range(const DsoRange &range) {
 }
 
 DsoFindRes DsoHdr::dso_find_same_or_smaller(const ddprof::Dso &dso) {
-  DsoFindRes res = {};
-  res.first = _set.find(dso);
-  res.second = false;
+  DsoFindRes res = std::make_pair<DsoFindRes::first_type, DsoFindRes::second_type>(_set.find(dso), false);
   // comparator only looks at start ptr
   if (res.first != _set.end()) {
     // if it is the same or smaller, we keep the current dso
