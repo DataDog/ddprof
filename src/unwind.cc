@@ -64,7 +64,13 @@ static bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
   }
 
   // We're probably safe to read
-  *result = *(Dwarf_Word *)(&us->stack[addr - sp_start]);
+  uint64_t stack_idx = addr - sp_start;
+  if (stack_idx > addr || stack_idx > INT64_MAX) {
+    LG_WRN("Underflow in stack idx, %ld - %ld = %ld", addr, sp_start,
+           stack_idx);
+    return false;
+  }
+  *result = *(Dwarf_Word *)(us->stack + stack_idx);
   return true;
 }
 
