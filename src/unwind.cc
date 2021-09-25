@@ -57,8 +57,9 @@ static bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
         us->dso_hdr->pid_read_dso(us->pid, result, sizeof(Dwarf_Word), addr);
     if (!find_res.second) {
       // Some regions are not handled
-      LG_DBG("[UNWIND] Couldn't get read 0x%lx from %d", addr, us->pid);
-      LG_DBG("[UNWIND] stack is 0x%lx:0x%lx", sp_start, sp_end);
+      LG_DBG("[UNWIND] Couldn't get read 0x%lx from %d, (0x%lx, 0x%lx)[%p, %p]",
+             addr, us->pid, sp_start, sp_end, us->stack,
+             us->stack + us->stack_sz);
     }
     return find_res.second;
   }
