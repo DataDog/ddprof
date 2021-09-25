@@ -331,28 +331,47 @@ DDRes ddprof_worker_finish(DDProfContext *ctx) {
 }
 #endif
 
+struct perf_event_hdr_wpid {
+  struct perf_event_header hdr;
+  uint32_t pid, tid;
+};
+
 DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
                     volatile bool *continue_profiling, DDProfContext *ctx) {
   // global try catch to avoid leaking exceptions to main loop
   try {
+
+    struct perf_event_hdr_wpid *wpid = (perf_event_hdr_wpid *)hdr;
     switch (hdr->type) {
+    /* Cases where the target type has a PID */
     case PERF_RECORD_SAMPLE:
+      if (!wpid->pid)
+        break;
       DDRES_CHECK_FWD(ddprof_pr_sample(ctx, hdr2samp(hdr), pos));
       break;
     case PERF_RECORD_MMAP:
+      if (!wpid->pid)
+        break;
       ddprof_pr_mmap(ctx, (perf_event_mmap *)hdr, pos);
       break;
-    case PERF_RECORD_LOST:
-      ddprof_pr_lost(ctx, (perf_event_lost *)hdr, pos);
-      break;
     case PERF_RECORD_COMM:
+      if (!wpid->pid)
+        break;
       ddprof_pr_comm(ctx, (perf_event_comm *)hdr, pos);
       break;
     case PERF_RECORD_EXIT:
+      if (!wpid->pid)
+        break;
       ddprof_pr_exit(ctx, (perf_event_exit *)hdr, pos);
       break;
     case PERF_RECORD_FORK:
+      if (!wpid->pid)
+        break;
       ddprof_pr_fork(ctx, (perf_event_fork *)hdr, pos);
+      break;
+    /* Cases where the target type might not have a PID */
+    case PERF_RECORD_LOST:
+      ddprof_pr_lost(ctx, (perf_event_lost *)hdr, pos);
       break;
     default:
       break;
