@@ -14,7 +14,6 @@
 
 static const int k_timeout_ms = 10000;
 static const int k_size_api_key = 32;
-#define K_URL_ALLOC_ATTEMPT_SIZE 256
 
 static ddprof_ffi_ByteSlice string_view_to_byteslice(string_view slice) {
   return (ddprof_ffi_ByteSlice){.ptr = (uint8_t *)slice.ptr, .len = slice.len};
@@ -27,22 +26,9 @@ static ddprof_ffi_ByteSlice char_star_to_byteslice(const char *string) {
 
 static char *alloc_url_agent(const char *protocol, const char *host,
                              const char *port) {
-  char *url = (char *)malloc(K_URL_ALLOC_ATTEMPT_SIZE);
-  if (unlikely(!url)) {
-    return NULL;
-  }
-
-  size_t expected_size = snprintf(url, 256, "%s%s:%s", protocol, host, port);
-
-  if (expected_size + 1 > K_URL_ALLOC_ATTEMPT_SIZE) {
-    char *new_url = (char *)realloc(url, expected_size + 1);
-    if (unlikely(!new_url)) {
-      free(url);
-      return new_url;
-    }
-    snprintf(new_url, expected_size + 1, "%s%s:%s", protocol, host, port);
-    return new_url;
-  }
+  size_t expected_size = snprintf(NULL, 0, "%s%s:%s", protocol, host, port);
+  char* url = (char *)malloc(expected_size + 1);
+  snprintf(url, expected_size, "%s%s:%s", protocol, host, port);
   return url;
 }
 
