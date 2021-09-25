@@ -331,8 +331,7 @@ DDRes ddprof_worker_finish(DDProfContext *ctx) {
 }
 #endif
 
-struct perf_event_hdr_wpid {
-  struct perf_event_header hdr;
+struct perf_event_hdr_wpid : perf_event_header {
   uint32_t pid, tid;
 };
 
@@ -341,7 +340,7 @@ DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
   // global try catch to avoid leaking exceptions to main loop
   try {
 
-    struct perf_event_hdr_wpid *wpid = (perf_event_hdr_wpid *)hdr;
+    struct perf_event_hdr_wpid *wpid = static_cast<perf_event_hdr_wpid *>(hdr);
     switch (hdr->type) {
     /* Cases where the target type has a PID */
     case PERF_RECORD_SAMPLE:
