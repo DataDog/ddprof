@@ -43,32 +43,40 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
   return ddres_init();
 }
 
-DDRes pevent_mmap(PEventHdr *pevent_hdr) {
+DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
   // Switch user if needed (when root switch to nobody user)
   UIDInfo info;
-  DDRES_CHECK_FWD(user_override(&info));
+  if (use_override)
+    DDRES_CHECK_FWD(user_override(&info));
 
   PEvent *pes = pevent_hdr->pes;
   for (int k = 0; k < pevent_hdr->size; ++k) {
     if (pes[k].fd != -1) {
       if (!(pes[k].region = perfown(pes[k].fd, &pes[k].reg_size))) {
-        DDRES_RETURN_ERROR_LOG(
-            DD_WHAT_PERFMMAP,
-            "Could not finalize watcher (idx#%d): registration (%s)", k,
-            strerror(errno));
+        LG_ERR("Could not finalize watcher (idx#%d): registration (%s)", k,
+               strerror(errno));
+        goto REGION_CLEANUP;
       }
     }
   }
 
-  // Revert user
-  DDRES_CHECK_FWD(revert_override(&info));
+  // Success : Revert user and exit
+  if (use_override)
+    DDRES_CHECK_FWD(revert_override(&info));
   return ddres_init();
+
+REGION_CLEANUP:
+  // Failure : attempt to clean and send error
+  DDRES_CHECK_FWD(pevent_munmap(pevent_hdr));
+  if (use_override)
+    DDRES_CHECK_FWD(revert_override(&info));
+  return ddres_error(DD_WHAT_PERFMMAP);
 }
 
 DDRes pevent_setup(DDProfContext *ctx, pid_t pid, int num_cpu,
                    PEventHdr *pevent_hdr) {
   DDRES_CHECK_FWD(pevent_open(ctx, pid, num_cpu, pevent_hdr));
-  DDRES_CHECK_FWD(pevent_mmap(pevent_hdr));
+  DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, true));
   return ddres_init();
 }
 

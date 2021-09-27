@@ -83,7 +83,10 @@ DDRes worker_unwind_init(DDProfContext *ctx) {
   // If we're here, then we are a child spawned during the startup operation.
   // That means we need to iterate through the perf_event_open() handles and
   // get the mmaps
-  DDRES_CHECK_FWD(pevent_mmap(pevent_hdr));
+  if (!IsDDResOK(pevent_mmap(pevent_hdr, true))) {
+    LG_NTC("Retrying attachment without user override");
+    DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, false));
+  }
   // Initialize the unwind state and library
   DDRES_CHECK_FWD(unwind_init(ctx->worker_ctx.us));
   return ddres_init();
