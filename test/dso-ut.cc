@@ -217,9 +217,10 @@ TEST(DSOTest, dso_from_procline) {
   // todo make dso_from_procline const
   Dso no_exec = dso_from_procline(10, const_cast<char *>(s_line_noexec));
   std::cerr << no_exec;
-  // check that element is not considered as it does not have an exec flag
-  EXPECT_EQ(no_exec._type, dso::kUndef);
-  EXPECT_EQ(no_exec._pid, -1);
+  EXPECT_EQ(no_exec._type, dso::kStandard);
+  EXPECT_EQ(no_exec._executable, false);
+  EXPECT_EQ(no_exec._pid, 10);
+
   Dso standard_dso = dso_from_procline(10, const_cast<char *>(s_exec_line));
   std::cerr << standard_dso;
   EXPECT_EQ(standard_dso._type, dso::kStandard);

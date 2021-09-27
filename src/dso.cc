@@ -96,12 +96,12 @@ static const std::string s_anon_str = "//anon";
 // invalid element
 Dso::Dso()
     : _pid(-1), _start(), _end(), _pgoff(), _filename(), _type(dso::kUndef),
-      _errored(true) {}
+      _executable(false), _errored(true) {}
 
 Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
-         std::string &&filename)
+         std::string &&filename, bool executable)
     : _pid(pid), _start(start), _end(end), _pgoff(pgoff), _filename(filename),
-      _type(dso::kStandard), _errored(false) {
+      _type(dso::kStandard), _executable(executable), _errored(false) {
   // note that substr manages the case where len str < len vdso_str
   if (_filename.substr(0, s_vdso_str.length()) == s_vdso_str) {
     _type = dso::kVdso;
@@ -120,8 +120,9 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
 }
 
 std::string Dso::to_string() const {
-  return string_format("PID[%d] %lx-%lx %lx (%s)(T-%s)", _pid, _start, _end,
-                       _pgoff, _filename.c_str(), dso::dso_type_str(_type));
+  return string_format("PID[%d] %lx-%lx %lx (%s)(T-%s)(%c)", _pid, _start, _end,
+                       _pgoff, _filename.c_str(), dso::dso_type_str(_type),
+                       _executable ? 'x' : '-');
 }
 
 std::ostream &operator<<(std::ostream &os, const Dso &dso) {
@@ -161,9 +162,15 @@ bool Dso::same_or_smaller(const Dso &o) const {
   if (_type != o._type) {
     return false;
   }
+
+  // only compare filename if we are backed by real files
   if (_type == dso::kStandard && _filename != o._filename) {
     return false;
   }
+  if (_executable != o._executable) {
+    return false;
+  }
+
   return true;
 }
 
@@ -254,13 +261,8 @@ Dso dso_from_procline(int pid, char *line) {
   if ((q = strchr(p, '\n')))
     *q = '\0';
 
-  // Check that it was executable otherwise we don't need to store it (IP will
-  // not refer to this section, except stack which can be non exec)
-  std::string filename(p);
-  if ('x' != m_mode[2] && filename != "[stack]")
-    return Dso();
-
-  return Dso(pid, m_start, m_end - 1, m_off, std::move(filename));
+  // Should we store non exec dso ?
+  return Dso(pid, m_start, m_end - 1, m_off, std::string(p), 'x' == m_mode[2]);
 }
 
 } // namespace ddprof

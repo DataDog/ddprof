@@ -24,7 +24,7 @@ public:
   // pid, start, end, offset, filename (copied once to avoid creating 3
   // different APIs)
   Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff = 0,
-      std::string &&filename = "");
+      std::string &&filename = "", bool executable = true);
   // copy parent and update pid
   Dso(const Dso &parent, pid_t new_pid) : Dso(parent) { _pid = new_pid; }
 
@@ -45,6 +45,7 @@ public:
   ElfAddress_t _pgoff;
   std::string _filename;
   dso::DsoType _type;
+  bool _executable;
 
   mutable bool _errored;
 };

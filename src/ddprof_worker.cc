@@ -122,24 +122,25 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   struct UnwindState *us = ctx->worker_ctx.us;
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
   us->pid = sample->pid;
-  us->stack = NULL;
   us->stack_sz = sample->size_stack;
   us->stack = sample->data_stack;
 
+#ifdef DEBUG
+  LG_DBG("[WORKER]<%d> (SAMPLE)%d: stack = %p / size = %lu", pos, us->pid,
+         us->stack, us->stack_sz);
+#endif
   memcpy(&us->regs[0], sample->regs, PERF_REGS_COUNT * sizeof(uint64_t));
   uw_output_clear(&us->output);
   unsigned long this_ticks_unwind = __rdtsc();
-  // Aggregate if unwinding went well
-  if (IsDDResOK(unwindstate__unwind(us))) {
-    DDRES_CHECK_FWD(ddprof_stats_add(STATS_UNWIND_TICKS,
-                                     __rdtsc() - this_ticks_unwind, NULL));
+  DDRes res = unwindstate__unwind(us);
 
+  // Aggregate if unwinding went well (todo : fatal error propagation)
+  if (IsDDResOK(res)) {
     // in lib mode we don't aggregate (protect to avoid link failures)
 #ifndef DDPROF_NATIVE_LIB
     DDProfPProf *pprof = ctx->worker_ctx.pprof;
     DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbols_hdr,
                                     sample->period, pos, pprof));
-
 #else
     if (ctx->stack_handler) {
       if (!ctx->stack_handler->apply(&us->output, ctx,
@@ -150,6 +151,8 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
     }
 #endif
   }
+  DDRES_CHECK_FWD(ddprof_stats_add(STATS_UNWIND_TICKS,
+                                   __rdtsc() - this_ticks_unwind, NULL));
 
   return ddres_init();
 }
@@ -235,7 +238,8 @@ void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int pos) {
   (void)ctx;
   LG_DBG("[PERF]<%d>(FORK)%d -> %d", pos, frk->ppid, frk->pid);
   if (frk->ppid != frk->pid) {
-    ctx->worker_ctx.us->dso_hdr->pid_fork(frk->ppid, frk->pid);
+    // Clear everything and populate at next error or with coming samples
+    ctx->worker_ctx.us->dso_hdr->pid_free(frk->pid);
   }
 }
 
