@@ -25,11 +25,16 @@ struct RegionKey {
 // mmaps the given regions
 class RegionHolder {
 public:
+  RegionHolder();
   RegionHolder(const std::string &full_path, size_t sz, uint64_t pgoff,
                dso::DsoType path_type);
   ~RegionHolder();
-  RegionHolder(RegionHolder &&other) = default;            // allow move
-  RegionHolder &operator=(RegionHolder &&other) = default; // allow move
+  RegionHolder(RegionHolder &&other) : RegionHolder() { swap(*this, other); }
+
+  RegionHolder &operator=(RegionHolder &&other) {
+    swap(*this, other);
+    return *this;
+  }
 
   RegionHolder(const RegionHolder &other) = delete;            // avoid copy
   RegionHolder &operator=(const RegionHolder &other) = delete; // avoid copy
@@ -37,6 +42,12 @@ public:
   std::size_t get_sz() const { return _sz; }
 
 private:
+  static void swap(RegionHolder &first, RegionHolder &second) noexcept {
+    std::swap(first._region, second._region);
+    std::swap(first._sz, second._sz);
+    std::swap(first._type, second._type);
+  }
+
   void *_region;
   std::size_t _sz;
   dso::DsoType _type;

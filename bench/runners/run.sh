@@ -244,8 +244,9 @@ if [[ "yes" == "${USE_DDPROF,,}" ]]; then
   DDPROF_CMD="${DDPROF_CMD} ${SERVICE_DDPROF_OPTION} ${DDPROF_CMD}"
 fi
 
-# Run it!
-echo "${DDPROF_CMD} ${SERVICE_OPTION} $@"
+# Run it! (debug print, warning, can print the key)
+#echo "${DDPROF_CMD} ${SERVICE_OPTION} $@"
+
 # exit 1
 eval "${DDPROF_CMD} ${SERVICE_OPTION} $@"
 

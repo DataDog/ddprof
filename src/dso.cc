@@ -463,7 +463,7 @@ DsoFindRes DsoHdr::pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
     return find_res;
   }
 
-  Offset_t file_region_offset = addr - (dso._start + dso._pgoff);
+  Offset_t file_region_offset = (addr - dso._start) + dso._pgoff;
 
   // At this point, we've
   //  Found a segment with matching parameters
@@ -471,7 +471,7 @@ DsoFindRes DsoHdr::pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
   //  Confirmed that the segment has the capacity to support our read
   // So let's read it!
   unsigned char *src = (unsigned char *)region.get_region();
-  memcpy(src + file_region_offset, buf, sz);
+  memcpy(buf, src + file_region_offset, sz);
   return find_res;
 }
 
@@ -482,11 +482,10 @@ DsoHdr::find_or_insert_region(const ddprof::Dso &dso) {
   const auto find_res = _region_map.find(key);
   LG_DBG("[DSO] Get region - %s", dso.to_string().c_str());
   if (find_res == _region_map.end()) {
-    const auto insert_res = _region_map.insert(std::make_pair(
+    const auto insert_res = _region_map.emplace(
         std::move(key),
-        // filename, size, page offset, path type
         ddprof::RegionHolder(dso._filename, dso._end - dso._start + 1,
-                             dso._pgoff, dso._type)));
+                             dso._pgoff, dso._type));
     assert(insert_res.second);
     return insert_res.first->second;
 

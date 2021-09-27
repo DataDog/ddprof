@@ -11,6 +11,8 @@ extern "C" {
 }
 
 namespace ddprof {
+RegionHolder::RegionHolder() : _region(nullptr), _sz(0), _type(dso::kUndef) {}
+
 RegionHolder::RegionHolder(const std::string &full_path, size_t sz,
                            uint64_t pgoff, dso::DsoType path_type)
     : _region(nullptr), _sz(0), _type(path_type) {
@@ -28,13 +30,13 @@ RegionHolder::RegionHolder(const std::string &full_path, size_t sz,
 
     if (fd != -1) { //
       _region = mmap(0, sz, PROT_READ, MAP_PRIVATE, fd, pgoff);
+      close(fd);
 
       if (!_region) {
         LG_ERR("[DSO] Unable to mmap region");
       } else {
         _sz = sz;
       }
-      close(fd);
     } else {
       LG_ERR("[DSO] Unable to read file : %s", full_path.c_str());
     }
@@ -48,7 +50,9 @@ bool RegionKey::operator==(const RegionKey &o) const {
 
 RegionHolder::~RegionHolder() {
   if (_type == dso::kStandard && _region) {
-    munmap(_region, _sz);
+    if (munmap(_region, _sz) == -1) {
+      LG_ERR("[DSO] Bad parameters when munmap %p - %lu", _region, _sz);
+    }
   }
 }
 

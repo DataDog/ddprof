@@ -21,9 +21,9 @@ typedef struct UnwindState {
   union {
     uint64_t regs[3];
     struct {
-      uint64_t ebp;
-      uint64_t esp;
-      uint64_t eip;
+      uint64_t ebp; // base address of the function's frame
+      uint64_t esp; // top of the stack
+      uint64_t eip; // Extended Instruction Pointer
     };
   };
   bool attached;

@@ -180,6 +180,12 @@ add_unit_test(
 )
 
 add_unit_test(
+    region_holder-ut
+    ../src/region_holder.cc
+    region_holder-ut.cc
+    DEFINITIONS MYNAME="region_holder-ut")
+
+add_unit_test(
     dso-ut
     ../src/dso.cc 
     ../src/signal_helper.c
