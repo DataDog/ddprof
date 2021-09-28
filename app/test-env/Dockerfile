@@ -1,4 +1,5 @@
-FROM ubuntu:20.04 as base
+ARG UBUNTU_VERSION=20
+FROM ubuntu:${UBUNTU_VERSION}.04 as base
 
 # Tell docker to use bash as the default
 SHELL ["/bin/bash", "-c"]

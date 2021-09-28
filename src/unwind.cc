@@ -205,10 +205,10 @@ int tid_cb(Dwfl_Thread *thread, void *targ) {
 
 static DDRes unwind_dwfl_begin(struct UnwindState *us) {
   static char *debuginfo_path;
-
   static const Dwfl_Callbacks proc_callbacks = {
       .find_elf = dwfl_linux_proc_find_elf,
       .find_debuginfo = dwfl_standard_find_debuginfo,
+      .section_address = nullptr,
       .debuginfo_path = &debuginfo_path,
   };
   us->dwfl = dwfl_begin(&proc_callbacks);
@@ -238,8 +238,11 @@ DDRes dwfl_caches_clear(struct UnwindState *us) {
 static DDRes unwind_attach(struct UnwindState *us) {
   static const Dwfl_Thread_Callbacks dwfl_callbacks = {
       .next_thread = next_thread,
+      .get_thread = nullptr,
       .memory_read = memory_read,
       .set_initial_registers = set_initial_registers,
+      .detach = nullptr,
+      .thread_detach = nullptr,
   };
 
   if (us->attached) {

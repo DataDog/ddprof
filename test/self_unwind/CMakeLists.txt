@@ -1,8 +1,4 @@
-
-
-# External dependencies (linked with FetchContent)
-include(FetchContent)
-
+# External dependencies (json package)
 find_package(nlohmann_json 3.10.2 REQUIRED)
 
 add_exe(selfuw
@@ -10,9 +6,10 @@ add_exe(selfuw
         stackchecker.cpp
         LIBRARIES DDProf::Native nlohmann_json::nlohmann_json
         DEFINITIONS "MYNAME=\"selfuw\"" "STACK_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
-# It would be better to include public only
-target_compile_features(selfuw
-  PRIVATE c_std_11 cxx_std_17
-)
+
+set_property(TARGET selfuw PROPERTY CXX_STANDARD 17)
+set_property(TARGET selfuw PROPERTY C_STANDARD 11)
+
+# slightly hacky : we should only include public headers 
 target_include_directories(selfuw PRIVATE ../../include ../../include/lib)
 install(TARGETS selfuw)

@@ -1,6 +1,7 @@
 # Using a recent compiler version and recent OS (better tooling)
 # We'll implement libc version sanitization in the code itself
-FROM ubuntu:20.04 as base
+ARG UBUNTU_VERSION=20
+FROM ubuntu:${UBUNTU_VERSION}.04 as base
 
 # Tell docker to use bash as the default
 SHELL ["/bin/bash", "-c"]
@@ -24,20 +25,21 @@ RUN apt update \
   ssh-client \
   subversion \
   zlib1g-dev \
-  libgtest-dev \
-  libgmock-dev \
   libjemalloc-dev \
   libcap-dev \
   gcovr \
   wget
 
-# llvm installer
-RUN bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+# Only necessary for ubuntu 16
+RUN DEBIAN_FRONTEND=noninteractive apt install -y apt-transport-https ca-certificates
 
-# To install a specific version of LLVM:
-RUN wget https://apt.llvm.org/llvm.sh && \
-  chmod +x llvm.sh && \
-  ./llvm.sh 12
+# llvm installer
+ADD ./app/base-env/llvm.sh /
+RUN /llvm.sh 12
+# Alternative is to run it directly from here :
+# RUN wget https://apt.llvm.org/llvm.sh && \
+#   chmod +x llvm.sh && \
+#   ./llvm.sh 12
 
 # Clang format not installed by default
 RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key| apt-key add -
@@ -57,6 +59,14 @@ RUN CMAKE_VERSION="3.20.1" \
   && tar --no-same-owner -C /usr/local --strip-components=1 -xf cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz \
   && rm cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz
 
+# google test / google mock
+RUN git clone --depth 1 --branch release-1.11.0 https://github.com/google/googletest.git \
+  && cd googletest \
+  && mkdir build \
+  && cd build \
+  && cmake ../ \
+  && cmake --build .  \
+  && make install
 
 # Cpp check 2.5 (ubuntu's 1.8 has some bugs on double free)
 RUN wget https://github.com/danmar/cppcheck/archive/refs/tags/2.5.tar.gz \
@@ -70,11 +80,20 @@ RUN wget https://github.com/danmar/cppcheck/archive/refs/tags/2.5.tar.gz \
   && cmake --build .  \
   && make install
 
-# json library
+# C++ json library (used for test purpose)
 RUN git clone --depth 1 --branch v3.10.2 https://github.com/nlohmann/json.git \
   && cd json \
   && mkdir build && cd build \
   && cmake DJSON_BuildTests=Off ../  \
+  && make install
+
+# C++ containers (header only, avoid pulling in boost)
+RUN git clone --depth 1 --branch 2.0 https://github.com/AmadeusITGroup/amc.git \
+  && cd amc \
+  && mkdir build \
+  && cd build \
+  && cmake -DAMC_ENABLE_TESTS=0 -DAMC_ENABLE_BENCHMARKS=0 ../ \
+  && cmake --build .  \
   && make install
 
 # A specific user is required to get access to perf event ressources. 

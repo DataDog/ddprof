@@ -22,6 +22,7 @@ usage() {
     echo "    --test/-t : launch the test image."
     echo "    --centos/-C : launch the test image."
     echo "    --clean/-c : rebuild the image before creating it."
+    echo "    --ubuntu_version/-u : use a given ubuntu version."
 }
 
 if [ $# != 0 ] && [ $1 == "-h" ]; then
@@ -30,6 +31,8 @@ if [ $# != 0 ] && [ $1 == "-h" ]; then
 fi
 
 PERFORM_CLEAN=0
+UBUNTU_VERSION=18
+
 while [ $# != 0 ]; do 
     if [ $# != 0 ] && [ $1 == "-t" -o $1 == "--test" ]; then
         DEFAULT_BASE_NAME=test_ddprof
@@ -43,9 +46,14 @@ while [ $# != 0 ]; do
         shift
         continue
     fi
-
     if [ $# != 0 ] && [ $1 == "--clean" -o $1 == "-c" ]; then
         PERFORM_CLEAN=1
+        shift
+        continue
+    fi
+    if [ $# != 0 ] && [ $1 == "--ubuntu_version" -o $1 == "-u" ]; then
+        UBUNTU_VERSION=$2
+        shift
         shift
         continue
     fi
@@ -87,19 +95,22 @@ if [ -e "${TOP_LVL_DIR}/docker-sync.yml" ]; then
     fi
 fi
 
-echo "Considering docker image    : $DEFAULT_BASE_NAME"
+DOCKER_TAG=${DEFAULT_BASE_NAME}_${UBUNTU_VERSION}
+
+echo "Considering docker image    : $DOCKER_TAG"
 echo "              Built from    : $BASE_DOCKERFILE"
 echo "           Mount command    : ${MOUNT_CMD}"
 
 if [ $PERFORM_CLEAN -eq 1 ]; then
-    echo "Clean image : ${DEFAULT_BASE_NAME}"
-    docker image rm ${DEFAULT_BASE_NAME}
+    echo "Clean image : ${DOCKER_TAG}"
+    docker image rm ${DOCKER_TAG}
 fi
 
 # Check if base image exists
-if [ -z "$(docker images |grep ${DEFAULT_BASE_NAME})" ]; then
+if [ -z "$(docker images |grep ${DOCKER_TAG})" ]; then
     echo "Building image"
-    docker build -t ${DEFAULT_BASE_NAME} -f $BASE_DOCKERFILE .
+    # docker build --build-arg arg=2.3
+    docker build -t ${DOCKER_TAG} -f $BASE_DOCKERFILE --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} .
     cd -
 else 
     echo "Base image found, not rebuilding. Remove it to force rebuild."
@@ -117,6 +128,6 @@ if [ -z `echo $OSTYPE|grep darwin` ]; then
 fi 
 
 echo "Launch docker image, DO NOT STORE ANYTHING outside of mounted directory (container is erased on exit)."
-docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -w /app --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} -e SSH_AUTH_SOCK=/ssh-agent ${DEFAULT_BASE_NAME}:latest /bin/bash
+docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -w /app --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} -e SSH_AUTH_SOCK=/ssh-agent ${DOCKER_TAG}:latest /bin/bash
 
 exit 0

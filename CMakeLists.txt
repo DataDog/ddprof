@@ -142,15 +142,6 @@ link_directories(${LIB_DIRNAME_LZMA})
 
 list(APPEND DDPROF_INCLUDE_LIST ${LLVM_DEMANGLE_PATH}/include)
 
-# libstdcxx
-# DAS - I have reservations about statically linking the c++ standard library,
-#       but couldn't put together a more competent solution in a short amount
-#       of time.  I suspect that it's fairly rare for customers to not have a
-#       c++ runtime as part of their distro core, but containers can get pretty
-#       small so who knows.  Either way, this is more about linking C++ from C
-#       than it is about statically linking libc++/libstdc++
-include(Findlibstdcxx)
-
 ## Elf utils
 list(APPEND DDPROF_INCLUDE_LIST ${ELFUTILS_INCLUDE_LIST})
 
@@ -168,7 +159,13 @@ set(DDPROF_GLOBAL_SRC
    ${EXPORTER_SRC}
    ${EXE_SRC})
 
-set(DDPROF_LIBRARY_LIST llvm-demangle libstdc++.a dw elf libz.a Threads::Threads liblzma.a amc::amc)
+
+set(DDPROF_LIBRARY_LIST llvm-demangle dw elf libz.a Threads::Threads liblzma.a amc::amc)
+
+if("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
+   # Static link of libstdc++ (in case it is not installed on customer side)
+   list(PREPEND DDPROF_LIBRARY_LIST -static-libstdc++)
+endif()
 
 if (ON)
    # Add the rust library - Refactoring ongoing. OFF for now
@@ -191,7 +188,11 @@ add_exe(ddprof
         LIBRARIES ${DDPROF_LIBRARY_LIST}
         DEFINITIONS ${DDPROF_DEFINITION_LIST})
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
+# TODO: revert to c++ 11 (string_format is blocking)
+set_property(TARGET ddprof PROPERTY CXX_STANDARD 14)
+set_property(TARGET ddprof PROPERTY C_STANDARD 11)
 
+# Link time optim
 if( LTO_SUPPORTED AND "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
    set_property(TARGET ddprof PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
@@ -222,10 +223,12 @@ option(BUILD_NATIVE_LIB "Build a library out of the native profiler" OFF)
    ## Create the lib
    add_library(ddprof-native
                ${DDPROF_LIB_SRC})
-
+   set_property(TARGET ddprof-native PROPERTY CXX_STANDARD 14)
+   set_property(TARGET ddprof-native PROPERTY C_STANDARD 11)
+               
    set_target_properties(ddprof-native PROPERTIES VERSION ${PROJECT_VERSION})
    set_target_properties(ddprof-native PROPERTIES
-       COMPILE_DEFINITIONS DDPROF_NATIVE_LIB)
+                         COMPILE_DEFINITIONS DDPROF_NATIVE_LIB)
 
    # libcap, can be removed from version distributed to client 
    list(APPEND NATIVE_LIB_LIBRARY_LIST libcap)
@@ -238,10 +241,12 @@ option(BUILD_NATIVE_LIB "Build a library out of the native profiler" OFF)
    target_include_directories(ddprof-native PRIVATE ${NATIVE_LIB_INCLUDE_LIST})
 
    target_link_libraries(ddprof-native PRIVATE ${NATIVE_LIB_LIBRARY_LIST})
-   target_compile_features(ddprof-native
-                           PUBLIC c_std_11 cxx_std_11)
    add_library(DDProf::Native ALIAS ddprof-native)
    install(TARGETS ddprof-native)
 
-   add_subdirectory(test/self_unwind)
+
+   option(ACCURACY_TEST "Enable accuracy test" OFF)
+   if(${ACCURACY_TEST})
+      add_subdirectory(test/self_unwind)
+   endif()
 endif()

@@ -5,8 +5,10 @@ stages:
 
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
-  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/86126716
-  BUILD_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:339a328fe4da12cd130b2b512c66a7f3a713347fb24c75c6061f801e24a93ddc
+  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/87754200
+  BUILD_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:7260f245813f624c6f81661b38e44df80173a88f66cf40a6815bb0ddc0545ca8
+  BUILD_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:b024312d4462e461658d85ff199b058b14c8ff163eee67ce575ebbe3b2fe31d5
+  BUILD_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:a35324470b3ff8c6f00b18fca58137b2513c3e3e6531601739042e341c98c60f
   # https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/81425357
   TEST_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:1565b429f9266dc10f98d615fcaf06941a1281292467820961364aff1376ef34
   # When build images are built, publish them with following tags
@@ -16,6 +18,8 @@ variables:
   # bare centos image
   CENTOS_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:centos
   # Deployment paths
+  DDOG_LIBC: "2.27"
+  LIBC_TYPE: "glibc"
   S3_PREFIX: s3://binaries.ddbuild.io/ddprof/release
   RELPATH: ddprof/release
   BINPATH: deliverables
@@ -26,12 +30,16 @@ build:base:
   stage: build
   when: manual
   tags: ["runner:docker", "size:large"]
+  parallel:
+    matrix:
+      - UB_VERSION: ["16", "18", "20"]
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
   script:
     - set -euo pipefail
-    - docker pull $BASE_IMG || true
-    - docker build --tag $BASE_IMG app/base-env
-    - docker push $BASE_IMG
+    - export TAG_DOCKER=${BASE_IMG}_${UB_VERSION}
+    - docker pull $TAG_DOCKER || true
+    - docker build --tag $TAG_DOCKER  --build-arg UBUNTU_VERSION=${UB_VERSION} -f ./app/base-env/Dockerfile .
+    - docker push $TAG_DOCKER
 
 # This is a cache of compile-time dependencies, like elfutils and libddprof.
 # This needs to be updated whenever these dependencies change and it matters,
@@ -39,11 +47,15 @@ build:deps:
   stage: build
   when: manual
   tags: ["runner:docker", "size:large"]
+  parallel:
+    matrix:
+      - UB_VERSION: ["16", "18", "20"]
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
   script:
     - set -euo pipefail
-    - docker build --tag $BUILD_IMG --build-arg CI=${CI} -f app/build-env/Dockerfile .
-    - docker push $BUILD_IMG
+    - export TAG_DOCKER=${BUILD_IMG}_${UB_VERSION}
+    - docker build --tag ${TAG_DOCKER} --build-arg CI=${CI} --build-arg BASE_IMAGE=${BASE_IMG}_${UB_VERSION} -f app/build-env/Dockerfile .
+    - docker push ${TAG_DOCKER}
 
 # This is a cache of compile-time dependencies, test image
 build:testing:
@@ -77,22 +89,31 @@ build:centos:
 build:ddprof:
   extends:
     - .light-job-resource-allocation
-  image: $BUILD_IMG_STICKY
   stage: build
   tags: ["runner:k8s"]
+  # refers to image defined in matrix
+  image: $IMAGE
   parallel:
     matrix:
-      - BUILD_TYPE: ["Release", "Debug", "SanitizedDebug", "Coverage"]
+      - IMAGE: ["${BUILD_IMG_18_STICKY}", "${BUILD_IMG_20_STICKY}"]
+        BUILD_TYPE: ["Release", "Debug", "SanitizedDebug", "Coverage"]
   variables:
     BUILDPATH: build_${BUILD_TYPE}
   script:
     - set -euxo pipefail
     - source setup_env.sh
-    - export DELIVERY_PATH="${CI_PROJECT_DIR}/${BINPATH}/${BUILD_TYPE}"
+    - export LIBC_VERSION=`ldd --version | head -n 1 | awk '{print $NF}'`
+    - export DELIVERY_PATH="${CI_PROJECT_DIR}/${BINPATH}/${LIBC_TYPE}/${LIBC_VERSION}/${BUILD_TYPE}/"
+    # Accuracy test : Self unwind is c++17 (todo: backport to c++14). following line checks that we are over 2.30
+    - if (( `echo $LIBC_VERSION| awk -F '.' '{print $2}'` > 30 )); then
+    - export ACCURACY_TEST=ON
+    - else
+    - export ACCURACY_TEST=OFF
+    - fi
     #Build image dependencies were stored in app, avoid rebuilding vendor content
     - ln -s /app/vendor vendor
     - mkdir -p ${BUILDPATH} && cd ${BUILDPATH}
-    - cmake -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_BENCHMARKS=ON -DBUILD_NATIVE_LIB=ON -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
+    - cmake -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_BENCHMARKS=ON -DACCURACY_TEST=${ACCURACY_TEST} -DBUILD_NATIVE_LIB=ON -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
     # Static checks
     - make cppcheck
     - make format
@@ -124,8 +145,8 @@ test:ddprof:
   script:
     - set -euxo pipefail
     - source setup_env.sh
-    # Print the k8 runner settings
-    - export BINDIR="./${BINPATH}/${BUILD_TYPE}/bin"
+    - export LIBC_VERSION=`ldd --version | head -n 1 | awk '{print $NF}'`
+    - export BINDIR="./${BINPATH}/${LIBC_TYPE}/${LIBC_VERSION}/${BUILD_TYPE}/bin"
     - echo "CHECK USER" && id
     - echo "CHECK SETTING ON PERF EVENT PARANOID" && cat /proc/sys/kernel/perf_event_paranoid
     - echo "CHECK SETTING ON PINNED MEMORY" && ulimit -l
@@ -144,8 +165,10 @@ test:ddprof:
     - else
     - native_bench.sh -b ${BINDIR}
     - fi
-    # Accuracy check for unwinding
+    # Accuracy check for unwinding (only if it was built)
+    - if [ -e  ${BINDIR}/selfuw ]; then
     - ${BINDIR}/selfuw ${CI_PROJECT_DIR}/test/self_unwind/data
+    - fi
   dependencies:
     - build:ddprof
 
@@ -161,7 +184,9 @@ test:centos:
   script:
     - set -euxo pipefail
     - source setup_env.sh
-    - export BINDIR="./${BINPATH}/${BUILD_TYPE}/bin"
+    # Centos 8 runs on 2.28, though we only build 2.27
+    - export LIBC_VERSION=${DDOG_LIBC}
+    - export BINDIR="./${BINPATH}/${LIBC_TYPE}/${LIBC_VERSION}/${BUILD_TYPE}/bin"
     # Check libc version
     - ldd --version
     - run.sh -b ${BINDIR} ${BINDIR}/collatz 1 20000 5000 A
@@ -171,16 +196,16 @@ test:centos:
 .ddprof_job:
   variables:
     BINNAME: ddprof
-    RELEASEBIN: ${BINPATH}/Release/bin/$BINNAME
-    DEBUGBIN: ${BINPATH}/Debug/bin/$BINNAME
+    RELEASEBIN: ${BINPATH}/${LIBC_TYPE}/${DDOG_LIBC}/Release/bin/$BINNAME
+    DEBUGBIN: ${BINPATH}/${LIBC_TYPE}/${DDOG_LIBC}/Debug/bin/$BINNAME
     GIT_SUBMODULE_STRATEGY: recursive
     PROMOTE: NONE
-  image: $BUILD_IMG_STICKY
+  image: $BUILD_IMG_20_STICKY
 
 deploy:ddprof:
   extends: .ddprof_job
   when: always
-  image: $BUILD_IMG_STICKY
+  image: $BUILD_IMG_20_STICKY
   stage: deploy
   tags: ["runner:docker"]
   script:
@@ -192,7 +217,7 @@ deploy:ddprof:
 promote:ddprof:
   extends: .ddprof_job
   when: manual
-  image: $BUILD_IMG_STICKY
+  image: $BUILD_IMG_20_STICKY
   stage: deploy
   tags: ["runner:docker"]
   script:
@@ -205,15 +230,15 @@ promote:ddprof:
 .collatz_job:
   variables:
     BINNAME: collatz
-    RELEASEBIN: ${BINPATH}/Release/bin/$BINNAME
-    DEBUGBIN: ${BINPATH}/Debug/bin/$BINNAME
+    RELEASEBIN: ${BINPATH}/${LIBC_TYPE}/${DDOG_LIBC}/Release/bin/$BINNAME
+    DEBUGBIN: ${BINPATH}/${LIBC_TYPE}/${DDOG_LIBC}/Debug/bin/$BINNAME
     GIT_SUBMODULE_STRATEGY: recursive
     PROMOTE: NONE
-  image: $BUILD_IMG_STICKY
+  image: $BUILD_IMG_20_STICKY
 
 deploy:collatz:
   extends: .collatz_job
-  image: $BUILD_IMG_STICKY
+  image: $BUILD_IMG_20_STICKY
   stage: deploy
   tags: ["runner:k8s"]
   script:
