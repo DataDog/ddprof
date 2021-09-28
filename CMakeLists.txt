@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.19)
 
  project(DDProf
   LANGUAGES C CXX
-  VERSION 0.6.2
+  VERSION 0.6.3
   DESCRIPTION "Datadog's native profiler"
 )
 
