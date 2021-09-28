@@ -31,7 +31,7 @@ extern "C" {
 using ddprof::DsoStats;
 
 static const DDPROF_STATS s_cycled_stats[] = {
-    STATS_UNWIND_TICKS, STATS_SAMPLE_LOST, STATS_SAMPLE_COUNT,
+    STATS_UNWIND_TICKS, STATS_EVENT_COUNT, STATS_EVENT_LOST, STATS_SAMPLE_COUNT,
     STATS_DSO_UNHANDLED_SECTIONS};
 
 #define cycled_stats_sz (sizeof(s_cycled_stats) / sizeof(DDPROF_STATS))
@@ -225,7 +225,7 @@ void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int pos) {
 
 void ddprof_pr_lost(DDProfContext *ctx, perf_event_lost *lost, int pos) {
   (void)pos;
-  ddprof_stats_add(STATS_SAMPLE_LOST, lost->lost, NULL);
+  ddprof_stats_add(STATS_EVENT_LOST, lost->lost, NULL);
 }
 
 void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm, int pos) {
@@ -342,7 +342,7 @@ DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
                     volatile bool *continue_profiling, DDProfContext *ctx) {
   // global try catch to avoid leaking exceptions to main loop
   try {
-
+    ddprof_stats_add(STATS_EVENT_COUNT, 1, NULL);
     struct perf_event_hdr_wpid *wpid = static_cast<perf_event_hdr_wpid *>(hdr);
     switch (hdr->type) {
     /* Cases where the target type has a PID */
