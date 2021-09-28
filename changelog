@@ -1,0 +1,17 @@
+0.6.2 to 0.6.3 (28/09/2021)
+* Add LTO to build process
+* Add _executable flag to DSO cache
+* DSO cache is populated with all regions, not just executable ones
+* Add PID-by-PID throttling to DSO backpopulate requests, since these requests
+  are numerous, expensive, and beyond a single invocation per sample, do not
+  improve unwinding quality--the throttle limits backpopulate to the soonest
+  of once very 200 samples or once per export
+* Fix bug where the lifetime of an mmap()'d region was bound to the lifetime
+  of the RegionHolder temporary, causing DSO reads to fail
+* Resequence the setuid() mmap maneuver so that an mmap() is attempted with
+  current UID before switching
+* Filter PID 0 before it hits any of the ddprof worker functions, since we
+  currently don't handle it at all
+* Fix buggy exit in application start when an invalid argument is given
+* Add an overflow check to the unwinding memory_read interface 
+* Add some backpopulate and region holder unit tests
