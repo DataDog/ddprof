@@ -1,7 +1,6 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -116,11 +115,13 @@ char *name_default = "libddprof";
 #ifndef LOG_MSG_CAP
 #  define LOG_MSG_CAP 4096
 #endif
+
 // The message buffer shall be a static, thread-local region defined by the
 // LOG_MSG_CAP compile-time parameter.  The accessible storage amount shall be
 // this region minus room for the following template:
 // `<XXX> MMM DD hh:mm:ss DDPROF[32768]: `  -- let's call this 38 chars
-void LOG_lfprintf(int lvl, int fac, const char *name, const char *format, ...) {
+void vlprintfln(int lvl, int fac, const char *name, const char *format,
+                va_list args) {
 
   static __thread char buf[LOG_MSG_CAP];
   ssize_t sz = -1;
@@ -137,8 +138,6 @@ void LOG_lfprintf(int lvl, int fac, const char *name, const char *format, ...) {
 
   // Sanity checks
   if (log_ctx->fd < 0)
-    return;
-  if (lvl > log_ctx->level || lvl < 0)
     return;
   if (!format)
     return;
@@ -173,11 +172,8 @@ void LOG_lfprintf(int lvl, int fac, const char *name, const char *format, ...) {
   }
 
   // Write the body into the buffer
-  va_list arg;
   ssize_t cap = LOG_MSG_CAP - sz_h - 2; // Room for optional newline and \0
-  va_start(arg, format);
-  sz = vsnprintf((char *)&buf[sz_h], cap, format, arg);
-  va_end(arg);
+  sz = vsnprintf((char *)&buf[sz_h], cap, format, args);
 
   if (sz > cap)
     sz = cap;
@@ -197,4 +193,21 @@ void LOG_lfprintf(int lvl, int fac, const char *name, const char *format, ...) {
     else
       rc = write(log_ctx->fd, buf, sz);
   } while (rc < 0 && errno == EINTR);
+}
+
+void olprintfln(int lvl, int fac, const char *name, const char *fmt, ...) {
+  if (lvl > log_ctx->level || lvl < 0)
+    return;
+
+  va_list args;
+  va_start(args, fmt);
+  vlprintfln(lvl, fac, name, fmt, args);
+  va_end(args);
+}
+
+void lprintfln(int lvl, int fac, const char *name, const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  vlprintfln(lvl, fac, name, fmt, args);
+  va_end(args);
 }
