@@ -35,7 +35,7 @@
 
 #define DDRES_GRACEFUL_SHUTDOWN()                                              \
   do {                                                                         \
-    LG_NTC("Shutting down worker gracefully");                                 \
+    LG_NFO("Shutting down worker gracefully");                                 \
     WORKER_SHUTDOWN();                                                         \
   } while (0)
 
@@ -43,7 +43,7 @@ DDRes spawn_workers(volatile bool *continue_profiling) {
   pid_t child_pid;
 
   while ((child_pid = fork())) {
-    LG_WRN("[PERF] Created child %d", child_pid);
+    LG_WRN("Created child %d", child_pid);
     waitpid(child_pid, NULL, 0);
 
     // Harvest the exit state of the child process.  We will always reset it
@@ -54,7 +54,7 @@ DDRes spawn_workers(volatile bool *continue_profiling) {
     } else {
       *continue_profiling = false;
     }
-    LG_NTC("Refreshing worker process");
+    LG_NFO("Refreshing worker process");
   }
 
   return ddres_init();
@@ -160,7 +160,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       pes[i].region->data_tail = head;
 
       if (head != tail)
-        LG_NTC("Head/tail buffer mismatch");
+        LG_WRN("Head/tail buffer mismatch");
     }
   }
 }
@@ -174,7 +174,7 @@ void main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
   continue_profiling = mmap(0, sizeof(bool), mmap_prot, mmap_flags, -1, 0);
   if (MAP_FAILED == continue_profiling) {
     // Allocation failure : stop the profiling
-    LG_ERR("[PERF] Could not initialize worker process coordinator");
+    LG_ERR("Could not initialize profiler");
     return;
   }
 
@@ -192,6 +192,6 @@ void main_loop_lib(const WorkerAttr *attr, DDProfContext *ctx) {
   // no fork. TODO : handle lifetime
   worker(ctx, attr, &continue_profiling);
   if (!continue_profiling) {
-    LG_ERR("[PERF] request to exit");
+    LG_ERR("Request to exit");
   }
 }

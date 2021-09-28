@@ -64,9 +64,8 @@ static bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
         us->dso_hdr->pid_read_dso(us->pid, result, sizeof(Dwarf_Word), addr);
     if (!find_res.second) {
       // Some regions are not handled
-      LG_DBG("[UNWIND] Couldn't get read 0x%lx from %d, (0x%lx, 0x%lx)[%p, %p]",
-             addr, us->pid, sp_start, sp_end, us->stack,
-             us->stack + us->stack_sz);
+      LG_DBG("Couldn't get read 0x%lx from %d, (0x%lx, 0x%lx)[%p, %p]", addr,
+             us->pid, sp_start, sp_end, us->stack, us->stack + us->stack_sz);
     }
     return find_res.second;
   }
@@ -98,7 +97,7 @@ Dwfl_Module *update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, uint64_t pc) {
   dso_hdr->_stats.incr_metric(DsoStats::kTargetDso, dso._type);
 
   if (dso.errored()) {
-    LG_DBG("[UNWIND] DSO Previously errored - mod (%s)", dso._filename.c_str());
+    LG_DBG("DSO Previously errored - mod (%s)", dso._filename.c_str());
     return NULL;
   }
 
@@ -111,7 +110,7 @@ Dwfl_Module *update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, uint64_t pc) {
     Dwarf_Addr vm_addr;
     dwfl_module_info(mod, 0, &vm_addr, 0, 0, 0, 0, 0);
     if (vm_addr != dso._start - dso._pgoff) {
-      LG_NTC("[UNWIND] Incoherent dso <--> dwfl_module");
+      LG_NTC("Incoherent DSO <--> dwfl_module");
       mod = NULL;
     }
   }
@@ -127,9 +126,8 @@ Dwfl_Module *update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, uint64_t pc) {
   }
   if (!mod) {
     dso.flag_error();
-    LG_WRN(
-        "[UNWIND] couldn't addrmodule (%s)[0x%lx], but got DSO %s[0x%lx:0x%lx]",
-        dwfl_errmsg(-1), pc, dso._filename.c_str(), dso._start, dso._end);
+    LG_WRN("couldn't addrmodule (%s)[0x%lx], but got DSO %s[0x%lx:0x%lx]",
+           dwfl_errmsg(-1), pc, dso._filename.c_str(), dso._start, dso._end);
     return NULL;
   }
 
@@ -141,22 +139,28 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
   Dwarf_Addr pc = 0;
   bool isactivation = false;
 
+  // Before we potentially exit, record the fact that we're processing a frame
+  ddprof_stats_add(STATS_UNWIND_FRAMES, 1, NULL);
+
   // Query the frame state to get the PC.  We skip the expensive check for
   // activation frame because the underlying DSO (module) may not have been
   // cached yet (but we need the PC to generate/check such a cache
   if (!dwfl_frame_pc(state, &pc, NULL)) {
-    LG_DBG("[UNWIND] dwfl_frame_pc NULL (%s)", dwfl_errmsg(-1));
+    LG_DBG("dwfl_frame_pc NULL (%s)", dwfl_errmsg(-1));
+    ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
     return DWARF_CB_ABORT;
   }
 
   Dwfl_Module *mod = update_mod(us->dso_hdr, us->dwfl, us->pid, pc);
   if (!mod) {
-    LG_DBG("[UNWIND] Unable to retrieve the Dwfl_Module");
+    LG_DBG("Unable to retrieve the Dwfl_Module");
+    ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
     return DWARF_CB_ABORT;
   }
 
   if (!dwfl_frame_pc(state, &pc, &isactivation)) {
-    LG_DBG("[UNWIND] %s", dwfl_errmsg(-1));
+    LG_DBG("Failure to compute frame PC: %s", dwfl_errmsg(-1));
+    ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
     return DWARF_CB_ABORT;
   }
   if (!isactivation)
@@ -164,12 +168,14 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
 
   Dwfl_Thread *thread = dwfl_frame_thread(state);
   if (!thread) {
-    LG_DBG("[UNWIND] dwfl_frame_thread was zero: (%s)", dwfl_errmsg(-1));
+    LG_DBG("dwfl_frame_thread was zero: (%s)", dwfl_errmsg(-1));
+    ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
     return DWARF_CB_ABORT;
   }
   Dwfl *dwfl = dwfl_thread_dwfl(thread);
   if (!dwfl) {
-    LG_DBG("[UNWIND] dwfl_thread_dwfl was zero: (%s)", dwfl_errmsg(-1));
+    LG_DBG("dwfl_thread_dwfl was zero: (%s)", dwfl_errmsg(-1));
+    ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
     return DWARF_CB_ABORT;
   }
 
@@ -182,6 +188,7 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
                         &output->locs[current_idx]._ipinfo_idx);
   if (IsDDResNotOK(cache_status)) {
     LG_DBG("Error from dwflmod_cache_status");
+    ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
     return DWARF_CB_ABORT;
   }
 
@@ -191,6 +198,7 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
                                     &(output->locs[current_idx]._map_info_idx));
   if (IsDDResNotOK(cache_status)) {
     LG_DBG("Error from mapinfo_lookup_get");
+    ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
     return DWARF_CB_ABORT;
   }
 
@@ -213,7 +221,7 @@ static DDRes unwind_dwfl_begin(struct UnwindState *us) {
   };
   us->dwfl = dwfl_begin(&proc_callbacks);
   if (!us->dwfl) {
-    LG_WRN("[UNWIND] dwfl_begin was zero (%s)", dwfl_errmsg(-1));
+    LG_WRN("dwfl_begin was zero (%s)", dwfl_errmsg(-1));
     return ddres_error(DD_WHAT_DWFL_LIB_ERROR);
   }
   us->attached = false;

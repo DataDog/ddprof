@@ -46,7 +46,7 @@ static bool ip_in_procline(char *line, uint64_t ip) {
   int m_p = 0;
 
   if (4 != sscanf(line, spec, &m_start, &m_end, m_mode, &m_off, &m_p)) {
-    LG_WRN("[DSO] Failed to scan mapfile line (search)");
+    LG_WRN("Failed to scan mapfile line (search)");
     return false;
   }
 
@@ -59,9 +59,9 @@ static void pid_find_ip(int pid, uint64_t ip) {
   FILE *mpf = file_holder._mpf;
   if (!mpf) {
     if (process_is_alive(pid))
-      LG_DBG("[DSO] Couldn't find ip:0x%lx for %d, process is dead", ip, pid);
+      LG_DBG("Couldn't find ip:0x%lx for %d, process is dead", ip, pid);
     else
-      LG_DBG("[DSO] Couldn't find ip:0x%lx for %d, mysteriously", ip, pid);
+      LG_DBG("Couldn't find ip:0x%lx for %d, mysteriously", ip, pid);
     return;
   }
 

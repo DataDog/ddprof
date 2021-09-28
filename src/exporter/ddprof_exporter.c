@@ -30,7 +30,7 @@ static char *alloc_url_agent(const char *protocol, const char *host,
   char* url = (char *)malloc(expected_size + 1);
   if (!url) // Early exit on alloc failure
     return NULL;
-  
+
   snprintf(url, expected_size + 1, "%s%s:%s", protocol, host, port);
   return url;
 }

@@ -11,7 +11,10 @@
   X(EVENT_COUNT, "event.count", STAT_GAUGE)                                    \
   X(EVENT_LOST, "event.lost", STAT_GAUGE)                                      \
   X(SAMPLE_COUNT, "sample.count", STAT_GAUGE)                                  \
+  X(CPU_TIME, "cpu.time", STAT_GAUGE)                                          \
   X(UNWIND_TICKS, "unwind.ticks", STAT_GAUGE)                                  \
+  X(UNWIND_FRAMES, "unwind.frames", STAT_GAUGE)                                \
+  X(UNWIND_ERRORS, "unwind.errors", STAT_GAUGE)                                \
   X(PROCFS_RSS, "procfs.rss", STAT_GAUGE)                                      \
   X(PROCFS_UTIME, "procfs.utime", STAT_GAUGE)                                  \
   X(PPROF_ST_ELEMS, "pprof.st_elements", STAT_GAUGE)                           \

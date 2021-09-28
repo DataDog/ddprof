@@ -49,7 +49,7 @@
 // Helpers for exapnding the OPT_TABLE here
 #define X_PRNT(a, b, c, d, e, f, g, h, i)                                      \
   if ((f)->i b)                                                                \
-    LG_NTC("  " #b ": %s", (f)->i b);
+    LG_PRINT("  " #b ": %s", (f)->i b);
 
 // We use a non-NULL definition for an undefined string, because it's important
 // that this table is always populated intentionally.  This is checked in the
@@ -72,7 +72,7 @@ char* help_str[DD_KLEN] = {
   [DD_SERVICE] =
 "    The name of this service\n",
   [DD_TAGS] = STR_UNDF,
-  [DD_VERSION] = 
+  [DD_VERSION] =
 "    Version of the service being profiled. Added to the tags during export.\n",
   [DD_PROFILING_ENABLED] =
 "    Whether to enable Datadog profiling.  If this is true, then "MYNAME" as well\n"

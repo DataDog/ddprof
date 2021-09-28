@@ -83,5 +83,6 @@ void LOG_setfacility(int);
 #define LG_ERR(...) olprintfln(LL_ERROR, -1, MYNAME, __VA_ARGS__)
 #define LG_WRN(...) olprintfln(LL_WARNING, -1, MYNAME, __VA_ARGS__)
 #define LG_NTC(...) olprintfln(LL_NOTICE, -1, MYNAME, __VA_ARGS__)
+#define LG_NFO(...) olprintfln(LL_INFORMATIONAL, -1, MYNAME, __VA_ARGS__)
 #define LG_DBG(...) olprintfln(LL_DEBUG, -1, MYNAME, __VA_ARGS__)
-#define LG_PRINT(...) vlprintfln(LL_INFORMATIONAL, -1, MYNAME, __VA_ARGS__)
+#define LG_PRINT(...) lprintfln(LL_INFORMATIONAL, -1, MYNAME, __VA_ARGS__)

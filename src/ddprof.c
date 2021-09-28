@@ -80,7 +80,7 @@ static DDRes ddprof_breakdown(DDProfContext *ctx) {
   PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
 
   if (IsDDResNotOK(pevent_cleanup(pevent_hdr))) {
-    LG_ERR("Error when calling pevent_cleanup.");
+    LG_WRN("Error when calling pevent_cleanup.");
   }
 
   DDRES_CHECK_FWD(ddprof_stats_free());
@@ -112,7 +112,7 @@ void ddprof_attach_profiler(DDProfContext *ctx, int num_cpu) {
     LG_WRN("Profiling context no longer valid");
 
   if (IsDDResNotOK(ddprof_breakdown(ctx)))
-    LG_ERR("Error when calling ddprof_breakdown.");
+    LG_ERR("Error when calling ddprof_breakdown");
   return;
 }
 #endif
@@ -126,13 +126,13 @@ void ddprof_attach_handler(DDProfContext *ctx,
   pid_t pid = ctx->params.pid;
 
   if (IsDDResNotOK(ddprof_setup(ctx, pid, num_cpu))) {
-    LG_ERR("Error seting up ddprof.");
+    LG_ERR("Error setting up ddprof");
     return;
   }
   // User defined handler
   ctx->stack_handler = stack_handler;
   // Enter the main loop -- returns after a number of cycles.
-  LG_NTC("Entering main loop");
+  LG_PRINT("Initiating Profiling");
   main_loop_lib(&perf_funs, ctx);
   if (errno)
     LG_WRN("Profiling context no longer valid (%s)", strerror(errno));
@@ -291,27 +291,24 @@ DDRes ddprof_ctx_set(const DDProfInput *input, DDProfContext *ctx) {
 
   // Process input printer (do this right before argv/c modification)
   if (input->printargs && arg_yesno(input->printargs, 1)) {
-    if (LOG_getlevel() < LL_NOTICE)
-      LG_WRN("printarg specified, but loglevel too low to emit parameters");
-    LG_NTC("Printing parameters -->");
+    LG_PRINT("Printing parameters -->");
     ddprof_print_params(input);
 
-    LG_NTC("  Native profiler enabled: %s",
-           ctx->params.enable ? "true" : "false");
+    LG_PRINT("  Native profiler enabled: %s",
+             ctx->params.enable ? "true" : "false");
 
     // Tell the user what mode is being used
-    LG_NTC("  Profiling mode: %s",
-           -1 == ctx->params.pid ? "global"
-               : pid_tmp         ? "target"
-                                 : "wrapper");
+    LG_PRINT("  Profiling mode: %s",
+             -1 == ctx->params.pid ? "global"
+                 : pid_tmp         ? "target"
+                                   : "wrapper");
 
     // Show watchers
-    LG_NTC("  Instrumented with %d watchers:", ctx->num_watchers);
+    LG_PRINT("  Instrumented with %d watchers:", ctx->num_watchers);
     for (int i = 0; i < ctx->num_watchers; i++) {
-      LG_NTC("    ID: %s, Pos: %d, Index: %lu, Label: %s, Mode: %d",
-             ctx->watchers[i].desc, i, ctx->watchers[i].config,
-             ctx->watchers[i].label, ctx->watchers[i].mode);
-      LG_NTC("Done printing parameters <--");
+      LG_PRINT("    ID: %s, Pos: %d, Index: %lu, Label: %s, Mode: %d",
+               ctx->watchers[i].desc, i, ctx->watchers[i].config,
+               ctx->watchers[i].label, ctx->watchers[i].mode);
     }
   }
   return ddres_init();

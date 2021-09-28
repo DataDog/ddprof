@@ -6,6 +6,7 @@
 #include "ddres_def.h"
 #include "dwfl_internals.h"
 #include "procutils.h"
+#include "unwind_metrics.h"
 #include "unwind_output.h"
 
 typedef struct UnwindSymbolsHdr UnwindSymbolsHdr;
