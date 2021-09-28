@@ -46,6 +46,13 @@ static bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
   (void)dwfl;
   struct UnwindState *us = (UnwindState *)arg;
 
+  // Check for overflow, which won't be captured by the checks below.  Sometimes
+  // addr is un-physically high and we don't know why yet.
+  if (addr > addr + sizeof(Dwarf_Word)) {
+    LG_WRN("Overflow in addr 0x%lx", addr);
+    return false;
+  }
+
   uint64_t sp_start = us->esp;
   uint64_t sp_end = sp_start + us->stack_sz;
 
@@ -64,11 +71,12 @@ static bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
     return find_res.second;
   }
 
-  // We're probably safe to read
+  // If we're here, we're going to read from the stack.  Just the same, we need
+  // to protect stack reads carefully, so split the indexing into a
+  // precomputation followed by a bounds check
   uint64_t stack_idx = addr - sp_start;
-  if (stack_idx > addr || stack_idx > INT64_MAX) {
-    LG_WRN("Underflow in stack idx, %ld - %ld = %ld", addr, sp_start,
-           stack_idx);
+  if (stack_idx > addr) {
+    LG_WRN("Stack miscalulation: %lu - %lu != %lu", addr, sp_start, stack_idx);
     return false;
   }
   *result = *(Dwarf_Word *)(us->stack + stack_idx);
