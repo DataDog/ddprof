@@ -121,6 +121,7 @@ build:ddprof:
     - make format
     - make -j ${KUBERNETES_CPU_LIMIT}
     - if [ ! $(./ddprof --version | sed 's/.*+//g') == "${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA}" ]; then exit 1; fi
+    - env
     - ctest --repeat-until-fail 5 --output-on-failure | tee test-output.log
     - make install
     - if [ ${BUILD_TYPE} == "Coverage" ]; then
