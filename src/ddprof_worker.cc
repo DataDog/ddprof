@@ -29,9 +29,12 @@ extern "C" {
 
 using ddprof::DsoStats;
 
-static const DDPROF_STATS s_cycled_stats[] = {
-    STATS_UNWIND_TICKS, STATS_EVENT_COUNT, STATS_EVENT_LOST, STATS_SAMPLE_COUNT,
-    STATS_DSO_UNHANDLED_SECTIONS};
+static const DDPROF_STATS s_cycled_stats[] = {STATS_UNWIND_TICKS,
+                                              STATS_EVENT_COUNT,
+                                              STATS_EVENT_LOST,
+                                              STATS_SAMPLE_COUNT,
+                                              STATS_DSO_UNHANDLED_SECTIONS,
+                                              STATS_CPU_TIME};
 
 #define cycled_stats_sz (sizeof(s_cycled_stats) / sizeof(DDPROF_STATS))
 
