@@ -25,13 +25,9 @@ int main(int argc, char *argv[]) {
 
   {
     bool continue_exec;
-    if (IsDDResNotOK(
-            ddprof_input_parse(argc, (char **)argv, &input, &continue_exec))) {
+    DDRes res = ddprof_input_parse(argc, (char **)argv, &input, &continue_exec);
+    if (IsDDResNotOK(res) || !continue_exec) {
       LG_WRN("Unable to parse parameters");
-      goto CLEANUP_INPUT;
-    }
-    if (!continue_exec) {
-      LG_DBG("Exiting");
       goto CLEANUP_INPUT;
     }
   }
@@ -51,9 +47,9 @@ int main(int argc, char *argv[]) {
   // Only throw an error if we needed the user to pass an arg
   if (ctx.params.pid) {
     if (ctx.params.pid == -1)
-      LG_NTC("Instrumenting whole system");
+      LG_NFO("Instrumenting whole system");
     else
-      LG_NTC("Instrumenting PID %d", ctx.params.pid);
+      LG_NFO("Instrumenting PID %d", ctx.params.pid);
   } else if (argc <= 0) {
     LG_ERR("No target specified, exiting");
     goto CLEANUP_ERR;
@@ -64,7 +60,7 @@ int main(int argc, char *argv[]) {
   \****************************************************************************/
   // If the profiler was disabled, just skip ahead
   if (!ctx.params.enable) {
-    LG_WRN("Profiling disabled");
+    LG_NFO("Profiling disabled");
   } else {
     // Initialize profiling.
     // If no PID was specified earlier, we autodaemonize and launch command

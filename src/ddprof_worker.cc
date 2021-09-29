@@ -17,7 +17,6 @@ extern "C" {
 #include "pprof/ddprof_pprof.h"
 #include "stack_handler.h"
 #include "unwind.h"
-#include "unwind_output.h"
 }
 
 #include "dso.hpp"
@@ -31,7 +30,7 @@ extern "C" {
 using ddprof::DsoStats;
 
 static const DDPROF_STATS s_cycled_stats[] = {
-    STATS_UNWIND_TICKS, STATS_SAMPLE_LOST, STATS_SAMPLE_COUNT,
+    STATS_UNWIND_TICKS, STATS_EVENT_COUNT, STATS_EVENT_LOST, STATS_SAMPLE_COUNT,
     STATS_DSO_UNHANDLED_SECTIONS};
 
 #define cycled_stats_sz (sizeof(s_cycled_stats) / sizeof(DDPROF_STATS))
@@ -127,6 +126,10 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   us->stack_sz = sample->size_stack;
   us->stack = sample->data_stack;
 
+  // If this is a SW_TASK_CLOCK-type event, then aggregate the time
+  if (ctx->watchers[pos].config == PERF_COUNT_SW_TASK_CLOCK)
+    ddprof_stats_add(STATS_CPU_TIME, sample->period, NULL);
+
 #ifdef DEBUG
   LG_DBG("[WORKER]<%d> (SAMPLE)%d: stack = %p / size = %lu", pos, us->pid,
          us->stack, us->stack_sz);
@@ -164,6 +167,7 @@ static void ddprof_reset_worker_stats(DsoHdr *dso_hdr) {
     ddprof_stats_clear(s_cycled_stats[i]);
   }
   dso_hdr->_stats.reset();
+  unwind_metrics_reset();
 }
 
 /// Cycle operations : export, sync metrics, update counters
@@ -213,7 +217,7 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
 void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int pos) {
   (void)ctx;
   if (!(map->header.misc & PERF_RECORD_MISC_MMAP_DATA)) {
-    LG_DBG("[PERF]<%d>(MAP)%d: %s (%lx/%lx/%lx)", pos, map->pid, map->filename,
+    LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx)", pos, map->pid, map->filename,
            map->addr, map->len, map->pgoff);
     ddprof::Dso new_dso(map->pid, map->addr, map->addr + map->len - 1,
                         map->pgoff, std::string(map->filename));
@@ -223,21 +227,21 @@ void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int pos) {
 
 void ddprof_pr_lost(DDProfContext *ctx, perf_event_lost *lost, int pos) {
   (void)pos;
-  ddprof_stats_add(STATS_SAMPLE_LOST, lost->lost, NULL);
+  ddprof_stats_add(STATS_EVENT_LOST, lost->lost, NULL);
 }
 
 void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm, int pos) {
   (void)ctx;
   // Change in process name (assuming exec) : clear all associated dso
   if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC) {
-    LG_DBG("[PERF]<%d>(COMM)%d -> %s", pos, comm->pid, comm->comm);
+    LG_DBG("<%d>(COMM)%d -> %s", pos, comm->pid, comm->comm);
     ctx->worker_ctx.us->dso_hdr->pid_free(comm->pid);
   }
 }
 
 void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int pos) {
   (void)ctx;
-  LG_DBG("[PERF]<%d>(FORK)%d -> %d", pos, frk->ppid, frk->pid);
+  LG_DBG("<%d>(FORK)%d -> %d", pos, frk->ppid, frk->pid);
   if (frk->ppid != frk->pid) {
     // Clear everything and populate at next error or with coming samples
     ctx->worker_ctx.us->dso_hdr->pid_free(frk->pid);
@@ -246,7 +250,7 @@ void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int pos) {
 
 void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int pos) {
   (void)ctx;
-  LG_DBG("[PERF]<%d>(EXIT)%d", pos, ext->pid);
+  LG_DBG("<%d>(EXIT)%d", pos, ext->pid);
   // Although pid dies, we do not know how many threads remain alive on this pid
   // (backpopulation will repopulate and fix things if needed)
 }
@@ -334,7 +338,7 @@ DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
                     volatile bool *continue_profiling, DDProfContext *ctx) {
   // global try catch to avoid leaking exceptions to main loop
   try {
-
+    ddprof_stats_add(STATS_EVENT_COUNT, 1, NULL);
     struct perf_event_hdr_wpid *wpid = static_cast<perf_event_hdr_wpid *>(hdr);
     switch (hdr->type) {
     /* Cases where the target type has a PID */

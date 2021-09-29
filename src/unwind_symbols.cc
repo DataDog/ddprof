@@ -22,7 +22,7 @@ DDRes ipinfo_lookup_get(struct UnwindSymbolsHdr *cache_hdr,
       if (ddprof::ipinfo_lookup_check(mod, newpc,
                                       cache_hdr->_ipinfo_table[*ipinfo_idx])) {
         ++(cache_hdr->_stats._errors);
-        LG_ERR("Error from ddprof::ipinfo_lookup_check (hit nb %d)",
+        LG_WRN("Error from ddprof::ipinfo_lookup_check (hit nb %d)",
                cache_hdr->_stats._hit);
         return ddres_error(DD_WHAT_UW_CACHE_ERROR);
       }
@@ -61,7 +61,7 @@ void unwind_symbols_hdr_free(struct UnwindSymbolsHdr *cache_hdr) {
     }
     // Should never throw
   } catch (...) {
-    LG_ERR("Unexpected exception (code should not throw on destruction)");
+    LG_ERR("Unexpected exception in symbolizer");
     assert(false);
   }
 }
