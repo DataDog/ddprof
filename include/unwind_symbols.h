@@ -22,8 +22,6 @@ DDRes unwind_symbols_hdr_init(struct UnwindSymbolsHdr **symbols_hdr);
 
 void unwind_symbols_hdr_free(struct UnwindSymbolsHdr *symbols_hdr);
 
-DDRes unwind_symbols_hdr_clear(struct UnwindSymbolsHdr *symbols_hdr);
-
 // Takes a dwarf module and an instruction pointer
 // Lookup if this instruction pointer was already encountered. If not, create a
 // new element in the table

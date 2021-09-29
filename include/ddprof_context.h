@@ -25,7 +25,6 @@ typedef struct DDProfWorkerContext {
   ProcStatus proc_status;
   int64_t send_nanos;     // Last time an export was sent
   uint32_t count_worker;  // exports since last cache clear
-  uint32_t count_cache;   // exports since worker was spawned
   uint32_t count_samples; // sample count to avoid bouncing on backpopulates
 } DDProfWorkerContext;
 
@@ -40,7 +39,6 @@ typedef struct DDProfContext {
     pid_t pid; // ! only use for perf attach (can be -1 in global mode)
     bool global;
     uint32_t worker_period; // exports between worker refreshes
-    uint32_t cache_period;  // exports between cache clears
     const char *internalstats;
   } params;
 

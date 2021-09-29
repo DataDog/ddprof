@@ -34,7 +34,6 @@ pid_t next_thread(Dwfl *, void *, void **);
 bool set_initial_registers(Dwfl_Thread *, void *);
 int frame_cb(Dwfl_Frame *, void *);
 int tid_cb(Dwfl_Thread *, void *);
-DDRes dwfl_caches_clear(struct UnwindState *);
 DDRes unwind_init(struct UnwindState *);
 void unwind_free(struct UnwindState *);
 DDRes unwindstate__unwind(struct UnwindState *us);

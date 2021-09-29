@@ -42,18 +42,6 @@ DDRes mapinfo_lookup_get(struct UnwindSymbolsHdr *cache_hdr,
   return ddres_init();
 }
 
-DDRes unwind_symbols_hdr_clear(struct UnwindSymbolsHdr *cache_hdr) {
-  try {
-    cache_hdr->_info_lookup.clear();
-    cache_hdr->_ipinfo_table.clear();
-    cache_hdr->_mapinfo_lookup.clear();
-    cache_hdr->_stats.display();
-    cache_hdr->_stats.reset();
-  }
-  CatchExcept2DDRes();
-  return ddres_init();
-}
-
 DDRes unwind_symbols_hdr_init(struct UnwindSymbolsHdr **cache_hdr) {
   try {
     // considering we manipulate an opaque pointer, we need to dynamically

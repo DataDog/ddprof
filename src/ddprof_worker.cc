@@ -70,7 +70,6 @@ DDRes worker_unwind_init(DDProfContext *ctx) {
   export_time_set(ctx);
   // Make sure worker-related counters are reset
   ctx->worker_ctx.count_worker = 0;
-  ctx->worker_ctx.count_cache = 0;
 
   ctx->worker_ctx.us = (UnwindState *)calloc(1, sizeof(UnwindState));
   if (!ctx->worker_ctx.us) {
@@ -189,7 +188,6 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
 
   // Increase the counts of exports
   ctx->worker_ctx.count_worker += 1;
-  ctx->worker_ctx.count_cache += 1;
 
   // allow new backpopulates
   ctx->worker_ctx.us->dso_hdr->reset_backpopulate_state();
@@ -272,12 +270,6 @@ static DDRes reset_state(DDProfContext *ctx,
     DDRES_RETURN_WARN_LOG(DD_WHAT_WORKER_RESET, "%s: cnt=%u - stop worker (%s)",
                           __FUNCTION__, ctx->worker_ctx.count_worker,
                           (*continue_profiling) ? "continue" : "stop");
-  }
-
-  // If we haven't hit the hard cap, have we hit the soft cap?
-  if (ctx->params.cache_period <= ctx->worker_ctx.count_cache) {
-    ctx->worker_ctx.count_cache = 0;
-    DDRES_CHECK_FWD(dwfl_caches_clear(ctx->worker_ctx.us));
   }
 
   return ddres_init();

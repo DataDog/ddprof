@@ -93,10 +93,6 @@ char* help_str[DD_KLEN] = {
 "    performance.  If default values are used for this and the upload period, then\n"
 "    workers are retired every four hours.\n"
 "    This value almost never needs to be changed.\n",
-  [DD_PROFILING_CACHE_PERIOD] =
-"    The number of uploads after which to clear unwinding caches.  The default\n"
-"    value is 15.\n"
-"    This value almost never needs to be changed.\n",
   [DD_PROFILING_NATIVEPRINTARGS] =
 "    Whether or not to print configuration parameters to the trace log.  Can\n"
 "    be `yes` or `no` (default: `no`).\n",

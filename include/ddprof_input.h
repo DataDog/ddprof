@@ -25,7 +25,6 @@ typedef struct DDProfInput {
   char *pid;
   char *global;
   char *worker_period;
-  char *cache_period;
   char *internalstats;
   // Watcher presets
   watcher_index_t watchers[MAX_TYPE_WATCHER];
@@ -77,7 +76,6 @@ typedef struct DDProfInput {
   XX(DD_PROFILING_NATIVE_ENABLED,  native_enable,             n, 'n', 1, input, NULL, "yes", )                   \
   XX(DD_PROFILING_UPLOAD_PERIOD,   upload_period,             u, 'u', 1, input, NULL, "60", )                    \
   XX(DD_PROFILING_WORKER_PERIOD,   worker_period,             w, 'w', 1, input, NULL, "240", )                   \
-  XX(DD_PROFILING_CACHE_PERIOD,    cache_period,              k, 'k', 1, input, NULL, "490", )                   \
   XX(DD_PROFILING_NATIVEFAULTINFO, faultinfo,                 s, 's', 1, input, NULL, "yes", )                   \
   XX(DD_PROFILING_NATIVEDUMPS,     coredumps,                 m, 'm', 1, input, NULL, "no", )                    \
   XX(DD_PROFILING_NATIVENICE,      nice,                      i, 'i', 1, input, NULL, "", )                      \

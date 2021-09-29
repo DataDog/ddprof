@@ -229,12 +229,6 @@ static void unwind_dwfl_end(struct UnwindState *us) {
   us->attached = false;
 }
 
-DDRes dwfl_caches_clear(struct UnwindState *us) {
-  DDRES_CHECK_FWD(unwind_symbols_hdr_clear(us->symbols_hdr));
-  unwind_dwfl_end(us);
-  return unwind_dwfl_begin(us);
-}
-
 static DDRes unwind_attach(struct UnwindState *us) {
   static const Dwfl_Thread_Callbacks dwfl_callbacks = {
       .next_thread = next_thread,

@@ -235,16 +235,6 @@ DDRes ddprof_ctx_set(const DDProfInput *input, DDProfContext *ctx) {
       ctx->params.worker_period = tmp_period;
   }
 
-  // process cache_period
-  // NOTE: if cache_period > worker_period, we will never reset the cache.
-  ctx->params.cache_period = 15;
-  if (input->cache_period) {
-    char *ptr_period = input->cache_period;
-    int tmp_period = strtol(input->cache_period, &ptr_period, 10);
-    if (ptr_period != input->cache_period && tmp_period > 0)
-      ctx->params.cache_period = tmp_period;
-  }
-
   // Process faultinfo
   ctx->params.faultinfo = arg_yesno(input->faultinfo, 1); // default no
 

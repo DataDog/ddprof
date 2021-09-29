@@ -17,9 +17,11 @@ variables:
   TEST_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:test
   # bare centos image
   CENTOS_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:centos
-  # Deployment paths
+  # Libc configuration
+  # Everything seems to be 2.27 or above in Datadog (feel free to prove me wrong)
   DDOG_LIBC: "2.27"
   LIBC_TYPE: "glibc"
+  # Deployment paths
   S3_PREFIX: s3://binaries.ddbuild.io/ddprof/release
   RELPATH: ddprof/release
   BINPATH: deliverables
