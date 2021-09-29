@@ -16,7 +16,7 @@
   X(UNWIND_FRAMES, "unwind.frames", STAT_COUNT)                                \
   X(UNWIND_ERRORS, "unwind.errors", STAT_COUNT)                                \
   X(PROCFS_RSS, "procfs.rss", STAT_COUNT)                                      \
-  X(PROCFS_UTIME, "procfs.utime", STAT_GAUGE)                                  \
+  X(PROCFS_UTIME, "procfs.utime", STAT_COUNT)                                  \
   X(PPROF_ST_ELEMS, "pprof.st_elements", STAT_COUNT)                           \
   X(DSO_UNHANDLED_SECTIONS, "dso.unhandled_sections", STAT_COUNT)              \
   X(DSO_NEW_DSO, "dso.new", STAT_COUNT)                                        \
