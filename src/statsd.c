@@ -16,7 +16,8 @@ DDRes statsd_listen(const char *path, size_t sz_path, int *fd) {
 
   // Open the socket
   memcpy(addr_bind.sun_path, path, sz_path);
-  if (-1 == (fd_sock = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0))) {
+  int socktype = SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK;
+  if (-1 == (fd_sock = socket(AF_UNIX, socktype, 0))) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "[STATSD] Creating UDS failed (%s)",
                           strerror(errno));
   }
@@ -109,9 +110,12 @@ DDRes statsd_send(int fd_sock, const char *key, void *val, int type) {
   }
 
   // Nothing to do if the write fails
-  if (sz != (size_t)write(fd_sock, buf, sz)) {
+  while (sz != (size_t)write(fd_sock, buf, sz) && errno == EINTR) {
     // Don't consider this as fatal.
-    DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Write failed");
+    if (errno == EWOULDBLOCK || errno == EAGAIN)
+      DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Write failed (sys buffer full)");
+    else
+      DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Write failed");
   }
   return ddres_init();
 }

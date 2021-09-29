@@ -79,7 +79,7 @@ TEST(ddprof_statsTest, ConnectAndSet) {
 }
 
 TEST(ddprof_statsTest, Arithmetic) {
-  const char path_listen[] = IPC_TEST_DATA "my_statsd_listener.sock";
+  const char path_listen[] = IPC_TEST_DATA "/my_statsd_listener.sock";
   unlink(path_listen); // make sure node is available, OK if this fails
 
   // Initiate "server"
