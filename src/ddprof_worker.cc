@@ -178,12 +178,6 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
   DDRES_CHECK_FWD(worker_update_stats(&ctx->worker_ctx.proc_status,
                                       ctx->worker_ctx.us->dso_hdr));
 
-  // Recompute the CPU time as an average number of integer ns per s
-  long cputime;
-  ddprof_stats_get(STATS_CPU_TIME, &cputime);
-  cputime = cputime / ctx->params.upload_period;
-  ddprof_stats_set(STATS_CPU_TIME, cputime > 0 ? cputime : 0);
-
   // And emit diagnostic output (if it's enabled)
   print_diagnostics(ctx->worker_ctx.us->dso_hdr);
   DDRES_CHECK_FWD(ddprof_stats_send(ctx->params.internalstats));
