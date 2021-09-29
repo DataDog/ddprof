@@ -112,7 +112,7 @@ DDRes statsd_send(int fd_sock, const char *key, void *val, int type) {
   // Nothing to do if the write fails
   if (sz != (size_t)write(fd_sock, buf, sz)) {
     // Don't consider this as fatal.
-    if (errno == O_NONBLOCK || errno == EAGAIN)
+    if (errno == EWOULDBLOCK || errno == EAGAIN)
       DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Write failed (sys buffer full)");
     else
       DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Write failed");
