@@ -118,6 +118,7 @@ Dwfl_Module *update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, uint64_t pc) {
   // Try again if either of the criteria above were false
   if (!mod) {
     const char *dso_filepath = dso._filename.c_str();
+    LG_DBG("Invalid mod (%s), PID %d (%s)", dso_filepath, pid, dwfl_errmsg(-1));
     if (dso._type == ddprof::dso::kStandard) {
       const char *dso_name = strrchr(dso_filepath, '/') + 1;
       mod = dwfl_report_elf(dwfl, dso_name, dso_filepath, -1,
@@ -153,7 +154,7 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
 
   Dwfl_Module *mod = update_mod(us->dso_hdr, us->dwfl, us->pid, pc);
   if (!mod) {
-    LG_DBG("Unable to retrieve the Dwfl_Module");
+    LG_DBG("Unable to retrieve the Dwfl_Module: %s", dwfl_errmsg(-1));
     ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
     return DWARF_CB_ABORT;
   }
