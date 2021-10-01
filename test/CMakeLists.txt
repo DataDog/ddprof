@@ -38,7 +38,7 @@ function(add_unit_test name)
         ../src/ddres_list.c
         ../src/logger.c
         ${MY_UNPARSED_ARGUMENTS})
-   add_dependencies(${name} ddprof-deps)
+   add_dependencies(${name} deps)
    target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
    # libddprof almost always required (unlikely file from libddprof)
    target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS} ${LIBDDPROF_INCLUDE_DIR})

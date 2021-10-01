@@ -198,6 +198,8 @@ target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 set_property(TARGET ddprof PROPERTY CXX_STANDARD 14)
 set_property(TARGET ddprof PROPERTY C_STANDARD 11)
 
+# Ensure all dependencies are computed
+add_dependencies(ddprof deps)
 # Link time optim
 if( LTO_SUPPORTED AND "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
    set_property(TARGET ddprof PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
@@ -234,6 +236,9 @@ option(BUILD_NATIVE_LIB "Build a library out of the native profiler" OFF)
    set_target_properties(ddprof-native PROPERTIES VERSION ${PROJECT_VERSION})
    set_target_properties(ddprof-native PROPERTIES
                          COMPILE_DEFINITIONS DDPROF_NATIVE_LIB)
+                         
+   # Ensure all dependencies are computed
+   add_dependencies(ddprof-native deps)
 
    # libcap, can be removed from version distributed to client 
    list(APPEND NATIVE_LIB_LIBRARY_LIST libcap)

@@ -43,6 +43,7 @@ static const unsigned s_nb_samples_per_backpopulate = 200;
 
 /// Human readable runtime information
 static void print_diagnostics(const DsoHdr *dso_hdr) {
+  LG_PRINT("Printing internal diagnostics");
   ddprof_stats_print();
   dso_hdr->_stats.log();
 #ifdef DBG_JEMALLOC

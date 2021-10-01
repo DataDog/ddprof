@@ -61,25 +61,45 @@ int main(int argc, char *argv[]) {
   if (!ctx.params.enable) {
     LG_NFO("Profiling disabled");
   } else {
-    // Initialize profiling.
+    pid_t temp_pid = 0, child_pid; // child pid is for the profiler
     // If no PID was specified earlier, we autodaemonize and launch command
     if (!ctx.params.pid) {
-      ctx.params.pid = getpid();
-      pid_t child_pid = fork();
+      ctx.params.pid = getpid(); // "parent" (target) PID
+      temp_pid = fork();         // "middle" (temporary) PID
 
-      // child_pid 0 if child.  Fork again and return to autodaemonize
-      if (!child_pid) {
-        if (fork())
-          goto CLEANUP; // Intermediate child returns, grandchild profiles
-      } else {
-        usleep(100000);
+      if (!temp_pid) { // If I'm the temp PID enter branch
+        temp_pid = getpid();
+        if ((child_pid = fork())) { // If I'm the temp PID again, enter branch
+          ddprof_ctx_free(&ctx);
+          ddprof_input_free(&input);
+          // Block until our child exits or sends us a kill signal
+          // NOTE, current process is NOT expected to unblock here; rather it
+          // ends by SIGTERM.  Exiting here is an error condition.
+          waitpid(child_pid, NULL, 0);
+          return ret;
+        } else {
+        }      // If I'm the child PID, then leave and attach profiler
+      } else { // If I'm the target PID, then now it's time to wait until my
+               // child, the middle PID, returns.  That's the cue to exec.
+        waitpid(temp_pid, NULL, 0);
         goto EXECUTE;
       }
-      waitpid(child_pid, NULL, 0);
     }
 
     // Attach the profiler
-    ddprof_attach_profiler(&ctx);
+    if (IsDDResNotOK(ddprof_setup(&ctx, ctx.params.pid))) {
+      LG_ERR("Failed to initialize profiling");
+      goto CLEANUP;
+    }
+
+    // If we have a temp PID, then it's waiting for us to send it a signal
+    // after we finish instrumenting.  This will end that process, which in turn
+    // will unblock the target from calling exec.
+    if (temp_pid)
+      kill(temp_pid, SIGTERM);
+
+    // Now enter profiling
+    ddprof_start_profiler(&ctx);
     LG_WRN("Profiling terminated");
     goto CLEANUP; // todo : propagate errors
   }

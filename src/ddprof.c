@@ -40,7 +40,7 @@ static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   exit(-1);
 }
 
-static DDRes ddprof_setup(DDProfContext *ctx, pid_t pid, int num_cpu) {
+DDRes ddprof_setup(DDProfContext *ctx, pid_t pid) {
   PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
   pevent_init(pevent_hdr);
 
@@ -49,7 +49,7 @@ static DDRes ddprof_setup(DDProfContext *ctx, pid_t pid, int num_cpu) {
     LG_ERR("Error when printing capabilities, continuing...");
   }
 
-  DDRES_CHECK_FWD(pevent_open(ctx, pid, num_cpu, pevent_hdr));
+  DDRES_CHECK_FWD(pevent_open(ctx, pid, ctx->params.num_cpu, pevent_hdr));
 
   // Setup signal handler if defined
   if (ctx->params.faultinfo)
@@ -91,29 +91,24 @@ static DDRes ddprof_breakdown(DDProfContext *ctx) {
 
 #ifndef DDPROF_NATIVE_LIB
 /*************************  Instrumentation Helpers  **************************/
-void ddprof_attach_profiler(DDProfContext *ctx) {
-
-  pid_t pid = ctx->params.pid;
+void ddprof_start_profiler(DDProfContext *ctx) {
   const WorkerAttr perf_funs = {
       .init_fun = ddprof_worker_init,
       .finish_fun = ddprof_worker_finish,
   };
-  if (IsDDResNotOK(ddprof_setup(ctx, pid, ctx->params.num_cpu))) {
-    LG_ERR("Error seting up ddprof.");
-    return;
-  }
 
-  LG_NTC("Entering main loop");
   // Enter the main loop -- this will not return unless there is an error.
+  LG_PRINT("Entering main loop");
   main_loop(&perf_funs, ctx);
+
   // If we're here, the main loop closed--probably the profilee closed
   if (errno)
     LG_WRN("Profiling context no longer valid (%s)", strerror(errno));
   else
-    LG_WRN("Profiling context no longer valid");
+    LG_NTC("Profiling context no longer valid");
 
   if (IsDDResNotOK(ddprof_breakdown(ctx)))
-    LG_ERR("Error when calling ddprof_breakdown");
+    LG_WRN("Error when calling ddprof_breakdown");
   return;
 }
 #endif
@@ -126,7 +121,7 @@ void ddprof_attach_handler(DDProfContext *ctx,
   };
   pid_t pid = ctx->params.pid;
 
-  if (IsDDResNotOK(ddprof_setup(ctx, pid, ctx->params.num_cpu))) {
+  if (IsDDResNotOK(ddprof_setup(ctx, pid))) {
     LG_ERR("Error setting up ddprof");
     return;
   }
