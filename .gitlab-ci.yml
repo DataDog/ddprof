@@ -9,8 +9,9 @@ variables:
   BUILD_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:d93e0c44a37e6e480672f70e644d7114ed4daa2b56ecbaae2d32849c0075337d
   BUILD_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:4d24767385fd385951808108510ddcb6958dd08e18150e0e157bb0ad8bb834de
   BUILD_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:0a244e64ed4d330401ffea15afe02b38b04c842e2b207bfeb3fb8bfac60cbf03
-  # https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/81425357
-  TEST_IMG_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:1565b429f9266dc10f98d615fcaf06941a1281292467820961364aff1376ef34
+  # https://gitlab.ddbuild.io/DataDog/ddprof/-/pipelines/5611418
+  TEST_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:1565b429f9266dc10f98d615fcaf06941a1281292467820961364aff1376ef34
+  TEST_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:fa799b8e4e14dd3580b34d544b3885387948b2260875cc6f533c9a3e922f13db
   # When build images are built, publish them with following tags
   BASE_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
   BUILD_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build
@@ -64,11 +65,15 @@ build:testing:
   stage: build
   when: manual
   tags: ["runner:docker", "size:large"]
+  parallel:
+    matrix:
+      - UB_VERSION: ["18", "20"]
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
   script:
     - set -euo pipefail
-    - docker build --tag $TEST_IMG -f app/test-env/Dockerfile .
-    - docker push $TEST_IMG
+    - export TAG_DOCKER=${TEST_IMG}_${UB_VERSION}
+    - docker build --tag $TAG_DOCKER --build-arg UBUNTU_VERSION=${UB_VERSION} -f app/test-env/Dockerfile .
+    - docker push $TAG_DOCKER
 
 # This is a cache of compile-time dependencies, test image
 build:centos:
@@ -138,15 +143,17 @@ build:ddprof:
 test:ddprof:
   extends:
     - .light-job-resource-allocation
-  image: $TEST_IMG_STICKY
+  image: $IMAGE
   stage: test
   tags: ["runner:k8s"]
   parallel:
     matrix:
-      - BUILD_TYPE: ["Release", "SanitizedDebug"]
+      - IMAGE: ["${TEST_IMG_18_STICKY}", "${TEST_IMG_20_STICKY}"]
+        BUILD_TYPE: ["Release", "SanitizedDebug"]
   script:
     - set -euxo pipefail
     - source setup_env.sh
+    # Test with the matching libc version
     - export LIBC_VERSION=`ldd --version | head -n 1 | awk '{print $NF}'`
     - export BINDIR="./${BINPATH}/${LIBC_TYPE}/${LIBC_VERSION}/${BUILD_TYPE}/bin"
     - echo "CHECK USER" && id
@@ -186,7 +193,7 @@ test:centos:
   script:
     - set -euxo pipefail
     - source setup_env.sh
-    # Centos 8 runs on 2.28, though we only build 2.27
+    # Centos 8 runs on 2.28, we build 2.27
     - export LIBC_VERSION=${DDOG_LIBC}
     - export BINDIR="./${BINPATH}/${LIBC_TYPE}/${LIBC_VERSION}/${BUILD_TYPE}/bin"
     # Check libc version
