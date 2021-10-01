@@ -275,7 +275,7 @@ void unwind_free(struct UnwindState *us) {
 
 DDRes unwindstate__unwind(struct UnwindState *us) {
   DDRes res;
-  // Initial a new dwfl context
+  // Initiate a new dwfl context
   DDRES_CHECK_FWD(unwind_dwfl_begin(us));
 
   // Update modules at the top
