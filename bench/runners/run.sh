@@ -218,7 +218,7 @@ DDPROF_CMD="${CMD} \
   -H ${cfg_ddprof_intake_url} \
   -P ${cfg_ddprof_intake_port} \
   -u ${cfg_ddprof_upload_period} \
-  -E ${cfg_ddprof_environment}test-staging \
+  -E ${cfg_ddprof_environment} \
   -l ${cfg_ddprof_loglevel} \
   -e ${cfg_ddprof_event} \
   -s ${cfg_ddprof_faultinfo} \

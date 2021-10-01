@@ -4,6 +4,7 @@
 #include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/resource.h>
+#include <sys/sysinfo.h>
 #include <unistd.h>
 #include <x86intrin.h>
 
@@ -90,14 +91,14 @@ static DDRes ddprof_breakdown(DDProfContext *ctx) {
 
 #ifndef DDPROF_NATIVE_LIB
 /*************************  Instrumentation Helpers  **************************/
-void ddprof_attach_profiler(DDProfContext *ctx, int num_cpu) {
+void ddprof_attach_profiler(DDProfContext *ctx) {
 
   pid_t pid = ctx->params.pid;
   const WorkerAttr perf_funs = {
       .init_fun = ddprof_worker_init,
       .finish_fun = ddprof_worker_finish,
   };
-  if (IsDDResNotOK(ddprof_setup(ctx, pid, num_cpu))) {
+  if (IsDDResNotOK(ddprof_setup(ctx, pid, ctx->params.num_cpu))) {
     LG_ERR("Error seting up ddprof.");
     return;
   }
@@ -118,14 +119,14 @@ void ddprof_attach_profiler(DDProfContext *ctx, int num_cpu) {
 #endif
 
 void ddprof_attach_handler(DDProfContext *ctx,
-                           const StackHandler *stack_handler, int num_cpu) {
+                           const StackHandler *stack_handler) {
   const WorkerAttr perf_funs = {
       .init_fun = worker_unwind_init,
       .finish_fun = worker_unwind_free,
   };
   pid_t pid = ctx->params.pid;
 
-  if (IsDDResNotOK(ddprof_setup(ctx, pid, num_cpu))) {
+  if (IsDDResNotOK(ddprof_setup(ctx, pid, ctx->params.num_cpu))) {
     LG_ERR("Error setting up ddprof");
     return;
   }
@@ -253,6 +254,8 @@ DDRes ddprof_ctx_set(const DDProfInput *input, DDProfContext *ctx) {
       ctx->params.nice = tmp_nice;
   }
 
+  ctx->params.num_cpu = get_nprocs();
+
   // Process sendfinal
   ctx->params.sendfinal = arg_yesno(input->sendfinal, 1);
 
@@ -276,6 +279,13 @@ DDRes ddprof_ctx_set(const DDProfInput *input, DDProfContext *ctx) {
     if (!ctx->params.internalstats) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
                              "Unable to allocate string for internalstats");
+    }
+  }
+  if (input->tags) {
+    ctx->params.tags = strdup(input->tags);
+    if (!ctx->params.tags) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
+                             "Unable to allocate string for tags");
     }
   }
 

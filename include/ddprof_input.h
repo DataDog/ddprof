@@ -26,6 +26,7 @@ typedef struct DDProfInput {
   char *global;
   char *worker_period;
   char *internalstats;
+  char *tags;
   // Watcher presets
   watcher_index_t watchers[MAX_TYPE_WATCHER];
   uint64_t sampling_value[MAX_TYPE_WATCHER];
@@ -70,8 +71,8 @@ typedef struct DDProfInput {
   XX(DD_SITE,                      site,                      I, 'I', 1, input, NULL, "",           exp_input.)  \
   XX(DD_TRACE_AGENT_PORT,          port,                      P, 'P', 1, input, NULL, "8126",       exp_input.)  \
   XX(DD_SERVICE,                   service,                   S, 'S', 1, input, NULL, "myservice",  exp_input.) \
-  XX(DD_TAGS,                      tags,                      T, 'T', 1, input, NULL, "",           exp_input.) \
   XX(DD_VERSION,                   serviceversion,            V, 'V', 1, input, NULL, "",           exp_input.) \
+  XX(DD_TAGS,                      tags,                      T, 'T', 1, input, NULL, "",                     )  \
   XX(DD_PROFILING_ENABLED,         enable,                    d, 'd', 1, input, NULL, "yes", )                   \
   XX(DD_PROFILING_NATIVE_ENABLED,  native_enable,             n, 'n', 1, input, NULL, "yes", )                   \
   XX(DD_PROFILING_UPLOAD_PERIOD,   upload_period,             u, 'u', 1, input, NULL, "60", )                    \

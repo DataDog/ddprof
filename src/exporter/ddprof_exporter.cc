@@ -1,19 +1,29 @@
 #include "exporter/ddprof_exporter.h"
 
+extern "C" {
 #include <assert.h>
 #include <ddprof/ffi.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <time.h>
 #include <unistd.h>
+}
 
 #include "ddres.h"
+#include "tags.hpp"
+#include <amc/vector.hpp>
+#include <string>
 
 static const int k_timeout_ms = 10000;
 static const int k_size_api_key = 32;
+#define K_URL_ALLOC_ATTEMPT_SIZE 256
+
+static ddprof_ffi_ByteSlice cpp_string_to_byteslice(const std::string &str) {
+  return (ddprof_ffi_ByteSlice){.ptr = (uint8_t *)str.c_str(),
+                                .len = str.size()};
+}
 
 static ddprof_ffi_ByteSlice string_view_to_byteslice(string_view slice) {
   return (ddprof_ffi_ByteSlice){.ptr = (uint8_t *)slice.ptr, .len = slice.len};
@@ -27,7 +37,7 @@ static ddprof_ffi_ByteSlice char_star_to_byteslice(const char *string) {
 static char *alloc_url_agent(const char *protocol, const char *host,
                              const char *port) {
   size_t expected_size = snprintf(NULL, 0, "%s%s:%s", protocol, host, port);
-  char* url = (char *)malloc(expected_size + 1);
+  char *url = (char *)malloc(expected_size + 1);
   if (!url) // Early exit on alloc failure
     return NULL;
 
@@ -77,6 +87,8 @@ static DDRes write_pprof_file(const ddprof_ffi_EncodedProfile *encoded_profile,
   return ddres_init();
 }
 
+extern "C" {
+
 DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
                            DDProfExporter *exporter) {
   memset(exporter, 0, sizeof(DDProfExporter));
@@ -113,39 +125,50 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
 
 static const int k_max_tags = 10;
 
-static int fill_tags(const DDProfExporter *exporter, ddprof_ffi_Tag *tags_) {
-  int idx_tags = 0;
-  tags_[idx_tags].name = char_star_to_byteslice("language");
-  tags_[idx_tags++].value = string_view_to_byteslice(exporter->_input.language);
+static void
+fill_tags(const UserTags *user_tags, const DDProfExporter *exporter,
+          amc::SmallVector<ddprof_ffi_Tag, k_max_tags> &tags_exporter) {
+  tags_exporter.push_back(ddprof_ffi_Tag{
+      .name = char_star_to_byteslice("language"),
+      .value = string_view_to_byteslice(exporter->_input.language)});
+
   if (exporter->_input.environment) {
-    tags_[idx_tags].name = char_star_to_byteslice("env");
-    tags_[idx_tags++].value =
-        char_star_to_byteslice(exporter->_input.environment);
+    tags_exporter.push_back(ddprof_ffi_Tag{
+        .name = char_star_to_byteslice("env"),
+        .value = char_star_to_byteslice(exporter->_input.environment)});
   }
+
   if (exporter->_input.serviceversion) {
-    tags_[idx_tags].name = char_star_to_byteslice("version");
-    tags_[idx_tags++].value =
-        char_star_to_byteslice(exporter->_input.serviceversion);
+    tags_exporter.push_back(ddprof_ffi_Tag{
+        .name = char_star_to_byteslice("version"),
+        .value = char_star_to_byteslice(exporter->_input.serviceversion)});
   }
+
   if (exporter->_input.service) {
-    tags_[idx_tags].name = char_star_to_byteslice("service");
-    tags_[idx_tags++].value = char_star_to_byteslice(exporter->_input.service);
+    tags_exporter.push_back(ddprof_ffi_Tag{
+        .name = char_star_to_byteslice("service"),
+        .value = char_star_to_byteslice(exporter->_input.service)});
   }
 
   if (exporter->_input.profiler_version.len) {
-    tags_[idx_tags].name = char_star_to_byteslice("profiler-version");
-    tags_[idx_tags++].value =
-        string_view_to_byteslice(exporter->_input.profiler_version);
+    tags_exporter.push_back(ddprof_ffi_Tag{
+        .name = char_star_to_byteslice("profiler-version"),
+        .value = string_view_to_byteslice(exporter->_input.profiler_version)});
   }
 
-  return idx_tags;
+  std::for_each(
+      user_tags->_tags.begin(), user_tags->_tags.end(), [&](auto const &el) {
+        tags_exporter.push_back(
+            ddprof_ffi_Tag{.name = cpp_string_to_byteslice(el.first),
+                           .value = cpp_string_to_byteslice(el.second)});
+      });
 }
 
-DDRes ddprof_exporter_new(DDProfExporter *exporter) {
-  ddprof_ffi_Tag tags_[k_max_tags];
-  int nb_tags = fill_tags(exporter, tags_);
-  assert(nb_tags < k_max_tags);
-  ddprof_ffi_Slice_tag tags = {.ptr = tags_, .len = nb_tags};
+DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
+  amc::SmallVector<ddprof_ffi_Tag, k_max_tags> tags_exporter;
+  fill_tags(user_tags, exporter, tags_exporter);
+  ddprof_ffi_Slice_tag tags = {.ptr = &tags_exporter[0],
+                               .len = tags_exporter.size()};
 
   ddprof_ffi_ByteSlice base_url = char_star_to_byteslice(exporter->_url);
   ddprof_ffi_EndpointV3 endpoint;
@@ -229,9 +252,11 @@ DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
 DDRes ddprof_exporter_free(DDProfExporter *exporter) {
   if (exporter->_exporter)
     ddprof_ffi_ProfileExporterV3_delete(exporter->_exporter);
-  exporter->_exporter = NULL;
+  exporter->_exporter = nullptr;
   exporter_input_free(&exporter->_input);
   free(exporter->_url);
-  exporter->_url = NULL;
+  exporter->_url = nullptr;
   return ddres_init();
 }
+
+} // extern C

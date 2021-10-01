@@ -10,7 +10,6 @@ extern "C" {
 #include "ddprof_context.h"
 #include "ddprof_stats.h"
 #include "dso.h"
-#include "exporter/ddprof_exporter.h"
 #include "logger.h"
 #include "perf.h"
 #include "pevent_lib.h"
@@ -20,6 +19,8 @@ extern "C" {
 }
 
 #include "dso.hpp"
+#include "exporter/ddprof_exporter.h"
+#include "tags.hpp"
 
 #include <cassert>
 
@@ -67,37 +68,46 @@ static inline void export_time_set(DDProfContext *ctx) {
 }
 
 DDRes worker_unwind_init(DDProfContext *ctx) {
+  try {
+    // Set the initial time
+    export_time_set(ctx);
+    // Make sure worker-related counters are reset
+    ctx->worker_ctx.count_worker = 0;
 
-  // Set the initial time
-  export_time_set(ctx);
-  // Make sure worker-related counters are reset
-  ctx->worker_ctx.count_worker = 0;
+    ctx->worker_ctx.us = (UnwindState *)calloc(1, sizeof(UnwindState));
+    if (!ctx->worker_ctx.us) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
+                             "Error when creating unwinding state");
+    }
 
-  ctx->worker_ctx.us = (UnwindState *)calloc(1, sizeof(UnwindState));
-  if (!ctx->worker_ctx.us) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
-                           "Error when creating unwinding state");
+    PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
+
+    // If we're here, then we are a child spawned during the startup operation.
+    // That means we need to iterate through the perf_event_open() handles and
+    // get the mmaps
+    if (!IsDDResOK(pevent_mmap(pevent_hdr, true))) {
+      LG_NTC("Retrying attachment without user override");
+      DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, false));
+    }
+    // Initialize the unwind state and library
+    DDRES_CHECK_FWD(unwind_init(ctx->worker_ctx.us));
+    ctx->worker_ctx.user_tags =
+        new UserTags(ctx->params.tags, ctx->params.num_cpu);
   }
-
-  PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
-
-  // If we're here, then we are a child spawned during the startup operation.
-  // That means we need to iterate through the perf_event_open() handles and
-  // get the mmaps
-  if (!IsDDResOK(pevent_mmap(pevent_hdr, true))) {
-    LG_NTC("Retrying attachment without user override");
-    DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, false));
-  }
-  // Initialize the unwind state and library
-  DDRES_CHECK_FWD(unwind_init(ctx->worker_ctx.us));
+  CatchExcept2DDRes();
   return ddres_init();
 }
 
 DDRes worker_unwind_free(DDProfContext *ctx) {
-  PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
-  unwind_free(ctx->worker_ctx.us);
-  DDRES_CHECK_FWD(pevent_munmap(pevent_hdr));
-  free(ctx->worker_ctx.us);
+  try {
+    delete ctx->worker_ctx.user_tags;
+    ctx->worker_ctx.user_tags = nullptr;
+    PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
+    unwind_free(ctx->worker_ctx.us);
+    DDRES_CHECK_FWD(pevent_munmap(pevent_hdr));
+    free(ctx->worker_ctx.us);
+  }
+  CatchExcept2DDRes();
   return ddres_init();
 }
 
@@ -300,32 +310,37 @@ DDRes ddprof_worker_timeout(volatile bool *continue_profiling,
 
 #ifndef DDPROF_NATIVE_LIB
 DDRes ddprof_worker_init(DDProfContext *ctx) {
-
-  ctx->worker_ctx.exp = (DDProfExporter *)malloc(sizeof(DDProfExporter));
-  if (!ctx->worker_ctx.exp) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error when creating exporter");
+  try {
+    ctx->worker_ctx.exp = (DDProfExporter *)malloc(sizeof(DDProfExporter));
+    if (!ctx->worker_ctx.exp) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error when creating exporter");
+    }
+    ctx->worker_ctx.pprof = (DDProfPProf *)malloc(sizeof(DDProfPProf));
+    if (!ctx->worker_ctx.pprof) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
+                             "Error when creating pprof structure");
+    }
+    DDRES_CHECK_FWD(worker_unwind_init(ctx));
+    DDRES_CHECK_FWD(ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp));
+    // warning : depends on unwind init
+    DDRES_CHECK_FWD(
+        ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp));
+    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof, ctx->watchers,
+                                         ctx->num_watchers));
   }
-  ctx->worker_ctx.pprof = (DDProfPProf *)malloc(sizeof(DDProfPProf));
-  if (!ctx->worker_ctx.pprof) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
-                           "Error when creating pprof structure");
-  }
-
-  DDRES_CHECK_FWD(ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp));
-  DDRES_CHECK_FWD(ddprof_exporter_new(ctx->worker_ctx.exp));
-  DDRES_CHECK_FWD(worker_unwind_init(ctx));
-  DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof, ctx->watchers,
-                                       ctx->num_watchers));
+  CatchExcept2DDRes();
   return ddres_init();
 }
 
 DDRes ddprof_worker_finish(DDProfContext *ctx) {
-
-  DDRES_CHECK_FWD(ddprof_exporter_free(ctx->worker_ctx.exp));
-  DDRES_CHECK_FWD(worker_unwind_free(ctx));
-  DDRES_CHECK_FWD(pprof_free_profile(ctx->worker_ctx.pprof));
-  free(ctx->worker_ctx.pprof);
-  free(ctx->worker_ctx.exp);
+  try {
+    DDRES_CHECK_FWD(ddprof_exporter_free(ctx->worker_ctx.exp));
+    DDRES_CHECK_FWD(worker_unwind_free(ctx));
+    DDRES_CHECK_FWD(pprof_free_profile(ctx->worker_ctx.pprof));
+    free(ctx->worker_ctx.pprof);
+    free(ctx->worker_ctx.exp);
+  }
+  CatchExcept2DDRes();
   return ddres_init();
 }
 #endif

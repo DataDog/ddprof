@@ -1,9 +1,13 @@
-extern "C" {
 #include "exporter/ddprof_exporter.h"
+
+extern "C" {
 #include "pprof/ddprof_pprof.h"
 }
+
 #include "loghandle.hpp"
+#include "tags.hpp"
 #include "unwind_output_mock.hpp"
+
 #include <gtest/gtest.h>
 #include <stdexcept>
 #include <string>
@@ -12,6 +16,9 @@ extern "C" {
 #include "unwind_symbols.hpp"
 
 namespace ddprof {
+
+// Mock
+int get_nb_hw_thread() { return 2; }
 
 #define K_RECEPTOR_ENV_ADDR "HTTP_RECEPTOR_URL"
 
@@ -98,7 +105,9 @@ TEST(DDProfExporter, simple) {
     EXPECT_TRUE(IsDDResOK(res));
   }
   {
-    res = ddprof_exporter_new(&exporter);
+    UserTags user_tags(nullptr, 4);
+
+    res = ddprof_exporter_new(&user_tags, &exporter);
     EXPECT_TRUE(IsDDResOK(res));
 
     res = ddprof_exporter_export(pprofs._profile, &exporter);

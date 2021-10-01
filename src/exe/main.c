@@ -8,7 +8,6 @@
 #include <errno.h>
 #include <signal.h>
 #include <string.h>
-#include <sys/sysinfo.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -80,7 +79,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Attach the profiler
-    ddprof_attach_profiler(&ctx, get_nprocs());
+    ddprof_attach_profiler(&ctx);
     LG_WRN("Profiling terminated");
     goto CLEANUP; // todo : propagate errors
   }

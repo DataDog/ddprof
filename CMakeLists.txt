@@ -56,11 +56,14 @@ message(STATUS "Libddprof Include directory " ${LIBDDPROF_INCLUDE_DIR})
 
 include(Findelfutils)
 
+#statsd
+include(Finddogfood)
+
 # llvm-demangle
 include(FindLibLlvmDemangle)
 
 add_custom_target(deps
-                  DEPENDS llvm-deps ddprof-deps elfutils-deps)
+                  DEPENDS llvm-deps ddprof-deps elfutils-deps dogfood-deps)
 
 #######################
 ### Static analysis ###
@@ -123,6 +126,9 @@ list(APPEND CMAKE_C_FLAGS ${FRAME_PTR_FLAG})
 list(APPEND CMAKE_CXX_FLAGS ${FRAME_PTR_FLAG})
 
 list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include)
+
+# statsd API
+list(APPEND DDPROF_INCLUDE_LIST ${DOGFOOD_INCLUDE_DIR})
 
 #libddprof
 list(APPEND DDPROF_INCLUDE_LIST ${LIBDDPROF_INCLUDE_DIR})
@@ -217,8 +223,7 @@ option(BUILD_NATIVE_LIB "Build a library out of the native profiler" OFF)
    ## Libs to link
    set(NATIVE_LIB_LIBRARY_LIST llvm-demangle dw elf libz.a Threads::Threads liblzma.a amc::amc)
    list(APPEND NATIVE_LIB_INCLUDE_LIST ${LIBDDPROF_INCLUDE_DIR} ) # to be removed (unlikely.h)
-   list(APPEND NATIVE_LIB_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include ${ELFUTILS_INCLUDE_LIST}) # legit includes
-
+   list(APPEND NATIVE_LIB_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include ${ELFUTILS_INCLUDE_LIST} ${DOGFOOD_INCLUDE_DIR}) # legit includes
 
    ## Create the lib
    add_library(ddprof-native

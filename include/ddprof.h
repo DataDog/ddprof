@@ -13,9 +13,8 @@ void ddprof_ctx_free(DDProfContext *);
 #ifndef DDPROF_NATIVE_LIB
 /*************************  Instrumentation Helpers  **************************/
 // Attach a profiler exporting results from a different fork
-void ddprof_attach_profiler(DDProfContext *, int);
+void ddprof_attach_profiler(DDProfContext *);
 #endif
 
 // Stack handler should remain valid
-void ddprof_attach_handler(DDProfContext *, const StackHandler *stack_handler,
-                           int);
+void ddprof_attach_handler(DDProfContext *, const StackHandler *stack_handler);

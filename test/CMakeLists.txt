@@ -170,14 +170,16 @@ add_unit_test(
 
 add_unit_test(
     ddprof_exporter-ut
-    ../src/exporter/ddprof_exporter.c
+    ../src/exporter/ddprof_exporter.cc
     ../src/pprof/ddprof_pprof.cc
     ../src/unwind_output.c
     ../src/perf_option.c
+    ../src/tags.cc
     ddprof_exporter-ut.cc
     LIBRARIES ddprof-ffi ${CMAKE_DL_LIBS}
     DEFINITIONS MYNAME="ddprof_exporter-ut"
 )
+target_include_directories(ddprof_exporter-ut PRIVATE ${DOGFOOD_INCLUDE_DIR})
 
 add_unit_test(
     region_holder-ut
@@ -193,3 +195,13 @@ add_unit_test(
     dso-ut.cc 
     DEFINITIONS MYNAME="dso-ut")
 target_include_directories(dso-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
+
+
+add_unit_test(
+    tags-ut
+    tags-ut.cc
+    ../src/tags.cc
+    ../src/thread_info.cc
+    DEFINITIONS MYNAME="tags-ut"
+)
+target_include_directories(tags-ut PRIVATE ${DOGFOOD_INCLUDE_DIR})

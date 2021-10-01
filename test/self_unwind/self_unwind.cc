@@ -48,7 +48,7 @@ void capture_ipinfo(DDProfContext *ctx, IPInfoMap *ip_info_map) {
   const StackHandler stack_handler = {
       .apply = stack_addtomap,
       .callback_ctx = reinterpret_cast<void *>(ip_info_map)};
-  ddprof_attach_handler(ctx, &stack_handler, get_nprocs());
+  ddprof_attach_handler(ctx, &stack_handler);
 }
 
 int main(int argc, char *argv[]) {
