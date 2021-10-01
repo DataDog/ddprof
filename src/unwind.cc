@@ -250,9 +250,10 @@ static DDRes unwind_attach(struct UnwindState *us) {
   if (us->attached) {
     return ddres_init();
   }
-  if (dwfl_attach_state(us->dwfl, NULL, us->pid, &dwfl_callbacks, us)) {
+  if (!dwfl_attach_state(us->dwfl, EM_NONE, us->pid, &dwfl_callbacks, us)) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_DWFL_LIB_ERROR,
-                           "[UNWIND] Error while calling dwfl_attach_state");
+                           "Error attaching dwfl on pid %d (%s)", us->pid,
+                           dwfl_errmsg(-1));
   }
   us->attached = true;
   return ddres_init();
@@ -262,7 +263,6 @@ DDRes unwind_init(struct UnwindState *us) {
   DDRES_CHECK_FWD(unwind_symbols_hdr_init(&(us->symbols_hdr)));
   DDRES_CHECK_FWD(libdso_init(&us->dso_hdr));
   elf_version(EV_CURRENT);
-  DDRES_CHECK_FWD(unwind_dwfl_begin(us));
   return ddres_init();
 }
 
@@ -275,6 +275,9 @@ void unwind_free(struct UnwindState *us) {
 
 DDRes unwindstate__unwind(struct UnwindState *us) {
   DDRes res;
+  // Initial a new dwfl context
+  DDRES_CHECK_FWD(unwind_dwfl_begin(us));
+
   // Update modules at the top
   Dwfl_Module *mod = update_mod(us->dso_hdr, us->dwfl, us->pid, us->eip);
   if (mod != NULL) {
@@ -308,6 +311,9 @@ DDRes unwindstate__unwind(struct UnwindState *us) {
                                       find_res.first->_type);
     }
   }
+
+  // We're done here, close down the dwfl context
+  unwind_dwfl_end(us);
   return res;
 }
 
