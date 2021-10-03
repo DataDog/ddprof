@@ -32,7 +32,8 @@ public:
   bool is_within(pid_t pid, ElfAddress_t addr) const;
   bool errored() const { return _errored; }
   bool operator<(const Dso &o) const;
-  bool operator==(const Dso &o) const;
+  // Avoid use of strict == as we do not consider _end in comparison
+  bool operator==(const Dso &o) const = delete;
   // perf gives larger regions than proc maps (keep the largest of them)
   bool same_or_smaller(const Dso &o) const;
   bool intersects(const Dso &o) const;
@@ -44,6 +45,7 @@ public:
   ElfAddress_t _end;
   ElfAddress_t _pgoff;
   std::string _filename;
+  DsoUID_t _id;
   dso::DsoType _type;
   bool _executable;
 
@@ -55,9 +57,6 @@ std::ostream &operator<<(std::ostream &os, const Dso &dso);
 typedef amc::FlatSet<Dso> DsoSet;
 typedef DsoSet::const_iterator DsoSetConstIt;
 typedef DsoSet::iterator DsoSetIt;
-
-// Helper to create a dso from a line in /proc/pid/maps
-Dso dso_from_procline(int pid, char *line);
 
 /* Range is assumed as [start, end) */
 typedef std::pair<DsoSetIt, DsoSetIt> DsoRange;
@@ -121,7 +120,7 @@ struct BackpopulateState {
 typedef std::unordered_map<pid_t, BackpopulateState> BackpopulateStateMap;
 
 struct DsoHdr {
-  DsoHdr() {}
+  DsoHdr() : _next_dso_id(0) {}
 
   /******* MAIN APIS **********/
   // Add the element check for overlap and remove them
@@ -131,9 +130,6 @@ struct DsoHdr {
 
   // Clear all dsos and regions associated with this pid
   void pid_free(int pid);
-
-  // copy the dso from the parent pid to the child
-  bool pid_fork(int ppid, int pid);
 
   // parse procfs to look for dso elements
   bool pid_backpopulate(int);
@@ -159,6 +155,13 @@ struct DsoHdr {
   // erase range of elements
   void erase_range(const ddprof::DsoRange &range);
 
+  // Helper to create a dso from a line in /proc/pid/maps
+  static ddprof::Dso dso_from_procline(int pid, char *line);
+
+  DsoFindRes find_res_not_found() {
+    return std::make_pair<ddprof::DsoSetConstIt, bool>(_set.end(), false);
+  }
+
   /********* Region helpers ***********/
   const ddprof::RegionHolder &find_or_insert_region(const ddprof::Dso &dso);
 
@@ -166,4 +169,5 @@ struct DsoHdr {
   ddprof::RegionMap _region_map;
   struct ddprof::DsoStats _stats;
   BackpopulateStateMap _backpopulate_state_map;
+  DsoUID_t _next_dso_id;
 };

@@ -25,13 +25,9 @@ void unwind_symbols_hdr_free(struct UnwindSymbolsHdr *symbols_hdr);
 // Takes a dwarf module and an instruction pointer
 // Lookup if this instruction pointer was already encountered. If not, create a
 // new element in the table
-DDRes ipinfo_lookup_get(struct UnwindSymbolsHdr *symbols_hdr,
-                        struct Dwfl_Module *mod, ElfAddress_t newpc, pid_t pid,
-                        IPInfoIdx_t *ipinfo_idx);
-
-DDRes mapinfo_lookup_get(struct UnwindSymbolsHdr *symbols_hdr,
-                         const struct Dwfl_Module *mod,
-                         MapInfoIdx_t *map_info_idx);
+DDRes ipinfo_lookup_get(struct UnwindSymbolsHdr *unwind_symbol_hdr,
+                        struct Dwfl_Module *mod, ElfAddress_t newpc,
+                        DsoUID_t dso_id, IPInfoIdx_t *ipinfo_idx);
 
 #ifdef __cplusplus
 }

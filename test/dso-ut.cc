@@ -132,7 +132,7 @@ TEST(DSOTest, erase) {
   fill_mock_hdr(dso_hdr);
   {
     DsoRange range = dso_hdr.get_pid_range(10);
-    EXPECT_EQ(*range.first, build_dso_10_1000());
+    EXPECT_TRUE(range.first->same_or_smaller(build_dso_10_1000()));
     EXPECT_EQ(range.second, dso_hdr._set.end());
     dso_hdr.erase_range(range);
     EXPECT_EQ(dso_hdr._set.size(), 1);
@@ -215,19 +215,22 @@ static const char *s_stack_line = "7ffcd6c68000-7ffcd6c89000 rw-p 00000000 00:00
 TEST(DSOTest, dso_from_procline) {
   LogHandle loghandle;
   // todo make dso_from_procline const
-  Dso no_exec = dso_from_procline(10, const_cast<char *>(s_line_noexec));
+  Dso no_exec =
+      DsoHdr::dso_from_procline(10, const_cast<char *>(s_line_noexec));
   std::cerr << no_exec;
   EXPECT_EQ(no_exec._type, dso::kStandard);
   EXPECT_EQ(no_exec._executable, false);
   EXPECT_EQ(no_exec._pid, 10);
 
-  Dso standard_dso = dso_from_procline(10, const_cast<char *>(s_exec_line));
+  Dso standard_dso =
+      DsoHdr::dso_from_procline(10, const_cast<char *>(s_exec_line));
   std::cerr << standard_dso;
   EXPECT_EQ(standard_dso._type, dso::kStandard);
-  Dso vdso_dso = dso_from_procline(10, const_cast<char *>(s_vdso_lib));
+  Dso vdso_dso = DsoHdr::dso_from_procline(10, const_cast<char *>(s_vdso_lib));
   std::cerr << vdso_dso;
   EXPECT_EQ(vdso_dso._type, dso::kVdso);
-  Dso stack_dso = dso_from_procline(10, const_cast<char *>(s_stack_line));
+  Dso stack_dso =
+      DsoHdr::dso_from_procline(10, const_cast<char *>(s_stack_line));
   std::cerr << stack_dso;
   EXPECT_EQ(stack_dso._type, dso::kStack);
 
@@ -235,7 +238,7 @@ TEST(DSOTest, dso_from_procline) {
   {
     // check that we don't overlap between lines that end on same byte
     Dso standard_dso_2 =
-        dso_from_procline(10, const_cast<char *>(s_exec_line2));
+        DsoHdr::dso_from_procline(10, const_cast<char *>(s_exec_line2));
     std::cerr << standard_dso_2;
     EXPECT_EQ(standard_dso._type, dso::kStandard);
     dso_hdr.insert_erase_overlap(std::move(standard_dso_2));
@@ -245,7 +248,7 @@ TEST(DSOTest, dso_from_procline) {
   {
     // check that we erase everything if we have an overlap
     Dso standard_dso_3 =
-        dso_from_procline(10, const_cast<char *>(s_exec_line3));
+        DsoHdr::dso_from_procline(10, const_cast<char *>(s_exec_line3));
     std::cerr << standard_dso_3;
     EXPECT_EQ(standard_dso._type, dso::kStandard);
     dso_hdr.insert_erase_overlap(std::move(standard_dso_3));
@@ -254,7 +257,7 @@ TEST(DSOTest, dso_from_procline) {
   {
     // check that we still match element number 3
     Dso standard_dso_4 =
-        dso_from_procline(10, const_cast<char *>(s_exec_line4));
+        DsoHdr::dso_from_procline(10, const_cast<char *>(s_exec_line4));
     std::cerr << standard_dso_4;
     DsoFindRes findres =
         dso_hdr.insert_erase_overlap(std::move(standard_dso_4));
@@ -262,21 +265,11 @@ TEST(DSOTest, dso_from_procline) {
     std::cerr << *findres.first;
     // EXPECT_EQ(findres.first._end, );
     Dso standard_dso_3 =
-        dso_from_procline(10, const_cast<char *>(s_exec_line3));
+        DsoHdr::dso_from_procline(10, const_cast<char *>(s_exec_line3));
     // check that 4 did not override number 3 (even if they overlap 3 is
     // smaller)
-    EXPECT_EQ(*findres.first, standard_dso_3);
+    EXPECT_EQ(findres.first->_end, standard_dso_3._end);
   }
-}
-
-TEST(DSOTest, fork) {
-  DsoHdr dso_hdr;
-  fill_mock_hdr(dso_hdr);
-  bool fork = dso_hdr.pid_fork(10, 11);
-  EXPECT_TRUE(fork);
-  Dso dso_forked = Dso(build_dso_10_1500(), 11);
-  DsoFindRes find_res = dso_hdr.dso_find_same_or_smaller(dso_forked);
-  EXPECT_EQ(dso_forked, *find_res.first);
 }
 
 // Retrieves instruction pointer

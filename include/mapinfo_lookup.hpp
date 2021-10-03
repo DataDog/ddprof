@@ -13,9 +13,10 @@ struct Dwfl_Module;
 
 namespace ddprof {
 
-typedef std::unordered_map<ElfAddress_t, MapInfoIdx_t> MapInfoLookup;
+typedef std::unordered_map<DsoUID_t, MapInfoIdx_t> MapInfoLookup;
 
 void mapinfo_lookup_get(MapInfoLookup &mapinfo_map, MapInfoTable &mapinfo_table,
-                        const Dwfl_Module *mod, MapInfoIdx_t *map_info_idx);
+                        const Dwfl_Module *mod, DsoUID_t dso_id,
+                        MapInfoIdx_t *map_info_idx);
 
 } // namespace ddprof

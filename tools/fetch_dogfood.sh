@@ -20,4 +20,4 @@ TOP_LVL_DIR=$PWD
 cd $CURRENTDIR
 
 cd $2
-git clone --depth 1 --branch $1 https://github.com/garrettsickles/DogFood.git
+git clone --depth 1 --branch $1 https://github.com/garrettsickles/DogFood.git  2> /dev/null

@@ -11,8 +11,9 @@ extern "C" {
 
 namespace ddprof {
 
-IPInfoKey::IPInfoKey(const Dwfl_Module *mod, ElfAddress_t newpc, pid_t pid)
-    : _low_addr(mod->low_addr), _newpc(newpc), _pid(pid) {}
+IPInfoKey::IPInfoKey(const Dwfl_Module *mod, ElfAddress_t newpc,
+                     DsoUID_t dso_id)
+    : _low_addr(mod->low_addr), _newpc(newpc), _dso_id(dso_id) {}
 
 // compute the info using dwarf and demangle apis
 static void ipinfo_get_from_dwfl(Dwfl_Module *mod, Dwarf_Addr newpc,
@@ -47,8 +48,8 @@ static void ipinfo_get_from_dwfl(Dwfl_Module *mod, Dwarf_Addr newpc,
 // pass through cache
 void ipinfo_lookup_get(IPInfoLookup &info_cache, IPInfoLookupStats &stats,
                        IPInfoTable &table, Dwfl_Module *mod, Dwarf_Addr newpc,
-                       pid_t pid, IPInfoIdx_t *ipinfo_idx) {
-  IPInfoKey key(mod, newpc, pid);
+                       DsoUID_t dso_id, IPInfoIdx_t *ipinfo_idx) {
+  IPInfoKey key(mod, newpc, dso_id);
   auto const it = info_cache.find(key);
   ++(stats._calls);
 
@@ -73,6 +74,10 @@ void ipinfo_lookup_get(IPInfoLookup &info_cache, IPInfoLookupStats &stats,
     info_cache.insert(std::make_pair<IPInfoKey, IPInfoIdx_t>(
         std::move(key), IPInfoIdx_t(*ipinfo_idx)));
   }
+#ifdef DEBUG
+  printf("DBG: Func = %s  \n", table[*ipinfo_idx]._demangle_name.c_str());
+  printf("     src  = %s  \n", table[*ipinfo_idx]._srcpath.c_str());
+#endif
 }
 
 bool ipinfo_lookup_check(struct Dwfl_Module *mod, Dwarf_Addr newpc,

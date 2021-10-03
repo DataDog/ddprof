@@ -95,13 +95,13 @@ static const std::string s_anon_str = "//anon";
 
 // invalid element
 Dso::Dso()
-    : _pid(-1), _start(), _end(), _pgoff(), _filename(), _type(dso::kUndef),
-      _executable(false), _errored(true) {}
+    : _pid(-1), _start(), _end(), _pgoff(), _filename(), _id(0),
+      _type(dso::kUndef), _executable(false), _errored(true) {}
 
 Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
          std::string &&filename, bool executable)
     : _pid(pid), _start(start), _end(end), _pgoff(pgoff), _filename(filename),
-      _type(dso::kStandard), _executable(executable), _errored(false) {
+      _id(0), _type(dso::kStandard), _executable(executable), _errored(false) {
   // note that substr manages the case where len str < len vdso_str
   if (_filename.substr(0, s_vdso_str.length()) == s_vdso_str) {
     _type = dso::kVdso;
@@ -120,9 +120,9 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
 }
 
 std::string Dso::to_string() const {
-  return string_format("PID[%d] %lx-%lx %lx (%s)(T-%s)(%c)", _pid, _start, _end,
-                       _pgoff, _filename.c_str(), dso::dso_type_str(_type),
-                       _executable ? 'x' : '-');
+  return string_format("PID[%d] %lx-%lx %lx (%s)(T-%s)(%c)(ID#%d)", _pid,
+                       _start, _end, _pgoff, _filename.c_str(),
+                       dso::dso_type_str(_type), _executable ? 'x' : '-', _id);
 }
 
 std::ostream &operator<<(std::ostream &os, const Dso &dso) {
@@ -174,12 +174,6 @@ bool Dso::same_or_smaller(const Dso &o) const {
   return true;
 }
 
-bool Dso::operator==(const Dso &o) const {
-  // default comparison is c++ 20
-  return _pid == o._pid && _start == o._start && _end == o._end &&
-      _pgoff == o._pgoff && _filename == o._filename;
-}
-
 bool Dso::intersects(const Dso &o) const {
   if (is_within(o._pid, o._start)) {
     return true;
@@ -221,48 +215,6 @@ void DsoStats::log() const {
 uint64_t DsoStats::sum_event_metric(DsoEventType dso_event) const {
   return std::accumulate(_metrics[dso_event].begin(), _metrics[dso_event].end(),
                          0);
-}
-
-Dso dso_from_procline(int pid, char *line) {
-  // clang-format off
-  // Example of format
-  /*
-    55d78839f000-55d7883a1000 r--p 00000000 fe:01 3287864                    /usr/local/bin/BadBoggleSolver_run
-    55d7883a1000-55d7883a5000 r-xp 00002000 fe:01 3287864                    /usr/local/bin/BadBoggleSolver_run
-    ...
-    55d78a12b000-55d78a165000 rw-p 00000000 00:00 0                          [heap]
-    ...
-    7f531437b000-7f531439e000 r-xp 00001000 fe:01 3932979                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
-    7f531439e000-7f53143a6000 r--p 00024000 fe:01 3932979                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
-    7f53143a8000-7f53143a9000 rw-p 0002d000 fe:01 3932979                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
-    7f53143a9000-7f53143aa000 rw-p 00000000 00:00 0 
-    7ffcd6c68000-7ffcd6c89000 rw-p 00000000 00:00 0                          [stack]
-    7ffcd6ce2000-7ffcd6ce6000 r--p 00000000 00:00 0                          [vvar]
-    7ffcd6ce6000-7ffcd6ce8000 r-xp 00000000 00:00 0                          [vdso]
-    ffffffffff600000-ffffffffff601000 r-xp 00000000 00:00 0                  [vsyscall]
-  */
-  // clang-format on
-  static const char spec[] = "%lx-%lx %4c %lx %*x:%*x %*d%n";
-  uint64_t m_start = 0;
-  uint64_t m_end = 0;
-  uint64_t m_off = 0;
-  char m_mode[4] = {0};
-  int m_p = 0;
-  // Check for formatting errors
-  if (4 != sscanf(line, spec, &m_start, &m_end, m_mode, &m_off, &m_p)) {
-    LG_ERR("[DSO] Failed to scan mapfile line");
-    throw ddprof::DDException(DD_SEVERROR, DD_WHAT_DSO);
-  }
-
-  // Make sure the name index points to a valid char
-  char *p = &line[m_p], *q;
-  while (isspace(*p))
-    p++;
-  if ((q = strchr(p, '\n')))
-    *q = '\0';
-
-  // Should we store non exec dso ?
-  return Dso(pid, m_start, m_end - 1, m_off, std::string(p), 'x' == m_mode[2]);
 }
 
 } // namespace ddprof
@@ -397,11 +349,11 @@ DsoFindRes DsoHdr::insert_erase_overlap(ddprof::Dso &&dso) {
     erase_range(range);
   }
   _stats.incr_metric(DsoStats::kNewDso, dso._type);
-  // warning rvalue : do not use dso after this line
-  find_res = _set.insert(dso);
+  // Warning : adding new inserts should update UIDs
+  dso._id = _next_dso_id++;
   LG_DBG("[DSO] : Insert %s", dso.to_string().c_str());
-
-  return find_res;
+  // warning rvalue : do not use dso after this line
+  return _set.insert(dso);
 }
 
 DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr) {
@@ -520,8 +472,8 @@ bool DsoHdr::pid_backpopulate(int pid) {
   size_t sz_buf = 0;
   bool element_added = false;
   while (-1 != getline(&buf, &sz_buf, mpf)) {
-    Dso dso = ddprof::dso_from_procline(pid, buf);
-    if (dso._pid == -1) {
+    Dso dso = dso_from_procline(pid, buf);
+    if (dso._pid == -1) { // invalid dso
       continue;
     }
     if ((insert_erase_overlap(std::move(dso))).second) {
@@ -534,26 +486,46 @@ bool DsoHdr::pid_backpopulate(int pid) {
   return element_added;
 }
 
-bool DsoHdr::pid_fork(int ppid, int pid) {
-  ddprof::DsoRange range = get_pid_range(ppid);
-  if (range.first == _set.end()) {
-    // nothing for this parent pid ?
-    if (!pid_backpopulate(ppid)) {
-      LG_WRN("[DSO](FORK) No PID found");
-      return pid_backpopulate(pid);
-    }
+Dso DsoHdr::dso_from_procline(int pid, char *line) {
+  // clang-format off
+  // Example of format
+  /*
+    55d78839f000-55d7883a1000 r--p 00000000 fe:01 3287864                    /usr/local/bin/BadBoggleSolver_run
+    55d7883a1000-55d7883a5000 r-xp 00002000 fe:01 3287864                    /usr/local/bin/BadBoggleSolver_run
+    ...
+    55d78a12b000-55d78a165000 rw-p 00000000 00:00 0                          [heap]
+    ...
+    7f531437b000-7f531439e000 r-xp 00001000 fe:01 3932979                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
+    7f531439e000-7f53143a6000 r--p 00024000 fe:01 3932979                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
+    7f53143a8000-7f53143a9000 rw-p 0002d000 fe:01 3932979                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
+    7f53143a9000-7f53143aa000 rw-p 00000000 00:00 0 
+    7ffcd6c68000-7ffcd6c89000 rw-p 00000000 00:00 0                          [stack]
+    7ffcd6ce2000-7ffcd6ce6000 r--p 00000000 00:00 0                          [vvar]
+    7ffcd6ce6000-7ffcd6ce8000 r-xp 00000000 00:00 0                          [vdso]
+    ffffffffff600000-ffffffffff601000 r-xp 00000000 00:00 0                  [vsyscall]
+  */
+  // clang-format on
+  static const char spec[] = "%lx-%lx %4c %lx %*x:%*x %*d%n";
+  uint64_t m_start = 0;
+  uint64_t m_end = 0;
+  uint64_t m_off = 0;
+  char m_mode[4] = {0};
+  int m_p = 0;
+  // Check for formatting errors
+  if (4 != sscanf(line, spec, &m_start, &m_end, m_mode, &m_off, &m_p)) {
+    LG_ERR("[DSO] Failed to scan mapfile line");
+    throw ddprof::DDException(DD_SEVERROR, DD_WHAT_DSO);
   }
-  // backpopulate worked on parent
-  range = get_pid_range(ppid);
-  ddprof::DsoSet set_to_insert;
-  for (DsoSetConstIt it = range.first; it != range.second; ++it) {
-    // warning do not change _set while using iterators (realloc)
-    _stats.incr_metric(DsoStats::kNewDso, it->_type);
-    set_to_insert.insert(ddprof::Dso(*it, pid));
-  }
-  _set.insert(set_to_insert.begin(), set_to_insert.end());
-  // return true if we added something (range not 0)
-  return set_to_insert.size();
+
+  // Make sure the name index points to a valid char
+  char *p = &line[m_p], *q;
+  while (isspace(*p))
+    p++;
+  if ((q = strchr(p, '\n')))
+    *q = '\0';
+
+  // Should we store non exec dso ?
+  return Dso(pid, m_start, m_end - 1, m_off, std::string(p), 'x' == m_mode[2]);
 }
 
 /*********************/

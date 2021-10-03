@@ -10,6 +10,7 @@ extern "C" {
 }
 
 #include "dso.hpp"
+#include "unwind_symbols.hpp"
 
 #define UNUSED(x) (void)(x)
 
@@ -17,6 +18,14 @@ using ddprof::Dso;
 using ddprof::DsoSetConstIt;
 using ddprof::DsoSetIt;
 using ddprof::DsoStats;
+
+// Structure to group Dso and Mod
+struct DsoMod {
+  explicit DsoMod(DsoFindRes find_res)
+      : _dso_find_res(find_res), _dwfl_mod(nullptr) {}
+  DsoFindRes _dso_find_res;
+  Dwfl_Module *_dwfl_mod;
+};
 
 pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
   (void)dwfl;
@@ -38,6 +47,31 @@ bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
   regs[16] = us->eip;
 
   return dwfl_thread_state_registers(thread, 0, 17, regs);
+}
+
+static DDRes add_frame(UnwindState *us, DsoMod dso_mod, uint64_t pc) {
+  Dwfl_Module *mod = dso_mod._dwfl_mod;
+  // if we are here, we can assume we found a dso
+  DsoUID_t dso_id = dso_mod._dso_find_res.first->_id;
+
+  UnwindOutput *output = &us->output;
+  int64_t current_idx = output->nb_locs;
+
+  DDRes cache_status = ipinfo_lookup_get(
+      us->symbols_hdr, mod, pc, dso_id, &output->locs[current_idx]._ipinfo_idx);
+  if (IsDDResNotOK(cache_status)) {
+    LG_DBG("Error from dwflmod_cache_status");
+    return cache_status;
+  }
+
+  output->locs[current_idx].ip = pc;
+
+  ddprof::mapinfo_lookup_get(us->symbols_hdr->_mapinfo_lookup,
+                             us->symbols_hdr->_mapinfo_table, mod, dso_id,
+                             &(output->locs[current_idx]._map_info_idx));
+
+  output->nb_locs++;
+  return ddres_init();
 }
 
 /// memory_read as per prototype define in libdwfl
@@ -82,15 +116,15 @@ static bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
   return true;
 }
 
-Dwfl_Module *update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, uint64_t pc) {
-  Dwfl_Module *mod;
+static DsoMod update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, uint64_t pc) {
   if (!dwfl)
-    return NULL;
+    return DsoMod(dso_hdr->find_res_not_found());
 
   // Lookup DSO
-  DsoFindRes dso_find_res = dso_hdr->dso_find_or_backpopulate(pid, pc);
+  DsoMod dso_mod_res(dso_hdr->dso_find_or_backpopulate(pid, pc));
+  const DsoFindRes &dso_find_res = dso_mod_res._dso_find_res;
   if (!dso_find_res.second) {
-    return NULL;
+    return dso_mod_res;
   }
 
   const Dso &dso = *dso_find_res.first;
@@ -98,40 +132,40 @@ Dwfl_Module *update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, uint64_t pc) {
 
   if (dso.errored()) {
     LG_DBG("DSO Previously errored - mod (%s)", dso._filename.c_str());
-    return NULL;
+    return dso_mod_res;
   }
 
   // Now that we've confirmed a separate lookup for the DSO based on procfs
   // and/or perf_event_open() "extra" events, we do two things
   // 1. Check that dwfl has a cache for this PID/pc combination
   // 2. Check that the given cache is accurate to the DSO
-  mod = dwfl_addrmodule(dwfl, pc);
-  if (mod) {
+  dso_mod_res._dwfl_mod = dwfl_addrmodule(dwfl, pc);
+  if (dso_mod_res._dwfl_mod) {
     Dwarf_Addr vm_addr;
-    dwfl_module_info(mod, 0, &vm_addr, 0, 0, 0, 0, 0);
+    dwfl_module_info(dso_mod_res._dwfl_mod, 0, &vm_addr, 0, 0, 0, 0, 0);
     if (vm_addr != dso._start - dso._pgoff) {
       LG_NTC("Incoherent DSO <--> dwfl_module");
-      mod = NULL;
+      dso_mod_res._dwfl_mod = NULL;
     }
   }
 
   // Try again if either of the criteria above were false
-  if (!mod) {
+  if (!dso_mod_res._dwfl_mod) {
     const char *dso_filepath = dso._filename.c_str();
     if (dso._type == ddprof::dso::kStandard) {
       const char *dso_name = strrchr(dso_filepath, '/') + 1;
-      mod = dwfl_report_elf(dwfl, dso_name, dso_filepath, -1,
-                            dso._start - dso._pgoff, false);
+      dso_mod_res._dwfl_mod = dwfl_report_elf(dwfl, dso_name, dso_filepath, -1,
+                                              dso._start - dso._pgoff, false);
     }
   }
-  if (!mod) {
+  if (!dso_mod_res._dwfl_mod) {
     dso.flag_error();
     LG_WRN("couldn't addrmodule (%s)[0x%lx], but got DSO %s[0x%lx:0x%lx]",
            dwfl_errmsg(-1), pc, dso._filename.c_str(), dso._start, dso._end);
-    return NULL;
+    return dso_mod_res;
   }
 
-  return mod;
+  return dso_mod_res;
 }
 
 int frame_cb(Dwfl_Frame *state, void *arg) {
@@ -150,8 +184,9 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
     ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
     return DWARF_CB_ABORT;
   }
+  DsoMod dso_mod = update_mod(us->dso_hdr, us->dwfl, us->pid, pc);
+  Dwfl_Module *mod = dso_mod._dwfl_mod;
 
-  Dwfl_Module *mod = update_mod(us->dso_hdr, us->dwfl, us->pid, pc);
   if (!mod) {
     LG_DBG("Unable to retrieve the Dwfl_Module");
     ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
@@ -180,29 +215,11 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
   }
 
   // Now we register
-  UnwindOutput *output = &us->output;
-  int64_t current_idx = output->nb_locs;
-
-  DDRes cache_status =
-      ipinfo_lookup_get(us->symbols_hdr, mod, pc, us->pid,
-                        &output->locs[current_idx]._ipinfo_idx);
-  if (IsDDResNotOK(cache_status)) {
-    LG_DBG("Error from dwflmod_cache_status");
+  if (!IsDDResOK(add_frame(us, dso_mod, pc))) {
     ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
     return DWARF_CB_ABORT;
   }
 
-  output->locs[current_idx].ip = pc;
-
-  cache_status = mapinfo_lookup_get(us->symbols_hdr, mod,
-                                    &(output->locs[current_idx]._map_info_idx));
-  if (IsDDResNotOK(cache_status)) {
-    LG_DBG("Error from mapinfo_lookup_get");
-    ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
-    return DWARF_CB_ABORT;
-  }
-
-  output->nb_locs++;
   return DWARF_CB_OK;
 }
 
@@ -276,8 +293,9 @@ void unwind_free(struct UnwindState *us) {
 DDRes unwindstate__unwind(struct UnwindState *us) {
   DDRes res;
   // Update modules at the top
-  Dwfl_Module *mod = update_mod(us->dso_hdr, us->dwfl, us->pid, us->eip);
-  if (mod != NULL) {
+  DsoMod dso_mod = update_mod(us->dso_hdr, us->dwfl, us->pid, us->eip);
+
+  if (dso_mod._dwfl_mod != NULL) {
     res = unwind_attach(us);
     if (!IsDDResOK(res)) { // frequent errors, avoid flooding logs
       LOG_ERROR_DETAILS(LG_DBG, res._what);
@@ -296,16 +314,15 @@ DDRes unwindstate__unwind(struct UnwindState *us) {
   }
   if (IsDDResNotOK(res)) {
     // analyse unwinding error
-    DsoFindRes find_res = us->dso_hdr->dso_find_closest(us->pid, us->eip);
-    if (!find_res.second) {
+    if (!dso_mod._dso_find_res.second) {
       LG_DBG("Could not localize top-level IP: [%d](0x%lx)", us->pid, us->eip);
       analyze_unwinding_error(us->pid, us->eip);
     } else {
-      LG_DBG("Failed unwind: %s [%d](0x%lx)", find_res.first->_filename.c_str(),
-             us->pid, us->eip);
+      LG_DBG("Failed unwind: %s [%d](0x%lx)",
+             dso_mod._dso_find_res.first->_filename.c_str(), us->pid, us->eip);
 
       us->dso_hdr->_stats.incr_metric(DsoStats::kUnwindFailure,
-                                      find_res.first->_type);
+                                      dso_mod._dso_find_res.first->_type);
     }
   }
   return res;

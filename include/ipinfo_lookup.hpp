@@ -16,8 +16,7 @@ namespace ddprof {
 
 // Key
 typedef struct IPInfoKey {
-  IPInfoKey() : _low_addr(0), _newpc(0), _pid(-1) {}
-  IPInfoKey(const Dwfl_Module *mod, ElfAddress_t newpc, pid_t pid);
+  IPInfoKey(const Dwfl_Module *mod, ElfAddress_t newpc, DsoUID_t dso_id);
 
   bool operator==(const IPInfoKey &other) const {
     return (_low_addr == other._low_addr && _newpc == other._newpc);
@@ -27,7 +26,7 @@ typedef struct IPInfoKey {
   ElfAddress_t _low_addr;
   ElfAddress_t _newpc;
   // Addresses are valid in the context of a pid
-  pid_t _pid;
+  DsoUID_t _dso_id;
 } IPInfoKey;
 
 } // namespace ddprof
@@ -40,7 +39,7 @@ template <> struct hash<ddprof::IPInfoKey> {
     // Combine hashes of standard types
     std::size_t hash_val = ddprof::hash_combine(
         hash<ElfAddress_t>()(k._low_addr), hash<ElfAddress_t>()(k._newpc));
-    hash_val = ddprof::hash_combine(hash_val, hash<int>()(k._pid));
+    hash_val = ddprof::hash_combine(hash_val, hash<DsoUID_t>()(k._dso_id));
     return hash_val;
   }
 };
@@ -61,7 +60,7 @@ struct IPInfoLookupStats {
 ///// PUBLIC FUNCTIONS /////
 void ipinfo_lookup_get(IPInfoLookup &info_cache, IPInfoLookupStats &stats,
                        IPInfoTable &table, Dwfl_Module *mod, ElfAddress_t newpc,
-                       pid_t pid, IPInfoIdx_t *ipinfo_idx);
+                       DsoUID_t dso_id, IPInfoIdx_t *ipinfo_idx);
 
 bool ipinfo_lookup_check(struct Dwfl_Module *mod, ElfAddress_t newpc,
                          const IPInfo &info);
