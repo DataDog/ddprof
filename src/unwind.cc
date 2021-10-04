@@ -251,7 +251,7 @@ static DDRes unwind_attach(struct UnwindState *us) {
   if (us->attached) {
     return ddres_init();
   }
-  if (!dwfl_attach_state(us->dwfl, EM_NONE, us->pid, &dwfl_callbacks, us)) {
+  if (!dwfl_attach_state(us->dwfl, NULL, us->pid, &dwfl_callbacks, us)) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_DWFL_LIB_ERROR,
                            "Error attaching dwfl on pid %d (%s)", us->pid,
                            dwfl_errmsg(-1));
