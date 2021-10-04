@@ -255,7 +255,7 @@ void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm, int pos) {
 
 void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int pos) {
   (void)ctx;
-  LG_DBG("<%d>(FORK)%d -> %d", pos, frk->ppid, frk->pid);
+  LG_DBG("<%d>(FORK)%d -> %d/%d", pos, frk->ppid, frk->pid, frk->tid);
   if (frk->ppid != frk->pid) {
     // Clear everything and populate at next error or with coming samples
     ctx->worker_ctx.us->dso_hdr->pid_free(frk->pid);
@@ -263,10 +263,20 @@ void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int pos) {
 }
 
 void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int pos) {
+  // On Linux, it seems that the thread group leader is the one whose task ID
+  // matches the process ID of the group.  Moreover, it seems that it is the
+  // overwhelming convention that this thread is closed after the other threads
+  // (upheld by both pthreads and runtimes).
+  // This could still cause problems if the ringubffer is processing samples for
+  // other threads in other ringbuffers after having processed the close of the
+  // thread leader locally.
   (void)ctx;
-  LG_DBG("<%d>(EXIT)%d", pos, ext->pid);
-  // Although pid dies, we do not know how many threads remain alive on this pid
-  // (backpopulation will repopulate and fix things if needed)
+  if (ext->pid == ext->tid) {
+    ctx->worker_ctx.us->dso_hdr->pid_free(ext->pid);
+    LG_DBG("<%d>(EXIT)%d", pos, ext->pid);
+  } else {
+    LG_DBG("<%d>(EXIT)%d/%d", pos, ext->pid, ext->tid);
+  }
 }
 
 /****************************** other functions *******************************/

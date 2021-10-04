@@ -15,6 +15,12 @@
 #include "logger.h"
 #include "user_override.h"
 
+// All values coming off of perf_event_open() structs are 8-byte aligned, but
+// evidently the interface doesn't pad variable-length members, so realignment
+// is needed
+#define PERF_ALIGNMENT (0x8 - 1)
+#define PERF_ALIGN(x) (((x) + PERF_ALIGNMENT) &~PERF_ALIGNMENT)
+
 #define DEFAULT_PAGE_SIZE 4096 // Concerned about hugepages?
 
 #define DEFAULT_BUFF_SIZE_SHIFT 6
@@ -30,6 +36,8 @@ struct perf_event_attr g_dd_native_attr = {
     .inherit = 1,
     .inherit_stat = 0,
     .mmap = 0, // keep track of executable mappings
+    .mmap_data = 0, // keep track of other mappings
+    .sample_id_all = 0,
     .task = 0, // Follow fork/stop events
     .comm = 0, // Follow exec()
     .enable_on_exec = 1,
@@ -71,6 +79,7 @@ int perfopen(pid_t pid, const PerfOption *opt, int cpu, bool extras) {
   // Extras
   if (extras) {
     attr.mmap = 1;
+    attr.mmap_data = 1;
     attr.task = 1;
     attr.comm = 1;
   }
@@ -187,26 +196,25 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
     sample.period = *buf++;
   }
   if (PERF_SAMPLE_READ & DEFAULT_SAMPLE_TYPE) {
-    // sizeof(uint64_t) == sizeof(ptr)
     sample.v = (struct read_format *)buf++;
   }
   if (PERF_SAMPLE_CALLCHAIN & DEFAULT_SAMPLE_TYPE) {
     sample.nr = *buf++;
     sample.ips = buf;
-    buf += sample.nr;
+    buf += PERF_ALIGN(sample.nr);
   }
   if (PERF_SAMPLE_RAW & DEFAULT_SAMPLE_TYPE) {}
   if (PERF_SAMPLE_BRANCH_STACK & DEFAULT_SAMPLE_TYPE) {}
   if (PERF_SAMPLE_REGS_USER & DEFAULT_SAMPLE_TYPE) {
     sample.abi = *buf++;
     sample.regs = buf;
-    buf += PERF_REGS_COUNT;
+    buf += PERF_ALIGN(PERF_REGS_COUNT);
   }
   if (PERF_SAMPLE_STACK_USER & DEFAULT_SAMPLE_TYPE) {
     sample.size_stack = *buf++;
     if (sample.size_stack) {
       sample.data_stack = (char *)buf;
-      buf = (uint64_t *)(sample.data_stack + sample.size_stack);
+      buf += PERF_ALIGN(sample.size_stack);
 
       // If the size was specified, we also have a dyn_size
       sample.size_stack = *buf++;
