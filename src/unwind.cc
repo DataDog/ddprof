@@ -264,6 +264,7 @@ DDRes unwind_init(struct UnwindState *us) {
   DDRES_CHECK_FWD(unwind_symbols_hdr_init(&(us->symbols_hdr)));
   DDRES_CHECK_FWD(libdso_init(&us->dso_hdr));
   elf_version(EV_CURRENT);
+  DDRES_CHECK_FWD(unwind_dwfl_begin(us));
   return ddres_init();
 }
 
@@ -276,9 +277,6 @@ void unwind_free(struct UnwindState *us) {
 
 DDRes unwindstate__unwind(struct UnwindState *us) {
   DDRes res;
-  // Initiate a new dwfl context
-  DDRES_CHECK_FWD(unwind_dwfl_begin(us));
-
   // Update modules at the top
   Dwfl_Module *mod = update_mod(us->dso_hdr, us->dwfl, us->pid, us->eip);
   if (mod != NULL) {
@@ -312,9 +310,6 @@ DDRes unwindstate__unwind(struct UnwindState *us) {
                                       find_res.first->_type);
     }
   }
-
-  // We're done here, close down the dwfl context
-  unwind_dwfl_end(us);
   return res;
 }
 
