@@ -152,6 +152,7 @@ static DsoMod update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, uint64_t pc) {
   // Try again if either of the criteria above were false
   if (!dso_mod_res._dwfl_mod) {
     const char *dso_filepath = dso._filename.c_str();
+    LG_DBG("Invalid mod (%s), PID %d (%s)", dso_filepath, pid, dwfl_errmsg(-1));
     if (dso._type == ddprof::dso::kStandard) {
       const char *dso_name = strrchr(dso_filepath, '/') + 1;
       dso_mod_res._dwfl_mod = dwfl_report_elf(dwfl, dso_name, dso_filepath, -1,
@@ -188,7 +189,7 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
   Dwfl_Module *mod = dso_mod._dwfl_mod;
 
   if (!mod) {
-    LG_DBG("Unable to retrieve the Dwfl_Module");
+    LG_DBG("Unable to retrieve the Dwfl_Module: %s", dwfl_errmsg(-1));
     ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
     return DWARF_CB_ABORT;
   }
@@ -267,9 +268,10 @@ static DDRes unwind_attach(struct UnwindState *us) {
   if (us->attached) {
     return ddres_init();
   }
-  if (dwfl_attach_state(us->dwfl, NULL, us->pid, &dwfl_callbacks, us)) {
+  if (!dwfl_attach_state(us->dwfl, NULL, us->pid, &dwfl_callbacks, us)) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_DWFL_LIB_ERROR,
-                           "[UNWIND] Error while calling dwfl_attach_state");
+                           "Error attaching dwfl on pid %d (%s)", us->pid,
+                           dwfl_errmsg(-1));
   }
   us->attached = true;
   return ddres_init();
