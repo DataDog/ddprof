@@ -9,6 +9,7 @@ enum DsoType {
   kStack,
   kHeap,
   kUndef,
+  kAnon,
   kNbDsoTypes
 };
 
@@ -16,21 +17,23 @@ enum DsoType {
 static inline const char *dso_type_str(DsoType path_type) {
   switch (path_type) {
   case kStandard:
-    return "kStandard";
+    return "Standard";
   case kVdso:
-    return "kVdso";
+    return "Vdso";
   case kVsysCall:
-    return "kVsysCall";
+    return "VsysCall";
   case kStack:
-    return "kStack";
+    return "Stack";
   case kHeap:
-    return "kHeap";
+    return "Heap";
   case kUndef:
-    return "kUndef";
+    return "Undefined";
+  case kAnon:
+    return "Anonymous";
   default:
-    return "unhandled";
+    break;
   }
-  return "unhandled";
+  return "Unhandled";
 }
 } // namespace dso
 

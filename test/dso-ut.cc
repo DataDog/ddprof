@@ -55,7 +55,7 @@ void fill_mock_dsoset(DsoSet &set) {
   insert_res = set.insert(build_dso_10_1500());
   EXPECT_TRUE(insert_res.second);
   // empty --> undef
-  EXPECT_TRUE(insert_res.first->_type == dso::kUndef);
+  EXPECT_TRUE(insert_res.first->_type == dso::kAnon);
 }
 
 void fill_mock_hdr(DsoHdr &dso_hdr) { fill_mock_dsoset(dso_hdr._set); }

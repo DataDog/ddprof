@@ -156,13 +156,14 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   DDRes res = unwindstate__unwind(us);
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
-  if (IsDDResOK(res)) {
-    // in lib mode we don't aggregate (protect to avoid link failures)
+  if (!IsDDResFatal(res)) {
 #ifndef DDPROF_NATIVE_LIB
+    // in lib mode we don't aggregate (protect to avoid link failures)
     DDProfPProf *pprof = ctx->worker_ctx.pprof;
     DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbols_hdr,
                                     sample->period, pos, pprof));
 #else
+    // Call the user's stack handler
     if (ctx->stack_handler) {
       if (!ctx->stack_handler->apply(&us->output, ctx,
                                      ctx->stack_handler->callback_ctx, pos)) {

@@ -36,8 +36,9 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
     _type = dso::kHeap;
     // Safeguard against other types of files we would not handle
   } else if (_filename.empty() ||
-             _filename.substr(0, s_anon_str.length()) == s_anon_str ||
-             _filename[0] == '[') {
+             _filename.substr(0, s_anon_str.length()) == s_anon_str) {
+    _type = dso::kAnon;
+  } else if (_filename[0] == '[') {
     _type = dso::kUndef;
   }
 }
