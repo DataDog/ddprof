@@ -44,7 +44,7 @@ static pid_t launch_test_prog(void) {
   }
 }
 
-void capture_ipinfo(DDProfContext *ctx, IPInfoMap *ip_info_map) {
+void capture_symbol(DDProfContext *ctx, SymbolMap *ip_info_map) {
   const StackHandler stack_handler = {
       .apply = stack_addtomap,
       .callback_ctx = reinterpret_cast<void *>(ip_info_map)};
@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
   std::string str_pid = std::to_string(pid_test_prog);
   const char *argv_override[] = {MYNAME,    "--pid",     str_pid.c_str(),
                                  "--event", "sCPU,1000", (char *)NULL};
-  IPInfoMap ip_info_map;
+  SymbolMap ip_info_map;
 
   // size - 1 as we add a null char at the end
   if (IsDDResNotOK(ddprof_input_parse(SZ_STATIC_ARRAY(argv_override) - 1,
@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
     goto CLEANUP;
   }
   // Launch profiling
-  capture_ipinfo(&ctx, &ip_info_map);
+  capture_symbol(&ctx, &ip_info_map);
 
   // Compare to reference stored in json file
   ret = compare_to_ref(k_test_executable, ip_info_map, data_directory);
@@ -114,12 +114,12 @@ bool stack_addtomap(const UnwindOutput *unwind_output, const DDProfContext *ctx,
                     void *callback_ctx, int perf_option_pos) {
   // if it is not 0, things are strange
   assert(callback_ctx);
-  suw::IPInfoMap *ip_info_map =
-      reinterpret_cast<suw::IPInfoMap *>(callback_ctx);
+  suw::SymbolMap *ip_info_map =
+      reinterpret_cast<suw::SymbolMap *>(callback_ctx);
   assert(perf_option_pos == 0);
   for (unsigned i = 0; i < unwind_output->nb_locs; ++i) {
-    const ddprof::IPInfo &ip_info = ddprof::get_ipinfo(ctx, unwind_output, i);
-    suw::IPInfoKey key(ip_info);
+    const ddprof::Symbol &ip_info = ddprof::get_symbol(ctx, unwind_output, i);
+    suw::DwflSymbolKey key(ip_info);
     (*ip_info_map)[key] = ip_info;
   }
   return true;

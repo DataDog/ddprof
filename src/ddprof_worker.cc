@@ -9,16 +9,18 @@ extern "C" {
 
 #include "ddprof_context.h"
 #include "ddprof_stats.h"
-#include "dso.h"
 #include "logger.h"
 #include "perf.h"
 #include "pevent_lib.h"
 #include "pprof/ddprof_pprof.h"
+#include "procutils.h"
 #include "stack_handler.h"
 #include "unwind.h"
+#include "unwind_state.h"
 }
 
-#include "dso.hpp"
+#include "dso_hdr.hpp"
+#include "dwfl_hdr.hpp"
 #include "exporter/ddprof_exporter.h"
 #include "tags.hpp"
 
@@ -249,7 +251,7 @@ void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm, int pos) {
   // Change in process name (assuming exec) : clear all associated dso
   if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC) {
     LG_DBG("<%d>(COMM)%d -> %s", pos, comm->pid, comm->comm);
-    ctx->worker_ctx.us->dso_hdr->pid_free(comm->pid);
+    unwind_pid_free(ctx->worker_ctx.us, comm->pid);
   }
 }
 
@@ -258,7 +260,7 @@ void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int pos) {
   LG_DBG("<%d>(FORK)%d -> %d", pos, frk->ppid, frk->pid);
   if (frk->ppid != frk->pid) {
     // Clear everything and populate at next error or with coming samples
-    ctx->worker_ctx.us->dso_hdr->pid_free(frk->pid);
+    unwind_pid_free(ctx->worker_ctx.us, frk->pid);
   }
 }
 
@@ -276,6 +278,9 @@ static DDRes reset_state(DDProfContext *ctx,
     DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW, "[DDPROF] Invalid context in %s",
                            __FUNCTION__);
   }
+
+  // clean up pids that we did not see recently
+  ctx->worker_ctx.us->dwfl_hdr->clear_unvisited();
 
   // Check to see whether we need to clear the whole worker
   // NOTE: we do not reset the counters here, since clearing the worker
@@ -296,16 +301,19 @@ static DDRes reset_state(DDProfContext *ctx,
 /********************************** callbacks *********************************/
 DDRes ddprof_worker_timeout(volatile bool *continue_profiling,
                             DDProfContext *ctx) {
-  int64_t now = now_nanos();
-  if (now > ctx->worker_ctx.send_nanos) {
-    DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now));
-    // reset state defines if we should reboot the worker
-    DDRes res = reset_state(ctx, continue_profiling);
-    // A warning can be returned for a reset and should not be ignored
-    if (IsDDResNotOK(res)) {
-      return res;
+  try {
+    int64_t now = now_nanos();
+    if (now > ctx->worker_ctx.send_nanos) {
+      DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now));
+      // reset state defines if we should reboot the worker
+      DDRes res = reset_state(ctx, continue_profiling);
+      // A warning can be returned for a reset and should not be ignored
+      if (IsDDResNotOK(res)) {
+        return res;
+      }
     }
   }
+  CatchExcept2DDRes();
   return ddres_init();
 }
 
@@ -347,8 +355,9 @@ DDRes ddprof_worker_finish(DDProfContext *ctx) {
 #endif
 
 // Simple wrapper over perf_event_hdr in order to filter by PID in a uniform
-// way.  Whenver PID is a valid concept for the given event type, the interface
-// uniformly presents PID as the element immediately after the header.
+// way.  Whenver PID is a valid concept for the given event type, the
+// interface uniformly presents PID as the element immediately after the
+// header.
 struct perf_event_hdr_wpid : perf_event_header {
   uint32_t pid, tid;
 };
@@ -362,8 +371,7 @@ DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
     switch (hdr->type) {
     /* Cases where the target type has a PID */
     case PERF_RECORD_SAMPLE:
-      if (wpid->pid)
-        DDRES_CHECK_FWD(ddprof_pr_sample(ctx, hdr2samp(hdr), pos));
+      DDRES_CHECK_FWD(ddprof_pr_sample(ctx, hdr2samp(hdr), pos));
       break;
     case PERF_RECORD_MMAP:
       if (wpid->pid)

@@ -92,12 +92,12 @@ DDRes pprof_free_profile(DDProfPProf *pprof) {
   return ddres_init();
 }
 
-static void write_function(const ddprof::IPInfo &ipinfo,
+static void write_function(const ddprof::Symbol &symbol,
                            ddprof_ffi_Function *ffi_func) {
-  ffi_func->name = std_string_2_slice_c_char(ipinfo._demangle_name);
+  ffi_func->name = std_string_2_slice_c_char(symbol._demangle_name);
   // The system name is not use on backend side for now -> leave empty
   ffi_func->system_name = ffi_empty_char_slice();
-  ffi_func->filename = std_string_2_slice_c_char(ipinfo._srcpath);
+  ffi_func->filename = std_string_2_slice_c_char(symbol._srcpath);
   // For now not filed
   ffi_func->start_line = 0;
 }
@@ -113,21 +113,21 @@ static void write_mapping(const ddprof::MapInfo &mapinfo, uint64_t offset,
   ffi_mapping->build_id = UNKNOWN_BUILD_ID;
 }
 
-static void write_location(const FunLoc *loc, const ddprof::IPInfo &ipinfo,
+static void write_location(const FunLoc *loc, const ddprof::Symbol &symbol,
                            const ddprof::MapInfo &mapinfo,
                            const ddprof_ffi_Slice_line *lines,
                            ddprof_ffi_Location *ffi_location) {
-  write_mapping(mapinfo, ipinfo._offset, &ffi_location->mapping);
+  write_mapping(mapinfo, symbol._offset, &ffi_location->mapping);
   ffi_location->address = loc->ip;
   ffi_location->lines = *lines;
   // Folded not handled for now
   ffi_location->is_folded = false;
 }
 
-static void write_line(const ddprof::IPInfo &ipinfo,
+static void write_line(const ddprof::Symbol &symbol,
                        ddprof_ffi_Line *ffi_line) {
-  write_function(ipinfo, &ffi_line->function);
-  ffi_line->line = ipinfo._lineno;
+  write_function(symbol, &ffi_line->function);
+  ffi_line->line = symbol._lineno;
 }
 
 // Assumption of API is that sample is valid in a single type
@@ -135,7 +135,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const UnwindSymbolsHdr *symbols_hdr, uint64_t value,
                       int watcher_idx, DDProfPProf *pprof) {
 
-  const ddprof::IPInfoTable &ipinfo_table = symbols_hdr->_ipinfo_table;
+  const ddprof::SymbolTable &symbol_table = symbols_hdr->_symbol_table;
   const ddprof::MapInfoTable &mapinfo_table = symbols_hdr->_mapinfo_table;
   ddprof_ffi_Profile *profile = pprof->_profile;
 
@@ -145,16 +145,16 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   // Add a value to the watcher we are sampling, leave others zeroed
   values[watcher_idx + 1] = value;
 
-  ddprof_ffi_Location locations_buff[DD_MAX_STACK];
+  ddprof_ffi_Location locations_buff[DD_MAX_STACK_DEPTH];
   // assumption of single line per loc for now
-  ddprof_ffi_Line line_buff[DD_MAX_STACK];
+  ddprof_ffi_Line line_buff[DD_MAX_STACK_DEPTH];
 
   const FunLoc *locs = uw_output->locs;
   for (unsigned i = 0; i < uw_output->nb_locs; ++i) {
     // possibly several lines to handle inlined function (not handled for now)
     ddprof_ffi_Slice_line lines = {.ptr = &line_buff[i], .len = 1};
-    write_line(ipinfo_table[locs[i]._ipinfo_idx], &line_buff[i]);
-    write_location(&locs[i], ipinfo_table[locs[i]._ipinfo_idx],
+    write_line(symbol_table[locs[i]._symbol_idx], &line_buff[i]);
+    write_location(&locs[i], symbol_table[locs[i]._symbol_idx],
                    mapinfo_table[locs[i]._map_info_idx], &lines,
                    &locations_buff[i]);
   }

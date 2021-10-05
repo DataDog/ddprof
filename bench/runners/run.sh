@@ -67,6 +67,7 @@ USE_CALLGRIND="no"
 USE_PERFSTAT="no"
 USE_VALGRIND="no"
 USE_DDPROF="no"
+USE_GDB="no"
 
 while [ $# != 0 ] && [ ${PARAM_FOUND} == 1 ] ; do 
   if [ $# == 0 ] || [ $1 == "-h" ]; then
@@ -136,6 +137,11 @@ while [ $# != 0 ] && [ ${PARAM_FOUND} == 1 ] ; do
     USE_DDPROF="yes"
     continue
   fi
+  if [ $# != 0 ] && [ $1 == "--gdb" ]; then
+    shift
+    USE_GDB="yes"
+    continue
+  fi
 
   # reach here only if we did not find params
   PARAM_FOUND=0
@@ -190,6 +196,12 @@ if [[ "yes" == "${USE_PERFSTAT,,}" ]]; then
   # -x allows for csv format
   PREPEND_CMD="perf stat -x ','"
 fi
+
+if [[ "yes" == "${USE_GDB,,}" ]]; then
+  echo "Gdb does not work. fix me !"
+  exit 1
+fi
+
 
 CMD="${PREPEND_CMD} ${CMD}"
 echo "ddprof cmd:${CMD}"

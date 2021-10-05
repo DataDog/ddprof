@@ -9,22 +9,22 @@
 
 namespace suw {
 
-using IPInfo = ddprof::IPInfo;
+using Symbol = ddprof::Symbol;
 
-void to_json(json &j, const IPInfo &ip_info) {
+void to_json(json &j, const Symbol &ip_info) {
   j = json{{"offset", ip_info._offset},
            {"demangle_name", ip_info._demangle_name}};
 }
 
-void from_json(const json &j, IPInfo &ip_info) {
+void from_json(const json &j, Symbol &ip_info) {
   j.at("offset").get_to(ip_info._offset);
   j.at("demangle_name").get_to(ip_info._demangle_name);
 }
 
-void add_ipinfo(json &j, const IPInfo &ip_info) {
-  json ipinfo_j;
-  to_json(ipinfo_j, ip_info);
-  j.push_back(ipinfo_j);
+void add_symbol(json &j, const Symbol &ip_info) {
+  json symbol_j;
+  to_json(symbol_j, ip_info);
+  j.push_back(symbol_j);
 }
 static void write_json_file(std::string_view exe_name, const json &data,
                             std::string_view data_directory) {
@@ -43,13 +43,13 @@ static void write_json_file(std::string_view exe_name, const json &data,
   file << data.dump(k_indent_spaces);
 }
 
-void write_json_file(std::string_view exe_name, const IPInfoMap &map,
+void write_json_file(std::string_view exe_name, const SymbolMap &map,
                      std::string_view data_directory) {
-  json unique_ipinfo;
+  json unique_symbol;
   for (const auto &info : map) {
-    add_ipinfo(unique_ipinfo, info.second);
+    add_symbol(unique_symbol, info.second);
   }
-  write_json_file(exe_name, unique_ipinfo, data_directory);
+  write_json_file(exe_name, unique_symbol, data_directory);
 }
 
 json parse_json_file(const std::string &filePath) {
@@ -64,7 +64,7 @@ json parse_json_file(const std::string &filePath) {
   return ret;
 }
 
-int compare_to_ref(std::string_view exe_name, const IPInfoMap &map,
+int compare_to_ref(std::string_view exe_name, const SymbolMap &map,
                    std::string_view data_directory) {
   std::string file_path;
   if (data_directory.empty())
@@ -74,11 +74,11 @@ int compare_to_ref(std::string_view exe_name, const IPInfoMap &map,
 
   file_path += "/" + std::string(exe_name) + "_ref" + ".json";
   json ref_json = parse_json_file(file_path);
-  IPInfoMap ref_ip_info_map;
+  SymbolMap ref_ip_info_map;
   for (auto json_el : ref_json) {
-    IPInfo ip_info;
+    Symbol ip_info;
     from_json(json_el, ip_info);
-    IPInfoKey key(ip_info);
+    DwflSymbolKey key(ip_info);
     ref_ip_info_map[key] = ip_info;
   }
   if (ref_ip_info_map.empty()) {

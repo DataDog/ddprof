@@ -171,8 +171,14 @@ test:ddprof:
     - unset DDPROF_PPROFS_FOLDER
     - if [ ${BUILD_TYPE} == "Release" ]; then # record only in release mode
     - native_bench.sh -r -b ${BINDIR}
-    - else
+    - else # still run it to catch sanitizer errors
     - native_bench.sh -b ${BINDIR}
+    - fi
+    # Execute a bench with larger number of forks (using sleep)
+    - if [ ${BUILD_TYPE} == "Release" ]; then # record only in release mode
+    - native_bench.sh -r -b ${BINDIR} -e sleep.sh
+    - else # still run it to catch sanitizer errors
+    - native_bench.sh -b ${BINDIR} -e sleep.sh
     - fi
     # Accuracy check for unwinding (only if it was built)
     - if [ -e  ${BINDIR}/selfuw ]; then

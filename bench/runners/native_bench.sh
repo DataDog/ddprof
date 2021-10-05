@@ -26,11 +26,15 @@ usage() {
 RECORD_STATS="no"
 BUILD_OPT=""
 
-while getopts "b:hr" arg; do
+while getopts "b:e:hr" arg; do
   case $arg in
     b)
       BUILD_OPT="-b ${OPTARG}"
       echo "Use ddprof from : ${OPTARG}"
+      ;;
+    e)
+      TOY_EXE="${OPTARG}"
+      echo "Override TOY_EXE to : ${TOY_EXE}"
       ;;
     h)
       usage
@@ -84,10 +88,9 @@ echo "CPU DIFF : $CPU_PRIME vs $CPU_SECOND "
 echo "WORKLOAD DIFF: $WORKLOAD_PRIME vs $WORKLOAD_SECOND"
 
 if [ ${RECORD_STATS} == "yes" ]; then
-    echo "Recording stats in ${RECORD_FILE}"
-    DATE=$(date)
-    echo "BadBoggleSolver_run, ${DATE}, ${CPU_PRIME}, ${CPU_SECOND}, ${WORKLOAD_PRIME}, ${WORKLOAD_SECOND}" >> ${TOP_LVL_DIR}/test/data/perf_local_results.csv
-
+  echo "Recording stats in ${RECORD_FILE}"
+  DATE=$(date)
+  echo "${TOY_EXE}, ${DATE}, ${CPU_PRIME}, ${CPU_SECOND}, ${WORKLOAD_PRIME}, ${WORKLOAD_SECOND}" >> ${TOP_LVL_DIR}/test/data/perf_local_results.csv
 
   # Record with statsd if socket is available
   TAG_STATS=""
@@ -96,7 +99,13 @@ if [ ${RECORD_STATS} == "yes" ]; then
     # Datadog.profiling is a common namespace to avoid billing customers for metrics, but in the context of this benchmark, it is less important
     # I will keep it nonetheless as a convention
     # These metrics are not part of the standard metrics exported by the profiler (as they result of this bench app)
-    STATS_PREFIX="datadog.profiling.native_bench."
+    if [ ${TOY_EXE} == "BadBoggleSolver_run" ]; then
+      TOY_STAT_NAME="" # avoid breaking current dashboards (until I have the courage to fix things)
+    else 
+      TOY_STAT_NAME=$(echo ${TOY_EXE} | awk -F '.' '{print $1}')
+      TOY_STAT_NAME="${TOY_STAT_NAME}."
+    fi
+    STATS_PREFIX="datadog.profiling.native_bench.${TOY_STAT_NAME}"
     #<TAG_KEY_1>:<TAG_VALUE_1>,<TAG_2>
     if [ ! -z ${CI_BUILD_ID:-""} ]; then
       TAG_STATS="#ci_build_id:${CI_BUILD_ID}"

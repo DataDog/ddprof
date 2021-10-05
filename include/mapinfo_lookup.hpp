@@ -1,8 +1,5 @@
 #pragma once
 
-extern "C" {
-#include "string_view.h"
-}
 #include "ddprof_defs.h"
 #include "mapinfo_table.hpp"
 
@@ -13,10 +10,10 @@ struct Dwfl_Module;
 
 namespace ddprof {
 
-typedef std::unordered_map<DsoUID_t, MapInfoIdx_t> MapInfoLookup;
+typedef std::unordered_map<DsoUID_t, MapInfoIdx_t> DwflMapInfoLookup;
 
-void mapinfo_lookup_get(MapInfoLookup &mapinfo_map, MapInfoTable &mapinfo_table,
-                        const Dwfl_Module *mod, DsoUID_t dso_id,
-                        MapInfoIdx_t *map_info_idx);
+void mapinfo_lookup_get(DwflMapInfoLookup &mapinfo_map,
+                        MapInfoTable &mapinfo_table, const Dwfl_Module *mod,
+                        DsoUID_t dso_id, MapInfoIdx_t *map_info_idx);
 
 } // namespace ddprof

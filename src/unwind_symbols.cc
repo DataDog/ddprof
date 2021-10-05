@@ -5,24 +5,20 @@
 #include <cassert>
 #include <cstdio>
 
-////////////////
-/* C Wrappers */
-////////////////
-
-extern "C" {
-DDRes ipinfo_lookup_get(struct UnwindSymbolsHdr *unwind_symbol_hdr,
-                        struct Dwfl_Module *mod, ElfAddress_t newpc,
-                        DsoUID_t dso_id, IPInfoIdx_t *ipinfo_idx) {
+DDRes dwfl_symbol_get_or_insert(struct UnwindSymbolsHdr *unwind_symbol_hdr,
+                                struct Dwfl_Module *mod, ElfAddress_t newpc,
+                                const ddprof::Dso &dso,
+                                SymbolIdx_t *symbol_idx) {
   try {
-    ddprof::ipinfo_lookup_get(
-        unwind_symbol_hdr->_info_lookup, unwind_symbol_hdr->_stats,
-        unwind_symbol_hdr->_ipinfo_table, mod, newpc, dso_id, ipinfo_idx);
+    ddprof::dwfl_symbol_get_or_insert(
+        unwind_symbol_hdr->_dwfl_info_lookup, unwind_symbol_hdr->_stats,
+        unwind_symbol_hdr->_symbol_table, mod, newpc, dso, symbol_idx);
 
     if (unwind_symbol_hdr->_setting == K_CACHE_VALIDATE) {
-      if (ddprof::ipinfo_lookup_check(
-              mod, newpc, unwind_symbol_hdr->_ipinfo_table[*ipinfo_idx])) {
+      if (ddprof::symbol_lookup_check(
+              mod, newpc, unwind_symbol_hdr->_symbol_table[*symbol_idx])) {
         ++(unwind_symbol_hdr->_stats._errors);
-        LG_WRN("Error from ddprof::ipinfo_lookup_check (hit nb %d)",
+        LG_WRN("Error from ddprof::symbol_lookup_check (hit nb %d)",
                unwind_symbol_hdr->_stats._hit);
         return ddres_error(DD_WHAT_UW_CACHE_ERROR);
       }
@@ -31,6 +27,11 @@ DDRes ipinfo_lookup_get(struct UnwindSymbolsHdr *unwind_symbol_hdr,
   CatchExcept2DDRes();
   return ddres_init();
 }
+
+////////////////
+/* C Wrappers */
+////////////////
+extern "C" {
 
 DDRes unwind_symbols_hdr_init(struct UnwindSymbolsHdr **unwind_symbol_hdr) {
   try {

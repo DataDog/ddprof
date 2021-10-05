@@ -1,41 +1,14 @@
 #pragma once
 
-#include <dwarf.h>
-#include <stdbool.h>
-
-#include "ddres_def.h"
-#include "dwfl_internals.h"
-#include "procutils.h"
 #include "unwind_metrics.h"
-#include "unwind_output.h"
 
-typedef struct UnwindSymbolsHdr UnwindSymbolsHdr;
-typedef struct DsoHdr DsoHdr;
+#include <sys/types.h>
 
-typedef struct UnwindState {
-  Dwfl *dwfl;
-  DsoHdr *dso_hdr;
-  struct UnwindSymbolsHdr *symbols_hdr;
-  pid_t pid;
-  char *stack;
-  size_t stack_sz;
-  union {
-    uint64_t regs[3];
-    struct {
-      uint64_t ebp; // base address of the function's frame
-      uint64_t esp; // top of the stack
-      uint64_t eip; // Extended Instruction Pointer
-    };
-  };
-  bool attached;
-  UnwindOutput output;
-} UnwindState;
-
-pid_t next_thread(Dwfl *, void *, void **);
-bool set_initial_registers(Dwfl_Thread *, void *);
-int frame_cb(Dwfl_Frame *, void *);
-int tid_cb(Dwfl_Thread *, void *);
 DDRes unwind_init(struct UnwindState *);
 void unwind_free(struct UnwindState *);
 DDRes unwindstate__unwind(struct UnwindState *us);
-void analyze_unwinding_error(pid_t, uint64_t);
+
+void unwind_cycle(struct UnwindState *us);
+
+// Clear unwinding structures of this pid
+void unwind_pid_free(struct UnwindState *us, pid_t pid);

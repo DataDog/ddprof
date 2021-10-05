@@ -5,8 +5,9 @@ extern "C" {
 }
 
 #include "ddprof_defs.h"
+#include "dso.hpp"
 #include "hash_helper.hpp"
-#include "ipinfo_table.hpp"
+#include "symbol_table.hpp"
 
 #include <unordered_map>
 
@@ -15,10 +16,10 @@ struct Dwfl_Module;
 namespace ddprof {
 
 // Key
-typedef struct IPInfoKey {
-  IPInfoKey(const Dwfl_Module *mod, ElfAddress_t newpc, DsoUID_t dso_id);
+typedef struct DwflSymbolKey {
+  DwflSymbolKey(const Dwfl_Module *mod, ElfAddress_t newpc, DsoUID_t dso_id);
 
-  bool operator==(const IPInfoKey &other) const {
+  bool operator==(const DwflSymbolKey &other) const {
     return (_low_addr == other._low_addr && _newpc == other._newpc);
   }
 
@@ -27,15 +28,15 @@ typedef struct IPInfoKey {
   ElfAddress_t _newpc;
   // Addresses are valid in the context of a pid
   DsoUID_t _dso_id;
-} IPInfoKey;
+} DwflSymbolKey;
 
 } // namespace ddprof
 
 // Define a custom hash func for this key :
 // - needs to be in std namespace to be automatically picked up by std container
 namespace std {
-template <> struct hash<ddprof::IPInfoKey> {
-  std::size_t operator()(const ddprof::IPInfoKey &k) const {
+template <> struct hash<ddprof::DwflSymbolKey> {
+  std::size_t operator()(const ddprof::DwflSymbolKey &k) const {
     // Combine hashes of standard types
     std::size_t hash_val = ddprof::hash_combine(
         hash<ElfAddress_t>()(k._low_addr), hash<ElfAddress_t>()(k._newpc));
@@ -46,10 +47,10 @@ template <> struct hash<ddprof::IPInfoKey> {
 } // namespace std
 
 namespace ddprof {
-typedef std::unordered_map<IPInfoKey, IPInfoIdx_t> IPInfoLookup;
+typedef std::unordered_map<DwflSymbolKey, SymbolIdx_t> DwflSymbolLookup;
 
-struct IPInfoLookupStats {
-  IPInfoLookupStats() : _hit(0), _calls(0), _errors(0) {}
+struct DwflSymbolLookupStats {
+  DwflSymbolLookupStats() : _hit(0), _calls(0), _errors(0) {}
   void reset();
   void display();
   int _hit;
@@ -58,11 +59,12 @@ struct IPInfoLookupStats {
 };
 
 ///// PUBLIC FUNCTIONS /////
-void ipinfo_lookup_get(IPInfoLookup &info_cache, IPInfoLookupStats &stats,
-                       IPInfoTable &table, Dwfl_Module *mod, ElfAddress_t newpc,
-                       DsoUID_t dso_id, IPInfoIdx_t *ipinfo_idx);
+void dwfl_symbol_get_or_insert(DwflSymbolLookup &dwfl_symbol_lookup,
+                               DwflSymbolLookupStats &stats, SymbolTable &table,
+                               Dwfl_Module *mod, ElfAddress_t newpc,
+                               const Dso &dso, SymbolIdx_t *symbol_idx);
 
-bool ipinfo_lookup_check(struct Dwfl_Module *mod, ElfAddress_t newpc,
-                         const IPInfo &info);
+bool symbol_lookup_check(struct Dwfl_Module *mod, ElfAddress_t newpc,
+                         const Symbol &info);
 
 } // namespace ddprof

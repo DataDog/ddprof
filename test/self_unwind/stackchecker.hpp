@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ipinfo_table.hpp"
+#include "symbol_table.hpp"
 #include <nlohmann/json.hpp>
 #include <set>
 #include <string>
@@ -17,23 +17,23 @@ static inline std::size_t hash_combine(std::size_t lhs, std::size_t rhs) {
 
 // #define CONSIDER_OFFSET
 #ifdef CONSIDER_OFFSET
-struct IPInfoKey {
-  explicit IPInfoKey(const ddprof::IPInfo &ipinfo)
-      : _demangle_name(ipinfo._demangle_name), _offset(ipinfo._offset) {}
+struct DwflSymbolKey {
+  explicit DwflSymbolKey(const ddprof::Symbol &symbol)
+      : _demangle_name(symbol._demangle_name), _offset(symbol._offset) {}
   std::string _demangle_name;
   Offset_t _offset;
-  bool operator==(const IPInfoKey &other) const {
+  bool operator==(const DwflSymbolKey &other) const {
     return (_demangle_name == other._demangle_name && _offset == other._offset);
   }
 };
 #else
 // Only consider demangled name for now
-struct IPInfoKey {
-  explicit IPInfoKey(const ddprof::IPInfo &ipinfo)
-      : _demangle_name(ipinfo._demangle_name) {}
+struct DwflSymbolKey {
+  explicit DwflSymbolKey(const ddprof::Symbol &symbol)
+      : _demangle_name(symbol._demangle_name) {}
   std::string _demangle_name;
 
-  bool operator==(const IPInfoKey &other) const {
+  bool operator==(const DwflSymbolKey &other) const {
     return (_demangle_name == other._demangle_name);
   }
 };
@@ -43,8 +43,8 @@ struct IPInfoKey {
 
 namespace std {
 #ifdef CONSIDER_OFFSET
-template <> struct hash<suw::IPInfoKey> {
-  std::size_t operator()(const suw::IPInfoKey &k) const {
+template <> struct hash<suw::DwflSymbolKey> {
+  std::size_t operator()(const suw::DwflSymbolKey &k) const {
     // Combine hashes of standard types
     std::size_t hash_val = suw::hash_combine(
         hash<std::string>()(k._demangle_name), hash<Offset_t>()(k._offset));
@@ -52,8 +52,8 @@ template <> struct hash<suw::IPInfoKey> {
   }
 };
 #else
-template <> struct hash<suw::IPInfoKey> {
-  std::size_t operator()(const suw::IPInfoKey &k) const {
+template <> struct hash<suw::DwflSymbolKey> {
+  std::size_t operator()(const suw::DwflSymbolKey &k) const {
     return hash<std::string>()(k._demangle_name);
   }
 };
@@ -65,15 +65,15 @@ namespace suw {
 
 using json = nlohmann::json;
 
-using IPInfoMap = std::unordered_map<suw::IPInfoKey, ddprof::IPInfo>;
+using SymbolMap = std::unordered_map<suw::DwflSymbolKey, ddprof::Symbol>;
 
 // Append ip info to a json file
-void add_ipinfo(json &j, const ddprof::IPInfo &ip_info);
+void add_symbol(json &j, const ddprof::Symbol &ip_info);
 
-void write_json_file(std::string_view exe_name, const IPInfoMap &map,
+void write_json_file(std::string_view exe_name, const SymbolMap &map,
                      std::string_view data_directory = "");
 
-int compare_to_ref(std::string_view exe_name, const IPInfoMap &map,
+int compare_to_ref(std::string_view exe_name, const SymbolMap &map,
                    std::string_view data_directory = "");
 
 } // namespace suw

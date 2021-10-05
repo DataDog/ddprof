@@ -3,12 +3,12 @@
 extern "C" {
 #include "unwind_output.h"
 }
-#include "ipinfo_table.hpp"
 #include "mapinfo_table.hpp"
+#include "symbol_table.hpp"
 
 typedef struct DDProfContext DDProfContext;
 namespace ddprof {
-const ddprof::IPInfo &get_ipinfo(const DDProfContext *ctx,
+const ddprof::Symbol &get_symbol(const DDProfContext *ctx,
                                  const UnwindOutput *unwind_output,
                                  unsigned loc_idx);
 

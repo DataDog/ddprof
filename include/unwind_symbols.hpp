@@ -2,7 +2,11 @@
 
 #include "unwind_symbols.h"
 
-#include "ipinfo_lookup.hpp"
+#include "common_symbol_lookup.hpp"
+#include "dso_symbol_lookup.hpp"
+#include "dwfl_symbol_lookup.hpp"
+
+#include "common_mapinfo_lookup.hpp"
 #include "mapinfo_lookup.hpp"
 
 extern "C" {
@@ -15,14 +19,18 @@ extern "C" {
 struct UnwindSymbolsHdr {
   UnwindSymbolsHdr();
   void display_stats() { _stats.display(); }
-  ddprof::IPInfoLookup _info_lookup;
-  ddprof::IPInfoTable _ipinfo_table;
 
-  ddprof::MapInfoLookup _mapinfo_lookup;
+  ddprof::DsoSymbolLookup _dso_symbol_lookup;
+  ddprof::CommonSymbolLookup _common_symbol_lookup;
+  ddprof::DwflSymbolLookup _dwfl_info_lookup;
+  ddprof::SymbolTable _symbol_table;
+
+  ddprof::CommonMapInfoLookup _common_mapinfo_lookup;
+  ddprof::DwflMapInfoLookup _dwfl_mapinfo_lookup;
   ddprof::MapInfoTable _mapinfo_table;
 
-  struct ddprof::IPInfoLookupStats _stats;
-  ipinfo_lookup_setting _setting;
+  struct ddprof::DwflSymbolLookupStats _stats;
+  symbol_lookup_setting _setting;
 };
 
 inline UnwindSymbolsHdr::UnwindSymbolsHdr() : _setting(K_CACHE_ON) {
@@ -34,3 +42,11 @@ inline UnwindSymbolsHdr::UnwindSymbolsHdr() : _setting(K_CACHE_ON) {
     }
   }
 }
+
+// Takes a dwarf module and an instruction pointer
+// Lookup if this instruction pointer was already encountered. If not, create a
+// new element in the table
+DDRes dwfl_symbol_get_or_insert(struct UnwindSymbolsHdr *unwind_symbol_hdr,
+                                struct Dwfl_Module *mod, ElfAddress_t newpc,
+                                const ddprof::Dso &dso,
+                                SymbolIdx_t *symbol_idx);

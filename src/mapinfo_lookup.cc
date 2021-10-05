@@ -9,9 +9,9 @@ extern "C" {
 
 namespace ddprof {
 
-void mapinfo_lookup_get(MapInfoLookup &mapinfo_map, MapInfoTable &mapinfo_table,
-                        const Dwfl_Module *mod, DsoUID_t dso_id,
-                        MapInfoIdx_t *map_info_idx) {
+void mapinfo_lookup_get(DwflMapInfoLookup &mapinfo_map,
+                        MapInfoTable &mapinfo_table, const Dwfl_Module *mod,
+                        DsoUID_t dso_id, MapInfoIdx_t *map_info_idx) {
 
   auto const it = mapinfo_map.find(dso_id);
   if (it != mapinfo_map.end()) {

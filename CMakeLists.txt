@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.19)
 
  project(DDProf
   LANGUAGES C CXX
-  VERSION 0.6.3
+  VERSION 0.6.4
   DESCRIPTION "Datadog's native profiler"
 )
 
@@ -245,7 +245,7 @@ option(BUILD_NATIVE_LIB "Build a library out of the native profiler" OFF)
    list(APPEND NATIVE_LIB_INCLUDE_LIST ${LIBCAP_INCLUDE_DIR})
 
    ## Headers we publish
-   set(LIB_HEADERS include/ddprof.h include/ddprof_input.h include/lib/ddprof_output.hpp include/ipinfo_table.hpp include/mapinfo_table.hpp include/ddres.h include/ddres_def.h include/ddres_list.h include/ddres_helpers.h include/ddres_exception.hpp)
+   set(LIB_HEADERS include/ddprof.h include/ddprof_input.h include/lib/ddprof_output.hpp include/symbol_table.hpp include/mapinfo_table.hpp include/ddres.h include/ddres_def.h include/ddres_list.h include/ddres_helpers.h include/ddres_exception.hpp)
    set_target_properties(ddprof-native PROPERTIES PUBLIC_HEADER "${LIB_HEADERS}")
 
    target_include_directories(ddprof-native PRIVATE ${NATIVE_LIB_INCLUDE_LIST})

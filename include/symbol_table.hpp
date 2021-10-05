@@ -1,24 +1,20 @@
-
 #pragma once
 
-extern "C" {
-#include "string_view.h"
-}
 #include "ddprof_defs.h"
 
 #include <string>
 #include <vector>
 
-// IPInfo
-
+// Symbol
+// Information relating to a given location
 namespace ddprof {
 // Value stored in the cache
-class IPInfo {
+class Symbol {
 public:
-  IPInfo() : _offset(0), _lineno(0) {}
+  Symbol() : _offset(0), _lineno(0) {}
 
   // Warning : Generates some string copies (these are not rvalues)
-  IPInfo(Offset_t offset, std::string symname, std::string demangle_name,
+  Symbol(Offset_t offset, std::string symname, std::string demangle_name,
          uint32_t lineno, std::string srcpath)
       : _offset(0), _symname(std::move(symname)),
         _demangle_name(std::move(demangle_name)), _lineno(lineno),
@@ -36,6 +32,6 @@ public:
   std::string _srcpath;
 };
 
-typedef std::vector<IPInfo> IPInfoTable;
+typedef std::vector<Symbol> SymbolTable;
 
 } // namespace ddprof

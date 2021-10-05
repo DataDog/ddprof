@@ -93,7 +93,7 @@ TEST(DDProfExporter, simple) {
   { // Aggregate pprofs
     UnwindSymbolsHdr symbols_hdr;
     UnwindOutput mock_output;
-    IPInfoTable &table = symbols_hdr._ipinfo_table;
+    SymbolTable &table = symbols_hdr._symbol_table;
     MapInfoTable &mapinfo_table = symbols_hdr._mapinfo_table;
 
     fill_unwind_symbols(table, mapinfo_table, mock_output);
