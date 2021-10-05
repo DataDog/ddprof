@@ -18,8 +18,8 @@
 // All values coming off of perf_event_open() structs are 8-byte aligned, but
 // evidently the interface doesn't pad variable-length members, so realignment
 // is needed
-#define PERF_ALIGNMENT (0x8 - 1)
-#define PERF_ALIGN(x) (((x) + PERF_ALIGNMENT) &~PERF_ALIGNMENT)
+#define PERF_ALIGNMENT 0x08ul
+#define PERF_ALIGN(x) (((x) + PERF_ALIGNMENT)&~((uint64_t)(PERF_ALIGNMENT - 1)))
 
 #define DEFAULT_PAGE_SIZE 4096 // Concerned about hugepages?
 
@@ -201,20 +201,20 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
   if (PERF_SAMPLE_CALLCHAIN & DEFAULT_SAMPLE_TYPE) {
     sample.nr = *buf++;
     sample.ips = buf;
-    buf += PERF_ALIGN(sample.nr);
+    buf += sample.nr;
   }
   if (PERF_SAMPLE_RAW & DEFAULT_SAMPLE_TYPE) {}
   if (PERF_SAMPLE_BRANCH_STACK & DEFAULT_SAMPLE_TYPE) {}
   if (PERF_SAMPLE_REGS_USER & DEFAULT_SAMPLE_TYPE) {
     sample.abi = *buf++;
     sample.regs = buf;
-    buf += PERF_ALIGN(PERF_REGS_COUNT);
+    buf += PERF_REGS_COUNT;
   }
   if (PERF_SAMPLE_STACK_USER & DEFAULT_SAMPLE_TYPE) {
     sample.size_stack = *buf++;
     if (sample.size_stack) {
       sample.data_stack = (char *)buf;
-      buf += PERF_ALIGN(sample.size_stack);
+      buf = (uint64_t *)(sample.data_stack + sample.size_stack);
 
       // If the size was specified, we also have a dyn_size
       sample.size_stack = *buf++;
