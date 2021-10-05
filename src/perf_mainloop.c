@@ -89,6 +89,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   // Worker poll loop
   while (1) {
     int n = poll(pfd, pfd_len, PSAMPLE_DEFAULT_WAKEUP);
+    bool sample_hit = false;
 
     // If there was an issue, return and let the caller check errno
     if (-1 == n && errno == EINTR) {
@@ -98,25 +99,12 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       DDRES_CHECK_OR_SHUTDOWN(ddres_error(DD_WHAT_POLLERROR));
     }
 
-    // If no file descriptors, call time-out
-    if (0 == n) {
-      DDRes res = ddprof_worker_timeout(continue_profiling, ctx);
-      if (IsDDResNotOK(res)) {
-        attr->finish_fun(ctx);
-        DDRES_CHECK_OR_SHUTDOWN(res);
-      }
-      continue;
-    }
-
     int pe_len = ctx->worker_ctx.pevent_hdr.size;
     PEvent *pes = ctx->worker_ctx.pevent_hdr.pes;
 
     // If we're here, we have at least one file descriptor active.  That means
     // the underyling ringbuffers can be checked.
     for (int i = 0; i < pe_len; i++) {
-      if (!pfd[i].revents)
-        continue;
-
       // Even though pollhup might mean that multiple file descriptors (hence,
       // ringbuffers) are still active, in the typical case, `perf_event_open`
       // shuts down either all or nothing.  Accordingly, when it shuts down one
@@ -144,6 +132,8 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
           // single contiguous object or update the hdr2sample code to account
           // for wrapping, but for now skip it.
         } else {
+          if (hdr->type == PERF_RECORD_SAMPLE)
+            sample_hit == true;
           DDRes res = ddprof_worker(hdr, pes[i].pos, continue_profiling, ctx);
           if (IsDDResNotOK(res)) {
             // ignoring possible errors from finish as we are closing
@@ -161,6 +151,16 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
 
       if (head != tail)
         LG_WRN("Head/tail buffer mismatch");
+    }
+
+    // If I didn't process any events, then hit the timeout
+    if (sample_hit) {
+      DDRes res = ddprof_worker_timeout(continue_profiling, ctx);
+      if (IsDDResNotOK(res)) {
+        attr->finish_fun(ctx);
+        DDRES_CHECK_OR_SHUTDOWN(res);
+      }
+      continue;
     }
   }
 }
