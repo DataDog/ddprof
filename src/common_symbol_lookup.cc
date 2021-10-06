@@ -5,7 +5,7 @@ namespace ddprof {
 Symbol symbol_from_common(CommonSymbolLookup::LookupCases lookup_case) {
   switch (lookup_case) {
   case CommonSymbolLookup::LookupCases::pid_0:
-    return Symbol(0, std::string(), std::string("[pid_0]"), 0, std::string());
+    return Symbol(0, std::string(), std::string(), 0, std::string("pid_0"));
   case CommonSymbolLookup::LookupCases::truncated_stack:
     return Symbol(0, std::string(), std::string("[truncated]"), 0,
                   std::string());

@@ -112,6 +112,14 @@ using ddprof::DsoStats;
 /**********/
 /* DsoHdr */
 /**********/
+DsoFindRes DsoHdr::dso_find_first(pid_t pid) {
+  Dso temp_dso(pid, 0, 0);
+  DsoSetConstIt it = _set.lower_bound(temp_dso);
+  if (it == _set.end() || it->_pid != pid) {
+    return find_res_not_found();
+  }
+  return std::make_pair<ddprof::DsoSetConstIt, bool>(std::move(it), true);
+}
 
 // Find the closest and indicate if we found a dso matching this address
 DsoFindRes DsoHdr::dso_find_closest(pid_t pid, ElfAddress_t addr) {
@@ -121,8 +129,7 @@ DsoFindRes DsoHdr::dso_find_closest(pid_t pid, ElfAddress_t addr) {
   // First element not less than (can match a start addr)
   DsoSetConstIt it = _set.lower_bound(temp_dso);
   if (it == _set.end()) {
-    return std::make_pair<ddprof::DsoSetConstIt, bool>(std::move(it),
-                                                       std::move(is_within));
+    return find_res_not_found();
   }
   is_within = it->is_within(pid, addr);
   // go back one element to check if we find it

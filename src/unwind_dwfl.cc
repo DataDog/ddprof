@@ -57,25 +57,6 @@ bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
   return dwfl_thread_state_registers(thread, 0, 17, regs);
 }
 
-static void add_dso_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc) {
-  UnwindOutput *output = &us->output;
-  int64_t current_idx = output->nb_locs;
-  output->locs[current_idx]._symbol_idx =
-      us->symbols_hdr->_dso_symbol_lookup.get_or_insert(
-          pc, dso, us->symbols_hdr->_symbol_table);
-
-  output->locs[current_idx].ip = 0;
-
-  // todo : although we could add mapping, it is not really used
-  // just add an empty element for mapping info
-  output->locs[current_idx]._map_info_idx =
-      us->symbols_hdr->_common_mapinfo_lookup.get_or_insert(
-          CommonMapInfoLookup::LookupCases::empty,
-          us->symbols_hdr->_mapinfo_table);
-
-  output->nb_locs++;
-}
-
 static DDRes add_dwfl_frame(UnwindState *us, DsoMod dso_mod, ElfAddress_t pc) {
   Dwfl_Module *mod = dso_mod._dwfl_mod;
   // if we are here, we can assume we found a dso
@@ -334,6 +315,7 @@ DDRes unwind_dwfl(UnwindState *us) {
       add_dso_frame(us, *dso_mod._dso_find_res.first, us->eip);
     }
   }
+  DDRES_CHECK_FWD(add_virtual_base_frame(us));
   return res;
 }
 } // namespace ddprof

@@ -90,6 +90,9 @@ struct DsoHdr {
   // parse procfs to look for dso elements
   bool pid_backpopulate(int);
 
+  // Find the first associated to this pid
+  DsoFindRes dso_find_first(pid_t pid);
+
   // Find the closest dso to this pid and addr
   DsoFindRes dso_find_closest(pid_t pid, ElfAddress_t addr);
 
