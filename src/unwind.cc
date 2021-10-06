@@ -31,23 +31,17 @@ void unwind_free(struct UnwindState *us) {
   us->symbols_hdr = NULL;
 }
 
-static DDRes pid_0_unwind(UnwindState *us) {
-  // for now we do not attempt to read anything from pid 0 samples
-  ddprof::add_common_frame(us, ddprof::CommonSymbolLookup::LookupCases::pid_0);
-  return ddres_init();
-}
-
 DDRes unwindstate__unwind(UnwindState *us) {
-  DDRes res;
-  if (us->pid == 0) {
-    res = pid_0_unwind(us);
-  } else {
+  DDRes res = ddres_init();
+  if (us->pid != 0) { // we can not unwind pid 0
     res = ddprof::unwind_dwfl(us);
   }
+  ddprof::add_virtual_base_frame(us);
   return res;
 }
 
 void unwind_pid_free(struct UnwindState *us, pid_t pid) {
   us->dso_hdr->pid_free(pid);
   us->dwfl_hdr->clear_pid(pid);
+  us->symbols_hdr->_base_frame_symbol_lookup.erase(pid);
 }

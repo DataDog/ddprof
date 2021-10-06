@@ -1,9 +1,5 @@
 #pragma once
 
-extern "C" {
-#include "string_view.h"
-}
-
 #include "ddprof_defs.h"
 #include "dso.hpp"
 #include "hash_helper.hpp"

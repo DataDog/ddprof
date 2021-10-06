@@ -91,7 +91,7 @@ struct DsoHdr {
   bool pid_backpopulate(int);
 
   // Find the first associated to this pid
-  DsoFindRes dso_find_first(pid_t pid);
+  DsoFindRes dso_find_first_executable(pid_t pid) const;
 
   // Find the closest dso to this pid and addr
   DsoFindRes dso_find_closest(pid_t pid, ElfAddress_t addr);
@@ -117,7 +117,7 @@ struct DsoHdr {
   // Helper to create a dso from a line in /proc/pid/maps
   static ddprof::Dso dso_from_procline(int pid, char *line);
 
-  DsoFindRes find_res_not_found() {
+  DsoFindRes find_res_not_found() const {
     return std::make_pair<ddprof::DsoSetConstIt, bool>(_set.end(), false);
   }
 

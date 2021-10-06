@@ -24,6 +24,7 @@ pid_t next_thread(Dwfl *, void *, void **);
 bool set_initial_registers(Dwfl_Thread *, void *);
 int frame_cb(Dwfl_Frame *, void *);
 int tid_cb(Dwfl_Thread *, void *);
+bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg);
 }
 
 namespace ddprof {
@@ -84,8 +85,7 @@ static DDRes add_dwfl_frame(UnwindState *us, DsoMod dso_mod, ElfAddress_t pc) {
 }
 
 /// memory_read as per prototype define in libdwfl
-static bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
-                        void *arg) {
+bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg) {
   (void)dwfl;
   struct UnwindState *us = (UnwindState *)arg;
 
@@ -315,7 +315,6 @@ DDRes unwind_dwfl(UnwindState *us) {
       add_dso_frame(us, *dso_mod._dso_find_res.first, us->eip);
     }
   }
-  DDRES_CHECK_FWD(add_virtual_base_frame(us));
   return res;
 }
 } // namespace ddprof

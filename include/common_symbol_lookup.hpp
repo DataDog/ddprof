@@ -9,7 +9,6 @@ namespace ddprof {
 class CommonSymbolLookup {
 public:
   enum LookupCases {
-    pid_0,
     truncated_stack,
     unknown_dso,
   };

@@ -112,9 +112,12 @@ using ddprof::DsoStats;
 /**********/
 /* DsoHdr */
 /**********/
-DsoFindRes DsoHdr::dso_find_first(pid_t pid) {
+DsoFindRes DsoHdr::dso_find_first_executable(pid_t pid) const {
   Dso temp_dso(pid, 0, 0);
   DsoSetConstIt it = _set.lower_bound(temp_dso);
+  while (it != _set.end() && !it->_executable && it->_pid == pid) {
+    ++it;
+  }
   if (it == _set.end() || it->_pid != pid) {
     return find_res_not_found();
   }

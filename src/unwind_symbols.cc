@@ -11,7 +11,7 @@ DDRes dwfl_symbol_get_or_insert(struct UnwindSymbolsHdr *unwind_symbol_hdr,
                                 SymbolIdx_t *symbol_idx) {
   try {
     ddprof::dwfl_symbol_get_or_insert(
-        unwind_symbol_hdr->_dwfl_info_lookup, unwind_symbol_hdr->_stats,
+        unwind_symbol_hdr->_dwfl_symbol_lookup, unwind_symbol_hdr->_stats,
         unwind_symbol_hdr->_symbol_table, mod, newpc, dso, symbol_idx);
 
     if (unwind_symbol_hdr->_setting == K_CACHE_VALIDATE) {

@@ -2,6 +2,7 @@
 
 #include "unwind_symbols.h"
 
+#include "base_frame_symbol_lookup.hpp"
 #include "common_symbol_lookup.hpp"
 #include "dso_symbol_lookup.hpp"
 #include "dwfl_symbol_lookup.hpp"
@@ -20,9 +21,10 @@ struct UnwindSymbolsHdr {
   UnwindSymbolsHdr();
   void display_stats() { _stats.display(); }
 
-  ddprof::DsoSymbolLookup _dso_symbol_lookup;
+  ddprof::BaseFrameSymbolLookup _base_frame_symbol_lookup;
   ddprof::CommonSymbolLookup _common_symbol_lookup;
-  ddprof::DwflSymbolLookup _dwfl_info_lookup;
+  ddprof::DsoSymbolLookup _dso_symbol_lookup;
+  ddprof::DwflSymbolLookup _dwfl_symbol_lookup;
   ddprof::SymbolTable _symbol_table;
 
   ddprof::CommonMapInfoLookup _common_mapinfo_lookup;
