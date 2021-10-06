@@ -1,3 +1,17 @@
+0.6.3 to 0.6.4 (06/10/2021)
+* Virtual Base frames : Ensure all frames are attached to a base frame
+* Explain Unwinding errors through virtual frames (ex: anonymous regions)
+* Unwinding fixes (for all processes that fork / global mode)
+    - Differentiate dwfl caches per PID
+    - Link symbol cache entries to the lifetime of a DSO
+* Improve instrumentation sequence : avoids missing initial frames
+    - Wait for instrumentation (perf event open) before launching the process
+* Build and test different libc versions : added 2.27
+* Unwinding fix : Fix check on dwfl_attach_state result
+* Support Tags in profiles 
+    - Add custom tags through input options
+    - Get information on number of CPUs and hw threads in profile tags
+
 0.6.2 to 0.6.3 (28/09/2021)
 * Add LTO to build process
 * Add _executable flag to DSO cache
