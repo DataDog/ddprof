@@ -152,7 +152,7 @@ fill_tags(const UserTags *user_tags, const DDProfExporter *exporter,
 
   if (exporter->_input.profiler_version.len) {
     tags_exporter.push_back(ddprof_ffi_Tag{
-        .name = char_star_to_byteslice("profiler-version"),
+        .name = char_star_to_byteslice("profiler_version"),
         .value = string_view_to_byteslice(exporter->_input.profiler_version)});
   }
 
