@@ -271,7 +271,6 @@ TEST(DSOTest, dso_from_procline) {
         dso_hdr.insert_erase_overlap(std::move(standard_dso_4));
     EXPECT_EQ(findres.second, true);
     std::cerr << *findres.first;
-    // EXPECT_EQ(findres.first._end, );
     Dso standard_dso_3 =
         DsoHdr::dso_from_procline(10, const_cast<char *>(s_exec_line3));
     // check that 4 did not override number 3 (even if they overlap 3 is

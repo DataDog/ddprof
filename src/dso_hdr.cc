@@ -232,7 +232,7 @@ DsoFindRes DsoHdr::dso_find_same_or_smaller(const ddprof::Dso &dso) {
 
 DsoUID_t DsoHdr::find_or_add_dso_uid(const Dso &dso) {
   if (dso._type != ddprof::dso::DsoType::kStandard) {
-    return _next_dso_id++;
+    return ++_next_dso_id;
   }
   ddprof::RegionKey key(dso._filename, dso._pgoff, dso._end - dso._start + 1,
                         dso._type);

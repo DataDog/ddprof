@@ -49,11 +49,13 @@ static DDRes create_pprof_file(ddprof_ffi_Timespec start,
                                ddprof_ffi_Timespec end, const char *dbg_folder,
                                int *fd) {
   char time_start[128] = {0};
-  struct tm *tm_start = localtime(&start.seconds);
+  // struct tm *localtime_r(const time_t *timep, struct tm *result);
+  struct tm tm_storage;
+  struct tm *tm_start = localtime_r(&start.seconds, &tm_storage);
   strftime(time_start, sizeof time_start, "%Y-%m-%dT%H:%M:%SZ", tm_start);
 
   char time_end[128] = {0};
-  struct tm *tm_end = localtime(&end.seconds);
+  struct tm *tm_end = localtime_r(&end.seconds, &tm_storage);
   strftime(time_end, sizeof time_end, "%Y-%m-%dT%H:%M:%SZ", tm_end);
 
   char filename[400];
