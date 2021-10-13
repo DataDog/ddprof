@@ -225,9 +225,9 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
       // If the size was specified, we also have a dyn_size
       dynsz_stack = *buf++;
 
-      // If dynsize is too big, that's an error, but right now just roll it back
-      // This doesn't affect deserialization.
-      sample.size_stack = size_stack <= dynsz_stack ? size_stack : dynsz_stack;
+      // If the dyn_size is too big, zero out the stack size since it is likely
+      // an error
+      sample.size_stack = size_stack <= dynsz_stack ? 0 : dynsz_stack;
     }
   }
   if (PERF_SAMPLE_WEIGHT & DEFAULT_SAMPLE_TYPE) {}
