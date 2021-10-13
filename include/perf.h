@@ -119,22 +119,11 @@ typedef struct perf_samplestacku {
   // uint64_t    dyn_size;   // Don't forget!
 } perf_samplestacku;
 
-// Used by rb_init() and friends
-typedef struct RingBuffer {
-  const char *start;
-  unsigned long offset;
-  size_t size;
-  size_t mask;
-  size_t meta_size; // size of the metadata page
-} RingBuffer;
-
 int perf_event_open(struct perf_event_attr *, pid_t, int, int, unsigned long);
 int perfopen(pid_t pid, const PerfOption *opt, int cpu, bool extras);
 size_t perf_mmap_size(int buf_size_shift);
 void *perfown_sz(int fd, size_t size_of_buffer);
 void *perfown(int fd, size_t *size);
 int perfdisown(void *region, size_t size);
-void rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size);
-uint64_t rb_next(RingBuffer *);
-struct perf_event_header *rb_seek(RingBuffer *, uint64_t);
-perf_event_sample *hdr2samp(struct perf_event_header *hdr);
+long get_page_size(void);
+size_t get_mask_from_size(size_t size);

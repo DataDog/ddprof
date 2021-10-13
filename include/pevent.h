@@ -2,14 +2,14 @@
 
 #include <sys/types.h>
 
+#include "perf_ringbuffer.h"
+
 #define MAX_NB_WATCHERS 450
 
 typedef struct PEvent {
   int pos; // Index into the sample
   int fd;  // Underlying perf event FD
-  struct perf_event_mmap_page *region;
-  size_t reg_size; // size of region
-  unsigned char* wrbuf;
+  RingBuffer rb; // metadata and buffers for processing perf ringbuffer
 } PEvent;
 
 typedef struct PEventHdr {

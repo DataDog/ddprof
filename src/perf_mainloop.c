@@ -113,24 +113,18 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
         DDRES_GRACEFUL_SHUTDOWN();
       }
 
-      // Helper definitions for this FD
-      struct perf_event_mmap_page *perfpage = pes[i].region;
-      char *pf_reg = (char *)perfpage;
-      size_t pf_rsz = pes[i].reg_size;
-
       // Drain the ringbuffer and dispatch to callback, as needed
       // The head and tail are taken literally (without wraparound), since they
       // don't wrap in the underlying object.  Instead, the rb_* interfaces
       // wrap when accessing.
+      RingBuffer *rb = &pes[i].rb;
+      struct perf_event_mmap_page *perfpage = rb->region;
       uint64_t head = perfpage->data_head;
       rmb();
       uint64_t tail = perfpage->data_tail;
-      RingBuffer *rb = &(RingBuffer){0};
-      rb_init(rb, perfpage, pf_rsz);
 
       while (head > tail) {
-        struct perf_event_header *hdr_tmp = rb_seek(rb, tail);
-        struct perf_event_header *hdr = hdr_tmp;
+        struct perf_event_header *hdr = rb_seek(rb, tail);
 
         // If the current element wraps around the buffer, need change hdr to
         // point to a linearized copy of the element, since the processors
@@ -142,7 +136,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
         // linearized buffer.  In the index space of the ringbuffer, these terms
         // would be reversed.
         if (rb_size - rb->offset < hdr->size) {
-          unsigned char *wrbuf = pes->wrbuf;
+          unsigned char *wrbuf = rb->wrbuf;
           uint64_t left_sz = rb_size - rb->offset;
           uint64_t right_sz = hdr->size - left_sz;
           memcpy(wrbuf, rb->start + rb->offset, left_sz);
@@ -170,7 +164,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       // We tell the kernel how much we read.  This *should* be the same as
       // the current tail, but in the case of an error head will be a safe
       // restart position.
-      pes[i].region->data_tail = head;
+      perfpage->data_tail = head;
 
       if (head != tail)
         LG_WRN("Head/tail buffer mismatch");

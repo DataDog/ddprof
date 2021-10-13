@@ -17,6 +17,9 @@ DDRes pevent_init(PEventHdr *pevent_hdr) {
   for (int k = 0; k < pevent_hdr->max_size; ++k) {
     pevent_hdr->pes[k].fd = -1;
 
+    if (pevent_hdr->pes[k].rb.wrbuf)
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB, "Noninitialized element filled");
+
     // Allocate room for a watcher-held buffer.  This is for linearizing
     // ringbuffer elements and depends on the per-watcher configuration for
     // perf_event_open().  Right now these are globally held, but these lines
@@ -24,11 +27,11 @@ DDRes pevent_init(PEventHdr *pevent_hdr) {
     // quantities become variable.
     uint64_t buf_sz = PERF_REGS_COUNT + PERF_SAMPLE_STACK_SIZE;
     buf_sz += sizeof(perf_event_sample);
-    pevent_hdr->pes[k].wrbuf = malloc(buf_sz);
-    if (!pevent_hdr->pes[k].wrbuf) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_PEINIT, "Error allocating storage for pevent watcher %d", k);
-    }
+    unsigned char *wrbuf = malloc(buf_sz);
+    if (!wrbuf)
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB, "Error allocating storage");
   }
+
   return ddres_init();
 }
 
@@ -65,11 +68,14 @@ DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
   PEvent *pes = pevent_hdr->pes;
   for (int k = 0; k < pevent_hdr->size; ++k) {
     if (pes[k].fd != -1) {
-      if (!(pes[k].region = perfown(pes[k].fd, &pes[k].reg_size))) {
+      size_t reg_sz = 0;
+      void *region = perfown(pes[k].fd, &reg_sz);
+      if (!region) {
         LG_ERR("Could not finalize watcher (idx#%d): registration (%s)", k,
                strerror(errno));
         goto REGION_CLEANUP;
       }
+      rb_init(&pes[k].rb, region, reg_sz);
     }
   }
 
@@ -108,12 +114,12 @@ DDRes pevent_enable(PEventHdr *pevent_hdr) {
 DDRes pevent_munmap(PEventHdr *pevent_hdr) {
   PEvent *pes = pevent_hdr->pes;
   for (int k = 0; k < pevent_hdr->size; ++k) {
-    if (pes[k].region) {
-      if (perfdisown(pes[k].region, pes[k].reg_size) != 0) {
+    if (pes[k].rb.region) {
+      if (perfdisown(pes[k].rb.region, pes[k].rb.size) != 0) {
         DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
                                "Error when using perfdisown %d", k);
       } else {
-        pes[k].region = NULL;
+        rb_clear(&pes[k].rb);
       }
     }
   }

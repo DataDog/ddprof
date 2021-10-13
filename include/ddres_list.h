@@ -26,6 +26,7 @@ extern "C" {
   X(USERID, "error in user ID manipulations")                                  \
   X(PEINIT, "error allocating space for pevent")                               \
   X(PERFOPEN, "error during perf_event_open")                                  \
+  X(PERFRB, "error with perf_event ringbuffer")                                \
   X(IOCTL, "error during perf_event_open")                                     \
   X(PERFMMAP, "error in mmap operations")                                      \
   X(MAINLOOP, "error in main_loop coordinator")                                \

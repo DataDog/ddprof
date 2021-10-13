@@ -154,6 +154,7 @@ add_unit_test(
     ../src/user_override.c
     ../src/perf.c
     ../src/perf_option.c
+    ../src/perf_ringbuffer.c
     pevent-ut.cc
     DEFINITIONS MYNAME="pevent-ut"
 )
