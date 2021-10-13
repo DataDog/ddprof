@@ -18,9 +18,6 @@
 // All values coming off of perf_event_open() structs are 8-byte aligned, but
 // evidently the interface doesn't pad variable-length members, so realignment
 // is needed
-#define PERF_ALIGNMENT 0x08ul
-#define PERF_ALIGN(x) (((x) + PERF_ALIGNMENT)&~((uint64_t)(PERF_ALIGNMENT - 1)))
-
 #define DEFAULT_PAGE_SIZE 4096 // Concerned about hugepages?
 
 #define DEFAULT_BUFF_SIZE_SHIFT 6
@@ -136,7 +133,8 @@ void *perfown(int fd, size_t *size) {
 int perfdisown(void *region, size_t size) { return munmap(region, size); }
 
 void rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size) {
-  rb->start = (const char *)page + get_page_size();
+  rb->meta_size = get_page_size();
+  rb->start = (const char *)page + rb->meta_size;
   rb->size = size;
   rb->mask = get_mask_from_size(size);
 }
@@ -211,15 +209,25 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
     buf += PERF_REGS_COUNT;
   }
   if (PERF_SAMPLE_STACK_USER & DEFAULT_SAMPLE_TYPE) {
-    sample.size_stack = *buf++;
-    if (sample.size_stack) {
+    uint64_t size_stack = *buf++;
+
+    // Empirically, it seems that the size of the static stack is either 0 or
+    // the amount requested in the call to `perf_event_open()`.  We don't check
+    // for that, since there isn't much we'd be able to do anyway.
+    if (size_stack == 0) {
+      sample.size_stack = 0;
+      sample.data_stack = NULL;
+    } else {
+      uint64_t dynsz_stack = 0;
       sample.data_stack = (char *)buf;
-      buf = (uint64_t *)(sample.data_stack + sample.size_stack);
+      buf = (uint64_t *)(sample.data_stack + size_stack);
 
       // If the size was specified, we also have a dyn_size
-      sample.size_stack = *buf++;
-    } else {
-      sample.data_stack = NULL;
+      dynsz_stack = *buf++;
+
+      // If dynsize is too big, that's an error, but right now just roll it back
+      // This doesn't affect deserialization.
+      sample.size_stack = size_stack <= dynsz_stack ? size_stack : dynsz_stack;
     }
   }
   if (PERF_SAMPLE_WEIGHT & DEFAULT_SAMPLE_TYPE) {}

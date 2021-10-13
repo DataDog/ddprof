@@ -16,5 +16,9 @@ cd $CURRENTDIR
 echo "while true;do curl -s -o /dev/null http://localhost:10000; done"
 
 # Presumes envoy is installed
-envoy --config-path $TOP_LVL_DIR/demos/envoy-demo.yaml
+envoy --config-path $TOP_LVL_DIR/demos/envoy-demo.yaml >/dev/null
+
+while true; do curl -s -o /dev/null http://localhost:10000; done &
+while true; do curl -s -o /dev/null http://localhost:10000; done &
+while true; do curl -s -o /dev/null http://localhost:10000; done &
 

@@ -78,6 +78,9 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   // disposition so that profiling is halted upon its termination
   *continue_profiling = false;
 
+  // Setup some storage to handle wraparound ringbuffer elements
+  unsigned char wrbuf[PERF_REGS_COUNT + PERF_SAMPLE_STACK_SIZE + sizeof(perf_event_sample)] = {0};
+
   // Setup poll() to watch perf_event file descriptors
   struct pollfd pfd[MAX_NB_WATCHERS];
   int pfd_len = 0;
@@ -102,8 +105,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
     int pe_len = ctx->worker_ctx.pevent_hdr.size;
     PEvent *pes = ctx->worker_ctx.pevent_hdr.pes;
 
-    // If we're here, we have at least one file descriptor active.  That means
-    // the underyling ringbuffers can be checked.
+    // Check the ringbuffers in order
     for (int i = 0; i < pe_len; i++) {
       // Even though pollhup might mean that multiple file descriptors (hence,
       // ringbuffers) are still active, in the typical case, `perf_event_open`
@@ -114,32 +116,55 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
         DDRES_GRACEFUL_SHUTDOWN();
       }
 
+      // Helper definitions for this FD
+      struct perf_event_mmap_page *perfpage = pes[i].region;
+      char *pf_reg = (char *)perfpage;
+      size_t pf_rsz = pes[i].reg_size;
+
       // Drain the ringbuffer and dispatch to callback, as needed
       // The head and tail are taken literally (without wraparound), since they
       // don't wrap in the underlying object.  Instead, the rb_* interfaces
       // wrap when accessing.
-      uint64_t head = pes[i].region->data_head;
+      uint64_t head = perfpage->data_head;
       rmb();
-      uint64_t tail = pes[i].region->data_tail;
+      uint64_t tail = perfpage->data_tail;
       RingBuffer *rb = &(RingBuffer){0};
-      rb_init(rb, pes[i].region, pes[i].reg_size);
+      rb_init(rb, perfpage, pf_rsz);
 
       while (head > tail) {
-        struct perf_event_header *hdr = rb_seek(rb, tail);
-        if ((char *)pes[i].region + pes[i].reg_size < (char *)hdr + hdr->size) {
-          // We don't handle the case when the object in the ringbuffer is
-          // wrapped around the end.  In such a case, we might copy into a
-          // single contiguous object or update the hdr2sample code to account
-          // for wrapping, but for now skip it.
-        } else {
-          if (hdr->type == PERF_RECORD_SAMPLE)
-            sample_hit == true;
-          DDRes res = ddprof_worker(hdr, pes[i].pos, continue_profiling, ctx);
-          if (IsDDResNotOK(res)) {
-            // ignoring possible errors from finish as we are closing
-            attr->finish_fun(ctx);
-            WORKER_SHUTDOWN();
-          }
+        struct perf_event_header *hdr_tmp = rb_seek(rb, tail);
+        struct perf_event_header *hdr = hdr_tmp;
+
+        // If the current element wraps around the buffer, need change hdr to
+        // point to a linearized copy of the element, since the processors
+        // don't handle overflow.  rb->size is actually the ringbuffer plus
+        // the metadata page, so make sure to account for that properly.
+        uint64_t rb_size = rb->size - rb->meta_size;
+
+        // The terms 'left' and 'right' below refer to the regions in the
+        // linearized buffer.  In the index space of the ringbuffer, these terms
+        // would be reversed.
+        if (rb_size - rb->offset < hdr->size) {
+          uint64_t left_sz = rb_size - rb->offset;
+          uint64_t right_sz = hdr->size - left_sz;
+          memcpy(wrbuf, rb->start + rb->offset, left_sz);
+          memcpy(wrbuf + left_sz, rb->start, right_sz);
+          hdr = (struct perf_event_header *)wrbuf;
+        }
+
+        // TODO this strongly binds the behavior of the sample processor as an
+        // export interface to this dispatch layer.  We can overcome this by
+        // moving the ddprof export code and adding a constant-time callback,
+        // but for now we're keeping this hack.
+        if (hdr->type == PERF_RECORD_SAMPLE)
+          sample_hit == true;
+
+        // Pass the event to the processors
+        DDRes res = ddprof_worker(hdr, pes[i].pos, continue_profiling, ctx);
+        if (IsDDResNotOK(res)) {
+          // ignoring possible errors from finish as we are closing
+          attr->finish_fun(ctx);
+          WORKER_SHUTDOWN();
         }
         tail += hdr->size;
       }

@@ -125,6 +125,7 @@ typedef struct RingBuffer {
   unsigned long offset;
   size_t size;
   size_t mask;
+  size_t meta_size; // size of the metadata page
 } RingBuffer;
 
 int perf_event_open(struct perf_event_attr *, pid_t, int, int, unsigned long);
