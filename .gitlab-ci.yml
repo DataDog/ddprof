@@ -6,12 +6,12 @@ stages:
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
   # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/87754200
-  BUILD_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:d93e0c44a37e6e480672f70e644d7114ed4daa2b56ecbaae2d32849c0075337d
-  BUILD_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:4d24767385fd385951808108510ddcb6958dd08e18150e0e157bb0ad8bb834de
-  BUILD_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:0a244e64ed4d330401ffea15afe02b38b04c842e2b207bfeb3fb8bfac60cbf03
+  BUILD_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:40dc9f6c281908e642cb6a2312c82963a7cb665dac0b8334b08267ddd089f31c
+  BUILD_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:7a56112ed0fbcb565c4476f6297b5946063636d4dc02cad496c3b2e2177b474f
+  BUILD_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:dc5c91e1475681cb82093db0edecc9009369d93f2b9ebbf60d1f0ac561ef419d
   # https://gitlab.ddbuild.io/DataDog/ddprof/-/pipelines/5611418
-  TEST_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:1565b429f9266dc10f98d615fcaf06941a1281292467820961364aff1376ef34
   TEST_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:fa799b8e4e14dd3580b34d544b3885387948b2260875cc6f533c9a3e922f13db
+  TEST_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:1565b429f9266dc10f98d615fcaf06941a1281292467820961364aff1376ef34
   # When build images are built, publish them with following tags
   BASE_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
   BUILD_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build
@@ -139,6 +139,30 @@ build:ddprof:
     paths:
       - ${CI_PROJECT_DIR}/${BINPATH}/
     expire_in: 1 week
+
+.heavy-duty-job-resource-allocation: &heavy-duty-job-resource-allocation
+  variables:
+    KUBERNETES_CPU_REQUEST: 4
+    KUBERNETES_MEMORY_REQUEST: 10Gi
+    KUBERNETES_MEMORY_LIMIT: 16Gi
+
+# Static analysis with codeql
+build:codeql:
+  when: manual
+  extends:
+    - .heavy-duty-job-resource-allocation
+  stage: build
+  tags: ["runner:k8s"]
+  # refers to image defined in matrix
+  image: $BUILD_IMG_20_STICKY
+  script:
+    - set -euxo pipefail
+        #Build image dependencies were stored in app, avoid rebuilding vendor content
+    - ln -s /app/vendor vendor
+    - ./tools/run_codeql.sh
+  artifacts:
+      paths:
+        - "cpp-security-quality.sarif"
 
 test:ddprof:
   extends:
