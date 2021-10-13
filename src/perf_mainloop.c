@@ -79,7 +79,8 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   *continue_profiling = false;
 
   // Setup some storage to handle wraparound ringbuffer elements
-  unsigned char wrbuf[PERF_REGS_COUNT + PERF_SAMPLE_STACK_SIZE + sizeof(perf_event_sample)] = {0};
+  unsigned char wrbuf[PERF_REGS_COUNT + PERF_SAMPLE_STACK_SIZE +
+                      sizeof(perf_event_sample)] = {0};
 
   // Setup poll() to watch perf_event file descriptors
   struct pollfd pfd[MAX_NB_WATCHERS];
