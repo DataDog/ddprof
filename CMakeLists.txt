@@ -195,7 +195,7 @@ add_exe(ddprof
         DEFINITIONS ${DDPROF_DEFINITION_LIST})
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 # TODO: revert to c++ 11 (string_format is blocking)
-set_property(TARGET ddprof PROPERTY CXX_STANDARD 14)
+set_property(TARGET ddprof PROPERTY CXX_STANDARD 11)
 set_property(TARGET ddprof PROPERTY C_STANDARD 11)
 
 # Ensure all dependencies are computed
@@ -230,7 +230,7 @@ option(BUILD_NATIVE_LIB "Build a library out of the native profiler" OFF)
    ## Create the lib
    add_library(ddprof-native
                ${DDPROF_LIB_SRC})
-   set_property(TARGET ddprof-native PROPERTY CXX_STANDARD 14)
+   set_property(TARGET ddprof-native PROPERTY CXX_STANDARD 11)
    set_property(TARGET ddprof-native PROPERTY C_STANDARD 11)
                
    set_target_properties(ddprof-native PROPERTIES VERSION ${PROJECT_VERSION})

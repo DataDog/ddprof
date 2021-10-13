@@ -102,7 +102,7 @@ build:ddprof:
   image: $IMAGE
   parallel:
     matrix:
-      - IMAGE: ["${BUILD_IMG_18_STICKY}", "${BUILD_IMG_20_STICKY}"]
+      - IMAGE: ["${BUILD_IMG_16_STICKY}", "${BUILD_IMG_18_STICKY}", "${BUILD_IMG_20_STICKY}"]
         BUILD_TYPE: ["Release", "Debug", "SanitizedDebug", "Coverage"]
   variables:
     BUILDPATH: build_${BUILD_TYPE}

@@ -33,8 +33,9 @@ DwflSymbolLookup_V2::DwflSymbolLookup_V2() : _lookup_setting(K_CACHE_ON) {
 
 unsigned DwflSymbolLookup_V2::size() const {
   unsigned total_nb_elts = 0;
-  std::for_each(_dso_map.begin(), _dso_map.end(),
-                [&](auto const &el) { total_nb_elts += el.second.size(); });
+  std::for_each(
+      _dso_map.begin(), _dso_map.end(),
+      [&](DwflDsoSymbolMapVT const &el) { total_nb_elts += el.second.size(); });
   return total_nb_elts;
 }
 

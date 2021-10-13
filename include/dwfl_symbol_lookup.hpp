@@ -97,6 +97,7 @@ private:
   // PIDs If we are sure the underlying symbols are the same, we can point
   // For short lived forks, this can avoid repopulating caches
   using DwflDsoSymbolMap = std::unordered_map<DsoUID_t, DwflSymbolMap>;
+  using DwflDsoSymbolMapVT = DwflDsoSymbolMap::value_type;
 
   static bool symbol_lookup_check(struct Dwfl_Module *mod, ElfAddress_t newpc,
                                   const Symbol &info);

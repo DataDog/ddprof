@@ -11,8 +11,8 @@ set(ELFUTILS_PATH ${VENDOR_PATH}/elfutils CACHE FILEPATH "location of elfutils f
 set(LIBDW_PATH ${ELFUTILS_PATH}/libdw/libdw.a CACHE FILEPATH "location of dw lib")
 set(LIBELF_PATH ${ELFUTILS_PATH}/libelf/libelf.a CACHE FILEPATH "location of elf lib")
 set(ELFUTILS_LIBS 
-                "${LIBDW_PATH}"
-                "${LIBELF_PATH}")
+    "${LIBDW_PATH}"
+    "${LIBELF_PATH}")
 
 list(APPEND ELFUTILS_INCLUDE_LIST ${ELFUTILS_PATH} ${ELFUTILS_PATH}/libdwfl ${ELFUTILS_PATH}/libdw ${ELFUTILS_PATH}/libebl ${ELFUTILS_PATH}/libelf)
 

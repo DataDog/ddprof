@@ -158,12 +158,12 @@ fill_tags(const UserTags *user_tags, const DDProfExporter *exporter,
         .value = string_view_to_byteslice(exporter->_input.profiler_version)});
   }
 
-  std::for_each(
-      user_tags->_tags.begin(), user_tags->_tags.end(), [&](auto const &el) {
-        tags_exporter.push_back(
-            ddprof_ffi_Tag{.name = cpp_string_to_byteslice(el.first),
-                           .value = cpp_string_to_byteslice(el.second)});
-      });
+  std::for_each(user_tags->_tags.begin(), user_tags->_tags.end(),
+                [&](ddprof::Tag const &el) {
+                  tags_exporter.push_back(ddprof_ffi_Tag{
+                      .name = cpp_string_to_byteslice(el.first),
+                      .value = cpp_string_to_byteslice(el.second)});
+                });
 }
 
 DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {

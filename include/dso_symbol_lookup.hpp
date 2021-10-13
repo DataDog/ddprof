@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dso.hpp"
+#include "hash_helper.hpp"
 #include "symbol_table.hpp"
 
 #include <unordered_map>
@@ -25,7 +26,8 @@ private:
       DsoDwflSymbolLookup;
   DsoDwflSymbolLookup _map_dso;
   // For non-standard DSO types, address is not relevant
-  std::unordered_map<dso::DsoType, SymbolIdx_t> _map_unhandled_dso;
+  std::unordered_map<dso::DsoType, SymbolIdx_t, EnumClassHash>
+      _map_unhandled_dso;
 };
 
 } // namespace ddprof

@@ -1,12 +1,12 @@
 extern "C" {
 #include "statsd.h"
 
-#include <cstdlib>
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <unistd.h>
 }
 
+#include <cstdlib>
 #include <gtest/gtest.h>
 #include <string>
 

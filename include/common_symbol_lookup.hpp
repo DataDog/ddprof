@@ -1,5 +1,6 @@
 #pragma once
 
+#include "hash_helper.hpp"
 #include "symbol_table.hpp"
 
 #include <unordered_map>
@@ -15,7 +16,7 @@ public:
   SymbolIdx_t get_or_insert(LookupCases lookup_case, SymbolTable &symbol_table);
 
 private:
-  std::unordered_map<LookupCases, SymbolIdx_t> _map;
+  std::unordered_map<LookupCases, SymbolIdx_t, EnumClassHash> _map;
 };
 
 } // namespace ddprof

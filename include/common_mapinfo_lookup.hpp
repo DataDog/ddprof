@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ddprof_defs.h"
+#include "hash_helper.hpp"
 #include "mapinfo_table.hpp"
 
 #include <string>
@@ -18,7 +19,7 @@ public:
                             MapInfoTable &mapinfo_table);
 
 private:
-  std::unordered_map<LookupCases, MapInfoIdx_t> _map;
+  std::unordered_map<LookupCases, MapInfoIdx_t, EnumClassHash> _map;
 };
 
 } // namespace ddprof
