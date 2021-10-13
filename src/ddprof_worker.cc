@@ -267,12 +267,9 @@ void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int pos) {
   // matches the process ID of the group.  Moreover, it seems that it is the
   // overwhelming convention that this thread is closed after the other threads
   // (upheld by both pthreads and runtimes).
-  // This could still cause problems if the ringubffer is processing samples for
-  // other threads in other ringbuffers after having processed the close of the
-  // thread leader locally.
+  // We do not clear the PID at this time because we currently cleanup anyway.
   (void)ctx;
   if (ext->pid == ext->tid) {
-    ctx->worker_ctx.us->dso_hdr->pid_free(ext->pid);
     LG_DBG("<%d>(EXIT)%d", pos, ext->pid);
   } else {
     LG_DBG("<%d>(EXIT)%d/%d", pos, ext->pid, ext->tid);
