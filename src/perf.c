@@ -15,9 +15,6 @@
 #include "logger.h"
 #include "user_override.h"
 
-// All values coming off of perf_event_open() structs are 8-byte aligned, but
-// evidently the interface doesn't pad variable-length members, so realignment
-// is needed
 #define DEFAULT_PAGE_SIZE 4096 // Concerned about hugepages?
 
 #define DEFAULT_BUFF_SIZE_SHIFT 6
