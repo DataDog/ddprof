@@ -370,7 +370,8 @@ DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
     /* Cases where the target type has a PID */
     case PERF_RECORD_SAMPLE:
       if (wpid->pid)
-        DDRES_CHECK_FWD(ddprof_pr_sample(ctx, hdr2samp(hdr, DEFAULT_SAMPLE_TYPE), pos));
+        DDRES_CHECK_FWD(
+            ddprof_pr_sample(ctx, hdr2samp(hdr, DEFAULT_SAMPLE_TYPE), pos));
       break;
     case PERF_RECORD_MMAP:
       if (wpid->pid)

@@ -10,7 +10,7 @@ extern "C" {
 #define DD_NATIVE_START_RANGE 2000
 
 #define EXPAND_ENUM(a, b) DD_WHAT_##a,
-#define EXPAND_ERROR_MESSAGE(a, b) #a": "b,
+#define EXPAND_ERROR_MESSAGE(a, b) #a ": " b,
 
 #define COMMOM_ERROR_TABLE(X)                                                  \
   X(UKNW, "undocumented error")                                                \
@@ -33,7 +33,7 @@ extern "C" {
   X(POLLTIMEOUT, "timeout when polling perf events")                           \
   X(POLLERROR, "Unknown poll error")                                           \
   X(POLLHANGUP, "perf event file descriptor hang up")                          \
-  X(WORKER_RESET,"worker reset requested (not a fatal error)")                 \
+  X(WORKER_RESET, "worker reset requested (not a fatal error)")                \
   X(PROCSTATE, "error when retrieveing procstate")                             \
   X(PPROF, "error in pprof manipulations")                                     \
   X(STATSD, "statsd interface")                                                \

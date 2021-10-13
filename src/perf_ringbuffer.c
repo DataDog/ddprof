@@ -13,9 +13,7 @@ bool rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size) {
   rb->mask = get_mask_from_size(size);
 }
 
-void rb_clear(RingBuffer *rb) {
-  memset(rb, 0, sizeof(*rb));
-}
+void rb_clear(RingBuffer *rb) { memset(rb, 0, sizeof(*rb)); }
 
 uint64_t rb_next(RingBuffer *rb) {
   rb->offset = (rb->offset + sizeof(uint64_t)) & (rb->mask);
@@ -34,8 +32,11 @@ typedef union flipper {
   uint32_t half[2];
 } flipper;
 
-#define SZ_CHECK if ((sz += 8) >= sz_hdr) return false
-bool samp2hdr(struct perf_event_header *hdr, perf_event_sample *sample, size_t sz_hdr, uint64_t mask) {
+#define SZ_CHECK                                                               \
+  if ((sz += 8) >= sz_hdr)                                                     \
+  return false
+bool samp2hdr(struct perf_event_header *hdr, perf_event_sample *sample,
+              size_t sz_hdr, uint64_t mask) {
   // There is absolutely no point for this interface except testing
 
   // Presumes that the user has allocated enough room for the whole sample
@@ -78,17 +79,17 @@ bool samp2hdr(struct perf_event_header *hdr, perf_event_sample *sample, size_t s
     *buf++ = sample->stream_id;
     SZ_CHECK;
   }
-  if (PERF_SAMPLE_CPU & mask) { }
-    ((flipper *)buf)->half[0] =  sample->cpu;
-    ((flipper *)buf)->half[1] =  sample->res;
-    SZ_CHECK;
+  if (PERF_SAMPLE_CPU & mask) {}
+  ((flipper *)buf)->half[0] = sample->cpu;
+  ((flipper *)buf)->half[1] = sample->res;
+  SZ_CHECK;
   if (PERF_SAMPLE_PERIOD & mask) {
     *buf++ = sample->period;
     SZ_CHECK;
   }
   if (PERF_SAMPLE_READ & mask) {
     *((struct read_format *)buf) = *sample->v;
-    buf += sizeof(struct read_format)/8; // read_format is uint64_t's
+    buf += sizeof(struct read_format) / 8; // read_format is uint64_t's
     sz += sizeof(struct read_format);
     if (sz >= sz_hdr)
       return false;
@@ -98,20 +99,20 @@ bool samp2hdr(struct perf_event_header *hdr, perf_event_sample *sample, size_t s
     SZ_CHECK;
 
     // Copy the values
-    sz += 8*sample->nr;  // early check
+    sz += 8 * sample->nr; // early check
     if (sz >= sz_hdr)
       return false;
     memcpy(buf, sample->ips, sample->nr);
     buf += sample->nr;
   }
-  if (PERF_SAMPLE_RAW & mask) { }
-  if (PERF_SAMPLE_BRANCH_STACK & mask) { }
+  if (PERF_SAMPLE_RAW & mask) {}
+  if (PERF_SAMPLE_BRANCH_STACK & mask) {}
   if (PERF_SAMPLE_REGS_USER & mask) {
     *buf++ = sample->abi;
     SZ_CHECK;
 
     // Copy the values
-    sz += 8*PERF_REGS_COUNT; // TODO pass this in the watcher
+    sz += 8 * PERF_REGS_COUNT; // TODO pass this in the watcher
     if (sz >= sz_hdr)
       return false;
     memcpy(buf, sample->regs, PERF_REGS_COUNT);
@@ -126,13 +127,13 @@ bool samp2hdr(struct perf_event_header *hdr, perf_event_sample *sample, size_t s
       if (sz >= sz_hdr)
         return false;
       memcpy(buf, sample->data_stack, sample->size_stack);
-      buf += sample->size_stack/8; // stack copy is always aligned or 0
+      buf += sample->size_stack / 8; // stack copy is always aligned or 0
     }
   }
-  if (PERF_SAMPLE_WEIGHT & mask) { }
-  if (PERF_SAMPLE_DATA_SRC & mask) { }
-  if (PERF_SAMPLE_TRANSACTION & mask) { }
-  if (PERF_SAMPLE_REGS_INTR & mask) { }
+  if (PERF_SAMPLE_WEIGHT & mask) {}
+  if (PERF_SAMPLE_DATA_SRC & mask) {}
+  if (PERF_SAMPLE_TRANSACTION & mask) {}
+  if (PERF_SAMPLE_REGS_INTR & mask) {}
 }
 
 perf_event_sample *hdr2samp(struct perf_event_header *hdr, uint64_t mask) {

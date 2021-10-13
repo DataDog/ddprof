@@ -7,8 +7,8 @@
 #define MAX_NB_WATCHERS 450
 
 typedef struct PEvent {
-  int pos; // Index into the sample
-  int fd;  // Underlying perf event FD
+  int pos;       // Index into the sample
+  int fd;        // Underlying perf event FD
   RingBuffer rb; // metadata and buffers for processing perf ringbuffer
 } PEvent;
 
