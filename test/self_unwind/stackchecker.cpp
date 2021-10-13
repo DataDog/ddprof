@@ -11,19 +11,19 @@ namespace suw {
 
 using Symbol = ddprof::Symbol;
 
-void to_json(json &j, const Symbol &ip_info) {
-  j = json{{"offset", ip_info._offset},
-           {"demangle_name", ip_info._demangle_name}};
+void to_json(json &j, const Symbol &symbol) {
+  j = json{{"src_path", symbol._srcpath},
+           {"demangle_name", symbol._demangle_name}};
 }
 
-void from_json(const json &j, Symbol &ip_info) {
-  j.at("offset").get_to(ip_info._offset);
-  j.at("demangle_name").get_to(ip_info._demangle_name);
+void from_json(const json &j, Symbol &symbol) {
+  j.at("src_path").get_to(symbol._srcpath);
+  j.at("demangle_name").get_to(symbol._demangle_name);
 }
 
-void add_symbol(json &j, const Symbol &ip_info) {
+void add_symbol(json &j, const Symbol &symbol) {
   json symbol_j;
-  to_json(symbol_j, ip_info);
+  to_json(symbol_j, symbol);
   j.push_back(symbol_j);
 }
 static void write_json_file(std::string_view exe_name, const json &data,
@@ -74,26 +74,26 @@ int compare_to_ref(std::string_view exe_name, const SymbolMap &map,
 
   file_path += "/" + std::string(exe_name) + "_ref" + ".json";
   json ref_json = parse_json_file(file_path);
-  SymbolMap ref_ip_info_map;
+  SymbolMap ref_symbol_map;
   for (auto json_el : ref_json) {
-    Symbol ip_info;
-    from_json(json_el, ip_info);
-    DwflSymbolKey key(ip_info);
-    ref_ip_info_map[key] = ip_info;
+    Symbol symbol;
+    from_json(json_el, symbol);
+    DwflSymbolKey key(symbol);
+    ref_symbol_map[key] = symbol;
   }
-  if (ref_ip_info_map.empty()) {
+  if (ref_symbol_map.empty()) {
     throw std::runtime_error("Unable to create reference set");
   }
   // Loop on all reference elements
   int cpt_not_found = 0;
-  for (const auto &pair_el : ref_ip_info_map) {
+  for (const auto &pair_el : ref_symbol_map) {
     if (map.find(pair_el.first) == map.end()) {
       ++cpt_not_found;
       std::cerr << "Unable to find :" << pair_el.second._demangle_name
                 << std::endl;
     }
   }
-  int failures = cpt_not_found * 100 / ref_ip_info_map.size();
+  int failures = cpt_not_found * 100 / ref_symbol_map.size();
   std::cerr << "******************************" << std::endl;
   std::cerr << "Failures (%) = " << failures << std::endl;
   std::cerr << "******************************" << std::endl;

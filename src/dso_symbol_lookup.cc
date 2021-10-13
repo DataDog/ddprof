@@ -16,8 +16,7 @@ Symbol symbol_from_dso(ElfAddress_t normalized_addr, const Dso &dso) {
   // address that means something for our user (addr)
   std::string dso_dbg_str =
       normalized_addr ? string_format("[%p:dso]", normalized_addr) : "";
-  return Symbol(dso._pgoff, std::string(), dso_dbg_str, 0,
-                dso.format_filename());
+  return Symbol(dso._pgoff, dso_dbg_str, dso_dbg_str, 0, dso.format_filename());
 }
 } // namespace
 

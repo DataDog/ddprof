@@ -91,6 +91,14 @@ TEST(DSOTest, is_within) {
   EXPECT_EQ(find_res.first->_start, 1000);
 }
 
+// caught bug in implem
+TEST(DSOTest, is_within_2) {
+  DsoHdr dso_hdr;
+  fill_mock_hdr(dso_hdr);
+  DsoFindRes find_res = dso_hdr.dso_find_closest(10, 2300);
+  EXPECT_EQ(find_res.second, true);
+}
+
 TEST(DSOTest, intersections) {
   DsoHdr dso_hdr;
   fill_mock_hdr(dso_hdr);

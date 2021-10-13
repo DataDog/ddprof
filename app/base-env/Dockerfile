@@ -28,7 +28,7 @@ RUN apt update \
   libjemalloc-dev \
   libcap-dev \
   gcovr \
-  netcat \
+  netcat-openbsd \
   wget
 
 # Only necessary for ubuntu 16

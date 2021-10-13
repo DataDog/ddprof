@@ -7,7 +7,6 @@ extern "C" {
 #include "logger.h"
 #include "procutils.h"
 #include "signal_helper.h"
-#include "unwind_symbols.h"
 
 #include <dwarf.h>
 }
@@ -67,7 +66,7 @@ static DDRes add_dwfl_frame(UnwindState *us, DsoMod dso_mod, ElfAddress_t pc) {
   UnwindOutput *output = &us->output;
   int64_t current_idx = output->nb_locs;
 
-  DDRes cache_status = dwfl_symbol_get_or_insert(
+  DDRes cache_status = dwfl_lookup_get_or_insert(
       us->symbols_hdr, mod, pc, dso, &output->locs[current_idx]._symbol_idx);
   if (IsDDResNotOK(cache_status)) {
     LG_DBG("Error from dwflmod_cache_status");
@@ -76,10 +75,9 @@ static DDRes add_dwfl_frame(UnwindState *us, DsoMod dso_mod, ElfAddress_t pc) {
 
   output->locs[current_idx].ip = pc;
 
-  ddprof::mapinfo_lookup_get(us->symbols_hdr->_dwfl_mapinfo_lookup,
-                             us->symbols_hdr->_mapinfo_table, mod, dso._id,
-                             &(output->locs[current_idx]._map_info_idx));
-
+  output->locs[current_idx]._map_info_idx =
+      us->symbols_hdr->_mapinfo_lookup.get_or_insert(
+          us->pid, us->symbols_hdr->_mapinfo_table, dso);
   output->nb_locs++;
   return ddres_init();
 }
@@ -179,13 +177,17 @@ static DsoMod update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, uint64_t pc) {
 }
 
 int frame_cb(Dwfl_Frame *state, void *arg) {
+  static unsigned frame_id = 0;
+#ifdef DEBUG
+  LG_NFO("Beging frame id = %d", ++frame_id);
+#endif
   struct UnwindState *us = (UnwindState *)arg;
 
   // Before we potentially exit, record the fact that we're processing a frame
   ddprof_stats_add(STATS_UNWIND_FRAMES, 1, NULL);
 
   if (max_stack_depth_reached(us)) {
-    LG_DBG("Max number of stacks reached");
+    LG_DBG("Max number of stacks reached (frame#%u)", frame_id);
     return DWARF_CB_ABORT;
   }
 
@@ -196,7 +198,7 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
   // activation frame because the underlying DSO (module) may not have been
   // cached yet (but we need the PC to generate/check such a cache
   if (!dwfl_frame_pc(state, &pc, NULL)) {
-    LG_DBG("dwfl_frame_pc NULL (%s)", dwfl_errmsg(-1));
+    LG_DBG("dwfl_frame_pc NULL (%s)(frame#%u)", dwfl_errmsg(-1), frame_id);
     ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
     return DWARF_CB_ABORT;
   }
@@ -204,22 +206,34 @@ int frame_cb(Dwfl_Frame *state, void *arg) {
   Dwfl_Module *mod = dso_mod._dwfl_mod;
 
   if (!mod) {
-    LG_DBG("Unable to retrieve the Dwfl_Module: %s", dwfl_errmsg(-1));
+    LG_DBG("Unable to retrieve the Dwfl_Module: %s (frame#%u)", dwfl_errmsg(-1),
+           frame_id);
     goto ERROR_FRAME_ABORT;
   }
 
   if (!dwfl_frame_pc(state, &pc, &isactivation)) {
-    LG_DBG("Failure to compute frame PC: %s", dwfl_errmsg(-1));
+    LG_DBG("Failure to compute frame PC: %s (frame#%u)", dwfl_errmsg(-1),
+           frame_id);
     goto ERROR_FRAME_ABORT;
   }
   if (!isactivation)
     --pc;
-
+  // updating frame can call backpopulate which invalidates the dso pointer
+  // --> refresh the iterator
+  dso_mod._dso_find_res = us->dso_hdr->dso_find_closest(us->pid, pc);
+  if (!dso_mod._dso_find_res.second) {
+    // strange scenario (backpopulate removed this dso)
+    LG_DBG("Unable to retrieve DSO after call to frame_pc (frame#%u)",
+           frame_id);
+    goto ERROR_FRAME_ABORT;
+  }
   // Now we register
   if (!IsDDResOK(add_dwfl_frame(us, dso_mod, pc))) {
     goto ERROR_FRAME_ABORT;
   }
-
+#ifdef DEBUG
+  LG_NFO("Success frame id = %d", frame_id);
+#endif
   return DWARF_CB_OK;
 ERROR_FRAME_ABORT:
   ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
@@ -230,6 +244,9 @@ ERROR_FRAME_ABORT:
   } else {
     add_common_frame(us, CommonSymbolLookup::LookupCases::unknown_dso);
   }
+#ifdef DEBUG
+  LG_NFO("Error frame id = %d", frame_id);
+#endif
   return DWARF_CB_ABORT;
 }
 
@@ -291,10 +308,12 @@ DDRes unwind_dwfl(UnwindState *us) {
     }
 
     if (!dwfl_getthread_frames(us->dwfl, us->pid, frame_cb, us)) {
+#ifdef DEBUG
       /* This should be investigated - when all errors are solved we can
        * reactivate the log (it is too verbose for now) */
-      // LG_DBG("[UNWIND] dwfl_getthread_frames was nonzero (%s)",
-      // dwfl_errmsg(-1));
+      LG_DBG("[UNWIND] dwfl_getthread_frames was nonzero (%s)",
+             dwfl_errmsg(-1));
+#endif
       res = us->output.nb_locs > 0 ? ddres_init()
                                    : ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
     }

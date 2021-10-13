@@ -88,7 +88,7 @@ struct DsoHdr {
   void pid_free(int pid);
 
   // parse procfs to look for dso elements
-  bool pid_backpopulate(int);
+  bool pid_backpopulate(int, int &nb_elts_added);
 
   // Find the first associated to this pid
   DsoFindRes dso_find_first_executable(pid_t pid) const;
@@ -121,6 +121,8 @@ struct DsoHdr {
     return std::make_pair<ddprof::DsoSetConstIt, bool>(_set.end(), false);
   }
 
+  DsoUID_t find_or_add_dso_uid(const ddprof::Dso &dso);
+
   /********* Region helpers ***********/
   const ddprof::RegionHolder &find_or_insert_region(const ddprof::Dso &dso);
 
@@ -128,5 +130,7 @@ struct DsoHdr {
   ddprof::RegionMap _region_map;
   struct ddprof::DsoStats _stats;
   BackpopulateStateMap _backpopulate_state_map;
+  // Associate unique IDs even for different PIDs
+  std::unordered_map<ddprof::RegionKey, DsoUID_t> _dso_uid_map;
   DsoUID_t _next_dso_id;
 };

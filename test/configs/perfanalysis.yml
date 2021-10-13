@@ -8,6 +8,7 @@ ddprof:
     period: 3
   environment: us1.prod.dog
   loglevel: notice
+  logmode: stdout
   event: sCPU,1000
   faultinfo: on
   worker_period: 2

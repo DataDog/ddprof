@@ -27,11 +27,12 @@ BaseFrameSymbolLookup::get_or_insert(pid_t pid, SymbolTable &symbol_table,
     if (pid) { // only when we are not on pid 0
       DsoFindRes find_res = dso_hdr.dso_find_first_executable(pid);
       if (find_res.second) {
-        LG_WRN("Unable to find base frame for pid %d", pid);
         // use start as address as a trick to remove addr info (as it will most
         // of the time be null and ignored in the dso frame generation)
         symbol_idx = dso_symbol_lookup.get_or_insert(
             find_res.first->_start, *find_res.first, symbol_table);
+      } else {
+        LG_WRN("Unable to find base frame for pid %d", pid);
       }
     }
     // no dso exec dso for this pid : add a v-frame for the pid

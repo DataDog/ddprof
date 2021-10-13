@@ -104,11 +104,11 @@ static void write_function(const ddprof::Symbol &symbol,
 
 #define UNKNOWN_BUILD_ID ffi_empty_char_slice()
 
-static void write_mapping(const ddprof::MapInfo &mapinfo, uint64_t offset,
+static void write_mapping(const ddprof::MapInfo &mapinfo,
                           ddprof_ffi_Mapping *ffi_mapping) {
   ffi_mapping->memory_start = mapinfo._low_addr;
   ffi_mapping->memory_limit = mapinfo._high_addr;
-  ffi_mapping->file_offset = offset;
+  ffi_mapping->file_offset = mapinfo._offset;
   ffi_mapping->filename = std_string_2_slice_c_char(mapinfo._sopath);
   ffi_mapping->build_id = UNKNOWN_BUILD_ID;
 }
@@ -117,7 +117,7 @@ static void write_location(const FunLoc *loc, const ddprof::Symbol &symbol,
                            const ddprof::MapInfo &mapinfo,
                            const ddprof_ffi_Slice_line *lines,
                            ddprof_ffi_Location *ffi_location) {
-  write_mapping(mapinfo, symbol._offset, &ffi_location->mapping);
+  write_mapping(mapinfo, &ffi_location->mapping);
   ffi_location->address = loc->ip;
   ffi_location->lines = *lines;
   // Folded not handled for now

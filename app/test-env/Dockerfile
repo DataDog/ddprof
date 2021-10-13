@@ -4,6 +4,7 @@ FROM ubuntu:${UBUNTU_VERSION}.04 as base
 # Tell docker to use bash as the default
 SHELL ["/bin/bash", "-c"]
 
+# Some of these are just for investigations (as this image is also used to test locally)
 RUN apt update \
     && DEBIAN_FRONTEND=noninteractive apt install -y \
     awscli \
@@ -19,7 +20,9 @@ RUN apt update \
     graphviz \
     valgrind \
     subversion \
-    netcat
+    netcat-openbsd \
+    vim \
+    bsdmainutils
 
 # Newer CMake
 FROM base as cmake

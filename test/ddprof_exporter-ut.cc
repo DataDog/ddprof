@@ -16,6 +16,8 @@ extern "C" {
 #include "unwind_symbols.hpp"
 
 namespace ddprof {
+// todo : cut this dependency
+DwflSymbolLookup_V2::DwflSymbolLookup_V2() : _lookup_setting(K_CACHE_ON) {}
 
 // Mock
 int get_nb_hw_thread() { return 2; }

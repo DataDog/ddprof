@@ -224,6 +224,7 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
     LG_WRN("Timer skew detected; frequent warnings may suggest system issue");
     export_time_set(ctx);
   }
+  unwind_cycle(ctx->worker_ctx.us);
 
   // Reset stats relevant to a single cycle
   ddprof_reset_worker_stats(ctx->worker_ctx.us->dso_hdr);

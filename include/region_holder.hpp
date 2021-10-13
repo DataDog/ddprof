@@ -68,6 +68,6 @@ template <> struct hash<ddprof::RegionKey> {
 } // namespace std
 namespace ddprof {
 // Associate files to mmaped regions (unique ptr to avoid copies)
-typedef std::unordered_map<RegionKey, RegionHolder> RegionMap;
+typedef std::unordered_map<DsoUID_t, RegionHolder> RegionMap;
 
 } // namespace ddprof

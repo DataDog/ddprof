@@ -13,5 +13,7 @@ typedef uint32_t DsoUID_t;
 
 typedef int32_t SymbolIdx_t;
 typedef int32_t MapInfoIdx_t;
+// Absolute address (needs to be adjusted with the start address of binary)
 typedef uint64_t ElfAddress_t;
+// Address within a binary : adjust doing (abs_addr - start_bin) + offset
 typedef ElfAddress_t Offset_t;

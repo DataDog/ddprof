@@ -13,8 +13,8 @@ extern "C" {
 #include "unwind_symbols.hpp"
 
 DDRes unwind_init(struct UnwindState *us) {
-  DDRES_CHECK_FWD(unwind_symbols_hdr_init(&(us->symbols_hdr)));
   try {
+    us->symbols_hdr = new UnwindSymbolsHdr();
     us->dso_hdr = new DsoHdr();
     ddprof::unwind_dwfl_init(us);
   }
@@ -24,11 +24,11 @@ DDRes unwind_init(struct UnwindState *us) {
 }
 
 void unwind_free(struct UnwindState *us) {
-  unwind_symbols_hdr_free(us->symbols_hdr);
+  delete us->symbols_hdr;
   delete us->dso_hdr;
-  us->dso_hdr = nullptr;
   ddprof::unwind_dwfl_free(us);
-  us->symbols_hdr = NULL;
+  us->symbols_hdr = nullptr;
+  us->dso_hdr = nullptr;
 }
 
 DDRes unwindstate__unwind(UnwindState *us) {
@@ -44,4 +44,9 @@ void unwind_pid_free(struct UnwindState *us, pid_t pid) {
   us->dso_hdr->pid_free(pid);
   us->dwfl_hdr->clear_pid(pid);
   us->symbols_hdr->_base_frame_symbol_lookup.erase(pid);
+}
+
+void unwind_cycle(struct UnwindState *us) {
+  us->symbols_hdr->display_stats();
+  us->symbols_hdr->cycle();
 }

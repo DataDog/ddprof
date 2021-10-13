@@ -9,3 +9,5 @@
 // config of cpp checks needs more includes
 missingInclude
 unusedLabel:*/dso-ut.cc
+// warning about weird comma : I could not explain this warning
+constStatement:*/dwfl_symbol_lookup.cc

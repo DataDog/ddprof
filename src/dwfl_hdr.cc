@@ -46,7 +46,7 @@ void DwflHdr::clear_unvisited() {
   }
   for (pid_t el : pids_remove) {
     _dwfl_map.erase(el);
-    LG_NFO("[DWFL] DWFL Map Clearing PID %d \n", el);
+    LG_NFO("[DWFL] DWFL Map Clearing PID%d", el);
   }
 
   // clear the list of visited for next cycle

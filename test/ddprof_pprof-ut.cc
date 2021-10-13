@@ -18,6 +18,9 @@ extern "C" {
 #include <string>
 
 namespace ddprof {
+// todo : cut this dependency
+DwflSymbolLookup_V2::DwflSymbolLookup_V2() : _lookup_setting(K_CACHE_ON) {}
+
 TEST(DDProfPProf, init_profiles) {
   DDProfPProf pprofs;
   const PerfOption *perf_option_cpu = perfoptions_preset(10);

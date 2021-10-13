@@ -131,15 +131,20 @@ DsoFindRes DsoHdr::dso_find_closest(pid_t pid, ElfAddress_t addr) {
   Dso temp_dso(pid, addr, addr);
   // First element not less than (can match a start addr)
   DsoSetConstIt it = _set.lower_bound(temp_dso);
-  if (it == _set.end()) {
+  if (it != _set.end()) { // map is empty
+    is_within = it->is_within(pid, addr);
+    if (is_within) { // exact match
+      return std::make_pair<ddprof::DsoSetConstIt, bool>(std::move(it),
+                                                         std::move(is_within));
+    }
+  }
+  // previous element is more likely to contain our addr
+  if (it != _set.begin()) {
+    --it;
+  } else { // map is empty
     return find_res_not_found();
   }
   is_within = it->is_within(pid, addr);
-  // go back one element to check if we find it
-  if (!is_within && it != _set.begin()) {
-    --it;
-    is_within = it->is_within(pid, addr);
-  }
   return std::make_pair<ddprof::DsoSetConstIt, bool>(std::move(it),
                                                      std::move(is_within));
 }
@@ -209,17 +214,7 @@ DsoRange DsoHdr::get_pid_range(pid_t pid) {
 
 // erase range of elements
 void DsoHdr::erase_range(const DsoRange &range) {
-  auto it = range.first;
-  while (it != range.second) {
-    // someone else could need this region, but we do not hold a reference
-    // count (over optim ?)
-    LG_DBG("[DSO] : Erase %s", it->to_string().c_str());
-    ddprof::RegionKey key(it->_filename, it->_pgoff, it->_end - it->_start + 1,
-                          it->_type);
-    _region_map.erase(key);
-    ++it;
-  }
-
+  // region maps are kept (as they are used for several pids)
   _set.erase(range.first, range.second);
 }
 
@@ -233,6 +228,22 @@ DsoFindRes DsoHdr::dso_find_same_or_smaller(const ddprof::Dso &dso) {
     res.second = res.first->same_or_smaller(dso);
   }
   return res;
+}
+
+DsoUID_t DsoHdr::find_or_add_dso_uid(const Dso &dso) {
+  if (dso._type != ddprof::dso::DsoType::kStandard) {
+    return _next_dso_id++;
+  }
+  ddprof::RegionKey key(dso._filename, dso._pgoff, dso._end - dso._start + 1,
+                        dso._type);
+  auto it = _dso_uid_map.find(key);
+  if (it == _dso_uid_map.end()) {
+    DsoUID_t current_uid = _next_dso_id++;
+    _dso_uid_map.emplace(std::move(key), current_uid);
+    return current_uid;
+  } else {
+    return it->second;
+  }
 }
 
 DsoFindRes DsoHdr::insert_erase_overlap(ddprof::Dso &&dso) {
@@ -249,8 +260,9 @@ DsoFindRes DsoHdr::insert_erase_overlap(ddprof::Dso &&dso) {
     erase_range(range);
   }
   _stats.incr_metric(DsoStats::kNewDso, dso._type);
+
   // Warning : adding new inserts should update UIDs
-  dso._id = _next_dso_id++;
+  dso._id = find_or_add_dso_uid(dso);
   LG_DBG("[DSO] : Insert %s", dso.to_string().c_str());
   // warning rvalue : do not use dso after this line
   return _set.insert(dso);
@@ -266,7 +278,8 @@ DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr) {
       bp_state._perm = kForbidden;    // ... but only once
       LG_NTC("[DSO] Couldn't find DSO for [%d](0x%lx). backpopulate", pid,
              addr);
-      if (pid_backpopulate(pid)) {
+      int nb_elts_added = 0;
+      if (pid_backpopulate(pid, nb_elts_added) && nb_elts_added) {
         find_res = dso_find_closest(pid, addr);
       }
 #ifndef NDEBUG
@@ -333,13 +346,11 @@ DsoFindRes DsoHdr::pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
 
 const ddprof::RegionHolder &
 DsoHdr::find_or_insert_region(const ddprof::Dso &dso) {
-  ddprof::RegionKey key(dso._filename, dso._pgoff, dso._end - dso._start + 1,
-                        dso._type);
-  const auto find_res = _region_map.find(key);
+  const auto find_res = _region_map.find(dso._id);
   LG_DBG("[DSO] Get region - %s", dso.to_string().c_str());
   if (find_res == _region_map.end()) {
     const auto insert_res = _region_map.emplace(
-        std::move(key),
+        dso._id,
         ddprof::RegionHolder(dso._filename, dso._end - dso._start + 1,
                              dso._pgoff, dso._type));
     assert(insert_res.second);
@@ -355,9 +366,11 @@ void DsoHdr::pid_free(int pid) {
   erase_range(range);
 }
 
-// Return false if nothing was added
-// Return true if a dso was added
-bool DsoHdr::pid_backpopulate(int pid) {
+// Return false if proc map is not available
+// Return true proc map was found, use nb_elts_added for number of added
+// elements
+bool DsoHdr::pid_backpopulate(int pid, int &nb_elts_added) {
+  nb_elts_added = 0;
   ProcFileHolder proc_file_holder(pid);
   LG_NTC("[DSO] Backpopulating PID %d", pid);
   FILE *mpf = proc_file_holder._mpf;
@@ -370,20 +383,20 @@ bool DsoHdr::pid_backpopulate(int pid) {
 
   char *buf = NULL;
   size_t sz_buf = 0;
-  bool element_added = false;
+
   while (-1 != getline(&buf, &sz_buf, mpf)) {
     Dso dso = dso_from_procline(pid, buf);
     if (dso._pid == -1) { // invalid dso
       continue;
     }
     if ((insert_erase_overlap(std::move(dso))).second) {
-      element_added = true;
+      ++nb_elts_added;
     }
   }
   if (buf != NULL) {
     free(buf);
   }
-  return element_added;
+  return true;
 }
 
 Dso DsoHdr::dso_from_procline(int pid, char *line) {

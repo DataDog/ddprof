@@ -32,7 +32,8 @@ static inline void fill_symbol_table_1(SymbolTable &symbol_table) {
 
 static inline void fill_mapinfo_table_1(MapInfoTable &mapinfo_table) {
   for (unsigned i = 0; i < K_MOCK_LOC_SIZE; ++i) {
-    mapinfo_table.emplace_back(100 + i, 200 + i, std::string(s_so_paths[0]));
+    mapinfo_table.emplace_back(100 + i, 200 + i, 10 + i,
+                               std::string(s_so_paths[0]));
   }
 }
 

@@ -195,11 +195,12 @@ if [[ "yes" == "${USE_PERFSTAT,,}" ]]; then
   empty_or_exit ${PREPEND_CMD}
   # -x allows for csv format
   PREPEND_CMD="perf stat -x ','"
+  # PREPEND_CMD="perf stat" # standard display (vs csv)
 fi
 
 if [[ "yes" == "${USE_GDB,,}" ]]; then
-  echo "Gdb does not work. fix me !"
-  exit 1
+  empty_or_exit ${PREPEND_CMD}
+  PREPEND_CMD="gdb --command=$SCRIPTDIR/configs/gdb_commands.txt  --args"
 fi
 
 
@@ -235,6 +236,7 @@ DDPROF_CMD="${CMD} \
   -e ${cfg_ddprof_event} \
   -s ${cfg_ddprof_faultinfo} \
   -w ${cfg_ddprof_worker_period} \
+  -o ${cfg_ddprof_logmode} \
   -a ${cfg_ddprof_printargs}"
 
 # Set any switchable environment variables

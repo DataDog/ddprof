@@ -21,6 +21,7 @@ usage() {
     echo ""
     echo "-r record performance results (in $RECORD_FILE)"
     echo "-b <ddprof_folder> override ddprof folder."
+    echo "-e <executable> override executable to benchmark."
 }
 
 RECORD_STATS="no"
@@ -72,6 +73,8 @@ do
     expected_trace=$(grep "${trace}" ${output_second})
     if [ -z "${expected_trace-=''}" ]; then
         echo "error : unable to find pattern ${trace}"
+        echo "---------------- Dump trace for analysis ----------------"
+        cat ${output_second}
         exit 1
     fi
 done

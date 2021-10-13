@@ -9,7 +9,7 @@
 namespace suw {
 
 // Avoid flaky CI failures
-static const int k_failure_threshold = 25;
+static const int k_failure_threshold = 45;
 
 static inline std::size_t hash_combine(std::size_t lhs, std::size_t rhs) {
   return rhs + 0x9e3779b9 + (lhs << 6) + (lhs >> 2);
@@ -68,7 +68,7 @@ using json = nlohmann::json;
 using SymbolMap = std::unordered_map<suw::DwflSymbolKey, ddprof::Symbol>;
 
 // Append ip info to a json file
-void add_symbol(json &j, const ddprof::Symbol &ip_info);
+void add_symbol(json &j, const ddprof::Symbol &symbol);
 
 void write_json_file(std::string_view exe_name, const SymbolMap &map,
                      std::string_view data_directory = "");
