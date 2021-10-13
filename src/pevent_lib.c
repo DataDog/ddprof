@@ -11,12 +11,25 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-void pevent_init(PEventHdr *pevent_hdr) {
+DDRes pevent_init(PEventHdr *pevent_hdr) {
   memset(pevent_hdr, 0, sizeof(PEventHdr));
   pevent_hdr->max_size = MAX_NB_WATCHERS;
   for (int k = 0; k < pevent_hdr->max_size; ++k) {
     pevent_hdr->pes[k].fd = -1;
+
+    // Allocate room for a watcher-held buffer.  This is for linearizing
+    // ringbuffer elements and depends on the per-watcher configuration for
+    // perf_event_open().  Right now these are globally held, but these lines
+    // need to be updated when the reg count, stack size, or other dynamic
+    // quantities become variable.
+    uint64_t buf_sz = PERF_REGS_COUNT + PERF_SAMPLE_STACK_SIZE;
+    buf_sz += sizeof(perf_event_sample);
+    pevent_hdr->pes[k].wrbuf = malloc(buf_sz);
+    if (!pevent_hdr->pes[k].wrbuf) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PEINIT, "Error allocating storage for pevent watcher %d", k);
+    }
   }
+  return ddres_init();
 }
 
 DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,

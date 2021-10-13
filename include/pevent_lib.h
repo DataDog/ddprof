@@ -4,7 +4,8 @@
 #include "ddres_def.h"
 #include "pevent.h"
 
-void pevent_init(PEventHdr *pevent_hdr);
+// Sets initial state for every pevent in the pevent_hdr, also allocates space
+DDRes pevent_init(PEventHdr *pevent_hdr);
 
 /// Setup perf event according to requested watchers.
 DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,

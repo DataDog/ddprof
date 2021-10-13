@@ -78,10 +78,6 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   // disposition so that profiling is halted upon its termination
   *continue_profiling = false;
 
-  // Setup some storage to handle wraparound ringbuffer elements
-  unsigned char wrbuf[PERF_REGS_COUNT + PERF_SAMPLE_STACK_SIZE +
-                      sizeof(perf_event_sample)] = {0};
-
   // Setup poll() to watch perf_event file descriptors
   struct pollfd pfd[MAX_NB_WATCHERS];
   int pfd_len = 0;
@@ -146,6 +142,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
         // linearized buffer.  In the index space of the ringbuffer, these terms
         // would be reversed.
         if (rb_size - rb->offset < hdr->size) {
+          unsigned char *wrbuf = pes->wrbuf;
           uint64_t left_sz = rb_size - rb->offset;
           uint64_t right_sz = hdr->size - left_sz;
           memcpy(wrbuf, rb->start + rb->offset, left_sz);

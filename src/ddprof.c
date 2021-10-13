@@ -42,7 +42,9 @@ static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
 
 DDRes ddprof_setup(DDProfContext *ctx, pid_t pid) {
   PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
-  pevent_init(pevent_hdr);
+  DDRes res = pevent_init(pevent_hdr);
+  if (!IsDDResOK(res))
+    return res;
 
   // Don't stop if error as this is only for debug purpose
   if (IsDDResNotOK(log_capabilities(false))) {

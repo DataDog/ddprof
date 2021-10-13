@@ -9,6 +9,7 @@ typedef struct PEvent {
   int fd;  // Underlying perf event FD
   struct perf_event_mmap_page *region;
   size_t reg_size; // size of region
+  unsigned char* wrbuf;
 } PEvent;
 
 typedef struct PEventHdr {
