@@ -5,7 +5,7 @@
 #include <iostream>
 #include <map>
 #include <streambuf>
-#include <string_view>
+#include <string>
 
 namespace suw {
 
@@ -26,8 +26,8 @@ void add_symbol(json &j, const Symbol &symbol) {
   to_json(symbol_j, symbol);
   j.push_back(symbol_j);
 }
-static void write_json_file(std::string_view exe_name, const json &data,
-                            std::string_view data_directory) {
+static void write_json_file(std::string exe_name, const json &data,
+                            std::string data_directory) {
   std::string file_path;
   if (data_directory.empty())
     file_path = std::string(STACK_DATA);
@@ -43,8 +43,8 @@ static void write_json_file(std::string_view exe_name, const json &data,
   file << data.dump(k_indent_spaces);
 }
 
-void write_json_file(std::string_view exe_name, const SymbolMap &map,
-                     std::string_view data_directory) {
+void write_json_file(std::string exe_name, const SymbolMap &map,
+                     std::string data_directory) {
   json unique_symbol;
   for (const auto &info : map) {
     add_symbol(unique_symbol, info.second);
@@ -64,8 +64,8 @@ json parse_json_file(const std::string &filePath) {
   return ret;
 }
 
-int compare_to_ref(std::string_view exe_name, const SymbolMap &map,
-                   std::string_view data_directory) {
+int compare_to_ref(std::string exe_name, const SymbolMap &map,
+                   std::string data_directory) {
   std::string file_path;
   if (data_directory.empty())
     file_path = std::string(STACK_DATA);

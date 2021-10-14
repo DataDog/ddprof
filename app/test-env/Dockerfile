@@ -42,7 +42,7 @@ RUN KERNEL_VERSION=$(uname -r | awk -F '[-\.]' '{print "v"$1"."$2}') && \
     cp perf /usr/local/bin
 
 # Retrieve a program to run
-RUN git clone --depth 1 --branch ddprof_ci https://github.com/DataDog/bad-boggle-solver.git
+RUN git clone --depth 1 --branch ddprof_ci_v2 https://github.com/DataDog/bad-boggle-solver.git
 
 # Build and install toy project
 RUN cd bad-boggle-solver \ 

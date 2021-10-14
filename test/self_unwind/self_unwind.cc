@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
   int ret = 0;
   bool continue_exec;
   pid_t pid_test_prog = launch_test_prog();
-  std::string_view data_directory("");
+  std::string data_directory("");
 
   if (argc >= 2) {
     data_directory = argv[1];

@@ -53,7 +53,8 @@ SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
   }
 #endif
 #ifdef DEBUG
-  LG_DBG("Looking for : %lx ", normalized_pc);
+  LG_DBG("Looking for : %lx = (%lx - %lx) + (offset : %lx) / dso:%s",
+         normalized_pc, newpc, dso._start, dso._pgoff, dso._filename.c_str());
 #endif
   DsoUID_t dso_uid = dso._id;
   DwflSymbolMap &map = _dso_map[dso_uid];
@@ -86,7 +87,7 @@ SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
     // Override with info from dso
     // Avoid bouncing on these requests and insert an element
     Offset_t start_sym = normalized_pc;
-    Offset_t end_sym = normalized_pc + k_sym_min_size;
+    Offset_t end_sym = normalized_pc + 1;
 
     SymbolIdx_t symbol_idx = dso_symbol_lookup.get_or_insert(newpc, dso, table);
 #ifdef DEBUG
@@ -97,13 +98,20 @@ SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
 
     return symbol_idx;
   } else { // Success from dwarf symbolization
-    Offset_t start_sym = elf_sym.st_value;
+    bool normalize_elf = dso.is_within(dso._pid, elf_sym.st_value);
+    Offset_t start_sym = normalize_elf
+        ? (elf_sym.st_value - dso._start) + dso._pgoff
+        : elf_sym.st_value;
+    ;
+
     if (elf_sym.st_size == 0) { // when size is 0, bump it to min
       elf_sym.st_size += k_sym_min_size;
     }
     Offset_t end_sym =
         std::max(elf_sym.st_value + elf_sym.st_size - 1, normalized_pc);
-
+    if (normalize_elf) {
+      end_sym = (end_sym - dso._start) + dso._pgoff;
+    }
     // Check if the closest element is the same
     if (find_res.first != map.end()) {
       // if it is the same -> extend the end
@@ -138,6 +146,22 @@ SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
   }
 }
 
+static void check_range_assumption(ElfAddress_t mod_addr, ElfAddress_t elf_addr,
+                                   size_t elf_size, ElfAddress_t newpc) {
+  LG_NFO("WO VMA lsym.from=%lx, lsym.to=%lx", elf_addr, elf_addr + elf_size);
+  if ((newpc >= mod_addr + elf_addr) &&
+      (newpc <=
+       mod_addr + elf_addr + elf_size + DwflSymbolLookup_V2::k_sym_min_size)) {
+    LG_NFO("DWFL: WARNING -- YEAH IN NORMALIZED RANGE");
+  } else if ((newpc >= elf_addr) &&
+             (newpc <=
+              elf_addr + elf_size + DwflSymbolLookup_V2::k_sym_min_size)) {
+    LG_NFO("DWFL: WARNING -- OH IN VMA RANGE ! STILL YEAH ??");
+  } else {
+    LG_NFO("DWFL: WARNING -- ERROR NOTHING MAKES SENSE, RUN");
+  }
+}
+
 // compute the info using dwarf and demangle APIs
 static void symbol_get_from_dwfl(Dwfl_Module *mod, Dwarf_Addr newpc,
                                  Symbol &symbol, GElf_Sym &elf_sym) {
@@ -152,13 +176,8 @@ static void symbol_get_from_dwfl(Dwfl_Module *mod, Dwarf_Addr newpc,
   if (lsymname) {
 
 #ifdef DEBUG
-    if (!(newpc >= mod->low_addr + elf_sym.st_value) ||
-        !(newpc <= mod->low_addr + elf_sym.st_value + elf_sym.st_size +
-              DwflSymbolLookup_V2::k_sym_min_size)) {
-      LG_NFO("WO VMA lsym.from=%lx, lsym.to=%lx", elf_sym.st_value,
-             elf_sym.st_value + elf_sym.st_size);
-      LG_NFO("DWFL: WARNING -- BAD ASSUMPTION ON ELF SYMBOL RANGE");
-    }
+    check_range_assumption(mod->low_addr, elf_sym.st_value, elf_sym.st_size,
+                           newpc);
 #endif
 
     symbol._symname = std::string(lsymname);
@@ -237,9 +256,10 @@ bool DwflSymbolLookup_V2::symbol_lookup_check(struct Dwfl_Module *mod,
                                                   &lshndxp, &lelfp, &lbias);
 
 #ifdef DEBUG
-  LG_DBG("DWFL: Lookup res = %lx->%lx, shndx=%u, biais=%lx, elfp=%p, shndxp=%u",
+  LG_DBG("DWFL: Lookup res = %lx->%lx, shndx=%u, biais=%lx, elfp=%p, "
+         "shndxp=%u, %s",
          lsym.st_value, lsym.st_value + lsym.st_size, lsym.st_shndx, lbias,
-         lelfp, lshndxp);
+         lelfp, lshndxp, localsymname);
 #endif
 
   bool error_found = false;

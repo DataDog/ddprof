@@ -10,8 +10,9 @@ variables:
   BUILD_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:8e28c7939ca877af6117151eaec5d03c0341e7115abca6c0d46cbd701543fb0a
   BUILD_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:c4c2756dfe034dbba5f573fc3bdf7f056bec5914b49b81901afe3380daa5bfac
   # https://gitlab.ddbuild.io/DataDog/ddprof/-/pipelines/5611418
-  TEST_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:70bdae2cae2eafe2285dbae47c6a991dbd253b73e11f8b7232935099e2acf2ae
-  TEST_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:1a1bd456d3b8f2dd769e507f56596009a4cd2089bbd6e8a08cf93e92abb42c19
+  TEST_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:a06908a49fbdf93fb62e7c5a650ec6da587c21f8f5060cf0657d4b08a63df985
+  TEST_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:128fff36c0cc5a8d9f31d8082fbcdde7fe8cad960514f01a1a11b209ef94d08b
+  TEST_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:04c624f448361a67a8899cf141d0ebaed0e8e55a4276fed765c5459453a5145c
   # When build images are built, publish them with following tags
   BASE_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
   BUILD_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build
@@ -67,7 +68,7 @@ build:testing:
   tags: ["runner:docker", "size:large"]
   parallel:
     matrix:
-      - UB_VERSION: ["18", "20"]
+      - UB_VERSION: ["16", "18", "20"]
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
   script:
     - set -euo pipefail
@@ -111,16 +112,10 @@ build:ddprof:
     - source setup_env.sh
     - export LIBC_VERSION=`ldd --version | head -n 1 | awk '{print $NF}'`
     - export DELIVERY_PATH="${CI_PROJECT_DIR}/${BINPATH}/${LIBC_TYPE}/${LIBC_VERSION}/${BUILD_TYPE}/"
-    # Accuracy test : Self unwind is c++17 (todo: backport to c++14). following line checks that we are over 2.30
-    - if (( `echo $LIBC_VERSION| awk -F '.' '{print $2}'` > 30 )); then
-    - export ACCURACY_TEST=ON
-    - else
-    - export ACCURACY_TEST=OFF
-    - fi
     #Build image dependencies were stored in app, avoid rebuilding vendor content
     - ln -s /app/vendor vendor
     - mkdir -p ${BUILDPATH} && cd ${BUILDPATH}
-    - cmake -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_BENCHMARKS=ON -DACCURACY_TEST=${ACCURACY_TEST} -DBUILD_NATIVE_LIB=ON -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
+    - cmake -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_BENCHMARKS=ON -DACCURACY_TEST=ON -DBUILD_NATIVE_LIB=ON -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
     # Static checks
     - make cppcheck
     - make format
@@ -172,7 +167,7 @@ test:ddprof:
   tags: ["runner:k8s"]
   parallel:
     matrix:
-      - IMAGE: ["${TEST_IMG_18_STICKY}", "${TEST_IMG_20_STICKY}"]
+      - IMAGE: ["${TEST_IMG_16_STICKY}", "${TEST_IMG_18_STICKY}", "${TEST_IMG_20_STICKY}"]
         BUILD_TYPE: ["Release", "SanitizedDebug"]
   script:
     - set -euxo pipefail
@@ -185,25 +180,25 @@ test:ddprof:
     - echo "CHECK SETTING ON PINNED MEMORY" && ulimit -l
     - echo "CHECK SETTING on PERF EVEN OPEN" && cat /proc/sys/kernel/perf_event_mlock_kb
     - echo ""
-    - check_dependencies.sh ${BINDIR}/ddprof test/data/expected_deps_${BUILD_TYPE}.txt
+    - if [ ${BUILD_TYPE} == "Release" ]; then 
+    - check_dependencies.sh ${BINDIR}/ddprof test/data/expected_deps_${LIBC_TYPE}_${LIBC_VERSION}_${BUILD_TYPE}.txt
+    - fi
     # Print help (checks that we have the correct help associated to params)
     - ${BINDIR}/ddprof -h
+    # Record perf only for release and more recent libc versions (perfs are bad on libc 23)
+    - if (( `echo $LIBC_VERSION| awk -F '.' '{print $2}'` > 27 )) && [ ${BUILD_TYPE} == "Release" ]; then
+    - export RECORD_OPTION="-r"
+    - else 
+    - export RECORD_OPTION="" # no recording
+    - fi
     # Run toy project for 5 seconds
     - mkdir pprofs && export DDPROF_PPROFS_FOLDER="$PWD/pprofs"
     - run.sh -b ${BINDIR} BadBoggleSolver_run 5
     - ls ${DDPROF_PPROFS_FOLDER} # todo : add a check on pprofs
     - unset DDPROF_PPROFS_FOLDER
-    - if [ ${BUILD_TYPE} == "Release" ]; then # record only in release mode
-    - native_bench.sh -r -b ${BINDIR}
-    - else # still run it to catch sanitizer errors
-    - native_bench.sh -b ${BINDIR}
-    - fi
-    # Execute a bench with larger number of forks (using sleep)
-    - if [ ${BUILD_TYPE} == "Release" ]; then # record only in release mode
-    - native_bench.sh -r -b ${BINDIR} -e sleep.sh
-    - else # still run it to catch sanitizer errors
-    - native_bench.sh -b ${BINDIR} -e sleep.sh
-    - fi
+    # Run the BadBoggleSolver_run as a benchmark
+    - native_bench.sh ${RECORD_OPTION} -b ${BINDIR}
+    - native_bench.sh ${RECORD_OPTION} -b ${BINDIR} -e sleep.sh
     # Accuracy check for unwinding (only if it was built)
     - if [ -e  ${BINDIR}/selfuw ]; then
     - ${BINDIR}/selfuw ${CI_PROJECT_DIR}/test/self_unwind/data
