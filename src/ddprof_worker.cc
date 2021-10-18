@@ -282,9 +282,6 @@ static DDRes reset_state(DDProfContext *ctx,
                            __FUNCTION__);
   }
 
-  // clean up pids that we did not see recently
-  ctx->worker_ctx.us->dwfl_hdr->clear_unvisited();
-
   // Check to see whether we need to clear the whole worker
   // NOTE: we do not reset the counters here, since clearing the worker
   //       1. is nonlocalized to this function; we just send a return value

@@ -51,4 +51,7 @@ void unwind_pid_free(struct UnwindState *us, pid_t pid) {
 void unwind_cycle(struct UnwindState *us) {
   us->symbols_hdr->display_stats();
   us->symbols_hdr->cycle();
+
+  // clean up pids that we did not see recently
+  us->dwfl_hdr->clear_unvisited();
 }

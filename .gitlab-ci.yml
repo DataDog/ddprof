@@ -257,7 +257,7 @@ promote:ddprof:
   tags: ["runner:docker"]
   script:
     - set -euo pipefail
-    - export PROMOTE=YES
+    - export PROMOTE=MAJOR
     - tools/ci_upload.sh
   dependencies:
     - build:ddprof
