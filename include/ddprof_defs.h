@@ -13,7 +13,13 @@ typedef uint32_t DsoUID_t;
 
 typedef int32_t SymbolIdx_t;
 typedef int32_t MapInfoIdx_t;
-// Absolute address (needs to be adjusted with the start address of binary)
+// Generic type : prefer the more explicit types
 typedef uint64_t ElfAddress_t;
-// Address within a binary : adjust doing (abs_addr - start_bin) + offset
+// Offset types : add or substract to address types
 typedef ElfAddress_t Offset_t;
+// Absolute address (needs to be adjusted with the start address of binary)
+typedef ElfAddress_t ProcessAddress_t;
+// Address within a binary : adjust doing (abs_addr - start_bin) + offset
+typedef ElfAddress_t FileAddress_t;
+// Address within the loaded part of the region
+typedef ElfAddress_t RegionAddress_t;

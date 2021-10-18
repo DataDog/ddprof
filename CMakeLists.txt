@@ -62,8 +62,19 @@ include(Finddogfood)
 # llvm-demangle
 include(FindLibLlvmDemangle)
 
+# Dependency cache
 add_custom_target(deps
                   DEPENDS llvm-deps ddprof-deps elfutils-deps dogfood-deps)
+
+# Lzma
+find_package(LibLZMA)
+list(APPEND DDPROF_INCLUDE_LIST ${LIBLZMA_INCLUDE_DIRS})
+get_filename_component(LIB_DIRNAME_LZMA ${LIBLZMA_LIBRARIES} DIRECTORY)
+message(STATUS "LibLZMA found in following folder : " ${LIB_DIRNAME_LZMA})
+link_directories(${LIB_DIRNAME_LZMA})
+
+## Elf libraries
+list(APPEND ELFUTILS_LIBRARIES dw elf libz.a liblzma.a)
 
 #######################
 ### Static analysis ###
@@ -139,12 +150,6 @@ if (NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
    message(STATUS "BUILD WILL FAIL : NON LINUX SYSTEMS NOT HANDLED")
 endif()
 
-# Lzma
-find_package(LibLZMA)
-list(APPEND DDPROF_INCLUDE_LIST ${LIBLZMA_INCLUDE_DIRS})
-get_filename_component(LIB_DIRNAME_LZMA ${LIBLZMA_LIBRARIES} DIRECTORY)
-message(STATUS "LibLZMA found in following folder : " ${LIB_DIRNAME_LZMA})
-link_directories(${LIB_DIRNAME_LZMA})
 
 list(APPEND DDPROF_INCLUDE_LIST ${LLVM_DEMANGLE_PATH}/include)
 
@@ -157,7 +162,6 @@ aux_source_directory(src/pprof PPROF_SRC)
 aux_source_directory(src/exporter EXPORTER_SRC)
 aux_source_directory(src/exe EXE_SRC)
 
-
 # Define all sources
 set(DDPROF_GLOBAL_SRC
    ${COMMON_SRC}
@@ -165,8 +169,7 @@ set(DDPROF_GLOBAL_SRC
    ${EXPORTER_SRC}
    ${EXE_SRC})
 
-
-set(DDPROF_LIBRARY_LIST llvm-demangle dw elf libz.a Threads::Threads liblzma.a amc::amc)
+set(DDPROF_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads amc::amc)
 
 if("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
    # Static link of libstdc++ (in case it is not installed on customer side)
@@ -223,7 +226,7 @@ option(BUILD_NATIVE_LIB "Build a library out of the native profiler" OFF)
       ${LIB_SRC})
 
    ## Libs to link
-   set(NATIVE_LIB_LIBRARY_LIST llvm-demangle dw elf libz.a Threads::Threads liblzma.a amc::amc)
+   set(NATIVE_LIB_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads amc::amc)
    list(APPEND NATIVE_LIB_INCLUDE_LIST ${LIBDDPROF_INCLUDE_DIR} ) # to be removed (unlikely.h)
    list(APPEND NATIVE_LIB_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include ${ELFUTILS_INCLUDE_LIST} ${DOGFOOD_INCLUDE_DIR}) # legit includes
 

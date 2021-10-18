@@ -24,6 +24,8 @@ DDRes unwind_init(struct UnwindState *us) {
 }
 
 void unwind_free(struct UnwindState *us) {
+  if (!us)
+    return;
   delete us->symbols_hdr;
   delete us->dso_hdr;
   ddprof::unwind_dwfl_free(us);

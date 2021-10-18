@@ -12,9 +12,6 @@ DDPROF_CONFIG_FILE=${TOP_LVL_DIR}/test/configs/perfanalysis.yml
 RECORD_FILE=${TOP_LVL_DIR}/test/data/perf_local_results.csv
 TOY_EXE="BadBoggleSolver_run"
 
-### TRACES TO FIND IN EXECUTION ###
-# fragile but simple pattern : check for traces to make sure we followed expected flow
-declare -a arr_expected=("Entering main loop" "unwind.ticks")
 
 usage() {
     echo "Launchs ddprof with a toy project and gather performance results."
@@ -68,16 +65,11 @@ run.sh -f ${DDPROF_CONFIG_FILE} --perfstat ${BUILD_OPT} ${TOY_EXE} ${BENCH_RUN_D
 echo "Wait for end of run..."
 wait
 
-for trace in "${arr_expected[@]}"
-do
-    expected_trace=$(grep "${trace}" ${output_second})
-    if [ -z "${expected_trace-=''}" ]; then
-        echo "error : unable to find pattern ${trace}"
-        echo "---------------- Dump trace for analysis ----------------"
-        cat ${output_second}
-        exit 1
-    fi
-done
+check_log_errors.sh ${output_second}
+retVal=$?
+if [ $retVal -ne 0 ]; then
+    exit 1
+fi
 
 echo "Retrieve CPU value"
 

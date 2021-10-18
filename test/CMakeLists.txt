@@ -90,7 +90,7 @@ add_unit_test(
 add_unit_test(
     demangle-ut
     demangle-ut.cc
-    LIBRARIES llvm-demangle libstdc++.a
+    LIBRARIES llvm-demangle
 )
 target_include_directories(demangle-ut PRIVATE ${LLVM_DEMANGLE_PATH}/include)
 
@@ -207,3 +207,12 @@ add_unit_test(
     DEFINITIONS MYNAME="tags-ut"
 )
 target_include_directories(tags-ut PRIVATE ${DOGFOOD_INCLUDE_DIR})
+
+add_unit_test(
+    dwfl_symbol-ut
+    dwfl_symbol-ut.cc
+    ../src/dwfl_symbol.cc
+    LIBRARIES llvm-demangle ${ELFUTILS_LIBRARIES}
+    DEFINITIONS MYNAME="dwfl_symbol-ut"
+)
+target_include_directories(dwfl_symbol-ut PRIVATE ${ELFUTILS_INCLUDE_LIST} ${LLVM_DEMANGLE_PATH}/include)

@@ -14,6 +14,8 @@ struct Dwfl_Module;
 
 namespace ddprof {
 
+#define DWFL_CACHE_AS_MAP
+
 struct DwflSymbolLookupStats {
   DwflSymbolLookupStats()
       : _hit(0), _calls(0), _errors(0), _no_dwfl_symbols(0) {}
@@ -49,7 +51,14 @@ private:
   DsoUID_t _dso_id;
 };
 
+// Allows to Choose between a hashmap and a map (managing ranges)
+#ifndef DWFL_CACHE_AS_MAP
+// Fallback mechanism if a cache issue is found the hashmap is safe
+using DwflSymbolMap = std::unordered_map<Offset_t, DwflSymbolVal_V2>;
+#else
+// Range management allows better performances (and less mem overhead)
 using DwflSymbolMap = std::map<Offset_t, DwflSymbolVal_V2>;
+#endif
 using DwflSymbolMapIt = DwflSymbolMap::iterator;
 using DwflSymbolMapFindRes = std::pair<DwflSymbolMapIt, bool>;
 using DwflSymbolMapValueType =
@@ -67,7 +76,7 @@ public:
   // Get symbol from internal cache or fetch through dwarf
   SymbolIdx_t get_or_insert(SymbolTable &table,
                             DsoSymbolLookup &dso_symbol_lookup,
-                            Dwfl_Module *mod, ElfAddress_t newpc,
+                            Dwfl_Module *mod, ElfAddress_t process_pc,
                             const Dso &dso);
 
   void erase(DsoUID_t dso_uid) { _dso_map.erase(dso_uid); }
@@ -75,8 +84,6 @@ public:
   DwflSymbolLookupStats _stats;
 
   unsigned size() const;
-
-  static const unsigned k_sym_min_size = 8;
 
 private:
   /// Set through env var (DDPROF_CACHE_SETTING) in case of doubts on cache
@@ -94,13 +101,14 @@ private:
 
   // Unique ID representing a DSO
   // I (r1viollet) am not using PIDs as I reuse DSOs between
-  // PIDs If we are sure the underlying symbols are the same, we can point
-  // For short lived forks, this can avoid repopulating caches
+  // PIDs. If we are sure the underlying symbols are the same, we can assume the
+  // symbol cache is the same. For short lived forks, this can avoid
+  // repopulating caches.
   using DwflDsoSymbolMap = std::unordered_map<DsoUID_t, DwflSymbolMap>;
   using DwflDsoSymbolMapVT = DwflDsoSymbolMap::value_type;
 
-  static bool symbol_lookup_check(struct Dwfl_Module *mod, ElfAddress_t newpc,
-                                  const Symbol &info);
+  static bool symbol_lookup_check(struct Dwfl_Module *mod,
+                                  ElfAddress_t process_pc, const Symbol &info);
 
   // unordered map of DSO elements
   DwflDsoSymbolMap _dso_map;

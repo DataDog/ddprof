@@ -109,6 +109,7 @@ DDRes worker_unwind_free(DDProfContext *ctx) {
     unwind_free(ctx->worker_ctx.us);
     DDRES_CHECK_FWD(pevent_munmap(pevent_hdr));
     free(ctx->worker_ctx.us);
+    ctx->worker_ctx.us = nullptr;
   }
   CatchExcept2DDRes();
   return ddres_init();
@@ -322,16 +323,16 @@ DDRes ddprof_worker_timeout(volatile bool *continue_profiling,
 #ifndef DDPROF_NATIVE_LIB
 DDRes ddprof_worker_init(DDProfContext *ctx) {
   try {
-    ctx->worker_ctx.exp = (DDProfExporter *)malloc(sizeof(DDProfExporter));
+    DDRES_CHECK_FWD(worker_unwind_init(ctx));
+    ctx->worker_ctx.exp = (DDProfExporter *)calloc(1, sizeof(DDProfExporter));
     if (!ctx->worker_ctx.exp) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error when creating exporter");
     }
-    ctx->worker_ctx.pprof = (DDProfPProf *)malloc(sizeof(DDProfPProf));
+    ctx->worker_ctx.pprof = (DDProfPProf *)calloc(1, sizeof(DDProfPProf));
     if (!ctx->worker_ctx.pprof) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
                              "Error when creating pprof structure");
     }
-    DDRES_CHECK_FWD(worker_unwind_init(ctx));
     DDRES_CHECK_FWD(ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp));
     // warning : depends on unwind init
     DDRES_CHECK_FWD(
@@ -345,11 +346,15 @@ DDRes ddprof_worker_init(DDProfContext *ctx) {
 
 DDRes ddprof_worker_finish(DDProfContext *ctx) {
   try {
-    DDRES_CHECK_FWD(ddprof_exporter_free(ctx->worker_ctx.exp));
     DDRES_CHECK_FWD(worker_unwind_free(ctx));
-    DDRES_CHECK_FWD(pprof_free_profile(ctx->worker_ctx.pprof));
-    free(ctx->worker_ctx.pprof);
-    free(ctx->worker_ctx.exp);
+    if (ctx->worker_ctx.exp) {
+      DDRES_CHECK_FWD(ddprof_exporter_free(ctx->worker_ctx.exp));
+      free(ctx->worker_ctx.exp);
+    }
+    if (ctx->worker_ctx.pprof) {
+      DDRES_CHECK_FWD(pprof_free_profile(ctx->worker_ctx.pprof));
+      free(ctx->worker_ctx.pprof);
+    }
   }
   CatchExcept2DDRes();
   return ddres_init();

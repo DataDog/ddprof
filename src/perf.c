@@ -18,7 +18,6 @@
 #define DEFAULT_PAGE_SIZE 4096 // Concerned about hugepages?
 
 #define DEFAULT_BUFF_SIZE_SHIFT 6
-#define RETRY_BUFF_SIZE_SHIFT 3
 
 static long s_page_size = 0;
 
@@ -113,14 +112,10 @@ void *perfown_sz(int fd, size_t size_of_buffer) {
   return region;
 }
 
-// returns region, size is updated with the attempted size
+// returns region, size is updated with the mmaped size
 // On failure, returns NULL
 void *perfown(int fd, size_t *size) {
   *size = perf_mmap_size(DEFAULT_BUFF_SIZE_SHIFT);
-  void *reg = perfown_sz(fd, *size);
-  if (reg)
-    return reg;
-  *size = perf_mmap_size(RETRY_BUFF_SIZE_SHIFT);
   return perfown_sz(fd, *size);
 }
 
