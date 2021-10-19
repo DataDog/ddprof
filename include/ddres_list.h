@@ -31,8 +31,7 @@ extern "C" {
   X(DD_WHAT_POLLTIMEOUT, "POLLTIMEOUT: timeout when polling perf events")      \
   X(DD_WHAT_POLLERROR, "POLLERROR: Unknown poll error")                        \
   X(DD_WHAT_POLLHANGUP, "POLLHANGUP: perf event file descriptor hang up")      \
-  X(DD_WHAT_WORKER_RESET,                                                      \
-    "WORKER_RESET: worker reset requested (not a fatal error)")                \
+  X(DD_WHAT_WORKER_RESET, "WORKER_RESET: worker reset requested (expected)")   \
   X(DD_WHAT_PROCSTATE, "PROCSTATE: error when retrieveing procstate")          \
   X(DD_WHAT_PPROF, "PPROF: error in pprof manipulations")                      \
   X(DD_WHAT_STATSD, "STATSD: statsd interface")                                \

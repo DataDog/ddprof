@@ -13,6 +13,9 @@ public:
   SymbolIdx_t get_or_insert(ElfAddress_t addr, const Dso &dso,
                             SymbolTable &symbol_table);
 
+  // only binary info
+  SymbolIdx_t get_or_insert(const Dso &dso, SymbolTable &symbol_table);
+
   void clear_dso_symbols(DsoUID_t dso_id);
 
 private:

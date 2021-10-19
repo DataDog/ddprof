@@ -29,7 +29,7 @@
 #define DDRES_CHECK_OR_SHUTDOWN(res, shut_down_process)                        \
   DDRes eval_res = res;                                                        \
   if (IsDDResNotOK(eval_res)) {                                                \
-    LG_WRN("[PERF] Shut down worker (error:%s).",                              \
+    LG_WRN("[PERF] Shut down worker (what:%s).",                               \
            ddres_error_message(eval_res._what));                               \
     shut_down_process;                                                         \
     WORKER_SHUTDOWN();                                                         \

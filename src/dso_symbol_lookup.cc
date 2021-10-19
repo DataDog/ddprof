@@ -15,7 +15,7 @@ Symbol symbol_from_unhandled_dso(const Dso &dso) {
 Symbol symbol_from_dso(ElfAddress_t normalized_addr, const Dso &dso) {
   // address that means something for our user (addr)
   std::string dso_dbg_str =
-      normalized_addr ? string_format("[%p:dso]", normalized_addr) : "";
+      normalized_addr ? string_format("[%p:file]", normalized_addr) : "";
   return Symbol(dso._pgoff, dso_dbg_str, dso_dbg_str, 0, dso.format_filename());
 }
 } // namespace
@@ -58,6 +58,13 @@ SymbolIdx_t DsoSymbolLookup::get_or_insert(ElfAddress_t addr, const Dso &dso,
         std::pair<ElfAddress_t, SymbolIdx_t>(normalized_addr, symbol_idx));
   }
   return symbol_idx;
+}
+
+SymbolIdx_t DsoSymbolLookup::get_or_insert(const Dso &dso,
+                                           SymbolTable &symbol_table) {
+  // use start an address that will be zeroed as a trick to remove addr
+  // info (as we simply want the binary info)
+  return get_or_insert(dso._start - dso._pgoff, dso, symbol_table);
 }
 
 void DsoSymbolLookup::clear_dso_symbols(DsoUID_t dso_id) {
