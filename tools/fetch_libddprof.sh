@@ -26,8 +26,8 @@ cd $CURRENTDIR
 
 VER_LIBDDPROF=$1
 TAR_LIBDDPROF=libddprof_${VER_LIBDDPROF}.tar.gz
-URL_LIBDDPROF=http://binaries.ddbuild.io/libddprof/${TAR_LIBDDPROF}
-S3_URL_LIBDDPROF=s3://binaries.ddbuild.io/libddprof/${TAR_LIBDDPROF}
+URL_LIBDDPROF=http://binaries.ddbuild.io/libddprof-build/${TAR_LIBDDPROF}
+S3_URL_LIBDDPROF=s3://binaries.ddbuild.io/libddprof-build/${TAR_LIBDDPROF}
 
 SHA256_LIBDDPROF=$2
 mkdir -p $3
