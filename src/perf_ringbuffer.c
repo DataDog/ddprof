@@ -44,7 +44,7 @@ uint64_t rb_next(RingBuffer *rb) {
 struct perf_event_header *rb_seek(RingBuffer *rb, uint64_t offset) {
   struct perf_event_header *ret;
   rb->offset = (unsigned long)offset & (rb->mask);
-  ret = rb->start + rb->offset;
+  ret = (struct perf_event_header *)(rb->start + rb->offset);
 
   // Now check whether we overrun the end of the ringbuffer.  If so, pass in a
   // buffer rather than the raw event.
@@ -56,7 +56,7 @@ struct perf_event_header *rb_seek(RingBuffer *rb, uint64_t offset) {
     uint64_t right_sz = ret->size - left_sz;
     memcpy(rb->wrbuf, rb->start + rb->offset, left_sz);
     memcpy(rb->wrbuf + left_sz, rb->start, right_sz);
-    ret = (struct perf_event_header *)wrbuf;
+    ret = (struct perf_event_header *)rb->wrbuf;
   }
 
   return ret;
