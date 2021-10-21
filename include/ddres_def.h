@@ -28,13 +28,13 @@ typedef struct DDRes {
 
 #define FillDDRes(res, sev, what)                                              \
   do {                                                                         \
-    (res)._sev = (sev);                                                            \
-    (res)._what = (what);                                                          \
+    (res)._sev = (sev);                                                        \
+    (res)._what = (what);                                                      \
   } while (0)
 
 #define InitDDResOK(res)                                                       \
   do {                                                                         \
-    (res)._val = 0;                                                              \
+    (res)._val = 0;                                                            \
   } while (0)
 
 #define FillDDResFatal(res, what) FillDDRes((res), DD_SEVERROR, what)
