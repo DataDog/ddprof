@@ -141,7 +141,7 @@ DDRes pevent_close(PEventHdr *pevent_hdr) {
 // returns the number of successful cleans
 DDRes pevent_cleanup(PEventHdr *pevent_hdr) {
   DDRes ret = ddres_init();
-  DDRes ret_tmp = ddres_init();
+  DDRes ret_tmp;
 
   // Cleanup for things which cannot error
   for (int k = 0; k < pevent_hdr->size; ++k) {
