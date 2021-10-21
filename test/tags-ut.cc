@@ -48,7 +48,7 @@ TEST(Tags, user_tags) {
 
   UserTags user_tags(nullptr, 8);
   std::for_each(user_tags._tags.begin(), user_tags._tags.end(),
-                [](auto const &el) {
+                [](Tag const &el) {
                   LG_DBG("Tag = %s:%s", el.first.c_str(), el.second.c_str());
                 });
 }

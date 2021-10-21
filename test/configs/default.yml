@@ -8,6 +8,7 @@ ddprof:
     period: 2
   environment: test-staging
   loglevel: notice
+  logmode: stdout
   event: sCPU,1000
   faultinfo: on
   worker_period: 2

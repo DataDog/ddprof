@@ -49,11 +49,13 @@ static DDRes create_pprof_file(ddprof_ffi_Timespec start,
                                ddprof_ffi_Timespec end, const char *dbg_folder,
                                int *fd) {
   char time_start[128] = {0};
-  struct tm *tm_start = localtime(&start.seconds);
+  // struct tm *localtime_r(const time_t *timep, struct tm *result);
+  struct tm tm_storage;
+  struct tm *tm_start = localtime_r(&start.seconds, &tm_storage);
   strftime(time_start, sizeof time_start, "%Y-%m-%dT%H:%M:%SZ", tm_start);
 
   char time_end[128] = {0};
-  struct tm *tm_end = localtime(&end.seconds);
+  struct tm *tm_end = localtime_r(&end.seconds, &tm_storage);
   strftime(time_end, sizeof time_end, "%Y-%m-%dT%H:%M:%SZ", tm_end);
 
   char filename[400];
@@ -152,16 +154,16 @@ fill_tags(const UserTags *user_tags, const DDProfExporter *exporter,
 
   if (exporter->_input.profiler_version.len) {
     tags_exporter.push_back(ddprof_ffi_Tag{
-        .name = char_star_to_byteslice("profiler-version"),
+        .name = char_star_to_byteslice("profiler_version"),
         .value = string_view_to_byteslice(exporter->_input.profiler_version)});
   }
 
-  std::for_each(
-      user_tags->_tags.begin(), user_tags->_tags.end(), [&](auto const &el) {
-        tags_exporter.push_back(
-            ddprof_ffi_Tag{.name = cpp_string_to_byteslice(el.first),
-                           .value = cpp_string_to_byteslice(el.second)});
-      });
+  std::for_each(user_tags->_tags.begin(), user_tags->_tags.end(),
+                [&](ddprof::Tag const &el) {
+                  tags_exporter.push_back(ddprof_ffi_Tag{
+                      .name = cpp_string_to_byteslice(el.first),
+                      .value = cpp_string_to_byteslice(el.second)});
+                });
 }
 
 DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {

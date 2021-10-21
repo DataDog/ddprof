@@ -76,7 +76,6 @@ Architectural showpieces and such will always be available in the `docs/` folder
 In order to take advantage of *ddprof*, you need a few things
 
 - Linux kernel 4.15 or later (if you need to support an earlier kernel, create an issue outlining your need!  If you're blocked in a *libc* issue, also create an issue and we'll resolve it even sooner)
-- Your desired application or libraries must have debuginfo.  This means they either have a `.eh_frame` or `.debug_info`.  *ddprof* will, but does not currently, support split debuginfo.
 - Access to `perf events` ([more info](./docs/PerfEventParanoid.md))
 
 ## Contributing
@@ -85,11 +84,7 @@ In order to take advantage of *ddprof*, you need a few things
 
 Here are a few ideas of some interesting features. You can refer to the DataDog Jira board for a full listing.
 
-- Profiling backend does not currently colorize flamegraphs according to code source
 - `ddprof` does not support framepointers
-- `ddprof` does not support split debuginfo
-- `ddprof` does not furnish overhead numbers to end users
-- `ddprof` does not yet implement retry if intake is unreachable
 
 ### Benchmarks
 
@@ -100,4 +95,4 @@ Any benchmark or feedback on usage is welcome. Specific benchmarks could address
 
 ## Disclaimer
 
-This is a *pre-beta* release.  It should not be destructive, but it may be useless. Only deploy in production if you have a very high risk tolerance, a great reversion strategy, and you've taped your pager to your face.  If you do it, please don't @ me in your postmortem :)
+This is a *pre-beta* release.  It should not be destructive, but it may be useless.

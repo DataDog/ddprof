@@ -26,16 +26,19 @@
 #  define WORKER_SHUTDOWN() exit(0)
 #endif
 
-#define DDRES_CHECK_OR_SHUTDOWN(res)                                           \
-  if (IsDDResNotOK(res)) {                                                     \
-    LG_WRN("[PERF] Shut down worker (error:%s).",                              \
-           ddres_error_message(res._what));                                    \
+#define DDRES_CHECK_OR_SHUTDOWN(res, shut_down_process)                        \
+  DDRes eval_res = res;                                                        \
+  if (IsDDResNotOK(eval_res)) {                                                \
+    LG_WRN("[PERF] Shut down worker (what:%s).",                               \
+           ddres_error_message(eval_res._what));                               \
+    shut_down_process;                                                         \
     WORKER_SHUTDOWN();                                                         \
   }
 
-#define DDRES_GRACEFUL_SHUTDOWN()                                              \
+#define DDRES_GRACEFUL_SHUTDOWN(shut_down_process)                             \
   do {                                                                         \
     LG_NFO("Shutting down worker gracefully");                                 \
+    shut_down_process;                                                         \
     WORKER_SHUTDOWN();                                                         \
   } while (0)
 
@@ -84,7 +87,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   pollfd_setup(&ctx->worker_ctx.pevent_hdr, pfd, &pfd_len);
 
   // Perform user-provided initialization
-  DDRES_CHECK_OR_SHUTDOWN(attr->init_fun(ctx));
+  DDRES_CHECK_OR_SHUTDOWN(attr->init_fun(ctx), attr->finish_fun(ctx));
 
   // Worker poll loop
   while (1) {
@@ -95,8 +98,8 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
     if (-1 == n && errno == EINTR) {
       continue;
     } else if (-1 == n) {
-      attr->finish_fun(ctx);
-      DDRES_CHECK_OR_SHUTDOWN(ddres_error(DD_WHAT_POLLERROR));
+      DDRES_CHECK_OR_SHUTDOWN(ddres_error(DD_WHAT_POLLERROR),
+                              attr->finish_fun(ctx));
     }
 
     int pe_len = ctx->worker_ctx.pevent_hdr.size;
@@ -109,8 +112,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       // shuts down either all or nothing.  Accordingly, when it shuts down one
       // file descriptor, we shut down profiling.
       if (pfd[i].revents & POLLHUP) {
-        DDRES_CHECK_OR_SHUTDOWN(attr->finish_fun(ctx));
-        DDRES_GRACEFUL_SHUTDOWN();
+        DDRES_GRACEFUL_SHUTDOWN(attr->finish_fun(ctx));
       }
 
       // Drain the ringbuffer and dispatch to callback, as needed
@@ -175,7 +177,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       DDRes res = ddprof_worker_timeout(continue_profiling, ctx);
       if (IsDDResNotOK(res)) {
         attr->finish_fun(ctx);
-        DDRES_CHECK_OR_SHUTDOWN(res);
+        DDRES_CHECK_OR_SHUTDOWN(res, attr->finish_fun(ctx));
       }
       continue;
     }
@@ -209,6 +211,6 @@ void main_loop_lib(const WorkerAttr *attr, DDProfContext *ctx) {
   // no fork. TODO : handle lifetime
   worker(ctx, attr, &continue_profiling);
   if (!continue_profiling) {
-    LG_ERR("Request to exit");
+    LG_NFO("Request to exit");
   }
 }

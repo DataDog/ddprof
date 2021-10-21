@@ -1,30 +1,27 @@
 #include "mapinfo_lookup.hpp"
 
-extern "C" {
-#include "dwfl_internals.h"
-#include <dwarf.h>
-}
-
 #include "ddres.h"
 
 namespace ddprof {
 
-void mapinfo_lookup_get(MapInfoLookup &mapinfo_map, MapInfoTable &mapinfo_table,
-                        const Dwfl_Module *mod, DsoUID_t dso_id,
-                        MapInfoIdx_t *map_info_idx) {
+MapInfoIdx_t MapInfoLookup::get_or_insert(pid_t pid,
+                                          MapInfoTable &mapinfo_table,
+                                          const Dso &dso) {
+  MapInfoAddrMap &addr_map = _mapinfo_pidmap[pid];
+  auto it = addr_map.find(dso._start);
 
-  auto const it = mapinfo_map.find(dso_id);
-  if (it != mapinfo_map.end()) {
-    *map_info_idx = it->second;
-  } else {
-    char *localsname = strrchr(mod->name, '/');
-    std::string sname_str(localsname ? localsname + 1 : mod->name);
-    *map_info_idx = mapinfo_table.size();
-
-    mapinfo_table.emplace_back(mod->low_addr, mod->high_addr,
+  if (it == addr_map.end()) { // create a mapinfo from dso element
+    size_t pos = dso._filename.rfind('/');
+    std::string sname_str = (pos == std::string::npos)
+        ? dso._filename
+        : dso._filename.substr(pos + 1);
+    MapInfoIdx_t map_info_idx = mapinfo_table.size();
+    mapinfo_table.emplace_back(dso._start, dso._end, dso._pgoff,
                                std::move(sname_str));
-    mapinfo_map.insert(std::make_pair<ElfAddress_t, MapInfoIdx_t>(
-        std::move(dso_id), MapInfoIdx_t(*map_info_idx)));
+    addr_map.emplace(dso._start, map_info_idx);
+    return map_info_idx;
+  } else {
+    return it->second;
   }
 }
 

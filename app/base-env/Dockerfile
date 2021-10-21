@@ -28,6 +28,7 @@ RUN apt update \
   libjemalloc-dev \
   libcap-dev \
   gcovr \
+  netcat-openbsd \
   wget
 
 # Only necessary for ubuntu 16
@@ -95,6 +96,8 @@ RUN git clone --depth 1 --branch 2.0 https://github.com/AmadeusITGroup/amc.git \
   && cmake -DAMC_ENABLE_TESTS=0 -DAMC_ENABLE_BENCHMARKS=0 ../ \
   && cmake --build .  \
   && make install
+
+RUN curl -L https://github.com/github/codeql-action/releases/download/codeql-bundle-20210622/codeql-bundle-linux64.tar.gz -o - | tar -xz -C /usr/local
 
 # A specific user is required to get access to perf event ressources. 
 # This enables unit testing using perf-event ressources

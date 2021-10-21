@@ -1,4 +1,4 @@
-#include "dso.hpp"
+#include "dso_hdr.hpp"
 
 #include <gtest/gtest.h>
 #include <string>
@@ -55,7 +55,7 @@ void fill_mock_dsoset(DsoSet &set) {
   insert_res = set.insert(build_dso_10_1500());
   EXPECT_TRUE(insert_res.second);
   // empty --> undef
-  EXPECT_TRUE(insert_res.first->_type == dso::kUndef);
+  EXPECT_TRUE(insert_res.first->_type == dso::kAnon);
 }
 
 void fill_mock_hdr(DsoHdr &dso_hdr) { fill_mock_dsoset(dso_hdr._set); }
@@ -89,6 +89,14 @@ TEST(DSOTest, is_within) {
   ASSERT_FALSE(find_res.first == dso_hdr._set.end());
   EXPECT_EQ(find_res.first->_pid, 10);
   EXPECT_EQ(find_res.first->_start, 1000);
+}
+
+// caught bug in implem
+TEST(DSOTest, is_within_2) {
+  DsoHdr dso_hdr;
+  fill_mock_hdr(dso_hdr);
+  DsoFindRes find_res = dso_hdr.dso_find_closest(10, 2300);
+  EXPECT_EQ(find_res.second, true);
 }
 
 TEST(DSOTest, intersections) {
@@ -263,7 +271,6 @@ TEST(DSOTest, dso_from_procline) {
         dso_hdr.insert_erase_overlap(std::move(standard_dso_4));
     EXPECT_EQ(findres.second, true);
     std::cerr << *findres.first;
-    // EXPECT_EQ(findres.first._end, );
     Dso standard_dso_3 =
         DsoHdr::dso_from_procline(10, const_cast<char *>(s_exec_line3));
     // check that 4 did not override number 3 (even if they overlap 3 is

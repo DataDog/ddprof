@@ -6,12 +6,13 @@ stages:
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
   # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/87754200
-  BUILD_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:d93e0c44a37e6e480672f70e644d7114ed4daa2b56ecbaae2d32849c0075337d
-  BUILD_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:4d24767385fd385951808108510ddcb6958dd08e18150e0e157bb0ad8bb834de
-  BUILD_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:0a244e64ed4d330401ffea15afe02b38b04c842e2b207bfeb3fb8bfac60cbf03
+  BUILD_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:276369d70d11a05c07841082073cd651b494b7e76e998e7ef4db558f7446ed6c
+  BUILD_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:60b97152ad6196953738bc04291bdb5474d8b6adf90da36403f4efac494b9e09
+  BUILD_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:dbba21f3e2c2985b364139098015acfac105bf0157bdc093093201c7be11f00f
   # https://gitlab.ddbuild.io/DataDog/ddprof/-/pipelines/5611418
-  TEST_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:1565b429f9266dc10f98d615fcaf06941a1281292467820961364aff1376ef34
-  TEST_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:fa799b8e4e14dd3580b34d544b3885387948b2260875cc6f533c9a3e922f13db
+  TEST_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:a06908a49fbdf93fb62e7c5a650ec6da587c21f8f5060cf0657d4b08a63df985
+  TEST_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:128fff36c0cc5a8d9f31d8082fbcdde7fe8cad960514f01a1a11b209ef94d08b
+  TEST_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:04c624f448361a67a8899cf141d0ebaed0e8e55a4276fed765c5459453a5145c
   # When build images are built, publish them with following tags
   BASE_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:base
   BUILD_IMG: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof:build
@@ -67,7 +68,7 @@ build:testing:
   tags: ["runner:docker", "size:large"]
   parallel:
     matrix:
-      - UB_VERSION: ["18", "20"]
+      - UB_VERSION: ["16", "18", "20"]
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
   script:
     - set -euo pipefail
@@ -102,7 +103,7 @@ build:ddprof:
   image: $IMAGE
   parallel:
     matrix:
-      - IMAGE: ["${BUILD_IMG_18_STICKY}", "${BUILD_IMG_20_STICKY}"]
+      - IMAGE: ["${BUILD_IMG_16_STICKY}", "${BUILD_IMG_18_STICKY}", "${BUILD_IMG_20_STICKY}"]
         BUILD_TYPE: ["Release", "Debug", "SanitizedDebug", "Coverage"]
   variables:
     BUILDPATH: build_${BUILD_TYPE}
@@ -111,16 +112,10 @@ build:ddprof:
     - source setup_env.sh
     - export LIBC_VERSION=`ldd --version | head -n 1 | awk '{print $NF}'`
     - export DELIVERY_PATH="${CI_PROJECT_DIR}/${BINPATH}/${LIBC_TYPE}/${LIBC_VERSION}/${BUILD_TYPE}/"
-    # Accuracy test : Self unwind is c++17 (todo: backport to c++14). following line checks that we are over 2.30
-    - if (( `echo $LIBC_VERSION| awk -F '.' '{print $2}'` > 30 )); then
-    - export ACCURACY_TEST=ON
-    - else
-    - export ACCURACY_TEST=OFF
-    - fi
     #Build image dependencies were stored in app, avoid rebuilding vendor content
     - ln -s /app/vendor vendor
     - mkdir -p ${BUILDPATH} && cd ${BUILDPATH}
-    - cmake -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_BENCHMARKS=ON -DACCURACY_TEST=${ACCURACY_TEST} -DBUILD_NATIVE_LIB=ON -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
+    - cmake -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_BENCHMARKS=ON -DACCURACY_TEST=ON -DBUILD_NATIVE_LIB=ON -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
     # Static checks
     - make cppcheck
     - make format
@@ -140,6 +135,30 @@ build:ddprof:
       - ${CI_PROJECT_DIR}/${BINPATH}/
     expire_in: 1 week
 
+.heavy-duty-job-resource-allocation: &heavy-duty-job-resource-allocation
+  variables:
+    KUBERNETES_CPU_REQUEST: 4
+    KUBERNETES_MEMORY_REQUEST: 10Gi
+    KUBERNETES_MEMORY_LIMIT: 16Gi
+
+# Static analysis with codeql
+build:codeql:
+  when: manual
+  extends:
+    - .heavy-duty-job-resource-allocation
+  stage: build
+  tags: ["runner:k8s"]
+  # refers to image defined in matrix
+  image: $BUILD_IMG_20_STICKY
+  script:
+    - set -euxo pipefail
+        #Build image dependencies were stored in app, avoid rebuilding vendor content
+    - ln -s /app/vendor vendor
+    - ./tools/run_codeql.sh
+  artifacts:
+      paths:
+        - "cpp-security-quality.sarif"
+
 test:ddprof:
   extends:
     - .light-job-resource-allocation
@@ -148,7 +167,7 @@ test:ddprof:
   tags: ["runner:k8s"]
   parallel:
     matrix:
-      - IMAGE: ["${TEST_IMG_18_STICKY}", "${TEST_IMG_20_STICKY}"]
+      - IMAGE: ["${TEST_IMG_16_STICKY}", "${TEST_IMG_18_STICKY}", "${TEST_IMG_20_STICKY}"]
         BUILD_TYPE: ["Release", "SanitizedDebug"]
   script:
     - set -euxo pipefail
@@ -161,19 +180,26 @@ test:ddprof:
     - echo "CHECK SETTING ON PINNED MEMORY" && ulimit -l
     - echo "CHECK SETTING on PERF EVEN OPEN" && cat /proc/sys/kernel/perf_event_mlock_kb
     - echo ""
-    - check_dependencies.sh ${BINDIR}/ddprof test/data/expected_deps_${BUILD_TYPE}.txt
+    - if [ ${BUILD_TYPE} == "Release" ]; then 
+    - check_dependencies.sh ${BINDIR}/ddprof test/data/expected_deps_${LIBC_TYPE}_${LIBC_VERSION}_${BUILD_TYPE}.txt
+    - fi
     # Print help (checks that we have the correct help associated to params)
     - ${BINDIR}/ddprof -h
+    # Record perf only for release and more recent libc versions (perfs are bad on libc 23)
+    - if (( `echo $LIBC_VERSION| awk -F '.' '{print $2}'` > 27 )) && [ ${BUILD_TYPE} == "Release" ]; then
+    - export RECORD_OPTION="-r"
+    - else 
+    - export RECORD_OPTION="" # no recording
+    - fi
     # Run toy project for 5 seconds
     - mkdir pprofs && export DDPROF_PPROFS_FOLDER="$PWD/pprofs"
-    - run.sh -b ${BINDIR} BadBoggleSolver_run 5
-    - ls ${DDPROF_PPROFS_FOLDER} # todo : add a check on pprofs
+    - run.sh -b ${BINDIR} BadBoggleSolver_run 5 &> ddprof_log && cat ddprof_log && check_log_errors.sh ddprof_log
     - unset DDPROF_PPROFS_FOLDER
-    - if [ ${BUILD_TYPE} == "Release" ]; then # record only in release mode
-    - native_bench.sh -r -b ${BINDIR}
-    - else
-    - native_bench.sh -b ${BINDIR}
-    - fi
+    # symbol cache validation mechanism
+    - export DDPROF_CACHE_SETTING=VALIDATE; run.sh BadBoggleSolver_run 20 &> ddprof_log && check_log_errors.sh ddprof_log; unset DDPROF_CACHE_SETTING
+    # Run the BadBoggleSolver_run as a benchmark
+    - native_bench.sh ${RECORD_OPTION} -b ${BINDIR}
+    - native_bench.sh ${RECORD_OPTION} -b ${BINDIR} -e sleep.sh
     # Accuracy check for unwinding (only if it was built)
     - if [ -e  ${BINDIR}/selfuw ]; then
     - ${BINDIR}/selfuw ${CI_PROJECT_DIR}/test/self_unwind/data
@@ -231,7 +257,7 @@ promote:ddprof:
   tags: ["runner:docker"]
   script:
     - set -euo pipefail
-    - export PROMOTE=YES
+    - export PROMOTE=MAJOR
     - tools/ci_upload.sh
   dependencies:
     - build:ddprof

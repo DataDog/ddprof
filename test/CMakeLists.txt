@@ -39,6 +39,8 @@ function(add_unit_test name)
         ../src/logger.c
         ${MY_UNPARSED_ARGUMENTS})
    add_dependencies(${name} deps)
+   set_property(TARGET ${name} PROPERTY CXX_STANDARD 11)
+
    target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
    # libddprof almost always required (unlikely file from libddprof)
    target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS} ${LIBDDPROF_INCLUDE_DIR})
@@ -87,9 +89,8 @@ add_unit_test(
 
 add_unit_test(
     demangle-ut
-    ../src/demangle.cpp
     demangle-ut.cc
-    LIBRARIES llvm-demangle libstdc++.a
+    LIBRARIES llvm-demangle
 )
 target_include_directories(demangle-ut PRIVATE ${LLVM_DEMANGLE_PATH}/include)
 
@@ -199,6 +200,7 @@ add_unit_test(
 add_unit_test(
     dso-ut
     ../src/dso.cc 
+    ../src/dso_hdr.cc 
     ../src/signal_helper.c
     ../src/region_holder.cc
     dso-ut.cc 
@@ -214,3 +216,12 @@ add_unit_test(
     DEFINITIONS MYNAME="tags-ut"
 )
 target_include_directories(tags-ut PRIVATE ${DOGFOOD_INCLUDE_DIR})
+
+add_unit_test(
+    dwfl_symbol-ut
+    dwfl_symbol-ut.cc
+    ../src/dwfl_symbol.cc
+    LIBRARIES llvm-demangle ${ELFUTILS_LIBRARIES}
+    DEFINITIONS MYNAME="dwfl_symbol-ut"
+)
+target_include_directories(dwfl_symbol-ut PRIVATE ${ELFUTILS_INCLUDE_LIST} ${LLVM_DEMANGLE_PATH}/include)

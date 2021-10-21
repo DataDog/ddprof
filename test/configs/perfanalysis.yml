@@ -3,11 +3,12 @@ ddprof:
     url: datad0g.com
     port: 80
   service:
-    name: native-ci_boggle
+    name: native-ci_bench
   upload:
     period: 3
   environment: us1.prod.dog
   loglevel: notice
+  logmode: stdout
   event: sCPU,1000
   faultinfo: on
   worker_period: 2

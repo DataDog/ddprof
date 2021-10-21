@@ -5,6 +5,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "logger.h"
+
 // TODO, these probably aren't too necessary now...
 char *g_procfs_linebuffer = NULL;
 size_t g_procfs_linebuffer_sz = 0;
@@ -18,7 +20,7 @@ size_t mapcache_Find(pid_t pid) {
     if (pid == g_mapcache.pid[i] || !g_mapcache.pid[i])
       break;
   if (i == MC_MAX)
-    printf("<HORRIBLE ERROR> mapcache ran out\n");
+    LG_ERR("<HORRIBLE ERROR> mapcache ran out\n");
   return i;
 }
 
@@ -72,7 +74,7 @@ int procfs_MapOpen(pid_t target) {
   }
   if (-1 == g_procfs_map_fd) {
     // TODO, general logging
-    printf("Error opening the procfs map\n");
+    LG_NTC("Error opening the procfs map: %d\n", target);
     return -1;
   }
 
@@ -97,14 +99,14 @@ char procfs_MmapGet(Map *map) {
   if (!map->map) {
     int fd = open(map->path, O_RDONLY);
     if (-1 == fd) {
-      printf("I couldn't open the map (%s)!\n", map->path);
+      LG_NTC("I couldn't open the map (%s)!\n", map->path);
       return -1;
     }
     uint64_t mapsz = map->end - map->start + 1; // e.g., if start=end, map "1"b
     map->map = mmap(0, mapsz, PROT_READ, MAP_PRIVATE, fd, map->off);
     close(fd);
     if (!map->map) {
-      printf("I couldn't map the map!\n");
+      LG_NTC("I couldn't map the map!\n");
       return -1;
     }
   }

@@ -4,6 +4,7 @@ FROM ubuntu:${UBUNTU_VERSION}.04 as base
 # Tell docker to use bash as the default
 SHELL ["/bin/bash", "-c"]
 
+# Some of these are just for investigations (as this image is also used to test locally)
 RUN apt update \
     && DEBIAN_FRONTEND=noninteractive apt install -y \
     awscli \
@@ -19,7 +20,9 @@ RUN apt update \
     graphviz \
     valgrind \
     subversion \
-    netcat
+    netcat-openbsd \
+    vim \
+    bsdmainutils
 
 # Newer CMake
 FROM base as cmake
@@ -39,7 +42,7 @@ RUN KERNEL_VERSION=$(uname -r | awk -F '[-\.]' '{print "v"$1"."$2}') && \
     cp perf /usr/local/bin
 
 # Retrieve a program to run
-RUN git clone --depth 1 --branch ddprof_ci https://github.com/DataDog/bad-boggle-solver.git
+RUN git clone --depth 1 --branch ddprof_ci_v2 https://github.com/DataDog/bad-boggle-solver.git
 
 # Build and install toy project
 RUN cd bad-boggle-solver \ 

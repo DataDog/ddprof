@@ -67,6 +67,7 @@ USE_CALLGRIND="no"
 USE_PERFSTAT="no"
 USE_VALGRIND="no"
 USE_DDPROF="no"
+USE_GDB="no"
 
 while [ $# != 0 ] && [ ${PARAM_FOUND} == 1 ] ; do 
   if [ $# == 0 ] || [ $1 == "-h" ]; then
@@ -136,6 +137,11 @@ while [ $# != 0 ] && [ ${PARAM_FOUND} == 1 ] ; do
     USE_DDPROF="yes"
     continue
   fi
+  if [ $# != 0 ] && [ $1 == "--gdb" ]; then
+    shift
+    USE_GDB="yes"
+    continue
+  fi
 
   # reach here only if we did not find params
   PARAM_FOUND=0
@@ -189,7 +195,14 @@ if [[ "yes" == "${USE_PERFSTAT,,}" ]]; then
   empty_or_exit ${PREPEND_CMD}
   # -x allows for csv format
   PREPEND_CMD="perf stat -x ','"
+  # PREPEND_CMD="perf stat" # standard display (vs csv)
 fi
+
+if [[ "yes" == "${USE_GDB,,}" ]]; then
+  empty_or_exit ${PREPEND_CMD}
+  PREPEND_CMD="gdb --command=$SCRIPTDIR/configs/gdb_commands.txt  --args"
+fi
+
 
 CMD="${PREPEND_CMD} ${CMD}"
 echo "ddprof cmd:${CMD}"
@@ -223,6 +236,7 @@ DDPROF_CMD="${CMD} \
   -e ${cfg_ddprof_event} \
   -s ${cfg_ddprof_faultinfo} \
   -w ${cfg_ddprof_worker_period} \
+  -o ${cfg_ddprof_logmode} \
   -a ${cfg_ddprof_printargs}"
 
 # Set any switchable environment variables

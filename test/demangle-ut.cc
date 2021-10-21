@@ -1,4 +1,4 @@
-#include "demangle.h"
+#include "llvm/Demangle/Demangle.h"
 
 #include <gtest/gtest.h>
 
@@ -32,16 +32,8 @@ std::vector<struct test_case> cases = {
 
 #define BUF_LEN 1024
 TEST(DemangleTest, Positive) {
-  char buf[BUF_LEN] = {0};
-
-  for (auto &tcase : cases) {
-    demangle(tcase.test.c_str(), buf, BUF_LEN);
-    if (strncmp(buf, tcase.answer.c_str(), tcase.answer.size())) {
-      std::cout << tcase.test << std::endl;
-      std::cout << buf << std::endl;
-      std::cout << tcase.answer << std::endl;
-    }
-
-    EXPECT_TRUE(0 == strncmp(buf, tcase.answer.c_str(), tcase.answer.size()));
+  for (auto const &tcase : cases) {
+    std::string demangled_func = llvm::demangle(tcase.test);
+    EXPECT_EQ(demangled_func, tcase.answer);
   }
 }

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "ipinfo_table.hpp"
 #include "mapinfo_table.hpp"
+#include "symbol_table.hpp"
 #include "unwind_output.h"
 
 namespace ddprof {
@@ -22,9 +22,9 @@ static const char *s_so_paths[] = {"/app/lib/bar.0.so"};
 
 // ddprof_ffi_Mapping
 
-static inline void fill_ipinfo_table_1(IPInfoTable &ipinfo_table) {
+static inline void fill_symbol_table_1(SymbolTable &symbol_table) {
   for (unsigned i = 0; i < K_MOCK_LOC_SIZE; ++i) {
-    ipinfo_table.emplace_back(300 + i, std::string(s_syn_names[i]),
+    symbol_table.emplace_back(300 + i, std::string(s_syn_names[i]),
                               std::string(s_func_names[i]), 10 * i,
                               std::string(s_src_paths[i]));
   }
@@ -32,7 +32,8 @@ static inline void fill_ipinfo_table_1(IPInfoTable &ipinfo_table) {
 
 static inline void fill_mapinfo_table_1(MapInfoTable &mapinfo_table) {
   for (unsigned i = 0; i < K_MOCK_LOC_SIZE; ++i) {
-    mapinfo_table.emplace_back(100 + i, 200 + i, std::string(s_so_paths[0]));
+    mapinfo_table.emplace_back(100 + i, 200 + i, 10 + i,
+                               std::string(s_so_paths[0]));
   }
 }
 
@@ -43,15 +44,15 @@ static inline void fill_unwind_output_1(UnwindOutput &uw_output) {
   FunLoc *locs = uw_output.locs;
   for (unsigned i = 0; i < uw_output.nb_locs; ++i) {
     locs[i].ip = 42 + i;
-    locs[i]._ipinfo_idx = i;
+    locs[i]._symbol_idx = i;
     locs[i]._map_info_idx = i;
   }
 }
 
-static inline void fill_unwind_symbols(IPInfoTable &ipinfo_table,
+static inline void fill_unwind_symbols(SymbolTable &symbol_table,
                                        MapInfoTable &mapinfo_table,
                                        UnwindOutput &uw_output) {
-  fill_ipinfo_table_1(ipinfo_table);
+  fill_symbol_table_1(symbol_table);
   fill_mapinfo_table_1(mapinfo_table);
   fill_unwind_output_1(uw_output);
 }

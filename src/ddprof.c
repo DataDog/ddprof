@@ -146,8 +146,10 @@ DDRes ddprof_ctx_set(const DDProfInput *input, DDProfContext *ctx) {
   // Process logging mode
   char const *logpattern[] = {"stdout", "stderr", "syslog", "disabled"};
   const int sizeOfLogpattern = 4;
-  switch (arg_which(input->logmode, logpattern, sizeOfLogpattern)) {
-  case -1:
+  int idx_log_mode = input->logmode
+      ? arg_which(input->logmode, logpattern, sizeOfLogpattern)
+      : 0; // default to stdout
+  switch (idx_log_mode) {
   case 0:
     LOG_open(LOG_STDOUT, "");
     break;

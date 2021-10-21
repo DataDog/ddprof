@@ -9,16 +9,18 @@ extern "C" {
 
 #include "ddprof_context.h"
 #include "ddprof_stats.h"
-#include "dso.h"
 #include "logger.h"
 #include "perf.h"
 #include "pevent_lib.h"
 #include "pprof/ddprof_pprof.h"
+#include "procutils.h"
 #include "stack_handler.h"
 #include "unwind.h"
+#include "unwind_state.h"
 }
 
-#include "dso.hpp"
+#include "dso_hdr.hpp"
+#include "dwfl_hdr.hpp"
 #include "exporter/ddprof_exporter.h"
 #include "tags.hpp"
 
@@ -107,6 +109,7 @@ DDRes worker_unwind_free(DDProfContext *ctx) {
     unwind_free(ctx->worker_ctx.us);
     DDRES_CHECK_FWD(pevent_munmap(pevent_hdr));
     free(ctx->worker_ctx.us);
+    ctx->worker_ctx.us = nullptr;
   }
   CatchExcept2DDRes();
   return ddres_init();
@@ -154,13 +157,14 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   DDRes res = unwindstate__unwind(us);
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
-  if (IsDDResOK(res)) {
-    // in lib mode we don't aggregate (protect to avoid link failures)
+  if (!IsDDResFatal(res)) {
 #ifndef DDPROF_NATIVE_LIB
+    // in lib mode we don't aggregate (protect to avoid link failures)
     DDProfPProf *pprof = ctx->worker_ctx.pprof;
     DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbols_hdr,
                                     sample->period, pos, pprof));
 #else
+    // Call the user's stack handler
     if (ctx->stack_handler) {
       if (!ctx->stack_handler->apply(&us->output, ctx,
                                      ctx->stack_handler->callback_ctx, pos)) {
@@ -221,6 +225,7 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
     LG_WRN("Timer skew detected; frequent warnings may suggest system issue");
     export_time_set(ctx);
   }
+  unwind_cycle(ctx->worker_ctx.us);
 
   // Reset stats relevant to a single cycle
   ddprof_reset_worker_stats(ctx->worker_ctx.us->dso_hdr);
@@ -249,7 +254,7 @@ void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm, int pos) {
   // Change in process name (assuming exec) : clear all associated dso
   if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC) {
     LG_DBG("<%d>(COMM)%d -> %s", pos, comm->pid, comm->comm);
-    ctx->worker_ctx.us->dso_hdr->pid_free(comm->pid);
+    unwind_pid_free(ctx->worker_ctx.us, comm->pid);
   }
 }
 
@@ -258,7 +263,7 @@ void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int pos) {
   LG_DBG("<%d>(FORK)%d -> %d/%d", pos, frk->ppid, frk->pid, frk->tid);
   if (frk->ppid != frk->pid) {
     // Clear everything and populate at next error or with coming samples
-    ctx->worker_ctx.us->dso_hdr->pid_free(frk->pid);
+    unwind_pid_free(ctx->worker_ctx.us, frk->pid);
   }
 }
 
@@ -303,32 +308,35 @@ static DDRes reset_state(DDProfContext *ctx,
 /********************************** callbacks *********************************/
 DDRes ddprof_worker_timeout(volatile bool *continue_profiling,
                             DDProfContext *ctx) {
-  int64_t now = now_nanos();
-  if (now > ctx->worker_ctx.send_nanos) {
-    DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now));
-    // reset state defines if we should reboot the worker
-    DDRes res = reset_state(ctx, continue_profiling);
-    // A warning can be returned for a reset and should not be ignored
-    if (IsDDResNotOK(res)) {
-      return res;
+  try {
+    int64_t now = now_nanos();
+    if (now > ctx->worker_ctx.send_nanos) {
+      DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now));
+      // reset state defines if we should reboot the worker
+      DDRes res = reset_state(ctx, continue_profiling);
+      // A warning can be returned for a reset and should not be ignored
+      if (IsDDResNotOK(res)) {
+        return res;
+      }
     }
   }
+  CatchExcept2DDRes();
   return ddres_init();
 }
 
 #ifndef DDPROF_NATIVE_LIB
 DDRes ddprof_worker_init(DDProfContext *ctx) {
   try {
-    ctx->worker_ctx.exp = (DDProfExporter *)malloc(sizeof(DDProfExporter));
+    DDRES_CHECK_FWD(worker_unwind_init(ctx));
+    ctx->worker_ctx.exp = (DDProfExporter *)calloc(1, sizeof(DDProfExporter));
     if (!ctx->worker_ctx.exp) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error when creating exporter");
     }
-    ctx->worker_ctx.pprof = (DDProfPProf *)malloc(sizeof(DDProfPProf));
+    ctx->worker_ctx.pprof = (DDProfPProf *)calloc(1, sizeof(DDProfPProf));
     if (!ctx->worker_ctx.pprof) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
                              "Error when creating pprof structure");
     }
-    DDRES_CHECK_FWD(worker_unwind_init(ctx));
     DDRES_CHECK_FWD(ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp));
     // warning : depends on unwind init
     DDRES_CHECK_FWD(
@@ -342,11 +350,15 @@ DDRes ddprof_worker_init(DDProfContext *ctx) {
 
 DDRes ddprof_worker_finish(DDProfContext *ctx) {
   try {
-    DDRES_CHECK_FWD(ddprof_exporter_free(ctx->worker_ctx.exp));
     DDRES_CHECK_FWD(worker_unwind_free(ctx));
-    DDRES_CHECK_FWD(pprof_free_profile(ctx->worker_ctx.pprof));
-    free(ctx->worker_ctx.pprof);
-    free(ctx->worker_ctx.exp);
+    if (ctx->worker_ctx.exp) {
+      DDRES_CHECK_FWD(ddprof_exporter_free(ctx->worker_ctx.exp));
+      free(ctx->worker_ctx.exp);
+    }
+    if (ctx->worker_ctx.pprof) {
+      DDRES_CHECK_FWD(pprof_free_profile(ctx->worker_ctx.pprof));
+      free(ctx->worker_ctx.pprof);
+    }
   }
   CatchExcept2DDRes();
   return ddres_init();
@@ -354,8 +366,9 @@ DDRes ddprof_worker_finish(DDProfContext *ctx) {
 #endif
 
 // Simple wrapper over perf_event_hdr in order to filter by PID in a uniform
-// way.  Whenver PID is a valid concept for the given event type, the interface
-// uniformly presents PID as the element immediately after the header.
+// way.  Whenver PID is a valid concept for the given event type, the
+// interface uniformly presents PID as the element immediately after the
+// header.
 struct perf_event_hdr_wpid : perf_event_header {
   uint32_t pid, tid;
 };

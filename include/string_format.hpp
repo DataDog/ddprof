@@ -18,7 +18,11 @@ std::string string_format(const std::string &format, Args... args) {
     throw std::runtime_error("Error during formatting.");
   }
   auto size = static_cast<size_t>(size_s);
+#if __cplusplus < 201300
+  auto buf = std::unique_ptr<char[]>(new char[size]);
+#else
   auto buf = std::make_unique<char[]>(size);
+#endif
   std::snprintf(buf.get(), size, format.c_str(), args...);
   return std::string(buf.get(),
                      buf.get() + size - 1); // We don't want the '\0' inside

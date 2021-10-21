@@ -26,7 +26,6 @@ int main(int argc, char *argv[]) {
     bool continue_exec;
     DDRes res = ddprof_input_parse(argc, (char **)argv, &input, &continue_exec);
     if (IsDDResNotOK(res) || !continue_exec) {
-      LG_WRN("Unable to parse parameters");
       goto CLEANUP_INPUT;
     }
   }

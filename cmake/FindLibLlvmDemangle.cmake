@@ -27,8 +27,8 @@ add_custom_command(OUTPUT ${LLVM_DEMANGLE_SRC_FILES}
 add_custom_target(llvm-deps DEPENDS ${LLVM_DEMANGLE_SRC_FILES})
 
 add_library(llvm-demangle STATIC
-            src/demangle.cpp
             ${LLVM_DEMANGLE_SRC_FILES})
+set_property(TARGET llvm-demangle PROPERTY CXX_STANDARD 14)
 
 add_dependencies(llvm-demangle llvm-deps)
 

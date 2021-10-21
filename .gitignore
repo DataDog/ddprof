@@ -20,6 +20,7 @@ docker-sync.yml
 /build*
 /.docker-sync
 /pprofs
+/ddprof.codeql
 
 #==============================================================================#
 # Editor auto-saving
@@ -56,3 +57,4 @@ test/configs/perso.yml
 .editorconfig
 test/data/*.pprof
 test/self_unwind/data/BadBoggleSolver_run.json
+cpp-security-quality.sarif

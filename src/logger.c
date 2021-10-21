@@ -91,11 +91,14 @@ bool LOG_open(int mode, char *opts) {
   case LOG_STDERR:
     log_ctx->fd = STDERR_FILENO;
     break;
-  case LOG_FILE:;
-    int fd = open(opts, O_RDWR | O_APPEND | O_CREAT | O_CLOEXEC, 0777);
+  case LOG_FILE: {
+    int fd = open(opts, O_RDWR | O_APPEND | O_CREAT | O_CLOEXEC, 0755);
+
     if (-1 == fd)
       return false;
     log_ctx->fd = fd;
+    break;
+  }
   }
 
   // Finalize

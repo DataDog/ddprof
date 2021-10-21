@@ -1,142 +1,210 @@
 [
   {
-    "demangle_name": "std::istream::sentry::sentry(std::istream&, bool)",
-    "offset": 130
+    "demangle_name": "tng::Boggle::Node::IsValidPostion(std::array<int, 2ul> const&)",
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
   },
   {
-    "demangle_name": "tng::Boggle::Node::createChildren(std::array<std::array<bool, 4ul>, 4ul> const&)",
-    "offset": 127
+    "demangle_name": "std::locale::~locale()",
+    "src_path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25"
   },
   {
-    "demangle_name": "srandom",
-    "offset": 44
+    "demangle_name": "__read",
+    "src_path": "../sysdeps/unix/sysv/linux/read.c"
   },
   {
-    "demangle_name": "srandom_r",
-    "offset": 275
+    "demangle_name": "_IO_un_link",
+    "src_path": "/build/glibc-S9d2JN/glibc-2.27/libio/genops.c"
   },
   {
-    "demangle_name": "malloc",
-    "offset": 115
+    "demangle_name": "fileno_unlocked",
+    "src_path": "/build/glibc-S9d2JN/glibc-2.27/libio/fileno.c"
   },
   {
-    "demangle_name": "_int_malloc",
-    "offset": 2946
+    "demangle_name": "tng::Boggle::ConsiderPos(std::array<std::array<bool, 4ul>, 4ul> const&, std::array<int, 2ul> const&)",
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
   },
   {
-    "demangle_name": "__memmove_avx_unaligned_erms",
-    "offset": 135
-  },
-  {
-    "demangle_name": "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_create(unsigned long&, unsigned long)",
-    "offset": 35
-  },
-  {
-    "demangle_name": "void std::__adjust_heap<__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, long, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, __gnu_cxx::__ops::_Iter_less_iter>(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, long, long, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, __gnu_cxx::__ops::_Iter_less_iter)",
-    "offset": 840
-  },
-  {
-    "demangle_name": "_IO_file_close_it@@GLIBC_2.2.5",
-    "offset": 111
-  },
-  {
-    "demangle_name": "void std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >::_M_realloc_insert<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&&)",
-    "offset": 255
-  },
-  {
-    "demangle_name": "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_append(char const*, unsigned long)",
-    "offset": 63
-  },
-  {
-    "demangle_name": "tng::InvalidChar(char)",
-    "offset": 0
-  },
-  {
-    "demangle_name": "_start",
-    "offset": 45
-  },
-  {
-    "demangle_name": "unlink_chunk.isra.0",
-    "offset": 25
-  },
-  {
-    "demangle_name": "tng::main(int, char**)",
-    "offset": 931
-  },
-  {
-    "demangle_name": "std::basic_istream<char, std::char_traits<char> >& std::getline<char, std::char_traits<char>, std::allocator<char> >(std::basic_istream<char, std::char_traits<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, char)",
-    "offset": 228
+    "demangle_name": "tng::Boggle::operator+(std::array<int, 2ul> const&, std::array<int, 2ul> const&)",
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
   },
   {
     "demangle_name": "std::__basic_file<char>::close()",
-    "offset": 47
-  },
-  {
-    "demangle_name": "void std::__introsort_loop<__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, long, __gnu_cxx::__ops::_Iter_less_iter>(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, long, __gnu_cxx::__ops::_Iter_less_iter) (.isra.0)",
-    "offset": 743
-  },
-  {
-    "demangle_name": "__libc_start_main",
-    "offset": 242
-  },
-  {
-    "demangle_name": "malloc_consolidate",
-    "offset": 92
-  },
-  {
-    "demangle_name": "void std::__unguarded_linear_insert<__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__ops::_Val_less_iter>(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__ops::_Val_less_iter)",
-    "offset": 634
-  },
-  {
-    "demangle_name": "__memcmp_avx2_movbe",
-    "offset": 276
-  },
-  {
-    "demangle_name": "_IO_file_close",
-    "offset": 0
-  },
-  {
-    "demangle_name": "__gnu_cxx::__normal_iterator<char*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > std::__find_if<__gnu_cxx::__normal_iterator<char*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, __gnu_cxx::__ops::_Iter_pred<bool (*)(char)> >(__gnu_cxx::__normal_iterator<char*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, __gnu_cxx::__normal_iterator<char*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, __gnu_cxx::__ops::_Iter_pred<bool (*)(char)>, std::random_access_iterator_tag)",
-    "offset": 67
-  },
-  {
-    "demangle_name": "toupper",
-    "offset": 35
-  },
-  {
-    "demangle_name": "__memchr_avx2",
-    "offset": 32
-  },
-  {
-    "demangle_name": "std::basic_filebuf<char, std::char_traits<char> >::close()",
-    "offset": 170
+    "src_path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25"
   },
   {
     "demangle_name": "fclose@@GLIBC_2.2.5",
-    "offset": 357
+    "src_path": "/build/glibc-S9d2JN/glibc-2.27/libio/iofclose.c"
   },
   {
-    "demangle_name": "void std::__make_heap<__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__ops::_Iter_less_iter>(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__ops::_Iter_less_iter&)",
-    "offset": 218
+    "demangle_name": "_IO_file_close_it@@GLIBC_2.2.5",
+    "src_path": "/build/glibc-S9d2JN/glibc-2.27/libio/fileops.c"
   },
   {
-    "demangle_name": "_int_free",
-    "offset": 1951
+    "demangle_name": "_IO_setb",
+    "src_path": "/build/glibc-S9d2JN/glibc-2.27/libio/genops.c"
   },
   {
-    "demangle_name": "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_mutate(unsigned long, unsigned long, char const*, unsigned long)",
-    "offset": 20
+    "demangle_name": "std::basic_istream<char, std::char_traits<char> >& std::getline<char, std::char_traits<char>, std::allocator<char> >(std::basic_istream<char, std::char_traits<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, char)",
+    "src_path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25"
+  },
+  {
+    "demangle_name": "std::vector<tng::Boggle::Node, std::allocator<tng::Boggle::Node> >::~vector()",
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
+  },
+  {
+    "demangle_name": "std::istream::sentry::sentry(std::istream&, bool)",
+    "src_path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25"
+  },
+  {
+    "demangle_name": "systrim.isra.1.constprop.11",
+    "src_path": "/build/glibc-S9d2JN/glibc-2.27/malloc/malloc.c"
+  },
+  {
+    "demangle_name": "std::basic_filebuf<char, std::char_traits<char> >::close()",
+    "src_path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25"
+  },
+  {
+    "demangle_name": "toupper",
+    "src_path": "/build/glibc-S9d2JN/glibc-2.27/ctype/ctype.c"
+  },
+  {
+    "demangle_name": "__gnu_cxx::__normal_iterator<char*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > std::__find_if<__gnu_cxx::__normal_iterator<char*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, __gnu_cxx::__ops::_Iter_pred<bool (*)(char)> >(__gnu_cxx::__normal_iterator<char*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, __gnu_cxx::__normal_iterator<char*, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, __gnu_cxx::__ops::_Iter_pred<bool (*)(char)>, std::random_access_iterator_tag)",
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
+  },
+  {
+    "demangle_name": "_int_malloc",
+    "src_path": "/build/glibc-S9d2JN/glibc-2.27/malloc/malloc.c"
+  },
+  {
+    "demangle_name": "std::basic_filebuf<char, std::char_traits<char> >::_M_destroy_internal_buffer()",
+    "src_path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25"
   },
   {
     "demangle_name": "operator new(unsigned long)",
-    "offset": 24
+    "src_path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25"
+  },
+  {
+    "demangle_name": "__memcmp_avx2_movbe",
+    "src_path": "../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S"
+  },
+  {
+    "demangle_name": "void std::__make_heap<__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__ops::_Iter_less_iter>(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__ops::_Iter_less_iter&)",
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
+  },
+  {
+    "demangle_name": "",
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
+  },
+  {
+    "demangle_name": "__dynamic_cast",
+    "src_path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25"
+  },
+  {
+    "demangle_name": "void std::__introsort_loop<__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, long, __gnu_cxx::__ops::_Iter_less_iter>(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, long, __gnu_cxx::__ops::_Iter_less_iter) (.isra.84)",
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
+  },
+  {
+    "demangle_name": "tng::InvalidChar(char)",
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
+  },
+  {
+    "demangle_name": "__libc_free",
+    "src_path": "/build/glibc-S9d2JN/glibc-2.27/malloc/malloc.c"
+  },
+  {
+    "demangle_name": "malloc",
+    "src_path": "/build/glibc-S9d2JN/glibc-2.27/malloc/malloc.c"
+  },
+  {
+    "demangle_name": "void std::__adjust_heap<__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, long, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, __gnu_cxx::__ops::_Iter_less_iter>(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, long, long, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, __gnu_cxx::__ops::_Iter_less_iter)",
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
+  },
+  {
+    "demangle_name": "void std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >::_M_realloc_insert<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&&)",
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
+  },
+  {
+    "demangle_name": "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_mutate(unsigned long, unsigned long, char const*, unsigned long)",
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
+  },
+  {
+    "demangle_name": "tng::main(int, char**)",
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
+  },
+  {
+    "demangle_name": "__libc_start_main",
+    "src_path": "../csu/libc-start.c"
+  },
+  {
+    "demangle_name": "__memchr_avx2",
+    "src_path": "../sysdeps/x86_64/multiarch/memchr-avx2.S"
+  },
+  {
+    "demangle_name": "_start",
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
+  },
+  {
+    "demangle_name": "std::__basic_file<char>::xsgetn(char*, long)",
+    "src_path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25"
+  },
+  {
+    "demangle_name": "std::basic_filebuf<char, std::char_traits<char> >::underflow()",
+    "src_path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25"
+  },
+  {
+    "demangle_name": "operator delete[](void*)",
+    "src_path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25"
   },
   {
     "demangle_name": "tng::Boggle::ExpandNode(tng::Boggle::Node&, std::array<std::array<bool, 4ul>, 4ul> const&, tng::WordDict const&, std::array<std::array<char, 4ul>, 4ul> const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >&)",
-    "offset": 833
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
+  },
+  {
+    "demangle_name": "__memmove_avx_unaligned_erms",
+    "src_path": "../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S"
   },
   {
     "demangle_name": "tng::Boggle::FindAllWords[abi:cxx11](std::array<std::array<char, 4ul>, 4ul> const&, tng::WordDict const&)",
-    "offset": 216
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
+  },
+  {
+    "demangle_name": "tng::Boggle::Node::createChildren(std::array<std::array<bool, 4ul>, 4ul> const&)",
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
+  },
+  {
+    "demangle_name": "void std::__insertion_sort<__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__ops::_Iter_less_iter>(__gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__normal_iterator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >*, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > >, __gnu_cxx::__ops::_Iter_less_iter)",
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
+  },
+  {
+    "demangle_name": "std::ctype<char> const& std::use_facet<std::ctype<char> >(std::locale const&)",
+    "src_path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25"
+  },
+  {
+    "demangle_name": "void std::vector<tng::Boggle::Node, std::allocator<tng::Boggle::Node> >::_M_realloc_insert<std::array<int, 2ul>&, tng::Boggle::Node*>(__gnu_cxx::__normal_iterator<tng::Boggle::Node*, std::vector<tng::Boggle::Node, std::allocator<tng::Boggle::Node> > >, std::array<int, 2ul>&, tng::Boggle::Node*&&)",
+    "src_path": "/usr/local/bin/BadBoggleSolver_run"
+  },
+  {
+    "demangle_name": "std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_append(char const*, unsigned long)",
+    "src_path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25"
+  },
+  {
+    "demangle_name": "operator delete(void*)",
+    "src_path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25"
+  },
+  {
+    "demangle_name": "__cxxabiv1::__vmi_class_type_info::__do_dyncast(long, __cxxabiv1::__class_type_info::__sub_kind, __cxxabiv1::__class_type_info const*, void const*, __cxxabiv1::__class_type_info const*, void const*, __cxxabiv1::__class_type_info::__dyncast_result&) const",
+    "src_path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25"
+  },
+  {
+    "demangle_name": "bool std::has_facet<std::ctype<char> >(std::locale const&)",
+    "src_path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25"
+  },
+  {
+    "demangle_name": "std::basic_ios<char, std::char_traits<char> >::_M_cache_locale(std::locale const&)",
+    "src_path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25"
+  },
+  {
+    "demangle_name": "std::basic_ios<char, std::char_traits<char> >::init(std::basic_streambuf<char, std::char_traits<char> >*)",
+    "src_path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.25"
   }
 ]
