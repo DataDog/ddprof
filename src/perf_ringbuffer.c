@@ -12,10 +12,29 @@ bool rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size) {
   rb->size = size;
   rb->mask = get_mask_from_size(size);
 
+  // If already allocated just free it
+  if (rb->wrbuf)
+    free(rb->wrbuf);
+
+  // Allocate room for a watcher-held buffer.  This is for linearizing
+  // ringbuffer elements and depends on the per-watcher configuration for
+  // perf_event_open().  Eventually this size will be non-static.
+  uint64_t buf_sz = PERF_REGS_COUNT + PERF_SAMPLE_STACK_SIZE;
+  buf_sz += sizeof(perf_event_sample);
+  unsigned char *wrbuf = malloc(buf_sz);
+  if (!wrbuf)
+    return false;
+  rb->wrbuf = wrbuf;
+
   return true;
 }
 
 void rb_clear(RingBuffer *rb) { memset(rb, 0, sizeof(*rb)); }
+void rb_free(RingBuffer *rb) {
+  if (rb->wrbuf)
+    free(rb->wrbuf);
+  rb->wrbuf = NULL;
+}
 
 uint64_t rb_next(RingBuffer *rb) {
   rb->offset = (rb->offset + sizeof(uint64_t)) & (rb->mask);

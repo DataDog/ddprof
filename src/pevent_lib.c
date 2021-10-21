@@ -26,20 +26,6 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
     for (int j = 0; j < num_cpu; ++j) {
       int k = pevent_hdr->size++;
 
-      // If already allocated, then clear it first
-      if (pevent_hdr->pes[k].rb.wrbuf)
-        free(pevent_hdr->pes[k].rb.wrbuf);
-
-      // Allocate room for a watcher-held buffer.  This is for linearizing
-      // ringbuffer elements and depends on the per-watcher configuration for
-      // perf_event_open().  Eventually this size will be non-static.
-      uint64_t buf_sz = PERF_REGS_COUNT + PERF_SAMPLE_STACK_SIZE;
-      buf_sz += sizeof(perf_event_sample);
-      unsigned char *wrbuf = malloc(buf_sz);
-      if (!wrbuf)
-        DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB, "Error allocating storage");
-
-      pes[k].rb.wrbuf = wrbuf;
       pes[k].pos = i;
       pes[k].fd = perfopen(pid, &ctx->watchers[i], j, true);
       if (pes[k].fd == -1) {
@@ -72,7 +58,10 @@ DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
                strerror(errno));
         goto REGION_CLEANUP;
       }
-      rb_init(&pes[k].rb, region, reg_sz);
+      if (!rb_init(&pes[k].rb, region, reg_sz)) {
+        LG_ERR("Could not allocate storage for watcher (idx#%d)", k);
+        goto REGION_CLEANUP;
+      }
     }
   }
 
@@ -83,9 +72,9 @@ DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
 
 REGION_CLEANUP:
   // Failure : attempt to clean and send error
-  DDRES_CHECK_FWD(pevent_munmap(pevent_hdr));
+  pevent_munmap(pevent_hdr);
   if (use_override)
-    DDRES_CHECK_FWD(revert_override(&info));
+    revert_override(&info);
   return ddres_error(DD_WHAT_PERFMMAP);
 }
 
@@ -143,21 +132,13 @@ DDRes pevent_cleanup(PEventHdr *pevent_hdr) {
   DDRes ret = ddres_init();
   DDRes ret_tmp;
 
-  // Cleanup for things which cannot error
-  for (int k = 0; k < pevent_hdr->size; ++k) {
-    free(pevent_hdr->pes[k].rb.wrbuf);
-    pevent_hdr->pes[k].rb.wrbuf = NULL;
-  }
+  for (int k = 0; k < pevent_hdr->size; ++k)
+    rb_free(&pevent_hdr->pes[k].rb);
 
-  // Cleanup for things which can error.  We don't have a convenient way of
-  // clarifying which element threw an error, but it's better to greedily close
-  // all resources we can and indicate at least one error than it is to leave
-  // resources allocated, but unrecoverable.
-  for (int k = 0; k < pevent_hdr->size; ++k) {
-    if (!IsDDResOK(ret_tmp = pevent_munmap(pevent_hdr)))
-      ret = ret_tmp;
-    if (!IsDDResOK(ret_tmp = pevent_close(pevent_hdr)))
-      ret = ret_tmp;
-  }
+  // Cleanup both, storing the error if one was generated
+  if (!IsDDResOK(ret_tmp = pevent_munmap(pevent_hdr)))
+    ret = ret_tmp;
+  if (!IsDDResOK(ret_tmp = pevent_close(pevent_hdr)))
+    ret = ret_tmp;
   return ret;
 }

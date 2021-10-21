@@ -14,6 +14,7 @@ typedef struct RingBuffer {
 } RingBuffer;
 
 bool rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size);
+void rb_free(RingBuffer *rb);
 void rb_clear(RingBuffer *rb); // does not deallocate the buffer storage
 uint64_t rb_next(RingBuffer *rb);
 struct perf_event_header *rb_seek(RingBuffer *rb, uint64_t offset);
