@@ -149,7 +149,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
         // moving the ddprof export code and adding a constant-time callback,
         // but for now we're keeping this hack.
         if (hdr->type == PERF_RECORD_SAMPLE)
-          sample_hit == true;
+          sample_hit = true;
 
         // Pass the event to the processors
         DDRes res = ddprof_worker(hdr, pes[i].pos, continue_profiling, ctx);

@@ -11,6 +11,8 @@ bool rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size) {
   rb->start = (const char *)page + rb->meta_size;
   rb->size = size;
   rb->mask = get_mask_from_size(size);
+
+  return true;
 }
 
 void rb_clear(RingBuffer *rb) { memset(rb, 0, sizeof(*rb)); }
