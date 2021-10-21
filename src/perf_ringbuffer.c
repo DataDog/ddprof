@@ -51,7 +51,7 @@ struct perf_event_header *rb_seek(RingBuffer *rb, uint64_t offset) {
   // The terms 'left' and 'right' below refer to the regions in the
   // linearized buffer.  In the index space of the ringbuffer, these terms
   // would be reversed.
-  if ((rb->size - rb->meta_size) < ret->size) {
+  if (rb->size - rb->meta_size - rb->offset < ret->size) {
     uint64_t left_sz = rb->size - rb->meta_size - rb->offset;
     uint64_t right_sz = ret->size - left_sz;
     memcpy(rb->wrbuf, rb->start + rb->offset, left_sz);
