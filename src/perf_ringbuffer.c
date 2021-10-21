@@ -40,11 +40,16 @@ bool samp2hdr(struct perf_event_header *hdr, perf_event_sample *sample,
   // There is absolutely no point for this interface except testing
 
   // Presumes that the user has allocated enough room for the whole sample
-  if (!hdr || !sz_hdr)
+  if (!hdr || !sz_hdr || sz_hdr < sizeof(struct perf_event_header))
     return NULL;
+  memset(hdr, 0, sz_hdr);
 
+  // Initiate
   size_t sz = sizeof(*hdr);
-  uint64_t *buf = (uint64_t *)(hdr + 1); // skip over common part
+  *hdr = sample->header;
+  hdr->size = 0; // update size at end
+
+  uint64_t *buf = (uint64_t *)&hdr[1]; // buffer starts at sample
 
   if (sz >= sz_hdr)
     return false;
@@ -79,10 +84,11 @@ bool samp2hdr(struct perf_event_header *hdr, perf_event_sample *sample,
     *buf++ = sample->stream_id;
     SZ_CHECK;
   }
-  if (PERF_SAMPLE_CPU & mask) {}
-  ((flipper *)buf)->half[0] = sample->cpu;
-  ((flipper *)buf)->half[1] = sample->res;
-  SZ_CHECK;
+  if (PERF_SAMPLE_CPU & mask) {
+    ((flipper *)buf)->half[0] = sample->cpu;
+    ((flipper *)buf)->half[1] = sample->res;
+    SZ_CHECK;
+  }
   if (PERF_SAMPLE_PERIOD & mask) {
     *buf++ = sample->period;
     SZ_CHECK;
@@ -127,20 +133,27 @@ bool samp2hdr(struct perf_event_header *hdr, perf_event_sample *sample,
       if (sz >= sz_hdr)
         return false;
       memcpy(buf, sample->data_stack, sample->size_stack);
-      buf += sample->size_stack / 8; // stack copy is always aligned or 0
+      buf += ((sample->size_stack + 0x7) & ~0x7) / 8; // align and convert
+      *buf++ = sample->dyn_size_stack;
+      SZ_CHECK;
     }
   }
   if (PERF_SAMPLE_WEIGHT & mask) {}
   if (PERF_SAMPLE_DATA_SRC & mask) {}
   if (PERF_SAMPLE_TRANSACTION & mask) {}
   if (PERF_SAMPLE_REGS_INTR & mask) {}
+
+  hdr->size = sz;
+  return true;
 }
 
 perf_event_sample *hdr2samp(struct perf_event_header *hdr, uint64_t mask) {
   static perf_event_sample sample = {0};
   memset(&sample, 0, sizeof(sample));
 
-  uint64_t *buf = (uint64_t *)(hdr + 1); // skip over common part
+  sample.header = *hdr;
+
+  uint64_t *buf = (uint64_t *)&hdr[1]; // sample starts after header
 
   if (PERF_SAMPLE_IDENTIFIER & mask) {
     sample.sample_id = *buf++;
@@ -196,6 +209,7 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr, uint64_t mask) {
     // for that, since there isn't much we'd be able to do anyway.
     if (size_stack == 0) {
       sample.size_stack = 0;
+      sample.dyn_size_stack = 0;
       sample.data_stack = NULL;
     } else {
       uint64_t dynsz_stack = 0;
@@ -207,7 +221,8 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr, uint64_t mask) {
 
       // If the dyn_size is too big, zero out the stack size since it is likely
       // an error
-      sample.size_stack = size_stack <= dynsz_stack ? 0 : dynsz_stack;
+      sample.size_stack = size_stack < dynsz_stack ? 0 : dynsz_stack;
+      sample.dyn_size_stack = dynsz_stack; // for debugging
     }
   }
   if (PERF_SAMPLE_WEIGHT & mask) {}
