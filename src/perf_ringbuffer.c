@@ -42,8 +42,24 @@ uint64_t rb_next(RingBuffer *rb) {
 }
 
 struct perf_event_header *rb_seek(RingBuffer *rb, uint64_t offset) {
+  struct perf_event_header *ret;
   rb->offset = (unsigned long)offset & (rb->mask);
-  return (struct perf_event_header *)(rb->start + rb->offset);
+  ret = rb->start + rb->offset;
+
+  // Now check whether we overrun the end of the ringbuffer.  If so, pass in a
+  // buffer rather than the raw event.
+  // The terms 'left' and 'right' below refer to the regions in the
+  // linearized buffer.  In the index space of the ringbuffer, these terms
+  // would be reversed.
+  if ((rb->size - rb->meta_size) < ret->size) {
+    uint64_t left_sz = rb->size - rb->meta_size - rb->offset;
+    uint64_t right_sz = ret->size - left_sz;
+    memcpy(rb->wrbuf, rb->start + rb->offset, left_sz);
+    memcpy(rb->wrbuf + left_sz, rb->start, right_sz);
+    ret = (struct perf_event_header *)wrbuf;
+  }
+
+  return ret;
 }
 
 // This union is an implementation trick to make splitting apart an 8-byte

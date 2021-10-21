@@ -128,24 +128,6 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       while (head > tail) {
         struct perf_event_header *hdr = rb_seek(rb, tail);
 
-        // If the current element wraps around the buffer, need change hdr to
-        // point to a linearized copy of the element, since the processors
-        // don't handle overflow.  rb->size is actually the ringbuffer plus
-        // the metadata page, so make sure to account for that properly.
-        uint64_t rb_size = rb->size - rb->meta_size;
-
-        // The terms 'left' and 'right' below refer to the regions in the
-        // linearized buffer.  In the index space of the ringbuffer, these terms
-        // would be reversed.
-        if (rb_size - rb->offset < hdr->size) {
-          unsigned char *wrbuf = rb->wrbuf;
-          uint64_t left_sz = rb_size - rb->offset;
-          uint64_t right_sz = hdr->size - left_sz;
-          memcpy(wrbuf, rb->start + rb->offset, left_sz);
-          memcpy(wrbuf + left_sz, rb->start, right_sz);
-          hdr = (struct perf_event_header *)wrbuf;
-        }
-
         // TODO this strongly binds the behavior of the sample processor as an
         // export interface to this dispatch layer.  We can overcome this by
         // moving the ddprof export code and adding a constant-time callback,
