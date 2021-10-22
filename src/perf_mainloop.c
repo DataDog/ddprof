@@ -77,6 +77,29 @@ static void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
   }
 }
 
+static bool dispatch_event(DDProfContext *ctx, PEvent *pes, const WorkerAttr *attr, volatile bool *continue_profiling) {
+  // Process a single event from the given watcher, returning whether there was
+  // an event available or not
+  RingBuffer *rb = &pes->rb;
+  struct perf_event_mmap_page *perfpage = rb->region;
+  uint64_t head = perfpage->data_head;
+  rmb();
+  uint64_t tail = perfpage->data_tail;
+
+  if (head > tail) {
+    struct perf_event_header *hdr = rb_seek(rb, tail);
+
+    // Pass the event to the processors
+    DDRes res = ddprof_worker(hdr, pes->pos, continue_profiling, ctx);
+    if (IsDDResNotOK(res))
+      return false;
+    tail += hdr->size;
+  }
+
+  perfpage->data_tail = tail;
+  return true;
+}
+
 static void worker(DDProfContext *ctx, const WorkerAttr *attr,
                    volatile bool *continue_profiling) {
   // Until a restartable terminal condition is met, the worker will set its
@@ -94,7 +117,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   // Worker poll loop
   while (1) {
     int n = poll(pfd, pfd_len, PSAMPLE_DEFAULT_WAKEUP);
-    bool sample_hit = false;
+    int processed_samples = 0;
 
     // If there was an issue, return and let the caller check errno
     if (-1 == n && errno == EINTR) {
@@ -104,66 +127,71 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
                               attr->finish_fun(ctx));
     }
 
+    // Convenience structs
     int pe_len = ctx->worker_ctx.pevent_hdr.size;
     PEvent *pes = ctx->worker_ctx.pevent_hdr.pes;
 
-    // Check the ringbuffers in order
+    // If one of the perf_event_open() feeds was closed by the kernel, shut down
+    // profiling
     for (int i = 0; i < pe_len; i++) {
       // Even though pollhup might mean that multiple file descriptors (hence,
       // ringbuffers) are still active, in the typical case, `perf_event_open`
       // shuts down either all or nothing.  Accordingly, when it shuts down one
       // file descriptor, we shut down profiling.
-      if (pfd[i].revents & POLLHUP) {
+      if (pfd[i].revents & POLLHUP)
         DDRES_GRACEFUL_SHUTDOWN(attr->finish_fun(ctx));
-      }
+    }
 
-      // Drain the ringbuffer and dispatch to callback, as needed
-      // The head and tail are taken literally (without wraparound), since they
-      // don't wrap in the underlying object.  Instead, the rb_* interfaces
-      // wrap when accessing.
-      RingBuffer *rb = &pes[i].rb;
-      struct perf_event_mmap_page *perfpage = rb->region;
-      uint64_t head = perfpage->data_head;
-      rmb();
-      uint64_t tail = perfpage->data_tail;
+    // Check the ringbuffers, finding the one with the oldest event
+    // We'll run into an issue when TSC wraps around, but the ordering is
+    // handled by our backpopulate functionality--tiny blip for a few samples.
+    uint64_t v_old = UINT64_MAX;
+    int i_old = 0;
+    struct perf_event_header *hdr = NULL;
+    while (i_old != -1) {
+      i_old = -1; // if failure to set, end
+      v_old = UINT64_MAX;
 
-      while (head > tail) {
-        struct perf_event_header *hdr = rb_seek(rb, tail);
+      for (int i = 0; i < pe_len; i++) {
+        RingBuffer *rb = &pes[i].rb;
+        struct perf_event_mmap_page *perfpage = rb->region;
+        uint64_t head = perfpage->data_head;
+        rmb();
+        uint64_t tail = perfpage->data_tail;
 
-        // TODO this strongly binds the behavior of the sample processor as an
-        // export interface to this dispatch layer.  We can overcome this by
-        // moving the ddprof export code and adding a constant-time callback,
-        // but for now we're keeping this hack.
-        if (hdr->type == PERF_RECORD_SAMPLE)
-          sample_hit = true;
-
-        // Pass the event to the processors
-        DDRes res = ddprof_worker(hdr, pes[i].pos, continue_profiling, ctx);
-        if (IsDDResNotOK(res)) {
-          // ignoring possible errors from finish as we are closing
-          attr->finish_fun(ctx);
-          WORKER_SHUTDOWN();
+        if (head > tail) {
+          hdr = rb_seek(rb, tail);
+          uint64_t event_time = hdr_time(hdr, DEFAULT_SAMPLE_TYPE);
+          if (event_time < v_old) {
+            v_old = event_time;
+            i_old = i;
+          }
         }
-        tail += hdr->size;
       }
 
-      // We tell the kernel how much we read.  This *should* be the same as
-      // the current tail, but in the case of an error head will be a safe
-      // restart position.
-      perfpage->data_tail = head;
-
-      if (head != tail)
-        LG_WRN("Head/tail buffer mismatch");
+      // i_old now holds -1 or the value of the event we should process.
+      if (i_old == -1) {
+        // Didn't find any events, so exit while loop
+      } else if (!dispatch_event(ctx, &pes[i_old], attr, continue_profiling)) {
+        // Got a shutdown signal.
+        // ignoring possible errors from finish as we are closing
+        attr->finish_fun(ctx);
+        WORKER_SHUTDOWN();
+      } else {
+        // Otherwise, we successfully dispatched an event.  If it was a sample,
+        // then say so
+        if (hdr->type == PERF_RECORD_SAMPLE)
+          ++processed_samples;
+      }
     }
 
     // If I didn't process any events, then hit the timeout
-    if (sample_hit) {
+    if (!processed_samples) {
       DDRes res = ddprof_worker_timeout(continue_profiling, ctx);
       if (IsDDResNotOK(res)) {
         attr->finish_fun(ctx);
         DDRES_CHECK_OR_SHUTDOWN(res, attr->finish_fun(ctx));
       }
-      continue;
     }
   }
 }
