@@ -145,12 +145,11 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
     // Check the ringbuffers, finding the one with the oldest event
     // We'll run into an issue when TSC wraps around, but the ordering is
     // handled by our backpopulate functionality--tiny blip for a few samples.
-    uint64_t v_old = UINT64_MAX;
     int i_old = 0;
     struct perf_event_header *hdr = NULL;
     while (i_old != -1) {
       i_old = -1; // if failure to set, end
-      v_old = UINT64_MAX;
+      uint64_t v_old = UINT64_MAX;
 
       for (int i = 0; i < pe_len; ++i) {
         RingBuffer *rb = &pes[i].rb;
