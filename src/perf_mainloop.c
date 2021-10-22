@@ -78,8 +78,8 @@ static void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
 static bool dispatch_event(DDProfContext *ctx, PEvent *pes,
                            const WorkerAttr *attr,
                            volatile bool *continue_profiling) {
-  // Process a single event from the given watcher, returning whether there was
-  // an event available or not
+  // Process a single event from the given watcher, returning whether the event
+  // threw an error
   RingBuffer *rb = &pes->rb;
   struct perf_event_mmap_page *perfpage = rb->region;
   uint64_t head = perfpage->data_head;
