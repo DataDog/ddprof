@@ -8,7 +8,7 @@
 #include "ddres_def.h"
 #include "perf_option.h"
 
-#define PSAMPLE_DEFAULT_WAKEUP 1000 // sample frequency check
+#define PSAMPLE_DEFAULT_WAKEUP 10 // sample frequency check
 #define PERF_SAMPLE_STACK_SIZE (4096 * 8)
 #define PERF_SAMPLE_STACK_REGS 3
 #define MAX_INSN 16
@@ -21,11 +21,18 @@
 // TODO, this comes from BP, SP, and IP
 // see arch/x86/include/uapi/asm/perf_regs.h in the linux sources
 // We're going to hardcode everything for now...
-#define PERF_REGS_MASK ((1 << 6) | (1 << 7) | (1 << 8))
+#define PERF_REGS_MASK_X86 ((1 << 6) | (1 << 7) | (1 << 8))
+
+// 31 and 32 are the stack and PC, respectively.  29 is r29, see
+// https://github.com/ARM-software/abi-aa where it is usd conventionally as the
+// frame pointer register
+// Note that the order of these has to be changed in the unwinding code!
+#define PERF_REGS_MASK_ARM ((1 << 31) | (1 << 32) | (1 << 29))
 
 // This is a human-hardcoded number given the mask above; update it if the mask
 // gets more bits
 #define PERF_REGS_COUNT 3
+#define PERF_REGS_MASK PERF_REGS_MASK_X86
 
 typedef struct read_format {
   uint64_t value;        // The value of the event
@@ -84,6 +91,7 @@ typedef struct perf_event_lost {
 
 // clang-format off
 typedef struct perf_event_sample {
+  struct      perf_event_header header;
   uint64_t    sample_id;                // if PERF_SAMPLE_IDENTIFIER
   uint64_t    ip;                       // if PERF_SAMPLE_IP
   uint32_t    pid, tid;                 // if PERF_SAMPLE_TID
@@ -119,21 +127,11 @@ typedef struct perf_samplestacku {
   // uint64_t    dyn_size;   // Don't forget!
 } perf_samplestacku;
 
-// Used by rb_init() and friends
-typedef struct RingBuffer {
-  const char *start;
-  unsigned long offset;
-  size_t size;
-  size_t mask;
-} RingBuffer;
-
 int perf_event_open(struct perf_event_attr *, pid_t, int, int, unsigned long);
 int perfopen(pid_t pid, const PerfOption *opt, int cpu, bool extras);
 size_t perf_mmap_size(int buf_size_shift);
 void *perfown_sz(int fd, size_t size_of_buffer);
 void *perfown(int fd, size_t *size);
 int perfdisown(void *region, size_t size);
-void rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size);
-uint64_t rb_next(RingBuffer *);
-struct perf_event_header *rb_seek(RingBuffer *, uint64_t);
-perf_event_sample *hdr2samp(struct perf_event_header *hdr);
+long get_page_size(void);
+size_t get_mask_from_size(size_t size);

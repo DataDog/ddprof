@@ -133,7 +133,7 @@ TEST(DDRes, ErrorMessageCheck) {
   }
 
   EXPECT_TRUE(strcmp(ddres_error_message(DD_WHAT_BADALLOC),
-                     "BADALLOC: Allocation error") == 0);
+                     "BADALLOC: allocation error") == 0);
 
   for (int i = DD_NATIVE_START_RANGE; i < NATIVE_ERROR_SIZE; ++i) {
     printf("Id = %d \n", i);

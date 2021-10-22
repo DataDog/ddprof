@@ -92,6 +92,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   // Worker poll loop
   while (1) {
     int n = poll(pfd, pfd_len, PSAMPLE_DEFAULT_WAKEUP);
+    bool sample_hit = false;
 
     // If there was an issue, return and let the caller check errno
     if (-1 == n && errno == EINTR) {
@@ -101,24 +102,11 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
                               attr->finish_fun(ctx));
     }
 
-    // If no file descriptors, call time-out
-    if (0 == n) {
-      DDRes res = ddprof_worker_timeout(continue_profiling, ctx);
-      if (IsDDResNotOK(res)) {
-        DDRES_CHECK_OR_SHUTDOWN(res, attr->finish_fun(ctx));
-      }
-      continue;
-    }
-
     int pe_len = ctx->worker_ctx.pevent_hdr.size;
     PEvent *pes = ctx->worker_ctx.pevent_hdr.pes;
 
-    // If we're here, we have at least one file descriptor active.  That means
-    // the underyling ringbuffers can be checked.
+    // Check the ringbuffers in order
     for (int i = 0; i < pe_len; i++) {
-      if (!pfd[i].revents)
-        continue;
-
       // Even though pollhup might mean that multiple file descriptors (hence,
       // ringbuffers) are still active, in the typical case, `perf_event_open`
       // shuts down either all or nothing.  Accordingly, when it shuts down one
@@ -131,26 +119,28 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       // The head and tail are taken literally (without wraparound), since they
       // don't wrap in the underlying object.  Instead, the rb_* interfaces
       // wrap when accessing.
-      uint64_t head = pes[i].region->data_head;
+      RingBuffer *rb = &pes[i].rb;
+      struct perf_event_mmap_page *perfpage = rb->region;
+      uint64_t head = perfpage->data_head;
       rmb();
-      uint64_t tail = pes[i].region->data_tail;
-      RingBuffer *rb = &(RingBuffer){0};
-      rb_init(rb, pes[i].region, pes[i].reg_size);
+      uint64_t tail = perfpage->data_tail;
 
       while (head > tail) {
         struct perf_event_header *hdr = rb_seek(rb, tail);
-        if ((char *)pes[i].region + pes[i].reg_size < (char *)hdr + hdr->size) {
-          // We don't handle the case when the object in the ringbuffer is
-          // wrapped around the end.  In such a case, we might copy into a
-          // single contiguous object or update the hdr2sample code to account
-          // for wrapping, but for now skip it.
-        } else {
-          DDRes res = ddprof_worker(hdr, pes[i].pos, continue_profiling, ctx);
-          if (IsDDResNotOK(res)) {
-            // ignoring possible errors from finish as we are closing
-            attr->finish_fun(ctx);
-            WORKER_SHUTDOWN();
-          }
+
+        // TODO this strongly binds the behavior of the sample processor as an
+        // export interface to this dispatch layer.  We can overcome this by
+        // moving the ddprof export code and adding a constant-time callback,
+        // but for now we're keeping this hack.
+        if (hdr->type == PERF_RECORD_SAMPLE)
+          sample_hit = true;
+
+        // Pass the event to the processors
+        DDRes res = ddprof_worker(hdr, pes[i].pos, continue_profiling, ctx);
+        if (IsDDResNotOK(res)) {
+          // ignoring possible errors from finish as we are closing
+          attr->finish_fun(ctx);
+          WORKER_SHUTDOWN();
         }
         tail += hdr->size;
       }
@@ -158,10 +148,20 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       // We tell the kernel how much we read.  This *should* be the same as
       // the current tail, but in the case of an error head will be a safe
       // restart position.
-      pes[i].region->data_tail = head;
+      perfpage->data_tail = head;
 
       if (head != tail)
         LG_WRN("Head/tail buffer mismatch");
+    }
+
+    // If I didn't process any events, then hit the timeout
+    if (sample_hit) {
+      DDRes res = ddprof_worker_timeout(continue_profiling, ctx);
+      if (IsDDResNotOK(res)) {
+        attr->finish_fun(ctx);
+        DDRES_CHECK_OR_SHUTDOWN(res, attr->finish_fun(ctx));
+      }
+      continue;
     }
   }
 }

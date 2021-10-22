@@ -9,40 +9,42 @@ extern "C" {
 #define DD_COMMON_START_RANGE 1000
 #define DD_NATIVE_START_RANGE 2000
 
-#define EXPAND_ENUM(a, b) a,
-#define EXPAND_ERROR_MESSAGE(a, b) b,
+#define EXPAND_ENUM(a, b) DD_WHAT_##a,
+#define EXPAND_ERROR_MESSAGE(a, b) #a ": " b,
 
 #define COMMOM_ERROR_TABLE(X)                                                  \
-  X(DD_WHAT_UKNW, "UKNW: Undocumented error")                                  \
-  X(DD_WHAT_BADALLOC, "BADALLOC: Allocation error")                            \
-  X(DD_WHAT_STDEXCEPT, "STDEXCEPT: Standard exception caught")                 \
-  X(DD_WHAT_UKNWEXCEPT, "UKNWEXCEPT: Unknown exception caught")
+  X(UKNW, "undocumented error")                                                \
+  X(BADALLOC, "allocation error")                                              \
+  X(STDEXCEPT, "standard exception caught")                                    \
+  X(UKNWEXCEPT, "unknown exception caught")
 
 #define NATIVE_ERROR_TABLE(X)                                                  \
-  X(DD_WHAT_DWFL_LIB_ERROR, "DWFL_LIB_ERROR: error withing dwfl library")      \
-  X(DD_WHAT_UW_CACHE_ERROR, "UW_CACHE_ERROR: error from unwinding cache")      \
-  X(DD_WHAT_UW_ERROR, "UW_ERROR: error from unwinding code")                   \
-  X(DD_WHAT_CAPLIB, "CAPLIB: error when reading capabilities")                 \
-  X(DD_WHAT_USERID, "USERID: error in user ID manipulations")                  \
-  X(DD_WHAT_PERFOPEN, "PERFOPEN: error during perf_event_open")                \
-  X(DD_WHAT_IOCTL, "PERFOPEN: error during perf_event_open")                   \
-  X(DD_WHAT_PERFMMAP, "PERFMMAP: error in mmap operations")                    \
-  X(DD_WHAT_MAINLOOP, "MAINLOOP: error in main_loop coordinator")              \
-  X(DD_WHAT_POLLTIMEOUT, "POLLTIMEOUT: timeout when polling perf events")      \
-  X(DD_WHAT_POLLERROR, "POLLERROR: Unknown poll error")                        \
-  X(DD_WHAT_POLLHANGUP, "POLLHANGUP: perf event file descriptor hang up")      \
-  X(DD_WHAT_WORKER_RESET, "WORKER_RESET: worker reset requested (expected)")   \
-  X(DD_WHAT_PROCSTATE, "PROCSTATE: error when retrieveing procstate")          \
-  X(DD_WHAT_PPROF, "PPROF: error in pprof manipulations")                      \
-  X(DD_WHAT_STATSD, "STATSD: statsd interface")                                \
-  X(DD_WHAT_DDPROF_STATS, "DDPROF_STATS: error in stats module")               \
-  X(DD_WHAT_EXPORTER, "EXPORTER")                                              \
-  X(DD_WHAT_ARGUMENT, "ARGUMENT: Error writing arguments")                     \
-  X(DD_WHAT_INPUT_PROCESS, "DD_WHAT_INPUT_PROCESS")                            \
-  X(DD_WHAT_STACK_HANDLE, "DD_WHAT_STACK_HANDLE")                              \
-  X(DD_WHAT_DSO, "DD_WHAT_DSO")                                                \
-  X(DD_WHAT_UNHANDLED_DSO, "UNHANDLED_DSO: ignore dso type")                   \
-  X(DD_WHAT_UNITTEST, "UNITTEST: unit test error")
+  X(DWFL_LIB_ERROR, "error withing dwfl library")                              \
+  X(UW_CACHE_ERROR, "error from unwinding cache")                              \
+  X(UW_ERROR, "error from unwinding code")                                     \
+  X(CAPLIB, "error when reading capabilities")                                 \
+  X(USERID, "error in user ID manipulations")                                  \
+  X(PEINIT, "error allocating space for pevent")                               \
+  X(PERFOPEN, "error during perf_event_open")                                  \
+  X(PERFRB, "error with perf_event ringbuffer")                                \
+  X(IOCTL, "error during perf_event_open")                                     \
+  X(PERFMMAP, "error in mmap operations")                                      \
+  X(MAINLOOP, "error in main_loop coordinator")                                \
+  X(POLLTIMEOUT, "timeout when polling perf events")                           \
+  X(POLLERROR, "Unknown poll error")                                           \
+  X(POLLHANGUP, "perf event file descriptor hang up")                          \
+  X(WORKER_RESET, "worker reset requested (not a fatal error)")                \
+  X(PROCSTATE, "error when retrieveing procstate")                             \
+  X(PPROF, "error in pprof manipulations")                                     \
+  X(STATSD, "statsd interface")                                                \
+  X(DDPROF_STATS, "error in stats module")                                     \
+  X(EXPORTER, "error exporting")                                               \
+  X(ARGUMENT, "error writing arguments")                                       \
+  X(INPUT_PROCESS, "")                                                         \
+  X(STACK_HANDLE, "")                                                          \
+  X(DSO, "")                                                                   \
+  X(UNHANDLED_DSO, "ignore dso type")                                          \
+  X(UNITTEST, "unit test error")
 
 // generic erno errors available from /usr/include/asm-generic/errno.h
 

@@ -28,7 +28,9 @@ struct perf_event_attr g_dd_native_attr = {
     .disabled = 1,
     .inherit = 1,
     .inherit_stat = 0,
-    .mmap = 0, // keep track of executable mappings
+    .mmap = 0,      // keep track of executable mappings
+    .mmap_data = 0, // keep track of other mappings
+    .sample_id_all = 0,
     .task = 0, // Follow fork/stop events
     .comm = 0, // Follow exec()
     .enable_on_exec = 1,
@@ -38,7 +40,7 @@ struct perf_event_attr g_dd_native_attr = {
     .exclude_hv = 1,
 };
 
-static long get_page_size(void) {
+long get_page_size(void) {
   if (!s_page_size) {
     s_page_size = sysconf(_SC_PAGESIZE);
     // log if we have an unusual page size
@@ -70,6 +72,7 @@ int perfopen(pid_t pid, const PerfOption *opt, int cpu, bool extras) {
   // Extras
   if (extras) {
     attr.mmap = 1;
+    attr.mmap_data = 1;
     attr.task = 1;
     attr.comm = 1;
   }
@@ -120,104 +123,3 @@ void *perfown(int fd, size_t *size) {
 }
 
 int perfdisown(void *region, size_t size) { return munmap(region, size); }
-
-void rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size) {
-  rb->start = (const char *)page + get_page_size();
-  rb->size = size;
-  rb->mask = get_mask_from_size(size);
-}
-
-uint64_t rb_next(RingBuffer *rb) {
-  rb->offset = (rb->offset + sizeof(uint64_t)) & (rb->mask);
-  return *(uint64_t *)(rb->start + rb->offset);
-}
-
-struct perf_event_header *rb_seek(RingBuffer *rb, uint64_t offset) {
-  rb->offset = (unsigned long)offset & (rb->mask);
-  return (struct perf_event_header *)(rb->start + rb->offset);
-}
-
-// This union is an implementation trick to make splitting apart an 8-byte
-// aligned block into two 4-byte blocks easier
-typedef union flipper {
-  uint64_t full;
-  uint32_t half[2];
-} flipper;
-
-perf_event_sample *hdr2samp(struct perf_event_header *hdr) {
-  static perf_event_sample sample = {0};
-  memset(&sample, 0, sizeof(sample));
-
-  uint64_t *buf = (uint64_t *)(hdr + 1);
-
-  if (PERF_SAMPLE_IDENTIFIER & DEFAULT_SAMPLE_TYPE) {
-    sample.sample_id = *buf++;
-  }
-  if (PERF_SAMPLE_IP & DEFAULT_SAMPLE_TYPE) {
-    sample.ip = *buf++;
-  }
-  if (PERF_SAMPLE_TID & DEFAULT_SAMPLE_TYPE) {
-    sample.pid = ((flipper *)buf)->half[0];
-    sample.tid = ((flipper *)buf)->half[1];
-    buf++;
-  }
-  if (PERF_SAMPLE_TIME & DEFAULT_SAMPLE_TYPE) {
-    sample.time = *buf++;
-  }
-  if (PERF_SAMPLE_ADDR & DEFAULT_SAMPLE_TYPE) {
-    sample.addr = *buf++;
-  }
-  if (PERF_SAMPLE_ID & DEFAULT_SAMPLE_TYPE) {
-    sample.id = *buf++;
-  }
-  if (PERF_SAMPLE_STREAM_ID & DEFAULT_SAMPLE_TYPE) {
-    sample.stream_id = *buf++;
-  }
-  if (PERF_SAMPLE_CPU & DEFAULT_SAMPLE_TYPE) {
-    sample.cpu = ((flipper *)buf)->half[0];
-    sample.res = ((flipper *)buf)->half[1];
-    buf++;
-  }
-  if (PERF_SAMPLE_PERIOD & DEFAULT_SAMPLE_TYPE) {
-    sample.period = *buf++;
-  }
-  if (PERF_SAMPLE_READ & DEFAULT_SAMPLE_TYPE) {
-    // sizeof(uint64_t) == sizeof(ptr)
-    sample.v = (struct read_format *)buf++;
-  }
-  if (PERF_SAMPLE_CALLCHAIN & DEFAULT_SAMPLE_TYPE) {
-    sample.nr = *buf++;
-    sample.ips = buf;
-    buf += sample.nr;
-  }
-  if (PERF_SAMPLE_RAW & DEFAULT_SAMPLE_TYPE) {}
-  if (PERF_SAMPLE_BRANCH_STACK & DEFAULT_SAMPLE_TYPE) {}
-  if (PERF_SAMPLE_REGS_USER & DEFAULT_SAMPLE_TYPE) {
-    sample.abi = *buf++;
-    sample.regs = buf;
-    buf += PERF_REGS_COUNT;
-  }
-  if (PERF_SAMPLE_STACK_USER & DEFAULT_SAMPLE_TYPE) {
-    sample.size_stack = *buf++;
-    if (sample.size_stack) {
-      sample.data_stack = (char *)buf;
-      buf = (uint64_t *)(sample.data_stack + sample.size_stack);
-
-      // If the size was specified, we also have a dyn_size
-      sample.size_stack = *buf++;
-    } else {
-      sample.data_stack = NULL;
-    }
-  }
-  if (PERF_SAMPLE_WEIGHT & DEFAULT_SAMPLE_TYPE) {}
-  if (PERF_SAMPLE_DATA_SRC & DEFAULT_SAMPLE_TYPE) {}
-  if (PERF_SAMPLE_TRANSACTION & DEFAULT_SAMPLE_TYPE) {}
-  if (PERF_SAMPLE_REGS_INTR & DEFAULT_SAMPLE_TYPE) {}
-
-  // Ensure buf can be used in a semantically correct way without worrying
-  // whether we've implemented the next consumer.  This is to keep static
-  // analysis and checkers happy.
-  (void)buf;
-
-  return &sample;
-}

@@ -14,19 +14,18 @@
 void pevent_init(PEventHdr *pevent_hdr) {
   memset(pevent_hdr, 0, sizeof(PEventHdr));
   pevent_hdr->max_size = MAX_NB_WATCHERS;
-  for (int k = 0; k < pevent_hdr->max_size; ++k) {
+  for (int k = 0; k < pevent_hdr->max_size; ++k)
     pevent_hdr->pes[k].fd = -1;
-  }
 }
 
 DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
                   PEventHdr *pevent_hdr) {
   PEvent *pes = pevent_hdr->pes;
   assert(pevent_hdr->size == 0); // check for previous init
-  for (int i = 0; i < ctx->num_watchers && ctx->params.enable; ++i) {
+  for (int i = 0; i < ctx->num_watchers; ++i) {
     for (int j = 0; j < num_cpu; ++j) {
-      int k = pevent_hdr->size;
-      ++(pevent_hdr->size);
+      int k = pevent_hdr->size++;
+
       pes[k].pos = i;
       pes[k].fd = perfopen(pid, &ctx->watchers[i], j, true);
       if (pes[k].fd == -1) {
@@ -52,9 +51,15 @@ DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
   PEvent *pes = pevent_hdr->pes;
   for (int k = 0; k < pevent_hdr->size; ++k) {
     if (pes[k].fd != -1) {
-      if (!(pes[k].region = perfown(pes[k].fd, &pes[k].reg_size))) {
+      size_t reg_sz = 0;
+      void *region = perfown(pes[k].fd, &reg_sz);
+      if (!region) {
         LG_ERR("Could not finalize watcher (idx#%d): registration (%s)", k,
                strerror(errno));
+        goto REGION_CLEANUP;
+      }
+      if (!rb_init(&pes[k].rb, region, reg_sz)) {
+        LG_ERR("Could not allocate storage for watcher (idx#%d)", k);
         goto REGION_CLEANUP;
       }
     }
@@ -67,9 +72,9 @@ DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
 
 REGION_CLEANUP:
   // Failure : attempt to clean and send error
-  DDRES_CHECK_FWD(pevent_munmap(pevent_hdr));
+  pevent_munmap(pevent_hdr);
   if (use_override)
-    DDRES_CHECK_FWD(revert_override(&info));
+    revert_override(&info);
   return ddres_error(DD_WHAT_PERFMMAP);
 }
 
@@ -95,13 +100,12 @@ DDRes pevent_enable(PEventHdr *pevent_hdr) {
 DDRes pevent_munmap(PEventHdr *pevent_hdr) {
   PEvent *pes = pevent_hdr->pes;
   for (int k = 0; k < pevent_hdr->size; ++k) {
-    if (pes[k].region) {
-      if (perfdisown(pes[k].region, pes[k].reg_size) != 0) {
+    if (pes[k].rb.region) {
+      if (perfdisown(pes[k].rb.region, pes[k].rb.size) != 0) {
         DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
                                "Error when using perfdisown %d", k);
-      } else {
-        pes[k].region = NULL;
       }
+      pes[k].rb.region = NULL;
     }
   }
   return ddres_init();
@@ -125,9 +129,16 @@ DDRes pevent_close(PEventHdr *pevent_hdr) {
 
 // returns the number of successful cleans
 DDRes pevent_cleanup(PEventHdr *pevent_hdr) {
-  for (int k = 0; k < pevent_hdr->size; ++k) {
-    DDRES_CHECK_FWD(pevent_munmap(pevent_hdr));
-    DDRES_CHECK_FWD(pevent_close(pevent_hdr));
-  }
-  return ddres_init();
+  DDRes ret = ddres_init();
+  DDRes ret_tmp;
+
+  for (int k = 0; k < pevent_hdr->size; ++k)
+    rb_free(&pevent_hdr->pes[k].rb);
+
+  // Cleanup both, storing the error if one was generated
+  if (!IsDDResOK(ret_tmp = pevent_munmap(pevent_hdr)))
+    ret = ret_tmp;
+  if (!IsDDResOK(ret_tmp = pevent_close(pevent_hdr)))
+    ret = ret_tmp;
+  return ret;
 }

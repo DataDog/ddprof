@@ -4,6 +4,7 @@
 #include "ddres_def.h"
 #include "pevent.h"
 
+/// Sets initial state for every pevent in the pevent_hdr
 void pevent_init(PEventHdr *pevent_hdr);
 
 /// Setup perf event according to requested watchers.

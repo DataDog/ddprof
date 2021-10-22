@@ -150,11 +150,20 @@ add_unit_test(
 )
 
 add_unit_test(
+    perf_ringbuffer-ut
+    ../src/perf.c
+    ../src/perf_ringbuffer.c
+    perf_ringbuffer-ut.cc
+    DEFINITIONS MYNAME="perf_ringbuffer-ut"
+)
+
+add_unit_test(
     pevent-ut
     ../src/pevent_lib.c
     ../src/user_override.c
     ../src/perf.c
     ../src/perf_option.c
+    ../src/perf_ringbuffer.c
     pevent-ut.cc
     DEFINITIONS MYNAME="pevent-ut"
 )

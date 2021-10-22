@@ -28,16 +28,16 @@ typedef struct DDRes {
 
 #define FillDDRes(res, sev, what)                                              \
   do {                                                                         \
-    res._sev = sev;                                                            \
-    res._what = what;                                                          \
+    (res)._sev = (sev);                                                        \
+    (res)._what = (what);                                                      \
   } while (0)
 
 #define InitDDResOK(res)                                                       \
   do {                                                                         \
-    res._val = 0;                                                              \
+    (res)._val = 0;                                                            \
   } while (0)
 
-#define FillDDResFatal(res, what) FillDDRes(res, DD_SEVERROR, what)
+#define FillDDResFatal(res, what) FillDDRes((res), DD_SEVERROR, what)
 
 /******** STANDARD APIs TO USE BELLOW **********/
 // In C you should be careful of static inline vs extern inline vs inline
@@ -73,13 +73,13 @@ static inline bool ddres_equal(DDRes lhs, DDRes rhs) {
 // Assumption behind these is that SEVERROR does not occur often
 
 /// true if ddres is not OK (unlikely)
-#define IsDDResNotOK(res) unlikely(res._sev != DD_SEVOK)
+#define IsDDResNotOK(res) unlikely((res)._sev != DD_SEVOK)
 
 /// true if ddres is OK (likely)
-#define IsDDResOK(res) likely(res._sev == DD_SEVOK)
+#define IsDDResOK(res) likely((res)._sev == DD_SEVOK)
 
 /// true if ddres is fatal (unlikely)
-#define IsDDResFatal(res) unlikely(res._sev == DD_SEVERROR)
+#define IsDDResFatal(res) unlikely((res)._sev == DD_SEVERROR)
 
 #ifdef __cplusplus
 } // extern "C"
