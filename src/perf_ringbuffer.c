@@ -277,7 +277,7 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr, uint64_t mask) {
 
 inline static int get_bits(uint64_t val) {
   int count = 0;
-  while(val) {
+  while (val) {
     count += val & 1;
     val >>= 1;
   }
@@ -291,15 +291,18 @@ uint64_t hdr_time(struct perf_event_header *hdr, uint64_t mask) {
   uint64_t sampleid_mask_bits;
   uint8_t *buf;
 
-  switch(hdr->type) {
+  switch (hdr->type) {
 
   // For sample events, there is no sample_id struct at the end of the feed, so
   // we need to compute the time from the sample.  Rather than doing the full
   // sample2hdr computation, we do an abbreviated lookup from the top of the
   // header
   case PERF_RECORD_SAMPLE:
-    buf = (uint8_t*)&hdr[1];
-    return *(uint64_t*)&buf[8*get_bits(mask & (PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_IP | PERF_SAMPLE_TID))];
+    buf = (uint8_t *)&hdr[1];
+    return *(uint64_t *)&buf[8 *
+                             get_bits(mask &
+                                      (PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_IP |
+                                       PERF_SAMPLE_TID))];
 
   // For non-sample type events, the time is in the sample_id struct which is
   // at the very end of the feed.  We seek to the top of the header, which
@@ -313,10 +316,11 @@ uint64_t hdr_time(struct perf_event_header *hdr, uint64_t mask) {
   case PERF_RECORD_FORK:
   case PERF_RECORD_LOST:
     sampleid_mask_bits = mask;
-    sampleid_mask_bits &= PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ID | PERF_SAMPLE_STREAM_ID | PERF_SAMPLE_CPU | PERF_SAMPLE_IDENTIFIER;
+    sampleid_mask_bits &= PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ID |
+        PERF_SAMPLE_STREAM_ID | PERF_SAMPLE_CPU | PERF_SAMPLE_IDENTIFIER;
     sampleid_mask_bits = get_bits(sampleid_mask_bits);
-    buf = ((uint8_t*)hdr) + hdr->size - sizeof(uint64_t)*sampleid_mask_bits;
-    return *(uint64_t*)&buf[8*!!(mask & PERF_SAMPLE_TID)];
+    buf = ((uint8_t *)hdr) + hdr->size - sizeof(uint64_t) * sampleid_mask_bits;
+    return *(uint64_t *)&buf[8 * !!(mask & PERF_SAMPLE_TID)];
   }
 
   return 0;

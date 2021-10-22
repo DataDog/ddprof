@@ -77,7 +77,9 @@ static void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
   }
 }
 
-static bool dispatch_event(DDProfContext *ctx, PEvent *pes, const WorkerAttr *attr, volatile bool *continue_profiling) {
+static bool dispatch_event(DDProfContext *ctx, PEvent *pes,
+                           const WorkerAttr *attr,
+                           volatile bool *continue_profiling) {
   // Process a single event from the given watcher, returning whether there was
   // an event available or not
   RingBuffer *rb = &pes->rb;
