@@ -21,3 +21,5 @@ struct perf_event_header *rb_seek(RingBuffer *rb, uint64_t offset);
 bool samp2hdr(struct perf_event_header *hdr, perf_event_sample *sample,
               size_t sz_hdr, uint64_t mask);
 perf_event_sample *hdr2samp(struct perf_event_header *hdr, uint64_t mask);
+
+uint64_t hdr_time(struct perf_event_header *hdr, uint64_t mask);

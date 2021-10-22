@@ -11,6 +11,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <stdio.h>
+
 #include "ddprof_worker.h"
 #include "ddres.h"
 #include "logger.h"
