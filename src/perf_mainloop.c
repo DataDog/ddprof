@@ -68,7 +68,7 @@ static void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
   *pfd_len = pevent_hdr->size;
   const PEvent *pes = pevent_hdr->pes;
   // Setup poll() to watch perf_event file descriptors
-  for (int i = 0; i < *pfd_len; i++) {
+  for (int i = 0; i < *pfd_len; ++i) {
     // NOTE: if fd is negative, it will be ignored
     pfd[i].fd = pes[i].fd;
     pfd[i].events = POLLIN | POLLERR | POLLHUP;
@@ -133,7 +133,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
 
     // If one of the perf_event_open() feeds was closed by the kernel, shut down
     // profiling
-    for (int i = 0; i < pe_len; i++) {
+    for (int i = 0; i < pe_len; ++i) {
       // Even though pollhup might mean that multiple file descriptors (hence,
       // ringbuffers) are still active, in the typical case, `perf_event_open`
       // shuts down either all or nothing.  Accordingly, when it shuts down one
@@ -152,7 +152,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       i_old = -1; // if failure to set, end
       v_old = UINT64_MAX;
 
-      for (int i = 0; i < pe_len; i++) {
+      for (int i = 0; i < pe_len; ++i) {
         RingBuffer *rb = &pes[i].rb;
         struct perf_event_mmap_page *perfpage = rb->region;
         uint64_t head = perfpage->data_head;
