@@ -91,7 +91,7 @@ struct DsoHdr {
   bool pid_backpopulate(int, int &nb_elts_added);
 
   // Find the first associated to this pid
-  DsoFindRes dso_find_first_executable(pid_t pid) const;
+  DsoFindRes dso_find_first_std_executable(pid_t pid) const;
 
   // Find the closest dso to this pid and addr
   DsoFindRes dso_find_closest(pid_t pid, ElfAddress_t addr);

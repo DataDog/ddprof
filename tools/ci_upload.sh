@@ -15,8 +15,13 @@ DIR=$(git rev-parse --show-toplevel)
 if [ ! -z "${RELEASEBIN}" ]; then 
   # Upload with ddprof_version_buildid : example ddprof_0.6.4_5769351-8471af37
   $DIR/tools/upload.sh -p ${S3ROOT}/release -f ${RELEASEBIN} -n $(${RELEASEBIN} --version | sed -e 's/ /_/g' -e 's/\+/_/g')
-  # Upload with ddprof_version : example ddprof_0.6.4
-  $DIR/tools/upload.sh -p ${S3ROOT}/release -f ${RELEASEBIN} -n $(${RELEASEBIN} --version | sed -e 's/ /_/g' -e 's/\+.*//g')
+  if [ ! -z $PROMOTE ] && [ $PROMOTE = "MAIN" ]; then
+    $DIR/tools/upload.sh -p ${S3ROOT}/release -f ${RELEASEBIN} -n $(${RELEASEBIN} --version | sed -e 's/ .*//g')_main
+  fi
+  if [ ! -z $PROMOTE ] && [ $PROMOTE = "CANDIDATE" ]; then
+    # Upload with ddprof_candidate
+    $DIR/tools/upload.sh -p ${S3ROOT}/release -f ${RELEASEBIN} -n $(${RELEASEBIN} --version | sed -e 's/ .*//g')_candidate
+  fi
   if [ ! -z $PROMOTE ] && [ $PROMOTE = "MAJOR" ]; then
     # Upload with ddprof : warning this will be pulled down automatically in Datadog
     $DIR/tools/upload.sh -p ${S3ROOT}/release -f ${RELEASEBIN} -n $(${RELEASEBIN} --version | sed -e 's/ .*//g')
