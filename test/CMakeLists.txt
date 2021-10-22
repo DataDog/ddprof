@@ -158,6 +158,13 @@ add_unit_test(
 )
 
 add_unit_test(
+    producer_linearizer-ut
+    ../src/producer_linearizer.c
+    producer_linearizer-ut.cc
+    DEFINITIONS MYNAME="producer_linearizer-ut"
+)
+
+add_unit_test(
     pevent-ut
     ../src/pevent_lib.c
     ../src/user_override.c
