@@ -55,7 +55,7 @@ int *getfd(int sfd, int *sz) {
   *sz = *(int *)msg.msg_iov[0].iov_base;
   int num_fd = 0;
   struct cmsghdr *cmsg = NULL;
-  int *fd = calloc(*sz, sizeof(int));
+  int *fd = calloc(*sz, sizeof(*fd));
   if (!fd) {
     *sz = -3;
     return NULL;

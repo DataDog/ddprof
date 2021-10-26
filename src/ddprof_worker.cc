@@ -354,10 +354,12 @@ DDRes ddprof_worker_finish(DDProfContext *ctx) {
     if (ctx->worker_ctx.exp) {
       DDRES_CHECK_FWD(ddprof_exporter_free(ctx->worker_ctx.exp));
       free(ctx->worker_ctx.exp);
+      ctx->worker_ctx.exp = nullptr;
     }
     if (ctx->worker_ctx.pprof) {
       DDRES_CHECK_FWD(pprof_free_profile(ctx->worker_ctx.pprof));
       free(ctx->worker_ctx.pprof);
+      ctx->worker_ctx.pprof = nullptr;
     }
   }
   CatchExcept2DDRes();

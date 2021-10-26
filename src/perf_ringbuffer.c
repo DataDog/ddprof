@@ -15,6 +15,7 @@ bool rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size) {
   // If already allocated just free it
   if (rb->wrbuf)
     free(rb->wrbuf);
+  rb->wrbuf = NULL; // in case alloc fails
 
   // Allocate room for a watcher-held buffer.  This is for linearizing
   // ringbuffer elements and depends on the per-watcher configuration for

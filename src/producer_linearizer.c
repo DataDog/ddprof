@@ -29,8 +29,7 @@ bool ProducerLinearizer_init(ProducerLinearizer *pl, uint64_t sz, uint64_t *A) {
   return true;
 
 PLINIT_ERR_CLEANUP:
-  free(I);
-  free(F);
+  ProducerLinearizer_Free(pl);
   return false;
 }
 

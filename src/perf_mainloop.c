@@ -109,6 +109,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   uint64_t i_ev;
   if (!ProducerLinearizer_init(&pl, pe_len, time_values)) {
     free(time_values);
+    time_values = NULL;
     WORKER_SHUTDOWN();
   }
 
@@ -116,6 +117,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   struct perf_event_header **hdrs = calloc(sizeof(*hdrs), pe_len);
   if (!hdrs) {
     free(time_values);
+    time_values = NULL;
     WORKER_SHUTDOWN();
   }
 
@@ -187,6 +189,8 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
         attr->finish_fun(ctx);
         free(time_values);
         free(hdrs);
+        time_values = NULL;
+        hdrs = NULL;
         WORKER_SHUTDOWN();
       } else {
         // Otherwise, we successfully dispatched an event.  If it was a sample,
