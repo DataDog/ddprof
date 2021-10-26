@@ -4,12 +4,12 @@
 #include <stdint.h>
 
 typedef struct ProducerLinearizer {
-  uint64_t sz; // number of allocated slots
-  uint64_t *A; // Array of values of length sz
-  uint64_t *I; // Array of indices; allocated by interface
-  bool *F; // Mask of free indices; allocated by interface
+  uint64_t sz;        // number of allocated slots
+  uint64_t *A;        // Array of values of length sz
+  uint64_t *I;        // Array of indices; allocated by interface
+  bool *F;            // Mask of free indices; allocated by interface
   uint64_t freecount; // count of the slots in F set to true
-  uint64_t cursor; // see pop documentation
+  uint64_t cursor;    // see pop documentation
 } ProducerLinearizer;
 
 // Initializes a ProducerLinearizer object, allocates storage

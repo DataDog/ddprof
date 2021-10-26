@@ -16,6 +16,7 @@
 #include "logger.h"
 #include "perf.h"
 #include "pevent.h"
+#include "producer_linearizer.h"
 #include "unwind.h"
 
 #define rmb() __asm__ volatile("lfence" ::: "memory")
@@ -42,7 +43,7 @@
     WORKER_SHUTDOWN();                                                         \
   } while (0)
 
-DDRes spawn_workers(volatile bool *continue_profiling) {
+DDRes spawn_workers(volatile bool *keep_profiling) {
   pid_t child_pid;
 
   while ((child_pid = fork())) {
@@ -52,10 +53,10 @@ DDRes spawn_workers(volatile bool *continue_profiling) {
     // Harvest the exit state of the child process.  We will always reset it
     // to false so that a child who segfaults or exits erroneously does not
     // cause a pointless loop of spawning
-    if (!*continue_profiling) {
+    if (!*keep_profiling) {
       DDRES_RETURN_WARN_LOG(DD_WHAT_MAINLOOP, "Stop profiling");
     } else {
-      *continue_profiling = false;
+      *keep_profiling = false;
     }
     LG_NFO("Refreshing worker process");
   }
@@ -75,36 +76,21 @@ static void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
   }
 }
 
-static bool dispatch_event(DDProfContext *ctx, PEvent *pes,
-                           const WorkerAttr *attr,
-                           volatile bool *continue_profiling) {
-  // Process a single event from the given watcher, returning whether the event
-  // threw an error
-  RingBuffer *rb = &pes->rb;
-  struct perf_event_mmap_page *perfpage = rb->region;
-  uint64_t head = perfpage->data_head;
-  rmb();
-  uint64_t tail = perfpage->data_tail;
-
-  if (head > tail) {
-    struct perf_event_header *hdr = rb_seek(rb, tail);
-
-    // Pass the event to the processors
-    DDRes res = ddprof_worker(hdr, pes->pos, continue_profiling, ctx);
-    if (IsDDResNotOK(res))
-      return false;
-    tail += hdr->size;
-  }
-
-  perfpage->data_tail = tail;
+static bool dispatch_event(DDProfContext *ctx, struct perf_event_header *hdr,
+                           int pos, const WorkerAttr *attr,
+                           volatile bool *keep_profiling) {
+  // Processes the given event
+  DDRes res = ddprof_worker(hdr, pos, keep_profiling, ctx);
+  if (IsDDResNotOK(res))
+    return false;
   return true;
 }
 
 static void worker(DDProfContext *ctx, const WorkerAttr *attr,
-                   volatile bool *continue_profiling) {
+                   volatile bool *keep_profiling) {
   // Until a restartable terminal condition is met, the worker will set its
   // disposition so that profiling is halted upon its termination
-  *continue_profiling = false;
+  *keep_profiling = false;
 
   // Setup poll() to watch perf_event file descriptors
   struct pollfd pfd[MAX_NB_WATCHERS];
@@ -113,6 +99,18 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
 
   // Perform user-provided initialization
   DDRES_CHECK_OR_SHUTDOWN(attr->init_fun(ctx), attr->finish_fun(ctx));
+
+  // Setup a ProducerLinearizer for managing the ringbuffer
+  int pe_len = ctx->worker_ctx.pevent_hdr.size;
+  ProducerLinearizer pl = {0};
+  uint64_t *time_values = calloc(sizeof(uint64_t), pe_len);
+  uint64_t i_ev;
+  if (!ProducerLinearizer_init(&pl, pe_len, time_values))
+    WORKER_SHUTDOWN();
+
+  // Setup array to track headers, so we don't need to re-copy elements
+  struct perf_event_header **hdrs =
+      calloc(sizeof(struct perf_event_header *), pe_len);
 
   // Worker poll loop
   while (1) {
@@ -128,7 +126,6 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
     }
 
     // Convenience structs
-    int pe_len = ctx->worker_ctx.pevent_hdr.size;
     PEvent *pes = ctx->worker_ctx.pevent_hdr.pes;
 
     // If one of the perf_event_open() feeds was closed by the kernel, shut down
@@ -142,16 +139,19 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
         DDRES_GRACEFUL_SHUTDOWN(attr->finish_fun(ctx));
     }
 
-    // Check the ringbuffers, finding the one with the oldest event
-    // We'll run into an issue when TSC wraps around, but the ordering is
-    // handled by our backpopulate functionality--tiny blip for a few samples.
-    int i_old = 0;
+    // While there are events to process, iterate through them.  This strategy
+    // orders the current topmost event from each watcher, which assumes that
+    // within a single watcher conflicting events are ordered properly.  This
+    // seems to be a valid assumption on x86/ARM.
     struct perf_event_header *hdr = NULL;
-    while (i_old != -1) {
-      i_old = -1; // if failure to set, end
-      uint64_t v_old = UINT64_MAX;
+    while (1) {
 
+      // Visit any ringbuffers which do *not* have a time.
       for (int i = 0; i < pe_len; ++i) {
+        // Don't revisit the same watcher before it gets dispatched
+        if (!pl.F[i])
+          continue;
+
         RingBuffer *rb = &pes[i].rb;
         struct perf_event_mmap_page *perfpage = rb->region;
         uint64_t head = perfpage->data_head;
@@ -159,19 +159,16 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
         uint64_t tail = perfpage->data_tail;
 
         if (head > tail) {
-          hdr = rb_seek(rb, tail);
-          uint64_t event_time = hdr_time(hdr, DEFAULT_SAMPLE_TYPE);
-          if (event_time < v_old) {
-            v_old = event_time;
-            i_old = i;
-          }
+          hdrs[i] = rb_seek(rb, tail);
+          time_values[i] = hdr_time(hdrs[i], DEFAULT_SAMPLE_TYPE);
+          ProducerLinearizer_push(&pl, i);
         }
       }
 
-      // i_old now holds -1 or the value of the event we should process.
-      if (i_old == -1) {
-        // Didn't find any events, so exit while loop
-      } else if (!dispatch_event(ctx, &pes[i_old], attr, continue_profiling)) {
+      if (!ProducerLinearizer_pop(&pl, &i_ev)) {
+        // Don't have any more events to process, so exit while loop
+        break;
+      } else if (!dispatch_event(ctx, hdrs[i_ev], i_ev, attr, keep_profiling)) {
         // Got a shutdown signal.
         // ignoring possible errors from finish as we are closing
         attr->finish_fun(ctx);
@@ -179,14 +176,14 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       } else {
         // Otherwise, we successfully dispatched an event.  If it was a sample,
         // then say so
-        if (hdr->type == PERF_RECORD_SAMPLE)
+        if (hdrs[i_ev]->type == PERF_RECORD_SAMPLE)
           ++processed_samples;
       }
     }
 
     // If I didn't process any events, then hit the timeout
     if (!processed_samples) {
-      DDRes res = ddprof_worker_timeout(continue_profiling, ctx);
+      DDRes res = ddprof_worker_timeout(keep_profiling, ctx);
       if (IsDDResNotOK(res)) {
         attr->finish_fun(ctx);
         DDRES_CHECK_OR_SHUTDOWN(res, attr->finish_fun(ctx));
@@ -200,9 +197,9 @@ void main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
   // is used to communicate terminal profiling state
   int mmap_prot = PROT_READ | PROT_WRITE;
   int mmap_flags = MAP_ANONYMOUS | MAP_SHARED;
-  volatile bool *continue_profiling;
-  continue_profiling = mmap(0, sizeof(bool), mmap_prot, mmap_flags, -1, 0);
-  if (MAP_FAILED == continue_profiling) {
+  volatile bool *keep_profiling;
+  keep_profiling = mmap(0, sizeof(bool), mmap_prot, mmap_flags, -1, 0);
+  if (MAP_FAILED == keep_profiling) {
     // Allocation failure : stop the profiling
     LG_ERR("Could not initialize profiler");
     return;
@@ -210,18 +207,18 @@ void main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
 
   // Create worker processes to fulfill poll loop.  Only the parent process
   // can exit with an error code, which signals the termination of profiling.
-  if (IsDDResNotOK(spawn_workers(continue_profiling))) {
+  if (IsDDResNotOK(spawn_workers(keep_profiling))) {
     return;
   }
 
-  worker(ctx, attr, continue_profiling);
+  worker(ctx, attr, keep_profiling);
 }
 
 void main_loop_lib(const WorkerAttr *attr, DDProfContext *ctx) {
-  bool continue_profiling;
+  bool keep_profiling;
   // no fork. TODO : handle lifetime
-  worker(ctx, attr, &continue_profiling);
-  if (!continue_profiling) {
+  worker(ctx, attr, &keep_profiling);
+  if (!keep_profiling) {
     LG_NFO("Request to exit");
   }
 }

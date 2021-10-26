@@ -5,17 +5,17 @@
 #include <string.h>
 
 bool ProducerLinearizer_init(ProducerLinearizer *pl, uint64_t sz, uint64_t *A) {
-  if (!pl | !A | !sz)
+  if (!pl || !A || !sz)
     return false;
 
   // allocate storage
-  uint64_t *I = malloc(sz*sizeof(*I));
+  uint64_t *I = malloc(sz * sizeof(*I));
   if (!I)
     goto PLINIT_ERR_CLEANUP;
-  bool *F = malloc(sz*sizeof(*F));
+  bool *F = malloc(sz * sizeof(*F));
   if (!F)
     goto PLINIT_ERR_CLEANUP;
-  memset(F, 1, sizeof(*F)*sz);
+  memset(F, 1, sizeof(*F) * sz);
 
   // Allocate linear indices
   for (uint64_t i = 0; i < sz; i++)
@@ -49,8 +49,8 @@ bool ProducerLinearizer_push(ProducerLinearizer *pl, uint64_t i) {
     return false;
 
   pl->F[i] = false; // Update free list
-  --pl->freecount; // Update free count
-  pl->cursor = 0; // reposition cursor to head (see pop)
+  --pl->freecount;  // Update free count
+  pl->cursor = 0;   // reposition cursor to head (see pop)
   return true;
 }
 
@@ -71,8 +71,7 @@ int PL_cmp(const void *L, const void *R, void *state) {
     return -1;
 
   // Otherwise, standard comparison applies.
-  return v_L == v_R ? 0 :
-         v_L < v_R  ? -1 : 1;
+  return v_L == v_R ? 0 : v_L < v_R ? -1 : 1;
 }
 
 // This is a modestly tuned implementation.  It could be made much better by
