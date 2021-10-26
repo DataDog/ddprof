@@ -143,20 +143,18 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
     // orders the current topmost event from each watcher, which assumes that
     // within a single watcher conflicting events are ordered properly.  This
     // seems to be a valid assumption on x86/ARM.
-    struct perf_event_header *hdr = NULL;
     while (1) {
-
-      // Visit any ringbuffers which do *not* have a time.
       for (int i = 0; i < pe_len; ++i) {
-        // Don't revisit the same watcher before it gets dispatched
+        // If a watcher is not free, then we already have the oldest time.
+        // Skip it.
         if (!pl.F[i])
           continue;
 
+        // Memory-ordering safe access of ringbuffer elements
         RingBuffer *rb = &pes[i].rb;
-        struct perf_event_mmap_page *perfpage = rb->region;
-        uint64_t head = perfpage->data_head;
+        uint64_t head = rb->region->data_head;
         rmb();
-        uint64_t tail = perfpage->data_tail;
+        uint64_t tail = rb->region->data_tail;
 
         if (head > tail) {
           hdrs[i] = rb_seek(rb, tail);
@@ -165,12 +163,20 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
         }
       }
 
-      if (!ProducerLinearizer_pop(&pl, &i_ev)) {
-        // Don't have any more events to process, so exit while loop
+      // We've iterated through the ringbuffers, populating the
+      // ProducerLinearizer with any new events.  Try to pop one event.  If none
+      // are available, then return to `poll()` and wait.
+      if (!ProducerLinearizer_pop(&pl, &i_ev))
         break;
-      } else if (!dispatch_event(ctx, hdrs[i_ev], i_ev, attr, keep_profiling)) {
-        // Got a shutdown signal.
-        // ignoring possible errors from finish as we are closing
+
+      // At this point in time, we've identified the event we're going to
+      // process.  We advance the corresponding ringbuffer so we do not
+      // revisit that event again
+      pes[i_ev].rb.region->data_tail += hdrs[i_ev]->size;
+
+      // Attempt to dispatch the event
+      if (!dispatch_event(ctx, hdrs[i_ev], i_ev, attr, keep_profiling)) {
+        // If dispatch failed, we discontinue the worker
         attr->finish_fun(ctx);
         WORKER_SHUTDOWN();
       } else {

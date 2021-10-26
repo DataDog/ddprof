@@ -382,9 +382,10 @@ DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
     switch (hdr->type) {
     /* Cases where the target type has a PID */
     case PERF_RECORD_SAMPLE:
-      if (wpid->pid)
-        DDRES_CHECK_FWD(
-            ddprof_pr_sample(ctx, hdr2samp(hdr, DEFAULT_SAMPLE_TYPE), pos));
+      if (wpid->pid) {
+        perf_event_sample *sample = hdr2samp(hdr, DEFAULT_SAMPLE_TYPE);
+        DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, pos));
+      }
       break;
     case PERF_RECORD_MMAP:
       if (wpid->pid)
