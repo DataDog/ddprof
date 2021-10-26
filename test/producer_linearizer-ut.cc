@@ -41,6 +41,7 @@ TEST(ProducerLinearizerTest, SimpleTest) {
   // Now mess everything up by changing all values and pushing everything
   for (int j = 0; j < 10; j++) {
     MyVals[j] = 100 - j;
+    (void)MyVals[j]; // kill cppcheck nag since this is used inside of interface
     ASSERT_TRUE(ProducerLinearizer_push(&pl, j));
   }
 
