@@ -114,7 +114,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
 
   // Setup array to track headers, so we don't need to re-copy elements
   struct perf_event_header **hdrs = calloc(sizeof(*hdrs), pe_len);
-  if (hdrs) {
+  if (!hdrs) {
     free(time_values);
     WORKER_SHUTDOWN();
   }
