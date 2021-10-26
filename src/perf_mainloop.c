@@ -104,13 +104,20 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   int pe_len = ctx->worker_ctx.pevent_hdr.size;
   ProducerLinearizer pl = {0};
   uint64_t *time_values = calloc(sizeof(uint64_t), pe_len);
-  uint64_t i_ev;
-  if (!ProducerLinearizer_init(&pl, pe_len, time_values))
+  if (!time_values)
     WORKER_SHUTDOWN();
+  uint64_t i_ev;
+  if (!ProducerLinearizer_init(&pl, pe_len, time_values)) {
+    free(time_values);
+    WORKER_SHUTDOWN();
+  }
 
   // Setup array to track headers, so we don't need to re-copy elements
-  struct perf_event_header **hdrs =
-      calloc(sizeof(struct perf_event_header *), pe_len);
+  struct perf_event_header **hdrs = calloc(sizeof(*hdrs), pe_len);
+  if (hdrs) {
+    free(time_values);
+    WORKER_SHUTDOWN();
+  }
 
   // Worker poll loop
   while (1) {
@@ -178,6 +185,8 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       if (!dispatch_event(ctx, hdrs[i_ev], pes[i_ev].pos, attr, can_run)) {
         // If dispatch failed, we discontinue the worker
         attr->finish_fun(ctx);
+        free(time_values);
+        free(hdrs);
         WORKER_SHUTDOWN();
       } else {
         // Otherwise, we successfully dispatched an event.  If it was a sample,
