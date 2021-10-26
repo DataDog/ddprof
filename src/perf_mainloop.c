@@ -43,7 +43,7 @@
     WORKER_SHUTDOWN();                                                         \
   } while (0)
 
-DDRes spawn_workers(volatile bool *keep_profiling) {
+DDRes spawn_workers(volatile bool *can_run) {
   pid_t child_pid;
 
   while ((child_pid = fork())) {
@@ -53,10 +53,10 @@ DDRes spawn_workers(volatile bool *keep_profiling) {
     // Harvest the exit state of the child process.  We will always reset it
     // to false so that a child who segfaults or exits erroneously does not
     // cause a pointless loop of spawning
-    if (!*keep_profiling) {
+    if (!*can_run) {
       DDRES_RETURN_WARN_LOG(DD_WHAT_MAINLOOP, "Stop profiling");
     } else {
-      *keep_profiling = false;
+      *can_run = false;
     }
     LG_NFO("Refreshing worker process");
   }
@@ -78,19 +78,19 @@ static void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
 
 static bool dispatch_event(DDProfContext *ctx, struct perf_event_header *hdr,
                            int pos, const WorkerAttr *attr,
-                           volatile bool *keep_profiling) {
+                           volatile bool *can_run) {
   // Processes the given event
-  DDRes res = ddprof_worker(hdr, pos, keep_profiling, ctx);
+  DDRes res = ddprof_worker(hdr, pos, can_run, ctx);
   if (IsDDResNotOK(res))
     return false;
   return true;
 }
 
 static void worker(DDProfContext *ctx, const WorkerAttr *attr,
-                   volatile bool *keep_profiling) {
+                   volatile bool *can_run) {
   // Until a restartable terminal condition is met, the worker will set its
   // disposition so that profiling is halted upon its termination
-  *keep_profiling = false;
+  *can_run = false;
 
   // Setup poll() to watch perf_event file descriptors
   struct pollfd pfd[MAX_NB_WATCHERS];
@@ -175,7 +175,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       pes[i_ev].rb.region->data_tail += hdrs[i_ev]->size;
 
       // Attempt to dispatch the event
-      if (!dispatch_event(ctx, hdrs[i_ev], i_ev, attr, keep_profiling)) {
+      if (!dispatch_event(ctx, hdrs[i_ev], pes[i_ev].pos, attr, can_run)) {
         // If dispatch failed, we discontinue the worker
         attr->finish_fun(ctx);
         WORKER_SHUTDOWN();
@@ -189,7 +189,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
 
     // If I didn't process any events, then hit the timeout
     if (!processed_samples) {
-      DDRes res = ddprof_worker_timeout(keep_profiling, ctx);
+      DDRes res = ddprof_worker_timeout(can_run, ctx);
       if (IsDDResNotOK(res)) {
         attr->finish_fun(ctx);
         DDRES_CHECK_OR_SHUTDOWN(res, attr->finish_fun(ctx));
@@ -203,9 +203,9 @@ void main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
   // is used to communicate terminal profiling state
   int mmap_prot = PROT_READ | PROT_WRITE;
   int mmap_flags = MAP_ANONYMOUS | MAP_SHARED;
-  volatile bool *keep_profiling;
-  keep_profiling = mmap(0, sizeof(bool), mmap_prot, mmap_flags, -1, 0);
-  if (MAP_FAILED == keep_profiling) {
+  volatile bool *can_run;
+  can_run = mmap(0, sizeof(bool), mmap_prot, mmap_flags, -1, 0);
+  if (MAP_FAILED == can_run) {
     // Allocation failure : stop the profiling
     LG_ERR("Could not initialize profiler");
     return;
@@ -213,18 +213,18 @@ void main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
 
   // Create worker processes to fulfill poll loop.  Only the parent process
   // can exit with an error code, which signals the termination of profiling.
-  if (IsDDResNotOK(spawn_workers(keep_profiling))) {
+  if (IsDDResNotOK(spawn_workers(can_run))) {
     return;
   }
 
-  worker(ctx, attr, keep_profiling);
+  worker(ctx, attr, can_run);
 }
 
 void main_loop_lib(const WorkerAttr *attr, DDProfContext *ctx) {
-  bool keep_profiling;
+  bool can_run;
   // no fork. TODO : handle lifetime
-  worker(ctx, attr, &keep_profiling);
-  if (!keep_profiling) {
+  worker(ctx, attr, &can_run);
+  if (!can_run) {
     LG_NFO("Request to exit");
   }
 }
