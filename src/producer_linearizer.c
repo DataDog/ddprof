@@ -4,27 +4,29 @@
 #include <stdlib.h>
 #include <string.h>
 
-bool ProducerLinearizer_init(ProducerLinearizer *pl, uint64_t sz, uint64_t *A) {
-  if (!pl || !A || !sz)
+bool ProducerLinearizer_init(ProducerLinearizer *pl, uint64_t sz) {
+  if (!pl || !sz)
     return false;
+  pl->A = pl->I =  NULL; // to prevent free() issues on error
+  pl->F = NULL;
 
   // allocate storage
-  uint64_t *I = malloc(sz * sizeof(*I));
-  if (!I)
+  if (!(pl->I = malloc(sz * sizeof(*pl->I))))
     goto PLINIT_ERR_CLEANUP;
-  bool *F = malloc(sz * sizeof(*F));
-  if (!F)
+  if (!(pl->A = malloc(sz * sizeof(*pl->A))))
     goto PLINIT_ERR_CLEANUP;
-  memset(F, 1, sizeof(*F) * sz);
+  if (!(pl->F = malloc(sz * sizeof(*pl->F))))
+    goto PLINIT_ERR_CLEANUP;
 
-  // Allocate linear indices
-  for (uint64_t i = 0; i < sz; i++)
-    I[i] = i;
+  // Initialize storage
+  memset(pl->F, 1, sizeof(*pl->F) * sz);
+  for (uint64_t i = 0; i < sz; i++) {
+    pl->I[i] = i;
+    pl->A[i] = UINT64_MAX;
+  }
 
-  pl->I = I;
-  pl->F = F;
+  // Initialize other fields
   pl->sz = sz;
-  pl->A = A;
   pl->freecount = sz;
   return true;
 
@@ -36,10 +38,11 @@ PLINIT_ERR_CLEANUP:
 void ProducerLinearizer_free(ProducerLinearizer *pl) {
   free(pl->I);
   free(pl->F);
+  free(pl->A);
   memset(pl, 0, sizeof(*pl));
 }
 
-bool ProducerLinearizer_push(ProducerLinearizer *pl, uint64_t i) {
+bool ProducerLinearizer_push(ProducerLinearizer *pl, uint64_t i, uint64_t v) {
   if (i >= pl->sz)
     return false;
 
@@ -47,6 +50,7 @@ bool ProducerLinearizer_push(ProducerLinearizer *pl, uint64_t i) {
   if (!pl->F[i])
     return false;
 
+  pl->A[i] = v; // Update value
   pl->F[i] = false; // Update free list
   --pl->freecount;  // Update free count
   pl->cursor = 0;   // reposition cursor to head (see pop)

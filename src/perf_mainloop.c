@@ -76,16 +76,6 @@ static void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
   }
 }
 
-static bool dispatch_event(DDProfContext *ctx, struct perf_event_header *hdr,
-                           int pos, const WorkerAttr *attr,
-                           volatile bool *can_run) {
-  // Processes the given event
-  DDRes res = ddprof_worker(hdr, pos, can_run, ctx);
-  if (IsDDResNotOK(res))
-    return false;
-  return true;
-}
-
 static void worker(DDProfContext *ctx, const WorkerAttr *attr,
                    volatile bool *can_run) {
   // Until a restartable terminal condition is met, the worker will set its
@@ -103,13 +93,8 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   // Setup a ProducerLinearizer for managing the ringbuffer
   int pe_len = ctx->worker_ctx.pevent_hdr.size;
   ProducerLinearizer pl = {0};
-  uint64_t *time_values = calloc(sizeof(uint64_t), pe_len);
-  if (!time_values)
-    WORKER_SHUTDOWN();
   uint64_t i_ev;
-  if (!ProducerLinearizer_init(&pl, pe_len, time_values)) {
-    free(time_values);
-    time_values = NULL;
+  if (!ProducerLinearizer_init(&pl, pe_len)) {
     WORKER_SHUTDOWN();
   }
 
@@ -127,8 +112,6 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
     if (-1 == n && errno == EINTR) {
       continue;
     } else if (-1 == n) {
-      free(time_values);
-      time_values = NULL;
       ProducerLinearizer_free(&pl);
       DDRES_CHECK_OR_SHUTDOWN(ddres_error(DD_WHAT_POLLERROR),
                               attr->finish_fun(ctx));
@@ -145,7 +128,6 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       // shuts down either all or nothing.  Accordingly, when it shuts down one
       // file descriptor, we shut down profiling.
       if (pfd[i].revents & POLLHUP) {
-        free(time_values);
         free(hdrs);
         ProducerLinearizer_free(&pl);
         DDRES_GRACEFUL_SHUTDOWN(attr->finish_fun(ctx));
@@ -171,8 +153,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
 
         if (head > tail) {
           hdrs[i] = rb_seek(rb, tail);
-          time_values[i] = hdr_time(hdrs[i], DEFAULT_SAMPLE_TYPE);
-          ProducerLinearizer_push(&pl, i);
+          ProducerLinearizer_push(&pl, i, hdr_time(hdrs[i], DEFAULT_SAMPLE_TYPE));
         }
       }
 
@@ -188,8 +169,8 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       pes[i_ev].rb.region->data_tail += hdrs[i_ev]->size;
 
       // Attempt to dispatch the event
-      if (!dispatch_event(ctx, hdrs[i_ev], pes[i_ev].pos, attr, can_run)) {
-        // If dispatch failed, we discontinue the worker
+      DDRes res = ddprof_worker(hdrs[i_ev], pes[i_ev].pos, can_run, ctx);
+      if (IsDDResNotOK(res)) {
         attr->finish_fun(ctx);
         goto WORKER_CLEANUP_AND_EXIT;
       } else {
@@ -211,7 +192,6 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   }
 
 WORKER_CLEANUP_AND_EXIT:
-  free(time_values);
   free(hdrs);
   ProducerLinearizer_free(&pl);
 }
