@@ -300,10 +300,9 @@ uint64_t hdr_time(struct perf_event_header *hdr, uint64_t mask) {
   // header
   case PERF_RECORD_SAMPLE:
     buf = (uint8_t *)&hdr[1];
-    return *(uint64_t *)&buf[8 *
-                             get_bits(mask &
-                                      (PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_IP |
-                                       PERF_SAMPLE_TID))];
+    uint64_t mbits = PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_IP | PERF_SAMPLE_TID;
+    mbits &= mask;
+    return *(uint64_t *)&buf[8 * get_bits(mbits)];
 
   // For non-sample type events, the time is in the sample_id struct which is
   // at the very end of the feed.  We seek to the top of the header, which

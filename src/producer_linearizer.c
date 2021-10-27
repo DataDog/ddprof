@@ -7,7 +7,7 @@
 bool ProducerLinearizer_init(ProducerLinearizer *pl, uint64_t sz) {
   if (!pl || !sz)
     return false;
-  pl->A = pl->I =  NULL; // to prevent free() issues on error
+  pl->A = pl->I = NULL; // to prevent free() issues on error
   pl->F = NULL;
 
   // allocate storage
@@ -50,7 +50,7 @@ bool ProducerLinearizer_push(ProducerLinearizer *pl, uint64_t i, uint64_t v) {
   if (!pl->F[i])
     return false;
 
-  pl->A[i] = v; // Update value
+  pl->A[i] = v;     // Update value
   pl->F[i] = false; // Update free list
   --pl->freecount;  // Update free count
   pl->cursor = 0;   // reposition cursor to head (see pop)

@@ -153,7 +153,8 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
 
         if (head > tail) {
           hdrs[i] = rb_seek(rb, tail);
-          ProducerLinearizer_push(&pl, i, hdr_time(hdrs[i], DEFAULT_SAMPLE_TYPE));
+          ProducerLinearizer_push(&pl, i,
+                                  hdr_time(hdrs[i], DEFAULT_SAMPLE_TYPE));
         }
       }
 
