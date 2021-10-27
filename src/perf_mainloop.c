@@ -115,12 +115,8 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
 
   // Setup array to track headers, so we don't need to re-copy elements
   struct perf_event_header **hdrs = calloc(sizeof(*hdrs), pe_len);
-  if (!hdrs) {
-    free(time_values);
-    time_values = NULL;
-    ProducerLinearizer_free(&pl);
-    WORKER_SHUTDOWN();
-  }
+  if (!hdrs)
+    goto WORKER_CLEANUP_AND_EXIT;
 
   // Worker poll loop
   while (1) {
@@ -151,6 +147,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       if (pfd[i].revents & POLLHUP) {
         free(time_values);
         free(hdrs);
+        ProducerLinearizer_free(&pl);
         DDRES_GRACEFUL_SHUTDOWN(attr->finish_fun(ctx));
       }
     }
@@ -194,11 +191,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       if (!dispatch_event(ctx, hdrs[i_ev], pes[i_ev].pos, attr, can_run)) {
         // If dispatch failed, we discontinue the worker
         attr->finish_fun(ctx);
-        free(time_values);
-        free(hdrs);
-        time_values = NULL;
-        hdrs = NULL;
-        WORKER_SHUTDOWN();
+        goto WORKER_CLEANUP_AND_EXIT;
       } else {
         // Otherwise, we successfully dispatched an event.  If it was a sample,
         // then say so
@@ -212,13 +205,15 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       DDRes res = ddprof_worker_timeout(can_run, ctx);
       if (IsDDResNotOK(res)) {
         attr->finish_fun(ctx);
-        free(time_values);
-        time_values = NULL;
-        ProducerLinearizer_free(&pl);
-        WORKER_SHUTDOWN();
+        goto WORKER_CLEANUP_AND_EXIT;
       }
     }
   }
+
+WORKER_CLEANUP_AND_EXIT:
+  free(time_values);
+  free(hdrs);
+  ProducerLinearizer_free(&pl);
 }
 
 void main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
