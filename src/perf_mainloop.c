@@ -118,6 +118,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   if (!hdrs) {
     free(time_values);
     time_values = NULL;
+    ProducerLinearizer_free(&pl);
     WORKER_SHUTDOWN();
   }
 
@@ -130,6 +131,9 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
     if (-1 == n && errno == EINTR) {
       continue;
     } else if (-1 == n) {
+      free(time_values);
+      time_values = NULL;
+      ProducerLinearizer_free(&pl);
       DDRES_CHECK_OR_SHUTDOWN(ddres_error(DD_WHAT_POLLERROR),
                               attr->finish_fun(ctx));
     }
@@ -144,8 +148,11 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       // ringbuffers) are still active, in the typical case, `perf_event_open`
       // shuts down either all or nothing.  Accordingly, when it shuts down one
       // file descriptor, we shut down profiling.
-      if (pfd[i].revents & POLLHUP)
+      if (pfd[i].revents & POLLHUP) {
+        free(time_values);
+        free(hdrs);
         DDRES_GRACEFUL_SHUTDOWN(attr->finish_fun(ctx));
+      }
     }
 
     // While there are events to process, iterate through them.  This strategy
@@ -205,7 +212,10 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       DDRes res = ddprof_worker_timeout(can_run, ctx);
       if (IsDDResNotOK(res)) {
         attr->finish_fun(ctx);
-        DDRES_CHECK_OR_SHUTDOWN(res, attr->finish_fun(ctx));
+        free(time_values);
+        time_values = NULL;
+        ProducerLinearizer_free(&pl);
+        WORKER_SHUTDOWN();
       }
     }
   }
