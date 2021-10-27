@@ -22,15 +22,17 @@
 #define rmb() __asm__ volatile("lfence" ::: "memory")
 
 #ifdef DDPROF_NATIVE_LIB
-#  define WORKER_SHUTDOWN() {                                                  \
-  ProducerLinearizer_free(&pl);                                                \
-  return;                                                                      \
-}
+#  define WORKER_SHUTDOWN()                                                    \
+    {                                                                          \
+      ProducerLinearizer_free(&pl);                                            \
+      return;                                                                  \
+    }
 #else
-#  define WORKER_SHUTDOWN() {                                                  \
-  ProducerLinearizer_free(&pl);                                                \
-  exit(0);                                                                     \
-}
+#  define WORKER_SHUTDOWN()                                                    \
+    {                                                                          \
+      ProducerLinearizer_free(&pl);                                            \
+      exit(0);                                                                 \
+    }
 #endif
 
 #define DDRES_CHECK_OR_SHUTDOWN(res, shut_down_process)                        \
