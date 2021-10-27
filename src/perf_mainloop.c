@@ -22,9 +22,15 @@
 #define rmb() __asm__ volatile("lfence" ::: "memory")
 
 #ifdef DDPROF_NATIVE_LIB
-#  define WORKER_SHUTDOWN() return;
+#  define WORKER_SHUTDOWN() {                                                  \
+  ProducerLinearizer_free(&pl);                                                \
+  return;                                                                      \
+}
 #else
-#  define WORKER_SHUTDOWN() exit(0)
+#  define WORKER_SHUTDOWN() {                                                  \
+  ProducerLinearizer_free(&pl);                                                \
+  exit(0);                                                                     \
+}
 #endif
 
 #define DDRES_CHECK_OR_SHUTDOWN(res, shut_down_process)                        \
@@ -82,6 +88,13 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   // disposition so that profiling is halted upon its termination
   *can_run = false;
 
+  // Setup a ProducerLinearizer for managing the ringbuffer
+  int pe_len = ctx->worker_ctx.pevent_hdr.size;
+  uint64_t i_ev;
+  ProducerLinearizer pl = {0};
+  if (!ProducerLinearizer_init(&pl, pe_len))
+    WORKER_SHUTDOWN();
+
   // Setup poll() to watch perf_event file descriptors
   struct pollfd pfd[MAX_NB_WATCHERS];
   int pfd_len = 0;
@@ -89,14 +102,6 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
 
   // Perform user-provided initialization
   DDRES_CHECK_OR_SHUTDOWN(attr->init_fun(ctx), attr->finish_fun(ctx));
-
-  // Setup a ProducerLinearizer for managing the ringbuffer
-  int pe_len = ctx->worker_ctx.pevent_hdr.size;
-  ProducerLinearizer pl = {0};
-  uint64_t i_ev;
-  if (!ProducerLinearizer_init(&pl, pe_len)) {
-    WORKER_SHUTDOWN();
-  }
 
   // Setup array to track headers, so we don't need to re-copy elements
   struct perf_event_header *hdrs[MAX_NB_WATCHERS] = {0};
@@ -110,7 +115,6 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
     if (-1 == n && errno == EINTR) {
       continue;
     } else if (-1 == n) {
-      ProducerLinearizer_free(&pl);
       DDRES_CHECK_OR_SHUTDOWN(ddres_error(DD_WHAT_POLLERROR),
                               attr->finish_fun(ctx));
     }
@@ -126,7 +130,6 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       // shuts down either all or nothing.  Accordingly, when it shuts down one
       // file descriptor, we shut down profiling.
       if (pfd[i].revents & POLLHUP) {
-        ProducerLinearizer_free(&pl);
         DDRES_GRACEFUL_SHUTDOWN(attr->finish_fun(ctx));
       }
     }
@@ -170,7 +173,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       DDRes res = ddprof_worker(hdrs[i_ev], pes[i_ev].pos, can_run, ctx);
       if (IsDDResNotOK(res)) {
         attr->finish_fun(ctx);
-        goto WORKER_CLEANUP_AND_EXIT;
+        WORKER_SHUTDOWN();
       } else {
         // Otherwise, we successfully dispatched an event.  If it was a sample,
         // then say so
@@ -184,13 +187,10 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       DDRes res = ddprof_worker_timeout(can_run, ctx);
       if (IsDDResNotOK(res)) {
         attr->finish_fun(ctx);
-        goto WORKER_CLEANUP_AND_EXIT;
+        WORKER_SHUTDOWN();
       }
     }
   }
-
-WORKER_CLEANUP_AND_EXIT:
-  ProducerLinearizer_free(&pl);
 }
 
 void main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
