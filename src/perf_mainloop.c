@@ -99,9 +99,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   }
 
   // Setup array to track headers, so we don't need to re-copy elements
-  struct perf_event_header **hdrs = calloc(sizeof(*hdrs), pe_len);
-  if (!hdrs)
-    goto WORKER_CLEANUP_AND_EXIT;
+  struct perf_event_header *hdrs[MAX_NB_WATCHERS] = {0};
 
   // Worker poll loop
   while (1) {
@@ -128,7 +126,6 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       // shuts down either all or nothing.  Accordingly, when it shuts down one
       // file descriptor, we shut down profiling.
       if (pfd[i].revents & POLLHUP) {
-        free(hdrs);
         ProducerLinearizer_free(&pl);
         DDRES_GRACEFUL_SHUTDOWN(attr->finish_fun(ctx));
       }
@@ -193,7 +190,6 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   }
 
 WORKER_CLEANUP_AND_EXIT:
-  free(hdrs);
   ProducerLinearizer_free(&pl);
 }
 
