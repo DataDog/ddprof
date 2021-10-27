@@ -97,7 +97,16 @@ bool memory_read(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg) {
   uint64_t sp_start = us->esp;
   uint64_t sp_end = sp_start + us->stack_sz;
 
-  if (addr < sp_start || addr + sizeof(Dwarf_Word) > sp_end) {
+  if (addr < sp_start && addr > sp_start - 4096) {
+    // libdwfl might try to read values which are before our snapshot of the
+    // stack.  Because the stack has the growsdown property and has a max size,
+    // the pages before the current top of the stack are safe (no DSOs will
+    // ever be mapped there on Linux, even if they actually did fit in the
+    // single page before the top of the stack).  Avoiding these reads allows
+    // us to prevent unnecessary backpopulate calls.
+    LG_NTC("Invalid stack access, %lu before ESP", sp_start - addr);
+    return false;
+  } else if (addr < sp_start || addr + sizeof(Dwarf_Word) > sp_end) {
     // If we're here, we're not in the stack.  We should interpet addr as an
     // address in VM, not as a file offset.
     // Strongly assumes we're also in an executable region?
