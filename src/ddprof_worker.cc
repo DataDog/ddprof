@@ -15,7 +15,6 @@ extern "C" {
 #include "pprof/ddprof_pprof.h"
 #include "procutils.h"
 #include "stack_handler.h"
-#include "unwind.h"
 #include "unwind_state.h"
 }
 
@@ -23,6 +22,7 @@ extern "C" {
 #include "dwfl_hdr.hpp"
 #include "exporter/ddprof_exporter.h"
 #include "tags.hpp"
+#include "unwind.hpp"
 
 #include <cassert>
 
@@ -30,7 +30,7 @@ extern "C" {
 #  include <jemalloc/jemalloc.h>
 #endif
 
-using ddprof::DsoStats;
+using namespace ddprof;
 
 static const DDPROF_STATS s_cycled_stats[] = {STATS_UNWIND_TICKS,
                                               STATS_EVENT_COUNT,
@@ -151,7 +151,8 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   LG_DBG("[WORKER]<%d> (SAMPLE)%d: stack = %p / size = %lu", pos, us->pid,
          us->stack, us->stack_sz);
 #endif
-  memcpy(&us->regs[0], sample->regs, PERF_REGS_COUNT * sizeof(uint64_t));
+  memcpy(&us->initial_regs.regs[0], sample->regs,
+         PERF_REGS_COUNT * sizeof(uint64_t));
   uw_output_clear(&us->output);
   unsigned long this_ticks_unwind = __rdtsc();
   DDRes res = unwindstate__unwind(us);

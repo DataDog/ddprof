@@ -9,8 +9,6 @@ extern "C" {
 }
 #include <cassert>
 
-// #define DEBUG
-
 namespace ddprof {
 #ifdef DEBUG
 static void check_range_assumption(const char *symname, ElfAddress_t mod_addr,

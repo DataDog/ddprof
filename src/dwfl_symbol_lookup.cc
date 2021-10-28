@@ -12,8 +12,6 @@ extern "C" {
 #include "dwfl_symbol.hpp"
 #include "string_format.hpp"
 
-// #define DEBUG
-
 namespace ddprof {
 
 DwflSymbolLookup_V2::DwflSymbolLookup_V2() : _lookup_setting(K_CACHE_ON) {

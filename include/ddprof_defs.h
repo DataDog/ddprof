@@ -23,3 +23,5 @@ typedef ElfAddress_t ProcessAddress_t;
 typedef ElfAddress_t FileAddress_t;
 // Address within the loaded part of the region
 typedef ElfAddress_t RegionAddress_t;
+// Elf word
+typedef uint64_t ElfWord_t;

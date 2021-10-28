@@ -42,11 +42,3 @@ struct UnwindSymbolsHdr {
   struct ddprof::DwflSymbolLookupStats _stats;
   symbol_lookup_setting _setting;
 };
-
-// Takes a dwarf module and an instruction pointer
-// Lookup if this instruction pointer was already encountered. If not, create a
-// new element in the table
-DDRes dwfl_lookup_get_or_insert(struct UnwindSymbolsHdr *unwind_symbol_hdr,
-                                struct Dwfl_Module *mod,
-                                ElfAddress_t process_pc, const ddprof::Dso &dso,
-                                SymbolIdx_t *symbol_idx);
