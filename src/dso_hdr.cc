@@ -64,9 +64,7 @@ static void pid_find_ip(int pid, uint64_t ip) {
       return;
     }
   }
-  if (buf != NULL) {
-    free(buf);
-  }
+  free(buf);
 
   LG_DBG("[DSO] Couldn't find ip:0x%lx for %d", ip, pid);
   return;
@@ -395,9 +393,7 @@ bool DsoHdr::pid_backpopulate(int pid, int &nb_elts_added) {
       ++nb_elts_added;
     }
   }
-  if (buf != NULL) {
-    free(buf);
-  }
+  free(buf);
   return true;
 }
 
@@ -413,7 +409,7 @@ Dso DsoHdr::dso_from_procline(int pid, char *line) {
     7f531437b000-7f531439e000 r-xp 00001000 fe:01 3932979                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
     7f531439e000-7f53143a6000 r--p 00024000 fe:01 3932979                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
     7f53143a8000-7f53143a9000 rw-p 0002d000 fe:01 3932979                    /usr/lib/x86_64-linux-gnu/ld-2.31.so
-    7f53143a9000-7f53143aa000 rw-p 00000000 00:00 0 
+    7f53143a9000-7f53143aa000 rw-p 00000000 00:00 0
     7ffcd6c68000-7ffcd6c89000 rw-p 00000000 00:00 0                          [stack]
     7ffcd6ce2000-7ffcd6ce6000 r--p 00000000 00:00 0                          [vvar]
     7ffcd6ce6000-7ffcd6ce8000 r-xp 00000000 00:00 0                          [vdso]

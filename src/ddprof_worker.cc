@@ -354,10 +354,12 @@ DDRes ddprof_worker_finish(DDProfContext *ctx) {
     if (ctx->worker_ctx.exp) {
       DDRES_CHECK_FWD(ddprof_exporter_free(ctx->worker_ctx.exp));
       free(ctx->worker_ctx.exp);
+      ctx->worker_ctx.exp = nullptr;
     }
     if (ctx->worker_ctx.pprof) {
       DDRES_CHECK_FWD(pprof_free_profile(ctx->worker_ctx.pprof));
       free(ctx->worker_ctx.pprof);
+      ctx->worker_ctx.pprof = nullptr;
     }
   }
   CatchExcept2DDRes();
@@ -382,9 +384,10 @@ DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
     switch (hdr->type) {
     /* Cases where the target type has a PID */
     case PERF_RECORD_SAMPLE:
-      if (wpid->pid)
-        DDRES_CHECK_FWD(
-            ddprof_pr_sample(ctx, hdr2samp(hdr, DEFAULT_SAMPLE_TYPE), pos));
+      if (wpid->pid) {
+        perf_event_sample *sample = hdr2samp(hdr, DEFAULT_SAMPLE_TYPE);
+        DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, pos));
+      }
       break;
     case PERF_RECORD_MMAP:
       if (wpid->pid)

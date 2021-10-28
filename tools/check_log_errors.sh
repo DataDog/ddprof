@@ -15,7 +15,7 @@ do
     if [ -z "${expected_trace-=''}" ]; then
         echo "error : unable to find pattern ${trace}"
         echo "---------------- Dump trace for analysis ----------------"
-        cat ${output_second}
+        cat $1
         exit 1
     fi
 done
@@ -28,7 +28,8 @@ do
     #echo "$bad_trace"
     if [ ! -z "${bad_trace-=''}" ]; then
         echo "error : found bad pattern in logs ${trace}"
-        cat ${output_second}
+        echo "---------------- Dump trace for analysis ----------------"
+        cat $1
         exit 1
     fi
 done
