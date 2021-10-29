@@ -5,22 +5,25 @@
 ddprof is meant to build on Linux.
 *Local builds on macos do not work (you don't have access to perf events).*
 
-### Virtual box
+### Native linux
 
-Install a VM with Ubuntu & build from there.
-You will need your ssh keys configured to retrieve dependencies.
-*Under construction* :building_construction:
+Install the required libraries described in the [app/base-env/Dockerfile](app/base-env/Dockerfile).
+Checkout the [Build Commands section](#build-commands).
 
 ### Docker
 
 Docker can be used if you are not already on a linux environment. You need an ssh configuration as some repositories are private.
-The following commands create a docker container based on ubuntu to build while using your current ssh configuration.
+The following script create a docker container based on CI dockerfiles. It will:
+
+- Use your ssh configuration
+- Automatically pull down all dependencies (same as in CI)
+- Sync your files with the docker environment
 
 ```bash
 ./tools/launch_local_build.sh
 ```
 
-To speed up builds, we recommend usage of docker-sync.
+To speed up builds, we recommend usage of docker-sync (shared filesystems are very slow).
 
 1 - create a docker-sync.yml file in the root of the repo.
 
@@ -54,10 +57,6 @@ docker-sync clean
 docker volume rm ddprof-sync
 ```
 
-### Native linux
-
-Check the required libraries described in the [app/base-env/Dockerfile](app/base-env/Dockerfile).
-
 ## Build commands
 
 ### Building the native profiler
@@ -80,7 +79,7 @@ Add the argument `-DBUILD_BENCHMARKS=ON` to the cmake command line.
 
 ### Setup
 
-Write your datadog keys in a `.env_perso.yml` file in the root of the repository. For now only the staging0 is necessary. Refer to the `.env.yml` file.
+Write your datadog keys in a `.env_perso.yml` file in the root of the repository. Refer to the `.env.yml` file as a template.
 Configurations are taken from the test/configs folder.
 
 ### Run examples
@@ -91,7 +90,7 @@ A stress test examples is available (you need to build the bench/collatz folder 
 ./bench/runners/runit.sh collatz 
 ```
 
-run.sh is a wrapper that helps give relevant arguments to the profiler.
+`run.sh` is a wrapper that helps give relevant arguments to the profiler.
 Profile your own apps using
 
 ```bash
@@ -140,8 +139,10 @@ This is a benchmarking tool for the native profiler.
 
 `ddprof` and `collatz` are versioned in binaries.ddbuild.io with something like the following scheme.
 
-* `ddprof/release/ddprof`: latest main version
-* `ddprof/release/ddprof_X.Y.Z_CIID-SHORTHASH`: pinned build, where CIID is the pipeline ID and SHORTHASH is the short commit hash.
+- `ddprof/release/ddprof`: latest stable version
+- `ddprof/release/ddprof_main`: version from main branch
+- `ddprof/release/ddprof_candidate`: candidate version to be deployed as stable
+- `ddprof/release/ddprof_X.Y.Z_CIID-SHORTHASH`: pinned build, where CIID is the pipeline ID and SHORTHASH is the short commit hash.
 
 `ddprof` and `collatz` report their version information.
 

@@ -1,23 +1,14 @@
-[![codecov](https://codecov.io/gh/DataDog/ddprof/branch/main/graph/badge.svg?token=K8N03GBATD)](https://codecov.io/gh/DataDog/ddprof)
-
 # ddprof
 
-Native profiler from Datadog
+A native profiler from Datadog for linux.
+
+[![codecov](https://codecov.io/gh/DataDog/ddprof/branch/main/graph/badge.svg?token=K8N03GBATD)](https://codecov.io/gh/DataDog/ddprof)
 
 ## Overview
 
 `ddprof` is a commandline utility for engaging kernel-mediated telemetry of an application and forwarding the resulting information to the Datadog backend.  In several ways, it's similar to the `perf record` tool.  Currently, `ddprof` is limited to CPU profiling of ELF binaries equipped with debuginfo.
 
 ## Quick Start
-
-Check that your linux version is above 4.15 ([not on linux ?](#prerequisites))
-
-```bash
-uname -r
-```
-
-Check that you can access `perf_event_open()` ([more info](./docs/PerfEventParanoid.md)):
-ie `perf_event_paranoid` setting is set to `<= 2` or you have `CAP_SYS_ADMIN` capabilities (required on Ubuntu / Debian).
 
 ### From binary
 
@@ -28,20 +19,29 @@ Refer to [commands](docs/Commands.md) for the commands supported by `ddprof`. Ex
 ./ddprof -S my_native_service ./run.sh
 ```
 
-*Binary built with gcc-10 & ubuntu (binary compatibility :warning:).*
+*Binary built with glibc `2.27` (check your own libc version with `ldd --version`). Other versions available in CI.*
 
 ### From source
 
-If you are running on a linux distribution, run :
+Checkout our build section [here](./docs/Build.md).
+
+### Prerequisites
+
+Check that your linux version is above 4.15 ([not on linux ?](#prerequisites))
 
 ```bash
-mkdir -p build_Release
-cd build_Release
-cmake -DCMAKE_BUILD_TYPE=Release ../
-make -j 4 .
+uname -r
 ```
 
-More information [here](./docs/Build.md).
+Check that you can access `perf_event_open()` ([more info](./docs/PerfEventParanoid.md)).
+Or you have `CAP_SYS_ADMIN` capabilities.
+
+```bash
+# needs to be less than or equal to 2
+cat /proc/sys/kernel/perf_event_paranoid
+```
+
+Don't hesitate to [reach-out](#Reaching-out) if you are not able to use our profiler.
 
 ## Key Features
 
@@ -71,12 +71,9 @@ Architectural showpieces and such will always be available in the `docs/` folder
 - [Architecture and design discussions](./docs/Design.md)
 - [Automatically updated list of commads](./docs/Commands.md)
 
-## Prerequisites
+## Reaching out
 
-In order to take advantage of *ddprof*, you need a few things
-
-- Linux kernel 4.15 or later (if you need to support an earlier kernel, create an issue outlining your need!  If you're blocked in a *libc* issue, also create an issue and we'll resolve it even sooner)
-- Access to `perf events` ([more info](./docs/PerfEventParanoid.md))
+If you are experiencing issues or need some help using `ddprof`, reach out to us ! Open a ticket or head over to our slack channel.
 
 ## Contributing
 
