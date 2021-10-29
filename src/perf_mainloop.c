@@ -166,20 +166,25 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       if (!ProducerLinearizer_pop(&pl, &i_ev))
         break;
 
-      // At this point in time, we've identified the event we're going to
-      // process.  We advance the corresponding ringbuffer so we do not
-      // revisit that event again
-      pes[i_ev].rb.region->data_tail += hdrs[i_ev]->size;
-
       // Attempt to dispatch the event
       DDRes res = ddprof_worker(hdrs[i_ev], pes[i_ev].pos, can_run, ctx);
+      uint64_t hdr_type = hdrs[i_ev]->type;
+
+      // At this point in time, we've identified the event we're going to
+      // process.  We advance the corresponding ringbuffer so we do not
+      // revisit that event again.  We can't do this earlier because under
+      // load the kernel may overwrite the previous event while we're reading
+      // it.
+      pes[i_ev].rb.region->data_tail += hdrs[i_ev]->size;
+
+      // Now check the return
       if (IsDDResNotOK(res)) {
         attr->finish_fun(ctx);
         WORKER_SHUTDOWN();
       } else {
         // Otherwise, we successfully dispatched an event.  If it was a sample,
         // then say so
-        if (hdrs[i_ev]->type == PERF_RECORD_SAMPLE)
+        if (hdr_type == PERF_RECORD_SAMPLE)
           ++processed_samples;
       }
     }
