@@ -57,21 +57,56 @@ std::pair<std::string, std::string> get_receptor_host_port() {
   }
 }
 
-void fill_mock_exporter_input(ExporterInput *exporter_input,
-                              std::pair<std::string, std::string> &url) {
-  exporter_input->apikey = "abc"; // agent for local tests (not taken as key)
-                                  // "yisthisisanapikeyof32charslooong";
+void fill_mock_exporter_input(ExporterInput &exporter_input,
+                              std::pair<std::string, std::string> &url,
+                              bool fill_valid_key) {
+  if (fill_valid_key) {
+    exporter_input.apikey = "yisthisisanapikeyof32charslooong";
+  } else {
+    // agent for local tests (not taken as key)
+    exporter_input.apikey = "nope_not_a_good_key";
+  }
 
-  exporter_input->environment = "unit-test";
-  exporter_input->host = url.first.c_str();
-  exporter_input->site = "whatever is a site";
-  exporter_input->port = url.second.c_str();
-  exporter_input->service = MYNAME;
-  exporter_input->serviceversion = "42";
-  exporter_input->user_agent = STRING_VIEW_LITERAL("DDPROF_MOCK");
-  exporter_input->language = STRING_VIEW_LITERAL("NATIVE");
-  exporter_input->family = STRING_VIEW_LITERAL("SANCHEZ");
-  exporter_input->profiler_version = STRING_VIEW_LITERAL("1.1.2");
+  exporter_input.environment = "unit-test";
+  exporter_input.host = url.first.c_str();
+  exporter_input.site = "datadog_is_cool.com";
+  exporter_input.port = url.second.c_str();
+  exporter_input.service = MYNAME;
+  exporter_input.serviceversion = "42";
+  exporter_input.user_agent = STRING_VIEW_LITERAL("DDPROF_MOCK");
+  exporter_input.language = STRING_VIEW_LITERAL("NATIVE");
+  exporter_input.family = STRING_VIEW_LITERAL("SANCHEZ");
+  exporter_input.profiler_version = STRING_VIEW_LITERAL("1.1.2");
+}
+
+TEST(DDProfExporter, url) {
+  LogHandle handle;
+  std::pair<std::string, std::string> url =
+      std::make_pair("25.04.1988.0", "1234");
+  ExporterInput exporter_input;
+  // Test the site / host / port / API logic
+  // If API key --> use site
+  fill_mock_exporter_input(exporter_input, url, true);
+  DDProfExporter exporter;
+  DDRes res = ddprof_exporter_init(&exporter_input, &exporter);
+  EXPECT_TRUE(IsDDResOK(res));
+  EXPECT_EQ(strcmp(exporter._url, "datadog_is_cool.com"), 0);
+  ddprof_exporter_free(&exporter);
+
+  // Default to host if site not found
+  // To be discussed : should we fail here ?
+  exporter_input.site = nullptr;
+  res = ddprof_exporter_init(&exporter_input, &exporter);
+  EXPECT_TRUE(IsDDResOK(res));
+  EXPECT_EQ(strcmp(exporter._url, "25.04.1988.0"), 0);
+  ddprof_exporter_free(&exporter);
+
+  // If no API key --> expect host
+  fill_mock_exporter_input(exporter_input, url, false);
+  res = ddprof_exporter_init(&exporter_input, &exporter);
+  EXPECT_TRUE(IsDDResOK(res));
+  EXPECT_EQ(strcmp(exporter._url, "http://25.04.1988.0:1234"), 0);
+  ddprof_exporter_free(&exporter);
 }
 
 TEST(DDProfExporter, simple) {
@@ -81,7 +116,7 @@ TEST(DDProfExporter, simple) {
   std::pair<std::string, std::string> url = ddprof::get_receptor_host_port();
 
   { // setup input parameters
-    fill_mock_exporter_input(&exporter_input, url);
+    fill_mock_exporter_input(exporter_input, url, false);
   }
   DDProfPProf pprofs;
   DDProfExporter exporter;

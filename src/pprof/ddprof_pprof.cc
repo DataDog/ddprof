@@ -66,6 +66,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, const PerfOption *options,
     perf_value_type[value_index].type_ = perf_value_slice;
     perf_value_type[value_index].unit = perf_unit;
   }
+
   pprof->_nb_values = value_index;
   struct ddprof_ffi_Slice_value_type sample_types = {.ptr = perf_value_type,
                                                      .len = value_index};
@@ -95,10 +96,9 @@ DDRes pprof_free_profile(DDProfPProf *pprof) {
 static void write_function(const ddprof::Symbol &symbol,
                            ddprof_ffi_Function *ffi_func) {
   ffi_func->name = std_string_2_slice_c_char(symbol._demangle_name);
-  // The system name is not use on backend side for now -> leave empty
-  ffi_func->system_name = ffi_empty_char_slice();
+  ffi_func->system_name = std_string_2_slice_c_char(symbol._symname);
   ffi_func->filename = std_string_2_slice_c_char(symbol._srcpath);
-  // For now not filed
+  // Not filed (can be computed if needed using the start range from elf)
   ffi_func->start_line = 0;
 }
 
@@ -152,17 +152,16 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   const FunLoc *locs = uw_output->locs;
   for (unsigned i = 0; i < uw_output->nb_locs; ++i) {
     // possibly several lines to handle inlined function (not handled for now)
-    ddprof_ffi_Slice_line lines = {.ptr = &line_buff[i], .len = 1};
     write_line(symbol_table[locs[i]._symbol_idx], &line_buff[i]);
+    ddprof_ffi_Slice_line lines = {.ptr = &line_buff[i], .len = 1};
     write_location(&locs[i], symbol_table[locs[i]._symbol_idx],
                    mapinfo_table[locs[i]._map_info_idx], &lines,
                    &locations_buff[i]);
   }
-
   struct ddprof_ffi_Sample sample = {
       .locations = {.ptr = locations_buff, uw_output->nb_locs},
-      .value = {.ptr = values, .len = pprof->_nb_values},
-      .label = {.ptr = NULL, 0},
+      .values = {.ptr = values, .len = pprof->_nb_values},
+      .labels = {.ptr = NULL, 0},
   };
 
   uint64_t id_sample = ddprof_ffi_Profile_add(profile, sample);
@@ -175,7 +174,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
 
 DDRes pprof_reset(DDProfPProf *pprof) {
   if (!ddprof_ffi_Profile_reset(pprof->_profile)) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile");
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to reset profile");
   }
   return ddres_init();
 }

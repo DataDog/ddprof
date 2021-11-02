@@ -59,14 +59,15 @@
 char* help_str[DD_KLEN] = {
   [DD_API_KEY] =
 "    A valid Datadog API key.  Passing the API key will cause "MYNAME" to bypass\n"
-"    the Datadog agent.  Erroneously adding this key might break an otherwise\n"
-"    functioning deployment!\n",
+"    the Datadog agent.  Do NOT specify if you are running with an agent!\n",
   [DD_ENV] =
 "    The name of the environment to use in the Datadog UI.\n",
   [DD_AGENT_HOST] =
-"    The hostname to use for intake.  This is either the hostname for the agent\n"
-"    or the backend endpoint, if bypassing the agent.\n",
-  [DD_SITE] = STR_UNDF,
+"    The hostname of the agent. Port should also be specified.\n",
+  [DD_SITE] =
+"    Site url when bypassing the agent (directly pointing to intake backend).",
+"    Expected url should have the form datadoghq.com\n",
+"    Refer to the url / network traffic section in the docs\n",
   [DD_TRACE_AGENT_PORT] =
 "    The intake port for the Datadog agent or backend system.\n",
   [DD_SERVICE] =

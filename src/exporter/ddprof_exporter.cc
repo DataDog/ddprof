@@ -111,8 +111,14 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
     exporter->_url =
         alloc_url_agent("http://", exporter_input->host, exporter_input->port);
   } else {
-    // warning : should not contain intake.profile. (prepended in exporter)
-    exporter->_url = strdup(exporter_input->host);
+    // site is the usual option for intake
+    if (exporter->_input.site) {
+      // warning : should not contain intake.profile. (prepended in libddprof)
+      exporter->_url = strdup(exporter_input->site);
+    } else {
+      LG_ERR("[EXPORTER] Please provide site instead of host (ignoring port)");
+      exporter->_url = strdup(exporter_input->host);
+    }
   }
   if (!exporter->_url) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to write url");
@@ -182,11 +188,16 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
     endpoint = ddprof_ffi_EndpointV3_agentless(base_url, api_key);
   }
 
-  exporter->_exporter = ddprof_ffi_ProfileExporterV3_new(
-      string_view_to_byteslice(exporter->_input.family), tags, endpoint);
+  ddprof_ffi_NewProfileExporterV3Result new_exporterv3 =
+      ddprof_ffi_ProfileExporterV3_new(
+          string_view_to_byteslice(exporter->_input.family), tags, endpoint);
 
-  if (!exporter->_exporter) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failure creating exporter.");
+  if (new_exporterv3.tag == DDPROF_FFI_NEW_PROFILE_EXPORTER_V3_RESULT_OK) {
+    exporter->_exporter = new_exporterv3.ok;
+  } else {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failure creating exporter - %s",
+                           new_exporterv3.err.ptr);
+    ddprof_ffi_Buffer_reset(&new_exporterv3.err);
   }
   return ddres_init();
 }

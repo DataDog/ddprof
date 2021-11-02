@@ -64,9 +64,11 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
   int linep;
   const char *localsrcpath =
       dwfl_lineinfo(line, &process_pc, static_cast<int *>(&linep), 0, 0, 0);
-  symbol._lineno = static_cast<uint32_t>(linep);
   if (localsrcpath) {
     symbol._srcpath = std::string(localsrcpath);
+    symbol._lineno = static_cast<uint32_t>(linep);
+  } else {
+    symbol._lineno = 0;
   }
   return symbol_success;
 }

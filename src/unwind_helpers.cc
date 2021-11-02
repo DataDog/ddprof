@@ -31,7 +31,7 @@ static void add_virtual_frame(UnwindState *us, SymbolIdx_t symbol_idx) {
           CommonMapInfoLookup::LookupCases::empty,
           us->symbols_hdr->_mapinfo_table);
 
-  output->nb_locs++;
+  ++output->nb_locs;
 }
 
 void add_common_frame(UnwindState *us,
@@ -83,7 +83,7 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
     // ever be mapped there on Linux, even if they actually did fit in the
     // single page before the top of the stack).  Avoiding these reads allows
     // us to prevent unnecessary backpopulate calls.
-    LG_DBG("Invalid stack access, %lu before ESP", sp_start - addr);
+    LG_DBG("Invalid stack access:%lu before ESP", sp_start - addr);
     return false;
   } else if (addr < sp_start || addr + sizeof(ElfWord_t) > sp_end) {
     // If we're here, we're not in the stack.  We should interpet addr as an
