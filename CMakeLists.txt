@@ -141,7 +141,7 @@ list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include)
 # statsd API
 list(APPEND DDPROF_INCLUDE_LIST ${DOGFOOD_INCLUDE_DIR})
 
-#libddprof
+# libddprof
 list(APPEND DDPROF_INCLUDE_LIST ${LIBDDPROF_INCLUDE_DIR})
 
 # Check that we are on a linux system
