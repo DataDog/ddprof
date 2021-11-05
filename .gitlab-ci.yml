@@ -29,7 +29,7 @@ variables:
   BINPATH: deliverables
   S3ROOT: ddprof
   DOWNSTREAM_BRANCH:
-    value: "erwan.viollet/automate_ddprof_deploys"
+    value: "master"
     description: "Run a specific datadog-reliability-env branch downstream"
   FORCE_TRIGGER:
     value: "true"
