@@ -201,10 +201,10 @@ test:ddprof:
     - fi
     # Run toy project for 5 seconds
     - mkdir pprofs && export DDPROF_PPROFS_FOLDER="$PWD/pprofs"
-    - run.sh -b ${BINDIR} BadBoggleSolver_run 5 &> ddprof_log && cat ddprof_log && check_log_errors.sh ddprof_log
+    - run.sh -b ${BINDIR} -f test/configs/perfanalysis.yml BadBoggleSolver_run 5 &> ddprof_log && cat ddprof_log && check_log_errors.sh ddprof_log
     - unset DDPROF_PPROFS_FOLDER
     # symbol cache validation mechanism
-    - export DDPROF_CACHE_SETTING=VALIDATE; run.sh BadBoggleSolver_run 20 &> ddprof_log && check_log_errors.sh ddprof_log; unset DDPROF_CACHE_SETTING
+    - export DDPROF_CACHE_SETTING=VALIDATE; run.sh -f test/configs/perfanalysis.yml BadBoggleSolver_run 20 &> ddprof_log && check_log_errors.sh ddprof_log; unset DDPROF_CACHE_SETTING
     # Run the BadBoggleSolver_run as a benchmark
     - native_bench.sh ${RECORD_OPTION} -b ${BINDIR}
     - native_bench.sh ${RECORD_OPTION} -b ${BINDIR} -e sleep.sh
@@ -232,7 +232,7 @@ test:centos:
     - export BINDIR="./${BINPATH}/${LIBC_TYPE}/${LIBC_VERSION}/${BUILD_TYPE}/bin"
     # Check libc version
     - ldd --version
-    - run.sh -b ${BINDIR} ${BINDIR}/collatz 1 20000 5000 A
+    - run.sh -f test/configs/perfanalysis.yml -b ${BINDIR} ${BINDIR}/collatz 1 20000 5000 A
   dependencies:
     - build:ddprof
 

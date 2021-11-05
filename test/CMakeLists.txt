@@ -188,6 +188,7 @@ add_unit_test(
 add_unit_test(
     ddprof_exporter-ut
     ../src/exporter/ddprof_exporter.cc
+    ../src/ddprof_cmdline.c
     ../src/pprof/ddprof_pprof.cc
     ../src/unwind_output.c
     ../src/perf_option.c

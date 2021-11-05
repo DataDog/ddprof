@@ -70,8 +70,9 @@ typedef struct DDProfInput {
   XX(DD_AGENT_HOST,                host,                      H, 'H', 1, input, NULL, "localhost",  exp_input.)  \
   XX(DD_SITE,                      site,                      I, 'I', 1, input, NULL, "",           exp_input.)  \
   XX(DD_TRACE_AGENT_PORT,          port,                      P, 'P', 1, input, NULL, "8126",       exp_input.)  \
-  XX(DD_SERVICE,                   service,                   S, 'S', 1, input, NULL, "myservice",  exp_input.) \
-  XX(DD_VERSION,                   serviceversion,            V, 'V', 1, input, NULL, "",           exp_input.) \
+  XX(DD_SERVICE,                   service,                   S, 'S', 1, input, NULL, "myservice",  exp_input.)  \
+  XX(DD_VERSION,                   serviceversion,            V, 'V', 1, input, NULL, "",           exp_input.)  \
+  XX(DD_PROFILING_EXPORT,          do_export,                 X, 'X', 1, input, NULL, "yes",        exp_input.)  \
   XX(DD_TAGS,                      tags,                      T, 'T', 1, input, NULL, "",                     )  \
   XX(DD_PROFILING_ENABLED,         enable,                    d, 'd', 1, input, NULL, "yes", )                   \
   XX(DD_PROFILING_NATIVE_ENABLED,  native_enable,             n, 'n', 1, input, NULL, "yes", )                   \

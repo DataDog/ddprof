@@ -124,6 +124,9 @@ char* help_str[DD_KLEN] = {
   [DD_PROFILING_NATIVEGLOBAL] =
 "    Instruments the whole system.  Overrides DD_PROFILING_NATIVETARGET.\n"
 "    Requires specific permissions or a perf_event_paranoid value of less than 1.\n",
+  [DD_PROFILING_EXPORT] =
+"    Defines if profiles are exported through a HTTP call.\n"
+"    This is useful for developers/investigations.\n",
   [DD_PROFILING_INTERNALSTATS] =
 "    Statsd socket to send internal profiler stats.\n",
 };

@@ -18,6 +18,7 @@ typedef struct DDProfExporter {
   ExporterInput _input;
   char *_url; // url contains path and port
   bool _agent;
+  bool _export;              // debug mode : should we send profiles ?
   const char *_debug_folder; // write pprofs to folder
   ddprof_ffi_ProfileExporterV3 *_exporter;
 } DDProfExporter;

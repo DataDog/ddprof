@@ -22,6 +22,13 @@ DwflSymbolLookup_V2::DwflSymbolLookup_V2() : _lookup_setting(K_CACHE_ON) {}
 // Mock
 int get_nb_hw_thread() { return 2; }
 
+// clang-format off
+// How to test the exporter with a receptor
+// Boot a receptor (example mockserver): docker run --name http_receptor --rm -p 1080:1080 mockserver/mockserver
+// get the url : docker inspect --format '{{ .NetworkSettings.IPAddress }}' http_receptor
+// Once the url is set within the docker, you can test the messages being sent
+// (example : export HTTP_RECEPTOR_URL=http://172.17.0.5:1080)
+// clang-format on
 #define K_RECEPTOR_ENV_ADDR "HTTP_RECEPTOR_URL"
 
 const char *get_url_from_env(const char *env_var) {
@@ -73,6 +80,7 @@ void fill_mock_exporter_input(ExporterInput &exporter_input,
   exporter_input.port = url.second.c_str();
   exporter_input.service = MYNAME;
   exporter_input.serviceversion = "42";
+  exporter_input.do_export = "yes";
   exporter_input.user_agent = STRING_VIEW_LITERAL("DDPROF_MOCK");
   exporter_input.language = STRING_VIEW_LITERAL("NATIVE");
   exporter_input.family = STRING_VIEW_LITERAL("SANCHEZ");
@@ -147,10 +155,11 @@ TEST(DDProfExporter, simple) {
     res = ddprof_exporter_new(&user_tags, &exporter);
     EXPECT_TRUE(IsDDResOK(res));
 
-    res = ddprof_exporter_export(pprofs._profile, &exporter);
-    // if url is set, expect success
     if (ddprof::get_url_from_env(K_RECEPTOR_ENV_ADDR)) {
-      EXPECT_TRUE(IsDDResOK(res));
+      // receptor is defined
+      res = ddprof_exporter_export(pprofs._profile, &exporter);
+      // We should not be able to send profiles (usually 404)
+      EXPECT_FALSE(IsDDResOK(res));
     }
   }
   res = ddprof_exporter_free(&exporter);

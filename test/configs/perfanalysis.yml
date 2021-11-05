@@ -7,6 +7,7 @@ ddprof:
   upload:
     period: 3
   environment: us1.prod.dog
+  do_export: no
   loglevel: notice
   logmode: stdout
   event: sCPU,1000

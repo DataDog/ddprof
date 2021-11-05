@@ -1,6 +1,8 @@
 #include "exporter/ddprof_exporter.h"
 
 extern "C" {
+#include "ddprof_cmdline.h"
+
 #include <assert.h>
 #include <ddprof/ffi.h>
 #include <errno.h>
@@ -18,7 +20,6 @@ extern "C" {
 
 static const int k_timeout_ms = 10000;
 static const int k_size_api_key = 32;
-#define K_URL_ALLOC_ATTEMPT_SIZE 256
 
 static ddprof_ffi_ByteSlice cpp_string_to_byteslice(const std::string &str) {
   return (ddprof_ffi_ByteSlice){.ptr = (uint8_t *)str.c_str(),
@@ -94,6 +95,7 @@ extern "C" {
 DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
                            DDProfExporter *exporter) {
   memset(exporter, 0, sizeof(DDProfExporter));
+
   DDRES_CHECK_FWD(exporter_input_copy(exporter_input, &exporter->_input));
   // if we have an API key we assume we are heading for intake (slightly
   // fragile #TODO add a parameter)
@@ -116,7 +118,10 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
       // warning : should not contain intake.profile. (prepended in libddprof)
       exporter->_url = strdup(exporter_input->site);
     } else {
-      LG_ERR("[EXPORTER] Please provide site instead of host (ignoring port)");
+      LG_WRN(
+          "[EXPORTER] Agentless - Attempting to use host (%s) instead of empty "
+          "site",
+          exporter_input->host);
       exporter->_url = strdup(exporter_input->host);
     }
   }
@@ -127,7 +132,7 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
 
   // Debug process : capture pprof to a folder
   exporter->_debug_folder = getenv("DDPROF_PPROFS_FOLDER");
-
+  exporter->_export = arg_yesno(exporter->_input.do_export, 1);
   return ddres_init();
 }
 
@@ -202,6 +207,32 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
   return ddres_init();
 }
 
+static DDRes check_send_response_code(uint16_t send_response_code) {
+  if (send_response_code >= 200 && send_response_code < 300) {
+    // Although we expect only 200, this range represents sucessful sends
+    if (send_response_code != 200) {
+      LG_NTC("[EXPORTER] HTTP Response code %u (success)", send_response_code);
+    }
+    return ddres_init();
+  }
+  if (send_response_code == 504) {
+    LG_WRN("[EXPORTER] Error 504 (Timeout) - Dropping profile");
+    // TODO - implement retry
+    return ddres_init();
+  }
+  if (send_response_code == 403) {
+    LG_ERR("[EXPORTER] Error 403 (Forbidden) - Check API key");
+    return ddres_error(DD_WHAT_EXPORTER);
+  }
+  if (send_response_code == 404) {
+    LG_ERR("[EXPORTER] Error 404 (Not found) - Profiles not accepted");
+    return ddres_error(DD_WHAT_EXPORTER);
+  }
+  LG_WRN("[EXPORTER] Error sending data - HTTP code %u (continue profiling)",
+         send_response_code);
+  return ddres_init();
+}
+
 DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
                              DDProfExporter *exporter) {
   DDRes res = ddres_init();
@@ -223,40 +254,39 @@ DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
       .capacity = encoded_profile->buffer.capacity,
   };
 
-  LG_NTC("[EXPORTER] Export buffer of size %lu", profile_buffer.len);
+  if (exporter->_export) {
+    LG_NTC("[EXPORTER] Export buffer of size %lu", profile_buffer.len);
 
-  // Backend has some logic based on the following naming
-  ddprof_ffi_File files_[] = {{
-      .name = char_star_to_byteslice("auto.pprof"),
-      .file = &profile_buffer,
-  }};
+    // Backend has some logic based on the following naming
+    ddprof_ffi_File files_[] = {{
+        .name = char_star_to_byteslice("auto.pprof"),
+        .file = &profile_buffer,
+    }};
+    struct ddprof_ffi_Slice_file files = {
+        .ptr = files_, .len = sizeof files_ / sizeof *files_};
 
-  struct ddprof_ffi_Slice_file files = {.ptr = files_,
-                                        .len = sizeof files_ / sizeof *files_};
+    ddprof_ffi_Request *request = ddprof_ffi_ProfileExporterV3_build(
+        exporter->_exporter, start, end, files, k_timeout_ms);
+    if (request) {
+      struct ddprof_ffi_SendResult result =
+          ddprof_ffi_ProfileExporterV3_send(exporter->_exporter, request);
 
-  ddprof_ffi_Request *request = ddprof_ffi_ProfileExporterV3_build(
-      exporter->_exporter, start, end, files, k_timeout_ms);
-  if (request) {
-    struct ddprof_ffi_SendResult result =
-        ddprof_ffi_ProfileExporterV3_send(exporter->_exporter, request);
-
-    if (result.tag == DDPROF_FFI_SEND_RESULT_FAILURE) {
-      LG_WRN("[EXPORTER] Failure to send message (%lu-%lu)", result.failure.len,
-             result.failure.capacity);
-      // The following lines can print error messages. Though for now this
-      // overflows so do not use.
-      /*
-       LG_WRN("Failure to send profiles (%*s)", (int)result.failure.len,
-       error_msg);
-      */
-      // Free error buffer (prefer this API to the free API)
-      ddprof_ffi_Buffer_reset(&result.failure);
-      res = ddres_warn(DD_WHAT_EXPORTER);
+      if (result.tag == DDPROF_FFI_SEND_RESULT_FAILURE) {
+        LG_WRN("Failure to establish connection - check url %s",
+               exporter->_url);
+        // There is an overflow issue when using the error buffer from rust
+        // LG_WRN("Failure to send profiles (%*s)", (int)result.failure.len,
+        //        result.failure.ptr);
+        // Free error buffer (prefer this API to the free API)
+        ddprof_ffi_Buffer_reset(&result.failure);
+        res = ddres_error(DD_WHAT_EXPORTER);
+      } else {
+        res = check_send_response_code(result.http_response.code);
+      }
+    } else {
+      LG_ERR("[EXPORTER] Failure to build request");
+      res = ddres_error(DD_WHAT_EXPORTER);
     }
-    /* # TODO insert retry around here ?? On what type of errors */
-  } else {
-    LG_ERR("[EXPORTER] Failure to build request");
-    res = ddres_error(DD_WHAT_EXPORTER);
   }
   ddprof_ffi_EncodedProfile_delete(encoded_profile);
   return res;

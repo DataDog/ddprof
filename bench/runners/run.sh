@@ -209,8 +209,9 @@ if [[ "yes" == "${USE_CALLGRIND,,}" ]]; then
   PREPEND_CMD="valgrind --tool=callgrind"
 fi
 if [[ "yes" == "${USE_VALGRIND,,}" ]]; then
+  XML_VALGRIND=$(mktemp)
   empty_or_exit ${PREPEND_CMD}
-  PREPEND_CMD="valgrind"
+  PREPEND_CMD="valgrind --leak-check=full --show-reachable=yes --error-limit=no --gen-suppressions=all --log-file=${XML_VALGRIND}"
 fi
 
 if [[ "yes" == "${USE_PERFSTAT,,}" ]]; then
@@ -256,6 +257,7 @@ CMD=$(add_if_not_empty ${CMD} "-s" "${cfg_ddprof_faultinfo:-""}")
 CMD=$(add_if_not_empty ${CMD} "-w" "${cfg_ddprof_worker_period:-""}")
 CMD=$(add_if_not_empty ${CMD} "-o" "${cfg_ddprof_logmode:-""}")
 CMD=$(add_if_not_empty ${CMD} "-a" "${cfg_ddprof_printargs:-""}")
+CMD=$(add_if_not_empty ${CMD} "-X" "${cfg_ddprof_do_export:-""}")
 
 DDPROF_CMD=${CMD}
 
@@ -289,5 +291,8 @@ eval "${DDPROF_CMD} ${SERVICE_OPTION} $@"
 echo "###### Uploaded to ${cfg_ddprof_service_name}_${VER} ######"
 if [[ "yes" == "${USE_DDPROF,,}" ]]; then
   echo "###### Uploaded ddprof analysis to ddprof_profile_${VER} ######"
+fi
+if [ ! -z ${XML_VALGRIND:-""} ]; then 
+  echo "Check vagrind results here ${XML_VALGRIND}"
 fi
 exit 0
