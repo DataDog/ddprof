@@ -332,7 +332,7 @@ DsoFindRes DsoHdr::pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
     return find_res;
   }
 
-  Offset_t file_region_offset = (addr - dso._start) + dso._pgoff;
+  Offset_t file_region_offset = (addr - dso._start);
 
   // At this point, we've
   //  Found a segment with matching parameters
