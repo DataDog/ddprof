@@ -1,5 +1,6 @@
 linux-vdso
 libdl
+libm
 libgcc, To be removed
 libpthread
 libc

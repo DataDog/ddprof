@@ -38,8 +38,7 @@
 // TODO das210603 I don't think this needs to be inlined as a macro anymore
 #define FREE_EXP(key, targ)                                                    \
   __extension__({                                                              \
-    if ((targ)->key)                                                           \
-      free((void *)(targ)->key);                                               \
+    free((void *)(targ)->key);                                                 \
     (targ)->key = NULL;                                                        \
   })
 

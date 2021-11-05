@@ -8,9 +8,7 @@
 typedef struct DDProfInput DDProfInput;
 typedef struct DDProfContext DDProfContext;
 
-/***************************** Context Management *****************************/
-DDRes ddprof_ctx_set(const DDProfInput *input, DDProfContext *);
-void ddprof_ctx_free(DDProfContext *);
+// Setup perf event open according to watchers
 DDRes ddprof_setup(DDProfContext *ctx, pid_t pid);
 
 #ifndef DDPROF_NATIVE_LIB

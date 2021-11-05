@@ -1,6 +1,7 @@
 #include "ddprof.h"
 
 #include "ddprof_context.h"
+#include "ddprof_context_lib.h"
 #include "ddprof_input.h"
 #include "logger.h"
 #include "unwind.h"
@@ -26,14 +27,15 @@ int main(int argc, char *argv[]) {
     bool continue_exec;
     DDRes res = ddprof_input_parse(argc, (char **)argv, &input, &continue_exec);
     if (IsDDResNotOK(res) || !continue_exec) {
-      goto CLEANUP_INPUT;
+      ddprof_input_free(&input);
+      goto EXIT_NO_FREE;
     }
   }
-  // logger can be closed (as it is opened in ddprof_ctx_set)
+  // logger can be closed (as it is opened in ddprof_context_set)
   LOG_close();
 
   // cmdline args have been processed.  Set the ctx
-  if (IsDDResNotOK(ddprof_ctx_set(&input, &ctx))) {
+  if (IsDDResNotOK(ddprof_context_set(&input, &ctx))) {
     LG_ERR("Error setting up profiling context, exiting");
     goto CLEANUP_ERR;
   }
@@ -41,6 +43,9 @@ int main(int argc, char *argv[]) {
 
   argv += input.nb_parsed_params;
   argc -= input.nb_parsed_params;
+
+  // input no longer needed, ctx and args are set
+  ddprof_input_free(&input);
 
   // Only throw an error if we needed the user to pass an arg
   if (ctx.params.pid) {
@@ -69,8 +74,7 @@ int main(int argc, char *argv[]) {
       if (!temp_pid) { // If I'm the temp PID enter branch
         temp_pid = getpid();
         if ((child_pid = fork())) { // If I'm the temp PID again, enter branch
-          ddprof_ctx_free(&ctx);
-          ddprof_input_free(&input);
+          ddprof_context_free(&ctx);
           // Block until our child exits or sends us a kill signal
           // NOTE, current process is NOT expected to unblock here; rather it
           // ends by SIGTERM.  Exiting here is an error condition.
@@ -104,6 +108,7 @@ int main(int argc, char *argv[]) {
   }
 
 EXECUTE:
+  ddprof_context_free(&ctx);
   if (-1 == execvp(*argv, (char *const *)argv)) {
     switch (errno) {
     case ENOENT:
@@ -122,10 +127,7 @@ EXECUTE:
 CLEANUP_ERR:
   ret = -1;
 CLEANUP:
-  ddprof_ctx_free(&ctx);
-CLEANUP_INPUT:
-  // These are cleaned by execvp(), but we remove them here since this is the
-  // error path and we don't want static analysis to report leaks.
-  ddprof_input_free(&input);
+  ddprof_context_free(&ctx);
+EXIT_NO_FREE:
   return ret;
 }

@@ -11,6 +11,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "ddprof_context_lib.h"
 #include "ddprof_worker.h"
 #include "ddres.h"
 #include "logger.h"
@@ -21,19 +22,11 @@
 
 #define rmb() __asm__ volatile("lfence" ::: "memory")
 
-#ifdef DDPROF_NATIVE_LIB
-#  define WORKER_SHUTDOWN()                                                    \
-    {                                                                          \
-      ProducerLinearizer_free(&pl);                                            \
-      return;                                                                  \
-    }
-#else
-#  define WORKER_SHUTDOWN()                                                    \
-    {                                                                          \
-      ProducerLinearizer_free(&pl);                                            \
-      exit(0);                                                                 \
-    }
-#endif
+#define WORKER_SHUTDOWN()                                                      \
+  {                                                                            \
+    ProducerLinearizer_free(&pl);                                              \
+    return;                                                                    \
+  }
 
 #define DDRES_CHECK_OR_SHUTDOWN(res, shut_down_process)                        \
   DDRes eval_res = res;                                                        \
@@ -215,11 +208,14 @@ void main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
   }
 
   worker(ctx, attr, can_run);
+  // Child finished profiling: Free and exit
+  ddprof_context_free(ctx);
+  exit(0);
 }
 
 void main_loop_lib(const WorkerAttr *attr, DDProfContext *ctx) {
   bool can_run;
-  // no fork. TODO : handle lifetime
+  // no fork. TODO : give exit trigger to user
   worker(ctx, attr, &can_run);
   if (!can_run) {
     LG_NFO("Request to exit");

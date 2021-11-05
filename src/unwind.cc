@@ -4,7 +4,6 @@ extern "C" {
 #include "ddres.h"
 #include "libebl.h"
 #include "logger.h"
-#include "procutils.h"
 #include "signal_helper.h"
 }
 
@@ -18,26 +17,6 @@ extern "C" {
 #define UNUSED(x) (void)(x)
 
 namespace ddprof {
-
-static void analyze_unwinding_error(pid_t pid, uint64_t eip) {
-  // expensive operations should not be executed with NDEBUG
-#ifndef NDEBUG
-  Map *map = procfs_MapMatch(pid, eip);
-  // kill 0 to check if the process has finished protected by NDEBUG
-  if (!map)
-    LG_WRN("Error getting map for [%d](0x%lx)", pid, eip);
-  else {
-    if (process_is_alive(pid)) {
-      LG_WRN("Error unwinding %s [%d](0x%lx)", map->path, pid, eip);
-    } else {
-      LG_NTC("Process ended before we could unwind [%d]", pid);
-    }
-  }
-#else
-  UNUSED(pid);
-  UNUSED(eip);
-#endif
-}
 
 DDRes unwind_init(UnwindState *us) {
   try {
@@ -72,7 +51,6 @@ static void add_error_frame(UnwindState *us) {
   if (!dso_mod._dso_find_res.second) {
     LG_DBG("Could not localize top-level IP: [%d](0x%lx)", us->pid,
            us->current_regs.eip);
-    analyze_unwinding_error(us->pid, us->current_regs.eip);
     add_common_frame(us, CommonSymbolLookup::LookupCases::unknown_dso);
   } else {
     LG_DBG("Failed unwind: %s [%d](0x%lx)",

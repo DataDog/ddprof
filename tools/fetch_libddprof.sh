@@ -59,11 +59,11 @@ SHA_TAR=$(sha256sum ${DOWNLOAD_PATH}/${TAR_LIBDDPROF} | cut -d' ' -f1)
 
 if [ $SHA_TAR != ${SHA256_LIBDDPROF} ];then
     echo "Error validating libddprof"
+    echo "Got following SHA: ${SHA_TAR} (instead of ${SHA256_LIBDDPROF})"
     echo "Please clear ${DOWNLOAD_PATH}/${TAR_LIBDDPROF} before restarting"
     exit 1
 fi
 
-# Rust target not used for now, only extract deliverables
 tmp_dir=$(mktemp -d -t deliverables-XXXXXXXXXX)
 echo "Extract to $tmp_dir"
 cd $tmp_dir

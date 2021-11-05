@@ -1,9 +1,9 @@
 extern "C" {
 #include "ddprof.h"
 #include "ddprof_context.h"
+#include "ddprof_context_lib.h"
 #include "ddprof_input.h"
 #include "stack_handler.h"
-
 #include <sys/sysinfo.h>
 #include <unistd.h>
 }
@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
 
   DDProfContext ctx;
 
-  if (IsDDResNotOK(ddprof_ctx_set(&input, &ctx))) {
+  if (IsDDResNotOK(ddprof_context_set(&input, &ctx))) {
     std::cerr << "unable to init input " << std::endl;
     ret = -1;
     goto CLEANUP;
@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
   ret = compare_to_ref(k_test_executable, symbol_map, data_directory);
 
 CLEANUP:
-  ddprof_ctx_free(&ctx);
+  ddprof_context_free(&ctx);
 CLEANUP_INPUT:
   ddprof_input_free(&input);
   return ret;

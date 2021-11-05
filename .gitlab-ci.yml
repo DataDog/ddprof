@@ -6,9 +6,9 @@ stages:
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
   # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/87754200
-  BUILD_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:f35ea15e4344fa3bffc789986279da30688d1afe4c83371e11f7d6b1814af82f
-  BUILD_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:af0d88b688e23ea64c3544358485a31f57eeaf4fabfcd709b6df50c271cb6e79
-  BUILD_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:ad1274baf8afe15f748b85372ba9a4a9eced44aa648837156bd1b7a8d63e6f5d
+  BUILD_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:13d5530fc3f1f0152f55f9fd7f57d96c47e3be844d9fe4940cb75a4be20e3cb5
+  BUILD_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:e7822ca4ac39ecbb469713d2f7698be86dfd2caa6a3f75f411b1f1c107385f42
+  BUILD_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:6a3ccd4154fd8795cb18eb4dff3e4dbb80f5990b0362051ef21f1ce605b1e1d7
   # https://gitlab.ddbuild.io/DataDog/ddprof/-/pipelines/5611418
   TEST_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:a06908a49fbdf93fb62e7c5a650ec6da587c21f8f5060cf0657d4b08a63df985
   TEST_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:128fff36c0cc5a8d9f31d8082fbcdde7fe8cad960514f01a1a11b209ef94d08b
@@ -248,7 +248,6 @@ test:centos:
 # Standard deployment job : automatically promotes main version
 deploy:ddprof:
   extends: .ddprof_job
-  when: always
   image: $BUILD_IMG_20_STICKY
   stage: deploy
   tags: ["runner:docker"]

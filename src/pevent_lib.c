@@ -98,6 +98,7 @@ DDRes pevent_enable(PEventHdr *pevent_hdr) {
 
 /// Clean the mmap buffer
 DDRes pevent_munmap(PEventHdr *pevent_hdr) {
+
   PEvent *pes = pevent_hdr->pes;
   for (int k = 0; k < pevent_hdr->size; ++k) {
     if (pes[k].rb.region) {
@@ -107,7 +108,9 @@ DDRes pevent_munmap(PEventHdr *pevent_hdr) {
       }
       pes[k].rb.region = NULL;
     }
+    rb_free(&pevent_hdr->pes[k].rb);
   }
+
   return ddres_init();
 }
 
@@ -131,9 +134,6 @@ DDRes pevent_close(PEventHdr *pevent_hdr) {
 DDRes pevent_cleanup(PEventHdr *pevent_hdr) {
   DDRes ret = ddres_init();
   DDRes ret_tmp;
-
-  for (int k = 0; k < pevent_hdr->size; ++k)
-    rb_free(&pevent_hdr->pes[k].rb);
 
   // Cleanup both, storing the error if one was generated
   if (!IsDDResOK(ret_tmp = pevent_munmap(pevent_hdr)))
