@@ -104,7 +104,7 @@ bool compute_elf_range(RegionAddress_t region_pc, ProcessAddress_t mod_lowaddr,
   assert(mod_lowaddr >= bias);
   // adjust to region (biais is 0 if we are in a process address)
   ElfAddress_t elf_adjust = mod_lowaddr - bias + dso_offset;
-  assert(elf_sym.st_value > elf_adjust);
+  assert(elf_sym.st_value >= elf_adjust);
 
   start_sym = elf_sym.st_value - elf_adjust;
   // size can be 0 consider a min offset
