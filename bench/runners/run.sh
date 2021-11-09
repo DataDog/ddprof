@@ -21,6 +21,28 @@ add_if_not_empty() {
   fi
 }
 
+check_valgrind_errors() {
+  ERRORS_VALGRIND=$(grep "ERROR SUMMARY:" ${1} )
+  # Check if we have some errors flagged in report
+  REMAINING_ERRORS=$(echo $ERRORS_VALGRIND | awk '{if($0!~"0 errors"){print $0}}')
+  if [ ! -z ${REMAINING_ERRORS,,} ]; then
+    echo "---------- Error checking valgrind report ----------"
+    echo ${ERRORS_VALGRIND}
+    cat $1
+    exit 1
+  fi
+  echo "Parsing ${1}"
+  # Select all regions that start with { and end with } (these match valgrind suppressions)
+  SUPPRESSIONS_VALGRIND=$(awk 'BEGIN{ok=1} \
+      {if($0~"^\{"){ok=0;} if(ok==0){print $0"\n";} if($0~"^\}"){ok=1;} }' ${1})
+  if [ "${SUPPRESSIONS_VALGRIND,,}" != "" ]; then
+    # A new leak must have been detected --> error out
+    echo "---------- Error checking new suppressions ----------"
+    echo ${SUPPRESSIONS_VALGRIND}
+    exit 1
+  fi
+}
+
 ### Set directory names
 CURRENTDIR=$PWD
 SCRIPTPATH=$(readlink -f "$0")
@@ -209,9 +231,9 @@ if [[ "yes" == "${USE_CALLGRIND,,}" ]]; then
   PREPEND_CMD="valgrind --tool=callgrind"
 fi
 if [[ "yes" == "${USE_VALGRIND,,}" ]]; then
-  XML_VALGRIND=$(mktemp)
+  OUTPUT_VALGRIND=$(mktemp)
   empty_or_exit ${PREPEND_CMD}
-  PREPEND_CMD="valgrind --leak-check=full --show-reachable=yes --error-limit=no --gen-suppressions=all --log-file=${XML_VALGRIND}"
+  PREPEND_CMD="valgrind --leak-check=full --show-reachable=yes --error-limit=no --gen-suppressions=all --log-file=${OUTPUT_VALGRIND} --suppressions=${TOP_LVL_DIR}/test/data/valgrind_suppression_release.supp"
 fi
 
 if [[ "yes" == "${USE_PERFSTAT,,}" ]]; then
@@ -292,7 +314,10 @@ echo "###### Uploaded to ${cfg_ddprof_service_name}_${VER} ######"
 if [[ "yes" == "${USE_DDPROF,,}" ]]; then
   echo "###### Uploaded ddprof analysis to ddprof_profile_${VER} ######"
 fi
-if [ ! -z ${XML_VALGRIND:-""} ]; then 
-  echo "Check vagrind results here ${XML_VALGRIND}"
+
+if [ ! -z ${OUTPUT_VALGRIND:-""} ]; then 
+  echo "Check vagrind results here ${OUTPUT_VALGRIND}"
+  check_valgrind_errors "${OUTPUT_VALGRIND}"
 fi
+
 exit 0

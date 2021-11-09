@@ -212,6 +212,10 @@ test:ddprof:
     - if [ -e  ${BINDIR}/selfuw ]; then
     - ${BINDIR}/selfuw ${CI_PROJECT_DIR}/test/self_unwind/data
     - fi
+    # Valgrind with suppressions (check valgrind_suppressions_release.supp)
+    - if [ ${BUILD_TYPE} == "Release" ]; then 
+    - run.sh --valgrind -b ${BINDIR} -f test/configs/perfanalysis.yml BadBoggleSolver_run 5
+    - fi
   dependencies:
     - build:ddprof
 
