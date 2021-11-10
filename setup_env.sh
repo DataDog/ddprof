@@ -1,6 +1,8 @@
+# Unless explicitly stated otherwise all files in this repository are licensed under the Apache License Version 2.0.
+# This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
+
 # Run source ./setup_env.sh
 export PATH=$PATH:${PWD}/tools:${PWD}/bench/runners
-
 
 # Helper command lines for cmake. Source this file, then you can just do :
 # SanCMake ../ 
