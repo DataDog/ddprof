@@ -1,13 +1,9 @@
-# Unless explicitly stated otherwise all files in this repository are licensed under the Apache License Version 2.0.
-# This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
-
-
 #!/bin/bash
 # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 set -euo pipefail
 
-#yml parser in shell
-#https://stackoverflow.com/questions/5014632/how-can-i-parse-a-yaml-file-from-a-linux-shell-script
+# yml parser in shell. Source :
+# https://stackoverflow.com/questions/5014632/how-can-i-parse-a-yaml-file-from-a-linux-shell-script
 
 # Usage :
 # eval $(parse_yaml sample.yml)
