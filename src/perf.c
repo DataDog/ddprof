@@ -17,7 +17,7 @@
 
 #define DEFAULT_PAGE_SIZE 4096 // Concerned about hugepages?
 
-#define DEFAULT_BUFF_SIZE_SHIFT 5
+#define DEFAULT_BUFF_SIZE_SHIFT 6
 
 static long s_page_size = 0;
 
