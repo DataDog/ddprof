@@ -1,3 +1,6 @@
+# Unless explicitly stated otherwise all files in this repository are licensed under the Apache License Version 2.0.
+# This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
+
 # Fetch elfutilities and build them according to the compiler used in the project
 # The following variables and targets are defined as result : 
 # - ELFUTILS_INCLUDE_LIST
