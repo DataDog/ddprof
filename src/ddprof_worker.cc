@@ -350,7 +350,15 @@ static DDRes reset_state(DDProfContext *ctx,
   //       2. new worker should be initialized with a fresh state, so clearing
   //          it here is irrelevant anyway
   if (ctx->params.worker_period <= ctx->worker_ctx.count_worker) {
+
+    // We have to return, but before we can do so we need to check for pending
+    // exports.  If an export is stuck, we have to fail.
     *continue_profiling = true;
+    if (ctx->worker_ctx.pending) {
+      const struct timespec waittime = {5, 0}; // arbitrary!
+      if (!pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime))
+        *continue_profiling = false;
+    }
     DDRES_RETURN_WARN_LOG(DD_WHAT_WORKER_RESET, "%s: cnt=%u - stop worker (%s)",
                           __FUNCTION__, ctx->worker_ctx.count_worker,
                           (*continue_profiling) ? "continue" : "stop");
