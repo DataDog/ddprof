@@ -422,6 +422,14 @@ DDRes ddprof_worker_init(DDProfContext *ctx) {
 
 DDRes ddprof_worker_finish(DDProfContext *ctx) {
   try {
+    // First, see if there are any outstanding requests and give them a token
+    // amount of time to complete
+    if (ctx->worker_ctx.pending) {
+      const struct timespec waittime = {5, 0}; // arbitrary!
+      if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime))
+        pthread_cancel(ctx->worker_ctx.exp_tid);
+    }
+
     DDRES_CHECK_FWD(worker_unwind_free(ctx));
     for (int i = 0; i < 2; i++) {
       if (ctx->worker_ctx.exp[i]) {
