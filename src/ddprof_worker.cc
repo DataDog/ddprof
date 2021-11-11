@@ -81,6 +81,8 @@ DDRes worker_unwind_init(DDProfContext *ctx) {
     export_time_set(ctx);
     // Make sure worker-related counters are reset
     ctx->worker_ctx.count_worker = 0;
+    // Make sure worker index is initialized correctly
+    ctx->worker_ctx.i_export = 0;
 
     ctx->worker_ctx.us = (UnwindState *)calloc(1, sizeof(UnwindState));
     if (!ctx->worker_ctx.us) {
@@ -101,6 +103,12 @@ DDRes worker_unwind_init(DDProfContext *ctx) {
     DDRES_CHECK_FWD(unwind_init(ctx->worker_ctx.us));
     ctx->worker_ctx.user_tags =
         new UserTags(ctx->params.tags, ctx->params.num_cpu);
+
+    // Zero out pointers to dynamically allocated memory
+    ctx->worker_ctx.exp[0] = nullptr;
+    ctx->worker_ctx.exp[1] = nullptr;
+    ctx->worker_ctx.pprof[0] = nullptr;
+    ctx->worker_ctx.pprof[1] = nullptr;
   }
   CatchExcept2DDRes();
   return ddres_init();
@@ -166,7 +174,8 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   if (!IsDDResFatal(res)) {
 #ifndef DDPROF_NATIVE_LIB
     // in lib mode we don't aggregate (protect to avoid link failures)
-    DDProfPProf *pprof = ctx->worker_ctx.pprof;
+    int i_export = ctx->worker_ctx.i_export;
+    DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
     DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbols_hdr,
                                     sample->period, pos, pprof));
 #else
@@ -194,6 +203,26 @@ static void ddprof_reset_worker_stats(DsoHdr *dso_hdr) {
   unwind_metrics_reset();
 }
 
+#ifndef DDPROF_NATIVE_LIB
+void *ddprof_worker_export_thread(void *arg) {
+  DDProfWorkerContext *worker = (DDProfWorkerContext *)arg;
+  int i = worker->i_export;
+
+  if (IsDDResNotOK(ddprof_exporter_export(worker->pprof[i]->_profile, worker->exp[i]))) {
+    worker->exp_error = true;
+    worker->pending = false;
+    return nullptr;
+  }
+
+  if (IsDDResNotOK(pprof_reset(worker->pprof[i]))) {
+    worker->exp_error = true;
+    worker->pending = false;
+  }
+
+  return nullptr;
+}
+#endif
+
 /// Cycle operations : export, sync metrics, update counters
 static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
 
@@ -208,9 +237,22 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
 #ifndef DDPROF_NATIVE_LIB
   // Take the current pprof contents and ship them to the backend.  This also
   // clears the pprof for reuse
-  DDRES_CHECK_FWD(ddprof_exporter_export(ctx->worker_ctx.pprof->_profile,
-                                         ctx->worker_ctx.exp));
-  DDRES_CHECK_FWD(pprof_reset(ctx->worker_ctx.pprof));
+  // Dispatch happens in a thread, with the underlying data structure for
+  // aggregation rotating between exports.  If we return to this point before
+  // the previous thread has finished, it's counted as an error and the profiler
+  // is terminated.
+  
+  // If something is pending, return error
+  if (ctx->worker_ctx.pending)
+    return ddres_create(DD_SEVERROR, DD_WHAT_EXPORT_TIMEOUT); 
+  if (ctx->worker_ctx.exp_error)
+    return ddres_create(DD_SEVERROR, DD_WHAT_EXPORTER);
+
+  // Dispatch to thread
+  ctx->worker_ctx.pending = true;
+  ctx->worker_ctx.exp_error = false;
+  pthread_t tid = 0;
+  pthread_create(&tid, NULL, ddprof_worker_export_thread, &ctx->worker_ctx);
 
 #endif
 
@@ -334,21 +376,31 @@ DDRes ddprof_worker_timeout(volatile bool *continue_profiling,
 DDRes ddprof_worker_init(DDProfContext *ctx) {
   try {
     DDRES_CHECK_FWD(worker_unwind_init(ctx));
-    ctx->worker_ctx.exp = (DDProfExporter *)calloc(1, sizeof(DDProfExporter));
-    if (!ctx->worker_ctx.exp) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error when creating exporter");
+    ctx->worker_ctx.exp[0] = (DDProfExporter *)calloc(1, sizeof(DDProfExporter));
+    ctx->worker_ctx.exp[1] = (DDProfExporter *)calloc(1, sizeof(DDProfExporter));
+    ctx->worker_ctx.pprof[0] = (DDProfPProf *)calloc(1, sizeof(DDProfPProf));
+    ctx->worker_ctx.pprof[1] = (DDProfPProf *)calloc(1, sizeof(DDProfPProf));
+    if (!ctx->worker_ctx.exp[0] || !ctx->worker_ctx.exp[1]) {
+      free(ctx->worker_ctx.exp[0]);
+      free(ctx->worker_ctx.exp[1]);
+      free(ctx->worker_ctx.pprof[0]);
+      free(ctx->worker_ctx.pprof[1]);
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error creating exporter");
     }
-    ctx->worker_ctx.pprof = (DDProfPProf *)calloc(1, sizeof(DDProfPProf));
-    if (!ctx->worker_ctx.pprof) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
-                             "Error when creating pprof structure");
+    if (!ctx->worker_ctx.pprof[0] || !ctx->worker_ctx.pprof[1]) {
+      free(ctx->worker_ctx.exp[0]);
+      free(ctx->worker_ctx.exp[1]);
+      free(ctx->worker_ctx.pprof[0]);
+      free(ctx->worker_ctx.pprof[1]);
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error creating pprof holder");
     }
-    DDRES_CHECK_FWD(ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp));
+    DDRES_CHECK_FWD(ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp[0]));
+    DDRES_CHECK_FWD(ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp[1]));
     // warning : depends on unwind init
-    DDRES_CHECK_FWD(
-        ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp));
-    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof, ctx->watchers,
-                                         ctx->num_watchers));
+    DDRES_CHECK_FWD( ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[0]));
+    DDRES_CHECK_FWD( ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[1]));
+    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[0], ctx->watchers, ctx->num_watchers));
+    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[1], ctx->watchers, ctx->num_watchers));
   }
   CatchExcept2DDRes();
   return ddres_init();
@@ -357,15 +409,17 @@ DDRes ddprof_worker_init(DDProfContext *ctx) {
 DDRes ddprof_worker_finish(DDProfContext *ctx) {
   try {
     DDRES_CHECK_FWD(worker_unwind_free(ctx));
-    if (ctx->worker_ctx.exp) {
-      DDRES_CHECK_FWD(ddprof_exporter_free(ctx->worker_ctx.exp));
-      free(ctx->worker_ctx.exp);
-      ctx->worker_ctx.exp = nullptr;
-    }
-    if (ctx->worker_ctx.pprof) {
-      DDRES_CHECK_FWD(pprof_free_profile(ctx->worker_ctx.pprof));
-      free(ctx->worker_ctx.pprof);
-      ctx->worker_ctx.pprof = nullptr;
+    for (int i = 0; i < 2; i++) {
+      if (ctx->worker_ctx.exp[i]) {
+        DDRES_CHECK_FWD(ddprof_exporter_free(ctx->worker_ctx.exp[i]));
+        free(ctx->worker_ctx.exp[i]);
+        ctx->worker_ctx.exp[i] = nullptr;
+      }
+      if (ctx->worker_ctx.pprof[i]) {
+        DDRES_CHECK_FWD(pprof_free_profile(ctx->worker_ctx.pprof[i]));
+        free(ctx->worker_ctx.pprof[i]);
+        ctx->worker_ctx.pprof[i] = nullptr;
+      }
     }
   }
   CatchExcept2DDRes();

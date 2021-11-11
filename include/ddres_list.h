@@ -44,6 +44,7 @@ extern "C" {
   X(STATSD, "statsd interface")                                                \
   X(DDPROF_STATS, "error in stats module")                                     \
   X(EXPORTER, "error exporting")                                               \
+  X(EXPORT_TIMEOUT, "pending export failed to return in time")                 \
   X(ARGUMENT, "error writing arguments")                                       \
   X(INPUT_PROCESS, "")                                                         \
   X(STACK_HANDLE, "")                                                          \
