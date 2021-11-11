@@ -30,6 +30,7 @@ typedef struct DDProfWorkerContext {
   int i_export;
   volatile bool pending;
   volatile bool exp_error;
+  pthread_t exp_tid;
   UnwindState *us;
   UserTags *user_tags;
   ProcStatus proc_status;

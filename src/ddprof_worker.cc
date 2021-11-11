@@ -83,6 +83,7 @@ DDRes worker_unwind_init(DDProfContext *ctx) {
     ctx->worker_ctx.count_worker = 0;
     // Make sure worker index is initialized correctly
     ctx->worker_ctx.i_export = 0;
+    ctx->worker_ctx.exp_tid = {0};
 
     ctx->worker_ctx.us = (UnwindState *)calloc(1, sizeof(UnwindState));
     if (!ctx->worker_ctx.us) {
@@ -240,20 +241,24 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
   // clears the pprof for reuse
   // Dispatch happens in a thread, with the underlying data structure for
   // aggregation rotating between exports.  If we return to this point before
-  // the previous thread has finished, it's counted as an error and the profiler
-  // is terminated.
+  // the previous thread has finished,  we wait for up to five seconds before
+  // failing
 
   // If something is pending, return error
-  if (ctx->worker_ctx.pending)
-    return ddres_create(DD_SEVERROR, DD_WHAT_EXPORT_TIMEOUT);
+  if (ctx->worker_ctx.pending) {
+    const struct timespec waittime = {5, 0}; // arbitrary!
+    if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime))
+      return ddres_create(DD_SEVERROR, DD_WHAT_EXPORT_TIMEOUT);
+  }
   if (ctx->worker_ctx.exp_error)
     return ddres_create(DD_SEVERROR, DD_WHAT_EXPORTER);
 
   // Dispatch to thread
   ctx->worker_ctx.pending = true;
   ctx->worker_ctx.exp_error = false;
-  pthread_t tid = 0;
-  pthread_create(&tid, NULL, ddprof_worker_export_thread, &ctx->worker_ctx);
+  ctx->worker_ctx.i_export = !!ctx->worker_ctx.i_export;
+  pthread_create(&ctx->worker_ctx.exp_tid, NULL, ddprof_worker_export_thread,
+                 &ctx->worker_ctx);
 
 #endif
 
