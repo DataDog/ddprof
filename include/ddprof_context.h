@@ -24,9 +24,9 @@ typedef struct UserTags UserTags;
 
 // Mutable states within a worker
 typedef struct DDProfWorkerContext {
-  PEventHdr pevent_hdr; // perf_event buffer holder
-  DDProfExporter *exp[2];  // wrapper around rust exporter
-  DDProfPProf *pprof[2];   // wrapper around rust exporter
+  PEventHdr pevent_hdr;   // perf_event buffer holder
+  DDProfExporter *exp[2]; // wrapper around rust exporter
+  DDProfPProf *pprof[2];  // wrapper around rust exporter
   int i_export;
   volatile bool pending;
   volatile bool exp_error;
