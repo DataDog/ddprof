@@ -52,30 +52,21 @@ DDRes statsd_connect(const char *path, size_t sz_path, int *fd) {
   assert(sz_path);
   assert(fd);
 
-  char template[] = "/tmp/statsd.XXXXXX";
+  char path_listen[] = "/tmp/"MYNAME".1234567890";
+  size_t sz = 0;
+  sz = snprintf(path_listen, sizeof(path_listen), "/tmp/"MYNAME"%d", getpid());
   struct sockaddr_un addr_peer = {.sun_family = AF_UNIX};
   int fd_sock = -1;
-  int fd_tmp = -1;
 
-  // We bind to a temporary file, since that's needed for the interface
-  if (-1 == (fd_tmp = mkstemp(template))) {
-    DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD,
-                          "[STATSD] Creating temporary file failed (%s)",
-                          strerror(errno));
-  }
-
-  unlink(template);
   memcpy(addr_peer.sun_path, path, sz_path);
-  DDRes res = statsd_listen(template, sizeof(template) - 1, &fd_sock);
-
+  DDRes res = statsd_listen(path_listen, sz, &fd_sock);
+  unlink(path_listen);
   if (IsDDResNotOK(res)) {
-    close(fd_tmp);
     return res;
   }
 
   // Now connect to the specified listening path
   if (connect(fd_sock, (struct sockaddr *)&addr_peer, sizeof(addr_peer))) {
-    close(fd_tmp);
     close(fd_sock);
     DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD,
                           "[STATSD] Connecting to host failed (%s)",
@@ -83,7 +74,6 @@ DDRes statsd_connect(const char *path, size_t sz_path, int *fd) {
   }
 
   // If we're here, then the connection has been fully established
-  close(fd_tmp); // The listen file descriptor is no longer needed
   *fd = fd_sock;
   return ddres_init();
 }
