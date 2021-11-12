@@ -52,9 +52,10 @@ DDRes statsd_connect(const char *path, size_t sz_path, int *fd) {
   assert(sz_path);
   assert(fd);
 
-  char path_listen[] = "/tmp/"MYNAME".1234567890";
+  char path_listen[] = "/tmp/" MYNAME ".1234567890";
   size_t sz = 0;
-  sz = snprintf(path_listen, sizeof(path_listen), "/tmp/"MYNAME"%d", getpid());
+  sz =
+      snprintf(path_listen, sizeof(path_listen), "/tmp/" MYNAME "%d", getpid());
   struct sockaddr_un addr_peer = {.sun_family = AF_UNIX};
   int fd_sock = -1;
 
