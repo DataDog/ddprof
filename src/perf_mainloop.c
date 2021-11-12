@@ -27,9 +27,7 @@
 #define rmb() __asm__ volatile("lfence" ::: "memory")
 
 #define WORKER_SHUTDOWN()                                                      \
-  {                                                                            \
-    return;                                                                    \
-  }
+  { return; }
 
 #define DDRES_CHECK_OR_SHUTDOWN(res, shut_down_process)                        \
   DDRes eval_res = res;                                                        \
@@ -122,35 +120,35 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
     }
 
     // While there are events to process, iterate through them.
-   bool events = false;
-   do {
-     for (int i = 0; i < pe_len; ++i) {
-       // Memory-ordering safe access of ringbuffer elements
-       RingBuffer *rb = &pes[i].rb;
-       uint64_t head = rb->region->data_head;
-       rmb();
-       uint64_t tail = rb->region->data_tail;
-       if (head == tail)
-         continue;
-       events = true;
+    bool events = false;
+    do {
+      for (int i = 0; i < pe_len; ++i) {
+        // Memory-ordering safe access of ringbuffer elements
+        RingBuffer *rb = &pes[i].rb;
+        uint64_t head = rb->region->data_head;
+        rmb();
+        uint64_t tail = rb->region->data_tail;
+        if (head == tail)
+          continue;
+        events = true;
 
-       // Attempt to dispatch the event
-       struct perf_event_header *hdr = rb_seek(rb, tail);
-       DDRes res = ddprof_worker(hdr, pes[i].pos, can_run, ctx);
+        // Attempt to dispatch the event
+        struct perf_event_header *hdr = rb_seek(rb, tail);
+        DDRes res = ddprof_worker(hdr, pes[i].pos, can_run, ctx);
 
-       // We've processed the current event, so we can advance the ringbuffer
-       rb->region->data_tail += hdr->size;
+        // We've processed the current event, so we can advance the ringbuffer
+        rb->region->data_tail += hdr->size;
 
-       // Check for processing error
-       if (IsDDResNotOK(res)) {
-         attr->finish_fun(ctx);
-         WORKER_SHUTDOWN();
-       } else {
-         if (hdr->type == PERF_RECORD_SAMPLE)
-           ++processed_samples;
-       }
-     }
-   } while (events);
+        // Check for processing error
+        if (IsDDResNotOK(res)) {
+          attr->finish_fun(ctx);
+          WORKER_SHUTDOWN();
+        } else {
+          if (hdr->type == PERF_RECORD_SAMPLE)
+            ++processed_samples;
+        }
+      }
+    } while (events);
 
     // If I didn't process any events, then hit the timeout
     if (!processed_samples) {
