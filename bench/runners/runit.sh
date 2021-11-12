@@ -47,7 +47,6 @@ for arg in "$@"; do
   if [[ ${arg} == "boggle" ]]; then JOB="BadBoggleSolver_run 1000"; fi #1000 seconds
   if [[ ${arg} == "envoy" ]]; then JOB="${DEFAULT_JOB_PATH}envoy-runner.sh"; fi
   if [[ ${arg} == "redis" ]]; then JOB="${DEFAULT_JOB_PATH}redis-runner.sh"; fi
-  if [[ ${arg} == "compile" ]]; then JOB="${DEFAULT_JOB_PATH}compile-runner.sh"; fi
   if [[ ${arg} == "collatz" ]]; then JOB="${DEFAULT_JOB_PATH}collrunner.sh"; fi
   if [[ ${arg} == "sleep" ]]; then JOB="${DEFAULT_JOB_PATH}sleep.sh"; fi
   if [[ ${arg} == "noexist" ]]; then JOB="${DEFAULT_JOB_PATH}fakejob.sh"; fi
