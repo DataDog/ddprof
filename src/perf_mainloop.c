@@ -22,16 +22,12 @@
 #include "logger.h"
 #include "perf.h"
 #include "pevent.h"
-#include "producer_linearizer.h"
 #include "unwind.h"
 
 #define rmb() __asm__ volatile("lfence" ::: "memory")
 
 #define WORKER_SHUTDOWN()                                                      \
-  {                                                                            \
-    ProducerLinearizer_free(&pl);                                              \
-    return;                                                                    \
-  }
+  { return; }
 
 #define DDRES_CHECK_OR_SHUTDOWN(res, shut_down_process)                        \
   DDRes eval_res = res;                                                        \
@@ -88,14 +84,8 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   // disposition so that profiling is halted upon its termination
   *can_run = false;
 
-  // Setup a ProducerLinearizer for managing the ringbuffer
-  int pe_len = ctx->worker_ctx.pevent_hdr.size;
-  uint64_t i_ev;
-  ProducerLinearizer pl = {0};
-  if (!ProducerLinearizer_init(&pl, pe_len))
-    WORKER_SHUTDOWN();
-
   // Setup poll() to watch perf_event file descriptors
+  int pe_len = ctx->worker_ctx.pevent_hdr.size;
   struct pollfd pfd[MAX_NB_WATCHERS];
   int pfd_len = 0;
   pollfd_setup(&ctx->worker_ctx.pevent_hdr, pfd, &pfd_len);
@@ -103,13 +93,10 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   // Perform user-provided initialization
   DDRES_CHECK_OR_SHUTDOWN(attr->init_fun(ctx), attr->finish_fun(ctx));
 
-  // Setup array to track headers, so we don't need to re-copy elements
-  struct perf_event_header *hdrs[MAX_NB_WATCHERS] = {0};
-
   // Worker poll loop
   while (1) {
+    uint64_t processed_samples = 0;
     int n = poll(pfd, pfd_len, PSAMPLE_DEFAULT_WAKEUP);
-    int processed_samples = 0;
 
     // If there was an issue, return and let the caller check errno
     if (-1 == n && errno == EINTR) {
@@ -125,62 +112,44 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
     // If one of the perf_event_open() feeds was closed by the kernel, shut down
     // profiling
     for (int i = 0; i < pe_len; ++i) {
-      // Even though pollhup might mean that multiple file descriptors (hence,
-      // ringbuffers) are still active, in the typical case, `perf_event_open`
-      // shuts down either all or nothing.  Accordingly, when it shuts down one
-      // file descriptor, we shut down profiling.
+      // This closes profiling when there still may be viable feeds, but we
+      // don't handle that case yet.
       if (pfd[i].revents & POLLHUP) {
         DDRES_GRACEFUL_SHUTDOWN(attr->finish_fun(ctx));
       }
     }
 
-    // While there are events to process, iterate through them.  This strategy
-    // orders the current topmost event from each watcher, which assumes that
-    // within a single watcher conflicting events are ordered properly.  This
-    // seems to be a valid assumption on x86/ARM.
-    while (1) {
+    // While there are events to process, iterate through them.
+    bool events;
+    do {
+      events = false;
       for (int i = 0; i < pe_len; ++i) {
-        // If a watcher is not free, then we already have the oldest time.
-        // Skip it.
-        if (!pl.F[i])
-          continue;
-
         // Memory-ordering safe access of ringbuffer elements
         RingBuffer *rb = &pes[i].rb;
         uint64_t head = rb->region->data_head;
         rmb();
         uint64_t tail = rb->region->data_tail;
+        if (head == tail)
+          continue;
+        events = true;
 
-        if (head > tail) {
-          hdrs[i] = rb_seek(rb, tail);
-          ProducerLinearizer_push(&pl, i,
-                                  hdr_time(hdrs[i], DEFAULT_SAMPLE_TYPE));
+        // Attempt to dispatch the event
+        struct perf_event_header *hdr = rb_seek(rb, tail);
+        DDRes res = ddprof_worker(hdr, pes[i].pos, can_run, ctx);
+
+        // We've processed the current event, so we can advance the ringbuffer
+        rb->region->data_tail += hdr->size;
+
+        // Check for processing error
+        if (IsDDResNotOK(res)) {
+          attr->finish_fun(ctx);
+          WORKER_SHUTDOWN();
+        } else {
+          if (hdr->type == PERF_RECORD_SAMPLE)
+            ++processed_samples;
         }
       }
-
-      // We've iterated through the ringbuffers, populating the
-      // ProducerLinearizer with any new events.  Try to pop one event.  If none
-      // are available, then return to `poll()` and wait.
-      if (!ProducerLinearizer_pop(&pl, &i_ev))
-        break;
-
-      // Attempt to dispatch the event
-      DDRes res = ddprof_worker(hdrs[i_ev], pes[i_ev].pos, can_run, ctx);
-
-      // We've processed the current event, so we can advance the ringbuffer
-      pes[i_ev].rb.region->data_tail += hdrs[i_ev]->size;
-
-      // Continue to check for processing error
-      if (IsDDResNotOK(res)) {
-        attr->finish_fun(ctx);
-        WORKER_SHUTDOWN();
-      } else {
-        // Otherwise, we successfully dispatched an event.  If it was a sample,
-        // then say so
-        if (hdrs[i_ev]->type == PERF_RECORD_SAMPLE)
-          ++processed_samples;
-      }
-    }
+    } while (events);
 
     // If I didn't process any events, then hit the timeout
     if (!processed_samples) {
