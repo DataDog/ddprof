@@ -120,8 +120,9 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
     }
 
     // While there are events to process, iterate through them.
-    bool events = false;
+    bool events;
     do {
+      events = false;
       for (int i = 0; i < pe_len; ++i) {
         // Memory-ordering safe access of ringbuffer elements
         RingBuffer *rb = &pes[i].rb;
