@@ -76,9 +76,9 @@ char* help_str[DD_KLEN] = {
 "    The intake port for the Datadog agent or backend system.\n",
   [DD_SERVICE] =
 "    The name of this service\n",
-  [DD_TAGS] = 
+  [DD_TAGS] =
 "    Tags sent with both profiler metrics and profiles.\n"
-"    Refer to the Datadog tag section to understand what is supported",
+"    Refer to the Datadog tag section to understand what is supported.\n",
   [DD_VERSION] =
 "    Version of the service being profiled. Added to the tags during export.\n",
   [DD_PROFILING_ENABLED] =
