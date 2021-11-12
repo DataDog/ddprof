@@ -246,7 +246,9 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
 
   // If something is pending, return error
   if (ctx->worker_ctx.pending) {
-    const struct timespec waittime = {5, 0}; // arbitrary!
+    struct timespec waittime;
+    clock_gettime(CLOCK_REALTIME, &waittime);
+    waittime.tv_sec += 5;
     if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime))
       return ddres_create(DD_SEVERROR, DD_WHAT_EXPORT_TIMEOUT);
   }
@@ -355,8 +357,10 @@ static DDRes reset_state(DDProfContext *ctx,
     // exports.  If an export is stuck, we have to fail.
     *continue_profiling = true;
     if (ctx->worker_ctx.pending) {
-      const struct timespec waittime = {5, 0}; // arbitrary!
-      if (!pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime))
+      struct timespec waittime;
+      clock_gettime(CLOCK_REALTIME, &waittime);
+      waittime.tv_sec += 5;
+      if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime))
         *continue_profiling = false;
     }
     DDRES_RETURN_WARN_LOG(DD_WHAT_WORKER_RESET, "%s: cnt=%u - stop worker (%s)",
@@ -433,9 +437,12 @@ DDRes ddprof_worker_finish(DDProfContext *ctx) {
     // First, see if there are any outstanding requests and give them a token
     // amount of time to complete
     if (ctx->worker_ctx.pending) {
-      const struct timespec waittime = {5, 0}; // arbitrary!
-      if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime))
+      struct timespec waittime;
+      clock_gettime(CLOCK_REALTIME, &waittime);
+      waittime.tv_sec += 5;
+      if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime)) {
         pthread_cancel(ctx->worker_ctx.exp_tid);
+      }
     }
 
     DDRES_CHECK_FWD(worker_unwind_free(ctx));
