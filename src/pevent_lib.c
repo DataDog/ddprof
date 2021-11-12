@@ -59,7 +59,7 @@ DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
       size_t reg_sz = 0;
       void *region = perfown(pes[k].fd, &reg_sz);
       if (!region) {
-        LG_ERR("Could not finalize watcher (idx#%d): registration (%s)", k,
+        LG_WRN("Could not finalize watcher (idx#%d): registration (%s)", k,
                strerror(errno));
         goto REGION_CLEANUP;
       }
