@@ -253,7 +253,7 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
   if (ctx->worker_ctx.pending) {
     struct timespec waittime;
     clock_gettime(CLOCK_REALTIME, &waittime);
-    waittime.tv_sec += 5;
+    waittime.tv_sec += 60;
     if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime)) {
       LG_WRN("Exporter took too long");
       return ddres_create(DD_SEVERROR, DD_WHAT_EXPORT_TIMEOUT);
