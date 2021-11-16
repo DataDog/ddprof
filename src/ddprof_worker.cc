@@ -206,7 +206,6 @@ static void ddprof_reset_worker_stats(DsoHdr *dso_hdr) {
 
 #ifndef DDPROF_NATIVE_LIB
 void *ddprof_worker_export_thread(void *arg) {
-  LG_NFO("Entering worker thread.");
   DDProfWorkerContext *worker = (DDProfWorkerContext *)arg;
   int i = worker->i_export;
 
@@ -367,9 +366,11 @@ static DDRes reset_state(DDProfContext *ctx,
     if (ctx->worker_ctx.pending) {
       struct timespec waittime;
       clock_gettime(CLOCK_REALTIME, &waittime);
-      waittime.tv_sec += 5;
-      if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime))
+      waittime.tv_sec += 60; // wait up to a minute?
+      if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime)) {
         *continue_profiling = false;
+        LG_WRN("export failed to complete in time");
+      }
     }
     DDRES_RETURN_WARN_LOG(DD_WHAT_WORKER_RESET, "%s: cnt=%u - stop worker (%s)",
                           __FUNCTION__, ctx->worker_ctx.count_worker,
