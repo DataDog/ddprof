@@ -206,11 +206,13 @@ static void ddprof_reset_worker_stats(DsoHdr *dso_hdr) {
 
 #ifndef DDPROF_NATIVE_LIB
 void *ddprof_worker_export_thread(void *arg) {
+  LG_NFO("Entering worker thread.");
   DDProfWorkerContext *worker = (DDProfWorkerContext *)arg;
   int i = worker->i_export;
 
   if (IsDDResNotOK(
           ddprof_exporter_export(worker->pprof[i]->_profile, worker->exp[i]))) {
+    LG_NFO("Failed to export from worker");
     worker->exp_error = true;
     worker->pending = false;
     return nullptr;
@@ -253,8 +255,10 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
     struct timespec waittime;
     clock_gettime(CLOCK_REALTIME, &waittime);
     waittime.tv_sec += 5;
-    if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime))
+    if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime)) {
+      LG_WRN("Exporter took too long");
       return ddres_create(DD_SEVERROR, DD_WHAT_EXPORT_TIMEOUT);
+    }
   }
   if (ctx->worker_ctx.exp_error)
     return ddres_create(DD_SEVERROR, DD_WHAT_EXPORTER);
