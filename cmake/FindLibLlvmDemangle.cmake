@@ -20,7 +20,9 @@ set(LLVM_DEMANGLE_SRC_FILES
     ${LLVM_DEMANGLE_SRC}/ItaniumDemangle.cpp
     ${LLVM_DEMANGLE_SRC}/MicrosoftDemangle.cpp
     ${LLVM_DEMANGLE_SRC}/MicrosoftDemangleNodes.cpp
-    ${LLVM_DEMANGLE_SRC}/RustDemangle.cpp)
+    ${LLVM_DEMANGLE_SRC}/RustDemangle.cpp
+    ${LLVM_DEMANGLE_SRC}/DLangDemangle.cpp
+    )
 
 add_custom_command(OUTPUT ${LLVM_DEMANGLE_SRC_FILES}
                    COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_llvm_demangler.sh"

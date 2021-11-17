@@ -4,7 +4,7 @@
 # libddprof : common profiler imported libraries
 ## Associated https://gitlab.ddbuild.io/DataDog/libddprof-build/-/jobs/90384402
 set(VER_LIBDDPROF "64823667" CACHE STRING "libddprof version")
-set(SHA256_LIBDDPROF "2f9ff46eca0acb1729f5a695a04b1b0d11abce91565bc18cdf8883a9870a55d6" CACHE STRING "libddprof sha256")
+set(SHA256_LIBDDPROF "3bfe61553a9665c029e372ebad052d0545de4eb8b43e1d0958edd6680e4e7f4f" CACHE STRING "libddprof sha256")
 
 set(LIBDDPROF_REL_FFI_LIB ${CMAKE_SOURCE_DIR}/vendor/libddprof/x86_64-unknown-linux-gnu/lib/libddprof_ffi.a)
 set(LIBDDPROF_CMAKE_SCRIPT ${CMAKE_SOURCE_DIR}/vendor/libddprof/x86_64-unknown-linux-gnu/cmake/DDProfConfig.cmake)
