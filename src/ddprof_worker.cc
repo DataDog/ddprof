@@ -35,6 +35,8 @@ extern "C" {
 #  include <jemalloc/jemalloc.h>
 #endif
 
+#define DDPROF_EXPORT_TIMEOUT_MAX 60
+
 using namespace ddprof;
 
 static const DDPROF_STATS s_cycled_stats[] = {STATS_UNWIND_TICKS,
@@ -253,7 +255,9 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
   if (ctx->worker_ctx.pending) {
     struct timespec waittime;
     clock_gettime(CLOCK_REALTIME, &waittime);
-    waittime.tv_sec += 60;
+    int waitsec = DDPROF_EXPORT_TIMEOUT_MAX - ctx->params.upload_period;
+    waitsec = waitsec > 1 ? waitsec : 1;
+    waittime.tv_sec += waitsec;
     if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime)) {
       LG_WRN("Exporter took too long");
       return ddres_create(DD_SEVERROR, DD_WHAT_EXPORT_TIMEOUT);
@@ -366,7 +370,9 @@ static DDRes reset_state(DDProfContext *ctx,
     if (ctx->worker_ctx.pending) {
       struct timespec waittime;
       clock_gettime(CLOCK_REALTIME, &waittime);
-      waittime.tv_sec += 60; // wait up to a minute?
+      int waitsec = DDPROF_EXPORT_TIMEOUT_MAX - ctx->params.upload_period;
+      waitsec = waitsec > 1 ? waitsec : 1;
+      waittime.tv_sec += waitsec;
       if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime)) {
         *continue_profiling = false;
         LG_WRN("export failed to complete in time");
