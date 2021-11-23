@@ -186,6 +186,7 @@ test:ddprof:
     # Test with the matching libc version
     - export LIBC_VERSION=`ldd --version | head -n 1 | awk '{print $NF}'`
     - export BINDIR="./${BINPATH}/${LIBC_TYPE}/${LIBC_VERSION}/${BUILD_TYPE}/bin"
+    - export RUST_BACKTRACE=1
     - echo "CHECK USER" && id
     - echo "CHECK SETTING ON PERF EVENT PARANOID" && cat /proc/sys/kernel/perf_event_paranoid
     - echo "CHECK SETTING ON PINNED MEMORY" && ulimit -l

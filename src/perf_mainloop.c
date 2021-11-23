@@ -153,8 +153,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
 
     // If I didn't process any events, then hit the timeout
     if (!processed_samples) {
-      DDRes res = ddprof_worker_timeout(can_run, ctx);
-      if (IsDDResNotOK(res)) {
+      if (IsDDResNotOK(ddprof_worker_timeout(can_run, ctx))) {
         attr->finish_fun(ctx);
         WORKER_SHUTDOWN();
       }

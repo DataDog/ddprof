@@ -12,7 +12,7 @@ TOP_LVL_DIR=$PWD
 cd $CURRENTDIR
 
 # Find most recent clang-format, defaulting to an unqualified default
-CLANG_FORMAT=$(command -v clang-format{-12,-11,-10,-9,} | head -n 1)
+CLANG_FORMAT=$(command -v clang-format{-13,-12,-11,-10,-9,} | head -n 1)
 if ! command -v "${CLANG_FORMAT}" > /dev/null 2>&1; then
   echo "No suitable clang-format found"
   exit 1

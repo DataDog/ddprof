@@ -62,8 +62,11 @@
 #define STR_UNDF (char*)1
 char* help_str[DD_KLEN] = {
   [DD_API_KEY] =
-"    A valid Datadog API key.  Passing the API key will cause "MYNAME" to bypass\n"
-"    the Datadog agent.  Do NOT specify if you are running with an agent!\n",
+"    A valid Datadog API key.  This is an experimental feature intended for\n",
+"    testing; do not use in agent-based configurations, as the agent will be\n",
+"    bypassed when an API key is given.  In addition, expect the following:\n",
+"      * TCP port 443 will be used, regardless of whether a `--port` was given\n",
+"      * The given agent host will be expanded to intake.profile.$HOST\n",
   [DD_ENV] =
 "    The name of the environment to use in the Datadog UI.\n",
   [DD_AGENT_HOST] =
@@ -76,9 +79,9 @@ char* help_str[DD_KLEN] = {
 "    The intake port for the Datadog agent or backend system.\n",
   [DD_SERVICE] =
 "    The name of this service\n",
-  [DD_TAGS] = 
+  [DD_TAGS] =
 "    Tags sent with both profiler metrics and profiles.\n"
-"    Refer to the Datadog tag section to understand what is supported",
+"    Refer to the Datadog tag section to understand what is supported.\n",
   [DD_VERSION] =
 "    Version of the service being profiled. Added to the tags during export.\n",
   [DD_PROFILING_ENABLED] =

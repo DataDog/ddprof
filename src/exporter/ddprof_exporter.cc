@@ -211,6 +211,7 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
 }
 
 static DDRes check_send_response_code(uint16_t send_response_code) {
+  LG_DBG("[EXPORTER] HTTP Response code: %u", send_response_code);
   if (send_response_code >= 200 && send_response_code < 300) {
     // Although we expect only 200, this range represents sucessful sends
     if (send_response_code != 200) {
@@ -274,6 +275,7 @@ DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
       struct ddprof_ffi_SendResult result =
           ddprof_ffi_ProfileExporterV3_send(exporter->_exporter, request);
 
+      LG_NFO("[EXPORTER] Request tag value: %u", result.tag);
       if (result.tag == DDPROF_FFI_SEND_RESULT_FAILURE) {
         LG_WRN("Failure to establish connection - check url %s",
                exporter->_url);

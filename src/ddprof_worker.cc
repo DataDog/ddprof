@@ -35,6 +35,8 @@ extern "C" {
 #  include <jemalloc/jemalloc.h>
 #endif
 
+#define DDPROF_EXPORT_TIMEOUT_MAX 60
+
 using namespace ddprof;
 
 static const DDPROF_STATS s_cycled_stats[] = {STATS_UNWIND_TICKS,
@@ -81,6 +83,9 @@ DDRes worker_unwind_init(DDProfContext *ctx) {
     export_time_set(ctx);
     // Make sure worker-related counters are reset
     ctx->worker_ctx.count_worker = 0;
+    // Make sure worker index is initialized correctly
+    ctx->worker_ctx.i_export = 0;
+    ctx->worker_ctx.exp_tid = {0};
 
     ctx->worker_ctx.us = (UnwindState *)calloc(1, sizeof(UnwindState));
     if (!ctx->worker_ctx.us) {
@@ -101,6 +106,12 @@ DDRes worker_unwind_init(DDProfContext *ctx) {
     DDRES_CHECK_FWD(unwind_init(ctx->worker_ctx.us));
     ctx->worker_ctx.user_tags =
         new UserTags(ctx->params.tags, ctx->params.num_cpu);
+
+    // Zero out pointers to dynamically allocated memory
+    ctx->worker_ctx.exp[0] = nullptr;
+    ctx->worker_ctx.exp[1] = nullptr;
+    ctx->worker_ctx.pprof[0] = nullptr;
+    ctx->worker_ctx.pprof[1] = nullptr;
   }
   CatchExcept2DDRes();
   return ddres_init();
@@ -166,7 +177,8 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   if (!IsDDResFatal(res)) {
 #ifndef DDPROF_NATIVE_LIB
     // in lib mode we don't aggregate (protect to avoid link failures)
-    DDProfPProf *pprof = ctx->worker_ctx.pprof;
+    int i_export = ctx->worker_ctx.i_export;
+    DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
     DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbols_hdr,
                                     sample->period, pos, pprof));
 #else
@@ -194,6 +206,28 @@ static void ddprof_reset_worker_stats(DsoHdr *dso_hdr) {
   unwind_metrics_reset();
 }
 
+#ifndef DDPROF_NATIVE_LIB
+void *ddprof_worker_export_thread(void *arg) {
+  DDProfWorkerContext *worker = (DDProfWorkerContext *)arg;
+  int i = worker->i_export;
+
+  if (IsDDResNotOK(
+          ddprof_exporter_export(worker->pprof[i]->_profile, worker->exp[i]))) {
+    LG_NFO("Failed to export from worker");
+    worker->exp_error = true;
+    worker->pending = false;
+    return nullptr;
+  }
+
+  if (IsDDResNotOK(pprof_reset(worker->pprof[i]))) {
+    worker->exp_error = true;
+    worker->pending = false;
+  }
+
+  return nullptr;
+}
+#endif
+
 /// Cycle operations : export, sync metrics, update counters
 static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
 
@@ -203,14 +237,41 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
 
   // And emit diagnostic output (if it's enabled)
   print_diagnostics(ctx->worker_ctx.us->dso_hdr);
-  DDRES_CHECK_FWD(ddprof_stats_send(ctx->params.internalstats));
+  if (IsDDResNotOK(ddprof_stats_send(ctx->params.internalstats))) {
+    LG_WRN("Unable to utilize to statsd socket.  Suppressing future stats.");
+    free((void *)ctx->params.internalstats);
+    ctx->params.internalstats = NULL;
+  }
 
 #ifndef DDPROF_NATIVE_LIB
   // Take the current pprof contents and ship them to the backend.  This also
   // clears the pprof for reuse
-  DDRES_CHECK_FWD(ddprof_exporter_export(ctx->worker_ctx.pprof->_profile,
-                                         ctx->worker_ctx.exp));
-  DDRES_CHECK_FWD(pprof_reset(ctx->worker_ctx.pprof));
+  // Dispatch happens in a thread, with the underlying data structure for
+  // aggregation rotating between exports.  If we return to this point before
+  // the previous thread has finished,  we wait for up to five seconds before
+  // failing
+
+  // If something is pending, return error
+  if (ctx->worker_ctx.pending) {
+    struct timespec waittime;
+    clock_gettime(CLOCK_REALTIME, &waittime);
+    int waitsec = DDPROF_EXPORT_TIMEOUT_MAX - ctx->params.upload_period;
+    waitsec = waitsec > 1 ? waitsec : 1;
+    waittime.tv_sec += waitsec;
+    if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime)) {
+      LG_WRN("Exporter took too long");
+      return ddres_create(DD_SEVERROR, DD_WHAT_EXPORT_TIMEOUT);
+    }
+  }
+  if (ctx->worker_ctx.exp_error)
+    return ddres_create(DD_SEVERROR, DD_WHAT_EXPORTER);
+
+  // Dispatch to thread
+  ctx->worker_ctx.pending = true;
+  ctx->worker_ctx.exp_error = false;
+  ctx->worker_ctx.i_export = !!ctx->worker_ctx.i_export;
+  pthread_create(&ctx->worker_ctx.exp_tid, NULL, ddprof_worker_export_thread,
+                 &ctx->worker_ctx);
 
 #endif
 
@@ -302,7 +363,21 @@ static DDRes reset_state(DDProfContext *ctx,
   //       2. new worker should be initialized with a fresh state, so clearing
   //          it here is irrelevant anyway
   if (ctx->params.worker_period <= ctx->worker_ctx.count_worker) {
+
+    // We have to return, but before we can do so we need to check for pending
+    // exports.  If an export is stuck, we have to fail.
     *continue_profiling = true;
+    if (ctx->worker_ctx.pending) {
+      struct timespec waittime;
+      clock_gettime(CLOCK_REALTIME, &waittime);
+      int waitsec = DDPROF_EXPORT_TIMEOUT_MAX - ctx->params.upload_period;
+      waitsec = waitsec > 1 ? waitsec : 1;
+      waittime.tv_sec += waitsec;
+      if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime)) {
+        *continue_profiling = false;
+        LG_WRN("export failed to complete in time");
+      }
+    }
     DDRES_RETURN_WARN_LOG(DD_WHAT_WORKER_RESET, "%s: cnt=%u - stop worker (%s)",
                           __FUNCTION__, ctx->worker_ctx.count_worker,
                           (*continue_profiling) ? "continue" : "stop");
@@ -334,21 +409,39 @@ DDRes ddprof_worker_timeout(volatile bool *continue_profiling,
 DDRes ddprof_worker_init(DDProfContext *ctx) {
   try {
     DDRES_CHECK_FWD(worker_unwind_init(ctx));
-    ctx->worker_ctx.exp = (DDProfExporter *)calloc(1, sizeof(DDProfExporter));
-    if (!ctx->worker_ctx.exp) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error when creating exporter");
+    ctx->worker_ctx.exp[0] =
+        (DDProfExporter *)calloc(1, sizeof(DDProfExporter));
+    ctx->worker_ctx.exp[1] =
+        (DDProfExporter *)calloc(1, sizeof(DDProfExporter));
+    ctx->worker_ctx.pprof[0] = (DDProfPProf *)calloc(1, sizeof(DDProfPProf));
+    ctx->worker_ctx.pprof[1] = (DDProfPProf *)calloc(1, sizeof(DDProfPProf));
+    if (!ctx->worker_ctx.exp[0] || !ctx->worker_ctx.exp[1]) {
+      free(ctx->worker_ctx.exp[0]);
+      free(ctx->worker_ctx.exp[1]);
+      free(ctx->worker_ctx.pprof[0]);
+      free(ctx->worker_ctx.pprof[1]);
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error creating exporter");
     }
-    ctx->worker_ctx.pprof = (DDProfPProf *)calloc(1, sizeof(DDProfPProf));
-    if (!ctx->worker_ctx.pprof) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
-                             "Error when creating pprof structure");
+    if (!ctx->worker_ctx.pprof[0] || !ctx->worker_ctx.pprof[1]) {
+      free(ctx->worker_ctx.exp[0]);
+      free(ctx->worker_ctx.exp[1]);
+      free(ctx->worker_ctx.pprof[0]);
+      free(ctx->worker_ctx.pprof[1]);
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error creating pprof holder");
     }
-    DDRES_CHECK_FWD(ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp));
+    DDRES_CHECK_FWD(
+        ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp[0]));
+    DDRES_CHECK_FWD(
+        ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp[1]));
     // warning : depends on unwind init
     DDRES_CHECK_FWD(
-        ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp));
-    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof, ctx->watchers,
-                                         ctx->num_watchers));
+        ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[0]));
+    DDRES_CHECK_FWD(
+        ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[1]));
+    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[0],
+                                         ctx->watchers, ctx->num_watchers));
+    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[1],
+                                         ctx->watchers, ctx->num_watchers));
   }
   CatchExcept2DDRes();
   return ddres_init();
@@ -356,16 +449,29 @@ DDRes ddprof_worker_init(DDProfContext *ctx) {
 
 DDRes ddprof_worker_finish(DDProfContext *ctx) {
   try {
-    DDRES_CHECK_FWD(worker_unwind_free(ctx));
-    if (ctx->worker_ctx.exp) {
-      DDRES_CHECK_FWD(ddprof_exporter_free(ctx->worker_ctx.exp));
-      free(ctx->worker_ctx.exp);
-      ctx->worker_ctx.exp = nullptr;
+    // First, see if there are any outstanding requests and give them a token
+    // amount of time to complete
+    if (ctx->worker_ctx.pending) {
+      struct timespec waittime;
+      clock_gettime(CLOCK_REALTIME, &waittime);
+      waittime.tv_sec += 5;
+      if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime)) {
+        pthread_cancel(ctx->worker_ctx.exp_tid);
+      }
     }
-    if (ctx->worker_ctx.pprof) {
-      DDRES_CHECK_FWD(pprof_free_profile(ctx->worker_ctx.pprof));
-      free(ctx->worker_ctx.pprof);
-      ctx->worker_ctx.pprof = nullptr;
+
+    DDRES_CHECK_FWD(worker_unwind_free(ctx));
+    for (int i = 0; i < 2; i++) {
+      if (ctx->worker_ctx.exp[i]) {
+        DDRES_CHECK_FWD(ddprof_exporter_free(ctx->worker_ctx.exp[i]));
+        free(ctx->worker_ctx.exp[i]);
+        ctx->worker_ctx.exp[i] = nullptr;
+      }
+      if (ctx->worker_ctx.pprof[i]) {
+        DDRES_CHECK_FWD(pprof_free_profile(ctx->worker_ctx.pprof[i]));
+        free(ctx->worker_ctx.pprof[i]);
+        ctx->worker_ctx.pprof[i] = nullptr;
+      }
     }
   }
   CatchExcept2DDRes();
