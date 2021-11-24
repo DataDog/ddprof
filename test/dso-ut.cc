@@ -301,8 +301,20 @@ TEST(DSOTest, backpopulate) {
   ASSERT_TRUE(find_res.second);
   // check that string dso-ut is contained in the dso
   EXPECT_TRUE(find_res.first->_filename.find(MYNAME) != std::string::npos);
+  // check that we match the local binary
+  std::string path_bin = dso_hdr.get_path_to_binary(*find_res.first);
+  EXPECT_EQ(path_bin, find_res.first->_filename);
   dso_hdr._set.erase(find_res.first);
   find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
   EXPECT_FALSE(find_res.second);
 }
+
+TEST(DSOTest, missing_dso) {
+  LogHandle loghandle;
+  DsoHdr dso_hdr;
+  Dso foo_dso = build_dso_5_1500();
+  std::string path_bin = dso_hdr.get_path_to_binary(foo_dso);
+  EXPECT_TRUE(path_bin.empty());
+}
+
 } // namespace ddprof

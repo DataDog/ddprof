@@ -8,21 +8,24 @@
 extern "C" {
 #include "ddprof_defs.h"
 #include "logger.h"
+#include "procutils.h"
 #include "signal_helper.h"
 }
 #include "ddres.h"
 #include <cassert>
 #include <numeric>
 
-static FILE *procfs_map_open(int pid) {
+static FILE *procfs_map_open(int pid, const char *path_to_proc = "") {
   char buf[1024] = {0};
-  snprintf(buf, 1024, "/proc/%d/maps", pid);
+  snprintf(buf, 1024, "%s/proc/%d/maps", path_to_proc, pid);
   return fopen(buf, "r");
 }
 
 namespace {
 struct ProcFileHolder {
-  explicit ProcFileHolder(int pid) { _mpf = procfs_map_open(pid); }
+  explicit ProcFileHolder(int pid, const std::string &path_to_proc = "") {
+    _mpf = procfs_map_open(pid, path_to_proc.c_str());
+  }
   ~ProcFileHolder() {
     if (_mpf)
       fclose(_mpf);
@@ -48,8 +51,9 @@ static bool ip_in_procline(char *line, uint64_t ip) {
 }
 
 #ifndef NDEBUG
-static void pid_find_ip(int pid, uint64_t ip) {
-  ProcFileHolder file_holder(pid);
+static void pid_find_ip(int pid, uint64_t ip,
+                        const std::string &path_to_proc = "") {
+  ProcFileHolder file_holder(pid, path_to_proc);
   FILE *mpf = file_holder._mpf;
   if (!mpf) {
     if (process_is_alive(pid))
@@ -115,6 +119,14 @@ using ddprof::DsoStats;
 /**********/
 /* DsoHdr */
 /**********/
+DsoHdr::DsoHdr() : _next_dso_id(0) {
+  // Test different places for existence of /proc
+  if (check_file_type("/host/proc", S_IFDIR)) {
+    // In Datadog we often mount to /host
+    _path_to_proc = "/host";
+  }
+}
+
 DsoFindRes DsoHdr::dso_find_first_std_executable(pid_t pid) const {
   Dso temp_dso(pid, 0, 0);
   DsoSetConstIt it = _set.lower_bound(temp_dso);
@@ -274,6 +286,11 @@ DsoFindRes DsoHdr::insert_erase_overlap(ddprof::Dso &&dso) {
 }
 
 DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr) {
+  if (addr < 4095) {
+    LG_DBG("[DSO] Skipping 0 page");
+    return find_res_not_found();
+  }
+
   DsoFindRes find_res = dso_find_closest(pid, addr);
   if (!find_res.second) { // backpopulate
     // Following line creates the state for pid if it does not exist
@@ -289,7 +306,7 @@ DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr) {
       }
 #ifndef NDEBUG
       if (!find_res.second) { // debug info
-        pid_find_ip(pid, addr);
+        pid_find_ip(pid, addr, _path_to_proc);
       }
 #endif
     }
@@ -301,15 +318,8 @@ DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr) {
 DsoFindRes DsoHdr::pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
   assert(buf);
   assert(sz > 0);
-  DsoFindRes find_res = std::make_pair<DsoSetIt, bool>(_set.end(), false);
 
-  // Can skip the zero page
-  if (addr < 4095) {
-    LG_DBG("[DSO] Skipping 0 page");
-    return find_res;
-  }
-
-  find_res = dso_find_or_backpopulate(pid, addr);
+  DsoFindRes find_res = dso_find_or_backpopulate(pid, addr);
   if (!find_res.second) {
     return find_res;
   }
@@ -376,7 +386,7 @@ void DsoHdr::pid_free(int pid) {
 // elements
 bool DsoHdr::pid_backpopulate(int pid, int &nb_elts_added) {
   nb_elts_added = 0;
-  ProcFileHolder proc_file_holder(pid);
+  ProcFileHolder proc_file_holder(pid, _path_to_proc);
   LG_NTC("[DSO] Backpopulating PID %d", pid);
   FILE *mpf = proc_file_holder._mpf;
   if (!mpf) {
@@ -442,4 +452,21 @@ Dso DsoHdr::dso_from_procline(int pid, char *line) {
 
   // Should we store non exec dso ?
   return Dso(pid, m_start, m_end - 1, m_off, std::string(p), 'x' == m_mode[2]);
+}
+
+std::string DsoHdr::get_path_to_binary(const ddprof::Dso &dso) {
+  // check if file exists locally
+  if (check_file_type(dso._filename.c_str(), S_IFMT)) {
+    return dso._filename;
+  }
+  // whole host :
+  // Example : /proc/<pid>/root/usr/local/bin/exe_file
+  //   or      /host/proc/<pid>/root/usr/local/bin/exe_file
+  std::string proc_path = _path_to_proc + "/proc/" + std::to_string(dso._pid) +
+      "/root" + dso._filename;
+  if (check_file_type(proc_path.c_str(), S_IFMT)) {
+    return proc_path;
+  }
+  LG_DBG("[DSO] Unable to find path to %s", dso._filename.c_str());
+  return std::string();
 }

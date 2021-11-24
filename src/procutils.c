@@ -7,6 +7,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "logger.h"
@@ -45,4 +47,15 @@ DDRes proc_read(ProcStatus *procstat) {
   }
   fclose(ststream);
   return ddres_init();
+}
+
+bool check_file_type(const char *pathname, int file_type) {
+  struct stat info;
+
+  if (stat(pathname, &info) != 0) {
+    return false;
+  } else if (info.st_mode & file_type) {
+    return true;
+  }
+  return false;
 }

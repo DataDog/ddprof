@@ -8,7 +8,11 @@
 #include "ddres.h"
 #include "proc_status.h"
 
+#include <sys/stat.h>
 #include <sys/types.h>
 
 // Get internal stats from /proc/self/stat
 DDRes proc_read(ProcStatus *);
+
+// check sys types for the different types (S_IFLNK, S_IFDIR...)
+bool check_file_type(const char *pathname, int file_type);

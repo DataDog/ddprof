@@ -7,6 +7,7 @@
 
 extern "C" {
 #include "procutils.h"
+#include <unistd.h>
 }
 
 TEST(ProcUtilsTest, proc_read) {
@@ -18,4 +19,15 @@ TEST(ProcUtilsTest, proc_read) {
   printf("rss: %lu\n", procstat.rss);
   printf("user: %lu\n", procstat.utime);
   printf("cuser: %lu\n", procstat.cutime);
+}
+
+TEST(ProcUtilsTest, check_file_type) {
+  char buf[1024] = {0};
+  snprintf(buf, 1024, "/proc/%d/maps", getpid());
+  ASSERT_TRUE(check_file_type(buf, S_IFMT));
+  ASSERT_FALSE(check_file_type(buf, S_IFDIR));
+  snprintf(buf, 1024, "/proc/%d", getpid());
+  // directory are also files
+  ASSERT_TRUE(check_file_type(buf, S_IFMT));
+  ASSERT_TRUE(check_file_type(buf, S_IFDIR));
 }

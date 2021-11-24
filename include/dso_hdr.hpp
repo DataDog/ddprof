@@ -81,7 +81,7 @@ struct BackpopulateState {
 typedef std::unordered_map<pid_t, BackpopulateState> BackpopulateStateMap;
 
 struct DsoHdr {
-  DsoHdr() : _next_dso_id(0) {}
+  DsoHdr();
 
   /******* MAIN APIS **********/
   // Add the element check for overlap and remove them
@@ -128,6 +128,9 @@ struct DsoHdr {
 
   DsoUID_t find_or_add_dso_uid(const ddprof::Dso &dso);
 
+  // returns an empty string if it can't find the binary
+  std::string get_path_to_binary(const ddprof::Dso &dso);
+
   /********* Region helpers ***********/
   const ddprof::RegionHolder &find_or_insert_region(const ddprof::Dso &dso);
 
@@ -138,4 +141,6 @@ struct DsoHdr {
   // Associate unique IDs even for different PIDs
   std::unordered_map<ddprof::RegionKey, DsoUID_t> _dso_uid_map;
   DsoUID_t _next_dso_id;
+  // /proc files can be mounted at various places (whole host profiling)
+  std::string _path_to_proc;
 };

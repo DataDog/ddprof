@@ -45,14 +45,17 @@ DsoMod update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, ProcessAddress_t pc) {
     }
   }
 
-  // Try again if either of the criteria above were false
-  if (!dso_mod_res._dwfl_mod) {
-    const char *dso_filepath = dso._filename.c_str();
-    LG_DBG("Invalid mod (%s), PID %d (%s)", dso_filepath, pid, dwfl_errmsg(-1));
-    if (dso._type == ddprof::dso::kStandard) {
-      const char *dso_name = strrchr(dso_filepath, '/') + 1;
-      dso_mod_res._dwfl_mod = dwfl_report_elf(dwfl, dso_name, dso_filepath, -1,
-                                              dso._start - dso._pgoff, false);
+  // Try again if either if we failed to hit the dwfl cache above
+  if (!dso_mod_res._dwfl_mod && dso._type == ddprof::dso::kStandard) {
+    // assumption is that this string is built only once
+    const std::string filepath = dso_hdr->get_path_to_binary(dso);
+    if (!filepath.empty()) {
+      const char *dso_name = strrchr(filepath.c_str(), '/') + 1;
+      // Try again within this POD's filesystem
+      LG_DBG("Invalid mod (%s), PID %d (%s)", filepath.c_str(), pid,
+             dwfl_errmsg(-1));
+      dso_mod_res._dwfl_mod = dwfl_report_elf(
+          dwfl, dso_name, filepath.c_str(), -1, dso._start - dso._pgoff, false);
     }
   }
   if (!dso_mod_res._dwfl_mod) {
