@@ -20,6 +20,8 @@ static const std::string s_stack_str = "[stack]";
 static const std::string s_heap_str = "[heap]";
 // anon and empty are the same (one comes from perf, the other from proc maps)
 static const std::string s_anon_str = "//anon";
+// Example of these include : anon_inode:[perf_event]
+static const std::string s_anon_inode_str = "anon_inode";
 
 // invalid element
 Dso::Dso()
@@ -41,7 +43,9 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
     _type = dso::kHeap;
     // Safeguard against other types of files we would not handle
   } else if (_filename.empty() ||
-             _filename.substr(0, s_anon_str.length()) == s_anon_str) {
+             _filename.substr(0, s_anon_str.length()) == s_anon_str ||
+             _filename.substr(0, s_anon_inode_str.length()) ==
+                 s_anon_inode_str) {
     _type = dso::kAnon;
   } else if (_filename[0] == '[') {
     _type = dso::kUndef;

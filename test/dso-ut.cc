@@ -222,6 +222,7 @@ static const char *s_exec_line4 = "55d788391000-55d7883a1000 r-xp 00002000 fe:01
 static const char *s_line_noexec = "7f531437a000-7f531437b000 r--p 00000000 fe:01 3932979                    /usr/lib/x86_64-linux-gnu/ld-2.31.so";
 static const char *s_vdso_lib = "7ffcd6ce6000-7ffcd6ce8000 r-xp 00000000 00:00 0                          [vdso]";
 static const char *s_stack_line = "7ffcd6c68000-7ffcd6c89000 rw-p 00000000 00:00 0                          [stack]";
+static const char *s_inode_line = "7ffcd6c89000-7ffcd6c92000 rw-p 00000000 00:00 0                          anon_inode:[perf_event]";
 
 // clang-format on
 
@@ -234,19 +235,30 @@ TEST(DSOTest, dso_from_procline) {
   EXPECT_EQ(no_exec._type, dso::kStandard);
   EXPECT_EQ(no_exec._executable, false);
   EXPECT_EQ(no_exec._pid, 10);
-
   Dso standard_dso =
       DsoHdr::dso_from_procline(10, const_cast<char *>(s_exec_line));
-  std::cerr << standard_dso;
-  EXPECT_EQ(standard_dso._type, dso::kStandard);
-  Dso vdso_dso = DsoHdr::dso_from_procline(10, const_cast<char *>(s_vdso_lib));
-  std::cerr << vdso_dso;
-  EXPECT_EQ(vdso_dso._type, dso::kVdso);
-  Dso stack_dso =
-      DsoHdr::dso_from_procline(10, const_cast<char *>(s_stack_line));
-  std::cerr << stack_dso;
-  EXPECT_EQ(stack_dso._type, dso::kStack);
-
+  { // standard
+    std::cerr << standard_dso;
+    EXPECT_EQ(standard_dso._type, dso::kStandard);
+  }
+  { // vdso
+    Dso vdso_dso =
+        DsoHdr::dso_from_procline(10, const_cast<char *>(s_vdso_lib));
+    std::cerr << vdso_dso;
+    EXPECT_EQ(vdso_dso._type, dso::kVdso);
+  }
+  { // stack
+    Dso stack_dso =
+        DsoHdr::dso_from_procline(10, const_cast<char *>(s_stack_line));
+    std::cerr << stack_dso;
+    EXPECT_EQ(stack_dso._type, dso::kStack);
+  }
+  { // inode
+    Dso inode_dso =
+        DsoHdr::dso_from_procline(10, const_cast<char *>(s_inode_line));
+    std::cerr << inode_dso;
+    EXPECT_EQ(inode_dso._type, dso::kAnon);
+  }
   DsoHdr dso_hdr;
   {
     // check that we don't overlap between lines that end on same byte
