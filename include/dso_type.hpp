@@ -15,6 +15,7 @@ enum DsoType {
   kHeap,
   kUndef,
   kAnon,
+  kSocket,
   kNbDsoTypes
 };
 
@@ -35,6 +36,8 @@ static inline const char *dso_type_str(DsoType path_type) {
     return "Undefined";
   case kAnon:
     return "Anonymous";
+  case kSocket:
+    return "kSocket";
   default:
     break;
   }
