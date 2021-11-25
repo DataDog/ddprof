@@ -9,12 +9,12 @@ extern "C" {
 #include "dwfl_internals.h"
 #include "logger.h"
 }
-#include "unwind_symbols.hpp"
+#include "symbol_hdr.hpp"
 
 namespace ddprof {
 DsoMod update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, ProcessAddress_t pc) {
   if (!dwfl)
-    return DsoMod(dso_hdr->find_res_not_found());
+    return DsoMod(dso_hdr->find_res_not_found(pid));
 
   // Lookup DSO
   DsoMod dso_mod_res(dso_hdr->dso_find_or_backpopulate(pid, pc));
@@ -70,7 +70,7 @@ DsoMod update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, ProcessAddress_t pc) {
 
 SymbolIdx_t add_dwfl_frame(UnwindState *us, DsoMod dso_mod, ElfAddress_t pc) {
   Dwfl_Module *mod = dso_mod._dwfl_mod;
-  UnwindSymbolsHdr *unwind_symbol_hdr = us->symbols_hdr;
+  SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
   // if we are here, we can assume we found a dso
   assert(dso_mod._dso_find_res.second);
   const Dso &dso = *dso_mod._dso_find_res.first;
@@ -79,21 +79,20 @@ SymbolIdx_t add_dwfl_frame(UnwindState *us, DsoMod dso_mod, ElfAddress_t pc) {
   int64_t current_loc_idx = output->nb_locs;
 
   output->locs[current_loc_idx]._symbol_idx =
-      unwind_symbol_hdr->_dwfl_symbol_lookup_v2.get_or_insert(
-          unwind_symbol_hdr->_symbol_table,
-          unwind_symbol_hdr->_dso_symbol_lookup, mod, pc, dso);
+      unwind_symbol_hdr._dwfl_symbol_lookup_v2.get_or_insert(
+          unwind_symbol_hdr._symbol_table, unwind_symbol_hdr._dso_symbol_lookup,
+          mod, pc, dso);
 #ifdef DEBUG
-  LG_NTC(
-      "Considering frame with IP : %lx / %s ", pc,
-      us->symbols_hdr->_symbol_table[output->locs[current_loc_idx]._symbol_idx]
-          ._symname.c_str());
+  LG_NTC("Considering frame with IP : %lx / %s ", pc,
+         us->symbol_hdr._symbol_table[output->locs[current_loc_idx]._symbol_idx]
+             ._symname.c_str());
 #endif
 
   output->locs[current_loc_idx].ip = pc;
 
   output->locs[current_loc_idx]._map_info_idx =
-      us->symbols_hdr->_mapinfo_lookup.get_or_insert(
-          us->pid, us->symbols_hdr->_mapinfo_table, dso);
+      us->symbol_hdr._mapinfo_lookup.get_or_insert(
+          us->pid, us->symbol_hdr._mapinfo_table, dso);
   output->nb_locs++;
   return output->locs[current_loc_idx]._symbol_idx;
 }

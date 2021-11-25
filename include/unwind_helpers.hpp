@@ -7,11 +7,11 @@
 
 extern "C" {
 #include "ddprof_defs.h"
-#include "unwind_state.h"
 }
 
 #include "dso.hpp"
-#include "unwind_symbols.hpp"
+#include "symbol_hdr.hpp"
+#include "unwind_state.hpp"
 
 namespace ddprof {
 bool max_stack_depth_reached(UnwindState *us);

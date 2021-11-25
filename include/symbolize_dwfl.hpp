@@ -8,9 +8,8 @@
 extern "C" {
 #include "ddprof_defs.h"
 #include "ddres_def.h"
-#include "unwind_state.h"
 }
-#include "dso_hdr.hpp"
+#include "unwind_state.hpp"
 
 typedef struct Dwfl Dwfl;
 typedef struct Dwfl_Module Dwfl_Module;

@@ -12,6 +12,7 @@ extern "C" {
 #include "signal_helper.h"
 }
 #include "ddres.h"
+#include <algorithm>
 #include <cassert>
 #include <numeric>
 
@@ -112,6 +113,7 @@ uint64_t DsoStats::sum_event_metric(DsoEventType dso_event) const {
 
 using ddprof::Dso;
 using ddprof::DsoRange;
+using ddprof::DsoSet;
 using ddprof::DsoSetConstIt;
 using ddprof::DsoSetIt;
 using ddprof::DsoStats;
@@ -127,28 +129,29 @@ DsoHdr::DsoHdr() : _next_dso_id(0) {
   }
 }
 
-DsoFindRes DsoHdr::dso_find_first_std_executable(pid_t pid) const {
+DsoFindRes DsoHdr::dso_find_first_std_executable(pid_t pid) {
+  const DsoSet &set = _map[pid];
   Dso temp_dso(pid, 0, 0);
-  DsoSetConstIt it = _set.lower_bound(temp_dso);
+  DsoSetConstIt it = set.lower_bound(temp_dso);
   // look for the first executable standard region
-  while (it != _set.end() && !it->_executable &&
+  while (it != set.end() && !it->_executable &&
          it->_type != ddprof::dso::kStandard && it->_pid == pid) {
     ++it;
   }
-  if (it == _set.end() || it->_pid != pid) {
-    return find_res_not_found();
+  if (it == set.end() || it->_pid != pid) {
+    return find_res_not_found(set);
   }
   return std::make_pair<ddprof::DsoSetConstIt, bool>(std::move(it), true);
 }
 
-// Find the closest and indicate if we found a dso matching this address
-DsoFindRes DsoHdr::dso_find_closest(pid_t pid, ElfAddress_t addr) {
+DsoFindRes DsoHdr::dso_find_closest(const DsoSet &set, pid_t pid,
+                                    ElfAddress_t addr) {
   bool is_within = false;
   // Create a fake object to search (this is not needed in c++ 14)
   Dso temp_dso(pid, addr, addr);
   // First element not less than (can match a start addr)
-  DsoSetConstIt it = _set.lower_bound(temp_dso);
-  if (it != _set.end()) { // map is empty
+  DsoSetConstIt it = set.lower_bound(temp_dso);
+  if (it != set.end()) { // map is empty
     is_within = it->is_within(pid, addr);
     if (is_within) { // exact match
       return std::make_pair<ddprof::DsoSetConstIt, bool>(std::move(it),
@@ -156,14 +159,19 @@ DsoFindRes DsoHdr::dso_find_closest(pid_t pid, ElfAddress_t addr) {
     }
   }
   // previous element is more likely to contain our addr
-  if (it != _set.begin()) {
+  if (it != set.begin()) {
     --it;
   } else { // map is empty
-    return find_res_not_found();
+    return find_res_not_found(set);
   }
   is_within = it->is_within(pid, addr);
   return std::make_pair<ddprof::DsoSetConstIt, bool>(std::move(it),
                                                      std::move(is_within));
+}
+
+// Find the closest and indicate if we found a dso matching this address
+DsoFindRes DsoHdr::dso_find_closest(pid_t pid, ElfAddress_t addr) {
+  return dso_find_closest(_map[pid], pid, addr);
 }
 
 bool DsoHdr::dso_handled_type_read_dso(const Dso &dso) {
@@ -175,17 +183,17 @@ bool DsoHdr::dso_handled_type_read_dso(const Dso &dso) {
   return true;
 }
 
-DsoRange DsoHdr::get_intersection(const Dso &dso) {
-  if (_set.empty()) {
-    return std::make_pair<DsoSetIt, DsoSetIt>(_set.end(), _set.end());
+DsoRange DsoHdr::get_intersection(const DsoSet &set, const Dso &dso) {
+  if (set.empty()) {
+    return std::make_pair<DsoSetIt, DsoSetIt>(set.end(), set.end());
   }
   // Get element after (with a start addr over the current)
-  DsoSetIt first_el = _set.lower_bound(dso);
+  DsoSetIt first_el = set.lower_bound(dso);
   // Lower bound will return the first over our current element.
   //         <700--1050> <1100--1500> <1600--2200>
   // Elt to insert :  <1000-------------2000>
   // Go to previous as it could also overlap
-  while (first_el != _set.begin()) {
+  while (first_el != set.begin()) {
     --first_el;
     // Stop when :
     // - start of the list
@@ -196,13 +204,13 @@ DsoRange DsoHdr::get_intersection(const Dso &dso) {
     }
   }
   // init in case we don't find anything
-  DsoSetIt start = _set.end();
-  DsoSetIt end = _set.end();
+  DsoSetIt start = set.end();
+  DsoSetIt end = set.end();
 
   // Loop accross the possible range keeping track of first and last
-  while (first_el != _set.end()) {
+  while (first_el != set.end()) {
     if (dso.intersects(*first_el)) {
-      if (start == _set.end()) {
+      if (start == set.end()) {
         start = first_el;
       }
       end = first_el;
@@ -214,33 +222,25 @@ DsoRange DsoHdr::get_intersection(const Dso &dso) {
     ++first_el;
   }
   // push end element (as it should be after the last element)
-  if (end != _set.end()) {
+  if (end != set.end()) {
     ++end;
   }
   return std::make_pair<DsoSetIt, DsoSetIt>(std::move(start), std::move(end));
 }
 
-// get all elements of a pid
-DsoRange DsoHdr::get_pid_range(pid_t pid) {
-  Dso temp_dso(pid + 1, 0, 0);
-  auto it_end = _set.lower_bound(Dso(pid + 1, 0, 0));
-  auto it_start = _set.lower_bound(Dso(pid, 0, 0));
-  return std::make_pair<DsoSetIt, DsoSetIt>(std::move(it_start),
-                                            std::move(it_end));
-}
-
 // erase range of elements
-void DsoHdr::erase_range(const DsoRange &range) {
+void DsoHdr::erase_range(DsoSet &set, const DsoRange &range) {
   // region maps are kept (as they are used for several pids)
-  _set.erase(range.first, range.second);
+  set.erase(range.first, range.second);
 }
 
-DsoFindRes DsoHdr::dso_find_same_or_smaller(const ddprof::Dso &dso) {
+DsoFindRes DsoHdr::dso_find_same_or_smaller(const DsoSet &set,
+                                            const ddprof::Dso &dso) {
   DsoFindRes res =
       std::make_pair<DsoFindRes::first_type, DsoFindRes::second_type>(
-          _set.find(dso), false);
+          set.find(dso), false);
   // comparator only looks at start ptr
-  if (res.first != _set.end()) {
+  if (res.first != set.end()) {
     // if it is the same or smaller, we keep the current dso
     res.second = res.first->same_or_smaller(dso);
   }
@@ -263,18 +263,16 @@ DsoUID_t DsoHdr::find_or_add_dso_uid(const Dso &dso) {
   }
 }
 
-DsoFindRes DsoHdr::insert_erase_overlap(ddprof::Dso &&dso) {
-  DsoFindRes find_res = dso_find_same_or_smaller(dso);
+DsoFindRes DsoHdr::insert_erase_overlap(DsoSet &set, ddprof::Dso &&dso) {
+  DsoFindRes find_res = dso_find_same_or_smaller(set, dso);
   // nothing to do if already exists
   if (find_res.second)
     return find_res;
 
-  // todo : optimise this by changing to a map for cases where a single el can
-  // be replaced
-  DsoRange range = get_intersection(dso);
+  DsoRange range = get_intersection(set, dso);
 
-  if (range.first != _set.end()) {
-    erase_range(range);
+  if (range.first != set.end()) {
+    erase_range(set, range);
   }
   _stats.incr_metric(DsoStats::kNewDso, dso._type);
 
@@ -282,16 +280,21 @@ DsoFindRes DsoHdr::insert_erase_overlap(ddprof::Dso &&dso) {
   dso._id = find_or_add_dso_uid(dso);
   LG_DBG("[DSO] : Insert %s", dso.to_string().c_str());
   // warning rvalue : do not use dso after this line
-  return _set.insert(dso);
+  return set.insert(dso);
+}
+
+DsoFindRes DsoHdr::insert_erase_overlap(ddprof::Dso &&dso) {
+  return insert_erase_overlap(_map[dso._pid], std::move(dso));
 }
 
 DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr) {
+  DsoSet &set = _map[pid];
   if (addr < 4095) {
     LG_DBG("[DSO] Skipping 0 page");
-    return find_res_not_found();
+    return find_res_not_found(set);
   }
 
-  DsoFindRes find_res = dso_find_closest(pid, addr);
+  DsoFindRes find_res = dso_find_closest(set, pid, addr);
   if (!find_res.second) { // backpopulate
     // Following line creates the state for pid if it does not exist
     BackpopulateState &bp_state = _backpopulate_state_map[pid];
@@ -301,8 +304,8 @@ DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr) {
       LG_NTC("[DSO] Couldn't find DSO for [%d](0x%lx). backpopulate", pid,
              addr);
       int nb_elts_added = 0;
-      if (pid_backpopulate(pid, nb_elts_added) && nb_elts_added) {
-        find_res = dso_find_closest(pid, addr);
+      if (pid_backpopulate(set, pid, nb_elts_added) && nb_elts_added) {
+        find_res = dso_find_closest(set, pid, addr);
       }
 #ifndef NDEBUG
       if (!find_res.second) { // debug info
@@ -376,15 +379,12 @@ DsoHdr::find_or_insert_region(const ddprof::Dso &dso) {
   }
 }
 
-void DsoHdr::pid_free(int pid) {
-  ddprof::DsoRange range = get_pid_range(pid);
-  erase_range(range);
-}
+void DsoHdr::pid_free(int pid) { _map.erase(pid); }
 
 // Return false if proc map is not available
 // Return true proc map was found, use nb_elts_added for number of added
 // elements
-bool DsoHdr::pid_backpopulate(int pid, int &nb_elts_added) {
+bool DsoHdr::pid_backpopulate(DsoSet &set, pid_t pid, int &nb_elts_added) {
   nb_elts_added = 0;
   ProcFileHolder proc_file_holder(pid, _path_to_proc);
   LG_NTC("[DSO] Backpopulating PID %d", pid);
@@ -404,7 +404,7 @@ bool DsoHdr::pid_backpopulate(int pid, int &nb_elts_added) {
     if (dso._pid == -1) { // invalid dso
       continue;
     }
-    if ((insert_erase_overlap(std::move(dso))).second) {
+    if ((insert_erase_overlap(set, std::move(dso))).second) {
       ++nb_elts_added;
     }
   }
@@ -469,4 +469,13 @@ std::string DsoHdr::get_path_to_binary(const ddprof::Dso &dso) {
   }
   LG_DBG("[DSO] Unable to find path to %s", dso._filename.c_str());
   return std::string();
+}
+
+int DsoHdr::get_nb_dso() const {
+  unsigned total_nb_elts = 0;
+  std::for_each(_map.begin(), _map.end(),
+                [&](ddprof::DsoPidMap::value_type const &el) {
+                  total_nb_elts += el.second.size();
+                });
+  return total_nb_elts;
 }

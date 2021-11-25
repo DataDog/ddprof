@@ -6,8 +6,7 @@
 #pragma once
 
 #include "ddres_def.h"
-#include "dwfl_hdr.hpp"
-#include "unwind_state.h"
+#include "unwind_state.hpp"
 
 namespace ddprof {
 

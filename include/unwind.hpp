@@ -7,14 +7,14 @@
 
 extern "C" {
 #include "unwind_metrics.h"
-#include "unwind_state.h"
 #include <sys/types.h>
 }
+#include "unwind_state.hpp"
 
 namespace ddprof {
 
-DDRes unwind_init(UnwindState *);
-void unwind_free(UnwindState *);
+void unwind_init(void);
+
 DDRes unwindstate__unwind(UnwindState *us);
 
 void unwind_cycle(UnwindState *us);

@@ -19,7 +19,7 @@ class BaseFrameSymbolLookup {
 public:
   SymbolIdx_t get_or_insert(pid_t pid, SymbolTable &symbol_table,
                             DsoSymbolLookup &dso_symbol_lookup,
-                            const DsoHdr &dso_hdr);
+                            DsoHdr &dso_hdr);
 
   // Erase symbol lookup for this pid (warning symbols still exist)
   void erase(pid_t pid) {
@@ -30,7 +30,7 @@ public:
 private:
   SymbolIdx_t insert_bin_symbol(pid_t pid, SymbolTable &symbol_table,
                                 DsoSymbolLookup &dso_symbol_lookup,
-                                const DsoHdr &dso_hdr);
+                                DsoHdr &dso_hdr);
   static const int k_nb_bin_lookups = 10;
   struct PidSymbol {
     explicit PidSymbol(SymbolIdx_t symb_idx)

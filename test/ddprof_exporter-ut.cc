@@ -18,7 +18,7 @@ extern "C" {
 #include <string>
 #include <utility>
 
-#include "unwind_symbols.hpp"
+#include "symbol_hdr.hpp"
 
 namespace ddprof {
 // todo : cut this dependency
@@ -141,17 +141,17 @@ TEST(DDProfExporter, simple) {
   }
 
   { // Aggregate pprofs
-    UnwindSymbolsHdr symbols_hdr;
+    SymbolHdr symbol_hdr;
     UnwindOutput mock_output;
-    SymbolTable &table = symbols_hdr._symbol_table;
-    MapInfoTable &mapinfo_table = symbols_hdr._mapinfo_table;
+    SymbolTable &table = symbol_hdr._symbol_table;
+    MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
 
     fill_unwind_symbols(table, mapinfo_table, mock_output);
 
     const PerfOption *perf_option_cpu = perfoptions_preset(10);
     res = pprof_create_profile(&pprofs, perf_option_cpu, 1);
     EXPECT_TRUE(IsDDResOK(res));
-    res = pprof_aggregate(&mock_output, &symbols_hdr, 1000, 0, &pprofs);
+    res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, 0, &pprofs);
     EXPECT_TRUE(IsDDResOK(res));
   }
   {

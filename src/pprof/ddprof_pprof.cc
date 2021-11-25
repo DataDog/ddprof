@@ -1,6 +1,7 @@
-// Unless explicitly stated otherwise all files in this repository are licensed under the Apache License Version 2.0.
-// This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
-
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the Apache License Version 2.0. This product includes software
+// developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
+// Datadog, Inc.
 
 extern "C" {
 #include "pprof/ddprof_pprof.h"
@@ -16,7 +17,7 @@ extern "C" {
 #include "ddprof_defs.h"
 }
 
-#include "unwind_symbols.hpp"
+#include "symbol_hdr.hpp"
 
 static const unsigned long s_nanos_in_one_sec = 1000000000;
 
@@ -135,11 +136,11 @@ static void write_line(const ddprof::Symbol &symbol,
 
 // Assumption of API is that sample is valid in a single type
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
-                      const UnwindSymbolsHdr *symbols_hdr, uint64_t value,
+                      const SymbolHdr *symbol_hdr, uint64_t value,
                       int watcher_idx, DDProfPProf *pprof) {
 
-  const ddprof::SymbolTable &symbol_table = symbols_hdr->_symbol_table;
-  const ddprof::MapInfoTable &mapinfo_table = symbols_hdr->_mapinfo_table;
+  const ddprof::SymbolTable &symbol_table = symbol_hdr->_symbol_table;
+  const ddprof::MapInfoTable &mapinfo_table = symbol_hdr->_mapinfo_table;
   ddprof_ffi_Profile *profile = pprof->_profile;
 
   int64_t values[MAX_TYPE_WATCHER + 1] = {0};

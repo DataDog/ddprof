@@ -19,15 +19,10 @@ extern "C" {
 #include "stdlib.h"
 }
 
-/// Set through env var (DDPROF_CACHE_SETTING) in case of doubts on cache
-typedef enum symbol_lookup_setting {
-  K_CACHE_ON = 0,
-  K_CACHE_VALIDATE,
-} symbol_lookup_setting;
-
 // out of namespace as these are visible on C side
 // Minimal c++ structure to keep a style close to C
-struct UnwindSymbolsHdr {
+struct SymbolHdr {
+  SymbolHdr() {}
   void display_stats() const {
     _dwfl_symbol_lookup_v2._stats.display(_dwfl_symbol_lookup_v2.size());
   }
@@ -45,5 +40,4 @@ struct UnwindSymbolsHdr {
   ddprof::MapInfoTable _mapinfo_table;
 
   struct ddprof::DwflSymbolLookupStats _stats;
-  symbol_lookup_setting _setting;
 };

@@ -5,20 +5,26 @@
 
 #pragma once
 
-#include <stdbool.h>
+extern "C" {
+#include "unwind_output.h"
 #include <sys/types.h>
+}
 
 #include "ddres_def.h"
-#include "unwind_output.h"
+#include "dso_hdr.hpp"
+#include "dwfl_hdr.hpp"
+#include "symbol_hdr.hpp"
 
-typedef struct UnwindSymbolsHdr UnwindSymbolsHdr;
-typedef struct DsoHdr DsoHdr;
-typedef struct DwflHdr DwflHdr;
 typedef struct Dwfl Dwfl;
 
 #define K_NB_REGS_UNWIND 3
 
-typedef struct UnwindRegisters {
+struct UnwindRegisters {
+  UnwindRegisters() {
+    for (int i = 0; i < K_NB_REGS_UNWIND; ++i) {
+      regs[i] = 0;
+    }
+  }
   union {
     uint64_t regs[K_NB_REGS_UNWIND];
     struct {
@@ -27,14 +33,17 @@ typedef struct UnwindRegisters {
       uint64_t eip; // Extended Instruction Pointer
     };
   };
-} UnwindRegisters;
+};
 
 typedef struct UnwindState {
-  DwflHdr *dwfl_hdr;
+  UnwindState() : dwfl(nullptr), pid(-1), stack(nullptr), stack_sz(0) {
+    uw_output_clear(&output);
+  }
+  DwflHdr dwfl_hdr;
   Dwfl *dwfl;
 
-  DsoHdr *dso_hdr;
-  UnwindSymbolsHdr *symbols_hdr;
+  DsoHdr dso_hdr;
+  SymbolHdr symbol_hdr;
 
   pid_t pid;
   char *stack;
@@ -43,7 +52,6 @@ typedef struct UnwindState {
   UnwindRegisters initial_regs;
   UnwindRegisters current_regs;
 
-  bool attached;
   UnwindOutput output;
 } UnwindState;
 

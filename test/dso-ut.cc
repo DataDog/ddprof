@@ -41,49 +41,26 @@ Dso build_dso_file_10_2500() {
  that.
 */
 
-void fill_mock_dsoset(DsoSet &set) {
-  auto insert_res = set.insert(build_dso_5_1500());
+void fill_mock_hdr(DsoHdr &dso_hdr) {
+  auto insert_res = dso_hdr._map[5].insert(build_dso_5_1500());
   EXPECT_TRUE(insert_res.first->_type == dso::kStandard);
   EXPECT_TRUE(insert_res.second);
 
-  insert_res = set.insert(build_dso_10_1000());
+  insert_res = dso_hdr._map[10].insert(build_dso_10_1000());
   EXPECT_TRUE(insert_res.second);
 
   // insert with equal key (start and pid)
-  insert_res = set.insert(build_dso_10_1000_dupe());
+  insert_res = dso_hdr._map[10].insert(build_dso_10_1000_dupe());
   EXPECT_FALSE(insert_res.second);
 
   EXPECT_EQ(insert_res.first->_start, 1000);
-  insert_res = set.insert(build_dso_10_2000());
+  insert_res = dso_hdr._map[10].insert(build_dso_10_2000());
   EXPECT_TRUE(insert_res.second);
 
-  insert_res = set.insert(build_dso_10_1500());
+  insert_res = dso_hdr._map[10].insert(build_dso_10_1500());
   EXPECT_TRUE(insert_res.second);
   // empty --> undef
   EXPECT_TRUE(insert_res.first->_type == dso::kAnon);
-}
-
-void fill_mock_hdr(DsoHdr &dso_hdr) { fill_mock_dsoset(dso_hdr._set); }
-
-TEST(DSOTest, InsertAndFind) {
-  DsoSet set;
-  fill_mock_dsoset(set);
-  for (const auto &el : set) {
-    std::cerr << el;
-  }
-  std::cerr << "Find dso 10 1000 " << std::endl;
-  // First higher than dso 1 (should be dso )
-  Dso dso_10_1000 = build_dso_10_1000();
-  {
-    const auto it = set.find(dso_10_1000);
-    EXPECT_TRUE(it != set.end());
-  }
-  {
-    const auto it = set.lower_bound(dso_10_1000);
-    std::cerr << *it;
-    // should be itself
-    EXPECT_EQ(it->_start, 1000);
-  }
 }
 
 TEST(DSOTest, is_within) {
@@ -91,7 +68,7 @@ TEST(DSOTest, is_within) {
   fill_mock_hdr(dso_hdr);
   DsoFindRes find_res = dso_hdr.dso_find_closest(10, 1300);
   EXPECT_FALSE(find_res.second);
-  ASSERT_FALSE(find_res.first == dso_hdr._set.end());
+  ASSERT_FALSE(find_res.first == dso_hdr._map[10].end());
   EXPECT_EQ(find_res.first->_pid, 10);
   EXPECT_EQ(find_res.first->_start, 1000);
 }
@@ -109,7 +86,7 @@ TEST(DSOTest, intersections) {
   fill_mock_hdr(dso_hdr);
   {
     Dso dso_inter(10, 900, 1700);
-    DsoRange range = dso_hdr.get_intersection(dso_inter);
+    DsoRange range = dso_hdr.get_intersection(dso_hdr._map[10], dso_inter);
     EXPECT_EQ(range.first->_pid, 10);
     EXPECT_EQ(range.first->_start, 1000);
     // contains the 1500 -> 1999 element, WARNING the end element is after the
@@ -119,21 +96,21 @@ TEST(DSOTest, intersections) {
   }
   {
     Dso dso_no(10, 400, 500);
-    DsoRange range = dso_hdr.get_intersection(dso_no);
-    EXPECT_EQ(range.first, dso_hdr._set.end());
-    EXPECT_EQ(range.second, dso_hdr._set.end());
+    DsoRange range = dso_hdr.get_intersection(dso_hdr._map[10], dso_no);
+    EXPECT_EQ(range.first, dso_hdr._map[10].end());
+    EXPECT_EQ(range.second, dso_hdr._map[10].end());
   }
   {
     Dso dso_other_pid(9, 900, 1700);
-    DsoRange range = dso_hdr.get_intersection(dso_other_pid);
-    EXPECT_EQ(range.first, dso_hdr._set.end());
-    EXPECT_EQ(range.second, dso_hdr._set.end());
+    DsoRange range = dso_hdr.get_intersection(dso_hdr._map[9], dso_other_pid);
+    EXPECT_EQ(range.first, dso_hdr._map[9].end());
+    EXPECT_EQ(range.second, dso_hdr._map[9].end());
   }
   { // single element
     Dso dso_equal_addr(10, 1200, 1400);
-    DsoRange range = dso_hdr.get_intersection(dso_equal_addr);
-    ASSERT_TRUE(range.first != dso_hdr._set.end());
-    ASSERT_TRUE(range.second != dso_hdr._set.end());
+    DsoRange range = dso_hdr.get_intersection(dso_hdr._map[10], dso_equal_addr);
+    ASSERT_TRUE(range.first != dso_hdr._map[10].end());
+    ASSERT_TRUE(range.second != dso_hdr._map[10].end());
 
     EXPECT_EQ(range.first->_start, 1000);
     EXPECT_EQ(range.second->_start, 1500);
@@ -144,11 +121,8 @@ TEST(DSOTest, erase) {
   DsoHdr dso_hdr;
   fill_mock_hdr(dso_hdr);
   {
-    DsoRange range = dso_hdr.get_pid_range(10);
-    EXPECT_TRUE(range.first->same_or_smaller(build_dso_10_1000()));
-    EXPECT_EQ(range.second, dso_hdr._set.end());
-    dso_hdr.erase_range(range);
-    EXPECT_EQ(dso_hdr._set.size(), 1);
+    dso_hdr.pid_free(10);
+    EXPECT_EQ(dso_hdr.get_nb_dso(), 1);
   }
 }
 
@@ -157,7 +131,8 @@ TEST(DSOTest, find_same) {
   fill_mock_hdr(dso_hdr);
   {
     Dso dso_equal_addr(10, 1000, 1400);
-    DsoFindRes find_res = dso_hdr.dso_find_same_or_smaller(dso_equal_addr);
+    DsoFindRes find_res =
+        dso_hdr.dso_find_same_or_smaller(dso_hdr._map[10], dso_equal_addr);
     EXPECT_FALSE(find_res.second);
     EXPECT_EQ(find_res.first->_start, 1000);
   }
@@ -182,14 +157,17 @@ TEST(DSOTest, insert_erase_overlap) {
       Dso dso_overlap(10, 1100, 1700);
       dso_hdr.insert_erase_overlap(std::move(dso_overlap));
     }
-    DsoFindRes find_res = dso_hdr.dso_find_same_or_smaller(build_dso_10_1000());
+    DsoFindRes find_res =
+        dso_hdr.dso_find_same_or_smaller(dso_hdr._map[10], build_dso_10_1000());
     EXPECT_FALSE(find_res.second);
-    find_res = dso_hdr.dso_find_same_or_smaller(build_dso_10_1500());
+    find_res =
+        dso_hdr.dso_find_same_or_smaller(dso_hdr._map[10], build_dso_10_1500());
     EXPECT_FALSE(find_res.second);
-    EXPECT_EQ(dso_hdr._set.size(), 3);
+    EXPECT_EQ(dso_hdr.get_nb_dso(), 3);
     {
       Dso dso_overlap_2(10, 1100, 1700);
-      find_res = dso_hdr.dso_find_same_or_smaller(dso_overlap_2);
+      find_res =
+          dso_hdr.dso_find_same_or_smaller(dso_hdr._map[10], dso_overlap_2);
       EXPECT_TRUE(find_res.second);
     }
   }
@@ -205,7 +183,7 @@ TEST(DSOTest, path_type) {
 TEST(DSOTest, file_dso) {
   DsoHdr dso_hdr;
   DsoFindRes insert_res =
-      dso_hdr.insert_erase_overlap(build_dso_file_10_2500());
+      dso_hdr.insert_erase_overlap(dso_hdr._map[10], build_dso_file_10_2500());
   EXPECT_TRUE(insert_res.second);
   const Dso &dso = *insert_res.first;
   const ddprof::RegionHolder &region = dso_hdr.find_or_insert_region(dso);
@@ -268,7 +246,7 @@ TEST(DSOTest, dso_from_procline) {
     EXPECT_EQ(standard_dso._type, dso::kStandard);
     dso_hdr.insert_erase_overlap(std::move(standard_dso_2));
     dso_hdr.insert_erase_overlap(std::move(standard_dso));
-    EXPECT_EQ(dso_hdr._set.size(), 2);
+    EXPECT_EQ(dso_hdr.get_nb_dso(), 2);
   }
   {
     // check that we erase everything if we have an overlap
@@ -277,7 +255,7 @@ TEST(DSOTest, dso_from_procline) {
     std::cerr << standard_dso_3;
     EXPECT_EQ(standard_dso._type, dso::kStandard);
     dso_hdr.insert_erase_overlap(std::move(standard_dso_3));
-    EXPECT_EQ(dso_hdr._set.size(), 1);
+    EXPECT_EQ(dso_hdr.get_nb_dso(), 1);
   }
   {
     // check that we still match element number 3
@@ -316,7 +294,8 @@ TEST(DSOTest, backpopulate) {
   // check that we match the local binary
   std::string path_bin = dso_hdr.get_path_to_binary(*find_res.first);
   EXPECT_EQ(path_bin, find_res.first->_filename);
-  dso_hdr._set.erase(find_res.first);
+  // manually erase the unit test's binary
+  dso_hdr._map[getpid()].erase(find_res.first);
   find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
   EXPECT_FALSE(find_res.second);
 }

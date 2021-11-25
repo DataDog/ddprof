@@ -14,9 +14,9 @@ extern "C" {
 #include <dwarf.h>
 }
 
+#include "symbol_hdr.hpp"
 #include "symbolize_dwfl.hpp"
 #include "unwind_helpers.hpp"
-#include "unwind_symbols.hpp"
 
 extern "C" {
 pid_t next_thread(Dwfl *, void *, void **);
@@ -86,7 +86,7 @@ static bool add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
     return true; // invalid pc : do not add frame
   }
-  DsoMod dso_mod = update_mod(us->dso_hdr, us->dwfl, us->pid, pc);
+  DsoMod dso_mod = update_mod(&us->dso_hdr, us->dwfl, us->pid, pc);
   Dwfl_Module *mod = dso_mod._dwfl_mod;
 
   if (mod) {
@@ -99,7 +99,7 @@ static bool add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
       --pc;
     // updating frame can call backpopulate which invalidates the dso pointer
     // --> refresh the iterator
-    dso_mod._dso_find_res = us->dso_hdr->dso_find_closest(us->pid, pc);
+    dso_mod._dso_find_res = us->dso_hdr.dso_find_closest(us->pid, pc);
     if (!dso_mod._dso_find_res.second) {
       // strange scenario (backpopulate removed this dso)
       LG_DBG("Unable to retrieve DSO after call to frame_pc (depth#%lu)",

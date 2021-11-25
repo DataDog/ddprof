@@ -23,7 +23,7 @@ Symbol symbol_from_pid(pid_t pid) {
 SymbolIdx_t
 BaseFrameSymbolLookup::insert_bin_symbol(pid_t pid, SymbolTable &symbol_table,
                                          DsoSymbolLookup &dso_symbol_lookup,
-                                         const DsoHdr &dso_hdr) {
+                                         DsoHdr &dso_hdr) {
   SymbolIdx_t symbol_idx = -1;
   DsoFindRes find_res = dso_hdr.dso_find_first_std_executable(pid);
   if (find_res.second && find_res.first->_type == dso::kStandard) {
@@ -38,7 +38,7 @@ BaseFrameSymbolLookup::insert_bin_symbol(pid_t pid, SymbolTable &symbol_table,
 SymbolIdx_t
 BaseFrameSymbolLookup::get_or_insert(pid_t pid, SymbolTable &symbol_table,
                                      DsoSymbolLookup &dso_symbol_lookup,
-                                     const DsoHdr &dso_hdr) {
+                                     DsoHdr &dso_hdr) {
   auto const it_bin = _bin_map.find(pid);
   auto const it_pid = _pid_map.find(pid);
 

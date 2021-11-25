@@ -1,5 +1,7 @@
-// Unless explicitly stated otherwise all files in this repository are licensed under the Apache License Version 2.0.
-// This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the Apache License Version 2.0. This product includes software
+// developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
+// Datadog, Inc.
 
 #pragma once
 
@@ -9,7 +11,7 @@
 #include "unwind_output.h"
 
 typedef struct ddprof_ffi_Profile ddprof_ffi_Profile;
-typedef struct UnwindSymbolsHdr UnwindSymbolsHdr;
+typedef struct SymbolHdr SymbolHdr;
 
 typedef struct DDProfPProf {
   /* single profile gathering several value types */
@@ -28,7 +30,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, const PerfOption *options,
  * @param pprof
  */
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
-                      const UnwindSymbolsHdr *symbols_hdr, uint64_t value,
+                      const SymbolHdr *symbol_hdr, uint64_t value,
                       int watcher_idx, DDProfPProf *pprof);
 
 DDRes pprof_reset(DDProfPProf *pprof);

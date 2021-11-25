@@ -6,7 +6,7 @@
 #include "unwind_helpers.hpp"
 #include "ddres.h"
 #include "dso_hdr.hpp"
-#include "unwind_symbols.hpp"
+#include "symbol_hdr.hpp"
 
 namespace ddprof {
 
@@ -32,9 +32,9 @@ static void add_virtual_frame(UnwindState *us, SymbolIdx_t symbol_idx) {
 
   // just add an empty element for mapping info
   output->locs[current_loc_idx]._map_info_idx =
-      us->symbols_hdr->_common_mapinfo_lookup.get_or_insert(
+      us->symbol_hdr._common_mapinfo_lookup.get_or_insert(
           CommonMapInfoLookup::LookupCases::empty,
-          us->symbols_hdr->_mapinfo_table);
+          us->symbol_hdr._mapinfo_table);
 
   ++output->nb_locs;
 }
@@ -42,21 +42,21 @@ static void add_virtual_frame(UnwindState *us, SymbolIdx_t symbol_idx) {
 void add_common_frame(UnwindState *us,
                       CommonSymbolLookup::LookupCases lookup_case) {
   add_virtual_frame(us,
-                    us->symbols_hdr->_common_symbol_lookup.get_or_insert(
-                        lookup_case, us->symbols_hdr->_symbol_table));
+                    us->symbol_hdr._common_symbol_lookup.get_or_insert(
+                        lookup_case, us->symbol_hdr._symbol_table));
 }
 
 void add_dso_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc) {
   add_virtual_frame(us,
-                    us->symbols_hdr->_dso_symbol_lookup.get_or_insert(
-                        pc, dso, us->symbols_hdr->_symbol_table));
+                    us->symbol_hdr._dso_symbol_lookup.get_or_insert(
+                        pc, dso, us->symbol_hdr._symbol_table));
 }
 
 void add_virtual_base_frame(UnwindState *us) {
   add_virtual_frame(us,
-                    us->symbols_hdr->_base_frame_symbol_lookup.get_or_insert(
-                        us->pid, us->symbols_hdr->_symbol_table,
-                        us->symbols_hdr->_dso_symbol_lookup, *us->dso_hdr));
+                    us->symbol_hdr._base_frame_symbol_lookup.get_or_insert(
+                        us->pid, us->symbol_hdr._symbol_table,
+                        us->symbol_hdr._dso_symbol_lookup, us->dso_hdr));
 }
 
 // read a word from the given stack
@@ -95,7 +95,7 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
     // address in VM, not as a file offset.
     // Strongly assumes we're also in an executable region?
     DsoFindRes find_res =
-        us->dso_hdr->pid_read_dso(us->pid, result, sizeof(ElfWord_t), addr);
+        us->dso_hdr.pid_read_dso(us->pid, result, sizeof(ElfWord_t), addr);
     if (!find_res.second) {
       // Some regions are not handled
       LG_DBG("Couldn't get read 0x%lx from %d, (0x%lx, 0x%lx)[%p, %p]", addr,

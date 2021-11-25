@@ -20,7 +20,6 @@ extern "C" {
 #include "pprof/ddprof_pprof.h"
 #include "procutils.h"
 #include "stack_handler.h"
-#include "unwind_state.h"
 }
 
 #include "dso_hdr.hpp"
@@ -28,6 +27,7 @@ extern "C" {
 #include "exporter/ddprof_exporter.h"
 #include "tags.hpp"
 #include "unwind.hpp"
+#include "unwind_state.hpp"
 
 #include <cassert>
 
@@ -51,10 +51,10 @@ static const DDPROF_STATS s_cycled_stats[] = {STATS_UNWIND_TICKS,
 static const unsigned s_nb_samples_per_backpopulate = 200;
 
 /// Human readable runtime information
-static void print_diagnostics(const DsoHdr *dso_hdr) {
+static void print_diagnostics(const DsoHdr &dso_hdr) {
   LG_PRINT("Printing internal diagnostics");
   ddprof_stats_print();
-  dso_hdr->_stats.log();
+  dso_hdr._stats.log();
 #ifdef DBG_JEMALLOC
   // jemalloc stats
   malloc_stats_print(NULL, NULL, "");
@@ -87,11 +87,7 @@ DDRes worker_unwind_init(DDProfContext *ctx) {
     ctx->worker_ctx.i_export = 0;
     ctx->worker_ctx.exp_tid = {0};
 
-    ctx->worker_ctx.us = (UnwindState *)calloc(1, sizeof(UnwindState));
-    if (!ctx->worker_ctx.us) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
-                             "Error when creating unwinding state");
-    }
+    ctx->worker_ctx.us = new UnwindState();
 
     PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
 
@@ -103,7 +99,7 @@ DDRes worker_unwind_init(DDProfContext *ctx) {
       DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, false));
     }
     // Initialize the unwind state and library
-    DDRES_CHECK_FWD(unwind_init(ctx->worker_ctx.us));
+    unwind_init();
     ctx->worker_ctx.user_tags =
         new UserTags(ctx->params.tags, ctx->params.num_cpu);
 
@@ -121,10 +117,11 @@ DDRes worker_unwind_free(DDProfContext *ctx) {
   try {
     delete ctx->worker_ctx.user_tags;
     ctx->worker_ctx.user_tags = nullptr;
+
     PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
-    unwind_free(ctx->worker_ctx.us);
     DDRES_CHECK_FWD(pevent_munmap(pevent_hdr));
-    free(ctx->worker_ctx.us);
+
+    delete ctx->worker_ctx.us;
     ctx->worker_ctx.us = nullptr;
   }
   CatchExcept2DDRes();
@@ -144,7 +141,7 @@ static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr) {
                    dso_hdr->_stats.sum_event_metric(DsoStats::kUnhandledDso));
   ddprof_stats_set(STATS_DSO_NEW_DSO,
                    dso_hdr->_stats.sum_event_metric(DsoStats::kNewDso));
-  ddprof_stats_set(STATS_DSO_SIZE, dso_hdr->_set.size());
+  ddprof_stats_set(STATS_DSO_SIZE, dso_hdr->get_nb_dso());
   ddprof_stats_set(STATS_DSO_MAPPED, dso_hdr->_region_map.size());
   return ddres_init();
 }
@@ -179,7 +176,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
     // in lib mode we don't aggregate (protect to avoid link failures)
     int i_export = ctx->worker_ctx.i_export;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
-    DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbols_hdr,
+    DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr,
                                     sample->period, pos, pprof));
 #else
     // Call the user's stack handler
@@ -233,7 +230,7 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
 
   // Scrape procfs for process usage statistics
   DDRES_CHECK_FWD(worker_update_stats(&ctx->worker_ctx.proc_status,
-                                      ctx->worker_ctx.us->dso_hdr));
+                                      &ctx->worker_ctx.us->dso_hdr));
 
   // And emit diagnostic output (if it's enabled)
   print_diagnostics(ctx->worker_ctx.us->dso_hdr);
@@ -279,7 +276,7 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
   ctx->worker_ctx.count_worker += 1;
 
   // allow new backpopulates
-  ctx->worker_ctx.us->dso_hdr->reset_backpopulate_state();
+  ctx->worker_ctx.us->dso_hdr.reset_backpopulate_state();
 
   // Update the time last sent
   ctx->worker_ctx.send_nanos += export_time_convert(ctx->params.upload_period);
@@ -295,7 +292,7 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
   unwind_cycle(ctx->worker_ctx.us);
 
   // Reset stats relevant to a single cycle
-  ddprof_reset_worker_stats(ctx->worker_ctx.us->dso_hdr);
+  ddprof_reset_worker_stats(&ctx->worker_ctx.us->dso_hdr);
 
   return ddres_init();
 }
@@ -307,7 +304,7 @@ void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int pos) {
            map->addr, map->len, map->pgoff);
     ddprof::Dso new_dso(map->pid, map->addr, map->addr + map->len - 1,
                         map->pgoff, std::string(map->filename));
-    ctx->worker_ctx.us->dso_hdr->insert_erase_overlap(std::move(new_dso));
+    ctx->worker_ctx.us->dso_hdr.insert_erase_overlap(std::move(new_dso));
   }
 }
 
@@ -529,7 +526,7 @@ DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
     // backpopulate if needed
     if (++ctx->worker_ctx.count_samples > s_nb_samples_per_backpopulate) {
       // allow new backpopulates and reset counter
-      ctx->worker_ctx.us->dso_hdr->reset_backpopulate_state();
+      ctx->worker_ctx.us->dso_hdr.reset_backpopulate_state();
       ctx->worker_ctx.count_samples = 0;
     }
 
