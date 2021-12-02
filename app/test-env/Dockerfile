@@ -45,7 +45,7 @@ RUN KERNEL_VERSION=$(uname -r | awk -F '[-\.]' '{print "v"$1"."$2}') && \
 RUN git clone --depth 1 --branch ddprof_ci_v3 https://github.com/DataDog/bad-boggle-solver.git
 
 # Build and install toy project
-RUN cd bad-boggle-solver \ 
+RUN cd bad-boggle-solver \
     && mkdir build \
     && cd build \
     && cmake -DCMAKE_BUILD_TYPE=Release ../ \

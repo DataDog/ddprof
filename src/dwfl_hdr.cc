@@ -14,9 +14,25 @@ extern "C" {
 #include <utility>
 #include <vector>
 
+namespace ddprof {
+DwflWrapper::DwflWrapper() : _dwfl(nullptr), _attached(false) {
+  static const Dwfl_Callbacks proc_callbacks = {
+      .find_elf = dwfl_linux_proc_find_elf,
+      .find_debuginfo = dwfl_standard_find_debuginfo,
+      .section_address = nullptr,
+      .debuginfo_path = nullptr, // specify dir to look into
+  };
+  _dwfl = dwfl_begin(&proc_callbacks);
+  if (!_dwfl) {
+    LG_WRN("dwfl_begin was zero (%s)", dwfl_errmsg(-1));
+    throw DDException(ddres_error(DD_WHAT_DWFL_LIB_ERROR));
+  }
+}
+
+DwflWrapper::~DwflWrapper() { dwfl_end(_dwfl); }
+
 DDRes DwflWrapper::attach(pid_t pid, const Dwfl_Thread_Callbacks *callbacks,
                           struct UnwindState *us) {
-
   if (_attached) {
     return ddres_init();
   }
@@ -58,3 +74,5 @@ void DwflHdr::clear_unvisited() {
 }
 
 void DwflHdr::clear_pid(pid_t pid) { _dwfl_map.erase(pid); }
+
+} // namespace ddprof

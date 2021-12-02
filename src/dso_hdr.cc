@@ -16,13 +16,18 @@ extern "C" {
 #include <cassert>
 #include <numeric>
 
+namespace ddprof {
+
+using DsoFindRes = DsoHdr::DsoFindRes;
+using DsoRange = DsoHdr::DsoRange;
+
+namespace {
 static FILE *procfs_map_open(int pid, const char *path_to_proc = "") {
   char buf[1024] = {0};
   snprintf(buf, 1024, "%s/proc/%d/maps", path_to_proc, pid);
   return fopen(buf, "r");
 }
 
-namespace {
 struct ProcFileHolder {
   explicit ProcFileHolder(int pid, const std::string &path_to_proc = "") {
     _mpf = procfs_map_open(pid, path_to_proc.c_str());
@@ -33,7 +38,6 @@ struct ProcFileHolder {
   }
   FILE *_mpf;
 };
-} // namespace
 
 static bool ip_in_procline(char *line, uint64_t ip) {
   static const char spec[] = "%lx-%lx %4c %lx %*x:%*x %*d%n";
@@ -80,8 +84,7 @@ static void pid_find_ip(int pid, uint64_t ip,
   return;
 }
 #endif
-
-namespace ddprof {
+} // namespace
 
 /***************/
 /*    STATS    */
@@ -109,15 +112,6 @@ uint64_t DsoStats::sum_event_metric(DsoEventType dso_event) const {
                          0);
 }
 
-} // namespace ddprof
-
-using ddprof::Dso;
-using ddprof::DsoRange;
-using ddprof::DsoSet;
-using ddprof::DsoSetConstIt;
-using ddprof::DsoSetIt;
-using ddprof::DsoStats;
-
 /**********/
 /* DsoHdr */
 /**********/
@@ -134,14 +128,14 @@ DsoFindRes DsoHdr::dso_find_first_std_executable(pid_t pid) {
   Dso temp_dso(pid, 0, 0);
   DsoSetConstIt it = set.lower_bound(temp_dso);
   // look for the first executable standard region
-  while (it != set.end() && !it->_executable &&
-         it->_type != ddprof::dso::kStandard && it->_pid == pid) {
+  while (it != set.end() && !it->_executable && it->_type != dso::kStandard &&
+         it->_pid == pid) {
     ++it;
   }
   if (it == set.end() || it->_pid != pid) {
     return find_res_not_found(set);
   }
-  return std::make_pair<ddprof::DsoSetConstIt, bool>(std::move(it), true);
+  return std::make_pair<DsoSetConstIt, bool>(std::move(it), true);
 }
 
 DsoFindRes DsoHdr::dso_find_closest(const DsoSet &set, pid_t pid,
@@ -154,8 +148,8 @@ DsoFindRes DsoHdr::dso_find_closest(const DsoSet &set, pid_t pid,
   if (it != set.end()) { // map is empty
     is_within = it->is_within(pid, addr);
     if (is_within) { // exact match
-      return std::make_pair<ddprof::DsoSetConstIt, bool>(std::move(it),
-                                                         std::move(is_within));
+      return std::make_pair<DsoSetConstIt, bool>(std::move(it),
+                                                 std::move(is_within));
     }
   }
   // previous element is more likely to contain our addr
@@ -165,8 +159,8 @@ DsoFindRes DsoHdr::dso_find_closest(const DsoSet &set, pid_t pid,
     return find_res_not_found(set);
   }
   is_within = it->is_within(pid, addr);
-  return std::make_pair<ddprof::DsoSetConstIt, bool>(std::move(it),
-                                                     std::move(is_within));
+  return std::make_pair<DsoSetConstIt, bool>(std::move(it),
+                                             std::move(is_within));
 }
 
 // Find the closest and indicate if we found a dso matching this address
@@ -175,7 +169,7 @@ DsoFindRes DsoHdr::dso_find_closest(pid_t pid, ElfAddress_t addr) {
 }
 
 bool DsoHdr::dso_handled_type_read_dso(const Dso &dso) {
-  if (dso._type != ddprof::dso::kStandard) {
+  if (dso._type != dso::kStandard) {
     // only handle standard path for now
     _stats.incr_metric(DsoStats::kUnhandledDso, dso._type);
     return false;
@@ -234,8 +228,7 @@ void DsoHdr::erase_range(DsoSet &set, const DsoRange &range) {
   set.erase(range.first, range.second);
 }
 
-DsoFindRes DsoHdr::dso_find_same_or_smaller(const DsoSet &set,
-                                            const ddprof::Dso &dso) {
+DsoFindRes DsoHdr::dso_find_same_or_smaller(const DsoSet &set, const Dso &dso) {
   DsoFindRes res =
       std::make_pair<DsoFindRes::first_type, DsoFindRes::second_type>(
           set.find(dso), false);
@@ -248,11 +241,11 @@ DsoFindRes DsoHdr::dso_find_same_or_smaller(const DsoSet &set,
 }
 
 DsoUID_t DsoHdr::find_or_add_dso_uid(const Dso &dso) {
-  if (dso._type != ddprof::dso::DsoType::kStandard) {
+  if (dso._type != dso::DsoType::kStandard) {
     return ++_next_dso_id;
   }
-  ddprof::RegionKey key(dso._filename, dso._pgoff, dso._end - dso._start + 1,
-                        dso._type);
+  RegionKey key(dso._filename, dso._pgoff, dso._end - dso._start + 1,
+                dso._type);
   auto it = _dso_uid_map.find(key);
   if (it == _dso_uid_map.end()) {
     DsoUID_t current_uid = _next_dso_id++;
@@ -263,7 +256,7 @@ DsoUID_t DsoHdr::find_or_add_dso_uid(const Dso &dso) {
   }
 }
 
-DsoFindRes DsoHdr::insert_erase_overlap(DsoSet &set, ddprof::Dso &&dso) {
+DsoFindRes DsoHdr::insert_erase_overlap(DsoSet &set, Dso &&dso) {
   DsoFindRes find_res = dso_find_same_or_smaller(set, dso);
   // nothing to do if already exists
   if (find_res.second)
@@ -283,7 +276,7 @@ DsoFindRes DsoHdr::insert_erase_overlap(DsoSet &set, ddprof::Dso &&dso) {
   return set.insert(dso);
 }
 
-DsoFindRes DsoHdr::insert_erase_overlap(ddprof::Dso &&dso) {
+DsoFindRes DsoHdr::insert_erase_overlap(Dso &&dso) {
   return insert_erase_overlap(_map[dso._pid], std::move(dso));
 }
 
@@ -335,7 +328,7 @@ DsoFindRes DsoHdr::pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
   }
 
   // Find the cached segment
-  const ddprof::RegionHolder &region = find_or_insert_region(dso);
+  const RegionHolder &region = find_or_insert_region(dso);
   if (!region.get_region()) {
     LG_ERR("[DSO] Unable to retrieve region from DSO.");
     find_res.second = false;
@@ -362,15 +355,14 @@ DsoFindRes DsoHdr::pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
   return find_res;
 }
 
-const ddprof::RegionHolder &
-DsoHdr::find_or_insert_region(const ddprof::Dso &dso) {
+const RegionHolder &DsoHdr::find_or_insert_region(const Dso &dso) {
   const auto find_res = _region_map.find(dso._id);
   LG_DBG("[DSO] Get region - %s", dso.to_string().c_str());
   if (find_res == _region_map.end()) {
     const auto insert_res = _region_map.emplace(
         dso._id,
-        ddprof::RegionHolder(dso._filename, dso._end - dso._start + 1,
-                             dso._pgoff, dso._type));
+        RegionHolder(dso._filename, dso._end - dso._start + 1, dso._pgoff,
+                     dso._type));
     assert(insert_res.second);
     return insert_res.first->second;
 
@@ -440,7 +432,7 @@ Dso DsoHdr::dso_from_procline(int pid, char *line) {
   // Check for formatting errors
   if (4 != sscanf(line, spec, &m_start, &m_end, m_mode, &m_off, &m_p)) {
     LG_ERR("[DSO] Failed to scan mapfile line");
-    throw ddprof::DDException(DD_SEVERROR, DD_WHAT_DSO);
+    throw DDException(DD_SEVERROR, DD_WHAT_DSO);
   }
 
   // Make sure the name index points to a valid char
@@ -454,7 +446,7 @@ Dso DsoHdr::dso_from_procline(int pid, char *line) {
   return Dso(pid, m_start, m_end - 1, m_off, std::string(p), 'x' == m_mode[2]);
 }
 
-std::string DsoHdr::get_path_to_binary(const ddprof::Dso &dso) {
+std::string DsoHdr::get_path_to_binary(const Dso &dso) {
   // check if file exists locally
   if (check_file_type(dso._filename.c_str(), S_IFMT)) {
     return dso._filename;
@@ -473,9 +465,11 @@ std::string DsoHdr::get_path_to_binary(const ddprof::Dso &dso) {
 
 int DsoHdr::get_nb_dso() const {
   unsigned total_nb_elts = 0;
-  std::for_each(_map.begin(), _map.end(),
-                [&](ddprof::DsoPidMap::value_type const &el) {
-                  total_nb_elts += el.second.size();
-                });
+  std::for_each(_map.begin(), _map.end(), [&](DsoPidMap::value_type const &el) {
+    total_nb_elts += el.second.size();
+  });
   return total_nb_elts;
 }
+
+int DsoHdr::get_nb_mapped_dso() const { return _region_map.size(); }
+} // namespace ddprof

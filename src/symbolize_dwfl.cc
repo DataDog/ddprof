@@ -18,7 +18,7 @@ DsoMod update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, ProcessAddress_t pc) {
 
   // Lookup DSO
   DsoMod dso_mod_res(dso_hdr->dso_find_or_backpopulate(pid, pc));
-  const DsoFindRes &dso_find_res = dso_mod_res._dso_find_res;
+  const DsoHdr::DsoFindRes &dso_find_res = dso_mod_res._dso_find_res;
   if (!dso_find_res.second) {
     return dso_mod_res;
   }

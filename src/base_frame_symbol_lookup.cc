@@ -25,7 +25,7 @@ BaseFrameSymbolLookup::insert_bin_symbol(pid_t pid, SymbolTable &symbol_table,
                                          DsoSymbolLookup &dso_symbol_lookup,
                                          DsoHdr &dso_hdr) {
   SymbolIdx_t symbol_idx = -1;
-  DsoFindRes find_res = dso_hdr.dso_find_first_std_executable(pid);
+  DsoHdr::DsoFindRes find_res = dso_hdr.dso_find_first_std_executable(pid);
   if (find_res.second && find_res.first->_type == dso::kStandard) {
     symbol_idx = dso_symbol_lookup.get_or_insert(*find_res.first, symbol_table);
     _bin_map.insert(std::pair<pid_t, SymbolIdx_t>(pid, symbol_idx));

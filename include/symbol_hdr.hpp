@@ -19,8 +19,6 @@ extern "C" {
 #include "stdlib.h"
 }
 
-// out of namespace as these are visible on C side
-// Minimal c++ structure to keep a style close to C
 struct SymbolHdr {
   SymbolHdr() {}
   void display_stats() const {

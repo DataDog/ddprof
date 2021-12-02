@@ -94,7 +94,7 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
     // If we're here, we're not in the stack.  We should interpet addr as an
     // address in VM, not as a file offset.
     // Strongly assumes we're also in an executable region?
-    DsoFindRes find_res =
+    DsoHdr::DsoFindRes find_res =
         us->dso_hdr.pid_read_dso(us->pid, result, sizeof(ElfWord_t), addr);
     if (!find_res.second) {
       // Some regions are not handled

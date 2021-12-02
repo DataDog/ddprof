@@ -39,10 +39,10 @@ typedef struct UnwindState {
   UnwindState() : dwfl(nullptr), pid(-1), stack(nullptr), stack_sz(0) {
     uw_output_clear(&output);
   }
-  DwflHdr dwfl_hdr;
-  Dwfl *dwfl;
+  ddprof::DwflHdr dwfl_hdr;
+  Dwfl *dwfl; // pointer to current dwfl element
 
-  DsoHdr dso_hdr;
+  ddprof::DsoHdr dso_hdr;
   SymbolHdr symbol_hdr;
 
   pid_t pid;

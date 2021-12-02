@@ -11,6 +11,9 @@
 #include "loghandle.hpp"
 namespace ddprof {
 
+using DsoFindRes = DsoHdr::DsoFindRes;
+using DsoRange = DsoHdr::DsoRange;
+
 Dso build_dso_5_1500() { return Dso(5, 1500, 1999, 10, "foo.so.1"); }
 
 Dso build_dso_10_1000() { return Dso(10, 1000, 1200, 0, "bar.so.1"); }
@@ -186,7 +189,7 @@ TEST(DSOTest, file_dso) {
       dso_hdr.insert_erase_overlap(dso_hdr._map[10], build_dso_file_10_2500());
   EXPECT_TRUE(insert_res.second);
   const Dso &dso = *insert_res.first;
-  const ddprof::RegionHolder &region = dso_hdr.find_or_insert_region(dso);
+  const RegionHolder &region = dso_hdr.find_or_insert_region(dso);
   std::cerr << "Region " << region.get_region() << std::endl;
 }
 

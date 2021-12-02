@@ -54,13 +54,13 @@ DDRes unwindstate__unwind(UnwindState *us) {
     // Create or get the dwfl object associated to cache
     DwflWrapper &dwfl_wrapper = us->dwfl_hdr.get_or_insert(us->pid);
     us->dwfl = dwfl_wrapper._dwfl;
-    res = ddprof::unwind_dwfl(us, dwfl_wrapper);
+    res = unwind_dwfl(us, dwfl_wrapper);
   }
   if (IsDDResNotOK(res)) {
     add_error_frame(us);
   }
   // Add a frame that identifies executable to which these belong
-  ddprof::add_virtual_base_frame(us);
+  add_virtual_base_frame(us);
   return res;
 }
 

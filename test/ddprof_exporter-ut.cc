@@ -126,7 +126,7 @@ TEST(DDProfExporter, simple) {
   LogHandle handle;
   ExporterInput exporter_input;
   // Warning : Leave URL alive
-  std::pair<std::string, std::string> url = ddprof::get_receptor_host_port();
+  std::pair<std::string, std::string> url = get_receptor_host_port();
 
   { // setup input parameters
     fill_mock_exporter_input(exporter_input, url, false);
@@ -160,7 +160,7 @@ TEST(DDProfExporter, simple) {
     res = ddprof_exporter_new(&user_tags, &exporter);
     EXPECT_TRUE(IsDDResOK(res));
 
-    if (ddprof::get_url_from_env(K_RECEPTOR_ENV_ADDR)) {
+    if (get_url_from_env(K_RECEPTOR_ENV_ADDR)) {
       // receptor is defined
       res = ddprof_exporter_export(pprofs._profile, &exporter);
       // We should not be able to send profiles (usually 404)

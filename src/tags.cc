@@ -6,13 +6,42 @@
 #include "tags.hpp"
 #include "thread_info.hpp"
 
-#include "DogFood.hpp"
-
 extern "C" {
 #include "logger.h"
 }
 #include <utility>
 
+namespace {
+// From the DogFood repo. Credit goes to Garrett Sickles, who has an awesome
+// DogStatsD C++ library : https://github.com/garrettsickles/DogFood.git
+inline bool ValidateTags(const std::string &_tag) {
+  if (_tag.length() == 0 || _tag.length() > 200)
+    return false;
+
+  ////////////////////////////////////////////////////////
+  // Verify the first character is a letter
+  if (!std::isalpha(_tag.at(0)))
+    return false;
+
+  ////////////////////////////////////////////////////////
+  // Verify end is not a colon
+  if (_tag.back() == ':')
+    return false;
+
+  ////////////////////////////////////////////////////////
+  // Verify each character
+  for (size_t n = 0; n < _tag.length(); n++) {
+    const char c = _tag.at(n);
+    if (std::isalnum(c) || c == '_' || c == '-' || c == ':' || c == '.' ||
+        c == '/' || c == '\\')
+      continue;
+    else
+      return false;
+  }
+  return true;
+}
+
+} // namespace
 namespace ddprof {
 
 static Tag split_kv(const char *str, size_t end_pos, char c = ':') {
@@ -45,8 +74,7 @@ void split(const char *str, Tags &tags, char c) {
       // skip this empty tag
       continue;
     }
-    if (!DogFood::ValidateTags(current_tag.first) ||
-        !DogFood::ValidateTags(current_tag.second)) {
+    if (!ValidateTags(current_tag.first) || !ValidateTags(current_tag.second)) {
       LG_WRN("[TAGS] Bad tag value - skip %s:%s", current_tag.first.c_str(),
              current_tag.second.c_str());
     } else {

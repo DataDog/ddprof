@@ -17,9 +17,9 @@ typedef struct Dwfl_Module Dwfl_Module;
 namespace ddprof {
 // Structure to group Dso and Mod
 struct DsoMod {
-  explicit DsoMod(DsoFindRes find_res)
+  explicit DsoMod(DsoHdr::DsoFindRes find_res)
       : _dso_find_res(find_res), _dwfl_mod(nullptr) {}
-  DsoFindRes _dso_find_res;
+  DsoHdr::DsoFindRes _dso_find_res;
   Dwfl_Module *_dwfl_mod;
 };
 
