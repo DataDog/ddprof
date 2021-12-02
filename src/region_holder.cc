@@ -32,7 +32,6 @@ RegionHolder::RegionHolder(const std::string &full_path, size_t sz,
     _sz = 4096;
   } else if (path_type == dso::kStandard) {
     int fd = open(full_path.c_str(), O_RDONLY);
-
     if (fd != -1) { //
       _region = mmap(0, sz, PROT_READ, MAP_PRIVATE, fd, pgoff);
       close(fd);

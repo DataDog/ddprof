@@ -123,7 +123,8 @@ public:
   int get_nb_dso() const;
   int get_nb_mapped_dso() const;
   /********* Region helpers ***********/
-  const RegionHolder &find_or_insert_region(const Dso &dso);
+  // returns null if the file was not found
+  const RegionHolder *find_or_insert_region(const Dso &dso);
 
   // Unordered map of sorted
   DsoPidMap _map;

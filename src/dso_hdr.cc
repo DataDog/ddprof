@@ -244,6 +244,7 @@ DsoUID_t DsoHdr::find_or_add_dso_uid(const Dso &dso) {
   if (dso._type != dso::DsoType::kStandard) {
     return ++_next_dso_id;
   }
+  // we use only the filename as key (container would be nice)
   RegionKey key(dso._filename, dso._pgoff, dso._end - dso._start + 1,
                 dso._type);
   auto it = _dso_uid_map.find(key);
@@ -328,8 +329,8 @@ DsoFindRes DsoHdr::pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
   }
 
   // Find the cached segment
-  const RegionHolder &region = find_or_insert_region(dso);
-  if (!region.get_region()) {
+  const RegionHolder *region = find_or_insert_region(dso);
+  if (!region || !region->get_region()) {
     LG_ERR("[DSO] Unable to retrieve region from DSO.");
     find_res.second = false;
     return find_res;
@@ -350,24 +351,33 @@ DsoFindRes DsoHdr::pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
   //  Adjusted addr to be a segment-offset
   //  Confirmed that the segment has the capacity to support our read
   // So let's read it!
-  unsigned char *src = (unsigned char *)region.get_region();
+  unsigned char *src = (unsigned char *)region->get_region();
   memcpy(buf, src + file_region_offset, sz);
   return find_res;
 }
 
-const RegionHolder &DsoHdr::find_or_insert_region(const Dso &dso) {
+const RegionHolder *DsoHdr::find_or_insert_region(const Dso &dso) {
   const auto find_res = _region_map.find(dso._id);
   LG_DBG("[DSO] Get region - %s", dso.to_string().c_str());
   if (find_res == _region_map.end()) {
+    // Assuming binaries are the same between containers is problematic.
+    //    IMPORTANT TODO: Add container to the key
+    std::string path_to_bin =
+        dso._type == dso::kStandard ? get_path_to_binary(dso) : dso._filename;
+    if (path_to_bin.empty()) {
+      return nullptr; // file is gone
+    }
+    // Warning : there can still be a race condition here where file is deleted
+    // between previous check and region mapping (at which point we will not
+    // retry later if the same binary comes again)
     const auto insert_res = _region_map.emplace(
         dso._id,
-        RegionHolder(dso._filename, dso._end - dso._start + 1, dso._pgoff,
-                     dso._type));
-    assert(insert_res.second);
-    return insert_res.first->second;
-
+        RegionHolder(get_path_to_binary(dso), dso._end - dso._start + 1,
+                     dso._pgoff, dso._type));
+    assert(insert_res.second); // insertion should be successful
+    return &insert_res.first->second;
   } else { // iterator contains a pair key / value
-    return find_res->second;
+    return &find_res->second;
   }
 }
 

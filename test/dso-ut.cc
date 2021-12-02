@@ -189,8 +189,10 @@ TEST(DSOTest, file_dso) {
       dso_hdr.insert_erase_overlap(dso_hdr._map[10], build_dso_file_10_2500());
   EXPECT_TRUE(insert_res.second);
   const Dso &dso = *insert_res.first;
-  const RegionHolder &region = dso_hdr.find_or_insert_region(dso);
-  std::cerr << "Region " << region.get_region() << std::endl;
+  const RegionHolder *region = dso_hdr.find_or_insert_region(dso);
+  EXPECT_TRUE(region);
+  EXPECT_TRUE(region->get_region());
+  std::cerr << "Region " << region->get_region() << std::endl;
 }
 
 // clang-format off
