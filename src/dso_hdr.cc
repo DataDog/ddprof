@@ -244,9 +244,8 @@ DsoUID_t DsoHdr::find_or_add_dso_uid(const Dso &dso) {
   if (dso._type != dso::DsoType::kStandard) {
     return ++_next_dso_id;
   }
-  // we use only the filename as key (container would be nice)
-  RegionKey key(dso._filename, dso._pgoff, dso._end - dso._start + 1,
-                dso._type);
+  RegionKey key(get_binary_loc_info(dso).second, dso._pgoff,
+                dso._end - dso._start + 1, dso._type);
   auto it = _dso_uid_map.find(key);
   if (it == _dso_uid_map.end()) {
     DsoUID_t current_uid = _next_dso_id++;
@@ -331,7 +330,8 @@ DsoFindRes DsoHdr::pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
   // Find the cached segment
   const RegionHolder *region = find_or_insert_region(dso);
   if (!region || !region->get_region()) {
-    LG_ERR("[DSO] Unable to retrieve region from DSO.");
+    LG_ERR("[DSO] Unable to retrieve region from DSO %s (region=%p)",
+           dso._filename.c_str(), region);
     find_res.second = false;
     return find_res;
   }
@@ -362,18 +362,20 @@ const RegionHolder *DsoHdr::find_or_insert_region(const Dso &dso) {
   if (find_res == _region_map.end()) {
     // Assuming binaries are the same between containers is problematic.
     //    IMPORTANT TODO: Add container to the key
-    std::string path_to_bin =
-        dso._type == dso::kStandard ? get_path_to_binary(dso) : dso._filename;
+    std::string path_to_bin = dso._type == dso::kStandard
+        ? get_binary_loc_info(dso).first
+        : dso._filename;
     if (path_to_bin.empty()) {
-      return nullptr; // file is gone
+      return nullptr; // file is gone, avoid insert (this can be a short lived
+                      // process)
     }
     // Warning : there can still be a race condition here where file is deleted
     // between previous check and region mapping (at which point we will not
     // retry later if the same binary comes again)
-    const auto insert_res = _region_map.emplace(
-        dso._id,
-        RegionHolder(get_path_to_binary(dso), dso._end - dso._start + 1,
-                     dso._pgoff, dso._type));
+    const auto insert_res =
+        _region_map.emplace(dso._id,
+                            RegionHolder(path_to_bin, dso._end - dso._start + 1,
+                                         dso._pgoff, dso._type));
     assert(insert_res.second); // insertion should be successful
     return &insert_res.first->second;
   } else { // iterator contains a pair key / value
@@ -456,21 +458,25 @@ Dso DsoHdr::dso_from_procline(int pid, char *line) {
   return Dso(pid, m_start, m_end - 1, m_off, std::string(p), 'x' == m_mode[2]);
 }
 
-std::string DsoHdr::get_path_to_binary(const Dso &dso) {
+DsoHdr::FileLocInfo_t DsoHdr::get_binary_loc_info(const Dso &dso) {
   // check if file exists locally
-  if (check_file_type(dso._filename.c_str(), S_IFMT)) {
-    return dso._filename;
+  inode_t inode = get_file_inode(dso._filename.c_str());
+  if (inode) {
+    return std::make_pair<std::string, inode_t>(std::string(dso._filename),
+                                                std::move(inode));
   }
   // whole host :
   // Example : /proc/<pid>/root/usr/local/bin/exe_file
   //   or      /host/proc/<pid>/root/usr/local/bin/exe_file
   std::string proc_path = _path_to_proc + "/proc/" + std::to_string(dso._pid) +
       "/root" + dso._filename;
-  if (check_file_type(proc_path.c_str(), S_IFMT)) {
-    return proc_path;
+  inode = get_file_inode(proc_path.c_str());
+  if (inode) {
+    return std::make_pair<std::string, inode_t>(std::move(proc_path),
+                                                std::move(inode));
   }
   LG_DBG("[DSO] Unable to find path to %s", dso._filename.c_str());
-  return std::string();
+  return std::make_pair<std::string, inode_t>(std::string(), 0);
 }
 
 int DsoHdr::get_nb_dso() const {

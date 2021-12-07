@@ -59,3 +59,13 @@ bool check_file_type(const char *pathname, int file_type) {
   }
   return false;
 }
+
+inode_t get_file_inode(const char *pathname) {
+  struct stat info;
+
+  if (stat(pathname, &info) != 0) {
+    return 0;
+  } else {
+    return info.st_ino;
+  }
+}

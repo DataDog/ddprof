@@ -15,6 +15,8 @@
 
 // unique identifier to serve as a key for Dso
 typedef uint32_t DsoUID_t;
+// Linux Inode type
+typedef uint64_t inode_t;
 
 typedef int32_t SymbolIdx_t;
 typedef int32_t MapInfoIdx_t;

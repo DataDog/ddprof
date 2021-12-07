@@ -47,7 +47,7 @@ RegionHolder::RegionHolder(const std::string &full_path, size_t sz,
 }
 
 bool RegionKey::operator==(const RegionKey &o) const {
-  return _full_path == o._full_path && _offset == o._offset && _sz == o._sz &&
+  return _inode == o._inode && _offset == o._offset && _sz == o._sz &&
       _type == o._type;
 }
 

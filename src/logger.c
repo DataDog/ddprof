@@ -204,9 +204,6 @@ void vlprintfln(int lvl, int fac, const char *name, const char *format,
 }
 
 void olprintfln(int lvl, int fac, const char *name, const char *fmt, ...) {
-  if (lvl > log_ctx->level || lvl < 0)
-    return;
-
   va_list args;
   va_start(args, fmt);
   vlprintfln(lvl, fac, name, fmt, args);

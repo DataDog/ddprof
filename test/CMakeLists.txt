@@ -64,6 +64,11 @@ add_unit_test(
 )
 
 add_unit_test(
+    logger-ut
+    logger-ut.cc
+)
+
+add_unit_test(
     signal_helper-ut
     ../src/signal_helper.c 
     signal_helper-ut.cc
@@ -136,6 +141,7 @@ add_unit_test(
     DEFINITIONS MYNAME="userid-ut"
 )
 
+add_compile_definitions("IPC_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 add_unit_test(
     procutils-ut
     ../src/procutils.c

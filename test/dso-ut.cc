@@ -297,8 +297,9 @@ TEST(DSOTest, backpopulate) {
   // check that string dso-ut is contained in the dso
   EXPECT_TRUE(find_res.first->_filename.find(MYNAME) != std::string::npos);
   // check that we match the local binary
-  std::string path_bin = dso_hdr.get_path_to_binary(*find_res.first);
-  EXPECT_EQ(path_bin, find_res.first->_filename);
+  DsoHdr::FileLocInfo_t file_loc_info =
+      dso_hdr.get_binary_loc_info(*find_res.first);
+  EXPECT_EQ(file_loc_info.first, find_res.first->_filename);
   // manually erase the unit test's binary
   dso_hdr._map[getpid()].erase(find_res.first);
   find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
@@ -308,9 +309,11 @@ TEST(DSOTest, backpopulate) {
 TEST(DSOTest, missing_dso) {
   LogHandle loghandle;
   DsoHdr dso_hdr;
+  // Build fake dso
   Dso foo_dso = build_dso_5_1500();
-  std::string path_bin = dso_hdr.get_path_to_binary(foo_dso);
-  EXPECT_TRUE(path_bin.empty());
+  DsoHdr::FileLocInfo_t file_loc_info = dso_hdr.get_binary_loc_info(foo_dso);
+  EXPECT_TRUE(file_loc_info.first.empty());
+  EXPECT_FALSE(file_loc_info.second);
 }
 
 } // namespace ddprof

@@ -48,7 +48,7 @@ DsoMod update_mod(DsoHdr *dso_hdr, Dwfl *dwfl, int pid, ProcessAddress_t pc) {
   // Try again if either if we failed to hit the dwfl cache above
   if (!dso_mod_res._dwfl_mod && dso._type == ddprof::dso::kStandard) {
     // assumption is that this string is built only once
-    const std::string filepath = dso_hdr->get_path_to_binary(dso);
+    const std::string filepath = dso_hdr->get_binary_loc_info(dso).first;
     if (!filepath.empty()) {
       const char *dso_name = strrchr(filepath.c_str(), '/') + 1;
       // Try again within this POD's filesystem

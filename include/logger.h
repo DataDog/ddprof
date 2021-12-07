@@ -8,6 +8,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 
+#include "unlikely.h"
 #include "version.h"
 
 extern char *LOG_IGNORE;
@@ -85,9 +86,17 @@ int LOG_getlevel();
 void LOG_setfacility(int);
 
 /******************************* Logging Macros *******************************/
-#define LG_ERR(...) olprintfln(LL_ERROR, -1, MYNAME, __VA_ARGS__)
-#define LG_WRN(...) olprintfln(LL_WARNING, -1, MYNAME, __VA_ARGS__)
-#define LG_NTC(...) olprintfln(LL_NOTICE, -1, MYNAME, __VA_ARGS__)
-#define LG_NFO(...) olprintfln(LL_INFORMATIONAL, -1, MYNAME, __VA_ARGS__)
-#define LG_DBG(...) olprintfln(LL_DEBUG, -1, MYNAME, __VA_ARGS__)
-#define LG_PRINT(...) lprintfln(LL_INFORMATIONAL, -1, MYNAME, __VA_ARGS__)
+// Avoid calling arguments (which can have CPU costs unless level is OK)
+#define LG_IF_LVL_OK(level, ...)                                               \
+  do {                                                                         \
+    if (unlikely(level <= LOG_getlevel() && level >= 0)) {                     \
+      olprintfln(level, -1, MYNAME, __VA_ARGS__);                              \
+    }                                                                          \
+  } while (false)
+
+#define LG_ERR(...) LG_IF_LVL_OK(LL_ERROR, __VA_ARGS__)
+#define LG_WRN(...) LG_IF_LVL_OK(LL_WARNING, __VA_ARGS__)
+#define LG_NTC(...) LG_IF_LVL_OK(LL_NOTICE, __VA_ARGS__)
+#define LG_NFO(...) LG_IF_LVL_OK(LL_INFORMATIONAL, __VA_ARGS__)
+#define LG_DBG(...) LG_IF_LVL_OK(LL_DEBUG, __VA_ARGS__)
+#define LG_PRINT(...) LG_IF_LVL_OK(LL_INFORMATIONAL, __VA_ARGS__)

@@ -73,6 +73,9 @@ public:
   typedef std::pair<DsoSetIt, DsoSetIt> DsoRange;
   typedef std::pair<DsoSetConstIt, bool> DsoFindRes;
 
+  /* Path and inode information */
+  typedef std::pair<std::string, inode_t> FileLocInfo_t;
+
   /******* MAIN APIS **********/
   DsoHdr();
 
@@ -118,7 +121,7 @@ public:
   }
 
   // returns an empty string if it can't find the binary
-  std::string get_path_to_binary(const Dso &dso);
+  FileLocInfo_t get_binary_loc_info(const Dso &dso);
 
   int get_nb_dso() const;
   int get_nb_mapped_dso() const;

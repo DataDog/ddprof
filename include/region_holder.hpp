@@ -17,11 +17,13 @@ extern "C" {
 namespace ddprof {
 
 struct RegionKey {
-  RegionKey(const std::string &full_path, ElfAddress_t offset, std::size_t sz,
+  RegionKey(inode_t inode, ElfAddress_t offset, std::size_t sz,
             dso::DsoType path_type)
-      : _full_path(full_path), _offset(offset), _sz(sz), _type(path_type) {}
+      : _inode(inode), _offset(offset), _sz(sz), _type(path_type) {}
   bool operator==(const RegionKey &o) const;
-  std::string _full_path;
+  // inode is used as a key (instead of path which can be the same for several
+  // containers). TODO: inode could be the same across several filesystems
+  inode_t _inode;
   ElfAddress_t _offset;
   std::size_t _sz;
   dso::DsoType _type; // although it is a function of path, lets keep it
@@ -64,7 +66,7 @@ template <> struct hash<ddprof::RegionKey> {
   std::size_t operator()(const ddprof::RegionKey &k) const {
     // Combine hashes of standard types
     std::size_t hash_val = ddprof::hash_combine(
-        hash<std::string>()(k._full_path), hash<ElfAddress_t>()(k._offset));
+        hash<inode_t>()(k._inode), hash<ElfAddress_t>()(k._offset));
     hash_val = ddprof::hash_combine(hash_val, hash<size_t>()(k._sz));
     return hash_val;
   }

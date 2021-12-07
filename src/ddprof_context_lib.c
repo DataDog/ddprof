@@ -40,20 +40,24 @@ DDRes ddprof_context_set(const DDProfInput *input, DDProfContext *ctx) {
   }
 
   // Process logging level
-  char const *loglpattern[] = {"debug", "notice", "warn", "error"};
-  const int sizeOfLoglpattern = 4;
+  char const *loglpattern[] = {"debug", "informational", "notice", "warn",
+                               "error"};
+  const int sizeOfLoglpattern = 5;
   switch (arg_which(input->loglevel, loglpattern, sizeOfLoglpattern)) {
   case 0:
     LOG_setlevel(LL_DEBUG);
     break;
   case 1:
+    LOG_setlevel(LL_INFORMATIONAL);
+    break;
+  case 2:
     LOG_setlevel(LL_NOTICE);
     break;
-  case -1:
-  case 2:
+  case -1: // default
+  case 3:
     LOG_setlevel(LL_WARNING);
     break;
-  case 3:
+  case 4:
     LOG_setlevel(LL_ERROR);
     break;
   }

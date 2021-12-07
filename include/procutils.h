@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "ddprof_defs.h"
 #include "ddres.h"
 #include "proc_status.h"
 
@@ -16,3 +17,6 @@ DDRes proc_read(ProcStatus *);
 
 // check sys types for the different types (S_IFLNK, S_IFDIR...)
 bool check_file_type(const char *pathname, int file_type);
+
+// Returns 0 if it can not find the matching file (0 represents a deleted file)
+inode_t get_file_inode(const char *pathname);

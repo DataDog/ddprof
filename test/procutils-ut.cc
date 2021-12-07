@@ -31,3 +31,21 @@ TEST(ProcUtilsTest, check_file_type) {
   ASSERT_TRUE(check_file_type(buf, S_IFMT));
   ASSERT_TRUE(check_file_type(buf, S_IFDIR));
 }
+
+TEST(ProcUtilsTest, inode) {
+  {
+    char buf[1024] = {0};
+    snprintf(buf, 1024, "/proc/%d/maps", getpid());
+    inode_t inode = get_file_inode(buf);
+    ASSERT_TRUE(inode);
+  }
+  { // symlinks
+    std::string path_procutils_test =
+        std::string(IPC_TEST_DATA "/procutils_test.txt");
+    std::string path_l_procutils_test =
+        std::string(IPC_TEST_DATA "/link_procutils_test.txt");
+    inode_t inode = get_file_inode(path_procutils_test.c_str());
+    inode_t inode_link = get_file_inode(path_l_procutils_test.c_str());
+    ASSERT_EQ(inode, inode_link);
+  }
+}
