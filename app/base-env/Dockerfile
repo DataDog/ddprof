@@ -88,15 +88,6 @@ RUN git clone --depth 1 --branch v3.10.2 https://github.com/nlohmann/json.git \
   && cmake DJSON_BuildTests=Off ../  \
   && make install
 
-# C++ containers (header only, avoid pulling in boost)
-RUN git clone --depth 1 --branch 2.0 https://github.com/AmadeusITGroup/amc.git \
-  && cd amc \
-  && mkdir build \
-  && cd build \
-  && cmake -DAMC_ENABLE_TESTS=0 -DAMC_ENABLE_BENCHMARKS=0 ../ \
-  && cmake --build .  \
-  && make install
-
 RUN curl -L https://github.com/github/codeql-action/releases/download/codeql-bundle-20210622/codeql-bundle-linux64.tar.gz -o - | tar -xz -C /usr/local
 
 # A specific user is required to get access to perf event ressources. 

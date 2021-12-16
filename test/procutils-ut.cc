@@ -36,16 +36,28 @@ TEST(ProcUtilsTest, inode) {
   {
     char buf[1024] = {0};
     snprintf(buf, 1024, "/proc/%d/maps", getpid());
-    inode_t inode = get_file_inode(buf);
-    ASSERT_TRUE(inode);
+    int64_t size;
+    inode_t inode;
+
+    bool file_found = get_file_inode(buf, &inode, &size);
+    ASSERT_TRUE(file_found);
   }
   { // symlinks
     std::string path_procutils_test =
         std::string(IPC_TEST_DATA "/procutils_test.txt");
     std::string path_l_procutils_test =
         std::string(IPC_TEST_DATA "/link_procutils_test.txt");
-    inode_t inode = get_file_inode(path_procutils_test.c_str());
-    inode_t inode_link = get_file_inode(path_l_procutils_test.c_str());
+    int64_t size;
+    inode_t inode;
+    bool file_found =
+        get_file_inode(path_procutils_test.c_str(), &inode, &size);
+    ASSERT_TRUE(file_found);
+    int64_t size_link;
+    inode_t inode_link;
+    bool link_found =
+        get_file_inode(path_l_procutils_test.c_str(), &inode_link, &size_link);
+    ASSERT_TRUE(link_found);
     ASSERT_EQ(inode, inode_link);
+    ASSERT_EQ(size, size_link);
   }
 }

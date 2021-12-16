@@ -32,27 +32,25 @@ public:
 
   // Check if the provided address falls within the provided dso
   bool is_within(pid_t pid, ElfAddress_t addr) const;
-  bool errored() const { return _errored; }
-  bool operator<(const Dso &o) const;
   // Avoid use of strict == as we do not consider _end in comparison
   bool operator==(const Dso &o) const = delete;
   // perf gives larger regions than proc maps (keep the largest of them)
-  bool same_or_smaller(const Dso &o) const;
+
   bool intersects(const Dso &o) const;
   std::string to_string() const;
   std::string format_filename() const;
-  void flag_error() const { _errored = true; }
+
+  // Adjust as linker can reduce size of mmap
+  bool adjust_same(const Dso &o);
 
   pid_t _pid;
   ElfAddress_t _start;
   ElfAddress_t _end;
   ElfAddress_t _pgoff;
-  std::string _filename;
-  DsoUID_t _id;
+  std::string _filename; // path as perceived by the user
   dso::DsoType _type;
   bool _executable;
-
-  mutable bool _errored;
+  mutable FileInfoId_t _id;
 };
 
 std::ostream &operator<<(std::ostream &os, const Dso &dso);

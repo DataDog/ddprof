@@ -6,10 +6,12 @@
 #pragma once
 
 #include "ddres_def.h"
-#include "unwind_state.hpp"
 
+typedef struct UnwindState UnwindState;
 namespace ddprof {
 
-DDRes unwind_dwfl(UnwindState *us, DwflWrapper &dwfl_wrapper);
+DDRes unwind_init_dwfl(UnwindState *us);
+
+DDRes unwind_dwfl(UnwindState *us);
 
 } // namespace ddprof

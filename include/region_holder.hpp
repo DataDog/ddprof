@@ -11,23 +11,11 @@ extern "C" {
 #include <string>
 #include <unordered_map>
 
+#include "ddprof_file_info-i.hpp"
 #include "dso_type.hpp"
 #include "hash_helper.hpp"
 
 namespace ddprof {
-
-struct RegionKey {
-  RegionKey(inode_t inode, ElfAddress_t offset, std::size_t sz,
-            dso::DsoType path_type)
-      : _inode(inode), _offset(offset), _sz(sz), _type(path_type) {}
-  bool operator==(const RegionKey &o) const;
-  // inode is used as a key (instead of path which can be the same for several
-  // containers). TODO: inode could be the same across several filesystems
-  inode_t _inode;
-  ElfAddress_t _offset;
-  std::size_t _sz;
-  dso::DsoType _type; // although it is a function of path, lets keep it
-};
 
 // mmaps the given regions
 class RegionHolder {
@@ -60,21 +48,7 @@ private:
   dso::DsoType _type;
 };
 
-} // namespace ddprof
-namespace std {
-template <> struct hash<ddprof::RegionKey> {
-  std::size_t operator()(const ddprof::RegionKey &k) const {
-    // Combine hashes of standard types
-    std::size_t hash_val = ddprof::hash_combine(
-        hash<inode_t>()(k._inode), hash<ElfAddress_t>()(k._offset));
-    hash_val = ddprof::hash_combine(hash_val, hash<size_t>()(k._sz));
-    return hash_val;
-  }
-};
-
-} // namespace std
-namespace ddprof {
-// Associate files to mmaped regions (unique ptr to avoid copies)
-typedef std::unordered_map<DsoUID_t, RegionHolder> RegionMap;
+// Associate files to mmaped regions
+typedef std::unordered_map<FileInfoId_t, RegionHolder> RegionMap;
 
 } // namespace ddprof

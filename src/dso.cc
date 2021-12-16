@@ -20,20 +20,23 @@ static const std::string s_stack_str = "[stack]";
 static const std::string s_heap_str = "[heap]";
 // anon and empty are the same (one comes from perf, the other from proc maps)
 static const std::string s_anon_str = "//anon";
+static const std::string s_jsa_str = ".jsa";
 // Example of these include : anon_inode:[perf_event]
 static const std::string s_anon_inode_str = "anon_inode";
 // Example socket:[123456]
 static const std::string s_socket_str = "socket";
-
+// null elements
+static const std::string s_dev_zero_str = "/dev/zero";
+static const std::string s_dev_null_str = "/dev/null";
 // invalid element
 Dso::Dso()
-    : _pid(-1), _start(), _end(), _pgoff(), _filename(), _id(0),
-      _type(dso::kUndef), _executable(false), _errored(true) {}
+    : _pid(-1), _start(), _end(), _pgoff(), _filename(), _type(dso::kUndef),
+      _executable(false), _id(k_file_info_error) {}
 
 Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
          std::string &&filename, bool executable)
     : _pid(pid), _start(start), _end(end), _pgoff(pgoff), _filename(filename),
-      _id(0), _type(dso::kStandard), _executable(executable), _errored(false) {
+      _type(dso::kStandard), _executable(executable), _id(k_file_info_undef) {
   // note that substr manages the case where len str < len vdso_str
   if (_filename.substr(0, s_vdso_str.length()) == s_vdso_str) {
     _type = dso::kVdso;
@@ -47,7 +50,13 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
   } else if (_filename.empty() ||
              _filename.substr(0, s_anon_str.length()) == s_anon_str ||
              _filename.substr(0, s_anon_inode_str.length()) ==
-                 s_anon_inode_str) {
+                 s_anon_inode_str ||
+             _filename.substr(0, s_dev_zero_str.length()) == s_dev_zero_str ||
+             _filename.substr(0, s_dev_null_str.length()) == s_dev_null_str ||
+             // ends with .jsa
+             ((_filename.length() > s_jsa_str.length() + 1) &&
+              _filename.substr(_filename.length() - s_jsa_str.length(),
+                               _filename.length()) == s_jsa_str)) {
     _type = dso::kAnon;
   } else if (_filename.substr(0, s_socket_str.length()) == s_socket_str) {
     _type = dso::kSocket;
@@ -75,39 +84,21 @@ std::ostream &operator<<(std::ostream &os, const Dso &dso) {
   return os;
 }
 
-bool Dso::operator<(const Dso &o) const {
-  // In priority consider the pid in the order
-  if (_pid < o._pid) {
-    return true;
-  } else if (_pid > o._pid) {
-    return false;
-  } else { // then look at the start address
-    if (_start < o._start) {
-      return true;
-    }
-  }
-  return false;
-}
-
 // perf does not return the same sizes as proc maps
 // Example :
 // PID<1> 7f763019e000-7f76304ddfff (//anon)
 // PID<1> 7f763019e000-7f76304de000 ()
 
-bool Dso::same_or_smaller(const Dso &o) const {
+bool Dso::adjust_same(const Dso &o) {
   if (_start != o._start) {
     return false;
   }
   if (_pgoff != o._pgoff) {
     return false;
   }
-  if (_end < o._end) {
-    return false;
-  }
   if (_type != o._type) {
     return false;
   }
-
   // only compare filename if we are backed by real files
   if (_type == dso::kStandard && _filename != o._filename) {
     return false;
@@ -115,18 +106,23 @@ bool Dso::same_or_smaller(const Dso &o) const {
   if (_executable != o._executable) {
     return false;
   }
-
+  _end = o._end;
   return true;
 }
 
 bool Dso::intersects(const Dso &o) const {
-  if (is_within(o._pid, o._start)) {
-    return true;
+  // Check order of points
+  // Test that we have lowest-start <-> lowest-end  ... highiest-start
+  if (_start < o._start) {
+    // this Dso comes first check then it ends before the other
+    if (_end < o._start) {
+      return false;
+    }
+  } else if (o._end < _start) {
+    // dso comes after, check that other ends before our start
+    return false;
   }
-  if (is_within(o._pid, o._end)) {
-    return true;
-  }
-  return false;
+  return true;
 }
 
 bool Dso::is_within(pid_t pid, ElfAddress_t addr) const {

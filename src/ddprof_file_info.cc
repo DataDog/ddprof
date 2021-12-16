@@ -3,9 +3,13 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#pragma once
+#include "ddprof_file_info.hpp"
 
-#include "ddprof_defs.h"
+namespace ddprof {
 
-// Resets the metrics
-void unwind_metrics_reset(void);
+bool FileInfoKey::operator==(const FileInfoKey &o) const {
+  // default comparison is c++20
+  return _inode == o._inode && _offset == o._offset && _sz == o._sz;
+}
+
+} // namespace ddprof

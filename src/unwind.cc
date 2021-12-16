@@ -10,54 +10,47 @@ extern "C" {
 #include "libebl.h"
 #include "logger.h"
 #include "signal_helper.h"
+#include "unwind_metrics.h"
 }
 
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
 #include "symbol_hdr.hpp"
-#include "symbolize_dwfl.hpp"
 #include "unwind_dwfl.hpp"
 #include "unwind_helpers.hpp"
+#include "unwind_state.hpp"
 
 #define UNUSED(x) (void)(x)
 
 namespace ddprof {
-
 void unwind_init(void) { elf_version(EV_CURRENT); }
 
-static void unwindstate_init_sample(UnwindState *us) {
-  uw_output_clear(&us->output);
-  us->current_regs = us->initial_regs;
+static void find_dso_add_error_frame(UnwindState *us) {
+  DsoHdr::DsoFindRes find_res =
+      us->dso_hdr.dso_find_closest(us->pid, us->current_regs.eip);
+  add_error_frame(find_res.second ? &(find_res.first->second) : nullptr, us,
+                  us->current_regs.eip);
 }
 
-static void add_error_frame(UnwindState *us) {
-  DsoMod dso_mod =
-      update_mod(&us->dso_hdr, us->dwfl, us->pid, us->current_regs.eip);
-  if (!dso_mod._dso_find_res.second) {
-    LG_DBG("Could not localize top-level IP: [%d](0x%lx)", us->pid,
-           us->current_regs.eip);
-    add_common_frame(us, CommonSymbolLookup::LookupCases::unknown_dso);
-  } else {
-    LG_DBG("Failed unwind: %s [%d](0x%lx)",
-           dso_mod._dso_find_res.first->_filename.c_str(), us->pid,
-           us->current_regs.eip);
-    us->dso_hdr._stats.incr_metric(DsoStats::kUnwindFailure,
-                                   dso_mod._dso_find_res.first->_type);
-    add_dso_frame(us, *dso_mod._dso_find_res.first, us->current_regs.eip);
-  }
+void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
+                        pid_t sample_pid, uint64_t sample_size_stack,
+                        char *sample_data_stack) {
+  uw_output_clear(&us->output);
+  memcpy(&us->initial_regs.regs[0], sample_regs,
+         K_NB_REGS_UNWIND * sizeof(uint64_t));
+  us->current_regs = us->initial_regs;
+  us->pid = sample_pid;
+  us->stack_sz = sample_size_stack;
+  us->stack = sample_data_stack;
 }
 
 DDRes unwindstate__unwind(UnwindState *us) {
   DDRes res = ddres_init();
   if (us->pid != 0) { // we can not unwind pid 0
-    unwindstate_init_sample(us);
-    // Create or get the dwfl object associated to cache
-    DwflWrapper &dwfl_wrapper = us->dwfl_hdr.get_or_insert(us->pid);
-    us->dwfl = dwfl_wrapper._dwfl;
-    res = unwind_dwfl(us, dwfl_wrapper);
+    res = unwind_dwfl(us);
   }
   if (IsDDResNotOK(res)) {
-    add_error_frame(us);
+    find_dso_add_error_frame(us);
   }
   // Add a frame that identifies executable to which these belong
   add_virtual_base_frame(us);
@@ -73,9 +66,11 @@ void unwind_pid_free(UnwindState *us, pid_t pid) {
 void unwind_cycle(UnwindState *us) {
   us->symbol_hdr.display_stats();
   us->symbol_hdr.cycle();
-
   // clean up pids that we did not see recently
   us->dwfl_hdr.clear_unvisited();
+
+  us->dso_hdr._stats.reset();
+  unwind_metrics_reset();
 }
 
 } // namespace ddprof

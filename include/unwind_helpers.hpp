@@ -11,7 +11,8 @@ extern "C" {
 
 #include "dso.hpp"
 #include "symbol_hdr.hpp"
-#include "unwind_state.hpp"
+
+typedef struct UnwindState UnwindState;
 
 namespace ddprof {
 bool max_stack_depth_reached(UnwindState *us);
@@ -24,5 +25,7 @@ void add_dso_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc);
 void add_virtual_base_frame(UnwindState *us);
 
 bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg);
+
+void add_error_frame(const Dso *dso, UnwindState *us, ProcessAddress_t pc);
 
 } // namespace ddprof

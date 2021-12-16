@@ -1,2 +1,2 @@
 set follow-fork-mode child
-break worker_unwind_init
+break worker_library_init

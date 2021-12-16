@@ -104,7 +104,7 @@ static DDRes ddprof_breakdown(DDProfContext *ctx) {
 void ddprof_start_profiler(DDProfContext *ctx) {
   const WorkerAttr perf_funs = {
       .init_fun = ddprof_worker_init,
-      .finish_fun = ddprof_worker_finish,
+      .finish_fun = ddprof_worker_free,
   };
 
   // Enter the main loop -- this will not return unless there is an error.
@@ -126,8 +126,8 @@ void ddprof_start_profiler(DDProfContext *ctx) {
 void ddprof_attach_handler(DDProfContext *ctx,
                            const StackHandler *stack_handler) {
   const WorkerAttr perf_funs = {
-      .init_fun = worker_unwind_init,
-      .finish_fun = worker_unwind_free,
+      .init_fun = worker_library_init,
+      .finish_fun = worker_library_free,
   };
   pid_t pid = ctx->params.pid;
 

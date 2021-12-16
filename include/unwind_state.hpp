@@ -13,6 +13,7 @@ extern "C" {
 #include "ddres_def.h"
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
+#include "dwfl_thread_callbacks.hpp"
 #include "symbol_hdr.hpp"
 
 typedef struct Dwfl Dwfl;
@@ -35,12 +36,16 @@ struct UnwindRegisters {
   };
 };
 
+/// UnwindState
+/// Single structure with everything necessary in unwinding. The structure is
+/// given through callbacks
 typedef struct UnwindState {
-  UnwindState() : dwfl(nullptr), pid(-1), stack(nullptr), stack_sz(0) {
+  UnwindState() : _dwfl_wrapper(nullptr), pid(-1), stack(nullptr), stack_sz(0) {
     uw_output_clear(&output);
   }
+
   ddprof::DwflHdr dwfl_hdr;
-  Dwfl *dwfl; // pointer to current dwfl element
+  ddprof::DwflWrapper *_dwfl_wrapper; // pointer to current dwfl element
 
   ddprof::DsoHdr dso_hdr;
   SymbolHdr symbol_hdr;

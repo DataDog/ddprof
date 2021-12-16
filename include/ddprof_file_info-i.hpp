@@ -5,7 +5,9 @@
 
 #pragma once
 
-#include "ddprof_defs.h"
-
-// Resets the metrics
-void unwind_metrics_reset(void);
+namespace ddprof {
+// unique identifier to serve as a key for Dso
+typedef int32_t FileInfoId_t;
+static const int k_file_info_undef = -1;
+static const int k_file_info_error = 0;
+} // namespace ddprof

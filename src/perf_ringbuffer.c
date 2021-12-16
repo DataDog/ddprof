@@ -257,7 +257,7 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr, uint64_t mask) {
     } else {
       uint64_t dynsz_stack = 0;
       sample.data_stack = (char *)buf;
-      buf += ((size_stack + 0x7UL) & ~0x7UL) / 8; // align
+      buf += ((size_stack + 0x7UL) & ~0x7UL) / 8; // align (/8 as it is uint64)
 
       // If the size was specified, we also have a dyn_size
       dynsz_stack = *buf++;

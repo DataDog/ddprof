@@ -100,9 +100,6 @@ endif()
 # Install lib cap to retrieve capabilities
 include(Findlibcap)
 
-# c++ containers (MIT license) without pulling in boost (mainly flat set)
-find_package(amc)
-
 ####################
 ### Unit tests   ###
 ####################
@@ -166,7 +163,7 @@ set(DDPROF_GLOBAL_SRC
    ${EXPORTER_SRC}
    ${EXE_SRC})
 
-set(DDPROF_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads amc::amc)
+set(DDPROF_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 
 if("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
    # Static link of libstdc++ (in case it is not installed on customer side)
@@ -223,7 +220,7 @@ option(BUILD_NATIVE_LIB "Build a library out of the native profiler" OFF)
       ${LIB_SRC})
 
    ## Libs to link
-   set(NATIVE_LIB_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads amc::amc)
+   set(NATIVE_LIB_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
    list(APPEND NATIVE_LIB_INCLUDE_LIST ${LIBDDPROF_INCLUDE_DIR} ) # to be removed (unlikely.h)
    list(APPEND NATIVE_LIB_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include ${ELFUTILS_INCLUDE_LIST}) # legit includes
 

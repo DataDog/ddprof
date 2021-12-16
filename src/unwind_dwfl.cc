@@ -10,53 +10,86 @@ extern "C" {
 #include "ddres.h"
 #include "dwfl_internals.h"
 #include "logger.h"
-
-#include <dwarf.h>
 }
 
+#include "dwfl_thread_callbacks.hpp"
 #include "symbol_hdr.hpp"
-#include "symbolize_dwfl.hpp"
 #include "unwind_helpers.hpp"
+#include "unwind_state.hpp"
 
 extern "C" {
-pid_t next_thread(Dwfl *, void *, void **);
-bool set_initial_registers(Dwfl_Thread *, void *);
 int frame_cb(Dwfl_Frame *, void *);
-int tid_cb(Dwfl_Thread *, void *);
-bool memory_read_dwfl(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
-                      void *arg);
 }
 
 namespace ddprof {
 
-/// memory_read as per prototype define in libdwfl
-bool memory_read_dwfl(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
-                      void *arg) {
-  (void)dwfl;
-  return memory_read(addr, result, arg);
-}
+DDRes unwind_init_dwfl(UnwindState *us) {
+  // Create or get the dwfl object associated to cache
+  us->_dwfl_wrapper = &(us->dwfl_hdr.get_or_insert(us->pid));
+  if (!us->_dwfl_wrapper->_attached) {
+    // we need to add at least one module to figure out the architecture (to
+    // create the unwinding backend)
 
-pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
-  (void)dwfl;
-  if (*thread_argp != NULL) {
-    return 0;
+    DsoHdr::DsoMap &map = us->dso_hdr._map[us->pid];
+    if (map.empty()) {
+      int nb_elts;
+      us->dso_hdr.pid_backpopulate(us->pid, nb_elts);
+    }
+
+    bool success = false;
+    // Find an elf file we can load for this PID
+    for (auto el : map) {
+      if (el.second._executable) {
+        const Dso &dso = el.second;
+        FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
+        if (file_info_id <= k_file_info_error) {
+          LG_DBG("Unable to find file for DSO %s", dso.to_string().c_str());
+          continue;
+        }
+        const FileInfoValue &file_info_value =
+            us->dso_hdr.get_file_info_value(file_info_id);
+        if (IsDDResOK(us->_dwfl_wrapper->register_mod(us->current_regs.eip, dso,
+                                                      file_info_value))) {
+          // one success is fine
+          success = true;
+          break;
+        }
+      }
+    }
+    if (!success) {
+      LG_DBG("Unable to attach a mod for PID%d", us->pid);
+      return ddres_warn(DD_WHAT_UW_ERROR);
+    }
+
+    static const Dwfl_Thread_Callbacks dwfl_callbacks = {
+        .next_thread = next_thread,
+        .get_thread = nullptr,
+        .memory_read = memory_read_dwfl,
+        .set_initial_registers = set_initial_registers,
+        .detach = nullptr,
+        .thread_detach = nullptr,
+    };
+    // Creates the dwfl unwinding backend
+    return us->_dwfl_wrapper->attach(us->pid, &dwfl_callbacks, us);
   }
-  struct UnwindState *us = (UnwindState *)arg;
-  *thread_argp = arg;
-  return us->pid;
+  return ddres_init();
 }
 
-bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
-  struct UnwindState *us = (UnwindState *)arg;
-  Dwarf_Word regs[17] = {0};
-
-  // I only save three lol
-  regs[6] = us->current_regs.ebp;
-  regs[7] = us->current_regs.esp;
-  regs[16] = us->current_regs.eip;
-
-  return dwfl_thread_state_registers(thread, 0, 17, regs);
+static void trace_unwinding_end(UnwindState *us) {
+  if (LL_DEBUG <= LOG_getlevel()) {
+    DsoHdr::DsoFindRes find_res =
+        us->dso_hdr.dso_find_closest(us->pid, us->current_regs.eip);
+    if (find_res.second) {
+      LG_DBG("Stopped at %lx - dso %s - error %s", us->current_regs.eip,
+             find_res.first->second.to_string().c_str(), dwfl_errmsg(-1));
+    } else {
+      LG_DBG("Unknown DSO %lx - error %s", us->current_regs.eip,
+             dwfl_errmsg(-1));
+    }
+  }
 }
+
+static void add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc);
 
 static void copy_current_registers(const Dwfl_Frame *state,
                                    UnwindRegisters &current_regs) {
@@ -77,58 +110,35 @@ static bool add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   Dwarf_Addr pc = 0;
   bool isactivation = false;
 
-  // Query the frame state to get the PC.  We skip the expensive check for
-  // activation frame because the underlying DSO (module) may not have been
-  // cached yet (but we need the PC to generate/check such a cache
-  if (!dwfl_frame_pc(dwfl_frame, &pc, NULL)) {
-    LG_DBG("dwfl_frame_pc NULL (%s)(depth#%lu)", dwfl_errmsg(-1),
+  if (!dwfl_frame_pc(dwfl_frame, &pc, &isactivation)) {
+    LG_DBG("Failure to compute frame PC: %s (depth#%lu)", dwfl_errmsg(-1),
            us->output.nb_locs);
-    ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
+    DsoHdr::DsoFindRes find_res = us->dso_hdr.dso_find_closest(us->pid, pc);
+    add_error_frame(find_res.second ? &(find_res.first->second) : nullptr, us,
+                    pc);
     return true; // invalid pc : do not add frame
   }
-  DsoMod dso_mod = update_mod(&us->dso_hdr, us->dwfl, us->pid, pc);
-  Dwfl_Module *mod = dso_mod._dwfl_mod;
 
-  if (mod) {
-    if (!dwfl_frame_pc(dwfl_frame, &pc, &isactivation)) {
-      LG_DBG("Failure to compute frame PC: %s (depth#%lu)", dwfl_errmsg(-1),
-             us->output.nb_locs);
-      goto ERROR_FRAME_CONTINUE_UNWINDING;
-    }
-    if (!isactivation)
-      --pc;
-    // updating frame can call backpopulate which invalidates the dso pointer
-    // --> refresh the iterator
-    dso_mod._dso_find_res = us->dso_hdr.dso_find_closest(us->pid, pc);
-    if (!dso_mod._dso_find_res.second) {
-      // strange scenario (backpopulate removed this dso)
-      LG_DBG("Unable to retrieve DSO after call to frame_pc (depth#%lu)",
-             us->output.nb_locs);
-      goto ERROR_FRAME_CONTINUE_UNWINDING;
-    }
-    // Now we register
-    add_dwfl_frame(us, dso_mod, pc);
-  } else {
-    LG_DBG("Unable to retrieve the Dwfl_Module: %s (depth#%lu)",
-           dwfl_errmsg(-1), us->output.nb_locs);
-    goto ERROR_FRAME_CONTINUE_UNWINDING;
+  if (!isactivation)
+    --pc;
+
+  DsoHdr::DsoFindRes find_res =
+      us->dso_hdr.dso_find_or_backpopulate(us->pid, pc);
+  if (!find_res.second) {
+    // no matching file was found
+    LG_DBG("[UW]%d: DSO not found at 0x%lx (depth#%lu)", us->pid, pc,
+           us->output.nb_locs);
+    add_error_frame(nullptr, us, pc);
+    return true;
   }
 
-  return true;
-ERROR_FRAME_CONTINUE_UNWINDING:
-
-  ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
-  if (dso_mod._dso_find_res.second) {
-    const Dso &dso = *dso_mod._dso_find_res.first;
-    add_dso_frame(us, dso, pc);
-  } else {
-    add_common_frame(us, CommonSymbolLookup::LookupCases::unknown_dso);
-  }
-  LG_DBG("Error frame (depth#%lu)", us->output.nb_locs);
+  // Now we register
+  add_dwfl_frame(us, find_res.first->second, pc);
   return true;
 }
 
-int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
+// frame_cb callback at every frame for the dwarf unwinding
+static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
   UnwindState *us = (UnwindState *)arg;
 #ifdef DEBUG
   LG_NFO("Beging depth %lu", us->output.nb_locs);
@@ -150,37 +160,59 @@ int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
   return DWARF_CB_OK;
 }
 
-int tid_cb(Dwfl_Thread *thread, void *targ) {
-  dwfl_thread_getframes(thread, frame_cb, targ);
-  return DWARF_CB_OK;
-}
-
-static DDRes unwind_attach(DwflWrapper &dwfl_wrapper, struct UnwindState *us) {
-  static const Dwfl_Thread_Callbacks dwfl_callbacks = {
-      .next_thread = next_thread,
-      .get_thread = nullptr,
-      .memory_read = memory_read_dwfl,
-      .set_initial_registers = set_initial_registers,
-      .detach = nullptr,
-      .thread_detach = nullptr,
-  };
-  return dwfl_wrapper.attach(us->pid, &dwfl_callbacks, us);
-}
-
-DDRes unwind_dwfl(UnwindState *us, DwflWrapper &dwfl_wrapper) {
-  DDRes res;
-  res = unwind_attach(dwfl_wrapper, us);
-  if (!IsDDResOK(res)) { // frequent errors, avoid flooding logs
+DDRes unwind_dwfl(UnwindState *us) {
+  DDRes res = unwind_init_dwfl(us);
+  if (!IsDDResOK(res)) {
     LOG_ERROR_DETAILS(LG_DBG, res._what);
     return res;
   }
   //
   // Launch the dwarf unwinding (uses frame_cb callback)
-  if (!dwfl_getthread_frames(us->dwfl, us->pid, frame_cb, us)) {
-    res = us->output.nb_locs > 0 ? ddres_init()
-                                 : ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
+  if (dwfl_getthread_frames(us->_dwfl_wrapper->_dwfl, us->pid, frame_cb, us) !=
+      0) {
+    trace_unwinding_end(us);
   }
+  res = us->output.nb_locs > 0 ? ddres_init()
+                               : ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
   return res;
+}
+
+void add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc) {
+
+  SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
+  // if not encountered previously, update file location / key
+  FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
+  if (file_info_id <= k_file_info_error) {
+    // unable to acces file: add as much info from dso
+    add_dso_frame(us, dso, pc);
+    return;
+  }
+
+  const FileInfoValue &file_info_value =
+      us->dso_hdr.get_file_info_value(file_info_id);
+
+  // ensure unwinding backend has access to this module
+  us->_dwfl_wrapper->register_mod(pc, dso, file_info_value);
+
+  UnwindOutput *output = &us->output;
+  int64_t current_loc_idx = output->nb_locs;
+
+  output->locs[current_loc_idx]._symbol_idx =
+      unwind_symbol_hdr._dwfl_symbol_lookup_v2.get_or_insert(
+          us->_dwfl_wrapper->_dwfl, unwind_symbol_hdr._symbol_table,
+          unwind_symbol_hdr._dso_symbol_lookup, pc, dso, file_info_value);
+#ifdef DEBUG
+  LG_NTC("Considering frame with IP : %lx / %s ", pc,
+         us->symbol_hdr._symbol_table[output->locs[current_loc_idx]._symbol_idx]
+             ._symname.c_str());
+#endif
+
+  output->locs[current_loc_idx].ip = pc;
+
+  output->locs[current_loc_idx]._map_info_idx =
+      us->symbol_hdr._mapinfo_lookup.get_or_insert(
+          us->pid, us->symbol_hdr._mapinfo_table, dso);
+  output->nb_locs++;
 }
 
 } // namespace ddprof

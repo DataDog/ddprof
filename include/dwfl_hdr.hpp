@@ -6,10 +6,14 @@
 #pragma once
 
 extern "C" {
+#include "ddprof_defs.h"
 #include "dwfl_internals.h"
 #include <sys/types.h>
 }
 #include "ddres.h"
+
+#include "ddprof_file_info.hpp"
+#include "dso.hpp"
 
 #include <unordered_map>
 #include <unordered_set>
@@ -36,6 +40,9 @@ struct DwflWrapper {
   DDRes attach(pid_t pid, const Dwfl_Thread_Callbacks *callbacks,
                UnwindState *us);
 
+  DDRes register_mod(ProcessAddress_t pc, const Dso &dso,
+                     const FileInfoValue &fileInfoValue);
+
   ~DwflWrapper();
 
   static void swap(DwflWrapper &first, DwflWrapper &second) noexcept {
@@ -45,6 +52,9 @@ struct DwflWrapper {
 
   Dwfl *_dwfl;
   bool _attached;
+
+  // Keep track of the files we added to the dwfl object
+  std::unordered_map<FileInfoId_t, bool> _mod_added;
 };
 
 class DwflHdr {

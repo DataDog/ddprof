@@ -13,8 +13,6 @@
 // Maximum depth for a single stack
 #define DD_MAX_STACK_DEPTH 1024
 
-// unique identifier to serve as a key for Dso
-typedef uint32_t DsoUID_t;
 // Linux Inode type
 typedef uint64_t inode_t;
 

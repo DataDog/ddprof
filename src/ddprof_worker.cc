@@ -77,7 +77,7 @@ static inline void export_time_set(DDProfContext *ctx) {
       now_nanos() + export_time_convert(ctx->params.upload_period);
 }
 
-DDRes worker_unwind_init(DDProfContext *ctx) {
+DDRes worker_library_init(DDProfContext *ctx) {
   try {
     // Set the initial time
     export_time_set(ctx);
@@ -113,7 +113,7 @@ DDRes worker_unwind_init(DDProfContext *ctx) {
   return ddres_init();
 }
 
-DDRes worker_unwind_free(DDProfContext *ctx) {
+DDRes worker_library_free(DDProfContext *ctx) {
   try {
     delete ctx->worker_ctx.user_tags;
     ctx->worker_ctx.user_tags = nullptr;
@@ -152,21 +152,14 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   // Before we do anything else, copy the perf_event_header into a sample
   struct UnwindState *us = ctx->worker_ctx.us;
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
-  us->pid = sample->pid;
-  us->stack_sz = sample->size_stack;
-  us->stack = sample->data_stack;
+
+  // copy the sample context into the unwind structure
+  unwind_init_sample(us, sample->regs, sample->pid, sample->size_stack,
+                     sample->data_stack);
 
   // If this is a SW_TASK_CLOCK-type event, then aggregate the time
   if (ctx->watchers[pos].config == PERF_COUNT_SW_TASK_CLOCK)
     ddprof_stats_add(STATS_CPU_TIME, sample->period, NULL);
-
-#ifdef DEBUG
-  LG_DBG("[WORKER]<%d> (SAMPLE)%d: stack = %p / size = %lu", pos, us->pid,
-         us->stack, us->stack_sz);
-#endif
-  memcpy(&us->initial_regs.regs[0], sample->regs,
-         PERF_REGS_COUNT * sizeof(uint64_t));
-  uw_output_clear(&us->output);
   unsigned long this_ticks_unwind = __rdtsc();
   DDRes res = unwindstate__unwind(us);
 
@@ -199,8 +192,6 @@ static void ddprof_reset_worker_stats(DsoHdr *dso_hdr) {
   for (unsigned i = 0; i < cycled_stats_sz; ++i) {
     ddprof_stats_clear(s_cycled_stats[i]);
   }
-  dso_hdr->_stats.reset();
-  unwind_metrics_reset();
 }
 
 #ifndef DDPROF_NATIVE_LIB
@@ -405,7 +396,7 @@ DDRes ddprof_worker_timeout(volatile bool *continue_profiling,
 #ifndef DDPROF_NATIVE_LIB
 DDRes ddprof_worker_init(DDProfContext *ctx) {
   try {
-    DDRES_CHECK_FWD(worker_unwind_init(ctx));
+    DDRES_CHECK_FWD(worker_library_init(ctx));
     ctx->worker_ctx.exp[0] =
         (DDProfExporter *)calloc(1, sizeof(DDProfExporter));
     ctx->worker_ctx.exp[1] =
@@ -444,7 +435,7 @@ DDRes ddprof_worker_init(DDProfContext *ctx) {
   return ddres_init();
 }
 
-DDRes ddprof_worker_finish(DDProfContext *ctx) {
+DDRes ddprof_worker_free(DDProfContext *ctx) {
   try {
     // First, see if there are any outstanding requests and give them a token
     // amount of time to complete
@@ -457,7 +448,7 @@ DDRes ddprof_worker_finish(DDProfContext *ctx) {
       }
     }
 
-    DDRES_CHECK_FWD(worker_unwind_free(ctx));
+    DDRES_CHECK_FWD(worker_library_free(ctx));
     for (int i = 0; i < 2; i++) {
       if (ctx->worker_ctx.exp[i]) {
         DDRES_CHECK_FWD(ddprof_exporter_free(ctx->worker_ctx.exp[i]));

@@ -14,20 +14,26 @@ extern "C" {
 #include <utility>
 #include <vector>
 
+#include "ddres.h"
+#include "dwfl_module.hpp"
+
 namespace ddprof {
+
 DwflWrapper::DwflWrapper() : _dwfl(nullptr), _attached(false) {
+  // for split debug, we can fill the debuginfo_path
   static const Dwfl_Callbacks proc_callbacks = {
       .find_elf = dwfl_linux_proc_find_elf,
       .find_debuginfo = dwfl_standard_find_debuginfo,
       .section_address = nullptr,
-      .debuginfo_path = nullptr, // specify dir to look into
+      .debuginfo_path = nullptr,
   };
+
   _dwfl = dwfl_begin(&proc_callbacks);
   if (!_dwfl) {
     LG_WRN("dwfl_begin was zero (%s)", dwfl_errmsg(-1));
     throw DDException(ddres_error(DD_WHAT_DWFL_LIB_ERROR));
   }
-}
+} // namespace ddprof
 
 DwflWrapper::~DwflWrapper() { dwfl_end(_dwfl); }
 
@@ -54,6 +60,20 @@ DwflWrapper &DwflHdr::get_or_insert(pid_t pid) {
     return pair.first->second;
   }
   return it->second;
+}
+
+DDRes DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
+                                const FileInfoValue &fileInfoValue) {
+  bool &mod_added = _mod_added[fileInfoValue.get_id()];
+  if (!mod_added) {
+    Dwfl_Module *mod = update_module(_dwfl, pc, dso, fileInfoValue);
+    if (!mod) {
+      LG_DBG("Unable to register mod %s", dso.to_string().c_str());
+      return ddres_warn(DD_WHAT_UW_ERROR);
+    }
+    mod_added = true;
+  }
+  return ddres_init();
 }
 
 void DwflHdr::clear_unvisited() {

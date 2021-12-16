@@ -3,10 +3,15 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "unwind_helpers.hpp"
+extern "C" {
+#include "ddprof_stats.h"
+}
+
 #include "ddres.h"
 #include "dso_hdr.hpp"
 #include "symbol_hdr.hpp"
+#include "unwind_helpers.hpp"
+#include "unwind_state.hpp"
 
 namespace ddprof {
 
@@ -25,6 +30,9 @@ bool max_stack_depth_reached(UnwindState *us) {
 static void add_virtual_frame(UnwindState *us, SymbolIdx_t symbol_idx) {
   UnwindOutput *output = &us->output;
   int64_t current_loc_idx = output->nb_locs;
+  if (output->nb_locs >= DD_MAX_STACK_DEPTH) {
+    return; // avoid overflow
+  }
   output->locs[current_loc_idx]._symbol_idx = symbol_idx;
 
   // API in lib mode should clarify this
@@ -64,24 +72,40 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
   *result = 0;
   struct UnwindState *us = (UnwindState *)arg;
 
-  if ((addr & 0x7) != 0) {
-    // The address is not 8-bit aligned here
-    LG_WRN("Addr is not aligned 0x%lx", addr);
+  if (addr < 4095) {
+    LG_DBG("[MEMREAD] Skipping 0 page");
     return false;
   }
+
+  if ((addr & 0x7) != 0) {
+    // The address is not 8-bit aligned here
+    LG_NTC("Addr is not aligned 0x%lx", addr);
+    return false;
+  }
+
+#ifdef SKIP_UNALIGNED_REGS
+  // for sanitizer
+  if ((us->initial_regs.esp & 0x7) != 0) {
+    // The address is not 8-bit aligned here
+    LG_DBG("Addr is not aligned 0x%lx", addr);
+    return false;
+  }
+#endif
 
   // Check for overflow, which won't be captured by the checks below.  Sometimes
   // addr is un-physically high and we don't know why yet.
   if (addr > addr + sizeof(ElfWord_t)) {
-    LG_WRN("Overflow in addr 0x%lx", addr);
+    LG_DBG("Overflow in addr 0x%lx", addr);
     return false;
   }
 
   // stack grows down, so end of stack is start
+  // us->initial_regs.esp does not have to be aligned
   uint64_t sp_start = us->initial_regs.esp;
   uint64_t sp_end = sp_start + us->stack_sz;
 
   if (addr < sp_start && addr > sp_start - 4096) {
+#ifdef DEBUG
     // libdwfl might try to read values which are before our snapshot of the
     // stack.  Because the stack has the growsdown property and has a max size,
     // the pages before the current top of the stack are safe (no DSOs will
@@ -89,6 +113,7 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
     // single page before the top of the stack).  Avoiding these reads allows
     // us to prevent unnecessary backpopulate calls.
     LG_DBG("Invalid stack access:%lu before ESP", sp_start - addr);
+#endif
     return false;
   } else if (addr < sp_start || addr + sizeof(ElfWord_t) > sp_end) {
     // If we're here, we're not in the stack.  We should interpet addr as an
@@ -109,11 +134,21 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
   // precomputation followed by a bounds check
   uint64_t stack_idx = addr - sp_start;
   if (stack_idx > addr) {
-    LG_WRN("Stack miscalculation: %lu - %lu != %lu", addr, sp_start, stack_idx);
+    LG_WRN("Stack miscalculation: %lx - %lx != %lx", addr, sp_start, stack_idx);
     return false;
   }
+
   *result = *(ElfWord_t *)(us->stack + stack_idx);
   return true;
 }
 
+void add_error_frame(const Dso *dso, UnwindState *us, ProcessAddress_t pc) {
+  ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
+  if (dso) {
+    add_dso_frame(us, *dso, pc);
+  } else {
+    add_common_frame(us, CommonSymbolLookup::LookupCases::unknown_dso);
+  }
+  LG_DBG("Error frame (depth#%lu)", us->output.nb_locs);
+}
 } // namespace ddprof

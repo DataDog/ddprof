@@ -4,6 +4,7 @@
 // Datadog, Inc.
 
 #include "unwind_metrics.h"
+#include "ddprof_stats.h"
 
 static const DDPROF_STATS s_cycled_stats[] = {STATS_UNWIND_FRAMES,
                                               STATS_UNWIND_ERRORS};

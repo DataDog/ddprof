@@ -5,13 +5,13 @@
 
 #pragma once
 
-// C++ flat set (less allocs than std::set)
-#include <amc/flatset.hpp>
 #include <array>
 #include <cassert>
+#include <map>
 #include <string>
 #include <unordered_map>
 
+#include "ddprof_file_info.hpp"
 #include "dso.hpp"
 
 namespace ddprof {
@@ -60,28 +60,34 @@ private:
  * DSO Header *
  **************/
 /// Keep track of binaries and associate them to address ranges
+/// We have 3 levels of information per DSO
+///
+/// PID map : split everything per PID
+/// Map of DSOs : information from proc map (addresses / binary name)
+/// File info : latest location of the file and unique ID to represent it
+/// Region holder : mmap of associated files
 class DsoHdr {
 public:
   /******* Structures and types **********/
-  typedef amc::FlatSet<Dso> DsoSet;
-  typedef std::unordered_map<pid_t, DsoSet> DsoPidMap;
+  typedef std::map<ProcessAddress_t, Dso> DsoMap;
+  typedef std::unordered_map<pid_t, DsoMap> DsoPidMap;
 
-  typedef DsoSet::const_iterator DsoSetConstIt;
-  typedef DsoSet::iterator DsoSetIt;
+  typedef DsoMap::const_iterator DsoMapConstIt;
+  typedef DsoMap::iterator DsoMapIt;
 
   /* Range is assumed as [start, end) */
-  typedef std::pair<DsoSetIt, DsoSetIt> DsoRange;
-  typedef std::pair<DsoSetConstIt, bool> DsoFindRes;
-
-  /* Path and inode information */
-  typedef std::pair<std::string, inode_t> FileLocInfo_t;
+  typedef std::pair<DsoMapIt, DsoMapIt> DsoRange;
+  typedef std::pair<DsoMapConstIt, bool> DsoFindRes;
 
   /******* MAIN APIS **********/
   DsoHdr();
 
   // Add the element check for overlap and remove them
   DsoFindRes insert_erase_overlap(Dso &&dso);
-  DsoFindRes insert_erase_overlap(DsoSet &set, Dso &&dso);
+  DsoFindRes insert_erase_overlap(DsoMap &map, Dso &&dso);
+
+  // true if it erases anything
+  bool erase_overlap(const Dso &dso);
 
   DsoFindRes pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr);
 
@@ -94,34 +100,46 @@ public:
   // Find the closest dso to this pid and addr
   DsoFindRes dso_find_closest(pid_t pid, ElfAddress_t addr);
 
-  static DsoFindRes dso_find_closest(const DsoSet &set, pid_t pid,
+  static DsoFindRes dso_find_closest(const DsoMap &map, pid_t pid,
                                      ElfAddress_t addr);
 
   bool dso_handled_type_read_dso(const Dso &dso);
 
+  // parse procfs to look for dso elements
+  bool pid_backpopulate(pid_t pid, int &nb_elts_added);
+
+  // find or parse procfs if allowed
   DsoFindRes dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr);
 
   void reset_backpopulate_state() { _backpopulate_state_map.clear(); }
   /******* HELPERS **********/
   // Find the dso if same
-  static DsoFindRes dso_find_same_or_smaller(const DsoSet &set, const Dso &dso);
+  static DsoFindRes dso_find_adjust_same(DsoMap &map, const Dso &dso);
 
-  // Returns a range that points on _set.end() if nothing was found
-  static DsoRange get_intersection(const DsoSet &set, const Dso &dso);
+  // Returns a range that points on _map.end() if nothing was found
+  static DsoRange get_intersection(DsoMap &map, const Dso &dso);
 
   // Helper to create a dso from a line in /proc/pid/maps
   static Dso dso_from_procline(int pid, char *line);
 
-  static DsoFindRes find_res_not_found(const DsoSet &set) {
-    return std::make_pair<DsoSetConstIt, bool>(set.end(), false);
+  static DsoFindRes find_res_not_found(const DsoMap &map) {
+    return std::make_pair<DsoMapConstIt, bool>(map.end(), false);
   }
 
   DsoFindRes find_res_not_found(int pid) {
-    return std::make_pair<DsoSetConstIt, bool>(_map[pid].end(), false);
+    // not const as it can create an element if the map does not exist for pid
+    return std::make_pair<DsoMapConstIt, bool>(_map[pid].end(), false);
   }
 
+  // Access file and retrieve absolute path and ID
+  FileInfoId_t get_or_insert_file_info(const Dso &dso);
+
   // returns an empty string if it can't find the binary
-  FileLocInfo_t get_binary_loc_info(const Dso &dso);
+  FileInfo find_file_info(const Dso &dso);
+
+  const FileInfoValue &get_file_info_value(FileInfoId_t id) const {
+    return _file_info_vector[id];
+  }
 
   int get_nb_dso() const;
   int get_nb_mapped_dso() const;
@@ -148,19 +166,20 @@ private:
   // Associate pid to a backpopulation state
   typedef std::unordered_map<pid_t, BackpopulateState> BackpopulateStateMap;
 
-  // parse procfs to look for dso elements
-  bool pid_backpopulate(DsoSet &set, pid_t pid, int &nb_elts_added);
-
   // erase range of elements
-  static void erase_range(DsoSet &set, const DsoRange &range);
+  static void erase_range(DsoMap &map, const DsoRange &range);
 
-  DsoUID_t find_or_add_dso_uid(const Dso &dso);
+  // parse procfs to look for dso elements
+  bool pid_backpopulate(DsoMap &map, pid_t pid, int &nb_elts_added);
+
+  FileInfoId_t update_id_and_path(const Dso &dso);
 
   BackpopulateStateMap _backpopulate_state_map;
+
   RegionMap _region_map;
-  std::unordered_map<RegionKey, DsoUID_t> _dso_uid_map;
-  // Associate unique IDs even for different PIDs
-  DsoUID_t _next_dso_id;
+
+  FileInfoMap _file_info_map;
+  FileInfoVector _file_info_vector;
   // /proc files can be mounted at various places (whole host profiling)
   std::string _path_to_proc;
 };

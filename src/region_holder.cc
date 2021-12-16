@@ -43,12 +43,10 @@ RegionHolder::RegionHolder(const std::string &full_path, size_t sz,
     } else {
       LG_ERR("Unable to read file : %s", full_path.c_str());
     }
+  } else {
+    LG_ERR("Attempt to map unknown file type: %s (%lx/%lx)", full_path.c_str(),
+           sz, pgoff);
   }
-}
-
-bool RegionKey::operator==(const RegionKey &o) const {
-  return _inode == o._inode && _offset == o._offset && _sz == o._sz &&
-      _type == o._type;
 }
 
 RegionHolder::~RegionHolder() {

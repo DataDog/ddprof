@@ -3,4 +3,3 @@ elfutils,"https://sourceware.org/elfutils/",LGPL-3.0-or-later,Free Software Foun
 libcap,"https://git.kernel.org/pub/scm/libs/libcap/libcap.git/",BSD-3-Clause,Free Software Foundation 
 liblzma,"https://github.com/kobolabs/liblzma",Public-Domain,NA
 llvm-demangle,"https://github.com/llvm/llvm-project",Apache-2.0,llvm-project
-amc,"https://github.com/AmadeusITGroup/amc",AML,Amadeus s.a.s

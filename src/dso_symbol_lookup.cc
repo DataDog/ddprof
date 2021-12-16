@@ -49,8 +49,8 @@ SymbolIdx_t DsoSymbolLookup::get_or_insert(ElfAddress_t addr, const Dso &dso,
       dso._type != dso::kVsysCall) {
     return get_or_insert_unhandled_type(dso, symbol_table);
   }
-  AddrDwflSymbolLookup &addr_lookup = _map_dso[dso._id];
-  Offset_t normalized_addr = (addr - dso._start) + dso._pgoff;
+  AddrDwflSymbolLookup &addr_lookup = _map_dso[dso._filename];
+  FileAddress_t normalized_addr = (addr - dso._start) + dso._pgoff;
 
   auto const it = addr_lookup.find(normalized_addr);
   SymbolIdx_t symbol_idx;
@@ -60,7 +60,7 @@ SymbolIdx_t DsoSymbolLookup::get_or_insert(ElfAddress_t addr, const Dso &dso,
     symbol_idx = symbol_table.size();
     symbol_table.push_back(symbol_from_dso(normalized_addr, dso));
     addr_lookup.insert(
-        std::pair<ElfAddress_t, SymbolIdx_t>(normalized_addr, symbol_idx));
+        std::pair<FileAddress_t, SymbolIdx_t>(normalized_addr, symbol_idx));
   }
   return symbol_idx;
 }
@@ -72,7 +72,4 @@ SymbolIdx_t DsoSymbolLookup::get_or_insert(const Dso &dso,
   return get_or_insert(dso._start - dso._pgoff, dso, symbol_table);
 }
 
-void DsoSymbolLookup::clear_dso_symbols(DsoUID_t dso_id) {
-  _map_dso.erase(dso_id);
-}
 } // namespace ddprof

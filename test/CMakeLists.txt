@@ -217,7 +217,8 @@ add_unit_test(
 add_unit_test(
     dso-ut
     ../src/dso.cc 
-    ../src/dso_hdr.cc 
+    ../src/dso_hdr.cc
+    ../src/ddprof_file_info.cc
     ../src/procutils.c
     ../src/signal_helper.c
     ../src/region_holder.cc
