@@ -199,19 +199,17 @@ void *ddprof_worker_export_thread(void *arg) {
   DDProfWorkerContext *worker = (DDProfWorkerContext *)arg;
   int i = worker->i_export;
 
-  if (IsDDResNotOK(
+  if (IsDDResFatal(
           ddprof_exporter_export(worker->pprof[i]->_profile, worker->exp[i]))) {
     LG_NFO("Failed to export from worker");
     worker->exp_error = true;
-    worker->pending = false;
-    return nullptr;
   }
 
   if (IsDDResNotOK(pprof_reset(worker->pprof[i]))) {
     worker->exp_error = true;
-    worker->pending = false;
   }
 
+  worker->pending = false;
   return nullptr;
 }
 #endif
@@ -257,7 +255,7 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
   // Dispatch to thread
   ctx->worker_ctx.pending = true;
   ctx->worker_ctx.exp_error = false;
-  ctx->worker_ctx.i_export = !!ctx->worker_ctx.i_export;
+  ctx->worker_ctx.i_export = 1 - ctx->worker_ctx.i_export;
   pthread_create(&ctx->worker_ctx.exp_tid, NULL, ddprof_worker_export_thread,
                  &ctx->worker_ctx);
 
