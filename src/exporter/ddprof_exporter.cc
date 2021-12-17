@@ -286,8 +286,16 @@ DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
         //        result.failure.ptr);
         // Free error buffer (prefer this API to the free API)
         ddprof_ffi_Buffer_reset(&result.failure);
-        res = ddres_error(DD_WHAT_EXPORTER);
+        if (exporter->_nb_consecutive_errors++ >=
+            K_NB_CONSECUTIVE_ERRORS_ALLOWED) {
+          // this will shut down profiler
+          res = ddres_error(DD_WHAT_EXPORTER);
+        } else {
+          res = ddres_warn(DD_WHAT_EXPORTER);
+        }
       } else {
+        // success establishing connection
+        exporter->_nb_consecutive_errors = 0;
         res = check_send_response_code(result.http_response.code);
       }
     } else {

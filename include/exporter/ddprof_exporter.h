@@ -1,5 +1,7 @@
-// Unless explicitly stated otherwise all files in this repository are licensed under the Apache License Version 2.0.
-// This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the Apache License Version 2.0. This product includes software
+// developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
+// Datadog, Inc.
 
 #pragma once
 
@@ -17,13 +19,16 @@ typedef struct ddprof_ffi_ProfileExporterV3 ddprof_ffi_ProfileExporterV3;
 typedef struct ddprof_ffi_Profile ddprof_ffi_Profile;
 typedef struct UserTags UserTags;
 
+#define K_NB_CONSECUTIVE_ERRORS_ALLOWED 3
+
 typedef struct DDProfExporter {
   ExporterInput _input;
-  char *_url; // url contains path and port
-  bool _agent;
-  bool _export;              // debug mode : should we send profiles ?
+  char *_url;                // url contains path and port
   const char *_debug_folder; // write pprofs to folder
   ddprof_ffi_ProfileExporterV3 *_exporter;
+  bool _agent;
+  bool _export; // debug mode : should we send profiles ?
+  int32_t _nb_consecutive_errors;
 } DDProfExporter;
 
 DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
