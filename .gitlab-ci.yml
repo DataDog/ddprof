@@ -8,10 +8,10 @@ stages:
 
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
-  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/87754200
-  BUILD_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:cbeb47ad306eb86a30f51a0ca4f920103b136c3b05aeaf0be4f4b3fe3383fc7c
-  BUILD_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:396d18bc685de6ae6c8a954866e1872d14f6e94004b43b7cc82f79d30e65a57b
-  BUILD_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:70d707e6b7726e07edde6f671f44a78f36267558f3bfcfcfe6d6395dfba2b3ed
+  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/104212638
+  BUILD_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:66973f402f9c96bf7de60b1d6b62cdabdd00e1effca421bb1fa104977fcb7d5b
+  BUILD_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:3bbd7b03b2fb99171e9020656a86f042c14022c0c5e39b8d5a523d177dbca57d
+  BUILD_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:b32c396128f9b2886896810021771efa8f8d17aa719b13d87088a640f7d818bd
   # https://gitlab.ddbuild.io/DataDog/ddprof/-/pipelines/5611418
   TEST_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:a06908a49fbdf93fb62e7c5a650ec6da587c21f8f5060cf0657d4b08a63df985
   TEST_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:128fff36c0cc5a8d9f31d8082fbcdde7fe8cad960514f01a1a11b209ef94d08b

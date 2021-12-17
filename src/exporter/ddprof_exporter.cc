@@ -20,8 +20,10 @@ extern "C" {
 
 #include "ddres.h"
 #include "tags.hpp"
-#include <amc/vector.hpp>
+
+#include <algorithm>
 #include <string>
+#include <vector>
 
 static const int k_timeout_ms = 10000;
 static const int k_size_api_key = 32;
@@ -143,9 +145,8 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
 
 static const int k_max_tags = 10;
 
-static void
-fill_tags(const UserTags *user_tags, const DDProfExporter *exporter,
-          amc::SmallVector<ddprof_ffi_Tag, k_max_tags> &tags_exporter) {
+static void fill_tags(const UserTags *user_tags, const DDProfExporter *exporter,
+                      std::vector<ddprof_ffi_Tag> &tags_exporter) {
   tags_exporter.push_back(ddprof_ffi_Tag{
       .name = char_star_to_byteslice("language"),
       .value = string_view_to_byteslice(exporter->_input.language)});
@@ -183,7 +184,7 @@ fill_tags(const UserTags *user_tags, const DDProfExporter *exporter,
 }
 
 DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
-  amc::SmallVector<ddprof_ffi_Tag, k_max_tags> tags_exporter;
+  std::vector<ddprof_ffi_Tag> tags_exporter;
   fill_tags(user_tags, exporter, tags_exporter);
   ddprof_ffi_Slice_tag tags = {.ptr = &tags_exporter[0],
                                .len = tags_exporter.size()};
