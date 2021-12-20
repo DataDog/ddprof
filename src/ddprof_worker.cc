@@ -84,7 +84,7 @@ DDRes worker_library_init(DDProfContext *ctx) {
     // Make sure worker-related counters are reset
     ctx->worker_ctx.count_worker = 0;
     // Make sure worker index is initialized correctly
-    ctx->worker_ctx.i_export = 0;
+    ctx->worker_ctx.i_current_pprof = 0;
     ctx->worker_ctx.exp_tid = {0};
 
     ctx->worker_ctx.us = new UnwindState();
@@ -167,7 +167,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   if (!IsDDResFatal(res)) {
 #ifndef DDPROF_NATIVE_LIB
     // in lib mode we don't aggregate (protect to avoid link failures)
-    int i_export = ctx->worker_ctx.i_export;
+    int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
     DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr,
                                     sample->period, pos, pprof));
@@ -197,7 +197,8 @@ static void ddprof_reset_worker_stats(DsoHdr *dso_hdr) {
 #ifndef DDPROF_NATIVE_LIB
 void *ddprof_worker_export_thread(void *arg) {
   DDProfWorkerContext *worker = (DDProfWorkerContext *)arg;
-  int i = worker->i_export;
+  // export the one we are not writting to
+  int i = 1 - worker->i_current_pprof;
 
   if (IsDDResFatal(
           ddprof_exporter_export(worker->pprof[i]->_profile, worker->exp[i]))) {
@@ -255,7 +256,10 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
   // Dispatch to thread
   ctx->worker_ctx.pending = true;
   ctx->worker_ctx.exp_error = false;
-  ctx->worker_ctx.i_export = 1 - ctx->worker_ctx.i_export;
+
+  // switch before we async export to avoid any possible race conditions (then
+  // take into account the switch)
+  ctx->worker_ctx.i_current_pprof = 1 - ctx->worker_ctx.i_current_pprof;
   pthread_create(&ctx->worker_ctx.exp_tid, NULL, ddprof_worker_export_thread,
                  &ctx->worker_ctx);
 

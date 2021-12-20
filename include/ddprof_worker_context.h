@@ -15,7 +15,7 @@ typedef struct DDProfWorkerContext {
   PEventHdr pevent_hdr;   // perf_event buffer holder
   DDProfExporter *exp[2]; // wrapper around rust exporter
   DDProfPProf *pprof[2];  // wrapper around rust exporter
-  int i_export;
+  int i_current_pprof;
   volatile bool pending;
   volatile bool exp_error;
   pthread_t exp_tid;
