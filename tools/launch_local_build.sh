@@ -17,7 +17,7 @@ cd $CURRENTDIR
 usage() {
     echo "$0 [-t] [clean]"
     echo "Launch a docker instance locally of the CI images. ssh socket is forwarded to the build image."
-    echo " You can specify a foder to mount in a .env file ${TOP_LVL_DIR}/.env"
+    echo " You can specify a folder to mount in a .env file ${TOP_LVL_DIR}/.env"
     echo "    Add this line to the file --> DEFAULT_DEV_WORKSPACE=<some path you want to mount>"
     echo "You can have a docker-sync.yml file in the root of this repo which will be used as a mounted volume (speeds up compile)."
     echo ""

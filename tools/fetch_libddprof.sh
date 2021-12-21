@@ -30,7 +30,7 @@ cd $CURRENTDIR
 
 VER_LIBDDPROF=$1
 TAR_LIBDDPROF=libddprof_${VER_LIBDDPROF}.tar.gz
-URL_LIBDDPROF=http://binaries.ddbuild.io/libddprof-build/${TAR_LIBDDPROF}
+URL_LIBDDPROF=https://binaries.ddbuild.io/libddprof-build/${TAR_LIBDDPROF}
 S3_URL_LIBDDPROF=s3://binaries.ddbuild.io/libddprof-build/${TAR_LIBDDPROF}
 
 SHA256_LIBDDPROF=$2
@@ -51,7 +51,7 @@ if [ ! -e  ${TAR_LIBDDPROF} ]; then
     if [ ${IS_CI} == "false" ]; then
         # Http works locally
         echo "Download using curl..."
-        curl -L ${URL_LIBDDPROF} -o ${TAR_LIBDDPROF}
+        curl -k -L ${URL_LIBDDPROF} -o ${TAR_LIBDDPROF}
     else # CI flow uses aws cli
         #Locally you can use aws vault to test this command
         #aws-vault exec build-stable-developer -- aws s3 cp ${S3_URL_LIBDDPROF} ${DOWNLOAD_PATH}

@@ -154,9 +154,11 @@ void vlprintfln(int lvl, int fac, const char *name, const char *format,
   // Note that setting the time on most syslog daemons is probably unnecessary,
   // since the service will strip it out and replace it.  We add it here anyway
   // for completeness (and we need it anyway for other log modes)
-  char tm_str[sizeof("mmm dd HH:MM:SS") + 1] = {0};
+  static __thread char tm_str[sizeof("mmm dd HH:MM:SS0")] = {0};
   time_t t = time(NULL);
-  strftime(tm_str, sizeof(tm_str), "%b %d %H:%M:%S", localtime(&t));
+  struct tm lt;
+  localtime_r(&t, &lt);
+  strftime(tm_str, sizeof(tm_str), "%b %d %H:%M:%S", &lt);
 
   // Get the PID; overriding if necessary (allow for testing overflow)
   pid_t pid = getpid();

@@ -27,7 +27,7 @@ RC=0
 tmpfile=$(mktemp /tmp/clang-format-diff.XXXXXX)
 
 CLANG_OPTION="--dry-run"
-if [ ${APPLY,,} == yes ];then 
+if [ ${APPLY:-,,} == yes ];then 
   #inplace
   CLANG_OPTION="-i"
 fi

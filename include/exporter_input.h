@@ -28,6 +28,7 @@ typedef struct ExporterInput {
   string_view language;       // appended to the tags (set to native)
   string_view family;
   string_view profiler_version;
+  bool agentless; // Whether or not to actually use API key/intake
 } ExporterInput;
 
 // Proposals for other arguments (tags)

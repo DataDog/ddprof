@@ -2,22 +2,25 @@
 # This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
 
 SET(GCC_DEBUG_FLAGS "-g -Wall")
-set(ASAN_FLAGS "-g -fsanitize=address -fsanitize=undefined -fsanitize=leak -fsanitize=float-divide-by-zero -fno-sanitize-recover")
+set(SAN_FLAGS "-fsanitize=undefined -fsanitize=float-divide-by-zero -fno-sanitize-recover")
+set(ASAN_FLAGS "-fsanitize=address -fsanitize=leak")
+set(TSAN_FLAGS "-fsanitize=thread")
 set(STACK_FLAGS "-fstack-protector-all")
 ## Frame pointers
 set(FRAME_PTR_FLAG "-fno-omit-frame-pointer")
 
-list(APPEND CMAKE_CONFIGURATION_TYPES SanitizedDebug)
+list(APPEND CMAKE_CONFIGURATION_TYPES SanitizedDebug ThreadSanitizedDebug)
 
 # Add new build types
 message(STATUS "Adding build types...")
 
+## Add flags for sanitized debug (asan)
 SET(CMAKE_CXX_FLAGS_SANITIZEDDEBUG
-    "${GCC_DEBUG_FLAGS} ${ASAN_FLAGS} ${STACK_FLAGS}"
+    "${GCC_DEBUG_FLAGS} ${SAN_FLAGS} ${ASAN_FLAGS} ${STACK_FLAGS}"
     CACHE STRING "Flags used by the C++ compiler during sanitized builds."
     FORCE )
 SET(CMAKE_C_FLAGS_SANITIZEDDEBUG
-    "${GCC_DEBUG_FLAGS} ${ASAN_FLAGS} ${STACK_FLAGS}"
+    "${GCC_DEBUG_FLAGS} ${SAN_FLAGS} ${ASAN_FLAGS} ${STACK_FLAGS}"
     CACHE STRING "Flags used by the C compiler during sanitized builds."
     FORCE )
 SET(CMAKE_EXE_LINKER_FLAGS_SANITIZEDDEBUG
@@ -25,6 +28,24 @@ SET(CMAKE_EXE_LINKER_FLAGS_SANITIZEDDEBUG
     CACHE STRING "Flags used for linking binaries during sanitized builds."
     FORCE )
 SET(CMAKE_SHARED_LINKER_FLAGS_SANITIZEDDEBUG
+    ""
+    CACHE STRING "Flags used by the shared libraries linker during sanitized builds."
+    FORCE )
+
+## Add flags for thread-sanized debu
+SET(CMAKE_CXX_FLAGS_THREADSANITIZEDDEBUG
+    "${GCC_DEBUG_FLAGS} ${SAN_FLAGS} ${TSAN_FLAGS} ${STACK_FLAGS}"
+    CACHE STRING "Flags used by the C++ compiler during sanitized builds."
+    FORCE )
+SET(CMAKE_C_FLAGS_THREADSANITIZEDDEBUG
+    "${GCC_DEBUG_FLAGS} ${SAN_FLAGS} ${TSAN_FLAGS} ${STACK_FLAGS}"
+    CACHE STRING "Flags used by the C compiler during sanitized builds."
+    FORCE )
+SET(CMAKE_EXE_LINKER_FLAGS_THREADSANITIZEDDEBUG
+    ""
+    CACHE STRING "Flags used for linking binaries during sanitized builds."
+    FORCE )
+SET(CMAKE_SHARED_LINKER_FLAGS_THREADSANITIZEDDEBUG
     ""
     CACHE STRING "Flags used by the shared libraries linker during sanitized builds."
     FORCE )
@@ -37,15 +58,21 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     # lsan is combined with asan
     # CMake: Avoid usage of list to make sure we have spaces (not ;)
     # static ubsan is giving link errors : to be investigated
-    set(CMAKE_EXE_LINKER_FLAGS_SANITIZEDDEBUG "${CMAKE_EXE_LINKER_FLAGS_SANITIZEDDEBUG} -static-libasan")
-    set(CMAKE_SHARED_LINKER_FLAGS_SANITIZEDDEBUG "${CMAKE_SHARED_LINKER_FLAGS_SANITIZEDDEBUG} -static-libasan")
+    set(CMAKE_EXE_LINKER_FLAGS_SANITIZEDDEBUG "${CMAKE_EXE_LINKER_FLAGS_SANITIZEDDEBUG} -static-libasan -static-libubsan")
+    set(CMAKE_SHARED_LINKER_FLAGS_SANITIZEDDEBUG "${CMAKE_SHARED_LINKER_FLAGS_SANITIZEDDEBUG} -static-libasan -static-libubsan")
+    set(CMAKE_EXE_LINKER_FLAGS_THREADSANITIZEDDEBUG "${CMAKE_EXE_LINKER_FLAGS_THREADSANITIZEDDEBUG} -static-libtsan -static-libubsan")
+    set(CMAKE_SHARED_LINKER_FLAGS_THREADSANITIZEDDEBUG "${CMAKE_SHARED_LINKER_FLAGS_THREADSANITIZEDDEBUG} -static-libtsan -static-libubsan")
 endif()
 
 MARK_AS_ADVANCED(
     CMAKE_CXX_FLAGS_SANITIZEDDEBUG
     CMAKE_C_FLAGS_SANITIZEDDEBUG
     CMAKE_EXE_LINKER_FLAGS_SANITIZEDDEBUG
-    CMAKE_SHARED_LINKER_FLAGS_SANITIZEDDEBUG )
+    CMAKE_SHARED_LINKER_FLAGS_SANITIZEDDEBUG
+    CMAKE_CXX_FLAGS_THREADSANITIZEDDEBUG
+    CMAKE_C_FLAGS_THREADSANITIZEDDEBUG
+    CMAKE_EXE_LINKER_FLAGS_THREADSANITIZEDDEBUG
+    CMAKE_SHARED_LINKER_FLAGS_THREADSANITIZEDDEBUG )
 
 list(APPEND CMAKE_CONFIGURATION_TYPES Coverage)
 

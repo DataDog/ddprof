@@ -23,6 +23,10 @@ SanCMake() {
     cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=SanitizedDebug "$@"
 }
 
+TSanCMake() {
+    cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=ThreadSanitizedDebug "$@"
+}
+
 CovCMake() {
     cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=Coverage "$@"
 }

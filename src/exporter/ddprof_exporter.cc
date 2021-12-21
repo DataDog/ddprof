@@ -107,7 +107,8 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
   // if we have an API key we assume we are heading for intake (slightly
   // fragile #TODO add a parameter)
 
-  if (exporter_input->apikey &&
+  if (exporter_input->agentless &&
+      exporter_input->apikey &&
       strlen(exporter_input->apikey) >= k_size_api_key) {
     LG_NTC("[EXPORTER] Targeting intake instead of agent (API Key available)");
     exporter->_agent = false;
@@ -270,7 +271,9 @@ DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
         .file = &profile_buffer,
     }};
     struct ddprof_ffi_Slice_file files = {
-        .ptr = files_, .len = sizeof files_ / sizeof *files_};
+        .ptr = files_,
+        .len = sizeof files_ / sizeof *files_
+    };
 
     ddprof_ffi_Request *request = ddprof_ffi_ProfileExporterV3_build(
         exporter->_exporter, start, end, files, k_timeout_ms);
@@ -280,8 +283,7 @@ DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
 
       LG_NFO("[EXPORTER] Request tag value: %u", result.tag);
       if (result.tag == DDPROF_FFI_SEND_RESULT_FAILURE) {
-        LG_WRN("Failure to establish connection - check url %s",
-               exporter->_url);
+        LG_WRN("Failure to establish connection, check url %s", exporter->_url);
         // There is an overflow issue when using the error buffer from rust
         // LG_WRN("Failure to send profiles (%*s)", (int)result.failure.len,
         //        result.failure.ptr);

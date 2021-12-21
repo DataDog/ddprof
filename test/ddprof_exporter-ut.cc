@@ -79,6 +79,7 @@ void fill_mock_exporter_input(ExporterInput &exporter_input,
     exporter_input.apikey = "nope_not_a_good_key";
   }
 
+  exporter_input.agentless = "yes";
   exporter_input.environment = "unit-test";
   exporter_input.host = url.first.c_str();
   exporter_input.site = "datadog_is_cool.com";

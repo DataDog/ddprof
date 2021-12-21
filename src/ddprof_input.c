@@ -52,8 +52,16 @@
 
 // Helpers for exapnding the OPT_TABLE here
 #define X_PRNT(a, b, c, d, e, f, g, h, i)                                      \
-  if ((f)->i b)                                                                \
-    LG_PRINT("  " #b ": %s", (f)->i b);
+  __extension__({                                                              \
+    if ((f)->i b) {                                                            \
+      if (__builtin_types_compatible_p(typeof((f)->i b), char *))              \
+        LG_PRINT("  " #b ": %s", (char *)(f)->i b);                            \
+      else {                                                                   \
+        char *truefalse[] = {"false", "true"};                                 \
+        LG_PRINT("  " #b ": %s", truefalse[!!((f)->i b)]);                     \
+      }                                                                        \
+    }                                                                          \
+  });
 
 // We use a non-NULL definition for an undefined string, because it's important
 // that this table is always populated intentionally.  This is checked in the

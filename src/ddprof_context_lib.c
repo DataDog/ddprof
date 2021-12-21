@@ -94,6 +94,9 @@ DDRes ddprof_context_set(const DDProfInput *input, DDProfContext *ctx) {
   // Process native profiler enablement override
   ctx->params.enable = !arg_yesno(input->native_enable, 0);
 
+  // Process enablement for agent mode
+  ctx->exp_input.agentless = arg_yesno(input->agentless, 1); // default no
+
   // process upload_period
   if (input->upload_period) {
     double x = strtod(input->upload_period, NULL);
