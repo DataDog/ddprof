@@ -23,6 +23,7 @@ struct SymbolHdr {
   SymbolHdr() {}
   void display_stats() const {
     _dwfl_symbol_lookup_v2._stats.display(_dwfl_symbol_lookup_v2.size());
+    _dso_symbol_lookup.stats_display();
   }
   void cycle() { _dwfl_symbol_lookup_v2._stats.reset(); }
 

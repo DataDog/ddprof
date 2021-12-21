@@ -60,7 +60,7 @@ private:
 };
 
 // Range management allows better performances (and less mem overhead)
-using DwflSymbolMap = std::map<Offset_t, DwflSymbolVal_V2>;
+using DwflSymbolMap = std::map<RegionAddress_t, DwflSymbolVal_V2>;
 using DwflSymbolMapIt = DwflSymbolMap::iterator;
 using DwflSymbolMapFindRes = std::pair<DwflSymbolMapIt, bool>;
 using DwflSymbolMapValueType =
@@ -81,7 +81,7 @@ public:
                             ProcessAddress_t process_pc, const Dso &dso,
                             const FileInfoValue &file_info);
 
-  void erase(FileInfoId_t file_info_id) { _dso_map.erase(file_info_id); }
+  void erase(FileInfoId_t file_info_id) { _file_info_map.erase(file_info_id); }
 
   DwflSymbolLookupStats _stats;
 
@@ -112,14 +112,14 @@ private:
   // PIDs. If we are sure the underlying symbols are the same, we can assume the
   // symbol cache is the same. For short lived forks, this can avoid
   // repopulating caches.
-  using DwflDsoSymbolMap = std::unordered_map<FileInfoId_t, DwflSymbolMap>;
-  using DwflDsoSymbolMapVT = DwflDsoSymbolMap::value_type;
+  using FileInfoMap = std::unordered_map<FileInfoId_t, DwflSymbolMap>;
+  using FileInfoMapVT = FileInfoMap::value_type;
 
   static bool symbol_lookup_check(Dwfl_Module *mod, ElfAddress_t process_pc,
                                   const Symbol &info);
 
   // unordered map of DSO elements
-  DwflDsoSymbolMap _dso_map;
+  FileInfoMap _file_info_map;
 };
 
 } // namespace ddprof

@@ -36,8 +36,8 @@ DwflSymbolLookup_V2::DwflSymbolLookup_V2() : _lookup_setting(K_CACHE_ON) {
 unsigned DwflSymbolLookup_V2::size() const {
   unsigned total_nb_elts = 0;
   std::for_each(
-      _dso_map.begin(), _dso_map.end(),
-      [&](DwflDsoSymbolMapVT const &el) { total_nb_elts += el.second.size(); });
+      _file_info_map.begin(), _file_info_map.end(),
+      [&](FileInfoMapVT const &el) { total_nb_elts += el.second.size(); });
   return total_nb_elts;
 }
 
@@ -58,7 +58,7 @@ DwflSymbolLookup_V2::get_or_insert(Dwfl *dwfl, SymbolTable &table,
   LG_DBG("Looking for : %lx = (%lx - %lx) / (offset : %lx) / dso:%s", region_pc,
          process_pc, dso._start, dso._pgoff, dso._filename.c_str());
 #endif
-  DwflSymbolMap &map = _dso_map[file_info.get_id()];
+  DwflSymbolMap &map = _file_info_map[file_info.get_id()];
   DwflSymbolMapFindRes find_res = find_closest(map, region_pc);
   if (find_res.second) { // already found the correct symbol
 #ifdef DEBUG
@@ -236,20 +236,19 @@ bool DwflSymbolLookup_V2::symbol_lookup_check(Dwfl_Module *mod,
 void DwflSymbolLookupStats::display(unsigned nb_elts) const {
   static const int k_cent_precision = 10000;
   if (_calls) {
-    LG_NTC("symbol_lookup_stats : Hit / calls = [%d/%d] = %d", _hit, _calls,
+    LG_NTC("DWFL_SYMB | %10s | [%d/%d] = %d", "Hit", _hit, _calls,
            (_hit * k_cent_precision) / _calls);
     if (_errors) {
-      LG_WRN("                   Errors / calls = [%d/%d] = %d", _errors,
-             _calls, (_errors * k_cent_precision) / _calls);
+      LG_WRN("DWFL_SYMB | %10s | [%d/%d] = %d", "Errors", _errors, _calls,
+             (_errors * k_cent_precision) / _calls);
     }
     if (_no_dwfl_symbols) {
-      LG_NTC("no_dwfl_symbols :  Occur / calls = [%d/%d] = %d",
-             _no_dwfl_symbols, _calls,
-             (_no_dwfl_symbols * k_cent_precision) / _calls);
+      LG_NTC("DWFL_SYMB | %10s | [%d/%d] = %d", "Not found", _no_dwfl_symbols,
+             _calls, (_no_dwfl_symbols * k_cent_precision) / _calls);
     }
-    LG_NTC("                   Size of cache = %d", nb_elts);
+    LG_NTC("DWFL_SYMB | %10s | %d", "Size ", nb_elts);
   } else {
-    LG_NTC("symbol_lookup_stats : 0 calls");
+    LG_NTC("DWFL_SYMB NO CALLS");
   }
 }
 

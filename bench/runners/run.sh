@@ -272,6 +272,7 @@ else # No env var, check file for key
   CMD=$(add_if_not_empty ${CMD} "-A" ${!ENV_KEY:-""})
 fi
 
+CMD=$(add_if_not_empty ${CMD} "-L" "${cfg_ddprof_agentless:-""}")
 CMD=$(add_if_not_empty ${CMD} "-I" "${cfg_ddprof_intake_site:-""}")
 CMD=$(add_if_not_empty ${CMD} "-H" "${cfg_ddprof_intake_url:-""}")
 CMD=$(add_if_not_empty ${CMD} "-P" "${cfg_ddprof_intake_port:-""}")

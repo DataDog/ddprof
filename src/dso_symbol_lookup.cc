@@ -8,6 +8,12 @@
 #include "dso_type.hpp"
 #include "string_format.hpp"
 
+extern "C" {
+#include "logger.h"
+}
+
+#include <algorithm>
+
 namespace ddprof {
 
 namespace {
@@ -49,7 +55,7 @@ SymbolIdx_t DsoSymbolLookup::get_or_insert(ElfAddress_t addr, const Dso &dso,
       dso._type != dso::kVsysCall) {
     return get_or_insert_unhandled_type(dso, symbol_table);
   }
-  AddrDwflSymbolLookup &addr_lookup = _map_dso[dso._filename];
+  AddressMap &addr_lookup = _map_dso_path[dso._filename];
   FileAddress_t normalized_addr = (addr - dso._start) + dso._pgoff;
 
   auto const it = addr_lookup.find(normalized_addr);
@@ -70,6 +76,19 @@ SymbolIdx_t DsoSymbolLookup::get_or_insert(const Dso &dso,
   // use start an address that will be zeroed as a trick to remove addr
   // info (as we simply want the binary info)
   return get_or_insert(dso._start - dso._pgoff, dso, symbol_table);
+}
+
+void DsoSymbolLookup::stats_display() const {
+  LG_NTC("DSO_SYMB  | %10s | %lu", "SIZE", get_size());
+}
+
+size_t DsoSymbolLookup::get_size() const {
+  unsigned total_nb_elts = 0;
+  std::for_each(_map_dso_path.begin(), _map_dso_path.end(),
+                [&](DsoPathMap::value_type const &el) {
+                  total_nb_elts += el.second.size();
+                });
+  return total_nb_elts;
 }
 
 } // namespace ddprof

@@ -87,6 +87,7 @@ char* help_str[DD_KLEN] = {
 "    The intake port for the Datadog agent or backend system.\n",
   [DD_SERVICE] =
 "    The name of this service\n",
+  [DD_PROFILING_AGENTLESS] = STR_UNDF,
   [DD_TAGS] =
 "    Tags sent with both profiler metrics and profiles.\n"
 "    Refer to the Datadog tag section to understand what is supported.\n",

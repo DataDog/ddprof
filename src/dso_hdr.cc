@@ -270,12 +270,18 @@ FileInfoId_t DsoHdr::update_id_and_path(const Dso &dso) {
   if (it == _file_info_map.end()) {
     dso._id = _file_info_vector.size();
     _file_info_map.emplace(std::move(key), dso._id);
+#ifdef DEBUG
+    LG_NTC("New file %d - %s - %ld", dso._id, file_info._path.c_str(),
+           file_info._size);
+#endif
     _file_info_vector.emplace_back(std::move(file_info), dso._id);
   } else { // already exists
     dso._id = it->second;
     // update with latest location
-    _file_info_vector[dso._id]._info = file_info;
-    _file_info_vector[dso._id]._errored = false; // allow retry with new file
+    if (file_info._path != _file_info_vector[dso._id]._info._path) {
+      _file_info_vector[dso._id]._info = file_info;
+      _file_info_vector[dso._id]._errored = false; // allow retry with new file
+    }
   }
   return dso._id;
 }

@@ -21,16 +21,19 @@ public:
   // only binary info
   SymbolIdx_t get_or_insert(const Dso &dso, SymbolTable &symbol_table);
 
+  void stats_display() const;
+
 private:
+  size_t get_size() const;
+
   SymbolIdx_t get_or_insert_unhandled_type(const Dso &dso,
                                            SymbolTable &symbol_table);
   // map of maps --> the aim is to monitor usage of some maps and clear them
   // toghether
   // TODO : find efficient clear on symbol table before we do this
-  typedef std::unordered_map<FileAddress_t, SymbolIdx_t> AddrDwflSymbolLookup;
-  typedef std::unordered_map<std::string, AddrDwflSymbolLookup>
-      DsoDwflSymbolLookup;
-  DsoDwflSymbolLookup _map_dso;
+  typedef std::unordered_map<FileAddress_t, SymbolIdx_t> AddressMap;
+  typedef std::unordered_map<std::string, AddressMap> DsoPathMap;
+  DsoPathMap _map_dso_path;
   // For non-standard DSO types, address is not relevant
   std::unordered_map<dso::DsoType, SymbolIdx_t, EnumClassHash>
       _map_unhandled_dso;
