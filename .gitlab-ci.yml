@@ -5,6 +5,7 @@ stages:
   - build
   - test
   - deploy
+  - relenv
 
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
@@ -294,25 +295,6 @@ promote_major:ddprof:
   dependencies:
     - build:ddprof
 
-# Trigger downstream event on relenv
-deploy_to_reliability_env:
-  stage: deploy
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      when: on_success
-    - when: manual
-  trigger:
-    project: DataDog/datadog-reliability-env
-    branch: $DOWNSTREAM_BRANCH
-  variables:
-    UPSTREAM_PACKAGE_JOB: build
-    UPSTREAM_PROJECT_ID: $CI_PROJECT_ID
-    UPSTREAM_PROJECT_NAME: $CI_PROJECT_NAME
-    UPSTREAM_PIPELINE_ID: $CI_PIPELINE_ID
-    UPSTREAM_BRANCH: $CI_COMMIT_REF_NAME
-    UPSTREAM_COMMIT_SHA: $CI_COMMIT_SHA
-    FORCE_TRIGGER: $FORCE_TRIGGER
-
 .collatz_job:
   variables:
     BINNAME: collatz
@@ -331,3 +313,22 @@ deploy:collatz:
     - set -euxo pipefail
     - if [ $CI_COMMIT_BRANCH = "main" ];then export PROMOTE=MAJOR;fi
     - tools/ci_upload.sh
+
+# Trigger downstream event on relenv
+deploy_to_reliability_env:
+  stage: relenv
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: on_success
+    - when: manual
+  trigger:
+    project: DataDog/datadog-reliability-env
+    branch: $DOWNSTREAM_BRANCH
+  variables:
+    UPSTREAM_PACKAGE_JOB: build
+    UPSTREAM_PROJECT_ID: $CI_PROJECT_ID
+    UPSTREAM_PROJECT_NAME: $CI_PROJECT_NAME
+    UPSTREAM_PIPELINE_ID: $CI_PIPELINE_ID
+    UPSTREAM_BRANCH: $CI_COMMIT_REF_NAME
+    UPSTREAM_COMMIT_SHA: $CI_COMMIT_SHA
+    FORCE_TRIGGER: $FORCE_TRIGGER

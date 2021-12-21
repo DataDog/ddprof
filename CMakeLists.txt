@@ -89,8 +89,8 @@ include(Format)
 ##################################
 find_package(PkgConfig REQUIRED)
 
-option(JEMALLOC "Enable jemalloc stats" OFF)
-if (${JEMALLOC})
+option(DDPROF_JEMALLOC "Enable jemalloc stats" OFF)
+if (${DDPROF_JEMALLOC})
    #jemalloc for debug
    include(Jemalloc)
    message(STATUS "Adding jemalloc for DBG purpose" ${JEMALLOC_ROOT_DIR})
@@ -177,7 +177,7 @@ if (ON)
 endif()
 
 
-if (${JEMALLOC})
+if (${DDPROF_JEMALLOC})
    list(PREPEND DDPROF_LIBRARY_LIST jemalloc)
 endif()
 
@@ -224,7 +224,7 @@ option(BUILD_NATIVE_LIB "Build a library out of the native profiler" OFF)
    list(APPEND NATIVE_LIB_INCLUDE_LIST ${LIBDDPROF_INCLUDE_DIR} ) # to be removed (unlikely.h)
    list(APPEND NATIVE_LIB_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include ${ELFUTILS_INCLUDE_LIST}) # legit includes
 
-   if (${JEMALLOC})
+   if (${DDPROF_JEMALLOC})
       list(PREPEND NATIVE_LIB_LIBRARY_LIST jemalloc)
    endif()
 
