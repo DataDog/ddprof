@@ -16,15 +16,15 @@ namespace ddprof {
 // Generates virtual frames for common unhandled cases
 class CommonMapInfoLookup {
 public:
-  enum LookupCases {
+  enum MappingErrors {
     empty, // when mapping info is not relevant, just put am empty field
   };
 
-  SymbolIdx_t get_or_insert(LookupCases lookup_case,
+  SymbolIdx_t get_or_insert(MappingErrors lookup_case,
                             MapInfoTable &mapinfo_table);
 
 private:
-  std::unordered_map<LookupCases, MapInfoIdx_t, EnumClassHash> _map;
+  std::unordered_map<MappingErrors, MapInfoIdx_t, EnumClassHash> _map;
 };
 
 } // namespace ddprof

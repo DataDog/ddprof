@@ -113,9 +113,7 @@ static bool add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   if (!dwfl_frame_pc(dwfl_frame, &pc, &isactivation)) {
     LG_DBG("Failure to compute frame PC: %s (depth#%lu)", dwfl_errmsg(-1),
            us->output.nb_locs);
-    DsoHdr::DsoFindRes find_res = us->dso_hdr.dso_find_closest(us->pid, pc);
-    add_error_frame(find_res.second ? &(find_res.first->second) : nullptr, us,
-                    pc);
+    add_error_frame(nullptr, us, pc, SymbolErrors::dwfl_frame);
     return true; // invalid pc : do not add frame
   }
 
@@ -128,7 +126,7 @@ static bool add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     // no matching file was found
     LG_DBG("[UW]%d: DSO not found at 0x%lx (depth#%lu)", us->pid, pc,
            us->output.nb_locs);
-    add_error_frame(nullptr, us, pc);
+    add_error_frame(nullptr, us, pc, SymbolErrors::unknown_dso);
     return true;
   }
 
@@ -144,18 +142,18 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
   LG_NFO("Beging depth %lu", us->output.nb_locs);
 #endif
 
-  copy_current_registers(dwfl_frame, us->current_regs);
-#ifdef DEBUG
-  LG_NTC("Current regs : ebp %lx, esp %lx, eip %lx", us->current_regs.ebp,
-         us->current_regs.esp, us->current_regs.eip);
-#endif
-
   // Before we potentially exit, record the fact that we're processing a frame
   ddprof_stats_add(STATS_UNWIND_FRAMES, 1, NULL);
 
   if (!add_symbol(dwfl_frame, us)) {
     return DWARF_CB_ABORT;
   }
+
+  copy_current_registers(dwfl_frame, us->current_regs);
+#ifdef DEBUG
+  LG_NTC("Current regs : ebp %lx, esp %lx, eip %lx", us->current_regs.ebp,
+         us->current_regs.esp, us->current_regs.eip);
+#endif
 
   return DWARF_CB_OK;
 }

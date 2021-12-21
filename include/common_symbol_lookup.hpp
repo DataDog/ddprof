@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "common_symbol_errors.hpp"
 #include "hash_helper.hpp"
 #include "symbol_table.hpp"
 
@@ -14,14 +15,11 @@ namespace ddprof {
 // Generates virtual frames for common unhandled cases
 class CommonSymbolLookup {
 public:
-  enum LookupCases {
-    truncated_stack,
-    unknown_dso,
-  };
-  SymbolIdx_t get_or_insert(LookupCases lookup_case, SymbolTable &symbol_table);
+  SymbolIdx_t get_or_insert(SymbolErrors lookup_case,
+                            SymbolTable &symbol_table);
 
 private:
-  std::unordered_map<LookupCases, SymbolIdx_t, EnumClassHash> _map;
+  std::unordered_map<SymbolErrors, SymbolIdx_t, EnumClassHash> _map;
 };
 
 } // namespace ddprof

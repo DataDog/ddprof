@@ -21,7 +21,7 @@ bool max_stack_depth_reached(UnwindState *us) {
   if (output->nb_locs + 2 >= DD_MAX_STACK_DEPTH) {
     // ensure we don't overflow
     output->nb_locs = DD_MAX_STACK_DEPTH - 2;
-    add_common_frame(us, CommonSymbolLookup::LookupCases::truncated_stack);
+    add_common_frame(us, SymbolErrors::truncated_stack);
     return true;
   }
   return false;
@@ -41,14 +41,13 @@ static void add_virtual_frame(UnwindState *us, SymbolIdx_t symbol_idx) {
   // just add an empty element for mapping info
   output->locs[current_loc_idx]._map_info_idx =
       us->symbol_hdr._common_mapinfo_lookup.get_or_insert(
-          CommonMapInfoLookup::LookupCases::empty,
+          CommonMapInfoLookup::MappingErrors::empty,
           us->symbol_hdr._mapinfo_table);
 
   ++output->nb_locs;
 }
 
-void add_common_frame(UnwindState *us,
-                      CommonSymbolLookup::LookupCases lookup_case) {
+void add_common_frame(UnwindState *us, SymbolErrors lookup_case) {
   add_virtual_frame(us,
                     us->symbol_hdr._common_symbol_lookup.get_or_insert(
                         lookup_case, us->symbol_hdr._symbol_table));
@@ -142,12 +141,13 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
   return true;
 }
 
-void add_error_frame(const Dso *dso, UnwindState *us, ProcessAddress_t pc) {
+void add_error_frame(const Dso *dso, UnwindState *us, ProcessAddress_t pc,
+                     SymbolErrors error_case) {
   ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
   if (dso) {
     add_dso_frame(us, *dso, pc);
   } else {
-    add_common_frame(us, CommonSymbolLookup::LookupCases::unknown_dso);
+    add_common_frame(us, error_case);
   }
   LG_DBG("Error frame (depth#%lu)", us->output.nb_locs);
 }

@@ -133,8 +133,9 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(
     SymbolIdx_t symbol_idx =
         dso_symbol_lookup.get_or_insert(process_pc, dso, table);
 #ifdef DEBUG
-    LG_DBG("Insert (dwfl failure): %lx,%lx -> %s,%d,%d", start_sym, end_sym,
-           table[symbol_idx]._symname.c_str(), file_info.get_id(), symbol_idx);
+    LG_DBG("Insert (dwfl failure): %lx,%lx -> %s,%d,%d,%s", start_sym, end_sym,
+           table[symbol_idx]._symname.c_str(), file_info.get_id(), symbol_idx,
+           dso.to_string().c_str());
 #endif
     map.emplace(start_sym, DwflSymbolVal_V2(end_sym, symbol_idx));
 

@@ -7,9 +7,9 @@
 
 namespace ddprof {
 
-MapInfo mapinfo_from_common(CommonMapInfoLookup::LookupCases lookup_case) {
+MapInfo mapinfo_from_common(CommonMapInfoLookup::MappingErrors lookup_case) {
   switch (lookup_case) {
-  case CommonMapInfoLookup::LookupCases::empty:
+  case CommonMapInfoLookup::MappingErrors::empty:
     return MapInfo();
   default:
     break;
@@ -17,9 +17,9 @@ MapInfo mapinfo_from_common(CommonMapInfoLookup::LookupCases lookup_case) {
   return MapInfo();
 }
 
-MapInfoIdx_t
-CommonMapInfoLookup::get_or_insert(CommonMapInfoLookup::LookupCases lookup_case,
-                                   MapInfoTable &mapinfo_table) {
+MapInfoIdx_t CommonMapInfoLookup::get_or_insert(
+    CommonMapInfoLookup::MappingErrors lookup_case,
+    MapInfoTable &mapinfo_table) {
   auto const it = _map.find(lookup_case);
   MapInfoIdx_t res;
   if (it != _map.end()) {
@@ -27,7 +27,7 @@ CommonMapInfoLookup::get_or_insert(CommonMapInfoLookup::LookupCases lookup_case,
   } else { // insert things
     res = mapinfo_table.size();
     mapinfo_table.push_back(mapinfo_from_common(lookup_case));
-    _map.insert(std::pair<CommonMapInfoLookup::LookupCases, MapInfoIdx_t>(
+    _map.insert(std::pair<CommonMapInfoLookup::MappingErrors, MapInfoIdx_t>(
         lookup_case, res));
   }
   return res;

@@ -57,7 +57,7 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
 // #define FLAG_SYMBOL
 // A small mechanism to create a trace around the expected function
 #ifdef FLAG_SYMBOL
-  static const std::string look_for_symb = "pprof_aggregate";
+  static const std::string look_for_symb = "runtime.asmcgocall.abi0";
   if (symbol._demangle_name.find(look_for_symb) != std::string::npos) {
     LG_NFO("DGB:: GOING THROUGH EXPECTED FUNC: %s", look_for_symb.c_str());
   }
