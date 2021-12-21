@@ -265,24 +265,46 @@ FileInfoId_t DsoHdr::update_id_and_path(const Dso &dso) {
   }
 
   // check if we already encountered binary (cache by region with offset)
-  FileInfoKey key(file_info._inode, dso._pgoff, file_info._size);
-  auto it = _file_info_map.find(key);
-  if (it == _file_info_map.end()) {
-    dso._id = _file_info_vector.size();
-    _file_info_map.emplace(std::move(key), dso._id);
+  FileInfoInodeKey key_inode(file_info._inode, dso._pgoff, file_info._size);
+  FileInfoPathKey key_path(dso._filename, dso._pgoff, file_info._size);
+
+  dso._id = _file_info_vector.size();
+
+  // inode find, check with path + inode
+  auto it_inode = _file_info_inode_map.find(key_inode);
+  auto it_path = _file_info_path_map.find(key_path);
+  bool found_file[2] = {false, false};
+  // if either finds use value of find
+  if (it_inode != _file_info_inode_map.end()) {
+    // The inode found it, this one is saffer
+    dso._id = it_inode->second;
+    found_file[0] = true; // inode
+  }
+  if (!found_file[0] && it_path != _file_info_path_map.end()) {
+    // the inode did not find it and the path has it.
+    dso._id = it_path->second;
+    found_file[1] = true; // path
+  }
+  // NO ONE found it, insert new element
+  if (!found_file[0] && !found_file[1]) {
 #ifdef DEBUG
     LG_NTC("New file %d - %s - %ld", dso._id, file_info._path.c_str(),
            file_info._size);
 #endif
     _file_info_vector.emplace_back(std::move(file_info), dso._id);
-  } else { // already exists
-    dso._id = it->second;
-    // update with latest location
-    if (file_info._path != _file_info_vector[dso._id]._info._path) {
-      _file_info_vector[dso._id]._info = file_info;
-      _file_info_vector[dso._id]._errored = false; // allow retry with new file
-    }
+  } else if (file_info._path != _file_info_vector[dso._id]._info._path) {
+    // Someone found it, use fresh info
+    _file_info_vector[dso._id]._info = file_info;
+    _file_info_vector[dso._id]._errored = false; // allow retry with new file
   }
+  // insert in maps that did not find it yet
+  if (!found_file[0]) {
+    _file_info_inode_map.emplace(std::move(key_inode), dso._id);
+  }
+  if (!found_file[1]) {
+    _file_info_path_map.emplace(std::move(key_path), dso._id);
+  }
+
   return dso._id;
 }
 

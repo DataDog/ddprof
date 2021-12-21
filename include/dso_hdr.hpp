@@ -178,7 +178,9 @@ private:
 
   RegionMap _region_map;
 
-  FileInfoMap _file_info_map;
+  FileInfoInodeMap _file_info_inode_map;
+  FileInfoPathMap _file_info_path_map;
+
   FileInfoVector _file_info_vector;
   // /proc files can be mounted at various places (whole host profiling)
   std::string _path_to_proc;

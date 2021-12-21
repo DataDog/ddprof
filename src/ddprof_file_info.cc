@@ -7,9 +7,14 @@
 
 namespace ddprof {
 
-bool FileInfoKey::operator==(const FileInfoKey &o) const {
+bool FileInfoInodeKey::operator==(const FileInfoInodeKey &o) const {
   // default comparison is c++20
   return _inode == o._inode && _offset == o._offset && _sz == o._sz;
+}
+
+bool FileInfoPathKey::operator==(const FileInfoPathKey &o) const {
+  // default comparison is c++20
+  return _path == o._path && _offset == o._offset && _sz == o._sz;
 }
 
 } // namespace ddprof

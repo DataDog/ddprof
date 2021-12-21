@@ -20,10 +20,10 @@ namespace ddprof {
 /// Defines file uniqueness
 /// Considering we can have relative paths within several containers, we check
 /// inodes
-struct FileInfoKey {
-  FileInfoKey(inode_t inode, ElfAddress_t offset, std::size_t sz)
+struct FileInfoInodeKey {
+  FileInfoInodeKey(inode_t inode, ElfAddress_t offset, std::size_t sz)
       : _inode(inode), _offset(offset), _sz(sz) {}
-  bool operator==(const FileInfoKey &o) const;
+  bool operator==(const FileInfoInodeKey &o) const;
   // inode is used as a key (instead of path which can be the same for several
   // containers). TODO: inode could be the same across several filesystems (size
   // is there to mitigate)
@@ -32,17 +32,39 @@ struct FileInfoKey {
   std::size_t _sz;
 };
 
+struct FileInfoPathKey {
+  FileInfoPathKey(const std::string &path, ElfAddress_t offset, std::size_t sz)
+      : _path(path), _offset(offset), _sz(sz) {}
+  bool operator==(const FileInfoPathKey &o) const;
+  // inode is used as a key (instead of path which can be the same for several
+  // containers). TODO: inode could be the same across several filesystems (size
+  // is there to mitigate)
+  std::string _path;
+  Offset_t _offset;
+  std::size_t _sz;
+};
+
 } // namespace ddprof
 
 namespace std {
-template <> struct hash<ddprof::FileInfoKey> {
-  std::size_t operator()(const ddprof::FileInfoKey &k) const {
+template <> struct hash<ddprof::FileInfoInodeKey> {
+  std::size_t operator()(const ddprof::FileInfoInodeKey &k) const {
     std::size_t hash_val = ddprof::hash_combine(hash<inode_t>()(k._inode),
                                                 hash<Offset_t>()(k._offset));
     hash_val = ddprof::hash_combine(hash_val, hash<size_t>()(k._sz));
     return hash_val;
   }
 };
+
+template <> struct hash<ddprof::FileInfoPathKey> {
+  std::size_t operator()(const ddprof::FileInfoPathKey &k) const {
+    std::size_t hash_val = ddprof::hash_combine(hash<std::string>()(k._path),
+                                                hash<Offset_t>()(k._offset));
+    hash_val = ddprof::hash_combine(hash_val, hash<size_t>()(k._sz));
+    return hash_val;
+  }
+};
+
 } // namespace std
 
 namespace ddprof {
@@ -72,7 +94,9 @@ private:
   FileInfoId_t _id; // unique ID matching index in table
 };
 
-typedef std::unordered_map<FileInfoKey, FileInfoId_t> FileInfoMap;
+typedef std::unordered_map<FileInfoInodeKey, FileInfoId_t> FileInfoInodeMap;
+typedef std::unordered_map<FileInfoPathKey, FileInfoId_t> FileInfoPathMap;
+
 typedef std::vector<FileInfoValue> FileInfoVector;
 
 } // namespace ddprof

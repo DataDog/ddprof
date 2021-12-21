@@ -224,6 +224,10 @@ option(BUILD_NATIVE_LIB "Build a library out of the native profiler" OFF)
    list(APPEND NATIVE_LIB_INCLUDE_LIST ${LIBDDPROF_INCLUDE_DIR} ) # to be removed (unlikely.h)
    list(APPEND NATIVE_LIB_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include ${ELFUTILS_INCLUDE_LIST}) # legit includes
 
+   if (${JEMALLOC})
+      list(PREPEND NATIVE_LIB_LIBRARY_LIST jemalloc)
+   endif()
+
    ## Create the lib
    add_library(ddprof-native
                ${DDPROF_LIB_SRC})

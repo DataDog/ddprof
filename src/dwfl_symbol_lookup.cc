@@ -36,8 +36,8 @@ DwflSymbolLookup_V2::DwflSymbolLookup_V2() : _lookup_setting(K_CACHE_ON) {
 unsigned DwflSymbolLookup_V2::size() const {
   unsigned total_nb_elts = 0;
   std::for_each(
-      _file_info_map.begin(), _file_info_map.end(),
-      [&](FileInfoMapVT const &el) { total_nb_elts += el.second.size(); });
+      _file_info_inode_map.begin(), _file_info_inode_map.end(),
+      [&](FileInfoInodeMapVT const &el) { total_nb_elts += el.second.size(); });
   return total_nb_elts;
 }
 
@@ -58,7 +58,7 @@ DwflSymbolLookup_V2::get_or_insert(Dwfl *dwfl, SymbolTable &table,
   LG_DBG("Looking for : %lx = (%lx - %lx) / (offset : %lx) / dso:%s", region_pc,
          process_pc, dso._start, dso._pgoff, dso._filename.c_str());
 #endif
-  DwflSymbolMap &map = _file_info_map[file_info.get_id()];
+  DwflSymbolMap &map = _file_info_inode_map[file_info.get_id()];
   DwflSymbolMapFindRes find_res = find_closest(map, region_pc);
   if (find_res.second) { // already found the correct symbol
 #ifdef DEBUG
