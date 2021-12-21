@@ -31,6 +31,7 @@ typedef struct DDProfContext {
     const char *tags;
   } params;
 
+  bool initialized;
   ExporterInput exp_input;
   const StackHandler *stack_handler;
   PerfOption watchers[MAX_TYPE_WATCHER];

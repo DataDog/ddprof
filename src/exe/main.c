@@ -21,9 +21,9 @@
 /**************************** Program Entry Point *****************************/
 int main(int argc, char *argv[]) {
   //---- Inititiate structs
-  int ret = 0;
+  int ret = -1;
   DDProfInput input;
-  DDProfContext ctx;
+  DDProfContext ctx = {0};
   // Set temporary logger for argument parsing
   LOG_open(LOG_STDERR, NULL);
   LOG_setlevel(LL_WARNING);
@@ -32,8 +32,14 @@ int main(int argc, char *argv[]) {
     bool continue_exec;
     DDRes res = ddprof_input_parse(argc, (char **)argv, &input, &continue_exec);
     if (IsDDResNotOK(res) || !continue_exec) {
+      if (IsDDResOK(res)) {
+        // Input parsing calls out to print commands, like for the version or
+        // the help.  If we performed one of those, we are done, but it is not
+        // an error.
+        ret = 0;
+      }
       ddprof_input_free(&input);
-      goto EXIT_NO_FREE;
+      goto CLEANUP;
     }
   }
   // logger can be closed (as it is opened in ddprof_context_set)
@@ -42,7 +48,7 @@ int main(int argc, char *argv[]) {
   // cmdline args have been processed.  Set the ctx
   if (IsDDResNotOK(ddprof_context_set(&input, &ctx))) {
     LG_ERR("Error setting up profiling context, exiting");
-    goto CLEANUP_ERR;
+    goto CLEANUP;
   }
   // Adjust input parameters for execvp() (we do this even if unnecessary)
 
@@ -60,13 +66,13 @@ int main(int argc, char *argv[]) {
       LG_NFO("Instrumenting PID %d", ctx.params.pid);
   } else if (argc <= 0) {
     LG_ERR("No target specified, exiting");
-    goto CLEANUP_ERR;
+    goto CLEANUP;
   }
 
   /****************************************************************************\
   |                             Run the Profiler                               |
   \****************************************************************************/
-  // If the profiler was disabled, just skip ahead
+  // If the profiler was disabled, just skip ahead to EXECUTE
   if (!ctx.params.enable) {
     LG_NFO("Profiling disabled");
   } else {
@@ -107,11 +113,18 @@ int main(int argc, char *argv[]) {
       kill(temp_pid, SIGTERM);
 
     // Now enter profiling
-    ddprof_start_profiler(&ctx);
-    LG_WRN("Profiling terminated");
-    goto CLEANUP; // todo : propagate errors
+    DDRes res = ddprof_start_profiler(&ctx);
+    if (IsDDResNotOK(res)) {
+      // Some kind of error; tell the user about what happened in one line
+      LG_ERR("Profiling terminated (%s)", ddres_error_message(res._what));
+    } else {
+      // Normal error -- don't overcommunicate
+      LG_WRN("Profiling terminated");
+    }
+    goto CLEANUP;
   }
 
+// Execute manages its own return path, since we
 EXECUTE:
   ddprof_context_free(&ctx);
   if (-1 == execvp(*argv, (char *const *)argv)) {
@@ -129,10 +142,7 @@ EXECUTE:
     }
   }
 
-CLEANUP_ERR:
-  ret = -1;
 CLEANUP:
-  ddprof_context_free(&ctx);
-EXIT_NO_FREE:
+  ddprof_context_free(&ctx); // no-op if ctx already freed
   return ret;
 }

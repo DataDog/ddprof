@@ -45,9 +45,11 @@
     WORKER_SHUTDOWN();                                                         \
   } while (0)
 
-DDRes spawn_workers(volatile bool *can_run) {
+DDRes spawn_workers(MLWorkerFlags *flags) {
   pid_t child_pid;
 
+  // child immediately exits the while() and returns from this function, whereas
+  // the parent stays here forever, spawning workers.
   while ((child_pid = fork())) {
     LG_WRN("Created child %d", child_pid);
     waitpid(child_pid, NULL, 0);
@@ -55,10 +57,12 @@ DDRes spawn_workers(volatile bool *can_run) {
     // Harvest the exit state of the child process.  We will always reset it
     // to false so that a child who segfaults or exits erroneously does not
     // cause a pointless loop of spawning
-    if (!*can_run) {
-      DDRES_RETURN_WARN_LOG(DD_WHAT_MAINLOOP, "Stop profiling");
-    } else {
-      *can_run = false;
+    if (!flags->can_run) {
+      if (flags->errors) {
+        DDRES_RETURN_WARN_LOG(DD_WHAT_MAINLOOP, "Stop profiling");
+      } else {
+        return ddres_init();
+      }
     }
     LG_NFO("Refreshing worker process");
   }
@@ -79,10 +83,11 @@ static void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
 }
 
 static void worker(DDProfContext *ctx, const WorkerAttr *attr,
-                   volatile bool *can_run) {
+                   MLWorkerFlags *flags) {
   // Until a restartable terminal condition is met, the worker will set its
   // disposition so that profiling is halted upon its termination
-  *can_run = false;
+  flags->can_run = false;
+  flags->errors = true;
 
   // Setup poll() to watch perf_event file descriptors
   int pe_len = ctx->worker_ctx.pevent_hdr.size;
@@ -115,6 +120,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       // This closes profiling when there still may be viable feeds, but we
       // don't handle that case yet.
       if (pfd[i].revents & POLLHUP) {
+        flags->errors = false; // This is a graceful shutdown!
         DDRES_GRACEFUL_SHUTDOWN(attr->finish_fun(ctx));
       }
     }
@@ -135,7 +141,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
 
         // Attempt to dispatch the event
         struct perf_event_header *hdr = rb_seek(rb, tail);
-        DDRes res = ddprof_worker(hdr, pes[i].pos, can_run, ctx);
+        DDRes res = ddprof_worker(hdr, pes[i].pos, &flags->can_run, ctx);
 
         // We've processed the current event, so we can advance the ringbuffer
         rb->region->data_tail += hdr->size;
@@ -153,7 +159,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
 
     // If I didn't process any events, then hit the timeout
     if (!processed_samples) {
-      if (IsDDResNotOK(ddprof_worker_timeout(can_run, ctx))) {
+      if (IsDDResNotOK(ddprof_worker_timeout(&flags->can_run, ctx))) {
         attr->finish_fun(ctx);
         WORKER_SHUTDOWN();
       }
@@ -161,36 +167,38 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
   }
 }
 
-void main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
+DDRes main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
   // Setup a shared memory region between the parent and child processes.  This
   // is used to communicate terminal profiling state
   int mmap_prot = PROT_READ | PROT_WRITE;
   int mmap_flags = MAP_ANONYMOUS | MAP_SHARED;
-  volatile bool *can_run;
-  can_run = mmap(0, sizeof(bool), mmap_prot, mmap_flags, -1, 0);
-  if (MAP_FAILED == can_run) {
+  MLWorkerFlags *flags = mmap(0, sizeof(*flags), mmap_prot, mmap_flags, -1, 0);
+  if (MAP_FAILED == flags) {
     // Allocation failure : stop the profiling
     LG_ERR("Could not initialize profiler");
-    return;
+    return ddres_error(DD_WHAT_MAINLOOP_INIT);
   }
 
   // Create worker processes to fulfill poll loop.  Only the parent process
   // can exit with an error code, which signals the termination of profiling.
-  if (IsDDResNotOK(spawn_workers(can_run))) {
-    return;
+  DDRes res = spawn_workers(flags);
+  if (IsDDResNotOK(res)) {
+    munmap(flags, sizeof(*flags));
+    return res;
   }
 
-  worker(ctx, attr, can_run);
+  worker(ctx, attr, flags);
   // Child finished profiling: Free and exit
   ddprof_context_free(ctx);
+  munmap(flags, sizeof(*flags));
   exit(0);
 }
 
 void main_loop_lib(const WorkerAttr *attr, DDProfContext *ctx) {
-  bool can_run;
+  MLWorkerFlags flags = {0};
   // no fork. TODO : give exit trigger to user
-  worker(ctx, attr, &can_run);
-  if (!can_run) {
+  worker(ctx, attr, &flags);
+  if (!flags.can_run) {
     LG_NFO("Request to exit");
   }
 }

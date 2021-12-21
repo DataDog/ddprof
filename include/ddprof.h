@@ -19,7 +19,7 @@ DDRes ddprof_setup(DDProfContext *ctx, pid_t pid);
 #ifndef DDPROF_NATIVE_LIB
 /*************************  Instrumentation Helpers  **************************/
 // Attach a profiler exporting results from a different fork
-void ddprof_start_profiler(DDProfContext *);
+DDRes ddprof_start_profiler(DDProfContext *);
 #endif
 
 // Stack handler should remain valid

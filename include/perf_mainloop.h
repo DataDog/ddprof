@@ -8,6 +8,11 @@
 #include "ddprof_context.h"
 #include "worker_attr.h"
 
+typedef struct MLWorkerFlags {
+  volatile bool can_run;
+  volatile bool errors;
+} MLWorkerFlags;
+
 /**
  * Continuously poll for new events and process them accordingly
  *
@@ -19,7 +24,7 @@
  *
  * @return
  */
-void main_loop(const WorkerAttr *, DDProfContext *);
+DDRes main_loop(const WorkerAttr *, DDProfContext *);
 
 // Same as main loop without any forks
 void main_loop_lib(const WorkerAttr *attr, DDProfContext *ctx);

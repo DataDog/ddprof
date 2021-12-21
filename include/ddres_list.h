@@ -35,6 +35,7 @@ extern "C" {
   X(IOCTL, "error during perf_event_open")                                     \
   X(PERFMMAP, "error in mmap operations")                                      \
   X(MAINLOOP, "error in main_loop coordinator")                                \
+  X(MAINLOOP_INIT, "error initializing the profiling mainloop")                \
   X(POLLTIMEOUT, "timeout when polling perf events")                           \
   X(POLLERROR, "Unknown poll error")                                           \
   X(POLLHANGUP, "perf event file descriptor hang up")                          \

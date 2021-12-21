@@ -187,11 +187,15 @@ DDRes ddprof_context_set(const DDProfInput *input, DDProfContext *ctx) {
                ctx->watchers[i].label, ctx->watchers[i].mode);
     }
   }
+  ctx->initialized = true;
   return ddres_init();
 }
 
 void ddprof_context_free(DDProfContext *ctx) {
-  exporter_input_free(&ctx->exp_input);
-  free((char *)ctx->params.internalstats);
-  free((char *)ctx->params.tags);
+  if (ctx->initialized) {
+    exporter_input_free(&ctx->exp_input);
+    free((char *)ctx->params.internalstats);
+    free((char *)ctx->params.tags);
+    memset(ctx, 0, sizeof(*ctx)); // also sets ctx->initialized = false;
+  }
 }

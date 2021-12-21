@@ -101,7 +101,7 @@ static DDRes ddprof_breakdown(DDProfContext *ctx) {
 
 #ifndef DDPROF_NATIVE_LIB
 /*************************  Instrumentation Helpers  **************************/
-void ddprof_start_profiler(DDProfContext *ctx) {
+DDRes ddprof_start_profiler(DDProfContext *ctx) {
   const WorkerAttr perf_funs = {
       .init_fun = ddprof_worker_init,
       .finish_fun = ddprof_worker_free,
@@ -109,17 +109,13 @@ void ddprof_start_profiler(DDProfContext *ctx) {
 
   // Enter the main loop -- this will not return unless there is an error.
   LG_PRINT("Entering main loop");
-  main_loop(&perf_funs, ctx);
-
-  // If we're here, the main loop closed--probably the profilee closed
-  if (errno)
-    LG_WRN("Profiling context no longer valid (%s)", strerror(errno));
-  else
-    LG_NTC("Profiling context no longer valid");
-
-  if (IsDDResNotOK(ddprof_breakdown(ctx)))
-    LG_WRN("Error when calling ddprof_breakdown");
-  return;
+  DDRes res;
+  if (IsDDResNotOK(res = main_loop(&perf_funs, ctx))) {
+    return res;
+  } else if (IsDDResNotOK(res = ddprof_breakdown(ctx))) {
+    return res;
+  }
+  return ddres_init();
 }
 #endif
 
@@ -138,7 +134,7 @@ void ddprof_attach_handler(DDProfContext *ctx,
   // User defined handler
   ctx->stack_handler = stack_handler;
   // Enter the main loop -- returns after a number of cycles.
-  LG_PRINT("Initiating Profiling");
+  LG_NFO("Initiating Profiling");
   main_loop_lib(&perf_funs, ctx);
   if (errno)
     LG_WRN("Profiling context no longer valid (%s)", strerror(errno));
