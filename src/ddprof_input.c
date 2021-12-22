@@ -56,6 +56,8 @@
     if ((f)->i b) {                                                            \
       if (__builtin_types_compatible_p(typeof((f)->i b), char *))              \
         LG_PRINT("  " #b ": %s", (char *)(f)->i b);                            \
+      else if (__builtin_types_compatible_p(typeof((f)->i b), const char *))   \
+        LG_PRINT("  " #b ": %s", (char *)(f)->i b);                            \
       else {                                                                   \
         char *truefalse[] = {"false", "true"};                                 \
         LG_PRINT("  " #b ": %s", truefalse[!!((f)->i b)]);                     \
@@ -70,18 +72,24 @@
 #define STR_UNDF (char*)1
 char* help_str[DD_KLEN] = {
   [DD_API_KEY] =
-"    A valid Datadog API key.  This is an experimental feature intended for\n",
-"    testing; do not use in agent-based configurations, as the agent will be\n",
-"    bypassed when an API key is given.  In addition, expect the following:\n",
-"      * TCP port 443 will be used, regardless of whether a `--port` was given\n",
+"    A valid Datadog API key.  This is an experimental feature intended for\n"
+"    testing; do not use in agent-based configurations, as the agent will be\n"
+"    bypassed when an API key is given.  In addition, expect the following:\n"
+"      * TCP port 443 will be used, regardless of whether a `--port` was given\n"
 "      * The given agent host will be expanded to intake.profile.$HOST\n",
   [DD_ENV] =
 "    The name of the environment to use in the Datadog UI.\n",
   [DD_AGENT_HOST] =
 "    The hostname of the agent. Port should also be specified.\n",
+  [DD_TRACE_AGENT_URL] =
+"    A <hostname>:<port> URL.  Either <hostname>:<port>, http://<hostname>:<port>\n"
+"    or https://<hostname>:<port> are valid.  Overrides any other specification for\n"
+"    the host or port, except if the URL is specified without a port, such as\n"
+"    http://myhost.domain.com, in which case the port can be specified separately\n",
+"    by the user.",
   [DD_SITE] =
-"    Site url when bypassing the agent (directly pointing to intake backend).",
-"    Expected url should have the form datadoghq.com\n",
+"    Site url when bypassing the agent (directly pointing to intake backend).\n"
+"    Expected url should have the form datadoghq.com\n"
 "    Refer to the url / network traffic section in the docs\n",
   [DD_TRACE_AGENT_PORT] =
 "    The intake port for the Datadog agent or backend system.\n",

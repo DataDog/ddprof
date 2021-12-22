@@ -13,7 +13,7 @@
 #include <sys/sysinfo.h>
 
 /****************************  Argument Processor  ***************************/
-DDRes ddprof_context_set(const DDProfInput *input, DDProfContext *ctx) {
+DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   memset(ctx, 0, sizeof(DDProfContext));
   // Process logging mode
   char const *logpattern[] = {"stdout", "stderr", "syslog", "disabled"};
@@ -150,6 +150,7 @@ DDRes ddprof_context_set(const DDProfInput *input, DDProfContext *ctx) {
     ctx->params.pid = -1;
   }
 
+  // Enable or disable the propagation of internal statistics
   if (input->internalstats) {
     ctx->params.internalstats = strdup(input->internalstats);
     if (!ctx->params.internalstats) {
@@ -157,11 +158,66 @@ DDRes ddprof_context_set(const DDProfInput *input, DDProfContext *ctx) {
                              "Unable to allocate string for internalstats");
     }
   }
+
+  // Specify export tags
   if (input->tags) {
     ctx->params.tags = strdup(input->tags);
     if (!ctx->params.tags) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
                              "Unable to allocate string for tags");
+    }
+  }
+
+  // URL-based host/port override
+  if (input->url && *input->url) {
+    LG_NTC("Processing URL: %s", input->url);
+    char *delim = strchr(input->url, ':');
+    char *host = input->url;
+    char *port = NULL;
+    if (delim && delim[1] == '/' && delim[2] == '/') {
+      // A colon was found.
+      // http://hostname:port -> (hostname, port)
+      // ftp://hostname:port -> error
+      // hostname:port -> (hostname, port)
+      // hostname: -> (hostname, default_port)
+      // hostname -> (hostname, default_port)
+
+      // Drop the schema
+      *delim = '\0';
+      if (!strncasecmp(input->url, "http", 4) ||
+          !strncasecmp(input->url, "https", 5)) {
+        *delim = ':';
+        host = delim + 3; // Navigate after schema
+      }
+      delim = strchr(host, ':');
+    }
+
+    if (delim) {
+      // Check to see if there is another colon for the port
+      // We're going to treat this as the port.  This is slightly problematic,
+      // since an invalid port is going to invalidate the default and then throw
+      // an error later, but for now let's just do what the user told us even if
+      // it isn't what they wanted.  :)
+      *delim = '\0';
+      port = delim + 1;
+    }
+
+    // Modify the input structure to reflect the values from the URL.  This
+    // overwrites an otherwise immutable parameter, which is slightly
+    // unfortunate, but this way it harmonizes with the downstream movement of
+    // host/port and the input arg pretty-printer.
+    if (host) {
+      free((char *)input->exp_input.host);
+      input->exp_input.host = strdup(host);
+    }
+    if (port) {
+      free((char *)input->exp_input.port);
+      input->exp_input.port = strdup(port);
+    }
+
+    // Revert the delimiter in case we want to print the URL later
+    if (delim) {
+      *delim = ':';
     }
   }
 
