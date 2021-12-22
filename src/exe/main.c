@@ -22,7 +22,7 @@
 int main(int argc, char *argv[]) {
   //---- Inititiate structs
   int ret = -1;
-  DDProfInput input;
+  DDProfInput input = {0};
   DDProfContext ctx = {0};
   // Set temporary logger for argument parsing
   LOG_open(LOG_STDERR, NULL);

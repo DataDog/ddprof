@@ -71,12 +71,7 @@
 // clang-format off
 #define STR_UNDF (char*)1
 char* help_str[DD_KLEN] = {
-  [DD_API_KEY] =
-"    A valid Datadog API key.  This is an experimental feature intended for\n"
-"    testing; do not use in agent-based configurations, as the agent will be\n"
-"    bypassed when an API key is given.  In addition, expect the following:\n"
-"      * TCP port 443 will be used, regardless of whether a `--port` was given\n"
-"      * The given agent host will be expanded to intake.profile.$HOST\n",
+  [DD_API_KEY] = STR_UNDF,
   [DD_ENV] =
 "    The name of the environment to use in the Datadog UI.\n",
   [DD_AGENT_HOST] =
@@ -87,20 +82,22 @@ char* help_str[DD_KLEN] = {
 "    the host or port, except if the URL is specified without a port, such as\n"
 "    http://myhost.domain.com, in which case the port can be specified separately\n",
 "    by the user.",
-  [DD_SITE] =
-"    Site url when bypassing the agent (directly pointing to intake backend).\n"
-"    Expected url should have the form datadoghq.com\n"
-"    Refer to the url / network traffic section in the docs\n",
+  [DD_SITE] = STR_UNDF,
   [DD_TRACE_AGENT_PORT] =
-"    The intake port for the Datadog agent or backend system.\n",
+"    The communication port for the Datadog agent or backend system.\n",
   [DD_SERVICE] =
-"    The name of this service\n",
+"    The name of this service.  It is useful to populate this field, as it will\n"
+"    make it easier to locate and filter interesting profiles.\n"
+"    For global mode, note that all application-level profiles are consolidated in\n"
+"    the same view.\n",
   [DD_PROFILING_AGENTLESS] = STR_UNDF,
   [DD_TAGS] =
 "    Tags sent with both profiler metrics and profiles.\n"
 "    Refer to the Datadog tag section to understand what is supported.\n",
   [DD_VERSION] =
-"    Version of the service being profiled. Added to the tags during export.\n",
+"    Version of the service being profiled. Added to the tags during export.\n"
+"    This is an optional field, but it is useful for locating and filtering\n"
+"    regressions or interesting behavior.\n",
   [DD_PROFILING_ENABLED] =
 "    Whether to enable Datadog profiling.  If this is true, then "MYNAME" as well\n"
 "    as any other Datadog profilers are enabled.  If false, they are all disabled.\n"
@@ -111,25 +108,13 @@ char* help_str[DD_KLEN] = {
 "    Whether to enable "MYNAME" specifically, without altering how other Datadog\n"
 "    profilers are run.  For example, DD_PROFILING_ENABLED can be used to disable\n"
 "    an inner profile, whilst setting DD_PROFILING_NATIVE_ENABLED to enable "MYNAME"\n",
-  [DD_PROFILING_UPLOAD_PERIOD] =
-"    In seconds, how frequently to upload gathered data to Datadog.  Defaults to 60\n"
-"    This value almost never needs to be changed.\n",
-  [DD_PROFILING_WORKER_PERIOD] =
-"    The number of uploads after which the current worker process is retired.\n"
-"    This gives the user some ability to control the tradeoff between memory and\n"
-"    performance.  If default values are used for this and the upload period, then\n"
-"    workers are retired every four hours.\n"
-"    This value almost never needs to be changed.\n",
+  [DD_PROFILING_UPLOAD_PERIOD] = STR_UNDF,
+  [DD_PROFILING_WORKER_PERIOD] = STR_UNDF,
   [DD_PROFILING_NATIVEPRINTARGS] =
 "    Whether or not to print configuration parameters to the trace log.  Can\n"
 "    be `yes` or `no` (default: `no`).\n",
-  [DD_PROFILING_NATIVEFAULTINFO] =
-"    If "MYNAME" encounters a critical error, print a backtrace of internal\n"
-"    functions for diagnostic purposes.  Values are `on` or `off`\n"
-"    (default: off)\n",
-  [DD_PROFILING_NATIVEDUMPS] =
-"    Whether "MYNAME" is able to emit coredumps on failure.\n"
-"    (default: off)\n",
+  [DD_PROFILING_NATIVEFAULTINFO] = STR_UNDF,
+  [DD_PROFILING_NATIVEDUMPS] = STR_UNDF,
   [DD_PROFILING_NATIVENICE] =
 "    Sets the nice level of "MYNAME" without affecting any instrumented\n"
 "    processes.  This is useful on small containers with spiky workloads.\n"
@@ -141,19 +126,14 @@ char* help_str[DD_KLEN] = {
 "    cleared between runs and a service restart is needed for log rotation.\n",
   [DD_PROFILING_NATIVELOGLEVEL] =
 "    One of `debug`, `notice`, `warn`, `error`.  Default is `warn`.\n",
-  [DD_PROFILING_NATIVESENDFINAL] =
-"    Determines whether to emit the last partial export if the instrumented\n"
-"    process ends.  This is almost never useful.  Default is `no`.\n",
+  [DD_PROFILING_NATIVESENDFINAL] = STR_UNDF,
   [DD_PROFILING_NATIVETARGET] =
 "    Instrument the given PID rather than launching a new process.\n",
   [DD_PROFILING_NATIVEGLOBAL] =
 "    Instruments the whole system.  Overrides DD_PROFILING_NATIVETARGET.\n"
 "    Requires specific permissions or a perf_event_paranoid value of less than 1.\n",
-  [DD_PROFILING_EXPORT] =
-"    Defines if profiles are exported through a HTTP call.\n"
-"    This is useful for developers/investigations.\n",
-  [DD_PROFILING_INTERNALSTATS] =
-"    Statsd socket to send internal profiler stats.\n",
+  [DD_PROFILING_EXPORT] = STR_UNDF,
+  [DD_PROFILING_INTERNALSTATS] = STR_UNDF,
 };
 // clang-format on
 
@@ -166,26 +146,8 @@ void ddprof_print_help() {
 " eg: "MYNAME" -A hunter2 -H localhost -P 8192 redis-server /etc/redis/redis.conf\n\n";
 
   char help_opts_extra[] =
-"  -e, --event:\n"
-"    A string representing the events to sample.  Defaults to `cw`\n"
-"    See the `events` section below for more details.\n"
-"    eg: --event sCPU,1000 --event hREF\n\n"
 "  -v, --version:\n"
 "    Prints the version of "MYNAME" and exits.\n\n";
-
-  char help_events[] =
-"Events\n"
-MYNAME" can register to various system events in order to customize the\n"
-"information retrieved during profiling.  Note that certain events can add\n"
-"more overhead during profiling; be sure to test your service under a realistic\n"
-"load simulation to ensure the desired forms of profiling are acceptable.\n"
-"\n"
-"The listing below gives the string to pass to the --event argument, a\n"
-"brief description of the event, the name of the event as it will appear in\n"
-"the Datadog UI, and the units.\n"
-"Events with the same name in the UI conflict with each other; be sure to pick\n"
-"only one such event!\n"
-"\n";
   // clang-format on
 
   printf("%s", help_hdr);
@@ -198,13 +160,6 @@ MYNAME" can register to various system events in order to customize the\n"
     }
   }
   printf("%s", help_opts_extra);
-  printf("%s", help_events);
-
-  for (int i = 0; i < perfoptions_nb_presets(); i++) {
-    printf("%-10s - %-15s (%s, %s)\n", perfoptions_lookup_idx(i),
-           perfoptions_preset(i)->desc, perfoptions_preset(i)->label,
-           perfoptions_preset(i)->unit);
-  }
 }
 
 // fills the default parameters for the input structure
