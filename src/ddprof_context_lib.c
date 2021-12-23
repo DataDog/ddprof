@@ -208,11 +208,15 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     // host/port and the input arg pretty-printer.
     if (host) {
       free((char *)input->exp_input.host);
-      input->exp_input.host = strdup(host);
+      free((char *)ctx->exp_input.host);
+      input->exp_input.host = strdup(host); // For the pretty-printer
+      ctx->exp_input.host = strdup(host);
     }
     if (port) {
       free((char *)input->exp_input.port);
-      input->exp_input.port = strdup(port);
+      free((char *)ctx->exp_input.port);
+      input->exp_input.port = strdup(port); // Merely for the pretty-printer
+      ctx->exp_input.port = strdup(port);
     }
 
     // Revert the delimiter in case we want to print the URL later
