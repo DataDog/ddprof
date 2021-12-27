@@ -41,3 +41,61 @@ function(add_exe name)
    list(REMOVE_DUPLICATES exe_include_dirs)
    target_include_directories(${name} PRIVATE ${exe_include_dirs} ${all_includes})
 endfunction()
+
+# Set a target to statically include libc
+function(use_libcxx)
+  cmake_parse_arguments(USE_LIBCXX
+    "STATIC"
+    "TARGET"
+    ""
+    ${ARGN})
+
+  if (NOT USE_LIBCXX_TARGET)
+    message("You must supply a TARGET to use_libcxx")
+  endif()
+    
+  if("${CMAKE_C_COMPILER_ID}" STREQUAL "Clang")
+    target_compile_options(${USE_LIBCXX_TARGET} BEFORE PUBLIC --stdlib=libc++)
+    target_link_options(${USE_LIBCXX_TARGET} BEFORE PUBLIC --stdlib=libc++)
+
+    if (USE_LIBCXX_STATIC)
+      target_compile_options(${USE_LIBCXX_TARGET} PUBLIC -rtlib=compiler-rt)
+      target_link_options(${USE_LIBCXX_TARGET} PUBLIC -rtlib=compiler-rt)
+
+      set_property(TARGET ${SETSTATICCX_TARGET} PROPERTY LIBCXX_USE_COMPILER_RT "YES")
+      set_property(TARGET ${SETSTATICCX_TARGET} PROPERTY LIBCXXABI_USE_COMPILER_RT "YES")
+      set_property(TARGET ${SETSTATICCX_TARGET} PROPERTY LIBCXXABI_USE_LLVM_UNWINDER "YES")
+
+      # Find and link static libraries
+      set(LLVM_LIB_DIRS "/usr/lib/llvm-12/lib")
+      find_library(LIBCXX_STATIC NAMES libc++.a HINTS ${LLVM_LIB_DIRS})
+      find_library(LIBCXXABI_STATIC NAMES libc++abi.a HINTS ${LLVM_LIB_DIRS})
+      find_library(LIBUNWIND_STATIC NAMES libunwind.a HINTS ${LLVM_LIB_DIRS})
+      target_link_libraries(${USE_LIBCXX_TARGET} PUBLIC ${LIBCXX_STATIC})
+      target_link_libraries(${USE_LIBCXX_TARGET} PUBLIC ${LIBCXXABI_STATIC})
+      target_link_libraries(${USE_LIBCXX_TARGET} PUBLIC ${LIBUNWIND_STATIC})
+      target_link_libraries(${USE_LIBCXX_TARGET} PUBLIC liblzma.a) #found in toplevel
+    endif()
+  endif()
+  if (USE_LIBCXX_STATIC)
+    target_compile_options(${USE_LIBCXX_TARGET} PUBLIC -static-libstdc++)
+    target_link_options(${USE_LIBCXX_TARGET} PUBLIC -static-libstdc++)
+  endif()
+
+endfunction()
+
+# Set a target's disposition for clang-tidy
+function(enable_clangtidy)
+  cmake_parse_arguments(ENABLE_CLANGTIDY
+    "NOTIDY"
+    "TARGET"
+    ""
+    ${ARGN})
+    if (NOT ENABLE_CLANGTIDY_NOTIDY)
+      set(CLANG_TIDY_OPTIONS "clang-tidy; -header-filter=.; -checks=*;")
+    else()
+      set(CLANG_TIDY_OPTIONS "")
+    endif()
+    set_property(TARGET ${ENABLE_CLANGTIDY_TARGET} PROPERTY CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_OPTIONS}")
+    set_property(TARGET ${ENABLE_CLANGTIDY_TARGET} PROPERTY CMAKE_C_CLANG_TIDY "${CLANG_TIDY_OPTIONS}")
+endfunction()

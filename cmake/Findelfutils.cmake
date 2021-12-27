@@ -8,7 +8,7 @@
 # - static lib : dw
 
 set(MD5_ELF "6f58aa1b9af1a5681b1cbf63e0da2d67" CACHE STRING "md5 of the elf tar")
-set(VER_ELF "0.183" CACHE STRING "elfutils version")
+set(VER_ELF "0.186" CACHE STRING "elfutils version")
 set(ELFUTILS_PATH ${VENDOR_PATH}/elfutils CACHE FILEPATH "location of elfutils file")
 
 set(LIBDW_PATH ${ELFUTILS_PATH}/libdw/libdw.a CACHE FILEPATH "location of dw lib")

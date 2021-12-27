@@ -14,13 +14,12 @@ RUN apt update \
   && DEBIAN_FRONTEND=noninteractive apt install -y \
   awscli \
   binutils-dev \
-  gcc \
-  g++ \
   git \
   curl \
   make \
   m4 \
   liblzma-dev \
+  libunwind-dev \
   pkg-config \
   ssh-client \
   subversion \
@@ -35,12 +34,10 @@ RUN apt update \
 RUN DEBIAN_FRONTEND=noninteractive apt install -y apt-transport-https ca-certificates
 
 # llvm installer
+RUN apt-get remove -y gcc g++
 ADD ./app/base-env/llvm.sh /
 RUN /llvm.sh 12
-# Alternative is to run it directly from here :
-# RUN wget https://apt.llvm.org/llvm.sh && \
-#   chmod +x llvm.sh && \
-#   ./llvm.sh 12
+RUN apt install -y libc++-12-dev libc++abi-12-dev
 
 # Clang format not installed by default
 RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key| apt-key add -
@@ -65,7 +62,7 @@ RUN git clone --depth 1 --branch release-1.11.0 https://github.com/google/google
   && cd googletest \
   && mkdir build \
   && cd build \
-  && cmake ../ \
+  && cmake -DCMAKE_CXX_FLAGS="--stdlib=libc++" ../ \
   && cmake --build .  \
   && make install
 
@@ -85,10 +82,13 @@ RUN wget https://github.com/danmar/cppcheck/archive/refs/tags/2.5.tar.gz \
 RUN git clone --depth 1 --branch v3.10.2 https://github.com/nlohmann/json.git \
   && cd json \
   && mkdir build && cd build \
-  && cmake DJSON_BuildTests=Off ../  \
+  && cmake -DCMAKE_CXX_FLAGS="--stdlib=libc++" -DJSON_BuildTests=Off ../  \
   && make install
 
 RUN curl -L https://github.com/github/codeql-action/releases/download/codeql-bundle-20210622/codeql-bundle-linux64.tar.gz -o - | tar -xz -C /usr/local
+
+# Now that we're all done, reinstall gcc for gcov
+RUN apt install -y gcc g++ gcovr
 
 # A specific user is required to get access to perf event ressources. 
 # This enables unit testing using perf-event ressources

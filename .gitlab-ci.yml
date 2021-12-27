@@ -9,10 +9,10 @@ stages:
 
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
-  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/jobs/104212638
-  BUILD_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:66973f402f9c96bf7de60b1d6b62cdabdd00e1effca421bb1fa104977fcb7d5b
-  BUILD_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:3bbd7b03b2fb99171e9020656a86f042c14022c0c5e39b8d5a523d177dbca57d
-  BUILD_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:b32c396128f9b2886896810021771efa8f8d17aa719b13d87088a640f7d818bd
+  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/pipelines/6438021
+  BUILD_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:c58644f82caf189db44d39960d3fa9c3d2e9ac962ed8e30c19c5c3255fa2e9a1
+  BUILD_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:bcc4a521b339f2b88b7861d57a232e65d039eec9a6c53c4eea38c2f306ca922a
+  BUILD_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:ca2fa92497535309043164374ec839cd3f5eeaca2d24f03d6390f629e2963970
   # https://gitlab.ddbuild.io/DataDog/ddprof/-/pipelines/5611418
   TEST_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:a06908a49fbdf93fb62e7c5a650ec6da587c21f8f5060cf0657d4b08a63df985
   TEST_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:128fff36c0cc5a8d9f31d8082fbcdde7fe8cad960514f01a1a11b209ef94d08b
@@ -126,11 +126,11 @@ build:ddprof:
     #Build image dependencies were stored in app, avoid rebuilding vendor content
     - ln -s /app/vendor vendor
     - mkdir -p ${BUILDPATH} && cd ${BUILDPATH}
-    - cmake -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_BENCHMARKS=ON -DACCURACY_TEST=ON -DBUILD_NATIVE_LIB=ON -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
+    - cmake -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_BENCHMARKS=ON -DACCURACY_TEST=ON -DBUILD_NATIVE_LIB=ON -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
     # Static checks
     - make cppcheck
     - make format
-    - make -j ${KUBERNETES_CPU_LIMIT}
+    - make VERBOSE=1 -j ${KUBERNETES_CPU_LIMIT}
     - if [ ! $(./ddprof --version | sed 's/.*+//g') == "${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA}" ]; then exit 1; fi
     - ctest --repeat-until-fail 5 --output-on-failure | tee test-output.log
     - if [ ${BUILD_TYPE} == "Release" ]; then strip --strip-debug ddprof; fi

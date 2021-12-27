@@ -19,7 +19,7 @@ fi
 NB_DEPS=$(ldd $1 | wc -l)
 NB_EXPECTED_DEPS=$(cat $2 | wc -l)
 
-if [ $NB_DEPS != $NB_EXPECTED_DEPS ]; then
+if [ $NB_DEPS -gt $NB_EXPECTED_DEPS ]; then
     echo "Check dependencies different number."
     echo "Nb deps = $NB_DEPS vs Expected : $NB_EXPECTED_DEPS"
     ldd $1

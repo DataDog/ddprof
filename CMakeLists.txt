@@ -130,8 +130,8 @@ list(APPEND DDPROF_DEFINITION_LIST "MYNAME=\"${CMAKE_PROJECT_NAME_LC}\"")
 include(Version)
 
 # Leave frame pointers to help with profiling
-list(APPEND CMAKE_C_FLAGS ${FRAME_PTR_FLAG})
-list(APPEND CMAKE_CXX_FLAGS ${FRAME_PTR_FLAG})
+string(APPEND CMAKE_C_FLAGS " ${FRAME_PTR_FLAG}")
+string(APPEND CMAKE_CXX_FLAGS " ${FRAME_PTR_FLAG}")
 
 list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include)
 
@@ -165,11 +165,6 @@ set(DDPROF_GLOBAL_SRC
 
 set(DDPROF_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 
-if("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
-   # Static link of libstdc++ (in case it is not installed on customer side)
-   list(PREPEND DDPROF_LIBRARY_LIST -static-libstdc++)
-endif()
-
 if (ON)
    # Add the rust library - Refactoring ongoing. OFF for now
    list(PREPEND DDPROF_LIBRARY_LIST DDProf::FFI)
@@ -194,6 +189,7 @@ target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 # TODO: revert to c++ 11 (string_format is blocking)
 set_property(TARGET ddprof PROPERTY CXX_STANDARD 11)
 set_property(TARGET ddprof PROPERTY C_STANDARD 11)
+use_libcxx(TARGET ddprof STATIC)
 
 # Ensure all dependencies are computed
 add_dependencies(ddprof deps)

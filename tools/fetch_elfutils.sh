@@ -63,5 +63,12 @@ rm -f ${DOWNLOAD_PATH}/${TAR_ELF}
 
 echo "Compile elfutils using ${C_COMPILER}"
 
+# The flags below are hardcoded to work around clang compatibility issues in
+# elfutils 186; these are irrelevant for GCC.  Note that this won't propagate
+# envvars back up to the calling build system.
+# TODO is there a better way to infer compiler family?
+if [ "clang" == $(basename ${C_COMPILER}) ]; then
+  export CFLAGS="-Wno-xor-used-as-pow -Wno-gnu-variable-sized-type-not-at-end"
+fi
 cd ${TARGET_EXTRACT} && ./configure CC=${C_COMPILER} --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning
 make -j4 -C ${TARGET_EXTRACT}

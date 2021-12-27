@@ -44,7 +44,7 @@ function(add_unit_test name)
    add_dependencies(${name} deps)
    set_property(TARGET ${name} PROPERTY CXX_STANDARD 11)
 
-   target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
+   target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock unwind)
    # libddprof almost always required (unlikely file from libddprof)
    target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS} ${LIBDDPROF_INCLUDE_DIR})
 
@@ -52,7 +52,8 @@ function(add_unit_test name)
    set_tests_properties(${name} PROPERTIES
                         ENVIRONMENT "UBSAN_OPTIONS=halt_on_error=1 abort_on_error=1 print_stacktrace=1;\
                         LSAN_OPTIONS=detect_leaks=1 malloc_context_size=2 print_suppressions=0")
-
+   use_libcxx(TARGET ${name})
+   enable_clangtidy(TARGET ${name} NOTIDY)
 endfunction()
 
 #### Definition of unit tests ####
@@ -99,6 +100,7 @@ add_unit_test(
     demangle-ut
     demangle-ut.cc
     LIBRARIES llvm-demangle
+    DEFINITIONS MYNAME="demangle-ut"
 )
 target_include_directories(demangle-ut PRIVATE ${LLVM_DEMANGLE_PATH}/include)
 

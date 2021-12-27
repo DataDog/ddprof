@@ -26,6 +26,7 @@ usage() {
     echo "    --centos/-C : launch the test image."
     echo "    --clean/-c : rebuild the image before creating it."
     echo "    --ubuntu_version/-u : use a given ubuntu version."
+    echo "    --image_id/-i : use a specified docker ID, conflicts with -u."
 }
 
 if [ $# != 0 ] && [ $1 == "-h" ]; then
@@ -56,6 +57,14 @@ while [ $# != 0 ]; do
     fi
     if [ $# != 0 ] && [ $1 == "--ubuntu_version" -o $1 == "-u" ]; then
         UBUNTU_VERSION=$2
+        shift
+        shift
+        continue
+    fi
+    if [ $# != 0 ] && [ $1 == "--image_id" -o $1 == "-i" ]; then
+      DOCKER_NAME=$2
+      DOCKER_TAG=""
+      CUSTOM_ID="yes"
         shift
         shift
         continue
@@ -98,22 +107,26 @@ if [ -e "${TOP_LVL_DIR}/docker-sync.yml" ]; then
     fi
 fi
 
-DOCKER_TAG=${DEFAULT_BASE_NAME}_${UBUNTU_VERSION}
+# If we didn't pass a custom ID, then focus on Ubuntu
+if [ ! ${CUSTOM_ID:-,,} == "yes" ]; then
+  DOCKER_NAME=${DEFAULT_BASE_NAME}_${UBUNTU_VERSION}
+  DOCKER_TAG=":latest"
+fi
 
-echo "Considering docker image    : $DOCKER_TAG"
+echo "Considering docker image    : $DOCKER_NAME"
 echo "              Built from    : $BASE_DOCKERFILE"
 echo "           Mount command    : ${MOUNT_CMD}"
 
 if [ $PERFORM_CLEAN -eq 1 ]; then
-    echo "Clean image : ${DOCKER_TAG}"
-    docker image rm ${DOCKER_TAG}
+    echo "Clean image : ${DOCKER_NAME}"
+    docker image rm ${DOCKER_NAME}
 fi
 
 # Check if base image exists
-if [ -z "$(docker images |grep ${DOCKER_TAG})" ]; then
+if [ ! ${CUSTOM_ID:-,,} == "yes" ] && [ -z "$(docker images | grep ${DOCKER_NAME})" ]; then
     echo "Building image"
     # docker build --build-arg arg=2.3
-    docker build -t ${DOCKER_TAG} -f $BASE_DOCKERFILE --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} .
+    docker build -t ${DOCKER_NAME} -f $BASE_DOCKERFILE --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} .
     cd -
 else 
     echo "Base image found, not rebuilding. Remove it to force rebuild."
@@ -131,6 +144,6 @@ if [ -z `echo $OSTYPE|grep darwin` ]; then
 fi 
 
 echo "Launch docker image, DO NOT STORE ANYTHING outside of mounted directory (container is erased on exit)."
-docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -w /app --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} -e SSH_AUTH_SOCK=/ssh-agent ${DOCKER_TAG}:latest /bin/bash
+docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -w /app --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} -e SSH_AUTH_SOCK=/ssh-agent ${DOCKER_NAME}${DOCKER_TAG} /bin/bash
 
 exit 0

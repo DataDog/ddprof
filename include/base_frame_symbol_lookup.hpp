@@ -5,14 +5,9 @@
 
 #pragma once
 
-extern "C" {
-#include <sys/types.h>
-}
 #include "dso_hdr.hpp"
 #include "dso_symbol_lookup.hpp"
 #include "symbol_table.hpp"
-
-#include <unordered_map>
 
 namespace ddprof {
 class BaseFrameSymbolLookup {
