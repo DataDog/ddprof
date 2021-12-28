@@ -130,7 +130,7 @@ build:ddprof:
     # Static checks
     - make cppcheck
     - make format
-    - make VERBOSE=1 -j ${KUBERNETES_CPU_LIMIT}
+    - make -j ${KUBERNETES_CPU_LIMIT}
     - if [ ! $(./ddprof --version | sed 's/.*+//g') == "${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA}" ]; then exit 1; fi
     - ctest --repeat-until-fail 5 --output-on-failure | tee test-output.log
     - if [ ${BUILD_TYPE} == "Release" ]; then strip --strip-debug ddprof; fi

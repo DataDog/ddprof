@@ -16,7 +16,7 @@ typedef struct string_view {
 } string_view;
 
 static inline string_view string_view_create(const char *ptr, size_t len) {
-  return (string_view){.ptr = (ptr), len};
+  return (string_view){.ptr = (ptr), .len = len};
 }
 
 static inline string_view string_view_create_strlen(const char *ptr) {

@@ -32,7 +32,7 @@ std_string_2_slice_c_char(const std::string &str) {
 }
 
 #define SLICE_LITERAL(str)                                                     \
-  (struct ddprof_ffi_Slice_c_char) { .ptr = (str), sizeof(str) - 1 }
+  (struct ddprof_ffi_Slice_c_char) { .ptr = (str), .len = sizeof(str) - 1 }
 
 static ddprof_ffi_Slice_c_char ffi_empty_char_slice(void) {
   return (struct ddprof_ffi_Slice_c_char){.ptr = (NULL), 0};
@@ -163,9 +163,9 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
                    &locations_buff[i]);
   }
   struct ddprof_ffi_Sample sample = {
-      .locations = {.ptr = locations_buff, uw_output->nb_locs},
+      .locations = {.ptr = locations_buff, .len = uw_output->nb_locs},
       .values = {.ptr = values, .len = pprof->_nb_values},
-      .labels = {.ptr = NULL, 0},
+      .labels = {.ptr = NULL, .len = 0},
   };
 
   uint64_t id_sample = ddprof_ffi_Profile_add(profile, sample);
