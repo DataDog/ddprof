@@ -260,8 +260,12 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
   // switch before we async export to avoid any possible race conditions (then
   // take into account the switch)
   ctx->worker_ctx.i_current_pprof = 1 - ctx->worker_ctx.i_current_pprof;
+#  ifndef NO_THREADED_EXPORT
   pthread_create(&ctx->worker_ctx.exp_tid, NULL, ddprof_worker_export_thread,
                  &ctx->worker_ctx);
+#  else
+  ddprof_worker_export_thread(reinterpret_cast<void *>(&ctx->worker_ctx));
+#  endif
 
 #endif
 
