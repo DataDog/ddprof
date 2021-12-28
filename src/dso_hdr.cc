@@ -273,20 +273,21 @@ FileInfoId_t DsoHdr::update_id_and_path(const Dso &dso) {
   // inode find, check with path + inode
   auto it_inode = _file_info_inode_map.find(key_inode);
   auto it_path = _file_info_path_map.find(key_path);
-  bool found_file[2] = {false, false};
+  bool found_file = false;
+
   // if either finds use value of find
   if (it_inode != _file_info_inode_map.end()) {
     // The inode found it, this one is saffer
     dso._id = it_inode->second;
-    found_file[0] = true; // inode
+    found_file = true; // inode
   }
-  if (!found_file[0] && it_path != _file_info_path_map.end()) {
+  if (!found_file && it_path != _file_info_path_map.end()) {
     // the inode did not find it and the path has it.
     dso._id = it_path->second;
-    found_file[1] = true; // path
+    found_file = true; // path
   }
   // NO ONE found it, insert new element
-  if (!found_file[0] && !found_file[1]) {
+  if (!found_file) {
 #ifdef DEBUG
     LG_NTC("New file %d - %s - %ld", dso._id, file_info._path.c_str(),
            file_info._size);
@@ -298,10 +299,10 @@ FileInfoId_t DsoHdr::update_id_and_path(const Dso &dso) {
     _file_info_vector[dso._id]._errored = false; // allow retry with new file
   }
   // insert in maps that did not find it yet
-  if (!found_file[0]) {
+  if (it_inode == _file_info_inode_map.end()) {
     _file_info_inode_map.emplace(std::move(key_inode), dso._id);
   }
-  if (!found_file[1]) {
+  if (it_path == _file_info_path_map.end()) {
     _file_info_path_map.emplace(std::move(key_path), dso._id);
   }
 

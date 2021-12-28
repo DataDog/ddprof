@@ -93,6 +93,20 @@ void DwflHdr::clear_unvisited() {
   _visited_pid.clear();
 }
 
+int DwflHdr::get_nb_mod() const {
+  int nb_mods = 0;
+  std::for_each(
+      _dwfl_map.begin(), _dwfl_map.end(),
+      [&](std::unordered_map<pid_t, DwflWrapper>::value_type const &el) {
+        nb_mods += el.second._mod_added.size();
+      });
+  return nb_mods;
+}
+
+void DwflHdr::display_stats() const {
+  LG_NTC("DWFL_HDR  | %10s | %d", "NB MODS", get_nb_mod());
+}
+
 void DwflHdr::clear_pid(pid_t pid) { _dwfl_map.erase(pid); }
 
 } // namespace ddprof

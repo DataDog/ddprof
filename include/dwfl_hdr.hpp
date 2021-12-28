@@ -63,6 +63,10 @@ public:
   void clear_unvisited();
   void clear_pid(pid_t pid);
 
+  // get number of accessed modules
+  int get_nb_mod() const;
+  void display_stats() const;
+
 private:
   std::unordered_map<pid_t, DwflWrapper> _dwfl_map;
   std::unordered_set<pid_t> _visited_pid;
