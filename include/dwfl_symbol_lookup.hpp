@@ -81,9 +81,7 @@ public:
                             ProcessAddress_t process_pc, const Dso &dso,
                             const FileInfoValue &file_info);
 
-  void erase(FileInfoId_t file_info_id) {
-    _file_info_inode_map.erase(file_info_id);
-  }
+  void erase(FileInfoId_t file_info_id) { _file_info_map.erase(file_info_id); }
 
   DwflSymbolLookupStats _stats;
 
@@ -114,14 +112,14 @@ private:
   // PIDs. If we are sure the underlying symbols are the same, we can assume the
   // symbol cache is the same. For short lived forks, this can avoid
   // repopulating caches.
-  using FileInfoInodeMap = std::unordered_map<FileInfoId_t, DwflSymbolMap>;
-  using FileInfoInodeMapVT = FileInfoInodeMap::value_type;
+  using FileInfo2SymbolMap = std::unordered_map<FileInfoId_t, DwflSymbolMap>;
+  using FileInfo2SymbolVT = FileInfo2SymbolMap::value_type;
 
   static bool symbol_lookup_check(Dwfl_Module *mod, ElfAddress_t process_pc,
                                   const Symbol &info);
 
   // unordered map of DSO elements
-  FileInfoInodeMap _file_info_inode_map;
+  FileInfo2SymbolMap _file_info_map;
 };
 
 } // namespace ddprof

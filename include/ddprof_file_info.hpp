@@ -32,33 +32,12 @@ struct FileInfoInodeKey {
   std::size_t _sz;
 };
 
-struct FileInfoPathKey {
-  FileInfoPathKey(const std::string &path, ElfAddress_t offset, std::size_t sz)
-      : _path(path), _offset(offset), _sz(sz) {}
-  bool operator==(const FileInfoPathKey &o) const;
-  // inode is used as a key (instead of path which can be the same for several
-  // containers). TODO: inode could be the same across several filesystems (size
-  // is there to mitigate)
-  std::string _path;
-  Offset_t _offset;
-  std::size_t _sz;
-};
-
 } // namespace ddprof
 
 namespace std {
 template <> struct hash<ddprof::FileInfoInodeKey> {
   std::size_t operator()(const ddprof::FileInfoInodeKey &k) const {
     std::size_t hash_val = ddprof::hash_combine(hash<inode_t>()(k._inode),
-                                                hash<Offset_t>()(k._offset));
-    hash_val = ddprof::hash_combine(hash_val, hash<size_t>()(k._sz));
-    return hash_val;
-  }
-};
-
-template <> struct hash<ddprof::FileInfoPathKey> {
-  std::size_t operator()(const ddprof::FileInfoPathKey &k) const {
-    std::size_t hash_val = ddprof::hash_combine(hash<std::string>()(k._path),
                                                 hash<Offset_t>()(k._offset));
     hash_val = ddprof::hash_combine(hash_val, hash<size_t>()(k._sz));
     return hash_val;
@@ -95,8 +74,6 @@ private:
 };
 
 typedef std::unordered_map<FileInfoInodeKey, FileInfoId_t> FileInfoInodeMap;
-typedef std::unordered_map<FileInfoPathKey, FileInfoId_t> FileInfoPathMap;
-
 typedef std::vector<FileInfoValue> FileInfoVector;
 
 } // namespace ddprof

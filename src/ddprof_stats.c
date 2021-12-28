@@ -128,5 +128,5 @@ void ddprof_stats_print() {
   if (!ddprof_stats)
     return;
   for (unsigned int i = 0; i < STATS_LEN; ++i)
-    LG_PRINT("%s: %ld", stats_paths[i], ddprof_stats[i]);
+    LG_NTC("%s: %ld", stats_paths[i], ddprof_stats[i]);
 }

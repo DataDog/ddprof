@@ -62,7 +62,6 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
     LG_NFO("DGB:: GOING THROUGH EXPECTED FUNC: %s", look_for_symb.c_str());
   }
 #endif
-
   Dwfl_Line *line = dwfl_module_getsrc(mod, process_pc);
   // srcpath
   int linep;

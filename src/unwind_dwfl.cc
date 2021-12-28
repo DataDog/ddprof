@@ -195,6 +195,7 @@ void add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc) {
   UnwindOutput *output = &us->output;
   int64_t current_loc_idx = output->nb_locs;
 
+  // get or create the dwfl symbol
   output->locs[current_loc_idx]._symbol_idx =
       unwind_symbol_hdr._dwfl_symbol_lookup_v2.get_or_insert(
           us->_dwfl_wrapper->_dwfl, unwind_symbol_hdr._symbol_table,

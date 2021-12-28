@@ -78,7 +78,7 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
 
   if ((addr & 0x7) != 0) {
     // The address is not 8-bit aligned here
-    LG_NTC("Addr is not aligned 0x%lx", addr);
+    LG_DBG("Addr is not aligned 0x%lx", addr);
     return false;
   }
 

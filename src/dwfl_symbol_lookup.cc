@@ -36,8 +36,8 @@ DwflSymbolLookup_V2::DwflSymbolLookup_V2() : _lookup_setting(K_CACHE_ON) {
 unsigned DwflSymbolLookup_V2::size() const {
   unsigned total_nb_elts = 0;
   std::for_each(
-      _file_info_inode_map.begin(), _file_info_inode_map.end(),
-      [&](FileInfoInodeMapVT const &el) { total_nb_elts += el.second.size(); });
+      _file_info_map.begin(), _file_info_map.end(),
+      [&](FileInfo2SymbolVT const &el) { total_nb_elts += el.second.size(); });
   return total_nb_elts;
 }
 
@@ -58,7 +58,7 @@ DwflSymbolLookup_V2::get_or_insert(Dwfl *dwfl, SymbolTable &table,
   LG_DBG("Looking for : %lx = (%lx - %lx) / (offset : %lx) / dso:%s", region_pc,
          process_pc, dso._start, dso._pgoff, dso._filename.c_str());
 #endif
-  DwflSymbolMap &map = _file_info_inode_map[file_info.get_id()];
+  DwflSymbolMap &map = _file_info_map[file_info.get_id()];
   DwflSymbolMapFindRes find_res = find_closest(map, region_pc);
   if (find_res.second) { // already found the correct symbol
 #ifdef DEBUG
@@ -130,10 +130,16 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(
     Offset_t start_sym = region_pc;
     Offset_t end_sym = region_pc + 1;
 
+#ifdef ADD_ADDR_IN_SYMB
+    // adds interesting debug information that can be used to investigate
+    // symbolization failures. Also causes memory increase
     SymbolIdx_t symbol_idx =
         dso_symbol_lookup.get_or_insert(process_pc, dso, table);
+#else
+    SymbolIdx_t symbol_idx = dso_symbol_lookup.get_or_insert(dso, table);
+#endif
 #ifdef DEBUG
-    LG_DBG("Insert (dwfl failure): %lx,%lx -> %s,%d,%d,%s", start_sym, end_sym,
+    LG_NTC("Insert (dwfl failure): %lx,%lx -> %s,%d,%d,%s", start_sym, end_sym,
            table[symbol_idx]._symname.c_str(), file_info.get_id(), symbol_idx,
            dso.to_string().c_str());
 #endif
@@ -236,11 +242,11 @@ bool DwflSymbolLookup_V2::symbol_lookup_check(Dwfl_Module *mod,
 void DwflSymbolLookupStats::display(unsigned nb_elts) const {
   static const int k_cent_precision = 10000;
   if (_calls) {
-    LG_NTC("DWFL_SYMB | %10s | [%d/%d] = %d", "Hit", _hit, _calls,
-           (_hit * k_cent_precision) / _calls);
+    LG_NTC("DWFL_SYMB | %10s | [%d/%d] = %ld", "Hit", _hit, _calls,
+           (static_cast<int64_t>(_hit) * k_cent_precision) / _calls);
     if (_errors) {
-      LG_WRN("DWFL_SYMB | %10s | [%d/%d] = %d", "Errors", _errors, _calls,
-             (_errors * k_cent_precision) / _calls);
+      LG_WRN("DWFL_SYMB | %10s | [%d/%d] = %ld", "Errors", _errors, _calls,
+             (static_cast<int64_t>(_errors) * k_cent_precision) / _calls);
     }
     if (_no_dwfl_symbols) {
       LG_NTC("DWFL_SYMB | %10s | [%d/%d] = %d", "Not found", _no_dwfl_symbols,

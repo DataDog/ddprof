@@ -265,47 +265,24 @@ FileInfoId_t DsoHdr::update_id_and_path(const Dso &dso) {
   }
 
   // check if we already encountered binary (cache by region with offset)
-  FileInfoInodeKey key_inode(file_info._inode, dso._pgoff, file_info._size);
-  FileInfoPathKey key_path(dso._filename, dso._pgoff, file_info._size);
-
-  dso._id = _file_info_vector.size();
-
-  // inode find, check with path + inode
-  auto it_inode = _file_info_inode_map.find(key_inode);
-  auto it_path = _file_info_path_map.find(key_path);
-  bool found_file = false;
-
-  // if either finds use value of find
-  if (it_inode != _file_info_inode_map.end()) {
-    // The inode found it, this one is saffer
-    dso._id = it_inode->second;
-    found_file = true; // inode
-  }
-  if (!found_file && it_path != _file_info_path_map.end()) {
-    // the inode did not find it and the path has it.
-    dso._id = it_path->second;
-    found_file = true; // path
-  }
-  // NO ONE found it, insert new element
-  if (!found_file) {
+  FileInfoInodeKey key(file_info._inode, dso._pgoff, file_info._size);
+  auto it = _file_info_inode_map.find(key);
+  if (it == _file_info_inode_map.end()) {
+    dso._id = _file_info_vector.size();
+    _file_info_inode_map.emplace(std::move(key), dso._id);
 #ifdef DEBUG
     LG_NTC("New file %d - %s - %ld", dso._id, file_info._path.c_str(),
            file_info._size);
 #endif
     _file_info_vector.emplace_back(std::move(file_info), dso._id);
-  } else if (file_info._path != _file_info_vector[dso._id]._info._path) {
-    // Someone found it, use fresh info
-    _file_info_vector[dso._id]._info = file_info;
-    _file_info_vector[dso._id]._errored = false; // allow retry with new file
+  } else { // already exists
+    dso._id = it->second;
+    // update with latest location
+    if (file_info._path != _file_info_vector[dso._id]._info._path) {
+      _file_info_vector[dso._id]._info = file_info;
+      _file_info_vector[dso._id]._errored = false; // allow retry with new file
+    }
   }
-  // insert in maps that did not find it yet
-  if (it_inode == _file_info_inode_map.end()) {
-    _file_info_inode_map.emplace(std::move(key_inode), dso._id);
-  }
-  if (it_path == _file_info_path_map.end()) {
-    _file_info_path_map.emplace(std::move(key_path), dso._id);
-  }
-
   return dso._id;
 }
 
@@ -357,7 +334,7 @@ DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr) {
     ++bp_state._nbUnfoundDsos;
     if (bp_state._perm == kAllowed) { // retry
       bp_state._perm = kForbidden;    // ... but only once
-      LG_NTC("[DSO] Couldn't find DSO for [%d](0x%lx). backpopulate", pid,
+      LG_DBG("[DSO] Couldn't find DSO for [%d](0x%lx). backpopulate", pid,
              addr);
       int nb_elts_added = 0;
       if (pid_backpopulate(map, pid, nb_elts_added) && nb_elts_added) {
@@ -468,9 +445,9 @@ bool DsoHdr::pid_backpopulate(DsoMap &map, pid_t pid, int &nb_elts_added) {
   LG_DBG("[DSO] Backpopulating PID %d", pid);
   FILE *mpf = proc_file_holder._mpf;
   if (!mpf) {
-    LG_NTC("[DSO] Failed to open procfs for %d", pid);
+    LG_DBG("[DSO] Failed to open procfs for %d", pid);
     if (!process_is_alive(pid))
-      LG_NTC("[DSO] Process nonexistant");
+      LG_DBG("[DSO] Process nonexistant");
     return false;
   }
 
