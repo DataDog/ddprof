@@ -76,28 +76,29 @@ char* help_str[DD_KLEN] = {
 "    The name of the environment to use in the Datadog UI.\n",
   [DD_AGENT_HOST] =
 "    The hostname of the agent. Port should also be specified.\n",
+  [DD_SITE] = STR_UNDF,
+  [DD_TRACE_AGENT_PORT] =
+"    The communication port for the Datadog agent or backend system.\n",
   [DD_TRACE_AGENT_URL] =
 "    A <hostname>:<port> URL.  Either <hostname>:<port>, http://<hostname>:<port>\n"
 "    or https://<hostname>:<port> are valid.  Overrides any other specification for\n"
 "    the host or port, except if the URL is specified without a port, such as\n"
-"    http://myhost.domain.com, in which case the port can be specified separately\n",
+"    http://myhost.domain.com, in which case the port can be specified separately\n"
 "    by the user.",
-  [DD_SITE] = STR_UNDF,
-  [DD_TRACE_AGENT_PORT] =
-"    The communication port for the Datadog agent or backend system.\n",
   [DD_SERVICE] =
 "    The name of this service.  It is useful to populate this field, as it will\n"
 "    make it easier to locate and filter interesting profiles.\n"
 "    For global mode, note that all application-level profiles are consolidated in\n"
 "    the same view.\n",
-  [DD_PROFILING_AGENTLESS] = STR_UNDF,
-  [DD_TAGS] =
-"    Tags sent with both profiler metrics and profiles.\n"
-"    Refer to the Datadog tag section to understand what is supported.\n",
   [DD_VERSION] =
 "    Version of the service being profiled. Added to the tags during export.\n"
 "    This is an optional field, but it is useful for locating and filtering\n"
 "    regressions or interesting behavior.\n",
+  [DD_PROFILING_EXPORT] = STR_UNDF,
+  [DD_PROFILING_AGENTLESS] = STR_UNDF,
+  [DD_TAGS] =
+"    Tags sent with both profiler metrics and profiles.\n"
+"    Refer to the Datadog tag section to understand what is supported.\n",
   [DD_PROFILING_ENABLED] =
 "    Whether to enable Datadog profiling.  If this is true, then "MYNAME" as well\n"
 "    as any other Datadog profilers are enabled.  If false, they are all disabled.\n"
@@ -110,15 +111,16 @@ char* help_str[DD_KLEN] = {
 "    an inner profile, whilst setting DD_PROFILING_NATIVE_ENABLED to enable "MYNAME"\n",
   [DD_PROFILING_UPLOAD_PERIOD] = STR_UNDF,
   [DD_PROFILING_WORKER_PERIOD] = STR_UNDF,
-  [DD_PROFILING_NATIVEPRINTARGS] =
-"    Whether or not to print configuration parameters to the trace log.  Can\n"
-"    be `yes` or `no` (default: `no`).\n",
   [DD_PROFILING_NATIVEFAULTINFO] = STR_UNDF,
   [DD_PROFILING_NATIVEDUMPS] = STR_UNDF,
   [DD_PROFILING_NATIVENICE] =
 "    Sets the nice level of "MYNAME" without affecting any instrumented\n"
 "    processes.  This is useful on small containers with spiky workloads.\n"
 "    If this parameter isn't given, then the nice level is unchanged.\n",
+  [DD_PROFILING_NATIVEPRINTARGS] =
+"    Whether or not to print configuration parameters to the trace log.  Can\n"
+"    be `yes` or `no` (default: `no`).\n",
+  [DD_PROFILING_NATIVESENDFINAL] = STR_UNDF,
   [DD_PROFILING_NATIVELOGMODE] =
 "    One of `stdout`, `stderr`, `syslog`, or `disabled`.  Default is `stdout`.\n"
 "    If a value is given but it does not match the above, it is treated as a\n"
@@ -126,13 +128,11 @@ char* help_str[DD_KLEN] = {
 "    cleared between runs and a service restart is needed for log rotation.\n",
   [DD_PROFILING_NATIVELOGLEVEL] =
 "    One of `debug`, `notice`, `warn`, `error`.  Default is `warn`.\n",
-  [DD_PROFILING_NATIVESENDFINAL] = STR_UNDF,
   [DD_PROFILING_NATIVETARGET] =
 "    Instrument the given PID rather than launching a new process.\n",
   [DD_PROFILING_NATIVEGLOBAL] =
 "    Instruments the whole system.  Overrides DD_PROFILING_NATIVETARGET.\n"
 "    Requires specific permissions or a perf_event_paranoid value of less than 1.\n",
-  [DD_PROFILING_EXPORT] = STR_UNDF,
   [DD_PROFILING_INTERNALSTATS] = STR_UNDF,
 };
 // clang-format on

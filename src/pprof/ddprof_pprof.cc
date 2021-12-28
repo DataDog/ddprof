@@ -35,7 +35,7 @@ std_string_2_slice_c_char(const std::string &str) {
   (struct ddprof_ffi_Slice_c_char) { .ptr = (str), .len = sizeof(str) - 1 }
 
 static ddprof_ffi_Slice_c_char ffi_empty_char_slice(void) {
-  return (struct ddprof_ffi_Slice_c_char){.ptr = (NULL), 0};
+  return (struct ddprof_ffi_Slice_c_char){.ptr = (NULL), .len = 0};
 }
 
 static const struct ddprof_ffi_ValueType s_sample_count = {
