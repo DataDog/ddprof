@@ -44,7 +44,7 @@ function(add_unit_test name)
    add_dependencies(${name} deps)
    set_property(TARGET ${name} PROPERTY CXX_STANDARD 11)
 
-   target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock unwind)
+   target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
    # libddprof almost always required (unlikely file from libddprof)
    target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS} ${LIBDDPROF_INCLUDE_DIR})
 
