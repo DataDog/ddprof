@@ -42,17 +42,15 @@ function(add_unit_test name)
         ../src/logger.c
         ${MY_UNPARSED_ARGUMENTS})
    add_dependencies(${name} deps)
-   set_property(TARGET ${name} PROPERTY CXX_STANDARD 11)
+   set_property(TARGET ${name} PROPERTY CXX_STANDARD 14)
 
    target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
-   # libddprof almost always required (unlikely file from libddprof)
-   target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS} ${LIBDDPROF_INCLUDE_DIR})
+   target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS})
 
    add_test(NAME ${name} COMMAND ${name})
    set_tests_properties(${name} PROPERTIES
                         ENVIRONMENT "UBSAN_OPTIONS=halt_on_error=1 abort_on_error=1 print_stacktrace=1;\
                         LSAN_OPTIONS=detect_leaks=1 malloc_context_size=2 print_suppressions=0")
-   use_libcxx(TARGET ${name})
    enable_clangtidy(TARGET ${name} NOTIDY)
 endfunction()
 
@@ -195,6 +193,8 @@ add_unit_test(
     LIBRARIES ddprof-ffi ${CMAKE_DL_LIBS}
     DEFINITIONS MYNAME="ddprof_pprof-ut"
 )
+target_include_directories(ddprof_pprof-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
+
 
 add_unit_test(
     ddprof_exporter-ut
@@ -208,7 +208,7 @@ add_unit_test(
     LIBRARIES ddprof-ffi ${CMAKE_DL_LIBS}
     DEFINITIONS MYNAME="ddprof_exporter-ut"
 )
-target_include_directories(ddprof_exporter-ut PRIVATE ${DOGFOOD_INCLUDE_DIR})
+target_include_directories(ddprof_exporter-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
 
 add_unit_test(
     region_holder-ut

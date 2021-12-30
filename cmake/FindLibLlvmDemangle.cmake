@@ -38,7 +38,6 @@ set_property(TARGET llvm-demangle PROPERTY CXX_STANDARD 14)
 set_property(TARGET llvm-deps PROPERTY CXX_STANDARD 14)
 enable_clangtidy(TARGET llvm-demangle NOTIDY)
 enable_clangtidy(TARGET llvm-deps NOTIDY)
-use_libcxx(TARGET llvm-demangle)
 
 add_dependencies(llvm-demangle llvm-deps)
 

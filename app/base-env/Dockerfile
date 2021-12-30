@@ -14,8 +14,10 @@ RUN apt update \
   && DEBIAN_FRONTEND=noninteractive apt install -y \
   awscli \
   binutils-dev \
+  gcovr \
   git \
   curl \
+  lcov \
   make \
   m4 \
   liblzma-dev \
@@ -26,18 +28,23 @@ RUN apt update \
   zlib1g-dev \
   libjemalloc-dev \
   libcap-dev \
-  gcovr \
   netcat-openbsd \
   wget
 
 # Only necessary for ubuntu 16
 RUN DEBIAN_FRONTEND=noninteractive apt install -y apt-transport-https ca-certificates
 
-# llvm installer
-RUN apt-get remove -y gcc g++
+# Codeql : static analysis tooling
+RUN curl -L https://github.com/github/codeql-action/releases/download/codeql-bundle-20210622/codeql-bundle-linux64.tar.gz -o - | tar -xz -C /usr/local
+
+################
+## LLVM SETUP ##
+################
 ADD ./app/base-env/llvm.sh /
 RUN /llvm.sh 12
-RUN apt install -y libc++-12-dev libc++abi-12-dev
+
+ENV CC clang
+ENV CXX clang++
 
 # Clang format not installed by default
 RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key| apt-key add -
@@ -62,7 +69,7 @@ RUN git clone --depth 1 --branch release-1.11.0 https://github.com/google/google
   && cd googletest \
   && mkdir build \
   && cd build \
-  && cmake -DCMAKE_CXX_FLAGS="--stdlib=libc++" ../ \
+  && cmake -DCMAKE_CXX_COMPILER="clang++" -DCMAKE_CXX_FLAGS="-std=c++14" ../ \
   && cmake --build .  \
   && make install
 
@@ -82,13 +89,8 @@ RUN wget https://github.com/danmar/cppcheck/archive/refs/tags/2.5.tar.gz \
 RUN git clone --depth 1 --branch v3.10.2 https://github.com/nlohmann/json.git \
   && cd json \
   && mkdir build && cd build \
-  && cmake -DCMAKE_CXX_FLAGS="--stdlib=libc++" -DJSON_BuildTests=Off ../  \
+  && cmake -DJSON_BuildTests=Off ../  \
   && make install
-
-RUN curl -L https://github.com/github/codeql-action/releases/download/codeql-bundle-20210622/codeql-bundle-linux64.tar.gz -o - | tar -xz -C /usr/local
-
-# Now that we're all done, reinstall gcc for gcov
-RUN apt install -y gcc g++ gcovr
 
 # A specific user is required to get access to perf event ressources. 
 # This enables unit testing using perf-event ressources
