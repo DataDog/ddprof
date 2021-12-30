@@ -27,20 +27,6 @@ TEST(MMapTest, Mlock32KB) {
   free(memory);
 }
 
-// check what system allows in terms of mmap
-TEST(MMapTest, MMap32K) {
-  const size_t alloc_size = 32 * 1024 * 1024; // 32 MB
-  std::string fileName = IPC_TEST_DATA "/mmap_test_1.txt";
-  unlink(fileName.c_str());
-  int fileFd = open(fileName.c_str(), O_CREAT | O_RDWR, 0600);
-  void *reg =
-      mmap(NULL, alloc_size, PROT_READ | PROT_WRITE, MAP_SHARED, fileFd, 0);
-  EXPECT_TRUE(reg);
-  int ret = munmap(reg, alloc_size);
-  EXPECT_TRUE(ret == 0);
-  close(fileFd);
-}
-
 TEST(MMapTest, PerfOpen) {
   int pid = getpid();
   std::cerr << "Pid number" << pid << std::endl;
