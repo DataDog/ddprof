@@ -6,14 +6,14 @@
 set(VER_LIBDDPROF "64823667" CACHE STRING "libddprof version")
 set(SHA256_LIBDDPROF "3bfe61553a9665c029e372ebad052d0545de4eb8b43e1d0958edd6680e4e7f4f" CACHE STRING "libddprof sha256")
 
-set(LIBDDPROF_REL_FFI_LIB ${CMAKE_SOURCE_DIR}/vendor/libddprof/x86_64-unknown-linux-gnu/lib/libddprof_ffi.a)
-set(LIBDDPROF_CMAKE_SCRIPT ${CMAKE_SOURCE_DIR}/vendor/libddprof/x86_64-unknown-linux-gnu/cmake/DDProfConfig.cmake)
+set(LIBDDPROF_REL_FFI_LIB ${VENDOR_PATH}/libddprof/x86_64-unknown-linux-gnu/lib/libddprof_ffi.a)
+set(LIBDDPROF_CMAKE_SCRIPT ${VENDOR_PATH}/libddprof/x86_64-unknown-linux-gnu/cmake/DDProfConfig.cmake)
 
 list(APPEND
     LIBDDPROF_INCLUDE_DIR
-    ${CMAKE_SOURCE_DIR}/vendor/libddprof/x86_64-unknown-linux-gnu/include)
+    ${VENDOR_PATH}/libddprof/x86_64-unknown-linux-gnu/include)
 
-set(LIBDDPROF_VERSION_FILE ${CMAKE_SOURCE_DIR}/vendor/libddprof/version.txt)
+set(LIBDDPROF_VERSION_FILE ${VENDOR_PATH}/libddprof/version.txt)
 
 # Expected files
 set(LIBDDPROF_FILES

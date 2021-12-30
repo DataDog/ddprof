@@ -27,6 +27,7 @@ usage() {
     echo "    --clean/-c : rebuild the image before creating it."
     echo "    --ubuntu_version/-u : use a given ubuntu version."
     echo "    --image_id/-i : use a specified docker ID, conflicts with -u."
+    echo "    --gcc : use gcc instead of clang."
 }
 
 if [ $# != 0 ] && [ $1 == "-h" ]; then
@@ -36,6 +37,7 @@ fi
 
 PERFORM_CLEAN=0
 UBUNTU_VERSION=18
+USE_GCC="no"
 
 while [ $# != 0 ]; do 
     if [ $# != 0 ] && [ $1 == "-t" -o $1 == "--test" ]; then
@@ -62,14 +64,18 @@ while [ $# != 0 ]; do
         continue
     fi
     if [ $# != 0 ] && [ $1 == "--image_id" -o $1 == "-i" ]; then
-      DOCKER_NAME=$2
-      DOCKER_TAG=""
-      CUSTOM_ID="yes"
+        DOCKER_NAME=$2
+        DOCKER_TAG=""
+        CUSTOM_ID="yes"
         shift
         shift
         continue
     fi
-
+    if [ $# != 0 ] && [ $1 == "--gcc" ]; then
+        USE_GCC="yes"
+        shift
+        continue
+    fi
     echo "Error : unhandled parameter"
     usage
     exit 1
@@ -109,11 +115,15 @@ fi
 
 # If we didn't pass a custom ID, then focus on Ubuntu
 if [ ! ${CUSTOM_ID:-,,} == "yes" ]; then
-  DOCKER_NAME=${DEFAULT_BASE_NAME}_${UBUNTU_VERSION}
-  DOCKER_TAG=":latest"
+    DOCKER_NAME=${DEFAULT_BASE_NAME}_${UBUNTU_VERSION}
+    DOCKER_TAG=":latest"
+    if [ ${USE_GCC:-,,} == "yes" ]; then
+        DOCKER_NAME="${DOCKER_NAME}_gcc"
+    fi
 fi
 
 echo "Considering docker image    : $DOCKER_NAME"
+echo "                   Tag      : $DOCKER_TAG"
 echo "              Built from    : $BASE_DOCKERFILE"
 echo "           Mount command    : ${MOUNT_CMD}"
 
@@ -123,11 +133,15 @@ if [ $PERFORM_CLEAN -eq 1 ]; then
 fi
 
 # Check if base image exists
-if [ ! ${CUSTOM_ID:-,,} == "yes" ] && [ -z "$(docker images | grep ${DOCKER_NAME})" ]; then
+if [ ! ${CUSTOM_ID:-,,} == "yes" ] && [ -z "$(docker images | awk '{print $1}'| grep -E "^${DOCKER_NAME}$")" ]; then
     echo "Building image"
-    # docker build --build-arg arg=2.3
-    docker build -t ${DOCKER_NAME} -f $BASE_DOCKERFILE --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} .
-    cd -
+    COMPILE_BUILD_ARG=""
+    if [ ${USE_GCC:-,,} == "yes" ]; then
+        COMPILE_BUILD_ARG="--build-arg CXX_COMPILER=g++ --build-arg C_COMPILER=gcc"
+    fi  
+    BUILD_CMD="docker build -t ${DOCKER_NAME} -f $BASE_DOCKERFILE --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} ${COMPILE_BUILD_ARG} ."
+    echo ""
+    eval ${BUILD_CMD}
 else 
     echo "Base image found, not rebuilding. Remove it to force rebuild."
 fi

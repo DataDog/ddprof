@@ -8,7 +8,7 @@ ADD . /app/
 
 RUN cd /app && mkdir build_Release && \
     cd build_Release && \
-    cmake -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release ../ && \
+    cmake -DCMAKE_CXX_COMPILER=${CXX} -DCMAKE_C_COMPILER=${CC} -DCMAKE_BUILD_TYPE=Release ../ && \
     make deps
 
 WORKDIR /app

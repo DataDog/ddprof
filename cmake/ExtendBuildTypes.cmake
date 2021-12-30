@@ -1,6 +1,11 @@
 # Unless explicitly stated otherwise all files in this repository are licensed under the Apache License Version 2.0.
 # This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
 
+# Default built type
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "Release" CACHE STRING "CMake build type" FORCE)
+endif()
+
 SET(GCC_DEBUG_FLAGS "-g -Wall")
 set(SAN_FLAGS "-fsanitize=undefined -fsanitize=float-divide-by-zero -fno-sanitize-recover")
 set(ASAN_FLAGS "-fsanitize=address -fsanitize=leak")

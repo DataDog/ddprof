@@ -9,10 +9,11 @@ stages:
 
 variables:
   KUBERNETES_SERVICE_ACCOUNT_OVERWRITE: ddprof
-  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/pipelines/6472558
-  BUILD_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:5f232f688cb989c492292562c288758c5663e85d002c134515350017804a20f1
-  BUILD_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:8d5d8ec670285cf7e2e63fd3da3b83600e96ee0ee17532f5cc9660705e578193
-  BUILD_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:202b1adb5e1d383c979c8ad623d4be623b63bfc346b1f25bbf7f231f10a29c36
+  # Cache of the valid images to start build steps faster : https://gitlab.ddbuild.io/DataDog/ddprof/-/pipelines/6475549
+  BUILD_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:f3c7384e8d6837265f87bcbaa8adb52c22de0e5cdacd8a761391686ca55d772c
+  BUILD_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:bbf9cc427df96ff9c73f38ff36137e00e766a68e05d2b5bc7d2c423d82ea8dcb
+  BUILD_IMG_20_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:0a327c8605799372b6467de0681330ff38406f36a8b11bb03d3e44a135c9fcb9
+  BUILD_GCC_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:fca37494b8f6848ef6b1e10f4b9236fcb1d836e8b8bdc5130f53d9c84decbd35
   # https://gitlab.ddbuild.io/DataDog/ddprof/-/pipelines/5611418
   TEST_IMG_16_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:a06908a49fbdf93fb62e7c5a650ec6da587c21f8f5060cf0657d4b08a63df985
   TEST_IMG_18_STICKY: 486234852809.dkr.ecr.us-east-1.amazonaws.com/ci/ddprof@sha256:128fff36c0cc5a8d9f31d8082fbcdde7fe8cad960514f01a1a11b209ef94d08b
@@ -48,12 +49,17 @@ build:base:
   parallel:
     matrix:
       - UB_VERSION: ["16", "18", "20"]
+        CXX_COMPILER: "clang++"
+        C_COMPILER: "clang"
+      - UB_VERSION: ["18"]
+        CXX_COMPILER: "g++"
+        C_COMPILER: "gcc"
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
   script:
     - set -euo pipefail
-    - export TAG_DOCKER=${BASE_IMG}_${UB_VERSION}
+    - export TAG_DOCKER=${BASE_IMG}_${UB_VERSION}_${C_COMPILER}
     - docker pull $TAG_DOCKER || true
-    - docker build --tag $TAG_DOCKER  --build-arg UBUNTU_VERSION=${UB_VERSION} -f ./app/base-env/Dockerfile .
+    - docker build --tag $TAG_DOCKER  --build-arg UBUNTU_VERSION=${UB_VERSION} --build-arg CXX_COMPILER=${CXX_COMPILER} --build-arg C_COMPILER=${C_COMPILER} -f ./app/base-env/Dockerfile .
     - docker push $TAG_DOCKER
 
 # This is a cache of compile-time dependencies, like elfutils and libddprof.
@@ -65,11 +71,16 @@ build:deps:
   parallel:
     matrix:
       - UB_VERSION: ["16", "18", "20"]
+        CXX_COMPILER: "clang++"
+        C_COMPILER: "clang"
+      - UB_VERSION: ["18"]
+        CXX_COMPILER: "g++"
+        C_COMPILER: "gcc"
   image: 486234852809.dkr.ecr.us-east-1.amazonaws.com/docker:18.03.1
   script:
     - set -euo pipefail
-    - export TAG_DOCKER=${BUILD_IMG}_${UB_VERSION}
-    - docker build --tag ${TAG_DOCKER} --build-arg CI=${CI} --build-arg BASE_IMAGE=${BASE_IMG}_${UB_VERSION} -f app/build-env/Dockerfile .
+    - export TAG_DOCKER=${BUILD_IMG}_${UB_VERSION}_${C_COMPILER}
+    - docker build --tag ${TAG_DOCKER} --build-arg CI=${CI} --build-arg BASE_IMAGE=${BASE_IMG}_${UB_VERSION}_${C_COMPILER} -f app/build-env/Dockerfile .
     - docker push ${TAG_DOCKER}
 
 # This is a cache of compile-time dependencies, test image
@@ -115,7 +126,7 @@ build:ddprof:
   parallel:
     matrix:
       - IMAGE: ["${BUILD_IMG_16_STICKY}", "${BUILD_IMG_18_STICKY}", "${BUILD_IMG_20_STICKY}"]
-        BUILD_TYPE: ["Release", "Debug", "SanitizedDebug", "Coverage"]
+        BUILD_TYPE: ["Release", "Debug", "SanitizedDebug"]
   variables:
     BUILDPATH: build_${BUILD_TYPE}
   script:
@@ -126,26 +137,41 @@ build:ddprof:
     #Build image dependencies were stored in app, avoid rebuilding vendor content
     - ln -s /app/vendor vendor
     - mkdir -p ${BUILDPATH} && cd ${BUILDPATH}
-    - cmake -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_BENCHMARKS=ON -DACCURACY_TEST=ON -DBUILD_NATIVE_LIB=ON -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
+    - cmake -DCMAKE_CXX_COMPILER=${CXX} -DCMAKE_C_COMPILER=${CC} -DCMAKE_INSTALL_PREFIX=${DELIVERY_PATH} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DBUILD_BENCHMARKS=ON -DACCURACY_TEST=ON -DBUILD_NATIVE_LIB=ON -DBUILD_REV=${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA} ..
     # Static checks
-    - make cppcheck
-    - make format
     - make -j ${KUBERNETES_CPU_LIMIT}
     - if [ ! $(./ddprof --version | sed 's/.*+//g') == "${CI_PIPELINE_ID}-${CI_COMMIT_SHORT_SHA}" ]; then exit 1; fi
     - ctest --repeat-until-fail 5 --output-on-failure | tee test-output.log
     - if [ ${BUILD_TYPE} == "Release" ]; then strip --strip-debug ddprof; fi
     - make install
-    - if [ ${BUILD_TYPE} == "Coverage" ]; then
-    - make ctest_coverage
-    - export CODECOV_TOKEN=$(aws ssm get-parameter --region us-east-1 --name ci.ddprof.codecov-token --with-decryption --query "Parameter.Value" --out text)
-    - ${CI_PROJECT_DIR}/tools/codecov.sh -Z
-    - fi
-      # This job gives useful info on the mmap/mlock/perfopen capabilities in CI / different user
-    - cd test && RunDDBuild ./mmap-ut
   artifacts:
     paths:
       - ${CI_PROJECT_DIR}/${BINPATH}/
     expire_in: 1 week
+
+build:coverage:
+  extends:
+    - .light-job-resource-allocation
+  stage: build
+  tags: ["runner:k8s"]
+  image: ${BUILD_GCC_IMG_18_STICKY}
+  variables:
+    BUILD_TYPE: "Coverage"
+    BUILDPATH: build_${BUILD_TYPE}
+  script:
+    - set -euxo pipefail
+    - source setup_env.sh
+    - ln -s /app/vendor vendor
+    - mkdir -p ${BUILDPATH} && cd ${BUILDPATH}
+    - cmake -DCMAKE_CXX_COMPILER=${CXX} -DCMAKE_C_COMPILER=${CC} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} ..
+    - make cppcheck
+    - make format
+    - make -j ${KUBERNETES_CPU_LIMIT}
+    - make ctest_coverage
+    - export CODECOV_TOKEN=$(aws ssm get-parameter --region us-east-1 --name ci.ddprof.codecov-token --with-decryption --query "Parameter.Value" --out text)
+    - ${CI_PROJECT_DIR}/tools/codecov.sh -Z
+      # This job gives useful info on the mmap/mlock/perfopen capabilities in CI / different user
+    - cd test && RunDDBuild ./mmap-ut
 
 .heavy-duty-job-resource-allocation: &heavy-duty-job-resource-allocation
   variables:

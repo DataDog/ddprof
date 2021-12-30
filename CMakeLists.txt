@@ -24,7 +24,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 include(ExtendBuildTypes)
 
 # Default value
-option(CMAKE_BUILD_TYPE "Build type" Debug)
 message(STATUS "Build type set to " ${CMAKE_BUILD_TYPE})
 
 ## Allow to easily import external libraries
@@ -38,7 +37,9 @@ find_package(Threads REQUIRED)
 include(Helperfunc)
 
 # path to external dependencies
-set(VENDOR_PATH ${CMAKE_SOURCE_DIR}/vendor CACHE FILEPATH " Path to the vendor directory")
+set(VENDOR_EXTENSION "" CACHE STRING "Extension to differentiate how vendors were built")
+set(VENDOR_PATH "${CMAKE_SOURCE_DIR}/vendor${VENDOR_EXTENSION}" CACHE FILEPATH "Path to the vendor directory")
+message(STATUS "Vendor path set to " ${VENDOR_PATH})
 
 include(CheckIPOSupported)
 check_ipo_supported(RESULT LTO_SUPPORTED OUTPUT error)

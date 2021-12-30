@@ -3,6 +3,11 @@
 ARG UBUNTU_VERSION=20
 FROM ubuntu:${UBUNTU_VERSION}.04 as base
 
+ARG UBUNTU_VERSION
+ENV OS_IDENTIFIER="UB${UBUNTU_VERSION}"
+ARG CXX_COMPILER="clang++"
+ARG C_COMPILER="clang"
+
 # Tell docker to use bash as the default
 SHELL ["/bin/bash", "-c"]
 
@@ -37,14 +42,13 @@ RUN DEBIAN_FRONTEND=noninteractive apt install -y apt-transport-https ca-certifi
 # Codeql : static analysis tooling
 RUN curl -L https://github.com/github/codeql-action/releases/download/codeql-bundle-20210622/codeql-bundle-linux64.tar.gz -o - | tar -xz -C /usr/local
 
+RUN if [[ "${CXX_COMPILER}" == "g++" ]] ; then apt install -y gcc g++ ; else echo "Skip install of g++" ; fi
+
 ################
 ## LLVM SETUP ##
 ################
 ADD ./app/base-env/llvm.sh /
 RUN /llvm.sh 12
-
-ENV CC clang
-ENV CXX clang++
 
 # Clang format not installed by default
 RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key| apt-key add -
@@ -54,6 +58,9 @@ RUN apt update \
 
 # Provides the llvm-symbolizer (better debug information in case of sanitizer issue)
 ENV PATH="/usr/lib/llvm-12/bin/:$PATH"
+
+ENV CC=${C_COMPILER}
+ENV CXX=${CXX_COMPILER}
 
 # Newer CMake
 FROM base as cmake
@@ -69,7 +76,7 @@ RUN git clone --depth 1 --branch release-1.11.0 https://github.com/google/google
   && cd googletest \
   && mkdir build \
   && cd build \
-  && cmake -DCMAKE_CXX_COMPILER="clang++" -DCMAKE_CXX_FLAGS="-std=c++14" ../ \
+  && cmake -DCMAKE_CXX_COMPILER="${CXX_COMPILER}" -DCMAKE_CXX_FLAGS="-std=c++14" ../ \
   && cmake --build .  \
   && make install
 
@@ -89,7 +96,7 @@ RUN wget https://github.com/danmar/cppcheck/archive/refs/tags/2.5.tar.gz \
 RUN git clone --depth 1 --branch v3.10.2 https://github.com/nlohmann/json.git \
   && cd json \
   && mkdir build && cd build \
-  && cmake -DJSON_BuildTests=Off ../  \
+  && cmake -DJSON_BuildTests=Off -DCMAKE_CXX_COMPILER="${CXX_COMPILER}" -DCMAKE_CXX_FLAGS="-std=c++14" ../  \
   && make install
 
 # A specific user is required to get access to perf event ressources. 
