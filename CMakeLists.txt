@@ -37,7 +37,7 @@ find_package(Threads REQUIRED)
 include(Helperfunc)
 
 # path to external dependencies
-set(VENDOR_EXTENSION "" CACHE STRING "Extension to differentiate how vendors were built")
+set(VENDOR_EXTENSION "" CACHE STRING "Extension to allow builds with different libc")
 set(VENDOR_PATH "${CMAKE_SOURCE_DIR}/vendor${VENDOR_EXTENSION}" CACHE FILEPATH "Path to the vendor directory")
 message(STATUS "Vendor path set to " ${VENDOR_PATH})
 
