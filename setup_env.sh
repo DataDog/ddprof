@@ -35,7 +35,9 @@ CovCMake() {
     cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=Coverage "$@"
 }
 
-mkBuildDir() {
+## Build a directory with a naming that reflects the OS / compiler we are using
+## Example : mkBuildDir Rel --> build_UB18_clang_Rel
+MkBuildDir() {
     mkdir -p build_${OS_IDENTIFIER}_${CC}_${1}
     cd build_${OS_IDENTIFIER}_${CC}_${1}
 }

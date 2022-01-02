@@ -8,15 +8,17 @@ set -euo pipefail
 IFS=$'\n\t'
 
 ### Set directory names
-CURRENTDIR=$PWD
-SCRIPTPATH=$(readlink -f "$0")
-SCRIPTDIR=$(dirname $SCRIPTPATH)
-cd $SCRIPTDIR/../
-TOP_LVL_DIR=$PWD
-cd $CURRENTDIR
+if [ $# == 0 ]; then
+    echo "Specify the vendor directory to fetch llvm sources"
+    exit 1
+fi
+
+mkdir -p $1
+cd $1
+VENDOR_PATH=${PWD}
 
 ### Nuke the old llvm dir
-LLVM_ROOT=$TOP_LVL_DIR/vendor/llvm
+LLVM_ROOT=${VENDOR_PATH}/llvm
 rm -rf $LLVM_ROOT
 mkdir -p $LLVM_ROOT/include/llvm/
 mkdir -p $LLVM_ROOT/lib/

@@ -25,7 +25,7 @@ set(LLVM_DEMANGLE_SRC_FILES
     )
 
 add_custom_command(OUTPUT ${LLVM_DEMANGLE_SRC_FILES}
-                   COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_llvm_demangler.sh"
+                   COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_llvm_demangler.sh" ${VENDOR_PATH}
                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
                    COMMENT "Fetching llvm dependencies")
 
