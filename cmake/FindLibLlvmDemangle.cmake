@@ -11,9 +11,9 @@
 #    LLVM_DEMANGLE_SOURCES
 #    LLVM_DEMANGLE_PATH
 
-set(LLVM_DEMANGLE_PATH ${CMAKE_SOURCE_DIR}/vendor/llvm CACHE STRING " Path to the llvm-demangle directory")
+set(LLVM_DEMANGLE_PATH ${VENDOR_PATH}/llvm CACHE STRING " Path to the llvm-demangle directory")
 set(LLVM_DEMANGLE_SVNROOT https://github.com/llvm/llvm-project/trunk/llvm CACHE STRING " GitHub URL for LLVM")
-set(LLVM_DEMANGLE_SRC ${CMAKE_SOURCE_DIR}/vendor/llvm/lib/Demangle CACHE STRING "Path to the llvm-demangle sources")
+set(LLVM_DEMANGLE_SRC ${VENDOR_PATH}/llvm/lib/Demangle CACHE STRING "Path to the llvm-demangle sources")
 
 set(LLVM_DEMANGLE_SRC_FILES
     ${LLVM_DEMANGLE_SRC}/Demangle.cpp
