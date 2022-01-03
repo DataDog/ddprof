@@ -28,10 +28,9 @@ cd $SCRIPTDIR/../
 TOP_LVL_DIR=$PWD
 cd $CURRENTDIR
 
-VER_LIBDDPROF=$1
-TAR_LIBDDPROF=libddprof_${VER_LIBDDPROF}.tar.gz
-URL_LIBDDPROF=https://binaries.ddbuild.io/libddprof-build/${TAR_LIBDDPROF}
-S3_URL_LIBDDPROF=s3://binaries.ddbuild.io/libddprof-build/${TAR_LIBDDPROF}
+TAG_LIBDDPROF=$1
+TAR_LIBDDPROF=libddprof_${TAG_LIBDDPROF}.tar.gz
+GITHUB_URL_LIBDDPROF=https://github.com/DataDog/libddprof/releases/download/${TAG_LIBDDPROF}/libddprof-x86_64-unknown-linux-gnu.tar.gz
 
 SHA256_LIBDDPROF=$2
 mkdir -p $3
@@ -48,16 +47,8 @@ mkdir -p ${TARGET_EXTRACT}
 
 IS_CI=${CI:-false}
 if [ ! -e  ${TAR_LIBDDPROF} ]; then
-    if [ ${IS_CI} == "false" ]; then
-        # Http works locally
-        echo "Download using curl..."
-        curl -k -L ${URL_LIBDDPROF} -o ${TAR_LIBDDPROF}
-    else # CI flow uses aws cli
-        #Locally you can use aws vault to test this command
-        #aws-vault exec build-stable-developer -- aws s3 cp ${S3_URL_LIBDDPROF} ${DOWNLOAD_PATH}
-        echo "Download using s3..."
-        aws s3 cp ${S3_URL_LIBDDPROF} ${DOWNLOAD_PATH}
-    fi
+    echo "Downloading libddprof..."
+    curl -L ${GITHUB_URL_LIBDDPROF} -o ${TAR_LIBDDPROF}
 fi
 SHA_TAR=$(sha256sum ${DOWNLOAD_PATH}/${TAR_LIBDDPROF} | cut -d' ' -f1)
 

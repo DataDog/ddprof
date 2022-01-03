@@ -3,8 +3,10 @@
 
 # libddprof : common profiler imported libraries
 ## Associated https://gitlab.ddbuild.io/DataDog/libddprof-build/-/jobs/90384402
-set(VER_LIBDDPROF "64823667" CACHE STRING "libddprof version")
-set(SHA256_LIBDDPROF "3bfe61553a9665c029e372ebad052d0545de4eb8b43e1d0958edd6680e4e7f4f" CACHE STRING "libddprof sha256")
+set(TAG_LIBDDPROF "v0.2.0-rc.1" CACHE STRING "libddprof github tag")
+set(VER_LIBDDPROF "e9b9b9c9" CACHE STRING "libddprof version")
+
+set(SHA256_LIBDDPROF "e47d91cb3d2d73a8106417e5f5c6e94db4fc4f6f133e815c0187286d33c6be62" CACHE STRING "libddprof sha256")
 
 set(LIBDDPROF_REL_FFI_LIB ${VENDOR_PATH}/libddprof/x86_64-unknown-linux-gnu/lib/libddprof_ffi.a)
 set(LIBDDPROF_CMAKE_SCRIPT ${VENDOR_PATH}/libddprof/x86_64-unknown-linux-gnu/cmake/DDProfConfig.cmake)
@@ -22,9 +24,9 @@ set(LIBDDPROF_FILES
   ${LIBDDPROF_CMAKE_SCRIPT})
 
 add_custom_command(OUTPUT ${LIBDDPROF_FILES}
-                  COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_libddprof.sh" ${VER_LIBDDPROF} ${SHA256_LIBDDPROF} ${VENDOR_PATH}
+                  COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_libddprof.sh" ${TAG_LIBDDPROF} ${SHA256_LIBDDPROF} ${VENDOR_PATH}
                   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                  COMMENT "Fetching libddprof version ${VER_LIBDDPROF}...")
+                  COMMENT "Fetching libddprof version ${TAG_LIBDDPROF}...")
 add_custom_target(ddprof-deps DEPENDS ${LIBDDPROF_FILES})
 
 # Version check 
