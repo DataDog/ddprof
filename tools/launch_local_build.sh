@@ -16,16 +16,17 @@ cd $CURRENTDIR
 
 usage() {
     echo "$0 [-t] [clean]"
-    echo "Launch a docker instance locally of the CI images. ssh socket is forwarded to the build image."
-    echo " You can specify a folder to mount in a .env file ${TOP_LVL_DIR}/.env"
-    echo "    Add this line to the file --> DEFAULT_DEV_WORKSPACE=<some path you want to mount>"
-    echo "You can have a docker-sync.yml file in the root of this repo which will be used as a mounted volume (speeds up compile)."
+    echo "Launch a docker instance for local developments. Your ssh socket is forwarded to the build image."
+    echo ""
+    echo " Shared files" 
+    echo " Recommended solution -- use a docker-sync.yml file in the root of this repo which will be used as a mounted volume."
+    echo " Alternative solution -- You can specify a folder to mount in a .env file ${TOP_LVL_DIR}/.env"
+    echo " Default solution     -- if nothing is specified this repository will be shared (!slower than docker-sync)"    
     echo ""
     echo " Optional parameters "
-    echo "    --test/-t : launch the test image."
-    echo "    --centos/-C : launch the test image."
+    echo "    --dockerfile/-f : use a custom docker file."
     echo "    --clean/-c : rebuild the image before creating it."
-    echo "    --ubuntu_version/-u : use a given ubuntu version."
+    echo "    --ubuntu_version/-u : specify ubuntu version (expected values: 16 / 18 / 20)"
     echo "    --image_id/-i : use a specified docker ID, conflicts with -u."
     echo "    --gcc : use gcc instead of clang."
 }
@@ -40,15 +41,13 @@ UBUNTU_VERSION=18
 USE_GCC="no"
 
 while [ $# != 0 ]; do 
-    if [ $# != 0 ] && [ $1 == "-t" -o $1 == "--test" ]; then
-        DEFAULT_BASE_NAME=test_ddprof
-        BASE_DOCKERFILE="./app/test-env/Dockerfile"
+    if [ $# != 0 ] && [ $1 == "-f" -o $1 == "--dockerfile" ]; then
+        cd $(dirname $2)
+        # Hacky, use path to identify name of docker image
+        DEFAULT_BASE_NAME=$(md5sum<<<${PWD} | awk '{print $1}')
+        cd ${CURRENTDIR}
+        BASE_DOCKERFILE="$2"
         shift
-        continue
-    fi
-    if [ $# != 0 ] && [ $1 == "-C" -o $1 == "--centos" ]; then
-        DEFAULT_BASE_NAME=test_centos
-        BASE_DOCKERFILE="./app/centos/Dockerfile"
         shift
         continue
     fi
@@ -123,7 +122,6 @@ if [ ! ${CUSTOM_ID:-,,} == "yes" ]; then
 fi
 
 echo "Considering docker image    : $DOCKER_NAME"
-echo "                   Tag      : $DOCKER_TAG"
 echo "              Built from    : $BASE_DOCKERFILE"
 echo "           Mount command    : ${MOUNT_CMD}"
 
@@ -140,7 +138,6 @@ if [ ! ${CUSTOM_ID:-,,} == "yes" ] && [ -z "$(docker images | awk '{print $1}'| 
         COMPILE_BUILD_ARG="--build-arg CXX_COMPILER=g++ --build-arg C_COMPILER=gcc"
     fi  
     BUILD_CMD="docker build -t ${DOCKER_NAME} -f $BASE_DOCKERFILE --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} ${COMPILE_BUILD_ARG} ."
-    echo ""
     eval ${BUILD_CMD}
 else 
     echo "Base image found, not rebuilding. Remove it to force rebuild."
