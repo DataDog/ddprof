@@ -12,13 +12,9 @@ typedef struct UserTags UserTags;
 
 // Mutable states within a worker
 typedef struct DDProfWorkerContext {
-  PEventHdr pevent_hdr;   // perf_event buffer holder
-  DDProfExporter *exp[2]; // wrapper around rust exporter
-  DDProfPProf *pprof[2];  // wrapper around rust exporter
-  int i_current_pprof;
-  volatile bool pending;
-  volatile bool exp_error;
-  pthread_t exp_tid;
+  PEventHdr pevent_hdr; // perf_event buffer holder
+  DDProfExporter *exp;  // wrapper around rust exporter
+  DDProfPProf *pprof;   // wrapper around rust exporter
   UnwindState *us;
   UserTags *user_tags;
   ProcStatus proc_status;
