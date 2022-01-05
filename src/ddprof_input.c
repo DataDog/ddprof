@@ -143,7 +143,7 @@ char *help_key[DD_KLEN] = {OPT_TABLE(X_HLPK)};
 void ddprof_print_help() {
   char help_hdr[] = ""
 " usage: "MYNAME" [--help] [PROFILER_OPTIONS] COMMAND [COMMAND_ARGS]\n"
-" eg: "MYNAME" -A hunter2 -H localhost -P 8192 redis-server /etc/redis/redis.conf\n\n";
+" eg: "MYNAME" -S hunter2 -H localhost -P 8192 redis-server /etc/redis/redis.conf\n\n";
 
   char help_opts_extra[] =
 "  -v, --version:\n"
