@@ -200,7 +200,7 @@ endif()
 
 message(STATUS "Install destination " ${CMAKE_INSTALL_PREFIX})
 install(TARGETS ddprof)
-
+install(FILES LICENSE LICENSE-3rdparty.csv LICENSE.LGPLV3 NOTICE DESTINATION ${CMAKE_INSTALL_PREFIX})
 
 #######################################
 ### Declaration of native library   ###
