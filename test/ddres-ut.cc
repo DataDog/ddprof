@@ -17,13 +17,13 @@ extern "C" {
 namespace ddprof {
 
 TEST(DDRes, Size) {
-  DDRes ddres = {0};
+  DDRes ddres = ddres_init();
   ASSERT_TRUE(sizeof(ddres) == sizeof(int32_t));
 }
 
 TEST(DDRes, InitOK) {
   {
-    DDRes ddres1 = {0};
+    DDRes ddres1 = {};
     DDRes ddres2 = ddres_init();
     DDRes ddres3;
     InitDDResOK(ddres3);

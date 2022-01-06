@@ -53,6 +53,7 @@ function(static_link_cxx)
     message("You must supply a TARGET to static_link_cxx")
   endif()
   target_link_options(${STATIC_LINK_CXX_TARGET} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-static-libstdc++>)
+  target_link_options(${STATIC_LINK_CXX_TARGET} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-static-libgcc>)
 endfunction()
 
 # Set a target's disposition for clang-tidy

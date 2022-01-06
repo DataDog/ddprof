@@ -229,7 +229,7 @@ option(BUILD_NATIVE_LIB "Build a library out of the native profiler" OFF)
                ${DDPROF_LIB_SRC})
    set_property(TARGET ddprof-native PROPERTY CXX_STANDARD 14)
    set_property(TARGET ddprof-native PROPERTY C_STANDARD 11)
-               
+
    set_target_properties(ddprof-native PROPERTIES VERSION ${PROJECT_VERSION})
    set_target_properties(ddprof-native PROPERTIES
                          COMPILE_DEFINITIONS DDPROF_NATIVE_LIB)

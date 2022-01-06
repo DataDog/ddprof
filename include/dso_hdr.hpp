@@ -149,7 +149,7 @@ public:
 
   // Unordered map of sorted
   DsoPidMap _map;
-  struct DsoStats _stats;
+  DsoStats _stats;
 
 private:
   enum BackpopulatePermission {

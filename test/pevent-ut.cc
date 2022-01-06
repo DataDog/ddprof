@@ -22,7 +22,7 @@ void mock_ddprof_context(DDProfContext *ctx) {
 
 TEST(PeventTest, setup_cleanup) {
   PEventHdr pevent_hdr;
-  DDProfContext ctx = {0};
+  DDProfContext ctx = {};
   pid_t mypid = getpid();
   mock_ddprof_context(&ctx);
   pevent_init(&pevent_hdr);

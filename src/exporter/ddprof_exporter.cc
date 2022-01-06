@@ -143,8 +143,6 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
   return ddres_init();
 }
 
-static const int k_max_tags = 10;
-
 static void fill_tags(const UserTags *user_tags, const DDProfExporter *exporter,
                       std::vector<ddprof_ffi_Tag> &tags_exporter) {
   tags_exporter.push_back(ddprof_ffi_Tag{

@@ -66,7 +66,7 @@ static inline DDRes ddres_warn(int16_t what) {
 
 /// Create an OK DDRes
 static inline DDRes ddres_init(void) {
-  DDRes ddres = {0};
+  DDRes ddres = {};
   return ddres;
 }
 

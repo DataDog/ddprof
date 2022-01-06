@@ -64,7 +64,7 @@ TEST(PerfRingbufferTest, SampleSymmetryx86) {
   for (uint64_t i = 0; i < sizeof(default_stack) / sizeof(*default_stack); i++)
     default_stack[i] = i & 255;
   uint64_t default_regs[3] = {0x1111, 0x2222, 0x4444};
-  struct perf_event_sample sample = {0};
+  struct perf_event_sample sample = {};
   uint64_t default_val = 0x11111111;
   sample.header.type = PERF_RECORD_SAMPLE;
   sample.sample_id = default_val;
