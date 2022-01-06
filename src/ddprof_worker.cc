@@ -124,7 +124,7 @@ static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr) {
   long utime_old = procstat->utime;
   DDRES_CHECK_FWD(proc_read(procstat));
 
-  ddprof_stats_set(STATS_PROCFS_RSS, 1024 * procstat->rss);
+  ddprof_stats_set(STATS_PROCFS_RSS, get_page_size() * procstat->rss);
   ddprof_stats_set(STATS_PROCFS_UTIME, procstat->utime - utime_old);
   ddprof_stats_set(STATS_DSO_UNHANDLED_SECTIONS,
                    dso_hdr->_stats.sum_event_metric(DsoStats::kUnhandledDso));
