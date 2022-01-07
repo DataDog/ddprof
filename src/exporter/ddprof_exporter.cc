@@ -277,9 +277,8 @@ DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
           ddprof_ffi_ProfileExporterV3_send(exporter->_exporter, request);
       if (result.tag == DDPROF_FFI_SEND_RESULT_FAILURE) {
         LG_WRN("Failure to establish connection, check url %s", exporter->_url);
-        // There is an overflow issue when using the error buffer from rust
-        // LG_WRN("Failure to send profiles (%*s)", (int)result.failure.len,
-        //        result.failure.ptr);
+        LG_WRN("Failure to send profiles (%.*s)", (int)result.failure.len,
+               result.failure.ptr);
         // Free error buffer (prefer this API to the free API)
         ddprof_ffi_Buffer_reset(&result.failure);
         if (exporter->_nb_consecutive_errors++ >=
