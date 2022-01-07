@@ -20,7 +20,7 @@ usage() {
 
 
 # last line holds the version of ddprof
-VERSION_FROM_FILE=$(cat $1 | tail -n 1)
+VERSION_FROM_FILE=$(grep -E "^Version" $1 | awk -F "[: ]*" '{print $NF}')
 VERSION_INPUT=$2
 OUTPUT_CHECK=$3
 

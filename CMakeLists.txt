@@ -16,7 +16,7 @@ cmake_minimum_required(VERSION 3.19)
 message(STATUS "Compiler ID : ${CMAKE_C_COMPILER_ID}")
 
 # Debug command to get gcc command lines
-# set( CMAKE_VERBOSE_MAKEFILE on )
+# set(CMAKE_VERBOSE_MAKEFILE on)
 
 # Define the include path of cmake scripts
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
@@ -169,7 +169,6 @@ set(DDPROF_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 if (ON)
    # Add the rust library - Refactoring ongoing. OFF for now
    list(PREPEND DDPROF_LIBRARY_LIST DDProf::FFI)
-   list(APPEND DDPROF_LIBRARY_LIST ${CMAKE_DL_LIBS})
 endif()
 
 

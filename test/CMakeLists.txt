@@ -190,7 +190,7 @@ add_unit_test(
     ../src/unwind_output.c
     ../src/perf_option.c
     ddprof_pprof-ut.cc
-    LIBRARIES ddprof-ffi ${CMAKE_DL_LIBS}
+    LIBRARIES DDProf::FFI
     DEFINITIONS MYNAME="ddprof_pprof-ut"
 )
 target_include_directories(ddprof_pprof-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
@@ -205,7 +205,7 @@ add_unit_test(
     ../src/perf_option.c
     ../src/tags.cc
     ddprof_exporter-ut.cc
-    LIBRARIES ddprof-ffi ${CMAKE_DL_LIBS}
+    LIBRARIES DDProf::FFI
     DEFINITIONS MYNAME="ddprof_exporter-ut"
 )
 target_include_directories(ddprof_exporter-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
