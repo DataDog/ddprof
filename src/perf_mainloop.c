@@ -45,8 +45,10 @@
     WORKER_SHUTDOWN();                                                         \
   } while (0)
 
-DDRes spawn_workers(MLWorkerFlags *flags) {
+DDRes spawn_workers(MLWorkerFlags *flags, bool *is_worker) {
   pid_t child_pid;
+
+  *is_worker = false;
 
   // child immediately exits the while() and returns from this function, whereas
   // the parent stays here forever, spawning workers.
@@ -67,6 +69,7 @@ DDRes spawn_workers(MLWorkerFlags *flags) {
     LG_NFO("Refreshing worker process");
   }
 
+  *is_worker = true;
   return ddres_init();
 }
 
@@ -181,13 +184,15 @@ DDRes main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
 
   // Create worker processes to fulfill poll loop.  Only the parent process
   // can exit with an error code, which signals the termination of profiling.
-  DDRes res = spawn_workers(flags);
+  bool is_worker = false;
+  DDRes res = spawn_workers(flags, &is_worker);
   if (IsDDResNotOK(res)) {
     munmap(flags, sizeof(*flags));
     return res;
   }
-
-  worker(ctx, attr, flags);
+  if (is_worker) {
+    worker(ctx, attr, flags);
+  }
   // Child finished profiling: Free and exit
   ddprof_context_free(ctx);
   munmap(flags, sizeof(*flags));
