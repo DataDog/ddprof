@@ -1,0 +1,31 @@
+0.6.3 to 0.6.4 (06/10/2021)
+* Virtual Base frames : Ensure all frames are attached to a base frame
+* Explain Unwinding errors through virtual frames (ex: anonymous regions)
+* Unwinding fixes (for all processes that fork / global mode)
+    - Differentiate dwfl caches per PID
+    - Link symbol cache entries to the lifetime of a DSO
+* Improve instrumentation sequence : avoids missing initial frames
+    - Wait for instrumentation (perf event open) before launching the process
+* Build and test different libc versions : added 2.27
+* Unwinding fix : Fix check on dwfl_attach_state result
+* Support Tags in profiles 
+    - Add custom tags through input options
+    - Get information on number of CPUs and hw threads in profile tags
+
+0.6.2 to 0.6.3 (28/09/2021)
+* Add LTO to build process
+* Add _executable flag to DSO cache
+* DSO cache is populated with all regions, not just executable ones
+* Add PID-by-PID throttling to DSO backpopulate requests, since these requests
+  are numerous, expensive, and beyond a single invocation per sample, do not
+  improve unwinding quality--the throttle limits backpopulate to the soonest
+  of once very 200 samples or once per export
+* Fix bug where the lifetime of an mmap()'d region was bound to the lifetime
+  of the RegionHolder temporary, causing DSO reads to fail
+* Resequence the setuid() mmap maneuver so that an mmap() is attempted with
+  current UID before switching
+* Filter PID 0 before it hits any of the ddprof worker functions, since we
+  currently don't handle it at all
+* Fix buggy exit in application start when an invalid argument is given
+* Add an overflow check to the unwinding memory_read interface 
+* Add some backpopulate and region holder unit tests

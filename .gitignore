@@ -1,0 +1,61 @@
+#==============================================================================#
+# Directories to ignore (do not add trailing '/'s, they skip symlinks).
+#==============================================================================#
+deliverables
+redis
+release
+temp
+tmp
+vendor*
+.cache
+.ccls-cache
+.idea
+.vs
+.vscode
+docker-sync.yml
+
+#==============================================================================#
+# Directories to ignore only in root directory
+#==============================================================================#
+/build*
+/.docker-sync
+/pprofs
+/ddprof.codeql
+
+#==============================================================================#
+# Editor auto-saving
+#==============================================================================#
+*~
+\#*\#
+*.autosave
+
+#==============================================================================#
+# Files to ignore recursively
+#==============================================================================#
+**/CMakeCache.txt
+**/CMakeFiles
+**/CMakeScripts
+**/.project
+**/.cproject
+**/.settings
+
+
+#==============================================================================#
+# Files to ignore
+#==============================================================================#
+compile_commands.json
+.gdb_history
+*.i
+*.o
+*.s
+*.bc
+*.swp
+*.dump
+.env
+.env_perso.yml
+test/configs/perso.yml
+.editorconfig
+test/data/*.pprof
+test/self_unwind/data/BadBoggleSolver_run.json
+cpp-security-quality.sarif
+test/data/ipc_test_data_Positive.txt

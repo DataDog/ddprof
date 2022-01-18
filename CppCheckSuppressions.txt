@@ -1,0 +1,13 @@
+// All of the warnings should be fixed : initial PR to start putting in place cppchecks in CI
+//example :
+//arithOperationsOnVoidPointer:*/ddprof.c:12
+//static variables
+//buf not used (but should be in future version of code)
+//static variable levels
+//variableScope:*/logger.c:124
+
+// config of cpp checks needs more includes
+missingInclude
+unusedLabel:*/dso-ut.cc
+// warning about weird comma : I could not explain this warning
+constStatement:*/dwfl_symbol_lookup.cc

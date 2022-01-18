@@ -1,0 +1,8 @@
+linux-vdso
+libdl
+librt
+libpthread
+libc
+ld-linux-x86-64.so.2
+libm
+libutil
