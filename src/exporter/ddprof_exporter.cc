@@ -155,10 +155,10 @@ static void fill_tags(const UserTags *user_tags, const DDProfExporter *exporter,
         .value = char_star_to_byteslice(exporter->_input.environment)});
   }
 
-  if (exporter->_input.serviceversion) {
+  if (exporter->_input.vername) {
     tags_exporter.push_back(ddprof_ffi_Tag{
         .name = char_star_to_byteslice("version"),
-        .value = char_star_to_byteslice(exporter->_input.serviceversion)});
+        .value = char_star_to_byteslice(exporter->_input.vername)});
   }
 
   if (exporter->_input.service) {

@@ -2,7 +2,7 @@
 
 ```bash
  usage: ddprof [--help] [PROFILER_OPTIONS] COMMAND [COMMAND_ARGS]
- eg: ddprof -A hunter2 -H localhost -P 8192 redis-server /etc/redis/redis.conf
+ eg: ddprof -S service_name -H localhost -P 8192 redis-server /etc/redis/redis.conf
 
 Options:
   -E, --environment, (envvar: DD_ENV)
@@ -19,14 +19,14 @@ Options:
     or https://<hostname>:<port> are valid.  Overrides any other specification for
     the host or port, except if the URL is specified without a port, such as
     http://myhost.domain.com, in which case the port can be specified separately
-
+    by the user.
   -S, --service, (envvar: DD_SERVICE)
     The name of this service.  It is useful to populate this field, as it will
     make it easier to locate and filter interesting profiles.
     For global mode, note that all application-level profiles are consolidated in
     the same view.
 
-  -V, --serviceversion, (envvar: DD_VERSION)
+  -V, --vername, (envvar: DD_VERSION)
     Version of the service being profiled. Added to the tags during export.
     This is an optional field, but it is useful for locating and filtering
     regressions or interesting behavior.

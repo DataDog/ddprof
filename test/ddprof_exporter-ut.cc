@@ -85,7 +85,7 @@ void fill_mock_exporter_input(ExporterInput &exporter_input,
   exporter_input.site = "datadog_is_cool.com";
   exporter_input.port = url.second.c_str();
   exporter_input.service = MYNAME;
-  exporter_input.serviceversion = "42";
+  exporter_input.vername = "42";
   exporter_input.do_export = "yes";
   exporter_input.user_agent = STRING_VIEW_LITERAL("DDPROF_MOCK");
   exporter_input.language = STRING_VIEW_LITERAL("NATIVE");
