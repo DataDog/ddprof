@@ -1,3 +1,11 @@
+0.6.4 to 0.7.0 (19/01/2022)
+* Asynchronous HTTP exports 
+- Reduces lost events while exporting
+* Support clang builds
+* Whole host profiling 
+  - Add support to locate files through /proc
+* Support url option
+
 0.6.3 to 0.6.4 (06/10/2021)
 * Virtual Base frames : Ensure all frames are attached to a base frame
 * Explain Unwinding errors through virtual frames (ex: anonymous regions)
