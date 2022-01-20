@@ -71,7 +71,7 @@ typedef struct DDProfInput {
 #define EXPORTER_OPT_TABLE(XX)        \
 //  A                                   B                   C   D   E   F     G     H              I
 #define OPT_TABLE(XX)                                                                                   \
-  XX(DD_API_KEY,                        api_key,             A, 'A', 1, input, NULL, "",           exp_input.)  \
+  XX(DD_API_KEY,                        api_key,            A, 'A', 1, input, NULL, "",           exp_input.)  \
   XX(DD_ENV,                            environment,        E, 'E', 1, input, NULL, "",           exp_input.)  \
   XX(DD_AGENT_HOST,                     host,               H, 'H', 1, input, NULL, "localhost",  exp_input.)  \
   XX(DD_SITE,                           site,               I, 'I', 1, input, NULL, "",           exp_input.)  \
@@ -89,7 +89,7 @@ typedef struct DDProfInput {
   XX(DD_PROFILING_NATIVE_FAULT_INFO,    fault_info,         s, 's', 1, input, NULL, "yes", )                   \
   XX(DD_PROFILING_NATIVE_CORE_DUMPS,    core_dumps,         m, 'm', 1, input, NULL, "no", )                    \
   XX(DD_PROFILING_NATIVE_NICE,          nice,               i, 'i', 1, input, NULL, "", )                      \
-  XX(DD_PROFILING_NATIVE_SHOW_CONFIG,   show_config,        a, 'a', 1, input, NULL, "no", )                    \
+  XX(DD_PROFILING_NATIVE_SHOW_CONFIG,   show_config,        c, 'c', 1, input, NULL, "no", )                    \
   XX(DD_PROFILING_NATIVE_SEND_FINAL,    send_final,         f, 'f', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_NATIVE_LOG_MODE,      log_mode,           o, 'o', 1, input, NULL, "stdout", )                \
   XX(DD_PROFILING_NATIVE_LOG_LEVEL,     log_level,          l, 'l', 1, input, NULL, "error", )                 \
