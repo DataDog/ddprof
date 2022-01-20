@@ -2,7 +2,7 @@
 
 ```bash
  usage: ddprof [--help] [PROFILER_OPTIONS] COMMAND [COMMAND_ARGS]
- eg: ddprof -A hunter2 -H localhost -P 8192 redis-server /etc/redis/redis.conf
+ eg: ddprof -S service_name -H localhost -P 8192 redis-server /etc/redis/redis.conf
 
 Options:
   -E, --environment, (envvar: DD_ENV)
@@ -19,6 +19,7 @@ Options:
     or https://<hostname>:<port> are valid.  Overrides any other specification for
     the host or port, except if the URL is specified without a port, such as
     http://myhost.domain.com, in which case the port can be specified separately
+    by the user.
 
   -S, --service, (envvar: DD_SERVICE)
     The name of this service.  It is useful to populate this field, as it will
@@ -52,7 +53,7 @@ Options:
     processes.  This is useful on small containers with spiky workloads.
     If this parameter isn't given, then the nice level is unchanged.
 
-  -a, --show_config, (envvar: DD_PROFILING_NATIVE_SHOW_CONFIG)
+  -c, --show_config, (envvar: DD_PROFILING_NATIVE_SHOW_CONFIG)
     Whether or not to print configuration parameters to the trace log.  Can
     be `yes` or `no` (default: `no`).
 
@@ -71,6 +72,10 @@ Options:
   -g, --global, (envvar: DD_PROFILING_NATIVE_GLOBAL)
     Instruments the whole system.  Overrides DD_PROFILING_NATIVE_TARGET_PID.
     Requires specific permissions or a perf_event_paranoid value of less than 1.
+
+  -b, --internal_stats, (envvar: DD_PROFILING_INTERNAL_STATS)
+    Enables statsd metrics for ddprof. Value should point to a statsd socket.
+    Example: /var/run/datadog-agent/statsd.sock
 
   -v, --version:
     Prints the version of ddprof and exits.
