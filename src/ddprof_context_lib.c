@@ -18,8 +18,8 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   // Process logging mode
   char const *logpattern[] = {"stdout", "stderr", "syslog", "disabled"};
   const int sizeOfLogpattern = 4;
-  int idx_log_mode = input->logmode
-      ? arg_which(input->logmode, logpattern, sizeOfLogpattern)
+  int idx_log_mode = input->log_mode
+      ? arg_which(input->log_mode, logpattern, sizeOfLogpattern)
       : 0; // default to stdout
   switch (idx_log_mode) {
   case 0:
@@ -35,7 +35,7 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     LOG_open(LOG_DISABLE, "");
     break;
   default:
-    LOG_open(LOG_FILE, input->logmode);
+    LOG_open(LOG_FILE, input->log_mode);
     break;
   }
 
@@ -43,7 +43,7 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   char const *loglpattern[] = {"debug", "informational", "notice", "warn",
                                "error"};
   const int sizeOfLoglpattern = 5;
-  switch (arg_which(input->loglevel, loglpattern, sizeOfLoglpattern)) {
+  switch (arg_which(input->log_level, loglpattern, sizeOfLoglpattern)) {
   case 0:
     LOG_setlevel(LL_DEBUG);
     break;
@@ -112,13 +112,13 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
       ctx->params.worker_period = tmp_period;
   }
 
-  // Process faultinfo
-  ctx->params.faultinfo = arg_yesno(input->faultinfo, 1); // default no
+  // Process fault_info
+  ctx->params.fault_info = arg_yesno(input->fault_info, 1); // default no
 
-  // Process coredumps
-  // This probably makes no sense with faultinfo enabled, but considering that
+  // Process core_dumps
+  // This probably makes no sense with fault_info enabled, but considering that
   // there are other dumpable signals, we ignore
-  ctx->params.coredumps = arg_yesno(input->coredumps, 1); // default no
+  ctx->params.core_dumps = arg_yesno(input->core_dumps, 1); // default no
 
   // Process nice level
   // default value is -1 : nothing to override
@@ -132,8 +132,8 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
 
   ctx->params.num_cpu = get_nprocs();
 
-  // Process sendfinal
-  ctx->params.sendfinal = arg_yesno(input->sendfinal, 1);
+  // Process send_final
+  ctx->params.send_final = arg_yesno(input->send_final, 1);
 
   // Adjust target PID
   pid_t pid_tmp = 0;
@@ -151,11 +151,11 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   }
 
   // Enable or disable the propagation of internal statistics
-  if (input->internalstats) {
-    ctx->params.internalstats = strdup(input->internalstats);
-    if (!ctx->params.internalstats) {
+  if (input->internal_stats) {
+    ctx->params.internal_stats = strdup(input->internal_stats);
+    if (!ctx->params.internal_stats) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
-                             "Unable to allocate string for internalstats");
+                             "Unable to allocate string for internal_stats");
     }
   }
 
@@ -226,7 +226,7 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   }
 
   // Process input printer (do this right before argv/c modification)
-  if (input->printargs && arg_yesno(input->printargs, 1)) {
+  if (input->show_config && arg_yesno(input->show_config, 1)) {
     LG_PRINT("Printing parameters -->");
     ddprof_print_params(input);
 
@@ -254,7 +254,7 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
 void ddprof_context_free(DDProfContext *ctx) {
   if (ctx->initialized) {
     exporter_input_free(&ctx->exp_input);
-    free((char *)ctx->params.internalstats);
+    free((char *)ctx->params.internal_stats);
     free((char *)ctx->params.tags);
     memset(ctx, 0, sizeof(*ctx)); // also sets ctx->initialized = false;
   }

@@ -223,10 +223,10 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
 
   // And emit diagnostic output (if it's enabled)
   print_diagnostics(ctx->worker_ctx.us->dso_hdr);
-  if (IsDDResNotOK(ddprof_stats_send(ctx->params.internalstats))) {
+  if (IsDDResNotOK(ddprof_stats_send(ctx->params.internal_stats))) {
     LG_WRN("Unable to utilize to statsd socket.  Suppressing future stats.");
-    free((void *)ctx->params.internalstats);
-    ctx->params.internalstats = NULL;
+    free((void *)ctx->params.internal_stats);
+    ctx->params.internal_stats = NULL;
   }
 
 #ifndef DDPROF_NATIVE_LIB

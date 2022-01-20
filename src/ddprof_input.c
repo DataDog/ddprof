@@ -84,7 +84,7 @@ char* help_str[DD_KLEN] = {
 "    or https://<hostname>:<port> are valid.  Overrides any other specification for\n"
 "    the host or port, except if the URL is specified without a port, such as\n"
 "    http://myhost.domain.com, in which case the port can be specified separately\n"
-"    by the user.",
+"    by the user.\n",
   [DD_SERVICE] =
 "    The name of this service.  It is useful to populate this field, as it will\n"
 "    make it easier to locate and filter interesting profiles.\n"
@@ -110,30 +110,32 @@ char* help_str[DD_KLEN] = {
 "    profilers are run.  For example, DD_PROFILING_ENABLED can be used to disable\n"
 "    an inner profile, whilst setting DD_PROFILING_NATIVE_ENABLED to enable "MYNAME"\n",
   [DD_PROFILING_UPLOAD_PERIOD] = STR_UNDF,
-  [DD_PROFILING_WORKER_PERIOD] = STR_UNDF,
-  [DD_PROFILING_NATIVEFAULTINFO] = STR_UNDF,
-  [DD_PROFILING_NATIVEDUMPS] = STR_UNDF,
-  [DD_PROFILING_NATIVENICE] =
+  [DD_PROFILING_NATIVE_WORKER_PERIOD] = STR_UNDF,
+  [DD_PROFILING_NATIVE_FAULT_INFO] = STR_UNDF,
+  [DD_PROFILING_NATIVE_CORE_DUMPS] = STR_UNDF,
+  [DD_PROFILING_NATIVE_NICE] =
 "    Sets the nice level of "MYNAME" without affecting any instrumented\n"
 "    processes.  This is useful on small containers with spiky workloads.\n"
 "    If this parameter isn't given, then the nice level is unchanged.\n",
-  [DD_PROFILING_NATIVEPRINTARGS] =
+  [DD_PROFILING_NATIVE_SHOW_CONFIG] =
 "    Whether or not to print configuration parameters to the trace log.  Can\n"
 "    be `yes` or `no` (default: `no`).\n",
-  [DD_PROFILING_NATIVESENDFINAL] = STR_UNDF,
-  [DD_PROFILING_NATIVELOGMODE] =
+  [DD_PROFILING_NATIVE_SEND_FINAL] = STR_UNDF,
+  [DD_PROFILING_NATIVE_LOG_MODE] =
 "    One of `stdout`, `stderr`, `syslog`, or `disabled`.  Default is `stdout`.\n"
 "    If a value is given but it does not match the above, it is treated as a\n"
 "    filesystem path and a log will be appended there.  Log files are not\n"
 "    cleared between runs and a service restart is needed for log rotation.\n",
-  [DD_PROFILING_NATIVELOGLEVEL] =
+  [DD_PROFILING_NATIVE_LOG_LEVEL] =
 "    One of `debug`, `notice`, `warn`, `error`.  Default is `warn`.\n",
-  [DD_PROFILING_NATIVETARGET] =
+  [DD_PROFILING_NATIVE_TARGET_PID] =
 "    Instrument the given PID rather than launching a new process.\n",
-  [DD_PROFILING_NATIVEGLOBAL] =
-"    Instruments the whole system.  Overrides DD_PROFILING_NATIVETARGET.\n"
+  [DD_PROFILING_NATIVE_GLOBAL] =
+"    Instruments the whole system.  Overrides DD_PROFILING_NATIVE_TARGET_PID.\n"
 "    Requires specific permissions or a perf_event_paranoid value of less than 1.\n",
-  [DD_PROFILING_INTERNALSTATS] = STR_UNDF,
+  [DD_PROFILING_INTERNAL_STATS] = 
+  "    Enables statsd metrics for "MYNAME". Value should point to a statsd socket.\n"
+  "    Example: /var/run/datadog-agent/statsd.sock\n",
 };
 // clang-format on
 

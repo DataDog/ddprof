@@ -15,23 +15,23 @@ typedef int16_t watcher_index_t;
 typedef struct DDProfInput {
   int nb_parsed_params;
   // Parameters for interpretation
-  char *logmode;
-  char *loglevel;
+  char *log_mode;
+  char *log_level;
   // Input parameters
-  char *printargs;
+  char *show_config;
   char *count_samples;
   char *enable;
   char *native_enable;
   char *agentless;
   char *upload_period;
-  char *faultinfo;
-  char *coredumps;
+  char *fault_info;
+  char *core_dumps;
   char *nice;
-  char *sendfinal;
+  char *send_final;
   char *pid;
   char *global;
   char *worker_period;
-  char *internalstats;
+  char *internal_stats;
   char *tags;
   char *url;
   // Watcher presets
@@ -69,34 +69,33 @@ typedef struct DDProfInput {
 // clang-format off
 
 #define EXPORTER_OPT_TABLE(XX)        \
-
-//  A                              B                          C   D   E   F     G     H              I
-#define OPT_TABLE(XX)                                                                                            \
-  XX(DD_API_KEY,                   apikey,                    A, 'A', 1, input, NULL, "",           exp_input.)  \
-  XX(DD_ENV,                       environment,               E, 'E', 1, input, NULL, "",           exp_input.)  \
-  XX(DD_AGENT_HOST,                host,                      H, 'H', 1, input, NULL, "localhost",  exp_input.)  \
-  XX(DD_SITE,                      site,                      I, 'I', 1, input, NULL, "",           exp_input.)  \
-  XX(DD_TRACE_AGENT_PORT,          port,                      P, 'P', 1, input, NULL, "8126",       exp_input.)  \
-  XX(DD_TRACE_AGENT_URL,           url,                       U, 'U', 1, input, NULL, "", )                      \
-  XX(DD_SERVICE,                   service,                   S, 'S', 1, input, NULL, "myservice",  exp_input.)  \
-  XX(DD_VERSION,                   serviceversion,            V, 'V', 1, input, NULL, "",           exp_input.)  \
-  XX(DD_PROFILING_EXPORT,          do_export,                 X, 'X', 1, input, NULL, "yes",        exp_input.)  \
-  XX(DD_PROFILING_AGENTLESS,       agentless,                 L, 'L', 1, input, NULL, "",                     )  \
-  XX(DD_TAGS,                      tags,                      T, 'T', 1, input, NULL, "", )                      \
-  XX(DD_PROFILING_ENABLED,         enable,                    d, 'd', 1, input, NULL, "yes", )                   \
-  XX(DD_PROFILING_NATIVE_ENABLED,  native_enable,             n, 'n', 1, input, NULL, "yes", )                   \
-  XX(DD_PROFILING_UPLOAD_PERIOD,   upload_period,             u, 'u', 1, input, NULL, "59", )                    \
-  XX(DD_PROFILING_WORKER_PERIOD,   worker_period,             w, 'w', 1, input, NULL, "240", )                   \
-  XX(DD_PROFILING_NATIVEFAULTINFO, faultinfo,                 s, 's', 1, input, NULL, "yes", )                   \
-  XX(DD_PROFILING_NATIVEDUMPS,     coredumps,                 m, 'm', 1, input, NULL, "no", )                    \
-  XX(DD_PROFILING_NATIVENICE,      nice,                      i, 'i', 1, input, NULL, "", )                      \
-  XX(DD_PROFILING_NATIVEPRINTARGS, printargs,                 a, 'a', 1, input, NULL, "no", )                    \
-  XX(DD_PROFILING_NATIVESENDFINAL, sendfinal,                 f, 'f', 1, input, NULL, "", )                      \
-  XX(DD_PROFILING_NATIVELOGMODE,   logmode,                   o, 'o', 1, input, NULL, "stdout", )                \
-  XX(DD_PROFILING_NATIVELOGLEVEL,  loglevel,                  l, 'l', 1, input, NULL, "error", )                 \
-  XX(DD_PROFILING_NATIVETARGET,    pid,                       p, 'p', 1, input, NULL, "", )                      \
-  XX(DD_PROFILING_NATIVEGLOBAL,    global,                    g, 'g', 1, input, NULL, "", )                      \
-  XX(DD_PROFILING_INTERNALSTATS,   internalstats,             b, 'b', 1, input, NULL, "/var/run/datadog-agent/statsd.sock", )
+//  A                                   B                   C   D   E   F     G     H              I
+#define OPT_TABLE(XX)                                                                                   \
+  XX(DD_API_KEY,                        api_key,             A, 'A', 1, input, NULL, "",           exp_input.)  \
+  XX(DD_ENV,                            environment,        E, 'E', 1, input, NULL, "",           exp_input.)  \
+  XX(DD_AGENT_HOST,                     host,               H, 'H', 1, input, NULL, "localhost",  exp_input.)  \
+  XX(DD_SITE,                           site,               I, 'I', 1, input, NULL, "",           exp_input.)  \
+  XX(DD_TRACE_AGENT_PORT,               port,               P, 'P', 1, input, NULL, "8126",       exp_input.)  \
+  XX(DD_TRACE_AGENT_URL,                url,                U, 'U', 1, input, NULL, "", )                      \
+  XX(DD_SERVICE,                        service,            S, 'S', 1, input, NULL, "myservice",  exp_input.)  \
+  XX(DD_VERSION,                        service_version,    V, 'V', 1, input, NULL, "",           exp_input.)  \
+  XX(DD_PROFILING_EXPORT,               do_export,          X, 'X', 1, input, NULL, "yes",        exp_input.)  \
+  XX(DD_PROFILING_AGENTLESS,            agentless,          L, 'L', 1, input, NULL, "",                     )  \
+  XX(DD_TAGS,                           tags,               T, 'T', 1, input, NULL, "", )                      \
+  XX(DD_PROFILING_ENABLED,              enable,             d, 'd', 1, input, NULL, "yes", )                   \
+  XX(DD_PROFILING_NATIVE_ENABLED,       native_enable,      n, 'n', 1, input, NULL, "yes", )                   \
+  XX(DD_PROFILING_UPLOAD_PERIOD,        upload_period,      u, 'u', 1, input, NULL, "59", )                    \
+  XX(DD_PROFILING_NATIVE_WORKER_PERIOD, worker_period,      w, 'w', 1, input, NULL, "240", )                   \
+  XX(DD_PROFILING_NATIVE_FAULT_INFO,    fault_info,         s, 's', 1, input, NULL, "yes", )                   \
+  XX(DD_PROFILING_NATIVE_CORE_DUMPS,    core_dumps,         m, 'm', 1, input, NULL, "no", )                    \
+  XX(DD_PROFILING_NATIVE_NICE,          nice,               i, 'i', 1, input, NULL, "", )                      \
+  XX(DD_PROFILING_NATIVE_SHOW_CONFIG,   show_config,        a, 'a', 1, input, NULL, "no", )                    \
+  XX(DD_PROFILING_NATIVE_SEND_FINAL,    send_final,         f, 'f', 1, input, NULL, "", )                      \
+  XX(DD_PROFILING_NATIVE_LOG_MODE,      log_mode,           o, 'o', 1, input, NULL, "stdout", )                \
+  XX(DD_PROFILING_NATIVE_LOG_LEVEL,     log_level,          l, 'l', 1, input, NULL, "error", )                 \
+  XX(DD_PROFILING_NATIVE_TARGET_PID,    pid,                p, 'p', 1, input, NULL, "", )                      \
+  XX(DD_PROFILING_NATIVE_GLOBAL,        global,             g, 'g', 1, input, NULL, "", )                      \
+  XX(DD_PROFILING_INTERNAL_STATS,       internal_stats,     b, 'b', 1, input, NULL, "", )
 // clang-format on
 
 #define X_ENUM(a, b, c, d, e, f, g, h, i) a,

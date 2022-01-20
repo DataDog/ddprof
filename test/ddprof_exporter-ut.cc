@@ -73,10 +73,10 @@ void fill_mock_exporter_input(ExporterInput &exporter_input,
                               std::pair<std::string, std::string> &url,
                               bool fill_valid_key) {
   if (fill_valid_key) {
-    exporter_input.apikey = "yisthisisanapikeyof32charslooong";
+    exporter_input.api_key = "yisthisisanapi_keyof32charslooong";
   } else {
     // agent for local tests (not taken as key)
-    exporter_input.apikey = "nope_not_a_good_key";
+    exporter_input.api_key = "nope_not_a_good_key";
   }
 
   exporter_input.agentless = "yes";
@@ -85,7 +85,7 @@ void fill_mock_exporter_input(ExporterInput &exporter_input,
   exporter_input.site = "datadog_is_cool.com";
   exporter_input.port = url.second.c_str();
   exporter_input.service = MYNAME;
-  exporter_input.serviceversion = "42";
+  exporter_input.service_version = "42";
   exporter_input.do_export = "yes";
   exporter_input.user_agent = STRING_VIEW_LITERAL("DDPROF_MOCK");
   exporter_input.language = STRING_VIEW_LITERAL("NATIVE");
