@@ -26,7 +26,7 @@ Options:
     For global mode, note that all application-level profiles are consolidated in
     the same view.
 
-  -V, --serviceversion, (envvar: DD_VERSION)
+  -V, --service_version, (envvar: DD_VERSION)
     Version of the service being profiled. Added to the tags during export.
     This is an optional field, but it is useful for locating and filtering
     regressions or interesting behavior.
@@ -47,29 +47,29 @@ Options:
     profilers are run.  For example, DD_PROFILING_ENABLED can be used to disable
     an inner profile, whilst setting DD_PROFILING_NATIVE_ENABLED to enable ddprof
 
-  -i, --nice, (envvar: DD_PROFILING_NATIVENICE)
+  -i, --nice, (envvar: DD_PROFILING_NATIVE_NICE)
     Sets the nice level of ddprof without affecting any instrumented
     processes.  This is useful on small containers with spiky workloads.
     If this parameter isn't given, then the nice level is unchanged.
 
-  -a, --printargs, (envvar: DD_PROFILING_NATIVEPRINTARGS)
+  -a, --show_config, (envvar: DD_PROFILING_NATIVE_SHOW_CONFIG)
     Whether or not to print configuration parameters to the trace log.  Can
     be `yes` or `no` (default: `no`).
 
-  -o, --logmode, (envvar: DD_PROFILING_NATIVELOGMODE)
+  -o, --log_mode, (envvar: DD_PROFILING_NATIVE_LOG_MODE)
     One of `stdout`, `stderr`, `syslog`, or `disabled`.  Default is `stdout`.
     If a value is given but it does not match the above, it is treated as a
     filesystem path and a log will be appended there.  Log files are not
     cleared between runs and a service restart is needed for log rotation.
 
-  -l, --loglevel, (envvar: DD_PROFILING_NATIVELOGLEVEL)
+  -l, --log_level, (envvar: DD_PROFILING_NATIVE_LOG_LEVEL)
     One of `debug`, `notice`, `warn`, `error`.  Default is `warn`.
 
-  -p, --pid, (envvar: DD_PROFILING_NATIVETARGET)
+  -p, --pid, (envvar: DD_PROFILING_NATIVE_TARGET_PID)
     Instrument the given PID rather than launching a new process.
 
-  -g, --global, (envvar: DD_PROFILING_NATIVEGLOBAL)
-    Instruments the whole system.  Overrides DD_PROFILING_NATIVETARGET.
+  -g, --global, (envvar: DD_PROFILING_NATIVE_GLOBAL)
+    Instruments the whole system.  Overrides DD_PROFILING_NATIVE_TARGET_PID.
     Requires specific permissions or a perf_event_paranoid value of less than 1.
 
   -v, --version:

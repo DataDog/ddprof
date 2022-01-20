@@ -33,7 +33,7 @@ TEST_F(InputTest, default_values) {
   } else {
     EXPECT_EQ(strcmp(input.exp_input.service, "myservice"), 0);
   }
-  EXPECT_EQ(strcmp(input.logmode, "stdout"), 0);
+  EXPECT_EQ(strcmp(input.log_mode, "stdout"), 0);
   ddprof_input_free(&input);
 }
 
@@ -55,14 +55,14 @@ TEST_F(InputTest, single_param) {
   bool contine_exec;
   int argc = 4;
   const char *input_values[] = {MYNAME, "-m", "yes", "my_program"};
-  //   const char *input_values[] = {MYNAME, "--coredumps", "yes",
+  //   const char *input_values[] = {MYNAME, "--core_dumps", "yes",
   //   "my_program"};
 
   DDRes res =
       ddprof_input_parse(argc, (char **)input_values, &input, &contine_exec);
   EXPECT_TRUE(IsDDResOK(res));
   EXPECT_TRUE(contine_exec);
-  EXPECT_EQ(strcmp(input.coredumps, "yes"), 0);
+  EXPECT_EQ(strcmp(input.core_dumps, "yes"), 0);
   EXPECT_EQ(input.nb_parsed_params, 3);
   ddprof_print_params(&input);
   ddprof_input_free(&input);

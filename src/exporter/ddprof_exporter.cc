@@ -107,8 +107,8 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
   // if we have an API key we assume we are heading for intake (slightly
   // fragile #TODO add a parameter)
 
-  if (exporter_input->agentless && exporter_input->apikey &&
-      strlen(exporter_input->apikey) >= k_size_api_key) {
+  if (exporter_input->agentless && exporter_input->api_key &&
+      strlen(exporter_input->api_key) >= k_size_api_key) {
     LG_NTC("[EXPORTER] Targeting intake instead of agent (API Key available)");
     exporter->_agent = false;
   } else {
@@ -155,10 +155,10 @@ static void fill_tags(const UserTags *user_tags, const DDProfExporter *exporter,
         .value = char_star_to_byteslice(exporter->_input.environment)});
   }
 
-  if (exporter->_input.serviceversion) {
+  if (exporter->_input.service_version) {
     tags_exporter.push_back(ddprof_ffi_Tag{
         .name = char_star_to_byteslice("version"),
-        .value = char_star_to_byteslice(exporter->_input.serviceversion)});
+        .value = char_star_to_byteslice(exporter->_input.service_version)});
   }
 
   if (exporter->_input.service) {
@@ -193,7 +193,7 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
     endpoint = ddprof_ffi_EndpointV3_agent(base_url);
   } else {
     ddprof_ffi_ByteSlice api_key =
-        char_star_to_byteslice(exporter->_input.apikey);
+        char_star_to_byteslice(exporter->_input.api_key);
     endpoint = ddprof_ffi_EndpointV3_agentless(base_url, api_key);
   }
 

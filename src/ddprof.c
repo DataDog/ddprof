@@ -61,14 +61,14 @@ DDRes ddprof_setup(DDProfContext *ctx, pid_t pid) {
   DDRES_CHECK_FWD(pevent_open(ctx, pid, ctx->params.num_cpu, pevent_hdr));
 
   // Setup signal handler if defined
-  if (ctx->params.faultinfo)
+  if (ctx->params.fault_info)
     sigaction(SIGSEGV,
               &(struct sigaction){.sa_sigaction = sigsegv_handler,
                                   .sa_flags = SA_SIGINFO},
               NULL);
 
   // Disable core dumps (unless enabled)
-  if (!ctx->params.coredumps) {
+  if (!ctx->params.core_dumps) {
     disable_core_dumps();
   }
 
