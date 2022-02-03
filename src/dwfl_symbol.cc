@@ -14,23 +14,6 @@ extern "C" {
 #include <cassert>
 
 namespace ddprof {
-#ifdef DEBUG
-static void check_range_assumption(const char *symname, ElfAddress_t mod_addr,
-                                   ElfAddress_t elf_addr, size_t elf_size,
-                                   ElfAddress_t newpc, ElfAddress_t bias) {
-  LG_NFO("WO VMA lsym.from=%lx, lsym.to=%lx (bias=%lx) symname=%s", elf_addr,
-         elf_addr + elf_size - 1, bias, symname);
-  if ((newpc >= mod_addr + elf_addr) &&
-      (newpc <= mod_addr + elf_addr + elf_size + k_min_symbol_size)) {
-    LG_NFO("DWFL: WARNING -- YEAH IN NORMALIZED RANGE");
-  } else if ((newpc >= elf_addr) &&
-             (newpc <= elf_addr + elf_size + k_min_symbol_size)) {
-    LG_NFO("DWFL: WARNING -- OH IN PROCESS RANGE ! STILL YEAH !!");
-  } else {
-    LG_NFO("DWFL: WARNING -- ERROR NOTHING MAKES SENSE, RUN");
-  }
-}
-#endif
 
 // compute the info using dwarf and demangle APIs
 bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
@@ -46,11 +29,6 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
   if (lsymname) {
     symbol._symname = std::string(lsymname);
     symbol._demangle_name = llvm::demangle(symbol._symname);
-#ifdef DEBUG
-    check_range_assumption(symbol._symname.c_str(), mod->low_addr,
-                           elf_sym.st_value, elf_sym.st_size, process_pc,
-                           lbias);
-#endif
     symbol_success = true;
   }
 

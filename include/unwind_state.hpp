@@ -55,7 +55,7 @@ typedef struct UnwindState {
   size_t stack_sz;
 
   UnwindRegisters initial_regs;
-  UnwindRegisters current_regs;
+  uint64_t current_eip;
 
   UnwindOutput output;
 } UnwindState;

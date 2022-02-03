@@ -66,8 +66,8 @@ DDRes DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
                                 const FileInfoValue &fileInfoValue) {
   bool &mod_added = _mod_added[fileInfoValue.get_id()];
   if (!mod_added) {
-    Dwfl_Module *mod = update_module(_dwfl, pc, dso, fileInfoValue);
-    if (!mod) {
+    DDProfMod ddprof_mod = update_module(_dwfl, pc, dso, fileInfoValue);
+    if (!ddprof_mod._mod) {
       LG_DBG("Unable to register mod %s", dso.to_string().c_str());
       return ddres_warn(DD_WHAT_UW_ERROR);
     }

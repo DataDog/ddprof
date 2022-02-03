@@ -48,7 +48,7 @@ DDRes unwind_init_dwfl(UnwindState *us) {
         }
         const FileInfoValue &file_info_value =
             us->dso_hdr.get_file_info_value(file_info_id);
-        if (IsDDResOK(us->_dwfl_wrapper->register_mod(us->current_regs.eip, dso,
+        if (IsDDResOK(us->_dwfl_wrapper->register_mod(us->current_eip, dso,
                                                       file_info_value))) {
           // one success is fine
           success = true;
@@ -78,26 +78,17 @@ DDRes unwind_init_dwfl(UnwindState *us) {
 static void trace_unwinding_end(UnwindState *us) {
   if (LL_DEBUG <= LOG_getlevel()) {
     DsoHdr::DsoFindRes find_res =
-        us->dso_hdr.dso_find_closest(us->pid, us->current_regs.eip);
+        us->dso_hdr.dso_find_closest(us->pid, us->current_eip);
     if (find_res.second) {
-      LG_DBG("Stopped at %lx - dso %s - error %s", us->current_regs.eip,
+      LG_DBG("Stopped at %lx - dso %s - error %s", us->current_eip,
              find_res.first->second.to_string().c_str(), dwfl_errmsg(-1));
     } else {
-      LG_DBG("Unknown DSO %lx - error %s", us->current_regs.eip,
-             dwfl_errmsg(-1));
+      LG_DBG("Unknown DSO %lx - error %s", us->current_eip, dwfl_errmsg(-1));
     }
   }
 }
 
 static void add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc);
-
-static void copy_current_registers(const Dwfl_Frame *state,
-                                   UnwindRegisters &current_regs) {
-  // Update regs on current unwinding position
-  current_regs.ebp = state->regs[6];
-  current_regs.esp = state->regs[7];
-  current_regs.eip = state->regs[16];
-}
 
 // returns true if we should continue unwinding
 static bool add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
@@ -119,6 +110,9 @@ static bool add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
 
   if (!isactivation)
     --pc;
+
+  // save last instruction pointer to keep
+  us->current_eip = pc;
 
   DsoHdr::DsoFindRes find_res =
       us->dso_hdr.dso_find_or_backpopulate(us->pid, pc);
@@ -148,12 +142,6 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
   if (!add_symbol(dwfl_frame, us)) {
     return DWARF_CB_ABORT;
   }
-
-  copy_current_registers(dwfl_frame, us->current_regs);
-#ifdef DEBUG
-  LG_NTC("Current regs : ebp %lx, esp %lx, eip %lx", us->current_regs.ebp,
-         us->current_regs.esp, us->current_regs.eip);
-#endif
 
   return DWARF_CB_OK;
 }
