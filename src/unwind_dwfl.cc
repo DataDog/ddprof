@@ -111,7 +111,6 @@ static bool add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   if (!isactivation)
     --pc;
 
-  // save last instruction pointer to keep
   us->current_eip = pc;
 
   DsoHdr::DsoFindRes find_res =

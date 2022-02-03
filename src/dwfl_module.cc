@@ -34,15 +34,12 @@ DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
     const char *main_name = nullptr;
     dwfl_module_info(ddprof_mod._mod, 0, &ddprof_mod._low_addr,
                      &ddprof_mod._high_addr, 0, 0, &main_name, 0);
-    LG_WRN("Retrieveing mod with file : %s vs main.name %s",
-           fileInfoValue.get_path().c_str(), main_name);
     if (ddprof_mod._low_addr != dso._start - dso._pgoff) {
       // not using only addresses (as we get off by 1 page errors)
       const std::string &filepath = fileInfoValue.get_path();
       if (filepath.empty() || main_name == nullptr) {
         ddprof_mod._mod = nullptr;
       } else {
-        // A dso replaced the mod - todo free this dwfl object
         // Although the check is slightly fragile
         // we are not comparing the full path as we use the proc maps
         // to access them. So the root path could change while
@@ -50,6 +47,7 @@ DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
         const char *dso_name = strrchr(filepath.c_str(), '/') + 1;
         const char *mod_name = strrchr(main_name, '/') + 1;
         if (strcmp(mod_name, dso_name) != 0) {
+          // A dso replaced the mod - todo free this dwfl object
           LG_NTC("Incoherent DSO (%s) %lx != %lx dwfl_module (%s)",
                  filepath.c_str(), dso._start - dso._pgoff, low_addr,
                  main_name);
