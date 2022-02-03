@@ -10,6 +10,7 @@ extern "C" {
 #include <sys/types.h>
 }
 
+#include "ddprof_defs.h"
 #include "ddres_def.h"
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
@@ -40,7 +41,9 @@ struct UnwindRegisters {
 /// Single structure with everything necessary in unwinding. The structure is
 /// given through callbacks
 typedef struct UnwindState {
-  UnwindState() : _dwfl_wrapper(nullptr), pid(-1), stack(nullptr), stack_sz(0) {
+  UnwindState()
+      : _dwfl_wrapper(nullptr), pid(-1), stack(nullptr), stack_sz(0),
+        current_eip(0) {
     uw_output_clear(&output);
   }
 
@@ -55,7 +58,7 @@ typedef struct UnwindState {
   size_t stack_sz;
 
   UnwindRegisters initial_regs;
-  uint64_t current_eip;
+  ProcessAddress_t current_eip;
 
   UnwindOutput output;
 } UnwindState;

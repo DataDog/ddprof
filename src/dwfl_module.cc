@@ -27,8 +27,6 @@ DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
   DDProfMod ddprof_mod;
 
   ddprof_mod._mod = dwfl_addrmodule(dwfl, pc);
-  Dwarf_Addr low_addr = 0;
-  Dwarf_Addr high_addr = 0;
 
   if (ddprof_mod._mod) {
     const char *main_name = nullptr;
@@ -49,8 +47,8 @@ DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
         if (strcmp(mod_name, dso_name) != 0) {
           // A dso replaced the mod - todo free this dwfl object
           LG_NTC("Incoherent DSO (%s) %lx != %lx dwfl_module (%s)",
-                 filepath.c_str(), dso._start - dso._pgoff, low_addr,
-                 main_name);
+                 filepath.c_str(), dso._start - dso._pgoff,
+                 ddprof_mod._low_addr, main_name);
           ddprof_mod._mod = nullptr;
         }
       }
