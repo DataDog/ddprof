@@ -10,6 +10,15 @@ extern "C" {
 }
 
 namespace ddprof {
+
+static const char *get_filename(const char *full_path) {
+  const char *right_slash = strrchr(full_path, '/');
+  if (!right_slash) {
+    return full_path;
+  }
+  return right_slash + 1;
+}
+
 DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
                         const FileInfoValue &fileInfoValue) {
   if (!dwfl)
@@ -42,8 +51,8 @@ DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
         // we are not comparing the full path as we use the proc maps
         // to access them. So the root path could change while
         // this would still be the same file.
-        const char *dso_name = strrchr(filepath.c_str(), '/') + 1;
-        const char *mod_name = strrchr(main_name, '/') + 1;
+        const char *dso_name = get_filename(filepath.c_str());
+        const char *mod_name = get_filename(main_name);
         if (strcmp(mod_name, dso_name) != 0) {
           // A dso replaced the mod - todo free this dwfl object
           LG_NTC("Incoherent DSO (%s) %lx != %lx dwfl_module (%s)",
