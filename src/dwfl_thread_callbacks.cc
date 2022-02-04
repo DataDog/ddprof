@@ -17,11 +17,10 @@ bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
   struct UnwindState *us = reinterpret_cast<UnwindState *>(arg);
   Dwarf_Word regs[17] = {0};
 
-  // Use the current instead of initial registers to ensure we can call several
-  // unwinding loops. Only 3 registers are used in the unwinding
-  regs[6] = us->current_regs.ebp;
-  regs[7] = us->current_regs.esp;
-  regs[16] = us->current_regs.eip;
+  // Only 3 registers are used in the unwinding
+  regs[6] = us->initial_regs.ebp;
+  regs[7] = us->initial_regs.esp;
+  regs[16] = us->initial_regs.eip;
 
   return dwfl_thread_state_registers(thread, 0, 17, regs);
 }

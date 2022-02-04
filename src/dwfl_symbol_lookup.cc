@@ -70,8 +70,8 @@ DwflSymbolLookup_V2::get_or_insert(Dwfl *dwfl, SymbolTable &table,
     // cache validation mechanism: force dwfl lookup to compare with matched
     // symbols
     if (_lookup_setting == K_CACHE_VALIDATE) {
-      Dwfl_Module *mod = update_module(dwfl, process_pc, dso, file_info);
-      if (symbol_lookup_check(mod, process_pc,
+      DDProfMod ddprof_mod = update_module(dwfl, process_pc, dso, file_info);
+      if (symbol_lookup_check(ddprof_mod._mod, process_pc,
                               table[find_res.first->second.get_symbol_idx()])) {
         ++_stats._errors;
       }
@@ -120,10 +120,11 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(
   GElf_Sym elf_sym;
   Offset_t lbias;
   // Looking up Mod here is a waist (pending refactoring)
-  Dwfl_Module *mod = update_module(dwfl, process_pc, dso, file_info);
+  DDProfMod ddprof_mod = update_module(dwfl, process_pc, dso, file_info);
   RegionAddress_t region_pc = process_pc - dso._start;
 
-  if (!symbol_get_from_dwfl(mod, process_pc, symbol, elf_sym, lbias)) {
+  if (!symbol_get_from_dwfl(ddprof_mod._mod, process_pc, symbol, elf_sym,
+                            lbias)) {
     ++_stats._no_dwfl_symbols;
     // Override with info from dso
     // Avoid bouncing on these requests and insert an element
@@ -174,8 +175,8 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(
     symbol._srcpath = dso.format_filename();
   }
 
-  if (!compute_elf_range(region_pc, mod->low_addr, dso._pgoff, elf_sym, lbias,
-                         start_sym, end_sym)) {
+  if (!compute_elf_range(region_pc, ddprof_mod._low_addr, dso._pgoff, elf_sym,
+                         lbias, start_sym, end_sym)) {
     // elf section does not add up to something that makes sense
     // insert this PC without considering elf section
     start_sym = region_pc;
