@@ -17,9 +17,7 @@ struct DDProfMod {
 
   DDProfMod() : _mod(nullptr), _low_addr(0), _high_addr(0), _status(kUnknown) {}
 
-  explicit DDProfMod(Status inconsistent) : DDProfMod() {
-    _status = inconsistent;
-  }
+  explicit DDProfMod(Status status) : DDProfMod() { _status = status; }
 
   Dwfl_Module *_mod;
   ProcessAddress_t _low_addr;
