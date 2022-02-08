@@ -264,5 +264,3 @@ add_unit_test(
 )
 target_include_directories(dwfl_module-ut PRIVATE ${ELFUTILS_INCLUDE_LIST})
 add_compile_definitions("DWFL_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
-
-# set_target_properties(dwfl_module-ut PROPERTIES COMPILE_OPTIONS "-fpie" LINK_FLAGS "-pie")

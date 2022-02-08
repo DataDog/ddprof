@@ -67,13 +67,14 @@ DDRes DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
                                 const FileInfoValue &fileInfoValue) {
   bool &mod_added = _mod_added[fileInfoValue.get_id()];
   if (!mod_added) {
+    // first time we see this binary for this pid
     DDProfMod ddprof_mod = update_module(_dwfl, pc, dso, fileInfoValue);
     if (!ddprof_mod._mod) {
       LG_WRN("Unable to register mod %s - %d", dso.to_string().c_str(),
-             ddprof_mod._inconsistent);
-      // first time we see this binary for this pid, unfortunately, it
-      // overlaps with a previous binary we loaded. Flag this inconsistency
-      _inconsistent = ddprof_mod._inconsistent;
+             ddprof_mod._status);
+      // If it overlaps with a previous binary we loaded, flag this
+      // inconsistency
+      _inconsistent = ddprof_mod._status == DDProfMod::kInconsistent;
       return ddres_warn(DD_WHAT_UW_ERROR);
     }
     mod_added = true;

@@ -56,7 +56,7 @@ DDRes unwindstate__unwind(UnwindState *us) {
   add_virtual_base_frame(us);
   if (us->_dwfl_wrapper->_inconsistent) {
     // error detected on this pid
-    LG_WRN("Let us get rid of pid %d \n", us->pid);
+    LG_WRN("(Inconsistent DWFL/DSOs)%d - Free associated objects", us->pid);
     unwind_pid_free(us, us->pid);
   }
   return res;

@@ -58,7 +58,7 @@ DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
           LG_NTC("Incoherent DSO (%s) %lx != %lx dwfl_module (%s)",
                  filepath.c_str(), dso._start - dso._pgoff,
                  ddprof_mod._low_addr, main_name);
-          return DDProfMod(true);
+          return DDProfMod(DDProfMod::kInconsistent);
         }
       }
     }

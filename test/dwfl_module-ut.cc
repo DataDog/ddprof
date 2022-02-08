@@ -68,7 +68,7 @@ TEST(DwflModule, inconsistency_test) {
     DDProfMod ddprof_mod = update_module(dwfl_wrapper._dwfl, bad_dso._start,
                                          bad_dso, file_info_value);
     EXPECT_EQ(ddprof_mod._low_addr, 0);
-    EXPECT_EQ(ddprof_mod._inconsistent, true);
+    EXPECT_EQ(ddprof_mod._status, DDProfMod::kInconsistent);
   }
 }
 

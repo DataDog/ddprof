@@ -124,8 +124,7 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(
   DDProfMod ddprof_mod =
       update_module(dwfl_wrapper._dwfl, process_pc, dso, file_info);
   if (!ddprof_mod._mod) {
-    dwfl_wrapper._inconsistent = ddprof_mod._inconsistent;
-    LG_WRN("Unable to retrieve mod. %d ", ddprof_mod._inconsistent);
+    dwfl_wrapper._inconsistent = ddprof_mod._status == DDProfMod::kInconsistent;
   }
 
   RegionAddress_t region_pc = process_pc - dso._start;

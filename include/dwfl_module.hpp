@@ -10,17 +10,21 @@ extern "C" {
 namespace ddprof {
 
 struct DDProfMod {
-  DDProfMod()
-      : _mod(nullptr), _low_addr(0), _high_addr(0), _inconsistent(false) {}
+  enum Status {
+    kUnknown,
+    kInconsistent,
+  };
 
-  explicit DDProfMod(bool inconsistent) : DDProfMod() {
-    _inconsistent = inconsistent;
+  DDProfMod() : _mod(nullptr), _low_addr(0), _high_addr(0), _status(kUnknown) {}
+
+  explicit DDProfMod(Status inconsistent) : DDProfMod() {
+    _status = inconsistent;
   }
 
   Dwfl_Module *_mod;
   ProcessAddress_t _low_addr;
   ProcessAddress_t _high_addr;
-  bool _inconsistent;
+  Status _status;
 };
 
 // From a dso object (and the matching file), attach the module to the dwfl
