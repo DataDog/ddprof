@@ -44,6 +44,7 @@ function(add_unit_test name)
    add_dependencies(${name} deps)
    set_property(TARGET ${name} PROPERTY CXX_STANDARD 14)
 
+
    target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
    target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS})
 
@@ -193,7 +194,7 @@ add_unit_test(
     LIBRARIES DDProf::FFI
     DEFINITIONS MYNAME="ddprof_pprof-ut"
 )
-target_include_directories(ddprof_pprof-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
+target_include_directories(ddprof_pprof-ut PRIVATE ${ELFUTILS_INCLUDE_LIST} ${LIBDDPROF_INCLUDE_DIR})
 
 
 add_unit_test(
@@ -208,7 +209,7 @@ add_unit_test(
     LIBRARIES DDProf::FFI
     DEFINITIONS MYNAME="ddprof_exporter-ut"
 )
-target_include_directories(ddprof_exporter-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
+target_include_directories(ddprof_exporter-ut PRIVATE ${ELFUTILS_INCLUDE_LIST} ${LIBDDPROF_INCLUDE_DIR})
 
 add_unit_test(
     region_holder-ut
@@ -246,3 +247,22 @@ add_unit_test(
     DEFINITIONS MYNAME="dwfl_symbol-ut"
 )
 target_include_directories(dwfl_symbol-ut PRIVATE ${ELFUTILS_INCLUDE_LIST} ${LLVM_DEMANGLE_PATH}/include)
+
+add_unit_test(
+    dwfl_module-ut
+    dwfl_module-ut.cc
+    ../src/dwfl_hdr.cc
+    ../src/dwfl_module.cc
+    ../src/dso.cc 
+    ../src/dso_hdr.cc
+    ../src/ddprof_file_info.cc
+    ../src/procutils.c
+    ../src/signal_helper.c
+    ../src/region_holder.cc
+    LIBRARIES ${ELFUTILS_LIBRARIES}
+    DEFINITIONS MYNAME="dwfl_symbol-ut"
+)
+target_include_directories(dwfl_module-ut PRIVATE ${ELFUTILS_INCLUDE_LIST})
+add_compile_definitions("DWFL_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
+
+# set_target_properties(dwfl_module-ut PROPERTIES COMPILE_OPTIONS "-fpie" LINK_FLAGS "-pie")

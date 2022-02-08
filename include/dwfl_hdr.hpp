@@ -10,6 +10,7 @@ extern "C" {
 #include "dwfl_internals.h"
 #include <sys/types.h>
 }
+
 #include "ddres.h"
 
 #include "ddprof_file_info.hpp"
@@ -25,7 +26,8 @@ namespace ddprof {
 struct DwflWrapper {
   explicit DwflWrapper();
 
-  DwflWrapper(DwflWrapper &&other) : _dwfl(nullptr), _attached(false) {
+  DwflWrapper(DwflWrapper &&other)
+      : _dwfl(nullptr), _attached(false), _inconsistent(false) {
     swap(*this, other);
   }
 
@@ -52,6 +54,7 @@ struct DwflWrapper {
 
   Dwfl *_dwfl;
   bool _attached;
+  bool _inconsistent;
 
   // Keep track of the files we added to the dwfl object
   std::unordered_map<FileInfoId_t, bool> _mod_added;

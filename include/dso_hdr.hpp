@@ -147,7 +147,7 @@ public:
   // returns null if the file was not found
   const RegionHolder *find_or_insert_region(const Dso &dso);
 
-  // Unordered map of sorted
+  // Unordered map (by pid) of sorted DSOs
   DsoPidMap _map;
   DsoStats _stats;
 
