@@ -190,7 +190,7 @@ static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc) {
   // get or create the dwfl symbol
   output->locs[current_loc_idx]._symbol_idx =
       unwind_symbol_hdr._dwfl_symbol_lookup_v2.get_or_insert(
-          *(us->_dwfl_wrapper), unwind_symbol_hdr._symbol_table,
+          us->_dwfl_wrapper, unwind_symbol_hdr._symbol_table,
           unwind_symbol_hdr._dso_symbol_lookup, pc, dso, file_info_value);
 #ifdef DEBUG
   LG_NTC("Considering frame with IP : %lx / %s ", pc,

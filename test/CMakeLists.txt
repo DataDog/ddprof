@@ -194,7 +194,7 @@ add_unit_test(
     LIBRARIES DDProf::FFI
     DEFINITIONS MYNAME="ddprof_pprof-ut"
 )
-target_include_directories(ddprof_pprof-ut PRIVATE ${ELFUTILS_INCLUDE_LIST} ${LIBDDPROF_INCLUDE_DIR})
+target_include_directories(ddprof_pprof-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
 
 
 add_unit_test(
@@ -209,7 +209,7 @@ add_unit_test(
     LIBRARIES DDProf::FFI
     DEFINITIONS MYNAME="ddprof_exporter-ut"
 )
-target_include_directories(ddprof_exporter-ut PRIVATE ${ELFUTILS_INCLUDE_LIST} ${LIBDDPROF_INCLUDE_DIR})
+target_include_directories(ddprof_exporter-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
 
 add_unit_test(
     region_holder-ut

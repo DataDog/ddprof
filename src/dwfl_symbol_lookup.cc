@@ -14,6 +14,7 @@ extern "C" {
 #include <cassert>
 #include <string>
 
+#include "dwfl_hdr.hpp"
 #include "dwfl_module.hpp"
 #include "dwfl_symbol.hpp"
 #include "string_format.hpp"
@@ -47,7 +48,7 @@ unsigned DwflSymbolLookup_V2::size() const {
 
 // Retrieve existing symbol or attempt to read from dwarf
 SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
-    ddprof::DwflWrapper &dwfl_wrapper, SymbolTable &table,
+    DwflWrapper *dwfl_wrapper, SymbolTable &table,
     DsoSymbolLookup &dso_symbol_lookup, ProcessAddress_t process_pc,
     const Dso &dso, const FileInfoValue &file_info) {
   ++_stats._calls;
@@ -70,7 +71,7 @@ SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
     // symbols
     if (_lookup_setting == K_CACHE_VALIDATE) {
       DDProfMod ddprof_mod =
-          update_module(dwfl_wrapper._dwfl, process_pc, dso, file_info);
+          update_module(dwfl_wrapper->_dwfl, process_pc, dso, file_info);
       if (symbol_lookup_check(ddprof_mod._mod, process_pc,
                               table[find_res.first->second.get_symbol_idx()])) {
         ++_stats._errors;
@@ -111,20 +112,22 @@ DwflSymbolMapFindRes DwflSymbolLookup_V2::find_closest(DwflSymbolMap &map,
                                                std::move(is_within));
 }
 
-SymbolIdx_t DwflSymbolLookup_V2::insert(
-    ddprof::DwflWrapper &dwfl_wrapper, SymbolTable &table,
-    DsoSymbolLookup &dso_symbol_lookup, ProcessAddress_t process_pc,
-    const Dso &dso, const FileInfoValue &file_info, DwflSymbolMap &map,
-    DwflSymbolMapFindRes find_res) {
+SymbolIdx_t
+DwflSymbolLookup_V2::insert(DwflWrapper *dwfl_wrapper, SymbolTable &table,
+                            DsoSymbolLookup &dso_symbol_lookup,
+                            ProcessAddress_t process_pc, const Dso &dso,
+                            const FileInfoValue &file_info, DwflSymbolMap &map,
+                            DwflSymbolMapFindRes find_res) {
 
   Symbol symbol;
   GElf_Sym elf_sym;
   Offset_t lbias;
   // Looking up Mod here is a waist (pending refactoring)
   DDProfMod ddprof_mod =
-      update_module(dwfl_wrapper._dwfl, process_pc, dso, file_info);
+      update_module(dwfl_wrapper->_dwfl, process_pc, dso, file_info);
   if (!ddprof_mod._mod) {
-    dwfl_wrapper._inconsistent = ddprof_mod._status == DDProfMod::kInconsistent;
+    dwfl_wrapper->_inconsistent =
+        ddprof_mod._status == DDProfMod::kInconsistent;
   }
 
   RegionAddress_t region_pc = process_pc - dso._start;
