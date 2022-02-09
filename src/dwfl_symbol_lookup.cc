@@ -48,7 +48,7 @@ unsigned DwflSymbolLookup_V2::size() const {
 
 // Retrieve existing symbol or attempt to read from dwarf
 SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
-    DwflWrapper *dwfl_wrapper, SymbolTable &table,
+    DwflWrapper &dwfl_wrapper, SymbolTable &table,
     DsoSymbolLookup &dso_symbol_lookup, ProcessAddress_t process_pc,
     const Dso &dso, const FileInfoValue &file_info) {
   ++_stats._calls;
@@ -71,7 +71,7 @@ SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
     // symbols
     if (_lookup_setting == K_CACHE_VALIDATE) {
       DDProfMod ddprof_mod =
-          update_module(dwfl_wrapper->_dwfl, process_pc, dso, file_info);
+          update_module(dwfl_wrapper._dwfl, process_pc, dso, file_info);
       if (symbol_lookup_check(ddprof_mod._mod, process_pc,
                               table[find_res.first->second.get_symbol_idx()])) {
         ++_stats._errors;
@@ -113,7 +113,7 @@ DwflSymbolMapFindRes DwflSymbolLookup_V2::find_closest(DwflSymbolMap &map,
 }
 
 SymbolIdx_t
-DwflSymbolLookup_V2::insert(DwflWrapper *dwfl_wrapper, SymbolTable &table,
+DwflSymbolLookup_V2::insert(DwflWrapper &dwfl_wrapper, SymbolTable &table,
                             DsoSymbolLookup &dso_symbol_lookup,
                             ProcessAddress_t process_pc, const Dso &dso,
                             const FileInfoValue &file_info, DwflSymbolMap &map,
@@ -124,10 +124,9 @@ DwflSymbolLookup_V2::insert(DwflWrapper *dwfl_wrapper, SymbolTable &table,
   Offset_t lbias;
   // Looking up Mod here is a waist (pending refactoring)
   DDProfMod ddprof_mod =
-      update_module(dwfl_wrapper->_dwfl, process_pc, dso, file_info);
+      update_module(dwfl_wrapper._dwfl, process_pc, dso, file_info);
   if (!ddprof_mod._mod) {
-    dwfl_wrapper->_inconsistent =
-        ddprof_mod._status == DDProfMod::kInconsistent;
+    dwfl_wrapper._inconsistent = ddprof_mod._status == DDProfMod::kInconsistent;
   }
 
   RegionAddress_t region_pc = process_pc - dso._start;

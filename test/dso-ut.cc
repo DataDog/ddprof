@@ -39,7 +39,9 @@ Dso build_dso_vsyscall() { return Dso(0, 0, 0, 7, "[vsyscall]/some/syscall"); }
 
 Dso build_dso_file_10_2500() {
   std::string fileName = IPC_TEST_DATA "/dso_test_data.so";
-  return Dso(10, 2501, 2510, 0, std::move(fileName));
+  // not using the current pid would fail (as we need to access the file in the
+  // context of the process)
+  return Dso(getpid(), 2501, 2510, 0, std::move(fileName));
 }
 
 /*
@@ -198,9 +200,10 @@ TEST(DSOTest, file_dso) {
       dso_hdr.insert_erase_overlap(dso_hdr._map[10], build_dso_file_10_2500());
   ASSERT_TRUE(insert_res.second);
   const Dso &dso = insert_res.first->second;
+  // actual file access here
   const RegionHolder *region = dso_hdr.find_or_insert_region(dso);
-  EXPECT_TRUE(region);
-  EXPECT_TRUE(region->get_region());
+  ASSERT_TRUE(region);
+  ASSERT_TRUE(region->get_region());
 }
 
 // clang-format off
@@ -299,7 +302,13 @@ TEST(DSOTest, backpopulate) {
               std::string::npos);
   // check that we match the local binary
   FileInfo file_info = dso_hdr.find_file_info(find_res.first->second);
-  EXPECT_EQ(file_info._path, find_res.first->second._filename);
+  std::string filename_disk =
+      file_info._path.substr(file_info._path.find_last_of("/") + 1);
+
+  std::string filename_procfs = find_res.first->second._filename.substr(
+      find_res.first->second._filename.find_last_of("/") + 1);
+
+  EXPECT_EQ(filename_procfs, filename_disk);
   // manually erase the unit test's binary
   dso_hdr._map[getpid()].erase(find_res.first);
   find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);

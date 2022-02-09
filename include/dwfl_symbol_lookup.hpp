@@ -79,7 +79,7 @@ public:
   DwflSymbolLookup_V2();
 
   // Get symbol from internal cache or fetch through dwarf
-  SymbolIdx_t get_or_insert(DwflWrapper *dwfl_wrapper, SymbolTable &table,
+  SymbolIdx_t get_or_insert(DwflWrapper &dwfl_wrapper, SymbolTable &table,
                             DsoSymbolLookup &dso_symbol_lookup,
                             ProcessAddress_t process_pc, const Dso &dso,
                             const FileInfoValue &file_info);
@@ -99,7 +99,7 @@ private:
 
   SymbolLookupSetting _lookup_setting;
 
-  SymbolIdx_t insert(DwflWrapper *dwfl_wrapper, SymbolTable &table,
+  SymbolIdx_t insert(DwflWrapper &dwfl_wrapper, SymbolTable &table,
                      DsoSymbolLookup &dso_symbol_lookup,
                      ProcessAddress_t process_pc, const Dso &dso,
                      const FileInfoValue &file_info, DwflSymbolMap &map,
