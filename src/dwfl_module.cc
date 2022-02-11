@@ -45,44 +45,49 @@ DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
       // not using only addresses (as we get off by 1 page errors)
       const std::string &filepath = fileInfoValue.get_path();
       if (filepath.empty() || main_name == nullptr) {
-        ddprof_mod._mod = nullptr;
+        return DDProfMod();
       } else {
-        // Although the check is slightly fragile
-        // we are not comparing the full path as we use the proc maps
+        // This check is slightly fragile (checking file names)
+        // We are not comparing the full path as we use the proc maps
         // to access them. So the root path could change while
         // this would still be the same file.
         const char *dso_name = get_filename(filepath.c_str());
         const char *mod_name = get_filename(main_name);
         if (strcmp(mod_name, dso_name) != 0) {
-          // A dso replaced the mod - todo free this dwfl object
+          // A dso replaced the mod - flag as incoherent for future release
           LG_NTC("Incoherent DSO (%s) %lx != %lx dwfl_module (%s)",
                  filepath.c_str(), dso._start - dso._pgoff,
                  ddprof_mod._low_addr, main_name);
-          ddprof_mod._mod = nullptr;
+          return DDProfMod(DDProfMod::kInconsistent);
         }
       }
     }
+    return ddprof_mod;
   }
 
-  // Try again if either if we failed to hit the dwfl cache above
+  // Load the file at a matching DSO address
   if (!ddprof_mod._mod && dso._type == ddprof::dso::kStandard) {
-    // assumption is that this string is built only once
     const std::string &filepath = fileInfoValue.get_path();
     if (!filepath.empty()) {
       const char *dso_name = strrchr(filepath.c_str(), '/') + 1;
       dwfl_errno(); // erase previous error
       ddprof_mod._mod = dwfl_report_elf(dwfl, dso_name, filepath.c_str(), -1,
                                         dso._start - dso._pgoff, false);
-      LG_DBG("Loaded mod from file (%s), PID %d (%s)[offset:%lx], mod[%lx;%lx]",
-             filepath.c_str(), dso._pid, dwfl_errmsg(-1), dso._pgoff,
-             ddprof_mod._low_addr, ddprof_mod._high_addr);
     }
   }
+
   if (!ddprof_mod._mod) {
+    // Ideally we would differentiate pid errors from file errors.
+    // For perf reasons we will just flag the file as errored
     fileInfoValue._errored = true;
-    LG_WRN("couldn't addrmodule (%s)[0x%lx], DSO:%s (%s)", dwfl_errmsg(-1), pc,
+    LG_WRN("Couldn't addrmodule (%s)[0x%lx], DSO:%s (%s)", dwfl_errmsg(-1), pc,
            dso.to_string().c_str(), fileInfoValue.get_path().c_str());
-    return ddprof_mod;
+  } else {
+    dwfl_module_info(ddprof_mod._mod, 0, &ddprof_mod._low_addr,
+                     &ddprof_mod._high_addr, 0, 0, 0, 0);
+    LG_DBG("Loaded mod from file (%s), PID %d (%s)[offset:%lx], mod[%lx;%lx]",
+           fileInfoValue.get_path().c_str(), dso._pid, dwfl_errmsg(-1),
+           dso._pgoff, ddprof_mod._low_addr, ddprof_mod._high_addr);
   }
 
   return ddprof_mod;

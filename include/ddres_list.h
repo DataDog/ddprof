@@ -27,6 +27,7 @@ extern "C" {
   X(DWFL_LIB_ERROR, "error withing dwfl library")                              \
   X(UW_CACHE_ERROR, "error from unwinding cache")                              \
   X(UW_ERROR, "error from unwinding code")                                     \
+  X(UW_MAX_DEPTH, "max depth reached in unwinding")                            \
   X(CAPLIB, "error when reading capabilities")                                 \
   X(USERID, "error in user ID manipulations")                                  \
   X(PEINIT, "error allocating space for pevent")                               \
