@@ -60,6 +60,7 @@ TEST(PerfRingbufferTest, SampleSymmetryx86) {
   // Setup the reference sample
   uint64_t mask = DEFAULT_SAMPLE_TYPE | PERF_SAMPLE_IDENTIFIER |
       PERF_SAMPLE_IP | PERF_SAMPLE_ADDR;
+  SampleOptions opt = {mask, PERF_REGS_MASK_X86, {0}, PERF_REGS_COUNT};
   char default_stack[4096] = {0};
   for (uint64_t i = 0; i < sizeof(default_stack) / sizeof(*default_stack); i++)
     default_stack[i] = i & 255;
@@ -85,11 +86,11 @@ TEST(PerfRingbufferTest, SampleSymmetryx86) {
   // Convert the sample to a header
   char hdr_placeholder[2 * 4096] = {0}; // too big, but that's OK for now
   struct perf_event_header *hdr = (struct perf_event_header *)hdr_placeholder;
-  ASSERT_TRUE(samp2hdr(hdr, &sample, sizeof(hdr_placeholder), mask));
+  ASSERT_TRUE(samp2hdr(hdr, &sample, sizeof(hdr_placeholder), &opt));
 
   // Convert the header back into a sample
   struct perf_event_sample *sample_new;
-  sample_new = hdr2samp(hdr, mask);
+  sample_new = hdr2samp(hdr, &opt);
 
   // Compare
   ASSERT_TRUE(sample_eq(&sample, sample_new));

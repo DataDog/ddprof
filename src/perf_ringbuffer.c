@@ -25,7 +25,7 @@ bool rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size) {
   // Allocate room for a watcher-held buffer.  This is for linearizing
   // ringbuffer elements and depends on the per-watcher configuration for
   // perf_event_open().  Eventually this size will be non-static.
-  uint64_t buf_sz = PERF_REGS_COUNT + PERF_SAMPLE_STACK_SIZE;
+  uint64_t buf_sz = PERF_REGS_MAX + PERF_SAMPLE_STACK_SIZE;
   buf_sz += sizeof(perf_event_sample);
   unsigned char *wrbuf = malloc(buf_sz);
   if (!wrbuf)
@@ -79,10 +79,11 @@ typedef union flipper {
   if ((sz += 8) >= sz_hdr)                                                     \
   return false
 bool samp2hdr(struct perf_event_header *hdr, perf_event_sample *sample,
-              size_t sz_hdr, uint64_t mask) {
+              size_t sz_hdr, SampleOptions *opt) {
   // There is absolutely no point for this interface except testing
 
   // Presumes that the user has allocated enough room for the whole sample
+  uint64_t mask = opt->options_mask;
   if (!hdr || !sz_hdr || sz_hdr < sizeof(struct perf_event_header))
     return NULL;
   memset(hdr, 0, sz_hdr);
@@ -161,11 +162,11 @@ bool samp2hdr(struct perf_event_header *hdr, perf_event_sample *sample,
     SZ_CHECK;
 
     // Copy the values
-    sz += 8 * PERF_REGS_COUNT; // TODO pass this in the watcher
+    sz += 8 * opt->regnum;
     if (sz >= sz_hdr)
       return false;
-    memcpy(buf, sample->regs, PERF_REGS_COUNT);
-    buf += PERF_REGS_COUNT;
+    memcpy(buf, sample->regs, opt->regnum);
+    buf += opt->regnum;
   }
   if (PERF_SAMPLE_STACK_USER & mask) {
     *buf++ = sample->size_stack;
@@ -190,7 +191,8 @@ bool samp2hdr(struct perf_event_header *hdr, perf_event_sample *sample,
   return true;
 }
 
-perf_event_sample *hdr2samp(struct perf_event_header *hdr, uint64_t mask) {
+perf_event_sample *hdr2samp(struct perf_event_header *hdr, SampleOptions *opt) {
+  uint64_t mask = opt->options_mask;
   static perf_event_sample sample = {0};
   memset(&sample, 0, sizeof(sample));
 
@@ -242,7 +244,7 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr, uint64_t mask) {
   if (PERF_SAMPLE_REGS_USER & mask) {
     sample.abi = *buf++;
     sample.regs = buf;
-    buf += PERF_REGS_COUNT;
+    buf += opt->regnum;
   }
   if (PERF_SAMPLE_STACK_USER & mask) {
     uint64_t size_stack = *buf++;

@@ -82,6 +82,13 @@ int perfopen(pid_t pid, const PerfOption *opt, int cpu, bool extras) {
     attr.comm = 1;
   }
 
+  // Specifically for the uprobe event, we allow the user to define one
+  // additional register to be captured and used as the sampling width.
+  if (opt->target_reg) {
+    attr.sample_regs_user |= opt->target_reg;
+  }
+  ((PerfOption *)opt)->regmask = attr.sample_regs_user;
+
   int fd = perf_event_open(&attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC);
   if (-1 == fd && EACCES == errno) {
     return -1;

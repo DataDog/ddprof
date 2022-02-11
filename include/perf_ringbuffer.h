@@ -18,13 +18,20 @@ typedef struct RingBuffer {
   unsigned char *wrbuf;
 } RingBuffer;
 
+typedef struct SampleOptions {
+  uint64_t options_mask;
+  uint64_t regmask;
+  uint8_t regs_idx[PERF_REGS_MAX];
+  uint8_t regnum;
+} SampleOptions;
+
 bool rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size);
 void rb_free(RingBuffer *rb);
 void rb_clear(RingBuffer *rb); // does not deallocate the buffer storage
 uint64_t rb_next(RingBuffer *rb);
 struct perf_event_header *rb_seek(RingBuffer *rb, uint64_t offset);
 bool samp2hdr(struct perf_event_header *hdr, perf_event_sample *sample,
-              size_t sz_hdr, uint64_t mask);
-perf_event_sample *hdr2samp(struct perf_event_header *hdr, uint64_t mask);
+              size_t sz_hdr, SampleOptions *options);
+perf_event_sample *hdr2samp(struct perf_event_header *hdr, SampleOptions *options);
 
 uint64_t hdr_time(struct perf_event_header *hdr, uint64_t mask);

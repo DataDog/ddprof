@@ -196,7 +196,7 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
     return ddres_init();
   }
 
-  char opt_short[] = "+" OPT_TABLE(X_OSTR) "e:hv";
+  char opt_short[] = "+" OPT_TABLE(X_OSTR) "e:t:hv";
   optind = 1; // reset argument parsing (in case we are called several times)
 
   while (-1 != (c = getopt_long(argc, argv, opt_short, lopts, &oi))) {
@@ -218,6 +218,12 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
         LG_WRN("Ignoring invalid event (%s)", optarg);
       }
       break;
+    case 't':;
+      if (process_tracepoint(optarg, &idx, &sampling_value)) {
+      } else {
+        LG_WRN("Ignoring invalid tracepoint (%s)", optarg);
+      }
+
     case 'h':;
       ddprof_print_help();
       *continue_exec = false;

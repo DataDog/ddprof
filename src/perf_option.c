@@ -30,6 +30,7 @@ static const PerfOption perfoptions[] = {
   {"Block-Issue",     PERF_TYPE_TRACEPOINT, {1132},                                {1},    "block-issue",    "events", .include_kernel = true},
   {"Block-Complete",  PERF_TYPE_TRACEPOINT, {1134},                                {1},    "block-complete", "events", .include_kernel = true},
   {"Malloc",          PERF_TYPE_BREAKPOINT, {0},                                   {1},    "malloc",         "events", .bp_type = HW_BREAKPOINT_X},
+  {"uprobe1",         PERF_TYPE_TRACEPOINT, {1590},                                {1},    "cpu-time",       "nanoseconds"}
 };
 // clang-format on
 
@@ -38,7 +39,7 @@ static const PerfOption perfoptions[] = {
 static const char *perfoptions_lookup_table[] = {
     "hCPU",   "hREF",  "hINSTR", "hCREF", "hCMISS", "hBRANCH",
     "hBMISS", "hBUS",  "hBSTF",  "hBSTB", "sCPU",   "sWALL",
-    "sCI",    "kBLKI", "kBLKS",  "kBLKC", "bMalloc"};
+    "sCI",    "kBLKI", "kBLKS",  "kBLKC", "bMalloc", "kMEM"};
 
 #define perfoptions_sz (sizeof(perfoptions) / sizeof(*perfoptions))
 #define perfoptions_lookup_sz                                                  \

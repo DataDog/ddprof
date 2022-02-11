@@ -4,10 +4,18 @@
 // Datadog, Inc.
 
 #include "ddprof_cmdline.h"
+#include "logger.h"
 
 #include <assert.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
 
 int arg_which(const char *str, char const *const *set, int sz_set) {
   if (!str || !set)
@@ -34,6 +42,119 @@ bool arg_yesno(const char *str, int mode) {
     return true;
   }
   return false;
+}
+
+uint8_t lookup_register(char *perc) {
+  uint8_t reg = 0;
+  if (perc) {
+    perc++;
+    char *perc_copy = perc;
+    long reg_buf = strtol(perc, &perc_copy, 10);
+    if (!*perc_copy) {
+      reg = reg_buf;
+    } else {
+      reg = 0;
+      LG_NTC("Could not parse register %s", perc);
+    }
+  }
+  return reg;
+}
+
+typedef enum ptret_t {
+  PTRET_OK,
+  PTRET_BADFORMAT,
+  PTRET_BADPERMS,
+  PTRET_NOEXIST,
+} ptret_t;
+int process_tracepoint(const char *str, uint64_t *ret_freq, uint8_t *ret_reg) {
+  // minimum form; provides counts, samples every hit
+  // -t groupname:tracename
+  // Register-qualified form
+  // -t groupname:tracename%REG
+  // Sample-qualified form, sets a frequency value
+  // -t groupname:tracename@freq
+  // full
+  // -t groupename:tracename%REG@freq
+  // groupname, tracename, REG - strings
+  // REG - can be a number 1-6
+  // freq is a number
+  size_t sz_str = strlen(str);
+  char *groupname;
+  char *tracename;
+  uint8_t reg;
+  uint64_t freq;
+
+  // Check format
+  if (!sz_str)
+    return PTRET_BADFORMAT;
+  char *colon = strchr(str, ':');
+  char *perc = strchr(str, '%');
+  char *amp = strchr(str, '@');
+
+  if (!colon)
+    return PTRET_BADFORMAT;
+
+  // Split strings
+  if (colon)
+    *colon = '\0';
+  if (perc)
+    *perc = '\0';
+  if (amp)
+    *amp = '\0';
+
+  // Input checking
+  groupname = strdup(str);
+  tracename = strdup(colon+1);
+  if (perc)
+    reg = lookup_register(perc+1);
+  else
+    reg = UINT8_MAX; // guardian value
+  if (amp) {
+    char *str_check = (char *)str;
+    uint64_t buf = strtoll(amp+1, &str_check, 10);
+    if (!*str_check)
+      freq = buf;
+  } else {
+    freq = 1;
+  }
+
+#warning fix arbitrary size
+  char path[2048] = {0};
+  char buf[64] = {0};
+  char *buf_copy = buf;
+  snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/id", groupname, tracename);
+  int fd = open(path, O_RDONLY);
+  if (-1 == fd) {
+    if (errno == ENOENT)
+      return PTRET_NOEXIST;
+    return PTRET_BADPERMS;
+  }
+#warning handle eintr
+  if ( 1 <= read(fd, buf, sizeof(buf))) {
+    close(fd);
+    long trace_id = strtol(buf, &buf_copy, 10);
+    if (*buf_copy) {
+      return PTRET_BADFORMAT;
+    }
+  } else {
+    close(fd);
+#warning better message plox
+    LG_NTC("Read failed?");
+  }
+
+  // Check enablement, just to print a log.  We still enable instrumentation.
+  snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/enable", groupname, tracename);
+  fd = open(path, O_RDONLY);
+  if (-1 == fd || 1 != read(fd, buf, 1) || '0' == *buf) {
+    LG_NTC("Tracepint %s:%s is not enabled.  Instrumentation will proceed, but you may not have any events.", groupname, tracename);
+  } else {
+    LG_NFO("Tracepoint %s:%s successfully enabled", groupname, tracename);
+  }
+
+  // OK done
+  *ret_freq = freq;
+  *ret_reg = reg;
+  return PTRET_OK;
 }
 
 bool process_event(const char *str, const char **lookup, size_t sz_lookup,

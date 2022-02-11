@@ -154,12 +154,28 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
 
   // copy the sample context into the unwind structure
-  unwind_init_sample(us, sample->regs, sample->pid, sample->size_stack,
+  // For this part, we have to figure out which registers to send along
+#warning this is a good start, but we still need to fully register the uprobe
+  uint64_t sample_regs[PERF_REGS_COUNT] = {0};
+  int j0 = 0, j1 = 0, target_reg = 0;
+  for (unsigned long i = 0; i < 32; i++ ) {
+    if ( (1ul << i) & PERF_REGS_MASK)
+      sample_regs[j0++] = sample->regs[j1];
+    if ( i == ctx->watchers[pos].target_reg)
+      target_reg = i;
+    if ( (1ul << i) & ctx->watchers[pos].regmask)
+      j1++;
+  }
+  unwind_init_sample(us, sample_regs, sample->pid, sample->size_stack,
                      sample->data_stack);
 
   // If this is a SW_TASK_CLOCK-type event, then aggregate the time
   if (ctx->watchers[pos].config == PERF_COUNT_SW_TASK_CLOCK)
     ddprof_stats_add(STATS_CPU_TIME, sample->period, NULL);
+  else if (ctx->watchers[pos].config == PERF_TYPE_TRACEPOINT &&
+           ctx->watchers[pos].target_reg) {
+    uint64_t sample_val = sample->regs[target_reg];
+  }
   unsigned long this_ticks_unwind = __rdtsc();
   DDRes res = unwindstate__unwind(us);
 
@@ -486,6 +502,9 @@ struct perf_event_hdr_wpid : perf_event_header {
 DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
                     volatile bool *continue_profiling, DDProfContext *ctx) {
   // global try catch to avoid leaking exceptions to main loop
+  SampleOptions opt = {DEFAULT_SAMPLE_TYPE, ctx->watchers[pos].regmask, {0}};
+  opt.regnum = (uint8_t)__builtin_popcountll(ctx->watchers[pos].regmask);
+
   try {
     ddprof_stats_add(STATS_EVENT_COUNT, 1, NULL);
     struct perf_event_hdr_wpid *wpid = static_cast<perf_event_hdr_wpid *>(hdr);
@@ -493,7 +512,7 @@ DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
     /* Cases where the target type has a PID */
     case PERF_RECORD_SAMPLE:
       if (wpid->pid) {
-        perf_event_sample *sample = hdr2samp(hdr, DEFAULT_SAMPLE_TYPE);
+        perf_event_sample *sample = hdr2samp(hdr, &opt);
         DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, pos));
       }
       break;
