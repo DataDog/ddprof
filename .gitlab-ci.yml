@@ -10,3 +10,9 @@ trigger_internal_build:
     project: DataDog/ddprof-build
     strategy: depend
     branch: $DOWNSTREAM_BRANCH
+
+run-codeql-scan:
+  variables:
+    CODEQL_BUNDLE_URL: https://github.com/github/codeql-action/releases/download/codeql-bundle-20210622/codeql-bundle-linux64.tar.gz
+  script:
+    - curl -L $CODEQL_BUNDLE_URL > /tmp/codeql.tar.gz && tar -zxf /tmp/codeql.tar.gz -C /usr/local && rm /tmp/codeql.tar.gz
