@@ -19,7 +19,8 @@ extern "C" {
 
 namespace ddprof {
 
-DwflWrapper::DwflWrapper() : _dwfl(nullptr), _attached(false) {
+DwflWrapper::DwflWrapper()
+    : _dwfl(nullptr), _attached(false), _inconsistent(false) {
   // for split debug, we can fill the debuginfo_path
   static const Dwfl_Callbacks proc_callbacks = {
       .find_elf = dwfl_linux_proc_find_elf,
@@ -66,9 +67,14 @@ DDRes DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
                                 const FileInfoValue &fileInfoValue) {
   bool &mod_added = _mod_added[fileInfoValue.get_id()];
   if (!mod_added) {
+    // first time we see this binary for this pid
     DDProfMod ddprof_mod = update_module(_dwfl, pc, dso, fileInfoValue);
     if (!ddprof_mod._mod) {
-      LG_DBG("Unable to register mod %s", dso.to_string().c_str());
+      LG_WRN("Unable to register mod %s - %d", dso.to_string().c_str(),
+             ddprof_mod._status);
+      // If it overlaps with a previous binary we loaded, flag this
+      // inconsistency
+      _inconsistent = ddprof_mod._status == DDProfMod::kInconsistent;
       return ddres_warn(DD_WHAT_UW_ERROR);
     }
     mod_added = true;

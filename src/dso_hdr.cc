@@ -510,20 +510,15 @@ Dso DsoHdr::dso_from_procline(int pid, char *line) {
 }
 
 FileInfo DsoHdr::find_file_info(const Dso &dso) {
-  // check if file exists locally
   int64_t size;
   inode_t inode;
-  bool file_found = get_file_inode(dso._filename.c_str(), &inode, &size);
-
-  if (file_found) {
-    return FileInfo(dso._filename, size, inode);
-  }
-  // whole host :
+  // to ensure we always retrieve the file in the context of our process, we go
+  // through proc maps
   // Example : /proc/<pid>/root/usr/local/bin/exe_file
   //   or      /host/proc/<pid>/root/usr/local/bin/exe_file
   std::string proc_path = _path_to_proc + "/proc/" + std::to_string(dso._pid) +
       "/root" + dso._filename;
-  file_found = get_file_inode(proc_path.c_str(), &inode, &size);
+  bool file_found = get_file_inode(proc_path.c_str(), &inode, &size);
   if (file_found) {
     return FileInfo(proc_path, size, inode);
   }

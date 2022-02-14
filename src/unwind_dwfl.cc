@@ -88,14 +88,14 @@ static void trace_unwinding_end(UnwindState *us) {
   }
 }
 
-static void add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc);
+static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc);
 
 // returns true if we should continue unwinding
-static bool add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
+static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
 
   if (max_stack_depth_reached(us)) {
     LG_DBG("Max number of stacks reached (depth#%lu)", us->output.nb_locs);
-    return false;
+    return ddres_warn(DD_WHAT_UW_MAX_DEPTH);
   }
 
   Dwarf_Addr pc = 0;
@@ -105,7 +105,7 @@ static bool add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     LG_DBG("Failure to compute frame PC: %s (depth#%lu)", dwfl_errmsg(-1),
            us->output.nb_locs);
     add_error_frame(nullptr, us, pc, SymbolErrors::dwfl_frame);
-    return true; // invalid pc : do not add frame
+    return ddres_init(); // invalid pc : do not add frame
   }
 
   if (!isactivation)
@@ -120,12 +120,14 @@ static bool add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     LG_DBG("[UW]%d: DSO not found at 0x%lx (depth#%lu)", us->pid, pc,
            us->output.nb_locs);
     add_error_frame(nullptr, us, pc, SymbolErrors::unknown_dso);
-    return true;
+    return ddres_init();
   }
 
   // Now we register
-  add_dwfl_frame(us, find_res.first->second, pc);
-  return true;
+  if (IsDDResNotOK(add_dwfl_frame(us, find_res.first->second, pc))) {
+    return ddres_warn(DD_WHAT_UW_ERROR);
+  }
+  return ddres_init();
 }
 
 // frame_cb callback at every frame for the dwarf unwinding
@@ -138,7 +140,7 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
   // Before we potentially exit, record the fact that we're processing a frame
   ddprof_stats_add(STATS_UNWIND_FRAMES, 1, NULL);
 
-  if (!add_symbol(dwfl_frame, us)) {
+  if (IsDDResNotOK(add_symbol(dwfl_frame, us))) {
     return DWARF_CB_ABORT;
   }
 
@@ -162,7 +164,7 @@ DDRes unwind_dwfl(UnwindState *us) {
   return res;
 }
 
-void add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc) {
+static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc) {
 
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
   // if not encountered previously, update file location / key
@@ -170,14 +172,17 @@ void add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc) {
   if (file_info_id <= k_file_info_error) {
     // unable to acces file: add as much info from dso
     add_dso_frame(us, dso, pc);
-    return;
+    // We could stop here or attempt to continue in the dwarf unwinding
+    return ddres_init();
   }
 
   const FileInfoValue &file_info_value =
       us->dso_hdr.get_file_info_value(file_info_id);
 
-  // ensure unwinding backend has access to this module
-  us->_dwfl_wrapper->register_mod(pc, dso, file_info_value);
+  // ensure unwinding backend has access to this module (and check consistency)
+  if (IsDDResNotOK(us->_dwfl_wrapper->register_mod(pc, dso, file_info_value))) {
+    return ddres_warn(DD_WHAT_UW_ERROR);
+  }
 
   UnwindOutput *output = &us->output;
   int64_t current_loc_idx = output->nb_locs;
@@ -185,7 +190,7 @@ void add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc) {
   // get or create the dwfl symbol
   output->locs[current_loc_idx]._symbol_idx =
       unwind_symbol_hdr._dwfl_symbol_lookup_v2.get_or_insert(
-          us->_dwfl_wrapper->_dwfl, unwind_symbol_hdr._symbol_table,
+          *(us->_dwfl_wrapper), unwind_symbol_hdr._symbol_table,
           unwind_symbol_hdr._dso_symbol_lookup, pc, dso, file_info_value);
 #ifdef DEBUG
   LG_NTC("Considering frame with IP : %lx / %s ", pc,
@@ -199,6 +204,8 @@ void add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc) {
       us->symbol_hdr._mapinfo_lookup.get_or_insert(
           us->pid, us->symbol_hdr._mapinfo_table, dso);
   output->nb_locs++;
+
+  return ddres_init();
 }
 
 } // namespace ddprof
