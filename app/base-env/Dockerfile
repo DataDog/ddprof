@@ -34,6 +34,7 @@ RUN apt update \
   libjemalloc-dev \
   libcap-dev \
   netcat-openbsd \
+  unzip \
   wget
 
 # Only necessary for ubuntu 16
@@ -70,6 +71,14 @@ RUN CMAKE_VERSION="3.20.1" \
   && (printf "${CMAKE_SHA256}  cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz" | sha256sum --check --strict --status) \
   && tar --no-same-owner -C /usr/local --strip-components=1 -xf cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz \
   && rm cmake-${CMAKE_VERSION}-Linux-x86_64.tar.gz
+
+# Ninja build 1.10.2
+RUN NINJA_VERSION="1.10.2" \
+  && NINJA_SHA256="763464859c7ef2ea3a0a10f4df40d2025d3bb9438fcb1228404640410c0ec22d" \
+  && wget https://github.com/ninja-build/ninja/releases/download/v${NINJA_VERSION}/ninja-linux.zip \
+  && (printf "${NINJA_SHA256}  ninja-linux.zip" | sha256sum --check --strict --status) \
+  && unzip -d /usr/local/bin ninja-linux.zip \
+  && rm ninja-linux.zip
 
 # google test / google mock
 RUN git clone --depth 1 --branch release-1.11.0 https://github.com/google/googletest.git \
