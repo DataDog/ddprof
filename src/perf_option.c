@@ -11,7 +11,7 @@
 #include <stddef.h>
 
 // clang-format off
-static const PerfOption perfoptions[] = {
+PerfOption perfoptions[] = {
   // Hardware
   {"CPU Cycles",      PERF_TYPE_HARDWARE, {PERF_COUNT_HW_CPU_CYCLES},              {99},   "cpu-cycle",      "cycles", .freq = true},
   {"Ref. CPU Cycles", PERF_TYPE_HARDWARE, {PERF_COUNT_HW_REF_CPU_CYCLES},          {1000}, "ref-cycle",      "cycles", .freq = true},
@@ -30,7 +30,7 @@ static const PerfOption perfoptions[] = {
   {"Block-Issue",     PERF_TYPE_TRACEPOINT, {1132},                                {1},    "block-issue",    "events", .include_kernel = true},
   {"Block-Complete",  PERF_TYPE_TRACEPOINT, {1134},                                {1},    "block-complete", "events", .include_kernel = true},
   {"Malloc",          PERF_TYPE_BREAKPOINT, {0},                                   {1},    "malloc",         "events", .bp_type = HW_BREAKPOINT_X},
-  {"uprobe1",         PERF_TYPE_TRACEPOINT, {1590},                                {1},    "cpu-time",       "nanoseconds"}
+  {"Tracepoint",      PERF_TYPE_TRACEPOINT, {0},                                   {1},    "cpu-time",       "nanoseconds"}
 };
 // clang-format on
 
@@ -51,6 +51,8 @@ const PerfOption *perfoptions_preset(int idx) {
   }
   return &perfoptions[idx];
 }
+
+int perfoptions_get_tracepoint_idx() { return perfoptions_sz - 1;}
 
 int perfoptions_nb_presets(void) { return perfoptions_sz; }
 

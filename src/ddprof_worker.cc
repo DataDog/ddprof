@@ -153,28 +153,26 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   struct UnwindState *us = ctx->worker_ctx.us;
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
 
-  // copy the sample context into the unwind structure
-  // For this part, we have to figure out which registers to send along
-#warning this is a good start, but we still need to fully register the uprobe
-  uint64_t sample_regs[PERF_REGS_COUNT] = {0};
-  int j0 = 0, j1 = 0, target_reg = 0;
-  for (unsigned long i = 0; i < 32; i++ ) {
-    if ( (1ul << i) & PERF_REGS_MASK)
-      sample_regs[j0++] = sample->regs[j1];
-    if ( i == ctx->watchers[pos].target_reg)
-      target_reg = i;
-    if ( (1ul << i) & ctx->watchers[pos].regmask)
-      j1++;
+  // Set the registers which will be passed along into the unwinder
+  uint64_t sample_regs[PERF_REGS_MAX] = {0};
+  for (unsigned int i = 0, j = 0; i < 32; i++) {
+    if ((1ul << i) & PERF_REGS_MASK) {
+      sample_regs[j] = sample->regs[ctx->watchers[pos].regs_idx[j]];
+      ++j;
+    }
   }
   unwind_init_sample(us, sample_regs, sample->pid, sample->size_stack,
                      sample->data_stack);
 
   // If this is a SW_TASK_CLOCK-type event, then aggregate the time
+  uint64_t sample_val = sample->period; // Default aggregation
   if (ctx->watchers[pos].config == PERF_COUNT_SW_TASK_CLOCK)
     ddprof_stats_add(STATS_CPU_TIME, sample->period, NULL);
   else if (ctx->watchers[pos].config == PERF_TYPE_TRACEPOINT &&
            ctx->watchers[pos].target_reg) {
-    uint64_t sample_val = sample->regs[target_reg];
+    // If this is a tracepoint, override the aggregation with whatever the
+    // user specified
+    sample_val = sample->regs[ctx->watchers[pos].target_reg];
   }
   unsigned long this_ticks_unwind = __rdtsc();
   DDRes res = unwindstate__unwind(us);
@@ -186,7 +184,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
     DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr,
-                                    sample->period, pos, pprof));
+                                    sample_val, pos, pprof));
 #else
     // Call the user's stack handler
     if (ctx->stack_handler) {

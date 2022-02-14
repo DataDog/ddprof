@@ -44,29 +44,27 @@ bool arg_yesno(const char *str, int mode) {
   return false;
 }
 
-uint8_t lookup_register(char *perc) {
+
+#ifdef __aarch64__
+#  warning tracepoints are broken on ARM
+#endif
+int arg2reg[] = {0, 5, 4, 3, 2, 16, 17};
+uint8_t get_register(char *str) {
   uint8_t reg = 0;
-  if (perc) {
-    perc++;
-    char *perc_copy = perc;
-    long reg_buf = strtol(perc, &perc_copy, 10);
-    if (!*perc_copy) {
-      reg = reg_buf;
-    } else {
-      reg = 0;
-      LG_NTC("Could not parse register %s", perc);
-    }
+  char *str_copy = str;
+  long reg_buf = strtol(str, &str_copy, 10);
+  if (!*str_copy) {
+    reg = reg_buf;
+  } else {
+    reg = 0;
+    LG_NTC("Could not parse register %s", str);
   }
-  return reg;
+
+  // If we're here, then we have a register.
+  return arg2reg[reg];
 }
 
-typedef enum ptret_t {
-  PTRET_OK,
-  PTRET_BADFORMAT,
-  PTRET_BADPERMS,
-  PTRET_NOEXIST,
-} ptret_t;
-int process_tracepoint(const char *str, uint64_t *ret_freq, uint8_t *ret_reg) {
+int process_tracepoint(const char *str, uint64_t *ret_freq, uint8_t *ret_reg, uint64_t *ret_config) {
   // minimum form; provides counts, samples every hit
   // -t groupname:tracename
   // Register-qualified form
@@ -106,7 +104,7 @@ int process_tracepoint(const char *str, uint64_t *ret_freq, uint8_t *ret_reg) {
   groupname = strdup(str);
   tracename = strdup(colon+1);
   if (perc)
-    reg = lookup_register(perc+1);
+    reg = get_register(perc+1);
   else
     reg = UINT8_MAX; // guardian value
   if (amp) {
@@ -118,34 +116,34 @@ int process_tracepoint(const char *str, uint64_t *ret_freq, uint8_t *ret_reg) {
     freq = 1;
   }
 
-#warning fix arbitrary size
-  char path[2048] = {0};
+  char path[2048] = {0};  // somewhat arbitrarily
   char buf[64] = {0};
   char *buf_copy = buf;
-  snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/id", groupname, tracename);
+  int pathsz = snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/id", groupname, tracename);
+  if (pathsz >= sizeof(path)) {
+    // Possibly ran out of room
+    return PTRET_BADFORMAT;
+  }
   int fd = open(path, O_RDONLY);
-  if (-1 == fd) {
-    if (errno == ENOENT)
-      return PTRET_NOEXIST;
-    return PTRET_BADPERMS;
-  }
-#warning handle eintr
-  if ( 1 <= read(fd, buf, sizeof(buf))) {
-    close(fd);
-    long trace_id = strtol(buf, &buf_copy, 10);
-    if (*buf_copy) {
-      return PTRET_BADFORMAT;
-    }
-  } else {
-    close(fd);
-#warning better message plox
-    LG_NTC("Read failed?");
-  }
+  if (-1 == fd)
+    return errno == ENOENT ? PTRET_NOEXIST : PTRET_BADPERMS;
+
+  // Read the data in an eintr-safe way
+  int read_ret = -1;
+  long trace_id = 0;
+  do {
+    read_ret = read(fd, buf, sizeof(buf));
+  } while (read_ret == -1 && errno == EINTR);
+  close(fd);
+  if ( read_ret > 0 )
+    trace_id = strtol(buf, &buf_copy, 10);
+  if (*buf_copy && *buf_copy != '\n')
+    return PTRET_BADFORMAT;
 
   // Check enablement, just to print a log.  We still enable instrumentation.
   snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/enable", groupname, tracename);
   fd = open(path, O_RDONLY);
-  if (-1 == fd || 1 != read(fd, buf, 1) || '0' == *buf) {
+  if (-1 == fd || 1 != read(fd, buf, 1) || '0' != *buf) {
     LG_NTC("Tracepint %s:%s is not enabled.  Instrumentation will proceed, but you may not have any events.", groupname, tracename);
   } else {
     LG_NFO("Tracepoint %s:%s successfully enabled", groupname, tracename);
@@ -154,6 +152,7 @@ int process_tracepoint(const char *str, uint64_t *ret_freq, uint8_t *ret_reg) {
   // OK done
   *ret_freq = freq;
   *ret_reg = reg;
+  *ret_config = trace_id;
   return PTRET_OK;
 }
 

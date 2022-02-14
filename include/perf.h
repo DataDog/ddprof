@@ -23,22 +23,6 @@
   (PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_TID |          \
    PERF_SAMPLE_TIME | PERF_SAMPLE_PERIOD)
 
-// TODO, this comes from BP, SP, and IP
-// see arch/x86/include/uapi/asm/perf_regs.h in the linux sources
-// We're going to hardcode everything for now...
-#define PERF_REGS_MASK_X86 ((1 << 6) | (1 << 7) | (1 << 8))
-
-// 31 and 32 are the stack and PC, respectively.  29 is r29, see
-// https://github.com/ARM-software/abi-aa where it is usd conventionally as the
-// frame pointer register
-// Note that the order of these has to be changed in the unwinding code!
-#define PERF_REGS_MASK_ARM ((1 << 31) | (1 << 32) | (1 << 29))
-
-// This is a human-hardcoded number given the mask above; update it if the mask
-// gets more bits
-#define PERF_REGS_COUNT 3
-#define PERF_REGS_MASK PERF_REGS_MASK_X86
-
 typedef struct read_format {
   uint64_t value;        // The value of the event
   uint64_t time_enabled; // if PERF_FORMAT_TOTAL_TIME_ENABLED
@@ -140,3 +124,4 @@ void *perfown(int fd, size_t *size);
 int perfdisown(void *region, size_t size);
 long get_page_size(void);
 size_t get_mask_from_size(size_t size);
+int get_array_from_mask(uint64_t mask, uint8_t *array, uint8_t sz_array);

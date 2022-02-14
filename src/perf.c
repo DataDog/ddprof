@@ -60,6 +60,18 @@ int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
   return syscall(__NR_perf_event_open, attr, pid, cpu, gfd, flags);
 }
 
+int get_array_from_mask(uint64_t mask, uint8_t *array, uint8_t sz_array) {
+  int j = 0;
+  for (unsigned int i = 0; i<64; i++) {
+    if ((1ul << i) & mask) {
+      if (array)
+        array[j] = i;
+      ++j;
+    }
+  }
+  return j;
+}
+
 int perfopen(pid_t pid, const PerfOption *opt, int cpu, bool extras) {
   struct perf_event_attr attr = g_dd_native_attr;
   attr.type = opt->type;
@@ -87,7 +99,6 @@ int perfopen(pid_t pid, const PerfOption *opt, int cpu, bool extras) {
   if (opt->target_reg) {
     attr.sample_regs_user |= opt->target_reg;
   }
-  ((PerfOption *)opt)->regmask = attr.sample_regs_user;
 
   int fd = perf_event_open(&attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC);
   if (-1 == fd && EACCES == errno) {

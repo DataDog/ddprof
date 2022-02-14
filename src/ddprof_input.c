@@ -199,13 +199,12 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
   char opt_short[] = "+" OPT_TABLE(X_OSTR) "e:t:hv";
   optind = 1; // reset argument parsing (in case we are called several times)
 
+  size_t idx;
+  uint64_t sampling_value = 0;
   while (-1 != (c = getopt_long(argc, argv, opt_short, lopts, &oi))) {
     switch (c) {
       OPT_TABLE(X_CASE)
     case 'e':;
-      size_t idx;
-      uint64_t sampling_value = 0;
-
       // Iterate through the specified events and define new watchers if any
       // of them are valid.  If the user specifies a '0' value, then that's
       // the same as using the default (equivalently, the ',0' could be omitted)
@@ -219,11 +218,21 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
       }
       break;
     case 't':;
-      if (process_tracepoint(optarg, &idx, &sampling_value)) {
+      uint8_t reg;
+      unsigned long config;
+      if (!process_tracepoint(optarg, &sampling_value, &reg, &config)) {
+        idx = perfoptions_get_tracepoint_idx();
+        PerfOption *popt = (PerfOption*)perfoptions_preset(idx);
+        popt->target_reg = reg;
+        popt->regmask = PERF_REGS_MASK | reg;
+        popt->config = config;
+        input->watchers[input->num_watchers] = idx;
+        input->sampling_value[input->num_watchers] = sampling_value;
+        ++input->num_watchers;
       } else {
         LG_WRN("Ignoring invalid tracepoint (%s)", optarg);
       }
-
+      break;
     case 'h':;
       ddprof_print_help();
       *continue_exec = false;
