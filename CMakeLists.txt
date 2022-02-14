@@ -60,12 +60,9 @@ message(STATUS "Libddprof Include directory " ${LIBDDPROF_INCLUDE_DIR})
 
 include(Findelfutils)
 
-# llvm-demangle
-include(FindLibLlvmDemangle)
-
 # Dependency cache
 add_custom_target(deps
-                  DEPENDS llvm-deps ddprof-deps elfutils-deps)
+                  DEPENDS ddprof-deps elfutils-deps)
 
 # Lzma
 find_package(LibLZMA)
@@ -100,6 +97,9 @@ endif()
 
 # Install lib cap to retrieve capabilities
 include(Findlibcap)
+
+# llvm demangler
+add_subdirectory(third_party/llvm)
 
 ####################
 ### Unit tests   ###
@@ -205,7 +205,7 @@ install(FILES LICENSE LICENSE-3rdparty.csv LICENSE.LGPLV3 NOTICE DESTINATION ${C
 ### Declaration of native library   ###
 #######################################
 option(BUILD_NATIVE_LIB "Build a library out of the native profiler" OFF)
-   if (${BUILD_NATIVE_LIB})
+if (${BUILD_NATIVE_LIB})
 
    aux_source_directory(src/lib LIB_SRC)
 
