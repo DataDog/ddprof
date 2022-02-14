@@ -53,7 +53,7 @@ compile_commands.json
 *.dump
 .env
 .env_perso.yml
-test/configs/perso.yml
+.test_config.yml
 .editorconfig
 test/data/*.pprof
 test/self_unwind/data/BadBoggleSolver_run.json

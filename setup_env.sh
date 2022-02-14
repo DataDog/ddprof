@@ -4,6 +4,12 @@
 # Run source ./setup_env.sh
 export PATH=$PATH:${PWD}/tools:${PWD}/bench/runners
 
+if [ -e /tools/setup_env.sh ]; then
+    cd /tools
+    source setup_env.sh
+    cd -
+fi
+
 # Helper command lines for cmake. Source this file, then you can just do :
 # SanCMake ../ 
 

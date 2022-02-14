@@ -154,7 +154,13 @@ if [ -z `echo $OSTYPE|grep darwin` ]; then
     echo "Attempting to continue : please update script for your OS if ssh socket is failing."
 fi 
 
+# Extra build tools
+MOUNT_EXTRA_TOOLS=""
+if [ ! -z  ${EXTRA_TOOLS_WORKSPACE} ]; then
+    MOUNT_EXTRA_TOOLS="-v ${EXTRA_TOOLS_WORKSPACE}:/tools"
+fi
+
 echo "Launch docker image, DO NOT STORE ANYTHING outside of mounted directory (container is erased on exit)."
-docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -w /app --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} -e SSH_AUTH_SOCK=/ssh-agent ${DOCKER_NAME}${DOCKER_TAG} /bin/bash
+docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent ${MOUNT_EXTRA_TOOLS} -v :/build_tools -w /app --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} -e SSH_AUTH_SOCK=/ssh-agent ${DOCKER_NAME}${DOCKER_TAG} /bin/bash
 
 exit 0

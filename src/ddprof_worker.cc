@@ -215,7 +215,7 @@ void *ddprof_worker_export_thread(void *arg) {
 #endif
 
 /// Cycle operations : export, sync metrics, update counters
-static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
+DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now, bool async_export) {
 
   // Scrape procfs for process usage statistics
   DDRES_CHECK_FWD(worker_update_stats(&ctx->worker_ctx.proc_status,
@@ -259,13 +259,14 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
   // switch before we async export to avoid any possible race conditions (then
   // take into account the switch)
   ctx->worker_ctx.i_current_pprof = 1 - ctx->worker_ctx.i_current_pprof;
-#  ifndef NO_THREADED_EXPORT
-  pthread_create(&ctx->worker_ctx.exp_tid, NULL, ddprof_worker_export_thread,
-                 &ctx->worker_ctx);
-#  else
-  ddprof_worker_export_thread(reinterpret_cast<void *>(&ctx->worker_ctx));
-#  endif
-
+  if (async_export) {
+    pthread_create(&ctx->worker_ctx.exp_tid, NULL, ddprof_worker_export_thread,
+                   &ctx->worker_ctx);
+  } else {
+    ddprof_worker_export_thread(reinterpret_cast<void *>(&ctx->worker_ctx));
+    if (ctx->worker_ctx.exp_error)
+      return ddres_create(DD_SEVERROR, DD_WHAT_EXPORTER);
+  }
 #endif
 
   // Increase the counts of exports
@@ -330,9 +331,9 @@ void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int pos) {
 void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int pos) {
   // On Linux, it seems that the thread group leader is the one whose task ID
   // matches the process ID of the group.  Moreover, it seems that it is the
-  // overwhelming convention that this thread is closed after the other threads
-  // (upheld by both pthreads and runtimes).
-  // We do not clear the PID at this time because we currently cleanup anyway.
+  // overwhelming convention that this thread is closed after the other
+  // threads (upheld by both pthreads and runtimes). We do not clear the PID
+  // at this time because we currently cleanup anyway.
   (void)ctx;
   if (ext->pid == ext->tid) {
     LG_DBG("<%d>(EXIT)%d", pos, ext->pid);
@@ -341,7 +342,7 @@ void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int pos) {
   }
 }
 
-/****************************** other functions *******************************/
+/***************************** other functions *****************************/
 static DDRes reset_state(DDProfContext *ctx,
                          volatile bool *continue_profiling) {
   if (!ctx) {
@@ -387,7 +388,7 @@ DDRes ddprof_worker_timeout(volatile bool *continue_profiling,
   try {
     int64_t now = now_nanos();
     if (now > ctx->worker_ctx.send_nanos) {
-      DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now));
+      DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now, true));
       // reset state defines if we should reboot the worker
       DDRes res = reset_state(ctx, continue_profiling);
       // A warning can be returned for a reset and should not be ignored
@@ -534,7 +535,7 @@ DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
     int64_t now = now_nanos();
 
     if (now > ctx->worker_ctx.send_nanos) {
-      DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now));
+      DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now, true));
       // reset state defines if we should reboot the worker
       DDRes res = reset_state(ctx, continue_profiling);
       // A warning can be returned for a reset and should not be ignored

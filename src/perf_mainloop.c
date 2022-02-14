@@ -124,6 +124,10 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       // don't handle that case yet.
       if (pfd[i].revents & POLLHUP) {
         flags->errors = false; // This is a graceful shutdown!
+        // Send off last results
+        DDRES_CHECK_OR_SHUTDOWN(
+            ddprof_worker_cycle(ctx, ctx->worker_ctx.send_nanos + 1, false),
+            attr->finish_fun(ctx));
         DDRES_GRACEFUL_SHUTDOWN(attr->finish_fun(ctx));
       }
     }

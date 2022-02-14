@@ -14,6 +14,7 @@
 typedef struct DDProfContext DDProfContext;
 
 DDRes ddprof_timeout(volatile bool *continue_profiling, DDProfContext *arg);
+DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now, bool async_export);
 DDRes ddprof_worker_init(DDProfContext *arg);
 DDRes ddprof_worker_free(DDProfContext *);
 DDRes ddprof_worker_timeout(volatile bool *continue_profiling,
