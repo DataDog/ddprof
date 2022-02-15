@@ -94,11 +94,15 @@ int perfopen(pid_t pid, const PerfOption *opt, int cpu, bool extras) {
     attr.comm = 1;
   }
 
-  // Specifically for the uprobe event, we allow the user to define one
-  // additional register to be captured and used as the sampling width.
-  if (opt->target_reg) {
-    attr.sample_regs_user |= opt->target_reg;
-  }
+  // Specifically for the tracepoint event, we allow the user to define one
+  // additional register to be captured
+  if (opt->target_reg)
+    attr.sample_regs_user |= (1ul << opt->target_reg);
+
+  // The only unambiguous source for the actual register mask is the attribute
+  // being sent to perfopen(), so here we mutate the input options, so that
+  // that the mask can be used elsewhere
+  ((PerfOption *)opt)->regmask = attr.sample_regs_user;
 
   int fd = perf_event_open(&attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC);
   if (-1 == fd && EACCES == errno) {

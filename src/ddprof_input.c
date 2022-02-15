@@ -224,7 +224,6 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
         idx = perfoptions_get_tracepoint_idx();
         PerfOption *popt = (PerfOption*)perfoptions_preset(idx);
         popt->target_reg = reg;
-        popt->regmask = PERF_REGS_MASK | reg;
         popt->config = config;
         input->watchers[input->num_watchers] = idx;
         input->sampling_value[input->num_watchers] = sampling_value;

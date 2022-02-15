@@ -155,11 +155,11 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
 
   // Set the registers which will be passed along into the unwinder
   uint64_t sample_regs[PERF_REGS_MAX] = {0};
-  for (unsigned int i = 0, j = 0; i < 32; i++) {
-    if ((1ul << i) & PERF_REGS_MASK) {
-      sample_regs[j] = sample->regs[ctx->watchers[pos].regs_idx[j]];
+  for (unsigned int i = 0, j = 0, k = 0; i < 32; i++) {
+    if ((1ul << i) & PERF_REGS_MASK)
+      sample_regs[k++] = sample->regs[j];
+    if ((1ul << i) & ctx->watchers[pos].regmask) 
       ++j;
-    }
   }
   unwind_init_sample(us, sample_regs, sample->pid, sample->size_stack,
                      sample->data_stack);
