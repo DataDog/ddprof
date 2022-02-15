@@ -38,7 +38,7 @@ cd $3
 DOWNLOAD_PATH=$PWD
 TARGET_EXTRACT=${DOWNLOAD_PATH}/libddprof
 
-if [ -e ${TARGET_EXTRACT} ]; then
+if [ -z "$(find "${TARGET_EXTRACT}" -type f)" ]; then
     echo "Error, clean the directory : ${TARGET_EXTRACT}"
     exit 1
 fi
