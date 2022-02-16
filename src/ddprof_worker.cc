@@ -165,28 +165,20 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
                      sample->data_stack);
 
   // If this is a SW_TASK_CLOCK-type event, then aggregate the time
-  uint64_t sample_val = sample->period; // Default aggregation
+  int64_t sample_val = sample->period; // Default aggregation
   if (ctx->watchers[pos].type == PERF_COUNT_SW_TASK_CLOCK) {
     ddprof_stats_add(STATS_CPU_TIME, sample->period, NULL);
   } else if (ctx->watchers[pos].type == PERF_TYPE_TRACEPOINT &&
              ctx->watchers[pos].is_raw) {
     uint64_t raw_offset = ctx->watchers[pos].trace_off;
     uint64_t raw_sz = ctx->watchers[pos].trace_sz;
-    // Assume signed input, but unsigned output
-    // TODO the underlying aggregation semantics of ddprof need to address this
-    int64_t sample_tmp = 0;
-    memcpy(&sample_tmp, sample->data_raw + raw_offset, raw_sz);
-    if (sample_tmp > 0)
-      sample_val = sample_tmp;
+    memcpy(&sample_val, sample->data_raw + raw_offset, raw_sz);
   } else if (ctx->watchers[pos].type == PERF_TYPE_TRACEPOINT &&
              ctx->watchers[pos].target_reg) {
     // If this is a tracepoint, override the aggregation with whatever the
     // user specified
-    // Assume signed input, but unsigned output
-    // TODO the underlying aggregation semantics of ddprof need to address this
-    int64_t sample_tmp = sample->regs[ctx->watchers[pos].target_reg];
-    if (sample_tmp > 0)
-      sample_val = sample_tmp;
+    memcpy(&sample_val, &sample->regs[ctx->watchers[pos].target_reg],
+           sizeof(int64_t));
   }
   unsigned long this_ticks_unwind = __rdtsc();
   DDRes res = unwindstate__unwind(us);
@@ -198,6 +190,8 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
     // in lib mode we don't aggregate (protect to avoid link failures)
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
+    if (sample_val < 0)
+      LG_ERR("Negative: %ld", sample_val);
     DDRES_CHECK_FWD(
         pprof_aggregate(&us->output, &us->symbol_hdr, sample_val, pos, pprof));
 #else

@@ -30,7 +30,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, const PerfOption *options,
  * @param pprof
  */
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
-                      const SymbolHdr *symbol_hdr, uint64_t value,
+                      const SymbolHdr *symbol_hdr, int64_t value,
                       int watcher_idx, DDProfPProf *pprof);
 
 DDRes pprof_reset(DDProfPProf *pprof);

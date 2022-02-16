@@ -136,7 +136,7 @@ static void write_line(const ddprof::Symbol &symbol,
 
 // Assumption of API is that sample is valid in a single type
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
-                      const SymbolHdr *symbol_hdr, uint64_t value,
+                      const SymbolHdr *symbol_hdr, int64_t value,
                       int watcher_idx, DDProfPProf *pprof) {
 
   const ddprof::SymbolTable &symbol_table = symbol_hdr->_symbol_table;
