@@ -169,10 +169,24 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   if (ctx->watchers[pos].type == PERF_COUNT_SW_TASK_CLOCK) {
     ddprof_stats_add(STATS_CPU_TIME, sample->period, NULL);
   } else if (ctx->watchers[pos].type == PERF_TYPE_TRACEPOINT &&
+           ctx->watchers[pos].is_raw) {
+    uint64_t raw_offset = ctx->watchers[pos].trace_off;
+    uint64_t raw_sz = ctx->watchers[pos].trace_sz;
+    // Assume signed input, but unsigned output
+    // TODO the underlying aggregation semantics of ddprof need to address this
+    int64_t sample_tmp = 0;
+    memcpy(&sample_tmp, sample->data_raw + raw_offset, raw_sz);
+    if (sample_tmp > 0)
+      sample_val = sample_tmp;
+  } else if (ctx->watchers[pos].type == PERF_TYPE_TRACEPOINT &&
            ctx->watchers[pos].target_reg) {
     // If this is a tracepoint, override the aggregation with whatever the
     // user specified
-    sample_val = sample->regs[ctx->watchers[pos].target_reg];
+    // Assume signed input, but unsigned output
+    // TODO the underlying aggregation semantics of ddprof need to address this
+    int64_t sample_tmp = sample->regs[ctx->watchers[pos].target_reg];
+    if (sample_tmp > 0)
+      sample_val = sample_tmp;
   }
   unsigned long this_ticks_unwind = __rdtsc();
   DDRes res = unwindstate__unwind(us);

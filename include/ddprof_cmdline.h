@@ -9,6 +9,22 @@
 #include <stddef.h> // size_t
 #include <stdint.h> // uint64_t
 
+typedef enum ptret_t {
+  PTRET_OK,
+  PTRET_BADFORMAT,
+  PTRET_BADPERMS,
+  PTRET_NOEXIST,
+} ptret_t;
+
+typedef struct traceconfig_t {
+  uint64_t id;
+  uint64_t period;
+  bool is_raw; // Do I get the sample from a raw event?
+  uint8_t reg;
+  uint8_t trace_off;
+  uint8_t trace_sz;
+} traceconfig_t;
+
 /**************************** Cmdline Helpers *********************************/
 // Helper functions for processing commandline arguments.
 //
@@ -29,10 +45,4 @@ bool arg_yesno(const char *str, int mode);
 bool process_event(const char *str, const char **lookup, size_t sz_lookup,
                    size_t *idx, uint64_t *value);
 
-typedef enum ptret_t {
-  PTRET_OK,
-  PTRET_BADFORMAT,
-  PTRET_BADPERMS,
-  PTRET_NOEXIST,
-} ptret_t;
-int process_tracepoint(const char *str, uint64_t *ret_freq, uint8_t *ret_reg, uint64_t *ret_config);
+ptret_t process_tracepoint(const char *str, traceconfig_t *config);

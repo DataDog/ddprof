@@ -218,15 +218,22 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
       }
       break;
     case 't':;
-      uint8_t reg;
-      unsigned long config;
-      if (!process_tracepoint(optarg, &sampling_value, &reg, &config)) {
+      traceconfig_t config = {0};
+      if (!process_tracepoint(optarg, &config)) {
         idx = perfoptions_get_tracepoint_idx();
         PerfOption *popt = (PerfOption*)perfoptions_preset(idx);
-        popt->target_reg = reg;
-        popt->config = config;
+
+        if (config.is_raw) {
+          popt->is_raw = true;
+          popt->trace_off = config.trace_off;
+          popt->trace_sz = config.trace_sz;
+        } else {
+          popt->is_raw = false;
+          popt->target_reg = config.reg;
+        }
+        popt->config = config.id;
         input->watchers[input->num_watchers] = idx;
-        input->sampling_value[input->num_watchers] = sampling_value;
+        input->sampling_value[input->num_watchers] = config.period;
         ++input->num_watchers;
       } else {
         LG_WRN("Ignoring invalid tracepoint (%s)", optarg);

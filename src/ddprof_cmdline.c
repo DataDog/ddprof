@@ -49,9 +49,9 @@ bool arg_yesno(const char *str, int mode) {
 #  warning tracepoints are broken on ARM
 #endif
 int arg2reg[] = {0, 5, 4, 3, 2, 16, 17};
-uint8_t get_register(char *str) {
+uint8_t get_register(const char *str) {
   uint8_t reg = 0;
-  char *str_copy = str;
+  char *str_copy = (char *)str;
   long reg_buf = strtol(str, &str_copy, 10);
   if (!*str_copy) {
     reg = reg_buf;
@@ -64,23 +64,44 @@ uint8_t get_register(char *str) {
   return arg2reg[reg];
 }
 
-int process_tracepoint(const char *str, uint64_t *ret_freq, uint8_t *ret_reg, uint64_t *ret_config) {
+bool get_trace_format(const char *str, uint8_t *trace_off, uint8_t *trace_sz) {
+  char *str_copy = (char *)str;
+  if (!str)
+    return false;
+
+  char *period = strchr(str, '.');
+  char *period_copy = period;
+  if (!period)
+    return false;
+
+  *trace_off = strtol(str, &str_copy, 10);
+  *trace_sz = strtol(period + 1, &period_copy, 10);
+
+  // Error if the size is zero, otherwise fine probably
+  return !trace_sz;
+}
+
+ptret_t process_tracepoint(const char *str, traceconfig_t *conf) {
   // minimum form; provides counts, samples every hit
   // -t groupname:tracename
   // Register-qualified form
   // -t groupname:tracename%REG
-  // Sample-qualified form, sets a frequency value
-  // -t groupname:tracename@freq
+  // -t groupname:tracename$offset.size
+  // Sample-qualified form, sets a period value
+  // -t groupname:tracename@period
   // full
-  // -t groupename:tracename%REG@freq
+  // -t groupename:tracename%REG@period
   // groupname, tracename, REG - strings
   // REG - can be a number 1-6
-  // freq is a number
+  // period is a number
   size_t sz_str = strlen(str);
   char *groupname;
   char *tracename;
   uint8_t reg = 0;
-  uint64_t freq = 1;
+  uint64_t period = 1;
+  bool is_raw = false;
+  uint8_t trace_off = 0;
+  uint8_t trace_sz = 0;
 
   // Check format
   if (!sz_str)
@@ -88,32 +109,45 @@ int process_tracepoint(const char *str, uint64_t *ret_freq, uint8_t *ret_reg, ui
   char *colon = strchr(str, ':');
   char *perc = strchr(str, '%');
   char *amp = strchr(str, '@');
+  char *dollar = strchr(str, '$');
 
   if (!colon)
+    return PTRET_BADFORMAT;
+  if (dollar && perc)
     return PTRET_BADFORMAT;
 
   // Split strings
   if (colon)
-    *colon = '\0';
+    *colon = 0;
   if (perc)
-    *perc = '\0';
+    *perc = 0;
   if (amp)
-    *amp = '\0';
+    *amp = 0;
+  if (dollar)
+    *dollar = 0;
 
-  // Input checking
+  // Name checking
   groupname = strdup(str);
   tracename = strdup(colon+1);
+
+  // If a register is specified, process that
   if (perc)
     reg = get_register(perc+1);
-  else
-    reg = 0; // guardian value
+
+  // OTOH, if an offset into the raw event is specified, get that
+  if (dollar && !get_trace_format(dollar+1, &trace_off, &trace_sz)) {
+    is_raw = true;
+  } else {
+    trace_off = 0;
+    trace_sz = 0;
+  }
+
+  // If the user specified a period, make sure it is valid
   if (amp) {
     char *str_check = (char *)str;
     uint64_t buf = strtoll(amp+1, &str_check, 10);
     if (!*str_check)
-      freq = buf;
-  } else {
-    freq = 1;
+      period = buf;
   }
 
   char path[2048] = {0};  // somewhat arbitrarily
@@ -150,9 +184,12 @@ int process_tracepoint(const char *str, uint64_t *ret_freq, uint8_t *ret_reg, ui
   }
 
   // OK done
-  *ret_freq = freq;
-  *ret_reg = reg;
-  *ret_config = trace_id;
+  conf->id = trace_id;
+  conf->period = period;
+  conf->is_raw = is_raw;
+  conf->reg = reg;
+  conf->trace_off = trace_off;
+  conf->trace_sz = trace_sz;
   return PTRET_OK;
 }
 
