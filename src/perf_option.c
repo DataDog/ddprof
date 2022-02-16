@@ -30,7 +30,7 @@ PerfOption perfoptions[] = {
   {"Block-Issue",     PERF_TYPE_TRACEPOINT, {1132},                                {1},    "block-issue",    "events", .include_kernel = true},
   {"Block-Complete",  PERF_TYPE_TRACEPOINT, {1134},                                {1},    "block-complete", "events", .include_kernel = true},
   {"Malloc",          PERF_TYPE_BREAKPOINT, {0},                                   {1},    "malloc",         "events", .bp_type = HW_BREAKPOINT_X},
-  {"Tracepoint",      PERF_TYPE_TRACEPOINT, {0},                                   {1},    "cpu-time",       "nanoseconds"}
+  {"Tracepoint",      PERF_TYPE_TRACEPOINT, {0},                                   {1},    "cpu-time",       "nanoseconds", .include_kernel = true}
 };
 // clang-format on
 

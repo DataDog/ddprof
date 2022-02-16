@@ -79,8 +79,8 @@ int process_tracepoint(const char *str, uint64_t *ret_freq, uint8_t *ret_reg, ui
   size_t sz_str = strlen(str);
   char *groupname;
   char *tracename;
-  uint8_t reg;
-  uint64_t freq;
+  uint8_t reg = 0;
+  uint64_t freq = 1;
 
   // Check format
   if (!sz_str)
@@ -106,7 +106,7 @@ int process_tracepoint(const char *str, uint64_t *ret_freq, uint8_t *ret_reg, ui
   if (perc)
     reg = get_register(perc+1);
   else
-    reg = UINT8_MAX; // guardian value
+    reg = 0; // guardian value
   if (amp) {
     char *str_check = (char *)str;
     uint64_t buf = strtoll(amp+1, &str_check, 10);

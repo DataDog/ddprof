@@ -166,9 +166,9 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
 
   // If this is a SW_TASK_CLOCK-type event, then aggregate the time
   uint64_t sample_val = sample->period; // Default aggregation
-  if (ctx->watchers[pos].config == PERF_COUNT_SW_TASK_CLOCK)
+  if (ctx->watchers[pos].type == PERF_COUNT_SW_TASK_CLOCK) {
     ddprof_stats_add(STATS_CPU_TIME, sample->period, NULL);
-  else if (ctx->watchers[pos].config == PERF_TYPE_TRACEPOINT &&
+  } else if (ctx->watchers[pos].type == PERF_TYPE_TRACEPOINT &&
            ctx->watchers[pos].target_reg) {
     // If this is a tracepoint, override the aggregation with whatever the
     // user specified
@@ -502,6 +502,9 @@ DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
   // global try catch to avoid leaking exceptions to main loop
   SampleOptions opt = {DEFAULT_SAMPLE_TYPE, ctx->watchers[pos].regmask, {0}};
   opt.regnum = (uint8_t)__builtin_popcountll(ctx->watchers[pos].regmask);
+  if (ctx->watchers[pos].perfmask) {
+    opt.options_mask = ctx->watchers[pos].perfmask;
+  }
 
   try {
     ddprof_stats_add(STATS_EVENT_COUNT, 1, NULL);

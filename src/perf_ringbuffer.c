@@ -155,7 +155,11 @@ bool samp2hdr(struct perf_event_header *hdr, perf_event_sample *sample,
     memcpy(buf, sample->ips, sample->nr);
     buf += sample->nr;
   }
-  if (PERF_SAMPLE_RAW & mask) {}
+  if (PERF_SAMPLE_RAW & mask) {
+    *buf++ = sample->size_raw;
+    memcpy(buf, sample->data_raw, sample->size_raw);
+    buf += sample->size_raw;
+  }
   if (PERF_SAMPLE_BRANCH_STACK & mask) {}
   if (PERF_SAMPLE_REGS_USER & mask) {
     *buf++ = sample->abi;
@@ -239,7 +243,19 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr, SampleOptions *opt) {
     sample.ips = buf;
     buf += sample.nr;
   }
-  if (PERF_SAMPLE_RAW & mask) {}
+  if (PERF_SAMPLE_RAW & mask) {
+    // size_raw is a 32-bit integer!
+    uint32_t *buf32 = (uint32_t *)buf;
+    sample.size_raw = *buf32++;
+    if (sample.size_raw) {
+      unsigned char *buf8 = (unsigned char *)buf32;
+      sample.data_raw = (char *)buf8;
+      buf8 += sample.size_raw;
+      buf32 = (uint32_t *)buf8;
+    }
+    buf = (uint64_t *)buf32;
+    buf = (uint64_t *)(((uint64_t)buf + 0x7UL) & ~0x7UL);
+  }
   if (PERF_SAMPLE_BRANCH_STACK & mask) {}
   if (PERF_SAMPLE_REGS_USER & mask) {
     sample.abi = *buf++;

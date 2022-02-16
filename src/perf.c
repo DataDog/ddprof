@@ -43,6 +43,8 @@ struct perf_event_attr g_dd_native_attr = {
     .sample_regs_user = PERF_REGS_MASK,
     .exclude_kernel = 1,
     .exclude_hv = 1,
+    .exclude_guest = 1,
+    .exclude_callchain_user = 1,
 };
 
 long get_page_size(void) {
@@ -85,6 +87,12 @@ int perfopen(pid_t pid, const PerfOption *opt, int cpu, bool extras) {
     attr.config = 0; // as per perf_event_open() manpage
     attr.bp_type = opt->bp_type;
   }
+
+  // If this is a tracepoint type event, then go ahead and setup the raw handler
+  if (opt->type & PERF_TYPE_TRACEPOINT) {
+    attr.sample_type |= PERF_SAMPLE_RAW;
+  }
+  ((PerfOption *)opt)->perfmask = attr.sample_type;
 
   // Extras
   if (extras) {

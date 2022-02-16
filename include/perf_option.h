@@ -34,8 +34,12 @@ typedef struct PerfOption {
   bool include_kernel;
   bool freq;
   char bp_type;
+  uint64_t perfmask;
   uint64_t regmask;
+  bool target_israw;
   uint8_t target_reg; // register number of the target
+  uint8_t target_raw_offset;
+  uint8_t target_raw_size;
 //  uint8_t target_reg_idx; // index in the register array of the target
   uint8_t regs_idx[PERF_REGS_MAX];
 } PerfOption;
