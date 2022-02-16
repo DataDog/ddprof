@@ -45,7 +45,8 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
 
       // We've successfully registered the perf_event_open() context, so finish
       // up transferring state into the watcher
-      get_array_from_mask(ctx->watchers[i].regmask, ctx->watchers[i].regs_idx, PERF_REGS_MAX);
+      get_array_from_mask(ctx->watchers[i].regmask, ctx->watchers[i].regs_idx,
+                          PERF_REGS_MAX);
     }
   }
   return ddres_init();

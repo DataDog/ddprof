@@ -7,15 +7,15 @@
 #include "logger.h"
 
 #include <assert.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 int arg_which(const char *str, char const *const *set, int sz_set) {
   if (!str || !set)
@@ -43,7 +43,6 @@ bool arg_yesno(const char *str, int mode) {
   }
   return false;
 }
-
 
 #ifdef __aarch64__
 #  warning tracepoints are broken on ARM
@@ -128,14 +127,14 @@ ptret_t process_tracepoint(const char *str, traceconfig_t *conf) {
 
   // Name checking
   groupname = strdup(str);
-  tracename = strdup(colon+1);
+  tracename = strdup(colon + 1);
 
   // If a register is specified, process that
   if (perc)
-    reg = get_register(perc+1);
+    reg = get_register(perc + 1);
 
   // OTOH, if an offset into the raw event is specified, get that
-  if (dollar && !get_trace_format(dollar+1, &trace_off, &trace_sz)) {
+  if (dollar && !get_trace_format(dollar + 1, &trace_off, &trace_sz)) {
     is_raw = true;
   } else {
     trace_off = 0;
@@ -145,15 +144,17 @@ ptret_t process_tracepoint(const char *str, traceconfig_t *conf) {
   // If the user specified a period, make sure it is valid
   if (amp) {
     char *str_check = (char *)str;
-    uint64_t buf = strtoll(amp+1, &str_check, 10);
+    uint64_t buf = strtoll(amp + 1, &str_check, 10);
     if (!*str_check)
       period = buf;
   }
 
-  char path[2048] = {0};  // somewhat arbitrarily
+  char path[2048] = {0}; // somewhat arbitrarily
   char buf[64] = {0};
   char *buf_copy = buf;
-  int pathsz = snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/id", groupname, tracename);
+  int pathsz =
+      snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/id",
+               groupname, tracename);
   if (pathsz >= sizeof(path)) {
     // Possibly ran out of room
     return PTRET_BADFORMAT;
@@ -169,16 +170,19 @@ ptret_t process_tracepoint(const char *str, traceconfig_t *conf) {
     read_ret = read(fd, buf, sizeof(buf));
   } while (read_ret == -1 && errno == EINTR);
   close(fd);
-  if ( read_ret > 0 )
+  if (read_ret > 0)
     trace_id = strtol(buf, &buf_copy, 10);
   if (*buf_copy && *buf_copy != '\n')
     return PTRET_BADFORMAT;
 
   // Check enablement, just to print a log.  We still enable instrumentation.
-  snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/enable", groupname, tracename);
+  snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/enable",
+           groupname, tracename);
   fd = open(path, O_RDONLY);
   if (-1 == fd || 1 != read(fd, buf, 1) || '0' != *buf) {
-    LG_NTC("Tracepint %s:%s is not enabled.  Instrumentation will proceed, but you may not have any events.", groupname, tracename);
+    LG_NTC("Tracepint %s:%s is not enabled.  Instrumentation will proceed, but "
+           "you may not have any events.",
+           groupname, tracename);
   } else {
     LG_NFO("Tracepoint %s:%s successfully enabled", groupname, tracename);
   }

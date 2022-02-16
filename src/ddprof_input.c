@@ -221,7 +221,7 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
       traceconfig_t config = {0};
       if (!process_tracepoint(optarg, &config)) {
         idx = perfoptions_get_tracepoint_idx();
-        PerfOption *popt = (PerfOption*)perfoptions_preset(idx);
+        PerfOption *popt = (PerfOption *)perfoptions_preset(idx);
 
         if (config.is_raw) {
           popt->is_raw = true;

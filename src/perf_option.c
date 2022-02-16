@@ -37,8 +37,8 @@ PerfOption perfoptions[] = {
 // There's a strong assumption here that these elements match up perfectly with
 // the table below.  This will be a bit of a pain to maintain.
 static const char *perfoptions_lookup_table[] = {
-    "hCPU",   "hREF",  "hINSTR", "hCREF", "hCMISS", "hBRANCH",
-    "hBMISS", "hBUS",  "hBSTF",  "hBSTB", "sCPU",   "sWALL",
+    "hCPU",   "hREF",  "hINSTR", "hCREF", "hCMISS",  "hBRANCH",
+    "hBMISS", "hBUS",  "hBSTF",  "hBSTB", "sCPU",    "sWALL",
     "sCI",    "kBLKI", "kBLKS",  "kBLKC", "bMalloc", "kMEM"};
 
 #define perfoptions_sz (sizeof(perfoptions) / sizeof(*perfoptions))
@@ -52,7 +52,7 @@ const PerfOption *perfoptions_preset(int idx) {
   return &perfoptions[idx];
 }
 
-int perfoptions_get_tracepoint_idx() { return perfoptions_sz - 1;}
+int perfoptions_get_tracepoint_idx() { return perfoptions_sz - 1; }
 
 int perfoptions_nb_presets(void) { return perfoptions_sz; }
 

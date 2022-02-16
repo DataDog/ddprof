@@ -158,7 +158,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   for (unsigned int i = 0, j = 0, k = 0; i < 32; i++) {
     if ((1ul << i) & PERF_REGS_MASK)
       sample_regs[k++] = sample->regs[j];
-    if ((1ul << i) & ctx->watchers[pos].regmask) 
+    if ((1ul << i) & ctx->watchers[pos].regmask)
       ++j;
   }
   unwind_init_sample(us, sample_regs, sample->pid, sample->size_stack,
@@ -169,7 +169,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   if (ctx->watchers[pos].type == PERF_COUNT_SW_TASK_CLOCK) {
     ddprof_stats_add(STATS_CPU_TIME, sample->period, NULL);
   } else if (ctx->watchers[pos].type == PERF_TYPE_TRACEPOINT &&
-           ctx->watchers[pos].is_raw) {
+             ctx->watchers[pos].is_raw) {
     uint64_t raw_offset = ctx->watchers[pos].trace_off;
     uint64_t raw_sz = ctx->watchers[pos].trace_sz;
     // Assume signed input, but unsigned output
@@ -179,7 +179,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
     if (sample_tmp > 0)
       sample_val = sample_tmp;
   } else if (ctx->watchers[pos].type == PERF_TYPE_TRACEPOINT &&
-           ctx->watchers[pos].target_reg) {
+             ctx->watchers[pos].target_reg) {
     // If this is a tracepoint, override the aggregation with whatever the
     // user specified
     // Assume signed input, but unsigned output
@@ -197,8 +197,8 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
     // in lib mode we don't aggregate (protect to avoid link failures)
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
-    DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr,
-                                    sample_val, pos, pprof));
+    DDRES_CHECK_FWD(
+        pprof_aggregate(&us->output, &us->symbol_hdr, sample_val, pos, pprof));
 #else
     // Call the user's stack handler
     if (ctx->stack_handler) {

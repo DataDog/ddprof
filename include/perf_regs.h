@@ -8,7 +8,7 @@
 // see arch/x86/include/uapi/asm/perf_regs.h in the linux sources
 // We're going to hardcode everything for now...
 #define PERF_REGS_MASK_X86 ((1 << 6) | (1 << 7) | (1 << 8))
-#define PERF_REGS_IDX_X86 {6,7,8};
+#define PERF_REGS_IDX_X86 {6, 7, 8};
 
 // 31 and 32 are the stack and PC, respectively.  29 is r29, see
 // https://github.com/ARM-software/abi-aa where it is usd conventionally as the
@@ -21,4 +21,3 @@
 #define PERF_REGS_COUNT 3
 #define PERF_REGS_MASK PERF_REGS_MASK_X86
 #define PERF_REGS_IDX PERF_REGS_IDX_X86
-

@@ -64,7 +64,7 @@ int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
 
 int get_array_from_mask(uint64_t mask, uint8_t *array, uint8_t sz_array) {
   int j = 0;
-  for (unsigned int i = 0; i<64; i++) {
+  for (unsigned int i = 0; i < 64; i++) {
     if ((1ul << i) & mask) {
       if (array)
         array[j] = i;
