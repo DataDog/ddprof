@@ -116,8 +116,7 @@ ptret_t process_tracepoint(const char *str, traceconfig_t *conf) {
     return PTRET_BADFORMAT;
 
   // Split strings
-  if (colon)
-    *colon = 0;
+  *colon = 0; // colon is true from previous check
   if (perc)
     *perc = 0;
   if (amp)

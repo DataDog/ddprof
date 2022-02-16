@@ -193,6 +193,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
   if (!IsDDResFatal(res)) {
+    (void)sample_val; // remove nags when building for library mode
 #ifndef DDPROF_NATIVE_LIB
     // in lib mode we don't aggregate (protect to avoid link failures)
     int i_export = ctx->worker_ctx.i_current_pprof;
