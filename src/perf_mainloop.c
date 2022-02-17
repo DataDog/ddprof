@@ -24,7 +24,13 @@
 #include "pevent.h"
 #include "unwind.h"
 
-#define rmb() __asm__ volatile("lfence" ::: "memory")
+// Implements a read memory barrier.  Note the different pipeline architectures
+// require different types of fences!
+#ifdef __x86_64__
+#  define rmb() __asm__ volatile("lfence" ::: "memory")
+#elif __aarch64__
+#  define rmb() __asm__ volatile("dmb ishld" ::: "memory")
+#endif
 
 #define WORKER_SHUTDOWN()                                                      \
   { return; }

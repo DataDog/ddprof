@@ -13,7 +13,11 @@
 #include <sys/resource.h>
 #include <sys/sysinfo.h>
 #include <unistd.h>
-#include <x86intrin.h>
+#ifdef __x86_64
+#  include <x86intrin.h>
+#elif __aarch64__
+#  define __rdtsc() 0
+#endif
 
 #include "cap_display.h"
 #include "ddprof_cmdline.h"

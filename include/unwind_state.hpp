@@ -19,7 +19,11 @@ extern "C" {
 
 typedef struct Dwfl Dwfl;
 
-#define K_NB_REGS_UNWIND 3
+#ifdef __x86_64__
+#  define K_NB_REGS_UNWIND 3
+#elif __aarch64__
+#  define K_NB_REGS_UNWIND 4
+#endif
 
 struct UnwindRegisters {
   UnwindRegisters() {
@@ -31,6 +35,9 @@ struct UnwindRegisters {
     uint64_t regs[K_NB_REGS_UNWIND];
     struct {
       uint64_t ebp; // base address of the function's frame
+#ifdef __aarch64__
+      uint64_t lr;  // last record (ARM)
+#endif
       uint64_t esp; // top of the stack
       uint64_t eip; // Extended Instruction Pointer
     };

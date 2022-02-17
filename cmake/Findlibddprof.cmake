@@ -3,19 +3,28 @@
 
 # libddprof : common profiler imported libraries
 ## Associated https://gitlab.ddbuild.io/DataDog/libddprof-build/-/jobs/90384402
-set(TAG_LIBDDPROF "v0.2.0-rc.2" CACHE STRING "libddprof github tag")
-set(VER_LIBDDPROF "0.2.0" CACHE STRING "libddprof version")
+set(TAG_LIBDDPROF "v0.3.0" CACHE STRING "libddprof github tag")
+set(VER_LIBDDPROF "0.3.0" CACHE STRING "libddprof version")
 
-set(SHA256_LIBDDPROF "7c055d11e1bcd12716fd7ff99597777c827da5dd2c99de0900f27672accb8de1" CACHE STRING "libddprof sha256")
+set(SHA256_LIBDDPROF_X86 "450ada55dc571ea17b5fdc88d5e8a425e8885365cf625b03c91e7e68b6fc113a" CACHE STRING "libddprof sha256")
+set(SHA256_LIBDDPROF_ARM "d2e83bb6a70a8faf0d6a299e8ea79676a8b7a22cc14c1b95b4d981b77e865f0d" CACHE STRING "libddprof sha256")
 
-set(LIBDDPROF_X86_ROOT ${VENDOR_PATH}/libddprof/libddprof-x86_64-unknown-linux-gnu)
-set(LIBDDPROF_REL_FFI_LIB ${LIBDDPROF_X86_ROOT}/lib/libddprof_ffi.a)
+set(LIBDDPROF_X86_ROOT ${VENDOR_PATH}/libddprof/x86_64-unknown-linux-gnu)
+set(LIBDDPROF_ARM_ROOT ${VENDOR_PATH}/libddprof/aarm64-unknown-linux-gnu)
+if ( ARM_BUILD )
+  set(LIBDDPROF_ROOT ${LIBDDPROF_ARM_ROOT})
+  set(SHA256_LIBDDPROF ${SHA256_LIBDDPROF_ARM})
+else()
+  set(LIBDDPROF_ROOT ${LIBDDPROF_X86_ROOT})
+  set(SHA256_LIBDDPROF ${SHA256_LIBDDPROF_X86})
+endif()
+set(LIBDDPROF_REL_FFI_LIB ${LIBDDPROF_ROOT}/lib/libddprof_ffi.a)
 
 list(APPEND
     LIBDDPROF_INCLUDE_DIR
-    ${LIBDDPROF_X86_ROOT}/include)
+    ${LIBDDPROF_ROOT}/include)
 
-set(LIBDDPROF_VERSION_FILE ${LIBDDPROF_X86_ROOT}/lib/pkgconfig/ddprof_ffi.pc)
+set(LIBDDPROF_VERSION_FILE ${LIBDDPROF_ROOT}/lib/pkgconfig/ddprof_ffi.pc)
 
 # Expected files
 set(LIBDDPROF_FILES
