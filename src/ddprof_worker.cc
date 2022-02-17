@@ -10,7 +10,11 @@ extern "C" {
 #include <stdint.h>
 #include <sys/time.h>
 #include <time.h>
-#include <x86intrin.h>
+#ifdef __x86_64__
+#  include <x86intrin.h>
+#elif __aarch64__
+#  define __rdtsc() 0
+#endif
 
 #include "ddprof_context.h"
 #include "ddprof_stats.h"

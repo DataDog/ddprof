@@ -7,10 +7,10 @@ set(TAG_LIBDDPROF "v0.3.0" CACHE STRING "libddprof github tag")
 set(VER_LIBDDPROF "0.3.0" CACHE STRING "libddprof version")
 
 set(SHA256_LIBDDPROF_X86 "450ada55dc571ea17b5fdc88d5e8a425e8885365cf625b03c91e7e68b6fc113a" CACHE STRING "libddprof sha256")
-set(SHA256_LIBDDPROF_ARM "d2e83bb6a70a8faf0d6a299e8ea79676a8b7a22cc14c1b95b4d981b77e865f0d" CACHE STRING "libddprof sha256")
+set(SHA256_LIBDDPROF_ARM "25b50573189545e84e65ce66a8d834d74e031a743489af4e89f9d8e1308ed28c" CACHE STRING "libddprof sha256")
 
-set(LIBDDPROF_X86_ROOT ${VENDOR_PATH}/libddprof/x86_64-unknown-linux-gnu)
-set(LIBDDPROF_ARM_ROOT ${VENDOR_PATH}/libddprof/aarm64-unknown-linux-gnu)
+set(LIBDDPROF_X86_ROOT ${VENDOR_PATH}/libddprof/libddprof-x86_64-unknown-linux-gnu)
+set(LIBDDPROF_ARM_ROOT ${VENDOR_PATH}/libddprof/libddprof-aarch64-unknown-linux-gnu)
 if ( ARM_BUILD )
   set(LIBDDPROF_ROOT ${LIBDDPROF_ARM_ROOT})
   set(SHA256_LIBDDPROF ${SHA256_LIBDDPROF_ARM})
