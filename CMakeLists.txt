@@ -23,6 +23,14 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 include(ExtendBuildTypes)
 
+# Detection of architecture
+include(TargetArch)
+target_architecture(DDPROF_ARCH)
+set(DDPROF_SUPPORTED_ARCHS "x86_64")
+if(NOT ${DDPROF_ARCH} IN_LIST DDPROF_SUPPORTED_ARCHS)
+   message(FATAL_ERROR "Unhandled architecture ${DDPROF_ARCH}")
+endif()
+
 # Default value
 message(STATUS "Build type set to " ${CMAKE_BUILD_TYPE})
 
