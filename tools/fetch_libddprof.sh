@@ -38,7 +38,7 @@ cd $3
 DOWNLOAD_PATH=$PWD
 TARGET_EXTRACT=${DOWNLOAD_PATH}/libddprof
 
-if [ -z "$(find "${TARGET_EXTRACT}" -type f)" ]; then
+if [ -n "$(find "${TARGET_EXTRACT}" -type f)" ]; then
     echo "Error, clean the directory : ${TARGET_EXTRACT}"
     exit 1
 fi
@@ -59,11 +59,4 @@ if [ $SHA_TAR != ${SHA256_LIBDDPROF} ];then
     exit 1
 fi
 
-tmp_dir=$(mktemp -d -t deliverables-XXXXXXXXXX)
-echo "Extract to $tmp_dir"
-cd $tmp_dir
-tar xvfz ${DOWNLOAD_PATH}/${TAR_LIBDDPROF}
-mv * ${TARGET_EXTRACT}
-rmdir $tmp_dir
-cd -
-exit 0
+tar xvfz ${DOWNLOAD_PATH}/${TAR_LIBDDPROF} -C ${TARGET_EXTRACT}

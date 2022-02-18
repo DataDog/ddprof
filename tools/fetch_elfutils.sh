@@ -36,7 +36,7 @@ C_COMPILER=${4}
 TAR_ELF="elfutils-${VER_ELF}.tar.bz2"
 URL_ELF="https://sourceware.org/elfutils/ftp/${VER_ELF}/${TAR_ELF}"
 
-if [ -z "$(find "${TARGET_EXTRACT}" -type f)" ]; then
+if [ -n "$(find "${TARGET_EXTRACT}" -type f)" ]; then
     echo "Error, clean the directory : ${TARGET_EXTRACT}"
     exit 1
 fi
