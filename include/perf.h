@@ -38,10 +38,10 @@
 // gets more bits
 #ifdef __x86_64
 #  define PERF_REGS_MASK PERF_REGS_MASK_X86
-#  define PERF_REGS_COUNT 4
+#  define PERF_REGS_COUNT 3
 #elif __aarch64__
 #  define PERF_REGS_MASK PERF_REGS_MASK_ARM
-#  define PERF_REGS_COUNT 3
+#  define PERF_REGS_COUNT 4
 #else
 #  error "platform is not supported"
 #endif
