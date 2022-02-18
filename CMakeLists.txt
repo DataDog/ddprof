@@ -13,7 +13,12 @@ cmake_minimum_required(VERSION 3.19)
   DESCRIPTION "Datadog's native profiler"
 )
 
-message(STATUS "Compiler ID : ${CMAKE_C_COMPILER_ID}")
+message(STATUS "Compiler ID: ${CMAKE_C_COMPILER_ID}")
+message(STATUS "System processor (platform): ${CMAKE_SYSTEM_PROCESSOR}")
+message(STATUS "SYSTEM NAME " ${CMAKE_SYSTEM_NAME})
+if (NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+   message(FATAL_ERROR "Non Linux systems are not handled in ddprof")
+endif()
 
 # Debug command to get gcc command lines
 # set(CMAKE_VERBOSE_MAKEFILE on)
@@ -138,13 +143,6 @@ list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include)
 
 # libddprof
 list(APPEND DDPROF_INCLUDE_LIST ${LIBDDPROF_INCLUDE_DIR})
-
-# Check that we are on a linux system
-message(STATUS "SYSTEM NAME " ${CMAKE_SYSTEM_NAME})
-if (NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
-   message(STATUS "BUILD WILL FAIL : NON LINUX SYSTEMS NOT HANDLED")
-endif()
-
 
 list(APPEND DDPROF_INCLUDE_LIST ${LLVM_DEMANGLE_PATH}/include)
 

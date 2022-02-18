@@ -14,50 +14,34 @@ COMPILER_SETTING="-DCMAKE_CXX_COMPILER=${CXX:-"g++"} -DCMAKE_C_COMPILER=${CC:-"g
 # Avoid having the vendors compiled in the same directory
 EXTENSION_CC=${CC:-"gcc"}
 EXTENSION_OS=${OS_IDENTIFIER:-"linux"}
-VENDOR_EXTENSION="-DVENDOR_EXTENSION=_${EXTENSION_CC,,}_${EXTENSION_OS,,}"
-COMMON_OPT="${COMPILER_SETTING} ${VENDOR_EXTENSION} -DACCURACY_TEST=ON -DCMAKE_INSTALL_PREFIX=${DDPROF_INSTALL_PREFIX} -DBUILD_BENCHMARKS=${DDPROF_BUILD_BENCH} -DBUILD_NATIVE_LIB=${NATIVE_LIB}"
-
-# Detect platform architecture (cross-compile not supported)
-# TODO can this be moved cleanly into cmake?
-ARCH_FLAGS=""
-case $(uname -m) in
-  "aarch64")
-    ARCH_FLAGS="-DARM_BUILD=yes"
-    ;;
-  "x86_64")
-    ARCH_FLAGS=""
-    ;;
-  *)
-    echo "Nice processor you've got there, but I don't support it"
-    exit -1
-    ;;
-esac
+VENDOR_EXTENSION="_${EXTENSION_CC}_${EXTENSION_OS}"
+COMMON_OPT="${COMPILER_SETTING} -DVENDOR_EXTENSION=${VENDOR_EXTENSION} -DACCURACY_TEST=ON -DCMAKE_INSTALL_PREFIX=${DDPROF_INSTALL_PREFIX} -DBUILD_BENCHMARKS=${DDPROF_BUILD_BENCH} -DBUILD_NATIVE_LIB=${NATIVE_LIB}"
 
 RelCMake() {
-    cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=Release ${ARCH_FLAGS} "$@"
+    cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=Release "$@"
 }
 
 DebCMake() {
-    cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=Debug ${ARCH_FLAGS} "$@"
+    cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=Debug "$@"
 }
 
 SanCMake() {
-    cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=SanitizedDebug ${ARCH_FLAGS} "$@"
+    cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=SanitizedDebug "$@"
 }
 
 TSanCMake() {
-    cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=ThreadSanitizedDebug ${ARCH_FLAGS} "$@"
+    cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=ThreadSanitizedDebug "$@"
 }
 
 CovCMake() {
-    cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=Coverage ${ARCH_FLAGS} "$@"
+    cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=Coverage "$@"
 }
 
 ## Build a directory with a naming that reflects the OS / compiler we are using
 ## Example : mkBuildDir Rel --> build_UB18_clang_Rel
 MkBuildDir() {
-    mkdir -p build_${OS_IDENTIFIER}_${CC}_${1}
-    cd build_${OS_IDENTIFIER}_${CC}_${1}
+    mkdir -p build${VENDOR_EXTENSION}_${1}
+    cd build${VENDOR_EXTENSION}_${1}
 }
 
 RunDDBuild() {
