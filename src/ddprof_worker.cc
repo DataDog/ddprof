@@ -10,14 +10,10 @@ extern "C" {
 #include <stdint.h>
 #include <sys/time.h>
 #include <time.h>
-#ifdef __x86_64__
-#  include <x86intrin.h>
-#elif __aarch64__
-#  define __rdtsc() 0
-#endif
 
 #include "ddprof_context.h"
 #include "ddprof_stats.h"
+#include "intrin.h"
 #include "logger.h"
 #include "perf.h"
 #include "pevent_lib.h"

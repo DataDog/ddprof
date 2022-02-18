@@ -13,11 +13,6 @@
 #include <sys/resource.h>
 #include <sys/sysinfo.h>
 #include <unistd.h>
-#ifdef __x86_64
-#  include <x86intrin.h>
-#elif __aarch64__
-#  define __rdtsc() 0
-#endif
 
 #include "cap_display.h"
 #include "ddprof_cmdline.h"
@@ -27,6 +22,7 @@
 #include "ddprof_stats.h"
 #include "ddprof_worker.h"
 #include "ddres.h"
+#include "intrin.h"
 #include "logger.h"
 #include "perf_mainloop.h"
 #include "pevent_lib.h"
