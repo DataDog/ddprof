@@ -21,7 +21,8 @@ if (CPP_CHECK_COMMAND)
          "--enable=warning,performance,portability,information,style"
          "--template=${CPPCHECK_TEMPLATE}"
          "--library=googletest"
-         "--quiet" 
+         "--quiet"
+         "--inline-suppr"
          "--suppressions-list=${CMAKE_SOURCE_DIR}/CppCheckSuppressions.txt"
          #"--cppcheck-build-dir=${CMAKE_BINARY_DIR}" #does not work well with suppressions
          ${CPPCHECK_DIRS}
