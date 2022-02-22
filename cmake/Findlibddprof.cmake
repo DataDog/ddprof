@@ -6,16 +6,24 @@
 set(TAG_LIBDDPROF "v0.4.0-rc.1" CACHE STRING "libddprof github tag")
 set(VER_LIBDDPROF "0.4.0-rc.1" CACHE STRING "libddprof version")
 
-set(SHA256_LIBDDPROF "6b18703b24b5408d7071bfe1ddeb5bf73454ad6669e31b37a8401ad94ca9aed6" CACHE STRING "libddprof sha256")
+set(SHA256_LIBDDPROF_X86 "6b18703b24b5408d7071bfe1ddeb5bf73454ad6669e31b37a8401ad94ca9aed6" CACHE STRING "libddprof sha256")
+set(SHA256_LIBDDPROF_ARM "5000f84c70961b4ae03f0497751cf52a46e29ce4f7c1be2d9eefea491ceec891" CACHE STRING "libddprof sha256")
 
-set(LIBDDPROF_X86_ROOT ${VENDOR_PATH}/libddprof/libddprof-x86_64-unknown-linux-gnu)
-set(LIBDDPROF_REL_FFI_LIB ${LIBDDPROF_X86_ROOT}/lib/libddprof_ffi.a)
+set(LIBDDPROF_ROOT ${VENDOR_PATH}/libddprof/libddprof-${CMAKE_SYSTEM_PROCESSOR}-unknown-linux-gnu)
+if ( "${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64" )
+  set(SHA256_LIBDDPROF ${SHA256_LIBDDPROF_ARM})
+elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+  set(SHA256_LIBDDPROF ${SHA256_LIBDDPROF_X86})
+else()
+   message(FATAL_ERROR "Unhandled processor ${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+set(LIBDDPROF_REL_FFI_LIB ${LIBDDPROF_ROOT}/lib/libddprof_ffi.a)
 
 list(APPEND
     LIBDDPROF_INCLUDE_DIR
-    ${LIBDDPROF_X86_ROOT}/include)
+    ${LIBDDPROF_ROOT}/include)
 
-set(LIBDDPROF_VERSION_FILE ${LIBDDPROF_X86_ROOT}/lib/pkgconfig/ddprof_ffi.pc)
+set(LIBDDPROF_VERSION_FILE ${LIBDDPROF_ROOT}/lib/pkgconfig/ddprof_ffi.pc)
 
 # Expected files
 set(LIBDDPROF_FILES

@@ -31,7 +31,13 @@ extern "C" {
 
 #include "defer.hpp"
 
-#define rmb() __asm__ volatile("lfence" ::: "memory")
+// Implements a read memory barrier.  Note the different pipeline architectures
+// require different types of fences!
+#ifdef __x86_64__
+#  define rmb() __asm__ volatile("lfence" ::: "memory")
+#elif __aarch64__
+#  define rmb() __asm__ volatile("dmb ishld" ::: "memory")
+#endif
 
 static pid_t g_child_pid = 0;
 static bool g_termination_requested = false;

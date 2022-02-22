@@ -28,9 +28,10 @@ cd $SCRIPTDIR/../
 TOP_LVL_DIR=$PWD
 cd $CURRENTDIR
 
+MARCH=$(uname -m)
 TAG_LIBDDPROF=$1
 TAR_LIBDDPROF=libddprof_${TAG_LIBDDPROF}.tar.gz
-GITHUB_URL_LIBDDPROF=https://github.com/DataDog/libddprof/releases/download/${TAG_LIBDDPROF}/libddprof-x86_64-unknown-linux-gnu.tar.gz
+GITHUB_URL_LIBDDPROF=https://github.com/DataDog/libddprof/releases/download/${TAG_LIBDDPROF}/libddprof-${MARCH}-unknown-linux-gnu.tar.gz
 
 SHA256_LIBDDPROF=$2
 mkdir -p $3
