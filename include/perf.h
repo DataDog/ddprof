@@ -13,7 +13,7 @@
 #include "ddres_def.h"
 #include "perf_option.h"
 
-#define PSAMPLE_DEFAULT_WAKEUP 10 // sample frequency check
+#define PSAMPLE_DEFAULT_WAKEUP_MS 100 // sample frequency check
 #define PERF_SAMPLE_STACK_SIZE (4096 * 8)
 #define PERF_SAMPLE_STACK_REGS 3
 #define MAX_INSN 16

@@ -215,7 +215,8 @@ void *ddprof_worker_export_thread(void *arg) {
 #endif
 
 /// Cycle operations : export, sync metrics, update counters
-static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
+DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
+                          bool synchronous_export) {
 
   // Scrape procfs for process usage statistics
   DDRES_CHECK_FWD(worker_update_stats(&ctx->worker_ctx.proc_status,
@@ -259,13 +260,15 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
   // switch before we async export to avoid any possible race conditions (then
   // take into account the switch)
   ctx->worker_ctx.i_current_pprof = 1 - ctx->worker_ctx.i_current_pprof;
-#  ifndef NO_THREADED_EXPORT
-  pthread_create(&ctx->worker_ctx.exp_tid, NULL, ddprof_worker_export_thread,
-                 &ctx->worker_ctx);
-#  else
-  ddprof_worker_export_thread(reinterpret_cast<void *>(&ctx->worker_ctx));
-#  endif
-
+  if (!synchronous_export) {
+    pthread_create(&ctx->worker_ctx.exp_tid, NULL, ddprof_worker_export_thread,
+                   &ctx->worker_ctx);
+  } else {
+    ddprof_worker_export_thread(reinterpret_cast<void *>(&ctx->worker_ctx));
+    if (ctx->worker_ctx.exp_error) {
+      return ddres_create(DD_SEVERROR, DD_WHAT_EXPORTER);
+    }
+  }
 #endif
 
   // Increase the counts of exports
@@ -337,59 +340,16 @@ void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int pos) {
   }
 }
 
-/****************************** other functions *******************************/
-static DDRes reset_state(DDProfContext *ctx,
-                         volatile bool *continue_profiling) {
-  if (!ctx) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW, "[DDPROF] Invalid context in %s",
-                           __FUNCTION__);
-  }
-
-  // Check to see whether we need to clear the whole worker
-  // NOTE: we do not reset the counters here, since clearing the worker
-  //       1. is nonlocalized to this function; we just send a return value
-  //          which informs the caller to refresh the worker
-  //       2. new worker should be initialized with a fresh state, so clearing
-  //          it here is irrelevant anyway
-  if (ctx->params.worker_period <= ctx->worker_ctx.count_worker) {
-
-    // We have to return, but before we can do so we need to check for pending
-    // exports.  If an export is stuck, we have to fail.
-    *continue_profiling = true;
-    if (ctx->worker_ctx.exp_tid) {
-      struct timespec waittime;
-      clock_gettime(CLOCK_REALTIME, &waittime);
-      int waitsec = DDPROF_EXPORT_TIMEOUT_MAX - ctx->params.upload_period;
-      waitsec = waitsec > 1 ? waitsec : 1;
-      waittime.tv_sec += waitsec;
-      if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime)) {
-        *continue_profiling = false;
-        LG_WRN("export failed to complete in time");
-      } else {
-        ctx->worker_ctx.exp_tid = 0;
-      }
-    }
-    DDRES_RETURN_WARN_LOG(DD_WHAT_WORKER_RESET, "%s: cnt=%u - stop worker (%s)",
-                          __FUNCTION__, ctx->worker_ctx.count_worker,
-                          (*continue_profiling) ? "continue" : "stop");
-  }
-
-  return ddres_init();
-}
-
 /********************************** callbacks *********************************/
-DDRes ddprof_worker_timeout(volatile bool *continue_profiling,
-                            DDProfContext *ctx) {
+DDRes ddprof_worker_maybe_export(DDProfContext *ctx, int64_t now_ns,
+                                 bool *restart_worker) {
   try {
-    int64_t now = now_nanos();
-    if (now > ctx->worker_ctx.send_nanos) {
-      DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now));
-      // reset state defines if we should reboot the worker
-      DDRes res = reset_state(ctx, continue_profiling);
-      // A warning can be returned for a reset and should not be ignored
-      if (IsDDResNotOK(res)) {
-        return res;
-      }
+    if (now_ns > ctx->worker_ctx.send_nanos) {
+      // restart worker if number of uploads is reached
+      *restart_worker =
+          (ctx->params.worker_period <= ctx->worker_ctx.count_worker);
+      // when restarting worker, do a synchronous export
+      DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now_ns, *restart_worker));
     }
   }
   CatchExcept2DDRes();
@@ -479,8 +439,8 @@ struct perf_event_hdr_wpid : perf_event_header {
   uint32_t pid, tid;
 };
 
-DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
-                    volatile bool *continue_profiling, DDProfContext *ctx) {
+DDRes ddprof_worker_process_event(struct perf_event_header *hdr, int pos,
+                                  DDProfContext *ctx) {
   // global try catch to avoid leaking exceptions to main loop
   try {
     ddprof_stats_add(STATS_EVENT_COUNT, 1, NULL);
@@ -523,20 +483,6 @@ DDRes ddprof_worker(struct perf_event_header *hdr, int pos,
       // allow new backpopulates and reset counter
       ctx->worker_ctx.us->dso_hdr.reset_backpopulate_state();
       ctx->worker_ctx.count_samples = 0;
-    }
-
-    // Click the timer at the end of processing, since we always add the
-    // sampling rate to the last time.
-    int64_t now = now_nanos();
-
-    if (now > ctx->worker_ctx.send_nanos) {
-      DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now));
-      // reset state defines if we should reboot the worker
-      DDRes res = reset_state(ctx, continue_profiling);
-      // A warning can be returned for a reset and should not be ignored
-      if (IsDDResNotOK(res)) {
-        return res;
-      }
     }
   }
   CatchExcept2DDRes();

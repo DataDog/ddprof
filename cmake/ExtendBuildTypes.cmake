@@ -8,7 +8,15 @@ endif()
 
 add_compile_options(-Wall)
 
-set(GCC_DEBUG_FLAGS "-g -Wall")
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
+        add_compile_options(-Wshadow=local)
+    endif()
+else()
+    add_compile_options(-Wshadow)
+endif()
+
+set(GCC_DEBUG_FLAGS "-g")
 set(SAN_FLAGS "-fsanitize=undefined -fsanitize=float-divide-by-zero -fno-sanitize-recover")
 set(ASAN_FLAGS "-fsanitize=address -fsanitize=leak")
 set(TSAN_FLAGS "-fsanitize=thread")

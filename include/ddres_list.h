@@ -40,7 +40,6 @@ extern "C" {
   X(POLLTIMEOUT, "timeout when polling perf events")                           \
   X(POLLERROR, "Unknown poll error")                                           \
   X(POLLHANGUP, "perf event file descriptor hang up")                          \
-  X(WORKER_RESET, "worker reset requested (not a fatal error)")                \
   X(PROCSTATE, "error when retrieveing procstate")                             \
   X(PPROF, "error in pprof manipulations")                                     \
   X(STATSD, "statsd interface")                                                \
@@ -52,6 +51,7 @@ extern "C" {
   X(STACK_HANDLE, "")                                                          \
   X(DSO, "")                                                                   \
   X(UNHANDLED_DSO, "ignore dso type")                                          \
+  X(WORKERLOOP_INIT, "error initializing the worker loop")                     \
   X(UNITTEST, "unit test error")
 
 // generic erno errors available from /usr/include/asm-generic/errno.h

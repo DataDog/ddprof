@@ -56,6 +56,18 @@ extern "C" {
     }                                                                          \
   } while (0)
 
+/// Evaluate function and return error if -1 (add an error log)
+#define DDRES_CHECK_ERRNO(eval, what, ...)                                     \
+  do {                                                                         \
+    if (unlikely(eval == -1)) {                                                \
+      int e = errno;                                                           \
+      LG_ERR(__VA_ARGS__);                                                     \
+      LOG_ERROR_DETAILS(LG_ERR, what);                                         \
+      LG_ERR("errno(%d): %s", e, strerror(e));                                 \
+      return ddres_error(what);                                                \
+    }                                                                          \
+  } while (0)
+
 /// Check boolean and log
 #define DDRES_CHECK_BOOL(eval, what, ...)                                      \
   do {                                                                         \
