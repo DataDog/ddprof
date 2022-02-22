@@ -69,7 +69,7 @@ int perfopen(pid_t pid, const PerfOption *opt, int cpu, bool extras) {
   attr.freq = opt->freq;
 
   // Breakpoint
-  if (opt->type & PERF_TYPE_BREAKPOINT) {
+  if (opt->type == PERF_TYPE_BREAKPOINT) {
     attr.config = 0; // as per perf_event_open() manpage
     attr.bp_type = opt->bp_type;
   }
