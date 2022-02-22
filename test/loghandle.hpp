@@ -11,7 +11,7 @@ extern "C" {
 
 class LogHandle {
 public:
-  LogHandle(int lvl = LL_DEBUG) {
+  explicit LogHandle(int lvl = LL_DEBUG) {
     LOG_open(LOG_STDERR, nullptr);
     LOG_setlevel(lvl);
   }

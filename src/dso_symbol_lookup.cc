@@ -19,15 +19,14 @@ namespace ddprof {
 namespace {
 
 Symbol symbol_from_unhandled_dso(const Dso &dso) {
-  return Symbol(dso._pgoff, std::string(), std::string(), 0,
-                dso::dso_type_str(dso._type));
+  return Symbol(std::string(), std::string(), 0, dso::dso_type_str(dso._type));
 }
 
 Symbol symbol_from_dso(ElfAddress_t normalized_addr, const Dso &dso) {
   // address that means something for our user (addr)
   std::string dso_dbg_str =
       normalized_addr ? string_format("[%p:file]", normalized_addr) : "";
-  return Symbol(dso._pgoff, dso_dbg_str, dso_dbg_str, 0, dso.format_filename());
+  return Symbol(dso_dbg_str, dso_dbg_str, 0, dso.format_filename());
 }
 } // namespace
 

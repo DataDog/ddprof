@@ -29,7 +29,7 @@ static const char *s_so_paths[] = {"/app/lib/bar.0.so"};
 
 static inline void fill_symbol_table_1(SymbolTable &symbol_table) {
   for (unsigned i = 0; i < K_MOCK_LOC_SIZE; ++i) {
-    symbol_table.emplace_back(300 + i, std::string(s_syn_names[i]),
+    symbol_table.emplace_back(std::string(s_syn_names[i]),
                               std::string(s_func_names[i]), 10 * i,
                               std::string(s_src_paths[i]));
   }

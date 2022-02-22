@@ -27,7 +27,6 @@ typedef struct DDProfInput {
   char *fault_info;
   char *core_dumps;
   char *nice;
-  char *send_final;
   char *pid;
   char *global;
   char *worker_period;
@@ -90,7 +89,6 @@ typedef struct DDProfInput {
   XX(DD_PROFILING_NATIVE_CORE_DUMPS,    core_dumps,         m, 'm', 1, input, NULL, "no", )                    \
   XX(DD_PROFILING_NATIVE_NICE,          nice,               i, 'i', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_NATIVE_SHOW_CONFIG,   show_config,        c, 'c', 1, input, NULL, "no", )                    \
-  XX(DD_PROFILING_NATIVE_SEND_FINAL,    send_final,         f, 'f', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_NATIVE_LOG_MODE,      log_mode,           o, 'o', 1, input, NULL, "stdout", )                \
   XX(DD_PROFILING_NATIVE_LOG_LEVEL,     log_level,          l, 'l', 1, input, NULL, "error", )                 \
   XX(DD_PROFILING_NATIVE_TARGET_PID,    pid,                p, 'p', 1, input, NULL, "", )                      \

@@ -23,7 +23,6 @@ typedef struct DDProfContext {
     bool core_dumps;
     int nice;
     int num_cpu;
-    bool send_final;
     pid_t pid; // ! only use for perf attach (can be -1 in global mode)
     bool global;
     uint32_t worker_period; // exports between worker refreshes
