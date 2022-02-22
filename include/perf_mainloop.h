@@ -5,11 +5,15 @@
 
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "ddprof_context.h"
 #include "worker_attr.h"
 
 typedef struct MLWorkerFlags {
-  volatile bool can_run;
+  volatile bool restart_worker;
   volatile bool errors;
 } MLWorkerFlags;
 
@@ -28,3 +32,7 @@ DDRes main_loop(const WorkerAttr *, DDProfContext *);
 
 // Same as main loop without any forks
 void main_loop_lib(const WorkerAttr *attr, DDProfContext *ctx);
+
+#ifdef __cplusplus
+}
+#endif
