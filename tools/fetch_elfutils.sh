@@ -36,7 +36,7 @@ C_COMPILER=${4}
 TAR_ELF="elfutils-${VER_ELF}.tar.bz2"
 URL_ELF="https://sourceware.org/elfutils/ftp/${VER_ELF}/${TAR_ELF}"
 
-if [ -d "${TARGET_EXTRACT}" && -z "$(find "${TARGET_EXTRACT}" -type f)" ]; then
+if [ -n "$(find "${TARGET_EXTRACT}" -type f)" ]; then
     echo "Error, clean the directory : ${TARGET_EXTRACT}"
     exit 1
 fi
@@ -70,5 +70,5 @@ echo "Compile elfutils using ${C_COMPILER}"
 if [ "clang" == $(basename ${C_COMPILER}) ]; then
   export CFLAGS="-Wno-xor-used-as-pow -Wno-gnu-variable-sized-type-not-at-end"
 fi
-cd ${TARGET_EXTRACT} && ./configure CC=${C_COMPILER} --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning
+cd ${TARGET_EXTRACT} && ./configure CC=${C_COMPILER} --without-bzlib --without-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning
 make -j4 -C ${TARGET_EXTRACT}
