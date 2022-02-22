@@ -42,6 +42,7 @@ struct ProcFileHolder {
   FILE *_mpf;
 };
 
+#ifndef NDEBUG
 static bool ip_in_procline(char *line, uint64_t ip) {
   static const char spec[] = "%lx-%lx %4c %lx %*x:%*x %*d%n";
   uint64_t m_start = 0;
@@ -58,7 +59,6 @@ static bool ip_in_procline(char *line, uint64_t ip) {
   return ip >= m_start && ip <= m_end;
 }
 
-#ifndef NDEBUG
 static void pid_find_ip(int pid, uint64_t ip,
                         const std::string &path_to_proc = "") {
   ProcFileHolder file_holder(pid, path_to_proc);

@@ -62,7 +62,7 @@ static void print_diagnostics(const DsoHdr &dso_hdr) {
 }
 
 static inline int64_t now_nanos() {
-  static struct timeval tv = {0};
+  static struct timeval tv = {};
   gettimeofday(&tv, NULL);
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
 }
@@ -188,7 +188,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   return ddres_init();
 }
 
-static void ddprof_reset_worker_stats(DsoHdr *dso_hdr) {
+static void ddprof_reset_worker_stats() {
   for (unsigned i = 0; i < cycled_stats_sz; ++i) {
     ddprof_stats_clear(s_cycled_stats[i]);
   }
@@ -288,13 +288,12 @@ static DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now) {
   unwind_cycle(ctx->worker_ctx.us);
 
   // Reset stats relevant to a single cycle
-  ddprof_reset_worker_stats(&ctx->worker_ctx.us->dso_hdr);
+  ddprof_reset_worker_stats();
 
   return ddres_init();
 }
 
 void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int pos) {
-  (void)ctx;
   if (!(map->header.misc & PERF_RECORD_MISC_MMAP_DATA)) {
     LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx)", pos, map->pid, map->filename,
            map->addr, map->len, map->pgoff);
@@ -304,13 +303,11 @@ void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int pos) {
   }
 }
 
-void ddprof_pr_lost(DDProfContext *ctx, perf_event_lost *lost, int pos) {
-  (void)pos;
+void ddprof_pr_lost(DDProfContext *, perf_event_lost *lost, int) {
   ddprof_stats_add(STATS_EVENT_LOST, lost->lost, NULL);
 }
 
 void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm, int pos) {
-  (void)ctx;
   // Change in process name (assuming exec) : clear all associated dso
   if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC) {
     LG_DBG("<%d>(COMM)%d -> %s", pos, comm->pid, comm->comm);
@@ -319,7 +316,6 @@ void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm, int pos) {
 }
 
 void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int pos) {
-  (void)ctx;
   LG_DBG("<%d>(FORK)%d -> %d/%d", pos, frk->ppid, frk->pid, frk->tid);
   if (frk->ppid != frk->pid) {
     // Clear everything and populate at next error or with coming samples

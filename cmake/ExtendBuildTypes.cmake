@@ -6,7 +6,9 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release" CACHE STRING "CMake build type" FORCE)
 endif()
 
-SET(GCC_DEBUG_FLAGS "-g -Wall")
+add_compile_options(-Wall)
+
+set(GCC_DEBUG_FLAGS "-g -Wall")
 set(SAN_FLAGS "-fsanitize=undefined -fsanitize=float-divide-by-zero -fno-sanitize-recover")
 set(ASAN_FLAGS "-fsanitize=address -fsanitize=leak")
 set(TSAN_FLAGS "-fsanitize=thread")

@@ -74,7 +74,7 @@ void LOG_close() {
   log_ctx->fd = -1;
 }
 
-bool LOG_open(int mode, char *opts) {
+bool LOG_open(int mode, const char *opts) {
   if (log_ctx->fd >= 0)
     LOG_close();
 

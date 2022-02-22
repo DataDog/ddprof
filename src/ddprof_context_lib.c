@@ -132,9 +132,6 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
 
   ctx->params.num_cpu = get_nprocs();
 
-  // Process send_final
-  ctx->params.send_final = arg_yesno(input->send_final, 1);
-
   // Adjust target PID
   pid_t pid_tmp = 0;
   if (input->pid && (pid_tmp = strtol(input->pid, NULL, 10)))

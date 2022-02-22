@@ -16,7 +16,7 @@ namespace ddprof {
 namespace {
 Symbol symbol_from_pid(pid_t pid) {
   std::string pid_str = string_format("pid_%d", pid);
-  return Symbol(0, std::string(), std::string(), 0, pid_str);
+  return Symbol(std::string(), std::string(), 0, pid_str);
 }
 } // namespace
 
