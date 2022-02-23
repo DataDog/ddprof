@@ -24,13 +24,19 @@ bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
   regs[16] = us->initial_regs.eip;
 #elif __aarch64__
   Dwarf_Word regs[33] = {0};
-  regs[29] = us->initial_regs.ebp;
-  regs[30] = us->initial_regs.lr;
-  regs[31] = us->initial_regs.esp;
-  regs[32] = us->initial_regs.eip;
+  for (int i = 0; i< 33; ++i) {
+    regs[i] = us->initial_regs.regs[i];
+  }
+  // regs[29] = us->initial_regs.ebp;
+  // regs[30] = us->initial_regs.lr;
+  // regs[31] = us->initial_regs.esp;
+  // regs[32] = us->initial_regs.eip;
 #endif
 
-  return dwfl_thread_state_registers(thread, 0, sizeof(regs)/sizeof(*regs), regs);
+  bool ret = dwfl_thread_state_registers(thread, 0, sizeof(regs)/sizeof(*regs), regs);
+  Dwarf_Word dwarf_pc = us->initial_regs.eip;
+	dwfl_thread_state_register_pc(thread, dwarf_pc);
+  return ret;
 }
 
 /// memory_read as per prototype define in libdwfl

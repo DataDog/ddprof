@@ -22,7 +22,7 @@ typedef struct Dwfl Dwfl;
 #ifdef __x86_64__
 #  define K_NB_REGS_UNWIND 3
 #elif __aarch64__
-#  define K_NB_REGS_UNWIND 4
+#  define K_NB_REGS_UNWIND 33
 #endif
 
 struct UnwindRegisters {
@@ -34,6 +34,7 @@ struct UnwindRegisters {
   union {
     uint64_t regs[K_NB_REGS_UNWIND];
     struct {
+      uint64_t ireg[29];
       uint64_t ebp; // base address of the function's frame
 #ifdef __aarch64__
       uint64_t lr;  // last record (ARM)
