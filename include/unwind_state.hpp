@@ -15,15 +15,12 @@ extern "C" {
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
 #include "dwfl_thread_callbacks.hpp"
+#include "perf.h"
 #include "symbol_hdr.hpp"
 
 typedef struct Dwfl Dwfl;
 
-#ifdef __x86_64__
-#  define K_NB_REGS_UNWIND 3
-#elif __aarch64__
-#  define K_NB_REGS_UNWIND 33
-#endif
+#define K_NB_REGS_UNWIND PERF_REGS_COUNT
 
 struct UnwindRegisters {
   UnwindRegisters() {
@@ -34,13 +31,21 @@ struct UnwindRegisters {
   union {
     uint64_t regs[K_NB_REGS_UNWIND];
     struct {
-      uint64_t ireg[29];
-      uint64_t ebp; // base address of the function's frame
-#ifdef __aarch64__
-      uint64_t lr;  // last record (ARM)
+#ifdef __x86_64__
+      uint64_t __reserved_regs1[6]; // 0-5
+      uint64_t ebp; // x86_64 procedure call, register 6
+      uint64_t esp; // 7
+      uint64_t eip; // 8
+      uint64_t __reserved_regs2[25]; // 9-33
+
+#elif __aarch64__
+      uint64_t __reserved_regs1[29]; // 0-28
+      uint64_t ebp; // aarch64 procedure call, register 29
+      uint64_t lr; // 30
+      uint64_t esp; // 31
+      uint64_t eip; // 32
+      uint64_t __reserved_regs2[1]; // 33
 #endif
-      uint64_t esp; // top of the stack
-      uint64_t eip; // Extended Instruction Pointer
     };
   };
 };
