@@ -20,7 +20,15 @@ extern "C" {
 
 typedef struct Dwfl Dwfl;
 
-#define K_NB_REGS_UNWIND PERF_REGS_COUNT
+// This is not a strict mirror of the register values acquired by perf; rather
+// it's an array whose individual positions each have semantic value in the 
+// context of DWARF; accordingly, the size is arch-dependent.
+// It is possible to provide SIMD registers on x86, but we don't do that here.
+#ifdef __x86_64__
+#define  K_NB_REGS_UNWIND 17
+#elif __aarch64__
+#define  K_NB_REGS_UNWIND 33
+#endif
 
 // The layout below follows kernel arch/<ARCH>/include/uapi/asm/perf_regs.h
 struct UnwindRegisters {
@@ -34,23 +42,13 @@ struct UnwindRegisters {
     struct {
 #ifdef __x86_64__
       uint64_t eax;
-      uint64_t ebx;
-      uint64_t ecx;
       uint64_t edx;
+      uint64_t ecx;
+      uint64_t ebx;
       uint64_t esi;
       uint64_t edi;
-      uint64_t ebp; // 6,
-      uint64_t sp; // 7, called esp in x86_64
-      uint64_t pc; // 8, called eip in x86_64
-      uint64_t flags;
-      uint64_t cs;
-      uint64_t ss;
-/*
-      uint64_t ds; // For some reason, these x86 segment registers cannot be
-      uint64_t es; // passed to the perf_event_open user_regs mask.
-      uint64_t fs; These are registers 12-15
-      uint64_t gs;
-*/
+      uint64_t fp; // ebp
+      uint64_t sp; // esp
       uint64_t r8;
       uint64_t r9;
       uint64_t r10;
@@ -59,6 +57,7 @@ struct UnwindRegisters {
       uint64_t r13;
       uint64_t r14;
       uint64_t r15;
+      uint64_t pc; // eip
 #elif __aarch64__
       uint64_t x0;
       uint64_t x1;

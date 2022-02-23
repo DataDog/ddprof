@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "ddres_def.h"
+#include "perf_archmap.h"
 #include "perf_option.h"
 
 #define PSAMPLE_DEFAULT_WAKEUP_MS 100 // sample frequency check
@@ -22,9 +23,6 @@
 #define DEFAULT_SAMPLE_TYPE                                                    \
   (PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_TID |          \
    PERF_SAMPLE_TIME | PERF_SAMPLE_PERIOD)
-
-#define PERF_REGS_COUNT 33 // Use the lowest 33 registers
-#define PERF_REGS_MASK (~(~0ull << PERF_REGS_COUNT))
 
 typedef struct read_format {
   uint64_t value;        // The value of the event
