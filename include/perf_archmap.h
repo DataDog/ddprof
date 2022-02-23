@@ -25,12 +25,12 @@ enum PERF_ARCHMAP_X86 {
   PAM_X86_FL,
   PAM_X86_CS,
   PAM_X86_SS,
-/*
-  PAM_X86_DS,  // These segment registers cannot be read using common user
-  PAM_X86_ES,  // permissions.  Accordingly, they are omitted from the mask.
-  PAM_X86_FS,  // They are retained here for documentation.
-  PAM_X86_GS,  // <-- and this one too
-*/
+  /*
+    PAM_X86_DS,  // These segment registers cannot be read using common user
+    PAM_X86_ES,  // permissions.  Accordingly, they are omitted from the mask.
+    PAM_X86_FS,  // They are retained here for documentation.
+    PAM_X86_GS,  // <-- and this one too
+  */
   PAM_X86_R8,
   PAM_X86_R9,
   PAM_X86_R10,
@@ -42,7 +42,7 @@ enum PERF_ARCHMAP_X86 {
   PAM_X86_MAX,
 };
 #elif __aarch64__
-  // Registers 0-32
+// Registers 0-32
 #  define PERF_REGS_COUNT 33
 #  define PERF_REGS_MASK (~(~0ull << PERF_REGS_COUNT))
 #  define REGNAME(X) PAM_ARM_##x
@@ -76,8 +76,8 @@ enum perf_event_arm_regs {
   PAM_ARM_X26,
   PAM_ARM_X27,
   PAM_ARM_X28,
-  PAM_ARM_X29, PAM_ARM_FP = PAM_ARM_X29
-  PAM_ARM_LR,
+  PAM_ARM_X29,
+  PAM_ARM_FP = PAM_ARM_X29 PAM_ARM_LR,
   PAM_ARM_SP,
   PAM_ARM_PC,
   PAM_ARM_MAX,
