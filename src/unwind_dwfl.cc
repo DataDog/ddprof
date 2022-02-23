@@ -48,7 +48,7 @@ DDRes unwind_init_dwfl(UnwindState *us) {
         }
         const FileInfoValue &file_info_value =
             us->dso_hdr.get_file_info_value(file_info_id);
-        if (IsDDResOK(us->_dwfl_wrapper->register_mod(us->current_eip, dso,
+        if (IsDDResOK(us->_dwfl_wrapper->register_mod(us->current_ip, dso,
                                                       file_info_value))) {
           // one success is fine
           success = true;
@@ -78,12 +78,12 @@ DDRes unwind_init_dwfl(UnwindState *us) {
 static void trace_unwinding_end(UnwindState *us) {
   if (LL_DEBUG <= LOG_getlevel()) {
     DsoHdr::DsoFindRes find_res =
-        us->dso_hdr.dso_find_closest(us->pid, us->current_eip);
+        us->dso_hdr.dso_find_closest(us->pid, us->current_ip);
     if (find_res.second) {
-      LG_DBG("Stopped at %lx - dso %s - error %s", us->current_eip,
+      LG_DBG("Stopped at %lx - dso %s - error %s", us->current_ip,
              find_res.first->second.to_string().c_str(), dwfl_errmsg(-1));
     } else {
-      LG_DBG("Unknown DSO %lx - error %s", us->current_eip, dwfl_errmsg(-1));
+      LG_DBG("Unknown DSO %lx - error %s", us->current_ip, dwfl_errmsg(-1));
     }
   }
 }
@@ -111,7 +111,7 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   if (!isactivation)
     --pc;
 
-  us->current_eip = pc;
+  us->current_ip = pc;
 
   DsoHdr::DsoFindRes find_res =
       us->dso_hdr.dso_find_or_backpopulate(us->pid, pc);

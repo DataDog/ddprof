@@ -84,7 +84,7 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
 
 #ifdef SKIP_UNALIGNED_REGS
   // for sanitizer
-  if ((us->initial_regs.esp & 0x7) != 0) {
+  if ((us->initial_regs.sp & 0x7) != 0) {
     // The address is not 8-bit aligned here
     LG_DBG("Addr is not aligned 0x%lx", addr);
     return false;
@@ -99,8 +99,8 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
   }
 
   // stack grows down, so end of stack is start
-  // us->initial_regs.esp does not have to be aligned
-  uint64_t sp_start = us->initial_regs.esp;
+  // us->initial_regs.sp does not have to be aligned
+  uint64_t sp_start = us->initial_regs.sp;
   uint64_t sp_end = sp_start + us->stack_sz;
 
   if (addr < sp_start && addr > sp_start - 4096) {
@@ -111,7 +111,7 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
     // ever be mapped there on Linux, even if they actually did fit in the
     // single page before the top of the stack).  Avoiding these reads allows
     // us to prevent unnecessary backpopulate calls.
-    LG_DBG("Invalid stack access:%lu before ESP", sp_start - addr);
+    LG_DBG("Invalid stack access:%lu before SP", sp_start - addr);
 #endif
     return false;
   } else if (addr < sp_start || addr + sizeof(ElfWord_t) > sp_end) {
