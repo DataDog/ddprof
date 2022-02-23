@@ -45,8 +45,8 @@ enum PERF_ARCHMAP_X86 {
 // Registers 0-32
 #  define PERF_REGS_COUNT 33
 #  define PERF_REGS_MASK (~(~0ull << PERF_REGS_COUNT))
-#  define REGNAME(X) PAM_ARM_##x
-enum perf_event_arm_regs {
+#  define REGNAME(x) PAM_ARM_##x
+enum PERF_ARCHMAP_ARM {
   PAM_ARM_X0,
   PAM_ARM_X1,
   PAM_ARM_X2,
@@ -77,7 +77,8 @@ enum perf_event_arm_regs {
   PAM_ARM_X27,
   PAM_ARM_X28,
   PAM_ARM_X29,
-  PAM_ARM_FP = PAM_ARM_X29 PAM_ARM_LR,
+  PAM_ARM_FP = PAM_ARM_X29, // For uniformity
+  PAM_ARM_LR,
   PAM_ARM_SP,
   PAM_ARM_PC,
   PAM_ARM_MAX,
