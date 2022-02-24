@@ -79,6 +79,7 @@ list(APPEND ELFUTILS_LIBRARIES dw elf libz.a liblzma.a)
 #######################
 
 #Cpp Check
+include(ClangTidy)
 include(Cppcheckconfig)
 include(Format)
 

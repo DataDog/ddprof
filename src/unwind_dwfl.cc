@@ -38,7 +38,7 @@ DDRes unwind_init_dwfl(UnwindState *us) {
 
     bool success = false;
     // Find an elf file we can load for this PID
-    for (auto el : map) {
+    for (const auto &el : map) {
       if (el.second._executable) {
         const Dso &dso = el.second;
         FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);

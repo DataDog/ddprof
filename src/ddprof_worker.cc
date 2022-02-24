@@ -216,7 +216,7 @@ void *ddprof_worker_export_thread(void *arg) {
 
 /// Cycle operations : export, sync metrics, update counters
 DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
-                          bool synchronous_export) {
+                          [[maybe_unused]] bool synchronous_export) {
 
   // Scrape procfs for process usage statistics
   DDRES_CHECK_FWD(worker_update_stats(&ctx->worker_ctx.proc_status,
