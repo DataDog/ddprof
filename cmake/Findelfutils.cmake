@@ -7,7 +7,7 @@
 # - static lib : elf
 # - static lib : dw
 
-set(MD5_ELF "6f58aa1b9af1a5681b1cbf63e0da2d67" CACHE STRING "md5 of the elf tar")
+set(SHA256_ELF "7f6fb9149b1673d38d9178a0d3e0fb8a1ec4f53a9f4c2ff89469609879641177" CACHE STRING "SHA256 of the elf tar")
 set(VER_ELF "0.186" CACHE STRING "elfutils version")
 set(ELFUTILS_PATH ${VENDOR_PATH}/elfutils CACHE FILEPATH "location of elfutils file")
 
@@ -20,7 +20,7 @@ set(ELFUTILS_LIBS
 list(APPEND ELFUTILS_INCLUDE_LIST ${ELFUTILS_PATH} ${ELFUTILS_PATH}/libdwfl ${ELFUTILS_PATH}/libdw ${ELFUTILS_PATH}/libebl ${ELFUTILS_PATH}/libelf)
 
 add_custom_command(OUTPUT ${ELFUTILS_LIBS}
-                    COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_elfutils.sh" "${VER_ELF}" "${MD5_ELF}" ${VENDOR_PATH} ${CMAKE_C_COMPILER}
+                    COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_elfutils.sh" "${VER_ELF}" "${SHA256_ELF}" ${VENDOR_PATH} ${CMAKE_C_COMPILER}
                     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
                     COMMENT "Fetching elfutils")
 add_custom_target(elfutils-deps DEPENDS ${ELFUTILS_LIBS})
