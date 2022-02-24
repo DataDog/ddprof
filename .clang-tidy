@@ -1,0 +1,4 @@
+Checks: 'bugprone-*,-bugprone-easily-swappable-parameters,-bugprone-narrowing-conversions,cert-*,clang-analyzer-*,misc-*'
+FormatStyle: 'file'
+WarningsAsErrors: '*'
+# performance-*,modernize-*,cppcoreguidelines-*
