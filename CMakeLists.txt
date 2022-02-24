@@ -116,7 +116,7 @@ endif()
 ###################
 ### Benchmarks  ###
 ###################
-option(BUILD_BENCHMARKS "Enable tests" OFF)
+option(BUILD_BENCHMARKS "Enable benchmarks" OFF)
 if (${BUILD_BENCHMARKS})
   add_subdirectory(bench/collatz)
 endif()
@@ -186,8 +186,6 @@ add_exe(ddprof
         LIBRARIES ${DDPROF_LIBRARY_LIST}
         DEFINITIONS ${DDPROF_DEFINITION_LIST})
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
-set_property(TARGET ddprof PROPERTY CXX_STANDARD 14)
-set_property(TARGET ddprof PROPERTY C_STANDARD 11)
 static_link_cxx(TARGET ddprof)
 
 # Ensure all dependencies are computed
@@ -218,15 +216,13 @@ add_library(ddprof_wrapper-static STATIC ${DDPROF_WRAPPER_SOURCES})
 set_target_properties(ddprof_wrapper-static PROPERTIES OUTPUT_NAME ddprof_wrapper)
 target_include_directories(ddprof_wrapper-static PUBLIC ${CMAKE_SOURCE_DIR}/include/wrapper ${CMAKE_SOURCE_DIR}/include)
 set_target_properties(ddprof_wrapper-static PROPERTIES
-   PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/wrapper/ddprof_wrapper.h"
-   CXX_STANDARD 14)
+   PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/wrapper/ddprof_wrapper.h")
 
 add_library(ddprof_wrapper-shared SHARED ${DDPROF_WRAPPER_SOURCES})
 set_target_properties(ddprof_wrapper-shared PROPERTIES OUTPUT_NAME ddprof_wrapper)
 target_include_directories(ddprof_wrapper-shared PUBLIC ${CMAKE_SOURCE_DIR}/include/wrapper ${CMAKE_SOURCE_DIR}/include)
 set_target_properties(ddprof_wrapper-shared PROPERTIES
-   PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/wrapper/ddprof_wrapper.h"
-   CXX_STANDARD 14)
+   PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/wrapper/ddprof_wrapper.h")
 
 install(TARGETS ddprof_wrapper-static ddprof_wrapper-shared)
 
@@ -256,9 +252,7 @@ if (${BUILD_NATIVE_LIB})
    ## Create the lib
    add_library(ddprof-native
                ${DDPROF_LIB_SRC})
-   set_property(TARGET ddprof-native PROPERTY CXX_STANDARD 14)
-   set_property(TARGET ddprof-native PROPERTY C_STANDARD 11)
-
+   
    set_target_properties(ddprof-native PROPERTIES VERSION ${PROJECT_VERSION})
    set_target_properties(ddprof-native PROPERTIES
                          COMPILE_DEFINITIONS DDPROF_NATIVE_LIB)

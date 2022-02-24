@@ -42,7 +42,7 @@ function(add_unit_test name)
         ../src/logger.c
         ${MY_UNPARSED_ARGUMENTS})
    add_dependencies(${name} deps)
-   set_property(TARGET ${name} PROPERTY CXX_STANDARD 14)
+   
 
 
    target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
