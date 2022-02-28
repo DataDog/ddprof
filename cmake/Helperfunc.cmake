@@ -55,19 +55,3 @@ function(static_link_cxx)
   target_link_options(${STATIC_LINK_CXX_TARGET} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-static-libstdc++>)
   target_link_options(${STATIC_LINK_CXX_TARGET} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-static-libgcc>)
 endfunction()
-
-# Set a target's disposition for clang-tidy
-function(enable_clangtidy)
-  cmake_parse_arguments(ENABLE_CLANGTIDY
-    "NOTIDY"
-    "TARGET"
-    ""
-    ${ARGN})
-    if (NOT ENABLE_CLANGTIDY_NOTIDY)
-      set(CLANG_TIDY_OPTIONS "clang-tidy; -header-filter=.; -checks=*;")
-    else()
-      set(CLANG_TIDY_OPTIONS "")
-    endif()
-    set_property(TARGET ${ENABLE_CLANGTIDY_TARGET} PROPERTY CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_OPTIONS}")
-    set_property(TARGET ${ENABLE_CLANGTIDY_TARGET} PROPERTY CMAKE_C_CLANG_TIDY "${CLANG_TIDY_OPTIONS}")
-endfunction()

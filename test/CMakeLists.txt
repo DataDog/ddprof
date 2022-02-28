@@ -42,8 +42,7 @@ function(add_unit_test name)
         ../src/logger.c
         ${MY_UNPARSED_ARGUMENTS})
    add_dependencies(${name} deps)
-   set_property(TARGET ${name} PROPERTY CXX_STANDARD 14)
-
+   
 
    target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
    target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS})
@@ -52,7 +51,7 @@ function(add_unit_test name)
    set_tests_properties(${name} PROPERTIES
                         ENVIRONMENT "UBSAN_OPTIONS=halt_on_error=1 abort_on_error=1 print_stacktrace=1;\
                         LSAN_OPTIONS=detect_leaks=1 malloc_context_size=2 print_suppressions=0")
-   enable_clangtidy(TARGET ${name} NOTIDY)
+   disable_clangtidy(${name})
 endfunction()
 
 #### Definition of unit tests ####

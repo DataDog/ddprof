@@ -11,5 +11,3 @@ missingInclude
 // trick to retrieve instruction pointer in unit tests
 unusedLabel:*/dso-ut.cc
 unusedLabel:*/dwfl_module-ut.cc
-// warning about weird comma : I could not explain this warning
-constStatement:*/dwfl_symbol_lookup.cc

@@ -26,8 +26,8 @@ extern "C" {
 
 static constexpr int k_default_timeout_ms = 1000;
 
-extern const char _binary_ddprof_start[];
-extern const char _binary_ddprof_end[];
+extern const char _binary_ddprof_start[]; // NOLINT cert-dcl51-cpp
+extern const char _binary_ddprof_end[];   // NOLINT cert-dcl51-cpp
 
 namespace {
 struct ProfilerState {
@@ -38,7 +38,7 @@ struct ProfilerState {
 ProfilerState g_state;
 
 struct ProfilerAutoStart {
-  ProfilerAutoStart() {
+  ProfilerAutoStart() noexcept {
     // Note that library needs to be linked with `--no-as-needed` when using
     // autostart Otherwise linker will completely remove library from DT_NEEDED
     // and library will not be loaded
@@ -70,7 +70,7 @@ struct ProfilerAutoStart {
 ProfilerAutoStart g_autostart;
 } // namespace
 
-int ddprof_start_profiling() {
+static int ddprof_start_profiling_internal() {  
   if (g_state.started) {
     return -1;
   }
@@ -164,6 +164,14 @@ int ddprof_start_profiling() {
   }
 
   return 0;
+}
+
+int ddprof_start_profiling() {  
+  try {
+    return ddprof_start_profiling_internal();
+  } catch(...) {   
+  }
+  return -1;
 }
 
 void ddprof_stop_profiling(int timeout_ms) {
