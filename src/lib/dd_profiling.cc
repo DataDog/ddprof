@@ -3,7 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "ddprof_wrapper.h"
+#include "dd_profiling.h"
 
 extern "C" {
 #include "ddprof_cmdline.h"
@@ -51,7 +51,7 @@ struct ProfilerAutoStart {
       // if library is preloaded, autostart profiling since there is no way
       // otherwise to start profiling
       const char *ldpreload_env = getenv("LD_PRELOAD");
-      if (ldpreload_env && strstr(ldpreload_env, "libddprof_wrapper.so")) {
+      if (ldpreload_env && strstr(ldpreload_env, "libdd_profiling.so")) {
         autostart = true;
       }
     }
@@ -130,7 +130,7 @@ static int ddprof_start_profiling_internal() {
       char pid_opt_str[] = "-p";
       char *argv[] = {ddprof_str, pid_opt_str, pid_buf, NULL};
 
-      // unset LD_PRELOAD, otherwise if libddprof_wrapper.so was preloaded, it
+      // unset LD_PRELOAD, otherwise if libdd_profiling.so was preloaded, it
       // would trigger a fork bomb
       unsetenv("LD_PRELOAD");
 
