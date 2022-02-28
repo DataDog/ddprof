@@ -99,7 +99,7 @@ if [ -e "${TOP_LVL_DIR}/docker-sync.yml" ]; then
     VOLUME_SYNC=$(grep -A 1 "syncs:" "${TOP_LVL_DIR}/docker-sync.yml" | tail -n 1 | awk -F ':' '{print $1}' | sed "s/ //g")
     echo "$VOLUME_SYNC"
     MOUNT_CMD="--mount source=${VOLUME_SYNC},target=/app"
-    if ! grep -q "$VOLUME_SYNC" "$(docker-sync list | grep )"; then
+    if ! docker-sync list | grep -q "$VOLUME_SYNC"; then
         echo "Please generate a volume: $VOLUME_SYNC"
         echo "Suggested commands:"
         echo "docker volume create $VOLUME_SYNC"
