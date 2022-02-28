@@ -40,7 +40,7 @@ bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
   regs[n++] = us->initial_regs.regs[REGNAME(R13)];
   regs[n++] = us->initial_regs.regs[REGNAME(R14)];
   regs[n++] = us->initial_regs.regs[REGNAME(R15)];
-  regs[n++] = us->initial_regs.regs[REGNAME(EIP)];
+  regs[n++] = us->initial_regs.regs[REGNAME(PC)];
 #elif __aarch64__
   regs[n++] = us->initial_regs.regs[REGNAME(X0)];
   regs[n++] = us->initial_regs.regs[REGNAME(X1)];
@@ -74,12 +74,15 @@ bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
   regs[n++] = us->initial_regs.regs[REGNAME(FP)];
   regs[n++] = us->initial_regs.regs[REGNAME(LR)];
   regs[n++] = us->initial_regs.regs[REGNAME(SP)];
-  regs[n++] = us->initial_regs.regs[REGNAME(PC)];
+
+  // Although the perf registers designate the register after SP as the PC, this
+  // convention is not a documented convention of the DWARF registers.  We set
+  // the PC manually.
 #else
 # error Architecture not supported
 #endif
 
-  if (!dwfl_thread_state_registers(thread, 0, n - 1, regs))
+  if (!dwfl_thread_state_registers(thread, 0, n, regs))
     return false;
 
   dwfl_thread_state_register_pc(thread, us->initial_regs.regs[REGNAME(PC)]);
