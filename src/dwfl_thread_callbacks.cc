@@ -20,6 +20,7 @@ pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
 bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
   Dwarf_Word regs[33] = {}; // max register count across all arcs
   int n = 0;
+  struct UnwindState *us = reinterpret_cast<UnwindState *>(arg);
 
 #ifdef __x86_64__
   // Substantial difference here in 32- and 64-bit x86; only support 64-bit now
