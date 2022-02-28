@@ -21,35 +21,37 @@ fi
 
 VER_ELF=$1
 SHA256_ELF=$2
-mkdir -p ${3}
-cd ${3}
-DOWNLOAD_PATH=$PWD
-TARGET_EXTRACT=${DOWNLOAD_PATH}/elfutils
+TARGET_EXTRACT=$3
 C_COMPILER=${4}
 
+mkdir -p "${TARGET_EXTRACT}"
+cd "${TARGET_EXTRACT}"
 
 TAR_ELF="elfutils-${VER_ELF}.tar.bz2"
 URL_ELF="https://sourceware.org/elfutils/ftp/${VER_ELF}/${TAR_ELF}"
 
-if [ -e "${TARGET_EXTRACT}" ]; then
-    rm -rf ${TARGET_EXTRACT}/*
+already_present=0
+if [ -e "${TAR_ELF}" ]; then
+    already_present=1
+else
+    curl -LO "${URL_ELF}"
 fi
 
-mkdir -p ${DOWNLOAD_PATH}
-cd ${DOWNLOAD_PATH}
-if [ ! -e ${DOWNLOAD_PATH}/${TAR_ELF} ]; then
-    curl -L --remote-name-all ${URL_ELF}
+echo "Checking elfutils sha256"
+if ! echo "${SHA256_ELF} ${TAR_ELF}" | sha256sum --check --strict --status; then
+    echo "Error validating elfutils SHA256"
+    echo "Please clear $TARGET_EXTRACT before restarting"
+    exit 1
 fi
 
-echo "Checking md5 of elfutils..."
-echo "${SHA256_ELF} ${TAR_ELF}" | sha256sum --check --strict --status
+[ $already_present -eq 1 ] && exit 0
 
-echo "Extract elfutils..."
-mkdir -p ${TARGET_EXTRACT}
-tar --no-same-owner -C ${TARGET_EXTRACT} --strip-components 1 -xf ${DOWNLOAD_PATH}/${TAR_ELF}
-rm -f ${DOWNLOAD_PATH}/${TAR_ELF}
+echo "Extracting elfutils"
+mkdir src
+cd src
+tar --no-same-owner --strip-components 1 -xf "../${TAR_ELF}"
 
-echo "Compile elfutils using ${C_COMPILER}"
+echo "Compiling elfutils using ${C_COMPILER}"
 
 # The flags below are hardcoded to work around clang compatibility issues in
 # elfutils 186; these are irrelevant for GCC.  Note that this won't propagate
@@ -58,5 +60,5 @@ echo "Compile elfutils using ${C_COMPILER}"
 if [[ "$(basename "${C_COMPILER}")" == clang* ]]; then
   export CFLAGS="-Wno-xor-used-as-pow -Wno-gnu-variable-sized-type-not-at-end -Wno-unused-but-set-parameter"
 fi
-cd ${TARGET_EXTRACT} && ./configure CC=${C_COMPILER} --without-bzlib --without-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning
-make -j4 -C ${TARGET_EXTRACT}
+./configure CC="${C_COMPILER}" --without-bzlib --without-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning --prefix "${TARGET_EXTRACT}"
+make "-j$(nproc)" install

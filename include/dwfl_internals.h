@@ -5,5 +5,5 @@
 
 #pragma once
 
-#include "libdw.h"
-#include "libdwfl.h"
+#include "elfutils/libdw.h"
+#include "elfutils/libdwfl.h"
