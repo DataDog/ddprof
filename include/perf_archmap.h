@@ -83,4 +83,6 @@ enum PERF_ARCHMAP_ARM {
   PAM_ARM_PC,
   PAM_ARM_MAX,
 };
+#else
+#  error Architecture not supported
 #endif

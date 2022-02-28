@@ -20,8 +20,6 @@ extern "C" {
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
 
-#define UNUSED(x) (void)(x)
-
 namespace ddprof {
 void unwind_init(void) { elf_version(EV_CURRENT); }
 

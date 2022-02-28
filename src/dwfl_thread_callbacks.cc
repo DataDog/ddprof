@@ -18,8 +18,9 @@ pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
 // Instead, we crib off of libdwfl's ARM/x86 unwind code in elfutil's
 // libdwfl/unwind-libdw.c
 bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
+  UnwindState *us = static_cast<UnwindState *>(arg);
   Dwarf_Word regs[33] = {}; // max register count across all arcs
-  int n = 0;
+  uint64_t n = 0;
 
 #ifdef __x86_64__
   // Substantial difference here in 32- and 64-bit x86; only support 64-bit now
@@ -40,7 +41,7 @@ bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
   regs[n++] = us->initial_regs.regs[REGNAME(R14)];
   regs[n++] = us->initial_regs.regs[REGNAME(R15)];
   regs[n++] = us->initial_regs.regs[REGNAME(EIP)];
-#elif __arch64__
+#elif __aarch64__
   regs[n++] = us->initial_regs.regs[REGNAME(X0)];
   regs[n++] = us->initial_regs.regs[REGNAME(X1)];
   regs[n++] = us->initial_regs.regs[REGNAME(X2)];
@@ -74,9 +75,15 @@ bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
   regs[n++] = us->initial_regs.regs[REGNAME(LR)];
   regs[n++] = us->initial_regs.regs[REGNAME(SP)];
   regs[n++] = us->initial_regs.regs[REGNAME(PC)];
+#else
+# error Architecture not supported
 #endif
 
-  return dwfl_thread_state_registers(thread, 0, n, regs);
+  if (!dwfl_thread_state_registers(thread, 0, n - 1, regs))
+    return false;
+
+  dwfl_thread_state_register_pc(thread, us->initial_regs.regs[REGNAME(PC)]);
+  return true;
 }
 
 /// memory_read as per prototype define in libdwfl

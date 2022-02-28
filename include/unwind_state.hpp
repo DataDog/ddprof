@@ -28,6 +28,8 @@ typedef struct Dwfl Dwfl;
 #  define K_NB_REGS_UNWIND 17
 #elif __aarch64__
 #  define K_NB_REGS_UNWIND 33
+#else
+#  error Architecture not supported
 #endif
 
 // The layout below follows kernel arch/<ARCH>/include/uapi/asm/perf_regs.h
@@ -92,6 +94,8 @@ struct UnwindRegisters {
       uint64_t lr; // 30
       uint64_t sp; // 31
       uint64_t pc; // For uniformity with libdwfl/ARM spec
+#else
+#  error Architecture not supported
 #endif
     };
   };
