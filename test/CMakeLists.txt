@@ -41,8 +41,6 @@ function(add_unit_test name)
         ../src/ddres_list.c
         ../src/logger.c
         ${MY_UNPARSED_ARGUMENTS})
-   add_dependencies(${name} deps)
-   
 
    target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
    target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS})

@@ -54,17 +54,12 @@ endif()
 ##############
 ### Deps   ###
 ##############
-# Define a dependency target to fetch all dependencies ahead of time (CI build time optim)
 
 # libddprof
 include(Findlibddprof)
 message(STATUS "Libddprof Include directory " ${LIBDDPROF_INCLUDE_DIR})
 
 include(Findelfutils)
-
-# Dependency cache
-add_custom_target(deps
-                  DEPENDS ddprof-deps elfutils-deps)
 
 # Lzma
 find_package(LibLZMA)
@@ -184,8 +179,6 @@ add_exe(ddprof
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 static_link_cxx(TARGET ddprof)
 
-# Ensure all dependencies are computed
-add_dependencies(ddprof deps)
 # Link time optim
 if( LTO_SUPPORTED AND "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
    set_property(TARGET ddprof PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
@@ -254,9 +247,6 @@ if (${BUILD_NATIVE_LIB})
    set_target_properties(ddprof-native PROPERTIES
                          COMPILE_DEFINITIONS DDPROF_NATIVE_LIB)
                          
-   # Ensure all dependencies are computed
-   add_dependencies(ddprof-native deps)
-
    # libcap, can be removed from version distributed to client 
    list(APPEND NATIVE_LIB_LIBRARY_LIST libcap)
    list(APPEND NATIVE_LIB_INCLUDE_LIST ${LIBCAP_INCLUDE_DIR})

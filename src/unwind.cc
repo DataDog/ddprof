@@ -7,7 +7,6 @@
 
 extern "C" {
 #include "ddres.h"
-#include "libebl.h"
 #include "logger.h"
 #include "signal_helper.h"
 #include "unwind_metrics.h"
