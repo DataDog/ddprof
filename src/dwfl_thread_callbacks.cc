@@ -18,9 +18,9 @@ pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
 // Instead, we crib off of libdwfl's ARM/x86 unwind code in elfutil's
 // libdwfl/unwind-libdw.c
 bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
-  UnwindState *us = static_cast<UnwindState *>(arg);
   Dwarf_Word regs[33] = {}; // max register count across all arcs
   uint64_t n = 0;
+  struct UnwindState *us = reinterpret_cast<UnwindState *>(arg);
 
 #ifdef __x86_64__
   // Substantial difference here in 32- and 64-bit x86; only support 64-bit now

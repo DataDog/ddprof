@@ -20,15 +20,8 @@ if [ $# != 3 ] || [ $1 == "-h" ]; then
     exit 1
 fi
 
-### Set directory names
-CURRENTDIR=$PWD
-SCRIPTPATH=$(readlink -f "$0")
-SCRIPTDIR=$(dirname $SCRIPTPATH)
-cd $SCRIPTDIR/../
-TOP_LVL_DIR=$PWD
-cd $CURRENTDIR
-
 MARCH=$(uname -m)
+
 TAG_LIBDDPROF=$1
 TAR_LIBDDPROF=libddprof_${TAG_LIBDDPROF}.tar.gz
 GITHUB_URL_LIBDDPROF=https://github.com/DataDog/libddprof/releases/download/${TAG_LIBDDPROF}/libddprof-${MARCH}-unknown-linux-gnu.tar.gz
@@ -39,14 +32,12 @@ cd $3
 DOWNLOAD_PATH=$PWD
 TARGET_EXTRACT=${DOWNLOAD_PATH}/libddprof
 
-if [ -n "$(find "${TARGET_EXTRACT}" -type f)" ]; then
-    echo "Error, clean the directory : ${TARGET_EXTRACT}"
-    exit 1
+if [ -e "${TARGET_EXTRACT}" ]; then
+    rm -rf ${TARGET_EXTRACT}/*
 fi
 
 mkdir -p ${TARGET_EXTRACT}
 
-IS_CI=${CI:-false}
 if [ ! -e  ${TAR_LIBDDPROF} ]; then
     echo "Downloading libddprof..."
     curl -L ${GITHUB_URL_LIBDDPROF} -o ${TAR_LIBDDPROF}

@@ -48,7 +48,7 @@ static inline int64_t now_nanos() {
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
 }
 
-static void handle_signal(int signum) {
+static void handle_signal(int) {
   g_termination_requested = true;
 
   // forwarding signal to child
@@ -154,7 +154,7 @@ static inline DDRes worker_process_ring_buffers(PEvent *pes, int pe_len,
   // While there are events to process, iterate through them
   // while limiting time spent in loop to at most PSAMPLE_DEFAULT_WAKEUP_MS
   int64_t loop_start_ns = now_nanos();
-  int64_t local_now_ns = loop_start_ns;
+  int64_t local_now_ns;
 
   bool events;
   do {
