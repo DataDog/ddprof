@@ -12,4 +12,4 @@ static_link_cxx(TARGET selfuw)
 
 # slightly hacky : we should only include public headers 
 target_include_directories(selfuw PRIVATE ../../include ../../include/lib)
-install(TARGETS selfuw)
+install(TARGETS selfuw DESTINATION selfuw)

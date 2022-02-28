@@ -19,6 +19,10 @@
 
 #include "statsd.h"
 
+#ifdef USE_DD_PROFILING
+#include "dd_profiling.h"
+#endif
+
 #ifdef MYNAME
 #undef MYNAME
 #define MYNAME "collatz"
@@ -143,6 +147,13 @@ int main (int c, char** v) {
   counter = mmap(NULL, sizeof(unsigned long), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
   *counter = 0;
 
+#ifdef USE_DD_PROFILING
+  if (ddprof_start_profiling() != 0) {
+      fprintf(stderr, "Failed to start profiling\n");
+      return 1;
+  }
+#endif
+
   // Setup barrier for coordination
   pthread_barrierattr_t bat = {0};
   pthread_barrier_t *pb = mmap(NULL, sizeof(pthread_barrier_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
@@ -202,6 +213,10 @@ int main (int c, char** v) {
   // Print results
   if (getpid() == pids[0]) {
     printf("%ld, %llu, %f\n", *counter, ticks, ((double)ticks)/((double)*counter));
+
+#ifdef USE_DD_PROFILING
+  ddprof_stop_profiling(1000);
+#endif
   }
   return 0;
 }

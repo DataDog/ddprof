@@ -31,9 +31,6 @@ include(ExtendBuildTypes)
 # Default value
 message(STATUS "Build type set to " ${CMAKE_BUILD_TYPE})
 
-## Allow to easily import external libraries
-include(FetchContent)
-
 # Check for pthread
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
@@ -195,8 +192,7 @@ if( LTO_SUPPORTED AND "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
 endif()
 
 message(STATUS "Install destination " ${CMAKE_INSTALL_PREFIX})
-install(TARGETS ddprof)
-install(FILES LICENSE LICENSE-3rdparty.csv LICENSE.LGPLV3 NOTICE DESTINATION ${CMAKE_INSTALL_PREFIX})
+install(FILES LICENSE LICENSE-3rdparty.csv LICENSE.LGPLV3 NOTICE DESTINATION ddprof)
 
 set(DDPROF_EXE_OBJECT "ddprof.o")
 set(EXE_OBJECT_PATH "${CMAKE_CURRENT_BINARY_DIR}/${DDPROF_EXE_OBJECT}")
@@ -207,23 +203,27 @@ add_custom_command(OUTPUT ${DDPROF_EXE_OBJECT}
   DEPENDS ddprof
 )
 
-set(DDPROF_WRAPPER_SOURCES src/wrapper/ddprof_wrapper.cc src/ddprof_cmdline.c src/logger.c src/logger_setup.cc $<TARGET_OBJECTS:ddprof_exe_object>)
+set(DD_PROFILING_SOURCES src/lib/dd_profiling.cc src/ddprof_cmdline.c src/logger.c src/logger_setup.cc $<TARGET_OBJECTS:ddprof_exe_object>)
 add_library(ddprof_exe_object OBJECT IMPORTED GLOBAL)
 set_target_properties(ddprof_exe_object PROPERTIES IMPORTED_OBJECTS "${DDPROF_EXE_OBJECT}")
 
-add_library(ddprof_wrapper-static STATIC ${DDPROF_WRAPPER_SOURCES})
-set_target_properties(ddprof_wrapper-static PROPERTIES OUTPUT_NAME ddprof_wrapper)
-target_include_directories(ddprof_wrapper-static PUBLIC ${CMAKE_SOURCE_DIR}/include/wrapper ${CMAKE_SOURCE_DIR}/include)
-set_target_properties(ddprof_wrapper-static PROPERTIES
-   PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/wrapper/ddprof_wrapper.h")
+add_library(dd_profiling-static STATIC ${DD_PROFILING_SOURCES})
+set_target_properties(dd_profiling-static PROPERTIES OUTPUT_NAME dd_profiling)
+target_include_directories(dd_profiling-static PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include)
+set_target_properties(dd_profiling-static PROPERTIES
+   PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
 
-add_library(ddprof_wrapper-shared SHARED ${DDPROF_WRAPPER_SOURCES})
-set_target_properties(ddprof_wrapper-shared PROPERTIES OUTPUT_NAME ddprof_wrapper)
-target_include_directories(ddprof_wrapper-shared PUBLIC ${CMAKE_SOURCE_DIR}/include/wrapper ${CMAKE_SOURCE_DIR}/include)
-set_target_properties(ddprof_wrapper-shared PROPERTIES
-   PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/wrapper/ddprof_wrapper.h")
+add_library(dd_profiling-shared SHARED ${DD_PROFILING_SOURCES})
+set_target_properties(dd_profiling-shared PROPERTIES OUTPUT_NAME dd_profiling)
+target_include_directories(dd_profiling-shared PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include)
+set_target_properties(dd_profiling-shared PROPERTIES
+   PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
 
-install(TARGETS ddprof_wrapper-static ddprof_wrapper-shared)
+install(TARGETS ddprof dd_profiling-static dd_profiling-shared
+        RUNTIME DESTINATION ddprof/bin
+        LIBRARY DESTINATION ddprof/lib
+        ARCHIVE DESTINATION ddprof/lib
+        PUBLIC_HEADER DESTINATION ddprof/include)
 
 
 #######################################
@@ -232,12 +232,10 @@ install(TARGETS ddprof_wrapper-static ddprof_wrapper-shared)
 option(BUILD_NATIVE_LIB "Build a library out of the native profiler" OFF)
 if (${BUILD_NATIVE_LIB})
 
-   aux_source_directory(src/lib LIB_SRC)
-
    # Define all sources
    set(DDPROF_LIB_SRC
       ${COMMON_SRC}
-      ${LIB_SRC})
+      src/lib/ddprof_output.cc)
 
    ## Libs to link
    set(NATIVE_LIB_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
@@ -263,15 +261,10 @@ if (${BUILD_NATIVE_LIB})
    list(APPEND NATIVE_LIB_LIBRARY_LIST libcap)
    list(APPEND NATIVE_LIB_INCLUDE_LIST ${LIBCAP_INCLUDE_DIR})
 
-   ## Headers we publish
-   set(LIB_HEADERS include/ddprof.h include/ddprof_context_lib.h include/ddprof_input.h include/lib/ddprof_output.hpp include/symbol_table.hpp include/mapinfo_table.hpp include/ddres.h include/ddres_def.h include/ddres_list.h include/ddres_helpers.h include/ddres_exception.hpp)
-   set_target_properties(ddprof-native PROPERTIES PUBLIC_HEADER "${LIB_HEADERS}")
-
    target_include_directories(ddprof-native PRIVATE ${NATIVE_LIB_INCLUDE_LIST})
 
    target_link_libraries(ddprof-native PRIVATE ${NATIVE_LIB_LIBRARY_LIST})
    add_library(DDProf::Native ALIAS ddprof-native)
-   install(TARGETS ddprof-native)
 
 
    option(ACCURACY_TEST "Enable accuracy test" OFF)
