@@ -35,7 +35,7 @@ void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
   uw_output_clear(&us->output);
   memcpy(&us->initial_regs.regs[0], sample_regs,
          K_NB_REGS_UNWIND * sizeof(uint64_t));
-  us->current_ip = us->initial_regs.regs[REGNAME(EIP)];
+  us->current_ip = us->initial_regs.regs[REGNAME(PC)];
   us->pid = sample_pid;
   us->stack_sz = sample_size_stack;
   us->stack = sample_data_stack;
