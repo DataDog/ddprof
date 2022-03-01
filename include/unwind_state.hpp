@@ -24,13 +24,9 @@ typedef struct Dwfl Dwfl;
 // it's an array whose individual positions each have semantic value in the
 // context of DWARF; accordingly, the size is arch-dependent.
 // It is possible to provide SIMD registers on x86, but we don't do that here.
-#ifdef __x86_64__
-#  define K_NB_REGS_UNWIND 17
-#elif __aarch64__
+
+// This is the max register index supported across all architectures
 #  define K_NB_REGS_UNWIND 33
-#else
-#  error Architecture not supported
-#endif
 
 // The layout below follows kernel arch/<ARCH>/include/uapi/asm/perf_regs.h
 struct UnwindRegisters {
