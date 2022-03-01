@@ -19,7 +19,7 @@ extern "C" {
 // Simple test to see if mlock fails for large sizes
 TEST(MMapTest, Mlock32KB) {
   const int alloc_size = 32 * 1024; // 32 KB
-  char *memory = (char *)malloc(alloc_size);
+  char *memory = (char *)calloc(alloc_size, sizeof(char));
   ASSERT_TRUE(memory);
   int ret = mlock(memory, alloc_size);
   EXPECT_TRUE(ret == 0);
