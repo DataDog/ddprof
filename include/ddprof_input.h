@@ -5,6 +5,10 @@
 
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "ddprof_defs.h"
 #include "ddres_def.h"
 #include "exporter_input.h"
@@ -115,3 +119,7 @@ void ddprof_print_help();
 void ddprof_print_params(const DDProfInput *input);
 
 void ddprof_input_free(DDProfInput *input);
+
+#ifdef __cplusplus
+}
+#endif

@@ -5,12 +5,18 @@
 
 extern "C" {
 #include "ddprof_input.h"
-
+#include "perf_option.h"
 #include "string_view.h"
 }
 
+#include "arraysize.h"
+#include "defer.hpp"
 #include "loghandle.hpp"
+
 #include <gtest/gtest.h>
+#include <string_view>
+
+using namespace std::literals;
 
 class InputTest : public ::testing::Test {
 protected:
@@ -92,4 +98,83 @@ TEST_F(InputTest, dump_fixed) {
   EXPECT_FALSE(contine_exec);
   EXPECT_EQ(input.nb_parsed_params, 2);
   ddprof_input_free(&input);
+}
+
+TEST_F(InputTest, event_from_env) {
+  defer { unsetenv("DD_PROFILING_NATIVE_EVENTS"); };
+  {
+    DDProfInput input;
+    bool contine_exec = true;
+    const char *input_values[] = {MYNAME, "my_program"};
+    setenv("DD_PROFILING_NATIVE_EVENTS", "sCPU,1000", 1);
+    DDRes res = ddprof_input_parse(
+        ARRAY_SIZE(input_values), (char **)input_values, &input, &contine_exec);
+
+    EXPECT_TRUE(IsDDResOK(res));
+    EXPECT_TRUE(contine_exec);
+    EXPECT_EQ(input.nb_parsed_params, 1);
+    EXPECT_EQ(input.num_watchers, 1);
+    // cppcheck-suppress literalWithCharPtrCompare
+    EXPECT_EQ(perfoptions_lookup_idx(input.watchers[0]), "sCPU"sv);
+    EXPECT_EQ(input.sampling_value[0], 1000);
+    ddprof_input_free(&input);
+  }
+  {
+    DDProfInput input;
+    bool contine_exec = true;
+    const char *input_values[] = {MYNAME, "my_program"};
+    setenv("DD_PROFILING_NATIVE_EVENTS", ";", 1);
+    DDRes res = ddprof_input_parse(
+        ARRAY_SIZE(input_values), (char **)input_values, &input, &contine_exec);
+
+    EXPECT_TRUE(IsDDResOK(res));
+    EXPECT_TRUE(contine_exec);
+    EXPECT_EQ(input.nb_parsed_params, 1);
+    EXPECT_EQ(input.num_watchers, 0);
+    ddprof_input_free(&input);
+  }
+  {
+    DDProfInput input;
+    bool contine_exec = true;
+    const char *input_values[] = {MYNAME, "my_program"};
+    setenv("DD_PROFILING_NATIVE_EVENTS", ";sCPU,1000;", 1);
+    DDRes res = ddprof_input_parse(
+        ARRAY_SIZE(input_values), (char **)input_values, &input, &contine_exec);
+
+    EXPECT_TRUE(IsDDResOK(res));
+    EXPECT_TRUE(contine_exec);
+    EXPECT_EQ(input.nb_parsed_params, 1);
+    EXPECT_EQ(input.num_watchers, 1);
+
+    // string_view literal confuses cppcheck
+    // cppcheck-suppress literalWithCharPtrCompare
+    EXPECT_EQ(perfoptions_lookup_idx(input.watchers[0]), "sCPU"sv);
+    EXPECT_EQ(input.sampling_value[0], 1000);
+    ddprof_input_free(&input);
+  }
+  {
+    DDProfInput input;
+    bool contine_exec = true;
+    const char *input_values[] = {MYNAME, "-e", "hINSTR,456", "my_program"};
+    setenv("DD_PROFILING_NATIVE_EVENTS", "sCPU,1000;hCPU,123", 1);
+    DDRes res = ddprof_input_parse(
+        ARRAY_SIZE(input_values), (char **)input_values, &input, &contine_exec);
+
+    EXPECT_TRUE(IsDDResOK(res));
+    EXPECT_TRUE(contine_exec);
+    EXPECT_EQ(input.nb_parsed_params, 3);
+    EXPECT_EQ(input.num_watchers, 3);
+    // cppcheck-suppress literalWithCharPtrCompare
+    EXPECT_EQ(perfoptions_lookup_idx(input.watchers[0]), "sCPU"sv);
+    // cppcheck-suppress literalWithCharPtrCompare
+    EXPECT_EQ(perfoptions_lookup_idx(input.watchers[1]), "hCPU"sv);
+    // cppcheck-suppress literalWithCharPtrCompare
+    EXPECT_EQ(perfoptions_lookup_idx(input.watchers[2]), "hINSTR"sv);
+
+    EXPECT_EQ(input.sampling_value[0], 1000);
+    EXPECT_EQ(input.sampling_value[1], 123);
+    EXPECT_EQ(input.sampling_value[2], 456);
+
+    ddprof_input_free(&input);
+  }
 }
