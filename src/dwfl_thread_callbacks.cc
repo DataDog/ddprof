@@ -31,7 +31,7 @@ bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
   regs[n++] = us->initial_regs.regs[REGNAME(ESI)];
   regs[n++] = us->initial_regs.regs[REGNAME(EDI)];
   regs[n++] = us->initial_regs.regs[REGNAME(EBP)];
-  regs[n++] = us->initial_regs.regs[REGNAME(ESP)];
+  regs[n++] = us->initial_regs.regs[REGNAME(SP)];
   regs[n++] = us->initial_regs.regs[REGNAME(R8)];
   regs[n++] = us->initial_regs.regs[REGNAME(R9)];
   regs[n++] = us->initial_regs.regs[REGNAME(R10)];
