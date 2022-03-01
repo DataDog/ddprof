@@ -100,7 +100,7 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
 
   // stack grows down, so end of stack is start
   // us->initial_regs.sp does not have to be aligned
-  uint64_t sp_start = us->initial_regs.sp;
+  uint64_t sp_start = us->initial_regs.regs[REGNAME(ESP)];
   uint64_t sp_end = sp_start + us->stack_sz;
 
   if (addr < sp_start && addr > sp_start - 4096) {
