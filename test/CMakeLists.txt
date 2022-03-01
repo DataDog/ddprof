@@ -150,7 +150,7 @@ add_unit_test(
 add_unit_test(
     ddprof_input-ut
     ../src/ddprof_cmdline.c 
-    ../src/ddprof_input.c
+    ../src/ddprof_input.cc
     ../src/perf_option.c
     ddprof_input-ut.cc
     DEFINITIONS MYNAME="ddprof_input-ut"
