@@ -10,7 +10,12 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <x86intrin.h>
+
+#ifdef __x86_64__
+#  include <x86intrin.h>
+#elif __aarch64__
+#  define __rdtsc() 0
+#endif
 
 #include "statsd.h"
 

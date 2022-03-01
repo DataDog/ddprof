@@ -6,6 +6,7 @@
 #pragma once
 
 extern "C" {
+#include "perf_archmap.h"
 #include "unwind_output.h"
 #include <sys/types.h>
 }
@@ -15,26 +16,22 @@ extern "C" {
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
 #include "dwfl_thread_callbacks.hpp"
+#include "perf.h"
 #include "symbol_hdr.hpp"
 
 typedef struct Dwfl Dwfl;
 
-#define K_NB_REGS_UNWIND 3
+// This is not a strict mirror of the register values acquired by perf; rather
+// it's an array whose individual positions each have semantic value in the
+// context of DWARF; accordingly, the size is arch-dependent.
+// It is possible to provide SIMD registers on x86, but we don't do that here.
 
+// This is the max register index supported across all architectures
+#define K_NB_REGS_UNWIND PERF_REGS_COUNT
+
+// The layout below follows kernel arch/<ARCH>/include/uapi/asm/perf_regs.h
 struct UnwindRegisters {
-  UnwindRegisters() {
-    for (int i = 0; i < K_NB_REGS_UNWIND; ++i) {
-      regs[i] = 0;
-    }
-  }
-  union {
-    uint64_t regs[K_NB_REGS_UNWIND];
-    struct {
-      uint64_t ebp; // base address of the function's frame
-      uint64_t esp; // top of the stack
-      uint64_t eip; // Extended Instruction Pointer
-    };
-  };
+  uint64_t regs[K_NB_REGS_UNWIND] = {};
 };
 
 /// UnwindState
@@ -43,7 +40,7 @@ struct UnwindRegisters {
 typedef struct UnwindState {
   UnwindState()
       : _dwfl_wrapper(nullptr), pid(-1), stack(nullptr), stack_sz(0),
-        current_eip(0) {
+        current_ip(0) {
     uw_output_clear(&output);
   }
 
@@ -58,7 +55,7 @@ typedef struct UnwindState {
   size_t stack_sz;
 
   UnwindRegisters initial_regs;
-  ProcessAddress_t current_eip;
+  ProcessAddress_t current_ip;
 
   UnwindOutput output;
 } UnwindState;

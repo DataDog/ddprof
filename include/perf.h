@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "ddres_def.h"
+#include "perf_archmap.h"
 #include "perf_option.h"
 
 #define PSAMPLE_DEFAULT_WAKEUP_MS 100 // sample frequency check
@@ -22,22 +23,6 @@
 #define DEFAULT_SAMPLE_TYPE                                                    \
   (PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_TID |          \
    PERF_SAMPLE_TIME | PERF_SAMPLE_PERIOD)
-
-// TODO, this comes from BP, SP, and IP
-// see arch/x86/include/uapi/asm/perf_regs.h in the linux sources
-// We're going to hardcode everything for now...
-#define PERF_REGS_MASK_X86 ((1 << 6) | (1 << 7) | (1 << 8))
-
-// 31 and 32 are the stack and PC, respectively.  29 is r29, see
-// https://github.com/ARM-software/abi-aa where it is usd conventionally as the
-// frame pointer register
-// Note that the order of these has to be changed in the unwinding code!
-#define PERF_REGS_MASK_ARM ((1 << 31) | (1 << 32) | (1 << 29))
-
-// This is a human-hardcoded number given the mask above; update it if the mask
-// gets more bits
-#define PERF_REGS_COUNT 3
-#define PERF_REGS_MASK PERF_REGS_MASK_X86
 
 typedef struct read_format {
   uint64_t value;        // The value of the event

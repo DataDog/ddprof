@@ -76,7 +76,7 @@ TEST(PerfRingbufferTest, SampleSymmetryx86) {
   sample.addr = 0x6 * default_val;
   sample.period = 0x7 * default_val;
   // s_id, v, nr, ips, size_raw, data_raw, bnr, lbr -- untested because unused!
-  sample.abi = PERF_REGS_MASK_X86;
+  sample.abi = PERF_SAMPLE_REGS_ABI_64;
   sample.regs = default_regs;
   sample.size_stack = 4096;
   sample.data_stack = default_stack;

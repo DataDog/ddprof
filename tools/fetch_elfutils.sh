@@ -58,5 +58,5 @@ echo "Compile elfutils using ${C_COMPILER}"
 if [[ "$(basename "${C_COMPILER}")" == clang* ]]; then
   export CFLAGS="-Wno-xor-used-as-pow -Wno-gnu-variable-sized-type-not-at-end -Wno-unused-but-set-parameter"
 fi
-cd ${TARGET_EXTRACT} && ./configure CC=${C_COMPILER} --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning
+cd ${TARGET_EXTRACT} && ./configure CC=${C_COMPILER} --without-bzlib --without-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning
 make -j4 -C ${TARGET_EXTRACT}
