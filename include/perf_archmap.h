@@ -21,7 +21,8 @@ enum PERF_ARCHMAP_X86 {
   PAM_X86_EDI,
   PAM_X86_EBP,
   PAM_X86_ESP,
-  PAM_X86_EIP, PAM_X86_PC = PAM_X86_EIP, // For uniformity
+  PAM_X86_EIP,
+  PAM_X86_PC = PAM_X86_EIP, // For uniformity
   PAM_X86_FL,
   PAM_X86_CS,
   PAM_X86_SS,
@@ -76,7 +77,8 @@ enum PERF_ARCHMAP_ARM {
   PAM_ARM_X26,
   PAM_ARM_X27,
   PAM_ARM_X28,
-  PAM_ARM_X29, PAM_ARM_FP = PAM_ARM_X29, // For uniformity
+  PAM_ARM_X29,
+  PAM_ARM_FP = PAM_ARM_X29, // For uniformity
   PAM_ARM_LR,
   PAM_ARM_SP,
   PAM_ARM_PC,

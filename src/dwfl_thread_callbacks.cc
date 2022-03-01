@@ -79,7 +79,7 @@ bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
   // convention is not a documented convention of the DWARF registers.  We set
   // the PC manually.
 #else
-# error Architecture not supported
+#  error Architecture not supported
 #endif
 
   if (!dwfl_thread_state_registers(thread, 0, n, regs))

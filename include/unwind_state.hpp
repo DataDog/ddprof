@@ -26,7 +26,7 @@ typedef struct Dwfl Dwfl;
 // It is possible to provide SIMD registers on x86, but we don't do that here.
 
 // This is the max register index supported across all architectures
-#  define K_NB_REGS_UNWIND 33
+#define K_NB_REGS_UNWIND 33
 
 // The layout below follows kernel arch/<ARCH>/include/uapi/asm/perf_regs.h
 struct UnwindRegisters {
