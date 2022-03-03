@@ -27,7 +27,7 @@ FROM base-${UBUNTU_VERSION} AS base-clang
 ENV CC=clang-${CLANG_VERSION}
 ENV CXX=clang++-${CLANG_VERSION}
 
-FROM base-${COMPILER} AS dependencies
+FROM base-${COMPILER} AS final
 
 # Tell docker to use bash as the default
 SHELL ["/bin/bash", "-c"]
@@ -70,7 +70,6 @@ RUN /llvm.sh ${CLANG_VERSION} && /gcc.sh ${GCC_VERSION}
 ENV PATH="/usr/lib/llvm-${CLANG_VERSION}/bin/:$PATH"
 
 # Newer CMake
-FROM dependencies as cmake
 RUN VERSION="3.22.2" \
   && MARCH=$(uname -m) \
   && SHA256_ARM="02b2b36afc932ede2d77ba53456785bae85538d5d4600f87220072b95d926c5b" \
@@ -82,7 +81,6 @@ RUN VERSION="3.22.2" \
   && tar --no-same-owner -C /usr/local --strip-components=1 -xf ${TAR_NAME} \
   && rm ${TAR_NAME}
 
-FROM cmake as final
 # Ninja build 1.10.2
 RUN VERSION="1.10.2" \
   && SHA256="ce35865411f0490368a8fc383f29071de6690cbadc27704734978221f25e2bed" \
