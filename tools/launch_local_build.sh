@@ -120,7 +120,8 @@ echo "           Mount command    : ${MOUNT_CMD}"
 
 if [ $PERFORM_CLEAN -eq 1 ]; then
     echo "Clean image : ${DOCKER_NAME}"
-    docker image rm "${DOCKER_NAME}"
+    # if docker image does not exist, we should not fail
+    docker image rm "${DOCKER_NAME}" || true
 fi
 
 # Check if base image exists

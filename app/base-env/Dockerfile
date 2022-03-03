@@ -27,7 +27,7 @@ FROM base-${UBUNTU_VERSION} AS base-clang
 ENV CC=clang-${CLANG_VERSION}
 ENV CXX=clang++-${CLANG_VERSION}
 
-FROM base-${COMPILER} AS final
+FROM base-${COMPILER} AS dependencies
 
 # Tell docker to use bash as the default
 SHELL ["/bin/bash", "-c"]
@@ -70,13 +70,19 @@ RUN /llvm.sh ${CLANG_VERSION} && /gcc.sh ${GCC_VERSION}
 ENV PATH="/usr/lib/llvm-${CLANG_VERSION}/bin/:$PATH"
 
 # Newer CMake
+FROM dependencies as cmake
 RUN VERSION="3.22.2" \
-  && SHA256="38b3befdee8fd2bac06954e2a77cb3072e6833c69d8cc013c0a3b26f1cfdfe37" \
-  && curl -LO https://github.com/Kitware/CMake/releases/download/v${VERSION}/cmake-${VERSION}-Linux-x86_64.tar.gz \
-  && (printf "${SHA256}  cmake-${VERSION}-Linux-x86_64.tar.gz" | sha256sum --check --strict --status) \
-  && tar --no-same-owner -C /usr/local --strip-components=1 -xf cmake-${VERSION}-Linux-x86_64.tar.gz \
-  && rm cmake-${VERSION}-Linux-x86_64.tar.gz
+  && MARCH=$(uname -m) \
+  && SHA256_ARM="02b2b36afc932ede2d77ba53456785bae85538d5d4600f87220072b95d926c5b" \
+  && SHA256_X86="38b3befdee8fd2bac06954e2a77cb3072e6833c69d8cc013c0a3b26f1cfdfe37" \
+  && if [ "$MARCH" = aarch64 ]; then SHA256=$SHA256_ARM; else SHA256=$SHA256_X86; fi \
+  && TAR_NAME="cmake-${VERSION}-Linux-${MARCH}.tar.gz" \
+  && curl -LO https://github.com/Kitware/CMake/releases/download/v${VERSION}/${TAR_NAME} \
+  && (printf "${SHA256}  ${TAR_NAME}" | sha256sum --check --strict --status) \
+  && tar --no-same-owner -C /usr/local --strip-components=1 -xf ${TAR_NAME} \
+  && rm ${TAR_NAME}
 
+FROM cmake as final
 # Ninja build 1.10.2
 RUN VERSION="1.10.2" \
   && SHA256="763464859c7ef2ea3a0a10f4df40d2025d3bb9438fcb1228404640410c0ec22d" \
