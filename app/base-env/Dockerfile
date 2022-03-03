@@ -82,8 +82,6 @@ RUN VERSION="3.22.2" \
   && tar --no-same-owner -C /usr/local --strip-components=1 -xf ${TAR_NAME} \
   && rm ${TAR_NAME}
 
-
-
 FROM cmake as final
 # Ninja build 1.10.2
 RUN VERSION="1.10.2" \
