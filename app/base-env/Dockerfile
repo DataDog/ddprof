@@ -82,14 +82,18 @@ RUN VERSION="3.22.2" \
   && tar --no-same-owner -C /usr/local --strip-components=1 -xf ${TAR_NAME} \
   && rm ${TAR_NAME}
 
+
+
 FROM cmake as final
 # Ninja build 1.10.2
 RUN VERSION="1.10.2" \
-  && SHA256="763464859c7ef2ea3a0a10f4df40d2025d3bb9438fcb1228404640410c0ec22d" \
-  && curl -LO https://github.com/ninja-build/ninja/releases/download/v${VERSION}/ninja-linux.zip \
-  && (printf "${SHA256} ninja-linux.zip" | sha256sum --check --strict --status) \
-  && unzip -d /usr/local/bin ninja-linux.zip \
-  && rm ninja-linux.zip
+  && SHA256="ce35865411f0490368a8fc383f29071de6690cbadc27704734978221f25e2bed" \
+  && curl -LO https://github.com/ninja-build/ninja/archive/refs/tags/v${VERSION}.tar.gz \
+  && (printf "${SHA256} v${VERSION}.tar.gz" | sha256sum --check --strict --status) \
+  && tar xvfz v${VERSION}.tar.gz \
+  && cd ninja-${VERSION} \
+  && cmake -Bbuild-cmake \
+  && cmake --build build-cmake  -j $(nproc) -t install
 
 # google test / google mock
 RUN VERSION="1.11.0" \
