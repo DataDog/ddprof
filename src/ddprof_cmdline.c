@@ -152,7 +152,7 @@ ptret_t process_tracepoint(const char *str, traceconfig_t *conf) {
   char buf[64] = {0};
   char *buf_copy = buf;
   int pathsz =
-      snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/id",
+      snprintf(path, sizeof(path), "/sys/kernel/debug/tracing/events/%s/%s/id",
                groupname, tracename);
   if (pathsz >= sizeof(path)) {
     // Possibly ran out of room
@@ -175,7 +175,7 @@ ptret_t process_tracepoint(const char *str, traceconfig_t *conf) {
     return PTRET_BADFORMAT;
 
   // Check enablement, just to print a log.  We still enable instrumentation.
-  snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/enable",
+  snprintf(path, sizeof(path), "/sys/kernel/debug/tracing/events/%s/%s/enable",
            groupname, tracename);
   fd = open(path, O_RDONLY);
   if (-1 == fd || 1 != read(fd, buf, 1) || '0' != *buf) {
