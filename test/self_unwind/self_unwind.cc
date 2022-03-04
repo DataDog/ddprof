@@ -1,5 +1,7 @@
-// Unless explicitly stated otherwise all files in this repository are licensed under the Apache License Version 2.0.
-// This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the Apache License Version 2.0. This product includes software
+// developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
+// Datadog, Inc.
 
 extern "C" {
 #include "ddprof.h"
@@ -11,14 +13,13 @@ extern "C" {
 #include <unistd.h>
 }
 
+#include "arraysize.h"
 #include "ddprof_output.hpp"
 #include "ddres.h"
 #include "stackchecker.hpp"
 
 #include <iostream>
 #include <unistd.h>
-
-#define SZ_STATIC_ARRAY(array) (sizeof(array) / sizeof(array[0]))
 
 static const char *k_test_executable = "BadBoggleSolver_run";
 
@@ -58,7 +59,7 @@ void capture_symbol(DDProfContext *ctx, SymbolMap *symbol_map) {
   ddprof_attach_handler(ctx, &stack_handler);
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *const argv[]) {
   DDProfInput input;
   int ret = 0;
   bool continue_exec;
@@ -77,7 +78,7 @@ int main(int argc, char *argv[]) {
   SymbolMap symbol_map;
 
   // size - 1 as we add a null char at the end
-  if (IsDDResNotOK(ddprof_input_parse(SZ_STATIC_ARRAY(argv_override) - 1,
+  if (IsDDResNotOK(ddprof_input_parse(ARRAY_SIZE(argv_override) - 1,
                                       const_cast<char **>(argv_override),
                                       &input, &continue_exec))) {
     std::cerr << "unable to init input " << std::endl;

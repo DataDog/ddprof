@@ -5,15 +5,13 @@
 
 #pragma once
 
+#ifdef __cplusplus
 extern "C" {
-#include "logger.h"
-}
+#endif
 
-class LogHandle {
-public:
-  explicit LogHandle(int lvl = LL_DEBUG) {
-    LOG_open(LOG_STDERR, nullptr);
-    LOG_setlevel(lvl);
-  }
-  ~LogHandle() { LOG_close(); }
-};
+int ddprof_start_profiling();
+void ddprof_stop_profiling(int timeout_ms);
+
+#ifdef __cplusplus
+}
+#endif

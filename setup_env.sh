@@ -13,35 +13,41 @@ NATIVE_LIB="ON"
 COMPILER_SETTING="-DCMAKE_CXX_COMPILER=${CXX:-"g++"} -DCMAKE_C_COMPILER=${CC:-"gcc"}"
 # Avoid having the vendors compiled in the same directory
 EXTENSION_CC=${CC:-"gcc"}
+# strip version number from compiler
+EXTENSION_CC=${EXTENSION_CC%-*}
 EXTENSION_OS=${OS_IDENTIFIER:-"linux"}
 VENDOR_EXTENSION="-DVENDOR_EXTENSION=_${EXTENSION_CC,,}_${EXTENSION_OS,,}"
 COMMON_OPT="${COMPILER_SETTING} ${VENDOR_EXTENSION} -DACCURACY_TEST=ON -DCMAKE_INSTALL_PREFIX=${DDPROF_INSTALL_PREFIX} -DBUILD_BENCHMARKS=${DDPROF_BUILD_BENCH} -DBUILD_NATIVE_LIB=${NATIVE_LIB}"
 
 RelCMake() {
+    # shellcheck disable=SC2086
     cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=Release  "$@"
 }
 
 DebCMake() {
+    # shellcheck disable=SC2086
     cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=Debug "$@"
 }
 
 SanCMake() {
+    # shellcheck disable=SC2086
     cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=SanitizedDebug "$@"
 }
 
 TSanCMake() {
+    # shellcheck disable=SC2086
     cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=ThreadSanitizedDebug "$@"
 }
 
 CovCMake() {
+    # shellcheck disable=SC2086
     cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=Coverage "$@"
 }
 
 ## Build a directory with a naming that reflects the OS / compiler we are using
 ## Example : mkBuildDir Rel --> build_UB18_clang_Rel
 MkBuildDir() {
-    mkdir -p build_${OS_IDENTIFIER}_${CC}_${1}
-    cd build_${OS_IDENTIFIER}_${CC}_${1}
+    mkdir -p "build_${OS_IDENTIFIER}_${CC}_${1}" && cd "$_" || exit 1
 }
 
 RunDDBuild() {

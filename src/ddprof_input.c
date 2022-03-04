@@ -120,7 +120,6 @@ char* help_str[DD_KLEN] = {
   [DD_PROFILING_NATIVE_SHOW_CONFIG] =
 "    Whether or not to print configuration parameters to the trace log.  Can\n"
 "    be `yes` or `no` (default: `no`).\n",
-  [DD_PROFILING_NATIVE_SEND_FINAL] = STR_UNDF,
   [DD_PROFILING_NATIVE_LOG_MODE] =
 "    One of `stdout`, `stderr`, `syslog`, or `disabled`.  Default is `stdout`.\n"
 "    If a value is given but it does not match the above, it is treated as a\n"

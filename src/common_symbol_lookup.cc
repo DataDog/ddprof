@@ -10,14 +10,12 @@ namespace ddprof {
 Symbol symbol_from_common(SymbolErrors lookup_case) {
   switch (lookup_case) {
   case SymbolErrors::truncated_stack:
-    return Symbol(0, std::string(), std::string("[truncated]"), 0,
-                  std::string());
+    return Symbol(std::string(), std::string("[truncated]"), 0, std::string());
   case SymbolErrors::unknown_dso:
-    return Symbol(0, std::string(), std::string("[unknown_dso]"), 0,
+    return Symbol(std::string(), std::string("[unknown_dso]"), 0,
                   std::string());
   case SymbolErrors::dwfl_frame:
-    return Symbol(0, std::string(), std::string("[dwfl_frame]"), 0,
-                  std::string());
+    return Symbol(std::string(), std::string("[dwfl_frame]"), 0, std::string());
 
   default:
     break;

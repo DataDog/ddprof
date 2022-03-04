@@ -10,7 +10,7 @@ extern "C" {
 #include <gtest/gtest.h>
 
 TEST(ProducerLinearizerTest, SimpleTest) {
-  ProducerLinearizer pl = {0};
+  ProducerLinearizer pl = {};
   // Initializer
   ASSERT_TRUE(ProducerLinearizer_init(&pl, 10));
 

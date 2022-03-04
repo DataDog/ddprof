@@ -79,6 +79,7 @@ list(APPEND ELFUTILS_LIBRARIES dw elf libz.a liblzma.a)
 #######################
 
 #Cpp Check
+include(ClangTidy)
 include(Cppcheckconfig)
 include(Format)
 
@@ -116,7 +117,7 @@ endif()
 ###################
 ### Benchmarks  ###
 ###################
-option(BUILD_BENCHMARKS "Enable tests" OFF)
+option(BUILD_BENCHMARKS "Enable benchmarks" OFF)
 if (${BUILD_BENCHMARKS})
   add_subdirectory(bench/collatz)
 endif()
@@ -186,8 +187,6 @@ add_exe(ddprof
         LIBRARIES ${DDPROF_LIBRARY_LIST}
         DEFINITIONS ${DDPROF_DEFINITION_LIST})
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
-set_property(TARGET ddprof PROPERTY CXX_STANDARD 14)
-set_property(TARGET ddprof PROPERTY C_STANDARD 11)
 static_link_cxx(TARGET ddprof)
 
 # Ensure all dependencies are computed
@@ -200,6 +199,34 @@ endif()
 message(STATUS "Install destination " ${CMAKE_INSTALL_PREFIX})
 install(TARGETS ddprof)
 install(FILES LICENSE LICENSE-3rdparty.csv LICENSE.LGPLV3 NOTICE DESTINATION ${CMAKE_INSTALL_PREFIX})
+
+set(DDPROF_EXE_OBJECT "ddprof.o")
+set(EXE_OBJECT_PATH "${CMAKE_CURRENT_BINARY_DIR}/${DDPROF_EXE_OBJECT}")
+add_custom_command(OUTPUT ${DDPROF_EXE_OBJECT}
+  # taken from https://dvdhrm.wordpress.com/2013/03/08/linking-binary-data/
+  COMMAND ld -r -o ${DDPROF_EXE_OBJECT} -z noexecstack --format=binary ddprof
+  COMMAND objcopy --rename-section .data=.rodata,alloc,load,readonly,data,contents ${DDPROF_EXE_OBJECT}
+  DEPENDS ddprof
+)
+
+set(DDPROF_WRAPPER_SOURCES src/wrapper/ddprof_wrapper.cc src/ddprof_cmdline.c src/logger.c src/logger_setup.cc $<TARGET_OBJECTS:ddprof_exe_object>)
+add_library(ddprof_exe_object OBJECT IMPORTED GLOBAL)
+set_target_properties(ddprof_exe_object PROPERTIES IMPORTED_OBJECTS "${DDPROF_EXE_OBJECT}")
+
+add_library(ddprof_wrapper-static STATIC ${DDPROF_WRAPPER_SOURCES})
+set_target_properties(ddprof_wrapper-static PROPERTIES OUTPUT_NAME ddprof_wrapper)
+target_include_directories(ddprof_wrapper-static PUBLIC ${CMAKE_SOURCE_DIR}/include/wrapper ${CMAKE_SOURCE_DIR}/include)
+set_target_properties(ddprof_wrapper-static PROPERTIES
+   PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/wrapper/ddprof_wrapper.h")
+
+add_library(ddprof_wrapper-shared SHARED ${DDPROF_WRAPPER_SOURCES})
+set_target_properties(ddprof_wrapper-shared PROPERTIES OUTPUT_NAME ddprof_wrapper)
+target_include_directories(ddprof_wrapper-shared PUBLIC ${CMAKE_SOURCE_DIR}/include/wrapper ${CMAKE_SOURCE_DIR}/include)
+set_target_properties(ddprof_wrapper-shared PROPERTIES
+   PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/wrapper/ddprof_wrapper.h")
+
+install(TARGETS ddprof_wrapper-static ddprof_wrapper-shared)
+
 
 #######################################
 ### Declaration of native library   ###
@@ -226,9 +253,7 @@ if (${BUILD_NATIVE_LIB})
    ## Create the lib
    add_library(ddprof-native
                ${DDPROF_LIB_SRC})
-   set_property(TARGET ddprof-native PROPERTY CXX_STANDARD 14)
-   set_property(TARGET ddprof-native PROPERTY C_STANDARD 11)
-
+   
    set_target_properties(ddprof-native PROPERTIES VERSION ${PROJECT_VERSION})
    set_target_properties(ddprof-native PROPERTIES
                          COMPILE_DEFINITIONS DDPROF_NATIVE_LIB)

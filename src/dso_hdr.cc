@@ -12,6 +12,8 @@ extern "C" {
 #include "signal_helper.h"
 }
 #include "ddres.h"
+#include "defer.hpp"
+
 #include <algorithm>
 #include <cassert>
 #include <numeric>
@@ -31,17 +33,7 @@ static FILE *procfs_map_open(int pid, const char *path_to_proc = "") {
   return fopen(buf, "r");
 }
 
-struct ProcFileHolder {
-  explicit ProcFileHolder(int pid, const std::string &path_to_proc = "") {
-    _mpf = procfs_map_open(pid, path_to_proc.c_str());
-  }
-  ~ProcFileHolder() {
-    if (_mpf)
-      fclose(_mpf);
-  }
-  FILE *_mpf;
-};
-
+#ifndef NDEBUG
 static bool ip_in_procline(char *line, uint64_t ip) {
   static const char spec[] = "%lx-%lx %4c %lx %*x:%*x %*d%n";
   uint64_t m_start = 0;
@@ -58,11 +50,9 @@ static bool ip_in_procline(char *line, uint64_t ip) {
   return ip >= m_start && ip <= m_end;
 }
 
-#ifndef NDEBUG
 static void pid_find_ip(int pid, uint64_t ip,
                         const std::string &path_to_proc = "") {
-  ProcFileHolder file_holder(pid, path_to_proc);
-  FILE *mpf = file_holder._mpf;
+  FILE *mpf = procfs_map_open(pid, path_to_proc.c_str());
   if (!mpf) {
     if (process_is_alive(pid))
       LG_DBG("Couldn't find ip:0x%lx for %d, process is dead", ip, pid);
@@ -70,6 +60,7 @@ static void pid_find_ip(int pid, uint64_t ip,
       LG_DBG("Couldn't find ip:0x%lx for %d, mysteriously", ip, pid);
     return;
   }
+  defer { fclose(mpf); };
 
   char *buf = NULL;
   size_t sz_buf = 0;
@@ -112,7 +103,7 @@ void DsoStats::log() const {
 
 uint64_t DsoStats::sum_event_metric(DsoEventType dso_event) const {
   return std::accumulate(_metrics[dso_event].begin(), _metrics[dso_event].end(),
-                         0);
+                         0UL);
 }
 
 /**********/
@@ -441,15 +432,15 @@ bool DsoHdr::pid_backpopulate(pid_t pid, int &nb_elts_added) {
 // elements
 bool DsoHdr::pid_backpopulate(DsoMap &map, pid_t pid, int &nb_elts_added) {
   nb_elts_added = 0;
-  ProcFileHolder proc_file_holder(pid, _path_to_proc);
   LG_DBG("[DSO] Backpopulating PID %d", pid);
-  FILE *mpf = proc_file_holder._mpf;
+  FILE *mpf = procfs_map_open(pid, _path_to_proc.c_str());
   if (!mpf) {
     LG_DBG("[DSO] Failed to open procfs for %d", pid);
     if (!process_is_alive(pid))
       LG_DBG("[DSO] Process nonexistant");
     return false;
   }
+  defer { fclose(mpf); };
 
   char *buf = NULL;
   size_t sz_buf = 0;

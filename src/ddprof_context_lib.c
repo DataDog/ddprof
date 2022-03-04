@@ -9,58 +9,14 @@
 #include "ddprof_context.h"
 #include "ddprof_input.h"
 #include "logger.h"
+#include "logger_setup.h"
 
 #include <sys/sysinfo.h>
 
 /****************************  Argument Processor  ***************************/
 DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   memset(ctx, 0, sizeof(DDProfContext));
-  // Process logging mode
-  char const *logpattern[] = {"stdout", "stderr", "syslog", "disabled"};
-  const int sizeOfLogpattern = 4;
-  int idx_log_mode = input->log_mode
-      ? arg_which(input->log_mode, logpattern, sizeOfLogpattern)
-      : 0; // default to stdout
-  switch (idx_log_mode) {
-  case 0:
-    LOG_open(LOG_STDOUT, "");
-    break;
-  case 1:
-    LOG_open(LOG_STDERR, "");
-    break;
-  case 2:
-    LOG_open(LOG_SYSLOG, "");
-    break;
-  case 3:
-    LOG_open(LOG_DISABLE, "");
-    break;
-  default:
-    LOG_open(LOG_FILE, input->log_mode);
-    break;
-  }
-
-  // Process logging level
-  char const *loglpattern[] = {"debug", "informational", "notice", "warn",
-                               "error"};
-  const int sizeOfLoglpattern = 5;
-  switch (arg_which(input->log_level, loglpattern, sizeOfLoglpattern)) {
-  case 0:
-    LOG_setlevel(LL_DEBUG);
-    break;
-  case 1:
-    LOG_setlevel(LL_INFORMATIONAL);
-    break;
-  case 2:
-    LOG_setlevel(LL_NOTICE);
-    break;
-  case -1: // default
-  case 3:
-    LOG_setlevel(LL_WARNING);
-    break;
-  case 4:
-    LOG_setlevel(LL_ERROR);
-    break;
-  }
+  setup_logger(input->log_mode, input->log_level);
 
   for (int idx_watcher = 0; idx_watcher < input->num_watchers; ++idx_watcher) {
     ctx->watchers[ctx->num_watchers] =
@@ -131,9 +87,6 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   }
 
   ctx->params.num_cpu = get_nprocs();
-
-  // Process send_final
-  ctx->params.send_final = arg_yesno(input->send_final, 1);
 
   // Adjust target PID
   pid_t pid_tmp = 0;

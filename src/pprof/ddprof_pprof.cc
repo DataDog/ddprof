@@ -117,8 +117,7 @@ static void write_mapping(const ddprof::MapInfo &mapinfo,
   ffi_mapping->build_id = UNKNOWN_BUILD_ID;
 }
 
-static void write_location(const FunLoc *loc, const ddprof::Symbol &symbol,
-                           const ddprof::MapInfo &mapinfo,
+static void write_location(const FunLoc *loc, const ddprof::MapInfo &mapinfo,
                            const ddprof_ffi_Slice_line *lines,
                            ddprof_ffi_Location *ffi_location) {
   write_mapping(mapinfo, &ffi_location->mapping);
@@ -158,8 +157,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     // possibly several lines to handle inlined function (not handled for now)
     write_line(symbol_table[locs[i]._symbol_idx], &line_buff[i]);
     ddprof_ffi_Slice_line lines = {.ptr = &line_buff[i], .len = 1};
-    write_location(&locs[i], symbol_table[locs[i]._symbol_idx],
-                   mapinfo_table[locs[i]._map_info_idx], &lines,
+    write_location(&locs[i], mapinfo_table[locs[i]._map_info_idx], &lines,
                    &locations_buff[i]);
   }
   struct ddprof_ffi_Sample sample = {

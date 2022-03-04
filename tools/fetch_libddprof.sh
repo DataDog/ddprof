@@ -20,14 +20,6 @@ if [ $# != 3 ] || [ $1 == "-h" ]; then
     exit 1
 fi
 
-### Set directory names
-CURRENTDIR=$PWD
-SCRIPTPATH=$(readlink -f "$0")
-SCRIPTDIR=$(dirname $SCRIPTPATH)
-cd $SCRIPTDIR/../
-TOP_LVL_DIR=$PWD
-cd $CURRENTDIR
-
 TAG_LIBDDPROF=$1
 TAR_LIBDDPROF=libddprof_${TAG_LIBDDPROF}.tar.gz
 GITHUB_URL_LIBDDPROF=https://github.com/DataDog/libddprof/releases/download/${TAG_LIBDDPROF}/libddprof-x86_64-unknown-linux-gnu.tar.gz
@@ -38,14 +30,12 @@ cd $3
 DOWNLOAD_PATH=$PWD
 TARGET_EXTRACT=${DOWNLOAD_PATH}/libddprof
 
-if [ -e ${TARGET_EXTRACT} ]; then
-    echo "Error, clean the directory : ${TARGET_EXTRACT}"
-    exit 1
+if [ -e "${TARGET_EXTRACT}" ]; then
+    rm -rf ${TARGET_EXTRACT}/*
 fi
 
 mkdir -p ${TARGET_EXTRACT}
 
-IS_CI=${CI:-false}
 if [ ! -e  ${TAR_LIBDDPROF} ]; then
     echo "Downloading libddprof..."
     curl -L ${GITHUB_URL_LIBDDPROF} -o ${TAR_LIBDDPROF}
@@ -59,11 +49,4 @@ if [ $SHA_TAR != ${SHA256_LIBDDPROF} ];then
     exit 1
 fi
 
-tmp_dir=$(mktemp -d -t deliverables-XXXXXXXXXX)
-echo "Extract to $tmp_dir"
-cd $tmp_dir
-tar xvfz ${DOWNLOAD_PATH}/${TAR_LIBDDPROF}
-mv * ${TARGET_EXTRACT}
-rmdir $tmp_dir
-cd -
-exit 0
+tar xvfz ${DOWNLOAD_PATH}/${TAR_LIBDDPROF} -C ${TARGET_EXTRACT}

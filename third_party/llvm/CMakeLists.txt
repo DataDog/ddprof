@@ -22,9 +22,8 @@ set(LLVM_DEMANGLE_SRC_FILES
 add_library(llvm-demangle STATIC
             ${LLVM_DEMANGLE_SRC_FILES})
 
-set_property(TARGET llvm-demangle PROPERTY CXX_STANDARD 14)
-enable_clangtidy(TARGET llvm-demangle NOTIDY)
+# disable warnings for third party
+target_compile_options(llvm-demangle PRIVATE "-w")
+disable_clangtidy(llvm-demangle)
 
-target_include_directories(llvm-demangle PUBLIC
-  include
-)
+target_include_directories(llvm-demangle PUBLIC include)

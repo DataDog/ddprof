@@ -3,10 +3,10 @@
 
 # libddprof : common profiler imported libraries
 ## Associated https://gitlab.ddbuild.io/DataDog/libddprof-build/-/jobs/90384402
-set(TAG_LIBDDPROF "v0.2.0-rc.2" CACHE STRING "libddprof github tag")
-set(VER_LIBDDPROF "0.2.0" CACHE STRING "libddprof version")
+set(TAG_LIBDDPROF "v0.4.0-rc.1" CACHE STRING "libddprof github tag")
+set(VER_LIBDDPROF "0.4.0-rc.1" CACHE STRING "libddprof version")
 
-set(SHA256_LIBDDPROF "7c055d11e1bcd12716fd7ff99597777c827da5dd2c99de0900f27672accb8de1" CACHE STRING "libddprof sha256")
+set(SHA256_LIBDDPROF "6b18703b24b5408d7071bfe1ddeb5bf73454ad6669e31b37a8401ad94ca9aed6" CACHE STRING "libddprof sha256")
 
 set(LIBDDPROF_X86_ROOT ${VENDOR_PATH}/libddprof/libddprof-x86_64-unknown-linux-gnu)
 set(LIBDDPROF_REL_FFI_LIB ${LIBDDPROF_X86_ROOT}/lib/libddprof_ffi.a)

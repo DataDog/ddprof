@@ -47,13 +47,14 @@ bool sample_eq(struct perf_event_sample *s1, struct perf_event_sample *s2) {
     printf("Stack mismatch\n");
     return false;
   }
-  return true;
 
   // TODO hardcoded register number, should get from ABI
   if (s1->abi && memcmp(s1->regs, s2->regs, 3)) {
     printf("Register mismatch\n");
     return false;
   }
+
+  return true;
 }
 
 TEST(PerfRingbufferTest, SampleSymmetryx86) {

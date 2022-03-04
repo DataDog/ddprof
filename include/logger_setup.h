@@ -5,15 +5,12 @@
 
 #pragma once
 
+#ifdef __cplusplus
 extern "C" {
-#include "logger.h"
-}
+#endif
 
-class LogHandle {
-public:
-  explicit LogHandle(int lvl = LL_DEBUG) {
-    LOG_open(LOG_STDERR, nullptr);
-    LOG_setlevel(lvl);
-  }
-  ~LogHandle() { LOG_close(); }
-};
+void setup_logger(const char *log_mode, const char *log_level);
+
+#ifdef __cplusplus
+}
+#endif

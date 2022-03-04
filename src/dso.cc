@@ -12,22 +12,24 @@ extern "C" {
 
 #include "string_format.hpp"
 
+#include <string_view>
+
 namespace ddprof {
 
-static const std::string s_vdso_str = "[vdso]";
-static const std::string s_vsyscall_str = "[vsyscall]";
-static const std::string s_stack_str = "[stack]";
-static const std::string s_heap_str = "[heap]";
+static const std::string_view s_vdso_str = "[vdso]";
+static const std::string_view s_vsyscall_str = "[vsyscall]";
+static const std::string_view s_stack_str = "[stack]";
+static const std::string_view s_heap_str = "[heap]";
 // anon and empty are the same (one comes from perf, the other from proc maps)
-static const std::string s_anon_str = "//anon";
-static const std::string s_jsa_str = ".jsa";
+static const std::string_view s_anon_str = "//anon";
+static const std::string_view s_jsa_str = ".jsa";
 // Example of these include : anon_inode:[perf_event]
-static const std::string s_anon_inode_str = "anon_inode";
+static const std::string_view s_anon_inode_str = "anon_inode";
 // Example socket:[123456]
-static const std::string s_socket_str = "socket";
+static const std::string_view s_socket_str = "socket";
 // null elements
-static const std::string s_dev_zero_str = "/dev/zero";
-static const std::string s_dev_null_str = "/dev/null";
+static const std::string_view s_dev_zero_str = "/dev/zero";
+static const std::string_view s_dev_null_str = "/dev/null";
 // invalid element
 Dso::Dso()
     : _pid(-1), _start(), _end(), _pgoff(), _filename(), _type(dso::kUndef),

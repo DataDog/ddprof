@@ -25,7 +25,7 @@ VERSION_INPUT=$2
 OUTPUT_CHECK=$3
 
 if [ ${VERSION_FROM_FILE} != ${VERSION_INPUT} ]; then
-    echo "--- Libddprof version does not match : ${VERSION_FROM_FILE} vs ${VERSION_INPUT}"
+    echo "--- Libddprof version does not match : ${VERSION_FROM_FILE} (file) vs ${VERSION_INPUT} (expected)"
     exit 1
 fi
 

@@ -65,7 +65,7 @@ typedef enum LOG_FACILITY {
 // Manage the logging backend
 bool LOG_syslog_open();
 void LOG_close();
-bool LOG_open(int, char *);
+bool LOG_open(int, const char *);
 
 // Formatted print to the ddprof logging facility
 // Log-print-Formatted with Level, Facility, and Name
