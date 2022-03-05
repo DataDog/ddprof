@@ -21,9 +21,18 @@ endif()
 
 set(GCC_DEBUG_FLAGS "-g")
 set(SAN_FLAGS "-fsanitize=undefined -fsanitize=float-divide-by-zero -fno-sanitize-recover")
-set(ASAN_FLAGS "-fsanitize=address -fsanitize=leak")
+set(ASAN_FLAGS "-fsanitize=address")
 set(TSAN_FLAGS "-fsanitize=thread")
-set(STACK_FLAGS "-fstack-protector-all")
+set(STACK_FLAGS "-fstack-protector-all")\
+# On arm builds LSAN is barely usable
+# https://github.com/google/sanitizers/issues/703
+option(DDPROF_SKIP_LSAN "Remove lsan." OFF)
+if(DDPROF_SKIP_LSAN)
+    set(LSAN_FLAGS "-fsanitize=leak")
+else()
+    set(LSAN_FLAGS "")
+endif()
+
 ## Frame pointers
 set(FRAME_PTR_FLAG "-fno-omit-frame-pointer")
 
@@ -34,11 +43,11 @@ message(STATUS "Adding build types...")
 
 ## Add flags for sanitized debug (asan)
 SET(CMAKE_CXX_FLAGS_SANITIZEDDEBUG
-    "${GCC_DEBUG_FLAGS} ${SAN_FLAGS} ${ASAN_FLAGS} ${STACK_FLAGS}"
+    "${GCC_DEBUG_FLAGS} ${SAN_FLAGS} ${ASAN_FLAGS} ${LSAN_FLAGS} ${STACK_FLAGS}"
     CACHE STRING "Flags used by the C++ compiler during sanitized builds."
     FORCE )
 SET(CMAKE_C_FLAGS_SANITIZEDDEBUG
-    "${GCC_DEBUG_FLAGS} ${SAN_FLAGS} ${ASAN_FLAGS} ${STACK_FLAGS}"
+    "${GCC_DEBUG_FLAGS} ${SAN_FLAGS} ${ASAN_FLAGS} ${LSAN_FLAGS} ${STACK_FLAGS}"
     CACHE STRING "Flags used by the C compiler during sanitized builds."
     FORCE )
 SET(CMAKE_EXE_LINKER_FLAGS_SANITIZEDDEBUG
