@@ -45,7 +45,7 @@ void test_pprof(const DDProfPProf *pprofs) {
 
   // Check that encoded time is close to now
   time_t local_time = time(NULL);
-  EXPECT_TRUE(local_time - start.seconds < 1);
+  EXPECT_TRUE(local_time - start.seconds < 2);
 
   ddprof_ffi_Buffer profile_buffer = {
       .ptr = encoded_profile->buffer.ptr,
