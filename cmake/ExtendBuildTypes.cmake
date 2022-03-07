@@ -23,11 +23,11 @@ set(GCC_DEBUG_FLAGS "-g")
 set(SAN_FLAGS "-fsanitize=undefined -fsanitize=float-divide-by-zero -fno-sanitize-recover")
 set(ASAN_FLAGS "-fsanitize=address")
 set(TSAN_FLAGS "-fsanitize=thread")
-set(STACK_FLAGS "-fstack-protector-all")\
+set(STACK_FLAGS "-fstack-protector-all")
 # On arm builds LSAN is barely usable
 # https://github.com/google/sanitizers/issues/703
 option(DDPROF_SKIP_LSAN "Remove lsan." OFF)
-if(DDPROF_SKIP_LSAN)
+if(${DDPROF_SKIP_LSAN})
     set(LSAN_FLAGS "-fsanitize=leak")
 else()
     set(LSAN_FLAGS "")
