@@ -5,6 +5,10 @@ find_package(GTest REQUIRED)
 
 enable_testing()
 
+# On arm builds Leak Detection is barely usable.
+# https://github.com/google/sanitizers/issues/703
+option(DDPROF_DETECT_LEAK "Parameter for leak detection." 1)
+
 ### Code coverage
 if("${CMAKE_BUILD_TYPE}" STREQUAL "Coverage")
     message(STATUS "Activating code coverage in tests")
@@ -20,7 +24,7 @@ endif()
 
 #[[ Create a unit test
 Syntax:
-add_unit_test(<name> src1 [src2 ...] [LIBRARIES lib1 lib2 ...] [DEFINITIONS def1 def2] [NO_DETECT_LEAKS])
+add_unit_test(<name> src1 [src2 ...] [LIBRARIES lib1 lib2 ...] [DEFINITIONS def1 def2])
 will compile an unit test named <name> from source files src1 src2...
 with pre-processor definitions def1 def2 (-Ddef1 -Ddef2 ... will be added to compile command)
 and link against lib1 lib2 ... and libm
@@ -46,9 +50,8 @@ function(add_unit_test name)
    target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS})
 
    add_test(NAME ${name} COMMAND ${name})
-   set_tests_properties(${name} PROPERTIES
-                        ENVIRONMENT "UBSAN_OPTIONS=halt_on_error=1 abort_on_error=1 print_stacktrace=1;\
-                        LSAN_OPTIONS=detect_leaks=1 malloc_context_size=2 print_suppressions=0")
+   set_tests_properties(${name} PROPERTIES  
+                        ENVIRONMENT "UBSAN_OPTIONS=halt_on_error=1 abort_on_error=1 print_stacktrace=1;LSAN_OPTIONS=detect_leaks=${DDPROF_DETECT_LEAK} malloc_context_size=2 print_suppressions=0")
    disable_clangtidy(${name})
 endfunction()
 
