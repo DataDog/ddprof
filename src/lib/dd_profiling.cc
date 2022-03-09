@@ -179,6 +179,8 @@ void ddprof_stop_profiling(int timeout_ms) {
     return;
   }
 
+  defer { g_state.started = false; };
+
   auto time_limit =
       std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
 
@@ -186,11 +188,15 @@ void ddprof_stop_profiling(int timeout_ms) {
   const auto time_slice = std::chrono::milliseconds(10);
 
   while (std::chrono::steady_clock::now() < time_limit) {
-    if (kill(g_state.profiler_pid, 0) == -1 && errno == ESRCH) {
-      break;
-    }
     std::this_thread::sleep_for(time_slice);
+
+    // check if profiler process is still alive
+    if (kill(g_state.profiler_pid, 0) == -1 && errno == ESRCH) {
+      return;
+    }
   }
 
-  g_state.started = false;
+  // timeout reached and profiler process is still not dead
+  // Do a forceful kill
+  kill(g_state.profiler_pid, SIGKILL);
 }
