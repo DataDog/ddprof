@@ -205,11 +205,6 @@ void *ddprof_worker_export_thread(void *arg) {
     LG_NFO("Failed to export from worker");
     worker->exp_error = true;
   }
-
-  if (IsDDResNotOK(pprof_reset(worker->pprof[i]))) {
-    worker->exp_error = true;
-  }
-
   return nullptr;
 }
 #endif
@@ -260,6 +255,12 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
   // switch before we async export to avoid any possible race conditions (then
   // take into account the switch)
   ctx->worker_ctx.i_current_pprof = 1 - ctx->worker_ctx.i_current_pprof;
+
+  // Reset the current, ensuring the timestamp starts when we are about to write
+  // to it
+  DDRES_CHECK_FWD(
+      pprof_reset(ctx->worker_ctx.pprof[ctx->worker_ctx.i_current_pprof]));
+
   if (!synchronous_export) {
     pthread_create(&ctx->worker_ctx.exp_tid, NULL, ddprof_worker_export_thread,
                    &ctx->worker_ctx);
