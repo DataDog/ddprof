@@ -211,6 +211,11 @@ set_target_properties(dd_profiling-shared PROPERTIES OUTPUT_NAME dd_profiling)
 target_include_directories(dd_profiling-shared PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include)
 set_target_properties(dd_profiling-shared PROPERTIES
    PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
+   
+# Link libstdc++/libgcc statically and export only profiler API
+static_link_cxx(TARGET dd_profiling-shared)
+set_target_properties(dd_profiling-shared PROPERTIES LINK_DEPENDS "${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")
+target_link_options(dd_profiling-shared PRIVATE "LINKER:--version-script=${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")
 
 install(TARGETS ddprof dd_profiling-static dd_profiling-shared
         RUNTIME DESTINATION ddprof/bin
