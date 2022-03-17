@@ -25,7 +25,7 @@ bool rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size) {
   // Allocate room for a watcher-held buffer.  This is for linearizing
   // ringbuffer elements and depends on the per-watcher configuration for
   // perf_event_open().  Eventually this size will be non-static.
-  uint64_t buf_sz = PERF_REGS_MAX + PERF_SAMPLE_STACK_SIZE;
+  uint64_t buf_sz = sizeof(uint64_t) * PERF_REGS_COUNT + PERF_SAMPLE_STACK_SIZE;
   buf_sz += sizeof(perf_event_sample);
   unsigned char *wrbuf = malloc(buf_sz);
   if (!wrbuf)

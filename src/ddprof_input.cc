@@ -5,13 +5,17 @@
 
 #include "ddprof_input.h"
 
-#include <assert.h>
+#include <cassert>
+#include <cstdio>
 #include <getopt.h>
-#include <stdio.h>
+#include <sstream>
+#include <string>
 
+extern "C" {
 #include "ddprof_cmdline.h"
 #include "perf_option.h"
 #include "version.h"
+}
 
 /************************ Options Table Helper Macros *************************/
 #define X_FREE(a, b, c, d, e, f, g, h, i) FREE_EXP(i b, f);
@@ -22,16 +26,16 @@
 
 // TODO das210603 I don't think this needs to be inlined as a macro anymore
 #define DFLT_EXP(evar, key, targ, func, dfault)                                \
-  __extension__({                                                              \
+  {                                                                            \
     char *_buf = NULL;                                                         \
     if (!((targ)->key)) {                                                      \
       if (getenv(evar))                                                        \
         _buf = strdup(getenv(evar));                                           \
-      else if (*dfault)                                                        \
+      else if (*(dfault))                                                      \
         _buf = strdup(dfault);                                                 \
       (targ)->key = _buf;                                                      \
     }                                                                          \
-  })
+  }
 
 #define CASE_EXP(casechar, targ, key)                                          \
   case casechar:                                                               \
@@ -42,35 +46,28 @@
 
 // TODO das210603 I don't think this needs to be inlined as a macro anymore
 #define FREE_EXP(key, targ)                                                    \
-  __extension__({                                                              \
+  {                                                                            \
     free((void *)(targ)->key);                                                 \
     (targ)->key = NULL;                                                        \
-  })
+  }
 
 #define X_HLPK(a, b, c, d, e, f, g, h, i)                                      \
   "  -" #c ", --" #b ", (envvar: " #a ")",
 
-// Helpers for exapnding the OPT_TABLE here
+// Helpers for expanding the OPT_TABLE here
 #define X_PRNT(a, b, c, d, e, f, g, h, i)                                      \
-  __extension__({                                                              \
+  {                                                                            \
     if ((f)->i b) {                                                            \
-      if (__builtin_types_compatible_p(typeof((f)->i b), char *))              \
-        LG_PRINT("  " #b ": %s", (char *)(f)->i b);                            \
-      else if (__builtin_types_compatible_p(typeof((f)->i b), const char *))   \
-        LG_PRINT("  " #b ": %s", (char *)(f)->i b);                            \
-      else {                                                                   \
-        char *truefalse[] = {"false", "true"};                                 \
-        LG_PRINT("  " #b ": %s", truefalse[!!((f)->i b)]);                     \
-      }                                                                        \
+      LG_PRINT("  " #b ": %s", (f)->i b);                                      \
     }                                                                          \
-  });
+  }
 
 // We use a non-NULL definition for an undefined string, because it's important
 // that this table is always populated intentionally.  This is checked in the
 // loop inside ddprof_print_help()
 // clang-format off
 #define STR_UNDF (char*)1
-char* help_str[DD_KLEN] = {
+const char* help_str[DD_KLEN] = {
   [DD_API_KEY] = STR_UNDF,
   [DD_ENV] =
 "    The name of the environment to use in the Datadog UI.\n",
@@ -100,21 +97,21 @@ char* help_str[DD_KLEN] = {
 "    Tags sent with both profiler metrics and profiles.\n"
 "    Refer to the Datadog tag section to understand what is supported.\n",
   [DD_PROFILING_ENABLED] =
-"    Whether to enable Datadog profiling.  If this is true, then "MYNAME" as well\n"
+"    Whether to enable Datadog profiling.  If this is true, then " MYNAME " as well\n"
 "    as any other Datadog profilers are enabled.  If false, they are all disabled.\n"
 "    Note: if this is set, the native profiler will set the DD_PROFILING_ENABLED\n"
 "    environment variable in all sub-environments, thereby enabling Datadog profilers.\n"
 "    default: on\n",
   [DD_PROFILING_NATIVE_ENABLED] =
-"    Whether to enable "MYNAME" specifically, without altering how other Datadog\n"
+"    Whether to enable " MYNAME " specifically, without altering how other Datadog\n"
 "    profilers are run.  For example, DD_PROFILING_ENABLED can be used to disable\n"
-"    an inner profile, whilst setting DD_PROFILING_NATIVE_ENABLED to enable "MYNAME"\n",
+"    an inner profile, whilst setting DD_PROFILING_NATIVE_ENABLED to enable " MYNAME "\n",
   [DD_PROFILING_UPLOAD_PERIOD] = STR_UNDF,
   [DD_PROFILING_NATIVE_WORKER_PERIOD] = STR_UNDF,
   [DD_PROFILING_NATIVE_FAULT_INFO] = STR_UNDF,
   [DD_PROFILING_NATIVE_CORE_DUMPS] = STR_UNDF,
   [DD_PROFILING_NATIVE_NICE] =
-"    Sets the nice level of "MYNAME" without affecting any instrumented\n"
+"    Sets the nice level of " MYNAME " without affecting any instrumented\n"
 "    processes.  This is useful on small containers with spiky workloads.\n"
 "    If this parameter isn't given, then the nice level is unchanged.\n",
   [DD_PROFILING_NATIVE_SHOW_CONFIG] =
@@ -133,22 +130,51 @@ char* help_str[DD_KLEN] = {
 "    Instruments the whole system.  Overrides DD_PROFILING_NATIVE_TARGET_PID.\n"
 "    Requires specific permissions or a perf_event_paranoid value of less than 1.\n",
   [DD_PROFILING_INTERNAL_STATS] = 
-  "    Enables statsd metrics for "MYNAME". Value should point to a statsd socket.\n"
+  "    Enables statsd metrics for " MYNAME ". Value should point to a statsd socket.\n"
   "    Example: /var/run/datadog-agent/statsd.sock\n",
 };
 // clang-format on
 
-char *help_key[DD_KLEN] = {OPT_TABLE(X_HLPK)};
+const char *help_key[DD_KLEN] = {OPT_TABLE(X_HLPK)};
+
+static void ddprof_input_default_events(DDProfInput *input) {
+  const char *events = getenv("DD_PROFILING_NATIVE_EVENTS");
+  if (!events) {
+    return;
+  }
+
+  std::istringstream iss(events);
+  for (std::string event_str; std::getline(iss, event_str, ';');) {
+    size_t idx;
+    uint64_t sampling_value = 0;
+
+    if (event_str.empty()) {
+      continue;
+    }
+
+    // Iterate through the specified events and define new watchers if any
+    // of them are valid.  If the user specifies a '0' value, then that's
+    // the same as using the default (equivalently, the ',0' could be omitted)
+    if (process_event(event_str.c_str(), perfoptions_lookup(),
+                      perfoptions_nb_presets(), &idx, &sampling_value)) {
+      input->watchers[input->num_watchers] = idx;
+      input->sampling_value[input->num_watchers] = sampling_value;
+      ++input->num_watchers;
+    } else {
+      LG_WRN("Ignoring invalid event (%s)", event_str.c_str());
+    }
+  }
+}
 
 // clang-format off
 void ddprof_print_help() {
   char help_hdr[] = ""
-" usage: "MYNAME" [--help] [PROFILER_OPTIONS] COMMAND [COMMAND_ARGS]\n"
-" eg: "MYNAME" -S service_name -H localhost -P 8192 redis-server /etc/redis/redis.conf\n\n";
+" usage: " MYNAME " [--help] [PROFILER_OPTIONS] COMMAND [COMMAND_ARGS]\n"
+" eg: " MYNAME " -S service_name -H localhost -P 8192 redis-server /etc/redis/redis.conf\n\n";
 
   char help_opts_extra[] =
 "  -v, --version:\n"
-"    Prints the version of "MYNAME" and exits.\n\n";
+"    Prints the version of " MYNAME " and exits.\n\n";
   // clang-format on
 
   printf("%s", help_hdr);
@@ -170,6 +196,8 @@ DDRes ddprof_input_default(DDProfInput *input) {
   exporter_input_dflt(&input->exp_input);
   // Populate default values (mutates ctx)
   OPT_TABLE(X_DFLT);
+
+  ddprof_input_default_events(input);
   return ddres_init();
 }
 
@@ -203,7 +231,10 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
   while (-1 != (c = getopt_long(argc, argv, opt_short, lopts, &oi))) {
     switch (c) {
       OPT_TABLE(X_CASE)
-    case 'e':;
+    case 'e': {
+      size_t idx;
+      uint64_t sampling_value = 0;
+
       // Iterate through the specified events and define new watchers if any
       // of them are valid.  If the user specifies a '0' value, then that's
       // the same as using the default (equivalently, the ',0' could be omitted)
@@ -216,6 +247,7 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
         LG_WRN("Ignoring invalid event (%s)", optarg);
       }
       break;
+    }
     case 't':;
       traceconfig_t config = {0};
       if (!process_tracepoint(optarg, &config)) {
@@ -238,19 +270,22 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
         LG_WRN("Ignoring invalid tracepoint (%s)", optarg);
       }
       break;
-    case 'h':;
+    case 'h': {
       ddprof_print_help();
       *continue_exec = false;
       break;
-    case 'v':;
+    }
+    case 'v': {
       print_version();
       *continue_exec = false;
       break;
-    default:;
+    }
+    default: {
       *continue_exec = false;
       res = ddres_warn(DD_WHAT_INPUT_PROCESS);
       LG_ERR("Invalid option %s", argv[optind - 1]);
       break;
+    }
     }
   }
   input->nb_parsed_params = optind;

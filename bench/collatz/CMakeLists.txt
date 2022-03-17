@@ -18,4 +18,19 @@ add_exe(collatz
         DEFINITIONS ${COLLATZ_DEFINITION_LIST})
 target_include_directories(collatz PRIVATE ${STATSD_INCLUDE_DIR} ${LIBDDPROF_INCLUDE_DIR})
 
-install(TARGETS collatz)
+add_exe(collatz-profiling-shared
+        ${COLLATZ_SRC}
+        LIBRARIES Threads::Threads dd_profiling-shared
+        DEFINITIONS ${COLLATZ_DEFINITION_LIST} USE_DD_PROFILING)
+target_include_directories(collatz-profiling-shared PRIVATE ${STATSD_INCLUDE_DIR} ${LIBDDPROF_INCLUDE_DIR})
+
+add_exe(collatz-profiling-static
+        ${COLLATZ_SRC}
+        LIBRARIES Threads::Threads dd_profiling-static
+        DEFINITIONS ${COLLATZ_DEFINITION_LIST} USE_DD_PROFILING)
+target_include_directories(collatz-profiling-static PRIVATE ${STATSD_INCLUDE_DIR} ${LIBDDPROF_INCLUDE_DIR})
+
+install(TARGETS collatz DESTINATION collatz)
+install(TARGETS collatz-profiling-shared DESTINATION collatz)
+install(TARGETS collatz-profiling-static DESTINATION collatz)
+

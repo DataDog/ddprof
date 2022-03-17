@@ -31,8 +31,6 @@ extern "C" {
 
 #include "defer.hpp"
 
-#define rmb() __asm__ volatile("lfence" ::: "memory")
-
 static pid_t g_child_pid = 0;
 static bool g_termination_requested = false;
 

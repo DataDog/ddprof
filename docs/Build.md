@@ -65,7 +65,7 @@ docker volume rm ddprof-sync
 source setup_env.sh
 mkdir -p build_Release
 cd build_Release
-RelCmake ../
+RelCMake ../
 make -j 4 .
 ```
 

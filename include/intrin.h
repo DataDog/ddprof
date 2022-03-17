@@ -5,5 +5,8 @@
 
 #pragma once
 
-#include "elfutils/libdw.h"
-#include "elfutils/libdwfl.h"
+#ifdef __x86_64
+#  include <x86intrin.h>
+#elif __aarch64__
+#  define __rdtsc() 0
+#endif

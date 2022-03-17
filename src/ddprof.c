@@ -13,7 +13,6 @@
 #include <sys/resource.h>
 #include <sys/sysinfo.h>
 #include <unistd.h>
-#include <x86intrin.h>
 
 #include "cap_display.h"
 #include "ddprof_cmdline.h"
@@ -23,6 +22,7 @@
 #include "ddprof_stats.h"
 #include "ddprof_worker.h"
 #include "ddres.h"
+#include "intrin.h"
 #include "logger.h"
 #include "perf_mainloop.h"
 #include "pevent_lib.h"

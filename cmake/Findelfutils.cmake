@@ -9,28 +9,20 @@
 
 set(SHA256_ELF "7f6fb9149b1673d38d9178a0d3e0fb8a1ec4f53a9f4c2ff89469609879641177" CACHE STRING "SHA256 of the elf tar")
 set(VER_ELF "0.186" CACHE STRING "elfutils version")
-set(ELFUTILS_PATH ${VENDOR_PATH}/elfutils CACHE FILEPATH "location of elfutils file")
+set(ELFUTILS_PATH ${VENDOR_PATH}/elfutils-${VER_ELF})
 
-set(LIBDW_PATH ${ELFUTILS_PATH}/libdw/libdw.a CACHE FILEPATH "location of dw lib")
-set(LIBELF_PATH ${ELFUTILS_PATH}/libelf/libelf.a CACHE FILEPATH "location of elf lib")
-set(ELFUTILS_LIBS 
-    "${LIBDW_PATH}"
-    "${LIBELF_PATH}")
+set(LIBDW_PATH ${ELFUTILS_PATH}/lib/libdw.a)
+set(LIBELF_PATH ${ELFUTILS_PATH}/lib/libelf.a)
 
-list(APPEND ELFUTILS_INCLUDE_LIST ${ELFUTILS_PATH} ${ELFUTILS_PATH}/libdwfl ${ELFUTILS_PATH}/libdw ${ELFUTILS_PATH}/libebl ${ELFUTILS_PATH}/libelf)
+list(APPEND ELFUTILS_INCLUDE_LIST ${ELFUTILS_PATH}/include)
 
-add_custom_command(OUTPUT ${ELFUTILS_LIBS}
-                    COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_elfutils.sh" "${VER_ELF}" "${SHA256_ELF}" ${VENDOR_PATH} ${CMAKE_C_COMPILER}
-                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-                    COMMENT "Fetching elfutils")
-add_custom_target(elfutils-deps DEPENDS ${ELFUTILS_LIBS})
+execute_process(COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_elfutils.sh" "${VER_ELF}" "${SHA256_ELF}" "${ELFUTILS_PATH}" "${CMAKE_C_COMPILER}"
+                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_library(dw STATIC IMPORTED)
 set_property(TARGET dw PROPERTY
              IMPORTED_LOCATION ${LIBDW_PATH})
-add_dependencies(dw elfutils-deps)
 
 add_library(elf STATIC IMPORTED)
 set_property(TARGET elf PROPERTY
              IMPORTED_LOCATION ${LIBELF_PATH})
-add_dependencies(elf elfutils-deps)

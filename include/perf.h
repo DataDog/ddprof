@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "ddres_def.h"
+#include "perf_archmap.h"
 #include "perf_option.h"
 
 #define PSAMPLE_DEFAULT_WAKEUP_MS 100 // sample frequency check

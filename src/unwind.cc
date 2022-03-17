@@ -7,7 +7,6 @@
 
 extern "C" {
 #include "ddres.h"
-#include "libebl.h"
 #include "logger.h"
 #include "signal_helper.h"
 #include "unwind_metrics.h"
@@ -20,16 +19,14 @@ extern "C" {
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
 
-#define UNUSED(x) (void)(x)
-
 namespace ddprof {
 void unwind_init(void) { elf_version(EV_CURRENT); }
 
 static void find_dso_add_error_frame(UnwindState *us) {
   DsoHdr::DsoFindRes find_res =
-      us->dso_hdr.dso_find_closest(us->pid, us->current_eip);
+      us->dso_hdr.dso_find_closest(us->pid, us->current_ip);
   add_error_frame(find_res.second ? &(find_res.first->second) : nullptr, us,
-                  us->current_eip);
+                  us->current_ip);
 }
 
 void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
@@ -38,7 +35,7 @@ void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
   uw_output_clear(&us->output);
   memcpy(&us->initial_regs.regs[0], sample_regs,
          K_NB_REGS_UNWIND * sizeof(uint64_t));
-  us->current_eip = us->initial_regs.eip;
+  us->current_ip = us->initial_regs.regs[REGNAME(PC)];
   us->pid = sample_pid;
   us->stack_sz = sample_size_stack;
   us->stack = sample_data_stack;

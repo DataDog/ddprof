@@ -1,3 +1,22 @@
+0.7.0 to 0.8.0 (09/03/2022)
+* Remove usage of libdwfl internals
+* Free inconsistent dwfl modules
+We can come into situations where DSOs don't match the dwfl objects.
+In this situation we can free all of the PID objects to ensure we will
+reload all DSOs and all dwfl objects at the next sample
+* Minor fixes for global mode
+* Multiple updates in build system
+Support ninja, import llvm to a third party directory, compile in c++20,
+setup third parties during configure step.
+* Library mode 
+Deliver profiler as static and shared libraries. DDProf is embedded in the library.
+The library daemonizes ddprof. Check out our internal documentation.
+* Ensure we export the data gathered at the end of the process's lifetime
+This also ensure we export data for short lived processes
+* Improved management of signals
+SIGTERM and SIGINT now properly end the application
+* ARM support
+
 0.6.4 to 0.7.0 (19/01/2022)
 * Asynchronous HTTP exports 
 - Reduces lost events while exporting
