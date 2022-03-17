@@ -61,7 +61,7 @@ TEST(PerfRingbufferTest, SampleSymmetryx86) {
   // Setup the reference sample
   uint64_t mask = DEFAULT_SAMPLE_TYPE | PERF_SAMPLE_IDENTIFIER |
       PERF_SAMPLE_IP | PERF_SAMPLE_ADDR;
-  SampleOptions opt = {mask, PERF_REGS_MASK_X86, {0}, PERF_REGS_COUNT};
+  SampleOptions opt = {mask, PERF_REGS_MASK, {0}, PERF_REGS_COUNT};
   char default_stack[4096] = {0};
   for (uint64_t i = 0; i < sizeof(default_stack) / sizeof(*default_stack); i++)
     default_stack[i] = i & 255;

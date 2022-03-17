@@ -228,13 +228,12 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
 
   size_t idx;
   uint64_t sampling_value = 0;
+  LG_WRN("Process args");
+
   while (-1 != (c = getopt_long(argc, argv, opt_short, lopts, &oi))) {
     switch (c) {
       OPT_TABLE(X_CASE)
     case 'e': {
-      size_t idx;
-      uint64_t sampling_value = 0;
-
       // Iterate through the specified events and define new watchers if any
       // of them are valid.  If the user specifies a '0' value, then that's
       // the same as using the default (equivalently, the ',0' could be omitted)
@@ -248,8 +247,9 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
       }
       break;
     }
-    case 't':;
+    case 't': {
       traceconfig_t config = {0};
+      LG_WRN("process trace point %s \n", optarg);
       if (!process_tracepoint(optarg, &config)) {
         idx = perfoptions_get_tracepoint_idx();
         PerfOption *popt = (PerfOption *)perfoptions_preset(idx);
@@ -270,6 +270,7 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
         LG_WRN("Ignoring invalid tracepoint (%s)", optarg);
       }
       break;
+    }
     case 'h': {
       ddprof_print_help();
       *continue_exec = false;

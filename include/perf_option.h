@@ -8,9 +8,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "perf_regs.h"
+#include "perf_archmap.h"
 
-#define PERF_REGS_MAX 8 // defines max storage for registers in options
+// defines max storage for registers in options
+#define PERF_REGS_MAX PERF_REGS_COUNT
 
 typedef struct BPDef {
   uint64_t bp_addr;
@@ -40,7 +41,7 @@ typedef struct PerfOption {
   uint8_t target_reg; // register number of the target
   uint8_t trace_off;
   uint8_t trace_sz;
-  uint8_t regs_idx[PERF_REGS_MAX];
+  uint8_t regs_idx[PERF_REGS_COUNT];
 } PerfOption;
 
 /// Get preset matching index, returns NULL if out of bound

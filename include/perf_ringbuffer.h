@@ -21,7 +21,7 @@ typedef struct RingBuffer {
 typedef struct SampleOptions {
   uint64_t options_mask;
   uint64_t regmask;
-  uint8_t regs_idx[PERF_REGS_MAX];
+  uint8_t regs_idx[PERF_REGS_COUNT];
   uint8_t regnum;
 } SampleOptions;
 
