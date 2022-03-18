@@ -253,18 +253,20 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr, SampleOptions *opt) {
       buf8 += sample.size_raw;
       buf32 = (uint32_t *)buf8;
     }
-    buf = (uint64_t *)buf32;
-    buf = (uint64_t *)(((uint64_t)buf + 0x7UL) & ~0x7UL);
+    // align (taking into account size which is uint32)
+    buf += ((sample.size_raw + sizeof(uint32_t) + 0x7UL) & ~0x7UL) / 8;
   }
   if (PERF_SAMPLE_BRANCH_STACK & mask) {}
   if (PERF_SAMPLE_REGS_USER & mask) {
     sample.abi = *buf++;
+    if (sample.abi == PERF_SAMPLE_REGS_ABI_NONE) {
+      return NULL;
+    }
     sample.regs = buf;
     buf += opt->regnum;
   }
   if (PERF_SAMPLE_STACK_USER & mask) {
     uint64_t size_stack = *buf++;
-
     // Empirically, it seems that the size of the static stack is either 0 or
     // the amount requested in the call to `perf_event_open()`.  We don't check
     // for that, since there isn't much we'd be able to do anyway.

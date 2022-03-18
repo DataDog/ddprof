@@ -466,11 +466,9 @@ struct perf_event_hdr_wpid : perf_event_header {
 DDRes ddprof_worker_process_event(struct perf_event_header *hdr, int pos,
                                   DDProfContext *ctx) {
   // global try catch to avoid leaking exceptions to main loop
-  SampleOptions opt = {DEFAULT_SAMPLE_TYPE, ctx->watchers[pos].regmask, {0}};
+  SampleOptions opt = {
+      ctx->watchers[pos].perfmask, ctx->watchers[pos].regmask, {0}};
   opt.regnum = (uint8_t)__builtin_popcountll(ctx->watchers[pos].regmask);
-  if (ctx->watchers[pos].perfmask) {
-    opt.options_mask = ctx->watchers[pos].perfmask;
-  }
 
   try {
     ddprof_stats_add(STATS_EVENT_COUNT, 1, NULL);
@@ -480,7 +478,9 @@ DDRes ddprof_worker_process_event(struct perf_event_header *hdr, int pos,
     case PERF_RECORD_SAMPLE:
       if (wpid->pid) {
         perf_event_sample *sample = hdr2samp(hdr, &opt);
-        DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, pos));
+        if (sample) { // check sample is usable for unwinding
+          DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, pos));
+        }
       }
       break;
     case PERF_RECORD_MMAP:
