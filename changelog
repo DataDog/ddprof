@@ -1,3 +1,6 @@
+0.8.0 to 0.8.1 (18/03/2022)
+* Remove dependency on libstdc++ in library mode
+
 0.7.0 to 0.8.0 (09/03/2022)
 * Remove usage of libdwfl internals
 * Free inconsistent dwfl modules
