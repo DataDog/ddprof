@@ -4,7 +4,9 @@
 // Datadog, Inc.
 
 #include "ddprof_cmdline.h"
+
 #include "logger.h"
+#include "perf_archmap.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -44,10 +46,13 @@ bool arg_yesno(const char *str, int mode) {
   return false;
 }
 
-#ifdef __aarch64__
+#ifdef __x86_64__
+int arg2reg[] = {PAM_X86_EAX, PAM_X86_EDI, PAM_X86_ESI, PAM_X86_EDX,
+                 PAM_X86_ECX, PAM_X86_R8,  PAM_X86_R9};
+#elif defined __aarch64__
 #  warning tracepoints are broken on ARM
 #endif
-int arg2reg[] = {0, 5, 4, 3, 2, 16, 17};
+
 uint8_t get_register(const char *str) {
   uint8_t reg = 0;
   char *str_copy = (char *)str;

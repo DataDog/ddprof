@@ -249,7 +249,6 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
     }
     case 't': {
       traceconfig_t config = {0};
-      LG_WRN("process trace point %s \n", optarg);
       if (!process_tracepoint(optarg, &config)) {
         idx = perfoptions_get_tracepoint_idx();
         PerfOption *popt = (PerfOption *)perfoptions_preset(idx);

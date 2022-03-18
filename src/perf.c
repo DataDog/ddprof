@@ -62,12 +62,15 @@ int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
   return syscall(__NR_perf_event_open, attr, pid, cpu, gfd, flags);
 }
 
+// writes the index of the registery at the index matching the position of the
+// captured registry
 int get_array_from_mask(uint64_t mask, uint8_t *array, uint8_t sz_array) {
   int j = 0;
+  if (!array)
+    return j;
   for (unsigned int i = 0; i < 64; i++) {
     if ((1ul << i) & mask) {
-      if (array)
-        array[j] = i;
+      array[j] = i;
       ++j;
     }
   }
@@ -88,7 +91,8 @@ int perfopen(pid_t pid, const PerfOption *opt, int cpu, bool extras) {
     attr.bp_type = opt->bp_type;
   }
 
-  // If this is a tracepoint type event, then go ahead and setup the raw handler
+  // If this is a tracepoint type event, then go ahead and setup the raw
+  // handler
   if (opt->type & PERF_TYPE_TRACEPOINT) {
     attr.sample_type |= PERF_SAMPLE_RAW;
   }

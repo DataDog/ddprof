@@ -13,12 +13,12 @@
 #  define PERF_REGS_MASK 0xff0fff
 #  define REGNAME(x) PAM_X86_##x
 enum PERF_ARCHMAP_X86 {
-  PAM_X86_EAX,
+  PAM_X86_EAX = 0, // return value
   PAM_X86_EBX,
-  PAM_X86_ECX,
-  PAM_X86_EDX,
-  PAM_X86_ESI,
-  PAM_X86_EDI,
+  PAM_X86_ECX, // 4th arg
+  PAM_X86_EDX, // 3rd arg
+  PAM_X86_ESI, // 2nd arg
+  PAM_X86_EDI, // 1st arg
   PAM_X86_EBP,
   PAM_X86_ESP,
   PAM_X86_SP = PAM_X86_ESP, // For uniformity
@@ -33,8 +33,8 @@ enum PERF_ARCHMAP_X86 {
     PAM_X86_FS,  // They are retained here for documentation.
     PAM_X86_GS,  // <-- and this one too
   */
-  PAM_X86_R8,
-  PAM_X86_R9,
+  PAM_X86_R8, // 5th arg
+  PAM_X86_R9, // 6th arg
   PAM_X86_R10,
   PAM_X86_R11,
   PAM_X86_R12,
@@ -43,6 +43,7 @@ enum PERF_ARCHMAP_X86 {
   PAM_X86_R15,
   PAM_X86_MAX,
 };
+
 #elif __aarch64__
 // Registers 0-32
 #  define PERF_REGS_COUNT 33
