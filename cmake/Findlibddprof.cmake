@@ -23,8 +23,6 @@ list(APPEND
     LIBDDPROF_INCLUDE_DIR
     ${LIBDDPROF_ROOT}/include)
 
-set(LIBDDPROF_VERSION_FILE ${LIBDDPROF_ROOT}/lib/pkgconfig/ddprof_ffi.pc)
-
 execute_process(COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_libddprof.sh" ${TAG_LIBDDPROF} ${SHA256_LIBDDPROF} ${LIBDDPROF_ROOT}
                 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
