@@ -101,7 +101,6 @@ add_unit_test(
     LIBRARIES llvm-demangle
     DEFINITIONS MYNAME="demangle-ut"
 )
-target_include_directories(demangle-ut PRIVATE ${LLVM_DEMANGLE_PATH}/include)
 
 add_compile_definitions("IPC_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 
@@ -194,8 +193,6 @@ add_unit_test(
     LIBRARIES DDProf::FFI
     DEFINITIONS MYNAME="ddprof_pprof-ut"
 )
-target_include_directories(ddprof_pprof-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
-
 
 add_unit_test(
     ddprof_exporter-ut
@@ -209,7 +206,6 @@ add_unit_test(
     LIBRARIES DDProf::FFI
     DEFINITIONS MYNAME="ddprof_exporter-ut"
 )
-target_include_directories(ddprof_exporter-ut PRIVATE ${LIBDDPROF_INCLUDE_DIR})
 
 add_unit_test(
     region_holder-ut
@@ -246,7 +242,6 @@ add_unit_test(
     LIBRARIES llvm-demangle ${ELFUTILS_LIBRARIES}
     DEFINITIONS MYNAME="dwfl_symbol-ut"
 )
-target_include_directories(dwfl_symbol-ut PRIVATE ${ELFUTILS_INCLUDE_LIST} ${LLVM_DEMANGLE_PATH}/include)
 
 add_unit_test(
     dwfl_module-ut
@@ -262,5 +257,4 @@ add_unit_test(
     LIBRARIES ${ELFUTILS_LIBRARIES}
     DEFINITIONS MYNAME="dwfl_symbol-ut"
 )
-target_include_directories(dwfl_module-ut PRIVATE ${ELFUTILS_INCLUDE_LIST})
 add_compile_definitions("DWFL_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
