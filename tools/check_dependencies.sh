@@ -15,14 +15,15 @@ if [ $# != 2 ] || [ $1 == "-h" ]; then
     exit 0
 fi
 
-# Poor man's test, I'll come back to it
-NB_DEPS=$(ldd $1 | wc -l)
-NB_EXPECTED_DEPS=$(cat $2 | wc -l)
+# Omit ld-linux because its full name depends on the architecture
+actual_deps=$(readelf -d "$1" | grep '(NEEDED) *Shared library: \[' | grep -Fv "[ld-linux-" | awk '{ print $5}' | tr -d '[]' | sort -u)
+expected_deps=$(sort -u < "$2")
 
-if [ $NB_DEPS -gt $NB_EXPECTED_DEPS ]; then
-    echo "Check dependencies different number."
-    echo "Nb deps = $NB_DEPS vs Expected : $NB_EXPECTED_DEPS"
-    ldd $1
+unexpected_deps=$(comm -13 <(echo "$expected_deps") <(echo "$actual_deps"))
+
+if [ -n "$unexpected_deps" ]; then
+    echo "Unexpected dependencies:" 1>&2
+    echo $unexpected_deps 1>&2
     exit 1
 fi
 
