@@ -132,8 +132,22 @@ RUN VERSION="3.10.5" \
   && cmake -GNinja -DJSON_BuildTests=Off ../ \
   && cmake --build . -t install \
   && popd \
-  && rm -rf json json.tar.xz 
+  && rm -rf json json.tar.xz
 
-# A specific user is required to get access to perf event ressources. 
+# Google benchmark
+RUN VERSION="1.6.1" \
+  && curl -LO "https://github.com/google/benchmark/archive/refs/tags/v${VERSION}.tar.gz" \
+  && SHA256="6132883bc8c9b0df5375b16ab520fac1a85dc9e4cf5be59480448ece74b278d4" \
+  && (printf "${SHA256} v${VERSION}.tar.gz" | sha256sum --check --strict --status) \
+  && tar xf v${VERSION}.tar.gz \
+  && pushd benchmark-${VERSION} \
+  # python is missing on ubuntu 20.04, use python 3 instead
+  && { command -v python > /dev/null || { ln -s /usr/bin/python3 python && export PATH=$PWD:$PATH; }; } \
+  && cmake -DCMAKE_BUILD_TYPE=Release -DBENCHMARK_USE_BUNDLED_GTEST=OFF -GNinja -S . -B "build" \
+  && cmake --build "build" --target install \
+  && popd \
+  && rm -rf benchmark-${VERSION} v${VERSION}.tar.gz
+
+# A specific user is required to get access to perf event ressources.
 # This enables unit testing using perf-event ressources
 RUN useradd -ms /bin/bash ddbuild
