@@ -16,8 +16,6 @@
 
 #define PSAMPLE_DEFAULT_WAKEUP_MS 100 // sample frequency check
 #define PERF_SAMPLE_STACK_SIZE (4096 * 8)
-#define PERF_SAMPLE_STACK_REGS 3
-#define MAX_INSN 16
 
 // TODO, probably make this part of the unwinding context or ddprof ctx
 #define DEFAULT_SAMPLE_TYPE                                                    \
