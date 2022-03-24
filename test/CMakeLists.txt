@@ -2,6 +2,7 @@
 # This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
 
 find_package(GTest REQUIRED)
+find_package(benchmark REQUIRED)
 
 enable_testing()
 
@@ -41,24 +42,24 @@ function(add_unit_test name)
    message(STATUS "Creating unit test : " ${name})
 
    ## Create exe with sources. Always add logger and error management in the unit tests
-   add_exe(${name} 
+   add_exe(${name}
         ../src/ddres_list.c
         ../src/logger.c
         ${MY_UNPARSED_ARGUMENTS})
 
    target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
-   target_include_directories(${name} PRIVATE ../include ${GTEST_INCLUDE_DIRS})
+   target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST} ${GTEST_INCLUDE_DIRS})
 
    add_test(NAME ${name} COMMAND ${name})
-   set_tests_properties(${name} PROPERTIES  
-                        ENVIRONMENT "UBSAN_OPTIONS=halt_on_error=1 abort_on_error=1 print_stacktrace=1;LSAN_OPTIONS=detect_leaks=${DDPROF_DETECT_LEAK} malloc_context_size=2 print_suppressions=0")
+   set_tests_properties(${name} PROPERTIES
+                        ENVIRONMENT "UBSAN_OPTIONS=halt_on_error=1 abort_on_error=1 print_stacktrace=1;LSAN_OPTIONS=detect_leaks=$<BOOL:${DDPROF_DETECT_LEAK}> malloc_context_size=2 print_suppressions=0;ASAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/cmake/asan.supp")
    disable_clangtidy(${name})
 endfunction()
 
 #### Definition of unit tests ####
 add_unit_test(
     ddprofcmdline-ut
-    ../src/ddprof_cmdline.c 
+    ../src/ddprof_cmdline.c
     ../src/perf_option.c
     ddprofcmdline-ut.cc
 )
@@ -70,28 +71,28 @@ add_unit_test(
 
 add_unit_test(
     signal_helper-ut
-    ../src/signal_helper.c 
+    ../src/signal_helper.c
     signal_helper-ut.cc
 )
 
 include(Version)
 add_unit_test(
     version-ut
-    ../src/version.c 
+    ../src/version.c
     version-ut.cc
     DEFINITIONS ${DDPROF_DEFINITION_LIST}
 )
 
 add_unit_test(
     statsd-ut
-    ../src/statsd.c 
+    ../src/statsd.c
     statsd-ut.cc
 )
 
 add_unit_test(
     ddprof_stats-ut
     ../src/ddprof_stats.c
-    ../src/statsd.c 
+    ../src/statsd.c
     ddprof_stats-ut.cc
 )
 
@@ -151,7 +152,7 @@ add_unit_test(
 
 add_unit_test(
     ddprof_input-ut
-    ../src/ddprof_cmdline.c 
+    ../src/ddprof_cmdline.c
     ../src/ddprof_input.cc
     ../src/perf_option.c
     ddprof_input-ut.cc
@@ -215,13 +216,13 @@ add_unit_test(
 
 add_unit_test(
     dso-ut
-    ../src/dso.cc 
+    ../src/dso.cc
     ../src/dso_hdr.cc
     ../src/ddprof_file_info.cc
     ../src/procutils.c
     ../src/signal_helper.c
     ../src/region_holder.cc
-    dso-ut.cc 
+    dso-ut.cc
     DEFINITIONS MYNAME="dso-ut")
 target_include_directories(dso-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
 
@@ -248,7 +249,7 @@ add_unit_test(
     dwfl_module-ut.cc
     ../src/dwfl_hdr.cc
     ../src/dwfl_module.cc
-    ../src/dso.cc 
+    ../src/dso.cc
     ../src/dso_hdr.cc
     ../src/ddprof_file_info.cc
     ../src/procutils.c
@@ -258,3 +259,40 @@ add_unit_test(
     DEFINITIONS MYNAME="dwfl_symbol-ut"
 )
 add_compile_definitions("DWFL_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
+
+add_unit_test(
+    savecontext-ut
+    savecontext-ut.cc
+    ../src/base_frame_symbol_lookup.cc
+    ../src/common_mapinfo_lookup.cc
+    ../src/common_symbol_lookup.cc
+    ../src/ddprof_file_info.cc
+    ../src/ddprof_stats.c
+    ../src/dso.cc
+    ../src/dso_hdr.cc
+    ../src/dso_symbol_lookup.cc
+    ../src/dwfl_hdr.cc
+    ../src/dwfl_module.cc
+    ../src/dwfl_symbol.cc
+    ../src/dwfl_symbol_lookup.cc
+    ../src/dwfl_thread_callbacks.cc
+    ../src/savecontext.cc
+    ../src/mapinfo_lookup.cc
+    ../src/procutils.c
+    ../src/region_holder.cc
+    ../src/signal_helper.c
+    ../src/statsd.c
+    ../src/unwind.cc
+    ../src/unwind_dwfl.cc
+    ../src/unwind_helpers.cc
+    ../src/unwind_metrics.c
+    ../src/unwind_output.c
+    LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
+    DEFINITIONS MYNAME="savecontext-ut"
+)
+
+add_executable(savecontext-bench savecontext-bench.cc ../src/savecontext.cc)
+target_link_libraries(savecontext-bench benchmark::benchmark benchmark::benchmark_main)
+target_include_directories(savecontext-bench PRIVATE ${DDPROF_INCLUDE_LIST})
+# clang-tidy does like google-benchmark macros
+disable_clangtidy(savecontext-bench)

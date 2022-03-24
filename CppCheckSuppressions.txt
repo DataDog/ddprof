@@ -11,3 +11,6 @@ missingInclude
 // trick to retrieve instruction pointer in unit tests
 unusedLabel:*/dso-ut.cc
 unusedLabel:*/dwfl_module-ut.cc
+
+// cppcheck does not like google benchmark macros
+constParameterCallback:*/*-bench.cc
