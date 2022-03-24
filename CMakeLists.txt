@@ -90,18 +90,6 @@ include(Findlibcap)
 # llvm demangler
 add_subdirectory(third_party/llvm)
 
-####################
-### Unit tests   ###
-####################
-
-### Unit tests
-# Add infrastructure for enabling tests
-option(BUILD_DDPROF_TESTING "Enable tests" ON)
-if (${BUILD_DDPROF_TESTING})
-  enable_testing()
-  add_subdirectory(test)
-endif()
-
 ###################
 ### Benchmarks  ###
 ###################
@@ -123,7 +111,7 @@ include(Version)
 string(APPEND CMAKE_C_FLAGS " ${FRAME_PTR_FLAG}")
 string(APPEND CMAKE_CXX_FLAGS " ${FRAME_PTR_FLAG}")
 
-list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include)
+list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
 
 # Find the source files
 aux_source_directory(src COMMON_SRC)
@@ -220,7 +208,6 @@ if (${BUILD_NATIVE_LIB})
 
    ## Libs to link
    set(NATIVE_LIB_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
-   list(APPEND NATIVE_LIB_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include)
 
    if (${DDPROF_JEMALLOC})
       list(PREPEND NATIVE_LIB_LIBRARY_LIST jemalloc)
@@ -236,9 +223,8 @@ if (${BUILD_NATIVE_LIB})
                          
    # libcap, can be removed from version distributed to client 
    list(APPEND NATIVE_LIB_LIBRARY_LIST libcap)
-   list(APPEND NATIVE_LIB_INCLUDE_LIST ${LIBCAP_INCLUDE_DIR})
 
-   target_include_directories(ddprof-native PRIVATE ${NATIVE_LIB_INCLUDE_LIST})
+   target_include_directories(ddprof-native PRIVATE ${DDPROF_INCLUDE_LIST})
 
    target_link_libraries(ddprof-native PRIVATE ${NATIVE_LIB_LIBRARY_LIST})
    add_library(DDProf::Native ALIAS ddprof-native)
@@ -248,4 +234,16 @@ if (${BUILD_NATIVE_LIB})
    if(${ACCURACY_TEST})
       add_subdirectory(test/self_unwind)
    endif()
+endif()
+
+####################
+### Unit tests   ###
+####################
+
+### Unit tests
+# Add infrastructure for enabling tests
+option(BUILD_DDPROF_TESTING "Enable tests" ON)
+if (${BUILD_DDPROF_TESTING})
+  enable_testing()
+  add_subdirectory(test)
 endif()
