@@ -188,12 +188,14 @@ static_link_cxx(TARGET dd_profiling-shared)
 set_target_properties(dd_profiling-shared PROPERTIES LINK_DEPENDS "${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")
 target_link_options(dd_profiling-shared PRIVATE "LINKER:--version-script=${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")
 
+add_library(dd_allocation_profiling SHARED src/lib/malloc_interceptor.cc)
+target_link_libraries(dd_allocation_profiling PUBLIC dl)
+
 install(TARGETS ddprof dd_profiling-static dd_profiling-shared
         RUNTIME DESTINATION ddprof/bin
         LIBRARY DESTINATION ddprof/lib
         ARCHIVE DESTINATION ddprof/lib
         PUBLIC_HEADER DESTINATION ddprof/include)
-
 
 #######################################
 ### Declaration of native library   ###

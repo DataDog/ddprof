@@ -296,3 +296,7 @@ target_link_libraries(savecontext-bench benchmark::benchmark benchmark::benchmar
 target_include_directories(savecontext-bench PRIVATE ${DDPROF_INCLUDE_LIST})
 # clang-tidy does like google-benchmark macros
 disable_clangtidy(savecontext-bench)
+
+add_executable(library_injector library_injector-main.cc ../src/library_injector.cc)
+target_link_libraries(library_injector dl)
+target_include_directories(library_injector PRIVATE ../include)
