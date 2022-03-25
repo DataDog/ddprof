@@ -13,17 +13,17 @@
 #  define PERF_REGS_MASK 0xff0fff
 #  define REGNAME(x) PAM_X86_##x
 enum PERF_ARCHMAP_X86 {
-  PAM_X86_EAX,
-  PAM_X86_EBX,
-  PAM_X86_ECX,
-  PAM_X86_EDX,
-  PAM_X86_ESI,
-  PAM_X86_EDI,
-  PAM_X86_EBP,
-  PAM_X86_ESP,
-  PAM_X86_SP = PAM_X86_ESP, // For uniformity
-  PAM_X86_EIP,
-  PAM_X86_PC = PAM_X86_EIP, // For uniformity
+  PAM_X86_RAX,
+  PAM_X86_RBX,
+  PAM_X86_RCX,
+  PAM_X86_RDX,
+  PAM_X86_RSI,
+  PAM_X86_RDI,
+  PAM_X86_RBP,
+  PAM_X86_RSP,
+  PAM_X86_SP = PAM_X86_RSP, // For uniformity
+  PAM_X86_RIP,
+  PAM_X86_PC = PAM_X86_RIP, // For uniformity
   PAM_X86_FL,
   PAM_X86_CS,
   PAM_X86_SS,
