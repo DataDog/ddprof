@@ -24,13 +24,13 @@ bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
 
 #ifdef __x86_64__
   // Substantial difference here in 32- and 64-bit x86; only support 64-bit now
-  regs[n++] = us->initial_regs.regs[REGNAME(EAX)];
-  regs[n++] = us->initial_regs.regs[REGNAME(EDX)];
-  regs[n++] = us->initial_regs.regs[REGNAME(ECX)];
-  regs[n++] = us->initial_regs.regs[REGNAME(EBX)];
-  regs[n++] = us->initial_regs.regs[REGNAME(ESI)];
-  regs[n++] = us->initial_regs.regs[REGNAME(EDI)];
-  regs[n++] = us->initial_regs.regs[REGNAME(EBP)];
+  regs[n++] = us->initial_regs.regs[REGNAME(RAX)];
+  regs[n++] = us->initial_regs.regs[REGNAME(RDX)];
+  regs[n++] = us->initial_regs.regs[REGNAME(RCX)];
+  regs[n++] = us->initial_regs.regs[REGNAME(RBX)];
+  regs[n++] = us->initial_regs.regs[REGNAME(RSI)];
+  regs[n++] = us->initial_regs.regs[REGNAME(RDI)];
+  regs[n++] = us->initial_regs.regs[REGNAME(RBP)];
   regs[n++] = us->initial_regs.regs[REGNAME(SP)];
   regs[n++] = us->initial_regs.regs[REGNAME(R8)];
   regs[n++] = us->initial_regs.regs[REGNAME(R9)];

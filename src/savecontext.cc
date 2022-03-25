@@ -9,49 +9,45 @@
 #include <cstring>
 #include <pthread.h>
 
-#define XSTR(s) STR(s)
-#define STR(s) #s
-
 #ifdef __x86_64__
-// hardcode register index in mask
-// Did not find a way to reuse enum values from perf-archmap.h
-#  define RBX_IDX 1
-#  define RBP_IDX 6
-#  define RSP_IDX 7
-#  define RIP_IDX 8
-#  define R12_IDX 16
-#  define R13_IDX 17
-#  define R14_IDX 18
-#  define R15_IDX 19
 
-#  define DEST_MEM(reg) XSTR(reg##_IDX) "*8(%rdi)\n"
-#  define SAVE_REG(reg) "movq %" #  reg ", " DEST_MEM(reg)
+#  define INPUT_REG(reg) [i##reg] "i"(REGNAME(reg))
 
 static __attribute__((noinline, naked)) void
 save_registers(ddprof::span<uint64_t, PERF_REGS_COUNT>) {
   // The goal here is to capture the state of registers after the return of this
   // function. That is why this function must not be inlined.
 
-  // clang-format off
-    asm (
-    // Retrieve caller save registers
-    // Callee save register are not needed since they could contain anything after function return
-    SAVE_REG(RBX)
-    SAVE_REG(RBP)    
-    SAVE_REG(R12)
-    SAVE_REG(R13)
-    SAVE_REG(R14)
-    SAVE_REG(R15)
-    // Bump the stack by 8 bytes to remove the return address, 
-    // that way we will have the value of RSP after funtion return
-    "leaq 8(%rsp), %rax\n"
-    "movq %rax, " DEST_MEM(RSP) "\n"
-    // 0(%rsp) contains the return address, this is the value of RIP after funtion return
-    "movq 0(%rsp), %rax\n"
-    "movq %rax, " DEST_MEM(RIP) "\n"
-    "ret\n"
-    );
-  // clang-format on
+  asm(
+      // Save caller save registers
+      // Callee save register are not needed since they could contain anything
+      // after function return, and thus cannot be used for unwinding %c[rbx]
+      // requires a constant and prints it without punctuation (without it,
+      // immediate constant would be printed with a `$` prefix, and this would
+      // result in invalid assembly)
+      "movq %%rbx, %c[iRBX]*8(%%rdi)\n"
+      "movq %%rbp, %c[iRBP]*8(%%rdi)\n"
+      "movq %%r12, %c[iR12]*8(%%rdi)\n"
+      "movq %%r13, %c[iR13]*8(%%rdi)\n"
+      "movq %%r14, %c[iR14]*8(%%rdi)\n"
+      "movq %%r15, %c[iR15]*8(%%rdi)\n"
+      // Bump the stack by 8 bytes to remove the return address,
+      // that way we will have the value of RSP after funtion return
+      "leaq 8(%%rsp), %%rax\n"
+      "movq %%rax, %c[iRSP]*8(%%rdi)\n"
+      // 0(%rsp) contains the return address, this is the value of RIP after
+      // funtion return
+      "movq 0(%%rsp), %%rax\n"
+      "movq %%rax, %c[iRIP]*8(%%rdi)\n"
+      "ret\n"
+      :
+      // Pass register indices in input array as input operands
+      // INPUT_REG(reg) expands to [i##reg]"i"(PAM_X86_#reg).
+      // This allows passing enum value PAM_X86_#reg as an immediate integer
+      // constant named i`reg` inside the asm block.
+      : INPUT_REG(RBX), INPUT_REG(RBP), INPUT_REG(R12), INPUT_REG(R13),
+        INPUT_REG(R14), INPUT_REG(R15), INPUT_REG(RSP), INPUT_REG(RIP)
+      :);
 }
 
 #else
