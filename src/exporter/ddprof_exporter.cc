@@ -28,18 +28,16 @@ extern "C" {
 static const int k_timeout_ms = 10000;
 static const int k_size_api_key = 32;
 
-static ddprof_ffi_ByteSlice cpp_string_to_byteslice(const std::string &str) {
-  return (ddprof_ffi_ByteSlice){.ptr = (uint8_t *)str.c_str(),
-                                .len = str.size()};
+static ddprof_ffi_CharSlice cpp_string_to_CharSlice(const std::string &str) {
+  return (ddprof_ffi_CharSlice){.ptr = (char *)str.c_str(), .len = str.size()};
 }
 
-static ddprof_ffi_ByteSlice string_view_to_byteslice(string_view slice) {
-  return (ddprof_ffi_ByteSlice){.ptr = (uint8_t *)slice.ptr, .len = slice.len};
+static ddprof_ffi_CharSlice string_view_to_CharSlice(string_view slice) {
+  return (ddprof_ffi_CharSlice){.ptr = (char *)slice.ptr, .len = slice.len};
 }
 
-static ddprof_ffi_ByteSlice char_star_to_byteslice(const char *string) {
-  return (ddprof_ffi_ByteSlice){.ptr = (uint8_t *)string,
-                                .len = strlen(string)};
+static ddprof_ffi_CharSlice char_star_to_CharSlice(const char *string) {
+  return (ddprof_ffi_CharSlice){.ptr = (char *)string, .len = strlen(string)};
 }
 
 static char *alloc_url_agent(const char *protocol, const char *host,
@@ -146,38 +144,38 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
 static void fill_tags(const UserTags *user_tags, const DDProfExporter *exporter,
                       std::vector<ddprof_ffi_Tag> &tags_exporter) {
   tags_exporter.push_back(ddprof_ffi_Tag{
-      .name = char_star_to_byteslice("language"),
-      .value = string_view_to_byteslice(exporter->_input.language)});
+      .name = char_star_to_CharSlice("language"),
+      .value = string_view_to_CharSlice(exporter->_input.language)});
 
   if (exporter->_input.environment) {
     tags_exporter.push_back(ddprof_ffi_Tag{
-        .name = char_star_to_byteslice("env"),
-        .value = char_star_to_byteslice(exporter->_input.environment)});
+        .name = char_star_to_CharSlice("env"),
+        .value = char_star_to_CharSlice(exporter->_input.environment)});
   }
 
   if (exporter->_input.service_version) {
     tags_exporter.push_back(ddprof_ffi_Tag{
-        .name = char_star_to_byteslice("version"),
-        .value = char_star_to_byteslice(exporter->_input.service_version)});
+        .name = char_star_to_CharSlice("version"),
+        .value = char_star_to_CharSlice(exporter->_input.service_version)});
   }
 
   if (exporter->_input.service) {
     tags_exporter.push_back(ddprof_ffi_Tag{
-        .name = char_star_to_byteslice("service"),
-        .value = char_star_to_byteslice(exporter->_input.service)});
+        .name = char_star_to_CharSlice("service"),
+        .value = char_star_to_CharSlice(exporter->_input.service)});
   }
 
   if (exporter->_input.profiler_version.len) {
     tags_exporter.push_back(ddprof_ffi_Tag{
-        .name = char_star_to_byteslice("profiler_version"),
-        .value = string_view_to_byteslice(exporter->_input.profiler_version)});
+        .name = char_star_to_CharSlice("profiler_version"),
+        .value = string_view_to_CharSlice(exporter->_input.profiler_version)});
   }
 
   std::for_each(user_tags->_tags.begin(), user_tags->_tags.end(),
                 [&](ddprof::Tag const &el) {
                   tags_exporter.push_back(ddprof_ffi_Tag{
-                      .name = cpp_string_to_byteslice(el.first),
-                      .value = cpp_string_to_byteslice(el.second)});
+                      .name = cpp_string_to_CharSlice(el.first),
+                      .value = cpp_string_to_CharSlice(el.second)});
                 });
 }
 
@@ -187,19 +185,19 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
   ddprof_ffi_Slice_tag tags = {.ptr = &tags_exporter[0],
                                .len = tags_exporter.size()};
 
-  ddprof_ffi_ByteSlice base_url = char_star_to_byteslice(exporter->_url);
+  ddprof_ffi_CharSlice base_url = char_star_to_CharSlice(exporter->_url);
   ddprof_ffi_EndpointV3 endpoint;
   if (exporter->_agent) {
     endpoint = ddprof_ffi_EndpointV3_agent(base_url);
   } else {
-    ddprof_ffi_ByteSlice api_key =
-        char_star_to_byteslice(exporter->_input.api_key);
+    ddprof_ffi_CharSlice api_key =
+        char_star_to_CharSlice(exporter->_input.api_key);
     endpoint = ddprof_ffi_EndpointV3_agentless(base_url, api_key);
   }
 
   ddprof_ffi_NewProfileExporterV3Result new_exporterv3 =
       ddprof_ffi_ProfileExporterV3_new(
-          string_view_to_byteslice(exporter->_input.family), tags, endpoint);
+          string_view_to_CharSlice(exporter->_input.family), tags, endpoint);
 
   if (new_exporterv3.tag == DDPROF_FFI_NEW_PROFILE_EXPORTER_V3_RESULT_OK) {
     exporter->_exporter = new_exporterv3.ok;
@@ -253,19 +251,18 @@ DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
   ddprof_ffi_Timespec start = encoded_profile->start;
   ddprof_ffi_Timespec end = encoded_profile->end;
 
-  ddprof_ffi_Buffer profile_buffer = {
+  ddprof_ffi_ByteSlice profile_data = {
       .ptr = encoded_profile->buffer.ptr,
       .len = encoded_profile->buffer.len,
-      .capacity = encoded_profile->buffer.capacity,
   };
 
   if (exporter->_export) {
-    LG_NTC("[EXPORTER] Export buffer of size %lu", profile_buffer.len);
+    LG_NTC("[EXPORTER] Export buffer of size %lu", profile_data.len);
 
     // Backend has some logic based on the following naming
     ddprof_ffi_File files_[] = {{
-        .name = char_star_to_byteslice("auto.pprof"),
-        .file = &profile_buffer,
+        .name = char_star_to_CharSlice("auto.pprof"),
+        .file = profile_data,
     }};
     struct ddprof_ffi_Slice_file files = {
         .ptr = files_, .len = sizeof files_ / sizeof *files_};
