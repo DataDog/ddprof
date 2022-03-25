@@ -41,7 +41,7 @@ RegionHolder::RegionHolder(const std::string &full_path, size_t sz,
         _sz = sz;
       }
     } else {
-      LG_ERR("Unable to read file : %s", full_path.c_str());
+      LG_WRN("Unable to read file : %s", full_path.c_str());
     }
   } else {
     LG_ERR("Attempt to map unknown file type: %s (%lx/%lx)", full_path.c_str(),
