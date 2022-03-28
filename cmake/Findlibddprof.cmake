@@ -24,7 +24,7 @@ list(APPEND
     ${LIBDDPROF_ROOT}/include)
 
 execute_process(COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_libddprof.sh" ${TAG_LIBDDPROF} ${SHA256_LIBDDPROF} ${LIBDDPROF_ROOT}
-                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND_ERROR_IS_FATAL ANY)
 
 # This is duplicated from the cmake configuration provided by libddprof
 # How to fix this : using find_package
