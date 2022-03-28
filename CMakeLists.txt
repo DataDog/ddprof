@@ -126,7 +126,7 @@ set(DDPROF_GLOBAL_SRC
    ${EXPORTER_SRC}
    ${EXE_SRC})
 
-set(DDPROF_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
+set(DDPROF_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads /usr/lib/libexecinfo.a)
 
 if (ON)
    # Add the rust library - Refactoring ongoing. OFF for now
@@ -147,6 +147,7 @@ add_exe(ddprof
         ${DDPROF_GLOBAL_SRC}
         LIBRARIES ${DDPROF_LIBRARY_LIST}
         DEFINITIONS ${DDPROF_DEFINITION_LIST})
+target_link_options(ddprof PRIVATE "-static")
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 static_link_cxx(TARGET ddprof)
 

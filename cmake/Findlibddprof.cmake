@@ -5,7 +5,7 @@
 ## Associated https://gitlab.ddbuild.io/DataDog/libddprof-build/-/jobs/90384402
 set(TAG_LIBDDPROF "v0.4.0-rc.1" CACHE STRING "libddprof github tag")
 
-set(SHA256_LIBDDPROF_X86 "6b18703b24b5408d7071bfe1ddeb5bf73454ad6669e31b37a8401ad94ca9aed6" CACHE STRING "libddprof sha256")
+set(SHA256_LIBDDPROF_X86 "a17e921bef789cfebf85a2b5789b4174b58e3f343a31237ce83a82eea178dca5" CACHE STRING "libddprof sha256")
 set(SHA256_LIBDDPROF_ARM "5000f84c70961b4ae03f0497751cf52a46e29ce4f7c1be2d9eefea491ceec891" CACHE STRING "libddprof sha256")
 
 set(LIBDDPROF_ROOT ${VENDOR_PATH}/libddprof-${TAG_LIBDDPROF})

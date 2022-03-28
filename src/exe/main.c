@@ -18,6 +18,11 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#ifndef __GNU_LIBRARY__
+/* musl libc doesn't have error() */
+void error() {}
+#endif
+
 /**************************** Program Entry Point *****************************/
 int main(int argc, char *argv[]) {
   //---- Inititiate structs

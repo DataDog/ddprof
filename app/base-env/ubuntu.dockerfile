@@ -102,8 +102,8 @@ RUN VERSION="1.11.0" \
   && pushd googletest-release-${VERSION} \
   && mkdir build \
   && cd build \
-  && cmake -GNinja ../ \
-  && cmake --build . -t install \
+  && cmake -Bbuild -GNinja ../ \
+  && cmake --build build -t install \
   && popd \
   && rm -rf googletest-release-${VERSION} release-${VERSION}.tar.gz
 

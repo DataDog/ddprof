@@ -26,7 +26,7 @@ TAG_LIBDDPROF=$1
 SHA256_LIBDDPROF=$2
 TARGET_EXTRACT=$3
 
-TAR_LIBDDPROF=libddprof-${MARCH}-unknown-linux-gnu.tar.gz
+TAR_LIBDDPROF=libddprof-${MARCH}-alpine-linux-musl.tar.gz
 GITHUB_URL_LIBDDPROF=https://github.com/DataDog/libddprof/releases/download/${TAG_LIBDDPROF}/${TAR_LIBDDPROF}
 
 mkdir -p "$TARGET_EXTRACT"
@@ -41,7 +41,7 @@ else
 fi
 
 echo "Checking libddprof sha256"
-if ! echo "${SHA256_LIBDDPROF} ${TAR_LIBDDPROF}" | sha256sum --check --strict --status; then
+if ! echo "${SHA256_LIBDDPROF}  ${TAR_LIBDDPROF}" | sha256sum -c; then
     echo "Error validating libddprof SHA256"
     echo "Please clear $TARGET_EXTRACT before restarting"
     exit 1

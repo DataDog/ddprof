@@ -38,7 +38,7 @@ else
 fi
 
 echo "Checking elfutils sha256"
-if ! echo "${SHA256_ELF} ${TAR_ELF}" | sha256sum --check --strict --status; then
+if ! echo "${SHA256_ELF}  ${TAR_ELF}" | sha256sum -c; then
     echo "Error validating elfutils SHA256"
     echo "Please clear $TARGET_EXTRACT before restarting"
     exit 1
