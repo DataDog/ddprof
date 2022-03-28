@@ -26,7 +26,7 @@ set(LIBELF_PATH ${ELFUTILS_PATH}/lib/libelf.a)
 set(ELFUTILS_INCLUDE_DIRS ${ELFUTILS_PATH}/include)
 
 execute_process(COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_elfutils.sh" "${VER_ELF}" "${SHA256_ELF}" "${ELFUTILS_PATH}" "${CMAKE_C_COMPILER}"
-                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+                WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND_ERROR_IS_FATAL ANY)
 
 add_library(dw STATIC IMPORTED)
 set_target_properties(dw PROPERTIES
