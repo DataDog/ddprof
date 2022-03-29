@@ -36,7 +36,7 @@ already_present=0
 if [ -e "${TAR_LIBDDPROF}" ]; then
     already_present=1
 else
-    echo "Downloading libddprof..."
+    echo "Downloading libddprof ${TAG_LIBDDPROF}..."
     curl -LO "${GITHUB_URL_LIBDDPROF}"
 fi
 

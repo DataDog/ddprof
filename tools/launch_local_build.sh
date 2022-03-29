@@ -20,10 +20,14 @@ usage() {
     echo "$0 [-t] [clean]"
     echo "Launch a docker instance for local developments. Your ssh socket is forwarded to the build image."
     echo ""
+    echo "Example launching the ddprof ubuntu docker for build purposes"
+    echo ""
+    echo "${0} -u 18"
+    echo ""
     echo " Shared files" 
-    echo " Recommended solution -- use a docker-sync.yml file in the root of this repo which will be used as a mounted volume."
-    echo " Alternative solution -- You can specify a folder to mount in a .env file ${TOP_LVL_DIR}/.env"
-    echo " Default solution     -- if nothing is specified this repository will be shared (!slower than docker-sync)"    
+    echo " Recommended solution -- Use a docker-sync.yml file in the directory from which you launch."
+    echo " Alternative solution -- You can specify a folder to mount in a .env file ${CURRENTDIR}/.env"
+    echo " Default solution     -- if nothing is specified current directory will be shared (!slow on macos)"    
     echo ""
     echo " Optional parameters "
     echo "    --dockerfile/-f : use a custom docker file."
@@ -80,11 +84,11 @@ while [ $# != 0 ]; do
     esac
 done
 
-if [ -e "${TOP_LVL_DIR}/.env" ]; then
-    source "${TOP_LVL_DIR}/.env"
+if [ -e "${CURRENTDIR}/.env" ]; then
+    source "${CURRENTDIR}/.env"
 fi
 
-MOUNT_CMD="-v ${DEFAULT_DEV_WORKSPACE:-${TOP_LVL_DIR}}:/app"
+MOUNT_CMD="-v ${DEFAULT_DEV_WORKSPACE:-${CURRENTDIR}}:/app"
 
 # Support docker sync : Improves compilation speed 
 # Example of config (to be pasted in the docker-sync.yml file)
@@ -94,9 +98,9 @@ MOUNT_CMD="-v ${DEFAULT_DEV_WORKSPACE:-${TOP_LVL_DIR}}:/app"
 #     sync_strategy: "native_osx"
 #     src: "./"
 #     host_disk_mount_mode: "cached"
-if [ -e "${TOP_LVL_DIR}/docker-sync.yml" ]; then
+if [ -e "${CURRENTDIR}/docker-sync.yml" ]; then
     # Grep the docker sync config (expected in root directory) to retrieve name of volume
-    VOLUME_SYNC=$(grep -A 1 "syncs:" "${TOP_LVL_DIR}/docker-sync.yml" | tail -n 1 | awk -F ':' '{print $1}' | sed "s/ //g")
+    VOLUME_SYNC=$(grep -A 1 "syncs:" "${CURRENTDIR}/docker-sync.yml" | tail -n 1 | awk -F ':' '{print $1}' | sed "s/ //g")
     echo "$VOLUME_SYNC"
     MOUNT_CMD="--mount source=${VOLUME_SYNC},target=/app"
     if ! docker-sync list | grep -q "$VOLUME_SYNC"; then
@@ -128,6 +132,7 @@ fi
 if [ ! ${CUSTOM_ID:-,,} == "yes" ] && ! docker images | awk '{print $1}'| grep -qE "^${DOCKER_NAME}$"; then
     echo "Building image"
     BUILD_CMD="docker build -t ${DOCKER_NAME} --build-arg COMPILER=$COMPILER --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} -f $BASE_DOCKERFILE ."
+    #echo "${BUILD_CMD}"
     eval "${BUILD_CMD}"
 else 
     echo "Base image found, not rebuilding. Remove it to force rebuild."
@@ -139,11 +144,12 @@ if [ -z "$(ssh-add -L)" ]; then
     exit 1
 fi
 
-if [[ "$OSTYPE" != "darwin*" ]]; then
+if [[ $OSTYPE != darwin* ]]; then
     echo "Script only tested on MacOS."
     echo "Attempting to continue : please update script for your OS if ssh socket is failing."
 fi 
 
 echo "Launch docker image, DO NOT STORE ANYTHING outside of mounted directory (container is erased on exit)."
- # shellcheck disable=SC2086
-docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -w /app --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} -e SSH_AUTH_SOCK=/ssh-agent "${DOCKER_NAME}${DOCKER_TAG}" /bin/bash
+# shellcheck disable=SC2086
+CMD="docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -w /app --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} -e SSH_AUTH_SOCK=/ssh-agent \"${DOCKER_NAME}${DOCKER_TAG}\" /bin/bash"
+eval "$CMD"
