@@ -3,17 +3,15 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include "ipc.h"
+#include "ipc.hpp"
 
+#include <cstdlib>
 #include <fcntl.h>
+#include <string>
 #include <sys/socket.h>
 #include <unistd.h>
-}
-#include <cstdlib>
 
 #include <gtest/gtest.h>
-#include <string>
 
 static const int kParentIdx = 0;
 static const int kChildIdx = 1;
@@ -36,29 +34,30 @@ TEST(IPCTest, Positive) {
     // Send something from child
     size_t writeRet = write(fileFd, payload.c_str(), payload.size());
     EXPECT_GT(writeRet, 0);
-    EXPECT_TRUE(fileFd != -1);
-    EXPECT_TRUE(sendfd(sockets[kChildIdx], &fileFd, 1));
+    EXPECT_NE(fileFd, -1);
+    std::byte dummy{1};
+    EXPECT_EQ(ddprof::send(sockets[kChildIdx], {&dummy, 1}, {&fileFd, 1}), 0);
     close(sockets[kChildIdx]);
     close(fileFd);
     return;
   } else {
     // I am a parent
     close(sockets[kChildIdx]);
-    int size = 0;
-    int *fileDescr;
-    fileDescr = getfd(sockets[kParentIdx], &size);
-    EXPECT_EQ(size, 1);
-    EXPECT_TRUE(fcntl(fileDescr[0], F_GETFD, 0) != -1);
+    int fd;
+    std::byte buf[32];
+    auto res = ddprof::receive(sockets[kParentIdx], buf, {&fd, 1});
+    EXPECT_EQ(res.first, 1);
+    EXPECT_EQ(res.second, 1);
+    EXPECT_NE(fcntl(fd, F_GETFD, 0), -1);
     // reset the cursor
-    lseek(fileDescr[0], 0, SEEK_SET);
+    lseek(fd, 0, SEEK_SET);
     char *buffer = (char *)malloc(payload.size());
-    int readRet = read(fileDescr[0], buffer, payload.size());
+    int readRet = read(fd, buffer, payload.size());
     EXPECT_TRUE(readRet > 0);
     // Check it in the parent
-    EXPECT_TRUE(memcmp(payload.c_str(), buffer, payload.size()) == 0);
+    EXPECT_EQ(memcmp(payload.c_str(), buffer, payload.size()), 0);
     close(sockets[kParentIdx]);
     free(buffer);
-    close(fileDescr[0]);
-    free(fileDescr);
+    close(fd);
   }
 }

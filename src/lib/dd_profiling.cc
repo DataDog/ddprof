@@ -10,6 +10,7 @@ extern "C" {
 #include "logger_setup.h"
 }
 #include "defer.hpp"
+#include "ipc.hpp"
 
 #include <cerrno>
 #include <chrono>
@@ -18,13 +19,12 @@ extern "C" {
 #include <cstring>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/socket.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
-
-static constexpr int k_default_timeout_ms = 1000;
 
 extern const char _binary_ddprof_start[]; // NOLINT cert-dcl51-cpp
 extern const char _binary_ddprof_end[];   // NOLINT cert-dcl51-cpp
@@ -40,8 +40,8 @@ ProfilerState g_state;
 struct ProfilerAutoStart {
   ProfilerAutoStart() noexcept {
     // Note that library needs to be linked with `--no-as-needed` when using
-    // autostart Otherwise linker will completely remove library from DT_NEEDED
-    // and library will not be loaded
+    // autostart, otherwise linker will completely remove library from DT_NEEDED
+    // and library will not be loaded.
 
     bool autostart = false;
     const char *autostart_env = getenv("DD_PROFILING_NATIVE_AUTOSTART");
@@ -61,22 +61,20 @@ struct ProfilerAutoStart {
   }
 
   ~ProfilerAutoStart() {
-    if (g_state.started) {
-      ddprof_stop_profiling(k_default_timeout_ms);
-    }
+    // profiler will stop when process exits
   }
 };
 
 ProfilerAutoStart g_autostart;
 } // namespace
 
-static int ddprof_start_profiling_internal() {  
+static int ddprof_start_profiling_internal() {
   if (g_state.started) {
     return -1;
   }
   pid_t target_pid = getpid();
-  int pipefd[2];
-  if (pipe2(pipefd, O_CLOEXEC) == -1) {
+  int sockfds[2];
+  if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sockfds) == -1) {
     return -1;
   }
 
@@ -87,9 +85,9 @@ static int ddprof_start_profiling_internal() {
 
   if (middle_pid == 0) {
     // executed in middle
-    close(pipefd[0]);
+    close(sockfds[0]);
 
-    auto defer_pipeclose = make_defer([&pipefd] { close(pipefd[1]); });
+    auto defer_socketclose = make_defer([&sockfds] { close(sockfds[1]); });
 
     middle_pid = getpid();
     if (middle_pid == -1) {
@@ -99,7 +97,6 @@ static int ddprof_start_profiling_internal() {
     pid_t grandchild_pid = fork();
     if (grandchild_pid == 0) {
       // executed in grand child
-      grandchild_pid = getpid();
       char ddprof_str[] = "ddprof";
 
       int fd = syscall(SYS_memfd_create, ddprof_str, 1U /*MFD_CLOEXEC*/);
@@ -117,30 +114,27 @@ static int ddprof_start_profiling_internal() {
 
       char pid_buf[32];
       snprintf(pid_buf, sizeof(pid_buf), "%d", target_pid);
-
-      kill(middle_pid, SIGTERM);
-      if (write(pipefd[1], &grandchild_pid, sizeof(grandchild_pid)) !=
-          sizeof(grandchild_pid)) {
-        return -1;
-      }
-
-      defer_pipeclose.release();
-      close(pipefd[1]);
+      char sock_buf[32];
+      snprintf(sock_buf, sizeof(sock_buf), "%d", sockfds[1]);
 
       char pid_opt_str[] = "-p";
-      char *argv[] = {ddprof_str, pid_opt_str, pid_buf, NULL};
+      char sock_opt_str[] = "-Z";
+
+      char *argv[] = {ddprof_str,   pid_opt_str, pid_buf,
+                      sock_opt_str, sock_buf,    NULL};
 
       // unset LD_PRELOAD, otherwise if libdd_profiling.so was preloaded, it
       // would trigger a fork bomb
       unsetenv("LD_PRELOAD");
+
+      kill(middle_pid, SIGTERM);
 
       if (fexecve(fd, argv, environ) == -1) {
         return -1;
       }
     } else {
       // executed in middle
-      defer_pipeclose.release();
-      close(pipefd[1]);
+      defer_socketclose.reset();
 
       // waiting to be killed by grand child
       waitpid(grandchild_pid, NULL, 0);
@@ -150,27 +144,31 @@ static int ddprof_start_profiling_internal() {
     }
   } else {
     // executed by parent
-    close(pipefd[1]);
-    defer { close(pipefd[0]); };
+    close(sockfds[1]);
+    defer { close(sockfds[0]); };
 
     waitpid(middle_pid, NULL, 0);
-    pid_t grandchild_pid;
-    if (read(pipefd[0], &grandchild_pid, sizeof(grandchild_pid)) !=
-        sizeof(grandchild_pid)) {
+
+    ddprof::RequestMessage req = {.request = ddprof::RequestMessage::kPid};
+    if (!ddprof::send(sockfds[0], req)) {
       return -1;
     }
-    g_state.profiler_pid = grandchild_pid;
+    ddprof::ResponseMessage resp;
+    if (!ddprof::receive(sockfds[0], resp)) {
+      return -1;
+    }
+
+    g_state.profiler_pid = resp.data.pid;
     g_state.started = true;
   }
 
   return 0;
 }
 
-int ddprof_start_profiling() {  
+int ddprof_start_profiling() {
   try {
     return ddprof_start_profiling_internal();
-  } catch(...) {   
-  }
+  } catch (...) {}
   return -1;
 }
 
