@@ -26,6 +26,8 @@ typedef struct DDProfContext {
     pid_t pid; // ! only use for perf attach (can be -1 in global mode)
     bool global;
     uint32_t worker_period; // exports between worker refreshes
+    int sockfd;
+    bool wait_on_socket;
     const char *internal_stats;
     const char *tags;
   } params;

@@ -167,22 +167,23 @@ add_custom_command(OUTPUT ${DDPROF_EXE_OBJECT}
   DEPENDS ddprof
 )
 
-set(DD_PROFILING_SOURCES src/lib/dd_profiling.cc src/ddprof_cmdline.c src/logger.c src/logger_setup.cc $<TARGET_OBJECTS:ddprof_exe_object>)
+set(DD_PROFILING_SOURCES src/lib/dd_profiling.cc src/ddprof_cmdline.c src/logger.c src/logger_setup.cc src/ipc.cc
+                         $<TARGET_OBJECTS:ddprof_exe_object>)
 add_library(ddprof_exe_object OBJECT IMPORTED GLOBAL)
 set_target_properties(ddprof_exe_object PROPERTIES IMPORTED_OBJECTS "${DDPROF_EXE_OBJECT}")
 
 add_library(dd_profiling-static STATIC ${DD_PROFILING_SOURCES})
 set_target_properties(dd_profiling-static PROPERTIES OUTPUT_NAME dd_profiling)
-target_include_directories(dd_profiling-static PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(dd_profiling-static PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
 set_target_properties(dd_profiling-static PROPERTIES
    PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
 
 add_library(dd_profiling-shared SHARED ${DD_PROFILING_SOURCES})
 set_target_properties(dd_profiling-shared PROPERTIES OUTPUT_NAME dd_profiling)
-target_include_directories(dd_profiling-shared PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include)
-set_target_properties(dd_profiling-shared PROPERTIES
+target_include_directories(dd_profiling-shared PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
+set_target_properties(dd_profiling-static PROPERTIES
    PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
-   
+
 # Link libstdc++/libgcc statically and export only profiler API
 static_link_cxx(TARGET dd_profiling-shared)
 set_target_properties(dd_profiling-shared PROPERTIES LINK_DEPENDS "${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")

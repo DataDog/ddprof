@@ -3,6 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
+extern "C" {
 #include "ddprof.h"
 
 #include "ddprof_context.h"
@@ -10,6 +11,9 @@
 #include "ddprof_input.h"
 #include "logger.h"
 #include "unwind.h"
+}
+
+#include "ipc.hpp"
 
 #include <errno.h>
 #include <signal.h>
@@ -22,8 +26,8 @@
 int main(int argc, char *argv[]) {
   //---- Inititiate structs
   int ret = -1;
-  DDProfInput input = {0};
-  DDProfContext ctx = {0};
+  DDProfInput input = {};
+  DDProfContext ctx = {};
   // Set temporary logger for argument parsing
   LOG_open(LOG_STDERR, NULL);
   LOG_setlevel(LL_WARNING);
@@ -111,6 +115,24 @@ int main(int argc, char *argv[]) {
     // will unblock the target from calling exec.
     if (temp_pid)
       kill(temp_pid, SIGTERM);
+
+    if (ctx.params.sockfd != -1 && ctx.params.wait_on_socket) {
+      ddprof::RequestMessage req;
+      if (!ddprof::receive(ctx.params.sockfd, req)) {
+        LG_ERR("Failed to receive message from target");
+        goto CLEANUP;
+      }
+      ddprof::ResponseMessage resp;
+      if (req.request & ddprof::RequestMessage::kPid) {
+        resp.data.pid = getpid();
+      }
+      if (!ddprof::send(ctx.params.sockfd, resp)) {
+        LG_ERR("Failed to send response to target");
+        goto CLEANUP;
+      }
+      close(ctx.params.sockfd);
+      ctx.params.sockfd = -1;
+    }
 
     // Now enter profiling
     DDRes res = ddprof_start_profiler(&ctx);

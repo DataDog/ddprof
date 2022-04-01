@@ -11,7 +11,9 @@
 #include "logger.h"
 #include "logger_setup.h"
 
+#include <errno.h>
 #include <sys/sysinfo.h>
+#include <unistd.h>
 
 /****************************  Argument Processor  ***************************/
 DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
@@ -201,6 +203,19 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
                ctx->watchers[i].label, ctx->watchers[i].mode);
     }
   }
+
+  ctx->params.sockfd = -1;
+  ctx->params.wait_on_socket = false;
+  if (input->socket && strlen(input->socket) > 0) {
+    char *endptr;
+    int res = strtoul(input->socket, &endptr, 10);
+    // checking that stroul actually succeeded is a pain
+    if (*endptr == '\0' && (res != ULONG_MAX || errno != ERANGE)) {
+      ctx->params.sockfd = res;
+      ctx->params.wait_on_socket = true;
+    }
+  }
+
   ctx->initialized = true;
   return ddres_init();
 }
@@ -211,5 +226,8 @@ void ddprof_context_free(DDProfContext *ctx) {
     free((char *)ctx->params.internal_stats);
     free((char *)ctx->params.tags);
     memset(ctx, 0, sizeof(*ctx)); // also sets ctx->initialized = false;
+    if (ctx->params.sockfd != -1) {
+      close(ctx->params.sockfd);
+    }
   }
 }
