@@ -26,6 +26,11 @@ extern "C" {
 #include <thread>
 #include <unistd.h>
 
+static constexpr const char *const kProfilerActiveEnvVariable =
+    "DDPDD_PROFILING_NATIVE_LIBRARY_ACTIVE";
+static constexpr const char *const kProfilerAutoStartEnvVariable =
+    "DD_PROFILING_NATIVE_AUTOSTART";
+
 extern const char _binary_ddprof_start[]; // NOLINT cert-dcl51-cpp
 extern const char _binary_ddprof_end[];   // NOLINT cert-dcl51-cpp
 
@@ -37,6 +42,17 @@ struct ProfilerState {
 
 ProfilerState g_state;
 
+// return true if this profiler is active for this process or one of its parent
+bool is_profiler_library_active() {
+  return getenv(kProfilerActiveEnvVariable) != nullptr;
+}
+
+void set_profiler_library_active() {
+  setenv(kProfilerActiveEnvVariable, "1", 1);
+}
+
+void set_profiler_library_inactive() { unsetenv(kProfilerActiveEnvVariable); }
+
 struct ProfilerAutoStart {
   ProfilerAutoStart() noexcept {
     // Note that library needs to be linked with `--no-as-needed` when using
@@ -44,7 +60,7 @@ struct ProfilerAutoStart {
     // and library will not be loaded.
 
     bool autostart = false;
-    const char *autostart_env = getenv("DD_PROFILING_NATIVE_AUTOSTART");
+    const char *autostart_env = getenv(kProfilerAutoStartEnvVariable);
     if (autostart_env && arg_yesno(autostart_env, 1)) {
       autostart = true;
     } else {
@@ -69,7 +85,9 @@ ProfilerAutoStart g_autostart;
 } // namespace
 
 static int ddprof_start_profiling_internal() {
-  if (g_state.started) {
+  // Refuse to start profiler if already started by this process or if active if
+  // one of its parent
+  if (g_state.started || is_profiler_library_active()) {
     return -1;
   }
   pid_t target_pid = getpid();
@@ -142,25 +160,26 @@ static int ddprof_start_profiling_internal() {
       // should never be executed
       return -1;
     }
-  } else {
-    // executed by parent
-    close(sockfds[1]);
-    defer { close(sockfds[0]); };
-
-    waitpid(middle_pid, NULL, 0);
-
-    ddprof::RequestMessage req = {.request = ddprof::RequestMessage::kPid};
-    if (!ddprof::send(sockfds[0], req)) {
-      return -1;
-    }
-    ddprof::ResponseMessage resp;
-    if (!ddprof::receive(sockfds[0], resp)) {
-      return -1;
-    }
-
-    g_state.profiler_pid = resp.data.pid;
-    g_state.started = true;
   }
+
+  // executed by parent
+  close(sockfds[1]);
+  defer { close(sockfds[0]); };
+
+  waitpid(middle_pid, NULL, 0);
+
+  ddprof::RequestMessage req = {.request = ddprof::RequestMessage::kPid};
+  if (!ddprof::send(sockfds[0], req)) {
+    return -1;
+  }
+  ddprof::ResponseMessage resp;
+  if (!ddprof::receive(sockfds[0], resp)) {
+    return -1;
+  }
+
+  set_profiler_library_active();
+  g_state.profiler_pid = resp.data.pid;
+  g_state.started = true;
 
   return 0;
 }
@@ -177,7 +196,10 @@ void ddprof_stop_profiling(int timeout_ms) {
     return;
   }
 
-  defer { g_state.started = false; };
+  defer {
+    g_state.started = false;
+    set_profiler_library_inactive();
+  };
 
   auto time_limit =
       std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
