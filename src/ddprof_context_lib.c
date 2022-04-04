@@ -36,7 +36,6 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   DDRES_CHECK_FWD(exporter_input_copy(&input->exp_input, &ctx->exp_input));
 
   // Set defaults
-  ctx->params.enable = true;
   ctx->params.upload_period = 60.0;
 
   // Process enable.  Note that we want the effect to hit an inner profile.
@@ -48,7 +47,9 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     setenv("DD_PROFILING_ENABLED", "false", true);
 
   // Process native profiler enablement override
-  ctx->params.enable = !arg_yesno(input->native_enable, 0);
+  if (input->native_enable) {
+    ctx->params.enable = arg_yesno(input->native_enable, 1);
+  }
 
   // Process enablement for agent mode
   ctx->exp_input.agentless = arg_yesno(input->agentless, 1); // default no
