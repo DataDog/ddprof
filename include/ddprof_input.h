@@ -86,7 +86,7 @@ typedef struct DDProfInput {
   XX(DD_PROFILING_AGENTLESS,            agentless,          L, 'L', 1, input, NULL, "",                     )  \
   XX(DD_TAGS,                           tags,               T, 'T', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_ENABLED,              enable,             d, 'd', 1, input, NULL, "yes", )                   \
-  XX(DD_PROFILING_NATIVE_ENABLED,       native_enable,      n, 'n', 1, input, NULL, "yes", )                   \
+  XX(DD_PROFILING_NATIVE_ENABLED,       native_enable,      n, 'n', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_UPLOAD_PERIOD,        upload_period,      u, 'u', 1, input, NULL, "59", )                    \
   XX(DD_PROFILING_NATIVE_WORKER_PERIOD, worker_period,      w, 'w', 1, input, NULL, "240", )                   \
   XX(DD_PROFILING_NATIVE_FAULT_INFO,    fault_info,         s, 's', 1, input, NULL, "yes", )                   \
