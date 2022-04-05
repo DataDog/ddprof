@@ -87,7 +87,7 @@ DDRes spawn_workers(MLWorkerFlags *flags, bool *is_worker) {
   while (!g_termination_requested && (child_pid = fork())) {
     g_child_pid = child_pid;
     {
-      LG_WRN("Created child %d", child_pid);
+      LG_NTC("Created child %d", child_pid);
       // unblock signals, we can now forward signals to child
       modify_sigprocmask(SIG_UNBLOCK);
       waitpid(g_child_pid, NULL, 0);
