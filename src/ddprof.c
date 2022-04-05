@@ -49,7 +49,7 @@ static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   exit(-1);
 }
 
-DDRes ddprof_setup(DDProfContext *ctx, pid_t pid) {
+DDRes ddprof_setup(DDProfContext *ctx) {
   PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
   pevent_init(pevent_hdr);
 
@@ -58,7 +58,8 @@ DDRes ddprof_setup(DDProfContext *ctx, pid_t pid) {
     LG_ERR("Error when printing capabilities, continuing...");
   }
 
-  DDRES_CHECK_FWD(pevent_open(ctx, pid, ctx->params.num_cpu, pevent_hdr));
+  DDRES_CHECK_FWD(
+      pevent_open(ctx, ctx->params.pid, ctx->params.num_cpu, pevent_hdr));
 
   // Setup signal handler if defined
   if (ctx->params.fault_info)
@@ -87,7 +88,7 @@ DDRes ddprof_setup(DDProfContext *ctx, pid_t pid) {
   return ddres_init();
 }
 
-static DDRes ddprof_breakdown(DDProfContext *ctx) {
+DDRes ddprof_teardown(DDProfContext *ctx) {
   PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
 
   if (IsDDResNotOK(pevent_cleanup(pevent_hdr))) {
@@ -109,13 +110,7 @@ DDRes ddprof_start_profiler(DDProfContext *ctx) {
 
   // Enter the main loop -- this will not return unless there is an error.
   LG_PRINT("Entering main loop");
-  DDRes res;
-  if (IsDDResNotOK(res = main_loop(&perf_funs, ctx))) {
-    return res;
-  } else if (IsDDResNotOK(res = ddprof_breakdown(ctx))) {
-    return res;
-  }
-  return ddres_init();
+  return main_loop(&perf_funs, ctx);
 }
 #endif
 
@@ -125,9 +120,8 @@ void ddprof_attach_handler(DDProfContext *ctx,
       .init_fun = worker_library_init,
       .finish_fun = worker_library_free,
   };
-  pid_t pid = ctx->params.pid;
 
-  if (IsDDResNotOK(ddprof_setup(ctx, pid))) {
+  if (IsDDResNotOK(ddprof_setup(ctx))) {
     LG_ERR("Error setting up ddprof");
     return;
   }
@@ -141,7 +135,7 @@ void ddprof_attach_handler(DDProfContext *ctx,
   else
     LG_WRN("Profiling context no longer valid");
 
-  if (IsDDResNotOK(ddprof_breakdown(ctx)))
-    LG_ERR("Error when calling ddprof_breakdown.");
+  if (IsDDResNotOK(ddprof_teardown(ctx)))
+    LG_ERR("Error when calling ddprof_teardown.");
   return;
 }

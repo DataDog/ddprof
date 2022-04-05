@@ -280,21 +280,24 @@ DDRes main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
     return ddres_error(DD_WHAT_MAINLOOP_INIT);
   }
 
+  defer { munmap(flags, sizeof(*flags)); };
+
   // Create worker processes to fulfill poll loop.  Only the parent process
   // can exit with an error code, which signals the termination of profiling.
   bool is_worker = false;
   DDRes res = spawn_workers(flags, &is_worker);
   if (IsDDResNotOK(res)) {
-    munmap(flags, sizeof(*flags));
     return res;
   }
   if (is_worker) {
     worker(ctx, attr, flags);
+    // Ensure worker does not return,
+    // because we don't want to free resources (perf_event fds,...) that are
+    // shared between processes. Only free the context.
+    ddprof_context_free(ctx);
+    exit(0);
   }
-  // Child finished profiling: Free and exit
-  ddprof_context_free(ctx);
-  munmap(flags, sizeof(*flags));
-  exit(0);
+  return {};
 }
 
 void main_loop_lib(const WorkerAttr *attr, DDProfContext *ctx) {
