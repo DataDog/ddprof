@@ -241,6 +241,10 @@ perf_event_sample *hdr2samp(struct perf_event_header *hdr, uint64_t mask) {
   if (PERF_SAMPLE_BRANCH_STACK & mask) {}
   if (PERF_SAMPLE_REGS_USER & mask) {
     sample.abi = *buf++;
+    // In case regs are not available, ignore this sample
+    if (sample.abi == PERF_SAMPLE_REGS_ABI_NONE) {
+      return NULL;
+    }
     sample.regs = buf;
     buf += PERF_REGS_COUNT;
   }
