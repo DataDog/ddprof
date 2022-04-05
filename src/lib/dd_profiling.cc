@@ -91,6 +91,24 @@ static int ddprof_start_profiling_internal() {
     return -1;
   }
   pid_t target_pid = getpid();
+  enum { kParentIdx, kChildIdx };
+
+  // Create a socket pair to establish a commuication channel between library
+  // and profiler Communication occurs only during profiler setup and sockets
+  // are closed once profiler is attached.
+  // This channel is used to:
+  //  * ensure that profiler is attached before returning
+  //    from ddprof_start_profiling
+  //  * retrieve PID of profiler on library side
+  //  * retrieve ring buffer information for allocation profiling on library
+  //    side. This requires passing file descriptors between procressers, that's
+  //    why unix socket are used here.
+  // Overview of the communication process:
+  //  * library create socket pair and fork + exec into ddprof executable
+  //  * library sends a message requesting profiler PID and waits for a reply
+  //  * ddprof starts up, attaches itself to the target process, then waits for
+  //    a PID request and replies
+  //  * both library and profiler close their socket and continue
   int sockfds[2];
   if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sockfds) == -1) {
     return -1;
@@ -102,10 +120,11 @@ static int ddprof_start_profiling_internal() {
   }
 
   if (middle_pid == 0) {
-    // executed in middle
-    close(sockfds[0]);
+    // executed in temporary intermediate process
+    close(sockfds[kParentIdx]);
 
-    auto defer_socketclose = make_defer([&sockfds] { close(sockfds[1]); });
+    auto defer_socketclose =
+        make_defer([&sockfds] { close(sockfds[kChildIdx]); });
 
     middle_pid = getpid();
     if (middle_pid == -1) {
@@ -114,7 +133,7 @@ static int ddprof_start_profiling_internal() {
 
     pid_t grandchild_pid = fork();
     if (grandchild_pid == 0) {
-      // executed in grand child
+      // executed in grand child (ie. ddprof process)
       char ddprof_str[] = "ddprof";
 
       int fd = syscall(SYS_memfd_create, ddprof_str, 1U /*MFD_CLOEXEC*/);
@@ -151,10 +170,10 @@ static int ddprof_start_profiling_internal() {
         return -1;
       }
     } else {
-      // executed in middle
+      // executed in intermediate process
       defer_socketclose.reset();
 
-      // waiting to be killed by grand child
+      // waiting to be killed by grand child (ie. ddprof process)
       waitpid(grandchild_pid, NULL, 0);
 
       // should never be executed
@@ -162,25 +181,23 @@ static int ddprof_start_profiling_internal() {
     }
   }
 
-  // executed by parent
-  close(sockfds[1]);
-  defer { close(sockfds[0]); };
+  // executed by parent process
 
+  close(sockfds[kChildIdx]);
+
+  // wait for the intermediate processs to be killed
   waitpid(middle_pid, NULL, 0);
 
-  ddprof::RequestMessage req = {.request = ddprof::RequestMessage::kPid};
-  if (!ddprof::send(sockfds[0], req)) {
-    return -1;
-  }
-  ddprof::ResponseMessage resp;
-  if (!ddprof::receive(sockfds[0], resp)) {
+  try {
+    ddprof::Client client{ddprof::UnixSocket{sockfds[kParentIdx]}};
+    g_state.profiler_pid = client.get_profiler_pid();
+  } catch(const ddprof::DDException& e) {
     return -1;
   }
 
-  set_profiler_library_active();
-  g_state.profiler_pid = resp.data.pid;
   g_state.started = true;
-
+  set_profiler_library_active();
+  
   return 0;
 }
 

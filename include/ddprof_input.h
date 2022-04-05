@@ -5,12 +5,13 @@
 
 #pragma once
 
+#include "ddprof_defs.h"
+#include "ddres_def.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "ddprof_defs.h"
-#include "ddres_def.h"
 #include "exporter_input.h"
 
 typedef int16_t watcher_index_t;

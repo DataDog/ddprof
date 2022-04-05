@@ -52,7 +52,8 @@ extern "C" {
   X(DSO, "")                                                                   \
   X(UNHANDLED_DSO, "ignore dso type")                                          \
   X(WORKERLOOP_INIT, "error initializing the worker loop")                     \
-  X(UNITTEST, "unit test error")
+  X(UNITTEST, "unit test error")                                               \
+  X(SOCKET, "error during socket operation")
 
 // generic erno errors available from /usr/include/asm-generic/errno.h
 

@@ -117,21 +117,28 @@ int main(int argc, char *argv[]) {
       kill(temp_pid, SIGTERM);
 
     if (ctx.params.sockfd != -1 && ctx.params.wait_on_socket) {
+      // Takes ownership of the open socket, socket will be closed when exiting
+      // this block
+      ddprof::UnixSocket socket(ctx.params.sockfd);
+      ctx.params.sockfd = -1;
+
+      std::error_code ec;
+      socket.set_read_timeout(ddprof::kDefaultSocketTimeout, ec);
+      socket.set_write_timeout(ddprof::kDefaultSocketTimeout, ec);
+
       ddprof::RequestMessage req;
-      if (!ddprof::receive(ctx.params.sockfd, req)) {
+      if (IsDDResNotOK(ddprof::receive(socket, req))) {
         LG_ERR("Failed to receive message from target");
         goto CLEANUP;
       }
       ddprof::ResponseMessage resp;
       if (req.request & ddprof::RequestMessage::kPid) {
-        resp.data.pid = getpid();
+        resp.pid = getpid();
       }
-      if (!ddprof::send(ctx.params.sockfd, resp)) {
+      if (IsDDResNotOK(ddprof::send(socket, resp))) {
         LG_ERR("Failed to send response to target");
         goto CLEANUP;
       }
-      close(ctx.params.sockfd);
-      ctx.params.sockfd = -1;
     }
 
     // Now enter profiling

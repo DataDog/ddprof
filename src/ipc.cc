@@ -11,8 +11,31 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <unistd.h>
 
 namespace ddprof {
+
+namespace {
+// Internal structure for response that is sent over the wire
+struct InternalResponseMessage {
+  uint32_t request;
+  int32_t pid;
+  uint64_t mem_size;
+};
+
+timeval to_timeval(std::chrono::microseconds duration) noexcept {
+  const std::chrono::seconds sec =
+      std::chrono::duration_cast<std::chrono::seconds>(duration);
+
+  timeval tv;
+  tv.tv_sec = time_t(sec.count());
+  tv.tv_usec = suseconds_t(
+      std::chrono::duration_cast<std::chrono::microseconds>(duration - sec)
+          .count());
+  return tv;
+}
+
+} // namespace
 
 template <typename T> ddprof::span<std::byte> to_byte_span(T *obj) {
   return {reinterpret_cast<std::byte *>(obj), sizeof(T)};
@@ -22,8 +45,57 @@ template <typename T> ddprof::span<const std::byte> to_byte_span(const T *obj) {
   return {reinterpret_cast<const std::byte *>(obj), sizeof(T)};
 }
 
-ssize_t send(int sfd, ddprof::span<const std::byte> buffer,
-             ddprof::span<const int> fds) {
+template <typename ReturnType>
+inline ReturnType error_wrapper(ReturnType return_value,
+                                std::error_code &ec) noexcept {
+  if (return_value < 0) {
+    ec = std::error_code(errno, std::system_category());
+  } else {
+    ec = std::error_code();
+  }
+  return return_value;
+}
+
+UnixSocket::~UnixSocket() {
+  if (_handle != kInvalidSocket) {
+    ::close(_handle);
+  }
+}
+
+void UnixSocket::close(std::error_code &ec) noexcept {
+  error_wrapper(::close(_handle), ec);
+}
+
+void UnixSocket::set_write_timeout(std::chrono::microseconds duration,
+                                   std::error_code &ec) noexcept {
+  timeval tv = to_timeval(duration);
+  error_wrapper(::setsockopt(_handle, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)),
+                ec);
+}
+
+void UnixSocket::set_read_timeout(std::chrono::microseconds duration,
+                                  std::error_code &ec) noexcept {
+  timeval tv = to_timeval(duration);
+  error_wrapper(::setsockopt(_handle, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)),
+                ec);
+}
+
+size_t UnixSocket::send(ConstBuffer buffer, std::error_code &ec) noexcept {
+  auto res =
+      error_wrapper(::send(_handle, buffer.data(), buffer.size(), 0), ec);
+  if (ec) {
+    return 0;
+  }
+
+  if (static_cast<size_t>(res) != buffer.size()) {
+    ec = std::error_code(EAGAIN, std::system_category());
+  }
+
+  return res;
+}
+
+size_t UnixSocket::send(ConstBuffer buffer, ddprof::span<const int> fds,
+                        std::error_code &ec) noexcept {
   msghdr msg = {};
   if (fds.size() > kMaxFD || buffer.empty()) {
     return -1;
@@ -48,24 +120,40 @@ ssize_t send(int sfd, ddprof::span<const std::byte> buffer,
     cmsg->cmsg_level = SOL_SOCKET;
     cmsg->cmsg_type = SCM_RIGHTS;
     cmsg->cmsg_len = CMSG_LEN(payload_size);
-    memcpy(CMSG_DATA(cmsg), fds.data(), payload_size);
+    ::memcpy(CMSG_DATA(cmsg), fds.data(), payload_size);
   }
 
-  if (sendmsg(sfd, &msg, 0) != static_cast<ssize_t>(buffer.size())) {
-    return -1;
+  auto res = error_wrapper(::sendmsg(_handle, &msg, MSG_DONTWAIT), ec);
+  if (ec) {
+    return 0;
   }
 
-  return 0;
+  if (static_cast<size_t>(res) != buffer.size()) {
+    ec = std::error_code(EAGAIN, std::system_category());
+  }
+
+  return res;
 }
 
-std::pair<ssize_t, size_t> receive(int sockfd, ddprof::span<std::byte> buffer,
-                                   ddprof::span<int> fds) {
+size_t UnixSocket::receive(ddprof::span<std::byte> buffer,
+                           std::error_code &ec) noexcept {
+  ssize_t nr =
+      error_wrapper(::recv(_handle, buffer.data(), buffer.size(), 0), ec);
+  if (ec) {
+    return 0;
+  }
+  return nr;
+}
+
+std::pair<size_t, size_t> UnixSocket::receive(ddprof::span<std::byte> buffer,
+                                              ddprof::span<int> fds,
+                                              std::error_code &ec) noexcept {
 
   msghdr msgh;
 
-  /* Allocate a char buffer for the ancillary data. See the comments
-     in sendfd() */
   union {
+    /* Ancillary data buffer, wrapped in a union
+       in order to ensure it is suitably aligned */
     char buf[CMSG_SPACE(kMaxFD * sizeof(int))];
     cmsghdr align;
   } controlMsg;
@@ -87,9 +175,9 @@ std::pair<ssize_t, size_t> receive(int sockfd, ddprof::span<std::byte> buffer,
   msgh.msg_control = controlMsg.buf;
   msgh.msg_controllen = sizeof(controlMsg.buf);
 
-  ssize_t nr = recvmsg(sockfd, &msgh, 0);
-  if (nr == -1) {
-    return {-1, 0};
+  ssize_t nr = error_wrapper(::recvmsg(_handle, &msgh, 0), ec);
+  if (ec) {
+    return {0, 0};
   }
 
   cmsghdr *cmsgp = CMSG_FIRSTHDR(&msgh);
@@ -107,39 +195,118 @@ std::pair<ssize_t, size_t> receive(int sockfd, ddprof::span<std::byte> buffer,
   /* Check the validity of the 'cmsghdr' */
   if (static_cast<size_t>(nfds) > fds.size() ||
       cmsgp->cmsg_level != SOL_SOCKET || cmsgp->cmsg_type != SCM_RIGHTS) {
-    return {-1, 0};
+    return {nr, 0};
   }
 
-  memcpy(fds.data(), CMSG_DATA(cmsgp), nfds * sizeof(int));
+  ::memcpy(fds.data(), CMSG_DATA(cmsgp), nfds * sizeof(int));
   return {nr, nfds};
 }
 
-bool send(int sfd, const RequestMessage &msg) {
-  return send(sfd, to_byte_span(&msg)) >= 0;
+DDRes send(UnixSocket &socket, const RequestMessage &msg) {
+  std::error_code ec;
+  socket.send(to_byte_span(&msg), ec);
+  DDRES_CHECK_ERRORCODE(ec, DD_WHAT_SOCKET, "Unable to send request message");
+  return {};
 }
 
-bool send(int sfd, const ResponseMessage &msg) {
-  int fds[2] = {msg.fds.mem_fd, msg.fds.event_fd};
+DDRes send(UnixSocket &socket, const ReplyMessage &msg) {
+  int fds[2] = {msg.ring_buffer.mem_fd, msg.ring_buffer.event_fd};
   ddprof::span<int> fd_span{
-      fds, (msg.data.request & RequestMessage::kRingBuffer) ? 2ul : 0ul};
-  return send(sfd, to_byte_span(&msg.data), fd_span) >= 0;
+      fds, (msg.request & RequestMessage::kRingBuffer) ? 2ul : 0ul};
+  std::error_code ec;
+  InternalResponseMessage data = {.request = msg.request,
+                                  .pid = msg.pid,
+                                  .mem_size = msg.ring_buffer.mem_size};
+  socket.send(to_byte_span(&data), fd_span, ec);
+  DDRES_CHECK_ERRORCODE(ec, DD_WHAT_SOCKET, "Unable to send response message");
+  return {};
 }
 
-bool receive(int sfd, RequestMessage &msg) {
-  auto res = receive(sfd, to_byte_span(&msg));
-  return res.first == sizeof(msg) && res.second == 0;
-}
-
-bool receive(int sfd, ResponseMessage &msg) {
-  int fds[2];
-  auto res = receive(sfd, to_byte_span(&msg.data), fds);
-  if (res.first != sizeof(msg.data) ||
-      ((msg.data.request & RequestMessage::kRingBuffer) ^ (res.second == 2))) {
-    return false;
+DDRes receive(UnixSocket &socket, RequestMessage &msg) {
+  std::error_code ec;
+  auto res = socket.receive(to_byte_span(&msg), ec);
+  DDRES_CHECK_ERRORCODE(ec, DD_WHAT_SOCKET,
+                        "Unable to receive request message");
+  if (res != sizeof(msg)) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_SOCKET, "Unable to receive request message");
   }
-  msg.fds.mem_fd = fds[0];
-  msg.fds.event_fd = fds[1];
-  return true;
+
+  return {};
+}
+
+DDRes receive(UnixSocket &socket, ReplyMessage &msg) {
+  int fds[2] = {-1, -1};
+  std::error_code ec;
+  InternalResponseMessage data;
+  auto res = socket.receive(to_byte_span(&data), fds, ec);
+
+  DDRES_CHECK_ERRORCODE(ec, DD_WHAT_SOCKET,
+                        "Unable to receive response message");
+  if (res.first != sizeof(data) ||
+      ((data.request & RequestMessage::kRingBuffer) ^ (res.second == 2))) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_SOCKET,
+                           "Unable to receive response message");
+  }
+  msg.pid = data.pid;
+  msg.request = data.request;
+  msg.ring_buffer.mem_size = data.mem_size;
+  msg.ring_buffer.mem_fd = fds[0];
+  msg.ring_buffer.event_fd = fds[1];
+  return {};
+}
+
+Client::Client(UnixSocket &&socket, std::chrono::microseconds timeout)
+    : _socket(std::move(socket)) {
+  std::error_code ec;
+  _socket.set_read_timeout(timeout, ec);
+  if (ec) {
+    DDRES_THROW_EXCEPTION(DD_WHAT_SOCKET, "Unable to set timeout on socket");
+  }
+  _socket.set_write_timeout(timeout, ec);
+  if (ec) {
+    DDRES_THROW_EXCEPTION(DD_WHAT_SOCKET, "Unable to set timeout on socket");
+  }
+}
+
+pid_t Client::get_profiler_pid() {
+  ddprof::RequestMessage request = {.request = ddprof::RequestMessage::kPid};
+  DDRES_CHECK_THROW_EXCEPTION(ddprof::send(_socket, request));
+  ddprof::ReplyMessage reply;
+  DDRES_CHECK_THROW_EXCEPTION(ddprof::receive(_socket, reply));
+  return reply.pid;
+}
+
+RingBufferInfo Client::get_ring_buffer() {
+  ddprof::RequestMessage request = {.request =
+                                        ddprof::RequestMessage::kRingBuffer};
+  DDRES_CHECK_THROW_EXCEPTION(ddprof::send(_socket, request));
+  ddprof::ReplyMessage reply;
+  DDRES_CHECK_THROW_EXCEPTION(ddprof::receive(_socket, reply));
+  return reply.ring_buffer;
+}
+
+Server::Server(UnixSocket &&socket, std::chrono::microseconds timeout)
+    : _socket(std::move(socket)) {
+  std::error_code ec;
+  _socket.set_read_timeout(timeout, ec);
+  if (ec) {
+    DDRES_THROW_EXCEPTION(DD_WHAT_SOCKET, "Unable to set timeout on socket");
+  }
+  _socket.set_write_timeout(timeout, ec);
+  if (ec) {
+    DDRES_THROW_EXCEPTION(DD_WHAT_SOCKET, "Unable to set timeout on socket");
+  }
+}
+
+void Server::waitForRequest() {
+  RequestMessage request;
+  DDRES_CHECK_THROW_EXCEPTION(ddprof::receive(_socket, request));
+  ReplyMessage reply;
+  if (request.request & RequestMessage::kPid) {
+    reply.pid = getpid();
+  }
+  if (request.request & RequestMessage::kRingBuffer) {}
+  DDRES_CHECK_THROW_EXCEPTION(ddprof::send(_socket, reply));
 }
 
 } // namespace ddprof

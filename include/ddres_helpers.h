@@ -59,7 +59,7 @@ extern "C" {
 /// Evaluate function and return error if -1 (add an error log)
 #define DDRES_CHECK_ERRNO(eval, what, ...)                                     \
   do {                                                                         \
-    if (unlikely(eval == -1)) {                                                \
+    if (unlikely((eval) == -1)) {                                              \
       int e = errno;                                                           \
       LG_ERR(__VA_ARGS__);                                                     \
       LOG_ERROR_DETAILS(LG_ERR, what);                                         \
@@ -98,5 +98,23 @@ extern "C" {
 // possible improvement : flag to consider warnings as errors
 
 #ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+extern "C++" {
+#  include <system_error>
+
+/// Evaluate function and return error if -1 (add an error log)
+#  define DDRES_CHECK_ERRORCODE(eval, what, ...)                               \
+    do {                                                                       \
+      std::error_code err = (eval);                                            \
+      if (err) {                                                               \
+        LG_ERR(__VA_ARGS__);                                                   \
+        LOG_ERROR_DETAILS(LG_ERR, what);                                       \
+        LG_ERR("error_code(%d): %s", err.value(), err.message().c_str());      \
+        return ddres_error(what);                                              \
+      }                                                                        \
+    } while (0)
 }
 #endif
