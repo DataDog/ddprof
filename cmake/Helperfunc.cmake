@@ -35,8 +35,7 @@ function(add_exe name)
    endforeach()
    add_executable(${name} ${exe_sources})
    set_target_properties(${name} PROPERTIES
-       COMPILE_DEFINITIONS "${exe_definitions}"
-       BUILD_RPATH "${runtime_path}")
+       COMPILE_DEFINITIONS "${exe_definitions}")
    target_link_libraries(${name} PRIVATE ${exe_libraries})
    list(REMOVE_DUPLICATES exe_include_dirs)
    target_include_directories(${name} PRIVATE ${exe_include_dirs} ${all_includes})
