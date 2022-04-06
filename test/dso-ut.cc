@@ -360,7 +360,6 @@ TEST(DSOTest, pid_read_dso) {
 
 TEST(DSOTest, mmap_into_backpop) {
   DsoHdr dso_hdr;
-  // LogHandle log_handle;
   pid_t my_pid = getpid();
   int nb_elts;
   dso_hdr.pid_backpopulate(my_pid, nb_elts);
