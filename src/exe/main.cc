@@ -17,6 +17,7 @@ extern "C" {
 
 #include <cassert>
 #include <errno.h>
+#include <functional>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -71,15 +72,20 @@ InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
   return InputResult::kSuccess;
 }
 
-// daemonization function return some pid for daemon process, 0 for control
-// (non-daemon) process, -1 for error
-pid_t daemonize() {
+// Daemonization function return some pid for daemon process, 0 for control
+// (non-daemon) process, -1 for error.
+// cleanup_function is a callable invoked in the context of the intermediate,
+// short-lived process that will be killed by daemon process.
+pid_t daemonize(std::function<void()> cleanup_function = {}) {
   pid_t temp_pid = fork(); // "middle" (temporary) PID
 
   if (!temp_pid) { // If I'm the temp PID enter branch
     temp_pid = getpid();
     if (pid_t child_pid = fork();
         child_pid) { // If I'm the temp PID again, enter branch
+      if (cleanup_function) {
+        cleanup_function();
+      }
       // Block until our child exits or sends us a kill signal
       // NOTE, current process is NOT expected to unblock here; rather it
       // ends by SIGTERM.  Exiting here is an error condition.
@@ -111,7 +117,7 @@ int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
   if (!ctx->params.pid) {
     // If no PID was specified earlier, we autodaemonize and target current pid
     ctx->params.pid = getpid();
-    temp_pid = daemonize();
+    temp_pid = daemonize([ctx] { ddprof_context_free(ctx); });
 
     if (temp_pid == -1) {
       return -1;
@@ -199,7 +205,7 @@ int main(int argc, char *argv[]) {
   \****************************************************************************/
   // Ownership of context is passed to start_profiler
   // This function does not return in the context of profiler process
-  // It only returns in the context of target process (ie. in non-PID mode) 
+  // It only returns in the context of target process (ie. in non-PID mode)
   start_profiler(&ctx);
 
   // Execute manages its own return path
