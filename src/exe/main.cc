@@ -86,10 +86,12 @@ pid_t daemonize() {
       waitpid(child_pid, NULL, 0);
       return -1;
     } else {
+      // If I'm the child PID, then leave and attach profiler
       return temp_pid;
-    }      // If I'm the child PID, then leave and attach profiler
-  } else { // If I'm the target PID, then now it's time to wait until my
-           // child, the middle PID, returns.  That's the cue to exec.
+    }
+  } else {
+    // If I'm the target PID, then now it's time to wait until my
+    // child, the middle PID, returns.
     waitpid(temp_pid, NULL, 0);
     return 0;
   }
@@ -110,6 +112,10 @@ int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     // If no PID was specified earlier, we autodaemonize and target current pid
     ctx->params.pid = getpid();
     temp_pid = daemonize();
+
+    if (temp_pid == -1) {
+      return -1;
+    }
 
     // non-daemon process: return control to caller
     if (!temp_pid) {
@@ -191,7 +197,9 @@ int main(int argc, char *argv[]) {
   /****************************************************************************\
   |                             Run the Profiler                               |
   \****************************************************************************/
-  // ownership of context is passed to start_profiler
+  // Ownership of context is passed to start_profiler
+  // This function does not return in the context of profiler process
+  // It only returns in the context of target process (ie. in non-PID mode) 
   start_profiler(&ctx);
 
   // Execute manages its own return path

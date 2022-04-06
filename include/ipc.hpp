@@ -18,7 +18,7 @@ namespace ddprof {
 // configuration. 253 is a common safe lower bound for that value.
 static constexpr size_t kMaxFD = 253;
 
-static constexpr auto kDefaultSocketTimeout = std::chrono::seconds{1};
+static constexpr auto kDefaultSocketTimeout = std::chrono::seconds{2};
 
 using socket_t = int;
 
