@@ -50,7 +50,7 @@ unsigned long *my_counter = &(unsigned long){0};
 // This is the function body for every expanded function in the X-table
 #define FUNBOD                                                                 \
   {                                                                            \
-    int n = x & 1 ? x * 3 + 1 : x / 2;                                         \
+    int64_t n = x & 1 ? x * 3 + 1 : x / 2;                                         \
     __sync_add_and_fetch(my_counter, 1);                                       \
     return 1 >= n ? 1 : funs[n % funlen](n);                                   \
   }
@@ -65,15 +65,15 @@ unsigned long *my_counter = &(unsigned long){0};
 
 // X-table; use something like gcc -E collatz.c to see how this works :)
 #define COLLATZ(X) C(X, N3)
-#define DECL(f) int f(int);
+#define DECL(f) int64_t f(int64_t);
 #define NAME(f) f,
-#define DEFN(f) int f(int x) FUNBOD;
+#define DEFN(f) int64_t f(int64_t x) FUNBOD;
 
 // Declare function prototypes
 COLLATZ(DECL)
 
 // Define function lookup table
-int (*funs[])(int) = {COLLATZ(NAME)};
+int64_t (*funs[])(int64_t) = {COLLATZ(NAME)};
 const int funlen = sizeof(funs) / sizeof(*funs);
 
 // Define the functions
