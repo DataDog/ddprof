@@ -60,21 +60,18 @@ int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
   return syscall(__NR_perf_event_open, attr, pid, cpu, gfd, flags);
 }
 
-int perfopen(pid_t pid, const PerfOption *opt, int cpu, bool extras) {
+int perfopen(pid_t pid, const PerfWatcher *watcher, int cpu, bool extras) {
   struct perf_event_attr attr = g_dd_native_attr;
-  attr.type = opt->type;
-  attr.config = opt->config;
-  attr.sample_period = opt->sample_period; // Equivalently, freq
-  attr.exclude_kernel = !(opt->include_kernel);
-  attr.freq = opt->freq;
+  attr.type = watcher->type;
+  attr.config = watcher->config;
+  attr.sample_period = watcher->sample_period; // Equivalently, freq
+  attr.freq = watcher->options.is_freq;
 
-  // Breakpoint
-  if (opt->type == PERF_TYPE_BREAKPOINT) {
-    attr.config = 0; // as per perf_event_open() manpage
-    attr.bp_type = opt->bp_type;
-  }
+#warning move the sample type stuff out of this
+  attr.sample_type |= watcher->options.is_raw ? PERF_SAMPLE_RAW : 0;
+  attr.exclude_kernel = !(watcher->options.is_kernel);
 
-  // Extras
+  // Extras (metadata for tracking process state)
   if (extras) {
     attr.mmap = 1;
     attr.mmap_data = 1;

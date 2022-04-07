@@ -6,7 +6,7 @@
 extern "C" {
 #include "pprof/ddprof_pprof.h"
 
-#include "perf_option.h"
+#include "perf_watcher.h"
 
 #include <ddprof/ffi.h>
 #include <fcntl.h>
@@ -27,8 +27,7 @@ DwflSymbolLookup_V2::DwflSymbolLookup_V2() : _lookup_setting(K_CACHE_ON) {}
 
 TEST(DDProfPProf, init_profiles) {
   DDProfPProf pprofs;
-  const PerfOption *perf_option_cpu = perfoptions_preset(10);
-  DDRes res = pprof_create_profile(&pprofs, perf_option_cpu, 1);
+  DDRes res = pprof_create_profile(&pprofs, DDPROF_PWT_CPU_NANOS, 999);
   EXPECT_TRUE(IsDDResOK(res));
   res = pprof_free_profile(&pprofs);
   EXPECT_TRUE(IsDDResOK(res));
@@ -69,9 +68,7 @@ TEST(DDProfPProf, aggregate) {
 
   fill_unwind_symbols(table, mapinfo_table, mock_output);
   DDProfPProf pprofs;
-  const PerfOption *perf_option_cpu = perfoptions_preset(10);
-
-  DDRes res = pprof_create_profile(&pprofs, perf_option_cpu, 1);
+  DDRes res = pprof_create_profile(&pprofs, DDPROF_PWT_CPU_NANOS, 999);
   EXPECT_TRUE(IsDDResOK(res));
 
   res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, 0, &pprofs);

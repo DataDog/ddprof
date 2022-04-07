@@ -6,8 +6,16 @@
 #include "ddprof_cmdline.h"
 
 #include <assert.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#include "ddres_helpers.h"
 
 int arg_which(const char *str, char const *const *set, int sz_set) {
   if (!str || !set)
@@ -36,44 +44,191 @@ bool arg_yesno(const char *str, int mode) {
   return false;
 }
 
-bool process_event(const char *str, const char **lookup, size_t sz_lookup,
-                   size_t *idx, uint64_t *value) {
-  size_t sz_str = strlen(str);
+// If this returns false, then the passed watcher should be regarded as invalid
+bool watcher_from_event(const char *str, PerfWatcher *watcher) {
+  const PerfWatcher *tmp_watcher;
+  if (!(tmp_watcher = ewatcher_from_str(str)))
+    return false;
 
-  for (size_t i = 0; i < sz_lookup; ++i) {
-    size_t sz_key = strlen(lookup[i]);
-    if (!strncmp(lookup[i], str, sz_key)) {
-      // If the user didn't specify anything else, we're done.
-      if (sz_str == sz_key) {
-        *idx = i;
-        return true;
-      }
+  // Now we have to process options out of the string
+  char *str_chk; // for checking the result of parsing
+  char *str_tmp = strchr(str, ','); // points to ',' or is nullptr
+  uint64_t value_tmp = tmp_watcher->sample_period; // get default val
 
-      // perf_event_open() expects unsigned 64-bit integers, but it's somewhat
-      // annoying to process unsigned ints using the standard interface.  We
-      // take what we can get and convert to unsigned via absolute value.
-      uint64_t value_tmp = 0;
-      char *str_tmp = (char *)&str[sz_key];
-      char *str_chk = str_tmp;
-
-      // We use a comma as a separator; if it doesn't immediately precede the
-      // label, then any subsequent processing is invalid.
-      if (*str_tmp != ',')
-        return false;
-
-      // Currently, we demand that the entire numeric portion of the event
-      // specifier is valid.  This is the place to add code for suffix support,
-      // probably :)
-      value_tmp = strtoll(&str_tmp[1], &str_chk, 10);
-      if (*str_chk)
-        return false;
-
-      // If we're here, we received a valid event and a valid numeric portion.
-      *idx = i;
-      *value = value_tmp;
-      return true;
-    }
+  if (str_tmp) {
+    ++str_tmp; // nav to after ','
+    value_tmp = strtoll(str_tmp, &str_chk, 10);
+    if (*str_chk)
+      return false; // If this is malformed, the whole thing is malformed?
   }
 
-  return false;
+  // If we're here, then we've processed the event specification correctly, so
+  // we copy the tmp_watcher into the storage given by the user and update the
+  // mutable field
+  *watcher = *tmp_watcher;
+  watcher->sample_period = value_tmp;
+  return true;
+}
+
+#ifdef __aarch64__
+#  warning tracepoints are broken on ARM
+#endif
+#ifdef __x86_64__
+int arg2reg[] = {-1, 5, 4, 3, 2, 16, 17}; // 1-indexed, so pad
+#elif __aarch64__
+#else
+int arg2reg[] = {-1, 0, 1, 2, 3, 4, 5, 6};
+#error Your architecture is not supported
+#endif
+uint8_t get_register(const char *str) {
+  uint8_t reg = 0;
+  char *str_copy = (char *)str;
+  long reg_buf = strtol(str, &str_copy, 10);
+  if (!*str_copy) {
+    reg = reg_buf;
+  } else {
+    reg = 0;
+    LG_NTC("Could not parse register %s", str);
+  }
+
+  // If we're here, then we have a register.
+  return arg2reg[reg];
+}
+
+bool get_trace_format(const char *str, uint8_t *trace_off, uint8_t *trace_sz) {
+  char *str_copy = (char *)str;
+  if (!str)
+    return false;
+
+  char *period = strchr(str, '.');
+  char *period_copy = period;
+  if (!period)
+    return false;
+
+  *trace_off = strtol(str, &str_copy, 10);
+  *trace_sz = strtol(period + 1, &period_copy, 10);
+
+  // Error if the size is zero, otherwise fine probably
+  return !trace_sz;
+}
+
+// If this returns false, then the passed watcher should be regarded as invalid
+bool watcher_from_tracepoint(const char *str, PerfWatcher *watcher) {
+  // minimum form; provides counts, samples every hit
+  // -t groupname:tracename
+  // Register-qualified form
+  // -t groupname:tracename%REG
+  // -t groupname:tracename$offset.size
+  // Sample-qualified form, sets a period value
+  // -t groupname:tracename@period
+  // full
+  // -t groupename:tracename%REG@period
+  // groupname, tracename, REG - strings
+  // REG - can be a number 1-6
+  // period is a number
+  size_t sz_str = strlen(str);
+  char *groupname;
+  char *tracename;
+  uint8_t reg = 0;
+  uint64_t period = 1;
+  bool is_raw = false;
+  uint8_t trace_off = 0;
+  uint8_t trace_sz = 0;
+
+  // Check format
+  if (!sz_str)
+    return false;
+  char *colon = strchr(str, ':');
+  char *perc = strchr(str, '%');
+  char *amp = strchr(str, '@');
+  char *dollar = strchr(str, '$');
+
+  if (!colon)
+    return false;
+  if (dollar && perc)
+    return false;
+
+  // Split strings
+  *colon = 0; // colon is true from previous check
+  if (perc)
+    *perc = 0;
+  if (amp)
+    *amp = 0;
+  if (dollar)
+    *dollar = 0;
+
+  // Name checking
+  groupname = strdup(str);
+  tracename = strdup(colon + 1);
+
+  // If a register is specified, process that
+  if (perc)
+    reg = get_register(perc + 1);
+
+  // OTOH, if an offset into the raw event is specified, get that
+  if (dollar && !get_trace_format(dollar + 1, &trace_off, &trace_sz)) {
+    is_raw = true;
+  } else {
+    trace_off = 0;
+    trace_sz = 0;
+  }
+
+  // If the user specified a period, make sure it is valid
+  if (amp) {
+    char *str_check = (char *)str;
+    uint64_t buf = strtoll(amp + 1, &str_check, 10);
+    if (!*str_check)
+      period = buf;
+  }
+
+  char path[2048] = {0}; // somewhat arbitrarily
+  char buf[64] = {0};
+  char *buf_copy = buf;
+  int pathsz =
+      snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/id",
+               groupname, tracename);
+  if (pathsz >= sizeof(path)) {
+    // Possibly ran out of room
+    return false;
+  }
+  int fd = open(path, O_RDONLY);
+  if (-1 == fd)
+    return false;
+
+  // Read the data in an eintr-safe way
+  int read_ret = -1;
+  long trace_id = 0;
+  do {
+    read_ret = read(fd, buf, sizeof(buf));
+  } while (read_ret == -1 && errno == EINTR);
+  close(fd);
+  if (read_ret > 0)
+    trace_id = strtol(buf, &buf_copy, 10);
+  if (*buf_copy && *buf_copy != '\n')
+    return false;
+
+  // Check enablement, just to print a log.  We still enable instrumentation.
+  snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/enable",
+           groupname, tracename);
+  fd = open(path, O_RDONLY);
+  if (-1 == fd || 1 != read(fd, buf, 1) || '0' != *buf) {
+    LG_NTC("Tracepint %s:%s is not enabled.  Instrumentation will proceed, but "
+           "you may not have any events.",
+           groupname, tracename);
+  } else {
+    LG_NFO("Tracepoint %s:%s successfully enabled", groupname, tracename);
+  }
+
+  // OK done
+  *watcher = *twatcher_default();
+  watcher->id = trace_id;
+  watcher->sample_period = period;
+  watcher->options.is_raw = is_raw;
+  if (reg) {
+    watcher->reg = reg;
+  } else {
+    watcher->trace_off = trace_off;
+    watcher->trace_sz = trace_sz;
+  }
+  return true;
 }

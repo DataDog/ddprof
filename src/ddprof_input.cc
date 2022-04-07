@@ -13,7 +13,7 @@
 
 extern "C" {
 #include "ddprof_cmdline.h"
-#include "perf_option.h"
+#include "perf_watcher.h"
 #include "version.h"
 }
 
@@ -145,23 +145,15 @@ static void ddprof_input_default_events(DDProfInput *input) {
 
   std::istringstream iss(events);
   for (std::string event_str; std::getline(iss, event_str, ';');) {
-    size_t idx;
-    uint64_t sampling_value = 0;
-
     if (event_str.empty()) {
       continue;
     }
 
-    // Iterate through the specified events and define new watchers if any
-    // of them are valid.  If the user specifies a '0' value, then that's
-    // the same as using the default (equivalently, the ',0' could be omitted)
-    if (process_event(event_str.c_str(), perfoptions_lookup(),
-                      perfoptions_nb_presets(), &idx, &sampling_value)) {
-      input->watchers[input->num_watchers] = idx;
-      input->sampling_value[input->num_watchers] = sampling_value;
+    const char *event = event_str.c_str();
+    if (watcher_from_event(event, &input->watchers[input->num_watchers])) {
       ++input->num_watchers;
     } else {
-      LG_WRN("Ignoring invalid event (%s)", event_str.c_str());
+      LG_WRN("Ignoring invalid event (%s)", event);
     }
   }
 }
@@ -208,6 +200,7 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
   int c = 0, oi = 0;
   *continue_exec = true;
   struct option lopts[] = {OPT_TABLE(X_LOPT){"event", 1, 0, 'e'},
+                           {"tracepoint", 1, 0, 't'},
                            {"help", 0, 0, 'h'},
                            {"version", 0, 0, 'v'},
                            // Last element should be filled with 0s
@@ -223,27 +216,26 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
     return ddres_init();
   }
 
-  char opt_short[] = "+" OPT_TABLE(X_OSTR) "e:hv";
+  char opt_short[] = "+" OPT_TABLE(X_OSTR) "e:t:hv";
   optind = 1; // reset argument parsing (in case we are called several times)
 
   while (-1 != (c = getopt_long(argc, argv, opt_short, lopts, &oi))) {
     switch (c) {
       OPT_TABLE(X_CASE)
-    case 'e': {
-      size_t idx;
-      uint64_t sampling_value = 0;
+    case 't': case 'e': {
+      if (!optarg || !*optarg)
+        continue;
 
-      // Iterate through the specified events and define new watchers if any
-      // of them are valid.  If the user specifies a '0' value, then that's
-      // the same as using the default (equivalently, the ',0' could be omitted)
-      if (process_event(optarg, perfoptions_lookup(), perfoptions_nb_presets(),
-                        &idx, &sampling_value)) {
-        input->watchers[input->num_watchers] = idx;
-        input->sampling_value[input->num_watchers] = sampling_value;
+      bool (*process_fun)(const char *str, PerfWatcher *watcher);
+      if (c == 'e')
+        process_fun = &watcher_from_event;
+      else if (c == 't')
+        process_fun = &watcher_from_tracepoint;
+
+      if (!process_fun(optarg, &input->watchers[input->num_watchers]))
+        LG_WRN("Ignoring invalid event/tracepoint (%s)", optarg);
+      else
         ++input->num_watchers;
-      } else {
-        LG_WRN("Ignoring invalid event (%s)", optarg);
-      }
       break;
     }
     case 'h': {

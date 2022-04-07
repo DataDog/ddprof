@@ -12,7 +12,7 @@ extern "C" {
 #include "ddprof_defs.h"
 #include "ddres_def.h"
 #include "exporter_input.h"
-#include "perf_option.h"
+#include "perf_watcher.h"
 #include "string_view.h"
 
 typedef struct ddprof_ffi_ProfileExporterV3 ddprof_ffi_ProfileExporterV3;

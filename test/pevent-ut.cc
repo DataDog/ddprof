@@ -7,7 +7,7 @@ extern "C" {
 #include "pevent_lib.h"
 
 #include "ddprof_context.h"
-#include "perf_option.h"
+#include "perf_watcher.h"
 
 #include <sys/sysinfo.h>
 #include <unistd.h>
@@ -17,7 +17,7 @@ extern "C" {
 void mock_ddprof_context(DDProfContext *ctx) {
   ctx->num_watchers = 1;
   ctx->params.enable = true;
-  ctx->watchers[0] = *perfoptions_preset(10); // 10 is cpu time
+  ctx->watchers[0] = *ewatcher_from_str("sCPU"); // kernel-derived CPU time
 }
 
 TEST(PeventTest, setup_cleanup) {

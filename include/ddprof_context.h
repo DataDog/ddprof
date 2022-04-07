@@ -10,7 +10,7 @@
 #include "ddprof_defs.h"
 #include "ddprof_worker_context.h"
 #include "exporter_input.h"
-#include "perf_option.h"
+#include "perf_watcher.h"
 
 // forward declarations
 typedef struct StackHandler StackHandler;
@@ -33,7 +33,7 @@ typedef struct DDProfContext {
   bool initialized;
   ExporterInput exp_input;
   const StackHandler *stack_handler;
-  PerfOption watchers[MAX_TYPE_WATCHER];
+  PerfWatcher watchers[MAX_TYPE_WATCHER];
   int num_watchers;
   void *callback_ctx; // user state to be used in callback (lib mode)
   DDProfWorkerContext worker_ctx;

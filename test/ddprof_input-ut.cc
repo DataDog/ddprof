@@ -5,7 +5,7 @@
 
 extern "C" {
 #include "ddprof_input.h"
-#include "perf_option.h"
+#include "perf_watcher.h"
 #include "string_view.h"
 }
 

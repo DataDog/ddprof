@@ -12,6 +12,7 @@ extern "C" {
 #include "ddprof_defs.h"
 #include "ddres_def.h"
 #include "exporter_input.h"
+#include "perf_watcher.h"
 
 typedef int16_t watcher_index_t;
 
@@ -38,8 +39,7 @@ typedef struct DDProfInput {
   char *tags;
   char *url;
   // Watcher presets
-  watcher_index_t watchers[MAX_TYPE_WATCHER];
-  uint64_t sampling_value[MAX_TYPE_WATCHER];
+  PerfWatcher watchers[MAX_TYPE_WATCHER];
   int num_watchers;
   ExporterInput exp_input;
 } DDProfInput;

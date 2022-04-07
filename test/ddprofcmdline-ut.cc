@@ -5,7 +5,7 @@
 
 extern "C" {
 #include "ddprof_cmdline.h"
-#include "perf_option.h"
+#include "perf_watcher.h"
 }
 
 #include <gtest/gtest.h>

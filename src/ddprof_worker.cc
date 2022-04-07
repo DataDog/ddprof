@@ -390,10 +390,10 @@ DDRes ddprof_worker_init(DDProfContext *ctx) {
         ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[0]));
     DDRES_CHECK_FWD(
         ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[1]));
-    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[0],
-                                         ctx->watchers, ctx->num_watchers));
-    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[1],
-                                         ctx->watchers, ctx->num_watchers));
+
+#warning move default type definition into the context
+    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[0], DDPROF_PWT_CPU_NANOS, 999));
+    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[1], DDPROF_PWT_CPU_NANOS, 999));
   }
   CatchExcept2DDRes();
   return ddres_init();

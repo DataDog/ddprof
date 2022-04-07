@@ -36,11 +36,12 @@ TEST(MMapTest, PerfOpen) {
 
   int cpu = 0;
 
-  for (int i = 0; i < perfoptions_nb_presets(); ++i) {
+  for (int i = 0; i < DDPROF_PWE_LENGTH; ++i) {
     std::cerr << "#######################################" << std::endl;
-    std::cerr << "-->" << i << " " << perfoptions_preset(i)->desc << std::endl;
+    std::cerr << "-->" << i << " " << ewatcher_from_idx(i)->desc << std::endl;
 
-    int perf_fd = perfopen(pid, perfoptions_preset(i), cpu, false);
+    int perf_fd = perfopen(pid, ewatcher_from_idx(i), cpu, false);
+#warning this should be investigated/fixed?
     if (i == 10 || i == 11) { // Expected not to fail for CPU / WALL profiling
       EXPECT_TRUE(perf_fd != -1);
     }

@@ -38,50 +38,32 @@ static ddprof_ffi_Slice_c_char ffi_empty_char_slice(void) {
   return (struct ddprof_ffi_Slice_c_char){.ptr = (NULL), .len = 0};
 }
 
-static const struct ddprof_ffi_ValueType s_sample_count = {
-    .type_ = SLICE_LITERAL("sample"),
-    .unit = SLICE_LITERAL("count"),
-};
-
-static const struct ddprof_ffi_ValueType s_cpu_time = {
-    .type_ = SLICE_LITERAL("cpu-time"),
-    .unit = SLICE_LITERAL("nanoseconds"),
-};
-
-static const struct ddprof_ffi_ValueType s_cpu_sample = {
-    .type_ = SLICE_LITERAL("cpu-sample"),
-    .unit = SLICE_LITERAL("count"),
-};
-
-DDRes pprof_create_profile(DDProfPProf *pprof, const PerfOption *options,
-                           unsigned nbOptions) {
-  // Create one value
-  struct ddprof_ffi_ValueType perf_value_type[MAX_TYPE_WATCHER + 1];
-  unsigned value_index = 0;
-  perf_value_type[value_index++] = s_sample_count;
-
-  /* Add one value type per watcher */
-  for (; value_index < nbOptions + 1; ++value_index) {
-    ddprof_ffi_Slice_c_char perf_value_slice = {.ptr = options->label,
-                                                .len = strlen(options->label)};
-    ddprof_ffi_Slice_c_char perf_unit = {.ptr = options->unit,
-                                         .len = strlen(options->unit)};
-
-    perf_value_type[value_index].type_ = perf_value_slice;
-    perf_value_type[value_index].unit = perf_unit;
+DDRes pprof_create_profile(DDProfPProf *pprof, unsigned type_default,
+    int64_t periodfreq_default) {
+  // Add all the registered profile types (perf_watcher.h)
+  struct ddprof_ffi_ValueType perf_value_type[DDPROF_PWT_LENGTH];
+  for (unsigned i = 0; i < DDPROF_PWT_LENGTH; ++i) {
+    const char *value_name = profile_name_from_idx(i);
+    const char *value_unit = profile_unit_from_idx(i);
+    if (!value_name || !value_unit) {
+      LG_WRN("Malformed sample type (%d)", i);
+      continue;
+    }
+    perf_value_type[i].type_ = (ddprof_ffi_Slice_c_char) {
+      .ptr = value_name,
+      .len = strlen(value_name)};
+    perf_value_type[i].unit = (ddprof_ffi_Slice_c_char) {
+      .ptr = value_unit,
+      .len = strlen(value_unit)};
   }
 
-  pprof->_nb_values = value_index;
+  pprof->_nb_values = DDPROF_PWT_LENGTH;
   struct ddprof_ffi_Slice_value_type sample_types = {.ptr = perf_value_type,
-                                                     .len = value_index};
-  struct ddprof_ffi_Period period;
-  if (options->freq) {
-    period.type_ = s_cpu_time;
-    period.value = (s_nanos_in_one_sec) / options->sample_frequency;
-  } else {
-    period.type_ = s_cpu_sample;
-    period.value = options->sample_period;
-  }
+                                                     .len = pprof->_nb_values};
+  struct ddprof_ffi_Period period = {
+    .type_ = perf_value_type[type_default],
+    .value = periodfreq_default
+  };
 
   pprof->_profile = ddprof_ffi_Profile_new(sample_types, &period);
   if (!pprof->_profile) {

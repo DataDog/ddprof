@@ -149,8 +149,7 @@ TEST(DDProfExporter, simple) {
 
     fill_unwind_symbols(table, mapinfo_table, mock_output);
 
-    const PerfOption *perf_option_cpu = perfoptions_preset(10);
-    res = pprof_create_profile(&pprofs, perf_option_cpu, 1);
+    res = pprof_create_profile(&pprofs, DDPROF_PWT_CPU_NANOS, 999);
     EXPECT_TRUE(IsDDResOK(res));
     res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, 0, &pprofs);
     EXPECT_TRUE(IsDDResOK(res));
