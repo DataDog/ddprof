@@ -113,7 +113,7 @@ bool get_trace_format(const char *str, uint8_t *trace_off, uint8_t *trace_sz) {
 }
 
 // If this returns false, then the passed watcher should be regarded as invalid
-bool watcher_from_tracepoint(const char *str, PerfWatcher *watcher) {
+bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
   // minimum form; provides counts, samples every hit
   // -t groupname:tracename
   // Register-qualified form
@@ -126,9 +126,10 @@ bool watcher_from_tracepoint(const char *str, PerfWatcher *watcher) {
   // groupname, tracename, REG - strings
   // REG - can be a number 1-6
   // period is a number
+  char *str = strdup(_str);
   size_t sz_str = strlen(str);
-  char *groupname;
-  char *tracename;
+  const char *groupname;
+  const char *tracename;
   uint8_t reg = 0;
   uint64_t period = 1;
   bool is_raw = false;
@@ -136,17 +137,19 @@ bool watcher_from_tracepoint(const char *str, PerfWatcher *watcher) {
   uint8_t trace_sz = 0;
 
   // Check format
-  if (!sz_str)
+  if (!sz_str) {
+    free(str);
     return false;
+  }
   char *colon = strchr(str, ':');
   char *perc = strchr(str, '%');
   char *amp = strchr(str, '@');
   char *dollar = strchr(str, '$');
 
-  if (!colon)
+  if (!colon || (dollar && perc)) {
+    free(str);
     return false;
-  if (dollar && perc)
-    return false;
+  }
 
   // Split strings
   *colon = 0; // colon is true from previous check
@@ -158,8 +161,8 @@ bool watcher_from_tracepoint(const char *str, PerfWatcher *watcher) {
     *dollar = 0;
 
   // Name checking
-  groupname = strdup(str);
-  tracename = strdup(colon + 1);
+  groupname = str;
+  tracename = colon + 1;
 
   // If a register is specified, process that
   if (perc)
@@ -189,11 +192,14 @@ bool watcher_from_tracepoint(const char *str, PerfWatcher *watcher) {
                groupname, tracename);
   if (pathsz >= sizeof(path)) {
     // Possibly ran out of room
+    free(str);
     return false;
   }
   int fd = open(path, O_RDONLY);
-  if (-1 == fd)
+  if (-1 == fd) {
+    free(str);
     return false;
+  }
 
   // Read the data in an eintr-safe way
   int read_ret = -1;
@@ -204,8 +210,10 @@ bool watcher_from_tracepoint(const char *str, PerfWatcher *watcher) {
   close(fd);
   if (read_ret > 0)
     trace_id = strtol(buf, &buf_copy, 10);
-  if (*buf_copy && *buf_copy != '\n')
+  if (*buf_copy && *buf_copy != '\n') {
+    free(str);
     return false;
+  }
 
   // Check enablement, just to print a log.  We still enable instrumentation.
   snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/enable",
@@ -230,5 +238,7 @@ bool watcher_from_tracepoint(const char *str, PerfWatcher *watcher) {
     watcher->trace_off = trace_off;
     watcher->trace_sz = trace_sz;
   }
+  watcher->tracepoint_group = groupname;
+  watcher->tracepoint_name = tracename;
   return true;
 }

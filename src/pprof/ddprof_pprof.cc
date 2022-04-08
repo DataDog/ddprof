@@ -34,13 +34,15 @@ std_string_2_slice_c_char(const std::string &str) {
 #define SLICE_LITERAL(str)                                                     \
   (struct ddprof_ffi_Slice_c_char) { .ptr = (str), .len = sizeof(str) - 1 }
 
+#define PPROF_MAX_LABELS 5
+
 static ddprof_ffi_Slice_c_char ffi_empty_char_slice(void) {
   return (struct ddprof_ffi_Slice_c_char){.ptr = (NULL), .len = 0};
 }
 
 DDRes pprof_create_profile(DDProfPProf *pprof, unsigned type_default,
     int64_t periodfreq_default) {
-  // Add all the registered profile types (perf_watcher.h)
+  // Add all the defined profile types (perf_watcher.h)
   struct ddprof_ffi_ValueType perf_value_type[DDPROF_PWT_LENGTH];
   for (unsigned i = 0; i < DDPROF_PWT_LENGTH; ++i) {
     const char *value_name = profile_name_from_idx(i);
@@ -118,17 +120,16 @@ static void write_line(const ddprof::Symbol &symbol,
 // Assumption of API is that sample is valid in a single type
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr *symbol_hdr, uint64_t value,
-                      int watcher_idx, DDProfPProf *pprof) {
+                      const PerfWatcher *watcher, DDProfPProf *pprof) {
 
   const ddprof::SymbolTable &symbol_table = symbol_hdr->_symbol_table;
   const ddprof::MapInfoTable &mapinfo_table = symbol_hdr->_mapinfo_table;
   ddprof_ffi_Profile *profile = pprof->_profile;
 
-  int64_t values[MAX_TYPE_WATCHER + 1] = {0};
-  // Counted a single time
-  values[0] = 1;
-  // Add a value to the watcher we are sampling, leave others zeroed
-  values[watcher_idx + 1] = value;
+  int64_t values[DDPROF_PWT_LENGTH] = {0};
+  values[watcher->profile_id] = value;
+  if (watcher->has_count)
+    values[watcher->count_id] = 1;
 
   ddprof_ffi_Location locations_buff[DD_MAX_STACK_DEPTH];
   // assumption of single line per loc for now
@@ -142,10 +143,47 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     write_location(&locs[i], mapinfo_table[locs[i]._map_info_idx], &lines,
                    &locations_buff[i]);
   }
+
+  // Create the labels for the sample.  Two samples are the same only when
+  // their locations _and_ all labels are identical, so we admit a very limited
+  // number of labels at present
+  struct ddprof_ffi_Label labels[PPROF_MAX_LABELS] = {0};
+  size_t labels_num = 0;
+
+  // The max PID on Linux is approximately 2^22 (~4e6), which also limits TID
+  char pid_str[7] = {0};
+  char tid_str[7] = {0};
+
+  // These labels are hardcoded on the Datadog backend
+  static char pid_key[] = "process_id";
+  static char tid_key[] = "thread_id";
+  static char tracepoint_key[] = "tracepoint_type";
+
+  // Add any configured labels.  Note that TID alone has the same cardinalit as
+  // (TID;PID) tuples, so except for symbol table overhead it doesn't matter
+  // much if TID implies PID for clarity.
+  if (watcher->send_pid || watcher->send_tid) {
+    size_t sz = snprintf(pid_str, sizeof(pid_str), "%d", uw_output->pid);
+    labels[labels_num].key = (struct ddprof_ffi_Slice_c_char){.ptr = pid_key, .len = sizeof(pid_key)-1};
+    labels[labels_num].str = (struct ddprof_ffi_Slice_c_char){.ptr = pid_str, .len = sz};
+    ++labels_num;
+  }
+  if (watcher->send_tid) {
+    size_t sz = snprintf(tid_str, sizeof(tid_str), "%d", uw_output->tid);
+    labels[labels_num].key = (struct ddprof_ffi_Slice_c_char){.ptr = tid_key, .len = sizeof(tid_key)-1};
+    labels[labels_num].str = (struct ddprof_ffi_Slice_c_char){.ptr = tid_str, .len = sz};
+    ++labels_num;
+  }
+  if (watcher->config == PERF_TYPE_TRACEPOINT) {
+    // This adds only the trace name.  Maybe we should have group + tracenames?
+    labels[labels_num].key = (struct ddprof_ffi_Slice_c_char){.ptr = tracepoint_key, .len = sizeof(tracepoint_key) - 1}; 
+    labels[labels_num].str = (struct ddprof_ffi_Slice_c_char){.ptr = watcher->tracepoint_name, .len = strlen(watcher->tracepoint_name)};
+    ++labels_num;
+  }
   struct ddprof_ffi_Sample sample = {
       .locations = {.ptr = locations_buff, .len = uw_output->nb_locs},
       .values = {.ptr = values, .len = pprof->_nb_values},
-      .labels = {.ptr = NULL, .len = 0},
+      .labels = {.ptr = labels, .len = labels_num},
   };
 
   uint64_t id_sample = ddprof_ffi_Profile_add(profile, sample);

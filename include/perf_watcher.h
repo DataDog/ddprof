@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <linux/perf_event.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -25,21 +26,30 @@ typedef struct PerfWatcher {
   int profile_id;
   // perf_event_open configs
   struct PerfWatcherOptions options;
+  bool has_count;
+  int count_id;
   // tracepoint configuration
   uint64_t id;
   uint8_t reg;
   uint8_t trace_off;
   uint8_t trace_sz;
+  const char* tracepoint_name;
+  const char* tracepoint_group;
+  // Other configs
+  bool send_pid;
+  bool send_tid;
 } PerfWatcher;
 
 // The Datadog backend only understands pre-configured event types.  Those
 // types are defined here, and then referenced in the watcher
+// The last column is a dependent type which is always aggregated as a count
+// whenever the main type is aggregated.
 #define PROFILE_TYPE_TABLE(X) \
-  X(TRACEPOINT, tracepoint, events) \
-  X(CPU_NANOS,  cpu-time,   nanoseconds) \
-  X(CPU_SAMPLE, cpu-sample, count)
+  X(TRACEPOINT, tracepoint, events,      -1)         \
+  X(CPU_NANOS,  cpu-time,   nanoseconds, CPU_SAMPLE) \
+  X(CPU_SAMPLE, cpu-sample, count,       -1)
 
-#define X_ENUM(a, b, c) DDPROF_PWT_##a,
+#define X_ENUM(a, b, c, d) DDPROF_PWT_##a,
 typedef enum DDPROF_SAMPLE_TYPES {
   PROFILE_TYPE_TABLE(X_ENUM)
   DDPROF_PWT_LENGTH,

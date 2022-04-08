@@ -157,6 +157,10 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   unwind_init_sample(us, sample->regs, sample->pid, sample->size_stack,
                      sample->data_stack);
 
+  // If a sample has a PID, it has a TID.  Include it for downstream labels
+  us->output.pid = sample->pid;
+  us->output.tid = sample->tid;
+
   // If this is a SW_TASK_CLOCK-type event, then aggregate the time
   if (ctx->watchers[pos].config == PERF_COUNT_SW_TASK_CLOCK)
     ddprof_stats_add(STATS_CPU_TIME, sample->period, NULL);
@@ -167,10 +171,11 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   if (!IsDDResFatal(res)) {
 #ifndef DDPROF_NATIVE_LIB
     // in lib mode we don't aggregate (protect to avoid link failures)
+    PerfWatcher *watcher = &ctx->watchers[pos];
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
     DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr,
-                                    sample->period, pos, pprof));
+                                    sample->period, watcher, pprof));
 #else
     // Call the user's stack handler
     if (ctx->stack_handler) {

@@ -5,13 +5,11 @@
 
 #include "perf_watcher.h"
 
-#include <linux/perf_event.h>
-
 #include <stddef.h>
 #include <string.h>
 
 
-#define X_STR(a, b, c) #b,
+#define X_STR(a, b, c, d) #b,
 const char *profile_name_from_idx(int idx) {
   static const char* sample_names[] = { PROFILE_TYPE_TABLE(X_STR) };
   if (idx < 0 && idx >= DDPROF_PWT_LENGTH)
@@ -19,7 +17,7 @@ const char *profile_name_from_idx(int idx) {
   return sample_names[idx];
 }
 #undef X_STR
-#define X_STR(a, b, c) #c,
+#define X_STR(a, b, c, d) #c,
 const char *profile_unit_from_idx(int idx) {
   static const char* sample_units[] = { PROFILE_TYPE_TABLE(X_STR) };
   if (idx < 0 && idx >= DDPROF_PWT_LENGTH)
