@@ -47,7 +47,8 @@ TEST(MMapTest, PerfOpen) {
     if (ewatcher_from_idx(i)->type != PERF_TYPE_SOFTWARE) {
       std::cerr << "$$$$$$$ OH NO $$$$$$$$$" << std::endl;
       std::cerr << "-->" << i << " " << ewatcher_from_idx(i)->desc << std::endl;
-      std::cerr << "ERROR ---> :" << errno << "=" << strerror(errno) << std::endl;
+      std::cerr << "ERROR ---> :" << errno << "=" << strerror(errno)
+                << std::endl;
       continue;
     }
     EXPECT_TRUE(perf_fd != -1);

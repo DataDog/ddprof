@@ -222,7 +222,8 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
   while (-1 != (c = getopt_long(argc, argv, opt_short, lopts, &oi))) {
     switch (c) {
       OPT_TABLE(X_CASE)
-    case 't': case 'e': {
+    case 't':
+    case 'e': {
       if (!optarg || !*optarg)
         continue;
 

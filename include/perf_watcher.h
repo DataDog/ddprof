@@ -32,8 +32,8 @@ typedef struct PerfWatcher {
   uint8_t reg;
   uint8_t trace_off;
   uint8_t trace_sz;
-  const char* tracepoint_name;
-  const char* tracepoint_group;
+  const char *tracepoint_name;
+  const char *tracepoint_group;
   // Other configs
   bool send_pid;
   bool send_tid;
@@ -43,22 +43,21 @@ typedef struct PerfWatcher {
 // types are defined here, and then referenced in the watcher
 // The last column is a dependent type which is always aggregated as a count
 // whenever the main type is aggregated.
-#define PROFILE_TYPE_TABLE(X) \
-  X(NOCOUNT, nocount, nocount,           NOCOUNT)    \
-  X(TRACEPOINT, tracepoint, events,      NOCOUNT)    \
-  X(CPU_NANOS,  cpu-time,   nanoseconds, CPU_SAMPLE) \
-  X(CPU_SAMPLE, cpu-sample, count,       NOCOUNT)
+#define PROFILE_TYPE_TABLE(X)                                                  \
+  X(NOCOUNT, nocount, nocount, NOCOUNT)                                        \
+  X(TRACEPOINT, tracepoint, events, NOCOUNT)                                   \
+  X(CPU_NANOS, cpu - time, nanoseconds, CPU_SAMPLE)                            \
+  X(CPU_SAMPLE, cpu - sample, count, NOCOUNT)
 
 #define X_ENUM(a, b, c, d) DDPROF_PWT_##a,
 typedef enum DDPROF_SAMPLE_TYPES {
-  PROFILE_TYPE_TABLE(X_ENUM)
-  DDPROF_PWT_LENGTH,
+  PROFILE_TYPE_TABLE(X_ENUM) DDPROF_PWT_LENGTH,
 } DDPROF_SAMPLE_TYPES;
 #undef X_ENUM
 
 enum DDPROF_PERFOPEN_CONFIGS {
-  IS_FREQ = 1<<0,
-  IS_KERNEL = 1<<1,
+  IS_FREQ = 1 << 0,
+  IS_KERNEL = 1 << 1,
 };
 
 // Whereas tracepoints are dynamically configured and can be checked at runtime,
@@ -90,8 +89,7 @@ enum DDPROF_PERFOPEN_CONFIGS {
 
 #define X_ENUM(a, b, c, d, e, f, g) DDPROF_PWE_##a,
 typedef enum DDPROF_EVENT_NAMES {
-  EVENT_CONFIG_TABLE(X_ENUM)
-  DDPROF_PWE_LENGTH,
+  EVENT_CONFIG_TABLE(X_ENUM) DDPROF_PWE_LENGTH,
 } DDPROF_EVENT_NAMES;
 #undef X_ENUM
 

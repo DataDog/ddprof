@@ -51,7 +51,7 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
     return false;
 
   // Now we have to process options out of the string
-  char *str_chk; // for checking the result of parsing
+  char *str_chk;                    // for checking the result of parsing
   char *str_tmp = strchr(str, ','); // points to ',' or is nullptr
   uint64_t value_tmp = tmp_watcher->sample_period; // get default val
 
@@ -78,7 +78,7 @@ int arg2reg[] = {-1, 5, 4, 3, 2, 16, 17}; // 1-indexed, so pad
 #elif __aarch64__
 #else
 int arg2reg[] = {-1, 0, 1, 2, 3, 4, 5, 6};
-#error Your architecture is not supported
+#  error Your architecture is not supported
 #endif
 uint8_t get_register(const char *str) {
   uint8_t reg = 0;

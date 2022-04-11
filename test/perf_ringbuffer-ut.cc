@@ -6,8 +6,8 @@
 extern "C" {
 #include <stdio.h>
 
-#include "perf_watcher.h" // for default sample type used in ddprof
 #include "perf_ringbuffer.h"
+#include "perf_watcher.h" // for default sample type used in ddprof
 }
 
 #include <gtest/gtest.h>

@@ -151,7 +151,7 @@ TEST(DDProfExporter, simple) {
 
     res = pprof_create_profile(&pprofs, DDPROF_PWT_CPU_NANOS, 999);
     EXPECT_TRUE(IsDDResOK(res));
-    
+
     // Use an event type which has the CPU_NANOS profile type
     const PerfWatcher *watcher = ewatcher_from_str("sCPU");
     res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, watcher, &pprofs);

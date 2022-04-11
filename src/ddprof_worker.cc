@@ -396,11 +396,13 @@ DDRes ddprof_worker_init(DDProfContext *ctx) {
     DDRES_CHECK_FWD(
         ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[1]));
 
-    // The export profiles non-optionally have the default SampleType of cpu-time.
-    // This should maybe change when we have more than one customer-facing
-    // type.
-    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[0], DDPROF_PWT_CPU_NANOS, 999));
-    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[1], DDPROF_PWT_CPU_NANOS, 999));
+    // The export profiles non-optionally have the default SampleType of
+    // cpu-time. This should maybe change when we have more than one
+    // customer-facing type.
+    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[0],
+                                         DDPROF_PWT_CPU_NANOS, 999));
+    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[1],
+                                         DDPROF_PWT_CPU_NANOS, 999));
   }
   CatchExcept2DDRes();
   return ddres_init();
