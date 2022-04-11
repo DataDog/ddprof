@@ -76,8 +76,8 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
 #ifdef __x86_64__
 int arg2reg[] = {-1, 5, 4, 3, 2, 16, 17}; // 1-indexed, so pad
 #elif __aarch64__
-#else
 int arg2reg[] = {-1, 0, 1, 2, 3, 4, 5, 6};
+#else
 #  error Your architecture is not supported
 #endif
 uint8_t get_register(const char *str) {
