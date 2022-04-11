@@ -19,8 +19,6 @@ extern "C" {
 
 #include "symbol_hdr.hpp"
 
-static const unsigned long s_nanos_in_one_sec = 1000000000;
-
 // Slice helpers
 static ddprof_ffi_Slice_c_char
 std_string_2_slice_c_char(const std::string &str) {
@@ -147,12 +145,12 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   // Create the labels for the sample.  Two samples are the same only when
   // their locations _and_ all labels are identical, so we admit a very limited
   // number of labels at present
-  struct ddprof_ffi_Label labels[PPROF_MAX_LABELS] = {0};
+  struct ddprof_ffi_Label labels[PPROF_MAX_LABELS] = {};
   size_t labels_num = 0;
 
   // The max PID on Linux is approximately 2^22 (~4e6), which also limits TID
-  char pid_str[7] = {0};
-  char tid_str[7] = {0};
+  char pid_str[7] = {};
+  char tid_str[7] = {};
 
   // These labels are hardcoded on the Datadog backend
   static char pid_key[] = "process_id";
