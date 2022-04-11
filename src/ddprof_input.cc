@@ -228,9 +228,9 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
         continue;
 
       bool (*process_fun)(const char *str, PerfWatcher *watcher);
-      if (c == 'e')
-        process_fun = &watcher_from_event;
-      else if (c == 't')
+      process_fun = &watcher_from_event;
+      // Override handler if tracepoint
+      if (c == 't')
         process_fun = &watcher_from_tracepoint;
 
       if (!process_fun(optarg, &input->watchers[input->num_watchers]))
