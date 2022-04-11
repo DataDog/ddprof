@@ -41,7 +41,10 @@ extern "C" {
   case casechar:                                                               \
     if ((targ)->key)                                                           \
       free((void *)(targ)->key);                                               \
-    (targ)->key = strdup(optarg);                                              \
+    if (optarg && *optarg)                                                     \
+      (targ)->key = strdup(optarg);                                            \
+    else                                                                       \
+      (targ)->key = strdup("");                                                \
     break;
 
 // TODO das210603 I don't think this needs to be inlined as a macro anymore
