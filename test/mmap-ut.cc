@@ -40,12 +40,12 @@ TEST(MMapTest, PerfOpen) {
     std::cerr << "#######################################" << std::endl;
     std::cerr << "-->" << i << " " << ewatcher_from_idx(i)->desc << std::endl;
 
-    const PerfWatcher *watcher = ewatcher_From_idx(i);
+    const PerfWatcher *watcher = ewatcher_from_idx(i);
     int perf_fd = perfopen(pid, watcher, cpu, false);
 
-    // All software-type events should succeed instrumentation.  Other types
-    // may require higher privileges
-    if (watcher->type != PERF_TYPE_SOFTWARE || watcher->option.is_kernel) {
+    // Pure-userspace software events should all pass.  Anything else should hit
+    // this filter
+    if (watcher->type != PERF_TYPE_SOFTWARE || watcher->options.is_kernel) {
       continue;
     }
     EXPECT_TRUE(perf_fd != -1);

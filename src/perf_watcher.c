@@ -62,13 +62,13 @@ const PerfWatcher tracepoint_templates[] = {{
 
 #define X_STR(a, b, c, d, e, f, g) #a,
 int str_to_event_idx(const char *str) {
-  static const char *event_input_names[] = {EVENT_CONFIG_TABLE(X_STR)};
+  static const char *event_names[] = {EVENT_CONFIG_TABLE(X_STR)}; // NOLINT
   int type;
   if (!str)
     return -1;
   size_t sz_str = strlen(str);
   for (type = 0; type < DDPROF_PWE_LENGTH; ++type) {
-    size_t sz_thistype = strlen(event_input_names[type]);
+    size_t sz_thistype = strlen(event_names[type]);
 
     // We don't want to match partial events, and the event specification
     // demands that events are either whole or immediately preceeded by a comma.
@@ -76,7 +76,7 @@ int str_to_event_idx(const char *str) {
       continue;
     else if (sz_str > sz_thistype && str[sz_thistype] != ',')
       continue;
-    if (!strncmp(str, event_input_names[type], sz_thistype))
+    if (!strncmp(str, event_names[type], sz_thistype))
       return type;
   }
   return -1;
