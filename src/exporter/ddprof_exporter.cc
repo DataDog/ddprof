@@ -19,6 +19,7 @@ extern "C" {
 }
 
 #include "ddres.h"
+#include "defer.hpp"
 #include "tags.hpp"
 
 #include <algorithm>
@@ -75,7 +76,7 @@ static DDRes create_pprof_file(ddprof_ffi_Timespec start,
 /// Write pprof to a valid file descriptor : allows to use pprof tools
 static DDRes write_profile(const ddprof_ffi_EncodedProfile *encoded_profile,
                            int fd) {
-  const ddprof_ffi_Buffer *buffer = &encoded_profile->buffer;
+  const ddprof_ffi_Vec_u8 *buffer = &encoded_profile->buffer;
   if (write(fd, buffer->ptr, buffer->len) == 0) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER,
                            "Failed to write byte buffer to stdout! %s\n",
@@ -203,7 +204,7 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
   } else {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failure creating exporter - %s",
                            new_exporterv3.err.ptr);
-    ddprof_ffi_Buffer_reset(&new_exporterv3.err);
+    ddprof_ffi_NewProfileExporterV3Result_drop(new_exporterv3);
   }
   return ddres_init();
 }
@@ -238,11 +239,15 @@ static DDRes check_send_response_code(uint16_t send_response_code) {
 DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
                              DDProfExporter *exporter) {
   DDRes res = ddres_init();
-  struct ddprof_ffi_EncodedProfile *encoded_profile =
+  struct ddprof_ffi_SerializeResult serialized_result =
       ddprof_ffi_Profile_serialize(profile);
-  if (!encoded_profile) {
+  defer { ddprof_ffi_SerializeResult_drop(serialized_result); };
+  if (serialized_result.tag != DDPROF_FFI_SERIALIZE_RESULT_OK) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to serialize");
   }
+
+  struct ddprof_ffi_EncodedProfile *encoded_profile = &serialized_result.ok;
+
   if (exporter->_debug_folder) {
     write_pprof_file(encoded_profile, exporter->_debug_folder);
   }
@@ -267,16 +272,17 @@ DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
         .ptr = files_, .len = sizeof files_ / sizeof *files_};
 
     ddprof_ffi_Request *request = ddprof_ffi_ProfileExporterV3_build(
-        exporter->_exporter, start, end, files, k_timeout_ms);
+        exporter->_exporter, start, end, files, {}, k_timeout_ms);
     if (request) {
       struct ddprof_ffi_SendResult result =
           ddprof_ffi_ProfileExporterV3_send(exporter->_exporter, request);
+      defer { ddprof_ffi_SendResult_drop(result); };
+
       if (result.tag == DDPROF_FFI_SEND_RESULT_FAILURE) {
         LG_WRN("Failure to establish connection, check url %s", exporter->_url);
         LG_WRN("Failure to send profiles (%.*s)", (int)result.failure.len,
                result.failure.ptr);
         // Free error buffer (prefer this API to the free API)
-        ddprof_ffi_Buffer_reset(&result.failure);
         if (exporter->_nb_consecutive_errors++ >=
             K_NB_CONSECUTIVE_ERRORS_ALLOWED) {
           // this will shut down profiler
@@ -294,7 +300,6 @@ DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
       res = ddres_error(DD_WHAT_EXPORTER);
     }
   }
-  ddprof_ffi_EncodedProfile_delete(encoded_profile);
   return res;
 }
 

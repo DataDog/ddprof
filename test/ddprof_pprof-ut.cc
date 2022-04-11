@@ -36,28 +36,30 @@ TEST(DDProfPProf, init_profiles) {
 
 void test_pprof(const DDProfPProf *pprofs) {
   const ddprof_ffi_Profile *profile = pprofs->_profile;
-  struct ddprof_ffi_EncodedProfile *encoded_profile =
+
+  struct ddprof_ffi_SerializeResult serialized_result =
       ddprof_ffi_Profile_serialize(profile);
 
-  EXPECT_TRUE(encoded_profile);
+  // struct ddprof_ffi_EncodedProfile *encoded_profile =
+  //     ddprof_ffi_Profile_serialize(profile);
 
-  ddprof_ffi_Timespec start = encoded_profile->start;
+  ASSERT_EQ(serialized_result.tag, DDPROF_FFI_SERIALIZE_RESULT_OK);
+
+  ddprof_ffi_Timespec start = serialized_result.ok.start;
 
   // Check that encoded time is close to now
   time_t local_time = time(NULL);
   EXPECT_TRUE(local_time - start.seconds < 2);
 
-  ddprof_ffi_Buffer profile_buffer = {
-      .ptr = encoded_profile->buffer.ptr,
-      .len = encoded_profile->buffer.len,
-      .capacity = encoded_profile->buffer.capacity,
-  };
-  EXPECT_TRUE(profile_buffer.ptr);
+  ddprof_ffi_Vec_u8 profile_vec = serialized_result.ok.buffer;
+
+  EXPECT_TRUE(profile_vec.ptr);
 
   // Test that we are generating content
-  EXPECT_TRUE(profile_buffer.len > 500);
-  EXPECT_TRUE(profile_buffer.capacity >= profile_buffer.len);
-  ddprof_ffi_EncodedProfile_delete(encoded_profile);
+  EXPECT_TRUE(profile_vec.len > 500);
+  EXPECT_TRUE(profile_vec.capacity >= profile_vec.len);
+
+  ddprof_ffi_SerializeResult_drop(serialized_result);
 }
 
 TEST(DDProfPProf, aggregate) {
