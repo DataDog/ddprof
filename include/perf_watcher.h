@@ -61,7 +61,9 @@ enum DDPROF_PERFOPEN_CONFIGS {
 
 // Whereas tracepoints are dynamically configured and can be checked at runtime,
 // we lack the ability to inspect events of type other than TYPE_TRACEPOINT.
-// Accordingly, we maintain a list of events
+// Accordingly, we maintain a list of events, even though the type of these
+// events are marked as tracepoint unless they represent a well-known profiling
+// type!
 // clang-format off
 //  short    desc              type config                   period/freq  profile type   addtl. configs
 #define EVENT_CONFIG_TABLE(X) \

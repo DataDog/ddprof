@@ -149,7 +149,8 @@ static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr) {
 /************************* perf_event_open() helpers **************************/
 /// Entry point for sample aggregation
 DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
-  // Before we do anything else, copy the perf_event_header into a sample
+  if (!sample)
+    return ddres_warn(DD_WHAT_PERFSAMP);
   struct UnwindState *us = ctx->worker_ctx.us;
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
 

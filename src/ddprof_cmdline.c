@@ -67,12 +67,18 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
   // mutable field
   *watcher = *tmp_watcher;
   watcher->sample_period = value_tmp;
+
+  // If an event doesn't have a well-defined profile type, then it gets
+  // registered as a tracepoint profile.  Make sure it has a valid name for the
+  // label
+  static const char event_groupname[] = "custom_events";
+  if (watcher->profile_id == DDPROF_PWT_TRACEPOINT) {
+    watcher->tracepoint_name = watcher->desc;
+    watcher->tracepoint_group = event_groupname;
+  }
   return true;
 }
 
-#ifdef __aarch64__
-#  warning tracepoints are broken on ARM
-#endif
 #ifdef __x86_64__
 int arg2reg[] = {-1, 5, 4, 3, 2, 16, 17}; // 1-indexed, so pad
 #elif __aarch64__
