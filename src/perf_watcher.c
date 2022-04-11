@@ -17,7 +17,7 @@ uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
 #define X_STR(a, b, c, d) #b,
 const char *profile_name_from_idx(int idx) {
   static const char *sample_names[] = {PROFILE_TYPE_TABLE(X_STR)};
-  if (idx < 0 && idx >= DDPROF_PWT_LENGTH)
+  if (idx < 0 || idx >= DDPROF_PWT_LENGTH)
     return NULL;
   return sample_names[idx];
 }
@@ -25,7 +25,7 @@ const char *profile_name_from_idx(int idx) {
 #define X_STR(a, b, c, d) #c,
 const char *profile_unit_from_idx(int idx) {
   static const char *sample_units[] = {PROFILE_TYPE_TABLE(X_STR)};
-  if (idx < 0 && idx >= DDPROF_PWT_LENGTH)
+  if (idx < 0 || idx >= DDPROF_PWT_LENGTH)
     return NULL;
   return sample_units[idx];
 }
@@ -33,14 +33,14 @@ const char *profile_unit_from_idx(int idx) {
 #define X_DEP(a, b, c, d) DDPROF_PWT_##d,
 int get_count_type_from_idx(int idx) {
   static const int count_id[] = {PROFILE_TYPE_TABLE(X_DEP)};
-  if (idx < 0 && idx >= DDPROF_PWT_LENGTH)
+  if (idx < 0 || idx >= DDPROF_PWT_LENGTH)
     return -1;
   return count_id[idx];
 }
 #undef X_DEP
 
 bool is_countable_type(int idx) {
-  if (idx < 0 && idx >= DDPROF_PWT_LENGTH)
+  if (idx < 0 || idx >= DDPROF_PWT_LENGTH)
     return false;
   return DDPROF_PWT_NOCOUNT != get_count_type_from_idx(idx);
 }
