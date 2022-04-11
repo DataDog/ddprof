@@ -40,9 +40,6 @@ void test_pprof(const DDProfPProf *pprofs) {
   struct ddprof_ffi_SerializeResult serialized_result =
       ddprof_ffi_Profile_serialize(profile);
 
-  // struct ddprof_ffi_EncodedProfile *encoded_profile =
-  //     ddprof_ffi_Profile_serialize(profile);
-
   ASSERT_EQ(serialized_result.tag, DDPROF_FFI_SERIALIZE_RESULT_OK);
 
   ddprof_ffi_Timespec start = serialized_result.ok.start;
