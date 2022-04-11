@@ -208,7 +208,6 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
     read_ret = read(fd, buf, sizeof(buf));
   } while (read_ret == -1 && errno == EINTR);
   close(fd);
-  LG_ERR("BUF is %s", buf);
   if (read_ret > 0)
     trace_id = strtol(buf, &buf_copy, 10);
   if (*buf_copy && *buf_copy != '\n') {
