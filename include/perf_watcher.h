@@ -28,7 +28,6 @@ typedef struct PerfWatcher {
   struct PerfWatcherOptions options;
   int count_id;
   // tracepoint configuration
-  uint64_t id;
   uint8_t reg;
   uint8_t trace_off;
   uint8_t trace_sz;

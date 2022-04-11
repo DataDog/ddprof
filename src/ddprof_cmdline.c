@@ -208,6 +208,7 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
     read_ret = read(fd, buf, sizeof(buf));
   } while (read_ret == -1 && errno == EINTR);
   close(fd);
+  LG_ERR("BUF is %s", buf);
   if (read_ret > 0)
     trace_id = strtol(buf, &buf_copy, 10);
   if (*buf_copy && *buf_copy != '\n') {
@@ -229,7 +230,7 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
 
   // OK done
   *watcher = *twatcher_default();
-  watcher->id = trace_id;
+  watcher->config = trace_id;
   watcher->sample_period = period;
   if (is_raw)
     watcher->sample_type |= PERF_SAMPLE_RAW;
