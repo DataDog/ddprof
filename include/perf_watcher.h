@@ -12,11 +12,11 @@
 struct PerfWatcherOptions {
   bool is_kernel;
   bool is_freq;
-  bool is_raw;
 };
 
 typedef struct PerfWatcher {
   const char *desc;
+  uint64_t sample_type;
   int type;
   unsigned long config;
   union {
@@ -26,7 +26,6 @@ typedef struct PerfWatcher {
   int profile_id;
   // perf_event_open configs
   struct PerfWatcherOptions options;
-  bool has_count;
   int count_id;
   // tracepoint configuration
   uint64_t id;
@@ -45,9 +44,10 @@ typedef struct PerfWatcher {
 // The last column is a dependent type which is always aggregated as a count
 // whenever the main type is aggregated.
 #define PROFILE_TYPE_TABLE(X) \
-  X(TRACEPOINT, tracepoint, events,      -1)         \
+  X(NOCOUNT, nocount, nocount,           NOCOUNT)    \
+  X(TRACEPOINT, tracepoint, events,      NOCOUNT)    \
   X(CPU_NANOS,  cpu-time,   nanoseconds, CPU_SAMPLE) \
-  X(CPU_SAMPLE, cpu-sample, count,       -1)
+  X(CPU_SAMPLE, cpu-sample, count,       NOCOUNT)
 
 #define X_ENUM(a, b, c, d) DDPROF_PWT_##a,
 typedef enum DDPROF_SAMPLE_TYPES {
@@ -103,3 +103,7 @@ const PerfWatcher *twatcher_default();
 // Helper functions for profile types
 const char *profile_name_from_idx(int idx);
 const char *profile_unit_from_idx(int idx);
+bool is_countable_type(int idx);
+
+// Helper functions, mostly for tests
+uint64_t perf_event_default_sample_type();

@@ -128,7 +128,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
 
   int64_t values[DDPROF_PWT_LENGTH] = {0};
   values[watcher->profile_id] = value;
-  if (watcher->has_count)
+  if (is_countable_type(watcher->profile_id))
     values[watcher->count_id] = 1;
 
   ddprof_ffi_Location locations_buff[DD_MAX_STACK_DEPTH];
@@ -176,7 +176,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   }
   if (watcher->config == PERF_TYPE_TRACEPOINT) {
     // This adds only the trace name.  Maybe we should have group + tracenames?
-    labels[labels_num].key = (struct ddprof_ffi_Slice_c_char){.ptr = tracepoint_key, .len = sizeof(tracepoint_key) - 1}; 
+    labels[labels_num].key = (struct ddprof_ffi_Slice_c_char){.ptr = tracepoint_key, .len = sizeof(tracepoint_key) - 1};
     labels[labels_num].str = (struct ddprof_ffi_Slice_c_char){.ptr = watcher->tracepoint_name, .len = strlen(watcher->tracepoint_name)};
     ++labels_num;
   }

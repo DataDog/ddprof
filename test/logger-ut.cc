@@ -9,7 +9,7 @@ static const char *func_incr() {
   return "foo";
 }
 
-TEST(RegionHodler, Simple) {
+TEST(RegionHolder, Simple) {
   LogHandle log_handle(LL_ERROR);
   LG_WRN("Some warning that should not show %s", func_incr());
   EXPECT_EQ(call_counter, 0);

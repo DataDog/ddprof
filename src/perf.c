@@ -28,7 +28,6 @@ static long s_page_size = 0;
 
 struct perf_event_attr g_dd_native_attr = {
     .size = sizeof(struct perf_event_attr),
-    .sample_type = DEFAULT_SAMPLE_TYPE,
     .precise_ip = 2,
     .disabled = 1,
     .inherit = 1,
@@ -66,9 +65,7 @@ int perfopen(pid_t pid, const PerfWatcher *watcher, int cpu, bool extras) {
   attr.config = watcher->config;
   attr.sample_period = watcher->sample_period; // Equivalently, freq
   attr.freq = watcher->options.is_freq;
-
-#warning move the sample type stuff out of this
-  attr.sample_type |= watcher->options.is_raw ? PERF_SAMPLE_RAW : 0;
+  attr.sample_type = watcher->sample_type;
   attr.exclude_kernel = !(watcher->options.is_kernel);
 
   // Extras (metadata for tracking process state)

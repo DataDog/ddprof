@@ -396,7 +396,9 @@ DDRes ddprof_worker_init(DDProfContext *ctx) {
     DDRES_CHECK_FWD(
         ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[1]));
 
-#warning move default type definition into the context
+    // The export profiles non-optionally have the default SampleType of cpu-time.
+    // This should maybe change when we have more than one customer-facing
+    // type.
     DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[0], DDPROF_PWT_CPU_NANOS, 999));
     DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[1], DDPROF_PWT_CPU_NANOS, 999));
   }
@@ -455,7 +457,8 @@ DDRes ddprof_worker_process_event(struct perf_event_header *hdr, int pos,
     /* Cases where the target type has a PID */
     case PERF_RECORD_SAMPLE:
       if (wpid->pid) {
-        perf_event_sample *sample = hdr2samp(hdr, DEFAULT_SAMPLE_TYPE);
+        uint64_t mask = ctx->watchers[pos].sample_type;
+        perf_event_sample *sample = hdr2samp(hdr, mask);
         DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, pos));
       }
       break;

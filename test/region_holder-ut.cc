@@ -11,7 +11,7 @@
 #include <iostream>
 
 namespace ddprof {
-TEST(RegionHodler, Simple) {
+TEST(RegionHolder, Simple) {
   LogHandle log_handle;
   std::string fileName = IPC_TEST_DATA "/dso_test_data.so";
   RegionHolder reg1(fileName, 12, 0, dso::kStandard);

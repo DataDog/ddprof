@@ -17,11 +17,6 @@
 #define PSAMPLE_DEFAULT_WAKEUP_MS 100 // sample frequency check
 #define PERF_SAMPLE_STACK_SIZE (4096 * 8)
 
-// TODO, probably make this part of the unwinding context or ddprof ctx
-#define DEFAULT_SAMPLE_TYPE                                                    \
-  (PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_TID |          \
-   PERF_SAMPLE_TIME | PERF_SAMPLE_PERIOD)
-
 typedef struct read_format {
   uint64_t value;        // The value of the event
   uint64_t time_enabled; // if PERF_FORMAT_TOTAL_TIME_ENABLED
@@ -122,4 +117,5 @@ void *perfown_sz(int fd, size_t size_of_buffer);
 void *perfown(int fd, size_t *size);
 int perfdisown(void *region, size_t size);
 long get_page_size(void);
+uint64_t get_sample_type(const PerfWatcher *watcher);
 size_t get_mask_from_size(size_t size);

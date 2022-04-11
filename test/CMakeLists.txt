@@ -162,6 +162,7 @@ add_unit_test(
 add_unit_test(
     perf_ringbuffer-ut
     ../src/perf.c
+    ../src/perf_watcher.c
     ../src/perf_ringbuffer.c
     perf_ringbuffer-ut.cc
     DEFINITIONS MYNAME="perf_ringbuffer-ut"

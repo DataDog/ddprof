@@ -41,10 +41,16 @@ TEST(MMapTest, PerfOpen) {
     std::cerr << "-->" << i << " " << ewatcher_from_idx(i)->desc << std::endl;
 
     int perf_fd = perfopen(pid, ewatcher_from_idx(i), cpu, false);
-#warning this should be investigated/fixed?
-    if (i == 10 || i == 11) { // Expected not to fail for CPU / WALL profiling
-      EXPECT_TRUE(perf_fd != -1);
+
+    // All software-type events should succeed instrumentation.  Other types
+    // may require higher privileges
+    if (ewatcher_from_idx(i)->type != PERF_TYPE_SOFTWARE) {
+      std::cerr << "$$$$$$$ OH NO $$$$$$$$$" << std::endl;
+      std::cerr << "-->" << i << " " << ewatcher_from_idx(i)->desc << std::endl;
+      std::cerr << "ERROR ---> :" << errno << "=" << strerror(errno) << std::endl;
+      continue;
     }
+    EXPECT_TRUE(perf_fd != -1);
     if (perf_fd == -1) {
       std::cerr << "ERROR ---> :" << errno << "=" << strerror(errno)
                 << std::endl;

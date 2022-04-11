@@ -231,7 +231,8 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
   *watcher = *twatcher_default();
   watcher->id = trace_id;
   watcher->sample_period = period;
-  watcher->options.is_raw = is_raw;
+  if (is_raw)
+    watcher->sample_type |= PERF_SAMPLE_RAW;
   if (reg) {
     watcher->reg = reg;
   } else {

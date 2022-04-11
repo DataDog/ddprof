@@ -6,8 +6,7 @@
 extern "C" {
 #include "pprof/ddprof_pprof.h"
 
-#include "perf_watcher.h"
-
+#include "ddprof_input.h"
 #include <ddprof/ffi.h>
 #include <fcntl.h>
 #include <time.h>
@@ -71,7 +70,10 @@ TEST(DDProfPProf, aggregate) {
   DDRes res = pprof_create_profile(&pprofs, DDPROF_PWT_CPU_NANOS, 999);
   EXPECT_TRUE(IsDDResOK(res));
 
-  res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, 0, &pprofs);
+  // Use an event type which has the CPU_NANOS profile type
+  const PerfWatcher *watcher = ewatcher_from_str("sCPU");
+  ASSERT_NE(watcher, nullptr);
+  res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, watcher, &pprofs);
   EXPECT_TRUE(IsDDResOK(res));
 
   test_pprof(&pprofs);
