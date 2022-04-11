@@ -114,8 +114,7 @@ TEST_F(InputTest, event_from_env) {
     EXPECT_TRUE(contine_exec);
     EXPECT_EQ(input.nb_parsed_params, 1);
     EXPECT_EQ(input.num_watchers, 1);
-    // cppcheck-suppress literalWithCharPtrCompare
-    //
+
     const PerfWatcher *watcher = ewatcher_from_idx(DDPROF_PWE_sCPU);
     EXPECT_NE(nullptr, watcher);
     EXPECT_EQ(watcher->config, input.watchers[0].config);
