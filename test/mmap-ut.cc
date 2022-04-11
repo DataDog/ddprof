@@ -40,15 +40,12 @@ TEST(MMapTest, PerfOpen) {
     std::cerr << "#######################################" << std::endl;
     std::cerr << "-->" << i << " " << ewatcher_from_idx(i)->desc << std::endl;
 
-    int perf_fd = perfopen(pid, ewatcher_from_idx(i), cpu, false);
+    const PerfWatcher *watcher = ewatcher_From_idx(i);
+    int perf_fd = perfopen(pid, watcher, cpu, false);
 
     // All software-type events should succeed instrumentation.  Other types
     // may require higher privileges
-    if (ewatcher_from_idx(i)->type != PERF_TYPE_SOFTWARE) {
-      std::cerr << "$$$$$$$ OH NO $$$$$$$$$" << std::endl;
-      std::cerr << "-->" << i << " " << ewatcher_from_idx(i)->desc << std::endl;
-      std::cerr << "ERROR ---> :" << errno << "=" << strerror(errno)
-                << std::endl;
+    if (watcher->type != PERF_TYPE_SOFTWARE || watcher->option.is_kernel) {
       continue;
     }
     EXPECT_TRUE(perf_fd != -1);
