@@ -76,7 +76,8 @@ TEST(DDProfPProf, aggregate) {
   ctx.num_watchers = 1;
   DDRes res = pprof_create_profile(&pprof, &ctx);
   EXPECT_TRUE(IsDDResOK(res));
-  res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, &ctx.watchers[0], ctx.sample_type_pv, &pprof);
+  res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, &ctx.watchers[0],
+                        ctx.sample_type_pv, &pprof);
 
   EXPECT_TRUE(IsDDResOK(res));
 
