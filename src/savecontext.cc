@@ -19,8 +19,8 @@ save_registers(ddprof::span<uint64_t, PERF_REGS_COUNT>) {
   // function. That is why this function must not be inlined.
 
   asm(
-      // Save caller save registers
-      // Callee save register are not needed since they could contain anything
+      // Only save callee saved registers.
+      // Caller saved registers are not needed since they could contain anything
       // after function return, and thus cannot be used for unwinding %c[rbx]
       // requires a constant and prints it without punctuation (without it,
       // immediate constant would be printed with a `$` prefix, and this would

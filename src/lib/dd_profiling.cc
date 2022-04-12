@@ -10,6 +10,7 @@ extern "C" {
 #include "logger_setup.h"
 }
 #include "defer.hpp"
+#include "ipc.hpp"
 
 #include <cerrno>
 #include <chrono>
@@ -18,13 +19,17 @@ extern "C" {
 #include <cstring>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/socket.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
 
-static constexpr int k_default_timeout_ms = 1000;
+static constexpr const char *const kProfilerActiveEnvVariable =
+    "DDPDD_PROFILING_NATIVE_LIBRARY_ACTIVE";
+static constexpr const char *const kProfilerAutoStartEnvVariable =
+    "DD_PROFILING_NATIVE_AUTOSTART";
 
 extern const char _binary_ddprof_start[]; // NOLINT cert-dcl51-cpp
 extern const char _binary_ddprof_end[];   // NOLINT cert-dcl51-cpp
@@ -37,14 +42,25 @@ struct ProfilerState {
 
 ProfilerState g_state;
 
+// return true if this profiler is active for this process or one of its parent
+bool is_profiler_library_active() {
+  return getenv(kProfilerActiveEnvVariable) != nullptr;
+}
+
+void set_profiler_library_active() {
+  setenv(kProfilerActiveEnvVariable, "1", 1);
+}
+
+void set_profiler_library_inactive() { unsetenv(kProfilerActiveEnvVariable); }
+
 struct ProfilerAutoStart {
   ProfilerAutoStart() noexcept {
     // Note that library needs to be linked with `--no-as-needed` when using
-    // autostart Otherwise linker will completely remove library from DT_NEEDED
-    // and library will not be loaded
+    // autostart, otherwise linker will completely remove library from DT_NEEDED
+    // and library will not be loaded.
 
     bool autostart = false;
-    const char *autostart_env = getenv("DD_PROFILING_NATIVE_AUTOSTART");
+    const char *autostart_env = getenv(kProfilerAutoStartEnvVariable);
     if (autostart_env && arg_yesno(autostart_env, 1)) {
       autostart = true;
     } else {
@@ -61,22 +77,40 @@ struct ProfilerAutoStart {
   }
 
   ~ProfilerAutoStart() {
-    if (g_state.started) {
-      ddprof_stop_profiling(k_default_timeout_ms);
-    }
+    // profiler will stop when process exits
   }
 };
 
 ProfilerAutoStart g_autostart;
 } // namespace
 
-static int ddprof_start_profiling_internal() {  
-  if (g_state.started) {
+static int ddprof_start_profiling_internal() {
+  // Refuse to start profiler if already started by this process or if active if
+  // one of its parent
+  if (g_state.started || is_profiler_library_active()) {
     return -1;
   }
   pid_t target_pid = getpid();
-  int pipefd[2];
-  if (pipe2(pipefd, O_CLOEXEC) == -1) {
+  enum { kParentIdx, kChildIdx };
+
+  // Create a socket pair to establish a commuication channel between library
+  // and profiler Communication occurs only during profiler setup and sockets
+  // are closed once profiler is attached.
+  // This channel is used to:
+  //  * ensure that profiler is attached before returning
+  //    from ddprof_start_profiling
+  //  * retrieve PID of profiler on library side
+  //  * retrieve ring buffer information for allocation profiling on library
+  //    side. This requires passing file descriptors between procressers, that's
+  //    why unix socket are used here.
+  // Overview of the communication process:
+  //  * library create socket pair and fork + exec into ddprof executable
+  //  * library sends a message requesting profiler PID and waits for a reply
+  //  * ddprof starts up, attaches itself to the target process, then waits for
+  //    a PID request and replies
+  //  * both library and profiler close their socket and continue
+  int sockfds[2];
+  if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sockfds) == -1) {
     return -1;
   }
 
@@ -86,10 +120,11 @@ static int ddprof_start_profiling_internal() {
   }
 
   if (middle_pid == 0) {
-    // executed in middle
-    close(pipefd[0]);
+    // executed in temporary intermediate process
+    close(sockfds[kParentIdx]);
 
-    auto defer_pipeclose = make_defer([&pipefd] { close(pipefd[1]); });
+    auto defer_socketclose =
+        make_defer([&sockfds] { close(sockfds[kChildIdx]); });
 
     middle_pid = getpid();
     if (middle_pid == -1) {
@@ -98,8 +133,7 @@ static int ddprof_start_profiling_internal() {
 
     pid_t grandchild_pid = fork();
     if (grandchild_pid == 0) {
-      // executed in grand child
-      grandchild_pid = getpid();
+      // executed in grand child (ie. ddprof process)
       char ddprof_str[] = "ddprof";
 
       int fd = syscall(SYS_memfd_create, ddprof_str, 1U /*MFD_CLOEXEC*/);
@@ -117,60 +151,60 @@ static int ddprof_start_profiling_internal() {
 
       char pid_buf[32];
       snprintf(pid_buf, sizeof(pid_buf), "%d", target_pid);
-
-      kill(middle_pid, SIGTERM);
-      if (write(pipefd[1], &grandchild_pid, sizeof(grandchild_pid)) !=
-          sizeof(grandchild_pid)) {
-        return -1;
-      }
-
-      defer_pipeclose.release();
-      close(pipefd[1]);
+      char sock_buf[32];
+      snprintf(sock_buf, sizeof(sock_buf), "%d", sockfds[1]);
 
       char pid_opt_str[] = "-p";
-      char *argv[] = {ddprof_str, pid_opt_str, pid_buf, NULL};
+      char sock_opt_str[] = "-Z";
+
+      char *argv[] = {ddprof_str,   pid_opt_str, pid_buf,
+                      sock_opt_str, sock_buf,    NULL};
 
       // unset LD_PRELOAD, otherwise if libdd_profiling.so was preloaded, it
       // would trigger a fork bomb
       unsetenv("LD_PRELOAD");
 
+      kill(middle_pid, SIGTERM);
+
       if (fexecve(fd, argv, environ) == -1) {
         return -1;
       }
     } else {
-      // executed in middle
-      defer_pipeclose.release();
-      close(pipefd[1]);
+      // executed in intermediate process
+      defer_socketclose.reset();
 
-      // waiting to be killed by grand child
+      // waiting to be killed by grand child (ie. ddprof process)
       waitpid(grandchild_pid, NULL, 0);
 
       // should never be executed
       return -1;
     }
-  } else {
-    // executed by parent
-    close(pipefd[1]);
-    defer { close(pipefd[0]); };
-
-    waitpid(middle_pid, NULL, 0);
-    pid_t grandchild_pid;
-    if (read(pipefd[0], &grandchild_pid, sizeof(grandchild_pid)) !=
-        sizeof(grandchild_pid)) {
-      return -1;
-    }
-    g_state.profiler_pid = grandchild_pid;
-    g_state.started = true;
   }
 
+  // executed by parent process
+
+  close(sockfds[kChildIdx]);
+
+  // wait for the intermediate processs to be killed
+  waitpid(middle_pid, NULL, 0);
+
+  try {
+    ddprof::Client client{ddprof::UnixSocket{sockfds[kParentIdx]}};
+    g_state.profiler_pid = client.get_profiler_pid();
+  } catch(const ddprof::DDException& e) {
+    return -1;
+  }
+
+  g_state.started = true;
+  set_profiler_library_active();
+  
   return 0;
 }
 
-int ddprof_start_profiling() {  
+int ddprof_start_profiling() {
   try {
     return ddprof_start_profiling_internal();
-  } catch(...) {   
-  }
+  } catch (...) {}
   return -1;
 }
 
@@ -179,7 +213,10 @@ void ddprof_stop_profiling(int timeout_ms) {
     return;
   }
 
-  defer { g_state.started = false; };
+  defer {
+    g_state.started = false;
+    set_profiler_library_inactive();
+  };
 
   auto time_limit =
       std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);

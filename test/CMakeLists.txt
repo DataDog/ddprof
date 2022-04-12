@@ -107,7 +107,7 @@ add_compile_definitions("IPC_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 
 add_unit_test(
     ipc-ut
-    ../src/ipc.c
+    ../src/ipc.cc
     ipc-ut.cc
 )
 

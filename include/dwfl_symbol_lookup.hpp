@@ -67,7 +67,7 @@ using DwflSymbolMap = std::map<RegionAddress_t, DwflSymbolVal_V2>;
 using DwflSymbolMapIt = DwflSymbolMap::iterator;
 using DwflSymbolMapFindRes = std::pair<DwflSymbolMapIt, bool>;
 using DwflSymbolMapValueType =
-    DwflSymbolMap::value_type; // key value pair <Offset_t, DwflSymbolVal_V2>;
+    DwflSymbolMap::value_type; // key value pair Offset_t, DwflSymbolVal_V2
 
 /*********************/
 /* Main lookup class */

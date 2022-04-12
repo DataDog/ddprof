@@ -462,7 +462,9 @@ DDRes ddprof_worker_process_event(struct perf_event_header *hdr, int pos,
       if (wpid->pid) {
         uint64_t mask = ctx->watchers[pos].sample_type;
         perf_event_sample *sample = hdr2samp(hdr, mask);
-        DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, pos));
+        if (sample) {
+          DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, pos));
+        }
       }
       break;
     case PERF_RECORD_MMAP:
