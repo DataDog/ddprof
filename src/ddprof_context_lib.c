@@ -20,11 +20,12 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   memset(ctx, 0, sizeof(DDProfContext));
   setup_logger(input->log_mode, input->log_level);
 
-  // Shallow copy of the watchers from the input object into the context.  This
-  // enables us to easily manage the lifetime of
-  ctx->num_watchers = 0;
-  for (int *i = &ctx->num_watchers; *i < input->num_watchers; ++*i)
-    ctx->watchers[*i] = input->watchers[*i];
+  // Shallow copy of the watchers from the input object into the context.
+  int nwatchers;
+  for (nwatchers = 0; nwatchers < input->num_watchers; ++nwatchers) {
+    ctx->watchers[nwatchers] = input->watchers[nwatchers];
+  }
+  ctx->num_watchers = nwatchers;
 
   // If no events were given, install the default watcher with default freq.
   if (!ctx->num_watchers) {

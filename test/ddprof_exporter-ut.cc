@@ -149,12 +149,13 @@ TEST(DDProfExporter, simple) {
 
     fill_unwind_symbols(table, mapinfo_table, mock_output);
 
-    res = pprof_create_profile(&pprofs, DDPROF_PWT_CPU_NANOS, 999);
-    EXPECT_TRUE(IsDDResOK(res));
+    DDProfContext ctx = {};
+    ctx.watchers[0] = *ewatcher_from_str("sCPU");
+    ctx.num_watchers = 1;
 
-    // Use an event type which has the CPU_NANOS profile type
-    const PerfWatcher *watcher = ewatcher_from_str("sCPU");
-    res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, watcher, &pprofs);
+    res = pprof_create_profile(&pprofs, &ctx);
+    EXPECT_TRUE(IsDDResOK(res));
+    res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, &ctx.watchers[0], ctx.sample_type_pv, &pprofs);
     EXPECT_TRUE(IsDDResOK(res));
   }
   {

@@ -166,7 +166,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   int64_t values[DDPROF_PWT_LENGTH] = {0};
   values[sample_type_pv[watcher->sample_type_id]] = value;
   if (watcher_has_countable_sample_type(watcher))
-    values[sample_type_pv[watcher_to_count_id(watcher)]] = 1;
+    values[sample_type_pv[watcher_to_count_sample_type_id(watcher)]] = 1;
 
   ddprof_ffi_Location locations_buff[DD_MAX_STACK_DEPTH];
   // assumption of single line per loc for now

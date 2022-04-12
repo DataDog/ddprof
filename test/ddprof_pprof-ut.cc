@@ -25,10 +25,14 @@ namespace ddprof {
 DwflSymbolLookup_V2::DwflSymbolLookup_V2() : _lookup_setting(K_CACHE_ON) {}
 
 TEST(DDProfPProf, init_profiles) {
-  DDProfPProf pprofs;
-  DDRes res = pprof_create_profile(&pprofs, DDPROF_PWT_CPU_NANOS, 999);
+  DDProfPProf pprof;
+  DDProfContext ctx = {};
+  ctx.watchers[0] = *ewatcher_from_str("sCPU");
+  ctx.num_watchers = 1;
+
+  DDRes res = pprof_create_profile(&pprof, &ctx);
   EXPECT_TRUE(IsDDResOK(res));
-  res = pprof_free_profile(&pprofs);
+  res = pprof_free_profile(&pprof);
   EXPECT_TRUE(IsDDResOK(res));
 }
 
@@ -66,19 +70,19 @@ TEST(DDProfPProf, aggregate) {
   MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
 
   fill_unwind_symbols(table, mapinfo_table, mock_output);
-  DDProfPProf pprofs;
-  DDRes res = pprof_create_profile(&pprofs, DDPROF_PWT_CPU_NANOS, 999);
+  DDProfPProf pprof;
+  DDProfContext ctx = {};
+  ctx.watchers[0] = *ewatcher_from_str("sCPU");
+  ctx.num_watchers = 1;
+  DDRes res = pprof_create_profile(&pprof, &ctx);
+  EXPECT_TRUE(IsDDResOK(res));
+  res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, &ctx.watchers[0], ctx.sample_type_pv, &pprof);
+
   EXPECT_TRUE(IsDDResOK(res));
 
-  // Use an event type which has the CPU_NANOS profile type
-  const PerfWatcher *watcher = ewatcher_from_str("sCPU");
-  ASSERT_NE(watcher, nullptr);
-  res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, watcher, &pprofs);
-  EXPECT_TRUE(IsDDResOK(res));
+  test_pprof(&pprof);
 
-  test_pprof(&pprofs);
-
-  res = pprof_free_profile(&pprofs);
+  res = pprof_free_profile(&pprof);
   EXPECT_TRUE(IsDDResOK(res));
 }
 
