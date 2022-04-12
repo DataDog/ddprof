@@ -16,6 +16,7 @@
 #include <unistd.h>
 
 #include "ddres_helpers.h"
+#include "perf_archmap.h"
 
 int arg_which(const char *str, char const *const *set, int sz_set) {
   if (!str || !set)
@@ -79,13 +80,15 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
   return true;
 }
 
+#define R(x) REGNAME(x)
 #ifdef __x86_64__
-int arg2reg[] = {-1, 5, 4, 3, 2, 16, 17}; // 1-indexed, so pad
+int arg2reg[] = {-1, R(RDI), R(RSI), R(RDX), R(RCX), R(R8), R(R9)};
 #elif __aarch64__
-int arg2reg[] = {-1, 0, 1, 2, 3, 4, 5, 6};
+int arg2reg[] = {-1, R(0), R(1), R(2), R(3), R(4), R(5), R(6)};
 #else
 #  error Your architecture is not supported
 #endif
+#undef R
 uint8_t get_register(const char *str) {
   uint8_t reg = 0;
   char *str_copy = (char *)str;

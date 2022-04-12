@@ -14,7 +14,7 @@
 
 uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
 
-#define X_STR(a, b, c, d) #b,
+#define X_STR(a, b, c, d) b,
 const char *profile_name_from_idx(int idx) {
   static const char *sample_names[] = {PROFILE_TYPE_TABLE(X_STR)};
   if (idx < 0 || idx >= DDPROF_PWT_LENGTH)

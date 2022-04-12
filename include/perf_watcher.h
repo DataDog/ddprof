@@ -43,10 +43,10 @@ typedef struct PerfWatcher {
 // The last column is a dependent type which is always aggregated as a count
 // whenever the main type is aggregated.
 #define PROFILE_TYPE_TABLE(X)                                                  \
-  X(NOCOUNT, nocount, nocount, NOCOUNT)                                        \
-  X(TRACEPOINT, tracepoint, events, NOCOUNT)                                   \
-  X(CPU_NANOS, cpu - time, nanoseconds, CPU_SAMPLE)                            \
-  X(CPU_SAMPLE, cpu - sample, count, NOCOUNT)
+  X(NOCOUNT, "nocount", nocount, NOCOUNT)                                        \
+  X(TRACEPOINT, "tracepoint", events, NOCOUNT)                                   \
+  X(CPU_NANOS, "cpu-time", nanoseconds, CPU_SAMPLE)                            \
+  X(CPU_SAMPLE, "cpu-sample", count, NOCOUNT)
 
 #define X_ENUM(a, b, c, d) DDPROF_PWT_##a,
 typedef enum DDPROF_SAMPLE_TYPES {
