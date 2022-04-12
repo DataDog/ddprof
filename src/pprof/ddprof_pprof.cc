@@ -38,36 +38,70 @@ static ddprof_ffi_Slice_c_char ffi_empty_char_slice(void) {
   return (struct ddprof_ffi_Slice_c_char){.ptr = (NULL), .len = 0};
 }
 
-DDRes pprof_create_profile(DDProfPProf *pprof, unsigned type_default,
-    int64_t periodfreq_default) {
-  // Add all the defined profile types (perf_watcher.h), skipping the first
+DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
+  // Figure out which sample_type_ids are used by active watchers
+  const PerfWatcher *watchers = ctx->watchers;
+  size_t num_watchers = ctx->num_watchers;
+  bool active_ids[DDPROF_PWT_LENGTH] = {};
   struct ddprof_ffi_ValueType perf_value_type[DDPROF_PWT_LENGTH];
-  unsigned num_profiles = 0;
+  for (unsigned i = 0; i < num_watchers; ++i) {
+    int this_id = watchers[i].sample_type_id;
+    if (this_id < 0 || this_id == DDPROF_PWT_NOCOUNT || this_id >= DDPROF_PWT_LENGTH) {
+      LG_WRN("Watcher \"%s\" (%d) has invalid sample_type_id %d, ignoring",
+          watchers[i].desc, i, this_id);
+      continue;
+    }
+    active_ids[watchers[i].sample_type_id] = true;
+  }
+
+  // Now that we have all of the sample ids, we populate the sample_type_id 
+  // permutation vector. This allows the exporter to take the absolute sample ID 
+  // and convert it into the index of the pprof.
+  memset(ctx->sample_type_pv, 0, sizeof(*ctx->sample_type_pv)*DDPROF_PWT_LENGTH);
+  unsigned num_sample_type_ids = 0;
   for (unsigned i = 0; i < DDPROF_PWT_LENGTH; ++i) {
-    // skip unused
-    if (i == DDPROF_PWT_NOCOUNT)
+    if (!active_ids[i])
       continue;
     const char *value_name = profile_name_from_idx(i);
     const char *value_unit = profile_unit_from_idx(i);
     if (!value_name || !value_unit) {
-      LG_WRN("Malformed sample type (%d)", i);
+      LG_WRN("Malformed sample type (%d), ignoring", i);
       continue;
     }
-    perf_value_type[num_profiles].type_ = (ddprof_ffi_Slice_c_char) {
+    ctx->sample_type_pv[i] = num_sample_type_ids;
+    perf_value_type[num_sample_type_ids].type_ = (ddprof_ffi_Slice_c_char) {
       .ptr = value_name,
       .len = strlen(value_name)};
-    perf_value_type[num_profiles].unit = (ddprof_ffi_Slice_c_char) {
+    perf_value_type[num_sample_type_ids].unit = (ddprof_ffi_Slice_c_char) {
       .ptr = value_unit,
       .len = strlen(value_unit)};
-    ++num_profiles;
+    ++num_sample_type_ids;
   }
 
-  pprof->_nb_values = num_profiles;
+  // If none of the samples were good, that's an error
+  if (!num_sample_type_ids) {
+    // We use the phrase "profile type" in the error, since this is more
+    // obvious for customers.
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "No valid profile types given");
+  }
+
+  pprof->_nb_values = num_sample_type_ids;
   struct ddprof_ffi_Slice_value_type sample_types = {.ptr = perf_value_type,
                                                      .len = pprof->_nb_values};
+
+  // To populate the defaults, we take the period/frequency of the first watcher
+  // with the first valid sample_type_id.  The checks above ensure we have one
+  // such watcher.
+  int64_t periodfreq_default = 0;
+  for (unsigned i = 0; i < num_watchers; ++i) {
+    if (ctx->sample_type_pv[0] == watchers[i].sample_type_id) {
+      periodfreq_default = watchers[i].sample_period;
+      break;
+    }
+  }
   struct ddprof_ffi_Period period = {
-    .type_ = perf_value_type[type_default],
-    .value = periodfreq_default
+    .type_ = perf_value_type[0],
+    .value = periodfreq_default,
   };
 
   pprof->_profile = ddprof_ffi_Profile_new(sample_types, &period);
@@ -123,16 +157,16 @@ static void write_line(const ddprof::Symbol &symbol,
 // Assumption of API is that sample is valid in a single type
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr *symbol_hdr, uint64_t value,
-                      const PerfWatcher *watcher, DDProfPProf *pprof) {
+                      const PerfWatcher *watcher, const int* sample_type_pv, DDProfPProf *pprof) {
 
   const ddprof::SymbolTable &symbol_table = symbol_hdr->_symbol_table;
   const ddprof::MapInfoTable &mapinfo_table = symbol_hdr->_mapinfo_table;
   ddprof_ffi_Profile *profile = pprof->_profile;
 
   int64_t values[DDPROF_PWT_LENGTH] = {0};
-  values[watcher->sample_type_id] = value;
+  values[sample_type_pv[watcher->sample_type_id]] = value;
   if (watcher_has_countable_sample_type(watcher))
-    values[watcher_to_count_id(watcher)] = 1;
+    values[sample_type_pv[watcher_to_count_id(watcher)]] = 1;
 
   ddprof_ffi_Location locations_buff[DD_MAX_STACK_DEPTH];
   // assumption of single line per loc for now
