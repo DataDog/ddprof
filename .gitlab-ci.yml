@@ -1,4 +1,5 @@
 
+
 # Triggers a build within the Datadog infrastructure in the ddprof-build repository
 trigger_internal_build:
   variables:
@@ -6,6 +7,8 @@ trigger_internal_build:
     DDPROF_COMMIT_BRANCH: ${CI_COMMIT_BRANCH}
     DDPROF_COMMIT_SHA: ${CI_COMMIT_SHA}
     DDPROF_SHORT_COMMIT_SHA: ${CI_COMMIT_SHORT_SHA}
+    # Reliability environment downstream branch
+    DDPROF_RELENV_BRANCH: master
   trigger:
     project: DataDog/ddprof-build
     strategy: depend

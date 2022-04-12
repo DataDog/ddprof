@@ -14,7 +14,10 @@ typedef struct DDProfInput DDProfInput;
 typedef struct DDProfContext DDProfContext;
 
 // Setup perf event open according to watchers
-DDRes ddprof_setup(DDProfContext *ctx, pid_t pid);
+DDRes ddprof_setup(DDProfContext *ctx);
+
+// Free perf event resources
+DDRes ddprof_teardown(DDProfContext *ctx);
 
 #ifndef DDPROF_NATIVE_LIB
 /*************************  Instrumentation Helpers  **************************/

@@ -3,17 +3,15 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include "ipc.h"
+#include "ipc.hpp"
 
+#include <cstdlib>
 #include <fcntl.h>
+#include <string>
 #include <sys/socket.h>
 #include <unistd.h>
-}
-#include <cstdlib>
 
 #include <gtest/gtest.h>
-#include <string>
 
 static const int kParentIdx = 0;
 static const int kChildIdx = 1;
@@ -30,35 +28,78 @@ TEST(IPCTest, Positive) {
   if (!child_pid) {
     // I am the child, close parent socket (dupe)
     close(sockets[kParentIdx]);
+    ddprof::UnixSocket socket(sockets[kChildIdx]);
     // delete files if it exists
     unlink(fileName.c_str());
     int fileFd = open(fileName.c_str(), O_CREAT | O_RDWR, 0600);
     // Send something from child
     size_t writeRet = write(fileFd, payload.c_str(), payload.size());
     EXPECT_GT(writeRet, 0);
-    EXPECT_TRUE(fileFd != -1);
-    EXPECT_TRUE(sendfd(sockets[kChildIdx], &fileFd, 1));
+    EXPECT_NE(fileFd, -1);
+    std::byte dummy{1};
+    std::error_code ec;
+    EXPECT_EQ(socket.send({&dummy, 1}, {&fileFd, 1}, ec), 1);
+    EXPECT_FALSE(ec);
     close(sockets[kChildIdx]);
     close(fileFd);
     return;
   } else {
     // I am a parent
     close(sockets[kChildIdx]);
-    int size = 0;
-    int *fileDescr;
-    fileDescr = getfd(sockets[kParentIdx], &size);
-    EXPECT_EQ(size, 1);
-    EXPECT_TRUE(fcntl(fileDescr[0], F_GETFD, 0) != -1);
+    ddprof::UnixSocket socket(sockets[kParentIdx]);
+    int fd;
+    std::byte buf[32];
+    std::error_code ec;
+    auto res = socket.receive(buf, {&fd, 1}, ec);
+    EXPECT_FALSE(ec);
+    EXPECT_EQ(res.first, 1);
+    EXPECT_EQ(res.second, 1);
+    EXPECT_NE(fcntl(fd, F_GETFD, 0), -1);
     // reset the cursor
-    lseek(fileDescr[0], 0, SEEK_SET);
+    lseek(fd, 0, SEEK_SET);
     char *buffer = (char *)malloc(payload.size());
-    int readRet = read(fileDescr[0], buffer, payload.size());
+    int readRet = read(fd, buffer, payload.size());
     EXPECT_TRUE(readRet > 0);
     // Check it in the parent
-    EXPECT_TRUE(memcmp(payload.c_str(), buffer, payload.size()) == 0);
+    EXPECT_EQ(memcmp(payload.c_str(), buffer, payload.size()), 0);
     close(sockets[kParentIdx]);
     free(buffer);
-    close(fileDescr[0]);
-    free(fileDescr);
+    close(fd);
+  }
+}
+
+TEST(IPCTest, timeout) {
+  int sockets[2] = {-1, -1};
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_DGRAM, 0, sockets), 0);
+  ddprof::UnixSocket sock1(sockets[0]);
+  ddprof::UnixSocket sock2(sockets[1]);
+  std::error_code ec;
+
+  auto timeout = std::chrono::milliseconds{10};
+  {
+    sock2.set_read_timeout(timeout, ec);
+    ASSERT_FALSE(ec);
+    std::byte buffer[32];
+
+    auto t0 = std::chrono::steady_clock::now();
+    ASSERT_EQ(sock2.receive(buffer, ec), 0);
+    auto d = std::chrono::steady_clock::now() - t0;
+    ASSERT_GE(d, timeout);
+    ASSERT_TRUE(ec);
+  }
+
+  sock1.set_write_timeout(timeout, ec);
+  ASSERT_FALSE(ec);
+  while (true) {
+    // fill up send queue
+    std::byte buffer[1024];
+    auto t0 = std::chrono::steady_clock::now();
+    auto r = sock1.send(buffer, ec);
+    auto d = std::chrono::steady_clock::now() - t0;
+    if (ec) {
+      ASSERT_GE(d, timeout);
+      break;
+    }
+    ASSERT_EQ(r, sizeof(buffer));
   }
 }

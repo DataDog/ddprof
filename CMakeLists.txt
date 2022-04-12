@@ -167,26 +167,33 @@ add_custom_command(OUTPUT ${DDPROF_EXE_OBJECT}
   DEPENDS ddprof
 )
 
-set(DD_PROFILING_SOURCES src/lib/dd_profiling.cc src/ddprof_cmdline.c src/perf_watcher.c src/logger.c src/logger_setup.cc $<TARGET_OBJECTS:ddprof_exe_object>)
+set(DD_PROFILING_SOURCES src/lib/dd_profiling.cc src/ddprof_cmdline.c src/logger.c src/logger_setup.cc src/ipc.cc src/perf_watcher.c
+                         $<TARGET_OBJECTS:ddprof_exe_object>)
 add_library(ddprof_exe_object OBJECT IMPORTED GLOBAL)
 set_target_properties(ddprof_exe_object PROPERTIES IMPORTED_OBJECTS "${DDPROF_EXE_OBJECT}")
 
 add_library(dd_profiling-static STATIC ${DD_PROFILING_SOURCES})
 set_target_properties(dd_profiling-static PROPERTIES OUTPUT_NAME dd_profiling)
-target_include_directories(dd_profiling-static PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(dd_profiling-static PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
 set_target_properties(dd_profiling-static PROPERTIES
    PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
 
 add_library(dd_profiling-shared SHARED ${DD_PROFILING_SOURCES})
 set_target_properties(dd_profiling-shared PROPERTIES OUTPUT_NAME dd_profiling)
-target_include_directories(dd_profiling-shared PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include)
-set_target_properties(dd_profiling-shared PROPERTIES
+target_include_directories(dd_profiling-shared PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
+set_target_properties(dd_profiling-static PROPERTIES
    PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
-   
+
 # Link libstdc++/libgcc statically and export only profiler API
 static_link_cxx(TARGET dd_profiling-shared)
 set_target_properties(dd_profiling-shared PROPERTIES LINK_DEPENDS "${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")
 target_link_options(dd_profiling-shared PRIVATE "LINKER:--version-script=${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")
+# Fix for link error in sanitizeddebug build mode with gcc:
+# /usr/bin/ld: ./libdd_profiling.so: undefined reference to `__dynamic_cast'
+# /usr/bin/ld: ./libdd_profiling.so: undefined reference to `typeinfo for __cxxabiv1::__vmi_class_type_info'
+# The cause of the error is that gcc puts `-lstdc++` before `-lubsan` in the linker invocation
+# Workaround is add another `-lstdc++` after `-lubsan` at the end, we cannot use `-static-libstdc++` because it does not force gcc to another `-lstdc++` at the end
+target_link_libraries(dd_profiling-shared PRIVATE "$<$<AND:$<C_COMPILER_ID:GNU>,$<CONFIG:SanitizedDebug>>:-Wl,-Bstatic;-lubsan;-lstdc++;-Wl,-Bdynamic>")
 
 install(TARGETS ddprof dd_profiling-static dd_profiling-shared
         RUNTIME DESTINATION ddprof/bin

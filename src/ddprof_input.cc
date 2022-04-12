@@ -135,6 +135,7 @@ const char* help_str[DD_KLEN] = {
   [DD_PROFILING_INTERNAL_STATS] = 
   "    Enables statsd metrics for " MYNAME ". Value should point to a statsd socket.\n"
   "    Example: /var/run/datadog-agent/statsd.sock\n",
+  [DD_PROFILING_NATIVE_SOCKET] = STR_UNDF,
 };
 // clang-format on
 

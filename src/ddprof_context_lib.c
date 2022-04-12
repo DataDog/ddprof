@@ -11,7 +11,9 @@
 #include "logger.h"
 #include "logger_setup.h"
 
+#include <errno.h>
 #include <sys/sysinfo.h>
+#include <unistd.h>
 
 /****************************  Argument Processor  ***************************/
 DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
@@ -33,7 +35,6 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   DDRES_CHECK_FWD(exporter_input_copy(&input->exp_input, &ctx->exp_input));
 
   // Set defaults
-  ctx->params.enable = true;
   ctx->params.upload_period = 60.0;
 
   // Process enable.  Note that we want the effect to hit an inner profile.
@@ -45,7 +46,9 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     setenv("DD_PROFILING_ENABLED", "false", true);
 
   // Process native profiler enablement override
-  ctx->params.enable = !arg_yesno(input->native_enable, 0);
+  if (input->native_enable) {
+    ctx->params.enable = arg_yesno(input->native_enable, 1);
+  }
 
   // Process enablement for agent mode
   ctx->exp_input.agentless = arg_yesno(input->agentless, 1); // default no
@@ -197,6 +200,19 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
                profile_name_from_idx(ctx->watchers[i].profile_id));
     }
   }
+
+  ctx->params.sockfd = -1;
+  ctx->params.wait_on_socket = false;
+  if (input->socket && strlen(input->socket) > 0) {
+    char *endptr;
+    int res = strtoul(input->socket, &endptr, 10);
+    // checking that stroul actually succeeded is a pain
+    if (*endptr == '\0' && (res != ULONG_MAX || errno != ERANGE)) {
+      ctx->params.sockfd = res;
+      ctx->params.wait_on_socket = true;
+    }
+  }
+
   ctx->initialized = true;
   return ddres_init();
 }
@@ -206,6 +222,9 @@ void ddprof_context_free(DDProfContext *ctx) {
     exporter_input_free(&ctx->exp_input);
     free((char *)ctx->params.internal_stats);
     free((char *)ctx->params.tags);
-    memset(ctx, 0, sizeof(*ctx)); // also sets ctx->initialized = false;
+    memset(ctx, 0, sizeof(*ctx)); // also sets ctx->initialized to false
+    if (ctx->params.sockfd != -1) {
+      close(ctx->params.sockfd);
+    }
   }
 }

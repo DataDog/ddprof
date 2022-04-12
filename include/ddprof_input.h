@@ -5,12 +5,13 @@
 
 #pragma once
 
+#include "ddprof_defs.h"
+#include "ddres_def.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "ddprof_defs.h"
-#include "ddres_def.h"
 #include "exporter_input.h"
 #include "perf_watcher.h"
 
@@ -38,6 +39,7 @@ typedef struct DDProfInput {
   char *internal_stats;
   char *tags;
   char *url;
+  char *socket;
   // Watcher presets
   PerfWatcher watchers[MAX_TYPE_WATCHER];
   int num_watchers;
@@ -86,7 +88,7 @@ typedef struct DDProfInput {
   XX(DD_PROFILING_AGENTLESS,            agentless,          L, 'L', 1, input, NULL, "",                     )  \
   XX(DD_TAGS,                           tags,               T, 'T', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_ENABLED,              enable,             d, 'd', 1, input, NULL, "yes", )                   \
-  XX(DD_PROFILING_NATIVE_ENABLED,       native_enable,      n, 'n', 1, input, NULL, "yes", )                   \
+  XX(DD_PROFILING_NATIVE_ENABLED,       native_enable,      n, 'n', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_UPLOAD_PERIOD,        upload_period,      u, 'u', 1, input, NULL, "59", )                    \
   XX(DD_PROFILING_NATIVE_WORKER_PERIOD, worker_period,      w, 'w', 1, input, NULL, "240", )                   \
   XX(DD_PROFILING_NATIVE_FAULT_INFO,    fault_info,         s, 's', 1, input, NULL, "yes", )                   \
@@ -97,7 +99,8 @@ typedef struct DDProfInput {
   XX(DD_PROFILING_NATIVE_LOG_LEVEL,     log_level,          l, 'l', 1, input, NULL, "error", )                 \
   XX(DD_PROFILING_NATIVE_TARGET_PID,    pid,                p, 'p', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_NATIVE_GLOBAL,        global,             g, 'g', 1, input, NULL, "", )                      \
-  XX(DD_PROFILING_INTERNAL_STATS,       internal_stats,     b, 'b', 1, input, NULL, "", )
+  XX(DD_PROFILING_INTERNAL_STATS,       internal_stats,     b, 'b', 1, input, NULL, "", )                      \
+  XX(DD_PROFILING_NATIVE_SOCKET,        socket,             Z, 'Z', 1, input, NULL, "", )
 // clang-format on
 
 #define X_ENUM(a, b, c, d, e, f, g, h, i) a,

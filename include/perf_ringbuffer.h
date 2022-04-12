@@ -14,7 +14,6 @@ typedef struct RingBuffer {
   size_t meta_size; // size of the metadata page
   size_t size;      // size of the entire region, including metadata
   struct perf_event_mmap_page *region;
-  size_t reg_size;
   unsigned char *wrbuf;
 } RingBuffer;
 

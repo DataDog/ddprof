@@ -26,6 +26,31 @@ private:
 };
 } // namespace ddprof
 
+#define DDRES_THROW_EXCEPTION(what, ...)                                       \
+  do {                                                                         \
+    LG_ERR(__VA_ARGS__);                                                       \
+    LOG_ERROR_DETAILS(LG_ERR, what);                                           \
+    throw ddprof::DDException(ddres_error(what));                              \
+  } while (0)
+
+#define DDRES_CHECK_THROW_EXCEPTION(ddres)                                     \
+  do {                                                                         \
+    DDRes lddres = ddres; /* single eval */                                    \
+    if (IsDDResNotOK(lddres)) {                                                \
+      if (IsDDResFatal(lddres)) {                                              \
+        LG_ERR("Forward error at %s:%u - %s", __FILE__, __LINE__,              \
+               ddres_error_message(lddres._what));                             \
+        throw ddprof::DDException(lddres);                                     \
+      } else if (lddres._sev == DD_SEVWARN) {                                  \
+        LG_WRN("Recover from sev=%d at %s:%u - %s", lddres._sev, __FILE__,     \
+               __LINE__, ddres_error_message(lddres._what));                   \
+      } else {                                                                 \
+        LG_NTC("Recover from sev=%d at %s:%u - %s", lddres._sev, __FILE__,     \
+               __LINE__, ddres_error_message(lddres._what));                   \
+      }                                                                        \
+    }                                                                          \
+  } while (0)
+
 /// Catch exceptions and give info when possible
 #define CatchExcept2DDRes()                                                    \
   catch (const ddprof::DDException &e) {                                       \

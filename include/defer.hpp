@@ -21,9 +21,12 @@ public:
   template <typename T>
   explicit DeferHolder(T &&f) : _func(std::forward<T>(f)) {}
 
-  ~DeferHolder() {
+  ~DeferHolder() { reset(); }
+
+  void reset() {
     if (_active) {
       _func();
+      _active = false;
     }
   }
 
