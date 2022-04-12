@@ -84,7 +84,7 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
 #ifdef __x86_64__
 int arg2reg[] = {-1, R(RDI), R(RSI), R(RDX), R(RCX), R(R8), R(R9)};
 #elif __aarch64__
-int arg2reg[] = {-1, R(0), R(1), R(2), R(3), R(4), R(5), R(6)};
+int arg2reg[] = {-1, R(X0), R(X1), R(X2), R(X3), R(X4), R(X5), R(X6)};
 #else
 #  error Your architecture is not supported
 #endif
