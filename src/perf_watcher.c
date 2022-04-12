@@ -52,6 +52,7 @@ bool is_countable_type(int idx) {
 #define X_EVENTS(a, b, c, d, e, f, g) {b, BASE_STYPES, c, d, e, f, BITS2OPT(g)},
 const PerfWatcher events_templates[] = {EVENT_CONFIG_TABLE(X_EVENTS)};
 const PerfWatcher tracepoint_templates[] = {{
+    .desc = "Tracepoint",
     .type = PERF_TYPE_TRACEPOINT,
     .sample_period = 1,
     .sample_type = BASE_STYPES,
@@ -96,4 +97,8 @@ const PerfWatcher *ewatcher_from_str(const char *str) {
 const PerfWatcher *twatcher_default() {
   // Only the one (for now?!)
   return &tracepoint_templates[0];
+}
+
+bool watcher_is_tracepoint(const PerfWatcher *watcher) {
+  return DDPROF_PWT_TRACEPOINT == watcher->profile_id;
 }

@@ -172,7 +172,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     labels[labels_num].str = (struct ddprof_ffi_Slice_c_char){.ptr = tid_str, .len = sz};
     ++labels_num;
   }
-  if (watcher->type == PERF_TYPE_TRACEPOINT) {
+  if (watcher_is_tracepoint(watcher)) {
     // This adds only the trace name.  Maybe we should have group + tracenames?
     labels[labels_num].key = (struct ddprof_ffi_Slice_c_char){.ptr = tracepoint_key, .len = sizeof(tracepoint_key) - 1};
     labels[labels_num].str = (struct ddprof_ffi_Slice_c_char){.ptr = watcher->tracepoint_name, .len = strlen(watcher->tracepoint_name)};

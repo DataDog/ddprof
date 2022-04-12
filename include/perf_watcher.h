@@ -98,6 +98,7 @@ typedef enum DDPROF_EVENT_NAMES {
 const PerfWatcher *ewatcher_from_idx(int idx);
 const PerfWatcher *ewatcher_from_str(const char *str);
 const PerfWatcher *twatcher_default();
+bool watcher_is_tracepoint(const PerfWatcher *watcher);
 
 // Helper functions for profile types
 const char *profile_name_from_idx(int idx);
