@@ -31,18 +31,17 @@ const char *profile_unit_from_idx(int idx) {
 }
 #undef X_STR
 #define X_DEP(a, b, c, d) DDPROF_PWT_##d,
-int get_count_type_from_idx(int idx) {
+int watcher_to_count_id(const PerfWatcher *watcher) {
   static const int count_id[] = {PROFILE_TYPE_TABLE(X_DEP)};
+  int idx = watcher->sample_type_id;
   if (idx < 0 || idx >= DDPROF_PWT_LENGTH)
-    return -1;
+    return DDPROF_PWT_NOCOUNT;
   return count_id[idx];
 }
 #undef X_DEP
 
-bool is_countable_type(int idx) {
-  if (idx < 0 || idx >= DDPROF_PWT_LENGTH)
-    return false;
-  return DDPROF_PWT_NOCOUNT != get_count_type_from_idx(idx);
+bool watcher_has_countable_sample_type(const PerfWatcher *watcher) {
+  return DDPROF_PWT_NOCOUNT != watcher_to_count_id(watcher);
 }
 
 #define BITS2OPT(b)                                                            \
@@ -56,7 +55,7 @@ const PerfWatcher tracepoint_templates[] = {{
     .type = PERF_TYPE_TRACEPOINT,
     .sample_period = 1,
     .sample_type = BASE_STYPES,
-    .profile_id = DDPROF_PWT_TRACEPOINT,
+    .sample_type_id = DDPROF_PWT_TRACEPOINT,
     .options = {.is_kernel = true},
 }};
 #undef X_PWATCH
@@ -99,6 +98,6 @@ const PerfWatcher *twatcher_default() {
   return &tracepoint_templates[0];
 }
 
-bool watcher_is_tracepoint(const PerfWatcher *watcher) {
-  return DDPROF_PWT_TRACEPOINT == watcher->profile_id;
+bool watcher_has_tracepoint(const PerfWatcher *watcher) {
+  return DDPROF_PWT_TRACEPOINT == watcher->sample_type_id;
 }

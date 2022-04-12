@@ -73,7 +73,7 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
   // registered as a tracepoint profile.  Make sure it has a valid name for the
   // label
   static const char event_groupname[] = "custom_events";
-  if (watcher->profile_id == DDPROF_PWT_TRACEPOINT) {
+  if (watcher->sample_type_id == DDPROF_PWT_TRACEPOINT) {
     watcher->tracepoint_name = watcher->desc;
     watcher->tracepoint_group = event_groupname;
   }

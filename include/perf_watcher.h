@@ -23,10 +23,9 @@ typedef struct PerfWatcher {
     uint64_t sample_period;
     uint64_t sample_frequency;
   };
-  int profile_id;
+  int sample_type_id;
   // perf_event_open configs
   struct PerfWatcherOptions options;
-  int count_id;
   // tracepoint configuration
   uint8_t reg;
   uint8_t trace_off;
@@ -98,12 +97,13 @@ typedef enum DDPROF_EVENT_NAMES {
 const PerfWatcher *ewatcher_from_idx(int idx);
 const PerfWatcher *ewatcher_from_str(const char *str);
 const PerfWatcher *twatcher_default();
-bool watcher_is_tracepoint(const PerfWatcher *watcher);
+bool watcher_has_countable_sample_type(const PerfWatcher *watcher);
+bool watcher_has_tracepoint(const PerfWatcher *watcher);
+int watcher_to_count_id(const PerfWatcher *watcher);
 
 // Helper functions for profile types
 const char *profile_name_from_idx(int idx);
 const char *profile_unit_from_idx(int idx);
-bool is_countable_type(int idx);
 
 // Helper functions, mostly for tests
 uint64_t perf_event_default_sample_type();
