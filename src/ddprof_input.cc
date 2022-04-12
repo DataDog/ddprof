@@ -154,10 +154,12 @@ static void ddprof_input_default_events(DDProfInput *input) {
     }
 
     const char *event = event_str.c_str();
-    if (watcher_from_event(event, &input->watchers[input->num_watchers])) {
-      ++input->num_watchers;
+    PerfWatcher *watcher = &input->watchers[input->num_watchers];
+    if (!watcher_from_event(event, watcher) &&
+        !watcher_from_tracepoint(event, watcher)) {
+      LG_WRN("Ignoring invalid event/tracepoint (%s)", optarg);
     } else {
-      LG_WRN("Ignoring invalid event (%s)", event);
+      ++input->num_watchers;
     }
   }
 }
@@ -204,7 +206,6 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
   int c = 0, oi = 0;
   *continue_exec = true;
   struct option lopts[] = {OPT_TABLE(X_LOPT){"event", 1, 0, 'e'},
-                           {"tracepoint", 1, 0, 't'},
                            {"help", 0, 0, 'h'},
                            {"version", 0, 0, 'v'},
                            // Last element should be filled with 0s
@@ -226,21 +227,17 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
   while (-1 != (c = getopt_long(argc, argv, opt_short, lopts, &oi))) {
     switch (c) {
       OPT_TABLE(X_CASE)
-    case 't':
     case 'e': {
       if (!optarg || !*optarg)
         continue;
 
-      bool (*process_fun)(const char *str, PerfWatcher *watcher);
-      process_fun = &watcher_from_event;
-      // Override handler if tracepoint
-      if (c == 't')
-        process_fun = &watcher_from_tracepoint;
-
-      if (!process_fun(optarg, &input->watchers[input->num_watchers]))
+      PerfWatcher *watcher = &input->watchers[input->num_watchers];
+      if (!watcher_from_event(optarg, watcher) &&
+          !watcher_from_tracepoint(optarg, watcher)) {
         LG_WRN("Ignoring invalid event/tracepoint (%s)", optarg);
-      else
+      } else {
         ++input->num_watchers;
+      }
       break;
     }
     case 'h': {
