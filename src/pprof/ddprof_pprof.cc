@@ -40,24 +40,29 @@ static ddprof_ffi_Slice_c_char ffi_empty_char_slice(void) {
 
 DDRes pprof_create_profile(DDProfPProf *pprof, unsigned type_default,
     int64_t periodfreq_default) {
-  // Add all the defined profile types (perf_watcher.h)
+  // Add all the defined profile types (perf_watcher.h), skipping the first
   struct ddprof_ffi_ValueType perf_value_type[DDPROF_PWT_LENGTH];
+  unsigned num_profiles = 0;
   for (unsigned i = 0; i < DDPROF_PWT_LENGTH; ++i) {
+    // skip unused
+    if (i == DDPROF_PWT_NOCOUNT)
+      continue;
     const char *value_name = profile_name_from_idx(i);
     const char *value_unit = profile_unit_from_idx(i);
     if (!value_name || !value_unit) {
       LG_WRN("Malformed sample type (%d)", i);
       continue;
     }
-    perf_value_type[i].type_ = (ddprof_ffi_Slice_c_char) {
+    perf_value_type[num_profiles].type_ = (ddprof_ffi_Slice_c_char) {
       .ptr = value_name,
       .len = strlen(value_name)};
-    perf_value_type[i].unit = (ddprof_ffi_Slice_c_char) {
+    perf_value_type[num_profiles].unit = (ddprof_ffi_Slice_c_char) {
       .ptr = value_unit,
       .len = strlen(value_unit)};
+    ++num_profiles;
   }
 
-  pprof->_nb_values = DDPROF_PWT_LENGTH;
+  pprof->_nb_values = num_profiles;
   struct ddprof_ffi_Slice_value_type sample_types = {.ptr = perf_value_type,
                                                      .len = pprof->_nb_values};
   struct ddprof_ffi_Period period = {
