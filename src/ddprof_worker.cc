@@ -176,8 +176,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
     DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr,
-                                    sample->period, watcher,
-                                    ctx->sample_type_pv, pprof));
+                                    sample->period, watcher, pprof));
 #else
     // Call the user's stack handler
     if (ctx->stack_handler) {
@@ -398,9 +397,6 @@ DDRes ddprof_worker_init(DDProfContext *ctx) {
     DDRES_CHECK_FWD(
         ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[1]));
 
-    // The export profiles non-optionally have the default SampleType of
-    // cpu-time. This should maybe change when we have more than one
-    // customer-facing type.
     DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[0], ctx));
     DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[1], ctx));
   }

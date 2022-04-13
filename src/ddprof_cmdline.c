@@ -17,6 +17,7 @@
 
 #include "ddres_helpers.h"
 #include "perf_archmap.h"
+#include "perf_watcher.h"
 
 int arg_which(const char *str, char const *const *set, int sz_set) {
   if (!str || !set)

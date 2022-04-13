@@ -198,7 +198,7 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     for (int i = 0; i < ctx->num_watchers; i++) {
       LG_PRINT("    ID: %s, Pos: %d, Index: %lu, Label: %s",
                ctx->watchers[i].desc, i, ctx->watchers[i].config,
-               profile_name_from_idx(ctx->watchers[i].sample_type_id));
+               sample_type_name_from_idx(ctx->watchers[i].sample_type_id));
     }
   }
 

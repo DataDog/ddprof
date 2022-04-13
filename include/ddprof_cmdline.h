@@ -9,7 +9,7 @@
 #include <stddef.h> // size_t
 #include <stdint.h> // uint64_t
 
-#include "perf_watcher.h"
+typedef struct PerfWatcher PerfWatcher;
 
 /**************************** Cmdline Helpers *********************************/
 // Helper functions for processing commandline arguments.

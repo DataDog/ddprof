@@ -15,7 +15,7 @@
 uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
 
 #define X_STR(a, b, c, d) b,
-const char *profile_name_from_idx(int idx) {
+const char *sample_type_name_from_idx(int idx) {
   static const char *sample_names[] = {PROFILE_TYPE_TABLE(X_STR)};
   if (idx < 0 || idx >= DDPROF_PWT_LENGTH)
     return NULL;
@@ -23,7 +23,7 @@ const char *profile_name_from_idx(int idx) {
 }
 #undef X_STR
 #define X_STR(a, b, c, d) #c,
-const char *profile_unit_from_idx(int idx) {
+const char *sample_type_unit_from_idx(int idx) {
   static const char *sample_units[] = {PROFILE_TYPE_TABLE(X_STR)};
   if (idx < 0 || idx >= DDPROF_PWT_LENGTH)
     return NULL;
@@ -31,14 +31,18 @@ const char *profile_unit_from_idx(int idx) {
 }
 #undef X_STR
 #define X_DEP(a, b, c, d) DDPROF_PWT_##d,
-int watcher_to_count_sample_type_id(const PerfWatcher *watcher) {
+int sample_type_id_to_count_sample_type_id(int idx) {
   static const int count_ids[] = {PROFILE_TYPE_TABLE(X_DEP)};
-  int idx = watcher->sample_type_id;
   if (idx < 0 || idx >= DDPROF_PWT_LENGTH)
     return DDPROF_PWT_NOCOUNT;
   return count_ids[idx];
 }
 #undef X_DEP
+
+int watcher_to_count_sample_type_id(const PerfWatcher *watcher) {
+  int idx = watcher->sample_type_id;
+  return sample_type_id_to_count_sample_type_id(idx);
+}
 
 bool watcher_has_countable_sample_type(const PerfWatcher *watcher) {
   return DDPROF_PWT_NOCOUNT != watcher_to_count_sample_type_id(watcher);

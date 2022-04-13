@@ -117,5 +117,4 @@ void *perfown_sz(int fd, size_t size_of_buffer);
 void *perfown(int fd, size_t *size);
 int perfdisown(void *region, size_t size);
 long get_page_size(void);
-uint64_t get_sample_type(const PerfWatcher *watcher);
 size_t get_mask_from_size(size_t size);

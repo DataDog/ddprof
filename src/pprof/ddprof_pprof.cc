@@ -39,43 +39,68 @@ static ddprof_ffi_Slice_c_char ffi_empty_char_slice(void) {
 }
 
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
-  // Figure out which sample_type_ids are used by active watchers
-  const PerfWatcher *watchers = ctx->watchers;
+  PerfWatcher *watchers = ctx->watchers;
   size_t num_watchers = ctx->num_watchers;
-  bool active_ids[DDPROF_PWT_LENGTH] = {};
   struct ddprof_ffi_ValueType perf_value_type[DDPROF_PWT_LENGTH];
+
+  // Figure out which sample_type_ids are used by active watchers
+  // We also record the watcher with the lowest valid sample_type id, since that
+  // will serve as the default for the pprof
+  bool active_ids[DDPROF_PWT_LENGTH] = {};
+  PerfWatcher *default_watcher = &watchers[0];
   for (unsigned i = 0; i < num_watchers; ++i) {
     int this_id = watchers[i].sample_type_id;
+    int count_id = sample_type_id_to_count_sample_type_id(this_id);
     if (this_id < 0 || this_id == DDPROF_PWT_NOCOUNT || this_id >= DDPROF_PWT_LENGTH) {
       LG_WRN("Watcher \"%s\" (%d) has invalid sample_type_id %d, ignoring",
           watchers[i].desc, i, this_id);
       continue;
     }
-    active_ids[watchers[i].sample_type_id] = true;
+
+    if (this_id <= default_watcher->sample_type_id) // update default
+      default_watcher = &watchers[i];
+    active_ids[this_id] = true; // update mask
+    if (count_id != DDPROF_PWT_NOCOUNT)
+      active_ids[count_id] = true; // if the count is valid, update mask for it
   }
 
-  // Now that we have all of the sample ids, we populate the sample_type_id 
-  // permutation vector. This allows the exporter to take the absolute sample ID 
-  // and convert it into the index of the pprof.
-  memset(ctx->sample_type_pv, 0, sizeof(*ctx->sample_type_pv)*DDPROF_PWT_LENGTH);
-  unsigned num_sample_type_ids = 0;
-  for (unsigned i = 0; i < DDPROF_PWT_LENGTH; ++i) {
+  // Convert the mask into a lookup.  While we're at it, populate the metadata
+  // for the pprof
+  int pv[DDPROF_PWT_LENGTH];
+  int num_sample_type_ids = 0;
+  memset(pv, 0, sizeof(pv));
+  for (int i = 0; i < DDPROF_PWT_LENGTH; ++i) {
     if (!active_ids[i])
       continue;
-    const char *value_name = profile_name_from_idx(i);
-    const char *value_unit = profile_unit_from_idx(i);
+    assert(i != DDPROF_PWT_NOCOUNT);
+
+    const char *value_name = sample_type_name_from_idx(i);
+    const char *value_unit = sample_type_unit_from_idx(i);
     if (!value_name || !value_unit) {
       LG_WRN("Malformed sample type (%d), ignoring", i);
       continue;
     }
-    ctx->sample_type_pv[i] = num_sample_type_ids;
     perf_value_type[num_sample_type_ids].type_ = (ddprof_ffi_Slice_c_char) {
       .ptr = value_name,
       .len = strlen(value_name)};
     perf_value_type[num_sample_type_ids].unit = (ddprof_ffi_Slice_c_char) {
       .ptr = value_unit,
       .len = strlen(value_unit)};
+
+    // Update the pv
+    pv[i] = num_sample_type_ids;
     ++num_sample_type_ids;
+  }
+
+  // Update each watcher
+  for (unsigned i = 0; i < num_watchers; ++i) {
+    int permuted_id = pv[watchers[i].sample_type_id];
+    int permuted_count_id = pv[watcher_to_count_sample_type_id(&watchers[i])];
+
+    watchers[i].pprof_sample_idx = permuted_id;
+    if (watcher_has_countable_sample_type(&watchers[i])) {
+      watchers[i].pprof_count_sample_idx = permuted_count_id;
+    }
   }
 
   // If none of the samples were good, that's an error
@@ -89,19 +114,16 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
   struct ddprof_ffi_Slice_value_type sample_types = {.ptr = perf_value_type,
                                                      .len = pprof->_nb_values};
 
-  // To populate the defaults, we take the period/frequency of the first watcher
-  // with the first valid sample_type_id.  The checks above ensure we have one
-  // such watcher.
-  int64_t periodfreq_default = 0;
-  for (unsigned i = 0; i < num_watchers; ++i) {
-    if (ctx->sample_type_pv[0] == watchers[i].sample_type_id) {
-      periodfreq_default = watchers[i].sample_period;
-      break;
-    }
-  }
+  // Populate the default.  If we have a frequency, assume it is given in hertz
+  // and convert to a period in nanoseconds.  This is broken for many event-
+  // based types (but providing frequency would also be broken in those cases)
+  int64_t default_period = default_watcher->sample_period;
+  if (default_watcher->options.is_freq)
+    default_period = 1e9/default_period;
+
   struct ddprof_ffi_Period period = {
-    .type_ = perf_value_type[0],
-    .value = periodfreq_default,
+    .type_ = perf_value_type[pv[default_watcher->pprof_sample_idx]],
+    .value = default_period,
   };
 
   pprof->_profile = ddprof_ffi_Profile_new(sample_types, &period);
@@ -157,16 +179,16 @@ static void write_line(const ddprof::Symbol &symbol,
 // Assumption of API is that sample is valid in a single type
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr *symbol_hdr, uint64_t value,
-                      const PerfWatcher *watcher, const int* sample_type_pv, DDProfPProf *pprof) {
+                      const PerfWatcher *watcher, DDProfPProf *pprof) {
 
   const ddprof::SymbolTable &symbol_table = symbol_hdr->_symbol_table;
   const ddprof::MapInfoTable &mapinfo_table = symbol_hdr->_mapinfo_table;
   ddprof_ffi_Profile *profile = pprof->_profile;
 
   int64_t values[DDPROF_PWT_LENGTH] = {0};
-  values[sample_type_pv[watcher->sample_type_id]] = value;
+  values[watcher->pprof_sample_idx] = value;
   if (watcher_has_countable_sample_type(watcher))
-    values[sample_type_pv[watcher_to_count_sample_type_id(watcher)]] = 1;
+    values[watcher->pprof_count_sample_idx] = 1;
 
   ddprof_ffi_Location locations_buff[DD_MAX_STACK_DEPTH];
   // assumption of single line per loc for now

@@ -23,7 +23,7 @@ typedef struct PerfWatcher {
     uint64_t sample_period;
     uint64_t sample_frequency;
   };
-  int sample_type_id;
+  int sample_type_id;  // index into the sample types defined in this header
   // perf_event_open configs
   struct PerfWatcherOptions options;
   // tracepoint configuration
@@ -35,6 +35,8 @@ typedef struct PerfWatcher {
   // Other configs
   bool send_pid;
   bool send_tid;
+  int pprof_sample_idx; // index into the SampleType in the pprof
+  int pprof_count_sample_idx; // index into the pprof for the count
 } PerfWatcher;
 
 // The Datadog backend only understands pre-configured event types.  Those
@@ -101,9 +103,10 @@ bool watcher_has_countable_sample_type(const PerfWatcher *watcher);
 bool watcher_has_tracepoint(const PerfWatcher *watcher);
 int watcher_to_count_sample_type_id(const PerfWatcher *watcher);
 
-// Helper functions for profile types
-const char *profile_name_from_idx(int idx);
-const char *profile_unit_from_idx(int idx);
+// Helper functions for sample types
+const char *sample_type_name_from_idx(int idx);
+const char *sample_type_unit_from_idx(int idx);
+int sample_type_id_to_count_sample_type_id(int idx);
 
 // Helper functions, mostly for tests
 uint64_t perf_event_default_sample_type();
