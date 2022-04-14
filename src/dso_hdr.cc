@@ -6,12 +6,12 @@
 #include "dso_hdr.hpp"
 
 extern "C" {
-#include <fcntl.h>
-#include <unistd.h>
 #include "ddprof_defs.h"
 #include "logger.h"
 #include "procutils.h"
 #include "signal_helper.h"
+#include <fcntl.h>
+#include <unistd.h>
 }
 #include "ddres.h"
 #include "defer.hpp"
@@ -118,11 +118,11 @@ DsoHdr::DsoHdr() {
   // Fortunately, `/proc/self` will return a symlink to my process ID in the
   // corresponding namespace, so this is easy to check
   char pid_str[sizeof("42949672960")] = {};
-   if (-1 != readlink("/host/proc/self", pid_str, sizeof(pid_str)) &&
-       getpid() == strtol(pid_str, NULL, 10)) {
-     // @Datadog we often mount to /host the /proc files
-     _path_to_proc = "/host";
-   }
+  if (-1 != readlink("/host/proc/self", pid_str, sizeof(pid_str)) &&
+      getpid() == strtol(pid_str, NULL, 10)) {
+    // @Datadog we often mount to /host the /proc files
+    _path_to_proc = "/host";
+  }
   // 0 element is error element
   _file_info_vector.emplace_back(FileInfo(), 0, true);
 }
