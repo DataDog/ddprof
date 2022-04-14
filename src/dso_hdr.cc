@@ -6,6 +6,8 @@
 #include "dso_hdr.hpp"
 
 extern "C" {
+#include <fcntl.h>
+#include <unistd.h>
 #include "ddprof_defs.h"
 #include "logger.h"
 #include "procutils.h"
@@ -112,10 +114,15 @@ uint64_t DsoStats::sum_event_metric(DsoEventType dso_event) const {
 DsoHdr::DsoHdr() {
   // keep dso_id 0 as a reserved value
   // Test different places for existence of /proc
-  if (check_file_type("/host/proc", S_IFDIR)) {
-    // @Datadog we often mount to /host the /proc files
-    _path_to_proc = "/host";
-  }
+  // A given procfs can only work if its PID namespace is the same as mine.
+  // Fortunately, `/proc/self` will return a symlink to my process ID in the
+  // corresponding namespace, so this is easy to check
+  char pid_str[sizeof("42949672960")] = {};
+   if (-1 != readlink("/host/proc/self", pid_str, sizeof(pid_str)) &&
+       getpid() == strtol(pid_str, NULL, 10)) {
+     // @Datadog we often mount to /host the /proc files
+     _path_to_proc = "/host";
+   }
   // 0 element is error element
   _file_info_vector.emplace_back(FileInfo(), 0, true);
 }
