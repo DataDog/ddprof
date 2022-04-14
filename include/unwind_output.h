@@ -21,6 +21,8 @@ typedef struct FunLoc {
 typedef struct UnwindOutput {
   FunLoc locs[DD_MAX_STACK_DEPTH];
   uint64_t nb_locs;
+  int pid;
+  int tid;
 } UnwindOutput;
 
 void uw_output_clear(UnwindOutput *);

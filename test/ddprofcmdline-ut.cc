@@ -5,14 +5,12 @@
 
 extern "C" {
 #include "ddprof_cmdline.h"
-#include "perf_option.h"
+#include "perf_watcher.h"
 }
 
 #include <gtest/gtest.h>
 
 static char const *const sTestPaterns[] = {"cAn", "yUo", "eVen", "tYpe"};
-
-TEST(CmdLineTst, PerfoptionMatchSize) { ASSERT_TRUE(perfoptions_match_size()); }
 
 TEST(CmdLineTst, ArgWhich) {
   ASSERT_EQ(arg_which("tYpe", sTestPaterns, 4), 3);
@@ -49,31 +47,29 @@ TEST(CmdLineTst, NullPatterns) {
 }
 
 TEST(CmdLineTst, FirstEventHit) {
-  char const *str = perfoptions_lookup_idx(0);
-  size_t i = 999999;
-  uint64_t val = 0;
-  ASSERT_TRUE(process_event(str, perfoptions_lookup(), perfoptions_nb_presets(),
-                            &i, &val));
-  ASSERT_EQ(i, 0);
+  char const *str = "hCPU";
+  PerfWatcher watcher = {};
+  ASSERT_TRUE(watcher_from_event(str, &watcher));
+  ASSERT_EQ(watcher.type, PERF_TYPE_HARDWARE);
+  ASSERT_EQ(watcher.type, PERF_COUNT_HW_CPU_CYCLES);
 }
 
 TEST(CmdLineTst, LastEventHit) {
-  char const *str = perfoptions_lookup_idx(perfoptions_nb_presets() - 1);
-  size_t i = 999999;
-  uint64_t val = 0;
-  ASSERT_TRUE(process_event(str, perfoptions_lookup(), perfoptions_nb_presets(),
-                            &i, &val));
-  ASSERT_EQ(i, perfoptions_nb_presets() - 1);
+  int idx = DDPROF_PWE_LENGTH - 1;
+  const PerfWatcher *w1 = ewatcher_from_idx(idx);
+  const PerfWatcher *w2 =
+      ewatcher_from_str("sDUM"); // should be the last watcher
+  ASSERT_NE(nullptr, w1);
+  ASSERT_NE(nullptr, w2);
+  ASSERT_EQ(w1, w2);
 }
 
 TEST(CmdLineTst, LiteralEventWithGoodValue) {
   char const *str = "hCPU,555";
-  size_t i = 999999;
-  uint64_t val = 0;
-  ASSERT_TRUE(process_event(str, perfoptions_lookup(), perfoptions_nb_presets(),
-                            &i, &val));
-  ASSERT_EQ(i, 0);
-  ASSERT_EQ(val, 555); // value changed
+  PerfWatcher watcher = {};
+  watcher.sample_period = 12345;
+  ASSERT_TRUE(watcher_from_event(str, &watcher));
+  ASSERT_EQ(watcher.sample_period, 555); // value changed
 }
 
 // An event without a separator is invalid, even if the components are valid.
@@ -81,24 +77,18 @@ TEST(CmdLineTst, LiteralEventWithGoodValue) {
 // point.
 TEST(CmdLineTst, LiteralEventWithNoComma) {
   char const *str = "hCPU1";
-  size_t i = 999999;
-  uint64_t v = 0;
-  ASSERT_FALSE(process_event(str, perfoptions_lookup(),
-                             perfoptions_nb_presets(), &i, &v));
+  PerfWatcher watcher = {};
+  ASSERT_FALSE(watcher_from_event(str, &watcher));
 }
 
 TEST(CmdLineTst, LiteralEventWithVeryBadValue) {
   char const *str = "hCPU,apples";
-  size_t i = 999999;
-  uint64_t v = 1;
-  ASSERT_FALSE(process_event(str, perfoptions_lookup(),
-                             perfoptions_nb_presets(), &i, &v));
+  PerfWatcher watcher = {};
+  ASSERT_FALSE(watcher_from_event(str, &watcher));
 }
 
 TEST(CmdLineTst, LiteralEventWithKindaBadValue) {
   char const *str = "hCPU,123apples";
-  size_t i = 999999;
-  uint64_t v = 1;
-  ASSERT_FALSE(process_event(str, perfoptions_lookup(),
-                             perfoptions_nb_presets(), &i, &v));
+  PerfWatcher watcher = {};
+  ASSERT_FALSE(watcher_from_event(str, &watcher));
 }

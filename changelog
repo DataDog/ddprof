@@ -1,3 +1,12 @@
+0.8.1 to 0.8.2 (14/04/2022)
+* Correctly convert Watcher frequency to pprof period (for time-based
+frequency)
+* Added general tracepoint support, allowing users to attach to uprobes,
+kprobes, and other instrumentable tracing interfaces. This feature is
+undocumented, pending support in the Datadog Profiling product.
+* Apart from software-based CPU time, all other events now get uploaded as a
+tracepoint type
+
 0.8.0 to 0.8.1 (18/03/2022)
 * Remove dependency on libstdc++ in library mode
 

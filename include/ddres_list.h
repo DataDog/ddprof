@@ -33,6 +33,7 @@ extern "C" {
   X(PEINIT, "error allocating space for pevent")                               \
   X(PERFOPEN, "error during perf_event_open")                                  \
   X(PERFRB, "error with perf_event ringbuffer")                                \
+  X(PERFSAMP, "error processing perf sample")                                  \
   X(IOCTL, "error during perf_event_open")                                     \
   X(PERFMMAP, "error in mmap operations")                                      \
   X(MAINLOOP, "error in main_loop coordinator")                                \

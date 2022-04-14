@@ -19,8 +19,6 @@ extern "C" {
 
 #include "symbol_hdr.hpp"
 
-static const unsigned long s_nanos_in_one_sec = 1000000000;
-
 // Slice helpers
 static ddprof_ffi_Slice_c_char
 std_string_2_slice_c_char(const std::string &str) {
@@ -34,54 +32,99 @@ std_string_2_slice_c_char(const std::string &str) {
 #define SLICE_LITERAL(str)                                                     \
   (struct ddprof_ffi_Slice_c_char) { .ptr = (str), .len = sizeof(str) - 1 }
 
+#define PPROF_MAX_LABELS 5
+
 static ddprof_ffi_Slice_c_char ffi_empty_char_slice(void) {
   return (struct ddprof_ffi_Slice_c_char){.ptr = (NULL), .len = 0};
 }
 
-static const struct ddprof_ffi_ValueType s_sample_count = {
-    .type_ = SLICE_LITERAL("sample"),
-    .unit = SLICE_LITERAL("count"),
-};
+DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
+  PerfWatcher *watchers = ctx->watchers;
+  size_t num_watchers = ctx->num_watchers;
+  struct ddprof_ffi_ValueType perf_value_type[DDPROF_PWT_LENGTH];
 
-static const struct ddprof_ffi_ValueType s_cpu_time = {
-    .type_ = SLICE_LITERAL("cpu-time"),
-    .unit = SLICE_LITERAL("nanoseconds"),
-};
+  // Figure out which sample_type_ids are used by active watchers
+  // We also record the watcher with the lowest valid sample_type id, since that
+  // will serve as the default for the pprof
+  bool active_ids[DDPROF_PWT_LENGTH] = {};
+  PerfWatcher *default_watcher = &watchers[0];
+  for (unsigned i = 0; i < num_watchers; ++i) {
+    int this_id = watchers[i].sample_type_id;
+    int count_id = sample_type_id_to_count_sample_type_id(this_id);
+    if (this_id < 0 || this_id == DDPROF_PWT_NOCOUNT || this_id >= DDPROF_PWT_LENGTH) {
+      LG_WRN("Watcher \"%s\" (%d) has invalid sample_type_id %d, ignoring",
+          watchers[i].desc, i, this_id);
+      continue;
+    }
 
-static const struct ddprof_ffi_ValueType s_cpu_sample = {
-    .type_ = SLICE_LITERAL("cpu-sample"),
-    .unit = SLICE_LITERAL("count"),
-};
-
-DDRes pprof_create_profile(DDProfPProf *pprof, const PerfOption *options,
-                           unsigned nbOptions) {
-  // Create one value
-  struct ddprof_ffi_ValueType perf_value_type[MAX_TYPE_WATCHER + 1];
-  unsigned value_index = 0;
-  perf_value_type[value_index++] = s_sample_count;
-
-  /* Add one value type per watcher */
-  for (; value_index < nbOptions + 1; ++value_index) {
-    ddprof_ffi_Slice_c_char perf_value_slice = {.ptr = options->label,
-                                                .len = strlen(options->label)};
-    ddprof_ffi_Slice_c_char perf_unit = {.ptr = options->unit,
-                                         .len = strlen(options->unit)};
-
-    perf_value_type[value_index].type_ = perf_value_slice;
-    perf_value_type[value_index].unit = perf_unit;
+    if (this_id <= default_watcher->sample_type_id) // update default
+      default_watcher = &watchers[i];
+    active_ids[this_id] = true; // update mask
+    if (count_id != DDPROF_PWT_NOCOUNT)
+      active_ids[count_id] = true; // if the count is valid, update mask for it
   }
 
-  pprof->_nb_values = value_index;
+  // Convert the mask into a lookup.  While we're at it, populate the metadata
+  // for the pprof
+  int pv[DDPROF_PWT_LENGTH];
+  int num_sample_type_ids = 0;
+  memset(pv, 0, sizeof(pv));
+  for (int i = 0; i < DDPROF_PWT_LENGTH; ++i) {
+    if (!active_ids[i])
+      continue;
+    assert(i != DDPROF_PWT_NOCOUNT);
+
+    const char *value_name = sample_type_name_from_idx(i);
+    const char *value_unit = sample_type_unit_from_idx(i);
+    if (!value_name || !value_unit) {
+      LG_WRN("Malformed sample type (%d), ignoring", i);
+      continue;
+    }
+    perf_value_type[num_sample_type_ids].type_ = (ddprof_ffi_Slice_c_char) {
+      .ptr = value_name,
+      .len = strlen(value_name)};
+    perf_value_type[num_sample_type_ids].unit = (ddprof_ffi_Slice_c_char) {
+      .ptr = value_unit,
+      .len = strlen(value_unit)};
+
+    // Update the pv
+    pv[i] = num_sample_type_ids;
+    ++num_sample_type_ids;
+  }
+
+  // Update each watcher
+  for (unsigned i = 0; i < num_watchers; ++i) {
+    int permuted_id = pv[watchers[i].sample_type_id];
+    int permuted_count_id = pv[watcher_to_count_sample_type_id(&watchers[i])];
+
+    watchers[i].pprof_sample_idx = permuted_id;
+    if (watcher_has_countable_sample_type(&watchers[i])) {
+      watchers[i].pprof_count_sample_idx = permuted_count_id;
+    }
+  }
+
+  // If none of the samples were good, that's an error
+  if (!num_sample_type_ids) {
+    // We use the phrase "profile type" in the error, since this is more
+    // obvious for customers.
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "No valid profile types given");
+  }
+
+  pprof->_nb_values = num_sample_type_ids;
   struct ddprof_ffi_Slice_value_type sample_types = {.ptr = perf_value_type,
-                                                     .len = value_index};
-  struct ddprof_ffi_Period period;
-  if (options->freq) {
-    period.type_ = s_cpu_time;
-    period.value = (s_nanos_in_one_sec) / options->sample_frequency;
-  } else {
-    period.type_ = s_cpu_sample;
-    period.value = options->sample_period;
-  }
+                                                     .len = pprof->_nb_values};
+
+  // Populate the default.  If we have a frequency, assume it is given in hertz
+  // and convert to a period in nanoseconds.  This is broken for many event-
+  // based types (but providing frequency would also be broken in those cases)
+  int64_t default_period = default_watcher->sample_period;
+  if (default_watcher->options.is_freq)
+    default_period = 1e9/default_period;
+
+  struct ddprof_ffi_Period period = {
+    .type_ = perf_value_type[pv[default_watcher->pprof_sample_idx]],
+    .value = default_period,
+  };
 
   pprof->_profile = ddprof_ffi_Profile_new(sample_types, &period);
   if (!pprof->_profile) {
@@ -136,17 +179,16 @@ static void write_line(const ddprof::Symbol &symbol,
 // Assumption of API is that sample is valid in a single type
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr *symbol_hdr, uint64_t value,
-                      int watcher_idx, DDProfPProf *pprof) {
+                      const PerfWatcher *watcher, DDProfPProf *pprof) {
 
   const ddprof::SymbolTable &symbol_table = symbol_hdr->_symbol_table;
   const ddprof::MapInfoTable &mapinfo_table = symbol_hdr->_mapinfo_table;
   ddprof_ffi_Profile *profile = pprof->_profile;
 
-  int64_t values[MAX_TYPE_WATCHER + 1] = {0};
-  // Counted a single time
-  values[0] = 1;
-  // Add a value to the watcher we are sampling, leave others zeroed
-  values[watcher_idx + 1] = value;
+  int64_t values[DDPROF_PWT_LENGTH] = {0};
+  values[watcher->pprof_sample_idx] = value;
+  if (watcher_has_countable_sample_type(watcher))
+    values[watcher->pprof_count_sample_idx] = 1;
 
   ddprof_ffi_Location locations_buff[DD_MAX_STACK_DEPTH];
   // assumption of single line per loc for now
@@ -160,10 +202,47 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     write_location(&locs[i], mapinfo_table[locs[i]._map_info_idx], &lines,
                    &locations_buff[i]);
   }
+
+  // Create the labels for the sample.  Two samples are the same only when
+  // their locations _and_ all labels are identical, so we admit a very limited
+  // number of labels at present
+  struct ddprof_ffi_Label labels[PPROF_MAX_LABELS] = {};
+  size_t labels_num = 0;
+
+  // The max PID on Linux is approximately 2^22 (~4e6), which also limits TID
+  char pid_str[7] = {};
+  char tid_str[7] = {};
+
+  // These labels are hardcoded on the Datadog backend
+  static char pid_key[] = "process_id";
+  static char tid_key[] = "thread_id";
+  static char tracepoint_key[] = "tracepoint_type";
+
+  // Add any configured labels.  Note that TID alone has the same cardinalit as
+  // (TID;PID) tuples, so except for symbol table overhead it doesn't matter
+  // much if TID implies PID for clarity.
+  if (watcher->send_pid || watcher->send_tid) {
+    size_t sz = snprintf(pid_str, sizeof(pid_str), "%d", uw_output->pid);
+    labels[labels_num].key = (struct ddprof_ffi_Slice_c_char){.ptr = pid_key, .len = sizeof(pid_key)-1};
+    labels[labels_num].str = (struct ddprof_ffi_Slice_c_char){.ptr = pid_str, .len = sz};
+    ++labels_num;
+  }
+  if (watcher->send_tid) {
+    size_t sz = snprintf(tid_str, sizeof(tid_str), "%d", uw_output->tid);
+    labels[labels_num].key = (struct ddprof_ffi_Slice_c_char){.ptr = tid_key, .len = sizeof(tid_key)-1};
+    labels[labels_num].str = (struct ddprof_ffi_Slice_c_char){.ptr = tid_str, .len = sz};
+    ++labels_num;
+  }
+  if (watcher_has_tracepoint(watcher)) {
+    // This adds only the trace name.  Maybe we should have group + tracenames?
+    labels[labels_num].key = (struct ddprof_ffi_Slice_c_char){.ptr = tracepoint_key, .len = sizeof(tracepoint_key) - 1};
+    labels[labels_num].str = (struct ddprof_ffi_Slice_c_char){.ptr = watcher->tracepoint_name, .len = strlen(watcher->tracepoint_name)};
+    ++labels_num;
+  }
   struct ddprof_ffi_Sample sample = {
       .locations = {.ptr = locations_buff, .len = uw_output->nb_locs},
       .values = {.ptr = values, .len = pprof->_nb_values},
-      .labels = {.ptr = NULL, .len = 0},
+      .labels = {.ptr = labels, .len = labels_num},
   };
 
   uint64_t id_sample = ddprof_ffi_Profile_add(profile, sample);

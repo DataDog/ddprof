@@ -7,6 +7,7 @@ extern "C" {
 #include <stdio.h>
 
 #include "perf_ringbuffer.h"
+#include "perf_watcher.h" // for default sample type used in ddprof
 }
 
 #include <gtest/gtest.h>
@@ -59,8 +60,8 @@ bool sample_eq(struct perf_event_sample *s1, struct perf_event_sample *s2) {
 
 TEST(PerfRingbufferTest, SampleSymmetryx86) {
   // Setup the reference sample
-  uint64_t mask = DEFAULT_SAMPLE_TYPE | PERF_SAMPLE_IDENTIFIER |
-      PERF_SAMPLE_IP | PERF_SAMPLE_ADDR;
+  uint64_t mask = perf_event_default_sample_type();
+  mask |= PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_IP | PERF_SAMPLE_ADDR;
   char default_stack[4096] = {0};
   for (uint64_t i = 0; i < sizeof(default_stack) / sizeof(*default_stack); i++)
     default_stack[i] = i & 255;

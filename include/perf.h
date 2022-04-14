@@ -12,15 +12,10 @@
 
 #include "ddres_def.h"
 #include "perf_archmap.h"
-#include "perf_option.h"
+#include "perf_watcher.h"
 
 #define PSAMPLE_DEFAULT_WAKEUP_MS 100 // sample frequency check
 #define PERF_SAMPLE_STACK_SIZE (4096 * 8)
-
-// TODO, probably make this part of the unwinding context or ddprof ctx
-#define DEFAULT_SAMPLE_TYPE                                                    \
-  (PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_TID |          \
-   PERF_SAMPLE_TIME | PERF_SAMPLE_PERIOD)
 
 typedef struct read_format {
   uint64_t value;        // The value of the event
@@ -116,7 +111,7 @@ typedef struct perf_samplestacku {
 } perf_samplestacku;
 
 int perf_event_open(struct perf_event_attr *, pid_t, int, int, unsigned long);
-int perfopen(pid_t pid, const PerfOption *opt, int cpu, bool extras);
+int perfopen(pid_t pid, const PerfWatcher *opt, int cpu, bool extras);
 size_t perf_mmap_size(int buf_size_shift);
 void *perfown_sz(int fd, size_t size_of_buffer);
 void *perfown(int fd, size_t *size);

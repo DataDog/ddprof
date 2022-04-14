@@ -149,13 +149,18 @@ static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr) {
 /************************* perf_event_open() helpers **************************/
 /// Entry point for sample aggregation
 DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
-  // Before we do anything else, copy the perf_event_header into a sample
+  if (!sample)
+    return ddres_warn(DD_WHAT_PERFSAMP);
   struct UnwindState *us = ctx->worker_ctx.us;
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
 
   // copy the sample context into the unwind structure
   unwind_init_sample(us, sample->regs, sample->pid, sample->size_stack,
                      sample->data_stack);
+
+  // If a sample has a PID, it has a TID.  Include it for downstream labels
+  us->output.pid = sample->pid;
+  us->output.tid = sample->tid;
 
   // If this is a SW_TASK_CLOCK-type event, then aggregate the time
   if (ctx->watchers[pos].config == PERF_COUNT_SW_TASK_CLOCK)
@@ -167,10 +172,11 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   if (!IsDDResFatal(res)) {
 #ifndef DDPROF_NATIVE_LIB
     // in lib mode we don't aggregate (protect to avoid link failures)
+    PerfWatcher *watcher = &ctx->watchers[pos];
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
     DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr,
-                                    sample->period, pos, pprof));
+                                    sample->period, watcher, pprof));
 #else
     // Call the user's stack handler
     if (ctx->stack_handler) {
@@ -390,10 +396,9 @@ DDRes ddprof_worker_init(DDProfContext *ctx) {
         ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[0]));
     DDRES_CHECK_FWD(
         ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[1]));
-    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[0],
-                                         ctx->watchers, ctx->num_watchers));
-    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[1],
-                                         ctx->watchers, ctx->num_watchers));
+
+    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[0], ctx));
+    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[1], ctx));
   }
   CatchExcept2DDRes();
   return ddres_init();
@@ -450,7 +455,8 @@ DDRes ddprof_worker_process_event(struct perf_event_header *hdr, int pos,
     /* Cases where the target type has a PID */
     case PERF_RECORD_SAMPLE:
       if (wpid->pid) {
-        perf_event_sample *sample = hdr2samp(hdr, DEFAULT_SAMPLE_TYPE);
+        uint64_t mask = ctx->watchers[pos].sample_type;
+        perf_event_sample *sample = hdr2samp(hdr, mask);
         if (sample) {
           DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, pos));
         }

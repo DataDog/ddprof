@@ -20,19 +20,17 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   memset(ctx, 0, sizeof(DDProfContext));
   setup_logger(input->log_mode, input->log_level);
 
-  for (int idx_watcher = 0; idx_watcher < input->num_watchers; ++idx_watcher) {
-    ctx->watchers[ctx->num_watchers] =
-        *(perfoptions_preset(input->watchers[idx_watcher]));
-    if (input->sampling_value[idx_watcher]) // override preset
-      ctx->watchers[ctx->num_watchers].sample_period =
-          input->sampling_value[idx_watcher];
+  // Shallow copy of the watchers from the input object into the context.
+  int nwatchers;
+  for (nwatchers = 0; nwatchers < input->num_watchers; ++nwatchers) {
+    ctx->watchers[nwatchers] = input->watchers[nwatchers];
   }
-  ctx->num_watchers = input->num_watchers;
+  ctx->num_watchers = nwatchers;
 
-  // If events are set, install default watcher
+  // If no events were given, install the default watcher with default freq.
   if (!ctx->num_watchers) {
     ctx->num_watchers = 1;
-    ctx->watchers[0] = *perfoptions_preset(10);
+    ctx->watchers[0] = *ewatcher_from_str("sCPU");
   }
 
   DDRES_CHECK_FWD(exporter_input_copy(&input->exp_input, &ctx->exp_input));
@@ -198,9 +196,9 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     // Show watchers
     LG_PRINT("  Instrumented with %d watchers:", ctx->num_watchers);
     for (int i = 0; i < ctx->num_watchers; i++) {
-      LG_PRINT("    ID: %s, Pos: %d, Index: %lu, Label: %s, Mode: %d",
+      LG_PRINT("    ID: %s, Pos: %d, Index: %lu, Label: %s",
                ctx->watchers[i].desc, i, ctx->watchers[i].config,
-               ctx->watchers[i].label, ctx->watchers[i].mode);
+               sample_type_name_from_idx(ctx->watchers[i].sample_type_id));
     }
   }
 

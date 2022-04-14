@@ -60,7 +60,7 @@ endfunction()
 add_unit_test(
     ddprofcmdline-ut
     ../src/ddprof_cmdline.c
-    ../src/perf_option.c
+    ../src/perf_watcher.c
     ddprofcmdline-ut.cc
 )
 
@@ -114,7 +114,7 @@ add_unit_test(
 add_unit_test(
     mmap-ut
     ../src/perf.c
-    ../src/perf_option.c
+    ../src/perf_watcher.c
     mmap-ut.cc
     DEFINITIONS MYNAME="mmap-ut"
 )
@@ -154,7 +154,7 @@ add_unit_test(
     ddprof_input-ut
     ../src/ddprof_cmdline.c
     ../src/ddprof_input.cc
-    ../src/perf_option.c
+    ../src/perf_watcher.c
     ddprof_input-ut.cc
     DEFINITIONS MYNAME="ddprof_input-ut"
 )
@@ -162,6 +162,7 @@ add_unit_test(
 add_unit_test(
     perf_ringbuffer-ut
     ../src/perf.c
+    ../src/perf_watcher.c
     ../src/perf_ringbuffer.c
     perf_ringbuffer-ut.cc
     DEFINITIONS MYNAME="perf_ringbuffer-ut"
@@ -179,7 +180,7 @@ add_unit_test(
     ../src/pevent_lib.c
     ../src/user_override.c
     ../src/perf.c
-    ../src/perf_option.c
+    ../src/perf_watcher.c
     ../src/perf_ringbuffer.c
     pevent-ut.cc
     DEFINITIONS MYNAME="pevent-ut"
@@ -189,7 +190,7 @@ add_unit_test(
     ddprof_pprof-ut
     ../src/pprof/ddprof_pprof.cc
     ../src/unwind_output.c
-    ../src/perf_option.c
+    ../src/perf_watcher.c
     ddprof_pprof-ut.cc
     LIBRARIES DDProf::FFI
     DEFINITIONS MYNAME="ddprof_pprof-ut"
@@ -201,7 +202,7 @@ add_unit_test(
     ../src/ddprof_cmdline.c
     ../src/pprof/ddprof_pprof.cc
     ../src/unwind_output.c
-    ../src/perf_option.c
+    ../src/perf_watcher.c
     ../src/tags.cc
     ddprof_exporter-ut.cc
     LIBRARIES DDProf::FFI

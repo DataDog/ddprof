@@ -5,9 +5,10 @@
 
 #pragma once
 
+#include "ddprof_context.h"
 #include "ddprof_defs.h"
 #include "ddres_def.h"
-#include "perf_option.h"
+#include "perf_watcher.h"
 #include "unwind_output.h"
 
 typedef struct ddprof_ffi_Profile ddprof_ffi_Profile;
@@ -19,8 +20,7 @@ typedef struct DDProfPProf {
   unsigned _nb_values;
 } DDProfPProf;
 
-DDRes pprof_create_profile(DDProfPProf *pprof, const PerfOption *options,
-                           unsigned nbOptions);
+DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx);
 
 /**
  * Aggregate to the existing profile the provided unwinding output.
@@ -31,7 +31,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, const PerfOption *options,
  */
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr *symbol_hdr, uint64_t value,
-                      int watcher_idx, DDProfPProf *pprof);
+                      const PerfWatcher *watcher, DDProfPProf *pprof);
 
 DDRes pprof_reset(DDProfPProf *pprof);
 

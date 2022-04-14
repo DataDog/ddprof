@@ -36,14 +36,19 @@ TEST(MMapTest, PerfOpen) {
 
   int cpu = 0;
 
-  for (int i = 0; i < perfoptions_nb_presets(); ++i) {
+  for (int i = 0; i < DDPROF_PWE_LENGTH; ++i) {
     std::cerr << "#######################################" << std::endl;
-    std::cerr << "-->" << i << " " << perfoptions_preset(i)->desc << std::endl;
+    std::cerr << "-->" << i << " " << ewatcher_from_idx(i)->desc << std::endl;
 
-    int perf_fd = perfopen(pid, perfoptions_preset(i), cpu, false);
-    if (i == 10 || i == 11) { // Expected not to fail for CPU / WALL profiling
-      EXPECT_TRUE(perf_fd != -1);
+    const PerfWatcher *watcher = ewatcher_from_idx(i);
+    int perf_fd = perfopen(pid, watcher, cpu, false);
+
+    // Pure-userspace software events should all pass.  Anything else should hit
+    // this filter
+    if (watcher->type != PERF_TYPE_SOFTWARE || watcher->options.is_kernel) {
+      continue;
     }
+    EXPECT_TRUE(perf_fd != -1);
     if (perf_fd == -1) {
       std::cerr << "ERROR ---> :" << errno << "=" << strerror(errno)
                 << std::endl;

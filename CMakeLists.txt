@@ -9,8 +9,8 @@ cmake_minimum_required(VERSION 3.19)
 
  project(DDProf
   LANGUAGES C CXX
-  VERSION 0.8.1
-  DESCRIPTION "Datadog's native profiler"
+  VERSION 0.8.2
+  DESCRIPTION "Datadog's native profiler for Linux"
 )
 
 message(STATUS "Compiler ID: ${CMAKE_C_COMPILER_ID}")
@@ -167,7 +167,7 @@ add_custom_command(OUTPUT ${DDPROF_EXE_OBJECT}
   DEPENDS ddprof
 )
 
-set(DD_PROFILING_SOURCES src/lib/dd_profiling.cc src/ddprof_cmdline.c src/logger.c src/logger_setup.cc src/ipc.cc
+set(DD_PROFILING_SOURCES src/lib/dd_profiling.cc src/ddprof_cmdline.c src/logger.c src/logger_setup.cc src/ipc.cc src/perf_watcher.c
                          $<TARGET_OBJECTS:ddprof_exe_object>)
 add_library(ddprof_exe_object OBJECT IMPORTED GLOBAL)
 set_target_properties(ddprof_exe_object PROPERTIES IMPORTED_OBJECTS "${DDPROF_EXE_OBJECT}")

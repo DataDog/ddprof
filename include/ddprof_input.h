@@ -13,6 +13,7 @@ extern "C" {
 #endif
 
 #include "exporter_input.h"
+#include "perf_watcher.h"
 
 typedef int16_t watcher_index_t;
 
@@ -40,8 +41,7 @@ typedef struct DDProfInput {
   char *url;
   char *socket;
   // Watcher presets
-  watcher_index_t watchers[MAX_TYPE_WATCHER];
-  uint64_t sampling_value[MAX_TYPE_WATCHER];
+  PerfWatcher watchers[MAX_TYPE_WATCHER];
   int num_watchers;
   ExporterInput exp_input;
 } DDProfInput;
@@ -85,7 +85,7 @@ typedef struct DDProfInput {
   XX(DD_SERVICE,                        service,            S, 'S', 1, input, NULL, "myservice",  exp_input.)  \
   XX(DD_VERSION,                        service_version,    V, 'V', 1, input, NULL, "",           exp_input.)  \
   XX(DD_PROFILING_EXPORT,               do_export,          X, 'X', 1, input, NULL, "yes",        exp_input.)  \
-  XX(DD_PROFILING_AGENTLESS,            agentless,          L, 'L', 1, input, NULL, "",                     )  \
+  XX(DD_PROFILING_AGENTLESS,            agentless,          L, 'L', 1, input, NULL, "", )                      \
   XX(DD_TAGS,                           tags,               T, 'T', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_ENABLED,              enable,             d, 'd', 1, input, NULL, "yes", )                   \
   XX(DD_PROFILING_NATIVE_ENABLED,       native_enable,      n, 'n', 1, input, NULL, "", )                      \

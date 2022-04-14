@@ -5,7 +5,7 @@
 
 extern "C" {
 #include "ddprof_input.h"
-#include "perf_option.h"
+#include "perf_watcher.h"
 #include "string_view.h"
 }
 
@@ -114,9 +114,11 @@ TEST_F(InputTest, event_from_env) {
     EXPECT_TRUE(contine_exec);
     EXPECT_EQ(input.nb_parsed_params, 1);
     EXPECT_EQ(input.num_watchers, 1);
-    // cppcheck-suppress literalWithCharPtrCompare
-    EXPECT_EQ(perfoptions_lookup_idx(input.watchers[0]), "sCPU"sv);
-    EXPECT_EQ(input.sampling_value[0], 1000);
+
+    const PerfWatcher *watcher = ewatcher_from_idx(DDPROF_PWE_sCPU);
+    EXPECT_NE(nullptr, watcher);
+    EXPECT_EQ(watcher->config, input.watchers[0].config);
+    EXPECT_EQ(input.watchers[0].sample_period, 1000);
     ddprof_input_free(&input);
   }
   {
@@ -146,16 +148,17 @@ TEST_F(InputTest, event_from_env) {
     EXPECT_EQ(input.nb_parsed_params, 1);
     EXPECT_EQ(input.num_watchers, 1);
 
-    // string_view literal confuses cppcheck
-    // cppcheck-suppress literalWithCharPtrCompare
-    EXPECT_EQ(perfoptions_lookup_idx(input.watchers[0]), "sCPU"sv);
-    EXPECT_EQ(input.sampling_value[0], 1000);
+    const PerfWatcher *watcher = ewatcher_from_idx(DDPROF_PWE_sCPU);
+    EXPECT_NE(nullptr, watcher);
+    EXPECT_EQ(input.watchers[0].config, watcher->config);
+    EXPECT_EQ(input.watchers[0].type, watcher->type);
+    EXPECT_EQ(input.watchers[0].sample_period, 1000);
     ddprof_input_free(&input);
   }
   {
     DDProfInput input;
     bool contine_exec = true;
-    const char *input_values[] = {MYNAME, "-e", "hINSTR,456", "my_program"};
+    const char *input_values[] = {MYNAME, "-e", "hINST,456", "my_program"};
     setenv("DD_PROFILING_NATIVE_EVENTS", "sCPU,1000;hCPU,123", 1);
     DDRes res = ddprof_input_parse(
         ARRAY_SIZE(input_values), (char **)input_values, &input, &contine_exec);
@@ -164,16 +167,20 @@ TEST_F(InputTest, event_from_env) {
     EXPECT_TRUE(contine_exec);
     EXPECT_EQ(input.nb_parsed_params, 3);
     EXPECT_EQ(input.num_watchers, 3);
-    // cppcheck-suppress literalWithCharPtrCompare
-    EXPECT_EQ(perfoptions_lookup_idx(input.watchers[0]), "sCPU"sv);
-    // cppcheck-suppress literalWithCharPtrCompare
-    EXPECT_EQ(perfoptions_lookup_idx(input.watchers[1]), "hCPU"sv);
-    // cppcheck-suppress literalWithCharPtrCompare
-    EXPECT_EQ(perfoptions_lookup_idx(input.watchers[2]), "hINSTR"sv);
+    const PerfWatcher *w_scpu = ewatcher_from_idx(DDPROF_PWE_sCPU);
+    const PerfWatcher *w_hcpu = ewatcher_from_idx(DDPROF_PWE_hCPU);
+    const PerfWatcher *w_hinst = ewatcher_from_idx(DDPROF_PWE_hINST);
 
-    EXPECT_EQ(input.sampling_value[0], 1000);
-    EXPECT_EQ(input.sampling_value[1], 123);
-    EXPECT_EQ(input.sampling_value[2], 456);
+    EXPECT_NE(nullptr, w_scpu);
+    EXPECT_NE(nullptr, w_hcpu);
+    EXPECT_NE(nullptr, w_hinst);
+    EXPECT_EQ(w_scpu->config, input.watchers[0].config);
+    EXPECT_EQ(w_hcpu->config, input.watchers[1].config);
+    EXPECT_EQ(w_hinst->config, input.watchers[2].config);
+
+    EXPECT_EQ(input.watchers[0].sample_period, 1000);
+    EXPECT_EQ(input.watchers[1].sample_period, 123);
+    EXPECT_EQ(input.watchers[2].sample_period, 456);
 
     ddprof_input_free(&input);
   }

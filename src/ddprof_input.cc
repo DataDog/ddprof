@@ -13,7 +13,7 @@
 
 extern "C" {
 #include "ddprof_cmdline.h"
-#include "perf_option.h"
+#include "perf_watcher.h"
 #include "version.h"
 }
 
@@ -41,7 +41,10 @@ extern "C" {
   case casechar:                                                               \
     if ((targ)->key)                                                           \
       free((void *)(targ)->key);                                               \
-    (targ)->key = strdup(optarg);                                              \
+    if (optarg && *optarg)                                                     \
+      (targ)->key = strdup(optarg);                                            \
+    else                                                                       \
+      (targ)->key = strdup("");                                                \
     break;
 
 // TODO das210603 I don't think this needs to be inlined as a macro anymore
@@ -146,23 +149,17 @@ static void ddprof_input_default_events(DDProfInput *input) {
 
   std::istringstream iss(events);
   for (std::string event_str; std::getline(iss, event_str, ';');) {
-    size_t idx;
-    uint64_t sampling_value = 0;
-
     if (event_str.empty()) {
       continue;
     }
 
-    // Iterate through the specified events and define new watchers if any
-    // of them are valid.  If the user specifies a '0' value, then that's
-    // the same as using the default (equivalently, the ',0' could be omitted)
-    if (process_event(event_str.c_str(), perfoptions_lookup(),
-                      perfoptions_nb_presets(), &idx, &sampling_value)) {
-      input->watchers[input->num_watchers] = idx;
-      input->sampling_value[input->num_watchers] = sampling_value;
-      ++input->num_watchers;
+    const char *event = event_str.c_str();
+    PerfWatcher *watcher = &input->watchers[input->num_watchers];
+    if (!watcher_from_event(event, watcher) &&
+        !watcher_from_tracepoint(event, watcher)) {
+      LG_WRN("Ignoring invalid event/tracepoint (%s)", optarg);
     } else {
-      LG_WRN("Ignoring invalid event (%s)", event_str.c_str());
+      ++input->num_watchers;
     }
   }
 }
@@ -224,26 +221,22 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
     return ddres_init();
   }
 
-  char opt_short[] = "+" OPT_TABLE(X_OSTR) "e:hv";
+  char opt_short[] = "+" OPT_TABLE(X_OSTR) "e:t:hv";
   optind = 1; // reset argument parsing (in case we are called several times)
 
   while (-1 != (c = getopt_long(argc, argv, opt_short, lopts, &oi))) {
     switch (c) {
       OPT_TABLE(X_CASE)
     case 'e': {
-      size_t idx;
-      uint64_t sampling_value = 0;
+      if (!optarg || !*optarg)
+        continue;
 
-      // Iterate through the specified events and define new watchers if any
-      // of them are valid.  If the user specifies a '0' value, then that's
-      // the same as using the default (equivalently, the ',0' could be omitted)
-      if (process_event(optarg, perfoptions_lookup(), perfoptions_nb_presets(),
-                        &idx, &sampling_value)) {
-        input->watchers[input->num_watchers] = idx;
-        input->sampling_value[input->num_watchers] = sampling_value;
-        ++input->num_watchers;
+      PerfWatcher *watcher = &input->watchers[input->num_watchers];
+      if (!watcher_from_event(optarg, watcher) &&
+          !watcher_from_tracepoint(optarg, watcher)) {
+        LG_WRN("Ignoring invalid event/tracepoint (%s)", optarg);
       } else {
-        LG_WRN("Ignoring invalid event (%s)", optarg);
+        ++input->num_watchers;
       }
       break;
     }

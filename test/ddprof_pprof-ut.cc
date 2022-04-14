@@ -6,8 +6,7 @@
 extern "C" {
 #include "pprof/ddprof_pprof.h"
 
-#include "perf_option.h"
-
+#include "ddprof_input.h"
 #include <ddprof/ffi.h>
 #include <fcntl.h>
 #include <time.h>
@@ -26,11 +25,14 @@ namespace ddprof {
 DwflSymbolLookup_V2::DwflSymbolLookup_V2() : _lookup_setting(K_CACHE_ON) {}
 
 TEST(DDProfPProf, init_profiles) {
-  DDProfPProf pprofs;
-  const PerfOption *perf_option_cpu = perfoptions_preset(10);
-  DDRes res = pprof_create_profile(&pprofs, perf_option_cpu, 1);
+  DDProfPProf pprof;
+  DDProfContext ctx = {};
+  ctx.watchers[0] = *ewatcher_from_str("sCPU");
+  ctx.num_watchers = 1;
+
+  DDRes res = pprof_create_profile(&pprof, &ctx);
   EXPECT_TRUE(IsDDResOK(res));
-  res = pprof_free_profile(&pprofs);
+  res = pprof_free_profile(&pprof);
   EXPECT_TRUE(IsDDResOK(res));
 }
 
@@ -68,18 +70,20 @@ TEST(DDProfPProf, aggregate) {
   MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
 
   fill_unwind_symbols(table, mapinfo_table, mock_output);
-  DDProfPProf pprofs;
-  const PerfOption *perf_option_cpu = perfoptions_preset(10);
+  DDProfPProf pprof;
+  DDProfContext ctx = {};
+  ctx.watchers[0] = *ewatcher_from_str("sCPU");
+  ctx.num_watchers = 1;
+  DDRes res = pprof_create_profile(&pprof, &ctx);
+  EXPECT_TRUE(IsDDResOK(res));
+  res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, &ctx.watchers[0],
+                        &pprof);
 
-  DDRes res = pprof_create_profile(&pprofs, perf_option_cpu, 1);
   EXPECT_TRUE(IsDDResOK(res));
 
-  res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, 0, &pprofs);
-  EXPECT_TRUE(IsDDResOK(res));
+  test_pprof(&pprof);
 
-  test_pprof(&pprofs);
-
-  res = pprof_free_profile(&pprofs);
+  res = pprof_free_profile(&pprof);
   EXPECT_TRUE(IsDDResOK(res));
 }
 
