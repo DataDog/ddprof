@@ -6,37 +6,30 @@
 #include "exporter/ddprof_exporter.h"
 
 extern "C" {
+#include "ddprof/ffi.h"
 #include "ddprof_cmdline.h"
-
-#include <assert.h>
-#include <ddprof/ffi.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string_view>
-#include <time.h>
-#include <unistd.h>
 }
 
+#include "arraysize.h"
+#include "ddprof_ffi_utils.hpp"
 #include "ddres.h"
 #include "defer.hpp"
 #include "tags.hpp"
 
 #include <algorithm>
+#include <assert.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string>
+#include <string_view>
+#include <time.h>
+#include <unistd.h>
 #include <vector>
 
 static const int k_timeout_ms = 10000;
 static const int k_size_api_key = 32;
-
-static ddprof_ffi_CharSlice to_CharSlice(std::string_view str) {
-  return (ddprof_ffi_CharSlice){.ptr = str.data(), .len = str.size()};
-}
-
-static ddprof_ffi_CharSlice to_CharSlice(string_view slice) {
-  return (ddprof_ffi_CharSlice){.ptr = slice.ptr, .len = slice.len};
-}
 
 static char *alloc_url_agent(const char *protocol, const char *host,
                              const char *port) {
@@ -50,20 +43,14 @@ static char *alloc_url_agent(const char *protocol, const char *host,
 }
 
 static DDRes create_pprof_file(ddprof_ffi_Timespec start,
-                               ddprof_ffi_Timespec end, const char *dbg_folder,
-                               int *fd) {
-  char time_start[128] = {0};
-  struct tm tm_storage;
-  struct tm *tm_start = localtime_r(&start.seconds, &tm_storage);
-  strftime(time_start, sizeof time_start, "%Y-%m-%dT%H:%M:%SZ", tm_start);
-
-  char time_end[128] = {0};
-  struct tm *tm_end = localtime_r(&end.seconds, &tm_storage);
-  strftime(time_end, sizeof time_end, "%Y-%m-%dT%H:%M:%SZ", tm_end);
+                               const char *dbg_folder, int *fd) {
+  char time_start[128] = {};
+  tm tm_storage;
+  tm *tm_start = gmtime_r(&start.seconds, &tm_storage);
+  strftime(time_start, sizeof time_start, "%Y%m%dT%H%M%SZ", tm_start);
 
   char filename[400];
-  snprintf(filename, 400, "%s/ddprof_%s_%s.pprof", dbg_folder, time_start,
-           time_end);
+  snprintf(filename, 400, "%s/ddprof_%s.pprof", dbg_folder, time_start);
   LG_NTC("[EXPORTER] Writing pprof to file %s", filename);
   (*fd) = open(filename, O_CREAT | O_RDWR, 0600);
   DDRES_CHECK_INT((*fd), DD_WHAT_EXPORTER, "Failure to create pprof file");
@@ -85,11 +72,10 @@ static DDRes write_profile(const ddprof_ffi_EncodedProfile *encoded_profile,
 static DDRes write_pprof_file(const ddprof_ffi_EncodedProfile *encoded_profile,
                               const char *dbg_folder) {
   int fd = -1;
-  create_pprof_file(encoded_profile->start, encoded_profile->end, dbg_folder,
-                    &fd);
-  write_profile(encoded_profile, fd);
-  close(fd);
-  return ddres_init();
+  DDRES_CHECK_FWD(create_pprof_file(encoded_profile->start, dbg_folder, &fd));
+  defer { close(fd); };
+  DDRES_CHECK_FWD(write_profile(encoded_profile, fd));
+  return {};
 }
 
 extern "C" {
@@ -240,17 +226,17 @@ static DDRes check_send_response_code(uint16_t send_response_code) {
   return ddres_init();
 }
 
-DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
+DDRes ddprof_exporter_export(const ddprof_ffi_Profile *profile,
                              DDProfExporter *exporter) {
   DDRes res = ddres_init();
-  struct ddprof_ffi_SerializeResult serialized_result =
+  ddprof_ffi_SerializeResult serialized_result =
       ddprof_ffi_Profile_serialize(profile);
   defer { ddprof_ffi_SerializeResult_drop(serialized_result); };
   if (serialized_result.tag != DDPROF_FFI_SERIALIZE_RESULT_OK) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to serialize");
   }
 
-  struct ddprof_ffi_EncodedProfile *encoded_profile = &serialized_result.ok;
+  ddprof_ffi_EncodedProfile *encoded_profile = &serialized_result.ok;
 
   if (exporter->_debug_folder) {
     write_pprof_file(encoded_profile, exporter->_debug_folder);
@@ -272,13 +258,12 @@ DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
         .name = to_CharSlice("auto.pprof"),
         .file = profile_data,
     }};
-    struct ddprof_ffi_Slice_file files = {
-        .ptr = files_, .len = sizeof files_ / sizeof *files_};
+    ddprof_ffi_Slice_file files = {.ptr = files_, .len = ARRAY_SIZE(files_)};
 
     ddprof_ffi_Request *request = ddprof_ffi_ProfileExporterV3_build(
         exporter->_exporter, start, end, files, {}, k_timeout_ms);
     if (request) {
-      struct ddprof_ffi_SendResult result = ddprof_ffi_ProfileExporterV3_send(
+      ddprof_ffi_SendResult result = ddprof_ffi_ProfileExporterV3_send(
           exporter->_exporter, request, nullptr);
       defer { ddprof_ffi_SendResult_drop(result); };
 

@@ -3,7 +3,9 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
+extern "C" {
 #include "perf_watcher.h"
+}
 
 #include <stddef.h>
 #include <string.h>
@@ -48,17 +50,13 @@ bool watcher_has_countable_sample_type(const PerfWatcher *watcher) {
   return DDPROF_PWT_NOCOUNT != watcher_to_count_sample_type_id(watcher);
 }
 
-#define BITS2OPT(b)                                                            \
-  ((struct PerfWatcherOptions){.is_kernel = (b)&IS_KERNEL,                     \
-                               .is_freq = (b)&IS_FREQ})
-
-#define X_EVENTS(a, b, c, d, e, f, g) {b, BASE_STYPES, c, d, e, f, BITS2OPT(g)},
+#define X_EVENTS(a, b, c, d, e, f, g) {b, BASE_STYPES, c, d, {e}, f, g},
 const PerfWatcher events_templates[] = {EVENT_CONFIG_TABLE(X_EVENTS)};
 const PerfWatcher tracepoint_templates[] = {{
     .desc = "Tracepoint",
+    .sample_type = BASE_STYPES,
     .type = PERF_TYPE_TRACEPOINT,
     .sample_period = 1,
-    .sample_type = BASE_STYPES,
     .sample_type_id = DDPROF_PWT_TRACEPOINT,
     .options = {.is_kernel = true},
 }};
@@ -76,9 +74,8 @@ int str_to_event_idx(const char *str) {
 
     // We don't want to match partial events, and the event specification
     // demands that events are either whole or immediately preceeded by a comma.
-    if (sz_str < sz_thistype)
-      continue;
-    else if (sz_str > sz_thistype && str[sz_thistype] != ',')
+    if ((sz_str < sz_thistype) ||
+        (sz_str > sz_thistype && str[sz_thistype] != ','))
       continue;
     if (!strncmp(str, event_names[type], sz_thistype))
       return type;

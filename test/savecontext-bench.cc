@@ -8,6 +8,7 @@
 #include "perf.h"
 #include "perf_archmap.h"
 #include "savecontext.hpp"
+#include "syscalls.hpp"
 
 #include <thread>
 
@@ -43,7 +44,6 @@ static void BM_SaveContext(benchmark::State &state) {
 BENCHMARK(BM_SaveContext);
 
 static void BM_GetStackStart(benchmark::State &state) {
-
   for (auto _ : state) {
     get_stack_start();
   }
@@ -63,7 +63,6 @@ static void BM_GetStackStartInThread(benchmark::State &state) {
 BENCHMARK(BM_GetStackStartInThread);
 
 static void BM_GetStackStartTLS(benchmark::State &state) {
-
   for (auto _ : state) {
     get_stack_start_tls();
   }
@@ -81,3 +80,19 @@ static void BM_GetStackStartInThreadTLS(benchmark::State &state) {
 }
 
 BENCHMARK(BM_GetStackStartInThreadTLS);
+
+static void BM_GetPID(benchmark::State &state) {
+  for (auto _ : state) {
+    getpid();
+  }
+}
+
+BENCHMARK(BM_GetPID);
+
+static void BM_GetTID(benchmark::State &state) {
+  for (auto _ : state) {
+    ddprof::gettid();
+  }
+}
+
+BENCHMARK(BM_GetTID);

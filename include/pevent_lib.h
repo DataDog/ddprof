@@ -5,6 +5,10 @@
 
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "ddprof_context.h"
 #include "ddres_def.h"
 #include "pevent.h"
@@ -15,6 +19,9 @@ void pevent_init(PEventHdr *pevent_hdr);
 /// Setup perf event according to requested watchers.
 DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
                   PEventHdr *pevent_hdr);
+
+DDRes pevent_create_custom_ring_buffer(PEvent *pevent,
+                                       size_t ring_buffer_size_order);
 
 /// Setup mmap buffers according to content of peventhdr
 DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override);
@@ -34,3 +41,7 @@ DDRes pevent_close(PEventHdr *pevent_hdr);
 
 /// cleanup watchers = cleanup perfevent + cleanup mmap (clean everything)
 DDRes pevent_cleanup(PEventHdr *pevent_hdr);
+
+#ifdef __cplusplus
+}
+#endif

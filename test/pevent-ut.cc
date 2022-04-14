@@ -12,7 +12,12 @@ extern "C" {
 #include <sys/sysinfo.h>
 #include <unistd.h>
 }
+
+#include "loghandle.hpp"
+
+#include <fstream>
 #include <gtest/gtest.h>
+#include <sys/resource.h>
 
 void mock_ddprof_context(DDProfContext *ctx) {
   ctx->num_watchers = 1;
@@ -21,6 +26,14 @@ void mock_ddprof_context(DDProfContext *ctx) {
 }
 
 TEST(PeventTest, setup_cleanup) {
+  LogHandle handle;
+  rlimit lim;
+  getrlimit(RLIMIT_MEMLOCK, &lim);
+  printf("RLIMIT_MEMLOCK: %lu/%lu\n", lim.rlim_cur, lim.rlim_max);
+  std::ifstream f("/proc/sys/kernel/perf_event_mlock_kb");
+  std::string s;
+  f >> s;
+  printf("perf_event_mlock_kb: %s\n, nprocs: %d\n", s.c_str(), get_nprocs());
   PEventHdr pevent_hdr;
   DDProfContext ctx = {};
   pid_t mypid = getpid();

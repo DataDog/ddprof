@@ -158,12 +158,12 @@ static inline DDRes worker_process_ring_buffers(PEvent *pes, int pe_len,
       // https://github.com/torvalds/linux/blob/v5.16/tools/include/linux/ring_buffer.h#L59
       uint64_t head = __atomic_load_n(&rb->region->data_head, __ATOMIC_ACQUIRE);
       uint64_t tail = rb->region->data_tail;
-
       while (tail != head) {
         events = true;
 
         // Attempt to dispatch the event
         struct perf_event_header *hdr = rb_seek(rb, tail);
+        assert(hdr->size > 0);
         DDRes res = ddprof_worker_process_event(hdr, pes[i].pos, ctx);
 
         // We've processed the current event, so we can advance the ringbuffer

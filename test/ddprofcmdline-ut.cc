@@ -58,7 +58,7 @@ TEST(CmdLineTst, LastEventHit) {
   int idx = DDPROF_PWE_LENGTH - 1;
   const PerfWatcher *w1 = ewatcher_from_idx(idx);
   const PerfWatcher *w2 =
-      ewatcher_from_str("sDUM"); // should be the last watcher
+      ewatcher_from_str("sALLOC"); // should be the last watcher
   ASSERT_NE(nullptr, w1);
   ASSERT_NE(nullptr, w2);
   ASSERT_EQ(w1, w2);
