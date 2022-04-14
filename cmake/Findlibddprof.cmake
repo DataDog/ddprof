@@ -3,10 +3,10 @@
 
 # libddprof : common profiler imported libraries
 ## Associated https://gitlab.ddbuild.io/DataDog/libddprof-build/-/jobs/90384402
-set(TAG_LIBDDPROF "v0.5.0-rc.1" CACHE STRING "libddprof github tag")
+set(TAG_LIBDDPROF "v0.6.0-rc.1" CACHE STRING "libddprof github tag")
 
-set(SHA256_LIBDDPROF_X86 "2db92e2ad87005a043e415fd62079af1f1df3642be9bed3ade840c5533a61063" CACHE STRING "libddprof sha256")
-set(SHA256_LIBDDPROF_ARM "ab4cd1fc9bc3975775bd2ff2122ac0b475533d504965b931d377cca122f7b0b3" CACHE STRING "libddprof sha256")
+set(SHA256_LIBDDPROF_X86 "6b18703b24b5408d7071bfe1ddeb5bf73454ad6669e31b37a8401ad94ca9aed6" CACHE STRING "libddprof sha256")
+set(SHA256_LIBDDPROF_ARM "5000f84c70961b4ae03f0497751cf52a46e29ce4f7c1be2d9eefea491ceec891" CACHE STRING "libddprof sha256")
 
 set(LIBDDPROF_ROOT ${VENDOR_PATH}/libddprof-${TAG_LIBDDPROF})
 if ( "${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64" )
