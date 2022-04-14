@@ -48,7 +48,7 @@ function(add_unit_test name)
         ${MY_UNPARSED_ARGUMENTS})
 
    target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
-   target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST} ${GTEST_INCLUDE_DIRS})
+   target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST} ${GTEST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/include/lib)
 
    add_test(NAME ${name} COMMAND ${name})
    set_tests_properties(${name} PROPERTIES
@@ -56,11 +56,38 @@ function(add_unit_test name)
    disable_clangtidy(${name})
 endfunction()
 
+#[[ Create a benchmark
+Syntax:
+add_benchmark(<name> src1 [src2 ...] [LIBRARIES lib1 lib2 ...] [DEFINITIONS def1 def2])
+will compile an unit test named <name> from source files src1 src2...
+with pre-processor definitions def1 def2 (-Ddef1 -Ddef2 ... will be added to compile command)
+and link against lib1 lib2 ... and libm
+
+Examples:
+add_benchmark(myexe src1.cpp)
+add_benchmark(myexe src1.cpp DEFINITIONS UNIT_TEST)
+#]]
+function(add_benchmark name)
+   set(options)
+   set(oneValueArgs)
+   set(multiValueArgs)
+   cmake_parse_arguments(PARSE_ARGV 1 MY "${options}" "${oneValueArgs}" "${multiValueArgs}")
+   message(STATUS "Creating unit test : " ${name})
+
+   ## Create exe with sources. Always add logger and error management in the unit tests
+   add_exe(${name}
+        ${MY_UNPARSED_ARGUMENTS})
+
+   target_link_libraries(${name} PRIVATE Threads::Threads benchmark::benchmark benchmark::benchmark_main)
+   target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST})
+   disable_clangtidy(${name})
+endfunction()
+
 #### Definition of unit tests ####
 add_unit_test(
     ddprofcmdline-ut
     ../src/ddprof_cmdline.c
-    ../src/perf_watcher.c
+    ../src/perf_watcher.cc
     ddprofcmdline-ut.cc
 )
 
@@ -113,8 +140,8 @@ add_unit_test(
 
 add_unit_test(
     mmap-ut
-    ../src/perf.c
-    ../src/perf_watcher.c
+    ../src/perf.cc
+    ../src/perf_watcher.cc
     mmap-ut.cc
     DEFINITIONS MYNAME="mmap-ut"
 )
@@ -154,15 +181,15 @@ add_unit_test(
     ddprof_input-ut
     ../src/ddprof_cmdline.c
     ../src/ddprof_input.cc
-    ../src/perf_watcher.c
+    ../src/perf_watcher.cc
     ddprof_input-ut.cc
     DEFINITIONS MYNAME="ddprof_input-ut"
 )
 
 add_unit_test(
     perf_ringbuffer-ut
-    ../src/perf.c
-    ../src/perf_watcher.c
+    ../src/perf.cc
+    ../src/perf_watcher.cc
     ../src/perf_ringbuffer.c
     perf_ringbuffer-ut.cc
     DEFINITIONS MYNAME="perf_ringbuffer-ut"
@@ -177,10 +204,10 @@ add_unit_test(
 
 add_unit_test(
     pevent-ut
-    ../src/pevent_lib.c
+    ../src/pevent_lib.cc
     ../src/user_override.c
-    ../src/perf.c
-    ../src/perf_watcher.c
+    ../src/perf.cc
+    ../src/perf_watcher.cc
     ../src/perf_ringbuffer.c
     pevent-ut.cc
     DEFINITIONS MYNAME="pevent-ut"
@@ -190,7 +217,7 @@ add_unit_test(
     ddprof_pprof-ut
     ../src/pprof/ddprof_pprof.cc
     ../src/unwind_output.c
-    ../src/perf_watcher.c
+    ../src/perf_watcher.cc
     ddprof_pprof-ut.cc
     LIBRARIES DDProf::FFI
     DEFINITIONS MYNAME="ddprof_pprof-ut"
@@ -202,7 +229,7 @@ add_unit_test(
     ../src/ddprof_cmdline.c
     ../src/pprof/ddprof_pprof.cc
     ../src/unwind_output.c
-    ../src/perf_watcher.c
+    ../src/perf_watcher.cc
     ../src/tags.cc
     ddprof_exporter-ut.cc
     LIBRARIES DDProf::FFI
@@ -292,8 +319,43 @@ add_unit_test(
     DEFINITIONS MYNAME="savecontext-ut"
 )
 
-add_executable(savecontext-bench savecontext-bench.cc ../src/savecontext.cc)
-target_link_libraries(savecontext-bench benchmark::benchmark benchmark::benchmark_main)
-target_include_directories(savecontext-bench PRIVATE ${DDPROF_INCLUDE_LIST})
-# clang-tidy does like google-benchmark macros
-disable_clangtidy(savecontext-bench)
+add_unit_test(
+    allocation_tracker-ut
+    allocation_tracker-ut.cc
+    ../src/lib/allocation_tracker.cc
+    ../src/base_frame_symbol_lookup.cc
+    ../src/common_mapinfo_lookup.cc
+    ../src/common_symbol_lookup.cc
+    ../src/ddprof_file_info.cc
+    ../src/ddprof_stats.c
+    ../src/dso.cc
+    ../src/dso_hdr.cc
+    ../src/dso_symbol_lookup.cc
+    ../src/dwfl_hdr.cc
+    ../src/dwfl_module.cc
+    ../src/dwfl_symbol.cc
+    ../src/dwfl_symbol_lookup.cc
+    ../src/dwfl_thread_callbacks.cc
+    ../src/pevent_lib.cc
+    ../src/perf.cc
+    ../src/perf_ringbuffer.c
+    ../src/perf_watcher.cc
+    ../src/savecontext.cc
+    ../src/mapinfo_lookup.cc
+    ../src/procutils.c
+    ../src/region_holder.cc
+    ../src/signal_helper.c
+    ../src/statsd.c
+    ../src/user_override.c
+    ../src/unwind.cc
+    ../src/unwind_dwfl.cc
+    ../src/unwind_helpers.cc
+    ../src/unwind_metrics.c
+    ../src/unwind_output.c
+    LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
+    DEFINITIONS ${DDPROF_DEFINITION_LIST})
+
+add_benchmark(savecontext-bench savecontext-bench.cc ../src/savecontext.cc)
+
+add_exe(simple_malloc-static simple_malloc.cc
+        LIBRARIES Threads::Threads dd_profiling-static)

@@ -12,6 +12,7 @@ extern "C" {
 #include <sys/sysinfo.h>
 #include <unistd.h>
 }
+
 #include <gtest/gtest.h>
 
 void mock_ddprof_context(DDProfContext *ctx) {

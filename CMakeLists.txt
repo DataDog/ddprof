@@ -105,6 +105,10 @@ endif()
 string(TOLOWER ${CMAKE_PROJECT_NAME} CMAKE_PROJECT_NAME_LC)
 list(APPEND DDPROF_DEFINITION_LIST "MYNAME=\"${CMAKE_PROJECT_NAME_LC}\"")
 
+if("${CMAKE_BUILD_TYPE}" STREQUAL "Release" OR "${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
+   list(APPEND DDPROF_DEFINITION_LIST "DDPROF_OPTIM=1")
+endif()
+
 include(Version)
 
 # Leave frame pointers to help with profiling
@@ -151,7 +155,7 @@ target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 static_link_cxx(TARGET ddprof)
 
 # Link time optim
-if( LTO_SUPPORTED AND "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+if(LTO_SUPPORTED AND "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
    set_property(TARGET ddprof PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 
@@ -167,7 +171,9 @@ add_custom_command(OUTPUT ${DDPROF_EXE_OBJECT}
   DEPENDS ddprof
 )
 
-set(DD_PROFILING_SOURCES src/lib/dd_profiling.cc src/ddprof_cmdline.c src/logger.c src/logger_setup.cc src/ipc.cc src/perf_watcher.c
+set(DD_PROFILING_SOURCES src/lib/dd_profiling.cc src/ddprof_cmdline.c src/logger.c src/logger_setup.cc src/ipc.cc 
+                         src/pevent_lib.cc src/perf.cc src/perf_ringbuffer.c src/perf_watcher.cc src/user_override.c
+                         src/ddres_list.c src/savecontext.cc src/lib/malloc_wrapper.cc src/lib/allocation_tracker.cc
                          $<TARGET_OBJECTS:ddprof_exe_object>)
 add_library(ddprof_exe_object OBJECT IMPORTED GLOBAL)
 set_target_properties(ddprof_exe_object PROPERTIES IMPORTED_OBJECTS "${DDPROF_EXE_OBJECT}")
@@ -183,6 +189,7 @@ set_target_properties(dd_profiling-shared PROPERTIES OUTPUT_NAME dd_profiling)
 target_include_directories(dd_profiling-shared PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
 set_target_properties(dd_profiling-static PROPERTIES
    PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
+target_link_libraries(dd_profiling-static PUBLIC dl pthread)
 
 # Link libstdc++/libgcc statically and export only profiler API
 static_link_cxx(TARGET dd_profiling-shared)
@@ -194,13 +201,13 @@ target_link_options(dd_profiling-shared PRIVATE "LINKER:--version-script=${CMAKE
 # The cause of the error is that gcc puts `-lstdc++` before `-lubsan` in the linker invocation
 # Workaround is add another `-lstdc++` after `-lubsan` at the end, we cannot use `-static-libstdc++` because it does not force gcc to another `-lstdc++` at the end
 target_link_libraries(dd_profiling-shared PRIVATE "$<$<AND:$<C_COMPILER_ID:GNU>,$<CONFIG:SanitizedDebug>>:-Wl,-Bstatic;-lubsan;-lasan;-lstdc++;-Wl,-Bdynamic>")
+target_link_libraries(dd_profiling-shared PUBLIC dl pthread)
 
 install(TARGETS ddprof dd_profiling-static dd_profiling-shared
         RUNTIME DESTINATION ddprof/bin
         LIBRARY DESTINATION ddprof/lib
         ARCHIVE DESTINATION ddprof/lib
         PUBLIC_HEADER DESTINATION ddprof/include)
-
 
 #######################################
 ### Declaration of native library   ###

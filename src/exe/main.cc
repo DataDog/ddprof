@@ -146,13 +146,35 @@ int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
   }
 
   if (ctx->params.sockfd != -1 && ctx->params.wait_on_socket) {
+    ddprof::ReplyMessage reply;
+    reply.request = ddprof::RequestMessage::kProfilerInfo;
+    reply.pid = getpid();
+
+    int alloc_watcher_idx =
+        ddprof_context_allocation_profiling_watcher_idx(ctx);
+    if (alloc_watcher_idx != -1) {
+      ddprof::span pevents{ctx->worker_ctx.pevent_hdr.pes,
+                           ctx->worker_ctx.pevent_hdr.size};
+      auto event_it = std::find_if(pevents.begin(), pevents.end(),
+                   [alloc_watcher_idx](const auto &pevent) {
+                     return pevent.pos == alloc_watcher_idx;
+                   });
+      if (event_it != pevents.end()) {
+        reply.ring_buffer.event_fd = event_it->fd;
+        reply.ring_buffer.ring_fd = event_it->mapfd;
+        reply.ring_buffer.mem_size = perf_mmap_size(DEFAULT_BUFF_SIZE_SHIFT);
+        reply.allocation_profiling_rate = ctx->watchers[alloc_watcher_idx].sample_period;
+      }
+    }
+
     try {
       // Takes ownership of the open socket, socket will be closed when
       // exiting this block
       ddprof::Server server{ddprof::UnixSocket{ctx->params.sockfd}};
       ctx->params.sockfd = -1;
 
-      server.waitForRequest();
+      server.waitForRequest(
+          [&reply](const ddprof::RequestMessage &) { return reply; });
     } catch (const ddprof::DDException &e) {
       LOG_ERROR_DETAILS(LG_ERR, e.get_DDRes()._what);
       return -1;

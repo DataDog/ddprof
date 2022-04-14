@@ -12,9 +12,13 @@
 #define MAX_NB_WATCHERS 450
 
 typedef struct PEvent {
-  int pos;       // Index into the sample
-  int fd;        // Underlying perf event FD
-  RingBuffer rb; // metadata and buffers for processing perf ringbuffer
+  int pos; // Index into the sample
+  int fd; // Underlying perf event FD for perf_events, otherwise an eventfd that
+          // signals data is available in ring buffer
+  int mapfd;         // FD for ring buffer, same as `fd` for perf events
+  bool custom_event; // true if custom event (not handled by perf, eg. memory
+                     // allocations)
+  RingBuffer rb;     // metadata and buffers for processing perf ringbuffer
 } PEvent;
 
 typedef struct PEventHdr {

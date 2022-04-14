@@ -5,12 +5,15 @@
 
 #include "dd_profiling.h"
 
+#include "allocation_tracker.hpp"
+
 extern "C" {
 #include "ddprof_cmdline.h"
 #include "logger_setup.h"
 }
 #include "defer.hpp"
 #include "ipc.hpp"
+#include "syscalls.hpp"
 
 #include <cerrno>
 #include <chrono>
@@ -26,17 +29,19 @@ extern "C" {
 #include <thread>
 #include <unistd.h>
 
-static constexpr const char *const kProfilerActiveEnvVariable =
-    "DDPDD_PROFILING_NATIVE_LIBRARY_ACTIVE";
-static constexpr const char *const kProfilerAutoStartEnvVariable =
+static constexpr const char *k_profiler_active_env_variable =
+    "DD_PROFILING_NATIVE_LIBRARY_ACTIVE";
+static constexpr const char *k_profiler_auto_start_env_variable =
     "DD_PROFILING_NATIVE_AUTOSTART";
 
+// address of embedded ddprof executable
 extern const char _binary_ddprof_start[]; // NOLINT cert-dcl51-cpp
 extern const char _binary_ddprof_end[];   // NOLINT cert-dcl51-cpp
 
 namespace {
 struct ProfilerState {
   bool started = false;
+  bool allocation_profiling_started = false;
   pid_t profiler_pid = 0;
 };
 
@@ -44,14 +49,23 @@ ProfilerState g_state;
 
 // return true if this profiler is active for this process or one of its parent
 bool is_profiler_library_active() {
-  return getenv(kProfilerActiveEnvVariable) != nullptr;
+  return getenv(k_profiler_active_env_variable) != nullptr;
 }
 
 void set_profiler_library_active() {
-  setenv(kProfilerActiveEnvVariable, "1", 1);
+  setenv(k_profiler_active_env_variable, "1", 1);
 }
 
-void set_profiler_library_inactive() { unsetenv(kProfilerActiveEnvVariable); }
+void set_profiler_library_inactive() {
+  unsetenv(k_profiler_active_env_variable);
+}
+
+void allocation_profiling_stop() {
+  if (g_state.allocation_profiling_started) {
+    ddprof::allocation_tracking_free();
+    g_state.allocation_profiling_started = false;
+  }
+}
 
 struct ProfilerAutoStart {
   ProfilerAutoStart() noexcept {
@@ -60,7 +74,7 @@ struct ProfilerAutoStart {
     // and library will not be loaded.
 
     bool autostart = false;
-    const char *autostart_env = getenv(kProfilerAutoStartEnvVariable);
+    const char *autostart_env = getenv(k_profiler_auto_start_env_variable);
     if (autostart_env && arg_yesno(autostart_env, 1)) {
       autostart = true;
     } else {
@@ -83,6 +97,47 @@ struct ProfilerAutoStart {
 
 ProfilerAutoStart g_autostart;
 } // namespace
+
+static int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
+  char ddprof_str[] = "ddprof";
+
+  int fd = ddprof::memfd_create(ddprof_str, 1U /*MFD_CLOEXEC*/);
+
+  if (fd == -1) {
+    return -1;
+  }
+  defer { close(fd); };
+
+  if (write(fd, _binary_ddprof_start,
+            // cppcheck-suppress comparePointers
+            _binary_ddprof_end - _binary_ddprof_start) == -1) {
+    return -1;
+  }
+
+  char pid_buf[32];
+  snprintf(pid_buf, sizeof(pid_buf), "%d", target_pid);
+  char sock_buf[32];
+  snprintf(sock_buf, sizeof(sock_buf), "%d", sock_fd);
+
+  char pid_opt_str[] = "-p";
+  char sock_opt_str[] = "-Z";
+
+  char *argv[] = {ddprof_str,   pid_opt_str, pid_buf,
+                  sock_opt_str, sock_buf,    NULL};
+
+  // unset LD_PRELOAD, otherwise if libdd_profiling.so was preloaded, it
+  // would trigger a fork bomb
+  unsetenv("LD_PRELOAD");
+
+  kill(parent_pid, SIGTERM);
+
+  if (fexecve(fd, argv, environ) == -1) {
+    return -1;
+  }
+
+  // unreachable
+  return -1;
+}
 
 static int ddprof_start_profiling_internal() {
   // Refuse to start profiler if already started by this process or if active if
@@ -134,55 +189,24 @@ static int ddprof_start_profiling_internal() {
     pid_t grandchild_pid = fork();
     if (grandchild_pid == 0) {
       // executed in grand child (ie. ddprof process)
-      char ddprof_str[] = "ddprof";
 
-      int fd = syscall(SYS_memfd_create, ddprof_str, 1U /*MFD_CLOEXEC*/);
-
-      if (fd == -1) {
-        return -1;
-      }
-      defer { close(fd); };
-
-      if (write(fd, _binary_ddprof_start,
-                // cppcheck-suppress comparePointers
-                _binary_ddprof_end - _binary_ddprof_start) == -1) {
-        return -1;
-      }
-
-      char pid_buf[32];
-      snprintf(pid_buf, sizeof(pid_buf), "%d", target_pid);
-      char sock_buf[32];
-      snprintf(sock_buf, sizeof(sock_buf), "%d", sockfds[1]);
-
-      char pid_opt_str[] = "-p";
-      char sock_opt_str[] = "-Z";
-
-      char *argv[] = {ddprof_str,   pid_opt_str, pid_buf,
-                      sock_opt_str, sock_buf,    NULL};
-
-      // unset LD_PRELOAD, otherwise if libdd_profiling.so was preloaded, it
-      // would trigger a fork bomb
-      unsetenv("LD_PRELOAD");
-
-      kill(middle_pid, SIGTERM);
-
-      if (fexecve(fd, argv, environ) == -1) {
-        return -1;
-      }
+      // exec_ddprof does not return on success
+      exec_ddprof(target_pid, middle_pid, sockfds[kChildIdx]);
     } else {
       // executed in intermediate process
       defer_socketclose.reset();
 
       // waiting to be killed by grand child (ie. ddprof process)
       waitpid(grandchild_pid, NULL, 0);
-
-      // should never be executed
-      return -1;
     }
+
+    // should never be executed
+    exit(1);
   }
 
   // executed by parent process
 
+  // close child socket end
   close(sockfds[kChildIdx]);
 
   // wait for the intermediate processs to be killed
@@ -190,14 +214,22 @@ static int ddprof_start_profiling_internal() {
 
   try {
     ddprof::Client client{ddprof::UnixSocket{sockfds[kParentIdx]}};
-    g_state.profiler_pid = client.get_profiler_pid();
-  } catch(const ddprof::DDException& e) {
-    return -1;
-  }
+    auto info = client.get_profiler_info();
+    g_state.profiler_pid = info.pid;
+    if (info.allocation_profiling_rate > 0) {
+      ddprof::allocation_tracking_init(info.allocation_profiling_rate, false,
+                                       info.ring_buffer);
+      g_state.allocation_profiling_started = true;
+    }
+  } catch (const ddprof::DDException &e) { return -1; }
 
+  if (g_state.allocation_profiling_started) {
+    // disable allocation profiling in child upon fork
+    pthread_atfork(nullptr, nullptr, &allocation_profiling_stop);
+  }
   g_state.started = true;
   set_profiler_library_active();
-  
+
   return 0;
 }
 
@@ -217,6 +249,10 @@ void ddprof_stop_profiling(int timeout_ms) {
     g_state.started = false;
     set_profiler_library_inactive();
   };
+
+  if (g_state.allocation_profiling_started) {
+    allocation_profiling_stop();
+  }
 
   auto time_limit =
       std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
