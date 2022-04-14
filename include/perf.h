@@ -14,8 +14,11 @@
 #include "perf_archmap.h"
 #include "perf_watcher.h"
 
+// defaut ring buffer size expressed as a power-of-two in number of pages
+#define DEFAULT_BUFF_SIZE_SHIFT 6
+
 #define PSAMPLE_DEFAULT_WAKEUP_MS 100 // sample frequency check
-#define PERF_SAMPLE_STACK_SIZE (4096 * 8)
+#define PERF_SAMPLE_STACK_SIZE (4096UL * 8)
 
 typedef struct read_format {
   uint64_t value;        // The value of the event
@@ -113,8 +116,8 @@ typedef struct perf_samplestacku {
 int perf_event_open(struct perf_event_attr *, pid_t, int, int, unsigned long);
 int perfopen(pid_t pid, const PerfWatcher *opt, int cpu, bool extras);
 size_t perf_mmap_size(int buf_size_shift);
-void *perfown_sz(int fd, size_t size_of_buffer);
-void *perfown(int fd, size_t *size);
-int perfdisown(void *region, size_t size);
+void *perfown_sz(int fd, size_t size_of_buffer, bool mirror);
+void *perfown(int fd, bool mirror, size_t *size);
+int perfdisown(void *region, size_t size, bool is_mirrored);
 long get_page_size(void);
 size_t get_mask_from_size(size_t size);

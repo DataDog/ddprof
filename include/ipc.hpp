@@ -9,6 +9,7 @@
 #include "span.hpp"
 
 #include <chrono>
+#include <functional>
 #include <system_error>
 
 namespace ddprof {
@@ -70,22 +71,23 @@ private:
 
 struct RequestMessage {
   // Request flags
-  enum { kPid = 1, kRingBuffer = 2 };
+  enum { kProfilerInfo = 1 };
   // request is bit mask of request flags
   uint32_t request = 0;
 };
 
 struct RingBufferInfo {
-  uint64_t mem_size = 0;
-  int mem_fd = -1;
+  int64_t mem_size = -1;
+  int ring_fd = -1;
   int event_fd = -1;
 };
 
 struct ReplyMessage {
   // reply with the request flags from the request
   uint32_t request = 0;
-  // pid is returned if request & kPid
+  // profiler pid
   int32_t pid = -1;
+  int64_t allocation_profiling_rate = -1;
   // RingBufferInfo is returned if request & kRingBuffer
   RingBufferInfo ring_buffer;
 };
@@ -95,8 +97,7 @@ public:
   explicit Client(UnixSocket &&socket,
                   std::chrono::microseconds timeout = kDefaultSocketTimeout);
 
-  pid_t get_profiler_pid();
-  RingBufferInfo get_ring_buffer();
+  ReplyMessage get_profiler_info();
 
 private:
   UnixSocket _socket;
@@ -107,7 +108,8 @@ public:
   explicit Server(UnixSocket &&socket,
                   std::chrono::microseconds timeout = kDefaultSocketTimeout);
 
-  void waitForRequest();
+  using ReplyFunc = std::function<ReplyMessage(const RequestMessage &)>;
+  void waitForRequest(ReplyFunc func);
 
 private:
   UnixSocket _socket;

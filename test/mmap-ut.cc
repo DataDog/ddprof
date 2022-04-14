@@ -3,18 +3,20 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include <gtest/gtest.h>
-#include <string>
+extern "C" {
+#include "perf.h"
+}
+
+#include "syscalls.hpp"
 
 #include <cstdio>
 #include <cstdlib>
-
-extern "C" {
 #include <fcntl.h>
-#include <perf.h>
+#include <gtest/gtest.h>
+#include <string>
 #include <sys/mman.h>
+#include <sys/syscall.h>
 #include <unistd.h>
-}
 
 // Simple test to see if mlock fails for large sizes
 TEST(MMapTest, Mlock32KB) {
@@ -63,7 +65,7 @@ TEST(MMapTest, PerfOpen) {
       std::cerr << "mmap size attempt --> " << mmap_size << "("
                 << buf_size_shift << ")";
 
-      region = perfown_sz(perf_fd, mmap_size);
+      region = perfown_sz(perf_fd, mmap_size, false);
 
       if (!region) {
         std::cerr << " = FAILURE !!!" << std::endl;
@@ -76,7 +78,30 @@ TEST(MMapTest, PerfOpen) {
       std::cerr << "FULL SUCCESS (size=" << mmap_size << ")" << std::endl;
     }
     ASSERT_TRUE(region);
-    perfdisown(region, mmap_size);
+    ASSERT_EQ(perfdisown(region, mmap_size, false), 0);
     close(perf_fd);
   }
+}
+
+TEST(MMapTest, Mirroring) {
+  int buf_size_shift = 0;
+  size_t mmap_size = perf_mmap_size(buf_size_shift);
+
+  int fd = ddprof::memfd_create("foo", 0);
+  ASSERT_NE(fd, -1);
+  ASSERT_EQ(ftruncate(fd, mmap_size), 0);
+
+  std::byte *region = static_cast<std::byte *>(perfown_sz(fd, mmap_size, true));
+  ASSERT_TRUE(region);
+
+  size_t usable_size = mmap_size - get_page_size();
+  std::byte *start = region + get_page_size();
+  std::byte *end = start + usable_size;
+
+  *start = static_cast<std::byte>(0xff);
+  EXPECT_EQ(*region, std::byte{0});
+  EXPECT_EQ(*end, std::byte{0xff});
+
+  close(fd);
+  ASSERT_EQ(perfdisown(region, mmap_size, true), 0);
 }

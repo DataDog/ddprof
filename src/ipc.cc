@@ -20,7 +20,8 @@ namespace {
 struct InternalResponseMessage {
   uint32_t request;
   int32_t pid;
-  uint64_t mem_size;
+  int64_t mem_size;
+  int64_t allocation_profiling_rate;
 };
 
 timeval to_timeval(std::chrono::microseconds duration) noexcept {
@@ -210,13 +211,14 @@ DDRes send(UnixSocket &socket, const RequestMessage &msg) {
 }
 
 DDRes send(UnixSocket &socket, const ReplyMessage &msg) {
-  int fds[2] = {msg.ring_buffer.mem_fd, msg.ring_buffer.event_fd};
-  ddprof::span<int> fd_span{
-      fds, (msg.request & RequestMessage::kRingBuffer) ? 2ul : 0ul};
+  int fds[2] = {msg.ring_buffer.ring_fd, msg.ring_buffer.event_fd};
+  ddprof::span<int> fd_span{fds, (msg.ring_buffer.mem_size != -1) ? 2ul : 0ul};
   std::error_code ec;
   InternalResponseMessage data = {.request = msg.request,
                                   .pid = msg.pid,
-                                  .mem_size = msg.ring_buffer.mem_size};
+                                  .mem_size = msg.ring_buffer.mem_size,
+                                  .allocation_profiling_rate =
+                                      msg.allocation_profiling_rate};
   socket.send(to_byte_span(&data), fd_span, ec);
   DDRES_CHECK_ERRORCODE(ec, DD_WHAT_SOCKET, "Unable to send response message");
   return {};
@@ -243,14 +245,15 @@ DDRes receive(UnixSocket &socket, ReplyMessage &msg) {
   DDRES_CHECK_ERRORCODE(ec, DD_WHAT_SOCKET,
                         "Unable to receive response message");
   if (res.first != sizeof(data) ||
-      ((data.request & RequestMessage::kRingBuffer) ^ (res.second == 2))) {
+      ((data.mem_size != -1) ^ (res.second == 2))) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_SOCKET,
                            "Unable to receive response message");
   }
   msg.pid = data.pid;
   msg.request = data.request;
+  msg.allocation_profiling_rate = data.allocation_profiling_rate;
   msg.ring_buffer.mem_size = data.mem_size;
-  msg.ring_buffer.mem_fd = fds[0];
+  msg.ring_buffer.ring_fd = fds[0];
   msg.ring_buffer.event_fd = fds[1];
   return {};
 }
@@ -268,21 +271,12 @@ Client::Client(UnixSocket &&socket, std::chrono::microseconds timeout)
   }
 }
 
-pid_t Client::get_profiler_pid() {
-  ddprof::RequestMessage request = {.request = ddprof::RequestMessage::kPid};
-  DDRES_CHECK_THROW_EXCEPTION(ddprof::send(_socket, request));
-  ddprof::ReplyMessage reply;
+ReplyMessage Client::get_profiler_info() {
+  RequestMessage request = {.request = RequestMessage::kProfilerInfo};
+  DDRES_CHECK_THROW_EXCEPTION(send(_socket, request));
+  ReplyMessage reply;
   DDRES_CHECK_THROW_EXCEPTION(ddprof::receive(_socket, reply));
-  return reply.pid;
-}
-
-RingBufferInfo Client::get_ring_buffer() {
-  ddprof::RequestMessage request = {.request =
-                                        ddprof::RequestMessage::kRingBuffer};
-  DDRES_CHECK_THROW_EXCEPTION(ddprof::send(_socket, request));
-  ddprof::ReplyMessage reply;
-  DDRES_CHECK_THROW_EXCEPTION(ddprof::receive(_socket, reply));
-  return reply.ring_buffer;
+  return reply;
 }
 
 Server::Server(UnixSocket &&socket, std::chrono::microseconds timeout)
@@ -298,14 +292,10 @@ Server::Server(UnixSocket &&socket, std::chrono::microseconds timeout)
   }
 }
 
-void Server::waitForRequest() {
+void Server::waitForRequest(ReplyFunc func) {
   RequestMessage request;
   DDRES_CHECK_THROW_EXCEPTION(ddprof::receive(_socket, request));
-  ReplyMessage reply;
-  if (request.request & RequestMessage::kPid) {
-    reply.pid = getpid();
-  }
-  if (request.request & RequestMessage::kRingBuffer) {}
+  ReplyMessage reply = func(request);
   DDRES_CHECK_THROW_EXCEPTION(ddprof::send(_socket, reply));
 }
 

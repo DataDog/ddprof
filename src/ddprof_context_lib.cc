@@ -5,19 +5,24 @@
 
 #include "ddprof_context_lib.h"
 
+extern "C" {
 #include "ddprof_cmdline.h"
 #include "ddprof_context.h"
 #include "ddprof_input.h"
 #include "logger.h"
 #include "logger_setup.h"
+}
 
+#include "span.hpp"
+
+#include <algorithm>
 #include <errno.h>
 #include <sys/sysinfo.h>
 #include <unistd.h>
 
 /****************************  Argument Processor  ***************************/
 DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
-  memset(ctx, 0, sizeof(DDProfContext));
+  *ctx = {};
   setup_logger(input->log_mode, input->log_level);
 
   // Shallow copy of the watchers from the input object into the context.
@@ -31,6 +36,17 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   if (!ctx->num_watchers) {
     ctx->num_watchers = 1;
     ctx->watchers[0] = *ewatcher_from_str("sCPU");
+  }
+
+  ddprof::span watchers{ctx->watchers, static_cast<size_t>(ctx->num_watchers)};
+  if (std::find_if(watchers.begin(), watchers.end(),
+                   [](const auto &watcher) {
+                     return watcher.type < PERF_TYPE_MAX;
+                   }) == watchers.end() &&
+      ctx->num_watchers < MAX_TYPE_WATCHER) {
+    // if there are no perf active watcher, add a dummy watcher to be notified
+    // on process exit
+    ctx->watchers[ctx->num_watchers++] = *ewatcher_from_str("sDUM");
   }
 
   DDRES_CHECK_FWD(exporter_input_copy(&input->exp_input, &ctx->exp_input));
@@ -206,7 +222,7 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   ctx->params.wait_on_socket = false;
   if (input->socket && strlen(input->socket) > 0) {
     char *endptr;
-    int res = strtoul(input->socket, &endptr, 10);
+    auto res = strtoul(input->socket, &endptr, 10);
     // checking that stroul actually succeeded is a pain
     if (*endptr == '\0' && (res != ULONG_MAX || errno != ERANGE)) {
       ctx->params.sockfd = res;
@@ -223,9 +239,23 @@ void ddprof_context_free(DDProfContext *ctx) {
     exporter_input_free(&ctx->exp_input);
     free((char *)ctx->params.internal_stats);
     free((char *)ctx->params.tags);
-    memset(ctx, 0, sizeof(*ctx)); // also sets ctx->initialized to false
+    *ctx = {};
     if (ctx->params.sockfd != -1) {
       close(ctx->params.sockfd);
     }
   }
+}
+
+int ddprof_context_allocation_profiling_watcher_idx(const DDProfContext *ctx) {
+  ddprof::span watchers{ctx->watchers, static_cast<size_t>(ctx->num_watchers)};
+  auto it =
+      std::find_if(watchers.begin(), watchers.end(), [](const auto &watcher) {
+        return watcher.type == kDDPROF_TYPE_CUSTOM &&
+            watcher.config == kDDPROF_COUNT_ALLOCATIONS;
+      });
+
+  if (it != watchers.end()) {
+    return it - watchers.begin();
+  }
+  return -1;
 }
