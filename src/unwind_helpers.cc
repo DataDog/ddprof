@@ -66,6 +66,9 @@ void add_virtual_base_frame(UnwindState *us) {
                         us->symbol_hdr._dso_symbol_lookup, us->dso_hdr));
 }
 
+void add_perfmap_frame(UnwindState *us, ProcessAddress_t addr) {
+}
+
 // read a word from the given stack
 bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
   *result = 0;

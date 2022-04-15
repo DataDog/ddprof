@@ -17,6 +17,8 @@ extern "C" {
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
 
+#include <fstream>
+
 extern "C" {
 int frame_cb(Dwfl_Frame *, void *);
 }
@@ -99,6 +101,39 @@ static void copy_current_registers(const Dwfl_Frame *state,
   current_regs.eip = state->regs[16];
 }
 
+bool add_anon_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc) {
+  // TODO
+  // This doesn't respect mount or PID namespaces, try harder
+  std::string line;
+  std::ifstream fs("/tmp/perf-" + std::to_string(dso._pid) + ".map");
+  while (std::getline(fs, line)) {
+    std::vector<std::string> el;
+    size_t i1 = line.find(' ');
+    size_t i2 = i1 + 1 + line.substr(i1+1).find(' ');
+    unsigned long addr_start = std::stoul(line, nullptr, 16);
+    unsigned long addr_end = addr_start + std::stoul(line.substr(i1+1), nullptr, 16);
+
+    if (pc >= addr_start && pc < addr_end) {
+      std::string str = line.substr(i2);
+      FunLoc *loc = &us->output.locs[us->output.nb_locs];
+
+      // Push the symbol into the symbol table
+      Symbol sym(addr_start, str, str, 0, std::string()); 
+      loc->_symbol_idx = us->symbol_hdr._symbol_table.size();
+      us->symbol_hdr._symbol_table.push_back(sym);
+
+      loc->ip = pc;
+      loc->_map_info_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
+                            us->pid,
+                            us->symbol_hdr._mapinfo_table,
+                            dso);
+      us->output.nb_locs++;
+      return true;
+    }
+  }
+  return false;
+}
+
 // returns true if we should continue unwinding
 static bool add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
 
@@ -131,6 +166,9 @@ static bool add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   }
 
   // Now we register
+  if (find_res.first->second._type == dso::kAnon)
+    if (add_anon_frame(us, find_res.first->second, pc))
+      return true;
   add_dwfl_frame(us, find_res.first->second, pc);
   return true;
 }
@@ -201,7 +239,7 @@ void add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc) {
           us->_dwfl_wrapper->_dwfl, unwind_symbol_hdr._symbol_table,
           unwind_symbol_hdr._dso_symbol_lookup, pc, dso, file_info_value);
 #ifdef DEBUG
-  LG_NTC("Considering frame with IP : %lx / %s ", pc,
+  LG_PRINT("Considering frame with IP : %lx / %s ", pc,
          us->symbol_hdr._symbol_table[output->locs[current_loc_idx]._symbol_idx]
              ._symname.c_str());
 #endif
