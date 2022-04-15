@@ -14,6 +14,7 @@ extern "C" {
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string_view>
 #include <time.h>
 #include <unistd.h>
 }
@@ -29,8 +30,9 @@ extern "C" {
 static const int k_timeout_ms = 10000;
 static const int k_size_api_key = 32;
 
-static ddprof_ffi_CharSlice cpp_string_to_CharSlice(const std::string &str) {
-  return (ddprof_ffi_CharSlice){.ptr = (char *)str.c_str(), .len = str.size()};
+static ddprof_ffi_CharSlice
+cpp_string_to_CharSlice(const std::string_view &str) {
+  return (ddprof_ffi_CharSlice){.ptr = (char *)str.data(), .len = str.size()};
 }
 
 static ddprof_ffi_CharSlice string_view_to_CharSlice(string_view slice) {
@@ -141,49 +143,69 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
   return ddres_init();
 }
 
-static void fill_tags(const UserTags *user_tags, const DDProfExporter *exporter,
-                      std::vector<ddprof_ffi_Tag> &tags_exporter) {
-  tags_exporter.push_back(ddprof_ffi_Tag{
-      .name = char_star_to_CharSlice("language"),
-      .value = string_view_to_CharSlice(exporter->_input.language)});
-
-  if (exporter->_input.environment) {
-    tags_exporter.push_back(ddprof_ffi_Tag{
-        .name = char_star_to_CharSlice("env"),
-        .value = char_star_to_CharSlice(exporter->_input.environment)});
+static DDRes add_single_tag_c(ddprof_ffi_Vec_tag &tags_exporter,
+                              const char *key, string_view value) {
+  ddprof_ffi_PushTagResult push_tag_res =
+      ddprof_ffi_Vec_tag_push(&tags_exporter, char_star_to_CharSlice(key),
+                              string_view_to_CharSlice(value));
+  defer { ddprof_ffi_PushTagResult_drop(push_tag_res); };
+  if (push_tag_res.tag == DDPROF_FFI_PUSH_TAG_RESULT_ERR) {
+    LG_ERR("[EXPORTER] Failure generate tag (%.*s)", (int)push_tag_res.err.len,
+           push_tag_res.err.ptr);
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to generate tags");
   }
+  return ddres_init();
+}
 
-  if (exporter->_input.service_version) {
-    tags_exporter.push_back(ddprof_ffi_Tag{
-        .name = char_star_to_CharSlice("version"),
-        .value = char_star_to_CharSlice(exporter->_input.service_version)});
+static DDRes add_single_tag_cpp(ddprof_ffi_Vec_tag &tags_exporter,
+                                std::string_view key, std::string_view value) {
+  ddprof_ffi_PushTagResult push_tag_res =
+      ddprof_ffi_Vec_tag_push(&tags_exporter, cpp_string_to_CharSlice(key),
+                              cpp_string_to_CharSlice(value));
+  defer { ddprof_ffi_PushTagResult_drop(push_tag_res); };
+  if (push_tag_res.tag == DDPROF_FFI_PUSH_TAG_RESULT_ERR) {
+    LG_ERR("[EXPORTER] Failure generate tag (%.*s)", (int)push_tag_res.err.len,
+           push_tag_res.err.ptr);
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to generate tags");
   }
+  return ddres_init();
+}
 
-  if (exporter->_input.service) {
-    tags_exporter.push_back(ddprof_ffi_Tag{
-        .name = char_star_to_CharSlice("service"),
-        .value = char_star_to_CharSlice(exporter->_input.service)});
-  }
+static DDRes fill_tags(const UserTags *user_tags,
+                       const DDProfExporter *exporter,
+                       ddprof_ffi_Vec_tag &tags_exporter) {
 
-  if (exporter->_input.profiler_version.len) {
-    tags_exporter.push_back(ddprof_ffi_Tag{
-        .name = char_star_to_CharSlice("profiler_version"),
-        .value = string_view_to_CharSlice(exporter->_input.profiler_version)});
-  }
+  DDRES_CHECK_FWD(
+      add_single_tag_cpp(tags_exporter, std::string_view("language"),
+                         std::string_view(exporter->_input.language.ptr,
+                                          exporter->_input.language.len)));
+
+  DDRES_CHECK_FWD(
+      add_single_tag_cpp(tags_exporter, std::string_view("language"),
+                         std::string_view(exporter->_input.environment)));
+
+  DDRES_CHECK_FWD(
+      add_single_tag_cpp(tags_exporter, "version",
+                         std::string_view(exporter->_input.service_version)));
+
+  DDRES_CHECK_FWD(add_single_tag_cpp(
+      tags_exporter, "service", std::string_view(exporter->_input.service)));
+
+  DDRES_CHECK_FWD(add_single_tag_c(tags_exporter, "profiler_version",
+                                   exporter->_input.profiler_version));
 
   std::for_each(user_tags->_tags.begin(), user_tags->_tags.end(),
                 [&](ddprof::Tag const &el) {
-                  tags_exporter.push_back(ddprof_ffi_Tag{
-                      .name = cpp_string_to_CharSlice(el.first),
-                      .value = cpp_string_to_CharSlice(el.second)});
+                  // todo error things
+                  add_single_tag_cpp(tags_exporter, el.first, el.second);
                 });
+
+  return ddres_init();
 }
 
 DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
-  std::vector<ddprof_ffi_Tag> tags_exporter;
+  ddprof_ffi_Vec_tag tags_exporter = ddprof_ffi_Vec_tag_new();
   fill_tags(user_tags, exporter, tags_exporter);
-  ddprof_ffi_Slice_tag tags = {.ptr = &tags_exporter[0],
-                               .len = tags_exporter.size()};
 
   ddprof_ffi_CharSlice base_url = char_star_to_CharSlice(exporter->_url);
   ddprof_ffi_EndpointV3 endpoint;
@@ -197,7 +219,8 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
 
   ddprof_ffi_NewProfileExporterV3Result new_exporterv3 =
       ddprof_ffi_ProfileExporterV3_new(
-          string_view_to_CharSlice(exporter->_input.family), tags, endpoint);
+          string_view_to_CharSlice(exporter->_input.family), &tags_exporter,
+          endpoint);
 
   if (new_exporterv3.tag == DDPROF_FFI_NEW_PROFILE_EXPORTER_V3_RESULT_OK) {
     exporter->_exporter = new_exporterv3.ok;
@@ -274,8 +297,8 @@ DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
     ddprof_ffi_Request *request = ddprof_ffi_ProfileExporterV3_build(
         exporter->_exporter, start, end, files, {}, k_timeout_ms);
     if (request) {
-      struct ddprof_ffi_SendResult result =
-          ddprof_ffi_ProfileExporterV3_send(exporter->_exporter, request);
+      struct ddprof_ffi_SendResult result = ddprof_ffi_ProfileExporterV3_send(
+          exporter->_exporter, request, nullptr);
       defer { ddprof_ffi_SendResult_drop(result); };
 
       if (result.tag == DDPROF_FFI_SEND_RESULT_FAILURE) {
