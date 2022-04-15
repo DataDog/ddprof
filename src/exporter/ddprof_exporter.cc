@@ -194,12 +194,9 @@ static DDRes fill_tags(const UserTags *user_tags,
   DDRES_CHECK_FWD(add_single_tag_c(tags_exporter, "profiler_version",
                                    exporter->_input.profiler_version));
 
-  std::for_each(user_tags->_tags.begin(), user_tags->_tags.end(),
-                [&](ddprof::Tag const &el) {
-                  // todo error things
-                  add_single_tag_cpp(tags_exporter, el.first, el.second);
-                });
-
+  for (auto &el : user_tags->_tags) {
+    DDRES_CHECK_FWD(add_single_tag_cpp(tags_exporter, el.first, el.second));
+  }
   return ddres_init();
 }
 
