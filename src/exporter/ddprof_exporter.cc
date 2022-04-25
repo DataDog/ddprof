@@ -154,24 +154,30 @@ static DDRes add_single_tag(ddprof_ffi_Vec_tag &tags_exporter,
 static DDRes fill_tags(const UserTags *user_tags,
                        const DDProfExporter *exporter,
                        ddprof_ffi_Vec_tag &tags_exporter) {
+
+  // language is guaranteed to be filled
   DDRES_CHECK_FWD(
       add_single_tag(tags_exporter, "language",
                      std::string_view(exporter->_input.language.ptr,
                                       exporter->_input.language.len)));
 
-  DDRES_CHECK_FWD(
-      add_single_tag(tags_exporter, "language", exporter->_input.environment));
+  if (exporter->_input.environment)
+    DDRES_CHECK_FWD(
+        add_single_tag(tags_exporter, "env", exporter->_input.environment));
 
-  DDRES_CHECK_FWD(add_single_tag(tags_exporter, "version",
-                                 exporter->_input.service_version));
+  if (exporter->_input.service_version)
+    DDRES_CHECK_FWD(add_single_tag(tags_exporter, "version",
+                                   exporter->_input.service_version));
 
-  DDRES_CHECK_FWD(
-      add_single_tag(tags_exporter, "service", exporter->_input.service));
+  if (exporter->_input.service)
+    DDRES_CHECK_FWD(
+        add_single_tag(tags_exporter, "service", exporter->_input.service));
 
-  DDRES_CHECK_FWD(
-      add_single_tag(tags_exporter, "profiler_version",
-                     std::string_view(exporter->_input.profiler_version.ptr,
-                                      exporter->_input.profiler_version.len)));
+  if (exporter->_input.profiler_version.len)
+    DDRES_CHECK_FWD(add_single_tag(
+        tags_exporter, "profiler_version",
+        std::string_view(exporter->_input.profiler_version.ptr,
+                         exporter->_input.profiler_version.len)));
 
   for (auto &el : user_tags->_tags) {
     DDRES_CHECK_FWD(add_single_tag(tags_exporter, el.first, el.second));
