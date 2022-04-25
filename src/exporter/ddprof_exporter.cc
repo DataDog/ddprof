@@ -14,11 +14,13 @@ extern "C" {
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string_view>
 #include <time.h>
 #include <unistd.h>
 }
 
 #include "ddres.h"
+#include "defer.hpp"
 #include "tags.hpp"
 
 #include <algorithm>
@@ -28,16 +30,12 @@ extern "C" {
 static const int k_timeout_ms = 10000;
 static const int k_size_api_key = 32;
 
-static ddprof_ffi_CharSlice cpp_string_to_CharSlice(const std::string &str) {
-  return (ddprof_ffi_CharSlice){.ptr = (char *)str.c_str(), .len = str.size()};
+static ddprof_ffi_CharSlice to_CharSlice(std::string_view str) {
+  return (ddprof_ffi_CharSlice){.ptr = str.data(), .len = str.size()};
 }
 
-static ddprof_ffi_CharSlice string_view_to_CharSlice(string_view slice) {
-  return (ddprof_ffi_CharSlice){.ptr = (char *)slice.ptr, .len = slice.len};
-}
-
-static ddprof_ffi_CharSlice char_star_to_CharSlice(const char *string) {
-  return (ddprof_ffi_CharSlice){.ptr = (char *)string, .len = strlen(string)};
+static ddprof_ffi_CharSlice to_CharSlice(string_view slice) {
+  return (ddprof_ffi_CharSlice){.ptr = slice.ptr, .len = slice.len};
 }
 
 static char *alloc_url_agent(const char *protocol, const char *host,
@@ -75,7 +73,7 @@ static DDRes create_pprof_file(ddprof_ffi_Timespec start,
 /// Write pprof to a valid file descriptor : allows to use pprof tools
 static DDRes write_profile(const ddprof_ffi_EncodedProfile *encoded_profile,
                            int fd) {
-  const ddprof_ffi_Buffer *buffer = &encoded_profile->buffer;
+  const ddprof_ffi_Vec_u8 *buffer = &encoded_profile->buffer;
   if (write(fd, buffer->ptr, buffer->len) == 0) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER,
                            "Failed to write byte buffer to stdout! %s\n",
@@ -140,71 +138,78 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
   return ddres_init();
 }
 
-static void fill_tags(const UserTags *user_tags, const DDProfExporter *exporter,
-                      std::vector<ddprof_ffi_Tag> &tags_exporter) {
-  tags_exporter.push_back(ddprof_ffi_Tag{
-      .name = char_star_to_CharSlice("language"),
-      .value = string_view_to_CharSlice(exporter->_input.language)});
-
-  if (exporter->_input.environment) {
-    tags_exporter.push_back(ddprof_ffi_Tag{
-        .name = char_star_to_CharSlice("env"),
-        .value = char_star_to_CharSlice(exporter->_input.environment)});
+static DDRes add_single_tag(ddprof_ffi_Vec_tag &tags_exporter,
+                            std::string_view key, std::string_view value) {
+  ddprof_ffi_PushTagResult push_tag_res = ddprof_ffi_Vec_tag_push(
+      &tags_exporter, to_CharSlice(key), to_CharSlice(value));
+  defer { ddprof_ffi_PushTagResult_drop(push_tag_res); };
+  if (push_tag_res.tag == DDPROF_FFI_PUSH_TAG_RESULT_ERR) {
+    LG_ERR("[EXPORTER] Failure generate tag (%.*s)", (int)push_tag_res.err.len,
+           push_tag_res.err.ptr);
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to generate tags");
   }
+  return ddres_init();
+}
 
-  if (exporter->_input.service_version) {
-    tags_exporter.push_back(ddprof_ffi_Tag{
-        .name = char_star_to_CharSlice("version"),
-        .value = char_star_to_CharSlice(exporter->_input.service_version)});
+static DDRes fill_tags(const UserTags *user_tags,
+                       const DDProfExporter *exporter,
+                       ddprof_ffi_Vec_tag &tags_exporter) {
+
+  // language is guaranteed to be filled
+  DDRES_CHECK_FWD(
+      add_single_tag(tags_exporter, "language",
+                     std::string_view(exporter->_input.language.ptr,
+                                      exporter->_input.language.len)));
+
+  if (exporter->_input.environment)
+    DDRES_CHECK_FWD(
+        add_single_tag(tags_exporter, "env", exporter->_input.environment));
+
+  if (exporter->_input.service_version)
+    DDRES_CHECK_FWD(add_single_tag(tags_exporter, "version",
+                                   exporter->_input.service_version));
+
+  if (exporter->_input.service)
+    DDRES_CHECK_FWD(
+        add_single_tag(tags_exporter, "service", exporter->_input.service));
+
+  if (exporter->_input.profiler_version.len)
+    DDRES_CHECK_FWD(add_single_tag(
+        tags_exporter, "profiler_version",
+        std::string_view(exporter->_input.profiler_version.ptr,
+                         exporter->_input.profiler_version.len)));
+
+  for (auto &el : user_tags->_tags) {
+    DDRES_CHECK_FWD(add_single_tag(tags_exporter, el.first, el.second));
   }
-
-  if (exporter->_input.service) {
-    tags_exporter.push_back(ddprof_ffi_Tag{
-        .name = char_star_to_CharSlice("service"),
-        .value = char_star_to_CharSlice(exporter->_input.service)});
-  }
-
-  if (exporter->_input.profiler_version.len) {
-    tags_exporter.push_back(ddprof_ffi_Tag{
-        .name = char_star_to_CharSlice("profiler_version"),
-        .value = string_view_to_CharSlice(exporter->_input.profiler_version)});
-  }
-
-  std::for_each(user_tags->_tags.begin(), user_tags->_tags.end(),
-                [&](ddprof::Tag const &el) {
-                  tags_exporter.push_back(ddprof_ffi_Tag{
-                      .name = cpp_string_to_CharSlice(el.first),
-                      .value = cpp_string_to_CharSlice(el.second)});
-                });
+  return ddres_init();
 }
 
 DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
-  std::vector<ddprof_ffi_Tag> tags_exporter;
+  ddprof_ffi_Vec_tag tags_exporter = ddprof_ffi_Vec_tag_new();
   fill_tags(user_tags, exporter, tags_exporter);
-  ddprof_ffi_Slice_tag tags = {.ptr = &tags_exporter[0],
-                               .len = tags_exporter.size()};
 
-  ddprof_ffi_CharSlice base_url = char_star_to_CharSlice(exporter->_url);
+  ddprof_ffi_CharSlice base_url = to_CharSlice(exporter->_url);
   ddprof_ffi_EndpointV3 endpoint;
   if (exporter->_agent) {
     endpoint = ddprof_ffi_EndpointV3_agent(base_url);
   } else {
-    ddprof_ffi_CharSlice api_key =
-        char_star_to_CharSlice(exporter->_input.api_key);
+    ddprof_ffi_CharSlice api_key = to_CharSlice(exporter->_input.api_key);
     endpoint = ddprof_ffi_EndpointV3_agentless(base_url, api_key);
   }
 
   ddprof_ffi_NewProfileExporterV3Result new_exporterv3 =
-      ddprof_ffi_ProfileExporterV3_new(
-          string_view_to_CharSlice(exporter->_input.family), tags, endpoint);
+      ddprof_ffi_ProfileExporterV3_new(to_CharSlice(exporter->_input.family),
+                                       &tags_exporter, endpoint);
 
   if (new_exporterv3.tag == DDPROF_FFI_NEW_PROFILE_EXPORTER_V3_RESULT_OK) {
     exporter->_exporter = new_exporterv3.ok;
   } else {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failure creating exporter - %s",
                            new_exporterv3.err.ptr);
-    ddprof_ffi_Buffer_reset(&new_exporterv3.err);
+    ddprof_ffi_NewProfileExporterV3Result_drop(new_exporterv3);
   }
+  ddprof_ffi_Vec_tag_drop(tags_exporter);
   return ddres_init();
 }
 
@@ -238,11 +243,15 @@ static DDRes check_send_response_code(uint16_t send_response_code) {
 DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
                              DDProfExporter *exporter) {
   DDRes res = ddres_init();
-  struct ddprof_ffi_EncodedProfile *encoded_profile =
+  struct ddprof_ffi_SerializeResult serialized_result =
       ddprof_ffi_Profile_serialize(profile);
-  if (!encoded_profile) {
+  defer { ddprof_ffi_SerializeResult_drop(serialized_result); };
+  if (serialized_result.tag != DDPROF_FFI_SERIALIZE_RESULT_OK) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to serialize");
   }
+
+  struct ddprof_ffi_EncodedProfile *encoded_profile = &serialized_result.ok;
+
   if (exporter->_debug_folder) {
     write_pprof_file(encoded_profile, exporter->_debug_folder);
   }
@@ -260,23 +269,24 @@ DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
 
     // Backend has some logic based on the following naming
     ddprof_ffi_File files_[] = {{
-        .name = char_star_to_CharSlice("auto.pprof"),
+        .name = to_CharSlice("auto.pprof"),
         .file = profile_data,
     }};
     struct ddprof_ffi_Slice_file files = {
         .ptr = files_, .len = sizeof files_ / sizeof *files_};
 
     ddprof_ffi_Request *request = ddprof_ffi_ProfileExporterV3_build(
-        exporter->_exporter, start, end, files, k_timeout_ms);
+        exporter->_exporter, start, end, files, {}, k_timeout_ms);
     if (request) {
-      struct ddprof_ffi_SendResult result =
-          ddprof_ffi_ProfileExporterV3_send(exporter->_exporter, request);
+      struct ddprof_ffi_SendResult result = ddprof_ffi_ProfileExporterV3_send(
+          exporter->_exporter, request, nullptr);
+      defer { ddprof_ffi_SendResult_drop(result); };
+
       if (result.tag == DDPROF_FFI_SEND_RESULT_FAILURE) {
         LG_WRN("Failure to establish connection, check url %s", exporter->_url);
         LG_WRN("Failure to send profiles (%.*s)", (int)result.failure.len,
                result.failure.ptr);
         // Free error buffer (prefer this API to the free API)
-        ddprof_ffi_Buffer_reset(&result.failure);
         if (exporter->_nb_consecutive_errors++ >=
             K_NB_CONSECUTIVE_ERRORS_ALLOWED) {
           // this will shut down profiler
@@ -294,7 +304,6 @@ DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
       res = ddres_error(DD_WHAT_EXPORTER);
     }
   }
-  ddprof_ffi_EncodedProfile_delete(encoded_profile);
   return res;
 }
 
