@@ -31,7 +31,7 @@ static const int k_timeout_ms = 10000;
 static const int k_size_api_key = 32;
 
 static ddprof_ffi_CharSlice
-cpp_string_to_CharSlice(const std::string_view &str) {
+cpp_string_to_CharSlice(const std::string_view str) {
   return (ddprof_ffi_CharSlice){.ptr = (char *)str.data(), .len = str.size()};
 }
 
@@ -174,7 +174,6 @@ static DDRes add_single_tag_cpp(ddprof_ffi_Vec_tag &tags_exporter,
 static DDRes fill_tags(const UserTags *user_tags,
                        const DDProfExporter *exporter,
                        ddprof_ffi_Vec_tag &tags_exporter) {
-
   DDRES_CHECK_FWD(
       add_single_tag_cpp(tags_exporter, std::string_view("language"),
                          std::string_view(exporter->_input.language.ptr,
@@ -226,6 +225,7 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
                            new_exporterv3.err.ptr);
     ddprof_ffi_NewProfileExporterV3Result_drop(new_exporterv3);
   }
+  ddprof_ffi_Vec_tag_drop(tags_exporter);
   return ddres_init();
 }
 
