@@ -31,11 +31,11 @@ static const int k_timeout_ms = 10000;
 static const int k_size_api_key = 32;
 
 static ddprof_ffi_CharSlice to_CharSlice(const std::string_view str) {
-  return (ddprof_ffi_CharSlice){.ptr = (char *)str.data(), .len = str.size()};
+  return (ddprof_ffi_CharSlice){.ptr = str.data(), .len = str.size()};
 }
 
 static ddprof_ffi_CharSlice to_CharSlice(string_view slice) {
-  return (ddprof_ffi_CharSlice){.ptr = (char *)slice.ptr, .len = slice.len};
+  return (ddprof_ffi_CharSlice){.ptr = slice.ptr, .len = slice.len};
 }
 
 static char *alloc_url_agent(const char *protocol, const char *host,
@@ -138,21 +138,8 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
   return ddres_init();
 }
 
-static DDRes add_single_tag_c(ddprof_ffi_Vec_tag &tags_exporter,
-                              const char *key, string_view value) {
-  ddprof_ffi_PushTagResult push_tag_res = ddprof_ffi_Vec_tag_push(
-      &tags_exporter, to_CharSlice(key), to_CharSlice(value));
-  defer { ddprof_ffi_PushTagResult_drop(push_tag_res); };
-  if (push_tag_res.tag == DDPROF_FFI_PUSH_TAG_RESULT_ERR) {
-    LG_ERR("[EXPORTER] Failure generate tag (%.*s)", (int)push_tag_res.err.len,
-           push_tag_res.err.ptr);
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to generate tags");
-  }
-  return ddres_init();
-}
-
-static DDRes add_single_tag_cpp(ddprof_ffi_Vec_tag &tags_exporter,
-                                std::string_view key, std::string_view value) {
+static DDRes add_single_tag(ddprof_ffi_Vec_tag &tags_exporter,
+                            std::string_view key, std::string_view value) {
   ddprof_ffi_PushTagResult push_tag_res = ddprof_ffi_Vec_tag_push(
       &tags_exporter, to_CharSlice(key), to_CharSlice(value));
   defer { ddprof_ffi_PushTagResult_drop(push_tag_res); };
@@ -168,26 +155,26 @@ static DDRes fill_tags(const UserTags *user_tags,
                        const DDProfExporter *exporter,
                        ddprof_ffi_Vec_tag &tags_exporter) {
   DDRES_CHECK_FWD(
-      add_single_tag_cpp(tags_exporter, std::string_view("language"),
-                         std::string_view(exporter->_input.language.ptr,
-                                          exporter->_input.language.len)));
+      add_single_tag(tags_exporter, "language",
+                     std::string_view(exporter->_input.language.ptr,
+                                      exporter->_input.language.len)));
 
   DDRES_CHECK_FWD(
-      add_single_tag_cpp(tags_exporter, std::string_view("language"),
-                         std::string_view(exporter->_input.environment)));
+      add_single_tag(tags_exporter, "language", exporter->_input.environment));
+
+  DDRES_CHECK_FWD(add_single_tag(tags_exporter, "version",
+                                 exporter->_input.service_version));
 
   DDRES_CHECK_FWD(
-      add_single_tag_cpp(tags_exporter, "version",
-                         std::string_view(exporter->_input.service_version)));
+      add_single_tag(tags_exporter, "service", exporter->_input.service));
 
-  DDRES_CHECK_FWD(add_single_tag_cpp(
-      tags_exporter, "service", std::string_view(exporter->_input.service)));
-
-  DDRES_CHECK_FWD(add_single_tag_c(tags_exporter, "profiler_version",
-                                   exporter->_input.profiler_version));
+  DDRES_CHECK_FWD(
+      add_single_tag(tags_exporter, "profiler_version",
+                     std::string_view(exporter->_input.profiler_version.ptr,
+                                      exporter->_input.profiler_version.len)));
 
   for (auto &el : user_tags->_tags) {
-    DDRES_CHECK_FWD(add_single_tag_cpp(tags_exporter, el.first, el.second));
+    DDRES_CHECK_FWD(add_single_tag(tags_exporter, el.first, el.second));
   }
   return ddres_init();
 }
