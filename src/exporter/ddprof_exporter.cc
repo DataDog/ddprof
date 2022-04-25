@@ -30,7 +30,7 @@ extern "C" {
 static const int k_timeout_ms = 10000;
 static const int k_size_api_key = 32;
 
-static ddprof_ffi_CharSlice to_CharSlice(const std::string_view str) {
+static ddprof_ffi_CharSlice to_CharSlice(std::string_view str) {
   return (ddprof_ffi_CharSlice){.ptr = str.data(), .len = str.size()};
 }
 
