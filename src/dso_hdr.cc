@@ -117,7 +117,7 @@ DsoHdr::DsoHdr() {
   // A given procfs can only work if its PID namespace is the same as mine.
   // Fortunately, `/proc/self` will return a symlink to my process ID in the
   // corresponding namespace, so this is easy to check
-  char pid_str[sizeof("42949672960")] = {};
+  char pid_str[sizeof("1073741824")] = {}; // Linux max pid/tid is 2^30
   if (-1 != readlink("/host/proc/self", pid_str, sizeof(pid_str)) &&
       getpid() == strtol(pid_str, NULL, 10)) {
     // @Datadog we often mount to /host the /proc files
