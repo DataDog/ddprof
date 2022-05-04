@@ -100,10 +100,15 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
 DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
   // Switch user if needed (when root switch to nobody user)
   UIDInfo info;
+
   if (use_override) {
     DDRES_CHECK_FWD(user_override(&info));
-    defer { revert_override(&info); };
   }
+  auto defer_revert_override = make_defer([&]() {
+    if (use_override) {
+      revert_override(&info);
+    }
+  });
 
   auto defer_munmap = make_defer([&] { pevent_munmap(pevent_hdr); });
 
