@@ -193,7 +193,7 @@ target_link_options(dd_profiling-shared PRIVATE "LINKER:--version-script=${CMAKE
 # /usr/bin/ld: ./libdd_profiling.so: undefined reference to `typeinfo for __cxxabiv1::__vmi_class_type_info'
 # The cause of the error is that gcc puts `-lstdc++` before `-lubsan` in the linker invocation
 # Workaround is add another `-lstdc++` after `-lubsan` at the end, we cannot use `-static-libstdc++` because it does not force gcc to another `-lstdc++` at the end
-target_link_libraries(dd_profiling-shared PRIVATE "$<$<AND:$<C_COMPILER_ID:GNU>,$<CONFIG:SanitizedDebug>>:-Wl,-Bstatic;-lubsan;-lstdc++;-Wl,-Bdynamic>")
+target_link_libraries(dd_profiling-shared PRIVATE "$<$<AND:$<C_COMPILER_ID:GNU>,$<CONFIG:SanitizedDebug>>:-Wl,-Bstatic;-lubsan;-lasan;-lstdc++;-Wl,-Bdynamic>")
 
 install(TARGETS ddprof dd_profiling-static dd_profiling-shared
         RUNTIME DESTINATION ddprof/bin
