@@ -142,7 +142,8 @@ static DDRes signalfd_setup(pollfd *pfd) {
 
 static inline DDRes worker_process_ring_buffers(PEvent *pes, int pe_len,
                                                 DDProfContext *ctx,
-                                                int64_t *now_ns) {
+                                                int64_t *now_ns,
+                                                bool *timeout) {
   // While there are events to process, iterate through them
   // while limiting time spent in loop to at most PSAMPLE_DEFAULT_WAKEUP_MS
   int64_t loop_start_ns = now_nanos();
@@ -187,6 +188,7 @@ static inline DDRes worker_process_ring_buffers(PEvent *pes, int pe_len,
                PSAMPLE_DEFAULT_WAKEUP_MS * 1000000L);
 
   *now_ns = local_now_ns;
+  *timeout = events;
   return {};
 }
 
@@ -196,44 +198,56 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
   // Setup poll() to watch perf_event file descriptors
   int pe_len = ctx->worker_ctx.pevent_hdr.size;
   // one extra slot in pfd to accomodate for signal fd
-  struct pollfd pfd[MAX_NB_WATCHERS + 1];
+  struct pollfd pfds[MAX_NB_WATCHERS + 1];
   int pfd_len = 0;
-  pollfd_setup(&ctx->worker_ctx.pevent_hdr, pfd, &pfd_len);
+  pollfd_setup(&ctx->worker_ctx.pevent_hdr, pfds, &pfd_len);
 
-  DDRES_CHECK_FWD(signalfd_setup(&pfd[pfd_len]));
+  DDRES_CHECK_FWD(signalfd_setup(&pfds[pfd_len]));
   int signal_pos = pfd_len++;
 
   // Perform user-provided initialization
   defer { attr->finish_fun(ctx); };
   DDRES_CHECK_FWD(attr->init_fun(ctx));
 
+  bool samples_left_in_buffer = false;
+  bool stop = false;
+
   // Worker poll loop
-  while (true) {
-    int n = poll(pfd, pfd_len, PSAMPLE_DEFAULT_WAKEUP_MS);
-
-    // If there was an issue, return and let the caller check errno
-    if (-1 == n && errno == EINTR) {
-      continue;
-    }
-    DDRES_CHECK_ERRNO(n, DD_WHAT_POLLERROR, "poll failed");
-
-    if (pfd[signal_pos].revents & POLLIN) {
-      LG_NFO("Received termination signal");
-      break;
-    }
-
+  while (!stop) {
     // Convenience structs
     PEvent *pes = ctx->worker_ctx.pevent_hdr.pes;
 
-    // If one of the perf_event_open() feeds was closed by the kernel, shut down
-    // profiling
-    if (std::any_of(pfd, pfd + pe_len,
-                    [&](pollfd &x) { return x.revents & POLLHUP; })) {
-      break;
+    if (!samples_left_in_buffer) {
+      int n = poll(pfds, pfd_len, PSAMPLE_DEFAULT_WAKEUP_MS);
+
+      // If there was an issue, return and let the caller check errno
+      if (-1 == n && errno == EINTR) {
+        continue;
+      }
+      DDRES_CHECK_ERRNO(n, DD_WHAT_POLLERROR, "poll failed");
+
+      if (pfds[signal_pos].revents & POLLIN) {
+        LG_NFO("Received termination signal");
+        break;
+      }
+
+      for (int i = 0; i < pe_len; ++i) {
+        pollfd &pfd = pfds[i];
+        if (pfd.revents & POLLHUP) {
+          stop = true;
+        } else if (pfd.revents & POLLIN && pes[i].custom_event) {
+          // for custom ring buffer, need to read from eventfd to flush POLLIN
+          // status
+          uint64_t count;
+          DDRES_CHECK_ERRNO(read(pes[i].fd, &count, sizeof(count)),
+                            DD_WHAT_PERFRB, "Failed to read from evenfd");
+        }
+      }
     }
 
     int64_t now_ns = 0;
-    DDRES_CHECK_FWD(worker_process_ring_buffers(pes, pe_len, ctx, &now_ns));
+    DDRES_CHECK_FWD(worker_process_ring_buffers(pes, pe_len, ctx, &now_ns,
+                                                &samples_left_in_buffer));
     DDRES_CHECK_FWD(ddprof_worker_maybe_export(ctx, now_ns, restart_worker));
 
     if (*restart_worker) {

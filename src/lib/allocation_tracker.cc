@@ -192,62 +192,63 @@ void AllocationTracker::track_allocation(uintptr_t, size_t size,
 
 DDRes AllocationTracker::push_sample(uint64_t allocated_size,
                                      TrackerThreadLocalState &tl_state) {
-  {
-    RingBufferWriter writer{_pevent_hdr.pes[0].rb};
-    auto needed_size = sizeof(AllocationEvent);
+  RingBufferWriter writer{_pevent_hdr.pes[0].rb};
+  auto needed_size = sizeof(AllocationEvent);
 
-    if (_state.lost_count) {
-      needed_size += sizeof(LostEvent);
-    }
-
-    if (writer.available_size() < needed_size) {
-      // ring buffer is full, increase lost count
-      ++_state.lost_count;
-
-      // not an error
-      return {};
-    }
-
-    Buffer buf = writer.reserve(sizeof(AllocationEvent));
-    AllocationEvent *event = reinterpret_cast<AllocationEvent *>(buf.data());
-    event->hdr.misc = 0;
-    event->hdr.size = sizeof(AllocationEvent);
-    event->hdr.type = PERF_RECORD_SAMPLE;
-    event->abi = PERF_SAMPLE_REGS_ABI_64;
-    event->sample_id.time = 0;
-
-    if (_state.pid == 0) {
-      // \fixme reset on fork
-      _state.pid = getpid();
-    }
-    if (tl_state.tid == 0) {
-      tl_state.tid = ddprof::gettid();
-    }
-
-    event->sample_id.pid = _state.pid;
-    event->sample_id.tid = tl_state.tid;
-    event->period = allocated_size;
-    event->size = PERF_SAMPLE_STACK_SIZE;
-
-    event->dyn_size =
-        save_context(event->regs, ddprof::Buffer{event->data, event->size});
-
-    if (_state.lost_count) {
-      Buffer buf_lost = writer.reserve(sizeof(LostEvent));
-      LostEvent *lost_event = reinterpret_cast<LostEvent *>(buf_lost.data());
-      lost_event->hdr.size = sizeof(LostEvent);
-      lost_event->hdr.misc = 0;
-      lost_event->hdr.type = PERF_RECORD_LOST;
-      lost_event->id = 0;
-      lost_event->lost = _state.lost_count;
-      _state.lost_count = 0;
-    }
+  if (_state.lost_count) {
+    needed_size += sizeof(LostEvent);
   }
-  uint64_t count = 1;
-  if (write(_pevent_hdr.pes[0].fd, &count, sizeof(count)) != sizeof(count)) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
-                           "Error writing to memory allocation eventfd (%s)",
-                           strerror(errno));
+
+  if (writer.available_size() < needed_size) {
+    // ring buffer is full, increase lost count
+    ++_state.lost_count;
+
+    // not an error
+    return {};
+  }
+
+  Buffer buf = writer.reserve(sizeof(AllocationEvent));
+  AllocationEvent *event = reinterpret_cast<AllocationEvent *>(buf.data());
+  event->hdr.misc = 0;
+  event->hdr.size = sizeof(AllocationEvent);
+  event->hdr.type = PERF_RECORD_SAMPLE;
+  event->abi = PERF_SAMPLE_REGS_ABI_64;
+  event->sample_id.time = 0;
+
+  if (_state.pid == 0) {
+    // \fixme reset on fork
+    _state.pid = getpid();
+  }
+  if (tl_state.tid == 0) {
+    tl_state.tid = ddprof::gettid();
+  }
+
+  event->sample_id.pid = _state.pid;
+  event->sample_id.tid = tl_state.tid;
+  event->period = allocated_size;
+  event->size = PERF_SAMPLE_STACK_SIZE;
+
+  event->dyn_size =
+      save_context(event->regs, ddprof::Buffer{event->data, event->size});
+
+  if (_state.lost_count) {
+    Buffer buf_lost = writer.reserve(sizeof(LostEvent));
+    LostEvent *lost_event = reinterpret_cast<LostEvent *>(buf_lost.data());
+    lost_event->hdr.size = sizeof(LostEvent);
+    lost_event->hdr.misc = 0;
+    lost_event->hdr.type = PERF_RECORD_LOST;
+    lost_event->id = 0;
+    lost_event->lost = _state.lost_count;
+    _state.lost_count = 0;
+  }
+
+  if (writer.commit()) {
+    uint64_t count = 1;
+    if (write(_pevent_hdr.pes[0].fd, &count, sizeof(count)) != sizeof(count)) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
+                             "Error writing to memory allocation eventfd (%s)",
+                             strerror(errno));
+    }
   }
   return {};
 }

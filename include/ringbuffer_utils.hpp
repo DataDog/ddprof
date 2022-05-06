@@ -17,47 +17,59 @@ class RingBufferWriter {
 public:
   explicit RingBufferWriter(RingBuffer &rb) : _rb(rb) {
     _tail = __atomic_load_n(&_rb.region->data_tail, __ATOMIC_ACQUIRE);
-    _head = _rb.region->data_head;
+    _head = _initial_head = _rb.region->data_head;
     assert(_tail <= _head);
-    _available_size = _rb.data_size - (_head - _tail);
   }
 
   ~RingBufferWriter() {
-    __atomic_store_n(&_rb.region->data_head, _head, __ATOMIC_RELEASE);
+    if (_initial_head != _head) {
+      __atomic_store_n(&_rb.region->data_head, _head, __ATOMIC_RELEASE);
+    }
   }
 
   RingBufferWriter(const RingBufferWriter &) = delete;
   RingBufferWriter &operator=(const RingBufferWriter &) = delete;
 
-  inline size_t available_size() const { return _available_size; }
+  inline size_t available_size() const {
+    return _rb.data_size - (_head - _tail);
+  }
 
   Buffer reserve(size_t n) {
-    assert(n < _available_size);
+    assert(n < available_size());
+
     uint64_t head_linear = _head & _rb.mask;
     std::byte *dest = (std::byte *)(_rb.start + head_linear);
-    _available_size -= n;
     _head += n;
 
     return {dest, n};
   }
 
   void write(Buffer buf) {
-    assert(buf.size() <= _available_size);
+    assert(buf.size() <= available_size());
 
     uint64_t head_linear = _head & _rb.mask;
     char *dest = const_cast<char *>(_rb.start) + head_linear;
 
     memcpy(dest, buf.data(), buf.size());
-
-    _available_size -= buf.size();
     _head += buf.size();
+  }
+
+  // return true if notification to consumer is necesssary
+  // Notification is necessary only if consumer has caught up with producer
+  // (meaning tail afer commit is at or after head before commit)
+  bool commit() {
+    __atomic_store_n(&_rb.region->data_head, _head, __ATOMIC_RELEASE);
+    _tail = __atomic_load_n(&_rb.region->data_tail, __ATOMIC_ACQUIRE);
+    bool consumer_has_caught_up = _tail >= _initial_head;
+    _initial_head = _head;
+    return consumer_has_caught_up;
   }
 
 private:
   RingBuffer &_rb;
   uint64_t _tail;
+  uint64_t _initial_head;
   uint64_t _head;
-  size_t _available_size;
 };
 
 class RingBufferReader {
