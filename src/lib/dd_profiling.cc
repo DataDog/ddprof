@@ -62,7 +62,7 @@ void set_profiler_library_inactive() {
 
 void allocation_profiling_stop() {
   if (g_state.allocation_profiling_started) {
-    ddprof::allocation_tracking_free();
+    ddprof::AllocationTracker::allocation_tracking_free();
     g_state.allocation_profiling_started = false;
   }
 }
@@ -217,8 +217,8 @@ static int ddprof_start_profiling_internal() {
     auto info = client.get_profiler_info();
     g_state.profiler_pid = info.pid;
     if (info.allocation_profiling_rate > 0) {
-      ddprof::allocation_tracking_init(info.allocation_profiling_rate, false,
-                                       info.ring_buffer);
+      ddprof::AllocationTracker::allocation_tracking_init(
+          info.allocation_profiling_rate, false, info.ring_buffer);
       g_state.allocation_profiling_started = true;
     }
   } catch (const ddprof::DDException &e) { return -1; }
@@ -229,7 +229,6 @@ static int ddprof_start_profiling_internal() {
   }
   g_state.started = true;
   set_profiler_library_active();
-
   return 0;
 }
 

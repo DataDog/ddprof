@@ -17,7 +17,7 @@
 #include <unistd.h>
 
 __attribute__((noinline)) void my_malloc(size_t size) {
-  ddprof::track_allocation(0xdeadbeef, size);
+  ddprof::AllocationTracker::track_allocation(0xdeadbeef, size);
   // prevent tail call optimization
   getpid();
 }
@@ -58,10 +58,8 @@ TEST(allocation_tracker, start_stop) {
   const uint64_t rate = 1;
   const size_t buf_size_order = 5;
   RingBufferHolder ring_buffer{buf_size_order};
-  ddprof::allocation_tracking_init(
-      rate,
-      static_cast<uint32_t>(
-          ddprof::AllocationTrackingFlags::kDeterministicSampling),
+  ddprof::AllocationTracker::allocation_tracking_init(
+      rate, ddprof::AllocationTracker::kDeterministicSampling,
       ring_buffer.get_buffer_info());
 
   my_func_calling_malloc(1);
@@ -91,6 +89,6 @@ TEST(allocation_tracker, start_stop) {
       symbol_table[state.output.locs[NB_FRAMES_TO_SKIP]._symbol_idx];
   ASSERT_EQ(symbol._symname, "my_func_calling_malloc");
 
-  ddprof::allocation_tracking_free();
+  ddprof::AllocationTracker::allocation_tracking_free();
 #endif
 }

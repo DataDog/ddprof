@@ -83,7 +83,8 @@ void init() {
 
 void *malloc(size_t size) {
   void *ptr = s_malloc(size);
-  ddprof::track_allocation(reinterpret_cast<uintptr_t>(ptr), size);
+  ddprof::AllocationTracker::track_allocation(reinterpret_cast<uintptr_t>(ptr),
+                                              size);
   return ptr;
 }
 
@@ -97,7 +98,8 @@ void free(void *ptr) {
     return;
   }
 
-  ddprof::track_deallocation(reinterpret_cast<uintptr_t>(ptr));
+  ddprof::AllocationTracker::track_deallocation(
+      reinterpret_cast<uintptr_t>(ptr));
   s_free(ptr);
 }
 
@@ -108,7 +110,8 @@ void temp_free(void *ptr) noexcept {
 
 void *calloc(size_t nmemb, size_t size) {
   void *ptr = s_calloc(nmemb, size);
-  ddprof::track_allocation(reinterpret_cast<uintptr_t>(ptr), size * nmemb);
+  ddprof::AllocationTracker::track_allocation(reinterpret_cast<uintptr_t>(ptr),
+                                              size * nmemb);
   return ptr;
 }
 
@@ -119,10 +122,12 @@ void *temp_calloc(size_t nmemb, size_t size) noexcept {
 
 void *realloc(void *ptr, size_t size) {
   if (ptr) {
-    ddprof::track_deallocation(reinterpret_cast<uintptr_t>(ptr));
+    ddprof::AllocationTracker::track_deallocation(
+        reinterpret_cast<uintptr_t>(ptr));
   }
   void *newptr = s_realloc(ptr, size);
-  ddprof::track_allocation(reinterpret_cast<uintptr_t>(ptr), size);
+  ddprof::AllocationTracker::track_allocation(reinterpret_cast<uintptr_t>(ptr),
+                                              size);
   return newptr;
 }
 
@@ -134,7 +139,8 @@ void *temp_realloc(void *ptr, size_t size) noexcept {
 int posix_memalign(void **memptr, size_t alignment, size_t size) {
   int ret = s_posix_memalign(memptr, alignment, size);
   if (likely(!ret)) {
-    ddprof::track_allocation(reinterpret_cast<uintptr_t>(*memptr), size);
+    ddprof::AllocationTracker::track_allocation(
+        reinterpret_cast<uintptr_t>(*memptr), size);
   }
   return ret;
 }
@@ -146,7 +152,7 @@ int temp_posix_memalign(void **memptr, size_t alignment, size_t size) noexcept {
 
 void *aligned_alloc(size_t alignment, size_t size) {
   void *ptr = s_aligned_alloc(alignment, size);
-  ddprof::track_allocation(reinterpret_cast<uintptr_t>(ptr), size);
+  ddprof::AllocationTracker::track_allocation(reinterpret_cast<uintptr_t>(ptr), size);
   return ptr;
 }
 
@@ -157,7 +163,8 @@ void *temp_aligned_alloc(size_t alignment, size_t size) noexcept {
 
 void *memalign(size_t alignment, size_t size) {
   void *ptr = s_memalign(alignment, size);
-  ddprof::track_allocation(reinterpret_cast<uintptr_t>(ptr), size);
+  ddprof::AllocationTracker::track_allocation(reinterpret_cast<uintptr_t>(ptr),
+                                              size);
   return ptr;
 }
 void *temp_memalign(size_t alignment, size_t size) noexcept {
@@ -167,7 +174,8 @@ void *temp_memalign(size_t alignment, size_t size) noexcept {
 
 void *pvalloc(size_t size) {
   void *ptr = s_pvalloc(size);
-  ddprof::track_allocation(reinterpret_cast<uintptr_t>(ptr), size);
+  ddprof::AllocationTracker::track_allocation(reinterpret_cast<uintptr_t>(ptr),
+                                              size);
   return ptr;
 }
 
@@ -178,7 +186,8 @@ void *temp_pvalloc(size_t size) noexcept {
 
 void *valloc(size_t size) {
   void *ptr = s_valloc(size);
-  ddprof::track_allocation(reinterpret_cast<uintptr_t>(ptr), size);
+  ddprof::AllocationTracker::track_allocation(reinterpret_cast<uintptr_t>(ptr),
+                                              size);
   return ptr;
 }
 
@@ -189,10 +198,12 @@ void *temp_valloc(size_t size) noexcept {
 
 void *reallocarray(void *ptr, size_t nmemb, size_t size) noexcept {
   if (ptr) {
-    ddprof::track_deallocation(reinterpret_cast<uintptr_t>(ptr));
+    ddprof::AllocationTracker::track_deallocation(
+        reinterpret_cast<uintptr_t>(ptr));
   }
   void *newptr = s_reallocarray(ptr, nmemb, size);
-  ddprof::track_allocation(reinterpret_cast<uintptr_t>(ptr), size * nmemb);
+  ddprof::AllocationTracker::track_allocation(reinterpret_cast<uintptr_t>(ptr),
+                                              size * nmemb);
   return newptr;
 }
 
