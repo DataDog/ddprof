@@ -208,7 +208,7 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
       return {};
     }
 
-    Buffer buf = writer.reserve(needed_size);
+    Buffer buf = writer.reserve(sizeof(AllocationEvent));
     AllocationEvent *event = reinterpret_cast<AllocationEvent *>(buf.data());
     event->hdr.misc = 0;
     event->hdr.size = sizeof(AllocationEvent);
@@ -232,20 +232,15 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
     event->dyn_size =
         save_context(event->regs, ddprof::Buffer{event->data, event->size});
 
-    writer.write(
-        ddprof::Buffer{reinterpret_cast<std::byte *>(event), sizeof(*event)});
-
     if (_state.lost_count) {
-      LostEvent lost_event;
-      lost_event.hdr.size = sizeof(LostEvent);
-      lost_event.hdr.misc = 0;
-      lost_event.hdr.type = PERF_RECORD_LOST;
-      lost_event.id = 0;
-      lost_event.lost = _state.lost_count;
+      Buffer buf_lost = writer.reserve(sizeof(LostEvent));
+      LostEvent *lost_event = reinterpret_cast<LostEvent *>(buf_lost.data());
+      lost_event->hdr.size = sizeof(LostEvent);
+      lost_event->hdr.misc = 0;
+      lost_event->hdr.type = PERF_RECORD_LOST;
+      lost_event->id = 0;
+      lost_event->lost = _state.lost_count;
       _state.lost_count = 0;
-
-      writer.write(ddprof::Buffer{reinterpret_cast<std::byte *>(&lost_event),
-                                  sizeof(lost_event)});
     }
   }
   uint64_t count = 1;
