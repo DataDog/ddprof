@@ -103,19 +103,6 @@ ProfilerAutoStart g_autostart;
 static int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
   char ddprof_str[] = "ddprof";
 
-  int fd = ddprof::memfd_create(ddprof_str, 1U /*MFD_CLOEXEC*/);
-
-  if (fd == -1) {
-    return -1;
-  }
-  defer { close(fd); };
-
-  if (write(fd, _binary_ddprof_start,
-            // cppcheck-suppress comparePointers
-            _binary_ddprof_end - _binary_ddprof_start) == -1) {
-    return -1;
-  }
-
   char pid_buf[32];
   snprintf(pid_buf, sizeof(pid_buf), "%d", target_pid);
   char sock_buf[32];
@@ -138,6 +125,18 @@ static int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
       ddprof_exe) {
     execve(ddprof_exe, argv, environ);
   } else {
+    int fd = ddprof::memfd_create(ddprof_str, 1U /*MFD_CLOEXEC*/);
+
+    if (fd == -1) {
+      return -1;
+    }
+    defer { close(fd); };
+
+    if (write(fd, _binary_ddprof_start,
+              // cppcheck-suppress comparePointers
+              _binary_ddprof_end - _binary_ddprof_start) == -1) {
+      return -1;
+    }
     fexecve(fd, argv, environ);
   }
 
