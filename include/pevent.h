@@ -7,6 +7,10 @@
 
 #include <sys/types.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "perf_ringbuffer.h"
 
 #define MAX_NB_WATCHERS 450
@@ -26,3 +30,7 @@ typedef struct PEventHdr {
   size_t size;
   size_t max_size;
 } PEventHdr;
+
+#ifdef __cplusplus
+}
+#endif
