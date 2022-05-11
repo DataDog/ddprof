@@ -357,6 +357,17 @@ add_unit_test(
     LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
     DEFINITIONS ${DDPROF_DEFINITION_LIST})
 
+
+add_unit_test(
+    ringbuffer-ut
+    ringbuffer-ut.cc
+    ../src/perf.cc
+    ../src/perf_ringbuffer.c
+    ../src/pevent_lib.cc
+    ../src/ringbuffer_utils.cc
+    ../src/user_override.c
+)
+
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/savecontext.cc)
 
 add_exe(simple_malloc-static simple_malloc.cc

@@ -37,11 +37,13 @@ public:
   RingBufferWriter &operator=(const RingBufferWriter &) = delete;
 
   inline size_t available_size() const {
-    return _rb.data_size - (_head - _tail);
+    // Always leave one free char, as a completely full buffer is
+    // indistinguishable from an empty one
+    return _rb.data_size - (_head + 1 - _tail);
   }
 
   Buffer reserve(size_t n) {
-    assert(n < available_size());
+    assert(n <= available_size());
 
     uint64_t head_linear = _head & _rb.mask;
     std::byte *dest = (std::byte *)(_rb.start + head_linear);
