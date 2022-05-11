@@ -37,8 +37,8 @@ typedef struct PerfWatcher {
   const char *tracepoint_name;
   const char *tracepoint_group;
   // Other configs
-  bool send_pid;
-  bool send_tid;
+  bool suppress_pid;
+  bool suppress_tid;
   int pprof_sample_idx;       // index into the SampleType in the pprof
   int pprof_count_sample_idx; // index into the pprof for the count
 } PerfWatcher;
