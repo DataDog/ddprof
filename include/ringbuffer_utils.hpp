@@ -5,13 +5,19 @@
 
 #pragma once
 
+#include "ddprof_buffer.hpp"
 extern "C" {
 #include "perf_ringbuffer.h"
 }
 
 #include <cassert>
+#include <cstring>
+
+struct PEvent;
 
 namespace ddprof {
+
+struct RingBufferInfo;
 
 class RingBufferWriter {
 public:
@@ -84,7 +90,7 @@ public:
     __atomic_store_n(&_rb.region->data_tail, _tail, __ATOMIC_RELEASE);
   }
 
-  inline size_t available_size() const { return _head - _tail; }
+  inline size_t available_for_read() const { return _head - _tail; }
 
   ConstBuffer read_all_available() {
     uint64_t tail_linear = _tail & _rb.mask;
