@@ -20,6 +20,7 @@ extern "C" {
 #include <atomic>
 #include <cassert>
 #include <cstdint>
+#include <cstdlib>
 #include <linux/perf_event.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -89,6 +90,11 @@ DDRes AllocationTracker::allocation_tracking_init(
   if (state.track_allocations) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW, "Allocation profiler already started");
   }
+
+  // force initialization of malloc wrappers if not done yet
+  // volatile prevents compiler from optimizing out calls to malloc/free
+  void *volatile p = ::malloc(1);
+  ::free(p);
 
   DDRES_CHECK_FWD(instance->init(allocation_profiling_rate,
                                  flags & kDeterministicSampling, ring_buffer));
