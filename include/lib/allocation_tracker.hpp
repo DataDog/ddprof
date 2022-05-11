@@ -81,7 +81,7 @@ private:
   TrackerState _state;
   uint64_t _sampling_interval;
   std::mt19937 _gen;
-  PEventHdr _pevent_hdr;
+  PEvent _pevent;
   bool _deterministic_sampling;
 
   static thread_local TrackerThreadLocalState _tl_state;
