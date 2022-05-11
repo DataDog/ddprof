@@ -141,13 +141,6 @@ void *perfown_sz(int fd, size_t size_of_buffer, bool mirror) {
   return region;
 }
 
-// returns region, size is updated with the mmaped size
-// On failure, returns NULL
-void *perfown(int fd, bool mirror, size_t *size) {
-  *size = perf_mmap_size(DEFAULT_BUFF_SIZE_SHIFT);
-  return perfown_sz(fd, *size, mirror);
-}
-
 int perfdisown(void *region, size_t size, bool is_mirrored) {
   std::byte *ptr = static_cast<std::byte *>(region);
 
