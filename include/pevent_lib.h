@@ -20,9 +20,6 @@ void pevent_init(PEventHdr *pevent_hdr);
 DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
                   PEventHdr *pevent_hdr);
 
-DDRes pevent_create_custom_ring_buffer(PEvent *pevent,
-                                       size_t ring_buffer_size_order);
-
 /// Setup mmap buffers according to content of peventhdr
 DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override);
 
@@ -41,6 +38,12 @@ DDRes pevent_close(PEventHdr *pevent_hdr);
 
 /// cleanup watchers = cleanup perfevent + cleanup mmap (clean everything)
 DDRes pevent_cleanup(PEventHdr *pevent_hdr);
+
+DDRes pevent_mmap_event(PEvent *pevent);
+
+DDRes pevent_munmap_event(PEvent *pevent);
+
+DDRes pevent_close_event(PEvent *pevent);
 
 #ifdef __cplusplus
 }

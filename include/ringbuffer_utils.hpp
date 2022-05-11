@@ -101,10 +101,37 @@ public:
     return {start, n};
   }
 
+  void check_for_new_data() {
+    _head = __atomic_load_n(&_rb.region->data_head, __ATOMIC_ACQUIRE);
+  }
+
 private:
   RingBuffer &_rb;
   uint64_t _tail;
   uint64_t _head;
 };
+
+// Initialize event from ring buffer info and mmap ring buffer into process
+DDRes ring_buffer_attach(const RingBufferInfo &info, PEvent *event);
+
+// Mmap ring buffer into process from already initialized event
+DDRes ring_buffer_attach(PEvent &event);
+
+// Unmap ring buffer
+DDRes ring_buffer_detach(PEvent &event);
+
+// Create ring buffer (create memfd and eventfd)
+// Ring buffer is not mapped upon return from this function, ring_buffer_attach
+// needs to be called to map it
+DDRes ring_buffer_create(size_t buffer_size_page_order, PEvent *event);
+
+// Destroy ring buffer: close memfd / eventfd
+DDRes ring_buffer_close(PEvent &event);
+
+// Create and attach ring buffer
+DDRes ring_buffer_setup(size_t buffer_size_page_order, PEvent *event);
+
+// Unmap and close ring buffer
+DDRes ring_buffer_cleanup(PEvent &event);
 
 } // namespace ddprof
