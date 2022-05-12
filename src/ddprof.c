@@ -58,6 +58,8 @@ DDRes ddprof_setup(DDProfContext *ctx) {
     LG_ERR("Error when printing capabilities, continuing...");
   }
 
+  // Do not mmap events yet because mmap'ings from perf fds are lost after
+  // fork
   DDRES_CHECK_FWD(
       pevent_open(ctx, ctx->params.pid, ctx->params.num_cpu, pevent_hdr));
 

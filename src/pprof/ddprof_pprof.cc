@@ -201,23 +201,21 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   // number of labels at present
   ddprof_ffi_Label labels[PPROF_MAX_LABELS] = {};
   size_t labels_num = 0;
-
-  // The max PID on Linux is approximately 2^22 (~4e6), which also limits TID
   // cppcheck-suppress variableScope
-  char pid_str[7] = {};
+  char pid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
   // cppcheck-suppress variableScope
-  char tid_str[7] = {};
+  char tid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
 
   // Add any configured labels.  Note that TID alone has the same cardinality as
   // (TID;PID) tuples, so except for symbol table overhead it doesn't matter
   // much if TID implies PID for clarity.
-  if (watcher->send_pid || watcher->send_tid) {
+  if (!watcher->suppress_pid || !watcher->suppress_tid) {
     snprintf(pid_str, sizeof(pid_str), "%d", uw_output->pid);
     labels[labels_num].key = to_CharSlice("process id");
     labels[labels_num].str = to_CharSlice(pid_str);
     ++labels_num;
   }
-  if (watcher->send_tid) {
+  if (!watcher->suppress_tid ) {
     snprintf(tid_str, sizeof(tid_str), "%d", uw_output->tid);
     labels[labels_num].key = to_CharSlice("thread id");
     labels[labels_num].str = to_CharSlice(tid_str);

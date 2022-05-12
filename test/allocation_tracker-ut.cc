@@ -7,6 +7,7 @@
 #include "ipc.hpp"
 #include "perf_watcher.h"
 #include "pevent_lib.h"
+#include "ringbuffer_holder.hpp"
 #include "ringbuffer_utils.hpp"
 #include "syscalls.hpp"
 #include "unwind.hpp"
@@ -30,34 +31,11 @@ __attribute__((noinline)) void my_func_calling_malloc(size_t size) {
 }
 }
 
-class RingBufferHolder {
-public:
-  explicit RingBufferHolder(size_t buffer_size_order) {
-    pevent_init(&_pevent_hdr);
-    _pevent_hdr.size = 1;
-    EXPECT_TRUE(IsDDResOK(pevent_create_custom_ring_buffer(&_pevent_hdr.pes[0],
-                                                           buffer_size_order)));
-    EXPECT_TRUE(IsDDResOK(pevent_mmap(&_pevent_hdr, true)));
-  }
-
-  ~RingBufferHolder() { pevent_cleanup(&_pevent_hdr); }
-
-  ddprof::RingBufferInfo get_buffer_info() const {
-    const auto &pe = _pevent_hdr.pes[0];
-    return {static_cast<int64_t>(pe.rb.size), pe.mapfd, pe.fd};
-  }
-
-  RingBuffer &get_ring_buffer() { return _pevent_hdr.pes[0].rb; }
-
-private:
-  PEventHdr _pevent_hdr;
-};
-
 TEST(allocation_tracker, start_stop) {
 #ifdef __x86_64__
   const uint64_t rate = 1;
   const size_t buf_size_order = 5;
-  RingBufferHolder ring_buffer{buf_size_order};
+  ddprof::RingBufferHolder ring_buffer{buf_size_order};
   ddprof::AllocationTracker::allocation_tracking_init(
       rate, ddprof::AllocationTracker::kDeterministicSampling,
       ring_buffer.get_buffer_info());
@@ -65,7 +43,7 @@ TEST(allocation_tracker, start_stop) {
   my_func_calling_malloc(1);
 
   ddprof::RingBufferReader reader{ring_buffer.get_ring_buffer()};
-  ASSERT_GT(reader.available_size(), 0);
+  ASSERT_GT(reader.available_for_read(), 0);
 
   auto buf = reader.read_all_available();
   const perf_event_header *hdr =

@@ -208,6 +208,7 @@ add_unit_test(
     ../src/perf.cc
     ../src/perf_watcher.cc
     ../src/perf_ringbuffer.c
+    ../src/ringbuffer_utils.cc
     ../src/sys_utils.cc
     pevent-ut.cc
     DEFINITIONS MYNAME="pevent-ut"
@@ -340,6 +341,7 @@ add_unit_test(
     ../src/perf.cc
     ../src/perf_ringbuffer.c
     ../src/perf_watcher.cc
+    ../src/ringbuffer_utils.cc
     ../src/savecontext.cc
     ../src/mapinfo_lookup.cc
     ../src/procutils.c
@@ -361,6 +363,16 @@ add_unit_test(
     sys_utils-ut.cc
     ../src/sys_utils.cc
     )
+
+add_unit_test(
+    ringbuffer-ut
+    ringbuffer-ut.cc
+    ../src/perf.cc
+    ../src/perf_ringbuffer.c
+    ../src/pevent_lib.cc
+    ../src/ringbuffer_utils.cc
+    ../src/user_override.c
+)
 
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/savecontext.cc)
 

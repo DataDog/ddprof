@@ -33,6 +33,8 @@ static constexpr const char *k_profiler_active_env_variable =
     "DD_PROFILING_NATIVE_LIBRARY_ACTIVE";
 static constexpr const char *k_profiler_auto_start_env_variable =
     "DD_PROFILING_NATIVE_AUTOSTART";
+static constexpr const char *k_profiler_ddprof_exe_env_variable =
+    "DD_PROFILING_NATIVE_DDPROF_EXE";
 
 // address of embedded ddprof executable
 extern const char _binary_ddprof_start[]; // NOLINT cert-dcl51-cpp
@@ -101,19 +103,6 @@ ProfilerAutoStart g_autostart;
 static int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
   char ddprof_str[] = "ddprof";
 
-  int fd = ddprof::memfd_create(ddprof_str, 1U /*MFD_CLOEXEC*/);
-
-  if (fd == -1) {
-    return -1;
-  }
-  defer { close(fd); };
-
-  if (write(fd, _binary_ddprof_start,
-            // cppcheck-suppress comparePointers
-            _binary_ddprof_end - _binary_ddprof_start) == -1) {
-    return -1;
-  }
-
   char pid_buf[32];
   snprintf(pid_buf, sizeof(pid_buf), "%d", target_pid);
   char sock_buf[32];
@@ -122,6 +111,7 @@ static int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
   char pid_opt_str[] = "-p";
   char sock_opt_str[] = "-Z";
 
+  // cppcheck-suppress variableScope
   char *argv[] = {ddprof_str,   pid_opt_str, pid_buf,
                   sock_opt_str, sock_buf,    NULL};
 
@@ -131,11 +121,25 @@ static int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
 
   kill(parent_pid, SIGTERM);
 
-  if (fexecve(fd, argv, environ) == -1) {
-    return -1;
+  if (const char *ddprof_exe = getenv(k_profiler_ddprof_exe_env_variable);
+      ddprof_exe) {
+    execve(ddprof_exe, argv, environ);
+  } else {
+    int fd = ddprof::memfd_create(ddprof_str, 1U /*MFD_CLOEXEC*/);
+
+    if (fd == -1) {
+      return -1;
+    }
+    defer { close(fd); };
+
+    if (write(fd, _binary_ddprof_start,
+              // cppcheck-suppress comparePointers
+              _binary_ddprof_end - _binary_ddprof_start) == -1) {
+      return -1;
+    }
+    fexecve(fd, argv, environ);
   }
 
-  // unreachable
   return -1;
 }
 

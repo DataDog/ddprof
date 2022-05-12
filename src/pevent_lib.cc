@@ -12,6 +12,7 @@ extern "C" {
 }
 
 #include "defer.hpp"
+#include "ringbuffer_utils.hpp"
 #include "sys_utils.hpp"
 #include "syscalls.hpp"
 
@@ -19,7 +20,6 @@ extern "C" {
 #include <errno.h>
 #include <stddef.h>
 #include <string.h>
-#include <sys/eventfd.h>
 #include <sys/ioctl.h>
 #include <sys/syscall.h>
 #include <unistd.h>
@@ -39,32 +39,10 @@ static DDRes pevent_create(PEventHdr *pevent_hdr, int watcher_idx,
 void pevent_init(PEventHdr *pevent_hdr) {
   memset(pevent_hdr, 0, sizeof(PEventHdr));
   pevent_hdr->max_size = MAX_NB_WATCHERS;
-  for (size_t k = 0; k < pevent_hdr->max_size; ++k)
+  for (size_t k = 0; k < pevent_hdr->max_size; ++k) {
     pevent_hdr->pes[k].fd = -1;
-}
-
-DDRes pevent_create_custom_ring_buffer(PEvent *pevent,
-                                       size_t ring_buffer_size_order) {
-  pevent->mapfd =
-      ddprof::memfd_create("allocation_ring_buffer", 1U /*MFD_CLOEXEC*/);
-  if (pevent->mapfd == -1) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
-                           "Error calling memfd_create on watcher %d (%s)",
-                           pevent->pos, strerror(errno));
+    pevent_hdr->pes[k].mapfd = -1;
   }
-  if (ftruncate(pevent->mapfd, perf_mmap_size(ring_buffer_size_order)) == -1) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
-                           "Error calling ftruncate on watcher %d (%s)",
-                           pevent->pos, strerror(errno));
-  }
-  pevent->fd = eventfd(0, 0);
-  if (pevent->fd == -1) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
-                           "Error calling evenfd on watcher %d (%s)",
-                           pevent->pos, strerror(errno));
-  }
-  pevent->custom_event = true;
-  return {};
 }
 
 static void display_system_config(void) {
@@ -96,17 +74,41 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
                                  watcher_idx, cpu_idx, strerror(errno));
         }
         pes[pevent_idx].mapfd = pes[pevent_idx].fd;
+        pevent_hdr->pes[pevent_idx].ring_buffer_size =
+            perf_mmap_size(DEFAULT_BUFF_SIZE_SHIFT);
         pes[pevent_idx].custom_event = false;
       }
     } else {
       // custom event, eg.allocation profiling
       size_t pevent_idx = 0;
       DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
-      DDRES_CHECK_FWD(pevent_create_custom_ring_buffer(
-          &pevent_hdr->pes[pevent_idx], DEFAULT_BUFF_SIZE_SHIFT));
+      DDRES_CHECK_FWD(ddprof::ring_buffer_create(DEFAULT_BUFF_SIZE_SHIFT,
+                                                 &pevent_hdr->pes[pevent_idx]));
     }
   }
   return ddres_init();
+}
+
+DDRes pevent_mmap_event(PEvent *event) {
+  if (event->mapfd != -1) {
+    // Do not mirror perf ring buffer because this doubles the amount of
+    // mlocked pages
+    bool mirror = event->custom_event;
+
+    perf_event_mmap_page *region = static_cast<perf_event_mmap_page *>(
+        perfown_sz(event->mapfd, event->ring_buffer_size, mirror));
+    if (!region) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
+                             "Could not mmap memory for watcher #%d: %s",
+                             event->pos, strerror(errno));
+    }
+    if (!rb_init(&event->rb, region, event->ring_buffer_size, mirror)) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
+                             "Could not allocate memory for watcher #%d",
+                             event->pos);
+    }
+  }
+  return {};
 }
 
 DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
@@ -125,26 +127,7 @@ DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
 
   PEvent *pes = pevent_hdr->pes;
   for (size_t k = 0; k < pevent_hdr->size; ++k) {
-    if (pes[k].mapfd != -1) {
-      size_t reg_sz = 0;
-      // Do not mirror perf ring buffer because this doubles the amount of
-      // mlocked pages
-      bool mirror = pes[k].custom_event;
-
-      perf_event_mmap_page *region = static_cast<perf_event_mmap_page *>(
-          perfown(pes[k].mapfd, mirror, &reg_sz));
-      if (!region) {
-        DDRES_RETURN_ERROR_LOG(
-            DD_WHAT_PERFMMAP,
-            "Could not finalize watcher (idx#%zu): registration (%s)", k,
-            strerror(errno));
-      }
-      if (!rb_init(&pes[k].rb, region, reg_sz, mirror)) {
-        DDRES_RETURN_ERROR_LOG(
-            DD_WHAT_PERFMMAP,
-            "Could not allocate storage for watcher (idx#%zu)", k);
-      }
-    }
+    DDRES_CHECK_FWD(pevent_mmap_event(&pes[k]));
   }
 
   defer_munmap.release();
@@ -172,46 +155,65 @@ DDRes pevent_enable(PEventHdr *pevent_hdr) {
   return ddres_init();
 }
 
+DDRes pevent_munmap_event(PEvent *event) {
+  if (event->rb.region) {
+    if (perfdisown(event->rb.region, event->rb.size, event->rb.is_mirrored) !=
+        0) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
+                             "Error when using perfdisown for watcher #%d",
+                             event->pos);
+    }
+    event->rb.region = NULL;
+  }
+  rb_free(&event->rb);
+  return {};
+}
+
 /// Clean the mmap buffer
 DDRes pevent_munmap(PEventHdr *pevent_hdr) {
-
   PEvent *pes = pevent_hdr->pes;
+  DDRes res{};
+
   for (size_t k = 0; k < pevent_hdr->size; ++k) {
-    if (pes[k].rb.region) {
-      if (perfdisown(pes[k].rb.region, pes[k].rb.size, pes[k].rb.is_mirrored) !=
-          0) {
-        DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
-                               "Error when using perfdisown %zu", k);
-      }
-      pes[k].rb.region = NULL;
+    DDRes local_res = pevent_munmap_event(&pes[k]);
+    if (!IsDDResOK(local_res)) {
+      res = local_res;
     }
-    rb_free(&pevent_hdr->pes[k].rb);
   }
 
-  return ddres_init();
+  return res;
+}
+
+DDRes pevent_close_event(PEvent *event) {
+  if (event->fd != -1) {
+    if (close(event->fd) == -1) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
+                             "Error when closing fd=%d (watcher #%d) (%s)",
+                             event->fd, event->pos, strerror(errno));
+    }
+    event->fd = -1;
+  }
+  if (event->custom_event && event->mapfd != -1) {
+    if (close(event->mapfd) == -1) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
+                             "Error when closing mapfd=%d (watcher #%d) (%s)",
+                             event->mapfd, event->pos, strerror(errno));
+    }
+  }
+  return {};
 }
 
 DDRes pevent_close(PEventHdr *pevent_hdr) {
   PEvent *pes = pevent_hdr->pes;
+  DDRes res{};
   for (size_t k = 0; k < pevent_hdr->size; ++k) {
-    if (pes[k].fd != -1) {
-      if (close(pes[k].fd) == -1) {
-        DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
-                               "Error when closing fd=%d (idx#%zu) (%s)",
-                               pes[k].fd, k, strerror(errno));
-      }
-      pes[k].fd = -1;
-    }
-    if (pes[k].custom_event && pes[k].mapfd != -1) {
-      if (close(pes[k].mapfd) == -1) {
-        DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
-                               "Error when closing mapfd=%d (idx#%zu) (%s)",
-                               pes[k].mapfd, k, strerror(errno));
-      }
+    DDRes local_res = pevent_close_event(&pes[k]);
+    if (!IsDDResOK(local_res)) {
+      res = local_res;
     }
   }
   pevent_hdr->size = 0;
-  return ddres_init();
+  return res;
 }
 
 // returns the number of successful cleans

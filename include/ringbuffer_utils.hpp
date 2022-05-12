@@ -5,13 +5,19 @@
 
 #pragma once
 
+#include "ddprof_buffer.hpp"
 extern "C" {
 #include "perf_ringbuffer.h"
 }
 
 #include <cassert>
+#include <cstring>
+
+struct PEvent;
 
 namespace ddprof {
+
+struct RingBufferInfo;
 
 class RingBufferWriter {
 public:
@@ -31,11 +37,13 @@ public:
   RingBufferWriter &operator=(const RingBufferWriter &) = delete;
 
   inline size_t available_size() const {
-    return _rb.data_size - (_head - _tail);
+    // Always leave one free char, as a completely full buffer is
+    // indistinguishable from an empty one
+    return _rb.data_size - (_head + 1 - _tail);
   }
 
   Buffer reserve(size_t n) {
-    assert(n < available_size());
+    assert(n <= available_size());
 
     uint64_t head_linear = _head & _rb.mask;
     std::byte *dest = (std::byte *)(_rb.start + head_linear);
@@ -84,7 +92,7 @@ public:
     __atomic_store_n(&_rb.region->data_tail, _tail, __ATOMIC_RELEASE);
   }
 
-  inline size_t available_size() const { return _head - _tail; }
+  inline size_t available_for_read() const { return _head - _tail; }
 
   ConstBuffer read_all_available() {
     uint64_t tail_linear = _tail & _rb.mask;
@@ -95,10 +103,37 @@ public:
     return {start, n};
   }
 
+  void check_for_new_data() {
+    _head = __atomic_load_n(&_rb.region->data_head, __ATOMIC_ACQUIRE);
+  }
+
 private:
   RingBuffer &_rb;
   uint64_t _tail;
   uint64_t _head;
 };
+
+// Initialize event from ring buffer info and mmap ring buffer into process
+DDRes ring_buffer_attach(const RingBufferInfo &info, PEvent *event);
+
+// Mmap ring buffer into process from already initialized event
+DDRes ring_buffer_attach(PEvent &event);
+
+// Unmap ring buffer
+DDRes ring_buffer_detach(PEvent &event);
+
+// Create ring buffer (create memfd and eventfd)
+// Ring buffer is not mapped upon return from this function, ring_buffer_attach
+// needs to be called to map it
+DDRes ring_buffer_create(size_t buffer_size_page_order, PEvent *event);
+
+// Destroy ring buffer: close memfd / eventfd
+DDRes ring_buffer_close(PEvent &event);
+
+// Create and attach ring buffer
+DDRes ring_buffer_setup(size_t buffer_size_page_order, PEvent *event);
+
+// Unmap and close ring buffer
+DDRes ring_buffer_cleanup(PEvent &event);
 
 } // namespace ddprof

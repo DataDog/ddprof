@@ -20,6 +20,7 @@ extern "C" {
 #include <atomic>
 #include <cassert>
 #include <cstdint>
+#include <cstdlib>
 #include <linux/perf_event.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -90,6 +91,11 @@ DDRes AllocationTracker::allocation_tracking_init(
     DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW, "Allocation profiler already started");
   }
 
+  // force initialization of malloc wrappers if not done yet
+  // volatile prevents compiler from optimizing out calls to malloc/free
+  void *volatile p = ::malloc(1);
+  ::free(p);
+
   DDRES_CHECK_FWD(instance->init(allocation_profiling_rate,
                                  flags & kDeterministicSampling, ring_buffer));
 
@@ -105,21 +111,19 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
                               const RingBufferInfo &ring_buffer) {
   _sampling_interval = mem_profile_interval;
   _deterministic_sampling = deterministic_sampling;
-  pevent_init(&_pevent_hdr);
-  _pevent_hdr.size = 1;
-  PEvent &pe = _pevent_hdr.pes[0];
-  pe.fd = ring_buffer.event_fd;
-  pe.mapfd = ring_buffer.ring_fd;
-  pe.pos = -1;
-  pe.custom_event = true;
-  return pevent_mmap(&_pevent_hdr, true);
+  _pevent = {.pos = -1,
+             .fd = ring_buffer.event_fd,
+             .mapfd = ring_buffer.ring_fd,
+             .ring_buffer_size = static_cast<size_t>(ring_buffer.mem_size),
+             .custom_event = true};
+  return pevent_mmap_event(&_pevent);
 }
 
 void AllocationTracker::free() {
   _state.track_allocations = false;
   _state.track_deallocations = false;
 
-  pevent_munmap(&_pevent_hdr);
+  pevent_munmap_event(&_pevent);
 
   // Do not destroy the object:
   // there is an inherent race condition between checking
@@ -192,7 +196,7 @@ void AllocationTracker::track_allocation(uintptr_t, size_t size,
 
 DDRes AllocationTracker::push_sample(uint64_t allocated_size,
                                      TrackerThreadLocalState &tl_state) {
-  RingBufferWriter writer{_pevent_hdr.pes[0].rb};
+  RingBufferWriter writer{_pevent.rb};
   auto needed_size = sizeof(AllocationEvent);
 
   if (_state.lost_count) {
@@ -244,7 +248,7 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
 
   if (writer.commit()) {
     uint64_t count = 1;
-    if (write(_pevent_hdr.pes[0].fd, &count, sizeof(count)) != sizeof(count)) {
+    if (write(_pevent.fd, &count, sizeof(count)) != sizeof(count)) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
                              "Error writing to memory allocation eventfd (%s)",
                              strerror(errno));

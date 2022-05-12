@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "ddprof_buffer.hpp"
 #include "ddres.h"
 #include "span.hpp"
 
@@ -22,9 +23,6 @@ static constexpr size_t kMaxFD = 253;
 static constexpr auto kDefaultSocketTimeout = std::chrono::seconds{2};
 
 using socket_t = int;
-
-using Buffer = ddprof::span<std::byte>;
-using ConstBuffer = ddprof::span<const std::byte>;
 
 class UnixSocket {
 public:

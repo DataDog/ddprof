@@ -90,7 +90,7 @@ void *malloc(size_t size) {
 
 void *temp_malloc(size_t size) noexcept {
   check_init();
-  return malloc(size);
+  return s_malloc(size);
 }
 
 void free(void *ptr) {
@@ -105,7 +105,7 @@ void free(void *ptr) {
 
 void temp_free(void *ptr) noexcept {
   check_init();
-  return free(ptr);
+  return s_free(ptr);
 }
 
 void *calloc(size_t nmemb, size_t size) {
@@ -117,7 +117,7 @@ void *calloc(size_t nmemb, size_t size) {
 
 void *temp_calloc(size_t nmemb, size_t size) noexcept {
   check_init();
-  return calloc(nmemb, size);
+  return s_calloc(nmemb, size);
 }
 
 void *realloc(void *ptr, size_t size) {
@@ -133,7 +133,7 @@ void *realloc(void *ptr, size_t size) {
 
 void *temp_realloc(void *ptr, size_t size) noexcept {
   check_init();
-  return realloc(ptr, size);
+  return s_realloc(ptr, size);
 }
 
 int posix_memalign(void **memptr, size_t alignment, size_t size) {
@@ -147,7 +147,7 @@ int posix_memalign(void **memptr, size_t alignment, size_t size) {
 
 int temp_posix_memalign(void **memptr, size_t alignment, size_t size) noexcept {
   check_init();
-  return posix_memalign(memptr, alignment, size);
+  return s_posix_memalign(memptr, alignment, size);
 }
 
 void *aligned_alloc(size_t alignment, size_t size) {
@@ -158,7 +158,7 @@ void *aligned_alloc(size_t alignment, size_t size) {
 
 void *temp_aligned_alloc(size_t alignment, size_t size) noexcept {
   check_init();
-  return aligned_alloc(alignment, size);
+  return s_aligned_alloc(alignment, size);
 }
 
 void *memalign(size_t alignment, size_t size) {
@@ -169,7 +169,7 @@ void *memalign(size_t alignment, size_t size) {
 }
 void *temp_memalign(size_t alignment, size_t size) noexcept {
   check_init();
-  return memalign(alignment, size);
+  return s_memalign(alignment, size);
 }
 
 void *pvalloc(size_t size) {
@@ -181,7 +181,7 @@ void *pvalloc(size_t size) {
 
 void *temp_pvalloc(size_t size) noexcept {
   check_init();
-  return pvalloc(size);
+  return s_pvalloc(size);
 }
 
 void *valloc(size_t size) {
@@ -193,7 +193,7 @@ void *valloc(size_t size) {
 
 void *temp_valloc(size_t size) noexcept {
   check_init();
-  return valloc(size);
+  return s_valloc(size);
 }
 
 void *reallocarray(void *ptr, size_t nmemb, size_t size) noexcept {
@@ -209,5 +209,5 @@ void *reallocarray(void *ptr, size_t nmemb, size_t size) noexcept {
 
 void *temp_reallocarray(void *ptr, size_t nmemb, size_t size) noexcept {
   check_init();
-  return reallocarray(ptr, nmemb, size);
+  return s_reallocarray(ptr, nmemb, size);
 }
