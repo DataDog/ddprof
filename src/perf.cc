@@ -42,6 +42,7 @@ struct perf_event_attr g_dd_native_attr = {
     .precise_ip = 2,
     .mmap_data = 0, // keep track of other mappings
     .sample_id_all = 1,
+    .exclude_callchain_kernel = 1,
     .sample_regs_user = PERF_REGS_MASK,
     .sample_stack_user = PERF_SAMPLE_STACK_SIZE, // Is this an insane default?
 };

@@ -174,6 +174,7 @@ add_custom_command(OUTPUT ${DDPROF_EXE_OBJECT}
 set(DD_PROFILING_SOURCES src/lib/dd_profiling.cc src/ddprof_cmdline.c src/logger.c src/logger_setup.cc src/ipc.cc 
                          src/pevent_lib.cc src/perf.cc src/perf_ringbuffer.c src/perf_watcher.cc src/user_override.c
                          src/ddres_list.c src/savecontext.cc src/lib/malloc_wrapper.cc src/lib/allocation_tracker.cc
+                         src/sys_utils.cc
                          $<TARGET_OBJECTS:ddprof_exe_object>)
 add_library(ddprof_exe_object OBJECT IMPORTED GLOBAL)
 set_target_properties(ddprof_exe_object PROPERTIES IMPORTED_OBJECTS "${DDPROF_EXE_OBJECT}")

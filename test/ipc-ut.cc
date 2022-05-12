@@ -18,7 +18,7 @@ static const int kChildIdx = 1;
 
 TEST(IPCTest, Positive) {
   // Create a socket pair
-  std::string fileName = IPC_TEST_DATA "/ipc_test_data_Positive.txt";
+  std::string fileName = UNIT_TEST_DATA "/ipc_test_data_Positive.txt";
   std::string payload = "Interesting test.";
 
   int sockets[2] = {-1, -1};
@@ -69,6 +69,7 @@ TEST(IPCTest, Positive) {
 }
 
 TEST(IPCTest, timeout) {
+
   int sockets[2] = {-1, -1};
   ASSERT_EQ(socketpair(AF_UNIX, SOCK_DGRAM, 0, sockets), 0);
   ddprof::UnixSocket sock1(sockets[0]);

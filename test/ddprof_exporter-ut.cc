@@ -138,7 +138,7 @@ TEST(DDProfExporter, simple) {
   EXPECT_TRUE(IsDDResOK(res));
   { // override folder to write debug pprofs
     // You can view content using : pprof -raw ./test/data/ddprof_
-    exporter._debug_folder = IPC_TEST_DATA;
+    exporter._debug_folder = UNIT_TEST_DATA;
   }
 
   { // Aggregate pprofs

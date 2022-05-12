@@ -67,7 +67,7 @@ enum DDProfTypeId { kDDPROF_TYPE_CUSTOM = PERF_TYPE_MAX + 100 };
 enum DDProfCustomCountId { kDDPROF_COUNT_ALLOCATIONS = 0 };
 
 #define IS_FREQ                                                                \
-  { .is_freq = true }
+  { .is_kernel = true, .is_freq = true }
 #define IS_KERNEL                                                              \
   { .is_kernel = true }
 

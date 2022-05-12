@@ -13,7 +13,7 @@
 namespace ddprof {
 TEST(RegionHolder, Simple) {
   LogHandle log_handle;
-  std::string fileName = IPC_TEST_DATA "/dso_test_data.so";
+  std::string fileName = UNIT_TEST_DATA "/dso_test_data.so";
   RegionHolder reg1(fileName, 12, 0, dso::kStandard);
 
   RegionHolder reg2 = std::move(reg1);

@@ -84,6 +84,8 @@ function(add_benchmark name)
 endfunction()
 
 #### Definition of unit tests ####
+add_compile_definitions("UNIT_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
+
 add_unit_test(
     ddprofcmdline-ut
     ../src/ddprof_cmdline.c
@@ -130,8 +132,6 @@ add_unit_test(
     DEFINITIONS MYNAME="demangle-ut"
 )
 
-add_compile_definitions("IPC_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
-
 add_unit_test(
     ipc-ut
     ../src/ipc.cc
@@ -169,7 +169,6 @@ add_unit_test(
     DEFINITIONS MYNAME="userid-ut"
 )
 
-add_compile_definitions("IPC_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 add_unit_test(
     procutils-ut
     ../src/procutils.c
@@ -209,6 +208,7 @@ add_unit_test(
     ../src/perf.cc
     ../src/perf_watcher.cc
     ../src/perf_ringbuffer.c
+    ../src/sys_utils.cc
     pevent-ut.cc
     DEFINITIONS MYNAME="pevent-ut"
 )
@@ -346,6 +346,7 @@ add_unit_test(
     ../src/region_holder.cc
     ../src/signal_helper.c
     ../src/statsd.c
+    ../src/sys_utils.cc
     ../src/user_override.c
     ../src/unwind.cc
     ../src/unwind_dwfl.cc
@@ -354,6 +355,12 @@ add_unit_test(
     ../src/unwind_output.c
     LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
     DEFINITIONS ${DDPROF_DEFINITION_LIST})
+
+add_unit_test(
+    sys_utils-ut
+    sys_utils-ut.cc
+    ../src/sys_utils.cc
+    )
 
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/savecontext.cc)
 

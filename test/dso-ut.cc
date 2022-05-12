@@ -38,7 +38,7 @@ Dso build_dso_vdso() { return Dso(10, 12, 13, 14, "[vdso]/usr/var/12"); }
 Dso build_dso_vsyscall() { return Dso(0, 0, 0, 7, "[vsyscall]/some/syscall"); }
 
 Dso build_dso_file_10_2500() {
-  std::string fileName = IPC_TEST_DATA "/dso_test_data.so";
+  std::string fileName = UNIT_TEST_DATA "/dso_test_data.so";
   // not using the current pid would fail (as we need to access the file in the
   // context of the process)
   return Dso(getpid(), 2501, 2510, 0, std::move(fileName));

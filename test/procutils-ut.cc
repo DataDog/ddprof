@@ -44,9 +44,9 @@ TEST(ProcUtilsTest, inode) {
   }
   { // symlinks
     std::string path_procutils_test =
-        std::string(IPC_TEST_DATA "/procutils_test.txt");
+        std::string(UNIT_TEST_DATA "/procutils_test.txt");
     std::string path_l_procutils_test =
-        std::string(IPC_TEST_DATA "/link_procutils_test.txt");
+        std::string(UNIT_TEST_DATA "/link_procutils_test.txt");
     int64_t size;
     inode_t inode;
     bool file_found =

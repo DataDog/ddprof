@@ -12,6 +12,7 @@ extern "C" {
 }
 
 #include "defer.hpp"
+#include "sys_utils.hpp"
 #include "syscalls.hpp"
 
 #include <assert.h>
@@ -66,6 +67,16 @@ DDRes pevent_create_custom_ring_buffer(PEvent *pevent,
   return {};
 }
 
+static void display_system_config(void) {
+  int val;
+  DDRes res = ddprof::sys_perf_event_paranoid(val);
+  if (IsDDResOK(res)) {
+    LG_NFO("Check System Configuration - perf_event_paranoid=%d", val);
+  } else {
+    LG_NFO("Unable to access system configuration");
+  }
+}
+
 DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
                   PEventHdr *pevent_hdr) {
   PEvent *pes = pevent_hdr->pes;
@@ -79,6 +90,7 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
         pes[pevent_idx].fd =
             perfopen(pid, &ctx->watchers[watcher_idx], cpu_idx, true);
         if (pes[pevent_idx].fd == -1) {
+          display_system_config();
           DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
                                  "Error calling perfopen on watcher %d.%d (%s)",
                                  watcher_idx, cpu_idx, strerror(errno));
@@ -87,7 +99,7 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
         pes[pevent_idx].custom_event = false;
       }
     } else {
-      // cutom event, eg.allocation profiling
+      // custom event, eg.allocation profiling
       size_t pevent_idx = 0;
       DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
       DDRES_CHECK_FWD(pevent_create_custom_ring_buffer(
