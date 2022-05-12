@@ -371,6 +371,7 @@ add_unit_test(
     ../src/perf_ringbuffer.c
     ../src/pevent_lib.cc
     ../src/ringbuffer_utils.cc
+    ../src/sys_utils.cc
     ../src/user_override.c
 )
 

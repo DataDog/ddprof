@@ -165,7 +165,7 @@ static inline DDRes worker_process_ring_buffers(PEvent *pes, int pe_len,
         // Attempt to dispatch the event
         struct perf_event_header *hdr = rb_seek(rb, tail);
         assert(hdr->size > 0);
-        DDRes res = ddprof_worker_process_event(hdr, pes[i].pos, ctx);
+        DDRes res = ddprof_worker_process_event(hdr, pes[i].watcher_pos, ctx);
 
         // We've processed the current event, so we can advance the ringbuffer
         tail += hdr->size;

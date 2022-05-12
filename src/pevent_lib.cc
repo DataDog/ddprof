@@ -32,7 +32,7 @@ static DDRes pevent_create(PEventHdr *pevent_hdr, int watcher_idx,
                            pevent_hdr->max_size);
   }
   *pevent_idx = pevent_hdr->size++;
-  pevent_hdr->pes[*pevent_idx].pos = watcher_idx;
+  pevent_hdr->pes[*pevent_idx].watcher_pos = watcher_idx;
   return {};
 }
 
@@ -100,12 +100,12 @@ DDRes pevent_mmap_event(PEvent *event) {
     if (!region) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
                              "Could not mmap memory for watcher #%d: %s",
-                             event->pos, strerror(errno));
+                             event->watcher_pos, strerror(errno));
     }
     if (!rb_init(&event->rb, region, event->ring_buffer_size, mirror)) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
                              "Could not allocate memory for watcher #%d",
-                             event->pos);
+                             event->watcher_pos);
     }
   }
   return {};
@@ -161,7 +161,7 @@ DDRes pevent_munmap_event(PEvent *event) {
         0) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
                              "Error when using perfdisown for watcher #%d",
-                             event->pos);
+                             event->watcher_pos);
     }
     event->rb.region = NULL;
   }
@@ -189,7 +189,7 @@ DDRes pevent_close_event(PEvent *event) {
     if (close(event->fd) == -1) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
                              "Error when closing fd=%d (watcher #%d) (%s)",
-                             event->fd, event->pos, strerror(errno));
+                             event->fd, event->watcher_pos, strerror(errno));
     }
     event->fd = -1;
   }
@@ -197,7 +197,7 @@ DDRes pevent_close_event(PEvent *event) {
     if (close(event->mapfd) == -1) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
                              "Error when closing mapfd=%d (watcher #%d) (%s)",
-                             event->mapfd, event->pos, strerror(errno));
+                             event->mapfd, event->watcher_pos, strerror(errno));
     }
   }
   return {};

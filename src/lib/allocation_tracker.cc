@@ -111,7 +111,7 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
                               const RingBufferInfo &ring_buffer) {
   _sampling_interval = mem_profile_interval;
   _deterministic_sampling = deterministic_sampling;
-  _pevent = {.pos = -1,
+  _pevent = {.watcher_pos = -1,
              .fd = ring_buffer.event_fd,
              .mapfd = ring_buffer.ring_fd,
              .ring_buffer_size = static_cast<size_t>(ring_buffer.mem_size),

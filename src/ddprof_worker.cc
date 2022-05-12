@@ -148,7 +148,8 @@ static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr) {
 
 /************************* perf_event_open() helpers **************************/
 /// Entry point for sample aggregation
-DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
+DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
+                       int watcher_pos) {
   if (!sample)
     return ddres_warn(DD_WHAT_PERFSAMP);
   struct UnwindState *us = ctx->worker_ctx.us;
@@ -163,7 +164,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   us->output.tid = sample->tid;
 
   // If this is a SW_TASK_CLOCK-type event, then aggregate the time
-  if (ctx->watchers[pos].config == PERF_COUNT_SW_TASK_CLOCK)
+  if (ctx->watchers[watcher_pos].config == PERF_COUNT_SW_TASK_CLOCK)
     ddprof_stats_add(STATS_CPU_TIME, sample->period, NULL);
   unsigned long this_ticks_unwind = __rdtsc();
   DDRes res = unwindstate__unwind(us);
@@ -172,7 +173,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   if (!IsDDResFatal(res)) {
 #ifndef DDPROF_NATIVE_LIB
     // in lib mode we don't aggregate (protect to avoid link failures)
-    PerfWatcher *watcher = &ctx->watchers[pos];
+    PerfWatcher *watcher = &ctx->watchers[watcher_pos];
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
     DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr,
@@ -181,7 +182,8 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
     // Call the user's stack handler
     if (ctx->stack_handler) {
       if (!ctx->stack_handler->apply(&us->output, ctx,
-                                     ctx->stack_handler->callback_ctx, pos)) {
+                                     ctx->stack_handler->callback_ctx,
+                                     watcher_pos)) {
         DDRES_RETURN_ERROR_LOG(DD_WHAT_STACK_HANDLE,
                                "Stack handler returning errors");
       }
@@ -303,10 +305,10 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
   return ddres_init();
 }
 
-void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int pos) {
+void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int watcher_pos) {
   if (!(map->header.misc & PERF_RECORD_MISC_MMAP_DATA)) {
-    LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx)", pos, map->pid, map->filename,
-           map->addr, map->len, map->pgoff);
+    LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx)", watcher_pos, map->pid,
+           map->filename, map->addr, map->len, map->pgoff);
     ddprof::Dso new_dso(map->pid, map->addr, map->addr + map->len - 1,
                         map->pgoff, std::string(map->filename));
     ctx->worker_ctx.us->dso_hdr.insert_erase_overlap(std::move(new_dso));
@@ -317,23 +319,24 @@ void ddprof_pr_lost(DDProfContext *, perf_event_lost *lost, int) {
   ddprof_stats_add(STATS_EVENT_LOST, lost->lost, NULL);
 }
 
-void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm, int pos) {
+void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm,
+                    int watcher_pos) {
   // Change in process name (assuming exec) : clear all associated dso
   if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC) {
-    LG_DBG("<%d>(COMM)%d -> %s", pos, comm->pid, comm->comm);
+    LG_DBG("<%d>(COMM)%d -> %s", watcher_pos, comm->pid, comm->comm);
     unwind_pid_free(ctx->worker_ctx.us, comm->pid);
   }
 }
 
-void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int pos) {
-  LG_DBG("<%d>(FORK)%d -> %d/%d", pos, frk->ppid, frk->pid, frk->tid);
+void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int watcher_pos) {
+  LG_DBG("<%d>(FORK)%d -> %d/%d", watcher_pos, frk->ppid, frk->pid, frk->tid);
   if (frk->ppid != frk->pid) {
     // Clear everything and populate at next error or with coming samples
     unwind_pid_free(ctx->worker_ctx.us, frk->pid);
   }
 }
 
-void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int pos) {
+void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int watcher_pos) {
   // On Linux, it seems that the thread group leader is the one whose task ID
   // matches the process ID of the group.  Moreover, it seems that it is the
   // overwhelming convention that this thread is closed after the other threads
@@ -341,9 +344,9 @@ void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int pos) {
   // We do not clear the PID at this time because we currently cleanup anyway.
   (void)ctx;
   if (ext->pid == ext->tid) {
-    LG_DBG("<%d>(EXIT)%d", pos, ext->pid);
+    LG_DBG("<%d>(EXIT)%d", watcher_pos, ext->pid);
   } else {
-    LG_DBG("<%d>(EXIT)%d/%d", pos, ext->pid, ext->tid);
+    LG_DBG("<%d>(EXIT)%d/%d", watcher_pos, ext->pid, ext->tid);
   }
 }
 
@@ -445,8 +448,8 @@ struct perf_event_hdr_wpid : perf_event_header {
   uint32_t pid, tid;
 };
 
-DDRes ddprof_worker_process_event(struct perf_event_header *hdr, int pos,
-                                  DDProfContext *ctx) {
+DDRes ddprof_worker_process_event(struct perf_event_header *hdr,
+                                  int watcher_pos, DDProfContext *ctx) {
   // global try catch to avoid leaking exceptions to main loop
   try {
     ddprof_stats_add(STATS_EVENT_COUNT, 1, NULL);
@@ -455,33 +458,33 @@ DDRes ddprof_worker_process_event(struct perf_event_header *hdr, int pos,
     /* Cases where the target type has a PID */
     case PERF_RECORD_SAMPLE:
       if (wpid->pid) {
-        uint64_t mask = ctx->watchers[pos].sample_type;
+        uint64_t mask = ctx->watchers[watcher_pos].sample_type;
         perf_event_sample *sample = hdr2samp(hdr, mask);
         if (sample) {
-          DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, pos));
+          DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, watcher_pos));
         }
       }
       break;
     case PERF_RECORD_MMAP:
       if (wpid->pid)
-        ddprof_pr_mmap(ctx, (perf_event_mmap *)hdr, pos);
+        ddprof_pr_mmap(ctx, (perf_event_mmap *)hdr, watcher_pos);
       break;
     case PERF_RECORD_COMM:
       if (wpid->pid)
-        ddprof_pr_comm(ctx, (perf_event_comm *)hdr, pos);
+        ddprof_pr_comm(ctx, (perf_event_comm *)hdr, watcher_pos);
       break;
     case PERF_RECORD_EXIT:
       if (wpid->pid)
-        ddprof_pr_exit(ctx, (perf_event_exit *)hdr, pos);
+        ddprof_pr_exit(ctx, (perf_event_exit *)hdr, watcher_pos);
       break;
     case PERF_RECORD_FORK:
       if (wpid->pid)
-        ddprof_pr_fork(ctx, (perf_event_fork *)hdr, pos);
+        ddprof_pr_fork(ctx, (perf_event_fork *)hdr, watcher_pos);
       break;
 
     /* Cases where the target type might not have a PID */
     case PERF_RECORD_LOST:
-      ddprof_pr_lost(ctx, (perf_event_lost *)hdr, pos);
+      ddprof_pr_lost(ctx, (perf_event_lost *)hdr, watcher_pos);
       break;
     default:
       break;

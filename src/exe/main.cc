@@ -155,15 +155,17 @@ int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     if (alloc_watcher_idx != -1) {
       ddprof::span pevents{ctx->worker_ctx.pevent_hdr.pes,
                            ctx->worker_ctx.pevent_hdr.size};
-      auto event_it = std::find_if(pevents.begin(), pevents.end(),
-                   [alloc_watcher_idx](const auto &pevent) {
-                     return pevent.pos == alloc_watcher_idx;
-                   });
+      auto event_it =
+          std::find_if(pevents.begin(), pevents.end(),
+                       [alloc_watcher_idx](const auto &pevent) {
+                         return pevent.watcher_pos == alloc_watcher_idx;
+                       });
       if (event_it != pevents.end()) {
         reply.ring_buffer.event_fd = event_it->fd;
         reply.ring_buffer.ring_fd = event_it->mapfd;
         reply.ring_buffer.mem_size = perf_mmap_size(DEFAULT_BUFF_SIZE_SHIFT);
-        reply.allocation_profiling_rate = ctx->watchers[alloc_watcher_idx].sample_period;
+        reply.allocation_profiling_rate =
+            ctx->watchers[alloc_watcher_idx].sample_period;
       }
     }
 
