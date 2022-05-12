@@ -250,7 +250,7 @@ perf_event_sample *hdr2samp(const struct perf_event_header *hdr,
   if (PERF_SAMPLE_REGS_USER & mask) {
     sample.abi = *buf++;
     // In case regs are not available, ignore this sample
-    if (sample.abi == PERF_SAMPLE_REGS_ABI_NONE) {
+    if (sample.abi != PERF_SAMPLE_REGS_ABI_32 && sample.abi != PERF_SAMPLE_REGS_ABI_64) {
       return NULL;
     }
     sample.regs = buf;
