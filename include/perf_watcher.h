@@ -9,8 +9,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+typedef enum {
+  PWRequestedFalse = 0, // always off
+  PWRequestedTrue,      // always on
+  PWPreferedTrue,       // On if possible, default to OFF on failure
+} PerfWatcherValue;
+
 struct PerfWatcherOptions {
-  bool is_kernel;
+  PerfWatcherValue is_kernel;
   bool is_freq;
   uint8_t nb_frames_to_skip; // number of bottom frames to skip in stack trace
                              // (useful for allocation profiling to remove
@@ -66,10 +72,14 @@ enum DDProfTypeId { kDDPROF_TYPE_CUSTOM = PERF_TYPE_MAX + 100 };
 
 enum DDProfCustomCountId { kDDPROF_COUNT_ALLOCATIONS = 0 };
 
+#define IS_FREQ_PREF_KERNEL                                                    \
+  { .is_kernel = PWPreferedTrue, .is_freq = true }
+
 #define IS_FREQ                                                                \
-  { .is_kernel = true, .is_freq = true }
+  { .is_freq = true }
+
 #define IS_KERNEL                                                              \
-  { .is_kernel = true }
+  { .is_kernel = PWRequestedTrue }
 
 #ifdef DDPROF_OPTIM
 #  define NB_FRAMES_TO_SKIP 4
@@ -98,7 +108,7 @@ enum DDProfCustomCountId { kDDPROF_COUNT_ALLOCATIONS = 0 };
   X(hBUS,    "Bus Cycles",      PERF_TYPE_HARDWARE,  PERF_COUNT_HW_BUS_CYCLES,              1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(hBSTF,   "Bus Stalls(F)",   PERF_TYPE_HARDWARE,  PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(hBSTB,   "Bus Stalls(B)",   PERF_TYPE_HARDWARE,  PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(sCPU,    "CPU Time",        PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_TASK_CLOCK,              99,           DDPROF_PWT_CPU_NANOS,   IS_FREQ)                 \
+  X(sCPU,    "CPU Time",        PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_TASK_CLOCK,              99,           DDPROF_PWT_CPU_NANOS,   IS_FREQ_PREF_KERNEL)                 \
   X(sPF,     "Page Faults",     PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_PAGE_FAULTS,             1,            DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
   X(sCS,     "Con. Switch",     PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_CONTEXT_SWITCHES,        1,            DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
   X(sMig,    "CPU Migrations",  PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_CPU_MIGRATIONS,          99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \

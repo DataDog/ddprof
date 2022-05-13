@@ -55,29 +55,34 @@ static void display_system_config(void) {
   }
 }
 
+static DDRes pevent_all_cpus(const PerfWatcher *watcher, int watcher_idx,
+                             pid_t pid, int num_cpu, PEventHdr *pevent_hdr) {
+  PEvent *pes = pevent_hdr->pes;
+  for (int cpu_idx = 0; cpu_idx < num_cpu; ++cpu_idx) {
+    size_t pevent_idx = 0;
+    DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
+    pes[pevent_idx].fd = perfopen(pid, watcher, cpu_idx, true);
+    if (pes[pevent_idx].fd == -1) {
+      display_system_config();
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
+                             "Error calling perfopen on watcher %d.%d (%s)",
+                             watcher_idx, cpu_idx, strerror(errno));
+    }
+    pes[pevent_idx].mapfd = pes[pevent_idx].fd;
+    pevent_hdr->pes[pevent_idx].ring_buffer_size =
+        perf_mmap_size(DEFAULT_BUFF_SIZE_SHIFT);
+    pes[pevent_idx].custom_event = false;
+  }
+  return ddres_init();
+}
+
 DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
                   PEventHdr *pevent_hdr) {
-  PEvent *pes = pevent_hdr->pes;
   assert(pevent_hdr->size == 0); // check for previous init
   for (int watcher_idx = 0; watcher_idx < ctx->num_watchers; ++watcher_idx) {
     if (ctx->watchers[watcher_idx].type < kDDPROF_TYPE_CUSTOM) {
-      for (int cpu_idx = 0; cpu_idx < num_cpu; ++cpu_idx) {
-        size_t pevent_idx = 0;
-        DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
-
-        pes[pevent_idx].fd =
-            perfopen(pid, &ctx->watchers[watcher_idx], cpu_idx, true);
-        if (pes[pevent_idx].fd == -1) {
-          display_system_config();
-          DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
-                                 "Error calling perfopen on watcher %d.%d (%s)",
-                                 watcher_idx, cpu_idx, strerror(errno));
-        }
-        pes[pevent_idx].mapfd = pes[pevent_idx].fd;
-        pevent_hdr->pes[pevent_idx].ring_buffer_size =
-            perf_mmap_size(DEFAULT_BUFF_SIZE_SHIFT);
-        pes[pevent_idx].custom_event = false;
-      }
+      DDRES_CHECK_FWD(pevent_all_cpus(&ctx->watchers[watcher_idx], watcher_idx,
+                                      pid, num_cpu, pevent_hdr));
     } else {
       // custom event, eg.allocation profiling
       size_t pevent_idx = 0;
@@ -113,6 +118,8 @@ DDRes pevent_mmap_event(PEvent *event) {
 
 DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
   // Switch user if needed (when root switch to nobody user)
+  // pinned memory accounting in root user does not always work
+  // hence we use a different user
   UIDInfo info;
   if (use_override) {
     DDRES_CHECK_FWD(user_override(&info));

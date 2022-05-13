@@ -47,7 +47,8 @@ TEST(MMapTest, PerfOpen) {
 
     // Pure-userspace software events should all pass.  Anything else should hit
     // this filter
-    if (watcher->type != PERF_TYPE_SOFTWARE || watcher->options.is_kernel) {
+    if (watcher->type != PERF_TYPE_SOFTWARE ||
+        watcher->options.is_kernel == PWRequestedTrue) {
       continue;
     }
     EXPECT_TRUE(perf_fd != -1);

@@ -53,7 +53,7 @@ extern "C" {
   X(DSO, "")                                                                   \
   X(UNHANDLED_DSO, "ignore dso type")                                          \
   X(WORKERLOOP_INIT, "error initializing the worker loop")                     \
-  X(SYS_CONFIG, "error checking system configuration")                           \
+  X(SYS_CONFIG, "error checking system configuration")                         \
   X(UNITTEST, "unit test error")                                               \
   X(SOCKET, "error during socket operation")
 

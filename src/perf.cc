@@ -23,6 +23,7 @@ extern "C" {
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <vector>
 
 #define DEFAULT_PAGE_SIZE 4096 // Concerned about hugepages?
 
@@ -62,14 +63,16 @@ int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
   return syscall(__NR_perf_event_open, attr, pid, cpu, gfd, flags);
 }
 
-int perfopen(pid_t pid, const PerfWatcher *watcher, int cpu, bool extras) {
+perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
+                                         bool extras) {
   struct perf_event_attr attr = g_dd_native_attr;
   attr.type = watcher->type;
   attr.config = watcher->config;
   attr.sample_period = watcher->sample_period; // Equivalently, freq
   attr.freq = watcher->options.is_freq;
   attr.sample_type = watcher->sample_type;
-  attr.exclude_kernel = !(watcher->options.is_kernel);
+  // If is_kernel is requested false --> exclude_kernel == true
+  attr.exclude_kernel = (watcher->options.is_kernel == PWRequestedFalse);
 
   // Extras (metadata for tracking process state)
   if (extras) {
@@ -78,8 +81,34 @@ int perfopen(pid_t pid, const PerfWatcher *watcher, int cpu, bool extras) {
     attr.task = 1;
     attr.comm = 1;
   }
+  return attr;
+}
 
-  return perf_event_open(&attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC);
+// return attr sorted by priority
+std::vector<perf_event_attr>
+all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras) {
+  std::vector<perf_event_attr> ret_attr;
+  ret_attr.push_back(perf_config_from_watcher(watcher, extras));
+  if (watcher->options.is_kernel == PWPreferedTrue) {
+    // duplicate the config, while excluding kernel
+    ret_attr.push_back(ret_attr.back());
+    ret_attr.back().exclude_kernel = true;
+  }
+  return ret_attr;
+}
+
+int perfopen(pid_t pid, const PerfWatcher *watcher, int cpu, bool extras) {
+  std::vector<perf_event_attr> perf_event_attrs =
+      all_perf_configs_from_watcher(watcher, extras);
+  int fd = -1;
+  for (auto &attr : perf_event_attrs) {
+    // if anything succeeds, we get out
+    if ((fd = perf_event_open(&attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC)) !=
+        -1) {
+      break;
+    }
+  }
+  return fd;
 }
 
 size_t perf_mmap_size(int buf_size_shift) {

@@ -24,6 +24,7 @@ if (CPP_CHECK_COMMAND)
          "--quiet"
          "--inline-suppr"
          "--suppressions-list=${CMAKE_SOURCE_DIR}/CppCheckSuppressions.txt"
+         # "--verbose"
          #"--cppcheck-build-dir=${CMAKE_BINARY_DIR}" #does not work well with suppressions
          ${CPPCHECK_DIRS}
          )
