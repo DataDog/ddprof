@@ -136,8 +136,8 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
   // period is a number
   char *str = strdup(_str);
   size_t sz_str = strlen(str);
-  const char *groupname;
-  const char *tracename;
+  const char *gname;
+  const char *tname;
   uint8_t reg = 0;
   uint64_t period = 1;
   bool is_raw = false;
@@ -169,8 +169,8 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
     *dollar = 0;
 
   // Name checking
-  groupname = str;
-  tracename = colon + 1;
+  gname = str;
+  tname = colon + 1;
 
   // If a register is specified, process that
   if (perc)
@@ -193,12 +193,25 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
   }
 
   char path[2048] = {0}; // somewhat arbitrarily
+  size_t sz_path = sizeof(path);
   char buf[64] = {0};
   char *buf_copy = buf;
-  int pathsz =
-      snprintf(path, sizeof(path), "/sys/kernel/debug/tracing/events/%s/%s/id",
-               groupname, tracename);
-  if (static_cast<size_t>(pathsz) >= sizeof(path)) {
+
+  // Need to figure out whether we use debugfs or tracefs
+  char tracefs_path[] = "/sys/kernel/tracing/events";
+  char debugfs_path[] = "/sys/kernel/debug/tracing/events";
+  char *spath = tracefs_path;
+  struct stat sb;
+  if (stat(spath, &sb)) {
+    spath = debugfs_path;
+    if (stat(spath, &sb)) {
+      return false;
+    }
+  }
+
+  // If we're here, then `spath` contains the path to find events
+  int pathsz = snprintf(path, sz_path, "%s/%s/%s/id", spath, gname , tname);
+  if (static_cast<size_t>(pathsz) >= sz_path) {
     // Possibly ran out of room
     free(str);
     return false;
@@ -224,15 +237,14 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
   }
 
   // Check enablement, just to print a log.  We still enable instrumentation.
-  snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/enable",
-           groupname, tracename);
+  snprintf(path, sz_path, "%s/%s/%s/enable", spath, gname, tname);
   fd = open(path, O_RDONLY);
   if (-1 == fd || 1 != read(fd, buf, 1) || '0' != *buf) {
     LG_NTC("Tracepint %s:%s is not enabled.  Instrumentation will proceed, but "
            "you may not have any events.",
-           groupname, tracename);
+           gname, tname);
   } else {
-    LG_NFO("Tracepoint %s:%s successfully enabled", groupname, tracename);
+    LG_NFO("Tracepoint %s:%s successfully enabled", gname, tname);
   }
 
   // OK done
@@ -247,7 +259,7 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
     watcher->trace_off = trace_off;
     watcher->trace_sz = trace_sz;
   }
-  watcher->tracepoint_group = groupname;
-  watcher->tracepoint_name = tracename;
+  watcher->tracepoint_group = gname;
+  watcher->tracepoint_name = tname;
   return true;
 }

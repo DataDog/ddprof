@@ -273,20 +273,26 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   auto unwind_ticks = ddprof::get_tsc_cycles();
   ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL);
 
+  // Usually we want to send the sample_val, but sometimes we need to process
+  // the event to get the desired value
+  PerfWatcher *watcher = &ctx->watchers[watcher_pos];
+  uint64_t sample_val = sample->period;
+  if (PERF_SAMPLE_RAW & watcher->sample_type) {
+    uint64_t raw_offset = watcher->trace_off;
+    uint64_t raw_sz = watcher->trace_sz;
+    memcpy(&sample_val, sample->data_raw + raw_offset, raw_sz);
+  }
+
   // Aggregate if unwinding went well (todo : fatal error propagation)
   if (!IsDDResFatal(res)) {
     struct UnwindState *us = ctx->worker_ctx.us;
 
-    uint64_t val = 0;
-    memory_read(us->current_ip, &val, -1, (void*)us);
-    PRINT_NFO("The value of IP is %p and the value is %d", us->current_ip, (int)val);
 #ifndef DDPROF_NATIVE_LIB
     // in lib mode we don't aggregate (protect to avoid link failures)
-    PerfWatcher *watcher = &ctx->watchers[watcher_pos];
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
     DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr,
-                                    sample->period, 1, watcher, pprof));
+                                    sample_val, 1, watcher, pprof));
     if (ctx->params.show_samples) {
       ddprof_print_sample(us->output, us->symbol_hdr, sample->period, *watcher);
     }
