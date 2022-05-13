@@ -168,15 +168,24 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   unsigned long this_ticks_unwind = __rdtsc();
   DDRes res = unwindstate__unwind(us);
 
+  // Usually we want to send the sample_val, but sometimes we need to process
+  // the event to get the desired value
+  PerfWatcher *watcher = &ctx->watchers[pos];
+  uint64_t sample_val = sample->period;
+  if (PERF_SAMPLE_RAW & watcher->sample_type) {
+    uint64_t raw_offset = watcher->trace_off;
+    uint64_t raw_sz = watcher->trace_sz;
+    memcpy(&sample_val, sample->data_raw + raw_offset, raw_sz);
+  }
+
   // Aggregate if unwinding went well (todo : fatal error propagation)
   if (!IsDDResFatal(res)) {
 #ifndef DDPROF_NATIVE_LIB
     // in lib mode we don't aggregate (protect to avoid link failures)
-    PerfWatcher *watcher = &ctx->watchers[pos];
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
     DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr,
-                                    sample->period, watcher, pprof));
+                                    sample_val, watcher, pprof));
 #else
     // Call the user's stack handler
     if (ctx->stack_handler) {
