@@ -11,3 +11,5 @@ missingInclude
 // trick to retrieve instruction pointer in unit tests
 unusedLabel:*/dso-ut.cc
 unusedLabel:*/dwfl_module-ut.cc
+
+preprocessorErrorDirective:*/perf_watcher.h
