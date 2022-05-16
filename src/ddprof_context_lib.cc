@@ -201,20 +201,20 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     ddprof_print_params(input);
 
     LG_NFO("  Native profiler enabled: %s",
-             ctx->params.enable ? "true" : "false");
+           ctx->params.enable ? "true" : "false");
 
     // Tell the user what mode is being used
     LG_NFO("  Profiling mode: %s",
-             -1 == ctx->params.pid ? "global"
-                 : pid_tmp         ? "target"
-                                   : "wrapper");
+           -1 == ctx->params.pid ? "global"
+               : pid_tmp         ? "target"
+                                 : "wrapper");
 
     // Show watchers
     LG_NFO("  Instrumented with %d watchers:", ctx->num_watchers);
     for (int i = 0; i < ctx->num_watchers; i++) {
       LG_NFO("    ID: %s, Pos: %d, Index: %lu, Label: %s",
-               ctx->watchers[i].desc, i, ctx->watchers[i].config,
-               sample_type_name_from_idx(ctx->watchers[i].sample_type_id));
+             ctx->watchers[i].desc, i, ctx->watchers[i].config,
+             sample_type_name_from_idx(ctx->watchers[i].sample_type_id));
     }
   }
 

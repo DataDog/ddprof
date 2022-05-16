@@ -29,7 +29,7 @@ DDRes log_capabilities(bool verbose) {
   cap_t cap_struct = cap_get_pid(pid);
   ssize_t text_size = 0;
   char *pcap_text = cap_to_text(cap_struct, &text_size);
-  LG_NFO("Capabilities : %s", pcap_text);
+  LG_NFO("Capabilities %s", pcap_text);
 
   if (verbose) {
     for (int i = 0; i < CAP_LAST_CAP; ++i) {

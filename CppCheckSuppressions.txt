@@ -1,6 +1,6 @@
 // All of the warnings should be fixed : initial PR to start putting in place cppchecks in CI
 //example :
-//arithOperationsOnVoidPointer:*/ddprof.c:12
+//arithOperationsOnVoidPointer:*/ddprof.cc:12
 //static variables
 //buf not used (but should be in future version of code)
 //static variable levels

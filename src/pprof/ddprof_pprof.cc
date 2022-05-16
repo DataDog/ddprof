@@ -215,7 +215,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   }
   if (!watcher->suppress_tid ) {
     snprintf(tid_str, sizeof(tid_str), "%d", uw_output->tid);
-    labels[labels_num].key = to_CharSlice("thread_id");
+    labels[labels_num].key = to_CharSlice("thread id");
     labels[labels_num].str = to_CharSlice(tid_str);
     ++labels_num;
   }
