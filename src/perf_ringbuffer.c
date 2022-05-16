@@ -240,19 +240,6 @@ perf_event_sample *hdr2samp(const struct perf_event_header *hdr,
   if (PERF_SAMPLE_READ & mask) {
     sample.v = (struct read_format *)buf++;
   }
-  /*
-  enum perf_callchain_context {
-        PERF_CONTEXT_HV			= (__u64)-32,
-        PERF_CONTEXT_KERNEL		= (__u64)-128,
-        PERF_CONTEXT_USER		= (__u64)-512,
-
-        PERF_CONTEXT_GUEST		= (__u64)-2048,
-        PERF_CONTEXT_GUEST_KERNEL	= (__u64)-2176,
-        PERF_CONTEXT_GUEST_USER		= (__u64)-2560,
-
-        PERF_CONTEXT_MAX		= (__u64)-4095,
-};
-*/
 
   if (PERF_SAMPLE_CALLCHAIN & mask) {
     sample.nr = *buf++;

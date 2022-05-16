@@ -49,14 +49,26 @@ static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   exit(-1);
 }
 
-DDRes ddprof_setup(DDProfContext *ctx) {
-  PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
-  pevent_init(pevent_hdr);
+void display_system_info(void){
 
   // Don't stop if error as this is only for debug purpose
   if (IsDDResNotOK(log_capabilities(false))) {
     LG_ERR("Error when printing capabilities, continuing...");
   }
+  // int val;
+  // if (IsDDResOK(ddprof::sys_perf_event_paranoid(val))){
+  //   LG_NFO("perf_event_paranoid : %d", val);
+  // }
+  // else {
+  //   LG_WRN("Unable to access perf_event_paranoid setting");
+  // }
+}
+
+DDRes ddprof_setup(DDProfContext *ctx) {
+  PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
+  pevent_init(pevent_hdr);
+
+  display_system_info();
 
   // Do not mmap events yet because mmap'ings from perf fds are lost after
   // fork
@@ -111,7 +123,7 @@ DDRes ddprof_start_profiler(DDProfContext *ctx) {
   };
 
   // Enter the main loop -- this will not return unless there is an error.
-  LG_PRINT("Entering main loop");
+  LG_NFO("Entering main loop");
   return main_loop(&perf_funs, ctx);
 }
 #endif

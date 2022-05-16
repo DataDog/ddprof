@@ -24,6 +24,7 @@ extern "C" {
 #include <sys/types.h>
 #include <unistd.h>
 #include <vector>
+#include <string_format.hpp>
 
 #define DEFAULT_PAGE_SIZE 4096 // Concerned about hugepages?
 
@@ -63,6 +64,30 @@ int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
   return syscall(__NR_perf_event_open, attr, pid, cpu, gfd, flags);
 }
 
+static const char* get_perf_type_str(perf_type_id type_id){
+  switch(type_id) {
+    case PERF_TYPE_HARDWARE:
+      return "HARDWARE";
+    case PERF_TYPE_SOFTWARE:
+      return "SOFTWARE";
+    case PERF_TYPE_TRACEPOINT:
+      return "TRACEPOINT";
+    case PERF_TYPE_HW_CACHE:
+      return "HW_CACHE";
+    case PERF_TYPE_RAW:
+      return "RAW";
+    case PERF_TYPE_BREAKPOINT:
+      return "BREAKPOINT";
+    default:
+      return "UNKNOWN";
+  }
+  return "UNKNOWN";
+}
+
+static std::string perf_event_attr_dbg_str(const perf_event_attr &attr){
+  return ddprof::string_format("%s - exclude_kernel = %d", get_perf_type_str(static_cast<perf_type_id>(attr.type)), attr.exclude_kernel);
+}
+
 perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
                                          bool extras) {
   struct perf_event_attr attr = g_dd_native_attr;
@@ -72,7 +97,7 @@ perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
   attr.freq = watcher->options.is_freq;
   attr.sample_type = watcher->sample_type;
   // If is_kernel is requested false --> exclude_kernel == true
-  attr.exclude_kernel = (watcher->options.is_kernel == PWRequestedFalse);
+  attr.exclude_kernel = (watcher->options.is_kernel == kPerfWatcher_Off);
 
   // Extras (metadata for tracking process state)
   if (extras) {
@@ -89,7 +114,7 @@ std::vector<perf_event_attr>
 all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras) {
   std::vector<perf_event_attr> ret_attr;
   ret_attr.push_back(perf_config_from_watcher(watcher, extras));
-  if (watcher->options.is_kernel == PWPreferedTrue) {
+  if (watcher->options.is_kernel == kPerfWatcher_Try) {
     // duplicate the config, while excluding kernel
     ret_attr.push_back(ret_attr.back());
     ret_attr.back().exclude_kernel = true;
@@ -97,6 +122,12 @@ all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras) {
   return ret_attr;
 }
 
+
+// Watcher -->  attr / kernel ON 
+//         -->  attr / kernel OFF
+//
+// Store the attr 
+ 
 int perfopen(pid_t pid, const PerfWatcher *watcher, int cpu, bool extras) {
   std::vector<perf_event_attr> perf_event_attrs =
       all_perf_configs_from_watcher(watcher, extras);
@@ -106,6 +137,9 @@ int perfopen(pid_t pid, const PerfWatcher *watcher, int cpu, bool extras) {
     if ((fd = perf_event_open(&attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC)) !=
         -1) {
       break;
+    }
+    else {
+      LG_WRN("perf_event_open: Failed to instrument %s", perf_event_attr_dbg_str(attr).c_str());
     }
   }
   return fd;
