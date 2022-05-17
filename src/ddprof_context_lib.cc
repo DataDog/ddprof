@@ -16,6 +16,7 @@ extern "C" {
 #include "span.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <errno.h>
 #include <sys/sysinfo.h>
 #include <unistd.h>
@@ -221,11 +222,11 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   ctx->params.sockfd = -1;
   ctx->params.wait_on_socket = false;
   if (input->socket && strlen(input->socket) > 0) {
-    char *endptr;
-    auto res = strtoul(input->socket, &endptr, 10);
-    // checking that stroul actually succeeded is a pain
-    if (*endptr == '\0' && (res != ULONG_MAX || errno != ERANGE)) {
-      ctx->params.sockfd = res;
+    std::string_view sv{input->socket};
+    int sockfd;
+    auto [ptr, ec] = std::from_chars(sv.data(), sv.end(), sockfd);
+    if (ec == std::errc() && ptr == sv.end()) {
+      ctx->params.sockfd = sockfd;
       ctx->params.wait_on_socket = true;
     }
   }
