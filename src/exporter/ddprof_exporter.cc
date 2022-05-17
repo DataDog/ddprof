@@ -43,14 +43,14 @@ static char *alloc_url_agent(const char *protocol, const char *host,
 }
 
 static DDRes create_pprof_file(ddprof_ffi_Timespec start,
-                               const char *dbg_folder, int *fd) {
+                               const char *dbg_pprof_prefix, int *fd) {
   char time_start[128] = {};
   tm tm_storage;
   tm *tm_start = gmtime_r(&start.seconds, &tm_storage);
   strftime(time_start, sizeof time_start, "%Y%m%dT%H%M%SZ", tm_start);
 
   char filename[400];
-  snprintf(filename, 400, "%s/ddprof_%s.pprof", dbg_folder, time_start);
+  snprintf(filename, 400, "%s%s.pprof", dbg_pprof_prefix, time_start);
   LG_NTC("[EXPORTER] Writing pprof to file %s", filename);
   (*fd) = open(filename, O_CREAT | O_RDWR, 0600);
   DDRES_CHECK_INT((*fd), DD_WHAT_EXPORTER, "Failure to create pprof file");
@@ -70,9 +70,10 @@ static DDRes write_profile(const ddprof_ffi_EncodedProfile *encoded_profile,
 }
 
 static DDRes write_pprof_file(const ddprof_ffi_EncodedProfile *encoded_profile,
-                              const char *dbg_folder) {
+                              const char *dbg_pprof_prefix) {
   int fd = -1;
-  DDRES_CHECK_FWD(create_pprof_file(encoded_profile->start, dbg_folder, &fd));
+  DDRES_CHECK_FWD(
+      create_pprof_file(encoded_profile->start, dbg_pprof_prefix, &fd));
   defer { close(fd); };
   DDRES_CHECK_FWD(write_profile(encoded_profile, fd));
   return {};
@@ -119,7 +120,7 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
   LG_NTC("[EXPORTER] URL %s", exporter->_url);
 
   // Debug process : capture pprof to a folder
-  exporter->_debug_folder = getenv("DDPROF_PPROFS_FOLDER");
+  exporter->_debug_pprof_prefix = exporter->_input.debug_pprof_prefix;
   exporter->_export = arg_yesno(exporter->_input.do_export, 1);
   return ddres_init();
 }
@@ -238,8 +239,8 @@ DDRes ddprof_exporter_export(const ddprof_ffi_Profile *profile,
 
   ddprof_ffi_EncodedProfile *encoded_profile = &serialized_result.ok;
 
-  if (exporter->_debug_folder) {
-    write_pprof_file(encoded_profile, exporter->_debug_folder);
+  if (exporter->_debug_pprof_prefix) {
+    write_pprof_file(encoded_profile, exporter->_debug_pprof_prefix);
   }
 
   ddprof_ffi_Timespec start = encoded_profile->start;

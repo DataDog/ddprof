@@ -95,6 +95,7 @@ const char* help_str[DD_KLEN] = {
 "    This is an optional field, but it is useful for locating and filtering\n"
 "    regressions or interesting behavior.\n",
   [DD_PROFILING_EXPORT] = STR_UNDF,
+  [DD_PROFILING_PPROF_PREFIX] = STR_UNDF,
   [DD_PROFILING_AGENTLESS] = STR_UNDF,
   [DD_TAGS] =
 "    Tags sent with both profiler metrics and profiles.\n"
