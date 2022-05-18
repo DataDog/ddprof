@@ -5,7 +5,9 @@
 
 set -euo pipefail
 
-cd "$(git rev-parse --show-toplevel)"
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+cd "$SCRIPT_DIR/.."
 
 # Find most recent clang-format, defaulting to an unqualified default
 CLANG_FORMAT=$(command -v clang-format{-13,-12,-11,-10,-9,} | head -n 1)
