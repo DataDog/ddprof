@@ -243,7 +243,6 @@ perf_event_sample *hdr2samp(const struct perf_event_header *hdr,
 
   if (PERF_SAMPLE_CALLCHAIN & mask) {
     sample.nr = *buf++;
-    LG_DBG("Callchain =%lu", sample.nr);
     sample.ips = buf;
     buf += sample.nr;
   }

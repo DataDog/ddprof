@@ -68,39 +68,41 @@ void display_system_info(void) {
 
 DDRes ddprof_setup(DDProfContext *ctx) {
   PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
-  pevent_init(pevent_hdr);
+  try {
+    pevent_init(pevent_hdr);
 
-  display_system_info();
+    display_system_info();
 
-  // Do not mmap events yet because mmap'ings from perf fds are lost after
-  // fork
-  DDRES_CHECK_FWD(
-      pevent_open(ctx, ctx->params.pid, ctx->params.num_cpu, pevent_hdr));
+    // Do not mmap events yet because mmap'ings from perf fds are lost after
+    // fork
+    DDRES_CHECK_FWD(
+        pevent_open(ctx, ctx->params.pid, ctx->params.num_cpu, pevent_hdr));
 
-  // Setup signal handler if defined
-  if (ctx->params.fault_info) {
-    struct sigaction sigaction_handlers = {};
-    sigaction_handlers.sa_sigaction = sigsegv_handler;
-    sigaction_handlers.sa_flags = SA_SIGINFO;
-    sigaction(SIGSEGV, &(sigaction_handlers), NULL);
-  }
-  // Disable core dumps (unless enabled)
-  if (!ctx->params.core_dumps) {
-    disable_core_dumps();
-  }
-
-  // Set the nice level, but only if it was overridden because 0 is valid
-  if (ctx->params.nice != -1) {
-    setpriority(PRIO_PROCESS, 0, ctx->params.nice);
-    if (errno) {
-      LG_WRN("Requested nice level (%d) could not be set", ctx->params.nice);
+    // Setup signal handler if defined
+    if (ctx->params.fault_info) {
+      struct sigaction sigaction_handlers = {};
+      sigaction_handlers.sa_sigaction = sigsegv_handler;
+      sigaction_handlers.sa_flags = SA_SIGINFO;
+      sigaction(SIGSEGV, &(sigaction_handlers), NULL);
     }
+    // Disable core dumps (unless enabled)
+    if (!ctx->params.core_dumps) {
+      disable_core_dumps();
+    }
+
+    // Set the nice level, but only if it was overridden because 0 is valid
+    if (ctx->params.nice != -1) {
+      setpriority(PRIO_PROCESS, 0, ctx->params.nice);
+      if (errno) {
+        LG_WRN("Requested nice level (%d) could not be set", ctx->params.nice);
+      }
+    }
+
+    DDRES_CHECK_FWD(ddprof_stats_init());
+
+    DDRES_CHECK_FWD(pevent_enable(pevent_hdr));
   }
-
-  DDRES_CHECK_FWD(ddprof_stats_init());
-
-  DDRES_CHECK_FWD(pevent_enable(pevent_hdr));
-
+  CatchExcept2DDRes();
   return ddres_init();
 }
 

@@ -399,7 +399,7 @@ DDRes ddprof_worker_init(DDProfContext *ctx) {
         ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[0]));
     DDRES_CHECK_FWD(
         ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[1]));
-
+    // bool pevent_has_kernel = pevent_has_kernel_events();
     DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[0], ctx));
     DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[1], ctx));
   }

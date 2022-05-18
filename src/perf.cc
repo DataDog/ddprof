@@ -11,6 +11,7 @@ extern "C" {
 }
 
 #include "defer.hpp"
+#include "perf.hpp"
 
 #include <ctype.h>
 #include <errno.h>
@@ -112,27 +113,9 @@ perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
   return attr;
 }
 
-// return attr sorted by priority
-std::vector<perf_event_attr>
-all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras) {
-  std::vector<perf_event_attr> ret_attr;
-  ret_attr.push_back(perf_config_from_watcher(watcher, extras));
-  if (watcher->options.is_kernel == kPerfWatcher_Try) {
-    // duplicate the config, while excluding kernel
-    ret_attr.push_back(ret_attr.back());
-    ret_attr.back().exclude_kernel = true;
-  }
-  return ret_attr;
-}
-
-// Watcher -->  attr / kernel ON
-//         -->  attr / kernel OFF
-//
-// Store the attr
-
 int perfopen(pid_t pid, const PerfWatcher *watcher, int cpu, bool extras) {
   std::vector<perf_event_attr> perf_event_attrs =
-      all_perf_configs_from_watcher(watcher, extras);
+      ddprof::all_perf_configs_from_watcher(watcher, extras);
   int fd = -1;
   for (auto &attr : perf_event_attrs) {
     // if anything succeeds, we get out
@@ -219,3 +202,18 @@ int perfdisown(void *region, size_t size, bool is_mirrored) {
       ? 0
       : -1;
 }
+
+namespace ddprof {
+// return attr sorted by priority
+std::vector<perf_event_attr>
+all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras) {
+  std::vector<perf_event_attr> ret_attr;
+  ret_attr.push_back(perf_config_from_watcher(watcher, extras));
+  if (watcher->options.is_kernel == kPerfWatcher_Try) {
+    // duplicate the config, while excluding kernel
+    ret_attr.push_back(ret_attr.back());
+    ret_attr.back().exclude_kernel = true;
+  }
+  return ret_attr;
+}
+} // namespace ddprof

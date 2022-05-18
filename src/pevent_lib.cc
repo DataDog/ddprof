@@ -12,6 +12,7 @@ extern "C" {
 }
 
 #include "defer.hpp"
+#include "perf.hpp"
 #include "ringbuffer_utils.hpp"
 #include "sys_utils.hpp"
 #include "syscalls.hpp"
@@ -23,6 +24,10 @@ extern "C" {
 #include <sys/ioctl.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+
+struct PerfEventAttributes {
+  std::vector<perf_event_attr> _attrs;
+};
 
 static DDRes pevent_create(PEventHdr *pevent_hdr, int watcher_idx,
                            size_t *pevent_idx) {
@@ -38,40 +43,88 @@ static DDRes pevent_create(PEventHdr *pevent_hdr, int watcher_idx,
 
 void pevent_init(PEventHdr *pevent_hdr) {
   memset(pevent_hdr, 0, sizeof(PEventHdr));
-  pevent_hdr->max_size = MAX_NB_WATCHERS;
+  pevent_hdr->max_size = MAX_NB_PERF_EVENT_OPEN;
   for (size_t k = 0; k < pevent_hdr->max_size; ++k) {
     pevent_hdr->pes[k].fd = -1;
     pevent_hdr->pes[k].mapfd = -1;
+    pevent_hdr->pes[k].attr_idx = -1;
   }
+  pevent_hdr->attrs = new PerfEventAttributes();
 }
 
 static void display_system_config(void) {
   int val;
   DDRes res = ddprof::sys_perf_event_paranoid(val);
   if (IsDDResOK(res)) {
-    LG_NFO("Check System Configuration - perf_event_paranoid=%d", val);
+    LG_WRN("Check System Configuration - perf_event_paranoid=%d", val);
   } else {
-    LG_NFO("Unable to access system configuration");
+    LG_WRN("Unable to access system configuration");
   }
 }
 
-static DDRes pevent_all_cpus(const PerfWatcher *watcher, int watcher_idx,
-                             pid_t pid, int num_cpu, PEventHdr *pevent_hdr) {
+// set info for a perf_event_open type of buffer
+static void pevent_set_info(int fd, int attr_idx, PEvent &pevent) {
+  pevent.fd = fd;
+  pevent.mapfd = fd;
+  pevent.ring_buffer_size = perf_mmap_size(DEFAULT_BUFF_SIZE_SHIFT);
+  pevent.custom_event = false;
+  pevent.attr_idx = attr_idx;
+}
+
+static DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
+                                   pid_t pid, PEventHdr *pevent_hdr,
+                                   size_t &pevent_idx) {
+  // register cpu 0 and find a working config
   PEvent *pes = pevent_hdr->pes;
-  for (int cpu_idx = 0; cpu_idx < num_cpu; ++cpu_idx) {
-    size_t pevent_idx = 0;
+  std::vector<perf_event_attr> perf_event_attrs =
+      ddprof::all_perf_configs_from_watcher(watcher, true);
+  DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
+
+  // attempt with different configs
+  for (auto &attr : perf_event_attrs) {
+    // register cpu 0
+    int fd = perf_event_open(&attr, pid, 0, -1, PERF_FLAG_FD_CLOEXEC);
+    if (fd != -1) {
+      // Copy the successful config
+      pevent_hdr->attrs->_attrs.push_back(attr);
+      pevent_set_info(fd, pevent_hdr->attrs->_attrs.size() - 1,
+                      pes[pevent_idx]);
+      break;
+    }
+  }
+  // check if one of the configs was successful
+  if (pes[pevent_idx].attr_idx == -1) {
+    display_system_config();
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
+                           "Error calling perfopen on watcher %d.0 (%s)",
+                           watcher_idx, strerror(errno));
+  }
+
+  return ddres_init();
+}
+
+static DDRes pevent_open_all_cpus(const PerfWatcher *watcher, int watcher_idx,
+                                  pid_t pid, int num_cpu,
+                                  PEventHdr *pevent_hdr) {
+  PEvent *pes = pevent_hdr->pes;
+
+  size_t template_pevent_idx = -1;
+  DDRES_CHECK_FWD(pevent_register_cpu_0(watcher, watcher_idx, pid, pevent_hdr,
+                                        template_pevent_idx));
+  int template_attr_idx = pes[template_pevent_idx].attr_idx;
+  perf_event_attr *attr = &pevent_hdr->attrs->_attrs[template_attr_idx];
+
+  // used the fixed attr for the others
+  for (int cpu_idx = 1; cpu_idx < num_cpu; ++cpu_idx) {
+    size_t pevent_idx = -1;
     DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
-    pes[pevent_idx].fd = perfopen(pid, watcher, cpu_idx, true);
-    if (pes[pevent_idx].fd == -1) {
-      display_system_config();
+    int fd = perf_event_open(attr, pid, cpu_idx, -1, PERF_FLAG_FD_CLOEXEC);
+    if (fd == -1) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
                              "Error calling perfopen on watcher %d.%d (%s)",
                              watcher_idx, cpu_idx, strerror(errno));
     }
-    pes[pevent_idx].mapfd = pes[pevent_idx].fd;
-    pevent_hdr->pes[pevent_idx].ring_buffer_size =
-        perf_mmap_size(DEFAULT_BUFF_SIZE_SHIFT);
-    pes[pevent_idx].custom_event = false;
+    pevent_set_info(fd, pes[template_pevent_idx].attr_idx, pes[pevent_idx]);
   }
   return ddres_init();
 }
@@ -81,8 +134,8 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
   assert(pevent_hdr->size == 0); // check for previous init
   for (int watcher_idx = 0; watcher_idx < ctx->num_watchers; ++watcher_idx) {
     if (ctx->watchers[watcher_idx].type < kDDPROF_TYPE_CUSTOM) {
-      DDRES_CHECK_FWD(pevent_all_cpus(&ctx->watchers[watcher_idx], watcher_idx,
-                                      pid, num_cpu, pevent_hdr));
+      DDRES_CHECK_FWD(pevent_open_all_cpus(
+          &ctx->watchers[watcher_idx], watcher_idx, pid, num_cpu, pevent_hdr));
     } else {
       // custom event, eg.allocation profiling
       size_t pevent_idx = 0;
@@ -220,10 +273,11 @@ DDRes pevent_close(PEventHdr *pevent_hdr) {
     }
   }
   pevent_hdr->size = 0;
+  delete pevent_hdr->attrs;
+  pevent_hdr->attrs = nullptr;
   return res;
 }
 
-// returns the number of successful cleans
 DDRes pevent_cleanup(PEventHdr *pevent_hdr) {
   DDRes ret = ddres_init();
   DDRes ret_tmp;

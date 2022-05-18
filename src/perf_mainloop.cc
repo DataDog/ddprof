@@ -198,7 +198,7 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
   // Setup poll() to watch perf_event file descriptors
   int pe_len = ctx->worker_ctx.pevent_hdr.size;
   // one extra slot in pfd to accomodate for signal fd
-  struct pollfd pfds[MAX_NB_WATCHERS + 1];
+  struct pollfd pfds[MAX_NB_PERF_EVENT_OPEN + 1];
   int pfd_len = 0;
   pollfd_setup(&ctx->worker_ctx.pevent_hdr, pfds, &pfd_len);
 

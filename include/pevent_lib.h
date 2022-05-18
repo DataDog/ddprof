@@ -39,6 +39,8 @@ DDRes pevent_close(PEventHdr *pevent_hdr);
 /// cleanup watchers = cleanup perfevent + cleanup mmap (clean everything)
 DDRes pevent_cleanup(PEventHdr *pevent_hdr);
 
+// DDRes pevent_has_kernel_events(PEventHdr *pevent_hdr);
+
 DDRes pevent_mmap_event(PEvent *pevent);
 
 DDRes pevent_munmap_event(PEvent *pevent);
