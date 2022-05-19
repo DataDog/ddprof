@@ -3,13 +3,11 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "exporter/ddprof_exporter.h"
-
-extern "C" {
-#include "pprof/ddprof_pprof.h"
-}
+#include "exporter/ddprof_exporter.hpp"
 
 #include "loghandle.hpp"
+#include "pevent_lib_mocks.hpp"
+#include "pprof/ddprof_pprof.hpp"
 #include "tags.hpp"
 #include "unwind_output_mock.hpp"
 
@@ -167,7 +165,8 @@ TEST(DDProfExporter, simple) {
 
     if (get_url_from_env(K_RECEPTOR_ENV_ADDR)) {
       // receptor is defined
-      res = ddprof_exporter_export(pprofs._profile, &exporter);
+      Tags empty_tags;
+      res = ddprof_exporter_export(pprofs._profile, empty_tags, &exporter);
       // We should not be able to send profiles (usually 404)
       EXPECT_FALSE(IsDDResOK(res));
     }

@@ -5,19 +5,24 @@
 
 #pragma once
 
+extern "C"{
 #include "ddprof_context.h"
 #include "ddprof_defs.h"
 #include "ddres_def.h"
 #include "perf_watcher.h"
 #include "unwind_output.h"
+}
+#include "tags.hpp"
 
 typedef struct ddprof_ffi_Profile ddprof_ffi_Profile;
 typedef struct SymbolHdr SymbolHdr;
 
 typedef struct DDProfPProf {
+  DDProfPProf(): _profile(nullptr), _nb_values(0){}
   /* single profile gathering several value types */
   ddprof_ffi_Profile *_profile;
   unsigned _nb_values;
+  ddprof::Tags _tags;
 } DDProfPProf;
 
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx);

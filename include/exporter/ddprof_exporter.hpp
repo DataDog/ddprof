@@ -15,6 +15,12 @@ extern "C" {
 #include "perf_watcher.h"
 #include "string_view.h"
 
+#ifdef __cplusplus
+}
+#endif
+
+#include "tags.hpp"
+
 typedef struct ddprof_ffi_ProfileExporterV3 ddprof_ffi_ProfileExporterV3;
 typedef struct ddprof_ffi_Profile ddprof_ffi_Profile;
 typedef struct UserTags UserTags;
@@ -37,10 +43,7 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
 DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter);
 
 DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
+                             ddprof::Tags   &additional_tags,
                              DDProfExporter *exporter);
 
 DDRes ddprof_exporter_free(DDProfExporter *exporter);
-
-#ifdef __cplusplus
-}
-#endif

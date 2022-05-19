@@ -3,12 +3,13 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include "pprof/ddprof_pprof.h"
+#include "pprof/ddprof_pprof.hpp"
 
+extern "C" {
 #include "ddprof/ffi.h"
 #include "ddprof_defs.h"
 #include "ddres.h"
+#include "pevent_lib.h"
 }
 
 #include "ddprof_ffi_utils.hpp"
@@ -118,6 +119,14 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
   if (!pprof->_profile) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to allocate profiles");
   }
+
+  // Add relevant tags 
+  {
+    bool include_kernel = pevent_include_kernel_events(&ctx->worker_ctx.pevent_hdr);
+    pprof->_tags.push_back(std::make_pair(std::string("include_kernel"),
+                                          include_kernel?std::string("true"):std::string("false")));
+  }
+
   return ddres_init();
 }
 

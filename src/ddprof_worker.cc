@@ -17,14 +17,14 @@ extern "C" {
 #include "logger.h"
 #include "perf.h"
 #include "pevent_lib.h"
-#include "pprof/ddprof_pprof.h"
 #include "procutils.h"
 #include "stack_handler.h"
 }
 
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
-#include "exporter/ddprof_exporter.h"
+#include "exporter/ddprof_exporter.hpp"
+#include "pprof/ddprof_pprof.hpp"
 #include "tags.hpp"
 #include "unwind.hpp"
 #include "unwind_state.hpp"
@@ -208,8 +208,9 @@ void *ddprof_worker_export_thread(void *arg) {
   // export the one we are not writting to
   int i = 1 - worker->i_current_pprof;
 
-  if (IsDDResFatal(
-          ddprof_exporter_export(worker->pprof[i]->_profile, worker->exp[i]))) {
+  if (IsDDResFatal(ddprof_exporter_export(worker->pprof[i]->_profile,
+                                          worker->pprof[i]->_tags,
+                                          worker->exp[i]))) {
     LG_NFO("Failed to export from worker");
     worker->exp_error = true;
   }
@@ -374,22 +375,16 @@ DDRes ddprof_worker_init(DDProfContext *ctx) {
         (DDProfExporter *)calloc(1, sizeof(DDProfExporter));
     ctx->worker_ctx.exp[1] =
         (DDProfExporter *)calloc(1, sizeof(DDProfExporter));
-    ctx->worker_ctx.pprof[0] = (DDProfPProf *)calloc(1, sizeof(DDProfPProf));
-    ctx->worker_ctx.pprof[1] = (DDProfPProf *)calloc(1, sizeof(DDProfPProf));
+    ctx->worker_ctx.pprof[0] = new DDProfPProf();
+    ctx->worker_ctx.pprof[1] = new DDProfPProf();
     if (!ctx->worker_ctx.exp[0] || !ctx->worker_ctx.exp[1]) {
       free(ctx->worker_ctx.exp[0]);
       free(ctx->worker_ctx.exp[1]);
-      free(ctx->worker_ctx.pprof[0]);
-      free(ctx->worker_ctx.pprof[1]);
+      delete ctx->worker_ctx.pprof[0];
+      delete ctx->worker_ctx.pprof[1];
       DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error creating exporter");
     }
-    if (!ctx->worker_ctx.pprof[0] || !ctx->worker_ctx.pprof[1]) {
-      free(ctx->worker_ctx.exp[0]);
-      free(ctx->worker_ctx.exp[1]);
-      free(ctx->worker_ctx.pprof[0]);
-      free(ctx->worker_ctx.pprof[1]);
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error creating pprof holder");
-    }
+
     DDRES_CHECK_FWD(
         ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp[0]));
     DDRES_CHECK_FWD(
@@ -399,7 +394,7 @@ DDRes ddprof_worker_init(DDProfContext *ctx) {
         ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[0]));
     DDRES_CHECK_FWD(
         ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[1]));
-    // bool pevent_has_kernel = pevent_has_kernel_events();
+
     DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[0], ctx));
     DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[1], ctx));
   }
@@ -430,7 +425,7 @@ DDRes ddprof_worker_free(DDProfContext *ctx) {
       }
       if (ctx->worker_ctx.pprof[i]) {
         DDRES_CHECK_FWD(pprof_free_profile(ctx->worker_ctx.pprof[i]));
-        free(ctx->worker_ctx.pprof[i]);
+        delete ctx->worker_ctx.pprof[i];
         ctx->worker_ctx.pprof[i] = nullptr;
       }
     }

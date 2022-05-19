@@ -114,10 +114,10 @@ perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
 }
 
 int perfopen(pid_t pid, const PerfWatcher *watcher, int cpu, bool extras) {
-  std::vector<perf_event_attr> perf_event_attrs =
+  std::vector<perf_event_attr> perf_event_data =
       ddprof::all_perf_configs_from_watcher(watcher, extras);
   int fd = -1;
-  for (auto &attr : perf_event_attrs) {
+  for (auto &attr : perf_event_data) {
     // if anything succeeds, we get out
     if ((fd = perf_event_open(&attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC)) !=
         -1) {

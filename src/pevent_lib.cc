@@ -26,7 +26,7 @@ extern "C" {
 #include <unistd.h>
 
 struct PerfEventAttributes {
-  std::vector<perf_event_attr> _attrs;
+  std::vector<perf_event_attr> _data;
 };
 
 static DDRes pevent_create(PEventHdr *pevent_hdr, int watcher_idx,
@@ -76,19 +76,18 @@ static DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
                                    size_t &pevent_idx) {
   // register cpu 0 and find a working config
   PEvent *pes = pevent_hdr->pes;
-  std::vector<perf_event_attr> perf_event_attrs =
+  std::vector<perf_event_attr> perf_event_data =
       ddprof::all_perf_configs_from_watcher(watcher, true);
   DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
 
   // attempt with different configs
-  for (auto &attr : perf_event_attrs) {
+  for (auto &attr : perf_event_data) {
     // register cpu 0
     int fd = perf_event_open(&attr, pid, 0, -1, PERF_FLAG_FD_CLOEXEC);
     if (fd != -1) {
       // Copy the successful config
-      pevent_hdr->attrs->_attrs.push_back(attr);
-      pevent_set_info(fd, pevent_hdr->attrs->_attrs.size() - 1,
-                      pes[pevent_idx]);
+      pevent_hdr->attrs->_data.push_back(attr);
+      pevent_set_info(fd, pevent_hdr->attrs->_data.size() - 1, pes[pevent_idx]);
       break;
     }
   }
@@ -112,7 +111,7 @@ static DDRes pevent_open_all_cpus(const PerfWatcher *watcher, int watcher_idx,
   DDRES_CHECK_FWD(pevent_register_cpu_0(watcher, watcher_idx, pid, pevent_hdr,
                                         template_pevent_idx));
   int template_attr_idx = pes[template_pevent_idx].attr_idx;
-  perf_event_attr *attr = &pevent_hdr->attrs->_attrs[template_attr_idx];
+  perf_event_attr *attr = &pevent_hdr->attrs->_data[template_attr_idx];
 
   // used the fixed attr for the others
   for (int cpu_idx = 1; cpu_idx < num_cpu; ++cpu_idx) {
@@ -276,6 +275,15 @@ DDRes pevent_close(PEventHdr *pevent_hdr) {
   delete pevent_hdr->attrs;
   pevent_hdr->attrs = nullptr;
   return res;
+}
+
+bool pevent_include_kernel_events(const PEventHdr *pevent_hdr) {
+  for (const auto &attr : pevent_hdr->attrs->_data) {
+    if (attr.exclude_kernel == 0) {
+      return true;
+    }
+  }
+  return false;
 }
 
 DDRes pevent_cleanup(PEventHdr *pevent_hdr) {
