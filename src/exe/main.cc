@@ -44,7 +44,7 @@ static constexpr const char k_pid_place_holder[] = "{pid}";
 static DDRes get_library_path(std::string &path) {
   auto exe_path = fs::read_symlink("/proc/self/exe");
   auto lib_path = exe_path.parent_path() / k_libdd_profiling_name;
-  // first check if libdd_profiling.so exists in same diorectory as exe or in
+  // first, check if libdd_profiling.so exists in same directory as exe or in
   // <exe_path>/../lib/
   if (fs::exists(lib_path)) {
     path = lib_path;
@@ -57,20 +57,30 @@ static DDRes get_library_path(std::string &path) {
     return {};
   }
 
-  // Did not find libdd_profiling.so, use the one emebedded in ddprof exe
+  // Did not find libdd_profiling.so, use the one embedded in ddprof exe
   path = std::string{fs::temp_directory_path() / k_libdd_profiling_name} +
       ".XXXXXX";
 
+  // Create temporary file
   int fd = mkostemp(path.data(), O_CLOEXEC);
   DDRES_CHECK_ERRNO(fd, DD_WHAT_TEMP_FILE, "Failed to create temporary file");
+
+  // Write embedded lib into temp file
   // cppcheck-suppress comparePointers
   ssize_t lib_sz = _binary_libdd_profiling_embedded_so_end -
       _binary_libdd_profiling_embedded_so_start;
   if (write(fd, _binary_libdd_profiling_embedded_so_start, lib_sz) != lib_sz) {
     DDRES_CHECK_ERRNO(fd, DD_WHAT_TEMP_FILE, "Failed to write temporary file");
   }
+
+  // Unlink temp file, that way file will disappear from filesystem once last
+  // file descriptor pointing to it is closed
   unlink(path.data());
   char buffer[1024];
+
+  // Use symlink from /proc/<ddprof_pid>/fd/<fd> to refer to file.
+  // ddprof pid is not known yet so use a place holder that will be replaced
+  // later on
   sprintf(buffer, "/proc/%s/fd/%d", k_pid_place_holder, fd);
   path = buffer;
   return {};
@@ -150,10 +160,10 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
   if (!ctx->params.pid) {
     // If no PID was specified earlier, we autodaemonize and target current pid
 
-    // determine if library should be injected into target
+    // Determine if library should be injected into target process
+    // (ie. only if allocation profiling is active)
     bool allocation_profiling_started_from_wrapper =
-        ddprof_context_allocation_profiling_watcher_idx(ctx) != -1 &&
-        ctx->params.sockfd == -1;
+        ddprof_context_allocation_profiling_watcher_idx(ctx) != -1;
 
     std::string dd_profiling_lib_path;
 
@@ -195,6 +205,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
       // Allocation profiling activated, inject dd_profiling library with
       // LD_PRELOAD
       if (allocation_profiling_started_from_wrapper) {
+        // Determine final lib profiling path now that ddprof pid is known
         fixup_library_path(dd_profiling_lib_path, daemonize_res.daemon_pid);
         std::string preload_str = dd_profiling_lib_path;
         if (const char *s = getenv("LD_PRELOAD"); s) {
