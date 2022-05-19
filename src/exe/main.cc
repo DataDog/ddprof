@@ -139,7 +139,7 @@ static InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
 static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
   defer { ddprof_context_free(ctx); };
 
-  is_profiler = true;
+  is_profiler = false;
 
   if (!ctx->params.enable) {
     LG_NFO("Profiling disabled");
@@ -191,7 +191,6 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     if (!temp_pid) {
       // non-daemon process: return control to caller
       defer_child_socket_close.reset();
-      is_profiler = false;
 
       // Allocation profiling activated, inject dd_profiling library with
       // LD_PRELOAD
@@ -213,6 +212,9 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     defer_child_socket_close.release();
     defer_parent_socket_close.reset();
   }
+
+  // Now, we are the profiler process
+  is_profiler = true;
 
   // Attach the profiler
   if (IsDDResNotOK(ddprof_setup(ctx))) {
@@ -280,14 +282,17 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
   return 0;
 }
 
-// This function only returns in daemon mode for control (non-daemon) process
+// This function only returns in wrapper mode for control (non-ddprof) process
 static void start_profiler(DDProfContext *ctx) {
   bool is_profiler = false;
+
   // ownership of context is passed to start_profiler_internal
   int res = start_profiler_internal(ctx, is_profiler);
   if (is_profiler) {
     exit(res);
   }
+  // In wrapper mode (ie. ctx->params.pid == 0), whatever happened to ddprof,
+  // continue and start user process
   return;
 }
 
