@@ -137,7 +137,7 @@ static InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
     return InputResult::kError;
   }
 
-  if (ddprof_context_allocation_profiling_watcher_idx(ctx) != 1 &&
+  if (ddprof_context_allocation_profiling_watcher_idx(ctx) != -1 &&
       ctx->params.pid && ctx->params.sockfd == -1) {
     LG_ERR("Memory allocation profiling is not supported in PID mode");
     return InputResult::kError;
