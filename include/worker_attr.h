@@ -6,8 +6,9 @@
 #pragma once
 
 typedef struct DDProfContext DDProfContext;
+typedef struct PersistentWorkerState PersistentWorkerState;
 
 typedef struct WorkerAttr {
-  DDRes (*init_fun)(DDProfContext *);
+  DDRes (*init_fun)(DDProfContext *, PersistentWorkerState *);
   DDRes (*finish_fun)(DDProfContext *);
 } WorkerAttr;

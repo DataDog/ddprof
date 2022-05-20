@@ -2,6 +2,7 @@
 
 #include "pevent.h"
 #include "proc_status.h"
+#include "persistent_worker_state.h"
 
 typedef struct DDProfExporter DDProfExporter;
 typedef struct DDProfPProf DDProfPProf;
@@ -9,9 +10,12 @@ typedef struct StackHandler StackHandler;
 typedef struct StackHandler StackHandler;
 typedef struct UnwindState UnwindState;
 typedef struct UserTags UserTags;
+typedef struct UserTags UserTags;
 
 // Mutable states within a worker
 typedef struct DDProfWorkerContext {
+  // Persistent reference to the state shared accross workers
+  PersistentWorkerState *persistent_worker_state;
   PEventHdr pevent_hdr;   // perf_event buffer holder
   DDProfExporter *exp[2]; // wrapper around rust exporter
   DDProfPProf *pprof[2];  // wrapper around rust exporter

@@ -135,7 +135,7 @@ static DDRes add_single_tag(ddprof_ffi_Vec_tag &tags_exporter,
   return ddres_init();
 }
 
-static DDRes fill_tags(const UserTags *user_tags,
+static DDRes fill_stable_tags(const UserTags *user_tags,
                        const DDProfExporter *exporter,
                        ddprof_ffi_Vec_tag &tags_exporter) {
 
@@ -171,7 +171,7 @@ static DDRes fill_tags(const UserTags *user_tags,
 
 DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
   ddprof_ffi_Vec_tag tags_exporter = ddprof_ffi_Vec_tag_new();
-  fill_tags(user_tags, exporter, tags_exporter);
+  fill_stable_tags(user_tags, exporter, tags_exporter);
 
   ddprof_ffi_CharSlice base_url = to_CharSlice(exporter->_url);
   ddprof_ffi_EndpointV3 endpoint;
@@ -224,8 +224,22 @@ static DDRes check_send_response_code(uint16_t send_response_code) {
   return ddres_init();
 }
 
+static DDRes fill_cycle_tags(ddprof::Tags   &additional_tags,
+                             uint32_t        number_of_cycles,
+                             ddprof_ffi_Vec_tag &ffi_additional_tags){
+
+  DDRES_CHECK_FWD(add_single_tag(ffi_additional_tags, "profile_seq",
+                    std::to_string(number_of_cycles)));
+
+  for (auto &el : additional_tags) {
+    DDRES_CHECK_FWD(add_single_tag(ffi_additional_tags, el.first, el.second));
+  }
+  return ddres_init();
+}
+
 DDRes ddprof_exporter_export(const ddprof_ffi_Profile *profile,
                              ddprof::Tags   &additional_tags,
+                             uint32_t        number_of_cycles,
                              DDProfExporter *exporter) {
   DDRes res = ddres_init();
   ddprof_ffi_SerializeResult serialized_result =
@@ -254,10 +268,7 @@ DDRes ddprof_exporter_export(const ddprof_ffi_Profile *profile,
     defer {
       ddprof_ffi_Vec_tag_drop(ffi_additional_tags);
     };
-
-    for (auto &el : additional_tags) {
-      DDRES_CHECK_FWD(add_single_tag(ffi_additional_tags, el.first, el.second));
-    }
+    DDRES_CHECK_FWD(fill_cycle_tags(additional_tags, number_of_cycles, ffi_additional_tags););
 
     LG_NTC("[EXPORTER] Export buffer of size %lu", profile_data.len);
 

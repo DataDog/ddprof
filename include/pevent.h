@@ -12,11 +12,10 @@ extern "C" {
 #endif
 
 #include "perf_ringbuffer.h"
+#include "ddprof_defs.h"
 
 // Takes into account number of watchers * number of CPUs
 #define MAX_NB_PERF_EVENT_OPEN 450
-
-struct PerfEventAttributes;
 
 typedef struct PEvent {
   int watcher_pos; // Index to the watcher
@@ -32,10 +31,11 @@ typedef struct PEvent {
 
 typedef struct PEventHdr {
   PEvent pes[MAX_NB_PERF_EVENT_OPEN];
-  // Store the
-  PerfEventAttributes *attrs;
+  // Attributes of successful perf event opens
   size_t size;
   size_t max_size;
+  perf_event_attr attrs[MAX_TYPE_WATCHER];
+  size_t nb_attrs;
 } PEventHdr;
 
 #ifdef __cplusplus
