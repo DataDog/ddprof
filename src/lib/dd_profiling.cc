@@ -38,21 +38,41 @@ struct ProfilerState {
   bool started = false;
   bool allocation_profiling_started = false;
   pid_t profiler_pid = 0;
-};
 
+  static constexpr size_t profiler_active_len =
+      std::char_traits<char>::length(k_profiler_active_env_variable) +
+      std::char_traits<char>::length("=0");
+
+  // profiler_active_str holds the string
+  // "<k_profiler_active_env_variable>=[01]"
+  char profiler_active_str[profiler_active_len + 1];
+};
 ProfilerState g_state;
+
+void init_profiler_library_active() {
+  const char *s = getenv(k_profiler_active_env_variable);
+  bool profiler_active = s && strcmp(s, "1") == 0;
+  sprintf(g_state.profiler_active_str, "%s=%d", k_profiler_active_env_variable,
+          profiler_active ? 1 : 0);
+
+  // profiler_active_str is passed to putenv (putenv does not copy it and it
+  // becomes part of the environment). This allows to modify the environment
+  // without calling setenv/putenv which are not thread safe.
+  // Calling putenv here should be safe since we are in the library constructor.
+  putenv(g_state.profiler_active_str);
+}
 
 // return true if this profiler is active for this process or one of its parent
 bool is_profiler_library_active() {
-  return getenv(k_profiler_active_env_variable) != nullptr;
+  return g_state.profiler_active_str[g_state.profiler_active_len - 1] == '1';
 }
 
 void set_profiler_library_active() {
-  setenv(k_profiler_active_env_variable, "1", 1);
+  g_state.profiler_active_str[g_state.profiler_active_len - 1] = '1';
 }
 
 void set_profiler_library_inactive() {
-  unsetenv(k_profiler_active_env_variable);
+  g_state.profiler_active_str[g_state.profiler_active_len - 1] = '0';
 }
 
 void allocation_profiling_stop() {
@@ -94,6 +114,8 @@ struct ProfilerAutoStart {
         autostart = true;
       }
     }
+
+    init_profiler_library_active();
 
     // autostart if library is injected by ddprof
     if (autostart || get_ddprof_socket() != -1) {
