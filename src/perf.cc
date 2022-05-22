@@ -12,6 +12,7 @@ extern "C" {
 
 #include "defer.hpp"
 #include "perf.hpp"
+#include "string_format.hpp"
 
 #include <ctype.h>
 #include <errno.h>
@@ -19,7 +20,6 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <string_format.hpp>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
@@ -45,7 +45,6 @@ struct perf_event_attr g_dd_native_attr = {
     .precise_ip = 2,
     .mmap_data = 0, // keep track of other mappings
     .sample_id_all = 1,
-    .exclude_callchain_kernel = 1,
     .sample_regs_user = PERF_REGS_MASK,
     .sample_stack_user = PERF_SAMPLE_STACK_SIZE, // Is this an insane default?
 };
@@ -111,23 +110,6 @@ perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
     attr.comm = 1;
   }
   return attr;
-}
-
-int perfopen(pid_t pid, const PerfWatcher *watcher, int cpu, bool extras) {
-  std::vector<perf_event_attr> perf_event_data =
-      ddprof::all_perf_configs_from_watcher(watcher, extras);
-  int fd = -1;
-  for (auto &attr : perf_event_data) {
-    // if anything succeeds, we get out
-    if ((fd = perf_event_open(&attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC)) !=
-        -1) {
-      break;
-    } else {
-      LG_WRN("perf_event_open: Failed to instrument %s",
-             perf_event_attr_dbg_str(attr).c_str());
-    }
-  }
-  return fd;
 }
 
 size_t perf_mmap_size(int buf_size_shift) {

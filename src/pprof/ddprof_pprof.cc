@@ -210,7 +210,9 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   // number of labels at present
   ddprof_ffi_Label labels[PPROF_MAX_LABELS] = {};
   size_t labels_num = 0;
+  // cppcheck-suppress variableScope
   char pid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
+  // cppcheck-suppress variableScope
   char tid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
 
   // Add any configured labels.  Note that TID alone has the same cardinality as

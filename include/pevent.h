@@ -18,7 +18,7 @@ extern "C" {
 #define MAX_NB_PERF_EVENT_OPEN 450
 
 typedef struct PEvent {
-  int watcher_pos; // Index to the watcher
+  int watcher_pos; // Index to the watcher (containing perf event config)
   int fd; // Underlying perf event FD for perf_events, otherwise an eventfd that
           // signals data is available in ring buffer
   int mapfd;               // FD for ring buffer, same as `fd` for perf events
