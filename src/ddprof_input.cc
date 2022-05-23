@@ -17,6 +17,8 @@ extern "C" {
 #include "version.h"
 }
 
+#include "constants.hpp"
+
 /************************ Options Table Helper Macros *************************/
 #define X_FREE(a, b, c, d, e, f, g, h, i) FREE_EXP(i b, f);
 #define X_LOPT(a, b, c, d, e, f, g, h, i) {#b, e, 0, d},
@@ -95,6 +97,7 @@ const char* help_str[DD_KLEN] = {
 "    This is an optional field, but it is useful for locating and filtering\n"
 "    regressions or interesting behavior.\n",
   [DD_PROFILING_EXPORT] = STR_UNDF,
+  [DD_PROFILING_PPROF_PREFIX] = STR_UNDF,
   [DD_PROFILING_AGENTLESS] = STR_UNDF,
   [DD_TAGS] =
 "    Tags sent with both profiler metrics and profiles.\n"
@@ -142,7 +145,7 @@ const char* help_str[DD_KLEN] = {
 const char *help_key[DD_KLEN] = {OPT_TABLE(X_HLPK)};
 
 static void ddprof_input_default_events(DDProfInput *input) {
-  const char *events = getenv("DD_PROFILING_NATIVE_EVENTS");
+  const char *events = getenv(k_events_env_variable);
   if (!events) {
     return;
   }

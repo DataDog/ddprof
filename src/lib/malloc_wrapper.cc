@@ -152,7 +152,8 @@ int temp_posix_memalign(void **memptr, size_t alignment, size_t size) noexcept {
 
 void *aligned_alloc(size_t alignment, size_t size) {
   void *ptr = s_aligned_alloc(alignment, size);
-  ddprof::AllocationTracker::track_allocation(reinterpret_cast<uintptr_t>(ptr), size);
+  ddprof::AllocationTracker::track_allocation(reinterpret_cast<uintptr_t>(ptr),
+                                              size);
   return ptr;
 }
 

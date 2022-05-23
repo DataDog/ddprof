@@ -29,8 +29,8 @@ typedef struct UserTags UserTags;
 
 typedef struct DDProfExporter {
   ExporterInput _input;
-  char *_url;                // url contains path and port
-  const char *_debug_folder; // write pprofs to folder
+  char *_url;                      // url contains path and port
+  const char *_debug_pprof_prefix; // write pprofs to folder
   ddprof_ffi_ProfileExporterV3 *_exporter;
   bool _agent;
   bool _export; // debug mode : should we send profiles ?

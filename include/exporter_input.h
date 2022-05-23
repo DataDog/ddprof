@@ -22,10 +22,11 @@ typedef struct ExporterInput {
   const char *port; // port appended to the host IP (ignored in agentless)
   const char
       *service; // service to identify the profiles (ex:prof-probe-native)
-  const char *service_version; // appended to tags (example: 1.2.1)
-  const char *do_export;       // prevent exports if needed (debug flag)
-  string_view user_agent;      // ignored for now (override in shared lib)
-  string_view language;        // appended to the tags (set to native)
+  const char *service_version;    // appended to tags (example: 1.2.1)
+  const char *do_export;          // prevent exports if needed (debug flag)
+  const char *debug_pprof_prefix; // local pprof prefix (debug)
+  string_view user_agent;         // ignored for now (override in shared lib)
+  string_view language;           // appended to the tags (set to native)
   string_view family;
   string_view profiler_version;
   bool agentless; // Whether or not to actually use API key/intake
@@ -64,6 +65,7 @@ static inline DDRes exporter_input_copy(const ExporterInput *src,
   DUP_PARAM(service);
   DUP_PARAM(service_version);
   DUP_PARAM(do_export);
+  DUP_PARAM(debug_pprof_prefix);
   dest->user_agent = src->user_agent;
   dest->language = src->language;
   dest->family = src->family;
@@ -81,4 +83,5 @@ static inline void exporter_input_free(ExporterInput *exporter_input) {
   free((char *)exporter_input->service);
   free((char *)exporter_input->service_version);
   free((char *)exporter_input->do_export);
+  free((char *)exporter_input->debug_pprof_prefix);
 }

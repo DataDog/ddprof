@@ -85,6 +85,7 @@ void fill_mock_exporter_input(ExporterInput &exporter_input,
   exporter_input.service = MYNAME;
   exporter_input.service_version = "42";
   exporter_input.do_export = "yes";
+  exporter_input.debug_pprof_prefix = "some_prefix";
   exporter_input.user_agent = STRING_VIEW_LITERAL("DDPROF_MOCK");
   exporter_input.language = STRING_VIEW_LITERAL("NATIVE");
   exporter_input.family = STRING_VIEW_LITERAL("SANCHEZ");
@@ -136,7 +137,7 @@ TEST(DDProfExporter, simple) {
   EXPECT_TRUE(IsDDResOK(res));
   { // override folder to write debug pprofs
     // You can view content using : pprof -raw ./test/data/ddprof_
-    exporter._debug_folder = UNIT_TEST_DATA;
+    exporter._debug_pprof_prefix = UNIT_TEST_DATA "/ddprof_";
   }
 
   { // Aggregate pprofs
