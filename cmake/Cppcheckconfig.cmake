@@ -24,7 +24,6 @@ if (CPP_CHECK_COMMAND)
          "--quiet"
          "--inline-suppr"
          "--suppressions-list=${CMAKE_SOURCE_DIR}/CppCheckSuppressions.txt"
-         #"--cppcheck-build-dir=${CMAKE_BINARY_DIR}" #does not work well with suppressions
          ${CPPCHECK_DIRS}
          )
 
@@ -33,6 +32,8 @@ if (CPP_CHECK_COMMAND)
       COMMAND ${CPP_CHECK_COMMAND}
       --error-exitcode=1 # make sure CI pipeline fails
       # --check-config #check what header files are missing
+      # "--verbose"
+      #"--cppcheck-build-dir=${CMAKE_BINARY_DIR}" #does not work well with suppressions
       ${ALL_SOURCE_FILES}
       )
   

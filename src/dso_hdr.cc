@@ -395,7 +395,7 @@ DsoFindRes DsoHdr::pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
   //  Adjusted addr to be a segment-offset
   //  Confirmed that the segment has the capacity to support our read
   // So let's read it!
-  unsigned char *src = (unsigned char *)region->get_region();
+  unsigned char *src = static_cast<unsigned char *>(region->get_region());
   memcpy(buf, src + file_region_offset, sz);
   return find_res;
 }
