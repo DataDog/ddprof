@@ -14,3 +14,8 @@ unusedLabel:*/dwfl_module-ut.cc
 
 // cppcheck does not like google benchmark macros
 constParameterCallback:*/*-bench.cc
+
+// to be fixed progressively (generated with upgrade to 2.8)
+cstyleCast:*
+unusedStructMember:*
+constParameter:*/self_unwind.cc:62

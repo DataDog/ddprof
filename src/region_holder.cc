@@ -24,11 +24,11 @@ RegionHolder::RegionHolder(const std::string &full_path, size_t sz,
   if (path_type == dso::kVdso) {
     LG_DBG("Found a VDSO region");
     // use auxiliary vector
-    _region = (void *)(uintptr_t)getauxval(AT_SYSINFO_EHDR);
+    _region = reinterpret_cast<void *>(getauxval(AT_SYSINFO_EHDR));
     _sz = 4096;
   } else if (path_type == dso::kVsysCall) {
     LG_DBG("Found a VSYSCALL region");
-    _region = (void *)0xffffffffff600000;
+    _region = reinterpret_cast<void *>(0xffffffffff600000);
     _sz = 4096;
   } else if (path_type == dso::kStandard) {
     int fd = open(full_path.c_str(), O_RDONLY);
