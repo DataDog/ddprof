@@ -5,13 +5,13 @@
 
 #pragma once
 
-
-// Workers are reset by creating new forks. This structure is shared accross processes
+// Workers are reset by creating new forks. This structure is shared accross
+// processes
 typedef struct PersistentWorkerState {
   volatile bool restart_worker;
   volatile bool errors;
-  // Number of cycles since the begining of the app / profiling 
-  // Why not volatile ? Although several threads can update the number of cycles, by design
-  // Only a single thread reads and writes to this variable.
+  // Number of cycles since the begining of the app / profiling
+  // Why not volatile ? Although several threads can update the number of
+  // cycles, by design Only a single thread reads and writes to this variable.
   uint32_t number_of_cycles;
 } PersistentWorkerState;

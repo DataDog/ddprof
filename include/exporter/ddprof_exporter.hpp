@@ -43,8 +43,8 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
 DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter);
 
 DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
-                             ddprof::Tags   &additional_tags,
-                             uint32_t        number_of_cycles,
+                             ddprof::Tags &additional_tags,
+                             uint32_t number_of_cycles,
                              DDProfExporter *exporter);
 
 DDRes ddprof_exporter_free(DDProfExporter *exporter);

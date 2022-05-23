@@ -1,8 +1,8 @@
 #pragma once
 
+#include "persistent_worker_state.h"
 #include "pevent.h"
 #include "proc_status.h"
-#include "persistent_worker_state.h"
 
 typedef struct DDProfExporter DDProfExporter;
 typedef struct DDProfPProf DDProfPProf;

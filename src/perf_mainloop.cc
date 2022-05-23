@@ -73,7 +73,8 @@ static void modify_sigprocmask(int how) {
   sigprocmask(how, &mask, NULL);
 }
 
-DDRes spawn_workers(PersistentWorkerState *persistent_worker_state, bool *is_worker) {
+DDRes spawn_workers(PersistentWorkerState *persistent_worker_state,
+                    bool *is_worker) {
   pid_t child_pid = 0;
   *is_worker = false;
 
@@ -288,7 +289,8 @@ DDRes main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
   int mmap_prot = PROT_READ | PROT_WRITE;
   int mmap_flags = MAP_ANONYMOUS | MAP_SHARED;
   PersistentWorkerState *persistent_worker_state =
-      (PersistentWorkerState *)mmap(0, sizeof(PersistentWorkerState), mmap_prot, mmap_flags, -1, 0);
+      (PersistentWorkerState *)mmap(0, sizeof(PersistentWorkerState), mmap_prot,
+                                    mmap_flags, -1, 0);
   if (MAP_FAILED == persistent_worker_state) {
     // Allocation failure : stop the profiling
     LG_ERR("Could not initialize profiler");

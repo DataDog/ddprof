@@ -11,8 +11,8 @@
 extern "C" {
 #endif
 
-#include "perf_ringbuffer.h"
 #include "ddprof_defs.h"
+#include "perf_ringbuffer.h"
 
 // Takes into account number of watchers * number of CPUs
 #define MAX_NB_PERF_EVENT_OPEN 450

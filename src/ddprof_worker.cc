@@ -77,7 +77,8 @@ static inline void export_time_set(DDProfContext *ctx) {
       now_nanos() + export_time_convert(ctx->params.upload_period);
 }
 
-DDRes worker_library_init(DDProfContext *ctx, PersistentWorkerState *persistent_worker_state) {
+DDRes worker_library_init(DDProfContext *ctx,
+                          PersistentWorkerState *persistent_worker_state) {
   try {
     // Set the initial time
     export_time_set(ctx);
@@ -88,7 +89,7 @@ DDRes worker_library_init(DDProfContext *ctx, PersistentWorkerState *persistent_
     ctx->worker_ctx.exp_tid = {0};
 
     ctx->worker_ctx.us = new UnwindState();
-    
+
     // register the existing persistent storage for the state
     ctx->worker_ctx.persistent_worker_state = persistent_worker_state;
 
@@ -211,10 +212,9 @@ void *ddprof_worker_export_thread(void *arg) {
   // export the one we are not writting to
   int i = 1 - worker->i_current_pprof;
 
-  if (IsDDResFatal(ddprof_exporter_export(worker->pprof[i]->_profile,
-                                          worker->pprof[i]->_tags,
-                                          worker->persistent_worker_state->number_of_cycles,
-                                          worker->exp[i]))) {
+  if (IsDDResFatal(ddprof_exporter_export(
+          worker->pprof[i]->_profile, worker->pprof[i]->_tags,
+          worker->persistent_worker_state->number_of_cycles, worker->exp[i]))) {
     LG_NFO("Failed to export from worker");
     worker->exp_error = true;
   }
@@ -365,7 +365,9 @@ DDRes ddprof_worker_maybe_export(DDProfContext *ctx, int64_t now_ns) {
       ctx->worker_ctx.persistent_worker_state->restart_worker =
           (ctx->params.worker_period <= ctx->worker_ctx.count_worker);
       // when restarting worker, do a synchronous export
-      DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now_ns, ctx->worker_ctx.persistent_worker_state->restart_worker));
+      DDRES_CHECK_FWD(ddprof_worker_cycle(
+          ctx, now_ns,
+          ctx->worker_ctx.persistent_worker_state->restart_worker));
     }
   }
   CatchExcept2DDRes();
@@ -373,7 +375,8 @@ DDRes ddprof_worker_maybe_export(DDProfContext *ctx, int64_t now_ns) {
 }
 
 #ifndef DDPROF_NATIVE_LIB
-DDRes ddprof_worker_init(DDProfContext *ctx, PersistentWorkerState *persistent_worker_state) {
+DDRes ddprof_worker_init(DDProfContext *ctx,
+                         PersistentWorkerState *persistent_worker_state) {
   try {
     DDRES_CHECK_FWD(worker_library_init(ctx, persistent_worker_state));
     ctx->worker_ctx.exp[0] =
