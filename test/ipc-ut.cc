@@ -57,7 +57,7 @@ TEST(IPCTest, Positive) {
     EXPECT_NE(fcntl(fd, F_GETFD, 0), -1);
     // reset the cursor
     lseek(fd, 0, SEEK_SET);
-    char *buffer = (char *)malloc(payload.size());
+    char *buffer = static_cast<char *>(malloc(payload.size()));
     int readRet = read(fd, buffer, payload.size());
     EXPECT_TRUE(readRet > 0);
     // Check it in the parent
