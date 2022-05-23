@@ -28,7 +28,6 @@ struct TrackerThreadLocalState {
 
   pid_t tid; // cache of tid
 
-  // cppcheck-suppress unusedStructMember
   bool reentry_guard; // prevent reentry in AllocationTracker (eg. when
                       // allocation are done inside AllocationTracker)
 };
@@ -57,8 +56,6 @@ private:
     std::mutex mutex;
     std::atomic<bool> track_allocations = false;
     std::atomic<bool> track_deallocations = false;
-
-    // cppcheck-suppress unusedStructMember
     uint64_t lost_count; // count number of lost events
     pid_t pid;           // cache of pid
   };
