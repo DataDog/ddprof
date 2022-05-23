@@ -56,7 +56,6 @@ private:
     std::mutex mutex;
     std::atomic<bool> track_allocations = false;
     std::atomic<bool> track_deallocations = false;
-
     uint64_t lost_count; // count number of lost events
     pid_t pid;           // cache of pid
   };

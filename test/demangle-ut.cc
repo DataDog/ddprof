@@ -44,4 +44,4 @@ TEST(DemangleTest, Positive) {
     EXPECT_EQ(demangled_func, tcase.answer);
   }
 }
-}
+} // namespace ddprof
