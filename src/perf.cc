@@ -64,7 +64,7 @@ int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
   return syscall(__NR_perf_event_open, attr, pid, cpu, gfd, flags);
 }
 
-static const char *get_perf_type_str(perf_type_id type_id) {
+const char *perf_type_str(int type_id) {
   switch (type_id) {
   case PERF_TYPE_HARDWARE:
     return "HARDWARE";
@@ -82,13 +82,6 @@ static const char *get_perf_type_str(perf_type_id type_id) {
     return "UNKNOWN";
   }
   return "UNKNOWN";
-}
-
-static std::string perf_event_attr_dbg_str(const perf_event_attr &attr) {
-  return ddprof::string_format(
-      "%s - exclude_kernel = %d",
-      get_perf_type_str(static_cast<perf_type_id>(attr.type)),
-      attr.exclude_kernel);
 }
 
 perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
