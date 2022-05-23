@@ -211,13 +211,19 @@ void *ddprof_worker_export_thread(void *arg) {
   DDProfWorkerContext *worker = (DDProfWorkerContext *)arg;
   // export the one we are not writting to
   int i = 1 - worker->i_current_pprof;
+  uint32_t  number_of_cycles = worker->persistent_worker_state->number_of_cycles;
+  // Increase number of cycles in persistent storage
+  // This should start at 0, and if exporter thread
+  // gets killed, we should have a "hole"
+  ++(worker->persistent_worker_state->number_of_cycles);
 
   if (IsDDResFatal(ddprof_exporter_export(
           worker->pprof[i]->_profile, worker->pprof[i]->_tags,
-          worker->persistent_worker_state->number_of_cycles, worker->exp[i]))) {
+          number_of_cycles, worker->exp[i]))) {
     LG_NFO("Failed to export from worker");
     worker->exp_error = true;
   }
+
   return nullptr;
 }
 #endif
@@ -284,9 +290,6 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
     }
   }
 #endif
-  // Increase number of cycles in persistent storage
-  ++(ctx->worker_ctx.persistent_worker_state->number_of_cycles);
-
   // Increase the counts of exports
   ctx->worker_ctx.count_worker += 1;
 
