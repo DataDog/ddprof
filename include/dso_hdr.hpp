@@ -69,15 +69,15 @@ private:
 class DsoHdr {
 public:
   /******* Structures and types **********/
-  typedef std::map<ProcessAddress_t, Dso> DsoMap;
-  typedef std::unordered_map<pid_t, DsoMap> DsoPidMap;
+  using DsoMap = std::map<ProcessAddress_t, Dso>;
+  using DsoPidMap = std::unordered_map<pid_t, DsoMap>;
 
-  typedef DsoMap::const_iterator DsoMapConstIt;
-  typedef DsoMap::iterator DsoMapIt;
+  using DsoMapConstIt = DsoMap::const_iterator;
+  using DsoMapIt = DsoMap::iterator;
 
   /* Range is assumed as [start, end) */
-  typedef std::pair<DsoMapIt, DsoMapIt> DsoRange;
-  typedef std::pair<DsoMapConstIt, bool> DsoFindRes;
+  using DsoRange = std::pair<DsoMapIt, DsoMapIt>;
+  using DsoFindRes = std::pair<DsoMapConstIt, bool>;
 
   /******* MAIN APIS **********/
   DsoHdr();

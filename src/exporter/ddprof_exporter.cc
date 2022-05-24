@@ -225,21 +225,21 @@ static DDRes check_send_response_code(uint16_t send_response_code) {
   return ddres_init();
 }
 
-static DDRes fill_cycle_tags(ddprof::Tags &additional_tags,
+static DDRes fill_cycle_tags(const ddprof::Tags &additional_tags,
                              uint32_t number_of_cycles,
                              ddprof_ffi_Vec_tag &ffi_additional_tags) {
 
   DDRES_CHECK_FWD(add_single_tag(ffi_additional_tags, "profile_seq",
                                  std::to_string(number_of_cycles)));
 
-  for (auto &el : additional_tags) {
+  for (const auto &el : additional_tags) {
     DDRES_CHECK_FWD(add_single_tag(ffi_additional_tags, el.first, el.second));
   }
   return ddres_init();
 }
 
 DDRes ddprof_exporter_export(const ddprof_ffi_Profile *profile,
-                             ddprof::Tags &additional_tags,
+                             const ddprof::Tags &additional_tags,
                              uint32_t number_of_cycles,
                              DDProfExporter *exporter) {
   DDRes res = ddres_init();

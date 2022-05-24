@@ -14,16 +14,16 @@ extern "C" {
 }
 #include "tags.hpp"
 
-typedef struct ddprof_ffi_Profile ddprof_ffi_Profile;
-typedef struct SymbolHdr SymbolHdr;
+struct ddprof_ffi_Profile;
+struct SymbolHdr;
 
-typedef struct DDProfPProf {
-  DDProfPProf() : _profile(nullptr), _nb_values(0) {}
+struct DDProfPProf {
+  DDProfPProf() noexcept {}
   /* single profile gathering several value types */
-  ddprof_ffi_Profile *_profile;
-  unsigned _nb_values;
+  ddprof_ffi_Profile *_profile = nullptr;
+  unsigned _nb_values = 0;
   ddprof::Tags _tags;
-} DDProfPProf;
+};
 
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx);
 
