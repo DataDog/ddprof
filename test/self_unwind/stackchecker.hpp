@@ -51,10 +51,10 @@ using SymbolMap = std::unordered_map<suw::DwflSymbolKey, ddprof::Symbol>;
 // Append ip info to a json file
 void add_symbol(json &j, const ddprof::Symbol &symbol);
 
-void write_json_file(std::string exe_name, const SymbolMap &map,
-                     std::string data_directory = "");
+void write_json_file(const std::string &exe_name, const SymbolMap &map,
+                     std::string_view data_directory = {});
 
-int compare_to_ref(std::string_view exe_name, const SymbolMap &map,
+int compare_to_ref(const std::string &exe_name, const SymbolMap &map,
                    std::string_view data_directory = {});
 
 } // namespace suw

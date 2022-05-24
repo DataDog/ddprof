@@ -65,6 +65,7 @@ int main(int argc, char *const argv[]) {
   bool continue_exec;
   pid_t pid_test_prog = launch_test_prog();
   std::string data_directory("");
+  const std::string exe_name(k_test_executable);
 
   if (argc >= 2) {
     data_directory = argv[1];
@@ -103,10 +104,10 @@ int main(int argc, char *const argv[]) {
 
   log_run_info(symbol_map);
   // Capture new file (to help user create new reference)
-  write_json_file(k_test_executable, symbol_map, data_directory);
+  write_json_file(exe_name, symbol_map, data_directory);
 
   // Compare to reference stored in json file
-  ret = compare_to_ref(k_test_executable, symbol_map, data_directory);
+  ret = compare_to_ref(exe_name, symbol_map, data_directory);
 
 CLEANUP:
   ddprof_context_free(&ctx);

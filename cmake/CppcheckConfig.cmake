@@ -15,7 +15,6 @@ if (CPP_CHECK_COMMAND)
          "--inline-suppr"
          --project=${CMAKE_BINARY_DIR}/compile_commands.json
          "--suppressions-list=${CMAKE_SOURCE_DIR}/CppCheckSuppressions.txt"
-         "-j 4"
          )
 
    add_custom_target(
