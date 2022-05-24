@@ -148,7 +148,7 @@ list(APPEND DDPROF_LIBRARY_LIST libcap)
 list(APPEND DDPROF_INCLUDE_LIST ${LIBCAP_INCLUDE_DIR})
 
 set(DD_PROFILING_SOURCES src/lib/dd_profiling.cc src/daemonize.cc src/ddprof_cmdline.c src/logger.c src/logger_setup.cc 
-                         src/ipc.cc src/pevent_lib.cc src/perf.cc src/perf_ringbuffer.c src/perf_watcher.cc src/ringbuffer_utils.cc src/sys_utils.cc
+                         src/ipc.cc src/pevent_lib.cc src/perf.cc src/perf_ringbuffer.cc src/perf_watcher.cc src/ringbuffer_utils.cc src/sys_utils.cc
                          src/user_override.c src/ddres_list.c src/savecontext.cc src/lib/malloc_wrapper.cc src/lib/allocation_tracker.cc)
 
 add_library(dd_profiling-embedded SHARED ${DD_PROFILING_SOURCES})

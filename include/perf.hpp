@@ -5,10 +5,7 @@
 
 #pragma once
 
-extern "C" {
 #include <linux/perf_event.h>
-}
-
 #include <vector>
 
 namespace ddprof {

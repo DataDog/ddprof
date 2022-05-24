@@ -3,11 +3,13 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
+extern "C" {
 #include "perf_ringbuffer.h"
 
-#include <stdlib.h>
-
 #include "logger.h"
+}
+
+#include <stdlib.h>
 
 bool rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size,
              bool is_mirrored) {
@@ -32,7 +34,7 @@ bool rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size,
     uint64_t buf_sz =
         sizeof(uint64_t) * PERF_REGS_COUNT + PERF_SAMPLE_STACK_SIZE;
     buf_sz += sizeof(perf_event_sample);
-    unsigned char *wrbuf = malloc(buf_sz);
+    unsigned char *wrbuf = static_cast<unsigned char *>(malloc(buf_sz));
     if (!wrbuf)
       return false;
     rb->wrbuf = wrbuf;
@@ -316,12 +318,12 @@ uint64_t hdr_time(struct perf_event_header *hdr, uint64_t mask) {
   // we need to compute the time from the sample.  Rather than doing the full
   // sample2hdr computation, we do an abbreviated lookup from the top of the
   // header
-  case PERF_RECORD_SAMPLE:
+  case PERF_RECORD_SAMPLE: {
     buf = (uint8_t *)&hdr[1];
     uint64_t mbits = PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_IP | PERF_SAMPLE_TID;
     mbits &= mask;
     return *(uint64_t *)&buf[8 * get_bits(mbits)];
-
+  }
   // For non-sample type events, the time is in the sample_id struct which is
   // at the very end of the feed.  We seek to the top of the header, which
   // requires computing how many values are in the sample_id struct (depends

@@ -4,7 +4,6 @@
 // Datadog, Inc.
 
 #include "ddres_def.h"
-#include <string_view>
 
 namespace ddprof {
 

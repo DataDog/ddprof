@@ -12,7 +12,6 @@ extern "C" {
 
 #include "defer.hpp"
 #include "perf.hpp"
-#include "string_format.hpp"
 
 #include <ctype.h>
 #include <errno.h>

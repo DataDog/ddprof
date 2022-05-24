@@ -10,7 +10,6 @@ typedef struct StackHandler StackHandler;
 typedef struct StackHandler StackHandler;
 typedef struct UnwindState UnwindState;
 typedef struct UserTags UserTags;
-typedef struct UserTags UserTags;
 
 // Mutable states within a worker
 typedef struct DDProfWorkerContext {

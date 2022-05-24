@@ -112,7 +112,7 @@ enum DDProfCustomCountId { kDDPROF_COUNT_ALLOCATIONS = 0 };
   X(hBUS,    "Bus Cycles",      PERF_TYPE_HARDWARE,  PERF_COUNT_HW_BUS_CYCLES,              1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(hBSTF,   "Bus Stalls(F)",   PERF_TYPE_HARDWARE,  PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(hBSTB,   "Bus Stalls(B)",   PERF_TYPE_HARDWARE,  PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(sCPU,    "CPU Time",        PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_TASK_CLOCK,              99,           DDPROF_PWT_CPU_NANOS,   IS_FREQ_TRY_KERNEL)                 \
+  X(sCPU,    "CPU Time",        PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_TASK_CLOCK,              99,           DDPROF_PWT_CPU_NANOS,   IS_FREQ_TRY_KERNEL)      \
   X(sPF,     "Page Faults",     PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_PAGE_FAULTS,             1,            DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
   X(sCS,     "Con. Switch",     PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_CONTEXT_SWITCHES,        1,            DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
   X(sMig,    "CPU Migrations",  PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_CPU_MIGRATIONS,          99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \

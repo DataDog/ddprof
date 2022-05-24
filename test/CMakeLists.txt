@@ -189,7 +189,7 @@ add_unit_test(
     perf_ringbuffer-ut
     ../src/perf.cc
     ../src/perf_watcher.cc
-    ../src/perf_ringbuffer.c
+    ../src/perf_ringbuffer.cc
     perf_ringbuffer-ut.cc
     DEFINITIONS MYNAME="perf_ringbuffer-ut"
 )
@@ -207,7 +207,7 @@ add_unit_test(
     ../src/user_override.c
     ../src/perf.cc
     ../src/perf_watcher.cc
-    ../src/perf_ringbuffer.c
+    ../src/perf_ringbuffer.cc
     ../src/ringbuffer_utils.cc
     ../src/sys_utils.cc
     pevent-ut.cc
@@ -339,7 +339,7 @@ add_unit_test(
     ../src/dwfl_thread_callbacks.cc
     ../src/pevent_lib.cc
     ../src/perf.cc
-    ../src/perf_ringbuffer.c
+    ../src/perf_ringbuffer.cc
     ../src/perf_watcher.cc
     ../src/ringbuffer_utils.cc
     ../src/savecontext.cc
@@ -368,7 +368,7 @@ add_unit_test(
     ringbuffer-ut
     ringbuffer-ut.cc
     ../src/perf.cc
-    ../src/perf_ringbuffer.c
+    ../src/perf_ringbuffer.cc
     ../src/pevent_lib.cc
     ../src/ringbuffer_utils.cc
     ../src/sys_utils.cc
