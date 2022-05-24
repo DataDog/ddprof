@@ -266,7 +266,6 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
 
 static void worker(DDProfContext *ctx, const WorkerAttr *attr,
                    PersistentWorkerState *persistent_worker_state) {
-  bool restart_worker = false;
   persistent_worker_state->restart_worker = false;
   persistent_worker_state->errors = true;
 
@@ -279,7 +278,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
       LG_WRN("Worker warning (what:%s).", ddres_error_message(res._what));
     }
     LG_NFO("Shutting down worker gracefully");
-    persistent_worker_state->restart_worker = restart_worker;
+    persistent_worker_state->restart_worker = false;
     persistent_worker_state->errors = false;
   }
 }
