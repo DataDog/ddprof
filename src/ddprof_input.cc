@@ -237,7 +237,9 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
       PerfWatcher *watcher = &input->watchers[input->num_watchers];
       if (!watcher_from_event(optarg, watcher) &&
           !watcher_from_tracepoint(optarg, watcher)) {
-        LG_WRN("Ignoring invalid event/tracepoint (%s)", optarg);
+        LG_ERR("Invalid event/tracepoint (%s)", optarg);
+        res = ddres_error(DD_WHAT_INPUT_PROCESS);
+        *continue_exec = false;
       } else {
         ++input->num_watchers;
       }
@@ -255,7 +257,7 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
     }
     default: {
       *continue_exec = false;
-      res = ddres_warn(DD_WHAT_INPUT_PROCESS);
+      res = ddres_error(DD_WHAT_INPUT_PROCESS);
       LG_ERR("Invalid option %s", argv[optind - 1]);
       break;
     }
