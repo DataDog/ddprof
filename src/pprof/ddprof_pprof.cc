@@ -32,15 +32,16 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
   // We also record the watcher with the lowest valid sample_type id, since that
   // will serve as the default for the pprof
   bool active_ids[DDPROF_PWT_LENGTH] = {};
-  PerfWatcher *default_watcher = &watchers[0];
+  PerfWatcher *default_watcher = watchers;
   for (unsigned i = 0; i < num_watchers; ++i) {
     int this_id = watchers[i].sample_type_id;
     int count_id = sample_type_id_to_count_sample_type_id(this_id);
     if (this_id < 0 || this_id == DDPROF_PWT_NOCOUNT ||
         this_id >= DDPROF_PWT_LENGTH) {
       if (this_id != DDPROF_PWT_NOCOUNT) {
-        LG_WRN("Watcher \"%s\" (%d) has invalid sample_type_id %d, ignoring",
-               watchers[i].desc, i, this_id);
+        DDRES_RETURN_ERROR_LOG(
+            DD_WHAT_PPROF, "Watcher \"%s\" (%d) has invalid sample_type_id %d",
+            watchers[i].desc, i, this_id);
       }
       continue;
     }
@@ -54,9 +55,8 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
 
   // Convert the mask into a lookup.  While we're at it, populate the metadata
   // for the pprof
-  int pv[DDPROF_PWT_LENGTH];
+  int pv[DDPROF_PWT_LENGTH] = {};
   int num_sample_type_ids = 0;
-  memset(pv, 0, sizeof(pv));
   for (int i = 0; i < DDPROF_PWT_LENGTH; ++i) {
     if (!active_ids[i])
       continue;
@@ -92,32 +92,29 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
     }
   }
 
-  // If none of the samples were good, that's an error
-  if (!num_sample_type_ids) {
-    // We use the phrase "profile type" in the error, since this is more
-    // obvious for customers.
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "No valid profile types given");
-  }
-
   pprof->_nb_values = num_sample_type_ids;
   ddprof_ffi_Slice_value_type sample_types = {.ptr = perf_value_type,
                                               .len = pprof->_nb_values};
 
-  // Populate the default.  If we have a frequency, assume it is given in hertz
-  // and convert to a period in nanoseconds.  This is broken for many event-
-  // based types (but providing frequency would also be broken in those cases)
-  int64_t default_period = default_watcher->sample_period;
-  if (default_watcher->options.is_freq)
-    default_period = 1e9 / default_period;
+  ddprof_ffi_Period period;
+  if (num_sample_type_ids > 0) {
+    // Populate the default.  If we have a frequency, assume it is given in
+    // hertz and convert to a period in nanoseconds.  This is broken for many
+    // event- based types (but providing frequency would also be broken in those
+    // cases)
+    int64_t default_period = default_watcher->sample_period;
+    if (default_watcher->options.is_freq)
+      default_period = 1e9 / default_period;
 
-  ddprof_ffi_Period period = {
-      .type_ = perf_value_type[pv[default_watcher->pprof_sample_idx]],
-      .value = default_period,
-  };
-
-  pprof->_profile = ddprof_ffi_Profile_new(sample_types, &period);
+    period = {
+        .type_ = perf_value_type[pv[default_watcher->pprof_sample_idx]],
+        .value = default_period,
+    };
+  }
+  pprof->_profile = ddprof_ffi_Profile_new(
+      sample_types, num_sample_type_ids > 0 ? &period : nullptr);
   if (!pprof->_profile) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to allocate profiles");
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to create profile");
   }
 
   // Add relevant tags
@@ -133,7 +130,9 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
 }
 
 DDRes pprof_free_profile(DDProfPProf *pprof) {
-  ddprof_ffi_Profile_free(pprof->_profile);
+  if (pprof->_profile) {
+    ddprof_ffi_Profile_free(pprof->_profile);
+  }
   pprof->_profile = NULL;
   pprof->_nb_values = 0;
   return ddres_init();
