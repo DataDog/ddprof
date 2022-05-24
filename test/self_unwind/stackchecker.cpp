@@ -69,8 +69,8 @@ json parse_json_file(const std::string &filePath) {
   return ret;
 }
 
-int compare_to_ref(std::string exe_name, const SymbolMap &map,
-                   std::string data_directory) {
+int compare_to_ref(std::string_view exe_name, const SymbolMap &map,
+                   std::string_view data_directory) {
   std::string file_path;
   if (data_directory.empty())
     file_path = std::string(STACK_DATA);

@@ -28,6 +28,9 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 include(ExtendBuildTypes)
 
+# Allow cppcheck to build off of build commands
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Default value
 message(STATUS "Build type set to " ${CMAKE_BUILD_TYPE})
 
@@ -66,6 +69,7 @@ include(Findelfutils)
 ### Static analysis ###
 #######################
 include(ClangTidy)
+include(CppcheckConfig)
 include(Format)
 
 ##################################

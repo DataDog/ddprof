@@ -17,8 +17,7 @@ typedef struct DDProfContext DDProfContext;
 DDRes ddprof_worker_init(DDProfContext *arg,
                          PersistentWorkerState *persistent_worker_state);
 DDRes ddprof_worker_free(DDProfContext *);
-DDRes ddprof_worker_maybe_export(DDProfContext *arg, int64_t now_ns,
-                                 bool *restart_worker);
+DDRes ddprof_worker_maybe_export(DDProfContext *arg, int64_t now_ns);
 DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
                           bool synchronous_export);
 DDRes ddprof_worker_process_event(struct perf_event_header *hdr,

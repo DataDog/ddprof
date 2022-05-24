@@ -54,7 +54,7 @@ void add_symbol(json &j, const ddprof::Symbol &symbol);
 void write_json_file(std::string exe_name, const SymbolMap &map,
                      std::string data_directory = "");
 
-int compare_to_ref(std::string exe_name, const SymbolMap &map,
-                   std::string data_directory = "");
+int compare_to_ref(std::string_view exe_name, const SymbolMap &map,
+                   std::string_view data_directory = {});
 
 } // namespace suw

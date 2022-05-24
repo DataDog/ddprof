@@ -58,7 +58,7 @@ RunDDBuild() {
 
 # Runs cppcheck from a build directory
 RunCppCheck() {
-  cmake ${COMMON_OPT} -DCMAKE_EXPORT_COMPILE_COMMANDS=ON .
+  cmake ${COMMON_OPT} -DCMAKE_EXPORT_COMPILE_COMMANDS=ON  -DCMAKE_BUILD_TYPE=${1-"Debug"} ../
   export BUILD_DIR=$PWD
   cd ../
   export CPPCHECK_TEMPLATE "cppcheck:{id}:{file}:{line}:{severity}:{message}"
