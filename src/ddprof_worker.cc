@@ -361,7 +361,9 @@ void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int watcher_pos) {
 }
 
 /********************************** callbacks *********************************/
-DDRes ddprof_worker_maybe_export(DDProfContext *ctx, int64_t now_ns) {
+DDRes ddprof_worker_maybe_export(DDProfContext *ctx, int64_t now_ns,
+                                 bool *restart_worker) {
+  *restart_worker = false;
   try {
     if (now_ns > ctx->worker_ctx.send_nanos) {
       // restart worker if number of uploads is reached
@@ -372,6 +374,7 @@ DDRes ddprof_worker_maybe_export(DDProfContext *ctx, int64_t now_ns) {
           ctx, now_ns,
           ctx->worker_ctx.persistent_worker_state->restart_worker));
     }
+    *restart_worker = ctx->worker_ctx.persistent_worker_state->restart_worker;
   }
   CatchExcept2DDRes();
   return ddres_init();

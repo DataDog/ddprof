@@ -248,11 +248,12 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
     }
 
     int64_t now_ns = 0;
+    bool restart_worker = false;
     DDRES_CHECK_FWD(worker_process_ring_buffers(pes, pe_len, ctx, &now_ns,
                                                 &samples_left_in_buffer));
-    DDRES_CHECK_FWD(ddprof_worker_maybe_export(ctx, now_ns));
+    DDRES_CHECK_FWD(ddprof_worker_maybe_export(ctx, now_ns, &restart_worker));
 
-    if (persistent_worker_state->restart_worker) {
+    if (restart_worker) {
       // return directly no need to do a final export
       return {};
     }
