@@ -93,7 +93,7 @@ bool samp2hdr(struct perf_event_header *hdr, perf_event_sample *sample,
 
   // Presumes that the user has allocated enough room for the whole sample
   if (!hdr || !sz_hdr || sz_hdr < sizeof(struct perf_event_header))
-    return NULL;
+    return false;
   memset(hdr, 0, sz_hdr);
 
   // Initiate
@@ -170,7 +170,8 @@ bool samp2hdr(struct perf_event_header *hdr, perf_event_sample *sample,
     SZ_CHECK;
 
     // Copy the values
-    sz += 8 * PERF_REGS_COUNT; // TODO pass this in the watcher
+    sz += static_cast<size_t>(8 *
+                              PERF_REGS_COUNT); // TODO pass this in the watcher
     if (sz >= sz_hdr)
       return false;
     memcpy(buf, sample->regs, PERF_REGS_COUNT);
@@ -201,7 +202,7 @@ bool samp2hdr(struct perf_event_header *hdr, perf_event_sample *sample,
 
 perf_event_sample *hdr2samp(const struct perf_event_header *hdr,
                             uint64_t mask) {
-  static perf_event_sample sample = {0};
+  static perf_event_sample sample = {};
   memset(&sample, 0, sizeof(sample));
 
   sample.header = *hdr;
@@ -322,7 +323,7 @@ uint64_t hdr_time(struct perf_event_header *hdr, uint64_t mask) {
     buf = (uint8_t *)&hdr[1];
     uint64_t mbits = PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_IP | PERF_SAMPLE_TID;
     mbits &= mask;
-    return *(uint64_t *)&buf[8 * get_bits(mbits)];
+    return *(uint64_t *)&buf[static_cast<ptrdiff_t>(8 * get_bits(mbits))];
   }
   // For non-sample type events, the time is in the sample_id struct which is
   // at the very end of the feed.  We seek to the top of the header, which
@@ -340,7 +341,8 @@ uint64_t hdr_time(struct perf_event_header *hdr, uint64_t mask) {
         PERF_SAMPLE_STREAM_ID | PERF_SAMPLE_CPU | PERF_SAMPLE_IDENTIFIER;
     sampleid_mask_bits = get_bits(sampleid_mask_bits);
     buf = ((uint8_t *)hdr) + hdr->size - sizeof(uint64_t) * sampleid_mask_bits;
-    return *(uint64_t *)&buf[8 * !!(mask & PERF_SAMPLE_TID)];
+    return *(
+        uint64_t *)&buf[static_cast<ptrdiff_t>(8 * !!(mask & PERF_SAMPLE_TID))];
   }
 
   return 0;
