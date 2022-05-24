@@ -18,7 +18,6 @@ static const int kChildIdx = 1;
 
 TEST(IPCTest, Positive) {
   // Create a socket pair
-  std::string fileName = UNIT_TEST_DATA "/ipc_test_data_Positive.txt";
   std::string payload = "Interesting test.";
 
   int sockets[2] = {-1, -1};
@@ -26,6 +25,7 @@ TEST(IPCTest, Positive) {
   // Fork
   pid_t child_pid = fork();
   if (!child_pid) {
+    std::string fileName = UNIT_TEST_DATA "/ipc_test_data_Positive.txt";
     // I am the child, close parent socket (dupe)
     close(sockets[kParentIdx]);
     ddprof::UnixSocket socket(sockets[kChildIdx]);

@@ -55,3 +55,19 @@ RunDDBuild() {
     # run command as ddbuild user
     su ddbuild su -s /bin/bash -c "$@" ddbuild
 }
+
+# Runs cppcheck from a build directory
+RunCppCheck() {
+  cmake ${COMMON_OPT} -DCMAKE_EXPORT_COMPILE_COMMANDS=ON .
+  export BUILD_DIR=$PWD
+  cd ../
+  export CPPCHECK_TEMPLATE "cppcheck:{id}:{file}:{line}:{severity}:{message}"
+  cppcheck --project=${BUILD_DIR}/compile_commands.json \
+          --suppressions-list=./CppCheckSuppressions.txt \
+          --error-exitcode=1 \
+          --enable=warning,performance,portability,information,style \
+          --library=googletest \
+          --template=${CPPCHECK_TEMPLATE} \
+          --inline-suppr
+  cd -
+}

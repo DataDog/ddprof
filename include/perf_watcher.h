@@ -100,6 +100,7 @@ enum DDProfCustomCountId { kDDPROF_COUNT_ALLOCATIONS = 0 };
 // type!
 // clang-format off
 //  short    desc               perf event type      perf event count type                  period/freq   profile sample type     addtl. configs
+// cppcheck-suppress preprocessorErrorDirective
 #define EVENT_CONFIG_TABLE(X) \
   X(hCPU,    "CPU Cycles",      PERF_TYPE_HARDWARE,  PERF_COUNT_HW_CPU_CYCLES,              99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(hREF,    "Ref. CPU Cycles", PERF_TYPE_HARDWARE,  PERF_COUNT_HW_REF_CPU_CYCLES,          1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \

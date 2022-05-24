@@ -65,10 +65,7 @@ include(Findelfutils)
 #######################
 ### Static analysis ###
 #######################
-
-#Cpp Check
 include(ClangTidy)
-include(Cppcheckconfig)
 include(Format)
 
 ##################################
