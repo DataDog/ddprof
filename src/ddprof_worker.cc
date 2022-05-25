@@ -211,15 +211,14 @@ void *ddprof_worker_export_thread(void *arg) {
   DDProfWorkerContext *worker = (DDProfWorkerContext *)arg;
   // export the one we are not writting to
   int i = 1 - worker->i_current_pprof;
-  uint32_t number_of_cycles = worker->persistent_worker_state->number_of_cycles;
-  // Increase number of cycles in persistent storage
+  // Increase number of sequences in persistent storage
   // This should start at 0, and if exporter thread
-  // gets killed, we should have a "hole"
-  ++(worker->persistent_worker_state->number_of_cycles);
+  // gets joined forcefully, we should not resume on same value
+  uint32_t profile_seq = (worker->persistent_worker_state->profile_seq)++;
 
   if (IsDDResFatal(ddprof_exporter_export(worker->pprof[i]->_profile,
-                                          worker->pprof[i]->_tags,
-                                          number_of_cycles, worker->exp[i]))) {
+                                          worker->pprof[i]->_tags, profile_seq,
+                                          worker->exp[i]))) {
     LG_NFO("Failed to export from worker");
     worker->exp_error = true;
   }

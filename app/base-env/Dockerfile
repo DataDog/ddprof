@@ -107,7 +107,7 @@ RUN VERSION="1.11.0" \
   && popd \
   && rm -rf googletest-release-${VERSION} release-${VERSION}.tar.gz
 
-# Cpp check 2.7 (ubuntu's 1.8 has some bugs on double free)
+# More recent Cpp check (ubuntu defaults to a 1.8 version)
 RUN VERSION="2.8" \
   && curl -LO https://github.com/danmar/cppcheck/archive/refs/tags/${VERSION}.tar.gz \
   && SHA256="57298f3b805f0eb816a04115fbc70e701f75083cfb0305a44246e365cf27606a" \

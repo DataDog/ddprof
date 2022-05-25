@@ -226,11 +226,11 @@ static DDRes check_send_response_code(uint16_t send_response_code) {
 }
 
 static DDRes fill_cycle_tags(const ddprof::Tags &additional_tags,
-                             uint32_t number_of_cycles,
+                             uint32_t profile_seq,
                              ddprof_ffi_Vec_tag &ffi_additional_tags) {
 
   DDRES_CHECK_FWD(add_single_tag(ffi_additional_tags, "profile_seq",
-                                 std::to_string(number_of_cycles)));
+                                 std::to_string(profile_seq)));
 
   for (const auto &el : additional_tags) {
     DDRES_CHECK_FWD(add_single_tag(ffi_additional_tags, el.first, el.second));
@@ -240,8 +240,7 @@ static DDRes fill_cycle_tags(const ddprof::Tags &additional_tags,
 
 DDRes ddprof_exporter_export(const ddprof_ffi_Profile *profile,
                              const ddprof::Tags &additional_tags,
-                             uint32_t number_of_cycles,
-                             DDProfExporter *exporter) {
+                             uint32_t profile_seq, DDProfExporter *exporter) {
   DDRes res = ddres_init();
   ddprof_ffi_SerializeResult serialized_result =
       ddprof_ffi_Profile_serialize(profile);
@@ -267,8 +266,8 @@ DDRes ddprof_exporter_export(const ddprof_ffi_Profile *profile,
   if (exporter->_export) {
     ddprof_ffi_Vec_tag ffi_additional_tags = ddprof_ffi_Vec_tag_new();
     defer { ddprof_ffi_Vec_tag_drop(ffi_additional_tags); };
-    DDRES_CHECK_FWD(fill_cycle_tags(additional_tags, number_of_cycles,
-                                    ffi_additional_tags););
+    DDRES_CHECK_FWD(
+        fill_cycle_tags(additional_tags, profile_seq, ffi_additional_tags););
 
     LG_NTC("[EXPORTER] Export buffer of size %lu", profile_data.len);
 
