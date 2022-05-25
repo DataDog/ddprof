@@ -84,6 +84,8 @@ function(add_benchmark name)
 endfunction()
 
 #### Definition of unit tests ####
+add_compile_definitions("UNIT_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
+
 add_unit_test(
     ddprofcmdline-ut
     ../src/ddprof_cmdline.c
@@ -130,8 +132,6 @@ add_unit_test(
     DEFINITIONS MYNAME="demangle-ut"
 )
 
-add_compile_definitions("IPC_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
-
 add_unit_test(
     ipc-ut
     ../src/ipc.cc
@@ -169,7 +169,6 @@ add_unit_test(
     DEFINITIONS MYNAME="userid-ut"
 )
 
-add_compile_definitions("IPC_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 add_unit_test(
     procutils-ut
     ../src/procutils.c
@@ -190,7 +189,7 @@ add_unit_test(
     perf_ringbuffer-ut
     ../src/perf.cc
     ../src/perf_watcher.cc
-    ../src/perf_ringbuffer.c
+    ../src/perf_ringbuffer.cc
     perf_ringbuffer-ut.cc
     DEFINITIONS MYNAME="perf_ringbuffer-ut"
 )
@@ -208,8 +207,9 @@ add_unit_test(
     ../src/user_override.c
     ../src/perf.cc
     ../src/perf_watcher.cc
-    ../src/perf_ringbuffer.c
+    ../src/perf_ringbuffer.cc
     ../src/ringbuffer_utils.cc
+    ../src/sys_utils.cc
     pevent-ut.cc
     DEFINITIONS MYNAME="pevent-ut"
 )
@@ -339,7 +339,7 @@ add_unit_test(
     ../src/dwfl_thread_callbacks.cc
     ../src/pevent_lib.cc
     ../src/perf.cc
-    ../src/perf_ringbuffer.c
+    ../src/perf_ringbuffer.cc
     ../src/perf_watcher.cc
     ../src/ringbuffer_utils.cc
     ../src/savecontext.cc
@@ -348,6 +348,7 @@ add_unit_test(
     ../src/region_holder.cc
     ../src/signal_helper.c
     ../src/statsd.c
+    ../src/sys_utils.cc
     ../src/user_override.c
     ../src/unwind.cc
     ../src/unwind_dwfl.cc
@@ -357,14 +358,20 @@ add_unit_test(
     LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
     DEFINITIONS ${DDPROF_DEFINITION_LIST})
 
+add_unit_test(
+    sys_utils-ut
+    sys_utils-ut.cc
+    ../src/sys_utils.cc
+    )
 
 add_unit_test(
     ringbuffer-ut
     ringbuffer-ut.cc
     ../src/perf.cc
-    ../src/perf_ringbuffer.c
+    ../src/perf_ringbuffer.cc
     ../src/pevent_lib.cc
     ../src/ringbuffer_utils.cc
+    ../src/sys_utils.cc
     ../src/user_override.c
 )
 

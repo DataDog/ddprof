@@ -13,6 +13,7 @@ extern "C" {
 #include <unistd.h>
 }
 
+#include "loghandle.hpp"
 #include <gtest/gtest.h>
 
 void mock_ddprof_context(DDProfContext *ctx) {
@@ -23,6 +24,7 @@ void mock_ddprof_context(DDProfContext *ctx) {
 
 TEST(PeventTest, setup_cleanup) {
   PEventHdr pevent_hdr;
+  LogHandle log_handle;
   DDProfContext ctx = {};
   pid_t mypid = getpid();
   mock_ddprof_context(&ctx);

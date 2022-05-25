@@ -12,11 +12,6 @@ extern "C" {
 #include "ddprof_context.h"
 #include "worker_attr.h"
 
-typedef struct MLWorkerFlags {
-  volatile bool restart_worker;
-  volatile bool errors;
-} MLWorkerFlags;
-
 /**
  * Continuously poll for new events and process them accordingly
  *

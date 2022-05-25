@@ -3,9 +3,9 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include "pprof/ddprof_pprof.h"
+#include "pprof/ddprof_pprof.hpp"
 
+extern "C" {
 #include "ddprof_input.h"
 #include <ddprof/ffi.h>
 #include <fcntl.h>
@@ -14,6 +14,7 @@ extern "C" {
 }
 #include "loghandle.hpp"
 
+#include "pevent_lib_mocks.hpp"
 #include "symbol_hdr.hpp"
 #include "unwind_output_mock.hpp"
 #include <cstdlib>

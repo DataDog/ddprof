@@ -86,5 +86,6 @@ enum PERF_ARCHMAP_ARM {
   PAM_ARM_MAX,
 };
 #else
+// cppcheck-suppress preprocessorErrorDirective
 #  error Architecture not supported
 #endif

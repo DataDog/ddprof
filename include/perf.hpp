@@ -5,10 +5,10 @@
 
 #pragma once
 
-typedef struct DDProfContext DDProfContext;
-typedef struct PersistentWorkerState PersistentWorkerState;
+#include <linux/perf_event.h>
+#include <vector>
 
-typedef struct WorkerAttr {
-  DDRes (*init_fun)(DDProfContext *, PersistentWorkerState *);
-  DDRes (*finish_fun)(DDProfContext *);
-} WorkerAttr;
+namespace ddprof {
+std::vector<perf_event_attr>
+all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras);
+}

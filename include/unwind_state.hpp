@@ -37,7 +37,7 @@ struct UnwindRegisters {
 /// UnwindState
 /// Single structure with everything necessary in unwinding. The structure is
 /// given through callbacks
-typedef struct UnwindState {
+struct UnwindState {
   UnwindState()
       : _dwfl_wrapper(nullptr), pid(-1), stack(nullptr), stack_sz(0),
         current_ip(0) {
@@ -58,7 +58,7 @@ typedef struct UnwindState {
   ProcessAddress_t current_ip;
 
   UnwindOutput output;
-} UnwindState;
+};
 
 static inline bool unwind_registers_equal(const UnwindRegisters *lhs,
                                           const UnwindRegisters *rhs) {

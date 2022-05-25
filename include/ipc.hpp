@@ -87,6 +87,7 @@ struct ReplyMessage {
   int32_t pid = -1;
   int64_t allocation_profiling_rate = -1;
   // RingBufferInfo is returned if request & kRingBuffer
+  // cppcheck-suppress unusedStructMember
   RingBufferInfo ring_buffer;
 };
 

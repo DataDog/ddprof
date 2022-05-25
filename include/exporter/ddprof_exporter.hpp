@@ -5,15 +5,15 @@
 
 #pragma once
 
-#ifdef __cplusplus
 extern "C" {
-#endif
-
 #include "ddprof_defs.h"
 #include "ddres_def.h"
 #include "exporter_input.h"
 #include "perf_watcher.h"
 #include "string_view.h"
+}
+
+#include "tags.hpp"
 
 typedef struct ddprof_ffi_ProfileExporterV3 ddprof_ffi_ProfileExporterV3;
 typedef struct ddprof_ffi_Profile ddprof_ffi_Profile;
@@ -37,10 +37,7 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
 DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter);
 
 DDRes ddprof_exporter_export(const struct ddprof_ffi_Profile *profile,
-                             DDProfExporter *exporter);
+                             const ddprof::Tags &additional_tags,
+                             uint32_t profile_seq, DDProfExporter *exporter);
 
 DDRes ddprof_exporter_free(DDProfExporter *exporter);
-
-#ifdef __cplusplus
-}
-#endif

@@ -66,7 +66,6 @@ static DDRes get_library_path(std::string &path) {
   DDRES_CHECK_ERRNO(fd, DD_WHAT_TEMP_FILE, "Failed to create temporary file");
 
   // Write embedded lib into temp file
-  // cppcheck-suppress comparePointers
   ssize_t lib_sz = _binary_libdd_profiling_embedded_so_end -
       _binary_libdd_profiling_embedded_so_start;
   if (write(fd, _binary_libdd_profiling_embedded_so_start, lib_sz) != lib_sz) {
@@ -252,10 +251,11 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     if (alloc_watcher_idx != -1) {
       ddprof::span pevents{ctx->worker_ctx.pevent_hdr.pes,
                            ctx->worker_ctx.pevent_hdr.size};
-      auto event_it = std::find_if(pevents.begin(), pevents.end(),
-                                   [alloc_watcher_idx](const auto &pevent) {
-                                     return pevent.pos == alloc_watcher_idx;
-                                   });
+      auto event_it =
+          std::find_if(pevents.begin(), pevents.end(),
+                       [alloc_watcher_idx](const auto &pevent) {
+                         return pevent.watcher_pos == alloc_watcher_idx;
+                       });
       if (event_it != pevents.end()) {
         reply.ring_buffer.event_fd = event_it->fd;
         reply.ring_buffer.ring_fd = event_it->mapfd;

@@ -3,6 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
+extern "C" {
 #include "ddprof.h"
 
 #include <errno.h>
@@ -27,6 +28,8 @@
 #include "perf_mainloop.h"
 #include "pevent_lib.h"
 #include "version.h"
+}
+#include "sys_utils.hpp"
 
 static void disable_core_dumps(void) {
   struct rlimit core_limit;
@@ -49,44 +52,57 @@ static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   exit(-1);
 }
 
-DDRes ddprof_setup(DDProfContext *ctx) {
-  PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
-  pevent_init(pevent_hdr);
+void display_system_info(void) {
 
   // Don't stop if error as this is only for debug purpose
   if (IsDDResNotOK(log_capabilities(false))) {
     LG_ERR("Error when printing capabilities, continuing...");
   }
-
-  // Do not mmap events yet because mmap'ings from perf fds are lost after
-  // fork
-  DDRES_CHECK_FWD(
-      pevent_open(ctx, ctx->params.pid, ctx->params.num_cpu, pevent_hdr));
-
-  // Setup signal handler if defined
-  if (ctx->params.fault_info)
-    sigaction(SIGSEGV,
-              &(struct sigaction){.sa_sigaction = sigsegv_handler,
-                                  .sa_flags = SA_SIGINFO},
-              NULL);
-
-  // Disable core dumps (unless enabled)
-  if (!ctx->params.core_dumps) {
-    disable_core_dumps();
+  int val;
+  if (IsDDResOK(ddprof::sys_perf_event_paranoid(val))) {
+    LG_NFO("perf_event_paranoid : %d", val);
+  } else {
+    LG_WRN("Unable to access perf_event_paranoid setting");
   }
+}
 
-  // Set the nice level, but only if it was overridden because 0 is valid
-  if (ctx->params.nice != -1) {
-    setpriority(PRIO_PROCESS, 0, ctx->params.nice);
-    if (errno) {
-      LG_WRN("Requested nice level (%d) could not be set", ctx->params.nice);
+DDRes ddprof_setup(DDProfContext *ctx) {
+  PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
+  try {
+    pevent_init(pevent_hdr);
+
+    display_system_info();
+
+    // Do not mmap events yet because mmap'ings from perf fds are lost after
+    // fork
+    DDRES_CHECK_FWD(
+        pevent_open(ctx, ctx->params.pid, ctx->params.num_cpu, pevent_hdr));
+
+    // Setup signal handler if defined
+    if (ctx->params.fault_info) {
+      struct sigaction sigaction_handlers = {};
+      sigaction_handlers.sa_sigaction = sigsegv_handler;
+      sigaction_handlers.sa_flags = SA_SIGINFO;
+      sigaction(SIGSEGV, &(sigaction_handlers), NULL);
     }
+    // Disable core dumps (unless enabled)
+    if (!ctx->params.core_dumps) {
+      disable_core_dumps();
+    }
+
+    // Set the nice level, but only if it was overridden because 0 is valid
+    if (ctx->params.nice != -1) {
+      setpriority(PRIO_PROCESS, 0, ctx->params.nice);
+      if (errno) {
+        LG_WRN("Requested nice level (%d) could not be set", ctx->params.nice);
+      }
+    }
+
+    DDRES_CHECK_FWD(ddprof_stats_init());
+
+    DDRES_CHECK_FWD(pevent_enable(pevent_hdr));
   }
-
-  DDRES_CHECK_FWD(ddprof_stats_init());
-
-  DDRES_CHECK_FWD(pevent_enable(pevent_hdr));
-
+  CatchExcept2DDRes();
   return ddres_init();
 }
 
@@ -111,7 +127,7 @@ DDRes ddprof_start_profiler(DDProfContext *ctx) {
   };
 
   // Enter the main loop -- this will not return unless there is an error.
-  LG_PRINT("Entering main loop");
+  LG_NFO("Entering main loop");
   return main_loop(&perf_funs, ctx);
 }
 #endif
