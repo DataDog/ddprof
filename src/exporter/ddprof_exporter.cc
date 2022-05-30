@@ -243,7 +243,7 @@ DDRes ddprof_exporter_export(const ddprof_ffi_Profile *profile,
                              uint32_t profile_seq, DDProfExporter *exporter) {
   DDRes res = ddres_init();
   ddprof_ffi_SerializeResult serialized_result =
-      ddprof_ffi_Profile_serialize(profile);
+      ddprof_ffi_Profile_serialize(profile, nullptr, nullptr);
   defer { ddprof_ffi_SerializeResult_drop(serialized_result); };
   if (serialized_result.tag != DDPROF_FFI_SERIALIZE_RESULT_OK) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to serialize");
@@ -286,10 +286,10 @@ DDRes ddprof_exporter_export(const ddprof_ffi_Profile *profile,
           exporter->_exporter, request, nullptr);
       defer { ddprof_ffi_SendResult_drop(result); };
 
-      if (result.tag == DDPROF_FFI_SEND_RESULT_FAILURE) {
+      if (result.tag == DDPROF_FFI_SEND_RESULT_ERR) {
         LG_WRN("Failure to establish connection, check url %s", exporter->_url);
-        LG_WRN("Failure to send profiles (%.*s)", (int)result.failure.len,
-               result.failure.ptr);
+        LG_WRN("Failure to send profiles (%.*s)", (int)result.err.len,
+               result.err.ptr);
         // Free error buffer (prefer this API to the free API)
         if (exporter->_nb_consecutive_errors++ >=
             K_NB_CONSECUTIVE_ERRORS_ALLOWED) {

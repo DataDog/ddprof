@@ -112,7 +112,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
     };
   }
   pprof->_profile = ddprof_ffi_Profile_new(
-      sample_types, num_sample_type_ids > 0 ? &period : nullptr);
+      sample_types, num_sample_type_ids > 0 ? &period : nullptr, nullptr);
   if (!pprof->_profile) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to create profile");
   }
@@ -252,7 +252,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
 }
 
 DDRes pprof_reset(DDProfPProf *pprof) {
-  if (!ddprof_ffi_Profile_reset(pprof->_profile)) {
+  if (!ddprof_ffi_Profile_reset(pprof->_profile, nullptr)) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to reset profile");
   }
   return ddres_init();
