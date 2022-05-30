@@ -1,12 +1,12 @@
 # Unless explicitly stated otherwise all files in this repository are licensed under the Apache License Version 2.0.
 # This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
 
-# libddprof : common profiler imported libraries
-## Associated https://gitlab.ddbuild.io/DataDog/libddprof-build/-/jobs/90384402
-set(TAG_LIBDDPROF "v0.6.0-rc.1" CACHE STRING "libddprof github tag")
+# libdatadog : common profiler imported libraries
+# https://github.com/DataDog/libdatadog/releases/tag/v0.7.0-rc.1
+set(TAG_LIBDDPROF "v0.7.0-rc.1" CACHE STRING "libdatadog github tag")
 
-set(SHA256_LIBDDPROF_X86 "448e14a29fc4f4c432757e637aa64dc56d45ee5bad4fb26b6fafbabef466324d" CACHE STRING "libddprof sha256")
-set(SHA256_LIBDDPROF_ARM "564d5bbe45192cf031d2e963f049626dfb66a959c0d1ee3e5ad95ae91b1e3650" CACHE STRING "libddprof sha256")
+set(SHA256_LIBDDPROF_X86 "9b43711b23e42e76684eeced9e8d25183d350060d087d755622fa6748fa79aa5" CACHE STRING "libddprof sha256")
+set(SHA256_LIBDDPROF_ARM "e792c923d5cdc6d581da87d12ab789ae578fa588fb2a220f72660f8d25df6de8" CACHE STRING "libddprof sha256")
 
 set(LIBDDPROF_ROOT ${VENDOR_PATH}/libddprof-${TAG_LIBDDPROF})
 if ( "${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64" )

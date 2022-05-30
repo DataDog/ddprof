@@ -41,7 +41,7 @@ void test_pprof(const DDProfPProf *pprofs) {
   const ddprof_ffi_Profile *profile = pprofs->_profile;
 
   struct ddprof_ffi_SerializeResult serialized_result =
-      ddprof_ffi_Profile_serialize(profile);
+      ddprof_ffi_Profile_serialize(profile, nullptr, nullptr);
 
   ASSERT_EQ(serialized_result.tag, DDPROF_FFI_SERIALIZE_RESULT_OK);
 

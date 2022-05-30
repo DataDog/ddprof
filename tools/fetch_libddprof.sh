@@ -26,8 +26,9 @@ TAG_LIBDDPROF=$1
 SHA256_LIBDDPROF=$2
 TARGET_EXTRACT=$3
 
-TAR_LIBDDPROF=libddprof-${MARCH}-unknown-linux-gnu.tar.gz
-GITHUB_URL_LIBDDPROF=https://github.com/DataDog/libddprof/releases/download/${TAG_LIBDDPROF}/${TAR_LIBDDPROF}
+# https://github.com/DataDog/libdatadog/releases/download/v0.7.0-rc.1/libdatadog-aarch64-alpine-linux-musl.tar.gz
+TAR_LIBDDPROF=libdatadog-${MARCH}-unknown-linux-gnu.tar.gz
+GITHUB_URL_LIBDDPROF=https://github.com/DataDog/libdatadog/releases/download/${TAG_LIBDDPROF}/${TAR_LIBDDPROF}
 
 mkdir -p "$TARGET_EXTRACT"
 cd "$TARGET_EXTRACT"
