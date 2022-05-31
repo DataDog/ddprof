@@ -365,7 +365,7 @@ DDRes ddprof_worker_maybe_export(DDProfContext *ctx, int64_t now_ns) {
     if (now_ns > ctx->worker_ctx.send_nanos) {
       // restart worker if number of uploads is reached
       ctx->worker_ctx.persistent_worker_state->restart_worker =
-          (ctx->params.worker_period <= ctx->worker_ctx.count_worker);
+          (ctx->worker_ctx.count_worker + 1 >= ctx->params.worker_period);
       // when restarting worker, do a synchronous export
       DDRES_CHECK_FWD(ddprof_worker_cycle(
           ctx, now_ns,
