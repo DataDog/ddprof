@@ -276,8 +276,7 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
     if (IsDDResNotOK(res)) {
       LG_WRN("Worker warning (what:%s).", ddres_error_message(res._what));
     }
-    LG_NFO("Shutting down worker gracefully");
-    persistent_worker_state->restart_worker = false;
+    LG_NTC("Shutting down worker gracefully");
     persistent_worker_state->errors = false;
   }
 }
