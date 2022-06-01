@@ -175,7 +175,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
 
   // Usually we want to send the sample_val, but sometimes we need to process
   // the event to get the desired value
-  PerfWatcher *watcher = &ctx->watchers[pos];
+  PerfWatcher *watcher = &ctx->watchers[watcher_pos];
   uint64_t sample_val = sample->period;
   if (PERF_SAMPLE_RAW & watcher->sample_type) {
     uint64_t raw_offset = watcher->trace_off;

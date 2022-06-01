@@ -257,7 +257,7 @@ perf_event_sample *hdr2samp(const struct perf_event_header *hdr,
   if (PERF_SAMPLE_RAW & mask) {
     // size_raw is a 32-bit integer!
     sample.size_raw = ((flipper *)buf)->half[0];
-    sample.data_raw = sample.size_raw ? &((flipper *)buf)->half[1] : NULL;
+    sample.data_raw = sample.size_raw ? (char*)&((flipper *)buf)->half[1] : NULL;
     buf += 1 + (sample.size_raw / sizeof(*buf)); // Advance + align
   }
   if (PERF_SAMPLE_BRANCH_STACK & mask) {}
