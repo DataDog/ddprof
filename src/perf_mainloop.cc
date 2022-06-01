@@ -25,6 +25,7 @@ extern "C" {
 #include "ddres.h"
 #include "logger.h"
 #include "perf.h"
+#include "persistent_worker_state.h"
 #include "pevent.h"
 #include "unwind.h"
 }
@@ -72,7 +73,8 @@ static void modify_sigprocmask(int how) {
   sigprocmask(how, &mask, NULL);
 }
 
-DDRes spawn_workers(MLWorkerFlags *flags, bool *is_worker) {
+DDRes spawn_workers(PersistentWorkerState *persistent_worker_state,
+                    bool *is_worker) {
   pid_t child_pid = 0;
   *is_worker = false;
 
@@ -98,8 +100,8 @@ DDRes spawn_workers(MLWorkerFlags *flags, bool *is_worker) {
     // Harvest the exit state of the child process.  We will always reset it
     // to false so that a child who segfaults or exits erroneously does not
     // cause a pointless loop of spawning
-    if (!flags->restart_worker) {
-      if (flags->errors) {
+    if (!persistent_worker_state->restart_worker) {
+      if (persistent_worker_state->errors) {
         DDRES_RETURN_WARN_LOG(DD_WHAT_MAINLOOP, "Stop profiling");
       } else {
         break;
@@ -165,7 +167,7 @@ static inline DDRes worker_process_ring_buffers(PEvent *pes, int pe_len,
         // Attempt to dispatch the event
         struct perf_event_header *hdr = rb_seek(rb, tail);
         assert(hdr->size > 0);
-        DDRes res = ddprof_worker_process_event(hdr, pes[i].pos, ctx);
+        DDRes res = ddprof_worker_process_event(hdr, pes[i].watcher_pos, ctx);
 
         // We've processed the current event, so we can advance the ringbuffer
         tail += hdr->size;
@@ -193,12 +195,12 @@ static inline DDRes worker_process_ring_buffers(PEvent *pes, int pe_len,
 }
 
 static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
-                         bool *restart_worker) {
+                         PersistentWorkerState *persistent_worker_state) {
 
   // Setup poll() to watch perf_event file descriptors
   int pe_len = ctx->worker_ctx.pevent_hdr.size;
   // one extra slot in pfd to accomodate for signal fd
-  struct pollfd pfds[MAX_NB_WATCHERS + 1];
+  struct pollfd pfds[MAX_NB_PERF_EVENT_OPEN + 1];
   int pfd_len = 0;
   pollfd_setup(&ctx->worker_ctx.pevent_hdr, pfds, &pfd_len);
 
@@ -207,7 +209,7 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
 
   // Perform user-provided initialization
   defer { attr->finish_fun(ctx); };
-  DDRES_CHECK_FWD(attr->init_fun(ctx));
+  DDRES_CHECK_FWD(attr->init_fun(ctx, persistent_worker_state));
 
   bool samples_left_in_buffer = false;
   bool stop = false;
@@ -248,9 +250,9 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
     int64_t now_ns = 0;
     DDRES_CHECK_FWD(worker_process_ring_buffers(pes, pe_len, ctx, &now_ns,
                                                 &samples_left_in_buffer));
-    DDRES_CHECK_FWD(ddprof_worker_maybe_export(ctx, now_ns, restart_worker));
+    DDRES_CHECK_FWD(ddprof_worker_maybe_export(ctx, now_ns));
 
-    if (*restart_worker) {
+    if (ctx->worker_ctx.persistent_worker_state->restart_worker) {
       // return directly no need to do a final export
       return {};
     }
@@ -262,12 +264,11 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
 }
 
 static void worker(DDProfContext *ctx, const WorkerAttr *attr,
-                   MLWorkerFlags *flags) {
-  bool restart_worker = false;
-  flags->restart_worker = false;
-  flags->errors = true;
+                   PersistentWorkerState *persistent_worker_state) {
+  persistent_worker_state->restart_worker = false;
+  persistent_worker_state->errors = true;
 
-  DDRes res = worker_loop(ctx, attr, &restart_worker);
+  DDRes res = worker_loop(ctx, attr, persistent_worker_state);
   if (IsDDResFatal(res)) {
     LG_WRN("[PERF] Shut down worker (what:%s).",
            ddres_error_message(res._what));
@@ -275,9 +276,8 @@ static void worker(DDProfContext *ctx, const WorkerAttr *attr,
     if (IsDDResNotOK(res)) {
       LG_WRN("Worker warning (what:%s).", ddres_error_message(res._what));
     }
-    LG_NFO("Shutting down worker gracefully");
-    flags->restart_worker = restart_worker;
-    flags->errors = false;
+    LG_NTC("Shutting down worker gracefully");
+    persistent_worker_state->errors = false;
   }
 }
 
@@ -286,25 +286,26 @@ DDRes main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
   // is used to communicate terminal profiling state
   int mmap_prot = PROT_READ | PROT_WRITE;
   int mmap_flags = MAP_ANONYMOUS | MAP_SHARED;
-  MLWorkerFlags *flags =
-      (MLWorkerFlags *)mmap(0, sizeof(*flags), mmap_prot, mmap_flags, -1, 0);
-  if (MAP_FAILED == flags) {
+  PersistentWorkerState *persistent_worker_state =
+      (PersistentWorkerState *)mmap(0, sizeof(PersistentWorkerState), mmap_prot,
+                                    mmap_flags, -1, 0);
+  if (MAP_FAILED == persistent_worker_state) {
     // Allocation failure : stop the profiling
     LG_ERR("Could not initialize profiler");
     return ddres_error(DD_WHAT_MAINLOOP_INIT);
   }
 
-  defer { munmap(flags, sizeof(*flags)); };
+  defer { munmap(persistent_worker_state, sizeof(*persistent_worker_state)); };
 
   // Create worker processes to fulfill poll loop.  Only the parent process
   // can exit with an error code, which signals the termination of profiling.
   bool is_worker = false;
-  DDRes res = spawn_workers(flags, &is_worker);
+  DDRes res = spawn_workers(persistent_worker_state, &is_worker);
   if (IsDDResNotOK(res)) {
     return res;
   }
   if (is_worker) {
-    worker(ctx, attr, flags);
+    worker(ctx, attr, persistent_worker_state);
     // Ensure worker does not return,
     // because we don't want to free resources (perf_event fds,...) that are
     // shared between processes. Only free the context.
@@ -315,10 +316,10 @@ DDRes main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
 }
 
 void main_loop_lib(const WorkerAttr *attr, DDProfContext *ctx) {
-  MLWorkerFlags flags = {};
+  PersistentWorkerState persistent_worker_state = {};
   // no fork. TODO : give exit trigger to user
-  worker(ctx, attr, &flags);
-  if (!flags.restart_worker) {
+  worker(ctx, attr, &persistent_worker_state);
+  if (!persistent_worker_state.restart_worker) {
     LG_NFO("Request to exit");
   }
 }

@@ -11,6 +11,7 @@ extern "C" {
 }
 
 #include "defer.hpp"
+#include "perf.hpp"
 
 #include <ctype.h>
 #include <errno.h>
@@ -23,6 +24,7 @@ extern "C" {
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <vector>
 
 #define DEFAULT_PAGE_SIZE 4096 // Concerned about hugepages?
 
@@ -61,14 +63,36 @@ int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
   return syscall(__NR_perf_event_open, attr, pid, cpu, gfd, flags);
 }
 
-int perfopen(pid_t pid, const PerfWatcher *watcher, int cpu, bool extras) {
+const char *perf_type_str(int type_id) {
+  switch (type_id) {
+  case PERF_TYPE_HARDWARE:
+    return "HARDWARE";
+  case PERF_TYPE_SOFTWARE:
+    return "SOFTWARE";
+  case PERF_TYPE_TRACEPOINT:
+    return "TRACEPOINT";
+  case PERF_TYPE_HW_CACHE:
+    return "HW_CACHE";
+  case PERF_TYPE_RAW:
+    return "RAW";
+  case PERF_TYPE_BREAKPOINT:
+    return "BREAKPOINT";
+  default:
+    return "UNKNOWN";
+  }
+  return "UNKNOWN";
+}
+
+perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
+                                         bool extras) {
   struct perf_event_attr attr = g_dd_native_attr;
   attr.type = watcher->type;
   attr.config = watcher->config;
   attr.sample_period = watcher->sample_period; // Equivalently, freq
   attr.freq = watcher->options.is_freq;
   attr.sample_type = watcher->sample_type;
-  attr.exclude_kernel = !(watcher->options.is_kernel);
+  // If is_kernel is requested false --> exclude_kernel == true
+  attr.exclude_kernel = (watcher->options.is_kernel == kPerfWatcher_Off);
 
   // Extras (metadata for tracking process state)
   if (extras) {
@@ -77,8 +101,7 @@ int perfopen(pid_t pid, const PerfWatcher *watcher, int cpu, bool extras) {
     attr.task = 1;
     attr.comm = 1;
   }
-
-  return perf_event_open(&attr, pid, cpu, -1, PERF_FLAG_FD_CLOEXEC);
+  return attr;
 }
 
 size_t perf_mmap_size(int buf_size_shift) {
@@ -153,3 +176,18 @@ int perfdisown(void *region, size_t size, bool is_mirrored) {
       ? 0
       : -1;
 }
+
+namespace ddprof {
+// return attr sorted by priority
+std::vector<perf_event_attr>
+all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras) {
+  std::vector<perf_event_attr> ret_attr;
+  ret_attr.push_back(perf_config_from_watcher(watcher, extras));
+  if (watcher->options.is_kernel == kPerfWatcher_Try) {
+    // duplicate the config, while excluding kernel
+    ret_attr.push_back(ret_attr.back());
+    ret_attr.back().exclude_kernel = true;
+  }
+  return ret_attr;
+}
+} // namespace ddprof

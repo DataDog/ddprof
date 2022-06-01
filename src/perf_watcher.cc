@@ -58,7 +58,7 @@ const PerfWatcher tracepoint_templates[] = {{
     .type = PERF_TYPE_TRACEPOINT,
     .sample_period = 1,
     .sample_type_id = DDPROF_PWT_TRACEPOINT,
-    .options = {.is_kernel = true},
+    .options = {.is_kernel = kPerfWatcher_Required},
 }};
 #undef X_PWATCH
 

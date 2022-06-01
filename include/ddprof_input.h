@@ -73,9 +73,8 @@ typedef struct DDProfInput {
 */
 // clang-format off
 
-#define EXPORTER_OPT_TABLE(XX)        \
-//  A                                   B                   C   D   E   F     G     H              I
-#define OPT_TABLE(XX)                                                                                   \
+//  A                                   B                   C   D   E   F     G     H             I
+#define OPT_TABLE(XX)                                                                                          \
   XX(DD_API_KEY,                        api_key,            A, 'A', 1, input, NULL, "",           exp_input.)  \
   XX(DD_ENV,                            environment,        E, 'E', 1, input, NULL, "",           exp_input.)  \
   XX(DD_AGENT_HOST,                     host,               H, 'H', 1, input, NULL, "localhost",  exp_input.)  \
@@ -85,6 +84,7 @@ typedef struct DDProfInput {
   XX(DD_SERVICE,                        service,            S, 'S', 1, input, NULL, "myservice",  exp_input.)  \
   XX(DD_VERSION,                        service_version,    V, 'V', 1, input, NULL, "",           exp_input.)  \
   XX(DD_PROFILING_EXPORT,               do_export,          X, 'X', 1, input, NULL, "yes",        exp_input.)  \
+  XX(DD_PROFILING_PPROF_PREFIX,         debug_pprof_prefix, O, 'O', 1, input, NULL, "",           exp_input.)  \
   XX(DD_PROFILING_AGENTLESS,            agentless,          L, 'L', 1, input, NULL, "", )                      \
   XX(DD_TAGS,                           tags,               T, 'T', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_ENABLED,              enable,             d, 'd', 1, input, NULL, "yes", )                   \

@@ -7,13 +7,17 @@
 
 #include <gtest/gtest.h>
 
-struct test_case {
+namespace ddprof {
+
+struct DemangleTestContent {
+  // cppcheck-suppress unusedStructMember
   std::string test;
+  // cppcheck-suppress unusedStructMember
   std::string answer;
 };
 
 // Partly borrowed from the LLVM unit tests
-std::vector<struct test_case> cases = {
+std::vector<struct DemangleTestContent> s_demangle_cases = {
     {"_", "_"},
     {"_Z3fooi", "foo(int)"},
     {"_RNvC3foo3bar", "foo::bar"},
@@ -37,8 +41,9 @@ std::vector<struct test_case> cases = {
 
 #define BUF_LEN 1024
 TEST(DemangleTest, Positive) {
-  for (auto const &tcase : cases) {
+  for (auto const &tcase : s_demangle_cases) {
     std::string demangled_func = llvm::demangle(tcase.test);
     EXPECT_EQ(demangled_func, tcase.answer);
   }
 }
+} // namespace ddprof

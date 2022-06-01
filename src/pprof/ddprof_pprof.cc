@@ -3,12 +3,13 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include "pprof/ddprof_pprof.h"
+#include "pprof/ddprof_pprof.hpp"
 
+extern "C" {
 #include "ddprof/ffi.h"
 #include "ddprof_defs.h"
 #include "ddres.h"
+#include "pevent_lib.h"
 }
 
 #include "ddprof_ffi_utils.hpp"
@@ -31,15 +32,16 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
   // We also record the watcher with the lowest valid sample_type id, since that
   // will serve as the default for the pprof
   bool active_ids[DDPROF_PWT_LENGTH] = {};
-  PerfWatcher *default_watcher = &watchers[0];
+  PerfWatcher *default_watcher = watchers;
   for (unsigned i = 0; i < num_watchers; ++i) {
     int this_id = watchers[i].sample_type_id;
     int count_id = sample_type_id_to_count_sample_type_id(this_id);
     if (this_id < 0 || this_id == DDPROF_PWT_NOCOUNT ||
         this_id >= DDPROF_PWT_LENGTH) {
       if (this_id != DDPROF_PWT_NOCOUNT) {
-        LG_WRN("Watcher \"%s\" (%d) has invalid sample_type_id %d, ignoring",
-               watchers[i].desc, i, this_id);
+        DDRES_RETURN_ERROR_LOG(
+            DD_WHAT_PPROF, "Watcher \"%s\" (%d) has invalid sample_type_id %d",
+            watchers[i].desc, i, this_id);
       }
       continue;
     }
@@ -53,9 +55,8 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
 
   // Convert the mask into a lookup.  While we're at it, populate the metadata
   // for the pprof
-  int pv[DDPROF_PWT_LENGTH];
+  int pv[DDPROF_PWT_LENGTH] = {};
   int num_sample_type_ids = 0;
-  memset(pv, 0, sizeof(pv));
   for (int i = 0; i < DDPROF_PWT_LENGTH; ++i) {
     if (!active_ids[i])
       continue;
@@ -91,38 +92,47 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
     }
   }
 
-  // If none of the samples were good, that's an error
-  if (!num_sample_type_ids) {
-    // We use the phrase "profile type" in the error, since this is more
-    // obvious for customers.
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "No valid profile types given");
-  }
-
   pprof->_nb_values = num_sample_type_ids;
   ddprof_ffi_Slice_value_type sample_types = {.ptr = perf_value_type,
                                               .len = pprof->_nb_values};
 
-  // Populate the default.  If we have a frequency, assume it is given in hertz
-  // and convert to a period in nanoseconds.  This is broken for many event-
-  // based types (but providing frequency would also be broken in those cases)
-  int64_t default_period = default_watcher->sample_period;
-  if (default_watcher->options.is_freq)
-    default_period = 1e9 / default_period;
+  ddprof_ffi_Period period;
+  if (num_sample_type_ids > 0) {
+    // Populate the default.  If we have a frequency, assume it is given in
+    // hertz and convert to a period in nanoseconds.  This is broken for many
+    // event- based types (but providing frequency would also be broken in those
+    // cases)
+    int64_t default_period = default_watcher->sample_period;
+    if (default_watcher->options.is_freq)
+      default_period = 1e9 / default_period;
 
-  ddprof_ffi_Period period = {
-      .type_ = perf_value_type[pv[default_watcher->pprof_sample_idx]],
-      .value = default_period,
-  };
-
-  pprof->_profile = ddprof_ffi_Profile_new(sample_types, &period);
-  if (!pprof->_profile) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to allocate profiles");
+    period = {
+        .type_ = perf_value_type[pv[default_watcher->pprof_sample_idx]],
+        .value = default_period,
+    };
   }
+  pprof->_profile = ddprof_ffi_Profile_new(
+      sample_types, num_sample_type_ids > 0 ? &period : nullptr, nullptr);
+  if (!pprof->_profile) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to create profile");
+  }
+
+  // Add relevant tags
+  {
+    bool include_kernel =
+        pevent_include_kernel_events(&ctx->worker_ctx.pevent_hdr);
+    pprof->_tags.push_back(std::make_pair(
+        std::string("include_kernel"),
+        include_kernel ? std::string("true") : std::string("false")));
+  }
+
   return ddres_init();
 }
 
 DDRes pprof_free_profile(DDProfPProf *pprof) {
-  ddprof_ffi_Profile_free(pprof->_profile);
+  if (pprof->_profile) {
+    ddprof_ffi_Profile_free(pprof->_profile);
+  }
   pprof->_profile = NULL;
   pprof->_nb_values = 0;
   return ddres_init();
@@ -201,26 +211,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   // number of labels at present
   ddprof_ffi_Label labels[PPROF_MAX_LABELS] = {};
   size_t labels_num = 0;
-  // cppcheck-suppress variableScope
-  char pid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
-  // cppcheck-suppress variableScope
-  char tid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
 
-  // Add any configured labels.  Note that TID alone has the same cardinality as
-  // (TID;PID) tuples, so except for symbol table overhead it doesn't matter
-  // much if TID implies PID for clarity.
-  if (!watcher->suppress_pid || !watcher->suppress_tid) {
-    snprintf(pid_str, sizeof(pid_str), "%d", uw_output->pid);
-    labels[labels_num].key = to_CharSlice("process id");
-    labels[labels_num].str = to_CharSlice(pid_str);
-    ++labels_num;
-  }
-  if (!watcher->suppress_tid ) {
-    snprintf(tid_str, sizeof(tid_str), "%d", uw_output->tid);
-    labels[labels_num].key = to_CharSlice("thread id");
-    labels[labels_num].str = to_CharSlice(tid_str);
-    ++labels_num;
-  }
   if (watcher_has_tracepoint(watcher)) {
     // This adds only the trace name.  Maybe we should have group + tracenames?
     labels[labels_num].key = to_CharSlice("tracepoint_type");
@@ -242,7 +233,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
 }
 
 DDRes pprof_reset(DDProfPProf *pprof) {
-  if (!ddprof_ffi_Profile_reset(pprof->_profile)) {
+  if (!ddprof_ffi_Profile_reset(pprof->_profile, nullptr)) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to reset profile");
   }
   return ddres_init();

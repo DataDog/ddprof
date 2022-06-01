@@ -1,5 +1,7 @@
-// Unless explicitly stated otherwise all files in this repository are licensed under the Apache License Version 2.0.
-// This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the Apache License Version 2.0. This product includes software
+// developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
+// Datadog, Inc.
 
 #pragma once
 
@@ -49,10 +51,10 @@ using SymbolMap = std::unordered_map<suw::DwflSymbolKey, ddprof::Symbol>;
 // Append ip info to a json file
 void add_symbol(json &j, const ddprof::Symbol &symbol);
 
-void write_json_file(std::string exe_name, const SymbolMap &map,
-                     std::string data_directory = "");
+void write_json_file(const std::string &exe_name, const SymbolMap &map,
+                     std::string_view data_directory = {});
 
-int compare_to_ref(std::string exe_name, const SymbolMap &map,
-                   std::string data_directory = "");
+int compare_to_ref(const std::string &exe_name, const SymbolMap &map,
+                   std::string_view data_directory = {});
 
 } // namespace suw

@@ -234,7 +234,7 @@ int main(int c, char **v) {
 
   // Print results
   if (getpid() == pids[0]) {
-    printf("%ld, %llu, %f\n", *counter, ticks,
+    printf("%lu, %llu, %f\n", *counter, ticks,
            ((double)ticks) / ((double)*counter));
 
 #ifdef USE_DD_PROFILING

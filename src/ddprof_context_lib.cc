@@ -16,6 +16,7 @@ extern "C" {
 #include "span.hpp"
 
 #include <algorithm>
+#include <charconv>
 #include <errno.h>
 #include <sys/sysinfo.h>
 #include <unistd.h>
@@ -197,35 +198,35 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
 
   // Process input printer (do this right before argv/c modification)
   if (input->show_config && arg_yesno(input->show_config, 1)) {
-    LG_PRINT("Printing parameters -->");
+    LG_NFO("Printing parameters -->");
     ddprof_print_params(input);
 
-    LG_PRINT("  Native profiler enabled: %s",
-             ctx->params.enable ? "true" : "false");
+    LG_NFO("  Native profiler enabled: %s",
+           ctx->params.enable ? "true" : "false");
 
     // Tell the user what mode is being used
-    LG_PRINT("  Profiling mode: %s",
-             -1 == ctx->params.pid ? "global"
-                 : pid_tmp         ? "target"
-                                   : "wrapper");
+    LG_NFO("  Profiling mode: %s",
+           -1 == ctx->params.pid ? "global"
+               : pid_tmp         ? "target"
+                                 : "wrapper");
 
     // Show watchers
-    LG_PRINT("  Instrumented with %d watchers:", ctx->num_watchers);
+    LG_NFO("  Instrumented with %d watchers:", ctx->num_watchers);
     for (int i = 0; i < ctx->num_watchers; i++) {
-      LG_PRINT("    ID: %s, Pos: %d, Index: %lu, Label: %s",
-               ctx->watchers[i].desc, i, ctx->watchers[i].config,
-               sample_type_name_from_idx(ctx->watchers[i].sample_type_id));
+      LG_NFO("    ID: %s, Pos: %d, Index: %lu, Label: %s",
+             ctx->watchers[i].desc, i, ctx->watchers[i].config,
+             sample_type_name_from_idx(ctx->watchers[i].sample_type_id));
     }
   }
 
   ctx->params.sockfd = -1;
   ctx->params.wait_on_socket = false;
   if (input->socket && strlen(input->socket) > 0) {
-    char *endptr;
-    auto res = strtoul(input->socket, &endptr, 10);
-    // checking that stroul actually succeeded is a pain
-    if (*endptr == '\0' && (res != ULONG_MAX || errno != ERANGE)) {
-      ctx->params.sockfd = res;
+    std::string_view sv{input->socket};
+    int sockfd;
+    auto [ptr, ec] = std::from_chars(sv.data(), sv.end(), sockfd);
+    if (ec == std::errc() && ptr == sv.end()) {
+      ctx->params.sockfd = sockfd;
       ctx->params.wait_on_socket = true;
     }
   }

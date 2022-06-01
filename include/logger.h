@@ -99,4 +99,3 @@ void LOG_setfacility(int);
 #define LG_NTC(...) LG_IF_LVL_OK(LL_NOTICE, __VA_ARGS__)
 #define LG_NFO(...) LG_IF_LVL_OK(LL_INFORMATIONAL, __VA_ARGS__)
 #define LG_DBG(...) LG_IF_LVL_OK(LL_DEBUG, __VA_ARGS__)
-#define LG_PRINT(...) LG_IF_LVL_OK(LL_INFORMATIONAL, __VA_ARGS__)

@@ -10,6 +10,7 @@ extern "C" {
 }
 
 #include "arraysize.h"
+#include "constants.hpp"
 #include "defer.hpp"
 #include "loghandle.hpp"
 
@@ -101,12 +102,12 @@ TEST_F(InputTest, dump_fixed) {
 }
 
 TEST_F(InputTest, event_from_env) {
-  defer { unsetenv("DD_PROFILING_NATIVE_EVENTS"); };
+  defer { unsetenv(k_events_env_variable); };
   {
     DDProfInput input;
     bool contine_exec = true;
     const char *input_values[] = {MYNAME, "my_program"};
-    setenv("DD_PROFILING_NATIVE_EVENTS", "sCPU,1000", 1);
+    setenv(k_events_env_variable, "sCPU,1000", 1);
     DDRes res = ddprof_input_parse(
         ARRAY_SIZE(input_values), (char **)input_values, &input, &contine_exec);
 
@@ -125,7 +126,7 @@ TEST_F(InputTest, event_from_env) {
     DDProfInput input;
     bool contine_exec = true;
     const char *input_values[] = {MYNAME, "my_program"};
-    setenv("DD_PROFILING_NATIVE_EVENTS", ";", 1);
+    setenv(k_events_env_variable, ";", 1);
     DDRes res = ddprof_input_parse(
         ARRAY_SIZE(input_values), (char **)input_values, &input, &contine_exec);
 
@@ -139,7 +140,7 @@ TEST_F(InputTest, event_from_env) {
     DDProfInput input;
     bool contine_exec = true;
     const char *input_values[] = {MYNAME, "my_program"};
-    setenv("DD_PROFILING_NATIVE_EVENTS", ";sCPU,1000;", 1);
+    setenv(k_events_env_variable, ";sCPU,1000;", 1);
     DDRes res = ddprof_input_parse(
         ARRAY_SIZE(input_values), (char **)input_values, &input, &contine_exec);
 
@@ -159,7 +160,7 @@ TEST_F(InputTest, event_from_env) {
     DDProfInput input;
     bool contine_exec = true;
     const char *input_values[] = {MYNAME, "-e", "hINST,456", "my_program"};
-    setenv("DD_PROFILING_NATIVE_EVENTS", "sCPU,1000;hCPU,123", 1);
+    setenv(k_events_env_variable, "sCPU,1000;hCPU,123", 1);
     DDRes res = ddprof_input_parse(
         ARRAY_SIZE(input_values), (char **)input_values, &input, &contine_exec);
 

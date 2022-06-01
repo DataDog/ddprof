@@ -25,12 +25,11 @@ static const struct CapFlag2Text s_cap_flag_text[] = {
 #define SZ_CAP_2_TEXT 3
 
 DDRes log_capabilities(bool verbose) {
-  LG_PRINT("Checking capabilities");
   pid_t pid = getpid();
   cap_t cap_struct = cap_get_pid(pid);
   ssize_t text_size = 0;
   char *pcap_text = cap_to_text(cap_struct, &text_size);
-  LG_PRINT("Capabilities : %s", pcap_text);
+  LG_NFO("Capabilities %s", pcap_text);
 
   if (verbose) {
     for (int i = 0; i < CAP_LAST_CAP; ++i) {

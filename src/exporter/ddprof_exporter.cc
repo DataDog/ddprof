@@ -3,7 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "exporter/ddprof_exporter.h"
+#include "exporter/ddprof_exporter.hpp"
 
 extern "C" {
 #include "ddprof/ffi.h"
@@ -43,14 +43,14 @@ static char *alloc_url_agent(const char *protocol, const char *host,
 }
 
 static DDRes create_pprof_file(ddprof_ffi_Timespec start,
-                               const char *dbg_folder, int *fd) {
+                               const char *dbg_pprof_prefix, int *fd) {
   char time_start[128] = {};
   tm tm_storage;
   tm *tm_start = gmtime_r(&start.seconds, &tm_storage);
   strftime(time_start, sizeof time_start, "%Y%m%dT%H%M%SZ", tm_start);
 
   char filename[400];
-  snprintf(filename, 400, "%s/ddprof_%s.pprof", dbg_folder, time_start);
+  snprintf(filename, 400, "%s%s.pprof", dbg_pprof_prefix, time_start);
   LG_NTC("[EXPORTER] Writing pprof to file %s", filename);
   (*fd) = open(filename, O_CREAT | O_RDWR, 0600);
   DDRES_CHECK_INT((*fd), DD_WHAT_EXPORTER, "Failure to create pprof file");
@@ -70,15 +70,14 @@ static DDRes write_profile(const ddprof_ffi_EncodedProfile *encoded_profile,
 }
 
 static DDRes write_pprof_file(const ddprof_ffi_EncodedProfile *encoded_profile,
-                              const char *dbg_folder) {
+                              const char *dbg_pprof_prefix) {
   int fd = -1;
-  DDRES_CHECK_FWD(create_pprof_file(encoded_profile->start, dbg_folder, &fd));
+  DDRES_CHECK_FWD(
+      create_pprof_file(encoded_profile->start, dbg_pprof_prefix, &fd));
   defer { close(fd); };
   DDRES_CHECK_FWD(write_profile(encoded_profile, fd));
   return {};
 }
-
-extern "C" {
 
 DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
                            DDProfExporter *exporter) {
@@ -119,7 +118,7 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
   LG_NTC("[EXPORTER] URL %s", exporter->_url);
 
   // Debug process : capture pprof to a folder
-  exporter->_debug_folder = getenv("DDPROF_PPROFS_FOLDER");
+  exporter->_debug_pprof_prefix = exporter->_input.debug_pprof_prefix;
   exporter->_export = arg_yesno(exporter->_input.do_export, 1);
   return ddres_init();
 }
@@ -137,9 +136,9 @@ static DDRes add_single_tag(ddprof_ffi_Vec_tag &tags_exporter,
   return ddres_init();
 }
 
-static DDRes fill_tags(const UserTags *user_tags,
-                       const DDProfExporter *exporter,
-                       ddprof_ffi_Vec_tag &tags_exporter) {
+static DDRes fill_stable_tags(const UserTags *user_tags,
+                              const DDProfExporter *exporter,
+                              ddprof_ffi_Vec_tag &tags_exporter) {
 
   // language is guaranteed to be filled
   DDRES_CHECK_FWD(
@@ -173,7 +172,7 @@ static DDRes fill_tags(const UserTags *user_tags,
 
 DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
   ddprof_ffi_Vec_tag tags_exporter = ddprof_ffi_Vec_tag_new();
-  fill_tags(user_tags, exporter, tags_exporter);
+  fill_stable_tags(user_tags, exporter, tags_exporter);
 
   ddprof_ffi_CharSlice base_url = to_CharSlice(exporter->_url);
   ddprof_ffi_EndpointV3 endpoint;
@@ -226,11 +225,25 @@ static DDRes check_send_response_code(uint16_t send_response_code) {
   return ddres_init();
 }
 
+static DDRes fill_cycle_tags(const ddprof::Tags &additional_tags,
+                             uint32_t profile_seq,
+                             ddprof_ffi_Vec_tag &ffi_additional_tags) {
+
+  DDRES_CHECK_FWD(add_single_tag(ffi_additional_tags, "profile_seq",
+                                 std::to_string(profile_seq)));
+
+  for (const auto &el : additional_tags) {
+    DDRES_CHECK_FWD(add_single_tag(ffi_additional_tags, el.first, el.second));
+  }
+  return ddres_init();
+}
+
 DDRes ddprof_exporter_export(const ddprof_ffi_Profile *profile,
-                             DDProfExporter *exporter) {
+                             const ddprof::Tags &additional_tags,
+                             uint32_t profile_seq, DDProfExporter *exporter) {
   DDRes res = ddres_init();
   ddprof_ffi_SerializeResult serialized_result =
-      ddprof_ffi_Profile_serialize(profile);
+      ddprof_ffi_Profile_serialize(profile, nullptr, nullptr);
   defer { ddprof_ffi_SerializeResult_drop(serialized_result); };
   if (serialized_result.tag != DDPROF_FFI_SERIALIZE_RESULT_OK) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to serialize");
@@ -238,8 +251,8 @@ DDRes ddprof_exporter_export(const ddprof_ffi_Profile *profile,
 
   ddprof_ffi_EncodedProfile *encoded_profile = &serialized_result.ok;
 
-  if (exporter->_debug_folder) {
-    write_pprof_file(encoded_profile, exporter->_debug_folder);
+  if (exporter->_debug_pprof_prefix) {
+    write_pprof_file(encoded_profile, exporter->_debug_pprof_prefix);
   }
 
   ddprof_ffi_Timespec start = encoded_profile->start;
@@ -251,6 +264,11 @@ DDRes ddprof_exporter_export(const ddprof_ffi_Profile *profile,
   };
 
   if (exporter->_export) {
+    ddprof_ffi_Vec_tag ffi_additional_tags = ddprof_ffi_Vec_tag_new();
+    defer { ddprof_ffi_Vec_tag_drop(ffi_additional_tags); };
+    DDRES_CHECK_FWD(
+        fill_cycle_tags(additional_tags, profile_seq, ffi_additional_tags););
+
     LG_NTC("[EXPORTER] Export buffer of size %lu", profile_data.len);
 
     // Backend has some logic based on the following naming
@@ -261,16 +279,17 @@ DDRes ddprof_exporter_export(const ddprof_ffi_Profile *profile,
     ddprof_ffi_Slice_file files = {.ptr = files_, .len = ARRAY_SIZE(files_)};
 
     ddprof_ffi_Request *request = ddprof_ffi_ProfileExporterV3_build(
-        exporter->_exporter, start, end, files, {}, k_timeout_ms);
+        exporter->_exporter, start, end, files, &ffi_additional_tags,
+        k_timeout_ms);
     if (request) {
       ddprof_ffi_SendResult result = ddprof_ffi_ProfileExporterV3_send(
           exporter->_exporter, request, nullptr);
       defer { ddprof_ffi_SendResult_drop(result); };
 
-      if (result.tag == DDPROF_FFI_SEND_RESULT_FAILURE) {
+      if (result.tag == DDPROF_FFI_SEND_RESULT_ERR) {
         LG_WRN("Failure to establish connection, check url %s", exporter->_url);
-        LG_WRN("Failure to send profiles (%.*s)", (int)result.failure.len,
-               result.failure.ptr);
+        LG_WRN("Failure to send profiles (%.*s)", (int)result.err.len,
+               result.err.ptr);
         // Free error buffer (prefer this API to the free API)
         if (exporter->_nb_consecutive_errors++ >=
             K_NB_CONSECUTIVE_ERRORS_ALLOWED) {
@@ -301,5 +320,3 @@ DDRes ddprof_exporter_free(DDProfExporter *exporter) {
   exporter->_url = nullptr;
   return ddres_init();
 }
-
-} // extern C

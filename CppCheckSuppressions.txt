@@ -1,10 +1,6 @@
 // All of the warnings should be fixed : initial PR to start putting in place cppchecks in CI
 //example :
-//arithOperationsOnVoidPointer:*/ddprof.c:12
-//static variables
-//buf not used (but should be in future version of code)
-//static variable levels
-//variableScope:*/logger.c:124
+//arithOperationsOnVoidPointer:*/ddprof.cc:12
 
 // config of cpp checks needs more includes
 missingInclude
@@ -12,5 +8,7 @@ missingInclude
 unusedLabel:*/dso-ut.cc
 unusedLabel:*/dwfl_module-ut.cc
 
-// cppcheck does not like google benchmark macros
-constParameterCallback:*/*-bench.cc
+preprocessorErrorDirective:*/perf_watcher.h
+
+// Ignore llvm warnings
+*:*/third_party/*

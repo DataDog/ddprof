@@ -17,14 +17,14 @@ extern "C" {
 #include "logger.h"
 #include "perf.h"
 #include "pevent_lib.h"
-#include "pprof/ddprof_pprof.h"
 #include "procutils.h"
 #include "stack_handler.h"
 }
 
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
-#include "exporter/ddprof_exporter.h"
+#include "exporter/ddprof_exporter.hpp"
+#include "pprof/ddprof_pprof.hpp"
 #include "tags.hpp"
 #include "unwind.hpp"
 #include "unwind_state.hpp"
@@ -52,7 +52,7 @@ static const unsigned s_nb_samples_per_backpopulate = 200;
 
 /// Human readable runtime information
 static void print_diagnostics(const DsoHdr &dso_hdr) {
-  LG_PRINT("Printing internal diagnostics");
+  LG_NFO("Printing internal diagnostics");
   ddprof_stats_print();
   dso_hdr._stats.log();
 #ifdef DBG_JEMALLOC
@@ -77,7 +77,8 @@ static inline void export_time_set(DDProfContext *ctx) {
       now_nanos() + export_time_convert(ctx->params.upload_period);
 }
 
-DDRes worker_library_init(DDProfContext *ctx) {
+DDRes worker_library_init(DDProfContext *ctx,
+                          PersistentWorkerState *persistent_worker_state) {
   try {
     // Set the initial time
     export_time_set(ctx);
@@ -88,6 +89,9 @@ DDRes worker_library_init(DDProfContext *ctx) {
     ctx->worker_ctx.exp_tid = {0};
 
     ctx->worker_ctx.us = new UnwindState();
+
+    // register the existing persistent storage for the state
+    ctx->worker_ctx.persistent_worker_state = persistent_worker_state;
 
     PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
 
@@ -148,7 +152,8 @@ static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr) {
 
 /************************* perf_event_open() helpers **************************/
 /// Entry point for sample aggregation
-DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
+DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
+                       int watcher_pos) {
   if (!sample)
     return ddres_warn(DD_WHAT_PERFSAMP);
   struct UnwindState *us = ctx->worker_ctx.us;
@@ -163,7 +168,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
   us->output.tid = sample->tid;
 
   // If this is a SW_TASK_CLOCK-type event, then aggregate the time
-  if (ctx->watchers[pos].config == PERF_COUNT_SW_TASK_CLOCK)
+  if (ctx->watchers[watcher_pos].config == PERF_COUNT_SW_TASK_CLOCK)
     ddprof_stats_add(STATS_CPU_TIME, sample->period, NULL);
   unsigned long this_ticks_unwind = __rdtsc();
   DDRes res = unwindstate__unwind(us);
@@ -190,7 +195,8 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample, int pos) {
     // Call the user's stack handler
     if (ctx->stack_handler) {
       if (!ctx->stack_handler->apply(&us->output, ctx,
-                                     ctx->stack_handler->callback_ctx, pos)) {
+                                     ctx->stack_handler->callback_ctx,
+                                     watcher_pos)) {
         DDRES_RETURN_ERROR_LOG(DD_WHAT_STACK_HANDLE,
                                "Stack handler returning errors");
       }
@@ -214,12 +220,18 @@ void *ddprof_worker_export_thread(void *arg) {
   DDProfWorkerContext *worker = (DDProfWorkerContext *)arg;
   // export the one we are not writting to
   int i = 1 - worker->i_current_pprof;
+  // Increase number of sequences in persistent storage
+  // This should start at 0, and if exporter thread
+  // gets joined forcefully, we should not resume on same value
+  uint32_t profile_seq = (worker->persistent_worker_state->profile_seq)++;
 
-  if (IsDDResFatal(
-          ddprof_exporter_export(worker->pprof[i]->_profile, worker->exp[i]))) {
+  if (IsDDResFatal(ddprof_exporter_export(worker->pprof[i]->_profile,
+                                          worker->pprof[i]->_tags, profile_seq,
+                                          worker->exp[i]))) {
     LG_NFO("Failed to export from worker");
     worker->exp_error = true;
   }
+
   return nullptr;
 }
 #endif
@@ -286,7 +298,6 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
     }
   }
 #endif
-
   // Increase the counts of exports
   ctx->worker_ctx.count_worker += 1;
 
@@ -312,10 +323,10 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
   return ddres_init();
 }
 
-void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int pos) {
+void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int watcher_pos) {
   if (!(map->header.misc & PERF_RECORD_MISC_MMAP_DATA)) {
-    LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx)", pos, map->pid, map->filename,
-           map->addr, map->len, map->pgoff);
+    LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx)", watcher_pos, map->pid,
+           map->filename, map->addr, map->len, map->pgoff);
     ddprof::Dso new_dso(map->pid, map->addr, map->addr + map->len - 1,
                         map->pgoff, std::string(map->filename));
     ctx->worker_ctx.us->dso_hdr.insert_erase_overlap(std::move(new_dso));
@@ -326,23 +337,24 @@ void ddprof_pr_lost(DDProfContext *, perf_event_lost *lost, int) {
   ddprof_stats_add(STATS_EVENT_LOST, lost->lost, NULL);
 }
 
-void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm, int pos) {
+void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm,
+                    int watcher_pos) {
   // Change in process name (assuming exec) : clear all associated dso
   if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC) {
-    LG_DBG("<%d>(COMM)%d -> %s", pos, comm->pid, comm->comm);
+    LG_DBG("<%d>(COMM)%d -> %s", watcher_pos, comm->pid, comm->comm);
     unwind_pid_free(ctx->worker_ctx.us, comm->pid);
   }
 }
 
-void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int pos) {
-  LG_DBG("<%d>(FORK)%d -> %d/%d", pos, frk->ppid, frk->pid, frk->tid);
+void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int watcher_pos) {
+  LG_DBG("<%d>(FORK)%d -> %d/%d", watcher_pos, frk->ppid, frk->pid, frk->tid);
   if (frk->ppid != frk->pid) {
     // Clear everything and populate at next error or with coming samples
     unwind_pid_free(ctx->worker_ctx.us, frk->pid);
   }
 }
 
-void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int pos) {
+void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int watcher_pos) {
   // On Linux, it seems that the thread group leader is the one whose task ID
   // matches the process ID of the group.  Moreover, it seems that it is the
   // overwhelming convention that this thread is closed after the other threads
@@ -350,22 +362,23 @@ void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int pos) {
   // We do not clear the PID at this time because we currently cleanup anyway.
   (void)ctx;
   if (ext->pid == ext->tid) {
-    LG_DBG("<%d>(EXIT)%d", pos, ext->pid);
+    LG_DBG("<%d>(EXIT)%d", watcher_pos, ext->pid);
   } else {
-    LG_DBG("<%d>(EXIT)%d/%d", pos, ext->pid, ext->tid);
+    LG_DBG("<%d>(EXIT)%d/%d", watcher_pos, ext->pid, ext->tid);
   }
 }
 
 /********************************** callbacks *********************************/
-DDRes ddprof_worker_maybe_export(DDProfContext *ctx, int64_t now_ns,
-                                 bool *restart_worker) {
+DDRes ddprof_worker_maybe_export(DDProfContext *ctx, int64_t now_ns) {
   try {
     if (now_ns > ctx->worker_ctx.send_nanos) {
       // restart worker if number of uploads is reached
-      *restart_worker =
-          (ctx->params.worker_period <= ctx->worker_ctx.count_worker);
+      ctx->worker_ctx.persistent_worker_state->restart_worker =
+          (ctx->worker_ctx.count_worker + 1 >= ctx->params.worker_period);
       // when restarting worker, do a synchronous export
-      DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, now_ns, *restart_worker));
+      DDRES_CHECK_FWD(ddprof_worker_cycle(
+          ctx, now_ns,
+          ctx->worker_ctx.persistent_worker_state->restart_worker));
     }
   }
   CatchExcept2DDRes();
@@ -373,29 +386,24 @@ DDRes ddprof_worker_maybe_export(DDProfContext *ctx, int64_t now_ns,
 }
 
 #ifndef DDPROF_NATIVE_LIB
-DDRes ddprof_worker_init(DDProfContext *ctx) {
+DDRes ddprof_worker_init(DDProfContext *ctx,
+                         PersistentWorkerState *persistent_worker_state) {
   try {
-    DDRES_CHECK_FWD(worker_library_init(ctx));
+    DDRES_CHECK_FWD(worker_library_init(ctx, persistent_worker_state));
     ctx->worker_ctx.exp[0] =
         (DDProfExporter *)calloc(1, sizeof(DDProfExporter));
     ctx->worker_ctx.exp[1] =
         (DDProfExporter *)calloc(1, sizeof(DDProfExporter));
-    ctx->worker_ctx.pprof[0] = (DDProfPProf *)calloc(1, sizeof(DDProfPProf));
-    ctx->worker_ctx.pprof[1] = (DDProfPProf *)calloc(1, sizeof(DDProfPProf));
+    ctx->worker_ctx.pprof[0] = new DDProfPProf();
+    ctx->worker_ctx.pprof[1] = new DDProfPProf();
     if (!ctx->worker_ctx.exp[0] || !ctx->worker_ctx.exp[1]) {
       free(ctx->worker_ctx.exp[0]);
       free(ctx->worker_ctx.exp[1]);
-      free(ctx->worker_ctx.pprof[0]);
-      free(ctx->worker_ctx.pprof[1]);
+      delete ctx->worker_ctx.pprof[0];
+      delete ctx->worker_ctx.pprof[1];
       DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error creating exporter");
     }
-    if (!ctx->worker_ctx.pprof[0] || !ctx->worker_ctx.pprof[1]) {
-      free(ctx->worker_ctx.exp[0]);
-      free(ctx->worker_ctx.exp[1]);
-      free(ctx->worker_ctx.pprof[0]);
-      free(ctx->worker_ctx.pprof[1]);
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error creating pprof holder");
-    }
+
     DDRES_CHECK_FWD(
         ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp[0]));
     DDRES_CHECK_FWD(
@@ -436,7 +444,7 @@ DDRes ddprof_worker_free(DDProfContext *ctx) {
       }
       if (ctx->worker_ctx.pprof[i]) {
         DDRES_CHECK_FWD(pprof_free_profile(ctx->worker_ctx.pprof[i]));
-        free(ctx->worker_ctx.pprof[i]);
+        delete ctx->worker_ctx.pprof[i];
         ctx->worker_ctx.pprof[i] = nullptr;
       }
     }
@@ -454,8 +462,8 @@ struct perf_event_hdr_wpid : perf_event_header {
   uint32_t pid, tid;
 };
 
-DDRes ddprof_worker_process_event(struct perf_event_header *hdr, int pos,
-                                  DDProfContext *ctx) {
+DDRes ddprof_worker_process_event(struct perf_event_header *hdr,
+                                  int watcher_pos, DDProfContext *ctx) {
   // global try catch to avoid leaking exceptions to main loop
   try {
     ddprof_stats_add(STATS_EVENT_COUNT, 1, NULL);
@@ -464,33 +472,33 @@ DDRes ddprof_worker_process_event(struct perf_event_header *hdr, int pos,
     /* Cases where the target type has a PID */
     case PERF_RECORD_SAMPLE:
       if (wpid->pid) {
-        uint64_t mask = ctx->watchers[pos].sample_type;
+        uint64_t mask = ctx->watchers[watcher_pos].sample_type;
         perf_event_sample *sample = hdr2samp(hdr, mask);
         if (sample) {
-          DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, pos));
+          DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, watcher_pos));
         }
       }
       break;
     case PERF_RECORD_MMAP:
       if (wpid->pid)
-        ddprof_pr_mmap(ctx, (perf_event_mmap *)hdr, pos);
+        ddprof_pr_mmap(ctx, (perf_event_mmap *)hdr, watcher_pos);
       break;
     case PERF_RECORD_COMM:
       if (wpid->pid)
-        ddprof_pr_comm(ctx, (perf_event_comm *)hdr, pos);
+        ddprof_pr_comm(ctx, (perf_event_comm *)hdr, watcher_pos);
       break;
     case PERF_RECORD_EXIT:
       if (wpid->pid)
-        ddprof_pr_exit(ctx, (perf_event_exit *)hdr, pos);
+        ddprof_pr_exit(ctx, (perf_event_exit *)hdr, watcher_pos);
       break;
     case PERF_RECORD_FORK:
       if (wpid->pid)
-        ddprof_pr_fork(ctx, (perf_event_fork *)hdr, pos);
+        ddprof_pr_fork(ctx, (perf_event_fork *)hdr, watcher_pos);
       break;
 
     /* Cases where the target type might not have a PID */
     case PERF_RECORD_LOST:
-      ddprof_pr_lost(ctx, (perf_event_lost *)hdr, pos);
+      ddprof_pr_lost(ctx, (perf_event_lost *)hdr, watcher_pos);
       break;
     default:
       break;
