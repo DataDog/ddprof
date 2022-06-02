@@ -211,7 +211,26 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   // number of labels at present
   ddprof_ffi_Label labels[PPROF_MAX_LABELS] = {};
   size_t labels_num = 0;
+  char pid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
+  char tid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
 
+  // Add any configured labels.  Note that TID alone has the same cardinality as
+  // (TID;PID) tuples, so except for symbol table overhead it doesn't matter
+  // much if TID implies PID for clarity.
+  if (!watcher->suppress_pid || !watcher->suppress_tid) {
+    snprintf(pid_str, sizeof(pid_str), "%d", uw_output->pid);
+    labels[labels_num].key = to_CharSlice("process_id");
+    labels[labels_num].str = to_CharSlice(pid_str);
+    ++labels_num;
+  }
+  if (!watcher->suppress_tid) {
+    snprintf(tid_str, sizeof(tid_str), "%d", uw_output->tid);
+    // This naming has an impact on backend side (hence the inconsistency with
+    // process_id)
+    labels[labels_num].key = to_CharSlice("thread id");
+    labels[labels_num].str = to_CharSlice(tid_str);
+    ++labels_num;
+  }
   if (watcher_has_tracepoint(watcher)) {
     // This adds only the trace name.  Maybe we should have group + tracenames?
     labels[labels_num].key = to_CharSlice("tracepoint_type");
