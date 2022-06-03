@@ -175,7 +175,7 @@ DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
   // hence we use a different user
   UIDInfo info;
   if (use_override) {
-    DDRES_CHECK_FWD(user_override(&info));
+    DDRES_CHECK_FWD(user_override_if_root(&info));
   }
 
   defer {

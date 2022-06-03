@@ -64,6 +64,11 @@ static inline DDRes ddres_warn(int16_t what) {
   return ddres_create(DD_SEVWARN, what);
 }
 
+/// Creates a DDRes with a notice taking an error code (what)
+static inline DDRes ddres_notice(int16_t what) {
+  return ddres_create(DD_SEVNOTICE, what);
+}
+
 /// Create an OK DDRes
 static inline DDRes ddres_init(void) {
   DDRes ddres = {};

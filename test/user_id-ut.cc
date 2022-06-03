@@ -60,7 +60,7 @@ TEST(UserIDTest, api) {
   UIDInfo info;
   uid_t old_user = getuid();
 
-  DDRes res = user_override(&info);
+  DDRes res = user_override_if_root(&info);
   EXPECT_TRUE(IsDDResOK(res));
 
   uid_t new_user = getuid();
