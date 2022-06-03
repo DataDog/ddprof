@@ -13,6 +13,8 @@ typedef struct UIDInfo {
   uid_t previous_user;
 } UIDInfo;
 
-DDRes user_override(UIDInfo *user_override);
+DDRes user_override_if_root(UIDInfo *override_info);
 
-DDRes revert_override(UIDInfo *user_override);
+DDRes user_override(uid_t uid, UIDInfo *override_info);
+
+DDRes revert_override(UIDInfo *override_info);

@@ -62,7 +62,6 @@ bool check_file_type(const char *pathname, int file_type) {
 
 bool get_file_inode(const char *pathname, inode_t *inode, int64_t *size) {
   struct stat info;
-
   if (stat(pathname, &info) != 0) {
     *inode = 0;
     *size = 0;

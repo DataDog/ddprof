@@ -12,6 +12,8 @@ extern "C" {
 #include "signal_helper.h"
 #include <fcntl.h>
 #include <unistd.h>
+#include "user_override.h"
+#include <sys/stat.h>
 }
 #include "ddres.h"
 #include "defer.hpp"
@@ -434,25 +436,63 @@ bool DsoHdr::pid_backpopulate(pid_t pid, int &nb_elts_added) {
   return pid_backpopulate(_map[pid], pid, nb_elts_added);
 }
 
+struct ProcMapOpener {
+  ProcMapOpener(int pid, const char *path_to_proc = "") {
+    char proc_map_filename[1024] = {0};
+    auto n = snprintf(proc_map_filename, 1024, "%s/proc/%d/maps", path_to_proc, pid);
+    if (n >= 1024) { // unable to snprintf everything
+      return;
+    }
+    // open the proc map
+    _mpf = fopen(proc_map_filename, "r");
+
+    if (!_mpf) {
+      if (!process_is_alive(pid)) {
+        LG_DBG("[ProcMapOpener] Process nonexistant");
+        return;
+      }
+      // Check if we can switch user
+      struct stat info;
+      if (stat(proc_map_filename, &info) != 0) {
+        uid_t new_user_uid = info.st_uid;
+#warning check return status
+        user_override(new_user_uid, &_uid_info);
+        if (_uid_info.override) {
+          LG_DBG("[ProcMapOpener] Read proc map overriding user");
+          _mpf = fopen(proc_map_filename, "r");
+        }
+      }
+    }
+  }
+
+  ~ProcMapOpener() {
+#warning check return status
+    revert_override(&_uid_info);
+    if (_mpf) {
+      fclose(_mpf);
+    }
+  }
+  FILE *_mpf = nullptr;
+  UIDInfo _uid_info = {};
+};
+
+
 // Return false if proc map is not available
 // Return true proc map was found, use nb_elts_added for number of added
 // elements
 bool DsoHdr::pid_backpopulate(DsoMap &map, pid_t pid, int &nb_elts_added) {
   nb_elts_added = 0;
   LG_DBG("[DSO] Backpopulating PID %d", pid);
-  FILE *mpf = procfs_map_open(pid, _path_to_proc.c_str());
-  if (!mpf) {
+  ProcMapOpener proc_map_opener(pid, _path_to_proc.c_str());
+  if (!proc_map_opener._mpf) {
     LG_DBG("[DSO] Failed to open procfs for %d", pid);
-    if (!process_is_alive(pid))
-      LG_DBG("[DSO] Process nonexistant");
     return false;
   }
-  defer { fclose(mpf); };
 
   char *buf = NULL;
   size_t sz_buf = 0;
 
-  while (-1 != getline(&buf, &sz_buf, mpf)) {
+  while (-1 != getline(&buf, &sz_buf, proc_map_opener._mpf)) {
     Dso dso = dso_from_procline(pid, buf);
     if (dso._pid == -1) { // invalid dso
       continue;

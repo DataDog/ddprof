@@ -249,8 +249,9 @@ add_unit_test(
     ../src/dso_hdr.cc
     ../src/ddprof_file_info.cc
     ../src/procutils.c
-    ../src/signal_helper.c
     ../src/region_holder.cc
+    ../src/signal_helper.c
+    ../src/user_override.c
     dso-ut.cc
     DEFINITIONS MYNAME="dso-ut")
 target_include_directories(dso-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
@@ -284,6 +285,7 @@ add_unit_test(
     ../src/procutils.c
     ../src/signal_helper.c
     ../src/region_holder.cc
+    ../src/user_override.c
     LIBRARIES ${ELFUTILS_LIBRARIES}
     DEFINITIONS MYNAME="dwfl_symbol-ut"
 )
@@ -316,6 +318,7 @@ add_unit_test(
     ../src/unwind_helpers.cc
     ../src/unwind_metrics.c
     ../src/unwind_output.c
+    ../src/user_override.c
     LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
     DEFINITIONS MYNAME="savecontext-ut"
 )
@@ -355,6 +358,7 @@ add_unit_test(
     ../src/unwind_helpers.cc
     ../src/unwind_metrics.c
     ../src/unwind_output.c
+    ../src/user_override.c
     LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
     DEFINITIONS ${DDPROF_DEFINITION_LIST})
 

@@ -20,13 +20,13 @@
 static char const *const s_user_nobody = "nobody";
 static const uid_t s_root_user = 0;
 
-void init_uidinfo(UIDInfo *user_override) {
-  user_override->override = false;
-  user_override->previous_user = getuid();
+void init_uidinfo(UIDInfo *override_info) {
+  override_info->override = false;
+  override_info->previous_user = getuid();
 }
 
-DDRes user_override(UIDInfo *user_override) {
-  init_uidinfo(user_override);
+DDRes user_override_if_root(UIDInfo *override_info) {
+  init_uidinfo(override_info);
 
   if (getuid() != s_root_user) {
     // Already a different user nothing to do
@@ -39,21 +39,34 @@ DDRes user_override(UIDInfo *user_override) {
                            s_user_nobody);
   }
   uid_t nobodyuid = pwd->pw_uid;
-  DDRES_CHECK_INT(setresuid(nobodyuid, nobodyuid, -1), DD_WHAT_USERID,
-                  "Unable to set user %s (%s)", s_user_nobody, strerror(errno));
-  user_override->override = true;
-
+  DDRES_CHECK_FWD(user_override(nobodyuid, override_info));
+  override_info->override = true;
   return ddres_init();
 }
 
-DDRes revert_override(UIDInfo *user_override) {
-  if (!(user_override->override)) {
+
+DDRes user_override(uid_t uid, UIDInfo *override_info) {
+  uid_t current_user = getuid();
+  if (getuid() == uid) {
+    // Already this user
+    LG_DBG("Requesting a change for the same user");
+    return ddres_notice(DD_WHAT_USERID);
+  }
+  DDRES_CHECK_INT(setresuid(uid, uid, -1), DD_WHAT_USERID,
+                  "Unable to set user %u (%s)", uid, strerror(errno));
+  override_info->override = true;
+  override_info->previous_user = current_user;
+  return ddres_init();
+}
+
+DDRes revert_override(UIDInfo *override_info) {
+  if (!(override_info->override)) {
     // nothing to do we did not override previously
     return ddres_init();
   }
-  uid_t uid_old = user_override->previous_user;
+  uid_t uid_old = override_info->previous_user;
   DDRES_CHECK_INT(setresuid(uid_old, uid_old, -1), DD_WHAT_USERID,
                   "Unable to set user %s (%s)", s_user_nobody, strerror(errno));
-  init_uidinfo(user_override);
+  init_uidinfo(override_info);
   return ddres_init();
 }
