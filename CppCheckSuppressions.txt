@@ -12,3 +12,5 @@ preprocessorErrorDirective:*/perf_watcher.h
 
 // Ignore llvm warnings
 *:*/third_party/*
+// Ignore warnings from tests
+*:*/test/*

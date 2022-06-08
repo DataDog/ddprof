@@ -76,6 +76,8 @@ function(add_benchmark name)
 
    ## Create exe with sources. Always add logger and error management in the unit tests
    add_exe(${name}
+        ../src/ddres_list.c
+        ../src/logger.c
         ${MY_UNPARSED_ARGUMENTS})
 
    target_link_libraries(${name} PRIVATE Threads::Threads benchmark::benchmark benchmark::benchmark_main)
@@ -377,7 +379,15 @@ add_unit_test(
     ../src/user_override.c
 )
 
+add_unit_test(
+    timer-ut
+    timer-ut.cc
+    ../src/timer.cc
+    ../src/perf.cc
+)
+
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/savecontext.cc ../src/saveregisters.cc)
+add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 
 add_exe(simple_malloc-static simple_malloc.cc
         LIBRARIES Threads::Threads dd_profiling-static)
