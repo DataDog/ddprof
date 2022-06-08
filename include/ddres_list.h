@@ -56,7 +56,8 @@ extern "C" {
   X(SYS_CONFIG, "error checking system configuration")                         \
   X(UNITTEST, "unit test error")                                               \
   X(SOCKET, "error during socket operation")                                   \
-  X(TEMP_FILE, "error during temporary file creation")
+  X(TEMP_FILE, "error during temporary file creation")                         \
+  X(TSC, "failed to setup TSC")
 
 // generic erno errors available from /usr/include/asm-generic/errno.h
 
