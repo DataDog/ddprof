@@ -87,7 +87,7 @@ int get_ddprof_socket() {
   const char *socket_str = getenv(k_profiler_lib_socket_env_variable);
   if (socket_str) {
     std::string_view sv{socket_str};
-    int sockfd;
+    int sockfd = -1;
     if (auto [ptr, ec] = std::from_chars(sv.begin(), sv.end(), sockfd);
         ec == std::errc() && ptr == sv.end()) {
       return sockfd;
