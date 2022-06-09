@@ -4,7 +4,7 @@ set -euo pipefail
 ONAME="event_parser"
 
 lex -o${ONAME}.lex.c ${ONAME}.l
-yacc "-o${ONAME}" -d ${ONAME}.y
+yacc "-o${ONAME}.tab.c" -d ${ONAME}.y
 cc -g ${ONAME}.lex.c ${ONAME}.tab.c -I../../../include -o event
 
 ./event "JustAnEvent"

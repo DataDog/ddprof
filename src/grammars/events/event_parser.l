@@ -1,7 +1,7 @@
 %{
 #include <string.h>
 #include "event_config.h"
-#include "y.tab.h"
+#include "event_parser.h"
 %}
 
 %%
