@@ -15,7 +15,7 @@ int yywrap() { return 1;}
 typedef struct yy_buffer_state * YY_BUFFER_STATE;
 extern int yylex();
 extern int yyparse();
-extern YY_BUFFER_STATE yy_scan_string(char * str);
+extern YY_BUFFER_STATE yy_scan_string(const char * str);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
 
 void ev_splice(EventConf *A, const EventConf *B) {
@@ -68,10 +68,22 @@ void ev_print(const EventConf *tp) {
 
 }
 
+EventConf g_accum_event_conf = {0};
+bool g_debugout_enable = false;
+EventConf *EventConf_parse(const char *msg) {
+  int ret = -1;
+  YY_BUFFER_STATE buffer = yy_scan_string(msg);
+  ret = yyparse();
+  yy_delete_buffer(buffer);
+  return 0 == ret ? &g_accum_event_conf : NULL;
+}
+
 int main(int c, char **v) { 
+  g_debugout_enable = false;
   if (c) {
     printf("%s\n", v[1]);
     YY_BUFFER_STATE buffer = yy_scan_string(v[1]);
+    g_debugout_enable = true;
     yyparse();
     yy_delete_buffer(buffer);
   } else {
@@ -113,6 +125,7 @@ event: name location cadence type {
 		ev_splice(&$$, &$2);
 		ev_splice(&$$, &$3);
 		ev_splice(&$$, &$4);
+		g_accum_event_conf = $$;
 	}
 	;
 
