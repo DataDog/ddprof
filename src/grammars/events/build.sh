@@ -1,9 +1,11 @@
 #!/bin/bash
 set -euo pipefail 
 
-lex event.l
-yacc -d event.y
-cc -g lex.yy.c y.tab.c -I../../../include -o event
+ONAME="event_parser"
+
+lex -o${ONAME}.lex.c ${ONAME}.l
+yacc "-o${ONAME}" -d ${ONAME}.y
+cc -g ${ONAME}.lex.c ${ONAME}.tab.c -I../../../include -o event
 
 ./event "JustAnEvent"
 ./event "OneGroup:OneEvent"
