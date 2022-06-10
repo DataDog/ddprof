@@ -136,6 +136,14 @@ const char* help_str[DD_KLEN] = {
   "    Enables statsd metrics for " MYNAME ". Value should point to a statsd socket.\n"
   "    Example: /var/run/datadog-agent/statsd.sock\n",
   [DD_PROFILING_NATIVE_SOCKET] = STR_UNDF,
+  [DD_PROFILING_NATIVE_PRESET] =
+  "    Select a predefined profiling configuration.\n"
+  "    Available presets:\n"
+  "     - default: profile CPU and memory allocations\n"
+  "       (profile only CPU when targeting a given PID)\n"
+  "     - cpu_only: profile CPU\n"
+  "     - alloc_only: profile memory allocations\n"
+  "    If no --preset option is given, `default` preset is used.\n"
 };
 // clang-format on
 
@@ -231,12 +239,15 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
       if (!optarg || !*optarg)
         continue;
 
+      if (input->num_watchers == MAX_TYPE_WATCHER) {
+        DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Too many input events");
+      }
       PerfWatcher *watcher = &input->watchers[input->num_watchers];
       if (!watcher_from_event(optarg, watcher) &&
           !watcher_from_tracepoint(optarg, watcher)) {
-        LG_ERR("Invalid event/tracepoint (%s)", optarg);
-        res = ddres_error(DD_WHAT_INPUT_PROCESS);
         *continue_exec = false;
+        DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
+                               "Invalid event/tracepoint (%s)", optarg);
       } else {
         ++input->num_watchers;
       }
@@ -254,8 +265,8 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
     }
     default: {
       *continue_exec = false;
-      res = ddres_error(DD_WHAT_INPUT_PROCESS);
-      LG_ERR("Invalid option %s", argv[optind - 1]);
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Invalid option %s",
+                             argv[optind - 1]);
       break;
     }
     }
