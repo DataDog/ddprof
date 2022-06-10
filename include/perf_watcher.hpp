@@ -23,6 +23,7 @@ struct PerfWatcherOptions {
 };
 
 typedef struct PerfWatcher {
+  int ddprof_event_type; // ddprof event type from DDPROF_EVENT_NAMES enum
   const char *desc;
   uint64_t sample_type; // perf sample type: specifies values included in sample
   int type; // perf event type (software / hardware / tracepoint / ... or custom
@@ -125,6 +126,7 @@ enum DDProfCustomCountId { kDDPROF_COUNT_ALLOCATIONS = 0 };
 
 #define X_ENUM(a, b, c, d, e, f, g) DDPROF_PWE_##a,
 typedef enum DDPROF_EVENT_NAMES {
+  DDPROF_PWE_TRACEPOINT = -1,
   EVENT_CONFIG_TABLE(X_ENUM) DDPROF_PWE_LENGTH,
 } DDPROF_EVENT_NAMES;
 #undef X_ENUM
@@ -136,6 +138,7 @@ const PerfWatcher *twatcher_default();
 bool watcher_has_countable_sample_type(const PerfWatcher *watcher);
 bool watcher_has_tracepoint(const PerfWatcher *watcher);
 int watcher_to_count_sample_type_id(const PerfWatcher *watcher);
+const char *event_type_name_from_idx(int idx);
 
 // Helper functions for sample types
 const char *sample_type_name_from_idx(int idx);
