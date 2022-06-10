@@ -52,10 +52,34 @@ save_registers(ddprof::span<uint64_t, PERF_REGS_COUNT>) {
 
 #else
 
-static __attribute__((noinline, naked)) void
-save_registers(ddprof::span<uint64_t, PERF_REGS_COUNT>) {
-  asm("ret\n");
-}
+#  define save_registers(regs)                                                 \
+    ({                                                                         \
+      register uint64_t base_ptr __asm__("x0") = (uint64_t)(regs).data();      \
+      __asm__ __volatile__("stp x0, x1, [%[base], #0]\n"                       \
+                           "stp x2, x3, [%[base], #16]\n"                      \
+                           "stp x4, x5, [%[base], #32]\n"                      \
+                           "stp x6, x7, [%[base], #48]\n"                      \
+                           "stp x8, x9, [%[base], #64]\n"                      \
+                           "stp x10, x11, [%[base], #80]\n"                    \
+                           "stp x12, x13, [%[base], #96]\n"                    \
+                           "stp x14, x13, [%[base], #112]\n"                   \
+                           "stp x16, x17, [%[base], #128]\n"                   \
+                           "stp x18, x19, [%[base], #144]\n"                   \
+                           "stp x20, x21, [%[base], #160]\n"                   \
+                           "stp x22, x23, [%[base], #176]\n"                   \
+                           "stp x24, x25, [%[base], #192]\n"                   \
+                           "stp x26, x27, [%[base], #208]\n"                   \
+                           "stp x28, x29, [%[base], #224]\n"                   \
+                           "mov x1, sp\n"                                      \
+                           "stp x30, x1, [%[base], #240]\n"                    \
+                           "adr x1, ret%=\n"                                   \
+                           "str x1, [%[base], #256]\n"                         \
+                           "mov %[base], #0\n"                                 \
+                           "ret%=:\n"                                          \
+                           : [base] "+r"(base_ptr)                             \
+                           :                                                   \
+                           : "x1", "memory");                                  \
+    })
 
 #endif
 
@@ -97,7 +121,7 @@ save_stack(const std::byte *stack_ptr, ddprof::span<std::byte> buffer) {
 size_t save_context(ddprof::span<uint64_t, PERF_REGS_COUNT> regs,
                     ddprof::span<std::byte> buffer) {
   save_registers(regs);
-  // save the stack just after saving registers, stack part above saved RSP must
+  // save the stack just after saving registers, stack part above saved SP must
   // no be changed between call to save_registers and call to save_stack
   return save_stack(reinterpret_cast<const std::byte *>(regs[REGNAME(SP)]),
                     buffer);

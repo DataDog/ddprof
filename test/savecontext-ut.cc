@@ -49,6 +49,4 @@ void funcA() {
   getpid();
 }
 
-#ifdef __x86_64__
 TEST(getcontext, getcontext) { funcA(); }
-#endif

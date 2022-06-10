@@ -32,7 +32,6 @@ __attribute__((noinline)) void my_func_calling_malloc(size_t size) {
 }
 
 TEST(allocation_tracker, start_stop) {
-#ifdef __x86_64__
   const uint64_t rate = 1;
   const size_t buf_size_order = 5;
   ddprof::RingBufferHolder ring_buffer{buf_size_order};
@@ -68,5 +67,4 @@ TEST(allocation_tracker, start_stop) {
   ASSERT_EQ(symbol._symname, "my_func_calling_malloc");
 
   ddprof::AllocationTracker::allocation_tracking_free();
-#endif
 }
