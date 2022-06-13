@@ -48,14 +48,22 @@ public:
   void set_read_timeout(std::chrono::microseconds duration,
                         std::error_code &ec) noexcept;
 
-  size_t send(ConstBuffer buffer, std::error_code &ec) noexcept;
-  size_t send(ConstBuffer buffer, ddprof::span<const int> fds,
-              std::error_code &ec) noexcept;
+  void send(ConstBuffer buffer, std::error_code &ec) noexcept;
+  size_t send_partial(ConstBuffer buffer, std::error_code &ec) noexcept;
+  void send(ConstBuffer buffer, ddprof::span<const int> fds,
+            std::error_code &ec) noexcept;
+  size_t send_partial(ConstBuffer buffer, ddprof::span<const int> fds,
+                      std::error_code &ec) noexcept;
 
   std::pair<size_t, size_t> receive(Buffer buffer, ddprof::span<int> fds,
                                     std::error_code &ec) noexcept;
 
+  std::pair<size_t, size_t> receive_partial(Buffer buffer,
+                                            ddprof::span<int> fds,
+                                            std::error_code &ec) noexcept;
+
   size_t receive(Buffer buffer, std::error_code &ec) noexcept;
+  size_t receive_partial(Buffer buffer, std::error_code &ec) noexcept;
 
   socket_t release() noexcept {
     socket_t h = _handle;
