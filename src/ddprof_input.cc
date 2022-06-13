@@ -63,7 +63,7 @@ extern "C" {
 #define X_PRNT(a, b, c, d, e, f, g, h, i)                                      \
   {                                                                            \
     if ((f)->i b) {                                                            \
-      LG_NFO("  " #b ": %s", (f)->i b);                                        \
+      PRINT_NFO("  " #b ": %s", (f)->i b);                                     \
     }                                                                          \
   }
 

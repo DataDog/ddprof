@@ -20,8 +20,16 @@ typedef enum LOG_OPTS {
   LOG_FILE = 4,
 } LOG_OPTS;
 
+
 typedef enum LOG_LVL {
-  LL_EMERGENCY = 0,
+  LL_FORCE_ALERT = -1,
+  LL_FORCE_CRITICAL = -2,
+  LL_FORCE_ERROR = -3,
+  LL_FORCE_WARNING = -4,
+  LL_FORCE_NOTICE = -5,
+  LL_FORCE_INFORMATIONAL = -6,
+  LL_FORCE_DEBUG = -7,
+  LL_EMERGENCY = 0, // No force override because always printed
   LL_ALERT = 1,
   LL_CRITICAL = 2,
   LL_ERROR = 3,
@@ -29,7 +37,7 @@ typedef enum LOG_LVL {
   LL_NOTICE = 5,
   LL_INFORMATIONAL = 6,
   LL_DEBUG = 7,
-  LL_LENGTH
+  LL_LENGTH,
 } LOG_LVL;
 
 typedef enum LOG_FACILITY {
@@ -86,11 +94,16 @@ int LOG_getlevel();
 void LOG_setfacility(int);
 
 /******************************* Logging Macros *******************************/
+#define ABS(__x) ({                                                            \
+  typeof(__x) _x = (__x);                                                      \
+  _x < 0 ? -1 * _x : _x;                                                           \
+})
+
 // Avoid calling arguments (which can have CPU costs unless level is OK)
 #define LG_IF_LVL_OK(level, ...)                                               \
   do {                                                                         \
-    if (unlikely(level <= LOG_getlevel() && level >= 0)) {                     \
-      olprintfln(level, -1, MYNAME, __VA_ARGS__);                              \
+    if (unlikely(level <= LOG_getlevel())) {                                   \
+      olprintfln(ABS(level), -1, MYNAME, __VA_ARGS__);                         \
     }                                                                          \
   } while (false)
 
@@ -99,3 +112,4 @@ void LOG_setfacility(int);
 #define LG_NTC(...) LG_IF_LVL_OK(LL_NOTICE, __VA_ARGS__)
 #define LG_NFO(...) LG_IF_LVL_OK(LL_INFORMATIONAL, __VA_ARGS__)
 #define LG_DBG(...) LG_IF_LVL_OK(LL_DEBUG, __VA_ARGS__)
+#define PRINT_NFO(...) LG_IF_LVL_OK(-1 * LL_INFORMATIONAL, __VA_ARGS__)
