@@ -306,6 +306,7 @@ add_unit_test(
     ../src/dwfl_symbol_lookup.cc
     ../src/dwfl_thread_callbacks.cc
     ../src/savecontext.cc
+    ../src/saveregisters.cc
     ../src/mapinfo_lookup.cc
     ../src/procutils.c
     ../src/region_holder.cc
@@ -343,6 +344,7 @@ add_unit_test(
     ../src/perf_watcher.cc
     ../src/ringbuffer_utils.cc
     ../src/savecontext.cc
+    ../src/saveregisters.cc
     ../src/mapinfo_lookup.cc
     ../src/procutils.c
     ../src/region_holder.cc
@@ -375,7 +377,7 @@ add_unit_test(
     ../src/user_override.c
 )
 
-add_benchmark(savecontext-bench savecontext-bench.cc ../src/savecontext.cc)
+add_benchmark(savecontext-bench savecontext-bench.cc ../src/savecontext.cc ../src/saveregisters.cc)
 
 add_exe(simple_malloc-static simple_malloc.cc
         LIBRARIES Threads::Threads dd_profiling-static)
