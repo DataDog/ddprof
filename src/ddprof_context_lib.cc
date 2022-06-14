@@ -198,22 +198,22 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
 
   // Process input printer (do this right before argv/c modification)
   if (input->show_config && arg_yesno(input->show_config, 1)) {
-    LG_NFO("Printing parameters -->");
+    PRINT_NFO("Printing parameters -->");
     ddprof_print_params(input);
 
-    LG_NFO("  Native profiler enabled: %s",
+    PRINT_NFO("  Native profiler enabled: %s",
            ctx->params.enable ? "true" : "false");
 
     // Tell the user what mode is being used
-    LG_NFO("  Profiling mode: %s",
+    PRINT_NFO("  Profiling mode: %s",
            -1 == ctx->params.pid ? "global"
                : pid_tmp         ? "target"
                                  : "wrapper");
 
     // Show watchers
-    LG_NFO("  Instrumented with %d watchers:", ctx->num_watchers);
+    PRINT_NFO("  Instrumented with %d watchers:", ctx->num_watchers);
     for (int i = 0; i < ctx->num_watchers; i++) {
-      LG_NFO("    ID: %s, Pos: %d, Index: %lu, Label: %s",
+      PRINT_NFO("    ID: %s, Pos: %d, Index: %lu, Label: %s",
              ctx->watchers[i].desc, i, ctx->watchers[i].config,
              sample_type_name_from_idx(ctx->watchers[i].sample_type_id));
     }
