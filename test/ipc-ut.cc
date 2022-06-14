@@ -91,8 +91,9 @@ TEST(IPCTest, timeout) {
     // timeout measurement is not very accurate
     auto d = std::chrono::steady_clock::now() - t0;
     if (d < timeout) {
-      printf("Error1: %s, d=%.1fms\n", strerror(ec.value()),
-             d.count() / 1000000.0);
+      LG_ERR("Read timeout error: errno=%s, duration=%.1fms",
+             strerror(ec.value()),
+             std::chrono::duration<double, std::milli>(d).count());
     }
     ASSERT_GE(d, timeout - timeout_tolerance);
     ASSERT_TRUE(ec);
@@ -108,8 +109,9 @@ TEST(IPCTest, timeout) {
     auto d = std::chrono::steady_clock::now() - t0;
     if (ec) {
       if (d < timeout) {
-        printf("Error2: %s, d=%.1fms\n", strerror(ec.value()),
-               d.count() / 1000000.0);
+        LG_ERR("Write timeout error: errno=%s, duration=%.1fms",
+               strerror(ec.value()),
+               std::chrono::duration<double, std::milli>(d).count());
       }
       ASSERT_GE(d, timeout - timeout_tolerance);
       break;
