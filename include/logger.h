@@ -20,7 +20,6 @@ typedef enum LOG_OPTS {
   LOG_FILE = 4,
 } LOG_OPTS;
 
-
 typedef enum LOG_LVL {
   LL_FORCE_ALERT = -1,
   LL_FORCE_CRITICAL = -2,
@@ -94,10 +93,11 @@ int LOG_getlevel();
 void LOG_setfacility(int);
 
 /******************************* Logging Macros *******************************/
-#define ABS(__x) ({                                                            \
-  typeof(__x) _x = (__x);                                                      \
-  _x < 0 ? -1 * _x : _x;                                                           \
-})
+#define ABS(__x)                                                               \
+  ({                                                                           \
+    typeof(__x) _x = (__x);                                                    \
+    _x < 0 ? -1 * _x : _x;                                                     \
+  })
 
 // Avoid calling arguments (which can have CPU costs unless level is OK)
 #define LG_IF_LVL_OK(level, ...)                                               \
