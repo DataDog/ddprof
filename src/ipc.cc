@@ -90,10 +90,9 @@ void UnixSocket::send(ConstBuffer buffer, std::error_code &ec) noexcept {
 
 size_t UnixSocket::send_partial(ConstBuffer buffer,
                                 std::error_code &ec) noexcept {
-  size_t written = 0;
   ssize_t ret;
   do {
-    ret = ::send(_handle, buffer.data() + written, buffer.size() - written, 0);
+    ret = ::send(_handle, buffer.data(), buffer.size(), 0);
   } while (ret < 0 && errno == EINTR);
 
   error_wrapper(ret, ec);
