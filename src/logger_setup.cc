@@ -6,11 +6,8 @@
 #include "logger_setup.h"
 
 #include "arraysize.h"
-
-extern "C" {
 #include "ddprof_cmdline.h"
 #include "logger.h"
-}
 
 void setup_logger(const char *log_mode, const char *log_level) {
   // Process logging mode

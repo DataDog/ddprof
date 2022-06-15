@@ -5,10 +5,6 @@
 
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <limits.h>
 
 #define DD_COMMON_START_RANGE 1000
@@ -74,7 +70,3 @@ enum DDRes_What {
 
 /// Retrieve an explicit error message matching the error ID (from table above)
 const char *ddres_error_message(int16_t what);
-
-#ifdef __cplusplus
-}
-#endif

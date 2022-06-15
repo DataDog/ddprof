@@ -6,17 +6,14 @@
 #include "arraysize.h"
 #include "constants.hpp"
 #include "daemonize.hpp"
+#include "ddprof.h"
+#include "ddprof_context.h"
+#include "ddprof_context_lib.h"
 #include "ddprof_input.h"
 #include "ddres.h"
 #include "defer.hpp"
 #include "ipc.hpp"
-
-extern "C" {
-#include "ddprof.h"
-#include "ddprof_context.h"
-#include "ddprof_context_lib.h"
 #include "logger.h"
-}
 
 #include <cassert>
 #include <errno.h>

@@ -6,16 +6,13 @@
 #include "dd_profiling.h"
 
 #include "allocation_tracker.hpp"
-
-extern "C" {
-#include "ddprof_cmdline.h"
-#include "logger_setup.h"
-}
-
 #include "constants.hpp"
 #include "daemonize.hpp"
+#include "ddprof_cmdline.h"
 #include "defer.hpp"
 #include "ipc.hpp"
+#include "logger_setup.h"
+#include "signal_helper.h"
 #include "syscalls.hpp"
 
 #include <cerrno>
@@ -295,7 +292,7 @@ void ddprof_stop_profiling(int timeout_ms) {
     std::this_thread::sleep_for(time_slice);
 
     // check if profiler process is still alive
-    if (kill(g_state.profiler_pid, 0) == -1 && errno == ESRCH) {
+    if (!process_is_alive(g_state.profiler_pid)) {
       return;
     }
   }

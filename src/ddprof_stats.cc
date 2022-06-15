@@ -2,13 +2,12 @@
 // under the Apache License Version 2.0. This product includes software
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
+#include "ddprof_stats.h"
 
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
-
-#include <ddprof_stats.h>
 
 // Expand the statsd paths
 #define X_PATH(a, b, c) "datadog.profiling.native." b,
@@ -30,8 +29,9 @@ DDRes ddprof_stats_init(void) {
   if (ddprof_stats)
     return ddres_init();
 
-  ddprof_stats = mmap(NULL, sizeof(long) * STATS_LEN, PROT_READ | PROT_WRITE,
-                      MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  ddprof_stats = static_cast<long *>(mmap(NULL, sizeof(long) * STATS_LEN,
+                                          PROT_READ | PROT_WRITE,
+                                          MAP_SHARED | MAP_ANONYMOUS, -1, 0));
   if (MAP_FAILED == ddprof_stats) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_DDPROF_STATS, "Unable to mmap for stats");
   }
@@ -71,6 +71,15 @@ DDRes ddprof_stats_set(unsigned int stat, long n) {
   if (stat >= STATS_LEN)
     DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Invalid stat");
   ddprof_stats[stat] = n;
+  return ddres_init();
+}
+
+DDRes ddprof_stats_divide(unsigned int stat, long in) {
+  if (!ddprof_stats)
+    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Stats backend uninitialized");
+  if (stat >= STATS_LEN)
+    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Invalid stat");
+  ddprof_stats[stat] /= in;
   return ddres_init();
 }
 

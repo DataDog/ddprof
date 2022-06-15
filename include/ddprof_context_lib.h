@@ -6,10 +6,6 @@
 #pragma once
 #include "ddres_def.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 typedef struct DDProfInput DDProfInput;
 typedef struct DDProfContext DDProfContext;
 typedef struct PerfWatcher PerfWatcher;
@@ -19,7 +15,3 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *);
 void ddprof_context_free(DDProfContext *);
 
 int ddprof_context_allocation_profiling_watcher_idx(const DDProfContext *ctx);
-
-#ifdef __cplusplus
-}
-#endif

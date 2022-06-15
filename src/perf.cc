@@ -3,15 +3,12 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
 #include "perf.h"
 
-#include "logger.h"
-#include "user_override.h"
-}
-
 #include "defer.hpp"
+#include "logger.h"
 #include "perf.hpp"
+#include "user_override.h"
 
 #include <ctype.h>
 #include <errno.h>

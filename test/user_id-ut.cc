@@ -5,19 +5,12 @@
 
 #include <gtest/gtest.h>
 
-extern "C" {
+#include "loghandle.hpp"
+#include "user_override.h"
+
 #include <pwd.h>
 #include <sys/types.h>
 #include <unistd.h>
-
-#include "user_override.h"
-}
-
-#include "loghandle.hpp"
-
-#ifndef _GNU_SOURCE
-#  define _GNU_SOURCE
-#endif
 
 // Test setuid reversion
 TEST(UserIDTest, simple) {

@@ -5,10 +5,9 @@
 
 #include <gtest/gtest.h>
 
-extern "C" {
 #include "procutils.h"
+
 #include <unistd.h>
-}
 
 TEST(ProcUtilsTest, proc_read) {
 

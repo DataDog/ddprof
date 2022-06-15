@@ -6,18 +6,15 @@
 #pragma once
 
 #include "base_frame_symbol_lookup.hpp"
+#include "common_mapinfo_lookup.hpp"
 #include "common_symbol_lookup.hpp"
+#include "ddres_def.h"
 #include "dso_symbol_lookup.hpp"
 #include "dwfl_symbol_lookup.hpp"
-
-#include "common_mapinfo_lookup.hpp"
+#include "logger.h"
 #include "mapinfo_lookup.hpp"
 
-#include "ddres_def.h"
-extern "C" {
-#include "logger.h"
-#include "stdlib.h"
-}
+#include <stdlib.h>
 
 struct SymbolHdr {
   SymbolHdr() {}

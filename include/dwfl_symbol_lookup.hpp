@@ -16,10 +16,8 @@
 #include <map>
 #include <unordered_map>
 
-extern "C" {
 typedef struct Dwfl Dwfl;
 typedef struct Dwfl_Module Dwfl_Module;
-}
 
 namespace ddprof {
 

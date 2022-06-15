@@ -5,17 +5,14 @@
 
 #include "dwfl_hdr.hpp"
 
-extern "C" {
+#include "ddres.h"
+#include "dwfl_module.hpp"
 #include "logger.h"
-}
 
 #include <algorithm>
 #include <cassert>
 #include <utility>
 #include <vector>
-
-#include "ddres.h"
-#include "dwfl_module.hpp"
 
 namespace ddprof {
 

@@ -6,11 +6,11 @@
 #include "ddprof_cmdline.h"
 
 #include <assert.h>
+#include <cstring>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -53,8 +53,8 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
     return false;
 
   // Now we have to process options out of the string
-  char *str_chk;                    // for checking the result of parsing
-  char *str_tmp = strchr(str, ','); // points to ',' or is nullptr
+  char *str_chk; // for checking the result of parsing
+  const char *str_tmp = std::strchr(str, ','); // points to ',' or is nullptr
   uint64_t value_tmp = tmp_watcher->sample_period; // get default val
 
   if (str_tmp) {
@@ -106,17 +106,15 @@ uint8_t get_register(const char *str) {
 }
 
 bool get_trace_format(const char *str, uint8_t *trace_off, uint8_t *trace_sz) {
-  char *str_copy = (char *)str;
   if (!str)
     return false;
 
-  char *period = strchr(str, '.');
-  char *period_copy = period;
+  const char *period = std::strchr(str, '.');
   if (!period)
     return false;
 
-  *trace_off = strtol(str, &str_copy, 10);
-  *trace_sz = strtol(period + 1, &period_copy, 10);
+  *trace_off = strtol(str, nullptr, 10);
+  *trace_sz = strtol(period + 1, nullptr, 10);
 
   // Error if the size is zero, otherwise fine probably
   return !trace_sz;
@@ -200,7 +198,7 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
   int pathsz =
       snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/id",
                groupname, tracename);
-  if (pathsz >= sizeof(path)) {
+  if (static_cast<size_t>(pathsz) >= sizeof(path)) {
     // Possibly ran out of room
     free(str);
     return false;

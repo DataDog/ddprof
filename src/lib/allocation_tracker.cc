@@ -5,14 +5,11 @@
 
 #include "allocation_tracker.hpp"
 
-extern "C" {
-#include "perf.h"
-#include "pevent_lib.h"
-}
-
 #include "ddres.h"
 #include "defer.hpp"
 #include "ipc.hpp"
+#include "perf.h"
+#include "pevent_lib.h"
 #include "ringbuffer_utils.hpp"
 #include "savecontext.hpp"
 #include "syscalls.hpp"

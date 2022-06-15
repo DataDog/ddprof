@@ -3,16 +3,14 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
 #include "ddprof_input.h"
-#include "perf_watcher.h"
-#include "string_view.h"
-}
 
 #include "arraysize.h"
 #include "constants.hpp"
 #include "defer.hpp"
 #include "loghandle.hpp"
+#include "perf_watcher.h"
+#include "string_view.h"
 
 #include <gtest/gtest.h>
 #include <string_view>

@@ -5,9 +5,8 @@
 
 #pragma once
 
-extern "C" {
 #include "unwind_output.h"
-}
+
 #include "mapinfo_table.hpp"
 #include "symbol_table.hpp"
 

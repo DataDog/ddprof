@@ -3,9 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
 #include "version.h"
-}
 
 #include <gtest/gtest.h>
 #include <string>

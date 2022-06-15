@@ -5,21 +5,16 @@
 
 #include "unwind_dwfl.hpp"
 
-extern "C" {
 #include "ddprof_stats.h"
 #include "ddres.h"
 #include "dwfl_internals.h"
-#include "logger.h"
-}
-
 #include "dwfl_thread_callbacks.hpp"
+#include "logger.h"
 #include "symbol_hdr.hpp"
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
 
-extern "C" {
 int frame_cb(Dwfl_Frame *, void *);
-}
 
 namespace ddprof {
 
@@ -141,6 +136,7 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
   ddprof_stats_add(STATS_UNWIND_FRAMES, 1, NULL);
 
   if (IsDDResNotOK(add_symbol(dwfl_frame, us))) {
+    printf("!!add_symbol error\n");
     return DWARF_CB_ABORT;
   }
 

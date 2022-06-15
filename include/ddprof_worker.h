@@ -6,7 +6,6 @@
 #pragma once
 
 #include <linux/perf_event.h>
-#include <stdbool.h>
 
 #include "ddres.h"
 #include "persistent_worker_state.h"

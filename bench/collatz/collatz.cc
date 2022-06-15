@@ -37,7 +37,7 @@
 #endif
 
 unsigned long *counter = NULL;
-unsigned long *my_counter = &(unsigned long){0};
+unsigned long my_counter = 0;
 
 // Helper for processing input
 #define P(s, d)                                                                \
@@ -50,8 +50,8 @@ unsigned long *my_counter = &(unsigned long){0};
 // This is the function body for every expanded function in the X-table
 #define FUNBOD                                                                 \
   {                                                                            \
-    int64_t n = x & 1 ? x * 3 + 1 : x / 2;                                         \
-    __sync_add_and_fetch(my_counter, 1);                                       \
+    int64_t n = x & 1 ? x * 3 + 1 : x / 2;                                     \
+    my_counter += 1;                                       \
     return 1 >= n ? 1 : funs[n % funlen](n);                                   \
   }
 
@@ -131,7 +131,7 @@ int main(int c, char **v) {
     P(v[3], kj);
   if (c > 4) {
     switch (*v[4]) {
-      // clang-format off
+    // clang-format off
       case 'A': case 'a': t = 7;         break;
       case 'B': case 'b': t = 27;        break;
       case 'C': case 'c': t = 703;       break;
@@ -151,16 +151,17 @@ int main(int c, char **v) {
   // Setup
   static __thread unsigned long work_start, work_end;
   static __thread unsigned long last_counter = 0;
-  unsigned long *start_tick =
+  unsigned long *start_tick = static_cast<unsigned long *>(
       mmap(NULL, MAX_PROCS * sizeof(unsigned long), PROT_READ | PROT_WRITE,
-           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-  unsigned long *end_tick =
+           MAP_SHARED | MAP_ANONYMOUS, -1, 0));
+  unsigned long *end_tick = static_cast<unsigned long *>(
       mmap(NULL, MAX_PROCS * sizeof(unsigned long), PROT_READ | PROT_WRITE,
-           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+           MAP_SHARED | MAP_ANONYMOUS, -1, 0));
   pid_t pids[MAX_PROCS] = {0};
   pids[0] = getpid();
-  counter = mmap(NULL, sizeof(unsigned long), PROT_READ | PROT_WRITE,
-                 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  counter = static_cast<unsigned long *>(
+      mmap(NULL, sizeof(unsigned long), PROT_READ | PROT_WRITE,
+           MAP_SHARED | MAP_ANONYMOUS, -1, 0));
   *counter = 0;
 
 #ifdef USE_DD_PROFILING
@@ -172,9 +173,9 @@ int main(int c, char **v) {
 
   // Setup barrier for coordination
   pthread_barrierattr_t bat = {0};
-  pthread_barrier_t *pb =
+  pthread_barrier_t *pb = static_cast<pthread_barrier_t *>(
       mmap(NULL, sizeof(pthread_barrier_t), PROT_READ | PROT_WRITE,
-           MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+           MAP_SHARED | MAP_ANONYMOUS, -1, 0));
   pthread_barrierattr_init(&bat);
   pthread_barrierattr_setpshared(&bat, 1);
   pthread_barrier_init(pb, &bat, n);
@@ -212,17 +213,18 @@ int main(int c, char **v) {
       static char key_ticks[] = "app.collatz.ticks";
       static char key_stacks[] = "app.collatz.stacks";
       static char key_funs[] = "app.collatz.functions";
-      statsd_send(fd_statsd, key_ticks, &(long){work_end - work_start},
-                  STAT_GAUGE);
+      long val = static_cast<long>(work_end - work_start);
+      statsd_send(fd_statsd, key_ticks, &val, STAT_GAUGE);
       statsd_send(fd_statsd, key_stacks, &kj, STAT_GAUGE);
-      statsd_send(fd_statsd, key_funs, &(long){*my_counter - last_counter},
+      val = my_counter - last_counter;
+      statsd_send(fd_statsd, key_funs, &val,
                   STAT_GAUGE); // technically can overflow, but whatever
-      last_counter = *my_counter;
+      last_counter = my_counter;
     }
   }
 
   // Wait for everyone to be done
-  __sync_add_and_fetch(counter, *my_counter);
+  __sync_add_and_fetch(counter, my_counter);
   pthread_barrier_wait(pb);
   end_tick[me] = __rdtsc();
   pthread_barrier_wait(pb);

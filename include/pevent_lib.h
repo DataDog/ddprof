@@ -5,10 +5,6 @@
 
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "ddprof_context.h"
 #include "ddres_def.h"
 #include "pevent.h"
@@ -47,7 +43,3 @@ DDRes pevent_mmap_event(PEvent *pevent);
 DDRes pevent_munmap_event(PEvent *pevent);
 
 DDRes pevent_close_event(PEvent *pevent);
-
-#ifdef __cplusplus
-}
-#endif

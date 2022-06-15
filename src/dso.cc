@@ -5,11 +5,8 @@
 
 #include "dso.hpp"
 
-extern "C" {
 #include "ddprof_defs.h"
 #include "logger.h"
-}
-
 #include "string_format.hpp"
 
 #include <string_view>

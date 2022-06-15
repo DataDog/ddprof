@@ -5,7 +5,6 @@
 
 #pragma once
 
-#include <stdbool.h>
 #include <stddef.h>
 
 #include "ddres_def.h"

@@ -5,14 +5,10 @@
 
 #pragma once
 
-#include <sys/types.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "ddprof_defs.h"
 #include "perf_ringbuffer.h"
+
+#include <sys/types.h>
 
 // Takes into account number of watchers * number of CPUs
 #define MAX_NB_PERF_EVENT_OPEN 450
@@ -37,7 +33,3 @@ typedef struct PEventHdr {
   perf_event_attr attrs[MAX_TYPE_WATCHER];
   size_t nb_attrs;
 } PEventHdr;
-
-#ifdef __cplusplus
-}
-#endif

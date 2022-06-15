@@ -7,11 +7,6 @@
 
 #include "ddprof_defs.h"
 #include "ddres_def.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "exporter_input.h"
 #include "perf_watcher.h"
 
@@ -122,7 +117,3 @@ void ddprof_print_help();
 void ddprof_print_params(const DDProfInput *input);
 
 void ddprof_input_free(DDProfInput *input);
-
-#ifdef __cplusplus
-}
-#endif

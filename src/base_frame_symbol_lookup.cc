@@ -5,10 +5,8 @@
 
 #include "base_frame_symbol_lookup.hpp"
 
-extern "C" {
-#include "logger.h"
-}
 #include "dso_type.hpp"
+#include "logger.h"
 #include "string_format.hpp"
 
 namespace ddprof {

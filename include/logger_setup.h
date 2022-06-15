@@ -5,12 +5,4 @@
 
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 void setup_logger(const char *log_mode, const char *log_level);
-
-#ifdef __cplusplus
-}
-#endif

@@ -5,8 +5,6 @@
 
 #pragma once
 
-#include <stdbool.h>
-
 #include "ddres.h"
 #include "logger.h"
 #include "statsd.h"

@@ -5,10 +5,6 @@
 
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "ddprof_context.h"
 #include "worker_attr.h"
 
@@ -27,7 +23,3 @@ DDRes main_loop(const WorkerAttr *, DDProfContext *);
 
 // Same as main loop without any forks
 void main_loop_lib(const WorkerAttr *attr, DDProfContext *ctx);
-
-#ifdef __cplusplus
-}
-#endif

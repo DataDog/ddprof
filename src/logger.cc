@@ -53,13 +53,13 @@ bool LOG_setname(char *name) {
 }
 
 bool LOG_syslog_open() {
-  const struct sockaddr *sa = (struct sockaddr *)&(struct sockaddr_un){
-      .sun_family = AF_UNIX, .sun_path = "/dev/log"};
+  const sockaddr_un sa = {AF_UNIX, "/dev/log"};
   int fd = -1;
 
   if (0 > (fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0)))
     return false;
-  if (0 > connect(3, sa, 110)) { // TODO badmagic
+  if (0 >
+      connect(fd, reinterpret_cast<const struct sockaddr *>(&sa), sizeof(sa))) {
     close(fd);
     return false;
   }
@@ -167,7 +167,7 @@ void vlprintfln(int lvl, int fac, const char *name, const char *format,
     sz_h = snprintf(buf, LOG_MSG_CAP, "<%d>%s %s[%d]: ", lvl + fac * 8, tm_str,
                     name, pid);
   } else {
-    char *levels[LL_LENGTH] = {
+    const char *levels[LL_LENGTH] = {
         [LL_EMERGENCY] = "EMERGENCY",
         [LL_ALERT] = "ALERT",
         [LL_CRITICAL] = "CRITICAL",

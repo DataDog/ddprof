@@ -5,11 +5,9 @@
 
 #pragma once
 
-extern "C" {
-#include <sys/types.h>
-
 #include "ddres.h"
-}
+
+#include <sys/types.h>
 
 typedef struct UnwindState UnwindState;
 

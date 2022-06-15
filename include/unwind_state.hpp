@@ -5,19 +5,17 @@
 
 #pragma once
 
-extern "C" {
-#include "perf_archmap.h"
-#include "unwind_output.h"
-#include <sys/types.h>
-}
-
 #include "ddprof_defs.h"
 #include "ddres_def.h"
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
 #include "dwfl_thread_callbacks.hpp"
 #include "perf.h"
+#include "perf_archmap.h"
 #include "symbol_hdr.hpp"
+#include "unwind_output.h"
+
+#include <sys/types.h>
 
 typedef struct Dwfl Dwfl;
 

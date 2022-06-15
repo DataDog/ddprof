@@ -1,12 +1,12 @@
 
 # Reuse the same statsd implem as ddprof
-set(STATSD_SRC_FILE ../../src/statsd.c)
-set(LOGGER_SRC_FILE ../../src/logger.c)
-set(DDRESLIST_SRC_FILE ../../src/ddres_list.c)
+set(STATSD_SRC_FILE ../../src/statsd.cc)
+set(LOGGER_SRC_FILE ../../src/logger.cc)
+set(DDRESLIST_SRC_FILE ../../src/ddres_list.cc)
 set(STATSD_INCLUDE_DIR ../../include)
 
 set(COLLATZ_SRC
-    collatz.c
+    collatz.cc
     ${STATSD_SRC_FILE}
     ${LOGGER_SRC_FILE}
     ${DDRESLIST_SRC_FILE})

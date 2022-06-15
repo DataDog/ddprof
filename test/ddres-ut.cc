@@ -9,11 +9,7 @@
 #include "loghandle.hpp"
 
 #include <iostream>
-
-extern "C" {
 #include <stdarg.h>
-}
-
 namespace ddprof {
 
 TEST(DDRes, Size) {

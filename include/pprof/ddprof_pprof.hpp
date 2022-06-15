@@ -5,14 +5,12 @@
 
 #pragma once
 
-extern "C" {
 #include "ddprof_context.h"
 #include "ddprof_defs.h"
 #include "ddres_def.h"
 #include "perf_watcher.h"
-#include "unwind_output.h"
-}
 #include "tags.hpp"
+#include "unwind_output.h"
 
 struct ddprof_ffi_Profile;
 struct SymbolHdr;

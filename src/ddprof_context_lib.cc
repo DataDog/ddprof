@@ -5,14 +5,11 @@
 
 #include "ddprof_context_lib.h"
 
-extern "C" {
 #include "ddprof_cmdline.h"
 #include "ddprof_context.h"
 #include "ddprof_input.h"
 #include "logger.h"
 #include "logger_setup.h"
-}
-
 #include "span.hpp"
 
 #include <algorithm>

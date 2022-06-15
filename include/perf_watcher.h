@@ -6,7 +6,6 @@
 #pragma once
 
 #include <linux/perf_event.h>
-#include <stdbool.h>
 #include <stdint.h>
 
 typedef enum {

@@ -3,7 +3,6 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
 #include "ddprof.h"
 
 #include <errno.h>
@@ -27,9 +26,8 @@ extern "C" {
 #include "logger.h"
 #include "perf_mainloop.h"
 #include "pevent_lib.h"
-#include "version.h"
-}
 #include "sys_utils.hpp"
+#include "version.h"
 
 static void disable_core_dumps(void) {
   struct rlimit core_limit;

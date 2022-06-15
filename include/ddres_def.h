@@ -7,12 +7,7 @@
 
 #include "unlikely.h"
 
-#include <stdbool.h>
 #include <stdint.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #define DD_SEVOK 0
 #define DD_SEVNOTICE 1
@@ -86,8 +81,4 @@ static inline bool ddres_equal(DDRes lhs, DDRes rhs) {
 /// true if ddres is fatal (unlikely)
 #define IsDDResFatal(res) unlikely((res)._sev == DD_SEVERROR)
 
-#ifdef __cplusplus
-} // extern "C"
-
 inline bool operator==(DDRes lhs, DDRes rhs) { return ddres_equal(lhs, rhs); }
-#endif

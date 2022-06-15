@@ -11,13 +11,10 @@
 #include <sstream>
 #include <string>
 
-extern "C" {
+#include "constants.hpp"
 #include "ddprof_cmdline.h"
 #include "perf_watcher.h"
 #include "version.h"
-}
-
-#include "constants.hpp"
 
 /************************ Options Table Helper Macros *************************/
 #define X_FREE(a, b, c, d, e, f, g, h, i) FREE_EXP(i b, f);

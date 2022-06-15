@@ -5,6 +5,16 @@
 
 #include "perf_mainloop.h"
 
+#include "ddprof_context_lib.h"
+#include "ddprof_worker.h"
+#include "ddres.h"
+#include "defer.hpp"
+#include "logger.h"
+#include "perf.h"
+#include "persistent_worker_state.h"
+#include "pevent.h"
+#include "unwind.h"
+
 #include <algorithm>
 #include <assert.h>
 #include <errno.h>
@@ -18,19 +28,6 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
-
-extern "C" {
-#include "ddprof_context_lib.h"
-#include "ddprof_worker.h"
-#include "ddres.h"
-#include "logger.h"
-#include "perf.h"
-#include "persistent_worker_state.h"
-#include "pevent.h"
-#include "unwind.h"
-}
-
-#include "defer.hpp"
 
 static pid_t g_child_pid = 0;
 static bool g_termination_requested = false;

@@ -5,14 +5,11 @@
 
 #include "dwfl_symbol.hpp"
 
-#include <llvm/Demangle/Demangle.h>
-
-extern "C" {
 #include "dwfl_internals.h"
 #include "logger.h"
-}
 
 #include <cassert>
+#include <llvm/Demangle/Demangle.h>
 #include <string_view>
 
 namespace ddprof {

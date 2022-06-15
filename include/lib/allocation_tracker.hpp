@@ -6,11 +6,8 @@
 #pragma once
 
 #include "ddres_def.h"
-#include "unlikely.h"
-
-extern "C" {
 #include "pevent.h"
-}
+#include "unlikely.h"
 
 #include <atomic>
 #include <cstddef>

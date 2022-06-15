@@ -5,17 +5,13 @@
 
 #pragma once
 
-extern "C" {
 #include "ddprof_defs.h"
-#include "dwfl_internals.h"
-#include <sys/types.h>
-}
-
-#include "ddres.h"
-
 #include "ddprof_file_info.hpp"
+#include "ddres.h"
 #include "dso.hpp"
+#include "dwfl_internals.h"
 
+#include <sys/types.h>
 #include <unordered_map>
 #include <unordered_set>
 
