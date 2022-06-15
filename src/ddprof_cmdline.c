@@ -124,35 +124,35 @@ bool get_trace_format(const char *str, uint8_t *trace_off, uint8_t *trace_sz) {
 
 // If this returns false, then the passed watcher should be regarded as invalid
 bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
-/*
-<tracepoint-spec>  ::= <type-part> <name-part>
-                     | <type-part> <name-part> <location-part>
-                     | <type-part> <name-part> <location-part> <cadence-part>
-<type-part>        ::= "" | <type-sep> <type-qualifier>
-<name-part>        ::= <groupname> <event-sep> <eventname>
-                     | <eventname>
-                     | <id>
-<location-part>    ::= <register-sep> <register>
-                     | <offset-sep> <offset>
-                     | <offset-sep> <offset> <size-sep> <size>
-<cadence-part>     ::= <period-sep> <period>
-                     | <frequency-sep> <frequency>
-<type-part>        ::= [Mm][Gg] | [Gg][Mm] | [Mm] | [Gg]
-<groupname>        ::= <any valid filesystem characters except <event-sep>?>
-<eventname>        ::= <any valid filesystem characters except <event-sep>?>
-<id>               ::= <number>
-<register>         ::= <number>
-<offset>           ::= <number>
-<size>             ::= <number>
-<period>           ::= <number>
-<frequency>        ::= <number>
-<type-sep>         ::= "|"
-<event-sep>        ::= ":" | "/"
-<register-sep>     :: = "%"
-<offset-sep>       :: = "$"
-<period-sep>       :: = "@" | ","
-<frequency-sep>    :: = "^"
-*/
+  /*
+  <tracepoint-spec>  ::= <type-part> <name-part>
+                       | <type-part> <name-part> <location-part>
+                       | <type-part> <name-part> <location-part> <cadence-part>
+  <type-part>        ::= "" | <type-sep> <type-qualifier>
+  <name-part>        ::= <groupname> <event-sep> <eventname>
+                       | <eventname>
+                       | <id>
+  <location-part>    ::= <register-sep> <register>
+                       | <offset-sep> <offset>
+                       | <offset-sep> <offset> <size-sep> <size>
+  <cadence-part>     ::= <period-sep> <period>
+                       | <frequency-sep> <frequency>
+  <type-part>        ::= [Mm][Gg] | [Gg][Mm] | [Mm] | [Gg]
+  <groupname>        ::= <any valid filesystem characters except <event-sep>?>
+  <eventname>        ::= <any valid filesystem characters except <event-sep>?>
+  <id>               ::= <number>
+  <register>         ::= <number>
+  <offset>           ::= <number>
+  <size>             ::= <number>
+  <period>           ::= <number>
+  <frequency>        ::= <number>
+  <type-sep>         ::= "|"
+  <event-sep>        ::= ":" | "/"
+  <register-sep>     :: = "%"
+  <offset-sep>       :: = "$"
+  <period-sep>       :: = "@" | ","
+  <frequency-sep>    :: = "^"
+  */
   char *str = strdup(_str);
   size_t sz_str = strlen(str);
   const char *groupname;

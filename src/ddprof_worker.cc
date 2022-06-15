@@ -189,8 +189,8 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     // in lib mode we don't aggregate (protect to avoid link failures)
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
-    DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr,
-                                    sample_val, watcher, pprof));
+    DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr, sample_val,
+                                    watcher, pprof));
 #else
     // Call the user's stack handler
     if (ctx->stack_handler) {

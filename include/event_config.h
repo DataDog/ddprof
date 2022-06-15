@@ -9,22 +9,22 @@
 #include <stdint.h>
 
 typedef enum EventConfType {
-  EVENT_NONE      = 0,  // note:  this is not allowed, but named for consistency
-  EVENT_CALLGRAPH = 1<<0,
-  EVENT_METRIC    = 1<<1,
-  EVENT_BOTH      = EVENT_CALLGRAPH | EVENT_METRIC,
+  EVENT_NONE = 0, // note:  this is not allowed, but named for consistency
+  EVENT_CALLGRAPH = 1 << 0,
+  EVENT_METRIC = 1 << 1,
+  EVENT_BOTH = EVENT_CALLGRAPH | EVENT_METRIC,
 } EventConfType;
 
 typedef enum EventConfLocationType {
-  ECLOC_FREQ    = 0, // count simple events
-  ECLOC_REG     = 1, // Use the register specified in `register_num`
-  ECLOC_RAW     = 2, // Use the offset/size into the underlying RAW event
+  ECLOC_FREQ = 0, // count simple events
+  ECLOC_REG = 1,  // Use the register specified in `register_num`
+  ECLOC_RAW = 2,  // Use the offset/size into the underlying RAW event
 } EventConfLocationType;
 
 typedef enum EventConfCadenceType {
-  ECCAD_UNDEF  = 0,
+  ECCAD_UNDEF = 0,
   ECCAD_PERIOD = 1,
-  ECCAD_FREQ   = 2,
+  ECCAD_FREQ = 2,
 } EventConfCadenceType;
 
 typedef struct EventConf {

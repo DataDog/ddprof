@@ -11,8 +11,8 @@ cc -g ${ONAME}.lex.c ${ONAME}.tab.c -I../../../include -o event
 ./event "OneGroup:OneEvent"
 ./event 555
 ./event 'EventWithRegister%2'
-./event 'EventWithOffset$8'
-./event 'EventWithOffsetAndSize$8.24'
+./event 'EventWithOffset$24'
+./event 'EventWithOffsetAndSize$24.4'
 ./event 'EventWithMetric|M'
 ./event 'EventWithCallgraph|G'
 ./event 'EventWithBoth|MG'
