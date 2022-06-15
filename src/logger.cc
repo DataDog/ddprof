@@ -205,14 +205,16 @@ void vlprintfln(int lvl, int fac, const char *name, const char *format,
   } while (rc < 0 && errno == EINTR);
 }
 
-void olprintfln(int lvl, int fac, const char *name, const char *fmt, ...) {
+void olprintfln(int lvl, int fac, const char *name, const char *fmt,
+                ...) { // NOLINT cert-dcl50-cpp
   va_list args;
   va_start(args, fmt);
   vlprintfln(lvl, fac, name, fmt, args);
   va_end(args);
 }
 
-void lprintfln(int lvl, int fac, const char *name, const char *fmt, ...) {
+void lprintfln(int lvl, int fac, const char *name, const char *fmt,
+               ...) { // NOLINT cert-dcl50-cpp
   va_list args;
   va_start(args, fmt);
   vlprintfln(lvl, fac, name, fmt, args);
