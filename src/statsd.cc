@@ -85,13 +85,16 @@ DDRes statsd_send(int fd_sock, const char *key, void *val, int type) {
   switch (type) {
   default:
   case STAT_MS_LONG:
-    sz = snprintf(buf, sizeof(buf), "%s:%ld|%s", key, *(long *)val, "ms");
+    sz = snprintf(buf, sizeof(buf), "%s:%ld|%s", key,
+                  *reinterpret_cast<long *>(val), "ms");
     break;
   case STAT_MS_FLOAT:
-    sz = snprintf(buf, sizeof(buf), "%s:%f|%s", key, *(float *)val, "ms");
+    sz = snprintf(buf, sizeof(buf), "%s:%f|%s", key,
+                  *reinterpret_cast<float *>(val), "ms");
     break;
   case STAT_COUNT:
-    sz = snprintf(buf, sizeof(buf), "%s:%ld|%s", key, *(long *)val, "c");
+    sz = snprintf(buf, sizeof(buf), "%s:%ld|%s", key,
+                  *reinterpret_cast<long *>(val), "c");
     break;
   case STAT_GAUGE:
     sz = snprintf(buf, sizeof(buf), "%s:%ld|%s", key, *(long *)val, "g");
