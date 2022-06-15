@@ -7,7 +7,7 @@
 
 #include "mapinfo_table.hpp"
 #include "symbol_table.hpp"
-#include "unwind_output.h"
+#include "unwind_output.hpp"
 
 namespace ddprof {
 #define K_MOCK_LOC_SIZE 11

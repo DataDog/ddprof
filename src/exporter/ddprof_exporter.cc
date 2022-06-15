@@ -5,14 +5,10 @@
 
 #include "exporter/ddprof_exporter.hpp"
 
-extern "C" {
-#include "ddprof/ffi.h"
-#include "ddprof_cmdline.h"
-}
-
-#include "arraysize.h"
+#include "arraysize.hpp"
+#include "ddprof_cmdline.hpp"
 #include "ddprof_ffi_utils.hpp"
-#include "ddres.h"
+#include "ddres.hpp"
 #include "defer.hpp"
 #include "tags.hpp"
 
@@ -120,6 +116,7 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
   // Debug process : capture pprof to a folder
   exporter->_debug_pprof_prefix = exporter->_input.debug_pprof_prefix;
   exporter->_export = arg_yesno(exporter->_input.do_export, 1);
+
   return ddres_init();
 }
 

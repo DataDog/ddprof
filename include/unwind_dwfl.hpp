@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "ddres_def.h"
+#include "ddres_def.hpp"
 
 typedef struct UnwindState UnwindState;
 namespace ddprof {

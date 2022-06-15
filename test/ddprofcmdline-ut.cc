@@ -3,10 +3,8 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include "ddprof_cmdline.h"
-#include "perf_watcher.h"
-}
+#include "ddprof_cmdline.hpp"
+#include "perf_watcher.hpp"
 
 #include <gtest/gtest.h>
 

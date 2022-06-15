@@ -3,33 +3,29 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include "ddprof_worker.h"
+#include "ddprof_worker.hpp"
 
-#include <stddef.h>
-#include <stdint.h>
-#include <sys/time.h>
-#include <time.h>
-
-#include "ddprof_context.h"
-#include "ddprof_stats.h"
-#include "intrin.h"
-#include "logger.h"
-#include "perf.h"
-#include "pevent_lib.h"
-#include "procutils.h"
-#include "stack_handler.h"
-}
-
+#include "ddprof_context.hpp"
+#include "ddprof_stats.hpp"
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
 #include "exporter/ddprof_exporter.hpp"
+#include "logger.hpp"
+#include "perf.hpp"
+#include "pevent_lib.hpp"
 #include "pprof/ddprof_pprof.hpp"
+#include "procutils.hpp"
+#include "stack_handler.hpp"
 #include "tags.hpp"
+#include "timer.hpp"
 #include "unwind.hpp"
 #include "unwind_state.hpp"
 
 #include <cassert>
+#include <stddef.h>
+#include <stdint.h>
+#include <sys/time.h>
+#include <time.h>
 
 #ifdef DBG_JEMALLOC
 #  include <jemalloc/jemalloc.h>
@@ -159,6 +155,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   struct UnwindState *us = ctx->worker_ctx.us;
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
 
+  unsigned long this_ticks_unwind = ddprof::get_tsc_cycles();
   // copy the sample context into the unwind structure
   unwind_init_sample(us, sample->regs, sample->pid, sample->size_stack,
                      sample->data_stack);
@@ -170,7 +167,6 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   // If this is a SW_TASK_CLOCK-type event, then aggregate the time
   if (ctx->watchers[watcher_pos].config == PERF_COUNT_SW_TASK_CLOCK)
     ddprof_stats_add(STATS_CPU_TIME, sample->period, NULL);
-  unsigned long this_ticks_unwind = __rdtsc();
   DDRes res = unwindstate__unwind(us);
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
@@ -194,8 +190,8 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     }
 #endif
   }
-  DDRES_CHECK_FWD(ddprof_stats_add(STATS_UNWIND_TICKS,
-                                   __rdtsc() - this_ticks_unwind, NULL));
+  DDRES_CHECK_FWD(ddprof_stats_add(
+      STATS_UNWIND_TICKS, ddprof::get_tsc_cycles() - this_ticks_unwind, NULL));
 
   return ddres_init();
 }

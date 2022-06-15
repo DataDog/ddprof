@@ -5,15 +5,12 @@
 
 #pragma once
 
-extern "C" {
-#include "ddprof_defs.h"
-}
+#include "ddprof_defs.hpp"
+#include "region_holder.hpp"
 
 #include <iostream>
 #include <string>
 #include <utility>
-
-#include "region_holder.hpp"
 
 // Out of namespace to allow holding it in C object
 

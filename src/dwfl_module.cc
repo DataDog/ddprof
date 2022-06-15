@@ -5,9 +5,7 @@
 
 #include "dwfl_module.hpp"
 
-extern "C" {
-#include "logger.h"
-}
+#include "logger.hpp"
 
 namespace ddprof {
 

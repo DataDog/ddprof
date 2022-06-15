@@ -5,7 +5,7 @@
 
 #include <gtest/gtest.h>
 
-#include "perf.h"
+#include "perf.hpp"
 #include "savecontext.hpp"
 #include "unwind.hpp"
 #include "unwind_state.hpp"

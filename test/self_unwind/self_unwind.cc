@@ -3,32 +3,26 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include "ddprof.h"
-#include "ddprof_context.h"
-#include "ddprof_context_lib.h"
-#include "ddprof_input.h"
-#include "stack_handler.h"
-#include <sys/sysinfo.h>
-#include <unistd.h>
-}
-
-#include "arraysize.h"
+#include "arraysize.hpp"
+#include "ddprof.hpp"
+#include "ddprof_context.hpp"
+#include "ddprof_context_lib.hpp"
+#include "ddprof_input.hpp"
 #include "ddprof_output.hpp"
-#include "ddres.h"
+#include "ddres.hpp"
+#include "stack_handler.hpp"
 #include "stackchecker.hpp"
 
 #include <iostream>
+#include <sys/sysinfo.h>
 #include <unistd.h>
 
 static const char *k_test_executable = "BadBoggleSolver_run";
 
-extern "C" {
 // Callback to give to ddprof
 static bool stack_addtomap(const UnwindOutput *unwind_output,
                            const DDProfContext *ctx, void *callback_ctx,
                            int perf_option_pos);
-}
 
 namespace suw {
 

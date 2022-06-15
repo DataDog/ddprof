@@ -3,7 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "ddres.h"
+#include "ddres.hpp"
 #include <cstddef>
 #include <fstream>
 #include <limits>

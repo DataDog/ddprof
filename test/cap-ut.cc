@@ -5,17 +5,13 @@
 
 #include <gtest/gtest.h>
 
-#include <array>
-#include <iostream>
-
+#include "cap_display.hpp"
+#include "logger.hpp"
 #include "loghandle.hpp"
 
-extern "C" {
-#include "cap_display.h"
-#include "logger.h"
-
+#include <array>
+#include <iostream>
 #include <sys/capability.h>
-}
 
 namespace ddprof {
 

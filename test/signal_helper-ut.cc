@@ -3,13 +3,11 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include "signal_helper.h"
-#include <sys/types.h>
-#include <unistd.h>
-}
+#include "signal_helper.hpp"
 
 #include <gtest/gtest.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 TEST(SignalHelperTst, ProcessIsAlive) {
   pid_t myPid = getpid();

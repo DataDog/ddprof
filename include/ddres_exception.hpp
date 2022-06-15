@@ -7,9 +7,9 @@
 
 #include <exception>
 
-#include "ddres_def.h"
-#include "ddres_helpers.h"
-#include "ddres_list.h"
+#include "ddres_def.hpp"
+#include "ddres_helpers.hpp"
+#include "ddres_list.hpp"
 
 namespace ddprof {
 

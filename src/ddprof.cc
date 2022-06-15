@@ -3,8 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include "ddprof.h"
+#include "ddprof.hpp"
 
 #include <errno.h>
 #include <execinfo.h>
@@ -15,21 +14,19 @@ extern "C" {
 #include <sys/sysinfo.h>
 #include <unistd.h>
 
-#include "cap_display.h"
-#include "ddprof_cmdline.h"
-#include "ddprof_context.h"
-#include "ddprof_context_lib.h"
-#include "ddprof_input.h"
-#include "ddprof_stats.h"
-#include "ddprof_worker.h"
-#include "ddres.h"
-#include "intrin.h"
-#include "logger.h"
-#include "perf_mainloop.h"
-#include "pevent_lib.h"
-#include "version.h"
-}
+#include "cap_display.hpp"
+#include "ddprof_cmdline.hpp"
+#include "ddprof_context.hpp"
+#include "ddprof_context_lib.hpp"
+#include "ddprof_input.hpp"
+#include "ddprof_stats.hpp"
+#include "ddprof_worker.hpp"
+#include "ddres.hpp"
+#include "logger.hpp"
+#include "perf_mainloop.hpp"
+#include "pevent_lib.hpp"
 #include "sys_utils.hpp"
+#include "version.hpp"
 
 static void disable_core_dumps(void) {
   struct rlimit core_limit;

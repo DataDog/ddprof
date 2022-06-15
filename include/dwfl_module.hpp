@@ -1,11 +1,8 @@
 #pragma once
 
-extern "C" {
-#include "dwfl_internals.h"
-}
-
 #include "ddprof_file_info.hpp"
 #include "dso.hpp"
+#include "dwfl_internals.hpp"
 
 namespace ddprof {
 

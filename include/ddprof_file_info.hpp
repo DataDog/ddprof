@@ -5,16 +5,13 @@
 
 #pragma once
 
-extern "C" {
-#include "ddprof_defs.h"
-}
-#include <string>
-#include <unordered_map>
-#include <vector>
-
+#include "ddprof_defs.hpp"
 #include "ddprof_file_info-i.hpp"
 #include "hash_helper.hpp"
 
+#include <string>
+#include <unordered_map>
+#include <vector>
 namespace ddprof {
 
 /// Defines file uniqueness

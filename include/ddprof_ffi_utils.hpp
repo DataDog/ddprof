@@ -9,7 +9,7 @@ extern "C" {
 #include "ddprof/ffi.h"
 }
 
-#include "string_view.h"
+#include "string_view.hpp"
 
 #include <string_view>
 

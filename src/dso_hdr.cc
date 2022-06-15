@@ -5,20 +5,18 @@
 
 #include "dso_hdr.hpp"
 
-extern "C" {
-#include "ddprof_defs.h"
-#include "logger.h"
-#include "procutils.h"
-#include "signal_helper.h"
-#include <fcntl.h>
-#include <unistd.h>
-}
-#include "ddres.h"
+#include "ddprof_defs.hpp"
+#include "ddres.hpp"
 #include "defer.hpp"
+#include "logger.hpp"
+#include "procutils.hpp"
+#include "signal_helper.hpp"
 
 #include <algorithm>
 #include <cassert>
+#include <fcntl.h>
 #include <numeric>
+#include <unistd.h>
 
 namespace ddprof {
 

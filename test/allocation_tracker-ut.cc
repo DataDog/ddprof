@@ -5,8 +5,8 @@
 #include "allocation_tracker.hpp"
 
 #include "ipc.hpp"
-#include "perf_watcher.h"
-#include "pevent_lib.h"
+#include "perf_watcher.hpp"
+#include "pevent_lib.hpp"
 #include "ringbuffer_holder.hpp"
 #include "ringbuffer_utils.hpp"
 #include "syscalls.hpp"

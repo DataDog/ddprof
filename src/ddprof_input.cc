@@ -3,7 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "ddprof_input.h"
+#include "ddprof_input.hpp"
 
 #include <cassert>
 #include <cstdio>
@@ -11,13 +11,10 @@
 #include <sstream>
 #include <string>
 
-extern "C" {
-#include "ddprof_cmdline.h"
-#include "perf_watcher.h"
-#include "version.h"
-}
-
 #include "constants.hpp"
+#include "ddprof_cmdline.hpp"
+#include "perf_watcher.hpp"
+#include "version.hpp"
 
 /************************ Options Table Helper Macros *************************/
 #define X_FREE(a, b, c, d, e, f, g, h, i) FREE_EXP(i b, f);

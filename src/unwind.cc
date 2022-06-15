@@ -5,18 +5,15 @@
 
 #include "unwind.hpp"
 
-extern "C" {
-#include "ddres.h"
-#include "logger.h"
-#include "signal_helper.h"
-#include "unwind_metrics.h"
-}
-
+#include "ddres.hpp"
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
+#include "logger.hpp"
+#include "signal_helper.hpp"
 #include "symbol_hdr.hpp"
 #include "unwind_dwfl.hpp"
 #include "unwind_helpers.hpp"
+#include "unwind_metrics.hpp"
 #include "unwind_state.hpp"
 
 namespace ddprof {

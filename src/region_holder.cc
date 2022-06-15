@@ -5,15 +5,13 @@
 
 #include "region_holder.hpp"
 
-extern "C" {
+#include "ddres.hpp"
+#include "logger.hpp"
+
 #include <fcntl.h>
 #include <sys/auxv.h>
 #include <sys/mman.h>
 #include <unistd.h>
-
-#include "ddres.h"
-#include "logger.h"
-}
 
 namespace ddprof {
 RegionHolder::RegionHolder() : _region(nullptr), _sz(0), _type(dso::kUndef) {}

@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "ddprof_defs.h"
+#include "ddprof_defs.hpp"
 #include "ddprof_file_info.hpp"
 #include "dso.hpp"
 #include "dso_symbol_lookup.hpp"
@@ -16,10 +16,8 @@
 #include <map>
 #include <unordered_map>
 
-extern "C" {
 typedef struct Dwfl Dwfl;
 typedef struct Dwfl_Module Dwfl_Module;
-}
 
 namespace ddprof {
 

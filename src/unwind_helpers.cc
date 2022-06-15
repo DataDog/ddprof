@@ -3,14 +3,12 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include "ddprof_stats.h"
-}
+#include "unwind_helpers.hpp"
 
-#include "ddres.h"
+#include "ddprof_stats.hpp"
+#include "ddres.hpp"
 #include "dso_hdr.hpp"
 #include "symbol_hdr.hpp"
-#include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
 
 namespace ddprof {

@@ -6,7 +6,7 @@
 #include <gtest/gtest.h>
 #include <string>
 
-#include "dwfl_internals.h"
+#include "dwfl_internals.hpp"
 #include "loghandle.hpp"
 
 namespace ddprof {

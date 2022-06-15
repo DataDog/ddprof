@@ -5,11 +5,8 @@
 
 #pragma once
 
-extern "C" {
-#include "ddprof_defs.h"
-}
-
 #include "common_symbol_errors.hpp"
+#include "ddprof_defs.hpp"
 #include "dso.hpp"
 #include "symbol_hdr.hpp"
 

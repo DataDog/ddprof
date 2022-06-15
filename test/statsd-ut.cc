@@ -3,17 +3,14 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include "statsd.h"
-
-#include <fcntl.h>
-#include <sys/socket.h>
-#include <unistd.h>
-}
+#include "statsd.hpp"
 
 #include <cstdlib>
+#include <fcntl.h>
 #include <gtest/gtest.h>
 #include <string>
+#include <sys/socket.h>
+#include <unistd.h>
 
 TEST(StatsDTest, Connection) {
   // This takes advantage of the fact that UDP domain sockets opened in the way

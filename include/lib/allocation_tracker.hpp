@@ -5,12 +5,9 @@
 
 #pragma once
 
-#include "ddres_def.h"
-#include "unlikely.h"
-
-extern "C" {
-#include "pevent.h"
-}
+#include "ddres_def.hpp"
+#include "pevent.hpp"
+#include "unlikely.hpp"
 
 #include <atomic>
 #include <cstddef>

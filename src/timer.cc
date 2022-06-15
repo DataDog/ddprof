@@ -5,11 +5,9 @@
 
 #include "timer.hpp"
 
+#include "ddres.hpp"
 #include "defer.hpp"
-
-extern "C" {
-#include "perf.h"
-}
+#include "perf.hpp"
 
 #ifdef __x86_64__
 #  include <cpuid.h>

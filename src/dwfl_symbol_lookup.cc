@@ -5,19 +5,16 @@
 
 #include "dwfl_symbol_lookup.hpp"
 
-extern "C" {
-#include "dwfl_internals.h"
-#include "logger.h"
-}
+#include "dwfl_hdr.hpp"
+#include "dwfl_internals.hpp"
+#include "dwfl_module.hpp"
+#include "dwfl_symbol.hpp"
+#include "logger.hpp"
+#include "string_format.hpp"
 
 #include <algorithm>
 #include <cassert>
 #include <string>
-
-#include "dwfl_hdr.hpp"
-#include "dwfl_module.hpp"
-#include "dwfl_symbol.hpp"
-#include "string_format.hpp"
 
 namespace ddprof {
 

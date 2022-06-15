@@ -5,12 +5,10 @@
 
 #pragma once
 
-#include "ddprof_defs.h"
+#include "ddprof_defs.hpp"
 #include "symbol.hpp"
 
-extern "C" {
 #include "gelf.h"
-}
 
 struct Dwfl_Module;
 

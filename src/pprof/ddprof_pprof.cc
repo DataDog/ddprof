@@ -5,14 +5,10 @@
 
 #include "pprof/ddprof_pprof.hpp"
 
-extern "C" {
-#include "ddprof/ffi.h"
-#include "ddprof_defs.h"
-#include "ddres.h"
-#include "pevent_lib.h"
-}
-
+#include "ddprof_defs.hpp"
 #include "ddprof_ffi_utils.hpp"
+#include "ddres.hpp"
+#include "pevent_lib.hpp"
 #include "span.hpp"
 #include "symbol_hdr.hpp"
 
