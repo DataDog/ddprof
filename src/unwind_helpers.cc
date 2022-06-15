@@ -102,19 +102,15 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
   uint64_t sp_end = sp_start + us->stack_sz;
 
   if (addr < sp_start && addr > sp_start - 4096) {
-    // #ifdef DEBUG
+#ifdef DEBUG
     // libdwfl might try to read values which are before our snapshot of the
-    // stack.  Because t he stack has the growsdown property and has a max size,
+    // stack.  Because the stack has the growsdown property and has a max size,
     // the pages before the current top of the stack are safe (no DSOs will
     // ever be mapped there on Linux, even if they actually did fit in the
     // single page before the top of the stack).  Avoiding these reads allows
     // us to prevent unnecessary backpopulate calls.
-    // if (sp_start - addr == 8) {
-    //    *result = us->initial_regs.regs[PAM_X86_RBP];
-    //    return true;
-    // }
     LG_DBG("Invalid stack access:%lu before SP", sp_start - addr);
-    // #endif
+#endif
     return false;
   } else if (addr < sp_start || addr + sizeof(ElfWord_t) > sp_end) {
     // If we're here, we're not in the stack.  We should interpet addr as an

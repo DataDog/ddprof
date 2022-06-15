@@ -46,21 +46,6 @@ DDRes unwindstate__unwind(UnwindState *us) {
   if (IsDDResNotOK(res)) {
     find_dso_add_error_frame(us);
   }
-  auto &symbol_table = us->symbol_hdr._symbol_table;
-  auto &mapping_table = us->symbol_hdr._mapinfo_table;
-  if (us->output.nb_locs == 0 ||
-      symbol_table[us->output.locs[us->output.nb_locs - 1]._symbol_idx]
-              ._symname != "_start") {
-    printf("!!!OOOPS!!!\n");
-    for (uint64_t i = 0; i < us->output.nb_locs; ++i) {
-      auto &loc = us->output.locs[i];
-      auto &symbol = symbol_table[loc._symbol_idx];
-      auto &mapping = mapping_table[loc._map_info_idx];
-      printf("[%lu] %s %s:%u [0x%lx -> 0x%lx]\n", i, symbol._symname.c_str(),
-             symbol._srcpath.c_str(), symbol._lineno, loc.ip,
-             loc.ip - mapping._low_addr + mapping._offset);
-    }
-  }
   // Add a frame that identifies executable to which these belong
   add_virtual_base_frame(us);
   if (us->_dwfl_wrapper->_inconsistent) {
