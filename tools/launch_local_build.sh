@@ -29,6 +29,9 @@ usage() {
     echo " Alternative solution -- You can specify a folder to mount in a .env file ${CURRENTDIR}/.env"
     echo " Default solution     -- if nothing is specified current directory will be shared (!slow on macos)"    
     echo ""
+    echo " Extra directory mounted"
+    echo " Setting LOCAL_TOOL_DIR will mount an extra directory in /tools"
+    echo ""
     echo " Optional parameters "
     echo "    --dockerfile/-f : use a custom docker file."
     echo "    --clean/-c : rebuild the image before creating it."
@@ -138,6 +141,11 @@ else
     echo "Base image found, not rebuilding. Remove it to force rebuild."
 fi
 
+MOUNT_TOOL_CMD=""
+if [ ! -z ${LOCAL_TOOL_DIR-""} ]; then
+  MOUNT_TOOL_CMD="${MOUNT_TOOL_CMD} -v ${LOCAL_TOOL_DIR}:/tools"
+fi
+
 if [ -z "$(ssh-add -L)" ]; then
     echo "Please start your ssh agent. Example :"
     echo "ssh-add ~/.ssh/id_rsa"
@@ -151,5 +159,5 @@ fi
 
 echo "Launch docker image, DO NOT STORE ANYTHING outside of mounted directory (container is erased on exit)."
 # shellcheck disable=SC2086
-CMD="docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -w /app --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} -e SSH_AUTH_SOCK=/ssh-agent \"${DOCKER_NAME}${DOCKER_TAG}\" /bin/bash"
+CMD="docker run -it --rm ${MOUNT_TOOL_CMD} -v /run/host-services/ssh-auth.sock:/ssh-agent -w /app --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} -e SSH_AUTH_SOCK=/ssh-agent \"${DOCKER_NAME}${DOCKER_TAG}\" /bin/bash"
 eval "$CMD"

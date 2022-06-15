@@ -143,7 +143,11 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
   if (IsDDResNotOK(add_symbol(dwfl_frame, us))) {
     return DWARF_CB_ABORT;
   }
-
+  int dwfl_error_value = dwfl_errno();
+  if (dwfl_error_value) {
+    LG_DBG("Error flagged at depth = %lu -- Error:%s ", us->output.nb_locs,
+           dwfl_errmsg(dwfl_error_value));
+  }
   return DWARF_CB_OK;
 }
 
