@@ -7,9 +7,9 @@
 
 #include <linux/perf_event.h>
 
-#include "ddres.h"
-#include "persistent_worker_state.h"
-#include "pevent.h"
+#include "ddres.hpp"
+#include "persistent_worker_state.hpp"
+#include "pevent.hpp"
 
 typedef struct DDProfContext DDProfContext;
 

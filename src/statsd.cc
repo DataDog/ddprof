@@ -3,7 +3,9 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "statsd.h"
+#include "statsd.hpp"
+
+#include "ddres.hpp"
 
 #include <assert.h>
 #include <errno.h>
@@ -12,8 +14,6 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
-
-#include "ddres.h"
 
 DDRes statsd_listen(const char *path, size_t sz_path, int *fd) {
   struct sockaddr_un addr_bind = {.sun_family = AF_UNIX};

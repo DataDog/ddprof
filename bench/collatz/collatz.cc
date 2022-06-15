@@ -13,13 +13,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#ifdef __x86_64__
-#  include <x86intrin.h>
-#elif __aarch64__
-#  define __rdtsc() 0
-#endif
-
-#include "statsd.h"
+#include "statsd.hpp"
+#include "timer.hpp"
 
 #ifdef USE_DD_PROFILING
 #  include "dd_profiling.h"
@@ -197,11 +192,11 @@ int main(int c, char **v) {
   // work than we have cores, we might realistically start after other workers
   // have started.  So need to double-tap the barrier.
   pthread_barrier_wait(pb);
-  start_tick[me] = __rdtsc();
+  start_tick[me] = ddprof::get_tsc_cycles();
   pthread_barrier_wait(pb);
   for (int j = 0; j < ki; j++) {
 
-    work_start = __rdtsc();
+    work_start = ddprof::get_tsc_cycles();
     for (int i = 0; i < kj; i++) {
       int arg = t ? t : i;
       funs[arg % funlen](arg);
@@ -209,7 +204,7 @@ int main(int c, char **v) {
 
     // Print to statsd, if configured
     if (-1 != fd_statsd) {
-      work_end = __rdtsc();
+      work_end = ddprof::get_tsc_cycles();
       static char key_ticks[] = "app.collatz.ticks";
       static char key_stacks[] = "app.collatz.stacks";
       static char key_funs[] = "app.collatz.functions";
@@ -226,7 +221,7 @@ int main(int c, char **v) {
   // Wait for everyone to be done
   __sync_add_and_fetch(counter, my_counter);
   pthread_barrier_wait(pb);
-  end_tick[me] = __rdtsc();
+  end_tick[me] = ddprof::get_tsc_cycles();
   pthread_barrier_wait(pb);
   if (getpid() != pids[0])
     return 0;

@@ -3,7 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "pevent_lib.h"
+#include "pevent_lib.hpp"
 #include "ringbuffer_holder.hpp"
 #include "ringbuffer_utils.hpp"
 

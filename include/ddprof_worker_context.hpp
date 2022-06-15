@@ -1,7 +1,7 @@
 #pragma once
 
-#include "pevent.h"
-#include "proc_status.h"
+#include "pevent.hpp"
+#include "proc_status.hpp"
 
 typedef struct DDProfExporter DDProfExporter;
 typedef struct DDProfPProf DDProfPProf;

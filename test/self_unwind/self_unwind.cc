@@ -3,14 +3,14 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "arraysize.h"
-#include "ddprof.h"
-#include "ddprof_context.h"
-#include "ddprof_context_lib.h"
-#include "ddprof_input.h"
+#include "arraysize.hpp"
+#include "ddprof.hpp"
+#include "ddprof_context.hpp"
+#include "ddprof_context_lib.hpp"
+#include "ddprof_input.hpp"
 #include "ddprof_output.hpp"
-#include "ddres.h"
-#include "stack_handler.h"
+#include "ddres.hpp"
+#include "stack_handler.hpp"
 #include "stackchecker.hpp"
 
 #include <iostream>

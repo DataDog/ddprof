@@ -3,7 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "ddprof_cmdline.h"
+#include "ddprof_cmdline.hpp"
 
 #include <assert.h>
 #include <cstring>
@@ -15,9 +15,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "ddres_helpers.h"
-#include "perf_archmap.h"
-#include "perf_watcher.h"
+#include "ddres_helpers.hpp"
+#include "perf_archmap.hpp"
+#include "perf_watcher.hpp"
 
 int arg_which(const char *str, char const *const *set, int sz_set) {
   if (!str || !set)

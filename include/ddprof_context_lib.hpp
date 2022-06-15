@@ -4,7 +4,7 @@
 // Datadog, Inc.
 
 #pragma once
-#include "ddres_def.h"
+#include "ddres_def.hpp"
 
 typedef struct DDProfInput DDProfInput;
 typedef struct DDProfContext DDProfContext;

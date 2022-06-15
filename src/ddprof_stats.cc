@@ -2,7 +2,7 @@
 // under the Apache License Version 2.0. This product includes software
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
-#include "ddprof_stats.h"
+#include "ddprof_stats.hpp"
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -71,15 +71,6 @@ DDRes ddprof_stats_set(unsigned int stat, long n) {
   if (stat >= STATS_LEN)
     DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Invalid stat");
   ddprof_stats[stat] = n;
-  return ddres_init();
-}
-
-DDRes ddprof_stats_divide(unsigned int stat, long in) {
-  if (!ddprof_stats)
-    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Stats backend uninitialized");
-  if (stat >= STATS_LEN)
-    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Invalid stat");
-  ddprof_stats[stat] /= in;
   return ddres_init();
 }
 

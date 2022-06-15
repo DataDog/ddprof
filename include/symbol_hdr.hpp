@@ -8,10 +8,10 @@
 #include "base_frame_symbol_lookup.hpp"
 #include "common_mapinfo_lookup.hpp"
 #include "common_symbol_lookup.hpp"
-#include "ddres_def.h"
+#include "ddres_def.hpp"
 #include "dso_symbol_lookup.hpp"
 #include "dwfl_symbol_lookup.hpp"
-#include "logger.h"
+#include "logger.hpp"
 #include "mapinfo_lookup.hpp"
 
 #include <stdlib.h>

@@ -5,10 +5,10 @@
 
 #include "ringbuffer_utils.hpp"
 
-#include "ddres_helpers.h"
+#include "ddres_helpers.hpp"
 #include "ipc.hpp"
-#include "pevent.h"
-#include "pevent_lib.h"
+#include "pevent.hpp"
+#include "pevent_lib.hpp"
 #include "syscalls.hpp"
 
 #include <sys/eventfd.h>

@@ -5,8 +5,14 @@
 
 #pragma once
 
-#ifdef __x86_64
-#  include <x86intrin.h>
-#elif __aarch64__
-#  define __rdtsc() 0
-#endif
+#include "ddres.hpp"
+#include <sys/types.h>
+
+typedef struct UIDInfo {
+  bool override;
+  uid_t previous_user;
+} UIDInfo;
+
+DDRes user_override(UIDInfo *user_override);
+
+DDRes revert_override(UIDInfo *user_override);

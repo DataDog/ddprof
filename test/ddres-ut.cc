@@ -5,7 +5,7 @@
 
 #include <gtest/gtest.h>
 
-#include "ddres.h"
+#include "ddres.hpp"
 #include "loghandle.hpp"
 
 #include <iostream>

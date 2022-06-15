@@ -5,9 +5,9 @@
 
 #include "dwfl_hdr.hpp"
 
-#include "ddres.h"
+#include "ddres.hpp"
 #include "dwfl_module.hpp"
-#include "logger.h"
+#include "logger.hpp"
 
 #include <algorithm>
 #include <cassert>

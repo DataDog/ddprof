@@ -7,7 +7,7 @@
 
 #include <stddef.h>
 
-#include "ddres_def.h"
+#include "ddres_def.hpp"
 
 typedef enum STAT_TYPES {
   STAT_MS_LONG,

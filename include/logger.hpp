@@ -7,8 +7,8 @@
 
 #include <stdarg.h>
 
-#include "unlikely.h"
-#include "version.h"
+#include "unlikely.hpp"
+#include "version.hpp"
 
 extern char *LOG_IGNORE;
 typedef enum LOG_OPTS {

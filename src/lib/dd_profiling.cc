@@ -8,11 +8,11 @@
 #include "allocation_tracker.hpp"
 #include "constants.hpp"
 #include "daemonize.hpp"
-#include "ddprof_cmdline.h"
+#include "ddprof_cmdline.hpp"
 #include "defer.hpp"
 #include "ipc.hpp"
-#include "logger_setup.h"
-#include "signal_helper.h"
+#include "logger_setup.hpp"
+#include "signal_helper.hpp"
 #include "syscalls.hpp"
 
 #include <cerrno>

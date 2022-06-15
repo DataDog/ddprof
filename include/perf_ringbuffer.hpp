@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "perf.h"
+#include "perf.hpp"
 
 typedef struct RingBuffer {
   const char *start;

@@ -3,13 +3,13 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "ddprof_context_lib.h"
+#include "ddprof_context_lib.hpp"
 
-#include "ddprof_cmdline.h"
-#include "ddprof_context.h"
-#include "ddprof_input.h"
-#include "logger.h"
-#include "logger_setup.h"
+#include "ddprof_cmdline.hpp"
+#include "ddprof_context.hpp"
+#include "ddprof_input.hpp"
+#include "logger.hpp"
+#include "logger_setup.hpp"
 #include "span.hpp"
 
 #include <algorithm>

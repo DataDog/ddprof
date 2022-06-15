@@ -6,7 +6,7 @@
 #include "base_frame_symbol_lookup.hpp"
 
 #include "dso_type.hpp"
-#include "logger.h"
+#include "logger.hpp"
 #include "string_format.hpp"
 
 namespace ddprof {

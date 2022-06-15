@@ -5,11 +5,11 @@
 
 #pragma once
 
-#include "ddprof_defs.h"
+#include "ddprof_defs.hpp"
 #include "ddprof_file_info.hpp"
-#include "ddres.h"
+#include "ddres.hpp"
 #include "dso.hpp"
-#include "dwfl_internals.h"
+#include "dwfl_internals.hpp"
 
 #include <sys/types.h>
 #include <unordered_map>

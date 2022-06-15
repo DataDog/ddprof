@@ -3,16 +3,15 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "pevent_lib.h"
+#include "pevent_lib.hpp"
 
-#include "ddres.h"
+#include "ddres.hpp"
 #include "defer.hpp"
-#include "perf.h"
 #include "perf.hpp"
 #include "ringbuffer_utils.hpp"
 #include "sys_utils.hpp"
 #include "syscalls.hpp"
-#include "user_override.h"
+#include "user_override.hpp"
 
 #include <assert.h>
 #include <errno.h>

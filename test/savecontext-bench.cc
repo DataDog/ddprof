@@ -5,8 +5,8 @@
 
 #include <benchmark/benchmark.h>
 
-#include "perf.h"
-#include "perf_archmap.h"
+#include "perf.hpp"
+#include "perf_archmap.hpp"
 #include "savecontext.hpp"
 #include "syscalls.hpp"
 

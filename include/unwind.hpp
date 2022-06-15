@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "ddres.h"
+#include "ddres.hpp"
 
 #include <sys/types.h>
 

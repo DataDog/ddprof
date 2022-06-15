@@ -5,14 +5,6 @@
 
 #pragma once
 
-#include "ddres.h"
-#include <sys/types.h>
+#include "ddres_def.hpp"
 
-typedef struct UIDInfo {
-  bool override;
-  uid_t previous_user;
-} UIDInfo;
-
-DDRes user_override(UIDInfo *user_override);
-
-DDRes revert_override(UIDInfo *user_override);
+DDRes log_capabilities(bool verbose);

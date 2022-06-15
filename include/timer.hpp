@@ -4,7 +4,7 @@
 // Datadog, Inc.
 #pragma once
 
-#include "ddres.h"
+#include "ddres_def.hpp"
 
 #include <chrono>
 

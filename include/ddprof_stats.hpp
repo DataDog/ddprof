@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include "ddres.h"
-#include "logger.h"
-#include "statsd.h"
+#include "ddres.hpp"
+#include "logger.hpp"
+#include "statsd.hpp"
 
 #define X_ENUM(a, b, c) STATS_##a,
 #define STATS_TABLE(X)                                                         \

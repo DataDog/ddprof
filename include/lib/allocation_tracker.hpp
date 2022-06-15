@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include "ddres_def.h"
-#include "pevent.h"
-#include "unlikely.h"
+#include "ddres_def.hpp"
+#include "pevent.hpp"
+#include "unlikely.hpp"
 
 #include <atomic>
 #include <cstddef>

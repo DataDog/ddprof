@@ -3,16 +3,16 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "perf_mainloop.h"
+#include "perf_mainloop.hpp"
 
-#include "ddprof_context_lib.h"
-#include "ddprof_worker.h"
-#include "ddres.h"
+#include "ddprof_context_lib.hpp"
+#include "ddprof_worker.hpp"
+#include "ddres.hpp"
 #include "defer.hpp"
-#include "logger.h"
-#include "perf.h"
-#include "persistent_worker_state.h"
-#include "pevent.h"
+#include "logger.hpp"
+#include "perf.hpp"
+#include "persistent_worker_state.hpp"
+#include "pevent.hpp"
 #include "unwind.h"
 
 #include <algorithm>

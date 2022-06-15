@@ -5,10 +5,10 @@
 
 #pragma once
 
-#include "ddprof_defs.h"
-#include "ddres_def.h"
-#include "exporter_input.h"
-#include "perf_watcher.h"
+#include "ddprof_defs.hpp"
+#include "ddres_def.hpp"
+#include "exporter_input.hpp"
+#include "perf_watcher.hpp"
 
 typedef int16_t watcher_index_t;
 

@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include "ddprof_defs.h"
-#include "ddres.h"
-#include "proc_status.h"
+#include "ddprof_defs.hpp"
+#include "ddres.hpp"
+#include "proc_status.hpp"
 
 #include <sys/stat.h>
 #include <sys/types.h>

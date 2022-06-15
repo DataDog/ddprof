@@ -5,8 +5,8 @@
 
 #include "region_holder.hpp"
 
-#include "ddres.h"
-#include "logger.h"
+#include "ddres.hpp"
+#include "logger.hpp"
 
 #include <fcntl.h>
 #include <sys/auxv.h>

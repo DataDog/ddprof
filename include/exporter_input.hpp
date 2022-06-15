@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "ddres.h"
-#include "string_view.h"
+#include "ddres.hpp"
+#include "string_view.hpp"
 
 #include <stdlib.h>
 

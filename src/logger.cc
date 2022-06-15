@@ -14,7 +14,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "logger.h"
+#include "logger.hpp"
 
 typedef struct LoggerContext {
   int fd;

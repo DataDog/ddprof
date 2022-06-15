@@ -6,7 +6,7 @@
 #pragma once
 
 #include "common_symbol_errors.hpp"
-#include "ddprof_defs.h"
+#include "ddprof_defs.hpp"
 #include "dso.hpp"
 #include "symbol_hdr.hpp"
 

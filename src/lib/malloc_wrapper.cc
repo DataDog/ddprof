@@ -11,7 +11,7 @@
 #include <malloc.h>
 
 #include "allocation_tracker.hpp"
-#include "unlikely.h"
+#include "unlikely.hpp"
 
 // Declaration of reallocarray is only available starting from glibc 2.28
 extern "C" {

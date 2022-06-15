@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "ddprof_defs.h"
+#include "ddprof_defs.hpp"
 #include "ddprof_file_info-i.hpp"
 #include "dso_type.hpp"
 #include "hash_helper.hpp"

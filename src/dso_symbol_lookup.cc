@@ -6,7 +6,7 @@
 #include "dso_symbol_lookup.hpp"
 
 #include "dso_type.hpp"
-#include "logger.h"
+#include "logger.hpp"
 #include "string_format.hpp"
 
 #include <algorithm>

@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "ddprof_defs.h"
-#include "perf_ringbuffer.h"
+#include "ddprof_defs.hpp"
+#include "perf_ringbuffer.hpp"
 
 #include <sys/types.h>
 

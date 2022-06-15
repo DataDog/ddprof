@@ -3,11 +3,11 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "pevent_lib.h"
+#include "pevent_lib.hpp"
 
-#include "ddprof_context.h"
+#include "ddprof_context.hpp"
 #include "loghandle.hpp"
-#include "perf_watcher.h"
+#include "perf_watcher.hpp"
 
 #include <gtest/gtest.h>
 #include <sys/sysinfo.h>

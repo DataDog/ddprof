@@ -5,8 +5,8 @@
 
 #include "unwind_helpers.hpp"
 
-#include "ddprof_stats.h"
-#include "ddres.h"
+#include "ddprof_stats.hpp"
+#include "ddres.hpp"
 #include "dso_hdr.hpp"
 #include "symbol_hdr.hpp"
 #include "unwind_state.hpp"

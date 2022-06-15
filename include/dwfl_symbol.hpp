@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "ddprof_defs.h"
+#include "ddprof_defs.hpp"
 #include "symbol.hpp"
 
 #include "gelf.h"

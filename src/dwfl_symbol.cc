@@ -5,8 +5,8 @@
 
 #include "dwfl_symbol.hpp"
 
-#include "dwfl_internals.h"
-#include "logger.h"
+#include "dwfl_internals.hpp"
+#include "logger.hpp"
 
 #include <cassert>
 #include <llvm/Demangle/Demangle.h>

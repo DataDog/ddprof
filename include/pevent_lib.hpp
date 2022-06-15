@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include "ddprof_context.h"
-#include "ddres_def.h"
-#include "pevent.h"
+#include "ddprof_context.hpp"
+#include "ddres_def.hpp"
+#include "pevent.hpp"
 
 /// Sets initial state for every pevent in the pevent_hdr
 void pevent_init(PEventHdr *pevent_hdr);

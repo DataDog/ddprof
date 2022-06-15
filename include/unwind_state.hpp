@@ -5,15 +5,15 @@
 
 #pragma once
 
-#include "ddprof_defs.h"
-#include "ddres_def.h"
+#include "ddprof_defs.hpp"
+#include "ddres_def.hpp"
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
 #include "dwfl_thread_callbacks.hpp"
-#include "perf.h"
-#include "perf_archmap.h"
+#include "perf.hpp"
+#include "perf_archmap.hpp"
 #include "symbol_hdr.hpp"
-#include "unwind_output.h"
+#include "unwind_output.hpp"
 
 #include <sys/types.h>
 

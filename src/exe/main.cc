@@ -3,17 +3,17 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "arraysize.h"
+#include "arraysize.hpp"
 #include "constants.hpp"
 #include "daemonize.hpp"
-#include "ddprof.h"
-#include "ddprof_context.h"
-#include "ddprof_context_lib.h"
-#include "ddprof_input.h"
-#include "ddres.h"
+#include "ddprof.hpp"
+#include "ddprof_context.hpp"
+#include "ddprof_context_lib.hpp"
+#include "ddprof_input.hpp"
+#include "ddres.hpp"
 #include "defer.hpp"
 #include "ipc.hpp"
-#include "logger.h"
+#include "logger.hpp"
 
 #include <cassert>
 #include <errno.h>

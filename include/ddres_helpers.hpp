@@ -5,9 +5,9 @@
 
 #pragma once
 
-#include "ddres_def.h"
-#include "ddres_list.h"
-#include "logger.h"
+#include "ddres_def.hpp"
+#include "ddres_list.hpp"
+#include "logger.hpp"
 
 /// Replacement for variadic macro niladic expansion via `__VA_OPT__`, which
 /// is unsupported (boo!) in standards-compliant C static analysis tools and

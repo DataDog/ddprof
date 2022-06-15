@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dwfl_internals.h"
+#include "dwfl_internals.hpp"
 #include <dwarf.h>
 
 pid_t next_thread(Dwfl *, void *, void **);

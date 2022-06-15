@@ -23,7 +23,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #pragma once
 
-#include "perf_archmap.h"
+#include "perf_archmap.hpp"
 #include "span.hpp"
 
 __attribute__((noinline, naked)) void

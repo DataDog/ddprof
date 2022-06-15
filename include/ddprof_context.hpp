@@ -7,10 +7,10 @@
 
 #include <sys/types.h>
 
-#include "ddprof_defs.h"
-#include "ddprof_worker_context.h"
-#include "exporter_input.h"
-#include "perf_watcher.h"
+#include "ddprof_defs.hpp"
+#include "ddprof_worker_context.hpp"
+#include "exporter_input.hpp"
+#include "perf_watcher.hpp"
 
 // forward declarations
 typedef struct StackHandler StackHandler;

@@ -3,7 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "ddprof_stats.h"
+#include "ddprof_stats.hpp"
 
 #include <fcntl.h>
 #include <gtest/gtest.h>

@@ -6,7 +6,7 @@
 #pragma once
 
 #include "ddprof_buffer.hpp"
-#include "ddres.h"
+#include "ddres.hpp"
 #include "span.hpp"
 
 #include <chrono>

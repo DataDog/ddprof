@@ -8,7 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "perf_archmap.h"
+#include "perf_archmap.hpp"
 #include "span.hpp"
 
 /** Save registers and stack for remote unwinding

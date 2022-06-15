@@ -3,7 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "procutils.h"
+#include "procutils.hpp"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,7 +11,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "logger.h"
+#include "logger.hpp"
 
 static char StatusLine[] =
     "%d %s %c %d %d %d %d %u %lu %lu %lu %lu %lu %ld %ld %ld %ld %ld %ld "

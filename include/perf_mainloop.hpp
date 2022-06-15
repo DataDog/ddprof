@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "ddprof_context.h"
-#include "worker_attr.h"
+#include "ddprof_context.hpp"
+#include "worker_attr.hpp"
 
 /**
  * Continuously poll for new events and process them accordingly

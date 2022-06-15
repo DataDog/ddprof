@@ -6,7 +6,7 @@
 #include "pprof/ddprof_pprof.hpp"
 
 #include "ddprof_ffi_utils.hpp"
-#include "ddprof_input.h"
+#include "ddprof_input.hpp"
 #include "loghandle.hpp"
 #include "pevent_lib_mocks.hpp"
 #include "symbol_hdr.hpp"

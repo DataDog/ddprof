@@ -3,8 +3,8 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "perf_ringbuffer.h"
-#include "perf_watcher.h" // for default sample type used in ddprof
+#include "perf_ringbuffer.hpp"
+#include "perf_watcher.hpp" // for default sample type used in ddprof
 
 #include <gtest/gtest.h>
 #include <stdio.h>

@@ -3,21 +3,21 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "ddprof_worker.h"
+#include "ddprof_worker.hpp"
 
-#include "ddprof_context.h"
-#include "ddprof_stats.h"
+#include "ddprof_context.hpp"
+#include "ddprof_stats.hpp"
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
 #include "exporter/ddprof_exporter.hpp"
-#include "intrin.h"
-#include "logger.h"
-#include "perf.h"
-#include "pevent_lib.h"
+#include "logger.hpp"
+#include "perf.hpp"
+#include "pevent_lib.hpp"
 #include "pprof/ddprof_pprof.hpp"
-#include "procutils.h"
-#include "stack_handler.h"
+#include "procutils.hpp"
+#include "stack_handler.hpp"
 #include "tags.hpp"
+#include "timer.hpp"
 #include "unwind.hpp"
 #include "unwind_state.hpp"
 
@@ -35,12 +35,12 @@
 
 using namespace ddprof;
 
-static const DDPROF_STATS s_cycled_stats[] = {STATS_UNWIND_CPU_USAGE,
+static const DDPROF_STATS s_cycled_stats[] = {STATS_UNWIND_TICKS,
                                               STATS_EVENT_COUNT,
                                               STATS_EVENT_LOST,
                                               STATS_SAMPLE_COUNT,
                                               STATS_DSO_UNHANDLED_SECTIONS,
-                                              STATS_TARGET_CPU_USAGE};
+                                              STATS_CPU_TIME};
 
 #define cycled_stats_sz (sizeof(s_cycled_stats) / sizeof(DDPROF_STATS))
 
@@ -135,8 +135,8 @@ static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr) {
   long utime_old = procstat->utime;
   DDRES_CHECK_FWD(proc_read(procstat));
 
-  ddprof_stats_set(STATS_PROFILER_RSS, get_page_size() * procstat->rss);
-  ddprof_stats_set(STATS_PROFILER_CPU_USAGE, procstat->utime - utime_old);
+  ddprof_stats_set(STATS_PROCFS_RSS, get_page_size() * procstat->rss);
+  ddprof_stats_set(STATS_PROCFS_UTIME, procstat->utime - utime_old);
   ddprof_stats_set(STATS_DSO_UNHANDLED_SECTIONS,
                    dso_hdr->_stats.sum_event_metric(DsoStats::kUnhandledDso));
   ddprof_stats_set(STATS_DSO_NEW_DSO,
@@ -155,7 +155,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   struct UnwindState *us = ctx->worker_ctx.us;
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
 
-  unsigned long this_ticks_unwind = __rdtsc();
+  unsigned long this_ticks_unwind = ddprof::get_tsc_cycles();
   // copy the sample context into the unwind structure
   unwind_init_sample(us, sample->regs, sample->pid, sample->size_stack,
                      sample->data_stack);
@@ -166,7 +166,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
 
   // If this is a SW_TASK_CLOCK-type event, then aggregate the time
   if (ctx->watchers[watcher_pos].config == PERF_COUNT_SW_TASK_CLOCK)
-    ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
+    ddprof_stats_add(STATS_CPU_TIME, sample->period, NULL);
   DDRes res = unwindstate__unwind(us);
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
@@ -190,8 +190,8 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     }
 #endif
   }
-  DDRES_CHECK_FWD(ddprof_stats_add(STATS_UNWIND_CPU_USAGE,
-                                   __rdtsc() - this_ticks_unwind, NULL));
+  DDRES_CHECK_FWD(ddprof_stats_add(
+      STATS_UNWIND_TICKS, ddprof::get_tsc_cycles() - this_ticks_unwind, NULL));
 
   return ddres_init();
 }

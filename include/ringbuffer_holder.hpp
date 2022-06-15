@@ -7,7 +7,7 @@
 
 #include "ddres_exception.hpp"
 #include "ipc.hpp"
-#include "pevent.h"
+#include "pevent.hpp"
 #include "ringbuffer_utils.hpp"
 
 namespace ddprof {

@@ -3,7 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "ddres.h"
+#include "ddres.hpp"
 
 static const char *s_common_error_messages[] = {
     "Common start range", COMMOM_ERROR_TABLE(EXPAND_ERROR_MESSAGE)};

@@ -5,12 +5,12 @@
 
 #include "dso_hdr.hpp"
 
-#include "ddprof_defs.h"
-#include "ddres.h"
+#include "ddprof_defs.hpp"
+#include "ddres.hpp"
 #include "defer.hpp"
-#include "logger.h"
-#include "procutils.h"
-#include "signal_helper.h"
+#include "logger.hpp"
+#include "procutils.hpp"
+#include "signal_helper.hpp"
 
 #include <algorithm>
 #include <cassert>

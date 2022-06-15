@@ -3,8 +3,8 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "unwind_metrics.h"
-#include "ddprof_stats.h"
+#include "unwind_metrics.hpp"
+#include "ddprof_stats.hpp"
 
 static const DDPROF_STATS s_cycled_stats[] = {STATS_UNWIND_FRAMES,
                                               STATS_UNWIND_ERRORS};

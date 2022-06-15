@@ -5,6 +5,7 @@
 
 #pragma once
 
-#include "ddres_def.h"
-
-DDRes log_capabilities(bool verbose);
+#include "ddres_def.hpp"
+#include "ddres_exception.hpp"
+#include "ddres_helpers.hpp"
+#include "ddres_list.hpp"

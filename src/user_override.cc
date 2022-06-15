@@ -7,9 +7,9 @@
 #  define _GNU_SOURCE
 #endif
 
-#include "user_override.h"
+#include "user_override.hpp"
 
-#include "logger.h"
+#include "logger.hpp"
 #include "unistd.h"
 
 #include <errno.h>

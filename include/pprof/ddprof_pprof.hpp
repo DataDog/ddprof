@@ -5,12 +5,12 @@
 
 #pragma once
 
-#include "ddprof_context.h"
-#include "ddprof_defs.h"
-#include "ddres_def.h"
-#include "perf_watcher.h"
+#include "ddprof_context.hpp"
+#include "ddprof_defs.hpp"
+#include "ddres_def.hpp"
+#include "perf_watcher.hpp"
 #include "tags.hpp"
-#include "unwind_output.h"
+#include "unwind_output.hpp"
 
 struct ddprof_ffi_Profile;
 struct SymbolHdr;

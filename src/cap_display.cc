@@ -3,10 +3,10 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "cap_display.h"
+#include "cap_display.hpp"
 
-#include "ddres.h"
-#include "logger.h"
+#include "ddres.hpp"
+#include "logger.hpp"
 
 #include <sys/capability.h>
 #include <unistd.h>

@@ -3,11 +3,11 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "logger_setup.h"
+#include "logger_setup.hpp"
 
-#include "arraysize.h"
-#include "ddprof_cmdline.h"
-#include "logger.h"
+#include "arraysize.hpp"
+#include "ddprof_cmdline.hpp"
+#include "logger.hpp"
 
 void setup_logger(const char *log_mode, const char *log_level) {
   // Process logging mode

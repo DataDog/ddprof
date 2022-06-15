@@ -6,7 +6,7 @@
 #include <gtest/gtest.h>
 
 #include "loghandle.hpp"
-#include "user_override.h"
+#include "user_override.hpp"
 
 #include <pwd.h>
 #include <sys/types.h>

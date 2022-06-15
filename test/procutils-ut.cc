@@ -5,7 +5,7 @@
 
 #include <gtest/gtest.h>
 
-#include "procutils.h"
+#include "procutils.hpp"
 
 #include <unistd.h>
 

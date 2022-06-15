@@ -5,7 +5,7 @@
 
 #include "tags.hpp"
 
-#include "logger.h"
+#include "logger.hpp"
 #include "thread_info.hpp"
 
 #include <utility>

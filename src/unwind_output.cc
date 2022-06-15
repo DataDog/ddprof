@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "unwind_output.h"
+#include "unwind_output.hpp"
 
 static void FunLoc_clear(FunLoc *locs) {
   memset(locs, 0, sizeof(*locs) * DD_MAX_STACK_DEPTH);

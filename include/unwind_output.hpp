@@ -9,8 +9,8 @@
 
 #include <stdint.h>
 
-#include "ddprof_defs.h"
-#include "string_view.h"
+#include "ddprof_defs.hpp"
+#include "string_view.hpp"
 
 typedef struct FunLoc {
   uint64_t ip; // Relative to file, not VMA

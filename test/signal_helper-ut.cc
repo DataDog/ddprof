@@ -3,7 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "signal_helper.h"
+#include "signal_helper.hpp"
 
 #include <gtest/gtest.h>
 #include <sys/types.h>

@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "ddprof_defs.h"
+#include "ddprof_defs.hpp"
 #include "hash_helper.hpp"
 #include "mapinfo_table.hpp"
 

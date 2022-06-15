@@ -5,11 +5,11 @@
 
 #include "unwind_dwfl.hpp"
 
-#include "ddprof_stats.h"
-#include "ddres.h"
-#include "dwfl_internals.h"
+#include "ddprof_stats.hpp"
+#include "ddres.hpp"
+#include "dwfl_internals.hpp"
 #include "dwfl_thread_callbacks.hpp"
-#include "logger.h"
+#include "logger.hpp"
 #include "symbol_hdr.hpp"
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
