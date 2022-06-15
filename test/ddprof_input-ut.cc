@@ -94,7 +94,6 @@ TEST_F(InputTest, dump_fixed) {
       ddprof_input_parse(argc, (char **)input_values, &input, &contine_exec);
   EXPECT_FALSE(IsDDResOK(res));
   EXPECT_FALSE(contine_exec);
-  EXPECT_EQ(input.nb_parsed_params, 2);
   ddprof_input_free(&input);
 }
 
