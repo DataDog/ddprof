@@ -97,7 +97,8 @@ DDRes statsd_send(int fd_sock, const char *key, void *val, int type) {
                   *reinterpret_cast<long *>(val), "c");
     break;
   case STAT_GAUGE:
-    sz = snprintf(buf, sizeof(buf), "%s:%ld|%s", key, *(long *)val, "g");
+    sz = snprintf(buf, sizeof(buf), "%s:%ld|%s", key,
+                  *reinterpret_cast<long *>(val), "g");
     break;
   }
 
