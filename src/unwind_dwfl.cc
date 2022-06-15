@@ -136,7 +136,6 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
   ddprof_stats_add(STATS_UNWIND_FRAMES, 1, NULL);
 
   if (IsDDResNotOK(add_symbol(dwfl_frame, us))) {
-    printf("!!add_symbol error\n");
     return DWARF_CB_ABORT;
   }
 
