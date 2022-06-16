@@ -5,15 +5,16 @@
 
 #include "logger_setup.hpp"
 
-#include "arraysize.hpp"
 #include "ddprof_cmdline.hpp"
 #include "logger.hpp"
+
+#include <array>
 
 void setup_logger(const char *log_mode, const char *log_level) {
   // Process logging mode
   char const *logpattern[] = {"stdout", "stderr", "syslog", "disabled"};
   int idx_log_mode = log_mode
-      ? arg_which(log_mode, logpattern, ARRAY_SIZE(logpattern))
+      ? arg_which(log_mode, logpattern, std::size(logpattern))
       : 0; // default to stdout
   switch (idx_log_mode) {
   case 0:
@@ -36,7 +37,7 @@ void setup_logger(const char *log_mode, const char *log_level) {
   // Process logging level
   char const *loglpattern[] = {"debug", "informational", "notice", "warn",
                                "error"};
-  switch (arg_which(log_level, loglpattern, ARRAY_SIZE(loglpattern))) {
+  switch (arg_which(log_level, loglpattern, std::size(loglpattern))) {
   case 0:
     LOG_setlevel(LL_DEBUG);
     break;

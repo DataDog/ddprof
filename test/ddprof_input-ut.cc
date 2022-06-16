@@ -5,7 +5,6 @@
 
 #include "ddprof_input.hpp"
 
-#include "arraysize.hpp"
 #include "constants.hpp"
 #include "defer.hpp"
 #include "loghandle.hpp"
@@ -107,7 +106,7 @@ TEST_F(InputTest, event_from_env) {
     const char *input_values[] = {MYNAME, "my_program"};
     setenv(k_events_env_variable, "sCPU,1000", 1);
     DDRes res = ddprof_input_parse(
-        ARRAY_SIZE(input_values), (char **)input_values, &input, &contine_exec);
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
 
     EXPECT_TRUE(IsDDResOK(res));
     EXPECT_TRUE(contine_exec);
@@ -126,7 +125,7 @@ TEST_F(InputTest, event_from_env) {
     const char *input_values[] = {MYNAME, "my_program"};
     setenv(k_events_env_variable, ";", 1);
     DDRes res = ddprof_input_parse(
-        ARRAY_SIZE(input_values), (char **)input_values, &input, &contine_exec);
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
 
     EXPECT_TRUE(IsDDResOK(res));
     EXPECT_TRUE(contine_exec);
@@ -140,7 +139,7 @@ TEST_F(InputTest, event_from_env) {
     const char *input_values[] = {MYNAME, "my_program"};
     setenv(k_events_env_variable, ";sCPU,1000;", 1);
     DDRes res = ddprof_input_parse(
-        ARRAY_SIZE(input_values), (char **)input_values, &input, &contine_exec);
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
 
     EXPECT_TRUE(IsDDResOK(res));
     EXPECT_TRUE(contine_exec);
@@ -160,7 +159,7 @@ TEST_F(InputTest, event_from_env) {
     const char *input_values[] = {MYNAME, "-e", "hINST,456", "my_program"};
     setenv(k_events_env_variable, "sCPU,1000;hCPU,123", 1);
     DDRes res = ddprof_input_parse(
-        ARRAY_SIZE(input_values), (char **)input_values, &input, &contine_exec);
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
 
     EXPECT_TRUE(IsDDResOK(res));
     EXPECT_TRUE(contine_exec);

@@ -74,6 +74,15 @@ DDRes ddprof_stats_set(unsigned int stat, long n) {
   return ddres_init();
 }
 
+DDRes ddprof_stats_divide(unsigned int stat, long n) {
+  if (!ddprof_stats)
+    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Stats backend uninitialized");
+  if (stat >= STATS_LEN)
+    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Invalid stat");
+  ddprof_stats[stat] /= n;
+  return ddres_init();
+}
+
 DDRes ddprof_stats_clear(unsigned int stat) {
   return ddprof_stats_set(stat, 0);
 }
@@ -117,8 +126,10 @@ DDRes ddprof_stats_send(const char *statsd_socket) {
   }
 
   for (unsigned int i = 0; i < STATS_LEN; i++) {
-    DDRES_CHECK_FWD(statsd_send(fd_statsd, stats_paths[i], &ddprof_stats[i],
-                                stats_types[i]));
+    if (ddprof_stats[i] != -1) {
+      DDRES_CHECK_FWD(statsd_send(fd_statsd, stats_paths[i], &ddprof_stats[i],
+                                  stats_types[i]));
+    }
   }
 
   return statsd_close(fd_statsd);

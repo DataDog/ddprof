@@ -89,7 +89,8 @@ static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc);
 static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
 
   if (max_stack_depth_reached(us)) {
-    LG_DBG("Max number of stacks reached (depth#%lu)", us->output.nb_locs);
+    LG_DBG("Max stack depth reached (depth#%lu)", us->output.nb_locs);
+    ddprof_stats_add(STATS_UNWIND_TRUNCATED_OUTPUT, 1, nullptr);
     return ddres_warn(DD_WHAT_UW_MAX_DEPTH);
   }
 

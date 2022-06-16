@@ -3,6 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
+#include <array>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,7 +47,7 @@ unsigned long my_counter = 0;
 #define FUNBOD                                                                 \
   {                                                                            \
     int64_t n = x & 1 ? x * 3 + 1 : x / 2;                                     \
-    my_counter += 1;                                       \
+    my_counter += 1;                                                           \
     return 1 >= n ? 1 : funs[n % funlen](n);                                   \
   }
 
@@ -69,7 +70,7 @@ COLLATZ(DECL)
 
 // Define function lookup table
 int64_t (*funs[])(int64_t) = {COLLATZ(NAME)};
-const int funlen = sizeof(funs) / sizeof(*funs);
+const int funlen = std::size(funs);
 
 // Define the functions
 COLLATZ(DEFN)
@@ -126,7 +127,7 @@ int main(int c, char **v) {
     P(v[3], kj);
   if (c > 4) {
     switch (*v[4]) {
-    // clang-format off
+      // clang-format off
       case 'A': case 'a': t = 7;         break;
       case 'B': case 'b': t = 27;        break;
       case 'C': case 'c': t = 703;       break;

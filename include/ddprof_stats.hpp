@@ -14,17 +14,21 @@
   X(EVENT_COUNT, "event.count", STAT_GAUGE)                                    \
   X(EVENT_LOST, "event.lost", STAT_GAUGE)                                      \
   X(SAMPLE_COUNT, "sample.count", STAT_GAUGE)                                  \
-  X(CPU_TIME, "cpu.time", STAT_GAUGE)                                          \
-  X(UNWIND_TICKS, "unwind.ticks", STAT_GAUGE)                                  \
+  X(TARGET_CPU_USAGE, "target_process.cpu_usage.millicores", STAT_GAUGE)       \
+  X(UNWIND_CPU_USAGE, "unwind.millicores", STAT_GAUGE)                         \
   X(UNWIND_FRAMES, "unwind.frames", STAT_GAUGE)                                \
   X(UNWIND_ERRORS, "unwind.errors", STAT_GAUGE)                                \
-  X(PROCFS_RSS, "procfs.rss", STAT_GAUGE)                                      \
-  X(PROCFS_UTIME, "procfs.utime", STAT_GAUGE)                                  \
-  X(PPROF_ST_ELEMS, "pprof.st_elements", STAT_GAUGE)                           \
+  X(UNWIND_TRUNCATED_INPUT, "unwind.stack.truncated_input", STAT_GAUGE)        \
+  X(UNWIND_TRUNCATED_OUTPUT, "unwind.stack.truncated_output", STAT_GAUGE)      \
+  X(UNWIND_INCOMPLETE_STACK, "unwind.stack.incomplete", STAT_GAUGE)            \
+  X(UNWIND_AVG_STACK_SIZE, "unwind.stack.avg_size", STAT_GAUGE)                \
+  X(PROFILER_RSS, "profiler.rss", STAT_GAUGE)                                  \
+  X(PROFILER_CPU_USAGE, "profiler.cpu_usage.millicores", STAT_GAUGE)           \
   X(DSO_UNHANDLED_SECTIONS, "dso.unhandled_sections", STAT_GAUGE)              \
   X(DSO_NEW_DSO, "dso.new", STAT_GAUGE)                                        \
   X(DSO_SIZE, "dso.size", STAT_GAUGE)                                          \
-  X(DSO_MAPPED, "dso.mapped", STAT_GAUGE)
+  X(DSO_MAPPED, "dso.mapped", STAT_GAUGE)                                      \
+  X(PPROF_SIZE, "pprof.size", STAT_GAUGE)
 
 // Expand the enum/index for the individual stats
 typedef enum DDPROF_STATS { STATS_TABLE(X_ENUM) STATS_LEN } DDPROF_STATS;
@@ -43,6 +47,8 @@ DDRes ddprof_stats_free();
 
 // The add operator is multithread- and multiprocess-safe.  `out` can be NULL.
 DDRes ddprof_stats_add(unsigned int stat, long in, long *out);
+
+DDRes ddprof_stats_divide(unsigned int stat, long n);
 
 // Setting and clearing are last-through-the-gate operations with ties broken
 // by whatever the CPU is executing at that time.

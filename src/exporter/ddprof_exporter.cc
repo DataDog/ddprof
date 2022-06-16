@@ -5,7 +5,6 @@
 
 #include "exporter/ddprof_exporter.hpp"
 
-#include "arraysize.hpp"
 #include "ddprof_cmdline.hpp"
 #include "ddprof_ffi_utils.hpp"
 #include "ddres.hpp"
@@ -116,6 +115,8 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
   // Debug process : capture pprof to a folder
   exporter->_debug_pprof_prefix = exporter->_input.debug_pprof_prefix;
   exporter->_export = arg_yesno(exporter->_input.do_export, 1);
+
+  exporter->_last_pprof_size = -1;
 
   return ddres_init();
 }
@@ -260,6 +261,8 @@ DDRes ddprof_exporter_export(const ddprof_ffi_Profile *profile,
       .len = encoded_profile->buffer.len,
   };
 
+  exporter->_last_pprof_size = profile_data.len;
+
   if (exporter->_export) {
     ddprof_ffi_Vec_tag ffi_additional_tags = ddprof_ffi_Vec_tag_new();
     defer { ddprof_ffi_Vec_tag_drop(ffi_additional_tags); };
@@ -273,7 +276,7 @@ DDRes ddprof_exporter_export(const ddprof_ffi_Profile *profile,
         .name = to_CharSlice("auto.pprof"),
         .file = profile_data,
     }};
-    ddprof_ffi_Slice_file files = {.ptr = files_, .len = ARRAY_SIZE(files_)};
+    ddprof_ffi_Slice_file files = {.ptr = files_, .len = std::size(files_)};
 
     ddprof_ffi_Request *request = ddprof_ffi_ProfileExporterV3_build(
         exporter->_exporter, start, end, files, &ffi_additional_tags,
