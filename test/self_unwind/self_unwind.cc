@@ -3,7 +3,6 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "arraysize.hpp"
 #include "ddprof.hpp"
 #include "ddprof_context.hpp"
 #include "ddprof_context_lib.hpp"
@@ -71,9 +70,10 @@ int main(int argc, char *const argv[]) {
   const char *argv_override[] = {MYNAME,    "--pid",     str_pid.c_str(),
                                  "--event", "sCPU,1000", (char *)NULL};
   SymbolMap symbol_map;
+  DDProfContext ctx;
 
   // size - 1 as we add a null char at the end
-  if (IsDDResNotOK(ddprof_input_parse(ARRAY_SIZE(argv_override) - 1,
+  if (IsDDResNotOK(ddprof_input_parse(std::size(argv_override) - 1,
                                       const_cast<char **>(argv_override),
                                       &input, &continue_exec))) {
     std::cerr << "unable to init input " << std::endl;
@@ -85,8 +85,6 @@ int main(int argc, char *const argv[]) {
     ret = -1;
     goto CLEANUP_INPUT;
   }
-
-  DDProfContext ctx;
 
   if (IsDDResNotOK(ddprof_context_set(&input, &ctx))) {
     std::cerr << "unable to init input " << std::endl;

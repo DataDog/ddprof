@@ -3,6 +3,8 @@
 #include "pevent.hpp"
 #include "proc_status.hpp"
 
+#include <chrono>
+
 typedef struct DDProfExporter DDProfExporter;
 typedef struct DDProfPProf DDProfPProf;
 typedef struct PersistentWorkerState PersistentWorkerState;
@@ -12,7 +14,7 @@ typedef struct UnwindState UnwindState;
 typedef struct UserTags UserTags;
 
 // Mutable states within a worker
-typedef struct DDProfWorkerContext {
+struct DDProfWorkerContext {
   // Persistent reference to the state shared accross workers
   PersistentWorkerState *persistent_worker_state;
   PEventHdr pevent_hdr;   // perf_event buffer holder
@@ -24,7 +26,9 @@ typedef struct DDProfWorkerContext {
   UnwindState *us;
   UserTags *user_tags;
   ProcStatus proc_status;
+  std::chrono::steady_clock::time_point
+      cycle_start_time;   // time at which current export cycle was started
   int64_t send_nanos;     // Last time an export was sent
   uint32_t count_worker;  // exports since last cache clear
   uint32_t count_samples; // sample count to avoid bouncing on backpopulates
-} DDProfWorkerContext;
+};

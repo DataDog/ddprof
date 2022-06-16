@@ -26,6 +26,7 @@
 #include <stdint.h>
 #include <sys/time.h>
 #include <time.h>
+#include <unistd.h>
 
 #ifdef DBG_JEMALLOC
 #  include <jemalloc/jemalloc.h>
@@ -35,15 +36,14 @@
 
 using namespace ddprof;
 
-static const DDPROF_STATS s_cycled_stats[] = {STATS_UNWIND_TICKS,
+static const DDPROF_STATS s_cycled_stats[] = {STATS_UNWIND_CPU_USAGE,
                                               STATS_EVENT_COUNT,
                                               STATS_EVENT_LOST,
                                               STATS_SAMPLE_COUNT,
                                               STATS_DSO_UNHANDLED_SECTIONS,
-                                              STATS_CPU_TIME};
+                                              STATS_TARGET_CPU_USAGE};
 
-#define cycled_stats_sz (sizeof(s_cycled_stats) / sizeof(DDPROF_STATS))
-
+static const long k_clock_ticks_per_sec = sysconf(_SC_CLK_TCK);
 static const unsigned s_nb_samples_per_backpopulate = 200;
 
 /// Human readable runtime information
@@ -128,21 +128,47 @@ DDRes worker_library_free(DDProfContext *ctx) {
   return ddres_init();
 }
 
+[[maybe_unused]] static DDRes worker_init_stats(DDProfWorkerContext *ctx) {
+  DDRES_CHECK_FWD(proc_read(&ctx->proc_status));
+  ctx->cycle_start_time = std::chrono::steady_clock::now();
+  return {};
+}
+
 /// Retrieve cpu / memory info
-static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr) {
+static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr,
+                                 std::chrono::nanoseconds cycle_duration) {
   // Update the procstats, but first snapshot the utime so we can compute the
   // diff for the utime metric
-  long utime_old = procstat->utime;
+  int64_t cpu_time_old = procstat->utime + procstat->stime;
   DDRES_CHECK_FWD(proc_read(procstat));
-
-  ddprof_stats_set(STATS_PROCFS_RSS, get_page_size() * procstat->rss);
-  ddprof_stats_set(STATS_PROCFS_UTIME, procstat->utime - utime_old);
+  int64_t elapsed_nsec = std::chrono::nanoseconds{cycle_duration}.count();
+  int64_t millicores = ((procstat->utime + procstat->stime - cpu_time_old) *
+                        std::nano::den * 1000) /
+      (k_clock_ticks_per_sec * elapsed_nsec);
+  ddprof_stats_set(STATS_PROFILER_RSS, get_page_size() * procstat->rss);
+  ddprof_stats_set(STATS_PROFILER_CPU_USAGE, millicores);
   ddprof_stats_set(STATS_DSO_UNHANDLED_SECTIONS,
                    dso_hdr->_stats.sum_event_metric(DsoStats::kUnhandledDso));
   ddprof_stats_set(STATS_DSO_NEW_DSO,
                    dso_hdr->_stats.sum_event_metric(DsoStats::kNewDso));
   ddprof_stats_set(STATS_DSO_SIZE, dso_hdr->get_nb_dso());
   ddprof_stats_set(STATS_DSO_MAPPED, dso_hdr->get_nb_mapped_dso());
+
+  long target_cpu_nsec;
+  ddprof_stats_get(STATS_TARGET_CPU_USAGE, &target_cpu_nsec);
+  int64_t target_millicores = (target_cpu_nsec * 1000) / elapsed_nsec;
+  ddprof_stats_set(STATS_TARGET_CPU_USAGE, target_millicores);
+
+  long tsc_cycles;
+  ddprof_stats_get(STATS_UNWIND_CPU_USAGE, &tsc_cycles);
+  int64_t unwind_millicores =
+      (ddprof::tsc_cycles_to_ns(tsc_cycles) * 1000) / elapsed_nsec;
+  ddprof_stats_set(STATS_UNWIND_CPU_USAGE, unwind_millicores);
+
+  long nsamples;
+  ddprof_stats_get(STATS_SAMPLE_COUNT, &nsamples);
+  ddprof_stats_divide(STATS_UNWIND_AVG_STACK_SIZE, nsamples);
+
   return ddres_init();
 }
 
@@ -154,6 +180,11 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     return ddres_warn(DD_WHAT_PERFSAMP);
   struct UnwindState *us = ctx->worker_ctx.us;
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
+  ddprof_stats_add(STATS_UNWIND_AVG_STACK_SIZE, sample->size_stack, nullptr);
+
+  if (sample->size_stack == PERF_SAMPLE_STACK_SIZE) {
+    ddprof_stats_add(STATS_UNWIND_TRUNCATED_INPUT, 1, nullptr);
+  }
 
   unsigned long this_ticks_unwind = ddprof::get_tsc_cycles();
   // copy the sample context into the unwind structure
@@ -166,7 +197,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
 
   // If this is a SW_TASK_CLOCK-type event, then aggregate the time
   if (ctx->watchers[watcher_pos].config == PERF_COUNT_SW_TASK_CLOCK)
-    ddprof_stats_add(STATS_CPU_TIME, sample->period, NULL);
+    ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
   DDRes res = unwindstate__unwind(us);
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
@@ -190,14 +221,15 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     }
 #endif
   }
-  DDRES_CHECK_FWD(ddprof_stats_add(
-      STATS_UNWIND_TICKS, ddprof::get_tsc_cycles() - this_ticks_unwind, NULL));
+  DDRES_CHECK_FWD(ddprof_stats_add(STATS_UNWIND_CPU_USAGE,
+                                   ddprof::get_tsc_cycles() - this_ticks_unwind,
+                                   NULL));
 
   return ddres_init();
 }
 
 static void ddprof_reset_worker_stats() {
-  for (unsigned i = 0; i < cycled_stats_sz; ++i) {
+  for (unsigned i = 0; i < std::size(s_cycled_stats); ++i) {
     ddprof_stats_clear(s_cycled_stats[i]);
   }
 }
@@ -226,19 +258,6 @@ void *ddprof_worker_export_thread(void *arg) {
 /// Cycle operations : export, sync metrics, update counters
 DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
                           [[maybe_unused]] bool synchronous_export) {
-
-  // Scrape procfs for process usage statistics
-  DDRES_CHECK_FWD(worker_update_stats(&ctx->worker_ctx.proc_status,
-                                      &ctx->worker_ctx.us->dso_hdr));
-
-  // And emit diagnostic output (if it's enabled)
-  print_diagnostics(ctx->worker_ctx.us->dso_hdr);
-  if (IsDDResNotOK(ddprof_stats_send(ctx->params.internal_stats))) {
-    LG_WRN("Unable to utilize to statsd socket.  Suppressing future stats.");
-    free((void *)ctx->params.internal_stats);
-    ctx->params.internal_stats = NULL;
-  }
-
 #ifndef DDPROF_NATIVE_LIB
   // Take the current pprof contents and ship them to the backend.  This also
   // clears the pprof for reuse
@@ -285,6 +304,23 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
     }
   }
 #endif
+  auto cycle_now = std::chrono::steady_clock::now();
+  auto cycle_duration = cycle_now - ctx->worker_ctx.cycle_start_time;
+  ctx->worker_ctx.cycle_start_time = cycle_now;
+
+  // Scrape procfs for process usage statistics
+  DDRES_CHECK_FWD(worker_update_stats(&ctx->worker_ctx.proc_status,
+                                      &ctx->worker_ctx.us->dso_hdr,
+                                      cycle_duration));
+
+  // And emit diagnostic output (if it's enabled)
+  print_diagnostics(ctx->worker_ctx.us->dso_hdr);
+  if (IsDDResNotOK(ddprof_stats_send(ctx->params.internal_stats))) {
+    LG_WRN("Unable to utilize to statsd socket.  Suppressing future stats.");
+    free((void *)ctx->params.internal_stats);
+    ctx->params.internal_stats = NULL;
+  }
+
   // Increase the counts of exports
   ctx->worker_ctx.count_worker += 1;
 
@@ -403,6 +439,7 @@ DDRes ddprof_worker_init(DDProfContext *ctx,
 
     DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[0], ctx));
     DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[1], ctx));
+    DDRES_CHECK_FWD(worker_init_stats(&ctx->worker_ctx));
   }
   CatchExcept2DDRes();
   return ddres_init();

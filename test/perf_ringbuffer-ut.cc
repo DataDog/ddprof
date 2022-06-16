@@ -60,7 +60,7 @@ TEST(PerfRingbufferTest, SampleSymmetryx86) {
   uint64_t mask = perf_event_default_sample_type();
   mask |= PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_IP | PERF_SAMPLE_ADDR;
   char default_stack[4096] = {0};
-  for (uint64_t i = 0; i < sizeof(default_stack) / sizeof(*default_stack); i++)
+  for (uint64_t i = 0; i < std::size(default_stack); i++)
     default_stack[i] = i & 255;
   uint64_t default_regs[PERF_REGS_COUNT] = {};
   for (int i = 0; i < PERF_REGS_COUNT; ++i) {

@@ -3,7 +3,6 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "arraysize.hpp"
 #include "constants.hpp"
 #include "daemonize.hpp"
 #include "ddprof.hpp"
@@ -14,7 +13,9 @@
 #include "defer.hpp"
 #include "ipc.hpp"
 #include "logger.hpp"
+#include "timer.hpp"
 
+#include <array>
 #include <cassert>
 #include <errno.h>
 #include <fcntl.h>
@@ -85,7 +86,7 @@ static DDRes get_library_path(std::string &path) {
 // Replace pid place holder in path if present by pid argument
 static void fixup_library_path(std::string &path, pid_t pid) {
   if (size_t pos = path.find(k_pid_place_holder); pos != std::string::npos) {
-    path.replace(pos, ARRAY_SIZE(k_pid_place_holder) - 1, std::to_string(pid));
+    path.replace(pos, std::size(k_pid_place_holder) - 1, std::to_string(pid));
   }
 }
 
@@ -222,6 +223,8 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
 
   // Now, we are the profiler process
   is_profiler = true;
+
+  ddprof::init_tsc();
 
   // Attach the profiler
   if (IsDDResNotOK(ddprof_setup(ctx))) {
