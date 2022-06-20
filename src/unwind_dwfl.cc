@@ -105,7 +105,7 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     LG_DBG("Failure to compute frame PC: %s (depth#%lu)", dwfl_errmsg(-1),
            us->output.nb_locs);
     add_error_frame(nullptr, us, pc, SymbolErrors::dwfl_frame);
-    return ddres_init(); // invalid pc : do not add frame
+    return ddres_warn(DD_WHAT_UW_ERROR); // invalid pc : do not add frame
   }
 
   if (!isactivation)
@@ -120,7 +120,7 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     LG_DBG("[UW]%d: DSO not found at 0x%lx (depth#%lu)", us->pid, pc,
            us->output.nb_locs);
     add_error_frame(nullptr, us, pc, SymbolErrors::unknown_dso);
-    return ddres_init();
+    return ddres_warn(DD_WHAT_UW_ERROR); // invalid pc : do not add frame
   }
 
   // Now we register
@@ -137,17 +137,23 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
   LG_NFO("Beging depth %lu", us->output.nb_locs);
 #endif
 
-  // Before we potentially exit, record the fact that we're processing a frame
-  ddprof_stats_add(STATS_UNWIND_FRAMES, 1, NULL);
-
-  if (IsDDResNotOK(add_symbol(dwfl_frame, us))) {
-    return DWARF_CB_ABORT;
-  }
   int dwfl_error_value = dwfl_errno();
   if (dwfl_error_value) {
     LG_DBG("Error flagged at depth = %lu -- Error:%s ", us->output.nb_locs,
            dwfl_errmsg(dwfl_error_value));
+    us->in_error = true;
+  } else {
+    us->in_error = false;
   }
+
+  // Before we potentially exit, record the fact that we're processing a frame
+  ddprof_stats_add(STATS_UNWIND_FRAMES, 1, NULL);
+
+  if (IsDDResNotOK(add_symbol(dwfl_frame, us))) {
+    LG_DBG("Stop unwinding here ---------");
+    return DWARF_CB_ABORT;
+  }
+
   return DWARF_CB_OK;
 }
 
@@ -157,6 +163,14 @@ DDRes unwind_dwfl(UnwindState *us) {
     LOG_ERROR_DETAILS(LG_DBG, res._what);
     return res;
   }
+  LG_DBG("New unwinding #################");
+
+  int dwfl_error_value = dwfl_errno();
+  if (dwfl_error_value) {
+    LG_DBG("Existing error before starting -- Error:%s ",
+           dwfl_errmsg(dwfl_error_value));
+  }
+
   //
   // Launch the dwarf unwinding (uses frame_cb callback)
   if (dwfl_getthread_frames(us->_dwfl_wrapper->_dwfl, us->pid, frame_cb, us) !=
@@ -196,11 +210,14 @@ static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc) {
       unwind_symbol_hdr._dwfl_symbol_lookup_v2.get_or_insert(
           *(us->_dwfl_wrapper), unwind_symbol_hdr._symbol_table,
           unwind_symbol_hdr._dso_symbol_lookup, pc, dso, file_info_value);
-#ifdef DEBUG
-  LG_NTC("Considering frame with IP : %lx / %s ", pc,
-         us->symbol_hdr._symbol_table[output->locs[current_loc_idx]._symbol_idx]
-             ._symname.c_str());
-#endif
+  //#ifdef DEBUG
+  if (us->in_error) {
+    LG_NTC(
+        "Considering frame with IP : %lx / %s ", pc,
+        us->symbol_hdr._symbol_table[output->locs[current_loc_idx]._symbol_idx]
+            ._symname.c_str());
+  }
+  //#endif
 
   output->locs[current_loc_idx].ip = pc;
 

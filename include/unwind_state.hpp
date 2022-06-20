@@ -40,7 +40,7 @@ struct UnwindRegisters {
 struct UnwindState {
   UnwindState()
       : _dwfl_wrapper(nullptr), pid(-1), stack(nullptr), stack_sz(0),
-        current_ip(0) {
+        in_error(false), current_ip(0) {
     uw_output_clear(&output);
   }
 
@@ -53,7 +53,7 @@ struct UnwindState {
   pid_t pid;
   char *stack;
   size_t stack_sz;
-
+  bool in_error;
   UnwindRegisters initial_regs;
   ProcessAddress_t current_ip;
 
