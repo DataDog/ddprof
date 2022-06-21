@@ -25,7 +25,13 @@ set(LIBELF_PATH ${ELFUTILS_PATH}/lib/libelf.a)
 
 set(ELFUTILS_INCLUDE_DIRS ${ELFUTILS_PATH}/include)
 
-execute_process(COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_elfutils.sh" "${VER_ELF}" "${SHA256_ELF}" "${ELFUTILS_PATH}" "${CMAKE_C_COMPILER}"
+if("${CMAKE_BUILD_TYPE}" STREQUAL "Release" OR "${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
+    set(EXTRA_CFLAGS "-O3")
+else()
+    set(EXTRA_CFLAGS "-O0 -g")
+endif()
+
+execute_process(COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_elfutils.sh" "${VER_ELF}" "${SHA256_ELF}" "${ELFUTILS_PATH}" "${CMAKE_C_COMPILER}" "${EXTRA_CFLAGS}"
                 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND_ERROR_IS_FATAL ANY)
 
 add_library(dw STATIC IMPORTED)
