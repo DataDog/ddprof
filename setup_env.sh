@@ -16,33 +16,38 @@ EXTENSION_CC=${CC:-"gcc"}
 # strip version number from compiler
 EXTENSION_CC=${EXTENSION_CC%-*}
 EXTENSION_OS=${OS_IDENTIFIER:-"linux"}
+COMMON_OPT="${COMPILER_SETTING} -DACCURACY_TEST=ON -DCMAKE_INSTALL_PREFIX=${DDPROF_INSTALL_PREFIX} -DBUILD_BENCHMARKS=${DDPROF_BUILD_BENCH} -DBUILD_NATIVE_LIB=${NATIVE_LIB}"
 
-VENDOR_EXTENSION="_${EXTENSION_CC,,}_${EXTENSION_OS,,}"
-COMMON_OPT="${COMPILER_SETTING} -DVENDOR_EXTENSION=${VENDOR_EXTENSION} -DACCURACY_TEST=ON -DCMAKE_INSTALL_PREFIX=${DDPROF_INSTALL_PREFIX} -DBUILD_BENCHMARKS=${DDPROF_BUILD_BENCH} -DBUILD_NATIVE_LIB=${NATIVE_LIB}"
+CmakeWithOptions() {
+  BUILD_MODE=${1}
+  VENDOR_EXTENSION="_${EXTENSION_CC,,}_${EXTENSION_OS,,}"_${BUILD_MODE}
+  # shellcheck disable=SC2086
+  cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=${BUILD_MODE} -DVENDOR_EXTENSION=${VENDOR_EXTENSION} "$@"
+}
 
 RelCMake() {
-    # shellcheck disable=SC2086
-    cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=Release  "$@"
+  BUILD_MODE=Release
+  CmakeWithOptions ${BUILD_MODE}
 }
 
 DebCMake() {
-    # shellcheck disable=SC2086
-    cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=Debug "$@"
+    BUILD_MODE=Debug
+    CmakeWithOptions ${BUILD_MODE}
 }
 
 SanCMake() {
-    # shellcheck disable=SC2086
-    cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=SanitizedDebug "$@"
+    BUILD_MODE=SanitizedDebug
+    CmakeWithOptions ${BUILD_MODE}
 }
 
 TSanCMake() {
-    # shellcheck disable=SC2086
-    cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=ThreadSanitizedDebug "$@"
+    BUILD_MODE=ThreadSanitizedDebug
+    CmakeWithOptions ${BUILD_MODE}
 }
 
 CovCMake() {
-    # shellcheck disable=SC2086
-    cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=Coverage "$@"
+    BUILD_MODE=Coverage
+    CmakeWithOptions ${BUILD_MODE}
 }
 
 ## Build a directory with a naming that reflects the OS / compiler we are using
