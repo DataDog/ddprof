@@ -90,6 +90,7 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
 
   if (max_stack_depth_reached(us)) {
     LG_DBG("Max stack depth reached (depth#%lu)", us->output.nb_locs);
+    us->in_error = true;
     ddprof_stats_add(STATS_UNWIND_TRUNCATED_OUTPUT, 1, nullptr);
     return ddres_warn(DD_WHAT_UW_MAX_DEPTH);
   }
@@ -132,6 +133,14 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
 #ifdef DEBUG
   LG_NFO("Beging depth %lu", us->output.nb_locs);
 #endif
+  int dwfl_error_value = dwfl_errno();
+  if (dwfl_error_value) {
+    LG_DBG("Error flagged at depth = %lu -- Error:%s", us->output.nb_locs,
+           dwfl_errmsg(dwfl_error_value));
+    us->in_error = true;
+  } else {
+    us->in_error = false;
+  }
 
   // Before we potentially exit, record the fact that we're processing a frame
   ddprof_stats_add(STATS_UNWIND_FRAMES, 1, NULL);
@@ -157,6 +166,20 @@ DDRes unwind_dwfl(UnwindState *us) {
   }
   res = us->output.nb_locs > 0 ? ddres_init()
                                : ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
+
+  if (us->in_error) {
+    auto &symbol_table = us->symbol_hdr._symbol_table;
+    auto &mapping_table = us->symbol_hdr._mapinfo_table;
+    LG_ERR("Error while unwinding:");
+    for (uint64_t i = 0; i < us->output.nb_locs; ++i) {
+      auto &loc = us->output.locs[i];
+      auto &symbol = symbol_table[loc._symbol_idx];
+      auto &mapping = mapping_table[loc._map_info_idx];
+      printf("[%lu] %s %s:%u [0x%lx -> 0x%lx]\n", i, symbol._symname.c_str(),
+             symbol._srcpath.c_str(), symbol._lineno, loc.ip,
+             loc.ip - mapping._low_addr + mapping._offset);
+    }
+  }
   return res;
 }
 

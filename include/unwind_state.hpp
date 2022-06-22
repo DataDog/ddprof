@@ -38,7 +38,7 @@ struct UnwindRegisters {
 struct UnwindState {
   UnwindState()
       : _dwfl_wrapper(nullptr), pid(-1), stack(nullptr), stack_sz(0),
-        current_ip(0) {
+        current_ip(0), in_error(false) {
     uw_output_clear(&output);
   }
 
@@ -56,6 +56,7 @@ struct UnwindState {
   ProcessAddress_t current_ip;
 
   UnwindOutput output;
+  bool in_error;
 };
 
 static inline bool unwind_registers_equal(const UnwindRegisters *lhs,

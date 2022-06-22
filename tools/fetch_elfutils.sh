@@ -60,5 +60,5 @@ echo "Compiling elfutils using ${C_COMPILER}"
 if [[ "$(basename "${C_COMPILER}")" == clang* ]]; then
   export CFLAGS="-Wno-xor-used-as-pow -Wno-gnu-variable-sized-type-not-at-end -Wno-unused-but-set-parameter"
 fi
-./configure CC="${C_COMPILER}" --without-bzlib --without-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning --prefix "${TARGET_EXTRACT}"
+./configure CC="${C_COMPILER}" CFLAGS="-O0" --without-bzlib --without-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning --prefix "${TARGET_EXTRACT}"
 make "-j$(nproc)" install
