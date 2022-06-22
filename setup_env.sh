@@ -18,42 +18,51 @@ EXTENSION_CC=${EXTENSION_CC%-*}
 EXTENSION_OS=${OS_IDENTIFIER:-"linux"}
 COMMON_OPT="${COMPILER_SETTING} -DACCURACY_TEST=ON -DCMAKE_INSTALL_PREFIX=${DDPROF_INSTALL_PREFIX} -DBUILD_BENCHMARKS=${DDPROF_BUILD_BENCH} -DBUILD_NATIVE_LIB=${NATIVE_LIB}"
 
+GetDirectoryExtention() {
+  echo "_${EXTENSION_CC,,}_${EXTENSION_OS,,}_${1}"
+}
+
 CmakeWithOptions() {
+  # Build mode
+  # Extra Parameters to cmake
   BUILD_MODE=${1}
-  VENDOR_EXTENSION="_${EXTENSION_CC,,}_${EXTENSION_OS,,}"_${BUILD_MODE}
+  shift
+  VENDOR_EXTENSION=$(GetDirectoryExtention ${BUILD_MODE})
   # shellcheck disable=SC2086
-  cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=${BUILD_MODE} -DVENDOR_EXTENSION=${VENDOR_EXTENSION} "$@"
+  cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=${BUILD_MODE} -DVENDOR_EXTENSION=${VENDOR_EXTENSION} $@
 }
 
 RelCMake() {
   BUILD_MODE=Release
-  CmakeWithOptions ${BUILD_MODE}
+  CmakeWithOptions ${BUILD_MODE} $@
 }
 
 DebCMake() {
     BUILD_MODE=Debug
-    CmakeWithOptions ${BUILD_MODE}
+    CmakeWithOptions ${BUILD_MODE} $@
 }
 
 SanCMake() {
     BUILD_MODE=SanitizedDebug
-    CmakeWithOptions ${BUILD_MODE}
+    CmakeWithOptions ${BUILD_MODE} $@
 }
 
 TSanCMake() {
     BUILD_MODE=ThreadSanitizedDebug
-    CmakeWithOptions ${BUILD_MODE}
+    CmakeWithOptions ${BUILD_MODE} $@
 }
 
 CovCMake() {
     BUILD_MODE=Coverage
-    CmakeWithOptions ${BUILD_MODE}
+    CmakeWithOptions ${BUILD_MODE} $@
 }
 
 ## Build a directory with a naming that reflects the OS / compiler we are using
 ## Example : mkBuildDir Rel --> build_UB18_clang_Rel
 MkBuildDir() {
-    mkdir -p build${VENDOR_EXTENSION}_${1} && cd "$_" || exit 1
+    BUILD_DIR_EXTENSION=$(GetDirectoryExtention ${1})
+    echo ${BUILD_DIR_EXTENSION}
+    mkdir -p build${BUILD_DIR_EXTENSION} && cd "$_" || exit 1
 }
 
 RunDDBuild() {
