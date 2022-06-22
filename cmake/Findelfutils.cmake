@@ -25,10 +25,10 @@ set(LIBELF_PATH ${ELFUTILS_PATH}/lib/libelf.a)
 
 set(ELFUTILS_INCLUDE_DIRS ${ELFUTILS_PATH}/include)
 
-if("${CMAKE_BUILD_TYPE}" STREQUAL "Release" OR "${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
-    set(EXTRA_CFLAGS "-O3")
-else()
-    set(EXTRA_CFLAGS "-O0 -g")
+if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Release" AND NOT "${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
+    # Variable can contain several args as it is quoted
+    set(EXTRA_CFLAGS "-O0")
+    message(STATUS "elfutils - Adding ${EXTRA_CFLAGS} flag")
 endif()
 
 execute_process(COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_elfutils.sh" "${VER_ELF}" "${SHA256_ELF}" "${ELFUTILS_PATH}" "${CMAKE_C_COMPILER}" "${EXTRA_CFLAGS}"
