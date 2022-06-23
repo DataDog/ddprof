@@ -22,7 +22,7 @@ if [ "$#" -lt 4 ] || [ "$#" -ge 6 ]; then
 fi
 
 VER_ELF=$1
-SHA256_ELF=$2
+SHA512_ELF=$2
 TARGET_EXTRACT=$3
 C_COMPILER=${4}
 EXTRA_CFLAGS=""
@@ -44,8 +44,8 @@ else
     curl -LO "${URL_ELF}"
 fi
 
-echo "Checking elfutils sha256"
-if ! echo "${SHA256_ELF} ${TAR_ELF}" | sha256sum --check --strict --status; then
+echo "Checking elfutils sha512"
+if ! echo "${SHA512_ELF} ${TAR_ELF}" | sha512sum --check --strict --status; then
     echo "Error validating elfutils SHA256"
     echo "Please clear $TARGET_EXTRACT before restarting"
     exit 1
