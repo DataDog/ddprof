@@ -8,13 +8,15 @@ IFS=$'\n\t'
 
 usage() {
     echo "Usage :"
-    echo "$0 <version> <md5> <path> <c-compiler>"
+    echo "$0 <version> <md5> <path> <c-compiler> <extra-c-flags>"
+    echo ""
+    echo "The extra c flags should be a single arg (hence quoted)"
     echo ""
     echo "Example"
-    echo "  $0 0.183 6f58aa1b9af1a5681b1cbf63e0da2d67 ./vendor gcc"
+    echo "  $0 0.183 6f58aa1b9af1a5681b1cbf63e0da2d67 ./vendor gcc \"-O0 -g\""
 }
 
-if [ "$#" -ne 4 ]; then
+if [ "$#" -lt 4 ] || [ "$#" -ge 6 ]; then
     usage
     exit 1
 fi
@@ -23,6 +25,11 @@ VER_ELF=$1
 SHA256_ELF=$2
 TARGET_EXTRACT=$3
 C_COMPILER=${4}
+EXTRA_CFLAGS=""
+# C flags are optional
+if [ "$#" -ge 5 ]; then
+  EXTRA_CFLAGS=${5}
+fi
 
 mkdir -p "${TARGET_EXTRACT}"
 cd "${TARGET_EXTRACT}"
@@ -51,8 +58,6 @@ mkdir src
 cd src
 tar --no-same-owner --strip-components 1 -xf "../${TAR_ELF}"
 
-echo "Compiling elfutils using ${C_COMPILER}"
-
 # The flags below are hardcoded to work around clang compatibility issues in
 # elfutils 186; these are irrelevant for GCC.  Note that this won't propagate
 # envvars back up to the calling build system.
@@ -60,5 +65,9 @@ echo "Compiling elfutils using ${C_COMPILER}"
 if [[ "$(basename "${C_COMPILER}")" == clang* ]]; then
   export CFLAGS="-Wno-xor-used-as-pow -Wno-gnu-variable-sized-type-not-at-end -Wno-unused-but-set-parameter"
 fi
+export CFLAGS="${CFLAGS-""} ${EXTRA_CFLAGS}"
+
+echo "Compiling elfutils using ${C_COMPILER} / flags=$CFLAGS"
+
 ./configure CC="${C_COMPILER}" --without-bzlib --without-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning --prefix "${TARGET_EXTRACT}"
 make "-j$(nproc)" install
