@@ -182,6 +182,8 @@ add_unit_test(
     ddprof_input-ut
     ../src/ddprof_cmdline.cc
     ../src/ddprof_input.cc
+    ../src/ddprof_context_lib.cc
+    ../src/logger_setup.cc
     ../src/perf_watcher.cc
     ddprof_input-ut.cc
     DEFINITIONS MYNAME="ddprof_input-ut"

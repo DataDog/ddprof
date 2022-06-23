@@ -48,9 +48,11 @@ bool watcher_has_countable_sample_type(const PerfWatcher *watcher) {
   return DDPROF_PWT_NOCOUNT != watcher_to_count_sample_type_id(watcher);
 }
 
-#define X_EVENTS(a, b, c, d, e, f, g) {b, BASE_STYPES, c, d, {e}, f, g},
+#define X_EVENTS(a, b, c, d, e, f, g)                                          \
+  {DDPROF_PWE_##a, b, BASE_STYPES, c, d, {e}, f, g},
 const PerfWatcher events_templates[] = {EVENT_CONFIG_TABLE(X_EVENTS)};
 const PerfWatcher tracepoint_templates[] = {{
+    .ddprof_event_type = DDPROF_PWE_TRACEPOINT,
     .desc = "Tracepoint",
     .sample_type = BASE_STYPES,
     .type = PERF_TYPE_TRACEPOINT,
@@ -61,26 +63,33 @@ const PerfWatcher tracepoint_templates[] = {{
 #undef X_PWATCH
 
 #define X_STR(a, b, c, d, e, f, g) #a,
-int str_to_event_idx(const char *str) {
+const char *event_type_name_from_idx(int idx) {
   static const char *event_names[] = {EVENT_CONFIG_TABLE(X_STR)}; // NOLINT
+  if (idx < 0 || idx >= DDPROF_PWE_LENGTH)
+    return NULL;
+  return event_names[idx];
+}
+#undef X_STR
+
+int str_to_event_idx(const char *str) {
   int type;
   if (!str)
     return -1;
   size_t sz_str = strlen(str);
   for (type = 0; type < DDPROF_PWE_LENGTH; ++type) {
-    size_t sz_thistype = strlen(event_names[type]);
+    const char *event_name = event_type_name_from_idx(type);
+    size_t sz_thistype = strlen(event_name);
 
     // We don't want to match partial events, and the event specification
     // demands that events are either whole or immediately preceeded by a comma.
     if ((sz_str < sz_thistype) ||
         (sz_str > sz_thistype && str[sz_thistype] != ','))
       continue;
-    if (!strncmp(str, event_names[type], sz_thistype))
+    if (!strncmp(str, event_name, sz_thistype))
       return type;
   }
   return -1;
 }
-#undef X_STR
 
 const PerfWatcher *ewatcher_from_idx(int idx) {
   if (idx < 0 || idx >= DDPROF_PWE_LENGTH)

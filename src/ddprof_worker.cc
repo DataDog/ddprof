@@ -165,9 +165,11 @@ static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr,
       (ddprof::tsc_cycles_to_ns(tsc_cycles) * 1000) / elapsed_nsec;
   ddprof_stats_set(STATS_UNWIND_CPU_USAGE, unwind_millicores);
 
-  long nsamples;
+  long nsamples = 0;
   ddprof_stats_get(STATS_SAMPLE_COUNT, &nsamples);
-  ddprof_stats_divide(STATS_UNWIND_AVG_STACK_SIZE, nsamples);
+  if (nsamples != 0) {
+    ddprof_stats_divide(STATS_UNWIND_AVG_STACK_SIZE, nsamples);
+  }
 
   return ddres_init();
 }

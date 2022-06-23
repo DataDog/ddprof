@@ -208,8 +208,7 @@ static int ddprof_start_profiling_internal() {
     //  * library create socket pair and fork + exec into ddprof executable
     //  * library sends a message requesting profiler PID and waits for a reply
     //  * ddprof starts up, attaches itself to the target process, then waits
-    //  for
-    //    a PID request and replies
+    //    for a request and replies
     //  * both library and profiler close their socket and continue
     int sockfds[2];
     if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sockfds) == -1) {

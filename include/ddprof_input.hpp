@@ -35,6 +35,7 @@ typedef struct DDProfInput {
   char *tags;
   char *url;
   char *socket;
+  char *preset;
   // Watcher presets
   PerfWatcher watchers[MAX_TYPE_WATCHER];
   int num_watchers;
@@ -95,7 +96,9 @@ typedef struct DDProfInput {
   XX(DD_PROFILING_NATIVE_TARGET_PID,    pid,                p, 'p', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_NATIVE_GLOBAL,        global,             g, 'g', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_INTERNAL_STATS,       internal_stats,     b, 'b', 1, input, NULL, "", )                      \
-  XX(DD_PROFILING_NATIVE_SOCKET,        socket,             Z, 'Z', 1, input, NULL, "", )
+  XX(DD_PROFILING_NATIVE_SOCKET,        socket,             Z, 'Z', 1, input, NULL, "", )                      \
+  XX(DD_PROFILING_NATIVE_PRESET,        preset,             D, 'D', 1, input, NULL, "", )
+
 // clang-format on
 
 #define X_ENUM(a, b, c, d, e, f, g, h, i) a,
