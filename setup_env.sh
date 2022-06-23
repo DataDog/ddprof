@@ -25,36 +25,36 @@ GetDirectoryExtention() {
 CmakeWithOptions() {
   # Build mode
   # Extra Parameters to cmake
-  BUILD_MODE=${1}
+  BUILD_TYPE=${1}
   shift
-  VENDOR_EXTENSION=$(GetDirectoryExtention ${BUILD_MODE})
+  VENDOR_EXTENSION=$(GetDirectoryExtention ${BUILD_TYPE})
   # shellcheck disable=SC2086
-  cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=${BUILD_MODE} -DVENDOR_EXTENSION=${VENDOR_EXTENSION} $@
+  cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DVENDOR_EXTENSION=${VENDOR_EXTENSION} $@
 }
 
 RelCMake() {
-  BUILD_MODE=Release
-  CmakeWithOptions ${BUILD_MODE} $@
+  BUILD_TYPE=Release
+  CmakeWithOptions ${BUILD_TYPE} $@
 }
 
 DebCMake() {
-    BUILD_MODE=Debug
-    CmakeWithOptions ${BUILD_MODE} $@
+    BUILD_TYPE=Debug
+    CmakeWithOptions ${BUILD_TYPE} $@
 }
 
 SanCMake() {
-    BUILD_MODE=SanitizedDebug
-    CmakeWithOptions ${BUILD_MODE} $@
+    BUILD_TYPE=SanitizedDebug
+    CmakeWithOptions ${BUILD_TYPE} $@
 }
 
 TSanCMake() {
-    BUILD_MODE=ThreadSanitizedDebug
-    CmakeWithOptions ${BUILD_MODE} $@
+    BUILD_TYPE=ThreadSanitizedDebug
+    CmakeWithOptions ${BUILD_TYPE} $@
 }
 
 CovCMake() {
-    BUILD_MODE=Coverage
-    CmakeWithOptions ${BUILD_MODE} $@
+    BUILD_TYPE=Coverage
+    CmakeWithOptions ${BUILD_TYPE} $@
 }
 
 ## Build a directory with a naming that reflects the OS / compiler we are using

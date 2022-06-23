@@ -27,8 +27,8 @@ set(ELFUTILS_INCLUDE_DIRS ${ELFUTILS_PATH}/include)
 
 if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Release" AND NOT "${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
     # Variable can contain several args as it is quoted
-    set(EXTRA_CFLAGS "-O0")
-    message(STATUS "elfutils - Adding ${EXTRA_CFLAGS} flag")
+    set(EXTRA_CFLAGS "-O0 -g")
+    message(STATUS "elfutils - Adding compilation flags ${EXTRA_CFLAGS}")
 endif()
 
 execute_process(COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_elfutils.sh" "${VER_ELF}" "${SHA256_ELF}" "${ELFUTILS_PATH}" "${CMAKE_C_COMPILER}" "${EXTRA_CFLAGS}"

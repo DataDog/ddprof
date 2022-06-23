@@ -10,11 +10,13 @@ usage() {
     echo "Usage :"
     echo "$0 <version> <md5> <path> <c-compiler> <extra-c-flags>"
     echo ""
+    echo "The extra c flags should be a single arg (hence quoted)"
+    echo ""
     echo "Example"
-    echo "  $0 0.183 6f58aa1b9af1a5681b1cbf63e0da2d67 ./vendor gcc -O0"
+    echo "  $0 0.183 6f58aa1b9af1a5681b1cbf63e0da2d67 ./vendor gcc \"-O0 -g\""
 }
 
-if [ "$#" -lt 4 ]; then
+if [ "$#" -lt 4 ] || [ "$#" -ge 6 ]; then
     usage
     exit 1
 fi
@@ -24,6 +26,7 @@ SHA256_ELF=$2
 TARGET_EXTRACT=$3
 C_COMPILER=${4}
 EXTRA_CFLAGS=""
+# C flags are optional
 if [ "$#" -ge 5 ]; then
   EXTRA_CFLAGS=${5}
 fi
