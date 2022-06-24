@@ -113,19 +113,15 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
 #endif
     return false;
   } else if (addr < sp_start || addr + sizeof(ElfWord_t) > sp_end) {
-    // If we're here, we're not in the stack.  We should interpet addr as an
-    // address in VM, not as a file offset.
-    // Strongly assumes we're also in an executable region?
-    DsoHdr::DsoFindRes find_res =
-        us->dso_hdr.pid_read_dso(us->pid, result, sizeof(ElfWord_t), addr);
-    if (!find_res.second) {
-      // Some regions are not handled
-      LG_DBG("Couldn't get read 0x%lx from %d, (0x%lx, 0x%lx)[%p, %p]", addr,
+    // We used to look within the binaries when then matched mapped binaries.
+    // Though looking at the cases when this occured, it was not useful.
+    // Dwarf should not need to look inside binaries to define how to unwind.
+    // It was usually a result of frame pointer unwinding (where the frame 
+    // pointer was used for something else).
+    LG_DBG("Attempting to read outside of stack 0x%lx from %d, (0x%lx, 0x%lx)[%p, %p]", addr,
              us->pid, sp_start, sp_end, us->stack, us->stack + us->stack_sz);
-    }
-    return find_res.second;
+    return false;
   }
-
   // If we're here, we're going to read from the stack.  Just the same, we need
   // to protect stack reads carefully, so split the indexing into a
   // precomputation followed by a bounds check
@@ -134,7 +130,6 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
     LG_WRN("Stack miscalculation: %lx - %lx != %lx", addr, sp_start, stack_idx);
     return false;
   }
-
   *result = *(ElfWord_t *)(us->stack + stack_idx);
   return true;
 }
