@@ -46,7 +46,7 @@ fi
 
 echo "Checking elfutils sha512"
 if ! echo "${SHA512_ELF} ${TAR_ELF}" | sha512sum --check --strict --status; then
-    echo "Error validating elfutils SHA256"
+    echo "Error validating elfutils SHA512"
     echo "Please clear $TARGET_EXTRACT before restarting"
     exit 1
 fi
