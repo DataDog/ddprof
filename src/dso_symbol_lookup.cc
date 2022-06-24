@@ -5,6 +5,7 @@
 
 #include "dso_symbol_lookup.hpp"
 
+#include "ddprof_file_info-i.hpp"
 #include "dso_type.hpp"
 #include "logger.hpp"
 #include "string_format.hpp"

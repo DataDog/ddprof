@@ -65,7 +65,6 @@ private:
 /// PID map : split everything per PID
 /// Map of DSOs : information from proc map (addresses / binary name)
 /// File info : latest location of the file and unique ID to represent it
-/// Region holder : mmap of associated files
 class DsoHdr {
 public:
   /******* Structures and types **********/
@@ -88,8 +87,6 @@ public:
 
   // true if it erases anything
   bool erase_overlap(const Dso &dso);
-
-  DsoFindRes pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr);
 
   // Clear all dsos and regions associated with this pid
   void pid_free(int pid);
@@ -142,10 +139,6 @@ public:
   }
 
   int get_nb_dso() const;
-  int get_nb_mapped_dso() const;
-  /********* Region helpers ***********/
-  // returns null if the file was not found
-  const RegionHolder *find_or_insert_region(const Dso &dso);
 
   // Unordered map (by pid) of sorted DSOs
   DsoPidMap _map;
@@ -175,8 +168,6 @@ private:
   FileInfoId_t update_id_and_path(const Dso &dso);
 
   BackpopulateStateMap _backpopulate_state_map;
-
-  RegionMap _region_map;
 
   FileInfoInodeMap _file_info_inode_map;
 

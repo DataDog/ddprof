@@ -346,85 +346,6 @@ DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr) {
   return find_res;
 }
 
-// addr : in the virtual mem of the pid specified
-DsoFindRes DsoHdr::pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr) {
-  assert(buf);
-  assert(sz > 0);
-
-  DsoFindRes find_res = dso_find_or_backpopulate(pid, addr);
-  if (!find_res.second) {
-    return find_res;
-  }
-  const Dso &dso = find_res.first->second;
-  if (!dso_handled_type_read_dso(dso)) {
-    // We can not mmap if we do not have a file
-    LG_DBG("[DSO] Read DSO : Unhandled DSO %s", dso.to_string().c_str());
-    find_res.second = false;
-    return find_res;
-  }
-
-  // Find the cached segment
-  const RegionHolder *region = find_or_insert_region(dso);
-  if (!region || !region->get_region()) {
-    LG_DBG("[DSO] Unable to retrieve region from DSO %s (region=%p)",
-           dso._filename.c_str(), region);
-    find_res.second = false;
-    return find_res;
-  }
-
-  // Since addr is assumed in VM-space, convert it to segment-space, which is
-  // file space minus the offset into the leading page of the segment
-  if (addr < (dso._start) || (addr + sz) > (dso._end)) {
-    LG_ERR("[DSO] Logic error when computing segment space.");
-    find_res.second = false;
-    return find_res;
-  }
-
-  Offset_t file_region_offset = (addr - dso._start);
-
-  if (file_region_offset > region->get_sz()) {
-    LG_NTC("[DSO] Attempt to read past the dso file");
-    find_res.second = false;
-    return find_res;
-  }
-
-  // At this point, we've
-  //  Found a segment with matching parameters
-  //  Adjusted addr to be a segment-offset
-  //  Confirmed that the segment has the capacity to support our read
-  // So let's read it!
-  unsigned char *src = static_cast<unsigned char *>(region->get_region());
-  memcpy(buf, src + file_region_offset, sz);
-  return find_res;
-}
-
-const RegionHolder *DsoHdr::find_or_insert_region(const Dso &dso) {
-  FileInfoId_t id = get_or_insert_file_info(dso);
-  if (id <= k_file_info_error) {
-    return nullptr;
-  }
-  const auto find_res = _region_map.find(id);
-  if (find_res == _region_map.end()) {
-    size_t reg_size = dso._end - dso._start + 1;
-    if (static_cast<unsigned>(_file_info_vector[id].get_size()) < dso._pgoff) {
-      reg_size = 0;
-    } else {
-      reg_size =
-          std::min(reg_size, _file_info_vector[id].get_size() - dso._pgoff);
-    }
-    const auto insert_res =
-        _region_map.emplace(id,
-                            RegionHolder(_file_info_vector[id].get_path(),
-                                         reg_size, dso._pgoff, dso._type));
-    assert(insert_res.second); // insertion always successful
-    LG_DBG("[DSO] Inserted region for DSO %s, at %p(%lx)",
-           dso.to_string().c_str(), insert_res.first->second.get_region(),
-           dso._end - dso._start + 1);
-    return &insert_res.first->second;
-  } else { // iterator contains a pair key / value
-    return &find_res->second;
-  }
-}
 
 void DsoHdr::pid_free(int pid) { _map.erase(pid); }
 
@@ -529,6 +450,4 @@ int DsoHdr::get_nb_dso() const {
   });
   return total_nb_elts;
 }
-
-int DsoHdr::get_nb_mapped_dso() const { return _region_map.size(); }
 } // namespace ddprof

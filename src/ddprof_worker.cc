@@ -152,7 +152,6 @@ static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr,
   ddprof_stats_set(STATS_DSO_NEW_DSO,
                    dso_hdr->_stats.sum_event_metric(DsoStats::kNewDso));
   ddprof_stats_set(STATS_DSO_SIZE, dso_hdr->get_nb_dso());
-  ddprof_stats_set(STATS_DSO_MAPPED, dso_hdr->get_nb_mapped_dso());
 
   long target_cpu_nsec;
   ddprof_stats_get(STATS_TARGET_CPU_USAGE, &target_cpu_nsec);
