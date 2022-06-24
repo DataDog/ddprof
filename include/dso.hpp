@@ -6,7 +6,9 @@
 #pragma once
 
 #include "ddprof_defs.hpp"
-#include "region_holder.hpp"
+
+#include "dso_type.hpp"
+#include "ddprof_file_info-i.hpp"
 
 #include <iostream>
 #include <string>

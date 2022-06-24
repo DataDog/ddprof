@@ -27,7 +27,6 @@
   X(DSO_UNHANDLED_SECTIONS, "dso.unhandled_sections", STAT_GAUGE)              \
   X(DSO_NEW_DSO, "dso.new", STAT_GAUGE)                                        \
   X(DSO_SIZE, "dso.size", STAT_GAUGE)                                          \
-  X(DSO_MAPPED, "dso.mapped", STAT_GAUGE)                                      \
   X(PPROF_SIZE, "pprof.size", STAT_GAUGE)
 
 // Expand the enum/index for the individual stats

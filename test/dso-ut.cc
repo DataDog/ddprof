@@ -196,18 +196,6 @@ TEST(DSOTest, path_type) {
   EXPECT_TRUE(syscall_dso._type == dso::kVsysCall);
 }
 
-TEST(DSOTest, file_dso) {
-  DsoHdr dso_hdr;
-  DsoFindRes insert_res =
-      dso_hdr.insert_erase_overlap(dso_hdr._map[10], build_dso_file_10_2500());
-  ASSERT_TRUE(insert_res.second);
-  const Dso &dso = insert_res.first->second;
-  // actual file access here
-  const RegionHolder *region = dso_hdr.find_or_insert_region(dso);
-  ASSERT_TRUE(region);
-  ASSERT_TRUE(region->get_region());
-}
-
 // clang-format off
 static const char *s_exec_line = "55d7883a1000-55d7883a5000 r-xp 00002000 fe:01 3287864                    /usr/local/bin/BadBoggleSolver_run";
 static const char *s_exec_line2 = "55d788391000-55d7883a1000 r-xp 00002000 fe:01 0                    /usr/local/bin/BadBoggleSolver_run_2";
@@ -325,27 +313,6 @@ TEST(DSOTest, missing_dso) {
   FileInfo file_info = dso_hdr.find_file_info(foo_dso);
   EXPECT_TRUE(file_info._path.empty());
   EXPECT_FALSE(file_info._inode);
-}
-
-TEST(DSOTest, pid_read_dso) {
-  ElfAddress_t ip = _THIS_IP_;
-  DsoHdr dso_hdr;
-  pid_t my_pid = getpid();
-  dso_hdr.dso_find_or_backpopulate(my_pid, ip);
-  const DsoHdr::DsoMap &map = dso_hdr._map[my_pid];
-  bool found = false;
-  for (auto it = map.begin(); it != map.end(); ++it) {
-    const Dso &dso = it->second;
-    if (dso._filename.find("c++") != std::string::npos && dso._pgoff == 0) {
-      ElfWord_t elf_word = 0;
-      DsoHdr::DsoFindRes find_res = dso_hdr.pid_read_dso(
-          my_pid, &elf_word, sizeof(ElfWord_t), dso._start + 0x100);
-      LG_DBG("Read result = %lx (dso %s)", elf_word, dso.to_string().c_str());
-      EXPECT_TRUE(find_res.second);
-      found = true;
-    }
-  }
-  EXPECT_TRUE(found);
 }
 
 // clang-format off

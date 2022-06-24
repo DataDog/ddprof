@@ -235,19 +235,12 @@ add_unit_test(
 )
 
 add_unit_test(
-    region_holder-ut
-    ../src/region_holder.cc
-    region_holder-ut.cc
-    DEFINITIONS MYNAME="region_holder-ut")
-
-add_unit_test(
     dso-ut
     ../src/dso.cc
     ../src/dso_hdr.cc
     ../src/ddprof_file_info.cc
     ../src/procutils.cc
     ../src/signal_helper.cc
-    ../src/region_holder.cc
     dso-ut.cc
     DEFINITIONS MYNAME="dso-ut")
 target_include_directories(dso-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
@@ -280,7 +273,6 @@ add_unit_test(
     ../src/ddprof_file_info.cc
     ../src/procutils.cc
     ../src/signal_helper.cc
-    ../src/region_holder.cc
     LIBRARIES ${ELFUTILS_LIBRARIES}
     DEFINITIONS MYNAME="dwfl_symbol-ut"
 )
@@ -306,7 +298,6 @@ add_unit_test(
     ../src/saveregisters.cc
     ../src/mapinfo_lookup.cc
     ../src/procutils.cc
-    ../src/region_holder.cc
     ../src/signal_helper.cc
     ../src/statsd.cc
     ../src/unwind.cc
@@ -344,7 +335,6 @@ add_unit_test(
     ../src/saveregisters.cc
     ../src/mapinfo_lookup.cc
     ../src/procutils.cc
-    ../src/region_holder.cc
     ../src/signal_helper.cc
     ../src/statsd.cc
     ../src/sys_utils.cc

@@ -116,10 +116,12 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
     // We used to look within the binaries when then matched mapped binaries.
     // Though looking at the cases when this occured, it was not useful.
     // Dwarf should not need to look inside binaries to define how to unwind.
-    // It was usually a result of frame pointer unwinding (where the frame 
+    // It was usually a result of frame pointer unwinding (where the frame
     // pointer was used for something else).
-    LG_DBG("Attempting to read outside of stack 0x%lx from %d, (0x%lx, 0x%lx)[%p, %p]", addr,
-             us->pid, sp_start, sp_end, us->stack, us->stack + us->stack_sz);
+    LG_DBG("Attempting to read outside of stack 0x%lx from %d, (0x%lx, "
+           "0x%lx)[%p, %p]",
+           addr, us->pid, sp_start, sp_end, us->stack,
+           us->stack + us->stack_sz);
     return false;
   }
   // If we're here, we're going to read from the stack.  Just the same, we need
