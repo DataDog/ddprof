@@ -314,7 +314,9 @@ TEST(DSOTest, range_check) {
   ASSERT_TRUE(find_res.second);
   auto &map = dso_hdr._map[pid];
   DDProfModRange mod_range = dso_hdr.find_mod_range(find_res.first, map);
-  printf("Range for %s = [0x%lx - 0x%lx] \n", find_res.first->second._filename.c_str(), mod_range._low_addr, mod_range._high_addr);
+  printf("Range for %s = [0x%lx - 0x%lx] \n",
+         find_res.first->second._filename.c_str(), mod_range._low_addr,
+         mod_range._high_addr);
   EXPECT_GE(find_res.first->second._start, mod_range._low_addr);
 }
 

@@ -7,8 +7,8 @@
 
 #include "ddprof_defs.hpp"
 
-#include "dso_type.hpp"
 #include "ddprof_file_info-i.hpp"
+#include "dso_type.hpp"
 
 #include <iostream>
 #include <string>

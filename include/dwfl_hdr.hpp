@@ -7,10 +7,10 @@
 
 #include "ddprof_defs.hpp"
 #include "ddprof_file_info.hpp"
+#include "ddprof_module.hpp"
 #include "ddres.hpp"
 #include "dso.hpp"
 #include "dwfl_internals.hpp"
-#include "ddprof_module.hpp"
 
 #include <sys/types.h>
 #include <unordered_map>
@@ -42,8 +42,9 @@ struct DwflWrapper {
   // unsafe get don't check ranges
 
   // safe get
-  DDProfMod *register_mod(ProcessAddress_t pc, const Dso &dso, 
-                          DDProfModRange mod_range, const FileInfoValue &fileInfoValue);
+  DDProfMod *register_mod(ProcessAddress_t pc, const Dso &dso,
+                          DDProfModRange mod_range,
+                          const FileInfoValue &fileInfoValue);
 
   ~DwflWrapper();
 
@@ -55,7 +56,7 @@ struct DwflWrapper {
   Dwfl *_dwfl;
   bool _attached;
   bool _inconsistent;
-  
+
   // Keep track of the files we added to the dwfl object
   std::unordered_map<FileInfoId_t, DDProfMod> _ddprof_mods;
 };

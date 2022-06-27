@@ -7,11 +7,11 @@
 
 #include "ddprof_defs.hpp"
 #include "ddprof_file_info.hpp"
+#include "ddprof_module.hpp"
 #include "dso.hpp"
 #include "dso_symbol_lookup.hpp"
 #include "hash_helper.hpp"
 #include "symbol_table.hpp"
-#include "ddprof_module.hpp"
 
 #include <iostream>
 #include <map>

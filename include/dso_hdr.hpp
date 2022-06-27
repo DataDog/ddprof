@@ -12,8 +12,8 @@
 #include <unordered_map>
 
 #include "ddprof_file_info.hpp"
-#include "dso.hpp"
 #include "ddprof_module.hpp"
+#include "dso.hpp"
 
 namespace ddprof {
 

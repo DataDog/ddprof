@@ -9,7 +9,8 @@
 
 namespace ddprof {
 
-DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso, DDProfModRange mod_range,
+DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
+                        DDProfModRange mod_range,
                         const FileInfoValue &fileInfoValue) {
   if (!dwfl)
     return DDProfMod();
@@ -33,8 +34,7 @@ DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso, DDProfM
                      &ddprof_mod._high_addr, 0, 0, &main_name, 0);
     if (ddprof_mod._low_addr != mod_range._low_addr) {
       LG_NTC("Incoherent DSO (%s) %lx != %lx dwfl_module)",
-              dso._filename.c_str(), mod_range._low_addr,
-              ddprof_mod._low_addr);
+             dso._filename.c_str(), mod_range._low_addr, ddprof_mod._low_addr);
       return DDProfMod(DDProfMod::kInconsistent);
     }
     return ddprof_mod;
@@ -61,7 +61,8 @@ DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso, DDProfM
     dwfl_module_info(ddprof_mod._mod, 0, &ddprof_mod._low_addr,
                      &ddprof_mod._high_addr, 0, 0, 0, 0);
     LG_DBG("Loaded mod from file (%s), PID %d (%s) mod[%lx;%lx]",
-           fileInfoValue.get_path().c_str(), dso._pid, dwfl_errmsg(-1), ddprof_mod._low_addr, ddprof_mod._high_addr);
+           fileInfoValue.get_path().c_str(), dso._pid, dwfl_errmsg(-1),
+           ddprof_mod._low_addr, ddprof_mod._high_addr);
   }
   // TODO: Figure out how to check that mapping makes sense
   // ddprof_mod._high_addr != mod_range._high_addr

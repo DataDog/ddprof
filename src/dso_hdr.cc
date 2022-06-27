@@ -221,7 +221,8 @@ DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
 }
 
 // Find the lowest and highest for this given DSO
-DDProfModRange DsoHdr::find_mod_range(DsoMapConstIt it, const DsoMap &map) const {
+DDProfModRange DsoHdr::find_mod_range(DsoMapConstIt it,
+                                      const DsoMap &map) const {
   if (it == map.end()) {
     return DDProfModRange();
   }
@@ -240,10 +241,9 @@ DDProfModRange DsoHdr::find_mod_range(DsoMapConstIt it, const DsoMap &map) const
   }
   --it; // back up from end element (or different file)
 
-  return DDProfModRange{._low_addr = first_el->second._start, 
-                        ._high_addr = it->second._end };
+  return DDProfModRange{._low_addr = first_el->second._start,
+                        ._high_addr = it->second._end};
 }
-
 
 // erase range of elements
 void DsoHdr::erase_range(DsoMap &map, const DsoRange &range) {
@@ -370,7 +370,6 @@ DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr) {
   }
   return find_res;
 }
-
 
 void DsoHdr::pid_free(int pid) { _map.erase(pid); }
 

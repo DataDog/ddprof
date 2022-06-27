@@ -60,9 +60,10 @@ DwflWrapper &DwflHdr::get_or_insert(pid_t pid) {
   return it->second;
 }
 
- DDProfMod *DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso, 
-                                      DDProfModRange mod_range, const FileInfoValue &fileInfoValue) {
-  
+DDProfMod *DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
+                                     DDProfModRange mod_range,
+                                     const FileInfoValue &fileInfoValue) {
+
   DDProfMod *ddprof_mod = &_ddprof_mods[fileInfoValue.get_id()];
   if (!ddprof_mod->_low_addr) {
     // first time we see this binary for this pid

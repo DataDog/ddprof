@@ -268,15 +268,17 @@ add_unit_test(
     dwfl_module-ut.cc
     ../src/dwfl_hdr.cc
     ../src/dwfl_module.cc
+    ../src/dwfl_symbol.cc
     ../src/dso.cc
     ../src/dso_hdr.cc
     ../src/ddprof_file_info.cc
     ../src/procutils.cc
     ../src/signal_helper.cc
-    LIBRARIES ${ELFUTILS_LIBRARIES}
+    LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
     DEFINITIONS MYNAME="dwfl_symbol-ut"
 )
 add_compile_definitions("DWFL_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
+set_property(TARGET dwfl_module-ut PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 
 add_unit_test(
     savecontext-ut

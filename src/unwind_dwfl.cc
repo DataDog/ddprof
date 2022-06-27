@@ -46,13 +46,13 @@ DDRes unwind_init_dwfl(UnwindState *us) {
 
         // get low and high addr for this module
         DDProfModRange mod_range = us->dso_hdr.find_mod_range(it, map);
-        DDProfMod *ddprof_mod = us->_dwfl_wrapper->register_mod(us->current_ip, dso, mod_range, file_info_value);
+        DDProfMod *ddprof_mod = us->_dwfl_wrapper->register_mod(
+            us->current_ip, dso, mod_range, file_info_value);
         if (ddprof_mod->_mod) {
           // one success is fine
           success = true;
           break;
-        }
-        else if (ddprof_mod->_status == DDProfMod::kInconsistent) {
+        } else if (ddprof_mod->_status == DDProfMod::kInconsistent) {
           return ddres_warn(DD_WHAT_UW_ERROR);
         }
       }
@@ -88,7 +88,9 @@ static void trace_unwinding_end(UnwindState *us) {
     }
   }
 }
-static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc, DDProfMod *ddprof_mod, const FileInfoValue &file_info_value);
+static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
+                            DDProfMod *ddprof_mod,
+                            const FileInfoValue &file_info_value);
 
 // returns true if we should continue unwinding
 static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
@@ -124,9 +126,10 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     return ddres_init();
   }
   const Dso &dso = find_res.first->second;
-    // if not encountered previously, update file location / key
+  // if not encountered previously, update file location / key
   FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
-  DDProfModRange mod_range = us->dso_hdr.find_mod_range(find_res.first, us->dso_hdr._map[us->pid]);
+  DDProfModRange mod_range =
+      us->dso_hdr.find_mod_range(find_res.first, us->dso_hdr._map[us->pid]);
   if (file_info_id <= k_file_info_error) {
     // unable to acces file: add available info from dso
     add_dso_frame(us, dso, pc - mod_range._low_addr);
@@ -138,9 +141,10 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   const FileInfoValue &file_info_value =
       us->dso_hdr.get_file_info_value(file_info_id);
   // ensure unwinding backend has access to this module (and check consistency)
-  DDProfMod *ddprof_mod = us->_dwfl_wrapper->register_mod(pc, dso, mod_range, file_info_value);
+  DDProfMod *ddprof_mod =
+      us->_dwfl_wrapper->register_mod(pc, dso, mod_range, file_info_value);
   // Updates in DSO layout can create inconsistencies
-  if (ddprof_mod->_status == DDProfMod::kInconsistent ) {
+  if (ddprof_mod->_status == DDProfMod::kInconsistent) {
     return ddres_warn(DD_WHAT_UW_ERROR);
   }
 
@@ -185,7 +189,9 @@ DDRes unwind_dwfl(UnwindState *us) {
   return res;
 }
 
-static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc, DDProfMod *ddprof_mod, const FileInfoValue &file_info_value) {
+static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
+                            DDProfMod *ddprof_mod,
+                            const FileInfoValue &file_info_value) {
 
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
 
@@ -195,7 +201,8 @@ static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc, DD
   // get or create the dwfl symbol
   output->locs[current_loc_idx]._symbol_idx =
       unwind_symbol_hdr._dwfl_symbol_lookup_v2.get_or_insert(
-          *ddprof_mod, unwind_symbol_hdr._symbol_table, unwind_symbol_hdr._dso_symbol_lookup, pc, dso, file_info_value);
+          *ddprof_mod, unwind_symbol_hdr._symbol_table,
+          unwind_symbol_hdr._dso_symbol_lookup, pc, dso, file_info_value);
 #ifdef DEBUG
   LG_NTC("Considering frame with IP : %lx / %s ", pc,
          us->symbol_hdr._symbol_table[output->locs[current_loc_idx]._symbol_idx]

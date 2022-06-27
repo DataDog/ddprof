@@ -28,7 +28,8 @@ void unwind_init(void) { elf_version(EV_CURRENT); }
 static void find_dso_add_error_frame(UnwindState *us) {
   DsoHdr::DsoFindRes find_res =
       us->dso_hdr.dso_find_closest(us->pid, us->current_ip);
-  DDProfModRange mod_range = us->dso_hdr.find_mod_range(find_res.first, us->dso_hdr._map[us->pid]);
+  DDProfModRange mod_range =
+      us->dso_hdr.find_mod_range(find_res.first, us->dso_hdr._map[us->pid]);
   add_error_frame(find_res.second ? &(find_res.first->second) : nullptr, us,
                   us->current_ip - mod_range._low_addr);
 }

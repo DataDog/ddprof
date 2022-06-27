@@ -27,4 +27,4 @@ struct DDProfMod {
   ProcessAddress_t _high_addr;
   Status _status;
 };
-}
+} // namespace ddprof

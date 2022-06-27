@@ -16,6 +16,8 @@
 #include <cassert>
 #include <string>
 
+// #define DEBUG
+
 namespace ddprof {
 
 DwflSymbolLookup_V2::DwflSymbolLookup_V2() : _lookup_setting(K_CACHE_ON) {
@@ -52,8 +54,8 @@ SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
   RegionAddress_t file_pc = process_pc - ddprof_mod._low_addr;
 
 #ifdef DEBUG
-  LG_DBG("Looking for : %lx = (%lx - %lx) / dso:%s", file_pc,
-         process_pc, ddprof_mod._low_addr, dso._filename.c_str());
+  LG_DBG("Looking for : %lx = (%lx - %lx) / dso:%s", file_pc, process_pc,
+         ddprof_mod._low_addr, dso._filename.c_str());
 #endif
   DwflSymbolMap &map = _file_info_map[file_info.get_id()];
   DwflSymbolMapFindRes find_res = find_closest(map, file_pc);
@@ -127,7 +129,7 @@ DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod, SymbolTable &table,
     // Avoid bouncing on these requests and insert an element
     Offset_t start_sym = file_pc;
     Offset_t end_sym = file_pc + 1; // minimum range
-#define ADD_ADDR_IN_SYMB // creates more elements
+#define ADD_ADDR_IN_SYMB // creates more elements (but adds info on addresses)
 #ifdef ADD_ADDR_IN_SYMB
     // adds interesting debug information that can be used to investigate
     // symbolization failures. Also causes memory increase
@@ -146,56 +148,42 @@ DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod, SymbolTable &table,
     return symbol_idx;
   }
 
-  // Check if the closest element is the same
-  if (find_res.first != map.end()) {
-    // if it is the same -> extend the end to current pc
-    // Note: I have never hit this. Perhaps it can be removed (TBD)
-    SymbolIdx_t previous_symb = find_res.first->second.get_symbol_idx();
-    if (symbol._demangle_name == table[previous_symb]._demangle_name) {
-      find_res.first->second.set_end(file_pc);
-#ifdef DEBUG
-      LG_DBG("Reuse previously matched %lx,%lx -> %s,%d,%d",
-             find_res.first->first, file_pc, symbol._symname.c_str(),
-             file_info.get_id(), previous_symb);
-#endif
-      return previous_symb;
+  {
+    RegionAddress_t start_sym;
+    RegionAddress_t end_sym;
+    // All paths bellow will insert symbol in the table
+    SymbolIdx_t symbol_idx = table.size();
+    table.push_back(std::move(symbol));
+
+    Symbol &sym_ref = table.back();
+    if (sym_ref._srcpath.empty()) {
+      // override with info from dso (this slightly mixes mappings and sources)
+      // But it helps a lot at Datadog (as mappings are ignored for now in UI)
+      sym_ref._srcpath = dso.format_filename();
     }
-  }
 
-  RegionAddress_t start_sym;
-  RegionAddress_t end_sym;
-  // All paths bellow will insert symbol in the table
-  SymbolIdx_t symbol_idx = table.size();
-  if (symbol._srcpath.empty()) {
-    // override with info from dso (this slightly mixes mappings and sources)
-    // But it helps a lot at Datadog (as mappings are ignored for now in UI)
-    symbol._srcpath = dso.format_filename();
-  }
+    if (!compute_elf_range_v2(file_pc, elf_sym, start_sym, end_sym)) {
+      // elf section does not add up to something that makes sense
+      // insert this PC without considering elf section
+      start_sym = file_pc;
+      end_sym = file_pc + 1;
+#ifdef DEBUG
+      LG_DBG("elf_range failure --> Insert: %lx,%lx -> %s,%d,%d / shndx=%d",
+             start_sym, end_sym, sym_ref._symname.c_str(), file_info.get_id(),
+             symbol_idx, elf_sym.st_shndx);
+#endif
+      map.emplace(start_sym, DwflSymbolVal_V2(end_sym, symbol_idx));
+      return symbol_idx;
+    }
 
-  if (!compute_elf_range(file_pc, ddprof_mod._low_addr, dso._pgoff, elf_sym,
-                         lbias, start_sym, end_sym)) {
-    // elf section does not add up to something that makes sense
-    // insert this PC without considering elf section
-    start_sym = file_pc;
-    end_sym = file_pc + 1;
 #ifdef DEBUG
     LG_DBG("Insert: %lx,%lx -> %s,%d,%d / shndx=%d", start_sym, end_sym,
-           symbol._symname.c_str(), file_info.get_id(), symbol_idx,
+           sym_ref._symname.c_str(), file_info.get_id(), symbol_idx,
            elf_sym.st_shndx);
 #endif
     map.emplace(start_sym, DwflSymbolVal_V2(end_sym, symbol_idx));
-    table.push_back(std::move(symbol));
     return symbol_idx;
   }
-
-#ifdef DEBUG
-  LG_DBG("Insert: %lx,%lx -> %s,%d,%d / shndx=%d", start_sym, end_sym,
-         symbol._symname.c_str(), file_info.get_id(), symbol_idx,
-         elf_sym.st_shndx);
-#endif
-  map.emplace(start_sym, DwflSymbolVal_V2(end_sym, symbol_idx));
-  table.push_back(std::move(symbol));
-  return symbol_idx;
 }
 
 bool DwflSymbolLookup_V2::symbol_lookup_check(Dwfl_Module *mod,
