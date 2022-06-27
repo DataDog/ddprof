@@ -17,7 +17,7 @@ bool max_stack_depth_reached(UnwindState *us);
 
 void add_common_frame(UnwindState *us, SymbolErrors lookup_case);
 
-void add_dso_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc);
+void add_dso_frame(UnwindState *us, const Dso &dso, FileAddress_t normalized_addr);
 
 void add_virtual_base_frame(UnwindState *us);
 

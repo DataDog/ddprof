@@ -30,3 +30,16 @@ source ../setup_env.sh # loads common invocations for cmake--not necessary, but 
 
 It is useful to verify that the target machine can connect to a Datadog agent.  Follow the Datadog troubleshooting guidelines.
 
+## Dev tools
+
+### Understanding the section layout
+
+To get an overview of the section layout, use readelf. This will help you match what is loaded in proc maps.
+
+```
+readelf -lW <binary>
+```
+
+### Reading symbols
+
+

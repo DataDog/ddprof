@@ -49,15 +49,14 @@ SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
     DsoSymbolLookup &dso_symbol_lookup, ProcessAddress_t process_pc,
     const Dso &dso, const FileInfoValue &file_info) {
   ++_stats._calls;
-#warning this is not normalized in the file, you need to normalize with the mod
-  RegionAddress_t region_pc = process_pc - dso._start;
+  RegionAddress_t file_pc = process_pc - ddprof_mod._low_addr;
 
 #ifdef DEBUG
-  LG_DBG("Looking for : %lx = (%lx - %lx) / (offset : %lx) / dso:%s", region_pc,
-         process_pc, dso._start, dso._pgoff, dso._filename.c_str());
+  LG_DBG("Looking for : %lx = (%lx - %lx) / dso:%s", file_pc,
+         process_pc, ddprof_mod._low_addr, dso._filename.c_str());
 #endif
   DwflSymbolMap &map = _file_info_map[file_info.get_id()];
-  DwflSymbolMapFindRes find_res = find_closest(map, region_pc);
+  DwflSymbolMapFindRes find_res = find_closest(map, file_pc);
   if (find_res.second) { // already found the correct symbol
 #ifdef DEBUG
     LG_DBG("Match : %lx,%lx -> %s,%d,%d", find_res.first->first,
@@ -68,7 +67,6 @@ SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
     // cache validation mechanism: force dwfl lookup to compare with matched
     // symbols
     if (_lookup_setting == K_CACHE_VALIDATE) {
-#warning pass down argument to here and remove arg
       if (symbol_lookup_check(ddprof_mod._mod, process_pc,
                               table[find_res.first->second.get_symbol_idx()])) {
         ++_stats._errors;
@@ -120,21 +118,21 @@ DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod, SymbolTable &table,
   GElf_Sym elf_sym;
   Offset_t lbias;
 
-  RegionAddress_t region_pc = process_pc - dso._start;
+  RegionAddress_t file_pc = process_pc - ddprof_mod._low_addr;
 
   if (!symbol_get_from_dwfl(ddprof_mod._mod, process_pc, symbol, elf_sym,
                             lbias)) {
     ++_stats._no_dwfl_symbols;
     // Override with info from dso
     // Avoid bouncing on these requests and insert an element
-    Offset_t start_sym = region_pc;
-    Offset_t end_sym = region_pc + 1;
-
+    Offset_t start_sym = file_pc;
+    Offset_t end_sym = file_pc + 1; // minimum range
+#define ADD_ADDR_IN_SYMB // creates more elements
 #ifdef ADD_ADDR_IN_SYMB
     // adds interesting debug information that can be used to investigate
     // symbolization failures. Also causes memory increase
     SymbolIdx_t symbol_idx =
-        dso_symbol_lookup.get_or_insert(process_pc, dso, table);
+        dso_symbol_lookup.get_or_insert(file_pc, dso, table);
 #else
     SymbolIdx_t symbol_idx = dso_symbol_lookup.get_or_insert(dso, table);
 #endif
@@ -154,10 +152,10 @@ DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod, SymbolTable &table,
     // Note: I have never hit this. Perhaps it can be removed (TBD)
     SymbolIdx_t previous_symb = find_res.first->second.get_symbol_idx();
     if (symbol._demangle_name == table[previous_symb]._demangle_name) {
-      find_res.first->second.set_end(region_pc);
+      find_res.first->second.set_end(file_pc);
 #ifdef DEBUG
       LG_DBG("Reuse previously matched %lx,%lx -> %s,%d,%d",
-             find_res.first->first, region_pc, symbol._symname.c_str(),
+             find_res.first->first, file_pc, symbol._symname.c_str(),
              file_info.get_id(), previous_symb);
 #endif
       return previous_symb;
@@ -174,12 +172,12 @@ DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod, SymbolTable &table,
     symbol._srcpath = dso.format_filename();
   }
 
-  if (!compute_elf_range(region_pc, ddprof_mod._low_addr, dso._pgoff, elf_sym,
+  if (!compute_elf_range(file_pc, ddprof_mod._low_addr, dso._pgoff, elf_sym,
                          lbias, start_sym, end_sym)) {
     // elf section does not add up to something that makes sense
     // insert this PC without considering elf section
-    start_sym = region_pc;
-    end_sym = region_pc + 1;
+    start_sym = file_pc;
+    end_sym = file_pc + 1;
 #ifdef DEBUG
     LG_DBG("Insert: %lx,%lx -> %s,%d,%d / shndx=%d", start_sym, end_sym,
            symbol._symname.c_str(), file_info.get_id(), symbol_idx,

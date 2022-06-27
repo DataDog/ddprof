@@ -126,9 +126,10 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   const Dso &dso = find_res.first->second;
     // if not encountered previously, update file location / key
   FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
+  DDProfModRange mod_range = us->dso_hdr.find_mod_range(find_res.first, us->dso_hdr._map[us->pid]);
   if (file_info_id <= k_file_info_error) {
     // unable to acces file: add available info from dso
-    add_dso_frame(us, dso, pc);
+    add_dso_frame(us, dso, pc - mod_range._low_addr);
     // We could stop here or attempt to continue in the dwarf unwinding
     // sometimes frame pointer lets us go further -> So we continue
     return ddres_init();
@@ -136,8 +137,6 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
 
   const FileInfoValue &file_info_value =
       us->dso_hdr.get_file_info_value(file_info_id);
-
-  DDProfModRange mod_range = us->dso_hdr.find_mod_range(find_res.first, us->dso_hdr._map[us->pid]);
   // ensure unwinding backend has access to this module (and check consistency)
   DDProfMod *ddprof_mod = us->_dwfl_wrapper->register_mod(pc, dso, mod_range, file_info_value);
   // Updates in DSO layout can create inconsistencies
