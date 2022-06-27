@@ -8,6 +8,7 @@
 
 #include "dwfl_internals.hpp"
 #include "loghandle.hpp"
+#include "ddprof_module.hpp"
 
 namespace ddprof {
 
@@ -33,8 +34,8 @@ TEST(DwflModule, inconsistency_test) {
   // retrieve the map associated to pid
   DsoHdr::DsoMap &dso_map = dso_hdr._map[my_pid];
 
-  for (auto &tmp_dso : dso_map) {
-    const Dso &dso = tmp_dso.second;
+  for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
+    Dso &dso = it->second;
     if (dso._type != dso::kStandard || !dso._executable) {
       continue; // skip non exec / non standard (anon/vdso...)
     }
@@ -44,10 +45,11 @@ TEST(DwflModule, inconsistency_test) {
 
     const FileInfoValue &file_info_value =
         dso_hdr.get_file_info_value(file_info_id);
-    DDProfMod ddprof_mod =
-        update_module(dwfl_wrapper._dwfl, dso._start, dso, file_info_value);
+    DDProfModRange mod_range = dso_hdr.find_mod_range(it, dso_map);
+    DDProfMod ddprof_mod = update_module(dwfl_wrapper._dwfl, dso._start, dso, mod_range, file_info_value);
     // check that we loaded all mods matching the DSOs
-    EXPECT_EQ(ddprof_mod._low_addr, dso._start - dso._pgoff);
+    EXPECT_EQ(ddprof_mod._low_addr, mod_range._low_addr);
+    EXPECT_EQ(ddprof_mod._status, DDProfMod::kUnknown);
   }
 
   {
@@ -65,8 +67,9 @@ TEST(DwflModule, inconsistency_test) {
     const FileInfoValue &file_info_value =
         dso_hdr.get_file_info_value(file_info_id);
 
-    DDProfMod ddprof_mod = update_module(dwfl_wrapper._dwfl, bad_dso._start,
-                                         bad_dso, file_info_value);
+    DDProfModRange ddprof_range = {._low_addr = bad_dso._start, ._high_addr = bad_dso._end + 1};
+
+    DDProfMod ddprof_mod = update_module(dwfl_wrapper._dwfl, bad_dso._start, bad_dso, ddprof_range, file_info_value);
     EXPECT_EQ(ddprof_mod._low_addr, 0);
     EXPECT_EQ(ddprof_mod._status, DDProfMod::kInconsistent);
   }

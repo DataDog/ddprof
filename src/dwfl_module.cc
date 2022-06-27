@@ -9,15 +9,7 @@
 
 namespace ddprof {
 
-static const char *get_filename(const char *full_path) {
-  const char *right_slash = strrchr(full_path, '/');
-  if (!right_slash) {
-    return full_path;
-  }
-  return right_slash + 1;
-}
-
-DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
+DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso, DDProfModRange mod_range,
                         const FileInfoValue &fileInfoValue) {
   if (!dwfl)
     return DDProfMod();
@@ -39,26 +31,11 @@ DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
     const char *main_name = nullptr;
     dwfl_module_info(ddprof_mod._mod, 0, &ddprof_mod._low_addr,
                      &ddprof_mod._high_addr, 0, 0, &main_name, 0);
-    if (ddprof_mod._low_addr != dso._start - dso._pgoff) {
-      // not using only addresses (as we get off by 1 page errors)
-      const std::string &filepath = fileInfoValue.get_path();
-      if (filepath.empty() || main_name == nullptr) {
-        return DDProfMod();
-      } else {
-        // This check is slightly fragile (checking file names)
-        // We are not comparing the full path as we use the proc maps
-        // to access them. So the root path could change while
-        // this would still be the same file.
-        const char *dso_name = get_filename(filepath.c_str());
-        const char *mod_name = get_filename(main_name);
-        if (strcmp(mod_name, dso_name) != 0) {
-          // A dso replaced the mod - flag as incoherent for future release
-          LG_NTC("Incoherent DSO (%s) %lx != %lx dwfl_module (%s)",
-                 filepath.c_str(), dso._start - dso._pgoff,
-                 ddprof_mod._low_addr, main_name);
-          return DDProfMod(DDProfMod::kInconsistent);
-        }
-      }
+    if (ddprof_mod._low_addr != mod_range._low_addr) {
+      LG_NTC("Incoherent DSO (%s) %lx != %lx dwfl_module)",
+              dso._filename.c_str(), mod_range._low_addr,
+              ddprof_mod._low_addr);
+      return DDProfMod(DDProfMod::kInconsistent);
     }
     return ddprof_mod;
   }
@@ -70,7 +47,7 @@ DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
       const char *dso_name = strrchr(filepath.c_str(), '/') + 1;
       dwfl_errno(); // erase previous error
       ddprof_mod._mod = dwfl_report_elf(dwfl, dso_name, filepath.c_str(), -1,
-                                        dso._start - dso._pgoff, false);
+                                        mod_range._low_addr, false);
     }
   }
 
@@ -83,11 +60,11 @@ DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
   } else {
     dwfl_module_info(ddprof_mod._mod, 0, &ddprof_mod._low_addr,
                      &ddprof_mod._high_addr, 0, 0, 0, 0);
-    LG_DBG("Loaded mod from file (%s), PID %d (%s)[offset:%lx], mod[%lx;%lx]",
-           fileInfoValue.get_path().c_str(), dso._pid, dwfl_errmsg(-1),
-           dso._pgoff, ddprof_mod._low_addr, ddprof_mod._high_addr);
+    LG_DBG("Loaded mod from file (%s), PID %d (%s) mod[%lx;%lx]",
+           fileInfoValue.get_path().c_str(), dso._pid, dwfl_errmsg(-1), ddprof_mod._low_addr, ddprof_mod._high_addr);
   }
-
+  // TODO: Figure out how to check that mapping makes sense
+  // ddprof_mod._high_addr != mod_range._high_addr
   return ddprof_mod;
 }
 

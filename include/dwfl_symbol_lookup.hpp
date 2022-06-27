@@ -11,6 +11,7 @@
 #include "dso_symbol_lookup.hpp"
 #include "hash_helper.hpp"
 #include "symbol_table.hpp"
+#include "ddprof_module.hpp"
 
 #include <iostream>
 #include <map>
@@ -77,7 +78,7 @@ public:
   DwflSymbolLookup_V2();
 
   // Get symbol from internal cache or fetch through dwarf
-  SymbolIdx_t get_or_insert(DwflWrapper &dwfl_wrapper, SymbolTable &table,
+  SymbolIdx_t get_or_insert(const DDProfMod &ddprof_mod, SymbolTable &table,
                             DsoSymbolLookup &dso_symbol_lookup,
                             ProcessAddress_t process_pc, const Dso &dso,
                             const FileInfoValue &file_info);
@@ -97,7 +98,7 @@ private:
 
   SymbolLookupSetting _lookup_setting;
 
-  SymbolIdx_t insert(DwflWrapper &dwfl_wrapper, SymbolTable &table,
+  SymbolIdx_t insert(const DDProfMod &ddprof_mod, SymbolTable &table,
                      DsoSymbolLookup &dso_symbol_lookup,
                      ProcessAddress_t process_pc, const Dso &dso,
                      const FileInfoValue &file_info, DwflSymbolMap &map,

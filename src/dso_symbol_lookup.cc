@@ -53,6 +53,7 @@ SymbolIdx_t DsoSymbolLookup::get_or_insert(ElfAddress_t addr, const Dso &dso,
     return get_or_insert_unhandled_type(dso, symbol_table);
   }
   AddressMap &addr_lookup = _map_dso_path[dso._filename];
+#warning this is wrong
   FileAddress_t normalized_addr = (addr - dso._start) + dso._pgoff;
 
   auto const it = addr_lookup.find(normalized_addr);

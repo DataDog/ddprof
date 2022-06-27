@@ -220,6 +220,31 @@ DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
   return std::make_pair<DsoMapIt, DsoMapIt>(std::move(start), std::move(end));
 }
 
+// Find the lowest and highest for this given DSO
+DDProfModRange DsoHdr::find_mod_range(DsoMapConstIt it, const DsoMap &map) const {
+  if (it == map.end()) {
+    return DDProfModRange();
+  }
+  DsoMapConstIt first_el = it;
+  while (first_el != map.begin()) {
+    first_el--;
+    if (it->second._filename != first_el->second._filename) {
+      ++first_el;
+      break;
+    }
+  }
+  while (++it != map.end()) {
+    if (it->second._filename != first_el->second._filename) {
+      break;
+    }
+  }
+  --it; // back up from end element (or different file)
+
+  return DDProfModRange{._low_addr = first_el->second._start, 
+                        ._high_addr = it->second._end };
+}
+
+
 // erase range of elements
 void DsoHdr::erase_range(DsoMap &map, const DsoRange &range) {
   // region maps are kept (as they are used for several pids)
