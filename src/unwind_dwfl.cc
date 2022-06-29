@@ -158,15 +158,35 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   return ddres_init();
 }
 
+bool is_infinite_loop(UnwindState *us) {
+  UnwindOutput &output = us->output;
+  uint64_t nb_locs = output.nb_locs;
+  if (nb_locs <= 2) {
+    return false;
+  }
+  if (output.locs[nb_locs - 1]._symbol_idx ==
+      output.locs[nb_locs - 2]._symbol_idx) {
+    return true;
+  }
+  return false;
+}
+
 // frame_cb callback at every frame for the dwarf unwinding
 static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
   UnwindState *us = (UnwindState *)arg;
 #ifdef DEBUG
   LG_NFO("Beging depth %lu", us->output.nb_locs);
 #endif
-  [[maybe_unused]] int dwfl_error_value = dwfl_errno();
+  int dwfl_error_value = dwfl_errno();
+  if (dwfl_error_value) {
+    // Check if dwarf unwinding was a failure we can get stuck in infinite loops
+    if (is_infinite_loop(us)) {
+      LG_DBG("Break out of unwinding (possible infinite loop)");
+      return DWARF_CB_ABORT;
+    }
+  }
 #ifdef DEBUG
-  // We often fall back to frame pointer unwinding which creates a log
+  // We often fallback to frame pointer unwinding (which logs an error)
   if (dwfl_error_value) {
     LG_DBG("Error flagged at depth = %lu -- Error:%s ", us->output.nb_locs,
            dwfl_errmsg(dwfl_error_value));
