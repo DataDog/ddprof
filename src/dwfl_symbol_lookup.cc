@@ -144,7 +144,12 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod,
     map.emplace(start_sym, DwflSymbolVal_V2(end_sym, symbol_idx));
     return symbol_idx;
   }
-  assert(lbias == ddprof_mod._sym_bias);
+  if (lbias != ddprof_mod._sym_bias) {
+    LG_NTC("Failed assumption %s - %lx != %lx", dso._filename.c_str(), lbias,
+           ddprof_mod._sym_bias);
+    assert(0);
+  }
+
   {
     RegionAddress_t start_sym;
     RegionAddress_t end_sym;
