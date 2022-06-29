@@ -18,7 +18,7 @@ typedef uint64_t inode_t;
 
 typedef int32_t SymbolIdx_t;
 typedef int32_t MapInfoIdx_t;
-// Generic type : prefer the more explicit types
+// Elf address (same as the address used with addr2line)
 typedef uint64_t ElfAddress_t;
 // Offset types : add or substract to address types
 typedef ElfAddress_t Offset_t;

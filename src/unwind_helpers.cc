@@ -52,10 +52,11 @@ void add_common_frame(UnwindState *us, SymbolErrors lookup_case) {
 }
 
 void add_dso_frame(UnwindState *us, const Dso &dso,
-                   FileAddress_t normalized_addr) {
-  add_virtual_frame(us,
-                    us->symbol_hdr._dso_symbol_lookup.get_or_insert(
-                        normalized_addr, dso, us->symbol_hdr._symbol_table));
+                   ElfAddress_t normalized_addr, std::string_view addr_type) {
+  add_virtual_frame(
+      us,
+      us->symbol_hdr._dso_symbol_lookup.get_or_insert(
+          normalized_addr, dso, us->symbol_hdr._symbol_table, addr_type));
 }
 
 void add_virtual_base_frame(UnwindState *us) {
@@ -137,11 +138,11 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
   return true;
 }
 
-void add_error_frame(const Dso *dso, UnwindState *us,
-                     FileAddress_t normalized_addr, SymbolErrors error_case) {
+void add_error_frame(const Dso *dso, UnwindState *us, ProcessAddress_t pc,
+                     SymbolErrors error_case) {
   ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
   if (dso) {
-    add_dso_frame(us, *dso, normalized_addr);
+    add_dso_frame(us, *dso, pc, "pc");
   } else {
     add_common_frame(us, error_case);
   }

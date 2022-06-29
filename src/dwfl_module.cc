@@ -63,6 +63,18 @@ DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
     LG_DBG("Loaded mod from file (%s), PID %d (%s) mod[%lx;%lx]",
            fileInfoValue.get_path().c_str(), dso._pid, dwfl_errmsg(-1),
            ddprof_mod._low_addr, ddprof_mod._high_addr);
+
+    // Retrieve the biais to figure out the offset
+    // We can use the dwarf CFI (dwfl_module_eh_cfi)
+    // or the ELF (dwfl_module_getelf).
+    // Considering dwarf is not always available, prefer elf
+    Elf *elf = dwfl_module_getelf(ddprof_mod._mod, &ddprof_mod._sym_bias);
+    if (!elf) {
+      LG_DBG("Unable to find dwfl_cfi for mod - %s (%s)", dso._filename.c_str(),
+             dwfl_errmsg(-1));
+      // We could continue though it is preferable to flag this issue
+      return DDProfMod();
+    }
   }
   // TODO: Figure out how to check that mapping makes sense
   // ddprof_mod._high_addr != mod_range._high_addr

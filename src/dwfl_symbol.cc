@@ -25,10 +25,20 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
   const char *lsymname = dwfl_module_addrinfo(
       mod, process_pc, &loffset, &elf_sym, &lshndxp, &lelfp, &lbias);
 
+  [[maybe_unused]] int dwfl_error_value = dwfl_errno();
+#ifdef DEBUG
+  if (unlikely(dwfl_error_value)) {
+    LG_DBG("[DWFL_SYMB] addrinfo error -- Error:%s -- %s",
+           dwfl_errmsg(dwfl_error_value), lsymname);
+  }
+#endif
+
   if (lsymname) {
     symbol._symname = std::string(lsymname);
     symbol._demangle_name = llvm::demangle(symbol._symname);
     symbol_success = true;
+  } else {
+    return false;
   }
 
 // #define FLAG_SYMBOL
@@ -40,15 +50,22 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
   }
 #endif
   Dwfl_Line *line = dwfl_module_getsrc(mod, process_pc);
+  dwfl_error_value = dwfl_errno();
+#ifdef DEBUG
+  if (unlikely(dwfl_error_value)) {
+    LG_DBG("[DWFL_SYMB] dwfl_src error pc=%lx : Error:%s (Sym=%s)", process_pc,
+           dwfl_errmsg(dwfl_error_value), symbol._demangle_name.c_str());
+  }
+#endif
   // srcpath
-  int linep;
-  const char *localsrcpath =
-      dwfl_lineinfo(line, &process_pc, static_cast<int *>(&linep), 0, 0, 0);
-  if (localsrcpath) {
-    symbol._srcpath = std::string(localsrcpath);
-    symbol._lineno = static_cast<uint32_t>(linep);
-  } else {
-    symbol._lineno = 0;
+  if (line) {
+    int linep;
+    const char *localsrcpath =
+        dwfl_lineinfo(line, &process_pc, static_cast<int *>(&linep), 0, 0, 0);
+    if (localsrcpath) {
+      symbol._srcpath = std::string(localsrcpath);
+      symbol._lineno = static_cast<uint32_t>(linep);
+    }
   }
   return symbol_success;
 }

@@ -60,21 +60,31 @@ DwflWrapper &DwflHdr::get_or_insert(pid_t pid) {
   return it->second;
 }
 
+DDProfMod *DwflWrapper::unsafe_get(FileInfoId_t file_info_id) {
+  auto it = _ddprof_mods.find(file_info_id);
+  if (it == _ddprof_mods.end()) {
+    return nullptr;
+  }
+  return &it->second;
+}
+
 DDProfMod *DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
                                      DDProfModRange mod_range,
                                      const FileInfoValue &fileInfoValue) {
 
   DDProfMod *ddprof_mod = &_ddprof_mods[fileInfoValue.get_id()];
-  if (!ddprof_mod->_low_addr) {
-    // first time we see this binary for this pid
-    *ddprof_mod = update_module(_dwfl, pc, dso, mod_range, fileInfoValue);
-    if (!ddprof_mod->_mod) {
-      LG_WRN("Unable to register mod %s - %d", dso.to_string().c_str(),
-             ddprof_mod->_status);
-      // If it overlaps with a previous binary we loaded, flag this
-      // inconsistency
-      _inconsistent = ddprof_mod->_status == DDProfMod::kInconsistent;
-    }
+
+  if (ddprof_mod->_low_addr) {
+    LG_DBG("[DWFL_HDR] Update existing mod 0x%lx", ddprof_mod->_low_addr);
+  }
+  // first time we see this binary for this pid
+  *ddprof_mod = update_module(_dwfl, pc, dso, mod_range, fileInfoValue);
+  if (!ddprof_mod->_mod) {
+    LG_WRN("Unable to register mod %s - %d", dso.to_string().c_str(),
+           ddprof_mod->_status);
+    // If it overlaps with a previous binary we loaded, flag this
+    // inconsistency
+    _inconsistent = ddprof_mod->_status == DDProfMod::kInconsistent;
   }
   return ddprof_mod;
 }

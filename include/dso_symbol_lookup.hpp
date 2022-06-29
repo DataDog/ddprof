@@ -16,7 +16,8 @@ namespace ddprof {
 class DsoSymbolLookup {
 public:
   SymbolIdx_t get_or_insert(FileAddress_t normalized_addr, const Dso &dso,
-                            SymbolTable &symbol_table);
+                            SymbolTable &symbol_table,
+                            std::string_view addr_type = "elf");
 
   // only binary info
   SymbolIdx_t get_or_insert(const Dso &dso, SymbolTable &symbol_table);

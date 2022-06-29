@@ -22,9 +22,12 @@ struct DDProfMod {
 
   explicit DDProfMod(Status status) : DDProfMod() { _status = status; }
 
+  // In the current version of dwfl, the dwfl_module addresses are stable
   Dwfl_Module *_mod;
   ProcessAddress_t _low_addr;
   ProcessAddress_t _high_addr;
+  // The symbol biais (0 for position dependant)
+  ProcessAddress_t _sym_bias;
   Status _status;
 };
 } // namespace ddprof

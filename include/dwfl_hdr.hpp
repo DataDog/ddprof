@@ -40,6 +40,7 @@ struct DwflWrapper {
                UnwindState *us);
 
   // unsafe get don't check ranges
+  DDProfMod *unsafe_get(FileInfoId_t file_info_id);
 
   // safe get
   DDProfMod *register_mod(ProcessAddress_t pc, const Dso &dso,

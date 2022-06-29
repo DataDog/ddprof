@@ -58,15 +58,12 @@ TEST(DwflModule, inconsistency_test) {
       EXPECT_TRUE(res);
       EXPECT_EQ("ddprof::DwflModule_inconsistency_test_Test::TestBody()",
                 symbol._demangle_name);
-      std::cerr << "Found symbol -- " << symbol._demangle_name << std::endl;
       FileAddress_t file_addr = ip - mod_range._low_addr;
-      printf("File addr 0x%lx -- elf_sym.st_value = 0x%lx \n", file_addr,
-             elf_sym.st_value);
-      printf("                -- elf_sym.st_size = 0x%lx \n", elf_sym.st_size);
       FileAddress_t start_sym, end_sym = {};
       res = compute_elf_range_v2(file_addr, elf_sym, start_sym, end_sym);
       EXPECT_TRUE(res);
-      printf("Start --> 0x%lx - end %lx <--\n", start_sym, end_sym);
+      printf("Start --> 0x%lx - end %lx - lbiais 0x%lx <--\n", start_sym,
+             end_sym, lbiais);
       EXPECT_GE(file_addr, start_sym);
       EXPECT_LE(file_addr, end_sym);
     }

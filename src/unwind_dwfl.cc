@@ -128,26 +128,29 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   const Dso &dso = find_res.first->second;
   // if not encountered previously, update file location / key
   FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
-  DDProfModRange mod_range =
-      us->dso_hdr.find_mod_range(find_res.first, us->dso_hdr._map[us->pid]);
   if (file_info_id <= k_file_info_error) {
     // unable to acces file: add available info from dso
-    add_dso_frame(us, dso, pc - mod_range._low_addr);
+    add_dso_frame(us, dso, pc, "pc");
     // We could stop here or attempt to continue in the dwarf unwinding
     // sometimes frame pointer lets us go further -> So we continue
     return ddres_init();
   }
-
   const FileInfoValue &file_info_value =
       us->dso_hdr.get_file_info_value(file_info_id);
-  // ensure unwinding backend has access to this module (and check consistency)
-  DDProfMod *ddprof_mod =
-      us->_dwfl_wrapper->register_mod(pc, dso, mod_range, file_info_value);
-  // Updates in DSO layout can create inconsistencies
-  if (ddprof_mod->_status == DDProfMod::kInconsistent) {
-    return ddres_warn(DD_WHAT_UW_ERROR);
+  DDProfMod *ddprof_mod = us->_dwfl_wrapper->unsafe_get(file_info_id);
+  if (!ddprof_mod) {
+    // New module
+    DDProfModRange mod_range =
+        us->dso_hdr.find_mod_range(find_res.first, us->dso_hdr._map[us->pid]);
+    // ensure unwinding backend has access to this module (and check
+    // consistency)
+    ddprof_mod =
+        us->_dwfl_wrapper->register_mod(pc, dso, mod_range, file_info_value);
+    // Updates in DSO layout can create inconsistencies
+    if (ddprof_mod->_status == DDProfMod::kInconsistent) {
+      return ddres_warn(DD_WHAT_UW_ERROR);
+    }
   }
-
   // Now we register
   if (IsDDResNotOK(add_dwfl_frame(us, dso, pc, ddprof_mod, file_info_value))) {
     return ddres_warn(DD_WHAT_UW_ERROR);
@@ -160,6 +163,14 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
   UnwindState *us = (UnwindState *)arg;
 #ifdef DEBUG
   LG_NFO("Beging depth %lu", us->output.nb_locs);
+#endif
+  [[maybe_unused]] int dwfl_error_value = dwfl_errno();
+#ifdef DEBUG
+  // We often fall back to frame pointer unwinding which creates a log
+  if (dwfl_error_value) {
+    LG_DBG("Error flagged at depth = %lu -- Error:%s ", us->output.nb_locs,
+           dwfl_errmsg(dwfl_error_value));
+  }
 #endif
 
   // Before we potentially exit, record the fact that we're processing a frame

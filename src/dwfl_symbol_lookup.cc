@@ -51,14 +51,14 @@ SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
     DsoSymbolLookup &dso_symbol_lookup, ProcessAddress_t process_pc,
     const Dso &dso, const FileInfoValue &file_info) {
   ++_stats._calls;
-  RegionAddress_t file_pc = process_pc - ddprof_mod._low_addr;
+  RegionAddress_t elf_pc = process_pc - ddprof_mod._sym_bias;
 
 #ifdef DEBUG
-  LG_DBG("Looking for : %lx = (%lx - %lx) / dso:%s", file_pc, process_pc,
+  LG_DBG("Looking for : %lx = (%lx - %lx) / dso:%s", elf_pc, process_pc,
          ddprof_mod._low_addr, dso._filename.c_str());
 #endif
   DwflSymbolMap &map = _file_info_map[file_info.get_id()];
-  DwflSymbolMapFindRes find_res = find_closest(map, file_pc);
+  DwflSymbolMapFindRes find_res = find_closest(map, elf_pc);
   if (find_res.second) { // already found the correct symbol
 #ifdef DEBUG
     LG_DBG("Match : %lx,%lx -> %s,%d,%d", find_res.first->first,
@@ -120,21 +120,21 @@ DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod, SymbolTable &table,
   GElf_Sym elf_sym;
   Offset_t lbias;
 
-  RegionAddress_t file_pc = process_pc - ddprof_mod._low_addr;
+  ElfAddress_t elf_pc = process_pc - ddprof_mod._sym_bias;
 
   if (!symbol_get_from_dwfl(ddprof_mod._mod, process_pc, symbol, elf_sym,
                             lbias)) {
     ++_stats._no_dwfl_symbols;
     // Override with info from dso
     // Avoid bouncing on these requests and insert an element
-    Offset_t start_sym = file_pc;
-    Offset_t end_sym = file_pc + 1; // minimum range
+    Offset_t start_sym = elf_pc;
+    Offset_t end_sym = start_sym + 1; // minimum range
 #define ADD_ADDR_IN_SYMB // creates more elements (but adds info on addresses)
 #ifdef ADD_ADDR_IN_SYMB
     // adds interesting debug information that can be used to investigate
     // symbolization failures. Also causes memory increase
     SymbolIdx_t symbol_idx =
-        dso_symbol_lookup.get_or_insert(file_pc, dso, table);
+        dso_symbol_lookup.get_or_insert(elf_pc, dso, table);
 #else
     SymbolIdx_t symbol_idx = dso_symbol_lookup.get_or_insert(dso, table);
 #endif
@@ -144,10 +144,9 @@ DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod, SymbolTable &table,
            dso.to_string().c_str());
 #endif
     map.emplace(start_sym, DwflSymbolVal_V2(end_sym, symbol_idx));
-
     return symbol_idx;
   }
-
+  assert(lbias == ddprof_mod._sym_bias);
   {
     RegionAddress_t start_sym;
     RegionAddress_t end_sym;
@@ -162,11 +161,11 @@ DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod, SymbolTable &table,
       sym_ref._srcpath = dso.format_filename();
     }
 
-    if (!compute_elf_range_v2(file_pc, elf_sym, start_sym, end_sym)) {
+    if (!compute_elf_range_v2(elf_pc, elf_sym, start_sym, end_sym)) {
       // elf section does not add up to something that makes sense
       // insert this PC without considering elf section
-      start_sym = file_pc;
-      end_sym = file_pc + 1;
+      start_sym = elf_pc;
+      end_sym = elf_pc + 1;
 #ifdef DEBUG
       LG_DBG("elf_range failure --> Insert: %lx,%lx -> %s,%d,%d / shndx=%d",
              start_sym, end_sym, sym_ref._symname.c_str(), file_info.get_id(),
