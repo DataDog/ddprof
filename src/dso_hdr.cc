@@ -228,7 +228,7 @@ DDProfModRange DsoHdr::find_mod_range(DsoMapConstIt it,
   }
   DsoMapConstIt first_el = it;
   while (first_el != map.begin()) {
-    first_el--;
+    --first_el;
     if (it->second._filename != first_el->second._filename) {
       ++first_el;
       break;

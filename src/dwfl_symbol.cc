@@ -25,12 +25,14 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
   const char *lsymname = dwfl_module_addrinfo(
       mod, process_pc, &loffset, &elf_sym, &lshndxp, &lelfp, &lbias);
 
-  [[maybe_unused]] int dwfl_error_value = dwfl_errno();
 #ifdef DEBUG
+  int dwfl_error_value = dwfl_errno();
   if (unlikely(dwfl_error_value)) {
     LG_DBG("[DWFL_SYMB] addrinfo error -- Error:%s -- %s",
            dwfl_errmsg(dwfl_error_value), lsymname);
   }
+#else
+  dwfl_errno();
 #endif
 
   if (lsymname) {
@@ -50,12 +52,14 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
   }
 #endif
   Dwfl_Line *line = dwfl_module_getsrc(mod, process_pc);
-  dwfl_error_value = dwfl_errno();
 #ifdef DEBUG
+  dwfl_error_value = dwfl_errno();
   if (unlikely(dwfl_error_value)) {
     LG_DBG("[DWFL_SYMB] dwfl_src error pc=%lx : Error:%s (Sym=%s)", process_pc,
            dwfl_errmsg(dwfl_error_value), symbol._demangle_name.c_str());
   }
+#else
+  dwfl_errno();
 #endif
   // srcpath
   if (line) {

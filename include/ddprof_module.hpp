@@ -18,7 +18,9 @@ struct DDProfMod {
     kInconsistent,
   };
 
-  DDProfMod() : _mod(nullptr), _low_addr(0), _high_addr(0), _status(kUnknown) {}
+  DDProfMod()
+      : _mod(nullptr), _low_addr(0), _high_addr(0),
+        _sym_bias(static_cast<Offset_t>(-1)), _status(kUnknown) {}
 
   explicit DDProfMod(Status status) : DDProfMod() { _status = status; }
 
@@ -27,7 +29,7 @@ struct DDProfMod {
   ProcessAddress_t _low_addr;
   ProcessAddress_t _high_addr;
   // The symbol biais (0 for position dependant)
-  ProcessAddress_t _sym_bias;
+  Offset_t _sym_bias;
   Status _status;
 };
 } // namespace ddprof
