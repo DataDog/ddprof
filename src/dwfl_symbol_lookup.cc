@@ -48,8 +48,8 @@ unsigned DwflSymbolLookup_V2::size() const {
 // Retrieve existing symbol or attempt to read from dwarf
 SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
     const DDProfMod &ddprof_mod, SymbolTable &table,
-    DsoSymbolLookup &dso_symbol_lookup, ProcessAddress_t process_pc,
-    const Dso &dso, const FileInfoValue &file_info) {
+    DsoSymbolLookup &dso_symbol_lookup, FileInfoId_t file_info_id,
+    ProcessAddress_t process_pc, const Dso &dso) {
   ++_stats._calls;
   RegionAddress_t elf_pc = process_pc - ddprof_mod._sym_bias;
 
@@ -57,14 +57,14 @@ SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
   LG_DBG("Looking for : %lx = (%lx - %lx) / dso:%s", elf_pc, process_pc,
          ddprof_mod._low_addr, dso._filename.c_str());
 #endif
-  DwflSymbolMap &map = _file_info_map[file_info.get_id()];
+  DwflSymbolMap &map = _file_info_map[file_info_id];
   DwflSymbolMapFindRes find_res = find_closest(map, elf_pc);
   if (find_res.second) { // already found the correct symbol
 #ifdef DEBUG
     LG_DBG("Match : %lx,%lx -> %s,%d,%d", find_res.first->first,
            find_res.first->second.get_end(),
            table[find_res.first->second.get_symbol_idx()]._symname.c_str(),
-           file_info.get_id(), find_res.first->second.get_symbol_idx());
+           find_res.first->second.get_symbol_idx());
 #endif
     // cache validation mechanism: force dwfl lookup to compare with matched
     // symbols
@@ -78,8 +78,7 @@ SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
     return find_res.first->second.get_symbol_idx();
   }
 
-  return insert(ddprof_mod, table, dso_symbol_lookup, process_pc, dso,
-                file_info, map, find_res);
+  return insert(ddprof_mod, table, dso_symbol_lookup, process_pc, dso, map);
 }
 
 DwflSymbolMapFindRes DwflSymbolLookup_V2::find_closest(DwflSymbolMap &map,
@@ -109,12 +108,11 @@ DwflSymbolMapFindRes DwflSymbolLookup_V2::find_closest(DwflSymbolMap &map,
                                                std::move(is_within));
 }
 
-SymbolIdx_t
-DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod, SymbolTable &table,
-                            DsoSymbolLookup &dso_symbol_lookup,
-                            ProcessAddress_t process_pc, const Dso &dso,
-                            const FileInfoValue &file_info, DwflSymbolMap &map,
-                            DwflSymbolMapFindRes find_res) {
+SymbolIdx_t DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod,
+                                        SymbolTable &table,
+                                        DsoSymbolLookup &dso_symbol_lookup,
+                                        ProcessAddress_t process_pc,
+                                        const Dso &dso, DwflSymbolMap &map) {
 
   Symbol symbol;
   GElf_Sym elf_sym;
@@ -140,7 +138,7 @@ DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod, SymbolTable &table,
 #endif
 #ifdef DEBUG
     LG_NTC("Insert (dwfl failure): %lx,%lx -> %s,%d,%d,%s", start_sym, end_sym,
-           table[symbol_idx]._symname.c_str(), file_info.get_id(), symbol_idx,
+           table[symbol_idx]._symname.c_str(), symbol_idx,
            dso.to_string().c_str());
 #endif
     map.emplace(start_sym, DwflSymbolVal_V2(end_sym, symbol_idx));
@@ -168,8 +166,8 @@ DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod, SymbolTable &table,
       end_sym = elf_pc + 1;
 #ifdef DEBUG
       LG_DBG("elf_range failure --> Insert: %lx,%lx -> %s,%d,%d / shndx=%d",
-             start_sym, end_sym, sym_ref._symname.c_str(), file_info.get_id(),
-             symbol_idx, elf_sym.st_shndx);
+             start_sym, end_sym, sym_ref._symname.c_str(), symbol_idx,
+             elf_sym.st_shndx);
 #endif
       map.emplace(start_sym, DwflSymbolVal_V2(end_sym, symbol_idx));
       return symbol_idx;
@@ -177,8 +175,7 @@ DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod, SymbolTable &table,
 
 #ifdef DEBUG
     LG_DBG("Insert: %lx,%lx -> %s,%d,%d / shndx=%d", start_sym, end_sym,
-           sym_ref._symname.c_str(), file_info.get_id(), symbol_idx,
-           elf_sym.st_shndx);
+           sym_ref._symname.c_str(), symbol_idx, elf_sym.st_shndx);
 #endif
     map.emplace(start_sym, DwflSymbolVal_V2(end_sym, symbol_idx));
     return symbol_idx;

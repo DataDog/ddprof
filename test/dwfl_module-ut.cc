@@ -58,14 +58,14 @@ TEST(DwflModule, inconsistency_test) {
       EXPECT_TRUE(res);
       EXPECT_EQ("ddprof::DwflModule_inconsistency_test_Test::TestBody()",
                 symbol._demangle_name);
-      FileAddress_t file_addr = ip - mod_range._low_addr;
+      FileAddress_t elf_addr = ip - ddprof_mod._sym_bias;
       FileAddress_t start_sym, end_sym = {};
-      res = compute_elf_range_v2(file_addr, elf_sym, start_sym, end_sym);
+      res = compute_elf_range_v2(elf_addr, elf_sym, start_sym, end_sym);
       EXPECT_TRUE(res);
       printf("Start --> 0x%lx - end %lx - lbiais 0x%lx <--\n", start_sym,
              end_sym, lbiais);
-      EXPECT_GE(file_addr, start_sym);
-      EXPECT_LE(file_addr, end_sym);
+      EXPECT_GE(elf_addr, start_sym);
+      EXPECT_LE(elf_addr, end_sym);
     }
     // check that we loaded all mods matching the DSOs
     EXPECT_EQ(ddprof_mod._low_addr, mod_range._low_addr);

@@ -89,8 +89,7 @@ static void trace_unwinding_end(UnwindState *us) {
   }
 }
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
-                            DDProfMod *ddprof_mod,
-                            const FileInfoValue &file_info_value);
+                            DDProfMod *ddprof_mod, FileInfoId_t file_info_id);
 
 // returns true if we should continue unwinding
 static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
@@ -152,7 +151,7 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     }
   }
   // Now we register
-  if (IsDDResNotOK(add_dwfl_frame(us, dso, pc, ddprof_mod, file_info_value))) {
+  if (IsDDResNotOK(add_dwfl_frame(us, dso, pc, ddprof_mod, file_info_id))) {
     return ddres_warn(DD_WHAT_UW_ERROR);
   }
   return ddres_init();
@@ -221,8 +220,7 @@ DDRes unwind_dwfl(UnwindState *us) {
 }
 
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
-                            DDProfMod *ddprof_mod,
-                            const FileInfoValue &file_info_value) {
+                            DDProfMod *ddprof_mod, FileInfoId_t file_info_id) {
 
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
 
@@ -233,7 +231,7 @@ static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
   output->locs[current_loc_idx]._symbol_idx =
       unwind_symbol_hdr._dwfl_symbol_lookup_v2.get_or_insert(
           *ddprof_mod, unwind_symbol_hdr._symbol_table,
-          unwind_symbol_hdr._dso_symbol_lookup, pc, dso, file_info_value);
+          unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso);
 #ifdef DEBUG
   LG_NTC("Considering frame with IP : %lx / %s ", pc,
          us->symbol_hdr._symbol_table[output->locs[current_loc_idx]._symbol_idx]
