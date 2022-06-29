@@ -88,6 +88,9 @@ static void trace_unwinding_end(UnwindState *us) {
     }
   }
 }
+static DDRes add_symbol_map_frame(UnwindState *us, const Dso &dso,
+                                  ElfAddress_t pc);
+
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
                             DDProfMod *ddprof_mod, FileInfoId_t file_info_id);
 
@@ -150,9 +153,16 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
       return ddres_warn(DD_WHAT_UW_ERROR);
     }
   }
-  // Now we register
-  if (IsDDResNotOK(add_dwfl_frame(us, dso, pc, ddprof_mod, file_info_id))) {
-    return ddres_warn(DD_WHAT_UW_ERROR);
+
+  if (ddprof_mod->_symbol_method == kRuntimeSymbol) {
+    if (IsDDResNotOK(add_symbol_map_frame(us, dso, pc))) {
+      return ddres_warn(DD_WHAT_UW_ERROR);
+    }
+  } else {
+    // Lookup the symbol through dwarf
+    if (IsDDResNotOK(add_dwfl_frame(us, dso, pc, ddprof_mod, file_info_id))) {
+      return ddres_warn(DD_WHAT_UW_ERROR);
+    }
   }
   return ddres_init();
 }
@@ -217,6 +227,26 @@ DDRes unwind_dwfl(UnwindState *us) {
   res = us->output.nb_locs > 0 ? ddres_init()
                                : ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
   return res;
+}
+
+static DDRes add_symbol_map_frame(UnwindState *us, const Dso &dso,
+                                  ElfAddress_t pc) {
+  SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
+  SymbolTable &symbol_table = unwind_symbol_hdr._symbol_table;
+  RuntimeSymbolLookup &runtime_symbol_lookup =
+      unwind_symbol_hdr._runtime_symbol_lookup;
+  UnwindOutput *output = &us->output;
+  int64_t current_loc_idx = output->nb_locs;
+  // Get the symbol from perf map
+  output->locs[current_loc_idx]._symbol_idx =
+      runtime_symbol_lookup.get_or_insert(dso._pid, pc, symbol_table);
+  output->locs[current_loc_idx].ip = pc;
+  output->locs[current_loc_idx]._map_info_idx =
+      us->symbol_hdr._mapinfo_lookup.get_or_insert(
+          us->pid, us->symbol_hdr._mapinfo_table, dso);
+
+  output->nb_locs++;
+  return ddres_init();
 }
 
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,

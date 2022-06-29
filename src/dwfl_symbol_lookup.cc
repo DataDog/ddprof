@@ -145,7 +145,8 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod,
     map.emplace(start_sym, DwflSymbolVal_V2(end_sym, symbol_idx));
     return symbol_idx;
   }
-  // Failed assumption /lib/x86_64-linux-gnu/libc-2.31.so - 7f778200e000 != ffffffffffffffff
+  // Failed assumption /lib/x86_64-linux-gnu/libc-2.31.so - 7f778200e000 !=
+  // ffffffffffffffff
   // TODO : understand what this means
   if (lbias != ddprof_mod._sym_bias) {
     LG_NTC("Failed assumption %s - %lx != %lx", dso._filename.c_str(), lbias,

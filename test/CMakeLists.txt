@@ -296,6 +296,7 @@ add_unit_test(
     ../src/dwfl_symbol.cc
     ../src/dwfl_symbol_lookup.cc
     ../src/dwfl_thread_callbacks.cc
+    ../src/runtime_symbol_lookup.cc
     ../src/savecontext.cc
     ../src/saveregisters.cc
     ../src/mapinfo_lookup.cc
@@ -328,6 +329,7 @@ add_unit_test(
     ../src/dwfl_symbol.cc
     ../src/dwfl_symbol_lookup.cc
     ../src/dwfl_thread_callbacks.cc
+    ../src/runtime_symbol_lookup.cc
     ../src/pevent_lib.cc
     ../src/perf.cc
     ../src/perf_ringbuffer.cc
