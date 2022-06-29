@@ -146,7 +146,7 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     ddprof_mod =
         us->_dwfl_wrapper->register_mod(pc, dso, mod_range, file_info_value);
     // Updates in DSO layout can create inconsistencies
-    if (ddprof_mod->_status == DDProfMod::kInconsistent) {
+    if (!ddprof_mod->_mod || ddprof_mod->_status == DDProfMod::kInconsistent) {
       return ddres_warn(DD_WHAT_UW_ERROR);
     }
   }

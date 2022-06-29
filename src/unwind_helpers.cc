@@ -138,11 +138,18 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
   return true;
 }
 
-void add_error_frame(const Dso *dso, UnwindState *us, ProcessAddress_t pc,
+void add_error_frame(const Dso *dso, UnwindState *us,
+                     [[maybe_unused]] ProcessAddress_t pc,
                      SymbolErrors error_case) {
   ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
   if (dso) {
+// #define ADD_ADDR_IN_SYMB // creates more elements (but adds info on
+// addresses)
+#ifdef ADD_ADDR_IN_SYMB
     add_dso_frame(us, *dso, pc, "pc");
+#else
+    add_dso_frame(us, *dso, 0x0, "pc");
+#endif
   } else {
     add_common_frame(us, error_case);
   }

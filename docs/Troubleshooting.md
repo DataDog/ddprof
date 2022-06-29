@@ -42,4 +42,33 @@ readelf -lW <binary>
 
 ### Reading symbols
 
+```
+nm ./path_to_binary
+```
 
+### Disassembling code
+
+Matching the instruction pointers to assembly code. 
+
+```
+gdb --batch  -ex 'disas function_name' ./path_to_binary
+```
+
+### Dumping the dwarf information
+
+Getting the offsets from dwarf allows us to understand the unwinding patterns
+Add a filter on the instruction pointer that is relevant to the investigation
+
+```
+readelf -wF ./path_to_binary
+```
+
+example:
+```
+0002eb58 000000000000001c 0002eb2c FDE cie=00000030 pc=000000000015cbb5..000000000015cd1b
+   LOC           CFA      rbp   ra      
+000000000015cbb5 rsp+8    u     c-8   
+000000000015cbb6 rsp+16   c-16  c-8   
+000000000015cbb9 rbp+16   c-16  c-8   
+000000000015cd1a rsp+8    c-16  c-8   
+```
