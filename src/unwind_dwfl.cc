@@ -239,7 +239,6 @@ static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
   SymbolTable &symbol_table = unwind_symbol_hdr._symbol_table;
   RuntimeSymbolLookup &runtime_symbol_lookup =
       unwind_symbol_hdr._runtime_symbol_lookup;
-
   SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert(dso._pid, pc, symbol_table);
   if (symbol_idx == -1) {
     return ddres_warn(DD_WHAT_SYMB_ERROR);

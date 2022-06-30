@@ -369,6 +369,12 @@ add_unit_test(
 )
 
 add_unit_test(
+    runtime_symbol_lookup-ut
+    runtime_symbol_lookup-ut.cc
+    ../src/runtime_symbol_lookup.cc
+)
+
+add_unit_test(
     timer-ut
     timer-ut.cc
     ../src/timer.cc

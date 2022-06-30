@@ -59,10 +59,10 @@ void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
         should_skip_symbol(buffer)) {
       continue;
     }
-    symbol_table.emplace_back(Symbol(std::string(buffer), std::string(buffer), 0,
-                                        "unknown"));
     // elements are ordered
     it = symbol_map.emplace_hint(it, address, RumtimeSymbolVal(address+code_size-1, symbol_table.size()));
+    symbol_table.emplace_back(Symbol(std::string(buffer), std::string(buffer), 0,
+                                        "unknown"));
   }
 
   fclose(pmf);
