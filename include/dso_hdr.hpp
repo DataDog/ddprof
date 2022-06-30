@@ -93,7 +93,7 @@ public:
   void pid_free(int pid);
 
   // Find the first associated to this pid
-  DsoFindRes dso_find_first_std_executable(pid_t pid);
+  bool find_exe_name(pid_t pid, std::string &exe_name);
 
   // Find the lowest and highest for this given DSO
   DDProfModRange find_mod_range(DsoMapConstIt it, const DsoMap &map) const;

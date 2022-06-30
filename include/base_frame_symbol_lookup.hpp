@@ -24,7 +24,6 @@ public:
 
 private:
   SymbolIdx_t insert_bin_symbol(pid_t pid, SymbolTable &symbol_table,
-                                DsoSymbolLookup &dso_symbol_lookup,
                                 DsoHdr &dso_hdr);
   static const int k_nb_bin_lookups = 10;
   struct PidSymbol {

@@ -366,4 +366,16 @@ TEST(DSOTest, mmap_into_backpop) {
   // TODO: To be discussed - should we erase overlaping or not
 }
 
+TEST(DSOTest, exe_name) {
+  LogHandle handle;
+  ElfAddress_t ip = _THIS_IP_;
+  DsoHdr dso_hdr;
+  DsoFindRes find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
+  ASSERT_TRUE(find_res.second);
+  pid_t my_pid = getpid();
+  std::string exe_name;
+  bool found_exe = dso_hdr.find_exe_name(my_pid, exe_name);
+  EXPECT_TRUE(found_exe);
+  LG_NTC("%s", exe_name.c_str());
+}
 } // namespace ddprof
