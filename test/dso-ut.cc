@@ -246,7 +246,8 @@ TEST(DSOTest, dso_from_procline) {
   }
   {
     // dotnet dll
-    Dso jsa_dso = DsoHdr::dso_from_procline(10, const_cast<char *>(s_dotnet_line));
+    Dso jsa_dso =
+        DsoHdr::dso_from_procline(10, const_cast<char *>(s_dotnet_line));
     EXPECT_EQ(jsa_dso._type, dso::kAnon);
   }
 

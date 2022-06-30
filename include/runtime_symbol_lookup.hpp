@@ -35,7 +35,8 @@ private:
   using PidUnorderedMap = std::unordered_map<pid_t, SymbolMap>;
   void fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
                               SymbolTable &symbol_table);
-  static bool symbol_is_within(ProcessAddress_t pc, const SymbolMap::value_type &kv);
+  static bool symbol_is_within(ProcessAddress_t pc,
+                               const SymbolMap::value_type &kv);
   static RuntimeSymbolFindRes find_closest(SymbolMap &map, ProcessAddress_t pc);
   PidUnorderedMap _pid_map;
 };

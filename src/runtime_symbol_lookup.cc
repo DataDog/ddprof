@@ -39,7 +39,7 @@ void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
                                                  SymbolTable &symbol_table) {
   static const char spec[] = "%lx %x %[^\t\n]";
   FILE *pmf = perfmaps_open(pid, "/tmp");
-  
+
   symbol_map.clear();
   if (pmf == nullptr) {
     // Add a single fake symbol to avoid bouncing
@@ -60,9 +60,11 @@ void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
       continue;
     }
     // elements are ordered
-    it = symbol_map.emplace_hint(it, address, RumtimeSymbolVal(address+code_size-1, symbol_table.size()));
-    symbol_table.emplace_back(Symbol(std::string(buffer), std::string(buffer), 0,
-                                        "unknown"));
+    it = symbol_map.emplace_hint(
+        it, address,
+        RumtimeSymbolVal(address + code_size - 1, symbol_table.size()));
+    symbol_table.emplace_back(
+        Symbol(std::string(buffer), std::string(buffer), 0, "unknown"));
   }
 
   fclose(pmf);
@@ -76,7 +78,7 @@ SymbolIdx_t RuntimeSymbolLookup::get_or_insert(pid_t pid, ProcessAddress_t pc,
     // TODO : how do we know we need to refresh ?
     // read the map
   }
-  
+
   RuntimeSymbolFindRes find_res = find_closest(symbol_map, pc);
   if (find_res.second) {
     return find_res.first->second.get_symbol_idx();
@@ -86,8 +88,8 @@ SymbolIdx_t RuntimeSymbolLookup::get_or_insert(pid_t pid, ProcessAddress_t pc,
   return 0;
 }
 
-RuntimeSymbolLookup::RuntimeSymbolFindRes RuntimeSymbolLookup::find_closest(SymbolMap &map,
-                                                       ProcessAddress_t pc) {
+RuntimeSymbolLookup::RuntimeSymbolFindRes
+RuntimeSymbolLookup::find_closest(SymbolMap &map, ProcessAddress_t pc) {
   bool is_within = false;
 
   // First element not less than (can match exactly a start addr)

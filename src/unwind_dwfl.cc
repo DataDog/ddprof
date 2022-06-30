@@ -7,13 +7,13 @@
 
 #include "ddprof_stats.hpp"
 #include "ddres.hpp"
+#include "dso_type.hpp"
 #include "dwfl_internals.hpp"
 #include "dwfl_thread_callbacks.hpp"
 #include "logger.hpp"
 #include "symbol_hdr.hpp"
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
-#include "dso_type.hpp"
 
 int frame_cb(Dwfl_Frame *, void *);
 
@@ -90,7 +90,7 @@ static void trace_unwinding_end(UnwindState *us) {
   }
 }
 static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
-                                  ElfAddress_t pc);
+                                      ElfAddress_t pc);
 
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
                             DDProfMod *ddprof_mod, FileInfoId_t file_info_id);
@@ -133,8 +133,7 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     // Symbolize using map info if available
     if (IsDDResOK(add_runtime_symbol_frame(us, dso, pc))) {
       return ddres_init();
-    }
-    else { // fake frame 
+    } else { // fake frame
       add_dso_frame(us, dso, 0, "pc");
       return ddres_init();
     }
@@ -177,8 +176,10 @@ bool is_infinite_loop(UnwindState *us) {
   if (nb_locs <= 2) {
     return false;
   }
-  if (output.locs[nb_locs - 1]._symbol_idx ==
-      output.locs[nb_locs - 2]._symbol_idx) {
+  FunLoc &n_minus_one_loc = output.locs[nb_locs - 1];
+  FunLoc &n_minus_two_loc = output.locs[nb_locs - 2];
+  if (n_minus_one_loc._symbol_idx == n_minus_two_loc._symbol_idx &&
+      n_minus_one_loc.ip == n_minus_two_loc.ip) {
     return true;
   }
   return false;
@@ -195,7 +196,7 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
     // Check if dwarf unwinding was a failure we can get stuck in infinite loops
     if (is_infinite_loop(us)) {
       LG_DBG("Break out of unwinding (possible infinite loop)");
-      // return DWARF_CB_ABORT;
+      return DWARF_CB_ABORT;
     }
   }
 #ifdef DEBUG
@@ -239,7 +240,8 @@ static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
   SymbolTable &symbol_table = unwind_symbol_hdr._symbol_table;
   RuntimeSymbolLookup &runtime_symbol_lookup =
       unwind_symbol_hdr._runtime_symbol_lookup;
-  SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert(dso._pid, pc, symbol_table);
+  SymbolIdx_t symbol_idx =
+      runtime_symbol_lookup.get_or_insert(dso._pid, pc, symbol_table);
   if (symbol_idx == -1) {
     return ddres_warn(DD_WHAT_SYMB_ERROR);
   }
