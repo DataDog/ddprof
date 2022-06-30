@@ -17,11 +17,6 @@ struct DDProfModRange {
   ProcessAddress_t _high_addr = 0;
 };
 
-enum SymbolMethod {
-  kDwarfSymbol = 0,
-  kRuntimeSymbol,
-};
-
 struct DDProfMod {
   enum Status {
     kUnknown,
@@ -30,8 +25,7 @@ struct DDProfMod {
 
   DDProfMod()
       : _mod(nullptr), _low_addr(0), _high_addr(0),
-        _sym_bias(static_cast<Offset_t>(-1)), _status(kUnknown),
-        _symbol_method(kDwarfSymbol) {}
+        _sym_bias(static_cast<Offset_t>(-1)), _status(kUnknown) {}
 
   explicit DDProfMod(Status status) : DDProfMod() { _status = status; }
 
@@ -42,6 +36,5 @@ struct DDProfMod {
   // The symbol biais (0 for position dependant)
   Offset_t _sym_bias;
   Status _status;
-  SymbolMethod _symbol_method;
 };
 } // namespace ddprof

@@ -13,6 +13,7 @@
 #include "symbol_hdr.hpp"
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
+#include "dso_type.hpp"
 
 int frame_cb(Dwfl_Frame *, void *);
 
@@ -88,7 +89,7 @@ static void trace_unwinding_end(UnwindState *us) {
     }
   }
 }
-static DDRes add_symbol_map_frame(UnwindState *us, const Dso &dso,
+static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
                                   ElfAddress_t pc);
 
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
@@ -128,6 +129,16 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     return ddres_init();
   }
   const Dso &dso = find_res.first->second;
+  if (dso._type == dso::DsoType::kAnon) {
+    // Symbolize using map info if available
+    if (IsDDResOK(add_runtime_symbol_frame(us, dso, pc))) {
+      return ddres_init();
+    }
+    else { // fake frame 
+      add_dso_frame(us, dso, 0, "pc");
+      return ddres_init();
+    }
+  }
   // if not encountered previously, update file location / key
   FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
   if (file_info_id <= k_file_info_error) {
@@ -153,16 +164,9 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
       return ddres_warn(DD_WHAT_UW_ERROR);
     }
   }
-
-  if (ddprof_mod->_symbol_method == kRuntimeSymbol) {
-    if (IsDDResNotOK(add_symbol_map_frame(us, dso, pc))) {
-      return ddres_warn(DD_WHAT_UW_ERROR);
-    }
-  } else {
-    // Lookup the symbol through dwarf
-    if (IsDDResNotOK(add_dwfl_frame(us, dso, pc, ddprof_mod, file_info_id))) {
-      return ddres_warn(DD_WHAT_UW_ERROR);
-    }
+  // Lookup the symbol through dwarf
+  if (IsDDResNotOK(add_dwfl_frame(us, dso, pc, ddprof_mod, file_info_id))) {
+    return ddres_warn(DD_WHAT_UW_ERROR);
   }
   return ddres_init();
 }
@@ -229,17 +233,21 @@ DDRes unwind_dwfl(UnwindState *us) {
   return res;
 }
 
-static DDRes add_symbol_map_frame(UnwindState *us, const Dso &dso,
-                                  ElfAddress_t pc) {
+static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
+                                      ElfAddress_t pc) {
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
   SymbolTable &symbol_table = unwind_symbol_hdr._symbol_table;
   RuntimeSymbolLookup &runtime_symbol_lookup =
       unwind_symbol_hdr._runtime_symbol_lookup;
+
+  SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert(dso._pid, pc, symbol_table);
+  if (symbol_idx == -1) {
+    return ddres_warn(DD_WHAT_UW_ERROR);
+  }
   UnwindOutput *output = &us->output;
   int64_t current_loc_idx = output->nb_locs;
   // Get the symbol from perf map
-  output->locs[current_loc_idx]._symbol_idx =
-      runtime_symbol_lookup.get_or_insert(dso._pid, pc, symbol_table);
+  output->locs[current_loc_idx]._symbol_idx = symbol_idx;
   output->locs[current_loc_idx].ip = pc;
   output->locs[current_loc_idx]._map_info_idx =
       us->symbol_hdr._mapinfo_lookup.get_or_insert(

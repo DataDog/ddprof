@@ -41,8 +41,10 @@ void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
   FILE *pmf = perfmaps_open(pid, "/tmp");
 
   if (pmf == nullptr) {
-#warning figure out what to do here
-    std::cout << "No perfmap file found for pid " << pid << std::endl;
+    // Add a single fake symbol to avoid bouncing
+    symbol_map.emplace(0, RumtimeSymbolVal(1, -1));
+    LG_DBG("No perfmap file found (PID%d)", pid);
+    return;
   }
 
   char *line = NULL;
