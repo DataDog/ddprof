@@ -39,7 +39,8 @@ void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
                                                  SymbolTable &symbol_table) {
   static const char spec[] = "%lx %x %[^\t\n]";
   FILE *pmf = perfmaps_open(pid, "/tmp");
-
+  
+  symbol_map.clear();
   if (pmf == nullptr) {
     // Add a single fake symbol to avoid bouncing
     symbol_map.emplace(0, RumtimeSymbolVal(1, -1));
@@ -50,7 +51,7 @@ void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
   char *line = NULL;
   size_t sz_buf = 0;
   char buffer[2048];
-
+  auto it = symbol_map.end();
   while (-1 != getline(&line, &sz_buf, pmf)) {
     uint64_t address;
     uint32_t code_size;
@@ -58,9 +59,10 @@ void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
         should_skip_symbol(buffer)) {
       continue;
     }
-    symbol_table.emplace_back(std::string(buffer), std::string(buffer), 0,
-                              "unknown");
-    symbol_map.emplace(address, RumtimeSymbolVal(address+code_size-1, symbol_table.size()));
+    symbol_table.emplace_back(Symbol(std::string(buffer), std::string(buffer), 0,
+                                        "unknown"));
+    // elements are ordered
+    it = symbol_map.emplace_hint(it, address, RumtimeSymbolVal(address+code_size-1, symbol_table.size()));
   }
 
   fclose(pmf);
@@ -80,7 +82,7 @@ SymbolIdx_t RuntimeSymbolLookup::get_or_insert(pid_t pid, ProcessAddress_t pc,
     return find_res.first->second.get_symbol_idx();
   }
   // TODO what happens when we don't find a sym ? :-)
-  LG_WRN("Unable to find a symbol");
+  LG_WRN("(PID%d) Unable to find a symbol for %lx", pid, pc);
   return 0;
 }
 

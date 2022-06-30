@@ -195,7 +195,7 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
     // Check if dwarf unwinding was a failure we can get stuck in infinite loops
     if (is_infinite_loop(us)) {
       LG_DBG("Break out of unwinding (possible infinite loop)");
-      return DWARF_CB_ABORT;
+      // return DWARF_CB_ABORT;
     }
   }
 #ifdef DEBUG
@@ -242,7 +242,7 @@ static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
 
   SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert(dso._pid, pc, symbol_table);
   if (symbol_idx == -1) {
-    return ddres_warn(DD_WHAT_UW_ERROR);
+    return ddres_warn(DD_WHAT_SYMB_ERROR);
   }
   UnwindOutput *output = &us->output;
   int64_t current_loc_idx = output->nb_locs;

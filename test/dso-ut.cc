@@ -209,7 +209,7 @@ static const char *s_stack_line = "7ffcd6c68000-7ffcd6c89000 rw-p 00000000 00:00
 static const char *s_inode_line = "7ffcd6c89000-7ffcd6c92000 rw-p 00000000 00:00 0                          anon_inode:[perf_event]";
 
 static const char *s_jsa_line = "0x800000000-0x800001fff rw-p 00000000 00:00 0                          /usr/local/openjdk-11/lib/server/classes.jsa";
-
+static const char *s_dotnet_line = "7fbd4f1e4000-7fbd4f1ec000 r--s 00000000 ca:01 140372                     /usr/share/dotnet/shared/Microsoft.NETCore.App/6.0.5/System.Runtime.dll";
 // clang-format on
 
 TEST(DSOTest, dso_from_procline) {
@@ -244,6 +244,12 @@ TEST(DSOTest, dso_from_procline) {
     Dso jsa_dso = DsoHdr::dso_from_procline(10, const_cast<char *>(s_jsa_line));
     EXPECT_EQ(jsa_dso._type, dso::kAnon);
   }
+  {
+    // dotnet dll
+    Dso jsa_dso = DsoHdr::dso_from_procline(10, const_cast<char *>(s_dotnet_line));
+    EXPECT_EQ(jsa_dso._type, dso::kAnon);
+  }
+
   DsoHdr dso_hdr;
   {
     // check that we don't overlap between lines that end on same byte
