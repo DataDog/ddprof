@@ -110,7 +110,6 @@ uint64_t DsoStats::sum_event_metric(DsoEventType dso_event) const {
 /* DsoHdr */
 /**********/
 DsoHdr::DsoHdr() {
-  // keep dso_id 0 as a reserved value
   // Test different places for existence of /proc
   // A given procfs can only work if its PID namespace is the same as mine.
   // Fortunately, `/proc/self` will return a symlink to my process ID in the
@@ -125,18 +124,23 @@ DsoHdr::DsoHdr() {
   _file_info_vector.emplace_back(FileInfo(), 0, true);
 }
 
-DsoFindRes DsoHdr::dso_find_first_std_executable(pid_t pid) {
-  const DsoMap &map = _map[pid];
-  DsoMapConstIt it = map.lower_bound(0);
-  // look for the first executable standard region
-  while (it != map.end() && !it->second._executable &&
-         it->second._type != dso::kStandard) {
-    ++it;
+namespace {
+bool string_readlink(const char *path, std::string &link_name) {
+  char buff[1024];
+  ssize_t len = ::readlink(path, buff, sizeof(buff) - 1);
+  if (len != -1) {
+    buff[len] = '\0';
+    link_name = std::string(buff);
+    return true;
   }
-  if (it == map.end()) {
-    return find_res_not_found(map);
-  }
-  return std::make_pair<DsoMapConstIt, bool>(std::move(it), true);
+  return false;
+}
+} // namespace
+
+bool DsoHdr::find_exe_name(pid_t pid, std::string &exe_name) {
+  char exe_link[1024];
+  sprintf(exe_link, "%s/proc/%d/exe", _path_to_proc.c_str(), pid);
+  return string_readlink(exe_link, exe_name);
 }
 
 DsoFindRes DsoHdr::dso_find_closest(const DsoMap &map, pid_t pid,
