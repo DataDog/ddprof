@@ -391,8 +391,7 @@ DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr) {
 
   DsoFindRes find_res = dso_find_closest(map, pid, addr);
   if (!find_res.second) { // backpopulate
-    LG_DBG("[DSO] Couldn't find DSO for [%d](0x%lx). backpopulate", pid,
-            addr);
+    LG_DBG("[DSO] Couldn't find DSO for [%d](0x%lx). backpopulate", pid, addr);
     int nb_elts_added = 0;
     if (pid_backpopulate(map, pid, nb_elts_added) && nb_elts_added) {
       find_res = dso_find_closest(map, pid, addr);
@@ -416,7 +415,7 @@ bool DsoHdr::pid_backpopulate(pid_t pid, int &nb_elts_added) {
 // Return true proc map was found, use nb_elts_added for number of added
 // elements
 bool DsoHdr::pid_backpopulate(DsoMap &map, pid_t pid, int &nb_elts_added) {
-    // Following line creates the state for pid if it does not exist
+  // Following line creates the state for pid if it does not exist
   BackpopulateState &bp_state = _backpopulate_state_map[pid];
   ++bp_state._nbUnfoundDsos;
   if (bp_state._perm != kAllowed) { // retry
