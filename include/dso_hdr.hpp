@@ -13,6 +13,7 @@
 
 #include "ddprof_file_info.hpp"
 #include "ddprof_module.hpp"
+#include "ddres_def.hpp"
 #include "dso.hpp"
 
 namespace ddprof {
@@ -94,9 +95,12 @@ public:
 
   // Find the first associated to this pid
   bool find_exe_name(pid_t pid, std::string &exe_name);
+  DsoFindRes dso_find_first_std_executable(pid_t pid);
 
+  DDProfModRange compute_mod_range(DsoMapConstIt it, const DsoMap &map);
   // Find the lowest and highest for this given DSO
-  DDProfModRange find_mod_range(DsoMapConstIt it, const DsoMap &map) const;
+  DDRes mod_range_or_backpopulate(DsoMapConstIt it, DsoMap &map,
+                                  DDProfModRange &mod_range);
 
   // Find the closest dso to this pid and addr
   DsoFindRes dso_find_closest(pid_t pid, ElfAddress_t addr);

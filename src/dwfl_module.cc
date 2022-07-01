@@ -5,27 +5,25 @@
 
 #include "dwfl_module.hpp"
 
+#include "ddres.hpp"
 #include "logger.hpp"
 
 namespace ddprof {
 
-DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
-                        DDProfModRange mod_range,
-                        const FileInfoValue &fileInfoValue) {
-  if (!dwfl)
-    return DDProfMod();
-
-  if (fileInfoValue._errored) {
-    LG_DBG("DSO Previously errored - mod (%s)", dso._filename.c_str());
-    return DDProfMod();
+DDRes update_module(Dwfl *dwfl, ProcessAddress_t pc,
+                    const DDProfModRange &mod_range,
+                    const FileInfoValue &fileInfoValue, DDProfMod &ddprof_mod) {
+  const std::string &filepath = fileInfoValue.get_path();
+  const char *module_name = strrchr(filepath.c_str(), '/') + 1;
+  if (fileInfoValue._errored) { // avoid bouncing on errors
+    LG_DBG("DSO Previously errored - mod (%s)", module_name);
+    return ddres_warn(DD_WHAT_MODULE);
   }
+
   // Now that we've confirmed a separate lookup for the DSO based on procfs
   // and/or perf_event_open() "extra" events, we do two things
   // 1. Check that dwfl has a cache for this PID/pc combination
   // 2. Check that the given cache is accurate to the DSO
-
-  DDProfMod ddprof_mod;
-
   ddprof_mod._mod = dwfl_addrmodule(dwfl, pc);
 
   if (ddprof_mod._mod) {
@@ -33,20 +31,19 @@ DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
     dwfl_module_info(ddprof_mod._mod, 0, &ddprof_mod._low_addr,
                      &ddprof_mod._high_addr, 0, 0, &main_name, 0);
     if (ddprof_mod._low_addr != mod_range._low_addr) {
-      LG_NTC("Incoherent DSO (%s) %lx != %lx dwfl_module)",
-             dso._filename.c_str(), mod_range._low_addr, ddprof_mod._low_addr);
-      return DDProfMod(DDProfMod::kInconsistent);
+      LG_NTC("Incoherent Modules (%s-%s) %lx != %lx dwfl_module)", module_name,
+             main_name, mod_range._low_addr, ddprof_mod._low_addr);
+      ddprof_mod._status = DDProfMod::kInconsistent;
+      return ddres_warn(DD_WHAT_MODULE);
     }
-    return ddprof_mod;
+    return ddres_init();
   }
 
   // Load the file at a matching DSO address
-  if (!ddprof_mod._mod && dso._type == ddprof::dso::kStandard) {
-    const std::string &filepath = fileInfoValue.get_path();
+  if (!ddprof_mod._mod && fileInfoValue.get_id() > k_file_info_error) {
     if (!filepath.empty()) {
-      const char *dso_name = strrchr(filepath.c_str(), '/') + 1;
       dwfl_errno(); // erase previous error
-      ddprof_mod._mod = dwfl_report_elf(dwfl, dso_name, filepath.c_str(), -1,
+      ddprof_mod._mod = dwfl_report_elf(dwfl, module_name, filepath.c_str(), -1,
                                         mod_range._low_addr, false);
     }
   }
@@ -55,30 +52,29 @@ DDProfMod update_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
     // Ideally we would differentiate pid errors from file errors.
     // For perf reasons we will just flag the file as errored
     fileInfoValue._errored = true;
-    LG_WRN("Couldn't addrmodule (%s)[0x%lx], DSO:%s (%s)", dwfl_errmsg(-1), pc,
-           dso.to_string().c_str(), fileInfoValue.get_path().c_str());
+    LG_WRN("Couldn't addrmodule (%s)[0x%lx], MOD:%s (%s)", dwfl_errmsg(-1), pc,
+           module_name, fileInfoValue.get_path().c_str());
+    return ddres_warn(DD_WHAT_MODULE);
   } else {
     dwfl_module_info(ddprof_mod._mod, 0, &ddprof_mod._low_addr,
                      &ddprof_mod._high_addr, 0, 0, 0, 0);
-    LG_DBG("Loaded mod from file (%s), PID %d (%s) mod[%lx;%lx]",
-           fileInfoValue.get_path().c_str(), dso._pid, dwfl_errmsg(-1),
+    LG_DBG("Loaded mod from file (%s), (%s) mod[%lx;%lx]",
+           fileInfoValue.get_path().c_str(), dwfl_errmsg(-1),
            ddprof_mod._low_addr, ddprof_mod._high_addr);
-
-    // Retrieve the biais to figure out the offset
-    // We can use the dwarf CFI (dwfl_module_eh_cfi)
-    // or the ELF (dwfl_module_getelf).
-    // Considering dwarf is not always available, prefer elf
-    Elf *elf = dwfl_module_getelf(ddprof_mod._mod, &ddprof_mod._sym_bias);
-    if (!elf) {
-      LG_DBG("Unable to find dwfl_cfi for mod - %s (%s)", dso._filename.c_str(),
-             dwfl_errmsg(-1));
-      // We could continue though it is preferable to flag this issue
-      return DDProfMod();
-    }
   }
-  // TODO: Figure out how to check that mapping makes sense
-  // ddprof_mod._high_addr != mod_range._high_addr
-  return ddprof_mod;
+  return ddres_init();
+}
+
+DDRes update_bias(DDProfMod &ddprof_mod) {
+  // Retrieve the biais to figure out the offset
+  // We can use the dwarf CFI (dwfl_module_eh_cfi)
+  // or the ELF (dwfl_module_getelf).
+  // Considering dwarf is not always available, prefer elf
+  Elf *elf = dwfl_module_getelf(ddprof_mod._mod, &ddprof_mod._sym_bias);
+  if (!elf) {
+    return ddres_warn(DD_WHAT_MODULE);
+  }
+  return ddres_init();
 }
 
 } // namespace ddprof

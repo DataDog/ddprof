@@ -143,6 +143,20 @@ bool DsoHdr::find_exe_name(pid_t pid, std::string &exe_name) {
   return string_readlink(exe_link, exe_name);
 }
 
+DsoFindRes DsoHdr::dso_find_first_std_executable(pid_t pid) {
+  const DsoMap &map = _map[pid];
+  DsoMapConstIt it = map.lower_bound(0);
+  // look for the first executable standard region
+  while (it != map.end() && !it->second._executable &&
+         it->second._type != dso::kStandard) {
+    ++it;
+  }
+  if (it == map.end()) {
+    return find_res_not_found(map);
+  }
+  return std::make_pair<DsoMapConstIt, bool>(std::move(it), true);
+}
+
 DsoFindRes DsoHdr::dso_find_closest(const DsoMap &map, pid_t pid,
                                     ElfAddress_t addr) {
   bool is_within = false;
@@ -224,9 +238,7 @@ DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
   return std::make_pair<DsoMapIt, DsoMapIt>(std::move(start), std::move(end));
 }
 
-// Find the lowest and highest for this given DSO
-DDProfModRange DsoHdr::find_mod_range(DsoMapConstIt it,
-                                      const DsoMap &map) const {
+DDProfModRange DsoHdr::compute_mod_range(DsoMapConstIt it, const DsoMap &map) {
   if (it == map.end()) {
     return DDProfModRange();
   }
@@ -244,9 +256,34 @@ DDProfModRange DsoHdr::find_mod_range(DsoMapConstIt it,
     }
   }
   --it; // back up from end element (or different file)
-
   return DDProfModRange{._low_addr = first_el->second._start,
                         ._high_addr = it->second._end};
+}
+
+// Find the lowest and highest for this given DSO
+DDRes DsoHdr::mod_range_or_backpopulate(DsoMapConstIt it, DsoMap &map,
+                                        DDProfModRange &mod_range) {
+  mod_range = compute_mod_range(it, map);
+
+  const Dso &dso = it->second;
+  if (mod_range._low_addr > dso._start - dso._pgoff) {
+    // elf layout should take more space
+    int nb_elts_added;
+    if (pid_backpopulate(map, dso._pid, nb_elts_added) && nb_elts_added) {
+      DsoHdr::DsoFindRes find_res = dso_find_closest(map, dso._pid, dso._start);
+      if (!find_res.second) {
+        LG_DBG("[DSO] Mod range Error - dso no longer available");
+        return ddres_warn(DD_WHAT_DSO);
+      } else {
+        mod_range = compute_mod_range(find_res.first, map);
+        if (mod_range._low_addr > dso._start - dso._pgoff) {
+          // not fixed. should we attempt to load ?
+          return ddres_warn(DD_WHAT_DSO);
+        }
+      }
+    }
+  }
+  return ddres_init();
 }
 
 // erase range of elements
