@@ -157,18 +157,25 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   return ddres_init();
 }
 
+
 bool is_infinite_loop(UnwindState *us) {
   UnwindOutput &output = us->output;
   uint64_t nb_locs = output.nb_locs;
-  if (nb_locs <= 2) {
+  unsigned nb_frames_to_check = 3;
+  if (nb_locs <= nb_frames_to_check) {
     return false;
   }
-  if (output.locs[nb_locs - 1]._symbol_idx ==
-      output.locs[nb_locs - 2]._symbol_idx) {
-    return true;
+  for (unsigned i = 0; i < nb_frames_to_check; ++i) {
+    FunLoc &n_minus_one_loc = output.locs[nb_locs - i];
+    FunLoc &n_minus_two_loc = output.locs[nb_locs - i - 1];
+    if (n_minus_one_loc.ip != n_minus_two_loc.ip) {
+      return false;
+    }
   }
-  return false;
+  return true;
 }
+
+
 
 // frame_cb callback at every frame for the dwarf unwinding
 static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
