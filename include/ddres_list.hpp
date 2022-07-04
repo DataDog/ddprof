@@ -27,6 +27,7 @@
   X(UW_MAX_DEPTH, "max depth reached in unwinding")                            \
   X(CAPLIB, "error when reading capabilities")                                 \
   X(USERID, "error in user ID manipulations")                                  \
+  X(MODULE, "error retrieving debug info in modules")                          \
   X(PEINIT, "error allocating space for pevent")                               \
   X(PERFOPEN, "error during perf_event_open")                                  \
   X(PERFRB, "error with perf_event ringbuffer")                                \

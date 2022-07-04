@@ -46,19 +46,23 @@ TEST(DwflModule, inconsistency_test) {
 
     const FileInfoValue &file_info_value =
         dso_hdr.get_file_info_value(file_info_id);
-    DDProfModRange mod_range = dso_hdr.find_mod_range(it, dso_map);
-    DDProfMod ddprof_mod = update_module(dwfl_wrapper._dwfl, dso._start, dso,
-                                         mod_range, file_info_value);
+    DDProfModRange mod_range;
+    EXPECT_TRUE(IsDDResOK(
+        dso_hdr.mod_range_or_backpopulate(find_res.first, dso_map, mod_range)));
+    DDProfMod *ddprof_mod =
+        dwfl_wrapper.register_mod(dso._start, dso, mod_range, file_info_value);
+    EXPECT_TRUE(ddprof_mod->_mod);
     if (find_res.first == it) {
       Symbol symbol;
       GElf_Sym elf_sym;
       Offset_t lbiais;
       bool res =
-          symbol_get_from_dwfl(ddprof_mod._mod, ip, symbol, elf_sym, lbiais);
+          symbol_get_from_dwfl(ddprof_mod->_mod, ip, symbol, elf_sym, lbiais);
       EXPECT_TRUE(res);
       EXPECT_EQ("ddprof::DwflModule_inconsistency_test_Test::TestBody()",
                 symbol._demangle_name);
-      FileAddress_t elf_addr = ip - ddprof_mod._sym_bias;
+      EXPECT_EQ(lbiais, ddprof_mod->_sym_bias);
+      FileAddress_t elf_addr = ip - ddprof_mod->_sym_bias;
       FileAddress_t start_sym, end_sym = {};
       res = compute_elf_range_v2(elf_addr, elf_sym, start_sym, end_sym);
       EXPECT_TRUE(res);
@@ -68,8 +72,8 @@ TEST(DwflModule, inconsistency_test) {
       EXPECT_LE(elf_addr, end_sym);
     }
     // check that we loaded all mods matching the DSOs
-    EXPECT_EQ(ddprof_mod._low_addr, mod_range._low_addr);
-    EXPECT_EQ(ddprof_mod._status, DDProfMod::kUnknown);
+    EXPECT_EQ(ddprof_mod->_low_addr, mod_range._low_addr);
+    EXPECT_EQ(ddprof_mod->_status, DDProfMod::kUnknown);
   }
 
   {
@@ -87,14 +91,14 @@ TEST(DwflModule, inconsistency_test) {
     const FileInfoValue &file_info_value =
         dso_hdr.get_file_info_value(file_info_id);
 
-    DDProfModRange ddprof_range = {._low_addr = bad_dso._start,
-                                   ._high_addr = bad_dso._end + 1};
+    DDProfModRange bad_range = {._low_addr = bad_dso._start,
+                                ._high_addr = bad_dso._end + 1};
 
-    DDProfMod ddprof_mod =
-        update_module(dwfl_wrapper._dwfl, bad_dso._start, bad_dso, ddprof_range,
-                      file_info_value);
-    EXPECT_EQ(ddprof_mod._low_addr, 0);
-    EXPECT_EQ(ddprof_mod._status, DDProfMod::kInconsistent);
+    DDProfMod *ddprof_mod = dwfl_wrapper.register_mod(
+        bad_dso._start, bad_dso, bad_range, file_info_value);
+
+    EXPECT_EQ(ddprof_mod, nullptr);
+    EXPECT_EQ(dwfl_wrapper._inconsistent, true);
   }
 }
 

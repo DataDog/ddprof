@@ -320,7 +320,9 @@ TEST(DSOTest, range_check) {
   DsoFindRes find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
   ASSERT_TRUE(find_res.second);
   auto &map = dso_hdr._map[pid];
-  DDProfModRange mod_range = dso_hdr.find_mod_range(find_res.first, map);
+  DDProfModRange mod_range;
+  DDRes res = dso_hdr.mod_range_or_backpopulate(find_res.first, map, mod_range);
+  EXPECT_TRUE(IsDDResOK(res));
   printf("Range for %s = [0x%lx - 0x%lx] \n",
          find_res.first->second._filename.c_str(), mod_range._low_addr,
          mod_range._high_addr);

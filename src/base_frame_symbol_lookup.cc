@@ -18,18 +18,26 @@ Symbol symbol_from_pid(pid_t pid) {
 }
 } // namespace
 
-SymbolIdx_t BaseFrameSymbolLookup::insert_bin_symbol(pid_t pid,
-                                                     SymbolTable &symbol_table,
-                                                     DsoHdr &dso_hdr) {
+SymbolIdx_t
+BaseFrameSymbolLookup::insert_bin_symbol(pid_t pid, SymbolTable &symbol_table,
+                                         DsoSymbolLookup &dso_symbol_lookup,
+                                         DsoHdr &dso_hdr) {
   SymbolIdx_t symbol_idx = -1;
-  std::string exe_name;
-  bool exe_found = dso_hdr.find_exe_name(pid, exe_name);
-  if (exe_found) {
-    symbol_idx = symbol_table.size();
-    symbol_table.emplace_back(Symbol({}, {}, 0, exe_name));
+
+  DsoHdr::DsoFindRes find_res = dso_hdr.dso_find_first_std_executable(pid);
+  if (find_res.second && find_res.first->second._type == dso::kStandard) {
+    // todo : how to tie lifetime of DSO to this ?
+    symbol_idx =
+        dso_symbol_lookup.get_or_insert(find_res.first->second, symbol_table);
     _bin_map.insert(std::pair<pid_t, SymbolIdx_t>(pid, symbol_idx));
   } else {
-    LG_NTC("Unable to find base frame for pid %d", pid);
+    std::string exe_name;
+    bool exe_found = dso_hdr.find_exe_name(pid, exe_name);
+    if (exe_found) {
+      symbol_idx = symbol_table.size();
+      symbol_table.emplace_back(Symbol({}, {}, 0, exe_name));
+      _bin_map.insert(std::pair<pid_t, SymbolIdx_t>(pid, symbol_idx));
+    }
   }
   return symbol_idx;
 }
@@ -48,7 +56,8 @@ BaseFrameSymbolLookup::get_or_insert(pid_t pid, SymbolTable &symbol_table,
     // attempt k nb times to look for binary info
     if (it_pid == _pid_map.end() ||
         ++it_pid->second._nb_bin_lookups < k_nb_bin_lookups) {
-      symbol_idx = insert_bin_symbol(pid, symbol_table, dso_hdr);
+      symbol_idx =
+          insert_bin_symbol(pid, symbol_table, dso_symbol_lookup, dso_hdr);
     }
   }
   if (symbol_idx == -1 && it_pid != _pid_map.end()) {

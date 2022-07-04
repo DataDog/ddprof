@@ -69,24 +69,22 @@ DDProfMod *DwflWrapper::unsafe_get(FileInfoId_t file_info_id) {
 }
 
 DDProfMod *DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
-                                     DDProfModRange mod_range,
+                                     const DDProfModRange &mod_range,
                                      const FileInfoValue &fileInfoValue) {
 
-  DDProfMod *ddprof_mod = &_ddprof_mods[fileInfoValue.get_id()];
-
-  if (ddprof_mod->_low_addr) {
-    LG_DBG("[DWFL_HDR] Update existing mod 0x%lx", ddprof_mod->_low_addr);
+  DDProfMod new_mod;
+  DDRes res = update_module(_dwfl, pc, mod_range, fileInfoValue, new_mod);
+  _inconsistent = new_mod._status == DDProfMod::kInconsistent;
+  if (IsDDResNotOK(res)) {
+    return nullptr;
   }
-  // first time we see this binary for this pid
-  *ddprof_mod = update_module(_dwfl, pc, dso, mod_range, fileInfoValue);
-  if (!ddprof_mod->_mod) {
-    LG_WRN("Unable to register mod %s - %d", dso.to_string().c_str(),
-           ddprof_mod->_status);
-    // If it overlaps with a previous binary we loaded, flag this
-    // inconsistency
-    _inconsistent = ddprof_mod->_status == DDProfMod::kInconsistent;
+  if (IsDDResNotOK(update_bias(new_mod))) {
+    LG_DBG("Unable to compute bias from file (%s), PID %d, mod[%lx;%lx]",
+           fileInfoValue.get_path().c_str(), dso._pid, new_mod._low_addr,
+           new_mod._high_addr);
+    return nullptr;
   }
-  return ddprof_mod;
+  return &(_ddprof_mods[fileInfoValue.get_id()] = new_mod);
 }
 
 void DwflHdr::clear_unvisited() {

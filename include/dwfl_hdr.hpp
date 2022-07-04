@@ -44,7 +44,7 @@ struct DwflWrapper {
 
   // safe get
   DDProfMod *register_mod(ProcessAddress_t pc, const Dso &dso,
-                          DDProfModRange mod_range,
+                          const DDProfModRange &mod_range,
                           const FileInfoValue &fileInfoValue);
 
   ~DwflWrapper();

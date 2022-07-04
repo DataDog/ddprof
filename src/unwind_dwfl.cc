@@ -46,15 +46,17 @@ DDRes unwind_init_dwfl(UnwindState *us) {
             us->dso_hdr.get_file_info_value(file_info_id);
 
         // get low and high addr for this module
-        DDProfModRange mod_range = us->dso_hdr.find_mod_range(it, map);
+        DDProfModRange mod_range;
+        if (!IsDDResOK(
+                us->dso_hdr.mod_range_or_backpopulate(it, map, mod_range))) {
+          return ddres_warn(DD_WHAT_UW_ERROR);
+        }
         DDProfMod *ddprof_mod = us->_dwfl_wrapper->register_mod(
             us->current_ip, dso, mod_range, file_info_value);
-        if (ddprof_mod->_mod) {
+        if (ddprof_mod) {
           // one success is fine
           success = true;
           break;
-        } else if (ddprof_mod->_status == DDProfMod::kInconsistent) {
-          return ddres_warn(DD_WHAT_UW_ERROR);
         }
       }
     }
@@ -123,7 +125,7 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
       us->dso_hdr.dso_find_or_backpopulate(us->pid, pc);
   if (!find_res.second) {
     // no matching file was found
-    LG_DBG("[UW]%d: DSO not found at 0x%lx (depth#%lu)", us->pid, pc,
+    LG_DBG("[UW] (PID%d) DSO not found at 0x%lx (depth#%lu)", us->pid, pc,
            us->output.nb_locs);
     add_error_frame(nullptr, us, pc, SymbolErrors::unknown_dso);
     return ddres_init();
@@ -152,14 +154,17 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   DDProfMod *ddprof_mod = us->_dwfl_wrapper->unsafe_get(file_info_id);
   if (!ddprof_mod) {
     // New module
-    DDProfModRange mod_range =
-        us->dso_hdr.find_mod_range(find_res.first, us->dso_hdr._map[us->pid]);
+    DDProfModRange mod_range;
+    if (IsDDResNotOK(us->dso_hdr.mod_range_or_backpopulate(
+            find_res.first, us->dso_hdr._map[us->pid], mod_range))) {
+      return ddres_warn(DD_WHAT_UW_ERROR);
+    }
     // ensure unwinding backend has access to this module (and check
     // consistency)
     ddprof_mod =
         us->_dwfl_wrapper->register_mod(pc, dso, mod_range, file_info_value);
     // Updates in DSO layout can create inconsistencies
-    if (!ddprof_mod->_mod || ddprof_mod->_status == DDProfMod::kInconsistent) {
+    if (!ddprof_mod) {
       return ddres_warn(DD_WHAT_UW_ERROR);
     }
   }
@@ -173,16 +178,18 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
 bool is_infinite_loop(UnwindState *us) {
   UnwindOutput &output = us->output;
   uint64_t nb_locs = output.nb_locs;
-  if (nb_locs <= 2) {
+  unsigned nb_frames_to_check = 3;
+  if (nb_locs <= nb_frames_to_check) {
     return false;
   }
-  FunLoc &n_minus_one_loc = output.locs[nb_locs - 1];
-  FunLoc &n_minus_two_loc = output.locs[nb_locs - 2];
-  if (n_minus_one_loc._symbol_idx == n_minus_two_loc._symbol_idx &&
-      n_minus_one_loc.ip == n_minus_two_loc.ip) {
-    return true;
+  for (unsigned i = 0; i < nb_frames_to_check; ++i) {
+    FunLoc &n_minus_one_loc = output.locs[nb_locs - i];
+    FunLoc &n_minus_two_loc = output.locs[nb_locs - i - 1];
+    if (n_minus_one_loc.ip != n_minus_two_loc.ip) {
+      return false;
+    }
   }
-  return false;
+  return true;
 }
 
 // frame_cb callback at every frame for the dwarf unwinding
