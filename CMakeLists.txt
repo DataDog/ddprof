@@ -150,7 +150,7 @@ list(APPEND DDPROF_INCLUDE_LIST ${LIBCAP_INCLUDE_DIR})
 set(DD_PROFILING_SOURCES src/lib/dd_profiling.cc src/daemonize.cc src/ddprof_cmdline.cc src/logger.cc src/logger_setup.cc 
                          src/ipc.cc src/pevent_lib.cc src/perf.cc src/perf_ringbuffer.cc src/perf_watcher.cc src/ringbuffer_utils.cc src/sys_utils.cc
                          src/user_override.cc src/ddres_list.cc src/savecontext.cc src/saveregisters.cc src/signal_helper.cc
-                         src/lib/malloc_wrapper.cc src/lib/allocation_tracker.cc)
+                         src/lib/malloc_wrapper.cc src/lib/allocation_tracker.cc src/lib/crash_tracker.cc)
 
 add_library(dd_profiling-embedded SHARED ${DD_PROFILING_SOURCES})
 target_include_directories(dd_profiling-embedded PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
