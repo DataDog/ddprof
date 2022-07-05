@@ -40,8 +40,7 @@ public:
   };
 
   static DDRes allocation_tracking_init(uint64_t allocation_profiling_rate,
-                                        uint32_t flags,
-                                        const RingBufferInfo &ring_buffer);
+                                        uint32_t flags, PEvent *pevent);
   static void allocation_tracking_free();
 
   static inline __attribute__((no_sanitize("address"))) void
@@ -60,8 +59,8 @@ private:
   AllocationTracker();
   uint64_t next_sample_interval();
 
-  DDRes init(uint64_t mem_profile_interval, bool deterministic_sampling,
-             const RingBufferInfo &ring_buffer);
+  void init(uint64_t mem_profile_interval, bool deterministic_sampling,
+            PEvent *pevent);
   void free();
 
   static AllocationTracker *create_instance();

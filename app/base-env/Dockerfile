@@ -151,3 +151,8 @@ RUN VERSION="1.6.1" \
 # A specific user is required to get access to perf event ressources.
 # This enables unit testing using perf-event ressources
 RUN useradd -ms /bin/bash ddbuild
+
+## Additional debug tooling
+ARG LOCAL_DEV="OFF"
+RUN if [[ ${LOCAL_DEV} == "ON" ]]; DEBIAN_FRONTEND=noninteractive apt-get install -y \
+  gdb; fi

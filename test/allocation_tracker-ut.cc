@@ -35,36 +35,40 @@ TEST(allocation_tracker, start_stop) {
   const uint64_t rate = 1;
   const size_t buf_size_order = 5;
   ddprof::RingBufferHolder ring_buffer{buf_size_order};
+  ring_buffer.mmap();
   ddprof::AllocationTracker::allocation_tracking_init(
       rate, ddprof::AllocationTracker::kDeterministicSampling,
-      ring_buffer.get_buffer_info());
+      ring_buffer.get_pevent());
 
   my_func_calling_malloc(1);
 
-  ddprof::RingBufferReader reader{ring_buffer.get_ring_buffer()};
-  ASSERT_GT(reader.available_for_read(), 0);
+  { // lifetime of pevent > ring buffer reader
+    ddprof::RingBufferReader reader{ring_buffer.get_ring_buffer()};
+    ASSERT_GT(reader.available_for_read(), 0);
 
-  auto buf = reader.read_all_available();
-  const perf_event_header *hdr =
-      reinterpret_cast<const perf_event_header *>(buf.data());
-  ASSERT_EQ(hdr->type, PERF_RECORD_SAMPLE);
+    auto buf = reader.read_all_available();
+    const perf_event_header *hdr =
+        reinterpret_cast<const perf_event_header *>(buf.data());
+    ASSERT_EQ(hdr->type, PERF_RECORD_SAMPLE);
 
-  perf_event_sample *sample = hdr2samp(hdr, perf_event_default_sample_type());
+    perf_event_sample *sample = hdr2samp(hdr, perf_event_default_sample_type());
 
-  ASSERT_EQ(sample->period, 1);
-  ASSERT_EQ(sample->pid, getpid());
-  ASSERT_EQ(sample->tid, ddprof::gettid());
+    ASSERT_EQ(sample->period, 1);
+    ASSERT_EQ(sample->pid, getpid());
+    ASSERT_EQ(sample->tid, ddprof::gettid());
 
-  UnwindState state;
-  ddprof::unwind_init_sample(&state, sample->regs, sample->pid,
-                             sample->size_stack, sample->data_stack);
-  ddprof::unwindstate__unwind(&state);
+    UnwindState state;
+    ddprof::unwind_init_sample(&state, sample->regs, sample->pid,
+                               sample->size_stack, sample->data_stack);
+    ddprof::unwindstate__unwind(&state);
 
-  const auto &symbol_table = state.symbol_hdr._symbol_table;
-  ASSERT_GT(state.output.nb_locs, NB_FRAMES_TO_SKIP);
-  const auto &symbol =
-      symbol_table[state.output.locs[NB_FRAMES_TO_SKIP]._symbol_idx];
-  ASSERT_EQ(symbol._symname, "my_func_calling_malloc");
+    const auto &symbol_table = state.symbol_hdr._symbol_table;
+    ASSERT_GT(state.output.nb_locs, NB_FRAMES_TO_SKIP);
+    const auto &symbol =
+        symbol_table[state.output.locs[NB_FRAMES_TO_SKIP]._symbol_idx];
+    ASSERT_EQ(symbol._symname, "my_func_calling_malloc");
+  }
 
   ddprof::AllocationTracker::allocation_tracking_free();
+  ring_buffer.munmap();
 }

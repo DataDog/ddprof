@@ -371,6 +371,12 @@ add_unit_test(
     ../src/perf.cc
 )
 
+add_unit_test(
+    elf_symbolizer-ut
+    elf_symbolizer-ut.cc
+    LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
+)
+
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/savecontext.cc ../src/saveregisters.cc)
 add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 

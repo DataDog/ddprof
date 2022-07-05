@@ -13,6 +13,7 @@
 #include "defer.hpp"
 #include "ipc.hpp"
 #include "logger_setup.hpp"
+#include "pevent_lib.hpp"
 #include "signal_helper.hpp"
 #include "syscalls.hpp"
 
@@ -195,6 +196,9 @@ static int ddprof_start_profiling_internal() {
   if (g_state.started || is_profiler_library_active()) {
     return -1;
   }
+  LOG_open(LOG_STDERR, NULL);
+  LOG_setlevel(LL_DEBUG);
+
   int sockfd = get_ddprof_socket();
   pid_t target_pid = getpid();
 
@@ -253,18 +257,23 @@ static int ddprof_start_profiling_internal() {
     auto info = client.get_profiler_info();
     g_state.profiler_pid = info.pid;
     g_state._pevent = PEvent{.watcher_pos = -1,
-             .fd = info.ring_buffer.event_fd,
-             .mapfd = info.ring_buffer.ring_fd,
-             .ring_buffer_size = static_cast<size_t>(info.ring_buffer.mem_size),
-             .custom_event = true};
-    pevent_mmap_event(&g_state._pevent);
-
-    if (info.allocation_profiling_rate > 0
-     && IsDDResOK(ddprof::AllocationTracker::allocation_tracking_init(
-          info.allocation_profiling_rate, false, *g_state._pevent))){
-      g_state.allocation_profiling_started = true;
+                             .fd = info.ring_buffer.event_fd,
+                             .mapfd = info.ring_buffer.ring_fd,
+                             .ring_buffer_size =
+                                 static_cast<size_t>(info.ring_buffer.mem_size),
+                             .custom_event = true};
+    if (IsDDResNotOK(pevent_mmap_event(&g_state._pevent))) {
+      LG_DBG("Error in mmap setting up pevents");
+      return -1;
     }
-    if (IsDDResOK(ddprof::CrashTracker::crash_tracking_init(info.ring_buffer))) {
+
+    // if (info.allocation_profiling_rate > 0 &&
+    //     IsDDResOK(ddprof::AllocationTracker::allocation_tracking_init(
+    //         info.allocation_profiling_rate, false, &g_state._pevent))) {
+    //   g_state.allocation_profiling_started = true;
+    // }
+    if (IsDDResOK(
+            ddprof::CrashTracker::crash_tracking_init(&g_state._pevent))) {
       LG_DBG("Crash Tracking Setup");
       g_state.crash_tracking_started = true;
     }
@@ -305,8 +314,8 @@ void ddprof_stop_profiling(int timeout_ms) {
     crash_tracking_stop();
   }
 
-  if (g_state._pevent) {
-    pevent_munmap_event(g_state._pevent);
+  if (IsDDResNotOK(pevent_munmap_event(&g_state._pevent))) {
+    LG_WRN("Profiling - Failure to munmap pevent");
   }
 
   auto time_limit =

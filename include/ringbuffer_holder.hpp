@@ -18,6 +18,9 @@ public:
         ddprof::ring_buffer_setup(buffer_size_order, &_pevent));
   }
 
+  DDRes mmap() { return pevent_mmap_event(&_pevent); }
+  DDRes munmap() { return pevent_munmap_event(&_pevent); }
+
   ~RingBufferHolder() { ring_buffer_cleanup(_pevent); }
 
   RingBufferInfo get_buffer_info() const {
@@ -25,6 +28,8 @@ public:
   }
 
   RingBuffer &get_ring_buffer() { return _pevent.rb; }
+
+  PEvent *get_pevent() { return &_pevent; }
 
 private:
   PEvent _pevent;

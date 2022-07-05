@@ -131,7 +131,7 @@ fi
 # Check if base image exists
 if [ ! ${CUSTOM_ID:-,,} == "yes" ] && ! docker images | awk '{print $1}'| grep -qE "^${DOCKER_NAME}$"; then
     echo "Building image"
-    BUILD_CMD="docker build -t ${DOCKER_NAME} --build-arg COMPILER=$COMPILER --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} -f $BASE_DOCKERFILE ."
+    BUILD_CMD="docker build -t ${DOCKER_NAME} --build-arg COMPILER=$COMPILER  --build-arg LOCAL_DEV=ON --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} -f $BASE_DOCKERFILE ."
     #echo "${BUILD_CMD}"
     eval "${BUILD_CMD}"
 else 

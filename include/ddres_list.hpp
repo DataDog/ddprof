@@ -53,7 +53,8 @@
   X(UNITTEST, "unit test error")                                               \
   X(SOCKET, "error during socket operation")                                   \
   X(TEMP_FILE, "error during temporary file creation")                         \
-  X(TSC, "failed to setup TSC")
+  X(TSC, "failed to setup TSC")                                                \
+  X(CRASH_TRACKER, "Failed to setup crash tracking")
 
 // generic erno errors available from /usr/include/asm-generic/errno.h
 

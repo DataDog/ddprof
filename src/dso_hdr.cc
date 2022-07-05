@@ -346,7 +346,6 @@ DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr) {
   return find_res;
 }
 
-
 void DsoHdr::pid_free(int pid) { _map.erase(pid); }
 
 bool DsoHdr::pid_backpopulate(pid_t pid, int &nb_elts_added) {

@@ -53,7 +53,7 @@ TEST(CmdLineTst, FirstEventHit) {
 }
 
 TEST(CmdLineTst, LastEventHit) {
-  int idx = DDPROF_PWE_LENGTH - 1;
+  int idx = 19;
   const PerfWatcher *w1 = ewatcher_from_idx(idx);
   const PerfWatcher *w2 =
       ewatcher_from_str("sALLOC"); // should be the last watcher

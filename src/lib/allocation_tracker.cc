@@ -76,8 +76,7 @@ AllocationTracker *AllocationTracker::create_instance() {
 }
 
 DDRes AllocationTracker::allocation_tracking_init(
-    uint64_t allocation_profiling_rate, uint32_t flags,
-    const RingBufferInfo &ring_buffer) {
+    uint64_t allocation_profiling_rate, uint32_t flags, PEvent *pevent) {
   ReentryGuard guard(&_tl_state.reentry_guard);
 
   AllocationTracker *instance = create_instance();
@@ -93,8 +92,8 @@ DDRes AllocationTracker::allocation_tracking_init(
   void *volatile p = ::malloc(1);
   ::free(p);
 
-  DDRES_CHECK_FWD(instance->init(allocation_profiling_rate,
-                                 flags & kDeterministicSampling, ring_buffer));
+  instance->init(allocation_profiling_rate, flags & kDeterministicSampling,
+                 pevent);
 
   _instance = instance;
   state.track_allocations = true;
@@ -103,9 +102,8 @@ DDRes AllocationTracker::allocation_tracking_init(
   return {};
 }
 
-DDRes AllocationTracker::init(uint64_t mem_profile_interval,
-                              bool deterministic_sampling,
-                              PEvent *pevent) {
+void AllocationTracker::init(uint64_t mem_profile_interval,
+                             bool deterministic_sampling, PEvent *pevent) {
   _sampling_interval = mem_profile_interval;
   _deterministic_sampling = deterministic_sampling;
   _pevent = pevent;
@@ -114,7 +112,6 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
 void AllocationTracker::free() {
   _state.track_allocations = false;
   _state.track_deallocations = false;
-
 
   // Do not destroy the object:
   // there is an inherent race condition between checking
@@ -187,7 +184,7 @@ void AllocationTracker::track_allocation(uintptr_t, size_t size,
 
 DDRes AllocationTracker::push_sample(uint64_t allocated_size,
                                      TrackerThreadLocalState &tl_state) {
-  RingBufferWriter writer{_pevent};
+  RingBufferWriter writer{_pevent->rb};
   auto needed_size = sizeof(AllocationEvent);
 
   if (_state.lost_count) {

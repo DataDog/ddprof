@@ -1,32 +1,37 @@
 #pragma once
 
-#include "ddres.hpp"
+#include "ddres_def.hpp"
+#include "pevent.hpp"
+
+#include <mutex>
 
 namespace ddprof {
 
-CrashTracker {
-public:
-    CrashTracker(const CrashTracker &) = delete;
-    CrashTracker &operator=(const CrashTracker &) = delete;
+DDRes install_signal_handler(void);
 
-    static DDRes crash_tracking_init(const RingBufferInfo &ring_buffer);
-    static void crash_tracking_free();
-    static inline __attribute__((no_sanitize("address"))) void
+class CrashTracker {
+public:
+  explicit CrashTracker(PEvent *pevent) : _pevent(pevent) {}
+  CrashTracker(const CrashTracker &) = delete;
+  CrashTracker &operator=(const CrashTracker &) = delete;
+
+  static DDRes crash_tracking_init(PEvent *pevent);
+  static void crash_tracking_free();
+  static void track_crash(int signal_type);
 
 private:
-    struct TrackerState {
-        std::mutex _mutex;
-    }
+  struct TrackerState {
+    std::mutex _mutex;
+  };
 
-    static AllocationTracker *create_instance();
-    track_crash();
+  static CrashTracker *create_instance(PEvent *pevent);
 
-    TrackerState _state;
-    PEvent _pevent;
-    DDRes init(const RingBufferInfo &ring_buffer);
-    void free();
+  DDRes push_sample(int signal_type);
 
-    static CrashTracer *_instance;
+  TrackerState _state;
+  PEvent *_pevent;
+
+  static CrashTracker *_instance;
 };
 
-}
+} // namespace ddprof
