@@ -153,8 +153,10 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     return 0;
   }
 
+  const bool in_wrapper_mode = ctx->params.pid == 0;
+
   pid_t temp_pid = 0;
-  if (!ctx->params.pid) {
+  if (in_wrapper_mode) {
     // If no PID was specified earlier, we autodaemonize and target current pid
 
     // Determine if library should be injected into target process
@@ -274,8 +276,17 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
       server.waitForRequest(
           [&reply](const ddprof::RequestMessage &) { return reply; });
     } catch (const ddprof::DDException &e) {
-      LOG_ERROR_DETAILS(LG_ERR, e.get_DDRes()._what);
-      return -1;
+      if (in_wrapper_mode) {
+        // Failture in wrapper mode is not fatal:
+        // LD_PRELOAD may fail because target exe is statically linked
+        // (eg. go binaries)
+        LG_WRN("Unable to connect to profiler library (target executable might "
+               "be statically linked and library cannot be preloaded). "
+               "Allocation profiling will be disabled.");
+      } else {
+        LOG_ERROR_DETAILS(LG_ERR, e.get_DDRes()._what);
+        return -1;
+      }
     }
   }
 
