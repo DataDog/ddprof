@@ -1,7 +1,7 @@
 # Unless explicitly stated otherwise all files in this repository are licensed under the Apache License Version 2.0.
 # This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
 
-cmake_minimum_required(VERSION 3.19)
+cmake_minimum_require(VERSION 3.19)
 
 ############################
 ### Global definitions   ###
