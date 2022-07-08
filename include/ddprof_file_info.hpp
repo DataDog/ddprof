@@ -57,16 +57,22 @@ struct FileInfo {
 /// Keeps metadata on the file associated to a key
 class FileInfoValue {
 public:
-  FileInfoValue(FileInfo &&info, FileInfoId_t id, bool errored = false)
-      : _info(info), _errored(errored), _id(id) {}
+  FileInfoValue(FileInfo &&info, FileInfoId_t id, bool errored = false);
+  FileInfoValue(const FileInfoValue& other);
+  FileInfoValue& operator=(const FileInfoValue& other);
+  FileInfoValue(FileInfoValue&& other);
+  FileInfoValue& operator=(FileInfoValue&& other);
+  ~FileInfoValue();
   FileInfoId_t get_id() const { return _id; }
   int64_t get_size() const { return _info._size; }
   const std::string &get_path() const { return _info._path; }
 
   FileInfo _info;
+  int      _fd;
 
   mutable bool _errored; // a flag to avoid trying to read in a loop bad files
 private:
+  void copy_values(const FileInfoValue& other);
   FileInfoId_t _id; // unique ID matching index in table
 };
 

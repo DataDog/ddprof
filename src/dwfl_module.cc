@@ -43,7 +43,7 @@ DDRes update_module(Dwfl *dwfl, ProcessAddress_t pc,
   if (!ddprof_mod._mod && fileInfoValue.get_id() > k_file_info_error) {
     if (!filepath.empty()) {
       dwfl_errno(); // erase previous error
-      ddprof_mod._mod = dwfl_report_elf(dwfl, module_name, filepath.c_str(), -1,
+      ddprof_mod._mod = dwfl_report_elf(dwfl, module_name, filepath.c_str(), fileInfoValue._fd,
                                         mod_range._low_addr, false);
     }
   }
