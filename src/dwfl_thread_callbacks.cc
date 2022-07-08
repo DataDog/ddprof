@@ -91,7 +91,7 @@ bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
 
 /// memory_read as per prototype define in libdwfl
 bool memory_read_dwfl(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
-                      void *arg) {
+                      int regno, void *arg) {
   (void)dwfl;
-  return ddprof::memory_read(addr, result, arg);
+  return ddprof::memory_read(addr, result, regno, arg);
 }

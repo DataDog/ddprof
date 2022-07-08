@@ -23,7 +23,8 @@ void add_dso_frame(UnwindState *us, const Dso &dso, ProcessAddress_t pc,
 
 void add_virtual_base_frame(UnwindState *us);
 
-bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg);
+bool memory_read(ProcessAddress_t addr, ElfWord_t *result, int regno,
+                 void *arg);
 
 void add_error_frame(const Dso *dso, UnwindState *us, ProcessAddress_t pc,
                      SymbolErrors error_case = SymbolErrors::unknown_dso);

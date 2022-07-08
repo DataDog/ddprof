@@ -1,0 +1,111 @@
+diff -ur elfutils-0.186/libdwfl/frame_unwind.c elfutils-0.186_patched/libdwfl/frame_unwind.c
+--- elfutils-0.186/libdwfl/frame_unwind.c	2021-11-10 22:21:41.000000000 +0000
++++ elfutils-0.186_patched/libdwfl/frame_unwind.c	2022-07-08 14:22:12.760891930 +0000
+@@ -145,7 +145,7 @@
+ 
+ static bool
+ expr_eval (Dwfl_Frame *state, Dwarf_Frame *frame, const Dwarf_Op *ops,
+-	   size_t nops, Dwarf_Addr *result, Dwarf_Addr bias)
++	   size_t nops, Dwarf_Addr *result, Dwarf_Addr bias, int regno)
+ {
+   Dwfl_Process *process = state->thread->process;
+   if (nops == 0)
+@@ -314,7 +314,7 @@
+ 	    }
+ 	  if (! pop (&val1)
+ 	      || ! process->callbacks->memory_read (process->dwfl, val1, &val1,
+-						    process->callbacks_arg))
++						    -1, process->callbacks_arg))
+ 	    {
+ 	      free (stack.addrs);
+ 	      return false;
+@@ -467,7 +467,7 @@
+ 	  Dwarf_Addr cfa;
+ 	  if (frame == NULL
+ 	      || dwarf_frame_cfa (frame, &cfa_ops, &cfa_nops) != 0
+-	      || ! expr_eval (state, NULL, cfa_ops, cfa_nops, &cfa, bias)
++	      || ! expr_eval (state, NULL, cfa_ops, cfa_nops, &cfa, bias, -1)
+ 	      || ! push (cfa))
+ 	    {
+ 	      __libdwfl_seterrno (DWFL_E_LIBDW);
+@@ -498,7 +498,7 @@
+ 	  __libdwfl_seterrno (DWFL_E_INVALID_ARGUMENT);
+ 	  return false;
+ 	}
+-      if (! process->callbacks->memory_read (process->dwfl, *result, result,
++      if (! process->callbacks->memory_read (process->dwfl, *result, result, regno,
+ 					     process->callbacks_arg))
+ 	return false;
+     }
+@@ -600,7 +600,7 @@
+ 	      continue;
+ 	    }
+ 	}
+-      else if (! expr_eval (state, frame, reg_ops, reg_nops, &regval, bias))
++      else if (! expr_eval (state, frame, reg_ops, reg_nops, &regval, bias, regno))
+ 	{
+ 	  /* PPC32 vDSO has various invalid operations, ignore them.  The
+ 	     register will look as unset causing an error later, if used.
+@@ -709,7 +711,7 @@
+   Dwfl_Frame *state = arg;
+   Dwfl_Thread *thread = state->thread;
+   Dwfl_Process *process = thread->process;
+-  return process->callbacks->memory_read (process->dwfl, addr, datap,
++  return process->callbacks->memory_read (process->dwfl, addr, datap, -1,
+ 					  process->callbacks_arg);
+ }
+ 
+diff -ur elfutils-0.186/libdwfl/libdwfl.h elfutils-0.186_patched/libdwfl/libdwfl.h
+--- elfutils-0.186/libdwfl/libdwfl.h	2021-11-10 22:21:41.000000000 +0000
++++ elfutils-0.186_patched/libdwfl/libdwfl.h	2022-07-08 14:20:27.340893360 +0000
+@@ -664,8 +664,8 @@
+      successfully read *RESULT or false and sets dwfl_errno () on failure.
+      This method may be NULL - in such case dwfl_thread_getframes will return
+      only the initial frame.  */
+-  bool (*memory_read) (Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
+-                       void *dwfl_arg)
++  bool (*memory_read) (Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, 
++                       int regno, void *dwfl_arg)
+     __nonnull_attribute__ (1, 3);
+ 
+   /* Called on initial unwind to get the initial register state of the first
+diff -ur elfutils-0.186/libdwfl/linux-core-attach.c elfutils-0.186_patched/libdwfl/linux-core-attach.c
+--- elfutils-0.186/libdwfl/linux-core-attach.c	2021-11-10 22:21:41.000000000 +0000
++++ elfutils-0.186_patched/libdwfl/linux-core-attach.c	2022-07-08 14:24:00.932890463 +0000
+@@ -51,7 +51,7 @@
+ };
+ 
+ static bool
+-core_memory_read (Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
++core_memory_read (Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, int regno,
+ 		  void *dwfl_arg)
+ {
+   Dwfl_Process *process = dwfl->process;
+@@ -59,6 +59,7 @@
+   Elf *core = core_arg->core;
+   assert (core != NULL);
+   static size_t phnum;
++  (void) regno;
+   if (elf_getphdrnum (core, &phnum) < 0)
+     {
+       __libdwfl_seterrno (DWFL_E_LIBELF);
+diff -ur elfutils-0.186/libdwfl/linux-pid-attach.c elfutils-0.186_patched/libdwfl/linux-pid-attach.c
+--- elfutils-0.186/libdwfl/linux-pid-attach.c	2021-11-10 22:21:41.000000000 +0000
++++ elfutils-0.186_patched/libdwfl/linux-pid-attach.c	2022-07-08 14:23:28.596890901 +0000
+@@ -191,13 +191,14 @@
+ /* Note that the result word size depends on the architecture word size.
+    That is sizeof long. */
+ static bool
+-pid_memory_read (Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg)
++pid_memory_read (Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, int regno, void *arg)
+ {
+   struct __libdwfl_pid_arg *pid_arg = arg;
+   pid_t tid = pid_arg->tid_attached;
+   Dwfl_Process *process = dwfl->process;
+   assert (tid > 0);
+-
++  (void) regno;
++  
+ #ifdef HAVE_PROCESS_VM_READV
+   if (read_cached_memory (pid_arg, addr, result))
+     {
