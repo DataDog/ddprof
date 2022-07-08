@@ -82,7 +82,7 @@ DDRes worker_library_init(DDProfContext *ctx,
     ctx->worker_ctx.i_current_pprof = 0;
     ctx->worker_ctx.exp_tid = {0};
 
-    ctx->worker_ctx.us = new UnwindState();
+    ctx->worker_ctx.us = new UnwindState(ctx->params.fd_dd_profiling);
 
     // register the existing persistent storage for the state
     ctx->worker_ctx.persistent_worker_state = persistent_worker_state;

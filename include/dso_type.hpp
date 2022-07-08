@@ -16,6 +16,7 @@ enum DsoType {
   kUndef,
   kAnon,
   kSocket,
+  kDDProfiling, // special case in which the library might be known internally
   kNbDsoTypes
 };
 
@@ -38,6 +39,8 @@ static inline const char *dso_type_str(DsoType path_type) {
     return "Anonymous";
   case kSocket:
     return "kSocket";
+  case kDDProfiling:
+    return "kDDProfiling";
   default:
     break;
   }

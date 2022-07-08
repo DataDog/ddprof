@@ -39,7 +39,8 @@ extern const char
 
 static constexpr const char k_pid_place_holder[] = "{pid}";
 
-static DDRes get_library_path(std::string &path) {
+static DDRes get_library_path(std::string &path, int &fd) {
+  fd = -1;
   auto exe_path = fs::read_symlink("/proc/self/exe");
   auto lib_path = exe_path.parent_path() / k_libdd_profiling_name;
   // first, check if libdd_profiling.so exists in same directory as exe or in
@@ -60,7 +61,7 @@ static DDRes get_library_path(std::string &path) {
       ".XXXXXX";
 
   // Create temporary file
-  int fd = mkostemp(path.data(), O_CLOEXEC);
+  fd = mkostemp(path.data(), O_CLOEXEC);
   DDRES_CHECK_ERRNO(fd, DD_WHAT_TEMP_FILE, "Failed to create temporary file");
 
   // Write embedded lib into temp file
@@ -182,7 +183,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
       if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sockfds) == -1) {
         return -1;
       }
-      if (!IsDDResOK(get_library_path(dd_profiling_lib_path))) {
+      if (!IsDDResOK(get_library_path(dd_profiling_lib_path, ctx->params.fd_dd_profiling))) {
         return -1;
       }
       ctx->params.sockfd = sockfds[kChildIdx];

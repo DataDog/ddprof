@@ -36,8 +36,8 @@ struct UnwindRegisters {
 /// Single structure with everything necessary in unwinding. The structure is
 /// given through callbacks
 struct UnwindState {
-  UnwindState()
-      : _dwfl_wrapper(nullptr), pid(-1), stack(nullptr), stack_sz(0),
+  UnwindState(int fd_dd_profiling = -1)
+      : _dwfl_wrapper(nullptr), dso_hdr(fd_dd_profiling), pid(-1), stack(nullptr), stack_sz(0),
         current_ip(0) {
     uw_output_clear(&output);
   }

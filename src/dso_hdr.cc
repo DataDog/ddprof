@@ -109,7 +109,7 @@ uint64_t DsoStats::sum_event_metric(DsoEventType dso_event) const {
 /**********/
 /* DsoHdr */
 /**********/
-DsoHdr::DsoHdr() {
+DsoHdr::DsoHdr(int fd_dd_profiling): _fd_dd_profiling(fd_dd_profiling) {
   // Test different places for existence of /proc
   // A given procfs can only work if its PID namespace is the same as mine.
   // Fortunately, `/proc/self` will return a symlink to my process ID in the
@@ -267,7 +267,8 @@ FileInfoId_t DsoHdr::get_or_insert_file_info(const Dso &dso) {
 }
 
 FileInfoId_t DsoHdr::update_id_and_path(const Dso &dso) {
-  if (dso._type != dso::DsoType::kStandard) {
+  if (dso._type != dso::DsoType::kStandard
+      && dso._type != dso::DsoType::kDDProfiling) {
     dso._id = k_file_info_error; // no file associated
     return dso._id;
   }
@@ -284,17 +285,22 @@ FileInfoId_t DsoHdr::update_id_and_path(const Dso &dso) {
   if (it == _file_info_inode_map.end()) {
     dso._id = _file_info_vector.size();
     _file_info_inode_map.emplace(std::move(key), dso._id);
+    if (dso._type == dso::DsoType::kDDProfiling && _fd_dd_profiling != -1) {
+      _file_info_vector.emplace_back(std::move(file_info), dso._id, _fd_dd_profiling);
+    }else {
+      // open the file descriptor to this file
+      _file_info_vector.emplace_back(std::move(file_info), dso._id);
+    }
 #ifdef DEBUG
     LG_NTC("New file %d - %s - %ld", dso._id, file_info._path.c_str(),
            file_info._size);
 #endif
-    _file_info_vector.emplace_back(std::move(file_info), dso._id);
   } else { // already exists
     dso._id = it->second;
-    // update with latest location
-    if (file_info._path != _file_info_vector[dso._id]._info._path) {
-      _file_info_vector[dso._id]._info = file_info;
-      _file_info_vector[dso._id]._errored = false; // allow retry with new file
+    // update with last location
+    if (_file_info_vector[dso._id]._errored &&
+        file_info._path != _file_info_vector[dso._id]._info._path) {
+      _file_info_vector[dso._id] = FileInfoValue(std::move(file_info), dso._id);
     }
   }
   return dso._id;
