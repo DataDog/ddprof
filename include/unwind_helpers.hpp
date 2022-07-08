@@ -9,6 +9,7 @@
 #include "ddprof_defs.hpp"
 #include "dso.hpp"
 #include "symbol_hdr.hpp"
+#include <string_view>
 
 typedef struct UnwindState UnwindState;
 
@@ -17,7 +18,8 @@ bool max_stack_depth_reached(UnwindState *us);
 
 void add_common_frame(UnwindState *us, SymbolErrors lookup_case);
 
-void add_dso_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc);
+void add_dso_frame(UnwindState *us, const Dso &dso, ProcessAddress_t pc,
+                   std::string_view addr_type);
 
 void add_virtual_base_frame(UnwindState *us);
 

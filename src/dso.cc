@@ -20,6 +20,8 @@ static const std::string_view s_heap_str = "[heap]";
 // anon and empty are the same (one comes from perf, the other from proc maps)
 static const std::string_view s_anon_str = "//anon";
 static const std::string_view s_jsa_str = ".jsa";
+static const std::string_view s_dotnet_dll_str = ".dll";
+
 // Example of these include : anon_inode:[perf_event]
 static const std::string_view s_anon_inode_str = "anon_inode";
 // Example socket:[123456]
@@ -55,7 +57,10 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
              // ends with .jsa
              ((_filename.length() > s_jsa_str.length() + 1) &&
               _filename.substr(_filename.length() - s_jsa_str.length(),
-                               _filename.length()) == s_jsa_str)) {
+                               _filename.length()) == s_jsa_str) ||
+             ((_filename.length() > s_dotnet_dll_str.length() + 1) &&
+              _filename.substr(_filename.length() - s_dotnet_dll_str.length(),
+                               _filename.length()) == s_dotnet_dll_str)) {
     _type = dso::kAnon;
   } else if (_filename.substr(0, s_socket_str.length()) == s_socket_str) {
     _type = dso::kSocket;

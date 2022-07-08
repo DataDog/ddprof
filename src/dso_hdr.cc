@@ -110,7 +110,6 @@ uint64_t DsoStats::sum_event_metric(DsoEventType dso_event) const {
 /* DsoHdr */
 /**********/
 DsoHdr::DsoHdr() {
-  // keep dso_id 0 as a reserved value
   // Test different places for existence of /proc
   // A given procfs can only work if its PID namespace is the same as mine.
   // Fortunately, `/proc/self` will return a symlink to my process ID in the
@@ -123,6 +122,25 @@ DsoHdr::DsoHdr() {
   }
   // 0 element is error element
   _file_info_vector.emplace_back(FileInfo(), 0, true);
+}
+
+namespace {
+bool string_readlink(const char *path, std::string &link_name) {
+  char buff[1024];
+  ssize_t len = ::readlink(path, buff, sizeof(buff) - 1);
+  if (len != -1) {
+    buff[len] = '\0';
+    link_name = std::string(buff);
+    return true;
+  }
+  return false;
+}
+} // namespace
+
+bool DsoHdr::find_exe_name(pid_t pid, std::string &exe_name) {
+  char exe_link[1024];
+  sprintf(exe_link, "%s/proc/%d/exe", _path_to_proc.c_str(), pid);
+  return string_readlink(exe_link, exe_name);
 }
 
 DsoFindRes DsoHdr::dso_find_first_std_executable(pid_t pid) {
@@ -218,6 +236,54 @@ DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
     ++end;
   }
   return std::make_pair<DsoMapIt, DsoMapIt>(std::move(start), std::move(end));
+}
+
+DDProfModRange DsoHdr::compute_mod_range(DsoMapConstIt it, const DsoMap &map) {
+  if (it == map.end()) {
+    return DDProfModRange();
+  }
+  DsoMapConstIt first_el = it;
+  while (first_el != map.begin()) {
+    --first_el;
+    if (it->second._filename != first_el->second._filename) {
+      ++first_el;
+      break;
+    }
+  }
+  while (++it != map.end()) {
+    if (it->second._filename != first_el->second._filename) {
+      break;
+    }
+  }
+  --it; // back up from end element (or different file)
+  return DDProfModRange{._low_addr = first_el->second._start,
+                        ._high_addr = it->second._end};
+}
+
+// Find the lowest and highest for this given DSO
+DDRes DsoHdr::mod_range_or_backpopulate(DsoMapConstIt it, DsoMap &map,
+                                        DDProfModRange &mod_range) {
+  mod_range = compute_mod_range(it, map);
+
+  const Dso &dso = it->second;
+  if (mod_range._low_addr > dso._start - dso._pgoff) {
+    // elf layout should take more space
+    int nb_elts_added;
+    if (pid_backpopulate(map, dso._pid, nb_elts_added) && nb_elts_added) {
+      DsoHdr::DsoFindRes find_res = dso_find_closest(map, dso._pid, dso._start);
+      if (!find_res.second) {
+        LG_DBG("[DSO] Mod range Error - dso no longer available");
+        return ddres_warn(DD_WHAT_DSO);
+      } else {
+        mod_range = compute_mod_range(find_res.first, map);
+        if (mod_range._low_addr > dso._start - dso._pgoff) {
+          // not fixed. should we attempt to load ?
+          return ddres_warn(DD_WHAT_DSO);
+        }
+      }
+    }
+  }
+  return ddres_init();
 }
 
 // erase range of elements
@@ -325,23 +391,16 @@ DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr) {
 
   DsoFindRes find_res = dso_find_closest(map, pid, addr);
   if (!find_res.second) { // backpopulate
-    // Following line creates the state for pid if it does not exist
-    BackpopulateState &bp_state = _backpopulate_state_map[pid];
-    ++bp_state._nbUnfoundDsos;
-    if (bp_state._perm == kAllowed) { // retry
-      bp_state._perm = kForbidden;    // ... but only once
-      LG_DBG("[DSO] Couldn't find DSO for [%d](0x%lx). backpopulate", pid,
-             addr);
-      int nb_elts_added = 0;
-      if (pid_backpopulate(map, pid, nb_elts_added) && nb_elts_added) {
-        find_res = dso_find_closest(map, pid, addr);
-      }
-#ifndef NDEBUG
-      if (!find_res.second) { // debug info
-        pid_find_ip(pid, addr, _path_to_proc);
-      }
-#endif
+    LG_DBG("[DSO] Couldn't find DSO for [%d](0x%lx). backpopulate", pid, addr);
+    int nb_elts_added = 0;
+    if (pid_backpopulate(map, pid, nb_elts_added) && nb_elts_added) {
+      find_res = dso_find_closest(map, pid, addr);
     }
+#ifndef NDEBUG
+    if (!find_res.second) { // debug info
+      pid_find_ip(pid, addr, _path_to_proc);
+    }
+#endif
   }
   return find_res;
 }
@@ -356,6 +415,13 @@ bool DsoHdr::pid_backpopulate(pid_t pid, int &nb_elts_added) {
 // Return true proc map was found, use nb_elts_added for number of added
 // elements
 bool DsoHdr::pid_backpopulate(DsoMap &map, pid_t pid, int &nb_elts_added) {
+  // Following line creates the state for pid if it does not exist
+  BackpopulateState &bp_state = _backpopulate_state_map[pid];
+  ++bp_state._nbUnfoundDsos;
+  if (bp_state._perm != kAllowed) { // retry
+    return false;
+  }
+  bp_state._perm = kForbidden;
   nb_elts_added = 0;
   LG_DBG("[DSO] Backpopulating PID %d", pid);
   FILE *mpf = procfs_map_open(pid, _path_to_proc.c_str());

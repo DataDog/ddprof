@@ -13,6 +13,7 @@
 #include "dwfl_symbol_lookup.hpp"
 #include "logger.hpp"
 #include "mapinfo_lookup.hpp"
+#include "runtime_symbol_lookup.hpp"
 
 #include <stdlib.h>
 
@@ -29,6 +30,7 @@ struct SymbolHdr {
   ddprof::CommonSymbolLookup _common_symbol_lookup;
   ddprof::DsoSymbolLookup _dso_symbol_lookup;
   ddprof::DwflSymbolLookup_V2 _dwfl_symbol_lookup_v2;
+  ddprof::RuntimeSymbolLookup _runtime_symbol_lookup;
   // Symbol table (contains the references to strings)
   ddprof::SymbolTable _symbol_table;
 

@@ -209,7 +209,7 @@ static const char *s_stack_line = "7ffcd6c68000-7ffcd6c89000 rw-p 00000000 00:00
 static const char *s_inode_line = "7ffcd6c89000-7ffcd6c92000 rw-p 00000000 00:00 0                          anon_inode:[perf_event]";
 
 static const char *s_jsa_line = "0x800000000-0x800001fff rw-p 00000000 00:00 0                          /usr/local/openjdk-11/lib/server/classes.jsa";
-
+static const char *s_dotnet_line = "7fbd4f1e4000-7fbd4f1ec000 r--s 00000000 ca:01 140372                     /usr/share/dotnet/shared/Microsoft.NETCore.App/6.0.5/System.Runtime.dll";
 // clang-format on
 
 TEST(DSOTest, dso_from_procline) {
@@ -244,6 +244,13 @@ TEST(DSOTest, dso_from_procline) {
     Dso jsa_dso = DsoHdr::dso_from_procline(10, const_cast<char *>(s_jsa_line));
     EXPECT_EQ(jsa_dso._type, dso::kAnon);
   }
+  {
+    // dotnet dll
+    Dso jsa_dso =
+        DsoHdr::dso_from_procline(10, const_cast<char *>(s_dotnet_line));
+    EXPECT_EQ(jsa_dso._type, dso::kAnon);
+  }
+
   DsoHdr dso_hdr;
   {
     // check that we don't overlap between lines that end on same byte
@@ -305,6 +312,23 @@ TEST(DSOTest, backpopulate) {
   EXPECT_FALSE(find_res.second);
 }
 
+TEST(DSOTest, range_check) {
+  LogHandle loghandle;
+  ElfAddress_t ip = _THIS_IP_;
+  DsoHdr dso_hdr;
+  pid_t pid = getpid();
+  DsoFindRes find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
+  ASSERT_TRUE(find_res.second);
+  auto &map = dso_hdr._map[pid];
+  DDProfModRange mod_range;
+  DDRes res = dso_hdr.mod_range_or_backpopulate(find_res.first, map, mod_range);
+  EXPECT_TRUE(IsDDResOK(res));
+  printf("Range for %s = [0x%lx - 0x%lx] \n",
+         find_res.first->second._filename.c_str(), mod_range._low_addr,
+         mod_range._high_addr);
+  EXPECT_GE(find_res.first->second._start, mod_range._low_addr);
+}
+
 TEST(DSOTest, missing_dso) {
   LogHandle loghandle;
   DsoHdr dso_hdr;
@@ -351,4 +375,16 @@ TEST(DSOTest, mmap_into_backpop) {
   // TODO: To be discussed - should we erase overlaping or not
 }
 
+TEST(DSOTest, exe_name) {
+  LogHandle handle;
+  ElfAddress_t ip = _THIS_IP_;
+  DsoHdr dso_hdr;
+  DsoFindRes find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
+  ASSERT_TRUE(find_res.second);
+  pid_t my_pid = getpid();
+  std::string exe_name;
+  bool found_exe = dso_hdr.find_exe_name(my_pid, exe_name);
+  EXPECT_TRUE(found_exe);
+  LG_NTC("%s", exe_name.c_str());
+}
 } // namespace ddprof
