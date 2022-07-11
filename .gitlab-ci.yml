@@ -1,4 +1,12 @@
+# Unless explicitly stated otherwise all files in this repository are licensed under the Apache License Version 2.0.
+# This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
 
+variables:
+  # These are gitlab variables so that it's easier to do a manual deploy
+  # If these are set witih value and description, then it gives you UI elements
+  DOWNSTREAM_BRANCH:
+    value: "main"
+    description: "Run a specific branch downstream"
 
 # Triggers a build within the Datadog infrastructure in the ddprof-build repository
 trigger_internal_build:
