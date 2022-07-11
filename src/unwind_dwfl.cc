@@ -103,18 +103,12 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   }
 
   Dwarf_Addr pc = 0;
-  bool isactivation = false;
-
-  if (!dwfl_frame_pc(dwfl_frame, &pc, &isactivation)) {
+  if (!dwfl_frame_pc(dwfl_frame, &pc, nullptr)) {
     LG_DBG("Failure to compute frame PC: %s (depth#%lu)", dwfl_errmsg(-1),
            us->output.nb_locs);
     add_error_frame(nullptr, us, pc, SymbolErrors::dwfl_frame);
     return ddres_init(); // invalid pc : do not add frame
   }
-
-  if (!isactivation)
-    --pc;
-
   us->current_ip = pc;
 
   DsoHdr::DsoFindRes find_res =
@@ -155,6 +149,23 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
       return ddres_warn(DD_WHAT_UW_ERROR);
     }
   }
+
+  // To check that we are in an activation frame, we unwind the current frame
+  // This means we need access to the module information.
+  // Now that we have loaded the module, we can check if we are an activation
+  // frame
+  bool isactivation = false;
+
+  if (!dwfl_frame_pc(dwfl_frame, &pc, &isactivation)) {
+    LG_DBG("Failure to compute frame PC: %s (depth#%lu)", dwfl_errmsg(-1),
+           us->output.nb_locs);
+    add_error_frame(nullptr, us, pc, SymbolErrors::dwfl_frame);
+    return ddres_init(); // invalid pc : do not add frame
+  }
+  if (!isactivation)
+    --pc;
+  us->current_ip = pc;
+
   // Now we register
   if (IsDDResNotOK(add_dwfl_frame(us, dso, pc, ddprof_mod, file_info_id))) {
     return ddres_warn(DD_WHAT_UW_ERROR);
