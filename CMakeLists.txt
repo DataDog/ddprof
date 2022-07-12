@@ -61,6 +61,9 @@ endif()
 # libddprof
 include(Findlibddprof)
 
+find_package(LibLZMA)
+find_package(ZLIB)
+find_package(BZip2)
 # elfutils
 include(Findelfutils)
 

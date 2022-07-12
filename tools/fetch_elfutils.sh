@@ -45,13 +45,13 @@ else
 fi
 
 echo "Checking elfutils sha512"
-if ! echo "${SHA512_ELF} ${TAR_ELF}" | sha512sum --check --strict --status; then
+if ! echo "${SHA512_ELF}  ${TAR_ELF}" | sha512sum -c ; then
     echo "Error validating elfutils SHA512"
     echo "Please clear $TARGET_EXTRACT before restarting"
     exit 1
 fi
 
-[ $already_present -eq 1 ] && exit 0
+#[ $already_present -eq 1 ] && exit 0
 
 echo "Extracting elfutils"
 mkdir src
@@ -67,7 +67,7 @@ if [[ "$(basename "${C_COMPILER}")" == clang* ]]; then
 fi
 export CFLAGS="${CFLAGS-""} ${EXTRA_CFLAGS}"
 
-echo "Compiling elfutils using ${C_COMPILER} / flags=$CFLAGS"
-
-./configure CC="${C_COMPILER}" --without-bzlib --without-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning --prefix "${TARGET_EXTRACT}"
+echo "Compiling elfutils using ${C_COMPILER} / flags=$CFLAGS / LDFLAGS=${LDFLAGS-""} / LIBS=${LIBS-""}"
+#exit 0
+./configure CC="${C_COMPILER}" --without-bzlib --without-libintl-prefix --without-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning --prefix "${TARGET_EXTRACT}"
 make "-j$(nproc)" install

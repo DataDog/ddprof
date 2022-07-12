@@ -6,7 +6,6 @@
 #include "ddprof.hpp"
 
 #include <errno.h>
-#include <execinfo.h>
 #include <signal.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
@@ -40,12 +39,12 @@ static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   // TODO this really shouldn't call printf-family functions...
   (void)uc;
   static void *buf[4096] = {0};
-  size_t sz = backtrace(buf, 4096);
+//  size_t sz = backtrace(buf, 4096);
   fprintf(stderr, "ddprof[%d]: <%s> has encountered an error and will exit\n",
           getpid(), str_version().ptr);
   if (sig == SIGSEGV)
     printf("[DDPROF] Fault address: %p\n", si->si_addr);
-  backtrace_symbols_fd(buf, sz, STDERR_FILENO);
+//  backtrace_symbols_fd(buf, sz, STDERR_FILENO);
   exit(-1);
 }
 

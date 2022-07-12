@@ -4,7 +4,7 @@
 add_library(libcap STATIC IMPORTED)
 
 find_library(LIBCAP_LIBRARY_PATH 
-             libcap.a)
+             libcap.so)
 
 set_target_properties(libcap PROPERTIES IMPORTED_LOCATION "${LIBCAP_LIBRARY_PATH}")
 
