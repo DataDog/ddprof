@@ -267,7 +267,7 @@ add_unit_test(
     dwfl_module-ut
     dwfl_module-ut.cc
     ../src/dwfl_hdr.cc
-    ../src/dwfl_module.cc
+    ../src/ddprof_module_lib.cc
     ../src/dwfl_symbol.cc
     ../src/dso.cc
     ../src/dso_hdr.cc
@@ -292,7 +292,7 @@ add_unit_test(
     ../src/dso_hdr.cc
     ../src/dso_symbol_lookup.cc
     ../src/dwfl_hdr.cc
-    ../src/dwfl_module.cc
+    ../src/ddprof_module_lib.cc
     ../src/dwfl_symbol.cc
     ../src/dwfl_symbol_lookup.cc
     ../src/dwfl_thread_callbacks.cc
@@ -324,7 +324,7 @@ add_unit_test(
     ../src/dso_hdr.cc
     ../src/dso_symbol_lookup.cc
     ../src/dwfl_hdr.cc
-    ../src/dwfl_module.cc
+    ../src/ddprof_module_lib.cc
     ../src/dwfl_symbol.cc
     ../src/dwfl_symbol_lookup.cc
     ../src/dwfl_thread_callbacks.cc

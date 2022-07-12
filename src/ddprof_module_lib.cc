@@ -3,7 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "dwfl_module.hpp"
+#include "ddprof_module_lib.hpp"
 
 #include "ddres.hpp"
 #include "logger.hpp"

@@ -37,4 +37,5 @@ struct DDProfMod {
   Offset_t _sym_bias;
   Status _status;
 };
+
 } // namespace ddprof

@@ -22,6 +22,6 @@ static const Offset_t k_max_symbol_size = 80;
 bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
                           Symbol &symbol, GElf_Sym &elf_sym, Offset_t &lbias);
 
-bool compute_elf_range_v2(RegionAddress_t file_pc, const GElf_Sym &elf_sym,
-                          RegionAddress_t &start_sym, RegionAddress_t &end_sym);
+bool compute_elf_range(RegionAddress_t file_pc, const GElf_Sym &elf_sym,
+                       RegionAddress_t &start_sym, RegionAddress_t &end_sym);
 } // namespace ddprof

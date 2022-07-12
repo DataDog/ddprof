@@ -38,11 +38,9 @@ struct DwflSymbolLookupStats {
   int _no_dwfl_symbols;
 };
 
-using DwflSymbolKey_V2 = RegionAddress_t;
-
-class DwflSymbolVal_V2 {
+class DwflSymbolVal {
 public:
-  DwflSymbolVal_V2(Offset_t end, SymbolIdx_t symbol_idx)
+  DwflSymbolVal(Offset_t end, SymbolIdx_t symbol_idx)
       : _end(end), _symbol_idx(symbol_idx) {}
   // push end further
   void set_end(Offset_t end) {
@@ -62,11 +60,11 @@ private:
 };
 
 // Range management allows better performances (and less mem overhead)
-using DwflSymbolMap = std::map<RegionAddress_t, DwflSymbolVal_V2>;
+using DwflSymbolMap = std::map<RegionAddress_t, DwflSymbolVal>;
 using DwflSymbolMapIt = DwflSymbolMap::iterator;
 using DwflSymbolMapFindRes = std::pair<DwflSymbolMapIt, bool>;
 using DwflSymbolMapValueType =
-    DwflSymbolMap::value_type; // key value pair Offset_t, DwflSymbolVal_V2
+    DwflSymbolMap::value_type; // key value pair Offset_t, DwflSymbolVal
 
 /*********************/
 /* Main lookup class */

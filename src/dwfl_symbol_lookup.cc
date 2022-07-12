@@ -5,9 +5,9 @@
 
 #include "dwfl_symbol_lookup.hpp"
 
+#include "ddprof_module.hpp"
 #include "dwfl_hdr.hpp"
 #include "dwfl_internals.hpp"
-#include "dwfl_module.hpp"
 #include "dwfl_symbol.hpp"
 #include "logger.hpp"
 #include "string_format.hpp"
@@ -142,7 +142,7 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod,
            table[symbol_idx]._symname.c_str(), symbol_idx,
            dso.to_string().c_str());
 #endif
-    map.emplace(start_sym, DwflSymbolVal_V2(end_sym, symbol_idx));
+    map.emplace(start_sym, DwflSymbolVal(end_sym, symbol_idx));
     return symbol_idx;
   }
 
@@ -166,7 +166,7 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod,
       sym_ref._srcpath = dso.format_filename();
     }
 
-    if (!compute_elf_range_v2(elf_pc, elf_sym, start_sym, end_sym)) {
+    if (!compute_elf_range(elf_pc, elf_sym, start_sym, end_sym)) {
       // elf section does not add up to something that makes sense
       // insert this PC without considering elf section
       start_sym = elf_pc;
@@ -176,7 +176,7 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod,
              start_sym, end_sym, sym_ref._symname.c_str(), symbol_idx,
              elf_sym.st_shndx);
 #endif
-      map.emplace(start_sym, DwflSymbolVal_V2(end_sym, symbol_idx));
+      map.emplace(start_sym, DwflSymbolVal(end_sym, symbol_idx));
       return symbol_idx;
     }
 
@@ -184,7 +184,7 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod,
     LG_DBG("Insert: %lx,%lx -> %s,%d,%d / shndx=%d", start_sym, end_sym,
            sym_ref._symname.c_str(), symbol_idx, elf_sym.st_shndx);
 #endif
-    map.emplace(start_sym, DwflSymbolVal_V2(end_sym, symbol_idx));
+    map.emplace(start_sym, DwflSymbolVal(end_sym, symbol_idx));
     return symbol_idx;
   }
 }

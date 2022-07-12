@@ -64,7 +64,7 @@ TEST(DwflModule, inconsistency_test) {
       EXPECT_EQ(lbiais, ddprof_mod->_sym_bias);
       FileAddress_t elf_addr = ip - ddprof_mod->_sym_bias;
       FileAddress_t start_sym, end_sym = {};
-      res = compute_elf_range_v2(elf_addr, elf_sym, start_sym, end_sym);
+      res = compute_elf_range(elf_addr, elf_sym, start_sym, end_sym);
       EXPECT_TRUE(res);
       printf("Start --> 0x%lx - end %lx - lbiais 0x%lx <--\n", start_sym,
              end_sym, lbiais);

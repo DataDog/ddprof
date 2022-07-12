@@ -29,7 +29,7 @@ TEST(SymbolTest, compute_elf_range_offset) {
                       .st_size = 0x8b8};
   RegionAddress_t start_sym;
   RegionAddress_t end_sym;
-  bool res = compute_elf_range_v2(file_pc, elf_sym, start_sym, end_sym);
+  bool res = compute_elf_range(file_pc, elf_sym, start_sym, end_sym);
   EXPECT_TRUE(res);
   EXPECT_EQ(start_sym, 0x26b0);
   EXPECT_EQ(end_sym, 0x2f67);

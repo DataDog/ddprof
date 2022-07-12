@@ -5,8 +5,8 @@
 
 #include "dwfl_hdr.hpp"
 
+#include "ddprof_module_lib.hpp"
 #include "ddres.hpp"
-#include "dwfl_module.hpp"
 #include "logger.hpp"
 
 #include <algorithm>
