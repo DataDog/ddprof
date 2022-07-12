@@ -138,18 +138,21 @@ else
     echo "Base image found, not rebuilding. Remove it to force rebuild."
 fi
 
-if [ -z "$(ssh-add -L)" ]; then
-    echo "Please start your ssh agent. Example :"
-    echo "ssh-add ~/.ssh/id_rsa"
-    exit 1
+if [[ $OSTYPE == darwin* ]]; then
+  if [ -z "$(ssh-add -L)" ]; then
+      echo "Please start your ssh agent. Example :"
+      echo "ssh-add ~/.ssh/id_rsa"
+      exit 1
+  fi
+  echo "Launch docker image, DO NOT STORE ANYTHING outside of mounted directory (container is erased on exit)."
+  # shellcheck disable=SC2086
+  CMD="docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -w /app --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} -e SSH_AUTH_SOCK=/ssh-agent \"${DOCKER_NAME}${DOCKER_TAG}\" /bin/bash"
+else
+  if [[ $OSTYPE != darwin* ]]; then
+      echo "Script only tested on MacOS."
+      echo "Attempting to continue : please update script for your OS if ssh socket is failing."
+  fi 
+  CMD="docker run -it --rm -w /app --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} \"${DOCKER_NAME}${DOCKER_TAG}\" /bin/bash"
 fi
 
-if [[ $OSTYPE != darwin* ]]; then
-    echo "Script only tested on MacOS."
-    echo "Attempting to continue : please update script for your OS if ssh socket is failing."
-fi 
-
-echo "Launch docker image, DO NOT STORE ANYTHING outside of mounted directory (container is erased on exit)."
-# shellcheck disable=SC2086
-CMD="docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -w /app --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} -e SSH_AUTH_SOCK=/ssh-agent \"${DOCKER_NAME}${DOCKER_TAG}\" /bin/bash"
 eval "$CMD"
