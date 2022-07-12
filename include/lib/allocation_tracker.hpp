@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "ddprof_base.hpp"
 #include "ddres_def.hpp"
 #include "pevent.hpp"
 #include "unlikely.hpp"
@@ -44,7 +45,7 @@ public:
                                         const RingBufferInfo &ring_buffer);
   static void allocation_tracking_free();
 
-  static inline __attribute__((no_sanitize("address"))) void
+  static inline DDPROF_NO_SANITIZER_ADDRESS void
   track_allocation(uintptr_t addr, size_t size);
   static inline void track_deallocation(uintptr_t addr);
 
