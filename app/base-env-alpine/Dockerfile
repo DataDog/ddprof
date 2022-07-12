@@ -144,6 +144,16 @@ RUN VERSION="1.6.1" \
   && popd \
   && rm -rf benchmark-${VERSION} v${VERSION}.tar.gz
 
+# Liblzma
+# TODO: cleanup!
+RUN curl -LO https://tukaani.org/xz/xz-5.3.2alpha.tar.gz \
+  && tar -xvf xz-5.3.2alpha.tar.gz \
+  && cd xz-5.3.2alpha \
+  && ./configure \
+  && make -j 4 \
+  && make install \
+
+
 # UNUSED
 # A specific user is required to get access to perf event ressources.
 # This enables unit testing using perf-event ressources
