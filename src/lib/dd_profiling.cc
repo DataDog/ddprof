@@ -7,11 +7,13 @@
 
 #include "allocation_tracker.hpp"
 #include "constants.hpp"
+#include "crash_tracker.hpp"
 #include "daemonize.hpp"
 #include "ddprof_cmdline.hpp"
 #include "defer.hpp"
 #include "ipc.hpp"
 #include "logger_setup.hpp"
+#include "pevent_lib.hpp"
 #include "signal_helper.hpp"
 #include "syscalls.hpp"
 
@@ -34,7 +36,9 @@ namespace {
 struct ProfilerState {
   bool started = false;
   bool allocation_profiling_started = false;
+  bool crash_tracking_started = false;
   pid_t profiler_pid = 0;
+  PEvent _pevent;
 
   static constexpr size_t profiler_active_len =
       std::char_traits<char>::length(k_profiler_active_env_variable) +
@@ -44,6 +48,7 @@ struct ProfilerState {
   // "<k_profiler_active_env_variable>=[01]"
   char profiler_active_str[profiler_active_len + 1];
 };
+
 ProfilerState g_state;
 
 void init_profiler_library_active() {
@@ -77,6 +82,10 @@ void allocation_profiling_stop() {
     ddprof::AllocationTracker::allocation_tracking_free();
     g_state.allocation_profiling_started = false;
   }
+}
+void crash_tracking_stop() {
+  ddprof::CrashTracker::crash_tracking_free();
+  g_state.crash_tracking_started = false;
 }
 
 // Return socket created by ddprof when injecting lib if present
@@ -187,6 +196,9 @@ static int ddprof_start_profiling_internal() {
   if (g_state.started || is_profiler_library_active()) {
     return -1;
   }
+  LOG_open(LOG_STDERR, NULL);
+  LOG_setlevel(LL_DEBUG);
+
   int sockfd = get_ddprof_socket();
   pid_t target_pid = getpid();
 
@@ -244,10 +256,26 @@ static int ddprof_start_profiling_internal() {
     ddprof::Client client{ddprof::UnixSocket{sockfd}};
     auto info = client.get_profiler_info();
     g_state.profiler_pid = info.pid;
-    if (info.allocation_profiling_rate > 0) {
-      ddprof::AllocationTracker::allocation_tracking_init(
-          info.allocation_profiling_rate, false, info.ring_buffer);
-      g_state.allocation_profiling_started = true;
+    g_state._pevent = PEvent{.watcher_pos = -1,
+                             .fd = info.ring_buffer.event_fd,
+                             .mapfd = info.ring_buffer.ring_fd,
+                             .ring_buffer_size =
+                                 static_cast<size_t>(info.ring_buffer.mem_size),
+                             .custom_event = true};
+    if (IsDDResNotOK(pevent_mmap_event(&g_state._pevent))) {
+      LG_DBG("Error in mmap setting up pevents");
+      return -1;
+    }
+
+    // if (info.allocation_profiling_rate > 0 &&
+    //     IsDDResOK(ddprof::AllocationTracker::allocation_tracking_init(
+    //         info.allocation_profiling_rate, false, &g_state._pevent))) {
+    //   g_state.allocation_profiling_started = true;
+    // }
+    if (IsDDResOK(
+            ddprof::CrashTracker::crash_tracking_init(&g_state._pevent))) {
+      LG_DBG("Crash Tracking Setup");
+      g_state.crash_tracking_started = true;
     }
   } catch (const ddprof::DDException &e) { return -1; }
 
@@ -255,6 +283,7 @@ static int ddprof_start_profiling_internal() {
     // disable allocation profiling in child upon fork
     pthread_atfork(nullptr, nullptr, &allocation_profiling_stop);
   }
+
   g_state.started = true;
   set_profiler_library_active();
   return 0;
@@ -279,6 +308,14 @@ void ddprof_stop_profiling(int timeout_ms) {
 
   if (g_state.allocation_profiling_started) {
     allocation_profiling_stop();
+  }
+
+  if (g_state.crash_tracking_started) {
+    crash_tracking_stop();
+  }
+
+  if (IsDDResNotOK(pevent_munmap_event(&g_state._pevent))) {
+    LG_WRN("Profiling - Failure to munmap pevent");
   }
 
   auto time_limit =

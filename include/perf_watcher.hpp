@@ -59,7 +59,8 @@ typedef struct PerfWatcher {
   X(CPU_NANOS, "cpu-time", nanoseconds, CPU_SAMPLE)                            \
   X(CPU_SAMPLE, "cpu-samples", count, NOCOUNT)                                 \
   X(ALLOC_SAMPLE, "alloc-samples", count, NOCOUNT)                             \
-  X(ALLOC_SPACE, "alloc-space", bytes, ALLOC_SAMPLE)
+  X(ALLOC_SPACE, "alloc-space", bytes, ALLOC_SAMPLE)                           \
+  X(CRASH_SEGV, "alloc-space", count, NOCOUNT)
 
 #define X_ENUM(a, b, c, d) DDPROF_PWT_##a,
 typedef enum DDPROF_SAMPLE_TYPES {
@@ -121,7 +122,9 @@ enum DDProfCustomCountId { kDDPROF_COUNT_ALLOCATIONS = 0 };
   X(sALGN,   "Align. Faults",   PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_ALIGNMENT_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(sEMU,    "Emu. Faults",     PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_EMULATION_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(sDUM,    "Dummy",           PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_DUMMY,                   1,            DDPROF_PWT_NOCOUNT,     {})                      \
-  X(sALLOC,  "Allocations",     kDDPROF_TYPE_CUSTOM, kDDPROF_COUNT_ALLOCATIONS,             524288,       DDPROF_PWT_ALLOC_SPACE, SKIP_FRAMES)
+  X(sALLOC,  "Allocations",     kDDPROF_TYPE_CUSTOM, kDDPROF_COUNT_ALLOCATIONS,             524288,       DDPROF_PWT_ALLOC_SPACE, SKIP_FRAMES) \
+  X(sSEGV,   "Segv",            kDDPROF_TYPE_CUSTOM, kDDPROF_COUNT_ALLOCATIONS,             1,            DDPROF_PWT_CRASH_SEGV,  {})
+
 // clang-format on
 
 #define X_ENUM(a, b, c, d, e, f, g) DDPROF_PWE_##a,
