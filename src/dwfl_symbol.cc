@@ -61,7 +61,7 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
 #else
   dwfl_errno();
 #endif
-  // srcpath
+
   if (line) {
     int linep;
     const char *localsrcpath =
@@ -70,6 +70,16 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
       symbol._srcpath = std::string(localsrcpath);
       symbol._lineno = static_cast<uint32_t>(linep);
     }
+#ifdef DEBUG
+    dwfl_error_value = dwfl_errno();
+    if (unlikely(dwfl_error_value)) {
+      LG_DBG("[DWFL_SYMB] dwfl_lineinfo error pc=%lx : Error:%s (Sym=%s)",
+             process_pc, dwfl_errmsg(dwfl_error_value),
+             symbol._demangle_name.c_str());
+    }
+#else
+    dwfl_errno();
+#endif
   }
   return symbol_success;
 }
