@@ -13,6 +13,9 @@
 #include "unwind_state.hpp"
 
 #include <algorithm>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 #include <unistd.h>
 
 DDPROF_NOINLINE void funcA();
@@ -52,22 +55,43 @@ void funcA() {
 
 TEST(getcontext, getcontext) { funcA(); }
 
-DDPROF_NOINLINE void funcD() { asm("int3"); }
+// unwinding from signal handler does not work well on aarch64
+#ifdef __x86_64__
+static std::atomic<bool> stop;
+static std::mutex mutex;
+static std::condition_variable cv;
+static uint64_t regs[K_NB_REGS_UNWIND];
+static size_t stack_size;
+
+DDPROF_NO_SANITIZER_ADDRESS void handler(int sig) {
+  stack_size = save_context(regs, stack);
+  stop = true;
+}
+
+DDPROF_NOINLINE void funcD() {
+  {
+    std::unique_lock lock{mutex};
+    cv.notify_one();
+  }
+  while (!stop) {}
+}
 
 DDPROF_NOINLINE void funcC() {
+  signal(SIGUSR1, &handler);
+  defer { signal(SIGUSR1, SIG_DFL); };
+  stop = false;
+
   funcD();
   DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
 }
 
-static uint64_t regs[K_NB_REGS_UNWIND];
-static size_t stack_size;
-
-void handler(int sig) { stack_size = save_context(regs, stack); }
-
 TEST(getcontext, unwind_from_sighandler) {
-  signal(SIGTRAP, &handler);
-  defer { signal(SIGTRAP, SIG_DFL); };
-  funcC();
+  std::unique_lock lock{mutex};
+  std::thread t{funcC};
+  cv.wait(lock);
+  pthread_kill(t.native_handle(), SIGUSR1);
+  t.join();
+
   UnwindState state;
   ddprof::unwind_init_sample(&state, regs, getpid(), stack_size,
                              reinterpret_cast<char *>(stack));
@@ -79,14 +103,19 @@ TEST(getcontext, unwind_from_sighandler) {
     auto &symbol = symbol_table[state.output.locs[iloc]._symbol_idx];
     printf("%zu: %s\n", iloc, symbol._demangle_name.c_str());
   }
+  auto get_symbol = [&](int idx) {
+    return symbol_table[state.output.locs[idx]._symbol_idx];
+  };
 
   EXPECT_GT(state.output.nb_locs, 5);
-  auto &symbol0 = symbol_table[state.output.locs[0]._symbol_idx];
-  EXPECT_TRUE(symbol0._demangle_name.starts_with("save_context("));
-  auto &symbol1 = symbol_table[state.output.locs[1]._symbol_idx];
-  EXPECT_EQ(symbol1._demangle_name, "handler(int)");
-  auto &symbol3 = symbol_table[state.output.locs[3]._symbol_idx];
-  EXPECT_EQ(symbol3._demangle_name, "funcD()");
-  auto &symbol4 = symbol_table[state.output.locs[4]._symbol_idx];
-  EXPECT_EQ(symbol4._demangle_name, "funcC()");
+  EXPECT_TRUE(get_symbol(0)._demangle_name.starts_with("save_context("));
+  EXPECT_EQ(get_symbol(1)._demangle_name, "handler(int)");
+  size_t next_idx = 3;
+  while (next_idx < state.output.nb_locs - 1 &&
+         get_symbol(next_idx)._demangle_name != "funcD()") {
+    ++next_idx;
+  }
+  EXPECT_EQ(get_symbol(next_idx)._demangle_name, "funcD()");
+  EXPECT_EQ(get_symbol(next_idx + 1)._demangle_name, "funcC()");
 }
+#endif
