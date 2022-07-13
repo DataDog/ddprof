@@ -1,5 +1,3 @@
-#include "dwfl_module.hpp"
-
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
 
@@ -7,6 +5,8 @@
 #include <string>
 
 #include "ddprof_module.hpp"
+#include "ddprof_module_lib.hpp"
+
 #include "dwfl_internals.hpp"
 #include "dwfl_symbol.hpp"
 #include "loghandle.hpp"
