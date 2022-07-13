@@ -15,7 +15,7 @@ COMPILER_SETTING="-DCMAKE_CXX_COMPILER=${CXX:-"g++"} -DCMAKE_C_COMPILER=${CC:-"g
 EXTENSION_CC=${CC:-"gcc"}
 # strip version number from compiler
 EXTENSION_CC=${EXTENSION_CC%-*}
-echo "here ${OS_IDENTIFIER}"
+
 if [ -z ${OS_IDENTIFIER} ]; then 
   LIBC_INFO=$(ldd  --version 2>&1  | grep musl)
   if [ ! -z "${LIBC_INFO}" ]; then

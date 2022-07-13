@@ -49,10 +49,8 @@ COMPILER="gcc"
 while [ $# != 0 ]; do 
     case $1 in
         -f|--dockerfile)
-            cd "$(dirname "$2")"
-            # Hacky, use path to identify name of docker image
-            DEFAULT_BASE_NAME=$(md5sum<<<"${PWD}" | awk '{print $1}')
-            cd "${CURRENTDIR}"
+            # Use md5 of file to identify a unique name
+            DEFAULT_BASE_NAME=$(md5sum $2 | awk '{print $1}')
             BASE_DOCKERFILE="$2"
             shift
             shift

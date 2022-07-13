@@ -38,7 +38,7 @@ static void disable_core_dumps(void) {
 static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   // TODO this really shouldn't call printf-family functions...
   (void)uc;
-  static void *buf[4096] = {0};
+//  static void *buf[4096] = {0};
 //  size_t sz = backtrace(buf, 4096);
   fprintf(stderr, "ddprof[%d]: <%s> has encountered an error and will exit\n",
           getpid(), str_version().ptr);

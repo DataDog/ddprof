@@ -51,7 +51,7 @@ if ! echo "${SHA512_ELF}  ${TAR_ELF}" | sha512sum -c ; then
     exit 1
 fi
 
-#[ $already_present -eq 1 ] && exit 0
+[ $already_present -eq 1 ] && exit 0
 
 echo "Extracting elfutils"
 mkdir src
@@ -78,5 +78,5 @@ export CFLAGS="${CFLAGS-""} ${EXTRA_CFLAGS}"
 
 echo "Compiling elfutils using ${C_COMPILER} / flags=$CFLAGS / LDFLAGS=${LDFLAGS-""} / LIBS=${LIBS-""}"
 #exit 0
-./configure LIBS="-l:libintl.so" CC="${C_COMPILER}" --without-bzlib --without-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning --prefix "${TARGET_EXTRACT}"
+./configure CC="${C_COMPILER}" --without-bzlib --without-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning --prefix "${TARGET_EXTRACT}"
 make "-j$(nproc)" install

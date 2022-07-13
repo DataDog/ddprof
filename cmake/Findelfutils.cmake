@@ -10,10 +10,9 @@
 # Lzma / ZLib
 # Force static library by overriding CMAKE_FIND_LIBRARY_SUFFIXES since FindZLIB/FindLIBLZMA don't provide the option
 set(ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-SET(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+SET(CMAKE_FIND_LIBRARY_SUFFIXES ".a;.so")
 find_package(LibLZMA)
 find_package(ZLIB)
-#find_package(BZip2)
 # Restore CMAKE_FIND_LIBRARY_SUFFIXES
 set(CMAKE_FIND_LIBRARY_SUFFIXES ${ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
 
@@ -37,7 +36,6 @@ message(STATUS "${CMAKE_SOURCE_DIR}/tools/fetch_elfutils.sh ${VER_ELF} ${SHA512_
 execute_process(COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_elfutils.sh" "${VER_ELF}" "${SHA512_ELF}" "${ELFUTILS_PATH}" "${CMAKE_C_COMPILER}" "${EXTRA_CFLAGS}"
                 WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND_ERROR_IS_FATAL ANY)
 
-
 add_library(dw STATIC IMPORTED)
 set_target_properties(dw PROPERTIES
         IMPORTED_LOCATION ${LIBDW_PATH}
@@ -49,23 +47,6 @@ set_target_properties(elf PROPERTIES
                     IMPORTED_LOCATION ${LIBELF_PATH}
                     INTERFACE_INCLUDE_DIRECTORIES ${ELFUTILS_INCLUDE_DIRS}
                     INTERFACE_LINK_LIBRARIES "${LIBLZMA_LIBRARIES};${ZLIB_LIBRARIES}")
-
-#
-#set(LIBDW_PATH "/usr/lib/libdw.a")
-#set(LIBELF_PATH "/usr/lib/libelf.a")
-#set(ELFUTILS_INCLUDE_DIRS "/usr/include/elfutils")
-#
-#add_library(dw STATIC IMPORTED)
-#set_target_properties(dw PROPERTIES
-#                         IMPORTED_LOCATION ${LIBDW_PATH}
-#                         INTERFACE_INCLUDE_DIRECTORIES ${ELFUTILS_INCLUDE_DIRS}
-#                         INTERFACE_LINK_LIBRARIES "liblzma.a;ZLIB::ZLIB;bz2")
-#
-#add_library(elf STATIC IMPORTED)
-#set_target_properties(elf PROPERTIES
-#                      IMPORTED_LOCATION ${LIBELF_PATH}
-#                      INTERFACE_INCLUDE_DIRECTORIES ${ELFUTILS_INCLUDE_DIRS}
-#                      INTERFACE_LINK_LIBRARIES "LibLZMA::LibLZMA;ZLIB::ZLIB;bz2")
 
 ## Elf libraries
 set(ELFUTILS_LIBRARIES dw elf)
