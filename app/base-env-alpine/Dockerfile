@@ -20,11 +20,14 @@ RUN apk update \
 	 gcovr \
 	 git \
 	 subversion \
+	 patch \
 	 curl \
 	 wget \
 	 make \
 	 cmake \
 	 m4 \
+	 autoconf \
+	 automake \
 	 unzip \
 	 gcc \
 	 g++ \
@@ -35,6 +38,13 @@ RUN apk update \
 	 cppcheck \
 	 openssh \
 	 zlib-dev \
+	 bzip2-dev \
+	 xz-dev \
+	 argp-standalone \
+	 fts-dev \
+	 musl-obstack-dev \
+	 musl-libintl \
+	 musl-legacy-error \
 	 libcap-dev \
 	 netcat-openbsd
 
@@ -144,15 +154,31 @@ RUN VERSION="1.6.1" \
   && popd \
   && rm -rf benchmark-${VERSION} v${VERSION}.tar.gz
 
+
+ADD error.h.patch /
+ADD libdw_alloc.c.patch /
+
+#No longer needed
+#RUN patch /usr/include/error.h error.h.patch
+
 # Liblzma
 # TODO: cleanup!
-RUN curl -LO https://tukaani.org/xz/xz-5.3.2alpha.tar.gz \
-  && tar -xvf xz-5.3.2alpha.tar.gz \
-  && cd xz-5.3.2alpha \
-  && ./configure \
-  && make -j 4 \
-  && make install \
+#RUN curl -LO https://tukaani.org/xz/xz-5.3.2alpha.tar.gz \
+#  && tar -xvf xz-5.3.2alpha.tar.gz \
+#  && cd xz-5.3.2alpha \
+#  && ./configure \
+#  && make -j 4 \
+#  && make install \
 
+## argp-standalone
+#RUN curl -LO https://github.com/ericonr/argp-standalone/archive/refs/heads/master.zip \
+#  && unzip master.zip \
+#  && cd argp-standalone-master \
+#  && autoreconf --install \
+#  && ./configure \
+#  && make -j 4 \
+#  && cp argp.h /usr/include/ \
+#  && cp libargp.a /usr/lib/
 
 # UNUSED
 # A specific user is required to get access to perf event ressources.

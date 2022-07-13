@@ -33,7 +33,6 @@ if [ ! -z "${LIBC_INFO_MUSL}" ]; then
 else
     DISTRIBUTION="unknown-linux-gnu"
 fi
-echo "yaya $DISTRIBUTION"
 
 # https://github.com/DataDog/libdatadog/releases/download/v0.7.0-rc.1/libdatadog-aarch64-alpine-linux-musl.tar.gz
 TAR_LIBDDPROF=libdatadog-${MARCH}-${DISTRIBUTION}.tar.gz

@@ -1,0 +1,8 @@
+--- error.h
++++ error2.h
+@@ -14 +14 @@
+-static inline void error(int status, int errnum, const char* format, ...)
++void error(int status, int errnum, const char* format, ...)
+@@ -35 +35 @@
+-static inline void error_at_line(int status, int errnum, const char *filename,
++void error_at_line(int status, int errnum, const char *filename,
