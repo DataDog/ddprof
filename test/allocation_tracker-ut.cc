@@ -4,6 +4,7 @@
 // Datadog, Inc.
 #include "allocation_tracker.hpp"
 
+#include "ddprof_base.hpp"
 #include "ipc.hpp"
 #include "perf_watcher.hpp"
 #include "pevent_lib.hpp"
@@ -17,14 +18,14 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
-__attribute__((noinline)) void my_malloc(size_t size) {
+DDPROF_NOINLINE void my_malloc(size_t size) {
   ddprof::AllocationTracker::track_allocation(0xdeadbeef, size);
   // prevent tail call optimization
   getpid();
 }
 
 extern "C" {
-__attribute__((noinline)) void my_func_calling_malloc(size_t size) {
+DDPROF_NOINLINE void my_func_calling_malloc(size_t size) {
   my_malloc(size);
   // prevent tail call optimization
   getpid();

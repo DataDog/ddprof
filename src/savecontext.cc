@@ -5,7 +5,9 @@
 
 #include "savecontext.hpp"
 
+#include "ddprof_base.hpp"
 #include "saveregisters.hpp"
+#include "unlikely.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -13,7 +15,7 @@
 
 // Return stack end address (stack end address is the start of the stack since
 // stack grows down)
-static __attribute__((noinline)) const std::byte *get_stack_end_address() {
+DDPROF_NOINLINE static const std::byte *get_stack_end_address() {
   void *stack_addr;
   size_t stack_size;
   pthread_attr_t attrs;
@@ -27,12 +29,12 @@ static __attribute__((noinline)) const std::byte *get_stack_end_address() {
 // when we are grabbing the stack. But this is not enough, because ASAN
 // intercepts memcpy and reports a satck underflow there, empirically it appears
 // that both attribute and a suppression are required.
-static __attribute__((no_sanitize("address"))) size_t
+static DDPROF_NO_SANITIZER_ADDRESS size_t
 save_stack(const std::byte *stack_ptr, ddprof::span<std::byte> buffer) {
   // Use a thread local variable to cache the stack end address per thread
   thread_local static const std::byte *stack_end{};
 
-  if (!stack_end) {
+  if (unlikely(!stack_end)) {
     // Slow path, takes ~30us
     stack_end = get_stack_end_address();
   }

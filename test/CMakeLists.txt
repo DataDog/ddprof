@@ -378,3 +378,9 @@ add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 
 add_exe(simple_malloc-static simple_malloc.cc
         LIBRARIES Threads::Threads dd_profiling-static)
+
+if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    add_exe(read_past_sp read_past_sp.cc)
+    target_include_directories(read_past_sp PRIVATE ${DDPROF_INCLUDE_LIST})
+    add_test(NAME read_past_sp COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/read_past_sp-ut.sh WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+endif()
