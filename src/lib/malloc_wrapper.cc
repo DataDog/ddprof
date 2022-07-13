@@ -15,7 +15,8 @@
 
 // Declaration of reallocarray is only available starting from glibc 2.28
 extern "C" {
-void *pvalloc(size_t size);
+void *reallocarray(void *ptr, size_t nmemb, size_t size);
+void *pvalloc(size_t size) noexcept;
 
 void *temp_malloc(size_t size) noexcept;
 void temp_free(void *ptr) noexcept;
@@ -172,7 +173,7 @@ void *temp_memalign(size_t alignment, size_t size) noexcept {
   return s_memalign(alignment, size);
 }
 
-void *pvalloc(size_t size) {
+void *pvalloc(size_t size) noexcept {
   void *ptr = s_pvalloc(size);
   ddprof::AllocationTracker::track_allocation(reinterpret_cast<uintptr_t>(ptr),
                                               size);
