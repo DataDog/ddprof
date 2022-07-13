@@ -65,18 +65,22 @@ tar --no-same-owner --strip-components 1 -xf "../${TAR_ELF}"
 if [[ "$(basename "${C_COMPILER}")" == clang* ]]; then
   export CFLAGS="-Wno-xor-used-as-pow -Wno-gnu-variable-sized-type-not-at-end -Wno-unused-but-set-parameter"
 fi
+
 # Detect musl
 # If so, then set the DFNM_EXTMATCH macro to a harmless value.  We don't use the affected
 # codepaths, so it's OK (TODO: can we just disable compilation of those units?)
-has_musl=$(ldd /bin/ls | grep 'musl' | head -1 | cut -d ' ' -f1)
-if cat /proc/self/maps | grep -q musl; then
+MUSL_LIBC=$(ldd /bin/ls | grep 'musl' | head -1 | cut -d ' ' -f1 || true)
+if [ ! -z ${MUSL_LIBC-""} ]; then
   CFLAGS="${CFLAGS-""} -DFNM_EXTMATCH=0"
   patch $(find . -name 'libdw_alloc.c') /patch/libdw_alloc.c.patch
+else
+  echo "LIB is not detected as musl"
 fi
 
 export CFLAGS="${CFLAGS-""} ${EXTRA_CFLAGS}"
 
 echo "Compiling elfutils using ${C_COMPILER} / flags=$CFLAGS / LDFLAGS=${LDFLAGS-""} / LIBS=${LIBS-""}"
-#exit 0
+
 ./configure CC="${C_COMPILER}" --without-bzlib --without-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning --prefix "${TARGET_EXTRACT}"
+
 make "-j$(nproc)" install

@@ -15,7 +15,9 @@
 
 // Declaration of reallocarray is only available starting from glibc 2.28
 extern "C" {
-//void *reallocarray(void *ptr, size_t nmemb, size_t size) noexcept;
+#ifdef  reallocarray
+void *reallocarray(void *ptr, size_t nmemb, size_t size) noexcept;
+#endif
 
 void *temp_malloc(size_t size) noexcept;
 void temp_free(void *ptr) noexcept;
@@ -28,7 +30,9 @@ void *temp_memalign(size_t alignment, size_t size) noexcept;
 void *temp_pvalloc(size_t size) noexcept;
 #endif
 void *temp_valloc(size_t size) noexcept;
+#ifdef  reallocarray
 void *temp_reallocarray(void *ptr, size_t nmemb, size_t size) noexcept;
+#endif
 }
 
 #define ORIGINAL_FUNC(name) get_next<decltype(&::name)>(#name)
@@ -45,8 +49,9 @@ DECLARE_FUNC(realloc);
 DECLARE_FUNC(free);
 DECLARE_FUNC(posix_memalign);
 DECLARE_FUNC(aligned_alloc);
+#ifdef  reallocarray
 DECLARE_FUNC(reallocarray);
-
+#endif
 // obsolete allocation functions
 DECLARE_FUNC(memalign);
 #ifdef  pvalloc
@@ -82,7 +87,9 @@ void init() {
   s_pvalloc = ORIGINAL_FUNC(pvalloc);
 #endif
   s_valloc = ORIGINAL_FUNC(valloc);
+#ifdef reallocarry
   s_reallocarray = ORIGINAL_FUNC(reallocarray);
+#endif
 }
 
 } // namespace
@@ -205,6 +212,7 @@ void *temp_valloc(size_t size) noexcept {
   return s_valloc(size);
 }
 
+#ifdef reallocarray
 void *reallocarray(void *ptr, size_t nmemb, size_t size) noexcept {
   if (ptr) {
     ddprof::AllocationTracker::track_deallocation(
@@ -220,3 +228,4 @@ void *temp_reallocarray(void *ptr, size_t nmemb, size_t size) noexcept {
   check_init();
   return s_reallocarray(ptr, nmemb, size);
 }
+#endif
