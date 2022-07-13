@@ -1,0 +1,5 @@
+--- libdw_alloc.c
++++ libdw_alloc.c.2
+@@ -155 +155 @@
+-    error (EXIT_FAILURE, ENOMEM, "libdw");
++    exit (-1);
