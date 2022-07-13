@@ -15,9 +15,7 @@
 
 // Declaration of reallocarray is only available starting from glibc 2.28
 extern "C" {
-#ifdef  reallocarray
-void *reallocarray(void *ptr, size_t nmemb, size_t size) noexcept;
-#endif
+void *pvalloc(size_t size);
 
 void *temp_malloc(size_t size) noexcept;
 void temp_free(void *ptr) noexcept;
@@ -26,13 +24,9 @@ void *temp_realloc(void *ptr, size_t size) noexcept;
 int temp_posix_memalign(void **memptr, size_t alignment, size_t size) noexcept;
 void *temp_aligned_alloc(size_t alignment, size_t size) noexcept;
 void *temp_memalign(size_t alignment, size_t size) noexcept;
-#ifdef  pvalloc
 void *temp_pvalloc(size_t size) noexcept;
-#endif
 void *temp_valloc(size_t size) noexcept;
-#ifdef  reallocarray
 void *temp_reallocarray(void *ptr, size_t nmemb, size_t size) noexcept;
-#endif
 }
 
 #define ORIGINAL_FUNC(name) get_next<decltype(&::name)>(#name)
@@ -49,14 +43,10 @@ DECLARE_FUNC(realloc);
 DECLARE_FUNC(free);
 DECLARE_FUNC(posix_memalign);
 DECLARE_FUNC(aligned_alloc);
-#ifdef  reallocarray
 DECLARE_FUNC(reallocarray);
-#endif
 // obsolete allocation functions
 DECLARE_FUNC(memalign);
-#ifdef  pvalloc
 DECLARE_FUNC(pvalloc);
-#endif
 DECLARE_FUNC(valloc);
 
 namespace {
@@ -83,13 +73,9 @@ void init() {
   s_posix_memalign = ORIGINAL_FUNC(posix_memalign);
   s_aligned_alloc = ORIGINAL_FUNC(aligned_alloc);
   s_memalign = ORIGINAL_FUNC(memalign);
-#ifdef  pvalloc
   s_pvalloc = ORIGINAL_FUNC(pvalloc);
-#endif
   s_valloc = ORIGINAL_FUNC(valloc);
-#ifdef reallocarry
   s_reallocarray = ORIGINAL_FUNC(reallocarray);
-#endif
 }
 
 } // namespace
@@ -186,7 +172,6 @@ void *temp_memalign(size_t alignment, size_t size) noexcept {
   return s_memalign(alignment, size);
 }
 
-#ifdef  pvalloc
 void *pvalloc(size_t size) {
   void *ptr = s_pvalloc(size);
   ddprof::AllocationTracker::track_allocation(reinterpret_cast<uintptr_t>(ptr),
@@ -198,7 +183,6 @@ void *temp_pvalloc(size_t size) noexcept {
   check_init();
   return s_pvalloc(size);
 }
-#endif
 
 void *valloc(size_t size) {
   void *ptr = s_valloc(size);
@@ -212,8 +196,7 @@ void *temp_valloc(size_t size) noexcept {
   return s_valloc(size);
 }
 
-#ifdef reallocarray
-void *reallocarray(void *ptr, size_t nmemb, size_t size) noexcept {
+void *reallocarray(void *ptr, size_t nmemb, size_t size) {
   if (ptr) {
     ddprof::AllocationTracker::track_deallocation(
         reinterpret_cast<uintptr_t>(ptr));
@@ -228,4 +211,3 @@ void *temp_reallocarray(void *ptr, size_t nmemb, size_t size) noexcept {
   check_init();
   return s_reallocarray(ptr, nmemb, size);
 }
-#endif
