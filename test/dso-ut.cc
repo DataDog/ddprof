@@ -305,6 +305,23 @@ TEST(DSOTest, backpopulate) {
   EXPECT_FALSE(find_res.second);
 }
 
+TEST(DSOTest, range_check) {
+  LogHandle loghandle;
+  ElfAddress_t ip = _THIS_IP_;
+  DsoHdr dso_hdr;
+  pid_t pid = getpid();
+  DsoFindRes find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
+  ASSERT_TRUE(find_res.second);
+  auto &map = dso_hdr._map[pid];
+  DDProfModRange mod_range;
+  DDRes res = dso_hdr.mod_range_or_backpopulate(find_res.first, map, mod_range);
+  EXPECT_TRUE(IsDDResOK(res));
+  printf("Range for %s = [0x%lx - 0x%lx] \n",
+         find_res.first->second._filename.c_str(), mod_range._low_addr,
+         mod_range._high_addr);
+  EXPECT_GE(find_res.first->second._start, mod_range._low_addr);
+}
+
 TEST(DSOTest, missing_dso) {
   LogHandle loghandle;
   DsoHdr dso_hdr;
@@ -351,4 +368,16 @@ TEST(DSOTest, mmap_into_backpop) {
   // TODO: To be discussed - should we erase overlaping or not
 }
 
+TEST(DSOTest, exe_name) {
+  LogHandle handle;
+  ElfAddress_t ip = _THIS_IP_;
+  DsoHdr dso_hdr;
+  DsoFindRes find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
+  ASSERT_TRUE(find_res.second);
+  pid_t my_pid = getpid();
+  std::string exe_name;
+  bool found_exe = dso_hdr.find_exe_name(my_pid, exe_name);
+  EXPECT_TRUE(found_exe);
+  LG_NTC("%s", exe_name.c_str());
+}
 } // namespace ddprof

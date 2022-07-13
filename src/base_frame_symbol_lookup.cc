@@ -31,7 +31,13 @@ BaseFrameSymbolLookup::insert_bin_symbol(pid_t pid, SymbolTable &symbol_table,
         dso_symbol_lookup.get_or_insert(find_res.first->second, symbol_table);
     _bin_map.insert(std::pair<pid_t, SymbolIdx_t>(pid, symbol_idx));
   } else {
-    LG_NTC("Unable to find base frame for pid %d", pid);
+    std::string exe_name;
+    bool exe_found = dso_hdr.find_exe_name(pid, exe_name);
+    if (exe_found) {
+      symbol_idx = symbol_table.size();
+      symbol_table.emplace_back(Symbol({}, {}, 0, exe_name));
+      _bin_map.insert(std::pair<pid_t, SymbolIdx_t>(pid, symbol_idx));
+    }
   }
   return symbol_idx;
 }

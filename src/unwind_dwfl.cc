@@ -33,9 +33,9 @@ DDRes unwind_init_dwfl(UnwindState *us) {
 
     bool success = false;
     // Find an elf file we can load for this PID
-    for (const auto &el : map) {
-      if (el.second._executable) {
-        const Dso &dso = el.second;
+    for (auto it = map.begin(); it != map.end(); ++it) {
+      Dso &dso = it->second;
+      if (dso._executable) {
         FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
         if (file_info_id <= k_file_info_error) {
           LG_DBG("Unable to find file for DSO %s", dso.to_string().c_str());
@@ -43,8 +43,16 @@ DDRes unwind_init_dwfl(UnwindState *us) {
         }
         const FileInfoValue &file_info_value =
             us->dso_hdr.get_file_info_value(file_info_id);
-        if (IsDDResOK(us->_dwfl_wrapper->register_mod(us->current_ip, dso,
-                                                      file_info_value))) {
+
+        // get low and high addr for this module
+        DDProfModRange mod_range;
+        if (!IsDDResOK(
+                us->dso_hdr.mod_range_or_backpopulate(it, map, mod_range))) {
+          return ddres_warn(DD_WHAT_UW_ERROR);
+        }
+        DDProfMod *ddprof_mod = us->_dwfl_wrapper->register_mod(
+            us->current_ip, dso, mod_range, file_info_value);
+        if (ddprof_mod) {
           // one success is fine
           success = true;
           break;
@@ -82,8 +90,8 @@ static void trace_unwinding_end(UnwindState *us) {
     }
   }
 }
-
-static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc);
+static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
+                            DDProfMod *ddprof_mod, FileInfoId_t file_info_id);
 
 // returns true if we should continue unwinding
 static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
@@ -95,6 +103,57 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   }
 
   Dwarf_Addr pc = 0;
+  if (!dwfl_frame_pc(dwfl_frame, &pc, nullptr)) {
+    LG_DBG("Failure to compute frame PC: %s (depth#%lu)", dwfl_errmsg(-1),
+           us->output.nb_locs);
+    add_error_frame(nullptr, us, pc, SymbolErrors::dwfl_frame);
+    return ddres_init(); // invalid pc : do not add frame
+  }
+  us->current_ip = pc;
+
+  DsoHdr::DsoFindRes find_res =
+      us->dso_hdr.dso_find_or_backpopulate(us->pid, pc);
+  if (!find_res.second) {
+    // no matching file was found
+    LG_DBG("[UW] (PID%d) DSO not found at 0x%lx (depth#%lu)", us->pid, pc,
+           us->output.nb_locs);
+    add_error_frame(nullptr, us, pc, SymbolErrors::unknown_dso);
+    return ddres_init();
+  }
+  const Dso &dso = find_res.first->second;
+  // if not encountered previously, update file location / key
+  FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
+  if (file_info_id <= k_file_info_error) {
+    // unable to acces file: add available info from dso
+    add_dso_frame(us, dso, pc, "pc");
+    // We could stop here or attempt to continue in the dwarf unwinding
+    // sometimes frame pointer lets us go further -> So we continue
+    return ddres_init();
+  }
+  const FileInfoValue &file_info_value =
+      us->dso_hdr.get_file_info_value(file_info_id);
+  DDProfMod *ddprof_mod = us->_dwfl_wrapper->unsafe_get(file_info_id);
+  if (!ddprof_mod) {
+    // New module
+    DDProfModRange mod_range;
+    if (IsDDResNotOK(us->dso_hdr.mod_range_or_backpopulate(
+            find_res.first, us->dso_hdr._map[us->pid], mod_range))) {
+      return ddres_warn(DD_WHAT_UW_ERROR);
+    }
+    // ensure unwinding backend has access to this module (and check
+    // consistency)
+    ddprof_mod =
+        us->_dwfl_wrapper->register_mod(pc, dso, mod_range, file_info_value);
+    // Updates in DSO layout can create inconsistencies
+    if (!ddprof_mod) {
+      return ddres_warn(DD_WHAT_UW_ERROR);
+    }
+  }
+
+  // To check that we are in an activation frame, we unwind the current frame
+  // This means we need access to the module information.
+  // Now that we have loaded the module, we can check if we are an activation
+  // frame
   bool isactivation = false;
 
   if (!dwfl_frame_pc(dwfl_frame, &pc, &isactivation)) {
@@ -103,27 +162,32 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     add_error_frame(nullptr, us, pc, SymbolErrors::dwfl_frame);
     return ddres_init(); // invalid pc : do not add frame
   }
-
   if (!isactivation)
     --pc;
-
   us->current_ip = pc;
 
-  DsoHdr::DsoFindRes find_res =
-      us->dso_hdr.dso_find_or_backpopulate(us->pid, pc);
-  if (!find_res.second) {
-    // no matching file was found
-    LG_DBG("[UW]%d: DSO not found at 0x%lx (depth#%lu)", us->pid, pc,
-           us->output.nb_locs);
-    add_error_frame(nullptr, us, pc, SymbolErrors::unknown_dso);
-    return ddres_init();
-  }
-
   // Now we register
-  if (IsDDResNotOK(add_dwfl_frame(us, find_res.first->second, pc))) {
+  if (IsDDResNotOK(add_dwfl_frame(us, dso, pc, ddprof_mod, file_info_id))) {
     return ddres_warn(DD_WHAT_UW_ERROR);
   }
   return ddres_init();
+}
+
+bool is_infinite_loop(UnwindState *us) {
+  UnwindOutput &output = us->output;
+  uint64_t nb_locs = output.nb_locs;
+  unsigned nb_frames_to_check = 3;
+  if (nb_locs <= nb_frames_to_check) {
+    return false;
+  }
+  for (unsigned i = 0; i < nb_frames_to_check; ++i) {
+    FunLoc &n_minus_one_loc = output.locs[nb_locs - i];
+    FunLoc &n_minus_two_loc = output.locs[nb_locs - i - 1];
+    if (n_minus_one_loc.ip != n_minus_two_loc.ip) {
+      return false;
+    }
+  }
+  return true;
 }
 
 // frame_cb callback at every frame for the dwarf unwinding
@@ -131,6 +195,21 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
   UnwindState *us = (UnwindState *)arg;
 #ifdef DEBUG
   LG_NFO("Beging depth %lu", us->output.nb_locs);
+#endif
+  int dwfl_error_value = dwfl_errno();
+  if (dwfl_error_value) {
+    // Check if dwarf unwinding was a failure we can get stuck in infinite loops
+    if (is_infinite_loop(us)) {
+      LG_DBG("Break out of unwinding (possible infinite loop)");
+      return DWARF_CB_ABORT;
+    }
+  }
+#ifdef DEBUG
+  // We often fallback to frame pointer unwinding (which logs an error)
+  if (dwfl_error_value) {
+    LG_DBG("Error flagged at depth = %lu -- Error:%s ", us->output.nb_locs,
+           dwfl_errmsg(dwfl_error_value));
+  }
 #endif
 
   // Before we potentially exit, record the fact that we're processing a frame
@@ -160,25 +239,10 @@ DDRes unwind_dwfl(UnwindState *us) {
   return res;
 }
 
-static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc) {
+static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
+                            DDProfMod *ddprof_mod, FileInfoId_t file_info_id) {
 
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
-  // if not encountered previously, update file location / key
-  FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
-  if (file_info_id <= k_file_info_error) {
-    // unable to acces file: add as much info from dso
-    add_dso_frame(us, dso, pc);
-    // We could stop here or attempt to continue in the dwarf unwinding
-    return ddres_init();
-  }
-
-  const FileInfoValue &file_info_value =
-      us->dso_hdr.get_file_info_value(file_info_id);
-
-  // ensure unwinding backend has access to this module (and check consistency)
-  if (IsDDResNotOK(us->_dwfl_wrapper->register_mod(pc, dso, file_info_value))) {
-    return ddres_warn(DD_WHAT_UW_ERROR);
-  }
 
   UnwindOutput *output = &us->output;
   int64_t current_loc_idx = output->nb_locs;
@@ -186,8 +250,8 @@ static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc) {
   // get or create the dwfl symbol
   output->locs[current_loc_idx]._symbol_idx =
       unwind_symbol_hdr._dwfl_symbol_lookup_v2.get_or_insert(
-          *(us->_dwfl_wrapper), unwind_symbol_hdr._symbol_table,
-          unwind_symbol_hdr._dso_symbol_lookup, pc, dso, file_info_value);
+          *ddprof_mod, unwind_symbol_hdr._symbol_table,
+          unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso);
 #ifdef DEBUG
   LG_NTC("Considering frame with IP : %lx / %s ", pc,
          us->symbol_hdr._symbol_table[output->locs[current_loc_idx]._symbol_idx]

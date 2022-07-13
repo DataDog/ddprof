@@ -6,7 +6,8 @@
 #pragma once
 
 #include "ddprof_defs.hpp"
-#include "ddprof_file_info.hpp"
+#include "ddprof_file_info-i.hpp"
+#include "ddprof_module.hpp"
 #include "dso.hpp"
 #include "dso_symbol_lookup.hpp"
 #include "hash_helper.hpp"
@@ -37,11 +38,9 @@ struct DwflSymbolLookupStats {
   int _no_dwfl_symbols;
 };
 
-using DwflSymbolKey_V2 = RegionAddress_t;
-
-class DwflSymbolVal_V2 {
+class DwflSymbolVal {
 public:
-  DwflSymbolVal_V2(Offset_t end, SymbolIdx_t symbol_idx)
+  DwflSymbolVal(Offset_t end, SymbolIdx_t symbol_idx)
       : _end(end), _symbol_idx(symbol_idx) {}
   // push end further
   void set_end(Offset_t end) {
@@ -61,11 +60,11 @@ private:
 };
 
 // Range management allows better performances (and less mem overhead)
-using DwflSymbolMap = std::map<RegionAddress_t, DwflSymbolVal_V2>;
+using DwflSymbolMap = std::map<RegionAddress_t, DwflSymbolVal>;
 using DwflSymbolMapIt = DwflSymbolMap::iterator;
 using DwflSymbolMapFindRes = std::pair<DwflSymbolMapIt, bool>;
 using DwflSymbolMapValueType =
-    DwflSymbolMap::value_type; // key value pair Offset_t, DwflSymbolVal_V2
+    DwflSymbolMap::value_type; // key value pair Offset_t, DwflSymbolVal
 
 /*********************/
 /* Main lookup class */
@@ -77,10 +76,10 @@ public:
   DwflSymbolLookup_V2();
 
   // Get symbol from internal cache or fetch through dwarf
-  SymbolIdx_t get_or_insert(DwflWrapper &dwfl_wrapper, SymbolTable &table,
+  SymbolIdx_t get_or_insert(const DDProfMod &ddprof_mod, SymbolTable &table,
                             DsoSymbolLookup &dso_symbol_lookup,
-                            ProcessAddress_t process_pc, const Dso &dso,
-                            const FileInfoValue &file_info);
+                            FileInfoId_t file_id, ProcessAddress_t process_pc,
+                            const Dso &dso);
 
   void erase(FileInfoId_t file_info_id) { _file_info_map.erase(file_info_id); }
 
@@ -97,22 +96,20 @@ private:
 
   SymbolLookupSetting _lookup_setting;
 
-  SymbolIdx_t insert(DwflWrapper &dwfl_wrapper, SymbolTable &table,
+  SymbolIdx_t insert(const DDProfMod &ddprof_mod, SymbolTable &table,
                      DsoSymbolLookup &dso_symbol_lookup,
                      ProcessAddress_t process_pc, const Dso &dso,
-                     const FileInfoValue &file_info, DwflSymbolMap &map,
-                     DwflSymbolMapFindRes find_res);
+                     DwflSymbolMap &map);
 
   static bool dwfl_symbol_is_within(const Offset_t &norm_pc,
                                     const DwflSymbolMapValueType &kv);
   static DwflSymbolMapFindRes find_closest(DwflSymbolMap &map,
                                            Offset_t norm_pc);
 
-  // Unique ID representing a DSO
-  // I (r1viollet) am not using PIDs as I reuse DSOs between
-  // PIDs. If we are sure the underlying symbols are the same, we can assume the
-  // symbol cache is the same. For short lived forks, this can avoid
-  // repopulating caches.
+  // Symbols are ordered by file.
+  // The assumption is that the elf addresses are the same across processes
+  // The unordered map stores symbols per file,
+  // The map stores symbols per address range
   using FileInfo2SymbolMap = std::unordered_map<FileInfoId_t, DwflSymbolMap>;
   using FileInfo2SymbolVT = FileInfo2SymbolMap::value_type;
 
