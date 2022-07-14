@@ -8,17 +8,17 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef enum EventConfType {
-  EVENT_NONE = 0, // note:  this is not allowed, but named for consistency
+typedef enum EventConfMode{
+  EVENT_NONE      = 0,
   EVENT_CALLGRAPH = 1 << 0,
-  EVENT_METRIC = 1 << 1,
-  EVENT_BOTH = EVENT_CALLGRAPH | EVENT_METRIC,
-} EventConfType;
+  EVENT_METRIC    = 1 << 1,
+  EVENT_BOTH      = EVENT_CALLGRAPH | EVENT_METRIC,
+} EventConfMode;
 
 typedef enum EventConfLocationType {
-  ECLOC_FREQ = 0, // count simple events
-  ECLOC_REG = 1,  // Use the register specified in `register_num`
-  ECLOC_RAW = 2,  // Use the offset/size into the underlying RAW event
+  ECLOC_VAL = 0, // Use sample value from perf events
+  ECLOC_REG = 1, // Use the register from `register_num`
+  ECLOC_RAW = 2, // Use the offset/size for raw event
 } EventConfLocationType;
 
 typedef enum EventConfCadenceType {
@@ -27,16 +27,39 @@ typedef enum EventConfCadenceType {
   ECCAD_FREQ = 2,
 } EventConfCadenceType;
 
+typedef enum EventConfField {
+  ECF_NONE,
+  ECF_ARGCOEFF,
+  ECF_ARGOFFSET,
+  ECF_ARGSIZE,
+  ECF_EVENT,
+  ECF_FREQUENCY,
+  ECF_GROUP,
+  ECF_ID,
+  ECF_LABEL,
+  ECF_LOCATION,
+  ECF_MODE,
+  ECF_PARAMETER,
+  ECF_PERIOD,
+  ECF_REGISTER,
+} EventConfField;
+
 typedef struct EventConf {
-  EventConfType type;
-  bool has_id;
+  EventConfField field;  // For parsing
+  EventConfMode mode;
+
   uint64_t id;
-  const char *eventname;
-  const char *groupname;
+
+  char *label;
+  char *eventname;
+  char *groupname;
+
   EventConfLocationType loc_type;
   uint8_t register_num;
-  uint8_t size;
-  uint64_t offset;
+  uint8_t arg_size;
+  uint64_t arg_offset;
+  double arg_coeff;
+
   EventConfCadenceType cad_type;
   uint64_t cadence;
 } EventConf;

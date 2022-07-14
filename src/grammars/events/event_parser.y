@@ -1,6 +1,7 @@
 %{
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include "event_config.h"
 
@@ -8,7 +9,7 @@
 #define YYSTYPE char *
 */
 
-int yydebug = 0;
+#define YYDEBUG 0
 void yyerror(const char *str) {fprintf(stderr,"err: %s\n", str);}
 int yywrap() { return 1;}
 
@@ -18,51 +19,103 @@ extern int yyparse();
 extern YY_BUFFER_STATE yy_scan_string(const char * str);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
 
-void ev_splice(EventConf *A, const EventConf *B) {
-  // Accumulate into A only if A has undefined values
-  if (!A->has_id && B->has_id) {
-    A->has_id = B->has_id;
-    A->id = B->id;
+uint8_t reg_from_parameter(uint64_t parameter) {
+  return 1;
+}
+
+uint8_t mode_from_str(const char *str) {
+  uint8_t mode = EVENT_NONE;
+  if (!str || !*str)
+    return mode;
+
+  size_t sz = sizeof(str);
+  for (int i = 0; i < sz; ++i) {
+    if (str[i] == 'M' || str[i] == 'm')
+      mode |= EVENT_METRIC;
+    if (str[i] == 'G' || str[i] == 'g')
+      mode |= EVENT_CALLGRAPH;
+    if (str[i] == 'A' || str[i] == 'a' || str[i] == '*')
+      mode |= EVENT_BOTH;
   }
-  if (!A->eventname && B->eventname) {
-    A->eventname = B->eventname;
-    A->groupname = B->groupname;
+  return mode;
+}
+
+void conf_finalize(EventConf *conf) {
+  // If an eventname contains a ':'
+  //  * If there is no group, tokenize and populate group
+  //  * If there is a group, then just drop
+  char *colon;
+  if (conf->eventname && (colon = strchr(conf->eventname, ':'))) {
+    if (!conf->groupname)
+      conf->groupname = strdup(colon + 1);
+    *colon = '\0';
   }
 
-  if (A->type == EVENT_NONE && B->type != EVENT_NONE)
-    A->type = B->type;
+  // Generate label if needed
+  // * if both, "<eventname>:<groupname>"
+  // * if only event, "<eventname>"
+  // * if neither, but id, "id:<id>"
+  // * if none, then this is an invalid event anyway
+  if (!conf->label) {
+    if (conf->eventname && conf->groupname) {
+      size_t buf_sz = strlen(conf->eventname) + strlen(conf->groupname) + 3;
+      conf->label = malloc(buf_sz);
+      if (!conf->label) {
+        // This is an error.  Technically we should probably just shut down the
+        // application, but we'll pass an invalid conf instead
+        free(conf->eventname);
+        free(conf->groupname);
+        memset(&conf, 0, sizeof(conf));
+        return;
+      }
 
-  if (A->loc_type == ECLOC_FREQ && B->loc_type != ECLOC_FREQ) {
-    A->loc_type = B->loc_type;
-    A->register_num = B->register_num;
-    A->size = B->size;
-    A->offset = B->offset;
-  }
+      snprintf(conf->label, buf_sz - 1, "%s:%s", conf->eventname,
+               conf->groupname);
+    } else if (conf->eventname) {
+      conf->label = strdup(conf->eventname);
+    } else if (conf->id) {
+      size_t buf_sz = strlen("id:") + 10 + 2; // ~10 digits
+      conf->label = malloc(buf_sz);
+      if (!conf->label) {
+        // This is an error.  Technically we should probably just shut down the
+        // application, but we'll pass an invalid conf instead
+        free(conf->eventname);
+        free(conf->groupname);
+        memset(&conf, 0, sizeof(conf));
+        return;
+      }
 
-  if (A->cad_type == ECCAD_UNDEF && B->cad_type != ECCAD_UNDEF) {
-    A->cad_type = B->cad_type;
-    A->cadence = B->cadence;
+      snprintf(conf->label, buf_sz - 1, "id:%lu", conf->id);
+    }
   }
 }
 
-void ev_print(const EventConf *tp) {
-  if (tp->has_id)
+void conf_print(const EventConf *tp) {
+  if (tp->id)
     printf("  id: %lu\n", tp->id);
   else if (tp->groupname)
     printf("  tracepoint: %s:%s\n", tp->groupname, tp->eventname);
   else
     printf("  event: %s\n", tp->eventname);
+
+  if (tp->label)
+    printf("  label: %s\n", tp->label);
+  else
+    printf("  label: <generated from event/groupname>\n");
   
-  const char *typenames[] = {"ILLEGAL", "callgraph", "metric", "metric and callgraph"};
-  printf("  type: %s\n", typenames[tp->type]);
+  const char *modenames[] = {"ILLEGAL", "callgraph", "metric", "metric and callgraph"};
+  printf("  type: %s\n", modenames[tp->mode]);
 
 
-  if (tp->loc_type  == ECLOC_FREQ)
-    printf("  location: count\n");
+  if (tp->loc_type  == ECLOC_VAL)
+    printf("  location: value\n");
   else if (tp->loc_type == ECLOC_REG)
-    printf("  location: register %d\n", tp->register_num);
+    printf("  location: parameter%d\n", tp->register_num);
   else if (tp->loc_type == ECLOC_RAW)
-    printf("  location: raw event (offset %lu with size %d bytes)\n", tp->offset, tp->size);
+    printf("  location: raw event (%lu with size %d bytes)\n", tp->arg_offset, tp->arg_size);
+
+  if (tp->arg_coeff != 0)
+    printf("  coefficient: %f\n", tp->arg_coeff);
 
   printf("\n");
 
@@ -71,6 +124,7 @@ void ev_print(const EventConf *tp) {
 EventConf g_accum_event_conf = {0};
 bool g_debugout_enable = false;
 EventConf *EventConf_parse(const char *msg) {
+  memset(&g_accum_event_conf, 0, sizeof(g_accum_event_conf));
   int ret = -1;
   YY_BUFFER_STATE buffer = yy_scan_string(msg);
   ret = yyparse();
@@ -81,7 +135,7 @@ EventConf *EventConf_parse(const char *msg) {
 int main(int c, char **v) { 
   g_debugout_enable = false;
   if (c) {
-    printf("%s\n", v[1]);
+    printf(">\"%s\"\n", v[1]);
     YY_BUFFER_STATE buffer = yy_scan_string(v[1]);
     g_debugout_enable = true;
     yyparse();
@@ -99,119 +153,92 @@ int main(int c, char **v) {
 	uint64_t num;
 	char *str;
 	char typ;
-	EventConf event;
+	double fpnum;
+	EventConfField field;
 };
 
+%token EQ OPTSEP CONFSEP
+%token <fpnum> FLOAT
 %token <num> NUMBER HEXNUMBER
 %token <str> WORD
-%token EVENTSEP WORD REGISTERSEP OFFSETSEP SIZESEP PERIODSEP FREQUENCYSEP TYPESEP
+%token <str> KEY
 
-%type <num> register offset size event_id period frequency
-%type <str> groupname eventname typespec
-%type <event> event name location cadence type
+%type <num> uinteger
+%type <field> conf
+%type <field> opt
+
+//%type <num> register offset size event_id period frequency
+//%type <str> groupname eventname typespec
+//%type <event> event name location cadence type
 
 %%
 
-events:
-	   |
-	   events event{
-		ev_print(&$2);
-	   }
-	   ;
+// TODO when the event is finished up, eventnames with `:` will need to be
+//      split up
+// TODO this only allows a single config to be processed at a time
+confs: conf CONFSEP{ 
+          conf_print(&g_accum_event_conf);
+          conf_finalize(&g_accum_event_conf);
+      }
+      | conf { 
+          conf_print(&g_accum_event_conf);
+          conf_finalize(&g_accum_event_conf);
+      }
+      ;
 
-event: name location cadence type {
-		memset(&$$, 0, sizeof($$));
-		ev_splice(&$$, &$1);
-		ev_splice(&$$, &$2);
-		ev_splice(&$$, &$3);
-		ev_splice(&$$, &$4);
-		g_accum_event_conf = $$;
-	}
-	;
+conf: conf OPTSEP opt { }
+    |             opt { }
+    ;
 
-type:
-	{
-		memset(&$$, 0, sizeof($$));
-		$$.type = EVENT_CALLGRAPH;
-	} | TYPESEP typespec {
-		memset(&$$, 0, sizeof($$));
-		$$.type = EVENT_NONE;
-		char *msg = $2;
-		size_t sz = sizeof(msg);
-		for (int i = 0; i < sz; i++) {
-			if (msg[i] == 'M' || msg[i] == 'm')
-				$$.type |= EVENT_METRIC;
-			if (msg[i] == 'G' || msg[i] == 'g')
-				$$.type |= EVENT_CALLGRAPH;
-		}
-	}
+opt: KEY EQ WORD {
+       switch($$) {
+         case ECF_EVENT: g_accum_event_conf.eventname = $3; break;
+         case ECF_GROUP: g_accum_event_conf.groupname = $3; break;
+         case ECF_LABEL: g_accum_event_conf.label = $3; break;
+         case ECF_MODE:  g_accum_event_conf.mode |= mode_from_str($3); break;
+         default: break;
+       }
+     }
+     | KEY EQ uinteger {
+       switch($$) {
+         case ECF_ID: g_accum_event_conf.id = $3; break;
+         case ECF_ARGSIZE: g_accum_event_conf.arg_size= $3; break;
+         case ECF_ARGOFFSET: g_accum_event_conf.arg_offset = $3; break;
+         case ECF_ARGCOEFF: g_accum_event_conf.arg_coeff = 0.0 + $3; break;
+         case ECF_REGISTER: g_accum_event_conf.register_num = $3; break;
+         case ECF_MODE: g_accum_event_conf.mode = $3 & EVENT_BOTH; break;
+         case ECF_PARAMETER:
+           g_accum_event_conf.register_num = reg_from_parameter($3);
+           break;
+       }
 
-/* Don't forget to make events valid! */
-name:
-	groupname EVENTSEP eventname { 
-		memset(&$$, 0, sizeof($$));
-		$$.groupname = $1;
-		$$.eventname = $3;
-		$$.id = 0;
-		$$.has_id = false;
-	  } | eventname { 
-		memset(&$$, 0, sizeof($$));
-		$$.groupname = NULL;
-		$$.eventname = $1;
-		$$.id = 0;
-		$$.has_id = false;
-	  } | event_id {
-		memset(&$$, 0, sizeof($$));
-		$$.groupname = NULL;
-		$$.eventname = NULL;
-		$$.id = $1;
-		$$.has_id = true;
-	  }
-	  ;
+       // If the location type hasn't been set yet, AND we're populating
+       // metadata which implies a location, then set the location
+       // note:  this means in the face of conflicting input, the first type
+       //        of configuration is preferred
+       if (!g_accum_event_conf.loc_type) {
+         switch($$) {
+           case ECF_PARAMETER: g_accum_event_conf.loc_type = ECLOC_REG; break;
+           case ECF_REGISTER: g_accum_event_conf.loc_type = ECLOC_REG; break;
+           case ECF_ARGOFFSET: g_accum_event_conf.loc_type = ECLOC_RAW; break;
+         }
+       }
 
-location:
-        {
-		memset(&$$, 0, sizeof($$));
-	  	$$.loc_type = ECLOC_FREQ;
-	} | REGISTERSEP register { 
-		memset(&$$, 0, sizeof($$));
-		$$.loc_type = ECLOC_REG;
-		$$.register_num = $2;
-	} | OFFSETSEP offset {
-		memset(&$$, 0, sizeof($$));
-		$$.loc_type = ECLOC_RAW;
-		$$.offset = $2;
-		$$.size = sizeof(uint64_t);
-	} | OFFSETSEP offset SIZESEP size {
-		memset(&$$, 0, sizeof($$));
-		$$.loc_type = ECLOC_RAW;
-		$$.offset = $2;
-		$$.size = $4;
-		$$.size = $$.size < 1 ? 1 : $$.size;
-	}
-	;
+       // Only set cadence if it has yet to be specified
+       if (!g_accum_event_conf.cad_type) {
+         if ($$ == ECF_PERIOD) {
+           g_accum_event_conf.cadence = $3; break;
+           g_accum_event_conf.cad_type = ECCAD_PERIOD;
+         } else if ($$ == ECF_FREQUENCY) {
+           g_accum_event_conf.cadence = $3; break;
+           g_accum_event_conf.cad_type = ECCAD_FREQ;
+         }
+       }
+     }
+     | KEY EQ FLOAT {
+       if ($$ == ECF_ARGCOEFF)
+         g_accum_event_conf.arg_coeff = $3;
+     } | { }
+     ;
 
-cadence: 
-	{
-		memset(&$$, 0, sizeof($$));
-		$$.cad_type = ECCAD_UNDEF;
- 	} | PERIODSEP period {
-		memset(&$$, 0, sizeof($$));
-		$$.cad_type = ECCAD_PERIOD;
-		$$.cadence = $2;
-	} | FREQUENCYSEP frequency {
-		memset(&$$, 0, sizeof($$));
-		$$.cad_type = ECCAD_FREQ;
-		$$.cadence = $2;
-	}
-	;
-
-typespec: WORD
-groupname: WORD
-eventname: WORD
-register: NUMBER
-offset: NUMBER | HEXNUMBER
-size: NUMBER | HEXNUMBER
-event_id: NUMBER
-period: NUMBER
-frequency: NUMBER
+uinteger: NUMBER | HEXNUMBER
