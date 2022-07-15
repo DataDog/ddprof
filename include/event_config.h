@@ -8,11 +8,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef enum EventConfMode{
-  EVENT_NONE      = 0,
+typedef enum EventConfMode {
+  EVENT_NONE = 0,
   EVENT_CALLGRAPH = 1 << 0,
-  EVENT_METRIC    = 1 << 1,
-  EVENT_BOTH      = EVENT_CALLGRAPH | EVENT_METRIC,
+  EVENT_METRIC = 1 << 1,
+  EVENT_BOTH = EVENT_CALLGRAPH | EVENT_METRIC,
 } EventConfMode;
 
 typedef enum EventConfLocationType {
@@ -45,7 +45,7 @@ typedef enum EventConfField {
 } EventConfField;
 
 typedef struct EventConf {
-  EventConfField field;  // For parsing
+  EventConfField field; // For parsing
   EventConfMode mode;
 
   uint64_t id;

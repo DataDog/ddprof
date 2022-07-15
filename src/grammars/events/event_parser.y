@@ -10,7 +10,7 @@
 */
 
 #define YYDEBUG 0
-void yyerror(const char *str) {fprintf(stderr,"err: %s\n", str);}
+
 int yywrap() { return 1;}
 
 typedef struct yy_buffer_state * YY_BUFFER_STATE;
@@ -122,6 +122,14 @@ void conf_print(const EventConf *tp) {
 }
 
 EventConf g_accum_event_conf = {0};
+bool error_on_last_parse = true;
+
+void yyerror(const char *str) {
+#if (YYDEBUG == 1)
+  fprintf(stderr,"err: %s\n", str);
+#endif 
+}
+
 bool g_debugout_enable = false;
 EventConf *EventConf_parse(const char *msg) {
   memset(&g_accum_event_conf, 0, sizeof(g_accum_event_conf));
@@ -138,7 +146,10 @@ int main(int c, char **v) {
     printf(">\"%s\"\n", v[1]);
     YY_BUFFER_STATE buffer = yy_scan_string(v[1]);
     g_debugout_enable = true;
-    yyparse();
+    if (!yyparse())
+      conf_print(&g_accum_event_conf);
+    else
+      fprintf(stderr, "  ERROR\n");
     yy_delete_buffer(buffer);
   } else {
     yyparse();
@@ -177,11 +188,9 @@ int main(int c, char **v) {
 //      split up
 // TODO this only allows a single config to be processed at a time
 confs: conf CONFSEP{ 
-          conf_print(&g_accum_event_conf);
           conf_finalize(&g_accum_event_conf);
       }
       | conf { 
-          conf_print(&g_accum_event_conf);
           conf_finalize(&g_accum_event_conf);
       }
       ;

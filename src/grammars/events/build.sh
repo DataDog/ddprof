@@ -30,3 +30,4 @@ cc -g ${ONAME}.lex.c ${ONAME}.tab.c -I../../../include -o event
 ./event 'e=ev c=-1'
 ./event 'e=ev c=+1'
 ./event 'shoe=foot'
+./event 'zronk=foofoo'

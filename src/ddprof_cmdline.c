@@ -122,81 +122,25 @@ bool get_trace_format(const char *str, uint8_t *trace_off, uint8_t *trace_sz) {
   return !trace_sz;
 }
 
-// If this returns false, then the passed watcher should be regarded as invalid
-bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
-  char *str = strdup(_str);
-  size_t sz_str = strlen(str);
-  const char *groupname;
-  const char *tracename;
-  uint8_t reg = 0;
-  uint64_t period = 1;
-  bool is_raw = false;
-  uint8_t trace_off = 0;
-  uint8_t trace_sz = 0;
+int tracepoint_id_from_event(const char *eventname, const char *groupname) {
+  if (!event || !*event || !group || !*group)
+    return -1;
 
-  // Check format
-  if (!sz_str) {
-    free(str);
-    return false;
-  }
-  char *colon = strchr(str, ':');
-  char *perc = strchr(str, '%');
-  char *amp = strchr(str, '@');
-  char *dollar = strchr(str, '$');
-
-  if (!colon || (dollar && perc)) {
-    free(str);
-    return false;
-  }
-
-  // Split strings
-  *colon = 0; // colon is true from previous check
-  if (perc)
-    *perc = 0;
-  if (amp)
-    *amp = 0;
-  if (dollar)
-    *dollar = 0;
-
-  // Name checking
-  groupname = str;
-  tracename = colon + 1;
-
-  // If a register is specified, process that
-  if (perc)
-    reg = get_register(perc + 1);
-
-  // OTOH, if an offset into the raw event is specified, get that
-  if (dollar && !get_trace_format(dollar + 1, &trace_off, &trace_sz)) {
-    is_raw = true;
-  } else {
-    trace_off = 0;
-    trace_sz = 0;
-  }
-
-  // If the user specified a period, make sure it is valid
-  if (amp) {
-    char *str_check = (char *)str;
-    uint64_t buf = strtoll(amp + 1, &str_check, 10);
-    if (!*str_check)
-      period = buf;
-  }
-
-  char path[2048] = {0}; // somewhat arbitrarily
-  char buf[64] = {0};
+  static char path[4096]; // Arbitrary, but path sizes limits are difficult
+  static char buf[64];    // For reading
   char *buf_copy = buf;
   int pathsz =
       snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/id",
-               groupname, tracename);
+               groupname, eventname);
   if (pathsz >= sizeof(path)) {
     // Possibly ran out of room
     free(str);
-    return false;
+    return -1;
   }
   int fd = open(path, O_RDONLY);
   if (-1 == fd) {
     free(str);
-    return false;
+    return -1;
   }
 
   // Read the data in an eintr-safe way
@@ -213,17 +157,11 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
     return false;
   }
 
-  // Check enablement, just to print a log.  We still enable instrumentation.
-  snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/enable",
-           groupname, tracename);
-  fd = open(path, O_RDONLY);
-  if (-1 == fd || 1 != read(fd, buf, 1) || '0' != *buf) {
-    LG_NTC("Tracepint %s:%s is not enabled.  Instrumentation will proceed, but "
-           "you may not have any events.",
-           groupname, tracename);
-  } else {
-    LG_NFO("Tracepoint %s:%s successfully enabled", groupname, tracename);
-  }
+  return trace_id;
+}
+
+// If this returns false, then the passed watcher should be regarded as invalid
+bool watcher_from_tracepoint(const char *str, PerfWatcher *watcher) {
 
   // OK done
   *watcher = *twatcher_default();
