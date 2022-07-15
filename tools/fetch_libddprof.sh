@@ -44,7 +44,7 @@ GITHUB_URL_LIBDDPROF=https://github.com/DataDog/libdatadog/releases/download/${T
 
 SHA256_LIBDDPROF=$(grep "${TAR_LIBDDPROF}" ${CHECKSUM_FILE})
 
-mkdir -p "$TARGET_EXTRACT"
+mkdir -p "$TARGET_EXTRACT" || true
 cd "$TARGET_EXTRACT"
 
 already_present=0
