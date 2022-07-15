@@ -16,16 +16,13 @@ EXTENSION_CC=${CC:-"gcc"}
 # strip version number from compiler
 EXTENSION_CC=${EXTENSION_CC%-*}
 
-if [ -z ${OS_IDENTIFIER} ]; then 
-  LIBC_INFO=$(ldd  --version 2>&1  | grep musl)
-  if [ ! -z "${LIBC_INFO}" ]; then
-    OS_IDENTIFIER="alpine-linux"
-  else 
-    OS_IDENTIFIER="unknown-linux"
-  fi
+LIBC_INFO=$(ldd  --version 2>&1  | grep musl || true)
+if [ ! -z "${LIBC_INFO}" ]; then
+  EXTENSION_OS="alpine-linux"
+else
+  EXTENSION_OS="unknown-linux"
 fi
-DEFAULT_OS_NAME=""
-EXTENSION_OS=${OS_IDENTIFIER}
+
 COMMON_OPT="${COMPILER_SETTING} -DACCURACY_TEST=ON -DCMAKE_INSTALL_PREFIX=${DDPROF_INSTALL_PREFIX} -DBUILD_BENCHMARKS=${DDPROF_BUILD_BENCH} -DBUILD_NATIVE_LIB=${NATIVE_LIB}"
 
 GetDirectoryExtention() {
