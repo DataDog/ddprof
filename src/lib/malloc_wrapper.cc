@@ -15,7 +15,11 @@
 
 // Declaration of reallocarray is only available starting from glibc 2.28
 extern "C" {
+#ifdef __llvm__
+void *reallocarray(void *ptr, size_t nmemb, size_t size) noexcept;
+#else
 void *reallocarray(void *ptr, size_t nmemb, size_t size);
+#endif
 void *pvalloc(size_t size) noexcept;
 
 void *temp_malloc(size_t size) noexcept;
@@ -197,7 +201,11 @@ void *temp_valloc(size_t size) noexcept {
   return s_valloc(size);
 }
 
+#ifdef __llvm__
+void *reallocarray(void *ptr, size_t nmemb, size_t size) noexcept{
+#else
 void *reallocarray(void *ptr, size_t nmemb, size_t size) {
+#endif
   if (ptr) {
     ddprof::AllocationTracker::track_deallocation(
         reinterpret_cast<uintptr_t>(ptr));
