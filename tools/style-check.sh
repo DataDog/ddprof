@@ -29,4 +29,4 @@ fi
 declare -a arr_folders=("src" "test" "include")
 
 FILES_TO_FORMAT=".*[.]\(cpp\|cc\|c\|cxx\|h\|hpp\)"
-find "${arr_folders[@]}" -regex "${FILES_TO_FORMAT}" -print0 | xargs -0 "${CLANG_FORMAT}" ${CLANG_OPTION}
+find "${arr_folders[@]}" -regex "${FILES_TO_FORMAT}" -not -name "*.tab.c" -not -name "*.lex.c" -not -name "*event_parser.h" -print0 | xargs -0 "${CLANG_FORMAT}" ${CLANG_OPTION}
