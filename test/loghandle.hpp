@@ -5,9 +5,7 @@
 
 #pragma once
 
-extern "C" {
-#include "logger.h"
-}
+#include "logger.hpp"
 
 class LogHandle {
 public:

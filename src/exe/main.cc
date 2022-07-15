@@ -3,21 +3,19 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "arraysize.h"
 #include "constants.hpp"
 #include "daemonize.hpp"
-#include "ddprof_input.h"
-#include "ddres.h"
+#include "ddprof.hpp"
+#include "ddprof_context.hpp"
+#include "ddprof_context_lib.hpp"
+#include "ddprof_input.hpp"
+#include "ddres.hpp"
 #include "defer.hpp"
 #include "ipc.hpp"
+#include "logger.hpp"
+#include "timer.hpp"
 
-extern "C" {
-#include "ddprof.h"
-#include "ddprof_context.h"
-#include "ddprof_context_lib.h"
-#include "logger.h"
-}
-
+#include <array>
 #include <cassert>
 #include <errno.h>
 #include <fcntl.h>
@@ -88,7 +86,7 @@ static DDRes get_library_path(std::string &path) {
 // Replace pid place holder in path if present by pid argument
 static void fixup_library_path(std::string &path, pid_t pid) {
   if (size_t pos = path.find(k_pid_place_holder); pos != std::string::npos) {
-    path.replace(pos, ARRAY_SIZE(k_pid_place_holder) - 1, std::to_string(pid));
+    path.replace(pos, std::size(k_pid_place_holder) - 1, std::to_string(pid));
   }
 }
 
@@ -138,7 +136,7 @@ static InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
 
   if (ddprof_context_allocation_profiling_watcher_idx(ctx) != -1 &&
       ctx->params.pid && ctx->params.sockfd == -1) {
-    LG_ERR("Memory allocation profiling is not supported in PID mode");
+    LG_ERR("Memory allocation profiling is not supported in PID / global mode");
     return InputResult::kError;
   }
 
@@ -155,8 +153,10 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     return 0;
   }
 
+  const bool in_wrapper_mode = ctx->params.pid == 0;
+
   pid_t temp_pid = 0;
-  if (!ctx->params.pid) {
+  if (in_wrapper_mode) {
     // If no PID was specified earlier, we autodaemonize and target current pid
 
     // Determine if library should be injected into target process
@@ -226,6 +226,8 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
   // Now, we are the profiler process
   is_profiler = true;
 
+  ddprof::init_tsc();
+
   // Attach the profiler
   if (IsDDResNotOK(ddprof_setup(ctx))) {
     LG_ERR("Failed to initialize profiling");
@@ -274,8 +276,17 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
       server.waitForRequest(
           [&reply](const ddprof::RequestMessage &) { return reply; });
     } catch (const ddprof::DDException &e) {
-      LOG_ERROR_DETAILS(LG_ERR, e.get_DDRes()._what);
-      return -1;
+      if (in_wrapper_mode) {
+        // Failture in wrapper mode is not fatal:
+        // LD_PRELOAD may fail because target exe is statically linked
+        // (eg. go binaries)
+        LG_WRN("Unable to connect to profiler library (target executable might "
+               "be statically linked and library cannot be preloaded). "
+               "Allocation profiling will be disabled.");
+      } else {
+        LOG_ERROR_DETAILS(LG_ERR, e.get_DDRes()._what);
+        return -1;
+      }
     }
   }
 

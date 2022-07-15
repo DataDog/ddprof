@@ -3,16 +3,16 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include "ddprof_input.h"
-#include "perf_watcher.h"
-#include "string_view.h"
-}
+#include "ddprof_input.hpp"
 
-#include "arraysize.h"
 #include "constants.hpp"
+#include "ddprof_context.hpp"
+#include "ddprof_context_lib.hpp"
 #include "defer.hpp"
 #include "loghandle.hpp"
+#include "perf_watcher.hpp"
+#include "span.hpp"
+#include "string_view.hpp"
 
 #include <gtest/gtest.h>
 #include <string_view>
@@ -97,7 +97,6 @@ TEST_F(InputTest, dump_fixed) {
       ddprof_input_parse(argc, (char **)input_values, &input, &contine_exec);
   EXPECT_FALSE(IsDDResOK(res));
   EXPECT_FALSE(contine_exec);
-  EXPECT_EQ(input.nb_parsed_params, 2);
   ddprof_input_free(&input);
 }
 
@@ -109,7 +108,7 @@ TEST_F(InputTest, event_from_env) {
     const char *input_values[] = {MYNAME, "my_program"};
     setenv(k_events_env_variable, "sCPU,1000", 1);
     DDRes res = ddprof_input_parse(
-        ARRAY_SIZE(input_values), (char **)input_values, &input, &contine_exec);
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
 
     EXPECT_TRUE(IsDDResOK(res));
     EXPECT_TRUE(contine_exec);
@@ -128,7 +127,7 @@ TEST_F(InputTest, event_from_env) {
     const char *input_values[] = {MYNAME, "my_program"};
     setenv(k_events_env_variable, ";", 1);
     DDRes res = ddprof_input_parse(
-        ARRAY_SIZE(input_values), (char **)input_values, &input, &contine_exec);
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
 
     EXPECT_TRUE(IsDDResOK(res));
     EXPECT_TRUE(contine_exec);
@@ -142,7 +141,7 @@ TEST_F(InputTest, event_from_env) {
     const char *input_values[] = {MYNAME, "my_program"};
     setenv(k_events_env_variable, ";sCPU,1000;", 1);
     DDRes res = ddprof_input_parse(
-        ARRAY_SIZE(input_values), (char **)input_values, &input, &contine_exec);
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
 
     EXPECT_TRUE(IsDDResOK(res));
     EXPECT_TRUE(contine_exec);
@@ -162,7 +161,7 @@ TEST_F(InputTest, event_from_env) {
     const char *input_values[] = {MYNAME, "-e", "hINST,456", "my_program"};
     setenv(k_events_env_variable, "sCPU,1000;hCPU,123", 1);
     DDRes res = ddprof_input_parse(
-        ARRAY_SIZE(input_values), (char **)input_values, &input, &contine_exec);
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
 
     EXPECT_TRUE(IsDDResOK(res));
     EXPECT_TRUE(contine_exec);
@@ -184,5 +183,196 @@ TEST_F(InputTest, event_from_env) {
     EXPECT_EQ(input.watchers[2].sample_period, 456);
 
     ddprof_input_free(&input);
+  }
+}
+
+TEST_F(InputTest, duplicate_events) {
+  defer { unsetenv(k_events_env_variable); };
+  {
+    // Duplicate events (except tracepoints) are disallowed
+    DDProfInput input;
+    bool contine_exec = true;
+    const char *input_values[] = {MYNAME, "-e",       "sCPU,456",
+                                  "-e",   "sCPU,123", "my_program"};
+    DDRes res = ddprof_input_parse(
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
+
+    EXPECT_TRUE(IsDDResOK(res));
+    EXPECT_TRUE(contine_exec);
+
+    DDProfContext ctx;
+    res = ddprof_context_set(&input, &ctx);
+    EXPECT_FALSE(IsDDResOK(res));
+
+    ddprof_input_free(&input);
+    ddprof_context_free(&ctx);
+  }
+  {
+    // Duplicate events (except tracepoints) are disallowed
+    DDProfInput input;
+    bool contine_exec = true;
+    const char *input_values[] = {MYNAME, "-e", "sCPU,456", "my_program"};
+    setenv(k_events_env_variable, "sCPU,1000", 1);
+    DDRes res = ddprof_input_parse(
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
+
+    EXPECT_TRUE(IsDDResOK(res));
+    EXPECT_TRUE(contine_exec);
+
+    DDProfContext ctx;
+    res = ddprof_context_set(&input, &ctx);
+    EXPECT_FALSE(IsDDResOK(res));
+
+    ddprof_input_free(&input);
+    ddprof_context_free(&ctx);
+  }
+}
+
+TEST_F(InputTest, presets) {
+  {
+    // Default preset should be CPU + ALLOC
+    DDProfInput input;
+    bool contine_exec = true;
+    const char *input_values[] = {MYNAME, "my_program"};
+    DDRes res = ddprof_input_parse(
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
+
+    EXPECT_TRUE(IsDDResOK(res));
+    EXPECT_TRUE(contine_exec);
+
+    DDProfContext ctx;
+    res = ddprof_context_set(&input, &ctx);
+    EXPECT_TRUE(IsDDResOK(res));
+
+    ddprof::span watchers{ctx.watchers, static_cast<size_t>(ctx.num_watchers)};
+
+    EXPECT_EQ(watchers.size(), 2);
+    EXPECT_NE(std::find_if(watchers.begin(), watchers.end(),
+                           [](auto &w) {
+                             return w.ddprof_event_type == DDPROF_PWE_sCPU;
+                           }),
+              watchers.end());
+
+    EXPECT_NE(std::find_if(watchers.begin(), watchers.end(),
+                           [](auto &w) {
+                             return w.ddprof_event_type == DDPROF_PWE_sALLOC;
+                           }),
+              watchers.end());
+
+    ddprof_input_free(&input);
+    ddprof_context_free(&ctx);
+  }
+  {
+    // Default preset for PID mode should be CPU
+    DDProfInput input;
+    bool contine_exec = true;
+    const char *input_values[] = {MYNAME, "--pid", "1234", "my_program"};
+    DDRes res = ddprof_input_parse(
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
+
+    EXPECT_TRUE(IsDDResOK(res));
+    EXPECT_TRUE(contine_exec);
+
+    DDProfContext ctx;
+    res = ddprof_context_set(&input, &ctx);
+    EXPECT_TRUE(IsDDResOK(res));
+
+    EXPECT_EQ(ctx.num_watchers, 1);
+    EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sCPU);
+
+    ddprof_input_free(&input);
+    ddprof_context_free(&ctx);
+  }
+  {
+    // Check cpu_only preset
+    DDProfInput input;
+    bool contine_exec = true;
+    const char *input_values[] = {MYNAME, "--preset", "cpu_only", "my_program"};
+    DDRes res = ddprof_input_parse(
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
+
+    EXPECT_TRUE(IsDDResOK(res));
+    EXPECT_TRUE(contine_exec);
+
+    DDProfContext ctx;
+    res = ddprof_context_set(&input, &ctx);
+    EXPECT_TRUE(IsDDResOK(res));
+
+    ddprof::span watchers{ctx.watchers, static_cast<size_t>(ctx.num_watchers)};
+
+    EXPECT_EQ(ctx.num_watchers, 1);
+    EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sCPU);
+
+    ddprof_input_free(&input);
+    ddprof_context_free(&ctx);
+  }
+  {
+    // Check alloc_only preset
+    DDProfInput input;
+    bool contine_exec = true;
+    const char *input_values[] = {MYNAME, "--preset", "alloc_only",
+                                  "my_program"};
+    DDRes res = ddprof_input_parse(
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
+
+    EXPECT_TRUE(IsDDResOK(res));
+    EXPECT_TRUE(contine_exec);
+
+    DDProfContext ctx;
+    res = ddprof_context_set(&input, &ctx);
+    EXPECT_TRUE(IsDDResOK(res));
+
+    EXPECT_EQ(ctx.num_watchers, 2);
+    EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sALLOC);
+    EXPECT_EQ(ctx.watchers[1].ddprof_event_type, DDPROF_PWE_sDUM);
+
+    ddprof_input_free(&input);
+    ddprof_context_free(&ctx);
+  }
+  {
+    // Default preset should not be loaded if an event is given in input
+    DDProfInput input;
+    bool contine_exec = true;
+    const char *input_values[] = {MYNAME, "-e", "sCPU", "my_program"};
+    DDRes res = ddprof_input_parse(
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
+
+    EXPECT_TRUE(IsDDResOK(res));
+    EXPECT_TRUE(contine_exec);
+
+    DDProfContext ctx;
+    res = ddprof_context_set(&input, &ctx);
+    EXPECT_TRUE(IsDDResOK(res));
+
+    EXPECT_EQ(ctx.num_watchers, 1);
+    EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sCPU);
+
+    ddprof_input_free(&input);
+    ddprof_context_free(&ctx);
+  }
+  {
+    // If preset is explicit given in input, then another event with the same
+    // name as one of the preset events should override the preset event values
+    DDProfInput input;
+    bool contine_exec = true;
+    const char *input_values[] = {MYNAME,     "-e",      "sCPU,1234",
+                                  "--preset", "default", "my_program"};
+    DDRes res = ddprof_input_parse(
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
+
+    EXPECT_TRUE(IsDDResOK(res));
+    EXPECT_TRUE(contine_exec);
+
+    DDProfContext ctx;
+    res = ddprof_context_set(&input, &ctx);
+    EXPECT_TRUE(IsDDResOK(res));
+
+    EXPECT_EQ(ctx.num_watchers, 2);
+    EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sCPU);
+    EXPECT_EQ(ctx.watchers[0].sample_frequency, 1234);
+    EXPECT_EQ(ctx.watchers[1].ddprof_event_type, DDPROF_PWE_sALLOC);
+
+    ddprof_input_free(&input);
+    ddprof_context_free(&ctx);
   }
 }

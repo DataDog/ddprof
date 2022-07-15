@@ -13,8 +13,10 @@ if (CPP_CHECK_COMMAND)
          "--library=googletest"
          "--quiet"
          "--inline-suppr"
-         --project=${CMAKE_BINARY_DIR}/compile_commands.json
+         "--project=${CMAKE_BINARY_DIR}/compile_commands.json"
          "--suppressions-list=${CMAKE_SOURCE_DIR}/CppCheckSuppressions.txt"
+         -i ${CMAKE_SOURCE_DIR}/test
+         -i ${CMAKE_SOURCE_DIR}/third_party
          )
 
    add_custom_target(
@@ -22,6 +24,5 @@ if (CPP_CHECK_COMMAND)
       COMMAND ${CPP_CHECK_COMMAND}
       --error-exitcode=1 # make sure CI pipeline fails
       # --check-config #check what header files are missing
-      ${ALL_SOURCE_FILES}
       )
 endif()

@@ -3,18 +3,15 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include "pevent_lib.h"
+#include "pevent_lib.hpp"
 
-#include "ddprof_context.h"
-#include "perf_watcher.h"
+#include "ddprof_context.hpp"
+#include "loghandle.hpp"
+#include "perf_watcher.hpp"
 
+#include <gtest/gtest.h>
 #include <sys/sysinfo.h>
 #include <unistd.h>
-}
-
-#include "loghandle.hpp"
-#include <gtest/gtest.h>
 
 void mock_ddprof_context(DDProfContext *ctx) {
   ctx->num_watchers = 1;

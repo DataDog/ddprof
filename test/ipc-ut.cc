@@ -13,6 +13,8 @@
 
 #include <gtest/gtest.h>
 
+using namespace std::chrono_literals;
+
 static const int kParentIdx = 0;
 static const int kChildIdx = 1;
 
@@ -25,30 +27,28 @@ TEST(IPCTest, Positive) {
   // Fork
   pid_t child_pid = fork();
   if (!child_pid) {
-    std::string fileName = UNIT_TEST_DATA "/ipc_test_data_Positive.txt";
+    FILE *tmp_file = std::tmpfile();
     // I am the child, close parent socket (dupe)
     close(sockets[kParentIdx]);
     ddprof::UnixSocket socket(sockets[kChildIdx]);
-    // delete files if it exists
-    unlink(fileName.c_str());
-    int fileFd = open(fileName.c_str(), O_CREAT | O_RDWR, 0600);
+    int fileFd = fileno(tmp_file);
     // Send something from child
     size_t writeRet = write(fileFd, payload.c_str(), payload.size());
     EXPECT_GT(writeRet, 0);
     EXPECT_NE(fileFd, -1);
     std::byte dummy{1};
     std::error_code ec;
-    EXPECT_EQ(socket.send({&dummy, 1}, {&fileFd, 1}, ec), 1);
+    socket.send({&dummy, 1}, {&fileFd, 1}, ec);
     EXPECT_FALSE(ec);
     close(sockets[kChildIdx]);
     close(fileFd);
-    return;
+    exit(0);
   } else {
     // I am a parent
     close(sockets[kChildIdx]);
     ddprof::UnixSocket socket(sockets[kParentIdx]);
     int fd;
-    std::byte buf[32];
+    std::byte buf[1];
     std::error_code ec;
     auto res = socket.receive(buf, {&fd, 1}, ec);
     EXPECT_FALSE(ec);
@@ -65,18 +65,22 @@ TEST(IPCTest, Positive) {
     close(sockets[kParentIdx]);
     free(buffer);
     close(fd);
+    int wstatus;
+    EXPECT_EQ(child_pid, waitpid(child_pid, &wstatus, 0));
+    EXPECT_TRUE(WIFEXITED(wstatus));
+    EXPECT_EQ(WEXITSTATUS(wstatus), 0);
   }
 }
 
 TEST(IPCTest, timeout) {
-
   int sockets[2] = {-1, -1};
   ASSERT_EQ(socketpair(AF_UNIX, SOCK_DGRAM, 0, sockets), 0);
   ddprof::UnixSocket sock1(sockets[0]);
   ddprof::UnixSocket sock2(sockets[1]);
   std::error_code ec;
 
-  auto timeout = std::chrono::milliseconds{10};
+  auto timeout = 50ms;
+  auto timeout_tolerance = 10ms;
   {
     sock2.set_read_timeout(timeout, ec);
     ASSERT_FALSE(ec);
@@ -85,8 +89,13 @@ TEST(IPCTest, timeout) {
     auto t0 = std::chrono::steady_clock::now();
     ASSERT_EQ(sock2.receive(buffer, ec), 0);
     // timeout measurement is not very accurate
-    auto d = (std::chrono::steady_clock::now() - t0) * 4;
-    ASSERT_GE(d, timeout);
+    auto d = std::chrono::steady_clock::now() - t0;
+    if (d < timeout) {
+      LG_ERR("Read timeout error: errno=%s, duration=%.1fms",
+             strerror(ec.value()),
+             std::chrono::duration<double, std::milli>(d).count());
+    }
+    ASSERT_GE(d, timeout - timeout_tolerance);
     ASSERT_TRUE(ec);
   }
 
@@ -96,12 +105,16 @@ TEST(IPCTest, timeout) {
     // fill up send queue
     std::byte buffer[1024];
     auto t0 = std::chrono::steady_clock::now();
-    auto r = sock1.send(buffer, ec);
+    sock1.send(buffer, ec);
     auto d = std::chrono::steady_clock::now() - t0;
     if (ec) {
-      ASSERT_GE(d, timeout);
+      if (d < timeout) {
+        LG_ERR("Write timeout error: errno=%s, duration=%.1fms",
+               strerror(ec.value()),
+               std::chrono::duration<double, std::milli>(d).count());
+      }
+      ASSERT_GE(d, timeout - timeout_tolerance);
       break;
     }
-    ASSERT_EQ(r, sizeof(buffer));
   }
 }

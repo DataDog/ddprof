@@ -6,9 +6,7 @@
 #pragma once
 
 #include "ddprof_buffer.hpp"
-extern "C" {
-#include "perf_ringbuffer.h"
-}
+#include "perf_ringbuffer.hpp"
 
 #include <cassert>
 #include <cstring>

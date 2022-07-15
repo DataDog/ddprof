@@ -3,19 +3,15 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include "pevent_lib.h"
+#include "pevent_lib.hpp"
 
-#include "ddres.h"
-#include "perf.h"
-#include "user_override.h"
-}
-
+#include "ddres.hpp"
 #include "defer.hpp"
 #include "perf.hpp"
 #include "ringbuffer_utils.hpp"
 #include "sys_utils.hpp"
 #include "syscalls.hpp"
+#include "user_override.hpp"
 
 #include <assert.h>
 #include <errno.h>
@@ -89,7 +85,8 @@ static DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
     } else {
       LG_NFO("Failed to perf_event_open for watcher: %s - with attr.type=%s, "
              "exclude_kernel=%d",
-             watcher->desc, perf_type_str(attr.type), attr.exclude_kernel);
+             watcher->desc, perf_type_str(attr.type),
+             static_cast<int>(attr.exclude_kernel));
     }
   }
   // check if one of the configs was successful

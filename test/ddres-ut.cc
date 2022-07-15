@@ -5,15 +5,11 @@
 
 #include <gtest/gtest.h>
 
-#include "ddres.h"
+#include "ddres.hpp"
 #include "loghandle.hpp"
 
 #include <iostream>
-
-extern "C" {
 #include <stdarg.h>
-}
-
 namespace ddprof {
 
 TEST(DDRes, Size) {

@@ -6,16 +6,13 @@
 #include "dd_profiling.h"
 
 #include "allocation_tracker.hpp"
-
-extern "C" {
-#include "ddprof_cmdline.h"
-#include "logger_setup.h"
-}
-
 #include "constants.hpp"
 #include "daemonize.hpp"
+#include "ddprof_cmdline.hpp"
 #include "defer.hpp"
 #include "ipc.hpp"
+#include "logger_setup.hpp"
+#include "signal_helper.hpp"
 #include "syscalls.hpp"
 
 #include <cerrno>
@@ -87,7 +84,7 @@ int get_ddprof_socket() {
   const char *socket_str = getenv(k_profiler_lib_socket_env_variable);
   if (socket_str) {
     std::string_view sv{socket_str};
-    int sockfd;
+    int sockfd = -1;
     if (auto [ptr, ec] = std::from_chars(sv.begin(), sv.end(), sockfd);
         ec == std::errc() && ptr == sv.end()) {
       return sockfd;
@@ -211,8 +208,7 @@ static int ddprof_start_profiling_internal() {
     //  * library create socket pair and fork + exec into ddprof executable
     //  * library sends a message requesting profiler PID and waits for a reply
     //  * ddprof starts up, attaches itself to the target process, then waits
-    //  for
-    //    a PID request and replies
+    //    for a request and replies
     //  * both library and profiler close their socket and continue
     int sockfds[2];
     if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sockfds) == -1) {
@@ -295,7 +291,7 @@ void ddprof_stop_profiling(int timeout_ms) {
     std::this_thread::sleep_for(time_slice);
 
     // check if profiler process is still alive
-    if (kill(g_state.profiler_pid, 0) == -1 && errno == ESRCH) {
+    if (!process_is_alive(g_state.profiler_pid)) {
       return;
     }
   }

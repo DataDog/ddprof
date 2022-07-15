@@ -4,11 +4,10 @@
 // Datadog, Inc.
 
 #include "tags.hpp"
+
+#include "logger.hpp"
 #include "thread_info.hpp"
 
-extern "C" {
-#include "logger.h"
-}
 #include <utility>
 
 namespace {

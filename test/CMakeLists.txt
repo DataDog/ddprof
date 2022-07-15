@@ -43,8 +43,8 @@ function(add_unit_test name)
 
    ## Create exe with sources. Always add logger and error management in the unit tests
    add_exe(${name}
-        ../src/ddres_list.c
-        ../src/logger.c
+        ../src/ddres_list.cc
+        ../src/logger.cc
         ${MY_UNPARSED_ARGUMENTS})
 
    target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
@@ -76,6 +76,8 @@ function(add_benchmark name)
 
    ## Create exe with sources. Always add logger and error management in the unit tests
    add_exe(${name}
+        ../src/ddres_list.cc
+        ../src/logger.cc
         ${MY_UNPARSED_ARGUMENTS})
 
    target_link_libraries(${name} PRIVATE Threads::Threads benchmark::benchmark benchmark::benchmark_main)
@@ -88,7 +90,7 @@ add_compile_definitions("UNIT_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 
 add_unit_test(
     ddprofcmdline-ut
-    ../src/ddprof_cmdline.c
+    ../src/ddprof_cmdline.cc
     ../src/perf_watcher.cc
     ddprofcmdline-ut.cc
 )
@@ -100,28 +102,28 @@ add_unit_test(
 
 add_unit_test(
     signal_helper-ut
-    ../src/signal_helper.c
+    ../src/signal_helper.cc
     signal_helper-ut.cc
 )
 
 include(Version)
 add_unit_test(
     version-ut
-    ../src/version.c
+    ../src/version.cc
     version-ut.cc
     DEFINITIONS ${DDPROF_DEFINITION_LIST}
 )
 
 add_unit_test(
     statsd-ut
-    ../src/statsd.c
+    ../src/statsd.cc
     statsd-ut.cc
 )
 
 add_unit_test(
     ddprof_stats-ut
-    ../src/ddprof_stats.c
-    ../src/statsd.c
+    ../src/ddprof_stats.cc
+    ../src/statsd.cc
     ddprof_stats-ut.cc
 )
 
@@ -155,7 +157,7 @@ add_unit_test(
 
 add_unit_test(
     cap-ut
-    ../src/cap_display.c
+    ../src/cap_display.cc
     cap-ut.cc
     LIBRARIES libcap
     DEFINITIONS MYNAME="cap-ut"
@@ -165,21 +167,23 @@ target_include_directories(cap-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
 add_unit_test(
     user_id-ut
     user_id-ut.cc
-    ../src/user_override.c
+    ../src/user_override.cc
     DEFINITIONS MYNAME="userid-ut"
 )
 
 add_unit_test(
     procutils-ut
-    ../src/procutils.c
+    ../src/procutils.cc
     procutils-ut.cc
     DEFINITIONS MYNAME="procutils-ut"
 )
 
 add_unit_test(
     ddprof_input-ut
-    ../src/ddprof_cmdline.c
+    ../src/ddprof_cmdline.cc
     ../src/ddprof_input.cc
+    ../src/ddprof_context_lib.cc
+    ../src/logger_setup.cc
     ../src/perf_watcher.cc
     ddprof_input-ut.cc
     DEFINITIONS MYNAME="ddprof_input-ut"
@@ -195,16 +199,9 @@ add_unit_test(
 )
 
 add_unit_test(
-    producer_linearizer-ut
-    ../src/producer_linearizer.c
-    producer_linearizer-ut.cc
-    DEFINITIONS MYNAME="producer_linearizer-ut"
-)
-
-add_unit_test(
     pevent-ut
     ../src/pevent_lib.cc
-    ../src/user_override.c
+    ../src/user_override.cc
     ../src/perf.cc
     ../src/perf_watcher.cc
     ../src/perf_ringbuffer.cc
@@ -217,7 +214,7 @@ add_unit_test(
 add_unit_test(
     ddprof_pprof-ut
     ../src/pprof/ddprof_pprof.cc
-    ../src/unwind_output.c
+    ../src/unwind_output.cc
     ../src/perf_watcher.cc
     ddprof_pprof-ut.cc
     LIBRARIES DDProf::FFI
@@ -227,9 +224,9 @@ add_unit_test(
 add_unit_test(
     ddprof_exporter-ut
     ../src/exporter/ddprof_exporter.cc
-    ../src/ddprof_cmdline.c
+    ../src/ddprof_cmdline.cc
     ../src/pprof/ddprof_pprof.cc
-    ../src/unwind_output.c
+    ../src/unwind_output.cc
     ../src/perf_watcher.cc
     ../src/tags.cc
     ddprof_exporter-ut.cc
@@ -238,19 +235,12 @@ add_unit_test(
 )
 
 add_unit_test(
-    region_holder-ut
-    ../src/region_holder.cc
-    region_holder-ut.cc
-    DEFINITIONS MYNAME="region_holder-ut")
-
-add_unit_test(
     dso-ut
     ../src/dso.cc
     ../src/dso_hdr.cc
     ../src/ddprof_file_info.cc
-    ../src/procutils.c
-    ../src/signal_helper.c
-    ../src/region_holder.cc
+    ../src/procutils.cc
+    ../src/signal_helper.cc
     dso-ut.cc
     DEFINITIONS MYNAME="dso-ut")
 target_include_directories(dso-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
@@ -277,17 +267,18 @@ add_unit_test(
     dwfl_module-ut
     dwfl_module-ut.cc
     ../src/dwfl_hdr.cc
-    ../src/dwfl_module.cc
+    ../src/ddprof_module_lib.cc
+    ../src/dwfl_symbol.cc
     ../src/dso.cc
     ../src/dso_hdr.cc
     ../src/ddprof_file_info.cc
-    ../src/procutils.c
-    ../src/signal_helper.c
-    ../src/region_holder.cc
-    LIBRARIES ${ELFUTILS_LIBRARIES}
+    ../src/procutils.cc
+    ../src/signal_helper.cc
+    LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
     DEFINITIONS MYNAME="dwfl_symbol-ut"
 )
 add_compile_definitions("DWFL_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
+set_property(TARGET dwfl_module-ut PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 
 add_unit_test(
     savecontext-ut
@@ -296,26 +287,26 @@ add_unit_test(
     ../src/common_mapinfo_lookup.cc
     ../src/common_symbol_lookup.cc
     ../src/ddprof_file_info.cc
-    ../src/ddprof_stats.c
+    ../src/ddprof_stats.cc
     ../src/dso.cc
     ../src/dso_hdr.cc
     ../src/dso_symbol_lookup.cc
     ../src/dwfl_hdr.cc
-    ../src/dwfl_module.cc
+    ../src/ddprof_module_lib.cc
     ../src/dwfl_symbol.cc
     ../src/dwfl_symbol_lookup.cc
     ../src/dwfl_thread_callbacks.cc
     ../src/savecontext.cc
+    ../src/saveregisters.cc
     ../src/mapinfo_lookup.cc
-    ../src/procutils.c
-    ../src/region_holder.cc
-    ../src/signal_helper.c
-    ../src/statsd.c
+    ../src/procutils.cc
+    ../src/signal_helper.cc
+    ../src/statsd.cc
     ../src/unwind.cc
     ../src/unwind_dwfl.cc
     ../src/unwind_helpers.cc
-    ../src/unwind_metrics.c
-    ../src/unwind_output.c
+    ../src/unwind_metrics.cc
+    ../src/unwind_output.cc
     LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
     DEFINITIONS MYNAME="savecontext-ut"
 )
@@ -328,12 +319,12 @@ add_unit_test(
     ../src/common_mapinfo_lookup.cc
     ../src/common_symbol_lookup.cc
     ../src/ddprof_file_info.cc
-    ../src/ddprof_stats.c
+    ../src/ddprof_stats.cc
     ../src/dso.cc
     ../src/dso_hdr.cc
     ../src/dso_symbol_lookup.cc
     ../src/dwfl_hdr.cc
-    ../src/dwfl_module.cc
+    ../src/ddprof_module_lib.cc
     ../src/dwfl_symbol.cc
     ../src/dwfl_symbol_lookup.cc
     ../src/dwfl_thread_callbacks.cc
@@ -343,18 +334,18 @@ add_unit_test(
     ../src/perf_watcher.cc
     ../src/ringbuffer_utils.cc
     ../src/savecontext.cc
+    ../src/saveregisters.cc
     ../src/mapinfo_lookup.cc
-    ../src/procutils.c
-    ../src/region_holder.cc
-    ../src/signal_helper.c
-    ../src/statsd.c
+    ../src/procutils.cc
+    ../src/signal_helper.cc
+    ../src/statsd.cc
     ../src/sys_utils.cc
-    ../src/user_override.c
+    ../src/user_override.cc
     ../src/unwind.cc
     ../src/unwind_dwfl.cc
     ../src/unwind_helpers.cc
-    ../src/unwind_metrics.c
-    ../src/unwind_output.c
+    ../src/unwind_metrics.cc
+    ../src/unwind_output.cc
     LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
     DEFINITIONS ${DDPROF_DEFINITION_LIST})
 
@@ -372,10 +363,24 @@ add_unit_test(
     ../src/pevent_lib.cc
     ../src/ringbuffer_utils.cc
     ../src/sys_utils.cc
-    ../src/user_override.c
+    ../src/user_override.cc
 )
 
-add_benchmark(savecontext-bench savecontext-bench.cc ../src/savecontext.cc)
+add_unit_test(
+    timer-ut
+    timer-ut.cc
+    ../src/timer.cc
+    ../src/perf.cc
+)
+
+add_benchmark(savecontext-bench savecontext-bench.cc ../src/savecontext.cc ../src/saveregisters.cc)
+add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 
 add_exe(simple_malloc-static simple_malloc.cc
         LIBRARIES Threads::Threads dd_profiling-static)
+
+if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    add_exe(read_past_sp read_past_sp.cc)
+    target_include_directories(read_past_sp PRIVATE ${DDPROF_INCLUDE_LIST})
+    add_test(NAME read_past_sp COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/read_past_sp-ut.sh WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+endif()

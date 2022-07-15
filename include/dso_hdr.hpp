@@ -12,6 +12,8 @@
 #include <unordered_map>
 
 #include "ddprof_file_info.hpp"
+#include "ddprof_module.hpp"
+#include "ddres_def.hpp"
 #include "dso.hpp"
 
 namespace ddprof {
@@ -65,7 +67,6 @@ private:
 /// PID map : split everything per PID
 /// Map of DSOs : information from proc map (addresses / binary name)
 /// File info : latest location of the file and unique ID to represent it
-/// Region holder : mmap of associated files
 class DsoHdr {
 public:
   /******* Structures and types **********/
@@ -89,13 +90,17 @@ public:
   // true if it erases anything
   bool erase_overlap(const Dso &dso);
 
-  DsoFindRes pid_read_dso(int pid, void *buf, size_t sz, uint64_t addr);
-
   // Clear all dsos and regions associated with this pid
   void pid_free(int pid);
 
   // Find the first associated to this pid
+  bool find_exe_name(pid_t pid, std::string &exe_name);
   DsoFindRes dso_find_first_std_executable(pid_t pid);
+
+  DDProfModRange compute_mod_range(DsoMapConstIt it, const DsoMap &map);
+  // Find the lowest and highest for this given DSO
+  DDRes mod_range_or_backpopulate(DsoMapConstIt it, DsoMap &map,
+                                  DDProfModRange &mod_range);
 
   // Find the closest dso to this pid and addr
   DsoFindRes dso_find_closest(pid_t pid, ElfAddress_t addr);
@@ -111,7 +116,7 @@ public:
   // find or parse procfs if allowed
   DsoFindRes dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr);
 
-  void reset_backpopulate_state() { _backpopulate_state_map.clear(); }
+  void reset_backpopulate_state();
   /******* HELPERS **********/
   // Find the dso if same
   static DsoFindRes dso_find_adjust_same(DsoMap &map, const Dso &dso);
@@ -142,10 +147,6 @@ public:
   }
 
   int get_nb_dso() const;
-  int get_nb_mapped_dso() const;
-  /********* Region helpers ***********/
-  // returns null if the file was not found
-  const RegionHolder *find_or_insert_region(const Dso &dso);
 
   // Unordered map (by pid) of sorted DSOs
   DsoPidMap _map;
@@ -159,6 +160,7 @@ private:
 
   struct BackpopulateState {
     BackpopulateState() : _nbUnfoundDsos(), _perm(kAllowed) {}
+    static const int _k_nb_requests_between_backpopulates = 10;
     int _nbUnfoundDsos;
     BackpopulatePermission _perm;
   };
@@ -175,8 +177,6 @@ private:
   FileInfoId_t update_id_and_path(const Dso &dso);
 
   BackpopulateStateMap _backpopulate_state_map;
-
-  RegionMap _region_map;
 
   FileInfoInodeMap _file_info_inode_map;
 

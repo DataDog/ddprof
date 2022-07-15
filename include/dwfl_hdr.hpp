@@ -5,17 +5,14 @@
 
 #pragma once
 
-extern "C" {
-#include "ddprof_defs.h"
-#include "dwfl_internals.h"
-#include <sys/types.h>
-}
-
-#include "ddres.h"
-
+#include "ddprof_defs.hpp"
 #include "ddprof_file_info.hpp"
+#include "ddprof_module.hpp"
+#include "ddres.hpp"
 #include "dso.hpp"
+#include "dwfl_internals.hpp"
 
+#include <sys/types.h>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -42,8 +39,13 @@ struct DwflWrapper {
   DDRes attach(pid_t pid, const Dwfl_Thread_Callbacks *callbacks,
                UnwindState *us);
 
-  DDRes register_mod(ProcessAddress_t pc, const Dso &dso,
-                     const FileInfoValue &fileInfoValue);
+  // unsafe get don't check ranges
+  DDProfMod *unsafe_get(FileInfoId_t file_info_id);
+
+  // safe get
+  DDProfMod *register_mod(ProcessAddress_t pc, const Dso &dso,
+                          const DDProfModRange &mod_range,
+                          const FileInfoValue &fileInfoValue);
 
   ~DwflWrapper();
 
@@ -57,7 +59,7 @@ struct DwflWrapper {
   bool _inconsistent;
 
   // Keep track of the files we added to the dwfl object
-  std::unordered_map<FileInfoId_t, bool> _mod_added;
+  std::unordered_map<FileInfoId_t, DDProfMod> _ddprof_mods;
 };
 
 class DwflHdr {

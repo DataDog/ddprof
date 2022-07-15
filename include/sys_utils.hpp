@@ -3,7 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "ddres_def.h"
+#include "ddres_def.hpp"
 
 namespace ddprof {
 

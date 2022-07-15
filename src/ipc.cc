@@ -81,22 +81,37 @@ void UnixSocket::set_read_timeout(std::chrono::microseconds duration,
                 ec);
 }
 
-size_t UnixSocket::send(ConstBuffer buffer, std::error_code &ec) noexcept {
-  auto res =
-      error_wrapper(::send(_handle, buffer.data(), buffer.size(), 0), ec);
-  if (ec) {
-    return 0;
-  }
-
-  if (static_cast<size_t>(res) != buffer.size()) {
-    ec = std::error_code(EAGAIN, std::system_category());
-  }
-
-  return res;
+void UnixSocket::send(ConstBuffer buffer, std::error_code &ec) noexcept {
+  size_t written = 0;
+  do {
+    written += send_partial(remaining(buffer, written), ec);
+  } while (!ec && written < buffer.size());
 }
 
-size_t UnixSocket::send(ConstBuffer buffer, ddprof::span<const int> fds,
-                        std::error_code &ec) noexcept {
+size_t UnixSocket::send_partial(ConstBuffer buffer,
+                                std::error_code &ec) noexcept {
+  ssize_t ret;
+  do {
+    ret = ::send(_handle, buffer.data(), buffer.size(), 0);
+  } while (ret < 0 && errno == EINTR);
+
+  error_wrapper(ret, ec);
+
+  return ec ? 0 : ret;
+  ;
+}
+
+void UnixSocket::send(ConstBuffer buffer, ddprof::span<const int> fds,
+                      std::error_code &ec) noexcept {
+  size_t written = send_partial(buffer, fds, ec);
+
+  if (!ec && written < buffer.size()) {
+    send(remaining(buffer, written), ec);
+  }
+}
+
+size_t UnixSocket::send_partial(ConstBuffer buffer, ddprof::span<const int> fds,
+                                std::error_code &ec) noexcept {
   msghdr msg = {};
   if (fds.size() > kMaxFD || buffer.empty()) {
     return -1;
@@ -124,31 +139,51 @@ size_t UnixSocket::send(ConstBuffer buffer, ddprof::span<const int> fds,
     ::memcpy(CMSG_DATA(cmsg), fds.data(), payload_size);
   }
 
-  auto res = error_wrapper(::sendmsg(_handle, &msg, MSG_DONTWAIT), ec);
-  if (ec) {
-    return 0;
-  }
+  ssize_t ret;
+  do {
+    ret = ::sendmsg(_handle, &msg, 0);
+  } while (ret < 0 && errno == EINTR);
+  error_wrapper(ret, ec);
 
-  if (static_cast<size_t>(res) != buffer.size()) {
-    ec = std::error_code(EAGAIN, std::system_category());
-  }
-
-  return res;
+  return ec ? 0 : ret;
 }
 
 size_t UnixSocket::receive(ddprof::span<std::byte> buffer,
                            std::error_code &ec) noexcept {
-  ssize_t nr =
-      error_wrapper(::recv(_handle, buffer.data(), buffer.size(), 0), ec);
-  if (ec) {
-    return 0;
-  }
-  return nr;
+  size_t read = 0;
+
+  do {
+    read += receive_partial(remaining(buffer, read), ec);
+  } while (!ec && read < buffer.size());
+
+  return read;
+}
+
+size_t UnixSocket::receive_partial(ddprof::span<std::byte> buffer,
+                                   std::error_code &ec) noexcept {
+  ssize_t ret;
+  do {
+    ret = ::recv(_handle, buffer.data(), buffer.size(), 0);
+  } while (ret < 0 && errno == EINTR);
+  error_wrapper(ret, ec);
+
+  return ret < 0 ? 0 : ret;
 }
 
 std::pair<size_t, size_t> UnixSocket::receive(ddprof::span<std::byte> buffer,
                                               ddprof::span<int> fds,
                                               std::error_code &ec) noexcept {
+  auto [read, read_fds] = receive_partial(buffer, fds, ec);
+  if (!ec && read < buffer.size()) {
+    read += receive(remaining(buffer, read), ec);
+  }
+  return {read, read_fds};
+}
+
+std::pair<size_t, size_t>
+UnixSocket::receive_partial(ddprof::span<std::byte> buffer,
+                            ddprof::span<int> fds,
+                            std::error_code &ec) noexcept {
 
   msghdr msgh;
 
@@ -176,7 +211,11 @@ std::pair<size_t, size_t> UnixSocket::receive(ddprof::span<std::byte> buffer,
   msgh.msg_control = controlMsg.buf;
   msgh.msg_controllen = sizeof(controlMsg.buf);
 
-  ssize_t nr = error_wrapper(::recvmsg(_handle, &msgh, 0), ec);
+  ssize_t nr;
+  do {
+    nr = ::recvmsg(_handle, &msgh, 0);
+  } while (nr < 0 && errno == EINTR);
+  error_wrapper(nr, ec);
   if (ec) {
     return {0, 0};
   }
@@ -226,12 +265,9 @@ DDRes send(UnixSocket &socket, const ReplyMessage &msg) {
 
 DDRes receive(UnixSocket &socket, RequestMessage &msg) {
   std::error_code ec;
-  auto res = socket.receive(to_byte_span(&msg), ec);
+  socket.receive(to_byte_span(&msg), ec);
   DDRES_CHECK_ERRORCODE(ec, DD_WHAT_SOCKET,
                         "Unable to receive request message");
-  if (res != sizeof(msg)) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_SOCKET, "Unable to receive request message");
-  }
 
   return {};
 }
@@ -244,8 +280,7 @@ DDRes receive(UnixSocket &socket, ReplyMessage &msg) {
 
   DDRES_CHECK_ERRORCODE(ec, DD_WHAT_SOCKET,
                         "Unable to receive response message");
-  if (res.first != sizeof(data) ||
-      ((data.mem_size != -1) ^ (res.second == 2))) {
+  if ((data.mem_size != -1) ^ (res.second == 2)) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_SOCKET,
                            "Unable to receive response message");
   }

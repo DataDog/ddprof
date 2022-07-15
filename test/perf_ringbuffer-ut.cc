@@ -3,14 +3,11 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include <stdio.h>
-
-#include "perf_ringbuffer.h"
-#include "perf_watcher.h" // for default sample type used in ddprof
-}
+#include "perf_ringbuffer.hpp"
+#include "perf_watcher.hpp" // for default sample type used in ddprof
 
 #include <gtest/gtest.h>
+#include <stdio.h>
 
 const char cmp_fmt[] = "Mismatch in %s, 0x%lx != 0x%lx";
 #define SAMPLE_COMPARE(field)                                                  \
@@ -69,7 +66,7 @@ TEST(PerfRingbufferTest, SampleSymmetryx86) {
   mask |= PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_IP | PERF_SAMPLE_ADDR |
       PERF_SAMPLE_RAW;
   char default_stack[4096] = {0};
-  for (uint64_t i = 0; i < sizeof(default_stack) / sizeof(*default_stack); i++)
+  for (uint64_t i = 0; i < std::size(default_stack); i++)
     default_stack[i] = i & 255;
   char default_raw[16] = {0};
   for (uint64_t i = 0; i < sizeof(default_raw) / sizeof(*default_raw); i++)

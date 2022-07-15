@@ -10,9 +10,7 @@
 namespace ddprof {
 
 struct DemangleTestContent {
-  // cppcheck-suppress unusedStructMember
   std::string test;
-  // cppcheck-suppress unusedStructMember
   std::string answer;
 };
 

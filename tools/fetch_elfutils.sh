@@ -4,25 +4,33 @@
 # This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
 
 set -euo pipefail
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 IFS=$'\n\t'
 
 usage() {
     echo "Usage :"
-    echo "$0 <version> <md5> <path> <c-compiler>"
+    echo "$0 <version> <md5> <path> <c-compiler> <c-flags-override>"
     echo ""
+    echo "The extra c flags should be a single arg (hence quoted)"
+    echo "If specified, the default c flags should include \" -g -O2\""
     echo "Example"
-    echo "  $0 0.183 6f58aa1b9af1a5681b1cbf63e0da2d67 ./vendor gcc"
+    echo "  $0 0.183 6f58aa1b9af1a5681b1cbf63e0da2d67 ./vendor gcc \"-O0 -g\""
 }
 
-if [ "$#" -ne 4 ]; then
+if [ "$#" -lt 4 ] || [ "$#" -ge 6 ]; then
     usage
     exit 1
 fi
 
 VER_ELF=$1
-SHA256_ELF=$2
+SHA512_ELF=$2
 TARGET_EXTRACT=$3
 C_COMPILER=${4}
+C_FLAGS_OVERRIDE=""
+# C flags are optional
+if [ "$#" -ge 5 ]; then
+  C_FLAGS_OVERRIDE=${5}
+fi
 
 mkdir -p "${TARGET_EXTRACT}"
 cd "${TARGET_EXTRACT}"
@@ -37,9 +45,9 @@ else
     curl -LO "${URL_ELF}"
 fi
 
-echo "Checking elfutils sha256"
-if ! echo "${SHA256_ELF} ${TAR_ELF}" | sha256sum --check --strict --status; then
-    echo "Error validating elfutils SHA256"
+echo "Checking elfutils sha512"
+if ! echo "${SHA512_ELF} ${TAR_ELF}" | sha512sum --check --strict --status; then
+    echo "Error validating elfutils SHA512"
     echo "Please clear $TARGET_EXTRACT before restarting"
     exit 1
 fi
@@ -51,7 +59,7 @@ mkdir src
 cd src
 tar --no-same-owner --strip-components 1 -xf "../${TAR_ELF}"
 
-echo "Compiling elfutils using ${C_COMPILER}"
+patch -p1 < "${SCRIPT_DIR}/elfutils.patch"
 
 # The flags below are hardcoded to work around clang compatibility issues in
 # elfutils 186; these are irrelevant for GCC.  Note that this won't propagate
@@ -60,5 +68,17 @@ echo "Compiling elfutils using ${C_COMPILER}"
 if [[ "$(basename "${C_COMPILER}")" == clang* ]]; then
   export CFLAGS="-Wno-xor-used-as-pow -Wno-gnu-variable-sized-type-not-at-end -Wno-unused-but-set-parameter"
 fi
+# It is important NOT to set CFLAGS if you don't mean to
+# Otherwise you will not benefit from -O2 in the elfutils compilation
+if [ -n "${C_FLAGS_OVERRIDE-""}" ]; then
+  export CFLAGS="${CFLAGS-""} ${C_FLAGS_OVERRIDE}"
+else # Include the default flags for elfutils
+  if [ -n "${CFLAGS-""}" ]; then
+    export CFLAGS="${CFLAGS-""} -g -O2"
+  fi
+fi
+
+echo "Compiling elfutils using ${C_COMPILER} / flags=${CFLAGS-""}"
+
 ./configure CC="${C_COMPILER}" --without-bzlib --without-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning --prefix "${TARGET_EXTRACT}"
 make "-j$(nproc)" install

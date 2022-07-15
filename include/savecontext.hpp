@@ -8,10 +8,11 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "perf_archmap.h"
+#include "ddprof_base.hpp"
+#include "perf_archmap.hpp"
 #include "span.hpp"
 
 /** Save registers and stack for remote unwinding
  * Return saved stack size */
-size_t save_context(ddprof::span<uint64_t, PERF_REGS_COUNT> regs,
-                    ddprof::span<std::byte> buffer) __attribute__((noinline));
+DDPROF_NOIPO size_t save_context(ddprof::span<uint64_t, PERF_REGS_COUNT> regs,
+                                 ddprof::span<std::byte> buffer);

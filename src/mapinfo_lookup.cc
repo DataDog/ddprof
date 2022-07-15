@@ -5,7 +5,7 @@
 
 #include "mapinfo_lookup.hpp"
 
-#include "ddres.h"
+#include "ddres.hpp"
 
 namespace ddprof {
 

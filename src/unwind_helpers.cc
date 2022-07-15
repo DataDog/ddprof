@@ -3,14 +3,12 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include "ddprof_stats.h"
-}
+#include "unwind_helpers.hpp"
 
-#include "ddres.h"
+#include "ddprof_stats.hpp"
+#include "ddres.hpp"
 #include "dso_hdr.hpp"
 #include "symbol_hdr.hpp"
-#include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
 
 namespace ddprof {
@@ -53,10 +51,12 @@ void add_common_frame(UnwindState *us, SymbolErrors lookup_case) {
                         lookup_case, us->symbol_hdr._symbol_table));
 }
 
-void add_dso_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc) {
-  add_virtual_frame(us,
-                    us->symbol_hdr._dso_symbol_lookup.get_or_insert(
-                        pc, dso, us->symbol_hdr._symbol_table));
+void add_dso_frame(UnwindState *us, const Dso &dso,
+                   ElfAddress_t normalized_addr, std::string_view addr_type) {
+  add_virtual_frame(
+      us,
+      us->symbol_hdr._dso_symbol_lookup.get_or_insert(
+          normalized_addr, dso, us->symbol_hdr._symbol_table, addr_type));
 }
 
 void add_virtual_base_frame(UnwindState *us) {
@@ -67,7 +67,8 @@ void add_virtual_base_frame(UnwindState *us) {
 }
 
 // read a word from the given stack
-bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
+bool memory_read(ProcessAddress_t addr, ElfWord_t *result, int regno,
+                 void *arg) {
   *result = 0;
   struct UnwindState *us = (UnwindState *)arg;
 
@@ -104,6 +105,77 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
   uint64_t sp_end = sp_start + us->stack_sz;
 
   if (addr < sp_start && addr > sp_start - 4096) {
+    // Sometime DWARF emits CFI instructions that require reads below SP
+    // (in the 128-byte red zone beyond SP)
+    // This often occurs in function epilogues, for example in libc-2.31.so
+    // on ubuntu 20.04 x86_64 in realloc function:
+    // $ readelf -wF /usr/lib/x86_64-linux-gnu/libc-2.31.so | grep -F
+    // '009ae80..'
+    //    LOC           CFA      rbx   rbp   r12   r13   r14   r15   ra
+    // 000000000009ae80 rsp+8    u     u     u     u     u     u     c-8
+    // 000000000009ae86 rsp+16   u     u     u     u     u     c-16  c-8
+    // 000000000009ae88 rsp+24   u     u     u     u     c-24  c-16  c-8
+    // 000000000009ae8a rsp+32   u     u     u     c-32  c-24  c-16  c-8
+    // 000000000009ae8c rsp+40   u     u     c-40  c-32  c-24  c-16  c-8
+    // 000000000009ae90 rsp+48   u     c-48  c-40  c-32  c-24  c-16  c-8
+    // 000000000009ae94 rsp+56   c-56  c-48  c-40  c-32  c-24  c-16  c-8
+    // 000000000009ae98 rsp+80   c-56  c-48  c-40  c-32  c-24  c-16  c-8
+    // 000000000009aebd rsp+56   c-56  c-48  c-40  c-32  c-24  c-16  c-8
+    // 000000000009aec1 rsp+48   c-56  c-48  c-40  c-32  c-24  c-16  c-8
+    // 000000000009aec2 rsp+40   c-56  c-48  c-40  c-32  c-24  c-16  c-8
+    // 000000000009aec4 rsp+32   c-56  c-48  c-40  c-32  c-24  c-16  c-8
+    // 000000000009aec6 rsp+24   c-56  c-48  c-40  c-32  c-24  c-16  c-8
+    // 000000000009aec8 rsp+16   c-56  c-48  c-40  c-32  c-24  c-16  c-8
+    // 000000000009aeca rsp+8    c-56  c-48  c-40  c-32  c-24  c-16  c-8
+    // ...
+    // Dump of assembler code for function __GI___libc_realloc:
+    //  0x000000000009ae80 <+0>:  endbr64
+    //  0x000000000009ae84 <+4>:  push   %r15
+    //  0x000000000009ae86 <+6>:  push   %r14
+    //  0x000000000009ae88 <+8>:  push   %r13
+    //  0x000000000009ae8a <+10>:	push   %r12
+    //  0x000000000009ae8c <+12>:	mov    %rsi,%r12
+    //  0x000000000009ae8f <+15>:	push   %rbp
+    //  0x000000000009ae90 <+16>:	mov    %rdi,%rbp
+    //  0x000000000009ae93 <+19>:	push   %rbx
+    //  0x000000000009ae94 <+20>:	sub    $0x18,%rsp
+    //  0x000000000009ae98 <+24>:	mov    0x151141(%rip),%rax
+    //  0x000000000009ae9f <+31>:	mov    (%rax),%rax
+    //  0x000000000009aea2 <+34>:	test   %rax,%rax
+    //  0x000000000009aea5 <+37>:	jne    0x9b0e0 <__GI___libc_realloc+608>
+    //  0x000000000009aeab <+43>:	test   %rsi,%rsi
+    //  0x000000000009aeae <+46>:	jne    0x9aed0 <__GI___libc_realloc+80>
+    //  0x000000000009aeb0 <+48>:	test   %rdi,%rdi
+    //  0x000000000009aeb3 <+51>:	jne    0x9b0f8 <__GI___libc_realloc+632>
+    //  0x000000000009aeb9 <+57>:	add    $0x18,%rsp
+    //  0x000000000009aebd <+61>:	mov    %r12,%rdi
+    //  0x000000000009aec0 <+64>:	pop    %rbx
+    //  0x000000000009aec1 <+65>:	pop    %rbp
+    //  0x000000000009aec2 <+66>:	pop    %r12
+    //  0x000000000009aec4 <+68>:	pop    %r13
+    //  0x000000000009aec6 <+70>:	pop    %r14
+    //  0x000000000009aec8 <+72>:	pop    %r15
+    //  0x000000000009aeca <+74>:	jmp    0x9a0e0 <__GI___libc_malloc>
+    //  0x000000000009aecf <+79>:	nop
+    //  ...
+    // As a size optimization, DW_CFA_restore instruction are not emitted for
+    // stack pops during function epilogue and compiler relies on the
+    // guarantee by System V AMD64 ABI that 128-byte red zone
+    // beyond SP cannot being changed by anything (eg. by signal handlers),
+    // and therefore stack values are preserved after pop instructions.
+    // In remote unwinding this part of stack is not available since perf
+    // captures the stack starting from SP.
+    // We observe though that these CFI instructions follow pop assembly
+    // instructions that already restore the register value, and this issue
+    // only occurs in leaf function, therefore if a read before SP is
+    // requested when unwinding the leaf function for a register, we simply
+    // return the initial register value.
+    constexpr uint64_t k_red_zone_size = 128;
+    if (us->output.nb_locs <= 1 && regno != -1 &&
+        addr >= sp_start - k_red_zone_size) {
+      *result = us->initial_regs.regs[regno];
+      return true;
+    }
 #ifdef DEBUG
     // libdwfl might try to read values which are before our snapshot of the
     // stack.  Because the stack has the growsdown property and has a max size,
@@ -115,19 +187,17 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
 #endif
     return false;
   } else if (addr < sp_start || addr + sizeof(ElfWord_t) > sp_end) {
-    // If we're here, we're not in the stack.  We should interpet addr as an
-    // address in VM, not as a file offset.
-    // Strongly assumes we're also in an executable region?
-    DsoHdr::DsoFindRes find_res =
-        us->dso_hdr.pid_read_dso(us->pid, result, sizeof(ElfWord_t), addr);
-    if (!find_res.second) {
-      // Some regions are not handled
-      LG_DBG("Couldn't get read 0x%lx from %d, (0x%lx, 0x%lx)[%p, %p]", addr,
-             us->pid, sp_start, sp_end, us->stack, us->stack + us->stack_sz);
-    }
-    return find_res.second;
+    // We used to look within the binaries when then matched mapped binaries.
+    // Though looking at the cases when this occured, it was not useful.
+    // Dwarf should not need to look inside binaries to define how to unwind.
+    // It was usually a result of frame pointer unwinding (where the frame
+    // pointer was used for something else).
+    LG_DBG("Attempting to read outside of stack 0x%lx from %d, (0x%lx, "
+           "0x%lx)[%p, %p]",
+           addr, us->pid, sp_start, sp_end, us->stack,
+           us->stack + us->stack_sz);
+    return false;
   }
-
   // If we're here, we're going to read from the stack.  Just the same, we need
   // to protect stack reads carefully, so split the indexing into a
   // precomputation followed by a bounds check
@@ -136,16 +206,22 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, void *arg) {
     LG_WRN("Stack miscalculation: %lx - %lx != %lx", addr, sp_start, stack_idx);
     return false;
   }
-
   *result = *(ElfWord_t *)(us->stack + stack_idx);
   return true;
 }
 
-void add_error_frame(const Dso *dso, UnwindState *us, ProcessAddress_t pc,
+void add_error_frame(const Dso *dso, UnwindState *us,
+                     [[maybe_unused]] ProcessAddress_t pc,
                      SymbolErrors error_case) {
   ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
   if (dso) {
-    add_dso_frame(us, *dso, pc);
+// #define ADD_ADDR_IN_SYMB // creates more elements (but adds info on
+// addresses)
+#ifdef ADD_ADDR_IN_SYMB
+    add_dso_frame(us, *dso, pc, "pc");
+#else
+    add_dso_frame(us, *dso, 0x0, "pc");
+#endif
   } else {
     add_common_frame(us, error_case);
   }

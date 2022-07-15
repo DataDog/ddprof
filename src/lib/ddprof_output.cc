@@ -5,12 +5,9 @@
 
 #include "lib/ddprof_output.hpp"
 
-extern "C" {
-#include "ddprof_context.h"
-#include "unwind_output.h"
-}
-
+#include "ddprof_context.hpp"
 #include "symbol_hdr.hpp"
+#include "unwind_output.hpp"
 #include "unwind_state.hpp"
 
 namespace ddprof {

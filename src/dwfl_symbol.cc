@@ -5,14 +5,11 @@
 
 #include "dwfl_symbol.hpp"
 
-#include <llvm/Demangle/Demangle.h>
-
-extern "C" {
-#include "dwfl_internals.h"
-#include "logger.h"
-}
+#include "dwfl_internals.hpp"
+#include "logger.hpp"
 
 #include <cassert>
+#include <llvm/Demangle/Demangle.h>
 #include <string_view>
 
 namespace ddprof {
@@ -28,10 +25,22 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
   const char *lsymname = dwfl_module_addrinfo(
       mod, process_pc, &loffset, &elf_sym, &lshndxp, &lelfp, &lbias);
 
+#ifdef DEBUG
+  int dwfl_error_value = dwfl_errno();
+  if (unlikely(dwfl_error_value)) {
+    LG_DBG("[DWFL_SYMB] addrinfo error -- Error:%s -- %s",
+           dwfl_errmsg(dwfl_error_value), lsymname);
+  }
+#else
+  dwfl_errno();
+#endif
+
   if (lsymname) {
     symbol._symname = std::string(lsymname);
     symbol._demangle_name = llvm::demangle(symbol._symname);
     symbol_success = true;
+  } else {
+    return false;
   }
 
 // #define FLAG_SYMBOL
@@ -43,74 +52,48 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
   }
 #endif
   Dwfl_Line *line = dwfl_module_getsrc(mod, process_pc);
-  // srcpath
-  int linep;
-  const char *localsrcpath =
-      dwfl_lineinfo(line, &process_pc, static_cast<int *>(&linep), 0, 0, 0);
-  if (localsrcpath) {
-    symbol._srcpath = std::string(localsrcpath);
-    symbol._lineno = static_cast<uint32_t>(linep);
-  } else {
-    symbol._lineno = 0;
+#ifdef DEBUG
+  dwfl_error_value = dwfl_errno();
+  if (unlikely(dwfl_error_value)) {
+    LG_DBG("[DWFL_SYMB] dwfl_src error pc=%lx : Error:%s (Sym=%s)", process_pc,
+           dwfl_errmsg(dwfl_error_value), symbol._demangle_name.c_str());
+  }
+#else
+  dwfl_errno();
+#endif
+
+  if (line) {
+    int linep;
+    const char *localsrcpath =
+        dwfl_lineinfo(line, &process_pc, static_cast<int *>(&linep), 0, 0, 0);
+    if (localsrcpath) {
+      symbol._srcpath = std::string(localsrcpath);
+      symbol._lineno = static_cast<uint32_t>(linep);
+    }
+#ifdef DEBUG
+    dwfl_error_value = dwfl_errno();
+    if (unlikely(dwfl_error_value)) {
+      LG_DBG("[DWFL_SYMB] dwfl_lineinfo error pc=%lx : Error:%s (Sym=%s)",
+             process_pc, dwfl_errmsg(dwfl_error_value),
+             symbol._demangle_name.c_str());
+    }
+#else
+    dwfl_errno();
+#endif
   }
   return symbol_success;
 }
 
-// Compute the start and end addresses in the scope of a region for this symbol
-bool compute_elf_range(RegionAddress_t region_pc, ProcessAddress_t mod_lowaddr,
-                       Offset_t dso_offset, const GElf_Sym &elf_sym,
-                       Offset_t bias, RegionAddress_t &start_sym,
-                       RegionAddress_t &end_sym) {
-  // Success from dwarf symbolization
-  // The elf symbols can be in process address or within a region's address
-  // (depending on biais). We need to adapt this range.
-  // Also the given size can be 0, we will adjust depending on where the current
-  // PC is.
-  // clang-format off
-  /*
-    
-    We want to make sure we use only addesses in the scope of a region
-                            <---- Region ---><-Reg2-->
-                        dso(start)  PC     dso(end)
-                           ^        ^
-  <---------------> <-----------       mod  --------->
-                 mod (low) : a mod is in the context of a file
-                  ^
-  <---------------><------>       <--->
-       biais        offset       ^
-                                elf
-   The elf address can be given either in the context of the file
-   or in the context of the process. It can be adjusted with the bias and
-   offset. mod - bias is always the value to the start of the file.
- */
-  // clang-format on
-  assert(mod_lowaddr >= bias);
-  // adjust to region (biais is 0 if we are in a process address)
-  ElfAddress_t elf_adjust = mod_lowaddr - bias + dso_offset;
-  assert(elf_sym.st_value >= elf_adjust);
+bool compute_elf_range(RegionAddress_t file_pc, const GElf_Sym &elf_sym,
+                       RegionAddress_t &start_sym, RegionAddress_t &end_sym) {
 
-  start_sym = elf_sym.st_value - elf_adjust;
-  // size can be 0 consider a min offset
-  Offset_t end_offset = elf_sym.st_size + k_min_symbol_size - 1;
-  end_sym = elf_sym.st_value + end_offset - elf_adjust;
-
-#ifdef DEBUG
-  if (region_pc > end_sym) {
-    LG_DBG("[SYMBOL] BUMPING RANGE %lx -> %lx (%lx)", start_sym, end_sym,
-           region_pc);
+  start_sym = elf_sym.st_value;
+  if (elf_sym.st_size) {
+    end_sym = elf_sym.st_value + elf_sym.st_size - 1;
+  } else {
+    end_sym = elf_sym.st_value + k_min_symbol_size;
   }
-#endif
-
-  if (region_pc > end_sym + k_max_symbol_size || region_pc < start_sym) {
-    LG_DBG("[SYMBOL] ERROR IN RANGE %lx -> %lx (%lx)", start_sym, end_sym,
-           region_pc);
-    // Avoid bumping end symbol to an insane range
-    return false;
-  }
-  // if we do not cover this PC, bump it
-  end_sym = std::max(end_sym, region_pc);
-
-  return true;
+  return file_pc >= start_sym && file_pc <= end_sym;
 }
 
 } // namespace ddprof

@@ -5,19 +5,22 @@
 
 #include "unwind.hpp"
 
-extern "C" {
-#include "ddres.h"
-#include "logger.h"
-#include "signal_helper.h"
-#include "unwind_metrics.h"
-}
-
+#include "ddprof_stats.hpp"
+#include "ddres.hpp"
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
+#include "logger.hpp"
+#include "signal_helper.hpp"
 #include "symbol_hdr.hpp"
 #include "unwind_dwfl.hpp"
 #include "unwind_helpers.hpp"
+#include "unwind_metrics.hpp"
 #include "unwind_state.hpp"
+
+#include <array>
+#include <string_view.hpp>
+
+using namespace std::string_view_literals;
 
 namespace ddprof {
 void unwind_init(void) { elf_version(EV_CURRENT); }
@@ -41,6 +44,37 @@ void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
   us->stack = sample_data_stack;
 }
 
+static bool is_ld(const std::string &path) {
+  // path is expected to not contain slashes
+  assert(path.rfind('/') == std::string::npos);
+
+  return path.starts_with("ld-");
+}
+
+static bool is_stack_complete(UnwindState *us) {
+  static constexpr std::array s_expected_root_frames{"_start"sv, "__clone"sv,
+                                                     "_exit"sv};
+
+  if (us->output.nb_locs == 0) {
+    return false;
+  }
+
+  const auto &root_loc = us->output.locs[us->output.nb_locs - 1];
+  const auto &root_mapping =
+      us->symbol_hdr._mapinfo_table[root_loc._map_info_idx];
+
+  // If we are in ld.so (eg. during lib init before main) consider the stack as
+  // complete
+  if (is_ld(root_mapping._sopath)) {
+    return true;
+  }
+
+  const auto &root_func =
+      us->symbol_hdr._symbol_table[root_loc._symbol_idx]._symname;
+  return std::find(s_expected_root_frames.begin(), s_expected_root_frames.end(),
+                   root_func) != s_expected_root_frames.end();
+}
+
 DDRes unwindstate__unwind(UnwindState *us) {
   DDRes res = ddres_init();
   if (us->pid != 0) { // we can not unwind pid 0
@@ -49,6 +83,11 @@ DDRes unwindstate__unwind(UnwindState *us) {
   if (IsDDResNotOK(res)) {
     find_dso_add_error_frame(us);
   }
+
+  if (!is_stack_complete(us)) {
+    ddprof_stats_add(STATS_UNWIND_INCOMPLETE_STACK, 1, nullptr);
+  }
+
   // Add a frame that identifies executable to which these belong
   add_virtual_base_frame(us);
   if (us->_dwfl_wrapper->_inconsistent) {

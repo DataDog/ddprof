@@ -5,14 +5,11 @@
 
 #pragma once
 
-extern "C" {
-#include "ddprof_defs.h"
-#include "ddres_def.h"
-#include "exporter_input.h"
-#include "perf_watcher.h"
-#include "string_view.h"
-}
-
+#include "ddprof_defs.hpp"
+#include "ddres_def.hpp"
+#include "exporter_input.hpp"
+#include "perf_watcher.hpp"
+#include "string_view.hpp"
 #include "tags.hpp"
 
 typedef struct ddprof_ffi_ProfileExporterV3 ddprof_ffi_ProfileExporterV3;
@@ -29,6 +26,7 @@ typedef struct DDProfExporter {
   bool _agent;
   bool _export; // debug mode : should we send profiles ?
   int32_t _nb_consecutive_errors;
+  int64_t _last_pprof_size;
 } DDProfExporter;
 
 DDRes ddprof_exporter_init(const ExporterInput *exporter_input,

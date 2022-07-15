@@ -3,28 +3,105 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "ddprof_context_lib.h"
+#include "ddprof_context_lib.hpp"
 
-extern "C" {
-#include "ddprof_cmdline.h"
-#include "ddprof_context.h"
-#include "ddprof_input.h"
-#include "logger.h"
-#include "logger_setup.h"
-}
-
+#include "ddprof_cmdline.hpp"
+#include "ddprof_context.hpp"
+#include "ddprof_input.hpp"
+#include "logger.hpp"
+#include "logger_setup.hpp"
 #include "span.hpp"
 
 #include <algorithm>
 #include <charconv>
 #include <errno.h>
+#include <string_view>
 #include <sys/sysinfo.h>
 #include <unistd.h>
+
+static const PerfWatcher *
+find_duplicate_event(ddprof::span<const PerfWatcher> watchers) {
+  bool seen[DDPROF_PWE_LENGTH] = {};
+  for (auto &watcher : watchers) {
+    if (watcher.ddprof_event_type != DDPROF_PWE_TRACEPOINT &&
+        seen[watcher.ddprof_event_type]) {
+      return &watcher;
+    }
+    seen[watcher.ddprof_event_type] = true;
+  }
+  return nullptr;
+}
+
+struct Preset {
+  static constexpr size_t k_max_events = 10;
+  const char *name;
+  const char *events[k_max_events];
+};
+
+DDRes add_preset(DDProfContext *ctx, const char *preset,
+                 bool pid_or_global_mode) {
+  using namespace std::literals;
+  static Preset presets[] = {
+      {"default", {"sCPU", "sALLOC"}},
+      {"default-pid", {"sCPU"}},
+      {"cpu_only", {"sCPU"}},
+      {"alloc_only", {"sALLOC"}},
+  };
+
+  if (preset == "default"sv && pid_or_global_mode) {
+    preset = "default-pid";
+  }
+
+  ddprof::span presets_span{presets};
+  std::string_view preset_sv{preset};
+
+  auto it = std::find_if(presets_span.begin(), presets_span.end(),
+                         [&preset_sv](auto &e) { return e.name == preset_sv; });
+  if (it == presets_span.end()) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Unknown preset (%s)",
+                           preset);
+  }
+
+  for (const char *event : it->events) {
+    if (event == nullptr) {
+      break;
+    }
+    if (ctx->num_watchers == MAX_TYPE_WATCHER) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Too many input events");
+    }
+    PerfWatcher *watcher = &ctx->watchers[ctx->num_watchers];
+    if (!watcher_from_event(event, watcher) &&
+        !watcher_from_tracepoint(event, watcher)) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
+                             "Invalid event/tracepoint (%s)", event);
+    }
+    ddprof::span watchers{ctx->watchers,
+                          static_cast<size_t>(ctx->num_watchers)};
+
+    // ignore event if it was already present in watchers
+    if (watcher->ddprof_event_type == DDPROF_PWE_TRACEPOINT ||
+        std::find_if(watchers.begin(), watchers.end(), [&watcher](auto &w) {
+          return w.ddprof_event_type == watcher->ddprof_event_type;
+        }) == watchers.end()) {
+      ++ctx->num_watchers;
+    }
+  }
+
+  return {};
+}
 
 /****************************  Argument Processor  ***************************/
 DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   *ctx = {};
   setup_logger(input->log_mode, input->log_level);
+
+  if (const PerfWatcher *dup_watcher = find_duplicate_event(
+          {input->watchers, static_cast<size_t>(input->num_watchers)});
+      dup_watcher != nullptr) {
+    DDRES_RETURN_ERROR_LOG(
+        DD_WHAT_INPUT_PROCESS, "Duplicate event found in input: %s",
+        event_type_name_from_idx(dup_watcher->ddprof_event_type));
+  }
 
   // Shallow copy of the watchers from the input object into the context.
   int nwatchers;
@@ -32,23 +109,6 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     ctx->watchers[nwatchers] = input->watchers[nwatchers];
   }
   ctx->num_watchers = nwatchers;
-
-  // If no events were given, install the default watcher with default freq.
-  if (!ctx->num_watchers) {
-    ctx->num_watchers = 1;
-    ctx->watchers[0] = *ewatcher_from_str("sCPU");
-  }
-
-  ddprof::span watchers{ctx->watchers, static_cast<size_t>(ctx->num_watchers)};
-  if (std::find_if(watchers.begin(), watchers.end(),
-                   [](const auto &watcher) {
-                     return watcher.type < PERF_TYPE_MAX;
-                   }) == watchers.end() &&
-      ctx->num_watchers < MAX_TYPE_WATCHER) {
-    // if there are no perf active watcher, add a dummy watcher to be notified
-    // on process exit
-    ctx->watchers[ctx->num_watchers++] = *ewatcher_from_str("sDUM");
-  }
 
   DDRES_CHECK_FWD(exporter_input_copy(&input->exp_input, &ctx->exp_input));
 
@@ -196,29 +256,6 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     }
   }
 
-  // Process input printer (do this right before argv/c modification)
-  if (input->show_config && arg_yesno(input->show_config, 1)) {
-    LG_NFO("Printing parameters -->");
-    ddprof_print_params(input);
-
-    LG_NFO("  Native profiler enabled: %s",
-           ctx->params.enable ? "true" : "false");
-
-    // Tell the user what mode is being used
-    LG_NFO("  Profiling mode: %s",
-           -1 == ctx->params.pid ? "global"
-               : pid_tmp         ? "target"
-                                 : "wrapper");
-
-    // Show watchers
-    LG_NFO("  Instrumented with %d watchers:", ctx->num_watchers);
-    for (int i = 0; i < ctx->num_watchers; i++) {
-      LG_NFO("    ID: %s, Pos: %d, Index: %lu, Label: %s",
-             ctx->watchers[i].desc, i, ctx->watchers[i].config,
-             sample_type_name_from_idx(ctx->watchers[i].sample_type_id));
-    }
-  }
-
   ctx->params.sockfd = -1;
   ctx->params.wait_on_socket = false;
   if (input->socket && strlen(input->socket) > 0) {
@@ -228,6 +265,51 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     if (ec == std::errc() && ptr == sv.end()) {
       ctx->params.sockfd = sockfd;
       ctx->params.wait_on_socket = true;
+    }
+  }
+
+  const char *preset = input->preset;
+  if (!preset && ctx->num_watchers == 0) {
+    // use `default` preset when no preset and no events were given in input
+    preset = "default";
+  }
+
+  if (preset) {
+    bool pid_or_global_mode = ctx->params.pid && ctx->params.sockfd == -1;
+    DDRES_CHECK_FWD(add_preset(ctx, preset, pid_or_global_mode));
+  }
+
+  ddprof::span watchers{ctx->watchers, static_cast<size_t>(ctx->num_watchers)};
+  if (std::find_if(watchers.begin(), watchers.end(),
+                   [](const auto &watcher) {
+                     return watcher.type < PERF_TYPE_MAX;
+                   }) == watchers.end() &&
+      ctx->num_watchers < MAX_TYPE_WATCHER) {
+    // if there are no perf active watcher, add a dummy watcher to be notified
+    // on process exit
+    ctx->watchers[ctx->num_watchers++] = *ewatcher_from_str("sDUM");
+  }
+
+  // Process input printer (do this right before argv/c modification)
+  if (input->show_config && arg_yesno(input->show_config, 1)) {
+    PRINT_NFO("Printing parameters -->");
+    ddprof_print_params(input);
+
+    PRINT_NFO("  Native profiler enabled: %s",
+              ctx->params.enable ? "true" : "false");
+
+    // Tell the user what mode is being used
+    PRINT_NFO("  Profiling mode: %s",
+              -1 == ctx->params.pid ? "global"
+                  : pid_tmp         ? "target"
+                                    : "wrapper");
+
+    // Show watchers
+    PRINT_NFO("  Instrumented with %d watchers:", ctx->num_watchers);
+    for (int i = 0; i < ctx->num_watchers; i++) {
+      PRINT_NFO("    ID: %s, Pos: %d, Index: %lu, Label: %s",
+                ctx->watchers[i].desc, i, ctx->watchers[i].config,
+                sample_type_name_from_idx(ctx->watchers[i].sample_type_id));
     }
   }
 

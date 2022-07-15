@@ -5,14 +5,15 @@
 
 #include <benchmark/benchmark.h>
 
-#include "perf.h"
-#include "perf_archmap.h"
+#include "ddprof_base.hpp"
+#include "perf.hpp"
+#include "perf_archmap.hpp"
 #include "savecontext.hpp"
 #include "syscalls.hpp"
 
 #include <thread>
 
-__attribute__((noinline)) static void *get_stack_start() {
+DDPROF_NOINLINE static void *get_stack_start() {
   void *stack_addr;
   size_t stack_size;
   pthread_attr_t attrs;
@@ -21,7 +22,7 @@ __attribute__((noinline)) static void *get_stack_start() {
   return stack_addr;
 }
 
-__attribute__((noinline)) static void *get_stack_start_tls() {
+DDPROF_NOINLINE static void *get_stack_start_tls() {
   thread_local static void *stack_addr = nullptr;
   if (!stack_addr) {
     size_t stack_size;

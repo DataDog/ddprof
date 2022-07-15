@@ -20,27 +20,19 @@ TEST(SymbolTest, compute_elf_range_offset) {
     <DEBUG>Oct 17 07:46:11 ddprof[587]: Insert: 6b0,f6f -> _ZN3tng4mainEiPPc,0,8 / shndx=16
     clang-format on
   */
-  RegionAddress_t region_pc = 0xe06;
-  ProcessAddress_t mod_lowaddr = 0x560b979b4000;
-  Offset_t dso_offset = 0x2000;
+  RegionAddress_t file_pc = 0x2e06;
   GElf_Sym elf_sym = {.st_name = 0,
                       .st_info = '\0',
                       .st_other = '\0',
                       .st_shndx = 0,
                       .st_value = 0x26b0,
                       .st_size = 0x8b8};
-  Offset_t bias = 0x560b979b4000; // addresses are in the file context
   RegionAddress_t start_sym;
   RegionAddress_t end_sym;
-  bool res = compute_elf_range(region_pc, mod_lowaddr, dso_offset, elf_sym,
-                               bias, start_sym, end_sym);
+  bool res = compute_elf_range(file_pc, elf_sym, start_sym, end_sym);
   EXPECT_TRUE(res);
-  EXPECT_EQ(start_sym, 0x6b0);
-  EXPECT_EQ(end_sym, 0xf6f);
-  region_pc = 0x2e06;
-  res = compute_elf_range(region_pc, mod_lowaddr, dso_offset, elf_sym, bias,
-                          start_sym, end_sym);
-  EXPECT_FALSE(res);
+  EXPECT_EQ(start_sym, 0x26b0);
+  EXPECT_EQ(end_sym, 0x2f67);
 }
 
 } // namespace ddprof

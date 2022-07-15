@@ -81,6 +81,8 @@ TEST(DSOTest, is_within) {
   fill_mock_hdr(dso_hdr);
   DsoFindRes find_res = dso_hdr.dso_find_closest(10, 1300);
   EXPECT_TRUE(find_res.second);
+  std::string dso_str = find_res.first->second.to_string();
+  EXPECT_EQ(dso_str, "PID[10] 3e8-5db 0 (bar.so.1)(T-Standard)(x)(ID#-1)");
   DsoHdr::DsoFindRes not_found = dso_hdr.find_res_not_found(10);
   ASSERT_FALSE(find_res == not_found);
   EXPECT_EQ(find_res.first->second._pid, 10);
@@ -194,18 +196,6 @@ TEST(DSOTest, path_type) {
   EXPECT_TRUE(syscall_dso._type == dso::kVsysCall);
 }
 
-TEST(DSOTest, file_dso) {
-  DsoHdr dso_hdr;
-  DsoFindRes insert_res =
-      dso_hdr.insert_erase_overlap(dso_hdr._map[10], build_dso_file_10_2500());
-  ASSERT_TRUE(insert_res.second);
-  const Dso &dso = insert_res.first->second;
-  // actual file access here
-  const RegionHolder *region = dso_hdr.find_or_insert_region(dso);
-  ASSERT_TRUE(region);
-  ASSERT_TRUE(region->get_region());
-}
-
 // clang-format off
 static const char *s_exec_line = "55d7883a1000-55d7883a5000 r-xp 00002000 fe:01 3287864                    /usr/local/bin/BadBoggleSolver_run";
 static const char *s_exec_line2 = "55d788391000-55d7883a1000 r-xp 00002000 fe:01 0                    /usr/local/bin/BadBoggleSolver_run_2";
@@ -315,6 +305,23 @@ TEST(DSOTest, backpopulate) {
   EXPECT_FALSE(find_res.second);
 }
 
+TEST(DSOTest, range_check) {
+  LogHandle loghandle;
+  ElfAddress_t ip = _THIS_IP_;
+  DsoHdr dso_hdr;
+  pid_t pid = getpid();
+  DsoFindRes find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
+  ASSERT_TRUE(find_res.second);
+  auto &map = dso_hdr._map[pid];
+  DDProfModRange mod_range;
+  DDRes res = dso_hdr.mod_range_or_backpopulate(find_res.first, map, mod_range);
+  EXPECT_TRUE(IsDDResOK(res));
+  printf("Range for %s = [0x%lx - 0x%lx] \n",
+         find_res.first->second._filename.c_str(), mod_range._low_addr,
+         mod_range._high_addr);
+  EXPECT_GE(find_res.first->second._start, mod_range._low_addr);
+}
+
 TEST(DSOTest, missing_dso) {
   LogHandle loghandle;
   DsoHdr dso_hdr;
@@ -323,27 +330,6 @@ TEST(DSOTest, missing_dso) {
   FileInfo file_info = dso_hdr.find_file_info(foo_dso);
   EXPECT_TRUE(file_info._path.empty());
   EXPECT_FALSE(file_info._inode);
-}
-
-TEST(DSOTest, pid_read_dso) {
-  ElfAddress_t ip = _THIS_IP_;
-  DsoHdr dso_hdr;
-  pid_t my_pid = getpid();
-  dso_hdr.dso_find_or_backpopulate(my_pid, ip);
-  const DsoHdr::DsoMap &map = dso_hdr._map[my_pid];
-  bool found = false;
-  for (auto it = map.begin(); it != map.end(); ++it) {
-    const Dso &dso = it->second;
-    if (dso._filename.find("c++") != std::string::npos && dso._pgoff == 0) {
-      ElfWord_t elf_word = 0;
-      DsoHdr::DsoFindRes find_res = dso_hdr.pid_read_dso(
-          my_pid, &elf_word, sizeof(ElfWord_t), dso._start + 0x100);
-      LG_DBG("Read result = %lx (dso %s)", elf_word, dso.to_string().c_str());
-      EXPECT_TRUE(find_res.second);
-      found = true;
-    }
-  }
-  EXPECT_TRUE(found);
 }
 
 // clang-format off
@@ -382,4 +368,16 @@ TEST(DSOTest, mmap_into_backpop) {
   // TODO: To be discussed - should we erase overlaping or not
 }
 
+TEST(DSOTest, exe_name) {
+  LogHandle handle;
+  ElfAddress_t ip = _THIS_IP_;
+  DsoHdr dso_hdr;
+  DsoFindRes find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
+  ASSERT_TRUE(find_res.second);
+  pid_t my_pid = getpid();
+  std::string exe_name;
+  bool found_exe = dso_hdr.find_exe_name(my_pid, exe_name);
+  EXPECT_TRUE(found_exe);
+  LG_NTC("%s", exe_name.c_str());
+}
 } // namespace ddprof

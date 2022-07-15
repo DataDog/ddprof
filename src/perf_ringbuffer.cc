@@ -3,11 +3,9 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include "perf_ringbuffer.h"
+#include "perf_ringbuffer.hpp"
 
-#include "logger.h"
-}
+#include "logger.hpp"
 
 #include <stdlib.h>
 

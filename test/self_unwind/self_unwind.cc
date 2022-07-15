@@ -3,32 +3,25 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-extern "C" {
-#include "ddprof.h"
-#include "ddprof_context.h"
-#include "ddprof_context_lib.h"
-#include "ddprof_input.h"
-#include "stack_handler.h"
-#include <sys/sysinfo.h>
-#include <unistd.h>
-}
-
-#include "arraysize.h"
+#include "ddprof.hpp"
+#include "ddprof_context.hpp"
+#include "ddprof_context_lib.hpp"
+#include "ddprof_input.hpp"
 #include "ddprof_output.hpp"
-#include "ddres.h"
+#include "ddres.hpp"
+#include "stack_handler.hpp"
 #include "stackchecker.hpp"
 
 #include <iostream>
+#include <sys/sysinfo.h>
 #include <unistd.h>
 
 static const char *k_test_executable = "BadBoggleSolver_run";
 
-extern "C" {
 // Callback to give to ddprof
 static bool stack_addtomap(const UnwindOutput *unwind_output,
                            const DDProfContext *ctx, void *callback_ctx,
                            int perf_option_pos);
-}
 
 namespace suw {
 
@@ -77,9 +70,10 @@ int main(int argc, char *const argv[]) {
   const char *argv_override[] = {MYNAME,    "--pid",     str_pid.c_str(),
                                  "--event", "sCPU,1000", (char *)NULL};
   SymbolMap symbol_map;
+  DDProfContext ctx;
 
   // size - 1 as we add a null char at the end
-  if (IsDDResNotOK(ddprof_input_parse(ARRAY_SIZE(argv_override) - 1,
+  if (IsDDResNotOK(ddprof_input_parse(std::size(argv_override) - 1,
                                       const_cast<char **>(argv_override),
                                       &input, &continue_exec))) {
     std::cerr << "unable to init input " << std::endl;
@@ -91,8 +85,6 @@ int main(int argc, char *const argv[]) {
     ret = -1;
     goto CLEANUP_INPUT;
   }
-
-  DDProfContext ctx;
 
   if (IsDDResNotOK(ddprof_context_set(&input, &ctx))) {
     std::cerr << "unable to init input " << std::endl;

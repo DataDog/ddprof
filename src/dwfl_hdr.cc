@@ -5,17 +5,14 @@
 
 #include "dwfl_hdr.hpp"
 
-extern "C" {
-#include "logger.h"
-}
+#include "ddprof_module_lib.hpp"
+#include "ddres.hpp"
+#include "logger.hpp"
 
 #include <algorithm>
 #include <cassert>
 #include <utility>
 #include <vector>
-
-#include "ddres.h"
-#include "dwfl_module.hpp"
 
 namespace ddprof {
 
@@ -63,23 +60,31 @@ DwflWrapper &DwflHdr::get_or_insert(pid_t pid) {
   return it->second;
 }
 
-DDRes DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
-                                const FileInfoValue &fileInfoValue) {
-  bool &mod_added = _mod_added[fileInfoValue.get_id()];
-  if (!mod_added) {
-    // first time we see this binary for this pid
-    DDProfMod ddprof_mod = update_module(_dwfl, pc, dso, fileInfoValue);
-    if (!ddprof_mod._mod) {
-      LG_WRN("Unable to register mod %s - %d", dso.to_string().c_str(),
-             ddprof_mod._status);
-      // If it overlaps with a previous binary we loaded, flag this
-      // inconsistency
-      _inconsistent = ddprof_mod._status == DDProfMod::kInconsistent;
-      return ddres_warn(DD_WHAT_UW_ERROR);
-    }
-    mod_added = true;
+DDProfMod *DwflWrapper::unsafe_get(FileInfoId_t file_info_id) {
+  auto it = _ddprof_mods.find(file_info_id);
+  if (it == _ddprof_mods.end()) {
+    return nullptr;
   }
-  return ddres_init();
+  return &it->second;
+}
+
+DDProfMod *DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
+                                     const DDProfModRange &mod_range,
+                                     const FileInfoValue &fileInfoValue) {
+
+  DDProfMod new_mod;
+  DDRes res = update_module(_dwfl, pc, mod_range, fileInfoValue, new_mod);
+  _inconsistent = new_mod._status == DDProfMod::kInconsistent;
+  if (IsDDResNotOK(res)) {
+    return nullptr;
+  }
+  if (IsDDResNotOK(update_bias(new_mod))) {
+    LG_DBG("Unable to compute bias from file (%s), PID %d, mod[%lx;%lx]",
+           fileInfoValue.get_path().c_str(), dso._pid, new_mod._low_addr,
+           new_mod._high_addr);
+    return nullptr;
+  }
+  return &(_ddprof_mods[fileInfoValue.get_id()] = new_mod);
 }
 
 void DwflHdr::clear_unvisited() {
@@ -104,7 +109,7 @@ int DwflHdr::get_nb_mod() const {
   std::for_each(
       _dwfl_map.begin(), _dwfl_map.end(),
       [&](std::unordered_map<pid_t, DwflWrapper>::value_type const &el) {
-        nb_mods += el.second._mod_added.size();
+        nb_mods += el.second._ddprof_mods.size();
       });
   return nb_mods;
 }
