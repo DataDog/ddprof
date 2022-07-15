@@ -4,6 +4,7 @@
 # This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
 
 set -euo pipefail
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 IFS=$'\n\t'
 
 usage() {
@@ -57,6 +58,8 @@ echo "Extracting elfutils"
 mkdir src
 cd src
 tar --no-same-owner --strip-components 1 -xf "../${TAR_ELF}"
+
+patch -p1 < "${SCRIPT_DIR}/elfutils.patch"
 
 # The flags below are hardcoded to work around clang compatibility issues in
 # elfutils 186; these are irrelevant for GCC.  Note that this won't propagate

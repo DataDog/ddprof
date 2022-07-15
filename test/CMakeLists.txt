@@ -267,16 +267,18 @@ add_unit_test(
     dwfl_module-ut
     dwfl_module-ut.cc
     ../src/dwfl_hdr.cc
-    ../src/dwfl_module.cc
+    ../src/ddprof_module_lib.cc
+    ../src/dwfl_symbol.cc
     ../src/dso.cc
     ../src/dso_hdr.cc
     ../src/ddprof_file_info.cc
     ../src/procutils.cc
     ../src/signal_helper.cc
-    LIBRARIES ${ELFUTILS_LIBRARIES}
+    LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
     DEFINITIONS MYNAME="dwfl_symbol-ut"
 )
 add_compile_definitions("DWFL_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
+set_property(TARGET dwfl_module-ut PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 
 add_unit_test(
     savecontext-ut
@@ -290,7 +292,7 @@ add_unit_test(
     ../src/dso_hdr.cc
     ../src/dso_symbol_lookup.cc
     ../src/dwfl_hdr.cc
-    ../src/dwfl_module.cc
+    ../src/ddprof_module_lib.cc
     ../src/dwfl_symbol.cc
     ../src/dwfl_symbol_lookup.cc
     ../src/dwfl_thread_callbacks.cc
@@ -322,7 +324,7 @@ add_unit_test(
     ../src/dso_hdr.cc
     ../src/dso_symbol_lookup.cc
     ../src/dwfl_hdr.cc
-    ../src/dwfl_module.cc
+    ../src/ddprof_module_lib.cc
     ../src/dwfl_symbol.cc
     ../src/dwfl_symbol_lookup.cc
     ../src/dwfl_thread_callbacks.cc
@@ -376,3 +378,9 @@ add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 
 add_exe(simple_malloc-static simple_malloc.cc
         LIBRARIES Threads::Threads dd_profiling-static)
+
+if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    add_exe(read_past_sp read_past_sp.cc)
+    target_include_directories(read_past_sp PRIVATE ${DDPROF_INCLUDE_LIST})
+    add_test(NAME read_past_sp COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/read_past_sp-ut.sh WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+endif()

@@ -11,6 +11,7 @@
 #include <malloc.h>
 
 #include "allocation_tracker.hpp"
+#include "ddprof_base.hpp"
 #include "unlikely.hpp"
 
 // Declaration of reallocarray is only available starting from glibc 2.28
@@ -55,13 +56,13 @@ DECLARE_FUNC(pvalloc);
 DECLARE_FUNC(valloc);
 
 namespace {
-void init() __attribute__((noinline));
+DDPROF_NOINLINE void init();
 
 // calloc is invoked by dlsym, returning a null value in this case is well
 // handled by glibc
 void *temp_calloc2(size_t, size_t) noexcept { return nullptr; }
 
-inline __attribute__((no_sanitize("address"))) void check_init() {
+inline DDPROF_NO_SANITIZER_ADDRESS void check_init() {
   [[maybe_unused]] static bool init_once = []() {
     init();
     return true;
