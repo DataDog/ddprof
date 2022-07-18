@@ -44,18 +44,33 @@ void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
   us->stack = sample_data_stack;
 }
 
+static bool is_ld(const std::string &path) {
+  // path is expected to not contain slashes
+  assert(path.rfind('/') == std::string::npos);
+
+  return path.starts_with("ld-");
+}
+
 static bool is_stack_complete(UnwindState *us) {
-  static constexpr std::array s_expected_root_frames{"_start"sv, "__clone"sv};
+  static constexpr std::array s_expected_root_frames{"_start"sv, "__clone"sv,
+                                                     "_exit"sv};
 
   if (us->output.nb_locs == 0) {
     return false;
   }
 
-  auto &symbol_table = us->symbol_hdr._symbol_table;
-  auto &root_func =
-      symbol_table[us->output.locs[us->output.nb_locs - 1]._symbol_idx]
-          ._symname;
+  const auto &root_loc = us->output.locs[us->output.nb_locs - 1];
+  const auto &root_mapping =
+      us->symbol_hdr._mapinfo_table[root_loc._map_info_idx];
 
+  // If we are in ld.so (eg. during lib init before main) consider the stack as
+  // complete
+  if (is_ld(root_mapping._sopath)) {
+    return true;
+  }
+
+  const auto &root_func =
+      us->symbol_hdr._symbol_table[root_loc._symbol_idx]._symname;
   return std::find(s_expected_root_frames.begin(), s_expected_root_frames.end(),
                    root_func) != s_expected_root_frames.end();
 }
