@@ -68,9 +68,13 @@ patch -p1 < "${SCRIPT_DIR}/elfutils.patch"
 if [[ "$(basename "${C_COMPILER}")" == clang* ]]; then
   export CFLAGS="-Wno-xor-used-as-pow -Wno-gnu-variable-sized-type-not-at-end -Wno-unused-but-set-parameter"
 fi
-export CFLAGS="${CFLAGS-""} ${EXTRA_CFLAGS}"
+# It is important NOT to set CFLAGS if you don't mean to
+# Otherwise you will not benefit from -O2 in the elfutils compilation
+if [ -n "${EXTRA_CFLAGS-""}" ]; then
+  export CFLAGS="${CFLAGS-""} ${EXTRA_CFLAGS}"
+fi
 
-echo "Compiling elfutils using ${C_COMPILER} / flags=$CFLAGS"
+echo "Compiling elfutils using ${C_COMPILER} / flags=${CFLAGS-""}"
 
 ./configure CC="${C_COMPILER}" --without-bzlib --without-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning --prefix "${TARGET_EXTRACT}"
 make "-j$(nproc)" install
