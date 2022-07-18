@@ -9,10 +9,10 @@ IFS=$'\n\t'
 
 usage() {
     echo "Usage :"
-    echo "$0 <version> <md5> <path> <c-compiler> <extra-c-flags>"
+    echo "$0 <version> <md5> <path> <c-compiler> <c-flags-override>"
     echo ""
     echo "The extra c flags should be a single arg (hence quoted)"
-    echo ""
+    echo "If specified, the default c flags should include \" -g -O2\""
     echo "Example"
     echo "  $0 0.183 6f58aa1b9af1a5681b1cbf63e0da2d67 ./vendor gcc \"-O0 -g\""
 }
@@ -26,10 +26,10 @@ VER_ELF=$1
 SHA512_ELF=$2
 TARGET_EXTRACT=$3
 C_COMPILER=${4}
-EXTRA_CFLAGS=""
+C_FLAGS_OVERRIDE=""
 # C flags are optional
 if [ "$#" -ge 5 ]; then
-  EXTRA_CFLAGS=${5}
+  C_FLAGS_OVERRIDE=${5}
 fi
 
 mkdir -p "${TARGET_EXTRACT}"
@@ -80,9 +80,17 @@ else
   echo "LIB is not detected as musl"
 fi
 
-export CFLAGS="${CFLAGS-""} ${EXTRA_CFLAGS}"
+# It is important NOT to set CFLAGS if you don't mean to
+# Otherwise you will not benefit from -O2 in the elfutils compilation
+if [ -n "${C_FLAGS_OVERRIDE-""}" ]; then
+  export CFLAGS="${CFLAGS-""} ${C_FLAGS_OVERRIDE}"
+else # Include the default flags for elfutils
+  if [ -n "${CFLAGS-""}" ]; then
+    export CFLAGS="${CFLAGS-""} -g -O2"
+  fi
+fi
 
-echo "Compiling elfutils using ${C_COMPILER} / flags=$CFLAGS / LDFLAGS=${LDFLAGS-""} / LIBS=${LIBS-""}"
+echo "Compiling elfutils using ${C_COMPILER} / flags=${CFLAGS-""}"
 
 ./configure CC="${C_COMPILER}" --without-bzlib --without-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning --prefix "${TARGET_EXTRACT}"
 
