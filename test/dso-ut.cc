@@ -382,38 +382,27 @@ TEST(DSOTest, exe_name) {
 }
 
 // clang-format off
-
-// We need to find bounds regardless of anon regions in the middle
-// 7f8db8da9000-7f8db8dcb000 r-xp 00000000 00:3e 6559274                    /usr/lib64/ld-2.17.so
-// 7f8db8fc3000-7f8db8fc6000 rw-p 00000000 00:00 0
-// 7f8db8fc7000-7f8db8fca000 rw-p 00000000 00:00 0
-// 7f8db8fca000-7f8db8fcb000 r--p 00021000 00:3e 6559274                    /usr/lib64/ld-2.17.so
-// 7f8db8fcb000-7f8db8fcc000 rw-p 00022000 00:3e 6559274                    /usr/lib64/ld-2.17.so
-
-
-
-//   Dso no_exec =
-//      DsoHdr::dso_from_procline(10, const_cast<char *>(s_line_noexec));
-
+// We need to find bounds regardless of anonynous regions in the middle
 static const char *s_split_ld_line[] = {
-    "7f8db8da9000-7f8db8dcb000 r-xp 00000000 00:3e 6559274                    /usr/lib64/ld-2.17.so",
+    "7f8db8da9000-7f8db8dcb000 r-xp 00000000 00:3e 6559274                    /usr/lib64/ld-2.17.so", // <-- we expect this as low
     "7f8db8fc3000-7f8db8fc6000 rw-p 00000000 00:00 0",
     "7f8db8fc7000-7f8db8fca000 rw-p 00000000 00:00 0",
     "7f8db8fca000-7f8db8fcb000 r--p 00021000 00:3e 6559274                    /usr/lib64/ld-2.17.so",
-    "7f8db8fcb000-7f8db8fcc000 rw-p 00022000 00:3e 6559274                    /usr/lib64/ld-2.17.so",
+    "7f8db8fcb000-7f8db8fcc000 rw-p 00022000 00:3e 6559274                    /usr/lib64/ld-2.17.so", // <-- we expect this as high
     "7f8db8fcc000-7f8db8fcf000 rw-p 00000000 00:3e 6559274                    //anon"
   };
+// Also surrounding anon regions should not be considered
 // clang-format on
 
 TEST(DSOTest, split_range) {
   LogHandle handle;
   DsoHdr dso_hdr;
-  size_t  nb_dso = sizeof(s_split_ld_line) / (sizeof(*s_split_ld_line));
+  size_t nb_dso = sizeof(s_split_ld_line) / (sizeof(*s_split_ld_line));
   for (unsigned i = 0; i < nb_dso; ++i) {
     dso_hdr.insert_erase_overlap(
         DsoHdr::dso_from_procline(10, const_cast<char *>(s_split_ld_line[i])));
   }
-  auto& map = dso_hdr._map[10];
+  auto &map = dso_hdr._map[10];
   auto find_res = dso_hdr.dso_find_closest(map, 10, 0x7f8db8fca0a0);
   DDProfModRange mod_range = dso_hdr.compute_mod_range(find_res.first, map);
   LG_DBG("%lx - %lx", mod_range._low_addr, mod_range._high_addr);
