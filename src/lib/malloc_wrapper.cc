@@ -203,7 +203,7 @@ void *temp_valloc(size_t size) noexcept {
 }
 
 #ifdef __llvm__
-void *reallocarray(void *ptr, size_t nmemb, size_t size) noexcept{
+void *reallocarray(void *ptr, size_t nmemb, size_t size) noexcept {
 #else
 void *reallocarray(void *ptr, size_t nmemb, size_t size) {
 #endif
