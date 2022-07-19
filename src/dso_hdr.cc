@@ -525,4 +525,14 @@ int DsoHdr::get_nb_dso() const {
   });
   return total_nb_elts;
 }
+
+void DsoHdr::reset_backpopulate_state() {
+  for (auto &el : _backpopulate_state_map) {
+    if (el.second._nbUnfoundDsos >
+        BackpopulateState::_k_nb_requests_between_backpopulates) {
+      el.second = BackpopulateState();
+    }
+  }
+}
+
 } // namespace ddprof

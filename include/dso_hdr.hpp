@@ -116,7 +116,7 @@ public:
   // find or parse procfs if allowed
   DsoFindRes dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr);
 
-  void reset_backpopulate_state() { _backpopulate_state_map.clear(); }
+  void reset_backpopulate_state();
   /******* HELPERS **********/
   // Find the dso if same
   static DsoFindRes dso_find_adjust_same(DsoMap &map, const Dso &dso);
@@ -160,6 +160,7 @@ private:
 
   struct BackpopulateState {
     BackpopulateState() : _nbUnfoundDsos(), _perm(kAllowed) {}
+    static const int _k_nb_requests_between_backpopulates = 10;
     int _nbUnfoundDsos;
     BackpopulatePermission _perm;
   };
