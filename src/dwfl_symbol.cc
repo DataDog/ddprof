@@ -7,7 +7,6 @@
 
 #include "dwfl_internals.hpp"
 #include "logger.hpp"
-
 #include <cassert>
 #include <llvm/Demangle/Demangle.h>
 #include <string_view>
@@ -70,6 +69,22 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
       symbol._srcpath = std::string(localsrcpath);
       symbol._lineno = static_cast<uint32_t>(linep);
     }
+    Offset_t dw_bias;
+    Dwarf_Line *dwarf_line = dwfl_dwarf_line (line, &dw_bias);
+    Dwarf *dwarf = dwfl_module_getdwarf(mod, &dw_bias);
+    if (dwarf && dwarf_line) {
+      const char *inline_func_name = dwarf_linefunctionname(dwarf, dwarf_line);
+      if (inline_func_name) {
+        symbol._symname = std::string(inline_func_name);
+        symbol._demangle_name = llvm::demangle(symbol._symname);
+        // hack to force lookup of this inlined func
+        elf_sym.st_size = 2;
+      }
+    }
+//    extern Dwarf *dwfl_module_getdwarf (Dwfl_Module *, Dwarf_Addr *bias)
+//        __nonnull_attribute__ (2);
+//    extern const char *dwarf_linefunctionname (Dwarf *dbg, Dwarf_Line *line);
+
 #ifdef DEBUG
     dwfl_error_value = dwfl_errno();
     if (unlikely(dwfl_error_value)) {

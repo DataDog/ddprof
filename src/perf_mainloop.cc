@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <assert.h>
 #include <errno.h>
+#include <sys/epoll.h>
 #include <poll.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,6 +29,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <unordered_map>
 
 static pid_t g_child_pid = 0;
 static bool g_termination_requested = false;
@@ -110,20 +112,33 @@ DDRes spawn_workers(PersistentWorkerState *persistent_worker_state,
   *is_worker = child_pid == 0;
   return {};
 }
+//typedef union epoll_data {
+//  void        *ptr;
+//  int          fd;
+//  uint32_t     u32;
+//  uint64_t     u64;
+//} epoll_data_t;
+//
+//struct epoll_event {
+//  uint32_t     events;      /* Epoll events */
+//  epoll_data_t data;        /* User data variable */
+//};
 
-static void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
-                         int *pfd_len) {
-  *pfd_len = pevent_hdr->size;
+
+static void pollfd_setup(const PEventHdr *pevent_hdr, struct epoll_event *events,
+                         int *events_length, std::unordered_map<int,int> &fd_to_pevent) {
+  *events_length = pevent_hdr->size;
   const PEvent *pes = pevent_hdr->pes;
   // Setup poll() to watch perf_event file descriptors
-  for (int i = 0; i < *pfd_len; ++i) {
+  for (int i = 0; i < *events_length; ++i) {
     // NOTE: if fd is negative, it will be ignored
-    pfd[i].fd = pes[i].fd;
-    pfd[i].events = POLLIN | POLLERR | POLLHUP;
+    events[i].data.fd = pes[i].fd;
+    fd_to_pevent[pes[i].fd] = i;
+    events[i].events = POLLIN | POLLERR | POLLHUP;
   }
 }
 
-static DDRes signalfd_setup(pollfd *pfd) {
+static DDRes signalfd_setup(struct epoll_event *epoll_event) {
   sigset_t mask;
 
   sigemptyset(&mask);
@@ -134,8 +149,9 @@ static DDRes signalfd_setup(pollfd *pfd) {
   int sfd = signalfd(-1, &mask, 0);
   DDRES_CHECK_ERRNO(sfd, DD_WHAT_WORKERLOOP_INIT, "Could not set signalfd");
 
-  pfd->fd = sfd;
-  pfd->events = POLLIN;
+  epoll_event->data.fd = sfd;
+  epoll_event->events = POLLIN;
+
   return {};
 }
 
@@ -197,51 +213,73 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
   // Setup poll() to watch perf_event file descriptors
   int pe_len = ctx->worker_ctx.pevent_hdr.size;
   // one extra slot in pfd to accomodate for signal fd
-  struct pollfd pfds[MAX_NB_PERF_EVENT_OPEN + 1];
-  int pfd_len = 0;
-  pollfd_setup(&ctx->worker_ctx.pevent_hdr, pfds, &pfd_len);
+  struct epoll_event events[MAX_NB_PERF_EVENT_OPEN + 1];
+  int epoll_fd = epoll_create1(0);
+  DDRES_CHECK_INT(epoll_fd, DD_WHAT_POLLERROR, "error opening epoll");
+  std::unordered_map<int,int> fd_to_pevent;
 
-  DDRES_CHECK_FWD(signalfd_setup(&pfds[pfd_len]));
-  int signal_pos = pfd_len++;
+  int events_length = 0;
+  pollfd_setup(&ctx->worker_ctx.pevent_hdr, events, &events_length, fd_to_pevent);
 
+  DDRES_CHECK_FWD(signalfd_setup(&events[events_length]));
+  int signal_pos = events_length++;
+  fd_to_pevent[events[signal_pos].data.fd] = signal_pos;
   // Perform user-provided initialization
   defer { attr->finish_fun(ctx); };
+  defer{ close(epoll_fd); };
   DDRES_CHECK_FWD(attr->init_fun(ctx, persistent_worker_state));
 
   bool samples_left_in_buffer = false;
   bool stop = false;
 
+  for (int i = 0; i != events_length; ++i) {
+    DDRES_CHECK_INT(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, events[i].data.fd, &events[i]), DD_WHAT_POLLERROR, "error activating epoll");
+  }
   // Worker poll loop
   while (!stop) {
     // Convenience structs
     PEvent *pes = ctx->worker_ctx.pevent_hdr.pes;
 
     if (!samples_left_in_buffer) {
-      int n = poll(pfds, pfd_len, PSAMPLE_DEFAULT_WAKEUP_MS);
+      struct epoll_event received_events[MAX_NB_PERF_EVENT_OPEN + 1];
+      int event_count = epoll_wait(epoll_fd, received_events,
+                                   events_length, PSAMPLE_DEFAULT_WAKEUP_MS);
 
       // If there was an issue, return and let the caller check errno
-      if (-1 == n && errno == EINTR) {
+      if (-1 == event_count && errno == EINTR) {
         continue;
       }
-      DDRES_CHECK_ERRNO(n, DD_WHAT_POLLERROR, "poll failed");
+      DDRES_CHECK_ERRNO(event_count, DD_WHAT_POLLERROR, "poll failed");
 
-      if (pfds[signal_pos].revents & POLLIN) {
-        LG_NFO("Received termination signal");
-        break;
-      }
-
-      for (int i = 0; i < pe_len; ++i) {
-        pollfd &pfd = pfds[i];
-        if (pfd.revents & POLLHUP) {
+      std::string event_status(events_length, '0');
+      for (int i = 0; i < event_count; ++i) {
+        epoll_event &cur_event = received_events[i];
+        int pos = fd_to_pevent[cur_event.data.fd];
+        event_status[pos] = '1';
+        bool is_signal = (pos == signal_pos);
+        if (cur_event.events & POLLHUP) {
           stop = true;
-        } else if (pfd.revents & POLLIN && pes[i].custom_event) {
-          // for custom ring buffer, need to read from eventfd to flush POLLIN
-          // status
-          uint64_t count;
-          DDRES_CHECK_ERRNO(read(pes[i].fd, &count, sizeof(count)),
-                            DD_WHAT_PERFRB, "Failed to read from evenfd");
+        }
+
+        if (is_signal && cur_event.events & POLLIN) {
+          // TODO BUG : we do not come to check signal if we are processing
+          // A lot of events
+          LG_NFO("Received termination signal");
+          stop = true;
+          break;
+        }
+        if (static_cast<unsigned>(pos) < ctx->worker_ctx.pevent_hdr.size) {
+          // TODO : this is fragile (using POS is pes)
+          if (cur_event.events & POLLIN && pes[pos].custom_event) {
+            // for custom ring buffer, need to read from eventfd to flush POLLIN
+            // status
+            uint64_t count;
+            DDRES_CHECK_ERRNO(read(pes[i].fd, &count, sizeof(count)),
+                              DD_WHAT_PERFRB, "Failed to read from evenfd");
+          }
         }
       }
+      LG_NTC("Events ----- %s (%d)", event_status.c_str(), event_count);
     }
 
     int64_t now_ns = 0;
@@ -253,6 +291,7 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
       // return directly no need to do a final export
       return {};
     }
+    LG_NTC("samples left == %s", samples_left_in_buffer?"true":"false");
   }
 
   // export current samples before exiting

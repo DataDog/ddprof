@@ -44,7 +44,6 @@ static const DDPROF_STATS s_cycled_stats[] = {STATS_UNWIND_CPU_USAGE,
                                               STATS_TARGET_CPU_USAGE};
 
 static const long k_clock_ticks_per_sec = sysconf(_SC_CLK_TCK);
-static const unsigned s_nb_samples_per_backpopulate = 200;
 
 /// Human readable runtime information
 static void print_diagnostics(const DsoHdr &dso_hdr) {
@@ -529,12 +528,6 @@ DDRes ddprof_worker_process_event(struct perf_event_header *hdr,
       break;
     }
 
-    // backpopulate if needed
-    if (++ctx->worker_ctx.count_samples > s_nb_samples_per_backpopulate) {
-      // allow new backpopulates and reset counter
-      ctx->worker_ctx.us->dso_hdr.reset_backpopulate_state();
-      ctx->worker_ctx.count_samples = 0;
-    }
   }
   CatchExcept2DDRes();
   return ddres_init();
