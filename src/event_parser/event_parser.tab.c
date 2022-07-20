@@ -104,7 +104,9 @@ Maintained by Magnus Ekdahl <magnus@debian.org>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "event_config.h"
+#include "perf_archmap.hpp"
 
 /*
 #define YYSTYPE char *
@@ -119,10 +121,6 @@ extern int yylex();
 extern int yyparse();
 extern YY_BUFFER_STATE yy_scan_string(const char * str);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
-
-uint8_t reg_from_parameter(uint64_t parameter) {
-  return 1;
-}
 
 uint8_t mode_from_str(const char *str) {
   uint8_t mode = EVENT_NONE;
@@ -259,7 +257,7 @@ int main(int c, char **v) {
 }
 #endif
 
-#line 164 "event_parser.y"
+#line 162 "event_parser.y"
 typedef union {
 	uint64_t num;
 	char *str;
@@ -660,7 +658,7 @@ static const short yyrhs[] = {    12,
 
 #if (YY_event_parse_DEBUG != 0) || defined(YY_event_parse_ERROR_VERBOSE) 
 static const short yyrline[] = { 0,
-   191,   194,   199,   200,   203,   212,   248,   251,   254,   254
+   189,   192,   197,   198,   201,   210,   246,   249,   252,   252
 };
 
 static const char * const yytname[] = {   "$","error","$illegal.","EQ","OPTSEP",
@@ -1201,27 +1199,27 @@ YYLABEL(yyreduce)
   switch (yyn) {
 
 case 1:
-#line 191 "event_parser.y"
+#line 189 "event_parser.y"
 { 
           conf_finalize(&g_accum_event_conf);
       ;
     break;}
 case 2:
-#line 194 "event_parser.y"
+#line 192 "event_parser.y"
 { 
           conf_finalize(&g_accum_event_conf);
       ;
     break;}
 case 3:
-#line 199 "event_parser.y"
+#line 197 "event_parser.y"
 { ;
     break;}
 case 4:
-#line 200 "event_parser.y"
+#line 198 "event_parser.y"
 { ;
     break;}
 case 5:
-#line 203 "event_parser.y"
+#line 201 "event_parser.y"
 {
        switch(yyval.field) {
          case ECF_EVENT: g_accum_event_conf.eventname = yyvsp[0].str; break;
@@ -1233,7 +1231,7 @@ case 5:
      ;
     break;}
 case 6:
-#line 212 "event_parser.y"
+#line 210 "event_parser.y"
 {
        switch(yyval.field) {
          case ECF_ID: g_accum_event_conf.id = yyvsp[0].num; break;
@@ -1243,7 +1241,7 @@ case 6:
          case ECF_REGISTER: g_accum_event_conf.register_num = yyvsp[0].num; break;
          case ECF_MODE: g_accum_event_conf.mode = yyvsp[0].num & EVENT_BOTH; break;
          case ECF_PARAMETER:
-           g_accum_event_conf.register_num = reg_from_parameter(yyvsp[0].num);
+           g_accum_event_conf.register_num = param_to_regno(yyvsp[0].num);
            break;
        }
 
@@ -1272,14 +1270,14 @@ case 6:
      ;
     break;}
 case 7:
-#line 248 "event_parser.y"
+#line 246 "event_parser.y"
 {
        if (yyval.field == ECF_ARGCOEFF)
          g_accum_event_conf.arg_coeff = yyvsp[0].fpnum;
      ;
     break;}
 case 8:
-#line 251 "event_parser.y"
+#line 249 "event_parser.y"
 { ;
     break;}
 }
@@ -1486,4 +1484,4 @@ YYLABEL(yyerrhandle)
 /* END */
 
  #line 1038 "/usr/share/bison++/bison.cc"
-#line 255 "event_parser.y"
+#line 253 "event_parser.y"

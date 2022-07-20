@@ -83,45 +83,6 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
   return true;
 }
 
-#define R(x) REGNAME(x)
-#ifdef __x86_64__
-int arg2reg[] = {-1, R(RDI), R(RSI), R(RDX), R(RCX), R(R8), R(R9)};
-#elif __aarch64__
-int arg2reg[] = {-1, R(X0), R(X1), R(X2), R(X3), R(X4), R(X5), R(X6)};
-#else
-#  error Your architecture is not supported
-#endif
-#undef R
-uint8_t get_register(const char *str) {
-  uint8_t reg = 0;
-  char *str_copy = (char *)str;
-  long reg_buf = strtol(str, &str_copy, 10);
-  if (!*str_copy) {
-    reg = reg_buf;
-  } else {
-    reg = 0;
-    LG_NTC("Could not parse register %s", str);
-  }
-
-  // If we're here, then we have a register.
-  return arg2reg[reg];
-}
-
-bool get_trace_format(const char *str, uint8_t *trace_off, uint8_t *trace_sz) {
-  if (!str)
-    return false;
-
-  const char *period = std::strchr(str, '.');
-  if (!period)
-    return false;
-
-  *trace_off = strtol(str, nullptr, 10);
-  *trace_sz = strtol(period + 1, nullptr, 10);
-
-  // Error if the size is zero, otherwise fine probably
-  return !trace_sz;
-}
-
 int tracepoint_id_from_event(const char *eventname, const char *groupname) {
   if (!eventname || !*eventname || !groupname || !*groupname)
     return -1;

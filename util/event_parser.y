@@ -3,7 +3,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "event_config.h"
+#include "perf_archmap.hpp"
 
 /*
 #define YYSTYPE char *
@@ -18,10 +20,6 @@ extern int yylex();
 extern int yyparse();
 extern YY_BUFFER_STATE yy_scan_string(const char * str);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
-
-uint8_t reg_from_parameter(uint64_t parameter) {
-  return 1;
-}
 
 uint8_t mode_from_str(const char *str) {
   uint8_t mode = EVENT_NONE;
@@ -218,7 +216,7 @@ opt: KEY EQ WORD {
          case ECF_REGISTER: g_accum_event_conf.register_num = $3; break;
          case ECF_MODE: g_accum_event_conf.mode = $3 & EVENT_BOTH; break;
          case ECF_PARAMETER:
-           g_accum_event_conf.register_num = reg_from_parameter($3);
+           g_accum_event_conf.register_num = param_to_regno($3);
            break;
        }
 

@@ -89,3 +89,11 @@ enum PERF_ARCHMAP_ARM {
 // cppcheck-suppress preprocessorErrorDirective
 #  error Architecture not supported
 #endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+int param_to_regno(unsigned int param_no);
+#ifdef __cplusplus
+}
+#endif
