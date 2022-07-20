@@ -63,3 +63,13 @@ typedef struct EventConf {
   EventConfCadenceType cad_type;
   uint64_t cadence;
 } EventConf;
+
+// This header will be used both by the ddprof C++ code and the C compiler for
+// the parser-generator
+#ifdef __cplusplus
+extern "C" {
+#endif
+EventConf *EventConf_parse(const char *msg); // provided by event_parser.c
+#ifdef __cplusplus
+}
+#endif

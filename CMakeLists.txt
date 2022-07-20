@@ -123,13 +123,16 @@ aux_source_directory(src COMMON_SRC)
 aux_source_directory(src/pprof PPROF_SRC)
 aux_source_directory(src/exporter EXPORTER_SRC)
 aux_source_directory(src/exe EXE_SRC)
+aux_source_directory(src/event_parser EVENT_PARSER_SRC)
 
 # Define all sources
 set(DDPROF_GLOBAL_SRC
    ${COMMON_SRC}
    ${PPROF_SRC}
    ${EXPORTER_SRC}
-   ${EXE_SRC})
+   ${EXE_SRC}
+   ${EVENT_PARSER_SRC}
+)
 
 set(DDPROF_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 

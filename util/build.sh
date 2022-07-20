@@ -1,22 +1,17 @@
 #!/bin/bash
 set -euo pipefail 
+# This should only need to be run when the .y or .l files change
 
 ONAME="event_parser"
+INCLUDE_DIR=../include
+SOURCE_DIR=../src/${ONAME}
 
 lex -o${ONAME}.lex.c ${ONAME}.l
 yacc -v "-o${ONAME}.tab.c" -d ${ONAME}.y
-cc -g ${ONAME}.lex.c ${ONAME}.tab.c -I../../../include -o event
-
-#./event "JustAnEvent"
-#./event "OneGroup:OneEvent"
-#./event 555
-#./event 'EventWithRegister%2'
-#./event 'EventWithOffset$24'
-#./event 'EventWithOffsetAndSize$24.4'
-#./event 'EventWithMetric|M'
-#./event 'EventWithCallgraph|G'
-#./event 'EventWithBoth|MG'
-#./event 'Group:Event$2.1@5|MG'
+cc -O3 -DEVENT_PARSER_MAIN ${ONAME}.lex.c ${ONAME}.tab.c -I${INCLUDE_DIR} -o event
+mkdir -p ${SOURCE_DIR}
+mv ${ONAME}.h ${INCLUDE_DIR}
+mv *.c ${SOURCE_DIR}
 
 ./event 'event=value'
 ./event 'eventname=value'

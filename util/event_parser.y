@@ -74,7 +74,7 @@ void conf_finalize(EventConf *conf) {
     } else if (conf->eventname) {
       conf->label = strdup(conf->eventname);
     } else if (conf->id) {
-      size_t buf_sz = strlen("id:") + 10 + 2; // ~10 digits
+      size_t buf_sz = strlen("id:") + 20 + 2; // 2^64 has 20 digits
       conf->label = malloc(buf_sz);
       if (!conf->label) {
         // This is an error.  Technically we should probably just shut down the
@@ -122,7 +122,6 @@ void conf_print(const EventConf *tp) {
 }
 
 EventConf g_accum_event_conf = {0};
-bool error_on_last_parse = true;
 
 void yyerror(const char *str) {
 #if (YYDEBUG == 1)
@@ -130,7 +129,6 @@ void yyerror(const char *str) {
 #endif 
 }
 
-bool g_debugout_enable = false;
 EventConf *EventConf_parse(const char *msg) {
   memset(&g_accum_event_conf, 0, sizeof(g_accum_event_conf));
   int ret = -1;
@@ -140,6 +138,8 @@ EventConf *EventConf_parse(const char *msg) {
   return 0 == ret ? &g_accum_event_conf : NULL;
 }
 
+#ifdef EVENT_PARSER_MAIN
+bool g_debugout_enable = false;
 int main(int c, char **v) { 
   g_debugout_enable = false;
   if (c) {
@@ -156,6 +156,7 @@ int main(int c, char **v) {
   }
   return 0;
 }
+#endif
 %}
 
 %name event_parse

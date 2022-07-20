@@ -16,6 +16,8 @@
 #include <unistd.h>
 
 #include "ddres_helpers.hpp"
+#include "event_config.h"
+#include "event_parser.h"
 #include "perf_archmap.hpp"
 #include "perf_watcher.hpp"
 
@@ -121,7 +123,7 @@ bool get_trace_format(const char *str, uint8_t *trace_off, uint8_t *trace_sz) {
 }
 
 int tracepoint_id_from_event(const char *eventname, const char *groupname) {
-  if (!event || !*event || !group || !*group)
+  if (!eventname || !*eventname || !groupname || !*groupname)
     return -1;
 
   static char path[4096]; // Arbitrary, but path sizes limits are difficult
@@ -130,16 +132,11 @@ int tracepoint_id_from_event(const char *eventname, const char *groupname) {
   size_t pathsz =
       snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/id",
                groupname, eventname);
-  if (pathsz >= sizeof(path)) {
-    // Possibly ran out of room
-    free(str);
+  if (pathsz >= sizeof(path))
     return -1;
-  }
   int fd = open(path, O_RDONLY);
-  if (-1 == fd) {
-    free(str);
+  if (-1 == fd)
     return -1;
-  }
 
   // Read the data in an eintr-safe way
   int read_ret = -1;
@@ -150,30 +147,62 @@ int tracepoint_id_from_event(const char *eventname, const char *groupname) {
   close(fd);
   if (read_ret > 0)
     trace_id = strtol(buf, &buf_copy, 10);
-  if (*buf_copy && *buf_copy != '\n') {
-    free(str);
+  if (*buf_copy && *buf_copy != '\n')
     return false;
-  }
 
   return trace_id;
 }
 
 // If this returns false, then the passed watcher should be regarded as invalid
 bool watcher_from_tracepoint(const char *str, PerfWatcher *watcher) {
+  EventConf *conf = EventConf_parse(str);
+  if (!conf)
+    return false;
 
-  // OK done
+  // Start out with the correct template.
   *watcher = *twatcher_default();
-  watcher->config = trace_id;
-  watcher->sample_period = period;
-  if (is_raw)
-    watcher->sample_type |= PERF_SAMPLE_RAW;
-  if (reg) {
-    watcher->reg = reg;
+
+  // The most likely thing to be invalid is the selection of the tracepoint
+  // from the trace events system.  If the conf has a nonzero number for the id
+  // we assume the user has privileged information and knows what they want.
+  // Else, we use the group/event combination to extract that id from the
+  // tracefs filesystem in the canonical way.
+  int tracepoint_id = -1;
+  if (conf->id > 0) {
+    tracepoint_id = conf->id;
   } else {
-    watcher->trace_off = trace_off;
-    watcher->trace_sz = trace_sz;
+    tracepoint_id = tracepoint_id_from_event(conf->eventname, conf->groupname);
   }
-  watcher->tracepoint_group = groupname;
-  watcher->tracepoint_name = tracename;
+
+  if (tracepoint_id == -1) {
+    return false;
+  }
+  watcher->config = tracepoint_id;
+
+  // Configure the sampling strategy.  If no valid conf, use template default
+  if (conf->cad_type == ECCAD_PERIOD && conf->cadence > 0) {
+    watcher->sample_period = conf->cadence;
+  } else if (conf->cad_type == ECCAD_FREQ && conf->cadence > 0) {
+    watcher->sample_frequency = conf->cadence;
+    watcher->options.is_freq = true;
+  }
+
+  // Configure the data source
+  if (conf->loc_type == ECLOC_RAW) {
+    watcher->sample_type |= PERF_SAMPLE_RAW;
+    watcher->trace_off = conf->arg_offset;
+    if (conf->arg_size > 0)
+      watcher->trace_sz = conf->arg_size;
+    else
+      watcher->trace_sz = sizeof(uint64_t); // default raw entry
+  } else if (conf->loc_type == ECLOC_REG) {
+    watcher->reg = conf->register_num;
+  }
+
+  if (conf->arg_coeff != 0.0)
+    watcher->value_coefficient = conf->arg_coeff;
+
+  watcher->tracepoint_group = conf->groupname;
+  watcher->tracepoint_name = conf->eventname;
   return true;
 }
