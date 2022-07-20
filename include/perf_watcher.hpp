@@ -40,6 +40,7 @@ typedef struct PerfWatcher {
   uint8_t reg;
   uint8_t trace_off;
   uint8_t trace_sz;
+  double value_coefficient;
   const char *tracepoint_name;
   const char *tracepoint_group;
   // Other configs

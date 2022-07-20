@@ -16,6 +16,8 @@
 #include <unistd.h>
 
 #include "ddres_helpers.hpp"
+#include "event_config.h"
+#include "event_parser.h"
 #include "perf_archmap.hpp"
 #include "perf_watcher.hpp"
 
@@ -120,94 +122,21 @@ bool get_trace_format(const char *str, uint8_t *trace_off, uint8_t *trace_sz) {
   return !trace_sz;
 }
 
-// If this returns false, then the passed watcher should be regarded as invalid
-bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
-  // minimum form; provides counts, samples every hit
-  // -t groupname:tracename
-  // Register-qualified form
-  // -t groupname:tracename%REG
-  // -t groupname:tracename$offset.size
-  // Sample-qualified form, sets a period value
-  // -t groupname:tracename@period
-  // full
-  // -t groupename:tracename%REG@period
-  // groupname, tracename, REG - strings
-  // REG - can be a number 1-6
-  // period is a number
-  char *str = strdup(_str);
-  size_t sz_str = strlen(str);
-  const char *groupname;
-  const char *tracename;
-  uint8_t reg = 0;
-  uint64_t period = 1;
-  bool is_raw = false;
-  uint8_t trace_off = 0;
-  uint8_t trace_sz = 0;
+int tracepoint_id_from_event(const char *eventname, const char *groupname) {
+  if (!eventname || !*eventname || !groupname || !*groupname)
+    return -1;
 
-  // Check format
-  if (!sz_str) {
-    free(str);
-    return false;
-  }
-  char *colon = strchr(str, ':');
-  char *perc = strchr(str, '%');
-  char *amp = strchr(str, '@');
-  char *dollar = strchr(str, '$');
-
-  if (!colon || (dollar && perc)) {
-    free(str);
-    return false;
-  }
-
-  // Split strings
-  *colon = 0; // colon is true from previous check
-  if (perc)
-    *perc = 0;
-  if (amp)
-    *amp = 0;
-  if (dollar)
-    *dollar = 0;
-
-  // Name checking
-  groupname = str;
-  tracename = colon + 1;
-
-  // If a register is specified, process that
-  if (perc)
-    reg = get_register(perc + 1);
-
-  // OTOH, if an offset into the raw event is specified, get that
-  if (dollar && !get_trace_format(dollar + 1, &trace_off, &trace_sz)) {
-    is_raw = true;
-  } else {
-    trace_off = 0;
-    trace_sz = 0;
-  }
-
-  // If the user specified a period, make sure it is valid
-  if (amp) {
-    char *str_check = (char *)str;
-    uint64_t buf = strtoll(amp + 1, &str_check, 10);
-    if (!*str_check)
-      period = buf;
-  }
-
-  char path[2048] = {0}; // somewhat arbitrarily
-  char buf[64] = {0};
+  static char path[4096]; // Arbitrary, but path sizes limits are difficult
+  static char buf[64];    // For reading
   char *buf_copy = buf;
-  int pathsz =
+  size_t pathsz =
       snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/id",
-               groupname, tracename);
-  if (static_cast<size_t>(pathsz) >= sizeof(path)) {
-    // Possibly ran out of room
-    free(str);
-    return false;
-  }
+               groupname, eventname);
+  if (pathsz >= sizeof(path))
+    return -1;
   int fd = open(path, O_RDONLY);
-  if (-1 == fd) {
-    free(str);
-    return false;
-  }
+  if (-1 == fd)
+    return -1;
 
   // Read the data in an eintr-safe way
   int read_ret = -1;
@@ -218,36 +147,62 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
   close(fd);
   if (read_ret > 0)
     trace_id = strtol(buf, &buf_copy, 10);
-  if (*buf_copy && *buf_copy != '\n') {
-    free(str);
+  if (*buf_copy && *buf_copy != '\n')
+    return false;
+
+  return trace_id;
+}
+
+// If this returns false, then the passed watcher should be regarded as invalid
+bool watcher_from_tracepoint(const char *str, PerfWatcher *watcher) {
+  EventConf *conf = EventConf_parse(str);
+  if (!conf)
+    return false;
+
+  // Start out with the correct template.
+  *watcher = *twatcher_default();
+
+  // The most likely thing to be invalid is the selection of the tracepoint
+  // from the trace events system.  If the conf has a nonzero number for the id
+  // we assume the user has privileged information and knows what they want.
+  // Else, we use the group/event combination to extract that id from the
+  // tracefs filesystem in the canonical way.
+  int tracepoint_id = -1;
+  if (conf->id > 0) {
+    tracepoint_id = conf->id;
+  } else {
+    tracepoint_id = tracepoint_id_from_event(conf->eventname, conf->groupname);
+  }
+
+  if (tracepoint_id == -1) {
     return false;
   }
+  watcher->config = tracepoint_id;
 
-  // Check enablement, just to print a log.  We still enable instrumentation.
-  snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/enable",
-           groupname, tracename);
-  fd = open(path, O_RDONLY);
-  if (-1 == fd || 1 != read(fd, buf, 1) || '0' != *buf) {
-    LG_NTC("Tracepint %s:%s is not enabled.  Instrumentation will proceed, but "
-           "you may not have any events.",
-           groupname, tracename);
-  } else {
-    LG_NFO("Tracepoint %s:%s successfully enabled", groupname, tracename);
+  // Configure the sampling strategy.  If no valid conf, use template default
+  if (conf->cad_type == ECCAD_PERIOD && conf->cadence > 0) {
+    watcher->sample_period = conf->cadence;
+  } else if (conf->cad_type == ECCAD_FREQ && conf->cadence > 0) {
+    watcher->sample_frequency = conf->cadence;
+    watcher->options.is_freq = true;
   }
 
-  // OK done
-  *watcher = *twatcher_default();
-  watcher->config = trace_id;
-  watcher->sample_period = period;
-  if (is_raw)
+  // Configure the data source
+  if (conf->loc_type == ECLOC_RAW) {
     watcher->sample_type |= PERF_SAMPLE_RAW;
-  if (reg) {
-    watcher->reg = reg;
-  } else {
-    watcher->trace_off = trace_off;
-    watcher->trace_sz = trace_sz;
+    watcher->trace_off = conf->arg_offset;
+    if (conf->arg_size > 0)
+      watcher->trace_sz = conf->arg_size;
+    else
+      watcher->trace_sz = sizeof(uint64_t); // default raw entry
+  } else if (conf->loc_type == ECLOC_REG) {
+    watcher->reg = conf->register_num;
   }
-  watcher->tracepoint_group = groupname;
-  watcher->tracepoint_name = tracename;
+
+  if (conf->arg_coeff != 0.0)
+    watcher->value_coefficient = conf->arg_coeff;
+
+  watcher->tracepoint_group = conf->groupname;
+  watcher->tracepoint_name = conf->eventname;
   return true;
 }
