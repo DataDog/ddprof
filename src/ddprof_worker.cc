@@ -36,12 +36,11 @@
 
 using namespace ddprof;
 
-static const DDPROF_STATS s_cycled_stats[] = {STATS_UNWIND_CPU_USAGE,
-                                              STATS_EVENT_COUNT,
-                                              STATS_EVENT_LOST,
-                                              STATS_SAMPLE_COUNT,
-                                              STATS_DSO_UNHANDLED_SECTIONS,
-                                              STATS_TARGET_CPU_USAGE};
+static const DDPROF_STATS s_cycled_stats[] = {
+    STATS_UNWIND_AVG_TIME, STATS_AGGREGATION_AVG_TIME,
+    STATS_EVENT_COUNT,     STATS_EVENT_LOST,
+    STATS_SAMPLE_COUNT,    STATS_DSO_UNHANDLED_SECTIONS,
+    STATS_TARGET_CPU_USAGE};
 
 static const long k_clock_ticks_per_sec = sysconf(_SC_CLK_TCK);
 
@@ -157,18 +156,34 @@ static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr,
   int64_t target_millicores = (target_cpu_nsec * 1000) / elapsed_nsec;
   ddprof_stats_set(STATS_TARGET_CPU_USAGE, target_millicores);
 
-  long tsc_cycles;
-  ddprof_stats_get(STATS_UNWIND_CPU_USAGE, &tsc_cycles);
-  int64_t unwind_millicores =
-      (ddprof::tsc_cycles_to_ns(tsc_cycles) * 1000) / elapsed_nsec;
-  ddprof_stats_set(STATS_UNWIND_CPU_USAGE, unwind_millicores);
-
   long nsamples = 0;
   ddprof_stats_get(STATS_SAMPLE_COUNT, &nsamples);
+
+  long tsc_cycles;
+  ddprof_stats_get(STATS_UNWIND_AVG_TIME, &tsc_cycles);
+  int64_t avg_unwind_ns =
+      nsamples > 0 ? ddprof::tsc_cycles_to_ns(tsc_cycles) / nsamples : -1;
+
+  ddprof_stats_set(STATS_UNWIND_AVG_TIME, avg_unwind_ns);
+
+  ddprof_stats_get(STATS_AGGREGATION_AVG_TIME, &tsc_cycles);
+  int64_t avg_aggregation_ns =
+      nsamples > 0 ? ddprof::tsc_cycles_to_ns(tsc_cycles) / nsamples : -1;
+
+  ddprof_stats_set(STATS_AGGREGATION_AVG_TIME, avg_aggregation_ns);
+
   if (nsamples != 0) {
     ddprof_stats_divide(STATS_UNWIND_AVG_STACK_SIZE, nsamples);
+    ddprof_stats_divide(STATS_UNWIND_AVG_STACK_DEPTH, nsamples);
+  } else {
+    ddprof_stats_set(STATS_UNWIND_AVG_STACK_SIZE, -1);
+    ddprof_stats_set(STATS_UNWIND_AVG_STACK_DEPTH, -1);
   }
 
+  ddprof_stats_set(
+      STATS_PROFILE_DURATION,
+      std::chrono::duration_cast<std::chrono::milliseconds>(cycle_duration)
+          .count());
   return ddres_init();
 }
 
@@ -186,7 +201,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     ddprof_stats_add(STATS_UNWIND_TRUNCATED_INPUT, 1, nullptr);
   }
 
-  unsigned long this_ticks_unwind = ddprof::get_tsc_cycles();
+  auto ticks0 = ddprof::get_tsc_cycles();
   // copy the sample context into the unwind structure
   unwind_init_sample(us, sample->regs, sample->pid, sample->size_stack,
                      sample->data_stack);
@@ -199,6 +214,10 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   if (ctx->watchers[watcher_pos].config == PERF_COUNT_SW_TASK_CLOCK)
     ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
   DDRes res = unwindstate__unwind(us);
+
+  auto unwind_ticks = ddprof::get_tsc_cycles();
+  DDRES_CHECK_FWD(
+      ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL));
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
   if (!IsDDResFatal(res)) {
@@ -221,11 +240,12 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     }
 #endif
   }
-  DDRES_CHECK_FWD(ddprof_stats_add(STATS_UNWIND_CPU_USAGE,
-                                   ddprof::get_tsc_cycles() - this_ticks_unwind,
+
+  DDRES_CHECK_FWD(ddprof_stats_add(STATS_AGGREGATION_AVG_TIME,
+                                   ddprof::get_tsc_cycles() - unwind_ticks,
                                    NULL));
 
-  return ddres_init();
+  return {};
 }
 
 static void ddprof_reset_worker_stats() {

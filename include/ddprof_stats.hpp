@@ -15,19 +15,22 @@
   X(EVENT_LOST, "event.lost", STAT_GAUGE)                                      \
   X(SAMPLE_COUNT, "sample.count", STAT_GAUGE)                                  \
   X(TARGET_CPU_USAGE, "target_process.cpu_usage.millicores", STAT_GAUGE)       \
-  X(UNWIND_CPU_USAGE, "unwind.millicores", STAT_GAUGE)                         \
+  X(UNWIND_AVG_TIME, "unwind.avg_time_ns", STAT_GAUGE)                         \
   X(UNWIND_FRAMES, "unwind.frames", STAT_GAUGE)                                \
   X(UNWIND_ERRORS, "unwind.errors", STAT_GAUGE)                                \
   X(UNWIND_TRUNCATED_INPUT, "unwind.stack.truncated_input", STAT_GAUGE)        \
   X(UNWIND_TRUNCATED_OUTPUT, "unwind.stack.truncated_output", STAT_GAUGE)      \
   X(UNWIND_INCOMPLETE_STACK, "unwind.stack.incomplete", STAT_GAUGE)            \
   X(UNWIND_AVG_STACK_SIZE, "unwind.stack.avg_size", STAT_GAUGE)                \
+  X(UNWIND_AVG_STACK_DEPTH, "unwind.stack.avg_depth", STAT_GAUGE)              \
   X(PROFILER_RSS, "profiler.rss", STAT_GAUGE)                                  \
   X(PROFILER_CPU_USAGE, "profiler.cpu_usage.millicores", STAT_GAUGE)           \
   X(DSO_UNHANDLED_SECTIONS, "dso.unhandled_sections", STAT_GAUGE)              \
   X(DSO_NEW_DSO, "dso.new", STAT_GAUGE)                                        \
   X(DSO_SIZE, "dso.size", STAT_GAUGE)                                          \
-  X(PPROF_SIZE, "pprof.size", STAT_GAUGE)
+  X(PPROF_SIZE, "pprof.size", STAT_GAUGE)                                      \
+  X(PROFILE_DURATION, "profile.duration_ms", STAT_GAUGE)                       \
+  X(AGGREGATION_AVG_TIME, "aggregation.avg_time_ns", STAT_GAUGE)
 
 // Expand the enum/index for the individual stats
 typedef enum DDPROF_STATS { STATS_TABLE(X_ENUM) STATS_LEN } DDPROF_STATS;
