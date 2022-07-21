@@ -146,9 +146,7 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
 
 DDRes pevent_mmap_event(PEvent *event) {
   if (event->mapfd != -1) {
-    // Do not mirror perf ring buffer because this doubles the amount of
-    // mlocked pages
-    bool mirror = event->custom_event;
+    const bool mirror = true;
 
     perf_event_mmap_page *region = static_cast<perf_event_mmap_page *>(
         perfown_sz(event->mapfd, event->ring_buffer_size, mirror));
