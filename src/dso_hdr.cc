@@ -242,37 +242,19 @@ DDProfModRange DsoHdr::compute_mod_range(DsoMapConstIt it, const DsoMap &map) {
   if (it == map.end()) {
     return DDProfModRange();
   }
-  DsoMapConstIt first_el = it;
-  {
-    DsoMapConstIt loop_el = first_el;
-    while (loop_el != map.begin()) {
-      --loop_el;
-      // there can be anonymous regions in the middle of the mapping
-      if (loop_el->second._type != dso::DsoType::kAnon &&
-          it->second._filename != loop_el->second._filename) {
-        break;
-      }
-      if (it->second._filename == loop_el->second._filename) {
-        first_el = loop_el;
-      }
-    }
-  }
-
-  DsoMapConstIt last_el = it;
-  {
-    DsoMapConstIt loop_el = last_el;
-    while (++loop_el != map.end()) {
-      if (loop_el->second._type != dso::DsoType::kAnon &&
-          it->second._filename != loop_el->second._filename) {
-        break;
-      }
-      if (it->second._filename == loop_el->second._filename) {
-        last_el = loop_el;
-      }
-    }
-  }
-  return DDProfModRange{._low_addr = first_el->second._start,
-                        ._high_addr = last_el->second._end};
+  const Dso *dso = nullptr;
+  auto func = [&](auto &x) {
+    if (x.second._filename == it->second._filename) {
+      dso = &x.second;
+      return false;
+    };
+    return x.second._type != dso::DsoType::kAnon;
+  };
+  std::find_if(it, std::end(map), func);
+  ProcessAddress_t high_addr = dso->_end;
+  std::find_if(std::make_reverse_iterator(std::next(it)), std::rend(map), func);
+  ProcessAddress_t low_addr = dso->_start;
+  return DDProfModRange{._low_addr = low_addr, ._high_addr = high_addr};
 }
 
 // Find the lowest and highest for this given DSO
