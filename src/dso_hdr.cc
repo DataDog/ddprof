@@ -243,21 +243,36 @@ DDProfModRange DsoHdr::compute_mod_range(DsoMapConstIt it, const DsoMap &map) {
     return DDProfModRange();
   }
   DsoMapConstIt first_el = it;
-  while (first_el != map.begin()) {
-    --first_el;
-    if (it->second._filename != first_el->second._filename) {
-      ++first_el;
-      break;
+  {
+    DsoMapConstIt loop_el = first_el;
+    while (loop_el != map.begin()) {
+      --loop_el;
+      // there can be anonymous regions in the middle of the mapping
+      if (loop_el->second._type != dso::DsoType::kAnon &&
+          it->second._filename != loop_el->second._filename) {
+        break;
+      }
+      if (it->second._filename == loop_el->second._filename) {
+        first_el = loop_el;
+      }
     }
   }
-  while (++it != map.end()) {
-    if (it->second._filename != first_el->second._filename) {
-      break;
+
+  DsoMapConstIt last_el = it;
+  {
+    DsoMapConstIt loop_el = last_el;
+    while (++loop_el != map.end()) {
+      if (loop_el->second._type != dso::DsoType::kAnon &&
+          it->second._filename != loop_el->second._filename) {
+        break;
+      }
+      if (it->second._filename == loop_el->second._filename) {
+        last_el = loop_el;
+      }
     }
   }
-  --it; // back up from end element (or different file)
   return DDProfModRange{._low_addr = first_el->second._start,
-                        ._high_addr = it->second._end};
+                        ._high_addr = last_el->second._end};
 }
 
 // Find the lowest and highest for this given DSO
@@ -525,4 +540,14 @@ int DsoHdr::get_nb_dso() const {
   });
   return total_nb_elts;
 }
+
+void DsoHdr::reset_backpopulate_state() {
+  for (auto &el : _backpopulate_state_map) {
+    if (el.second._nbUnfoundDsos >
+        BackpopulateState::_k_nb_requests_between_backpopulates) {
+      el.second = BackpopulateState();
+    }
+  }
+}
+
 } // namespace ddprof
