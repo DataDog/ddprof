@@ -185,7 +185,7 @@ static int init_from_perf(ddprof::TscConversion &conv) {
 
   struct perf_event_mmap_page *pc =
       reinterpret_cast<perf_event_mmap_page *>(addr);
-  if (pc->cap_user_time != 1) {
+  if (pc == MAP_FAILED || pc->cap_user_time != 1) {
     return -1;
   }
 
