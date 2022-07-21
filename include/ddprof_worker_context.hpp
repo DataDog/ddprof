@@ -30,5 +30,4 @@ struct DDProfWorkerContext {
       cycle_start_time;   // time at which current export cycle was started
   int64_t send_nanos;     // Last time an export was sent
   uint32_t count_worker;  // exports since last cache clear
-  uint32_t count_samples; // sample count to avoid bouncing on backpopulates
 };
