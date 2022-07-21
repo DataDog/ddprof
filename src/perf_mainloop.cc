@@ -18,9 +18,9 @@
 #include <algorithm>
 #include <assert.h>
 #include <errno.h>
-#include <poll.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/epoll.h>
 #include <sys/mman.h>
 #include <sys/signalfd.h>
 #include <sys/socket.h>
@@ -28,6 +28,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#define  DEBUG
 
 static pid_t g_child_pid = 0;
 static bool g_termination_requested = false;
@@ -111,19 +113,52 @@ DDRes spawn_workers(PersistentWorkerState *persistent_worker_state,
   return {};
 }
 
-static void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
-                         int *pfd_len) {
-  *pfd_len = pevent_hdr->size;
+//#define POLLIN     0x0001  // EPOLLIN
+//#define POLLPRI    0x0002  // EPOLLPRI
+//#define POLLOUT    0x0004  // EPOLLOUT
+//#define POLLERR    0x0008  // EPOLLERR
+//#define POLLHUP    0x0010  // EPOLLHUP
+//#define POLLNVAL   0x0020  // unused in epoll
+//#define POLLRDNORM 0x0040  // EPOLLRDNORM
+//#define POLLRDBAND 0x0080  // EPOLLRDBAND
+//#define POLLWRNORM 0x0100  // EPOLLWRNORM
+//#define POLLWRBAND 0x0200  // EPOLLWRBAND
+//#define POLLMSG    0x0400  // EPOLLMSG
+//#define POLLREMOVE 0x1000  // unused in epoll
+//#define POLLRDHUP  0x2000  // EPOLLRDHUP
+
+
+//typedef union epoll_data {
+//  void        *ptr;
+//  int          fd;
+//  uint32_t     u32;
+//  uint64_t     u64;
+//} epoll_data_t;
+//
+//struct epoll_event {
+//  uint32_t     events;      /* Epoll events */
+//  epoll_data_t data;        /* User data variable */
+//};
+
+struct EPollEvent {
+  struct epoll_event _event;
+  int                _fd;
+};
+
+static void pollfd_setup(const PEventHdr *pevent_hdr,
+                         std::vector<EPollEvent>& epoll_events) {
+  // Setup epoll() to watch perf_event file descriptors
   const PEvent *pes = pevent_hdr->pes;
-  // Setup poll() to watch perf_event file descriptors
-  for (int i = 0; i < *pfd_len; ++i) {
-    // NOTE: if fd is negative, it will be ignored
-    pfd[i].fd = pes[i].fd;
-    pfd[i].events = POLLIN | POLLERR | POLLHUP;
+  for (unsigned i = 0; i < pevent_hdr->size; ++i) {
+    EPollEvent new_event;
+    new_event._event.events = EPOLLIN | EPOLLERR | EPOLLHUP;
+    new_event._event.data.u32 = epoll_events.size();
+    new_event._fd = pes[i].fd;
+    epoll_events.emplace_back(std::move(new_event));
   }
 }
 
-static DDRes signalfd_setup(pollfd *pfd) {
+static DDRes signalfd_setup(std::vector<EPollEvent>& epoll_events) {
   sigset_t mask;
 
   sigemptyset(&mask);
@@ -134,8 +169,11 @@ static DDRes signalfd_setup(pollfd *pfd) {
   int sfd = signalfd(-1, &mask, 0);
   DDRES_CHECK_ERRNO(sfd, DD_WHAT_WORKERLOOP_INIT, "Could not set signalfd");
 
-  pfd->fd = sfd;
-  pfd->events = POLLIN;
+  EPollEvent new_event;
+  new_event._event.events = EPOLLIN;
+  new_event._event.data.u32 = epoll_events.size();
+  new_event._fd = sfd;
+  epoll_events.emplace_back(std::move(new_event));
   return {};
 }
 
@@ -196,13 +234,11 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
 
   // Setup poll() to watch perf_event file descriptors
   int pe_len = ctx->worker_ctx.pevent_hdr.size;
-  // one extra slot in pfd to accomodate for signal fd
-  struct pollfd pfds[MAX_NB_PERF_EVENT_OPEN + 1];
-  int pfd_len = 0;
-  pollfd_setup(&ctx->worker_ctx.pevent_hdr, pfds, &pfd_len);
+  std::vector<EPollEvent> epoll_events;
+  pollfd_setup(&ctx->worker_ctx.pevent_hdr, epoll_events);
 
-  DDRES_CHECK_FWD(signalfd_setup(&pfds[pfd_len]));
-  int signal_pos = pfd_len++;
+  DDRES_CHECK_FWD(signalfd_setup(epoll_events));
+  int signal_pos = epoll_events.size() - 1;
 
   // Perform user-provided initialization
   defer { attr->finish_fun(ctx); };
@@ -211,37 +247,60 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
   bool samples_left_in_buffer = false;
   bool stop = false;
 
+  // Create epoll and register events
+  int epoll_fd = epoll_create1(0);
+  DDRES_CHECK_INT(epoll_fd, DD_WHAT_POLLERROR, "error opening epoll");
+  defer{ close(epoll_fd); };
+  int events_length = epoll_events.size();
+  for (int i = 0; i != events_length; ++i) {
+    DDRES_CHECK_INT(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, epoll_events[i]._fd, &epoll_events[i]._event), DD_WHAT_POLLERROR, "error activating epoll (fd=%d, pos=%d)", epoll_events[i]._fd, i);
+  }
+  std::vector<struct epoll_event> received_events(events_length);
   // Worker poll loop
   while (!stop) {
     // Convenience structs
     PEvent *pes = ctx->worker_ctx.pevent_hdr.pes;
-
     if (!samples_left_in_buffer) {
-      int n = poll(pfds, pfd_len, PSAMPLE_DEFAULT_WAKEUP_MS);
-
+      int event_count = epoll_wait(epoll_fd, received_events.data(),
+                                   events_length, PSAMPLE_DEFAULT_WAKEUP_MS);
+#ifdef  DEBUG
+      std::string event_status(events_length, '0');
+#endif
       // If there was an issue, return and let the caller check errno
-      if (-1 == n && errno == EINTR) {
+      if (-1 == event_count && errno == EINTR) {
         continue;
       }
-      DDRES_CHECK_ERRNO(n, DD_WHAT_POLLERROR, "poll failed");
-
-      if (pfds[signal_pos].revents & POLLIN) {
-        LG_NFO("Received termination signal");
-        break;
-      }
-
-      for (int i = 0; i < pe_len; ++i) {
-        pollfd &pfd = pfds[i];
-        if (pfd.revents & POLLHUP) {
+      DDRES_CHECK_ERRNO(event_count, DD_WHAT_POLLERROR, "epoll failed");
+      for (int i = 0; i < event_count; ++i) {
+        const epoll_event &cur_event = received_events[i];
+        int pos = cur_event.data.u32;
+        bool is_signal = (pos == signal_pos);
+        if (cur_event.events & EPOLLHUP) {
+          // hang up
           stop = true;
-        } else if (pfd.revents & POLLIN && pes[i].custom_event) {
-          // for custom ring buffer, need to read from eventfd to flush POLLIN
-          // status
-          uint64_t count;
-          DDRES_CHECK_ERRNO(read(pes[i].fd, &count, sizeof(count)),
-                            DD_WHAT_PERFRB, "Failed to read from evenfd");
         }
+        if (is_signal && cur_event.events & EPOLLIN) {
+          LG_NFO("Received termination signal");
+          stop = true;
+          break;
+        }
+        // Assumption is that the first signals are the pevent signals
+        if (static_cast<unsigned>(pos) < ctx->worker_ctx.pevent_hdr.size) {
+          if (cur_event.events & EPOLLIN && pes[pos].custom_event) {
+            // for custom ring buffer, need to read from eventfd to flush POLLIN
+            // status
+            uint64_t count;
+            DDRES_CHECK_ERRNO(read(pes[pos].fd, &count, sizeof(count)),
+                              DD_WHAT_PERFRB, "Failed to read from evenfd");
+          }
+        }
+#ifdef DEBUG
+        event_status[pos] = '1';
+#endif
       }
+#ifdef  DEBUG
+      LG_NTC("Events ----- %s (%d)", event_status.c_str(), event_count);
+#endif
     }
 
     int64_t now_ns = 0;
