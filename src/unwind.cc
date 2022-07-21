@@ -87,6 +87,7 @@ DDRes unwindstate__unwind(UnwindState *us) {
   if (!is_stack_complete(us)) {
     ddprof_stats_add(STATS_UNWIND_INCOMPLETE_STACK, 1, nullptr);
   }
+  ddprof_stats_add(STATS_UNWIND_AVG_STACK_DEPTH, us->output.nb_locs, nullptr);
 
   // Add a frame that identifies executable to which these belong
   add_virtual_base_frame(us);

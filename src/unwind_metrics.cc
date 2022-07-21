@@ -9,7 +9,8 @@
 static const DDPROF_STATS s_cycled_stats[] = {
     STATS_UNWIND_FRAMES,           STATS_UNWIND_ERRORS,
     STATS_UNWIND_TRUNCATED_INPUT,  STATS_UNWIND_TRUNCATED_OUTPUT,
-    STATS_UNWIND_INCOMPLETE_STACK, STATS_UNWIND_AVG_STACK_SIZE};
+    STATS_UNWIND_INCOMPLETE_STACK, STATS_UNWIND_AVG_STACK_SIZE,
+    STATS_UNWIND_AVG_STACK_DEPTH};
 
 void unwind_metrics_reset(void) {
   for (unsigned i = 0; i < std::size(s_cycled_stats); ++i)
