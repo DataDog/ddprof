@@ -34,7 +34,6 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
 #else
   dwfl_errno();
 #endif
-  LG_NFO("New symbol from %lx = %s", process_pc, lsymname);
 
   if (lsymname) {
     symbol._symname = std::string(lsymname);
@@ -94,7 +93,6 @@ bool compute_elf_range(RegionAddress_t file_pc, const GElf_Sym &elf_sym,
   } else {
     end_sym = elf_sym.st_value + k_min_symbol_size;
   }
-  LG_NFO("File PC = %lx - start = %lx / end = %lx", process_pc, start_sym, end_sym);
 
   return file_pc >= start_sym && file_pc <= end_sym;
 }
