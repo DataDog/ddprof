@@ -7,6 +7,7 @@ ENV CXX=g++
 # lcov
 # liblzma
 # libjemalloc
+# libexecinfo-dev # No static lib
 RUN apk update \
     && apk add --no-cache aws-cli \
 	 bash \
@@ -27,7 +28,7 @@ RUN apk update \
 	 gcc \
 	 g++ \
 	 clang \
-	 libunwind-dev \
+     libunwind-dev \
 	 py3-pkgconfig \
 	 gtest-dev \
 	 cppcheck \
