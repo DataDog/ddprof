@@ -114,21 +114,21 @@ TEST(getcontext, unwind_from_sighandler) {
   EXPECT_TRUE(get_symbol(0)._demangle_name.starts_with("save_context("));
   EXPECT_EQ(get_symbol(1)._demangle_name, "handler(int)");
   size_t next_idx = 3;
-#ifdef ALPINE_BUG_IS_FIXED
+#  ifdef ALPINE_BUG_IS_FIXED
   while (next_idx < state.output.nb_locs - 1 &&
          get_symbol(next_idx)._demangle_name != "funcD()") {
     ++next_idx;
   }
   EXPECT_EQ(get_symbol(next_idx)._demangle_name, "funcD()");
   EXPECT_EQ(get_symbol(next_idx + 1)._demangle_name, "funcC()");
-#else
+#  else
+  // On alpine release builds we are not able to find the funcD function.
   while (next_idx < state.output.nb_locs - 1 &&
          get_symbol(next_idx)._demangle_name != "funcC()") {
 
     ++next_idx;
   }
-  // On alpine release builds we are not able to find the funcD function.
   EXPECT_EQ(get_symbol(next_idx)._demangle_name, "funcC()");
-#endif
+#  endif
 }
 #endif

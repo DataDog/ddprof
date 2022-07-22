@@ -28,6 +28,7 @@ RUN apk update \
 	 gcc \
 	 g++ \
 	 clang \
+     libcap-static \
      libunwind-dev \
 	 py3-pkgconfig \
 	 gtest-dev \
