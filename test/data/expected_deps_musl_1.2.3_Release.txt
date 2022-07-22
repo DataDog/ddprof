@@ -1,0 +1,3 @@
+	/lib/ld-musl-x86_64.so.1
+	libc.musl-x86_64.so.1
+	libz.so.1
