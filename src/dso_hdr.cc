@@ -276,22 +276,28 @@ DDProfModRange DsoHdr::compute_mod_range(DsoMapConstIt it, const DsoMap &map) {
 }
 
 // Find the lowest and highest for this given DSO
-DDRes DsoHdr::mod_range_or_backpopulate(DsoMapConstIt it, DsoMap &map,
+DDRes DsoHdr::mod_range_or_backpopulate(DsoMapConstIt &it, DsoMap &map,
                                         DDProfModRange &mod_range) {
   mod_range = compute_mod_range(it, map);
 
-  const Dso &dso = it->second;
-  if (mod_range._low_addr > dso._start - dso._pgoff) {
+  const Dso *dso = &it->second;
+  if (mod_range._low_addr > dso->_start - dso->_pgoff) {
     // elf layout should take more space
     int nb_elts_added;
-    if (pid_backpopulate(map, dso._pid, nb_elts_added) && nb_elts_added) {
-      DsoHdr::DsoFindRes find_res = dso_find_closest(map, dso._pid, dso._start);
+    // backpopulate might invalidate `it`
+    const pid_t pid = dso->_pid;
+    ElfAddress_t start_addr = dso->_start;
+    if (pid_backpopulate(map, pid, nb_elts_added) && nb_elts_added) {
+      DsoHdr::DsoFindRes find_res = dso_find_closest(map, pid, start_addr);
       if (!find_res.second) {
         LG_DBG("[DSO] Mod range Error - dso no longer available");
         return ddres_warn(DD_WHAT_DSO);
       } else {
-        mod_range = compute_mod_range(find_res.first, map);
-        if (mod_range._low_addr > dso._start - dso._pgoff) {
+        // update `it` because it could have been erased
+        it = find_res.first;
+        dso = &it->second;
+        mod_range = compute_mod_range(it, map);
+        if (mod_range._low_addr > dso->_start - dso->_pgoff) {
           // not fixed. should we attempt to load ?
           return ddres_warn(DD_WHAT_DSO);
         }

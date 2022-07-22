@@ -99,7 +99,7 @@ public:
 
   DDProfModRange compute_mod_range(DsoMapConstIt it, const DsoMap &map);
   // Find the lowest and highest for this given DSO
-  DDRes mod_range_or_backpopulate(DsoMapConstIt it, DsoMap &map,
+  DDRes mod_range_or_backpopulate(DsoMapConstIt &it, DsoMap &map,
                                   DDProfModRange &mod_range);
 
   // Find the closest dso to this pid and addr
