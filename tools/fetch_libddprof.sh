@@ -55,12 +55,12 @@ else
     curl -LO "${GITHUB_URL_LIBDDPROF}"
 fi
 
- echo "Checking libddprof sha256"
- if ! echo "${SHA256_LIBDDPROF}" | sha256sum -c; then
-     echo "Error validating libddprof SHA256"
-     echo "Please clear $TARGET_EXTRACT before restarting"
-     exit 1
- fi
+echo "Checking libddprof sha256"
+if ! echo "${SHA256_LIBDDPROF}" | sha256sum -c; then
+   echo "Error validating libddprof SHA256"
+   echo "Please clear $TARGET_EXTRACT before restarting"
+   exit 1
+fi
 
 if [ $already_present -eq 0 ]; then
     echo "Extracting libddprof"

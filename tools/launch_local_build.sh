@@ -144,13 +144,15 @@ if [[ $OSTYPE == darwin* ]]; then
   fi
   echo "Launch docker image, DO NOT STORE ANYTHING outside of mounted directory (container is erased on exit)."
   # shellcheck disable=SC2086
-  CMD="docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -w /app --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} -e SSH_AUTH_SOCK=/ssh-agent \"${DOCKER_NAME}${DOCKER_TAG}\" /bin/bash"
+  MOUNT_SSH_AGENT="-v /run/host-services/ssh-auth.sock:/ssh-agent -e SSH_AUTH_SOCK=/ssh-agent"
 else
   if [[ $OSTYPE != darwin* ]]; then
-      echo "Script only tested on MacOS."
-      echo "Attempting to continue : please update script for your OS if ssh socket is failing."
-  fi 
-  CMD="docker run -it --rm -w /app --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} \"${DOCKER_NAME}${DOCKER_TAG}\" /bin/bash"
+      echo "Script mainly configured for MacOS."
+      echo "Not mounting ssh agent"
+  fi
+  MOUNT_SSH_AGENT=""
 fi
+
+CMD="docker run -it --rm  -w /app ${MOUNT_SSH_AGENT} --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} \"${DOCKER_NAME}${DOCKER_TAG}\" /bin/bash"
 
 eval "$CMD"

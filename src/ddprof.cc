@@ -6,8 +6,7 @@
 #include "ddprof.hpp"
 
 #include <errno.h>
-// Exec info does not have a static lib on alpine
-//#include <execinfo.h>
+
 #include <signal.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
@@ -29,6 +28,10 @@
 #include "sys_utils.hpp"
 #include "version.hpp"
 
+#ifdef __GLIBC__
+#include <execinfo.h>
+#endif
+
 static void disable_core_dumps(void) {
   struct rlimit core_limit;
   core_limit.rlim_cur = 0;
@@ -40,13 +43,17 @@ static void disable_core_dumps(void) {
 static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   // TODO this really shouldn't call printf-family functions...
   (void)uc;
-  //  static void *buf[4096] = {0};
-  //  size_t sz = backtrace(buf, 4096);
+#ifdef __GLIBC__
+  static void *buf[4096] = {0};
+  size_t sz = backtrace(buf, 4096);
+#endif
   fprintf(stderr, "ddprof[%d]: <%s> has encountered an error and will exit\n",
           getpid(), str_version().ptr);
   if (sig == SIGSEGV)
     printf("[DDPROF] Fault address: %p\n", si->si_addr);
-  //  backtrace_symbols_fd(buf, sz, STDERR_FILENO);
+#ifdef __GLIBC__
+  backtrace_symbols_fd(buf, sz, STDERR_FILENO);
+#endif
   exit(-1);
 }
 
