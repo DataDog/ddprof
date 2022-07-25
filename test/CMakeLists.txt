@@ -272,6 +272,7 @@ add_unit_test(
     ../src/dso.cc
     ../src/dso_hdr.cc
     ../src/ddprof_file_info.cc
+    ../src/failed_assumption.cc
     ../src/procutils.cc
     ../src/signal_helper.cc
     LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
@@ -296,6 +297,7 @@ add_unit_test(
     ../src/dwfl_symbol.cc
     ../src/dwfl_symbol_lookup.cc
     ../src/dwfl_thread_callbacks.cc
+    ../src/failed_assumption.cc
     ../src/savecontext.cc
     ../src/saveregisters.cc
     ../src/mapinfo_lookup.cc
@@ -328,6 +330,7 @@ add_unit_test(
     ../src/dwfl_symbol.cc
     ../src/dwfl_symbol_lookup.cc
     ../src/dwfl_thread_callbacks.cc
+    ../src/failed_assumption.cc
     ../src/pevent_lib.cc
     ../src/perf.cc
     ../src/perf_ringbuffer.cc

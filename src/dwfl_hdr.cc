@@ -69,22 +69,16 @@ DDProfMod *DwflWrapper::unsafe_get(FileInfoId_t file_info_id) {
 }
 
 DDProfMod *DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
-                                     const DDProfModRange &mod_range,
                                      const FileInfoValue &fileInfoValue) {
 
   DDProfMod new_mod;
-  DDRes res = update_module(_dwfl, pc, mod_range, fileInfoValue, new_mod);
+  DDRes res = report_module(_dwfl, pc, dso, fileInfoValue, new_mod);
   _inconsistent = new_mod._status == DDProfMod::kInconsistent;
   if (IsDDResNotOK(res)) {
     return nullptr;
   }
-  if (IsDDResNotOK(update_bias(new_mod))) {
-    LG_DBG("Unable to compute bias from file (%s), PID %d, mod[%lx;%lx]",
-           fileInfoValue.get_path().c_str(), dso._pid, new_mod._low_addr,
-           new_mod._high_addr);
-    return nullptr;
-  }
-  return &(_ddprof_mods[fileInfoValue.get_id()] = new_mod);
+  return &_ddprof_mods.insert_or_assign(fileInfoValue.get_id(), new_mod)
+              .first->second;
 }
 
 void DwflHdr::clear_unvisited() {
