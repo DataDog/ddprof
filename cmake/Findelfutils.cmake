@@ -10,7 +10,7 @@
 # Lzma / ZLib
 # Force static library by overriding CMAKE_FIND_LIBRARY_SUFFIXES since FindZLIB/FindLIBLZMA don't provide the option
 set(ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-SET(CMAKE_FIND_LIBRARY_SUFFIXES ".a;.so")
+SET(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
 find_package(LibLZMA)
 find_package(ZLIB)
 # Restore CMAKE_FIND_LIBRARY_SUFFIXES
