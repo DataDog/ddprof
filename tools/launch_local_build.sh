@@ -153,6 +153,13 @@ else
   MOUNT_SSH_AGENT=""
 fi
 
-CMD="docker run -it --rm  -w /app ${MOUNT_SSH_AGENT} --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} \"${DOCKER_NAME}${DOCKER_TAG}\" /bin/bash"
+# Example LOCAL_TOOL_DIR=~/dd/ddprof-build
+if [ -n "${LOCAL_TOOL_DIR-""}" ]; then
+  MOUNT_TOOLS_DIR="-v ${LOCAL_TOOL_DIR-""}:/tools"
+else
+  MOUNT_TOOLS_DIR=""
+fi
+
+CMD="docker run -it --rm  -w /app ${MOUNT_SSH_AGENT} ${MOUNT_TOOLS_DIR} --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} \"${DOCKER_NAME}${DOCKER_TAG}\" /bin/bash"
 
 eval "$CMD"
