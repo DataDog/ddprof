@@ -34,6 +34,7 @@ RUN apk update \
 	 gtest-dev \
 	 cppcheck \
 	 openssh \
+     zlib-dev \
      zlib-static \
      bzip2-dev \
 	 xz-dev \
