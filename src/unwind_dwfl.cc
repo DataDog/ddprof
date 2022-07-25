@@ -44,14 +44,8 @@ DDRes unwind_init_dwfl(UnwindState *us) {
         const FileInfoValue &file_info_value =
             us->dso_hdr.get_file_info_value(file_info_id);
 
-        // get low and high addr for this module
-        DDProfModRange mod_range;
-        if (!IsDDResOK(
-                us->dso_hdr.mod_range_or_backpopulate(it, map, mod_range))) {
-          return ddres_warn(DD_WHAT_UW_ERROR);
-        }
         DDProfMod *ddprof_mod = us->_dwfl_wrapper->register_mod(
-            us->current_ip, dso, mod_range, file_info_value);
+            us->current_ip, dso, file_info_value);
         if (ddprof_mod) {
           // one success is fine
           success = true;
@@ -134,16 +128,9 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
       us->dso_hdr.get_file_info_value(file_info_id);
   DDProfMod *ddprof_mod = us->_dwfl_wrapper->unsafe_get(file_info_id);
   if (!ddprof_mod) {
-    // New module
-    DDProfModRange mod_range;
-    if (IsDDResNotOK(us->dso_hdr.mod_range_or_backpopulate(
-            find_res.first, us->dso_hdr._map[us->pid], mod_range))) {
-      return ddres_warn(DD_WHAT_UW_ERROR);
-    }
     // ensure unwinding backend has access to this module (and check
     // consistency)
-    ddprof_mod =
-        us->_dwfl_wrapper->register_mod(pc, dso, mod_range, file_info_value);
+    ddprof_mod = us->_dwfl_wrapper->register_mod(pc, dso, file_info_value);
     // Updates in DSO layout can create inconsistencies
     if (!ddprof_mod) {
       return ddres_warn(DD_WHAT_UW_ERROR);
