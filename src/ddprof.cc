@@ -29,7 +29,7 @@
 #include "version.hpp"
 
 #ifdef __GLIBC__
-#include <execinfo.h>
+#  include <execinfo.h>
 #endif
 
 static void disable_core_dumps(void) {
