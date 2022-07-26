@@ -120,10 +120,11 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
     // There should not be a module already loaded at this address
     const char *main_name = nullptr;
     Dwarf_Addr low_addr, high_addr;
-    dwfl_module_info(ddprof_mod._mod, 0, &low_addr, &high_addr, 0, 0,
-                     &main_name, 0);
-    LG_NTC("Incoherent modules: module %s [%lx-%lx] already exists at %lx (%s)",
-           main_name, low_addr, high_addr, pc, module_name);
+    dwfl_module_info(mod, 0, &low_addr, &high_addr, 0, 0, &main_name, 0);
+    LG_NTC("Incoherent modules[PID=%d]: module %s [%lx-%lx] is already "
+           "loaded at %lx(%s[ID#%d])",
+           dso._pid, main_name, low_addr, high_addr, pc, filepath.c_str(),
+           fileInfoValue.get_id());
     ddprof_mod._status = DDProfMod::kInconsistent;
     return ddres_warn(DD_WHAT_MODULE);
   }
@@ -154,9 +155,9 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
   } else {
     dwfl_module_info(ddprof_mod._mod, 0, &ddprof_mod._low_addr,
                      &ddprof_mod._high_addr, 0, 0, 0, 0);
-    LG_DBG("Loaded mod from file (%s), (%s) mod[%lx-%lx] bias[%lx]",
-           fileInfoValue.get_path().c_str(), dwfl_errmsg(-1),
-           ddprof_mod._low_addr, ddprof_mod._high_addr, bias);
+    LG_DBG("Loaded mod from file (%s[ID#%d]), (%s) mod[%lx-%lx] bias[%lx]",
+           fileInfoValue.get_path().c_str(), fileInfoValue.get_id(),
+           dwfl_errmsg(-1), ddprof_mod._low_addr, ddprof_mod._high_addr, bias);
   }
 
   ddprof_mod._sym_bias = bias;
