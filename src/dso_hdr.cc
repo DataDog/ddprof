@@ -278,8 +278,8 @@ FileInfoId_t DsoHdr::update_id_and_path(const Dso &dso) {
     return dso._id;
   }
 
-  // check if we already encountered binary (cache by region with offset)
-  FileInfoInodeKey key(file_info._inode, dso._pgoff, file_info._size);
+  // check if we already encountered binary
+  FileInfoInodeKey key(file_info._inode, file_info._size);
   auto it = _file_info_inode_map.find(key);
   if (it == _file_info_inode_map.end()) {
     dso._id = _file_info_vector.size();

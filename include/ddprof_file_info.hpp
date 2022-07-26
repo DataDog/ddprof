@@ -18,14 +18,12 @@ namespace ddprof {
 /// Considering we can have relative paths within several containers, we check
 /// inodes
 struct FileInfoInodeKey {
-  FileInfoInodeKey(inode_t inode, ElfAddress_t offset, std::size_t sz)
-      : _inode(inode), _offset(offset), _sz(sz) {}
+  FileInfoInodeKey(inode_t inode, std::size_t sz) : _inode(inode), _sz(sz) {}
   bool operator==(const FileInfoInodeKey &o) const;
   // inode is used as a key (instead of path which can be the same for several
   // containers). TODO: inode could be the same across several filesystems (size
   // is there to mitigate)
   inode_t _inode;
-  Offset_t _offset;
   std::size_t _sz;
 };
 
@@ -35,8 +33,7 @@ namespace std {
 template <> struct hash<ddprof::FileInfoInodeKey> {
   std::size_t operator()(const ddprof::FileInfoInodeKey &k) const {
     std::size_t hash_val = ddprof::hash_combine(hash<inode_t>()(k._inode),
-                                                hash<Offset_t>()(k._offset));
-    hash_val = ddprof::hash_combine(hash_val, hash<size_t>()(k._sz));
+                                                hash<Offset_t>()(k._sz));
     return hash_val;
   }
 };
