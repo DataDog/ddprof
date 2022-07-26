@@ -1,5 +1,7 @@
---- libdw_alloc.c
-+++ libdw_alloc.c.2
+Using the version in error.h had issues. This patch is simpler.
+
+--- ./libdw/libdw_alloc.c
++++ ./libdw/libdw_alloc.c
 @@ -155 +155 @@
 -    error (EXIT_FAILURE, ENOMEM, "libdw");
 +    exit (-1);

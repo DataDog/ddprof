@@ -56,6 +56,7 @@ fi
 
 echo "Extracting elfutils"
 mkdir src
+mkdir lib
 cd src
 tar --no-same-owner --strip-components 1 -xf "../${TAR_ELF}"
 
@@ -75,7 +76,12 @@ fi
 MUSL_LIBC=$(ldd /bin/ls | grep 'musl' | head -1 | cut -d ' ' -f1 || true)
 if [ ! -z ${MUSL_LIBC-""} ]; then
   CFLAGS="${CFLAGS-""} -DFNM_EXTMATCH=0"
-  patch $(find . -name 'libdw_alloc.c') /patch/libdw_alloc.c.patch
+  cp /patch/libintl.h ../lib
+  patch -p1 < "/patch/fix-aarch64_fregs.patch"
+  patch -p1 < "/patch/fix-uninitialized.patch"
+  patch -p1 < "/patch/musl-asm-ptrace-h.patch"
+  patch -p1 < "/patch/musl-macros.patch"
+  patch -p1 < "/patch/libdw_alloc.c.patch"
 else
   echo "LIB is not detected as musl"
 fi
