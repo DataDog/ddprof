@@ -216,31 +216,29 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
     // Convenience structs
     PEvent *pes = ctx->worker_ctx.pevent_hdr.pes;
 
-    if (!samples_left_in_buffer) {
-      int n = poll(pfds, pfd_len, PSAMPLE_DEFAULT_WAKEUP_MS);
+    int n = poll(pfds, pfd_len, PSAMPLE_DEFAULT_WAKEUP_MS);
 
-      // If there was an issue, return and let the caller check errno
-      if (-1 == n && errno == EINTR) {
-        continue;
-      }
-      DDRES_CHECK_ERRNO(n, DD_WHAT_POLLERROR, "poll failed");
+    // If there was an issue, return and let the caller check errno
+    if (-1 == n && errno == EINTR) {
+      continue;
+    }
+    DDRES_CHECK_ERRNO(n, DD_WHAT_POLLERROR, "poll failed");
 
-      if (pfds[signal_pos].revents & POLLIN) {
-        LG_NFO("Received termination signal");
-        break;
-      }
+    if (pfds[signal_pos].revents & POLLIN) {
+      LG_NFO("Received termination signal");
+      break;
+    }
 
-      for (int i = 0; i < pe_len; ++i) {
-        pollfd &pfd = pfds[i];
-        if (pfd.revents & POLLHUP) {
-          stop = true;
-        } else if (pfd.revents & POLLIN && pes[i].custom_event) {
-          // for custom ring buffer, need to read from eventfd to flush POLLIN
-          // status
-          uint64_t count;
-          DDRES_CHECK_ERRNO(read(pes[i].fd, &count, sizeof(count)),
-                            DD_WHAT_PERFRB, "Failed to read from evenfd");
-        }
+    for (int i = 0; i < pe_len; ++i) {
+      pollfd &pfd = pfds[i];
+      if (pfd.revents & POLLHUP) {
+        stop = true;
+      } else if (pfd.revents & POLLIN && pes[i].custom_event) {
+        // for custom ring buffer, need to read from eventfd to flush POLLIN
+        // status
+        uint64_t count;
+        DDRES_CHECK_ERRNO(read(pes[i].fd, &count, sizeof(count)),
+                          DD_WHAT_PERFRB, "Failed to read from evenfd");
       }
     }
 
