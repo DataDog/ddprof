@@ -3,7 +3,7 @@
 
 variables:
   # These are gitlab variables so that it's easier to do a manual deploy
-  # If these are set witih value and description, then it gives you UI elements
+  # If these are set with value and description, then it gives you UI elements
   DOWNSTREAM_BRANCH:
     value: "main"
     description: "Run a specific branch downstream"
