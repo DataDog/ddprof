@@ -61,9 +61,9 @@ endif()
 # libddprof
 include(Findlibddprof)
 
+
 # elfutils
 include(Findelfutils)
-
 
 #######################
 ### Static analysis ###

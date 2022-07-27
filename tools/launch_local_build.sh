@@ -49,10 +49,8 @@ COMPILER="gcc"
 while [ $# != 0 ]; do 
     case $1 in
         -f|--dockerfile)
-            cd "$(dirname "$2")"
-            # Hacky, use path to identify name of docker image
-            DEFAULT_BASE_NAME=$(md5sum<<<"${PWD}" | awk '{print $1}')
-            cd "${CURRENTDIR}"
+            # Use md5 of file to identify a unique name
+            DEFAULT_BASE_NAME=$(md5sum $2 | awk '{print $1}')
             BASE_DOCKERFILE="$2"
             shift
             shift
@@ -138,18 +136,30 @@ else
     echo "Base image found, not rebuilding. Remove it to force rebuild."
 fi
 
-if [ -z "$(ssh-add -L)" ]; then
-    echo "Please start your ssh agent. Example :"
-    echo "ssh-add ~/.ssh/id_rsa"
-    exit 1
+if [[ $OSTYPE == darwin* ]]; then
+  if [ -z "$(ssh-add -L)" ]; then
+      echo "Please start your ssh agent. Example :"
+      echo "ssh-add ~/.ssh/id_rsa"
+      exit 1
+  fi
+  echo "Launch docker image, DO NOT STORE ANYTHING outside of mounted directory (container is erased on exit)."
+  # shellcheck disable=SC2086
+  MOUNT_SSH_AGENT="-v /run/host-services/ssh-auth.sock:/ssh-agent -e SSH_AUTH_SOCK=/ssh-agent"
+else
+  if [[ $OSTYPE != darwin* ]]; then
+      echo "Script mainly configured for MacOS."
+      echo "Not mounting ssh agent"
+  fi
+  MOUNT_SSH_AGENT=""
 fi
 
-if [[ $OSTYPE != darwin* ]]; then
-    echo "Script only tested on MacOS."
-    echo "Attempting to continue : please update script for your OS if ssh socket is failing."
-fi 
+# Example LOCAL_TOOL_DIR=~/dd/ddprof-build
+if [ -n "${LOCAL_TOOL_DIR-""}" ]; then
+  MOUNT_TOOLS_DIR="-v ${LOCAL_TOOL_DIR-""}:/tools"
+else
+  MOUNT_TOOLS_DIR=""
+fi
 
-echo "Launch docker image, DO NOT STORE ANYTHING outside of mounted directory (container is erased on exit)."
-# shellcheck disable=SC2086
-CMD="docker run -it --rm -v /run/host-services/ssh-auth.sock:/ssh-agent -w /app --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} -e SSH_AUTH_SOCK=/ssh-agent \"${DOCKER_NAME}${DOCKER_TAG}\" /bin/bash"
+CMD="docker run -it --rm  -w /app ${MOUNT_SSH_AGENT} ${MOUNT_TOOLS_DIR} --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} \"${DOCKER_NAME}${DOCKER_TAG}\" /bin/bash"
+
 eval "$CMD"

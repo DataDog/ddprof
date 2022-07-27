@@ -15,7 +15,14 @@ COMPILER_SETTING="-DCMAKE_CXX_COMPILER=${CXX:-"g++"} -DCMAKE_C_COMPILER=${CC:-"g
 EXTENSION_CC=${CC:-"gcc"}
 # strip version number from compiler
 EXTENSION_CC=${EXTENSION_CC%-*}
-EXTENSION_OS=${OS_IDENTIFIER:-"linux"}
+
+LIBC_INFO=$(ldd  --version 2>&1  | grep musl || true)
+if [ ! -z "${LIBC_INFO}" ]; then
+  EXTENSION_OS="alpine-linux"
+else
+  EXTENSION_OS="unknown-linux"
+fi
+
 COMMON_OPT="${COMPILER_SETTING} -DACCURACY_TEST=ON -DCMAKE_INSTALL_PREFIX=${DDPROF_INSTALL_PREFIX} -DBUILD_BENCHMARKS=${DDPROF_BUILD_BENCH} -DBUILD_NATIVE_LIB=${NATIVE_LIB}"
 
 GetDirectoryExtention() {

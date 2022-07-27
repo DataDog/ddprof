@@ -46,7 +46,7 @@ else
 fi
 
 echo "Checking elfutils sha512"
-if ! echo "${SHA512_ELF} ${TAR_ELF}" | sha512sum --check --strict --status; then
+if ! echo "${SHA512_ELF}  ${TAR_ELF}" | sha512sum -c ; then
     echo "Error validating elfutils SHA512"
     echo "Please clear $TARGET_EXTRACT before restarting"
     exit 1
@@ -56,6 +56,7 @@ fi
 
 echo "Extracting elfutils"
 mkdir src
+mkdir lib
 cd src
 tar --no-same-owner --strip-components 1 -xf "../${TAR_ELF}"
 
@@ -68,6 +69,20 @@ patch -p1 < "${SCRIPT_DIR}/elfutils.patch"
 if [[ "$(basename "${C_COMPILER}")" == clang* ]]; then
   export CFLAGS="-Wno-xor-used-as-pow -Wno-gnu-variable-sized-type-not-at-end -Wno-unused-but-set-parameter"
 fi
+
+# Detect musl
+MUSL_LIBC=$(ldd /bin/ls | grep 'musl' | head -1 | cut -d ' ' -f1 || true)
+if [ ! -z ${MUSL_LIBC-""} ]; then
+  cp /patch/libintl.h ../lib
+  patch -p1 < "/patch/fix-aarch64_fregs.patch"
+  patch -p1 < "/patch/fix-uninitialized.patch"
+  patch -p1 < "/patch/musl-asm-ptrace-h.patch"
+  patch -p1 < "/patch/musl-macros.patch"
+  patch -p1 < "/patch/libdw_alloc.c.patch"
+else
+  echo "LIB is not detected as musl"
+fi
+
 # It is important NOT to set CFLAGS if you don't mean to
 # Otherwise you will not benefit from -O2 in the elfutils compilation
 if [ -n "${C_FLAGS_OVERRIDE-""}" ]; then
@@ -81,4 +96,5 @@ fi
 echo "Compiling elfutils using ${C_COMPILER} / flags=${CFLAGS-""}"
 
 ./configure CC="${C_COMPILER}" --without-bzlib --without-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning --prefix "${TARGET_EXTRACT}"
+
 make "-j$(nproc)" install

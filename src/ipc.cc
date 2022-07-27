@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 namespace ddprof {
@@ -24,11 +25,11 @@ struct InternalResponseMessage {
   int64_t allocation_profiling_rate;
 };
 
-timeval to_timeval(std::chrono::microseconds duration) noexcept {
+struct timeval to_timeval(std::chrono::microseconds duration) noexcept {
   const std::chrono::seconds sec =
       std::chrono::duration_cast<std::chrono::seconds>(duration);
 
-  timeval tv;
+  struct timeval tv;
   tv.tv_sec = time_t(sec.count());
   tv.tv_usec = suseconds_t(
       std::chrono::duration_cast<std::chrono::microseconds>(duration - sec)
