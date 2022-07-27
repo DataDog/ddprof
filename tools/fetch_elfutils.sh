@@ -71,11 +71,8 @@ if [[ "$(basename "${C_COMPILER}")" == clang* ]]; then
 fi
 
 # Detect musl
-# If so, then set the DFNM_EXTMATCH macro to a harmless value.  We don't use the affected
-# codepaths, so it's OK (TODO: can we just disable compilation of those units?)
 MUSL_LIBC=$(ldd /bin/ls | grep 'musl' | head -1 | cut -d ' ' -f1 || true)
 if [ ! -z ${MUSL_LIBC-""} ]; then
-  CFLAGS="${CFLAGS-""} -DFNM_EXTMATCH=0"
   cp /patch/libintl.h ../lib
   patch -p1 < "/patch/fix-aarch64_fregs.patch"
   patch -p1 < "/patch/fix-uninitialized.patch"
