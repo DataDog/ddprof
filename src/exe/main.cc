@@ -211,6 +211,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
           preload_str.append(";");
           preload_str.append(s);
         }
+        LG_DBG("Setting LD_PRELOAD=%s", preload_str.c_str());
         setenv("LD_PRELOAD", preload_str.c_str(), 1);
         auto sock_str = std::to_string(sockfds[kParentIdx]);
         setenv(k_profiler_lib_socket_env_variable, sock_str.c_str(), 1);
