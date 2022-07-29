@@ -12,10 +12,12 @@ while kill -0 "$p" 2> /dev/null; do sleep 0.05s; done
 
 v=$(grep "datadog[.]profiling[.]native[.]unwind[.]stack[.]incomplete: *[0-9]*" -o log | awk -F: '{print $2}')
 if [[ -z "$v" ]]; then
+    cat log
     echo "Could not find metrics"
     exit 1
 # allow at most 3 incomplete stacks
 elif [[ "$v" -gt 3 ]]; then
+    cat log
     echo "Found incomplete stacks"
     exit 1
 fi
