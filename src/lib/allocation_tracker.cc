@@ -224,13 +224,17 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
     tl_state.tid = ddprof::gettid();
   }
 
+  if (tl_state.stack_end == nullptr) {
+    tl_state.stack_end = retrieve_stack_end_address();
+  }
+
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
   event->period = allocated_size;
   event->size = PERF_SAMPLE_STACK_SIZE;
 
-  event->dyn_size =
-      save_context(event->regs, ddprof::Buffer{event->data, event->size});
+  event->dyn_size = save_context(tl_state.stack_end, event->regs,
+                                 ddprof::Buffer{event->data, event->size});
 
   if (_state.lost_count) {
     Buffer buf_lost = writer.reserve(sizeof(LostEvent));
@@ -273,6 +277,13 @@ uint64_t AllocationTracker::next_sample_interval() {
     value = min_value;
   }
   return value;
+}
+
+void AllocationTracker::notify_thread_start() {
+  TrackerThreadLocalState &tl_state = AllocationTracker::_tl_state;
+
+  ReentryGuard guard(&_tl_state.reentry_guard);
+  tl_state.stack_end = retrieve_stack_end_address();
 }
 
 } // namespace ddprof
