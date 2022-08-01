@@ -3,16 +3,16 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
+#include "allocation_tracker.hpp"
+#include "ddprof_base.hpp"
+#include "unlikely.hpp"
+
 #include <atomic>
 #include <cassert>
 #include <cstddef>
 #include <cstdlib>
 #include <dlfcn.h>
 #include <malloc.h>
-
-#include "allocation_tracker.hpp"
-#include "ddprof_base.hpp"
-#include "unlikely.hpp"
 
 // Declaration of reallocarray is only available starting from glibc 2.28
 extern "C" {
