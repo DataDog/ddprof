@@ -366,7 +366,8 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
   return ddres_init();
 }
 
-void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int watcher_pos) {
+void ddprof_pr_mmap(DDProfContext *ctx, const perf_event_mmap *map,
+                    int watcher_pos) {
   if (!(map->header.misc & PERF_RECORD_MISC_MMAP_DATA)) {
     LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx)", watcher_pos, map->pid,
            map->filename, map->addr, map->len, map->pgoff);
@@ -376,11 +377,11 @@ void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int watcher_pos) {
   }
 }
 
-void ddprof_pr_lost(DDProfContext *, perf_event_lost *lost, int) {
+void ddprof_pr_lost(DDProfContext *, const perf_event_lost *lost, int) {
   ddprof_stats_add(STATS_EVENT_LOST, lost->lost, NULL);
 }
 
-void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm,
+void ddprof_pr_comm(DDProfContext *ctx, const perf_event_comm *comm,
                     int watcher_pos) {
   // Change in process name (assuming exec) : clear all associated dso
   if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC) {
@@ -389,7 +390,8 @@ void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm,
   }
 }
 
-void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int watcher_pos) {
+void ddprof_pr_fork(DDProfContext *ctx, const perf_event_fork *frk,
+                    int watcher_pos) {
   LG_DBG("<%d>(FORK)%d -> %d/%d", watcher_pos, frk->ppid, frk->pid, frk->tid);
   if (frk->ppid != frk->pid) {
     // Clear everything and populate at next error or with coming samples
@@ -397,7 +399,8 @@ void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int watcher_pos) {
   }
 }
 
-void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int watcher_pos) {
+void ddprof_pr_exit(DDProfContext *ctx, const perf_event_exit *ext,
+                    int watcher_pos) {
   // On Linux, it seems that the thread group leader is the one whose task ID
   // matches the process ID of the group.  Moreover, it seems that it is the
   // overwhelming convention that this thread is closed after the other threads
@@ -506,12 +509,13 @@ struct perf_event_hdr_wpid : perf_event_header {
   uint32_t pid, tid;
 };
 
-DDRes ddprof_worker_process_event(struct perf_event_header *hdr,
-                                  int watcher_pos, DDProfContext *ctx) {
+DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
+                                  DDProfContext *ctx) {
   // global try catch to avoid leaking exceptions to main loop
   try {
     ddprof_stats_add(STATS_EVENT_COUNT, 1, NULL);
-    struct perf_event_hdr_wpid *wpid = static_cast<perf_event_hdr_wpid *>(hdr);
+    const perf_event_hdr_wpid *wpid =
+        static_cast<const perf_event_hdr_wpid *>(hdr);
     switch (hdr->type) {
     /* Cases where the target type has a PID */
     case PERF_RECORD_SAMPLE:
@@ -525,24 +529,29 @@ DDRes ddprof_worker_process_event(struct perf_event_header *hdr,
       break;
     case PERF_RECORD_MMAP:
       if (wpid->pid)
-        ddprof_pr_mmap(ctx, (perf_event_mmap *)hdr, watcher_pos);
+        ddprof_pr_mmap(ctx, reinterpret_cast<const perf_event_mmap *>(hdr),
+                       watcher_pos);
       break;
     case PERF_RECORD_COMM:
       if (wpid->pid)
-        ddprof_pr_comm(ctx, (perf_event_comm *)hdr, watcher_pos);
+        ddprof_pr_comm(ctx, reinterpret_cast<const perf_event_comm *>(hdr),
+                       watcher_pos);
       break;
     case PERF_RECORD_EXIT:
       if (wpid->pid)
-        ddprof_pr_exit(ctx, (perf_event_exit *)hdr, watcher_pos);
+        ddprof_pr_exit(ctx, reinterpret_cast<const perf_event_exit *>(hdr),
+                       watcher_pos);
       break;
     case PERF_RECORD_FORK:
       if (wpid->pid)
-        ddprof_pr_fork(ctx, (perf_event_fork *)hdr, watcher_pos);
+        ddprof_pr_fork(ctx, reinterpret_cast<const perf_event_fork *>(hdr),
+                       watcher_pos);
       break;
 
     /* Cases where the target type might not have a PID */
     case PERF_RECORD_LOST:
-      ddprof_pr_lost(ctx, (perf_event_lost *)hdr, watcher_pos);
+      ddprof_pr_lost(ctx, reinterpret_cast<const perf_event_lost *>(hdr),
+                     watcher_pos);
       break;
     default:
       break;
