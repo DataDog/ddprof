@@ -108,12 +108,7 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
                               const RingBufferInfo &ring_buffer) {
   _sampling_interval = mem_profile_interval;
   _deterministic_sampling = deterministic_sampling;
-  _pevent = {.watcher_pos = -1,
-             .fd = ring_buffer.event_fd,
-             .mapfd = ring_buffer.ring_fd,
-             .ring_buffer_size = static_cast<size_t>(ring_buffer.mem_size),
-             .custom_event = true};
-  return pevent_mmap_event(&_pevent);
+  return ddprof::ring_buffer_attach(ring_buffer, &_pevent);
 }
 
 void AllocationTracker::free() {
@@ -193,7 +188,7 @@ void AllocationTracker::track_allocation(uintptr_t, size_t size,
 
 DDRes AllocationTracker::push_sample(uint64_t allocated_size,
                                      TrackerThreadLocalState &tl_state) {
-  RingBufferWriter writer{_pevent.rb};
+  PerfRingBufferWriter writer{_pevent.rb};
   auto needed_size = sizeof(AllocationEvent);
 
   if (_state.lost_count) {

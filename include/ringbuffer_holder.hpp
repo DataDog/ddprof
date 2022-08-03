@@ -13,15 +13,22 @@
 namespace ddprof {
 class RingBufferHolder {
 public:
-  explicit RingBufferHolder(size_t buffer_size_order) : _pevent{} {
-    DDRES_CHECK_THROW_EXCEPTION(
-        ddprof::ring_buffer_setup(buffer_size_order, &_pevent));
+  explicit RingBufferHolder(size_t buffer_size_order,
+                            RingBufferType ring_buffer_type,
+                            bool custom_event = true)
+      : _pevent{} {
+    DDRES_CHECK_THROW_EXCEPTION(ddprof::ring_buffer_setup(
+        buffer_size_order, ring_buffer_type, custom_event, &_pevent));
   }
 
   ~RingBufferHolder() { ring_buffer_cleanup(_pevent); }
 
+  RingBufferHolder(const RingBufferHolder &) = delete;
+  RingBufferHolder &operator=(const RingBufferHolder &) = delete;
+
   RingBufferInfo get_buffer_info() const {
-    return {static_cast<int64_t>(_pevent.rb.size), _pevent.mapfd, _pevent.fd};
+    return {static_cast<int64_t>(_pevent.ring_buffer_size), _pevent.mapfd,
+            _pevent.fd};
   }
 
   RingBuffer &get_ring_buffer() { return _pevent.rb; }

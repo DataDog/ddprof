@@ -35,15 +35,16 @@ DDPROF_NOINLINE void my_func_calling_malloc(size_t size) {
 TEST(allocation_tracker, start_stop) {
   const uint64_t rate = 1;
   const size_t buf_size_order = 5;
-  ddprof::RingBufferHolder ring_buffer{buf_size_order};
+  ddprof::RingBufferHolder ring_buffer{buf_size_order,
+                                       RingBufferType::kPerfRingBuffer};
   ddprof::AllocationTracker::allocation_tracking_init(
       rate, ddprof::AllocationTracker::kDeterministicSampling,
       ring_buffer.get_buffer_info());
 
   my_func_calling_malloc(1);
 
-  ddprof::RingBufferReader reader{ring_buffer.get_ring_buffer()};
-  ASSERT_GT(reader.available_for_read(), 0);
+  ddprof::PerfRingBufferReader reader{ring_buffer.get_ring_buffer()};
+  ASSERT_GT(reader.available_size(), 0);
 
   auto buf = reader.read_all_available();
   const perf_event_header *hdr =
