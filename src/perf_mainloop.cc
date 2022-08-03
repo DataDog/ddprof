@@ -13,6 +13,7 @@
 #include "perf.hpp"
 #include "persistent_worker_state.hpp"
 #include "pevent.hpp"
+#include "ringbuffer_utils.hpp"
 #include "unwind.h"
 
 #include <algorithm>
@@ -142,52 +143,44 @@ static DDRes signalfd_setup(pollfd *pfd) {
 static inline DDRes worker_process_ring_buffers(PEvent *pes, int pe_len,
                                                 DDProfContext *ctx,
                                                 int64_t *now_ns,
-                                                bool *timeout) {
+                                                int *ring_buffer_start_idx) {
   // While there are events to process, iterate through them
   // while limiting time spent in loop to at most PSAMPLE_DEFAULT_WAKEUP_MS
   int64_t loop_start_ns = now_nanos();
   int64_t local_now_ns;
 
+  int start_idx = *ring_buffer_start_idx;
   bool events;
   do {
     events = false;
-    for (int i = 0; i < pe_len; ++i) {
-      RingBuffer *rb = &pes[i].rb;
+    for (int i = start_idx; i < pe_len; ++i) {
+      ddprof::PerfRingBufferReader reader(pes[i].rb);
 
-      // Memory-ordering safe access of ringbuffer elements:
-      // https://github.com/torvalds/linux/blob/v5.16/tools/include/linux/ring_buffer.h#L59
-      uint64_t head = __atomic_load_n(&rb->region->data_head, __ATOMIC_ACQUIRE);
-      uint64_t tail = rb->region->data_tail;
-      while (tail != head) {
-        events = true;
-
-        // Attempt to dispatch the event
-        struct perf_event_header *hdr = rb_seek(rb, tail);
-        assert(hdr->size > 0);
+      ddprof::ConstBuffer buffer = reader.read_all_available();
+      while (!buffer.empty()) {
+        auto *hdr = reinterpret_cast<const perf_event_header *>(buffer.data());
         DDRes res = ddprof_worker_process_event(hdr, pes[i].watcher_pos, ctx);
 
-        // We've processed the current event, so we can advance the ringbuffer
-        tail += hdr->size;
+        // \fixme{nsavoire} free slot as soon as possible ?
+        // reader.advance(hdr->size);
 
         // Check for processing error
         if (IsDDResNotOK(res)) {
-          __atomic_store_n(&rb->region->data_tail, tail, __ATOMIC_RELEASE);
           return res;
         }
+        buffer = remaining(buffer, hdr->size);
       }
 
-      if (events) {
-        __atomic_store_n(&rb->region->data_tail, tail, __ATOMIC_RELEASE);
-      }
+      // PerfRingBufferReader destructor takes care of advancing ring buffer
+      // read position
     }
-
+    start_idx = 0;
     local_now_ns = now_nanos();
   } while (events &&
            (local_now_ns - loop_start_ns) <
                PSAMPLE_DEFAULT_WAKEUP_MS * 1000000L);
 
   *now_ns = local_now_ns;
-  *timeout = events;
   return {};
 }
 
@@ -208,7 +201,11 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
   defer { attr->finish_fun(ctx); };
   DDRES_CHECK_FWD(attr->init_fun(ctx, persistent_worker_state));
 
-  bool samples_left_in_buffer = false;
+  // ring_buffer_start_idx serves to indicate at which ring buffer index
+  // processing loop should restart if it was interrupted in the middle of the
+  // loop by timeout.
+  // Not used yet, because currently we process all ring buffers or none
+  int ring_buffer_start_idx = 0;
   bool stop = false;
 
   // Worker poll loop
@@ -244,7 +241,7 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
 
     int64_t now_ns = 0;
     DDRES_CHECK_FWD(worker_process_ring_buffers(pes, pe_len, ctx, &now_ns,
-                                                &samples_left_in_buffer));
+                                                &ring_buffer_start_idx));
     DDRES_CHECK_FWD(ddprof_worker_maybe_export(ctx, now_ns));
 
     if (ctx->worker_ctx.persistent_worker_state->restart_worker) {

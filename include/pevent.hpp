@@ -20,6 +20,7 @@ typedef struct PEvent {
   int mapfd;               // FD for ring buffer, same as `fd` for perf events
   int attr_idx;            // matching perf_event_attr
   size_t ring_buffer_size; // size of the ring buffer
+  RingBufferType ring_buffer_type;
   bool custom_event; // true if custom event (not handled by perf, eg. memory
                      // allocations)
   RingBuffer rb;     // metadata and buffers for processing perf ringbuffer
