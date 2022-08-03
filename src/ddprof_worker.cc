@@ -367,8 +367,7 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
 }
 
 void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int watcher_pos) {
-  static constexpr std::string_view anon_str{"//anon"};
-  if (map->filename != anon_str) {
+  if (!(map->header.misc & PERF_RECORD_MISC_MMAP_DATA)) {
     LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx)", watcher_pos, map->pid,
            map->filename, map->addr, map->len, map->pgoff);
     ddprof::Dso new_dso(map->pid, map->addr, map->addr + map->len - 1,
