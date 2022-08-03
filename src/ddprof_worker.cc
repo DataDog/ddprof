@@ -367,12 +367,14 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
 }
 
 void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int watcher_pos) {
-  LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx)", watcher_pos, map->pid, map->filename,
-         map->addr, map->len, map->pgoff);
-  ddprof::Dso new_dso(map->pid, map->addr, map->addr + map->len - 1, map->pgoff,
-                      std::string(map->filename),
-                      !(map->header.misc & PERF_RECORD_MISC_MMAP_DATA));
-  ctx->worker_ctx.us->dso_hdr.insert_erase_overlap(std::move(new_dso));
+  static constexpr std::string_view anon_str{"//anon"};
+  if (map->filename != anon_str) {
+    LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx)", watcher_pos, map->pid,
+           map->filename, map->addr, map->len, map->pgoff);
+    ddprof::Dso new_dso(map->pid, map->addr, map->addr + map->len - 1,
+                        map->pgoff, std::string(map->filename));
+    ctx->worker_ctx.us->dso_hdr.insert_erase_overlap(std::move(new_dso));
+  }
 }
 
 void ddprof_pr_lost(DDProfContext *, perf_event_lost *lost, int) {
