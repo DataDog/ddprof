@@ -7,8 +7,6 @@
 
 #include "perf.hpp"
 
-#include <atomic>
-
 enum class RingBufferType : uint8_t { kPerfRingBuffer };
 
 struct RingBuffer {
