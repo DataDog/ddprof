@@ -6,6 +6,7 @@
 #pragma once
 
 #include "ddprof_buffer.hpp"
+#include "mpscringbuffer.hpp"
 #include "perf_ringbuffer.hpp"
 
 #include <cassert>
@@ -133,6 +134,153 @@ public:
     assert(_initial_tail + n <= _tail);
     _initial_tail += n;
     __atomic_store_n(_rb.reader_pos, _initial_tail, __ATOMIC_RELEASE);
+  }
+
+  void advance() {
+    _initial_tail = _tail;
+    __atomic_store_n(_rb.reader_pos, _initial_tail, __ATOMIC_RELEASE);
+  }
+
+  size_t update_available() {
+    _head = __atomic_load_n(_rb.writer_pos, __ATOMIC_ACQUIRE);
+    return available_size();
+  }
+
+private:
+  RingBuffer &_rb;
+  uint64_t _tail;
+  uint64_t _initial_tail;
+  uint64_t _head;
+};
+
+struct MPSCRingBufferHeader {
+  uint64_t size;
+  static constexpr uint64_t k_discard_bit = 1UL << 62;
+  static constexpr uint64_t k_busy_bit = 1UL << 63;
+
+  static bool is_busy(uint64_t size) { return size & k_busy_bit; }
+  static bool is_discarded(uint64_t size) { return size & k_discard_bit; }
+};
+
+class MPSCRingBufferWriter {
+public:
+  explicit MPSCRingBufferWriter(RingBuffer &rb) : _rb(rb) {
+    assert(rb.type == RingBufferType::kMPSCRingBuffer);
+    _tail = __atomic_load_n(_rb.reader_pos, __ATOMIC_ACQUIRE);
+  }
+
+  MPSCRingBufferWriter(const MPSCRingBufferWriter &) = delete;
+  MPSCRingBufferWriter &operator=(const MPSCRingBufferWriter &) = delete;
+
+  void update_tail() {
+    _tail = __atomic_load_n(_rb.reader_pos, __ATOMIC_ACQUIRE);
+  }
+
+  Buffer reserve(size_t n) {
+    size_t n2 = align_up(n + sizeof(MPSCRingBufferHeader), 8);
+    if (n2 == 0) {
+      return {};
+    }
+
+    // \fixme{nsavoire} Not sure if spinlock is the best option here
+    lock(reinterpret_cast<std::atomic_flag *>(_rb.spinlock));
+
+    // No need for atomic operation, since we hold the lock
+    uint64_t writer_pos = *_rb.writer_pos;
+
+    uint64_t new_writer_pos = writer_pos + n2;
+    // Check that there is enough free space
+    if (_rb.mask < new_writer_pos - _tail) {
+      unlock(reinterpret_cast<std::atomic_flag *>(_rb.spinlock));
+      return {};
+    }
+
+    uint64_t head_linear = writer_pos & _rb.mask;
+    MPSCRingBufferHeader *hdr =
+        reinterpret_cast<MPSCRingBufferHeader *>(_rb.data + head_linear);
+
+    // Mark the sample as busy
+    hdr->size = n | MPSCRingBufferHeader::k_busy_bit;
+
+    // Atomic operation required to synchronize with reader load_acquire
+    __atomic_store_n(_rb.writer_pos, new_writer_pos, __ATOMIC_RELEASE);
+    unlock(reinterpret_cast<std::atomic_flag *>(_rb.spinlock));
+
+    return {reinterpret_cast<std::byte *>(hdr) + sizeof(MPSCRingBufferHeader),
+            n};
+  }
+
+  // Return true if notification to consumer is necesssary
+  // Notification is necessary only if consumer has caught up with producer
+  // (meaning tail afer commit is at or after head before commit)
+  bool commit(Buffer buf, bool discard = false) {
+    MPSCRingBufferHeader *hdr = reinterpret_cast<MPSCRingBufferHeader *>(
+        buf.data() - sizeof(MPSCRingBufferHeader));
+
+    // Clear busy bit
+    uint64_t new_size = hdr->size ^ MPSCRingBufferHeader::k_busy_bit;
+    if (discard) {
+      new_size |= MPSCRingBufferHeader::k_discard_bit;
+    }
+
+    // Needs release ordering to make sure that all previous writes are
+    // visible to the reader once reader acquires `hdr->size`
+    __atomic_store_n(&hdr->size, new_size, __ATOMIC_RELEASE);
+
+    _tail = __atomic_load_n(_rb.reader_pos, __ATOMIC_ACQUIRE);
+    uint64_t tail_linear = _tail & _rb.mask;
+    return tail_linear ==
+        static_cast<uint64_t>(reinterpret_cast<std::byte *>(hdr) - _rb.data);
+  }
+
+private:
+  RingBuffer &_rb;
+  uint64_t _tail;
+};
+
+class MPSCRingBufferReader {
+public:
+  explicit MPSCRingBufferReader(RingBuffer &rb) : _rb(rb) {
+    assert(rb.type == RingBufferType::kMPSCRingBuffer);
+    _head = __atomic_load_n(rb.writer_pos, __ATOMIC_ACQUIRE);
+    _tail = *_rb.reader_pos;
+    _initial_tail = _tail;
+    assert(_tail <= _head);
+  }
+
+  ~MPSCRingBufferReader() {
+    if (_tail != _initial_tail) {
+      __atomic_store_n(_rb.reader_pos, _tail, __ATOMIC_RELEASE);
+    }
+  }
+
+  inline size_t available_size() const { return _head - _tail; }
+
+  ConstBuffer read_sample() {
+    size_t n = _head - _tail;
+    if (n == 0) {
+      return {};
+    }
+
+    uint64_t tail_linear = _tail & _rb.mask;
+    std::byte *start = _rb.data + tail_linear;
+    MPSCRingBufferHeader *hdr = reinterpret_cast<MPSCRingBufferHeader *>(start);
+    uint64_t sz = __atomic_load_n(&hdr->size, __ATOMIC_ACQUIRE);
+
+    // Sample not committed yet, bail out
+    if (MPSCRingBufferHeader::is_busy(sz)) {
+      return {};
+    }
+
+    _tail += align_up((sz & ~MPSCRingBufferHeader::k_discard_bit) +
+                          sizeof(MPSCRingBufferHeader),
+                      8);
+
+    if (MPSCRingBufferHeader::is_discarded(sz)) {
+      return {};
+    }
+
+    return {start + sizeof(MPSCRingBufferHeader), sz};
   }
 
   void advance() {
