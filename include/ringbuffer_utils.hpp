@@ -20,15 +20,16 @@ struct RingBufferInfo;
 // Return `x` rounded up to next multiple of `y`
 // `y` must be a power of 2
 // Return 0 for x==0 or x > std::numeric_limits<uint64_t>::max()-7
-constexpr inline uint64_t round_up_to_mutiple_of_pow2(uint64_t x, uint64_t y) {
-  assert(y > 0 && (y & (y - 1)) == 0);
-  return ((x - 1) | (y - 1)) + 1;
+constexpr inline uint64_t round_up_to_mutiple_of_pow2(uint64_t x,
+                                                      uint64_t pow2) {
+  assert(pow2 > 0 && (pow2 & (pow2 - 1)) == 0);
+  return ((x - 1) | (pow2 - 1)) + 1;
 }
 
 constexpr inline uint64_t round_down_to_mutiple_of_pow2(uint64_t x,
-                                                        uint64_t y) {
-  assert(y > 0 && (y & (y - 1)) == 0);
-  return x & ~(y - 1);
+                                                        uint64_t pow2) {
+  assert(pow2 > 0 && (pow2 & (pow2 - 1)) == 0);
+  return x & ~(pow2 - 1);
 }
 
 class PerfRingBufferWriter {
