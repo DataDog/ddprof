@@ -28,7 +28,7 @@ public:
 
   RingBufferInfo get_buffer_info() const {
     return {static_cast<int64_t>(_pevent.ring_buffer_size), _pevent.mapfd,
-            _pevent.fd};
+            _pevent.fd, static_cast<int>(_pevent.ring_buffer_type)};
   }
 
   RingBuffer &get_ring_buffer() { return _pevent.rb; }

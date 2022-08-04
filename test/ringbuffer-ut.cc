@@ -251,3 +251,134 @@ TEST(ringbuffer, full) {
   EXPECT_TRUE(
       std::equal(buffer.begin(), buffer.end(), buffer2.begin(), buffer2.end()));
 }
+
+void mpsc_reader_fun(RingBuffer *rb, size_t nb_elements, size_t nb_producers,
+                     bool use_new_object, bool advance_eagerly) {
+  std::optional<MPSCRingBufferReader> reader(*rb);
+
+  std::vector<size_t> counts(nb_producers);
+  size_t total_count = 0;
+  while (total_count < nb_elements * nb_producers) {
+    if (use_new_object) {
+      reader.emplace(*rb);
+    } else {
+      reader->update_available();
+    }
+    for (ConstBuffer buf = reader->read_sample(); !buf.empty();
+         buf = reader->read_sample()) {
+      const MyElement *elem = reinterpret_cast<const MyElement *>(buf.data());
+
+      ASSERT_EQ(elem->hdr.size, sizeof(MyElement));
+      ASSERT_EQ(elem->hdr.misc, 5);
+      ASSERT_EQ(elem->hdr.type, 3);
+
+      int64_t producer_idx = elem->y;
+      size_t &count = counts[producer_idx];
+      ASSERT_EQ(elem->x, count);
+      ASSERT_EQ(elem->z, count * (producer_idx + 1));
+      ++count;
+      ++total_count;
+      if (advance_eagerly) {
+        reader->advance();
+      }
+    }
+
+    if (!advance_eagerly && !use_new_object) {
+      reader->advance();
+    }
+  }
+}
+
+void mpsc_writer_fun(RingBuffer *rb, size_t nb_elements, size_t producer_idx,
+                     bool use_new_object) {
+  std::optional<MPSCRingBufferWriter> writer(*rb);
+
+  for (int64_t i = 0; i < static_cast<int64_t>(nb_elements); ++i) {
+    if (use_new_object) {
+      writer.emplace(*rb);
+    }
+    auto buf = writer->reserve(sizeof(MyElement));
+    while (buf.empty()) {
+      sched_yield();
+      writer->update_tail();
+      buf = writer->reserve(sizeof(MyElement));
+    }
+
+    ASSERT_EQ(buf.size(), sizeof(MyElement));
+    MyElement *elem = reinterpret_cast<MyElement *>(buf.data());
+    elem->hdr.size = sizeof(MyElement);
+    elem->hdr.misc = 5;
+    elem->hdr.type = 3;
+
+    elem->x = i;
+    elem->y = producer_idx;
+    elem->z = i * (producer_idx + 1);
+    writer->commit(buf);
+  }
+}
+
+TEST(ringbuffer, mpsc_ring_buffer_simple) {
+  const size_t buf_size_order = 1;
+  RingBufferHolder ring_buffer{buf_size_order, RingBufferType::kMPSCRingBuffer};
+  MPSCRingBufferWriter writer{ring_buffer.get_ring_buffer()};
+  MPSCRingBufferReader reader{ring_buffer.get_ring_buffer()};
+  auto buf = writer.reserve(4);
+  ASSERT_EQ(buf.size(), 4);
+  *reinterpret_cast<uint32_t *>(buf.data()) = 0xdeadbeef;
+  writer.commit(buf);
+  ASSERT_TRUE(reader.read_sample().empty());
+  reader.update_available();
+  auto buf2 = reader.read_sample();
+  ASSERT_EQ(buf2.size(), 4);
+  ASSERT_EQ(*reinterpret_cast<uint32_t *>(buf.data()), 0xdeadbeef);
+}
+
+TEST(ringbuffer, mpsc_ring_buffer_single_producer) {
+  const size_t buf_size_order = 0;
+  RingBufferHolder ring_buffer{buf_size_order, RingBufferType::kMPSCRingBuffer};
+  constexpr size_t nelem = 1000;
+
+  for (int producer_use_new_object = 0; producer_use_new_object < 2;
+       ++producer_use_new_object) {
+    for (int consumer_use_new_object = 0; consumer_use_new_object < 2;
+         ++consumer_use_new_object) {
+      for (int consumer_advance_eagerly = 0; consumer_advance_eagerly < 2;
+           ++consumer_advance_eagerly) {
+        jthread producer{mpsc_writer_fun, &ring_buffer.get_ring_buffer(), nelem,
+                         0, producer_use_new_object};
+        jthread consumer{
+            mpsc_reader_fun,         &ring_buffer.get_ring_buffer(), nelem, 1,
+            consumer_use_new_object, consumer_advance_eagerly};
+      }
+    }
+  }
+}
+
+TEST(ringbuffer, mpsc_ring_buffer_multiple_producer) {
+  const size_t buf_size_order = 0;
+  RingBufferHolder ring_buffer{buf_size_order, RingBufferType::kMPSCRingBuffer};
+  constexpr size_t nelem = 1000;
+  constexpr size_t nproducer = 8;
+
+  for (int producer_use_new_object = 0; producer_use_new_object < 2;
+       ++producer_use_new_object) {
+    for (int consumer_use_new_object = 0; consumer_use_new_object < 2;
+         ++consumer_use_new_object) {
+      for (int consumer_advance_eagerly = 0; consumer_advance_eagerly < 2;
+           ++consumer_advance_eagerly) {
+        std::vector<jthread> producers;
+        for (size_t i = 0; i < nproducer; ++i) {
+          producers.emplace_back(mpsc_writer_fun,
+                                 &ring_buffer.get_ring_buffer(), nelem, i,
+                                 producer_use_new_object);
+        }
+        jthread consumer{mpsc_reader_fun,
+                         &ring_buffer.get_ring_buffer(),
+                         nelem,
+                         nproducer,
+                         consumer_use_new_object,
+                         consumer_advance_eagerly};
+      }
+    }
+  }
+}

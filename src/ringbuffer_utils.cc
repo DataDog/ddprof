@@ -23,6 +23,9 @@ DDRes ring_buffer_attach(const RingBufferInfo &info, PEvent *pevent) {
   case static_cast<int>(RingBufferType::kPerfRingBuffer):
     pevent->ring_buffer_type = RingBufferType::kPerfRingBuffer;
     break;
+  case static_cast<int>(RingBufferType::kMPSCRingBuffer):
+    pevent->ring_buffer_type = RingBufferType::kMPSCRingBuffer;
+    break;
   default:
     return ddres_error(DD_WHAT_PERFRB);
   }
