@@ -17,17 +17,17 @@ namespace ddprof {
 
 struct RingBufferInfo;
 
-// Return `x` rounded up to next multiple of `y`
-// `y` must be a power of 2
-// Return 0 for x==0 or x > std::numeric_limits<uint64_t>::max()-7
-constexpr inline uint64_t round_up_to_mutiple_of_pow2(uint64_t x,
-                                                      uint64_t pow2) {
+// Return `x` rounded up to next multiple of `pow2`
+// `pow2` must be a power of 2
+// Return 0 for x==0 or x > std::numeric_limits<uint64_t>::max() - pow2 + 1
+constexpr inline uint64_t align_up(uint64_t x, uint64_t pow2) {
   assert(pow2 > 0 && (pow2 & (pow2 - 1)) == 0);
   return ((x - 1) | (pow2 - 1)) + 1;
 }
 
-constexpr inline uint64_t round_down_to_mutiple_of_pow2(uint64_t x,
-                                                        uint64_t pow2) {
+// Return `x` rounded down to previous multiple of `pow2`
+// `pow2` must be a power of 2
+constexpr inline uint64_t align_down(uint64_t x, uint64_t pow2) {
   assert(pow2 > 0 && (pow2 & (pow2 - 1)) == 0);
   return x & ~(pow2 - 1);
 }
@@ -63,7 +63,7 @@ public:
 
   Buffer reserve(size_t n) {
     // Make sure to keep samples 8-byte aligned
-    size_t n_aligned = round_up_to_mutiple_of_pow2(n, 8);
+    size_t n_aligned = align_up(n, 8);
     if (n_aligned == 0 || n_aligned > available_size()) {
       return {};
     }
@@ -129,7 +129,7 @@ public:
 
   void advance(size_t n) {
     // Need to round up size provided by user to recover actual sample size
-    n = round_up_to_mutiple_of_pow2(n, 8);
+    n = align_up(n, 8);
     assert(_initial_tail + n <= _tail);
     _initial_tail += n;
     __atomic_store_n(_rb.reader_pos, _initial_tail, __ATOMIC_RELEASE);

@@ -147,22 +147,19 @@ void perf_writer_fun(RingBuffer *rb, size_t nb_elements, bool use_new_object,
 }
 
 TEST(ringbuffer, round) {
-  ASSERT_EQ(round_up_to_mutiple_of_pow2(0, 8), 0);
-  ASSERT_EQ(round_up_to_mutiple_of_pow2(1, 8), 8);
-  ASSERT_EQ(round_up_to_mutiple_of_pow2(7, 8), 8);
-  ASSERT_EQ(round_up_to_mutiple_of_pow2(8, 8), 8);
-  ASSERT_EQ(round_up_to_mutiple_of_pow2(9, 8), 16);
-  ASSERT_EQ(
-      round_up_to_mutiple_of_pow2(std::numeric_limits<uint64_t>::max() - 6, 8),
-      0);
+  ASSERT_EQ(align_up(0, 8), 0);
+  ASSERT_EQ(align_up(1, 8), 8);
+  ASSERT_EQ(align_up(7, 8), 8);
+  ASSERT_EQ(align_up(8, 8), 8);
+  ASSERT_EQ(align_up(9, 8), 16);
+  ASSERT_EQ(align_up(std::numeric_limits<uint64_t>::max() - 6, 8), 0);
 
-  ASSERT_EQ(round_down_to_mutiple_of_pow2(0, 8), 0);
-  ASSERT_EQ(round_down_to_mutiple_of_pow2(1, 8), 0);
-  ASSERT_EQ(round_down_to_mutiple_of_pow2(7, 8), 0);
-  ASSERT_EQ(round_down_to_mutiple_of_pow2(8, 8), 8);
-  ASSERT_EQ(round_down_to_mutiple_of_pow2(9, 8), 8);
-  ASSERT_EQ(round_down_to_mutiple_of_pow2(
-                std::numeric_limits<uint64_t>::max() - 6, 8),
+  ASSERT_EQ(align_down(0, 8), 0);
+  ASSERT_EQ(align_down(1, 8), 0);
+  ASSERT_EQ(align_down(7, 8), 0);
+  ASSERT_EQ(align_down(8, 8), 8);
+  ASSERT_EQ(align_down(9, 8), 8);
+  ASSERT_EQ(align_down(std::numeric_limits<uint64_t>::max() - 6, 8),
             std::numeric_limits<uint64_t>::max() - 7);
 }
 
@@ -238,11 +235,9 @@ TEST(ringbuffer, full) {
 
   auto sz = writer.available_size();
   EXPECT_GT(sz, 0);
-
-  auto sz2 = round_down_to_mutiple_of_pow2(sz, 8);
-
-  // size is rounded up to mutliple of 8 by reserve
-  auto buffer = writer.reserve(round_down_to_mutiple_of_pow2(sz, 8));
+  // size is rounded up to multiple of 8 by reserve
+  auto sz2 = align_down(sz, 8);
+  auto buffer = writer.reserve(sz2);
   ASSERT_FALSE(buffer.empty());
   std::fill(buffer.begin(), buffer.end(), std::byte{0xff});
 
