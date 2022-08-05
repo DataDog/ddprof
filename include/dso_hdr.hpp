@@ -167,7 +167,11 @@ private:
   // parse procfs to look for dso elements
   bool pid_backpopulate(DsoMap &map, pid_t pid, int &nb_elts_added);
 
-  FileInfoId_t update_id_and_path(const Dso &dso);
+  FileInfoId_t update_id_from_dso(const Dso &dso);
+
+  FileInfoId_t update_id_dd_profiling(const Dso &dso);
+
+  FileInfoId_t update_id_from_path(const Dso &dso);
 
   BackpopulateStateMap _backpopulate_state_map;
 
@@ -177,6 +181,9 @@ private:
   // /proc files can be mounted at various places (whole host profiling)
   std::string _path_to_proc;
   int _dd_profiling_fd;
+  // Assumption is that we have a single version of the dd_profiling library
+  // accross all PIDs.
+  FileInfoId_t _dd_profiling_file_info = k_file_info_undef;
 };
 
 } // namespace ddprof

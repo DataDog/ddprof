@@ -254,14 +254,29 @@ FileInfoId_t DsoHdr::get_or_insert_file_info(const Dso &dso) {
     return dso._id;
   }
   _stats.incr_metric(DsoStats::kTargetDso, dso._type);
-  return update_id_and_path(dso);
+  return update_id_from_dso(dso);
 }
 
-FileInfoId_t DsoHdr::update_id_and_path(const Dso &dso) {
-  if (!dso::has_relevant_path(dso._type)) {
-    dso._id = k_file_info_error; // no file associated
+FileInfoId_t DsoHdr::update_id_dd_profiling(const Dso &dso) {
+  if (_dd_profiling_file_info != k_file_info_undef) {
+    dso._id = _dd_profiling_file_info;
     return dso._id;
   }
+  
+  if (_dd_profiling_fd != -1) {
+    // Path is not valid, don't use the map
+    // fd already exists --> lookup directly
+    dso._id = _file_info_vector.size();
+    _dd_profiling_file_info = dso._id;
+    _file_info_vector.emplace_back(std::move(FileInfo(dso._filename, 0, 0)), dso._id,
+                                    _dd_profiling_fd);
+    return _dd_profiling_file_info;
+  }
+  _dd_profiling_file_info = update_id_from_path(dso);
+  return _dd_profiling_file_info;
+}
+
+FileInfoId_t DsoHdr::update_id_from_path(const Dso &dso) {
 
   FileInfo file_info = find_file_info(dso);
   if (!file_info._inode) {
@@ -275,13 +290,8 @@ FileInfoId_t DsoHdr::update_id_and_path(const Dso &dso) {
   if (it == _file_info_inode_map.end()) {
     dso._id = _file_info_vector.size();
     _file_info_inode_map.emplace(std::move(key), dso._id);
-    if (dso._type == dso::DsoType::kDDProfiling && _dd_profiling_fd >= 0) {
-      _file_info_vector.emplace_back(std::move(file_info), dso._id,
-                                     _dd_profiling_fd);
-    } else {
-      // open the file descriptor to this file
-      _file_info_vector.emplace_back(std::move(file_info), dso._id);
-    }
+    // open the file descriptor to this file
+    _file_info_vector.emplace_back(std::move(file_info), dso._id);
 #ifdef DEBUG
     LG_NTC("New file %d - %s - %ld", dso._id, file_info._path.c_str(),
            file_info._size);
@@ -295,6 +305,19 @@ FileInfoId_t DsoHdr::update_id_and_path(const Dso &dso) {
     }
   }
   return dso._id;
+}
+
+FileInfoId_t DsoHdr::update_id_from_dso(const Dso &dso) {
+  if (!dso::has_relevant_path(dso._type)) {
+    dso._id = k_file_info_error; // no file associated
+    return dso._id;
+  }
+
+  if (dso._type == dso::DsoType::kDDProfiling) {
+    return update_id_dd_profiling(dso);
+  }
+
+  return update_id_from_path(dso);
 }
 
 bool DsoHdr::erase_overlap(const Dso &dso) {
