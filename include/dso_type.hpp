@@ -20,7 +20,6 @@ enum DsoType {
   kNbDsoTypes
 };
 
-
 static inline bool has_relevant_path(dso::DsoType dso_type) {
   if (dso_type == kDDProfiling) {
     return true;

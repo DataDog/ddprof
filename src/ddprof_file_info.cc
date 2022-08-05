@@ -31,13 +31,12 @@ FileInfoValue::FileInfoValue(FileInfo &&info, FileInfoId_t id, int fd)
 }
 
 FileInfoValue::FileInfoValue(FileInfo &&info, FileInfoId_t id)
-    : _info(info), _fd(-1),  _id(id) {
+    : _info(info), _fd(-1), _id(id) {
   if (!_info._path.empty()) {
     _fd = open(_info._path.c_str(), O_RDONLY);
     if (_fd < 0) { // acceptable value for dwfl
       LG_WRN("[FileInfo] failed to open %s", _info._path.c_str());
-    }
-    else {
+    } else {
       LG_DBG("[FileInfo] Success opening %s, ", _info._path.c_str());
     }
   }

@@ -81,8 +81,8 @@ DDRes worker_library_init(DDProfContext *ctx,
     // Make sure worker index is initialized correctly
     ctx->worker_ctx.i_current_pprof = 0;
     ctx->worker_ctx.exp_tid = {0};
-    LG_DBG("retrieved fd = %d", ctx->params.fd_dd_profiling);
-    ctx->worker_ctx.us = new UnwindState(ctx->params.fd_dd_profiling);
+    LG_DBG("retrieved fd = %d", ctx->params.dd_profiling_fd);
+    ctx->worker_ctx.us = new UnwindState(ctx->params.dd_profiling_fd);
 
     // register the existing persistent storage for the state
     ctx->worker_ctx.persistent_worker_state = persistent_worker_state;

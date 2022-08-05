@@ -184,12 +184,11 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
         return -1;
       }
       int fd = -1;
-      if (!IsDDResOK(get_library_path(dd_profiling_lib_path,
-                                      fd))) {
+      if (!IsDDResOK(get_library_path(dd_profiling_lib_path, fd))) {
         return -1;
       }
-      LG_DBG("ctx->params.fd_dd_profiling = %d", ctx->params.fd_dd_profiling);
-      ctx->params.fd_dd_profiling = fd;
+      LG_DBG("ctx->params.dd_profiling_fd = %d", ctx->params.dd_profiling_fd);
+      ctx->params.dd_profiling_fd = fd;
 
       ctx->params.sockfd = sockfds[kChildIdx];
       ctx->params.wait_on_socket = true;

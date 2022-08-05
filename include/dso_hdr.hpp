@@ -81,7 +81,7 @@ public:
   using DsoFindRes = std::pair<DsoMapConstIt, bool>;
 
   /******* MAIN APIS **********/
-  DsoHdr(int fd_dd_profiling = -1);
+  explicit DsoHdr(int dd_profiling_fd = -1);
 
   // Add the element check for overlap and remove them
   DsoFindRes insert_erase_overlap(Dso &&dso);
@@ -176,7 +176,7 @@ private:
   FileInfoVector _file_info_vector;
   // /proc files can be mounted at various places (whole host profiling)
   std::string _path_to_proc;
-  int _fd_dd_profiling;
+  int _dd_profiling_fd;
 };
 
 } // namespace ddprof

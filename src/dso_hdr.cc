@@ -109,7 +109,7 @@ uint64_t DsoStats::sum_event_metric(DsoEventType dso_event) const {
 /**********/
 /* DsoHdr */
 /**********/
-DsoHdr::DsoHdr(int fd_dd_profiling) : _fd_dd_profiling(fd_dd_profiling) {
+DsoHdr::DsoHdr(int dd_profiling_fd) : _dd_profiling_fd(dd_profiling_fd) {
   // Test different places for existence of /proc
   // A given procfs can only work if its PID namespace is the same as mine.
   // Fortunately, `/proc/self` will return a symlink to my process ID in the
@@ -275,9 +275,9 @@ FileInfoId_t DsoHdr::update_id_and_path(const Dso &dso) {
   if (it == _file_info_inode_map.end()) {
     dso._id = _file_info_vector.size();
     _file_info_inode_map.emplace(std::move(key), dso._id);
-    if (dso._type == dso::DsoType::kDDProfiling && _fd_dd_profiling >= 0) {
+    if (dso._type == dso::DsoType::kDDProfiling && _dd_profiling_fd >= 0) {
       _file_info_vector.emplace_back(std::move(file_info), dso._id,
-                                     _fd_dd_profiling);
+                                     _dd_profiling_fd);
     } else {
       // open the file descriptor to this file
       _file_info_vector.emplace_back(std::move(file_info), dso._id);

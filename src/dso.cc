@@ -5,6 +5,7 @@
 
 #include "dso.hpp"
 
+#include "constants.hpp"
 #include "ddprof_defs.hpp"
 #include "logger.hpp"
 #include "string_format.hpp"
@@ -27,7 +28,7 @@ static const std::string_view s_socket_str = "socket";
 // null elements
 static const std::string_view s_dev_zero_str = "/dev/zero";
 static const std::string_view s_dev_null_str = "/dev/null";
-static const std::string_view s_dd_profiling_str = "libdd_profiling";
+static const std::string_view s_dd_profiling_str = k_libdd_profiling_name;
 
 // invalid element
 Dso::Dso()
