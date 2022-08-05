@@ -315,6 +315,8 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     }
   }
 
+  ctx->params.show_samples = input->show_samples != nullptr;
+
   ctx->initialized = true;
   return ddres_init();
 }
