@@ -21,7 +21,8 @@ bool FileInfoInodeKey::operator==(const FileInfoInodeKey &o) const {
 FileInfoValue::FileInfoValue(FileInfo &&info, FileInfoId_t id, int fd)
     : _info(info), _fd(-1), _id(id) {
   if (fd >= 0) {
-    LG_WRN("[FileInfo] yay got a FD(%d) to %s", fd, _info._path.c_str());
+    LG_DBG("[FileInfo] using existing file descriptor(%d) to %s", fd,
+           _info._path.c_str());
     _fd = dup(fd);
   }
   if (_fd < 0) { // acceptable value for dwfl

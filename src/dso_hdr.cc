@@ -262,14 +262,14 @@ FileInfoId_t DsoHdr::update_id_dd_profiling(const Dso &dso) {
     dso._id = _dd_profiling_file_info;
     return dso._id;
   }
-  
+
   if (_dd_profiling_fd != -1) {
     // Path is not valid, don't use the map
     // fd already exists --> lookup directly
     dso._id = _file_info_vector.size();
     _dd_profiling_file_info = dso._id;
-    _file_info_vector.emplace_back(std::move(FileInfo(dso._filename, 0, 0)), dso._id,
-                                    _dd_profiling_fd);
+    _file_info_vector.emplace_back(std::move(FileInfo(dso._filename, 0, 0)),
+                                   dso._id, _dd_profiling_fd);
     return _dd_profiling_file_info;
   }
   _dd_profiling_file_info = update_id_from_path(dso);
