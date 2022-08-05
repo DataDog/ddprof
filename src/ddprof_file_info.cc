@@ -58,24 +58,6 @@ FileInfoValue::~FileInfoValue() {
     close(this->_fd);
 }
 
-FileInfoValue::FileInfoValue(const FileInfoValue &other) {
-  copy_values(other);
-  if (other._fd >= 0) {
-    this->_fd = dup(other._fd);
-  }
-}
-
-FileInfoValue &FileInfoValue::operator=(const FileInfoValue &other) {
-  if (this != &other) {
-    close(this->_fd);
-    copy_values(other);
-    if (other._fd >= 0) {
-      this->_fd = dup(other._fd);
-    }
-  }
-  return *this;
-}
-
 FileInfoValue::FileInfoValue(FileInfoValue &&other) {
   copy_values(other);
   other._fd = -1;

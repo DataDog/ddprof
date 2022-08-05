@@ -95,7 +95,6 @@ DDRes AllocationTracker::allocation_tracking_init(
 
   DDRES_CHECK_FWD(instance->init(allocation_profiling_rate,
                                  flags & kDeterministicSampling, ring_buffer));
-
   _instance = instance;
   state.track_allocations = true;
   state.track_deallocations = flags & kTrackDeallocations;

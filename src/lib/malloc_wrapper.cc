@@ -87,8 +87,6 @@ void init() {
 } // namespace
 
 void *malloc(size_t size) {
-  printf("Going through %s", __FUNCTION__);
-
   void *ptr = s_malloc(size);
   ddprof::AllocationTracker::track_allocation(reinterpret_cast<uintptr_t>(ptr),
                                               size);

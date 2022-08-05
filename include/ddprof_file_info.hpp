@@ -58,8 +58,8 @@ public:
   FileInfoValue(FileInfo &&info, FileInfoId_t id, int fd);
   /// Opens a file descriptor to the file
   FileInfoValue(FileInfo &&info, FileInfoId_t id);
-  FileInfoValue(const FileInfoValue &other);
-  FileInfoValue &operator=(const FileInfoValue &other);
+  FileInfoValue(const FileInfoValue &other) = delete;
+  FileInfoValue &operator=(const FileInfoValue &other) = delete;;
   FileInfoValue(FileInfoValue &&other);
   FileInfoValue &operator=(FileInfoValue &&other);
   ~FileInfoValue();

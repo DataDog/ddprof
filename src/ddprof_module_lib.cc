@@ -138,8 +138,15 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
   ProcessAddress_t start = dso._start - dso._pgoff - start_offset;
   Offset_t bias = dso._start - dso._pgoff - bias_offset;
 
+  // libdwfl takes ownership (which is not 100% expected)
+  int fd = dup(fileInfoValue._fd);
+  if (fd < 0) {
+    LG_WRN("Couldn't duplicate fd to module %s(%s)", module_name,
+           fileInfoValue.get_path().c_str());
+    return ddres_warn(DD_WHAT_MODULE);
+  }
   ddprof_mod._mod = dwfl_report_elf(dwfl, module_name, filepath.c_str(),
-                                    fileInfoValue._fd, start, false);
+                                    fd, start, false);
 
   if (!ddprof_mod._mod) {
     // Ideally we would differentiate pid errors from file errors.
