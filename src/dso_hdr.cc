@@ -360,16 +360,11 @@ DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr) {
     LG_DBG("[DSO] Skipping 0 page");
     return find_res_not_found(map);
   }
-  int nb_elts_added = 0;
-
-  if (_backpopulate_state_map.find(pid) == _backpopulate_state_map.end()) {
-    // we never encountered this PID
-    pid_backpopulate(map, pid, nb_elts_added);
-  }
 
   DsoFindRes find_res = dso_find_closest(map, pid, addr);
-  if (!find_res.second && !nb_elts_added) { // backpopulate
+  if (!find_res.second) { // backpopulate
     LG_DBG("[DSO] Couldn't find DSO for [%d](0x%lx). backpopulate", pid, addr);
+    int nb_elts_added = 0;
     if (pid_backpopulate(map, pid, nb_elts_added) && nb_elts_added) {
       find_res = dso_find_closest(map, pid, addr);
     }
