@@ -37,8 +37,8 @@ struct UnwindRegisters {
 /// given through callbacks
 struct UnwindState {
   UnwindState(int fd_dd_profiling = -1)
-      : _dwfl_wrapper(nullptr), dso_hdr(fd_dd_profiling), pid(-1), stack(nullptr), stack_sz(0),
-        current_ip(0) {
+      : _dwfl_wrapper(nullptr), dso_hdr(fd_dd_profiling), pid(-1),
+        stack(nullptr), stack_sz(0), current_ip(0) {
     uw_output_clear(&output);
   }
 

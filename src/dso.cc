@@ -63,15 +63,13 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
     _type = dso::kSocket;
   } else if (_filename[0] == '[') {
     _type = dso::kUndef;
-  }
-  else { // check if this standard dso matches our internal dd_profiling lib
+  } else { // check if this standard dso matches our internal dd_profiling lib
     std::size_t pos = _filename.rfind('/');
-    if (pos != std::string::npos) {
-      if (_filename.substr(pos + 1, s_dd_profiling_str.length()) == s_dd_profiling_str) {
-        _type = dso::kDDProfiling;
-      }
+    if (pos != std::string::npos &&
+        _filename.substr(pos + 1, s_dd_profiling_str.length()) ==
+            s_dd_profiling_str) {
+      _type = dso::kDDProfiling;
     }
-
   }
 }
 
@@ -82,7 +80,7 @@ std::string Dso::to_string() const {
 }
 
 std::string Dso::format_filename() const {
-  if (_type == dso::kStandard) {
+  if (dso::has_relevant_path(_type)) {
     return _filename;
   } else {
     return dso::dso_type_str(_type);

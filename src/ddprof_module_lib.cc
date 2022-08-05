@@ -21,7 +21,8 @@
 namespace ddprof {
 
 static bool get_elf_offsets(int fd, Offset_t &start_offset,
-                            Offset_t &bias_offset, const std::string &filepath){
+                            Offset_t &bias_offset,
+                            const std::string &filepath) {
   Elf *elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
   if (elf == NULL) {
     LG_WRN("Invalid elf %s", filepath.c_str());
@@ -137,9 +138,8 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
   ProcessAddress_t start = dso._start - dso._pgoff - start_offset;
   Offset_t bias = dso._start - dso._pgoff - bias_offset;
 
-  ddprof_mod._mod =
-      dwfl_report_elf(dwfl, module_name, filepath.c_str(), fileInfoValue._fd,
-                      start, false);
+  ddprof_mod._mod = dwfl_report_elf(dwfl, module_name, filepath.c_str(),
+                                    fileInfoValue._fd, start, false);
 
   if (!ddprof_mod._mod) {
     // Ideally we would differentiate pid errors from file errors.

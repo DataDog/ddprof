@@ -103,8 +103,6 @@ public:
   static DsoFindRes dso_find_closest(const DsoMap &map, pid_t pid,
                                      ElfAddress_t addr);
 
-  bool dso_handled_type_read_dso(const Dso &dso);
-
   // parse procfs to look for dso elements
   bool pid_backpopulate(pid_t pid, int &nb_elts_added);
 

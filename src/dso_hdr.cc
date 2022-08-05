@@ -109,7 +109,7 @@ uint64_t DsoStats::sum_event_metric(DsoEventType dso_event) const {
 /**********/
 /* DsoHdr */
 /**********/
-DsoHdr::DsoHdr(int fd_dd_profiling): _fd_dd_profiling(fd_dd_profiling) {
+DsoHdr::DsoHdr(int fd_dd_profiling) : _fd_dd_profiling(fd_dd_profiling) {
   // Test different places for existence of /proc
   // A given procfs can only work if its PID namespace is the same as mine.
   // Fortunately, `/proc/self` will return a symlink to my process ID in the
@@ -121,7 +121,7 @@ DsoHdr::DsoHdr(int fd_dd_profiling): _fd_dd_profiling(fd_dd_profiling) {
     _path_to_proc = "/host";
   }
   // 0 element is error element
-  _file_info_vector.emplace_back(FileInfo(), 0, true);
+  _file_info_vector.emplace_back(FileInfo(), 0);
 }
 
 namespace {
@@ -183,15 +183,6 @@ DsoFindRes DsoHdr::dso_find_closest(const DsoMap &map, pid_t pid,
 // Find the closest and indicate if we found a dso matching this address
 DsoFindRes DsoHdr::dso_find_closest(pid_t pid, ElfAddress_t addr) {
   return dso_find_closest(_map[pid], pid, addr);
-}
-
-bool DsoHdr::dso_handled_type_read_dso(const Dso &dso) {
-  if (dso._type != dso::kStandard) {
-    // only handle standard path for now
-    _stats.incr_metric(DsoStats::kUnhandledDso, dso._type);
-    return false;
-  }
-  return true;
 }
 
 DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
@@ -267,8 +258,7 @@ FileInfoId_t DsoHdr::get_or_insert_file_info(const Dso &dso) {
 }
 
 FileInfoId_t DsoHdr::update_id_and_path(const Dso &dso) {
-  if (dso._type != dso::DsoType::kStandard
-      && dso._type != dso::DsoType::kDDProfiling) {
+  if (!dso::has_relevant_path(dso._type)) {
     dso._id = k_file_info_error; // no file associated
     return dso._id;
   }
@@ -285,9 +275,10 @@ FileInfoId_t DsoHdr::update_id_and_path(const Dso &dso) {
   if (it == _file_info_inode_map.end()) {
     dso._id = _file_info_vector.size();
     _file_info_inode_map.emplace(std::move(key), dso._id);
-    if (dso._type == dso::DsoType::kDDProfiling && _fd_dd_profiling != -1) {
-      _file_info_vector.emplace_back(std::move(file_info), dso._id, _fd_dd_profiling);
-    }else {
+    if (dso._type == dso::DsoType::kDDProfiling && _fd_dd_profiling >= 0) {
+      _file_info_vector.emplace_back(std::move(file_info), dso._id,
+                                     _fd_dd_profiling);
+    } else {
       // open the file descriptor to this file
       _file_info_vector.emplace_back(std::move(file_info), dso._id);
     }
