@@ -263,6 +263,8 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
         reply.ring_buffer.event_fd = event_it->fd;
         reply.ring_buffer.ring_fd = event_it->mapfd;
         reply.ring_buffer.mem_size = event_it->ring_buffer_size;
+        reply.ring_buffer.ring_buffer_type =
+            static_cast<int>(event_it->ring_buffer_type);
         reply.allocation_profiling_rate =
             ctx->watchers[alloc_watcher_idx].sample_period;
       }
