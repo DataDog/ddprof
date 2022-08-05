@@ -81,7 +81,6 @@ DDRes worker_library_init(DDProfContext *ctx,
     // Make sure worker index is initialized correctly
     ctx->worker_ctx.i_current_pprof = 0;
     ctx->worker_ctx.exp_tid = {0};
-    LG_DBG("retrieved fd = %d", ctx->params.dd_profiling_fd);
     ctx->worker_ctx.us = new UnwindState(ctx->params.dd_profiling_fd);
 
     // register the existing persistent storage for the state
@@ -210,7 +209,6 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   us->output.pid = sample->pid;
   us->output.tid = sample->tid;
 
-  LG_DBG("process watch pos = %d  --", watcher_pos);
   // If this is a SW_TASK_CLOCK-type event, then aggregate the time
   if (ctx->watchers[watcher_pos].config == PERF_COUNT_SW_TASK_CLOCK)
     ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
