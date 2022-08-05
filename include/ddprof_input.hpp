@@ -20,7 +20,7 @@ typedef struct DDProfInput {
   char *log_level;
   // Input parameters
   char *show_config;
-  char *count_samples;
+  char *show_samples;
   char *enable;
   char *native_enable;
   char *agentless;
@@ -97,7 +97,8 @@ typedef struct DDProfInput {
   XX(DD_PROFILING_NATIVE_GLOBAL,        global,             g, 'g', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_INTERNAL_STATS,       internal_stats,     b, 'b', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_NATIVE_SOCKET,        socket,             Z, 'Z', 1, input, NULL, "", )                      \
-  XX(DD_PROFILING_NATIVE_PRESET,        preset,             D, 'D', 1, input, NULL, "", )
+  XX(DD_PROFILING_NATIVE_PRESET,        preset,             D, 'D', 1, input, NULL, "", ) \
+  XX(DD_PROFILING_NATIVE_SHOW_SAMPLES,  show_samples,       Y, 'Y', 0, input, NULL, "", )
 
 // clang-format on
 
