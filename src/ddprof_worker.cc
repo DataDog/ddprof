@@ -227,6 +227,9 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
     DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr,
                                     sample->period, watcher, pprof));
+    if (ctx->params.show_samples) {
+      ddprof_print_sample(us->output, us->symbol_hdr, sample->period, *watcher);
+    }
 #else
     // Call the user's stack handler
     if (ctx->stack_handler) {

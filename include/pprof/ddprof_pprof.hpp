@@ -41,3 +41,7 @@ DDRes pprof_reset(DDProfPProf *pprof);
 DDRes pprof_write_profile(const DDProfPProf *pprof, int fd);
 
 DDRes pprof_free_profile(DDProfPProf *pprof);
+
+void ddprof_print_sample(const UnwindOutput &uw_output,
+                         const SymbolHdr &symbol_hdr, uint64_t value,
+                         const PerfWatcher &watcher);

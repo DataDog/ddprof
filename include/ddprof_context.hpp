@@ -29,6 +29,7 @@ typedef struct DDProfContext {
     int dd_profiling_fd;    // opened file descriptor to our internal lib
     int sockfd;
     bool wait_on_socket;
+    bool show_samples;
     const char *internal_stats;
     const char *tags;
   } params;
