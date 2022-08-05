@@ -20,14 +20,9 @@
 
 namespace ddprof {
 
-static bool get_elf_offsets(const std::string &filepath, Offset_t &start_offset,
+static bool get_elf_offsets(int fd, Offset_t &start_offset,
+                            const std::string &filepath,
                             Offset_t &bias_offset) {
-  int fd = ::open(filepath.c_str(), O_RDONLY);
-  if (fd < 0) {
-    LG_WRN("Could not open %s", filepath.c_str());
-    return false;
-  }
-  defer { ::close(fd); };
   Elf *elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
   if (elf == NULL) {
     LG_WRN("Invalid elf %s", filepath.c_str());
@@ -132,7 +127,8 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
   // Load the file at a matching DSO address
   dwfl_errno(); // erase previous error
   Offset_t start_offset, bias_offset;
-  if (!get_elf_offsets(filepath, start_offset, bias_offset)) {
+  if (!get_elf_offsets(fileInfoValue._fd, start_offset, filepath,
+                       bias_offset)) {
     fileInfoValue._errored = true;
     LG_WRN("Couldn't retrieve offsets from %s(%s)", module_name,
            fileInfoValue.get_path().c_str());
@@ -142,8 +138,15 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
   ProcessAddress_t start = dso._start - dso._pgoff - start_offset;
   Offset_t bias = dso._start - dso._pgoff - bias_offset;
 
+  // libdwfl takes ownership (which is not 100% expected)
+  int fd = dup(fileInfoValue._fd);
+  if (fd < 0) {
+    LG_WRN("Couldn't duplicate fd to module %s(%s)", module_name,
+           fileInfoValue.get_path().c_str());
+    return ddres_warn(DD_WHAT_MODULE);
+  }
   ddprof_mod._mod =
-      dwfl_report_elf(dwfl, module_name, filepath.c_str(), -1, start, false);
+      dwfl_report_elf(dwfl, module_name, filepath.c_str(), fd, start, false);
 
   if (!ddprof_mod._mod) {
     // Ideally we would differentiate pid errors from file errors.

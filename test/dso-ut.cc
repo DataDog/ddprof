@@ -210,10 +210,12 @@ static const char *s_inode_line = "7ffcd6c89000-7ffcd6c92000 rw-p 00000000 00:00
 
 static const char *s_jsa_line = "0x800000000-0x800001fff rw-p 00000000 00:00 0                          /usr/local/openjdk-11/lib/server/classes.jsa";
 
+static const char *s_dd_profiling = "0x800000000-0x800001fff rw-p 00000000 00:00 0                          /tmp/libdd_profiling.so.1234";
+
 // clang-format on
 
 TEST(DSOTest, dso_from_procline) {
-  // todo make dso_from_procline const
+  LogHandle handle;
   Dso no_exec =
       DsoHdr::dso_from_procline(10, const_cast<char *>(s_line_noexec));
   EXPECT_EQ(no_exec._type, dso::kStandard);
@@ -270,6 +272,11 @@ TEST(DSOTest, dso_from_procline) {
     DsoFindRes findres =
         dso_hdr.insert_erase_overlap(std::move(standard_dso_4));
     EXPECT_EQ(findres.first->second._end, end_4);
+  }
+  {
+    Dso dd_profiling_dso =
+        DsoHdr::dso_from_procline(10, const_cast<char *>(s_dd_profiling));
+    EXPECT_EQ(dd_profiling_dso._type, dso::kDDProfiling);
   }
 }
 

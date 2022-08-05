@@ -37,7 +37,7 @@ TEST(DwflModule, inconsistency_test) {
 
   for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
     Dso &dso = it->second;
-    if (dso._type != dso::kStandard || !dso._executable) {
+    if (!dso::has_relevant_path(dso._type) || !dso._executable) {
       continue; // skip non exec / non standard (anon/vdso...)
     }
 

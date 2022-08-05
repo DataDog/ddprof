@@ -375,6 +375,12 @@ add_unit_test(
     ../src/perf.cc
 )
 
+add_unit_test(
+    ddprof_file_info-ut
+    ddprof_file_info-ut.cc
+    ../src/ddprof_file_info.cc
+)
+
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/savecontext.cc ../src/saveregisters.cc)
 add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 

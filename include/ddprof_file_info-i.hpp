@@ -10,4 +10,5 @@ namespace ddprof {
 typedef int32_t FileInfoId_t;
 static const int k_file_info_undef = -1;
 static const int k_file_info_error = 0;
+static const int k_file_info_dd_profiling = 1;
 } // namespace ddprof

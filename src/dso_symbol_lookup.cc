@@ -52,7 +52,7 @@ SymbolIdx_t DsoSymbolLookup::get_or_insert(FileAddress_t normalized_addr,
                                            SymbolTable &symbol_table,
                                            std::string_view addr_type) {
   // Only add address information for relevant dso types
-  if (dso._type != dso::kStandard && dso._type != dso::kVdso &&
+  if (!dso::has_relevant_path(dso._type) && dso._type != dso::kVdso &&
       dso._type != dso::kVsysCall) {
     return get_or_insert_unhandled_type(dso, symbol_table);
   }

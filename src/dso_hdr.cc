@@ -109,7 +109,7 @@ uint64_t DsoStats::sum_event_metric(DsoEventType dso_event) const {
 /**********/
 /* DsoHdr */
 /**********/
-DsoHdr::DsoHdr() {
+DsoHdr::DsoHdr(int dd_profiling_fd) : _dd_profiling_fd(dd_profiling_fd) {
   // Test different places for existence of /proc
   // A given procfs can only work if its PID namespace is the same as mine.
   // Fortunately, `/proc/self` will return a symlink to my process ID in the
@@ -121,7 +121,7 @@ DsoHdr::DsoHdr() {
     _path_to_proc = "/host";
   }
   // 0 element is error element
-  _file_info_vector.emplace_back(FileInfo(), 0, true);
+  _file_info_vector.emplace_back(FileInfo(), 0);
 }
 
 namespace {
@@ -183,15 +183,6 @@ DsoFindRes DsoHdr::dso_find_closest(const DsoMap &map, pid_t pid,
 // Find the closest and indicate if we found a dso matching this address
 DsoFindRes DsoHdr::dso_find_closest(pid_t pid, ElfAddress_t addr) {
   return dso_find_closest(_map[pid], pid, addr);
-}
-
-bool DsoHdr::dso_handled_type_read_dso(const Dso &dso) {
-  if (dso._type != dso::kStandard) {
-    // only handle standard path for now
-    _stats.incr_metric(DsoStats::kUnhandledDso, dso._type);
-    return false;
-  }
-  return true;
 }
 
 DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
@@ -263,14 +254,29 @@ FileInfoId_t DsoHdr::get_or_insert_file_info(const Dso &dso) {
     return dso._id;
   }
   _stats.incr_metric(DsoStats::kTargetDso, dso._type);
-  return update_id_and_path(dso);
+  return update_id_from_dso(dso);
 }
 
-FileInfoId_t DsoHdr::update_id_and_path(const Dso &dso) {
-  if (dso._type != dso::DsoType::kStandard) {
-    dso._id = k_file_info_error; // no file associated
+FileInfoId_t DsoHdr::update_id_dd_profiling(const Dso &dso) {
+  if (_dd_profiling_file_info != k_file_info_undef) {
+    dso._id = _dd_profiling_file_info;
     return dso._id;
   }
+
+  if (_dd_profiling_fd != -1) {
+    // Path is not valid, don't use the map
+    // fd already exists --> lookup directly
+    dso._id = _file_info_vector.size();
+    _dd_profiling_file_info = dso._id;
+    _file_info_vector.emplace_back(std::move(FileInfo(dso._filename, 0, 0)),
+                                   dso._id, _dd_profiling_fd);
+    return _dd_profiling_file_info;
+  }
+  _dd_profiling_file_info = update_id_from_path(dso);
+  return _dd_profiling_file_info;
+}
+
+FileInfoId_t DsoHdr::update_id_from_path(const Dso &dso) {
 
   FileInfo file_info = find_file_info(dso);
   if (!file_info._inode) {
@@ -284,20 +290,34 @@ FileInfoId_t DsoHdr::update_id_and_path(const Dso &dso) {
   if (it == _file_info_inode_map.end()) {
     dso._id = _file_info_vector.size();
     _file_info_inode_map.emplace(std::move(key), dso._id);
+    // open the file descriptor to this file
+    _file_info_vector.emplace_back(std::move(file_info), dso._id);
 #ifdef DEBUG
     LG_NTC("New file %d - %s - %ld", dso._id, file_info._path.c_str(),
            file_info._size);
 #endif
-    _file_info_vector.emplace_back(std::move(file_info), dso._id);
   } else { // already exists
     dso._id = it->second;
-    // update with latest location
-    if (file_info._path != _file_info_vector[dso._id]._info._path) {
-      _file_info_vector[dso._id]._info = file_info;
-      _file_info_vector[dso._id]._errored = false; // allow retry with new file
+    // update with last location
+    if (_file_info_vector[dso._id]._errored &&
+        file_info._path != _file_info_vector[dso._id]._info._path) {
+      _file_info_vector[dso._id] = FileInfoValue(std::move(file_info), dso._id);
     }
   }
   return dso._id;
+}
+
+FileInfoId_t DsoHdr::update_id_from_dso(const Dso &dso) {
+  if (!dso::has_relevant_path(dso._type)) {
+    dso._id = k_file_info_error; // no file associated
+    return dso._id;
+  }
+
+  if (dso._type == dso::DsoType::kDDProfiling) {
+    return update_id_dd_profiling(dso);
+  }
+
+  return update_id_from_path(dso);
 }
 
 bool DsoHdr::erase_overlap(const Dso &dso) {

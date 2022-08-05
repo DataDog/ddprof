@@ -16,9 +16,19 @@ enum DsoType {
   kUndef,
   kAnon,
   kSocket,
+  kDDProfiling, // special case in which the library might be known internally
   kNbDsoTypes
 };
 
+static inline bool has_relevant_path(dso::DsoType dso_type) {
+  if (dso_type == kDDProfiling) {
+    return true;
+  }
+  if (dso_type == kStandard) {
+    return true;
+  }
+  return false;
+}
 // todo : find an enum that supports to_str
 static inline const char *dso_type_str(DsoType path_type) {
   switch (path_type) {
@@ -38,6 +48,8 @@ static inline const char *dso_type_str(DsoType path_type) {
     return "Anonymous";
   case kSocket:
     return "kSocket";
+  case kDDProfiling:
+    return "kDDProfiling";
   default:
     break;
   }

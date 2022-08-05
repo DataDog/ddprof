@@ -268,6 +268,8 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     }
   }
 
+  ctx->params.dd_profiling_fd = -1;
+
   const char *preset = input->preset;
   if (!preset && ctx->num_watchers == 0) {
     // use `default` preset when no preset and no events were given in input
