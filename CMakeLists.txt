@@ -153,6 +153,7 @@ set(DD_PROFILING_SOURCES src/lib/dd_profiling.cc src/daemonize.cc src/ddprof_cmd
                          src/lib/malloc_wrapper.cc src/lib/allocation_tracker.cc src/lib/pthread_hook.cc )
 
 add_library(dd_profiling-embedded SHARED ${DD_PROFILING_SOURCES})
+target_compile_definitions(dd_profiling-embedded PRIVATE NO_EMBEDDED_DDPROF_EXE)
 target_include_directories(dd_profiling-embedded PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
 set_target_properties(dd_profiling-embedded PROPERTIES
    PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")

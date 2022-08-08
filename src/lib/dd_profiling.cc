@@ -127,18 +127,14 @@ struct ProfilerAutoStart {
 ProfilerAutoStart g_autostart;
 } // namespace
 
+#ifdef NO_EMBEDDED_DDPROF_EXE
+static int exec_ddprof(pid_t, pid_t, int) { return -1; }
+#else
 // address of embedded ddprof executable
-__attribute__((
-    weak)) extern const char _binary_ddprof_start[]; // NOLINT cert-dcl51-cpp
-__attribute__((
-    weak)) extern const char _binary_ddprof_end[]; // NOLINT cert-dcl51-cpp
+extern const char _binary_ddprof_start[]; // NOLINT cert-dcl51-cpp
+extern const char _binary_ddprof_end[];   // NOLINT cert-dcl51-cpp
 
 static int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
-  // cppcheck-suppress knownConditionTrueFalse
-  if (!_binary_ddprof_start || !_binary_ddprof_end) {
-    return -1;
-  }
-
   char ddprof_str[] = "ddprof";
 
   char pid_buf[32];
@@ -180,6 +176,7 @@ static int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
 
   return -1;
 }
+#endif
 
 static int ddprof_start_profiling_internal() {
   // Refuse to start profiler if already started by this process or if active in
