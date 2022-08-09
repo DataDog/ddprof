@@ -216,7 +216,7 @@ opt: KEY EQ WORD {
          case ECF_REGISTER: g_accum_event_conf.register_num = $3; break;
          case ECF_MODE: g_accum_event_conf.mode = $3 & EVENT_BOTH; break;
          case ECF_PARAMETER:
-           g_accum_event_conf.register_num = param_to_regno($3);
+           g_accum_event_conf.register_num = param_to_regno_c($3);
            break;
        }
 

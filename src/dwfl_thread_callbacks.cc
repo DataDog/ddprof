@@ -1,4 +1,5 @@
 #include "dwfl_thread_callbacks.hpp"
+#include "perf_archmap.hpp"
 
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
@@ -19,70 +20,17 @@ pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
 // libdwfl/unwind-libdw.c
 bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
   Dwarf_Word regs[PERF_REGS_COUNT] = {}; // max register count across all arcs
-  uint64_t n = 0;
   struct UnwindState *us = reinterpret_cast<UnwindState *>(arg);
+  unsigned int num_regs = dwarf_regs_length();
 
-#ifdef __x86_64__
-  // Substantial difference here in 32- and 64-bit x86; only support 64-bit now
-  regs[n++] = us->initial_regs.regs[REGNAME(RAX)];
-  regs[n++] = us->initial_regs.regs[REGNAME(RDX)];
-  regs[n++] = us->initial_regs.regs[REGNAME(RCX)];
-  regs[n++] = us->initial_regs.regs[REGNAME(RBX)];
-  regs[n++] = us->initial_regs.regs[REGNAME(RSI)];
-  regs[n++] = us->initial_regs.regs[REGNAME(RDI)];
-  regs[n++] = us->initial_regs.regs[REGNAME(RBP)];
-  regs[n++] = us->initial_regs.regs[REGNAME(SP)];
-  regs[n++] = us->initial_regs.regs[REGNAME(R8)];
-  regs[n++] = us->initial_regs.regs[REGNAME(R9)];
-  regs[n++] = us->initial_regs.regs[REGNAME(R10)];
-  regs[n++] = us->initial_regs.regs[REGNAME(R11)];
-  regs[n++] = us->initial_regs.regs[REGNAME(R12)];
-  regs[n++] = us->initial_regs.regs[REGNAME(R13)];
-  regs[n++] = us->initial_regs.regs[REGNAME(R14)];
-  regs[n++] = us->initial_regs.regs[REGNAME(R15)];
-  regs[n++] = us->initial_regs.regs[REGNAME(PC)];
-#elif __aarch64__
-  regs[n++] = us->initial_regs.regs[REGNAME(X0)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X1)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X2)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X3)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X4)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X5)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X6)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X7)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X8)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X9)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X10)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X11)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X12)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X13)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X14)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X15)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X16)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X17)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X18)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X19)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X20)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X21)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X22)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X23)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X24)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X25)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X26)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X27)];
-  regs[n++] = us->initial_regs.regs[REGNAME(X28)];
-  regs[n++] = us->initial_regs.regs[REGNAME(FP)];
-  regs[n++] = us->initial_regs.regs[REGNAME(LR)];
-  regs[n++] = us->initial_regs.regs[REGNAME(SP)];
+  for (unsigned int i = 0; i < num_regs; ++i) {
+    regs[i] = us->initial_regs.regs[dwarf_to_perf_regno(i)];
+  }
 
   // Although the perf registers designate the register after SP as the PC, this
   // convention is not a documented convention of the DWARF registers.  We set
   // the PC manually.
-#else
-#  error Architecture not supported
-#endif
-
-  if (!dwfl_thread_state_registers(thread, 0, n, regs))
+  if (!dwfl_thread_state_registers(thread, 0, num_regs, regs))
     return false;
 
   dwfl_thread_state_register_pc(thread, us->initial_regs.regs[REGNAME(PC)]);

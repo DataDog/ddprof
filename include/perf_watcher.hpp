@@ -43,6 +43,7 @@ typedef struct PerfWatcher {
   double value_coefficient;
   const char *tracepoint_name;
   const char *tracepoint_group;
+  const char *tracepoint_label;
   // Other configs
   bool suppress_pid;
   bool suppress_tid;

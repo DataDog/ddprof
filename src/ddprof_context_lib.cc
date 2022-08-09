@@ -70,8 +70,7 @@ DDRes add_preset(DDProfContext *ctx, const char *preset,
       DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Too many input events");
     }
     PerfWatcher *watcher = &ctx->watchers[ctx->num_watchers];
-    if (!watcher_from_event(event, watcher) &&
-        !watcher_from_tracepoint(event, watcher)) {
+    if (!watcher_from_str(event, watcher)) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
                              "Invalid event/tracepoint (%s)", event);
     }
@@ -316,6 +315,8 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   ctx->initialized = true;
   return ddres_init();
 }
+
+void log_watcher(const PerfWatcher *watcher) {}
 
 void ddprof_context_free(DDProfContext *ctx) {
   if (ctx->initialized) {

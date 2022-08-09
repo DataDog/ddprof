@@ -1241,7 +1241,7 @@ case 6:
          case ECF_REGISTER: g_accum_event_conf.register_num = yyvsp[0].num; break;
          case ECF_MODE: g_accum_event_conf.mode = yyvsp[0].num & EVENT_BOTH; break;
          case ECF_PARAMETER:
-           g_accum_event_conf.register_num = param_to_regno(yyvsp[0].num);
+           g_accum_event_conf.register_num = param_to_regno_c(yyvsp[0].num);
            break;
        }
 

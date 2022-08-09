@@ -48,41 +48,6 @@ bool arg_yesno(const char *str, int mode) {
   return false;
 }
 
-// If this returns false, then the passed watcher should be regarded as invalid
-bool watcher_from_event(const char *str, PerfWatcher *watcher) {
-  const PerfWatcher *tmp_watcher;
-  if (!(tmp_watcher = ewatcher_from_str(str)))
-    return false;
-
-  // Now we have to process options out of the string
-  char *str_chk; // for checking the result of parsing
-  const char *str_tmp = std::strchr(str, ','); // points to ',' or is nullptr
-  uint64_t value_tmp = tmp_watcher->sample_period; // get default val
-
-  if (str_tmp) {
-    ++str_tmp; // nav to after ','
-    value_tmp = strtoll(str_tmp, &str_chk, 10);
-    if (*str_chk)
-      return false; // If this is malformed, the whole thing is malformed?
-  }
-
-  // If we're here, then we've processed the event specification correctly, so
-  // we copy the tmp_watcher into the storage given by the user and update the
-  // mutable field
-  *watcher = *tmp_watcher;
-  watcher->sample_period = value_tmp;
-
-  // If an event doesn't have a well-defined profile type, then it gets
-  // registered as a tracepoint profile.  Make sure it has a valid name for the
-  // label
-  static const char event_groupname[] = "custom_events";
-  if (watcher->sample_type_id == DDPROF_PWT_TRACEPOINT) {
-    watcher->tracepoint_name = watcher->desc;
-    watcher->tracepoint_group = event_groupname;
-  }
-  return true;
-}
-
 int tracepoint_id_from_event(const char *eventname, const char *groupname) {
   if (!eventname || !*eventname || !groupname || !*groupname)
     return -1;
@@ -115,13 +80,20 @@ int tracepoint_id_from_event(const char *eventname, const char *groupname) {
 }
 
 // If this returns false, then the passed watcher should be regarded as invalid
-bool watcher_from_tracepoint(const char *str, PerfWatcher *watcher) {
+bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   EventConf *conf = EventConf_parse(str);
+  const PerfWatcher *tmp_watcher;
   if (!conf)
     return false;
 
-  // Start out with the correct template.
-  *watcher = *twatcher_default();
+  // The watcher is templated; either from an existing Profiling template,
+  // keyed on the eventname, or it uses the generic template for Tracepoints
+  if ((tmp_watcher = ewatcher_from_str(conf->eventname))) {
+    *watcher = *tmp_watcher;
+    conf->id = 1; // matched, so invalidate Tracepoint checks
+  } else {
+    *watcher = *twatcher_default();
+  }
 
   // The most likely thing to be invalid is the selection of the tracepoint
   // from the trace events system.  If the conf has a nonzero number for the id

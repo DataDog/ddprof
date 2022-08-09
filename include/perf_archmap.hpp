@@ -90,10 +90,15 @@ enum PERF_ARCHMAP_ARM {
 #  error Architecture not supported
 #endif
 
+unsigned int dwarf_regs_length();
+unsigned int dwarf_to_perf_regno(unsigned int i);
+unsigned int param_to_perf_regno(unsigned int param_no);
+
+// C API for use by the tracepoint parser
 #ifdef __cplusplus
 extern "C" {
 #endif
-int param_to_regno(unsigned int param_no);
+unsigned int param_to_regno_c(unsigned int param_no);
 #ifdef __cplusplus
 }
 #endif

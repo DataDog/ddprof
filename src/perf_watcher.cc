@@ -73,19 +73,11 @@ const char *event_type_name_from_idx(int idx) {
 #undef X_STR
 
 int str_to_event_idx(const char *str) {
-  int type;
-  if (!str)
+  if (!str || !*str)
     return -1;
-  size_t sz_str = strlen(str);
-  for (type = 0; type < DDPROF_PWE_LENGTH; ++type) {
+  for (int type = 0; type < DDPROF_PWE_LENGTH; ++type) {
     const char *event_name = event_type_name_from_idx(type);
     size_t sz_thistype = strlen(event_name);
-
-    // We don't want to match partial events, and the event specification
-    // demands that events are either whole or immediately preceeded by a comma.
-    if ((sz_str < sz_thistype) ||
-        (sz_str > sz_thistype && str[sz_thistype] != ','))
-      continue;
     if (!strncmp(str, event_name, sz_thistype))
       return type;
   }

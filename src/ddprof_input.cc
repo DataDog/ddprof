@@ -163,8 +163,7 @@ static void ddprof_input_default_events(DDProfInput *input) {
 
     const char *event = event_str.c_str();
     PerfWatcher *watcher = &input->watchers[input->num_watchers];
-    if (!watcher_from_event(event, watcher) &&
-        !watcher_from_tracepoint(event, watcher)) {
+    if (!watcher_from_str(event, watcher)) {
       LG_WRN("Ignoring invalid event/tracepoint (%s)", optarg);
     } else {
       ++input->num_watchers;
@@ -243,8 +242,7 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
         DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Too many input events");
       }
       PerfWatcher *watcher = &input->watchers[input->num_watchers];
-      if (!watcher_from_event(optarg, watcher) &&
-          !watcher_from_tracepoint(optarg, watcher)) {
+      if (!watcher_from_str(optarg, watcher)) {
         *continue_exec = false;
         DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
                                "Invalid event/tracepoint (%s)", optarg);

@@ -228,9 +228,13 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     ++labels_num;
   }
   if (watcher_has_tracepoint(watcher)) {
-    // This adds only the trace name.  Maybe we should have group + tracenames?
     labels[labels_num].key = to_CharSlice("tracepoint_type");
-    labels[labels_num].str = to_CharSlice(watcher->tracepoint_name);
+
+    if (watcher->tracepoint_label) {
+      labels[labels_num].str = to_CharSlice(watcher->tracepoint_label);
+    } else {
+      labels[labels_num].str = to_CharSlice(watcher->tracepoint_name);
+    }
     ++labels_num;
   }
   ddprof_ffi_Sample sample = {

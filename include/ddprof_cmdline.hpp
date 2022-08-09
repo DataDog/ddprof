@@ -27,5 +27,4 @@ bool arg_inset(const char *str, char const *const *set, int sz_set);
 
 bool arg_yesno(const char *str, int mode);
 
-bool watcher_from_event(const char *str, PerfWatcher *watcher);
-bool watcher_from_tracepoint(const char *str, PerfWatcher *watcher);
+bool watcher_from_str(const char *str, PerfWatcher *watcher);
