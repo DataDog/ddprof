@@ -9,73 +9,28 @@
 
 #include <stdlib.h>
 
-bool rb_init(RingBuffer *rb, struct perf_event_mmap_page *page, size_t size,
-             bool is_mirrored) {
-  // Assumes storage has already been allocated in rb->wrbuf
+bool rb_init(RingBuffer *rb, void *base, size_t size,
+             RingBufferType ring_buffer_type) {
   rb->meta_size = get_page_size();
-  rb->region = page;
-  rb->start = (const char *)page + rb->meta_size;
-  rb->size = size;
+  rb->base = base;
+  rb->data = reinterpret_cast<std::byte *>(base) + rb->meta_size;
   rb->data_size = size - rb->meta_size;
   rb->mask = get_mask_from_size(size);
-  rb->is_mirrored = is_mirrored;
-
-  // If already allocated just free it
-  if (rb->wrbuf)
-    free(rb->wrbuf);
-  rb->wrbuf = NULL; // in case alloc fails
-
-  if (!is_mirrored) {
-    // Allocate room for a watcher-held buffer.  This is for linearizing
-    // ringbuffer elements and depends on the per-watcher configuration for
-    // perf_event_open().  Eventually this size will be non-static.
-    uint64_t buf_sz =
-        sizeof(uint64_t) * PERF_REGS_COUNT + PERF_SAMPLE_STACK_SIZE;
-    buf_sz += sizeof(perf_event_sample);
-    unsigned char *wrbuf = static_cast<unsigned char *>(malloc(buf_sz));
-    if (!wrbuf)
-      return false;
-    rb->wrbuf = wrbuf;
+  rb->type = ring_buffer_type;
+  if (ring_buffer_type == RingBufferType::kPerfRingBuffer) {
+    perf_event_mmap_page *meta =
+        reinterpret_cast<perf_event_mmap_page *>(rb->base);
+    rb->reader_pos = reinterpret_cast<uint64_t *>(&meta->data_tail);
+    rb->writer_pos = reinterpret_cast<uint64_t *>(&meta->data_head);
+  } else {
+    return false;
   }
 
   return true;
 }
 
-void rb_clear(RingBuffer *rb) { memset(rb, 0, sizeof(*rb)); }
-void rb_free(RingBuffer *rb) {
-  if (rb->wrbuf)
-    free(rb->wrbuf);
-  rb->wrbuf = NULL;
-}
+void rb_free(RingBuffer *rb) {}
 
-uint64_t rb_next(RingBuffer *rb) {
-  rb->offset = (rb->offset + sizeof(uint64_t)) & (rb->mask);
-  return *(uint64_t *)(rb->start + rb->offset);
-}
-
-struct perf_event_header *rb_seek(RingBuffer *rb, uint64_t offset) {
-  rb->offset = (unsigned long)offset & (rb->mask);
-
-  struct perf_event_header *ret =
-      (struct perf_event_header *)(rb->start + rb->offset);
-  // If buffer is mirrored or we don't overrun the end, just return a pointer in
-  // the buffer
-  if (rb->is_mirrored || rb->data_size - rb->offset >= ret->size) {
-    return ret;
-  }
-
-  // We overrun the end of the ringbuffer, pass in a buffer rather than the raw
-  // event. The terms 'left' and 'right' below refer to the regions in the
-  // linearized buffer.  In the index space of the ringbuffer, these terms
-  // would be reversed.
-  uint64_t left_sz = rb->data_size - rb->offset;
-  uint64_t right_sz = ret->size - left_sz;
-  memcpy(rb->wrbuf, rb->start + rb->offset, left_sz);
-  memcpy(rb->wrbuf + left_sz, rb->start, right_sz);
-  return (struct perf_event_header *)rb->wrbuf;
-}
-
-// This union is an implementation trick to make splitting apart an 8-byte
 // aligned block into two 4-byte blocks easier
 typedef union flipper {
   uint64_t full;
@@ -85,8 +40,8 @@ typedef union flipper {
 #define SZ_CHECK                                                               \
   if ((sz += 8) >= sz_hdr)                                                     \
   return false
-bool samp2hdr(struct perf_event_header *hdr, perf_event_sample *sample,
-              size_t sz_hdr, uint64_t mask) {
+bool samp2hdr(perf_event_header *hdr, perf_event_sample *sample, size_t sz_hdr,
+              uint64_t mask) {
   // There is absolutely no point for this interface except testing
 
   // Presumes that the user has allocated enough room for the whole sample

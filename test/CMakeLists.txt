@@ -10,7 +10,7 @@ enable_testing()
 # https://github.com/google/sanitizers/issues/703
 option(DDPROF_DETECT_LEAK "Parameter for leak detection." 1)
 
-### Code coverage
+# Code coverage
 if("${CMAKE_BUILD_TYPE}" STREQUAL "Coverage")
     message(STATUS "Activating code coverage in tests")
     include(CodeCoverage)
@@ -21,7 +21,7 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "Coverage")
     )
 endif()
 
-#### Define functions ####
+# Define functions
 
 #[[ Create a unit test
 Syntax:
@@ -35,25 +35,25 @@ add_unit_test(myexe src1.cpp)
 add_unit_test(myexe src1.cpp DEFINITIONS UNIT_TEST)
 #]]
 function(add_unit_test name)
-   set(options NO_DETECT_LEAKS)
-   set(oneValueArgs)
-   set(multiValueArgs)
-   cmake_parse_arguments(PARSE_ARGV 1 MY "${options}" "${oneValueArgs}" "${multiValueArgs}")
-   message(STATUS "Creating unit test : " ${name})
+    set(options NO_DETECT_LEAKS)
+    set(oneValueArgs)
+    set(multiValueArgs)
+    cmake_parse_arguments(PARSE_ARGV 1 MY "${options}" "${oneValueArgs}" "${multiValueArgs}")
+    message(STATUS "Creating unit test : " ${name})
 
-   ## Create exe with sources. Always add logger and error management in the unit tests
-   add_exe(${name}
+    # # Create exe with sources. Always add logger and error management in the unit tests
+    add_exe(${name}
         ../src/ddres_list.cc
         ../src/logger.cc
         ${MY_UNPARSED_ARGUMENTS})
 
-   target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
-   target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST} ${GTEST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/include/lib)
+    target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
+    target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST} ${GTEST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/include/lib)
 
-   add_test(NAME ${name} COMMAND ${name})
-   set_tests_properties(${name} PROPERTIES
-                        ENVIRONMENT "UBSAN_OPTIONS=halt_on_error=1 abort_on_error=1 print_stacktrace=1;LSAN_OPTIONS=detect_leaks=$<BOOL:${DDPROF_DETECT_LEAK}> malloc_context_size=2 print_suppressions=0;ASAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/cmake/asan.supp")
-   disable_clangtidy(${name})
+    add_test(NAME ${name} COMMAND ${name})
+    set_tests_properties(${name} PROPERTIES
+        ENVIRONMENT "UBSAN_OPTIONS=halt_on_error=1 abort_on_error=1 print_stacktrace=1;LSAN_OPTIONS=detect_leaks=$<BOOL:${DDPROF_DETECT_LEAK}> malloc_context_size=2 print_suppressions=0;ASAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/cmake/asan.supp")
+    disable_clangtidy(${name})
 endfunction()
 
 #[[ Create a benchmark
@@ -68,24 +68,24 @@ add_benchmark(myexe src1.cpp)
 add_benchmark(myexe src1.cpp DEFINITIONS UNIT_TEST)
 #]]
 function(add_benchmark name)
-   set(options)
-   set(oneValueArgs)
-   set(multiValueArgs)
-   cmake_parse_arguments(PARSE_ARGV 1 MY "${options}" "${oneValueArgs}" "${multiValueArgs}")
-   message(STATUS "Creating unit test : " ${name})
+    set(options)
+    set(oneValueArgs)
+    set(multiValueArgs)
+    cmake_parse_arguments(PARSE_ARGV 1 MY "${options}" "${oneValueArgs}" "${multiValueArgs}")
+    message(STATUS "Creating unit test : " ${name})
 
-   ## Create exe with sources. Always add logger and error management in the unit tests
-   add_exe(${name}
+    # # Create exe with sources. Always add logger and error management in the unit tests
+    add_exe(${name}
         ../src/ddres_list.cc
         ../src/logger.cc
         ${MY_UNPARSED_ARGUMENTS})
 
-   target_link_libraries(${name} PRIVATE Threads::Threads benchmark::benchmark benchmark::benchmark_main)
-   target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST})
-   disable_clangtidy(${name})
+    target_link_libraries(${name} PRIVATE Threads::Threads benchmark::benchmark benchmark::benchmark_main)
+    target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST})
+    disable_clangtidy(${name})
 endfunction()
 
-#### Definition of unit tests ####
+# Definition of unit tests
 add_compile_definitions("UNIT_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 
 add_unit_test(
@@ -254,7 +254,6 @@ add_unit_test(
     DEFINITIONS MYNAME="dso-ut")
 target_include_directories(dso-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
 
-
 add_unit_test(
     tags-ut
     tags-ut.cc
@@ -281,6 +280,7 @@ add_unit_test(
     ../src/dso.cc
     ../src/dso_hdr.cc
     ../src/ddprof_file_info.cc
+    ../src/failed_assumption.cc
     ../src/procutils.cc
     ../src/signal_helper.cc
     LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
@@ -305,6 +305,7 @@ add_unit_test(
     ../src/dwfl_symbol.cc
     ../src/dwfl_symbol_lookup.cc
     ../src/dwfl_thread_callbacks.cc
+    ../src/failed_assumption.cc
     ../src/savecontext.cc
     ../src/saveregisters.cc
     ../src/mapinfo_lookup.cc
@@ -337,6 +338,7 @@ add_unit_test(
     ../src/dwfl_symbol.cc
     ../src/dwfl_symbol_lookup.cc
     ../src/dwfl_thread_callbacks.cc
+    ../src/failed_assumption.cc
     ../src/pevent_lib.cc
     ../src/perf.cc
     ../src/perf_ringbuffer.cc
@@ -362,7 +364,7 @@ add_unit_test(
     sys_utils-ut
     sys_utils-ut.cc
     ../src/sys_utils.cc
-    )
+)
 
 add_unit_test(
     ringbuffer-ut
@@ -382,13 +384,25 @@ add_unit_test(
     ../src/perf.cc
 )
 
+add_unit_test(
+    ddprof_file_info-ut
+    ddprof_file_info-ut.cc
+    ../src/ddprof_file_info.cc
+)
+
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/savecontext.cc ../src/saveregisters.cc)
 add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 
 add_exe(simple_malloc-static simple_malloc.cc
-        LIBRARIES Threads::Threads dd_profiling-static)
+    LIBRARIES Threads::Threads dd_profiling-static)
 
-if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
+    add_exe(pthread_deadlock pthread_deadlock.cc
+        LIBRARIES Threads::Threads)
+    add_test(NAME pthread_deadlock COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/pthread_deadlock-ut.sh WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+endif()
+
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
     add_exe(read_past_sp read_past_sp.cc)
     target_include_directories(read_past_sp PRIVATE ${DDPROF_INCLUDE_LIST})
     add_test(NAME read_past_sp COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/read_past_sp-ut.sh WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

@@ -3,6 +3,10 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
+#include "allocation_tracker.hpp"
+#include "ddprof_base.hpp"
+#include "unlikely.hpp"
+
 #include <atomic>
 #include <cassert>
 #include <cstddef>
@@ -10,13 +14,14 @@
 #include <dlfcn.h>
 #include <malloc.h>
 
-#include "allocation_tracker.hpp"
-#include "ddprof_base.hpp"
-#include "unlikely.hpp"
-
 // Declaration of reallocarray is only available starting from glibc 2.28
 extern "C" {
+#ifdef __llvm__
 void *reallocarray(void *ptr, size_t nmemb, size_t size) noexcept;
+#else
+void *reallocarray(void *ptr, size_t nmemb, size_t size);
+#endif
+void *pvalloc(size_t size) noexcept;
 
 void *temp_malloc(size_t size) noexcept;
 void temp_free(void *ptr) noexcept;
@@ -45,7 +50,6 @@ DECLARE_FUNC(free);
 DECLARE_FUNC(posix_memalign);
 DECLARE_FUNC(aligned_alloc);
 DECLARE_FUNC(reallocarray);
-
 // obsolete allocation functions
 DECLARE_FUNC(memalign);
 DECLARE_FUNC(pvalloc);
@@ -174,7 +178,7 @@ void *temp_memalign(size_t alignment, size_t size) noexcept {
   return s_memalign(alignment, size);
 }
 
-void *pvalloc(size_t size) {
+void *pvalloc(size_t size) noexcept {
   void *ptr = s_pvalloc(size);
   ddprof::AllocationTracker::track_allocation(reinterpret_cast<uintptr_t>(ptr),
                                               size);
@@ -198,7 +202,11 @@ void *temp_valloc(size_t size) noexcept {
   return s_valloc(size);
 }
 
+#ifdef __llvm__
 void *reallocarray(void *ptr, size_t nmemb, size_t size) noexcept {
+#else
+void *reallocarray(void *ptr, size_t nmemb, size_t size) {
+#endif
   if (ptr) {
     ddprof::AllocationTracker::track_deallocation(
         reinterpret_cast<uintptr_t>(ptr));

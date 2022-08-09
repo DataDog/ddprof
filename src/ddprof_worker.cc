@@ -36,15 +36,13 @@
 
 using namespace ddprof;
 
-static const DDPROF_STATS s_cycled_stats[] = {STATS_UNWIND_CPU_USAGE,
-                                              STATS_EVENT_COUNT,
-                                              STATS_EVENT_LOST,
-                                              STATS_SAMPLE_COUNT,
-                                              STATS_DSO_UNHANDLED_SECTIONS,
-                                              STATS_TARGET_CPU_USAGE};
+static const DDPROF_STATS s_cycled_stats[] = {
+    STATS_UNWIND_AVG_TIME, STATS_AGGREGATION_AVG_TIME,
+    STATS_EVENT_COUNT,     STATS_EVENT_LOST,
+    STATS_SAMPLE_COUNT,    STATS_DSO_UNHANDLED_SECTIONS,
+    STATS_TARGET_CPU_USAGE};
 
 static const long k_clock_ticks_per_sec = sysconf(_SC_CLK_TCK);
-static const unsigned s_nb_samples_per_backpopulate = 200;
 
 /// Human readable runtime information
 static void print_diagnostics(const DsoHdr &dso_hdr) {
@@ -83,8 +81,7 @@ DDRes worker_library_init(DDProfContext *ctx,
     // Make sure worker index is initialized correctly
     ctx->worker_ctx.i_current_pprof = 0;
     ctx->worker_ctx.exp_tid = {0};
-
-    ctx->worker_ctx.us = new UnwindState();
+    ctx->worker_ctx.us = new UnwindState(ctx->params.dd_profiling_fd);
 
     // register the existing persistent storage for the state
     ctx->worker_ctx.persistent_worker_state = persistent_worker_state;
@@ -158,18 +155,34 @@ static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr,
   int64_t target_millicores = (target_cpu_nsec * 1000) / elapsed_nsec;
   ddprof_stats_set(STATS_TARGET_CPU_USAGE, target_millicores);
 
-  long tsc_cycles;
-  ddprof_stats_get(STATS_UNWIND_CPU_USAGE, &tsc_cycles);
-  int64_t unwind_millicores =
-      (ddprof::tsc_cycles_to_ns(tsc_cycles) * 1000) / elapsed_nsec;
-  ddprof_stats_set(STATS_UNWIND_CPU_USAGE, unwind_millicores);
-
   long nsamples = 0;
   ddprof_stats_get(STATS_SAMPLE_COUNT, &nsamples);
+
+  long tsc_cycles;
+  ddprof_stats_get(STATS_UNWIND_AVG_TIME, &tsc_cycles);
+  int64_t avg_unwind_ns =
+      nsamples > 0 ? ddprof::tsc_cycles_to_ns(tsc_cycles) / nsamples : -1;
+
+  ddprof_stats_set(STATS_UNWIND_AVG_TIME, avg_unwind_ns);
+
+  ddprof_stats_get(STATS_AGGREGATION_AVG_TIME, &tsc_cycles);
+  int64_t avg_aggregation_ns =
+      nsamples > 0 ? ddprof::tsc_cycles_to_ns(tsc_cycles) / nsamples : -1;
+
+  ddprof_stats_set(STATS_AGGREGATION_AVG_TIME, avg_aggregation_ns);
+
   if (nsamples != 0) {
     ddprof_stats_divide(STATS_UNWIND_AVG_STACK_SIZE, nsamples);
+    ddprof_stats_divide(STATS_UNWIND_AVG_STACK_DEPTH, nsamples);
+  } else {
+    ddprof_stats_set(STATS_UNWIND_AVG_STACK_SIZE, -1);
+    ddprof_stats_set(STATS_UNWIND_AVG_STACK_DEPTH, -1);
   }
 
+  ddprof_stats_set(
+      STATS_PROFILE_DURATION,
+      std::chrono::duration_cast<std::chrono::milliseconds>(cycle_duration)
+          .count());
   return ddres_init();
 }
 
@@ -187,7 +200,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     ddprof_stats_add(STATS_UNWIND_TRUNCATED_INPUT, 1, nullptr);
   }
 
-  unsigned long this_ticks_unwind = ddprof::get_tsc_cycles();
+  auto ticks0 = ddprof::get_tsc_cycles();
   // copy the sample context into the unwind structure
   unwind_init_sample(us, sample->regs, sample->pid, sample->size_stack,
                      sample->data_stack);
@@ -205,11 +218,18 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   // the event to get the desired value
   PerfWatcher *watcher = &ctx->watchers[watcher_pos];
   uint64_t sample_val = sample->period;
-  if (PERF_SAMPLE_RAW & watcher->sample_type) {
-    uint64_t raw_offset = watcher->trace_off;
-    uint64_t raw_sz = watcher->trace_sz;
+  if ((PERF_SAMPLE_RAW & watcher->sample_type) &&
+      watcher->loc_type == kPerfWatcherLoc_raw) {
+    uint64_t raw_offset = watcher->raw_off;
+    uint64_t raw_sz = watcher->raw_sz;
     memcpy(&sample_val, sample->data_raw + raw_offset, raw_sz);
+  } else if (watcher->loc_type == kPerfWatcherLoc_reg) {
+    memcpy(&sample_val, &sample->regs[watcher->regno], sizeof(sample_val));
   }
+
+  auto unwind_ticks = ddprof::get_tsc_cycles();
+  DDRES_CHECK_FWD(
+      ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL));
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
   if (!IsDDResFatal(res)) {
@@ -231,11 +251,12 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     }
 #endif
   }
-  DDRES_CHECK_FWD(ddprof_stats_add(STATS_UNWIND_CPU_USAGE,
-                                   ddprof::get_tsc_cycles() - this_ticks_unwind,
+
+  DDRES_CHECK_FWD(ddprof_stats_add(STATS_AGGREGATION_AVG_TIME,
+                                   ddprof::get_tsc_cycles() - unwind_ticks,
                                    NULL));
 
-  return ddres_init();
+  return {};
 }
 
 static void ddprof_reset_worker_stats() {
@@ -356,7 +377,8 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
   return ddres_init();
 }
 
-void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int watcher_pos) {
+void ddprof_pr_mmap(DDProfContext *ctx, const perf_event_mmap *map,
+                    int watcher_pos) {
   if (!(map->header.misc & PERF_RECORD_MISC_MMAP_DATA)) {
     LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx)", watcher_pos, map->pid,
            map->filename, map->addr, map->len, map->pgoff);
@@ -366,11 +388,11 @@ void ddprof_pr_mmap(DDProfContext *ctx, perf_event_mmap *map, int watcher_pos) {
   }
 }
 
-void ddprof_pr_lost(DDProfContext *, perf_event_lost *lost, int) {
+void ddprof_pr_lost(DDProfContext *, const perf_event_lost *lost, int) {
   ddprof_stats_add(STATS_EVENT_LOST, lost->lost, NULL);
 }
 
-void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm,
+void ddprof_pr_comm(DDProfContext *ctx, const perf_event_comm *comm,
                     int watcher_pos) {
   // Change in process name (assuming exec) : clear all associated dso
   if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC) {
@@ -379,7 +401,8 @@ void ddprof_pr_comm(DDProfContext *ctx, perf_event_comm *comm,
   }
 }
 
-void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int watcher_pos) {
+void ddprof_pr_fork(DDProfContext *ctx, const perf_event_fork *frk,
+                    int watcher_pos) {
   LG_DBG("<%d>(FORK)%d -> %d/%d", watcher_pos, frk->ppid, frk->pid, frk->tid);
   if (frk->ppid != frk->pid) {
     // Clear everything and populate at next error or with coming samples
@@ -387,7 +410,8 @@ void ddprof_pr_fork(DDProfContext *ctx, perf_event_fork *frk, int watcher_pos) {
   }
 }
 
-void ddprof_pr_exit(DDProfContext *ctx, perf_event_exit *ext, int watcher_pos) {
+void ddprof_pr_exit(DDProfContext *ctx, const perf_event_exit *ext,
+                    int watcher_pos) {
   // On Linux, it seems that the thread group leader is the one whose task ID
   // matches the process ID of the group.  Moreover, it seems that it is the
   // overwhelming convention that this thread is closed after the other threads
@@ -496,12 +520,13 @@ struct perf_event_hdr_wpid : perf_event_header {
   uint32_t pid, tid;
 };
 
-DDRes ddprof_worker_process_event(struct perf_event_header *hdr,
-                                  int watcher_pos, DDProfContext *ctx) {
+DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
+                                  DDProfContext *ctx) {
   // global try catch to avoid leaking exceptions to main loop
   try {
     ddprof_stats_add(STATS_EVENT_COUNT, 1, NULL);
-    struct perf_event_hdr_wpid *wpid = static_cast<perf_event_hdr_wpid *>(hdr);
+    const perf_event_hdr_wpid *wpid =
+        static_cast<const perf_event_hdr_wpid *>(hdr);
     switch (hdr->type) {
     /* Cases where the target type has a PID */
     case PERF_RECORD_SAMPLE:
@@ -515,34 +540,32 @@ DDRes ddprof_worker_process_event(struct perf_event_header *hdr,
       break;
     case PERF_RECORD_MMAP:
       if (wpid->pid)
-        ddprof_pr_mmap(ctx, (perf_event_mmap *)hdr, watcher_pos);
+        ddprof_pr_mmap(ctx, reinterpret_cast<const perf_event_mmap *>(hdr),
+                       watcher_pos);
       break;
     case PERF_RECORD_COMM:
       if (wpid->pid)
-        ddprof_pr_comm(ctx, (perf_event_comm *)hdr, watcher_pos);
+        ddprof_pr_comm(ctx, reinterpret_cast<const perf_event_comm *>(hdr),
+                       watcher_pos);
       break;
     case PERF_RECORD_EXIT:
       if (wpid->pid)
-        ddprof_pr_exit(ctx, (perf_event_exit *)hdr, watcher_pos);
+        ddprof_pr_exit(ctx, reinterpret_cast<const perf_event_exit *>(hdr),
+                       watcher_pos);
       break;
     case PERF_RECORD_FORK:
       if (wpid->pid)
-        ddprof_pr_fork(ctx, (perf_event_fork *)hdr, watcher_pos);
+        ddprof_pr_fork(ctx, reinterpret_cast<const perf_event_fork *>(hdr),
+                       watcher_pos);
       break;
 
     /* Cases where the target type might not have a PID */
     case PERF_RECORD_LOST:
-      ddprof_pr_lost(ctx, (perf_event_lost *)hdr, watcher_pos);
+      ddprof_pr_lost(ctx, reinterpret_cast<const perf_event_lost *>(hdr),
+                     watcher_pos);
       break;
     default:
       break;
-    }
-
-    // backpopulate if needed
-    if (++ctx->worker_ctx.count_samples > s_nb_samples_per_backpopulate) {
-      // allow new backpopulates and reset counter
-      ctx->worker_ctx.us->dso_hdr.reset_backpopulate_state();
-      ctx->worker_ctx.count_samples = 0;
     }
   }
   CatchExcept2DDRes();

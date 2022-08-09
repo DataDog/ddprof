@@ -9,9 +9,7 @@
 namespace ddprof {
 // From a dso object (and the matching file), attach the module to the dwfl
 // object, return the associated Dwfl_Module
-DDRes update_module(Dwfl *dwfl, ProcessAddress_t pc,
-                    const DDProfModRange &mod_range,
+DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
                     const FileInfoValue &fileInfoValue, DDProfMod &ddprof_mod);
 
-DDRes update_bias(DDProfMod &ddprof_mod);
 } // namespace ddprof

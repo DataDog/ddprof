@@ -3,15 +3,15 @@
 # Unless explicitly stated otherwise all files in this repository are licensed under the Apache License Version 2.0.
 # This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
 
-set -euo pipefail
+set -eu
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 cd "$SCRIPT_DIR/.."
 
 # Find most recent clang-format, defaulting to an unqualified default
-CLANG_FORMAT=$(command -v clang-format{-13,-12,-11,-10,-9,} | head -n 1)
-if ! command -v "${CLANG_FORMAT}" > /dev/null 2>&1; then
+CLANG_FORMAT=$(command -v clang-format{-13,-12,-11,-10,-9,} | head -n1)
+if [ -z "${CLANG_FORMAT}" ]; then
   echo "No suitable clang-format found"
   exit 1
 fi

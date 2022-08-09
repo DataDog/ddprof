@@ -86,6 +86,7 @@ struct RingBufferInfo {
   int64_t mem_size = -1;
   int ring_fd = -1;
   int event_fd = -1;
+  int ring_buffer_type = 0;
 };
 
 struct ReplyMessage {

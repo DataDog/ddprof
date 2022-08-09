@@ -18,14 +18,12 @@ namespace ddprof {
 /// Considering we can have relative paths within several containers, we check
 /// inodes
 struct FileInfoInodeKey {
-  FileInfoInodeKey(inode_t inode, ElfAddress_t offset, std::size_t sz)
-      : _inode(inode), _offset(offset), _sz(sz) {}
+  FileInfoInodeKey(inode_t inode, std::size_t sz) : _inode(inode), _sz(sz) {}
   bool operator==(const FileInfoInodeKey &o) const;
   // inode is used as a key (instead of path which can be the same for several
   // containers). TODO: inode could be the same across several filesystems (size
   // is there to mitigate)
   inode_t _inode;
-  Offset_t _offset;
   std::size_t _sz;
 };
 
@@ -35,8 +33,7 @@ namespace std {
 template <> struct hash<ddprof::FileInfoInodeKey> {
   std::size_t operator()(const ddprof::FileInfoInodeKey &k) const {
     std::size_t hash_val = ddprof::hash_combine(hash<inode_t>()(k._inode),
-                                                hash<Offset_t>()(k._offset));
-    hash_val = ddprof::hash_combine(hash_val, hash<size_t>()(k._sz));
+                                                hash<Offset_t>()(k._sz));
     return hash_val;
   }
 };
@@ -57,16 +54,26 @@ struct FileInfo {
 /// Keeps metadata on the file associated to a key
 class FileInfoValue {
 public:
-  FileInfoValue(FileInfo &&info, FileInfoId_t id, bool errored = false)
-      : _info(info), _errored(errored), _id(id) {}
+  /// duplicates and holds the file descriptor
+  FileInfoValue(FileInfo &&info, FileInfoId_t id, int fd);
+  /// Opens a file descriptor to the file
+  FileInfoValue(FileInfo &&info, FileInfoId_t id);
+  FileInfoValue(const FileInfoValue &other) = delete;
+  FileInfoValue &operator=(const FileInfoValue &other) = delete;
+  FileInfoValue(FileInfoValue &&other);
+  FileInfoValue &operator=(FileInfoValue &&other);
+  ~FileInfoValue();
   FileInfoId_t get_id() const { return _id; }
   int64_t get_size() const { return _info._size; }
   const std::string &get_path() const { return _info._path; }
 
   FileInfo _info;
+  int _fd;
 
-  mutable bool _errored; // a flag to avoid trying to read in a loop bad files
+  mutable bool _errored =
+      false; // a flag to avoid trying to read in a loop bad files
 private:
+  void copy_values(const FileInfoValue &other);
   FileInfoId_t _id; // unique ID matching index in table
 };
 

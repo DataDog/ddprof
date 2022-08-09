@@ -37,7 +37,7 @@ TEST(DwflModule, inconsistency_test) {
 
   for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
     Dso &dso = it->second;
-    if (dso._type != dso::kStandard || !dso._executable) {
+    if (!dso::has_relevant_path(dso._type) || !dso._executable) {
       continue; // skip non exec / non standard (anon/vdso...)
     }
 
@@ -46,11 +46,8 @@ TEST(DwflModule, inconsistency_test) {
 
     const FileInfoValue &file_info_value =
         dso_hdr.get_file_info_value(file_info_id);
-    DDProfModRange mod_range;
-    EXPECT_TRUE(IsDDResOK(
-        dso_hdr.mod_range_or_backpopulate(find_res.first, dso_map, mod_range)));
     DDProfMod *ddprof_mod =
-        dwfl_wrapper.register_mod(dso._start, dso, mod_range, file_info_value);
+        dwfl_wrapper.register_mod(dso._start, dso, file_info_value);
     EXPECT_TRUE(ddprof_mod->_mod);
     if (find_res.first == it) {
       Symbol symbol;
@@ -72,33 +69,7 @@ TEST(DwflModule, inconsistency_test) {
       EXPECT_LE(elf_addr, end_sym);
     }
     // check that we loaded all mods matching the DSOs
-    EXPECT_EQ(ddprof_mod->_low_addr, mod_range._low_addr);
     EXPECT_EQ(ddprof_mod->_status, DDProfMod::kUnknown);
-  }
-
-  {
-    // attempt loading a bad DSO that overlap with existing
-    // Create a DSO from the unit test DSO
-    const Dso &ut_dso = find_res.first->second;
-    Dso bad_dso(ut_dso);
-    bad_dso._id = k_file_info_undef;
-    // Test file to avoid matching file names
-    bad_dso._filename = DWFL_TEST_DATA "/dso_test_data.so";
-    bad_dso._start += 1; // offset to avoid matching previous dso
-
-    FileInfoId_t file_info_id = dso_hdr.get_or_insert_file_info(bad_dso);
-
-    const FileInfoValue &file_info_value =
-        dso_hdr.get_file_info_value(file_info_id);
-
-    DDProfModRange bad_range = {._low_addr = bad_dso._start,
-                                ._high_addr = bad_dso._end + 1};
-
-    DDProfMod *ddprof_mod = dwfl_wrapper.register_mod(
-        bad_dso._start, bad_dso, bad_range, file_info_value);
-
-    EXPECT_EQ(ddprof_mod, nullptr);
-    EXPECT_EQ(dwfl_wrapper._inconsistent, true);
   }
 }
 

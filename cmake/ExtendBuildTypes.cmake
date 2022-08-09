@@ -9,7 +9,7 @@ endif()
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_C_STANDARD 11)
 
-add_compile_options(-Wall)
+add_compile_options(-Wall -g)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 7.0)
@@ -19,7 +19,6 @@ else()
     add_compile_options(-Wshadow -Wno-c99-designator)
 endif()
 
-set(GCC_DEBUG_FLAGS "-g")
 set(SAN_FLAGS "-fsanitize=undefined -fsanitize=float-divide-by-zero -fno-sanitize-recover")
 set(ASAN_FLAGS "-fsanitize=address")
 set(TSAN_FLAGS "-fsanitize=thread")
@@ -35,11 +34,11 @@ message(STATUS "Adding build types...")
 
 ## Add flags for sanitized debug (asan)
 SET(CMAKE_CXX_FLAGS_SANITIZEDDEBUG
-    "${GCC_DEBUG_FLAGS} ${SAN_FLAGS} ${ASAN_FLAGS} ${STACK_FLAGS}"
+    "${SAN_FLAGS} ${ASAN_FLAGS} ${STACK_FLAGS}"
     CACHE STRING "Flags used by the C++ compiler during sanitized builds."
     FORCE )
 SET(CMAKE_C_FLAGS_SANITIZEDDEBUG
-    "${GCC_DEBUG_FLAGS} ${SAN_FLAGS} ${ASAN_FLAGS} ${STACK_FLAGS}"
+    "${SAN_FLAGS} ${ASAN_FLAGS} ${STACK_FLAGS}"
     CACHE STRING "Flags used by the C compiler during sanitized builds."
     FORCE )
 SET(CMAKE_EXE_LINKER_FLAGS_SANITIZEDDEBUG
@@ -53,11 +52,11 @@ SET(CMAKE_SHARED_LINKER_FLAGS_SANITIZEDDEBUG
 
 ## Add flags for thread-sanized debu
 SET(CMAKE_CXX_FLAGS_THREADSANITIZEDDEBUG
-    "${GCC_DEBUG_FLAGS} ${SAN_FLAGS} ${TSAN_FLAGS} ${STACK_FLAGS}"
+    "${SAN_FLAGS} ${TSAN_FLAGS} ${STACK_FLAGS}"
     CACHE STRING "Flags used by the C++ compiler during sanitized builds."
     FORCE )
 SET(CMAKE_C_FLAGS_THREADSANITIZEDDEBUG
-    "${GCC_DEBUG_FLAGS} ${SAN_FLAGS} ${TSAN_FLAGS} ${STACK_FLAGS}"
+    "${SAN_FLAGS} ${TSAN_FLAGS} ${STACK_FLAGS}"
     CACHE STRING "Flags used by the C compiler during sanitized builds."
     FORCE )
 SET(CMAKE_EXE_LINKER_FLAGS_THREADSANITIZEDDEBUG
@@ -97,11 +96,11 @@ list(APPEND CMAKE_CONFIGURATION_TYPES Coverage)
 
 # Add new build types
 SET(CMAKE_CXX_FLAGS_COVERAGE
-    "${GCC_DEBUG_FLAGS} -fprofile-arcs -ftest-coverage"
+    "-fprofile-arcs -ftest-coverage"
     CACHE STRING "Flags used by the C++ compiler during coverage builds."
     FORCE )
 SET(CMAKE_C_FLAGS_COVERAGE
-    "${GCC_DEBUG_FLAGS} -fprofile-arcs -ftest-coverage"
+    "-fprofile-arcs -ftest-coverage"
     CACHE STRING "Flags used by the C compiler during coverage builds."
     FORCE )
 SET(CMAKE_EXE_LINKER_FLAGS_COVERAGE

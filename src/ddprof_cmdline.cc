@@ -123,13 +123,13 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   // Configure the data source
   if (conf->loc_type == ECLOC_RAW) {
     watcher->sample_type |= PERF_SAMPLE_RAW;
-    watcher->trace_off = conf->arg_offset;
+    watcher->raw_off = conf->arg_offset;
     if (conf->arg_size > 0)
-      watcher->trace_sz = conf->arg_size;
+      watcher->raw_sz = conf->arg_size;
     else
-      watcher->trace_sz = sizeof(uint64_t); // default raw entry
+      watcher->raw_sz = sizeof(uint64_t); // default raw entry
   } else if (conf->loc_type == ECLOC_REG) {
-    watcher->reg = conf->register_num;
+    watcher->regno = conf->register_num;
   }
 
   if (conf->arg_coeff != 0.0)

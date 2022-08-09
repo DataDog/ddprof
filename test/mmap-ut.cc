@@ -65,7 +65,7 @@ TEST(MMapTest, PerfOpen) {
       std::cerr << "mmap size attempt --> " << mmap_size << "("
                 << buf_size_shift << ")";
 
-      region = perfown_sz(perf_fd, mmap_size, false);
+      region = perfown_sz(perf_fd, mmap_size);
 
       if (!region) {
         std::cerr << " = FAILURE !!!" << std::endl;
@@ -78,7 +78,7 @@ TEST(MMapTest, PerfOpen) {
       std::cerr << "FULL SUCCESS (size=" << mmap_size << ")" << std::endl;
     }
     ASSERT_TRUE(region);
-    ASSERT_EQ(perfdisown(region, mmap_size, false), 0);
+    ASSERT_EQ(perfdisown(region, mmap_size), 0);
     close(perf_fd);
   }
 }
@@ -91,7 +91,7 @@ TEST(MMapTest, Mirroring) {
   ASSERT_NE(fd, -1);
   ASSERT_EQ(ftruncate(fd, mmap_size), 0);
 
-  std::byte *region = static_cast<std::byte *>(perfown_sz(fd, mmap_size, true));
+  std::byte *region = static_cast<std::byte *>(perfown_sz(fd, mmap_size));
   ASSERT_TRUE(region);
 
   size_t usable_size = mmap_size - get_page_size();
@@ -103,5 +103,5 @@ TEST(MMapTest, Mirroring) {
   EXPECT_EQ(*end, std::byte{0xff});
 
   close(fd);
-  ASSERT_EQ(perfdisown(region, mmap_size, true), 0);
+  ASSERT_EQ(perfdisown(region, mmap_size), 0);
 }

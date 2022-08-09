@@ -111,48 +111,34 @@ size_t get_mask_from_size(size_t size) {
   return (size - get_page_size() - 1);
 }
 
-void *perfown_sz(int fd, size_t size_of_buffer, bool mirror) {
-  void *region;
+void *perfown_sz(int fd, size_t size_of_buffer) {
+  // Map in the region representing the ring buffer, map the buffer twice
+  // (minus metadata size) to avoid handling boundaries.
+  size_t total_length = 2 * size_of_buffer - get_page_size();
+  // Reserve twice the size of the buffer
+  void *region =
+      mmap(NULL, total_length, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  if (MAP_FAILED == region || !region)
+    return NULL;
 
-  if (!mirror) {
-    // Map in the region representing the ring buffer
-    // TODO what to do about hugepages?
-    region =
-        mmap(NULL, size_of_buffer, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    if (MAP_FAILED == region) {
-      return NULL;
-    }
-  } else {
-    // Map in the region representing the ring buffer, map the buffer twice
-    // (minus metadata size) to avoid handling boundaries.
-    size_t total_length = 2 * size_of_buffer - get_page_size();
-    // Reserve twice the size of the buffer
-    region =
-        mmap(NULL, total_length, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (MAP_FAILED == region || !region)
-      return NULL;
+  auto defer_munmap = make_defer([&]() { perfdisown(region, size_of_buffer); });
 
-    auto defer_munmap =
-        make_defer([&]() { perfdisown(region, size_of_buffer, true); });
+  std::byte *ptr = static_cast<std::byte *>(region);
 
-    std::byte *ptr = static_cast<std::byte *>(region);
+  // Each mapping of fd must have a size of 2^n+1 pages
+  // That's why starts by mapping buffer on the second half of reserved
+  // space and ensure that metadata page overlaps on the first part
+  if (mmap(ptr + size_of_buffer - get_page_size(), size_of_buffer,
+           PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0) == MAP_FAILED)
+    return NULL;
 
-    // Each mapping of fd must have a size of 2^n+1 pages
-    // That's why starts by mapping buffer on the second half of reserved
-    // space and ensure that metadata page overlaps on the first part
-    if (mmap(ptr + size_of_buffer - get_page_size(), size_of_buffer,
-             PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd,
-             0) == MAP_FAILED)
-      return NULL;
+  // Map buffer a second time on the first half of reserved space
+  // It will overlap the metadata page of the previous mapping.
+  if (mmap(ptr, size_of_buffer, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED,
+           fd, 0) == MAP_FAILED)
+    return NULL;
 
-    // Map buffer a second time on the first half of reserved space
-    // It will overlap the metadata page of the previous mapping.
-    if (mmap(ptr, size_of_buffer, PROT_READ | PROT_WRITE,
-             MAP_SHARED | MAP_FIXED, fd, 0) == MAP_FAILED)
-      return NULL;
-
-    defer_munmap.release();
-  }
+  defer_munmap.release();
 
   if (fcntl(fd, F_SETFL, O_RDWR | O_NONBLOCK) == -1) {
     LG_WRN("Unable to run fcntl on %d", fd);
@@ -161,12 +147,9 @@ void *perfown_sz(int fd, size_t size_of_buffer, bool mirror) {
   return region;
 }
 
-int perfdisown(void *region, size_t size, bool is_mirrored) {
+int perfdisown(void *region, size_t size) {
   std::byte *ptr = static_cast<std::byte *>(region);
 
-  if (!is_mirrored) {
-    return munmap(ptr, size);
-  }
   return (munmap(ptr + size - get_page_size(), size) == 0) &&
           (munmap(ptr, size) == 0) &&
           (munmap(ptr, 2 * size - get_page_size()) == 0)

@@ -5,6 +5,7 @@
 
 #include "dso.hpp"
 
+#include "constants.hpp"
 #include "ddprof_defs.hpp"
 #include "logger.hpp"
 #include "string_format.hpp"
@@ -27,6 +28,8 @@ static const std::string_view s_socket_str = "socket";
 // null elements
 static const std::string_view s_dev_zero_str = "/dev/zero";
 static const std::string_view s_dev_null_str = "/dev/null";
+static const std::string_view s_dd_profiling_str = k_libdd_profiling_name;
+
 // invalid element
 Dso::Dso()
     : _pid(-1), _start(), _end(), _pgoff(), _filename(), _type(dso::kUndef),
@@ -61,6 +64,13 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
     _type = dso::kSocket;
   } else if (_filename[0] == '[') {
     _type = dso::kUndef;
+  } else { // check if this standard dso matches our internal dd_profiling lib
+    std::size_t pos = _filename.rfind('/');
+    if (pos != std::string::npos &&
+        _filename.substr(pos + 1, s_dd_profiling_str.length()) ==
+            s_dd_profiling_str) {
+      _type = dso::kDDProfiling;
+    }
   }
 }
 
@@ -71,7 +81,7 @@ std::string Dso::to_string() const {
 }
 
 std::string Dso::format_filename() const {
-  if (_type == dso::kStandard) {
+  if (dso::has_relevant_path(_type)) {
     return _filename;
   } else {
     return dso::dso_type_str(_type);

@@ -93,6 +93,7 @@ bool compute_elf_range(RegionAddress_t file_pc, const GElf_Sym &elf_sym,
   } else {
     end_sym = elf_sym.st_value + k_min_symbol_size;
   }
+
   return file_pc >= start_sym && file_pc <= end_sym;
 }
 

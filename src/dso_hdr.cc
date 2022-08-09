@@ -109,7 +109,7 @@ uint64_t DsoStats::sum_event_metric(DsoEventType dso_event) const {
 /**********/
 /* DsoHdr */
 /**********/
-DsoHdr::DsoHdr() {
+DsoHdr::DsoHdr(int dd_profiling_fd) : _dd_profiling_fd(dd_profiling_fd) {
   // Test different places for existence of /proc
   // A given procfs can only work if its PID namespace is the same as mine.
   // Fortunately, `/proc/self` will return a symlink to my process ID in the
@@ -121,7 +121,7 @@ DsoHdr::DsoHdr() {
     _path_to_proc = "/host";
   }
   // 0 element is error element
-  _file_info_vector.emplace_back(FileInfo(), 0, true);
+  _file_info_vector.emplace_back(FileInfo(), 0);
 }
 
 namespace {
@@ -185,15 +185,6 @@ DsoFindRes DsoHdr::dso_find_closest(pid_t pid, ElfAddress_t addr) {
   return dso_find_closest(_map[pid], pid, addr);
 }
 
-bool DsoHdr::dso_handled_type_read_dso(const Dso &dso) {
-  if (dso._type != dso::kStandard) {
-    // only handle standard path for now
-    _stats.incr_metric(DsoStats::kUnhandledDso, dso._type);
-    return false;
-  }
-  return true;
-}
-
 DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
   if (map.empty()) {
     return std::make_pair<DsoMapIt, DsoMapIt>(map.end(), map.end());
@@ -238,56 +229,6 @@ DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
   return std::make_pair<DsoMapIt, DsoMapIt>(std::move(start), std::move(end));
 }
 
-DDProfModRange DsoHdr::compute_mod_range(DsoMapConstIt it, const DsoMap &map) {
-  if (it == map.end()) {
-    return DDProfModRange();
-  }
-  DsoMapConstIt first_el = it;
-  while (first_el != map.begin()) {
-    --first_el;
-    if (it->second._filename != first_el->second._filename) {
-      ++first_el;
-      break;
-    }
-  }
-  while (++it != map.end()) {
-    if (it->second._filename != first_el->second._filename) {
-      break;
-    }
-  }
-  --it; // back up from end element (or different file)
-  return DDProfModRange{._low_addr = first_el->second._start,
-                        ._high_addr = it->second._end};
-}
-
-// Find the lowest and highest for this given DSO
-DDRes DsoHdr::mod_range_or_backpopulate(DsoMapConstIt it, DsoMap &map,
-                                        DDProfModRange &mod_range) {
-  mod_range = compute_mod_range(it, map);
-
-  const Dso &dso = it->second;
-  if (mod_range._low_addr > dso._start - dso._pgoff) {
-    // elf layout should take more space
-    int nb_elts_added;
-    if (pid_backpopulate(map, dso._pid, nb_elts_added) && nb_elts_added) {
-      DsoHdr::DsoFindRes find_res = dso_find_closest(map, dso._pid, dso._start);
-      if (!find_res.second) {
-        LG_DBG("[DSO] Mod range Error - dso no longer available");
-        return ddres_warn(DD_WHAT_DSO);
-      } else {
-        mod_range = compute_mod_range(find_res.first, map);
-        if (mod_range._low_addr > dso._start - dso._pgoff) {
-          // not fixed. should we attempt to load ?
-          return ddres_warn(DD_WHAT_DSO);
-        }
-      }
-    } else { // backpopulate failure
-      return ddres_warn(DD_WHAT_DSO);
-    }
-  }
-  return ddres_init();
-}
-
 // erase range of elements
 void DsoHdr::erase_range(DsoMap &map, const DsoRange &range) {
   // region maps are kept (as they are used for several pids)
@@ -313,14 +254,29 @@ FileInfoId_t DsoHdr::get_or_insert_file_info(const Dso &dso) {
     return dso._id;
   }
   _stats.incr_metric(DsoStats::kTargetDso, dso._type);
-  return update_id_and_path(dso);
+  return update_id_from_dso(dso);
 }
 
-FileInfoId_t DsoHdr::update_id_and_path(const Dso &dso) {
-  if (dso._type != dso::DsoType::kStandard) {
-    dso._id = k_file_info_error; // no file associated
+FileInfoId_t DsoHdr::update_id_dd_profiling(const Dso &dso) {
+  if (_dd_profiling_file_info != k_file_info_undef) {
+    dso._id = _dd_profiling_file_info;
     return dso._id;
   }
+
+  if (_dd_profiling_fd != -1) {
+    // Path is not valid, don't use the map
+    // fd already exists --> lookup directly
+    dso._id = _file_info_vector.size();
+    _dd_profiling_file_info = dso._id;
+    _file_info_vector.emplace_back(FileInfo(dso._filename, 0, 0), dso._id,
+                                   _dd_profiling_fd);
+    return _dd_profiling_file_info;
+  }
+  _dd_profiling_file_info = update_id_from_path(dso);
+  return _dd_profiling_file_info;
+}
+
+FileInfoId_t DsoHdr::update_id_from_path(const Dso &dso) {
 
   FileInfo file_info = find_file_info(dso);
   if (!file_info._inode) {
@@ -328,26 +284,40 @@ FileInfoId_t DsoHdr::update_id_and_path(const Dso &dso) {
     return dso._id;
   }
 
-  // check if we already encountered binary (cache by region with offset)
-  FileInfoInodeKey key(file_info._inode, dso._pgoff, file_info._size);
+  // check if we already encountered binary
+  FileInfoInodeKey key(file_info._inode, file_info._size);
   auto it = _file_info_inode_map.find(key);
   if (it == _file_info_inode_map.end()) {
     dso._id = _file_info_vector.size();
     _file_info_inode_map.emplace(std::move(key), dso._id);
+    // open the file descriptor to this file
+    _file_info_vector.emplace_back(std::move(file_info), dso._id);
 #ifdef DEBUG
     LG_NTC("New file %d - %s - %ld", dso._id, file_info._path.c_str(),
            file_info._size);
 #endif
-    _file_info_vector.emplace_back(std::move(file_info), dso._id);
   } else { // already exists
     dso._id = it->second;
-    // update with latest location
-    if (file_info._path != _file_info_vector[dso._id]._info._path) {
-      _file_info_vector[dso._id]._info = file_info;
-      _file_info_vector[dso._id]._errored = false; // allow retry with new file
+    // update with last location
+    if (_file_info_vector[dso._id]._errored &&
+        file_info._path != _file_info_vector[dso._id]._info._path) {
+      _file_info_vector[dso._id] = FileInfoValue(std::move(file_info), dso._id);
     }
   }
   return dso._id;
+}
+
+FileInfoId_t DsoHdr::update_id_from_dso(const Dso &dso) {
+  if (!dso::has_relevant_path(dso._type)) {
+    dso._id = k_file_info_error; // no file associated
+    return dso._id;
+  }
+
+  if (dso._type == dso::DsoType::kDDProfiling) {
+    return update_id_dd_profiling(dso);
+  }
+
+  return update_id_from_path(dso);
 }
 
 bool DsoHdr::erase_overlap(const Dso &dso) {
@@ -390,16 +360,11 @@ DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr) {
     LG_DBG("[DSO] Skipping 0 page");
     return find_res_not_found(map);
   }
-  int nb_elts_added = 0;
-
-  if (_backpopulate_state_map.find(pid) == _backpopulate_state_map.end()) {
-    // we never encountered this PID
-    pid_backpopulate(map, pid, nb_elts_added);
-  }
 
   DsoFindRes find_res = dso_find_closest(map, pid, addr);
-  if (!find_res.second && !nb_elts_added) { // backpopulate
+  if (!find_res.second) { // backpopulate
     LG_DBG("[DSO] Couldn't find DSO for [%d](0x%lx). backpopulate", pid, addr);
+    int nb_elts_added = 0;
     if (pid_backpopulate(map, pid, nb_elts_added) && nb_elts_added) {
       find_res = dso_find_closest(map, pid, addr);
     }

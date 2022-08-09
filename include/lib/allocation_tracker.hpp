@@ -23,7 +23,7 @@ struct TrackerThreadLocalState {
   int64_t remaining_bytes; // remaining allocation bytes until next sample
   bool remaining_bytes_initialized; // false if remaining_bytes is not
                                     // initialized
-
+  const std::byte *stack_end;
   pid_t tid; // cache of tid
 
   bool reentry_guard; // prevent reentry in AllocationTracker (eg. when
@@ -32,6 +32,7 @@ struct TrackerThreadLocalState {
 
 class AllocationTracker {
 public:
+  friend class AllocationTrackerDisablerForCurrentThread;
   AllocationTracker(const AllocationTracker &) = delete;
   AllocationTracker &operator=(const AllocationTracker &) = delete;
 
@@ -39,6 +40,8 @@ public:
     kTrackDeallocations = 0x1,
     kDeterministicSampling = 0x2
   };
+
+  static void notify_thread_start();
 
   static DDRes allocation_tracking_init(uint64_t allocation_profiling_rate,
                                         uint32_t flags,

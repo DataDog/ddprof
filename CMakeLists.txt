@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.19)
 
  project(DDProf
   LANGUAGES C CXX
-  VERSION 0.8.2
+  VERSION 0.9.3
   DESCRIPTION "Datadog's native profiler for Linux"
 )
 
@@ -61,9 +61,9 @@ endif()
 # libddprof
 include(Findlibddprof)
 
+
 # elfutils
 include(Findelfutils)
-
 
 #######################
 ### Static analysis ###
@@ -153,10 +153,11 @@ list(APPEND DDPROF_INCLUDE_LIST ${LIBCAP_INCLUDE_DIR})
 set(DD_PROFILING_SOURCES src/lib/dd_profiling.cc src/daemonize.cc src/ddprof_cmdline.cc src/logger.cc src/logger_setup.cc 
                          src/ipc.cc src/pevent_lib.cc src/perf.cc src/perf_ringbuffer.cc src/perf_watcher.cc src/ringbuffer_utils.cc src/sys_utils.cc
                          src/user_override.cc src/ddres_list.cc src/savecontext.cc src/saveregisters.cc src/signal_helper.cc
-                         src/lib/malloc_wrapper.cc src/lib/allocation_tracker.cc src/event_parser/event_parser.lex.c
+                         src/lib/malloc_wrapper.cc src/lib/allocation_tracker.cc src/lib/pthread_hook.cc src/event_parser/event_parser.lex.c
                          src/perf_archmap.cc src/event_parser/event_parser.tab.c)
 
 add_library(dd_profiling-embedded SHARED ${DD_PROFILING_SOURCES})
+target_compile_definitions(dd_profiling-embedded PRIVATE NO_EMBEDDED_DDPROF_EXE)
 target_include_directories(dd_profiling-embedded PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
 set_target_properties(dd_profiling-embedded PROPERTIES
    PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")

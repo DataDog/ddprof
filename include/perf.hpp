@@ -115,8 +115,8 @@ typedef struct perf_samplestacku {
 
 int perf_event_open(struct perf_event_attr *, pid_t, int, int, unsigned long);
 size_t perf_mmap_size(int buf_size_shift);
-void *perfown_sz(int fd, size_t size_of_buffer, bool mirror);
-int perfdisown(void *region, size_t size, bool is_mirrored);
+void *perfown_sz(int fd, size_t size_of_buffer);
+int perfdisown(void *region, size_t size);
 long get_page_size(void);
 size_t get_mask_from_size(size_t size);
 const char *perf_type_str(int type_id);

@@ -61,7 +61,7 @@ SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
   DwflSymbolMapFindRes find_res = find_closest(map, elf_pc);
   if (find_res.second) { // already found the correct symbol
 #ifdef DEBUG
-    LG_DBG("Match : %lx,%lx -> %s,%d,%d", find_res.first->first,
+    LG_DBG("Match : %lx,%lx -> %s,%d", find_res.first->first,
            find_res.first->second.get_end(),
            table[find_res.first->second.get_symbol_idx()]._symname.c_str(),
            find_res.first->second.get_symbol_idx());
@@ -138,7 +138,7 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod,
     SymbolIdx_t symbol_idx = dso_symbol_lookup.get_or_insert(dso, table);
 #endif
 #ifdef DEBUG
-    LG_NTC("Insert (dwfl failure): %lx,%lx -> %s,%d,%d,%s", start_sym, end_sym,
+    LG_NTC("Insert (dwfl failure): %lx,%lx -> %s,%d,%s", start_sym, end_sym,
            table[symbol_idx]._symname.c_str(), symbol_idx,
            dso.to_string().c_str());
 #endif
@@ -172,7 +172,7 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod,
       start_sym = elf_pc;
       end_sym = elf_pc + 1;
 #ifdef DEBUG
-      LG_DBG("elf_range failure --> Insert: %lx,%lx -> %s,%d,%d / shndx=%d",
+      LG_DBG("elf_range failure --> Insert: %lx,%lx -> %s,%d / shndx=%d",
              start_sym, end_sym, sym_ref._symname.c_str(), symbol_idx,
              elf_sym.st_shndx);
 #endif
@@ -181,7 +181,7 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod,
     }
 
 #ifdef DEBUG
-    LG_DBG("Insert: %lx,%lx -> %s,%d,%d / shndx=%d", start_sym, end_sym,
+    LG_DBG("Insert: %lx,%lx -> %s,%d / shndx=%d", start_sym, end_sym,
            sym_ref._symname.c_str(), symbol_idx, elf_sym.st_shndx);
 #endif
     map.emplace(start_sym, DwflSymbolVal(end_sym, symbol_idx));

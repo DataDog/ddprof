@@ -59,6 +59,7 @@ static void pevent_set_info(int fd, int attr_idx, PEvent &pevent) {
   pevent.mapfd = fd;
   pevent.ring_buffer_size = perf_mmap_size(DEFAULT_BUFF_SIZE_SHIFT);
   pevent.custom_event = false;
+  pevent.ring_buffer_type = RingBufferType::kPerfRingBuffer;
   pevent.attr_idx = attr_idx;
 }
 
@@ -137,8 +138,9 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
       // custom event, eg.allocation profiling
       size_t pevent_idx = 0;
       DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
-      DDRES_CHECK_FWD(ddprof::ring_buffer_create(DEFAULT_BUFF_SIZE_SHIFT,
-                                                 &pevent_hdr->pes[pevent_idx]));
+      DDRES_CHECK_FWD(ddprof::ring_buffer_create(
+          DEFAULT_BUFF_SIZE_SHIFT, RingBufferType::kPerfRingBuffer, true,
+          &pevent_hdr->pes[pevent_idx]));
     }
   }
   return ddres_init();
@@ -146,20 +148,16 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
 
 DDRes pevent_mmap_event(PEvent *event) {
   if (event->mapfd != -1) {
-    // Do not mirror perf ring buffer because this doubles the amount of
-    // mlocked pages
-    bool mirror = event->custom_event;
-
-    perf_event_mmap_page *region = static_cast<perf_event_mmap_page *>(
-        perfown_sz(event->mapfd, event->ring_buffer_size, mirror));
+    void *region = perfown_sz(event->mapfd, event->ring_buffer_size);
     if (!region) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
                              "Could not mmap memory for watcher #%d: %s",
                              event->watcher_pos, strerror(errno));
     }
-    if (!rb_init(&event->rb, region, event->ring_buffer_size, mirror)) {
+    if (!rb_init(&event->rb, region, event->ring_buffer_size,
+                 event->ring_buffer_type)) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
-                             "Could not allocate memory for watcher #%d",
+                             "Could not initialize ring buffer for watcher #%d",
                              event->watcher_pos);
     }
   }
@@ -213,14 +211,13 @@ DDRes pevent_enable(PEventHdr *pevent_hdr) {
 }
 
 DDRes pevent_munmap_event(PEvent *event) {
-  if (event->rb.region) {
-    if (perfdisown(event->rb.region, event->rb.size, event->rb.is_mirrored) !=
-        0) {
+  if (event->rb.base) {
+    if (perfdisown(event->rb.base, event->ring_buffer_size) != 0) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
                              "Error when using perfdisown for watcher #%d",
                              event->watcher_pos);
     }
-    event->rb.region = NULL;
+    event->rb.base = NULL;
   }
   rb_free(&event->rb);
   return {};

@@ -14,6 +14,13 @@ typedef enum {
   kPerfWatcher_Try,      // On if possible, default to OFF on failure
 } PerfWatcherValue;
 
+typedef enum {
+  kPerfWatcherLoc_val = 0, // use the default sample value
+  kPerfWatcherLoc_reg,     // use CPU register (specified in `reg`)
+  kPerfWatcherLoc_raw,     // use raw event (specified by raw_*)
+
+} PerfWatcherLocation;
+
 struct PerfWatcherOptions {
   PerfWatcherValue is_kernel;
   bool is_freq;
@@ -37,9 +44,10 @@ typedef struct PerfWatcher {
   // perf_event_open configs
   struct PerfWatcherOptions options;
   // tracepoint configuration
-  uint8_t reg;
-  uint8_t trace_off;
-  uint8_t trace_sz;
+  PerfWatcherLocation loc_type; // defines how to normalize the sample value
+  uint8_t regno;
+  uint8_t raw_off;
+  uint8_t raw_sz;
   double value_coefficient;
   const char *tracepoint_name;
   const char *tracepoint_group;

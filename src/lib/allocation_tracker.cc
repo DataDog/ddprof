@@ -95,7 +95,6 @@ DDRes AllocationTracker::allocation_tracking_init(
 
   DDRES_CHECK_FWD(instance->init(allocation_profiling_rate,
                                  flags & kDeterministicSampling, ring_buffer));
-
   _instance = instance;
   state.track_allocations = true;
   state.track_deallocations = flags & kTrackDeallocations;
@@ -108,12 +107,7 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
                               const RingBufferInfo &ring_buffer) {
   _sampling_interval = mem_profile_interval;
   _deterministic_sampling = deterministic_sampling;
-  _pevent = {.watcher_pos = -1,
-             .fd = ring_buffer.event_fd,
-             .mapfd = ring_buffer.ring_fd,
-             .ring_buffer_size = static_cast<size_t>(ring_buffer.mem_size),
-             .custom_event = true};
-  return pevent_mmap_event(&_pevent);
+  return ddprof::ring_buffer_attach(ring_buffer, &_pevent);
 }
 
 void AllocationTracker::free() {
@@ -193,7 +187,7 @@ void AllocationTracker::track_allocation(uintptr_t, size_t size,
 
 DDRes AllocationTracker::push_sample(uint64_t allocated_size,
                                      TrackerThreadLocalState &tl_state) {
-  RingBufferWriter writer{_pevent.rb};
+  PerfRingBufferWriter writer{_pevent.rb};
   auto needed_size = sizeof(AllocationEvent);
 
   if (_state.lost_count) {
@@ -224,13 +218,17 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
     tl_state.tid = ddprof::gettid();
   }
 
+  if (tl_state.stack_end == nullptr) {
+    tl_state.stack_end = retrieve_stack_end_address();
+  }
+
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
   event->period = allocated_size;
   event->size = PERF_SAMPLE_STACK_SIZE;
 
-  event->dyn_size =
-      save_context(event->regs, ddprof::Buffer{event->data, event->size});
+  event->dyn_size = save_context(tl_state.stack_end, event->regs,
+                                 ddprof::Buffer{event->data, event->size});
 
   if (_state.lost_count) {
     Buffer buf_lost = writer.reserve(sizeof(LostEvent));
@@ -273,6 +271,13 @@ uint64_t AllocationTracker::next_sample_interval() {
     value = min_value;
   }
   return value;
+}
+
+void AllocationTracker::notify_thread_start() {
+  TrackerThreadLocalState &tl_state = AllocationTracker::_tl_state;
+
+  ReentryGuard guard(&_tl_state.reentry_guard);
+  tl_state.stack_end = retrieve_stack_end_address();
 }
 
 } // namespace ddprof

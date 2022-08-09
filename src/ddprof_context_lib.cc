@@ -89,6 +89,19 @@ DDRes add_preset(DDProfContext *ctx, const char *preset,
   return {};
 }
 
+void log_watcher(const PerfWatcher *w, int n) {
+  static std::array<std::string, 3> location_names = {
+      "Sample value",
+      "CPU register",
+      "Raw event",
+  };
+  PRINT_NFO("    ID: %s, Pos: %d, Index: %lu, Label: %s", w->desc, n, w->config,
+            sample_type_name_from_idx(w->sample_type_id));
+  PRINT_NFO("    Loc: %s, Name: %s, Label: %s",
+            location_names[w->loc_type].c_str(), w->tracepoint_name,
+            w->tracepoint_label);
+}
+
 /****************************  Argument Processor  ***************************/
 DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   *ctx = {};
@@ -267,6 +280,8 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     }
   }
 
+  ctx->params.dd_profiling_fd = -1;
+
   const char *preset = input->preset;
   if (!preset && ctx->num_watchers == 0) {
     // use `default` preset when no preset and no events were given in input
@@ -306,17 +321,13 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     // Show watchers
     PRINT_NFO("  Instrumented with %d watchers:", ctx->num_watchers);
     for (int i = 0; i < ctx->num_watchers; i++) {
-      PRINT_NFO("    ID: %s, Pos: %d, Index: %lu, Label: %s",
-                ctx->watchers[i].desc, i, ctx->watchers[i].config,
-                sample_type_name_from_idx(ctx->watchers[i].sample_type_id));
+      log_watcher(&ctx->watchers[i], i);
     }
   }
 
   ctx->initialized = true;
   return ddres_init();
 }
-
-void log_watcher(const PerfWatcher *watcher) {}
 
 void ddprof_context_free(DDProfContext *ctx) {
   if (ctx->initialized) {
