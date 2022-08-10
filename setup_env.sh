@@ -7,6 +7,7 @@ export PATH=$PATH:${PWD}/tools:${PWD}/bench/runners
 # Helper command lines for cmake. Source this file, then you can just do :
 # SanCMake ../ 
 
+SCRIPTDIR="$(cd -- $( dirname -- "${BASH_SOURCE[0]}" ) && pwd)" # no "$0" when sourcing
 DDPROF_INSTALL_PREFIX="../deliverables"
 DDPROF_BUILD_BENCH="ON"
 NATIVE_LIB="ON"
@@ -18,10 +19,10 @@ EXTENSION_CC=${EXTENSION_CC%-*}
 
 LIBC_HAS_MUSL=$(ldd  --version 2>&1  | grep musl || true)
 if [ ! -z "${LIBC_HAS_MUSL}" ]; then
-  LIBC_VERSION=$(get_libc_version.sh musl)
+  LIBC_VERSION=$(${SCRIPTDIR}/tools/get_libc_version.sh musl)
   EXTENSION_OS="alpine-linux-${LIBC_VERSION}"
 else
-  LIBC_VERSION=$(get_libc_version.sh gnu)
+  LIBC_VERSION=$(${SCRIPTDIR}/tools/get_libc_version.sh gnu)
   EXTENSION_OS="unknown-linux-${LIBC_VERSION}"
 fi
 
