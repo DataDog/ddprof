@@ -143,7 +143,7 @@ static int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
   snprintf(sock_buf, sizeof(sock_buf), "%d", sock_fd);
 
   char pid_opt_str[] = "-p";
-  char sock_opt_str[] = "-Z";
+  char sock_opt_str[] = "-z";
 
   // cppcheck-suppress variableScope
   char *argv[] = {ddprof_str,   pid_opt_str, pid_buf,
