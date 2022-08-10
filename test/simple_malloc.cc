@@ -4,6 +4,7 @@
 // Datadog, Inc.
 
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -47,6 +48,7 @@ struct Stats {
 
 extern "C" DDPROF_NOINLINE void
 do_lot_of_allocations(uint64_t loop_count, std::chrono::microseconds sleep,
+                      std::chrono::microseconds spin,
                       std::chrono::milliseconds timeout, Stats *stats) {
   uint64_t nb_alloc{0};
   uint64_t alloc_bytes{0};
@@ -69,6 +71,16 @@ do_lot_of_allocations(uint64_t loop_count, std::chrono::microseconds sleep,
     if (sleep.count()) {
       std::this_thread::sleep_for(sleep);
     }
+    if (spin.count()) {
+      auto target_time = std::chrono::steady_clock::now() + spin;
+      do {
+        volatile uint64_t sum = 1;
+        for (uint64_t j = 0; j < 100; ++j) {
+          sum = std::sqrt(sum) + std::sqrt(sum);
+        }
+      } while (std::chrono::steady_clock::now() < target_time);
+    }
+
     if (timeout.count() > 0 && std::chrono::steady_clock::now() >= end_time) {
       break;
     }
@@ -96,6 +108,7 @@ int main(int argc, char *argv[]) {
   unsigned int nb_forks{1};
   unsigned int nb_threads{1};
   unsigned int sleep_us{0};
+  unsigned int spin_us{0};
   int timeout_ms = -1;
   uint64_t loop_count = std::numeric_limits<uint64_t>::max();
   std::vector<std::string> exec_args;
@@ -110,6 +123,8 @@ int main(int argc, char *argv[]) {
   app.add_option("--timeout", timeout_ms, "Timeout after N milliseconds")
       ->default_val(0);
   app.add_option("--sleep", sleep_us, "Time to sleep (us) between allocations")
+      ->default_val(0);
+  app.add_option("--spin", spin_us, "Time to spin (us) between allocations")
       ->default_val(0);
 #ifdef USE_DD_PROFILING
   bool start_profiling = false;
@@ -151,9 +166,11 @@ int main(int argc, char *argv[]) {
   for (unsigned int i = 1; i < nb_threads; ++i) {
     threads.emplace_back(do_lot_of_allocations, loop_count,
                          std::chrono::microseconds{sleep_us},
+                         std::chrono::microseconds{spin_us},
                          std::chrono::milliseconds{timeout_ms}, &stats[i]);
   }
   do_lot_of_allocations(loop_count, std::chrono::microseconds{sleep_us},
+                        std::chrono::microseconds{spin_us},
                         std::chrono::milliseconds{timeout_ms}, &stats[0]);
   for (auto &t : threads) {
     t.join();
