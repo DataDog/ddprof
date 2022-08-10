@@ -14,6 +14,7 @@ log_file=$(mktemp -p "${PWD}" log.XXXX)
 
 if grep -qF "sample[" "${log_file}"; then
     echo "Unexpected samples"
+    cat "${log_file}"
     exit 1
 fi
 
@@ -22,6 +23,7 @@ fi
 
 if ! grep -q "sample\[type=cpu-samples.*;do_lot_of_allocations;" "${log_file}" || ! grep -q "sample\[type=alloc-samples.*;do_lot_of_allocations;" "${log_file}"; then
     echo "No samples"
+    cat "${log_file}"
     exit 1
 fi
 
@@ -30,6 +32,7 @@ fi
 
 if grep -qF "sample[" "${log_file}"; then
     echo "Unexpected samples"
+    cat "${log_file}"
     exit 1
 fi
 
@@ -38,6 +41,7 @@ fi
 
 if ! grep -q "sample\[type=cpu-samples.*;do_lot_of_allocations;" "${log_file}" || ! grep -q "sample\[type=alloc-samples.*;do_lot_of_allocations;" "${log_file}"; then
     echo "No samples"
+    cat "${log_file}"
     exit 1
 fi
 
@@ -45,6 +49,7 @@ fi
 ./ddprof -X no ./test/simple_malloc "${opts[@]}" >"${log_file}"
 if ! grep -q "sample\[type=cpu-samples.*;do_lot_of_allocations;" "${log_file}" || ! grep -q "sample\[type=alloc-samples.*;do_lot_of_allocations;" "${log_file}"; then
     echo "No samples"
+    cat "${log_file}"
     exit 1
 fi
 

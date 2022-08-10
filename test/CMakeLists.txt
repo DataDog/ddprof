@@ -387,16 +387,16 @@ add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 add_exe(simple_malloc-static simple_malloc.cc
     LIBRARIES Threads::Threads dd_profiling-static
     DEFINITIONS USE_DD_PROFILING)
-target_include_directories(simple_malloc-static PRIVATE ${CMAKE_SOURCE_DIR}/third_party)
+target_include_directories(simple_malloc-static PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
 
 add_exe(simple_malloc-shared simple_malloc.cc
     LIBRARIES dd_profiling-shared
     DEFINITIONS USE_DD_PROFILING)
-target_include_directories(simple_malloc-shared PRIVATE ${CMAKE_SOURCE_DIR}/third_party)
+target_include_directories(simple_malloc-shared PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
 
 add_exe(simple_malloc simple_malloc.cc
     LIBRARIES Threads::Threads)
-target_include_directories(simple_malloc PRIVATE ${CMAKE_SOURCE_DIR}/third_party)
+target_include_directories(simple_malloc PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
 
 add_test(NAME simple_malloc COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/simple_malloc-ut.sh WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 

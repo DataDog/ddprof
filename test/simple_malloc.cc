@@ -12,6 +12,9 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "ddprof_base.hpp"
+#include "syscalls.hpp"
+
 #include "CLI/CLI11.hpp"
 
 #ifdef USE_DD_PROFILING
@@ -42,7 +45,7 @@ struct Stats {
   pid_t tid;
 };
 
-extern "C" __attribute__((noinline)) void
+extern "C" DDPROF_NOINLINE void
 do_lot_of_allocations(uint64_t loop_count, std::chrono::microseconds sleep,
                       std::chrono::milliseconds timeout, Stats *stats) {
   uint64_t nb_alloc{0};
@@ -73,7 +76,7 @@ do_lot_of_allocations(uint64_t loop_count, std::chrono::microseconds sleep,
   auto end_cpu = thread_cpu_clock::now();
   end_time = std::chrono::steady_clock::now();
   *stats = {nb_alloc, alloc_bytes, end_time - start_time, end_cpu - start_cpu,
-            gettid()};
+            ddprof::gettid()};
 }
 
 void print_header() {
