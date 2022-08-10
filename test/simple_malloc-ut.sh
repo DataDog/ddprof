@@ -7,7 +7,7 @@ export DD_PROFILING_NATIVE_USE_EMBEDDED_LIB=1
 export LD_LIBRARY_PATH=$PWD
 
 opts=(--timeout 200)
-log_file=$(mktemp -p "${PWD}" log.XXXX)
+log_file=$(mktemp "${PWD}/log.XXXXXX")
 
 # Test disabled static lib mode
 ./test/simple_malloc-static "${opts[@]}" >"${log_file}"
