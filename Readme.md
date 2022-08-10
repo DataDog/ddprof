@@ -8,9 +8,11 @@ The Datadog Native Profiler for Linux
 
 ## Quick Start
 
+Our official documentation is available [here](https://docs.datadoghq.com/profiler/enabling/ddprof/?tab=environmentvariables).
+
 ### From binary
 
-Check out our Release page for prebuilt binaries.  Download the desired binary, making sure to mark it executable `chmod +x ./ddprof`.
+Check out our Release page for prebuilt binaries. Download the desired binary, making sure to mark it executable `chmod +x ./ddprof`.
 Refer to [commands](docs/Commands.md) for the commands supported by `ddprof`. Example :
 
 ```bash
@@ -46,23 +48,17 @@ Don't hesitate to [reach-out](#Reaching-out) if you are not able to use our prof
 
 ### Safety
 
-Unlike runtime profilers, the native profiler requires no code modifications of the target service.  It doesn't direct signals at the target, use any `LD_PRELOAD` tricks, replace shared objects, or otherwise interfere with program execution at the process level once the target application has been launched.
-
-In particular:
-
-- While segfaults and deadlocks can interrupt profiling, they do not propagate to the target application.
-- PID wrapper returns the PID of the target, rather than the PID of `ddprof`.  This is great when you are already running your target under a wrapper or if you're trying to wrap the init process of a PID namespace (as might be the case for containers).
-- ddprof isolates its memory footprint to restartable sub-processes
-- ddprof schedules its work on a single CPU core
+- Most operations are performed out of process
+- `ddprof`'s Memory usage is sandboxed
 
 ## Docs
 
 Architectural showpieces and such will always be available in the `docs/` folder.
 
-- [Overview on how to build and store artifacts](./docs/Build.md)
-- [Architecture and design discussions](./docs/Design.md)
+- [Build](./docs/Build.md)
+- [Design](./docs/Design.md)
 - [Automatically updated list of commads](./docs/Commands.md)
 
-## Contributing
+## Reaching-out
 
-Is there something you'd love to see in the tool?  Have a great idea for a new feature?  Did you find a bug?  Please feel free to submit PRs or issues as appropriate--the ddprof maintenance team will respond accordingly.
+Any contribution is welcome. Please check out our guidelines [here](CONTRIBUTING.md).
