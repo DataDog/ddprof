@@ -7,6 +7,7 @@
 
 #define DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION() __asm__ __volatile__("")
 #define DDPROF_NOINLINE __attribute__((noinline))
+#define DDPROF_ALWAYS_INLINE __attribute__((always_inline))
 #define DDPROF_NO_SANITIZER_ADDRESS __attribute__((no_sanitize("address")))
 
 #if defined(__clang__)
@@ -14,3 +15,19 @@
 #else
 #  define DDPROF_NOIPO __attribute__((noipa))
 #endif
+
+// Taken from google::benchmark
+namespace ddprof {
+template <class Tp>
+inline DDPROF_ALWAYS_INLINE void DoNotOptimize(Tp const &value) {
+  asm volatile("" : : "r,m"(value) : "memory");
+}
+
+template <class Tp> inline DDPROF_ALWAYS_INLINE void DoNotOptimize(Tp &value) {
+#if defined(__clang__)
+  asm volatile("" : "+r,m"(value) : : "memory");
+#else
+  asm volatile("" : "+m,r"(value) : : "memory");
+#endif
+}
+} // namespace ddprof
