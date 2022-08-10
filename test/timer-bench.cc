@@ -4,6 +4,7 @@
 // Datadog, Inc.
 
 #include <benchmark/benchmark.h>
+#include <sys/times.h>
 #include <time.h>
 
 #include "timer.hpp"
@@ -34,3 +35,29 @@ static void BM_rdtsc(benchmark::State &state) {
 }
 
 BENCHMARK(BM_rdtsc);
+
+static void BM_clock(benchmark::State &state) {
+  for (auto _ : state) {
+    clock();
+  }
+}
+
+BENCHMARK(BM_clock);
+
+static void BM_clock_thread_cputime(benchmark::State &state) {
+  for (auto _ : state) {
+    timespec tp;
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &tp);
+  }
+}
+
+BENCHMARK(BM_clock_thread_cputime);
+
+static void BM_times(benchmark::State &state) {
+  for (auto _ : state) {
+    tms tm;
+    ::times(&tm);
+  }
+}
+
+BENCHMARK(BM_times);
