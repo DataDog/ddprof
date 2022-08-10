@@ -23,13 +23,13 @@ check() {
 
     if [ "${expect_samples}" -eq 1 ]; then
         if ! grep -q "sample\[type=cpu-samples.*;do_lot_of_allocations" "${log_file}" || ! grep -q "sample\[type=alloc-samples.*;do_lot_of_allocations" "${log_file}"; then
-            echo "No sample found"
+            echo "No sample found for: $cmd"
             cat "${log_file}"
             exit 1
         fi
     else
         if grep -qF "sample[" "${log_file}"; then
-            echo "Unexpected samples"
+            echo "Unexpected samples for $cmd"
             cat "${log_file}"
             exit 1
         fi
