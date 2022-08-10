@@ -103,80 +103,83 @@ void print_stats(pid_t pid, const Stats &stats) {
 }
 
 int main(int argc, char *argv[]) {
-  CLI::App app{"Simple allocation test"};
+  try {
+    CLI::App app{"Simple allocation test"};
 
-  unsigned int nb_forks{1};
-  unsigned int nb_threads{1};
-  unsigned int sleep_us{0};
-  unsigned int spin_us{0};
-  int timeout_ms = -1;
-  uint64_t loop_count = std::numeric_limits<uint64_t>::max();
-  std::vector<std::string> exec_args;
+    unsigned int nb_forks{1};
+    unsigned int nb_threads{1};
+    unsigned int sleep_us{0};
+    unsigned int spin_us{0};
+    int timeout_ms = -1;
+    uint64_t loop_count = std::numeric_limits<uint64_t>::max();
+    std::vector<std::string> exec_args;
 
-  app.add_option("--fork", nb_forks, "Number of processes to create")
-      ->default_val(1);
-  app.add_option("--threads", nb_threads, "Number of threads to use")
-      ->default_val(1);
-  app.add_option("--exec", exec_args, "Exec the following command")
-      ->expected(-1);
-  app.add_option("--loop", loop_count, "Number of loops")->default_val(-1);
-  app.add_option("--timeout", timeout_ms, "Timeout after N milliseconds")
-      ->default_val(0);
-  app.add_option("--sleep", sleep_us, "Time to sleep (us) between allocations")
-      ->default_val(0);
-  app.add_option("--spin", spin_us, "Time to spin (us) between allocations")
-      ->default_val(0);
+    app.add_option("--fork", nb_forks, "Number of processes to create")
+        ->default_val(1);
+    app.add_option("--threads", nb_threads, "Number of threads to use")
+        ->default_val(1);
+    app.add_option("--exec", exec_args, "Exec the following command")
+        ->expected(-1);
+    app.add_option("--loop", loop_count, "Number of loops")->default_val(-1);
+    app.add_option("--timeout", timeout_ms, "Timeout after N milliseconds")
+        ->default_val(0);
+    app.add_option("--sleep", sleep_us,
+                   "Time to sleep (us) between allocations")
+        ->default_val(0);
+    app.add_option("--spin", spin_us, "Time to spin (us) between allocations")
+        ->default_val(0);
 #ifdef USE_DD_PROFILING
-  bool start_profiling = false;
-  app.add_flag("--profile", start_profiling, "Enable profiling")
-      ->default_val(false);
+    bool start_profiling = false;
+    app.add_flag("--profile", start_profiling, "Enable profiling")
+        ->default_val(false);
 #endif
 
-  CLI11_PARSE(app, argc, argv);
+    CLI11_PARSE(app, argc, argv);
 
 #ifdef USE_DD_PROFILING
-  if (start_profiling && ddprof_start_profiling() != 0) {
-    fprintf(stderr, "Failed to start profiling\n");
-    return 1;
-  }
+    if (start_profiling && ddprof_start_profiling() != 0) {
+      fprintf(stderr, "Failed to start profiling\n");
+      return 1;
+    }
 #endif
 
-  if (exec_args.empty()) {
-    print_header();
-  }
-
-  for (unsigned int i = 1; i < nb_forks; ++i) {
-    if (fork()) {
-      break;
+    if (exec_args.empty()) {
+      print_header();
     }
-  }
 
-  if (!exec_args.empty()) {
-    std::vector<char *> new_args;
-    for (auto &a : exec_args) {
-      new_args.push_back(a.data());
+    for (unsigned int i = 1; i < nb_forks; ++i) {
+      if (fork()) {
+        break;
+      }
     }
-    execvp(new_args[0], new_args.data());
-    perror("Exec failed: ");
-    return 1;
-  }
 
-  std::vector<std::thread> threads;
-  std::vector<Stats> stats{nb_threads};
-  for (unsigned int i = 1; i < nb_threads; ++i) {
-    threads.emplace_back(do_lot_of_allocations, loop_count,
-                         std::chrono::microseconds{sleep_us},
-                         std::chrono::microseconds{spin_us},
-                         std::chrono::milliseconds{timeout_ms}, &stats[i]);
-  }
-  do_lot_of_allocations(loop_count, std::chrono::microseconds{sleep_us},
-                        std::chrono::microseconds{spin_us},
-                        std::chrono::milliseconds{timeout_ms}, &stats[0]);
-  for (auto &t : threads) {
-    t.join();
-  }
-  auto pid = getpid();
-  for (auto &stat : stats) {
-    print_stats(pid, stat);
-  }
+    if (!exec_args.empty()) {
+      std::vector<char *> new_args;
+      for (auto &a : exec_args) {
+        new_args.push_back(a.data());
+      }
+      execvp(new_args[0], new_args.data());
+      perror("Exec failed: ");
+      return 1;
+    }
+
+    std::vector<std::thread> threads;
+    std::vector<Stats> stats{nb_threads};
+    for (unsigned int i = 1; i < nb_threads; ++i) {
+      threads.emplace_back(do_lot_of_allocations, loop_count,
+                           std::chrono::microseconds{sleep_us},
+                           std::chrono::microseconds{spin_us},
+                           std::chrono::milliseconds{timeout_ms}, &stats[i]);
+    }
+    do_lot_of_allocations(loop_count, std::chrono::microseconds{sleep_us},
+                          std::chrono::microseconds{spin_us},
+                          std::chrono::milliseconds{timeout_ms}, &stats[0]);
+    for (auto &t : threads) {
+      t.join();
+    }
+    auto pid = getpid();
+    for (auto &stat : stats) {
+      print_stats(pid, stat);
+    }
+  } catch (...) { return 1; }
 }

@@ -15,9 +15,11 @@ check() {
     cmd="$1"
     expect_samples="$2"
     ${cmd} >"${log_file}"
-    # need to wait for the profiling process to terminate, otherwise log might be incomplete
-    p=$(grep -o "Created child.*" "${log_file}" | awk '{print $3}')
-    while kill -0 "$p" 2> /dev/null; do sleep 0.05s; done
+    if [ "${expect_samples}" -eq 1 ]; then
+        # need to wait for the profiling process to terminate, otherwise log might be incomplete
+        p=$(grep -o "Created child.*" "${log_file}" | awk '{print $3}')
+        while kill -0 "$p" 2>/dev/null; do sleep 0.05s; done
+    fi
 
     if [ "${expect_samples}" -eq 1 ]; then
         if ! grep -q "sample\[type=cpu-samples.*;do_lot_of_allocations" "${log_file}" || ! grep -q "sample\[type=alloc-samples.*;do_lot_of_allocations" "${log_file}"; then
