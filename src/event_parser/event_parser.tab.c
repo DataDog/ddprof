@@ -140,16 +140,6 @@ uint8_t mode_from_str(const char *str) {
 }
 
 void conf_finalize(EventConf *conf) {
-  // If an eventname contains a ':'
-  //  * If there is no group, tokenize and populate group
-  //  * If there is a group, then just drop
-  char *colon;
-  if (conf->eventname && (colon = strchr(conf->eventname, ':'))) {
-    if (!conf->groupname)
-      conf->groupname = strdup(colon + 1);
-    *colon = '\0';
-  }
-
   // Generate label if needed
   // * if both, "<eventname>:<groupname>"
   // * if only event, "<eventname>"
@@ -224,7 +214,7 @@ EventConf g_accum_event_conf = {0};
 
 void yyerror(const char *str) {
 #if (YYDEBUG == 1)
-  fprintf(stderr,"err: %s\n", str);
+  fprintf(stderr, "err: %s\n", str);
 #endif 
 }
 
@@ -257,7 +247,7 @@ int main(int c, char **v) {
 }
 #endif
 
-#line 162 "event_parser.y"
+#line 152 "event_parser.y"
 typedef union {
 	uint64_t num;
 	char *str;
@@ -329,6 +319,7 @@ typedef union {
 #ifndef YY_event_parse_DEBUG
 
  #line 136 "/usr/share/bison++/bison.cc"
+#define YY_event_parse_DEBUG 1
 
 #line 136 "/usr/share/bison++/bison.cc"
 /* YY_event_parse_DEBUG */
@@ -607,11 +598,11 @@ YY_event_parse_CONSTRUCTOR_CODE;
  #line 352 "/usr/share/bison++/bison.cc"
 
 
-#define	YYFINAL		15
+#define	YYFINAL		19
 #define	YYFLAG		-32768
-#define	YYNTBASE	11
+#define	YYNTBASE	12
 
-#define YYTRANSLATE(x) ((unsigned)(x) <= 265 ? yytranslate[x] : 15)
+#define YYTRANSLATE(x) ((unsigned)(x) <= 265 ? yytranslate[x] : 16)
 
 static const char yytranslate[] = {     0,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -619,7 +610,7 @@ static const char yytranslate[] = {     0,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-     2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+     2,     2,     2,     2,     2,     2,     2,    11,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -645,64 +636,71 @@ static const char yytranslate[] = {     0,
 
 #if YY_event_parse_DEBUG != 0
 static const short yyprhs[] = {     0,
-     0,     3,     5,     9,    11,    15,    19,    23,    24,    26
+     0,     3,     5,     9,    13,    15,    17,    21,    27,    31,
+    35,    37
 };
 
-static const short yyrhs[] = {    12,
-     5,     0,    12,     0,    12,     4,    13,     0,    13,     0,
-    10,     3,     9,     0,    10,     3,    14,     0,    10,     3,
-     6,     0,     0,     7,     0,     8,     0
+static const short yyrhs[] = {    13,
+     5,     0,    13,     0,    13,     4,    14,     0,    13,     4,
+     9,     0,    14,     0,     9,     0,    10,     3,     9,     0,
+    10,     3,     9,    11,     9,     0,    10,     3,    15,     0,
+    10,     3,     6,     0,     7,     0,     8,     0
 };
 
 #endif
 
 #if (YY_event_parse_DEBUG != 0) || defined(YY_event_parse_ERROR_VERBOSE) 
 static const short yyrline[] = { 0,
-   189,   192,   197,   198,   201,   210,   246,   249,   252,   252
+   177,   178,   181,   182,   183,   184,   187,   196,   202,   238,
+   244,   244
 };
 
 static const char * const yytname[] = {   "$","error","$illegal.","EQ","OPTSEP",
-"CONFSEP","FLOAT","NUMBER","HEXNUMBER","WORD","KEY","confs","conf","opt","uinteger",
-""
+"CONFSEP","FLOAT","NUMBER","HEXNUMBER","WORD","KEY","':'","confs","conf","opt",
+"uinteger",""
 };
 #endif
 
 static const short yyr1[] = {     0,
-    11,    11,    12,    12,    13,    13,    13,    13,    14,    14
+    12,    12,    13,    13,    13,    13,    14,    14,    14,    14,
+    15,    15
 };
 
 static const short yyr2[] = {     0,
-     2,     1,     3,     1,     3,     3,     3,     0,     1,     1
+     2,     1,     3,     3,     1,     1,     3,     5,     3,     3,
+     1,     1
 };
 
-static const short yydefact[] = {     8,
-     0,     2,     4,     0,     8,     1,     7,     9,    10,     5,
-     6,     3,     0,     0,     0
+static const short yydefact[] = {     0,
+     6,     0,     2,     5,     0,     0,     1,    10,    11,    12,
+     7,     9,     4,     3,     0,     8,     0,     0,     0
 };
 
-static const short yydefgoto[] = {    13,
-     2,     3,    11
+static const short yydefgoto[] = {    17,
+     3,     4,    12
 };
 
-static const short yypact[] = {    -4,
-     4,     0,-32768,    -6,    -4,-32768,-32768,-32768,-32768,-32768,
--32768,-32768,     8,     9,-32768
+static const short yypact[] = {    -5,
+-32768,     7,     2,-32768,    -6,    -1,-32768,-32768,-32768,-32768,
+     0,-32768,-32768,-32768,     3,-32768,    13,    14,-32768
 };
 
 static const short yypgoto[] = {-32768,
--32768,     5,-32768
+-32768,     9,-32768
 };
 
 
-#define	YYLAST		10
+#define	YYLAST		15
 
 
-static const short yytable[] = {     7,
-     8,     9,    10,     5,     6,     1,     4,    14,    15,    12
+static const short yytable[] = {     8,
+     9,    10,    11,     1,     2,     6,     7,    13,     2,     5,
+    15,    16,    18,    19,    14
 };
 
 static const short yycheck[] = {     6,
-     7,     8,     9,     4,     5,    10,     3,     0,     0,     5
+     7,     8,     9,     9,    10,     4,     5,     9,    10,     3,
+    11,     9,     0,     0,     6
 };
 
 #line 352 "/usr/share/bison++/bison.cc"
@@ -1199,27 +1197,31 @@ YYLABEL(yyreduce)
   switch (yyn) {
 
 case 1:
-#line 189 "event_parser.y"
-{ 
-          conf_finalize(&g_accum_event_conf);
-      ;
+#line 177 "event_parser.y"
+{ conf_finalize(&g_accum_event_conf); ;
     break;}
 case 2:
-#line 192 "event_parser.y"
-{ 
-          conf_finalize(&g_accum_event_conf);
-      ;
+#line 178 "event_parser.y"
+{ conf_finalize(&g_accum_event_conf); ;
     break;}
 case 3:
-#line 197 "event_parser.y"
+#line 181 "event_parser.y"
 { ;
     break;}
 case 4:
-#line 198 "event_parser.y"
+#line 182 "event_parser.y"
 { ;
     break;}
 case 5:
-#line 201 "event_parser.y"
+#line 183 "event_parser.y"
+{ ;
+    break;}
+case 6:
+#line 184 "event_parser.y"
+{ g_accum_event_conf.eventname = yyvsp[0].str; ;
+    break;}
+case 7:
+#line 187 "event_parser.y"
 {
        switch(yyval.field) {
          case ECF_EVENT: g_accum_event_conf.eventname = yyvsp[0].str; break;
@@ -1230,8 +1232,17 @@ case 5:
        }
      ;
     break;}
-case 6:
-#line 210 "event_parser.y"
+case 8:
+#line 196 "event_parser.y"
+{
+       if (yyval.field == ECF_EVENT || yyval.field == ECF_GROUP) {
+         g_accum_event_conf.eventname = yyvsp[-2].str;
+         g_accum_event_conf.groupname = yyvsp[0].str;
+       }
+     ;
+    break;}
+case 9:
+#line 202 "event_parser.y"
 {
        switch(yyval.field) {
          case ECF_ID: g_accum_event_conf.id = yyvsp[0].num; break;
@@ -1269,16 +1280,12 @@ case 6:
        }
      ;
     break;}
-case 7:
-#line 246 "event_parser.y"
+case 10:
+#line 238 "event_parser.y"
 {
        if (yyval.field == ECF_ARGCOEFF)
          g_accum_event_conf.arg_coeff = yyvsp[0].fpnum;
      ;
-    break;}
-case 8:
-#line 249 "event_parser.y"
-{ ;
     break;}
 }
 
@@ -1484,4 +1491,4 @@ YYLABEL(yyerrhandle)
 /* END */
 
  #line 1038 "/usr/share/bison++/bison.cc"
-#line 253 "event_parser.y"
+#line 245 "event_parser.y"

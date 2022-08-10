@@ -73,6 +73,12 @@ z|trace_arg_size|argsz     DISPATCH(ARGSIZE)
 	return OPTSEP;
 }
 
+[a-zA-Z_][a-zA-Z0-9_]*  {
+	yylval.str = strdup(yytext);
+	BEGIN 0;
+	return WORD;
+}
+
 .                       {
 	return (int) yytext[0];
 }

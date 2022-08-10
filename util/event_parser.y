@@ -39,16 +39,6 @@ uint8_t mode_from_str(const char *str) {
 }
 
 void conf_finalize(EventConf *conf) {
-  // If an eventname contains a ':'
-  //  * If there is no group, tokenize and populate group
-  //  * If there is a group, then just drop
-  char *colon;
-  if (conf->eventname && (colon = strchr(conf->eventname, ':'))) {
-    if (!conf->groupname)
-      conf->groupname = strdup(colon + 1);
-    *colon = '\0';
-  }
-
   // Generate label if needed
   // * if both, "<eventname>:<groupname>"
   // * if only event, "<eventname>"
@@ -123,7 +113,7 @@ EventConf g_accum_event_conf = {0};
 
 void yyerror(const char *str) {
 #if (YYDEBUG == 1)
-  fprintf(stderr,"err: %s\n", str);
+  fprintf(stderr, "err: %s\n", str);
 #endif 
 }
 
@@ -183,19 +173,15 @@ int main(int c, char **v) {
 
 %%
 
-// TODO when the event is finished up, eventnames with `:` will need to be
-//      split up
 // TODO this only allows a single config to be processed at a time
-confs: conf CONFSEP{ 
-          conf_finalize(&g_accum_event_conf);
-      }
-      | conf { 
-          conf_finalize(&g_accum_event_conf);
-      }
+confs:  conf CONFSEP { conf_finalize(&g_accum_event_conf); }
+      | conf { conf_finalize(&g_accum_event_conf); }
       ;
 
 conf: conf OPTSEP opt { }
-    |             opt { }
+    | conf OPTSEP WORD { }
+    | opt { }
+    | WORD { g_accum_event_conf.eventname = $1; }
     ;
 
 opt: KEY EQ WORD {
@@ -205,6 +191,12 @@ opt: KEY EQ WORD {
          case ECF_LABEL: g_accum_event_conf.label = $3; break;
          case ECF_MODE:  g_accum_event_conf.mode |= mode_from_str($3); break;
          default: break;
+       }
+     }
+     | KEY EQ WORD ':' WORD {
+       if ($$ == ECF_EVENT || $$ == ECF_GROUP) {
+         g_accum_event_conf.eventname = $3;
+         g_accum_event_conf.groupname = $5;
        }
      }
      | KEY EQ uinteger {
@@ -246,7 +238,7 @@ opt: KEY EQ WORD {
      | KEY EQ FLOAT {
        if ($$ == ECF_ARGCOEFF)
          g_accum_event_conf.arg_coeff = $3;
-     } | { }
+     }
      ;
 
 uinteger: NUMBER | HEXNUMBER
