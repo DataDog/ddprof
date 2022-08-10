@@ -15,6 +15,11 @@ inline constexpr const char *k_profiler_active_env_variable =
 inline constexpr const char *k_profiler_auto_start_env_variable =
     "DD_PROFILING_NATIVE_AUTOSTART";
 
+// Env variable to force use of embedded shared library
+inline constexpr const char
+    *k_profiler_use_embedded_libdd_profiling_env_variable =
+        "DD_PROFILING_NATIVE_USE_EMBEDDED_LIB";
+
 // Env variable to override ddprof exe used in library mode
 // By default exe embedded in library is use
 inline constexpr const char *k_profiler_ddprof_exe_env_variable =
