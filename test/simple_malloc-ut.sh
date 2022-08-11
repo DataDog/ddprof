@@ -7,6 +7,9 @@ export DD_PROFILING_NATIVE_SHOW_SAMPLES=1
 export DD_PROFILING_NATIVE_USE_EMBEDDED_LIB=1
 export DD_PROFILING_NATIVE_LOG_LEVEL=debug
 export LD_LIBRARY_PATH=$PWD
+export DD_PROFILING_NATIVE_PRESET=default
+# force deterministic sampling
+export DD_PROFILING_NATIVE_EVENTS="sALLOC,-524288"
 
 opts="--loop 1000 --spin 100"
 log_file=$(mktemp "${PWD}/log.XXXXXX")
@@ -49,6 +52,6 @@ check "./test/simple_malloc-shared ${opts}" 0
 check "./test/simple_malloc-shared --profile ${opts}" 1
 
 # Test wrapper mode
-check "./ddprof -X no ./test/simple_malloc ${opts}" 1
+check "./ddprof ./test/simple_malloc ${opts}" 1
 
 rm "${log_file}"

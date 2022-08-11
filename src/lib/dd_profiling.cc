@@ -241,7 +241,13 @@ static int ddprof_start_profiling_internal() {
     ddprof::Client client{ddprof::UnixSocket{sockfd}};
     auto info = client.get_profiler_info();
     g_state.profiler_pid = info.pid;
-    if (info.allocation_profiling_rate > 0) {
+    if (info.allocation_profiling_rate != 0) {
+      uint32_t flags{0};
+      // Negative profiling rate is interpreted as deterministic sampling rate
+      if (info.allocation_profiling_rate < 0) {
+        flags |= ddprof::AllocationTracker::kDeterministicSampling;
+        info.allocation_profiling_rate = -info.allocation_profiling_rate;
+      }
       ddprof::AllocationTracker::allocation_tracking_init(
           info.allocation_profiling_rate, false, info.ring_buffer);
       g_state.allocation_profiling_started = true;
