@@ -45,18 +45,18 @@
 }
 
 b|label                    DISPATCH(LABEL)
-c|trace_arg_coeff|argcoeff DISPATCH(ARGCOEFF)
+c|arg_coeff|argcoeff       DISPATCH(ARGCOEFF)
 f|frequency|freq           DISPATCH(FREQUENCY)
 e|event|eventname|ev       DISPATCH(EVENT)
 g|group|groupname|gr       DISPATCH(GROUP)
-i|trace_id|id              DISPATCH(ID)
+i|id                       DISPATCH(ID)
 l|location|loc             DISPATCH(LOCATION)
 m|mode                     DISPATCH(MODE)
-n|trace_arg_num|argno      DISPATCH(PARAMETER)
-o|trace_arg_offset|argoff  DISPATCH(ARGOFFSET)
+n|arg_num|argno            DISPATCH(PARAMETER)
+o|arg_offset|argoff        DISPATCH(ARGOFFSET)
 p|period|per               DISPATCH(PERIOD)
-r|trace_reg_num|regno      DISPATCH(REGISTER)
-z|trace_arg_size|argsz     DISPATCH(ARGSIZE)
+r|register|regno           DISPATCH(REGISTER)
+z|arg_size|argsz           DISPATCH(ARGSIZE)
 
 =                       {
 	BEGIN VALUE;

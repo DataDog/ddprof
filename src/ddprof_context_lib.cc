@@ -95,9 +95,9 @@ void log_watcher(const PerfWatcher *w, int n) {
       "CPU register",
       "Raw event",
   };
-  PRINT_NFO("    ID: %s, Pos: %d, Index: %lu, Label: %s", w->desc, n, w->config,
-            sample_type_name_from_idx(w->sample_type_id));
-  PRINT_NFO("    Loc: %s, Name: %s, Label: %s",
+  PRINT_NFO("    ID: %s, Pos: %d, Index: %lu, Sample: %s", w->desc, n,
+            w->config, sample_type_name_from_idx(w->sample_type_id));
+  PRINT_NFO("    Loctype: %s, Name: %s, Label: %s",
             location_names[w->loc_type].c_str(), w->tracepoint_name,
             w->tracepoint_label);
 }

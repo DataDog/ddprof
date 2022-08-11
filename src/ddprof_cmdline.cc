@@ -122,6 +122,7 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
 
   // Configure the data source
   if (conf->loc_type == ECLOC_RAW) {
+    watcher->loc_type = kPerfWatcherLoc_raw;
     watcher->sample_type |= PERF_SAMPLE_RAW;
     watcher->raw_off = conf->arg_offset;
     if (conf->arg_size > 0)
@@ -130,6 +131,7 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
       watcher->raw_sz = sizeof(uint64_t); // default raw entry
   } else if (conf->loc_type == ECLOC_REG) {
     watcher->regno = conf->register_num;
+    watcher->loc_type = kPerfWatcherLoc_reg;
   }
 
   if (conf->arg_coeff != 0.0)
@@ -137,5 +139,6 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
 
   watcher->tracepoint_group = conf->groupname;
   watcher->tracepoint_name = conf->eventname;
+  watcher->tracepoint_label = conf->label;
   return true;
 }

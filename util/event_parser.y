@@ -167,10 +167,6 @@ int main(int c, char **v) {
 %type <field> conf
 %type <field> opt
 
-//%type <num> register offset size event_id period frequency
-//%type <str> groupname eventname typespec
-//%type <event> event name location cadence type
-
 %%
 
 // TODO this only allows a single config to be processed at a time
@@ -200,6 +196,7 @@ opt: KEY EQ WORD {
        }
      }
      | KEY EQ uinteger {
+       printf("Key uinteger\n");
        switch($$) {
          case ECF_ID: g_accum_event_conf.id = $3; break;
          case ECF_ARGSIZE: g_accum_event_conf.arg_size= $3; break;
@@ -222,6 +219,7 @@ opt: KEY EQ WORD {
            case ECF_REGISTER: g_accum_event_conf.loc_type = ECLOC_REG; break;
            case ECF_ARGOFFSET: g_accum_event_conf.loc_type = ECLOC_RAW; break;
          }
+         printf("Set location to %d\n", g_accum_event_conf.loc_type);
        }
 
        // Only set cadence if it has yet to be specified
