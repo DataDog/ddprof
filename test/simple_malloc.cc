@@ -58,13 +58,16 @@ do_lot_of_allocations(uint64_t loop_count, std::chrono::microseconds sleep,
   auto start_cpu = thread_cpu_clock::now();
   for (uint64_t i = 0; i < loop_count; ++i) {
     void *p = malloc(1000);
+    ddprof::DoNotOptimize(p);
     ++nb_alloc;
     alloc_bytes += 1000;
     void *p2 = realloc(p, 2000);
+    ddprof::DoNotOptimize(p2);
     ++nb_alloc;
     alloc_bytes += 2000;
     free(p2);
     void *p3 = calloc(1, 512);
+    ddprof::DoNotOptimize(p3);
     ++nb_alloc;
     alloc_bytes += 512;
     free(p3);
