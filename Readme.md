@@ -48,7 +48,7 @@ Don't hesitate to [reach-out](#Reaching-out) if you are not able to use our prof
 
 ### Safety
 
-- Most operations are performed out of process
+- Minimal interference to execution of instrumented processes
 - `ddprof`'s Memory usage is sandboxed
 
 ## Docs
