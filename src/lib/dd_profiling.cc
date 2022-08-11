@@ -249,7 +249,7 @@ static int ddprof_start_profiling_internal() {
         info.allocation_profiling_rate = -info.allocation_profiling_rate;
       }
       ddprof::AllocationTracker::allocation_tracking_init(
-          info.allocation_profiling_rate, false, info.ring_buffer);
+          info.allocation_profiling_rate, flags, info.ring_buffer);
       g_state.allocation_profiling_started = true;
     }
   } catch (const ddprof::DDException &e) { return -1; }
