@@ -50,6 +50,10 @@ extern "C" DDPROF_NOINLINE void
 do_lot_of_allocations(uint64_t loop_count, std::chrono::microseconds sleep,
                       std::chrono::microseconds spin,
                       std::chrono::milliseconds timeout, Stats *stats) {
+  printf("[time]Starting allocs: %.1fms\n",
+         ((std::chrono::system_clock::now().time_since_epoch().count() / 1000) %
+          10000000UL) /
+             1000.0);
   uint64_t nb_alloc{0};
   uint64_t alloc_bytes{0};
 
@@ -92,6 +96,10 @@ do_lot_of_allocations(uint64_t loop_count, std::chrono::microseconds sleep,
   end_time = std::chrono::steady_clock::now();
   *stats = {nb_alloc, alloc_bytes, end_time - start_time, end_cpu - start_cpu,
             ddprof::gettid()};
+  printf("[time]Finished allocs: %.1fms\n",
+         ((std::chrono::system_clock::now().time_since_epoch().count() / 1000) %
+          10000000UL) /
+             1000.0);
 }
 
 void print_header() {

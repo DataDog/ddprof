@@ -300,7 +300,10 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
       }
     }
   }
-
+  LG_DBG("[time]Starting profiler: %.1fms",
+         ((std::chrono::system_clock::now().time_since_epoch().count() / 1000) %
+          10000000UL) /
+             1000.0);
   // Now enter profiling
   DDRes res = ddprof_start_profiler(ctx);
   if (IsDDResNotOK(res)) {

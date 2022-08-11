@@ -208,6 +208,10 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
   int ring_buffer_start_idx = 0;
   bool stop = false;
 
+  LG_DBG("[time]Starting worker loop: %.1fms",
+         ((std::chrono::system_clock::now().time_since_epoch().count() / 1000) %
+          10000000UL) /
+             1000.0);
   // Worker poll loop
   while (!stop) {
     // Convenience structs
