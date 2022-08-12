@@ -17,6 +17,7 @@
 
 #include <array>
 #include <cassert>
+#include <charconv>
 #include <errno.h>
 #include <fcntl.h>
 #include <filesystem>
@@ -25,6 +26,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <thread>
 #include <unistd.h>
 
 namespace fs = std::filesystem;
@@ -38,6 +40,18 @@ extern const char
     _binary_libdd_profiling_embedded_so_end[]; // NOLINT cert-dcl51-cpp
 
 static constexpr const char k_pid_place_holder[] = "{pid}";
+
+static void maybe_slowdown_startup() {
+  // Simulate startup slowdown if requested
+  if (const char *s = getenv(k_startup_wait_ms_env_variable); s != nullptr) {
+    std::string_view sv{s};
+    int wait_ms = 0;
+    auto [ptr, ec] = std::from_chars(sv.begin(), sv.end(), wait_ms);
+    if (ec == std::errc() && ptr == sv.end() && wait_ms > 0) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(wait_ms));
+    }
+  }
+}
 
 static DDRes get_library_path(std::string &path, int &fd) {
   fd = -1;
@@ -300,6 +314,10 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
       }
     }
   }
+
+  LG_NTC("Starting profiler");
+
+  maybe_slowdown_startup();
 
   // Now enter profiling
   DDRes res = ddprof_start_profiler(ctx);
