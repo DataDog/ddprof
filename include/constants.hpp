@@ -34,4 +34,8 @@ inline constexpr const char *k_profiler_lib_socket_env_variable =
 inline constexpr const char *k_events_env_variable =
     "DD_PROFILING_NATIVE_EVENTS";
 
+// Env variable to slow down profiler startup
+inline constexpr const char *k_startup_wait_ms_env_variable =
+    "DD_PROFILING_NATIVE_STARTUP_WAIT_MS";
+
 inline constexpr const char *k_libdd_profiling_name = "libdd_profiling.so";
