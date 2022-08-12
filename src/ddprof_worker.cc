@@ -193,6 +193,8 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   if (!sample)
     return ddres_warn(DD_WHAT_PERFSAMP);
   struct UnwindState *us = ctx->worker_ctx.us;
+  PerfWatcher *watcher = &ctx->watchers[watcher_pos];
+
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
   ddprof_stats_add(STATS_UNWIND_AVG_STACK_SIZE, sample->size_stack, nullptr);
 
@@ -210,13 +212,16 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   us->output.tid = sample->tid;
 
   // If this is a SW_TASK_CLOCK-type event, then aggregate the time
-  if (ctx->watchers[watcher_pos].config == PERF_COUNT_SW_TASK_CLOCK)
+  if (watcher->config == PERF_COUNT_SW_TASK_CLOCK)
     ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
-  DDRes res = unwindstate__unwind(us);
+
+  // Attempt to fully unwind if the watcher has a callgraph type
+  DDRes res;
+  if (watcher->output_mode & kPerfWatcherMode_callgraph)
+    res = unwindstate__unwind(us);
 
   // Usually we want to send the sample_val, but sometimes we need to process
   // the event to get the desired value
-  PerfWatcher *watcher = &ctx->watchers[watcher_pos];
   uint64_t sample_val = sample->period;
   if ((PERF_SAMPLE_RAW & watcher->sample_type) &&
       watcher->loc_type == kPerfWatcherLoc_raw) {
@@ -232,7 +237,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
       ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL));
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
-  if (!IsDDResFatal(res)) {
+  if (!IsDDResFatal(res) && (watcher->output_mode & kPerfWatcherMode_callgraph)) {
 #ifndef DDPROF_NATIVE_LIB
     // in lib mode we don't aggregate (protect to avoid link failures)
     int i_export = ctx->worker_ctx.i_current_pprof;

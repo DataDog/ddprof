@@ -49,7 +49,6 @@ typedef enum EventConfField {
 } EventConfField;
 
 typedef struct EventConf {
-  EventConfField field; // For parsing
   EventConfMode mode;
 
   uint64_t id;

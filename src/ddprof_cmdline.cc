@@ -137,8 +137,31 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   if (conf->arg_coeff != 0.0)
     watcher->value_coefficient = conf->arg_coeff;
 
+  // Assume each template has the correct (usually 1) default for period, only
+  // override if needed
+  if (conf->cadence) {
+    if (conf->cad_type == ECCAD_FREQ) {
+      watcher->options.is_freq = true;
+      watcher->sample_frequency = conf->cadence;
+    } else {
+      watcher->options.is_freq = false;
+      watcher->sample_period = conf->cadence;
+    }
+  }
+
+  // The output mode isn't set as part of the configuration templates; we
+  // always default to callgraph mode
+  watcher->output_mode = kPerfWatcherMode_callgraph;
+  if (conf->mode & EVENT_BOTH) {
+    watcher->output_mode = 0;
+    if (conf->mode & EVENT_CALLGRAPH)
+      watcher->output_mode |= kPerfWatcherMode_callgraph;
+    if (conf->mode & EVENT_METRIC)
+      watcher->output_mode |= kPerfWatcherMode_metric;
+  }
+
+  watcher->tracepoint_event = conf->eventname;
   watcher->tracepoint_group = conf->groupname;
-  watcher->tracepoint_name = conf->eventname;
   watcher->tracepoint_label = conf->label;
   return true;
 }

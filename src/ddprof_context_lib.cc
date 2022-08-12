@@ -90,16 +90,36 @@ DDRes add_preset(DDProfContext *ctx, const char *preset,
 }
 
 void log_watcher(const PerfWatcher *w, int n) {
-  static std::array<std::string, 3> location_names = {
-      "Sample value",
-      "CPU register",
-      "Raw event",
-  };
-  PRINT_NFO("    ID: %s, Pos: %d, Index: %lu, Sample: %s", w->desc, n,
-            w->config, sample_type_name_from_idx(w->sample_type_id));
-  PRINT_NFO("    Loctype: %s, Name: %s, Label: %s",
-            location_names[w->loc_type].c_str(), w->tracepoint_name,
-            w->tracepoint_label);
+  PRINT_NFO("    ID: %s, Pos: %d, Index: %lu", w->desc, n, w->config);
+  switch(w->loc_type) {
+    case kPerfWatcherLoc_val:
+      PRINT_NFO("    Location: Sample");
+      break;
+    case kPerfWatcherLoc_reg:
+      PRINT_NFO("    Location: Register, regno: %d", w->regno);
+      break;
+    case kPerfWatcherLoc_raw:
+      PRINT_NFO("    Location: Raw event, offset: %d, size: %d",
+          w->raw_off, w->raw_sz);
+      break;
+    default:
+      PRINT_NFO("    ILLEGAL LOCATION");
+      break;
+  }
+
+  PRINT_NFO("    Category: %s, EventName: %s, GroupName: %s, Label: %s",
+            sample_type_name_from_idx(w->sample_type_id),
+            w->tracepoint_event, w->tracepoint_group, w->tracepoint_label);
+
+  if (w->options.is_freq)
+    PRINT_NFO("    Cadence: Freq, Freq: %lu", w->sample_frequency);
+  else
+    PRINT_NFO("    Cadence: Period, Period: %lu", w->sample_period);
+
+  if (w->output_mode & kPerfWatcherMode_callgraph)
+    PRINT_NFO("    Outputting to callgraph (flamegraph)");
+  if (w->output_mode & kPerfWatcherMode_metric)
+    PRINT_NFO("    Outputting to metric");
 }
 
 /****************************  Argument Processor  ***************************/

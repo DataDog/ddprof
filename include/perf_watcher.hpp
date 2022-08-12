@@ -21,6 +21,12 @@ typedef enum {
 
 } PerfWatcherLocation;
 
+typedef enum {
+  kPerfWatcherMode_disabled = 0, // Should never actually be used!
+  kPerfWatcherMode_callgraph  = 1 << 0,
+  kPerfWatcherMode_metric = 1 << 1,
+} PerfWatcherMode;
+
 struct PerfWatcherOptions {
   PerfWatcherValue is_kernel;
   bool is_freq;
@@ -49,7 +55,7 @@ typedef struct PerfWatcher {
   uint8_t raw_off;
   uint8_t raw_sz;
   double value_coefficient;
-  const char *tracepoint_name;
+  const char *tracepoint_event;
   const char *tracepoint_group;
   const char *tracepoint_label;
   // Other configs
@@ -57,6 +63,7 @@ typedef struct PerfWatcher {
   bool suppress_tid;
   int pprof_sample_idx;       // index into the SampleType in the pprof
   int pprof_count_sample_idx; // index into the pprof for the count
+  int output_mode;            // how to save the data
 } PerfWatcher;
 
 // The Datadog backend only understands pre-configured event types.  Those

@@ -230,10 +230,12 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   if (watcher_has_tracepoint(watcher)) {
     labels[labels_num].key = to_CharSlice("tracepoint_type");
 
+    // If the label is given, use that as the tracepoint type.  Otherwise
+    // default to the event name
     if (watcher->tracepoint_label) {
       labels[labels_num].str = to_CharSlice(watcher->tracepoint_label);
     } else {
-      labels[labels_num].str = to_CharSlice(watcher->tracepoint_name);
+      labels[labels_num].str = to_CharSlice(watcher->tracepoint_event);
     }
     ++labels_num;
   }
