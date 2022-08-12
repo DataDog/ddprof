@@ -331,6 +331,8 @@ void ddprof_context_free(DDProfContext *ctx) {
       close(ctx->params.sockfd);
     }
   }
+
+  LOG_close();
 }
 
 int ddprof_context_allocation_profiling_watcher_idx(const DDProfContext *ctx) {
