@@ -32,6 +32,15 @@ find_duplicate_event(ddprof::span<const PerfWatcher> watchers) {
   return nullptr;
 }
 
+static void order_watchers(ddprof::span<PerfWatcher> watchers) {
+  // Ensure that non-perf watchers are last because they might depend on
+  // processing perf events before (comm, mmap, ...)
+  std::stable_sort(
+      watchers.begin(), watchers.end(), [](const auto &lhs, const auto &rhs) {
+        return lhs.type < PERF_TYPE_MAX && rhs.type >= PERF_TYPE_MAX;
+      });
+}
+
 struct Preset {
   static constexpr size_t k_max_events = 10;
   const char *name;
@@ -282,15 +291,20 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   }
 
   ddprof::span watchers{ctx->watchers, static_cast<size_t>(ctx->num_watchers)};
-  if (std::find_if(watchers.begin(), watchers.end(),
-                   [](const auto &watcher) {
-                     return watcher.type < PERF_TYPE_MAX;
-                   }) == watchers.end() &&
-      ctx->num_watchers < MAX_TYPE_WATCHER) {
+  if (std::find_if(watchers.begin(), watchers.end(), [](const auto &watcher) {
+        return watcher.type < PERF_TYPE_MAX;
+      }) == watchers.end()) {
+
+    if (ctx->num_watchers == MAX_TYPE_WATCHER) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Too many input events");
+    }
+
     // if there are no perf active watcher, add a dummy watcher to be notified
     // on process exit
     ctx->watchers[ctx->num_watchers++] = *ewatcher_from_str("sDUM");
   }
+
+  order_watchers({ctx->watchers, static_cast<size_t>(ctx->num_watchers)});
 
   // Process input printer (do this right before argv/c modification)
   if (input->show_config && arg_yesno(input->show_config, 1)) {

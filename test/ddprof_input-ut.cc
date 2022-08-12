@@ -323,8 +323,8 @@ TEST_F(InputTest, presets) {
     EXPECT_TRUE(IsDDResOK(res));
 
     EXPECT_EQ(ctx.num_watchers, 2);
-    EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sALLOC);
-    EXPECT_EQ(ctx.watchers[1].ddprof_event_type, DDPROF_PWE_sDUM);
+    EXPECT_EQ(ctx.watchers[1].ddprof_event_type, DDPROF_PWE_sALLOC);
+    EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sDUM);
 
     ddprof_input_free(&input);
     ddprof_context_free(&ctx);
