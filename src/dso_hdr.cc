@@ -482,10 +482,15 @@ FileInfo DsoHdr::find_file_info(const Dso &dso) {
   //   or      /host/proc/<pid>/root/usr/local/bin/exe_file
   std::string proc_path = _path_to_proc + "/proc/" + std::to_string(dso._pid) +
       "/root" + dso._filename;
-  bool file_found = get_file_inode(proc_path.c_str(), &inode, &size);
-  if (file_found) {
+  if (get_file_inode(proc_path.c_str(), &inode, &size) && inode == dso._inode) {
     return FileInfo(proc_path, size, inode);
   }
+  // Try to find file in profiler mount namespace
+  if (get_file_inode(dso._filename.c_str(), &inode, &size) &&
+      inode == dso._inode) {
+    return FileInfo(dso._filename, size, inode);
+  }
+
   LG_DBG("[DSO] Unable to find path to %s", dso._filename.c_str());
   return FileInfo();
 }
