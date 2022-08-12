@@ -4,6 +4,7 @@
 // Datadog, Inc.
 
 #include <assert.h>
+#include <chrono>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -155,7 +156,11 @@ void vlprintfln(int lvl, int fac, const char *name, const char *format,
   // since the service will strip it out and replace it.  We add it here anyway
   // for completeness (and we need it anyway for other log modes)
   static __thread char tm_str[sizeof("mmm dd HH:MM:SS0")] = {0};
-  time_t t = time(NULL);
+  auto d = std::chrono::system_clock::now().time_since_epoch();
+  auto d_s = std::chrono::duration_cast<std::chrono::seconds>(d);
+  auto d_us = std::chrono::duration_cast<std::chrono::microseconds>(d - d_s);
+
+  time_t t = d_s.count();
   struct tm lt;
   localtime_r(&t, &lt);
   strftime(tm_str, sizeof(tm_str), "%b %d %H:%M:%S", &lt);
@@ -164,8 +169,8 @@ void vlprintfln(int lvl, int fac, const char *name, const char *format,
   pid_t pid = getpid();
 
   if (log_ctx->mode == LOG_SYSLOG) {
-    sz_h = snprintf(buf, LOG_MSG_CAP, "<%d>%s %s[%d]: ", lvl + fac * 8, tm_str,
-                    name, pid);
+    sz_h = snprintf(buf, LOG_MSG_CAP, "<%d>%s.%06lu %s[%d]: ", lvl + fac * 8,
+                    tm_str, d_us.count(), name, pid);
   } else {
     const char *levels[LL_LENGTH] = {
         [LL_EMERGENCY] = "EMERGENCY",
@@ -177,8 +182,8 @@ void vlprintfln(int lvl, int fac, const char *name, const char *format,
         [LL_INFORMATIONAL] = "INFORMATIONAL",
         [LL_DEBUG] = "DEBUG",
     };
-    sz_h = snprintf(buf, LOG_MSG_CAP, "<%s>%s %s[%d]: ", levels[lvl], tm_str,
-                    name, pid);
+    sz_h = snprintf(buf, LOG_MSG_CAP, "<%s>%s.%06lu %s[%d]: ", levels[lvl],
+                    tm_str, d_us.count(), name, pid);
   }
 
   // Write the body into the buffer
