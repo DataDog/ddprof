@@ -5,6 +5,10 @@
 
 #include "ddprof_cpumask.hpp"
 
+#include <dirent.h>
+#include <sys/sysinfo.h>
+#include <sys/types.h>
+
 namespace ddprof {
 
 /* Parse cpu mask given as hexa string (with optional 0x prefix) */
@@ -77,6 +81,30 @@ std::string cpu_mask_to_string(const cpu_set_t &cpu_mask) {
     s += static_cast<char>(v);
   }
   return s;
+}
+
+int nprocessors_conf() {
+  // Rationale: we cannot rely on get_nprocs / sysconf(_SC_NPROCESSORS_CONF)
+  // because they are implemented on top of sched_getaffinity in musl libc.
+  // Meaning that `taskset -c 0 getconf _NPROCESSORS_CONF` returns 1 on musl.
+  int ret = 0;
+  DIR *dir = opendir("/sys/devices/system/cpu");
+
+  if (dir) {
+    dirent *dp;
+
+    while ((dp = readdir(dir))) {
+      if (dp->d_type == DT_DIR && dp->d_name[0] == 'c' &&
+          dp->d_name[1] == 'p' && dp->d_name[2] == 'u' &&
+          isdigit(dp->d_name[3])) {
+        ++ret;
+      }
+    }
+    closedir(dir);
+  } else {
+    ret = get_nprocs_conf();
+  }
+  return ret != 0 ? ret : 1;
 }
 
 } // namespace ddprof

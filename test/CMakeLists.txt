@@ -382,6 +382,13 @@ add_unit_test(
     ../src/ddprof_file_info.cc
 )
 
+add_unit_test(
+    ddprof_cpumask-ut
+    ddprof_cpumask-ut.cc
+    ../src/ddprof_cpumask.cc
+)
+
+
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/savecontext.cc ../src/saveregisters.cc)
 add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 
