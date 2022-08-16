@@ -174,7 +174,7 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
       ctx->params.nice = tmp_nice;
   }
 
-  ctx->params.num_cpu = get_nprocs();
+  ctx->params.num_cpu = ddprof::nprocessors_conf();
 
   // Adjust target PID
   pid_t pid_tmp = 0;

@@ -10,5 +10,10 @@
 
 namespace ddprof {
 bool parse_cpu_mask(std::string_view sv, cpu_set_t &cpu_mask);
+
 std::string cpu_mask_to_string(const cpu_set_t &cpu_mask);
+
+// Return number of configured processors
+int nprocessors_conf();
+
 } // namespace ddprof
