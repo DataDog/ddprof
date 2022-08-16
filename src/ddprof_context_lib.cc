@@ -7,6 +7,7 @@
 
 #include "ddprof_cmdline.hpp"
 #include "ddprof_context.hpp"
+#include "ddprof_cpumask.hpp"
 #include "ddprof_input.hpp"
 #include "logger.hpp"
 #include "logger_setup.hpp"
@@ -288,6 +289,14 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   if (preset) {
     bool pid_or_global_mode = ctx->params.pid && ctx->params.sockfd == -1;
     DDRES_CHECK_FWD(add_preset(ctx, preset, pid_or_global_mode));
+  }
+
+  CPU_ZERO(&ctx->params.cpu_affinity);
+  if (input->affinity) {
+    if (!ddprof::parse_cpu_mask(input->affinity, ctx->params.cpu_affinity)) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
+                             "Invalid CPU affinity mask");
+    }
   }
 
   ddprof::span watchers{ctx->watchers, static_cast<size_t>(ctx->num_watchers)};
