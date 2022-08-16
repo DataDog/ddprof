@@ -183,6 +183,7 @@ add_unit_test(
     ../src/ddprof_cmdline.cc
     ../src/ddprof_input.cc
     ../src/ddprof_context_lib.cc
+    ../src/ddprof_cpumask.cc
     ../src/logger_setup.cc
     ../src/perf_watcher.cc
     ddprof_input-ut.cc
@@ -398,3 +399,5 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
     target_include_directories(read_past_sp PRIVATE ${DDPROF_INCLUDE_LIST})
     add_test(NAME read_past_sp COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/read_past_sp-ut.sh WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endif()
+
+add_test(NAME ddprof_help COMMAND ddprof -h WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

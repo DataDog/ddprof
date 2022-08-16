@@ -8,6 +8,7 @@
 #include "ddprof.hpp"
 #include "ddprof_context.hpp"
 #include "ddprof_context_lib.hpp"
+#include "ddprof_cpumask.hpp"
 #include "ddprof_input.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
@@ -250,6 +251,18 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
   is_profiler = true;
 
   ddprof::init_tsc();
+
+  if (CPU_COUNT(&ctx->params.cpu_affinity) > 0) {
+    LG_DBG("Setting affinity to 0x%s",
+           ddprof::cpu_mask_to_string(ctx->params.cpu_affinity).c_str());
+    if (sched_setaffinity(0, sizeof(cpu_set_t), &ctx->params.cpu_affinity) !=
+        0) {
+      LG_ERR("Failed to set profiler CPU affinity to 0x%s: %s",
+             ddprof::cpu_mask_to_string(ctx->params.cpu_affinity).c_str(),
+             strerror(errno));
+      return -1;
+    }
+  }
 
   // Attach the profiler
   if (IsDDResNotOK(ddprof_setup(ctx))) {
