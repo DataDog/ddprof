@@ -248,9 +248,12 @@ static int ddprof_start_profiling_internal() {
         flags |= ddprof::AllocationTracker::kDeterministicSampling;
         info.allocation_profiling_rate = -info.allocation_profiling_rate;
       }
-      ddprof::AllocationTracker::allocation_tracking_init(
-          info.allocation_profiling_rate, flags, info.ring_buffer);
-      g_state.allocation_profiling_started = true;
+      if (IsDDResOK(ddprof::AllocationTracker::allocation_tracking_init(
+              info.allocation_profiling_rate, flags, info.ring_buffer))) {
+        // \fixme{nsavoire} what should we do when allocation tracker init
+        // fails ?
+        g_state.allocation_profiling_started = true;
+      }
     }
   } catch (const ddprof::DDException &e) { return -1; }
 
