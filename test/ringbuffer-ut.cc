@@ -382,3 +382,18 @@ TEST(ringbuffer, mpsc_ring_buffer_multiple_producer) {
     }
   }
 }
+
+TEST(ringbuffer, mpsc_ring_buffer_stale_lock) {
+  const size_t buf_size_order = 0;
+  RingBufferHolder ring_buffer{buf_size_order, RingBufferType::kMPSCRingBuffer};
+  MPSCRingBufferWriter writer{ring_buffer.get_ring_buffer()};
+
+  // simulate stale lock
+  ddprof::lock(reinterpret_cast<std::atomic<bool> *>(
+                   ring_buffer.get_ring_buffer().spinlock),
+               std::chrono::milliseconds(1));
+
+  bool timeout = false;
+  ASSERT_TRUE(writer.reserve(4, &timeout).empty());
+  ASSERT_TRUE(timeout);
+}

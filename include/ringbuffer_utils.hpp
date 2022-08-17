@@ -37,8 +37,8 @@ class PerfRingBufferWriter {
 public:
   explicit PerfRingBufferWriter(RingBuffer &rb) : _rb(rb) {
     assert(rb.type == RingBufferType::kPerfRingBuffer);
-    _tail = __atomic_load_n(_rb.reader_pos, __ATOMIC_ACQUIRE);
     _head = _initial_head = *_rb.writer_pos;
+    update_available();
     assert(_tail <= _head);
   }
 
@@ -107,15 +107,16 @@ class PerfRingBufferReader {
 public:
   explicit PerfRingBufferReader(RingBuffer &rb) : _rb(rb) {
     assert(rb.type == RingBufferType::kPerfRingBuffer);
-    _head = __atomic_load_n(rb.writer_pos, __ATOMIC_ACQUIRE);
     _tail = *_rb.reader_pos;
     _initial_tail = _tail;
+    update_available();
     assert(_tail <= _head);
   }
 
   ~PerfRingBufferReader() {
-    if (_initial_tail < _tail)
-      __atomic_store_n(_rb.reader_pos, _tail, __ATOMIC_RELEASE);
+    if (_initial_tail < _tail) {
+      advance();
+    }
   }
 
   inline size_t available_size() const { return _head - _tail; }
@@ -164,9 +165,11 @@ struct MPSCRingBufferHeader {
 
 class MPSCRingBufferWriter {
 public:
+  static inline constexpr std::chrono::milliseconds k_lock_timeout{100};
+
   explicit MPSCRingBufferWriter(RingBuffer &rb) : _rb(rb) {
     assert(rb.type == RingBufferType::kMPSCRingBuffer);
-    _tail = __atomic_load_n(_rb.reader_pos, __ATOMIC_ACQUIRE);
+    update_tail();
   }
 
   MPSCRingBufferWriter(const MPSCRingBufferWriter &) = delete;
@@ -176,14 +179,21 @@ public:
     _tail = __atomic_load_n(_rb.reader_pos, __ATOMIC_ACQUIRE);
   }
 
-  Buffer reserve(size_t n) {
+  Buffer reserve(size_t n, bool *timeout = nullptr) {
     size_t n2 = align_up(n + sizeof(MPSCRingBufferHeader), 8);
     if (n2 == 0) {
       return {};
     }
 
     // \fixme{nsavoire} Not sure if spinlock is the best option here
-    lock(reinterpret_cast<std::atomic_flag *>(_rb.spinlock));
+    if (!lock(reinterpret_cast<std::atomic<bool> *>(_rb.spinlock),
+              k_lock_timeout)) {
+      // timeout on lock
+      if (timeout) {
+        *timeout = true;
+      }
+      return {};
+    }
 
     // No need for atomic operation, since we hold the lock
     uint64_t writer_pos = *_rb.writer_pos;
@@ -191,7 +201,7 @@ public:
     uint64_t new_writer_pos = writer_pos + n2;
     // Check that there is enough free space
     if (_rb.mask < new_writer_pos - _tail) {
-      unlock(reinterpret_cast<std::atomic_flag *>(_rb.spinlock));
+      unlock(reinterpret_cast<std::atomic<bool> *>(_rb.spinlock));
       return {};
     }
 
@@ -204,7 +214,7 @@ public:
 
     // Atomic operation required to synchronize with reader load_acquire
     __atomic_store_n(_rb.writer_pos, new_writer_pos, __ATOMIC_RELEASE);
-    unlock(reinterpret_cast<std::atomic_flag *>(_rb.spinlock));
+    unlock(reinterpret_cast<std::atomic<bool> *>(_rb.spinlock));
 
     return {reinterpret_cast<std::byte *>(hdr) + sizeof(MPSCRingBufferHeader),
             n};
@@ -242,22 +252,22 @@ class MPSCRingBufferReader {
 public:
   explicit MPSCRingBufferReader(RingBuffer &rb) : _rb(rb) {
     assert(rb.type == RingBufferType::kMPSCRingBuffer);
-    _head = __atomic_load_n(rb.writer_pos, __ATOMIC_ACQUIRE);
     _tail = *_rb.reader_pos;
     _initial_tail = _tail;
+    update_available();
     assert(_tail <= _head);
   }
 
   ~MPSCRingBufferReader() {
     if (_tail != _initial_tail) {
-      __atomic_store_n(_rb.reader_pos, _tail, __ATOMIC_RELEASE);
+      advance();
     }
   }
 
   inline size_t available_size() const { return _head - _tail; }
 
   ConstBuffer read_sample() {
-    size_t n = _head - _tail;
+    size_t n = available_size();
     if (n == 0) {
       return {};
     }

@@ -41,6 +41,7 @@ TEST(allocation_tracker, start_stop) {
       rate, ddprof::AllocationTracker::kDeterministicSampling,
       ring_buffer.get_buffer_info());
 
+  ASSERT_TRUE(ddprof::AllocationTracker::is_active());
   my_func_calling_malloc(1);
 
   ddprof::MPSCRingBufferReader reader{ring_buffer.get_ring_buffer()};
@@ -69,5 +70,28 @@ TEST(allocation_tracker, start_stop) {
       symbol_table[state.output.locs[NB_FRAMES_TO_SKIP]._symbol_idx];
   ASSERT_EQ(symbol._symname, "my_func_calling_malloc");
 
+  ddprof::AllocationTracker::allocation_tracking_free();
+  ASSERT_FALSE(ddprof::AllocationTracker::is_active());
+}
+
+TEST(allocation_tracker, stale_lock) {
+  const uint64_t rate = 1;
+  const size_t buf_size_order = 5;
+  ddprof::RingBufferHolder ring_buffer{buf_size_order,
+                                       RingBufferType::kMPSCRingBuffer};
+  ddprof::AllocationTracker::allocation_tracking_init(
+      rate, ddprof::AllocationTracker::kDeterministicSampling,
+      ring_buffer.get_buffer_info());
+
+  // simulate stale lock
+  ddprof::lock(reinterpret_cast<std::atomic<bool> *>(
+                   ring_buffer.get_ring_buffer().spinlock),
+               std::chrono::milliseconds(1));
+
+  for (uint32_t i = 0;
+       i < ddprof::AllocationTracker::k_max_consecutive_failures; ++i) {
+    ddprof::AllocationTracker::track_allocation(0xdeadbeef, 1);
+  }
+  ASSERT_FALSE(ddprof::AllocationTracker::is_active());
   ddprof::AllocationTracker::allocation_tracking_free();
 }

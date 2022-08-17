@@ -150,7 +150,8 @@ void AllocationTracker::track_allocation(uintptr_t, size_t size,
     return;
   }
 
-  // \fixme{nsavoire} reduce the scope of the mutex: change prng/make it thread local
+  // \fixme{nsavoire} reduce the scope of the mutex:
+  // change prng/make it thread local
   std::lock_guard lock{_state.mutex};
 
   // recheck if profiling is enabled
@@ -184,22 +185,33 @@ void AllocationTracker::track_allocation(uintptr_t, size_t size,
   uint64_t total_size = nsamples * sampling_interval;
 
   if (!IsDDResOK(push_sample(total_size, tl_state))) {
-    // error during ring buffer operation: stop allocation profiling
-    free();
+    ++_state.failure_count;
+    if (_state.failure_count >= k_max_consecutive_failures) {
+      // Too many errors during ring buffer operation: stop allocation profiling
+      free();
+    }
+  } else {
+    if (_state.failure_count.load(std::memory_order_relaxed) > 0) {
+      _state.failure_count = 0;
+    }
   }
 }
 
-bool AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer) {
+DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
+                                          bool &notify_needed) {
   auto lost_count = _state.lost_count.exchange(0, std::memory_order_acq_rel);
   if (lost_count == 0) {
-    return false;
+    return {};
   }
-
-  auto buffer = writer.reserve(sizeof(LostEvent));
+  bool timeout = false;
+  auto buffer = writer.reserve(sizeof(LostEvent), &timeout);
   if (buffer.empty()) {
     // buffer is full, put back lost samples
     _state.lost_count.fetch_add(lost_count, std::memory_order_acq_rel);
-    return false;
+    if (timeout) {
+      return ddres_error(DD_WHAT_PERFRB);
+    }
+    return {};
   }
 
   LostEvent *lost_event = reinterpret_cast<LostEvent *>(buffer.data());
@@ -208,7 +220,9 @@ bool AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer) {
   lost_event->hdr.type = PERF_RECORD_LOST;
   lost_event->id = 0;
   lost_event->lost = lost_count;
-  return writer.commit(buffer);
+  notify_needed = writer.commit(buffer);
+
+  return {};
 }
 
 DDRes AllocationTracker::push_sample(uint64_t allocated_size,
@@ -216,16 +230,21 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
   MPSCRingBufferWriter writer{_pevent.rb};
   bool notify_consumer{false};
 
+  bool timeout = false;
   if (unlikely(_state.lost_count.load(std::memory_order_relaxed))) {
-    notify_consumer = push_lost_sample(writer);
+    DDRES_CHECK_FWD(push_lost_sample(writer, notify_consumer));
   }
 
-  auto buffer = writer.reserve(sizeof(AllocationEvent));
+  auto buffer = writer.reserve(sizeof(AllocationEvent), &timeout);
 
   if (buffer.empty()) {
     // ring buffer is full, increase lost count
     _state.lost_count.fetch_add(1, std::memory_order_acq_rel);
 
+    if (timeout) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
+                             "Unable to get write lock on ring buffer");
+    }
     // not an error
     return {};
   }
@@ -238,7 +257,6 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
   event->sample_id.time = 0;
 
   if (_state.pid == 0) {
-    // \fixme reset on fork
     _state.pid = getpid();
   }
   if (tl_state.tid == 0) {
