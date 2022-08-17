@@ -36,17 +36,18 @@ TEST(allocation_tracker, start_stop) {
   const uint64_t rate = 1;
   const size_t buf_size_order = 5;
   ddprof::RingBufferHolder ring_buffer{buf_size_order,
-                                       RingBufferType::kPerfRingBuffer};
+                                       RingBufferType::kMPSCRingBuffer};
   ddprof::AllocationTracker::allocation_tracking_init(
       rate, ddprof::AllocationTracker::kDeterministicSampling,
       ring_buffer.get_buffer_info());
 
   my_func_calling_malloc(1);
 
-  ddprof::PerfRingBufferReader reader{ring_buffer.get_ring_buffer()};
+  ddprof::MPSCRingBufferReader reader{ring_buffer.get_ring_buffer()};
   ASSERT_GT(reader.available_size(), 0);
 
-  auto buf = reader.read_all_available();
+  auto buf = reader.read_sample();
+  ASSERT_FALSE(buf.empty());
   const perf_event_header *hdr =
       reinterpret_cast<const perf_event_header *>(buf.data());
   ASSERT_EQ(hdr->type, PERF_RECORD_SAMPLE);

@@ -17,6 +17,7 @@
 
 namespace ddprof {
 
+class MPSCRingBufferWriter;
 struct RingBufferInfo;
 
 struct TrackerThreadLocalState {
@@ -57,8 +58,8 @@ private:
     std::mutex mutex;
     std::atomic<bool> track_allocations = false;
     std::atomic<bool> track_deallocations = false;
-    uint64_t lost_count; // count number of lost events
-    pid_t pid;           // cache of pid
+    std::atomic<uint64_t> lost_count; // count number of lost events
+    pid_t pid;                        // cache of pid
   };
 
   AllocationTracker();
@@ -76,6 +77,7 @@ private:
 
   DDRes push_sample(uint64_t allocated_size, TrackerThreadLocalState &tl_state);
 
+  bool push_lost_sample(MPSCRingBufferWriter &writer);
   TrackerState _state;
   uint64_t _sampling_interval;
   std::mt19937 _gen;
