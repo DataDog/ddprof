@@ -296,4 +296,11 @@ void AllocationTracker::notify_thread_start() {
   tl_state.stack_end = retrieve_stack_end_address();
 }
 
+void AllocationTracker::notify_fork() {
+  if (_instance) {
+    _instance->_state.pid = 0;
+    _tl_state.tid = 0;
+  }
+}
+
 } // namespace ddprof

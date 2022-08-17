@@ -259,7 +259,7 @@ static int ddprof_start_profiling_internal() {
 
   if (g_state.allocation_profiling_started) {
     // disable allocation profiling in child upon fork
-    pthread_atfork(nullptr, nullptr, &allocation_profiling_stop);
+    pthread_atfork(nullptr, nullptr, &ddprof::AllocationTracker::notify_fork);
   }
   g_state.started = true;
   set_profiler_library_active();
