@@ -43,6 +43,7 @@ public:
   };
 
   static void notify_thread_start();
+  static void notify_fork();
 
   static DDRes allocation_tracking_init(uint64_t allocation_profiling_rate,
                                         uint32_t flags,
@@ -77,7 +78,9 @@ private:
 
   DDRes push_sample(uint64_t allocated_size, TrackerThreadLocalState &tl_state);
 
+  // Return true if consumer should be notified
   bool push_lost_sample(MPSCRingBufferWriter &writer);
+
   TrackerState _state;
   uint64_t _sampling_interval;
   std::mt19937 _gen;
