@@ -4,6 +4,8 @@
 // Datadog, Inc.
 #pragma once
 
+#include "ddprof_base.hpp"
+
 #include <atomic>
 #include <chrono>
 #include <thread>
@@ -12,53 +14,78 @@ namespace ddprof {
 //  mimic: std::hardware_destructive_interference_size, C++17
 constexpr std::size_t hardware_destructive_interference_size = 128;
 
-struct MPSCRingBufferMetaDataPage {
-  alignas(hardware_destructive_interference_size) uint64_t writer_pos;
-  alignas(hardware_destructive_interference_size) uint64_t reader_pos;
-  alignas(hardware_destructive_interference_size) std::atomic<bool> spinlock;
-};
+class SpinLock {
+public:
+  void lock() {
+    try_lock_until_slow(std::chrono::steady_clock::time_point::max());
+  }
 
-inline bool lock(std::atomic<bool> *lock, std::chrono::milliseconds timeout) {
-  // Taken from
-  // https://probablydance.com/2019/12/30/measuring-mutexes-spinlocks-and-how-bad-the-linux-scheduler-really-is/
-  static constexpr uint32_t k_max_active_spin = 4000;
-  static constexpr std::chrono::nanoseconds k_yield_sleep =
+  template <typename Rep, typename Period>
+  bool try_lock_for(std::chrono::duration<Rep, Period> timeout_duration) {
+    return lock_fast() ? true
+                       : try_lock_until_slow(std::chrono::steady_clock::now() +
+                                             timeout_duration);
+  }
+
+  void unlock() { _flag.store(false, std::memory_order_release); }
+
+private:
+  static inline constexpr uint32_t k_max_active_spin = 4000;
+  static inline constexpr std::chrono::nanoseconds k_yield_sleep =
       std::chrono::microseconds(500);
 
-  uint32_t spincount = 0;
-  std::chrono::steady_clock::time_point deadline{};
+  bool lock_fast() {
+    // Taken from
+    // https://probablydance.com/2019/12/30/measuring-mutexes-spinlocks-and-how-bad-the-linux-scheduler-really-is/
+    uint32_t spincount = 0;
 
-  for (;;) {
-    if (!lock->exchange(true, std::memory_order_acquire)) {
-      break;
-    }
-    do {
-      if (spincount < k_max_active_spin) {
-        ++spincount;
+    for (;;) {
+      if (!_flag.exchange(true, std::memory_order_acquire)) {
+        break;
+      }
+      do {
+        if (spincount < k_max_active_spin) {
+          ++spincount;
 #ifdef __x86_64__
-        asm volatile("pause");
+          asm volatile("pause");
 #else
-        asm volatile("yield");
+          asm volatile("yield");
 #endif
-      } else {
-        if (deadline.time_since_epoch().count() == 0) {
-          deadline = std::chrono::steady_clock::now() + timeout;
         } else {
-          if (std::chrono::steady_clock::now() > deadline) {
-            // timeout
-            return false;
-          }
+          return false;
+        }
+        // Wait for lock to be released without generating cache misses
+      } while (_flag.load(std::memory_order_relaxed));
+    }
+    return true;
+  }
+
+  DDPROF_NOINLINE bool
+  try_lock_until_slow(std::chrono::steady_clock::time_point timeout_time) {
+    for (;;) {
+      if (!_flag.exchange(true, std::memory_order_acquire)) {
+        break;
+      }
+      do {
+        if (std::chrono::steady_clock::now() > timeout_time) {
+          // timeout
+          return false;
         }
         // If active spin fails, yield
         std::this_thread::sleep_for(k_yield_sleep);
-      }
-      // Wait for lock to be released without generating cache misses
-    } while (lock->load(std::memory_order_relaxed));
-  }
-  return true;
-}
 
-inline void unlock(std::atomic<bool> *lock) {
-  lock->store(false, std::memory_order_release);
-}
+      } while (_flag.load(std::memory_order_relaxed));
+    }
+    return true;
+  }
+
+  std::atomic_bool _flag{};
+};
+
+struct MPSCRingBufferMetaDataPage {
+  alignas(hardware_destructive_interference_size) uint64_t writer_pos;
+  alignas(hardware_destructive_interference_size) uint64_t reader_pos;
+  alignas(hardware_destructive_interference_size) SpinLock spinlock;
+};
+
 } // namespace ddprof

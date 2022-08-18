@@ -9,6 +9,10 @@
 
 enum class RingBufferType : uint8_t { kPerfRingBuffer, kMPSCRingBuffer };
 
+namespace ddprof {
+class SpinLock;
+}
+
 struct RingBuffer {
   RingBufferType type;
   uint64_t mask;
@@ -19,7 +23,7 @@ struct RingBuffer {
 
   uint64_t *writer_pos;
   uint64_t *reader_pos;
-  void *spinlock;
+  ddprof::SpinLock *spinlock;
 };
 
 bool rb_init(RingBuffer *rb, void *base, size_t size, RingBufferType type);

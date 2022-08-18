@@ -11,6 +11,7 @@
 
 #include <cassert>
 #include <cstring>
+#include <mutex>
 
 struct PEvent;
 
@@ -44,7 +45,7 @@ public:
 
   ~PerfRingBufferWriter() {
     if (_initial_head != _head) {
-      __atomic_store_n(_rb.writer_pos, _head, __ATOMIC_RELEASE);
+      commit_internal();
     }
   }
 
@@ -89,14 +90,18 @@ public:
   // Notification is necessary only if consumer has caught up with producer
   // (meaning tail afer commit is at or after head before commit)
   bool commit() {
-    __atomic_store_n(_rb.writer_pos, _head, __ATOMIC_RELEASE);
-    _tail = __atomic_load_n(_rb.reader_pos, __ATOMIC_ACQUIRE);
+    commit_internal();
+    update_available();
     bool consumer_has_caught_up = _tail >= _initial_head;
     _initial_head = _head;
     return consumer_has_caught_up;
   }
 
 private:
+  void commit_internal() {
+    __atomic_store_n(_rb.writer_pos, _head, __ATOMIC_RELEASE);
+  }
+
   RingBuffer &_rb;
   uint64_t _tail;
   uint64_t _initial_head;
@@ -133,14 +138,10 @@ public:
     // Need to round up size provided by user to recover actual sample size
     n = align_up(n, 8);
     assert(_initial_tail + n <= _tail);
-    _initial_tail += n;
-    __atomic_store_n(_rb.reader_pos, _initial_tail, __ATOMIC_RELEASE);
+    advance_internal(_initial_tail + n);
   }
 
-  void advance() {
-    _initial_tail = _tail;
-    __atomic_store_n(_rb.reader_pos, _initial_tail, __ATOMIC_RELEASE);
-  }
+  void advance() { advance_internal(_tail); }
 
   size_t update_available() {
     _head = __atomic_load_n(_rb.writer_pos, __ATOMIC_ACQUIRE);
@@ -148,6 +149,11 @@ public:
   }
 
 private:
+  void advance_internal(uint64_t new_pos) {
+    __atomic_store_n(_rb.reader_pos, new_pos, __ATOMIC_RELEASE);
+    _initial_tail = new_pos;
+  }
+
   RingBuffer &_rb;
   uint64_t _tail;
   uint64_t _initial_tail;
@@ -186,8 +192,8 @@ public:
     }
 
     // \fixme{nsavoire} Not sure if spinlock is the best option here
-    if (!lock(reinterpret_cast<std::atomic<bool> *>(_rb.spinlock),
-              k_lock_timeout)) {
+    std::unique_lock lock{*_rb.spinlock, k_lock_timeout};
+    if (!lock.owns_lock()) {
       // timeout on lock
       if (timeout) {
         *timeout = true;
@@ -201,7 +207,6 @@ public:
     uint64_t new_writer_pos = writer_pos + n2;
     // Check that there is enough free space
     if (_rb.mask < new_writer_pos - _tail) {
-      unlock(reinterpret_cast<std::atomic<bool> *>(_rb.spinlock));
       return {};
     }
 
@@ -214,7 +219,6 @@ public:
 
     // Atomic operation required to synchronize with reader load_acquire
     __atomic_store_n(_rb.writer_pos, new_writer_pos, __ATOMIC_RELEASE);
-    unlock(reinterpret_cast<std::atomic<bool> *>(_rb.spinlock));
 
     return {reinterpret_cast<std::byte *>(hdr) + sizeof(MPSCRingBufferHeader),
             n};
