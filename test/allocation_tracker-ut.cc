@@ -84,9 +84,7 @@ TEST(allocation_tracker, stale_lock) {
       ring_buffer.get_buffer_info());
 
   // simulate stale lock
-  ddprof::lock(reinterpret_cast<std::atomic<bool> *>(
-                   ring_buffer.get_ring_buffer().spinlock),
-               std::chrono::milliseconds(1));
+  ring_buffer.get_ring_buffer().spinlock->lock();
 
   for (uint32_t i = 0;
        i < ddprof::AllocationTracker::k_max_consecutive_failures; ++i) {

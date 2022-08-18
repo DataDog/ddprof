@@ -389,9 +389,7 @@ TEST(ringbuffer, mpsc_ring_buffer_stale_lock) {
   MPSCRingBufferWriter writer{ring_buffer.get_ring_buffer()};
 
   // simulate stale lock
-  ddprof::lock(reinterpret_cast<std::atomic<bool> *>(
-                   ring_buffer.get_ring_buffer().spinlock),
-               std::chrono::milliseconds(1));
+  ring_buffer.get_ring_buffer().spinlock->lock();
 
   bool timeout = false;
   ASSERT_TRUE(writer.reserve(4, &timeout).empty());
