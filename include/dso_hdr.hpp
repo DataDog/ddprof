@@ -139,6 +139,10 @@ public:
     return _file_info_vector[id];
   }
 
+  std::string &get_path_to_proc() const {
+    return _path_to_proc;
+  }
+
   int get_nb_dso() const;
 
   // Unordered map (by pid) of sorted DSOs

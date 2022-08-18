@@ -23,6 +23,8 @@ static const std::string_view s_anon_str = "//anon";
 static const std::string_view s_jsa_str = ".jsa";
 // Example of these include : anon_inode:[perf_event]
 static const std::string_view s_anon_inode_str = "anon_inode";
+// dll should not be considered as elf files
+static const std::string_view s_dll_str = ".dll";
 // Example socket:[123456]
 static const std::string_view s_socket_str = "socket";
 // null elements
@@ -58,7 +60,10 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
              // ends with .jsa
              ((_filename.length() > s_jsa_str.length() + 1) &&
               _filename.substr(_filename.length() - s_jsa_str.length(),
-                               _filename.length()) == s_jsa_str)) {
+                               _filename.length()) == s_jsa_str) ||
+             ((_filename.length() > s_dll_str.length() + 1) &&
+              _filename.substr(_filename.length() - s_dll_str.length(),
+                               _filename.length()) == s_dll_str)) {
     _type = dso::kAnon;
   } else if (_filename.substr(0, s_socket_str.length()) == s_socket_str) {
     _type = dso::kSocket;

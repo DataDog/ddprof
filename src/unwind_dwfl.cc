@@ -13,6 +13,7 @@
 #include "symbol_hdr.hpp"
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
+#include "runtime_symbol_lookup.hpp"
 
 int frame_cb(Dwfl_Frame *, void *);
 
@@ -87,7 +88,35 @@ static void trace_unwinding_end(UnwindState *us) {
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
                             DDProfMod *ddprof_mod, FileInfoId_t file_info_id);
 
-// returns true if we should continue unwinding
+
+
+// check for runtime symbols provided in /tmp files
+static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
+                                      ElfAddress_t pc) {
+  SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
+  SymbolTable &symbol_table = unwind_symbol_hdr._symbol_table;
+  RuntimeSymbolLookup &runtime_symbol_lookup =
+      unwind_symbol_hdr._runtime_symbol_lookup;
+  SymbolIdx_t symbol_idx =
+      runtime_symbol_lookup.get_or_insert(dso._pid, pc, symbol_table);
+  if (symbol_idx == -1) {
+    add_dso_frame(us, dso, pc, "pc");
+    return ddres_init();
+  }
+  UnwindOutput *output = &us->output;
+  int64_t current_loc_idx = output->nb_locs;
+  // Get the symbol from perf map
+  output->locs[current_loc_idx]._symbol_idx = symbol_idx;
+  output->locs[current_loc_idx].ip = pc;
+  output->locs[current_loc_idx]._map_info_idx =
+      us->symbol_hdr._mapinfo_lookup.get_or_insert(
+          us->pid, us->symbol_hdr._mapinfo_table, dso);
+
+  output->nb_locs++;
+  return ddres_init();
+}
+
+// returns an OK status if we should continue unwinding
 static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
 
   if (max_stack_depth_reached(us)) {
@@ -115,6 +144,9 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     return ddres_init();
   }
   const Dso &dso = find_res.first->second;
+  if (dso._type == dso::DsoType::kAnon) {
+    return add_runtime_symbol_frame(us, dso, pc);
+  }
   // if not encountered previously, update file location / key
   FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
   if (file_info_id <= k_file_info_error) {
