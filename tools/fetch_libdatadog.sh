@@ -25,44 +25,44 @@ SCRIPTDIR=$(dirname "$SCRIPTPATH")
 
 MARCH=$(uname -m)
 
-TAG_LIBDDPROF=$1
+TAG_LIBDATADOG=$1
 TARGET_EXTRACT=$2
 
-CHECKSUM_FILE=${SCRIPTDIR}/libddprof_checksums.txt
+CHECKSUM_FILE=${SCRIPTDIR}/libdatadog_checksums.txt
 
 # Test for musl
 MUSL_LIBC=$(ldd /bin/ls | grep 'musl' | head -1 | cut -d ' ' -f1 || true)
-if [ ! -z ${MUSL_LIBC-""} ]; then
+if [[ -n ${MUSL_LIBC-""} ]]; then
     DISTRIBUTION="alpine-linux-musl"
 else
     DISTRIBUTION="unknown-linux-gnu"
 fi
 
 # https://github.com/DataDog/libdatadog/releases/download/v0.7.0-rc.1/libdatadog-aarch64-alpine-linux-musl.tar.gz
-TAR_LIBDDPROF=libdatadog-${MARCH}-${DISTRIBUTION}.tar.gz
-GITHUB_URL_LIBDDPROF=https://github.com/DataDog/libdatadog/releases/download/${TAG_LIBDDPROF}/${TAR_LIBDDPROF}
+TAR_LIBDATADOG=libdatadog-${MARCH}-${DISTRIBUTION}.tar.gz
+GITHUB_URL_LIBDATADOG=https://github.com/DataDog/libdatadog/releases/download/${TAG_LIBDATADOG}/${TAR_LIBDATADOG}
 
-SHA256_LIBDDPROF=$(grep "${TAR_LIBDDPROF}" ${CHECKSUM_FILE})
+SHA256_LIBDATADOG=$(grep "${TAR_LIBDATADOG}" "${CHECKSUM_FILE}")
 
 mkdir -p "$TARGET_EXTRACT" || true
 cd "$TARGET_EXTRACT"
 
-already_present=0
-if [ -e "${TAR_LIBDDPROF}" ]; then
+if [[ -e "${TAR_LIBDATADOG}" ]]; then
     already_present=1
 else
-    echo "Downloading libddprof ${TAG_LIBDDPROF}..."
-    curl -LO "${GITHUB_URL_LIBDDPROF}"
+    already_present=0
+    echo "Downloading libdatadog ${GITHUB_URL_LIBDATADOG}..."
+    curl -fsSLO "${GITHUB_URL_LIBDATADOG}"
 fi
 
-echo "Checking libddprof sha256"
-if ! echo "${SHA256_LIBDDPROF}" | sha256sum -c; then
-   echo "Error validating libddprof SHA256"
-   echo "Please clear $TARGET_EXTRACT before restarting"
-   exit 1
+echo "Checking libdatadog sha256"
+if ! echo "${SHA256_LIBDATADOG}" | sha256sum -c; then
+    echo "Error validating libdatadog SHA256"
+    echo "Please clear $TARGET_EXTRACT before restarting"
+    exit 1
 fi
 
-if [ $already_present -eq 0 ]; then
-    echo "Extracting libddprof"
-    tar xf "${TAR_LIBDDPROF}" --strip-components=1 --no-same-owner
+if [[ $already_present -eq 0 || ! -f "cmake/DatadogConfig.cmake" ]]; then
+    echo "Extracting ${TAR_LIBDATADOG}"
+    tar xf "${TAR_LIBDATADOG}" --strip-components=1 --no-same-owner
 fi

@@ -119,7 +119,7 @@ char *name_default = getprogname();
 extern char *__progname;
 #  define name_default __progname
 #else
-char *name_default = "libddprof";
+char *name_default = "ddprof";
 #endif
 #ifndef LOG_MSG_CAP
 #  define LOG_MSG_CAP 4096

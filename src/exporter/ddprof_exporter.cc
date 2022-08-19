@@ -5,8 +5,8 @@
 
 #include "exporter/ddprof_exporter.hpp"
 
+#include "ddog_profiling_utils.hpp"
 #include "ddprof_cmdline.hpp"
-#include "ddprof_ffi_utils.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "tags.hpp"
@@ -37,7 +37,7 @@ static char *alloc_url_agent(const char *protocol, const char *host,
   return url;
 }
 
-static DDRes create_pprof_file(ddprof_ffi_Timespec start,
+static DDRes create_pprof_file(ddog_Timespec start,
                                const char *dbg_pprof_prefix, int *fd) {
   char time_start[128] = {};
   tm tm_storage;
@@ -53,9 +53,8 @@ static DDRes create_pprof_file(ddprof_ffi_Timespec start,
 }
 
 /// Write pprof to a valid file descriptor : allows to use pprof tools
-static DDRes write_profile(const ddprof_ffi_EncodedProfile *encoded_profile,
-                           int fd) {
-  const ddprof_ffi_Vec_u8 *buffer = &encoded_profile->buffer;
+static DDRes write_profile(const ddog_EncodedProfile *encoded_profile, int fd) {
+  const ddog_Vec_u8 *buffer = &encoded_profile->buffer;
   if (write(fd, buffer->ptr, buffer->len) == 0) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER,
                            "Failed to write byte buffer to stdout! %s\n",
@@ -64,7 +63,7 @@ static DDRes write_profile(const ddprof_ffi_EncodedProfile *encoded_profile,
   return ddres_init();
 }
 
-static DDRes write_pprof_file(const ddprof_ffi_EncodedProfile *encoded_profile,
+static DDRes write_pprof_file(const ddog_EncodedProfile *encoded_profile,
                               const char *dbg_pprof_prefix) {
   int fd = -1;
   DDRES_CHECK_FWD(
@@ -97,7 +96,8 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
   } else {
     // site is the usual option for intake
     if (exporter->_input.site) {
-      // warning : should not contain intake.profile. (prepended in libddprof)
+      // warning : should not contain intake.profile. (prepended in
+      // libdatadog_profiling)
       exporter->_url = strdup(exporter_input->site);
     } else {
       LG_WRN(
@@ -121,12 +121,12 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
   return ddres_init();
 }
 
-static DDRes add_single_tag(ddprof_ffi_Vec_tag &tags_exporter,
-                            std::string_view key, std::string_view value) {
-  ddprof_ffi_PushTagResult push_tag_res = ddprof_ffi_Vec_tag_push(
-      &tags_exporter, to_CharSlice(key), to_CharSlice(value));
-  defer { ddprof_ffi_PushTagResult_drop(push_tag_res); };
-  if (push_tag_res.tag == DDPROF_FFI_PUSH_TAG_RESULT_ERR) {
+static DDRes add_single_tag(ddog_Vec_tag &tags_exporter, std::string_view key,
+                            std::string_view value) {
+  ddog_PushTagResult push_tag_res =
+      ddog_Vec_tag_push(&tags_exporter, to_CharSlice(key), to_CharSlice(value));
+  defer { ddog_PushTagResult_drop(push_tag_res); };
+  if (push_tag_res.tag == DDOG_PUSH_TAG_RESULT_ERR) {
     LG_ERR("[EXPORTER] Failure generate tag (%.*s)", (int)push_tag_res.err.len,
            push_tag_res.err.ptr);
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to generate tags");
@@ -136,7 +136,7 @@ static DDRes add_single_tag(ddprof_ffi_Vec_tag &tags_exporter,
 
 static DDRes fill_stable_tags(const UserTags *user_tags,
                               const DDProfExporter *exporter,
-                              ddprof_ffi_Vec_tag &tags_exporter) {
+                              ddog_Vec_tag &tags_exporter) {
 
   // language is guaranteed to be filled
   DDRES_CHECK_FWD(
@@ -169,30 +169,29 @@ static DDRes fill_stable_tags(const UserTags *user_tags,
 }
 
 DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
-  ddprof_ffi_Vec_tag tags_exporter = ddprof_ffi_Vec_tag_new();
+  ddog_Vec_tag tags_exporter = ddog_Vec_tag_new();
   fill_stable_tags(user_tags, exporter, tags_exporter);
 
-  ddprof_ffi_CharSlice base_url = to_CharSlice(exporter->_url);
-  ddprof_ffi_EndpointV3 endpoint;
+  ddog_CharSlice base_url = to_CharSlice(exporter->_url);
+  ddog_Endpoint endpoint;
   if (exporter->_agent) {
-    endpoint = ddprof_ffi_EndpointV3_agent(base_url);
+    endpoint = ddog_Endpoint_agent(base_url);
   } else {
-    ddprof_ffi_CharSlice api_key = to_CharSlice(exporter->_input.api_key);
-    endpoint = ddprof_ffi_EndpointV3_agentless(base_url, api_key);
+    ddog_CharSlice api_key = to_CharSlice(exporter->_input.api_key);
+    endpoint = ddog_Endpoint_agentless(base_url, api_key);
   }
 
-  ddprof_ffi_NewProfileExporterV3Result new_exporterv3 =
-      ddprof_ffi_ProfileExporterV3_new(to_CharSlice(exporter->_input.family),
-                                       &tags_exporter, endpoint);
+  ddog_NewProfileExporterResult new_exporter = ddog_ProfileExporter_new(
+      to_CharSlice(exporter->_input.family), &tags_exporter, endpoint);
 
-  if (new_exporterv3.tag == DDPROF_FFI_NEW_PROFILE_EXPORTER_V3_RESULT_OK) {
-    exporter->_exporter = new_exporterv3.ok;
+  if (new_exporter.tag == DDOG_NEW_PROFILE_EXPORTER_RESULT_OK) {
+    exporter->_exporter = new_exporter.ok;
   } else {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failure creating exporter - %s",
-                           new_exporterv3.err.ptr);
-    ddprof_ffi_NewProfileExporterV3Result_drop(new_exporterv3);
+                           new_exporter.err.ptr);
+    ddog_NewProfileExporterResult_drop(new_exporter);
   }
-  ddprof_ffi_Vec_tag_drop(tags_exporter);
+  ddog_Vec_tag_drop(tags_exporter);
   return ddres_init();
 }
 
@@ -225,7 +224,7 @@ static DDRes check_send_response_code(uint16_t send_response_code) {
 
 static DDRes fill_cycle_tags(const ddprof::Tags &additional_tags,
                              uint32_t profile_seq,
-                             ddprof_ffi_Vec_tag &ffi_additional_tags) {
+                             ddog_Vec_tag &ffi_additional_tags) {
 
   DDRES_CHECK_FWD(add_single_tag(ffi_additional_tags, "profile_seq",
                                  std::to_string(profile_seq)));
@@ -236,27 +235,27 @@ static DDRes fill_cycle_tags(const ddprof::Tags &additional_tags,
   return ddres_init();
 }
 
-DDRes ddprof_exporter_export(const ddprof_ffi_Profile *profile,
+DDRes ddprof_exporter_export(const ddog_Profile *profile,
                              const ddprof::Tags &additional_tags,
                              uint32_t profile_seq, DDProfExporter *exporter) {
   DDRes res = ddres_init();
-  ddprof_ffi_SerializeResult serialized_result =
-      ddprof_ffi_Profile_serialize(profile, nullptr, nullptr);
-  defer { ddprof_ffi_SerializeResult_drop(serialized_result); };
-  if (serialized_result.tag != DDPROF_FFI_SERIALIZE_RESULT_OK) {
+  ddog_SerializeResult serialized_result =
+      ddog_Profile_serialize(profile, nullptr, nullptr);
+  defer { ddog_SerializeResult_drop(serialized_result); };
+  if (serialized_result.tag != DDOG_SERIALIZE_RESULT_OK) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to serialize");
   }
 
-  ddprof_ffi_EncodedProfile *encoded_profile = &serialized_result.ok;
+  ddog_EncodedProfile *encoded_profile = &serialized_result.ok;
 
   if (exporter->_debug_pprof_prefix) {
     write_pprof_file(encoded_profile, exporter->_debug_pprof_prefix);
   }
 
-  ddprof_ffi_Timespec start = encoded_profile->start;
-  ddprof_ffi_Timespec end = encoded_profile->end;
+  ddog_Timespec start = encoded_profile->start;
+  ddog_Timespec end = encoded_profile->end;
 
-  ddprof_ffi_ByteSlice profile_data = {
+  ddog_ByteSlice profile_data = {
       .ptr = encoded_profile->buffer.ptr,
       .len = encoded_profile->buffer.len,
   };
@@ -264,29 +263,29 @@ DDRes ddprof_exporter_export(const ddprof_ffi_Profile *profile,
   exporter->_last_pprof_size = profile_data.len;
 
   if (exporter->_export) {
-    ddprof_ffi_Vec_tag ffi_additional_tags = ddprof_ffi_Vec_tag_new();
-    defer { ddprof_ffi_Vec_tag_drop(ffi_additional_tags); };
+    ddog_Vec_tag ffi_additional_tags = ddog_Vec_tag_new();
+    defer { ddog_Vec_tag_drop(ffi_additional_tags); };
     DDRES_CHECK_FWD(
         fill_cycle_tags(additional_tags, profile_seq, ffi_additional_tags););
 
     LG_NTC("[EXPORTER] Export buffer of size %lu", profile_data.len);
 
     // Backend has some logic based on the following naming
-    ddprof_ffi_File files_[] = {{
+    ddog_File files_[] = {{
         .name = to_CharSlice("auto.pprof"),
         .file = profile_data,
     }};
-    ddprof_ffi_Slice_file files = {.ptr = files_, .len = std::size(files_)};
+    ddog_Slice_file files = {.ptr = files_, .len = std::size(files_)};
 
-    ddprof_ffi_Request *request = ddprof_ffi_ProfileExporterV3_build(
-        exporter->_exporter, start, end, files, &ffi_additional_tags,
-        k_timeout_ms);
+    ddog_Request *request =
+        ddog_ProfileExporter_build(exporter->_exporter, start, end, files,
+                                   &ffi_additional_tags, k_timeout_ms);
     if (request) {
-      ddprof_ffi_SendResult result = ddprof_ffi_ProfileExporterV3_send(
-          exporter->_exporter, request, nullptr);
-      defer { ddprof_ffi_SendResult_drop(result); };
+      ddog_SendResult result =
+          ddog_ProfileExporter_send(exporter->_exporter, request, nullptr);
+      defer { ddog_SendResult_drop(result); };
 
-      if (result.tag == DDPROF_FFI_SEND_RESULT_ERR) {
+      if (result.tag == DDOG_SEND_RESULT_ERR) {
         LG_WRN("Failure to establish connection, check url %s", exporter->_url);
         LG_WRN("Failure to send profiles (%.*s)", (int)result.err.len,
                result.err.ptr);
@@ -313,7 +312,7 @@ DDRes ddprof_exporter_export(const ddprof_ffi_Profile *profile,
 
 DDRes ddprof_exporter_free(DDProfExporter *exporter) {
   if (exporter->_exporter)
-    ddprof_ffi_ProfileExporterV3_delete(exporter->_exporter);
+    ddog_ProfileExporter_delete(exporter->_exporter);
   exporter->_exporter = nullptr;
   exporter_input_free(&exporter->_input);
   free(exporter->_url);

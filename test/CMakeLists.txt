@@ -218,7 +218,7 @@ add_unit_test(
     ../src/unwind_output.cc
     ../src/perf_watcher.cc
     ddprof_pprof-ut.cc
-    LIBRARIES DDProf::FFI
+    LIBRARIES Datadog::Profiling
     DEFINITIONS MYNAME="ddprof_pprof-ut"
 )
 
@@ -231,7 +231,7 @@ add_unit_test(
     ../src/perf_watcher.cc
     ../src/tags.cc
     ddprof_exporter-ut.cc
-    LIBRARIES DDProf::FFI
+    LIBRARIES Datadog::Profiling
     DEFINITIONS MYNAME="ddprof_exporter-ut"
 )
 
