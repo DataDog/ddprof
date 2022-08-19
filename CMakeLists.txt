@@ -58,9 +58,8 @@ endif()
 ### Deps   ###
 ##############
 
-# libddprof
-include(Findlibddprof)
-
+# libdatadog_profiling
+include(Findlibdatadog)
 
 # elfutils
 include(Findelfutils)
@@ -135,7 +134,7 @@ set(DDPROF_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 
 if (ON)
    # Add the rust library - Refactoring ongoing. OFF for now
-   list(PREPEND DDPROF_LIBRARY_LIST DDProf::FFI)
+   list(PREPEND DDPROF_LIBRARY_LIST Datadog::Profiling)
 endif()
 
 
