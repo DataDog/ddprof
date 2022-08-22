@@ -13,6 +13,7 @@
 #include "ipc.hpp"
 #include "logger_setup.hpp"
 #include "signal_helper.hpp"
+#include "symbol_overrides.hpp"
 #include "syscalls.hpp"
 
 #include <cerrno>
@@ -252,6 +253,7 @@ static int ddprof_start_profiling_internal() {
               info.allocation_profiling_rate, flags, info.ring_buffer))) {
         // \fixme{nsavoire} what should we do when allocation tracker init
         // fails ?
+        ddprof::setup_overrides();
         g_state.allocation_profiling_started = true;
       }
     }
