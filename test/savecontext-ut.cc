@@ -114,7 +114,7 @@ TEST(getcontext, unwind_from_sighandler) {
   EXPECT_TRUE(get_symbol(0)._demangle_name.starts_with("save_context("));
   EXPECT_EQ(get_symbol(1)._demangle_name, "handler(int)");
   size_t next_idx = 3;
-#  ifdef ALPINE_BUG_IS_FIXED
+#  ifndef MUSL_LIBC
   while (next_idx < state.output.nb_locs - 1 &&
          get_symbol(next_idx)._demangle_name != "funcD()") {
     ++next_idx;
