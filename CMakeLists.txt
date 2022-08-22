@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.19)
 ### Global definitions   ###
 ############################
 
- project(DDProf
+project(DDProf
   LANGUAGES C CXX
   VERSION 0.9.3
   DESCRIPTION "Datadog's native profiler for Linux"
@@ -40,6 +40,12 @@ find_package(Threads REQUIRED)
 
 #helper functions (defines add_exe)
 include(Helperfunc)
+
+detect_libc(LIBC_TYPE)
+
+if (LIBC_TYPE STREQUAL "musl")
+   add_compile_definitions("MUSL_LIBC")
+endif()
 
 # path to external dependencies
 set(VENDOR_EXTENSION "" CACHE STRING "Extension to allow builds with different libc")
