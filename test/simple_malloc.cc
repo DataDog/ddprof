@@ -111,8 +111,8 @@ int main(int argc, char *argv[]) {
 
     unsigned int nb_forks{1};
     unsigned int nb_threads{1};
-    unsigned int sleep_us{0};
-    unsigned int spin_us{0};
+    uint64_t sleep_us{0};
+    uint64_t spin_us{0};
     int timeout_ms = -1;
     uint64_t loop_count = std::numeric_limits<uint64_t>::max();
     std::vector<std::string> exec_args;
