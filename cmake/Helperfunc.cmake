@@ -44,20 +44,15 @@ function(add_exe name)
    target_include_directories(${name} PRIVATE ${exe_include_dirs})
 endfunction()
 
-# Set a target to statically include libc
-function(static_link_cxx)
-   cmake_parse_arguments(STATIC_LINK_CXX
-      "" # option
-      "TARGET" # one value arg
-      "" # multi value arg
-      ${ARGN})
+# Set a target to statically link libstdc++
+function(target_static_libcxx target)
+   target_link_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-static-libstdc++>)
+   target_link_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-static-libgcc>)
+endfunction()
 
-   if(NOT STATIC_LINK_CXX_TARGET)
-      message("You must supply a TARGET to static_link_cxx")
-   endif()
-
-   target_link_options(${STATIC_LINK_CXX_TARGET} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-static-libstdc++>)
-   target_link_options(${STATIC_LINK_CXX_TARGET} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-static-libgcc>)
+# Set a target to statically link libc
+function(target_static_libc target)
+   target_link_options(${target} PRIVATE "-static")
 endfunction()
 
 function(detect_libc output_variable)
