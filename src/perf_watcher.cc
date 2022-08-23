@@ -5,6 +5,8 @@
 
 #include "perf_watcher.hpp"
 
+#include "perf.hpp"
+
 #include <stddef.h>
 #include <string.h>
 
@@ -49,7 +51,7 @@ bool watcher_has_countable_sample_type(const PerfWatcher *watcher) {
 }
 
 #define X_EVENTS(a, b, c, d, e, f, g)                                          \
-  {DDPROF_PWE_##a, b, BASE_STYPES, c, d, {e}, f, g},
+  {DDPROF_PWE_##a, b, BASE_STYPES, c, d, {e}, f, PERF_SAMPLE_STACK_SIZE, g},
 const PerfWatcher events_templates[] = {EVENT_CONFIG_TABLE(X_EVENTS)};
 const PerfWatcher tracepoint_templates[] = {{
     .ddprof_event_type = DDPROF_PWE_TRACEPOINT,
