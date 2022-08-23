@@ -42,7 +42,6 @@ struct perf_event_attr g_dd_native_attr = {
     .mmap_data = 0, // keep track of other mappings
     .sample_id_all = 1,
     .sample_regs_user = PERF_REGS_MASK,
-    .sample_stack_user = PERF_SAMPLE_STACK_SIZE, // Is this an insane default?
 };
 
 long get_page_size(void) {
@@ -88,6 +87,8 @@ perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
   attr.sample_period = watcher->sample_period; // Equivalently, freq
   attr.freq = watcher->options.is_freq;
   attr.sample_type = watcher->sample_type;
+  attr.sample_stack_user = watcher->sample_stack_size;
+
   // If is_kernel is requested false --> exclude_kernel == true
   attr.exclude_kernel = (watcher->options.is_kernel == kPerfWatcher_Off);
 
