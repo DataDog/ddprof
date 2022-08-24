@@ -19,6 +19,7 @@
 #include "tags.hpp"
 #include "timer.hpp"
 #include "unwind.hpp"
+#include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
 
 #include <cassert>
@@ -61,6 +62,31 @@ static inline int64_t now_nanos() {
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
 }
 
+#ifndef DDPROF_NATIVE_LIB
+static DDRes report_lost_events(DDProfContext *ctx) {
+  for (int watcher_idx = 0; watcher_idx < ctx->num_watchers; ++watcher_idx) {
+    if (ctx->worker_ctx.lost_events_per_watcher[watcher_idx] > 0) {
+      PerfWatcher *watcher = &ctx->watchers[watcher_idx];
+      UnwindState *us = ctx->worker_ctx.us;
+      uw_output_clear(&us->output);
+      add_common_frame(us, SymbolErrors::lost_event);
+      LG_WRN("Reporting #%lu -> [%lu] lost samples for watcher #%d",
+             ctx->worker_ctx.lost_events_per_watcher[watcher_idx],
+             ctx->worker_ctx.lost_events_per_watcher[watcher_idx] *
+                 watcher->sample_period,
+             watcher_idx);
+      DDRES_CHECK_FWD(pprof_aggregate(
+          &us->output, &us->symbol_hdr, watcher->sample_period,
+          ctx->worker_ctx.lost_events_per_watcher[watcher_idx], watcher,
+          ctx->worker_ctx.pprof[ctx->worker_ctx.i_current_pprof]));
+      ctx->worker_ctx.lost_events_per_watcher[watcher_idx] = 0;
+    }
+  }
+
+  return {};
+}
+#endif
+
 static inline long export_time_convert(double upload_period) {
   return upload_period * 1000000000;
 }
@@ -82,6 +108,8 @@ DDRes worker_library_init(DDProfContext *ctx,
     ctx->worker_ctx.i_current_pprof = 0;
     ctx->worker_ctx.exp_tid = {0};
     ctx->worker_ctx.us = new UnwindState(ctx->params.dd_profiling_fd);
+    std::fill(ctx->worker_ctx.lost_events_per_watcher.begin(),
+              ctx->worker_ctx.lost_events_per_watcher.end(), 0UL);
 
     // register the existing persistent storage for the state
     ctx->worker_ctx.persistent_worker_state = persistent_worker_state;
@@ -246,7 +274,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
     DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr,
-                                    sample->period, watcher, pprof));
+                                    sample->period, 1, watcher, pprof));
     if (ctx->params.show_samples) {
       ddprof_print_sample(us->output, us->symbol_hdr, sample->period, *watcher);
     }
@@ -321,8 +349,11 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
     }
     ctx->worker_ctx.exp_tid = 0;
   }
-  if (ctx->worker_ctx.exp_error)
+  if (ctx->worker_ctx.exp_error) {
     return ddres_create(DD_SEVERROR, DD_WHAT_EXPORTER);
+  }
+
+  DDRES_CHECK_FWD(report_lost_events(ctx));
 
   // Dispatch to thread
   ctx->worker_ctx.exp_error = false;
@@ -398,8 +429,10 @@ void ddprof_pr_mmap(DDProfContext *ctx, const perf_event_mmap2 *map,
   ctx->worker_ctx.us->dso_hdr.insert_erase_overlap(std::move(new_dso));
 }
 
-void ddprof_pr_lost(DDProfContext *, const perf_event_lost *lost, int) {
+void ddprof_pr_lost(DDProfContext *ctx, const perf_event_lost *lost,
+                    int watcher_pos) {
   ddprof_stats_add(STATS_EVENT_LOST, lost->lost, NULL);
+  ctx->worker_ctx.lost_events_per_watcher[watcher_pos] += lost->lost;
 }
 
 void ddprof_pr_comm(DDProfContext *ctx, const perf_event_comm *comm,
