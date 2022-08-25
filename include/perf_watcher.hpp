@@ -23,7 +23,7 @@ typedef enum {
 
 typedef enum {
   kPerfWatcherMode_disabled = 0, // Should never actually be used!
-  kPerfWatcherMode_callgraph  = 1 << 0,
+  kPerfWatcherMode_callgraph = 1 << 0,
   kPerfWatcherMode_metric = 1 << 1,
 } PerfWatcherMode;
 

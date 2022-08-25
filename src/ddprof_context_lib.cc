@@ -91,25 +91,25 @@ DDRes add_preset(DDProfContext *ctx, const char *preset,
 
 void log_watcher(const PerfWatcher *w, int n) {
   PRINT_NFO("    ID: %s, Pos: %d, Index: %lu", w->desc, n, w->config);
-  switch(w->loc_type) {
-    case kPerfWatcherLoc_val:
-      PRINT_NFO("    Location: Sample");
-      break;
-    case kPerfWatcherLoc_reg:
-      PRINT_NFO("    Location: Register, regno: %d", w->regno);
-      break;
-    case kPerfWatcherLoc_raw:
-      PRINT_NFO("    Location: Raw event, offset: %d, size: %d",
-          w->raw_off, w->raw_sz);
-      break;
-    default:
-      PRINT_NFO("    ILLEGAL LOCATION");
-      break;
+  switch (w->loc_type) {
+  case kPerfWatcherLoc_val:
+    PRINT_NFO("    Location: Sample");
+    break;
+  case kPerfWatcherLoc_reg:
+    PRINT_NFO("    Location: Register, regno: %d", w->regno);
+    break;
+  case kPerfWatcherLoc_raw:
+    PRINT_NFO("    Location: Raw event, offset: %d, size: %d", w->raw_off,
+              w->raw_sz);
+    break;
+  default:
+    PRINT_NFO("    ILLEGAL LOCATION");
+    break;
   }
 
   PRINT_NFO("    Category: %s, EventName: %s, GroupName: %s, Label: %s",
-            sample_type_name_from_idx(w->sample_type_id),
-            w->tracepoint_event, w->tracepoint_group, w->tracepoint_label);
+            sample_type_name_from_idx(w->sample_type_id), w->tracepoint_event,
+            w->tracepoint_group, w->tracepoint_label);
 
   if (w->options.is_freq)
     PRINT_NFO("    Cadence: Freq, Freq: %lu", w->sample_frequency);

@@ -237,7 +237,8 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
       ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL));
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
-  if (!IsDDResFatal(res) && (watcher->output_mode & kPerfWatcherMode_callgraph)) {
+  if (!IsDDResFatal(res) &&
+      (watcher->output_mode & kPerfWatcherMode_callgraph)) {
 #ifndef DDPROF_NATIVE_LIB
     // in lib mode we don't aggregate (protect to avoid link failures)
     int i_export = ctx->worker_ctx.i_current_pprof;
