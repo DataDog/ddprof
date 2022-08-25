@@ -10,42 +10,42 @@ ENV CXX=g++
 # libexecinfo-dev # No static lib
 RUN apk update \
     && apk add --no-cache aws-cli \
-	 bash \
-	 binutils-dev \
-	 ca-certificates \
-	 gcovr \
-	 git \
-	 subversion \
-	 patch \
-	 curl \
-	 wget \
-	 make \
-	 cmake \
-	 m4 \
-	 autoconf \
-	 automake \
-	 unzip \
-	 gcc \
-	 g++ \
-	 clang \
-   libcap-static \
-   libunwind-dev \
-	 py3-pkgconfig \
-	 gtest-dev \
-	 cppcheck \
-	 openssh \
-   zlib-dev \
-   zlib-static \
-   bzip2-dev \
-	 xz-dev \
-	 argp-standalone \
-	 fts-dev \
-	 musl-obstack-dev \
-	 musl-libintl \
-	 musl-legacy-error \
-	 libcap-dev \
-	 netcat-openbsd \
-   util-linux
+       bash \
+       binutils-dev \
+       ca-certificates \
+       gcovr \
+       git \
+       subversion \
+       patch \
+       curl \
+       wget \
+       make \
+       cmake \
+       m4 \
+       autoconf \
+       automake \
+       unzip \
+       gcc \
+       g++ \
+       clang \
+       libcap-static \
+       libunwind-dev \
+       py3-pkgconfig \
+       gtest-dev \
+       cppcheck \
+       openssh \
+       zlib-dev \
+       zlib-static \
+       bzip2-dev \
+       xz-dev \
+       argp-standalone \
+       fts-dev \
+       musl-obstack-dev \
+       musl-libintl \
+       musl-legacy-error \
+       libcap-dev \
+       netcat-openbsd \
+       util-linux
 
 # Tell docker to use bash as the default
 SHELL ["/bin/bash", "-c"]
