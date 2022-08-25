@@ -100,6 +100,6 @@ RUN VERSION="1.6.1" \
 
 # Patch to fix compilation of elfutils
 RUN mkdir /patch
-ADD ./app/base-env-alpine/*.patch /patch/
-ADD ./app/base-env-alpine/error.h /patch/
-ADD ./app/base-env-alpine/libintl.h /patch/
+ADD *.patch /patch/
+ADD error.h /patch/
+ADD libintl.h /patch/
