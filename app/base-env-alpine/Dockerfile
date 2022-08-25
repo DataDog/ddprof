@@ -9,7 +9,8 @@ ENV CXX=g++
 # libjemalloc
 # libexecinfo-dev # No static lib
 RUN apk update \
-    && apk add --no-cache aws-cli \
+    && apk add --no-cache \
+       aws-cli \
        bash \
        binutils-dev \
        ca-certificates \
