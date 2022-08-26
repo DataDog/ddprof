@@ -8,8 +8,8 @@ export PATH=$PATH:${PWD}/tools:${PWD}/bench/runners
 # SanCMake ../ 
 
 # Attempt to use the latest known working version of GCC as the default
-DDPROF_CC_DEFAULT=$(command -v gcc{-11,-10,-9,} | head -n1)
-DDPROF_CXX_DEFAULT=$(command -v g++{-11,-10,-9,} | head -n1)
+DDPROF_CC_DEFAULT=$(command -v gcc{-12,-11,-10,-9,} | head -n1)
+DDPROF_CXX_DEFAULT=$(command -v g++{-12,-11,-10,-9,} | head -n1)
 
 SCRIPTDIR="$(cd -- $( dirname -- "${BASH_SOURCE[0]}" ) && pwd)" # no "$0" when sourcing
 DDPROF_INSTALL_PREFIX="../deliverables"
