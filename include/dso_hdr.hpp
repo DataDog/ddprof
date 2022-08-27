@@ -139,7 +139,7 @@ public:
     return _file_info_vector[id];
   }
 
-  std::string &get_path_to_proc() const {
+  const std::string &get_path_to_proc() const {
     return _path_to_proc;
   }
 

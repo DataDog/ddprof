@@ -297,6 +297,7 @@ add_unit_test(
     ../src/dwfl_symbol_lookup.cc
     ../src/dwfl_thread_callbacks.cc
     ../src/failed_assumption.cc
+    ../src/runtime_symbol_lookup.cc
     ../src/savecontext.cc
     ../src/saveregisters.cc
     ../src/mapinfo_lookup.cc
@@ -335,6 +336,7 @@ add_unit_test(
     ../src/perf_ringbuffer.cc
     ../src/perf_watcher.cc
     ../src/ringbuffer_utils.cc
+    ../src/runtime_symbol_lookup.cc
     ../src/savecontext.cc
     ../src/saveregisters.cc
     ../src/mapinfo_lookup.cc
