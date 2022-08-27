@@ -118,7 +118,9 @@ DDRes ddprof_teardown(DDProfContext *ctx) {
     LG_WRN("Error when calling pevent_cleanup.");
   }
 
-  DDRES_CHECK_FWD(ddprof_stats_free());
+  if (IsDDResNotOK(ddprof_stats_free())) {
+    LG_WRN("Error when calling ddprof_stats_free.");
+  }
 
   return ddres_init();
 }

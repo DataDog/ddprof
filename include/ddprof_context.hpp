@@ -12,6 +12,8 @@
 #include "exporter_input.hpp"
 #include "perf_watcher.hpp"
 
+#include <sched.h>
+
 // forward declarations
 typedef struct StackHandler StackHandler;
 
@@ -29,6 +31,8 @@ typedef struct DDProfContext {
     int dd_profiling_fd;    // opened file descriptor to our internal lib
     int sockfd;
     bool wait_on_socket;
+    bool show_samples;
+    cpu_set_t cpu_affinity;
     const char *internal_stats;
     const char *tags;
   } params;

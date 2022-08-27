@@ -7,6 +7,7 @@
 
 #include "ddprof_cmdline.hpp"
 #include "ddprof_context.hpp"
+#include "ddprof_cpumask.hpp"
 #include "ddprof_input.hpp"
 #include "logger.hpp"
 #include "logger_setup.hpp"
@@ -30,6 +31,15 @@ find_duplicate_event(ddprof::span<const PerfWatcher> watchers) {
     seen[watcher.ddprof_event_type] = true;
   }
   return nullptr;
+}
+
+static void order_watchers(ddprof::span<PerfWatcher> watchers) {
+  // Ensure that non-perf watchers are last because they might depend on
+  // processing perf events before (comm, mmap, ...)
+  std::stable_sort(
+      watchers.begin(), watchers.end(), [](const auto &lhs, const auto &rhs) {
+        return lhs.type < PERF_TYPE_MAX && rhs.type >= PERF_TYPE_MAX;
+      });
 }
 
 struct Preset {
@@ -164,7 +174,7 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
       ctx->params.nice = tmp_nice;
   }
 
-  ctx->params.num_cpu = get_nprocs();
+  ctx->params.num_cpu = ddprof::nprocessors_conf();
 
   // Adjust target PID
   pid_t pid_tmp = 0;
@@ -281,16 +291,29 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     DDRES_CHECK_FWD(add_preset(ctx, preset, pid_or_global_mode));
   }
 
+  CPU_ZERO(&ctx->params.cpu_affinity);
+  if (input->affinity) {
+    if (!ddprof::parse_cpu_mask(input->affinity, ctx->params.cpu_affinity)) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
+                             "Invalid CPU affinity mask");
+    }
+  }
+
   ddprof::span watchers{ctx->watchers, static_cast<size_t>(ctx->num_watchers)};
-  if (std::find_if(watchers.begin(), watchers.end(),
-                   [](const auto &watcher) {
-                     return watcher.type < PERF_TYPE_MAX;
-                   }) == watchers.end() &&
-      ctx->num_watchers < MAX_TYPE_WATCHER) {
+  if (std::find_if(watchers.begin(), watchers.end(), [](const auto &watcher) {
+        return watcher.type < PERF_TYPE_MAX;
+      }) == watchers.end()) {
+
+    if (ctx->num_watchers == MAX_TYPE_WATCHER) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Too many input events");
+    }
+
     // if there are no perf active watcher, add a dummy watcher to be notified
     // on process exit
     ctx->watchers[ctx->num_watchers++] = *ewatcher_from_str("sDUM");
   }
+
+  order_watchers({ctx->watchers, static_cast<size_t>(ctx->num_watchers)});
 
   // Process input printer (do this right before argv/c modification)
   if (input->show_config && arg_yesno(input->show_config, 1)) {
@@ -315,6 +338,8 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     }
   }
 
+  ctx->params.show_samples = input->show_samples != nullptr;
+
   ctx->initialized = true;
   return ddres_init();
 }
@@ -329,6 +354,8 @@ void ddprof_context_free(DDProfContext *ctx) {
       close(ctx->params.sockfd);
     }
   }
+
+  LOG_close();
 }
 
 int ddprof_context_allocation_profiling_watcher_idx(const DDProfContext *ctx) {

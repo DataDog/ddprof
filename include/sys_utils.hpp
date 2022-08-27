@@ -3,6 +3,8 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
+#pragma once
+
 #include "ddres_def.hpp"
 
 namespace ddprof {

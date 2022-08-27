@@ -8,6 +8,7 @@
 #include "ddprof.hpp"
 #include "ddprof_context.hpp"
 #include "ddprof_context_lib.hpp"
+#include "ddprof_cpumask.hpp"
 #include "ddprof_input.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
@@ -17,6 +18,7 @@
 
 #include <array>
 #include <cassert>
+#include <charconv>
 #include <errno.h>
 #include <fcntl.h>
 #include <filesystem>
@@ -25,6 +27,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <thread>
 #include <unistd.h>
 
 namespace fs = std::filesystem;
@@ -39,21 +42,36 @@ extern const char
 
 static constexpr const char k_pid_place_holder[] = "{pid}";
 
+static void maybe_slowdown_startup() {
+  // Simulate startup slowdown if requested
+  if (const char *s = getenv(k_startup_wait_ms_env_variable); s != nullptr) {
+    std::string_view sv{s};
+    int wait_ms = 0;
+    auto [ptr, ec] = std::from_chars(sv.begin(), sv.end(), wait_ms);
+    if (ec == std::errc() && ptr == sv.end() && wait_ms > 0) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(wait_ms));
+    }
+  }
+}
+
 static DDRes get_library_path(std::string &path, int &fd) {
   fd = -1;
-  auto exe_path = fs::read_symlink("/proc/self/exe");
-  auto lib_path = exe_path.parent_path() / k_libdd_profiling_name;
-  // first, check if libdd_profiling.so exists in same directory as exe or in
-  // <exe_path>/../lib/
-  if (fs::exists(lib_path)) {
-    path = lib_path;
-    return {};
-  }
-  lib_path =
-      exe_path.parent_path().parent_path() / "lib" / k_libdd_profiling_name;
-  if (fs::exists(lib_path)) {
-    path = lib_path;
-    return {};
+
+  if (!getenv(k_profiler_use_embedded_libdd_profiling_env_variable)) {
+    auto exe_path = fs::read_symlink("/proc/self/exe");
+    auto lib_path = exe_path.parent_path() / k_libdd_profiling_name;
+    // first, check if libdd_profiling.so exists in same directory as exe or in
+    // <exe_path>/../lib/
+    if (fs::exists(lib_path)) {
+      path = lib_path;
+      return {};
+    }
+    lib_path =
+        exe_path.parent_path().parent_path() / "lib" / k_libdd_profiling_name;
+    if (fs::exists(lib_path)) {
+      path = lib_path;
+      return {};
+    }
   }
 
   // Did not find libdd_profiling.so, use the one embedded in ddprof exe
@@ -234,6 +252,18 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
 
   ddprof::init_tsc();
 
+  if (CPU_COUNT(&ctx->params.cpu_affinity) > 0) {
+    LG_DBG("Setting affinity to 0x%s",
+           ddprof::cpu_mask_to_string(ctx->params.cpu_affinity).c_str());
+    if (sched_setaffinity(0, sizeof(cpu_set_t), &ctx->params.cpu_affinity) !=
+        0) {
+      LG_ERR("Failed to set profiler CPU affinity to 0x%s: %s",
+             ddprof::cpu_mask_to_string(ctx->params.cpu_affinity).c_str(),
+             strerror(errno));
+      return -1;
+    }
+  }
+
   // Attach the profiler
   if (IsDDResNotOK(ddprof_setup(ctx))) {
     LG_ERR("Failed to initialize profiling");
@@ -297,6 +327,10 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
       }
     }
   }
+
+  LG_NTC("Starting profiler");
+
+  maybe_slowdown_startup();
 
   // Now enter profiling
   DDRes res = ddprof_start_profiler(ctx);

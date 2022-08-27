@@ -28,15 +28,15 @@ RUN apk update \
 	 gcc \
 	 g++ \
 	 clang \
-     libcap-static \
-     libunwind-dev \
+   libcap-static \
+   libunwind-dev \
 	 py3-pkgconfig \
 	 gtest-dev \
 	 cppcheck \
 	 openssh \
-     zlib-dev \
-     zlib-static \
-     bzip2-dev \
+   zlib-dev \
+   zlib-static \
+   bzip2-dev \
 	 xz-dev \
 	 argp-standalone \
 	 fts-dev \
@@ -44,7 +44,8 @@ RUN apk update \
 	 musl-libintl \
 	 musl-legacy-error \
 	 libcap-dev \
-	 netcat-openbsd
+	 netcat-openbsd \
+   util-linux
 
 # Tell docker to use bash as the default
 SHELL ["/bin/bash", "-c"]

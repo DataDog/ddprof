@@ -38,7 +38,7 @@ function(add_exe name)
        COMPILE_DEFINITIONS "${exe_definitions}")
    target_link_libraries(${name} PRIVATE ${exe_libraries})
    list(REMOVE_DUPLICATES exe_include_dirs)
-   target_include_directories(${name} PRIVATE ${exe_include_dirs} ${all_includes})
+   target_include_directories(${name} PRIVATE ${exe_include_dirs})
 endfunction()
 
 # Set a target to statically include libc

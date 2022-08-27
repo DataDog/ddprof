@@ -183,6 +183,7 @@ add_unit_test(
     ../src/ddprof_cmdline.cc
     ../src/ddprof_input.cc
     ../src/ddprof_context_lib.cc
+    ../src/ddprof_cpumask.cc
     ../src/logger_setup.cc
     ../src/perf_watcher.cc
     ddprof_input-ut.cc
@@ -383,11 +384,33 @@ add_unit_test(
     ../src/ddprof_file_info.cc
 )
 
+add_unit_test(
+    ddprof_cpumask-ut
+    ddprof_cpumask-ut.cc
+    ../src/ddprof_cpumask.cc
+)
+
+
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/savecontext.cc ../src/saveregisters.cc)
 add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 
-add_exe(simple_malloc-static simple_malloc.cc
-    LIBRARIES Threads::Threads dd_profiling-static)
+if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
+    add_exe(simple_malloc-static simple_malloc.cc
+        LIBRARIES Threads::Threads dd_profiling-static
+        DEFINITIONS USE_DD_PROFILING)
+    target_include_directories(simple_malloc-static PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
+
+    add_exe(simple_malloc-shared simple_malloc.cc
+        LIBRARIES dd_profiling-shared
+        DEFINITIONS USE_DD_PROFILING)
+    target_include_directories(simple_malloc-shared PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
+
+    add_exe(simple_malloc simple_malloc.cc
+        LIBRARIES Threads::Threads)
+    target_include_directories(simple_malloc PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
+
+    add_test(NAME simple_malloc COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/simple_malloc-ut.sh WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+endif()
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
     add_exe(pthread_deadlock pthread_deadlock.cc
@@ -400,3 +423,5 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
     target_include_directories(read_past_sp PRIVATE ${DDPROF_INCLUDE_LIST})
     add_test(NAME read_past_sp COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/read_past_sp-ut.sh WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endif()
+
+add_test(NAME ddprof_help COMMAND ddprof -h WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

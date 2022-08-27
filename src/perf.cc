@@ -94,7 +94,7 @@ perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
   // Extras (metadata for tracking process state)
   if (extras) {
     attr.mmap = 1;
-    attr.mmap_data = 1;
+    attr.mmap2 = 1;
     attr.task = 1;
     attr.comm = 1;
   }
