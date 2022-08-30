@@ -205,38 +205,48 @@ opt: KEY EQ WORD {
        switch($$) {
          case ECF_ID: g_accum_event_conf.id = $3; break;
          case ECF_ARGSIZE: g_accum_event_conf.arg_size= $3; break;
-         case ECF_ARGOFFSET: g_accum_event_conf.arg_offset = $3; break;
          case ECF_ARGCOEFF: g_accum_event_conf.arg_coeff = 0.0 + $3; break;
-         case ECF_REGISTER: g_accum_event_conf.register_num = $3; break;
          case ECF_MODE: g_accum_event_conf.mode = $3 & EVENT_BOTH; break;
-         case ECF_PARAMETER:
-           g_accum_event_conf.register_num = param_to_regno_c($3);
            break;
+
+         case ECF_PARAMETER:
+         case ECF_REGISTER:
+         case ECF_ARGOFFSET:
+           // If the location type has already been set, then this is an error.
+           if (g_accum_event_conf.loc_type) {
+             VAL_ERROR();
+             break;
+           }
+           if ($$ == ECF_PARAMETER) {
+             g_accum_event_conf.loc_type = ECLOC_REG;
+             g_accum_event_conf.register_num = param_to_regno_c($3);
+           }
+           if ($$ == ECF_REGISTER) {
+             g_accum_event_conf.loc_type = ECLOC_REG;
+             g_accum_event_conf.register_num = $3;
+           }
+           if ($$ == ECF_ARGOFFSET) {
+             g_accum_event_conf.loc_type = ECLOC_RAW;
+             g_accum_event_conf.arg_offset = $3;
+           }
+           break;
+
+         case ECF_PERIOD:
+         case ECF_FREQUENCY:
+           // If the cadence has already been set, it's an error
+           if (g_accum_event_conf.cad_type) {
+             VAL_ERROR();
+             break;
+            }
+
+           g_accum_event_conf.cadence = $3;
+           if ($$ == ECF_PERIOD)
+             g_accum_event_conf.cad_type = ECCAD_PERIOD;
+           if ($$ == ECF_FREQUENCY)
+             g_accum_event_conf.cad_type = ECCAD_FREQ;
+           break;
+
          default: VAL_ERROR(); break;
-       }
-
-       // If the location type hasn't been set yet, AND we're populating
-       // metadata which implies a location, then set the location
-       // note:  this means in the face of conflicting input, the first type
-       //        of configuration is preferred
-       if (!g_accum_event_conf.loc_type) {
-         switch($$) {
-           case ECF_PARAMETER: g_accum_event_conf.loc_type = ECLOC_REG; break;
-           case ECF_REGISTER: g_accum_event_conf.loc_type = ECLOC_REG; break;
-           case ECF_ARGOFFSET: g_accum_event_conf.loc_type = ECLOC_RAW; break;
-           default: VAL_ERROR(); break;
-         }
-       }
-
-       // Only set cadence if it has yet to be specified
-       if (!g_accum_event_conf.cad_type) {
-         if ($$ == ECF_PERIOD) {
-           g_accum_event_conf.cadence = $3; break;
-           g_accum_event_conf.cad_type = ECCAD_PERIOD;
-         } else if ($$ == ECF_FREQUENCY) {
-           g_accum_event_conf.cadence = $3; break;
-           g_accum_event_conf.cad_type = ECCAD_FREQ;
-         }
        }
      }
      | KEY EQ FLOAT {

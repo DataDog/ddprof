@@ -657,8 +657,8 @@ static const short yyrhs[] = {    13,
 
 #if (YY_event_parse_DEBUG != 0) || defined(YY_event_parse_ERROR_VERBOSE) 
 static const short yyrline[] = { 0,
-   179,   180,   183,   184,   185,   186,   189,   198,   204,   242,
-   250,   250
+   179,   180,   183,   184,   185,   186,   189,   198,   204,   252,
+   260,   260
 };
 
 static const char * const yytname[] = {   "$","error","$illegal.","EQ","OPTSEP",
@@ -1253,43 +1253,53 @@ case 9:
        switch(yyval.field) {
          case ECF_ID: g_accum_event_conf.id = yyvsp[0].num; break;
          case ECF_ARGSIZE: g_accum_event_conf.arg_size= yyvsp[0].num; break;
-         case ECF_ARGOFFSET: g_accum_event_conf.arg_offset = yyvsp[0].num; break;
          case ECF_ARGCOEFF: g_accum_event_conf.arg_coeff = 0.0 + yyvsp[0].num; break;
-         case ECF_REGISTER: g_accum_event_conf.register_num = yyvsp[0].num; break;
          case ECF_MODE: g_accum_event_conf.mode = yyvsp[0].num & EVENT_BOTH; break;
-         case ECF_PARAMETER:
-           g_accum_event_conf.register_num = param_to_regno_c(yyvsp[0].num);
            break;
+
+         case ECF_PARAMETER:
+         case ECF_REGISTER:
+         case ECF_ARGOFFSET:
+           // If the location type has already been set, then this is an error.
+           if (g_accum_event_conf.loc_type) {
+             VAL_ERROR();
+             break;
+           }
+           if (yyval.field == ECF_PARAMETER) {
+             g_accum_event_conf.loc_type = ECLOC_REG;
+             g_accum_event_conf.register_num = param_to_regno_c(yyvsp[0].num);
+           }
+           if (yyval.field == ECF_REGISTER) {
+             g_accum_event_conf.loc_type = ECLOC_REG;
+             g_accum_event_conf.register_num = yyvsp[0].num;
+           }
+           if (yyval.field == ECF_ARGOFFSET) {
+             g_accum_event_conf.loc_type = ECLOC_RAW;
+             g_accum_event_conf.arg_offset = yyvsp[0].num;
+           }
+           break;
+
+         case ECF_PERIOD:
+         case ECF_FREQUENCY:
+           // If the cadence has already been set, it's an error
+           if (g_accum_event_conf.cad_type) {
+             VAL_ERROR();
+             break;
+            }
+
+           g_accum_event_conf.cadence = yyvsp[0].num;
+           if (yyval.field == ECF_PERIOD)
+             g_accum_event_conf.cad_type = ECCAD_PERIOD;
+           if (yyval.field == ECF_FREQUENCY)
+             g_accum_event_conf.cad_type = ECCAD_FREQ;
+           break;
+
          default: VAL_ERROR(); break;
-       }
-
-       // If the location type hasn't been set yet, AND we're populating
-       // metadata which implies a location, then set the location
-       // note:  this means in the face of conflicting input, the first type
-       //        of configuration is preferred
-       if (!g_accum_event_conf.loc_type) {
-         switch(yyval.field) {
-           case ECF_PARAMETER: g_accum_event_conf.loc_type = ECLOC_REG; break;
-           case ECF_REGISTER: g_accum_event_conf.loc_type = ECLOC_REG; break;
-           case ECF_ARGOFFSET: g_accum_event_conf.loc_type = ECLOC_RAW; break;
-           default: VAL_ERROR(); break;
-         }
-       }
-
-       // Only set cadence if it has yet to be specified
-       if (!g_accum_event_conf.cad_type) {
-         if (yyval.field == ECF_PERIOD) {
-           g_accum_event_conf.cadence = yyvsp[0].num; break;
-           g_accum_event_conf.cad_type = ECCAD_PERIOD;
-         } else if (yyval.field == ECF_FREQUENCY) {
-           g_accum_event_conf.cadence = yyvsp[0].num; break;
-           g_accum_event_conf.cad_type = ECCAD_FREQ;
-         }
        }
      ;
     break;}
 case 10:
-#line 242 "event_parser.y"
+#line 252 "event_parser.y"
 {
        if (yyval.field == ECF_ARGCOEFF)
          g_accum_event_conf.arg_coeff = yyvsp[0].fpnum;
@@ -1501,4 +1511,4 @@ YYLABEL(yyerrhandle)
 /* END */
 
  #line 1038 "/usr/share/bison++/bison.cc"
-#line 251 "event_parser.y"
+#line 261 "event_parser.y"
