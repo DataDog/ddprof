@@ -80,19 +80,30 @@ int tracepoint_id_from_event(const char *eventname, const char *groupname) {
 }
 
 // If this returns false, then the passed watcher should be regarded as invalid
+uint64_t kIgnoredWatcherID = -1ull;
 bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   EventConf *conf = EventConf_parse(str);
   const PerfWatcher *tmp_watcher;
   if (!conf)
     return false;
 
+  // If there's no eventname, then this configuration is invalid
+  if (!conf->eventname || !*conf->eventname) {
+    return false;
+  }
+
   // The watcher is templated; either from an existing Profiling template,
   // keyed on the eventname, or it uses the generic template for Tracepoints
   if ((tmp_watcher = ewatcher_from_str(conf->eventname))) {
     *watcher = *tmp_watcher;
-    conf->id = 1; // matched, so invalidate Tracepoint checks
-  } else {
+    conf->id = kIgnoredWatcherID; // matched, so invalidate Tracepoint checks
+  } else if (conf->groupname && *conf->groupname) {
+    // If the event doesn't match an ewatcher, it is only valid if a group was
+    // also provided (splitting events on ':' is the responsibility of the
+    // parser)
     *watcher = *twatcher_default();
+  } else {
+    return false;
   }
 
   // The most likely thing to be invalid is the selection of the tracepoint
@@ -100,17 +111,19 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   // we assume the user has privileged information and knows what they want.
   // Else, we use the group/event combination to extract that id from the
   // tracefs filesystem in the canonical way.
-  int tracepoint_id = -1;
+  uint64_t tracepoint_id = 0;
   if (conf->id > 0) {
     tracepoint_id = conf->id;
   } else {
     tracepoint_id = tracepoint_id_from_event(conf->eventname, conf->groupname);
   }
 
-  if (tracepoint_id == -1) {
+  // 0 is an error, "-1" is ignored
+  if (!tracepoint_id) {
     return false;
+  } else if (tracepoint_id != kIgnoredWatcherID) {
+    watcher->config = tracepoint_id;
   }
-  watcher->config = tracepoint_id;
 
   // Configure the sampling strategy.  If no valid conf, use template default
   if (conf->cad_type == ECCAD_PERIOD && conf->cadence > 0) {
