@@ -10,6 +10,7 @@
 #include "ddres.hpp"
 #include "pevent_lib.hpp"
 #include "span.hpp"
+#include "string_format.hpp"
 #include "symbol_hdr.hpp"
 
 #include <errno.h>
@@ -258,4 +259,42 @@ DDRes pprof_reset(DDProfPProf *pprof) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to reset profile");
   }
   return ddres_init();
+}
+
+void ddprof_print_sample(const UnwindOutput &uw_output,
+                         const SymbolHdr &symbol_hdr, uint64_t value,
+                         const PerfWatcher &watcher) {
+
+  auto &symbol_table = symbol_hdr._symbol_table;
+  ddprof::span locs{uw_output.locs, uw_output.nb_locs};
+
+  const char *sample_name = sample_type_name_from_idx(
+      sample_type_id_to_count_sample_type_id(watcher.sample_type_id));
+
+  std::string buf =
+      ddprof::string_format("sample[type=%s;pid=%ld;tid=%ld] ", sample_name,
+                            uw_output.pid, uw_output.tid);
+
+  for (auto loc_it = locs.rbegin(); loc_it != locs.rend(); ++loc_it) {
+    auto &sym = symbol_table[loc_it->_symbol_idx];
+    if (loc_it != locs.rbegin()) {
+      buf += ";";
+    }
+    if (sym._symname.empty()) {
+      if (loc_it->ip == 0) {
+        std::string_view path{sym._srcpath};
+        auto pos = path.rfind('/');
+        buf += "(";
+        buf += path.substr(pos == std::string_view::npos ? 0 : pos + 1);
+        buf += ")";
+      } else {
+        buf += ddprof::string_format("%p", loc_it->ip);
+      }
+    } else {
+      std::string_view func{sym._symname};
+      buf += func.substr(0, func.find('('));
+    }
+  }
+
+  PRINT_NFO("%s %ld", buf.c_str(), value);
 }

@@ -298,6 +298,7 @@ uint64_t hdr_time(struct perf_event_header *hdr, uint64_t mask) {
   // position is the top of the struct if the PERF_SAMPLE_TID is not given and
   // 8 bytes into the struct if it is.
   case PERF_RECORD_MMAP:
+  case PERF_RECORD_MMAP2:
   case PERF_RECORD_COMM:
   case PERF_RECORD_EXIT:
   case PERF_RECORD_FORK:

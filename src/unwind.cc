@@ -17,6 +17,7 @@
 #include "unwind_metrics.hpp"
 #include "unwind_state.hpp"
 
+#include <algorithm>
 #include <array>
 #include <string_view.hpp>
 

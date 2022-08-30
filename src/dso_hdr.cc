@@ -443,14 +443,20 @@ Dso DsoHdr::dso_from_procline(int pid, char *line) {
     ffffffffff600000-ffffffffff601000 r-xp 00000000 00:00 0                  [vsyscall]
   */
   // clang-format on
-  static const char spec[] = "%lx-%lx %4c %lx %*x:%*x %*d%n";
+  static const char spec[] = "%lx-%lx %4c %lx %x:%x %lu%n";
   uint64_t m_start = 0;
   uint64_t m_end = 0;
   uint64_t m_off = 0;
   char m_mode[4] = {0};
   int m_p = 0;
+  uint32_t m_dev_major = 0;
+  uint32_t m_dev_minor = 0;
+  uint64_t m_inode = 0;
+
   // Check for formatting errors
-  if (4 != sscanf(line, spec, &m_start, &m_end, m_mode, &m_off, &m_p)) {
+  if (7 !=
+      sscanf(line, spec, &m_start, &m_end, m_mode, &m_off, &m_dev_major,
+             &m_dev_minor, &m_inode, &m_p)) {
     LG_ERR("[DSO] Failed to scan mapfile line");
     throw DDException(DD_SEVERROR, DD_WHAT_DSO);
   }
@@ -463,7 +469,8 @@ Dso DsoHdr::dso_from_procline(int pid, char *line) {
     *q = '\0';
 
   // Should we store non exec dso ?
-  return Dso(pid, m_start, m_end - 1, m_off, std::string(p), 'x' == m_mode[2]);
+  return Dso(pid, m_start, m_end - 1, m_off, std::string(p), 'x' == m_mode[2],
+             m_inode);
 }
 
 FileInfo DsoHdr::find_file_info(const Dso &dso) {
@@ -475,10 +482,15 @@ FileInfo DsoHdr::find_file_info(const Dso &dso) {
   //   or      /host/proc/<pid>/root/usr/local/bin/exe_file
   std::string proc_path = _path_to_proc + "/proc/" + std::to_string(dso._pid) +
       "/root" + dso._filename;
-  bool file_found = get_file_inode(proc_path.c_str(), &inode, &size);
-  if (file_found) {
+  if (get_file_inode(proc_path.c_str(), &inode, &size) && inode == dso._inode) {
     return FileInfo(proc_path, size, inode);
   }
+  // Try to find file in profiler mount namespace
+  if (get_file_inode(dso._filename.c_str(), &inode, &size) &&
+      inode == dso._inode) {
+    return FileInfo(dso._filename, size, inode);
+  }
+
   LG_DBG("[DSO] Unable to find path to %s", dso._filename.c_str());
   return FileInfo();
 }

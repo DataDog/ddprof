@@ -7,10 +7,39 @@ ddprof is meant to build on Linux.
 
 ### Native linux
 
-Install the required libraries described in the [app/base-env/Dockerfile](app/base-env/Dockerfile).
-Checkout the [Build Commands section](#build-commands).
+Install the required libraries described in the [Dockerfile](../app/base-env/Dockerfile).
+Once all dependencies are installed, you can run the [Build Commands section](#build-commands).
 
 ### Docker
+
+The [Dockerfile](../app/base-env/Dockerfile) contains all necessary dependencies to build the project.
+
+```
+./tools/launch_local_build.sh
+```
+
+Once inside the container, you can run the [Build Commands section](#build-commands).
+
+
+## Build commands
+
+### Building the native profiler
+
+```bash
+source setup_env.sh
+MkBuildDir Rel
+# For a release build
+RelCMake ../
+make -j 4 .
+```
+
+### Building the benchmark (collatz)
+
+A bench application will be built by default. Following CMake flag controls the build decision: `-DBUILD_BENCHMARKS=ON`.
+
+## Speeding up builds
+
+### Bypassing the use of shared docker volumes on MacOS
 
 Docker can be used if you are not already on a linux environment. You need an ssh configuration as some repositories are private.
 The following script create a docker container based on CI dockerfiles. It will:
@@ -55,44 +84,4 @@ docker-sync start # launchs a watcher that syncs the files (takes a long time on
 docker-sync stop
 docker-sync clean
 docker volume rm ddprof-sync
-```
-
-## Build commands
-
-### Building the native profiler
-
-```bash
-source setup_env.sh
-mkdir -p build_Release
-cd build_Release
-RelCMake ../
-make -j 4 .
-```
-
-### Building the benchmark (collatz)
-
-Add the argument `-DBUILD_BENCHMARKS=ON` to the cmake command line.
-
-## Run commands
-
-*Under construction* :building_construction:
-
-### Setup
-
-Write your datadog keys in a `.env_perso.yml` file in the root of the repository. Refer to the `.env.yml` file as a template.
-Configurations are taken from the test/configs folder.
-
-### Run examples
-
-A stress test examples is available (you need to build the bench/collatz folder first)
-
-```bash
-./bench/runners/runit.sh collatz 
-```
-
-`run.sh` is a wrapper that helps give relevant arguments to the profiler.
-Profile your own apps using
-
-```bash
-./bench/runners/run.sh my_own_exe 
 ```

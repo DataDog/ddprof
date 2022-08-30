@@ -32,13 +32,14 @@ static const std::string_view s_dd_profiling_str = k_libdd_profiling_name;
 
 // invalid element
 Dso::Dso()
-    : _pid(-1), _start(), _end(), _pgoff(), _filename(), _type(dso::kUndef),
-      _executable(false), _id(k_file_info_error) {}
+    : _pid(-1), _start(), _end(), _pgoff(), _filename(), _inode(),
+      _type(dso::kUndef), _executable(false), _id(k_file_info_error) {}
 
 Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
-         std::string &&filename, bool executable)
+         std::string &&filename, bool executable, inode_t inode)
     : _pid(pid), _start(start), _end(end), _pgoff(pgoff), _filename(filename),
-      _type(dso::kStandard), _executable(executable), _id(k_file_info_undef) {
+      _inode(inode), _type(dso::kStandard), _executable(executable),
+      _id(k_file_info_undef) {
   // note that substr manages the case where len str < len vdso_str
   if (_filename.substr(0, s_vdso_str.length()) == s_vdso_str) {
     _type = dso::kVdso;
@@ -109,7 +110,8 @@ bool Dso::adjust_same(const Dso &o) {
     return false;
   }
   // only compare filename if we are backed by real files
-  if (_type == dso::kStandard && _filename != o._filename) {
+  if (_type == dso::kStandard &&
+      (_filename != o._filename || _inode != o._inode)) {
     return false;
   }
   if (_executable != o._executable) {

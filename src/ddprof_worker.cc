@@ -245,6 +245,9 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
     DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr, sample_val,
                                     watcher, pprof));
+    if (ctx->params.show_samples) {
+      ddprof_print_sample(us->output, us->symbol_hdr, sample->period, *watcher);
+    }
 #else
     // Call the user's stack handler
     if (ctx->stack_handler) {
@@ -383,15 +386,14 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
   return ddres_init();
 }
 
-void ddprof_pr_mmap(DDProfContext *ctx, const perf_event_mmap *map,
+void ddprof_pr_mmap(DDProfContext *ctx, const perf_event_mmap2 *map,
                     int watcher_pos) {
-  if (!(map->header.misc & PERF_RECORD_MISC_MMAP_DATA)) {
-    LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx)", watcher_pos, map->pid,
-           map->filename, map->addr, map->len, map->pgoff);
-    ddprof::Dso new_dso(map->pid, map->addr, map->addr + map->len - 1,
-                        map->pgoff, std::string(map->filename));
-    ctx->worker_ctx.us->dso_hdr.insert_erase_overlap(std::move(new_dso));
-  }
+  LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx) %02u:%02u %lu", watcher_pos, map->pid,
+         map->filename, map->addr, map->len, map->pgoff, map->maj, map->min,
+         map->ino);
+  ddprof::Dso new_dso(map->pid, map->addr, map->addr + map->len - 1, map->pgoff,
+                      std::string(map->filename), true, map->ino);
+  ctx->worker_ctx.us->dso_hdr.insert_erase_overlap(std::move(new_dso));
 }
 
 void ddprof_pr_lost(DDProfContext *, const perf_event_lost *lost, int) {
@@ -544,9 +546,9 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
         }
       }
       break;
-    case PERF_RECORD_MMAP:
+    case PERF_RECORD_MMAP2:
       if (wpid->pid)
-        ddprof_pr_mmap(ctx, reinterpret_cast<const perf_event_mmap *>(hdr),
+        ddprof_pr_mmap(ctx, reinterpret_cast<const perf_event_mmap2 *>(hdr),
                        watcher_pos);
       break;
     case PERF_RECORD_COMM:

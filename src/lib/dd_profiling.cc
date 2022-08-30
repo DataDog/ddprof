@@ -143,7 +143,7 @@ static int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
   snprintf(sock_buf, sizeof(sock_buf), "%d", sock_fd);
 
   char pid_opt_str[] = "-p";
-  char sock_opt_str[] = "-Z";
+  char sock_opt_str[] = "-z";
 
   // cppcheck-suppress variableScope
   char *argv[] = {ddprof_str,   pid_opt_str, pid_buf,
@@ -241,9 +241,15 @@ static int ddprof_start_profiling_internal() {
     ddprof::Client client{ddprof::UnixSocket{sockfd}};
     auto info = client.get_profiler_info();
     g_state.profiler_pid = info.pid;
-    if (info.allocation_profiling_rate > 0) {
+    if (info.allocation_profiling_rate != 0) {
+      uint32_t flags{0};
+      // Negative profiling rate is interpreted as deterministic sampling rate
+      if (info.allocation_profiling_rate < 0) {
+        flags |= ddprof::AllocationTracker::kDeterministicSampling;
+        info.allocation_profiling_rate = -info.allocation_profiling_rate;
+      }
       ddprof::AllocationTracker::allocation_tracking_init(
-          info.allocation_profiling_rate, false, info.ring_buffer);
+          info.allocation_profiling_rate, flags, info.ring_buffer);
       g_state.allocation_profiling_started = true;
     }
   } catch (const ddprof::DDException &e) { return -1; }
