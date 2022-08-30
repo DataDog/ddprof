@@ -75,10 +75,11 @@ const char *event_type_name_from_idx(int idx) {
 int str_to_event_idx(const char *str) {
   if (!str || !*str)
     return -1;
+  size_t sz_input = strlen(str);
   for (int type = 0; type < DDPROF_PWE_LENGTH; ++type) {
     const char *event_name = event_type_name_from_idx(type);
-    size_t sz_thistype = strlen(event_name);
-    if (!strncmp(str, event_name, sz_thistype))
+    size_t sz_this = strlen(event_name);
+    if (sz_input == sz_this && !strncmp(str, event_name, sz_this))
       return type;
   }
   return -1;
