@@ -308,6 +308,7 @@ add_unit_test(
     ../src/failed_assumption.cc
     ../src/savecontext.cc
     ../src/saveregisters.cc
+    ../src/perf_archmap.cc
     ../src/mapinfo_lookup.cc
     ../src/procutils.cc
     ../src/signal_helper.cc
@@ -346,6 +347,7 @@ add_unit_test(
     ../src/ringbuffer_utils.cc
     ../src/savecontext.cc
     ../src/saveregisters.cc
+    ../src/perf_archmap.cc
     ../src/mapinfo_lookup.cc
     ../src/procutils.cc
     ../src/signal_helper.cc

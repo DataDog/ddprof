@@ -47,7 +47,7 @@ TEST(CmdLineTst, NullPatterns) {
 TEST(CmdLineTst, FirstEventHit) {
   char const *str = "hCPU";
   PerfWatcher watcher = {};
-  ASSERT_TRUE(watcher_from_event(str, &watcher));
+  ASSERT_TRUE(watcher_from_str(str, &watcher));
   ASSERT_EQ(watcher.type, PERF_TYPE_HARDWARE);
   ASSERT_EQ(watcher.type, PERF_COUNT_HW_CPU_CYCLES);
 }
@@ -63,10 +63,10 @@ TEST(CmdLineTst, LastEventHit) {
 }
 
 TEST(CmdLineTst, LiteralEventWithGoodValue) {
-  char const *str = "hCPU,555";
+  char const *str = "event=hCPU period=555";
   PerfWatcher watcher = {};
   watcher.sample_period = 12345;
-  ASSERT_TRUE(watcher_from_event(str, &watcher));
+  ASSERT_TRUE(watcher_from_str(str, &watcher));
   ASSERT_EQ(watcher.sample_period, 555); // value changed
 }
 
@@ -76,17 +76,17 @@ TEST(CmdLineTst, LiteralEventWithGoodValue) {
 TEST(CmdLineTst, LiteralEventWithNoComma) {
   char const *str = "hCPU1";
   PerfWatcher watcher = {};
-  ASSERT_FALSE(watcher_from_event(str, &watcher));
+  ASSERT_FALSE(watcher_from_str(str, &watcher));
 }
 
 TEST(CmdLineTst, LiteralEventWithVeryBadValue) {
-  char const *str = "hCPU,apples";
+  char const *str = "hCPU period=apples";
   PerfWatcher watcher = {};
-  ASSERT_FALSE(watcher_from_event(str, &watcher));
+  ASSERT_FALSE(watcher_from_str(str, &watcher));
 }
 
 TEST(CmdLineTst, LiteralEventWithKindaBadValue) {
-  char const *str = "hCPU,123apples";
+  char const *str = "hCPU period=123apples";
   PerfWatcher watcher = {};
-  ASSERT_FALSE(watcher_from_event(str, &watcher));
+  ASSERT_FALSE(watcher_from_str(str, &watcher));
 }
