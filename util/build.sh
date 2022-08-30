@@ -13,16 +13,5 @@ mkdir -p ${SOURCE_DIR}
 mv ${ONAME}.h ${INCLUDE_DIR}
 mv *.c ${SOURCE_DIR}
 
-./event 'ThisIsAnEventName'
-./event 'eventname=EventName'
-./event 'e=EventName'
-./event 'e=EventName:GroupName'
-./event 'e=event,g=group'
-./event 'e=event g=group'
-./event 'e=event+g=group'
-./event 'e=ev g=gr c=0.1'
-./event 'e=ev g=gr c=.1'
-./event 'e=ev g=gr c=1f'
-./event 'e=ev c=-1'
-./event 'e=ev c=+1'
-./event 'shoe=foot'
+# This can be used for debugging
+#./event 'ThisIsAnEventName'
