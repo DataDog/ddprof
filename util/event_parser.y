@@ -112,10 +112,16 @@ void conf_print(const EventConf *tp) {
 EventConf g_accum_event_conf = {0};
 
 void yyerror(const char *str) {
-#if (YYDEBUG == 1)
+#ifdef EVENT_PARSER_MAIN
   fprintf(stderr, "err: %s\n", str);
 #endif 
 }
+
+#define VAL_ERROR() \
+ do { \
+   yyerror("Invalid value"); \
+   YYABORT;  \
+ } while(0)
 
 EventConf *EventConf_parse(const char *msg) {
   memset(&g_accum_event_conf, 0, sizeof(g_accum_event_conf));
@@ -186,7 +192,7 @@ opt: KEY EQ WORD {
          case ECF_GROUP: g_accum_event_conf.groupname = $3; break;
          case ECF_LABEL: g_accum_event_conf.label = $3; break;
          case ECF_MODE:  g_accum_event_conf.mode |= mode_from_str($3); break;
-         default: break;
+         default: VAL_ERROR(); break;
        }
      }
      | KEY EQ WORD ':' WORD {
@@ -196,7 +202,6 @@ opt: KEY EQ WORD {
        }
      }
      | KEY EQ uinteger {
-       printf("Key uinteger\n");
        switch($$) {
          case ECF_ID: g_accum_event_conf.id = $3; break;
          case ECF_ARGSIZE: g_accum_event_conf.arg_size= $3; break;
@@ -207,6 +212,7 @@ opt: KEY EQ WORD {
          case ECF_PARAMETER:
            g_accum_event_conf.register_num = param_to_regno_c($3);
            break;
+         default: VAL_ERROR(); break;
        }
 
        // If the location type hasn't been set yet, AND we're populating
@@ -218,8 +224,8 @@ opt: KEY EQ WORD {
            case ECF_PARAMETER: g_accum_event_conf.loc_type = ECLOC_REG; break;
            case ECF_REGISTER: g_accum_event_conf.loc_type = ECLOC_REG; break;
            case ECF_ARGOFFSET: g_accum_event_conf.loc_type = ECLOC_RAW; break;
+           default: VAL_ERROR(); break;
          }
-         printf("Set location to %d\n", g_accum_event_conf.loc_type);
        }
 
        // Only set cadence if it has yet to be specified
@@ -236,6 +242,8 @@ opt: KEY EQ WORD {
      | KEY EQ FLOAT {
        if ($$ == ECF_ARGCOEFF)
          g_accum_event_conf.arg_coeff = $3;
+       else
+         VAL_ERROR();
      }
      ;
 

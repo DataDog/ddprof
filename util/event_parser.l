@@ -21,7 +21,7 @@
 	BEGIN 0;
 	return WORD;
 }
-[+]?[[:digit:]]+            {
+[[:digit:]]+            {
 	yylval.num = strtol(yytext, NULL, 10);
 	BEGIN 0;
 	return NUMBER;

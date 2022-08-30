@@ -213,10 +213,16 @@ void conf_print(const EventConf *tp) {
 EventConf g_accum_event_conf = {0};
 
 void yyerror(const char *str) {
-#if (YYDEBUG == 1)
+#ifdef EVENT_PARSER_MAIN
   fprintf(stderr, "err: %s\n", str);
 #endif 
 }
+
+#define VAL_ERROR() \
+ do { \
+   yyerror("Invalid value"); \
+   YYABORT;  \
+ } while(0)
 
 EventConf *EventConf_parse(const char *msg) {
   memset(&g_accum_event_conf, 0, sizeof(g_accum_event_conf));
@@ -247,7 +253,7 @@ int main(int c, char **v) {
 }
 #endif
 
-#line 152 "event_parser.y"
+#line 158 "event_parser.y"
 typedef union {
 	uint64_t num;
 	char *str;
@@ -651,8 +657,8 @@ static const short yyrhs[] = {    13,
 
 #if (YY_event_parse_DEBUG != 0) || defined(YY_event_parse_ERROR_VERBOSE) 
 static const short yyrline[] = { 0,
-   173,   174,   177,   178,   179,   180,   183,   192,   198,   236,
-   242,   242
+   179,   180,   183,   184,   185,   186,   189,   198,   204,   242,
+   250,   250
 };
 
 static const char * const yytname[] = {   "$","error","$illegal.","EQ","OPTSEP",
@@ -1197,43 +1203,43 @@ YYLABEL(yyreduce)
   switch (yyn) {
 
 case 1:
-#line 173 "event_parser.y"
+#line 179 "event_parser.y"
 { conf_finalize(&g_accum_event_conf); ;
     break;}
 case 2:
-#line 174 "event_parser.y"
+#line 180 "event_parser.y"
 { conf_finalize(&g_accum_event_conf); ;
     break;}
 case 3:
-#line 177 "event_parser.y"
+#line 183 "event_parser.y"
 { ;
     break;}
 case 4:
-#line 178 "event_parser.y"
+#line 184 "event_parser.y"
 { ;
     break;}
 case 5:
-#line 179 "event_parser.y"
+#line 185 "event_parser.y"
 { ;
     break;}
 case 6:
-#line 180 "event_parser.y"
+#line 186 "event_parser.y"
 { g_accum_event_conf.eventname = yyvsp[0].str; ;
     break;}
 case 7:
-#line 183 "event_parser.y"
+#line 189 "event_parser.y"
 {
        switch(yyval.field) {
          case ECF_EVENT: g_accum_event_conf.eventname = yyvsp[0].str; break;
          case ECF_GROUP: g_accum_event_conf.groupname = yyvsp[0].str; break;
          case ECF_LABEL: g_accum_event_conf.label = yyvsp[0].str; break;
          case ECF_MODE:  g_accum_event_conf.mode |= mode_from_str(yyvsp[0].str); break;
-         default: break;
+         default: VAL_ERROR(); break;
        }
      ;
     break;}
 case 8:
-#line 192 "event_parser.y"
+#line 198 "event_parser.y"
 {
        if (yyval.field == ECF_EVENT || yyval.field == ECF_GROUP) {
          g_accum_event_conf.eventname = yyvsp[-2].str;
@@ -1242,9 +1248,8 @@ case 8:
      ;
     break;}
 case 9:
-#line 198 "event_parser.y"
+#line 204 "event_parser.y"
 {
-       printf("Key uinteger\n");
        switch(yyval.field) {
          case ECF_ID: g_accum_event_conf.id = yyvsp[0].num; break;
          case ECF_ARGSIZE: g_accum_event_conf.arg_size= yyvsp[0].num; break;
@@ -1255,6 +1260,7 @@ case 9:
          case ECF_PARAMETER:
            g_accum_event_conf.register_num = param_to_regno_c(yyvsp[0].num);
            break;
+         default: VAL_ERROR(); break;
        }
 
        // If the location type hasn't been set yet, AND we're populating
@@ -1266,8 +1272,8 @@ case 9:
            case ECF_PARAMETER: g_accum_event_conf.loc_type = ECLOC_REG; break;
            case ECF_REGISTER: g_accum_event_conf.loc_type = ECLOC_REG; break;
            case ECF_ARGOFFSET: g_accum_event_conf.loc_type = ECLOC_RAW; break;
+           default: VAL_ERROR(); break;
          }
-         printf("Set location to %d\n", g_accum_event_conf.loc_type);
        }
 
        // Only set cadence if it has yet to be specified
@@ -1283,10 +1289,12 @@ case 9:
      ;
     break;}
 case 10:
-#line 236 "event_parser.y"
+#line 242 "event_parser.y"
 {
        if (yyval.field == ECF_ARGCOEFF)
          g_accum_event_conf.arg_coeff = yyvsp[0].fpnum;
+       else
+         VAL_ERROR();
      ;
     break;}
 }
@@ -1493,4 +1501,4 @@ YYLABEL(yyerrhandle)
 /* END */
 
  #line 1038 "/usr/share/bison++/bison.cc"
-#line 243 "event_parser.y"
+#line 251 "event_parser.y"
