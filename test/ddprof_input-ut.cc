@@ -106,7 +106,7 @@ TEST_F(InputTest, event_from_env) {
     DDProfInput input;
     bool contine_exec = true;
     const char *input_values[] = {MYNAME, "my_program"};
-    setenv(k_events_env_variable, "sCPU,1000", 1);
+    setenv(k_events_env_variable, "sCPU period=1000", 1);
     DDRes res = ddprof_input_parse(
         std::size(input_values), (char **)input_values, &input, &contine_exec);
 
@@ -139,7 +139,7 @@ TEST_F(InputTest, event_from_env) {
     DDProfInput input;
     bool contine_exec = true;
     const char *input_values[] = {MYNAME, "my_program"};
-    setenv(k_events_env_variable, ";sCPU,1000;", 1);
+    setenv(k_events_env_variable, ";sCPU period=1000;", 1);
     DDRes res = ddprof_input_parse(
         std::size(input_values), (char **)input_values, &input, &contine_exec);
 
@@ -158,8 +158,8 @@ TEST_F(InputTest, event_from_env) {
   {
     DDProfInput input;
     bool contine_exec = true;
-    const char *input_values[] = {MYNAME, "-e", "hINST,456", "my_program"};
-    setenv(k_events_env_variable, "sCPU,1000;hCPU,123", 1);
+    const char *input_values[] = {MYNAME, "-e", "hINST per=456", "my_program"};
+    setenv(k_events_env_variable, "sCPU period=1000;hCPU period=123", 1);
     DDRes res = ddprof_input_parse(
         std::size(input_values), (char **)input_values, &input, &contine_exec);
 
@@ -192,8 +192,8 @@ TEST_F(InputTest, duplicate_events) {
     // Duplicate events (except tracepoints) are disallowed
     DDProfInput input;
     bool contine_exec = true;
-    const char *input_values[] = {MYNAME, "-e",       "sCPU,456",
-                                  "-e",   "sCPU,123", "my_program"};
+    const char *input_values[] = {
+        MYNAME, "-e", "sCPU period=456", "-e", "sCPU period=123", "my_program"};
     DDRes res = ddprof_input_parse(
         std::size(input_values), (char **)input_values, &input, &contine_exec);
 
@@ -211,8 +211,8 @@ TEST_F(InputTest, duplicate_events) {
     // Duplicate events (except tracepoints) are disallowed
     DDProfInput input;
     bool contine_exec = true;
-    const char *input_values[] = {MYNAME, "-e", "sCPU,456", "my_program"};
-    setenv(k_events_env_variable, "sCPU,1000", 1);
+    const char *input_values[] = {MYNAME, "-e", "sCPU per=456", "my_program"};
+    setenv(k_events_env_variable, "sCPU per=1000", 1);
     DDRes res = ddprof_input_parse(
         std::size(input_values), (char **)input_values, &input, &contine_exec);
 
@@ -355,7 +355,7 @@ TEST_F(InputTest, presets) {
     // name as one of the preset events should override the preset event values
     DDProfInput input;
     bool contine_exec = true;
-    const char *input_values[] = {MYNAME,     "-e",      "sCPU,1234",
+    const char *input_values[] = {MYNAME,     "-e",      "sCPU per=1234",
                                   "--preset", "default", "my_program"};
     DDRes res = ddprof_input_parse(
         std::size(input_values), (char **)input_values, &input, &contine_exec);
