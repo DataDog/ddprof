@@ -45,12 +45,8 @@ int reg_lookup[] = {-1, R(X0), R(X1), R(X2), R(X3), R(X4), R(X5), R(X6)};
 #endif
 #undef R
 
-unsigned int dwarf_regs_length() {
-  return sizeof(reg_lookup) / sizeof(*reg_lookup);
-}
-
 unsigned int param_to_perf_regno(unsigned int param_no) {
-  if (param_no >= sizeof(reg_lookup) / sizeof(*reg_lookup))
+  if (!param_no || param_no >= sizeof(reg_lookup) / sizeof(*reg_lookup))
     return -1u;
 
   return reg_lookup[param_no];

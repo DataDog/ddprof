@@ -44,32 +44,32 @@
 }
 }
 
-b|label                    DISPATCH(LABEL)
-c|arg_coeff|argcoeff       DISPATCH(ARGCOEFF)
+c|arg_coeff|coeff          DISPATCH(ARGCOEFF)
 f|frequency|freq           DISPATCH(FREQUENCY)
 e|event|eventname|ev       DISPATCH(EVENT)
 g|group|groupname|gr       DISPATCH(GROUP)
 i|id                       DISPATCH(ID)
+l|label                    DISPATCH(LABEL)
 m|mode                     DISPATCH(MODE)
 n|arg_num|argno            DISPATCH(PARAMETER)
 o|arg_offset|argoff        DISPATCH(ARGOFFSET)
 p|period|per               DISPATCH(PERIOD)
 r|register|regno           DISPATCH(REGISTER)
-z|arg_size|argsz           DISPATCH(ARGSIZE)
+z|arg_size|argsz           DISPATCH(ARGSIZE )
 
 =                       {
 	BEGIN VALUE;
 	return EQ;
 }
 
-[ ,]                    {
+[ ,][ ]*                {
 	BEGIN 0;
 	return OPTSEP;
 }
 
-;                     {
+;                       {
 	BEGIN 0;
-	return OPTSEP;
+	return CONFSEP;
 }
 
 [a-zA-Z_][a-zA-Z0-9_]*  {

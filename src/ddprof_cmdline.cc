@@ -48,9 +48,10 @@ bool arg_yesno(const char *str, int mode) {
   return false;
 }
 
-int tracepoint_id_from_event(const char *eventname, const char *groupname) {
+unsigned int tracepoint_id_from_event(const char *eventname,
+                                      const char *groupname) {
   if (!eventname || !*eventname || !groupname || !*groupname)
-    return -1;
+    return 0;
 
   static char path[4096]; // Arbitrary, but path sizes limits are difficult
   static char buf[64];    // For reading
@@ -59,10 +60,10 @@ int tracepoint_id_from_event(const char *eventname, const char *groupname) {
       snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/id",
                groupname, eventname);
   if (pathsz >= sizeof(path))
-    return -1;
+    return 0;
   int fd = open(path, O_RDONLY);
   if (-1 == fd)
-    return -1;
+    return 0;
 
   // Read the data in an eintr-safe way
   int read_ret = -1;
@@ -74,13 +75,13 @@ int tracepoint_id_from_event(const char *eventname, const char *groupname) {
   if (read_ret > 0)
     trace_id = strtol(buf, &buf_copy, 10);
   if (*buf_copy && *buf_copy != '\n')
-    return false;
+    return 0;
 
   return trace_id;
 }
 
 // If this returns false, then the passed watcher should be regarded as invalid
-uint64_t kIgnoredWatcherID = -1ull;
+uint64_t kIgnoredWatcherID = -1ul;
 bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   EventConf *conf = EventConf_parse(str);
   const PerfWatcher *tmp_watcher;

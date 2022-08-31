@@ -175,8 +175,14 @@ int main(int c, char **v) {
 
 %%
 
-// TODO this only allows a single config to be processed at a time
+// this only allows a single config to be processed at a time
+// ... and has ugly whitespace stripping
 confs:  conf CONFSEP { conf_finalize(&g_accum_event_conf); }
+      | OPTSEP conf { conf_finalize(&g_accum_event_conf); }
+      | conf OPTSEP { conf_finalize(&g_accum_event_conf); }
+      | conf OPTSEP CONFSEP { conf_finalize(&g_accum_event_conf); }
+      | OPTSEP conf OPTSEP { conf_finalize(&g_accum_event_conf); }
+      | OPTSEP conf OPTSEP CONFSEP { conf_finalize(&g_accum_event_conf); }
       | conf { conf_finalize(&g_accum_event_conf); }
       ;
 
@@ -219,9 +225,18 @@ opt: KEY EQ WORD {
            }
            if ($$ == ECF_PARAMETER) {
              g_accum_event_conf.loc_type = ECLOC_REG;
+             unsigned int regno = param_to_regno_c($3);
+             if (regno == -1) {
+               VAL_ERROR();
+               break;
+             }
              g_accum_event_conf.register_num = param_to_regno_c($3);
            }
            if ($$ == ECF_REGISTER) {
+             if ($3 >= PERF_REGS_COUNT) {
+               VAL_ERROR();
+               break;
+             }
              g_accum_event_conf.loc_type = ECLOC_REG;
              g_accum_event_conf.register_num = $3;
            }
