@@ -7,7 +7,7 @@
 
 // F[i] = y_i; where i is the DWARF regno and y_i is the Linux perf regno
 unsigned int dwarf_to_perf_regno(unsigned int i) {
-  unsigned int lookup[] = {
+  static unsigned int lookup[] = {
 #ifdef __x86_64__
       REGNAME(RAX), REGNAME(RDX), REGNAME(RCX), REGNAME(RBX), REGNAME(RSI),
       REGNAME(RDI), REGNAME(RBP), REGNAME(SP),  REGNAME(R8),  REGNAME(R9),
@@ -26,8 +26,8 @@ unsigned int dwarf_to_perf_regno(unsigned int i) {
 #endif
   };
 
-  if (i > sizeof(lookup) / sizeof(*lookup)) {
-    return -1; // will be cast to bignum
+  if (i >= sizeof(lookup) / sizeof(*lookup)) {
+    return -1u; // implicit sentinel value
   }
 
   return lookup[i];
@@ -51,7 +51,7 @@ unsigned int dwarf_regs_length() {
 
 unsigned int param_to_perf_regno(unsigned int param_no) {
   if (param_no >= sizeof(reg_lookup) / sizeof(*reg_lookup))
-    return -1;
+    return -1u;
 
   return reg_lookup[param_no];
 }

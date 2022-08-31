@@ -90,7 +90,6 @@ enum PERF_ARCHMAP_ARM {
 #  error Architecture not supported
 #endif
 
-unsigned int dwarf_regs_length();
 unsigned int dwarf_to_perf_regno(unsigned int i);
 unsigned int param_to_perf_regno(unsigned int param_no);
 

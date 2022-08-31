@@ -21,11 +21,15 @@ pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
 bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
   Dwarf_Word regs[PERF_REGS_COUNT] = {}; // max register count across all arcs
   struct UnwindState *us = reinterpret_cast<UnwindState *>(arg);
-  unsigned int num_regs = dwarf_regs_length();
 
-  for (unsigned int i = 0; i < num_regs; ++i) {
-    regs[i] = us->initial_regs.regs[dwarf_to_perf_regno(i)];
-  }
+  unsigned int num_regs = 0;
+  unsigned int regs_idx = dwarf_to_perf_regno(num_regs);
+  do {
+    regs[num_regs] = us->initial_regs.regs[regs_idx];
+    ++num_regs;
+    regs_idx = dwarf_to_perf_regno(num_regs);
+  } while (regs_idx != -1u);
+  --num_regs; // reset to non-failing register value
 
   // Although the perf registers designate the register after SP as the PC, this
   // convention is not a documented convention of the DWARF registers.  We set
