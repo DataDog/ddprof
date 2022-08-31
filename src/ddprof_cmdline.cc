@@ -133,7 +133,7 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
     watcher->options.is_freq = true;
   }
 
-  // Configure the data source
+  // Configure value normalization
   if (conf->loc_type == ECLOC_RAW) {
     watcher->loc_type = kPerfWatcherLoc_raw;
     watcher->sample_type |= PERF_SAMPLE_RAW;
