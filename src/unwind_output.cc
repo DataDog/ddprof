@@ -15,4 +15,5 @@ static void FunLoc_clear(FunLoc *locs) {
 void uw_output_clear(UnwindOutput *output) {
   FunLoc_clear(output->locs);
   output->nb_locs = 0;
+  output->is_incomplete = true;
 }

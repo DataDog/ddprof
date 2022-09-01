@@ -196,7 +196,21 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
   ddprof_stats_add(STATS_UNWIND_AVG_STACK_SIZE, sample->size_stack, nullptr);
 
-  /* This test is no 100% accurate:
+  auto ticks0 = ddprof::get_tsc_cycles();
+  // copy the sample context into the unwind structure
+  unwind_init_sample(us, sample->regs, sample->pid, sample->size_stack,
+                     sample->data_stack);
+
+  // If a sample has a PID, it has a TID.  Include it for downstream labels
+  us->output.pid = sample->pid;
+  us->output.tid = sample->tid;
+
+  // If this is a SW_TASK_CLOCK-type event, then aggregate the time
+  if (ctx->watchers[watcher_pos].config == PERF_COUNT_SW_TASK_CLOCK)
+    ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
+  DDRes res = unwindstate__unwind(us);
+
+  /* This test is not 100% accurate:
    * Linux kernel does not take into account stack start (ie. end address since
    * stack grows down) when capturing the stack, it starts from SP register and
    * only limits the range with the requested size and user space end (cf.
@@ -211,24 +225,14 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
    * whole range up to the requested sample stack size, therefore always
    * returning samples with `dyn_size` equals to the requested sample stack
    * size, even if the end of captured stack is not actually part of the stack.
+   *
+   * That's why we consider the stack as truncated in input only if it is also
+   * detected as incomplete during unwinding.
    */
-  if (sample->size_stack == ctx->watchers[watcher_pos].sample_stack_size) {
+  if (sample->size_stack == ctx->watchers[watcher_pos].sample_stack_size &&
+      us->output.is_incomplete) {
     ddprof_stats_add(STATS_UNWIND_TRUNCATED_INPUT, 1, nullptr);
   }
-
-  auto ticks0 = ddprof::get_tsc_cycles();
-  // copy the sample context into the unwind structure
-  unwind_init_sample(us, sample->regs, sample->pid, sample->size_stack,
-                     sample->data_stack);
-
-  // If a sample has a PID, it has a TID.  Include it for downstream labels
-  us->output.pid = sample->pid;
-  us->output.tid = sample->tid;
-
-  // If this is a SW_TASK_CLOCK-type event, then aggregate the time
-  if (ctx->watchers[watcher_pos].config == PERF_COUNT_SW_TASK_CLOCK)
-    ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
-  DDRes res = unwindstate__unwind(us);
 
   auto unwind_ticks = ddprof::get_tsc_cycles();
   DDRES_CHECK_FWD(
