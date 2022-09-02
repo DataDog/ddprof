@@ -7,7 +7,7 @@ cmake_minimum_required(VERSION 3.19)
 ### Global definitions   ###
 ############################
 
- project(DDProf
+project(DDProf
   LANGUAGES C CXX
   VERSION 0.9.3
   DESCRIPTION "Datadog's native profiler for Linux"
@@ -41,6 +41,12 @@ find_package(Threads REQUIRED)
 #helper functions (defines add_exe)
 include(Helperfunc)
 
+detect_libc(LIBC_TYPE)
+
+if (LIBC_TYPE STREQUAL "musl")
+   add_compile_definitions("MUSL_LIBC")
+endif()
+
 # path to external dependencies
 set(VENDOR_EXTENSION "" CACHE STRING "Extension to allow builds with different libc")
 set(VENDOR_PATH "${CMAKE_SOURCE_DIR}/vendor${VENDOR_EXTENSION}" CACHE FILEPATH "Path to the vendor directory")
@@ -58,9 +64,8 @@ endif()
 ### Deps   ###
 ##############
 
-# libddprof
-include(Findlibddprof)
-
+# libdatadog_profiling
+include(Findlibdatadog)
 
 # elfutils
 include(Findelfutils)
@@ -135,7 +140,7 @@ set(DDPROF_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 
 if (ON)
    # Add the rust library - Refactoring ongoing. OFF for now
-   list(PREPEND DDPROF_LIBRARY_LIST DDProf::FFI)
+   list(PREPEND DDPROF_LIBRARY_LIST Datadog::Profiling)
 endif()
 
 

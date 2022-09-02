@@ -154,21 +154,41 @@ static inline DDRes worker_process_ring_buffers(PEvent *pes, int pe_len,
   do {
     events = false;
     for (int i = start_idx; i < pe_len; ++i) {
-      ddprof::PerfRingBufferReader reader(pes[i].rb);
+      auto &ring_buffer = pes[i].rb;
+      if (ring_buffer.type == RingBufferType::kPerfRingBuffer) {
+        ddprof::PerfRingBufferReader reader(ring_buffer);
 
-      ddprof::ConstBuffer buffer = reader.read_all_available();
-      while (!buffer.empty()) {
-        auto *hdr = reinterpret_cast<const perf_event_header *>(buffer.data());
-        DDRes res = ddprof_worker_process_event(hdr, pes[i].watcher_pos, ctx);
+        ddprof::ConstBuffer buffer = reader.read_all_available();
+        while (!buffer.empty()) {
+          auto *hdr =
+              reinterpret_cast<const perf_event_header *>(buffer.data());
+          DDRes res = ddprof_worker_process_event(hdr, pes[i].watcher_pos, ctx);
 
-        // \fixme{nsavoire} free slot as soon as possible ?
-        // reader.advance(hdr->size);
+          // Check for processing error
+          if (IsDDResNotOK(res)) {
+            return res;
+          }
+          // \fixme{nsavoire} free slot as soon as possible ?
+          // reader.advance(hdr->size);
 
-        // Check for processing error
-        if (IsDDResNotOK(res)) {
-          return res;
+          buffer = remaining(buffer, hdr->size);
         }
-        buffer = remaining(buffer, hdr->size);
+      } else {
+        ddprof::MPSCRingBufferReader reader{ring_buffer};
+        for (ddprof::ConstBuffer buffer{reader.read_sample()}; !buffer.empty();
+             buffer = reader.read_sample()) {
+          auto *hdr =
+              reinterpret_cast<const perf_event_header *>(buffer.data());
+          DDRes res = ddprof_worker_process_event(hdr, pes[i].watcher_pos, ctx);
+
+          // Check for processing error
+          if (IsDDResNotOK(res)) {
+            return res;
+          }
+
+          // \fixme{nsavoire} free slot as soon as possible ?
+          // reader.advance();
+        }
       }
 
       // PerfRingBufferReader destructor takes care of advancing ring buffer

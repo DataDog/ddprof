@@ -248,15 +248,18 @@ static int ddprof_start_profiling_internal() {
         flags |= ddprof::AllocationTracker::kDeterministicSampling;
         info.allocation_profiling_rate = -info.allocation_profiling_rate;
       }
-      ddprof::AllocationTracker::allocation_tracking_init(
-          info.allocation_profiling_rate, flags, info.ring_buffer);
-      g_state.allocation_profiling_started = true;
+      if (IsDDResOK(ddprof::AllocationTracker::allocation_tracking_init(
+              info.allocation_profiling_rate, flags, info.ring_buffer))) {
+        // \fixme{nsavoire} what should we do when allocation tracker init
+        // fails ?
+        g_state.allocation_profiling_started = true;
+      }
     }
   } catch (const ddprof::DDException &e) { return -1; }
 
   if (g_state.allocation_profiling_started) {
     // disable allocation profiling in child upon fork
-    pthread_atfork(nullptr, nullptr, &allocation_profiling_stop);
+    pthread_atfork(nullptr, nullptr, &ddprof::AllocationTracker::notify_fork);
   }
   g_state.started = true;
   set_profiler_library_active();

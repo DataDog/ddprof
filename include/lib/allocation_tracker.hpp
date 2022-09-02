@@ -17,6 +17,7 @@
 
 namespace ddprof {
 
+class MPSCRingBufferWriter;
 struct RingBufferInfo;
 
 struct TrackerThreadLocalState {
@@ -41,7 +42,10 @@ public:
     kDeterministicSampling = 0x2
   };
 
+  static inline constexpr uint32_t k_max_consecutive_failures{5};
+
   static void notify_thread_start();
+  static void notify_fork();
 
   static DDRes allocation_tracking_init(uint64_t allocation_profiling_rate,
                                         uint32_t flags,
@@ -52,13 +56,16 @@ public:
   track_allocation(uintptr_t addr, size_t size);
   static inline void track_deallocation(uintptr_t addr);
 
+  static inline bool is_active();
+
 private:
   struct TrackerState {
     std::mutex mutex;
     std::atomic<bool> track_allocations = false;
     std::atomic<bool> track_deallocations = false;
-    uint64_t lost_count; // count number of lost events
-    pid_t pid;           // cache of pid
+    std::atomic<uint64_t> lost_count; // count number of lost events
+    std::atomic<uint32_t> failure_count;
+    std::atomic<pid_t> pid; // cache of pid
   };
 
   AllocationTracker();
@@ -75,6 +82,9 @@ private:
   void track_deallocation(uintptr_t addr, TrackerThreadLocalState &tl_state);
 
   DDRes push_sample(uint64_t allocated_size, TrackerThreadLocalState &tl_state);
+
+  // Return true if consumer should be notified
+  DDRes push_lost_sample(MPSCRingBufferWriter &writer, bool &notify_needed);
 
   TrackerState _state;
   uint64_t _sampling_interval;
@@ -118,5 +128,10 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size) {
 }
 
 void AllocationTracker::track_deallocation(uintptr_t) {}
+
+bool AllocationTracker::is_active() {
+  auto instance = _instance;
+  return instance && instance->_state.track_allocations;
+}
 
 } // namespace ddprof
