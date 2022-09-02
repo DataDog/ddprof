@@ -70,10 +70,10 @@ using DwflSymbolMapValueType =
 /* Main lookup class */
 /*********************/
 
-class DwflSymbolLookup_V2 {
+class DwflSymbolLookup {
 public:
   // build and check env var to know check setting
-  DwflSymbolLookup_V2();
+  DwflSymbolLookup();
 
   // Get symbol from internal cache or fetch through dwarf
   SymbolIdx_t get_or_insert(const DDProfMod &ddprof_mod, SymbolTable &table,

@@ -29,7 +29,7 @@ struct SymbolHdr {
   ddprof::BaseFrameSymbolLookup _base_frame_symbol_lookup;
   ddprof::CommonSymbolLookup _common_symbol_lookup;
   ddprof::DsoSymbolLookup _dso_symbol_lookup;
-  ddprof::DwflSymbolLookup_V2 _dwfl_symbol_lookup_v2;
+  ddprof::DwflSymbolLookup _dwfl_symbol_lookup_v2;
   ddprof::RuntimeSymbolLookup _runtime_symbol_lookup;
   // Symbol table (contains the references to strings)
   ddprof::SymbolTable _symbol_table;

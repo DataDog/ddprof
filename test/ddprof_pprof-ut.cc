@@ -21,7 +21,7 @@
 
 namespace ddprof {
 // todo : cut this dependency
-DwflSymbolLookup_V2::DwflSymbolLookup_V2() : _lookup_setting(K_CACHE_ON) {}
+DwflSymbolLookup::DwflSymbolLookup() : _lookup_setting(K_CACHE_ON) {}
 
 TEST(DDProfPProf, init_profiles) {
   DDProfPProf pprof;

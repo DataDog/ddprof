@@ -20,7 +20,7 @@
 
 namespace ddprof {
 
-DwflSymbolLookup_V2::DwflSymbolLookup_V2() : _lookup_setting(K_CACHE_ON) {
+DwflSymbolLookup::DwflSymbolLookup() : _lookup_setting(K_CACHE_ON) {
   if (const char *env_p = std::getenv("DDPROF_CACHE_SETTING")) {
     if (strcmp(env_p, "VALIDATE") == 0) {
       // Allows to compare the accuracy of the cache
@@ -33,7 +33,7 @@ DwflSymbolLookup_V2::DwflSymbolLookup_V2() : _lookup_setting(K_CACHE_ON) {
   }
 }
 
-unsigned DwflSymbolLookup_V2::size() const {
+unsigned DwflSymbolLookup::size() const {
   unsigned total_nb_elts = 0;
   std::for_each(
       _file_info_map.begin(), _file_info_map.end(),
@@ -46,7 +46,7 @@ unsigned DwflSymbolLookup_V2::size() const {
 /****************/
 
 // Retrieve existing symbol or attempt to read from dwarf
-SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
+SymbolIdx_t DwflSymbolLookup::get_or_insert(
     const DDProfMod &ddprof_mod, SymbolTable &table,
     DsoSymbolLookup &dso_symbol_lookup, FileInfoId_t file_info_id,
     ProcessAddress_t process_pc, const Dso &dso) {
@@ -81,7 +81,7 @@ SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
   return insert(ddprof_mod, table, dso_symbol_lookup, process_pc, dso, map);
 }
 
-DwflSymbolMapFindRes DwflSymbolLookup_V2::find_closest(DwflSymbolMap &map,
+DwflSymbolMapFindRes DwflSymbolLookup::find_closest(DwflSymbolMap &map,
                                                        Offset_t norm_pc) {
   bool is_within = false;
 
@@ -108,7 +108,7 @@ DwflSymbolMapFindRes DwflSymbolLookup_V2::find_closest(DwflSymbolMap &map,
                                                std::move(is_within));
 }
 
-SymbolIdx_t DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod,
+SymbolIdx_t DwflSymbolLookup::insert(const DDProfMod &ddprof_mod,
                                         SymbolTable &table,
                                         DsoSymbolLookup &dso_symbol_lookup,
                                         ProcessAddress_t process_pc,
@@ -189,7 +189,7 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod,
   }
 }
 
-bool DwflSymbolLookup_V2::symbol_lookup_check(Dwfl_Module *mod,
+bool DwflSymbolLookup::symbol_lookup_check(Dwfl_Module *mod,
                                               Dwarf_Addr process_pc,
                                               const Symbol &symbol) {
   GElf_Off loffset;
@@ -253,7 +253,7 @@ void DwflSymbolLookupStats::reset() {
   _errors = 0;
 }
 
-bool DwflSymbolLookup_V2::dwfl_symbol_is_within(
+bool DwflSymbolLookup::dwfl_symbol_is_within(
     const Offset_t &norm_pc, const DwflSymbolMapValueType &kv) {
   if (norm_pc < kv.first) {
     return false;
