@@ -15,16 +15,6 @@
 
 namespace ddprof {
 
-struct managed_method_info {
-public:
-  managed_method_info(std::uint64_t addr, std::size_t cs, std::string fn)
-      : address{addr}, code_size{cs}, function_name{std::move(fn)} {}
-
-  std::uint64_t address;
-  std::size_t code_size;
-  std::string function_name;
-};
-
 FILE *RuntimeSymbolLookup::perfmaps_open(int pid, const char *path_to_perfmap = "") {
   char buf[1024] = {0};
   auto n = snprintf(buf, 1024, "%s/proc/%d/mount%s/perf-%d.map", _path_to_proc.c_str(), pid, path_to_perfmap, pid);

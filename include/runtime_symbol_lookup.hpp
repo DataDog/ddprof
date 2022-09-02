@@ -30,7 +30,7 @@ private:
 
 class RuntimeSymbolLookup {
 public:
-  RuntimeSymbolLookup(std::string_view path_to_proc) : _path_to_proc(path_to_proc) {}
+  explicit RuntimeSymbolLookup(std::string_view path_to_proc) : _path_to_proc(path_to_proc) {}
   SymbolIdx_t get_or_insert(pid_t pid, ProcessAddress_t pc,
                             SymbolTable &symbol_table);
 
