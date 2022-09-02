@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "defer.hpp"
 #include "logger.hpp"
 #include "runtime_symbol_lookup.hpp"
 
@@ -40,7 +41,7 @@ void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
                                                  SymbolTable &symbol_table) {
   static const char spec[] = "%lx %x %[^\t\n]";
   FILE *pmf = perfmaps_open(pid, "/tmp");
-
+  defer { fclose(pmf); };
   symbol_map.clear();
   if (pmf == nullptr) {
     // Add a single fake symbol to avoid bouncing
@@ -67,8 +68,6 @@ void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
     symbol_table.emplace_back(
         Symbol(std::string(buffer), std::string(buffer), 0, "unknown"));
   }
-
-  fclose(pmf);
 }
 
 SymbolIdx_t RuntimeSymbolLookup::get_or_insert(pid_t pid, ProcessAddress_t pc,
