@@ -73,6 +73,7 @@ void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
     symbol_table.emplace_back(
         Symbol(std::string(buffer), std::string(buffer), 0, "unknown"));
   }
+  free(line);
 }
 
 SymbolIdx_t RuntimeSymbolLookup::get_or_insert(pid_t pid, ProcessAddress_t pc,
