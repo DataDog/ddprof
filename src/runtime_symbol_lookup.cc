@@ -22,8 +22,7 @@ public:
 
 FILE *RuntimeSymbolLookup::perfmaps_open(int pid, const char *path_to_perfmap = "") {
   char buf[1024] = {0};
-  // TODO: we should consider using /host if needed
-  auto n = snprintf(buf, 1024, "%s/proc/%d/mount/%s/perf-%d.map", _path_to_proc.c_str(), pid, path_to_perfmap, pid);
+  auto n = snprintf(buf, 1024, "%s/proc/%d/mount%s/perf-%d.map", _path_to_proc.c_str(), pid, path_to_perfmap, pid);
   if (n >= 1024) { // unable to snprintf everything
     return nullptr;
   }
@@ -41,7 +40,6 @@ void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
                                                  SymbolTable &symbol_table) {
   static const char spec[] = "%lx %x %[^\t\n]";
   FILE *pmf = perfmaps_open(pid, "/tmp");
-  defer { fclose(pmf); };
   symbol_map.clear();
   if (pmf == nullptr) {
     // Add a single fake symbol to avoid bouncing
@@ -49,7 +47,9 @@ void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
     LG_DBG("No runtime symbols found file found (PID%d)", pid);
     return;
   }
+  defer { fclose(pmf); };
 
+  LG_DBG("Loading runtime symbols from (PID%d)", pid);
   char *line = NULL;
   size_t sz_buf = 0;
   char buffer[2048];
@@ -73,10 +73,11 @@ void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
 SymbolIdx_t RuntimeSymbolLookup::get_or_insert(pid_t pid, ProcessAddress_t pc,
                                                SymbolTable &symbol_table) {
   SymbolMap &symbol_map = _pid_map[pid];
+  // TODO : how do we know we need to refresh the symbol map ?
+  // A solution can be to poll + inotify ? Though where would this poll be handled ?
+
   if (symbol_map.empty()) {
     fill_perfmap_from_file(pid, symbol_map, symbol_table);
-    // TODO : how do we know we need to refresh ?
-    // poll + inotify ?
   }
 
   RuntimeSymbolFindRes find_res = find_closest(symbol_map, pc);

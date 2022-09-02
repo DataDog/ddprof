@@ -1,0 +1,37 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the Apache License Version 2.0. This product includes software
+// developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
+// Datadog, Inc.
+
+#include <gtest/gtest.h>
+
+#include "runtime_symbol_lookup.hpp"
+#include "symbol_table.hpp"
+#include "loghandle.hpp"
+
+#include <string>
+
+namespace ddprof {
+
+TEST(runtime_symbol_lookup, no_map) {
+    LogHandle log_handle;
+    SymbolTable symbol_table;
+    RuntimeSymbolLookup runtime_symbol_lookup(UNIT_TEST_DATA);
+    ProcessAddress_t pc = 0x7FB0614BB980;
+    // no pid 43
+    SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert(43, pc, symbol_table);
+    // We expect no symbols to be found for this pid
+    ASSERT_EQ(symbol_idx, -1);
+}
+
+TEST(runtime_symbol_lookup, parse_map) {
+    LogHandle log_handle;
+    SymbolTable symbol_table;
+    RuntimeSymbolLookup runtime_symbol_lookup(UNIT_TEST_DATA);
+    ProcessAddress_t pc = 0x7FB0614BB980;
+    SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert(42, pc, symbol_table);
+    ASSERT_NE(symbol_idx, -1);
+    ASSERT_TRUE(symbol_table[symbol_idx]._symname.find("RuntimeEnvironmentInfo::get_OsPlatform") != std::string::npos);
+}
+
+}

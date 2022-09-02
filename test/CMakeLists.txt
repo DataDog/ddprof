@@ -278,7 +278,6 @@ add_unit_test(
     LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
     DEFINITIONS MYNAME="dwfl_symbol-ut"
 )
-add_compile_definitions("DWFL_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 set_property(TARGET dwfl_module-ut PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 
 add_unit_test(
@@ -388,6 +387,12 @@ add_unit_test(
     ddprof_cpumask-ut
     ddprof_cpumask-ut.cc
     ../src/ddprof_cpumask.cc
+)
+
+add_unit_test(
+    runtime_symbol_lookup-ut
+    runtime_symbol_lookup-ut.cc
+    ../src/runtime_symbol_lookup.cc
 )
 
 
