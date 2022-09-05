@@ -21,12 +21,16 @@ fi
 [[ "${1:-,,}" == "apply" ]] && APPLY="yes"
 
 CLANG_OPTION="--dry-run --Werror"
+CMAKE_FORMAT_OPTIONS="--check"
 if [ ${APPLY:-,,} == yes ];then 
   #inplace
   CLANG_OPTION="-i"
+  CMAKE_FORMAT_OPTIONS="-i"
 fi
 
 declare -a arr_folders=("src" "test" "include")
 
 FILES_TO_FORMAT=".*[.]\(cpp\|cc\|c\|cxx\|h\|hpp\)"
 find "${arr_folders[@]}" -regex "${FILES_TO_FORMAT}" -print0 | xargs -0 "${CLANG_FORMAT}" ${CLANG_OPTION}
+
+find . -name CMakeLists.txt -and -not -path "./third_party/*" -print0 | xargs -0 cmake-format ${CMAKE_FORMAT_OPTIONS}
