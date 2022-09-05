@@ -142,7 +142,7 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     return ddres_init();
   }
   const Dso &dso = find_res.first->second;
-  if (dso._type == dso::DsoType::kAnon) {
+  if (dso::has_runtime_symbols(dso._type)) {
     return add_runtime_symbol_frame(us, dso, pc);
   }
   // if not encountered previously, update file location / key

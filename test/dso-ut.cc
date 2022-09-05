@@ -244,13 +244,13 @@ TEST(DSOTest, dso_from_procline) {
   {
     // jsa
     Dso jsa_dso = DsoHdr::dso_from_procline(10, const_cast<char *>(s_jsa_line));
-    EXPECT_EQ(jsa_dso._type, dso::kAnon);
+    EXPECT_EQ(jsa_dso._type, dso::kRuntime);
   }
   {
     // dotnet dll
     Dso dll_dso =
         DsoHdr::dso_from_procline(10, const_cast<char *>(s_dotnet_line));
-    EXPECT_EQ(dll_dso._type, dso::kAnon);
+    EXPECT_EQ(dll_dso._type, dso::kRuntime);
   }
   DsoHdr dso_hdr;
   {

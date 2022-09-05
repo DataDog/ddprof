@@ -57,15 +57,16 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
              _filename.substr(0, s_anon_inode_str.length()) ==
                  s_anon_inode_str ||
              _filename.substr(0, s_dev_zero_str.length()) == s_dev_zero_str ||
-             _filename.substr(0, s_dev_null_str.length()) == s_dev_null_str ||
-             // ends with .jsa
+             _filename.substr(0, s_dev_null_str.length()) == s_dev_null_str) {
+    _type = dso::kAnon;
+  } else if (// ends with .jsa
              ((_filename.length() > s_jsa_str.length() + 1) &&
               _filename.substr(_filename.length() - s_jsa_str.length(),
                                _filename.length()) == s_jsa_str) ||
              ((_filename.length() > s_dll_str.length() + 1) &&
               _filename.substr(_filename.length() - s_dll_str.length(),
                                _filename.length()) == s_dll_str)) {
-    _type = dso::kAnon;
+    _type = dso::kRuntime;
   } else if (_filename.substr(0, s_socket_str.length()) == s_socket_str) {
     _type = dso::kSocket;
   } else if (_filename[0] == '[') {
