@@ -26,8 +26,7 @@ SymbolMap::FindRes SymbolMap::find_closest(Offset_t norm_pc) {
   if (it != end()) { // map is empty
     is_within = SymbolMap::is_within(norm_pc, *it);
     if (is_within) {
-      return std::make_pair<SymbolMap::It, bool>(std::move(it),
-                                                 std::move(is_within));
+      return std::pair<SymbolMap::It, bool>(it, is_within);
     }
   }
 
@@ -39,9 +38,7 @@ SymbolMap::FindRes SymbolMap::find_closest(Offset_t norm_pc) {
   }
   // element can not be end (as we reversed or exit)
   is_within = SymbolMap::is_within(norm_pc, *it);
-#warning remove std::move
-  return std::make_pair<SymbolMap::It, bool>(std::move(it),
-                                             std::move(is_within));
+  return std::pair<SymbolMap::It, bool>(it, is_within);
 }
 
 } // namespace ddprof

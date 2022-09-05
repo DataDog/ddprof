@@ -16,6 +16,9 @@ typedef struct UnwindState UnwindState;
 namespace ddprof {
 bool max_stack_depth_reached(UnwindState *us);
 
+DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
+                UnwindState *us);
+
 void add_common_frame(UnwindState *us, SymbolErrors lookup_case);
 
 void add_dso_frame(UnwindState *us, const Dso &dso, ProcessAddress_t pc,

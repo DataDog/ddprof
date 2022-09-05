@@ -90,29 +90,7 @@ static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
 
 // check for runtime symbols provided in /tmp files
 static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
-                                      ElfAddress_t pc) {
-  SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
-  SymbolTable &symbol_table = unwind_symbol_hdr._symbol_table;
-  RuntimeSymbolLookup &runtime_symbol_lookup =
-      unwind_symbol_hdr._runtime_symbol_lookup;
-  SymbolIdx_t symbol_idx =
-      runtime_symbol_lookup.get_or_insert(dso._pid, pc, symbol_table);
-  if (symbol_idx == -1) {
-    add_dso_frame(us, dso, pc, "pc");
-    return ddres_init();
-  }
-  UnwindOutput *output = &us->output;
-  int64_t current_loc_idx = output->nb_locs;
-  // Get the symbol from perf map
-  output->locs[current_loc_idx]._symbol_idx = symbol_idx;
-  output->locs[current_loc_idx].ip = pc;
-  output->locs[current_loc_idx]._map_info_idx =
-      us->symbol_hdr._mapinfo_lookup.get_or_insert(
-          us->pid, us->symbol_hdr._mapinfo_table, dso);
-
-  output->nb_locs++;
-  return ddres_init();
-}
+                                      ElfAddress_t pc);
 
 // returns an OK status if we should continue unwinding
 static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
@@ -256,33 +234,55 @@ DDRes unwind_dwfl(UnwindState *us) {
   return res;
 }
 
-static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
-                            DDProfMod *ddprof_mod, FileInfoId_t file_info_id) {
-
-  SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
-
+static DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx,
+                       ElfAddress_t pc, const Dso &dso, UnwindState *us) {
   UnwindOutput *output = &us->output;
   int64_t current_loc_idx = output->nb_locs;
-
-  // get or create the dwfl symbol
-  output->locs[current_loc_idx]._symbol_idx =
-      unwind_symbol_hdr._dwfl_symbol_lookup_v2.get_or_insert(
-          *ddprof_mod, unwind_symbol_hdr._symbol_table,
-          unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso);
+  output->locs[current_loc_idx]._symbol_idx = symbol_idx;
+  output->locs[current_loc_idx].ip = pc;
+  output->locs[current_loc_idx]._map_info_idx = map_idx;
 #ifdef DEBUG
   LG_NTC("Considering frame with IP : %lx / %s ", pc,
          us->symbol_hdr._symbol_table[output->locs[current_loc_idx]._symbol_idx]
              ._symname.c_str());
 #endif
-
-  output->locs[current_loc_idx].ip = pc;
-
-  output->locs[current_loc_idx]._map_info_idx =
-      us->symbol_hdr._mapinfo_lookup.get_or_insert(
-          us->pid, us->symbol_hdr._mapinfo_table, dso);
   output->nb_locs++;
-
   return ddres_init();
+}
+
+static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
+                            DDProfMod *ddprof_mod, FileInfoId_t file_info_id) {
+
+  SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
+
+  // get or create the dwfl symbol
+  SymbolIdx_t symbol_idx =
+      unwind_symbol_hdr._dwfl_symbol_lookup_v2.get_or_insert(
+          *ddprof_mod, unwind_symbol_hdr._symbol_table,
+          unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso);
+  MapInfoIdx_t map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
+      us->pid, us->symbol_hdr._mapinfo_table, dso);
+  return add_frame(symbol_idx, map_idx, pc, dso, us);
+}
+
+// check for runtime symbols provided in /tmp files
+static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
+                                      ElfAddress_t pc) {
+  SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
+  SymbolTable &symbol_table = unwind_symbol_hdr._symbol_table;
+  RuntimeSymbolLookup &runtime_symbol_lookup =
+      unwind_symbol_hdr._runtime_symbol_lookup;
+  SymbolIdx_t symbol_idx =
+      runtime_symbol_lookup.get_or_insert(dso._pid, pc, symbol_table);
+  if (symbol_idx == -1) {
+    add_dso_frame(us, dso, pc, "pc");
+    return ddres_init();
+  }
+
+  MapInfoIdx_t map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
+      us->pid, us->symbol_hdr._mapinfo_table, dso);
+
+  return add_frame(symbol_idx, map_idx, pc, dso, us);
 }
 
 } // namespace ddprof

@@ -154,7 +154,7 @@ DsoFindRes DsoHdr::dso_find_first_std_executable(pid_t pid) {
   if (it == map.end()) {
     return find_res_not_found(map);
   }
-  return std::make_pair<DsoMapConstIt, bool>(std::move(it), true);
+  return std::pair<DsoMapConstIt, bool>(it, true);
 }
 
 DsoFindRes DsoHdr::dso_find_closest(const DsoMap &map, pid_t pid,
@@ -165,8 +165,7 @@ DsoFindRes DsoHdr::dso_find_closest(const DsoMap &map, pid_t pid,
   if (it != map.end()) {
     is_within = it->second.is_within(pid, addr);
     if (is_within) { // exact match
-      return std::make_pair<DsoMapConstIt, bool>(std::move(it),
-                                                 std::move(is_within));
+      return std::pair<DsoMapConstIt, bool>(it, is_within);
     }
   }
   // previous element is more likely to contain our addr
@@ -176,8 +175,7 @@ DsoFindRes DsoHdr::dso_find_closest(const DsoMap &map, pid_t pid,
     return find_res_not_found(map);
   }
   is_within = it->second.is_within(pid, addr);
-  return std::make_pair<DsoMapConstIt, bool>(std::move(it),
-                                             std::move(is_within));
+  return std::pair<DsoMapConstIt, bool>(it, is_within);
 }
 
 // Find the closest and indicate if we found a dso matching this address
@@ -187,7 +185,7 @@ DsoFindRes DsoHdr::dso_find_closest(pid_t pid, ElfAddress_t addr) {
 
 DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
   if (map.empty()) {
-    return std::make_pair<DsoMapIt, DsoMapIt>(map.end(), map.end());
+    return std::pair<DsoMapIt, DsoMapIt>(map.end(), map.end());
   }
   // Get element after (with a start addr over the current)
   DsoMapIt first_el = map.lower_bound(dso._start);
@@ -226,7 +224,7 @@ DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
   if (end != map.end()) {
     ++end;
   }
-  return std::make_pair<DsoMapIt, DsoMapIt>(std::move(start), std::move(end));
+  return std::pair<DsoMapIt, DsoMapIt>(start, end);
 }
 
 // erase range of elements
@@ -244,8 +242,8 @@ DsoFindRes DsoHdr::dso_find_adjust_same(DsoMap &map, const Dso &dso) {
     // if it is the same or smaller, we keep the current dso
     found_same = it->second.adjust_same(dso);
   }
-  return std::make_pair<DsoFindRes::first_type, DsoFindRes::second_type>(
-      std::move(it), std::move(found_same));
+  return std::pair<DsoFindRes::first_type, DsoFindRes::second_type>(it,
+                                                                    found_same);
 }
 
 FileInfoId_t DsoHdr::get_or_insert_file_info(const Dso &dso) {
@@ -346,8 +344,8 @@ DsoFindRes DsoHdr::insert_erase_overlap(DsoMap &map, Dso &&dso) {
   _stats.incr_metric(DsoStats::kNewDso, dso._type);
   LG_DBG("[DSO] : Insert %s", dso.to_string().c_str());
   // warning rvalue : do not use dso after this line
-  return map.insert(std::make_pair<ProcessAddress_t, Dso>(
-      ProcessAddress_t(dso._start), std::move(dso)));
+  return map.insert(std::make_pair<ProcessAddress_t, Dso>(std::move(dso._start),
+                                                          std::move(dso)));
 }
 
 DsoFindRes DsoHdr::insert_erase_overlap(Dso &&dso) {
