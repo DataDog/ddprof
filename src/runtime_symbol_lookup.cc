@@ -15,12 +15,21 @@
 
 namespace ddprof {
 
-FILE *RuntimeSymbolLookup::perfmaps_open(int pid, const char *path_to_perfmap = "") {
+FILE *RuntimeSymbolLookup::perfmaps_open(int pid,
+                                         const char *path_to_perfmap = "") {
   char buf[1024] = {0};
-  auto n = snprintf(buf, 1024, "%s/proc/%d/mount%s/perf-%d.map", _path_to_proc.c_str(), pid, path_to_perfmap, pid);
+  auto n = snprintf(buf, 1024, "%s/proc/%d/root%s/perf-%d.map",
+                    _path_to_proc.c_str(), pid, path_to_perfmap, pid);
   if (n >= 1024) { // unable to snprintf everything
     return nullptr;
   }
+  LG_NFO(" -- buff = %s", buf);
+  FILE *perfmap_file = fopen(buf, "r");
+  if (perfmap_file) {
+    return perfmap_file;
+  }
+  // attempt in local namespace
+  snprintf(buf, 1024, "%s/perf-%d.map", path_to_perfmap, pid);
   return fopen(buf, "r");
 }
 
@@ -33,13 +42,12 @@ bool should_skip_symbol(const char *symbol) {
 
 void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
                                                  SymbolTable &symbol_table) {
-  static const char spec[] = "%lx %x %[^\t\n]";
   FILE *pmf = perfmaps_open(pid, "/tmp");
   symbol_map.clear();
   if (pmf == nullptr) {
     // Add a single fake symbol to avoid bouncing
-    symbol_map.emplace(0, RumtimeSymbolVal(1, -1));
-    LG_DBG("No runtime symbols found file found (PID%d)", pid);
+    symbol_map.emplace(0, SymbolSpan());
+    LG_DBG("No runtime symbols (PID%d)", pid);
     return;
   }
   defer { fclose(pmf); };
@@ -52,14 +60,13 @@ void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
   while (-1 != getline(&line, &sz_buf, pmf)) {
     uint64_t address;
     uint32_t code_size;
-    if (3 != sscanf(line, spec, &address, &code_size, buffer) ||
+    if (3 != sscanf(line, "%lx %x %[^\t\n]", &address, &code_size, buffer) ||
         should_skip_symbol(buffer)) {
       continue;
     }
     // elements are ordered
     it = symbol_map.emplace_hint(
-        it, address,
-        RumtimeSymbolVal(address + code_size - 1, symbol_table.size()));
+        it, address, SymbolSpan(address + code_size - 1, symbol_table.size()));
     symbol_table.emplace_back(
         Symbol(std::string(buffer), std::string(buffer), 0, "unknown"));
   }
@@ -70,55 +77,18 @@ SymbolIdx_t RuntimeSymbolLookup::get_or_insert(pid_t pid, ProcessAddress_t pc,
                                                SymbolTable &symbol_table) {
   SymbolMap &symbol_map = _pid_map[pid];
   // TODO : how do we know we need to refresh the symbol map ?
-  // A solution can be to poll + inotify ? Though where would this poll be handled ?
+  // A solution can be to poll + inotify ? Though where would this poll be
+  // handled ?
 
   if (symbol_map.empty()) {
     fill_perfmap_from_file(pid, symbol_map, symbol_table);
   }
 
-  RuntimeSymbolFindRes find_res = find_closest(symbol_map, pc);
+  SymbolMap::FindRes find_res = symbol_map.find_closest(pc);
   if (find_res.second) {
     return find_res.first->second.get_symbol_idx();
   }
   return -1;
 }
 
-RuntimeSymbolLookup::RuntimeSymbolFindRes
-RuntimeSymbolLookup::find_closest(SymbolMap &map, ProcessAddress_t pc) {
-  bool is_within = false;
-
-  // First element not less than (can match exactly a start addr)
-  auto it = map.lower_bound(pc);
-  if (it != map.end()) { // map is empty
-    is_within = symbol_is_within(pc, *it);
-    if (is_within) {
-      return std::make_pair<SymbolMap::iterator, bool>(std::move(it),
-                                                       std::move(is_within));
-    }
-  }
-
-  // previous element is more likely to contain our addr
-  if (it != map.begin()) {
-    --it;
-  } else { // map is empty
-    return std::make_pair<SymbolMap::iterator, bool>(map.end(), false);
-  }
-  // element can not be end (as we reversed or exit)
-  is_within = symbol_is_within(pc, *it);
-
-  return std::make_pair<SymbolMap::iterator, bool>(std::move(it),
-                                                   std::move(is_within));
-}
-
-bool RuntimeSymbolLookup::symbol_is_within(ProcessAddress_t pc,
-                                           const SymbolMap::value_type &kv) {
-  if (pc < kv.first) {
-    return false;
-  }
-  if (pc > kv.second.get_end()) {
-    return false;
-  }
-  return true;
-}
-
-} // namespace ddprof 
+} // namespace ddprof

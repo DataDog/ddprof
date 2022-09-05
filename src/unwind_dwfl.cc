@@ -10,10 +10,10 @@
 #include "dwfl_internals.hpp"
 #include "dwfl_thread_callbacks.hpp"
 #include "logger.hpp"
+#include "runtime_symbol_lookup.hpp"
 #include "symbol_hdr.hpp"
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
-#include "runtime_symbol_lookup.hpp"
 
 int frame_cb(Dwfl_Frame *, void *);
 
@@ -87,8 +87,6 @@ static void trace_unwinding_end(UnwindState *us) {
 }
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
                             DDProfMod *ddprof_mod, FileInfoId_t file_info_id);
-
-
 
 // check for runtime symbols provided in /tmp files
 static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,

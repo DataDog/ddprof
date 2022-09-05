@@ -300,6 +300,7 @@ add_unit_test(
     ../src/runtime_symbol_lookup.cc
     ../src/savecontext.cc
     ../src/saveregisters.cc
+    ../src/symbol_map.cc
     ../src/mapinfo_lookup.cc
     ../src/procutils.cc
     ../src/signal_helper.cc
@@ -339,6 +340,7 @@ add_unit_test(
     ../src/runtime_symbol_lookup.cc
     ../src/savecontext.cc
     ../src/saveregisters.cc
+    ../src/symbol_map.cc
     ../src/mapinfo_lookup.cc
     ../src/procutils.cc
     ../src/signal_helper.cc
@@ -393,9 +395,14 @@ add_unit_test(
     runtime_symbol_lookup-ut
     runtime_symbol_lookup-ut.cc
     ../src/runtime_symbol_lookup.cc
+    ../src/symbol_map.cc
 )
 
-
+add_unit_test(
+    symbol_map-ut
+    symbol_map-ut.cc
+    ../src/symbol_map.cc
+)
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/savecontext.cc ../src/saveregisters.cc)
 add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 

@@ -18,7 +18,8 @@
 #include <stdlib.h>
 
 struct SymbolHdr {
-  SymbolHdr(std::string_view path_to_proc = "") : _runtime_symbol_lookup(path_to_proc) {}
+  SymbolHdr(std::string_view path_to_proc = "")
+      : _runtime_symbol_lookup(path_to_proc) {}
   void display_stats() const {
     _dwfl_symbol_lookup_v2._stats.display(_dwfl_symbol_lookup_v2.size());
     _dso_symbol_lookup.stats_display();

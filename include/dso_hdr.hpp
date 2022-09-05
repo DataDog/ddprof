@@ -139,9 +139,7 @@ public:
     return _file_info_vector[id];
   }
 
-  const std::string &get_path_to_proc() const {
-    return _path_to_proc;
-  }
+  const std::string &get_path_to_proc() const { return _path_to_proc; }
 
   int get_nb_dso() const;
 
