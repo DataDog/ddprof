@@ -4,6 +4,7 @@
 // Datadog, Inc.
 
 #include <iostream>
+#include <limits>
 #include <stdio.h>
 #include <string.h>
 #include <string>
@@ -12,6 +13,7 @@
 #include "defer.hpp"
 #include "logger.hpp"
 #include "runtime_symbol_lookup.hpp"
+#include "unlikely.hpp"
 
 namespace ddprof {
 
@@ -57,16 +59,30 @@ void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
   char buffer[2048];
   auto it = symbol_map.end();
   while (-1 != getline(&line, &sz_buf, pmf)) {
-    uint64_t address;
-    uint32_t code_size;
+    char address_buff[33]; // max size of 16 (as it should be hexa for uint64)
+    char size_buff[33];
     // Avoid considering any symbols beyond 300 chars
-    if (3 != sscanf(line, "%lx %x %300[^\t\n]", &address, &code_size, buffer) ||
+    if (3 !=
+            sscanf(line, "%16s %8s %300[^\t\n]", address_buff, size_buff,
+                   buffer) ||
         should_skip_symbol(buffer)) {
       continue;
     }
+    ProcessAddress_t address = std::strtoul(address_buff, nullptr, 16);
+    Offset_t code_size = std::strtoul(size_buff, nullptr, 16);
+    ProcessAddress_t end = address + code_size - 1;
+#ifdef DEBUG
+    LG_NFO("Attempt insert at %lx --> %lx / %s", address, end, buffer);
+#endif
+    if (unlikely(address >
+                 std::numeric_limits<ProcessAddress_t>::max() - code_size)) {
+      // Ignore overflow
+      continue;
+    }
+
     // elements are ordered
-    it = symbol_map.emplace_hint(
-        it, address, SymbolSpan(address + code_size - 1, symbol_table.size()));
+    it = symbol_map.emplace_hint(it, address,
+                                 SymbolSpan(end, symbol_table.size()));
     symbol_table.emplace_back(
         Symbol(std::string(buffer), std::string(buffer), 0, "unknown"));
   }
