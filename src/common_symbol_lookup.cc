@@ -35,7 +35,7 @@ SymbolIdx_t CommonSymbolLookup::get_or_insert(SymbolErrors lookup_case,
   } else { // insert things
     symbol_idx = symbol_table.size();
     symbol_table.push_back(symbol_from_common(lookup_case));
-    _map.insert(std::pair<SymbolErrors, SymbolIdx_t>(lookup_case, symbol_idx));
+    _map.insert(std::pair(lookup_case, symbol_idx));
   }
   return symbol_idx;
 }
