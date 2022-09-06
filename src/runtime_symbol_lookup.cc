@@ -23,7 +23,6 @@ FILE *RuntimeSymbolLookup::perfmaps_open(int pid,
   if (n >= 1024) { // unable to snprintf everything
     return nullptr;
   }
-  LG_NFO(" -- buff = %s", buf);
   FILE *perfmap_file = fopen(buf, "r");
   if (perfmap_file) {
     return perfmap_file;
@@ -60,8 +59,8 @@ void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
   while (-1 != getline(&line, &sz_buf, pmf)) {
     uint64_t address;
     uint32_t code_size;
-    if (sz_buf > 2048 ||
-        3 != sscanf(line, "%lx %x %[^\t\n]", &address, &code_size, buffer) ||
+    // Avoid considering any symbols beyond 300 chars
+    if (3 != sscanf(line, "%lx %x %300[^\t\n]", &address, &code_size, buffer) ||
         should_skip_symbol(buffer)) {
       continue;
     }
