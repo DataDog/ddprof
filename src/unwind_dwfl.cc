@@ -234,22 +234,6 @@ DDRes unwind_dwfl(UnwindState *us) {
   return res;
 }
 
-static DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx,
-                       ElfAddress_t pc, const Dso &dso, UnwindState *us) {
-  UnwindOutput *output = &us->output;
-  int64_t current_loc_idx = output->nb_locs;
-  output->locs[current_loc_idx]._symbol_idx = symbol_idx;
-  output->locs[current_loc_idx].ip = pc;
-  output->locs[current_loc_idx]._map_info_idx = map_idx;
-#ifdef DEBUG
-  LG_NTC("Considering frame with IP : %lx / %s ", pc,
-         us->symbol_hdr._symbol_table[output->locs[current_loc_idx]._symbol_idx]
-             ._symname.c_str());
-#endif
-  output->nb_locs++;
-  return ddres_init();
-}
-
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
                             DDProfMod *ddprof_mod, FileInfoId_t file_info_id) {
 
@@ -262,7 +246,7 @@ static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
           unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso);
   MapInfoIdx_t map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
       us->pid, us->symbol_hdr._mapinfo_table, dso);
-  return add_frame(symbol_idx, map_idx, pc, dso, us);
+  return add_frame(symbol_idx, map_idx, pc, us);
 }
 
 // check for runtime symbols provided in /tmp files
@@ -282,7 +266,7 @@ static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
   MapInfoIdx_t map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
       us->pid, us->symbol_hdr._mapinfo_table, dso);
 
-  return add_frame(symbol_idx, map_idx, pc, dso, us);
+  return add_frame(symbol_idx, map_idx, pc, us);
 }
 
 } // namespace ddprof

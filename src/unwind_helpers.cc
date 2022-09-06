@@ -54,29 +54,30 @@ DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
   return ddres_init();
 }
 
-static void add_virtual_frame(UnwindState *us, SymbolIdx_t symbol_idx) {
+static void add_frame_without_mapping(UnwindState *us, SymbolIdx_t symbol_idx) {
   add_frame(symbol_idx, -1, 0, us);
 }
 
 void add_common_frame(UnwindState *us, SymbolErrors lookup_case) {
-  add_virtual_frame(us,
-                    us->symbol_hdr._common_symbol_lookup.get_or_insert(
-                        lookup_case, us->symbol_hdr._symbol_table));
+  add_frame_without_mapping(us,
+                            us->symbol_hdr._common_symbol_lookup.get_or_insert(
+                                lookup_case, us->symbol_hdr._symbol_table));
 }
 
 void add_dso_frame(UnwindState *us, const Dso &dso,
                    ElfAddress_t normalized_addr, std::string_view addr_type) {
-  add_virtual_frame(
+  add_frame_without_mapping(
       us,
       us->symbol_hdr._dso_symbol_lookup.get_or_insert(
           normalized_addr, dso, us->symbol_hdr._symbol_table, addr_type));
 }
 
 void add_virtual_base_frame(UnwindState *us) {
-  add_virtual_frame(us,
-                    us->symbol_hdr._base_frame_symbol_lookup.get_or_insert(
-                        us->pid, us->symbol_hdr._symbol_table,
-                        us->symbol_hdr._dso_symbol_lookup, us->dso_hdr));
+  add_frame_without_mapping(
+      us,
+      us->symbol_hdr._base_frame_symbol_lookup.get_or_insert(
+          us->pid, us->symbol_hdr._symbol_table,
+          us->symbol_hdr._dso_symbol_lookup, us->dso_hdr));
 }
 
 // read a word from the given stack
