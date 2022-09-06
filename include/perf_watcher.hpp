@@ -34,6 +34,8 @@ typedef struct PerfWatcher {
     uint64_t sample_frequency;
   };
   int sample_type_id; // index into the sample types defined in this header
+  uint16_t sample_stack_size; // size of the stack to capture
+
   // perf_event_open configs
   struct PerfWatcherOptions options;
   // tracepoint configuration

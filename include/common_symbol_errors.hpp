@@ -11,6 +11,8 @@ enum SymbolErrors {
   truncated_stack,
   unknown_dso,
   dwfl_frame,
+  incomplete_stack,
+  lost_event,
 };
 
 }

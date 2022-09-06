@@ -23,6 +23,7 @@ typedef struct UnwindOutput {
   uint64_t nb_locs;
   int pid;
   int tid;
+  bool is_incomplete;
 } UnwindOutput;
 
 void uw_output_clear(UnwindOutput *);

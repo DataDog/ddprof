@@ -13,16 +13,9 @@
 
 namespace ddprof {
 
-bool max_stack_depth_reached(UnwindState *us) {
-  UnwindOutput *output = &us->output;
+bool is_max_stack_depth_reached(const UnwindState &us) {
   // +2 to keep room for common base frame
-  if (output->nb_locs + 2 >= DD_MAX_STACK_DEPTH) {
-    // ensure we don't overflow
-    output->nb_locs = DD_MAX_STACK_DEPTH - 2;
-    add_common_frame(us, SymbolErrors::truncated_stack);
-    return true;
-  }
-  return false;
+  return us.output.nb_locs + 2 >= DD_MAX_STACK_DEPTH;
 }
 
 DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,

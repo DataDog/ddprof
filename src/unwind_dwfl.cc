@@ -95,7 +95,8 @@ static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
 // returns an OK status if we should continue unwinding
 static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
 
-  if (max_stack_depth_reached(us)) {
+  if (is_max_stack_depth_reached(*us)) {
+    add_common_frame(us, SymbolErrors::truncated_stack);
     LG_DBG("Max stack depth reached (depth#%lu)", us->output.nb_locs);
     ddprof_stats_add(STATS_UNWIND_TRUNCATED_OUTPUT, 1, nullptr);
     return ddres_warn(DD_WHAT_UW_MAX_DEPTH);

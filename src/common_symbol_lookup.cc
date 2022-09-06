@@ -16,7 +16,10 @@ Symbol symbol_from_common(SymbolErrors lookup_case) {
                   std::string());
   case SymbolErrors::dwfl_frame:
     return Symbol(std::string(), std::string("[dwfl_frame]"), 0, std::string());
-
+  case SymbolErrors::incomplete_stack:
+    return Symbol(std::string(), std::string("[incomplete]"), 0, std::string());
+  case SymbolErrors::lost_event:
+    return Symbol(std::string(), std::string("[lost]"), 0, std::string());
   default:
     break;
   }
