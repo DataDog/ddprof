@@ -52,9 +52,8 @@ static Tag split_kv(const char *str, size_t end_pos, char c = ':') {
     LG_WRN("[TAGS] Error, bad tag value %s", str);
     return Tag();
   }
-  return std::make_pair(
-      std::string(begin, current_str - begin),
-      std::string(current_str + 1, end_pos - (current_str - begin + 1)));
+  return {std::string(begin, current_str - begin),
+          std::string(current_str + 1, end_pos - (current_str - begin + 1))};
 }
 
 void split(const char *str, Tags &tags, char c) {
@@ -86,8 +85,7 @@ void split(const char *str, Tags &tags, char c) {
 
 UserTags::UserTags(const char *tag_str, int nproc) {
   ddprof::split(tag_str, _tags);
-  _tags.push_back(std::make_pair(std::string("number_of_cpu_cores"),
-                                 std::to_string(nproc)));
-  _tags.push_back(std::make_pair(std::string("number_hw_concurent_threads"),
-                                 std::to_string(ddprof::get_nb_hw_thread())));
+  _tags.push_back({"number_of_cpu_cores", std::to_string(nproc)});
+  _tags.push_back({"number_hw_concurent_threads",
+                   std::to_string(ddprof::get_nb_hw_thread())});
 }

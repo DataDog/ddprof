@@ -154,7 +154,7 @@ DsoFindRes DsoHdr::dso_find_first_std_executable(pid_t pid) {
   if (it == map.end()) {
     return find_res_not_found(map);
   }
-  return std::pair(it, true);
+  return {it, true};
 }
 
 DsoFindRes DsoHdr::dso_find_closest(const DsoMap &map, pid_t pid,
@@ -165,7 +165,7 @@ DsoFindRes DsoHdr::dso_find_closest(const DsoMap &map, pid_t pid,
   if (it != map.end()) {
     is_within = it->second.is_within(pid, addr);
     if (is_within) { // exact match
-      return std::pair(it, is_within);
+      return {it, is_within};
     }
   }
   // previous element is more likely to contain our addr
@@ -175,7 +175,7 @@ DsoFindRes DsoHdr::dso_find_closest(const DsoMap &map, pid_t pid,
     return find_res_not_found(map);
   }
   is_within = it->second.is_within(pid, addr);
-  return std::pair(it, is_within);
+  return {it, is_within};
 }
 
 // Find the closest and indicate if we found a dso matching this address
@@ -185,7 +185,7 @@ DsoFindRes DsoHdr::dso_find_closest(pid_t pid, ElfAddress_t addr) {
 
 DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
   if (map.empty()) {
-    return std::pair(map.end(), map.end());
+    return {map.end(), map.end()};
   }
   // Get element after (with a start addr over the current)
   DsoMapIt first_el = map.lower_bound(dso._start);
@@ -224,7 +224,7 @@ DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
   if (end != map.end()) {
     ++end;
   }
-  return std::pair(start, end);
+  return {start, end};
 }
 
 // erase range of elements
@@ -242,7 +242,7 @@ DsoFindRes DsoHdr::dso_find_adjust_same(DsoMap &map, const Dso &dso) {
     // if it is the same or smaller, we keep the current dso
     found_same = it->second.adjust_same(dso);
   }
-  return std::pair(it, found_same);
+  return {it, found_same};
 }
 
 FileInfoId_t DsoHdr::get_or_insert_file_info(const Dso &dso) {
