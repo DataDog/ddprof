@@ -53,7 +53,7 @@ get_host_port_from_full_addr(const char *full_url) {
   std::string host =
       full_str.substr(found_host + 1, found_port - (found_host + 1));
 
-  return std::pair(std::move(host), std::move(port));
+  return {host, port};
 }
 
 // returns host and port from env var HTTP_RECEPTOR_URL

@@ -41,7 +41,7 @@ DsoSymbolLookup::get_or_insert_unhandled_type(const Dso &dso,
   } else {
     symbol_idx = symbol_table.size();
     symbol_table.push_back(symbol_from_unhandled_dso(dso));
-    _map_unhandled_dso.insert(std::pair(dso._type, symbol_idx));
+    _map_unhandled_dso.insert({dso._type, symbol_idx});
   }
   return symbol_idx;
 }
@@ -64,7 +64,7 @@ SymbolIdx_t DsoSymbolLookup::get_or_insert(FileAddress_t normalized_addr,
   } else { // insert things
     symbol_idx = symbol_table.size();
     symbol_table.push_back(symbol_from_dso(normalized_addr, dso, addr_type));
-    addr_lookup.insert(std::pair(normalized_addr, symbol_idx));
+    addr_lookup.insert({normalized_addr, symbol_idx});
   }
   return symbol_idx;
 }
