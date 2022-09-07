@@ -16,8 +16,8 @@
 int yywrap() { return 1;}
 
 typedef struct yy_buffer_state * YY_BUFFER_STATE;
-extern int yylex();
-extern int yyparse();
+extern int yylex(void);
+extern int yyparse(void);
 extern YY_BUFFER_STATE yy_scan_string(const char * str);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
 
@@ -27,7 +27,7 @@ uint8_t mode_from_str(const char *str) {
     return mode;
 
   size_t sz = sizeof(str);
-  for (int i = 0; i < sz; ++i) {
+  for (size_t i = 0; i < sz; ++i) {
     if (str[i] == 'M' || str[i] == 'm')
       mode |= EVENT_METRIC;
     if (str[i] == 'G' || str[i] == 'g')
@@ -47,7 +47,7 @@ void conf_finalize(EventConf *conf) {
   if (!conf->label) {
     if (conf->eventname && conf->groupname) {
       size_t buf_sz = strlen(conf->eventname) + strlen(conf->groupname) + 3;
-      conf->label = malloc(buf_sz);
+      conf->label = (char *)malloc(buf_sz);
       if (!conf->label) {
         // This is an error.  Technically we should probably just shut down the
         // application, but we'll pass an invalid conf instead
@@ -63,7 +63,7 @@ void conf_finalize(EventConf *conf) {
       conf->label = strdup(conf->eventname);
     } else if (conf->id) {
       size_t buf_sz = strlen("id:") + 20 + 2; // 2^64 has 20 digits
-      conf->label = malloc(buf_sz);
+      conf->label = (char *)malloc(buf_sz);
       if (!conf->label) {
         // This is an error.  Technically we should probably just shut down the
         // application, but we'll pass an invalid conf instead
@@ -109,7 +109,7 @@ void conf_print(const EventConf *tp) {
 
 }
 
-EventConf g_accum_event_conf = {0};
+EventConf g_accum_event_conf = {};
 
 void yyerror(const char *str) {
 #ifdef EVENT_PARSER_MAIN
@@ -226,7 +226,7 @@ opt: KEY EQ WORD {
            if ($$ == ECF_PARAMETER) {
              g_accum_event_conf.loc_type = ECLOC_REG;
              unsigned int regno = param_to_regno_c($3);
-             if (regno == -1) {
+             if (regno == -1ul) {
                VAL_ERROR();
                break;
              }
