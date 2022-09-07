@@ -70,6 +70,12 @@ void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
     }
     ProcessAddress_t address = std::strtoul(address_buff, nullptr, 16);
     Offset_t code_size = std::strtoul(size_buff, nullptr, 16);
+    // check for conversion issues
+    if (!address || !code_size ||
+        address == std::numeric_limits<ProcessAddress_t>::max() ||
+        code_size == std::numeric_limits<ProcessAddress_t>::max()) {
+      continue;
+    }
     ProcessAddress_t end = address + code_size - 1;
 #ifdef DEBUG
     LG_NFO("Attempt insert at %lx --> %lx / %s", address, end, buffer);

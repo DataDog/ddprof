@@ -21,7 +21,7 @@ TEST(SymbolMap, Span) {
 TEST(SymbolMap, Map) {
   SymbolMap map;
   SymbolSpan span0_1000(0x1000, 12);
-  map.insert(SymbolMap::ValueType(0, span0_1000));
+  map.emplace(0, span0_1000);
 }
 
 } // namespace ddprof

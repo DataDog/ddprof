@@ -32,12 +32,23 @@ private:
   SymbolIdx_t _symbol_idx;
 };
 
-class SymbolMap : public std::map<ElfAddress_t, SymbolSpan> {
+class SymbolMap : private std::map<ElfAddress_t, SymbolSpan> {
 public:
-  using It = SymbolMap::iterator;
-  using FindRes = std::pair<SymbolMap::It, bool>;
+  using Map = std::map<ElfAddress_t, SymbolSpan>;
+  using It = Map::iterator;
+  using ConstIt = Map::const_iterator;
+  using FindRes = std::pair<It, bool>;
   using ValueType =
-      SymbolMap::value_type; // key value pair ElfAddress_t, SymbolSpanMap
+      Map::value_type; // key value pair ElfAddress_t, SymbolSpanMap
+  // Functions we forward from underlying map type
+
+  using Map::begin;
+  using Map::clear;
+  using Map::emplace;
+  using Map::emplace_hint;
+  using Map::empty;
+  using Map::end;
+  using Map::size;
 
   static bool is_within(const Offset_t &norm_pc, const ValueType &kv);
   FindRes find_closest(Offset_t norm_pc);

@@ -241,10 +241,9 @@ static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
 
   // get or create the dwfl symbol
-  SymbolIdx_t symbol_idx =
-      unwind_symbol_hdr._dwfl_symbol_lookup_v2.get_or_insert(
-          *ddprof_mod, unwind_symbol_hdr._symbol_table,
-          unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso);
+  SymbolIdx_t symbol_idx = unwind_symbol_hdr._dwfl_symbol_lookup.get_or_insert(
+      *ddprof_mod, unwind_symbol_hdr._symbol_table,
+      unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso);
   MapInfoIdx_t map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
       us->pid, us->symbol_hdr._mapinfo_table, dso);
   return add_frame(symbol_idx, map_idx, pc, us);
