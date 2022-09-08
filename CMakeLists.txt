@@ -65,6 +65,22 @@ include(Findlibddprof)
 # elfutils
 include(Findelfutils)
 
+# parser
+find_package(BISON REQUIRED)
+find_package(FLEX REQUIRED)
+
+set(EVENT_PARSER_DIR ${CMAKE_CURRENT_BINARY_DIR}/event_parser)
+set(EVENT_PARSER_SRC ${EVENT_PARSER_DIR}/src)
+set(EVENT_PARSER_INCLUDE ${EVENT_PARSER_DIR}/include)
+file(MAKE_DIRECTORY ${EVENT_PARSER_DIR})
+file(MAKE_DIRECTORY ${EVENT_PARSER_SRC})
+file(MAKE_DIRECTORY ${EVENT_PARSER_INCLUDE})
+
+bison_target(event_parser_yacc util/event_parser.y ${EVENT_PARSER_SRC}/event_parser.tab.c
+             DEFINES_FILE ${EVENT_PARSER_INCLUDE}/event_parser.h)
+flex_target(event_parser_lex util/event_parser.l ${EVENT_PARSER_SRC}/event_parser.lex.c)
+add_flex_bison_dependency(event_parser_lex event_parser_yacc)
+
 #######################
 ### Static analysis ###
 #######################
@@ -117,13 +133,22 @@ string(APPEND CMAKE_C_FLAGS " ${FRAME_PTR_FLAG}")
 string(APPEND CMAKE_CXX_FLAGS " ${FRAME_PTR_FLAG}")
 
 list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
+list(APPEND DDPROF_INCLUDE_LIST ${EVENT_PARSER_INCLUDE})
 
 # Find the source files
 aux_source_directory(src COMMON_SRC)
 aux_source_directory(src/pprof PPROF_SRC)
 aux_source_directory(src/exporter EXPORTER_SRC)
 aux_source_directory(src/exe EXE_SRC)
-aux_source_directory(src/event_parser EVENT_PARSER_SRC)
+aux_source_directory(${EVENT_PARSER_SRC} PARSER_SRC) 
+
+# Create a dependency for generated header on the source file(s) referencing it
+# Subdirectories must be inclued explicitly as per the cmake docs
+set_property(SOURCE src/ddprof_cmdline.cc
+  APPEND PROPERTY OBJECT_DEPENDS
+    ${EVENT_PARSER_SRC}/event_parser.lex.c
+    ${EVENT_PARSER_SRC}/event_parser.tab.c
+    ${EVENT_PARSER_INCLUDE}/event_parser.h)
 
 # Define all sources
 set(DDPROF_GLOBAL_SRC
@@ -131,7 +156,7 @@ set(DDPROF_GLOBAL_SRC
    ${PPROF_SRC}
    ${EXPORTER_SRC}
    ${EXE_SRC}
-   ${EVENT_PARSER_SRC}
+   ${PARSER_SRC}
 )
 
 set(DDPROF_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
@@ -150,15 +175,34 @@ endif()
 list(APPEND DDPROF_LIBRARY_LIST libcap)
 list(APPEND DDPROF_INCLUDE_LIST ${LIBCAP_INCLUDE_DIR})
 
-set(DD_PROFILING_SOURCES src/lib/dd_profiling.cc src/daemonize.cc src/ddprof_cmdline.cc src/logger.cc src/logger_setup.cc 
-                         src/ipc.cc src/pevent_lib.cc src/perf.cc src/perf_ringbuffer.cc src/perf_watcher.cc src/ringbuffer_utils.cc src/sys_utils.cc
-                         src/user_override.cc src/ddres_list.cc src/savecontext.cc src/saveregisters.cc src/signal_helper.cc
-                         src/lib/malloc_wrapper.cc src/lib/allocation_tracker.cc src/lib/pthread_hook.cc src/event_parser/event_parser.lex.c
-                         src/perf_archmap.cc src/event_parser/event_parser.tab.c)
+set(DD_PROFILING_SOURCES
+  src/lib/dd_profiling.cc
+  src/daemonize.cc
+  src/ddprof_cmdline.cc
+  ${EVENT_PARSER_SRC}/event_parser.lex.c
+  ${EVENT_PARSER_SRC}/event_parser.tab.c
+  src/logger.cc
+  src/logger_setup.cc
+  src/ipc.cc
+  src/pevent_lib.cc
+  src/perf.cc
+  src/perf_ringbuffer.cc
+  src/perf_watcher.cc
+  src/ringbuffer_utils.cc
+  src/sys_utils.cc
+  src/user_override.cc
+  src/ddres_list.cc
+  src/savecontext.cc
+  src/saveregisters.cc
+  src/signal_helper.cc
+  src/lib/malloc_wrapper.cc
+  src/lib/allocation_tracker.cc
+  src/lib/pthread_hook.cc
+  src/perf_archmap.cc)
 
 add_library(dd_profiling-embedded SHARED ${DD_PROFILING_SOURCES})
 target_compile_definitions(dd_profiling-embedded PRIVATE NO_EMBEDDED_DDPROF_EXE)
-target_include_directories(dd_profiling-embedded PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
+target_include_directories(dd_profiling-embedded PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party ${EVENT_PARSER_INCLUDE})
 set_target_properties(dd_profiling-embedded PROPERTIES
    PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
 
@@ -213,14 +257,14 @@ set_target_properties(ddprof_exe_object PROPERTIES IMPORTED_OBJECTS "${DDPROF_EX
 
 add_library(dd_profiling-static STATIC ${DD_PROFILING_SOURCES} $<TARGET_OBJECTS:ddprof_exe_object>)
 set_target_properties(dd_profiling-static PROPERTIES OUTPUT_NAME dd_profiling)
-target_include_directories(dd_profiling-static PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
+target_include_directories(dd_profiling-static PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party ${EVENT_PARSER_INCLUDE})
 set_target_properties(dd_profiling-static PROPERTIES
    PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
 target_link_libraries(dd_profiling-static PUBLIC dl pthread)
 
 add_library(dd_profiling-shared SHARED ${DD_PROFILING_SOURCES} $<TARGET_OBJECTS:ddprof_exe_object>)
 set_target_properties(dd_profiling-shared PROPERTIES OUTPUT_NAME dd_profiling)
-target_include_directories(dd_profiling-shared PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party)
+target_include_directories(dd_profiling-shared PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/third_party ${EVENT_PARSER_INCLUDE})
 set_target_properties(dd_profiling-shared PROPERTIES
    PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
 
@@ -251,7 +295,7 @@ if (${BUILD_NATIVE_LIB})
    # Define all sources
    set(DDPROF_LIB_SRC
       ${COMMON_SRC}
-      ${EVENT_PARSER_SRC}
+      ${PARSER_SRC}
       src/lib/ddprof_output.cc)
 
    ## Libs to link

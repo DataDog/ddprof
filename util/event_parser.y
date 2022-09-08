@@ -13,8 +13,6 @@
 
 #define YYDEBUG 0
 
-int yywrap() { return 1;}
-
 typedef struct yy_buffer_state * YY_BUFFER_STATE;
 extern int yylex(void);
 extern int yyparse(void);
@@ -132,28 +130,26 @@ EventConf *EventConf_parse(const char *msg) {
   return 0 == ret ? &g_accum_event_conf : NULL;
 }
 
-#ifdef EVENT_PARSER_MAIN
-bool g_debugout_enable = false;
-int main(int c, char **v) { 
-  g_debugout_enable = false;
-  if (c) {
-    printf(">\"%s\"\n", v[1]);
-    YY_BUFFER_STATE buffer = yy_scan_string(v[1]);
-    g_debugout_enable = true;
-    if (!yyparse())
-      conf_print(&g_accum_event_conf);
-    else
-      fprintf(stderr, "  ERROR\n");
-    yy_delete_buffer(buffer);
-  } else {
-    yyparse();
-  }
-  return 0;
-}
-#endif
+//#ifdef EVENT_PARSER_MAIN
+//bool g_debugout_enable = false;
+//int main(int c, char **v) { 
+//  g_debugout_enable = false;
+//  if (c) {
+//    printf(">\"%s\"\n", v[1]);
+//    YY_BUFFER_STATE buffer = yy_scan_string(v[1]);
+//    g_debugout_enable = true;
+//    if (!yyparse())
+//      conf_print(&g_accum_event_conf);
+//    else
+//      fprintf(stderr, "  ERROR\n");
+//    yy_delete_buffer(buffer);
+//  } else {
+//    yyparse();
+//  }
+//  return 0;
+//}
+//#endif
 %}
-
-%name event_parse
 
 %union {
 	uint64_t num;
@@ -226,11 +222,11 @@ opt: KEY EQ WORD {
            if ($$ == ECF_PARAMETER) {
              g_accum_event_conf.loc_type = ECLOC_REG;
              unsigned int regno = param_to_regno_c($3);
-             if (regno == -1ul) {
+             if (regno == -1u) {
                VAL_ERROR();
                break;
              }
-             g_accum_event_conf.register_num = param_to_regno_c($3);
+             g_accum_event_conf.register_num = regno;
            }
            if ($$ == ECF_REGISTER) {
              if ($3 >= PERF_REGS_COUNT) {

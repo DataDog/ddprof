@@ -93,8 +93,7 @@ add_unit_test(
     ../src/ddprof_cmdline.cc
     ../src/perf_watcher.cc
     ../src/perf_archmap.cc
-    ../src/event_parser/event_parser.lex.c
-    ../src/event_parser/event_parser.tab.c
+    ${PARSER_SRC}
     ddprofcmdline-ut.cc
 )
 
@@ -190,8 +189,7 @@ add_unit_test(
     ../src/logger_setup.cc
     ../src/perf_watcher.cc
     ../src/perf_archmap.cc
-    ../src/event_parser/event_parser.lex.c
-    ../src/event_parser/event_parser.tab.c
+    ${PARSER_SRC}
     ddprof_input-ut.cc
     DEFINITIONS MYNAME="ddprof_input-ut"
 )
@@ -237,8 +235,7 @@ add_unit_test(
     ../src/perf_watcher.cc
     ../src/tags.cc
     ../src/perf_archmap.cc
-    ../src/event_parser/event_parser.lex.c
-    ../src/event_parser/event_parser.tab.c
+    ${PARSER_SRC}
     ddprof_exporter-ut.cc
     LIBRARIES DDProf::FFI
     DEFINITIONS MYNAME="ddprof_exporter-ut"

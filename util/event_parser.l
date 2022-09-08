@@ -1,3 +1,5 @@
+%option noyywrap
+
 %{
 #include <string.h>
 #include "event_config.h"

@@ -199,13 +199,15 @@ TEST(CmdLineTst, ParserKeyPatterns) {
 
   // argno should expand the given number into the correct sys-V register
   // for the given 1-indexed parameter value
-  ASSERT_FALSE(watcher_from_str("e=hCPU n=0", &watcher));
   ASSERT_TRUE(watcher_from_str("e=hCPU n=1", &watcher));
   ASSERT_EQ(watcher.regno, param_to_perf_regno(1));
   ASSERT_TRUE(watcher_from_str("e=hCPU n=2", &watcher));
   ASSERT_EQ(watcher.regno, param_to_perf_regno(2));
   ASSERT_TRUE(watcher_from_str("e=hCPU n=3", &watcher));
   ASSERT_EQ(watcher.regno, param_to_perf_regno(3));
+
+  // 0-parameter is an error
+  ASSERT_FALSE(watcher_from_str("e=hCPU n=0", &watcher));
 
   // argno should be bounds-checked
   ASSERT_FALSE(watcher_from_str("e=hCPU n=100", &watcher));
