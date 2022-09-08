@@ -86,7 +86,15 @@ DDRes unwindstate__unwind(UnwindState *us) {
   }
 
   if (!is_stack_complete(us)) {
+    us->output.is_incomplete = true;
     ddprof_stats_add(STATS_UNWIND_INCOMPLETE_STACK, 1, nullptr);
+    // Only add [incomplete] virtual frame if stack is not already truncated !
+    if (!is_max_stack_depth_reached(*us)) {
+      add_common_frame(us, SymbolErrors::incomplete_stack);
+    }
+
+  } else {
+    us->output.is_incomplete = false;
   }
   ddprof_stats_add(STATS_UNWIND_AVG_STACK_DEPTH, us->output.nb_locs, nullptr);
 

@@ -8,7 +8,7 @@
 #include <stddef.h>
 #include <string.h>
 
-// minor: Declaring this as a single header in libddprof would avoid duplication
+// minor: Declaring this as a single header in ddprof would avoid duplication
 
 typedef struct string_view {
   const char *ptr;

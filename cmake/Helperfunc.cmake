@@ -20,22 +20,25 @@ function(add_exe name)
    set(exe_libraries "")
    set(exe_definitions "")
    set(exe_include_dirs "")
+
    foreach(arg IN LISTS ARGN)
-      if (arg STREQUAL "LIBRARIES")
+      if(arg STREQUAL "LIBRARIES")
          set(cur_var "libraries")
-      elseif (arg STREQUAL "DEFINITIONS")
+      elseif(arg STREQUAL "DEFINITIONS")
          set(cur_var "definitions")
       else()
          list(APPEND exe_${cur_var} ${arg})
-         if (cur_var STREQUAL "sources")
+
+         if(cur_var STREQUAL "sources")
             get_filename_component(src_dir ${arg} DIRECTORY)
             list(APPEND exe_include_dirs ${src_dir})
          endif()
       endif()
    endforeach()
+
    add_executable(${name} ${exe_sources})
    set_target_properties(${name} PROPERTIES
-       COMPILE_DEFINITIONS "${exe_definitions}")
+      COMPILE_DEFINITIONS "${exe_definitions}")
    target_link_libraries(${name} PRIVATE ${exe_libraries})
    list(REMOVE_DUPLICATES exe_include_dirs)
    target_include_directories(${name} PRIVATE ${exe_include_dirs})
@@ -43,14 +46,32 @@ endfunction()
 
 # Set a target to statically include libc
 function(static_link_cxx)
-  cmake_parse_arguments(STATIC_LINK_CXX
-    "" # option
-    "TARGET" # one value arg
-    "" # multi value arg
-    ${ARGN})
-  if (NOT STATIC_LINK_CXX_TARGET)
-    message("You must supply a TARGET to static_link_cxx")
-  endif()
-  target_link_options(${STATIC_LINK_CXX_TARGET} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-static-libstdc++>)
-  target_link_options(${STATIC_LINK_CXX_TARGET} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-static-libgcc>)
+   cmake_parse_arguments(STATIC_LINK_CXX
+      "" # option
+      "TARGET" # one value arg
+      "" # multi value arg
+      ${ARGN})
+
+   if(NOT STATIC_LINK_CXX_TARGET)
+      message("You must supply a TARGET to static_link_cxx")
+   endif()
+
+   target_link_options(${STATIC_LINK_CXX_TARGET} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-static-libstdc++>)
+   target_link_options(${STATIC_LINK_CXX_TARGET} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-static-libgcc>)
+endfunction()
+
+function(detect_libc output_variable)
+   file(WRITE "${CMAKE_BINARY_DIR}/temp.c" "int main() {}")
+   try_compile(COMPILE_SUCCEEDED "${CMAKE_BINARY_DIR}/compile_tests" "${CMAKE_BINARY_DIR}/temp.c"
+      OUTPUT_VARIABLE output LINK_OPTIONS "-v")
+
+   if(NOT COMPILE_SUCCEEDED OR NOT "${output}" MATCHES "\"?-dynamic-linker\"? *\"?([^ \"]+)\"?")
+      message(FATAL_ERROR "Unable to determine libc")
+   endif()
+
+   if("${CMAKE_MATCH_1}" MATCHES "-musl-")
+      set(${output_variable} "musl" PARENT_SCOPE)
+   else()
+      set(${output_variable} "gnu" PARENT_SCOPE)
+   endif()
 endfunction()

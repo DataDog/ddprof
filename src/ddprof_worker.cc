@@ -19,6 +19,7 @@
 #include "tags.hpp"
 #include "timer.hpp"
 #include "unwind.hpp"
+#include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
 
 #include <cassert>
@@ -61,6 +62,31 @@ static inline int64_t now_nanos() {
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
 }
 
+#ifndef DDPROF_NATIVE_LIB
+static DDRes report_lost_events(DDProfContext *ctx) {
+  for (int watcher_idx = 0; watcher_idx < ctx->num_watchers; ++watcher_idx) {
+    if (ctx->worker_ctx.lost_events_per_watcher[watcher_idx] > 0) {
+      PerfWatcher *watcher = &ctx->watchers[watcher_idx];
+      UnwindState *us = ctx->worker_ctx.us;
+      uw_output_clear(&us->output);
+      add_common_frame(us, SymbolErrors::lost_event);
+      LG_WRN("Reporting #%lu -> [%lu] lost samples for watcher #%d",
+             ctx->worker_ctx.lost_events_per_watcher[watcher_idx],
+             ctx->worker_ctx.lost_events_per_watcher[watcher_idx] *
+                 watcher->sample_period,
+             watcher_idx);
+      DDRES_CHECK_FWD(pprof_aggregate(
+          &us->output, &us->symbol_hdr, watcher->sample_period,
+          ctx->worker_ctx.lost_events_per_watcher[watcher_idx], watcher,
+          ctx->worker_ctx.pprof[ctx->worker_ctx.i_current_pprof]));
+      ctx->worker_ctx.lost_events_per_watcher[watcher_idx] = 0;
+    }
+  }
+
+  return {};
+}
+#endif
+
 static inline long export_time_convert(double upload_period) {
   return upload_period * 1000000000;
 }
@@ -82,6 +108,8 @@ DDRes worker_library_init(DDProfContext *ctx,
     ctx->worker_ctx.i_current_pprof = 0;
     ctx->worker_ctx.exp_tid = {0};
     ctx->worker_ctx.us = new UnwindState(ctx->params.dd_profiling_fd);
+    std::fill(ctx->worker_ctx.lost_events_per_watcher.begin(),
+              ctx->worker_ctx.lost_events_per_watcher.end(), 0UL);
 
     // register the existing persistent storage for the state
     ctx->worker_ctx.persistent_worker_state = persistent_worker_state;
@@ -198,10 +226,6 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
   ddprof_stats_add(STATS_UNWIND_AVG_STACK_SIZE, sample->size_stack, nullptr);
 
-  if (sample->size_stack == PERF_SAMPLE_STACK_SIZE) {
-    ddprof_stats_add(STATS_UNWIND_TRUNCATED_INPUT, 1, nullptr);
-  }
-
   auto ticks0 = ddprof::get_tsc_cycles();
   // copy the sample context into the unwind structure
   unwind_init_sample(us, sample->regs, sample->pid, sample->size_stack,
@@ -232,6 +256,30 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     memcpy(&sample_val, &sample->regs[watcher->regno], sizeof(sample_val));
   }
 
+  /* This test is not 100% accurate:
+   * Linux kernel does not take into account stack start (ie. end address since
+   * stack grows down) when capturing the stack, it starts from SP register and
+   * only limits the range with the requested size and user space end (cf.
+   * https://elixir.bootlin.com/linux/v5.19.3/source/kernel/events/core.c#L6582).
+   * Then it tries to copy this range, and stops when it encounters a non-mapped
+   * address
+   * (https://elixir.bootlin.com/linux/v5.19.3/source/kernel/events/core.c#L6660).
+   * This works well for main thread since [stack] is at the top of the process
+   * user address space (and there is a gap between [vvar] and [stack]), but
+   * for threads, stack can be allocated anywhere on the heap and if address
+   * space below allocated stack is mapped, then kernel will happily copy the
+   * whole range up to the requested sample stack size, therefore always
+   * returning samples with `dyn_size` equals to the requested sample stack
+   * size, even if the end of captured stack is not actually part of the stack.
+   *
+   * That's why we consider the stack as truncated in input only if it is also
+   * detected as incomplete during unwinding.
+   */
+  if (sample->size_stack == ctx->watchers[watcher_pos].sample_stack_size &&
+      us->output.is_incomplete) {
+    ddprof_stats_add(STATS_UNWIND_TRUNCATED_INPUT, 1, nullptr);
+  }
+
   auto unwind_ticks = ddprof::get_tsc_cycles();
   DDRES_CHECK_FWD(
       ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL));
@@ -243,7 +291,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     // in lib mode we don't aggregate (protect to avoid link failures)
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
-    DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr, sample_val,
+    DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr, sample_val, 1,
                                     watcher, pprof));
     if (ctx->params.show_samples) {
       ddprof_print_sample(us->output, us->symbol_hdr, sample->period, *watcher);
@@ -319,8 +367,11 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
     }
     ctx->worker_ctx.exp_tid = 0;
   }
-  if (ctx->worker_ctx.exp_error)
+  if (ctx->worker_ctx.exp_error) {
     return ddres_create(DD_SEVERROR, DD_WHAT_EXPORTER);
+  }
+
+  DDRES_CHECK_FWD(report_lost_events(ctx));
 
   // Dispatch to thread
   ctx->worker_ctx.exp_error = false;
@@ -396,8 +447,10 @@ void ddprof_pr_mmap(DDProfContext *ctx, const perf_event_mmap2 *map,
   ctx->worker_ctx.us->dso_hdr.insert_erase_overlap(std::move(new_dso));
 }
 
-void ddprof_pr_lost(DDProfContext *, const perf_event_lost *lost, int) {
+void ddprof_pr_lost(DDProfContext *ctx, const perf_event_lost *lost,
+                    int watcher_pos) {
   ddprof_stats_add(STATS_EVENT_LOST, lost->lost, NULL);
+  ctx->worker_ctx.lost_events_per_watcher[watcher_pos] += lost->lost;
 }
 
 void ddprof_pr_comm(DDProfContext *ctx, const perf_event_comm *comm,

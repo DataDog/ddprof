@@ -12,13 +12,13 @@
 #include "tags.hpp"
 #include "unwind_output.hpp"
 
-struct ddprof_ffi_Profile;
+struct ddog_Profile;
 struct SymbolHdr;
 
 struct DDProfPProf {
   DDProfPProf() noexcept {}
   /* single profile gathering several value types */
-  ddprof_ffi_Profile *_profile = nullptr;
+  ddog_Profile *_profile = nullptr;
   unsigned _nb_values = 0;
   ddprof::Tags _tags;
 };
@@ -34,7 +34,8 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx);
  */
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr *symbol_hdr, uint64_t value,
-                      const PerfWatcher *watcher, DDProfPProf *pprof);
+                      uint64_t count, const PerfWatcher *watcher,
+                      DDProfPProf *pprof);
 
 DDRes pprof_reset(DDProfPProf *pprof);
 
