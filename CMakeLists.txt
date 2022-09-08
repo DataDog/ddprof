@@ -88,6 +88,10 @@ bison_target(event_parser_yacc util/event_parser.y ${EVENT_PARSER_SRC}/event_par
 flex_target(event_parser_lex util/event_parser.l ${EVENT_PARSER_SRC}/event_parser.lex.c)
 add_flex_bison_dependency(event_parser_lex event_parser_yacc)
 
+# note: don't rely on config-time source dir scans, since these files won't be generated until build
+set(PARSER_SRC # cmake-format: sortable
+               ${EVENT_PARSER_SRC}/event_parser.lex.c ${EVENT_PARSER_SRC}/event_parser.tab.c)
+
 # ---- Static analysis ----
 include(ClangTidy)
 include(CppcheckConfig)
@@ -138,7 +142,6 @@ aux_source_directory(src COMMON_SRC)
 aux_source_directory(src/pprof PPROF_SRC)
 aux_source_directory(src/exporter EXPORTER_SRC)
 aux_source_directory(src/exe EXE_SRC)
-aux_source_directory(${EVENT_PARSER_SRC} PARSER_SRC)
 
 # Create a dependency for generated header on the source file(s) referencing it Subdirectories must
 # be inclued explicitly as per the cmake docs
@@ -181,6 +184,7 @@ set(DD_PROFILING_SOURCES
     src/logger.cc
     src/logger_setup.cc
     src/perf.cc
+    src/perf_archmap.cc
     src/perf_ringbuffer.cc
     src/perf_watcher.cc
     src/pevent_lib.cc
