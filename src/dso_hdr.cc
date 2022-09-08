@@ -343,7 +343,7 @@ DsoFindRes DsoHdr::insert_erase_overlap(DsoMap &map, Dso &&dso) {
   _stats.incr_metric(DsoStats::kNewDso, dso._type);
   LG_DBG("[DSO] : Insert %s", dso.to_string().c_str());
   // warning rvalue : do not use dso after this line
-  return map.insert(std::pair(ProcessAddress_t(dso._start), std::move(dso)));
+  return map.insert({dso._start, std::move(dso)});
 }
 
 DsoFindRes DsoHdr::insert_erase_overlap(Dso &&dso) {
