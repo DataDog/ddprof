@@ -15,7 +15,6 @@ typedef struct DDProfExporter DDProfExporter;
 typedef struct DDProfPProf DDProfPProf;
 typedef struct PersistentWorkerState PersistentWorkerState;
 typedef struct StackHandler StackHandler;
-typedef struct StackHandler StackHandler;
 typedef struct UnwindState UnwindState;
 typedef struct UserTags UserTags;
 

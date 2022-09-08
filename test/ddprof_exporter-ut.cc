@@ -20,7 +20,7 @@
 
 namespace ddprof {
 // todo : cut this dependency
-DwflSymbolLookup_V2::DwflSymbolLookup_V2() : _lookup_setting(K_CACHE_ON) {}
+DwflSymbolLookup::DwflSymbolLookup() : _lookup_setting(K_CACHE_ON) {}
 
 // Mock
 int get_nb_hw_thread() { return 2; }
@@ -53,8 +53,7 @@ get_host_port_from_full_addr(const char *full_url) {
   std::string host =
       full_str.substr(found_host + 1, found_port - (found_host + 1));
 
-  return std::make_pair<std::string, std::string>(std::move(host),
-                                                  std::move(port));
+  return {host, port};
 }
 
 // returns host and port from env var HTTP_RECEPTOR_URL
@@ -63,7 +62,7 @@ std::pair<std::string, std::string> get_receptor_host_port() {
   if (full_addr) {
     return get_host_port_from_full_addr(full_addr);
   } else {
-    return std::make_pair<std::string, std::string>("localhost", "8126");
+    return std::pair("localhost", "8126");
   }
 }
 
@@ -94,8 +93,7 @@ void fill_mock_exporter_input(ExporterInput &exporter_input,
 
 TEST(DDProfExporter, url) {
   LogHandle handle;
-  std::pair<std::string, std::string> url =
-      std::make_pair("25.04.1988.0", "1234");
+  std::pair<std::string, std::string> url{"25.04.1988.0", "1234"};
   ExporterInput exporter_input;
   // Test the site / host / port / API logic
   // If API key --> use site

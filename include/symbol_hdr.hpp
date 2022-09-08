@@ -13,22 +13,25 @@
 #include "dwfl_symbol_lookup.hpp"
 #include "logger.hpp"
 #include "mapinfo_lookup.hpp"
+#include "runtime_symbol_lookup.hpp"
 
 #include <stdlib.h>
 
 struct SymbolHdr {
-  SymbolHdr() {}
+  SymbolHdr(std::string_view path_to_proc = "")
+      : _runtime_symbol_lookup(path_to_proc) {}
   void display_stats() const {
-    _dwfl_symbol_lookup_v2._stats.display(_dwfl_symbol_lookup_v2.size());
+    _dwfl_symbol_lookup._stats.display(_dwfl_symbol_lookup.size());
     _dso_symbol_lookup.stats_display();
   }
-  void cycle() { _dwfl_symbol_lookup_v2._stats.reset(); }
+  void cycle() { _dwfl_symbol_lookup._stats.reset(); }
 
   // Cache symbol associations
   ddprof::BaseFrameSymbolLookup _base_frame_symbol_lookup;
   ddprof::CommonSymbolLookup _common_symbol_lookup;
   ddprof::DsoSymbolLookup _dso_symbol_lookup;
-  ddprof::DwflSymbolLookup_V2 _dwfl_symbol_lookup_v2;
+  ddprof::DwflSymbolLookup _dwfl_symbol_lookup;
+  ddprof::RuntimeSymbolLookup _runtime_symbol_lookup;
   // Symbol table (contains the references to strings)
   ddprof::SymbolTable _symbol_table;
 

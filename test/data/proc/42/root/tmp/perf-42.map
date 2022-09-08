@@ -1,0 +1,2268 @@
+00007FB061490018 48 stub<1> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061490068 38 stub<2> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614900A8 8 stub<3> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614900B8 8 stub<4> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614900C8 88 stub<5> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061490168 a8 stub<6> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061490420 490 stub<7> AllocateTemporaryEntryPoints<PRECODE_STUB>
+00007FB061490A38 18 stub<8> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061490A58 a0 stub<9> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061490B00 60 stub<10> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061490CC0 318 stub<11> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061490FE8 330 stub<12> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061490B68 8 stub<13> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061490B78 b0 stub<14> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061490C30 8 stub<15> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061491328 1c0 stub<16> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614914F8 320 stub<17> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061490C40 8 stub<18> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061490C50 20 stub<19> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061491828 58 stub<20> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061490C78 8 stub<21> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061490C88 10 stub<22> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061491888 1c8 stub<23> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061491C30 270 stub<24> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061491A58 70 stub<25> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061490CA0 10 stub<26> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061491AD0 68 stub<27> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061491B40 20 stub<28> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061491B68 8 stub<29> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061491B78 8 stub<30> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061491EB0 1b8 stub<31> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061491B88 8 stub<32> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061491B98 20 stub<33> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061491BC0 8 stub<34> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061491BD0 8 stub<35> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061491BE0 10 stub<36> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061491BF8 20 stub<37> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492078 8 stub<38> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492088 8 stub<39> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492098 8 stub<40> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614920A8 8 stub<41> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614920B8 8 stub<42> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614920C8 8 stub<43> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614920D8 10 stub<44> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614920F0 10 stub<45> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492108 8 stub<46> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492118 8 stub<47> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492128 8 stub<48> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492138 80 stub<49> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614921C0 10 stub<50> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614921D8 10 stub<51> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614921F0 28 stub<52> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492220 10 stub<53> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492238 d0 stub<54> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492480 208 stub<55> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492698 240 stub<56> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492310 20 stub<57> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492338 8 stub<58> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492348 8 stub<59> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492358 8 stub<60> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492368 8 stub<61> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492378 10 stub<62> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492390 8 stub<63> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614923A0 20 stub<64> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614923C8 8 stub<65> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614923D8 10 stub<66> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614923F0 8 stub<67> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492400 8 stub<68> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492410 8 stub<69> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492420 8 stub<70> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492430 8 stub<71> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492440 8 stub<72> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492450 8 stub<73> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492460 10 stub<74> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614928E8 10 stub<75> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492900 10 stub<76> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492918 8 stub<77> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492928 8 stub<78> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492938 8 stub<79> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492948 80 stub<80> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614929D0 8 stub<81> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614929E0 8 stub<82> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614929F0 20 stub<83> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492A18 8 stub<84> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492A28 10 stub<85> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492A40 8 stub<86> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492A50 8 stub<87> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492A60 8 stub<88> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492A70 8 stub<89> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492A80 8 stub<90> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492A90 8 stub<91> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492AA0 8 stub<92> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492AB0 10 stub<93> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492AC8 10 stub<94> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492AE0 8 stub<95> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492AF0 8 stub<96> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492B00 8 stub<97> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492B10 10 stub<98> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492B28 20 stub<99> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492B50 80 stub<100> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492BD8 8 stub<101> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492BE8 8 stub<102> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492BF8 20 stub<103> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492C20 8 stub<104> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492C30 10 stub<105> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492C48 8 stub<106> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492C58 8 stub<107> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492C68 8 stub<108> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492C78 8 stub<109> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492C88 8 stub<110> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492C98 8 stub<111> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492CA8 8 stub<112> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492CB8 10 stub<113> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492CD0 10 stub<114> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492CF0 8 stub<115> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492D00 8 stub<116> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492D10 8 stub<117> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492D20 10 stub<118> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492D38 80 stub<119> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492DC0 8 stub<120> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492DD0 8 stub<121> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492DE0 20 stub<122> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492E08 8 stub<123> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492E18 10 stub<124> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492E30 8 stub<125> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492E40 8 stub<126> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492E50 8 stub<127> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492E60 8 stub<128> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492E70 8 stub<129> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492E80 8 stub<130> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492E90 8 stub<131> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492EA0 10 stub<132> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492EB8 10 stub<133> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492ED0 8 stub<134> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492EE0 8 stub<135> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492EF0 8 stub<136> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492F00 8 stub<137> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061492F10 170 stub<138> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614930F8 228 stub<139> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493330 80 stub<140> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493088 8 stub<141> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493098 8 stub<142> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614930A8 20 stub<143> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614930D0 8 stub<144> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614933B8 10 stub<145> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614933D0 8 stub<146> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614933E0 8 stub<147> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614933F0 8 stub<148> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493400 8 stub<149> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493410 8 stub<150> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493420 8 stub<151> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493430 8 stub<152> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493440 10 stub<153> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493458 10 stub<154> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493470 8 stub<155> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493480 8 stub<156> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493490 8 stub<157> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614934A0 168 stub<158> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493738 228 stub<159> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493970 170 stub<160> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493AF0 228 stub<161> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493D28 168 stub<162> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493EA0 228 stub<163> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614940D8 170 stub<164> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061494258 220 stub<165> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061494488 160 stub<166> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614945F8 220 stub<167> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061494828 168 stub<168> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614949A0 220 stub<169> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061494BD0 160 stub<170> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061494D40 220 stub<171> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061494F70 1a8 stub<172> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493610 20 stub<173> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495128 180 stub<174> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614952B8 198 stub<175> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495460 248 stub<176> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493638 10 stub<177> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493650 20 stub<178> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493678 80 stub<179> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493700 8 stub<180> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061493710 8 stub<181> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614956B8 20 stub<182> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614956E0 8 stub<183> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614956F0 10 stub<184> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495708 8 stub<185> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495718 8 stub<186> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495728 8 stub<187> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495738 8 stub<188> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495748 8 stub<189> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495758 8 stub<190> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495768 8 stub<191> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495778 10 stub<192> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495790 10 stub<193> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614957A8 8 stub<194> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614957B8 8 stub<195> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614957C8 8 stub<196> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614957D8 8 stub<197> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614957E8 80 stub<198> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495870 8 stub<199> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495880 8 stub<200> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495890 20 stub<201> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614958B8 8 stub<202> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614958C8 10 stub<203> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614958E0 8 stub<204> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614958F0 8 stub<205> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495900 8 stub<206> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495910 8 stub<207> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495920 8 stub<208> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495930 8 stub<209> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495940 8 stub<210> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495950 10 stub<211> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495968 10 stub<212> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495980 8 stub<213> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495990 8 stub<214> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614959A0 8 stub<215> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495AC0 1a8 stub<216> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614959B0 8 stub<217> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614959C0 20 stub<218> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495C78 180 stub<219> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495E08 198 stub<220> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495FB0 248 stub<221> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614959E8 8 stub<222> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061496208 100 stub<223> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061496318 240 stub<224> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061496568 f8 stub<225> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061496670 240 stub<226> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614959F8 10 stub<227> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495A10 8 stub<228> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614968C0 178 stub<229> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061496A48 228 stub<230> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061496C80 2b0 stub<231> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495A20 60 stub<232> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061496F40 170 stub<233> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614970C0 f0 stub<234> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614971B8 d8 stub<235> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495A88 10 stub<236> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497298 20 stub<237> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614972C0 c8 stub<238> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497390 20 stub<239> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614973B8 20 stub<240> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614973E0 d8 stub<241> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061495AA0 8 stub<242> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614974C8 8 stub<243> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497538 150 stub<244> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497690 28 stub<245> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614976C0 d8 stub<246> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614978D0 170 stub<247> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614977B0 e0 stub<248> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497B60 140 stub<249> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497E58 220 stub<250> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061498090 53 void [System.Private.CoreLib] System.Runtime.CompilerServices.CastHelpers::StelemRef(class System.Array,int32,object)[OptimizedTier1]
+00007FB061498100 2b object& [System.Private.CoreLib] System.Runtime.CompilerServices.CastHelpers::LdelemaRef(class System.Array,int32,void*)[OptimizedTier1]
+00007FB061497CA8 8 stub<251> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497CB8 38 stub<252> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497CF8 8 stub<253> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497D08 28 stub<254> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497D38 38 stub<255> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497D78 8 stub<256> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497D88 8 stub<257> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497D98 8 stub<258> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497DA8 8 stub<259> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497DB8 8 stub<260> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497DC8 8 stub<261> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497DD8 38 stub<262> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061498140 2a8 stub<263> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614983F8 270 stub<264> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061498678 2b0 stub<265> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497E18 8 stub<266> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497E28 8 stub<267> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061497E38 8 stub<268> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061498938 10 stub<269> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061498950 c8 stub<270> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061498A20 20 stub<271> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061498D40 348 stub<272> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061498A58 170 stub<273> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061498BD0 20 stub<274> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061498BF8 20 stub<275> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061498C20 20 stub<276> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061498C48 20 stub<277> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061498C70 18 stub<278> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061498C90 10 stub<279> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499098 198 stub<280> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499240 258 stub<281> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061498CF8 10 stub<282> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061498D10 10 stub<283> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614994B8 d0 stub<284> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499590 8 stub<285> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614995A0 70 stub<286> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499618 88 stub<287> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614996A8 40 stub<288> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614996F0 58 stub<289> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499750 28 stub<290> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614998B0 1f8 stub<291> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499AB8 1f8 stub<292> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499780 30 stub<293> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614997B8 30 stub<294> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614997F0 38 stub<295> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499830 8 stub<296> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499840 40 stub<297> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499CC0 30 stub<298> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499CF8 38 stub<299> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499888 8 stub<300> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499D38 30 stub<301> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499D70 8 stub<302> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499D80 8 stub<303> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499D90 28 stub<304> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499DC0 8 stub<305> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499DD0 40 stub<306> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499E18 30 stub<307> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499E50 38 stub<308> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499E90 8 stub<309> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499EA0 28 stub<310> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499ED0 8 stub<311> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499EE0 38 stub<312> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499F20 50 stub<313> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499F78 8 stub<314> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499F88 20 stub<315> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499FB0 10 stub<316> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499FC8 10 stub<317> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB061499FE0 48 stub<318> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A030 10 stub<319> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A048 18 stub<320> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A068 20 stub<321> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A090 10 stub<322> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A4D0 48 stub<323> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A520 48 stub<324> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A0A8 10 stub<325> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A570 30 stub<326> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A5A8 48 stub<327> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A5F8 28 stub<328> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A628 10 stub<329> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A640 48 stub<330> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A690 38 stub<331> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A6D0 38 stub<332> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A710 10 stub<333> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A728 48 stub<334> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A778 38 stub<335> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A7B8 38 stub<336> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A7F8 10 stub<337> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A810 8 stub<338> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A820 8 stub<339> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A8D8 a0 stub<340> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A830 38 stub<341> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A870 30 stub<342> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A8A8 8 stub<343> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A980 30 stub<344> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A9B8 240 stub<345> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149AC00 70 stub<346> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149A8B8 8 stub<347> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149ACE0 70 stub<348> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149AD58 70 stub<349> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149AC78 8 stub<350> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149ADD0 70 stub<351> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149B0E8 2a0 stub<352> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149AC88 8 stub<353> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149B398 2a0 stub<354> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149AC98 8 stub<355> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149ACA8 8 stub<356> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149ACB8 8 stub<357> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149AE58 50 stub<358> AllocateTemporaryEntryPoints<PRECODE_STUB>
+00007FB06149AEE8 18 stub<359> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149B648 2a8 stub<360> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149AF08 168 stub<361> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149B900 2a8 stub<362> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149BBB8 2a8 stub<363> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149BE70 2a8 stub<364> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149C128 98 stub<365> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149C1C8 c8 stub<366> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149C298 1b8 stub<367> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149C530 2a8 stub<368> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149B078 28 stub<369> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149C7E8 250 stub<370> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149CA48 2a8 stub<371> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149CD00 2a8 stub<372> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149CFB8 1b0 stub<373> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149D178 2a8 stub<374> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149D430 2a8 stub<375> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149D6E8 2a8 stub<376> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149D9A0 2a8 stub<377> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149C458 70 stub<378> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149DC58 178 stub<379> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149DDE0 248 stub<380> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149B0A8 8 stub<381> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149E038 70 stub<382> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149E0B0 e8 stub<383> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149E1A0 148 stub<384> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149E440 240 stub<385> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149B0B8 8 stub<386> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149B0C8 8 stub<387> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149C4D0 8 stub<388> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149C4E0 40 stub<389> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149E2F0 28 stub<390> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149E320 8 stub<391> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149E330 8 stub<392> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149E340 8 stub<393> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149E6A0 1b0 int32 [System.Private.CoreLib] System.SpanHelpers::IndexOf(char&,char,int32)[OptimizedTier1]
+00007FB06149E370 90 stub<394> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06096F000 18 stub<395> GenerateLookupStub<GenerateLookupStub>
+00007FB0609A4000 18 stub<396> GenerateResolveStub<GenerateResolveStub>
+00007FB060973000 20 stub<397> GenerateDispatchStub<GenerateDispatchStub>
+00007FB06149E900 c0 stub<398> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149EC78 400 stub<399> AllocateTemporaryEntryPoints<PRECODE_STUB>
+00007FB06149F100 228 stub<400> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149F330 18 stub<401> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149F350 18 stub<402> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149F488 198 stub<403> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149F630 200 stub<404> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149F370 f8 stub<405> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149F840 2b0 stub<406> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149FB00 30 stub<407> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149FB38 10 stub<408> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149FB50 c8 stub<409> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149FC20 10 stub<410> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149FC38 e0 stub<411> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149FD20 e0 stub<412> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149FE08 38 stub<413> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149FE58 98 stub<414> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149FF28 58 stub<415> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149FF88 20 stub<416> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149FFB0 20 stub<417> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06149FFD8 b8 stub<418> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0098 b8 stub<419> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0310 250 stub<420> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0570 250 stub<421> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0158 28 stub<422> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0188 38 stub<423> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A01C8 8 stub<424> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A01D8 8 stub<425> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A01E8 28 stub<426> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0218 38 stub<427> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0258 8 stub<428> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0268 8 stub<429> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0278 8 stub<430> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A07D0 1f8 stub<431> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0288 40 stub<432> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A02D0 30 stub<433> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A09D8 38 stub<434> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0A18 8 stub<435> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0A28 28 stub<436> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0A58 8 stub<437> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0A68 20 stub<438> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0A90 58 stub<439> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0AF0 48 stub<440> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0B40 20 stub<441> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0B68 20 stub<442> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0BA0 18 stub<443> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0BC0 20 stub<444> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0BE8 20 stub<445> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0C10 30 stub<446> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0C48 28 stub<447> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0C78 f0 stub<448> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0D70 10 stub<449> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0DE0 c8 stub<450> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0D88 48 stub<451> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB000 e stub<452> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614A0EB0 10 stub<453> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0EC8 58 stub<454> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0F28 58 stub<455> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A0F88 250 stub<456> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A15F0 28 stub<457> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A1620 38 stub<458> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A1660 8 stub<459> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A1670 8 stub<460> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A1680 8 stub<461> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A1720 68 stub<462> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A19F8 2a8 stub<463> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A1CB0 430 stub<464> AllocateTemporaryEntryPoints<PRECODE_STUB>
+00007FB0614A22E8 c0 stub<465> AllocateTemporaryEntryPoints<PRECODE_STUB>
+00007FB0614A23C8 e8 stub<466> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A24F0 268 stub<467> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A2768 270 stub<468> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609A4070 18 stub<469> GenerateResolveStub<GenerateResolveStub>
+00007FB060973020 20 stub<470> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0614A29E8 a8 stub<471> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A2A98 2b8 stub<472> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A24B8 8 stub<473> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A24C8 8 stub<474> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A2D58 8 stub<475> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A2D68 8 stub<476> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A2DF0 130 stub<477> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A2F30 e0 stub<478> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A3018 250 stub<479> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A3338 2b0 stub<480> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A2D78 8 stub<481> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A2D88 8 stub<482> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A2D98 8 stub<483> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A2DA8 8 stub<484> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A35F8 f0 stub<485> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A2DB8 18 stub<486> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A36F0 e8 stub<487> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A3A00 2a8 stub<488> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A3270 20 stub<489> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A3298 20 stub<490> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A37E0 80 stub<491> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A32C0 68 stub<492> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A3868 20 stub<493> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A3CB8 2a8 stub<494> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A3F70 2b0 stub<495> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A3890 20 stub<496> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A4230 1e0 stub<497> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A38B8 8 stub<498> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A38C8 8 stub<499> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A38D8 8 stub<500> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A38E8 8 stub<501> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06096F020 18 stub<502> GenerateLookupStub<GenerateLookupStub>
+00007FB0614A4420 747 void [Samples.Computer01] Samples.Computer01.Program::Main(string[])[MinOptJitted]
+00007FB0614A5008 50 stub<503> AllocateTemporaryEntryPoints<PRECODE_STUB>
+00007FB0614A5058 1e0 stub<504> AllocateTemporaryEntryPoints<PRECODE_STUB>
+00007FB0614A53B0 1d0 stub<505> AllocateTemporaryEntryPoints<PRECODE_STUB>
+00007FB0614A5238 108 stub<506> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A5588 118 stub<507> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A56B0 8 stub<508> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A56C0 178 stub<509> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A5AB8 2b0 stub<510> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A5840 250 stub<511> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A5D78 1c8 stub<512> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A5F50 2a8 stub<513> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A6208 20 stub<514> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A6230 20 stub<515> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A6488 80 stub<516> AllocateTemporaryEntryPoints<PRECODE_STUB>
+00007FB0614A6610 1d0 stub<517> AllocateTemporaryEntryPoints<PRECODE_STUB>
+00007FB0614A6518 20 stub<518> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A6808 110 stub<519> AllocateTemporaryEntryPoints<PRECODE_STUB>
+00007FB0614A6948 110 stub<520> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A6A60 50 stub<521> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A6AB8 d0 stub<522> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A6BF0 68 stub<523> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A6C60 78 stub<524> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A6CE0 178 stub<525> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A6B90 38 stub<526> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A6E60 80 stub<527> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A6EE8 e0 stub<528> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A6BD0 8 stub<529> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A6FF8 8 stub<530> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A7008 8 stub<531> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A7018 8 stub<532> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A7028 8 stub<533> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A7038 8 stub<534> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A7400 167 int32 [System.Private.CoreLib] System.SpanHelpers::SequenceCompareTo(uint8&,int32,uint8&,int32)[OptimizedTier1]
+00007FB0614A7048 20 stub<535> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB010 e stub<536> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614A7070 268 stub<537> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB020 e stub<538> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0609FB030 e stub<539> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614A7580 1f8 stub<540> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A7788 118 stub<541> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A78B0 118 stub<542> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A79D8 1f0 stub<543> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A72E0 8 stub<544> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A72F0 8 stub<545> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A7300 8 stub<546> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A7310 8 stub<547> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A7320 8 stub<548> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A7BE0 137 bool [System.Private.CoreLib] System.SpanHelpers::Contains(char&,char,int32)[OptimizedTier1]
+00007FB0614A7D38 120 stub<549> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A7E68 288 stub<550> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A7330 50 stub<551> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A7388 8 stub<552> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A7398 8 stub<553> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A73A8 10 stub<554> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A73C0 10 stub<555> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A73D8 18 stub<556> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A8100 18 stub<557> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A8120 18 stub<558> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A8140 8 stub<559> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A8150 60 stub<560> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A81B8 60 stub<561> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A8220 8 stub<562> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A8230 8 stub<563> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A8240 8 stub<564> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A8250 8 stub<565> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A8260 8 stub<566> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A8520 c7 int32 [System.Private.CoreLib] System.SpanHelpers::SequenceCompareTo(char&,int32,char&,int32)[OptimizedTier1]
+00007FB0614A8280 20 stub<567> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A82A8 20 stub<568> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB040 e stub<569> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614A82D0 20 stub<570> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB050 e stub<571> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0609FB060 e stub<572> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614A8600 288 stub<573> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A82F8 30 stub<574> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A8330 10 stub<575> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A8348 38 stub<576> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A8388 68 stub<577> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A83F8 b8 stub<578> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A84B8 8 stub<579> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A84C8 8 stub<580> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A84D8 8 stub<581> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A8898 1f8 stub<582> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A8AA0 88 stub<583> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A8B30 28 stub<584> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A8B60 28 stub<585> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A84E8 10 stub<586> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A8C20 1d0 stub<587> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A93A0 e0 stub<588> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A9488 8 stub<589> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A96C0 17f class [System.Runtime]Microsoft.Win32.SafeHandles.SafeFileHandle [System.Console] dynamicClass::IL_STUB_PInvoke(class [System.Runtime]Microsoft.Win32.SafeHandles.SafeFileHandle)[Optimized]
+00007FB0614A9878 2a0 stub<590> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A9B28 100 stub<591> AllocateTemporaryEntryPoints<PRECODE_STUB>
+00007FB0614A9C30 1f8 stub<592> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A9E38 70 stub<593> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A9EB0 68 stub<594> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A9F20 20 stub<595> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A9F48 40 stub<596> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A9F90 30 stub<597> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB070 e stub<598> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614A9FC8 220 stub<599> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AA240 1e8 stub<600> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AA438 e0 stub<601> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AA1F0 18 stub<602> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AA520 d0 stub<603> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614A9698 8 stub<604> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AA210 8 stub<605> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AA5F8 60 stub<606> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AA660 58 stub<607> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AA6C0 40 stub<608> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AA840 1c8 stub<609> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AA708 c0 stub<610> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AA7D0 20 stub<611> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AA7F8 20 stub<612> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB080 e stub<613> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614AAA18 40 stub<614> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB090 e stub<615> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0609FB0A0 e stub<616> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0609A40E0 18 stub<617> GenerateResolveStub<GenerateResolveStub>
+00007FB060973040 20 stub<618> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0614AAA60 20 stub<619> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AAA88 148 stub<620> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AABD8 38 stub<621> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AAC18 28 stub<622> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AAC48 40 stub<623> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AAC90 28 stub<624> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AACC0 40 stub<625> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AA220 8 stub<626> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AAD08 e8 stub<627> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB0B0 e stub<628> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0609FB0C0 e stub<629> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614AADF8 8 stub<630> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AAE20 8 stub<631> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AAE30 8 stub<632> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AAE40 20 stub<633> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AAE68 78 stub<634> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AAEE8 78 stub<635> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AAF68 218 stub<636> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AB188 50 stub<637> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AB228 1d0 stub<638> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AB408 138 stub<639> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AB1E0 10 stub<640> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AB1F8 20 stub<641> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AB550 1a0 stub<642> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AB700 270 stub<643> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AB980 2b0 stub<644> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ABC40 b8 stub<645> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ABD00 20 stub<646> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ABD28 d8 stub<647> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ABE08 1f8 stub<648> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AC048 1c0 stub<649> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AC218 1c0 stub<650> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AC3E8 48 stub<651> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AC438 48 stub<652> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB0D0 e stub<653> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0609FB0E0 11 stub<654> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614AC488 1a8 stub<655> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AC638 1a8 stub<656> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AC008 28 stub<657> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AC7F0 38 stub<658> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AC830 8 stub<659> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AC840 8 stub<660> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AC850 8 stub<661> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AC860 28 stub<662> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AC890 38 stub<663> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AC8D0 8 stub<664> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AC8E0 8 stub<665> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AC8F0 8 stub<666> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB100 e stub<667> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614AC900 110 stub<668> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ACA18 70 stub<669> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ACA90 a0 stub<670> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ACBF8 2a0 stub<671> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ACB38 8 stub<672> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ACB48 8 stub<673> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ACB58 8 stub<674> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ACB68 70 stub<675> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ACEA8 18 stub<676> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ACEC8 20 stub<677> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ACEF0 50 stub<678> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ACF48 70 stub<679> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ACFC0 8 stub<680> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ACFD0 8 stub<681> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ACFE0 8 stub<682> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ACFF0 8 stub<683> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD2C0 121 native uint [System.Private.CoreLib] System.Text.ASCIIUtility::NarrowUtf16ToAscii(char*,uint8*,native uint)[Optimized]
+00007FB0614AD000 1e0 stub<684> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB110 e stub<685> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0609FB120 e stub<686> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614AD1F8 8 stub<687> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD208 28 stub<688> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD238 38 stub<689> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD408 50 stub<690> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD278 8 stub<691> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD810 af bool [System.Console] dynamicClass::IL_STUB_PInvoke()[Optimized]
+00007FB0614AD460 10 stub<692> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD478 20 stub<693> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD4A0 20 stub<694> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD4C8 8 stub<695> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD8E0 11e bool [System.Console] dynamicClass::IL_STUB_PInvoke(class [System.Runtime]Microsoft.Win32.SafeHandles.SafeFileHandle)[Optimized]
+00007FB0614AD4E8 40 stub<696> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD530 18 stub<697> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD550 a8 stub<698> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD600 10 stub<699> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD618 8 stub<700> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD628 8 stub<701> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD638 8 stub<702> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD648 28 stub<703> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD678 50 stub<704> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ADA40 253 class [System.Runtime]Microsoft.Win32.SafeHandles.SafeFileHandle [System.Console] dynamicClass::IL_STUB_PInvoke(string,valuetype Interop/Sys/OpenFlags,int32)[Optimized]
+00007FB0614AD6E0 8 stub<705> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ADCD8 188 stub<706> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614ADE70 2a8 stub<707> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD700 8 stub<708> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AE130 12b int64 [System.Console] dynamicClass::IL_STUB_PInvoke(class [System.Runtime]Microsoft.Win32.SafeHandles.SafeFileHandle,int64,valuetype Interop/Sys/SeekWhence)[Optimized]
+00007FB0614AD720 8 stub<709> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AE2A0 129 int32 [System.Console] dynamicClass::IL_STUB_PInvoke(class [System.Runtime]System.Runtime.InteropServices.SafeHandle,uint8*,int32)[Optimized]
+00007FB0614AE408 120 stub<710> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD740 10 stub<711> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB130 e stub<712> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614AE538 2a0 stub<713> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD758 8 stub<714> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD768 8 stub<715> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD778 8 stub<716> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD788 8 stub<717> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AE800 ce native uint [System.Private.CoreLib] System.Text.ASCIIUtility::WidenAsciiToUtf16(uint8*,char*,native uint)[Optimized]
+00007FB0609FB140 e stub<718> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614AD798 20 stub<719> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB150 e stub<720> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0609FB160 e stub<721> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614AE8F0 60 stub<722> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD7D0 18 stub<723> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AE958 c0 stub<724> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AEA20 c0 stub<725> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AD7F0 10 stub<726> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AEAE8 8 stub<727> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AECF8 1f8 stub<728> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AEAF8 40 stub<729> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AEB40 30 stub<730> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AEB78 38 stub<731> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AEBB8 8 stub<732> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AEBC8 28 stub<733> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AEBF8 8 stub<734> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AEC08 18 stub<735> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AEC28 30 stub<736> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AEC60 88 stub<737> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AEF00 88 stub<738> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AEF90 8 stub<739> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AEFA0 8 stub<740> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AF710 28 instance void [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.ReadOnlyMemory`1[System.Char],System.ConsoleKeyInfo]::.ctor(class System.Collections.Generic.IEqualityComparer`1<!0>)[QuickJitted]
+00007FB0614AEFB0 10 stub<741> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AEFC8 48 stub<742> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AF018 48 stub<743> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AF068 18 stub<744> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AF750 288 stub<745> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AF9F0 10b instance void [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.ReadOnlyMemory`1[System.Char],System.ConsoleKeyInfo]::.ctor(int32,class System.Collections.Generic.IEqualityComparer`1<!0>)[QuickJitted]
+00007FB0614AF088 80 stub<746> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AFB20 27 class System.Collections.Generic.EqualityComparer`1<!0> [System.Private.CoreLib] System.Collections.Generic.EqualityComparer`1[System.ReadOnlyMemory`1[System.Char]]::get_Default()[QuickJitted]
+00007FB0614AFB60 68 void [System.Private.CoreLib] System.Collections.Generic.EqualityComparer`1[System.ReadOnlyMemory`1[System.Char]]::.cctor()[QuickJitted]
+00007FB0614AF110 20 stub<747> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AF148 50 stub<748> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AFBE0 318 stub<749> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AF1A0 c0 stub<750> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AFF08 b8 stub<751> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AF268 20 stub<752> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AF290 10 stub<753> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AF2A8 10 stub<754> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AF2C0 8 stub<755> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB170 11 stub<756> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614AFFC8 38 stub<757> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B0310 1e instance void [System.Private.CoreLib] System.Collections.Generic.GenericEqualityComparer`1[System.ReadOnlyMemory`1[System.Char]]::.ctor()[QuickJitted]
+00007FB0614B0350 1e instance void [System.Private.CoreLib] System.Collections.Generic.EqualityComparer`1[System.ReadOnlyMemory`1[System.Char]]::.ctor()[QuickJitted]
+00007FB0614B0008 108 stub<758> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B0118 1e0 stub<759> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B0388 1b0 stub<760> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614AF2D0 8 stub<761> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B0548 280 stub<762> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B07E0 46 instance void [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.ReadOnlyMemory`1[System.Char],System.ConsoleKeyInfo]::set_Item(!0,!1)[QuickJitted]
+00007FB0614B0840 20 stub<763> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06096F040 18 stub<764> GenerateLookupStub<GenerateLookupStub>
+00007FB0614AF2E0 8 stub<765> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B0868 8 stub<766> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06096F060 18 stub<767> GenerateLookupStub<GenerateLookupStub>
+00007FB0614B0878 c8 stub<768> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B0948 8 stub<769> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B0958 8 stub<770> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B0C60 358 instance bool [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.ReadOnlyMemory`1[System.Char],System.ConsoleKeyInfo]::TryInsert(!0,!1,valuetype System.Collections.Generic.InsertionBehavior)[Optimized]
+00007FB0614B0FE0 9e instance int32 [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.ReadOnlyMemory`1[System.Char],System.ConsoleKeyInfo]::Initialize(int32)[QuickJitted]
+00007FB0609A4150 18 stub<771> GenerateResolveStub<GenerateResolveStub>
+00007FB060973060 20 stub<772> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0614B0968 18 stub<773> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B10A0 177 instance void [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.ReadOnlyMemory`1[System.Char],System.ConsoleKeyInfo]::Resize(int32,bool)[Optimized]
+00007FB0609FB190 e stub<774> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB06096F080 18 stub<775> GenerateLookupStub<GenerateLookupStub>
+00007FB0609A41C0 18 stub<776> GenerateResolveStub<GenerateResolveStub>
+00007FB060973080 20 stub<777> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0614B1240 22 instance int32 [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.ReadOnlyMemory`1[System.Char],System.ConsoleKeyInfo]::get_Count()[QuickJitted]
+00007FB0614B0988 88 stub<778> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B0A18 8 stub<779> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1280 64 instance valuetype System.Collections.Generic.Dictionary`2/Enumerator<!0,!1> [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.ReadOnlyMemory`1[System.Char],System.ConsoleKeyInfo]::GetEnumerator()[QuickJitted]
+00007FB0614B0A28 1f8 stub<780> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1300 40 stub<781> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1348 38 stub<782> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B0C28 8 stub<783> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1388 28 stub<784> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B13B8 8 stub<785> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1710 5f instance void [System.Private.CoreLib] System.Collections.Generic.Dictionary`2+Enumerator[System.ReadOnlyMemory`1[System.Char],System.ConsoleKeyInfo]::.ctor(class System.Collections.Generic.Dictionary`2<!0,!1>,int32)[QuickJitted]
+00007FB0614B17A0 ea instance bool [System.Private.CoreLib] System.Collections.Generic.Dictionary`2+Enumerator[System.ReadOnlyMemory`1[System.Char],System.ConsoleKeyInfo]::MoveNext()[Optimized]
+00007FB0614B18B0 33 instance valuetype System.Collections.Generic.KeyValuePair`2<!0,!1> [System.Private.CoreLib] System.Collections.Generic.Dictionary`2+Enumerator[System.ReadOnlyMemory`1[System.Char],System.ConsoleKeyInfo]::get_Current()[QuickJitted]
+00007FB0614B1900 32 instance !0 [System.Private.CoreLib] System.Collections.Generic.KeyValuePair`2[System.ReadOnlyMemory`1[System.Char],System.ConsoleKeyInfo]::get_Key()[QuickJitted]
+00007FB0614B1950 14 instance void [System.Private.CoreLib] System.Collections.Generic.Dictionary`2+Enumerator[System.ReadOnlyMemory`1[System.Char],System.ConsoleKeyInfo]::Dispose()[QuickJitted]
+00007FB0614B13C8 8 stub<786> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1980 1b4 void [System.Console] dynamicClass::IL_STUB_PInvoke(string)[Optimized]
+00007FB0614B13F8 20 stub<787> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1420 8 stub<788> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1430 58 stub<789> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1490 38 stub<790> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1B70 e5 void [System.Console] dynamicClass::IL_STUB_PInvoke(valuetype Interop/Sys/ControlCharacterNames[],uint8[],int32,uint8&)[Optimized]
+00007FB0614B14F0 38 stub<791> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1530 38 stub<792> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1570 38 stub<793> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B15B0 38 stub<794> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B15F0 38 stub<795> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1630 60 stub<796> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1698 8 stub<797> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B16A8 8 stub<798> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B16B8 20 stub<799> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1C78 60 stub<800> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1CE0 30 stub<801> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B16E0 8 stub<802> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1D18 80 stub<803> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1DA0 80 stub<804> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1E28 a0 stub<805> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1ED0 20 stub<806> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1EF8 28 stub<807> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1F28 28 stub<808> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1F58 50 stub<809> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1FB0 38 stub<810> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B1FF0 68 stub<811> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2080 20 stub<812> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B20A8 a0 stub<813> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2060 8 stub<814> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2150 10 stub<815> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2168 10 stub<816> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2180 e0 stub<817> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2268 e0 stub<818> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2350 8 stub<819> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2360 8 stub<820> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2370 38 stub<821> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B23B0 38 stub<822> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B23F0 8 stub<823> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2400 20 stub<824> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2428 20 stub<825> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2450 28 stub<826> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2488 98 stub<827> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2528 1c8 stub<828> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2890 1b8 stub<829> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B26F8 a8 stub<830> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B27A8 20 stub<831> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B27D0 20 stub<832> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2808 28 stub<833> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2A58 120 stub<834> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB1A0 e stub<835> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0609FB1B0 e stub<836> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614B2B88 c8 stub<837> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB1C0 e stub<838> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614B2C58 28 stub<839> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2C88 20 stub<840> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2CB0 18 stub<841> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2CD0 18 stub<842> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2CF0 60 stub<843> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2F90 2a0 stub<844> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2D58 8 stub<845> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B3240 2a0 stub<846> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2D68 8 stub<847> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2D78 10 stub<848> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2D90 48 stub<849> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2DE0 10 stub<850> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B3500 20b int32 [System.Private.CoreLib] System.SpanHelpers::LastIndexOf(char&,char,int32)[OptimizedTier1]
+00007FB0614B2DF8 20 stub<851> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609A4230 18 stub<852> GenerateResolveStub<GenerateResolveStub>
+00007FB0609730A0 20 stub<853> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0614B2E40 8 stub<854> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2E50 8 stub<855> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2E60 8 stub<856> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2E70 8 stub<857> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2E80 8 stub<858> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2E90 8 stub<859> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2EA0 8 stub<860> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB1D0 e stub<861> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614B3728 d8 stub<862> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2EB0 8 stub<863> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB1E0 e stub<864> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614B2EC0 8 stub<865> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2ED0 8 stub<866> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2EE0 8 stub<867> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2EF0 8 stub<868> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B3B40 272 int32 [System.Private.CoreLib] System.SpanHelpers::IndexOf(uint8&,uint8,int32)[OptimizedTier1]
+00007FB0614B2F00 8 stub<869> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2F10 8 stub<870> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2F20 8 stub<871> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2F30 8 stub<872> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2F40 8 stub<873> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B3DE0 225 int32 [System.Private.CoreLib] System.SpanHelpers::LastIndexOf(uint8&,uint8,int32)[OptimizedTier1]
+00007FB0614B3808 188 stub<874> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B3998 b0 stub<875> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B3A50 48 stub<876> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2F50 10 stub<877> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B3AA0 40 stub<878> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4020 40 stub<879> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B2F68 8 stub<880> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B3AE8 20 stub<881> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4068 20 stub<882> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4090 20 stub<883> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B40B8 20 stub<884> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B40E0 40 stub<885> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B3B10 8 stub<886> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4128 d0 stub<887> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4200 d0 stub<888> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B42D8 20 stub<889> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4300 d0 stub<890> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B43D8 20 stub<891> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4400 8 stub<892> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4830 8 stub<893> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4840 8 stub<894> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4850 8 stub<895> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4860 c8 stub<896> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4930 e0 stub<897> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4A18 8 stub<898> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4A28 8 stub<899> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4A38 c8 stub<900> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4B08 8 stub<901> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4B18 8 stub<902> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4B28 8 stub<903> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4B38 8 stub<904> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4B48 68 stub<905> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4C38 f0 stub<906> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4D30 a8 stub<907> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4BB8 28 stub<908> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4BE8 10 stub<909> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4DE0 e0 stub<910> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609A42A0 18 stub<911> GenerateResolveStub<GenerateResolveStub>
+00007FB0609730C0 20 stub<912> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0609A4310 18 stub<913> GenerateResolveStub<GenerateResolveStub>
+00007FB0609730E0 20 stub<914> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0614B4C10 18 stub<915> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB1F0 e stub<916> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614B5040 63 void [Datadog.Demos.Util] Datadog.Demos.Util.EnvironmentInfo::PrintDescriptionToConsole()[MinOptJitted]
+00007FB0614B50C0 8e string [Datadog.Demos.Util] Datadog.Demos.Util.EnvironmentInfo::GetDescription()[MinOptJitted]
+00007FB0614B4EC8 70 stub<917> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4F40 8 stub<918> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4F50 8 stub<919> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B5168 130 stub<920> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4F60 8 stub<921> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4F70 8 stub<922> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B52A8 100 stub<923> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4F80 8 stub<924> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B4F90 88 stub<925> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B53B8 290 stub<926> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B5658 18 stub<927> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B5020 8 stub<928> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B5678 8 stub<929> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B5A60 17d4 string [Datadog.Demos.Util] Datadog.Demos.Util.EnvironmentInfo::ConstructDescriptionString()[MinOptJitted]
+00007FB0609A4380 18 stub<930> GenerateResolveStub<GenerateResolveStub>
+00007FB060973100 20 stub<931> GenerateDispatchStub<GenerateDispatchStub>
+00007FB06096F0A0 18 stub<932> GenerateLookupStub<GenerateLookupStub>
+00007FB06096F0C0 18 stub<933> GenerateLookupStub<GenerateLookupStub>
+00007FB0614B5688 8 stub<934> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B5698 8 stub<935> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B56A8 8 stub<936> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B56B8 8 stub<937> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B7270 223 instance void [System.Private.CoreLib] System.Text.StringBuilder+AppendInterpolatedStringHandler::AppendFormatted(!!0)[QuickJitted]
+00007FB0614B56C8 8 stub<938> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B56E8 8 stub<939> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B56F8 8 stub<940> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B74C0 22b instance void [System.Private.CoreLib] System.Text.StringBuilder+AppendInterpolatedStringHandler::AppendFormatted(!!0)[QuickJitted]
+00007FB0614B5708 120 stub<941> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B5830 1a8 stub<942> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B59E0 10 stub<943> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B59F8 8 stub<944> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B5A08 8 stub<945> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B5A18 20 stub<946> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B7710 108 stub<947> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B7828 190 stub<948> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B79E8 150 stub<949> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B7B40 30 stub<950> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B7B78 30 stub<951> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B7BB0 a8 stub<952> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B7DD0 1e8 stub<953> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B7C60 158 stub<954> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B7FC8 90 stub<955> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8060 8 stub<956> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8070 1e8 stub<957> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8260 20 stub<958> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8288 60 stub<959> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B82F0 c8 stub<960> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8430 120 stub<961> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8558 18 stub<962> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8578 20 stub<963> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B87D8 1e0 stub<964> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8620 20 stub<965> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8648 18 stub<966> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8668 10 stub<967> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8680 68 stub<968> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8700 8 stub<969> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8720 18 stub<970> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8750 18 stub<971> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8770 28 stub<972> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B87A0 10 stub<973> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B87B8 10 stub<974> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B89C8 10 stub<975> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B89E0 10 stub<976> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B89F8 18 stub<977> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8A18 20 stub<978> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8A40 20 stub<979> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8A68 10 stub<980> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8A80 10 stub<981> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8A98 10 stub<982> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8AB0 10 stub<983> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8AC8 10 stub<984> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8AE0 20 stub<985> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8B18 50 stub<986> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8B70 140 stub<987> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8CB8 58 stub<988> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8D18 20 stub<989> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8D40 10 stub<990> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8D58 10 stub<991> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B8DE0 245 int32 [System.Private.CoreLib] System.SpanHelpers::IndexOfAny(char&,char,char,char,int32)[OptimizedTier1]
+00007FB0614B8D90 20 stub<992> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9058 20 stub<993> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB200 e stub<994> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614B9080 8 stub<995> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609A43F0 18 stub<996> GenerateResolveStub<GenerateResolveStub>
+00007FB060973120 20 stub<997> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0609FB210 11 stub<998> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614B9090 8 stub<999> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B90A0 8 stub<1000> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B90B0 8 stub<1001> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B90C0 8 stub<1002> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B90D0 20 stub<1003> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B90F8 80 stub<1004> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9180 8 stub<1005> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9190 8 stub<1006> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B91A0 8 stub<1007> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B91B0 10 stub<1008> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B91C8 10 stub<1009> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B91E0 8 stub<1010> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B91F0 18 stub<1011> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9210 8 stub<1012> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9220 8 stub<1013> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9230 8 stub<1014> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9240 10 stub<1015> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9258 58 stub<1016> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B92B8 38 stub<1017> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9460 1a8 stub<1018> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9618 1a8 stub<1019> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B92F8 38 stub<1020> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9338 8 stub<1021> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9348 58 stub<1022> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B93A8 8 stub<1023> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B93B8 8 stub<1024> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B93C8 38 stub<1025> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9408 38 stub<1026> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B97D0 8 stub<1027> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B97E0 58 stub<1028> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9840 8 stub<1029> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9850 38 stub<1030> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9890 20 stub<1031> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB230 e stub<1032> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614B98C8 8 stub<1033> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B98D8 20 stub<1034> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9900 20 stub<1035> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9928 e8 stub<1036> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9BD8 2a8 stub<1037> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9E90 2a8 stub<1038> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BA148 2a8 stub<1039> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BA400 2a8 stub<1040> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609A4460 18 stub<1041> GenerateResolveStub<GenerateResolveStub>
+00007FB060973140 20 stub<1042> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0614B9A18 8 stub<1043> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9A28 10 stub<1044> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9A40 80 stub<1045> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9AC8 80 stub<1046> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9B50 10 stub<1047> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9B68 10 stub<1048> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BA6B8 68 stub<1049> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BA728 68 stub<1050> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9B80 10 stub<1051> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9B98 10 stub<1052> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614B9BB0 8 stub<1053> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BA798 68 stub<1054> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BAAC0 47 void [Datadog.Demos.Util] Datadog.Demos.Util.RuntimeEnvironmentInfo::.cctor()[MinOptJitted]
+00007FB0614BA818 20 stub<1055> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BAB20 34e class Datadog.Demos.Util.RuntimeEnvironmentInfo [Datadog.Demos.Util] Datadog.Demos.Util.RuntimeEnvironmentInfo::CreateNew()[MinOptJitted]
+00007FB0614BA840 8 stub<1056> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BA850 8 stub<1057> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BA880 20 stub<1058> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BAEA0 65 instance void [Datadog.Demos.Util] Datadog.Demos.Util.RuntimeEnvironmentInfo+CoreAssembyInformation::.ctor(bool,bool,string)[MinOptJitted]
+00007FB0614BA8A8 40 stub<1059> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BAF20 59 string [Datadog.Demos.Util] Datadog.Demos.Util.RuntimeEnvironmentInfo::GetRuntimeName(class Datadog.Demos.Util.RuntimeEnvironmentInfo/CoreAssembyInformation)[MinOptJitted]
+00007FB0614BA920 40 stub<1060> AllocateTemporaryEntryPoints<PRECODE_STUB>
+00007FB0614BAF90 2b0 string [Datadog.Demos.Util] Datadog.Demos.Util.RuntimeEnvironmentInfo::GetRuntimeVersion(class Datadog.Demos.Util.RuntimeEnvironmentInfo/CoreAssembyInformation,class [System.Runtime]System.Reflection.Assembly)[MinOptJitted]
+00007FB0614BB260 30 instance bool [Datadog.Demos.Util] Datadog.Demos.Util.RuntimeEnvironmentInfo+CoreAssembyInformation::get_IsSysPrivCoreLib()[MinOptJitted]
+00007FB0614BB2B0 70 string [Datadog.Demos.Util] Datadog.Demos.Util.RuntimeEnvironmentInfo::GetProcessArchitecture()[MinOptJitted]
+00007FB0614BB340 a6 string [Datadog.Demos.Util] Datadog.Demos.Util.RuntimeEnvironmentInfo::GetOsPlatform()[MinOptJitted]
+00007FB0609A44D0 18 stub<1061> GenerateResolveStub<GenerateResolveStub>
+00007FB060973160 20 stub<1062> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0614BB400 70 string [Datadog.Demos.Util] Datadog.Demos.Util.RuntimeEnvironmentInfo::GetOsArchitecture()[MinOptJitted]
+00007FB0614BB490 43 string [Datadog.Demos.Util] Datadog.Demos.Util.RuntimeEnvironmentInfo::GetOsDescription()[MinOptJitted]
+00007FB0614BB4F0 bf instance void [Datadog.Demos.Util] Datadog.Demos.Util.RuntimeEnvironmentInfo::.ctor(string,string,string,string,string,string,class Datadog.Demos.Util.RuntimeEnvironmentInfo/CoreAssembyInformation)[MinOptJitted]
+00007FB0614BB5D0 2a2 instance string [Datadog.Demos.Util] Datadog.Demos.Util.RuntimeEnvironmentInfo::ToString()[MinOptJitted]
+00007FB0614BB890 30 instance string [Datadog.Demos.Util] Datadog.Demos.Util.RuntimeEnvironmentInfo::get_RuntimeName()[MinOptJitted]
+00007FB0614BB8E0 30 instance string [Datadog.Demos.Util] Datadog.Demos.Util.RuntimeEnvironmentInfo::get_RuntimeVersion()[MinOptJitted]
+00007FB0614BB930 30 instance string [Datadog.Demos.Util] Datadog.Demos.Util.RuntimeEnvironmentInfo::get_ProcessArchitecture()[MinOptJitted]
+00007FB0614BB980 30 instance string [Datadog.Demos.Util] Datadog.Demos.Util.RuntimeEnvironmentInfo::get_OsPlatform()[MinOptJitted]
+00007FB0614BB9D0 30 instance string [Datadog.Demos.Util] Datadog.Demos.Util.RuntimeEnvironmentInfo::get_OsArchitecture()[MinOptJitted]
+00007FB0614BBA20 30 instance string [Datadog.Demos.Util] Datadog.Demos.Util.RuntimeEnvironmentInfo::get_OsDescription()[MinOptJitted]
+00007FB0614BA9A0 8 stub<1063> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BA9B0 20 stub<1064> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BA9D8 8 stub<1065> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BA9E8 18 stub<1066> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BAA08 20 stub<1067> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB240 11 stub<1068> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614BBE70 f0 stub<1069> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BAA30 8 stub<1070> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BAA40 8 stub<1071> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BBF68 130 stub<1072> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BAA50 8 stub<1073> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BAA60 8 stub<1074> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BC0A0 b0 stub<1075> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BC158 b0 stub<1076> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BC210 48 stub<1077> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BC278 2a0 stub<1078> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BC528 68 stub<1079> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BAA70 8 stub<1080> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BC598 280 stub<1081> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BC930 2a8 stub<1082> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BCBE8 2a8 stub<1083> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BCEA0 2a8 stub<1084> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BD158 2a8 stub<1085> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BD410 2a8 stub<1086> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BD6C8 2a8 stub<1087> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BD980 168 stub<1088> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BDAF8 2a8 stub<1089> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BDDB0 2a8 stub<1090> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BE068 2a8 stub<1091> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BE320 2a8 stub<1092> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BE5D8 2a8 stub<1093> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BE890 2a8 stub<1094> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BEB48 2a8 stub<1095> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BEE00 130 stub<1096> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BEF40 2a8 stub<1097> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BF1F8 2a8 stub<1098> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BF4B0 2a8 stub<1099> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BF768 2a8 stub<1100> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BFA20 2a8 stub<1101> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BFCD8 2a8 stub<1102> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BFF90 2a8 stub<1103> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C0248 2a8 stub<1104> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C0500 2a8 stub<1105> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C07B8 2a8 stub<1106> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C0A70 2a8 stub<1107> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BAA80 8 stub<1108> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BAA90 8 stub<1109> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614BAAA0 10 stub<1110> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C0D40 173 char* [System.Private.CoreLib] System.Text.Unicode.Utf16Utility::GetPointerToFirstInvalidChar(char*,int32,int64&,int32&)[Optimized]
+00007FB0614BC840 90 stub<1111> AllocateTemporaryEntryPoints<PRECODE_STUB>
+00007FB0614C0F30 28 stub<1112> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C0F60 8 stub<1113> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C0F70 20 stub<1114> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C0F98 18 stub<1115> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C0FB8 8 stub<1116> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C0FC8 8 stub<1117> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C0FD8 8 stub<1118> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C0FE8 8 stub<1119> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C0FF8 8 stub<1120> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB260 e stub<1121> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614C1008 10 stub<1122> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1020 10 stub<1123> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1038 28 stub<1124> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1068 8 stub<1125> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1078 c0 stub<1126> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1140 e0 stub<1127> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1228 10 stub<1128> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1240 58 stub<1129> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB270 e stub<1130> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614C12B0 20 stub<1131> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C12D8 20 stub<1132> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1720 20 stub<1133> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1748 10 stub<1134> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1760 c8 stub<1135> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1830 e0 stub<1136> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1918 8 stub<1137> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1B30 81f void [Samples.Computer01] Samples.Computer01.Program::ParseCommandLine(string[],valuetype [System.Runtime]System.TimeSpan&,bool&,valuetype Samples.Computer01.Scenario&,int32&,int32&)[MinOptJitted]
+00007FB0614C2370 33 instance void [Samples.Computer01] Samples.Computer01.ComputerService::.ctor()[MinOptJitted]
+00007FB0614C1928 10 stub<1138> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1940 38 stub<1139> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C23C0 d8 instance void [Datadog.RuntimeMetrics] Datadog.RuntimeMetrics.MetricsCollector::.ctor()[MinOptJitted]
+00007FB0614C24B0 23b string [Datadog.RuntimeMetrics] Datadog.RuntimeMetrics.MetricsCollector::GetMetricsFilePath()[MinOptJitted]
+00007FB0614C2710 251 instance void [Samples.Computer01] Samples.Computer01.ComputerService::StartService(valuetype Samples.Computer01.Scenario,int32)[MinOptJitted]
+00007FB0614C1980 40 stub<1140> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C19C8 30 stub<1141> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1A00 30 stub<1142> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1A38 30 stub<1143> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1A70 40 stub<1144> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1AB8 8 stub<1145> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1AC8 8 stub<1146> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1AD8 8 stub<1147> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C1AE8 20 stub<1148> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C29B0 bf instance void [Samples.Computer01] Samples.Computer01.ComputerService::StartComputer()[MinOptJitted]
+00007FB0614C2A88 f0 stub<1149> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C2B80 20 stub<1150> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C2BA8 20 stub<1151> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C2BD0 20 stub<1152> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C2E90 1e0 instance void [Samples.Computer01] Samples.Computer01.Computer`2[System.Byte,System.Collections.Generic.KeyValuePair`2[System.Char,System.Collections.Generic.KeyValuePair`2[System.Int32,System.Collections.Generic.KeyValuePair`2[System.Single,System.__Canon]]]]::.ctor()[MinOptJitted]
+00007FB0614C2BF8 10 stub<1153> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C2C10 8 stub<1154> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C2C30 d8 stub<1155> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C2D10 110 stub<1156> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3090 88 stub<1157> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C2E28 8 stub<1158> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3120 a8 stub<1159> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C31D0 b8 stub<1160> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3290 b0 stub<1161> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3498 1b0 stub<1162> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3658 158 stub<1163> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB280 11 stub<1164> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0614C37C0 58 stub<1165> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3820 358 stub<1166> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3BC8 160 stub<1167> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3468 8 stub<1168> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3D38 40 stub<1169> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3B80 30 stub<1170> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3D80 38 stub<1171> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3DC0 a8 stub<1172> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3478 8 stub<1173> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3E70 20 stub<1174> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3E98 8 stub<1175> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3EA8 8 stub<1176> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3EB8 28 stub<1177> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3EF8 30 stub<1178> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3F30 18 stub<1179> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3F50 20 stub<1180> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3F78 8 stub<1181> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C3F88 8 stub<1182> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4140 146 void [System.Private.CoreLib] System.RuntimeTypeHandle::GetActivationInfo(class System.RuntimeType,method object *(void*)&,void*&,method void *(object)&,bool&)[QuickJitted]
+00007FB0614C3F98 90 stub<1183> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4030 10 stub<1184> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4048 30 stub<1185> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4080 10 stub<1186> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4098 10 stub<1187> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C42B0 de instance void [Samples.Computer01] Samples.Computer01.Computer`2+NestedComputer[System.Byte,System.Collections.Generic.KeyValuePair`2[System.Char,System.Collections.Generic.KeyValuePair`2[System.Int32,System.Collections.Generic.KeyValuePair`2[System.Single,System.__Canon]]]]::.ctor()[MinOptJitted]
+00007FB0614C40B0 60 stub<1188> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C43A8 28 stub<1189> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C43D8 70 stub<1190> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4450 70 stub<1191> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C47B0 33 instance void [Samples.Computer01] Samples.Computer01.Computer`2+NestedComputer+DoublyNestedComputer`2[System.Byte,System.Collections.Generic.KeyValuePair`2[System.Char,System.Collections.Generic.KeyValuePair`2[System.Int32,System.Collections.Generic.KeyValuePair`2[System.Single,System.__Canon]]],System.Byte,System.Collections.Generic.KeyValuePair`2[System.Char,System.Threading.CancellationToken]]::.ctor()[MinOptJitted]
+00007FB0614C44C8 b8 stub<1192> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4588 40 stub<1193> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C45E0 58 stub<1194> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4640 d0 stub<1195> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4718 20 stub<1196> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C47F8 80 stub<1197> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4740 28 stub<1198> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4880 e8 stub<1199> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4970 258 stub<1200> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4C00 88 stub<1201> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4BD0 20 stub<1202> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4C90 20 stub<1203> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4CB8 20 stub<1204> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4CE0 c8 stub<1205> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4DB0 c8 stub<1206> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4E80 8 stub<1207> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4E90 20 stub<1208> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4EB8 20 stub<1209> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4EE0 8 stub<1210> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4EF0 8 stub<1211> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4F00 8 stub<1212> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4F10 38 stub<1213> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4F50 38 stub<1214> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4F90 20 stub<1215> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4FB8 20 stub<1216> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5410 70 stub<1217> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C4FE0 18 stub<1218> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5488 18 stub<1219> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C54A8 88 stub<1220> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5538 70 stub<1221> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C55B0 f8 stub<1222> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C56B0 10 stub<1223> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C56C8 58 stub<1224> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5728 50 stub<1225> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5780 28 stub<1226> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C57B0 28 stub<1227> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C57E0 20 stub<1228> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5818 38 stub<1229> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5868 c8 stub<1230> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5938 48 stub<1231> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5988 150 stub<1232> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5AE0 50 stub<1233> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5B38 20 stub<1234> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5B60 18 stub<1235> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5B80 20 stub<1236> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5BA8 18 stub<1237> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5BC8 18 stub<1238> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5C20 30 stub<1239> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5BE8 8 stub<1240> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5C58 40 stub<1241> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5CB0 18 stub<1242> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5CD0 78 stub<1243> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5D50 48 stub<1244> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5DA0 20 stub<1245> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5DC8 10 stub<1246> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5DE0 20 stub<1247> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5E08 8 stub<1248> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5E18 40 stub<1249> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5E70 8 stub<1250> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C6030 6d instance void [Samples.Computer01] Samples.Computer01.ComputerService::StartGenerics()[MinOptJitted]
+00007FB0614C5E80 88 stub<1251> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C60C0 33 instance void [Samples.Computer01] Samples.Computer01.GenericTypes::.ctor()[MinOptJitted]
+00007FB0614C5F10 20 stub<1252> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5F38 50 stub<1253> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5F90 18 stub<1254> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5FB0 8 stub<1255> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5FC0 8 stub<1256> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C6108 50 stub<1257> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C5FE0 38 stub<1258> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C6170 130 stub<1259> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C6510 1d6 instance void [Samples.Computer01] Samples.Computer01.GenericTypes::Start()[MinOptJitted]
+00007FB0614C6700 2a0 stub<1260> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C62A8 8 stub<1261> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C62C8 8 stub<1262> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C62D8 20 stub<1263> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C6300 8 stub<1264> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C6310 8 stub<1265> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C6320 18 stub<1266> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C6340 8 stub<1267> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C6350 8 stub<1268> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C6360 8 stub<1269> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C6370 8 stub<1270> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C6380 8 stub<1271> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C6390 8 stub<1272> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C63A0 8 stub<1273> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C63B0 8 stub<1274> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C63C0 8 stub<1275> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C63D0 8 stub<1276> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C63E0 8 stub<1277> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C6DC0 621 instance void [Samples.Computer01] Samples.Computer01.Computer`2[System.Byte,System.Collections.Generic.KeyValuePair`2[System.Char,System.Collections.Generic.KeyValuePair`2[System.Int32,System.Collections.Generic.KeyValuePair`2[System.Single,System.__Canon]]]]::Start()[MinOptJitted]
+00007FB0614C63F0 b8 stub<1278> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C7410 6d instance void [Samples.Computer01] Samples.Computer01.ComputerService::StartSimpleWallTime()[MinOptJitted]
+00007FB0614C74A0 33 instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime::.ctor()[MinOptJitted]
+00007FB0614C74E8 b8 stub<1279> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C75A8 1c0 stub<1280> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C78F0 2b0 stub<1281> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C7BB0 248 instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime::Start()[MinOptJitted]
+00007FB0614C64B0 20 stub<1282> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C7770 108 stub<1283> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D0018 1b8 stub<1284> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D01E0 1d8 stub<1285> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D03C8 198 stub<1286> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D0570 1b8 stub<1287> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0614C64D8 20 stub<1288> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D0740 c8 instance void [Samples.Computer01] Samples.Computer01.GenericTypes::DoBaseTypes()[MinOptJitted]
+00007FB0619D0820 a0 instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime::DoThreadSleep()[MinOptJitted]
+00007FB0619D08E0 c8 instance void [Samples.Computer01] Samples.Computer01.GenericTypes::DoValueAndReferenceTypes()[MinOptJitted]
+00007FB0614C7880 58 stub<1289> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D09C0 58 stub<1290> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D0DD0 a0 instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime::DoTaskDelay()[MinOptJitted]
+00007FB0619D0A20 18 stub<1291> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D0A40 20 stub<1292> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D0A68 28 stub<1293> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D0A98 e0 stub<1294> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D0B80 70 stub<1295> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D0E90 272 instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime::StartThreadSleep()[MinOptJitted]
+00007FB0619D0BF8 8 stub<1296> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D0C08 30 stub<1297> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D1120 128 instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime::StartTaskDelay()[MinOptJitted]
+00007FB0619D0C40 8 stub<1298> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D1260 2a8 stub<1300> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D0C50 8 stub<1299> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D1520 a0 instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime::Do100PercentCPU()[MinOptJitted]
+00007FB0619D15E0 6d instance void [Samples.Computer01] Samples.Computer01.ComputerService::StartPiComputation()[MinOptJitted]
+00007FB0619D0C60 8 stub<1301> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D0C70 f0 stub<1302> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D0D68 8 stub<1303> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D0D78 18 stub<1304> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D0D98 8 stub<1305> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D16E8 18 stub<1306> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D16B8 28 stub<1307> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D1670 33 instance void [Samples.Computer01] Samples.Computer01.PiComputation::.ctor()[MinOptJitted]
+00007FB0619D1AC0 1e1 instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime::StartThreadCPU()[MinOptJitted]
+00007FB0619D18D0 18 stub<1309> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D1708 1c0 stub<1308> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D1900 10 stub<1310> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D1918 40 stub<1311> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D1960 40 stub<1312> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D19A8 8 stub<1313> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB2A0 e stub<1314> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0619D1CC0 16b instance void [Samples.Computer01] Samples.Computer01.PiComputation::Start()[MinOptJitted]
+00007FB0619D1E50 ca instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime::OnSleep10(object)[MinOptJitted]
+00007FB0619D19B8 18 stub<1315> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D19D8 20 stub<1316> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D1A00 10 stub<1317> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D1F38 1c0 stub<1318> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D1A18 18 stub<1319> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D1A38 20 stub<1320> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D1A60 10 stub<1321> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D1A78 18 stub<1322> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D2110 ca instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime::OnSleep20(object)[MinOptJitted]
+00007FB0619D1A98 8 stub<1323> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D21F8 8 stub<1324> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D2208 8 stub<1325> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D21F8 8 stub<1326> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D2218 18 stub<1327> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D2600 140 instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime::OnCPU1(object)[MinOptJitted]
+00007FB0619D2238 8 stub<1328> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D2248 8 stub<1329> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D2760 ca instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime::OnSleep30(object)[MinOptJitted]
+00007FB0619D2850 180 instance void [Samples.Computer01] Samples.Computer01.GenericTypes::RunBaseTypes(class [System.Runtime]System.Collections.Generic.IEnumerable`1<int32>)[MinOptJitted]
+00007FB0619D2258 8 stub<1330> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D29F0 152 instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime::ComputeSum(int64)[MinOptJitted]
+00007FB0619D2268 20 stub<1331> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D2290 8 stub<1332> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D2B60 2c2 instance void [Samples.Computer01] Samples.Computer01.GenericTypes::RunValueAndReferenceTypes(class [System.Runtime]System.Collections.Generic.IEnumerable`1<int32>)[MinOptJitted]
+00007FB0619D22A0 20 stub<1333> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D22C8 1d0 stub<1334> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D2E40 33 instance void [Samples.Computer01] Samples.Computer01.GenericCouple`2[System.Byte,System.__Canon]::.ctor()[MinOptJitted]
+00007FB0619D2E90 90 instance int64 [Samples.Computer01] Samples.Computer01.SimpleWallTime::Sum(int64)[MinOptJitted]
+00007FB0619D2F40 33 instance void [Samples.Computer01] Samples.Computer01.GenericCouple`2[System.Byte,Samples.Computer01.ValueType]::.ctor()[MinOptJitted]
+00007FB0619D24B0 8 stub<1335> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D2F88 1f8 stub<1336> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D24C0 38 stub<1337> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D3190 1d0 stub<1338> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D2500 40 stub<1339> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D2548 48 stub<1340> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D2598 40 stub<1341> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D33C0 50 stub<1342> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D3418 20 stub<1343> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D3440 30 stub<1344> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D3370 36 instance void [Samples.Computer01] Samples.Computer01.ValueType::.ctor(int32)[MinOptJitted]
+00007FB0619D3478 38 stub<1345> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D37D0 140 instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime::OnCPU2(object)[MinOptJitted]
+00007FB0619D25E0 8 stub<1346> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D3930 38 instance void [Samples.Computer01] Samples.Computer01.GenericCouple`2[System.Byte,Samples.Computer01.ValueType]::Store(!0,!1)[MinOptJitted]
+00007FB0619D3980 73 instance void [Samples.Computer01] Samples.Computer01.ComputerService::StartFibonacciComputation(int32)[MinOptJitted]
+00007FB0619D3A10 41 instance void [Samples.Computer01] Samples.Computer01.ReferenceType::.ctor(int32)[MinOptJitted]
+00007FB0619D3A70 3f instance void [Samples.Computer01] Samples.Computer01.FibonacciComputation::.ctor(int32)[MinOptJitted]
+00007FB0619D3AD0 39 instance void [Samples.Computer01] Samples.Computer01.GenericCouple`2[System.Byte,System.__Canon]::Store(!0,!1)[MinOptJitted]
+00007FB0609A4540 18 stub<1348> GenerateResolveStub<GenerateResolveStub>
+00007FB0619D34B8 8 stub<1347> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB060973180 20 stub<1349> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0619D34C8 8 stub<1350> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D3B20 135 instance void [Samples.Computer01] Samples.Computer01.PiComputation::<Start>b__3_0()[MinOptJitted]
+00007FB0619D34D8 28 stub<1351> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D3C70 ca instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime::OnSleep40(object)[MinOptJitted]
+00007FB0619D3508 10 stub<1352> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D3520 8 stub<1353> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D3530 8 stub<1354> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D3D60 4e instance void [Samples.Computer01] Samples.Computer01.FibonacciComputation::.ctor(int32,int32)[MinOptJitted]
+00007FB0619D3DD0 f4 instance void [Samples.Computer01] Samples.Computer01.FibonacciComputation::Start()[MinOptJitted]
+00007FB0619D3EE0 140 instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime::OnCPU3(object)[MinOptJitted]
+00007FB0619D4040 4f instance !1 [Samples.Computer01] Samples.Computer01.GenericCouple`2[System.Byte,Samples.Computer01.ValueType]::Get(!0)[MinOptJitted]
+00007FB0619D3540 50 stub<1355> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D40B0 277 instance void [Samples.Computer01] Samples.Computer01.PiComputation::DoPiComputation()[MinOptJitted]
+00007FB0619D3598 10 stub<1356> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4370 53 instance !1 [Samples.Computer01] Samples.Computer01.GenericCouple`2[System.Byte,System.__Canon]::Get(!0)[MinOptJitted]
+00007FB0619D35B0 1f8 stub<1357> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4518 58 stub<1358> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D43E0 11a instance class [System.Collections]System.Collections.Generic.List`1<class [System.Runtime]System.Threading.Tasks.Task> [Samples.Computer01] Samples.Computer01.FibonacciComputation::CreateThreads()[MinOptJitted]
+00007FB0619D4578 40 stub<1359> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D45C0 8 stub<1360> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D45D0 30 stub<1361> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4608 38 stub<1362> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4648 8 stub<1363> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4658 8 stub<1364> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4668 28 stub<1365> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4698 68 stub<1366> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4718 18 stub<1367> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4738 18 stub<1368> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4758 8 stub<1369> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4768 8 stub<1370> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4778 8 stub<1371> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4788 8 stub<1372> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4920 db instance class [System.Runtime]System.Threading.Tasks.Task [Samples.Computer01] Samples.Computer01.SimpleWallTime::OnDelay10()[MinOptJitted]
+00007FB0619D4A20 db instance class [System.Runtime]System.Threading.Tasks.Task [Samples.Computer01] Samples.Computer01.SimpleWallTime::OnDelay20()[MinOptJitted]
+00007FB0619D4B20 33 instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime+<OnDelay10>d__14::.ctor()[MinOptJitted]
+00007FB0619D4BF0 33 instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime+<OnDelay20>d__15::.ctor()[MinOptJitted]
+00007FB0619D4798 38 stub<1373> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4B70 66 instance void [Samples.Computer01] Samples.Computer01.GenericContainer`9[System.Byte,System.Boolean,System.Char,System.Int32,System.__Canon,System.Int64,System.UInt64,System.Int64,System.Double]::.ctor()[MinOptJitted]
+00007FB0619D47D8 8 stub<1374> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D47E8 8 stub<1375> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D47F8 8 stub<1376> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D47E8 8 stub<1377> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4C40 22 instance void [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.Byte,System.Boolean]::.ctor()[QuickJitted]
+00007FB0619D4808 8 stub<1378> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4818 8 stub<1379> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4828 8 stub<1380> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4818 8 stub<1381> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4838 18 stub<1382> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4858 8 stub<1383> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4868 18 stub<1384> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4888 8 stub<1385> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4C80 10b instance void [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.Byte,System.Boolean]::.ctor(int32,class System.Collections.Generic.IEqualityComparer`1<!0>)[QuickJitted]
+00007FB0619D4898 48 stub<1386> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D4DB0 27a instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime+<OnDelay20>d__15::MoveNext()[MinOptJitted]
+00007FB0619D5310 db instance class [System.Runtime]System.Threading.Tasks.Task [Samples.Computer01] Samples.Computer01.SimpleWallTime::OnDelay40()[MinOptJitted]
+00007FB0619D5060 27a instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime+<OnDelay10>d__14::MoveNext()[MinOptJitted]
+00007FB0619D5410 db instance class [System.Runtime]System.Threading.Tasks.Task [Samples.Computer01] Samples.Computer01.SimpleWallTime::OnDelay30()[MinOptJitted]
+00007FB0619D5510 63 instance void [Samples.Computer01] Samples.Computer01.FibonacciComputation::<CreateThreads>b__11_0()[MinOptJitted]
+00007FB0619D5600 73 instance void [Samples.Computer01] Samples.Computer01.ComputerService::StartSleep(int32)[MinOptJitted]
+00007FB0619D5590 54 instance void [Samples.Computer01] Samples.Computer01.GenericContainer`9[System.Byte,System.Boolean,System.Char,System.Int32,System.__Canon,System.Int64,System.UInt64,System.Int64,System.Double]::Store(!0,!1)[MinOptJitted]
+00007FB0619D5690 33 instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime+<OnDelay40>d__17::.ctor()[MinOptJitted]
+00007FB0619D48E8 28 stub<1387> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D56E0 33 instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime+<OnDelay30>d__16::.ctor()[MinOptJitted]
+00007FB0619D5728 8 stub<1388> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D5738 8 stub<1389> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D5BB0 3f instance void [Samples.Computer01] Samples.Computer01.SleepManager::.ctor(int32)[MinOptJitted]
+00007FB0619D5C10 38 instance void [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.Byte,System.Boolean]::Add(!0,!1)[QuickJitted]
+00007FB0619D5B30 64 instance bool [Samples.Computer01] Samples.Computer01.FibonacciComputation::IsEventSet()[MinOptJitted]
+00007FB0619D5748 88 stub<1390> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D57D8 10 stub<1391> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D5818 8 stub<1393> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D5828 8 stub<1394> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D57F0 20 stub<1392> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D5838 58 stub<1395> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D5898 8 stub<1396> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D58A8 20 stub<1397> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06096F0E0 18 stub<1398> GenerateLookupStub<GenerateLookupStub>
+00007FB0619D58D0 8 stub<1399> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D63C0 62 instance void [Samples.Computer01] Samples.Computer01.SleepManager::.ctor(int32,int32)[MinOptJitted]
+00007FB0619D5C60 27a instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime+<OnDelay40>d__17::MoveNext()[MinOptJitted]
+00007FB0619D61C0 1d3 instance int64 [Samples.Computer01] Samples.Computer01.FibonacciComputation::DoFibonacciComputation()[MinOptJitted]
+00007FB0619D5F10 27a instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime+<OnDelay30>d__16::MoveNext()[MinOptJitted]
+00007FB06096F100 18 stub<1401> GenerateLookupStub<GenerateLookupStub>
+00007FB0619D5910 e0 stub<1400> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D59F8 a8 stub<1402> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D6440 e8 instance int64 [Samples.Computer01] Samples.Computer01.FibonacciComputation::DoComputationImpl(int32)[MinOptJitted]
+00007FB0619D6540 f4 instance void [Samples.Computer01] Samples.Computer01.SleepManager::Start()[MinOptJitted]
+00007FB0619D5AA8 10 stub<1403> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D6650 11a instance class [System.Collections]System.Collections.Generic.List`1<class [System.Runtime]System.Threading.Tasks.Task> [Samples.Computer01] Samples.Computer01.SleepManager::CreateThreads()[MinOptJitted]
+00007FB0619D6788 a0 stub<1404> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D6830 a0 stub<1405> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D5AD0 8 stub<1407> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D68D8 70 stub<1406> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D5AE0 8 stub<1408> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D5AF0 8 stub<1409> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D6B90 73 instance void [Samples.Computer01] Samples.Computer01.ComputerService::StartAsyncComputation(int32)[MinOptJitted]
+00007FB0619D6D40 41 instance void [Samples.Computer01] Samples.Computer01.AsyncComputation::.ctor(int32)[MinOptJitted]
+00007FB0619D6C20 5f instance void [Samples.Computer01] Samples.Computer01.SleepManager::<CreateThreads>b__10_0()[MinOptJitted]
+00007FB0619D6CA0 80 instance void [System.Private.CoreLib] System.Runtime.CompilerServices.AsyncTaskMethodBuilder::AwaitUnsafeOnCompleted(!!0&,!!1&)[QuickJitted]
+00007FB0619D5B00 8 stub<1410> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D5B10 8 stub<1411> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D6960 20 stub<1413> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D6950 8 stub<1412> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D6DA0 64 instance bool [Samples.Computer01] Samples.Computer01.SleepManager::IsEventSet()[MinOptJitted]
+00007FB0619D6988 8 stub<1414> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D6E20 f4 instance void [Samples.Computer01] Samples.Computer01.AsyncComputation::Start()[MinOptJitted]
+00007FB0619D6998 8 stub<1415> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D69A8 8 stub<1416> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D69B8 8 stub<1417> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D69C8 8 stub<1418> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D69D8 8 stub<1419> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D6F30 a5 instance void [Samples.Computer01] Samples.Computer01.SleepManager::DoSleep()[MinOptJitted]
+00007FB0619D6FF0 85 void [System.Private.CoreLib] System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1[System.Threading.Tasks.VoidTaskResult]::AwaitUnsafeOnCompleted(!!0&,!!1&,class System.Threading.Tasks.Task`1<!0>&)[QuickJitted]
+00007FB0619D69E8 8 stub<1420> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D69F8 8 stub<1421> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D6A18 8 stub<1423> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D6A08 8 stub<1422> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D74A0 11a instance class [System.Collections]System.Collections.Generic.List`1<class [System.Runtime]System.Threading.Tasks.Task> [Samples.Computer01] Samples.Computer01.AsyncComputation::CreateThreads()[MinOptJitted]
+00007FB0619D75D8 1c0 stub<1424> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D6A28 48 stub<1425> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D6A78 48 stub<1426> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D77C0 2f3 instance bool [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.Byte,System.Boolean]::TryInsert(!0,!1,valuetype System.Collections.Generic.InsertionBehavior)[Optimized]
+00007FB0619D6AC8 8 stub<1427> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D6AD8 8 stub<1428> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06096F120 18 stub<1429> GenerateLookupStub<GenerateLookupStub>
+00007FB0619D7B98 b0 stub<1430> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D7FA0 72 instance void [Samples.Computer01] Samples.Computer01.AsyncComputation::<CreateThreads>b__7_0()[MinOptJitted]
+00007FB0619D7AE0 9e instance int32 [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.Byte,System.Boolean]::Initialize(int32)[QuickJitted]
+00007FB0619D7C50 1a0 stub<1431> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D8030 64 instance bool [Samples.Computer01] Samples.Computer01.AsyncComputation::IsEventSet()[MinOptJitted]
+00007FB0619D80B0 81 void [System.Private.CoreLib] System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1[System.Threading.Tasks.VoidTaskResult]::AwaitUnsafeOnCompleted(!!0&,class System.Runtime.CompilerServices.IAsyncStateMachineBox)[OptimizedTier1]
+00007FB0619D6AE8 88 stub<1432> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D7DF8 68 stub<1433> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D7E68 8 stub<1434> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D7E78 8 stub<1435> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D7E88 18 stub<1436> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D7EA8 20 stub<1437> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D7ED0 80 stub<1438> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D7F58 8 stub<1439> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D8150 60 stub<1440> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D81B8 30 stub<1441> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D8560 db instance class [System.Runtime]System.Threading.Tasks.Task [Samples.Computer01] Samples.Computer01.AsyncComputation::Compute1()[MinOptJitted]
+00007FB0619D7F68 10 stub<1442> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D8660 33 instance void [Samples.Computer01] Samples.Computer01.AsyncComputation+<Compute1>d__9::.ctor()[MinOptJitted]
+00007FB0619D7F80 8 stub<1443> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D81F0 c0 stub<1444> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D82B8 8 stub<1445> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D82C8 c0 stub<1446> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D8390 8 stub<1447> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D83A0 b8 stub<1448> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D8460 10 stub<1449> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D8880 2b0 stub<1450> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D86B0 1ac instance void [Samples.Computer01] Samples.Computer01.AsyncComputation+<Compute1>d__9::MoveNext()[MinOptJitted]
+00007FB0619D8478 8 stub<1451> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D8B40 177 instance void [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.Byte,System.Boolean]::Resize(int32,bool)[Optimized]
+00007FB0619D8CD8 138 stub<1452> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D8488 8 stub<1453> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D8E20 2a8 stub<1454> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D84A8 8 stub<1455> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D90E0 68 instance bool [Samples.Computer01] Samples.Computer01.GenericContainer`9[System.Byte,System.Boolean,System.Char,System.Int32,System.__Canon,System.Int64,System.UInt64,System.Int64,System.Double]::TryGet(!0,!1&)[MinOptJitted]
+00007FB0619D9160 9b instance void [Samples.Computer01] Samples.Computer01.AsyncComputation::ConsumeCPU()[MinOptJitted]
+00007FB0619D84B8 38 stub<1456> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D84F8 8 stub<1457> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D8508 10 stub<1458> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D8520 8 stub<1459> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D9218 20 stub<1461> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D8530 8 stub<1460> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D9620 33 instance void [System.Collections] System.Collections.Generic.Stack`1[System.ConsoleKeyInfo]::.ctor()[QuickJitted]
+00007FB0619D9240 8 stub<1462> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D9250 20 stub<1463> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D9278 8 stub<1464> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D9288 20 stub<1465> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D9670 65 instance bool [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.Byte,System.Boolean]::TryGetValue(!0,!1&)[QuickJitted]
+00007FB0619D92B0 8 stub<1466> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D92C0 1f8 stub<1467> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D94C0 8 stub<1468> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D96F0 27 !!0[] [System.Private.CoreLib] System.Array::Empty()[QuickJitted]
+00007FB0619D94D0 8 stub<1469> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D94E0 8 stub<1470> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D94F0 40 stub<1471> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D9538 8 stub<1472> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D9548 30 stub<1474> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D9B40 2a void [System.Private.CoreLib] System.Array+EmptyArray`1[System.ConsoleKeyInfo]::.cctor()[QuickJitted]
+00007FB0619D9730 e0 stub<1473> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D9580 38 stub<1475> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D95D0 8 stub<1476> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB2B0 e stub<1477> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0619D9818 58 stub<1478> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D95E0 28 stub<1479> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D9878 58 stub<1480> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D98D8 8 stub<1481> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D98E8 8 stub<1482> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB2C0 e stub<1483> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0619D98F8 40 stub<1484> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D9B80 1b instance int32 [System.Collections] System.Collections.Generic.Stack`1[System.ConsoleKeyInfo]::get_Count()[QuickJitted]
+00007FB0619D9960 8 stub<1485> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D9BB0 b8 int32 [System.Console] dynamicClass::IL_STUB_PInvoke(uint8*,int32)[Optimized]
+00007FB0619D9970 20 stub<1486> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D99A8 10 stub<1487> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D99C0 c8 stub<1488> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D9E68 b0 stub<1489> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D9CA0 1a4 instance !1& [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.Byte,System.Boolean]::FindValue(!0)[Optimized]
+00007FB0619DA270 5f instance bool [Samples.Computer01] Samples.Computer01.GenericContainer`9[System.Byte,System.Boolean,System.Char,System.Int32,System.__Canon,System.Int64,System.UInt64,System.Int64,System.Double]::LongGenericParameterList(!0,!1&)[MinOptJitted]
+00007FB0619D9A90 68 stub<1490> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D9F20 68 stub<1491> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D9B00 20 stub<1492> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619D9F90 8 stub<1493> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DA2F0 18 !!0 [System.Private.CoreLib] System.Activator::CreateInstance()[QuickJitted]
+00007FB0619D9FA0 8 stub<1494> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DA320 4f !!0 [System.Private.CoreLib] System.Activator::CreateInstance()[QuickJitted]
+00007FB0619DA390 1d !!0 [System.Private.CoreLib] System.Activator::CreateInstance()[QuickJitted]
+00007FB0619D9FB0 8 stub<1495> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DA3D0 33 instance void [Samples.Computer01] Samples.Computer01.ComputerService+MySpecialClassA::.ctor()[MinOptJitted]
+00007FB0619DA420 89d instance void [Samples.Computer01] Samples.Computer01.Computer`2[System.Byte,System.Collections.Generic.KeyValuePair`2[System.Char,System.Collections.Generic.KeyValuePair`2[System.Int32,System.Collections.Generic.KeyValuePair`2[System.Single,System.__Canon]]]]::DoInvocations(int32&,int32&,float64&,float64&,uint64&,uint64&,valuetype [System.Runtime]System.DateTimeOffset&,valuetype [System.Runtime]System.DateTimeOffset)[MinOptJitted]
+00007FB0619D9FC0 38 stub<1496> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DA000 38 stub<1497> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DA040 1c0 stub<1498> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DA208 8 stub<1499> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DA218 8 stub<1500> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DA228 8 stub<1501> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DA238 8 stub<1502> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DAD10 14d instance uint64 [Samples.Computer01] Samples.Computer01.Computer`2+NestedComputer[System.Byte,System.Collections.Generic.KeyValuePair`2[System.Char,System.Collections.Generic.KeyValuePair`2[System.Int32,System.Collections.Generic.KeyValuePair`2[System.Single,System.__Canon]]]]::Compute(bool)[MinOptJitted]
+00007FB0619DA248 8 stub<1503> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DAE80 103 instance class [System.Runtime]System.Threading.Tasks.Task`1<uint64> [Samples.Computer01] Samples.Computer01.Computer`2+NestedComputer[System.Byte,System.Collections.Generic.KeyValuePair`2[System.Char,System.Collections.Generic.KeyValuePair`2[System.Int32,System.Collections.Generic.KeyValuePair`2[System.Single,System.__Canon]]]]::ComputeAsync(bool)[MinOptJitted]
+00007FB0619DAFA8 40 stub<1504> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DB3B0 398 instance class [System.Runtime]System.Threading.Tasks.Task`1<uint64> [Samples.Computer01] Samples.Computer01.Computer`2+NestedComputer[System.Byte,System.Collections.Generic.KeyValuePair`2[System.Char,System.Collections.Generic.KeyValuePair`2[System.Int32,System.Collections.Generic.KeyValuePair`2[System.Single,System.__Canon]]]]::ComputeCoreAsync(bool)[MinOptJitted]
+00007FB0619DB770 7b void [Samples.Computer01] Samples.Computer01.Computer`2[System.Byte,System.Collections.Generic.KeyValuePair`2[System.Char,System.Collections.Generic.KeyValuePair`2[System.Int32,System.Collections.Generic.KeyValuePair`2[System.Single,System.__Canon]]]]::.cctor()[MinOptJitted]
+00007FB0619DAFF0 30 stub<1505> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DB028 38 stub<1506> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DB068 38 stub<1507> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DB0A8 8 stub<1508> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DB0B8 8 stub<1509> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DB0C8 18 stub<1510> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609731A0 20 stub<1511> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0619DB0E8 8 stub<1512> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609731C0 20 stub<1513> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0619DB118 8 stub<1514> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DC388 8 stub<1515> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DC398 8 stub<1516> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DC3A8 8 stub<1517> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DC3B8 8 stub<1518> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DC3C8 8 stub<1519> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DC3D8 8 stub<1520> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DC3E8 8 stub<1521> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DC440 14f void [System.Private.CoreLib] System.Buffer::Memmove(uint8&,uint8&,native uint)[OptimizedTier1]
+00007FB0619DC5B8 200 stub<1522> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DC7C8 2a8 stub<1523> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DCA80 2a8 stub<1524> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DCD38 2a8 stub<1525> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DCFF0 2a8 stub<1526> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DD2A8 2a8 stub<1527> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DD560 2a8 stub<1528> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DD818 2a8 stub<1529> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DDAD0 2a8 stub<1530> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DDD88 2a8 stub<1531> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DE040 2a8 stub<1532> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DE2F8 2a8 stub<1533> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DE5B0 2a8 stub<1534> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DE880 158 instance void [System.Private.CoreLib] System.Runtime.InteropServices.SafeHandle::InternalRelease(bool)[OptimizedTier1]
+00007FB0619DEA00 8f instance void [System.Private.CoreLib] System.Runtime.InteropServices.SafeHandle::DangerousAddRef(bool&)[OptimizedTier1]
+00007FB0619DEAB0 9b void [System.Private.CoreLib] System.Threading.Thread::Sleep(int32)[OptimizedTier1]
+00007FB0619DEB70 1 instance void [System.Private.CoreLib] System.Object::.ctor()[OptimizedTier1]
+00007FB0619DEBA0 6f object [System.Private.CoreLib] System.Runtime.CompilerServices.CastHelpers::IsInstanceOfInterface(void*,object)[OptimizedTier1]
+00007FB0619DEC30 73 instance bool [System.Private.CoreLib] System.Threading.WaitHandle::WaitOne(int32)[OptimizedTier1]
+00007FB0619DECC0 d2 int32 [System.Private.CoreLib] System.Collections.HashHelpers::GetPrime(int32)[OptimizedTier1]
+00007FB0619DEDB0 71 instance valuetype System.TimeSpan [System.Private.CoreLib] System.TimeSpan::Add(valuetype System.TimeSpan)[OptimizedTier1]
+00007FB0619DEE40 38 stub<1535> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DC3F8 8 stub<1536> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DC408 18 stub<1537> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06096F140 18 stub<1538> GenerateLookupStub<GenerateLookupStub>
+00007FB06096F160 18 stub<1539> GenerateLookupStub<GenerateLookupStub>
+00007FB06096F180 18 stub<1540> GenerateLookupStub<GenerateLookupStub>
+00007FB06096F1A0 18 stub<1541> GenerateLookupStub<GenerateLookupStub>
+00007FB06096F1C0 18 stub<1542> GenerateLookupStub<GenerateLookupStub>
+00007FB0619DEE80 40 stub<1543> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DF260 191 int32 [System.Linq] System.Linq.Enumerable::Count(class [System.Runtime]System.Collections.Generic.IEnumerable`1<!!0>)[OptimizedTier1]
+00007FB0619DF420 7 instance int32 [System.Linq] System.Linq.Enumerable+RangeIterator::GetCount(bool)[OptimizedTier1]
+00007FB0619DF440 18 instance void [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.Byte,System.Boolean]::Add(!0,!1)[OptimizedTier1]
+00007FB0619DF480 1f0 instance bool [System.Private.CoreLib] System.Threading.WaitHandle::WaitOneNoCheck(int32)[OptimizedTier1]
+00007FB0619DF6A0 25 instance bool [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.Byte,System.Boolean]::TryGetValue(!0,!1&)[OptimizedTier1]
+00007FB0619DF6E0 a bool [System.Private.CoreLib] Internal.Runtime.CompilerServices.Unsafe::IsNullRef(!!0&)[OptimizedTier1]
+00007FB0619DF700 180 instance int32 [System.Private.CoreLib] System.TimeZoneInfo::CompareAdjustmentRuleToDateTime(class System.TimeZoneInfo/AdjustmentRule,class System.TimeZoneInfo/AdjustmentRule,valuetype System.DateTime,valuetype System.DateTime,bool)[OptimizedTier1]
+00007FB0619DF8A0 25 int32 [System.Private.CoreLib] System.Collections.HashHelpers::ExpandPrime(int32)[OptimizedTier1]
+00007FB0619DEEC8 8 stub<1544> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DEED8 8 stub<1545> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DF8E0 e5 void [System.Private.CoreLib] System.Array::Copy(class System.Array,class System.Array,int32)[OptimizedTier1]
+00007FB0619DEEE8 8 stub<1546> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DEEF8 8 stub<1547> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DEF08 8 stub<1548> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DEF18 8 stub<1549> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DEF28 8 stub<1550> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DEF38 8 stub<1551> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DF9F0 56 void [System.Private.CoreLib] System.String::FillStringChecked(string,int32,string)[OptimizedTier1]
+00007FB0619DFA60 40 valuetype System.DateTime [System.Private.CoreLib] System.DateTime::op_Subtraction(valuetype System.DateTime,valuetype System.TimeSpan)[OptimizedTier1]
+00007FB0619DFAC0 142 instance int32 [System.Private.CoreLib] System.DateTime::GetDatePart(int32)[OptimizedTier1]
+00007FB0619DEF48 8 stub<1552> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DEF58 8 stub<1553> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DEF68 10 stub<1554> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DEF80 e0 stub<1555> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DF068 8 stub<1556> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DFC20 d3 instance void [System.Private.CoreLib] System.Runtime.CompilerServices.DefaultInterpolatedStringHandler::AppendLiteral(string)[OptimizedTier1]
+00007FB0619DFD10 ce void [System.Private.CoreLib] System.Buffer::_Memmove(uint8&,uint8&,native uint)[OptimizedTier1]
+00007FB0619DFE00 40 valuetype System.DateTime [System.Private.CoreLib] System.DateTime::op_Addition(valuetype System.DateTime,valuetype System.TimeSpan)[OptimizedTier1]
+00007FB0619DFE60 18b instance valuetype System.DateTime [System.Private.CoreLib] System.TimeZoneInfo::ConvertToFromUtc(valuetype System.DateTime,valuetype System.TimeSpan,valuetype System.TimeSpan,bool)[OptimizedTier1]
+00007FB0619E0020 8d instance class System.TimeZoneInfo/AdjustmentRule [System.Private.CoreLib] System.TimeZoneInfo::GetPreviousAdjustmentRule(class System.TimeZoneInfo/AdjustmentRule,valuetype System.Nullable`1<int32>)[OptimizedTier1]
+00007FB0619DF078 8 stub<1557> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DF088 8 stub<1558> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DF098 60 stub<1559> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E00E0 131 instance void [System.Private.CoreLib] System.Runtime.CompilerServices.DefaultInterpolatedStringHandler::AppendFormatted(!!0)[OptimizedTier1]
+00007FB0619E0240 105 bool [System.Private.CoreLib] System.Number::TryUInt32ToDecStr(uint32,int32,valuetype System.Span`1<char>,int32&)[OptimizedTier1]
+00007FB0619E0360 140 string [System.Private.CoreLib] System.String::Concat(string,string)[OptimizedTier1]
+00007FB0619E04C0 4d valuetype System.DateTime [System.Private.CoreLib] System.DateTime::get_UtcNow()[OptimizedTier1]
+00007FB0619DF100 8 stub<1560> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DF110 10 stub<1561> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DF128 c8 stub<1562> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E0530 59 instance string [System.Private.CoreLib] System.String::Ctor(valuetype System.ReadOnlySpan`1<char>)[OptimizedTier1]
+00007FB0619E05B0 1 instance void [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.Byte,System.Boolean]::.ctor()[OptimizedTier1]
+00007FB0619E05D0 64 instance void [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.Byte,System.Boolean]::.ctor(int32,class System.Collections.Generic.IEqualityComparer`1<!0>)[OptimizedTier1]
+00007FB0619E0650 86 instance int32 [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.Byte,System.Boolean]::Initialize(int32)[OptimizedTier1]
+00007FB0619E0700 15 uint64 [System.Private.CoreLib] System.Collections.HashHelpers::GetFastModMultiplier(uint32)[OptimizedTier1]
+00007FB0619E0730 17 valuetype System.DateTimeOffset [System.Private.CoreLib] System.DateTimeOffset::get_Now()[OptimizedTier1]
+00007FB0619E0760 136 valuetype System.DateTimeOffset [System.Private.CoreLib] System.DateTimeOffset::ToLocalTime(valuetype System.DateTime,bool)[OptimizedTier1]
+00007FB0619E08C0 117 instance valuetype System.TimeSpan [System.Private.CoreLib] System.TimeZoneInfo::GetUtcOffset(valuetype System.DateTime,valuetype System.TimeZoneInfoOptions,class System.TimeZoneInfo/CachedData)[OptimizedTier1]
+00007FB0619E0A00 2b instance valuetype System.DateTimeKind [System.Private.CoreLib] System.TimeZoneInfo+CachedData::GetCorrespondingKind(class System.TimeZoneInfo)[OptimizedTier1]
+00007FB0619E0A40 201 valuetype System.TimeSpan [System.Private.CoreLib] System.TimeZoneInfo::GetUtcOffsetFromUtc(valuetype System.DateTime,class System.TimeZoneInfo,bool&,bool&)[OptimizedTier1]
+00007FB0619E0C80 14b instance class System.TimeZoneInfo/AdjustmentRule [System.Private.CoreLib] System.TimeZoneInfo::GetAdjustmentRuleForTime(valuetype System.DateTime,bool,valuetype System.Nullable`1<int32>&)[OptimizedTier1]
+00007FB0619E0DF0 4c instance valuetype System.DateTime [System.Private.CoreLib] System.DateTime::get_Date()[OptimizedTier1]
+00007FB0619E0E50 191 instance bool [System.Private.CoreLib] System.TimeZoneInfo+AdjustmentRule::get_HasDaylightSaving()[OptimizedTier1]
+00007FB0619E1020 9dc bool [System.Private.CoreLib] System.TimeZoneInfo::GetIsDaylightSavingsFromUtc(valuetype System.DateTime,int32,valuetype System.TimeSpan,class System.TimeZoneInfo/AdjustmentRule,valuetype System.Nullable`1<int32>,bool&,class System.TimeZoneInfo)[OptimizedTier1]
+00007FB0619E1A50 c9 instance valuetype System.Globalization.DaylightTimeStruct [System.Private.CoreLib] System.TimeZoneInfo::GetDaylightTime(int32,class System.TimeZoneInfo/AdjustmentRule,valuetype System.Nullable`1<int32>)[OptimizedTier1]
+00007FB0619E1B40 17c instance valuetype System.TimeSpan [System.Private.CoreLib] System.TimeZoneInfo::GetDaylightSavingsStartOffsetFromUtc(valuetype System.TimeSpan,class System.TimeZoneInfo/AdjustmentRule,valuetype System.Nullable`1<int32>)[OptimizedTier1]
+00007FB0619E1CE0 8f instance bool [System.Private.CoreLib] System.TimeZoneInfo+AdjustmentRule::IsStartDateMarkerForBeginningOfYear()[OptimizedTier1]
+00007FB0619E1D90 e5 valuetype System.TimeSpan [System.Private.CoreLib] System.TimeZoneInfo::GetDaylightSavingsEndOffsetFromUtc(valuetype System.TimeSpan,class System.TimeZoneInfo/AdjustmentRule)[OptimizedTier1]
+00007FB0619E1E90 8f instance bool [System.Private.CoreLib] System.TimeZoneInfo+AdjustmentRule::IsEndDateMarkerForEndOfYear()[OptimizedTier1]
+00007FB0619E1F40 130 bool [System.Private.CoreLib] System.TimeZoneInfo::CheckIsDst(valuetype System.DateTime,valuetype System.DateTime,valuetype System.DateTime,bool,class System.TimeZoneInfo/AdjustmentRule)[OptimizedTier1]
+00007FB0619E2090 114 int16 [System.Private.CoreLib] System.DateTimeOffset::ValidateOffset(valuetype System.TimeSpan)[OptimizedTier1]
+00007FB0619E21C0 a2 valuetype System.DateTime [System.Private.CoreLib] System.DateTimeOffset::ValidateDate(valuetype System.DateTime,valuetype System.TimeSpan)[OptimizedTier1]
+00007FB0619E2280 6e valuetype System.TimeSpan [System.Private.CoreLib] System.DateTimeOffset::op_Subtraction(valuetype System.DateTimeOffset,valuetype System.DateTimeOffset)[OptimizedTier1]
+00007FB0619E2310 1e valuetype System.TimeSpan [System.Private.CoreLib] System.DateTime::op_Subtraction(valuetype System.DateTime,valuetype System.DateTime)[OptimizedTier1]
+00007FB0619E2340 a bool [System.Private.CoreLib] System.TimeSpan::op_LessThan(valuetype System.TimeSpan,valuetype System.TimeSpan)[OptimizedTier1]
+00007FB0619E2360 15 instance int32 [System.Private.CoreLib] System.Random::Next()[OptimizedTier1]
+00007FB0619E23A0 5b instance int32 [System.Private.CoreLib] System.Random+XoshiroImpl::Next()[OptimizedTier1]
+00007FB0619E2410 4 instance int32 [System.Private.CoreLib] System.String::get_Length()[OptimizedTier1]
+00007FB0619DF1F8 8 stub<1563> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DF208 8 stub<1564> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E2430 78 instance void [System.Private.CoreLib] System.Runtime.CompilerServices.DefaultInterpolatedStringHandler::.ctor(int32,int32)[OptimizedTier1]
+00007FB0619DF218 8 stub<1565> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619DF228 8 stub<1566> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E24C0 8 stub<1567> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E24D0 8 stub<1568> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E24E0 28 stub<1569> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E2510 8 stub<1570> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E2520 20 stub<1571> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E2548 20 stub<1572> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E2570 20 stub<1573> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E2598 28 stub<1574> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E25C8 8 stub<1575> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E25D8 8 stub<1576> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E25E8 8 stub<1577> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E25F8 8 stub<1578> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E2608 8 stub<1579> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E2618 8 stub<1580> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E28E0 378 instance !0[] [System.Private.CoreLib] System.Buffers.TlsOverPerCoreLockedStacksArrayPool`1[System.Char]::Rent(int32)[OptimizedTier1]
+00007FB0619E2628 c8 stub<1581> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E2C80 71 instance string [System.Private.CoreLib] System.Runtime.CompilerServices.DefaultInterpolatedStringHandler::ToStringAndClear()[OptimizedTier1]
+00007FB0619E26F8 8 stub<1582> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E2708 8 stub<1583> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E2D20 34f instance void [System.Private.CoreLib] System.Buffers.TlsOverPerCoreLockedStacksArrayPool`1[System.Char]::Return(!0[],bool)[OptimizedTier1]
+00007FB0619E2718 60 stub<1584> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E2780 8 stub<1585> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E2790 80 stub<1586> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E2818 8 stub<1587> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E2828 20 stub<1588> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E2850 8 stub<1589> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E30A0 135 instance bool [System.Private.CoreLib] System.Runtime.CompilerServices.ConditionalWeakTable`2+Enumerator[System.__Canon,System.__Canon]::MoveNext()[OptimizedTier1]
+00007FB0619E2860 8 stub<1590> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3200 86 instance bool [System.Private.CoreLib] System.Runtime.CompilerServices.ConditionalWeakTable`2+Container[System.__Canon,System.__Canon]::TryGetEntry(int32,!0&,!1&)[OptimizedTier1]
+00007FB0619E2870 8 stub<1591> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E2880 8 stub<1592> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E32B0 f1 instance void [System.Private.CoreLib] System.Gen2GcCallback::Finalize()[OptimizedTier1]
+00007FB0619E33F0 e7 valuetype System.GCMemoryInfo [System.Private.CoreLib] System.GC::GetGCMemoryInfo(valuetype System.GCKind)[OptimizedTier1]
+00007FB0619E3500 52 void [System.Private.CoreLib] System.GC::ReRegisterForFinalize(object)[OptimizedTier1]
+00007FB0619E3570 1 instance void [System.Private.CoreLib] System.Runtime.ConstrainedExecution.CriticalFinalizerObject::Finalize()[OptimizedTier1]
+00007FB0619E35A0 59 object [System.Private.CoreLib] System.Runtime.CompilerServices.CastHelpers::ChkCastClass(void*,object)[OptimizedTier1]
+00007FB0619E3610 54 valuetype System.Buffers.Utilities/MemoryPressure [System.Private.CoreLib] System.Buffers.Utilities::GetMemoryPressure()[OptimizedTier1]
+00007FB0619E2890 8 stub<1593> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E28A0 8 stub<1594> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3698 8 stub<1595> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E36A8 20 stub<1596> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E36D0 80 stub<1597> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3758 38 stub<1598> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3798 8 stub<1599> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E37A8 8 stub<1600> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3AA0 160 instance class System.Collections.Generic.IEnumerator`1<valuetype System.Collections.Generic.KeyValuePair`2<!0,!1>> [System.Private.CoreLib] System.Runtime.CompilerServices.ConditionalWeakTable`2[System.__Canon,System.__Canon]::System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey,TValue>>.GetEnumerator()[OptimizedTier1]
+00007FB0619E3C30 31 instance void [System.Private.CoreLib] System.Runtime.CompilerServices.ConditionalWeakTable`2+Enumerator[System.__Canon,System.__Canon]::.ctor(class System.Runtime.CompilerServices.ConditionalWeakTable`2<!0,!1>)[OptimizedTier1]
+00007FB0619E37B8 8 stub<1601> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E37C8 8 stub<1602> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E37D8 8 stub<1603> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E37E8 8 stub<1604> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E37F8 8 stub<1605> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3808 8 stub<1606> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3818 8 stub<1607> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3C80 d5 instance void [System.Private.CoreLib] System.Runtime.CompilerServices.ConditionalWeakTable`2+Enumerator[System.__Canon,System.__Canon]::Dispose()[OptimizedTier1]
+00007FB0619E3828 8 stub<1608> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3838 8 stub<1609> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3D80 12 !!0 [System.Private.CoreLib] System.Threading.Interlocked::Exchange(!!0&,!!0)[OptimizedTier1]
+00007FB0619E3DB0 52 void [System.Private.CoreLib] System.GC::SuppressFinalize(object)[OptimizedTier1]
+00007FB0619E3E20 38 instance bool [System.Private.CoreLib] System.Threading.PortableThreadPool::OnGen2GCCallback()[OptimizedTier1]
+00007FB0619E3848 38 stub<1610> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3888 38 stub<1611> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3E70 2c instance bool [System.Private.CoreLib] System.Buffers.TlsOverPerCoreLockedStacksArrayPool`1+<>c[System.Char]::<InitializeTlsBucketsAndTrimming>b__13_0(object)[OptimizedTier1]
+00007FB06096F1E0 18 stub<1612> GenerateLookupStub<GenerateLookupStub>
+00007FB0619E38C8 20 stub<1613> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB06096F200 18 stub<1614> GenerateLookupStub<GenerateLookupStub>
+00007FB0619E38F0 8 stub<1615> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3900 20 stub<1616> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3928 8 stub<1617> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3938 38 stub<1618> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3978 8 stub<1619> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3EC0 52a instance bool [System.Private.CoreLib] System.Buffers.TlsOverPerCoreLockedStacksArrayPool`1[System.Char]::Trim()[OptimizedTier1]
+00007FB0609A45B0 18 stub<1620> GenerateResolveStub<GenerateResolveStub>
+00007FB0609731E0 20 stub<1621> GenerateDispatchStub<GenerateDispatchStub>
+00007FB060973200 20 stub<1622> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0609A4620 18 stub<1623> GenerateResolveStub<GenerateResolveStub>
+00007FB060973220 20 stub<1624> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0619E4460 2c instance bool [System.Private.CoreLib] System.Buffers.TlsOverPerCoreLockedStacksArrayPool`1+<>c[System.Byte]::<InitializeTlsBucketsAndTrimming>b__13_0(object)[OptimizedTier1]
+00007FB06096F220 18 stub<1625> GenerateLookupStub<GenerateLookupStub>
+00007FB06096F240 18 stub<1626> GenerateLookupStub<GenerateLookupStub>
+00007FB0619E3998 8 stub<1627> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E39A8 20 stub<1628> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E39D0 8 stub<1629> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E39E0 8 stub<1630> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E44A0 52c instance bool [System.Private.CoreLib] System.Buffers.TlsOverPerCoreLockedStacksArrayPool`1[System.Byte]::Trim()[OptimizedTier1]
+00007FB0609A4690 18 stub<1631> GenerateResolveStub<GenerateResolveStub>
+00007FB060973240 20 stub<1632> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0609A4700 18 stub<1633> GenerateResolveStub<GenerateResolveStub>
+00007FB060973260 20 stub<1634> GenerateDispatchStub<GenerateDispatchStub>
+00007FB060973280 20 stub<1635> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0619E4A40 8b instance int64 [System.Private.CoreLib] System.Diagnostics.Stopwatch::get_ElapsedMilliseconds()[OptimizedTier1]
+00007FB0619E4AF0 57 instance int64 [System.Private.CoreLib] System.Diagnostics.Stopwatch::GetRawElapsedTicks()[OptimizedTier1]
+00007FB0619E4B60 1d instance valuetype System.Collections.Generic.KeyValuePair`2<!0,!1> [System.Private.CoreLib] System.Runtime.CompilerServices.ConditionalWeakTable`2+Enumerator[System.__Canon,System.__Canon]::get_Current()[OptimizedTier1]
+00007FB0619E4B98 1c0 stub<1636> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E4D68 1c0 stub<1637> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E4F38 1c0 stub<1638> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3A00 8 stub<1639> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3A10 8 stub<1640> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E5110 9f4 class System.Threading.Tasks.Task`1<!!0> [System.Private.CoreLib] System.Threading.Tasks.Task::FromResult(!!0)[QuickJitted]
+00007FB0619E5B20 41 instance void [System.Private.CoreLib] System.Threading.Tasks.Task`1[System.UInt64]::.ctor(!0)[QuickJitted]
+00007FB0619E3A20 18 stub<1641> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E3A40 38 stub<1642> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E5B80 2b instance valuetype System.Runtime.CompilerServices.TaskAwaiter`1<!0> [System.Private.CoreLib] System.Threading.Tasks.Task`1[System.UInt64]::GetAwaiter()[QuickJitted]
+00007FB0619E5BC0 26 instance void [System.Private.CoreLib] System.Runtime.CompilerServices.TaskAwaiter`1[System.UInt64]::.ctor(class System.Threading.Tasks.Task`1<!0>)[QuickJitted]
+00007FB0619E5C00 1c0 stub<1643> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E5DD0 2f instance !0 [System.Private.CoreLib] System.Runtime.CompilerServices.TaskAwaiter`1[System.UInt64]::GetResult()[QuickJitted]
+00007FB0619E5E20 1c instance !0 [System.Private.CoreLib] System.Threading.Tasks.Task`1[System.UInt64]::get_ResultOnSuccess()[QuickJitted]
+00007FB0619E3A80 8 stub<1644> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E5E50 20 stub<1645> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E6260 98 instance class [System.Runtime]System.Threading.Tasks.Task`1<uint64> [Samples.Computer01] Samples.Computer01.Computer`2+NestedComputer+DoublyNestedComputer`2[System.Byte,System.Collections.Generic.KeyValuePair`2[System.Char,System.Collections.Generic.KeyValuePair`2[System.Int32,System.Collections.Generic.KeyValuePair`2[System.Single,System.__Canon]]],System.Byte,System.Collections.Generic.KeyValuePair`2[System.Char,System.Threading.CancellationToken]]::InvokeComputeAsync(bool,class Samples.Computer01.Computer`2/NestedComputer<!0,!1>)[MinOptJitted]
+00007FB0619E5E88 8 stub<1646> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E6320 88 instance void [System.Private.CoreLib] System.Runtime.CompilerServices.DefaultInterpolatedStringHandler::AppendFormatted(!!0)[Optimized]
+00007FB0619E5E98 e0 stub<1647> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E5F80 60 stub<1648> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E5FE8 58 stub<1649> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E6048 20 stub<1650> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E6070 18 stub<1651> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E6090 8 stub<1652> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E63C0 db instance class [System.Runtime]System.Threading.Tasks.Task [Samples.Computer01] Samples.Computer01.AsyncComputation::Compute2()[MinOptJitted]
+00007FB0619E64C0 33 instance void [Samples.Computer01] Samples.Computer01.AsyncComputation+<Compute2>d__10::.ctor()[MinOptJitted]
+00007FB0619E60A0 8 stub<1653> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E60B0 8 stub<1654> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E6510 1ac instance void [Samples.Computer01] Samples.Computer01.AsyncComputation+<Compute2>d__10::MoveNext()[MinOptJitted]
+00007FB0619E66E0 58 object [System.Private.CoreLib] System.Runtime.CompilerServices.CastHelpers::IsInstanceOfClass(void*,object)[OptimizedTier1]
+00007FB0609FB2D0 e stub<1655> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0619E60C0 8 stub<1656> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E60D0 8 stub<1657> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E6750 75 instance bool [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.ReadOnlyMemory`1[System.Char],System.ConsoleKeyInfo]::TryGetValue(!0,!1&)[QuickJitted]
+00007FB0619E60E0 8 stub<1658> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E60F0 8 stub<1659> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E67E0 1f7 instance !1& [System.Private.CoreLib] System.Collections.Generic.Dictionary`2[System.ReadOnlyMemory`1[System.Char],System.ConsoleKeyInfo]::FindValue(!0)[Optimized]
+00007FB0619E6A00 25 bool [System.Private.CoreLib] Internal.Runtime.CompilerServices.Unsafe::IsNullRef(!!0&)[QuickJitted]
+00007FB0619E6A40 13d instance void [Samples.Computer01] Samples.Computer01.ComputerService::StopService()[MinOptJitted]
+00007FB0619E6BD0 171 instance void [Samples.Computer01] Samples.Computer01.ComputerService::StopComputer()[MinOptJitted]
+00007FB0619E6110 8 stub<1660> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E6D70 152 instance void [Samples.Computer01] Samples.Computer01.Computer`2[System.Byte,System.Collections.Generic.KeyValuePair`2[System.Char,System.Collections.Generic.KeyValuePair`2[System.Int32,System.Collections.Generic.KeyValuePair`2[System.Single,System.__Canon]]]]::Stop()[MinOptJitted]
+00007FB0619E6120 58 stub<1661> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E61C0 8 stub<1662> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E61D0 8 stub<1663> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E6EF0 18 class [System.Runtime]System.IO.TextWriter [System.Console] System.Console::get_Out()[OptimizedTier1]
+00007FB0619E6F20 42 instance void [Samples.Computer01] Samples.Computer01.Computer`2[System.Byte,System.Collections.Generic.KeyValuePair`2[System.Char,System.Collections.Generic.KeyValuePair`2[System.Int32,System.Collections.Generic.KeyValuePair`2[System.Single,System.__Canon]]]]::Dispose()[MinOptJitted]
+00007FB0619E61E0 8 stub<1664> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E6F80 7e instance void [Samples.Computer01] Samples.Computer01.Computer`2[System.Byte,System.Collections.Generic.KeyValuePair`2[System.Char,System.Collections.Generic.KeyValuePair`2[System.Int32,System.Collections.Generic.KeyValuePair`2[System.Single,System.__Canon]]]]::Dispose(bool)[MinOptJitted]
+00007FB0619E7020 3a instance void [Samples.Computer01] Samples.Computer01.ComputerService::StopGenerics()[MinOptJitted]
+00007FB0619E7070 f3 instance void [Samples.Computer01] Samples.Computer01.GenericTypes::Stop()[MinOptJitted]
+00007FB0609A4770 18 stub<1665> GenerateResolveStub<GenerateResolveStub>
+00007FB0609732A0 20 stub<1666> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0609A47E0 18 stub<1667> GenerateResolveStub<GenerateResolveStub>
+00007FB0609732C0 20 stub<1668> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0619E61F0 20 stub<1669> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E6218 8 stub<1670> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E7178 38 stub<1671> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E7580 3a instance void [Samples.Computer01] Samples.Computer01.ComputerService::StopSimpleWallTime()[MinOptJitted]
+00007FB0619E75D0 f3 instance void [Samples.Computer01] Samples.Computer01.SimpleWallTime::Stop()[MinOptJitted]
+00007FB0609A4850 18 stub<1672> GenerateResolveStub<GenerateResolveStub>
+00007FB0609732E0 20 stub<1673> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0609A48C0 18 stub<1674> GenerateResolveStub<GenerateResolveStub>
+00007FB0619E71B8 18 stub<1675> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB060973300 20 stub<1676> GenerateDispatchStub<GenerateDispatchStub>
+00007FB060973320 20 stub<1677> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0619E71D8 20 stub<1678> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E76E0 3a instance void [Samples.Computer01] Samples.Computer01.ComputerService::StopPiComputation()[MinOptJitted]
+00007FB0619E7730 f3 instance void [Samples.Computer01] Samples.Computer01.PiComputation::Stop()[MinOptJitted]
+00007FB0619E7200 f0 stub<1679> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E6238 10 stub<1680> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E72F8 120 stub<1681> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E7420 a0 stub<1682> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E74C8 60 stub<1683> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E7838 128 stub<1684> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E7970 3a instance void [Samples.Computer01] Samples.Computer01.ComputerService::StopFibonacciComputation()[MinOptJitted]
+00007FB0619E7530 8 stub<1685> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E79C0 70 stub<1686> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E7540 8 stub<1687> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E7DD0 f3 instance void [Samples.Computer01] Samples.Computer01.FibonacciComputation::Stop()[MinOptJitted]
+00007FB0619E7A38 78 stub<1688> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E7550 8 stub<1689> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E7EE0 3a instance void [Samples.Computer01] Samples.Computer01.ComputerService::StopSleep()[MinOptJitted]
+00007FB0619E7AB8 18 stub<1690> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E7F30 f3 instance void [Samples.Computer01] Samples.Computer01.SleepManager::Stop()[MinOptJitted]
+00007FB0619E7AD8 30 stub<1691> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E7B10 120 stub<1692> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E7C38 8 stub<1693> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E7C58 88 stub<1694> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E7CE8 a0 stub<1695> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8038 158 stub<1696> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E81A0 e0 stub<1697> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8298 20 stub<1698> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E82C0 1f8 stub<1699> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E84C0 40 stub<1700> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8508 30 stub<1701> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8540 38 stub<1702> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8580 8 stub<1703> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E85A8 28 stub<1704> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E85D8 8 stub<1705> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E85E8 60 stub<1706> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8650 20 stub<1707> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8678 20 stub<1708> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E86A0 40 stub<1709> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E86E8 20 stub<1710> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB060973340 20 stub<1711> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0619E8730 40 stub<1712> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8788 c0 stub<1713> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8850 98 stub<1714> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E88F0 50 stub<1715> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8948 10 stub<1716> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8960 8 stub<1717> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8970 8 stub<1718> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8DB8 40 stub<1719> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8990 8 stub<1720> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8E00 28 stub<1721> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB2E0 e stub<1722> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0619E8E30 48 stub<1723> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8E90 60 stub<1724> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8EF8 20 stub<1725> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8F20 88 stub<1726> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E8FB0 a0 stub<1727> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9058 80 stub<1728> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E90E0 80 stub<1729> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E91C0 c8 stub<1730> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9168 30 stub<1731> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9290 68 stub<1732> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9300 80 stub<1733> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9388 88 stub<1734> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9418 38 stub<1735> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9458 80 stub<1736> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E95C8 150 stub<1737> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E94E0 30 stub<1738> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E91A0 8 stub<1739> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9728 190 stub<1740> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9518 90 stub<1741> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E98C8 8 stub<1742> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E98D8 10 stub<1743> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E98F0 20 stub<1744> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9918 20 stub<1745> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9940 20 stub<1746> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9968 118 stub<1747> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9A88 40 stub<1748> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9AD0 30 stub<1749> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9B08 48 stub<1750> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9B58 8 stub<1751> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9B68 70 stub<1752> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9CD0 268 stub<1753> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9F48 290 stub<1754> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EA1E8 268 stub<1755> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EA460 290 stub<1756> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9BE0 8 stub<1757> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9BF0 8 stub<1758> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9C00 8 stub<1759> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9C10 28 stub<1760> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9C40 38 stub<1761> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9C80 8 stub<1762> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9C90 8 stub<1763> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9CA0 8 stub<1764> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EA700 70 stub<1765> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619E9CB0 8 stub<1766> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EA778 8 stub<1767> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EA788 8 stub<1768> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EA798 8 stub<1769> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EA7A8 28 stub<1770> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EA7D8 38 stub<1771> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EA818 8 stub<1772> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EA828 70 stub<1773> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EA8A0 20 stub<1774> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EA8C8 10 stub<1775> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EA8E0 58 stub<1776> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EAB08 268 stub<1777> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EAD80 290 stub<1778> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EA940 c0 stub<1779> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EAA08 8 stub<1780> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EAA18 8 stub<1781> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EAA28 8 stub<1782> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EAA38 28 stub<1783> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EAA68 38 stub<1784> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB020 70 stub<1785> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EAAA8 8 stub<1786> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EAAB8 8 stub<1787> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB098 68 stub<1788> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB108 40 stub<1789> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB150 60 stub<1790> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB1B8 168 stub<1791> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EAAC8 20 stub<1792> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB328 8 stub<1793> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB2F0 e stub<1794> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0619EB338 b0 stub<1795> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB3F0 8 stub<1796> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB428 180 stub<1797> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB5B8 28 stub<1798> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB5E8 38 stub<1799> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB400 8 stub<1800> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB628 8 stub<1801> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB638 8 stub<1802> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB648 180 stub<1803> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB7D0 180 stub<1804> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB958 28 stub<1805> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB9C0 38 stub<1806> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB988 8 stub<1807> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EB998 8 stub<1808> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EBA00 8 stub<1809> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EBDD0 3c class System.Collections.Immutable.ImmutableArray`1/Builder<!!0> [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray::CreateBuilder(int32)[QuickJitted]
+00007FB0619EBA10 48 stub<1810> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EBA60 20 stub<1811> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EBE20 6e instance void [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1+Builder[System.Reflection.PortableExecutable.SectionHeader]::.ctor(int32)[QuickJitted]
+00007FB0619EBA88 68 stub<1812> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB300 e stub<1813> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0619EBEB0 6c instance void [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1+Builder[System.Reflection.PortableExecutable.SectionHeader]::Add(!0)[QuickJitted]
+00007FB0619EBAF8 8 stub<1814> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EBB08 8 stub<1815> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EBF30 56 instance void [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1+Builder[System.Reflection.PortableExecutable.SectionHeader]::EnsureCapacity(int32)[QuickJitted]
+00007FB0619EBB18 268 stub<1816> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EBFA0 290 stub<1817> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EBD88 8 stub<1818> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EC240 70 stub<1819> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EC2B8 b8 stub<1820> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EC650 d4 instance valuetype System.Collections.Immutable.ImmutableArray`1<!0> [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1+Builder[System.Reflection.PortableExecutable.SectionHeader]::MoveToImmutable()[QuickJitted]
+00007FB0619EC740 1f instance int32 [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1+Builder[System.Reflection.PortableExecutable.SectionHeader]::get_Capacity()[QuickJitted]
+00007FB0619EC780 1b instance int32 [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1+Builder[System.Reflection.PortableExecutable.SectionHeader]::get_Count()[QuickJitted]
+00007FB0619EC7B0 57 void [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1[System.Reflection.PortableExecutable.SectionHeader]::.cctor()[QuickJitted]
+00007FB0619EC820 26 instance void [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1[System.Reflection.PortableExecutable.SectionHeader]::.ctor(!0[])[QuickJitted]
+00007FB0619EC378 30 stub<1821> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EBD98 20 stub<1822> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EC3B0 8 stub<1823> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EC3C0 180 stub<1824> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EC860 3c class System.Collections.Immutable.ImmutableArray`1/Builder<!!0> [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray::CreateBuilder(int32)[QuickJitted]
+00007FB0619EC548 20 stub<1825> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EC8B0 6e instance void [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1+Builder[System.Reflection.PortableExecutable.DebugDirectoryEntry]::.ctor(int32)[QuickJitted]
+00007FB0619EC940 6f instance void [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1+Builder[System.Reflection.PortableExecutable.DebugDirectoryEntry]::Add(!0)[QuickJitted]
+00007FB0619EC570 8 stub<1826> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EC9D0 56 instance void [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1+Builder[System.Reflection.PortableExecutable.DebugDirectoryEntry]::EnsureCapacity(int32)[QuickJitted]
+00007FB0619ECA40 d1 instance valuetype System.Collections.Immutable.ImmutableArray`1<!0> [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1+Builder[System.Reflection.PortableExecutable.DebugDirectoryEntry]::MoveToImmutable()[QuickJitted]
+00007FB0619ECB30 1f instance int32 [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1+Builder[System.Reflection.PortableExecutable.DebugDirectoryEntry]::get_Capacity()[QuickJitted]
+00007FB0619ECB70 1b instance int32 [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1+Builder[System.Reflection.PortableExecutable.DebugDirectoryEntry]::get_Count()[QuickJitted]
+00007FB0619ECBA0 57 void [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1[System.Reflection.PortableExecutable.DebugDirectoryEntry]::.cctor()[QuickJitted]
+00007FB0619ECC10 26 instance void [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1[System.Reflection.PortableExecutable.DebugDirectoryEntry]::.ctor(!0[])[QuickJitted]
+00007FB0619EC580 20 stub<1827> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EC5A8 20 stub<1828> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EC5D0 8 stub<1829> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EC5E0 18 stub<1830> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EC600 18 stub<1831> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EC620 18 stub<1832> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ECC50 59 instance valuetype System.Collections.Immutable.ImmutableArray`1/Enumerator<!0> [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1[System.Reflection.PortableExecutable.DebugDirectoryEntry]::GetEnumerator()[QuickJitted]
+00007FB0619ECCC0 1e instance void [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1[System.Reflection.PortableExecutable.DebugDirectoryEntry]::ThrowNullRefIfNotInitialized()[QuickJitted]
+00007FB0619ECD00 30 instance void [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1+Enumerator[System.Reflection.PortableExecutable.DebugDirectoryEntry]::.ctor(!0[])[QuickJitted]
+00007FB0619ECD50 3d instance bool [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1+Enumerator[System.Reflection.PortableExecutable.DebugDirectoryEntry]::MoveNext()[QuickJitted]
+00007FB0619ECDB0 57 instance !0 [System.Collections.Immutable] System.Collections.Immutable.ImmutableArray`1+Enumerator[System.Reflection.PortableExecutable.DebugDirectoryEntry]::get_Current()[QuickJitted]
+00007FB0619ECE20 20 stub<1833> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ECE48 88 stub<1834> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ECED8 28 stub<1835> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB060973360 20 stub<1836> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0619ECF08 20 stub<1837> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ECF30 8 stub<1838> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ECF40 8 stub<1839> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ECF50 68 stub<1840> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED228 268 stub<1841> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED4A0 290 stub<1842> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ECFC0 70 stub<1843> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED038 8 stub<1844> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED048 18 stub<1845> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED068 38 stub<1846> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED0D8 90 stub<1847> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED170 48 stub<1848> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED1C0 10 stub<1849> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED1D8 18 stub<1850> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED740 30 stub<1851> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED1F8 20 stub<1852> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED778 50 stub<1853> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED7D0 18 stub<1854> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED7F0 20 stub<1855> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED818 18 stub<1856> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED838 38 stub<1857> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED878 10 stub<1858> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED890 20 stub<1859> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED8B8 20 stub<1860> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED8E0 20 stub<1861> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED908 30 stub<1862> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED940 30 stub<1863> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED978 28 stub<1864> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED9A8 30 stub<1865> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619ED9E0 30 stub<1866> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDA18 28 stub<1867> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDA48 10 stub<1868> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDA60 20 stub<1869> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDA88 10 stub<1870> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDAA0 20 stub<1871> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDAC8 20 stub<1872> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDAF0 10 stub<1873> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDB08 20 stub<1874> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDB48 40 stub<1875> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDB90 30 stub<1876> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDBC8 10 stub<1877> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDBE0 10 stub<1878> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDBF8 30 stub<1879> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDC30 20 stub<1880> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDC58 18 stub<1881> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDC78 10 stub<1882> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDC90 38 stub<1883> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDCD0 8 stub<1884> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDCE0 8 stub<1885> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDCF0 38 stub<1886> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDD30 8 stub<1887> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDD40 8 stub<1888> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDD50 20 stub<1889> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDD78 40 stub<1890> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDDC0 28 stub<1891> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDDF0 28 stub<1892> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDE20 48 stub<1893> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDE70 18 stub<1894> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDE90 28 stub<1895> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDEC0 28 stub<1896> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDEF0 18 stub<1897> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDF50 48 stub<1898> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDF10 20 stub<1899> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDFA0 18 stub<1900> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDFC0 18 stub<1901> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EDFE0 18 stub<1902> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EE000 28 stub<1903> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EE030 1e0 stub<1904> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EE358 2a8 stub<1905> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EE218 8 stub<1906> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EE228 8 stub<1907> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EE238 20 stub<1908> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EE260 20 stub<1909> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EE288 18 stub<1910> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EE2A8 20 stub<1911> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EE610 138 stub<1912> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB310 e stub<1913> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0619EE2E0 28 stub<1914> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EE310 30 stub<1915> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EE838 78 stub<1916> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EE8B8 8 stub<1917> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EEB60 12c int32 [System.Console] dynamicClass::IL_STUB_PInvoke(System.Runtime.InteropServices.SafeHandle /* MT: 0x00007FB061540C58 */,Interop/Sys/FileStatus /* MT: 0x00007FB061D6A398 */&)[Optimized]
+00007FB0619EE8E8 150 stub<1918> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EEA40 28 stub<1919> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EEA70 68 stub<1920> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EECC8 98 stub<1921> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EEAE0 18 stub<1922> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EEB00 8 stub<1923> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EF0D0 b3 int64 [System.Console] dynamicClass::IL_STUB_PInvoke(Interop/Sys/SysConfName /* MT: 0x00007FB061D6AF98 */)[Optimized]
+00007FB0619EEB20 8 stub<1924> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EF1B0 157 native int [System.Console] dynamicClass::IL_STUB_PInvoke(native int,uint64,Interop/Sys/MemoryMappedProtections /* MT: 0x00007FB061D696F8 */,Interop/Sys/MemoryMappedFlags /* MT: 0x00007FB061D6AE48 */,Microsoft.Win32.SafeHandles.SafeFileHandle /* MT: 0x00007FB0617112E8 */,int64)[Optimized]
+00007FB0619EEB40 8 stub<1925> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EF340 c2 int32 [System.Console] dynamicClass::IL_STUB_PInvoke(native int,uint64,Interop/Sys/MemoryAdvice /* MT: 0x00007FB061D6B0E8 */)[Optimized]
+00007FB0619EED78 78 stub<1926> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EEDF8 20 stub<1927> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EEE20 8 stub<1928> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EEE30 20 stub<1929> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EEE58 b8 stub<1930> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EF830 1c0 stub<1931> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB060973380 20 stub<1932> GenerateDispatchStub<GenerateDispatchStub>
+00007FB0619EEF18 20 stub<1933> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EEF40 68 stub<1934> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EFA00 48 instance !0 [System.Private.CoreLib] System.Nullable`1[System.Reflection.Metadata.SequencePoint]::get_Value()[QuickJitted]
+00007FB0619EEFB0 38 stub<1935> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EEFF0 10 stub<1936> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EF008 28 stub<1937> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EF038 28 stub<1938> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EF068 20 stub<1939> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EF090 8 stub<1940> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EF0A0 8 stub<1941> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EF0B0 8 stub<1942> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0619EFA60 210 stub<1943> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609FB320 e stub<1944> GenerateVTableCallStub<GenerateVTableCallStub>
+00007FB0619EFC80 10 stub<1945> AllocateTemporaryEntryPoints<PRECODE_FIXUP>
+00007FB0609A4930 18 stub<1946> GenerateResolveStub<GenerateResolveStub>
+00007FB0609733A0 20 stub<1947> GenerateDispatchStub<GenerateDispatchStub>
