@@ -18,45 +18,59 @@ bool is_max_stack_depth_reached(const UnwindState &us) {
   return us.output.nb_locs + 2 >= DD_MAX_STACK_DEPTH;
 }
 
-static void add_virtual_frame(UnwindState *us, SymbolIdx_t symbol_idx) {
+DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
+                UnwindState *us) {
   UnwindOutput *output = &us->output;
   int64_t current_loc_idx = output->nb_locs;
   if (output->nb_locs >= DD_MAX_STACK_DEPTH) {
-    return; // avoid overflow
+    DDRES_RETURN_WARN_LOG(DD_WHAT_UW_MAX_DEPTH,
+                          "Max stack depth reached"); // avoid overflow
   }
+
   output->locs[current_loc_idx]._symbol_idx = symbol_idx;
+  output->locs[current_loc_idx].ip = pc;
+  if (map_idx == -1) {
+    // just add an empty element for mapping info
+    output->locs[current_loc_idx]._map_info_idx =
+        us->symbol_hdr._common_mapinfo_lookup.get_or_insert(
+            CommonMapInfoLookup::MappingErrors::empty,
+            us->symbol_hdr._mapinfo_table);
+  } else {
+    output->locs[current_loc_idx]._map_info_idx = map_idx;
+  }
+#ifdef DEBUG
+  LG_NTC("Considering frame with IP : %lx / %s ", pc,
+         us->symbol_hdr._symbol_table[output->locs[current_loc_idx]._symbol_idx]
+             ._symname.c_str());
+#endif
+  output->nb_locs++;
+  return ddres_init();
+}
 
-  // API in lib mode should clarify this
-  output->locs[current_loc_idx].ip = 0;
-
-  // just add an empty element for mapping info
-  output->locs[current_loc_idx]._map_info_idx =
-      us->symbol_hdr._common_mapinfo_lookup.get_or_insert(
-          CommonMapInfoLookup::MappingErrors::empty,
-          us->symbol_hdr._mapinfo_table);
-
-  ++output->nb_locs;
+static void add_frame_without_mapping(UnwindState *us, SymbolIdx_t symbol_idx) {
+  add_frame(symbol_idx, -1, 0, us);
 }
 
 void add_common_frame(UnwindState *us, SymbolErrors lookup_case) {
-  add_virtual_frame(us,
-                    us->symbol_hdr._common_symbol_lookup.get_or_insert(
-                        lookup_case, us->symbol_hdr._symbol_table));
+  add_frame_without_mapping(us,
+                            us->symbol_hdr._common_symbol_lookup.get_or_insert(
+                                lookup_case, us->symbol_hdr._symbol_table));
 }
 
 void add_dso_frame(UnwindState *us, const Dso &dso,
                    ElfAddress_t normalized_addr, std::string_view addr_type) {
-  add_virtual_frame(
+  add_frame_without_mapping(
       us,
       us->symbol_hdr._dso_symbol_lookup.get_or_insert(
           normalized_addr, dso, us->symbol_hdr._symbol_table, addr_type));
 }
 
 void add_virtual_base_frame(UnwindState *us) {
-  add_virtual_frame(us,
-                    us->symbol_hdr._base_frame_symbol_lookup.get_or_insert(
-                        us->pid, us->symbol_hdr._symbol_table,
-                        us->symbol_hdr._dso_symbol_lookup, us->dso_hdr));
+  add_frame_without_mapping(
+      us,
+      us->symbol_hdr._base_frame_symbol_lookup.get_or_insert(
+          us->pid, us->symbol_hdr._symbol_table,
+          us->symbol_hdr._dso_symbol_lookup, us->dso_hdr));
 }
 
 // read a word from the given stack

@@ -84,8 +84,8 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
   return symbol_success;
 }
 
-bool compute_elf_range(RegionAddress_t file_pc, const GElf_Sym &elf_sym,
-                       RegionAddress_t &start_sym, RegionAddress_t &end_sym) {
+bool compute_elf_range(ElfAddress_t file_pc, const GElf_Sym &elf_sym,
+                       ElfAddress_t &start_sym, ElfAddress_t &end_sym) {
 
   start_sym = elf_sym.st_value;
   if (elf_sym.st_size) {

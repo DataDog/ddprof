@@ -5,7 +5,7 @@ deliverables
 redis
 release
 temp
-tmp
+
 vendor*
 .cache
 .ccls-cache
@@ -21,6 +21,7 @@ docker-sync.yml
 /.docker-sync
 /pprofs
 /ddprof.codeql
+/tmp
 
 #==============================================================================#
 # Editor auto-saving

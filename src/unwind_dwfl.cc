@@ -10,6 +10,7 @@
 #include "dwfl_internals.hpp"
 #include "dwfl_thread_callbacks.hpp"
 #include "logger.hpp"
+#include "runtime_symbol_lookup.hpp"
 #include "symbol_hdr.hpp"
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
@@ -87,7 +88,11 @@ static void trace_unwinding_end(UnwindState *us) {
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
                             DDProfMod *ddprof_mod, FileInfoId_t file_info_id);
 
-// returns true if we should continue unwinding
+// check for runtime symbols provided in /tmp files
+static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
+                                      ElfAddress_t pc);
+
+// returns an OK status if we should continue unwinding
 static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
 
   if (is_max_stack_depth_reached(*us)) {
@@ -116,6 +121,9 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     return ddres_init();
   }
   const Dso &dso = find_res.first->second;
+  if (dso::has_runtime_symbols(dso._type)) {
+    return add_runtime_symbol_frame(us, dso, pc);
+  }
   // if not encountered previously, update file location / key
   FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
   if (file_info_id <= k_file_info_error) {
@@ -232,28 +240,33 @@ static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
 
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
 
-  UnwindOutput *output = &us->output;
-  int64_t current_loc_idx = output->nb_locs;
-
   // get or create the dwfl symbol
-  output->locs[current_loc_idx]._symbol_idx =
-      unwind_symbol_hdr._dwfl_symbol_lookup_v2.get_or_insert(
-          *ddprof_mod, unwind_symbol_hdr._symbol_table,
-          unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso);
-#ifdef DEBUG
-  LG_NTC("Considering frame with IP : %lx / %s ", pc,
-         us->symbol_hdr._symbol_table[output->locs[current_loc_idx]._symbol_idx]
-             ._symname.c_str());
-#endif
+  SymbolIdx_t symbol_idx = unwind_symbol_hdr._dwfl_symbol_lookup.get_or_insert(
+      *ddprof_mod, unwind_symbol_hdr._symbol_table,
+      unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso);
+  MapInfoIdx_t map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
+      us->pid, us->symbol_hdr._mapinfo_table, dso);
+  return add_frame(symbol_idx, map_idx, pc, us);
+}
 
-  output->locs[current_loc_idx].ip = pc;
+// check for runtime symbols provided in /tmp files
+static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
+                                      ElfAddress_t pc) {
+  SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
+  SymbolTable &symbol_table = unwind_symbol_hdr._symbol_table;
+  RuntimeSymbolLookup &runtime_symbol_lookup =
+      unwind_symbol_hdr._runtime_symbol_lookup;
+  SymbolIdx_t symbol_idx =
+      runtime_symbol_lookup.get_or_insert(dso._pid, pc, symbol_table);
+  if (symbol_idx == -1) {
+    add_dso_frame(us, dso, pc, "pc");
+    return ddres_init();
+  }
 
-  output->locs[current_loc_idx]._map_info_idx =
-      us->symbol_hdr._mapinfo_lookup.get_or_insert(
-          us->pid, us->symbol_hdr._mapinfo_table, dso);
-  output->nb_locs++;
+  MapInfoIdx_t map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
+      us->pid, us->symbol_hdr._mapinfo_table, dso);
 
-  return ddres_init();
+  return add_frame(symbol_idx, map_idx, pc, us);
 }
 
 } // namespace ddprof

@@ -23,6 +23,8 @@ static const std::string_view s_anon_str = "//anon";
 static const std::string_view s_jsa_str = ".jsa";
 // Example of these include : anon_inode:[perf_event]
 static const std::string_view s_anon_inode_str = "anon_inode";
+// dll should not be considered as elf files
+static const std::string_view s_dll_str = ".dll";
 // Example socket:[123456]
 static const std::string_view s_socket_str = "socket";
 // null elements
@@ -50,17 +52,14 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
   } else if (_filename.substr(0, s_heap_str.length()) == s_heap_str) {
     _type = dso::kHeap;
     // Safeguard against other types of files we would not handle
-  } else if (_filename.empty() ||
-             _filename.substr(0, s_anon_str.length()) == s_anon_str ||
-             _filename.substr(0, s_anon_inode_str.length()) ==
-                 s_anon_inode_str ||
-             _filename.substr(0, s_dev_zero_str.length()) == s_dev_zero_str ||
-             _filename.substr(0, s_dev_null_str.length()) == s_dev_null_str ||
-             // ends with .jsa
-             ((_filename.length() > s_jsa_str.length() + 1) &&
-              _filename.substr(_filename.length() - s_jsa_str.length(),
-                               _filename.length()) == s_jsa_str)) {
+  } else if (_filename.empty() || _filename.starts_with(s_anon_str) ||
+             _filename.starts_with(s_anon_inode_str) ||
+             _filename.starts_with(s_dev_zero_str) ||
+             _filename.starts_with(s_dev_null_str)) {
     _type = dso::kAnon;
+  } else if ( // ends with .jsa
+      _filename.ends_with(s_jsa_str) || _filename.ends_with(s_dll_str)) {
+    _type = dso::kRuntime;
   } else if (_filename.substr(0, s_socket_str.length()) == s_socket_str) {
     _type = dso::kSocket;
   } else if (_filename[0] == '[') {

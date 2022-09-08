@@ -20,7 +20,7 @@
 
 namespace ddprof {
 
-DwflSymbolLookup_V2::DwflSymbolLookup_V2() : _lookup_setting(K_CACHE_ON) {
+DwflSymbolLookup::DwflSymbolLookup() : _lookup_setting(K_CACHE_ON) {
   if (const char *env_p = std::getenv("DDPROF_CACHE_SETTING")) {
     if (strcmp(env_p, "VALIDATE") == 0) {
       // Allows to compare the accuracy of the cache
@@ -33,7 +33,7 @@ DwflSymbolLookup_V2::DwflSymbolLookup_V2() : _lookup_setting(K_CACHE_ON) {
   }
 }
 
-unsigned DwflSymbolLookup_V2::size() const {
+unsigned DwflSymbolLookup::size() const {
   unsigned total_nb_elts = 0;
   std::for_each(
       _file_info_map.begin(), _file_info_map.end(),
@@ -46,19 +46,21 @@ unsigned DwflSymbolLookup_V2::size() const {
 /****************/
 
 // Retrieve existing symbol or attempt to read from dwarf
-SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
-    const DDProfMod &ddprof_mod, SymbolTable &table,
-    DsoSymbolLookup &dso_symbol_lookup, FileInfoId_t file_info_id,
-    ProcessAddress_t process_pc, const Dso &dso) {
+SymbolIdx_t DwflSymbolLookup::get_or_insert(const DDProfMod &ddprof_mod,
+                                            SymbolTable &table,
+                                            DsoSymbolLookup &dso_symbol_lookup,
+                                            FileInfoId_t file_info_id,
+                                            ProcessAddress_t process_pc,
+                                            const Dso &dso) {
   ++_stats._calls;
-  RegionAddress_t elf_pc = process_pc - ddprof_mod._sym_bias;
+  ElfAddress_t elf_pc = process_pc - ddprof_mod._sym_bias;
 
 #ifdef DEBUG
   LG_DBG("Looking for : %lx = (%lx - %lx) / dso:%s", elf_pc, process_pc,
          ddprof_mod._low_addr, dso._filename.c_str());
 #endif
-  DwflSymbolMap &map = _file_info_map[file_info_id];
-  DwflSymbolMapFindRes find_res = find_closest(map, elf_pc);
+  SymbolMap &map = _file_info_map[file_info_id];
+  SymbolMap::FindRes find_res = map.find_closest(elf_pc);
   if (find_res.second) { // already found the correct symbol
 #ifdef DEBUG
     LG_DBG("Match : %lx,%lx -> %s,%d", find_res.first->first,
@@ -81,38 +83,11 @@ SymbolIdx_t DwflSymbolLookup_V2::get_or_insert(
   return insert(ddprof_mod, table, dso_symbol_lookup, process_pc, dso, map);
 }
 
-DwflSymbolMapFindRes DwflSymbolLookup_V2::find_closest(DwflSymbolMap &map,
-                                                       Offset_t norm_pc) {
-  bool is_within = false;
-
-  // First element not less than (can match exactly a start addr)
-  DwflSymbolMapIt it = map.lower_bound(norm_pc);
-  if (it != map.end()) { // map is empty
-    is_within = dwfl_symbol_is_within(norm_pc, *it);
-    if (is_within) {
-      return std::make_pair<DwflSymbolMapIt, bool>(std::move(it),
-                                                   std::move(is_within));
-    }
-  }
-
-  // previous element is more likely to contain our addr
-  if (it != map.begin()) {
-    --it;
-  } else { // map is empty
-    return std::make_pair<DwflSymbolMapIt, bool>(map.end(), false);
-  }
-  // element can not be end (as we reversed or exit)
-  is_within = dwfl_symbol_is_within(norm_pc, *it);
-
-  return std::make_pair<DwflSymbolMapIt, bool>(std::move(it),
-                                               std::move(is_within));
-}
-
-SymbolIdx_t DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod,
-                                        SymbolTable &table,
-                                        DsoSymbolLookup &dso_symbol_lookup,
-                                        ProcessAddress_t process_pc,
-                                        const Dso &dso, DwflSymbolMap &map) {
+SymbolIdx_t DwflSymbolLookup::insert(const DDProfMod &ddprof_mod,
+                                     SymbolTable &table,
+                                     DsoSymbolLookup &dso_symbol_lookup,
+                                     ProcessAddress_t process_pc,
+                                     const Dso &dso, SymbolMap &map) {
 
   Symbol symbol;
   GElf_Sym elf_sym;
@@ -142,7 +117,7 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod,
            table[symbol_idx]._symname.c_str(), symbol_idx,
            dso.to_string().c_str());
 #endif
-    map.emplace(start_sym, DwflSymbolVal(end_sym, symbol_idx));
+    map.emplace(start_sym, SymbolSpan(end_sym, symbol_idx));
     return symbol_idx;
   }
 
@@ -153,8 +128,8 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod,
   }
 
   {
-    RegionAddress_t start_sym;
-    RegionAddress_t end_sym;
+    ElfAddress_t start_sym;
+    ElfAddress_t end_sym;
     // All paths bellow will insert symbol in the table
     SymbolIdx_t symbol_idx = table.size();
     table.push_back(std::move(symbol));
@@ -176,7 +151,7 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod,
              start_sym, end_sym, sym_ref._symname.c_str(), symbol_idx,
              elf_sym.st_shndx);
 #endif
-      map.emplace(start_sym, DwflSymbolVal(end_sym, symbol_idx));
+      map.emplace(start_sym, SymbolSpan(end_sym, symbol_idx));
       return symbol_idx;
     }
 
@@ -184,14 +159,14 @@ SymbolIdx_t DwflSymbolLookup_V2::insert(const DDProfMod &ddprof_mod,
     LG_DBG("Insert: %lx,%lx -> %s,%d / shndx=%d", start_sym, end_sym,
            sym_ref._symname.c_str(), symbol_idx, elf_sym.st_shndx);
 #endif
-    map.emplace(start_sym, DwflSymbolVal(end_sym, symbol_idx));
+    map.emplace(start_sym, SymbolSpan(end_sym, symbol_idx));
     return symbol_idx;
   }
 }
 
-bool DwflSymbolLookup_V2::symbol_lookup_check(Dwfl_Module *mod,
-                                              Dwarf_Addr process_pc,
-                                              const Symbol &symbol) {
+bool DwflSymbolLookup::symbol_lookup_check(Dwfl_Module *mod,
+                                           Dwarf_Addr process_pc,
+                                           const Symbol &symbol) {
   GElf_Off loffset;
   GElf_Sym lsym;
   GElf_Word lshndxp;
@@ -251,17 +226,6 @@ void DwflSymbolLookupStats::reset() {
   _hit = 0;
   _calls = 0;
   _errors = 0;
-}
-
-bool DwflSymbolLookup_V2::dwfl_symbol_is_within(
-    const Offset_t &norm_pc, const DwflSymbolMapValueType &kv) {
-  if (norm_pc < kv.first) {
-    return false;
-  }
-  if (norm_pc > kv.second.get_end()) {
-    return false;
-  }
-  return true;
 }
 
 } // namespace ddprof
