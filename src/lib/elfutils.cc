@@ -106,8 +106,12 @@ DynamicInfo retrieve_dynamic_info(const ElfW(Dyn) * dyn_begin,
           reinterpret_cast<const ElfW(Sym) *>(correct_address(it->d_un.d_ptr));
       break;
     case DT_HASH:
-      elf_hash =
-          reinterpret_cast<const uint32_t *>(correct_address(it->d_un.d_ptr));
+      // \fixme{nsavoire} Avoid processing DT_HASH since it sometimes points in
+      // kernel address range on Centos 7...
+
+      // elf_hash =
+      //     reinterpret_cast<const uint32_t
+      //     *>(correct_address(it->d_un.d_ptr));
       break;
     case DT_GNU_HASH:
       gnu_hash =
@@ -268,7 +272,9 @@ public:
   template <typename Reloc>
   void process_relocation(Reloc &reloc, const DynamicInfo &dyn_info) const {
     auto index = ELF64_R_SYM(reloc.r_info);
-    auto symname = dyn_info.strtab.data() + dyn_info.symtab[index].st_name;
+    // \fixme{nsavoire} size of symtab seems incorrect on CentsOS 7
+    auto symname =
+        dyn_info.strtab.data() + dyn_info.symtab.data()[index].st_name;
     auto addr = reloc.r_offset + dyn_info.base;
     if (symname == _symname) {
       override_entry(addr, _new_symbol);
