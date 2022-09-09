@@ -88,9 +88,16 @@ bison_target(event_parser_yacc util/event_parser.y ${EVENT_PARSER_SRC}/event_par
 flex_target(event_parser_lex util/event_parser.l ${EVENT_PARSER_SRC}/event_parser.lex.c)
 add_flex_bison_dependency(event_parser_lex event_parser_yacc)
 
-# note: don't rely on config-time source dir scans, since these files won't be generated until build
-set(PARSER_SRC # cmake-format: sortable
-               ${EVENT_PARSER_SRC}/event_parser.lex.c ${EVENT_PARSER_SRC}/event_parser.tab.c)
+# TODO note: don't rely on config-time source dir scans, since these files won't be generated until
+# build set(DD_EVENT_PARSER_SOURCES # cmake-format: sortable ${EVENT_PARSER_SRC}/event_parser.lex.c
+# ${EVENT_PARSER_SRC}/event_parser.tab.c)
+
+# bison/flex outputs aren't tracked properly in subdirectories, so make tests depend on an object
+# library
+add_library(event_parser OBJECT ${EVENT_PARSER_SRC}/event_parser.tab.c
+                                ${EVENT_PARSER_SRC}/event_parser.lex.c)
+target_include_directories(event_parser PUBLIC ${EVENT_PARSER_INCLUDE} include)
+set_property(TARGET event_parser PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # ---- Static analysis ----
 include(ClangTidy)
@@ -143,16 +150,13 @@ aux_source_directory(src/pprof PPROF_SRC)
 aux_source_directory(src/exporter EXPORTER_SRC)
 aux_source_directory(src/exe EXE_SRC)
 
-# Create a dependency for generated header on the source file(s) referencing it Subdirectories must
-# be inclued explicitly as per the cmake docs
-set_property(
-  SOURCE src/ddprof_cmdline.cc
-  APPEND
-  PROPERTY OBJECT_DEPENDS ${EVENT_PARSER_SRC}/event_parser.lex.c
-           ${EVENT_PARSER_SRC}/event_parser.tab.c ${EVENT_PARSER_INCLUDE}/event_parser.h)
+# TODO Create a dependency for generated header on the source file(s) referencing it Subdirectories
+# must be inclued explicitly as per the cmake docs set_property( SOURCE src/ddprof_cmdline.cc APPEND
+# PROPERTY OBJECT_DEPENDS ${EVENT_PARSER_SRC}/event_parser.lex.c
+# ${EVENT_PARSER_SRC}/event_parser.tab.c ${EVENT_PARSER_INCLUDE}/event_parser.h)
 
 # Define all sources
-set(DDPROF_GLOBAL_SRC ${COMMON_SRC} ${PPROF_SRC} ${EXPORTER_SRC} ${EXE_SRC} ${PARSER_SRC})
+set(DDPROF_GLOBAL_SRC ${COMMON_SRC} ${PPROF_SRC} ${EXPORTER_SRC} ${EXE_SRC})
 
 set(DDPROF_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 
@@ -171,8 +175,6 @@ list(APPEND DDPROF_INCLUDE_LIST ${LIBCAP_INCLUDE_DIR})
 
 set(DD_PROFILING_SOURCES
     # cmake-format: sortable
-    ${EVENT_PARSER_SRC}/event_parser.lex.c
-    ${EVENT_PARSER_SRC}/event_parser.tab.c
     src/daemonize.cc
     src/ddprof_cmdline.cc
     src/ddres_list.cc
@@ -195,7 +197,7 @@ set(DD_PROFILING_SOURCES
     src/sys_utils.cc
     src/user_override.cc)
 
-add_library(dd_profiling-embedded SHARED ${DD_PROFILING_SOURCES})
+add_library(dd_profiling-embedded SHARED ${DD_PROFILING_SOURCES} $<TARGET_OBJECTS:event_parser>)
 target_compile_definitions(dd_profiling-embedded PRIVATE NO_EMBEDDED_DDPROF_EXE)
 target_include_directories(
   dd_profiling-embedded PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include
@@ -238,7 +240,7 @@ set_target_properties(libddprofiling_object PROPERTIES IMPORTED_OBJECTS "${LIBDD
 
 # It is important to force most libraries as static
 add_exe(
-  ddprof ${DDPROF_GLOBAL_SRC} $<TARGET_OBJECTS:libddprofiling_object>
+  ddprof ${DDPROF_GLOBAL_SRC} $<TARGET_OBJECTS:libddprofiling_object> $<TARGET_OBJECTS:event_parser>
   LIBRARIES ${DDPROF_LIBRARY_LIST}
   DEFINITIONS ${DDPROF_DEFINITION_LIST})
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
@@ -264,7 +266,7 @@ add_custom_command(
 add_library(ddprof_exe_object OBJECT IMPORTED GLOBAL)
 set_target_properties(ddprof_exe_object PROPERTIES IMPORTED_OBJECTS "${DDPROF_EXE_OBJECT}")
 
-add_library(dd_profiling-static STATIC ${DD_PROFILING_SOURCES} $<TARGET_OBJECTS:ddprof_exe_object>)
+add_library(dd_profiling-static STATIC ${DD_PROFILING_SOURCES} $<TARGET_OBJECTS:event_parser>)
 set_target_properties(dd_profiling-static PROPERTIES OUTPUT_NAME dd_profiling)
 target_include_directories(
   dd_profiling-static PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include
@@ -273,7 +275,8 @@ set_target_properties(dd_profiling-static
                       PROPERTIES PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
 target_link_libraries(dd_profiling-static PUBLIC dl pthread)
 
-add_library(dd_profiling-shared SHARED ${DD_PROFILING_SOURCES} $<TARGET_OBJECTS:ddprof_exe_object>)
+add_library(dd_profiling-shared SHARED ${DD_PROFILING_SOURCES} $<TARGET_OBJECTS:ddprof_exe_object>
+                                       $<TARGET_OBJECTS:event_parser>)
 set_target_properties(dd_profiling-shared PROPERTIES OUTPUT_NAME dd_profiling)
 target_include_directories(
   dd_profiling-shared PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include
@@ -312,7 +315,7 @@ option(BUILD_NATIVE_LIB "Build a library out of the native profiler" OFF)
 if(${BUILD_NATIVE_LIB})
 
   # Define all sources
-  set(DDPROF_LIB_SRC ${COMMON_SRC} ${PARSER_SRC} src/lib/ddprof_output.cc)
+  set(DDPROF_LIB_SRC ${COMMON_SRC} src/lib/ddprof_output.cc)
 
   # Libs to link
   set(NATIVE_LIB_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
@@ -322,7 +325,7 @@ if(${BUILD_NATIVE_LIB})
   endif()
 
   # Create the lib
-  add_library(ddprof-native ${DDPROF_LIB_SRC})
+  add_library(ddprof-native ${DDPROF_LIB_SRC} $<TARGET_OBJECTS:event_parser>)
 
   set_target_properties(ddprof-native PROPERTIES VERSION ${PROJECT_VERSION})
   set_target_properties(ddprof-native PROPERTIES COMPILE_DEFINITIONS DDPROF_NATIVE_LIB)
