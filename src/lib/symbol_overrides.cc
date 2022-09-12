@@ -243,7 +243,8 @@ template <typename T> void install_hook(bool restore) {
   // use dlsym since it would return the same <symbol>>@plt symbol).
   if (!restore && !T::ref_checked) {
     ElfW(Sym) sym = ddprof::lookup_symbol(T::name, true);
-    if (sym.st_size == 0) {
+    if (sym.st_size == 0 &&
+        reinterpret_cast<decltype(T::ref)>(sym.st_value) == T::ref) {
       // null sized symbol, look for a non-null sized symbol
       sym = ddprof::lookup_symbol(T::name, false);
       if (sym.st_value && sym.st_size) {
@@ -252,8 +253,10 @@ template <typename T> void install_hook(bool restore) {
     }
     T::ref_checked = true;
   }
+  // Be careful not to override T::ref (compiler/linker may emit T::ref as a
+  // relocation pointing on malloc/realloc/calloc/...)
   ddprof::override_symbol(
-      T::name, reinterpret_cast<void *>(restore ? T::ref : &T::hook));
+      T::name, reinterpret_cast<void *>(restore ? T::ref : &T::hook), &T::ref);
 }
 
 void setup_hooks(bool restore) {

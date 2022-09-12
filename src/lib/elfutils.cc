@@ -165,7 +165,9 @@ DynamicInfo retrieve_dynamic_info(const ElfW(Dyn) * dyn_begin,
           .base = base};
 }
 
-template <typename F> int callback_wrapper(dl_phdr_info *info, size_t, F func) {
+template <typename F>
+int callback_wrapper(dl_phdr_info *info, size_t, bool exclude_self,
+                     const F &func) {
   const ElfW(Phdr) *phdr_dynamic = nullptr;
 
   for (auto phdr = info->dlpi_phdr, end = phdr + info->dlpi_phnum; phdr != end;
@@ -174,7 +176,7 @@ template <typename F> int callback_wrapper(dl_phdr_info *info, size_t, F func) {
       phdr_dynamic = phdr;
     }
     // Exclude this DSO
-    if (phdr->p_type == PT_LOAD && phdr->p_flags & PF_X) {
+    if (exclude_self && phdr->p_type == PT_LOAD && phdr->p_flags & PF_X) {
       ElfW(Addr) local_symbol_addr =
           reinterpret_cast<ElfW(Addr)>(&retrieve_dynamic_info);
       if (phdr->p_vaddr + info->dlpi_addr <= local_symbol_addr &&
@@ -203,22 +205,32 @@ template <typename F> int callback_wrapper(dl_phdr_info *info, size_t, F func) {
   return 0;
 }
 
-struct CallbackWrapper {
-  void *data;
+struct CallbackWrapperBase {
   using Fun = int (*)(dl_phdr_info *info, size_t size, void *data);
   Fun fun;
+  bool exclude_self;
+};
+
+template <typename F> struct CallbackWrapper : CallbackWrapperBase {
+  F callback;
 };
 
 int dl_iterate_hdr_callback(dl_phdr_info *info, size_t size, void *data) {
-  CallbackWrapper *callback = reinterpret_cast<CallbackWrapper *>(data);
-  return callback->fun(info, size, callback->data);
+  CallbackWrapperBase *callback = reinterpret_cast<CallbackWrapperBase *>(data);
+  return callback->fun(info, size, callback);
 }
 
-template <typename F> int dl_iterate_phdr_wrapper(F callback) {
-  CallbackWrapper my_callback{&callback,
-                              [](dl_phdr_info *info, size_t size, void *data) {
-                                return callback_wrapper(info, size, *(F *)data);
-                              }};
+template <typename F>
+int dl_iterate_phdr_wrapper(F callback, bool exclude_self = false) {
+  CallbackWrapper<F> my_callback{
+      {[](dl_phdr_info *info, size_t size, void *data) {
+         auto *wrapper = static_cast<CallbackWrapper<F> *>(data);
+         return callback_wrapper(info, size, wrapper->exclude_self,
+                                 wrapper->callback);
+       },
+       exclude_self},
+      std::move(callback),
+  };
   return dl_iterate_phdr(dl_iterate_hdr_callback, &my_callback);
 }
 
@@ -266,17 +278,19 @@ void override_entry(ElfW(Addr) entry_addr, uint64_t new_value) {
 
 class SymbolOverride {
 public:
-  explicit SymbolOverride(std::string_view symname, uint64_t new_symbol)
-      : _symname(symname), _new_symbol(new_symbol) {}
+  explicit SymbolOverride(std::string_view symname, uint64_t new_symbol,
+                          uint64_t do_not_override_this_symbol)
+      : _symname(symname), _new_symbol(new_symbol),
+        _do_not_override_this_symbol(do_not_override_this_symbol) {}
 
   template <typename Reloc>
   void process_relocation(Reloc &reloc, const DynamicInfo &dyn_info) const {
     auto index = ELF64_R_SYM(reloc.r_info);
-    // \fixme{nsavoire} size of symtab seems incorrect on CentsOS 7
+    // \fixme{nsavoire} size of symtab seems incorrect on CentOS 7
     auto symname =
         dyn_info.strtab.data() + dyn_info.symtab.data()[index].st_name;
     auto addr = reloc.r_offset + dyn_info.base;
-    if (symname == _symname) {
+    if (symname == _symname && addr != _do_not_override_this_symbol) {
       override_entry(addr, _new_symbol);
     }
   }
@@ -299,6 +313,7 @@ public:
 private:
   std::string_view _symname;
   uint64_t _new_symbol = 0;
+  uint64_t _do_not_override_this_symbol = 0;
 };
 
 } // namespace
@@ -408,9 +423,11 @@ ElfW(Sym) lookup_symbol(std::string_view symbol_name,
   return lookup.result();
 }
 
-void override_symbol(std::string_view symbol_name, void *new_symbol) {
-  SymbolOverride symbol_override{symbol_name,
-                                 reinterpret_cast<uint64_t>(new_symbol)};
+void override_symbol(std::string_view symbol_name, void *new_symbol,
+                     void *do_not_override_this_symbol) {
+  SymbolOverride symbol_override{
+      symbol_name, reinterpret_cast<uint64_t>(new_symbol),
+      reinterpret_cast<uint64_t>(do_not_override_this_symbol)};
   dl_iterate_phdr_wrapper(std::ref(symbol_override));
 }
 

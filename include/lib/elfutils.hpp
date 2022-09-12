@@ -26,6 +26,7 @@ ElfW(Sym)
     lookup_symbol(std::string_view symbol_name, bool accept_null_sized_symbol,
                   void *not_this_symbol = nullptr);
 
-void override_symbol(std::string_view symbol_name, void *new_symbol);
+void override_symbol(std::string_view symbol_name, void *new_symbol,
+                     void *do_not_override_this_symbol = nullptr);
 
 } // namespace ddprof
