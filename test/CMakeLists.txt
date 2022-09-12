@@ -80,7 +80,7 @@ function(add_benchmark name)
 
   target_link_libraries(${name} PRIVATE Threads::Threads benchmark::benchmark
                                         benchmark::benchmark_main)
-  target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST})
+  target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST} ${EVENT_PARSER_INCLUDE})
   disable_clangtidy(${name})
 endfunction()
 
@@ -88,7 +88,7 @@ endfunction()
 add_compile_definitions("UNIT_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 
 add_unit_test(ddprofcmdline-ut ../src/ddprof_cmdline.cc ../src/perf_watcher.cc ddprofcmdline-ut.cc
-              ../src/perf_archmap.cc LIBRARIES $<TARGET_OBJECTS:event_parser>)
+              LIBRARIES DDProf::Parser)
 
 add_unit_test(logger-ut logger-ut.cc)
 
@@ -131,9 +131,8 @@ add_unit_test(
   ../src/ddprof_cpumask.cc
   ../src/logger_setup.cc
   ../src/perf_watcher.cc
-  ../src/perf_archmap.cc
   ddprof_input-ut.cc
-  LIBRARIES $<TARGET_OBJECTS:event_parser>
+  LIBRARIES DDProf::Parser
   DEFINITIONS MYNAME="ddprof_input-ut")
 
 add_unit_test(perf_ringbuffer-ut ../src/perf.cc ../src/perf_watcher.cc ../src/perf_ringbuffer.cc
@@ -154,7 +153,7 @@ add_unit_test(
 add_unit_test(
   ddprof_pprof-ut ../src/pprof/ddprof_pprof.cc ../src/unwind_output.cc ../src/perf_watcher.cc
   ddprof_pprof-ut.cc
-  LIBRARIES Datadog::Profiling
+  LIBRARIES Datadog::Profiling DDProf::Parser
   DEFINITIONS MYNAME="ddprof_pprof-ut")
 
 add_unit_test(
@@ -165,9 +164,8 @@ add_unit_test(
   ../src/unwind_output.cc
   ../src/perf_watcher.cc
   ../src/tags.cc
-  ../src/perf_archmap.cc
   ddprof_exporter-ut.cc
-  LIBRARIES Datadog::Profiling $<TARGET_OBJECTS:event_parser>
+  LIBRARIES Datadog::Profiling DDProf::Parser
   DEFINITIONS MYNAME="ddprof_exporter-ut")
 
 add_unit_test(
@@ -223,12 +221,12 @@ add_unit_test(
   ../src/dwfl_symbol_lookup.cc
   ../src/dwfl_thread_callbacks.cc
   ../src/failed_assumption.cc
-  ../src/perf_archmap.cc
   ../src/runtime_symbol_lookup.cc
   ../src/symbol_map.cc
   ../src/savecontext.cc
   ../src/saveregisters.cc
   ../src/mapinfo_lookup.cc
+  ../src/perf_archmap.cc
   ../src/procutils.cc
   ../src/signal_helper.cc
   ../src/statsd.cc

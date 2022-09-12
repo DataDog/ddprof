@@ -130,25 +130,25 @@ EventConf *EventConf_parse(const char *msg) {
   return 0 == ret ? &g_accum_event_conf : NULL;
 }
 
-//#ifdef EVENT_PARSER_MAIN
-//bool g_debugout_enable = false;
-//int main(int c, char **v) { 
-//  g_debugout_enable = false;
-//  if (c) {
-//    printf(">\"%s\"\n", v[1]);
-//    YY_BUFFER_STATE buffer = yy_scan_string(v[1]);
-//    g_debugout_enable = true;
-//    if (!yyparse())
-//      conf_print(&g_accum_event_conf);
-//    else
-//      fprintf(stderr, "  ERROR\n");
-//    yy_delete_buffer(buffer);
-//  } else {
-//    yyparse();
-//  }
-//  return 0;
-//}
-//#endif
+#ifdef EVENT_PARSER_MAIN
+bool g_debugout_enable = false;
+int main(int c, char **v) {
+  g_debugout_enable = false;
+  if (c) {
+    printf(">\"%s\"\n", v[1]);
+    YY_BUFFER_STATE buffer = yy_scan_string(v[1]);
+    g_debugout_enable = true;
+    if (!yyparse())
+      conf_print(&g_accum_event_conf);
+    else
+      fprintf(stderr, "  ERROR\n");
+    yy_delete_buffer(buffer);
+  } else {
+    yyparse();
+  }
+  return 0;
+}
+#endif
 %}
 
 %union {

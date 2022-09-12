@@ -60,3 +60,8 @@ test/data/*.pprof
 test/self_unwind/data/BadBoggleSolver_run.json
 cpp-security-quality.sarif
 test/data/ipc_test_data_Positive.txt
+util/event
+util/event_parser.h
+util/event_parser.lex.c
+util/event_parser.tab.c
+util/event_parser.output
