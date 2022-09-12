@@ -79,7 +79,7 @@ int __fxstat(int ver, int fd, struct stat *buf) __attribute__((weak));
 extern int fstat(int fd, struct stat *buf)
     __attribute__((weak, alias("__fstat")));
 
-static int __fstat(int fd, struct stat *buf) {
+__attribute__((unused)) static int __fstat(int fd, struct stat *buf) {
   if (__fxstat) {
     return __fxstat(1, fd, buf);
   }

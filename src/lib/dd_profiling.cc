@@ -251,9 +251,12 @@ static int ddprof_start_profiling_internal() {
       }
       if (IsDDResOK(ddprof::AllocationTracker::allocation_tracking_init(
               info.allocation_profiling_rate, flags, info.ring_buffer))) {
+        // \fixme{nsavoire} pthread_create should probably be overridden
+        // at load time since we need to capture stack end addresses of all
+        // threads in case allocation profiling is started later on
+        ddprof::setup_overrides();
         // \fixme{nsavoire} what should we do when allocation tracker init
         // fails ?
-        ddprof::setup_overrides();
         g_state.allocation_profiling_started = true;
       }
     }

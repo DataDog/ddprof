@@ -264,6 +264,7 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
   }
 
   if (tl_state.stack_end == nullptr) {
+    // This call should only occur on main thread
     tl_state.stack_end = retrieve_stack_end_address();
   }
 
