@@ -72,7 +72,28 @@ include(Findlibdatadog)
 # elfutils
 include(Findelfutils)
 
-# parser
+# ---- Static analysis ----
+include(ClangTidy)
+include(CppcheckConfig)
+include(Format)
+
+# ---- Libraries (needed by ut) ----
+
+option(DDPROF_JEMALLOC "Enable jemalloc stats" OFF)
+if(${DDPROF_JEMALLOC})
+  # jemalloc for debug
+  include(Jemalloc)
+  message(STATUS "Adding jemalloc for DBG purpose" ${JEMALLOC_ROOT_DIR})
+  add_compile_definitions("DBG_JEMALLOC")
+endif()
+
+# Install lib cap to retrieve capabilities
+include(Findlibcap)
+
+# llvm demangler
+add_subdirectory(third_party/llvm)
+
+# ---- Event Parser ----
 find_package(BISON REQUIRED)
 find_package(FLEX REQUIRED)
 
@@ -95,27 +116,6 @@ add_library(event_parser STATIC ${DD_EVENT_PARSER_SOURCES} src/perf_archmap.cc)
 target_include_directories(event_parser PUBLIC ${EVENT_PARSER_INCLUDE} include)
 set_property(TARGET event_parser PROPERTY POSITION_INDEPENDENT_CODE ON)
 add_library(DDProf::Parser ALIAS event_parser)
-
-# ---- Static analysis ----
-include(ClangTidy)
-include(CppcheckConfig)
-include(Format)
-
-# ---- Libraries (needed by ut) ----
-
-option(DDPROF_JEMALLOC "Enable jemalloc stats" OFF)
-if(${DDPROF_JEMALLOC})
-  # jemalloc for debug
-  include(Jemalloc)
-  message(STATUS "Adding jemalloc for DBG purpose" ${JEMALLOC_ROOT_DIR})
-  add_compile_definitions("DBG_JEMALLOC")
-endif()
-
-# Install lib cap to retrieve capabilities
-include(Findlibcap)
-
-# llvm demangler
-add_subdirectory(third_party/llvm)
 
 # ---- Benchmarks ----
 option(BUILD_BENCHMARKS "Enable benchmarks" OFF)
