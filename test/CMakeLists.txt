@@ -188,6 +188,7 @@ add_unit_test(
 add_unit_test(
   dwfl_module-ut
   dwfl_module-ut.cc
+  ../src/build_id.cc
   ../src/dwfl_hdr.cc
   ../src/ddprof_module_lib.cc
   ../src/dwfl_symbol.cc
@@ -206,6 +207,7 @@ add_unit_test(
   savecontext-ut
   savecontext-ut.cc
   ../src/base_frame_symbol_lookup.cc
+  ../src/build_id.cc
   ../src/common_mapinfo_lookup.cc
   ../src/common_symbol_lookup.cc
   ../src/ddprof_file_info.cc
@@ -240,6 +242,7 @@ add_unit_test(
   allocation_tracker-ut.cc
   ../src/lib/allocation_tracker.cc
   ../src/base_frame_symbol_lookup.cc
+  ../src/build_id.cc
   ../src/common_mapinfo_lookup.cc
   ../src/common_symbol_lookup.cc
   ../src/ddprof_file_info.cc

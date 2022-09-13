@@ -7,6 +7,8 @@
 
 #include "ddprof_defs.hpp"
 
+#include "build_id.hpp"
+
 extern "C" {
 typedef struct Dwfl_Module Dwfl_Module;
 }
@@ -29,6 +31,12 @@ struct DDProfMod {
 
   explicit DDProfMod(Status status) : DDProfMod() { _status = status; }
 
+  void set_build_id(std::span<const unsigned char> x) {
+    _build_id = format_build_id(x);
+  }
+
+  // build id (string that displays the hexadecimal value)
+  BuildIdStr _build_id;
   // In the current version of dwfl, the dwfl_module addresses are stable
   Dwfl_Module *_mod;
   ProcessAddress_t _low_addr;

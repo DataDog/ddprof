@@ -43,6 +43,7 @@ DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
          us->symbol_hdr._symbol_table[output->locs[current_loc_idx]._symbol_idx]
              ._symname.c_str());
 #endif
+#undef DEBUG
   output->nb_locs++;
   return ddres_init();
 }

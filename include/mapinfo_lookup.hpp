@@ -20,7 +20,7 @@ namespace ddprof {
 class MapInfoLookup {
 public:
   MapInfoIdx_t get_or_insert(pid_t pid, MapInfoTable &mapinfo_table,
-                             const Dso &dso);
+                             const Dso &dso, const BuildIdStr *build_id = nullptr);
   void erase(pid_t pid) {
     // table elements are not removed (TODO to gain memory usage)
     _mapinfo_pidmap.erase(pid);

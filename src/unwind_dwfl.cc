@@ -86,7 +86,7 @@ static void trace_unwinding_end(UnwindState *us) {
   }
 }
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
-                            DDProfMod *ddprof_mod, FileInfoId_t file_info_id);
+                            const DDProfMod &ddprof_mod, FileInfoId_t file_info_id);
 
 // check for runtime symbols provided in /tmp files
 static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
@@ -120,10 +120,12 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     add_error_frame(nullptr, us, pc, SymbolErrors::unknown_dso);
     return ddres_init();
   }
+
   const Dso &dso = find_res.first->second;
   if (dso::has_runtime_symbols(dso._type)) {
     return add_runtime_symbol_frame(us, dso, pc);
   }
+
   // if not encountered previously, update file location / key
   FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
   if (file_info_id <= k_file_info_error) {
@@ -133,6 +135,7 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     // sometimes frame pointer lets us go further -> So we continue
     return ddres_init();
   }
+
   const FileInfoValue &file_info_value =
       us->dso_hdr.get_file_info_value(file_info_id);
   DDProfMod *ddprof_mod = us->_dwfl_wrapper->unsafe_get(file_info_id);
@@ -163,7 +166,7 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   us->current_ip = pc;
 
   // Now we register
-  if (IsDDResNotOK(add_dwfl_frame(us, dso, pc, ddprof_mod, file_info_id))) {
+  if (IsDDResNotOK(add_dwfl_frame(us, dso, pc, *ddprof_mod, file_info_id))) {
     return ddres_warn(DD_WHAT_UW_ERROR);
   }
   return ddres_init();
@@ -200,6 +203,7 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
       return DWARF_CB_ABORT;
     }
   }
+#define DEBUG
 #ifdef DEBUG
   // We often fallback to frame pointer unwinding (which logs an error)
   if (dwfl_error_value) {
@@ -207,6 +211,7 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
            dwfl_errmsg(dwfl_error_value));
   }
 #endif
+#undef DEBUG
 
   // Before we potentially exit, record the fact that we're processing a frame
   ddprof_stats_add(STATS_UNWIND_FRAMES, 1, NULL);
@@ -236,16 +241,16 @@ DDRes unwind_dwfl(UnwindState *us) {
 }
 
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
-                            DDProfMod *ddprof_mod, FileInfoId_t file_info_id) {
+                            const DDProfMod &ddprof_mod, FileInfoId_t file_info_id) {
 
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
 
   // get or create the dwfl symbol
   SymbolIdx_t symbol_idx = unwind_symbol_hdr._dwfl_symbol_lookup.get_or_insert(
-      *ddprof_mod, unwind_symbol_hdr._symbol_table,
+      ddprof_mod, unwind_symbol_hdr._symbol_table,
       unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso);
   MapInfoIdx_t map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
-      us->pid, us->symbol_hdr._mapinfo_table, dso);
+      us->pid, us->symbol_hdr._mapinfo_table, dso, &ddprof_mod._build_id);
   return add_frame(symbol_idx, map_idx, pc, us);
 }
 
