@@ -120,12 +120,10 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     add_error_frame(nullptr, us, pc, SymbolErrors::unknown_dso);
     return ddres_init();
   }
-
   const Dso &dso = find_res.first->second;
   if (dso::has_runtime_symbols(dso._type)) {
     return add_runtime_symbol_frame(us, dso, pc);
   }
-
   // if not encountered previously, update file location / key
   FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
   if (file_info_id <= k_file_info_error) {
@@ -135,7 +133,6 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     // sometimes frame pointer lets us go further -> So we continue
     return ddres_init();
   }
-
   const FileInfoValue &file_info_value =
       us->dso_hdr.get_file_info_value(file_info_id);
   DDProfMod *ddprof_mod = us->_dwfl_wrapper->unsafe_get(file_info_id);
@@ -203,7 +200,6 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
       return DWARF_CB_ABORT;
     }
   }
-#define DEBUG
 #ifdef DEBUG
   // We often fallback to frame pointer unwinding (which logs an error)
   if (dwfl_error_value) {
@@ -211,7 +207,6 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
            dwfl_errmsg(dwfl_error_value));
   }
 #endif
-#undef DEBUG
 
   // Before we potentially exit, record the fact that we're processing a frame
   ddprof_stats_add(STATS_UNWIND_FRAMES, 1, NULL);
