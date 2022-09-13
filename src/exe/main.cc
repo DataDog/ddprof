@@ -231,7 +231,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
         fixup_library_path(dd_profiling_lib_path, daemonize_res.daemon_pid);
         std::string preload_str = dd_profiling_lib_path;
         if (const char *s = getenv("LD_PRELOAD"); s) {
-          preload_str.append(";");
+          preload_str.append(":");
           preload_str.append(s);
         }
         LG_DBG("Setting LD_PRELOAD=%s", preload_str.c_str());
