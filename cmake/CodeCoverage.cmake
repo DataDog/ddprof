@@ -1,3 +1,4 @@
+# cmake-format: off
 # Source : https://github.com/bilke/cmake-modules/blob/master/CodeCoverage.cmake
 #
 # Copyright (c) 2012 - 2017, Lars Bilke
@@ -705,3 +706,4 @@ function(append_coverage_compiler_flags)
     set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${COVERAGE_COMPILER_FLAGS}" PARENT_SCOPE)
     message(STATUS "Appending code coverage compiler flags: ${COVERAGE_COMPILER_FLAGS}")
 endfunction() # append_coverage_compiler_flags
+# cmake-format: on
