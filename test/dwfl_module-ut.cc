@@ -49,6 +49,8 @@ TEST(DwflModule, inconsistency_test) {
     DDProfMod *ddprof_mod =
         dwfl_wrapper.register_mod(dso._start, dso, file_info_value);
     EXPECT_TRUE(ddprof_mod->_mod);
+    LG_DBG("ddprof_mod->_build_id = %s", ddprof_mod->_build_id.c_str());
+    EXPECT_FALSE(ddprof_mod->_build_id.empty());
     if (find_res.first == it) {
       Symbol symbol;
       GElf_Sym elf_sym;
