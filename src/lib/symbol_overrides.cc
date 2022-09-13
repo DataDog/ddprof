@@ -9,6 +9,7 @@
 #include "chrono_utils.hpp"
 #include "ddprof_base.hpp"
 #include "elfutils.hpp"
+#include "instrument_function.hpp"
 #include "reentry_guard.hpp"
 #include "unlikely.hpp"
 
@@ -840,18 +841,38 @@ void register_hooks() {
   register_hook<DlopenHook>();
 }
 
+enum class AllocFunctionId { kMalloc = 1, kRealloc, kCalloc };
+
 } // namespace
 
-void setup_overrides() {
+void setup_overrides(OverrideMode mode) {
   std::lock_guard const lock(g_mutex);
   MaybeReentryGuard const guard; // avoid tracking allocations
 
-  if (!g_symbol_overrides) {
-    g_symbol_overrides = std::make_unique<SymbolOverrides>();
-    register_hooks();
-  }
+  if (mode == kGOTOverride) {
+    if (!g_symbol_overrides) {
+      g_symbol_overrides = std::make_unique<SymbolOverrides>();
+      register_hooks();
+    }
 
-  g_symbol_overrides->apply_overrides();
+    g_symbol_overrides->apply_overrides();
+  } else {
+    ddprof::instrument_function("calloc",
+                                static_cast<int>(AllocFunctionId::kCalloc));
+    ddprof::instrument_function("realloc",
+                                static_cast<int>(AllocFunctionId::kRealloc));
+    // putting malloc first seems to crash...
+    ddprof::instrument_function("malloc",
+                                static_cast<int>(AllocFunctionId::kMalloc));
+    ddprof::instrument_function("_rjem_mallocx",
+                                static_cast<int>(AllocFunctionId::kMalloc));
+    ddprof::instrument_function("_rjem_rallocx",
+                                static_cast<int>(AllocFunctionId::kRealloc));
+    ddprof::instrument_function("_rjem_malloc",
+                                static_cast<int>(AllocFunctionId::kMalloc));
+    ddprof::instrument_function("_rjem_calloc",
+                                static_cast<int>(AllocFunctionId::kCalloc));
+  }
 }
 
 void restore_overrides() {
@@ -874,3 +895,31 @@ void update_overrides() {
 }
 
 } // namespace ddprof
+
+void EntryPayload(uint64_t return_address, uint64_t function_id,
+                  uint64_t stack_pointer, uint64_t return_trampoline_address) {
+
+  uint64_t *stackp = reinterpret_cast<uint64_t *>(stack_pointer);
+  AllocFunctionId alloc_func_id = static_cast<AllocFunctionId>(function_id);
+  uint64_t arg1 = stackp[-5];
+  uint64_t arg2 = stackp[-4];
+  uint64_t size = 0;
+
+  switch (alloc_func_id) {
+  case AllocFunctionId::kMalloc:
+    size = arg1;
+    break;
+  case AllocFunctionId::kCalloc:
+    size = arg1 * arg2;
+    break;
+  case AllocFunctionId::kRealloc:
+    size = arg2;
+    break;
+  }
+  ddprof::AllocationTracker::track_allocation(0, size, stackp);
+}
+
+extern "C" uint64_t ExitPayload() {
+  printf("ExitPayload\n");
+  return 0;
+}

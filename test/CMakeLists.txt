@@ -471,3 +471,12 @@ add_exe(deep_stacks deep_stacks.cc)
 
 add_unit_test(ddprof_module_lib-ut ddprof_module_lib-ut.cc ../src/ddprof_module_lib.cc
               ../src/build_id.cc ../src/dso.cc LIBRARIES ${ELFUTILS_LIBRARIES})
+
+add_library(dummy SHARED dummy_lib.cc)
+add_exe(
+  inject inject.cc
+  LIBRARIES orbit
+  DEFINITIONS ${DDPROF_DEFINITION_LIST})
+target_include_directories(inject PRIVATE ${DDPROF_INCLUDE_LIST})
+target_link_libraries(inject PRIVATE orbit)
+target_static_libcxx(inject)

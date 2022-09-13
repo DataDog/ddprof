@@ -18,6 +18,10 @@ namespace ddprof {
    Return an empty span in case of failure.*/
 DDPROF_NOIPO std::span<const std::byte> retrieve_stack_bounds();
 
+DDPROF_NO_SANITIZER_ADDRESS size_t save_stack(const std::byte *stack_end,
+                                              const std::byte *stack_ptr,
+                                              ddprof::span<std::byte> buffer);
+
 /** Save registers and stack for remote unwinding
  * Return saved stack size */
 DDPROF_NOIPO size_t

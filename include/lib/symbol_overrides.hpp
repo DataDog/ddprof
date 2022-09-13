@@ -8,9 +8,9 @@
 #include <chrono>
 
 namespace ddprof {
+enum class OverrideMode { kGOTOverride, kTrampoline };
 
-void setup_overrides();
-
+void setup_overrides(OverrideMode mode);
 void restore_overrides();
 
 // check if new libs have been loaded and update overrides accordingly

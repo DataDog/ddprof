@@ -12,6 +12,7 @@
 #include "ddprof_cpumask.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
+#include "inject_lib.hpp"
 #include "ipc.hpp"
 #include "libdd_profiling-embedded_hash.h"
 #include "logger.hpp"
@@ -169,12 +170,13 @@ DDRes get_library_path(TempFileHolder &libdd_profiling_path,
 }
 
 DDRes check_incompatible_options(const DDProfContext &ctx) {
-  if (context_allocation_profiling_watcher_idx(ctx) != -1 && ctx.params.pid &&
-      !ctx.params.pipefd_to_library) {
-    DDRES_RETURN_ERROR_LOG(
-        DD_WHAT_INPUT_PROCESS,
-        "Memory allocation profiling is not supported in PID / global mode");
-  }
+  // if (context_allocation_profiling_watcher_idx(ctx) != -1 && ctx.params.pid
+  // &&
+  //     !ctx.params.pipefd_to_library) {
+  //   DDRES_RETURN_ERROR_LOG(
+  //       DD_WHAT_INPUT_PROCESS,
+  //       "Memory allocation profiling is not supported in PID / global mode");
+  // }
   return {};
 }
 
@@ -268,6 +270,10 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
 
     // profiler process
     temp_pid = daemonize_res.temp_pid;
+  } else if (ctx->params.pid != -1) {
+    // ddprof::inject_library(ctx->params_pid)
+    LG_ERR("Library injection not implemented yet");
+    return -1;
   }
 
   // Now, we are the profiler process

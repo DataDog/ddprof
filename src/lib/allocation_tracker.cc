@@ -217,7 +217,8 @@ void AllocationTracker::free_on_consecutive_failures(bool success) {
 }
 
 void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
-                                         TrackerThreadLocalState &tl_state) {
+                                         TrackerThreadLocalState &tl_state,
+                                         uint64_t *stack_ptr) {
   // Reentrancy should be prevented by caller (by using ReentryGuard on
   // TrackerThreadLocalState::reentry_guard).
 
@@ -276,7 +277,8 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
       addr = 0;
     }
   }
-  bool const success = IsDDResOK(push_alloc_sample(addr, total_size, tl_state));
+  bool const success =
+      IsDDResOK(push_alloc_sample(addr, total_size, tl_state, stack_ptr));
   free_on_consecutive_failures(success);
   if (unlikely(!success) && _state.track_deallocations && addr) {
     _allocated_address_set.remove(addr);
@@ -446,7 +448,8 @@ DDRes AllocationTracker::push_dealloc_sample(
 
 DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
                                            uint64_t allocated_size,
-                                           TrackerThreadLocalState &tl_state) {
+                                           TrackerThreadLocalState &tl_state,
+                                           uint64_t *stack_ptr) {
   MPSCRingBufferWriter writer{&_pevent.rb};
   bool notify_consumer{false};
 
@@ -502,8 +505,24 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
 
   assert(reinterpret_cast<uintptr_t>(dyn_size) % alignof(uint64_t) == 0);
 
-  (*dyn_size) = save_context(tl_state.stack_bounds, event->regs,
+  if (stack_ptr) {
+    *dyn_size = save_stack(tl_state.stack_bounds, (std::byte *)(stack_ptr + 1),
+                           ddprof::Buffer{event->data, sample_stack_size});
+#ifdef __x86_64__
+    event->regs[REGNAME(RBX)] = stack_ptr[-10];
+    event->regs[REGNAME(RBP)] = stack_ptr[-11];
+    event->regs[REGNAME(R12)] = stack_ptr[-12];
+    event->regs[REGNAME(R13)] = stack_ptr[-13];
+    event->regs[REGNAME(R14)] = stack_ptr[-14];
+    event->regs[REGNAME(R15)] = stack_ptr[-15];
+
+    event->regs[REGNAME(RSP)] = (uint64_t)(stack_ptr + 1);
+    event->regs[REGNAME(RIP)] = stack_ptr[0];
+#endif
+  } else {
+    *dyn_size = save_context(tl_state.stack_bounds, event->regs,
                              ddprof::Buffer{event->data, sample_stack_size});
+  }
 
   event->hdr.misc = 0;
   event->hdr.size = event_size;
