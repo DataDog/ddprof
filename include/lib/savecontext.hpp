@@ -15,6 +15,10 @@
 /** Cache stack end from current thread in TLS for future use */
 DDPROF_NOIPO const std::byte *retrieve_stack_end_address();
 
+DDPROF_NO_SANITIZER_ADDRESS size_t save_stack(const std::byte *stack_end,
+                                              const std::byte *stack_ptr,
+                                              ddprof::span<std::byte> buffer);
+
 /** Save registers and stack for remote unwinding
  * Return saved stack size */
 DDPROF_NOIPO size_t save_context(const std::byte *stack_end,

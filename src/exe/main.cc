@@ -12,6 +12,7 @@
 #include "ddprof_input.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
+#include "inject_lib.hpp"
 #include "ipc.hpp"
 #include "logger.hpp"
 #include "tempfile.hpp"
@@ -200,12 +201,6 @@ static InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
     return InputResult::kError;
   }
 
-  if (ddprof_context_allocation_profiling_watcher_idx(ctx) != -1 &&
-      ctx->params.pid && ctx->params.sockfd == -1) {
-    LG_ERR("Memory allocation profiling is not supported in PID / global mode");
-    return InputResult::kError;
-  }
-
   return InputResult::kSuccess;
 }
 
@@ -299,6 +294,8 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     }
     defer_child_socket_close.release();
     defer_parent_socket_close.reset();
+  } else if (ctx->params.pid != -1) {
+    // ddprof::inject_library(ctx->params_pid)
   }
 
   // Now, we are the profiler process

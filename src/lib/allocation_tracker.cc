@@ -140,7 +140,8 @@ void AllocationTracker::allocation_tracking_free() {
 }
 
 void AllocationTracker::track_allocation(uintptr_t, size_t size,
-                                         TrackerThreadLocalState &tl_state) {
+                                         TrackerThreadLocalState &tl_state,
+                                         uint64_t *stack_ptr) {
   // Prevent reentrancy to avoid dead lock on mutex
   ReentryGuard guard(&tl_state.reentry_guard);
 
@@ -184,7 +185,7 @@ void AllocationTracker::track_allocation(uintptr_t, size_t size,
   tl_state.remaining_bytes = remaining_bytes;
   uint64_t total_size = nsamples * sampling_interval;
 
-  if (!IsDDResOK(push_sample(total_size, tl_state))) {
+  if (!IsDDResOK(push_sample(total_size, tl_state, stack_ptr))) {
     ++_state.failure_count;
     if (_state.failure_count >= k_max_consecutive_failures) {
       // Too many errors during ring buffer operation: stop allocation profiling
@@ -226,7 +227,8 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
 }
 
 DDRes AllocationTracker::push_sample(uint64_t allocated_size,
-                                     TrackerThreadLocalState &tl_state) {
+                                     TrackerThreadLocalState &tl_state,
+                                     uint64_t *stack_ptr) {
   MPSCRingBufferWriter writer{_pevent.rb};
   bool notify_consumer{false};
 
@@ -273,8 +275,25 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
   event->period = allocated_size;
   event->size = PERF_SAMPLE_STACK_SIZE;
 
-  event->dyn_size = save_context(tl_state.stack_end, event->regs,
-                                 ddprof::Buffer{event->data, event->size});
+  if (stack_ptr) {
+    event->dyn_size =
+        save_stack(tl_state.stack_end, (std::byte *)(stack_ptr + 1),
+                   ddprof::Buffer{event->data, event->size});
+#ifdef __x86_64__
+    event->regs[REGNAME(RBX)] = stack_ptr[-10];
+    event->regs[REGNAME(RBP)] = stack_ptr[-11];
+    event->regs[REGNAME(R12)] = stack_ptr[-12];
+    event->regs[REGNAME(R13)] = stack_ptr[-13];
+    event->regs[REGNAME(R14)] = stack_ptr[-14];
+    event->regs[REGNAME(R15)] = stack_ptr[-15];
+
+    event->regs[REGNAME(RSP)] = (uint64_t)(stack_ptr + 1);
+    event->regs[REGNAME(RIP)] = stack_ptr[0];
+#endif
+  } else {
+    event->dyn_size = save_context(tl_state.stack_end, event->regs,
+                                   ddprof::Buffer{event->data, event->size});
+  }
 
   if (writer.commit(buffer) || notify_consumer) {
     uint64_t count = 1;

@@ -360,3 +360,12 @@ add_test(
   NAME ddprof_help
   COMMAND ddprof -h
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_library(dummy SHARED dummy_lib.cc)
+add_exe(
+  inject inject.cc
+  LIBRARIES orbit
+  DEFINITIONS ${DDPROF_DEFINITION_LIST})
+target_include_directories(inject PRIVATE ${DDPROF_INCLUDE_LIST})
+target_link_libraries(inject PRIVATE orbit)
+target_static_libcxx(inject)

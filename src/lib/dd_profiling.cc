@@ -99,6 +99,9 @@ int get_ddprof_socket() {
 
 struct ProfilerAutoStart {
   ProfilerAutoStart() noexcept {
+    // \fixme{nsavoire} Remove / adapt logging from lib
+    LOG_open(LOG_STDERR, nullptr);
+    LOG_setlevel(LL_DEBUG);
     // Note that library needs to be linked with `--no-as-needed` when using
     // autostart, otherwise linker will completely remove library from DT_NEEDED
     // and library will not be loaded.
@@ -254,7 +257,7 @@ int ddprof_start_profiling_internal() {
         // \fixme{nsavoire} pthread_create should probably be overridden
         // at load time since we need to capture stack end addresses of all
         // threads in case allocation profiling is started later on
-        ddprof::setup_overrides();
+        ddprof::setup_overrides(ddprof::OverrideMode::kGOTOverride);
         // \fixme{nsavoire} what should we do when allocation tracker init
         // fails ?
         g_state.allocation_profiling_started = true;

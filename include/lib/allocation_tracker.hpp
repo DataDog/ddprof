@@ -53,7 +53,7 @@ public:
   static void allocation_tracking_free();
 
   static inline DDPROF_NO_SANITIZER_ADDRESS void
-  track_allocation(uintptr_t addr, size_t size);
+  track_allocation(uintptr_t addr, size_t size, uint64_t *stack_ptr = nullptr);
   static inline void track_deallocation(uintptr_t addr);
 
   static inline bool is_active();
@@ -78,10 +78,12 @@ private:
   static AllocationTracker *create_instance();
 
   void track_allocation(uintptr_t addr, size_t size,
-                        TrackerThreadLocalState &tl_state);
+                        TrackerThreadLocalState &tl_state,
+                        uint64_t *stack_ptr = nullptr);
   void track_deallocation(uintptr_t addr, TrackerThreadLocalState &tl_state);
 
-  DDRes push_sample(uint64_t allocated_size, TrackerThreadLocalState &tl_state);
+  DDRes push_sample(uint64_t allocated_size, TrackerThreadLocalState &tl_state,
+                    uint64_t *stack_ptr);
 
   // Return true if consumer should be notified
   DDRes push_lost_sample(MPSCRingBufferWriter &writer, bool &notify_needed);
@@ -96,7 +98,8 @@ private:
   static AllocationTracker *_instance;
 };
 
-void AllocationTracker::track_allocation(uintptr_t addr, size_t size) {
+void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
+                                         uint64_t *stack_ptr) {
   AllocationTracker *instance = _instance;
 
   // Be safe, if allocation tracker has not been initialized, just bail out
@@ -119,7 +122,7 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size) {
 
   if (likely(
           instance->_state.track_allocations.load(std::memory_order_relaxed))) {
-    instance->track_allocation(addr, size, tl_state);
+    instance->track_allocation(addr, size, tl_state, stack_ptr);
   } else {
     // allocation tracking is disabled, reset state
     tl_state.remaining_bytes_initialized = false;

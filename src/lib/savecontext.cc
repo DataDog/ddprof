@@ -35,9 +35,8 @@ DDPROF_NOINLINE const std::byte *retrieve_stack_end_address() {
 // when we are grabbing the stack. But this is not enough, because ASAN
 // intercepts memcpy and reports a satck underflow there, empirically it appears
 // that both attribute and a suppression are required.
-static DDPROF_NO_SANITIZER_ADDRESS size_t
-save_stack(const std::byte *stack_end, const std::byte *stack_ptr,
-           ddprof::span<std::byte> buffer) {
+size_t save_stack(const std::byte *stack_end, const std::byte *stack_ptr,
+                  ddprof::span<std::byte> buffer) {
   // take the min of current stack size and requested stack sample size~
   int64_t saved_stack_size =
       std::min(static_cast<intptr_t>(buffer.size()), stack_end - stack_ptr);

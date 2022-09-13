@@ -8,6 +8,7 @@
 #include "allocation_tracker.hpp"
 #include "ddprof_base.hpp"
 #include "elfutils.hpp"
+#include "instrument_function.hpp"
 #include "unlikely.hpp"
 
 #include <cstdlib>
@@ -57,7 +58,7 @@ void check_libraries() {
   // atomic ?
   if (g_check_libraries) {
     if (g_symbols_overridden && loaded_libraries_have_changed()) {
-      ddprof::setup_overrides();
+      ddprof::setup_overrides(ddprof::OverrideMode::kGOTOverride);
     }
     g_check_libraries = false;
   }
@@ -220,7 +221,7 @@ struct reallocarray {
     }
     auto newptr = ref(ptr, nmemb, size);
     ddprof::AllocationTracker::track_allocation(
-        reinterpret_cast<uintptr_t>(ptr), size * nmemb);
+        reinterpret_cast<uintptr_t>(newptr), size * nmemb);
     return newptr;
   }
 };
@@ -233,7 +234,7 @@ struct dlopen {
   static void *hook(const char *filename, int flags) noexcept {
     void *ret = ref(filename, flags);
     if (g_symbols_overridden) {
-      ddprof::setup_overrides();
+      ddprof::setup_overrides(ddprof::OverrideMode::kGOTOverride);
     }
     return ret;
   }
@@ -365,42 +366,91 @@ int install_timer() {
   return 0;
 }
 
-void setup_hooks(bool restore) {
-  install_hook<malloc>(restore);
-  install_hook<free>(restore);
-  install_hook<calloc>(restore);
-  install_hook<realloc>(restore);
-  install_hook<posix_memalign>(restore);
-  install_hook<aligned_alloc>(restore);
-  install_hook<memalign>(restore);
-  install_hook<valloc>(restore);
+enum class AllocFunctionId { kMalloc = 1, kRealloc, kCalloc };
 
-  if (reallocarray::ref) {
-    install_hook<reallocarray>(restore);
-  }
-  if (pvalloc::ref) {
-    install_hook<pvalloc>(restore);
-  }
-
+void setup_hooks(ddprof::OverrideMode mode, bool restore) {
   install_hook<pthread_create>(restore);
-  install_hook<dlopen>(restore);
+  if (mode == ddprof::OverrideMode::kGOTOverride) {
+    install_hook<malloc>(restore);
+    install_hook<free>(restore);
+    install_hook<calloc>(restore);
+    install_hook<realloc>(restore);
+    install_hook<posix_memalign>(restore);
+    install_hook<aligned_alloc>(restore);
+    install_hook<memalign>(restore);
+    install_hook<valloc>(restore);
+
+    if (reallocarray::ref) {
+      install_hook<reallocarray>(restore);
+    }
+    if (pvalloc::ref) {
+      install_hook<pvalloc>(restore);
+    }
+    install_hook<dlopen>(restore);
+  } else {
+    ddprof::instrument_function("calloc",
+                                static_cast<int>(AllocFunctionId::kCalloc));
+    ddprof::instrument_function("realloc",
+                                static_cast<int>(AllocFunctionId::kRealloc));
+    // putting malloc first seems to crash...
+    ddprof::instrument_function("malloc",
+                                static_cast<int>(AllocFunctionId::kMalloc));
+    ddprof::instrument_function("_rjem_mallocx",
+                                static_cast<int>(AllocFunctionId::kMalloc));
+    ddprof::instrument_function("_rjem_rallocx",
+                                static_cast<int>(AllocFunctionId::kRealloc));
+    ddprof::instrument_function("_rjem_malloc",
+                                static_cast<int>(AllocFunctionId::kMalloc));
+    ddprof::instrument_function("_rjem_calloc",
+                                static_cast<int>(AllocFunctionId::kCalloc));
+  }
 
   g_symbols_overridden = !restore;
-  if (restore && g_timer_active) {
-    uninstall_timer();
-  } else if (!restore && !g_timer_active) {
-    install_timer();
+  if (mode == ddprof::OverrideMode::kGOTOverride) {
+    if (restore && g_timer_active) {
+      uninstall_timer();
+    } else if (!restore && !g_timer_active) {
+      install_timer();
+    }
   }
 }
 
 } // namespace
 
 namespace ddprof {
-void setup_overrides() { setup_hooks(false); }
-void restore_overrides() { setup_hooks(true); }
+void setup_overrides(OverrideMode mode) { setup_hooks(mode, false); }
+void restore_overrides(OverrideMode mode) { setup_hooks(mode, true); }
 void reinstall_timer_after_fork() {
   if (g_symbols_overridden) {
     install_timer();
   }
 }
 } // namespace ddprof
+
+void EntryPayload(uint64_t return_address, uint64_t function_id,
+                  uint64_t stack_pointer, uint64_t return_trampoline_address) {
+
+  uint64_t *stackp = reinterpret_cast<uint64_t *>(stack_pointer);
+  AllocFunctionId alloc_func_id = static_cast<AllocFunctionId>(function_id);
+  uint64_t arg1 = stackp[-5];
+  uint64_t arg2 = stackp[-4];
+  uint64_t size = 0;
+
+  switch (alloc_func_id) {
+  case AllocFunctionId::kMalloc:
+    size = arg1;
+    break;
+  case AllocFunctionId::kCalloc:
+    size = arg1 * arg2;
+    break;
+  case AllocFunctionId::kRealloc:
+    size = arg2;
+    break;
+  }
+  ddprof::AllocationTracker::track_allocation(0, size, stackp);
+}
+
+extern "C" uint64_t ExitPayload() {
+  printf("ExitPayload\n");
+  return 0;
+}

@@ -6,7 +6,9 @@
 #pragma once
 
 namespace ddprof {
-void setup_overrides();
-void restore_overrides();
+enum class OverrideMode { kGOTOverride, kTrampoline };
+
+void setup_overrides(OverrideMode mode);
+void restore_overrides(OverrideMode mode);
 void reinstall_timer_after_fork();
 } // namespace ddprof

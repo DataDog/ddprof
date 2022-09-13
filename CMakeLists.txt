@@ -38,6 +38,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Default value
 message(STATUS "Build type set to " ${CMAKE_BUILD_TYPE})
 
+# For abseil / orbit
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 # Check for pthread
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
@@ -80,6 +83,9 @@ else()
 endif()
 
 # ---- Dependencies ----
+find_package(absl REQUIRED)
+find_package(capstone REQUIRED)
+find_package(LLVM REQUIRED)
 
 # libdatadog_profiling
 include(Findlibdatadog)
@@ -109,6 +115,8 @@ endif()
 
 # Install lib cap to retrieve capabilities
 include(Findlibcap)
+
+add_subdirectory(third_party/orbit)
 
 # llvm demangler
 add_subdirectory(third_party/llvm)
@@ -200,6 +208,7 @@ set(DD_PROFILING_SOURCES
     src/lib/dd_profiling.cc
     src/lib/elfutils.cc
     src/lib/lib_embedded_data.c
+    src/lib/instrument_function.cc
     src/lib/savecontext.cc
     src/lib/saveregisters.cc
     src/lib/symbol_overrides.cc
@@ -256,7 +265,7 @@ target_link_libraries(
   PRIVATE
     "$<$<AND:$<C_COMPILER_ID:GNU>,$<CONFIG:SanitizedDebug>>:-Wl,-Bstatic;-lubsan;-lasan;-lstdc++;-Wl,-Bdynamic>"
 )
-target_link_libraries(dd_profiling-embedded PUBLIC dl pthread rt)
+target_link_libraries(dd_profiling-embedded PUBLIC dl pthread orbit rt)
 
 set(LIBDD_PROFILING_EMBEDDED_OBJECT "${CMAKE_BINARY_DIR}/libdd_profiling-embedded.o")
 add_custom_command(
@@ -283,6 +292,7 @@ if(USE_LOADER)
 endif()
 
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
+target_link_libraries(ddprof PRIVATE orbit)
 target_static_libcxx(ddprof)
 if(BUILD_UNIVERSAL_DDPROF)
   target_static_libc(ddprof)
@@ -317,7 +327,7 @@ target_include_directories(
 set_target_properties(dd_profiling-static
                       PROPERTIES PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
 target_link_libraries(dd_profiling-static PRIVATE DDProf::Parser)
-target_link_libraries(dd_profiling-static PUBLIC dl pthread rt)
+target_link_libraries(dd_profiling-static PUBLIC dl pthread orbit rt)
 
 if(USE_LOADER)
   # When using a loader, libdd_profiling.so is a loader that embeds both libdd_profiling-embedded.so
@@ -348,7 +358,7 @@ else()
     PRIVATE
       "$<$<AND:$<C_COMPILER_ID:GNU>,$<CONFIG:SanitizedDebug>>:-Wl,-Bstatic;-lubsan;-lasan;-lstdc++;-Wl,-Bdynamic>"
   )
-  target_link_libraries(dd_profiling-shared PUBLIC dl pthread rt)
+  target_link_libraries(dd_profiling-shared PUBLIC dl pthread orbit rt)
 endif()
 
 target_static_libcxx(dd_profiling-shared)
@@ -380,7 +390,7 @@ install(
 
 # ---- Declaration of native library  ----
 option(BUILD_NATIVE_LIB "Build a library out of the native profiler" ON)
-if(${BUILD_NATIVE_LIB})
+if(OFF AND ${BUILD_NATIVE_LIB})
 
   # Define all sources
   set(DDPROF_LIB_SRC ${COMMON_SRC} src/lib/ddprof_output.cc)
