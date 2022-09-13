@@ -1,3 +1,4 @@
+# cmake-format: off
 # Source : https://github.com/c9s/r3/blob/2.0/cmake/Modules/FindJemalloc.cmake
 # Licence : MIT license
 #
@@ -45,3 +46,4 @@ mark_as_advanced(
     JEMALLOC_LIBRARIES
     JEMALLOC_INCLUDE_DIR
 )
+# cmake-format: on
