@@ -40,6 +40,7 @@ struct UnwindState {
       : _dwfl_wrapper(nullptr), dso_hdr(dd_profiling_fd), pid(-1),
         stack(nullptr), stack_sz(0), current_ip(0) {
     uw_output_clear(&output);
+    output.locs.reserve(DD_MAX_STACK_DEPTH);
   }
 
   ddprof::DwflHdr dwfl_hdr;

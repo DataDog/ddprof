@@ -15,35 +15,34 @@ namespace ddprof {
 
 bool is_max_stack_depth_reached(const UnwindState &us) {
   // +2 to keep room for common base frame
-  return us.output.nb_locs + 2 >= DD_MAX_STACK_DEPTH;
+  return us.output.locs.size() + 2 >= DD_MAX_STACK_DEPTH;
 }
 
 DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
                 UnwindState *us) {
   UnwindOutput *output = &us->output;
-  int64_t current_loc_idx = output->nb_locs;
-  if (output->nb_locs >= DD_MAX_STACK_DEPTH) {
+  if (output->locs.size() >= DD_MAX_STACK_DEPTH) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_UW_MAX_DEPTH,
                           "Max stack depth reached"); // avoid overflow
   }
+  FunLoc current = output->locs.back();
 
-  output->locs[current_loc_idx]._symbol_idx = symbol_idx;
-  output->locs[current_loc_idx].ip = pc;
+  current._symbol_idx = symbol_idx;
+  current.ip = pc;
   if (map_idx == -1) {
     // just add an empty element for mapping info
-    output->locs[current_loc_idx]._map_info_idx =
-        us->symbol_hdr._common_mapinfo_lookup.get_or_insert(
-            CommonMapInfoLookup::MappingErrors::empty,
-            us->symbol_hdr._mapinfo_table);
+    current._map_info_idx = us->symbol_hdr._common_mapinfo_lookup.get_or_insert(
+        CommonMapInfoLookup::MappingErrors::empty,
+        us->symbol_hdr._mapinfo_table);
   } else {
-    output->locs[current_loc_idx]._map_info_idx = map_idx;
+    current._map_info_idx = map_idx;
   }
 #ifdef DEBUG
   LG_NTC("Considering frame with IP : %lx / %s ", pc,
-         us->symbol_hdr._symbol_table[output->locs[current_loc_idx]._symbol_idx]
-             ._symname.c_str());
+         us->symbol_hdr._symbol_table[current._symbol_idx]._symname.c_str());
 #endif
-  output->nb_locs++;
+  output->locs.push_back(current);
+
   return ddres_init();
 }
 
@@ -178,7 +177,7 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, int regno,
     // requested when unwinding the leaf function for a register, we simply
     // return the initial register value.
     constexpr uint64_t k_red_zone_size = 128;
-    if (us->output.nb_locs <= 1 && regno != -1 &&
+    if (us->output.locs.size() <= 1 && regno != -1 &&
         addr >= sp_start - k_red_zone_size) {
       *result = us->initial_regs.regs[regno];
       return true;
@@ -232,6 +231,6 @@ void add_error_frame(const Dso *dso, UnwindState *us,
   } else {
     add_common_frame(us, error_case);
   }
-  LG_DBG("Error frame (depth#%lu)", us->output.nb_locs);
+  LG_DBG("Error frame (depth#%lu)", us->output.locs.size());
 }
 } // namespace ddprof

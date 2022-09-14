@@ -56,11 +56,11 @@ static bool is_stack_complete(UnwindState *us) {
   static constexpr std::array s_expected_root_frames{"_start"sv, "__clone"sv,
                                                      "_exit"sv};
 
-  if (us->output.nb_locs == 0) {
+  if (us->output.locs.size() == 0) {
     return false;
   }
 
-  const auto &root_loc = us->output.locs[us->output.nb_locs - 1];
+  const auto &root_loc = us->output.locs.back();
   const auto &root_mapping =
       us->symbol_hdr._mapinfo_table[root_loc._map_info_idx];
 
@@ -96,7 +96,8 @@ DDRes unwindstate__unwind(UnwindState *us) {
   } else {
     us->output.is_incomplete = false;
   }
-  ddprof_stats_add(STATS_UNWIND_AVG_STACK_DEPTH, us->output.nb_locs, nullptr);
+  ddprof_stats_add(STATS_UNWIND_AVG_STACK_DEPTH, us->output.locs.size(),
+                   nullptr);
 
   // Add a frame that identifies executable to which these belong
   add_virtual_base_frame(us);

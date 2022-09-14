@@ -215,17 +215,12 @@ static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr,
   return ddres_init();
 }
 
-/************************* perf_event_open() helpers **************************/
-/// Entry point for sample aggregation
-DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
-                       int watcher_pos) {
-  if (!sample)
-    return ddres_warn(DD_WHAT_PERFSAMP);
+static DDRes ddprof_unwind_sample(DDProfContext *ctx, perf_event_sample *sample,
+                                  int watcher_pos) {
   struct UnwindState *us = ctx->worker_ctx.us;
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
   ddprof_stats_add(STATS_UNWIND_AVG_STACK_SIZE, sample->size_stack, nullptr);
 
-  auto ticks0 = ddprof::get_tsc_cycles();
   // copy the sample context into the unwind structure
   unwind_init_sample(us, sample->regs, sample->pid, sample->size_stack,
                      sample->data_stack);
@@ -233,10 +228,6 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   // If a sample has a PID, it has a TID.  Include it for downstream labels
   us->output.pid = sample->pid;
   us->output.tid = sample->tid;
-
-  // If this is a SW_TASK_CLOCK-type event, then aggregate the time
-  if (ctx->watchers[watcher_pos].config == PERF_COUNT_SW_TASK_CLOCK)
-    ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
   DDRes res = unwindstate__unwind(us);
 
   /* This test is not 100% accurate:
@@ -263,12 +254,28 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     ddprof_stats_add(STATS_UNWIND_TRUNCATED_INPUT, 1, nullptr);
   }
 
+  return res;
+}
+
+/************************* perf_event_open() helpers **************************/
+/// Entry point for sample aggregation
+DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
+                       int watcher_pos) {
+  if (!sample)
+    return ddres_warn(DD_WHAT_PERFSAMP);
+
+  // If this is a SW_TASK_CLOCK-type event, then aggregate the time
+  if (ctx->watchers[watcher_pos].config == PERF_COUNT_SW_TASK_CLOCK)
+    ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
+
+  auto ticks0 = ddprof::get_tsc_cycles();
+  DDRes res = ddprof_unwind_sample(ctx, sample, watcher_pos);
   auto unwind_ticks = ddprof::get_tsc_cycles();
-  DDRES_CHECK_FWD(
-      ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL));
+  ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL);
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
   if (!IsDDResFatal(res)) {
+    struct UnwindState *us = ctx->worker_ctx.us;
 #ifndef DDPROF_NATIVE_LIB
     // in lib mode we don't aggregate (protect to avoid link failures)
     PerfWatcher *watcher = &ctx->watchers[watcher_pos];
@@ -292,9 +299,8 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
 #endif
   }
 
-  DDRES_CHECK_FWD(ddprof_stats_add(STATS_AGGREGATION_AVG_TIME,
-                                   ddprof::get_tsc_cycles() - unwind_ticks,
-                                   NULL));
+  ddprof_stats_add(STATS_AGGREGATION_AVG_TIME,
+                   ddprof::get_tsc_cycles() - unwind_ticks, NULL);
 
   return {};
 }

@@ -77,7 +77,7 @@ TEST(allocation_tracker, start_stop) {
     ddprof::unwindstate__unwind(&state);
 
     const auto &symbol_table = state.symbol_hdr._symbol_table;
-    ASSERT_GT(state.output.nb_locs, NB_FRAMES_TO_SKIP);
+    ASSERT_GT(state.output.locs.size(), NB_FRAMES_TO_SKIP);
     const auto &symbol =
         symbol_table[state.output.locs[NB_FRAMES_TO_SKIP]._symbol_idx];
     ASSERT_EQ(symbol._symname, "my_func_calling_malloc");
