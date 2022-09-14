@@ -14,6 +14,9 @@
   (PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_TID |          \
    PERF_SAMPLE_TIME | PERF_SAMPLE_PERIOD)
 
+#define ADDR_STYPES                                                            \
+  (PERF_SAMPLE_ADDR)
+
 uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
 
 #define X_STR(a, b, c, d) b,
@@ -50,6 +53,7 @@ bool watcher_has_countable_sample_type(const PerfWatcher *watcher) {
   return DDPROF_PWT_NOCOUNT != watcher_to_count_sample_type_id(watcher);
 }
 
+#warning replace this with some functions setting up config
 #define X_EVENTS(a, b, c, d, e, f, g)                                          \
   {DDPROF_PWE_##a, b, BASE_STYPES, c, d, {e}, f, PERF_SAMPLE_STACK_SIZE, g},
 const PerfWatcher events_templates[] = {EVENT_CONFIG_TABLE(X_EVENTS)};

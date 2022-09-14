@@ -13,6 +13,7 @@
 #include "syscalls.hpp"
 #include "unwind.hpp"
 #include "unwind_state.hpp"
+#include "ddprof_perf_event.hpp"
 
 #include <gtest/gtest.h>
 #include <sys/syscall.h>
@@ -20,6 +21,12 @@
 
 DDPROF_NOINLINE void my_malloc(size_t size) {
   ddprof::AllocationTracker::track_allocation(0xdeadbeef, size);
+  // prevent tail call optimization
+  getpid();
+}
+
+DDPROF_NOINLINE void my_free() {
+  ddprof::AllocationTracker::track_deallocation(0xdeadbeef);
   // prevent tail call optimization
   getpid();
 }
@@ -43,33 +50,46 @@ TEST(allocation_tracker, start_stop) {
 
   ASSERT_TRUE(ddprof::AllocationTracker::is_active());
   my_func_calling_malloc(1);
+  { // check that we get the relevant info for this allocation
+    ddprof::MPSCRingBufferReader reader{ring_buffer.get_ring_buffer()};
+    ASSERT_GT(reader.available_size(), 0);
 
-  ddprof::MPSCRingBufferReader reader{ring_buffer.get_ring_buffer()};
-  ASSERT_GT(reader.available_size(), 0);
+    auto buf = reader.read_sample();
+    ASSERT_FALSE(buf.empty());
+    const perf_event_header *hdr =
+        reinterpret_cast<const perf_event_header *>(buf.data());
+    ASSERT_EQ(hdr->type, PERF_RECORD_SAMPLE);
 
-  auto buf = reader.read_sample();
-  ASSERT_FALSE(buf.empty());
-  const perf_event_header *hdr =
-      reinterpret_cast<const perf_event_header *>(buf.data());
-  ASSERT_EQ(hdr->type, PERF_RECORD_SAMPLE);
+    perf_event_sample *sample = hdr2samp(hdr, perf_event_default_sample_type() | PERF_SAMPLE_ADDR);
 
-  perf_event_sample *sample = hdr2samp(hdr, perf_event_default_sample_type());
+    ASSERT_EQ(sample->period, 1);
+    ASSERT_EQ(sample->pid, getpid());
+    ASSERT_EQ(sample->tid, ddprof::gettid());
+    ASSERT_EQ(sample->addr, 0xdeadbeef);
 
-  ASSERT_EQ(sample->period, 1);
-  ASSERT_EQ(sample->pid, getpid());
-  ASSERT_EQ(sample->tid, ddprof::gettid());
+    UnwindState state;
+    ddprof::unwind_init_sample(&state, sample->regs, sample->pid,
+                              sample->size_stack, sample->data_stack);
+    ddprof::unwindstate__unwind(&state);
 
-  UnwindState state;
-  ddprof::unwind_init_sample(&state, sample->regs, sample->pid,
-                             sample->size_stack, sample->data_stack);
-  ddprof::unwindstate__unwind(&state);
+    const auto &symbol_table = state.symbol_hdr._symbol_table;
+    ASSERT_GT(state.output.nb_locs, NB_FRAMES_TO_SKIP);
+    const auto &symbol =
+        symbol_table[state.output.locs[NB_FRAMES_TO_SKIP]._symbol_idx];
+    ASSERT_EQ(symbol._symname, "my_func_calling_malloc");
+  }
+  my_free();
+  // ensure we get a deallocation event
+  {
+    ddprof::MPSCRingBufferReader reader{ring_buffer.get_ring_buffer()};
+    ASSERT_GT(reader.available_size(), 0);
 
-  const auto &symbol_table = state.symbol_hdr._symbol_table;
-  ASSERT_GT(state.output.nb_locs, NB_FRAMES_TO_SKIP);
-  const auto &symbol =
-      symbol_table[state.output.locs[NB_FRAMES_TO_SKIP]._symbol_idx];
-  ASSERT_EQ(symbol._symname, "my_func_calling_malloc");
-
+    auto buf = reader.read_sample();
+    ASSERT_FALSE(buf.empty());
+    const perf_event_header *hdr =
+        reinterpret_cast<const perf_event_header *>(buf.data());
+    ASSERT_EQ(hdr->type, PERF_CUSTOM_EVENT_DEALLOCATION);
+  }
   ddprof::AllocationTracker::allocation_tracking_free();
   ASSERT_FALSE(ddprof::AllocationTracker::is_active());
 }
@@ -93,3 +113,4 @@ TEST(allocation_tracker, stale_lock) {
   ASSERT_FALSE(ddprof::AllocationTracker::is_active());
   ddprof::AllocationTracker::allocation_tracking_free();
 }
+

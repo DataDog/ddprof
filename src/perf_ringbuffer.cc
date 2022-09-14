@@ -187,6 +187,7 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
   if (PERF_SAMPLE_TIME & mask) {
     sample.time = *buf++;
   }
+#warning hack to be removed (pending a better config on watcher types)
   if (PERF_SAMPLE_ADDR & mask) {
     sample.addr = *buf++;
   }

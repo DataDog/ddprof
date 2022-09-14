@@ -13,6 +13,7 @@
 #include "ringbuffer_utils.hpp"
 #include "savecontext.hpp"
 #include "syscalls.hpp"
+#include "ddprof_perf_event.hpp"
 
 #include <atomic>
 #include <cassert>
@@ -27,12 +28,12 @@ namespace ddprof {
 struct AllocationEvent {
   perf_event_header hdr;
   struct sample_id sample_id;
+  uint64_t addr;                         /* if PERF_SAMPLE_ADDR */
   uint64_t period;
-  uint64_t abi; /* if PERF_SAMPLE_REGS_USER */
-  uint64_t regs[PERF_REGS_COUNT];
-  /* if PERF_SAMPLE_REGS_USER */
-  uint64_t size;                          /* if PERF_SAMPLE_STACK_USER */
-  std::byte data[PERF_SAMPLE_STACK_SIZE]; /* if PERF_SAMPLE_STACK_USER */
+  uint64_t abi;                          /* if PERF_SAMPLE_REGS_USER */
+  uint64_t regs[PERF_REGS_COUNT];        /* if PERF_SAMPLE_REGS_USER */
+  uint64_t size;                         /* if PERF_SAMPLE_STACK_USER */
+  std::byte data[PERF_SAMPLE_STACK_SIZE];/* if PERF_SAMPLE_STACK_USER */
   uint64_t dyn_size;                      /* if PERF_SAMPLE_STACK_USER &&
                                         size != 0 */
 };
@@ -79,6 +80,8 @@ DDRes AllocationTracker::allocation_tracking_init(
     uint64_t allocation_profiling_rate, uint32_t flags,
     const RingBufferInfo &ring_buffer) {
   ReentryGuard guard(&_tl_state.reentry_guard);
+
+  flags &= kTrackDeallocations;
 
   AllocationTracker *instance = create_instance();
   auto &state = instance->_state;
@@ -139,7 +142,21 @@ void AllocationTracker::allocation_tracking_free() {
   instance->free();
 }
 
-void AllocationTracker::track_allocation(uintptr_t, size_t size,
+void AllocationTracker::free_on_consecutive_failures(bool success) {
+  if (!success) {
+    ++_state.failure_count;
+    if (_state.failure_count >= k_max_consecutive_failures) {
+      // Too many errors during ring buffer operation: stop allocation profiling
+      free();
+    }
+  } else {
+    if (_state.failure_count.load(std::memory_order_relaxed) > 0) {
+      _state.failure_count = 0;
+    }
+  }
+}
+
+void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
                                          TrackerThreadLocalState &tl_state) {
   // Prevent reentrancy to avoid dead lock on mutex
   ReentryGuard guard(&tl_state.reentry_guard);
@@ -184,17 +201,25 @@ void AllocationTracker::track_allocation(uintptr_t, size_t size,
   tl_state.remaining_bytes = remaining_bytes;
   uint64_t total_size = nsamples * sampling_interval;
 
-  if (!IsDDResOK(push_sample(total_size, tl_state))) {
-    ++_state.failure_count;
-    if (_state.failure_count >= k_max_consecutive_failures) {
-      // Too many errors during ring buffer operation: stop allocation profiling
-      free();
-    }
-  } else {
-    if (_state.failure_count.load(std::memory_order_relaxed) > 0) {
-      _state.failure_count = 0;
-    }
+  bool success = IsDDResOK(push_sample(addr, total_size, tl_state));
+  free_on_consecutive_failures(success);
+}
+
+void AllocationTracker::track_deallocation(uintptr_t addr, TrackerThreadLocalState &tl_state) {
+    // Prevent reentrancy to avoid dead lock on mutex
+  ReentryGuard guard(&tl_state.reentry_guard);
+
+  if (!guard) {
+    // This is an internal dealloc, so we don't need to keep track of this
+    return;
   }
+
+#warning check on internal hash
+  LG_NTC("Yep, track dealloc !");
+
+  bool notify = false;
+  bool success = IsDDResOK(push_dealloc_sample(addr, tl_state, notify));
+  free_on_consecutive_failures(success);
 }
 
 DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
@@ -225,7 +250,61 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
   return {};
 }
 
-DDRes AllocationTracker::push_sample(uint64_t allocated_size,
+// Return true if consumer should be notified
+DDRes AllocationTracker::push_dealloc_sample(uintptr_t addr, TrackerThreadLocalState &tl_state, bool &notify_needed) {
+  MPSCRingBufferWriter writer{_pevent.rb};
+  bool timeout = false;
+  bool notify_consumer{false};
+  // already loosing events ?
+  if (unlikely(_state.lost_count.load(std::memory_order_relaxed))) {
+    DDRES_CHECK_FWD(push_lost_sample(writer, notify_consumer));
+  }
+
+  auto buffer = writer.reserve(sizeof(DeallocationEvent), &timeout);
+  if (buffer.empty()) {
+    // ring buffer is full, increase lost count
+    _state.lost_count.fetch_add(1, std::memory_order_acq_rel);
+
+    if (timeout) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
+                             "Unable to get write lock on ring buffer");
+    }
+
+    // not an error
+    return {};
+  }
+
+  DeallocationEvent *event = reinterpret_cast<DeallocationEvent *>(buffer.data());
+  event->hdr.misc = 0;
+  event->hdr.size = sizeof(DeallocationEvent);
+  event->hdr.type = PERF_SAMPLE_ADDR;
+  event->sample_id.time = 0;
+
+  if (_state.pid == 0) {
+    _state.pid = getpid();
+  }
+  if (tl_state.tid == 0) {
+    tl_state.tid = ddprof::gettid();
+  }
+  event->sample_id.pid = _state.pid;
+  event->sample_id.tid = tl_state.tid;
+  
+  // address of dealloc
+  event->ptr = addr;
+
+  if (writer.commit(buffer) || notify_consumer) {
+    uint64_t count = 1;
+    if (write(_pevent.fd, &count, sizeof(count)) != sizeof(count)) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
+                             "Error writing to memory allocation eventfd (%s)",
+                             strerror(errno));
+    }
+  }
+  return {};
+}
+
+
+DDRes AllocationTracker::push_sample(uintptr_t addr, uint64_t allocated_size,
                                      TrackerThreadLocalState &tl_state) {
   MPSCRingBufferWriter writer{_pevent.rb};
   bool notify_consumer{false};
@@ -241,7 +320,7 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
     // ring buffer is full, increase lost count
     _state.lost_count.fetch_add(1, std::memory_order_acq_rel);
 
-    if (timeout) {
+    if (timeout) {  
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
                              "Unable to get write lock on ring buffer");
     }
@@ -255,6 +334,7 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
   event->hdr.type = PERF_RECORD_SAMPLE;
   event->abi = PERF_SAMPLE_REGS_ABI_64;
   event->sample_id.time = 0;
+  event->addr = addr;
 
   if (_state.pid == 0) {
     _state.pid = getpid();
