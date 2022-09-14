@@ -25,8 +25,7 @@ DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
     DDRES_RETURN_WARN_LOG(DD_WHAT_UW_MAX_DEPTH,
                           "Max stack depth reached"); // avoid overflow
   }
-  FunLoc current = output->locs.back();
-
+  FunLoc current;
   current._symbol_idx = symbol_idx;
   current.ip = pc;
   if (map_idx == -1) {

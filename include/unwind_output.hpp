@@ -19,11 +19,13 @@ typedef struct FunLoc {
   MapInfoIdx_t _map_info_idx;
 } FunLoc;
 
-typedef struct UnwindOutput {
+struct UnwindOutput {
+  void clear() {
+    locs.clear();
+    is_incomplete = true;
+  }
   std::vector<FunLoc> locs;
   int pid;
   int tid;
   bool is_incomplete;
-} UnwindOutput;
-
-void uw_output_clear(UnwindOutput *);
+};

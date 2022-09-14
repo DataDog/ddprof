@@ -39,7 +39,7 @@ struct UnwindState {
   explicit UnwindState(int dd_profiling_fd = -1)
       : _dwfl_wrapper(nullptr), dso_hdr(dd_profiling_fd), pid(-1),
         stack(nullptr), stack_sz(0), current_ip(0) {
-    uw_output_clear(&output);
+    output.clear();
     output.locs.reserve(DD_MAX_STACK_DEPTH);
   }
 

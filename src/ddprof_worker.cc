@@ -69,7 +69,7 @@ static DDRes report_lost_events(DDProfContext *ctx) {
     if (ctx->worker_ctx.lost_events_per_watcher[watcher_idx] > 0) {
       PerfWatcher *watcher = &ctx->watchers[watcher_idx];
       UnwindState *us = ctx->worker_ctx.us;
-      uw_output_clear(&us->output);
+      us->output.clear();
       add_common_frame(us, SymbolErrors::lost_event);
       LG_WRN("Reporting #%lu -> [%lu] lost samples for watcher #%d",
              ctx->worker_ctx.lost_events_per_watcher[watcher_idx],

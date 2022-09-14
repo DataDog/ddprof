@@ -36,7 +36,7 @@ static void find_dso_add_error_frame(UnwindState *us) {
 void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
                         pid_t sample_pid, uint64_t sample_size_stack,
                         char *sample_data_stack) {
-  uw_output_clear(&us->output);
+  us->output.clear();
   memcpy(&us->initial_regs.regs[0], sample_regs,
          K_NB_REGS_UNWIND * sizeof(uint64_t));
   us->current_ip = us->initial_regs.regs[REGNAME(PC)];
