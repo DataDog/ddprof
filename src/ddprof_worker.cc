@@ -6,6 +6,7 @@
 #include "ddprof_worker.hpp"
 
 #include "ddprof_context.hpp"
+#include "ddprof_perf_event.hpp"
 #include "ddprof_stats.hpp"
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
@@ -21,7 +22,6 @@
 #include "unwind.hpp"
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
-#include "ddprof_perf_event.hpp"
 
 #include <cassert>
 #include <stddef.h>
@@ -469,7 +469,8 @@ void ddprof_pr_exit(DDProfContext *ctx, const perf_event_exit *ext,
   }
 }
 
-void ddprof_pr_deallocation(DDProfContext *ctx, const DeallocationEvent *event, int watcher_pos) {
+void ddprof_pr_deallocation(DDProfContext *ctx, const DeallocationEvent *event,
+                            int watcher_pos) {
 #warning you are not finished working
   LG_NTC("Do something about dealloc %lx", event->ptr);
 }
@@ -581,8 +582,9 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
     case PERF_RECORD_SAMPLE:
       if (wpid->pid) {
         uint64_t mask = ctx->watchers[watcher_pos].sample_type;
-        bool is_allocation = (ctx->watchers[watcher_pos].type == kDDPROF_TYPE_CUSTOM &&
-            ctx->watchers[watcher_pos].config == kDDPROF_COUNT_ALLOCATIONS);
+        bool is_allocation =
+            (ctx->watchers[watcher_pos].type == kDDPROF_TYPE_CUSTOM &&
+             ctx->watchers[watcher_pos].config == kDDPROF_COUNT_ALLOCATIONS);
         if (is_allocation) // temp hack
           mask |= PERF_SAMPLE_ADDR;
         perf_event_sample *sample = hdr2samp(hdr, mask);
@@ -618,8 +620,8 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
                      watcher_pos);
       break;
     case PERF_CUSTOM_EVENT_DEALLOCATION:
-      ddprof_pr_deallocation(ctx, reinterpret_cast<const DeallocationEvent *>(hdr),
-                     watcher_pos);
+      ddprof_pr_deallocation(
+          ctx, reinterpret_cast<const DeallocationEvent *>(hdr), watcher_pos);
     default:
       break;
     }

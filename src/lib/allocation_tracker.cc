@@ -5,6 +5,7 @@
 
 #include "allocation_tracker.hpp"
 
+#include "ddprof_perf_event.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "ipc.hpp"
@@ -13,7 +14,6 @@
 #include "ringbuffer_utils.hpp"
 #include "savecontext.hpp"
 #include "syscalls.hpp"
-#include "ddprof_perf_event.hpp"
 
 #include <atomic>
 #include <cassert>
@@ -28,12 +28,12 @@ namespace ddprof {
 struct AllocationEvent {
   perf_event_header hdr;
   struct sample_id sample_id;
-  uint64_t addr;                         /* if PERF_SAMPLE_ADDR */
+  uint64_t addr; /* if PERF_SAMPLE_ADDR */
   uint64_t period;
-  uint64_t abi;                          /* if PERF_SAMPLE_REGS_USER */
-  uint64_t regs[PERF_REGS_COUNT];        /* if PERF_SAMPLE_REGS_USER */
-  uint64_t size;                         /* if PERF_SAMPLE_STACK_USER */
-  std::byte data[PERF_SAMPLE_STACK_SIZE];/* if PERF_SAMPLE_STACK_USER */
+  uint64_t abi;                           /* if PERF_SAMPLE_REGS_USER */
+  uint64_t regs[PERF_REGS_COUNT];         /* if PERF_SAMPLE_REGS_USER */
+  uint64_t size;                          /* if PERF_SAMPLE_STACK_USER */
+  std::byte data[PERF_SAMPLE_STACK_SIZE]; /* if PERF_SAMPLE_STACK_USER */
   uint64_t dyn_size;                      /* if PERF_SAMPLE_STACK_USER &&
                                         size != 0 */
 };
@@ -203,23 +203,34 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
 
   bool success = IsDDResOK(push_sample(addr, total_size, tl_state));
   free_on_consecutive_failures(success);
+
+  if (success) { // ensure we track this dealloc if it occurs
+    _address_set.insert(addr);
+  }
 }
 
-void AllocationTracker::track_deallocation(uintptr_t addr, TrackerThreadLocalState &tl_state) {
-    // Prevent reentrancy to avoid dead lock on mutex
+void AllocationTracker::track_deallocation(uintptr_t addr,
+                                           TrackerThreadLocalState &tl_state) {
+  // Prevent reentrancy to avoid dead lock on mutex
   ReentryGuard guard(&tl_state.reentry_guard);
 
   if (!guard) {
     // This is an internal dealloc, so we don't need to keep track of this
     return;
   }
+  std::lock_guard lock{_state.mutex};
 
-#warning check on internal hash
-  LG_NTC("Yep, track dealloc !");
+  // recheck if profiling is enabled
+  if (!_state.track_deallocations) {
+    return;
+  }
 
-  bool notify = false;
-  bool success = IsDDResOK(push_dealloc_sample(addr, tl_state, notify));
-  free_on_consecutive_failures(success);
+  // Inserting / Erasing addresses is done within the lock
+  if (_address_set.erase(addr)) {
+    bool notify = false;
+    bool success = IsDDResOK(push_dealloc_sample(addr, tl_state, notify));
+    free_on_consecutive_failures(success);
+  }
 }
 
 DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
@@ -251,11 +262,13 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
 }
 
 // Return true if consumer should be notified
-DDRes AllocationTracker::push_dealloc_sample(uintptr_t addr, TrackerThreadLocalState &tl_state, bool &notify_needed) {
+DDRes AllocationTracker::push_dealloc_sample(uintptr_t addr,
+                                             TrackerThreadLocalState &tl_state,
+                                             bool &notify_needed) {
   MPSCRingBufferWriter writer{_pevent.rb};
-  bool timeout = false;
   bool notify_consumer{false};
-  // already loosing events ?
+
+  bool timeout = false;
   if (unlikely(_state.lost_count.load(std::memory_order_relaxed))) {
     DDRES_CHECK_FWD(push_lost_sample(writer, notify_consumer));
   }
@@ -269,15 +282,15 @@ DDRes AllocationTracker::push_dealloc_sample(uintptr_t addr, TrackerThreadLocalS
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
                              "Unable to get write lock on ring buffer");
     }
-
     // not an error
     return {};
   }
 
-  DeallocationEvent *event = reinterpret_cast<DeallocationEvent *>(buffer.data());
+  DeallocationEvent *event =
+      reinterpret_cast<DeallocationEvent *>(buffer.data());
   event->hdr.misc = 0;
   event->hdr.size = sizeof(DeallocationEvent);
-  event->hdr.type = PERF_SAMPLE_ADDR;
+  event->hdr.type = PERF_CUSTOM_EVENT_DEALLOCATION;
   event->sample_id.time = 0;
 
   if (_state.pid == 0) {
@@ -288,7 +301,7 @@ DDRes AllocationTracker::push_dealloc_sample(uintptr_t addr, TrackerThreadLocalS
   }
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
-  
+
   // address of dealloc
   event->ptr = addr;
 
@@ -302,7 +315,6 @@ DDRes AllocationTracker::push_dealloc_sample(uintptr_t addr, TrackerThreadLocalS
   }
   return {};
 }
-
 
 DDRes AllocationTracker::push_sample(uintptr_t addr, uint64_t allocated_size,
                                      TrackerThreadLocalState &tl_state) {
@@ -320,7 +332,7 @@ DDRes AllocationTracker::push_sample(uintptr_t addr, uint64_t allocated_size,
     // ring buffer is full, increase lost count
     _state.lost_count.fetch_add(1, std::memory_order_acq_rel);
 
-    if (timeout) {  
+    if (timeout) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
                              "Unable to get write lock on ring buffer");
     }

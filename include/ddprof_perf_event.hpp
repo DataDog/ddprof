@@ -12,7 +12,8 @@
 // There are <30 different perf events (starting at 1000 seems safe)
 constexpr uint32_t PERF_CUSTOM_EVENT_DEALLOCATION = 1000;
 
-static_assert(PERF_CUSTOM_EVENT_DEALLOCATION>PERF_RECORD_MAX, "Error from PERF_CUSTOM_EVENT_DEALLOCATION definition");
+static_assert(PERF_CUSTOM_EVENT_DEALLOCATION > PERF_RECORD_MAX,
+              "Error from PERF_CUSTOM_EVENT_DEALLOCATION definition");
 
 namespace ddprof {
 
@@ -23,4 +24,4 @@ struct DeallocationEvent {
   uintptr_t ptr;
 };
 
-}
+} // namespace ddprof
