@@ -55,8 +55,8 @@ void conf_finalize(EventConf *conf) {
         return;
       }
 
-      snprintf(conf->label, buf_sz - 1, "%s:%s", conf->eventname,
-               conf->groupname);
+      snprintf(conf->label, buf_sz - 1, "%s:%s", conf->groupname,
+               conf->eventname);
     } else if (conf->eventname) {
       conf->label = strdup(conf->eventname);
     } else if (conf->id) {
