@@ -182,8 +182,7 @@ static int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
 static int ddprof_start_profiling_internal() {
   // Refuse to start profiler if already started by this process or if active in
   // one of its ancestors
-  if (g_state.started) {
-    // if (g_state.started || is_profiler_library_active()) {
+  if (g_state.started || is_profiler_library_active()) {
     return -1;
   }
   int sockfd = get_ddprof_socket();
