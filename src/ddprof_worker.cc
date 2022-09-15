@@ -305,6 +305,32 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   return {};
 }
 
+DDRes ddprof_pr_allocation_tracking(DDProfContext *ctx,
+                                    perf_event_sample *sample,
+                                    int watcher_pos) {
+  if (!sample)
+    return ddres_warn(DD_WHAT_PERFSAMP);
+
+  // If this is a SW_TASK_CLOCK-type event, then aggregate the time
+  if (ctx->watchers[watcher_pos].config == PERF_COUNT_SW_TASK_CLOCK)
+    ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
+
+  auto ticks0 = ddprof::get_tsc_cycles();
+  DDRes res = ddprof_unwind_sample(ctx, sample, watcher_pos);
+  auto unwind_ticks = ddprof::get_tsc_cycles();
+  ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL);
+
+  // Aggregate if unwinding went well (todo : fatal error propagation)
+  if (!IsDDResFatal(res)) {
+    struct UnwindState *us = ctx->worker_ctx.us;
+    ctx->worker_ctx.live_allocation.register_allocation(
+        us->output, sample->addr, sample->period, watcher_pos, sample->pid);
+  }
+
+  // TODO: propagate fatal
+  return ddres_init();
+}
+
 static void ddprof_reset_worker_stats() {
   for (unsigned i = 0; i < std::size(s_cycled_stats); ++i) {
     ddprof_stats_clear(s_cycled_stats[i]);
@@ -332,10 +358,43 @@ void *ddprof_worker_export_thread(void *arg) {
 }
 #endif
 
+#ifndef DDPROF_NATIVE_LIB
+static DDRes aggregate_stack(const LiveAllocation::AllocationInfo &alloc_info,
+                             DDProfContext *ctx) {
+  struct UnwindState *us = ctx->worker_ctx.us;
+  int watcher_pos = alloc_info._watcher_pos;
+  PerfWatcher *watcher = &ctx->watchers[watcher_pos];
+  int i_export = ctx->worker_ctx.i_current_pprof;
+  DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
+  DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr,
+                                  alloc_info._size, 1, watcher, pprof));
+  if (ctx->params.show_samples) {
+    ddprof_print_sample(us->output, us->symbol_hdr, alloc_info._size, *watcher);
+  }
+  return ddres_init();
+}
+
+static DDRes aggregate_live_allocations(DDProfContext *ctx) {
+  // this would be more efficient if we could reuse the same stacks in
+  // libdatadog
+  const LiveAllocation &live_allocations = ctx->worker_ctx.live_allocation;
+  for (const auto &stack_map : live_allocations._pid_map) {
+    for (const auto &alloc_info_pair : stack_map.second) {
+      DDRES_CHECK_FWD(aggregate_stack(alloc_info_pair.second, ctx));
+    }
+  }
+  return ddres_init();
+}
+#endif
+
 /// Cycle operations : export, sync metrics, update counters
 DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
                           [[maybe_unused]] bool synchronous_export) {
+
 #ifndef DDPROF_NATIVE_LIB
+  // TODO: lib mode (unhandled for now)
+  DDRES_CHECK_FWD(aggregate_live_allocations(ctx));
+
   // Take the current pprof contents and ship them to the backend.  This also
   // clears the pprof for reuse
   // Dispatch happens in a thread, with the underlying data structure for
@@ -477,8 +536,8 @@ void ddprof_pr_exit(DDProfContext *ctx, const perf_event_exit *ext,
 
 void ddprof_pr_deallocation(DDProfContext *ctx, const DeallocationEvent *event,
                             int watcher_pos) {
-#warning you are not finished working
-  LG_NTC("Do something about dealloc %lx", event->ptr);
+  ctx->worker_ctx.live_allocation.register_deallocation(event->ptr,
+                                                        event->sample_id.pid);
 }
 
 /********************************** callbacks *********************************/

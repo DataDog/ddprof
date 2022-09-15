@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "live_allocation.hpp"
 #include "pevent.hpp"
 #include "proc_status.hpp"
 
@@ -36,4 +37,5 @@ struct DDProfWorkerContext {
   int64_t send_nanos;    // Last time an export was sent
   uint32_t count_worker; // exports since last cache clear
   std::array<uint64_t, MAX_TYPE_WATCHER> lost_events_per_watcher;
+  ddprof::LiveAllocation live_allocation;
 };
