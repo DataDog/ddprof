@@ -349,10 +349,10 @@ void ddprof_context_free(DDProfContext *ctx) {
     exporter_input_free(&ctx->exp_input);
     free((char *)ctx->params.internal_stats);
     free((char *)ctx->params.tags);
-    *ctx = {};
     if (ctx->params.sockfd != -1) {
       close(ctx->params.sockfd);
     }
+    *ctx = {};
   }
 
   LOG_close();
