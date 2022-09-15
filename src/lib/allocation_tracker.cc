@@ -81,8 +81,6 @@ DDRes AllocationTracker::allocation_tracking_init(
     const RingBufferInfo &ring_buffer) {
   ReentryGuard guard(&_tl_state.reentry_guard);
 
-  flags &= kTrackDeallocations;
-
   AllocationTracker *instance = create_instance();
   auto &state = instance->_state;
   std::lock_guard lock{state.mutex};

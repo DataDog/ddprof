@@ -339,6 +339,8 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   }
 
   ctx->params.show_samples = input->show_samples != nullptr;
+  ctx->params.live_allocations =
+      arg_yesno(input->live_allocations, 1); // default no
 
   ctx->initialized = true;
   return ddres_init();

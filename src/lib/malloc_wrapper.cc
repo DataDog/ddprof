@@ -131,8 +131,8 @@ void *realloc(void *ptr, size_t size) {
         reinterpret_cast<uintptr_t>(ptr));
   }
   void *newptr = s_realloc(ptr, size);
-  ddprof::AllocationTracker::track_allocation(reinterpret_cast<uintptr_t>(ptr),
-                                              size);
+  ddprof::AllocationTracker::track_allocation(
+      reinterpret_cast<uintptr_t>(newptr), size);
   return newptr;
 }
 
@@ -212,8 +212,8 @@ void *reallocarray(void *ptr, size_t nmemb, size_t size) {
         reinterpret_cast<uintptr_t>(ptr));
   }
   void *newptr = s_reallocarray(ptr, nmemb, size);
-  ddprof::AllocationTracker::track_allocation(reinterpret_cast<uintptr_t>(ptr),
-                                              size * nmemb);
+  ddprof::AllocationTracker::track_allocation(
+      reinterpret_cast<uintptr_t>(newptr), size * nmemb);
   return newptr;
 }
 

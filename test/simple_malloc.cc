@@ -57,6 +57,7 @@ struct Options {
   std::chrono::milliseconds timeout_duration;
   uint32_t callstack_depth;
   uint32_t frame_size;
+  uint32_t skip_free;
 };
 
 extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
@@ -67,6 +68,7 @@ extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
   auto start_time = std::chrono::steady_clock::now();
   auto deadline_time = start_time + options.timeout_duration;
   auto start_cpu = thread_cpu_clock::now();
+  unsigned skip_free = 0;
   for (uint64_t i = 0; i < options.loop_count; ++i) {
     void *p = nullptr;
     if (options.malloc_size) {
@@ -84,7 +86,12 @@ extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
       p2 = p;
     }
     ddprof::DoNotOptimize(p2);
-    free(p2);
+
+    if (skip_free++ >= options.skip_free) {
+      free(p2);
+      skip_free = 0;
+    }
+
     if (options.sleep_duration_per_loop.count()) {
       std::this_thread::sleep_for(options.sleep_duration_per_loop);
     }
@@ -169,6 +176,9 @@ int main(int argc, char *argv[]) {
         ->default_val(0);
     app.add_option("--frame-size", opts.frame_size,
                    "Size to allocate on the stack for each frame")
+        ->default_val(0);
+    app.add_option("--skip-free", opts.skip_free,
+                   "Only free every N allocations (default is 0)")
         ->default_val(0);
 
     app.add_option<std::chrono::milliseconds, int64_t>(
