@@ -657,9 +657,9 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
         if (sample) {
           if (!is_allocation) {
             DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, watcher_pos));
-          }
-          else {
-            DDRES_CHECK_FWD(ddprof_pr_allocation_tracking(ctx, sample, watcher_pos));
+          } else {
+            DDRES_CHECK_FWD(
+                ddprof_pr_allocation_tracking(ctx, sample, watcher_pos));
           }
         }
       }
