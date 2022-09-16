@@ -41,6 +41,7 @@ check() {
     expected_pids="$2"
     expected_tids="${3-$2}"
     taskset "${test_cpu_mask}" ${cmd}
+
     if [[ "${expected_pids}" -eq 1 ]]; then
         # Ugly workaround for tail bug that makes it wait indefinitely for new lines when `grep -q` exists:
         # https://debbugs.gnu.org/cgi/bugreport.cgi?bug=13183
@@ -50,10 +51,10 @@ check() {
         kill "$COPROC_PID"
     fi
 
-    echo "alloc $(count "${log_file}" "alloc-samples" "pid")"
-    echo "cpu $(count "${log_file}" "cpu-samples" "pid")"
-    echo "alloc $(count "${log_file}" "alloc-samples" "tid")"
-    echo "cpu $(count "${log_file}" "cpu-samples" "tid")"
+    # echo "alloc $(count "${log_file}" "alloc-samples" "pid")"
+    # echo "cpu $(count "${log_file}" "cpu-samples" "pid")"
+    # echo "alloc $(count "${log_file}" "alloc-samples" "tid")"
+    # echo "cpu $(count "${log_file}" "cpu-samples" "tid")"
 
     if [[ "${expected_pids}" -ne 0 ]]; then
         if [[ $(count "${log_file}" "alloc-samples" "pid") -ne "${expected_pids}" ||
