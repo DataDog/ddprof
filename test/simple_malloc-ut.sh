@@ -4,7 +4,7 @@ set -euo pipefail
 
 export DD_PROFILING_EXPORT=no
 export DD_PROFILING_NATIVE_SHOW_SAMPLES=1
-export DD_PROFILING_NATIVE_USE_EMBEDDED_LIB=1
+export DD_PROFILING_NATIVE_USE_EMBEDDED_LIB=0
 export DD_PROFILING_NATIVE_LOG_LEVEL=debug
 export LD_LIBRARY_PATH=$PWD
 export DD_PROFILING_NATIVE_PRESET=default
@@ -50,6 +50,11 @@ check() {
         kill "$COPROC_PID"
     fi
 
+    echo "alloc $(count "${log_file}" "alloc-samples" "pid")"
+    echo "cpu $(count "${log_file}" "cpu-samples" "pid")"
+    echo "alloc $(count "${log_file}" "alloc-samples" "tid")"
+    echo "cpu $(count "${log_file}" "cpu-samples" "tid")"
+
     if [[ "${expected_pids}" -ne 0 ]]; then
         if [[ $(count "${log_file}" "alloc-samples" "pid") -ne "${expected_pids}" ||
         $(count "${log_file}" "cpu-samples" "pid") -ne "${expected_pids}" ||
@@ -86,6 +91,9 @@ check "./ddprof ./test/simple_malloc ${opts}" 1
 
 # Test wrapper mode with forks + threads
 check "./ddprof ./test/simple_malloc ${opts} --fork 2 --threads 2" 2 4
+
+# Test wrapper mode with forks + threads
+check "./ddprof --live_allocations yes ./test/simple_malloc ${opts} --fork 2 --threads 2 --skip-free 100" 2 4
 
 # Test slow profiler startup
 check "env DD_PROFILING_NATIVE_STARTUP_WAIT_MS=200 ./ddprof ./test/simple_malloc ${opts}" 1

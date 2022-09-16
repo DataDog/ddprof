@@ -52,7 +52,6 @@ bool watcher_has_countable_sample_type(const PerfWatcher *watcher) {
   return DDPROF_PWT_NOCOUNT != watcher_to_count_sample_type_id(watcher);
 }
 
-#warning replace this with some functions setting up config
 #define X_EVENTS(a, b, c, d, e, f, g)                                          \
   {DDPROF_PWE_##a, b, BASE_STYPES, c, d, {e}, f, PERF_SAMPLE_STACK_SIZE, g},
 const PerfWatcher events_templates[] = {EVENT_CONFIG_TABLE(X_EVENTS)};

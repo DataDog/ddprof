@@ -225,8 +225,7 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
 
   // Inserting / Erasing addresses is done within the lock
   if (_address_set.erase(addr)) {
-    bool notify = false;
-    bool success = IsDDResOK(push_dealloc_sample(addr, tl_state, notify));
+    bool success = IsDDResOK(push_dealloc_sample(addr, tl_state));
     free_on_consecutive_failures(success);
   }
 }
@@ -260,9 +259,8 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
 }
 
 // Return true if consumer should be notified
-DDRes AllocationTracker::push_dealloc_sample(uintptr_t addr,
-                                             TrackerThreadLocalState &tl_state,
-                                             bool &notify_needed) {
+DDRes AllocationTracker::push_dealloc_sample(
+    uintptr_t addr, TrackerThreadLocalState &tl_state) {
   MPSCRingBufferWriter writer{_pevent.rb};
   bool notify_consumer{false};
 

@@ -366,10 +366,11 @@ static DDRes aggregate_stack(const LiveAllocation::AllocationInfo &alloc_info,
   PerfWatcher *watcher = &ctx->watchers[watcher_pos];
   int i_export = ctx->worker_ctx.i_current_pprof;
   DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
-  DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr,
+  DDRES_CHECK_FWD(pprof_aggregate(&alloc_info._stack, &us->symbol_hdr,
                                   alloc_info._size, 1, watcher, pprof));
   if (ctx->params.show_samples) {
-    ddprof_print_sample(us->output, us->symbol_hdr, alloc_info._size, *watcher);
+    ddprof_print_sample(alloc_info._stack, us->symbol_hdr, alloc_info._size,
+                        *watcher);
   }
   return ddres_init();
 }
@@ -377,8 +378,8 @@ static DDRes aggregate_stack(const LiveAllocation::AllocationInfo &alloc_info,
 static DDRes aggregate_live_allocations(DDProfContext *ctx) {
   // this would be more efficient if we could reuse the same stacks in
   // libdatadog
-  const LiveAllocation &live_allocations = ctx->worker_ctx.live_allocation;
-  for (const auto &stack_map : live_allocations._pid_map) {
+  LiveAllocation &live_allocations = ctx->worker_ctx.live_allocation;
+  for (auto &stack_map : live_allocations._pid_map) {
     for (const auto &alloc_info_pair : stack_map.second) {
       DDRES_CHECK_FWD(aggregate_stack(alloc_info_pair.second, ctx));
     }
@@ -386,7 +387,7 @@ static DDRes aggregate_live_allocations(DDProfContext *ctx) {
            stack_map.second.size());
     // Safety to avoid spending all the time reporting allocations
     if (stack_map.second.size() >= LiveAllocation::kMaxTracked) {
-      stack_map.clear();
+      stack_map.second.clear();
     }
   }
   return ddres_init();
@@ -660,11 +661,11 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
           mask |= PERF_SAMPLE_ADDR;
         perf_event_sample *sample = hdr2samp(hdr, mask);
         if (sample) {
-          if (!is_allocation) {
-            DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, watcher_pos));
-          } else {
+          if (is_allocation && ctx->params.live_allocations) {
             DDRES_CHECK_FWD(
                 ddprof_pr_allocation_tracking(ctx, sample, watcher_pos));
+          } else {
+            DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, watcher_pos));
           }
         }
       }

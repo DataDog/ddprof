@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <functional>
+#include <signal.h>
 #include <sstream>
 #include <thread>
 #include <time.h>
@@ -23,6 +24,28 @@
 #ifdef USE_DD_PROFILING
 #  include "dd_profiling.h"
 #endif
+
+#ifdef __GLIBC__
+#  include <execinfo.h>
+#endif
+
+/*****************************  SIGSEGV Handler *******************************/
+static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
+  // TODO this really shouldn't call printf-family functions...
+  (void)uc;
+#ifdef __GLIBC__
+  static void *buf[4096] = {0};
+  size_t sz = backtrace(buf, 4096);
+#endif
+  fprintf(stderr, "simplemalloc[%d]:has encountered an error and will exit\n",
+          getpid());
+  if (sig == SIGSEGV)
+    printf("Fault address: %p\n", si->si_addr);
+#ifdef __GLIBC__
+  backtrace_symbols_fd(buf, sz, STDERR_FILENO);
+#endif
+  exit(-1);
+}
 
 struct thread_cpu_clock {
   using duration = std::chrono::nanoseconds;
@@ -149,6 +172,11 @@ void print_stats(pid_t pid, const Stats &stats) {
 }
 
 int main(int argc, char *argv[]) {
+  struct sigaction sigaction_handlers = {};
+  sigaction_handlers.sa_sigaction = sigsegv_handler;
+  sigaction_handlers.sa_flags = SA_SIGINFO;
+  sigaction(SIGSEGV, &(sigaction_handlers), NULL);
+
   try {
     CLI::App app{"Simple allocation test"};
 

@@ -91,8 +91,7 @@ private:
   DDRes push_lost_sample(MPSCRingBufferWriter &writer, bool &notify_needed);
 
   // Return true if consumer should be notified
-  DDRes push_dealloc_sample(uintptr_t addr, TrackerThreadLocalState &tl_state,
-                            bool &notify_needed);
+  DDRes push_dealloc_sample(uintptr_t addr, TrackerThreadLocalState &tl_state);
 
   void free_on_consecutive_failures(bool success);
 
