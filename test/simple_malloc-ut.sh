@@ -40,6 +40,7 @@ check() {
     cmd="$1"
     expected_pids="$2"
     expected_tids="${3-$2}"
+    # echo "Expected tids = $expected_tids"
     taskset "${test_cpu_mask}" ${cmd}
 
     if [[ "${expected_pids}" -eq 1 ]]; then
@@ -51,18 +52,33 @@ check() {
         kill "$COPROC_PID"
     fi
 
-    # echo "alloc $(count "${log_file}" "alloc-samples" "pid")"
-    # echo "cpu $(count "${log_file}" "cpu-samples" "pid")"
-    # echo "alloc $(count "${log_file}" "alloc-samples" "tid")"
-    # echo "cpu $(count "${log_file}" "cpu-samples" "tid")"
+    # echo "alloc pid count = $(count "${log_file}" "alloc-samples" "pid")"
+    # echo "cpu pid count = $(count "${log_file}" "cpu-samples" "pid")"
+    # echo "alloc tid count = $(count "${log_file}" "alloc-samples" "tid")"
+    # echo "cpu tid count = $(count "${log_file}" "cpu-samples" "tid")"
 
     if [[ "${expected_pids}" -ne 0 ]]; then
-        if [[ $(count "${log_file}" "alloc-samples" "pid") -ne "${expected_pids}" ||
-        $(count "${log_file}" "cpu-samples" "pid") -ne "${expected_pids}" ||
-        $(count "${log_file}" "alloc-samples" "tid") -ne "${expected_tids}" ||
+        result_pids=$(count "${log_file}" "alloc-samples" "pid")
+        if [[ ${result_pids} -ne "${expected_pids}" ]]; then
+            echo "Not enough alloc samples per PID - Res=${result_pids} vs Exp=${expected_pids}"
+            echo "command=$cmd"
+            print_log_samples "${log_file}" "alloc-samples"
+            exit 1
+        fi
+        result_pids=$(count "${log_file}" "cpu-samples" "pid")
+        if [[ ${result_pids} -ne "${expected_pids}" ]]; then
+            echo "Not enough cpu samples per PID - Res=${result_pids} vs Exp=${expected_pids}"
+            echo "command=$cmd"
+            print_log_samples "${log_file}" "cpu-samples"
+            exit 1
+        fi
+
+        if [[ $(count "${log_file}" "alloc-samples" "tid") -ne "${expected_tids}" ||
         $(count "${log_file}" "cpu-samples" "tid") -ne "${expected_tids}" ]]; then
-            echo "Incorrect number of sample found for: $cmd"
-            cat "${log_file}"
+            echo "Incorrect number of sample found per TID: $expected_tids"
+            echo "command=$cmd"
+            print_log_samples "${log_file}" "cpu-samples"
+            print_log_samples "${log_file}" "alloc-samples"
             exit 1
         fi
     else

@@ -38,6 +38,10 @@ public:
   AllocationTracker(const AllocationTracker &) = delete;
   AllocationTracker &operator=(const AllocationTracker &) = delete;
 
+  ~AllocationTracker() {
+    free();
+  }
+  
   enum AllocationTrackingFlags {
     kTrackDeallocations = 0x1,
     kDeterministicSampling = 0x2
