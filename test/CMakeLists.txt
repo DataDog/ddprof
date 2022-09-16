@@ -315,7 +315,6 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
   add_exe(simple_malloc simple_malloc.cc LIBRARIES Threads::Threads)
   target_include_directories(simple_malloc PRIVATE ${CMAKE_SOURCE_DIR}/include
                                                    ${CMAKE_SOURCE_DIR}/third_party)
-
   add_test(
     NAME simple_malloc
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/simple_malloc-ut.sh

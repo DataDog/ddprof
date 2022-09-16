@@ -102,7 +102,6 @@ void free(void *ptr) {
   if (ptr == nullptr) {
     return;
   }
-
   ddprof::AllocationTracker::track_deallocation(
       reinterpret_cast<uintptr_t>(ptr));
   s_free(ptr);
