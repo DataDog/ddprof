@@ -541,7 +541,8 @@ void ddprof_pr_exit(DDProfContext *ctx, const perf_event_exit *ext,
   }
 }
 
-void ddprof_pr_deallocation(DDProfContext *ctx, const DeallocationEvent *event) {
+void ddprof_pr_deallocation(DDProfContext *ctx,
+                            const DeallocationEvent *event) {
   ctx->worker_ctx.live_allocation.register_deallocation(event->ptr,
                                                         event->sample_id.pid);
 }
@@ -696,8 +697,8 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
                      watcher_pos);
       break;
     case PERF_CUSTOM_EVENT_DEALLOCATION:
-      ddprof_pr_deallocation(
-          ctx, reinterpret_cast<const DeallocationEvent *>(hdr));
+      ddprof_pr_deallocation(ctx,
+                             reinterpret_cast<const DeallocationEvent *>(hdr));
     default:
       break;
     }

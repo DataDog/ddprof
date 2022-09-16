@@ -224,10 +224,10 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
   }
 
   // Inserting / Erasing addresses is done within the lock
-  if (_address_set.erase(addr)) {
-    bool success = IsDDResOK(push_dealloc_sample(addr, tl_state));
-    free_on_consecutive_failures(success);
-  }
+  // if (_address_set.erase(addr)) {
+  bool success = IsDDResOK(push_dealloc_sample(addr, tl_state));
+  free_on_consecutive_failures(success);
+  // }
 }
 
 DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
