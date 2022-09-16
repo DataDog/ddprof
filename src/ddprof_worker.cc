@@ -379,10 +379,14 @@ static DDRes aggregate_live_allocations(DDProfContext *ctx) {
   // libdatadog
   const LiveAllocation &live_allocations = ctx->worker_ctx.live_allocation;
   for (const auto &stack_map : live_allocations._pid_map) {
-    LG_NTC("Number of Live allocations for PID%d = %lu ", stack_map.first,
-           stack_map.second.size());
     for (const auto &alloc_info_pair : stack_map.second) {
       DDRES_CHECK_FWD(aggregate_stack(alloc_info_pair.second, ctx));
+    }
+    LG_NTC("Number of Live allocations for PID%d = %lu ", stack_map.first,
+           stack_map.second.size());
+    // Safety to avoid spending all the time reporting allocations
+    if (stack_map.second.size() >= LiveAllocation::kMaxTracked) {
+      stack_map.clear();
     }
   }
   return ddres_init();
