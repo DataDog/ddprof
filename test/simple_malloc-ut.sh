@@ -40,7 +40,6 @@ check() {
     cmd="$1"
     expected_pids="$2"
     expected_tids="${3-$2}"
-    # echo "Expected tids = $expected_tids"
     taskset "${test_cpu_mask}" ${cmd}
 
     if [[ "${expected_pids}" -eq 1 ]]; then
@@ -74,7 +73,7 @@ check() {
         fi
 
         if [[ $(count "${log_file}" "alloc-samples" "tid") -ne "${expected_tids}" ||
-        $(count "${log_file}" "cpu-samples" "tid") -ne "${expected_tids}" ]]; then
+                $(count "${log_file}" "cpu-samples" "tid") -ne "${expected_tids}" ]]; then
             echo "Incorrect number of sample found per TID: $expected_tids"
             echo "command=$cmd"
             print_log_samples "${log_file}" "cpu-samples"
@@ -110,7 +109,7 @@ check "./ddprof ./test/simple_malloc ${opts}" 1
 check "./ddprof ./test/simple_malloc ${opts} --fork 2 --threads 2" 2 4
 
 # Test wrapper mode with forks + threads
-check "./ddprof --live_allocations yes ./test/simple_malloc ${opts} --fork 2 --threads 2 --skip-free 100" 2 4
+# check "./ddprof --live_allocations yes ./test/simple_malloc ${opts} --fork 2 --threads 2 --skip-free 100" 2 4
 
 # Test slow profiler startup
 check "env DD_PROFILING_NATIVE_STARTUP_WAIT_MS=200 ./ddprof ./test/simple_malloc ${opts}" 1
