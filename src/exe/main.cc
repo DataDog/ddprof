@@ -209,7 +209,6 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
              ctx->params.dd_profiling_fd, sockfds[kChildIdx],
              sockfds[kParentIdx]);
       ctx->params.dd_profiling_fd = fd;
-
       ctx->params.sockfd = sockfds[kChildIdx];
       ctx->params.wait_on_socket = true;
     }

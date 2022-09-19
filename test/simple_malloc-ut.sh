@@ -40,6 +40,7 @@ check() {
     cmd="$1"
     expected_pids="$2"
     expected_tids="${3-$2}"
+    # shellcheck disable=SC2086
     taskset "${test_cpu_mask}" ${cmd}
 
     if [[ "${expected_pids}" -eq 1 ]]; then

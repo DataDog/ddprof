@@ -245,9 +245,6 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
 
       // If the dyn_size is too big, zero out the stack size since it is
       // likely an error
-      LG_DBG("Sample: size_stack=%lu, dynsz_stack=%lu", size_stack,
-             dynsz_stack);
-
       sample.size_stack = size_stack < dynsz_stack ? 0 : dynsz_stack;
       sample.dyn_size_stack = dynsz_stack; // for debugging
     }
