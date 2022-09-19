@@ -121,12 +121,12 @@ public:
   static Dso dso_from_procline(int pid, char *line);
 
   static DsoFindRes find_res_not_found(const DsoMap &map) {
-    return std::make_pair<DsoMapConstIt, bool>(map.end(), false);
+    return {map.end(), false};
   }
 
   DsoFindRes find_res_not_found(int pid) {
     // not const as it can create an element if the map does not exist for pid
-    return std::make_pair<DsoMapConstIt, bool>(_map[pid].end(), false);
+    return {_map[pid].end(), false};
   }
 
   // Access file and retrieve absolute path and ID
@@ -138,6 +138,8 @@ public:
   const FileInfoValue &get_file_info_value(FileInfoId_t id) const {
     return _file_info_vector[id];
   }
+
+  const std::string &get_path_to_proc() const { return _path_to_proc; }
 
   int get_nb_dso() const;
 

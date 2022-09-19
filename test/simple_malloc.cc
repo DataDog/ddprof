@@ -3,12 +3,14 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
+#include <alloca.h>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <future>
+#include <functional>
+#include <sstream>
 #include <thread>
 #include <time.h>
 #include <unistd.h>
@@ -46,36 +48,49 @@ struct Stats {
   pid_t tid;
 };
 
-extern "C" DDPROF_NOINLINE void
-do_lot_of_allocations(uint64_t loop_count, std::chrono::microseconds sleep,
-                      std::chrono::microseconds spin,
-                      std::chrono::milliseconds timeout, Stats *stats) {
+struct Options {
+  uint64_t malloc_size;
+  uint64_t realloc_size;
+  uint64_t loop_count;
+  std::chrono::microseconds spin_duration_per_loop;
+  std::chrono::microseconds sleep_duration_per_loop;
+  std::chrono::milliseconds timeout_duration;
+  uint32_t callstack_depth;
+  uint32_t frame_size;
+};
+
+extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
+                                                      Stats &stats) {
   uint64_t nb_alloc{0};
   uint64_t alloc_bytes{0};
 
   auto start_time = std::chrono::steady_clock::now();
-  auto end_time = start_time + timeout;
+  auto deadline_time = start_time + options.timeout_duration;
   auto start_cpu = thread_cpu_clock::now();
-  for (uint64_t i = 0; i < loop_count; ++i) {
-    void *p = malloc(1000);
-    ddprof::DoNotOptimize(p);
-    ++nb_alloc;
-    alloc_bytes += 1000;
-    void *p2 = realloc(p, 2000);
-    ddprof::DoNotOptimize(p2);
-    ++nb_alloc;
-    alloc_bytes += 2000;
-    free(p2);
-    void *p3 = calloc(1, 512);
-    ddprof::DoNotOptimize(p3);
-    ++nb_alloc;
-    alloc_bytes += 512;
-    free(p3);
-    if (sleep.count()) {
-      std::this_thread::sleep_for(sleep);
+  for (uint64_t i = 0; i < options.loop_count; ++i) {
+    void *p = nullptr;
+    if (options.malloc_size) {
+      p = malloc(options.malloc_size);
+      ++nb_alloc;
+      alloc_bytes += options.malloc_size;
     }
-    if (spin.count()) {
-      auto target_time = std::chrono::steady_clock::now() + spin;
+    ddprof::DoNotOptimize(p);
+    void *p2;
+    if (options.realloc_size) {
+      p2 = realloc(p, options.realloc_size);
+      ++nb_alloc;
+      alloc_bytes += options.realloc_size;
+    } else {
+      p2 = p;
+    }
+    ddprof::DoNotOptimize(p2);
+    free(p2);
+    if (options.sleep_duration_per_loop.count()) {
+      std::this_thread::sleep_for(options.sleep_duration_per_loop);
+    }
+    if (options.spin_duration_per_loop.count()) {
+      auto target_time =
+          std::chrono::steady_clock::now() + options.spin_duration_per_loop;
       do {
         volatile uint64_t sum = 1;
         for (uint64_t j = 0; j < 100; ++j) {
@@ -84,14 +99,35 @@ do_lot_of_allocations(uint64_t loop_count, std::chrono::microseconds sleep,
       } while (std::chrono::steady_clock::now() < target_time);
     }
 
-    if (timeout.count() > 0 && std::chrono::steady_clock::now() >= end_time) {
+    if (options.timeout_duration.count() > 0 &&
+        std::chrono::steady_clock::now() >= deadline_time) {
       break;
     }
   }
   auto end_cpu = thread_cpu_clock::now();
-  end_time = std::chrono::steady_clock::now();
-  *stats = {nb_alloc, alloc_bytes, end_time - start_time, end_cpu - start_cpu,
-            ddprof::gettid()};
+  auto end_time = std::chrono::steady_clock::now();
+  stats = {nb_alloc, alloc_bytes, end_time - start_time, end_cpu - start_cpu,
+           ddprof::gettid()};
+}
+
+extern "C" DDPROF_NOINLINE void recursive_call(const Options &options,
+                                               Stats &stats, uint32_t depth) {
+  void *stack_alloc = nullptr;
+  if (options.frame_size) {
+    stack_alloc = alloca(options.frame_size);
+  }
+  ddprof::DoNotOptimize(stack_alloc);
+
+  if (depth == 0) {
+    do_lot_of_allocations(options, stats);
+  } else {
+    recursive_call(options, stats, depth - 1);
+  }
+  DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
+}
+
+extern "C" DDPROF_NOINLINE void wrapper(const Options &options, Stats &stats) {
+  recursive_call(options, stats, options.callstack_depth);
 }
 
 void print_header() {
@@ -111,10 +147,8 @@ int main(int argc, char *argv[]) {
 
     unsigned int nb_forks{1};
     unsigned int nb_threads{1};
-    unsigned int sleep_us{0};
-    unsigned int spin_us{0};
-    int timeout_ms = -1;
-    uint64_t loop_count = std::numeric_limits<uint64_t>::max();
+
+    Options opts;
     std::vector<std::string> exec_args;
 
     app.add_option("--fork", nb_forks, "Number of processes to create")
@@ -123,14 +157,35 @@ int main(int argc, char *argv[]) {
         ->default_val(1);
     app.add_option("--exec", exec_args, "Exec the following command")
         ->expected(-1);
-    app.add_option("--loop", loop_count, "Number of loops")->default_val(-1);
-    app.add_option("--timeout", timeout_ms, "Timeout after N milliseconds")
+    app.add_option("--loop", opts.loop_count, "Number of loops")
+        ->default_val(-1);
+    app.add_option("--malloc", opts.malloc_size,
+                   "Malloc allocation size per loop")
+        ->default_val(1000);
+    app.add_option("--realloc", opts.realloc_size,
+                   "Realloc allocation size per loop")
+        ->default_val(2000);
+    app.add_option("--call-depth", opts.callstack_depth, "Callstack depth")
         ->default_val(0);
-    app.add_option("--sleep", sleep_us,
-                   "Time to sleep (us) between allocations")
+    app.add_option("--frame-size", opts.frame_size,
+                   "Size to allocate on the stack for each frame")
         ->default_val(0);
-    app.add_option("--spin", spin_us, "Time to spin (us) between allocations")
-        ->default_val(0);
+
+    app.add_option<std::chrono::milliseconds, int64_t>(
+           "--timeout", opts.timeout_duration, "Timeout after N milliseconds")
+        ->default_val(0)
+        ->check(CLI::NonNegativeNumber);
+    app.add_option<std::chrono::microseconds, int64_t>(
+           "--sleep", opts.sleep_duration_per_loop,
+           "Time to sleep (us) between allocations")
+        ->default_val(0)
+        ->check(CLI::NonNegativeNumber);
+    app.add_option<std::chrono::microseconds, int64_t>(
+           "--spin", opts.spin_duration_per_loop,
+           "Time to spin (us) between allocations")
+        ->default_val(0)
+        ->check(CLI::NonNegativeNumber);
+
 #ifdef USE_DD_PROFILING
     bool start_profiling = false;
     app.add_flag("--profile", start_profiling, "Enable profiling")
@@ -145,7 +200,6 @@ int main(int argc, char *argv[]) {
       return 1;
     }
 #endif
-
     if (exec_args.empty()) {
       print_header();
     }
@@ -169,14 +223,9 @@ int main(int argc, char *argv[]) {
     std::vector<std::thread> threads;
     std::vector<Stats> stats{nb_threads};
     for (unsigned int i = 1; i < nb_threads; ++i) {
-      threads.emplace_back(do_lot_of_allocations, loop_count,
-                           std::chrono::microseconds{sleep_us},
-                           std::chrono::microseconds{spin_us},
-                           std::chrono::milliseconds{timeout_ms}, &stats[i]);
+      threads.emplace_back(wrapper, std::cref(opts), std::ref(stats[i]));
     }
-    do_lot_of_allocations(loop_count, std::chrono::microseconds{sleep_us},
-                          std::chrono::microseconds{spin_us},
-                          std::chrono::milliseconds{timeout_ms}, &stats[0]);
+    wrapper(opts, stats[0]);
     for (auto &t : threads) {
       t.join();
     }

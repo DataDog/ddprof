@@ -29,20 +29,34 @@ log_file=$(mktemp "${PWD}/log.XXXXXX")
 rm "${log_file}"
 export DD_PROFILING_NATIVE_LOG_MODE="${log_file}"
 
+count() {
+    log_file="$1"
+    sample_type="$2"
+    pid_or_tid="$3"
+    grep "sample\[type=${sample_type};.*;do_lot_of_allocations" "${log_file}" | grep -o "${pid_or_tid}=[0-9]*" | sort -u | wc -l
+}
+
 check() {
     cmd="$1"
-    expect_samples="$2"
+    expected_pids="$2"
+    expected_tids="${3-$2}"
+    # shellcheck disable=SC2086
     taskset "${test_cpu_mask}" ${cmd}
-    if [ "${expect_samples}" -eq 1 ]; then
+    if [[ "${expected_pids}" -eq 1 ]]; then
         # Ugly workaround for tail bug that makes it wait indefinitely for new lines when `grep -q` exists:
         # https://debbugs.gnu.org/cgi/bugreport.cgi?bug=13183
         # https://superuser.com/questions/270529/monitoring-a-file-until-a-string-is-found
-        coproc tail -F "${log_file}"; grep -Fq "Profiling terminated" <&"${COPROC[0]}"; kill "$COPROC_PID"
+        coproc tail -F "${log_file}"
+        grep -Fq "Profiling terminated" <&"${COPROC[0]}"
+        kill "$COPROC_PID"
     fi
 
-    if [ "${expect_samples}" -eq 1 ]; then
-        if ! grep -q "sample\[type=cpu-samples.*;do_lot_of_allocations" "${log_file}" || ! grep -q "sample\[type=alloc-samples.*;do_lot_of_allocations" "${log_file}"; then
-            echo "No sample found for: $cmd"
+    if [[ "${expected_pids}" -ne 0 ]]; then
+        if [[ $(count "${log_file}" "alloc-samples" "pid") -ne "${expected_pids}" ||
+        $(count "${log_file}" "cpu-samples" "pid") -ne "${expected_pids}" ||
+        $(count "${log_file}" "alloc-samples" "tid") -ne "${expected_tids}" ||
+        $(count "${log_file}" "cpu-samples" "tid") -ne "${expected_tids}" ]]; then
+            echo "Incorrect number of sample found for: $cmd"
             cat "${log_file}"
             exit 1
         fi
@@ -70,6 +84,9 @@ check "./test/simple_malloc-shared --profile ${opts}" 1
 
 # Test wrapper mode
 check "./ddprof ./test/simple_malloc ${opts}" 1
+
+# Test wrapper mode with forks + threads
+check "./ddprof ./test/simple_malloc ${opts} --fork 2 --threads 2" 2 4
 
 # Test slow profiler startup
 check "env DD_PROFILING_NATIVE_STARTUP_WAIT_MS=200 ./ddprof ./test/simple_malloc ${opts}" 1

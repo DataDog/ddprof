@@ -15,6 +15,7 @@ enum DsoType {
   kHeap,
   kUndef,
   kAnon,
+  kRuntime,
   kSocket,
   kDDProfiling, // special case in which the library might be known internally
   kNbDsoTypes
@@ -29,6 +30,12 @@ static inline bool has_relevant_path(dso::DsoType dso_type) {
   }
   return false;
 }
+
+// some runtimes such as java or .NET can publish maps to populate the symbols
+static inline bool has_runtime_symbols(dso::DsoType dso_type) {
+  return dso_type == kRuntime || dso_type == kAnon;
+}
+
 // todo : find an enum that supports to_str
 static inline const char *dso_type_str(DsoType path_type) {
   switch (path_type) {
@@ -46,6 +53,8 @@ static inline const char *dso_type_str(DsoType path_type) {
     return "Undefined";
   case kAnon:
     return "Anonymous";
+  case kRuntime:
+    return "Runtime";
   case kSocket:
     return "kSocket";
   case kDDProfiling:

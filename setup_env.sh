@@ -7,10 +7,15 @@ export PATH=$PATH:${PWD}/tools:${PWD}/bench/runners
 # Helper command lines for cmake. Source this file, then you can just do :
 # SanCMake ../ 
 
+# Attempt to use the latest known working version of GCC as the default
+DDPROF_CC_DEFAULT=$(command -v gcc{-12,-11,-10,-9,} | head -n1)
+DDPROF_CXX_DEFAULT=$(command -v g++{-12,-11,-10,-9,} | head -n1)
+
+SCRIPTDIR="$(cd -- $( dirname -- "${BASH_SOURCE[0]}" ) && pwd)" # no "$0" when sourcing
 DDPROF_INSTALL_PREFIX="../deliverables"
 DDPROF_BUILD_BENCH="ON"
 NATIVE_LIB="ON"
-COMPILER_SETTING="-DCMAKE_CXX_COMPILER=${CXX:-"g++"} -DCMAKE_C_COMPILER=${CC:-"gcc"}"
+COMPILER_SETTING="-DCMAKE_CXX_COMPILER=${CXX:-"${DDPROF_CXX_DEFAULT}"} -DCMAKE_C_COMPILER=${CC:-"${DDPROF_CC_DEFAULT}"}"
 # Avoid having the vendors compiled in the same directory
 EXTENSION_CC=${CC:-"gcc"}
 # strip version number from compiler
@@ -18,10 +23,10 @@ EXTENSION_CC=${EXTENSION_CC%-*}
 
 LIBC_HAS_MUSL=$(ldd  --version 2>&1  | grep musl || true)
 if [ ! -z "${LIBC_HAS_MUSL}" ]; then
-  LIBC_VERSION=$(get_libc_version.sh musl)
+  LIBC_VERSION=$(${SCRIPTDIR}/tools/get_libc_version.sh musl)
   EXTENSION_OS="alpine-linux-${LIBC_VERSION}"
 else
-  LIBC_VERSION=$(get_libc_version.sh gnu)
+  LIBC_VERSION=$(${SCRIPTDIR}/tools/get_libc_version.sh gnu)
   EXTENSION_OS="unknown-linux-${LIBC_VERSION}"
 fi
 

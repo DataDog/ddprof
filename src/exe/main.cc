@@ -205,9 +205,10 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
       if (!IsDDResOK(get_library_path(dd_profiling_lib_path, fd))) {
         return -1;
       }
-      LG_DBG("ctx->params.dd_profiling_fd = %d", ctx->params.dd_profiling_fd);
+      LG_DBG("ctx->params.dd_profiling_fd = %d - sockfds %d, %d",
+             ctx->params.dd_profiling_fd, sockfds[kChildIdx],
+             sockfds[kParentIdx]);
       ctx->params.dd_profiling_fd = fd;
-
       ctx->params.sockfd = sockfds[kChildIdx];
       ctx->params.wait_on_socket = true;
     }
@@ -231,7 +232,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
         fixup_library_path(dd_profiling_lib_path, daemonize_res.daemon_pid);
         std::string preload_str = dd_profiling_lib_path;
         if (const char *s = getenv("LD_PRELOAD"); s) {
-          preload_str.append(";");
+          preload_str.append(":");
           preload_str.append(s);
         }
         LG_DBG("Setting LD_PRELOAD=%s", preload_str.c_str());

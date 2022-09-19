@@ -34,28 +34,29 @@ SHELL ["/bin/bash", "-c"]
 
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-  software-properties-common \
   apt-transport-https \
   awscli \
   binutils-dev \
   ca-certificates \
+  curl \
   gcovr \
   git \
-  curl \
   lcov \
-  make \
-  m4 \
+  libcap-dev \
+  libjemalloc-dev \
   liblzma-dev \
   libunwind-dev \
+  m4 \
+  make \
+  netcat-openbsd \
   pkg-config \
+  python3-pip \
+  software-properties-common \
   ssh-client \
   subversion \
-  zlib1g-dev \
-  libjemalloc-dev \
-  libcap-dev \
-  netcat-openbsd \
   unzip \
-  wget
+  wget \
+  zlib1g-dev
 
 # Codeql : static analysis tooling
 RUN curl -L https://github.com/github/codeql-action/releases/download/codeql-bundle-20210622/codeql-bundle-linux64.tar.gz -o - | tar -xz -C /usr/local
@@ -147,6 +148,9 @@ RUN VERSION="1.6.1" \
   && cmake --build "build" --target install \
   && popd \
   && rm -rf benchmark-${VERSION} v${VERSION}.tar.gz
+
+# Install cmake_format
+RUN pip3 install cmake_format
 
 # A specific user is required to get access to perf event ressources.
 # This enables unit testing using perf-event ressources

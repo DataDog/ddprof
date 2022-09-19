@@ -27,8 +27,7 @@ MapInfoIdx_t CommonMapInfoLookup::get_or_insert(
   } else { // insert things
     res = mapinfo_table.size();
     mapinfo_table.push_back(mapinfo_from_common(lookup_case));
-    _map.insert(std::pair<CommonMapInfoLookup::MappingErrors, MapInfoIdx_t>(
-        lookup_case, res));
+    _map.insert({lookup_case, res});
   }
   return res;
 }

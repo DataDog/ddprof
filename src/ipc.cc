@@ -23,6 +23,7 @@ struct InternalResponseMessage {
   int32_t pid;
   int64_t mem_size;
   int64_t allocation_profiling_rate;
+  int32_t ring_buffer_type;
 };
 
 struct timeval to_timeval(std::chrono::microseconds duration) noexcept {
@@ -254,11 +255,12 @@ DDRes send(UnixSocket &socket, const ReplyMessage &msg) {
   int fds[2] = {msg.ring_buffer.ring_fd, msg.ring_buffer.event_fd};
   ddprof::span<int> fd_span{fds, (msg.ring_buffer.mem_size != -1) ? 2ul : 0ul};
   std::error_code ec;
-  InternalResponseMessage data = {.request = msg.request,
-                                  .pid = msg.pid,
-                                  .mem_size = msg.ring_buffer.mem_size,
-                                  .allocation_profiling_rate =
-                                      msg.allocation_profiling_rate};
+  InternalResponseMessage data = {
+      .request = msg.request,
+      .pid = msg.pid,
+      .mem_size = msg.ring_buffer.mem_size,
+      .allocation_profiling_rate = msg.allocation_profiling_rate,
+      .ring_buffer_type = msg.ring_buffer.ring_buffer_type};
   socket.send(to_byte_span(&data), fd_span, ec);
   DDRES_CHECK_ERRORCODE(ec, DD_WHAT_SOCKET, "Unable to send response message");
   return {};
@@ -289,6 +291,7 @@ DDRes receive(UnixSocket &socket, ReplyMessage &msg) {
   msg.request = data.request;
   msg.allocation_profiling_rate = data.allocation_profiling_rate;
   msg.ring_buffer.mem_size = data.mem_size;
+  msg.ring_buffer.ring_buffer_type = data.ring_buffer_type;
   msg.ring_buffer.ring_fd = fds[0];
   msg.ring_buffer.event_fd = fds[1];
   return {};

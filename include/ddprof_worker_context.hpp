@@ -1,14 +1,19 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the Apache License Version 2.0. This product includes software
+// developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
+// Datadog, Inc.
+
 #pragma once
 
 #include "pevent.hpp"
 #include "proc_status.hpp"
 
+#include <array>
 #include <chrono>
 
 typedef struct DDProfExporter DDProfExporter;
 typedef struct DDProfPProf DDProfPProf;
 typedef struct PersistentWorkerState PersistentWorkerState;
-typedef struct StackHandler StackHandler;
 typedef struct StackHandler StackHandler;
 typedef struct UnwindState UnwindState;
 typedef struct UserTags UserTags;
@@ -30,4 +35,5 @@ struct DDProfWorkerContext {
       cycle_start_time;  // time at which current export cycle was started
   int64_t send_nanos;    // Last time an export was sent
   uint32_t count_worker; // exports since last cache clear
+  std::array<uint64_t, MAX_TYPE_WATCHER> lost_events_per_watcher;
 };

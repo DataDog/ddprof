@@ -107,6 +107,10 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
                               const RingBufferInfo &ring_buffer) {
   _sampling_interval = mem_profile_interval;
   _deterministic_sampling = deterministic_sampling;
+  if (ring_buffer.ring_buffer_type !=
+      static_cast<int>(RingBufferType::kMPSCRingBuffer)) {
+    return ddres_error(DD_WHAT_PERFRB);
+  }
   return ddprof::ring_buffer_attach(ring_buffer, &_pevent);
 }
 
@@ -146,7 +150,8 @@ void AllocationTracker::track_allocation(uintptr_t, size_t size,
     return;
   }
 
-  // \fixme reduce the scope of the mutex: change prng/make it thread local
+  // \fixme{nsavoire} reduce the scope of the mutex:
+  // change prng/make it thread local
   std::lock_guard lock{_state.mutex};
 
   // recheck if profiling is enabled
@@ -180,30 +185,71 @@ void AllocationTracker::track_allocation(uintptr_t, size_t size,
   uint64_t total_size = nsamples * sampling_interval;
 
   if (!IsDDResOK(push_sample(total_size, tl_state))) {
-    // error during ring buffer operation: stop allocation profiling
-    free();
+    ++_state.failure_count;
+    if (_state.failure_count >= k_max_consecutive_failures) {
+      // Too many errors during ring buffer operation: stop allocation profiling
+      free();
+    }
+  } else {
+    if (_state.failure_count.load(std::memory_order_relaxed) > 0) {
+      _state.failure_count = 0;
+    }
   }
+}
+
+DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
+                                          bool &notify_needed) {
+  auto lost_count = _state.lost_count.exchange(0, std::memory_order_acq_rel);
+  if (lost_count == 0) {
+    return {};
+  }
+  bool timeout = false;
+  auto buffer = writer.reserve(sizeof(LostEvent), &timeout);
+  if (buffer.empty()) {
+    // buffer is full, put back lost samples
+    _state.lost_count.fetch_add(lost_count, std::memory_order_acq_rel);
+    if (timeout) {
+      return ddres_error(DD_WHAT_PERFRB);
+    }
+    return {};
+  }
+
+  LostEvent *lost_event = reinterpret_cast<LostEvent *>(buffer.data());
+  lost_event->hdr.size = sizeof(LostEvent);
+  lost_event->hdr.misc = 0;
+  lost_event->hdr.type = PERF_RECORD_LOST;
+  lost_event->id = 0;
+  lost_event->lost = lost_count;
+  notify_needed = writer.commit(buffer);
+
+  return {};
 }
 
 DDRes AllocationTracker::push_sample(uint64_t allocated_size,
                                      TrackerThreadLocalState &tl_state) {
-  PerfRingBufferWriter writer{_pevent.rb};
-  auto needed_size = sizeof(AllocationEvent);
+  MPSCRingBufferWriter writer{_pevent.rb};
+  bool notify_consumer{false};
 
-  if (_state.lost_count) {
-    needed_size += sizeof(LostEvent);
+  bool timeout = false;
+  if (unlikely(_state.lost_count.load(std::memory_order_relaxed))) {
+    DDRES_CHECK_FWD(push_lost_sample(writer, notify_consumer));
   }
 
-  if (writer.available_size() < needed_size) {
-    // ring buffer is full, increase lost count
-    ++_state.lost_count;
+  auto buffer = writer.reserve(sizeof(AllocationEvent), &timeout);
 
+  if (buffer.empty()) {
+    // ring buffer is full, increase lost count
+    _state.lost_count.fetch_add(1, std::memory_order_acq_rel);
+
+    if (timeout) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
+                             "Unable to get write lock on ring buffer");
+    }
     // not an error
     return {};
   }
 
-  Buffer buf = writer.reserve(sizeof(AllocationEvent));
-  AllocationEvent *event = reinterpret_cast<AllocationEvent *>(buf.data());
+  AllocationEvent *event = reinterpret_cast<AllocationEvent *>(buffer.data());
   event->hdr.misc = 0;
   event->hdr.size = sizeof(AllocationEvent);
   event->hdr.type = PERF_RECORD_SAMPLE;
@@ -211,7 +257,6 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
   event->sample_id.time = 0;
 
   if (_state.pid == 0) {
-    // \fixme reset on fork
     _state.pid = getpid();
   }
   if (tl_state.tid == 0) {
@@ -230,18 +275,7 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
   event->dyn_size = save_context(tl_state.stack_end, event->regs,
                                  ddprof::Buffer{event->data, event->size});
 
-  if (_state.lost_count) {
-    Buffer buf_lost = writer.reserve(sizeof(LostEvent));
-    LostEvent *lost_event = reinterpret_cast<LostEvent *>(buf_lost.data());
-    lost_event->hdr.size = sizeof(LostEvent);
-    lost_event->hdr.misc = 0;
-    lost_event->hdr.type = PERF_RECORD_LOST;
-    lost_event->id = 0;
-    lost_event->lost = _state.lost_count;
-    _state.lost_count = 0;
-  }
-
-  if (writer.commit()) {
+  if (writer.commit(buffer) || notify_consumer) {
     uint64_t count = 1;
     if (write(_pevent.fd, &count, sizeof(count)) != sizeof(count)) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
@@ -278,6 +312,13 @@ void AllocationTracker::notify_thread_start() {
 
   ReentryGuard guard(&_tl_state.reentry_guard);
   tl_state.stack_end = retrieve_stack_end_address();
+}
+
+void AllocationTracker::notify_fork() {
+  if (_instance) {
+    _instance->_state.pid = 0;
+    _tl_state.tid = 0;
+  }
 }
 
 } // namespace ddprof

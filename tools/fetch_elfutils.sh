@@ -42,7 +42,7 @@ already_present=0
 if [ -e "${TAR_ELF}" ]; then
     already_present=1
 else
-    curl -LO "${URL_ELF}"
+    curl -fsSLO "${URL_ELF}"
 fi
 
 echo "Checking elfutils sha512"
@@ -72,7 +72,7 @@ fi
 
 # Detect musl
 MUSL_LIBC=$(ldd /bin/ls | grep 'musl' | head -1 | cut -d ' ' -f1 || true)
-if [ ! -z ${MUSL_LIBC-""} ]; then
+if [[ -n ${MUSL_LIBC-""} ]]; then
   cp /patch/libintl.h ../lib
   patch -p1 < "/patch/fix-aarch64_fregs.patch"
   patch -p1 < "/patch/fix-uninitialized.patch"
