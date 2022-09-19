@@ -187,6 +187,7 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
   if (PERF_SAMPLE_TIME & mask) {
     sample.time = *buf++;
   }
+
   if (PERF_SAMPLE_ADDR & mask) {
     sample.addr = *buf++;
   }

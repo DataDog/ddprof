@@ -32,6 +32,7 @@ typedef struct DDProfContext {
     int sockfd;
     bool wait_on_socket;
     bool show_samples;
+    bool live_allocations; // for now this overrides
     cpu_set_t cpu_affinity;
     const char *internal_stats;
     const char *tags;

@@ -4,7 +4,7 @@ set -euo pipefail
 
 export DD_PROFILING_EXPORT=no
 export DD_PROFILING_NATIVE_SHOW_SAMPLES=1
-export DD_PROFILING_NATIVE_USE_EMBEDDED_LIB=1
+export DD_PROFILING_NATIVE_USE_EMBEDDED_LIB=0
 export DD_PROFILING_NATIVE_LOG_LEVEL=debug
 export LD_LIBRARY_PATH=$PWD
 export DD_PROFILING_NATIVE_PRESET=default
@@ -42,6 +42,7 @@ check() {
     expected_tids="${3-$2}"
     # shellcheck disable=SC2086
     taskset "${test_cpu_mask}" ${cmd}
+
     if [[ "${expected_pids}" -eq 1 ]]; then
         # Ugly workaround for tail bug that makes it wait indefinitely for new lines when `grep -q` exists:
         # https://debbugs.gnu.org/cgi/bugreport.cgi?bug=13183
@@ -51,13 +52,33 @@ check() {
         kill "$COPROC_PID"
     fi
 
+    # echo "alloc pid count = $(count "${log_file}" "alloc-samples" "pid")"
+    # echo "cpu pid count = $(count "${log_file}" "cpu-samples" "pid")"
+    # echo "alloc tid count = $(count "${log_file}" "alloc-samples" "tid")"
+    # echo "cpu tid count = $(count "${log_file}" "cpu-samples" "tid")"
+
     if [[ "${expected_pids}" -ne 0 ]]; then
-        if [[ $(count "${log_file}" "alloc-samples" "pid") -ne "${expected_pids}" ||
-        $(count "${log_file}" "cpu-samples" "pid") -ne "${expected_pids}" ||
-        $(count "${log_file}" "alloc-samples" "tid") -ne "${expected_tids}" ||
-        $(count "${log_file}" "cpu-samples" "tid") -ne "${expected_tids}" ]]; then
-            echo "Incorrect number of sample found for: $cmd"
-            cat "${log_file}"
+        result_pids=$(count "${log_file}" "alloc-samples" "pid")
+        if [[ ${result_pids} -ne "${expected_pids}" ]]; then
+            echo "Not enough alloc samples per PID - Res=${result_pids} vs Exp=${expected_pids}"
+            echo "command=$cmd"
+            print_log_samples "${log_file}" "alloc-samples"
+            exit 1
+        fi
+        result_pids=$(count "${log_file}" "cpu-samples" "pid")
+        if [[ ${result_pids} -ne "${expected_pids}" ]]; then
+            echo "Not enough cpu samples per PID - Res=${result_pids} vs Exp=${expected_pids}"
+            echo "command=$cmd"
+            print_log_samples "${log_file}" "cpu-samples"
+            exit 1
+        fi
+
+        if [[ $(count "${log_file}" "alloc-samples" "tid") -ne "${expected_tids}" ||
+                $(count "${log_file}" "cpu-samples" "tid") -ne "${expected_tids}" ]]; then
+            echo "Incorrect number of sample found per TID: $expected_tids"
+            echo "command=$cmd"
+            print_log_samples "${log_file}" "cpu-samples"
+            print_log_samples "${log_file}" "alloc-samples"
             exit 1
         fi
     else
@@ -87,6 +108,9 @@ check "./ddprof ./test/simple_malloc ${opts}" 1
 
 # Test wrapper mode with forks + threads
 check "./ddprof ./test/simple_malloc ${opts} --fork 2 --threads 2" 2 4
+
+# Test wrapper mode with forks + threads
+# check "./ddprof --live_allocations yes ./test/simple_malloc ${opts} --fork 2 --threads 2 --skip-free 100" 2 4
 
 # Test slow profiler startup
 check "env DD_PROFILING_NATIVE_STARTUP_WAIT_MS=200 ./ddprof ./test/simple_malloc ${opts}" 1
