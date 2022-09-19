@@ -179,7 +179,7 @@ struct reallocarray {
     }
     auto newptr = ref(ptr, nmemb, size);
     ddprof::AllocationTracker::track_allocation(
-        reinterpret_cast<uintptr_t>(ptr), size * nmemb);
+        reinterpret_cast<uintptr_t>(newptr), size * nmemb);
     return newptr;
   }
 };

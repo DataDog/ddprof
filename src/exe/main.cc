@@ -232,9 +232,10 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
               get_library_path(dd_profiling_lib_path, fd, dd_loader_path))) {
         return -1;
       }
-      LG_DBG("ctx->params.dd_profiling_fd = %d", ctx->params.dd_profiling_fd);
+      LG_DBG("ctx->params.dd_profiling_fd = %d - sockfds %d, %d",
+             ctx->params.dd_profiling_fd, sockfds[kChildIdx],
+             sockfds[kParentIdx]);
       ctx->params.dd_profiling_fd = fd;
-
       ctx->params.sockfd = sockfds[kChildIdx];
       ctx->params.wait_on_socket = true;
     }
@@ -331,6 +332,10 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
             static_cast<int>(event_it->ring_buffer_type);
         reply.allocation_profiling_rate =
             ctx->watchers[alloc_watcher_idx].sample_period;
+        if (ctx->params.live_allocations) {
+          reply.allocation_flags |=
+              (1 << ddprof::ReplyMessage::kLiveAllocation);
+        }
       }
     }
 

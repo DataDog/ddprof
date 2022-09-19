@@ -149,8 +149,7 @@ add_unit_test(
   DEFINITIONS MYNAME="pevent-ut")
 
 add_unit_test(
-  ddprof_pprof-ut ../src/pprof/ddprof_pprof.cc ../src/unwind_output.cc ../src/perf_watcher.cc
-  ddprof_pprof-ut.cc
+  ddprof_pprof-ut ../src/pprof/ddprof_pprof.cc ../src/perf_watcher.cc ddprof_pprof-ut.cc
   LIBRARIES Datadog::Profiling
   DEFINITIONS MYNAME="ddprof_pprof-ut")
 
@@ -159,7 +158,6 @@ add_unit_test(
   ../src/exporter/ddprof_exporter.cc
   ../src/ddprof_cmdline.cc
   ../src/pprof/ddprof_pprof.cc
-  ../src/unwind_output.cc
   ../src/perf_watcher.cc
   ../src/tags.cc
   ddprof_exporter-ut.cc
@@ -231,7 +229,6 @@ add_unit_test(
   ../src/unwind_dwfl.cc
   ../src/unwind_helpers.cc
   ../src/unwind_metrics.cc
-  ../src/unwind_output.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
   DEFINITIONS MYNAME="savecontext-ut")
 
@@ -272,7 +269,6 @@ add_unit_test(
   ../src/unwind_dwfl.cc
   ../src/unwind_helpers.cc
   ../src/unwind_metrics.cc
-  ../src/unwind_output.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
   DEFINITIONS ${DDPROF_DEFINITION_LIST})
 
@@ -321,7 +317,6 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
   add_exe(simple_malloc simple_malloc.cc LIBRARIES Threads::Threads)
   target_include_directories(simple_malloc PRIVATE ${CMAKE_SOURCE_DIR}/include
                                                    ${CMAKE_SOURCE_DIR}/third_party)
-
   add_test(
     NAME simple_malloc
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/simple_malloc-ut.sh

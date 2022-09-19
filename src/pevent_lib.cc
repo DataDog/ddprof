@@ -139,7 +139,7 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
       size_t pevent_idx = 0;
       DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
       DDRES_CHECK_FWD(ddprof::ring_buffer_create(
-          DEFAULT_BUFF_SIZE_SHIFT, RingBufferType::kMPSCRingBuffer, true,
+          MPSC_BUFF_SIZE_SHIFT, RingBufferType::kMPSCRingBuffer, true,
           &pevent_hdr->pes[pevent_idx]));
     }
   }

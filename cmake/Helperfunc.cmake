@@ -1,5 +1,6 @@
-# Unless explicitly stated otherwise all files in this repository are licensed under the Apache License Version 2.0.
-# This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
+# Unless explicitly stated otherwise all files in this repository are licensed under the Apache
+# License Version 2.0. This product includes software developed at Datadog
+# (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
 
 #[[ Create an executable
 Syntax:
@@ -15,33 +16,32 @@ add_exe(myexe src1.cpp
    DEFINITIONS UNIT_TEST)
 #]]
 function(add_exe name)
-   set(cur_var "sources")
-   set(exe_sources "")
-   set(exe_libraries "")
-   set(exe_definitions "")
-   set(exe_include_dirs "")
+  set(cur_var "sources")
+  set(exe_sources "")
+  set(exe_libraries "")
+  set(exe_definitions "")
+  set(exe_include_dirs "")
 
-   foreach(arg IN LISTS ARGN)
-      if(arg STREQUAL "LIBRARIES")
-         set(cur_var "libraries")
-      elseif(arg STREQUAL "DEFINITIONS")
-         set(cur_var "definitions")
-      else()
-         list(APPEND exe_${cur_var} ${arg})
+  foreach(arg IN LISTS ARGN)
+    if(arg STREQUAL "LIBRARIES")
+      set(cur_var "libraries")
+    elseif(arg STREQUAL "DEFINITIONS")
+      set(cur_var "definitions")
+    else()
+      list(APPEND exe_${cur_var} ${arg})
 
-         if(cur_var STREQUAL "sources")
-            get_filename_component(src_dir ${arg} DIRECTORY)
-            list(APPEND exe_include_dirs ${src_dir})
-         endif()
+      if(cur_var STREQUAL "sources")
+        get_filename_component(src_dir ${arg} DIRECTORY)
+        list(APPEND exe_include_dirs ${src_dir})
       endif()
-   endforeach()
+    endif()
+  endforeach()
 
-   add_executable(${name} ${exe_sources})
-   set_target_properties(${name} PROPERTIES
-      COMPILE_DEFINITIONS "${exe_definitions}")
-   target_link_libraries(${name} PRIVATE ${exe_libraries})
-   list(REMOVE_DUPLICATES exe_include_dirs)
-   target_include_directories(${name} PRIVATE ${exe_include_dirs})
+  add_executable(${name} ${exe_sources})
+  set_target_properties(${name} PROPERTIES COMPILE_DEFINITIONS "${exe_definitions}")
+  target_link_libraries(${name} PRIVATE ${exe_libraries})
+  list(REMOVE_DUPLICATES exe_include_dirs)
+  target_include_directories(${name} PRIVATE ${exe_include_dirs})
 endfunction()
 
 # Set a target to statically link libstdc++
@@ -56,17 +56,24 @@ function(target_static_libc target)
 endfunction()
 
 function(detect_libc output_variable)
-   file(WRITE "${CMAKE_BINARY_DIR}/temp.c" "int main() {}")
-   try_compile(COMPILE_SUCCEEDED "${CMAKE_BINARY_DIR}/compile_tests" "${CMAKE_BINARY_DIR}/temp.c"
-      OUTPUT_VARIABLE output LINK_OPTIONS "-v")
+  file(WRITE "${CMAKE_BINARY_DIR}/temp.c" "int main() {}")
+  try_compile(
+    COMPILE_SUCCEEDED "${CMAKE_BINARY_DIR}/compile_tests"
+    "${CMAKE_BINARY_DIR}/temp.c"
+    OUTPUT_VARIABLE output
+    LINK_OPTIONS "-v")
 
-   if(NOT COMPILE_SUCCEEDED OR NOT "${output}" MATCHES "\"?-dynamic-linker\"? *\"?([^ \"]+)\"?")
-      message(FATAL_ERROR "Unable to determine libc")
-   endif()
+  if(NOT COMPILE_SUCCEEDED OR NOT "${output}" MATCHES "\"?-dynamic-linker\"? *\"?([^ \"]+)\"?")
+    message(FATAL_ERROR "Unable to determine libc")
+  endif()
 
-   if("${CMAKE_MATCH_1}" MATCHES "-musl-")
-      set(${output_variable} "musl" PARENT_SCOPE)
-   else()
-      set(${output_variable} "gnu" PARENT_SCOPE)
-   endif()
+  if("${CMAKE_MATCH_1}" MATCHES "-musl-")
+    set(${output_variable}
+        "musl"
+        PARENT_SCOPE)
+  else()
+    set(${output_variable}
+        "gnu"
+        PARENT_SCOPE)
+  endif()
 endfunction()

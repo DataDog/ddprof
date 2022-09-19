@@ -14,6 +14,8 @@
   (PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_TID |          \
    PERF_SAMPLE_TIME | PERF_SAMPLE_PERIOD)
 
+#define ADDR_STYPES (PERF_SAMPLE_ADDR)
+
 uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
 
 #define X_STR(a, b, c, d) b,

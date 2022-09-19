@@ -99,6 +99,7 @@ struct ProfilerAutoStart {
     // Note that library needs to be linked with `--no-as-needed` when using
     // autostart, otherwise linker will completely remove library from DT_NEEDED
     // and library will not be loaded.
+
     bool autostart = false;
     const char *autostart_env = getenv(k_profiler_auto_start_env_variable);
     if (autostart_env && arg_yesno(autostart_env, 1)) {
@@ -249,6 +250,13 @@ static int ddprof_start_profiling_internal() {
         flags |= ddprof::AllocationTracker::kDeterministicSampling;
         info.allocation_profiling_rate = -info.allocation_profiling_rate;
       }
+
+      if (info.allocation_flags &
+          (1 << ddprof::ReplyMessage::kLiveAllocation)) {
+        // tracking deallocations to allow a live view
+        flags |= ddprof::AllocationTracker::kTrackDeallocations;
+      }
+
       if (IsDDResOK(ddprof::AllocationTracker::allocation_tracking_init(
               info.allocation_profiling_rate, flags, info.ring_buffer))) {
         // \fixme{nsavoire} what should we do when allocation tracker init
