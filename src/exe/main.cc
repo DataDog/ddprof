@@ -79,7 +79,7 @@ static DDRes create_temp_lib(std::string_view prefix,
 
   // Unlink temp file, that way file will disappear from filesystem once last
   // file descriptor pointing to it is closed
-  unlink(path.data());
+  unlink(template_str.data());
   char buffer[1024];
 
   // Use symlink from /proc/<ddprof_pid>/fd/<fd> to refer to file.
