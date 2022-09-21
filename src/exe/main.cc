@@ -30,6 +30,10 @@
 #include <thread>
 #include <unistd.h>
 
+#include <pwd.h>
+#include <sys/prctl.h>
+#include <sys/stat.h>
+
 namespace fs = std::filesystem;
 
 enum class InputResult { kSuccess, kStop, kError };
@@ -70,6 +74,7 @@ static DDRes create_temp_lib(std::string_view prefix,
   // Create temporary file
   fd = mkostemp(template_str.data(), O_CLOEXEC);
   DDRES_CHECK_ERRNO(fd, DD_WHAT_TEMP_FILE, "Failed to create temporary file");
+  fchmod(fd, 0555);
 
   // Write embedded lib into temp file
   if (write(fd, data.data(), data.size()) !=
@@ -77,16 +82,17 @@ static DDRes create_temp_lib(std::string_view prefix,
     DDRES_CHECK_ERRNO(fd, DD_WHAT_TEMP_FILE, "Failed to write temporary file");
   }
 
+  path = template_str;
   // Unlink temp file, that way file will disappear from filesystem once last
   // file descriptor pointing to it is closed
-  unlink(template_str.data());
-  char buffer[1024];
+  // unlink(template_str.data());
+  // char buffer[1024];
 
   // Use symlink from /proc/<ddprof_pid>/fd/<fd> to refer to file.
   // ddprof pid is not known yet so use a place holder that will be replaced
   // later on
-  sprintf(buffer, "/proc/%s/fd/%d", k_pid_place_holder, fd);
-  path = buffer;
+  // sprintf(buffer, "/proc/%s/fd/%d", k_pid_place_holder, fd);
+  // path = buffer;
   return {};
 }
 
@@ -199,6 +205,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
   }
 
   const bool in_wrapper_mode = ctx->params.pid == 0;
+  std::string dd_profiling_lib_path, dd_loader_path;
 
   pid_t temp_pid = 0;
   if (in_wrapper_mode) {
@@ -208,8 +215,6 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     // (ie. only if allocation profiling is active)
     bool allocation_profiling_started_from_wrapper =
         ddprof_context_allocation_profiling_watcher_idx(ctx) != -1;
-
-    std::string dd_profiling_lib_path, dd_loader_path;
 
     enum { kParentIdx, kChildIdx };
     int sockfds[2] = {-1, -1};
@@ -271,11 +276,34 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
       }
 
       defer_parent_socket_close.release();
+      if (ctx->params.switch_user) {
+        struct passwd *pwd = getpwnam(ctx->params.switch_user);
+        if (!pwd) {
+          LG_ERR("Unable to find user %s", ctx->params.switch_user);
+          return -1;
+        }
+
+        if (setuid(pwd->pw_uid) != 0) {
+          LG_ERR("Failed to switch to user %s", ctx->params.switch_user);
+          return -1;
+        }
+      }
       return 0;
     }
     defer_child_socket_close.release();
     defer_parent_socket_close.reset();
   }
+
+  defer {
+    if (!dd_profiling_lib_path.empty()) {
+      unlink(dd_profiling_lib_path.data());
+    }
+  };
+  defer {
+    if (!dd_loader_path.empty()) {
+      unlink(dd_loader_path.data());
+    }
+  };
 
   // Now, we are the profiler process
   is_profiler = true;

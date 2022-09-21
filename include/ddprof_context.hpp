@@ -34,6 +34,7 @@ typedef struct DDProfContext {
     bool show_samples;
     bool live_allocations; // for now this overrides
     cpu_set_t cpu_affinity;
+    const char *switch_user;
     const char *internal_stats;
     const char *tags;
   } params;
