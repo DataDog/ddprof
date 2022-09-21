@@ -36,6 +36,7 @@ typedef struct DDProfContext {
     cpu_set_t cpu_affinity;
     const char *internal_stats;
     const char *tags;
+    bool no_perf_event_watchers;
   } params;
 
   bool initialized;

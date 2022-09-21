@@ -20,7 +20,6 @@
 #include <assert.h>
 #include <errno.h>
 #include <poll.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/signalfd.h>
@@ -232,6 +231,16 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
   while (!stop) {
     // Convenience structs
     PEvent *pes = ctx->worker_ctx.pevent_hdr.pes;
+
+    // If we don't have any perf_event_open watchers, then terminate profiling
+    // based on the status of the original PID
+    // HACK incident-16151
+    if ( ctx->params.no_perf_event_watchers && ctx->params.pid > -1 ) {
+      if (-1 == kill(ctx->params.pid, 0)) {
+        LG_NFO("Received termination signal");
+        break;
+      }
+    }
 
     int n = poll(pfds, pfd_len, PSAMPLE_DEFAULT_WAKEUP_MS);
 

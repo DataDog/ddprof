@@ -130,18 +130,41 @@ static DDRes pevent_open_all_cpus(const PerfWatcher *watcher, int watcher_idx,
 DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
                   PEventHdr *pevent_hdr) {
   assert(pevent_hdr->size == 0); // check for previous init
+  bool permissive_watchers = false;
+  int perfopen_failures = 0;
+  int noncustom_watchers = 0;
+
+  // Iterate through the watchers and attempt to instrument them all.
+  // Failure to instrument a single watcher is not a problem.
+  //   Unless that watcher is a custom event, in which case stop
+  // Failure to instrument all watchers is an error,
+  //   unless one of the watchers is a DUMMY type, in which case we permit
+  //   instrumentation to continue, except we use `kill(ctx->pid)` to determine
+  //   when to stop profiling.
   for (int watcher_idx = 0; watcher_idx < ctx->num_watchers; ++watcher_idx) {
     if (ctx->watchers[watcher_idx].type < kDDPROF_TYPE_CUSTOM) {
-      DDRES_CHECK_FWD(pevent_open_all_cpus(
-          &ctx->watchers[watcher_idx], watcher_idx, pid, num_cpu, pevent_hdr));
+      ++noncustom_watchers;
+      DDRes res = pevent_open_all_cpus(&ctx->watchers[watcher_idx], watcher_idx,
+                                       pid, num_cpu, pevent_hdr);
+      if ( IsDDResNotOK(res) ) {
+        ++perfopen_failures;
+        LG_ERR("Instrumentation failure: %s", ddres_error_message(res._what));
+      }
     } else {
       // custom event, eg.allocation profiling
+      permissive_watchers = true;
       size_t pevent_idx = 0;
       DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
       DDRES_CHECK_FWD(ddprof::ring_buffer_create(
           MPSC_BUFF_SIZE_SHIFT, RingBufferType::kMPSCRingBuffer, true,
           &pevent_hdr->pes[pevent_idx]));
     }
+  }
+
+  if (perfopen_failures == noncustom_watchers && !permissive_watchers) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP, "Could not install any watchers");
+  } else if (perfopen_failures == noncustom_watchers && permissive_watchers) {
+    ctx->params.no_perf_event_watchers = true;
   }
   return ddres_init();
 }
