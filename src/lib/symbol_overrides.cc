@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <dlfcn.h>
 #include <malloc.h>
+#include <sys/mman.h>
 
 #if defined(__GNUC__) && !defined(__clang__)
 #  define NOEXCEPT noexcept
@@ -30,6 +31,25 @@ __attribute__((weak)) void *pvalloc(size_t size) NOEXCEPT;
 namespace {
 
 bool g_symbols_overridden = false;
+// \fixme{nsavoire} We should probably merge this TL state with
+// AllocationTracker::tl_state to have a single TL state since accessing it is
+// costly (call to tls_get_addr)
+thread_local bool g_in_allocator_guard = false;
+
+class Guard {
+public:
+  explicit Guard(bool *guard) : _guard(guard), _ok(!*guard) { *_guard = true; }
+  ~Guard() {
+    if (_ok) {
+      *_guard = false;
+    }
+  }
+  explicit operator bool() const { return _ok; }
+
+private:
+  bool *_guard;
+  bool _ok;
+};
 
 struct malloc {
   static constexpr auto name = "malloc";
@@ -37,6 +57,8 @@ struct malloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t size) noexcept {
+    Guard guard(&g_in_allocator_guard);
+
     auto ptr = ref(size);
     ddprof::AllocationTracker::track_allocation(
         reinterpret_cast<uintptr_t>(ptr), size);
@@ -67,6 +89,7 @@ struct calloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t nmemb, size_t size) noexcept {
+    Guard guard(&g_in_allocator_guard);
     auto ptr = ref(nmemb, size);
     ddprof::AllocationTracker::track_allocation(
         reinterpret_cast<uintptr_t>(ptr), size * nmemb);
@@ -81,6 +104,7 @@ struct realloc {
   static inline bool ref_checked = false;
 
   static void *hook(void *ptr, size_t size) noexcept {
+    Guard guard(&g_in_allocator_guard);
     if (likely(ptr)) {
       ddprof::AllocationTracker::track_deallocation(
           reinterpret_cast<uintptr_t>(ptr));
@@ -102,6 +126,7 @@ struct posix_memalign {
   static inline bool ref_checked = false;
 
   static int hook(void **memptr, size_t alignment, size_t size) noexcept {
+    Guard guard(&g_in_allocator_guard);
     auto ret = ref(memptr, alignment, size);
     if (likely(!ret)) {
       ddprof::AllocationTracker::track_allocation(
@@ -117,6 +142,7 @@ struct aligned_alloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t alignment, size_t size) noexcept {
+    Guard guard(&g_in_allocator_guard);
     auto ptr = ref(alignment, size);
     ddprof::AllocationTracker::track_allocation(
         reinterpret_cast<uintptr_t>(ptr), size);
@@ -131,6 +157,7 @@ struct memalign {
   static inline bool ref_checked = false;
 
   static void *hook(size_t alignment, size_t size) noexcept {
+    Guard guard(&g_in_allocator_guard);
     auto ptr = ref(alignment, size);
     ddprof::AllocationTracker::track_allocation(
         reinterpret_cast<uintptr_t>(ptr), size);
@@ -145,6 +172,7 @@ struct pvalloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t size) noexcept {
+    Guard guard(&g_in_allocator_guard);
     auto ptr = ref(size);
     ddprof::AllocationTracker::track_allocation(
         reinterpret_cast<uintptr_t>(ptr), size);
@@ -159,6 +187,7 @@ struct valloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t size) noexcept {
+    Guard guard(&g_in_allocator_guard);
     auto ptr = ref(size);
     ddprof::AllocationTracker::track_allocation(
         reinterpret_cast<uintptr_t>(ptr), size);
@@ -173,6 +202,7 @@ struct reallocarray {
   static inline bool ref_checked = false;
 
   static void *hook(void *ptr, size_t nmemb, size_t size) noexcept {
+    Guard guard(&g_in_allocator_guard);
     if (ptr) {
       ddprof::AllocationTracker::track_deallocation(
           reinterpret_cast<uintptr_t>(ptr));
@@ -236,6 +266,56 @@ struct pthread_create {
   }
 };
 
+struct mmap {
+  static constexpr auto name = "mmap";
+  static inline auto ref = &::mmap;
+  static inline bool ref_checked = false;
+
+  static void *hook(void *addr, size_t length, int prot, int flags, int fd,
+                    off_t offset) noexcept {
+    void *ptr = ref(addr, length, prot, flags, fd, offset);
+
+    if (addr == nullptr && fd == -1 && ptr != nullptr &&
+        !g_in_allocator_guard) {
+      ddprof::AllocationTracker::track_allocation(
+          reinterpret_cast<uintptr_t>(ptr), length);
+    }
+    return ptr;
+  }
+};
+
+struct mmap64_ {
+  static constexpr auto name = "mmap64";
+  static inline auto ref = &::mmap64;
+  static inline bool ref_checked = false;
+
+  static void *hook(void *addr, size_t length, int prot, int flags, int fd,
+                    off_t offset) noexcept {
+    void *ptr = ref(addr, length, prot, flags, fd, offset);
+
+    if (addr == nullptr && fd == -1 && ptr != nullptr &&
+        !g_in_allocator_guard) {
+      ddprof::AllocationTracker::track_allocation(
+          reinterpret_cast<uintptr_t>(ptr), length);
+    }
+    return ptr;
+  }
+};
+
+struct munmap {
+  static constexpr auto name = "munmap";
+  static inline auto ref = &::munmap;
+  static inline bool ref_checked = false;
+
+  static int hook(void *addr, size_t length) noexcept {
+    if (!g_in_allocator_guard) {
+      ddprof::AllocationTracker::track_deallocation(
+          reinterpret_cast<uintptr_t>(addr));
+    }
+    return ref(addr, length);
+  }
+};
+
 template <typename T> void install_hook(bool restore) {
   // On ubuntu 16, some symbols might be bound to <symbol>@plt symbols
   // in exe and since we override the symbols in the exe, this would cause
@@ -265,6 +345,10 @@ void setup_hooks(bool restore) {
   install_hook<aligned_alloc>(restore);
   install_hook<memalign>(restore);
   install_hook<valloc>(restore);
+
+  install_hook<mmap>(restore);
+  install_hook<mmap64_>(restore);
+  install_hook<munmap>(restore);
 
   if (reallocarray::ref) {
     install_hook<reallocarray>(restore);
