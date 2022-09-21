@@ -283,7 +283,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
           return -1;
         }
 
-        if (setuid(pwd->pw_uid) != 0) {
+        if (setresuid(pwd->pw_uid, pwd->pw_uid, pwd->pw_uid) != 0) {
           LG_ERR("Failed to switch to user %s", ctx->params.switch_user);
           return -1;
         }
