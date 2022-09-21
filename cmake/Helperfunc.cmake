@@ -46,13 +46,13 @@ endfunction()
 
 # Set a target to statically link libstdc++
 function(target_static_libcxx target)
-   target_link_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-static-libstdc++>)
-   target_link_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-static-libgcc>)
+  target_link_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-static-libstdc++>)
+  target_link_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-static-libgcc>)
 endfunction()
 
 # Set a target to statically link libc
 function(target_static_libc target)
-   target_link_options(${target} PRIVATE "-static")
+  target_link_options(${target} PRIVATE "-static")
 endfunction()
 
 function(detect_libc output_variable)
