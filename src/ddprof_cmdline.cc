@@ -85,10 +85,12 @@ uint64_t kIgnoredWatcherID = -1ul;
 bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   EventConf *conf = EventConf_parse(str);
   const PerfWatcher *tmp_watcher;
+  LG_NFO("hi");
   if (!conf)
     return false;
 
   // If there's no eventname, then this configuration is invalid
+  LG_NFO("hi2");
   if (!conf->eventname || !*conf->eventname) {
     return false;
   }
@@ -112,6 +114,7 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   // we assume the user has privileged information and knows what they want.
   // Else, we use the group/event combination to extract that id from the
   // tracefs filesystem in the canonical way.
+  LG_NFO("hi3");
   uint64_t tracepoint_id = 0;
   if (conf->id > 0) {
     tracepoint_id = conf->id;
@@ -120,6 +123,7 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   }
 
   // 0 is an error, "-1" is ignored
+  LG_NFO("hi4");
   if (!tracepoint_id) {
     return false;
   } else if (tracepoint_id != kIgnoredWatcherID) {

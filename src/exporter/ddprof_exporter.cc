@@ -270,10 +270,20 @@ DDRes ddprof_exporter_export(const ddog_Profile *profile,
 
     LG_NTC("[EXPORTER] Export buffer of size %lu", profile_data.len);
 
+    // We did a bad thing
+    uint8_t json[] = "{\"timeRange\": { \"startNs\": 0, \"endNs\": 100000 }, \"threads\": {\"syscalls\": [{\"startNs\": 0,\"endNs\": 1000,\"label\": \"hi\"}, {\"startNs\": 50000,\"endNs\": 90000,\"label\": \"hi\"}]}}";
+    ddog_ByteSlice timeline_data = {
+        .ptr = (const uint8_t*)json, //encoded_profile->buffer.ptr,
+        .len = sizeof(json) - 1, //encoded_profile->buffer.len,
+    };
+
     // Backend has some logic based on the following naming
     ddog_File files_[] = {{
         .name = to_CharSlice("auto.pprof"),
         .file = profile_data,
+    }, {
+        .name = to_CharSlice("timeline.json"),
+        .file = timeline_data
     }};
     ddog_Slice_file files = {.ptr = files_, .len = std::size(files_)};
 
