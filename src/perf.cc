@@ -8,7 +8,6 @@
 #include "defer.hpp"
 #include "logger.hpp"
 #include "perf.hpp"
-#include "user_override.hpp"
 
 #include <cassert>
 #include <ctype.h>

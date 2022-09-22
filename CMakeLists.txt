@@ -386,6 +386,9 @@ install(
 
 # ---- Unit tests ----
 
+aux_source_directory(${CMAKE_SOURCE_DIR}/src/async-profiler ASYNC_PROFILER_SRC)
+set(ASYNC_PROFILER_INCLUDE ${CMAKE_SOURCE_DIR}/include/async-profiler)
+
 # Unit tests Add infrastructure for enabling tests
 option(BUILD_DDPROF_TESTING "Enable tests" ON)
 if(${BUILD_DDPROF_TESTING})
