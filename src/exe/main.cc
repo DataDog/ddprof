@@ -15,6 +15,7 @@
 #include "ipc.hpp"
 #include "logger.hpp"
 #include "timer.hpp"
+#include "user_override.hpp"
 
 #include <array>
 #include <cassert>
@@ -195,7 +196,7 @@ static InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
 }
 
 static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
-  defer { ddprof_context_free(ctx); };
+  auto defer_context_free = make_defer([ctx] { ddprof_context_free(ctx); });
 
   is_profiler = false;
 
@@ -256,6 +257,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     if (!temp_pid) {
       // non-daemon process: return control to caller
       defer_child_socket_close.reset();
+      defer_context_free.release();
 
       // Allocation profiling activated, inject dd_profiling library with
       // LD_PRELOAD
@@ -276,18 +278,6 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
       }
 
       defer_parent_socket_close.release();
-      if (ctx->params.switch_user) {
-        struct passwd *pwd = getpwnam(ctx->params.switch_user);
-        if (!pwd) {
-          LG_ERR("Unable to find user %s", ctx->params.switch_user);
-          return -1;
-        }
-
-        if (setresuid(pwd->pw_uid, pwd->pw_uid, pwd->pw_uid) != 0) {
-          LG_ERR("Failed to switch to user %s", ctx->params.switch_user);
-          return -1;
-        }
-      }
       return 0;
     }
     defer_child_socket_close.release();
@@ -438,13 +428,23 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  /****************************************************************************\
-  |                             Run the Profiler                               |
-  \****************************************************************************/
-  // Ownership of context is passed to start_profiler
-  // This function does not return in the context of profiler process
-  // It only returns in the context of target process (ie. in non-PID mode)
-  start_profiler(&ctx);
+  {
+    defer { ddprof_context_free(&ctx); };
+    /****************************************************************************\
+    |                             Run the Profiler |
+    \****************************************************************************/
+    // Ownership of context is passed to start_profiler
+    // This function does not return in the context of profiler process
+    // It only returns in the context of target process (ie. in non-PID mode)
+    start_profiler(&ctx);
+
+    if (ctx.params.switch_user) {
+      if (!IsDDResOK(become_user(ctx.params.switch_user))) {
+        LG_ERR("Failed to switch to user %s", ctx.params.switch_user);
+        return -1;
+      }
+    }
+  }
 
   // Execute manages its own return path
   if (-1 == execvp(*argv, (char *const *)argv)) {

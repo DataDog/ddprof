@@ -16,3 +16,5 @@ typedef struct UIDInfo {
 DDRes user_override(UIDInfo *user_override);
 
 DDRes revert_override(UIDInfo *user_override);
+
+DDRes become_user(const char *user);
