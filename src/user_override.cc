@@ -23,22 +23,30 @@
 static char const *const s_user_nobody = "nobody";
 static const uid_t s_root_user = 0;
 
+namespace {
+struct DumpableRestorer {
+public:
+  DumpableRestorer() { _dumpable = prctl(PR_GET_DUMPABLE); }
+  ~DumpableRestorer() { prctl(PR_SET_DUMPABLE, _dumpable); }
+
+private:
+  int _dumpable;
+};
+} // namespace
+
 void init_uidinfo(UIDInfo *user_override) {
   user_override->override = false;
   user_override->previous_user = getuid();
 }
 
 static DDRes setresuid_wrapper(uid_t ruid, uid_t euid, uid_t suid) {
-  int dumpable = prctl(PR_GET_DUMPABLE);
-  DDRES_CHECK_INT(setresuid(ruid, euid, suid), DD_WHAT_USERID,
-                  "Unable to set user %s (%s)", s_user_nobody, strerror(errno));
   // Changing the effective user id causes the dumpable attribute of the process
   // to be reset to the value of /proc/sys/fs/suid_dumpable (usually 0, cf.
   // https://man7.org/linux/man-pages/man2/prctl.2.html), which in turn makes
   // /proc/self/fd/* files unreadable by parent processes.
   // Note that this is quite strange since with dumpable
   // attribute set to 0, ownership of /proc<pid>/ is set to root, this should
-  // to be an issue since we change euid only when root, but strangely doing
+  // not to be an issue since we change euid only when root, but strangely doing
   // this, parent process loses the permission to read /proc/<ddprof_pid>/fd/*
   // (but not /proc/<ddprof_pid>/maps).
   // When injecting libdd_profiling.so into target process, we use
@@ -46,7 +54,9 @@ static DDRes setresuid_wrapper(uid_t ruid, uid_t euid, uid_t suid) {
   // (ie. parent process) needs to be able to read ddprof /proc/<pid>/fd/*,
   // that's why we set dumpable attribute back to its intial value at each
   // effective user id change.
-  prctl(PR_SET_DUMPABLE, dumpable);
+  DumpableRestorer dumpable_restorer;
+  DDRES_CHECK_INT(setresuid(ruid, euid, suid), DD_WHAT_USERID,
+                  "Unable to set user %s (%s)", s_user_nobody, strerror(errno));
   return {};
 }
 
@@ -94,6 +104,8 @@ DDRes become_user(const char *username) {
 
   uid_t uid = pw->pw_uid;
   gid_t gid = pw->pw_gid;
+
+  DumpableRestorer dumpable_restorer;
 
   if (initgroups(pw->pw_name, gid) != 0) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_USERID, "Cannot init group list for %s",
