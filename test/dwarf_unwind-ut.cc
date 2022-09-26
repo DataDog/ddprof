@@ -64,13 +64,19 @@ size_t funcB(std::array <uint64_t, PERF_REGS_COUNT> &regs) {
   sc.sp = regs[REGNAME(SP)];
   sc.fp = regs[REGNAME(FP)];
 #endif
-
-  ap::StackBuffer buffer(stack, sc.sp, sc.sp + PERF_SAMPLE_STACK_SIZE);
+  // size should be < PERF_SAMPLE_STACK_SIZE
+  ap::StackBuffer buffer(stack, sc.sp, sc.sp + size);
 
   void *stack[128];
   int n = stackWalk(&cache_arary, sc, buffer, const_cast<const void**>(stack), 128, 0);
   for (int i = 0; i < n; ++i) {
-    printf("IP = %p \n", stack[i]);
+    { // retrieve symbol
+      CodeCache *code_cache = findLibraryByAddress(&cache_arary, reinterpret_cast<void*>(stack[i]));
+      if (code_cache) {
+        const char *sym_name = code_cache->binarySearch(stack[i]);
+        printf("IP = %p - %s\n", stack[i], sym_name);
+      }
+    }
   }
   
   return size;
@@ -93,7 +99,7 @@ void unwind_libdwfl(){
 TEST(dwarf_unwind, simple) {
   std::array <uint64_t, PERF_REGS_COUNT> regs;
   size_t  size_stack = funcA(regs);
-
+  EXPECT_TRUE(size_stack);
 
 
   // DO REGNAME(RBP) --> Gives the index inside the table
