@@ -340,6 +340,10 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
 
   ctx->params.show_samples = input->show_samples != nullptr;
 
+  if (input->switch_user) {
+    ctx->params.switch_user = strdup(input->switch_user);
+  }
+
   ctx->initialized = true;
   return ddres_init();
 }
@@ -349,6 +353,7 @@ void ddprof_context_free(DDProfContext *ctx) {
     exporter_input_free(&ctx->exp_input);
     free((char *)ctx->params.internal_stats);
     free((char *)ctx->params.tags);
+    free((char *)ctx->params.switch_user);
     if (ctx->params.sockfd != -1) {
       close(ctx->params.sockfd);
     }
