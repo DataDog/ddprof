@@ -13,9 +13,11 @@
 #include "unistd.h"
 
 #include <errno.h>
+#include <grp.h>
 #include <pwd.h>
 #include <string.h>
 #include <sys/prctl.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 static char const *const s_user_nobody = "nobody";
@@ -49,6 +51,9 @@ static DDRes setresuid_wrapper(uid_t ruid, uid_t euid, uid_t suid) {
 }
 
 DDRes user_override(UIDInfo *user_override) {
+  // Inspired from
+  // https://github.com/netdata/netdata/blob/71cb1ad68707718671ef57c901dfa2041f15bbe6/daemon/daemon.c#L77
+
   init_uidinfo(user_override);
 
   if (getuid() != s_root_user) {
@@ -78,4 +83,51 @@ DDRes revert_override(UIDInfo *user_override) {
   init_uidinfo(user_override);
 
   return ddres_init();
+}
+
+DDRes become_user(const char *username) {
+  struct passwd *pw = getpwnam(username);
+
+  if (!pw) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_USERID, "Unable to find user %s", username);
+  }
+
+  uid_t uid = pw->pw_uid;
+  gid_t gid = pw->pw_gid;
+
+  if (initgroups(pw->pw_name, gid) != 0) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_USERID, "Cannot init group list for %s",
+                           username);
+  }
+  if (setresgid(gid, gid, gid) != 0) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_USERID,
+                           "Cannot switch to user's %s group (gid: %u)",
+                           username, gid);
+  }
+  if (setresuid(uid, uid, uid) != 0) {
+    DDRES_RETURN_ERROR_LOG(
+        DD_WHAT_USERID, "Cannot switch to user %s (uid: %u).", username, uid);
+  }
+  if (setgid(gid) != 0) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_USERID,
+                           "Cannot switch to user's %s group (gid: %u)",
+                           username, gid);
+  }
+  if (setegid(gid) != 0) {
+    DDRES_RETURN_ERROR_LOG(
+        DD_WHAT_USERID,
+        "Cannot effectively switch to user's %s group (gid: %u)", username,
+        gid);
+  }
+  if (setuid(uid) != 0) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_USERID, "Cannot switch to user %s (uid: %u)",
+                           username, uid);
+  }
+  if (seteuid(uid) != 0) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_USERID,
+                           "Cannot effectively switch to user %s (uid: %u)",
+                           username, uid);
+  }
+
+  return {};
 }

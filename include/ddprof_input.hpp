@@ -37,6 +37,7 @@ typedef struct DDProfInput {
   char *url;
   char *socket;
   char *preset;
+  char *switch_user;
   char *live_allocations;
   // Watcher presets
   PerfWatcher watchers[MAX_TYPE_WATCHER];
@@ -102,6 +103,7 @@ typedef struct DDProfInput {
   XX(DD_PROFILING_NATIVE_PRESET,        preset,             D, 'D', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_NATIVE_SHOW_SAMPLES,  show_samples,       y, 'y', 0, input, NULL, "", )                      \
   XX(DD_PROFILING_NATIVE_CPU_AFFINITY,  affinity,           a, 'a', 1, input, NULL, "", )                      \
+  XX(DD_PROFILING_NATIVE_SWITCH_USER,   switch_user,        W, 'W', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_NATIVE_LIVE_ALLOC,    live_allocations,   k, 'k', 1, input, NULL, "no", )
 // clang-format on
 

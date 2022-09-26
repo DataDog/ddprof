@@ -15,6 +15,7 @@
 #include "ipc.hpp"
 #include "logger.hpp"
 #include "timer.hpp"
+#include "user_override.hpp"
 
 #include <array>
 #include <cassert>
@@ -29,6 +30,10 @@
 #include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
+
+#include <pwd.h>
+#include <sys/prctl.h>
+#include <sys/stat.h>
 
 namespace fs = std::filesystem;
 
@@ -70,6 +75,7 @@ static DDRes create_temp_lib(std::string_view prefix,
   // Create temporary file
   fd = mkostemp(template_str.data(), O_CLOEXEC);
   DDRES_CHECK_ERRNO(fd, DD_WHAT_TEMP_FILE, "Failed to create temporary file");
+  fchmod(fd, 0555);
 
   // Write embedded lib into temp file
   if (write(fd, data.data(), data.size()) !=
@@ -77,16 +83,17 @@ static DDRes create_temp_lib(std::string_view prefix,
     DDRES_CHECK_ERRNO(fd, DD_WHAT_TEMP_FILE, "Failed to write temporary file");
   }
 
+  path = template_str;
   // Unlink temp file, that way file will disappear from filesystem once last
   // file descriptor pointing to it is closed
-  unlink(template_str.data());
-  char buffer[1024];
+  // unlink(template_str.data());
+  // char buffer[1024];
 
   // Use symlink from /proc/<ddprof_pid>/fd/<fd> to refer to file.
   // ddprof pid is not known yet so use a place holder that will be replaced
   // later on
-  sprintf(buffer, "/proc/%s/fd/%d", k_pid_place_holder, fd);
-  path = buffer;
+  // sprintf(buffer, "/proc/%s/fd/%d", k_pid_place_holder, fd);
+  // path = buffer;
   return {};
 }
 
@@ -189,7 +196,7 @@ static InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
 }
 
 static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
-  defer { ddprof_context_free(ctx); };
+  auto defer_context_free = make_defer([ctx] { ddprof_context_free(ctx); });
 
   is_profiler = false;
 
@@ -199,6 +206,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
   }
 
   const bool in_wrapper_mode = ctx->params.pid == 0;
+  std::string dd_profiling_lib_path, dd_loader_path;
 
   pid_t temp_pid = 0;
   if (in_wrapper_mode) {
@@ -208,8 +216,6 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     // (ie. only if allocation profiling is active)
     bool allocation_profiling_started_from_wrapper =
         ddprof_context_allocation_profiling_watcher_idx(ctx) != -1;
-
-    std::string dd_profiling_lib_path, dd_loader_path;
 
     enum { kParentIdx, kChildIdx };
     int sockfds[2] = {-1, -1};
@@ -251,6 +257,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     if (!temp_pid) {
       // non-daemon process: return control to caller
       defer_child_socket_close.reset();
+      defer_context_free.release();
 
       // Allocation profiling activated, inject dd_profiling library with
       // LD_PRELOAD
@@ -276,6 +283,17 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     defer_child_socket_close.release();
     defer_parent_socket_close.reset();
   }
+
+  defer {
+    if (!dd_profiling_lib_path.empty()) {
+      unlink(dd_profiling_lib_path.data());
+    }
+  };
+  defer {
+    if (!dd_loader_path.empty()) {
+      unlink(dd_loader_path.data());
+    }
+  };
 
   // Now, we are the profiler process
   is_profiler = true;
@@ -410,13 +428,23 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  /****************************************************************************\
-  |                             Run the Profiler                               |
-  \****************************************************************************/
-  // Ownership of context is passed to start_profiler
-  // This function does not return in the context of profiler process
-  // It only returns in the context of target process (ie. in non-PID mode)
-  start_profiler(&ctx);
+  {
+    defer { ddprof_context_free(&ctx); };
+    /****************************************************************************\
+    |                             Run the Profiler |
+    \****************************************************************************/
+    // Ownership of context is passed to start_profiler
+    // This function does not return in the context of profiler process
+    // It only returns in the context of target process (ie. in non-PID mode)
+    start_profiler(&ctx);
+
+    if (ctx.params.switch_user) {
+      if (!IsDDResOK(become_user(ctx.params.switch_user))) {
+        LG_ERR("Failed to switch to user %s", ctx.params.switch_user);
+        return -1;
+      }
+    }
+  }
 
   // Execute manages its own return path
   if (-1 == execvp(*argv, (char *const *)argv)) {
