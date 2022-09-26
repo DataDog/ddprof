@@ -11,6 +11,7 @@
 #include "ddprof_cmdline.hpp"
 #include "defer.hpp"
 #include "ipc.hpp"
+#include "lib_embedded_data.hpp"
 #include "logger_setup.hpp"
 #include "signal_helper.hpp"
 #include "symbol_overrides.hpp"
@@ -32,6 +33,8 @@
 #include <unistd.h>
 
 namespace {
+int ddprof_start_profiling_internal();
+
 struct ProfilerState {
   bool started = false;
   bool allocation_profiling_started = false;
@@ -116,7 +119,9 @@ struct ProfilerAutoStart {
 
     // autostart if library is injected by ddprof
     if (autostart || get_ddprof_socket() != -1) {
-      ddprof_start_profiling();
+      try {
+        ddprof_start_profiling_internal();
+      } catch (...) {}
     }
   }
 
@@ -126,16 +131,8 @@ struct ProfilerAutoStart {
 };
 
 ProfilerAutoStart g_autostart;
-} // namespace
 
-#ifdef NO_EMBEDDED_DDPROF_EXE
-static int exec_ddprof(pid_t, pid_t, int) { return -1; }
-#else
-// address of embedded ddprof executable
-extern const char _binary_ddprof_start[]; // NOLINT cert-dcl51-cpp
-extern const char _binary_ddprof_end[];   // NOLINT cert-dcl51-cpp
-
-static int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
+int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
   char ddprof_str[] = "ddprof";
 
   char pid_buf[32];
@@ -160,16 +157,18 @@ static int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
       ddprof_exe) {
     execve(ddprof_exe, argv, environ);
   } else {
+    auto exe_data = ddprof::profiler_exe_data();
+    if (exe_data.empty()) {
+      return -1;
+    }
     int fd = ddprof::memfd_create(ddprof_str, 1U /*MFD_CLOEXEC*/);
-
     if (fd == -1) {
       return -1;
     }
     defer { close(fd); };
 
-    if (write(fd, _binary_ddprof_start,
-              // cppcheck-suppress comparePointers
-              _binary_ddprof_end - _binary_ddprof_start) == -1) {
+    if (write(fd, exe_data.data(), exe_data.size()) !=
+        static_cast<ssize_t>(exe_data.size())) {
       return -1;
     }
     fexecve(fd, argv, environ);
@@ -177,9 +176,8 @@ static int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
 
   return -1;
 }
-#endif
 
-static int ddprof_start_profiling_internal() {
+int ddprof_start_profiling_internal() {
   // Refuse to start profiler if already started by this process or if active in
   // one of its ancestors
   if (g_state.started || is_profiler_library_active()) {
@@ -270,6 +268,8 @@ static int ddprof_start_profiling_internal() {
   set_profiler_library_active();
   return 0;
 }
+
+} // namespace
 
 int ddprof_start_profiling() {
   try {

@@ -316,7 +316,7 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
 
   add_exe(
     simple_malloc-shared simple_malloc.cc
-    LIBRARIES dd_profiling-shared
+    LIBRARIES dd_profiling-shared Threads::Threads
     DEFINITIONS USE_DD_PROFILING)
   target_include_directories(simple_malloc-shared PRIVATE ${CMAKE_SOURCE_DIR}/include
                                                           ${CMAKE_SOURCE_DIR}/third_party)
