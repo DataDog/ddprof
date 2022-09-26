@@ -15,6 +15,7 @@
 #include "ipc.hpp"
 #include "logger.hpp"
 #include "timer.hpp"
+#include "user_override.hpp"
 
 #include <array>
 #include <cassert>
@@ -30,6 +31,10 @@
 #include <thread>
 #include <unistd.h>
 
+#include <pwd.h>
+#include <sys/prctl.h>
+#include <sys/stat.h>
+
 namespace fs = std::filesystem;
 
 enum class InputResult { kSuccess, kStop, kError };
@@ -39,8 +44,6 @@ extern const char
     _binary_libdd_profiling_embedded_so_start[]; // NOLINT cert-dcl51-cpp
 extern const char
     _binary_libdd_profiling_embedded_so_end[]; // NOLINT cert-dcl51-cpp
-
-static constexpr const char k_pid_place_holder[] = "{pid}";
 
 static void maybe_slowdown_startup() {
   // Simulate startup slowdown if requested
@@ -54,8 +57,33 @@ static void maybe_slowdown_startup() {
   }
 }
 
-static DDRes get_library_path(std::string &path, int &fd) {
+static DDRes create_temp_lib(std::string_view prefix,
+                             ddprof::span<const std::byte> data,
+                             std::string &path, int &fd) {
   fd = -1;
+
+  // Did not find libdd_profiling.so, use the one embedded in ddprof exe
+  auto template_str =
+      std::string{fs::temp_directory_path() / prefix} + ".XXXXXX";
+
+  // Create temporary file
+  fd = mkostemp(template_str.data(), O_CLOEXEC);
+  DDRES_CHECK_ERRNO(fd, DD_WHAT_TEMP_FILE, "Failed to create temporary file");
+  fchmod(fd, 0755);
+
+  // Write embedded lib into temp file
+  if (write(fd, data.data(), data.size()) !=
+      static_cast<ssize_t>(data.size())) {
+    DDRES_CHECK_ERRNO(fd, DD_WHAT_TEMP_FILE, "Failed to write temporary file");
+  }
+
+  path = template_str;
+  return {};
+}
+
+static DDRes get_library_path(std::string &libdd_profiling_path,
+                              int &libdd_profiling_fd) {
+  libdd_profiling_fd = -1;
 
   if (!getenv(k_profiler_use_embedded_libdd_profiling_env_variable)) {
     auto exe_path = fs::read_symlink("/proc/self/exe");
@@ -63,50 +91,24 @@ static DDRes get_library_path(std::string &path, int &fd) {
     // first, check if libdd_profiling.so exists in same directory as exe or in
     // <exe_path>/../lib/
     if (fs::exists(lib_path)) {
-      path = lib_path;
+      libdd_profiling_path = lib_path;
       return {};
     }
     lib_path =
         exe_path.parent_path().parent_path() / "lib" / k_libdd_profiling_name;
     if (fs::exists(lib_path)) {
-      path = lib_path;
+      libdd_profiling_path = lib_path;
       return {};
     }
   }
 
-  // Did not find libdd_profiling.so, use the one embedded in ddprof exe
-  path = std::string{fs::temp_directory_path() / k_libdd_profiling_name} +
-      ".XXXXXX";
+  DDRES_CHECK_FWD(create_temp_lib(
+      k_libdd_profiling_name,
+      ddprof::as_bytes(ddprof::span{_binary_libdd_profiling_embedded_so_start,
+                                    _binary_libdd_profiling_embedded_so_end}),
+      libdd_profiling_path, libdd_profiling_fd));
 
-  // Create temporary file
-  fd = mkostemp(path.data(), O_CLOEXEC);
-  DDRES_CHECK_ERRNO(fd, DD_WHAT_TEMP_FILE, "Failed to create temporary file");
-
-  // Write embedded lib into temp file
-  ssize_t lib_sz = _binary_libdd_profiling_embedded_so_end -
-      _binary_libdd_profiling_embedded_so_start;
-  if (write(fd, _binary_libdd_profiling_embedded_so_start, lib_sz) != lib_sz) {
-    DDRES_CHECK_ERRNO(fd, DD_WHAT_TEMP_FILE, "Failed to write temporary file");
-  }
-
-  // Unlink temp file, that way file will disappear from filesystem once last
-  // file descriptor pointing to it is closed
-  unlink(path.data());
-  char buffer[1024];
-
-  // Use symlink from /proc/<ddprof_pid>/fd/<fd> to refer to file.
-  // ddprof pid is not known yet so use a place holder that will be replaced
-  // later on
-  sprintf(buffer, "/proc/%s/fd/%d", k_pid_place_holder, fd);
-  path = buffer;
   return {};
-}
-
-// Replace pid place holder in path if present by pid argument
-static void fixup_library_path(std::string &path, pid_t pid) {
-  if (size_t pos = path.find(k_pid_place_holder); pos != std::string::npos) {
-    path.replace(pos, std::size(k_pid_place_holder) - 1, std::to_string(pid));
-  }
 }
 
 // Parse input and initialize context
@@ -163,7 +165,7 @@ static InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
 }
 
 static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
-  defer { ddprof_context_free(ctx); };
+  auto defer_context_free = make_defer([ctx] { ddprof_context_free(ctx); });
 
   is_profiler = false;
 
@@ -173,6 +175,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
   }
 
   const bool in_wrapper_mode = ctx->params.pid == 0;
+  std::string dd_profiling_lib_path;
 
   pid_t temp_pid = 0;
   if (in_wrapper_mode) {
@@ -182,8 +185,6 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     // (ie. only if allocation profiling is active)
     bool allocation_profiling_started_from_wrapper =
         ddprof_context_allocation_profiling_watcher_idx(ctx) != -1;
-
-    std::string dd_profiling_lib_path;
 
     enum { kParentIdx, kChildIdx };
     int sockfds[2] = {-1, -1};
@@ -224,12 +225,11 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     if (!temp_pid) {
       // non-daemon process: return control to caller
       defer_child_socket_close.reset();
+      defer_context_free.release();
 
       // Allocation profiling activated, inject dd_profiling library with
       // LD_PRELOAD
       if (allocation_profiling_started_from_wrapper) {
-        // Determine final lib profiling path now that ddprof pid is known
-        fixup_library_path(dd_profiling_lib_path, daemonize_res.daemon_pid);
         std::string preload_str = dd_profiling_lib_path;
         if (const char *s = getenv("LD_PRELOAD"); s) {
           preload_str.append(":");
@@ -247,6 +247,12 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     defer_child_socket_close.release();
     defer_parent_socket_close.reset();
   }
+
+  defer {
+    if (!dd_profiling_lib_path.empty()) {
+      unlink(dd_profiling_lib_path.data());
+    }
+  };
 
   // Now, we are the profiler process
   is_profiler = true;
@@ -377,13 +383,23 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  /****************************************************************************\
-  |                             Run the Profiler                               |
-  \****************************************************************************/
-  // Ownership of context is passed to start_profiler
-  // This function does not return in the context of profiler process
-  // It only returns in the context of target process (ie. in non-PID mode)
-  start_profiler(&ctx);
+  {
+    defer { ddprof_context_free(&ctx); };
+    /****************************************************************************\
+    |                             Run the Profiler |
+    \****************************************************************************/
+    // Ownership of context is passed to start_profiler
+    // This function does not return in the context of profiler process
+    // It only returns in the context of target process (ie. in non-PID mode)
+    start_profiler(&ctx);
+
+    if (ctx.params.switch_user) {
+      if (!IsDDResOK(become_user(ctx.params.switch_user))) {
+        LG_ERR("Failed to switch to user %s", ctx.params.switch_user);
+        return -1;
+      }
+    }
+  }
 
   // Execute manages its own return path
   if (-1 == execvp(*argv, (char *const *)argv)) {
