@@ -393,7 +393,7 @@ int main(int argc, char *argv[]) {
       break;
     case ENOEXEC:
     case EACCES:
-      LG_ERR("%s: permission denied", argv[0]);
+      LG_ERR("%s: pe  rmission denied", argv[0]);
       break;
     default:
       LG_WRN("%s: failed to execute (%s)", argv[0], strerror(errno));

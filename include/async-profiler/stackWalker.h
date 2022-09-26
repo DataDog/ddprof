@@ -23,22 +23,11 @@
 #include <stdint.h>
 
 #include "codeCache.h"
+#include "stack_context.h"
 
-struct StackContext {
-    const void* pc;
-    uintptr_t sp;
-    uintptr_t fp;
+CodeCache *findLibraryByAddress(CodeCacheArray *cache, const void* address);
 
-    void set(const void* pc, uintptr_t sp, uintptr_t fp) {
-        this->pc = pc;
-        this->sp = sp;
-        this->fp = fp;
-    }
-};
-
-class StackWalker {
-  public:
-    static int walkDwarf(CodeCacheArray *cache, void* ucontext, const void** callchain, int max_depth, int skip);
-};
+int stackWalk(CodeCacheArray *cache, ap::StackContext &sc, const ap::StackBuffer &buffer, 
+                const void** callchain, int max_depth, int skip);
 
 #endif // _STACKWALKER_H

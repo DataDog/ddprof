@@ -46,11 +46,12 @@ static __attribute__((constructor)) void init(void) {
             asmcgocall_base = (uintptr_t) c->getTextBase();
         }
     }
-}
+}   
 
-void populateStackContext(StackContext &sc, void *ucontext);
-int stackWalk(CodeCacheArray *cache, StackContext &sc, const void** callchain, int max_depth, int skip);
-bool stepStackContext(StackContext &sc, CodeCacheArray *cache);
+void populateStackContext(ap::StackContext &sc, void *ucontext);
+
+int stackWalk(CodeCacheArray *cache, ap::StackContext &sc, const void** callchain, int max_depth, int skip);
+bool stepStackContext(ap::StackContext &sc, CodeCacheArray *cache);
 
 extern "C"  {
 
@@ -129,6 +130,10 @@ struct cgo_context_arg {
     uintptr_t p;
 };
 
+#ifndef C_G_THING
+void async_cgo_context(void *p) {
+}
+#else 
 void async_cgo_context(void *p) {
     if (enabled == 0) {
         return;
@@ -144,7 +149,7 @@ void async_cgo_context(void *p) {
     if (ctx == NULL) {
         return;
     }
-    StackContext sc;
+    ap::StackContext sc;
     populateStackContext(sc, nullptr);
     CodeCacheArray *cache = (CodeCacheArraySingleton::getInstance());
     // There are two frames in the call stack we should skip.  The first is this
@@ -160,6 +165,8 @@ void async_cgo_context(void *p) {
     arg->p = (uintptr_t) ctx;
     return;
 }
+#endif
+
 
 struct cgo_traceback_arg {
 	uintptr_t  context;
@@ -168,6 +175,10 @@ struct cgo_traceback_arg {
 	uintptr_t  max;
 };
 
+#ifndef C_GO_THINGS
+void async_cgo_traceback(void *p) {
+}
+#else
 void async_cgo_traceback(void *p) {
     if (enabled == 0) {
         return;
@@ -175,7 +186,7 @@ void async_cgo_traceback(void *p) {
 
     struct cgo_traceback_arg *arg = (struct cgo_traceback_arg *)p;
     struct cgo_context *ctx = NULL;
-    StackContext sc;
+    ap::StackContext sc;
 
     // If we had a previous context, then we're being called to unwind some
     // previous C portion of a mixed C/Go call stack. We use the call stack
@@ -206,5 +217,7 @@ void async_cgo_traceback(void *p) {
 
     return;
 }
+#endif
+
 
 } // extern "C"

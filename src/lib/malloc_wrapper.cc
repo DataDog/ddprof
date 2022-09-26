@@ -173,6 +173,7 @@ void *memalign(size_t alignment, size_t size) {
                                               size);
   return ptr;
 }
+
 void *temp_memalign(size_t alignment, size_t size) noexcept {
   check_init();
   return s_memalign(alignment, size);

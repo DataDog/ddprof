@@ -8,6 +8,7 @@
 #include "defer.hpp"
 #include "logger.hpp"
 #include "perf.hpp"
+#include "user_override.hpp"
 
 #include <ctype.h>
 #include <errno.h>

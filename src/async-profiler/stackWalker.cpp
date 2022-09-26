@@ -21,12 +21,41 @@
 #include "dwarf.h"
 #include "safeAccess.h"
 #include "stackFrame.h"
+#include "logger.hpp"
+#include <cstdio>
 
 const intptr_t MIN_VALID_PC = 0x1000;
 const intptr_t MAX_WALK_SIZE = 0x100000;
 const intptr_t MAX_FRAME_SIZE = 0x40000;
 
-static CodeCache *findLibraryByAddress(CodeCacheArray *cache, const void* address) {
+bool read_memory(uint64_t addr, uint64_t *res, const ap::StackBuffer &buffer) {
+  if (addr < 4095) {
+    return false;
+  }
+  if ((addr & 0x7) != 0) {
+    // not aligned
+    return false;
+  }
+  if (addr > addr + sizeof(uint64_t)) {
+    return false;
+  }
+
+  if (addr < buffer.sp_start && addr > buffer.sp_start - 4096) {
+    // todo red zone thing
+    return false;
+  }
+  else if (addr < buffer.sp_start || addr + sizeof(uint64_t) > buffer.sp_end) {
+    return false;
+  }
+  uint64_t stack_idx = addr - buffer.sp_start;
+  if (stack_idx > addr) {
+    return false;
+  }
+  *res = *(uint64_t *)(buffer._bytes.data() + stack_idx);
+  return true;
+}
+
+CodeCache *findLibraryByAddress(CodeCacheArray *cache, const void* address) {
     const int native_lib_count = cache->count();
     for (int i = 0; i < native_lib_count; i++) {
         if (cache->operator[](i)->contains(address)) {
@@ -36,17 +65,18 @@ static CodeCache *findLibraryByAddress(CodeCacheArray *cache, const void* addres
     return NULL;
 }
 
-bool stepStackContext(StackContext &sc, FrameDesc *f);
-bool stepStackContext(StackContext &sc, CodeCacheArray *cache) {
+bool stepStackContext(ap::StackContext &sc, const ap::StackBuffer &buffer, FrameDesc *f);
+
+bool stepStackContext(ap::StackContext &sc, const ap::StackBuffer &buffer, CodeCacheArray *cache) {
     FrameDesc* f;
     CodeCache* cc = findLibraryByAddress(cache, sc.pc);
     if (cc == NULL || (f = cc->findFrameDesc(sc.pc)) == NULL) {
         f = &FrameDesc::default_frame;
     }
-    return stepStackContext(sc, f);
+    return stepStackContext(sc, buffer, f);
 }
 
-bool stepStackContext(StackContext &sc, FrameDesc *f) {
+bool stepStackContext(ap::StackContext &sc, const ap::StackBuffer &buffer, FrameDesc *f) {
     uintptr_t bottom = sc.sp + MAX_WALK_SIZE;
     uintptr_t prev_sp = sc.sp;
 
@@ -76,9 +106,24 @@ bool stepStackContext(StackContext &sc, FrameDesc *f) {
         sc.pc = (const char*)sc.pc + (f->fp_off >> 1);
     } else {
         if (f->fp_off != DW_SAME_FP && f->fp_off < MAX_FRAME_SIZE && f->fp_off > -MAX_FRAME_SIZE) {
-            sc.fp = (uintptr_t)SafeAccess::load((void**)(sc.sp + f->fp_off));
+            void* new_fp = SafeAccess::load((void**)(sc.sp + f->fp_off));
+            printf("Update FP to value (old code): %p\n", new_fp);
+            // Update the frame pointer (based on fp offset)
+            if (!read_memory(sc.sp + f->fp_off, reinterpret_cast<uint64_t*>(&sc.fp), buffer)) {
+                printf("Failure __%u \n", __LINE__);
+                return false;
+            }
+            printf("Update FP to value (read mem): %p\n", sc.fp);
         }
-        sc.pc = stripPointer(SafeAccess::load((void**)sc.sp - 1));
+        void* new_pc = stripPointer(SafeAccess::load((void**)sc.sp - 1));
+        // Update the pc using return address 
+        printf("Update new instruction pointer to value (old code): %p\n", new_pc);
+
+        if (!read_memory(reinterpret_cast<uint64_t>((void**)sc.sp - 1), reinterpret_cast<uint64_t*>(&sc.pc), buffer)) {
+            printf("Failure __%u \n", __LINE__);
+            return false;
+        }
+        printf("Update new instruction pointer to value (new code): %p\n", sc.pc);
     }
 
     if (sc.pc < (const void*)MIN_VALID_PC || sc.pc > (const void*)-MIN_VALID_PC) {
@@ -87,7 +132,7 @@ bool stepStackContext(StackContext &sc, FrameDesc *f) {
     return true;
 }
 
-void populateStackContext(StackContext &sc, void *ucontext) {
+void populateStackContext(ap::StackContext &sc, void *ucontext) {
     if (ucontext == NULL) {
         sc.pc = __builtin_return_address(0);
         sc.fp = (uintptr_t)__builtin_frame_address(1); // XXX(nick): this isn't safe....
@@ -100,7 +145,8 @@ void populateStackContext(StackContext &sc, void *ucontext) {
     }
 }
 
-int stackWalk(CodeCacheArray *cache, StackContext &sc, const void** callchain, int max_depth, int skip) {
+int stackWalk(CodeCacheArray *cache, ap::StackContext &sc, const ap::StackBuffer &buffer, 
+                const void** callchain, int max_depth, int skip) {
     int depth = -skip;
 
     // Walk until the bottom of the stack or until the first Java frame
@@ -109,7 +155,7 @@ int stackWalk(CodeCacheArray *cache, StackContext &sc, const void** callchain, i
         if (d >= 0) {
             callchain[d] = sc.pc;
         }
-        if (!stepStackContext(sc, cache)) {
+        if (!stepStackContext(sc, buffer, cache)) {
 	        break;
         }
     }
