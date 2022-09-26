@@ -386,7 +386,7 @@ static DDRes aggregate_live_allocations(DDProfContext *ctx) {
     LG_NTC("Number of Live allocations for PID%d = %lu ", stack_map.first,
            stack_map.second.size());
     // Safety to avoid spending all the time reporting allocations
-    if (stack_map.second.size() >= LiveAllocation::kMaxTracked) {
+    if (stack_map.second.size() >= liveallocation::kMaxTracked) {
       stack_map.second.clear();
     }
   }

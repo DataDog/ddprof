@@ -14,6 +14,7 @@
 #include "ringbuffer_utils.hpp"
 #include "savecontext.hpp"
 #include "syscalls.hpp"
+#include "live_allocation-c.hpp"
 
 #include <atomic>
 #include <cassert>
@@ -225,6 +226,10 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
 
   // Inserting / Erasing addresses is done within the lock
   if (_address_set.erase(addr)) {
+    if (_address_set.size() >= liveallocation::kMaxTracked) {
+      // avoid unbounded growth
+      _address_set.clear();
+    }
     bool success = IsDDResOK(push_dealloc_sample(addr, tl_state));
     free_on_consecutive_failures(success);
   }

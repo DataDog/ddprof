@@ -1,8 +1,14 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the Apache License Version 2.0. This product includes software
+// developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
+// Datadog, Inc.
+
 #pragma once
 
 #include "ddprof_defs.hpp"
 #include "logger.hpp"
 #include "unwind_output.hpp"
+#include "live_allocation-c.hpp"
 
 #include <unordered_map>
 
@@ -10,7 +16,6 @@ namespace ddprof {
 
 class LiveAllocation {
 public:
-  static constexpr auto kMaxTracked = 200000;
   void register_allocation(const UnwindOutput &stack, uintptr_t addr,
                            size_t size, int watcher_pos, pid_t pid) {
     StackMap &stack_map = _pid_map[pid];
