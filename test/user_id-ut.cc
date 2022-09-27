@@ -53,16 +53,19 @@ TEST(UserIDTest, api) {
   UIDInfo info;
   uid_t old_user = getuid();
 
-  DDRes res = user_override(&info);
+  DDRes res = user_override_to_nobody_if_root(&info);
   EXPECT_TRUE(IsDDResOK(res));
 
   uid_t new_user = getuid();
   printf("New user = %d \n", new_user);
   if (old_user == 0) { // root
     EXPECT_TRUE(new_user != 0);
-    EXPECT_TRUE(info.override);
+    EXPECT_EQ(info.uid, old_user);
+  } else {
+    EXPECT_EQ(info.uid, -1);
+    EXPECT_EQ(new_user, old_user);
   }
-  res = revert_override(&info);
+  res = user_override(info.uid, info.gid);
   EXPECT_TRUE(IsDDResOK(res));
   EXPECT_EQ(old_user, getuid());
 }
