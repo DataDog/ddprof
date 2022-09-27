@@ -11,11 +11,13 @@
 #include "logger.hpp"
 #include "procutils.hpp"
 #include "signal_helper.hpp"
+#include "user_override.hpp"
 
 #include <algorithm>
 #include <cassert>
 #include <fcntl.h>
 #include <numeric>
+#include <optional>
 #include <unistd.h>
 
 namespace ddprof {
@@ -24,13 +26,71 @@ using DsoFindRes = DsoHdr::DsoFindRes;
 using DsoRange = DsoHdr::DsoRange;
 
 namespace {
-static FILE *procfs_map_open(int pid, const char *path_to_proc = "") {
-  char buf[1024] = {0};
-  auto n = snprintf(buf, 1024, "%s/proc/%d/maps", path_to_proc, pid);
-  if (n >= 1024) { // unable to snprintf everything
-    return nullptr;
+
+class ProcMapFileHolder {
+public:
+  ProcMapFileHolder(FILE *f, UIDInfo old_uids) : _f(f), _old_uids(old_uids) {}
+
+  ProcMapFileHolder(const ProcMapFileHolder &) = delete;
+  ProcMapFileHolder(ProcMapFileHolder &&other) : ProcMapFileHolder() {
+    *this = std::move(other);
   }
-  return fopen(buf, "r");
+
+  ProcMapFileHolder &operator=(const ProcMapFileHolder &) = delete;
+  ProcMapFileHolder &operator=(ProcMapFileHolder &&other) {
+    swap(*this, other);
+    return *this;
+  }
+
+  ~ProcMapFileHolder() {
+    if (_f) {
+      fclose(_f);
+    }
+    if (_old_uids.uid != static_cast<uid_t>(-1) ||
+        _old_uids.gid != static_cast<uid_t>(-1)) {
+      user_override(_old_uids.uid, _old_uids.gid);
+    }
+  }
+
+  FILE *file() { return _f; }
+
+  friend void swap(ProcMapFileHolder &lhs, ProcMapFileHolder &rhs) noexcept {
+    using std::swap;
+    swap(lhs._f, rhs._f);
+    swap(lhs._old_uids, rhs._old_uids);
+  }
+
+private:
+  ProcMapFileHolder() = default;
+  FILE *_f = nullptr;
+  UIDInfo _old_uids;
+};
+
+std::optional<ProcMapFileHolder>
+make_proc_map_file_holder(int pid, const char *path_to_proc = "") {
+  char proc_map_filename[1024] = {};
+  auto n = snprintf(proc_map_filename, std::size(proc_map_filename),
+                    "%s/proc/%d/maps", path_to_proc, pid);
+  if (n < 0 ||
+      n >= static_cast<ssize_t>(
+               std::size(proc_map_filename))) { // unable to snprintf everything
+    return {};
+  }
+
+  UIDInfo old_uids;
+  FILE *f = fopen(proc_map_filename, "r");
+  if (!f) {
+    // Check if the file exists
+    struct stat info;
+    if (stat(proc_map_filename, &info) == 0 &&
+        IsDDResOK(user_override(info.st_uid, info.st_gid, &old_uids))) {
+      f = fopen(proc_map_filename, "r");
+    }
+  }
+  if (!f) {
+    return {};
+  }
+  return ProcMapFileHolder{f, old_uids};
 }
 
 #ifndef NDEBUG
@@ -52,27 +112,28 @@ static bool ip_in_procline(char *line, uint64_t ip) {
 
 static void pid_find_ip(int pid, uint64_t ip,
                         const std::string &path_to_proc = "") {
-  FILE *mpf = procfs_map_open(pid, path_to_proc.c_str());
-  if (!mpf) {
+  auto proc_map_file_holder =
+      make_proc_map_file_holder(pid, path_to_proc.c_str());
+  if (!proc_map_file_holder) {
     if (process_is_alive(pid))
       LG_DBG("Couldn't find ip:0x%lx for %d, process is dead", ip, pid);
     else
       LG_DBG("Couldn't find ip:0x%lx for %d, mysteriously", ip, pid);
     return;
   }
-  defer { fclose(mpf); };
 
-  char *buf = NULL;
+  FILE *mpf = proc_map_file_holder->file();
+
+  char *buf = nullptr;
+  defer { free(buf); };
   size_t sz_buf = 0;
   while (-1 != getline(&buf, &sz_buf, mpf)) {
     if (ip_in_procline(buf, ip)) {
       LG_DBG("[DSO] Found ip:0x%lx for %d", ip, pid);
       LG_DBG("[DSO] %.*s", (int)strlen(buf) - 1, buf);
-      free(buf);
       return;
     }
   }
-  free(buf);
 
   LG_DBG("[DSO] Couldn't find ip:0x%lx for %d", ip, pid);
   return;
@@ -395,14 +456,15 @@ bool DsoHdr::pid_backpopulate(DsoMap &map, pid_t pid, int &nb_elts_added) {
   bp_state._perm = kForbidden;
   nb_elts_added = 0;
   LG_DBG("[DSO] Backpopulating PID %d", pid);
-  FILE *mpf = procfs_map_open(pid, _path_to_proc.c_str());
-  if (!mpf) {
+  auto proc_map_file_holder =
+      make_proc_map_file_holder(pid, _path_to_proc.c_str());
+  if (!proc_map_file_holder) {
     LG_DBG("[DSO] Failed to open procfs for %d", pid);
     if (!process_is_alive(pid))
       LG_DBG("[DSO] Process nonexistant");
     return false;
   }
-  defer { fclose(mpf); };
+  FILE *mpf = proc_map_file_holder->file();
 
   char *buf = NULL;
   size_t sz_buf = 0;

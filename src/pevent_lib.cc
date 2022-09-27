@@ -170,12 +170,14 @@ DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
   // hence we use a different user
   UIDInfo info;
   if (use_override) {
-    DDRES_CHECK_FWD(user_override(&info));
+    /* perf_event_mlock_kb is accounted per real user id */
+    DDRES_CHECK_FWD(user_override_to_nobody_if_root(&info));
   }
 
   defer {
-    if (use_override)
-      revert_override(&info);
+    if (use_override) {
+      user_override(info.uid, info.gid);
+    }
   };
 
   auto defer_munmap = make_defer([&] { pevent_munmap(pevent_hdr); });
@@ -193,7 +195,10 @@ DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
 DDRes pevent_setup(DDProfContext *ctx, pid_t pid, int num_cpu,
                    PEventHdr *pevent_hdr) {
   DDRES_CHECK_FWD(pevent_open(ctx, pid, num_cpu, pevent_hdr));
-  DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, true));
+  if (!IsDDResOK(pevent_mmap(pevent_hdr, true))) {
+    LG_NTC("Retrying attachment without user override");
+    DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, false));
+  }
   return ddres_init();
 }
 
