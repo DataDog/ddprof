@@ -10,26 +10,62 @@
 #include "user_override.hpp"
 
 #include "logger.hpp"
-#include "unistd.h"
 
-#include <errno.h>
+#include <cerrno>
+#include <grp.h>
 #include <pwd.h>
 #include <string.h>
 #include <sys/prctl.h>
+#include <sys/types.h>
 #include <unistd.h>
 
-static char const *const s_user_nobody = "nobody";
-static const uid_t s_root_user = 0;
+namespace {
+constexpr const char *const s_user_nobody = "nobody";
+constexpr uid_t s_root_user = 0;
 
-void init_uidinfo(UIDInfo *user_override) {
-  user_override->override = false;
-  user_override->previous_user = getuid();
+struct DumpableRestorer {
+public:
+  DumpableRestorer() { _dumpable = prctl(PR_GET_DUMPABLE); }
+  ~DumpableRestorer() { prctl(PR_SET_DUMPABLE, _dumpable); }
+
+private:
+  int _dumpable;
+};
+
+} // namespace
+
+bool is_root() { return getuid() == s_root_user; }
+
+DDRes user_override_to_nobody_if_root(UIDInfo *old_uids) {
+  if (!is_root()) {
+    if (old_uids) {
+      *old_uids = {};
+    }
+    return {};
+  }
+  return user_override(s_user_nobody, old_uids);
 }
 
-static DDRes setresuid_wrapper(uid_t ruid, uid_t euid, uid_t suid) {
-  int dumpable = prctl(PR_GET_DUMPABLE);
-  DDRES_CHECK_INT(setresuid(ruid, euid, suid), DD_WHAT_USERID,
-                  "Unable to set user %s (%s)", s_user_nobody, strerror(errno));
+DDRes user_override(const char *user, UIDInfo *old_uids) {
+  struct passwd *pw = getpwnam(user);
+  if (!pw) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_USERID, "Unable to find user %s", user);
+  }
+
+  return user_override(pw->pw_uid, pw->pw_gid, old_uids);
+}
+
+DDRes user_override(uid_t uid, gid_t gid, UIDInfo *old_uids) {
+  if (old_uids) {
+    old_uids->gid = getgid();
+    old_uids->uid = getuid();
+  }
+
+  // Early exit if nothing to do
+  if (uid == static_cast<uid_t>(-1) && gid == static_cast<uid_t>(-1)) {
+    return {};
+  }
+
   // Changing the effective user id causes the dumpable attribute of the process
   // to be reset to the value of /proc/sys/fs/suid_dumpable (usually 0, cf.
   // https://man7.org/linux/man-pages/man2/prctl.2.html), which in turn makes
@@ -44,38 +80,66 @@ static DDRes setresuid_wrapper(uid_t ruid, uid_t euid, uid_t suid) {
   // (ie. parent process) needs to be able to read ddprof /proc/<pid>/fd/*,
   // that's why we set dumpable attribute back to its intial value at each
   // effective user id change.
-  prctl(PR_SET_DUMPABLE, dumpable);
+  DumpableRestorer dumpable_restorer;
+  if (gid != static_cast<uid_t>(-1)) {
+    DDRES_CHECK_INT(setresgid(gid, gid, -1), DD_WHAT_USERID,
+                    "Unable to set gid %d (%s)", gid, strerror(errno));
+  }
+  if (uid != static_cast<uid_t>(-1)) {
+    DDRES_CHECK_INT(setresuid(uid, uid, -1), DD_WHAT_USERID,
+                    "Unable to set uid %d (%s)", uid, strerror(errno));
+  }
+
   return {};
 }
 
-DDRes user_override(UIDInfo *user_override) {
-  init_uidinfo(user_override);
+DDRes become_user(const char *username) {
+  // Inspired from
+  // https://github.com/netdata/netdata/blob/71cb1ad68707718671ef57c901dfa2041f15bbe6/daemon/daemon.c#L77
 
-  if (getuid() != s_root_user) {
-    // Already a different user nothing to do
-    return ddres_init();
+  DumpableRestorer dumpable_restorer;
+  struct passwd *pw = getpwnam(username);
+
+  if (!pw) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_USERID, "Unable to find user %s", username);
   }
 
-  struct passwd *pwd = getpwnam(s_user_nobody);
-  if (!pwd) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_USERID, "Unable to find user %s",
-                           s_user_nobody);
+  uid_t uid = pw->pw_uid;
+  gid_t gid = pw->pw_gid;
+
+  if (initgroups(pw->pw_name, gid) != 0) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_USERID, "Cannot init group list for %s",
+                           username);
   }
-  uid_t nobodyuid = pwd->pw_uid;
-  DDRES_CHECK_FWD(setresuid_wrapper(nobodyuid, nobodyuid, -1));
-  user_override->override = true;
-
-  return ddres_init();
-}
-
-DDRes revert_override(UIDInfo *user_override) {
-  if (!(user_override->override)) {
-    // nothing to do we did not override previously
-    return ddres_init();
+  if (setresgid(gid, gid, gid) != 0) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_USERID,
+                           "Cannot switch to user's %s group (gid: %u)",
+                           username, gid);
   }
-  uid_t uid_old = user_override->previous_user;
-  DDRES_CHECK_FWD(setresuid_wrapper(uid_old, uid_old, -1));
-  init_uidinfo(user_override);
+  if (setresuid(uid, uid, uid) != 0) {
+    DDRES_RETURN_ERROR_LOG(
+        DD_WHAT_USERID, "Cannot switch to user %s (uid: %u).", username, uid);
+  }
+  if (setgid(gid) != 0) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_USERID,
+                           "Cannot switch to user's %s group (gid: %u)",
+                           username, gid);
+  }
+  if (setegid(gid) != 0) {
+    DDRES_RETURN_ERROR_LOG(
+        DD_WHAT_USERID,
+        "Cannot effectively switch to user's %s group (gid: %u)", username,
+        gid);
+  }
+  if (setuid(uid) != 0) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_USERID, "Cannot switch to user %s (uid: %u)",
+                           username, uid);
+  }
+  if (seteuid(uid) != 0) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_USERID,
+                           "Cannot effectively switch to user %s (uid: %u)",
+                           username, uid);
+  }
 
-  return ddres_init();
+  return {};
 }
