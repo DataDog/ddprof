@@ -196,7 +196,7 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
   char buf[64] = {0};
   char *buf_copy = buf;
   int pathsz =
-      snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/id",
+      snprintf(path, sizeof(path), "/sys/kernel/debug/tracing/events/%s/%s/id",
                groupname, tracename);
   if (static_cast<size_t>(pathsz) >= sizeof(path)) {
     // Possibly ran out of room
