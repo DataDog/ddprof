@@ -276,6 +276,10 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   // Aggregate if unwinding went well (todo : fatal error propagation)
   if (!IsDDResFatal(res)) {
     struct UnwindState *us = ctx->worker_ctx.us;
+
+    uint64_t val = 0;
+    memory_read(us->current_ip, &val, -1, (void*)us);
+    PRINT_NFO("The value of IP is %p and the value is %d", us->current_ip, (int)val);
 #ifndef DDPROF_NATIVE_LIB
     // in lib mode we don't aggregate (protect to avoid link failures)
     PerfWatcher *watcher = &ctx->watchers[watcher_pos];
@@ -693,8 +697,8 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
 
     /* Cases where the target type might not have a PID */
     case PERF_RECORD_LOST:
-      ddprof_pr_lost(ctx, reinterpret_cast<const perf_event_lost *>(hdr),
-                     watcher_pos);
+//      ddprof_pr_lost(ctx, reinterpret_cast<const perf_event_lost *>(hdr),
+//                     watcher_pos);
       break;
     case PERF_CUSTOM_EVENT_DEALLOCATION:
       ddprof_pr_deallocation(ctx,
