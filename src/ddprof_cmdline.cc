@@ -205,6 +205,7 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
   if (stat(spath, &sb)) {
     spath = debugfs_path;
     if (stat(spath, &sb)) {
+      free(str);
       return false;
     }
   }
