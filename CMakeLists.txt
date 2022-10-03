@@ -146,6 +146,7 @@ list(APPEND DDPROF_LIBRARY_LIST libcap)
 list(APPEND DDPROF_INCLUDE_LIST ${LIBCAP_INCLUDE_DIR})
 
 if(USE_LOADER)
+  # Build small loader lib that is in charge of dlopen'ing libdd_profiling-embedded.so
   add_library(dd_loader SHARED src/ddres_list.cc src/lib/lib_embedded_data.cc src/lib/loader.cc
                                src/logger.cc src/tempfile.cc)
   target_include_directories(
@@ -171,7 +172,6 @@ if(USE_LOADER)
     DEPENDS dd_loader)
   add_library(libdd_loader_object OBJECT IMPORTED GLOBAL)
   set_target_properties(libdd_loader_object PROPERTIES IMPORTED_OBJECTS "${LIBDD_LOADER_OBJECT}")
-
 endif()
 
 set(DD_PROFILING_SOURCES
@@ -198,6 +198,7 @@ set(DD_PROFILING_SOURCES
     src/sys_utils.cc
     src/user_override.cc)
 
+# libddprofiling_embeded.so is the actual profiling library
 add_library(dd_profiling-embedded SHARED ${DD_PROFILING_SOURCES})
 target_include_directories(
   dd_profiling-embedded PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include
@@ -291,6 +292,8 @@ set_target_properties(dd_profiling-static
 target_link_libraries(dd_profiling-static PUBLIC dl pthread)
 
 if(USE_LOADER)
+  # When using a loader, libdd_profiling.so is a loader that embeds both libdd_profiling-embedded.so
+  # and ddprof executable.
   add_library(dd_profiling-shared SHARED src/ddres_list.cc src/lib/lib_embedded_data.cc
                                          src/lib/loader.cc src/logger.cc src/tempfile.cc)
   target_link_libraries(dd_profiling-shared PRIVATE libddprofiling_embedded_object
@@ -298,6 +301,8 @@ if(USE_LOADER)
   target_compile_definitions(dd_profiling-shared PRIVATE DDPROF_EMBEDDED_LIB_DATA
                                                          DDPROF_EMBEDDED_EXE_DATA)
 else()
+  # Without loader, libdd_profiling.so is basically the same as libdd_profiling-embedded.so plus an
+  # embedded ddprof executable.
   add_library(dd_profiling-shared SHARED ${DD_PROFILING_SOURCES} src/lib/lib_embedded_data.cc
                                          src/tempfile.cc)
   target_link_libraries(dd_profiling-shared PRIVATE ddprof_exe_object)
