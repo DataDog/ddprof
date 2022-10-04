@@ -364,27 +364,38 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
     }
   }
 
+  // Syscall parameters
+#ifdef __x86_64__
+  uint64_t sc_ret = sample->regs[PAM_X86_RAX];
+  uint64_t sc_p1 = sample->regs[PAM_X86_RDI];
+  uint64_t sc_p2 = sample->regs[PAM_X86_RSI];
+  uint64_t sc_p3 = sample->regs[PAM_X86_RDX];
+  uint64_t sc_p4 = sample->regs[PAM_X86_R10];
+  uint64_t sc_p5 = sample->regs[PAM_X86_R8];
+  uint64_t sc_p6 = sample->regs[PAM_X86_R9];
+#ifdef __aarch64__
+  // Obviously ARM is totally broken here.
+  uint64_t sc_ret = sample->regs[PAM_ARM_X0];
+  uint64_t sc_p1 = sample->regs[PAM_ARM_X0]; 
+  uint64_t sc_p2 = sample->regs[PAM_ARM_X1];
+  uint64_t sc_p3 = sample->regs[PAM_ARM_X2];
+  uint64_t sc_p4 = sample->regs[PAM_ARM_X3];
+  uint64_t sc_p5 = sample->regs[PAM_ARM_X4];
+  uint64_t sc_p6 = sample->regs[PAM_ARM_X5];
+#elif
+#error Architecture not supported
+#endif
+
+  // hardcoded syscall numbers; these are uniform between x86/arm
   if (id == 9) {
-    sysalloc.do_mmap(*uwo, sample->regs[PAM_X86_RAX], sample->regs[PAM_X86_RSI],
-                     sample->pid);
-    LG_DBG("[%s]  SZ: 0x%lx, ADDR: %lx, FD: %d, T: %lu", "MMAP",
-           sample->regs[PAM_X86_RSI], sample->regs[PAM_X86_RAX],
-           (int)sample->regs[PAM_X86_R8], sample->time);
+    sysalloc.do_mmap(*uwo, sc_ret , sc_p2, sample->pid);
   } else if (id == 11) {
     sysalloc.do_munmap(sample->regs[PAM_X86_RDI], sample->regs[PAM_X86_RSI],
                        sample->pid);
-    LG_DBG("[%s]  SZ: 0x%lx, ADDR: %lx, T: %lu", "MUNMAP",
-           sample->regs[PAM_X86_RSI], sample->regs[PAM_X86_RDI], sample->time);
   } else if (id == 28) {
     // Unhandled, no need to handle
-    LG_DBG("[%s]  SZ: 0x%lx, ADDR: %lx, MODE: %d, T: %lu", "MADVISE",
-           sample->regs[PAM_X86_RSI], sample->regs[PAM_X86_RDI],
-           (int)sample->regs[PAM_X86_RDX], sample->time);
   } else if (id == 25) {
-    sysalloc.do_mremap(*uwo, sample->regs[PAM_X86_RAX],
-                       sample->regs[PAM_X86_RSI], sample->regs[PAM_X86_RDX],
-                       sample->pid);
-    LG_DBG("[%s]", "MREMAP");
+    sysalloc.do_mremap(*uwo, sc_ret, sc_p2, sc_p3, sample->pid);
   }
 
   return ddres_init();
