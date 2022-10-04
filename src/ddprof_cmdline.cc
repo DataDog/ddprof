@@ -78,6 +78,11 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
     watcher->tracepoint_name = watcher->desc;
     watcher->tracepoint_group = event_groupname;
   }
+
+  // Certain watcher configs get additional event information
+  if (watcher->config == kDDPROF_COUNT_ALLOCATIONS) {
+    watcher->sample_type |= PERF_SAMPLE_ADDR;
+  }
   return true;
 }
 
@@ -140,7 +145,6 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
   const char *tname;
   uint8_t reg = 0;
   uint64_t period = 1;
-  bool is_raw = false;
   uint8_t trace_off = 0;
   uint8_t trace_sz = 0;
 
@@ -176,10 +180,8 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
   if (perc)
     reg = get_register(perc + 1);
 
-  // OTOH, if an offset into the raw event is specified, get that
-  if (dollar && !get_trace_format(dollar + 1, &trace_off, &trace_sz)) {
-    is_raw = true;
-  } else {
+  // Try to set the raw event parameters.  If that fails, zero them out again.
+  if (dollar && get_trace_format(dollar + 1, &trace_off, &trace_sz)) {
     trace_off = 0;
     trace_sz = 0;
   }
@@ -252,8 +254,12 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
   *watcher = *twatcher_default();
   watcher->config = trace_id;
   watcher->sample_period = period;
-  if (is_raw)
-    watcher->sample_type |= PERF_SAMPLE_RAW;
+
+  // das221004 the raw field is a very small part of the overall event and
+  //           as of now we don't have a good way of determining whether a
+  //           certain event should be raw at time of processing.  So always
+  //           add it in
+  watcher->sample_type |= PERF_SAMPLE_RAW;
   if (reg) {
     watcher->reg = reg;
   } else {

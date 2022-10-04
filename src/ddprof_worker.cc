@@ -341,6 +341,62 @@ DDRes ddprof_pr_allocation_tracking(DDProfContext *ctx,
   return ddres_init();
 }
 
+DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
+                                       perf_event_sample *sample,
+                                       int watcher_pos) {
+  int64_t id;
+  memcpy(&id, sample->data_raw + 8, sizeof(id));
+  auto &sysalloc = ctx->worker_ctx.sys_allocation;
+
+
+  // Only unwind if we will need to propagate unwinding information forward
+  DDRes res = {};
+  UnwindOutput *uwo = NULL;
+  if (id == 9 || id == 25) {
+    auto ticks0 = ddprof::get_tsc_cycles();
+    res = ddprof_unwind_sample(ctx, sample, watcher_pos);
+    auto unwind_ticks = ddprof::get_tsc_cycles();
+    ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL);
+    uwo = &ctx->worker_ctx.us->output;
+
+    // TODO: propagate fatal
+    if (IsDDResFatal(res)) {
+      return ddres_init();
+    }
+  }
+
+  if (id == 9) {
+    sysalloc.do_mmap(*uwo, sample->regs[PAM_X86_RAX], sample->regs[PAM_X86_RSI], sample->pid); 
+    LG_DBG("[%s]  SZ: 0x%lx, ADDR: %lx, FD: %d, T: %lu",
+        "MMAP",
+        sample->regs[PAM_X86_RSI],
+        sample->regs[PAM_X86_RAX],
+        (int)sample->regs[PAM_X86_R8],
+        sample->time);
+  } else if (id == 11) {
+    sysalloc.do_munmap(sample->regs[PAM_X86_RDI], sample->regs[PAM_X86_RSI], sample->pid);
+    LG_DBG("[%s]  SZ: 0x%lx, ADDR: %lx, T: %lu",
+        "MUNMAP",
+        sample->regs[PAM_X86_RSI],
+        sample->regs[PAM_X86_RDI],
+        sample->time);
+  } else if (id == 28) {
+    // Unhandled, no need to handle
+    LG_DBG("[%s]  SZ: 0x%lx, ADDR: %lx, MODE: %d, T: %lu",
+        "MADVISE",
+        sample->regs[PAM_X86_RSI],
+        sample->regs[PAM_X86_RDI],
+        (int)sample->regs[PAM_X86_RDX],
+        sample->time);
+  } else if (id == 25) {
+    sysalloc.do_mremap(*uwo, sample->regs[PAM_X86_RAX], sample->regs[PAM_X86_RSI], sample->regs[PAM_X86_RDX], sample->pid);
+    LG_DBG("[%s]",
+           "MREMAP");
+  }
+
+  return ddres_init();
+}
+
 static void ddprof_reset_worker_stats() {
   for (unsigned i = 0; i < std::size(s_cycled_stats); ++i) {
     ddprof_stats_clear(s_cycled_stats[i]);
@@ -402,6 +458,26 @@ static DDRes aggregate_live_allocations(DDProfContext *ctx) {
   }
   return ddres_init();
 }
+
+static DDRes aggregate_sys_allocations(DDProfContext *ctx) {
+  struct UnwindState *us = ctx->worker_ctx.us;
+  SystemAllocation &sysallocs = ctx->worker_ctx.sys_allocation;
+  PerfWatcher *watcher = &ctx->watchers[sysallocs.watcher_pos];
+  int i_export = ctx->worker_ctx.i_current_pprof;
+  DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
+
+  // Iterate through each PID
+  for (auto &stack_map : sysallocs._pid_map) {
+
+    // Iterate through pages...
+    // TODO Probably aggregate into ranges of pages or something, but once per
+    //      page is just too much
+    for (const auto &page: stack_map.second) {
+      DDRES_CHECK_FWD(pprof_aggregate(&page.second, &us->symbol_hdr, 4096, 1, watcher, pprof));
+    }
+  }
+  return ddres_init();
+}
 #endif
 
 /// Cycle operations : export, sync metrics, update counters
@@ -411,6 +487,7 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
 #ifndef DDPROF_NATIVE_LIB
   // TODO: lib mode (unhandled for now)
   DDRES_CHECK_FWD(aggregate_live_allocations(ctx));
+  DDRES_CHECK_FWD(aggregate_sys_allocations(ctx));
 
   // Take the current pprof contents and ship them to the backend.  This also
   // clears the pprof for reuse
@@ -659,19 +736,28 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
     ddprof_stats_add(STATS_EVENT_COUNT, 1, NULL);
     const perf_event_hdr_wpid *wpid =
         static_cast<const perf_event_hdr_wpid *>(hdr);
+    PerfWatcher *watcher = &ctx->watchers[watcher_pos];
     switch (hdr->type) {
     /* Cases where the target type has a PID */
     case PERF_RECORD_SAMPLE:
       if (wpid->pid) {
-        uint64_t mask = ctx->watchers[watcher_pos].sample_type;
-        bool is_allocation =
-            (ctx->watchers[watcher_pos].type == kDDPROF_TYPE_CUSTOM &&
-             ctx->watchers[watcher_pos].config == kDDPROF_COUNT_ALLOCATIONS);
-        if (is_allocation) // temp hack
-          mask |= PERF_SAMPLE_ADDR;
+        uint64_t mask = watcher->sample_type;
         perf_event_sample *sample = hdr2samp(hdr, mask);
+
+        // Various checks for allocation profiling
+        // - sALLOC
+        // - mmap/munmap syscalls
+        bool is_allocation = watcher->type == kDDPROF_TYPE_CUSTOM &&
+             watcher->config == kDDPROF_COUNT_ALLOCATIONS;
         if (sample) {
-          if (is_allocation && ctx->params.live_allocations) {
+
+          if (ctx->params.system_allocations) {
+            static std::string sys_exit = "sys_exit";
+            bool is_rawcalls = !sys_exit.compare(watcher->tracepoint_name);
+            if (is_rawcalls && (watcher->sample_type & PERF_SAMPLE_RAW)) {
+              DDRES_CHECK_FWD(ddprof_pr_sysallocation_tracking(ctx, sample, watcher_pos));
+            }
+          } else if (is_allocation && ctx->params.live_allocations) {
             DDRES_CHECK_FWD(
                 ddprof_pr_allocation_tracking(ctx, sample, watcher_pos));
           } else {

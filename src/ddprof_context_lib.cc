@@ -342,6 +342,8 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   ctx->params.live_allocations =
       arg_yesno(input->live_allocations, 1); // default no
 
+  ctx->params.system_allocations = arg_yesno(input->system_allocations, 1);
+
   if (input->switch_user) {
     ctx->params.switch_user = strdup(input->switch_user);
   }
