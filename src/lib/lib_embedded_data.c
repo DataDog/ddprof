@@ -3,7 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "lib_embedded_data.hpp"
+#include "lib_embedded_data.h"
 
 #ifdef DDPROF_EMBEDDED_LIB_DATA
 // NOLINTNEXTLINE cert-dcl51-cpp
@@ -25,13 +25,17 @@ static const char _binary_ddprof_start[] = {}; // NOLINT cert-dcl51-cpp
 static const char _binary_ddprof_end[] = {};   // NOLINT cert-dcl51-cpp
 #endif
 
-namespace ddprof {
-span<const std::byte> profiling_lib_data() {
-  return as_bytes(ddprof::span{_binary_libdd_profiling_embedded_so_start,
-                               _binary_libdd_profiling_embedded_so_end});
+EmbeddedData profiling_lib_data() {
+  EmbeddedData data = {.data = _binary_libdd_profiling_embedded_so_start,
+                       // cppcheck-suppress comparePointers
+                       .size = _binary_libdd_profiling_embedded_so_end -
+                           _binary_libdd_profiling_embedded_so_start};
+  return data;
 }
 
-span<const std::byte> profiler_exe_data() {
-  return as_bytes(ddprof::span{_binary_ddprof_start, _binary_ddprof_end});
+EmbeddedData profiler_exe_data() {
+  EmbeddedData data = {.data = _binary_ddprof_start,
+                       // cppcheck-suppress comparePointers
+                       .size = _binary_ddprof_end - _binary_ddprof_start};
+  return data;
 }
-} // namespace ddprof

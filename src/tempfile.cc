@@ -19,8 +19,12 @@ namespace ddprof {
 DDRes create_temp_file(std::string_view prefix,
                        ddprof::span<const std::byte> data, mode_t mode,
                        std::string &path) {
+  std::error_code ec;
   auto template_str =
-      std::string{std::filesystem::temp_directory_path() / prefix} + ".XXXXXX";
+      std::string{std::filesystem::temp_directory_path(ec) / prefix} +
+      ".XXXXXX";
+  DDRES_CHECK_ERRORCODE(ec, DD_WHAT_TEMP_FILE,
+                        "Failed to determine temp directory path");
 
   // Create temporary file
   int fd = mkostemp(template_str.data(), O_CLOEXEC);

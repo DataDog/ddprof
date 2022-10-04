@@ -11,7 +11,7 @@
 #include "ddprof_cmdline.hpp"
 #include "defer.hpp"
 #include "ipc.hpp"
-#include "lib_embedded_data.hpp"
+#include "lib_embedded_data.h"
 #include "logger_setup.hpp"
 #include "signal_helper.hpp"
 #include "symbol_overrides.hpp"
@@ -157,8 +157,8 @@ int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
       ddprof_exe) {
     execve(ddprof_exe, argv, environ);
   } else {
-    auto exe_data = ddprof::profiler_exe_data();
-    if (exe_data.empty()) {
+    auto exe_data = profiler_exe_data();
+    if (exe_data.size == 0) {
       return -1;
     }
     int fd = ddprof::memfd_create(ddprof_str, 1U /*MFD_CLOEXEC*/);
@@ -167,8 +167,8 @@ int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
     }
     defer { close(fd); };
 
-    if (write(fd, exe_data.data(), exe_data.size()) !=
-        static_cast<ssize_t>(exe_data.size())) {
+    if (write(fd, exe_data.data, exe_data.size) !=
+        static_cast<ssize_t>(exe_data.size)) {
       return -1;
     }
     fexecve(fd, argv, environ);

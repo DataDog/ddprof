@@ -5,17 +5,14 @@
 
 #include "constants.hpp"
 #include "dd_profiling.h"
-#include "ddres_helpers.hpp"
-#include "defer.hpp"
-#include "lib_embedded_data.hpp"
-#include "loghandle.hpp"
-#include "tempfile.hpp"
+#include "lib_embedded_data.h"
 
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -44,22 +41,19 @@
  * available, it falls back to using __libc_dlopen_mode, an internal libc.so.6
  * function implementing dlopen, in that case.
  */
-extern "C" {
-void *dlopen(const char *filename, int flags) noexcept __attribute__((weak));
-void *dlsym(void *handle, const char *symbol) noexcept __attribute__((weak));
+void *dlopen(const char *filename, int flags) __attribute__((weak));
+void *dlsym(void *handle, const char *symbol) __attribute__((weak));
 // NOLINTNEXTLINE cert-dcl51-cpp
-void *__libc_dlopen_mode(const char *filename, int flag) noexcept
-    __attribute__((weak));
+void *__libc_dlopen_mode(const char *filename, int flag) __attribute__((weak));
 // NOLINTNEXTLINE cert-dcl51-cpp
 void *__libc_dlsym(void *handle, const char *symbol) __attribute__((weak));
 int pthread_cancel(pthread_t thread) __attribute__((weak));
 double log(double x) __attribute__((weak));
-}
 
 static void *s_libdl_handle = NULL;
 
 static void *my_dlopen(const char *filename, int flags) {
-  static decltype(dlopen) *dlopen_ptr = &dlopen;
+  static __typeof(dlopen) *dlopen_ptr = &dlopen;
 
   if (!dlopen_ptr) {
     // if libdl.so is not loaded, use __libc_dlopen_mode
@@ -92,7 +86,7 @@ static void ensure_libpthread_is_loaded() {
 }
 
 static void *my_dlsym(void *handle, const char *symbol) {
-  static decltype(dlsym) *dlsym_ptr = &dlsym;
+  static __typeof(dlsym) *dlsym_ptr = &dlsym;
   if (!dlsym_ptr) {
     // dlysm is not available: meaning we are on glibc and libdl.so was not
     // loaded at startup
@@ -107,8 +101,7 @@ static void *my_dlsym(void *handle, const char *symbol) {
       // __libc_dlsym.
       // Note that we need dlsym because __libc_dlsym does not provide
       // RTLD_DEFAULT/RTLD_NEXT functionality.
-      dlsym_ptr = reinterpret_cast<decltype(dlsym) *>(
-          __libc_dlsym(s_libdl_handle, "dlsym"));
+      dlsym_ptr = (__typeof(dlsym_ptr))__libc_dlsym(s_libdl_handle, "dlsym");
     }
 
     // Should not happen
@@ -120,59 +113,85 @@ static void *my_dlsym(void *handle, const char *symbol) {
   return dlsym_ptr(handle, symbol);
 }
 
-typedef int (*FstatFunc)(int, struct stat *) noexcept;
-
-// fstat is linked statically on glibc and symbol is not present in libc.so.6
-// Provide a replacement that calls __fxstat is present or fstat resolved with
-// dlsym/RTLD_NEXT
-extern "C" int __fxstat(int ver, int fd, struct stat *buf)
-    __attribute__((weak));
-
-extern int fstat(int fd, struct stat *buf)
-    __attribute__((weak, alias("__fstat")));
-
-// NOLINTNEXTLINE cert-dcl51-cpp
-extern "C" __attribute__((unused)) int __fstat(int fd, struct stat *buf) {
-  if (__fxstat) {
-    // __fxstat is available call it directly
-    return __fxstat(1, fd, buf);
+const char *temp_directory_path() {
+  const char *tmpdir = NULL;
+  const char *env[] = {"TMPDIR", "TMP", "TEMP", "TEMPDIR", NULL};
+  for (const char **e = env; tmpdir && *e != NULL; ++e) {
+    tmpdir = getenv(*e);
   }
-  // __fxtstat is not available, we must be executing on musl, therefore `fstat`
-  // should be availble in libc
-  static declatype(fstat) *s_fstat = NULL;
-  if (s_fstat == NULL) {
-    s_fstat = reinterpret_cast<FstatFunc>(my_dlsym(RTLD_NEXT, "fstat"));
-  }
-  if (s_fstat) {
-    return s_fstat(fd, buf);
+  const char *p = tmpdir ? tmpdir : "/tmp";
+  struct stat st;
+  if (!(stat(p, &st) == 0 && S_ISDIR(st.st_mode))) {
+    p = NULL;
   }
 
-  // Should not happen
-  return -1;
+  return p;
 }
 
-static std::string s_lib_profiling_path;
-static std::string s_profiler_exe_path;
-static void *s_profiling_lib_handle = nullptr;
-decltype(ddprof_start_profiling) *s_start_profiling_func = nullptr;
-decltype(ddprof_stop_profiling) *s_stop_profiling_func = nullptr;
+char *create_temp_file(const char *prefix, EmbeddedData data, mode_t mode) {
+  const char *tmp_dir = temp_directory_path();
+  if (!tmp_dir) {
+    return NULL;
+  }
 
-static DDRes __attribute__((constructor)) loader() {
-  LogHandle log_handle(LL_WARNING);
+  char *path = malloc(strlen(tmp_dir) + strlen(prefix) + strlen(".XXXXXX") + 2);
+  if (path == NULL) {
+    return NULL;
+  }
+  strcpy(path, tmp_dir);
+  strcat(path, "/");
+  strcat(path, prefix);
+  strcat(path, ".XXXXXX");
 
+  // Create temporary file
+  int fd = mkostemp(path, O_CLOEXEC);
+  if (fd == -1) {
+    free(path);
+    return NULL;
+  }
+
+  if (fchmod(fd, mode) != 0) {
+    close(fd);
+    unlink(path);
+    free(path);
+    return NULL;
+  }
+
+  // Write embedded lib into temp file
+  if (write(fd, data.data, data.size) != (ssize_t)data.size) {
+    close(fd);
+    unlink(path);
+    free(path);
+    return NULL;
+  }
+
+  close(fd);
+  return path;
+}
+
+static char *s_lib_profiling_path = NULL;
+static char *s_profiler_exe_path = NULL;
+static void *s_profiling_lib_handle = NULL;
+__typeof(ddprof_start_profiling) *s_start_profiling_func = NULL;
+__typeof(ddprof_stop_profiling) *s_stop_profiling_func = NULL;
+
+static void __attribute__((constructor)) loader() {
   const char *s = getenv(k_profiler_lib_env_variable);
   if (!s) {
-    auto lib_data = ddprof::profiling_lib_data();
-    auto exe_data = ddprof::profiler_exe_data();
-    if (lib_data.empty() || exe_data.empty()) {
+    EmbeddedData lib_data = profiling_lib_data();
+    EmbeddedData exe_data = profiler_exe_data();
+    if (lib_data.size == 0 || exe_data.size == 0) {
       // nothing to do
-      return {};
+      return;
     }
-    DDRES_CHECK_FWD(create_temp_file(k_libdd_profiling_name, lib_data, 0644,
-                                     s_lib_profiling_path));
-    create_temp_file(k_profiler_exe_name, exe_data, 0755, s_profiler_exe_path);
-    s = s_lib_profiling_path.c_str();
-    setenv(k_profiler_ddprof_exe_env_variable, s_profiler_exe_path.c_str(), 1);
+    s_lib_profiling_path =
+        create_temp_file(k_libdd_profiling_name, lib_data, 0644);
+    s_profiler_exe_path = create_temp_file(k_profiler_exe_name, exe_data, 0755);
+    if (!s_lib_profiling_path || !s_profiler_exe_path) {
+      return;
+    }
+    s = s_lib_profiling_path;
+    setenv(k_profiler_ddprof_exe_env_variable, s_profiler_exe_path, 1);
   }
 
   ensure_libdl_is_loaded();
@@ -181,20 +200,23 @@ static DDRes __attribute__((constructor)) loader() {
 
   s_profiling_lib_handle = my_dlopen(s, RTLD_LOCAL | RTLD_NOW);
   if (s_profiling_lib_handle) {
-    s_start_profiling_func = reinterpret_cast<decltype(s_start_profiling_func)>(
-        my_dlsym(s_profiling_lib_handle, "ddprof_start_profiling"));
-    s_stop_profiling_func = reinterpret_cast<decltype(s_stop_profiling_func)>(
-        my_dlsym(s_profiling_lib_handle, "ddprof_stop_profiling"));
+    s_start_profiling_func = (__typeof(s_start_profiling_func))my_dlsym(
+        s_profiling_lib_handle, "ddprof_start_profiling");
+    s_stop_profiling_func = (__typeof(s_stop_profiling_func))my_dlsym(
+        s_profiling_lib_handle, "ddprof_stop_profiling");
   }
-  return {};
+
+  return;
 }
 
 static void __attribute__((destructor)) unloader() {
-  if (!s_lib_profiling_path.empty()) {
-    unlink(s_lib_profiling_path.c_str());
+  if (s_lib_profiling_path) {
+    unlink(s_lib_profiling_path);
+    free(s_lib_profiling_path);
   }
-  if (!s_profiler_exe_path.empty()) {
-    unlink(s_profiler_exe_path.c_str());
+  if (s_profiler_exe_path) {
+    unlink(s_profiler_exe_path);
+    free(s_profiler_exe_path);
   }
 }
 

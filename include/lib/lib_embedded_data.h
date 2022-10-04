@@ -5,11 +5,20 @@
 
 #pragma once
 
-#include "span.hpp"
+#include <stddef.h>
 
-namespace ddprof {
-span<const std::byte> profiling_lib_data();
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-span<const std::byte> profiler_exe_data();
+typedef struct EmbeddedData {
+  const char *data;
+  size_t size;
+} EmbeddedData;
 
-} // namespace ddprof
+EmbeddedData profiling_lib_data();
+EmbeddedData profiler_exe_data();
+
+#ifdef __cplusplus
+}
+#endif
