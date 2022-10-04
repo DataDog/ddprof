@@ -392,8 +392,7 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
   if (id == 9) {
     sysalloc.do_mmap(*uwo, sc_ret, sc_p2, sample->pid);
   } else if (id == 11) {
-    sysalloc.do_munmap(sample->regs[PAM_X86_RDI], sample->regs[PAM_X86_RSI],
-                       sample->pid);
+    sysalloc.do_munmap(sc_p1, sc_p2, sample->pid);
   } else if (id == 28) {
     // Unhandled, no need to handle
   } else if (id == 25) {
