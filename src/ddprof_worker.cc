@@ -364,31 +364,33 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
     }
   }
 
-  // Syscall parameters
+  // Syscall parameters.  Suppressing nags because it's annoying to look these
+  // up and it isn't totally appropriate to spin out a new header just
+  // for this
 #ifdef __x86_64__
-  uint64_t sc_ret = sample->regs[PAM_X86_RAX];
-  uint64_t sc_p1 = sample->regs[PAM_X86_RDI];
-  uint64_t sc_p2 = sample->regs[PAM_X86_RSI];
-  uint64_t sc_p3 = sample->regs[PAM_X86_RDX];
-  uint64_t sc_p4 = sample->regs[PAM_X86_R10];
-  uint64_t sc_p5 = sample->regs[PAM_X86_R8];
-  uint64_t sc_p6 = sample->regs[PAM_X86_R9];
-#ifdef __aarch64__
+  [[maybe_unused]] uint64_t sc_ret = sample->regs[PAM_X86_RAX];
+  [[maybe_unused]] uint64_t sc_p1 = sample->regs[PAM_X86_RDI];
+  [[maybe_unused]] uint64_t sc_p2 = sample->regs[PAM_X86_RSI];
+  [[maybe_unused]] uint64_t sc_p3 = sample->regs[PAM_X86_RDX];
+  [[maybe_unused]] uint64_t sc_p4 = sample->regs[PAM_X86_R10];
+  [[maybe_unused]] uint64_t sc_p5 = sample->regs[PAM_X86_R8];
+  [[maybe_unused]] uint64_t sc_p6 = sample->regs[PAM_X86_R9];
+#elif __aarch64__
   // Obviously ARM is totally broken here.
-  uint64_t sc_ret = sample->regs[PAM_ARM_X0];
-  uint64_t sc_p1 = sample->regs[PAM_ARM_X0]; 
-  uint64_t sc_p2 = sample->regs[PAM_ARM_X1];
-  uint64_t sc_p3 = sample->regs[PAM_ARM_X2];
-  uint64_t sc_p4 = sample->regs[PAM_ARM_X3];
-  uint64_t sc_p5 = sample->regs[PAM_ARM_X4];
-  uint64_t sc_p6 = sample->regs[PAM_ARM_X5];
+  [[maybe_unused]] uint64_t sc_ret = sample->regs[PAM_ARM_X0];
+  [[maybe_unused]] uint64_t sc_p1 = sample->regs[PAM_ARM_X0];
+  [[maybe_unused]] uint64_t sc_p2 = sample->regs[PAM_ARM_X1];
+  [[maybe_unused]] uint64_t sc_p3 = sample->regs[PAM_ARM_X2];
+  [[maybe_unused]] uint64_t sc_p4 = sample->regs[PAM_ARM_X3];
+  [[maybe_unused]] uint64_t sc_p5 = sample->regs[PAM_ARM_X4];
+  [[maybe_unused]] uint64_t sc_p6 = sample->regs[PAM_ARM_X5];
 #else
-#error Architecture not supported
+#  error Architecture not supported
 #endif
 
   // hardcoded syscall numbers; these are uniform between x86/arm
   if (id == 9) {
-    sysalloc.do_mmap(*uwo, sc_ret , sc_p2, sample->pid);
+    sysalloc.do_mmap(*uwo, sc_ret, sc_p2, sample->pid);
   } else if (id == 11) {
     sysalloc.do_munmap(sample->regs[PAM_X86_RDI], sample->regs[PAM_X86_RSI],
                        sample->pid);
