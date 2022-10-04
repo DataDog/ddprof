@@ -347,6 +347,7 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
   int64_t id;
   memcpy(&id, sample->data_raw + 8, sizeof(id));
   auto &sysalloc = ctx->worker_ctx.sys_allocation;
+  sysalloc.watcher_pos = watcher_pos; // unnecessary, but where to put this?
 
   // Only unwind if we will need to propagate unwinding information forward
   DDRes res = {};
@@ -757,10 +758,12 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
             watcher->config == kDDPROF_COUNT_ALLOCATIONS;
         if (sample) {
 
-          if (ctx->params.system_allocations) {
+          if (ctx->params.system_allocations &&
+              (watcher->sample_type & PERF_SAMPLE_RAW) &&
+              watcher->tracepoint_name && *watcher->tracepoint_name) {
             static std::string sys_exit = "sys_exit";
             bool is_rawcalls = !sys_exit.compare(watcher->tracepoint_name);
-            if (is_rawcalls && (watcher->sample_type & PERF_SAMPLE_RAW)) {
+            if (is_rawcalls) {
               DDRES_CHECK_FWD(
                   ddprof_pr_sysallocation_tracking(ctx, sample, watcher_pos));
             }
