@@ -382,7 +382,7 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
   uint64_t sc_p4 = sample->regs[PAM_ARM_X3];
   uint64_t sc_p5 = sample->regs[PAM_ARM_X4];
   uint64_t sc_p6 = sample->regs[PAM_ARM_X5];
-#elif
+#else
 #error Architecture not supported
 #endif
 
