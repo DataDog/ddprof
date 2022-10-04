@@ -10,10 +10,13 @@ namespace ddprof {
 
 class SystemAllocation {
 private:
-  template <class T>
-  T to_page(T a) { return ((a + T{4095ull}) & (~T{4095ull})) >> T{12ull}; }
+  template <class T> T to_page(T a) {
+    return ((a + T{4095ull}) & (~T{4095ull})) >> T{12ull};
+  }
+
 public:
-  void add_allocs(const UnwindOutput &stack, uintptr_t addr, size_t size, pid_t pid) {
+  void add_allocs(const UnwindOutput &stack, uintptr_t addr, size_t size,
+                  pid_t pid) {
     StackMap &stack_map = _pid_map[pid];
 
     // Convert addr to page idx, then page-align size and decimate
@@ -53,7 +56,8 @@ public:
     }
   }
 
-  void do_mmap(const UnwindOutput &stack, uintptr_t addr, size_t size, pid_t pid) {
+  void do_mmap(const UnwindOutput &stack, uintptr_t addr, size_t size,
+               pid_t pid) {
     add_allocs(stack, addr, size, pid);
   }
 
@@ -65,11 +69,12 @@ public:
     // No reason to worry about this yet, since it only has to do with RSS
   }
 
-  void do_mremap(const UnwindOutput &stack, uintptr_t addr0, uintptr_t addr1, size_t size, pid_t pid) {
+  void do_mremap(const UnwindOutput &stack, uintptr_t addr0, uintptr_t addr1,
+                 size_t size, pid_t pid) {
     // We could either classify these pages as belonging to the original mmap
     // or to the mremap.  We chose the latter for now.
     del_allocs(addr0, size, pid);
-    add_allocs(stack, addr1, size, pid); 
+    add_allocs(stack, addr1, size, pid);
   }
 
   using StackMap = std::unordered_map<uintptr_t, UnwindOutput>;

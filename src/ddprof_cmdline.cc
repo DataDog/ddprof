@@ -213,7 +213,7 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
   }
 
   // If we're here, then `spath` contains the path to find events
-  int pathsz = snprintf(path, sz_path, "%s/%s/%s/id", spath, gname , tname);
+  int pathsz = snprintf(path, sz_path, "%s/%s/%s/id", spath, gname, tname);
   if (static_cast<size_t>(pathsz) >= sz_path) {
     // Possibly ran out of room
     free(str);

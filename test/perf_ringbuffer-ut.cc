@@ -46,8 +46,7 @@ bool sample_eq(struct perf_event_sample *s1, struct perf_event_sample *s2) {
     return false;
   }
 
-  if (s1->size_raw &&
-      memcmp(s1->data_raw, s2->data_raw, s1->size_raw)) {
+  if (s1->size_raw && memcmp(s1->data_raw, s2->data_raw, s1->size_raw)) {
     printf("Raw mismatch\n");
     return false;
   }
@@ -64,13 +63,14 @@ bool sample_eq(struct perf_event_sample *s1, struct perf_event_sample *s2) {
 TEST(PerfRingbufferTest, SampleSymmetryx86) {
   // Setup the reference sample
   uint64_t mask = perf_event_default_sample_type();
-  mask |= PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_IP | PERF_SAMPLE_ADDR | PERF_SAMPLE_RAW;
+  mask |= PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_IP | PERF_SAMPLE_ADDR |
+      PERF_SAMPLE_RAW;
   char default_stack[4096] = {0};
   for (uint64_t i = 0; i < std::size(default_stack); i++)
     default_stack[i] = i & 255;
   char default_raw[16] = {0};
   for (uint64_t i = 0; i < sizeof(default_raw) / sizeof(*default_raw); i++)
-    default_raw[i] = (i+11) & 255;
+    default_raw[i] = (i + 11) & 255;
   uint64_t default_regs[PERF_REGS_COUNT] = {};
   for (int i = 0; i < PERF_REGS_COUNT; ++i) {
     default_regs[i] = 1ull << i;

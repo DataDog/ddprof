@@ -126,12 +126,12 @@ void unwind_cycle(UnwindState *us) {
   unwind_metrics_reset();
 }
 
-//bool read_dso(UnwindState *us, ProcessAddress_t addr, unsigned char *buf, size_t sz) {
-//  DsoHdr::DsoFindRes find_res = us->dso_hdr.dso_find_closest(us->pid, us->current_ip);
-//  if (!find_res.second)
+// bool read_dso(UnwindState *us, ProcessAddress_t addr, unsigned char *buf,
+// size_t sz) {
+//  DsoHdr::DsoFindRes find_res = us->dso_hdr.dso_find_closest(us->pid,
+//  us->current_ip); if (!find_res.second)
 //    return false;
 //  Dso *dso = &find_res.first->second;
 //}
-
 
 } // namespace ddprof

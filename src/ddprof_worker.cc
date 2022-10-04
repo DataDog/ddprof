@@ -291,8 +291,8 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     // in lib mode we don't aggregate (protect to avoid link failures)
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
-    DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr,
-                                    sample_val, 1, watcher, pprof));
+    DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr, sample_val, 1,
+                                    watcher, pprof));
     if (ctx->params.show_samples) {
       ddprof_print_sample(us->output, us->symbol_hdr, sample->period, *watcher);
     }
@@ -348,7 +348,6 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
   memcpy(&id, sample->data_raw + 8, sizeof(id));
   auto &sysalloc = ctx->worker_ctx.sys_allocation;
 
-
   // Only unwind if we will need to propagate unwinding information forward
   DDRes res = {};
   UnwindOutput *uwo = NULL;
@@ -366,32 +365,26 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
   }
 
   if (id == 9) {
-    sysalloc.do_mmap(*uwo, sample->regs[PAM_X86_RAX], sample->regs[PAM_X86_RSI], sample->pid); 
-    LG_DBG("[%s]  SZ: 0x%lx, ADDR: %lx, FD: %d, T: %lu",
-        "MMAP",
-        sample->regs[PAM_X86_RSI],
-        sample->regs[PAM_X86_RAX],
-        (int)sample->regs[PAM_X86_R8],
-        sample->time);
+    sysalloc.do_mmap(*uwo, sample->regs[PAM_X86_RAX], sample->regs[PAM_X86_RSI],
+                     sample->pid);
+    LG_DBG("[%s]  SZ: 0x%lx, ADDR: %lx, FD: %d, T: %lu", "MMAP",
+           sample->regs[PAM_X86_RSI], sample->regs[PAM_X86_RAX],
+           (int)sample->regs[PAM_X86_R8], sample->time);
   } else if (id == 11) {
-    sysalloc.do_munmap(sample->regs[PAM_X86_RDI], sample->regs[PAM_X86_RSI], sample->pid);
-    LG_DBG("[%s]  SZ: 0x%lx, ADDR: %lx, T: %lu",
-        "MUNMAP",
-        sample->regs[PAM_X86_RSI],
-        sample->regs[PAM_X86_RDI],
-        sample->time);
+    sysalloc.do_munmap(sample->regs[PAM_X86_RDI], sample->regs[PAM_X86_RSI],
+                       sample->pid);
+    LG_DBG("[%s]  SZ: 0x%lx, ADDR: %lx, T: %lu", "MUNMAP",
+           sample->regs[PAM_X86_RSI], sample->regs[PAM_X86_RDI], sample->time);
   } else if (id == 28) {
     // Unhandled, no need to handle
-    LG_DBG("[%s]  SZ: 0x%lx, ADDR: %lx, MODE: %d, T: %lu",
-        "MADVISE",
-        sample->regs[PAM_X86_RSI],
-        sample->regs[PAM_X86_RDI],
-        (int)sample->regs[PAM_X86_RDX],
-        sample->time);
+    LG_DBG("[%s]  SZ: 0x%lx, ADDR: %lx, MODE: %d, T: %lu", "MADVISE",
+           sample->regs[PAM_X86_RSI], sample->regs[PAM_X86_RDI],
+           (int)sample->regs[PAM_X86_RDX], sample->time);
   } else if (id == 25) {
-    sysalloc.do_mremap(*uwo, sample->regs[PAM_X86_RAX], sample->regs[PAM_X86_RSI], sample->regs[PAM_X86_RDX], sample->pid);
-    LG_DBG("[%s]",
-           "MREMAP");
+    sysalloc.do_mremap(*uwo, sample->regs[PAM_X86_RAX],
+                       sample->regs[PAM_X86_RSI], sample->regs[PAM_X86_RDX],
+                       sample->pid);
+    LG_DBG("[%s]", "MREMAP");
   }
 
   return ddres_init();
@@ -472,8 +465,9 @@ static DDRes aggregate_sys_allocations(DDProfContext *ctx) {
     // Iterate through pages...
     // TODO Probably aggregate into ranges of pages or something, but once per
     //      page is just too much
-    for (const auto &page: stack_map.second) {
-      DDRES_CHECK_FWD(pprof_aggregate(&page.second, &us->symbol_hdr, 4096, 1, watcher, pprof));
+    for (const auto &page : stack_map.second) {
+      DDRES_CHECK_FWD(pprof_aggregate(&page.second, &us->symbol_hdr, 4096, 1,
+                                      watcher, pprof));
     }
   }
   return ddres_init();
@@ -748,14 +742,15 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
         // - sALLOC
         // - mmap/munmap syscalls
         bool is_allocation = watcher->type == kDDPROF_TYPE_CUSTOM &&
-             watcher->config == kDDPROF_COUNT_ALLOCATIONS;
+            watcher->config == kDDPROF_COUNT_ALLOCATIONS;
         if (sample) {
 
           if (ctx->params.system_allocations) {
             static std::string sys_exit = "sys_exit";
             bool is_rawcalls = !sys_exit.compare(watcher->tracepoint_name);
             if (is_rawcalls && (watcher->sample_type & PERF_SAMPLE_RAW)) {
-              DDRES_CHECK_FWD(ddprof_pr_sysallocation_tracking(ctx, sample, watcher_pos));
+              DDRES_CHECK_FWD(
+                  ddprof_pr_sysallocation_tracking(ctx, sample, watcher_pos));
             }
           } else if (is_allocation && ctx->params.live_allocations) {
             DDRES_CHECK_FWD(
