@@ -149,10 +149,6 @@ const char* help_str[DD_KLEN] = {
   [DD_PROFILING_NATIVE_SWITCH_USER] = STR_UNDF,
   [DD_PROFILING_NATIVE_LIVE_ALLOC] =
   "    Report only allocations that were not matched with a free.\n",
-  [DD_PROFILING_NATIVE_SYS_ALLOC] =
-  "    Report the behavior of system-level allocations.  This conflicts with\n"
-  "    sALLOC and other allocation options.  Must be paired with a suitable\n"
-  "    tracepoint event, such as \"-e \'raw_syscalls:sys_exit\'\".\n",
 };
 // clang-format on
 

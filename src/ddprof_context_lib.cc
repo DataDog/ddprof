@@ -120,6 +120,15 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   }
   ctx->num_watchers = nwatchers;
 
+  // Some profiling features, like system allocations, uses ctx storage and
+  // needs to associate a watcher (but only one watcher) to that storage.
+  for (int i = 0; i < ctx->num_watchers; ++i) {
+    if (ctx->watchers[i].ddprof_event_type == DDPROF_PWE_tALLOCSYS) {
+      ctx->worker_ctx.sys_allocation.watcher_pos = i;
+      break;
+    }
+  }
+
   DDRES_CHECK_FWD(exporter_input_copy(&input->exp_input, &ctx->exp_input));
 
   // Set defaults
@@ -341,8 +350,6 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   ctx->params.show_samples = input->show_samples != nullptr;
   ctx->params.live_allocations =
       arg_yesno(input->live_allocations, 1); // default no
-
-  ctx->params.system_allocations = arg_yesno(input->system_allocations, 1);
 
   if (input->switch_user) {
     ctx->params.switch_user = strdup(input->switch_user);

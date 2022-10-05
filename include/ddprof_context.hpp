@@ -33,7 +33,6 @@ typedef struct DDProfContext {
     bool wait_on_socket;
     bool show_samples;
     bool live_allocations; // for now this overrides
-    bool system_allocations;
     cpu_set_t cpu_affinity;
     const char *switch_user;
     const char *internal_stats;
