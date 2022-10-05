@@ -389,6 +389,7 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
 #endif
   if (sc_ret > -4096UL) {
     // If the syscall returned error, it didn't mutate state.  Skip!
+    // ("high" values are errors, as per standard)
     return ddres_init();
   }
 
