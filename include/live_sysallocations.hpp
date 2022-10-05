@@ -70,11 +70,13 @@ public:
   }
 
   void do_mremap(const UnwindOutput &stack, uintptr_t addr0, uintptr_t addr1,
-                 size_t size, pid_t pid) {
+                 size_t size0, size_t size1, pid_t pid) {
     // We could either classify these pages as belonging to the original mmap
     // or to the mremap.  We chose the latter for now.
-    del_allocs(addr0, size, pid);
-    add_allocs(stack, addr1, size, pid);
+    // Note that we potentially duplicate a lot of work here in the case
+    // that addr0 == addr1
+    del_allocs(addr0, size0, pid);
+    add_allocs(stack, addr1, size1, pid);
   }
 
   using StackMap = std::unordered_map<uintptr_t, UnwindOutput>;

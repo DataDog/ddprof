@@ -394,6 +394,7 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
   }
 
   // hardcoded syscall numbers; these are uniform between x86/arm
+  PRINT_NFO("SYSCALL: %lu", id);
   if (id == 9) {
     sysalloc.do_mmap(*uwo, sc_ret, sc_p2, sample->pid);
   } else if (id == 11) {
@@ -401,7 +402,7 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
   } else if (id == 28) {
     // Unhandled, no need to handle
   } else if (id == 25) {
-    sysalloc.do_mremap(*uwo, sc_ret, sc_p2, sc_p3, sample->pid);
+    sysalloc.do_mremap(*uwo, sc_ret, sc_p1, sc_p2, sc_p3, sample->pid);
   }
 
   return ddres_init();
