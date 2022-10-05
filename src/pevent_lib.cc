@@ -19,9 +19,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <sys/ioctl.h>
-#include <sys/mman.h>
 #include <sys/syscall.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 static DDRes pevent_create(PEventHdr *pevent_hdr, int watcher_idx,
@@ -273,7 +271,6 @@ DDRes pevent_setup(DDProfContext *ctx, pid_t pid, int num_cpu,
       int fd = pes->fd;
       for (int j = 0; j < pes->current_child_fd; ++j) {
         int child_fd = pes->child_fds[j];
-        //        if (ioctl(fd, PERF_EVENT_IOC_SET_OUTPUT, child_fd)) {
         if (ioctl(child_fd, PERF_EVENT_IOC_SET_OUTPUT, fd)) {
           DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
                                  "Could not ioctl() tALLOCSYS1");
