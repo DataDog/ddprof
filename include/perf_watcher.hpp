@@ -5,8 +5,6 @@
 
 #pragma once
 
-#include <vector>
-
 #include <linux/perf_event.h>
 #include <stdint.h>
 
