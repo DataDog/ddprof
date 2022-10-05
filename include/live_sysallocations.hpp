@@ -79,6 +79,11 @@ public:
     add_allocs(stack, addr1, size1, pid);
   }
 
+  void do_exit(pid_t pid) {
+    StackMap &stack_map = _pid_map[pid];
+    stack_map.clear();
+  }
+
   using StackMap = std::unordered_map<uintptr_t, UnwindOutput>;
   using PidMap = std::unordered_map<pid_t, StackMap>;
 
