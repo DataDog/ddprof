@@ -387,6 +387,10 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
 #else
 #  error Architecture not supported
 #endif
+  if (sc_ret > -4096UL) {
+    // If the syscall returned error, it didn't mutate state.  Skip!
+    return ddres_init();
+  }
 
   // hardcoded syscall numbers; these are uniform between x86/arm
   if (id == 9) {
