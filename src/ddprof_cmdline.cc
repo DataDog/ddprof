@@ -156,7 +156,7 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
         // We mutated the user's event, but it is invalid.
         return false;
       }
-      
+
       watcher->config = id;
       watcher->options.is_kernel = kPerfWatcher_Try;
     }

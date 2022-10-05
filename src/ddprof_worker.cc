@@ -759,7 +759,8 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
 
           // Handle special profiling types first
           if (watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS) {
-            DDRES_CHECK_FWD(ddprof_pr_sysallocation_tracking(ctx, sample, watcher_pos));
+            DDRES_CHECK_FWD(
+                ddprof_pr_sysallocation_tracking(ctx, sample, watcher_pos));
           } else if (is_allocation && ctx->params.live_allocations) {
             DDRES_CHECK_FWD(
                 ddprof_pr_allocation_tracking(ctx, sample, watcher_pos));
