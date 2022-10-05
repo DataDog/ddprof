@@ -127,8 +127,8 @@ enum DDProfCustomCountId {
   X(sPF,      "Page Faults",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS,             1,            DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
   X(sCS,      "Con. Switch",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_CONTEXT_SWITCHES,        1,            DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
   X(sMig,     "CPU Migrations",     PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_CPU_MIGRATIONS,          99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(sPFMAJ,   "Minor Faults",       PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS_MIN,         99,           DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
-  X(sPFMIN,   "Major Faults",       PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS_MAJ,         99,           DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
+  X(sPFMAJ,   "Major Faults",       PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS_MAJ,         99,           DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
+  X(sPFMIN,   "Minor Faults",       PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS_MIN,         99,           DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
   X(sALGN,    "Align. Faults",      PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_ALIGNMENT_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(sEMU,     "Emu. Faults",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_EMULATION_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(sDUM,     "Dummy",              PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_DUMMY,                   1,            DDPROF_PWT_NOCOUNT,     {})                      \
