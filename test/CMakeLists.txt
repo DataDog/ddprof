@@ -138,6 +138,7 @@ add_unit_test(perf_ringbuffer-ut ../src/perf.cc ../src/perf_watcher.cc ../src/pe
 
 add_unit_test(
   pevent-ut
+  ../src/ddprof_cmdline.cc
   ../src/pevent_lib.cc
   ../src/user_override.cc
   ../src/perf.cc
@@ -239,6 +240,7 @@ add_unit_test(
   ../src/base_frame_symbol_lookup.cc
   ../src/common_mapinfo_lookup.cc
   ../src/common_symbol_lookup.cc
+  ../src/ddprof_cmdline.cc
   ../src/ddprof_file_info.cc
   ../src/ddprof_stats.cc
   ../src/dso.cc
@@ -277,8 +279,10 @@ add_unit_test(sys_utils-ut sys_utils-ut.cc ../src/sys_utils.cc)
 add_unit_test(
   ringbuffer-ut
   ringbuffer-ut.cc
+  ../src/ddprof_cmdline.cc
   ../src/perf.cc
   ../src/perf_ringbuffer.cc
+  ../src/perf_watcher.cc
   ../src/pevent_lib.cc
   ../src/ringbuffer_utils.cc
   ../src/sys_utils.cc
