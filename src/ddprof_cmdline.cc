@@ -278,6 +278,7 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
   // perf_event needs the actual ID of the tracepoint
   long id = id_from_tracepoint(gname, tname);
   if (id == -1) {
+    free(str);
     return false;
   }
 
