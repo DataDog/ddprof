@@ -480,6 +480,9 @@ static DDRes aggregate_sys_allocations(DDProfContext *ctx) {
   int i_export = ctx->worker_ctx.i_current_pprof;
   DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
 
+  // Before we do anything, clear the pids that died in this period
+  sysallocs.sanitize_pids();
+
   // Iterate through each PID
   for (auto &stack_map : sysallocs._pid_map) {
 

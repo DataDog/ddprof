@@ -5,6 +5,9 @@
 #include "unwind_output.hpp"
 
 #include <unordered_map>
+#include <unordered_set>
+
+#include <signal.h>
 
 namespace ddprof {
 
@@ -26,6 +29,7 @@ public:
     for (auto i = page_start; i <= page_end; ++i) {
       stack_map[i] = stack;
     }
+    _visited_recently.insert(pid);
   }
 
   void move_allocs(uintptr_t addr0, uintptr_t addr1, size_t size, pid_t pid) {
@@ -42,6 +46,7 @@ public:
       stack_map[page_start_1 + i] = stack_map[page_start_0 + i];
       stack_map.erase(page_start_0 + i);
     }
+    _visited_recently.insert(pid);
   }
 
   void del_allocs(uintptr_t addr, size_t size, pid_t pid) {
@@ -54,6 +59,7 @@ public:
     for (auto i = page_start; i <= page_end; ++i) {
       stack_map.erase(i);
     }
+    _visited_recently.insert(pid);
   }
 
   void do_mmap(const UnwindOutput &stack, uintptr_t addr, size_t size,
@@ -82,12 +88,26 @@ public:
   void do_exit(pid_t pid) {
     StackMap &stack_map = _pid_map[pid];
     stack_map.clear();
+    _visited_recently.erase(pid);
+  }
+
+  void sanitize_pids() {
+    for (auto &stack_map : _pid_map) {
+      if (!_visited_recently.contains(stack_map.first)) {
+        // This PID wasn't visited recently.  Is it still around?
+        if (kill(stack_map.first, 0)) {
+          _pid_map[stack_map.first].clear();
+        }
+      }
+    }
+    _visited_recently.clear();
   }
 
   using StackMap = std::unordered_map<uintptr_t, UnwindOutput>;
   using PidMap = std::unordered_map<pid_t, StackMap>;
 
   PidMap _pid_map;
+  std::unordered_set<pid_t> _visited_recently;
   int watcher_pos;
 };
 
