@@ -403,10 +403,9 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
     // Unhandled, no need to handle
   } else if (id == 25) {
     sysalloc.do_mremap(*uwo, sc_ret, sc_p1, sc_p2, sc_p3, sample->pid);
-  } else if (id == 60 || id == 231) {
-    sysalloc.do_exit(sample->pid);
-  } else if (id == 59 || id == 322 || id == 520 || id == 545) {
-    // exec-family, but same as exit
+  } else if (id == 60 || id == 231 || id == 59 || id == 322 || id == 520 ||
+             id == 545) {
+    // Erase upon exit or exec
     sysalloc.do_exit(sample->pid);
   }
 
