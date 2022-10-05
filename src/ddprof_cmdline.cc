@@ -147,7 +147,29 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
 
   // Some profiling types get lots of additional state transplanted here
   if (watcher->options.is_overloaded) {
-    if (watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS) {
+    if (watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS1) {
+      // tALLOCSY1 overrides perfopen to bind together many file descriptors
+      watcher->tracepoint_group = "syscalls";
+      watcher->tracepoint_name = "sys_exit_mmap";
+      watcher->sample_type |= PERF_SAMPLE_RAW;
+      watcher->instrument_self = true;
+
+      // We have to test many kprobes
+      long id = id_from_tracepoint("syscalls", "sys_exit_mmap");
+      if (-1 == id) {
+        // We mutated the user's event, but it is invalid.
+        return false;
+      }
+      if (-1 == id_from_tracepoint("syscalls", "sys_exit_mremap")) {
+        return false;
+      }
+      if (-1 == id_from_tracepoint("syscalls", "sys_exit_munmap")) {
+        return false;
+      }
+
+      watcher->config = id;
+      watcher->options.is_kernel = kPerfWatcher_Try;
+    } else if (watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS2) {
       watcher->tracepoint_group = "raw_syscalls";
       watcher->tracepoint_name = "sys_exit";
       watcher->sample_type |= PERF_SAMPLE_RAW;

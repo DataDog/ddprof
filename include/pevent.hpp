@@ -24,6 +24,8 @@ typedef struct PEvent {
   bool custom_event; // true if custom event (not handled by perf, eg. memory
                      // allocations)
   RingBuffer rb;     // metadata and buffers for processing perf ringbuffer
+  int child_fds[MAX_NB_PERF_EVENT_OPEN];
+  int current_child_fd;
 } PEvent;
 
 typedef struct PEventHdr {
