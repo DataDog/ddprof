@@ -40,6 +40,7 @@ check() {
     cmd="$1"
     expected_pids="$2"
     expected_tids="${3-$2}"
+    # shellcheck disable=SC2086
     taskset "${test_cpu_mask}" ${cmd}
     if [[ "${expected_pids}" -eq 1 ]]; then
         # Ugly workaround for tail bug that makes it wait indefinitely for new lines when `grep -q` exists:
@@ -89,3 +90,8 @@ check "./ddprof ./test/simple_malloc ${opts} --fork 2 --threads 2" 2 4
 
 # Test slow profiler startup
 check "env DD_PROFILING_NATIVE_STARTUP_WAIT_MS=200 ./ddprof ./test/simple_malloc ${opts}" 1
+
+# Test switching user
+if runuser -u ddbuild /usr/bin/true &> /dev/null; then
+    check "./ddprof --switch_user ddbuild ./test/simple_malloc ${opts}" 1
+fi

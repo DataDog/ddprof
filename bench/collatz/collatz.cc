@@ -153,7 +153,7 @@ int main(int c, char **v) {
   unsigned long *end_tick = static_cast<unsigned long *>(
       mmap(NULL, MAX_PROCS * sizeof(unsigned long), PROT_READ | PROT_WRITE,
            MAP_SHARED | MAP_ANONYMOUS, -1, 0));
-  pid_t pids[MAX_PROCS] = {0};
+  pid_t pids[MAX_PROCS] = {};
   pids[0] = getpid();
   counter = static_cast<unsigned long *>(
       mmap(NULL, sizeof(unsigned long), PROT_READ | PROT_WRITE,
@@ -168,7 +168,7 @@ int main(int c, char **v) {
 #endif
 
   // Setup barrier for coordination
-  pthread_barrierattr_t bat = {0};
+  pthread_barrierattr_t bat = {};
   pthread_barrier_t *pb = static_cast<pthread_barrier_t *>(
       mmap(NULL, sizeof(pthread_barrier_t), PROT_READ | PROT_WRITE,
            MAP_SHARED | MAP_ANONYMOUS, -1, 0));
