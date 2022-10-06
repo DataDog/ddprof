@@ -151,16 +151,17 @@ endif()
 list(APPEND DDPROF_LIBRARY_LIST libcap)
 list(APPEND DDPROF_INCLUDE_LIST ${LIBCAP_INCLUDE_DIR})
 
+set(dd_profiling_linker_script "${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")
+
 if(USE_LOADER)
   # Build small loader lib that is in charge of dlopening libdd_profiling-embedded.so
-  add_library(dd_loader SHARED src/lib/lib_embedded_data.c src/lib/loader.c src/lib/stat_fix.c)
+  add_library(dd_loader SHARED src/lib/glibc_fixes.c src/lib/lib_embedded_data.c src/lib/loader.c
+                               src/sha1.c)
   target_include_directories(
     dd_loader PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/include/lib
                       ${CMAKE_SOURCE_DIR}/third_party)
-  set_target_properties(dd_loader PROPERTIES LINK_DEPENDS
-                                             "${CMAKE_SOURCE_DIR}/cmake/dd_loader.version")
-  target_link_options(dd_loader PRIVATE
-                      "LINKER:--version-script=${CMAKE_SOURCE_DIR}/cmake/dd_loader.version")
+  set_target_properties(dd_loader PROPERTIES LINK_DEPENDS "${dd_profiling_linker_script}")
+  target_link_options(dd_loader PRIVATE "LINKER:--version-script=${dd_profiling_linker_script}")
   target_static_libcxx(dd_loader)
 
   if(BUILD_UNIVERSAL_DDPROF)
@@ -204,8 +205,8 @@ set(DD_PROFILING_SOURCES
     src/sys_utils.cc
     src/user_override.cc)
 
-if(BUILD_UNIVERSAL_DDPROF AND USE_AUXILIARY)
-  list(APPEND DD_PROFILING_SOURCES src/lib/stat_fix.c)
+if(BUILD_UNIVERSAL_DDPROF)
+  list(APPEND DD_PROFILING_SOURCES src/lib/glibc_fixes.c)
 endif()
 
 # libddprofiling_embeded.so is the actual profiling library
@@ -218,10 +219,9 @@ set_target_properties(dd_profiling-embedded
 
 # Link libstdc++/libgcc statically and export only profiler API
 target_static_libcxx(dd_profiling-embedded)
-set_target_properties(dd_profiling-embedded
-                      PROPERTIES LINK_DEPENDS "${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")
+set_target_properties(dd_profiling-embedded PROPERTIES LINK_DEPENDS "${dd_profiling_linker_script}")
 target_link_options(dd_profiling-embedded PRIVATE
-                    "LINKER:--version-script=${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")
+                    "LINKER:--version-script=${dd_profiling_linker_script}")
 if(BUILD_UNIVERSAL_DDPROF)
   target_link_options(dd_profiling-embedded PRIVATE "-nolibc")
   if(USE_AUXILIARY)
@@ -309,20 +309,19 @@ target_link_libraries(dd_profiling-static PUBLIC dl pthread)
 if(USE_LOADER)
   # When using a loader, libdd_profiling.so is a loader that embeds both libdd_profiling-embedded.so
   # and ddprof executable.
-  add_library(dd_profiling-shared SHARED src/lib/lib_embedded_data.c src/lib/loader.c
-                                         src/lib/stat_fix.c)
+  add_library(dd_profiling-shared SHARED src/lib/glibc_fixes.c src/lib/lib_embedded_data.c
+                                         src/lib/loader.c src/sha1.c)
   target_link_libraries(dd_profiling-shared PRIVATE libddprofiling_embedded_object
                                                     ddprof_exe_object)
   target_compile_definitions(dd_profiling-shared PRIVATE DDPROF_EMBEDDED_LIB_DATA
                                                          DDPROF_EMBEDDED_EXE_DATA)
-  set(linker_script "${CMAKE_SOURCE_DIR}/cmake/dd_loader.version")
 else()
   # Without loader, libdd_profiling.so is basically the same as libdd_profiling-embedded.so plus an
   # embedded ddprof executable.
   add_library(dd_profiling-shared SHARED ${DD_PROFILING_SOURCES} src/lib/lib_embedded_data.c)
   target_link_libraries(dd_profiling-shared PRIVATE ddprof_exe_object)
   target_compile_definitions(dd_profiling-shared PRIVATE DDPROF_EMBEDDED_EXE_DATA)
-  set(linker_script "${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")
+
   # Fix for link error in sanitizeddebug build mode with gcc:
   # ~~~
   # /usr/bin/ld: ./libdd_profiling.so: undefined reference to `__dynamic_cast'
@@ -340,8 +339,9 @@ else()
 endif()
 
 target_static_libcxx(dd_profiling-shared)
-set_target_properties(dd_profiling-shared PROPERTIES LINK_DEPENDS "${linker_script}")
-target_link_options(dd_profiling-shared PRIVATE "LINKER:--version-script=${linker_script}")
+set_target_properties(dd_profiling-shared PROPERTIES LINK_DEPENDS "${dd_profiling_linker_script}")
+target_link_options(dd_profiling-shared PRIVATE
+                    "LINKER:--version-script=${dd_profiling_linker_script}")
 
 set_target_properties(dd_profiling-shared PROPERTIES OUTPUT_NAME dd_profiling)
 target_include_directories(

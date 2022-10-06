@@ -13,7 +13,11 @@
 #include <sys/stat.h>
 
 namespace ddprof {
+DDRes get_or_create_temp_file(std::string_view prefix,
+                              ddprof::span<const std::byte> data, mode_t mode,
+                              std::string &path);
+
 DDRes create_temp_file(std::string_view prefix,
                        ddprof::span<const std::byte> data, mode_t mode,
                        std::string &path);
-}
+} // namespace ddprof

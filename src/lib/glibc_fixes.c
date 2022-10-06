@@ -7,6 +7,14 @@
 #include <stddef.h>
 #include <sys/stat.h>
 
+#ifndef _STAT_VER_LINUX
+#  ifndef __x86_64__
+#    define _STAT_VER_LINUX 0
+#  else
+#    define _STAT_VER_LINUX 1
+#  endif
+#endif
+
 void *dlsym(void *handle, const char *symbol) __attribute__((weak));
 
 // fstat is linked statically on glibc and symbol is not present in libc.so.6
@@ -26,7 +34,7 @@ extern int stat(const char *pathname, struct stat *buf)
 __attribute__((unused)) int __fstat(int fd, struct stat *buf) {
   if (__fxstat) {
     // __fxstat is available call it directly
-    return __fxstat(1, fd, buf);
+    return __fxstat(_STAT_VER_LINUX, fd, buf);
   }
   // __fxtstat is not available, we must be executing on musl, therefore `fstat`
   // should be availble in libc
@@ -46,7 +54,7 @@ __attribute__((unused)) int __fstat(int fd, struct stat *buf) {
 __attribute__((unused)) int __stat(const char *pathname, struct stat *buf) {
   if (__xstat) {
     // __xstat is available call it directly
-    return __xstat(1, pathname, buf);
+    return __xstat(_STAT_VER_LINUX, pathname, buf);
   }
   // __xtstat is not available, we must be executing on musl, therefore `stat`
   // should be availble in libc
@@ -56,6 +64,38 @@ __attribute__((unused)) int __stat(const char *pathname, struct stat *buf) {
   }
   if (s_stat) {
     return s_stat(pathname, buf);
+  }
+
+  // Should not happen
+  return -1;
+}
+
+extern void *__dso_handle __attribute__((__visibility__("hidden")));
+
+int __register_atfork(void (*prepare)(void), void (*parent)(void),
+                      void (*child)(void), void *dso_handle)
+    __attribute__((weak));
+
+extern int pthread_atfork(void (*prepare)(void), void (*parent)(void),
+                          void (*child)(void))
+    __attribute__((weak, alias("__pthread_atfork")));
+
+/* pthread_atfork is defined in libc_nonshared.a on aarch64 glibc, hence we need
+ * to provide our own definition... */
+int __pthread_atfork(void (*prepare)(void), void (*parent)(void),
+                     void (*child)(void)) {
+  // if __register_atfork is available (glibc), call it directly
+  if (__register_atfork) {
+    return __register_atfork(prepare, parent, child, __dso_handle);
+  }
+
+  static __typeof(pthread_atfork) *s_func = NULL;
+  // we must be on musl, look up pthread_atfork
+  if (s_func == NULL && dlsym) {
+    s_func = (__typeof(s_func))dlsym(RTLD_NEXT, "pthread_atfork");
+  }
+  if (s_func) {
+    return s_func(prepare, parent, child);
   }
 
   // Should not happen

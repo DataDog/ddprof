@@ -6,6 +6,7 @@
 #include "constants.hpp"
 #include "dd_profiling.h"
 #include "lib_embedded_data.h"
+#include "sha1.h"
 
 #include <dlfcn.h>
 #include <fcntl.h>
@@ -113,10 +114,10 @@ static void *my_dlsym(void *handle, const char *symbol) {
   return dlsym_ptr(handle, symbol);
 }
 
-const char *temp_directory_path() {
+static const char *temp_directory_path() {
   const char *tmpdir = NULL;
   const char *env[] = {"TMPDIR", "TMP", "TEMP", "TEMPDIR", NULL};
-  for (const char **e = env; tmpdir && *e != NULL; ++e) {
+  for (const char **e = env; !tmpdir && *e; ++e) {
     tmpdir = getenv(*e);
   }
   const char *p = tmpdir ? tmpdir : "/tmp";
@@ -128,7 +129,8 @@ const char *temp_directory_path() {
   return p;
 }
 
-char *create_temp_file(const char *prefix, EmbeddedData data, mode_t mode) {
+static char *create_temp_file(const char *prefix, EmbeddedData data,
+                              mode_t mode) {
   const char *tmp_dir = temp_directory_path();
   if (!tmp_dir) {
     return NULL;
@@ -169,54 +171,94 @@ char *create_temp_file(const char *prefix, EmbeddedData data, mode_t mode) {
   return path;
 }
 
-static char *s_lib_profiling_path = NULL;
-static char *s_profiler_exe_path = NULL;
+static char *get_or_create_temp_file(const char *prefix, EmbeddedData data,
+                                     mode_t mode) {
+  const char *tmp_dir = temp_directory_path();
+  if (!tmp_dir) {
+    return NULL;
+  }
+
+  unsigned char digest[20];
+  char str_digest[41];
+  SHA1(digest, data.data, data.size);
+  SHA1StrDigest(digest, str_digest);
+
+  char *path =
+      malloc(strlen(tmp_dir) + strlen(prefix) + sizeof(str_digest) + 2);
+  if (path == NULL) {
+    return NULL;
+  }
+  strcpy(path, tmp_dir);
+  strcat(path, "/");
+  strcat(path, prefix);
+  strcat(path, "-");
+  strcat(path, str_digest);
+
+  // Check if file already exists
+  struct stat st;
+  if (stat(path, &st) == 0) {
+    return path;
+  }
+
+  char *tmp_path = create_temp_file(prefix, data, mode);
+  if (!tmp_path) {
+    free(path);
+    return NULL;
+  }
+
+  if (rename(tmp_path, path) != 0) {
+    unlink(tmp_path);
+    free(tmp_path);
+    free(path);
+    return NULL;
+  }
+
+  free(tmp_path);
+  return path;
+}
+
 static void *s_profiling_lib_handle = NULL;
 __typeof(ddprof_start_profiling) *s_start_profiling_func = NULL;
 __typeof(ddprof_stop_profiling) *s_stop_profiling_func = NULL;
 
 static void __attribute__((constructor)) loader() {
-  const char *s = getenv(k_profiler_lib_env_variable);
-  if (!s) {
+  char *lib_profiling_path = getenv(k_profiler_lib_env_variable);
+  if (!lib_profiling_path) {
     EmbeddedData lib_data = profiling_lib_data();
     EmbeddedData exe_data = profiler_exe_data();
     if (lib_data.size == 0 || exe_data.size == 0) {
       // nothing to do
       return;
     }
-    s_lib_profiling_path =
-        create_temp_file(k_libdd_profiling_name, lib_data, 0644);
-    s_profiler_exe_path = create_temp_file(k_profiler_exe_name, exe_data, 0755);
-    if (!s_lib_profiling_path || !s_profiler_exe_path) {
+    lib_profiling_path = get_or_create_temp_file(
+        k_libdd_profiling_embedded_name, lib_data, 0644);
+    char *profiler_exe_path =
+        get_or_create_temp_file(k_profiler_exe_name, exe_data, 0755);
+    if (!lib_profiling_path || !profiler_exe_path) {
+      free(lib_profiling_path);
+      free(profiler_exe_path);
       return;
     }
-    s = s_lib_profiling_path;
-    setenv(k_profiler_ddprof_exe_env_variable, s_profiler_exe_path, 1);
+    setenv(k_profiler_ddprof_exe_env_variable, profiler_exe_path, 1);
+    free(profiler_exe_path);
+  } else {
+    lib_profiling_path = strdup(lib_profiling_path);
+    if (!lib_profiling_path) {
+      return;
+    }
   }
 
   ensure_libdl_is_loaded();
   ensure_libm_is_loaded();
   ensure_libpthread_is_loaded();
 
-  s_profiling_lib_handle = my_dlopen(s, RTLD_LOCAL | RTLD_NOW);
+  s_profiling_lib_handle = my_dlopen(lib_profiling_path, RTLD_LOCAL | RTLD_NOW);
+  free(lib_profiling_path);
   if (s_profiling_lib_handle) {
     s_start_profiling_func = (__typeof(s_start_profiling_func))my_dlsym(
         s_profiling_lib_handle, "ddprof_start_profiling");
     s_stop_profiling_func = (__typeof(s_stop_profiling_func))my_dlsym(
         s_profiling_lib_handle, "ddprof_stop_profiling");
-  }
-
-  return;
-}
-
-static void __attribute__((destructor)) unloader() {
-  if (s_lib_profiling_path) {
-    unlink(s_lib_profiling_path);
-    free(s_lib_profiling_path);
-  }
-  if (s_profiler_exe_path) {
-    unlink(s_profiler_exe_path);
-    free(s_profiler_exe_path);
   }
 }
 
