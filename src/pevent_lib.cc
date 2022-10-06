@@ -109,10 +109,11 @@ static DDRes tallocsys1_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
       watcher_copy.tracepoint_name = kprobe.first.c_str();
       watcher_copy.config = kprobe.second.fd;
 
+      // THIS IS WRONG
       if (kprobe.second.enable_userstack) {
-        watcher_copy.ddprof_event_type = watcher->ddprof_event_type;
+        watcher_copy.sample_stack_size = watcher->sample_stack_size;
       } else {
-        watcher_copy.ddprof_event_type = 0;
+        watcher_copy.sample_stack_size = 0;
       }
 
       attr = perf_config_from_watcher(&watcher_copy, true);
