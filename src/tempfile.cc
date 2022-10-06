@@ -7,6 +7,7 @@
 
 #include "ddres_helpers.hpp"
 #include "defer.hpp"
+#include "sha1.h"
 
 #include <fcntl.h>
 #include <filesystem>
@@ -15,6 +16,34 @@
 #include <unistd.h>
 
 namespace ddprof {
+
+DDRes get_or_create_temp_file(std::string_view prefix,
+                              ddprof::span<const std::byte> data, mode_t mode,
+                              std::string &path) {
+  unsigned char digest[20];
+  char str_digest[41];
+  SHA1(digest, reinterpret_cast<const char *>(data.data()), data.size());
+  SHA1StrDigest(digest, str_digest);
+
+  std::error_code ec;
+  path = std::string{std::filesystem::temp_directory_path(ec) / prefix} + "-" +
+      std::string{str_digest};
+  DDRES_CHECK_ERRORCODE(ec, DD_WHAT_TEMP_FILE,
+                        "Failed to determine temp directory path");
+
+  if (std::filesystem::exists(path, ec)) {
+    return {};
+  }
+  std::string tmp_path;
+  DDRES_CHECK_FWD(create_temp_file(prefix, data, mode, tmp_path));
+  std::filesystem::rename(tmp_path, path, ec);
+  if (ec) {
+    std::filesystem::remove(tmp_path, ec);
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_TEMP_FILE, "Failed to rename temp file");
+  }
+
+  return {};
+}
 
 DDRes create_temp_file(std::string_view prefix,
                        ddprof::span<const std::byte> data, mode_t mode,

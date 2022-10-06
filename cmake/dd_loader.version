@@ -1,4 +1,0 @@
-{
-  global: ddprof_start_profiling; ddprof_stop_profiling; fstat; stat;
-  local: *;
-};
