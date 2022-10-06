@@ -284,6 +284,24 @@ struct mmap {
   }
 };
 
+struct mmap_ {
+  static constexpr auto name = "__mmap";
+  static inline auto ref = &::mmap;
+  static inline bool ref_checked = false;
+
+  static void *hook(void *addr, size_t length, int prot, int flags, int fd,
+                    off_t offset) noexcept {
+    void *ptr = ref(addr, length, prot, flags, fd, offset);
+
+    if (addr == nullptr && fd == -1 && ptr != nullptr &&
+        !g_in_allocator_guard) {
+      ddprof::AllocationTracker::track_allocation(
+          reinterpret_cast<uintptr_t>(ptr), length);
+    }
+    return ptr;
+  }
+};
+
 struct mmap64_ {
   static constexpr auto name = "mmap64";
   static inline auto ref = &::mmap64;
@@ -304,6 +322,20 @@ struct mmap64_ {
 
 struct munmap {
   static constexpr auto name = "munmap";
+  static inline auto ref = &::munmap;
+  static inline bool ref_checked = false;
+
+  static int hook(void *addr, size_t length) noexcept {
+    if (!g_in_allocator_guard) {
+      ddprof::AllocationTracker::track_deallocation(
+          reinterpret_cast<uintptr_t>(addr));
+    }
+    return ref(addr, length);
+  }
+};
+
+struct munmap_ {
+  static constexpr auto name = "__munmap";
   static inline auto ref = &::munmap;
   static inline bool ref_checked = false;
 
@@ -349,6 +381,8 @@ void setup_hooks(bool restore) {
   install_hook<mmap>(restore);
   install_hook<mmap64_>(restore);
   install_hook<munmap>(restore);
+  install_hook<mmap_>(restore);
+  install_hook<munmap_>(restore);
 
   if (reallocarray::ref) {
     install_hook<reallocarray>(restore);
