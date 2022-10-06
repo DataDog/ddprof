@@ -15,7 +15,7 @@
 #include <vector>
 
 // defaut ring buffer size expressed as a power-of-two in number of pages
-#define DEFAULT_BUFF_SIZE_SHIFT 8
+#define DEFAULT_BUFF_SIZE_SHIFT 6
 // this does not count as pinned memory, use a larger size
 #define MPSC_BUFF_SIZE_SHIFT 8
 
