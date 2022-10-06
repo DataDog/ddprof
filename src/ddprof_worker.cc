@@ -344,29 +344,14 @@ DDRes ddprof_pr_allocation_tracking(DDProfContext *ctx,
 DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
                                        perf_event_sample *sample,
                                        int watcher_pos) {
-  int64_t id;
-  memcpy(&id, sample->data_raw + 8, sizeof(id));
-  auto &sysalloc = ctx->worker_ctx.sys_allocation;
-
-  // Only unwind if we will need to propagate unwinding information forward
-  DDRes res = {};
-  UnwindOutput *uwo = NULL;
-  if (id == 9 || id == 25) {
-    auto ticks0 = ddprof::get_tsc_cycles();
-    res = ddprof_unwind_sample(ctx, sample, watcher_pos);
-    auto unwind_ticks = ddprof::get_tsc_cycles();
-    ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL);
-    uwo = &ctx->worker_ctx.us->output;
-
-    // TODO: propagate fatal
-    if (IsDDResFatal(res)) {
-      return ddres_init();
-    }
-  }
 
   // Syscall parameters.  Suppressing nags because it's annoying to look these
   // up and it isn't totally appropriate to spin out a new header just
   // for this
+  int64_t id;
+  memcpy(&id, sample->data_raw + 8, sizeof(id));
+  auto &sysalloc = ctx->worker_ctx.sys_allocation;
+
 #ifdef __x86_64__
   [[maybe_unused]] uint64_t sc_ret = sample->regs[PAM_X86_RAX];
   [[maybe_unused]] uint64_t sc_p1 = sample->regs[PAM_X86_RDI];
@@ -392,6 +377,23 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
     // ("high" values are errors, as per standard)
     return ddres_init();
   }
+
+  // Only unwind if we will need to propagate unwinding information forward
+  DDRes res = {};
+  UnwindOutput *uwo = NULL;
+  if (id == 9 || id == 25) {
+    auto ticks0 = ddprof::get_tsc_cycles();
+    res = ddprof_unwind_sample(ctx, sample, watcher_pos);
+    auto unwind_ticks = ddprof::get_tsc_cycles();
+    ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL);
+    uwo = &ctx->worker_ctx.us->output;
+
+    // TODO: propagate fatal
+    if (IsDDResFatal(res)) {
+      return ddres_init();
+    }
+  }
+
 
   // hardcoded syscall numbers; these are uniform between x86/arm
   if (id == 9) {
