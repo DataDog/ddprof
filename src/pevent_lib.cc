@@ -79,8 +79,7 @@ static DDRes tallocsys1_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
   };
   std::unordered_map<std::string, talloc_conf> kprobes{
       {"sys_exit_mmap", {-1, true}},        {"sys_exit_munmap", {-1, false}},
-      {"sys_exit_mremap", {-1, true}},      {"sys_exit_exit", {-1, false}},
-      {"sys_exit_exit_group", {-1, false}}, {"sys_exit_execve", {-1, false}}};
+      {"sys_exit_mremap", {-1, true}}};
 
   // Set the IDs
   for (auto &kprobe : kprobes) {
