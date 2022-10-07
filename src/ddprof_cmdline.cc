@@ -153,6 +153,7 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
       watcher->tracepoint_name = "sys_exit_mmap";
       watcher->instrument_self = true;
       watcher->options.is_kernel = kPerfWatcher_Try;
+      watcher->sample_stack_size /= 2; // Make this one smaller than normal
 
     } else if (watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS2) {
       // tALLOCSYS2 captures all syscalls; used to troubleshoot 1
