@@ -394,7 +394,6 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
     }
   }
 
-
   // hardcoded syscall numbers; these are uniform between x86/arm
   if (id == 9) {
     sysalloc.do_mmap(*uwo, sc_ret, sc_p2, sample->pid);
