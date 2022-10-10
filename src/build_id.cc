@@ -13,7 +13,6 @@ namespace ddprof {
 BuildIdStr format_build_id(BuildIdSpan build_id_span) {
   std::stringstream build_id_ss;
   build_id_ss << std::hex;
-  std::string dbg_build_id;
   for (auto el : build_id_span) {
     std::stringstream ss;
     ss << std::hex;
