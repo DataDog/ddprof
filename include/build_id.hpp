@@ -3,14 +3,14 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include <span>
-#include <vector>
+#include "span.hpp"
+
 #include <string>
+#include <vector>
 
 namespace ddprof {
-using BuildIdSpan = std::span<const unsigned char>;
-using BuildId = std::vector<unsigned char>;
+using BuildIdSpan = ddprof::span<const unsigned char>;
 using BuildIdStr = std::string;
 
 BuildIdStr format_build_id(BuildIdSpan build_id_span);
-}
+} // namespace ddprof

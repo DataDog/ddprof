@@ -304,6 +304,9 @@ add_unit_test(runtime_symbol_lookup-ut runtime_symbol_lookup-ut.cc ../src/runtim
 add_unit_test(ddprof_cpumask-ut ddprof_cpumask-ut.cc ../src/ddprof_cpumask.cc)
 
 add_unit_test(symbol_map-ut symbol_map-ut.cc ../src/symbol_map.cc)
+
+add_unit_test(build_id-ut build_id-ut.cc ../src/build_id.cc)
+
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/savecontext.cc ../src/saveregisters.cc)
 add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 

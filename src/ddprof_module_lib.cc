@@ -148,15 +148,14 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
   ddprof_mod._mod =
       dwfl_report_elf(dwfl, module_name, filepath.c_str(), fd, start, false);
 
-  
-  // Retrieve build id 
+  // Retrieve build id
   const unsigned char *bits = nullptr;
   GElf_Addr vaddr;
-  if (int size = dwfl_module_build_id (ddprof_mod._mod,
-				 &bits, &vaddr); size > 0) {
-    // ensure we called dwfl_module_getelf first (or this can fail)  
+  if (int size = dwfl_module_build_id(ddprof_mod._mod, &bits, &vaddr);
+      size > 0) {
+    // ensure we called dwfl_module_getelf first (or this can fail)
     // returns the size
-    ddprof_mod.set_build_id(std::span(bits, size));
+    ddprof_mod.set_build_id(ddprof::span(bits, size));
   }
 
   if (!ddprof_mod._mod) {
@@ -169,9 +168,11 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
   } else {
     dwfl_module_info(ddprof_mod._mod, 0, &ddprof_mod._low_addr,
                      &ddprof_mod._high_addr, 0, 0, 0, 0);
-    LG_DBG("Loaded mod from file (%s[ID#%d]), (%s) mod[%lx-%lx] bias[%lx], build-id: %s",
+    LG_DBG("Loaded mod from file (%s[ID#%d]), (%s) mod[%lx-%lx] bias[%lx], "
+           "build-id: %s",
            fileInfoValue.get_path().c_str(), fileInfoValue.get_id(),
-           dwfl_errmsg(-1), ddprof_mod._low_addr, ddprof_mod._high_addr, bias, ddprof_mod._build_id.c_str());
+           dwfl_errmsg(-1), ddprof_mod._low_addr, ddprof_mod._high_addr, bias,
+           ddprof_mod._build_id.c_str());
   }
 
   ddprof_mod._sym_bias = bias;

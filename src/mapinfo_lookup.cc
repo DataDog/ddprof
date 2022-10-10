@@ -11,7 +11,8 @@ namespace ddprof {
 
 MapInfoIdx_t MapInfoLookup::get_or_insert(pid_t pid,
                                           MapInfoTable &mapinfo_table,
-                                          const Dso &dso, const BuildIdStr *build_id) {
+                                          const Dso &dso,
+                                          std::optional<BuildIdStr> build_id) {
   MapInfoAddrMap &addr_map = _mapinfo_pidmap[pid];
   auto it = addr_map.find(dso._start);
 
@@ -22,7 +23,8 @@ MapInfoIdx_t MapInfoLookup::get_or_insert(pid_t pid,
         : dso._filename.substr(pos + 1);
     MapInfoIdx_t map_info_idx = mapinfo_table.size();
     mapinfo_table.emplace_back(dso._start, dso._end, dso._pgoff,
-                                std::move(sname_str), build_id?*build_id:BuildIdStr{});
+                               std::move(sname_str),
+                               build_id ? *build_id : BuildIdStr{});
     addr_map.emplace(dso._start, map_info_idx);
     return map_info_idx;
   } else {

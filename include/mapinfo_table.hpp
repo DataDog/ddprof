@@ -5,8 +5,8 @@
 
 #pragma once
 
-#include "ddprof_defs.hpp"
 #include "build_id.hpp"
+#include "ddprof_defs.hpp"
 
 #include <string>
 

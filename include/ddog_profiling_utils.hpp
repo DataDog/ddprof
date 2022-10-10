@@ -11,12 +11,8 @@ extern "C" {
 
 #include "string_view.hpp"
 
-#include <string_view>
 #include <span>
-
-inline ddog_CharSlice to_CharSlice(std::span <const unsigned char>span) {
-  return {.ptr = reinterpret_cast<const char *>(span.data()), .len = span.size()};
-}
+#include <string_view>
 
 inline ddog_CharSlice to_CharSlice(std::string_view str) {
   return {.ptr = str.data(), .len = str.size()};
@@ -25,4 +21,3 @@ inline ddog_CharSlice to_CharSlice(std::string_view str) {
 inline ddog_CharSlice to_CharSlice(string_view slice) {
   return {.ptr = slice.ptr, .len = slice.len};
 }
-
