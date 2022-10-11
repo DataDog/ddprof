@@ -177,6 +177,8 @@ int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
   return -1;
 }
 
+void notify_fork() { ddprof::AllocationTracker::notify_fork(); }
+
 int ddprof_start_profiling_internal() {
   // Refuse to start profiler if already started by this process or if active in
   // one of its ancestors
@@ -261,8 +263,7 @@ int ddprof_start_profiling_internal() {
   } catch (const ddprof::DDException &e) { return -1; }
 
   if (g_state.allocation_profiling_started) {
-    // disable allocation profiling in child upon fork
-    pthread_atfork(nullptr, nullptr, &ddprof::AllocationTracker::notify_fork);
+    pthread_atfork(nullptr, nullptr, notify_fork);
   }
   g_state.started = true;
   set_profiler_library_active();

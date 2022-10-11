@@ -16,6 +16,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
 /* Role of loader is to ensure that all dependencies (libdl/lim/lipthread) of
@@ -50,6 +51,8 @@ void *__libc_dlopen_mode(const char *filename, int flag) __attribute__((weak));
 void *__libc_dlsym(void *handle, const char *symbol) __attribute__((weak));
 int pthread_cancel(pthread_t thread) __attribute__((weak));
 double log(double x) __attribute__((weak));
+int timer_create(clockid_t clockid, struct sigevent *sevp, timer_t *timerid)
+    __attribute__((weak));
 
 static void *s_libdl_handle = NULL;
 
@@ -83,6 +86,12 @@ static void ensure_libm_is_loaded() {
 static void ensure_libpthread_is_loaded() {
   if (!pthread_cancel) {
     my_dlopen("libpthread.so.0", RTLD_GLOBAL | RTLD_NOW);
+  }
+}
+
+static void ensure_librt_is_loaded() {
+  if (!timer_create) {
+    my_dlopen("librt.so.1", RTLD_GLOBAL | RTLD_NOW);
   }
 }
 
@@ -251,6 +260,7 @@ static void __attribute__((constructor)) loader() {
   ensure_libdl_is_loaded();
   ensure_libm_is_loaded();
   ensure_libpthread_is_loaded();
+  ensure_librt_is_loaded();
 
   s_profiling_lib_handle = my_dlopen(lib_profiling_path, RTLD_LOCAL | RTLD_NOW);
   free(lib_profiling_path);

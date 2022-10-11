@@ -8,4 +8,5 @@
 namespace ddprof {
 void setup_overrides();
 void restore_overrides();
+void reinstall_timer_after_fork();
 } // namespace ddprof
