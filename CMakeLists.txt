@@ -225,8 +225,9 @@ target_link_options(dd_profiling-embedded PRIVATE
 if(BUILD_UNIVERSAL_DDPROF)
   target_link_options(dd_profiling-embedded PRIVATE "-nolibc")
   if(USE_AUXILIARY)
-    target_link_options(dd_profiling-embedded PRIVATE
-                        "-Wl,-f,libpthread.so.0;-Wl,-f,libm.so.6;-Wl,-f,libdl.so.2")
+    target_link_options(
+      dd_profiling-embedded PRIVATE
+      "-Wl,-f,libpthread.so.0;-Wl,-f,libm.so.6;-Wl,-f,libdl.so.2;-Wl,-f,librt.so.1")
     target_compile_definitions(dd_profiling-embedded PRIVATE DDPROF_MISSING_FSTAT)
   endif()
 endif()
@@ -244,7 +245,7 @@ target_link_libraries(
   PRIVATE
     "$<$<AND:$<C_COMPILER_ID:GNU>,$<CONFIG:SanitizedDebug>>:-Wl,-Bstatic;-lubsan;-lasan;-lstdc++;-Wl,-Bdynamic>"
 )
-target_link_libraries(dd_profiling-embedded PUBLIC dl pthread)
+target_link_libraries(dd_profiling-embedded PUBLIC dl pthread rt)
 
 set(LIBDD_PROFILING_EMBEDDED_OBJECT "${CMAKE_BINARY_DIR}/libdd_profiling-embedded.o")
 add_custom_command(
@@ -304,7 +305,7 @@ target_include_directories(
                              ${CMAKE_SOURCE_DIR}/third_party)
 set_target_properties(dd_profiling-static
                       PROPERTIES PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
-target_link_libraries(dd_profiling-static PUBLIC dl pthread)
+target_link_libraries(dd_profiling-static PUBLIC dl pthread rt)
 
 if(USE_LOADER)
   # When using a loader, libdd_profiling.so is a loader that embeds both libdd_profiling-embedded.so
@@ -335,7 +336,7 @@ else()
     PRIVATE
       "$<$<AND:$<C_COMPILER_ID:GNU>,$<CONFIG:SanitizedDebug>>:-Wl,-Bstatic;-lubsan;-lasan;-lstdc++;-Wl,-Bdynamic>"
   )
-  target_link_libraries(dd_profiling-shared PUBLIC dl pthread)
+  target_link_libraries(dd_profiling-shared PUBLIC dl pthread rt)
 endif()
 
 target_static_libcxx(dd_profiling-shared)
@@ -352,8 +353,9 @@ set_target_properties(dd_profiling-shared
 if(BUILD_UNIVERSAL_DDPROF)
   target_link_options(dd_profiling-shared PRIVATE "-nolibc")
   if(USE_AUXILIARY)
-    target_link_options(dd_profiling-shared PRIVATE
-                        "-Wl,-f,libpthread.so.0;-Wl,-f,libm.so.6;-Wl,-f,libdl.so.2")
+    target_link_options(
+      dd_profiling-shared PRIVATE
+      "-Wl,-f,libpthread.so.0;-Wl,-f,libm.so.6;-Wl,-f,libdl.so.2;-Wl,-f,librt.so.1")
   endif()
 endif()
 

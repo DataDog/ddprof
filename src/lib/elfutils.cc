@@ -431,4 +431,14 @@ void override_symbol(std::string_view symbol_name, void *new_symbol,
   dl_iterate_phdr_wrapper(std::ref(symbol_override));
 }
 
+static int count_callback(dl_phdr_info *, size_t, void *data) {
+  ++(*reinterpret_cast<int *>(data));
+  return 0;
+}
+
+int count_loaded_libraries() {
+  int count = 0;
+  dl_iterate_phdr(&count_callback, &count);
+  return count;
+}
 } // namespace ddprof

@@ -29,4 +29,6 @@ ElfW(Sym)
 void override_symbol(std::string_view symbol_name, void *new_symbol,
                      void *do_not_override_this_symbol = nullptr);
 
+int count_loaded_libraries();
+
 } // namespace ddprof

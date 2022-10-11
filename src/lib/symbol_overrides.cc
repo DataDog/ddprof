@@ -13,6 +13,8 @@
 #include <cstdlib>
 #include <dlfcn.h>
 #include <malloc.h>
+#include <signal.h>
+#include <time.h>
 
 #if defined(__GNUC__) && !defined(__clang__)
 #  define NOEXCEPT noexcept
@@ -25,11 +27,41 @@ extern "C" {
 __attribute__((weak)) void *reallocarray(void *ptr, size_t nmemb,
                                          size_t size) NOEXCEPT;
 __attribute__((weak)) void *pvalloc(size_t size) NOEXCEPT;
+// NOLINTNEXTLINE cert-dcl51-cpp
+__attribute__((weak)) int __libc_allocate_rtsig(int high) NOEXCEPT;
 }
 
 namespace {
+constexpr int k_timer_initial_interval_sec = 5;
+constexpr int k_timer_interval_sec = 59;
+constexpr int k_sigrtmax_offset = 3;
 
 bool g_symbols_overridden = false;
+bool g_check_libraries = false;
+bool g_timer_active = false;
+timer_t g_timerid;
+int g_timer_sig = -1;
+int g_nb_loaded_libraries = -1;
+
+DDPROF_NOINLINE bool loaded_libraries_have_changed() {
+  int nb = ddprof::count_loaded_libraries();
+  if (nb != g_nb_loaded_libraries) {
+    g_nb_loaded_libraries = nb;
+    return true;
+  }
+  return false;
+}
+
+void check_libraries() {
+  // \fixme{nsavoire} Race condition here, convert g_check_libraries to an
+  // atomic ?
+  if (g_check_libraries) {
+    if (g_symbols_overridden && loaded_libraries_have_changed()) {
+      ddprof::setup_overrides();
+    }
+    g_check_libraries = false;
+  }
+}
 
 struct malloc {
   static constexpr auto name = "malloc";
@@ -37,10 +69,10 @@ struct malloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t size) noexcept {
+    check_libraries();
     auto ptr = ref(size);
     ddprof::AllocationTracker::track_allocation(
         reinterpret_cast<uintptr_t>(ptr), size);
-
     return ptr;
   }
 };
@@ -51,6 +83,7 @@ struct free {
   static inline bool ref_checked = false;
 
   static void hook(void *ptr) noexcept {
+    check_libraries();
     if (ptr == nullptr) {
       return;
     }
@@ -67,6 +100,7 @@ struct calloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t nmemb, size_t size) noexcept {
+    check_libraries();
     auto ptr = ref(nmemb, size);
     ddprof::AllocationTracker::track_allocation(
         reinterpret_cast<uintptr_t>(ptr), size * nmemb);
@@ -81,6 +115,7 @@ struct realloc {
   static inline bool ref_checked = false;
 
   static void *hook(void *ptr, size_t size) noexcept {
+    check_libraries();
     if (likely(ptr)) {
       ddprof::AllocationTracker::track_deallocation(
           reinterpret_cast<uintptr_t>(ptr));
@@ -102,6 +137,7 @@ struct posix_memalign {
   static inline bool ref_checked = false;
 
   static int hook(void **memptr, size_t alignment, size_t size) noexcept {
+    check_libraries();
     auto ret = ref(memptr, alignment, size);
     if (likely(!ret)) {
       ddprof::AllocationTracker::track_allocation(
@@ -117,6 +153,7 @@ struct aligned_alloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t alignment, size_t size) noexcept {
+    check_libraries();
     auto ptr = ref(alignment, size);
     ddprof::AllocationTracker::track_allocation(
         reinterpret_cast<uintptr_t>(ptr), size);
@@ -131,6 +168,7 @@ struct memalign {
   static inline bool ref_checked = false;
 
   static void *hook(size_t alignment, size_t size) noexcept {
+    check_libraries();
     auto ptr = ref(alignment, size);
     ddprof::AllocationTracker::track_allocation(
         reinterpret_cast<uintptr_t>(ptr), size);
@@ -145,6 +183,7 @@ struct pvalloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t size) noexcept {
+    check_libraries();
     auto ptr = ref(size);
     ddprof::AllocationTracker::track_allocation(
         reinterpret_cast<uintptr_t>(ptr), size);
@@ -159,6 +198,7 @@ struct valloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t size) noexcept {
+    check_libraries();
     auto ptr = ref(size);
     ddprof::AllocationTracker::track_allocation(
         reinterpret_cast<uintptr_t>(ptr), size);
@@ -173,6 +213,7 @@ struct reallocarray {
   static inline bool ref_checked = false;
 
   static void *hook(void *ptr, size_t nmemb, size_t size) noexcept {
+    check_libraries();
     if (ptr) {
       ddprof::AllocationTracker::track_deallocation(
           reinterpret_cast<uintptr_t>(ptr));
@@ -259,6 +300,71 @@ template <typename T> void install_hook(bool restore) {
       T::name, reinterpret_cast<void *>(restore ? T::ref : &T::hook), &T::ref);
 }
 
+void timer_handler(int, siginfo_t *, void *) {
+  // check libraries only if symbols are overriden
+  g_check_libraries = g_symbols_overridden;
+}
+
+void uninstall_handler() {
+  struct sigaction sa;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = 0;
+  sa.sa_handler = SIG_IGN;
+  sigaction(g_timer_sig, &sa, NULL);
+}
+
+void uninstall_timer() {
+  uninstall_handler();
+  timer_delete(g_timerid);
+  g_timer_active = false;
+}
+
+int install_timer() {
+  if (g_timer_active) {
+    return 0;
+  }
+
+  if (g_timer_sig == -1) {
+    if (__libc_allocate_rtsig) {
+      // If available, use private libc function to allocate a free signal
+      g_timer_sig = __libc_allocate_rtsig(1);
+    } else {
+      // Pick an arbitrary signal
+      g_timer_sig = std::max(SIGRTMIN, SIGRTMAX - k_sigrtmax_offset);
+    }
+  }
+  if (g_timer_sig == -1) {
+    return -1;
+  }
+
+  struct sigaction sa;
+  sa.sa_flags = SA_SIGINFO | SA_RESTART;
+  sa.sa_sigaction = timer_handler;
+  sigemptyset(&sa.sa_mask);
+  if (sigaction(g_timer_sig, &sa, NULL) == -1) {
+    return -1;
+  }
+
+  sigevent sev;
+  sev.sigev_notify = SIGEV_SIGNAL;
+  sev.sigev_signo = g_timer_sig;
+  sev.sigev_value.sival_ptr = &g_timerid;
+  if (timer_create(CLOCK_MONOTONIC, &sev, &g_timerid) == -1) {
+    uninstall_handler();
+    return -1;
+  }
+
+  itimerspec its = {.it_interval = {.tv_sec = k_timer_interval_sec},
+                    .it_value = {.tv_sec = k_timer_initial_interval_sec}};
+  if (timer_settime(g_timerid, 0, &its, NULL) == -1) {
+    uninstall_timer();
+    return -1;
+  }
+
+  g_timer_active = true;
+  return 0;
+}
+
 void setup_hooks(bool restore) {
   install_hook<malloc>(restore);
   install_hook<free>(restore);
@@ -280,6 +386,11 @@ void setup_hooks(bool restore) {
   install_hook<dlopen>(restore);
 
   g_symbols_overridden = !restore;
+  if (restore && g_timer_active) {
+    uninstall_timer();
+  } else if (!restore && !g_timer_active) {
+    install_timer();
+  }
 }
 
 } // namespace
@@ -287,4 +398,9 @@ void setup_hooks(bool restore) {
 namespace ddprof {
 void setup_overrides() { setup_hooks(false); }
 void restore_overrides() { setup_hooks(true); }
+void reinstall_timer_after_fork() {
+  if (g_symbols_overridden) {
+    install_timer();
+  }
+}
 } // namespace ddprof
