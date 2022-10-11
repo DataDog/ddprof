@@ -10,8 +10,6 @@ extern "C" {
 }
 
 #include "string_view.hpp"
-
-#include <span>
 #include <string_view>
 
 inline ddog_CharSlice to_CharSlice(std::string_view str) {
