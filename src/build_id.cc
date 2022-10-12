@@ -6,20 +6,19 @@
 #include "build_id.hpp"
 
 #include <iomanip>
-#include <sstream>
 
 namespace ddprof {
 
 BuildIdStr format_build_id(BuildIdSpan build_id_span) {
-  std::stringstream build_id_ss;
-  build_id_ss << std::hex;
-  for (auto el : build_id_span) {
-    std::stringstream ss;
-    ss << std::hex;
-    ss << std::setfill('0') << std::setw(2) << static_cast<unsigned int>(el);
-    build_id_ss << ss.rdbuf();
+  std::string build_id_str;
+  // We encode every char on 2 hexa string characters
+  build_id_str.resize(build_id_span.size() * 2 + 1);
+  for (unsigned i = 0; i < build_id_span.size(); ++i) {
+    snprintf(&build_id_str[2 * i], 3, "%02x", build_id_span[i]);
   }
-  return build_id_ss.str();
+  // remove trailing '\0'
+  build_id_str.resize(2 * build_id_span.size());
+  return build_id_str;
 }
 
 } // namespace ddprof

@@ -13,4 +13,5 @@ using BuildIdSpan = ddprof::span<const unsigned char>;
 using BuildIdStr = std::string;
 
 BuildIdStr format_build_id(BuildIdSpan build_id_span);
+
 } // namespace ddprof

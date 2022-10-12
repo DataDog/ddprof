@@ -157,6 +157,9 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
     // returns the size
     ddprof_mod.set_build_id(ddprof::span(bits, size));
   }
+  else {
+    LG_DBG("No build id associated to mod");
+  }
 
   if (!ddprof_mod._mod) {
     // Ideally we would differentiate pid errors from file errors.
