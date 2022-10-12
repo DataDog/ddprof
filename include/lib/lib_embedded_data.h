@@ -5,8 +5,20 @@
 
 #pragma once
 
-namespace ddprof {
-void setup_overrides();
-void restore_overrides();
-void reinstall_timer_after_fork();
-} // namespace ddprof
+#include <stddef.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef struct EmbeddedData {
+  const char *data;
+  size_t size;
+} EmbeddedData;
+
+EmbeddedData profiling_lib_data();
+EmbeddedData profiler_exe_data();
+
+#ifdef __cplusplus
+}
+#endif

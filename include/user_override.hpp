@@ -8,13 +8,17 @@
 #include "ddres.hpp"
 #include <sys/types.h>
 
-typedef struct UIDInfo {
-  bool override;
-  uid_t previous_user;
-} UIDInfo;
+struct UIDInfo {
+  uid_t uid = -1;
+  gid_t gid = -1;
+};
 
-DDRes user_override(UIDInfo *user_override);
+// Change real and effective user and group ids
+DDRes user_override_to_nobody_if_root(UIDInfo *old_uids = nullptr);
+DDRes user_override(const char *user, UIDInfo *old_uids = nullptr);
+DDRes user_override(uid_t uid, gid_t gid, UIDInfo *old_uids = nullptr);
 
-DDRes revert_override(UIDInfo *user_override);
+bool is_root();
 
+// Irreversibly switch to user `user`
 DDRes become_user(const char *user);

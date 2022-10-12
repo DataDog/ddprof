@@ -14,6 +14,7 @@
 #include "defer.hpp"
 #include "ipc.hpp"
 #include "logger.hpp"
+#include "tempfile.hpp"
 #include "timer.hpp"
 #include "user_override.hpp"
 
@@ -45,11 +46,11 @@ extern const char
 extern const char
     _binary_libdd_profiling_embedded_so_end[]; // NOLINT cert-dcl51-cpp
 
+#ifdef DDPROF_USE_LOADER
 // address of embedded libddloader shared library
 extern const char _binary_libdd_loader_so_start[]; // NOLINT cert-dcl51-cpp
 extern const char _binary_libdd_loader_so_end[];   // NOLINT cert-dcl51-cpp
-
-static constexpr const char k_pid_place_holder[] = "{pid}";
+#endif
 
 static void maybe_slowdown_startup() {
   // Simulate startup slowdown if requested
@@ -63,83 +64,100 @@ static void maybe_slowdown_startup() {
   }
 }
 
-static DDRes create_temp_lib(std::string_view prefix,
-                             ddprof::span<const char> data, std::string &path,
-                             int &fd) {
-  fd = -1;
-
-  // Did not find libdd_profiling.so, use the one embedded in ddprof exe
-  auto template_str =
-      std::string{fs::temp_directory_path() / prefix} + ".XXXXXX";
-
-  // Create temporary file
-  fd = mkostemp(template_str.data(), O_CLOEXEC);
-  DDRES_CHECK_ERRNO(fd, DD_WHAT_TEMP_FILE, "Failed to create temporary file");
-  fchmod(fd, 0555);
-
-  // Write embedded lib into temp file
-  if (write(fd, data.data(), data.size()) !=
-      static_cast<ssize_t>(data.size())) {
-    DDRES_CHECK_ERRNO(fd, DD_WHAT_TEMP_FILE, "Failed to write temporary file");
+static std::string find_lib(std::string_view lib_name) {
+  auto exe_path = fs::read_symlink("/proc/self/exe");
+  auto lib_path = exe_path.parent_path() / lib_name;
+  // first, check if libdd_profiling.so exists in same directory as exe or in
+  // <exe_path>/../lib/
+  if (fs::exists(lib_path)) {
+    return lib_path;
   }
-
-  path = template_str;
-  // Unlink temp file, that way file will disappear from filesystem once last
-  // file descriptor pointing to it is closed
-  // unlink(template_str.data());
-  // char buffer[1024];
-
-  // Use symlink from /proc/<ddprof_pid>/fd/<fd> to refer to file.
-  // ddprof pid is not known yet so use a place holder that will be replaced
-  // later on
-  // sprintf(buffer, "/proc/%s/fd/%d", k_pid_place_holder, fd);
-  // path = buffer;
+  lib_path = exe_path.parent_path().parent_path() / "lib" / lib_name;
+  if (fs::exists(lib_path)) {
+    return lib_path;
+  }
   return {};
 }
 
-static DDRes get_library_path(std::string &libdd_profiling_path,
-                              int &libdd_profiling_fd,
-                              std::string &libdd_loader_path) {
-  libdd_profiling_fd = -1;
+class TempFileHolder {
+public:
+  TempFileHolder() = default;
+  TempFileHolder(std::string path, bool is_temporary)
+      : _path(std::move(path)), _is_temporary(is_temporary) {}
 
-  // \fixme{nsavoire} do we want to keep this ?
-  // if (!getenv(k_profiler_use_embedded_libdd_profiling_env_variable)) {
-  //   auto exe_path = fs::read_symlink("/proc/self/exe");
-  //   auto lib_path = exe_path.parent_path() / k_libdd_profiling_name;
-  //   // first, check if libdd_profiling.so exists in same directory as exe or
-  //   in
-  //   // <exe_path>/../lib/
-  //   if (fs::exists(lib_path)) {
-  //     path = lib_path;
-  //     return {};
-  //   }
-  //   lib_path =
-  //       exe_path.parent_path().parent_path() / "lib" /
-  //       k_libdd_profiling_name;
-  //   if (fs::exists(lib_path)) {
-  //     path = lib_path;
-  //     return {};
-  //   }
-  // }
+  ~TempFileHolder() {
+    if (_is_temporary && !_path.empty()) {
+      unlink(_path.c_str());
+    }
+  }
 
-  DDRES_CHECK_FWD(create_temp_lib(k_libdd_profiling_name,
-                                  {_binary_libdd_profiling_embedded_so_start,
-                                   _binary_libdd_profiling_embedded_so_end},
-                                  libdd_profiling_path, libdd_profiling_fd));
-  int libdd_loader_fd;
-  DDRES_CHECK_FWD(create_temp_lib(
-      k_libdd_loader_name,
-      {_binary_libdd_loader_so_start, _binary_libdd_loader_so_end},
-      libdd_loader_path, libdd_loader_fd));
+  TempFileHolder(const TempFileHolder &) = delete;
+  TempFileHolder &operator=(const TempFileHolder &) = delete;
+
+  TempFileHolder(TempFileHolder &&other) : TempFileHolder() {
+    *this = std::move(other);
+  }
+
+  TempFileHolder &operator=(TempFileHolder &&other) {
+    using std::swap;
+    swap(_path, other._path);
+    swap(_is_temporary, other._is_temporary);
+    return *this;
+  }
+
+  const std::string &path() const { return _path; }
+
+  bool is_temporary() const { return _is_temporary; }
+
+  std::string release() {
+    std::string s = std::move(_path);
+    _path.clear();
+    _is_temporary = false;
+    return s;
+  }
+
+private:
+  std::string _path;
+  bool _is_temporary = false;
+};
+
+static DDRes get_library_path(TempFileHolder &libdd_profiling_path,
+                              TempFileHolder &libdd_loader_path) {
+  std::string profiling_path;
+  std::string loader_path;
+
+  if (!getenv(k_profiler_use_embedded_libdd_profiling_env_variable)) {
+    profiling_path = find_lib(k_libdd_profiling_embedded_name);
+    loader_path = find_lib(k_libdd_loader_name);
+  }
+
+  if (profiling_path.empty()) {
+    DDRES_CHECK_FWD(get_or_create_temp_file(
+        k_libdd_profiling_embedded_name,
+        ddprof::as_bytes(ddprof::span{_binary_libdd_profiling_embedded_so_start,
+                                      _binary_libdd_profiling_embedded_so_end}),
+        0644, profiling_path));
+    libdd_profiling_path = TempFileHolder{profiling_path, false};
+  } else {
+    libdd_profiling_path = TempFileHolder{profiling_path, false};
+  }
+
+#ifdef DDPROF_USE_LOADER
+  if (loader_path.empty()) {
+    DDRES_CHECK_FWD(get_or_create_temp_file(
+        k_libdd_loader_name,
+        ddprof::as_bytes(ddprof::span{_binary_libdd_loader_so_start,
+                                      _binary_libdd_loader_so_end}),
+        0644, loader_path));
+    libdd_loader_path = TempFileHolder{loader_path, false};
+  } else {
+    libdd_loader_path = TempFileHolder{loader_path, false};
+  }
+#else
+  (void)libdd_loader_path;
+#endif
 
   return {};
-}
-
-// Replace pid place holder in path if present by pid argument
-static void fixup_library_path(std::string &path, pid_t pid) {
-  if (size_t pos = path.find(k_pid_place_holder); pos != std::string::npos) {
-    path.replace(pos, std::size(k_pid_place_holder) - 1, std::to_string(pid));
-  }
 }
 
 // Parse input and initialize context
@@ -206,7 +224,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
   }
 
   const bool in_wrapper_mode = ctx->params.pid == 0;
-  std::string dd_profiling_lib_path, dd_loader_path;
+  TempFileHolder dd_profiling_lib_holder, dd_loader_lib_holder;
 
   pid_t temp_pid = 0;
   if (in_wrapper_mode) {
@@ -233,15 +251,13 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
       if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sockfds) == -1) {
         return -1;
       }
-      int fd = -1;
-      if (!IsDDResOK(
-              get_library_path(dd_profiling_lib_path, fd, dd_loader_path))) {
+      if (!IsDDResOK(get_library_path(dd_profiling_lib_holder,
+                                      dd_loader_lib_holder))) {
         return -1;
       }
       LG_DBG("ctx->params.dd_profiling_fd = %d - sockfds %d, %d",
              ctx->params.dd_profiling_fd, sockfds[kChildIdx],
              sockfds[kParentIdx]);
-      ctx->params.dd_profiling_fd = fd;
       ctx->params.sockfd = sockfds[kChildIdx];
       ctx->params.wait_on_socket = true;
     }
@@ -259,20 +275,25 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
       defer_child_socket_close.reset();
       defer_context_free.release();
 
+      std::string dd_loader_lib_path = dd_loader_lib_holder.release();
+      std::string dd_profiling_lib_path = dd_profiling_lib_holder.release();
+
       // Allocation profiling activated, inject dd_profiling library with
       // LD_PRELOAD
       if (allocation_profiling_started_from_wrapper) {
-        // Determine final lib profiling path now that ddprof pid is known
-        fixup_library_path(dd_profiling_lib_path, daemonize_res.daemon_pid);
-        fixup_library_path(dd_loader_path, daemonize_res.daemon_pid);
-        std::string preload_str = dd_loader_path;
+        std::string preload_str = dd_loader_lib_path.empty()
+            ? dd_profiling_lib_path
+            : dd_loader_lib_path;
         if (const char *s = getenv("LD_PRELOAD"); s) {
           preload_str.append(":");
           preload_str.append(s);
         }
         LG_DBG("Setting LD_PRELOAD=%s", preload_str.c_str());
         setenv("LD_PRELOAD", preload_str.c_str(), 1);
-        setenv("DD_PROFILING_NATIVE_LIBRARY", dd_profiling_lib_path.c_str(), 1);
+        if (!dd_loader_lib_path.empty()) {
+          setenv("DD_PROFILING_NATIVE_LIBRARY", dd_profiling_lib_path.c_str(),
+                 1);
+        }
         auto sock_str = std::to_string(sockfds[kParentIdx]);
         setenv(k_profiler_lib_socket_env_variable, sock_str.c_str(), 1);
       }
@@ -283,17 +304,6 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     defer_child_socket_close.release();
     defer_parent_socket_close.reset();
   }
-
-  defer {
-    if (!dd_profiling_lib_path.empty()) {
-      unlink(dd_profiling_lib_path.data());
-    }
-  };
-  defer {
-    if (!dd_loader_path.empty()) {
-      unlink(dd_loader_path.data());
-    }
-  };
 
   // Now, we are the profiler process
   is_profiler = true;
