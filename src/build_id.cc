@@ -14,7 +14,7 @@ BuildIdStr format_build_id(BuildIdSpan build_id_span) {
   // We encode every char on 2 hexa string characters
   build_id_str.resize(build_id_span.size() * 2 + 1);
   for (unsigned i = 0; i < build_id_span.size(); ++i) {
-    snprintf(&build_id_str[static_cast<unsigned long>(2 * i)], 3, "%02x",
+    snprintf(&build_id_str[static_cast<unsigned>(2 * i)], 3, "%02x",
              build_id_span[i]);
   }
   // remove trailing '\0'
