@@ -147,3 +147,6 @@ namespace ddprof {
 std::vector<perf_event_attr>
 all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras);
 }
+
+perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
+                                         bool extras);

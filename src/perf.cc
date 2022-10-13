@@ -16,7 +16,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
@@ -28,7 +27,7 @@
 static long s_page_size = 0;
 
 struct perf_event_attr g_dd_native_attr = {
-    .size = sizeof(struct perf_event_attr),
+    .size = PERF_ATTR_SIZE_VER5,
     .disabled = 1,
     .inherit = 1,
     .exclude_kernel = 1,

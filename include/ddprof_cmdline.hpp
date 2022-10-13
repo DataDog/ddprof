@@ -29,3 +29,5 @@ bool arg_yesno(const char *str, int mode);
 
 bool watcher_from_event(const char *str, PerfWatcher *watcher);
 bool watcher_from_tracepoint(const char *str, PerfWatcher *watcher);
+
+long id_from_tracepoint(const char *gname, const char *tname);
