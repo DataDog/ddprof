@@ -13,7 +13,9 @@
 #include <cstdlib>
 #include <dlfcn.h>
 #include <malloc.h>
+#include <signal.h>
 #include <sys/mman.h>
+#include <time.h>
 
 #if defined(__GNUC__) && !defined(__clang__)
 #  define NOEXCEPT noexcept
@@ -26,30 +28,41 @@ extern "C" {
 __attribute__((weak)) void *reallocarray(void *ptr, size_t nmemb,
                                          size_t size) NOEXCEPT;
 __attribute__((weak)) void *pvalloc(size_t size) NOEXCEPT;
+// NOLINTNEXTLINE cert-dcl51-cpp
+__attribute__((weak)) int __libc_allocate_rtsig(int high) NOEXCEPT;
 }
 
 namespace {
+constexpr int k_timer_initial_interval_sec = 5;
+constexpr int k_timer_interval_sec = 59;
+constexpr int k_sigrtmax_offset = 3;
 
 bool g_symbols_overridden = false;
-// \fixme{nsavoire} We should probably merge this TL state with
-// AllocationTracker::tl_state to have a single TL state since accessing it is
-// costly (call to tls_get_addr)
-thread_local bool g_in_allocator_guard = false;
+bool g_check_libraries = false;
+bool g_timer_active = false;
+timer_t g_timerid;
+int g_timer_sig = -1;
+int g_nb_loaded_libraries = -1;
 
-class Guard {
-public:
-  explicit Guard(bool *guard) : _guard(guard), _ok(!*guard) { *_guard = true; }
-  ~Guard() {
-    if (_ok) {
-      *_guard = false;
-    }
+DDPROF_NOINLINE bool loaded_libraries_have_changed() {
+  int nb = ddprof::count_loaded_libraries();
+  if (nb != g_nb_loaded_libraries) {
+    g_nb_loaded_libraries = nb;
+    return true;
   }
-  explicit operator bool() const { return _ok; }
+  return false;
+}
 
-private:
-  bool *_guard;
-  bool _ok;
-};
+void check_libraries() {
+  // \fixme{nsavoire} Race condition here, convert g_check_libraries to an
+  // atomic ?
+  if (g_check_libraries) {
+    if (g_symbols_overridden && loaded_libraries_have_changed()) {
+      ddprof::setup_overrides();
+    }
+    g_check_libraries = false;
+  }
+}
 
 struct malloc {
   static constexpr auto name = "malloc";
@@ -57,12 +70,10 @@ struct malloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t size) noexcept {
-    Guard guard(&g_in_allocator_guard);
-
+    check_libraries();
     auto ptr = ref(size);
     ddprof::AllocationTracker::track_allocation(
         reinterpret_cast<uintptr_t>(ptr), size);
-
     return ptr;
   }
 };
@@ -73,6 +84,7 @@ struct free {
   static inline bool ref_checked = false;
 
   static void hook(void *ptr) noexcept {
+    check_libraries();
     if (ptr == nullptr) {
       return;
     }
@@ -89,7 +101,7 @@ struct calloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t nmemb, size_t size) noexcept {
-    Guard guard(&g_in_allocator_guard);
+    check_libraries();
     auto ptr = ref(nmemb, size);
     ddprof::AllocationTracker::track_allocation(
         reinterpret_cast<uintptr_t>(ptr), size * nmemb);
@@ -104,7 +116,7 @@ struct realloc {
   static inline bool ref_checked = false;
 
   static void *hook(void *ptr, size_t size) noexcept {
-    Guard guard(&g_in_allocator_guard);
+    check_libraries();
     if (likely(ptr)) {
       ddprof::AllocationTracker::track_deallocation(
           reinterpret_cast<uintptr_t>(ptr));
@@ -126,7 +138,7 @@ struct posix_memalign {
   static inline bool ref_checked = false;
 
   static int hook(void **memptr, size_t alignment, size_t size) noexcept {
-    Guard guard(&g_in_allocator_guard);
+    check_libraries();
     auto ret = ref(memptr, alignment, size);
     if (likely(!ret)) {
       ddprof::AllocationTracker::track_allocation(
@@ -142,7 +154,7 @@ struct aligned_alloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t alignment, size_t size) noexcept {
-    Guard guard(&g_in_allocator_guard);
+    check_libraries();
     auto ptr = ref(alignment, size);
     ddprof::AllocationTracker::track_allocation(
         reinterpret_cast<uintptr_t>(ptr), size);
@@ -157,7 +169,7 @@ struct memalign {
   static inline bool ref_checked = false;
 
   static void *hook(size_t alignment, size_t size) noexcept {
-    Guard guard(&g_in_allocator_guard);
+    check_libraries();
     auto ptr = ref(alignment, size);
     ddprof::AllocationTracker::track_allocation(
         reinterpret_cast<uintptr_t>(ptr), size);
@@ -172,7 +184,7 @@ struct pvalloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t size) noexcept {
-    Guard guard(&g_in_allocator_guard);
+    check_libraries();
     auto ptr = ref(size);
     ddprof::AllocationTracker::track_allocation(
         reinterpret_cast<uintptr_t>(ptr), size);
@@ -187,7 +199,7 @@ struct valloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t size) noexcept {
-    Guard guard(&g_in_allocator_guard);
+    check_libraries();
     auto ptr = ref(size);
     ddprof::AllocationTracker::track_allocation(
         reinterpret_cast<uintptr_t>(ptr), size);
@@ -202,14 +214,14 @@ struct reallocarray {
   static inline bool ref_checked = false;
 
   static void *hook(void *ptr, size_t nmemb, size_t size) noexcept {
-    Guard guard(&g_in_allocator_guard);
+    check_libraries();
     if (ptr) {
       ddprof::AllocationTracker::track_deallocation(
           reinterpret_cast<uintptr_t>(ptr));
     }
     auto newptr = ref(ptr, nmemb, size);
     ddprof::AllocationTracker::track_allocation(
-        reinterpret_cast<uintptr_t>(newptr), size * nmemb);
+        reinterpret_cast<uintptr_t>(ptr), size * nmemb);
     return newptr;
   }
 };
@@ -266,6 +278,9 @@ struct pthread_create {
   }
 };
 
+// FIXME
+// mmaps are using a guard that isn't contemporary to the merge from main,
+// do we need to protect mmaps from being double-counted inside of malloc
 struct mmap {
   static constexpr auto name = "mmap";
   static inline auto ref = &::mmap;
@@ -275,8 +290,24 @@ struct mmap {
                     off_t offset) noexcept {
     void *ptr = ref(addr, length, prot, flags, fd, offset);
 
-    if (addr == nullptr && fd == -1 && ptr != nullptr &&
-        !g_in_allocator_guard) {
+    if (addr == nullptr && fd == -1 && ptr != nullptr) {
+      ddprof::AllocationTracker::track_allocation(
+          reinterpret_cast<uintptr_t>(ptr), length);
+    }
+    return ptr;
+  }
+};
+
+struct mmap_ {
+  static constexpr auto name = "__mmap";
+  static inline auto ref = &::mmap;
+  static inline bool ref_checked = false;
+
+  static void *hook(void *addr, size_t length, int prot, int flags, int fd,
+                    off_t offset) noexcept {
+    void *ptr = ref(addr, length, prot, flags, fd, offset);
+
+    if (addr == nullptr && fd == -1 && ptr != nullptr) {
       ddprof::AllocationTracker::track_allocation(
           reinterpret_cast<uintptr_t>(ptr), length);
     }
@@ -293,8 +324,7 @@ struct mmap64_ {
                     off_t offset) noexcept {
     void *ptr = ref(addr, length, prot, flags, fd, offset);
 
-    if (addr == nullptr && fd == -1 && ptr != nullptr &&
-        !g_in_allocator_guard) {
+    if (addr == nullptr && fd == -1 && ptr != nullptr) {
       ddprof::AllocationTracker::track_allocation(
           reinterpret_cast<uintptr_t>(ptr), length);
     }
@@ -308,10 +338,20 @@ struct munmap {
   static inline bool ref_checked = false;
 
   static int hook(void *addr, size_t length) noexcept {
-    if (!g_in_allocator_guard) {
-      ddprof::AllocationTracker::track_deallocation(
-          reinterpret_cast<uintptr_t>(addr));
-    }
+    ddprof::AllocationTracker::track_deallocation(
+        reinterpret_cast<uintptr_t>(addr));
+    return ref(addr, length);
+  }
+};
+
+struct munmap_ {
+  static constexpr auto name = "__munmap";
+  static inline auto ref = &::munmap;
+  static inline bool ref_checked = false;
+
+  static int hook(void *addr, size_t length) noexcept {
+    ddprof::AllocationTracker::track_deallocation(
+        reinterpret_cast<uintptr_t>(addr));
     return ref(addr, length);
   }
 };
@@ -323,7 +363,8 @@ template <typename T> void install_hook(bool restore) {
   // use dlsym since it would return the same <symbol>>@plt symbol).
   if (!restore && !T::ref_checked) {
     ElfW(Sym) sym = ddprof::lookup_symbol(T::name, true);
-    if (sym.st_size == 0) {
+    if (sym.st_size == 0 &&
+        reinterpret_cast<decltype(T::ref)>(sym.st_value) == T::ref) {
       // null sized symbol, look for a non-null sized symbol
       sym = ddprof::lookup_symbol(T::name, false);
       if (sym.st_value && sym.st_size) {
@@ -332,8 +373,75 @@ template <typename T> void install_hook(bool restore) {
     }
     T::ref_checked = true;
   }
+  // Be careful not to override T::ref (compiler/linker may emit T::ref as a
+  // relocation pointing on malloc/realloc/calloc/...)
   ddprof::override_symbol(
-      T::name, reinterpret_cast<void *>(restore ? T::ref : &T::hook));
+      T::name, reinterpret_cast<void *>(restore ? T::ref : &T::hook), &T::ref);
+}
+
+void timer_handler(int, siginfo_t *, void *) {
+  // check libraries only if symbols are overriden
+  g_check_libraries = g_symbols_overridden;
+}
+
+void uninstall_handler() {
+  struct sigaction sa;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = 0;
+  sa.sa_handler = SIG_IGN;
+  sigaction(g_timer_sig, &sa, NULL);
+}
+
+void uninstall_timer() {
+  uninstall_handler();
+  timer_delete(g_timerid);
+  g_timer_active = false;
+}
+
+int install_timer() {
+  if (g_timer_active) {
+    return 0;
+  }
+
+  if (g_timer_sig == -1) {
+    if (__libc_allocate_rtsig) {
+      // If available, use private libc function to allocate a free signal
+      g_timer_sig = __libc_allocate_rtsig(1);
+    } else {
+      // Pick an arbitrary signal
+      g_timer_sig = std::max(SIGRTMIN, SIGRTMAX - k_sigrtmax_offset);
+    }
+  }
+  if (g_timer_sig == -1) {
+    return -1;
+  }
+
+  struct sigaction sa;
+  sa.sa_flags = SA_SIGINFO | SA_RESTART;
+  sa.sa_sigaction = timer_handler;
+  sigemptyset(&sa.sa_mask);
+  if (sigaction(g_timer_sig, &sa, NULL) == -1) {
+    return -1;
+  }
+
+  sigevent sev;
+  sev.sigev_notify = SIGEV_SIGNAL;
+  sev.sigev_signo = g_timer_sig;
+  sev.sigev_value.sival_ptr = &g_timerid;
+  if (timer_create(CLOCK_MONOTONIC, &sev, &g_timerid) == -1) {
+    uninstall_handler();
+    return -1;
+  }
+
+  itimerspec its = {.it_interval = {.tv_sec = k_timer_interval_sec},
+                    .it_value = {.tv_sec = k_timer_initial_interval_sec}};
+  if (timer_settime(g_timerid, 0, &its, NULL) == -1) {
+    uninstall_timer();
+    return -1;
+  }
+
+  g_timer_active = true;
+  return 0;
 }
 
 void setup_hooks(bool restore) {
@@ -345,10 +453,11 @@ void setup_hooks(bool restore) {
   install_hook<aligned_alloc>(restore);
   install_hook<memalign>(restore);
   install_hook<valloc>(restore);
-
   install_hook<mmap>(restore);
   install_hook<mmap64_>(restore);
   install_hook<munmap>(restore);
+  install_hook<mmap_>(restore);
+  install_hook<munmap_>(restore);
 
   if (reallocarray::ref) {
     install_hook<reallocarray>(restore);
@@ -361,6 +470,11 @@ void setup_hooks(bool restore) {
   install_hook<dlopen>(restore);
 
   g_symbols_overridden = !restore;
+  if (restore && g_timer_active) {
+    uninstall_timer();
+  } else if (!restore && !g_timer_active) {
+    install_timer();
+  }
 }
 
 } // namespace
@@ -368,4 +482,9 @@ void setup_hooks(bool restore) {
 namespace ddprof {
 void setup_overrides() { setup_hooks(false); }
 void restore_overrides() { setup_hooks(true); }
+void reinstall_timer_after_fork() {
+  if (g_symbols_overridden) {
+    install_timer();
+  }
+}
 } // namespace ddprof

@@ -172,6 +172,7 @@ add_unit_test(
   ../src/ddprof_file_info.cc
   ../src/procutils.cc
   ../src/signal_helper.cc
+  ../src/user_override.cc
   dso-ut.cc
   DEFINITIONS MYNAME="dso-ut")
 target_include_directories(dso-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
@@ -196,6 +197,7 @@ add_unit_test(
   ../src/failed_assumption.cc
   ../src/procutils.cc
   ../src/signal_helper.cc
+  ../src/user_override.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
   DEFINITIONS MYNAME="dwfl_symbol-ut")
 add_compile_definitions("DWFL_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
@@ -230,6 +232,7 @@ add_unit_test(
   ../src/unwind_dwfl.cc
   ../src/unwind_helpers.cc
   ../src/unwind_metrics.cc
+  ../src/user_override.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
   DEFINITIONS MYNAME="savecontext-ut")
 
@@ -313,7 +316,7 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
 
   add_exe(
     simple_malloc-shared simple_malloc.cc
-    LIBRARIES dd_profiling-shared
+    LIBRARIES dd_profiling-shared Threads::Threads
     DEFINITIONS USE_DD_PROFILING)
   target_include_directories(simple_malloc-shared PRIVATE ${CMAKE_SOURCE_DIR}/include
                                                           ${CMAKE_SOURCE_DIR}/third_party)

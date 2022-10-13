@@ -6,9 +6,14 @@
 #include "dso_hdr.hpp"
 
 #include <gtest/gtest.h>
+#include <pthread.h>
 #include <string>
+#include <sys/mman.h>
 
+#include "defer.hpp"
 #include "loghandle.hpp"
+#include "user_override.hpp"
+
 namespace ddprof {
 
 using DsoFindRes = DsoHdr::DsoFindRes;
@@ -375,6 +380,37 @@ TEST(DSOTest, exe_name) {
   bool found_exe = dso_hdr.find_exe_name(my_pid, exe_name);
   EXPECT_TRUE(found_exe);
   LG_NTC("%s", exe_name.c_str());
+}
+
+TEST(DSOTest, user_change) {
+  if (!is_root()) {
+    return;
+  }
+
+  pthread_barrierattr_t bat = {};
+  pthread_barrier_t *pb = static_cast<pthread_barrier_t *>(
+      mmap(NULL, sizeof(pthread_barrier_t), PROT_READ | PROT_WRITE,
+           MAP_SHARED | MAP_ANONYMOUS, -1, 0));
+  pthread_barrierattr_init(&bat);
+  pthread_barrierattr_setpshared(&bat, 1);
+  pthread_barrier_init(pb, &bat, 2);
+  defer { munmap(pb, sizeof(*pb)); };
+
+  if (pid_t child_pid = fork(); child_pid > 0) {
+    defer {
+      pthread_barrier_wait(pb);
+      waitpid(child_pid, NULL, 0);
+    };
+    LogHandle handle;
+    DsoHdr dso_hdr;
+    pthread_barrier_wait(pb);
+    int nb_elts;
+    ASSERT_TRUE(dso_hdr.pid_backpopulate(child_pid, nb_elts));
+  } else {
+    ASSERT_TRUE(IsDDResOK(become_user("nobody")));
+    pthread_barrier_wait(pb);
+    pthread_barrier_wait(pb);
+  }
 }
 
 } // namespace ddprof

@@ -254,16 +254,20 @@ DDRes pevent_mmap_event(PEvent *event) {
 
 DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
   // Switch user if needed (when root switch to nobody user)
-  // pinned memory accounting in root user does not always work
-  // hence we use a different user
+  // Pinned memory is accounted by the kernel by (real) uid across containers
+  // (uid 1000 in the host and in containers will share the same count).
+  // Sometimes root allowance (when no CAP_IPC_LOCK/CAP_SYS_ADMIN in a
+  // container) is already exhausted, hence we switch to a different user.
   UIDInfo info;
   if (use_override) {
-    DDRES_CHECK_FWD(user_override(&info));
+    /* perf_event_mlock_kb is accounted per real user id */
+    DDRES_CHECK_FWD(user_override_to_nobody_if_root(&info));
   }
 
   defer {
-    if (use_override)
-      revert_override(&info);
+    if (use_override) {
+      user_override(info.uid, info.gid);
+    }
   };
 
   auto defer_munmap = make_defer([&] { pevent_munmap(pevent_hdr); });
@@ -281,7 +285,10 @@ DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
 DDRes pevent_setup(DDProfContext *ctx, pid_t pid, int num_cpu,
                    PEventHdr *pevent_hdr) {
   DDRES_CHECK_FWD(pevent_open(ctx, pid, num_cpu, pevent_hdr));
-  DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, true));
+  if (!IsDDResOK(pevent_mmap(pevent_hdr, true))) {
+    LG_NTC("Retrying attachment without user override");
+    DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, false));
+  }
 
   // If any watchers have self-instrumentation, then they may have set up child
   // fds which now need to be consolidated via ioctl.  These fds cannot be

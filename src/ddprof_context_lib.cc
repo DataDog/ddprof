@@ -356,6 +356,10 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     ctx->params.switch_user = strdup(input->switch_user);
   }
 
+  if (input->switch_user) {
+    ctx->params.switch_user = strdup(input->switch_user);
+  }
+
   ctx->initialized = true;
   return ddres_init();
 }
