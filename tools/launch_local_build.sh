@@ -96,19 +96,19 @@ MOUNT_CMD="-v ${DEFAULT_DEV_WORKSPACE:-${CURRENTDIR}}:/app"
 #     sync_strategy: "native_osx"
 #     src: "./"
 #     host_disk_mount_mode: "cached"
-# if [ -e "${CURRENTDIR}/docker-sync.yml" ]; then
-#     # Grep the docker sync config (expected in root directory) to retrieve name of volume
-#     VOLUME_SYNC=$(grep -A 1 "syncs:" "${CURRENTDIR}/docker-sync.yml" | tail -n 1 | awk -F ':' '{print $1}' | sed "s/ //g")
-#     echo "$VOLUME_SYNC"
-#     MOUNT_CMD="--mount source=${VOLUME_SYNC},target=/app"
-#     if ! docker-sync list | grep -q "$VOLUME_SYNC"; then
-#         echo "Please generate a volume: $VOLUME_SYNC"
-#         echo "Suggested commands:"
-#         echo "docker volume create $VOLUME_SYNC"
-#         echo "docker-sync start"
-#         exit 1
-#     fi
-# fi
+if [ -e "${CURRENTDIR}/docker-sync.yml" ]; then
+    # Grep the docker sync config (expected in root directory) to retrieve name of volume
+    VOLUME_SYNC=$(grep -A 1 "syncs:" "${CURRENTDIR}/docker-sync.yml" | tail -n 1 | awk -F ':' '{print $1}' | sed "s/ //g")
+    echo "$VOLUME_SYNC"
+    MOUNT_CMD="--mount source=${VOLUME_SYNC},target=/app"
+    if ! docker-sync list | grep -q "$VOLUME_SYNC"; then
+        echo "Please generate a volume: $VOLUME_SYNC"
+        echo "Suggested commands:"
+        echo "docker volume create $VOLUME_SYNC"
+        echo "docker-sync start"
+        exit 1
+    fi
+fi
 
 # If we didn't pass a custom ID, then focus on Ubuntu
 if [ ! ${CUSTOM_ID:-,,} == "yes" ]; then
