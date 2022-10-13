@@ -14,6 +14,7 @@
 #include <dlfcn.h>
 #include <malloc.h>
 #include <signal.h>
+#include <sys/mman.h>
 #include <time.h>
 
 #if defined(__GNUC__) && !defined(__clang__)
@@ -280,7 +281,6 @@ struct pthread_create {
 // FIXME
 // mmaps are using a guard that isn't contemporary to the merge from main,
 // do we need to protect mmaps from being double-counted inside of malloc
-/*
 struct mmap {
   static constexpr auto name = "mmap";
   static inline auto ref = &::mmap;
@@ -290,8 +290,7 @@ struct mmap {
                     off_t offset) noexcept {
     void *ptr = ref(addr, length, prot, flags, fd, offset);
 
-    if (addr == nullptr && fd == -1 && ptr != nullptr &&
-        !g_in_allocator_guard) {
+    if (addr == nullptr && fd == -1 && ptr != nullptr) {
       ddprof::AllocationTracker::track_allocation(
           reinterpret_cast<uintptr_t>(ptr), length);
     }
@@ -308,8 +307,7 @@ struct mmap_ {
                     off_t offset) noexcept {
     void *ptr = ref(addr, length, prot, flags, fd, offset);
 
-    if (addr == nullptr && fd == -1 && ptr != nullptr &&
-        !g_in_allocator_guard) {
+    if (addr == nullptr && fd == -1 && ptr != nullptr) {
       ddprof::AllocationTracker::track_allocation(
           reinterpret_cast<uintptr_t>(ptr), length);
     }
@@ -326,8 +324,7 @@ struct mmap64_ {
                     off_t offset) noexcept {
     void *ptr = ref(addr, length, prot, flags, fd, offset);
 
-    if (addr == nullptr && fd == -1 && ptr != nullptr
-        !g_in_allocator_guard) {
+    if (addr == nullptr && fd == -1 && ptr != nullptr) {
       ddprof::AllocationTracker::track_allocation(
           reinterpret_cast<uintptr_t>(ptr), length);
     }
@@ -341,10 +338,8 @@ struct munmap {
   static inline bool ref_checked = false;
 
   static int hook(void *addr, size_t length) noexcept {
-    if (!g_in_allocator_guard) {
-      ddprof::AllocationTracker::track_deallocation(
-          reinterpret_cast<uintptr_t>(addr));
-    }
+    ddprof::AllocationTracker::track_deallocation(
+        reinterpret_cast<uintptr_t>(addr));
     return ref(addr, length);
   }
 };
@@ -355,14 +350,11 @@ struct munmap_ {
   static inline bool ref_checked = false;
 
   static int hook(void *addr, size_t length) noexcept {
-    if (!g_in_allocator_guard) {
-      ddprof::AllocationTracker::track_deallocation(
-          reinterpret_cast<uintptr_t>(addr));
-    }
+    ddprof::AllocationTracker::track_deallocation(
+        reinterpret_cast<uintptr_t>(addr));
     return ref(addr, length);
   }
 };
-*/
 
 template <typename T> void install_hook(bool restore) {
   // On ubuntu 16, some symbols might be bound to <symbol>@plt symbols
@@ -461,11 +453,11 @@ void setup_hooks(bool restore) {
   install_hook<aligned_alloc>(restore);
   install_hook<memalign>(restore);
   install_hook<valloc>(restore);
-//  install_hook<mmap>(restore);
-//  install_hook<mmap64_>(restore);
-//  install_hook<munmap>(restore);
-//  install_hook<mmap_>(restore);
-//  install_hook<munmap_>(restore);
+  install_hook<mmap>(restore);
+  install_hook<mmap64_>(restore);
+  install_hook<munmap>(restore);
+  install_hook<mmap_>(restore);
+  install_hook<munmap_>(restore);
 
   if (reallocarray::ref) {
     install_hook<reallocarray>(restore);
