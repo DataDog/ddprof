@@ -102,7 +102,7 @@ DDRes add_preset(DDProfContext *ctx, const char *preset,
 void log_watcher(const PerfWatcher *w, int n) {
   PRINT_NFO("    ID: %s, Pos: %d, Index: %lu", w->desc, n, w->config);
   switch (w->loc_type) {
-  case kPerfWatcherLoc_val:
+  case kPerfWatcherLoc_period:
     PRINT_NFO("    Location: Sample");
     break;
   case kPerfWatcherLoc_reg:

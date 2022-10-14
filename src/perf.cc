@@ -10,6 +10,7 @@
 #include "perf.hpp"
 #include "user_override.hpp"
 
+#include <cassert>
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -171,4 +172,33 @@ all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras) {
   }
   return ret_attr;
 }
+
+uint64_t perf_value_from_sample(const PerfWatcher *watcher,
+                                const perf_event_sample *sample) {
+  uint64_t val = 0;
+  if (watcher->loc_type == kPerfWatcherLoc_raw) {
+    if (PERF_SAMPLE_RAW & watcher->sample_type) {
+      uint64_t raw_offset = watcher->raw_off;
+      uint64_t raw_sz = watcher->raw_sz;
+      assert(raw_sz <= sizeof(uint64_t) && "Raw size fits in a uint64");
+      memcpy(&val, sample->data_raw + raw_offset, raw_sz);
+      return val;
+    } else { // unexpected config
+      assert(0 && "Inconsistent raw config between watcher and perf event");
+      LG_WRN("Unexpected watcher configuration -- No Raw events");
+      return val;
+    }
+  }
+  // Register value
+  if (watcher->loc_type == kPerfWatcherLoc_reg) {
+    memcpy(&val, &sample->regs[watcher->regno], sizeof(uint64_t));
+    return val;
+  }
+
+  // period by default
+  assert(watcher->loc_type == kPerfWatcherLoc_period &&
+         "All watcher types were considered");
+  return sample->period;
+}
+
 } // namespace ddprof

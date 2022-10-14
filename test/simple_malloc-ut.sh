@@ -37,6 +37,9 @@ count() {
 }
 
 check() {
+    echo "#########################"
+    echo "$1"
+    echo "#########################"
     cmd="$1"
     expected_pids="$2"
     expected_tids="${3-$2}"
