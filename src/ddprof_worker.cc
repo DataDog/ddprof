@@ -240,7 +240,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
 
   // Attempt to fully unwind if the watcher has a callgraph type
-  DDRes res;
+  DDRes res = {};
   if (watcher->output_mode & kPerfWatcherMode_callgraph)
     res = unwindstate__unwind(us);
 
