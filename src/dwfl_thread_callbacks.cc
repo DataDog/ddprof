@@ -29,7 +29,6 @@ bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
     ++num_regs;
     regs_idx = dwarf_to_perf_regno(num_regs);
   } while (regs_idx != -1u);
-  --num_regs; // reset to non-failing register number
 
   // Although the perf registers designate the register after SP as the PC, this
   // convention is not a documented convention of the DWARF registers.  We set
