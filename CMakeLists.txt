@@ -257,6 +257,8 @@ if(BUILD_UNIVERSAL_DDPROF)
   endif()
 endif()
 
+target_link_libraries(dd_profiling-embedded PRIVATE DDProf::Parser)
+
 # Fix for link error in sanitizeddebug build mode with gcc:
 # ~~~
 # /usr/bin/ld: ./libdd_profiling.so: undefined reference to `__dynamic_cast'
@@ -270,7 +272,7 @@ target_link_libraries(
   PRIVATE
     "$<$<AND:$<C_COMPILER_ID:GNU>,$<CONFIG:SanitizedDebug>>:-Wl,-Bstatic;-lubsan;-lasan;-lstdc++;-Wl,-Bdynamic>"
 )
-target_link_libraries(dd_profiling-embedded PUBLIC DDProf::Parser dl pthread rt)
+target_link_libraries(dd_profiling-embedded PUBLIC dl pthread rt)
 
 set(LIBDD_PROFILING_EMBEDDED_OBJECT "${CMAKE_BINARY_DIR}/libdd_profiling-embedded.o")
 add_custom_command(
@@ -330,7 +332,8 @@ target_include_directories(
                              ${CMAKE_SOURCE_DIR}/third_party)
 set_target_properties(dd_profiling-static
                       PROPERTIES PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
-target_link_libraries(dd_profiling-static PUBLIC DDProf::Parser dl pthread rt)
+target_link_libraries(dd_profiling-static PRIVATE DDProf::Parser)
+target_link_libraries(dd_profiling-static PUBLIC dl pthread rt)
 
 if(USE_LOADER)
   # When using a loader, libdd_profiling.so is a loader that embeds both libdd_profiling-embedded.so
