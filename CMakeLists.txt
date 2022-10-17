@@ -160,7 +160,7 @@ aux_source_directory(src/exe EXE_SRC)
 # Define all sources
 set(DDPROF_GLOBAL_SRC ${COMMON_SRC} ${PPROF_SRC} ${EXPORTER_SRC} ${EXE_SRC})
 
-set(DDPROF_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads DDProf::Parser)
+set(DDPROF_LIBRARY_LIST DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 
 if(ON)
   # Add the rust library - Refactoring ongoing. OFF for now
@@ -257,6 +257,8 @@ if(BUILD_UNIVERSAL_DDPROF)
   endif()
 endif()
 
+target_link_libraries(dd_profiling-embedded PRIVATE DDProf::Parser)
+
 # Fix for link error in sanitizeddebug build mode with gcc:
 # ~~~
 # /usr/bin/ld: ./libdd_profiling.so: undefined reference to `__dynamic_cast'
@@ -270,7 +272,7 @@ target_link_libraries(
   PRIVATE
     "$<$<AND:$<C_COMPILER_ID:GNU>,$<CONFIG:SanitizedDebug>>:-Wl,-Bstatic;-lubsan;-lasan;-lstdc++;-Wl,-Bdynamic>"
 )
-target_link_libraries(dd_profiling-embedded PUBLIC dl pthread rt DDProf::Parser)
+target_link_libraries(dd_profiling-embedded PUBLIC dl pthread rt)
 
 set(LIBDD_PROFILING_EMBEDDED_OBJECT "${CMAKE_BINARY_DIR}/libdd_profiling-embedded.o")
 add_custom_command(
@@ -290,7 +292,7 @@ add_exe(
   ddprof ${DDPROF_GLOBAL_SRC}
   LIBRARIES ${DDPROF_LIBRARY_LIST}
   DEFINITIONS ${DDPROF_DEFINITION_LIST})
-target_link_libraries(ddprof PRIVATE libddprofiling_embedded_object)
+target_link_libraries(ddprof PRIVATE DDProf::Parser libddprofiling_embedded_object)
 if(USE_LOADER)
   target_compile_definitions(ddprof PRIVATE "DDPROF_USE_LOADER")
   target_link_libraries(ddprof PRIVATE libdd_loader_object)
@@ -327,17 +329,18 @@ set_target_properties(dd_profiling-static PROPERTIES OUTPUT_NAME dd_profiling)
 target_compile_definitions(dd_profiling-static PRIVATE DDPROF_EMBEDDED_EXE_DATA)
 target_include_directories(
   dd_profiling-static PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include
-                             ${CMAKE_SOURCE_DIR}/third_party ${EVENT_PARSER_INCLUDE})
+                             ${CMAKE_SOURCE_DIR}/third_party)
 set_target_properties(dd_profiling-static
                       PROPERTIES PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
-target_link_libraries(dd_profiling-static PUBLIC dl pthread rt DDProf::Parser)
+target_link_libraries(dd_profiling-static PRIVATE DDProf::Parser)
+target_link_libraries(dd_profiling-static PUBLIC dl pthread rt)
 
 if(USE_LOADER)
   # When using a loader, libdd_profiling.so is a loader that embeds both libdd_profiling-embedded.so
   # and ddprof executable.
   add_library(dd_profiling-shared SHARED src/lib/glibc_fixes.c src/lib/lib_embedded_data.c
                                          src/lib/loader.c src/sha1.c)
-  target_link_libraries(dd_profiling-shared PRIVATE libddprofiling_embedded_object
+  target_link_libraries(dd_profiling-shared PRIVATE DDProf::Parser libddprofiling_embedded_object
                                                     ddprof_exe_object)
   target_compile_definitions(dd_profiling-shared PRIVATE DDPROF_EMBEDDED_LIB_DATA
                                                          DDPROF_EMBEDDED_EXE_DATA)
@@ -345,7 +348,7 @@ else()
   # Without loader, libdd_profiling.so is basically the same as libdd_profiling-embedded.so plus an
   # embedded ddprof executable.
   add_library(dd_profiling-shared SHARED ${DD_PROFILING_SOURCES} src/lib/lib_embedded_data.c)
-  target_link_libraries(dd_profiling-shared PRIVATE ddprof_exe_object)
+  target_link_libraries(dd_profiling-shared PRIVATE DDProf::Parser ddprof_exe_object)
   target_compile_definitions(dd_profiling-shared PRIVATE DDPROF_EMBEDDED_EXE_DATA)
 
   # Fix for link error in sanitizeddebug build mode with gcc:
@@ -372,10 +375,9 @@ target_link_options(dd_profiling-shared PRIVATE
 set_target_properties(dd_profiling-shared PROPERTIES OUTPUT_NAME dd_profiling)
 target_include_directories(
   dd_profiling-shared PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include
-                             ${CMAKE_SOURCE_DIR}/third_party ${EVENT_PARSER_INCLUDE})
+                             ${CMAKE_SOURCE_DIR}/third_party)
 set_target_properties(dd_profiling-shared
                       PROPERTIES PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
-target_link_libraries(dd_profiling-shared PUBLIC DDProf::Parser)
 if(BUILD_UNIVERSAL_DDPROF)
   target_link_options(dd_profiling-shared PRIVATE "-nolibc")
   if(USE_AUXILIARY)
@@ -400,7 +402,7 @@ if(${BUILD_NATIVE_LIB})
   set(DDPROF_LIB_SRC ${COMMON_SRC} src/lib/ddprof_output.cc)
 
   # Libs to link
-  set(NATIVE_LIB_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
+  set(NATIVE_LIB_LIBRARY_LIST DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 
   if(${DDPROF_JEMALLOC})
     list(PREPEND NATIVE_LIB_LIBRARY_LIST jemalloc)
@@ -417,7 +419,7 @@ if(${BUILD_NATIVE_LIB})
 
   target_include_directories(ddprof-native PRIVATE ${DDPROF_INCLUDE_LIST} ${EVENT_PARSER_INCLUDE})
 
-  target_link_libraries(ddprof-native PRIVATE ${NATIVE_LIB_LIBRARY_LIST} DDProf::Parser)
+  target_link_libraries(ddprof-native PRIVATE ${NATIVE_LIB_LIBRARY_LIST})
   add_library(DDProf::Native ALIAS ddprof-native)
 
   option(ACCURACY_TEST "Enable accuracy test" OFF)

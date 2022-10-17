@@ -240,21 +240,9 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
 
   // Attempt to fully unwind if the watcher has a callgraph type
-  DDRes res;
+  DDRes res = {};
   if (watcher->output_mode & kPerfWatcherMode_callgraph)
     res = unwindstate__unwind(us);
-
-  // Usually we want to send the sample_val, but sometimes we need to process
-  // the event to get the desired value
-  uint64_t sample_val = sample->period;
-  if ((PERF_SAMPLE_RAW & watcher->sample_type) &&
-      watcher->loc_type == kPerfWatcherLoc_raw) {
-    uint64_t raw_offset = watcher->raw_off;
-    uint64_t raw_sz = watcher->raw_sz;
-    memcpy(&sample_val, sample->data_raw + raw_offset, raw_sz);
-  } else if (watcher->loc_type == kPerfWatcherLoc_reg) {
-    memcpy(&sample_val, &sample->regs[watcher->regno], sizeof(sample_val));
-  }
 
   /* This test is not 100% accurate:
    * Linux kernel does not take into account stack start (ie. end address since
@@ -288,6 +276,9 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   if (!IsDDResFatal(res) &&
       (watcher->output_mode & kPerfWatcherMode_callgraph)) {
 #ifndef DDPROF_NATIVE_LIB
+    // Depending on the type of watcher, compute a value for sample
+    uint64_t sample_val = perf_value_from_sample(watcher, sample);
+
     // in lib mode we don't aggregate (protect to avoid link failures)
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];

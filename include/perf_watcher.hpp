@@ -15,9 +15,9 @@ typedef enum {
 } PerfWatcherValue;
 
 typedef enum {
-  kPerfWatcherLoc_val = 0, // use the default sample value
-  kPerfWatcherLoc_reg,     // use CPU register (specified in `reg`)
-  kPerfWatcherLoc_raw,     // use raw event (specified by raw_*)
+  kPerfWatcherLoc_period = 0, // use the fixed period as sample value
+  kPerfWatcherLoc_reg,        // use CPU register (specified in `reg`)
+  kPerfWatcherLoc_raw,        // use raw event (specified by raw_*)
 
 } PerfWatcherLocation;
 

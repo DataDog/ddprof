@@ -44,8 +44,8 @@ function(add_unit_test name)
   add_exe(${name} ../src/ddres_list.cc ../src/logger.cc ${MY_UNPARSED_ARGUMENTS})
 
   target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
-  target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST} ${GTEST_INCLUDE_DIRS}
-                                             ${CMAKE_SOURCE_DIR}/include/lib)
+  target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST} ${EVENT_PARSER_INCLUDE}
+                                             ${GTEST_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/include/lib)
 
   add_test(NAME ${name} COMMAND ${name})
   set_tests_properties(
@@ -80,7 +80,7 @@ function(add_benchmark name)
 
   target_link_libraries(${name} PRIVATE Threads::Threads benchmark::benchmark
                                         benchmark::benchmark_main)
-  target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST} ${CMAKE_SOURCE_DIR}/include/lib ${EVENT_PARSER_INCLUDE})
+  target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST} ${CMAKE_SOURCE_DIR}/include/lib)
   disable_clangtidy(${name})
 endfunction()
 

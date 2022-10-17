@@ -144,4 +144,7 @@ const char *perf_type_str(int type_id);
 namespace ddprof {
 std::vector<perf_event_attr>
 all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras);
-}
+
+uint64_t perf_value_from_sample(const PerfWatcher *watcher,
+                                const perf_event_sample *sample);
+} // namespace ddprof
