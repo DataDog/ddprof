@@ -15,6 +15,89 @@
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
 
+extern "C" {
+#include "libebl.h"
+}
+
+// clang-format off
+
+/// Hacky way of accessing registers
+//  --> imported definition from the libdwflP.h
+
+struct Dwfl_Process
+{
+  struct Dwfl *dwfl;
+  pid_t pid;
+  const Dwfl_Thread_Callbacks *callbacks;
+  void *callbacks_arg;
+  struct ebl *ebl;
+  bool ebl_close:1;
+};
+
+/* See its typedef in libdwfl.h.  */
+
+struct Dwfl_Thread
+{
+  Dwfl_Process *process;
+  pid_t tid;
+  /* Bottom (innermost) frame while we're initializing, NULL afterwards.  */
+  Dwfl_Frame *unwound;
+  void *callbacks_arg;
+};
+
+
+struct Dwfl_Frame
+{
+  Dwfl_Thread *thread;
+  /* Previous (outer) frame.  */
+  Dwfl_Frame *unwound;
+  bool signal_frame : 1;
+  bool initial_frame : 1;
+  enum
+  {
+    /* This structure is still being initialized or there was an error
+       initializing it.  */
+    DWFL_FRAME_STATE_ERROR,
+    /* PC field is valid.  */
+    DWFL_FRAME_STATE_PC_SET,
+    /* PC field is undefined, this means the next (inner) frame was the
+       outermost frame.  */
+    DWFL_FRAME_STATE_PC_UNDEFINED
+  } pc_state;
+  /* Either initialized from appropriate REGS element or on some archs
+     initialized separately as the return address has no DWARF register.  */
+  Dwarf_Addr pc;
+  /* (1 << X) bitmask where 0 <= X < ebl_frame_nregs.  */
+  uint64_t regs_set[3];
+  /* REGS array size is ebl_frame_nregs.
+     REGS_SET tells which of the REGS are valid.  */
+  Dwarf_Addr regs[];
+};
+
+/* Fetch value from Dwfl_Frame->regs indexed by DWARF REGNO.
+   No error code is set if the function returns FALSE.  */
+bool __libdwfl_frame_reg_get (Dwfl_Frame *state, unsigned regno,
+                              Dwarf_Addr *val);
+
+
+bool
+__libdwfl_frame_reg_get (Dwfl_Frame *state, unsigned regno, Dwarf_Addr *val)
+{
+  Ebl *ebl = state->thread->process->ebl;
+  if (! ebl_dwarf_to_regno (ebl, &regno))
+    return false;
+  if (regno >= ebl_frame_nregs (ebl))
+    return false;
+  if ((state->regs_set[regno / sizeof (*state->regs_set) / 8]
+       & ((uint64_t) 1U << (regno % (sizeof (*state->regs_set) * 8)))) == 0)
+    return false;
+  if (val)
+    *val = state->regs[regno];
+  return true;
+}
+
+// clang-format on
+
 int frame_cb(Dwfl_Frame *, void *);
 
 namespace ddprof {
@@ -85,6 +168,16 @@ static void trace_unwinding_end(UnwindState *us) {
     }
   }
 }
+
+void print_all_registers(Dwfl_Frame *dwfl_frame) {
+  for (int i = 0; i != PERF_REGS_COUNT; ++i) {
+    uint64_t val;
+    if (__libdwfl_frame_reg_get (dwfl_frame, i, &val)) {
+      LG_DBG("Register %i = %lx", i, val);
+    }
+  }
+}
+
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
                             DDProfMod *ddprof_mod, FileInfoId_t file_info_id);
 
@@ -120,10 +213,14 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     add_error_frame(nullptr, us, pc, SymbolErrors::unknown_dso);
     return ddres_init();
   }
+
+  // print_all_registers(dwfl_frame);
+
   const Dso &dso = find_res.first->second;
   if (dso::has_runtime_symbols(dso._type)) {
     return add_runtime_symbol_frame(us, dso, pc);
   }
+
   // if not encountered previously, update file location / key
   FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
   if (file_info_id <= k_file_info_error) {

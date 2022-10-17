@@ -25,8 +25,13 @@ set(ELFUTILS_PATH ${VENDOR_PATH}/elfutils-${VER_ELF})
 
 set(LIBDW_PATH ${ELFUTILS_PATH}/lib/libdw.a)
 set(LIBELF_PATH ${ELFUTILS_PATH}/lib/libelf.a)
+set(LIBEBL_PATH ${ELFUTILS_PATH}/src/libebl/libebl.a)
 
+
+set(DW_INCLUDE_DIRS ${ELFUTILS_PATH}/include/elfutils)
 set(ELFUTILS_INCLUDE_DIRS ${ELFUTILS_PATH}/include)
+# list(APPEND EBL_INCLUDE_DIRS ${ELFUTILS_PATH}/include/elfutils ${ELFUTILS_PATH}/include)
+set(EBL_INCLUDE_DIRS ${ELFUTILS_PATH}/src/libebl)
 
 if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Release" AND NOT "${CMAKE_BUILD_TYPE}" STREQUAL
                                                     "RelWithDebInfo")
@@ -49,7 +54,7 @@ add_library(dw STATIC IMPORTED)
 set_target_properties(
   dw
   PROPERTIES IMPORTED_LOCATION ${LIBDW_PATH}
-             INTERFACE_INCLUDE_DIRECTORIES ${ELFUTILS_INCLUDE_DIRS}
+             INTERFACE_INCLUDE_DIRECTORIES ${DW_INCLUDE_DIRS}
              INTERFACE_LINK_LIBRARIES "${LIBLZMA_LIBRARIES};${ZLIB_LIBRARIES}")
 
 add_library(elf STATIC IMPORTED)
@@ -59,5 +64,12 @@ set_target_properties(
              INTERFACE_INCLUDE_DIRECTORIES ${ELFUTILS_INCLUDE_DIRS}
              INTERFACE_LINK_LIBRARIES "${LIBLZMA_LIBRARIES};${ZLIB_LIBRARIES}")
 
+add_library(ebl STATIC IMPORTED)
+set_target_properties(
+  ebl
+  PROPERTIES IMPORTED_LOCATION ${LIBEBL_PATH}
+            INTERFACE_INCLUDE_DIRECTORIES ${EBL_INCLUDE_DIRS}
+            INTERFACE_LINK_LIBRARIES dw)
+    
 # Elf libraries
-set(ELFUTILS_LIBRARIES dw elf)
+set(ELFUTILS_LIBRARIES dw ebl elf)
