@@ -14,6 +14,7 @@ trigger_internal_build:
     DDPROF_COMMIT_BRANCH: ${CI_COMMIT_BRANCH}
     DDPROF_COMMIT_SHA: ${CI_COMMIT_SHA}
     DDPROF_SHORT_COMMIT_SHA: ${CI_COMMIT_SHORT_SHA}
+    DDPROF_COMMIT_TAG: ${CI_COMMIT_TAG}
     # Reliability environment downstream branch
     DDPROF_RELENV_BRANCH: master
   trigger:

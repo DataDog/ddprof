@@ -7,9 +7,21 @@ export PATH=$PATH:${PWD}/tools:${PWD}/bench/runners
 # Helper command lines for cmake. Source this file, then you can just do :
 # SanCMake ../ 
 
-# Attempt to use the latest known working version of GCC as the default
-DDPROF_CC_DEFAULT=$(command -v gcc{-12,-11,-10,-9,} | head -n1)
-DDPROF_CXX_DEFAULT=$(command -v g++{-12,-11,-10,-9,} | head -n1)
+# Attempt to use the explicit latest known working version of GCC as default
+DDPROF_CC_DEFAULT=gcc
+DDPROF_CXX_DEFAULT=g++
+for cc_ver in gcc-{12..9}; do
+  if command -v "$cc_ver" > /dev/null; then
+    DDPROF_CC_DEFAULT="$cc_ver"
+    break
+  fi
+done
+for cxx_ver in g++-{12..9}; do
+  if command -v "$cxx_ver" > /dev/null; then
+    DDPROF_CXX_DEFAULT="$cxx_ver"
+    break
+  fi
+done
 
 SCRIPTDIR="$(cd -- $( dirname -- "${BASH_SOURCE[0]}" ) && pwd)" # no "$0" when sourcing
 DDPROF_INSTALL_PREFIX="../deliverables"
