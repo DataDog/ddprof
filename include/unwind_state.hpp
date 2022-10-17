@@ -16,6 +16,8 @@
 #include "symbol_hdr.hpp"
 #include "unwind_output.hpp"
 
+#include "libaustin.h"
+
 #include <sys/types.h>
 
 typedef struct Dwfl Dwfl;
@@ -39,9 +41,10 @@ struct UnwindRegisters {
 struct UnwindState {
   explicit UnwindState(int dd_profiling_fd = -1)
       : _dwfl_wrapper(nullptr), dso_hdr("", dd_profiling_fd), pid(-1),
-        stack(nullptr), stack_sz(0), current_ip(0) {
+        stack(nullptr), stack_sz(0), current_ip(0), austin_handle(nullptr) {
     output.clear();
     output.locs.reserve(DD_MAX_STACK_DEPTH);
+
   }
 
   ddprof::DwflHdr dwfl_hdr;
@@ -59,6 +62,8 @@ struct UnwindState {
   ProcessAddress_t current_ip;
 
   UnwindOutput output;
+
+  austin_handle_t austin_handle;
 };
 
 static inline bool unwind_registers_equal(const UnwindRegisters *lhs,
