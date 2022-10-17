@@ -244,8 +244,6 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   if (watcher->output_mode & kPerfWatcherMode_callgraph)
     res = unwindstate__unwind(us);
 
-  uint64_t sample_val = perf_value_from_sample(watcher, sample);
-
   /* This test is not 100% accurate:
    * Linux kernel does not take into account stack start (ie. end address since
    * stack grows down) when capturing the stack, it starts from SP register and
@@ -278,6 +276,9 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   if (!IsDDResFatal(res) &&
       (watcher->output_mode & kPerfWatcherMode_callgraph)) {
 #ifndef DDPROF_NATIVE_LIB
+    // Depending on the type of watcher, compute a value for sample
+    uint64_t sample_val = perf_value_from_sample(watcher, sample);
+
     // in lib mode we don't aggregate (protect to avoid link failures)
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
