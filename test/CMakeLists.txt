@@ -43,7 +43,7 @@ function(add_unit_test name)
   # # Create exe with sources. Always add logger and error management in the unit tests
   add_exe(${name} ../src/ddres_list.cc ../src/logger.cc ${MY_UNPARSED_ARGUMENTS})
 
-  target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
+  target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock austin)
   target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST} ${GTEST_INCLUDE_DIRS}
                                              ${CMAKE_SOURCE_DIR}/include/lib)
 
@@ -226,6 +226,7 @@ add_unit_test(
   ../src/mapinfo_lookup.cc
   ../src/procutils.cc
   ../src/runtime_symbol_lookup.cc
+  ../src/austin_symbol_lookup.cc
   ../src/symbol_map.cc
   ../src/signal_helper.cc
   ../src/statsd.cc
@@ -266,6 +267,7 @@ add_unit_test(
   ../src/mapinfo_lookup.cc
   ../src/procutils.cc
   ../src/runtime_symbol_lookup.cc
+  ../src/austin_symbol_lookup.cc
   ../src/symbol_map.cc
   ../src/signal_helper.cc
   ../src/statsd.cc

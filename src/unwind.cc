@@ -17,6 +17,8 @@
 #include "unwind_metrics.hpp"
 #include "unwind_state.hpp"
 
+#include "libaustin.h"
+
 #include <algorithm>
 #include <array>
 #include <string_view.hpp>
@@ -31,6 +33,7 @@ static void find_dso_add_error_frame(UnwindState *us) {
       us->dso_hdr.dso_find_closest(us->pid, us->current_ip);
   add_error_frame(find_res.second ? &(find_res.first->second) : nullptr, us,
                   us->current_ip);
+  austin_up(); // Idempotent
 }
 
 void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
@@ -43,6 +46,7 @@ void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
   us->pid = sample_pid;
   us->stack_sz = sample_size_stack;
   us->stack = sample_data_stack;
+  us->austin_handle = austin_attach(sample_pid);
 }
 
 static bool is_ld(const std::string &path) {

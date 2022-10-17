@@ -5,16 +5,17 @@
 
 #include "unwind_dwfl.hpp"
 
+#include "austin_symbol_lookup.hpp"
 #include "ddprof_stats.hpp"
 #include "ddres.hpp"
 #include "dwfl_internals.hpp"
 #include "dwfl_thread_callbacks.hpp"
+#include "libaustin.h"
 #include "logger.hpp"
 #include "runtime_symbol_lookup.hpp"
 #include "symbol_hdr.hpp"
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
-
 extern "C" {
 #include "libebl.h"
 }
@@ -76,11 +77,7 @@ struct Dwfl_Frame
 
 /* Fetch value from Dwfl_Frame->regs indexed by DWARF REGNO.
    No error code is set if the function returns FALSE.  */
-bool __libdwfl_frame_reg_get (Dwfl_Frame *state, unsigned regno,
-                              Dwarf_Addr *val);
-
-
-bool
+static bool
 __libdwfl_frame_reg_get (Dwfl_Frame *state, unsigned regno, Dwarf_Addr *val)
 {
   Ebl *ebl = state->thread->process->ebl;
@@ -172,22 +169,25 @@ static void trace_unwinding_end(UnwindState *us) {
 void print_all_registers(Dwfl_Frame *dwfl_frame) {
   for (int i = 0; i != PERF_REGS_COUNT; ++i) {
     uint64_t val;
-    if (__libdwfl_frame_reg_get (dwfl_frame, i, &val)) {
+    if (__libdwfl_frame_reg_get(dwfl_frame, i, &val)) {
       LG_DBG("Register %i = %lx", i, val);
     }
   }
 }
 
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
-                            DDProfMod *ddprof_mod, FileInfoId_t file_info_id);
+                            DDProfMod *ddprof_mod, FileInfoId_t file_info_id,
+                            Dwfl_Frame *dwfl_frame);
 
 // check for runtime symbols provided in /tmp files
 static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
                                       ElfAddress_t pc);
 
+static DDRes add_python_frame(UnwindState *us, SymbolIdx_t symbol_idx,
+                              ElfAddress_t pc, Dwfl_Frame *dwfl_frame);
+
 // returns an OK status if we should continue unwinding
 static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
-
   if (is_max_stack_depth_reached(*us)) {
     add_common_frame(us, SymbolErrors::truncated_stack);
     LG_DBG("Max stack depth reached (depth#%lu)", us->output.nb_locs);
@@ -260,7 +260,8 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   us->current_ip = pc;
 
   // Now we register
-  if (IsDDResNotOK(add_dwfl_frame(us, dso, pc, ddprof_mod, file_info_id))) {
+  if (IsDDResNotOK(
+          add_dwfl_frame(us, dso, pc, ddprof_mod, file_info_id, dwfl_frame))) {
     return ddres_warn(DD_WHAT_UW_ERROR);
   }
   return ddres_init();
@@ -333,7 +334,8 @@ DDRes unwind_dwfl(UnwindState *us) {
 }
 
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
-                            DDProfMod *ddprof_mod, FileInfoId_t file_info_id) {
+                            DDProfMod *ddprof_mod, FileInfoId_t file_info_id,
+                            Dwfl_Frame *dwfl_frame) {
 
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
 
@@ -341,6 +343,11 @@ static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
   SymbolIdx_t symbol_idx = unwind_symbol_hdr._dwfl_symbol_lookup.get_or_insert(
       *ddprof_mod, unwind_symbol_hdr._symbol_table,
       unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso);
+
+  if (IsDDResOK(add_python_frame(us, symbol_idx, pc, dwfl_frame))) {
+    return ddres_init();
+  }
+
   MapInfoIdx_t map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
       us->pid, us->symbol_hdr._mapinfo_table, dso);
   return add_frame(symbol_idx, map_idx, pc, us);
@@ -364,6 +371,38 @@ static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
       us->pid, us->symbol_hdr._mapinfo_table, dso);
 
   return add_frame(symbol_idx, map_idx, pc, us);
+}
+
+// check for Python frame evaluation symbols
+static DDRes add_python_frame(UnwindState *us, SymbolIdx_t symbol_idx,
+                              ElfAddress_t pc, Dwfl_Frame *dwfl_frame) {
+  SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
+  SymbolTable &symbol_table = unwind_symbol_hdr._symbol_table;
+
+  std::string symname = symbol_table.at(symbol_idx)._symname;
+  if (us->austin_handle &&
+      (symname.find("PyEval_EvalFrameDefault") != std::string::npos ||
+       symname.find("PyEval_EvalFrameEx") != std::string::npos)) {
+    AustinSymbolLookup &austin_symbol_lookup =
+        unwind_symbol_hdr._austin_symbol_lookup;
+
+    // The register we are interested in is RSI, but it doesn't seem to be
+    // available. So we loop over the first 64 registers and stop if we find
+    // a register value that resolves correctly to a Python frame.
+    uint64_t val;
+    for (int i = 0; i < (int)sizeof(*dwfl_frame->regs_set) * 8; i++) {
+      if (__libdwfl_frame_reg_get(dwfl_frame, i, &val)) {
+        austin_frame_t *frame =
+            austin_read_frame(us->austin_handle, (void *)val);
+        if (frame) {
+          symbol_idx = austin_symbol_lookup.get_or_insert(frame, symbol_table);
+          return add_frame(symbol_idx, -1, pc, us);
+        }
+      }
+    }
+  }
+
+  return ddres_error(1);
 }
 
 } // namespace ddprof
