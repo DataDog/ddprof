@@ -24,7 +24,7 @@ uint8_t mode_from_str(const char *str) {
   if (!str || !*str)
     return mode;
 
-  size_t sz = sizeof(str);
+  size_t sz = strlen(str);
   for (size_t i = 0; i < sz; ++i) {
     if (str[i] == 'M' || str[i] == 'm')
       mode |= EVENT_METRIC;

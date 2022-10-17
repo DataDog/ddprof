@@ -78,8 +78,9 @@ DDRes ddprof_setup(DDProfContext *ctx) {
 
     display_system_info();
 
-    // Do not mmap events yet because mmap'ings from perf fds are lost after
-    // fork
+    // Open perf events and mmap events right now to start receiving events
+    // mmaps from perf fds will be lost after fork, that why we mmap them again
+    // in worker (but kernel only accounts for the pinned memory once).
     DDRES_CHECK_FWD(
         pevent_setup(ctx, ctx->params.pid, ctx->params.num_cpu, pevent_hdr));
 

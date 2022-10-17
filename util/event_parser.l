@@ -19,7 +19,7 @@
 
 <VALUE>{
 [a-zA-Z_][a-zA-Z0-9_]*  {
-	yylval.str = strdup(yytext);
+	yylval.str = yytext;
 	BEGIN 0;
 	return WORD;
 }
@@ -75,7 +75,7 @@ z|arg_size|argsz           DISPATCH(ARGSIZE )
 }
 
 [a-zA-Z_][a-zA-Z0-9_]*  {
-	yylval.str = strdup(yytext);
+	yylval.str = yytext;
 	BEGIN 0;
 	return WORD;
 }
