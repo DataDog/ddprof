@@ -2,9 +2,10 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
+//#include <string.h>
+#include <string>
 
-#include "event_config.h"
+#include "event_config.hpp"
 #include "perf_archmap.hpp"
 
 /*
@@ -24,8 +25,7 @@ uint8_t mode_from_str(const char *str) {
   if (!str || !*str)
     return mode;
 
-  size_t sz = strlen(str);
-  for (size_t i = 0; i < sz; ++i) {
+  for (size_t i = 0; str[i]; ++i) {
     if (str[i] == 'M' || str[i] == 'm')
       mode |= EVENT_METRIC;
     if (str[i] == 'G' || str[i] == 'g')
@@ -42,36 +42,13 @@ void conf_finalize(EventConf *conf) {
   // * if only event, "<eventname>"
   // * if neither, but id, "id:<id>"
   // * if none, then this is an invalid event anyway
-  if (!conf->label) {
-    if (conf->eventname && conf->groupname) {
-      size_t buf_sz = strlen(conf->eventname) + strlen(conf->groupname) + 3;
-      conf->label = (char *)malloc(buf_sz);
-      if (!conf->label) {
-        // This is an error.  Technically we should probably just shut down the
-        // application, but we'll pass an invalid conf instead
-        free(conf->eventname);
-        free(conf->groupname);
-        memset(&conf, 0, sizeof(conf));
-        return;
-      }
-
-      snprintf(conf->label, buf_sz - 1, "%s:%s", conf->groupname,
-               conf->eventname);
-    } else if (conf->eventname) {
-      conf->label = strdup(conf->eventname);
+  if (conf->label.empty()) {
+    if (!conf->eventname.empty() && !conf->groupname.empty()) {
+      conf->label = conf->groupname + ":" + conf->eventname;
+    } else if (!conf->eventname.empty() && conf->groupname.empty()) {
+      conf->label = conf->eventname;
     } else if (conf->id) {
-      size_t buf_sz = strlen("id:") + 20 + 2; // 2^64 has 20 digits
-      conf->label = (char *)malloc(buf_sz);
-      if (!conf->label) {
-        // This is an error.  Technically we should probably just shut down the
-        // application, but we'll pass an invalid conf instead
-        free(conf->eventname);
-        free(conf->groupname);
-        memset(&conf, 0, sizeof(conf));
-        return;
-      }
-
-      snprintf(conf->label, buf_sz - 1, "id:%lu", conf->id);
+      conf->label = "id:" + std::to_string(conf->id);
     }
   }
 }
@@ -79,13 +56,13 @@ void conf_finalize(EventConf *conf) {
 void conf_print(const EventConf *tp) {
   if (tp->id)
     printf("  id: %lu\n", tp->id);
-  else if (tp->groupname)
-    printf("  tracepoint: %s:%s\n", tp->groupname, tp->eventname);
+  else if (!tp->groupname.empty())
+    printf("  tracepoint: %s:%s\n", tp->groupname.c_str(), tp->eventname.c_str());
   else
-    printf("  event: %s\n", tp->eventname);
+    printf("  event: %s\n", tp->eventname.c_str());
 
-  if (tp->label)
-    printf("  label: %s\n", tp->label);
+  if (!tp->label.empty())
+    printf("  label: %s\n", tp->label.c_str());
   else
     printf("  label: <generated from event/groupname>\n");
   
@@ -122,7 +99,7 @@ void yyerror(const char *str) {
  } while(0)
 
 EventConf *EventConf_parse(const char *msg) {
-  memset(&g_accum_event_conf, 0, sizeof(g_accum_event_conf));
+  g_accum_event_conf = EventConf{};
   int ret = -1;
   YY_BUFFER_STATE buffer = yy_scan_string(msg);
   ret = yyparse();
@@ -185,22 +162,22 @@ confs:  conf CONFSEP { conf_finalize(&g_accum_event_conf); }
 conf: conf OPTSEP opt { }
     | conf OPTSEP WORD { }
     | opt { }
-    | WORD { g_accum_event_conf.eventname = $1; }
+    | WORD { g_accum_event_conf.eventname = std::string{$1}; }
     ;
 
 opt: KEY EQ WORD {
        switch($$) {
-         case ECF_EVENT: g_accum_event_conf.eventname = $3; break;
-         case ECF_GROUP: g_accum_event_conf.groupname = $3; break;
-         case ECF_LABEL: g_accum_event_conf.label = $3; break;
+         case ECF_EVENT: g_accum_event_conf.eventname = std::string{$3}; break;
+         case ECF_GROUP: g_accum_event_conf.groupname = std::string{$3}; break;
+         case ECF_LABEL: g_accum_event_conf.label = std::string{$3}; break;
          case ECF_MODE:  g_accum_event_conf.mode |= mode_from_str($3); break;
          default: VAL_ERROR(); break;
        }
      }
      | KEY EQ WORD ':' WORD {
        if ($$ == ECF_EVENT || $$ == ECF_GROUP) {
-         g_accum_event_conf.eventname = $3;
-         g_accum_event_conf.groupname = $5;
+         g_accum_event_conf.eventname = std::string{$3};
+         g_accum_event_conf.groupname = std::string{$5};
        }
      }
      | KEY EQ uinteger {

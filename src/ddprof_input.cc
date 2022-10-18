@@ -201,7 +201,7 @@ void ddprof_print_help() {
 // fills the default parameters for the input structure
 DDRes ddprof_input_default(DDProfInput *input) {
   // avoid assuming that things were set to 0 by user
-  memset(input, 0, sizeof(DDProfInput));
+  *input = DDProfInput{};
   exporter_input_dflt(&input->exp_input);
   // Populate default values (mutates ctx)
   OPT_TABLE(X_DFLT);

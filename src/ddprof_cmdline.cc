@@ -16,7 +16,7 @@
 #include <unistd.h>
 
 #include "ddres_helpers.hpp"
-#include "event_config.h"
+#include "event_config.hpp"
 #include "event_parser.h"
 #include "perf_archmap.hpp"
 #include "perf_watcher.hpp"
@@ -89,16 +89,16 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
     return false;
 
   // If there's no eventname, then this configuration is invalid
-  if (!conf->eventname || !*conf->eventname) {
+  if (conf->eventname.empty()) {
     return false;
   }
 
   // The watcher is templated; either from an existing Profiling template,
   // keyed on the eventname, or it uses the generic template for Tracepoints
-  if ((tmp_watcher = ewatcher_from_str(conf->eventname))) {
+  if ((tmp_watcher = ewatcher_from_str(conf->eventname.c_str()))) {
     *watcher = *tmp_watcher;
     conf->id = kIgnoredWatcherID; // matched, so invalidate Tracepoint checks
-  } else if (conf->groupname && *conf->groupname) {
+  } else if (!conf->groupname.empty()) {
     // If the event doesn't match an ewatcher, it is only valid if a group was
     // also provided (splitting events on ':' is the responsibility of the
     // parser)
@@ -116,7 +116,7 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   if (conf->id > 0) {
     tracepoint_id = conf->id;
   } else {
-    tracepoint_id = tracepoint_id_from_event(conf->eventname, conf->groupname);
+    tracepoint_id = tracepoint_id_from_event(conf->eventname.c_str(), conf->groupname.c_str());
   }
 
   // 0 is an error, "-1" is ignored

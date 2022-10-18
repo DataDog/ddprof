@@ -1,8 +1,9 @@
 %option noyywrap
+%option nounput
 
 %{
 #include <string.h>
-#include "event_config.h"
+#include "event_config.hpp"
 #include "event_parser.h"
 
 #define DISPATCH(type)                       \

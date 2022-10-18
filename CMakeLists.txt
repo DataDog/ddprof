@@ -113,14 +113,14 @@ set(EVENT_PARSER_SRC ${EVENT_PARSER_DIR}/src)
 set(EVENT_PARSER_INCLUDE ${EVENT_PARSER_DIR}/include)
 file(MAKE_DIRECTORY ${EVENT_PARSER_DIR} ${EVENT_PARSER_SRC} ${EVENT_PARSER_INCLUDE})
 
-bison_target(event_parser_yacc util/event_parser.y ${EVENT_PARSER_SRC}/event_parser.tab.c
+bison_target(event_parser_yacc util/event_parser.y ${EVENT_PARSER_SRC}/event_parser.tab.cpp
              DEFINES_FILE ${EVENT_PARSER_INCLUDE}/event_parser.h)
-flex_target(event_parser_lex util/event_parser.l ${EVENT_PARSER_SRC}/event_parser.lex.c)
+flex_target(event_parser_lex util/event_parser.l ${EVENT_PARSER_SRC}/event_parser.lex.cpp)
 add_flex_bison_dependency(event_parser_lex event_parser_yacc)
 
 set(DD_EVENT_PARSER_SOURCES
     # cmake-format: sortable
-    ${EVENT_PARSER_SRC}/event_parser.lex.c ${EVENT_PARSER_SRC}/event_parser.tab.c
+    ${EVENT_PARSER_SRC}/event_parser.lex.cpp ${EVENT_PARSER_SRC}/event_parser.tab.cpp
     src/perf_archmap.cc)
 
 add_library(event_parser STATIC ${DD_EVENT_PARSER_SOURCES} src/perf_archmap.cc)

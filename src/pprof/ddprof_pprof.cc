@@ -38,7 +38,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
       if (this_id != DDPROF_PWT_NOCOUNT) {
         DDRES_RETURN_ERROR_LOG(
             DD_WHAT_PPROF, "Watcher \"%s\" (%d) has invalid sample_type_id %d",
-            watchers[i].desc, i, this_id);
+            watchers[i].desc.c_str(), i, this_id);
       }
       continue;
     }
@@ -234,10 +234,10 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
 
     // If the label is given, use that as the tracepoint type.  Otherwise
     // default to the event name
-    if (watcher->tracepoint_label) {
-      labels[labels_num].str = to_CharSlice(watcher->tracepoint_label);
+    if (!watcher->tracepoint_label.empty()) {
+      labels[labels_num].str = to_CharSlice(watcher->tracepoint_label.c_str());
     } else {
-      labels[labels_num].str = to_CharSlice(watcher->tracepoint_event);
+      labels[labels_num].str = to_CharSlice(watcher->tracepoint_event.c_str());
     }
     ++labels_num;
   }

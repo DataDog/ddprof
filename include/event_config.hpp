@@ -5,7 +5,8 @@
 
 #pragma once
 
-#include <stdbool.h>
+#include <string>
+
 #include <stdint.h>
 
 // Defines how a sample is aggregated when it is received
@@ -49,13 +50,13 @@ typedef enum EventConfField {
 } EventConfField;
 
 typedef struct EventConf {
-  EventConfMode mode;
+  int mode;
 
   uint64_t id;
 
-  char *eventname;
-  char *groupname;
-  char *label;
+  std::string eventname;
+  std::string groupname;
+  std::string label;
 
   EventConfLocationType loc_type;
   uint8_t register_num;

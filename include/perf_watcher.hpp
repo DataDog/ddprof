@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <string>
+
 #include <linux/perf_event.h>
 #include <stdint.h>
 
@@ -37,7 +39,7 @@ struct PerfWatcherOptions {
 
 typedef struct PerfWatcher {
   int ddprof_event_type; // ddprof event type from DDPROF_EVENT_NAMES enum
-  const char *desc;
+  std::string desc;
   uint64_t sample_type; // perf sample type: specifies values included in sample
   int type; // perf event type (software / hardware / tracepoint / ... or custom
             // for non-perf events)
@@ -57,9 +59,9 @@ typedef struct PerfWatcher {
   uint8_t raw_off;
   uint8_t raw_sz;
   double value_coefficient;
-  const char *tracepoint_event;
-  const char *tracepoint_group;
-  const char *tracepoint_label;
+  std::string tracepoint_event;
+  std::string tracepoint_group;
+  std::string tracepoint_label;
   // Other configs
   bool suppress_pid;
   bool suppress_tid;
