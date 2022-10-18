@@ -20,17 +20,21 @@ extern int yyparse(void);
 extern YY_BUFFER_STATE yy_scan_string(const char * str);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
 
-uint8_t mode_from_str(const char *str) {
+uint8_t mode_from_str(const std::string &str) {
   uint8_t mode = EVENT_NONE;
-  if (!str || !*str)
+  if (str.empty())
     return mode;
 
-  for (size_t i = 0; str[i]; ++i) {
-    if (str[i] == 'M' || str[i] == 'm')
+  const std::string m_str{"Mm"};
+  const std::string g_str{"Gg"};
+  const std::string a_str{"Aa*"};
+
+  for (const char &c : str) {
+    if (m_str.find(c) != std::string::npos)
       mode |= EVENT_METRIC;
-    if (str[i] == 'G' || str[i] == 'g')
+    if (g_str.find(c) != std::string::npos)
       mode |= EVENT_CALLGRAPH;
-    if (str[i] == 'A' || str[i] == 'a' || str[i] == '*')
+    if (a_str.find(c) != std::string::npos)
       mode |= EVENT_BOTH;
   }
   return mode;
@@ -130,7 +134,7 @@ int main(int c, char **v) {
 
 %union {
 	uint64_t num;
-	char *str;
+	std::string *str;
 	char typ;
 	double fpnum;
 	EventConfField field;
@@ -150,34 +154,31 @@ int main(int c, char **v) {
 
 // this only allows a single config to be processed at a time
 // ... and has ugly whitespace stripping
-confs:  conf CONFSEP { conf_finalize(&g_accum_event_conf); }
-      | OPTSEP conf { conf_finalize(&g_accum_event_conf); }
-      | conf OPTSEP { conf_finalize(&g_accum_event_conf); }
-      | conf OPTSEP CONFSEP { conf_finalize(&g_accum_event_conf); }
-      | OPTSEP conf OPTSEP { conf_finalize(&g_accum_event_conf); }
-      | OPTSEP conf OPTSEP CONFSEP { conf_finalize(&g_accum_event_conf); }
-      | conf { conf_finalize(&g_accum_event_conf); }
+confs:
+      conf { conf_finalize(&g_accum_event_conf); }
+      | conf CONFSEP { conf_finalize(&g_accum_event_conf); }
       ;
 
-conf: conf OPTSEP opt { }
-    | conf OPTSEP WORD { }
-    | opt { }
-    | WORD { g_accum_event_conf.eventname = std::string{$1}; }
+conf: // can be empty; nothing happens
+    | opt
+    | conf OPTSEP conf 
     ;
 
-opt: KEY EQ WORD {
+opt: // can be empty; nothing happens
+   | WORD { g_accum_event_conf.eventname = *$1; }
+   | KEY EQ WORD {
        switch($$) {
-         case ECF_EVENT: g_accum_event_conf.eventname = std::string{$3}; break;
-         case ECF_GROUP: g_accum_event_conf.groupname = std::string{$3}; break;
-         case ECF_LABEL: g_accum_event_conf.label = std::string{$3}; break;
-         case ECF_MODE:  g_accum_event_conf.mode |= mode_from_str($3); break;
+         case ECF_EVENT: g_accum_event_conf.eventname = *$3; break;
+         case ECF_GROUP: g_accum_event_conf.groupname = *$3; break;
+         case ECF_LABEL: g_accum_event_conf.label = *$3; break;
+         case ECF_MODE:  g_accum_event_conf.mode |= mode_from_str(*$3); break;
          default: VAL_ERROR(); break;
        }
      }
      | KEY EQ WORD ':' WORD {
        if ($$ == ECF_EVENT || $$ == ECF_GROUP) {
-         g_accum_event_conf.eventname = std::string{$3};
-         g_accum_event_conf.groupname = std::string{$5};
+         g_accum_event_conf.eventname = *$3;
+         g_accum_event_conf.groupname = *$5;
        }
      }
      | KEY EQ uinteger {

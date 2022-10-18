@@ -19,8 +19,8 @@
 %%
 
 <VALUE>{
-[a-zA-Z_][a-zA-Z0-9_]*  {
-	yylval.str = yytext;
+[[:alpha:]_][[:alnum:]_]*   {
+	yylval.str = new std::string{yytext};
 	BEGIN 0;
 	return WORD;
 }
@@ -65,7 +65,7 @@ z|arg_size|argsz           DISPATCH(ARGSIZE )
 	return EQ;
 }
 
-[ ,][ ]*                {
+[ ,\t][ \t]*            {
 	BEGIN 0;
 	return OPTSEP;
 }
@@ -75,8 +75,8 @@ z|arg_size|argsz           DISPATCH(ARGSIZE )
 	return CONFSEP;
 }
 
-[a-zA-Z_][a-zA-Z0-9_]*  {
-	yylval.str = yytext;
+[[:alpha:]_][[:alnum:]_]*   {
+	yylval.str = new std::string{yytext};
 	BEGIN 0;
 	return WORD;
 }
