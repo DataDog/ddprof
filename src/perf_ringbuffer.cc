@@ -228,8 +228,8 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
   if (PERF_SAMPLE_BRANCH_STACK & mask) {}
   if (PERF_SAMPLE_REGS_USER & mask) {
     sample.abi = *buf++;
-    // Since some of the previous events are variable-length, ABI gives us
-    // an opportunity to sanity-check the buffer (only 2 legal values!)
+    // Unwinding is only supported for ABIs which are explicitly marked 32-/64- 
+    // bits.  Reject unspecified (*_NONE) and illegal ABI specifications.
     if (sample.abi != PERF_SAMPLE_REGS_ABI_32 &&
         sample.abi != PERF_SAMPLE_REGS_ABI_64) {
       return NULL;
