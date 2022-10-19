@@ -165,10 +165,9 @@ static void ddprof_input_default_events(DDProfInput *input) {
       continue;
     }
 
-    const char *event = event_str.c_str();
     PerfWatcher *watcher = &input->watchers[input->num_watchers];
-    if (!watcher_from_str(event, watcher)) {
-      LG_WRN("Ignoring invalid event/tracepoint (%s)", optarg);
+    if (!watcher_from_str(event_str.c_str(), watcher)) {
+      LG_WRN("Ignoring invalid event/tracepoint (%s)", event_str.c_str());
     } else {
       ++input->num_watchers;
     }
