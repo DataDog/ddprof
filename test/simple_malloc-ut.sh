@@ -50,13 +50,21 @@ check() {
         grep -Fq "Profiling terminated" <&"${COPROC[0]}"
         kill "$COPROC_PID"
     fi
-
     if [[ "${expected_pids}" -ne 0 ]]; then
-        if [[ $(count "${log_file}" "alloc-samples" "pid") -ne "${expected_pids}" ||
-        $(count "${log_file}" "cpu-samples" "pid") -ne "${expected_pids}" ||
-        $(count "${log_file}" "alloc-samples" "tid") -ne "${expected_tids}" ||
-        $(count "${log_file}" "cpu-samples" "tid") -ne "${expected_tids}" ]]; then
+
+        counted_pids_alloc=$(count "${log_file}" "alloc-samples" "pid")
+        counted_pids_cpu=$(count "${log_file}" "cpu-samples" "pid")
+        counted_tids_alloc=$(count "${log_file}" "alloc-samples" "tid")
+        counted_tids_cpu=$(count "${log_file}" "cpu-samples" "tid")
+        if [[ $counted_pids_alloc -ne "${expected_pids}" ||
+            $counted_pids_cpu -ne "${expected_pids}" ||
+            $counted_tids_alloc -ne "${expected_tids}" ||
+            $counted_tids_cpu -ne "${expected_tids}" ]]; then
             echo "Incorrect number of sample found for: $cmd"
+            echo "counted_pids_alloc = $counted_pids_alloc"
+            echo "counted_pids_cpu = ${counted_pids_cpu}"
+            echo "counted_tids_alloc = ${counted_tids_alloc}"
+            echo "counted_tids_cpu = ${counted_tids_cpu}"
             cat "${log_file}"
             exit 1
         fi

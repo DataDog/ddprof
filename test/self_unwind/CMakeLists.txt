@@ -9,7 +9,6 @@ add_exe(
 disable_clangtidy(selfuw)
 target_static_libcxx(selfuw)
 
-message(STATUS "top level ${CMAKE_SOURCE_DIR}")
 # slightly hacky : we should only include public headers
 target_include_directories(
   selfuw PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/include/lib
