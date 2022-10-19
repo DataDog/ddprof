@@ -126,6 +126,7 @@ set(DD_EVENT_PARSER_SOURCES
 add_library(event_parser STATIC ${DD_EVENT_PARSER_SOURCES} src/perf_archmap.cc)
 target_include_directories(event_parser PUBLIC ${EVENT_PARSER_INCLUDE} include)
 set_property(TARGET event_parser PROPERTY POSITION_INDEPENDENT_CODE ON)
+set_property(TARGET event_parser PROPERTY CXX_CLANG_TIDY "")
 add_library(DDProf::Parser ALIAS event_parser)
 
 # ---- Benchmarks ----
