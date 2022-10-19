@@ -135,7 +135,7 @@ int main(int c, char **v) {
 %}
 
 %union {
-	uint64_t num;
+	int64_t num;
 	std::string *str;
 	char typ;
 	double fpnum;
@@ -148,7 +148,7 @@ int main(int c, char **v) {
 %token <str> WORD
 %token <str> KEY
 
-%type <num> uinteger
+%type <num> integer 
 %type <field> conf
 %type <field> opt
 
@@ -200,7 +200,14 @@ opt:
        delete $3;
        delete $5;
      }
-     | KEY EQ uinteger {
+     | KEY EQ integer {
+       // FIXME TODO HACK
+       // As a temporary measure, we're allowing integers to be negative ONLY
+       // for the period.
+       if ($3 < 0 && $$ != ECF_PERIOD && $$ != ECF_ARGCOEFF) {
+         VAL_ERROR();
+         break;
+       }
        switch($$) {
          case ECF_ID: g_accum_event_conf.id = $3; break;
          case ECF_ARGSIZE: g_accum_event_conf.arg_size= $3; break;
@@ -265,4 +272,4 @@ opt:
      }
      ;
 
-uinteger: NUMBER | HEXNUMBER
+integer: NUMBER | HEXNUMBER

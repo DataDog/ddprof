@@ -128,9 +128,12 @@ TEST(CmdLineTst, ParserKeyPatterns) {
   ASSERT_TRUE(watcher_from_str("e=hCPU frequency=1", &watcher));
 
   // p|period|per
+  // FIXME periods should never be negative, but we allow it for the
+  // allocation profiler
   ASSERT_TRUE(watcher_from_str("e=hCPU p=1", &watcher));
   ASSERT_TRUE(watcher_from_str("e=hCPU per=1", &watcher));
   ASSERT_TRUE(watcher_from_str("e=hCPU period=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU period=-1", &watcher));
 
   // period + frequency is ambiguous, failure
   ASSERT_FALSE(watcher_from_str("e=hCPU p=1 f=1", &watcher));
@@ -237,8 +240,9 @@ TEST(CmdLineTst, ParserKeyPatterns) {
   ASSERT_TRUE(watcher_from_str("e=hCPU period=1", &watcher));
 
   // Period is a uint.
+  // FIXME temporarily relaxing this
   ASSERT_FALSE(watcher_from_str("e=hCPU p=1.0", &watcher));
-  ASSERT_FALSE(watcher_from_str("e=hCPU p=-1", &watcher));
+//  ASSERT_FALSE(watcher_from_str("e=hCPU p=-1", &watcher));
   ASSERT_FALSE(watcher_from_str("e=hCPU p=lots", &watcher));
   ASSERT_TRUE(watcher_from_str("e=hCPU p=0x0", &watcher));
 

@@ -32,24 +32,24 @@
 	BEGIN 0;
 	return WORD;
 }
-[[:digit:]]+            {
+[-+]?[[:digit:]]+           {
 	yylval.num = strtol(yytext, NULL, 10);
 	BEGIN 0;
 	return NUMBER;
 }
-0x[[:digit:]]+          {
+[-+]?0x[[:digit:]]+         {
 	
 	yylval.num = strtol(yytext, NULL, 16);
 	BEGIN 0;
 	return HEXNUMBER;
 }
-[-+]?[[:digit:].]+[fFdD]?    {
+[-+]?[[:digit:].]+[fFdD]?   {
 	yylval.fpnum = strtod(yytext, NULL);
 	BEGIN 0;
 	return FLOAT;
 }
 
-.                       {
+.                           {
 	BEGIN 0;
 	return (int) yytext[0];
 }
