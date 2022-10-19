@@ -172,8 +172,6 @@ bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,
 
 perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
   static perf_event_sample sample = {};
-  memset(&sample, 0, sizeof(sample));
-
   sample.header = *hdr;
 
   uint64_t *buf = (uint64_t *)&hdr[1]; // sample starts after header
@@ -228,10 +226,9 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
   if (PERF_SAMPLE_BRANCH_STACK & mask) {}
   if (PERF_SAMPLE_REGS_USER & mask) {
     sample.abi = *buf++;
-    // Unwinding is only supported for ABIs which are explicitly marked 32-/64- 
-    // bits.  Reject unspecified (*_NONE) and illegal ABI specifications.
-    if (sample.abi != PERF_SAMPLE_REGS_ABI_32 &&
-        sample.abi != PERF_SAMPLE_REGS_ABI_64) {
+    // ddprof only has register definitions for 64-bit processors.  Reject
+    // everything else for now.
+    if (sample.abi != PERF_SAMPLE_REGS_ABI_64) {
       return NULL;
     }
     sample.regs = buf;
