@@ -118,8 +118,9 @@ void log_watcher(const PerfWatcher *w, int n) {
   }
 
   PRINT_NFO("    Category: %s, EventName: %s, GroupName: %s, Label: %s",
-            sample_type_name_from_idx(w->sample_type_id), w->tracepoint_event.c_str(),
-            w->tracepoint_group.c_str(), w->tracepoint_label.c_str());
+            sample_type_name_from_idx(w->sample_type_id),
+            w->tracepoint_event.c_str(), w->tracepoint_group.c_str(),
+            w->tracepoint_label.c_str());
 
   if (w->options.is_freq)
     PRINT_NFO("    Cadence: Freq, Freq: %lu", w->sample_frequency);

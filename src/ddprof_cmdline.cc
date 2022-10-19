@@ -117,7 +117,8 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   if (conf->id > 0) {
     tracepoint_id = conf->id;
   } else {
-    tracepoint_id = tracepoint_id_from_event(conf->eventname.c_str(), conf->groupname.c_str());
+    tracepoint_id = tracepoint_id_from_event(conf->eventname.c_str(),
+                                             conf->groupname.c_str());
   }
 
   // 0 is an error, "-1" is ignored

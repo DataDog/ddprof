@@ -67,9 +67,7 @@ typedef struct EventConf {
   EventConfCadenceType cad_type;
   uint64_t cadence;
 
-  void clear() {
-    *this = EventConf{};
-  }
+  void clear() { *this = EventConf{}; }
 } EventConf;
 
 // This header will be used both by the ddprof C++ code and the C compiler for
