@@ -7,7 +7,7 @@
 #include "event_config.hpp"
 #include "perf_archmap.hpp"
 
-#define YYDEBUG 1
+#define YYDEBUG 0
 
 typedef struct yy_buffer_state * YY_BUFFER_STATE;
 extern int yylex(void);
