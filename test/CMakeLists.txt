@@ -80,7 +80,7 @@ function(add_benchmark name)
 
   target_link_libraries(${name} PRIVATE Threads::Threads benchmark::benchmark
                                         benchmark::benchmark_main)
-  target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST})
+  target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST} ${CMAKE_SOURCE_DIR}/include/lib)
   disable_clangtidy(${name})
 endfunction()
 
@@ -223,12 +223,12 @@ add_unit_test(
   ../src/dwfl_symbol_lookup.cc
   ../src/dwfl_thread_callbacks.cc
   ../src/failed_assumption.cc
-  ../src/runtime_symbol_lookup.cc
-  ../src/symbol_map.cc
-  ../src/savecontext.cc
-  ../src/saveregisters.cc
+  ../src/lib/savecontext.cc
+  ../src/lib/saveregisters.cc
   ../src/mapinfo_lookup.cc
   ../src/procutils.cc
+  ../src/runtime_symbol_lookup.cc
+  ../src/symbol_map.cc
   ../src/signal_helper.cc
   ../src/statsd.cc
   ../src/unwind.cc
@@ -264,12 +264,12 @@ add_unit_test(
   ../src/perf_ringbuffer.cc
   ../src/perf_watcher.cc
   ../src/ringbuffer_utils.cc
-  ../src/savecontext.cc
-  ../src/saveregisters.cc
-  ../src/runtime_symbol_lookup.cc
-  ../src/symbol_map.cc
+  ../src/lib/savecontext.cc
+  ../src/lib/saveregisters.cc
   ../src/mapinfo_lookup.cc
   ../src/procutils.cc
+  ../src/runtime_symbol_lookup.cc
+  ../src/symbol_map.cc
   ../src/signal_helper.cc
   ../src/statsd.cc
   ../src/sys_utils.cc
@@ -307,7 +307,9 @@ add_unit_test(symbol_map-ut symbol_map-ut.cc ../src/symbol_map.cc)
 
 add_unit_test(build_id-ut build_id-ut.cc ../src/build_id.cc)
 
-add_benchmark(savecontext-bench savecontext-bench.cc ../src/savecontext.cc ../src/saveregisters.cc)
+add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/savecontext.cc
+              ../src/lib/saveregisters.cc)
+
 add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
@@ -320,7 +322,7 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
 
   add_exe(
     simple_malloc-shared simple_malloc.cc
-    LIBRARIES dd_profiling-shared
+    LIBRARIES dd_profiling-shared Threads::Threads
     DEFINITIONS USE_DD_PROFILING)
   target_include_directories(simple_malloc-shared PRIVATE ${CMAKE_SOURCE_DIR}/include
                                                           ${CMAKE_SOURCE_DIR}/third_party)

@@ -1,4 +1,4 @@
 {
-  global: ddprof_start_profiling; ddprof_stop_profiling; malloc; realloc; free; calloc; reallocarray; posix_memalign; memalign; aligned_alloc; pvalloc; valloc; pthread_create;
+  global: ddprof_start_profiling; ddprof_stop_profiling;
   local: *;
 };
