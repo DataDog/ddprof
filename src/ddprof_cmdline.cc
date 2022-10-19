@@ -85,8 +85,9 @@ uint64_t kIgnoredWatcherID = -1ul;
 bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   EventConf *conf = EventConf_parse(str);
   const PerfWatcher *tmp_watcher;
-  if (!conf)
+  if (!conf) {
     return false;
+  }
 
   // If there's no eventname, then this configuration is invalid
   if (conf->eventname.empty()) {

@@ -2,17 +2,12 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-//#include <string.h>
 #include <string>
 
 #include "event_config.hpp"
 #include "perf_archmap.hpp"
 
-/*
-#define YYSTYPE char *
-*/
-
-#define YYDEBUG 0
+#define YYDEBUG 1
 
 typedef struct yy_buffer_state * YY_BUFFER_STATE;
 extern int yylex(void);
@@ -103,7 +98,7 @@ void yyerror(const char *str) {
  } while(0)
 
 EventConf *EventConf_parse(const char *msg) {
-  g_accum_event_conf = EventConf{};
+  g_accum_event_conf.clear();
   int ret = -1;
   YY_BUFFER_STATE buffer = yy_scan_string(msg);
   ret = yyparse();
@@ -150,36 +145,53 @@ int main(int c, char **v) {
 %type <field> conf
 %type <field> opt
 
+%destructor { delete $$; } WORD
+
 %%
 
 // this only allows a single config to be processed at a time
 // ... and has ugly whitespace stripping
 confs:
       conf { conf_finalize(&g_accum_event_conf); }
-      | conf CONFSEP { conf_finalize(&g_accum_event_conf); }
+      | confs CONFSEP conf // Unchained, subsequent configs ignored
       ;
 
-conf: // can be empty; nothing happens
-    | opt
-    | conf OPTSEP conf 
-    ;
+conf:
+    | opt | conf OPTSEP conf ;
 
-opt: // can be empty; nothing happens
-   | WORD { g_accum_event_conf.eventname = *$1; }
+opt:
+   WORD { 
+     g_accum_event_conf.eventname = *$1;
+     delete $1;
+   }
    | KEY EQ WORD {
        switch($$) {
-         case ECF_EVENT: g_accum_event_conf.eventname = *$3; break;
-         case ECF_GROUP: g_accum_event_conf.groupname = *$3; break;
-         case ECF_LABEL: g_accum_event_conf.label = *$3; break;
-         case ECF_MODE:  g_accum_event_conf.mode |= mode_from_str(*$3); break;
-         default: VAL_ERROR(); break;
+         case ECF_EVENT:
+           g_accum_event_conf.eventname = *$3;
+           break;
+         case ECF_GROUP:
+           g_accum_event_conf.groupname = *$3;
+           break;
+         case ECF_LABEL:
+           g_accum_event_conf.label = *$3;
+           break;
+         case ECF_MODE:
+           g_accum_event_conf.mode |= mode_from_str(*$3);
+           break;
+         default:
+           delete $3;
+           VAL_ERROR();
+           break;
        }
+       delete $3;
      }
      | KEY EQ WORD ':' WORD {
        if ($$ == ECF_EVENT || $$ == ECF_GROUP) {
          g_accum_event_conf.eventname = *$3;
          g_accum_event_conf.groupname = *$5;
        }
+       delete $3;
+       delete $5;
      }
      | KEY EQ uinteger {
        switch($$) {
