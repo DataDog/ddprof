@@ -155,7 +155,7 @@ typedef enum DDPROF_EVENT_NAMES {
 // Helper functions for event-type watcher lookups
 const PerfWatcher *ewatcher_from_idx(int idx);
 const PerfWatcher *ewatcher_from_str(const char *str);
-const PerfWatcher *twatcher_default();
+const PerfWatcher *tracepoint_default_watcher();
 bool watcher_has_countable_sample_type(const PerfWatcher *watcher);
 bool watcher_has_tracepoint(const PerfWatcher *watcher);
 int watcher_to_count_sample_type_id(const PerfWatcher *watcher);

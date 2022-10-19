@@ -52,18 +52,6 @@ bool watcher_has_countable_sample_type(const PerfWatcher *watcher) {
 
 #define X_EVENTS(a, b, c, d, e, f, g)                                          \
   {DDPROF_PWE_##a, b, BASE_STYPES, c, d, {e}, f, PERF_SAMPLE_STACK_SIZE, g},
-const PerfWatcher events_templates[] = {EVENT_CONFIG_TABLE(X_EVENTS)};
-const PerfWatcher tracepoint_templates[] = {{
-    .ddprof_event_type = DDPROF_PWE_TRACEPOINT,
-    .desc = "Tracepoint",
-    .sample_type = BASE_STYPES,
-    .type = PERF_TYPE_TRACEPOINT,
-    .sample_period = 1,
-    .sample_type_id = DDPROF_PWT_TRACEPOINT,
-    .options = {.is_kernel = kPerfWatcher_Required},
-    .value_coefficient = 1.0,
-}};
-#undef X_PWATCH
 
 #define X_STR(a, b, c, d, e, f, g) #a,
 const char *event_type_name_from_idx(int idx) {
@@ -90,16 +78,30 @@ int str_to_event_idx(const char *str) {
 const PerfWatcher *ewatcher_from_idx(int idx) {
   if (idx < 0 || idx >= DDPROF_PWE_LENGTH)
     return NULL;
-  return &events_templates[idx];
+  try {
+    static const PerfWatcher events[] = {EVENT_CONFIG_TABLE(X_EVENTS)};
+    return &events[idx];
+  } catch (...) { return NULL; }
 }
 
 const PerfWatcher *ewatcher_from_str(const char *str) {
   return ewatcher_from_idx(str_to_event_idx(str));
 }
 
-const PerfWatcher *twatcher_default() {
-  // Only the one (for now?!)
-  return &tracepoint_templates[0];
+const PerfWatcher *tracepoint_default_watcher() {
+  try {
+    static const PerfWatcher tracepoint_templates[] = {{
+        .ddprof_event_type = DDPROF_PWE_TRACEPOINT,
+        .desc = "Tracepoint",
+        .sample_type = BASE_STYPES,
+        .type = PERF_TYPE_TRACEPOINT,
+        .sample_period = 1,
+        .sample_type_id = DDPROF_PWT_TRACEPOINT,
+        .options = {.is_kernel = kPerfWatcher_Required},
+        .value_coefficient = 1.0,
+    }};
+    return &tracepoint_templates[0];
+  } catch (...) { return NULL; }
 }
 
 bool watcher_has_tracepoint(const PerfWatcher *watcher) {

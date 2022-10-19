@@ -103,7 +103,11 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
     // If the event doesn't match an ewatcher, it is only valid if a group was
     // also provided (splitting events on ':' is the responsibility of the
     // parser)
-    *watcher = *twatcher_default();
+    auto *tmp_tracepoint_watcher = tracepoint_default_watcher();
+    if (!tmp_tracepoint_watcher) {
+      return false;
+    }
+    *watcher = *tmp_tracepoint_watcher;
   } else {
     return false;
   }
