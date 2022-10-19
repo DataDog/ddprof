@@ -242,7 +242,7 @@ TEST(CmdLineTst, ParserKeyPatterns) {
   // Period is a uint.
   // FIXME temporarily relaxing this
   ASSERT_FALSE(watcher_from_str("e=hCPU p=1.0", &watcher));
-//  ASSERT_FALSE(watcher_from_str("e=hCPU p=-1", &watcher));
+  //  ASSERT_FALSE(watcher_from_str("e=hCPU p=-1", &watcher));
   ASSERT_FALSE(watcher_from_str("e=hCPU p=lots", &watcher));
   ASSERT_TRUE(watcher_from_str("e=hCPU p=0x0", &watcher));
 
