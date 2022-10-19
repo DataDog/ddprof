@@ -85,8 +85,11 @@ include(Findelfutils)
 
 # ---- Static analysis ----
 include(ClangTidy)
-include(CppcheckConfig)
 include(Format)
+
+# Generated code needs to be available for cppcheck to work
+include(CppcheckConfig)
+add_dependencies(cppcheck DDProf::Parser)
 
 # ---- Libraries (needed by ut) ----
 
