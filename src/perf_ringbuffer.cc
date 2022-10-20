@@ -248,7 +248,9 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
       sample.dyn_size_stack = dynsz_stack; // for debugging
     }
   }
-  if (PERF_SAMPLE_WEIGHT & mask) {}
+  if (PERF_SAMPLE_WEIGHT & mask) {
+    sample.weight = *buf++;
+  }
   if (PERF_SAMPLE_DATA_SRC & mask) {}
   if (PERF_SAMPLE_TRANSACTION & mask) {}
   if (PERF_SAMPLE_REGS_INTR & mask) {}

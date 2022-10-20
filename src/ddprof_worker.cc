@@ -273,8 +273,9 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     PerfWatcher *watcher = &ctx->watchers[watcher_pos];
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
+    uint64_t count = (sample->weight > 0) ? sample->weight : 1;
     DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr,
-                                    sample->period, 1, watcher, pprof));
+                                    sample->period, count, watcher, pprof));
     if (ctx->params.show_samples) {
       ddprof_print_sample(us->output, us->symbol_hdr, sample->period, *watcher);
     }

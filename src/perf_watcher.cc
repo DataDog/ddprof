@@ -10,10 +10,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#define BASE_STYPES                                                            \
-  (PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_TID |          \
-   PERF_SAMPLE_TIME | PERF_SAMPLE_PERIOD)
-
 uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
 
 #define X_STR(a, b, c, d) b,
@@ -50,8 +46,8 @@ bool watcher_has_countable_sample_type(const PerfWatcher *watcher) {
   return DDPROF_PWT_NOCOUNT != watcher_to_count_sample_type_id(watcher);
 }
 
-#define X_EVENTS(a, b, c, d, e, f, g)                                          \
-  {DDPROF_PWE_##a, b, BASE_STYPES, c, d, {e}, f, PERF_SAMPLE_STACK_SIZE, g},
+#define X_EVENTS(a, b, c, d, e, f, g, h)                                       \
+  {DDPROF_PWE_##a, b, h, c, d, {e}, f, PERF_SAMPLE_STACK_SIZE, g},
 const PerfWatcher events_templates[] = {EVENT_CONFIG_TABLE(X_EVENTS)};
 const PerfWatcher tracepoint_templates[] = {{
     .ddprof_event_type = DDPROF_PWE_TRACEPOINT,
@@ -64,7 +60,7 @@ const PerfWatcher tracepoint_templates[] = {{
 }};
 #undef X_PWATCH
 
-#define X_STR(a, b, c, d, e, f, g) #a,
+#define X_STR(a, b, c, d, e, f, g, h) #a,
 const char *event_type_name_from_idx(int idx) {
   static const char *event_names[] = {EVENT_CONFIG_TABLE(X_STR)}; // NOLINT
   if (idx < 0 || idx >= DDPROF_PWE_LENGTH)

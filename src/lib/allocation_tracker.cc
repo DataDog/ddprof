@@ -24,17 +24,17 @@
 
 namespace ddprof {
 
+// AllocationEvent has a layout compatible with perf_event_sample
 struct AllocationEvent {
   perf_event_header hdr;
   struct sample_id sample_id;
   uint64_t period;
-  uint64_t abi; /* if PERF_SAMPLE_REGS_USER */
+  uint64_t abi;
   uint64_t regs[PERF_REGS_COUNT];
-  /* if PERF_SAMPLE_REGS_USER */
-  uint64_t size;                          /* if PERF_SAMPLE_STACK_USER */
-  std::byte data[PERF_SAMPLE_STACK_SIZE]; /* if PERF_SAMPLE_STACK_USER */
-  uint64_t dyn_size;                      /* if PERF_SAMPLE_STACK_USER &&
-                                        size != 0 */
+  uint64_t size;
+  std::byte data[PERF_SAMPLE_STACK_SIZE];
+  uint64_t dyn_size;
+  uint64_t weight;
 };
 
 struct LostEvent {
@@ -184,7 +184,18 @@ void AllocationTracker::track_allocation(uintptr_t, size_t size,
   tl_state.remaining_bytes = remaining_bytes;
   uint64_t total_size = nsamples * sampling_interval;
 
-  if (!IsDDResOK(push_sample(total_size, tl_state))) {
+  if (_sampling_interval > 1) {
+    // Determine the allocation count as the inverse probability of sampling an
+    // allocation of size `size`.
+    // For large allocations, nsamples ~= 1
+    // For small allocations, nsamples ~= _sample_interval / size
+    nsamples = static_cast<size_t>(
+        1.0 /
+        (1.0 - std::exp(-static_cast<double>(size) / _sampling_interval)));
+  } else {
+    nsamples = 1;
+  }
+  if (!IsDDResOK(push_sample(nsamples, total_size, tl_state))) {
     ++_state.failure_count;
     if (_state.failure_count >= k_max_consecutive_failures) {
       // Too many errors during ring buffer operation: stop allocation profiling
@@ -225,7 +236,8 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
   return {};
 }
 
-DDRes AllocationTracker::push_sample(uint64_t allocated_size,
+DDRes AllocationTracker::push_sample(uint64_t alloc_count,
+                                     uint64_t allocated_size,
                                      TrackerThreadLocalState &tl_state) {
   MPSCRingBufferWriter writer{_pevent.rb};
   bool notify_consumer{false};
@@ -271,6 +283,7 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
   event->period = allocated_size;
+  event->weight = alloc_count;
   event->size = PERF_SAMPLE_STACK_SIZE;
 
   event->dyn_size = save_context(tl_state.stack_end, event->regs,
@@ -294,9 +307,8 @@ uint64_t AllocationTracker::next_sample_interval() {
   if (_deterministic_sampling) {
     return _sampling_interval;
   }
-  double sampling_rate = 1.0 / static_cast<double>(_sampling_interval);
-  std::exponential_distribution<> dist(sampling_rate);
-  double value = dist(_gen);
+  std::uniform_real_distribution<> dist;
+  double value = -std::log(dist(_gen)) * _sampling_interval;
   const size_t max_value = _sampling_interval * 20;
   const size_t min_value = 8;
   if (value > max_value) {

@@ -95,38 +95,42 @@ enum DDProfCustomCountId { kDDPROF_COUNT_ALLOCATIONS = 0 };
 #define SKIP_FRAMES                                                            \
   { .nb_frames_to_skip = NB_FRAMES_TO_SKIP }
 
+#define BASE_STYPES                                                            \
+  (PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_TID |          \
+   PERF_SAMPLE_TIME | PERF_SAMPLE_PERIOD)
+
 // Whereas tracepoints are dynamically configured and can be checked at runtime,
 // we lack the ability to inspect events of type other than TYPE_TRACEPOINT.
 // Accordingly, we maintain a list of events, even though the type of these
 // events are marked as tracepoint unless they represent a well-known profiling
 // type!
 // clang-format off
-//  short    desc               perf event type      perf event count type                  period/freq   profile sample type     addtl. configs
+//  short    desc               perf event type      perf event count type                  period/freq   profile sample type     addtl. configs      perf sample type
 // cppcheck-suppress preprocessorErrorDirective
 #define EVENT_CONFIG_TABLE(X) \
-  X(hCPU,    "CPU Cycles",      PERF_TYPE_HARDWARE,  PERF_COUNT_HW_CPU_CYCLES,              99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(hREF,    "Ref. CPU Cycles", PERF_TYPE_HARDWARE,  PERF_COUNT_HW_REF_CPU_CYCLES,          1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(hINST,   "Instr. Count",    PERF_TYPE_HARDWARE,  PERF_COUNT_HW_INSTRUCTIONS,            1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(hCREF,   "Cache Ref.",      PERF_TYPE_HARDWARE,  PERF_COUNT_HW_CACHE_REFERENCES,        999,          DDPROF_PWT_TRACEPOINT,  {})                      \
-  X(hCMISS,  "Cache Miss",      PERF_TYPE_HARDWARE,  PERF_COUNT_HW_CACHE_MISSES,            999,          DDPROF_PWT_TRACEPOINT,  {})                      \
-  X(hBRANCH, "Branche Instr.",  PERF_TYPE_HARDWARE,  PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     999,          DDPROF_PWT_TRACEPOINT,  {})                      \
-  X(hBMISS,  "Branch Miss",     PERF_TYPE_HARDWARE,  PERF_COUNT_HW_BRANCH_MISSES,           999,          DDPROF_PWT_TRACEPOINT,  {})                      \
-  X(hBUS,    "Bus Cycles",      PERF_TYPE_HARDWARE,  PERF_COUNT_HW_BUS_CYCLES,              1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(hBSTF,   "Bus Stalls(F)",   PERF_TYPE_HARDWARE,  PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(hBSTB,   "Bus Stalls(B)",   PERF_TYPE_HARDWARE,  PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(sCPU,    "CPU Time",        PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_TASK_CLOCK,              99,           DDPROF_PWT_CPU_NANOS,   IS_FREQ_TRY_KERNEL)      \
-  X(sPF,     "Page Faults",     PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_PAGE_FAULTS,             1,            DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
-  X(sCS,     "Con. Switch",     PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_CONTEXT_SWITCHES,        1,            DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
-  X(sMig,    "CPU Migrations",  PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_CPU_MIGRATIONS,          99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(sPFMAJ,  "Minor Faults",    PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_PAGE_FAULTS_MIN,         99,           DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
-  X(sPFMIN,  "Major Faults",    PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_PAGE_FAULTS_MAJ,         99,           DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
-  X(sALGN,   "Align. Faults",   PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_ALIGNMENT_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(sEMU,    "Emu. Faults",     PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_EMULATION_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(sDUM,    "Dummy",           PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_DUMMY,                   1,            DDPROF_PWT_NOCOUNT,     {})                      \
-  X(sALLOC,  "Allocations",     kDDPROF_TYPE_CUSTOM, kDDPROF_COUNT_ALLOCATIONS,             524288,       DDPROF_PWT_ALLOC_SPACE, SKIP_FRAMES)
+  X(hCPU,    "CPU Cycles",      PERF_TYPE_HARDWARE,  PERF_COUNT_HW_CPU_CYCLES,              99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ,            BASE_STYPES)  \
+  X(hREF,    "Ref. CPU Cycles", PERF_TYPE_HARDWARE,  PERF_COUNT_HW_REF_CPU_CYCLES,          1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ,            BASE_STYPES)  \
+  X(hINST,   "Instr. Count",    PERF_TYPE_HARDWARE,  PERF_COUNT_HW_INSTRUCTIONS,            1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ,            BASE_STYPES)  \
+  X(hCREF,   "Cache Ref.",      PERF_TYPE_HARDWARE,  PERF_COUNT_HW_CACHE_REFERENCES,        999,          DDPROF_PWT_TRACEPOINT,  {},                 BASE_STYPES)  \
+  X(hCMISS,  "Cache Miss",      PERF_TYPE_HARDWARE,  PERF_COUNT_HW_CACHE_MISSES,            999,          DDPROF_PWT_TRACEPOINT,  {},                 BASE_STYPES)  \
+  X(hBRANCH, "Branche Instr.",  PERF_TYPE_HARDWARE,  PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     999,          DDPROF_PWT_TRACEPOINT,  {},                 BASE_STYPES)  \
+  X(hBMISS,  "Branch Miss",     PERF_TYPE_HARDWARE,  PERF_COUNT_HW_BRANCH_MISSES,           999,          DDPROF_PWT_TRACEPOINT,  {},                 BASE_STYPES)  \
+  X(hBUS,    "Bus Cycles",      PERF_TYPE_HARDWARE,  PERF_COUNT_HW_BUS_CYCLES,              1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ,            BASE_STYPES)  \
+  X(hBSTF,   "Bus Stalls(F)",   PERF_TYPE_HARDWARE,  PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ,            BASE_STYPES)  \
+  X(hBSTB,   "Bus Stalls(B)",   PERF_TYPE_HARDWARE,  PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ,            BASE_STYPES)  \
+  X(sCPU,    "CPU Time",        PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_TASK_CLOCK,              99,           DDPROF_PWT_CPU_NANOS,   IS_FREQ_TRY_KERNEL, BASE_STYPES)  \
+  X(sPF,     "Page Faults",     PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_PAGE_FAULTS,             1,            DDPROF_PWT_TRACEPOINT,  IS_KERNEL,          BASE_STYPES)  \
+  X(sCS,     "Con. Switch",     PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_CONTEXT_SWITCHES,        1,            DDPROF_PWT_TRACEPOINT,  IS_KERNEL,          BASE_STYPES)  \
+  X(sMig,    "CPU Migrations",  PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_CPU_MIGRATIONS,          99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ,            BASE_STYPES)  \
+  X(sPFMAJ,  "Minor Faults",    PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_PAGE_FAULTS_MIN,         99,           DDPROF_PWT_TRACEPOINT,  IS_KERNEL,          BASE_STYPES)  \
+  X(sPFMIN,  "Major Faults",    PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_PAGE_FAULTS_MAJ,         99,           DDPROF_PWT_TRACEPOINT,  IS_KERNEL,          BASE_STYPES)  \
+  X(sALGN,   "Align. Faults",   PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_ALIGNMENT_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ,            BASE_STYPES)  \
+  X(sEMU,    "Emu. Faults",     PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_EMULATION_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ,            BASE_STYPES)  \
+  X(sDUM,    "Dummy",           PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_DUMMY,                   1,            DDPROF_PWT_NOCOUNT,     {},                 BASE_STYPES)  \
+  X(sALLOC,  "Allocations",     kDDPROF_TYPE_CUSTOM, kDDPROF_COUNT_ALLOCATIONS,             524288,       DDPROF_PWT_ALLOC_SPACE, SKIP_FRAMES,        (BASE_STYPES | PERF_SAMPLE_WEIGHT))
 // clang-format on
 
-#define X_ENUM(a, b, c, d, e, f, g) DDPROF_PWE_##a,
+#define X_ENUM(a, b, c, d, e, f, g, h) DDPROF_PWE_##a,
 typedef enum DDPROF_EVENT_NAMES {
   DDPROF_PWE_TRACEPOINT = -1,
   EVENT_CONFIG_TABLE(X_ENUM) DDPROF_PWE_LENGTH,

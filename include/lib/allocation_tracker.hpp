@@ -81,7 +81,8 @@ private:
                         TrackerThreadLocalState &tl_state);
   void track_deallocation(uintptr_t addr, TrackerThreadLocalState &tl_state);
 
-  DDRes push_sample(uint64_t allocated_size, TrackerThreadLocalState &tl_state);
+  DDRes push_sample(uint64_t alloc_count, uint64_t allocated_size,
+                    TrackerThreadLocalState &tl_state);
 
   // Return true if consumer should be notified
   DDRes push_lost_sample(MPSCRingBufferWriter &writer, bool &notify_needed);
