@@ -5,12 +5,12 @@
 
 #include "ddprof_module_lib.hpp"
 
+#include "build_id.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "failed_assumption.hpp"
 #include "logger.hpp"
 #include "string_format.hpp"
-#include "build_id.hpp"
 
 #include <fcntl.h>
 #include <gelf.h>

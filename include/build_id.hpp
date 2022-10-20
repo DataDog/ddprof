@@ -5,7 +5,6 @@
 
 #include "span.hpp"
 
-#include <cstddef>
 #include <string>
 
 namespace ddprof {
