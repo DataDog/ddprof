@@ -9,6 +9,7 @@
 #include "ddprof_defs.hpp"
 
 #include <string>
+#include <vector>
 
 namespace ddprof {
 class MapInfo {

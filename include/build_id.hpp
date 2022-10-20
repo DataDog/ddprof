@@ -5,8 +5,8 @@
 
 #include "span.hpp"
 
+#include <cstddef>
 #include <string>
-#include <vector>
 
 namespace ddprof {
 using BuildIdSpan = ddprof::span<const unsigned char>;

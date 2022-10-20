@@ -10,6 +10,7 @@
 #include "failed_assumption.hpp"
 #include "logger.hpp"
 #include "string_format.hpp"
+#include "build_id.hpp"
 
 #include <fcntl.h>
 #include <gelf.h>
@@ -155,7 +156,7 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
       size > 0) {
     // ensure we called dwfl_module_getelf first (or this can fail)
     // returns the size
-    ddprof_mod.set_build_id(ddprof::span(bits, size));
+    ddprof_mod.set_build_id(BuildIdSpan{bits, static_cast<unsigned>(size)});
   }
 
   if (!ddprof_mod._mod) {
