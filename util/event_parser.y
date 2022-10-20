@@ -22,8 +22,8 @@ extern int yyparse(void);
 extern YY_BUFFER_STATE yy_scan_string(const char * str);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
 
-uint8_t mode_from_str(const std::string &str) {
-  uint8_t mode = EVENT_NONE;
+EventConfMode mode_from_str(const std::string &str) {
+  EventConfMode mode = EventConfMode::kNone;
   if (str.empty())
     return mode;
 
@@ -33,11 +33,11 @@ uint8_t mode_from_str(const std::string &str) {
 
   for (const char &c : str) {
     if (m_str.find(c) != std::string::npos)
-      mode |= EVENT_METRIC;
+      mode |= EventConfMode::kMetric;
     if (g_str.find(c) != std::string::npos)
-      mode |= EVENT_CALLGRAPH;
+      mode |= EventConfMode::kGraph;
     if (a_str.find(c) != std::string::npos)
-      mode |= EVENT_BOTH;
+      mode |= EventConfMode::kAll;
   }
   return mode;
 }
@@ -57,6 +57,12 @@ void conf_finalize(EventConf *conf) {
       conf->label = "id:" + std::to_string(conf->id);
     }
   }
+
+  // If no cadence type is explicitly set, then period=1
+  if (conf->cad_type == EventConfCadenceType::kUndefined) {
+    conf->cad_type = EventConfCadenceType::kPeriod;
+    conf->cadence = 1;
+  }
 }
 
 void conf_print(const EventConf *tp) {
@@ -73,14 +79,14 @@ void conf_print(const EventConf *tp) {
     printf("  label: <generated from event/groupname>\n");
   
   const char *modenames[] = {"ILLEGAL", "callgraph", "metric", "metric and callgraph"};
-  printf("  type: %s\n", modenames[tp->mode]);
+  printf("  type: %s\n", modenames[static_cast<unsigned>(tp->mode)]);
 
 
-  if (tp->loc_type  == ECLOC_VAL)
+  if (tp->loc_type  == EventConfLocationType::kDefault)
     printf("  location: value\n");
-  else if (tp->loc_type == ECLOC_REG)
-    printf("  location: parameter%d\n", tp->register_num);
-  else if (tp->loc_type == ECLOC_RAW)
+  else if (tp->loc_type == EventConfLocationType::kRegister)
+    printf("  location: register (%d)\n", tp->register_num);
+  else if (tp->loc_type == EventConfLocationType::kRaw)
     printf("  location: raw event (%lu with size %d bytes)\n", tp->arg_offset, tp->arg_size);
 
   if (tp->arg_coeff != 0)
@@ -173,16 +179,16 @@ opt:
    }
    | KEY EQ WORD {
        switch($$) {
-         case ECF_EVENT:
+         case EventConfField::kEvent:
            g_accum_event_conf.eventname = *$3;
            break;
-         case ECF_GROUP:
+         case EventConfField::kGroup:
            g_accum_event_conf.groupname = *$3;
            break;
-         case ECF_LABEL:
+         case EventConfField::kLabel:
            g_accum_event_conf.label = *$3;
            break;
-         case ECF_MODE:
+         case EventConfField::kMode:
            g_accum_event_conf.mode |= mode_from_str(*$3);
            break;
          default:
@@ -193,7 +199,7 @@ opt:
        delete $3;
      }
      | KEY EQ WORD ':' WORD {
-       if ($$ == ECF_EVENT || $$ == ECF_GROUP) {
+       if ($$ == EventConfField::kEvent || $$ == EventConfField::kGroup) {
          g_accum_event_conf.eventname = *$3;
          g_accum_event_conf.groupname = *$5;
        }
@@ -204,27 +210,35 @@ opt:
        // FIXME TODO HACK
        // As a temporary measure, we're allowing integers to be negative ONLY
        // for the period.
-       if ($3 < 0 && $$ != ECF_PERIOD && $$ != ECF_ARGCOEFF) {
+       if ($3 < 0 && $$ != EventConfField::kPeriod && $$ != EventConfField::kArgCoeff) {
          VAL_ERROR();
          break;
        }
        switch($$) {
-         case ECF_ID: g_accum_event_conf.id = $3; break;
-         case ECF_ARGSIZE: g_accum_event_conf.arg_size= $3; break;
-         case ECF_ARGCOEFF: g_accum_event_conf.arg_coeff = 0.0 + $3; break;
-         case ECF_MODE: g_accum_event_conf.mode = $3 & EVENT_BOTH; break;
+         case EventConfField::kId:
+           g_accum_event_conf.id = $3;
+           break;
+         case EventConfField::kArgSize:
+           // sz without a valid offset is ignored?
+           g_accum_event_conf.arg_size= $3;
+           break;
+         case EventConfField::kArgCoeff:
+           g_accum_event_conf.arg_coeff = 0.0 + $3;
+           break;
+         case EventConfField::kMode:
+           g_accum_event_conf.mode = static_cast<EventConfMode>($3) & EventConfMode::kAll;
            break;
 
-         case ECF_PARAMETER:
-         case ECF_REGISTER:
-         case ECF_ARGOFFSET:
+         case EventConfField::kParameter:
+         case EventConfField::kRegister:
+         case EventConfField::kArgOffset:
            // If the location type has already been set, then this is an error.
-           if (g_accum_event_conf.loc_type) {
+           if (g_accum_event_conf.loc_type != EventConfLocationType::kDefault) {
              VAL_ERROR();
              break;
            }
-           if ($$ == ECF_PARAMETER) {
-             g_accum_event_conf.loc_type = ECLOC_REG;
+           if ($$ == EventConfField::kParameter) {
+             g_accum_event_conf.loc_type = EventConfLocationType::kRegister;
              unsigned int regno = param_to_regno_c($3);
              if (regno == -1u) {
                VAL_ERROR();
@@ -232,40 +246,40 @@ opt:
              }
              g_accum_event_conf.register_num = regno;
            }
-           if ($$ == ECF_REGISTER) {
+           if ($$ == EventConfField::kRegister) {
              if ($3 >= PERF_REGS_COUNT) {
                VAL_ERROR();
                break;
              }
-             g_accum_event_conf.loc_type = ECLOC_REG;
+             g_accum_event_conf.loc_type = EventConfLocationType::kRegister;
              g_accum_event_conf.register_num = $3;
            }
-           if ($$ == ECF_ARGOFFSET) {
-             g_accum_event_conf.loc_type = ECLOC_RAW;
+           if ($$ == EventConfField::kArgOffset) {
+             g_accum_event_conf.loc_type = EventConfLocationType::kRaw;
              g_accum_event_conf.arg_offset = $3;
            }
            break;
 
-         case ECF_PERIOD:
-         case ECF_FREQUENCY:
+         case EventConfField::kPeriod:
+         case EventConfField::kFrequency:
            // If the cadence has already been set, it's an error
-           if (g_accum_event_conf.cad_type) {
+           if (g_accum_event_conf.cad_type != EventConfCadenceType::kUndefined) {
              VAL_ERROR();
              break;
             }
 
            g_accum_event_conf.cadence = $3;
-           if ($$ == ECF_PERIOD)
-             g_accum_event_conf.cad_type = ECCAD_PERIOD;
-           if ($$ == ECF_FREQUENCY)
-             g_accum_event_conf.cad_type = ECCAD_FREQ;
+           if ($$ == EventConfField::kPeriod)
+             g_accum_event_conf.cad_type = EventConfCadenceType::kPeriod;
+           if ($$ == EventConfField::kFrequency)
+             g_accum_event_conf.cad_type = EventConfCadenceType::kFrequency;
            break;
 
          default: VAL_ERROR(); break;
        }
      }
      | KEY EQ FLOAT {
-       if ($$ == ECF_ARGCOEFF)
+       if ($$ == EventConfField::kArgCoeff)
          g_accum_event_conf.arg_coeff = $3;
        else
          VAL_ERROR();

@@ -16,7 +16,7 @@
 
 #define DISPATCH(type)                       \
 {                                            \
-	yylval.field = (ECF_##type);         \
+	yylval.field = (EventConfField::k##type);         \
 	return KEY;                          \
 }
 
@@ -55,18 +55,18 @@
 }
 }
 
-c|arg_coeff|coeff          DISPATCH(ARGCOEFF)
-f|frequency|freq           DISPATCH(FREQUENCY)
-e|event|eventname|ev       DISPATCH(EVENT)
-g|group|groupname|gr       DISPATCH(GROUP)
-i|id                       DISPATCH(ID)
-l|label                    DISPATCH(LABEL)
-m|mode                     DISPATCH(MODE)
-n|arg_num|argno            DISPATCH(PARAMETER)
-o|arg_offset|argoff        DISPATCH(ARGOFFSET)
-p|period|per               DISPATCH(PERIOD)
-r|register|regno           DISPATCH(REGISTER)
-z|arg_size|argsz           DISPATCH(ARGSIZE )
+c|arg_coeff|coeff          DISPATCH(ArgCoeff)
+f|frequency|freq           DISPATCH(Frequency)
+e|event|eventname|ev       DISPATCH(Event)
+g|group|groupname|gr       DISPATCH(Group)
+i|id                       DISPATCH(Id)
+l|label                    DISPATCH(Label)
+m|mode                     DISPATCH(Mode)
+n|arg_num|argno            DISPATCH(Parameter)
+o|arg_offset|argoff        DISPATCH(ArgOffset)
+p|period|per               DISPATCH(Period)
+r|register|regno           DISPATCH(Register)
+z|arg_size|argsz           DISPATCH(ArgSize)
 
 =                       {
 	BEGIN VALUE;
