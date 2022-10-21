@@ -189,6 +189,7 @@ add_unit_test(
 add_unit_test(
   dwfl_module-ut
   dwfl_module-ut.cc
+  ../src/build_id.cc
   ../src/dwfl_hdr.cc
   ../src/ddprof_module_lib.cc
   ../src/dwfl_symbol.cc
@@ -208,6 +209,7 @@ add_unit_test(
   savecontext-ut
   savecontext-ut.cc
   ../src/base_frame_symbol_lookup.cc
+  ../src/build_id.cc
   ../src/common_mapinfo_lookup.cc
   ../src/common_symbol_lookup.cc
   ../src/ddprof_file_info.cc
@@ -244,6 +246,7 @@ add_unit_test(
   allocation_tracker-ut.cc
   ../src/lib/allocation_tracker.cc
   ../src/base_frame_symbol_lookup.cc
+  ../src/build_id.cc
   ../src/common_mapinfo_lookup.cc
   ../src/common_symbol_lookup.cc
   ../src/ddprof_file_info.cc
@@ -304,8 +307,11 @@ add_unit_test(ddprof_cpumask-ut ddprof_cpumask-ut.cc ../src/ddprof_cpumask.cc)
 
 add_unit_test(symbol_map-ut symbol_map-ut.cc ../src/symbol_map.cc)
 
+add_unit_test(build_id-ut build_id-ut.cc ../src/build_id.cc)
+
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/savecontext.cc
               ../src/lib/saveregisters.cc)
+
 add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")

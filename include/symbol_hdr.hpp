@@ -27,6 +27,13 @@ struct SymbolHdr {
   }
   void cycle() { _dwfl_symbol_lookup._stats.reset(); }
 
+  void clear(pid_t pid) {
+    _base_frame_symbol_lookup.erase(pid);
+    // mappings are only relevant in the context of a given pid.
+    _mapinfo_lookup.erase(pid);
+    _runtime_symbol_lookup.erase(pid);
+  }
+
   // Cache symbol associations
   ddprof::BaseFrameSymbolLookup _base_frame_symbol_lookup;
   ddprof::CommonSymbolLookup _common_symbol_lookup;

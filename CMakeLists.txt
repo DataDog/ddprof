@@ -23,6 +23,9 @@ endif()
 # ~~~
 # set(CMAKE_VERBOSE_MAKEFILE on)
 
+# Add build ID info on alpine
+add_link_options("LINKER:--build-id=sha1")
+
 # Define the include path of cmake scripts
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
