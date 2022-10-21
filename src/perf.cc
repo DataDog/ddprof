@@ -181,6 +181,7 @@ uint64_t perf_value_from_sample(const PerfWatcher *watcher,
       uint64_t raw_offset = watcher->raw_off;
       uint64_t raw_sz = watcher->raw_sz;
       assert(raw_sz <= sizeof(uint64_t) && "Raw size fits in a uint64");
+      assert(raw_sz + raw_offset <= sample->size_raw && "Raw access fits");
       memcpy(&val, sample->data_raw + raw_offset, raw_sz);
       return val;
     } else { // unexpected config
