@@ -10,6 +10,7 @@
 
 #include "dso.hpp"
 
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -20,7 +21,8 @@ namespace ddprof {
 class MapInfoLookup {
 public:
   MapInfoIdx_t get_or_insert(pid_t pid, MapInfoTable &mapinfo_table,
-                             const Dso &dso);
+                             const Dso &dso,
+                             std::optional<BuildIdStr> build_id);
   void erase(pid_t pid) {
     // table elements are not removed (TODO to gain memory usage)
     _mapinfo_pidmap.erase(pid);

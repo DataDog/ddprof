@@ -150,7 +150,7 @@ static void write_mapping(const ddprof::MapInfo &mapinfo,
   ffi_mapping->memory_limit = mapinfo._high_addr;
   ffi_mapping->file_offset = mapinfo._offset;
   ffi_mapping->filename = to_CharSlice(mapinfo._sopath);
-  ffi_mapping->build_id = {};
+  ffi_mapping->build_id = to_CharSlice(mapinfo._build_id);
 }
 
 static void write_location(const FunLoc *loc, const ddprof::MapInfo &mapinfo,

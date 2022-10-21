@@ -5,6 +5,7 @@
 
 #include "ddprof_module_lib.hpp"
 
+#include "build_id.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "failed_assumption.hpp"
@@ -126,7 +127,7 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
 
   // Load the file at a matching DSO address
   dwfl_errno(); // erase previous error
-  Offset_t start_offset, bias_offset;
+  Offset_t start_offset = {}, bias_offset = {};
   if (!get_elf_offsets(fileInfoValue._fd, start_offset, filepath,
                        bias_offset)) {
     fileInfoValue._errored = true;
@@ -148,6 +149,16 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
   ddprof_mod._mod =
       dwfl_report_elf(dwfl, module_name, filepath.c_str(), fd, start, false);
 
+  // Retrieve build id
+  const unsigned char *bits = nullptr;
+  GElf_Addr vaddr;
+  if (int size = dwfl_module_build_id(ddprof_mod._mod, &bits, &vaddr);
+      size > 0) {
+    // ensure we called dwfl_module_getelf first (or this can fail)
+    // returns the size
+    ddprof_mod.set_build_id(BuildIdSpan{bits, static_cast<unsigned>(size)});
+  }
+
   if (!ddprof_mod._mod) {
     // Ideally we would differentiate pid errors from file errors.
     // For perf reasons we will just flag the file as errored
@@ -158,9 +169,11 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
   } else {
     dwfl_module_info(ddprof_mod._mod, 0, &ddprof_mod._low_addr,
                      &ddprof_mod._high_addr, 0, 0, 0, 0);
-    LG_DBG("Loaded mod from file (%s[ID#%d]), (%s) mod[%lx-%lx] bias[%lx]",
+    LG_DBG("Loaded mod from file (%s[ID#%d]), (%s) mod[%lx-%lx] bias[%lx], "
+           "build-id: %s",
            fileInfoValue.get_path().c_str(), fileInfoValue.get_id(),
-           dwfl_errmsg(-1), ddprof_mod._low_addr, ddprof_mod._high_addr, bias);
+           dwfl_errmsg(-1), ddprof_mod._low_addr, ddprof_mod._high_addr, bias,
+           ddprof_mod._build_id.c_str());
   }
 
   ddprof_mod._sym_bias = bias;
