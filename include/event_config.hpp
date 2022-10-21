@@ -11,27 +11,21 @@
 
 // Defines how a sample is aggregated when it is received
 enum class EventConfMode {
-  kNone= 0,
-  kGraph= 1 << 0,
-  kMetric= 1 << 1,
+  kNone = 0,
+  kGraph = 1 << 0,
+  kMetric = 1 << 1,
   kAll = kGraph | kMetric,
 };
 
-EventConfMode& operator|=(EventConfMode &A, const EventConfMode &B) {
-  A = static_cast<EventConfMode>(static_cast<unsigned>(A) | static_cast<unsigned>(B));
-  return A;
-}
-
-EventConfMode operator&(const EventConfMode &A, const EventConfMode &B) {
-  // & on bitmask enums is valid only in the space spanned by the values
-  return static_cast<EventConfMode>(static_cast<uint64_t>(A) & static_cast<uint64_t>(B) & static_cast<uint64_t>(EventConfMode::kAll));
-}
+EventConfMode &operator|=(EventConfMode &A, const EventConfMode &B);
+EventConfMode operator&(const EventConfMode &A, const EventConfMode &B);
+bool operator<=(const EventConfMode A, const EventConfMode B); // inclusion
 
 // Defines how samples are weighted
 enum class EventConfLocationType {
-  kDefault = 0, // Use sample value from perf events
+  kDefault = 0,  // Use sample value from perf events
   kRegister = 1, // Use the register from `register_num`
-  kRaw = 2, // Use the offset/size for raw event
+  kRaw = 2,      // Use the offset/size for raw event
 };
 
 // Defines how the sampling is configured (e.g., with `perf_event_open()`)
@@ -139,7 +133,7 @@ struct EventConf {
   double arg_coeff;
 
   EventConfCadenceType cad_type;
-  uint64_t cadence;
+  int64_t cadence;
 
   void clear() { *this = EventConf{}; }
 };

@@ -133,15 +133,17 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   }
 
   // Configure the sampling strategy.  If no valid conf, use template default
-  if (conf->cad_type == ECCAD_PERIOD && conf->cadence > 0) {
-    watcher->sample_period = conf->cadence;
-  } else if (conf->cad_type == ECCAD_FREQ && conf->cadence > 0) {
-    watcher->sample_frequency = conf->cadence;
-    watcher->options.is_freq = true;
+  if (conf->cadence != 0) {
+    if (conf->cad_type == EventConfCadenceType::kPeriod) {
+      watcher->sample_period = conf->cadence;
+    } else if (conf->cad_type == EventConfCadenceType::kFrequency) {
+      watcher->sample_frequency = conf->cadence;
+      watcher->options.is_freq = true;
+    }
   }
 
   // Configure value normalization
-  if (conf->loc_type == ECLOC_RAW) {
+  if (conf->loc_type == EventConfLocationType::kRaw) {
     watcher->loc_type = kPerfWatcherLoc_raw;
     watcher->sample_type |= PERF_SAMPLE_RAW;
     watcher->raw_off = conf->arg_offset;
@@ -149,7 +151,7 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
       watcher->raw_sz = conf->arg_size;
     else
       watcher->raw_sz = sizeof(uint64_t); // default raw entry
-  } else if (conf->loc_type == ECLOC_REG) {
+  } else if (conf->loc_type == EventConfLocationType::kRegister) {
     watcher->regno = conf->register_num;
     watcher->loc_type = kPerfWatcherLoc_reg;
   }
@@ -157,26 +159,14 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   if (conf->arg_coeff != 0.0)
     watcher->value_coefficient = conf->arg_coeff;
 
-  // Assume each template has the correct (usually 1) default for period, only
-  // override if needed
-  if (conf->cadence) {
-    if (conf->cad_type == ECCAD_FREQ) {
-      watcher->options.is_freq = true;
-      watcher->sample_frequency = conf->cadence;
-    } else {
-      watcher->options.is_freq = false;
-      watcher->sample_period = conf->cadence;
-    }
-  }
-
   // The output mode isn't set as part of the configuration templates; we
   // always default to callgraph mode
   watcher->output_mode = kPerfWatcherMode_callgraph;
-  if (conf->mode & EVENT_BOTH) {
+  if (EventConfMode::kAll <= conf->mode) {
     watcher->output_mode = 0;
-    if (conf->mode & EVENT_CALLGRAPH)
+    if (EventConfMode::kGraph <= conf->mode)
       watcher->output_mode |= kPerfWatcherMode_callgraph;
-    if (conf->mode & EVENT_METRIC)
+    if (EventConfMode::kMetric <= conf->mode)
       watcher->output_mode |= kPerfWatcherMode_metric;
   }
 

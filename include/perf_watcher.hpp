@@ -45,7 +45,7 @@ typedef struct PerfWatcher {
             // for non-perf events)
   unsigned long config; // specifies which perf event is requested
   union {
-    uint64_t sample_period;
+    int64_t sample_period;
     uint64_t sample_frequency;
   };
   int sample_type_id; // index into the sample types defined in this header

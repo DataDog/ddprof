@@ -61,7 +61,6 @@ void conf_finalize(EventConf *conf) {
   // If no cadence type is explicitly set, then period=1
   if (conf->cad_type == EventConfCadenceType::kUndefined) {
     conf->cad_type = EventConfCadenceType::kPeriod;
-    conf->cadence = 1;
   }
 }
 

@@ -16,7 +16,7 @@ set(DD_EVENT_PARSER_SOURCES
     ${EVENT_PARSER_SRC}/event_parser.lex.cpp ${EVENT_PARSER_SRC}/event_parser.tab.cpp
     src/perf_archmap.cc)
 
-add_library(event_parser STATIC ${DD_EVENT_PARSER_SOURCES} src/perf_archmap.cc)
+add_library(event_parser STATIC ${DD_EVENT_PARSER_SOURCES} src/perf_archmap.cc src/event_config.cc)
 target_include_directories(event_parser PUBLIC ${EVENT_PARSER_INCLUDE} include)
 set_property(TARGET event_parser PROPERTY POSITION_INDEPENDENT_CODE ON)
 set_property(TARGET event_parser PROPERTY CXX_CLANG_TIDY "")
