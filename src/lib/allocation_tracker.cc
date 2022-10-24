@@ -265,7 +265,8 @@ DDRes AllocationTracker::push_dealloc_sample(
   bool notify_consumer{false};
 
   bool timeout = false;
-  if (unlikely(_state.lost_count.load(std::memory_order_relaxed))) {
+  if (_state.lost_count.load(std::memory_order_relaxed) > 100) {
+    // Ignoring lost samples (due to wasted CPU)
     DDRES_CHECK_FWD(push_lost_sample(writer, notify_consumer));
   }
 
@@ -318,7 +319,7 @@ DDRes AllocationTracker::push_sample(uintptr_t addr, uint64_t allocated_size,
   bool notify_consumer{false};
 
   bool timeout = false;
-  if (unlikely(_state.lost_count.load(std::memory_order_relaxed))) {
+  if (_state.lost_count.load(std::memory_order_relaxed) > 100) {
     DDRES_CHECK_FWD(push_lost_sample(writer, notify_consumer));
   }
 

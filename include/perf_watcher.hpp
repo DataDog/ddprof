@@ -123,7 +123,7 @@ enum DDProfCustomCountId { kDDPROF_COUNT_ALLOCATIONS = 0 };
   X(sALGN,   "Align. Faults",   PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_ALIGNMENT_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(sEMU,    "Emu. Faults",     PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_EMULATION_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(sDUM,    "Dummy",           PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_DUMMY,                   1,            DDPROF_PWT_NOCOUNT,     {})                      \
-  X(sALLOC,  "Allocations",     kDDPROF_TYPE_CUSTOM, kDDPROF_COUNT_ALLOCATIONS,             524288,       DDPROF_PWT_ALLOC_SPACE, SKIP_FRAMES)
+  X(sALLOC,  "Allocations",     kDDPROF_TYPE_CUSTOM, kDDPROF_COUNT_ALLOCATIONS,             1048576,      DDPROF_PWT_ALLOC_SPACE, SKIP_FRAMES)
 // clang-format on
 
 #define X_ENUM(a, b, c, d, e, f, g) DDPROF_PWE_##a,
