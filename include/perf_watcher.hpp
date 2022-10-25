@@ -135,6 +135,7 @@ enum DDProfCustomCountId {
   X(sDUM,       "Dummy",              PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_DUMMY,                   1,            DDPROF_PWT_NOCOUNT,     {})                      \
   X(tALLOCSYS1, "System Allocations", PERF_TYPE_TRACEPOINT, kDDPROF_COUNT_SYSALLOCATIONS,          1,            DDPROF_PWT_ALLOC_SPACE, IS_OVERLOADED)           \
   X(tALLOCSYS2, "System Al. (heavy)", PERF_TYPE_TRACEPOINT, kDDPROF_COUNT_SYSALLOCATIONS,          1,            DDPROF_PWT_ALLOC_SPACE, IS_OVERLOADED)           \
+  X(tNOISYCPU,  "Noisy Neighbors",    PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_TASK_CLOCK,              1,            DDPROF_PWT_NOISYCPU,    IS_OVERLOADED)           \
   X(sALLOC,     "Allocations",        kDDPROF_TYPE_CUSTOM,  kDDPROF_COUNT_ALLOCATIONS,             524288,       DDPROF_PWT_ALLOC_SPACE, SKIP_FRAMES)
 // clang-format on
 

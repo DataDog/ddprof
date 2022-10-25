@@ -165,6 +165,9 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
         return false;
       }
       watcher->config = id;
+    } else if (watcher->ddprof_event_type == DDPROF_PWE_tNOISYCPU) {
+      watcher->sample_stack_size = 0;
+      watcher->sample_type |= PERF_SAMPLE_CPU;
     }
     watcher->sample_type |= PERF_SAMPLE_RAW;
     watcher->options.is_kernel = kPerfWatcher_Try;

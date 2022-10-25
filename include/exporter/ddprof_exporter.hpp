@@ -12,6 +12,8 @@
 #include "string_view.hpp"
 #include "tags.hpp"
 
+#include <nlohmann/json.hpp>
+
 typedef struct ddog_ProfileExporter ddog_ProfileExporter;
 typedef struct ddog_Profile ddog_Profile;
 typedef struct UserTags UserTags;
@@ -27,6 +29,7 @@ typedef struct DDProfExporter {
   bool _export; // debug mode : should we send profiles ?
   int32_t _nb_consecutive_errors;
   int64_t _last_pprof_size;
+  nlohmann::json timeline_data;
 } DDProfExporter;
 
 DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
