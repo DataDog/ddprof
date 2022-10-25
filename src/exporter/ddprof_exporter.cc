@@ -75,6 +75,7 @@ static DDRes write_pprof_file(const ddog_EncodedProfile *encoded_profile,
 
 DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
                            DDProfExporter *exporter) {
+//  exporter = {};
   memset(exporter, 0, sizeof(DDProfExporter));
 
   DDRES_CHECK_FWD(exporter_input_copy(exporter_input, &exporter->_input));

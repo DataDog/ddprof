@@ -415,41 +415,49 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
 }
 
 DDRes ddprof_pr_noisy_neighbors(DDProfContext *ctx, perf_event_sample *sample, int watcher_pos) {
+  int i_export = ctx->worker_ctx.i_current_pprof;
+  nlohmann::json &timeline_data = ctx->worker_ctx.exp[i_export]->timeline_data;
+  PerfWatcher *watcher = &ctx->watchers[watcher_pos];
+
+  // HACK, print out some stuff
+  PRINT_NFO("TID is %d", sample->tid);
+  PRINT_NFO("CPU is %d", sample->cpu);
+  PRINT_NFO("ID is %ld", sample->id);
   return ddres_init();
-//  nlohmann::json &timeline_data = ctx->worker_ctx.exp[i_export]->timeline_data;
-//  PerfWatcher *watcher = &ctx->watchers[watcher_pos];
-//
-//  // Detect whether this thread has ever been visited
-//  std::string tid = std::to_string(sample->tid);
-//  if (!timeline_data["threads"].contains(tid)) {
-//    uint64_t first_time = std::chrono::duration_cast<std::chrono::nanoseconds>(ctx->worker_ctx.cycle_start_time.time_since_epoch()).count();
-//    timeline_data["threads"][tid] = nlohmann::json::array();
-//    timeline_data["num"][tid] = 1;
-//
-//    timeline_data["threads"][tid][0] = nlohmann::json::object();
-//    timeline_data["threads"][tid][0]["startNs"] = first_time;
-//    timeline_data["threads"][tid][0]["label"] = "suspended";
-//  }
-//  uint64_t num = timeline_data["num"][tid];
-//
-//  timeline_data["threads"][tid][num - 1]["endNs"] = sample->time;
-//
-//  if (enter_label == watcher->tracepoint_label) {
-//    long sys_idx = sample_val;
-//    if (byebye == syscall_map[sys_idx]) {
-//      timeline_data["threads"][tid][num]["label"] = "exited";
-//    } else {
-//      timeline_data["threads"][tid][num]["label"] = syscall_map[sys_idx];
-//    }
-//    timeline_data["threads"][tid][num]["startNs"] = sample->time;
-//    timeline_data["num"][tid] = num + 1;
-//  } else if (exit_label == watcher->tracepoint_label) {
-//    if (std::string{"exited"} != timeline_data["threads"][tid][num - 1]["label"]) {
-//      timeline_data["threads"][tid][num]["label"] = "started";
-//      timeline_data["threads"][tid][num]["startNs"] = sample->time;
-//      timeline_data["num"][tid] = num + 1;
-//    }
-//  }
+
+  // Detect whether this thread has ever been visited
+  std::string tid = std::to_string(sample->tid);
+/*
+  if (!timeline_data["threads"].contains(tid)) {
+    uint64_t first_time = std::chrono::duration_cast<std::chrono::nanoseconds>(ctx->worker_ctx.cycle_start_time.time_since_epoch()).count();
+    timeline_data["threads"][tid] = nlohmann::json::array();
+    timeline_data["num"][tid] = 1;
+
+    timeline_data["threads"][tid][0] = nlohmann::json::object();
+    timeline_data["threads"][tid][0]["startNs"] = first_time;
+    timeline_data["threads"][tid][0]["label"] = "suspended";
+  }
+  uint64_t num = timeline_data["num"][tid];
+
+  timeline_data["threads"][tid][num - 1]["endNs"] = sample->time;
+
+  if (enter_label == watcher->tracepoint_label) {
+    long sys_idx = sample_val;
+    if (byebye == syscall_map[sys_idx]) {
+      timeline_data["threads"][tid][num]["label"] = "exited";
+    } else {
+      timeline_data["threads"][tid][num]["label"] = syscall_map[sys_idx];
+    }
+    timeline_data["threads"][tid][num]["startNs"] = sample->time;
+    timeline_data["num"][tid] = num + 1;
+  } else if (exit_label == watcher->tracepoint_label) {
+    if (std::string{"exited"} != timeline_data["threads"][tid][num - 1]["label"]) {
+      timeline_data["threads"][tid][num]["label"] = "started";
+      timeline_data["threads"][tid][num]["startNs"] = sample->time;
+      timeline_data["num"][tid] = num + 1;
+    }
+  }
+*/
 }
 
 static void ddprof_reset_worker_stats() {

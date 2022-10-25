@@ -143,6 +143,13 @@ static DDRes tallocsys1_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
   return ddres_init();
 }
 
+static DDRes tnoisycpu_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
+                            int num_cpu, PEventHdr *pevent_hdr) {
+
+  /* UNIMPLEMENTED */
+  return ddres_init();
+}
+
 static DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
                                    pid_t pid, PEventHdr *pevent_hdr,
                                    size_t &pevent_idx) {
@@ -215,9 +222,15 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
     if (watcher->instrument_self) {
       // Here we inline a lookup for the specific handler, but in reality this
       // should be defined at the level of the watcher
-      if (watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS1) {
-        DDRES_CHECK_FWD(
-            tallocsys1_open(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
+      switch (watcher->ddprof_event_type) {
+        case (DDPROF_PWE_tALLOCSYS1):
+          DDRES_CHECK_FWD(
+              tallocsys1_open(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
+          break;
+        case (DDPROF_PWE_tNOISYCPU):
+          DDRES_CHECK_FWD(
+              tnoisycpu_open(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
+          break;
       }
     } else if (watcher->type < kDDPROF_TYPE_CUSTOM) {
       DDRES_CHECK_FWD(

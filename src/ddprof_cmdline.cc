@@ -155,6 +155,8 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
       watcher->options.is_kernel = kPerfWatcher_Try;
       watcher->sample_stack_size /= 2; // Make this one smaller than normal
 
+      watcher->sample_type |= PERF_SAMPLE_RAW;
+      watcher->options.is_kernel = kPerfWatcher_Try;
     } else if (watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS2) {
       // tALLOCSYS2 captures all syscalls; used to troubleshoot 1
       watcher->tracepoint_group = "raw_syscalls";
@@ -165,12 +167,17 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
         return false;
       }
       watcher->config = id;
+      watcher->sample_type |= PERF_SAMPLE_RAW;
+      watcher->options.is_kernel = kPerfWatcher_Try;
     } else if (watcher->ddprof_event_type == DDPROF_PWE_tNOISYCPU) {
-      watcher->sample_stack_size = 0;
-      watcher->sample_type |= PERF_SAMPLE_CPU;
+      PRINT_NFO("Disabling call stacks for noisy neighbors");
+      PRINT_NFO("DISABLING SELF-INSTRUMENT for noisy neighbors");
+ //     watcher->instrument_self = true;
+      watcher->sample_stack_size = 0; // Disable for now
+      watcher->sample_type |= PERF_SAMPLE_CPU | PERF_SAMPLE_IDENTIFIER;
+
+      watcher->tracepoint_name = "sCPU";
     }
-    watcher->sample_type |= PERF_SAMPLE_RAW;
-    watcher->options.is_kernel = kPerfWatcher_Try;
   }
   return true;
 }
