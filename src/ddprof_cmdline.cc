@@ -84,7 +84,6 @@ unsigned int tracepoint_id_from_event(const char *eventname,
 uint64_t kIgnoredWatcherID = -1ul;
 bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   EventConf *conf = EventConf_parse(str);
-  const PerfWatcher *tmp_watcher;
   if (!conf) {
     return false;
   }
@@ -96,7 +95,11 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
 
   // The watcher is templated; either from an existing Profiling template,
   // keyed on the eventname, or it uses the generic template for Tracepoints
-  if ((tmp_watcher = ewatcher_from_str(conf->eventname.c_str()))) {
+  const PerfWatcher *tmp_watcher = ewatcher_from_str(conf->eventname.c_str());
+
+  if (WATCHER_FAILED == tmp_watcher) {
+    return false;
+  } else if (tmp_watcher) {
     *watcher = *tmp_watcher;
     conf->id = kIgnoredWatcherID; // matched, so invalidate Tracepoint checks
   } else if (!conf->groupname.empty()) {

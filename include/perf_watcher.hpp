@@ -152,6 +152,8 @@ typedef enum DDPROF_EVENT_NAMES {
 } DDPROF_EVENT_NAMES;
 #undef X_ENUM
 
+#define WATCHER_FAILED ((PerfWatcher *)((void *)-1))
+
 // Helper functions for event-type watcher lookups
 const PerfWatcher *ewatcher_from_idx(int idx);
 const PerfWatcher *ewatcher_from_str(const char *str);

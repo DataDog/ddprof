@@ -81,7 +81,7 @@ const PerfWatcher *ewatcher_from_idx(int idx) {
   try {
     static const PerfWatcher events[] = {EVENT_CONFIG_TABLE(X_EVENTS)};
     return &events[idx];
-  } catch (...) { return NULL; }
+  } catch (...) { return WATCHER_FAILED; }
 }
 
 const PerfWatcher *ewatcher_from_str(const char *str) {
@@ -90,7 +90,7 @@ const PerfWatcher *ewatcher_from_str(const char *str) {
 
 const PerfWatcher *tracepoint_default_watcher() {
   try {
-    static const PerfWatcher tracepoint_templates[] = {{
+    static const PerfWatcher tracepoint_template = {
         .ddprof_event_type = DDPROF_PWE_TRACEPOINT,
         .desc = "Tracepoint",
         .sample_type = BASE_STYPES,
@@ -99,9 +99,9 @@ const PerfWatcher *tracepoint_default_watcher() {
         .sample_type_id = DDPROF_PWT_TRACEPOINT,
         .options = {.is_kernel = kPerfWatcher_Required},
         .value_coefficient = 1.0,
-    }};
-    return &tracepoint_templates[0];
-  } catch (...) { return NULL; }
+    };
+    return &tracepoint_template;
+  } catch (...) { return WATCHER_FAILED; }
 }
 
 bool watcher_has_tracepoint(const PerfWatcher *watcher) {
