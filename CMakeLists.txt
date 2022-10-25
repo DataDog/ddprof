@@ -82,7 +82,7 @@ endif()
 include(Findlibdatadog)
 
 # Event Parser
-include(EventParser)
+add_subdirectory(src/event_parser)
 
 # elfutils
 include(Findelfutils)
