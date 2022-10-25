@@ -11,406 +11,389 @@
 // Architecture mapfile
 
 #ifndef __x86_64__
-#error GET OUT OF HERE LOL
+#error Not supported on your current architecture
 #endif
 
+#define SYSCALL_TABLE(X) \
+  X(0,   read) \
+  X(1,   write) \
+  X(2,   open) \
+  X(3,   close) \
+  X(4,   stat) \
+  X(5,   fstat) \
+  X(6,   lstat) \
+  X(7,   poll) \
+  X(8,   lseek) \
+  X(9,   mmap) \
+  X(10,  mprotect) \
+  X(11,  munmap) \
+  X(12,  brk) \
+  X(13,  rt_sigaction) \
+  X(14,  rt_sigprocmask) \
+  X(15,  rt_sigreturn) \
+  X(16,  ioctl) \
+  X(17,  pread64) \
+  X(18,  pwrite64) \
+  X(19,  readv) \
+  X(20,  writev) \
+  X(21,  access) \
+  X(22,  pipe) \
+  X(23,  select) \
+  X(24,  sched_yield) \
+  X(25,  mremap) \
+  X(26,  msync) \
+  X(27,  mincore) \
+  X(28,  madvise) \
+  X(29,  shmget) \
+  X(30,  shmat) \
+  X(31,  shmctl) \
+  X(32,  dup) \
+  X(33,  dup2) \
+  X(34,  pause) \
+  X(35,  nanosleep) \
+  X(36,  getitimer) \
+  X(37,  alarm) \
+  X(38,  setitimer) \
+  X(39,  getpid) \
+  X(40,  sendfile) \
+  X(41,  socket) \
+  X(42,  connect) \
+  X(43,  accept) \
+  X(44,  sendto) \
+  X(45,  recvfrom) \
+  X(46,  sendmsg) \
+  X(47,  recvmsg) \
+  X(48,  shutdown) \
+  X(49,  bind) \
+  X(50,  listen) \
+  X(51,  getsockname) \
+  X(52,  getpeername) \
+  X(53,  socketpair) \
+  X(54,  setsockopt) \
+  X(55,  getsockopt) \
+  X(56,  clone) \
+  X(57,  fork) \
+  X(58,  vfork) \
+  X(59,  execve) \
+  X(60,  exit) \
+  X(61,  wait4) \
+  X(62,  kill) \
+  X(63,  uname) \
+  X(64,  semget) \
+  X(65,  semop) \
+  X(66,  semctl) \
+  X(67,  shmdt) \
+  X(68,  msgget) \
+  X(69,  msgsnd) \
+  X(70,  msgrcv) \
+  X(71,  msgctl) \
+  X(72,  fcntl) \
+  X(73,  flock) \
+  X(74,  fsync) \
+  X(75,  fdatasync) \
+  X(76,  truncate) \
+  X(77,  ftruncate) \
+  X(78,  getdents) \
+  X(79,  getcwd) \
+  X(80,  chdir) \
+  X(81,  fchdir) \
+  X(82,  rename) \
+  X(83,  mkdir) \
+  X(84,  rmdir) \
+  X(85,  creat) \
+  X(86,  link) \
+  X(87,  unlink) \
+  X(88,  symlink) \
+  X(89,  readlink) \
+  X(90,  chmod) \
+  X(91,  fchmod) \
+  X(92,  chown) \
+  X(93,  fchown) \
+  X(94,  lchown) \
+  X(95,  umask) \
+  X(96,  gettimeofday) \
+  X(97,  getrlimit) \
+  X(98,  getrusage) \
+  X(99,  sysinfo) \
+  X(100, times) \
+  X(101, ptrace) \
+  X(102, getuid) \
+  X(103, syslog) \
+  X(104, getgid) \
+  X(105, setuid) \
+  X(106, setgid) \
+  X(107, geteuid) \
+  X(108, getegid) \
+  X(109, setpgid) \
+  X(110, getppid) \
+  X(111, getpgrp) \
+  X(112, setsid) \
+  X(113, setreuid) \
+  X(114, setregid) \
+  X(115, getgroups) \
+  X(116, setgroups) \
+  X(117, setresuid) \
+  X(118, getresuid) \
+  X(119, setresgid) \
+  X(120, getresgid) \
+  X(121, getpgid) \
+  X(122, setfsuid) \
+  X(123, setfsgid) \
+  X(124, getsid) \
+  X(125, capget) \
+  X(126, capset) \
+  X(127, rt_sigpending) \
+  X(128, rt_sigtimedwait) \
+  X(129, rt_sigqueueinfo) \
+  X(130, rt_sigsuspend) \
+  X(131, sigaltstack) \
+  X(132, utime) \
+  X(133, mknod) \
+  X(134, uselib) \
+  X(135, personality) \
+  X(136, ustat) \
+  X(137, statfs) \
+  X(138, fstatfs) \
+  X(139, sysfs) \
+  X(140, getpriority) \
+  X(141, setpriority) \
+  X(142, sched_setparam) \
+  X(143, sched_getparam) \
+  X(144, sched_setscheduler) \
+  X(145, sched_getscheduler) \
+  X(146, sched_get_priority_max) \
+  X(147, sched_get_priority_min) \
+  X(148, sched_rr_get_interval) \
+  X(149, mlock) \
+  X(150, munlock) \
+  X(151, mlockall) \
+  X(152, munlockall) \
+  X(153, vhangup) \
+  X(154, modify_ldt) \
+  X(155, pivot_root) \
+  X(156, _sysctl) \
+  X(157, prctl) \
+  X(158, arch_prctl) \
+  X(159, adjtimex) \
+  X(160, setrlimit) \
+  X(161, chroot) \
+  X(162, sync) \
+  X(163, acct) \
+  X(164, settimeofday) \
+  X(165, mount) \
+  X(166, umount2) \
+  X(167, swapon) \
+  X(168, swapoff) \
+  X(169, reboot) \
+  X(170, sethostname) \
+  X(171, setdomainname) \
+  X(172, iopl) \
+  X(173, ioperm) \
+  X(174, create_module) \
+  X(175, init_module) \
+  X(176, delete_module) \
+  X(177, get_kernel_syms) \
+  X(178, query_module) \
+  X(179, quotactl) \
+  X(180, nfsservctl) \
+  X(181, getpmsg) \
+  X(182, putpmsg) \
+  X(183, afs_syscall) \
+  X(184, tuxcall) \
+  X(185, security) \
+  X(186, gettid) \
+  X(187, readahead) \
+  X(188, setxattr) \
+  X(189, lsetxattr) \
+  X(190, fsetxattr) \
+  X(191, getxattr) \
+  X(192, lgetxattr) \
+  X(193, fgetxattr) \
+  X(194, listxattr) \
+  X(195, llistxattr) \
+  X(196, flistxattr) \
+  X(197, removexattr) \
+  X(198, lremovexattr) \
+  X(199, fremovexattr) \
+  X(200, tkill) \
+  X(201, time) \
+  X(202, futex) \
+  X(203, sched_setaffinity) \
+  X(204, sched_getaffinity) \
+  X(205, set_thread_area) \
+  X(206, io_setup) \
+  X(207, io_destroy) \
+  X(208, io_getevents) \
+  X(209, io_submit) \
+  X(210, io_cancel) \
+  X(211, get_thread_area) \
+  X(212, lookup_dcookie) \
+  X(213, epoll_create) \
+  X(214, epoll_ctl_old) \
+  X(215, epoll_wait_old) \
+  X(216, remap_file_pages) \
+  X(217, getdents64) \
+  X(218, set_tid_address) \
+  X(219, restart_syscall) \
+  X(220, semtimedop) \
+  X(221, fadvise64) \
+  X(222, timer_create) \
+  X(223, timer_settime) \
+  X(224, timer_gettime) \
+  X(225, timer_getoverrun) \
+  X(226, timer_delete) \
+  X(227, clock_settime) \
+  X(228, clock_gettime) \
+  X(229, clock_getres) \
+  X(230, clock_nanosleep) \
+  X(231, exit_group) \
+  X(232, epoll_wait) \
+  X(233, epoll_ctl) \
+  X(234, tgkill) \
+  X(235, utimes) \
+  X(236, vserver) \
+  X(237, mbind) \
+  X(238, set_mempolicy) \
+  X(239, get_mempolicy) \
+  X(240, mq_open) \
+  X(241, mq_unlink) \
+  X(242, mq_timedsend) \
+  X(243, mq_timedreceive) \
+  X(244, mq_notify) \
+  X(245, mq_getsetattr) \
+  X(246, kexec_load) \
+  X(247, waitid) \
+  X(248, add_key) \
+  X(249, request_key) \
+  X(250, keyctl) \
+  X(251, ioprio_set) \
+  X(252, ioprio_get) \
+  X(253, inotify_init) \
+  X(254, inotify_add_watch) \
+  X(255, inotify_rm_watch) \
+  X(256, migrate_pages) \
+  X(257, openat) \
+  X(258, mkdirat) \
+  X(259, mknodat) \
+  X(260, fchownat) \
+  X(261, futimesat) \
+  X(262, newfstatat) \
+  X(263, unlinkat) \
+  X(264, renameat) \
+  X(265, linkat) \
+  X(266, symlinkat) \
+  X(267, readlinkat) \
+  X(268, fchmodat) \
+  X(269, faccessat) \
+  X(270, pselect6) \
+  X(271, ppoll) \
+  X(272, unshare) \
+  X(273, set_robust_list) \
+  X(274, get_robust_list) \
+  X(275, splice) \
+  X(276, tee) \
+  X(277, sync_file_range) \
+  X(278, vmsplice) \
+  X(279, move_pages) \
+  X(280, utimensat) \
+  X(281, epoll_pwait) \
+  X(282, signalfd) \
+  X(283, timerfd_create) \
+  X(284, eventfd) \
+  X(285, fallocate) \
+  X(286, timerfd_settime) \
+  X(287, timerfd_gettime) \
+  X(288, accept4) \
+  X(289, signalfd4) \
+  X(290, eventfd2) \
+  X(291, epoll_create1) \
+  X(292, dup3) \
+  X(293, pipe2) \
+  X(294, inotify_init1) \
+  X(295, preadv) \
+  X(296, pwritev) \
+  X(297, rt_tgsigqueueinfo) \
+  X(298, perf_event_open) \
+  X(299, recvmmsg) \
+  X(300, fanotify_init) \
+  X(301, fanotify_mark) \
+  X(302, prlimit64) \
+  X(303, name_to_handle_at) \
+  X(304, open_by_handle_at) \
+  X(305, clock_adjtime) \
+  X(306, syncfs) \
+  X(307, sendmmsg) \
+  X(308, setns) \
+  X(309, getcpu) \
+  X(310, process_vm_readv) \
+  X(311, process_vm_writev) \
+  X(312, kcmp) \
+  X(313, finit_module) \
+  X(314, sched_setattr) \
+  X(315, sched_getattr) \
+  X(316, renameat2) \
+  X(317, seccomp) \
+  X(318, getrandom) \
+  X(319, memfd_create) \
+  X(320, kexec_file_load) \
+  X(321, bpf) \
+  X(322, execveat) \
+  X(323, userfaultfd) \
+  X(324, membarrier) \
+  X(325, mlock2) \
+  X(326, copy_file_range) \
+  X(327, preadv2) \
+  X(328, pwritev2) \
+  X(329, pkey_mprotect) \
+  X(330, pkey_alloc) \
+  X(331, pkey_free) \
+  X(332, statx) \
+  X(333, io_pgetevents) \
+  X(334, rseq) \
+  X(424, pidfd_send_signal) \
+  X(425, io_uring_setup) \
+  X(426, io_uring_enter) \
+  X(427, io_uring_register) \
+  X(428, open_tree) \
+  X(429, move_mount) \
+  X(430, fsopen) \
+  X(431, fsconfig) \
+  X(432, fsmount) \
+  X(433, fspick) \
+  X(434, pidfd_open) \
+  X(435, clone3) \
+  X(436, close_range) \
+  X(437, openat2) \
+  X(438, pidfd_getfd) \
+  X(439, faccessat2) \
+  X(440, process_madvise) \
+  X(441, epoll_pwait2) \
+  X(442, mount_setattr) \
+  X(443, quotactl_fd) \
+  X(444, landlock_create_ruleset) \
+  X(445, landlock_add_rule) \
+  X(446, landlock_restrict_self) \
+  X(447, memfd_secret) \
+  X(448, process_mrelease) \
+  X(449, futex_waitv) \
+  X(450, set_mempolicy_home_node)
+
+#define X_SYSMAP(a, b) {a, #b},
 std::map<int, const std::string> syscall_map = {
-  {0, "read"},
-  {1, "write"},
-  {2, "open"},
-  {3, "close"},
-  {4, "stat"},
-  {5, "fstat"},
-  {6, "lstat"},
-  {7, "poll"},
-  {8, "lseek"},
-  {9, "mmap"},
-  {10, "mprotect"},
-  {11, "munmap"},
-  {12, "brk"},
-  {13, "rt_sigaction"},
-  {14, "rt_sigprocmask"},
-  {15, "rt_sigreturn"},
-  {16, "ioctl"},
-  {17, "pread64"},
-  {18, "pwrite64"},
-  {19, "readv"},
-  {20, "writev"},
-  {21, "access"},
-  {22, "pipe"},
-  {23, "select"},
-  {24, "sched_yield"},
-  {25, "mremap"},
-  {26, "msync"},
-  {27, "mincore"},
-  {28, "madvise"},
-  {29, "shmget"},
-  {30, "shmat"},
-  {31, "shmctl"},
-  {32, "dup"},
-  {33, "dup2"},
-  {34, "pause"},
-  {35, "nanosleep"},
-  {36, "getitimer"},
-  {37, "alarm"},
-  {38, "setitimer"},
-  {39, "getpid"},
-  {40, "sendfile"},
-  {41, "socket"},
-  {42, "connect"},
-  {43, "accept"},
-  {44, "sendto"},
-  {45, "recvfrom"},
-  {46, "sendmsg"},
-  {47, "recvmsg"},
-  {48, "shutdown"},
-  {49, "bind"},
-  {50, "listen"},
-  {51, "getsockname"},
-  {52, "getpeername"},
-  {53, "socketpair"},
-  {54, "setsockopt"},
-  {55, "getsockopt"},
-  {56, "clone"},
-  {57, "fork"},
-  {58, "vfork"},
-  {59, "execve"},
-  {60, "exit"},
-  {61, "wait4"},
-  {62, "kill"},
-  {63, "uname"},
-  {64, "semget"},
-  {65, "semop"},
-  {66, "semctl"},
-  {67, "shmdt"},
-  {68, "msgget"},
-  {69, "msgsnd"},
-  {70, "msgrcv"},
-  {71, "msgctl"},
-  {72, "fcntl"},
-  {73, "flock"},
-  {74, "fsync"},
-  {75, "fdatasync"},
-  {76, "truncate"},
-  {77, "ftruncate"},
-  {78, "getdents"},
-  {79, "getcwd"},
-  {80, "chdir"},
-  {81, "fchdir"},
-  {82, "rename"},
-  {83, "mkdir"},
-  {84, "rmdir"},
-  {85, "creat"},
-  {86, "link"},
-  {87, "unlink"},
-  {88, "symlink"},
-  {89, "readlink"},
-  {90, "chmod"},
-  {91, "fchmod"},
-  {92, "chown"},
-  {93, "fchown"},
-  {94, "lchown"},
-  {95, "umask"},
-  {96, "gettimeofday"},
-  {97, "getrlimit"},
-  {98, "getrusage"},
-  {99, "sysinfo"},
-  {100, "times"},
-  {101, "ptrace"},
-  {102, "getuid"},
-  {103, "syslog"},
-  {104, "getgid"},
-  {105, "setuid"},
-  {106, "setgid"},
-  {107, "geteuid"},
-  {108, "getegid"},
-  {109, "setpgid"},
-  {110, "getppid"},
-  {111, "getpgrp"},
-  {112, "setsid"},
-  {113, "setreuid"},
-  {114, "setregid"},
-  {115, "getgroups"},
-  {116, "setgroups"},
-  {117, "setresuid"},
-  {118, "getresuid"},
-  {119, "setresgid"},
-  {120, "getresgid"},
-  {121, "getpgid"},
-  {122, "setfsuid"},
-  {123, "setfsgid"},
-  {124, "getsid"},
-  {125, "capget"},
-  {126, "capset"},
-  {127, "rt_sigpending"},
-  {128, "rt_sigtimedwait"},
-  {129, "rt_sigqueueinfo"},
-  {130, "rt_sigsuspend"},
-  {131, "sigaltstack"},
-  {132, "utime"},
-  {133, "mknod"},
-  {134, "uselib"},
-  {135, "personality"},
-  {136, "ustat"},
-  {137, "statfs"},
-  {138, "fstatfs"},
-  {139, "sysfs"},
-  {140, "getpriority"},
-  {141, "setpriority"},
-  {142, "sched_setparam"},
-  {143, "sched_getparam"},
-  {144, "sched_setscheduler"},
-  {145, "sched_getscheduler"},
-  {146, "sched_get_priority_max"},
-  {147, "sched_get_priority_min"},
-  {148, "sched_rr_get_interval"},
-  {149, "mlock"},
-  {150, "munlock"},
-  {151, "mlockall"},
-  {152, "munlockall"},
-  {153, "vhangup"},
-  {154, "modify_ldt"},
-  {155, "pivot_root"},
-  {156, "_sysctl"},
-  {157, "prctl"},
-  {158, "arch_prctl"},
-  {159, "adjtimex"},
-  {160, "setrlimit"},
-  {161, "chroot"},
-  {162, "sync"},
-  {163, "acct"},
-  {164, "settimeofday"},
-  {165, "mount"},
-  {166, "umount2"},
-  {167, "swapon"},
-  {168, "swapoff"},
-  {169, "reboot"},
-  {170, "sethostname"},
-  {171, "setdomainname"},
-  {172, "iopl"},
-  {173, "ioperm"},
-  {174, "create_module"},
-  {175, "init_module"},
-  {176, "delete_module"},
-  {177, "get_kernel_syms"},
-  {178, "query_module"},
-  {179, "quotactl"},
-  {180, "nfsservctl"},
-  {181, "getpmsg"},
-  {182, "putpmsg"},
-  {183, "afs_syscall"},
-  {184, "tuxcall"},
-  {185, "security"},
-  {186, "gettid"},
-  {187, "readahead"},
-  {188, "setxattr"},
-  {189, "lsetxattr"},
-  {190, "fsetxattr"},
-  {191, "getxattr"},
-  {192, "lgetxattr"},
-  {193, "fgetxattr"},
-  {194, "listxattr"},
-  {195, "llistxattr"},
-  {196, "flistxattr"},
-  {197, "removexattr"},
-  {198, "lremovexattr"},
-  {199, "fremovexattr"},
-  {200, "tkill"},
-  {201, "time"},
-  {202, "futex"},
-  {203, "sched_setaffinity"},
-  {204, "sched_getaffinity"},
-  {205, "set_thread_area"},
-  {206, "io_setup"},
-  {207, "io_destroy"},
-  {208, "io_getevents"},
-  {209, "io_submit"},
-  {210, "io_cancel"},
-  {211, "get_thread_area"},
-  {212, "lookup_dcookie"},
-  {213, "epoll_create"},
-  {214, "epoll_ctl_old"},
-  {215, "epoll_wait_old"},
-  {216, "remap_file_pages"},
-  {217, "getdents64"},
-  {218, "set_tid_address"},
-  {219, "restart_syscall"},
-  {220, "semtimedop"},
-  {221, "fadvise64"},
-  {222, "timer_create"},
-  {223, "timer_settime"},
-  {224, "timer_gettime"},
-  {225, "timer_getoverrun"},
-  {226, "timer_delete"},
-  {227, "clock_settime"},
-  {228, "clock_gettime"},
-  {229, "clock_getres"},
-  {230, "clock_nanosleep"},
-  {231, "exit_group"},
-  {232, "epoll_wait"},
-  {233, "epoll_ctl"},
-  {234, "tgkill"},
-  {235, "utimes"},
-  {236, "vserver"},
-  {237, "mbind"},
-  {238, "set_mempolicy"},
-  {239, "get_mempolicy"},
-  {240, "mq_open"},
-  {241, "mq_unlink"},
-  {242, "mq_timedsend"},
-  {243, "mq_timedreceive"},
-  {244, "mq_notify"},
-  {245, "mq_getsetattr"},
-  {246, "kexec_load"},
-  {247, "waitid"},
-  {248, "add_key"},
-  {249, "request_key"},
-  {250, "keyctl"},
-  {251, "ioprio_set"},
-  {252, "ioprio_get"},
-  {253, "inotify_init"},
-  {254, "inotify_add_watch"},
-  {255, "inotify_rm_watch"},
-  {256, "migrate_pages"},
-  {257, "openat"},
-  {258, "mkdirat"},
-  {259, "mknodat"},
-  {260, "fchownat"},
-  {261, "futimesat"},
-  {262, "newfstatat"},
-  {263, "unlinkat"},
-  {264, "renameat"},
-  {265, "linkat"},
-  {266, "symlinkat"},
-  {267, "readlinkat"},
-  {268, "fchmodat"},
-  {269, "faccessat"},
-  {270, "pselect6"},
-  {271, "ppoll"},
-  {272, "unshare"},
-  {273, "set_robust_list"},
-  {274, "get_robust_list"},
-  {275, "splice"},
-  {276, "tee"},
-  {277, "sync_file_range"},
-  {278, "vmsplice"},
-  {279, "move_pages"},
-  {280, "utimensat"},
-  {281, "epoll_pwait"},
-  {282, "signalfd"},
-  {283, "timerfd_create"},
-  {284, "eventfd"},
-  {285, "fallocate"},
-  {286, "timerfd_settime"},
-  {287, "timerfd_gettime"},
-  {288, "accept4"},
-  {289, "signalfd4"},
-  {290, "eventfd2"},
-  {291, "epoll_create1"},
-  {292, "dup3"},
-  {293, "pipe2"},
-  {294, "inotify_init1"},
-  {295, "preadv"},
-  {296, "pwritev"},
-  {297, "rt_tgsigqueueinfo"},
-  {298, "perf_event_open"},
-  {299, "recvmmsg"},
-  {300, "fanotify_init"},
-  {301, "fanotify_mark"},
-  {302, "prlimit64"},
-  {303, "name_to_handle_at"},
-  {304, "open_by_handle_at"},
-  {305, "clock_adjtime"},
-  {306, "syncfs"},
-  {307, "sendmmsg"},
-  {308, "setns"},
-  {309, "getcpu"},
-  {310, "process_vm_readv"},
-  {311, "process_vm_writev"},
-  {312, "kcmp"},
-  {313, "finit_module"},
-  {314, "sched_setattr"},
-  {315, "sched_getattr"},
-  {316, "renameat2"},
-  {317, "seccomp"},
-  {318, "getrandom"},
-  {319, "memfd_create"},
-  {320, "kexec_file_load"},
-  {321, "bpf"},
-  {322, "execveat"},
-  {323, "userfaultfd"},
-  {324, "membarrier"},
-  {325, "mlock2"},
-  {326, "copy_file_range"},
-  {327, "preadv2"},
-  {328, "pwritev2"},
-  {329, "pkey_mprotect"},
-  {330, "pkey_alloc"},
-  {331, "pkey_free"},
-  {332, "statx"},
-  {333, "io_pgetevents"},
-  {334, "rseq"},
-  {424, "pidfd_send_signal"},
-  {425, "io_uring_setup"},
-  {426, "io_uring_enter"},
-  {427, "io_uring_register"},
-  {428, "open_tree"},
-  {429, "move_mount"},
-  {430, "fsopen"},
-  {431, "fsconfig"},
-  {432, "fsmount"},
-  {433, "fspick"},
-  {434, "pidfd_open"},
-  {435, "clone3"},
-  {436, "close_range"},
-  {437, "openat2"},
-  {438, "pidfd_getfd"},
-  {439, "faccessat2"},
-  {440, "process_madvise"},
-  {441, "epoll_pwait2"},
-  {442, "mount_setattr"},
-  {443, "quotactl_fd"},
-  {444, "landlock_create_ruleset"},
-  {445, "landlock_add_rule"},
-  {446, "landlock_restrict_self"},
-  {447, "memfd_secret"},
-  {448, "process_mrelease"},
-  {449, "futex_waitv"},
-  {450, "set_mempolicy_home_node"},
-  {512, "rt_sigaction"},
-  {513, "rt_sigreturn"},
-  {514, "ioctl"},
-  {515, "readv"},
-  {516, "writev"},
-  {517, "recvfrom"},
-  {518, "sendmsg"},
-  {519, "recvmsg"},
-  {520, "execve"},
-  {521, "ptrace"},
-  {522, "rt_sigpending"},
-  {523, "rt_sigtimedwait"},
-  {524, "rt_sigqueueinfo"},
-  {525, "sigaltstack"},
-  {526, "timer_create"},
-  {527, "mq_notify"},
-  {528, "kexec_load"},
-  {529, "waitid"},
-  {530, "set_robust_list"},
-  {531, "get_robust_list"},
-  {532, "vmsplice"},
-  {533, "move_pages"},
-  {534, "preadv"},
-  {535, "pwritev"},
-  {536, "rt_tgsigqueueinfo"},
-  {537, "recvmmsg"},
-  {538, "sendmmsg"},
-  {539, "process_vm_readv"},
-  {540, "process_vm_writev"},
-  {541, "setsockopt"},
-  {542, "getsockopt"},
-  {543, "io_setup"},
-  {544, "io_submit"},
-  {545, "execveat"},
-  {546, "preadv2"},
-  {547, "pwritev2"},
+  SYSCALL_TABLE(X_SYSMAP)
 };
+
+#define X_SYSENUM(a, b) b = a,
+
+namespace ddprof{
+enum class Syscall {
+  SYSCALL_TABLE(X_SYSENUM)
+};
+
+bool operator==(const long int A, const Syscall &B) {
+  return A == static_cast<long int>(B);
+}
+}
+
+#undef X_SYSMAP
+#undef X_SYSENUM

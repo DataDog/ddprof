@@ -395,18 +395,18 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
     }
   }
 
-  if (id == ddprof::Syscalls::mmap) {
+  if (id == ddprof::Syscall::mmap) {
     sysalloc.do_mmap(*uwo, sc_ret, sc_p2, sample->pid);
-  } else if (id == ddprof::Syscalls::munmap) {
+  } else if (id == ddprof::Syscall::munmap) {
     sysalloc.do_munmap(sc_p1, sc_p2, sample->pid);
-  } else if (id == ddprof::Syscalls::madvise) {
+  } else if (id == ddprof::Syscall::madvise) {
     // Unhandled, no need to handle
-  } else if (id == ddprof::Syscalls::mremap) {
+  } else if (id == ddprof::Syscall::mremap) {
     sysalloc.do_mremap(*uwo, sc_ret, sc_p1, sc_p2, sc_p3, sample->pid);
-  } else if (id == ddprof::Syscalls::exit ||
-             id == ddprof::Syscalls::exit_group ||
-             id == ddprof::Syscalls::execve ||
-             id == ddprof::Syscalls::execveat) {
+  } else if (id == ddprof::Syscall::exit ||
+             id == ddprof::Syscall::exit_group ||
+             id == ddprof::Syscall::execve ||
+             id == ddprof::Syscall::execveat) {
     // Erase upon exit or exec
     sysalloc.do_exit(sample->pid);
   }
@@ -414,42 +414,42 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
   return ddres_init();
 }
 
-                ddprof_pr_noisy_neighbors(ctx, sample, watcher_pos) {
 DDRes ddprof_pr_noisy_neighbors(DDProfContext *ctx, perf_event_sample *sample, int watcher_pos) {
-  nlohmann::json &timeline_data = ctx->worker_ctx.exp[i_export]->timeline_data;
-  PerfWatcher *watcher = &ctx->watchers[watcher_pos];
-
-  // Detect whether this thread has ever been visited
-  std::string tid = std::to_string(sample->tid);
-  if (!timeline_data["threads"].contains(tid)) {
-    uint64_t first_time = std::chrono::duration_cast<std::chrono::nanoseconds>(ctx->worker_ctx.cycle_start_time.time_since_epoch()).count();
-    timeline_data["threads"][tid] = nlohmann::json::array();
-    timeline_data["num"][tid] = 1;
-
-    timeline_data["threads"][tid][0] = nlohmann::json::object();
-    timeline_data["threads"][tid][0]["startNs"] = first_time;
-    timeline_data["threads"][tid][0]["label"] = "suspended";
-  }
-  uint64_t num = timeline_data["num"][tid];
-
-  timeline_data["threads"][tid][num - 1]["endNs"] = sample->time;
-
-  if (enter_label == watcher->tracepoint_label) {
-    long sys_idx = sample_val;
-    if (byebye == syscall_map[sys_idx]) {
-      timeline_data["threads"][tid][num]["label"] = "exited";
-    } else {
-      timeline_data["threads"][tid][num]["label"] = syscall_map[sys_idx];
-    }
-    timeline_data["threads"][tid][num]["startNs"] = sample->time;
-    timeline_data["num"][tid] = num + 1;
-  } else if (exit_label == watcher->tracepoint_label) {
-    if (std::string{"exited"} != timeline_data["threads"][tid][num - 1]["label"]) {
-      timeline_data["threads"][tid][num]["label"] = "started";
-      timeline_data["threads"][tid][num]["startNs"] = sample->time;
-      timeline_data["num"][tid] = num + 1;
-    }
-  }
+  return ddres_init();
+//  nlohmann::json &timeline_data = ctx->worker_ctx.exp[i_export]->timeline_data;
+//  PerfWatcher *watcher = &ctx->watchers[watcher_pos];
+//
+//  // Detect whether this thread has ever been visited
+//  std::string tid = std::to_string(sample->tid);
+//  if (!timeline_data["threads"].contains(tid)) {
+//    uint64_t first_time = std::chrono::duration_cast<std::chrono::nanoseconds>(ctx->worker_ctx.cycle_start_time.time_since_epoch()).count();
+//    timeline_data["threads"][tid] = nlohmann::json::array();
+//    timeline_data["num"][tid] = 1;
+//
+//    timeline_data["threads"][tid][0] = nlohmann::json::object();
+//    timeline_data["threads"][tid][0]["startNs"] = first_time;
+//    timeline_data["threads"][tid][0]["label"] = "suspended";
+//  }
+//  uint64_t num = timeline_data["num"][tid];
+//
+//  timeline_data["threads"][tid][num - 1]["endNs"] = sample->time;
+//
+//  if (enter_label == watcher->tracepoint_label) {
+//    long sys_idx = sample_val;
+//    if (byebye == syscall_map[sys_idx]) {
+//      timeline_data["threads"][tid][num]["label"] = "exited";
+//    } else {
+//      timeline_data["threads"][tid][num]["label"] = syscall_map[sys_idx];
+//    }
+//    timeline_data["threads"][tid][num]["startNs"] = sample->time;
+//    timeline_data["num"][tid] = num + 1;
+//  } else if (exit_label == watcher->tracepoint_label) {
+//    if (std::string{"exited"} != timeline_data["threads"][tid][num - 1]["label"]) {
+//      timeline_data["threads"][tid][num]["label"] = "started";
+//      timeline_data["threads"][tid][num]["startNs"] = sample->time;
+//      timeline_data["num"][tid] = num + 1;
+//    }
+//  }
 }
 
 static void ddprof_reset_worker_stats() {
@@ -815,9 +815,9 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
               watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS2) {
             DDRES_CHECK_FWD(
                 ddprof_pr_sysallocation_tracking(ctx, sample, watcher_pos));
-          } else if (watcher_ddprof_event_type == DDPROF_PWE_NOISYNEIGHBORS) {
+          } else if (watcher->ddprof_event_type == DDPROF_PWE_tNOISYCPU) {
             DDRES_CHECK_FWD(
-                ddprof_pr_noisy_neighbors(ctx, sample, watcher_pos) {
+                ddprof_pr_noisy_neighbors(ctx, sample, watcher_pos));
           } else if (is_allocation && ctx->params.live_allocations) {
             DDRES_CHECK_FWD(
                 ddprof_pr_allocation_tracking(ctx, sample, watcher_pos));
