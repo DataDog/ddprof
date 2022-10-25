@@ -343,7 +343,12 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
 
     // if there are no perf active watcher, add a dummy watcher to be notified
     // on process exit
-    ctx->watchers[ctx->num_watchers++] = *ewatcher_from_str("sDUM");
+    const PerfWatcher *tmpwatcher = ewatcher_from_str("sDUM");
+    if (!tmpwatcher) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
+                             "Could not allocate storage for watcher template");
+    }
+    ctx->watchers[ctx->num_watchers++] = *tmpwatcher;
   }
 
   order_watchers({ctx->watchers, static_cast<size_t>(ctx->num_watchers)});
