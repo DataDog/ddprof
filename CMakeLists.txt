@@ -221,7 +221,7 @@ endif()
 add_library(dd_profiling-embedded SHARED ${DD_PROFILING_SOURCES})
 target_include_directories(
   dd_profiling-embedded PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include
-                               ${CMAKE_SOURCE_DIR}/third_party ${EVENT_PARSER_INCLUDE})
+                               ${CMAKE_SOURCE_DIR}/third_party)
 set_target_properties(dd_profiling-embedded
                       PROPERTIES PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
 
@@ -275,13 +275,13 @@ add_exe(
   ddprof ${DDPROF_GLOBAL_SRC}
   LIBRARIES ${DDPROF_LIBRARY_LIST}
   DEFINITIONS ${DDPROF_DEFINITION_LIST})
-target_link_libraries(ddprof PRIVATE DDProf::Parser libddprofiling_embedded_object)
+target_link_libraries(ddprof PRIVATE libddprofiling_embedded_object)
 if(USE_LOADER)
   target_compile_definitions(ddprof PRIVATE "DDPROF_USE_LOADER")
   target_link_libraries(ddprof PRIVATE libdd_loader_object)
 endif()
 
-target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST} ${EVENT_PARSER_INCLUDE})
+target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 target_static_libcxx(ddprof)
 if(BUILD_UNIVERSAL_DDPROF)
   target_static_libc(ddprof)
