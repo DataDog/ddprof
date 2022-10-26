@@ -157,43 +157,43 @@ TEST(CmdLineTst, ParserKeyPatterns) {
 
   // Mode is permissive
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=magnanimous", &watcher));
-  ASSERT_TRUE(watcher.output_mode & kPerfWatcherMode_callgraph);
-  ASSERT_TRUE(watcher.output_mode & kPerfWatcherMode_metric);
+  ASSERT_TRUE(watcher.output_mode <= PerfWatcherMode::kCallgraph);
+  ASSERT_TRUE(watcher.output_mode <= PerfWatcherMode::kMetric);
 
   // A or a designate all
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=A", &watcher));
-  ASSERT_TRUE(watcher.output_mode & kPerfWatcherMode_callgraph);
-  ASSERT_TRUE(watcher.output_mode & kPerfWatcherMode_metric);
+  ASSERT_TRUE(watcher.output_mode <= PerfWatcherMode::kCallgraph);
+  ASSERT_TRUE(watcher.output_mode <= PerfWatcherMode::kMetric);
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=a", &watcher));
-  ASSERT_TRUE(watcher.output_mode & kPerfWatcherMode_callgraph);
-  ASSERT_TRUE(watcher.output_mode & kPerfWatcherMode_metric);
+  ASSERT_TRUE(watcher.output_mode <= PerfWatcherMode::kCallgraph);
+  ASSERT_TRUE(watcher.output_mode <= PerfWatcherMode::kMetric);
 
   // both m and g together designate all
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=MG", &watcher));
-  ASSERT_TRUE(watcher.output_mode & kPerfWatcherMode_callgraph);
-  ASSERT_TRUE(watcher.output_mode & kPerfWatcherMode_metric);
+  ASSERT_TRUE(watcher.output_mode <= PerfWatcherMode::kCallgraph);
+  ASSERT_TRUE(watcher.output_mode <= PerfWatcherMode::kMetric);
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=mg", &watcher));
-  ASSERT_TRUE(watcher.output_mode & kPerfWatcherMode_callgraph);
-  ASSERT_TRUE(watcher.output_mode & kPerfWatcherMode_metric);
+  ASSERT_TRUE(watcher.output_mode <= PerfWatcherMode::kCallgraph);
+  ASSERT_TRUE(watcher.output_mode <= PerfWatcherMode::kMetric);
 
   // M or m is a metric (no callgraph unless specified)
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=M", &watcher));
-  ASSERT_FALSE(watcher.output_mode & kPerfWatcherMode_callgraph);
-  ASSERT_TRUE(watcher.output_mode & kPerfWatcherMode_metric);
+  ASSERT_FALSE(watcher.output_mode <= PerfWatcherMode::kCallgraph);
+  ASSERT_TRUE(watcher.output_mode <= PerfWatcherMode::kMetric);
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=m", &watcher));
-  ASSERT_FALSE(watcher.output_mode & kPerfWatcherMode_callgraph);
-  ASSERT_TRUE(watcher.output_mode & kPerfWatcherMode_metric);
+  ASSERT_FALSE(watcher.output_mode <= PerfWatcherMode::kCallgraph);
+  ASSERT_TRUE(watcher.output_mode <= PerfWatcherMode::kMetric);
 
   // G or g designate callgraph (default)
   ASSERT_TRUE(watcher_from_str("e=hCPU", &watcher));
-  ASSERT_TRUE(watcher.output_mode & kPerfWatcherMode_callgraph);
-  ASSERT_FALSE(watcher.output_mode & kPerfWatcherMode_metric);
+  ASSERT_TRUE(watcher.output_mode <= PerfWatcherMode::kCallgraph);
+  ASSERT_FALSE(watcher.output_mode <= PerfWatcherMode::kMetric);
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=G", &watcher));
-  ASSERT_TRUE(watcher.output_mode & kPerfWatcherMode_callgraph);
-  ASSERT_FALSE(watcher.output_mode & kPerfWatcherMode_metric);
+  ASSERT_TRUE(watcher.output_mode <= PerfWatcherMode::kCallgraph);
+  ASSERT_FALSE(watcher.output_mode <= PerfWatcherMode::kMetric);
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=g", &watcher));
-  ASSERT_TRUE(watcher.output_mode & kPerfWatcherMode_callgraph);
-  ASSERT_FALSE(watcher.output_mode & kPerfWatcherMode_metric);
+  ASSERT_TRUE(watcher.output_mode <= PerfWatcherMode::kCallgraph);
+  ASSERT_FALSE(watcher.output_mode <= PerfWatcherMode::kMetric);
 
   // n|arg_num|argno
   ASSERT_TRUE(watcher_from_str("e=hCPU n=1", &watcher));
