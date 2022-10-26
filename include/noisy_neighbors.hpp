@@ -68,12 +68,24 @@ struct NoisyNeighbors {
 
   nlohmann::json finalize(uint64_t t) {
     nlohmann::json ret{};
-    std::vector<pid_t> pidtable = {};
+    std::map<pid_t, uint64_t> pidtable = {};
     std::vector<std::string> thread_names = {};
     ret["threads"] = nlohmann::json::object();
     ret["timeRange"] = nlohmann::json::object();
+    ret["strings"] = nlohmann::json::array();
+    ret["frames"] = nlohmann::json::array();
     ret["timeRange"]["endNs"] = t;
     ret["timeRange"]["startNs"] = t;
+
+    // Add some helpful entries to the pidtable
+    ret["strings"].push_back(""); // first is empty
+    size_t path_idx = ret["strings"].size();
+    ret["strings"].push_back("unknown.cpp");
+    size_t pkg_idx = ret["strings"].size();
+    ret["strings"].push_back("libwhatever.so");
+    size_t class_idx = ret["strings"].size();
+    ret["strings"].push_back("IHaveNoClass");
+
     for (size_t i = 0; i < T.size(); i++) {
       // Populate placeholders.  We do this without checking size since we
       // want a blank entry for idle cores
@@ -88,12 +100,16 @@ struct NoisyNeighbors {
       for (size_t j = 0; j < T[i].pid.size(); j++) {
         pid_t this_pid = T[i].pid[j];
         size_t idx_pid = -1ull;
-        auto loc = std::find(pidtable.begin(), pidtable.end(), this_pid);
+        auto loc = pidtable.find(this_pid);
         if (loc != pidtable.end()) {
-          idx_pid = loc - pidtable.begin();
+          idx_pid = loc->second;
         } else {
-          idx_pid = pidtable.size();
-          pidtable.push_back(this_pid);
+          idx_pid = ret["strings"].size();
+          if (!this_pid)
+            ret["strings"].push_back("Idle");
+          else
+            ret["strings"].push_back(std::to_string(this_pid));
+          pidtable.insert({this_pid, idx_pid});
         }
 
         ret["threads"][thread_names.back()][j]["stack"] = nlohmann::json::array();
@@ -113,22 +129,6 @@ struct NoisyNeighbors {
     }
 
     // Now that we've gone through everything, fill in the symbol table
-    ret["strings"] = nlohmann::json::array();
-    ret["frames"] = nlohmann::json::array();
-    for (auto &s : pidtable) {
-      if (s == 0)
-        ret["strings"].push_back("Idle");
-      else
-        ret["strings"].push_back(std::to_string(s));
-    }
-
-    // Add some helpful entries to the pidtable
-    size_t path_idx = ret["strings"].size();
-    ret["strings"].push_back("unknown.cpp");
-    size_t pkg_idx = ret["strings"].size();
-    ret["strings"].push_back("libwhatever.so");
-    size_t class_idx = ret["strings"].size();
-    ret["strings"].push_back("IHaveNoClass");
 
     for (size_t i = 0; i < pidtable.size(); i++) {
       ret["frames"].push_back(nlohmann::json::array());
