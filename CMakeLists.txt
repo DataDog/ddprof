@@ -400,7 +400,7 @@ if(${BUILD_NATIVE_LIB})
   # libcap, can be removed from version distributed to client
   list(APPEND NATIVE_LIB_LIBRARY_LIST libcap)
 
-  target_include_directories(ddprof-native PRIVATE ${DDPROF_INCLUDE_LIST} ${EVENT_PARSER_INCLUDE})
+  target_include_directories(ddprof-native PRIVATE ${DDPROF_INCLUDE_LIST})
 
   target_link_libraries(ddprof-native PRIVATE ${NATIVE_LIB_LIBRARY_LIST})
   add_library(DDProf::Native ALIAS ddprof-native)
