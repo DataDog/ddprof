@@ -238,7 +238,7 @@ opt:
            }
            if ($$ == EventConfField::kParameter) {
              g_accum_event_conf.loc_type = EventConfLocationType::kRegister;
-             unsigned int regno = param_to_regno_c($3);
+             unsigned int regno = param_to_perf_regno($3);
              if (regno == -1u) {
                VAL_ERROR();
                break;
