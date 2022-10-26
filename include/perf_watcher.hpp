@@ -10,34 +10,33 @@
 #include <linux/perf_event.h>
 #include <stdint.h>
 
-typedef enum {
-  kPerfWatcher_Off = 0,  // always off
-  kPerfWatcher_Required, // always on
-  kPerfWatcher_Try,      // On if possible, default to OFF on failure
-} PerfWatcherValue;
+enum class PerfWatcherUseKernel {
+  kOff = 0,  // always off
+  kRequired, // always on
+  kTry,      // On if possible, default to OFF on failure
+};
 
-typedef enum {
-  kPerfWatcherLoc_period = 0, // use the fixed period as sample value
-  kPerfWatcherLoc_reg,        // use CPU register (specified in `reg`)
-  kPerfWatcherLoc_raw,        // use raw event (specified by raw_*)
+enum class PerfWatcherValueSource {
+  kSample = 0, // use the "default" sample value (sample->period)
+  kRegister    // use CPU register (specified in `reg`)
+  kRaw,        // use raw event (specified by raw_*)
+};
 
-} PerfWatcherLocation;
-
-typedef enum {
-  kPerfWatcherMode_disabled = 0, // Should never actually be used!
-  kPerfWatcherMode_callgraph = 1 << 0,
-  kPerfWatcherMode_metric = 1 << 1,
-} PerfWatcherMode;
+enum class PerfWatcherMode {
+  kDisabled = 0, // Should never actually be used!
+  kCallgraph = 1 << 0,
+  kMetric = 1 << 1,
+};
 
 struct PerfWatcherOptions {
-  PerfWatcherValue is_kernel;
+  PerfWatcherUseKernel use_kernel;
   bool is_freq;
   uint8_t nb_frames_to_skip; // number of bottom frames to skip in stack trace
                              // (useful for allocation profiling to remove
                              // frames belonging to lib_ddprofiling.so)
 };
 
-typedef struct PerfWatcher {
+struct PerfWatcher {
   int ddprof_event_type; // ddprof event type from DDPROF_EVENT_NAMES enum
   std::string desc;
   uint64_t sample_type; // perf sample type: specifies values included in sample
@@ -97,13 +96,13 @@ enum DDProfCustomCountId { kDDPROF_COUNT_ALLOCATIONS = 0 };
 // This depend on the state of configuration (capabilities /
 // perf_event_paranoid) Attempt to activate them and remove them if you fail
 #define IS_FREQ_TRY_KERNEL                                                     \
-  { .is_kernel = kPerfWatcher_Try, .is_freq = true }
+  { .use_kernel = PerfWatcherUseKernel::kTry, .is_freq = true }
 
 #define IS_FREQ                                                                \
   { .is_freq = true }
 
-#define IS_KERNEL                                                              \
-  { .is_kernel = kPerfWatcher_Required }
+#define USE_KERNEL \
+  { .use_kernel = PerfWatcherUserKernel::kRequired}
 
 #ifdef DDPROF_OPTIM
 #  define NB_FRAMES_TO_SKIP 4
@@ -134,11 +133,11 @@ enum DDProfCustomCountId { kDDPROF_COUNT_ALLOCATIONS = 0 };
   X(hBSTF,   "Bus Stalls(F)",   PERF_TYPE_HARDWARE,  PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(hBSTB,   "Bus Stalls(B)",   PERF_TYPE_HARDWARE,  PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(sCPU,    "CPU Time",        PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_TASK_CLOCK,              99,           DDPROF_PWT_CPU_NANOS,   IS_FREQ_TRY_KERNEL)      \
-  X(sPF,     "Page Faults",     PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_PAGE_FAULTS,             1,            DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
-  X(sCS,     "Con. Switch",     PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_CONTEXT_SWITCHES,        1,            DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
+  X(sPF,     "Page Faults",     PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_PAGE_FAULTS,             1,            DDPROF_PWT_TRACEPOINT,  USE_KERNEL)              \
+  X(sCS,     "Con. Switch",     PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_CONTEXT_SWITCHES,        1,            DDPROF_PWT_TRACEPOINT,  USE_KERNEL)              \
   X(sMig,    "CPU Migrations",  PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_CPU_MIGRATIONS,          99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(sPFMAJ,  "Minor Faults",    PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_PAGE_FAULTS_MIN,         99,           DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
-  X(sPFMIN,  "Major Faults",    PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_PAGE_FAULTS_MAJ,         99,           DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
+  X(sPFMAJ,  "Minor Faults",    PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_PAGE_FAULTS_MIN,         99,           DDPROF_PWT_TRACEPOINT,  USE_KERNEL)              \
+  X(sPFMIN,  "Major Faults",    PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_PAGE_FAULTS_MAJ,         99,           DDPROF_PWT_TRACEPOINT,  USE_KERNEL)              \
   X(sALGN,   "Align. Faults",   PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_ALIGNMENT_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(sEMU,    "Emu. Faults",     PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_EMULATION_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(sDUM,    "Dummy",           PERF_TYPE_SOFTWARE,  PERF_COUNT_SW_DUMMY,                   1,            DDPROF_PWT_NOCOUNT,     {})                      \

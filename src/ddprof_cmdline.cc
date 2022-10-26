@@ -147,7 +147,7 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
 
   // Configure value normalization
   if (conf->loc_type == EventConfLocationType::kRaw) {
-    watcher->loc_type = kPerfWatcherLoc_raw;
+    watcher->loc_type = PerfWatcherValueSource::kRaw;
     watcher->sample_type |= PERF_SAMPLE_RAW;
     watcher->raw_off = conf->arg_offset;
     if (conf->arg_size > 0)
@@ -156,7 +156,7 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
       watcher->raw_sz = sizeof(uint64_t); // default raw entry
   } else if (conf->loc_type == EventConfLocationType::kRegister) {
     watcher->regno = conf->register_num;
-    watcher->loc_type = kPerfWatcherLoc_reg;
+    watcher->loc_type = PerfWatcherValueSource::kRegister;
   }
 
   if (conf->arg_coeff != 0.0)
@@ -164,13 +164,13 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
 
   // The output mode isn't set as part of the configuration templates; we
   // always default to callgraph mode
-  watcher->output_mode = kPerfWatcherMode_callgraph;
+  watcher->output_mode = PerfWatcherMode::kCallgraph;
   if (EventConfMode::kAll <= conf->mode) {
     watcher->output_mode = 0;
     if (EventConfMode::kGraph <= conf->mode)
-      watcher->output_mode |= kPerfWatcherMode_callgraph;
+      watcher->output_mode |= PerfWatcherMode::kCallgraph;
     if (EventConfMode::kMetric <= conf->mode)
-      watcher->output_mode |= kPerfWatcherMode_metric;
+      watcher->output_mode |= PerfWatcherMode::kMetric;
   }
 
   watcher->tracepoint_event = conf->eventname;

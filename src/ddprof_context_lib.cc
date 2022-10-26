@@ -102,13 +102,13 @@ DDRes add_preset(DDProfContext *ctx, const char *preset,
 void log_watcher(const PerfWatcher *w, int n) {
   PRINT_NFO("    ID: %s, Pos: %d, Index: %lu", w->desc.c_str(), n, w->config);
   switch (w->loc_type) {
-  case kPerfWatcherLoc_period:
+  case PerfWatcherValueSource::kSample:
     PRINT_NFO("    Location: Sample");
     break;
-  case kPerfWatcherLoc_reg:
+  case PerfWatcherValueSource::kRegister:
     PRINT_NFO("    Location: Register, regno: %d", w->regno);
     break;
-  case kPerfWatcherLoc_raw:
+  case PerfWatcherValueSource::kRaw:
     PRINT_NFO("    Location: Raw event, offset: %d, size: %d", w->raw_off,
               w->raw_sz);
     break;
@@ -127,9 +127,9 @@ void log_watcher(const PerfWatcher *w, int n) {
   else
     PRINT_NFO("    Cadence: Period, Period: %lu", w->sample_period);
 
-  if (w->output_mode & kPerfWatcherMode_callgraph)
+  if (w->output_mode & PerfWatcherMode::kCallgraph)
     PRINT_NFO("    Outputting to callgraph (flamegraph)");
-  if (w->output_mode & kPerfWatcherMode_metric)
+  if (w->output_mode & PerfWatcherMode::kMetric)
     PRINT_NFO("    Outputting to metric");
 }
 

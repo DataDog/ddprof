@@ -241,7 +241,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
 
   // Attempt to fully unwind if the watcher has a callgraph type
   DDRes res = {};
-  if (watcher->output_mode & kPerfWatcherMode_callgraph)
+  if (watcher->output_mode & PerfWatcherMode::kCallgraph)
     res = unwindstate__unwind(us);
 
   /* This test is not 100% accurate:
@@ -274,7 +274,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
   if (!IsDDResFatal(res) &&
-      (watcher->output_mode & kPerfWatcherMode_callgraph)) {
+      (watcher->output_mode & PerfWatcherMode::kCallgraph)) {
 #ifndef DDPROF_NATIVE_LIB
     // Depending on the type of watcher, compute a value for sample
     uint64_t sample_val = perf_value_from_sample(watcher, sample);
