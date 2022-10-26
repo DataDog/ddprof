@@ -11,7 +11,7 @@
 
 // Defines how a sample is aggregated when it is received
 enum class EventConfMode {
-  kNone = 0,
+  kDisabled = 0,
   kGraph = 1 << 0,
   kMetric = 1 << 1,
   kAll = kGraph | kMetric,

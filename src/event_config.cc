@@ -20,5 +20,5 @@ EventConfMode operator&(const EventConfMode &A, const EventConfMode &B) {
 
 // Bitmask inclusion
 bool operator<=(const EventConfMode A, const EventConfMode B) {
-  return EventConfMode::kNone != ((EventConfMode::kAll & A) & B);
+  return EventConfMode::kDisabled != ((EventConfMode::kAll & A) & B);
 }

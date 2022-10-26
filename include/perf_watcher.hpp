@@ -18,7 +18,7 @@ enum class PerfWatcherUseKernel {
 
 enum class PerfWatcherValueSource {
   kSample = 0, // use the "default" sample value (sample->period)
-  kRegister    // use CPU register (specified in `reg`)
+  kRegister,   // use CPU register (specified in `reg`)
   kRaw,        // use raw event (specified by raw_*)
 };
 
@@ -26,7 +26,12 @@ enum class PerfWatcherMode {
   kDisabled = 0, // Should never actually be used!
   kCallgraph = 1 << 0,
   kMetric = 1 << 1,
+  kAll = kCallgraph | kMetric,
 };
+
+PerfWatcherMode &operator|=(PerfWatcherMode &A, const PerfWatcherMode &B);
+PerfWatcherMode operator&(const PerfWatcherMode &A, const PerfWatcherMode &B);
+bool operator<=(const PerfWatcherMode A, const PerfWatcherMode B);
 
 struct PerfWatcherOptions {
   PerfWatcherUseKernel use_kernel;
@@ -64,10 +69,10 @@ struct PerfWatcher {
   // Other configs
   bool suppress_pid;
   bool suppress_tid;
-  int pprof_sample_idx;       // index into the SampleType in the pprof
-  int pprof_count_sample_idx; // index into the pprof for the count
-  int output_mode;            // how to save the data
-} PerfWatcher;
+  int pprof_sample_idx;        // index into the SampleType in the pprof
+  int pprof_count_sample_idx;  // index into the pprof for the count
+  PerfWatcherMode output_mode; // how to save the data
+};
 
 // The Datadog backend only understands pre-configured event types.  Those
 // types are defined here, and then referenced in the watcher
@@ -101,8 +106,8 @@ enum DDProfCustomCountId { kDDPROF_COUNT_ALLOCATIONS = 0 };
 #define IS_FREQ                                                                \
   { .is_freq = true }
 
-#define USE_KERNEL \
-  { .use_kernel = PerfWatcherUserKernel::kRequired}
+#define USE_KERNEL                                                             \
+  { .use_kernel = PerfWatcherUseKernel::kRequired }
 
 #ifdef DDPROF_OPTIM
 #  define NB_FRAMES_TO_SKIP 4

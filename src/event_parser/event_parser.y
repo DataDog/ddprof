@@ -23,7 +23,7 @@ extern YY_BUFFER_STATE yy_scan_string(const char * str);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
 
 EventConfMode mode_from_str(const std::string &str) {
-  EventConfMode mode = EventConfMode::kNone;
+  EventConfMode mode = EventConfMode::kDisabled;
   if (str.empty())
     return mode;
 

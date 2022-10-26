@@ -10,6 +10,25 @@
 #include <stddef.h>
 #include <string.h>
 
+PerfWatcherMode &operator|=(PerfWatcherMode &A, const PerfWatcherMode &B) {
+  A = static_cast<PerfWatcherMode>(
+      (static_cast<unsigned>(A) | static_cast<unsigned>(B)) &
+      static_cast<unsigned>(PerfWatcherMode::kAll));
+  return A;
+}
+
+PerfWatcherMode operator&(const PerfWatcherMode &A, const PerfWatcherMode &B) {
+  // & on bitmask enums is valid only in the space spanned by the values
+  return static_cast<PerfWatcherMode>(
+      static_cast<uint64_t>(A) & static_cast<uint64_t>(B) &
+      static_cast<uint64_t>(PerfWatcherMode::kAll));
+}
+
+// Bitmask inclusion
+bool operator<=(const PerfWatcherMode A, const PerfWatcherMode B) {
+  return PerfWatcherMode::kDisabled != ((PerfWatcherMode::kAll & A) & B);
+}
+
 #define BASE_STYPES                                                            \
   (PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_TID |          \
    PERF_SAMPLE_TIME | PERF_SAMPLE_PERIOD)

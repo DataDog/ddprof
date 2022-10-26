@@ -127,9 +127,9 @@ void log_watcher(const PerfWatcher *w, int n) {
   else
     PRINT_NFO("    Cadence: Period, Period: %lu", w->sample_period);
 
-  if (w->output_mode & PerfWatcherMode::kCallgraph)
+  if (PerfWatcherMode::kCallgraph <= w->output_mode)
     PRINT_NFO("    Outputting to callgraph (flamegraph)");
-  if (w->output_mode & PerfWatcherMode::kMetric)
+  if (PerfWatcherMode::kMetric <= w->output_mode)
     PRINT_NFO("    Outputting to metric");
 }
 

@@ -166,7 +166,7 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   // always default to callgraph mode
   watcher->output_mode = PerfWatcherMode::kCallgraph;
   if (EventConfMode::kAll <= conf->mode) {
-    watcher->output_mode = 0;
+    watcher->output_mode = PerfWatcherMode::kDisabled;
     if (EventConfMode::kGraph <= conf->mode)
       watcher->output_mode |= PerfWatcherMode::kCallgraph;
     if (EventConfMode::kMetric <= conf->mode)
