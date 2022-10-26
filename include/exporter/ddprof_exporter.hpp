@@ -9,6 +9,7 @@
 #include "ddres_def.hpp"
 #include "exporter_input.hpp"
 #include "perf_watcher.hpp"
+#include "noisy_neighbors.hpp"
 #include "string_view.hpp"
 #include "tags.hpp"
 
@@ -30,6 +31,7 @@ typedef struct DDProfExporter {
   int32_t _nb_consecutive_errors;
   int64_t _last_pprof_size;
   nlohmann::json timeline_data;
+  std::unique_ptr<NoisyNeighbors> noisy_neighbors;
 } DDProfExporter;
 
 DDRes ddprof_exporter_init(const ExporterInput *exporter_input,

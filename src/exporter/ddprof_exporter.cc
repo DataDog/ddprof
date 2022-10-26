@@ -23,6 +23,10 @@
 #include <unistd.h>
 #include <vector>
 
+#include <fstream>
+#include <sstream>
+#include <ostream>
+
 static const int k_timeout_ms = 10000;
 static const int k_size_api_key = 32;
 
@@ -75,8 +79,7 @@ static DDRes write_pprof_file(const ddog_EncodedProfile *encoded_profile,
 
 DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
                            DDProfExporter *exporter) {
-//  exporter = {};
-  memset(exporter, 0, sizeof(DDProfExporter));
+  *exporter = {};
 
   DDRES_CHECK_FWD(exporter_input_copy(exporter_input, &exporter->_input));
   // if we have an API key we assume we are heading for intake (slightly
@@ -271,10 +274,33 @@ DDRes ddprof_exporter_export(const ddog_Profile *profile,
 
     LG_NTC("[EXPORTER] Export buffer of size %lu", profile_data.len);
 
+    uint64_t json_start = start.seconds*1e9 + start.nanoseconds;
+    uint64_t json_end = end.seconds*1e9 + end.nanoseconds;
+    nlohmann::json ret = exporter->noisy_neighbors->finalize(json_end);
+    ret["timeRange"]["startNs"] = json_start;
+    ret["timeRange"]["endNs"] = json_end;
+
+    std::ofstream jsoncpy("/tmp/noisy.timeline.json");
+    std::stringstream timeline_json = {};
+    timeline_json << ret;
+    std::string json_str = timeline_json.str();
+    jsoncpy << json_str;
+
+    ddog_ByteSlice timeline_data {
+      .ptr = (const uint8_t*)json_str.c_str(),
+      .len = json_str.size(),
+    };
+
+    // Now reset the noisy neighbor state
+    exporter->noisy_neighbors->clear();
+
     // Backend has some logic based on the following naming
     ddog_File files_[] = {{
         .name = to_CharSlice("auto.pprof"),
         .file = profile_data,
+    }, {
+        .name = to_CharSlice("timeline.json"),
+        .file = timeline_data,
     }};
     ddog_Slice_file files = {.ptr = files_, .len = std::size(files_)};
 

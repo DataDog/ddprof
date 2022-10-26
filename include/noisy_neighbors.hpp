@@ -1,0 +1,147 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the Apache License Version 2.0. This product includes software
+// developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
+// Datadog, Inc.
+
+#pragma once
+
+#include <algorithm>
+#include <vector>
+#include <unordered_map>
+#include <set>
+#include <string>
+
+#include <nlohmann/json.hpp>
+
+struct NoisyNeighborCpu {
+  std::vector<uint64_t> time_start;
+  std::vector<uint64_t> time_end;
+  std::vector<pid_t> pid;
+
+  void pid_on(pid_t p, uint64_t t) {
+    if (!pid.empty() && pid.back() == p)
+      return; // nothing to do
+    else if (!pid.empty() && pid.back() != p && pid.back() != 0) {
+      // Replacing a PID; invalidate old one
+      time_end.push_back(t);
+    }
+
+    pid.push_back(p);
+    time_start.push_back(t);
+  };
+
+  void pid_off(pid_t p, uint64_t t) {
+    // 1. p is not the latest PID, we missed something.  Invalidate the old one
+    // 2. p is the latest PID, invalidate it
+    // Either way it's the same, as long as the old PID isn't 0
+    if (!pid.empty() && pid.back() != p) {
+      time_end.push_back(t);
+      pid.push_back(0);
+      time_start.push_back(t);
+    }
+  };
+
+  void clear() {
+    time_start.clear();
+    time_end.clear();
+    pid.clear();
+  }
+};
+
+struct NoisyNeighbors {
+  std::vector<NoisyNeighborCpu> T;
+
+  NoisyNeighbors(int n) { 
+    for (int i = 0; i < n; i++)
+      T.push_back(NoisyNeighborCpu{});
+  }
+
+  void pid_on(pid_t p, unsigned cpu, uint64_t t) {
+    if (cpu < T.size())
+      T[cpu].pid_on(p, t);
+  };
+
+  void pid_off(pid_t p, unsigned cpu, uint64_t t) {
+    if (cpu < T.size())
+      T[cpu].pid_off(p, t);
+  }
+
+  nlohmann::json finalize(uint64_t t) {
+    nlohmann::json ret{};
+    std::vector<pid_t> pidtable = {};
+    ret["threads"] = nlohmann::json::array();
+    ret["timeRange"] = nlohmann::json::object();
+    ret["timeRange"]["endNs"] = t;
+    ret["timeRange"]["startNs"] = t;
+    for (size_t i = 0; i < T.size(); i++) {
+      // Populate placeholders.  We do this without checking size since we
+      // want a blank entry for idle cores
+      ret["threads"][i] = nlohmann::json::array();
+
+      // First, check this CPU to see if it has a better start time.
+      if (!T[i].time_start.empty() && T[i].time_start[0] < ret["timeRange"]["startNs"])
+        ret["timeRange"]["startNs"] = T[i].time_start[0];
+
+      // Iterate through entries
+      for (size_t j = 0; j < T[i].pid.size(); j++) {
+        pid_t this_pid = T[i].pid[j];
+        size_t idx_pid = -1ull;
+        auto loc = std::find(pidtable.begin(), pidtable.end(), this_pid);
+        if (loc != pidtable.end()) {
+          idx_pid = loc - pidtable.begin();
+        } else {
+          idx_pid = pidtable.size();
+          pidtable.push_back(this_pid);
+        }
+
+        ret["threads"][i][j]["stack"] = nlohmann::json::array();
+        ret["threads"][i][j]["stack"][0] = idx_pid;
+        ret["threads"][i][j]["startNs"] = T[i].time_start[j];
+
+        if (T[i].time_start.size() == T[i].time_end.size())
+          ret["threads"][i][j]["endNs"] = T[i].time_end[j];
+        else
+          ret["threads"][i][j]["endNs"] = t;
+
+        if (T[i].pid[j] != 0)
+          ret["threads"][i][j]["label"] = "ACTIVE";
+        else
+          ret["threads"][i][j]["label"] = "INACTIVE";
+      }
+    }
+
+    // Now that we've gone through everything, fill in the symbol table
+    ret["strings"] = nlohmann::json::array();
+    ret["frames"] = nlohmann::json::array();
+    for (auto &s : pidtable) {
+      if (s == 0)
+        ret["strings"].push_back("Idle");
+      else
+        ret["strings"].push_back(std::to_string(s));
+    }
+
+    // Add some helpful entries to the pidtable
+    size_t path_idx = ret["strings"].size();
+    ret["strings"].push_back("unknown.cpp");
+    size_t pkg_idx = ret["strings"].size();
+    ret["strings"].push_back("libwhatever.so");
+    size_t class_idx = ret["strings"].size();
+    ret["strings"].push_back("IHaveNoClass");
+
+    for (size_t i = 0; i < pidtable.size(); i++) {
+      ret["frames"].push_back(nlohmann::json::array());
+      ret["frames"][i].push_back(path_idx);
+      ret["frames"][i].push_back(pkg_idx);
+      ret["frames"][i].push_back(class_idx);
+      ret["frames"][i].push_back(i);
+      ret["frames"][i].push_back(-1);
+    }
+
+    return ret;
+  };
+
+  void clear() {
+    for (auto &t : T)
+      t.clear();
+  };
+};
