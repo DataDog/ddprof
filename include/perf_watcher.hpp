@@ -53,7 +53,7 @@ struct PerfWatcher {
   // perf_event_open configs
   struct PerfWatcherOptions options;
   // tracepoint configuration
-  PerfWatcherLocation loc_type; // defines how to normalize the sample value
+  PerfWatcherValueSource value_source; // how to normalize the sample value
   uint8_t regno;
   uint8_t raw_off;
   uint8_t raw_sz;

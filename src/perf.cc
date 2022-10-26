@@ -177,7 +177,7 @@ all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras) {
 uint64_t perf_value_from_sample(const PerfWatcher *watcher,
                                 const perf_event_sample *sample) {
   uint64_t val = 0;
-  if (watcher->loc_type == PerfWatcherValueSource::kRaw) {
+  if (watcher->value_source == PerfWatcherValueSource::kRaw) {
     if (PERF_SAMPLE_RAW & watcher->sample_type) {
       uint64_t raw_offset = watcher->raw_off;
       uint64_t raw_sz = watcher->raw_sz;
@@ -192,13 +192,13 @@ uint64_t perf_value_from_sample(const PerfWatcher *watcher,
     }
   }
   // Register value
-  if (watcher->loc_type == PerfWatcherValueSource::kRegister) {
+  if (watcher->value_source == PerfWatcherValueSource::kRegister) {
     memcpy(&val, &sample->regs[watcher->regno], sizeof(uint64_t));
     return val;
   }
 
   // period by default
-  assert(watcher->loc_type == PerfWatcherValueSource::kSample &&
+  assert(watcher->value_source == PerfWatcherValueSource::kSample &&
          "All watcher types were considered");
   return sample->period;
 }

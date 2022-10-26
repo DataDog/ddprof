@@ -146,17 +146,17 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   }
 
   // Configure value normalization
-  if (conf->loc_type == EventConfLocationType::kRaw) {
-    watcher->loc_type = PerfWatcherValueSource::kRaw;
+  if (conf->value_source == EventConfValueSource::kRaw) {
+    watcher->value_source = PerfWatcherValueSource::kRaw;
     watcher->sample_type |= PERF_SAMPLE_RAW;
     watcher->raw_off = conf->arg_offset;
     if (conf->arg_size > 0)
       watcher->raw_sz = conf->arg_size;
     else
       watcher->raw_sz = sizeof(uint64_t); // default raw entry
-  } else if (conf->loc_type == EventConfLocationType::kRegister) {
+  } else if (conf->value_source == EventConfValueSource::kRegister) {
     watcher->regno = conf->register_num;
-    watcher->loc_type = PerfWatcherValueSource::kRegister;
+    watcher->value_source = PerfWatcherValueSource::kRegister;
   }
 
   if (conf->arg_coeff != 0.0)

@@ -81,11 +81,11 @@ void conf_print(const EventConf *tp) {
   printf("  type: %s\n", modenames[static_cast<unsigned>(tp->mode)]);
 
 
-  if (tp->loc_type  == EventConfLocationType::kDefault)
+  if (tp->value_source  == EventConfValueSource::kDefault)
     printf("  location: value\n");
-  else if (tp->loc_type == EventConfLocationType::kRegister)
+  else if (tp->value_source == EventConfValueSource::kRegister)
     printf("  location: register (%d)\n", tp->register_num);
-  else if (tp->loc_type == EventConfLocationType::kRaw)
+  else if (tp->value_source == EventConfValueSource::kRaw)
     printf("  location: raw event (%lu with size %d bytes)\n", tp->arg_offset, tp->arg_size);
 
   if (tp->arg_coeff != 0)
@@ -232,12 +232,12 @@ opt:
          case EventConfField::kRegister:
          case EventConfField::kArgOffset:
            // If the location type has already been set, then this is an error.
-           if (g_accum_event_conf.loc_type != EventConfLocationType::kDefault) {
+           if (g_accum_event_conf.value_source != EventConfValueSource::kDefault) {
              VAL_ERROR();
              break;
            }
            if ($$ == EventConfField::kParameter) {
-             g_accum_event_conf.loc_type = EventConfLocationType::kRegister;
+             g_accum_event_conf.value_source = EventConfValueSource::kRegister;
              unsigned int regno = param_to_perf_regno($3);
              if (regno == -1u) {
                VAL_ERROR();
@@ -250,11 +250,11 @@ opt:
                VAL_ERROR();
                break;
              }
-             g_accum_event_conf.loc_type = EventConfLocationType::kRegister;
+             g_accum_event_conf.value_source = EventConfValueSource::kRegister;
              g_accum_event_conf.register_num = $3;
            }
            if ($$ == EventConfField::kArgOffset) {
-             g_accum_event_conf.loc_type = EventConfLocationType::kRaw;
+             g_accum_event_conf.value_source = EventConfValueSource::kRaw;
              g_accum_event_conf.arg_offset = $3;
            }
            break;

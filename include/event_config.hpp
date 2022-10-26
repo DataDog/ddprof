@@ -22,7 +22,7 @@ EventConfMode operator&(const EventConfMode &A, const EventConfMode &B);
 bool operator<=(const EventConfMode A, const EventConfMode B); // inclusion
 
 // Defines how samples are weighted
-enum class EventConfLocationType {
+enum class EventConfValueSource {
   kDefault = 0,  // Use sample value from perf events
   kRegister = 1, // Use the register from `register_num`
   kRaw = 2,      // Use the offset/size for raw event
@@ -126,7 +126,7 @@ struct EventConf {
   std::string groupname;
   std::string label;
 
-  EventConfLocationType loc_type;
+  EventConfValueSource value_source;
   uint8_t register_num;
   uint8_t arg_size;
   uint64_t arg_offset;
