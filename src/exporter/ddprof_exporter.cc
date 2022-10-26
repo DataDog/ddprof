@@ -280,6 +280,10 @@ DDRes ddprof_exporter_export(const ddog_Profile *profile,
     ret["timeRange"]["startNs"] = json_start;
     ret["timeRange"]["endNs"] = json_end;
 
+    // Also add a version tag
+    if (exporter->_input.service_version)
+      ret["version"] = exporter->_input.service_version;
+
     std::ofstream jsoncpy("/tmp/noisy.timeline.json");
     std::stringstream timeline_json = {};
     timeline_json << ret;

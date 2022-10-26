@@ -69,14 +69,16 @@ struct NoisyNeighbors {
   nlohmann::json finalize(uint64_t t) {
     nlohmann::json ret{};
     std::vector<pid_t> pidtable = {};
-    ret["threads"] = nlohmann::json::array();
+    std::vector<std::string> thread_names = {};
+    ret["threads"] = nlohmann::json::object();
     ret["timeRange"] = nlohmann::json::object();
     ret["timeRange"]["endNs"] = t;
     ret["timeRange"]["startNs"] = t;
     for (size_t i = 0; i < T.size(); i++) {
       // Populate placeholders.  We do this without checking size since we
       // want a blank entry for idle cores
-      ret["threads"][i] = nlohmann::json::array();
+      thread_names.push_back("CPU_" + std::to_string(i));
+      ret["threads"][thread_names.back()] = nlohmann::json::array();
 
       // First, check this CPU to see if it has a better start time.
       if (!T[i].time_start.empty() && T[i].time_start[0] < ret["timeRange"]["startNs"])
@@ -94,19 +96,19 @@ struct NoisyNeighbors {
           pidtable.push_back(this_pid);
         }
 
-        ret["threads"][i][j]["stack"] = nlohmann::json::array();
-        ret["threads"][i][j]["stack"][0] = idx_pid;
-        ret["threads"][i][j]["startNs"] = T[i].time_start[j];
+        ret["threads"][thread_names.back()][j]["stack"] = nlohmann::json::array();
+        ret["threads"][thread_names.back()][j]["stack"][0] = idx_pid;
+        ret["threads"][thread_names.back()][j]["startNs"] = T[i].time_start[j];
 
         if (T[i].time_start.size() == T[i].time_end.size())
-          ret["threads"][i][j]["endNs"] = T[i].time_end[j];
+          ret["threads"][thread_names.back()][j]["endNs"] = T[i].time_end[j];
         else
-          ret["threads"][i][j]["endNs"] = t;
+          ret["threads"][thread_names.back()][j]["endNs"] = t;
 
         if (T[i].pid[j] != 0)
-          ret["threads"][i][j]["label"] = "ACTIVE";
+          ret["threads"][thread_names.back()][j]["label"] = "ACTIVE";
         else
-          ret["threads"][i][j]["label"] = "INACTIVE";
+          ret["threads"][thread_names.back()][j]["label"] = "INACTIVE";
       }
     }
 
