@@ -181,13 +181,17 @@ uint64_t perf_value_from_sample(const PerfWatcher *watcher,
     if (PERF_SAMPLE_RAW & watcher->sample_type) {
       uint64_t raw_offset = watcher->raw_off;
       uint64_t raw_sz = watcher->raw_sz;
-      assert(raw_sz + raw_offset <= sample->size_raw && "Raw access fits");
+      if (raw_sz + raw_offset <= sample->size_raw) {
+        assert(0 && "Overflow in raw event access");
+        LG_WRN("Overflow in raw event access");
+        return 0;
+      }
       memcpy(&val, sample->data_raw + raw_offset, raw_sz);
       return val;
     } else { // unexpected config
       assert(0 && "Inconsistent raw config between watcher and perf event");
       LG_WRN("Unexpected watcher configuration -- No Raw events");
-      return val;
+      return 0;
     }
   }
   // Register value
