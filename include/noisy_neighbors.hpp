@@ -86,6 +86,12 @@ struct NoisyNeighbors {
     size_t class_idx = ret["strings"].size();
     ret["strings"].push_back("IHaveNoClass");
 
+    // Later on we'll refactor this properly, but for now just cheat.
+    size_t active_idx= ret["strings"].size();
+    ret["strings"].push_back("ACTIVE");
+    size_t inactive_idx= ret["strings"].size();
+    ret["strings"].push_back("INACTIVE");
+
     for (size_t i = 0; i < T.size(); i++) {
       // Populate placeholders.  We do this without checking size since we
       // want a blank entry for idle cores
@@ -122,9 +128,9 @@ struct NoisyNeighbors {
           ret["threads"][thread_names.back()][j]["endNs"] = t;
 
         if (T[i].pid[j] != 0)
-          ret["threads"][thread_names.back()][j]["label"] = "ACTIVE";
+          ret["threads"][thread_names.back()][j]["label"] = active_idx;
         else
-          ret["threads"][thread_names.back()][j]["label"] = "INACTIVE";
+          ret["threads"][thread_names.back()][j]["label"] = inactive_idx;
       }
     }
 
