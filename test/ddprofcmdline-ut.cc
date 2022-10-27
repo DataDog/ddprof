@@ -101,7 +101,7 @@ TEST(CmdLineTst, ParserKeyPatterns) {
 
   // s|arg_scale|scale
   ASSERT_TRUE(watcher_from_str("e=hCPU s=1", &watcher));
-  ASSERT_TRUE(watcher_from_str("e=hCPU arg_scale=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU value_scale=1", &watcher));
   ASSERT_TRUE(watcher_from_str("e=hCPU scale=1", &watcher));
 
   // Scale be floats and/or have sign, be zero
@@ -223,12 +223,12 @@ TEST(CmdLineTst, ParserKeyPatterns) {
   // ... but it CAN be a hex uint because all uints can be
   ASSERT_TRUE(watcher_from_str("e=hCPU n=0x01", &watcher));
 
-  // o|arg_offset|argoff
+  // o|raw_offset|rawoff
   ASSERT_TRUE(watcher_from_str("e=hCPU o=0", &watcher));
-  ASSERT_TRUE(watcher_from_str("e=hCPU argoff=0", &watcher));
-  ASSERT_TRUE(watcher_from_str("e=hCPU arg_offset=0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU rawoff=0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU raw_offset=0", &watcher));
 
-  // argoff is a uint.  If it has an upper bound, I don't know what it is yet.
+  // rawoff is a uint.  If it has an upper bound, I don't know what it is yet.
   ASSERT_FALSE(watcher_from_str("e=hCPU o=1.0", &watcher));
   ASSERT_FALSE(watcher_from_str("e=hCPU o=-1", &watcher));
   ASSERT_FALSE(watcher_from_str("e=hCPU o=rax", &watcher));
@@ -258,16 +258,15 @@ TEST(CmdLineTst, ParserKeyPatterns) {
   // ... but is still bounded by the architecture
   ASSERT_FALSE(watcher_from_str("e=hCPU r=100", &watcher));
 
-  // z|arg_size|argsz
+  // z|raw_size|rawsz
   ASSERT_TRUE(watcher_from_str("e=hCPU z=4", &watcher));
-  ASSERT_TRUE(watcher_from_str("e=hCPU argsz=4", &watcher));
-  ASSERT_TRUE(watcher_from_str("e=hCPU arg_size=4", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU rawsz=4", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU raw_size=4", &watcher));
 
-  // Technically argsz should be cosntrained to common int types, but we
-  // don't care yet.
-  ASSERT_TRUE(watcher_from_str("e=hCPU z=0", &watcher));
+  // We do some, but not a lot, of checking for int sizes
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=0", &watcher));
   ASSERT_TRUE(watcher_from_str("e=hCPU z=3", &watcher));
-  ASSERT_TRUE(watcher_from_str("e=hCPU z=12", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=12", &watcher));
 }
 
 TEST(CmdLineTst, LastEventHit) {

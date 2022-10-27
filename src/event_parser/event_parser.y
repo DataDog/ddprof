@@ -209,7 +209,7 @@ opt:
        // FIXME TODO HACK
        // As a temporary measure, we're allowing integers to be negative ONLY
        // for the period.
-       if ($3 < 0 && $$ != EventConfField::kPeriod && $$ != EventConfField::kArgScale) {
+       if ($3 < 0 && $$ != EventConfField::kPeriod && $$ != EventConfField::kValueScale) {
          VAL_ERROR();
          break;
        }
@@ -217,7 +217,7 @@ opt:
          case EventConfField::kId:
            g_accum_event_conf.id = $3;
            break;
-         case EventConfField::kArgSize:
+         case EventConfField::kRawSize:
            // sz without a valid offset is ignored?
            if ($3 > 8 || $3 == 0) {
              VAL_ERROR();
@@ -225,7 +225,7 @@ opt:
            }
            g_accum_event_conf.raw_size= $3;
            break;
-         case EventConfField::kArgScale:
+         case EventConfField::kValueScale:
            g_accum_event_conf.value_scale = 0.0 + $3;
            break;
          case EventConfField::kMode:
@@ -234,7 +234,7 @@ opt:
 
          case EventConfField::kParameter:
          case EventConfField::kRegister:
-         case EventConfField::kArgOffset:
+         case EventConfField::kRawOffset:
            // If the location type has already been set, then this is an error.
            if (g_accum_event_conf.value_source != EventConfValueSource::kSample) {
              VAL_ERROR();
@@ -257,7 +257,7 @@ opt:
              g_accum_event_conf.value_source = EventConfValueSource::kRegister;
              g_accum_event_conf.register_num = $3;
            }
-           if ($$ == EventConfField::kArgOffset) {
+           if ($$ == EventConfField::kRawOffset) {
              g_accum_event_conf.value_source = EventConfValueSource::kRaw;
              g_accum_event_conf.raw_offset = $3;
            }
@@ -282,7 +282,7 @@ opt:
        }
      }
      | KEY EQ FLOAT {
-       if ($$ == EventConfField::kArgScale)
+       if ($$ == EventConfField::kValueScale)
          g_accum_event_conf.value_scale = $3;
        else
          VAL_ERROR();

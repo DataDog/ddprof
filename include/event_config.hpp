@@ -60,18 +60,18 @@ enum class EventConfField {
   /*
    *  None is an invalid event type used to fence uninitialized values.
    */
-  kArgScale,
+  kValueScale,
   /*
-   *  ArgScale defines a real-valued coefficient which is used to scale the
+   *  ValueScale defines a real-valued coefficient which is used to scale the
    *  sample value when the correspond watcher is retrieved.  This is useful
    *  because multiple tracepoints may be globbed together in the Profiling
    *  UX and individual watchers therein may need to be scaled differently
    *  (e.g., mmap and munmap together although this is a bad example).
    */
-  kArgOffset,
-  kArgSize,
+  kRawOffset,
+  kRawSize,
   /*
-   *  ArgOffset and ArgSize are only valid for watchers where perf_event_open
+   *  RawOffset and RawSize are only valid for watchers where perf_event_open
    *  will generate raw event data.  Raw data is sent as a byte buffer, so
    *  the offset and size are needed to extract the desired (integral!) value
    *  from the buffer.
