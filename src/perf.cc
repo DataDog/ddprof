@@ -214,8 +214,7 @@ uint64_t perf_value_from_sample(const PerfWatcher *watcher,
   }
   // Register value
   if (watcher->value_source == EventConfValueSource::kRegister) {
-    memcpy(&val, &sample->regs[watcher->regno], sizeof(uint64_t));
-    return val;
+    return sample->regs[watcher->regno];
   }
 
   // period by default

@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <array> // for std::size()
+
 // Architecture mapfile
 
 #ifdef __x86_64__
@@ -111,7 +113,7 @@ constexpr unsigned int dwarf_to_perf_regno(unsigned int i) {
 #endif
   };
 
-  if (i >= sizeof(lookup) / sizeof(*lookup)) {
+  if (i >= std::size(lookup)) {
     return -1u; // implicit sentinel value
   }
 
@@ -133,7 +135,7 @@ constexpr unsigned int param_to_perf_regno(unsigned int param_no) {
 #endif
 #undef R
 
-  if (!param_no || param_no >= sizeof(reg_lookup) / sizeof(*reg_lookup))
+  if (!param_no || param_no >= std::size(reg_lookup))
     return -1u;
 
   return reg_lookup[param_no];
