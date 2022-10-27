@@ -99,28 +99,28 @@ TEST(CmdLineTst, ParserKeyPatterns) {
   ASSERT_TRUE(watcher_from_str("e=hCPU l=myLabel", &watcher));
   ASSERT_FALSE(watcher_from_str("l=myLabel", &watcher));
 
-  // c|arg_coeff|coeff
-  ASSERT_TRUE(watcher_from_str("e=hCPU c=1", &watcher));
-  ASSERT_TRUE(watcher_from_str("e=hCPU arg_coeff=1", &watcher));
-  ASSERT_TRUE(watcher_from_str("e=hCPU coeff=1", &watcher));
+  // s|arg_scale|scale
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU arg_scale=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU scale=1", &watcher));
 
-  // Coefficients can be floats and/or have sign, be zero
-  ASSERT_TRUE(watcher_from_str("e=hCPU c=1.0", &watcher));
-  ASSERT_TRUE(watcher_from_str("e=hCPU c=+1", &watcher));
-  ASSERT_TRUE(watcher_from_str("e=hCPU c=-1", &watcher));
-  ASSERT_TRUE(watcher_from_str("e=hCPU c=+1.0", &watcher));
-  ASSERT_TRUE(watcher_from_str("e=hCPU c=-1.0", &watcher));
-  ASSERT_TRUE(watcher_from_str("e=hCPU c=0", &watcher));
-  ASSERT_TRUE(watcher_from_str("e=hCPU c=+0", &watcher));
-  ASSERT_TRUE(watcher_from_str("e=hCPU c=-0", &watcher));
-  ASSERT_TRUE(watcher_from_str("e=hCPU c=+0.0", &watcher));
-  ASSERT_TRUE(watcher_from_str("e=hCPU c=-0.0", &watcher));
+  // Scale be floats and/or have sign, be zero
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=1.0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=+1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=-1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=+1.0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=-1.0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=+0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=-0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=+0.0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=-0.0", &watcher));
 
-  // but it is too weird for coefficients to be given in hex?
-  ASSERT_FALSE(watcher_from_str("e=hCPU c=0x0f", &watcher));
+  // but it is too weird for scale to be given in hex?
+  ASSERT_FALSE(watcher_from_str("e=hCPU s=0x0f", &watcher));
 
   // Floats can't be exponentials
-  ASSERT_FALSE(watcher_from_str("e=hCPU c=1e1", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU s=1e1", &watcher));
 
   // f|frequency|freq
   ASSERT_TRUE(watcher_from_str("e=hCPU f=1", &watcher));
