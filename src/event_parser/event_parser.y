@@ -35,7 +35,7 @@ EventConfMode mode_from_str(const std::string &str) {
     if (m_str.find(c) != std::string::npos)
       mode |= EventConfMode::kMetric;
     if (g_str.find(c) != std::string::npos)
-      mode |= EventConfMode::kGraph;
+      mode |= EventConfMode::kCallgraph;
     if (a_str.find(c) != std::string::npos)
       mode |= EventConfMode::kAll;
   }
@@ -81,7 +81,7 @@ void conf_print(const EventConf *tp) {
   printf("  type: %s\n", modenames[static_cast<unsigned>(tp->mode)]);
 
 
-  if (tp->value_source  == EventConfValueSource::kDefault)
+  if (tp->value_source  == EventConfValueSource::kSample)
     printf("  location: value\n");
   else if (tp->value_source == EventConfValueSource::kRegister)
     printf("  location: register (%d)\n", tp->register_num);
@@ -232,7 +232,7 @@ opt:
          case EventConfField::kRegister:
          case EventConfField::kArgOffset:
            // If the location type has already been set, then this is an error.
-           if (g_accum_event_conf.value_source != EventConfValueSource::kDefault) {
+           if (g_accum_event_conf.value_source != EventConfValueSource::kSample) {
              VAL_ERROR();
              break;
            }

@@ -10,25 +10,6 @@
 #include <stddef.h>
 #include <string.h>
 
-PerfWatcherMode &operator|=(PerfWatcherMode &A, const PerfWatcherMode &B) {
-  A = static_cast<PerfWatcherMode>(
-      (static_cast<unsigned>(A) | static_cast<unsigned>(B)) &
-      static_cast<unsigned>(PerfWatcherMode::kAll));
-  return A;
-}
-
-PerfWatcherMode operator&(const PerfWatcherMode &A, const PerfWatcherMode &B) {
-  // & on bitmask enums is valid only in the space spanned by the values
-  return static_cast<PerfWatcherMode>(
-      static_cast<uint64_t>(A) & static_cast<uint64_t>(B) &
-      static_cast<uint64_t>(PerfWatcherMode::kAll));
-}
-
-// Bitmask inclusion
-bool operator<=(const PerfWatcherMode A, const PerfWatcherMode B) {
-  return PerfWatcherMode::kDisabled != ((PerfWatcherMode::kAll & A) & B);
-}
-
 #define BASE_STYPES                                                            \
   (PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_TID |          \
    PERF_SAMPLE_TIME | PERF_SAMPLE_PERIOD)
@@ -97,10 +78,8 @@ int str_to_event_idx(const char *str) {
 const PerfWatcher *ewatcher_from_idx(int idx) {
   if (idx < 0 || idx >= DDPROF_PWE_LENGTH)
     return NULL;
-  try {
-    static const PerfWatcher events[] = {EVENT_CONFIG_TABLE(X_EVENTS)};
-    return &events[idx];
-  } catch (...) { return WATCHER_FAILED; }
+  static const PerfWatcher events[] = {EVENT_CONFIG_TABLE(X_EVENTS)};
+  return &events[idx];
 }
 
 const PerfWatcher *ewatcher_from_str(const char *str) {
@@ -108,19 +87,17 @@ const PerfWatcher *ewatcher_from_str(const char *str) {
 }
 
 const PerfWatcher *tracepoint_default_watcher() {
-  try {
-    static const PerfWatcher tracepoint_template = {
-        .ddprof_event_type = DDPROF_PWE_TRACEPOINT,
-        .desc = "Tracepoint",
-        .sample_type = BASE_STYPES,
-        .type = PERF_TYPE_TRACEPOINT,
-        .sample_period = 1,
-        .sample_type_id = DDPROF_PWT_TRACEPOINT,
-        .options = {.use_kernel = PerfWatcherUseKernel::kRequired},
-        .value_coefficient = 1.0,
-    };
-    return &tracepoint_template;
-  } catch (...) { return WATCHER_FAILED; }
+  static const PerfWatcher tracepoint_template = {
+      .ddprof_event_type = DDPROF_PWE_TRACEPOINT,
+      .desc = "Tracepoint",
+      .sample_type = BASE_STYPES,
+      .type = PERF_TYPE_TRACEPOINT,
+      .sample_period = 1,
+      .sample_type_id = DDPROF_PWT_TRACEPOINT,
+      .options = {.use_kernel = PerfWatcherUseKernel::kRequired},
+      .value_coefficient = 1.0,
+  };
+  return &tracepoint_template;
 }
 
 bool watcher_has_tracepoint(const PerfWatcher *watcher) {

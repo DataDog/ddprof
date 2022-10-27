@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "event_config.hpp"
+
 #include <string>
 
 #include <linux/perf_event.h>
@@ -16,23 +18,6 @@ enum class PerfWatcherUseKernel {
   kTry,      // On if possible, default to OFF on failure
 };
 
-enum class PerfWatcherValueSource {
-  kSample = 0, // use the "default" sample value (sample->period)
-  kRegister,   // use CPU register (specified in `reg`)
-  kRaw,        // use raw event (specified by raw_*)
-};
-
-enum class PerfWatcherMode {
-  kDisabled = 0, // Should never actually be used!
-  kCallgraph = 1 << 0,
-  kMetric = 1 << 1,
-  kAll = kCallgraph | kMetric,
-};
-
-PerfWatcherMode &operator|=(PerfWatcherMode &A, const PerfWatcherMode &B);
-PerfWatcherMode operator&(const PerfWatcherMode &A, const PerfWatcherMode &B);
-bool operator<=(const PerfWatcherMode A, const PerfWatcherMode B);
-
 struct PerfWatcherOptions {
   PerfWatcherUseKernel use_kernel;
   bool is_freq;
@@ -43,7 +28,6 @@ struct PerfWatcherOptions {
 
 struct PerfWatcher {
   int ddprof_event_type; // ddprof event type from DDPROF_EVENT_NAMES enum
-  std::string desc;
   uint64_t sample_type; // perf sample type: specifies values included in sample
   int type; // perf event type (software / hardware / tracepoint / ... or custom
             // for non-perf events)
@@ -58,11 +42,12 @@ struct PerfWatcher {
   // perf_event_open configs
   struct PerfWatcherOptions options;
   // tracepoint configuration
-  PerfWatcherValueSource value_source; // how to normalize the sample value
+  EventConfValueSource value_source; // how to normalize the sample value
   uint8_t regno;
   uint8_t raw_off;
   uint8_t raw_sz;
   double value_coefficient;
+  std::string desc;
   std::string tracepoint_event;
   std::string tracepoint_group;
   std::string tracepoint_label;
@@ -71,7 +56,7 @@ struct PerfWatcher {
   bool suppress_tid;
   int pprof_sample_idx;        // index into the SampleType in the pprof
   int pprof_count_sample_idx;  // index into the pprof for the count
-  PerfWatcherMode output_mode; // how to save the data
+  EventConfMode output_mode;   // how to save the data
 };
 
 // The Datadog backend only understands pre-configured event types.  Those

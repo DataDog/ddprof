@@ -12,9 +12,9 @@
 // Defines how a sample is aggregated when it is received
 enum class EventConfMode {
   kDisabled = 0,
-  kGraph = 1 << 0,
+  kCallgraph = 1 << 0,
   kMetric = 1 << 1,
-  kAll = kGraph | kMetric,
+  kAll = kCallgraph | kMetric,
 };
 
 EventConfMode &operator|=(EventConfMode &A, const EventConfMode &B);
@@ -23,7 +23,7 @@ bool operator<=(const EventConfMode A, const EventConfMode B); // inclusion
 
 // Defines how samples are weighted
 enum class EventConfValueSource {
-  kDefault = 0,  // Use sample value from perf events
+  kSample = 0,   // Use sample value (period) from perf events
   kRegister = 1, // Use the register from `register_num`
   kRaw = 2,      // Use the offset/size for raw event
 };

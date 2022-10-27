@@ -96,10 +96,7 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   // The watcher is templated; either from an existing Profiling template,
   // keyed on the eventname, or it uses the generic template for Tracepoints
   const PerfWatcher *tmp_watcher = ewatcher_from_str(conf->eventname.c_str());
-
-  if (WATCHER_FAILED == tmp_watcher) {
-    return false;
-  } else if (tmp_watcher) {
+  if (tmp_watcher) {
     *watcher = *tmp_watcher;
     conf->id = kIgnoredWatcherID; // matched, so invalidate Tracepoint checks
   } else if (!conf->groupname.empty()) {
@@ -145,9 +142,9 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
     }
   }
 
-  // Configure value normalization
+  // Configure value source
   if (conf->value_source == EventConfValueSource::kRaw) {
-    watcher->value_source = PerfWatcherValueSource::kRaw;
+    watcher->value_source = EventConfValueSource::kRaw;
     watcher->sample_type |= PERF_SAMPLE_RAW;
     watcher->raw_off = conf->arg_offset;
     if (conf->arg_size > 0)
@@ -156,7 +153,7 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
       watcher->raw_sz = sizeof(uint64_t); // default raw entry
   } else if (conf->value_source == EventConfValueSource::kRegister) {
     watcher->regno = conf->register_num;
-    watcher->value_source = PerfWatcherValueSource::kRegister;
+    watcher->value_source = EventConfValueSource::kRegister;
   }
 
   if (conf->arg_coeff != 0.0)
@@ -164,13 +161,9 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
 
   // The output mode isn't set as part of the configuration templates; we
   // always default to callgraph mode
-  watcher->output_mode = PerfWatcherMode::kCallgraph;
+  watcher->output_mode = EventConfMode::kCallgraph;
   if (EventConfMode::kAll <= conf->mode) {
-    watcher->output_mode = PerfWatcherMode::kDisabled;
-    if (EventConfMode::kGraph <= conf->mode)
-      watcher->output_mode |= PerfWatcherMode::kCallgraph;
-    if (EventConfMode::kMetric <= conf->mode)
-      watcher->output_mode |= PerfWatcherMode::kMetric;
+    watcher->output_mode = conf->mode;
   }
 
   watcher->tracepoint_event = conf->eventname;

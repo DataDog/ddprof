@@ -102,13 +102,13 @@ DDRes add_preset(DDProfContext *ctx, const char *preset,
 void log_watcher(const PerfWatcher *w, int n) {
   PRINT_NFO("    ID: %s, Pos: %d, Index: %lu", w->desc.c_str(), n, w->config);
   switch (w->value_source) {
-  case PerfWatcherValueSource::kSample:
+  case EventConfValueSource::kSample:
     PRINT_NFO("    Location: Sample");
     break;
-  case PerfWatcherValueSource::kRegister:
+  case EventConfValueSource::kRegister:
     PRINT_NFO("    Location: Register, regno: %d", w->regno);
     break;
-  case PerfWatcherValueSource::kRaw:
+  case EventConfValueSource::kRaw:
     PRINT_NFO("    Location: Raw event, offset: %d, size: %d", w->raw_off,
               w->raw_sz);
     break;
@@ -127,9 +127,9 @@ void log_watcher(const PerfWatcher *w, int n) {
   else
     PRINT_NFO("    Cadence: Period, Period: %lu", w->sample_period);
 
-  if (PerfWatcherMode::kCallgraph <= w->output_mode)
+  if (EventConfMode::kCallgraph <= w->output_mode)
     PRINT_NFO("    Outputting to callgraph (flamegraph)");
-  if (PerfWatcherMode::kMetric <= w->output_mode)
+  if (EventConfMode::kMetric <= w->output_mode)
     PRINT_NFO("    Outputting to metric");
 }
 
@@ -344,10 +344,6 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     // if there are no perf active watcher, add a dummy watcher to be notified
     // on process exit
     const PerfWatcher *tmpwatcher = ewatcher_from_str("sDUM");
-    if (WATCHER_FAILED == tmpwatcher || !tmpwatcher) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
-                             "Could not allocate storage for watcher template");
-    }
     ctx->watchers[ctx->num_watchers++] = *tmpwatcher;
   }
 
