@@ -219,6 +219,10 @@ opt:
            break;
          case EventConfField::kArgSize:
            // sz without a valid offset is ignored?
+           if ($3 > 8 || $3 == 0) {
+             VAL_ERROR();
+             break;
+           }
            g_accum_event_conf.raw_size= $3;
            break;
          case EventConfField::kArgScale:
