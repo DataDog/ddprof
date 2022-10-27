@@ -187,23 +187,23 @@ uint64_t perf_value_from_sample(const PerfWatcher *watcher,
         return 0;
       }
       switch (raw_sz) {
-        case 1:
-          val = *(uint8_t*)(sample->data_raw + raw_offset);
-          break;
-        case 2:
-          val = *(uint16_t*)(sample->data_raw + raw_offset);
-          break;
-        case 4:
-          val = *(uint32_t*)(sample->data_raw + raw_offset);
-          break;
-        case 8:
-          val = *(uint64_t*)(sample->data_raw + raw_offset);
-          break;
-        default:
-          assert(0 && "Non-integral size for raw value");
-          LG_WRN("Non-integral size for raw value");
-          val = 0;
-          break;
+      case 1:
+        val = *(uint8_t *)(sample->data_raw + raw_offset);
+        break;
+      case 2:
+        val = *(uint16_t *)(sample->data_raw + raw_offset);
+        break;
+      case 4:
+        val = *(uint32_t *)(sample->data_raw + raw_offset);
+        break;
+      case 8:
+        val = *(uint64_t *)(sample->data_raw + raw_offset);
+        break;
+      default:
+        assert(0 && "Non-integral size for raw value");
+        LG_WRN("Non-integral size for raw value");
+        val = 0;
+        break;
       }
       return val;
     } else { // unexpected config
