@@ -219,7 +219,7 @@ opt:
            break;
          case EventConfField::kRawSize:
            // sz without a valid offset is ignored?
-           if ($3 > 8 || $3 == 0) {
+           if ($3 != 1 && $3 != 2 && $3 != 4 && $3 != 8) {
              VAL_ERROR();
              break;
            }

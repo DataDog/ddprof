@@ -263,10 +263,21 @@ TEST(CmdLineTst, ParserKeyPatterns) {
   ASSERT_TRUE(watcher_from_str("e=hCPU rawsz=4", &watcher));
   ASSERT_TRUE(watcher_from_str("e=hCPU raw_size=4", &watcher));
 
-  // We do some, but not a lot, of checking for int sizes
+  // Check for allowed integer sizes
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=-1", &watcher));
   ASSERT_FALSE(watcher_from_str("e=hCPU z=0", &watcher));
-  ASSERT_TRUE(watcher_from_str("e=hCPU z=3", &watcher));
-  ASSERT_FALSE(watcher_from_str("e=hCPU z=12", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU z=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU z=2", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=3", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU z=4", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=5", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=6", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=7", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU z=8", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=9", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=16", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=32", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=64", &watcher));
 }
 
 TEST(CmdLineTst, LastEventHit) {
