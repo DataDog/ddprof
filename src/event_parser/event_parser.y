@@ -86,10 +86,10 @@ void conf_print(const EventConf *tp) {
   else if (tp->value_source == EventConfValueSource::kRegister)
     printf("  location: register (%d)\n", tp->register_num);
   else if (tp->value_source == EventConfValueSource::kRaw)
-    printf("  location: raw event (%lu with size %d bytes)\n", tp->arg_offset, tp->arg_size);
+    printf("  location: raw event (%lu with size %d bytes)\n", tp->raw_offset, tp->raw_size);
 
-  if (tp->arg_coeff != 0)
-    printf("  coefficient: %f\n", tp->arg_coeff);
+  if (tp->value_scale != 0)
+    printf("  scaling factor: %f\n", tp->value_scale);
 
   printf("\n");
 
@@ -209,7 +209,7 @@ opt:
        // FIXME TODO HACK
        // As a temporary measure, we're allowing integers to be negative ONLY
        // for the period.
-       if ($3 < 0 && $$ != EventConfField::kPeriod && $$ != EventConfField::kArgCoeff) {
+       if ($3 < 0 && $$ != EventConfField::kPeriod && $$ != EventConfField::kArgScale) {
          VAL_ERROR();
          break;
        }
@@ -219,10 +219,10 @@ opt:
            break;
          case EventConfField::kArgSize:
            // sz without a valid offset is ignored?
-           g_accum_event_conf.arg_size= $3;
+           g_accum_event_conf.raw_size= $3;
            break;
-         case EventConfField::kArgCoeff:
-           g_accum_event_conf.arg_coeff = 0.0 + $3;
+         case EventConfField::kArgScale:
+           g_accum_event_conf.value_scale = 0.0 + $3;
            break;
          case EventConfField::kMode:
            g_accum_event_conf.mode = static_cast<EventConfMode>($3) & EventConfMode::kAll;
@@ -255,7 +255,7 @@ opt:
            }
            if ($$ == EventConfField::kArgOffset) {
              g_accum_event_conf.value_source = EventConfValueSource::kRaw;
-             g_accum_event_conf.arg_offset = $3;
+             g_accum_event_conf.raw_offset = $3;
            }
            break;
 
@@ -278,8 +278,8 @@ opt:
        }
      }
      | KEY EQ FLOAT {
-       if ($$ == EventConfField::kArgCoeff)
-         g_accum_event_conf.arg_coeff = $3;
+       if ($$ == EventConfField::kArgScale)
+         g_accum_event_conf.value_scale = $3;
        else
          VAL_ERROR();
      }

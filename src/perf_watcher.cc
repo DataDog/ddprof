@@ -95,7 +95,7 @@ const PerfWatcher *tracepoint_default_watcher() {
       .sample_period = 1,
       .sample_type_id = DDPROF_PWT_TRACEPOINT,
       .options = {.use_kernel = PerfWatcherUseKernel::kRequired},
-      .value_coefficient = 1.0,
+      .value_scale = 1.0,
   };
   return &tracepoint_template;
 }

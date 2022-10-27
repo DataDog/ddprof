@@ -54,7 +54,7 @@ unsigned int tracepoint_id_from_event(const char *eventname,
     return 0;
 
   static char path[4096]; // Arbitrary, but path sizes limits are difficult
-  static char buf[64];    // For reading
+  static char buf[sizeof("4294967296")]; // For reading 32-bit decimal int
   char *buf_copy = buf;
   size_t pathsz =
       snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/id",
@@ -81,7 +81,7 @@ unsigned int tracepoint_id_from_event(const char *eventname,
 }
 
 // If this returns false, then the passed watcher should be regarded as invalid
-uint64_t kIgnoredWatcherID = -1ul;
+constexpr uint64_t kIgnoredWatcherID = -1ul;
 bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   EventConf *conf = EventConf_parse(str);
   if (!conf) {
@@ -146,9 +146,9 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   if (conf->value_source == EventConfValueSource::kRaw) {
     watcher->value_source = EventConfValueSource::kRaw;
     watcher->sample_type |= PERF_SAMPLE_RAW;
-    watcher->raw_off = conf->arg_offset;
-    if (conf->arg_size > 0)
-      watcher->raw_sz = conf->arg_size;
+    watcher->raw_off = conf->raw_offset;
+    if (conf->raw_size > 0)
+      watcher->raw_sz = conf->raw_size;
     else
       watcher->raw_sz = sizeof(uint64_t); // default raw entry
   } else if (conf->value_source == EventConfValueSource::kRegister) {
@@ -156,8 +156,8 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
     watcher->value_source = EventConfValueSource::kRegister;
   }
 
-  if (conf->arg_coeff != 0.0)
-    watcher->value_coefficient = conf->arg_coeff;
+  if (conf->value_scale != 0.0)
+    watcher->value_scale = conf->value_scale;
 
   // The output mode isn't set as part of the configuration templates; we
   // always default to callgraph mode

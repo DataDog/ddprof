@@ -226,7 +226,6 @@ add_unit_test(
   ../src/lib/savecontext.cc
   ../src/lib/saveregisters.cc
   ../src/mapinfo_lookup.cc
-  ../src/perf_archmap.cc
   ../src/procutils.cc
   ../src/runtime_symbol_lookup.cc
   ../src/symbol_map.cc
@@ -261,7 +260,6 @@ add_unit_test(
   ../src/failed_assumption.cc
   ../src/pevent_lib.cc
   ../src/perf.cc
-  ../src/perf_archmap.cc
   ../src/perf_ringbuffer.cc
   ../src/perf_watcher.cc
   ../src/ringbuffer_utils.cc

@@ -273,8 +273,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
       ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL));
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
-  if (!IsDDResFatal(res) &&
-      EventConfMode::kCallgraph <= watcher->output_mode) {
+  if (!IsDDResFatal(res) && EventConfMode::kCallgraph <= watcher->output_mode) {
 #ifndef DDPROF_NATIVE_LIB
     // Depending on the type of watcher, compute a value for sample
     uint64_t sample_val = perf_value_from_sample(watcher, sample);

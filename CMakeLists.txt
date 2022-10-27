@@ -204,7 +204,6 @@ set(DD_PROFILING_SOURCES
     src/logger.cc
     src/logger_setup.cc
     src/perf.cc
-    src/perf_archmap.cc
     src/perf_ringbuffer.cc
     src/perf_watcher.cc
     src/pevent_lib.cc

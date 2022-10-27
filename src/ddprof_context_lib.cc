@@ -99,8 +99,8 @@ DDRes add_preset(DDProfContext *ctx, const char *preset,
   return {};
 }
 
-void log_watcher(const PerfWatcher *w, int n) {
-  PRINT_NFO("    ID: %s, Pos: %d, Index: %lu", w->desc.c_str(), n, w->config);
+static void log_watcher(const PerfWatcher *w, int idx) {
+  PRINT_NFO("    ID: %s, Pos: %d, Index: %lu", w->desc.c_str(), idx, w->config);
   switch (w->value_source) {
   case EventConfValueSource::kSample:
     PRINT_NFO("    Location: Sample");

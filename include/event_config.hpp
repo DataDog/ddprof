@@ -17,9 +17,28 @@ enum class EventConfMode {
   kAll = kCallgraph | kMetric,
 };
 
-EventConfMode &operator|=(EventConfMode &A, const EventConfMode &B);
-EventConfMode operator&(const EventConfMode &A, const EventConfMode &B);
-bool operator<=(const EventConfMode A, const EventConfMode B); // inclusion
+// EventConfMode &operator|=(EventConfMode &A, const EventConfMode &B);
+// EventConfMode operator&(const EventConfMode &A, const EventConfMode &B);
+// bool operator<=(const EventConfMode A, const EventConfMode B); // inclusion
+//
+constexpr EventConfMode &operator|=(EventConfMode &A, const EventConfMode &B) {
+  A = static_cast<EventConfMode>(static_cast<unsigned>(A) |
+                                 static_cast<unsigned>(B));
+  return A;
+}
+
+constexpr EventConfMode operator&(const EventConfMode &A,
+                                  const EventConfMode &B) {
+  // & on bitmask enums is valid only in the space spanned by the values
+  return static_cast<EventConfMode>(static_cast<uint64_t>(A) &
+                                    static_cast<uint64_t>(B) &
+                                    static_cast<uint64_t>(EventConfMode::kAll));
+}
+
+// Bitmask inclusion
+constexpr bool operator<=(const EventConfMode A, const EventConfMode B) {
+  return EventConfMode::kDisabled != ((EventConfMode::kAll & A) & B);
+}
 
 // Defines how samples are weighted
 enum class EventConfValueSource {
@@ -41,9 +60,9 @@ enum class EventConfField {
   /*
    *  None is an invalid event type used to fence uninitialized values.
    */
-  kArgCoeff,
+  kArgScale,
   /*
-   *  ArgCoeff defines a real-valued coefficient which is used to scale the
+   *  ArgScale defines a real-valued coefficient which is used to scale the
    *  sample value when the correspond watcher is retrieved.  This is useful
    *  because multiple tracepoints may be globbed together in the Profiling
    *  UX and individual watchers therein may need to be scaled differently
@@ -128,9 +147,9 @@ struct EventConf {
 
   EventConfValueSource value_source;
   uint8_t register_num;
-  uint8_t arg_size;
-  uint64_t arg_offset;
-  double arg_coeff;
+  uint8_t raw_size;
+  uint64_t raw_offset;
+  double value_scale;
 
   EventConfCadenceType cad_type;
   int64_t cadence;

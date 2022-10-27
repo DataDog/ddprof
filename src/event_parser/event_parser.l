@@ -55,7 +55,7 @@
 }
 }
 
-c|arg_coeff|coeff          DISPATCH(ArgCoeff)
+s|value_scale|scale          DISPATCH(ArgScale)
 f|frequency|freq           DISPATCH(Frequency)
 e|event|eventname|ev       DISPATCH(Event)
 g|group|groupname|gr       DISPATCH(Group)
@@ -63,10 +63,10 @@ i|id                       DISPATCH(Id)
 l|label                    DISPATCH(Label)
 m|mode                     DISPATCH(Mode)
 n|arg_num|argno            DISPATCH(Parameter)
-o|arg_offset|argoff        DISPATCH(ArgOffset)
+o|raw_offset|argoff        DISPATCH(ArgOffset)
 p|period|per               DISPATCH(Period)
 r|register|regno           DISPATCH(Register)
-z|arg_size|argsz           DISPATCH(ArgSize)
+z|raw_size|argsz           DISPATCH(ArgSize)
 
 =                       {
 	BEGIN VALUE;
