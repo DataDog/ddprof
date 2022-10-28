@@ -16,6 +16,8 @@
 #include <unistd.h>
 
 #include "ddres_helpers.hpp"
+#include "event_config.hpp"
+#include "event_parser.h"
 #include "perf_archmap.hpp"
 #include "perf_watcher.hpp"
 
@@ -46,168 +48,22 @@ bool arg_yesno(const char *str, int mode) {
   return false;
 }
 
-// If this returns false, then the passed watcher should be regarded as invalid
-bool watcher_from_event(const char *str, PerfWatcher *watcher) {
-  const PerfWatcher *tmp_watcher;
-  if (!(tmp_watcher = ewatcher_from_str(str)))
-    return false;
+unsigned int tracepoint_id_from_event(const char *eventname,
+                                      const char *groupname) {
+  if (!eventname || !*eventname || !groupname || !*groupname)
+    return 0;
 
-  // Now we have to process options out of the string
-  char *str_chk; // for checking the result of parsing
-  const char *str_tmp = std::strchr(str, ','); // points to ',' or is nullptr
-  uint64_t value_tmp = tmp_watcher->sample_period; // get default val
-
-  if (str_tmp) {
-    ++str_tmp; // nav to after ','
-    value_tmp = strtoll(str_tmp, &str_chk, 10);
-    if (*str_chk)
-      return false; // If this is malformed, the whole thing is malformed?
-  }
-
-  // If we're here, then we've processed the event specification correctly, so
-  // we copy the tmp_watcher into the storage given by the user and update the
-  // mutable field
-  *watcher = *tmp_watcher;
-  watcher->sample_period = value_tmp;
-
-  // If an event doesn't have a well-defined profile type, then it gets
-  // registered as a tracepoint profile.  Make sure it has a valid name for the
-  // label
-  static const char event_groupname[] = "custom_events";
-  if (watcher->sample_type_id == DDPROF_PWT_TRACEPOINT) {
-    watcher->tracepoint_name = watcher->desc;
-    watcher->tracepoint_group = event_groupname;
-  }
-  return true;
-}
-
-#define R(x) REGNAME(x)
-#ifdef __x86_64__
-int arg2reg[] = {-1, R(RDI), R(RSI), R(RDX), R(RCX), R(R8), R(R9)};
-#elif __aarch64__
-int arg2reg[] = {-1, R(X0), R(X1), R(X2), R(X3), R(X4), R(X5), R(X6)};
-#else
-#  error Your architecture is not supported
-#endif
-#undef R
-uint8_t get_register(const char *str) {
-  uint8_t reg = 0;
-  char *str_copy = (char *)str;
-  long reg_buf = strtol(str, &str_copy, 10);
-  if (!*str_copy) {
-    reg = reg_buf;
-  } else {
-    reg = 0;
-    LG_NTC("Could not parse register %s", str);
-  }
-
-  // If we're here, then we have a register.
-  return arg2reg[reg];
-}
-
-bool get_trace_format(const char *str, uint8_t *trace_off, uint8_t *trace_sz) {
-  if (!str)
-    return false;
-
-  const char *period = std::strchr(str, '.');
-  if (!period)
-    return false;
-
-  *trace_off = strtol(str, nullptr, 10);
-  *trace_sz = strtol(period + 1, nullptr, 10);
-
-  // Error if the size is zero, otherwise fine probably
-  return !trace_sz;
-}
-
-// If this returns false, then the passed watcher should be regarded as invalid
-bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
-  // minimum form; provides counts, samples every hit
-  // -t groupname:tracename
-  // Register-qualified form
-  // -t groupname:tracename%REG
-  // -t groupname:tracename$offset.size
-  // Sample-qualified form, sets a period value
-  // -t groupname:tracename@period
-  // full
-  // -t groupename:tracename%REG@period
-  // groupname, tracename, REG - strings
-  // REG - can be a number 1-6
-  // period is a number
-  char *str = strdup(_str);
-  size_t sz_str = strlen(str);
-  const char *groupname;
-  const char *tracename;
-  uint8_t reg = 0;
-  uint64_t period = 1;
-  bool is_raw = false;
-  uint8_t trace_off = 0;
-  uint8_t trace_sz = 0;
-
-  // Check format
-  if (!sz_str) {
-    free(str);
-    return false;
-  }
-  char *colon = strchr(str, ':');
-  char *perc = strchr(str, '%');
-  char *amp = strchr(str, '@');
-  char *dollar = strchr(str, '$');
-
-  if (!colon || (dollar && perc)) {
-    free(str);
-    return false;
-  }
-
-  // Split strings
-  *colon = 0; // colon is true from previous check
-  if (perc)
-    *perc = 0;
-  if (amp)
-    *amp = 0;
-  if (dollar)
-    *dollar = 0;
-
-  // Name checking
-  groupname = str;
-  tracename = colon + 1;
-
-  // If a register is specified, process that
-  if (perc)
-    reg = get_register(perc + 1);
-
-  // OTOH, if an offset into the raw event is specified, get that
-  if (dollar && !get_trace_format(dollar + 1, &trace_off, &trace_sz)) {
-    is_raw = true;
-  } else {
-    trace_off = 0;
-    trace_sz = 0;
-  }
-
-  // If the user specified a period, make sure it is valid
-  if (amp) {
-    char *str_check = (char *)str;
-    uint64_t buf = strtoll(amp + 1, &str_check, 10);
-    if (!*str_check)
-      period = buf;
-  }
-
-  char path[2048] = {0}; // somewhat arbitrarily
-  char buf[64] = {0};
+  static char path[4096]; // Arbitrary, but path sizes limits are difficult
+  static char buf[sizeof("4294967296")]; // For reading 32-bit decimal int
   char *buf_copy = buf;
-  int pathsz =
+  size_t pathsz =
       snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/id",
-               groupname, tracename);
-  if (static_cast<size_t>(pathsz) >= sizeof(path)) {
-    // Possibly ran out of room
-    free(str);
-    return false;
-  }
+               groupname, eventname);
+  if (pathsz >= sizeof(path))
+    return 0;
   int fd = open(path, O_RDONLY);
-  if (-1 == fd) {
-    free(str);
-    return false;
-  }
+  if (-1 == fd)
+    return 0;
 
   // Read the data in an eintr-safe way
   int read_ret = -1;
@@ -218,36 +74,100 @@ bool watcher_from_tracepoint(const char *_str, PerfWatcher *watcher) {
   close(fd);
   if (read_ret > 0)
     trace_id = strtol(buf, &buf_copy, 10);
-  if (*buf_copy && *buf_copy != '\n') {
-    free(str);
+  if (*buf_copy && *buf_copy != '\n')
+    return 0;
+
+  return trace_id;
+}
+
+// If this returns false, then the passed watcher should be regarded as invalid
+constexpr uint64_t kIgnoredWatcherID = -1ul;
+bool watcher_from_str(const char *str, PerfWatcher *watcher) {
+  EventConf *conf = EventConf_parse(str);
+  if (!conf) {
     return false;
   }
 
-  // Check enablement, just to print a log.  We still enable instrumentation.
-  snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/enable",
-           groupname, tracename);
-  fd = open(path, O_RDONLY);
-  if (-1 == fd || 1 != read(fd, buf, 1) || '0' != *buf) {
-    LG_NTC("Tracepint %s:%s is not enabled.  Instrumentation will proceed, but "
-           "you may not have any events.",
-           groupname, tracename);
-  } else {
-    LG_NFO("Tracepoint %s:%s successfully enabled", groupname, tracename);
+  // If there's no eventname, then this configuration is invalid
+  if (conf->eventname.empty()) {
+    return false;
   }
 
-  // OK done
-  *watcher = *twatcher_default();
-  watcher->config = trace_id;
-  watcher->sample_period = period;
-  if (is_raw)
-    watcher->sample_type |= PERF_SAMPLE_RAW;
-  if (reg) {
-    watcher->reg = reg;
+  // The watcher is templated; either from an existing Profiling template,
+  // keyed on the eventname, or it uses the generic template for Tracepoints
+  const PerfWatcher *tmp_watcher = ewatcher_from_str(conf->eventname.c_str());
+  if (tmp_watcher) {
+    *watcher = *tmp_watcher;
+    conf->id = kIgnoredWatcherID; // matched, so invalidate Tracepoint checks
+  } else if (!conf->groupname.empty()) {
+    // If the event doesn't match an ewatcher, it is only valid if a group was
+    // also provided (splitting events on ':' is the responsibility of the
+    // parser)
+    auto *tmp_tracepoint_watcher = tracepoint_default_watcher();
+    if (!tmp_tracepoint_watcher) {
+      return false;
+    }
+    *watcher = *tmp_tracepoint_watcher;
   } else {
-    watcher->trace_off = trace_off;
-    watcher->trace_sz = trace_sz;
+    return false;
   }
-  watcher->tracepoint_group = groupname;
-  watcher->tracepoint_name = tracename;
+
+  // The most likely thing to be invalid is the selection of the tracepoint
+  // from the trace events system.  If the conf has a nonzero number for the id
+  // we assume the user has privileged information and knows what they want.
+  // Else, we use the group/event combination to extract that id from the
+  // tracefs filesystem in the canonical way.
+  uint64_t tracepoint_id = 0;
+  if (conf->id > 0) {
+    tracepoint_id = conf->id;
+  } else {
+    tracepoint_id = tracepoint_id_from_event(conf->eventname.c_str(),
+                                             conf->groupname.c_str());
+  }
+
+  // 0 is an error, "-1" is ignored
+  if (!tracepoint_id) {
+    return false;
+  } else if (tracepoint_id != kIgnoredWatcherID) {
+    watcher->config = tracepoint_id;
+  }
+
+  // Configure the sampling strategy.  If no valid conf, use template default
+  if (conf->cadence != 0) {
+    if (conf->cad_type == EventConfCadenceType::kPeriod) {
+      watcher->sample_period = conf->cadence;
+    } else if (conf->cad_type == EventConfCadenceType::kFrequency) {
+      watcher->sample_frequency = conf->cadence;
+      watcher->options.is_freq = true;
+    }
+  }
+
+  // Configure value source
+  if (conf->value_source == EventConfValueSource::kRaw) {
+    watcher->value_source = EventConfValueSource::kRaw;
+    watcher->sample_type |= PERF_SAMPLE_RAW;
+    watcher->raw_off = conf->raw_offset;
+    if (conf->raw_size > 0)
+      watcher->raw_sz = conf->raw_size;
+    else
+      watcher->raw_sz = sizeof(uint64_t); // default raw entry
+  } else if (conf->value_source == EventConfValueSource::kRegister) {
+    watcher->regno = conf->register_num;
+    watcher->value_source = EventConfValueSource::kRegister;
+  }
+
+  if (conf->value_scale != 0.0)
+    watcher->value_scale = conf->value_scale;
+
+  // The output mode isn't set as part of the configuration templates; we
+  // always default to callgraph mode
+  watcher->output_mode = EventConfMode::kCallgraph;
+  if (EventConfMode::kAll <= conf->mode) {
+    watcher->output_mode = conf->mode;
+  }
+
+  watcher->tracepoint_event = conf->eventname;
+  watcher->tracepoint_group = conf->groupname;
+  watcher->tracepoint_label = conf->label;
   return true;
 }

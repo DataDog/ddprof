@@ -128,7 +128,12 @@ bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,
     memcpy(buf, sample->ips, sample->nr);
     buf += sample->nr;
   }
-  if (PERF_SAMPLE_RAW & mask) {}
+  if (PERF_SAMPLE_RAW & mask) {
+    ((flipper *)buf)->half[0] = sample->size_raw;
+    memcpy(&((flipper *)buf)->half[1], sample->data_raw, sample->size_raw);
+    buf += 1 + (sample->size_raw / sizeof(*buf));
+    SZ_CHECK;
+  }
   if (PERF_SAMPLE_BRANCH_STACK & mask) {}
   if (PERF_SAMPLE_REGS_USER & mask) {
     *buf++ = sample->abi;
@@ -167,8 +172,6 @@ bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,
 
 perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
   static perf_event_sample sample = {};
-  memset(&sample, 0, sizeof(sample));
-
   sample.header = *hdr;
 
   uint64_t *buf = (uint64_t *)&hdr[1]; // sample starts after header
@@ -213,12 +216,19 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
     sample.ips = buf;
     buf += sample.nr;
   }
-  if (PERF_SAMPLE_RAW & mask) {}
+  if (PERF_SAMPLE_RAW & mask) {
+    // size_raw is a 32-bit integer!
+    sample.size_raw = ((flipper *)buf)->half[0];
+    sample.data_raw =
+        sample.size_raw ? (char *)&((flipper *)buf)->half[1] : NULL;
+    buf += 1 + (sample.size_raw / sizeof(*buf)); // Advance + align
+  }
   if (PERF_SAMPLE_BRANCH_STACK & mask) {}
   if (PERF_SAMPLE_REGS_USER & mask) {
     sample.abi = *buf++;
-    // In case regs are not available, ignore this sample
-    if (sample.abi == PERF_SAMPLE_REGS_ABI_NONE) {
+    // ddprof only has register definitions for 64-bit processors.  Reject
+    // everything else for now.
+    if (sample.abi != PERF_SAMPLE_REGS_ABI_64) {
       return NULL;
     }
     sample.regs = buf;

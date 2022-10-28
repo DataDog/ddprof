@@ -80,8 +80,7 @@ DDRes add_preset(DDProfContext *ctx, const char *preset,
       DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Too many input events");
     }
     PerfWatcher *watcher = &ctx->watchers[ctx->num_watchers];
-    if (!watcher_from_event(event, watcher) &&
-        !watcher_from_tracepoint(event, watcher)) {
+    if (!watcher_from_str(event, watcher)) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
                              "Invalid event/tracepoint (%s)", event);
     }
@@ -98,6 +97,40 @@ DDRes add_preset(DDProfContext *ctx, const char *preset,
   }
 
   return {};
+}
+
+static void log_watcher(const PerfWatcher *w, int idx) {
+  PRINT_NFO("    ID: %s, Pos: %d, Index: %lu", w->desc.c_str(), idx, w->config);
+  switch (w->value_source) {
+  case EventConfValueSource::kSample:
+    PRINT_NFO("    Location: Sample");
+    break;
+  case EventConfValueSource::kRegister:
+    PRINT_NFO("    Location: Register, regno: %d", w->regno);
+    break;
+  case EventConfValueSource::kRaw:
+    PRINT_NFO("    Location: Raw event, offset: %d, size: %d", w->raw_off,
+              w->raw_sz);
+    break;
+  default:
+    PRINT_NFO("    ILLEGAL LOCATION");
+    break;
+  }
+
+  PRINT_NFO("    Category: %s, EventName: %s, GroupName: %s, Label: %s",
+            sample_type_name_from_idx(w->sample_type_id),
+            w->tracepoint_event.c_str(), w->tracepoint_group.c_str(),
+            w->tracepoint_label.c_str());
+
+  if (w->options.is_freq)
+    PRINT_NFO("    Cadence: Freq, Freq: %lu", w->sample_frequency);
+  else
+    PRINT_NFO("    Cadence: Period, Period: %lu", w->sample_period);
+
+  if (EventConfMode::kCallgraph <= w->output_mode)
+    PRINT_NFO("    Outputting to callgraph (flamegraph)");
+  if (EventConfMode::kMetric <= w->output_mode)
+    PRINT_NFO("    Outputting to metric");
 }
 
 /****************************  Argument Processor  ***************************/
@@ -310,7 +343,8 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
 
     // if there are no perf active watcher, add a dummy watcher to be notified
     // on process exit
-    ctx->watchers[ctx->num_watchers++] = *ewatcher_from_str("sDUM");
+    const PerfWatcher *tmpwatcher = ewatcher_from_str("sDUM");
+    ctx->watchers[ctx->num_watchers++] = *tmpwatcher;
   }
 
   order_watchers({ctx->watchers, static_cast<size_t>(ctx->num_watchers)});
@@ -332,9 +366,7 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     // Show watchers
     PRINT_NFO("  Instrumented with %d watchers:", ctx->num_watchers);
     for (int i = 0; i < ctx->num_watchers; i++) {
-      PRINT_NFO("    ID: %s, Pos: %d, Index: %lu, Label: %s",
-                ctx->watchers[i].desc, i, ctx->watchers[i].config,
-                sample_type_name_from_idx(ctx->watchers[i].sample_type_id));
+      log_watcher(&ctx->watchers[i], i);
     }
   }
 

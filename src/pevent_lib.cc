@@ -86,7 +86,7 @@ static DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
     } else {
       LG_NFO("Failed to perf_event_open for watcher: %s - with attr.type=%s, "
              "exclude_kernel=%d",
-             watcher->desc, perf_type_str(attr.type),
+             watcher->desc.c_str(), perf_type_str(attr.type),
              static_cast<int>(attr.exclude_kernel));
     }
   }
