@@ -28,6 +28,7 @@ add_link_options("LINKER:--build-id=sha1")
 
 # Define the include path of cmake scripts
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/util")
 
 include(ExtendBuildTypes)
 
@@ -83,13 +84,19 @@ endif()
 # libdatadog_profiling
 include(Findlibdatadog)
 
+# Event Parser
+add_subdirectory(src/event_parser)
+
 # elfutils
 include(Findelfutils)
 
 # ---- Static analysis ----
 include(ClangTidy)
-include(CppcheckConfig)
 include(Format)
+
+# Generated code needs to be available for cppcheck to work
+include(CppcheckConfig)
+add_dependencies(cppcheck DDProf::Parser)
 
 # ---- Libraries (needed by ut) ----
 
@@ -139,7 +146,7 @@ aux_source_directory(src/exe EXE_SRC)
 # Define all sources
 set(DDPROF_GLOBAL_SRC ${COMMON_SRC} ${PPROF_SRC} ${EXPORTER_SRC} ${EXE_SRC})
 
-set(DDPROF_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
+set(DDPROF_LIBRARY_LIST DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 
 if(ON)
   # Add the rust library - Refactoring ongoing. OFF for now
@@ -235,6 +242,8 @@ if(BUILD_UNIVERSAL_DDPROF)
   endif()
 endif()
 
+target_link_libraries(dd_profiling-embedded PRIVATE DDProf::Parser)
+
 # Fix for link error in sanitizeddebug build mode with gcc:
 # ~~~
 # /usr/bin/ld: ./libdd_profiling.so: undefined reference to `__dynamic_cast'
@@ -329,6 +338,7 @@ target_include_directories(
                              ${CMAKE_SOURCE_DIR}/third_party)
 set_target_properties(dd_profiling-static
                       PROPERTIES PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
+target_link_libraries(dd_profiling-static PRIVATE DDProf::Parser)
 target_link_libraries(dd_profiling-static PUBLIC dl pthread rt)
 
 if(USE_LOADER)
@@ -336,7 +346,7 @@ if(USE_LOADER)
   # and ddprof executable.
   add_library(dd_profiling-shared SHARED src/lib/glibc_fixes.c src/lib/lib_embedded_data.c
                                          src/lib/loader.c src/sha1.c)
-  target_link_libraries(dd_profiling-shared PRIVATE libddprofiling_embedded_object
+  target_link_libraries(dd_profiling-shared PRIVATE DDProf::Parser libddprofiling_embedded_object
                                                     ddprof_exe_object)
   target_compile_definitions(dd_profiling-shared PRIVATE DDPROF_EMBEDDED_LIB_DATA
                                                          DDPROF_EMBEDDED_EXE_DATA)
@@ -344,7 +354,7 @@ else()
   # Without loader, libdd_profiling.so is basically the same as libdd_profiling-embedded.so plus an
   # embedded ddprof executable.
   add_library(dd_profiling-shared SHARED ${DD_PROFILING_SOURCES} src/lib/lib_embedded_data.c)
-  target_link_libraries(dd_profiling-shared PRIVATE ddprof_exe_object)
+  target_link_libraries(dd_profiling-shared PRIVATE DDProf::Parser ddprof_exe_object)
   target_compile_definitions(dd_profiling-shared PRIVATE DDPROF_EMBEDDED_EXE_DATA)
 
   # Fix for link error in sanitizeddebug build mode with gcc:
@@ -398,7 +408,7 @@ if(${BUILD_NATIVE_LIB})
   set(DDPROF_LIB_SRC ${COMMON_SRC} src/lib/ddprof_output.cc)
 
   # Libs to link
-  set(NATIVE_LIB_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
+  set(NATIVE_LIB_LIBRARY_LIST DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 
   if(${DDPROF_JEMALLOC})
     list(PREPEND NATIVE_LIB_LIBRARY_LIST jemalloc)

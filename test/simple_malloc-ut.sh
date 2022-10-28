@@ -9,7 +9,7 @@ export DD_PROFILING_NATIVE_LOG_LEVEL=debug
 export LD_LIBRARY_PATH=$PWD
 export DD_PROFILING_NATIVE_PRESET=default
 # force deterministic sampling
-export DD_PROFILING_NATIVE_EVENTS="sALLOC,-524288"
+export DD_PROFILING_NATIVE_EVENTS="sALLOC period=-524288"
 
 # Get available cpus
 # ddprof will be allowed to run on those cpus

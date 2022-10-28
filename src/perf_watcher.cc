@@ -52,17 +52,6 @@ bool watcher_has_countable_sample_type(const PerfWatcher *watcher) {
 
 #define X_EVENTS(a, b, c, d, e, f, g)                                          \
   {DDPROF_PWE_##a, b, BASE_STYPES, c, d, {e}, f, PERF_SAMPLE_STACK_SIZE, g},
-const PerfWatcher events_templates[] = {EVENT_CONFIG_TABLE(X_EVENTS)};
-const PerfWatcher tracepoint_templates[] = {{
-    .ddprof_event_type = DDPROF_PWE_TRACEPOINT,
-    .desc = "Tracepoint",
-    .sample_type = BASE_STYPES,
-    .type = PERF_TYPE_TRACEPOINT,
-    .sample_period = 1,
-    .sample_type_id = DDPROF_PWT_TRACEPOINT,
-    .options = {.is_kernel = kPerfWatcher_Required},
-}};
-#undef X_PWATCH
 
 #define X_STR(a, b, c, d, e, f, g) #a,
 const char *event_type_name_from_idx(int idx) {
@@ -74,20 +63,13 @@ const char *event_type_name_from_idx(int idx) {
 #undef X_STR
 
 int str_to_event_idx(const char *str) {
-  int type;
-  if (!str)
+  if (!str || !*str)
     return -1;
-  size_t sz_str = strlen(str);
-  for (type = 0; type < DDPROF_PWE_LENGTH; ++type) {
+  size_t sz_input = strlen(str);
+  for (int type = 0; type < DDPROF_PWE_LENGTH; ++type) {
     const char *event_name = event_type_name_from_idx(type);
-    size_t sz_thistype = strlen(event_name);
-
-    // We don't want to match partial events, and the event specification
-    // demands that events are either whole or immediately preceeded by a comma.
-    if ((sz_str < sz_thistype) ||
-        (sz_str > sz_thistype && str[sz_thistype] != ','))
-      continue;
-    if (!strncmp(str, event_name, sz_thistype))
+    size_t sz_this = strlen(event_name);
+    if (sz_input == sz_this && !strncmp(str, event_name, sz_this))
       return type;
   }
   return -1;
@@ -96,16 +78,26 @@ int str_to_event_idx(const char *str) {
 const PerfWatcher *ewatcher_from_idx(int idx) {
   if (idx < 0 || idx >= DDPROF_PWE_LENGTH)
     return NULL;
-  return &events_templates[idx];
+  static const PerfWatcher events[] = {EVENT_CONFIG_TABLE(X_EVENTS)};
+  return &events[idx];
 }
 
 const PerfWatcher *ewatcher_from_str(const char *str) {
   return ewatcher_from_idx(str_to_event_idx(str));
 }
 
-const PerfWatcher *twatcher_default() {
-  // Only the one (for now?!)
-  return &tracepoint_templates[0];
+const PerfWatcher *tracepoint_default_watcher() {
+  static const PerfWatcher tracepoint_template = {
+      .ddprof_event_type = DDPROF_PWE_TRACEPOINT,
+      .desc = "Tracepoint",
+      .sample_type = BASE_STYPES,
+      .type = PERF_TYPE_TRACEPOINT,
+      .sample_period = 1,
+      .sample_type_id = DDPROF_PWT_TRACEPOINT,
+      .options = {.use_kernel = PerfWatcherUseKernel::kRequired},
+      .value_scale = 1.0,
+  };
+  return &tracepoint_template;
 }
 
 bool watcher_has_tracepoint(const PerfWatcher *watcher) {
