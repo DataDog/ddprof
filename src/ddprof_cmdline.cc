@@ -136,6 +136,7 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   if (conf->cadence != 0) {
     if (conf->cad_type == EventConfCadenceType::kPeriod) {
       watcher->sample_period = conf->cadence;
+      watcher->options.is_freq = false;
     } else if (conf->cad_type == EventConfCadenceType::kFrequency) {
       watcher->sample_frequency = conf->cadence;
       watcher->options.is_freq = true;
