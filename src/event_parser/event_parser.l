@@ -5,9 +5,9 @@
   Datadog, Inc.
 */
 
-%option noyywrap
-%option nounput
-%option noinput
+%option noyywrap nounput noinput
+%option reentrant
+%option bison-bridge
 
 %{
 #include <string.h>
@@ -16,7 +16,7 @@
 
 #define DISPATCH(type)                       \
 {                                            \
-	yylval.field = (EventConfField::k##type);         \
+	yylval->field = (EventConfField::k##type);         \
 	return KEY;                          \
 }
 
@@ -28,23 +28,23 @@
 
 <VALUE>{
 [[:alpha:]_][[:alnum:]_]*   {
-	yylval.str = new std::string{yytext};
+	yylval->str = new std::string{yytext};
 	BEGIN 0;
 	return WORD;
 }
 [-+]?[[:digit:]]+           {
-	yylval.num = strtol(yytext, NULL, 10);
+	yylval->num = strtol(yytext, NULL, 10);
 	BEGIN 0;
 	return NUMBER;
 }
 [-+]?0x[[:digit:]]+         {
 	
-	yylval.num = strtol(yytext, NULL, 16);
+	yylval->num = strtol(yytext, NULL, 16);
 	BEGIN 0;
 	return HEXNUMBER;
 }
 [-+]?[[:digit:].]+[fFdD]?   {
-	yylval.fpnum = strtod(yytext, NULL);
+	yylval->fpnum = strtod(yytext, NULL);
 	BEGIN 0;
 	return FLOAT;
 }
@@ -68,27 +68,27 @@ p|period|per               DISPATCH(Period)
 r|register|regno           DISPATCH(Register)
 z|raw_size|rawsz           DISPATCH(RawSize)
 
-=                       {
+=                           {
 	BEGIN VALUE;
 	return EQ;
 }
 
-[ ,\t][ \t]*            {
+[ ,\t][ \t]*                {
 	BEGIN 0;
 	return OPTSEP;
 }
 
-;                       {
+;                           {
 	BEGIN 0;
 	return CONFSEP;
 }
 
 [[:alpha:]_][[:alnum:]_]*   {
-	yylval.str = new std::string{yytext};
+	yylval->str = new std::string{yytext};
 	BEGIN 0;
 	return WORD;
 }
 
-.                       {
+.                           {
 	return (int) yytext[0];
 }
