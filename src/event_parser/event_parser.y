@@ -5,6 +5,10 @@
   Datadog, Inc.
 */
 
+%define api.pure
+%lex-param {void *scanner} // actually yyscan_t
+%parse-param {void *scanner} // actually yyscan_t
+
 %{
 #include <stdio.h>
 #include <stdint.h>
@@ -12,15 +16,23 @@
 #include <string>
 
 #include "event_config.hpp"
+#include "event_parser.h"
 #include "perf_archmap.hpp"
 
 #define YYDEBUG 0
 
+#ifndef YY_TYPEDEF_YY_SCANNER_T
+#define YY_TYPEDEF_YY_SCANNER_T
 typedef struct yy_buffer_state * YY_BUFFER_STATE;
-extern int yylex(void);
-extern int yyparse(void);
-extern YY_BUFFER_STATE yy_scan_string(const char * str);
-extern void yy_delete_buffer(YY_BUFFER_STATE buffer);
+typedef void * yyscan_t;
+#endif
+
+extern int yylex_init(yyscan_t * scanner);
+extern int yylex(YYSTYPE * lvalp, void *scanner);
+extern int yyparse(yyscan_t scanner);
+extern int yylex_destroy(yyscan_t scanner);
+extern YY_BUFFER_STATE yy_scan_string(const char * str, yyscan_t scanner);
+extern void yy_delete_buffer(YY_BUFFER_STATE buffer, yyscan_t scanner);
 
 EventConfMode mode_from_str(const std::string &str) {
   EventConfMode mode = EventConfMode::kDisabled;
@@ -97,7 +109,7 @@ void conf_print(const EventConf *tp) {
 
 EventConf g_accum_event_conf = {};
 
-void yyerror(const char *str) {
+void yyerror(yyscan_t scanner, const char *str) {
 #ifdef EVENT_PARSER_MAIN
   fprintf(stderr, "err: %s\n", str);
 #endif 
@@ -105,16 +117,21 @@ void yyerror(const char *str) {
 
 #define VAL_ERROR() \
  do { \
-   yyerror("Invalid value"); \
+   yyerror(NULL, "Invalid value"); \
    YYABORT;  \
  } while(0)
 
 EventConf *EventConf_parse(const char *msg) {
   g_accum_event_conf.clear();
   int ret = -1;
-  YY_BUFFER_STATE buffer = yy_scan_string(msg);
-  ret = yyparse();
-  yy_delete_buffer(buffer);
+  yyscan_t scanner = NULL;
+  YY_BUFFER_STATE buffer = NULL;
+
+  yylex_init(&scanner);
+  buffer = yy_scan_string(msg, scanner);
+  ret = yyparse(scanner);
+  yy_delete_buffer(buffer, scanner);
+  yylex_destroy(scanner);
   return 0 == ret ? &g_accum_event_conf : NULL;
 }
 
