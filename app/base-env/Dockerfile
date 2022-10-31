@@ -37,8 +37,10 @@ RUN apt-get update \
   apt-transport-https \
   awscli \
   binutils-dev \
+  bison \
   ca-certificates \
   curl \
+  flex \
   gcovr \
   git \
   lcov \

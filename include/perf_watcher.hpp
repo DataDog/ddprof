@@ -5,17 +5,21 @@
 
 #pragma once
 
+#include "event_config.hpp"
+
+#include <string>
+
 #include <linux/perf_event.h>
 #include <stdint.h>
 
-typedef enum {
-  kPerfWatcher_Off = 0,  // always off
-  kPerfWatcher_Required, // always on
-  kPerfWatcher_Try,      // On if possible, default to OFF on failure
-} PerfWatcherValue;
+enum class PerfWatcherUseKernel {
+  kOff = 0,  // always off
+  kRequired, // always on
+  kTry,      // On if possible, default to OFF on failure
+};
 
 struct PerfWatcherOptions {
-  PerfWatcherValue is_kernel;
+  PerfWatcherUseKernel use_kernel;
   bool is_freq;
   uint8_t nb_frames_to_skip; // number of bottom frames to skip in stack trace
                              // (useful for allocation profiling to remove
@@ -25,15 +29,15 @@ struct PerfWatcherOptions {
                       // watcher in ddprof_cmdline.cc
 };
 
-typedef struct PerfWatcher {
+struct PerfWatcher {
   int ddprof_event_type; // ddprof event type from DDPROF_EVENT_NAMES enum
-  const char *desc;
+  std::string desc;
   uint64_t sample_type; // perf sample type: specifies values included in sample
   int type; // perf event type (software / hardware / tracepoint / ... or custom
             // for non-perf events)
   unsigned long config; // specifies which perf event is requested
   union {
-    uint64_t sample_period;
+    int64_t sample_period;
     uint64_t sample_frequency;
   };
   int sample_type_id; // index into the sample types defined in this header
@@ -42,18 +46,22 @@ typedef struct PerfWatcher {
   // perf_event_open configs
   struct PerfWatcherOptions options;
   // tracepoint configuration
-  uint8_t reg;
-  uint8_t trace_off;
-  uint8_t trace_sz;
-  const char *tracepoint_name;
-  const char *tracepoint_group;
+  EventConfValueSource value_source; // how to normalize the sample value
+  uint8_t regno;
+  uint8_t raw_off;
+  uint8_t raw_sz;
+  double value_scale;
+  std::string tracepoint_event;
+  std::string tracepoint_group;
+  std::string tracepoint_label;
   // Other configs
   bool suppress_pid;
   bool suppress_tid;
   int pprof_sample_idx;       // index into the SampleType in the pprof
   int pprof_count_sample_idx; // index into the pprof for the count
   bool instrument_self;       // do my own perfopen, etc
-} PerfWatcher;
+  EventConfMode output_mode;  // defines how sample data is aggregated
+};
 
 // The Datadog backend only understands pre-configured event types.  Those
 // types are defined here, and then referenced in the watcher
@@ -85,13 +93,13 @@ enum DDProfCustomCountId {
 // This depend on the state of configuration (capabilities /
 // perf_event_paranoid) Attempt to activate them and remove them if you fail
 #define IS_FREQ_TRY_KERNEL                                                     \
-  { .is_kernel = kPerfWatcher_Try, .is_freq = true }
+  { .use_kernel = PerfWatcherUseKernel::kTry, .is_freq = true }
 
 #define IS_FREQ                                                                \
   { .is_freq = true }
 
-#define IS_KERNEL                                                              \
-  { .is_kernel = kPerfWatcher_Required }
+#define USE_KERNEL                                                             \
+  { .use_kernel = PerfWatcherUseKernel::kRequired }
 
 #ifdef DDPROF_OPTIM
 #  define NB_FRAMES_TO_SKIP 4
@@ -125,11 +133,11 @@ enum DDProfCustomCountId {
   X(hBSTF,      "Bus Stalls(F)",      PERF_TYPE_HARDWARE,   PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(hBSTB,      "Bus Stalls(B)",      PERF_TYPE_HARDWARE,   PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(sCPU,       "CPU Time",           PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_TASK_CLOCK,              99,           DDPROF_PWT_CPU_NANOS,   IS_FREQ_TRY_KERNEL)      \
-  X(sPF,        "Page Faults",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS,             1,            DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
-  X(sCS,        "Con. Switch",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_CONTEXT_SWITCHES,        1,            DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
+  X(sPF,        "Page Faults",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS,             1,            DDPROF_PWT_TRACEPOINT,  USE_KERNEL)               \
+  X(sCS,        "Con. Switch",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_CONTEXT_SWITCHES,        1,            DDPROF_PWT_TRACEPOINT,  USE_KERNEL)               \
   X(sMig,       "CPU Migrations",     PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_CPU_MIGRATIONS,          99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(sPFMAJ,     "Major Faults",       PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS_MAJ,         99,           DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
-  X(sPFMIN,     "Minor Faults",       PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS_MIN,         99,           DDPROF_PWT_TRACEPOINT,  IS_KERNEL)               \
+  X(sPFMAJ,     "Major Faults",       PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS_MAJ,         99,           DDPROF_PWT_TRACEPOINT,  USE_KERNEL)               \
+  X(sPFMIN,     "Minor Faults",       PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS_MIN,         99,           DDPROF_PWT_TRACEPOINT,  USE_KERNEL)               \
   X(sALGN,      "Align. Faults",      PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_ALIGNMENT_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(sEMU,       "Emu. Faults",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_EMULATION_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(sDUM,       "Dummy",              PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_DUMMY,                   1,            DDPROF_PWT_NOCOUNT,     {})                      \
@@ -148,7 +156,7 @@ typedef enum DDPROF_EVENT_NAMES {
 // Helper functions for event-type watcher lookups
 const PerfWatcher *ewatcher_from_idx(int idx);
 const PerfWatcher *ewatcher_from_str(const char *str);
-const PerfWatcher *twatcher_default();
+const PerfWatcher *tracepoint_default_watcher();
 bool watcher_has_countable_sample_type(const PerfWatcher *watcher);
 bool watcher_has_tracepoint(const PerfWatcher *watcher);
 int watcher_to_count_sample_type_id(const PerfWatcher *watcher);

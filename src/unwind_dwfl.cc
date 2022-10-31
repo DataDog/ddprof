@@ -86,7 +86,8 @@ static void trace_unwinding_end(UnwindState *us) {
   }
 }
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
-                            DDProfMod *ddprof_mod, FileInfoId_t file_info_id);
+                            const DDProfMod &ddprof_mod,
+                            FileInfoId_t file_info_id);
 
 // check for runtime symbols provided in /tmp files
 static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
@@ -163,7 +164,7 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   us->current_ip = pc;
 
   // Now we register
-  if (IsDDResNotOK(add_dwfl_frame(us, dso, pc, ddprof_mod, file_info_id))) {
+  if (IsDDResNotOK(add_dwfl_frame(us, dso, pc, *ddprof_mod, file_info_id))) {
     return ddres_warn(DD_WHAT_UW_ERROR);
   }
   return ddres_init();
@@ -236,16 +237,17 @@ DDRes unwind_dwfl(UnwindState *us) {
 }
 
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
-                            DDProfMod *ddprof_mod, FileInfoId_t file_info_id) {
+                            const DDProfMod &ddprof_mod,
+                            FileInfoId_t file_info_id) {
 
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
 
   // get or create the dwfl symbol
   SymbolIdx_t symbol_idx = unwind_symbol_hdr._dwfl_symbol_lookup.get_or_insert(
-      *ddprof_mod, unwind_symbol_hdr._symbol_table,
+      ddprof_mod, unwind_symbol_hdr._symbol_table,
       unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso);
   MapInfoIdx_t map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
-      us->pid, us->symbol_hdr._mapinfo_table, dso);
+      us->pid, us->symbol_hdr._mapinfo_table, dso, ddprof_mod._build_id);
   return add_frame(symbol_idx, map_idx, pc, us);
 }
 
@@ -264,7 +266,7 @@ static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
   }
 
   MapInfoIdx_t map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
-      us->pid, us->symbol_hdr._mapinfo_table, dso);
+      us->pid, us->symbol_hdr._mapinfo_table, dso, {});
 
   return add_frame(symbol_idx, map_idx, pc, us);
 }

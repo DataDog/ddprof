@@ -218,6 +218,8 @@ static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr,
 static DDRes ddprof_unwind_sample(DDProfContext *ctx, perf_event_sample *sample,
                                   int watcher_pos) {
   struct UnwindState *us = ctx->worker_ctx.us;
+  PerfWatcher *watcher = &ctx->watchers[watcher_pos];
+
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
   ddprof_stats_add(STATS_UNWIND_AVG_STACK_SIZE, sample->size_stack, nullptr);
 
@@ -228,7 +230,15 @@ static DDRes ddprof_unwind_sample(DDProfContext *ctx, perf_event_sample *sample,
   // If a sample has a PID, it has a TID.  Include it for downstream labels
   us->output.pid = sample->pid;
   us->output.tid = sample->tid;
-  DDRes res = unwindstate__unwind(us);
+
+  // If this is a SW_TASK_CLOCK-type event, then aggregate the time
+  if (watcher->config == PERF_COUNT_SW_TASK_CLOCK)
+    ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
+
+  // Attempt to fully unwind if the watcher has a callgraph type
+  DDRes res = {};
+  if (EventConfMode::kCallgraph <= watcher->output_mode)
+    res = unwindstate__unwind(us);
 
   /* This test is not 100% accurate:
    * Linux kernel does not take into account stack start (ie. end address since
@@ -276,18 +286,14 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   // Usually we want to send the sample_val, but sometimes we need to process
   // the event to get the desired value
   PerfWatcher *watcher = &ctx->watchers[watcher_pos];
-  uint64_t sample_val = sample->period;
-  if (PERF_SAMPLE_RAW & watcher->sample_type) {
-    uint64_t raw_offset = watcher->trace_off;
-    uint64_t raw_sz = watcher->trace_sz;
-    memcpy(&sample_val, sample->data_raw + raw_offset, raw_sz);
-  }
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
-  if (!IsDDResFatal(res)) {
+  if (!IsDDResFatal(res) && EventConfMode::kCallgraph <= watcher->output_mode) {
     struct UnwindState *us = ctx->worker_ctx.us;
-
 #ifndef DDPROF_NATIVE_LIB
+    // Depending on the type of watcher, compute a value for sample
+    uint64_t sample_val = perf_value_from_sample(watcher, sample);
+
     // in lib mode we don't aggregate (protect to avoid link failures)
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];

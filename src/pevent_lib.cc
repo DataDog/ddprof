@@ -106,7 +106,7 @@ static DDRes tallocsys1_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
     // TODO
     for (auto &kprobe : kprobes) {
       watcher_copy.tracepoint_group = "syscalls";
-      watcher_copy.tracepoint_name = kprobe.first.c_str();
+      watcher_copy.tracepoint_label = kprobe.first;
       watcher_copy.config = kprobe.second.fd;
 
       // THIS IS WRONG
@@ -166,7 +166,7 @@ static DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
     } else {
       LG_NFO("Failed to perf_event_open for watcher: %s - with attr.type=%s, "
              "exclude_kernel=%d",
-             watcher->desc, perf_type_str(attr.type),
+             watcher->desc.c_str(), perf_type_str(attr.type),
              static_cast<int>(attr.exclude_kernel));
     }
   }

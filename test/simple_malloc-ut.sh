@@ -9,7 +9,7 @@ export DD_PROFILING_NATIVE_LOG_LEVEL=debug
 export LD_LIBRARY_PATH=$PWD
 export DD_PROFILING_NATIVE_PRESET=default
 # force deterministic sampling
-export DD_PROFILING_NATIVE_EVENTS="sALLOC,-524288"
+export DD_PROFILING_NATIVE_EVENTS="sALLOC period=-524288"
 
 # Get available cpus
 # ddprof will be allowed to run on those cpus
@@ -51,34 +51,21 @@ check() {
         grep -Fq "Profiling terminated" <&"${COPROC[0]}"
         kill "$COPROC_PID"
     fi
-
-    # echo "alloc pid count = $(count "${log_file}" "alloc-samples" "pid")"
-    # echo "cpu pid count = $(count "${log_file}" "cpu-samples" "pid")"
-    # echo "alloc tid count = $(count "${log_file}" "alloc-samples" "tid")"
-    # echo "cpu tid count = $(count "${log_file}" "cpu-samples" "tid")"
-
     if [[ "${expected_pids}" -ne 0 ]]; then
-        result_pids=$(count "${log_file}" "alloc-samples" "pid")
-        if [[ ${result_pids} -ne "${expected_pids}" ]]; then
-            echo "Not enough alloc samples per PID - Res=${result_pids} vs Exp=${expected_pids}"
-            echo "command=$cmd"
-            print_log_samples "${log_file}" "alloc-samples"
-            exit 1
-        fi
-        result_pids=$(count "${log_file}" "cpu-samples" "pid")
-        if [[ ${result_pids} -ne "${expected_pids}" ]]; then
-            echo "Not enough cpu samples per PID - Res=${result_pids} vs Exp=${expected_pids}"
-            echo "command=$cmd"
-            print_log_samples "${log_file}" "cpu-samples"
-            exit 1
-        fi
-
-        if [[ $(count "${log_file}" "alloc-samples" "tid") -ne "${expected_tids}" ||
-                $(count "${log_file}" "cpu-samples" "tid") -ne "${expected_tids}" ]]; then
-            echo "Incorrect number of sample found per TID: $expected_tids"
-            echo "command=$cmd"
-            print_log_samples "${log_file}" "cpu-samples"
-            print_log_samples "${log_file}" "alloc-samples"
+        counted_pids_alloc=$(count "${log_file}" "alloc-samples" "pid")
+        counted_pids_cpu=$(count "${log_file}" "cpu-samples" "pid")
+        counted_tids_alloc=$(count "${log_file}" "alloc-samples" "tid")
+        counted_tids_cpu=$(count "${log_file}" "cpu-samples" "tid")
+        if [[ $counted_pids_alloc -ne "${expected_pids}" ||
+            $counted_pids_cpu -ne "${expected_pids}" ||
+            $counted_tids_alloc -ne "${expected_tids}" ||
+            $counted_tids_cpu -ne "${expected_tids}" ]]; then
+            echo "Incorrect number of sample found for: $cmd"
+            echo "counted_pids_alloc = $counted_pids_alloc"
+            echo "counted_pids_cpu = ${counted_pids_cpu}"
+            echo "counted_tids_alloc = ${counted_tids_alloc}"
+            echo "counted_tids_cpu = ${counted_tids_cpu}"
+            cat "${log_file}"
             exit 1
         fi
     else

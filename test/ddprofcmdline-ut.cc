@@ -4,6 +4,7 @@
 // Datadog, Inc.
 
 #include "ddprof_cmdline.hpp"
+#include "perf_archmap.hpp"
 #include "perf_watcher.hpp"
 
 #include <gtest/gtest.h>
@@ -47,9 +48,236 @@ TEST(CmdLineTst, NullPatterns) {
 TEST(CmdLineTst, FirstEventHit) {
   char const *str = "hCPU";
   PerfWatcher watcher = {};
-  ASSERT_TRUE(watcher_from_event(str, &watcher));
+  ASSERT_TRUE(watcher_from_str(str, &watcher));
   ASSERT_EQ(watcher.type, PERF_TYPE_HARDWARE);
   ASSERT_EQ(watcher.type, PERF_COUNT_HW_CPU_CYCLES);
+}
+
+TEST(CmdLineTst, ParserKeyPatterns) {
+  PerfWatcher watcher = {};
+
+  // Simple events without qualification are valid event names
+  ASSERT_TRUE(watcher_from_str("hCPU", &watcher));
+
+  // Events should be tolerant of padding whitespace
+  // Three checks on each side to ensure fully recursive (base, 1, 2) stripping
+  ASSERT_TRUE(watcher_from_str(" hCPU", &watcher));
+  ASSERT_TRUE(watcher_from_str("  hCPU", &watcher));
+  ASSERT_TRUE(watcher_from_str("   hCPU", &watcher));
+  ASSERT_TRUE(watcher_from_str("hCPU ", &watcher));
+  ASSERT_TRUE(watcher_from_str("hCPU  ", &watcher));
+  ASSERT_TRUE(watcher_from_str("hCPU   ", &watcher));
+  ASSERT_TRUE(watcher_from_str("   hCPU   ", &watcher));
+
+  // Checking only the two-sided fully recursive whitespace stripping for
+  // value is sufficient?
+  ASSERT_EQ(watcher.type, PERF_TYPE_HARDWARE);
+  ASSERT_EQ(watcher.config, PERF_COUNT_HW_CPU_CYCLES);
+
+  // Extended events: e|event|eventname
+  ASSERT_TRUE(watcher_from_str("eventname=hCPU", &watcher));
+  ASSERT_TRUE(watcher_from_str("event=hCPU", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU", &watcher));
+  ASSERT_EQ(watcher.type, PERF_TYPE_HARDWARE);
+  ASSERT_EQ(watcher.config, PERF_COUNT_HW_CPU_CYCLES);
+
+  // Extended events are also whitespace insensitive
+  ASSERT_TRUE(watcher_from_str("   e=hCPU   ", &watcher));
+  ASSERT_EQ(watcher.type, PERF_TYPE_HARDWARE);
+  ASSERT_EQ(watcher.config, PERF_COUNT_HW_CPU_CYCLES);
+
+  // Events fail if invalid
+  ASSERT_FALSE(watcher_from_str("invalidEvent", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=invalidEvent", &watcher));
+
+  // Extended events with a group are tracepoints, and tracepoints are checked
+  // against tracefs for validity.  We don't have a positive check, since that
+  // assumes access to tracefs
+  ASSERT_FALSE(watcher_from_str("e=invalidEvent g=group", &watcher));
+
+  // Extended events _do_ require a valid event to be specified
+  ASSERT_TRUE(watcher_from_str("e=hCPU l=myLabel", &watcher));
+  ASSERT_FALSE(watcher_from_str("l=myLabel", &watcher));
+
+  // s|arg_scale|scale
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU value_scale=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU scale=1", &watcher));
+
+  // Scale be floats and/or have sign, be zero
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=1.0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=+1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=-1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=+1.0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=-1.0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=+0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=-0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=+0.0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU s=-0.0", &watcher));
+
+  // but it is too weird for scale to be given in hex?
+  ASSERT_FALSE(watcher_from_str("e=hCPU s=0x0f", &watcher));
+
+  // Floats can't be exponentials
+  ASSERT_FALSE(watcher_from_str("e=hCPU s=1e1", &watcher));
+
+  // f|frequency|freq
+  ASSERT_TRUE(watcher_from_str("e=hCPU f=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU freq=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU frequency=1", &watcher));
+
+  // p|period|per
+  // FIXME periods should never be negative, but we allow it for the
+  // allocation profiler
+  ASSERT_TRUE(watcher_from_str("e=hCPU p=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU per=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU period=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU period=-1", &watcher));
+
+  // period + frequency is ambiguous, failure
+  ASSERT_FALSE(watcher_from_str("e=hCPU p=1 f=1", &watcher));
+
+  // l|label
+  ASSERT_TRUE(watcher_from_str("e=hCPU l=foo", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU label=foo", &watcher));
+
+  // Labels can contain numbers
+  ASSERT_TRUE(watcher_from_str("e=hCPU label=foo123", &watcher));
+
+  // Labels ("words") cannot start with numbers
+  ASSERT_FALSE(watcher_from_str("e=hCPU label=14b31", &watcher));
+
+  // Labels cannot _be_ numbers
+  ASSERT_FALSE(watcher_from_str("e=hCPU label=14631", &watcher));
+
+  // m|mode
+  ASSERT_TRUE(watcher_from_str("e=hCPU m=g", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU mode=g", &watcher));
+
+  // Mode is permissive
+  ASSERT_TRUE(watcher_from_str("e=hCPU mode=magnanimous", &watcher));
+  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kCallgraph);
+  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kMetric);
+
+  // A or a designate all
+  ASSERT_TRUE(watcher_from_str("e=hCPU mode=A", &watcher));
+  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kCallgraph);
+  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kMetric);
+  ASSERT_TRUE(watcher_from_str("e=hCPU mode=a", &watcher));
+  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kCallgraph);
+  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kMetric);
+
+  // both m and g together designate all
+  ASSERT_TRUE(watcher_from_str("e=hCPU mode=MG", &watcher));
+  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kCallgraph);
+  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kMetric);
+  ASSERT_TRUE(watcher_from_str("e=hCPU mode=mg", &watcher));
+  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kCallgraph);
+  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kMetric);
+
+  // M or m is a metric (no callgraph unless specified)
+  ASSERT_TRUE(watcher_from_str("e=hCPU mode=M", &watcher));
+  ASSERT_FALSE(watcher.output_mode <= EventConfMode::kCallgraph);
+  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kMetric);
+  ASSERT_TRUE(watcher_from_str("e=hCPU mode=m", &watcher));
+  ASSERT_FALSE(watcher.output_mode <= EventConfMode::kCallgraph);
+  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kMetric);
+
+  // G or g designate callgraph (default)
+  ASSERT_TRUE(watcher_from_str("e=hCPU", &watcher));
+  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kCallgraph);
+  ASSERT_FALSE(watcher.output_mode <= EventConfMode::kMetric);
+  ASSERT_TRUE(watcher_from_str("e=hCPU mode=G", &watcher));
+  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kCallgraph);
+  ASSERT_FALSE(watcher.output_mode <= EventConfMode::kMetric);
+  ASSERT_TRUE(watcher_from_str("e=hCPU mode=g", &watcher));
+  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kCallgraph);
+  ASSERT_FALSE(watcher.output_mode <= EventConfMode::kMetric);
+
+  // n|arg_num|argno
+  ASSERT_TRUE(watcher_from_str("e=hCPU n=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU argno=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU arg_num=1", &watcher));
+
+  // argno should expand the given number into the correct sys-V register
+  // for the given 1-indexed parameter value
+  ASSERT_TRUE(watcher_from_str("e=hCPU n=1", &watcher));
+  ASSERT_EQ(watcher.regno, param_to_perf_regno(1));
+  ASSERT_TRUE(watcher_from_str("e=hCPU n=2", &watcher));
+  ASSERT_EQ(watcher.regno, param_to_perf_regno(2));
+  ASSERT_TRUE(watcher_from_str("e=hCPU n=3", &watcher));
+  ASSERT_EQ(watcher.regno, param_to_perf_regno(3));
+
+  // 0-parameter is an error
+  ASSERT_FALSE(watcher_from_str("e=hCPU n=0", &watcher));
+
+  // argno should be bounds-checked
+  ASSERT_FALSE(watcher_from_str("e=hCPU n=100", &watcher));
+
+  // argno can only be a uint
+  ASSERT_FALSE(watcher_from_str("e=hCPU n=1.0", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU n=-1", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU n=rax", &watcher));
+
+  // ... but it CAN be a hex uint because all uints can be
+  ASSERT_TRUE(watcher_from_str("e=hCPU n=0x01", &watcher));
+
+  // o|raw_offset|rawoff
+  ASSERT_TRUE(watcher_from_str("e=hCPU o=0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU rawoff=0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU raw_offset=0", &watcher));
+
+  // rawoff is a uint.  If it has an upper bound, I don't know what it is yet.
+  ASSERT_FALSE(watcher_from_str("e=hCPU o=1.0", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU o=-1", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU o=rax", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU o=0x0", &watcher));
+
+  // p|period|per
+  ASSERT_TRUE(watcher_from_str("e=hCPU p=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU per=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU period=1", &watcher));
+
+  // Period is a uint.
+  // FIXME temporarily relaxing this
+  ASSERT_FALSE(watcher_from_str("e=hCPU p=1.0", &watcher));
+  //  ASSERT_FALSE(watcher_from_str("e=hCPU p=-1", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU p=lots", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU p=0x0", &watcher));
+
+  // r|register|regno
+  ASSERT_TRUE(watcher_from_str("e=hCPU r=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU regno=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU register=1", &watcher));
+
+  // Right now the register is the linux/perf register number, which can be 0
+  ASSERT_TRUE(watcher_from_str("e=hCPU r=0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU r=0x1", &watcher));
+
+  // ... but is still bounded by the architecture
+  ASSERT_FALSE(watcher_from_str("e=hCPU r=100", &watcher));
+
+  // z|raw_size|rawsz
+  ASSERT_TRUE(watcher_from_str("e=hCPU z=4", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU rawsz=4", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU raw_size=4", &watcher));
+
+  // Check for allowed integer sizes
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=-1", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=0", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU z=1", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU z=2", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=3", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU z=4", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=5", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=6", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=7", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU z=8", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=9", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=16", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=32", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=hCPU z=64", &watcher));
 }
 
 TEST(CmdLineTst, LastEventHit) {
@@ -63,10 +291,10 @@ TEST(CmdLineTst, LastEventHit) {
 }
 
 TEST(CmdLineTst, LiteralEventWithGoodValue) {
-  char const *str = "hCPU,555";
+  char const *str = "event=hCPU period=555";
   PerfWatcher watcher = {};
   watcher.sample_period = 12345;
-  ASSERT_TRUE(watcher_from_event(str, &watcher));
+  ASSERT_TRUE(watcher_from_str(str, &watcher));
   ASSERT_EQ(watcher.sample_period, 555); // value changed
 }
 
@@ -76,17 +304,17 @@ TEST(CmdLineTst, LiteralEventWithGoodValue) {
 TEST(CmdLineTst, LiteralEventWithNoComma) {
   char const *str = "hCPU1";
   PerfWatcher watcher = {};
-  ASSERT_FALSE(watcher_from_event(str, &watcher));
+  ASSERT_FALSE(watcher_from_str(str, &watcher));
 }
 
 TEST(CmdLineTst, LiteralEventWithVeryBadValue) {
-  char const *str = "hCPU,apples";
+  char const *str = "hCPU period=apples";
   PerfWatcher watcher = {};
-  ASSERT_FALSE(watcher_from_event(str, &watcher));
+  ASSERT_FALSE(watcher_from_str(str, &watcher));
 }
 
 TEST(CmdLineTst, LiteralEventWithKindaBadValue) {
-  char const *str = "hCPU,123apples";
+  char const *str = "hCPU period=123apples";
   PerfWatcher watcher = {};
-  ASSERT_FALSE(watcher_from_event(str, &watcher));
+  ASSERT_FALSE(watcher_from_str(str, &watcher));
 }
