@@ -81,7 +81,7 @@ DDProfMod *DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
               .first->second;
 }
 
-void DwflHdr::clear_unvisited() {
+std::vector<pid_t> DwflHdr::get_unvisited() const {
   std::vector<pid_t> pids_remove;
   for (auto &el : _dwfl_map) {
     if (_visited_pid.find(el.first) == _visited_pid.end()) {
@@ -89,11 +89,10 @@ void DwflHdr::clear_unvisited() {
       pids_remove.push_back(el.first);
     }
   }
-  for (pid_t el : pids_remove) {
-    _dwfl_map.erase(el);
-    LG_NFO("[DWFL] DWFL Map Clearing PID%d", el);
-  }
+  return pids_remove;
+}
 
+std::vector<pid_t> DwflHdr::reset_unvisited() {
   // clear the list of visited for next cycle
   _visited_pid.clear();
 }
