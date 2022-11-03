@@ -120,7 +120,6 @@ void unwind_cycle(UnwindState *us) {
   us->symbol_hdr.cycle();
   // clean up pids that we did not see recently
   us->dwfl_hdr.display_stats();
-  us->dwfl_hdr.clear_unvisited();
 
   us->dso_hdr._stats.reset();
   unwind_metrics_reset();

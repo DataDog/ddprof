@@ -64,7 +64,8 @@ struct DwflWrapper {
 class DwflHdr {
 public:
   DwflWrapper &get_or_insert(pid_t pid);
-  void clear_unvisited();
+  std::vector<pid_t> get_unvisited() const;
+  std::vector<pid_t> reset_unvisited();
   void clear_pid(pid_t pid);
 
   // get number of accessed modules

@@ -512,6 +512,15 @@ static DDRes aggregate_sys_allocations(DDProfContext *ctx) {
 }
 #endif
 
+static void clear_unvisted_pids(DDProfWorkerContext &worker_ctx) {
+  UnwindState *us = worker_ctx.us;
+  const std::vector<pid_t> pids_remove = us->dwfl_hdr.get_unvisited();
+  for (pid_t el : pids_remove) {
+    unwind_pid_free(us, el);
+  }
+  us->dwfl_hdr.reset_unvisited();
+}
+
 /// Cycle operations : export, sync metrics, update counters
 DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
                           [[maybe_unused]] bool synchronous_export) {
@@ -603,6 +612,8 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
     export_time_set(ctx);
   }
   unwind_cycle(ctx->worker_ctx.us);
+
+  clear_unvisted_pids(ctx->worker_ctx);
 
   // Reset stats relevant to a single cycle
   ddprof_reset_worker_stats();
