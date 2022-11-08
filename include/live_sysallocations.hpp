@@ -85,9 +85,7 @@ public:
     add_allocs(stack, addr1, size1, pid);
   }
 
-  void clear_pid(pid_t pid) {
-    _pid_map.erase(pid);
-  }
+  void clear_pid(pid_t pid) { _pid_map.erase(pid); }
 
   using StackMap = std::unordered_map<uintptr_t, UnwindOutput>;
   using PidMap = std::unordered_map<pid_t, StackMap>;

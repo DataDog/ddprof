@@ -28,7 +28,7 @@ bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
   struct UnwindState *us = reinterpret_cast<UnwindState *>(arg);
 
   unsigned int regs_num;
-  for (regs_num = 0; - 1u != dwarf_to_perf_regno(regs_num); ++regs_num) {
+  for (regs_num = 0; -1u != dwarf_to_perf_regno(regs_num); ++regs_num) {
     unsigned int regs_idx = dwarf_to_perf_regno(regs_num);
     regs[regs_num] = us->initial_regs.regs[regs_idx];
   }

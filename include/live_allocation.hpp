@@ -25,9 +25,7 @@ public:
     }
   }
 
-  void clear_pid(pid_t pid) {
-    _pid_map.erase(pid);
-  }
+  void clear_pid(pid_t pid) { _pid_map.erase(pid); }
 
   struct AllocationInfo {
     UnwindOutput _stack;

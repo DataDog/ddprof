@@ -384,7 +384,7 @@ option(BUILD_NATIVE_LIB "Build a library out of the native profiler" ON)
 if(${BUILD_NATIVE_LIB})
 
   # Define all sources
-  set(DDPROF_LIB_SRC ${COMMON_SRC} src/lib/ddprof_output.cc include/pid_header.hpp)
+  set(DDPROF_LIB_SRC ${COMMON_SRC} src/lib/ddprof_output.cc)
 
   # Libs to link
   set(NATIVE_LIB_LIBRARY_LIST DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
