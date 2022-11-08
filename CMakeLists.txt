@@ -309,7 +309,6 @@ add_custom_command(
 add_library(ddprof_exe_object OBJECT IMPORTED GLOBAL)
 set_target_properties(ddprof_exe_object PROPERTIES IMPORTED_OBJECTS "${DDPROF_EXE_OBJECT}")
 
-# \fixme{nsavoire} Need to make this wotrk with loader + GOT override
 add_library(dd_profiling-static STATIC ${DD_PROFILING_SOURCES} $<TARGET_OBJECTS:ddprof_exe_object>)
 set_target_properties(dd_profiling-static PROPERTIES OUTPUT_NAME dd_profiling)
 target_compile_definitions(dd_profiling-static PRIVATE DDPROF_EMBEDDED_EXE_DATA)
@@ -385,7 +384,7 @@ option(BUILD_NATIVE_LIB "Build a library out of the native profiler" ON)
 if(${BUILD_NATIVE_LIB})
 
   # Define all sources
-  set(DDPROF_LIB_SRC ${COMMON_SRC} src/lib/ddprof_output.cc)
+  set(DDPROF_LIB_SRC ${COMMON_SRC} src/lib/ddprof_output.cc include/pid_header.hpp)
 
   # Libs to link
   set(NATIVE_LIB_LIBRARY_LIST DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)

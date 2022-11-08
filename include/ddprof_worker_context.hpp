@@ -8,6 +8,7 @@
 #include "live_allocation.hpp"
 #include "live_sysallocations.hpp"
 #include "pevent.hpp"
+#include "pid_header.hpp"
 #include "proc_status.hpp"
 
 #include <array>

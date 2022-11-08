@@ -65,7 +65,7 @@ class DwflHdr {
 public:
   DwflWrapper &get_or_insert(pid_t pid);
   std::vector<pid_t> get_unvisited() const;
-  std::vector<pid_t> reset_unvisited();
+  void reset_unvisited();
   void clear_pid(pid_t pid);
 
   // get number of accessed modules
@@ -74,6 +74,7 @@ public:
 
 private:
   std::unordered_map<pid_t, DwflWrapper> _dwfl_map;
+  // \fixme{r1viollet} this belongs in a higher level structure
   std::unordered_set<pid_t> _visited_pid;
 };
 

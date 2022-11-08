@@ -55,7 +55,10 @@ CmakeWithOptions() {
   shift
   VENDOR_EXTENSION=$(GetDirectoryExtention ${BUILD_TYPE})
   # shellcheck disable=SC2086
-  cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DVENDOR_EXTENSION=${VENDOR_EXTENSION} $@
+  cmd="cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DVENDOR_EXTENSION=${VENDOR_EXTENSION} $@"
+  echo "Using ${cmd}"
+  echo"###################################"
+  eval ${cmd}
 }
 
 RelCMake() {

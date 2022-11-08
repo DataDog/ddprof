@@ -85,22 +85,8 @@ public:
     add_allocs(stack, addr1, size1, pid);
   }
 
-  void do_exit(pid_t pid) {
-    StackMap &stack_map = _pid_map[pid];
-    stack_map.clear();
-    _visited_recently.erase(pid);
-  }
-
-  void sanitize_pids() {
-    for (auto &stack_map : _pid_map) {
-      if (!_visited_recently.contains(stack_map.first)) {
-        // This PID wasn't visited recently.  Is it still around?
-        if (kill(stack_map.first, 0)) {
-          _pid_map[stack_map.first].clear();
-        }
-      }
-    }
-    _visited_recently.clear();
+  void clear_pid(pid_t pid) {
+    _pid_map.erase(pid);
   }
 
   using StackMap = std::unordered_map<uintptr_t, UnwindOutput>;

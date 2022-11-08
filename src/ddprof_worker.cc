@@ -16,6 +16,7 @@
 #include "pevent_lib.hpp"
 #include "pprof/ddprof_pprof.hpp"
 #include "procutils.hpp"
+#include "signal_helper.hpp"
 #include "stack_handler.hpp"
 #include "tags.hpp"
 #include "timer.hpp"
@@ -45,6 +46,8 @@ static const DDPROF_STATS s_cycled_stats[] = {
     STATS_TARGET_CPU_USAGE};
 
 static const long k_clock_ticks_per_sec = sysconf(_SC_CLK_TCK);
+
+static DDRes worker_pid_free(DDProfContext *ctx, pid_t el);
 
 /// Human readable runtime information
 static void print_diagnostics(const DsoHdr &dso_hdr) {
@@ -264,6 +267,12 @@ static DDRes ddprof_unwind_sample(DDProfContext *ctx, perf_event_sample *sample,
     ddprof_stats_add(STATS_UNWIND_TRUNCATED_INPUT, 1, nullptr);
   }
 
+  if (us->_dwfl_wrapper->_inconsistent) {
+    // error detected on this pid
+    LG_WRN("(Inconsistent DWFL/DSOs)%d - Free associated objects", us->pid);
+    DDRES_CHECK_FWD(worker_pid_free(ctx, us->pid));
+  }
+
   return res;
 }
 
@@ -349,8 +358,8 @@ DDRes ddprof_pr_allocation_tracking(DDProfContext *ctx,
 
 DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
                                        perf_event_sample *sample,
-                                       int watcher_pos) {
-
+                                       int watcher_pos, bool &clear_pid) {
+  clear_pid = false;
   // Syscall parameters.  Suppressing nags because it's annoying to look these
   // up and it isn't totally appropriate to spin out a new header just
   // for this
@@ -412,7 +421,7 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
   } else if (id == 60 || id == 231 || id == 59 || id == 322 || id == 520 ||
              id == 545) {
     // Erase upon exit or exec
-    sysalloc.do_exit(sample->pid);
+    clear_pid = true;
   }
 
   return ddres_init();
@@ -446,8 +455,9 @@ void *ddprof_worker_export_thread(void *arg) {
 #endif
 
 #ifndef DDPROF_NATIVE_LIB
-static DDRes aggregate_stack(const LiveAllocation::AllocationInfo &alloc_info,
-                             DDProfContext *ctx) {
+static DDRes
+aggregate_livealloc_stack(const LiveAllocation::AllocationInfo &alloc_info,
+                          DDProfContext *ctx) {
   struct UnwindState *us = ctx->worker_ctx.us;
   int watcher_pos = alloc_info._watcher_pos;
   PerfWatcher *watcher = &ctx->watchers[watcher_pos];
@@ -462,20 +472,48 @@ static DDRes aggregate_stack(const LiveAllocation::AllocationInfo &alloc_info,
   return ddres_init();
 }
 
+static DDRes aggregate_live_allocations_for_pid(DDProfContext *ctx, pid_t pid) {
+  LiveAllocation &live_allocations = ctx->worker_ctx.live_allocation;
+  auto &stack_map = live_allocations._pid_map[pid];
+  for (const auto &alloc_info_pair : stack_map) {
+    DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info_pair.second, ctx));
+  }
+  return ddres_init();
+}
+
 static DDRes aggregate_live_allocations(DDProfContext *ctx) {
   // this would be more efficient if we could reuse the same stacks in
   // libdatadog
   LiveAllocation &live_allocations = ctx->worker_ctx.live_allocation;
   for (auto &stack_map : live_allocations._pid_map) {
     for (const auto &alloc_info_pair : stack_map.second) {
-      DDRES_CHECK_FWD(aggregate_stack(alloc_info_pair.second, ctx));
+      DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info_pair.second, ctx));
     }
     LG_NTC("Number of Live allocations for PID%d = %lu ", stack_map.first,
            stack_map.second.size());
-    // Safety to avoid spending all the time reporting allocations
-    if (stack_map.second.size() >= LiveAllocation::kMaxTracked) {
-      stack_map.second.clear();
-    }
+  }
+  return ddres_init();
+}
+
+DDRes aggregate_sys_allocation_stack(const UnwindOutput *uw_output,
+                                     const SymbolHdr *symbol_hdr,
+                                     const PerfWatcher *watcher,
+                                     DDProfPProf *pprof) {
+  DDRES_CHECK_FWD(
+      pprof_aggregate(uw_output, symbol_hdr, 4096, 1, watcher, pprof));
+  return ddres_init();
+}
+
+static DDRes aggregate_sys_allocations_for_pid(DDProfContext *ctx, pid_t pid) {
+  struct UnwindState *us = ctx->worker_ctx.us;
+  SystemAllocation &sysallocs = ctx->worker_ctx.sys_allocation;
+  PerfWatcher *watcher = &ctx->watchers[sysallocs.watcher_pos];
+  int i_export = ctx->worker_ctx.i_current_pprof;
+  DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
+  const auto &stack_map = sysallocs._pid_map[pid];
+  for (const auto &page : stack_map) {
+    DDRES_CHECK_FWD(aggregate_sys_allocation_stack(
+        &page.second, &us->symbol_hdr, watcher, pprof));
   }
   return ddres_init();
 }
@@ -487,31 +525,48 @@ static DDRes aggregate_sys_allocations(DDProfContext *ctx) {
   int i_export = ctx->worker_ctx.i_current_pprof;
   DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
 
-  // Before we do anything, clear the pids that died in this period
-  sysallocs.sanitize_pids();
-
   // Iterate through each PID
   for (auto &stack_map : sysallocs._pid_map) {
-
     // Iterate through pages...
     // TODO Probably aggregate into ranges of pages or something, but once per
     //      page is just too much
     for (const auto &page : stack_map.second) {
-      DDRES_CHECK_FWD(pprof_aggregate(&page.second, &us->symbol_hdr, 4096, 1,
-                                      watcher, pprof));
+      DDRES_CHECK_FWD(aggregate_sys_allocation_stack(
+          &page.second, &us->symbol_hdr, watcher, pprof));
     }
   }
   return ddres_init();
 }
+
+static DDRes worker_pid_free(DDProfContext *ctx, pid_t el) {
+  DDRES_CHECK_FWD(aggregate_sys_allocations_for_pid(ctx, el));
+  DDRES_CHECK_FWD(aggregate_live_allocations_for_pid(ctx, el));
+  UnwindState *us = ctx->worker_ctx.us;
+  unwind_pid_free(us, el);
+  ctx->worker_ctx.sys_allocation.clear_pid(el);
+  ctx->worker_ctx.live_allocation.clear_pid(el);
+  return ddres_init();
+}
+#else
+static DDRes worker_pid_free(DDProfContext *ctx, pid_t el) {
+  UnwindState *us = ctx->worker_ctx.us;
+  unwind_pid_free(us, el);
+  ctx->worker_ctx.sys_allocation.clear_pid(el);
+  ctx->worker_ctx.live_allocation.clear_pid(el);
+  return ddres_init();
+}
 #endif
 
-static void clear_unvisted_pids(DDProfWorkerContext &worker_ctx) {
-  UnwindState *us = worker_ctx.us;
+static DDRes clear_unvisted_pids(DDProfContext *ctx) {
+  UnwindState *us = ctx->worker_ctx.us;
   const std::vector<pid_t> pids_remove = us->dwfl_hdr.get_unvisited();
   for (pid_t el : pids_remove) {
-    unwind_pid_free(us, el);
+    if (!process_is_alive(el)) {
+      DDRES_CHECK_FWD(worker_pid_free(ctx, el));
+    }
   }
   us->dwfl_hdr.reset_unvisited();
+  return ddres_init();
 }
 
 /// Cycle operations : export, sync metrics, update counters
@@ -607,7 +662,7 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
   }
   unwind_cycle(ctx->worker_ctx.us);
 
-  clear_unvisted_pids(ctx->worker_ctx);
+  DDRES_CHECK_FWD(clear_unvisted_pids(ctx));
 
   // Reset stats relevant to a single cycle
   ddprof_reset_worker_stats();
@@ -631,22 +686,24 @@ void ddprof_pr_lost(DDProfContext *ctx, const perf_event_lost *lost,
   ctx->worker_ctx.lost_events_per_watcher[watcher_pos] += lost->lost;
 }
 
-void ddprof_pr_comm(DDProfContext *ctx, const perf_event_comm *comm,
-                    int watcher_pos) {
+DDRes ddprof_pr_comm(DDProfContext *ctx, const perf_event_comm *comm,
+                     int watcher_pos) {
   // Change in process name (assuming exec) : clear all associated dso
   if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC) {
     LG_DBG("<%d>(COMM)%d -> %s", watcher_pos, comm->pid, comm->comm);
-    unwind_pid_free(ctx->worker_ctx.us, comm->pid);
+    DDRES_CHECK_FWD(worker_pid_free(ctx, comm->pid));
   }
+  return ddres_init();
 }
 
-void ddprof_pr_fork(DDProfContext *ctx, const perf_event_fork *frk,
-                    int watcher_pos) {
+DDRes ddprof_pr_fork(DDProfContext *ctx, const perf_event_fork *frk,
+                     int watcher_pos) {
   LG_DBG("<%d>(FORK)%d -> %d/%d", watcher_pos, frk->ppid, frk->pid, frk->tid);
   if (frk->ppid != frk->pid) {
     // Clear everything and populate at next error or with coming samples
-    unwind_pid_free(ctx->worker_ctx.us, frk->pid);
+    DDRES_CHECK_FWD(worker_pid_free(ctx, frk->pid));
   }
+  return ddres_init();
 }
 
 void ddprof_pr_exit(DDProfContext *ctx, const perf_event_exit *ext,
@@ -790,8 +847,12 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
           // Handle special profiling types first
           if (watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS1 ||
               watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS2) {
-            DDRES_CHECK_FWD(
-                ddprof_pr_sysallocation_tracking(ctx, sample, watcher_pos));
+            bool clear_pid = false;
+            DDRES_CHECK_FWD(ddprof_pr_sysallocation_tracking(
+                ctx, sample, watcher_pos, clear_pid));
+            if (clear_pid) {
+              DDRES_CHECK_FWD(worker_pid_free(ctx, sample->pid));
+            }
           } else if (is_allocation && ctx->params.live_allocations) {
             DDRES_CHECK_FWD(
                 ddprof_pr_allocation_tracking(ctx, sample, watcher_pos));
@@ -808,8 +869,8 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
       break;
     case PERF_RECORD_COMM:
       if (wpid->pid)
-        ddprof_pr_comm(ctx, reinterpret_cast<const perf_event_comm *>(hdr),
-                       watcher_pos);
+        DDRES_CHECK_FWD(ddprof_pr_comm(
+            ctx, reinterpret_cast<const perf_event_comm *>(hdr), watcher_pos));
       break;
     case PERF_RECORD_EXIT:
       if (wpid->pid)
@@ -818,8 +879,8 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
       break;
     case PERF_RECORD_FORK:
       if (wpid->pid)
-        ddprof_pr_fork(ctx, reinterpret_cast<const perf_event_fork *>(hdr),
-                       watcher_pos);
+        DDRES_CHECK_FWD(ddprof_pr_fork(
+            ctx, reinterpret_cast<const perf_event_fork *>(hdr), watcher_pos));
       break;
 
     /* Cases where the target type might not have a PID */
