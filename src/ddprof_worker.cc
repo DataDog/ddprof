@@ -381,7 +381,7 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
   // Only unwind if we will need to propagate unwinding information forward
   DDRes res = {};
   UnwindOutput *uwo = NULL;
-  if (id == 9 || id == 25) {
+  if (id == ddprof::Syscall::mmap || id == ddprof::Syscall::mremap) {
     auto ticks0 = ddprof::get_tsc_cycles();
     res = ddprof_unwind_sample(ctx, sample, watcher_pos);
     auto unwind_ticks = ddprof::get_tsc_cycles();
