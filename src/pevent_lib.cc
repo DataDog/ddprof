@@ -14,6 +14,8 @@
 #include "syscalls.hpp"
 #include "user_override.hpp"
 
+#include <map>
+
 #include <assert.h>
 #include <errno.h>
 #include <stddef.h>
@@ -68,87 +70,116 @@ static void pevent_add_child_fd(int child_fd, PEvent &pevent) {
   pevent.child_fds[pevent.current_child_fd++] = child_fd;
 }
 
-static DDRes tallocsys1_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
-                             int num_cpu, PEventHdr *pevent_hdr) {
+struct LinkedPerfs {
+  const std::string tracepoint;
+  bool has_stack;
+};
+
+bool operator==(LinkedPerfs const &A, LinkedPerfs const &B) {
+  return A.tracepoint == B.tracepoint;
+}
+
+using LinkedPerfConf = std::unordered_set<LinkedPerfs>;
+
+template<>
+struct std::hash<LinkedPerfs> {
+  std::size_t operator()(LinkedPerfs const &A) const noexcept {
+    return std::hash<std::string>{}(A.tracepoint);
+  }
+};
+
+static const LinkedPerfConf tallocsys1_conf = {
+      {"sys_exit_mmap", true},
+      {"sys_exit_munmap", false},
+      {"sys_exit_mremap", true}};
+
+static const LinkedPerfConf topenfd_conf = {
+      {"sys_exit_open", true},
+      {"sys_exit_openat", true},
+      {"sys_exit_close", false},
+      {"sys_exit_exit", false},
+      {"sys_exit_exit_group", false}};
+
+static DDRes link_perfs(PerfWatcher *watcher, int watcher_idx, pid_t pid,
+                        int num_cpu, PEventHdr *pevent_hdr, const LinkedPerfConf &conf) {
   PerfWatcher watcher_copy = *watcher;
   PEvent *pes = pevent_hdr->pes;
 
-  struct talloc_conf {
-    int fd;
-    bool enable_userstack;
-  };
-  std::unordered_map<std::string, talloc_conf> kprobes{
-      {"sys_exit_mmap", {-1, true}},
-      {"sys_exit_munmap", {-1, false}},
-      {"sys_exit_mremap", {-1, true}}};
+  std::unordered_map<std::string, int> tracepoint_ids;
+  for (auto &probe : conf)
+    tracepoint_ids[probe.tracepoint] = -1;
 
   // Set the IDs
-  for (auto &kprobe : kprobes) {
-    long id = id_from_tracepoint("syscalls", kprobe.first.c_str());
+  for (const auto &probe : conf) {
+    long id = id_from_tracepoint("syscalls", probe.tracepoint.c_str());
     if (-1 == id) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
-                             "Error opening tracefs for tALLOCSYS1 on %s",
-                             kprobe.first.c_str());
+                             "Error opening tracefs for %s",
+                             probe.tracepoint.c_str());
     }
-    kprobes[kprobe.first].fd = id;
+    tracepoint_ids[probe.tracepoint] = id;
   }
 
-  // Iterate
-  for (int cpu_idx = 0; cpu_idx < num_cpu; ++cpu_idx) {
-    int fd = -1;
-    // Create the pevent which will consolidate this watcher
-    size_t pevent_idx = -1;
-    DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
-    perf_event_attr attr = {};
-    std::vector<int> cleanup_fds;
+  // The idea is to instrument every probe on every CPU
+  // All probes on the same CPU are collected and will be `ioctl()`'d later
+  // 
 
-    // This is very imperfect since failure leaves a dangling pevent
-    // TODO
-    for (auto &kprobe : kprobes) {
-      watcher_copy.tracepoint_group = "syscalls";
-      watcher_copy.tracepoint_name = kprobe.first.c_str();
-      watcher_copy.config = kprobe.second.fd;
+  std::map<int, int> cpu_pevent_idx = {};
+  for (const auto &probe: conf) {
+    // Setup the copy of the watcher with tracepoint stuff
+    watcher_copy.tracepoint_group = "syscalls";
+    watcher_copy.tracepoint_name = probe.tracepoint.c_str();
+    watcher_copy.config = tracepoint_ids[probe.tracepoint];
+    watcher_copy.sample_stack_size = probe.has_stack ? watcher->sample_stack_size / 4 : 0;
 
-      // THIS IS WRONG
-      if (kprobe.second.enable_userstack) {
-        watcher_copy.sample_stack_size = watcher->sample_stack_size;
+    // Record perf_event_open() attr struct
+    int attr_idx = pevent_hdr->nb_attrs++;
+    perf_event_attr attr = perf_config_from_watcher(&watcher_copy, true);
+    pevent_hdr->attrs[attr_idx] = attr;
+
+    bool watcher_failed = true;
+    for (int cpu_idx = 0; cpu_idx < num_cpu; ++cpu_idx) {
+      int fd = perf_event_open(&attr, pid, cpu_idx, -1, PERF_FLAG_FD_CLOEXEC);
+      if (fd < 0)
+        continue;
+      watcher_failed = false;
+
+      if (cpu_pevent_idx.contains(cpu_idx)) {
+        pevent_add_child_fd(fd, pes[cpu_pevent_idx[cpu_idx]]);
       } else {
-        watcher_copy.sample_stack_size = 0;
+        size_t pevent_idx = -1;
+        DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
+        pevent_set_info(fd, attr_idx, pes[pevent_idx]);
+        cpu_pevent_idx[cpu_idx] = pevent_idx;
       }
-
-      attr = perf_config_from_watcher(&watcher_copy, true);
-      int fd_tmp = -1;
-      fd_tmp = perf_event_open(&attr, pid, cpu_idx, -1, PERF_FLAG_FD_CLOEXEC);
-
-      if (-1 == fd_tmp) {
-        for (auto cleanup_fd : cleanup_fds) {
-          close(cleanup_fd);
-        }
-        DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
-                               "Error calling perfopen for tALLOCSYS1 on %s",
-                               kprobe.first.c_str());
-      }
-      if (-1 != fd) {
-        pevent_add_child_fd(fd_tmp, pes[pevent_idx]);
-      } else {
-        fd = fd_tmp;
-      }
-      cleanup_fds.push_back(fd_tmp);
     }
-    pevent_hdr->attrs[pevent_hdr->nb_attrs] = attr;
-    pevent_set_info(fd, pes[pevent_idx].attr_idx, pes[pevent_idx]);
-    ++pevent_hdr->nb_attrs;
-  }
 
+    // Ideally we'd invalidate the whole group, but we've stashed stuff now
+    // TODO fix this
+    if (watcher_failed) {
+      LG_ERR("Error calling perfopen on (%s)", probe.tracepoint.c_str());
+    }
+  }
   return ddres_init();
+}
+
+static DDRes tallocsys1_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
+                             int num_cpu, PEventHdr *pevent_hdr) {
+  return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, tallocsys1_conf);
+}
+
+static DDRes topenfd_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
+                             int num_cpu, PEventHdr *pevent_hdr) {
+  PRINT_NFO("Instrumenting filedesc watcher");
+  return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, topenfd_conf);
 }
 
 static DDRes tnoisycpu_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
                             int num_cpu, PEventHdr *pevent_hdr) {
-
   /* UNIMPLEMENTED */
   return ddres_init();
 }
+
 
 static DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
                                    pid_t pid, PEventHdr *pevent_hdr,
@@ -223,14 +254,20 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
       // Here we inline a lookup for the specific handler, but in reality this
       // should be defined at the level of the watcher
       switch (watcher->ddprof_event_type) {
-        case (DDPROF_PWE_tALLOCSYS1):
-          DDRES_CHECK_FWD(
-              tallocsys1_open(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
-          break;
-        case (DDPROF_PWE_tNOISYCPU):
-          DDRES_CHECK_FWD(
-              tnoisycpu_open(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
-          break;
+      case DDPROF_PWE_tALLOCSYS1:
+        DDRES_CHECK_FWD(
+            tallocsys1_open(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
+        break;
+      case (DDPROF_PWE_tNOISYCPU):
+        // Noisy CPU should not have its own open sequence yet
+        LG_ERR("Noisy CPU is opening its own perf!");
+        DDRES_CHECK_FWD(
+            tnoisycpu_open(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
+        break;
+      case DDPROF_PWE_tOPENFD:
+        DDRES_CHECK_FWD(
+            topenfd_open(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
+        break;
       }
     } else if (watcher->type < kDDPROF_TYPE_CUSTOM) {
       DDRES_CHECK_FWD(
@@ -314,7 +351,7 @@ DDRes pevent_setup(DDProfContext *ctx, pid_t pid, int num_cpu,
         int child_fd = pes->child_fds[j];
         if (ioctl(child_fd, PERF_EVENT_IOC_SET_OUTPUT, fd)) {
           DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
-                                 "Could not ioctl() tALLOCSYS1");
+                                 "Could not ioctl() linked perf buffers");
         }
       }
     }

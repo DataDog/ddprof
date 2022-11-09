@@ -139,7 +139,6 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
     watcher->tracepoint_name = watcher->desc;
     watcher->tracepoint_group = event_groupname;
   }
-
   // Certain watcher configs get additional event information
   if (watcher->config == kDDPROF_COUNT_ALLOCATIONS) {
     watcher->sample_type |= PERF_SAMPLE_ADDR;
@@ -169,13 +168,17 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
       watcher->config = id;
       watcher->sample_type |= PERF_SAMPLE_RAW;
       watcher->options.is_kernel = kPerfWatcher_Try;
+    } else if (watcher->ddprof_event_type == DDPROF_PWE_tOPENFD) {
+      watcher->tracepoint_group = "syscalls";
+      watcher->tracepoint_name = "sys_exit_openat";
+      watcher->instrument_self = true;
+      watcher->sample_type |= PERF_SAMPLE_RAW;
+      watcher->options.is_kernel = kPerfWatcher_Try;
     } else if (watcher->ddprof_event_type == DDPROF_PWE_tNOISYCPU) {
       PRINT_NFO("Disabling call stacks for noisy neighbors");
       PRINT_NFO("DISABLING SELF-INSTRUMENT for noisy neighbors");
- //     watcher->instrument_self = true;
       watcher->sample_stack_size = 0; // Disable for now
       watcher->sample_type |= PERF_SAMPLE_CPU | PERF_SAMPLE_IDENTIFIER;
-
       watcher->tracepoint_name = "sCPU";
     }
   }

@@ -122,11 +122,16 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
 
   // Some profiling features, like system allocations, uses ctx storage and
   // needs to associate a watcher (but only one watcher) to that storage.
+  bool alloc_set = false;
+  bool openfile_set = false;
   for (int i = 0; i < ctx->num_watchers; ++i) {
-    if (ctx->watchers[i].ddprof_event_type == DDPROF_PWE_tALLOCSYS1 ||
-        ctx->watchers[i].ddprof_event_type == DDPROF_PWE_tALLOCSYS2) {
+    if (!alloc_set && (ctx->watchers[i].ddprof_event_type == DDPROF_PWE_tALLOCSYS1 ||
+        ctx->watchers[i].ddprof_event_type == DDPROF_PWE_tALLOCSYS2)) {
       ctx->worker_ctx.sys_allocation.watcher_pos = i;
-      break;
+      alloc_set = true;
+    } else if (!openfile_set && ctx->watchers[i].ddprof_event_type == DDPROF_PWE_tOPENFD) {
+      ctx->worker_ctx.fileopen.watcher_pos = i;
+      openfile_set = true;
     }
   }
 
