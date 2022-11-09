@@ -131,7 +131,7 @@ static DDRes link_perfs(PerfWatcher *watcher, int watcher_idx, pid_t pid,
     watcher_copy.tracepoint_group = "syscalls";
     watcher_copy.tracepoint_name = probe.tracepoint.c_str();
     watcher_copy.config = tracepoint_ids[probe.tracepoint];
-    watcher_copy.sample_stack_size = probe.has_stack ? watcher->sample_stack_size : 0;
+    watcher_copy.sample_stack_size = probe.has_stack ? watcher->sample_stack_size / 4 : 0;
 
     // Record perf_event_open() attr struct
     int attr_idx = pevent_hdr->nb_attrs++;

@@ -420,8 +420,6 @@ DDRes ddprof_pr_openfd_tracking(DDProfContext *ctx, perf_event_sample *sample, i
   memcpy(&id, sample->data_raw + 8, sizeof(id));
   auto &fileopen = ctx->worker_ctx.fileopen;
 
-  PRINT_NFO("HELLO I AM SEEING A FILE OPEN NOW OK");
-
 #ifdef __x86_64__
   [[maybe_unused]] uint64_t sc_ret = sample->regs[PAM_X86_RAX];
   [[maybe_unused]] uint64_t sc_p1 = sample->regs[PAM_X86_RDI];
@@ -470,9 +468,8 @@ DDRes ddprof_pr_openfd_tracking(DDProfContext *ctx, perf_event_sample *sample, i
   if (id == 2 || id == 257) {
     fileopen.do_open(*uwo, sc_ret, sample->pid);
   } else if (id == 3) {
-    fileopen.do_close(sc_ret, sample->pid);
-  } else if (id == 60 || id == 231 || id == 59 || id == 322 || id == 520 ||
-             id == 545) {
+    fileopen.do_close(sc_p1, sample->pid);
+  } else if (id == 60 || id == 231 || id == 59 || id == 322) {
     // Erase upon exit or exec
     fileopen.do_exit(sample->pid);
   }

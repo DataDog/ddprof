@@ -21,7 +21,7 @@ static char StatusLine[] =
 DDRes proc_read(ProcStatus *procstat) {
   FILE *ststream = fopen("/proc/self/stat", "r");
   if (!ststream) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PROCSTATE, "Failed to open /proc/self/stat");
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PROCSTATE, "Failed to open /proc/self/stat (%s)", strerror(errno));
   }
 
   if (0 > fscanf(ststream, StatusLine, &procstat->pid, &procstat->comm,
