@@ -79,6 +79,7 @@ enum DDProfTypeId { kDDPROF_TYPE_CUSTOM = PERF_TYPE_MAX + 100 };
 enum DDProfCustomCountId {
   kDDPROF_COUNT_ALLOCATIONS = 0,
   kDDPROF_COUNT_SYSALLOCATIONS,
+  kDDPROF_COUNT_OPENFD,
 };
 
 // Kernel events are necessary to get a full accounting of CPU
@@ -135,6 +136,7 @@ enum DDProfCustomCountId {
   X(sDUM,       "Dummy",              PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_DUMMY,                   1,            DDPROF_PWT_NOCOUNT,     {})                      \
   X(tALLOCSYS1, "System Allocations", PERF_TYPE_TRACEPOINT, kDDPROF_COUNT_SYSALLOCATIONS,          1,            DDPROF_PWT_ALLOC_SPACE, IS_OVERLOADED)           \
   X(tALLOCSYS2, "System Al. (heavy)", PERF_TYPE_TRACEPOINT, kDDPROF_COUNT_SYSALLOCATIONS,          1,            DDPROF_PWT_ALLOC_SPACE, IS_OVERLOADED)           \
+  X(tOPENFD,    "Open File Desc.",    PERF_TYPE_TRACEPOINT, kDDPROF_COUNT_OPENFD,                  1,            DDPROF_PWT_TRACEPOINT,  IS_OVERLOADED)           \
   X(sALLOC,     "Allocations",        kDDPROF_TYPE_CUSTOM,  kDDPROF_COUNT_ALLOCATIONS,             524288,       DDPROF_PWT_ALLOC_SPACE, SKIP_FRAMES)
 // clang-format on
 

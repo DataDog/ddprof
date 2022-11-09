@@ -165,6 +165,11 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
         return false;
       }
       watcher->config = id;
+    } else if (watcher->ddprof_event_type == DDPROF_PWE_tOPENFD) {
+      watcher->tracepoint_group = "syscalls";
+      watcher->tracepoint_name = "sys_exit_openat";
+      watcher->instrument_self = true;
+      watcher->options.is_kernel = kPerfWatcher_Try;
     }
     watcher->sample_type |= PERF_SAMPLE_RAW;
     watcher->options.is_kernel = kPerfWatcher_Try;

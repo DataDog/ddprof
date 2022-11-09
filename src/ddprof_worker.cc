@@ -412,6 +412,75 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
   return ddres_init();
 }
 
+DDRes ddprof_pr_openfd_tracking(DDProfContext *ctx, perf_event_sample *sample, int watcher_pos) {
+  // Syscall parameters.  Suppressing nags because it's annoying to look these
+  // up and it isn't totally appropriate to spin out a new header just
+  // for this
+  int64_t id;
+  memcpy(&id, sample->data_raw + 8, sizeof(id));
+  auto &fileopen = ctx->worker_ctx.fileopen;
+
+  PRINT_NFO("HELLO I AM SEEING A FILE OPEN NOW OK");
+
+#ifdef __x86_64__
+  [[maybe_unused]] uint64_t sc_ret = sample->regs[PAM_X86_RAX];
+  [[maybe_unused]] uint64_t sc_p1 = sample->regs[PAM_X86_RDI];
+  [[maybe_unused]] uint64_t sc_p2 = sample->regs[PAM_X86_RSI];
+  [[maybe_unused]] uint64_t sc_p3 = sample->regs[PAM_X86_RDX];
+  [[maybe_unused]] uint64_t sc_p4 = sample->regs[PAM_X86_R10];
+  [[maybe_unused]] uint64_t sc_p5 = sample->regs[PAM_X86_R8];
+  [[maybe_unused]] uint64_t sc_p6 = sample->regs[PAM_X86_R9];
+#elif __aarch64__
+  // Obviously ARM is totally broken here.
+  [[maybe_unused]] uint64_t sc_ret = sample->regs[PAM_ARM_X0];
+  [[maybe_unused]] uint64_t sc_p1 = sample->regs[PAM_ARM_X0];
+  [[maybe_unused]] uint64_t sc_p2 = sample->regs[PAM_ARM_X1];
+  [[maybe_unused]] uint64_t sc_p3 = sample->regs[PAM_ARM_X2];
+  [[maybe_unused]] uint64_t sc_p4 = sample->regs[PAM_ARM_X3];
+  [[maybe_unused]] uint64_t sc_p5 = sample->regs[PAM_ARM_X4];
+  [[maybe_unused]] uint64_t sc_p6 = sample->regs[PAM_ARM_X5];
+#else
+#  error Architecture not supported
+#endif
+  if (sc_ret > -4096UL) {
+    // If the syscall returned error, it didn't mutate state.  Skip!
+    // ("high" values are errors, as per standard)
+    return ddres_init();
+  }
+
+  // If we're here, then whatever happened was successful.  Let's filter
+  // by syscall number
+  // Only unwind if we will need to propagate unwinding information forward
+  DDRes res = {};
+  UnwindOutput *uwo = NULL;
+  if (id == 2 || id == 257) {
+    auto ticks0 = ddprof::get_tsc_cycles();
+    res = ddprof_unwind_sample(ctx, sample, watcher_pos);
+    auto unwind_ticks = ddprof::get_tsc_cycles();
+    ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL);
+    uwo = &ctx->worker_ctx.us->output;
+
+    // TODO: propagate fatal
+    if (IsDDResFatal(res)) {
+      return ddres_init();
+    }
+  }
+
+  // hardcoded syscall numbers; these are uniform between x86/arm
+  if (id == 2 || id == 257) {
+    fileopen.do_open(*uwo, sc_ret, sample->pid);
+  } else if (id == 3) {
+    fileopen.do_close(sc_ret, sample->pid);
+  } else if (id == 60 || id == 231 || id == 59 || id == 322 || id == 520 ||
+             id == 545) {
+    // Erase upon exit or exec
+    fileopen.do_exit(sample->pid);
+  }
+
+  return ddres_init();
+
+}
+
 static void ddprof_reset_worker_stats() {
   for (unsigned i = 0; i < std::size(s_cycled_stats); ++i) {
     ddprof_stats_clear(s_cycled_stats[i]);
@@ -474,6 +543,30 @@ static DDRes aggregate_live_allocations(DDProfContext *ctx) {
   return ddres_init();
 }
 
+static DDRes aggregate_fileopen(DDProfContext *ctx) {
+  struct UnwindState *us = ctx->worker_ctx.us;
+  FileOpen &fileopen = ctx->worker_ctx.fileopen;
+  PerfWatcher *watcher = &ctx->watchers[fileopen.watcher_pos];
+  int i_export = ctx->worker_ctx.i_current_pprof;
+  DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
+
+  // Before we do anything, clear the pids that died in this period
+  fileopen.sanitize_pids();
+
+  // Iterate through each PID
+  for (auto &stack_map : fileopen._pid_map) {
+
+    // Iterate through pages...
+    // TODO Probably aggregate into ranges of pages or something, but once per
+    //      page is just too much
+    for (const auto &page : stack_map.second) {
+      DDRES_CHECK_FWD(pprof_aggregate(&page.second, &us->symbol_hdr, 1, 1,
+                                      watcher, pprof));
+    }
+  }
+  return ddres_init();
+}
+
 static DDRes aggregate_sys_allocations(DDProfContext *ctx) {
   struct UnwindState *us = ctx->worker_ctx.us;
   SystemAllocation &sysallocs = ctx->worker_ctx.sys_allocation;
@@ -507,6 +600,7 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
   // TODO: lib mode (unhandled for now)
   DDRES_CHECK_FWD(aggregate_live_allocations(ctx));
   DDRES_CHECK_FWD(aggregate_sys_allocations(ctx));
+  DDRES_CHECK_FWD(aggregate_fileopen(ctx));
 
   // Take the current pprof contents and ship them to the backend.  This also
   // clears the pprof for reuse
@@ -775,6 +869,8 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
               watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS2) {
             DDRES_CHECK_FWD(
                 ddprof_pr_sysallocation_tracking(ctx, sample, watcher_pos));
+          } else if (watcher->ddprof_event_type == DDPROF_PWE_tOPENFD) {
+            DDRES_CHECK_FWD(ddprof_pr_openfd_tracking(ctx, sample, watcher_pos));
           } else if (is_allocation && ctx->params.live_allocations) {
             DDRES_CHECK_FWD(
                 ddprof_pr_allocation_tracking(ctx, sample, watcher_pos));
