@@ -16,6 +16,8 @@
 
 // defaut ring buffer size expressed as a power-of-two in number of pages
 #define DEFAULT_BUFF_SIZE_SHIFT 6
+// this does not count as pinned memory, use a larger size
+#define MPSC_BUFF_SIZE_SHIFT 8
 
 #define PSAMPLE_DEFAULT_WAKEUP_MS 100 // sample frequency check
 
