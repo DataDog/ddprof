@@ -214,6 +214,17 @@ static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr,
   return ddres_init();
 }
 
+void ddprof_metric_aggregate(DDProfContext *ctx, PerfWatcher *watcher, uint64_t val) {
+  // Fallthrough sequence to figure out what we call this thing
+  const char *metric_name;
+  if (!watcher->tracepoint_label.empty())
+    metric_name = watcher->tracepoint_label.c_str();
+  else if (!watcher->desc.empty())
+    metric_name = watcher->desc.c_str();
+
+  ctx->metrics.add(metric_name, val); 
+}
+
 /************************* perf_event_open() helpers **************************/
 /// Entry point for sample aggregation
 DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
@@ -239,70 +250,76 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   if (watcher->config == PERF_COUNT_SW_TASK_CLOCK)
     ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
 
-  // Attempt to fully unwind if the watcher has a callgraph type
-  DDRes res = {};
-  if (EventConfMode::kCallgraph <= watcher->output_mode)
-    res = unwindstate__unwind(us);
-
-  /* This test is not 100% accurate:
-   * Linux kernel does not take into account stack start (ie. end address since
-   * stack grows down) when capturing the stack, it starts from SP register and
-   * only limits the range with the requested size and user space end (cf.
-   * https://elixir.bootlin.com/linux/v5.19.3/source/kernel/events/core.c#L6582).
-   * Then it tries to copy this range, and stops when it encounters a non-mapped
-   * address
-   * (https://elixir.bootlin.com/linux/v5.19.3/source/kernel/events/core.c#L6660).
-   * This works well for main thread since [stack] is at the top of the process
-   * user address space (and there is a gap between [vvar] and [stack]), but
-   * for threads, stack can be allocated anywhere on the heap and if address
-   * space below allocated stack is mapped, then kernel will happily copy the
-   * whole range up to the requested sample stack size, therefore always
-   * returning samples with `dyn_size` equals to the requested sample stack
-   * size, even if the end of captured stack is not actually part of the stack.
-   *
-   * That's why we consider the stack as truncated in input only if it is also
-   * detected as incomplete during unwinding.
-   */
-  if (sample->size_stack == ctx->watchers[watcher_pos].sample_stack_size &&
-      us->output.is_incomplete) {
-    ddprof_stats_add(STATS_UNWIND_TRUNCATED_INPUT, 1, nullptr);
-  }
-
+  // Keep track of TSC-based time
   auto unwind_ticks = ddprof::get_tsc_cycles();
-  DDRES_CHECK_FWD(
-      ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL));
 
-  // Aggregate if unwinding went well (todo : fatal error propagation)
-  if (!IsDDResFatal(res) && EventConfMode::kCallgraph <= watcher->output_mode) {
+  // Depending on the type of watcher, compute a value for sample
+  uint64_t sample_val = perf_value_from_sample(watcher, sample);
+
+  // Attempt to fully unwind if the watcher has a callgraph type
+  if (EventConfMode::kCallgraph <= watcher->output_mode) {
+    DDRes res = unwindstate__unwind(us);
+
+    /* This test is not 100% accurate:
+     * Linux kernel does not take into account stack start (ie. end address since
+     * stack grows down) when capturing the stack, it starts from SP register and
+     * only limits the range with the requested size and user space end (cf.
+     * https://elixir.bootlin.com/linux/v5.19.3/source/kernel/events/core.c#L6582).
+     * Then it tries to copy this range, and stops when it encounters a non-mapped
+     * address
+     * (https://elixir.bootlin.com/linux/v5.19.3/source/kernel/events/core.c#L6660).
+     * This works well for main thread since [stack] is at the top of the process
+     * user address space (and there is a gap between [vvar] and [stack]), but
+     * for threads, stack can be allocated anywhere on the heap and if address
+     * space below allocated stack is mapped, then kernel will happily copy the
+     * whole range up to the requested sample stack size, therefore always
+     * returning samples with `dyn_size` equals to the requested sample stack
+     * size, even if the end of captured stack is not actually part of the stack.
+     *
+     * That's why we consider the stack as truncated in input only if it is also
+     * detected as incomplete during unwinding.
+     */
+    if (sample->size_stack == ctx->watchers[watcher_pos].sample_stack_size &&
+        us->output.is_incomplete) {
+      ddprof_stats_add(STATS_UNWIND_TRUNCATED_INPUT, 1, nullptr);
+    }
+  
+    DDRES_CHECK_FWD(
+        ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL));
+  
+    // Aggregate if unwinding went well (todo : fatal error propagation)
+    if (!IsDDResFatal(res) && EventConfMode::kCallgraph <= watcher->output_mode) {
 #ifndef DDPROF_NATIVE_LIB
-    // Depending on the type of watcher, compute a value for sample
-    uint64_t sample_val = perf_value_from_sample(watcher, sample);
-
-    // in lib mode we don't aggregate (protect to avoid link failures)
-    int i_export = ctx->worker_ctx.i_current_pprof;
-    DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
-    DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr, sample_val, 1,
-                                    watcher, pprof));
-    if (ctx->params.show_samples) {
-      ddprof_print_sample(us->output, us->symbol_hdr, sample->period, *watcher);
-    }
-#else
-    // Call the user's stack handler
-    if (ctx->stack_handler) {
-      if (!ctx->stack_handler->apply(&us->output, ctx,
-                                     ctx->stack_handler->callback_ctx,
-                                     watcher_pos)) {
-        DDRES_RETURN_ERROR_LOG(DD_WHAT_STACK_HANDLE,
-                               "Stack handler returning errors");
+      // in lib mode we don't aggregate (protect to avoid link failures)
+      int i_export = ctx->worker_ctx.i_current_pprof;
+      DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
+      DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr, sample_val, 1,
+                                      watcher, pprof));
+      if (ctx->params.show_samples) {
+        ddprof_print_sample(us->output, us->symbol_hdr, sample->period, *watcher);
       }
-    }
+#else
+      // Call the user's stack handler
+      if (ctx->stack_handler) {
+        if (!ctx->stack_handler->apply(&us->output, ctx,
+                                       ctx->stack_handler->callback_ctx,
+                                       watcher_pos)) {
+          DDRES_RETURN_ERROR_LOG(DD_WHAT_STACK_HANDLE,
+                                 "Stack handler returning errors");
+        }
+      }
 #endif
+    }
   }
 
+  // If this watcher has a metric type, aggregate now
+  if (EventConfMode::kMetric <= watcher->output_mode)
+    ddprof_metric_aggregate(ctx, watcher, sample_val);
+
+  // Finalize
   DDRES_CHECK_FWD(ddprof_stats_add(STATS_AGGREGATION_AVG_TIME,
                                    ddprof::get_tsc_cycles() - unwind_ticks,
                                    NULL));
-
   return {};
 }
 
@@ -337,6 +354,9 @@ void *ddprof_worker_export_thread(void *arg) {
 DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
                           [[maybe_unused]] bool synchronous_export) {
 #ifndef DDPROF_NATIVE_LIB
+  // Ship stats
+  ctx->metrics.send();
+
   // Take the current pprof contents and ship them to the backend.  This also
   // clears the pprof for reuse
   // Dispatch happens in a thread, with the underlying data structure for

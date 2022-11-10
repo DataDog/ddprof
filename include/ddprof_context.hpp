@@ -11,6 +11,7 @@
 #include "ddprof_worker_context.hpp"
 #include "exporter_input.hpp"
 #include "perf_watcher.hpp"
+#include "metric_aggregator.hpp"
 
 #include <sched.h>
 
@@ -45,4 +46,5 @@ typedef struct DDProfContext {
   int num_watchers;
   void *callback_ctx; // user state to be used in callback (lib mode)
   DDProfWorkerContext worker_ctx;
+  MetricAggregator metrics;
 } DDProfContext;

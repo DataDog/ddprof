@@ -299,6 +299,12 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     }
   }
 
+  // If NULL, uses a default
+  if (input->metrics_socket && *input->metrics_socket)
+    ctx->metrics.sockpath = input->metrics_socket;
+  else
+    ctx->metrics.sockpath = "/var/run/datadog-agent/statsd.sock";
+
   ctx->params.sockfd = -1;
   ctx->params.wait_on_socket = false;
   if (input->socket && strlen(input->socket) > 0) {
