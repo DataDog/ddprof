@@ -7,6 +7,9 @@ variables:
   DOWNSTREAM_BUILD_BRANCH:
     value: "main"
     description: "Run the build CI on this branch"
+  DDPROF_RELENV_BRANCH:
+    value: "master"
+    description: "Run the reliability environment deploys on this branch"
 
 # Triggers a build within the Datadog infrastructure in the ddprof-build repository
 trigger_internal_build:
@@ -16,7 +19,7 @@ trigger_internal_build:
     DDPROF_SHORT_COMMIT_SHA: ${CI_COMMIT_SHORT_SHA}
     DDPROF_COMMIT_TAG: ${CI_COMMIT_TAG}
     # Reliability environment downstream branch
-    DDPROF_RELENV_BRANCH: ${DDPROF_RELENV_BRANCH-"master"}
+    DDPROF_RELENV_BRANCH: ${DDPROF_RELENV_BRANCH}
   trigger:
     project: DataDog/ddprof-build
     strategy: depend
