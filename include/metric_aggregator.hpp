@@ -18,9 +18,11 @@ struct MetricAggregator{
   std::unordered_map<std::string, uint64_t> values;
 
   void add(const std::string &str, uint64_t val) {
-    if (auto _f = values.find(str); _f == values.end())
-      values[str] = 0;
-    values[str] = values[str] + val;
+    std::string safe_str = str;
+    std::replace(safe_str.begin(), safe_str.end(), ':', '.');
+    if (auto _f = values.find(safe_str); _f == values.end())
+      values[safe_str] = 0;
+    values[safe_str] = values[safe_str] + val;
   }
 
   void clear() {

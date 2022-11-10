@@ -8,12 +8,8 @@
 #include <assert.h>
 #include <cstring>
 #include <errno.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 #include "ddres_helpers.hpp"
 #include "event_config.hpp"
@@ -48,38 +44,6 @@ bool arg_yesno(const char *str, int mode) {
   return false;
 }
 
-unsigned int tracepoint_id_from_event(const char *eventname,
-                                      const char *groupname) {
-  if (!eventname || !*eventname || !groupname || !*groupname)
-    return 0;
-
-  static char path[4096]; // Arbitrary, but path sizes limits are difficult
-  static char buf[sizeof("4294967296")]; // For reading 32-bit decimal int
-  char *buf_copy = buf;
-  size_t pathsz =
-      snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/id",
-               groupname, eventname);
-  if (pathsz >= sizeof(path))
-    return 0;
-  int fd = open(path, O_RDONLY);
-  if (-1 == fd)
-    return 0;
-
-  // Read the data in an eintr-safe way
-  int read_ret = -1;
-  long trace_id = 0;
-  do {
-    read_ret = read(fd, buf, sizeof(buf));
-  } while (read_ret == -1 && errno == EINTR);
-  close(fd);
-  if (read_ret > 0)
-    trace_id = strtol(buf, &buf_copy, 10);
-  if (*buf_copy && *buf_copy != '\n')
-    return 0;
-
-  return trace_id;
-}
-
 // If this returns false, then the passed watcher should be regarded as invalid
 constexpr uint64_t kIgnoredWatcherID = -1ul;
 bool watcher_from_str(const char *str, PerfWatcher *watcher) {
@@ -103,11 +67,7 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
     // If the event doesn't match an ewatcher, it is only valid if a group was
     // also provided (splitting events on ':' is the responsibility of the
     // parser)
-    auto *tmp_tracepoint_watcher = tracepoint_default_watcher();
-    if (!tmp_tracepoint_watcher) {
-      return false;
-    }
-    *watcher = *tmp_tracepoint_watcher;
+    *watcher = *tracepoint_default_watcher();
   } else {
     return false;
   }
@@ -132,10 +92,17 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
     watcher->config = tracepoint_id;
   }
 
+  // Configure some stuff relative to the mode
+  if (!(EventConfMode::kCallgraph <= watcher->output_mode)) {
+    watcher->sample_type &= ~PERF_SAMPLE_STACK_USER;
+    watcher->sample_stack_size = 0;
+  }
+
   // Configure the sampling strategy.  If no valid conf, use template default
   if (conf->cadence != 0) {
     if (conf->cad_type == EventConfCadenceType::kPeriod) {
       watcher->sample_period = conf->cadence;
+      watcher->options.is_freq = false;
     } else if (conf->cad_type == EventConfCadenceType::kFrequency) {
       watcher->sample_frequency = conf->cadence;
       watcher->options.is_freq = true;

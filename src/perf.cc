@@ -90,9 +90,11 @@ perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
   attr.sample_type = watcher->sample_type;
   attr.sample_stack_user = watcher->sample_stack_size;
 
-  // If use_kernel is requested false --> exclude_kernel == true
-  if (watcher->options.use_kernel == PerfWatcherUseKernel::kTry)
-    attr.exclude_kernel = true;
+  // NB inverted (kTry is handled at a higher level)
+  if (watcher->options.use_kernel == PerfWatcherUseKernel::kOff)
+    attr.exclude_kernel = 1;
+  else
+    attr.exclude_kernel = 0;
 
   // Extras (metadata for tracking process state)
   if (extras) {

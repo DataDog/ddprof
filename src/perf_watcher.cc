@@ -5,10 +5,15 @@
 
 #include "perf_watcher.hpp"
 
+#include "logger.hpp"
 #include "perf.hpp"
 
+#include <fcntl.h>
+#include <unistd.h>
 #include <stddef.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #define BASE_STYPES                                                            \
   (PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_TID |          \
@@ -103,3 +108,60 @@ const PerfWatcher *tracepoint_default_watcher() {
 bool watcher_has_tracepoint(const PerfWatcher *watcher) {
   return DDPROF_PWT_TRACEPOINT == watcher->sample_type_id;
 }
+
+const char *get_tracefs_root() {
+  static const char* tracepoint_root = NULL;
+  constexpr std::array<std::string_view, 2> candidate_paths = {
+    "/sys/kernel/tracing/events/",
+    "/sys/kernel/debug/tracing/events"
+  };
+
+  if (!tracepoint_root) {
+    struct stat sa;
+    for (auto &candidate : candidate_paths) {
+      if (!stat(candidate.data(), &sa))
+        return tracepoint_root = candidate.data();
+    }
+    // If none of them worked, then it failed.
+    // Log the message.
+    LG_WRN("Could not determine tracefs root");
+  }
+  return tracepoint_root;
+}
+
+unsigned int tracepoint_id_from_event(const char *eventname,
+                                      const char *groupname) {
+  if (!eventname || !*eventname || !groupname || !*groupname)
+    return 0;
+
+  static char path[4096]; // Arbitrary, but path sizes limits are difficult
+  static char buf[sizeof("4294967296")]; // For reading 32-bit decimal int
+  const char *tracefs_root = get_tracefs_root();
+  if (!tracefs_root) {
+    return 0;
+  }
+  char *buf_copy = buf;
+  size_t pathsz =
+      snprintf(path, sizeof(path), "%s/%s/%s/id",
+               tracefs_root, groupname, eventname);
+  if (pathsz >= sizeof(path))
+    return 0;
+  int fd = open(path, O_RDONLY);
+  if (-1 == fd)
+    return 0;
+
+  // Read the data in an eintr-safe way
+  int read_ret = -1;
+  long trace_id = 0;
+  do {
+    read_ret = read(fd, buf, sizeof(buf));
+  } while (read_ret == -1 && errno == EINTR);
+  close(fd);
+  if (read_ret > 0)
+    trace_id = strtol(buf, &buf_copy, 10);
+  if (*buf_copy && *buf_copy != '\n')
+    return 0;
+
+  return trace_id;
+}
+
