@@ -2,7 +2,7 @@
 # This product includes software developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
 
 variables:
-  # These are gitlab variables so that it's easier to do a manual deploy
+  # These are gitlab variables so that it's easier to do a manual deployx`
   # If these are set with value and description, then it gives you UI elements
   DOWNSTREAM_BUILD_BRANCH:
     value: "main"
@@ -13,13 +13,13 @@ variables:
 
 # Triggers a build within the Datadog infrastructure in the ddprof-build repository
 trigger_internal_build:
+  inherit:
+    variables: true
   variables:
     DDPROF_COMMIT_BRANCH: ${CI_COMMIT_BRANCH}
     DDPROF_COMMIT_SHA: ${CI_COMMIT_SHA}
     DDPROF_SHORT_COMMIT_SHA: ${CI_COMMIT_SHORT_SHA}
     DDPROF_COMMIT_TAG: ${CI_COMMIT_TAG}
-    # Reliability environment downstream branch
-    DDPROF_RELENV_BRANCH: ${DDPROF_RELENV_BRANCH}
   trigger:
     project: DataDog/ddprof-build
     strategy: depend
