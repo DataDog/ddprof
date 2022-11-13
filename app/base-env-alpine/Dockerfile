@@ -6,7 +6,6 @@ ENV CXX=g++
 #MISSING
 # lcov
 # liblzma
-# libjemalloc
 # libexecinfo-dev # No static lib
 RUN apk update \
     && apk add --no-cache aws-cli \
@@ -105,3 +104,9 @@ RUN mkdir /patch
 ADD ./app/base-env-alpine/*.patch /patch/
 ADD ./app/base-env-alpine/error.h /patch/
 ADD ./app/base-env-alpine/libintl.h /patch/
+
+# jemalloc
+RUN git clone --branch 5.3.0 https://github.com/jemalloc/jemalloc.git && \
+    ./autogen.sh && \
+    make && \
+    make install
