@@ -105,7 +105,6 @@ if(${DDPROF_JEMALLOC})
   # jemalloc for debug
   include(Jemalloc)
   message(STATUS "Adding jemalloc for DBG purpose" ${JEMALLOC_ROOT_DIR})
-  add_compile_definitions("DBG_JEMALLOC")
 endif()
 
 # Install lib cap to retrieve capabilities
