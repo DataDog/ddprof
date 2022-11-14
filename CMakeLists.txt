@@ -100,12 +100,11 @@ add_dependencies(cppcheck DDProf::Parser)
 
 # ---- Libraries (needed by ut) ----
 
-option(DDPROF_JEMALLOC "Enable jemalloc stats" OFF)
-if(${DDPROF_JEMALLOC})
+option(DDPROF_ALLOCATOR "Define the type of allocator (STANDARD / JEMALLOC)" STANDARD)
+if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
   # jemalloc for debug
   include(Jemalloc)
-  message(STATUS "Adding jemalloc for DBG purpose" ${JEMALLOC_ROOT_DIR})
-  add_compile_definitions("DBG_JEMALLOC")
+  message(STATUS "Using Allocator Jemalloc from" ${JEMALLOC_ROOT_DIR})
 endif()
 
 # Install lib cap to retrieve capabilities
@@ -153,7 +152,7 @@ if(ON)
   list(PREPEND DDPROF_LIBRARY_LIST Datadog::Profiling)
 endif()
 
-if(${DDPROF_JEMALLOC})
+if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
   list(PREPEND DDPROF_LIBRARY_LIST jemalloc)
 endif()
 
@@ -410,7 +409,7 @@ if(${BUILD_NATIVE_LIB})
   # Libs to link
   set(NATIVE_LIB_LIBRARY_LIST DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 
-  if(${DDPROF_JEMALLOC})
+  if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
     list(PREPEND NATIVE_LIB_LIBRARY_LIST jemalloc)
   endif()
 
