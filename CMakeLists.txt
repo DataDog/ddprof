@@ -104,7 +104,7 @@ option(DDPROF_ALLOCATOR "Define the type of allocator (STANDARD / JEMALLOC)" STA
 if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
   # jemalloc for debug
   include(Jemalloc)
-  message(STATUS "Adding jemalloc for DBG purpose" ${JEMALLOC_ROOT_DIR})
+  message(STATUS "Using Allocator Jemalloc from" ${JEMALLOC_ROOT_DIR})
 endif()
 
 # Install lib cap to retrieve capabilities
