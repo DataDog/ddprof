@@ -1,3 +1,22 @@
+0.9.3 to 0.10.1 (14/11/2022)
+* Allocation profiling follows forks
+* Universal binary: remove dependency on libc
+This allows compatibility with older libc
+* Formalize tracepoint grammar
+* Add build-id to mapping information
+* Use a temporary file to generate a library to load
+* Switch user if failing to read /proc/<pid>/maps
+* Changes in instrumentation mechanisms
+Periodically check for new loaded libraries
+Use GOT override instead of symbol interposition
+* Add information on lost events
+When ring buffer is full we flag them as "lost events".
+* Use jemalloc as default allocator
+
+0.8.2 to 0.9.3 (08/08/2022)
+* Allocation profiling
+* Many minor fixes
+
 0.8.1 to 0.8.2 (14/04/2022)
 * Correctly convert Watcher frequency to pprof period (for time-based
 frequency)
