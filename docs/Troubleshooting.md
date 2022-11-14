@@ -62,3 +62,9 @@ example:
 000000000015cbb9 rbp+16   c-16  c-8   
 000000000015cd1a rsp+8    c-16  c-8   
 ```
+
+### Checking allocator stats
+
+```
+MALLOC_CONF=stats_print:true ./ddprof -S test-service service_cmd
+```

@@ -29,10 +29,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#ifdef DBG_JEMALLOC
-#  include <jemalloc/jemalloc.h>
-#endif
-
 #define DDPROF_EXPORT_TIMEOUT_MAX 60
 
 using namespace ddprof;
@@ -50,10 +46,6 @@ static void print_diagnostics(const DsoHdr &dso_hdr) {
   LG_NFO("Printing internal diagnostics");
   ddprof_stats_print();
   dso_hdr._stats.log();
-#ifdef DBG_JEMALLOC
-  // jemalloc stats
-  malloc_stats_print(NULL, NULL, "");
-#endif
 }
 
 static inline int64_t now_nanos() {
