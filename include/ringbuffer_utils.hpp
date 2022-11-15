@@ -220,16 +220,15 @@ public:
     // Atomic operation required to synchronize with reader load_acquire
     __atomic_store_n(_rb.writer_pos, new_writer_pos, __ATOMIC_RELEASE);
 
-    return {reinterpret_cast<std::byte *>(hdr) + sizeof(MPSCRingBufferHeader),
-            n};
+    return {reinterpret_cast<std::byte *>(hdr + 1), n};
   }
 
   // Return true if notification to consumer is necesssary
   // Notification is necessary only if consumer has caught up with producer
   // (meaning tail afer commit is at or after head before commit)
   bool commit(Buffer buf, bool discard = false) {
-    MPSCRingBufferHeader *hdr = reinterpret_cast<MPSCRingBufferHeader *>(
-        buf.data() - sizeof(MPSCRingBufferHeader));
+    MPSCRingBufferHeader *hdr =
+        reinterpret_cast<MPSCRingBufferHeader *>(buf.data()) - 1;
 
     // Clear busy bit
     uint64_t new_size = hdr->size ^ MPSCRingBufferHeader::k_busy_bit;
@@ -294,7 +293,7 @@ public:
       return {};
     }
 
-    return {start + sizeof(MPSCRingBufferHeader), sz};
+    return {reinterpret_cast<std::byte *>(hdr + 1), sz};
   }
 
   void advance() {
