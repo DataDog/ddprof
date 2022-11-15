@@ -19,7 +19,6 @@ pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
   return us->pid;
 }
 
-
 // DWARF and the Linux kernel don't have a uniform view of the processor, so we
 // can't just follow the register mask and shove it into the output registers.
 // Instead, we crib off of libdwfl's ARM/x86 unwind code in elfutil's
