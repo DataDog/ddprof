@@ -1,0 +1,37 @@
+## things by pid
+#################
+DsoHdr
+-- DSO
+
+Lookups
+-- pid / bin maps
+-- mappings
+-- runtime
+
+DwflHdr
+-- DwflWrapper
+-- Visited pids
+
+## Not by pid
+#############
+-- File info (dso_hdr)
+-- Lookup
+Dwarf symbol lookup
+
+
+## Async profiler
+
+### SymbolLinux
+parseLibraries parses everything in proc self
+Instead, write an API that can work with ddprof object model
+
+LoadSymbolTable loads at a given base address
+We want to store all symbols at an elf address
+
+Oh wow, everything is added in a weird code blob
+Oh wow, native func is stored in a char and we deduce pointer from the offset to the name
+
+1) Rewrite parseLibraries
+we can use DSO information + file info
+Ensure the cache is at elf address (not base)
+Start is 0 or for non PIE,

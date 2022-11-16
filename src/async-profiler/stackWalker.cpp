@@ -76,6 +76,7 @@ bool stepStackContext(ap::StackContext &sc, const ap::StackBuffer &buffer, CodeC
     return stepStackContext(sc, buffer, f);
 }
 
+
 bool stepStackContext(ap::StackContext &sc, const ap::StackBuffer &buffer, FrameDesc *f) {
     uintptr_t bottom = sc.sp + MAX_WALK_SIZE;
     uintptr_t prev_sp = sc.sp;
