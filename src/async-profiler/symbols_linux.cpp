@@ -444,6 +444,7 @@ void ElfParser::loadSymbolTable(ElfSection* symtab) {
         if (sym->st_name != 0 && sym->st_value != 0) {
             // Skip special AArch64 mapping symbols: $x and $d
             if (sym->st_size != 0 || sym->st_info != 0 || strings[sym->st_name] != '$') {
+                printf("Loading sym %s at 0x%lx (base=0x%lx)\n", strings + sym->st_name, _base + sym->st_value, _base);
                 _cc->add(_base + sym->st_value, (int)sym->st_size, strings + sym->st_name);
             }
         }
