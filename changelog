@@ -16,7 +16,13 @@ This prevents a counter-performance on musl compilations
 
 0.8.2 to 0.9.3 (08/08/2022)
 * Allocation profiling
-* Other minor fixes (refer to git log)
+Library mode and wrapper mode have an option to instrument allocations with low overhead.
+Limitation: This only works for dynamically linked allocators (example: standard allocator) and does not follow forks. If you are concerned by these limitations, please reach out with your requirements.
+* Samples are labeled with PID / TID
+* Preset option : adds defined presets to simplify configuration of the profiler (cpu_only, alloc_only)
+* Catch kernel activity (when permissions allow it)
+* Several improvements to unwinding
+* Alpine musl (built on 3.16)
 
 0.8.1 to 0.8.2 (14/04/2022)
 * Correctly convert Watcher frequency to pprof period (for time-based
