@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.19)
 project(
   DDProf
   LANGUAGES C CXX
-  VERSION 0.9.3
+  VERSION 0.10.1
   DESCRIPTION "Datadog's native profiler for Linux")
 
 message(STATUS "Compiler ID: ${CMAKE_C_COMPILER_ID}")
@@ -23,8 +23,12 @@ endif()
 # ~~~
 # set(CMAKE_VERBOSE_MAKEFILE on)
 
+# Add build ID info on alpine
+add_link_options("LINKER:--build-id=sha1")
+
 # Define the include path of cmake scripts
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/util")
 
 include(ExtendBuildTypes)
 
@@ -45,6 +49,17 @@ detect_libc(LIBC_TYPE)
 
 if(LIBC_TYPE STREQUAL "musl")
   add_compile_definitions("MUSL_LIBC")
+  option(BUILD_UNIVERSAL_DDPROF "Build a universal (musl/glibc) version" ON)
+  option(USE_LOADER "Use an intermediate loader for libdd_profiling" ON)
+  option(USE_AUXILIARY "Use DT_AUXILIARY for libdd_profiling" OFF)
+else()
+  option(BUILD_UNIVERSAL_DDPROF "Build a universal (musl/glibc) version" OFF)
+  option(USE_LOADER "Use an intermediate loader for libdd_profiling" OFF)
+  option(USE_AUXILIARY "Use DT_AUXILIARY for libdd_profiling" OFF)
+endif()
+
+if(USE_LOADER AND USE_AUXILIARY)
+  message(FATAL_ERROR "USE_LOADER and USE_AUXILIARY are incompatible")
 endif()
 
 # path to external dependencies
@@ -69,22 +84,27 @@ endif()
 # libdatadog_profiling
 include(Findlibdatadog)
 
+# Event Parser
+add_subdirectory(src/event_parser)
+
 # elfutils
 include(Findelfutils)
 
 # ---- Static analysis ----
 include(ClangTidy)
-include(CppcheckConfig)
 include(Format)
+
+# Generated code needs to be available for cppcheck to work
+include(CppcheckConfig)
+add_dependencies(cppcheck DDProf::Parser)
 
 # ---- Libraries (needed by ut) ----
 
-option(DDPROF_JEMALLOC "Enable jemalloc stats" OFF)
-if(${DDPROF_JEMALLOC})
+option(DDPROF_ALLOCATOR "Define the type of allocator (STANDARD / JEMALLOC)" STANDARD)
+if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
   # jemalloc for debug
   include(Jemalloc)
-  message(STATUS "Adding jemalloc for DBG purpose" ${JEMALLOC_ROOT_DIR})
-  add_compile_definitions("DBG_JEMALLOC")
+  message(STATUS "Using Allocator Jemalloc from" ${JEMALLOC_ROOT_DIR})
 endif()
 
 # Install lib cap to retrieve capabilities
@@ -125,20 +145,50 @@ aux_source_directory(src/exe EXE_SRC)
 # Define all sources
 set(DDPROF_GLOBAL_SRC ${COMMON_SRC} ${PPROF_SRC} ${EXPORTER_SRC} ${EXE_SRC})
 
-set(DDPROF_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
+set(DDPROF_LIBRARY_LIST DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 
 if(ON)
   # Add the rust library - Refactoring ongoing. OFF for now
   list(PREPEND DDPROF_LIBRARY_LIST Datadog::Profiling)
 endif()
 
-if(${DDPROF_JEMALLOC})
+if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
   list(PREPEND DDPROF_LIBRARY_LIST jemalloc)
 endif()
 
 # libcap, can be removed from version distributed to client
 list(APPEND DDPROF_LIBRARY_LIST libcap)
 list(APPEND DDPROF_INCLUDE_LIST ${LIBCAP_INCLUDE_DIR})
+
+set(dd_profiling_linker_script "${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")
+
+if(USE_LOADER)
+  # Build small loader lib that is in charge of dlopening libdd_profiling-embedded.so
+  add_library(dd_loader SHARED src/lib/glibc_fixes.c src/lib/lib_embedded_data.c src/lib/loader.c
+                               src/sha1.c)
+  target_include_directories(
+    dd_loader PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/include/lib
+                      ${CMAKE_SOURCE_DIR}/third_party)
+  set_target_properties(dd_loader PROPERTIES LINK_DEPENDS "${dd_profiling_linker_script}")
+  target_link_options(dd_loader PRIVATE "LINKER:--version-script=${dd_profiling_linker_script}")
+  target_static_libcxx(dd_loader)
+
+  if(BUILD_UNIVERSAL_DDPROF)
+    target_link_options(dd_loader PRIVATE "-nolibc")
+  endif()
+
+  set(LIBDD_LOADER_OBJECT "${CMAKE_BINARY_DIR}/libdd_loader.o")
+  add_custom_command(
+    OUTPUT ${LIBDD_LOADER_OBJECT}
+    # taken from https://dvdhrm.wordpress.com/2013/03/08/linking-binary-data/
+    COMMAND ld -r -o ${LIBDD_LOADER_OBJECT} -z noexecstack --format=binary
+            $<TARGET_FILE_NAME:dd_loader>
+    COMMAND objcopy --rename-section .data=.rodata,alloc,load,readonly,data,contents
+            ${LIBDD_LOADER_OBJECT}
+    DEPENDS dd_loader)
+  add_library(libdd_loader_object OBJECT IMPORTED GLOBAL)
+  set_target_properties(libdd_loader_object PROPERTIES IMPORTED_OBJECTS "${LIBDD_LOADER_OBJECT}")
+endif()
 
 set(DD_PROFILING_SOURCES
     # cmake-format: sortable
@@ -148,8 +198,11 @@ set(DD_PROFILING_SOURCES
     src/ipc.cc
     src/lib/allocation_tracker.cc
     src/lib/dd_profiling.cc
-    src/lib/malloc_wrapper.cc
-    src/lib/pthread_hook.cc
+    src/lib/elfutils.cc
+    src/lib/lib_embedded_data.c
+    src/lib/savecontext.cc
+    src/lib/saveregisters.cc
+    src/lib/symbol_overrides.cc
     src/logger.cc
     src/logger_setup.cc
     src/perf.cc
@@ -157,14 +210,16 @@ set(DD_PROFILING_SOURCES
     src/perf_watcher.cc
     src/pevent_lib.cc
     src/ringbuffer_utils.cc
-    src/savecontext.cc
-    src/saveregisters.cc
     src/signal_helper.cc
     src/sys_utils.cc
     src/user_override.cc)
 
+if(BUILD_UNIVERSAL_DDPROF)
+  list(APPEND DD_PROFILING_SOURCES src/lib/glibc_fixes.c)
+endif()
+
+# libddprofiling_embeded.so is the actual profiling library
 add_library(dd_profiling-embedded SHARED ${DD_PROFILING_SOURCES})
-target_compile_definitions(dd_profiling-embedded PRIVATE NO_EMBEDDED_DDPROF_EXE)
 target_include_directories(
   dd_profiling-embedded PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include
                                ${CMAKE_SOURCE_DIR}/third_party)
@@ -172,11 +227,22 @@ set_target_properties(dd_profiling-embedded
                       PROPERTIES PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
 
 # Link libstdc++/libgcc statically and export only profiler API
-static_link_cxx(TARGET dd_profiling-embedded)
-set_target_properties(dd_profiling-embedded
-                      PROPERTIES LINK_DEPENDS "${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")
+target_static_libcxx(dd_profiling-embedded)
+set_target_properties(dd_profiling-embedded PROPERTIES LINK_DEPENDS "${dd_profiling_linker_script}")
 target_link_options(dd_profiling-embedded PRIVATE
-                    "LINKER:--version-script=${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")
+                    "LINKER:--version-script=${dd_profiling_linker_script}")
+if(BUILD_UNIVERSAL_DDPROF)
+  target_link_options(dd_profiling-embedded PRIVATE "-nolibc")
+  if(USE_AUXILIARY)
+    target_link_options(
+      dd_profiling-embedded PRIVATE
+      "-Wl,-f,libpthread.so.0;-Wl,-f,libm.so.6;-Wl,-f,libdl.so.2;-Wl,-f,librt.so.1")
+    target_compile_definitions(dd_profiling-embedded PRIVATE DDPROF_MISSING_FSTAT)
+  endif()
+endif()
+
+target_link_libraries(dd_profiling-embedded PRIVATE DDProf::Parser)
+
 # Fix for link error in sanitizeddebug build mode with gcc:
 # ~~~
 # /usr/bin/ld: ./libdd_profiling.so: undefined reference to `__dynamic_cast'
@@ -190,27 +256,37 @@ target_link_libraries(
   PRIVATE
     "$<$<AND:$<C_COMPILER_ID:GNU>,$<CONFIG:SanitizedDebug>>:-Wl,-Bstatic;-lubsan;-lasan;-lstdc++;-Wl,-Bdynamic>"
 )
-target_link_libraries(dd_profiling-embedded PUBLIC dl pthread)
+target_link_libraries(dd_profiling-embedded PUBLIC dl pthread rt)
 
-set(LIBDDPROFILING_OBJECT "libdd_profiling.o")
+set(LIBDD_PROFILING_EMBEDDED_OBJECT "${CMAKE_BINARY_DIR}/libdd_profiling-embedded.o")
 add_custom_command(
-  OUTPUT ${LIBDDPROFILING_OBJECT}
+  OUTPUT ${LIBDD_PROFILING_EMBEDDED_OBJECT}
   # taken from https://dvdhrm.wordpress.com/2013/03/08/linking-binary-data/
-  COMMAND ld -r -o ${LIBDDPROFILING_OBJECT} -z noexecstack --format=binary
+  COMMAND ld -r -o ${LIBDD_PROFILING_EMBEDDED_OBJECT} -z noexecstack --format=binary
           $<TARGET_FILE_NAME:dd_profiling-embedded>
   COMMAND objcopy --rename-section .data=.rodata,alloc,load,readonly,data,contents
-          ${LIBDDPROFILING_OBJECT}
+          ${LIBDD_PROFILING_EMBEDDED_OBJECT}
   DEPENDS dd_profiling-embedded)
-add_library(libddprofiling_object OBJECT IMPORTED GLOBAL)
-set_target_properties(libddprofiling_object PROPERTIES IMPORTED_OBJECTS "${LIBDDPROFILING_OBJECT}")
+add_library(libddprofiling_embedded_object OBJECT IMPORTED GLOBAL)
+set_target_properties(libddprofiling_embedded_object
+                      PROPERTIES IMPORTED_OBJECTS "${LIBDD_PROFILING_EMBEDDED_OBJECT}")
 
 # It is important to force most libraries as static
 add_exe(
-  ddprof ${DDPROF_GLOBAL_SRC} $<TARGET_OBJECTS:libddprofiling_object>
+  ddprof ${DDPROF_GLOBAL_SRC}
   LIBRARIES ${DDPROF_LIBRARY_LIST}
   DEFINITIONS ${DDPROF_DEFINITION_LIST})
+target_link_libraries(ddprof PRIVATE libddprofiling_embedded_object)
+if(USE_LOADER)
+  target_compile_definitions(ddprof PRIVATE "DDPROF_USE_LOADER")
+  target_link_libraries(ddprof PRIVATE libdd_loader_object)
+endif()
+
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
-static_link_cxx(TARGET ddprof)
+target_static_libcxx(ddprof)
+if(BUILD_UNIVERSAL_DDPROF)
+  target_static_libc(ddprof)
+endif()
 
 # Link time optim
 if(LTO_SUPPORTED AND "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
@@ -220,7 +296,7 @@ endif()
 message(STATUS "Install destination " ${CMAKE_INSTALL_PREFIX})
 install(FILES LICENSE LICENSE-3rdparty.csv LICENSE.LGPLV3 NOTICE DESTINATION ddprof)
 
-set(DDPROF_EXE_OBJECT "ddprof.o")
+set(DDPROF_EXE_OBJECT "${CMAKE_BINARY_DIR}/ddprof.o")
 add_custom_command(
   OUTPUT ${DDPROF_EXE_OBJECT}
   # taken from https://dvdhrm.wordpress.com/2013/03/08/linking-binary-data/
@@ -234,39 +310,66 @@ set_target_properties(ddprof_exe_object PROPERTIES IMPORTED_OBJECTS "${DDPROF_EX
 
 add_library(dd_profiling-static STATIC ${DD_PROFILING_SOURCES} $<TARGET_OBJECTS:ddprof_exe_object>)
 set_target_properties(dd_profiling-static PROPERTIES OUTPUT_NAME dd_profiling)
+target_compile_definitions(dd_profiling-static PRIVATE DDPROF_EMBEDDED_EXE_DATA)
 target_include_directories(
   dd_profiling-static PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include
                              ${CMAKE_SOURCE_DIR}/third_party)
 set_target_properties(dd_profiling-static
                       PROPERTIES PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
-target_link_libraries(dd_profiling-static PUBLIC dl pthread)
+target_link_libraries(dd_profiling-static PRIVATE DDProf::Parser)
+target_link_libraries(dd_profiling-static PUBLIC dl pthread rt)
 
-add_library(dd_profiling-shared SHARED ${DD_PROFILING_SOURCES} $<TARGET_OBJECTS:ddprof_exe_object>)
+if(USE_LOADER)
+  # When using a loader, libdd_profiling.so is a loader that embeds both libdd_profiling-embedded.so
+  # and ddprof executable.
+  add_library(dd_profiling-shared SHARED src/lib/glibc_fixes.c src/lib/lib_embedded_data.c
+                                         src/lib/loader.c src/sha1.c)
+  target_link_libraries(dd_profiling-shared PRIVATE DDProf::Parser libddprofiling_embedded_object
+                                                    ddprof_exe_object)
+  target_compile_definitions(dd_profiling-shared PRIVATE DDPROF_EMBEDDED_LIB_DATA
+                                                         DDPROF_EMBEDDED_EXE_DATA)
+else()
+  # Without loader, libdd_profiling.so is basically the same as libdd_profiling-embedded.so plus an
+  # embedded ddprof executable.
+  add_library(dd_profiling-shared SHARED ${DD_PROFILING_SOURCES} src/lib/lib_embedded_data.c)
+  target_link_libraries(dd_profiling-shared PRIVATE DDProf::Parser ddprof_exe_object)
+  target_compile_definitions(dd_profiling-shared PRIVATE DDPROF_EMBEDDED_EXE_DATA)
+
+  # Fix for link error in sanitizeddebug build mode with gcc:
+  # ~~~
+  # /usr/bin/ld: ./libdd_profiling.so: undefined reference to `__dynamic_cast'
+  # /usr/bin/ld: ./libdd_profiling.so: undefined reference to `typeinfo for __cxxabiv1::__vmi_class_type_info'
+  # ~~~
+  # The cause of the error is that gcc puts `-lstdc++` before `-lubsan` in the linker invocation.
+  # Workaround is to add another `-lstdc++` after `-lubsan` at the end, we cannot use
+  # `-static-libstdc++` because it does not force gcc to add another `-lstdc++` at the end.
+  target_link_libraries(
+    dd_profiling-shared
+    PRIVATE
+      "$<$<AND:$<C_COMPILER_ID:GNU>,$<CONFIG:SanitizedDebug>>:-Wl,-Bstatic;-lubsan;-lasan;-lstdc++;-Wl,-Bdynamic>"
+  )
+  target_link_libraries(dd_profiling-shared PUBLIC dl pthread rt)
+endif()
+
+target_static_libcxx(dd_profiling-shared)
+set_target_properties(dd_profiling-shared PROPERTIES LINK_DEPENDS "${dd_profiling_linker_script}")
+target_link_options(dd_profiling-shared PRIVATE
+                    "LINKER:--version-script=${dd_profiling_linker_script}")
+
 set_target_properties(dd_profiling-shared PROPERTIES OUTPUT_NAME dd_profiling)
 target_include_directories(
   dd_profiling-shared PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include
                              ${CMAKE_SOURCE_DIR}/third_party)
 set_target_properties(dd_profiling-shared
                       PROPERTIES PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
-
-# Link libstdc++/libgcc statically and export only profiler API
-static_link_cxx(TARGET dd_profiling-shared)
-set_target_properties(dd_profiling-shared
-                      PROPERTIES LINK_DEPENDS "${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")
-target_link_options(dd_profiling-shared PRIVATE
-                    "LINKER:--version-script=${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")
-# Fix for link error in sanitizeddebug build mode with gcc: /usr/bin/ld: ./libdd_profiling.so:
-# undefined reference to `__dynamic_cast' /usr/bin/ld: ./libdd_profiling.so: undefined reference to
-# `typeinfo for __cxxabiv1::__vmi_class_type_info' The cause of the error is that gcc puts
-# `-lstdc++` before `-lubsan` in the linker invocation Workaround is add another `-lstdc++` after
-# `-lubsan` at the end, we cannot use `-static-libstdc++` because it does not force gcc to another
-# `-lstdc++` at the end
-target_link_libraries(
-  dd_profiling-shared
-  PRIVATE
-    "$<$<AND:$<C_COMPILER_ID:GNU>,$<CONFIG:SanitizedDebug>>:-Wl,-Bstatic;-lubsan;-lasan;-lstdc++;-Wl,-Bdynamic>"
-)
-target_link_libraries(dd_profiling-shared PUBLIC dl pthread)
+if(BUILD_UNIVERSAL_DDPROF)
+  target_link_options(dd_profiling-shared PRIVATE "-nolibc")
+  if(USE_AUXILIARY)
+    target_link_options(
+      dd_profiling-shared PRIVATE
+      "-Wl,-f,libpthread.so.0;-Wl,-f,libm.so.6;-Wl,-f,libdl.so.2;-Wl,-f,librt.so.1")
+  endif()
+endif()
 
 install(
   TARGETS ddprof dd_profiling-static dd_profiling-shared
@@ -276,16 +379,16 @@ install(
   PUBLIC_HEADER DESTINATION ddprof/include)
 
 # ---- Declaration of native library  ----
-option(BUILD_NATIVE_LIB "Build a library out of the native profiler" OFF)
+option(BUILD_NATIVE_LIB "Build a library out of the native profiler" ON)
 if(${BUILD_NATIVE_LIB})
 
   # Define all sources
   set(DDPROF_LIB_SRC ${COMMON_SRC} src/lib/ddprof_output.cc)
 
   # Libs to link
-  set(NATIVE_LIB_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
+  set(NATIVE_LIB_LIBRARY_LIST DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 
-  if(${DDPROF_JEMALLOC})
+  if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
     list(PREPEND NATIVE_LIB_LIBRARY_LIST jemalloc)
   endif()
 

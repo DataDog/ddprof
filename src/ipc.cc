@@ -135,6 +135,10 @@ size_t UnixSocket::send_partial(ConstBuffer buffer, ddprof::span<const int> fds,
     msg.msg_control = u.buf;
     msg.msg_controllen = CMSG_SPACE(payload_size);
     cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
+    // musl use a smaller type for cmsg_len with extra padding
+    // if this padding is not initialized to zero, if will be wrongly
+    // interpreted as part of cmsg_len by glic
+    *cmsg = {};
     cmsg->cmsg_level = SOL_SOCKET;
     cmsg->cmsg_type = SCM_RIGHTS;
     cmsg->cmsg_len = CMSG_LEN(payload_size);
@@ -187,7 +191,7 @@ UnixSocket::receive_partial(ddprof::span<std::byte> buffer,
                             ddprof::span<int> fds,
                             std::error_code &ec) noexcept {
 
-  msghdr msgh;
+  msghdr msgh = {};
 
   union {
     /* Ancillary data buffer, wrapped in a union
@@ -195,12 +199,6 @@ UnixSocket::receive_partial(ddprof::span<std::byte> buffer,
     char buf[CMSG_SPACE(kMaxFD * sizeof(int))];
     cmsghdr align;
   } controlMsg;
-
-  /* The 'msg_name' field can be used to obtain the address of the
-     sending socket. However, we do not need this information. */
-
-  msgh.msg_name = NULL;
-  msgh.msg_namelen = 0;
 
   /* Specify buffer for receiving real data */
   iovec iov = {.iov_base = buffer.data(), .iov_len = buffer.size()};

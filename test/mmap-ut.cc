@@ -47,7 +47,7 @@ TEST(MMapTest, PerfOpen) {
     // Pure-userspace software events should all pass.  Anything else should hit
     // this filter
     if (watcher->type != PERF_TYPE_SOFTWARE ||
-        watcher->options.is_kernel == kPerfWatcher_Required) {
+        watcher->options.use_kernel == PerfWatcherUseKernel::kRequired) {
       continue;
     }
     EXPECT_TRUE(perf_fd != -1);

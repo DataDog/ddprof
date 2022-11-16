@@ -111,7 +111,7 @@ DDRes unwindstate__unwind(UnwindState *us) {
 void unwind_pid_free(UnwindState *us, pid_t pid) {
   us->dso_hdr.pid_free(pid);
   us->dwfl_hdr.clear_pid(pid);
-  us->symbol_hdr._base_frame_symbol_lookup.erase(pid);
+  us->symbol_hdr.clear(pid);
 }
 
 void unwind_cycle(UnwindState *us) {

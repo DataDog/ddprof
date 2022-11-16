@@ -19,6 +19,7 @@ public:
       : _path_to_proc(path_to_proc) {}
   SymbolIdx_t get_or_insert(pid_t pid, ProcessAddress_t pc,
                             SymbolTable &symbol_table);
+  void erase(pid_t pid) { _pid_map.erase(pid); }
 
 private:
   using PidUnorderedMap = std::unordered_map<pid_t, SymbolMap>;

@@ -80,14 +80,15 @@ function(add_benchmark name)
 
   target_link_libraries(${name} PRIVATE Threads::Threads benchmark::benchmark
                                         benchmark::benchmark_main)
-  target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST})
+  target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST} ${CMAKE_SOURCE_DIR}/include/lib)
   disable_clangtidy(${name})
 endfunction()
 
 # Definition of unit tests
 add_compile_definitions("UNIT_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 
-add_unit_test(ddprofcmdline-ut ../src/ddprof_cmdline.cc ../src/perf_watcher.cc ddprofcmdline-ut.cc)
+add_unit_test(ddprofcmdline-ut ../src/ddprof_cmdline.cc ../src/perf_watcher.cc ddprofcmdline-ut.cc
+              LIBRARIES DDProf::Parser)
 
 add_unit_test(logger-ut logger-ut.cc)
 
@@ -131,6 +132,7 @@ add_unit_test(
   ../src/logger_setup.cc
   ../src/perf_watcher.cc
   ddprof_input-ut.cc
+  LIBRARIES DDProf::Parser
   DEFINITIONS MYNAME="ddprof_input-ut")
 
 add_unit_test(perf_ringbuffer-ut ../src/perf.cc ../src/perf_watcher.cc ../src/perf_ringbuffer.cc
@@ -151,7 +153,7 @@ add_unit_test(
 add_unit_test(
   ddprof_pprof-ut ../src/pprof/ddprof_pprof.cc ../src/unwind_output.cc ../src/perf_watcher.cc
   ddprof_pprof-ut.cc
-  LIBRARIES Datadog::Profiling
+  LIBRARIES Datadog::Profiling DDProf::Parser
   DEFINITIONS MYNAME="ddprof_pprof-ut")
 
 add_unit_test(
@@ -163,7 +165,7 @@ add_unit_test(
   ../src/perf_watcher.cc
   ../src/tags.cc
   ddprof_exporter-ut.cc
-  LIBRARIES Datadog::Profiling
+  LIBRARIES Datadog::Profiling DDProf::Parser
   DEFINITIONS MYNAME="ddprof_exporter-ut")
 
 add_unit_test(
@@ -173,6 +175,7 @@ add_unit_test(
   ../src/ddprof_file_info.cc
   ../src/procutils.cc
   ../src/signal_helper.cc
+  ../src/user_override.cc
   dso-ut.cc
   DEFINITIONS MYNAME="dso-ut")
 target_include_directories(dso-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
@@ -188,6 +191,7 @@ add_unit_test(
 add_unit_test(
   dwfl_module-ut
   dwfl_module-ut.cc
+  ../src/build_id.cc
   ../src/dwfl_hdr.cc
   ../src/ddprof_module_lib.cc
   ../src/dwfl_symbol.cc
@@ -197,6 +201,7 @@ add_unit_test(
   ../src/failed_assumption.cc
   ../src/procutils.cc
   ../src/signal_helper.cc
+  ../src/user_override.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
   DEFINITIONS MYNAME="dwfl_symbol-ut")
 add_compile_definitions("DWFL_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
@@ -206,6 +211,7 @@ add_unit_test(
   savecontext-ut
   savecontext-ut.cc
   ../src/base_frame_symbol_lookup.cc
+  ../src/build_id.cc
   ../src/common_mapinfo_lookup.cc
   ../src/common_symbol_lookup.cc
   ../src/ddprof_file_info.cc
@@ -219,12 +225,12 @@ add_unit_test(
   ../src/dwfl_symbol_lookup.cc
   ../src/dwfl_thread_callbacks.cc
   ../src/failed_assumption.cc
-  ../src/runtime_symbol_lookup.cc
-  ../src/symbol_map.cc
-  ../src/savecontext.cc
-  ../src/saveregisters.cc
+  ../src/lib/savecontext.cc
+  ../src/lib/saveregisters.cc
   ../src/mapinfo_lookup.cc
   ../src/procutils.cc
+  ../src/runtime_symbol_lookup.cc
+  ../src/symbol_map.cc
   ../src/signal_helper.cc
   ../src/statsd.cc
   ../src/unwind.cc
@@ -232,6 +238,7 @@ add_unit_test(
   ../src/unwind_helpers.cc
   ../src/unwind_metrics.cc
   ../src/unwind_output.cc
+  ../src/user_override.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
   DEFINITIONS MYNAME="savecontext-ut")
 
@@ -240,6 +247,7 @@ add_unit_test(
   allocation_tracker-ut.cc
   ../src/lib/allocation_tracker.cc
   ../src/base_frame_symbol_lookup.cc
+  ../src/build_id.cc
   ../src/common_mapinfo_lookup.cc
   ../src/common_symbol_lookup.cc
   ../src/ddprof_file_info.cc
@@ -258,12 +266,12 @@ add_unit_test(
   ../src/perf_ringbuffer.cc
   ../src/perf_watcher.cc
   ../src/ringbuffer_utils.cc
-  ../src/savecontext.cc
-  ../src/saveregisters.cc
-  ../src/runtime_symbol_lookup.cc
-  ../src/symbol_map.cc
+  ../src/lib/savecontext.cc
+  ../src/lib/saveregisters.cc
   ../src/mapinfo_lookup.cc
   ../src/procutils.cc
+  ../src/runtime_symbol_lookup.cc
+  ../src/symbol_map.cc
   ../src/signal_helper.cc
   ../src/statsd.cc
   ../src/sys_utils.cc
@@ -298,7 +306,12 @@ add_unit_test(runtime_symbol_lookup-ut runtime_symbol_lookup-ut.cc ../src/runtim
 add_unit_test(ddprof_cpumask-ut ddprof_cpumask-ut.cc ../src/ddprof_cpumask.cc)
 
 add_unit_test(symbol_map-ut symbol_map-ut.cc ../src/symbol_map.cc)
-add_benchmark(savecontext-bench savecontext-bench.cc ../src/savecontext.cc ../src/saveregisters.cc)
+
+add_unit_test(build_id-ut build_id-ut.cc ../src/build_id.cc)
+
+add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/savecontext.cc
+              ../src/lib/saveregisters.cc)
+
 add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 
 message(STATUS "Async profiler" ${ASYNC_PROFILER_SRC})
@@ -319,7 +332,7 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
 
   add_exe(
     simple_malloc-shared simple_malloc.cc
-    LIBRARIES dd_profiling-shared
+    LIBRARIES dd_profiling-shared Threads::Threads
     DEFINITIONS USE_DD_PROFILING)
   target_include_directories(simple_malloc-shared PRIVATE ${CMAKE_SOURCE_DIR}/include
                                                           ${CMAKE_SOURCE_DIR}/third_party)

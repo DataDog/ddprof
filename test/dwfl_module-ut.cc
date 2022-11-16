@@ -67,6 +67,9 @@ TEST(DwflModule, inconsistency_test) {
              end_sym, lbiais);
       EXPECT_GE(elf_addr, start_sym);
       EXPECT_LE(elf_addr, end_sym);
+
+      // Only expect build-id on this binary (as we can not force it on others)
+      EXPECT_FALSE(ddprof_mod->_build_id.empty());
     }
     // check that we loaded all mods matching the DSOs
     EXPECT_EQ(ddprof_mod->_status, DDProfMod::kUnknown);

@@ -29,10 +29,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#ifdef DBG_JEMALLOC
-#  include <jemalloc/jemalloc.h>
-#endif
-
 #define DDPROF_EXPORT_TIMEOUT_MAX 60
 
 using namespace ddprof;
@@ -50,10 +46,6 @@ static void print_diagnostics(const DsoHdr &dso_hdr) {
   LG_NFO("Printing internal diagnostics");
   ddprof_stats_print();
   dso_hdr._stats.log();
-#ifdef DBG_JEMALLOC
-  // jemalloc stats
-  malloc_stats_print(NULL, NULL, "");
-#endif
 }
 
 static inline int64_t now_nanos() {
@@ -221,6 +213,8 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   if (!sample)
     return ddres_warn(DD_WHAT_PERFSAMP);
   struct UnwindState *us = ctx->worker_ctx.us;
+  PerfWatcher *watcher = &ctx->watchers[watcher_pos];
+
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
   ddprof_stats_add(STATS_UNWIND_AVG_STACK_SIZE, sample->size_stack, nullptr);
 
@@ -234,9 +228,13 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   us->output.tid = sample->tid;
 
   // If this is a SW_TASK_CLOCK-type event, then aggregate the time
-  if (ctx->watchers[watcher_pos].config == PERF_COUNT_SW_TASK_CLOCK)
+  if (watcher->config == PERF_COUNT_SW_TASK_CLOCK)
     ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
-  DDRes res = unwindstate__unwind(us);
+
+  // Attempt to fully unwind if the watcher has a callgraph type
+  DDRes res = {};
+  if (EventConfMode::kCallgraph <= watcher->output_mode)
+    res = unwindstate__unwind(us);
 
   /* This test is not 100% accurate:
    * Linux kernel does not take into account stack start (ie. end address since
@@ -267,14 +265,16 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
       ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL));
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
-  if (!IsDDResFatal(res)) {
+  if (!IsDDResFatal(res) && EventConfMode::kCallgraph <= watcher->output_mode) {
 #ifndef DDPROF_NATIVE_LIB
+    // Depending on the type of watcher, compute a value for sample
+    uint64_t sample_val = perf_value_from_sample(watcher, sample);
+
     // in lib mode we don't aggregate (protect to avoid link failures)
-    PerfWatcher *watcher = &ctx->watchers[watcher_pos];
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
-    DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr,
-                                    sample->period, 1, watcher, pprof));
+    DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr, sample_val, 1,
+                                    watcher, pprof));
     if (ctx->params.show_samples) {
       ddprof_print_sample(us->output, us->symbol_hdr, sample->period, *watcher);
     }

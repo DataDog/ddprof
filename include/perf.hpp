@@ -16,6 +16,8 @@
 
 // defaut ring buffer size expressed as a power-of-two in number of pages
 #define DEFAULT_BUFF_SIZE_SHIFT 6
+// this does not count as pinned memory, use a larger size
+#define MPSC_BUFF_SIZE_SHIFT 8
 
 #define PSAMPLE_DEFAULT_WAKEUP_MS 100 // sample frequency check
 
@@ -144,4 +146,7 @@ const char *perf_type_str(int type_id);
 namespace ddprof {
 std::vector<perf_event_attr>
 all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras);
-}
+
+uint64_t perf_value_from_sample(const PerfWatcher *watcher,
+                                const perf_event_sample *sample);
+} // namespace ddprof

@@ -11,11 +11,14 @@
 #include "logger.hpp"
 #include "procutils.hpp"
 #include "signal_helper.hpp"
+#include "user_override.hpp"
 
 #include <algorithm>
 #include <cassert>
 #include <fcntl.h>
+#include <memory>
 #include <numeric>
+#include <optional>
 #include <unistd.h>
 
 namespace ddprof {
@@ -24,13 +27,36 @@ using DsoFindRes = DsoHdr::DsoFindRes;
 using DsoRange = DsoHdr::DsoRange;
 
 namespace {
-static FILE *procfs_map_open(int pid, const char *path_to_proc = "") {
-  char buf[1024] = {0};
-  auto n = snprintf(buf, 1024, "%s/proc/%d/maps", path_to_proc, pid);
-  if (n >= 1024) { // unable to snprintf everything
-    return nullptr;
+
+using FileHolder = std::unique_ptr<FILE, decltype([](FILE *f) { fclose(f); })>;
+
+FileHolder open_proc_maps(int pid, const char *path_to_proc = "") {
+  char proc_map_filename[1024] = {};
+  auto n = snprintf(proc_map_filename, std::size(proc_map_filename),
+                    "%s/proc/%d/maps", path_to_proc, pid);
+  if (n < 0 ||
+      n >= static_cast<ssize_t>(
+               std::size(proc_map_filename))) { // unable to snprintf everything
+    return {};
   }
-  return fopen(buf, "r");
+
+  FILE *f = fopen(proc_map_filename, "r");
+  if (!f) {
+    // Check if the file exists
+    struct stat info;
+    UIDInfo old_uids;
+    if (stat(proc_map_filename, &info) == 0 &&
+        // try to switch to file user
+        IsDDResOK(user_override(info.st_uid, info.st_gid, &old_uids))) {
+      f = fopen(proc_map_filename, "r");
+      // switch back to initial user
+      user_override(old_uids.uid, old_uids.gid);
+    }
+  }
+  if (!f) {
+    return {};
+  }
+  return FileHolder{f};
 }
 
 #ifndef NDEBUG
@@ -52,27 +78,25 @@ static bool ip_in_procline(char *line, uint64_t ip) {
 
 static void pid_find_ip(int pid, uint64_t ip,
                         const std::string &path_to_proc = "") {
-  FILE *mpf = procfs_map_open(pid, path_to_proc.c_str());
-  if (!mpf) {
+  auto proc_map_file_holder = open_proc_maps(pid, path_to_proc.c_str());
+  if (!proc_map_file_holder) {
     if (process_is_alive(pid))
       LG_DBG("Couldn't find ip:0x%lx for %d, process is dead", ip, pid);
     else
       LG_DBG("Couldn't find ip:0x%lx for %d, mysteriously", ip, pid);
     return;
   }
-  defer { fclose(mpf); };
 
-  char *buf = NULL;
+  char *buf = nullptr;
+  defer { free(buf); };
   size_t sz_buf = 0;
-  while (-1 != getline(&buf, &sz_buf, mpf)) {
+  while (-1 != getline(&buf, &sz_buf, proc_map_file_holder.get())) {
     if (ip_in_procline(buf, ip)) {
       LG_DBG("[DSO] Found ip:0x%lx for %d", ip, pid);
       LG_DBG("[DSO] %.*s", (int)strlen(buf) - 1, buf);
-      free(buf);
       return;
     }
   }
-  free(buf);
 
   LG_DBG("[DSO] Couldn't find ip:0x%lx for %d", ip, pid);
   return;
@@ -395,19 +419,18 @@ bool DsoHdr::pid_backpopulate(DsoMap &map, pid_t pid, int &nb_elts_added) {
   bp_state._perm = kForbidden;
   nb_elts_added = 0;
   LG_DBG("[DSO] Backpopulating PID %d", pid);
-  FILE *mpf = procfs_map_open(pid, _path_to_proc.c_str());
-  if (!mpf) {
+  auto proc_map_file_holder = open_proc_maps(pid, _path_to_proc.c_str());
+  if (!proc_map_file_holder) {
     LG_DBG("[DSO] Failed to open procfs for %d", pid);
     if (!process_is_alive(pid))
       LG_DBG("[DSO] Process nonexistant");
     return false;
   }
-  defer { fclose(mpf); };
-
   char *buf = NULL;
+  defer { free(buf); };
   size_t sz_buf = 0;
 
-  while (-1 != getline(&buf, &sz_buf, mpf)) {
+  while (-1 != getline(&buf, &sz_buf, proc_map_file_holder.get())) {
     Dso dso = dso_from_procline(pid, buf);
     if (dso._pid == -1) { // invalid dso
       continue;
@@ -416,7 +439,6 @@ bool DsoHdr::pid_backpopulate(DsoMap &map, pid_t pid, int &nb_elts_added) {
       ++nb_elts_added;
     }
   }
-  free(buf);
   return true;
 }
 

@@ -5,6 +5,7 @@
 
 #include "ddprof_module_lib.hpp"
 
+#include "build_id.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "failed_assumption.hpp"
@@ -20,8 +21,7 @@
 
 namespace ddprof {
 
-static bool get_elf_offsets(int fd, Offset_t &start_offset,
-                            const std::string &filepath,
+static bool get_elf_offsets(int fd, const std::string &filepath,
                             Offset_t &bias_offset) {
   Elf *elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
   if (elf == NULL) {
@@ -46,7 +46,6 @@ static bool get_elf_offsets(int fd, Offset_t &start_offset,
       LG_WRN("Invalid elf %s", filepath.c_str());
       return false;
     }
-    Elf64_Addr first_load_segment_vaddr = -1;
     for (size_t i = 0; i < phnum; ++i) {
       GElf_Phdr phdr_mem;
       GElf_Phdr *ph = gelf_getphdr(elf, i, &phdr_mem);
@@ -56,29 +55,9 @@ static bool get_elf_offsets(int fd, Offset_t &start_offset,
       }
       constexpr int rx = PF_X | PF_R;
       if (ph->p_type == PT_LOAD) {
-        if (first_load_segment_vaddr == -1UL) {
-          first_load_segment_vaddr = ph->p_vaddr;
-          if (ehdr->e_type == ET_DYN && first_load_segment_vaddr != 0) {
-            report_failed_assumption(ddprof::string_format(
-                "Non zero vaddr[%lx] for first load "
-                "segment of DYN elf (prelink?): %s",
-                first_load_segment_vaddr, filepath.c_str()));
-          }
-          if (ph->p_offset != 0) {
-            report_failed_assumption(ddprof::string_format(
-                "Non zero file offset[%lx] for first load segment: %s",
-                ph->p_offset, filepath.c_str()));
-          }
-          if ((ph->p_vaddr & (ph->p_align - 1)) != 0) {
-            report_failed_assumption(ddprof::string_format(
-                "Non aligned vaddr[%lx] file offset for first load segment: %s",
-                ph->p_vaddr, filepath.c_str()));
-          }
-        }
         if ((ph->p_flags & rx) == rx) {
           if (!found_exec) {
             bias_offset = ph->p_vaddr - ph->p_offset;
-            start_offset = bias_offset - first_load_segment_vaddr;
             found_exec = true;
           } else {
             report_failed_assumption(ddprof::string_format(
@@ -126,16 +105,14 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
 
   // Load the file at a matching DSO address
   dwfl_errno(); // erase previous error
-  Offset_t start_offset, bias_offset;
-  if (!get_elf_offsets(fileInfoValue._fd, start_offset, filepath,
-                       bias_offset)) {
+  Offset_t bias_offset{};
+  if (!get_elf_offsets(fileInfoValue._fd, filepath, bias_offset)) {
     fileInfoValue._errored = true;
     LG_WRN("Couldn't retrieve offsets from %s(%s)", module_name,
            fileInfoValue.get_path().c_str());
     return ddres_warn(DD_WHAT_MODULE);
   }
 
-  ProcessAddress_t start = dso._start - dso._pgoff - start_offset;
   Offset_t bias = dso._start - dso._pgoff - bias_offset;
 
   // libdwfl takes ownership (which is not 100% expected)
@@ -146,7 +123,17 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
     return ddres_warn(DD_WHAT_MODULE);
   }
   ddprof_mod._mod =
-      dwfl_report_elf(dwfl, module_name, filepath.c_str(), fd, start, false);
+      dwfl_report_elf(dwfl, module_name, filepath.c_str(), fd, bias, true);
+
+  // Retrieve build id
+  const unsigned char *bits = nullptr;
+  GElf_Addr vaddr;
+  if (int size = dwfl_module_build_id(ddprof_mod._mod, &bits, &vaddr);
+      size > 0) {
+    // ensure we called dwfl_module_getelf first (or this can fail)
+    // returns the size
+    ddprof_mod.set_build_id(BuildIdSpan{bits, static_cast<unsigned>(size)});
+  }
 
   if (!ddprof_mod._mod) {
     // Ideally we would differentiate pid errors from file errors.
@@ -158,9 +145,11 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
   } else {
     dwfl_module_info(ddprof_mod._mod, 0, &ddprof_mod._low_addr,
                      &ddprof_mod._high_addr, 0, 0, 0, 0);
-    LG_DBG("Loaded mod from file (%s[ID#%d]), (%s) mod[%lx-%lx] bias[%lx]",
+    LG_DBG("Loaded mod from file (%s[ID#%d]), (%s) mod[%lx-%lx] bias[%lx], "
+           "build-id: %s",
            fileInfoValue.get_path().c_str(), fileInfoValue.get_id(),
-           dwfl_errmsg(-1), ddprof_mod._low_addr, ddprof_mod._high_addr, bias);
+           dwfl_errmsg(-1), ddprof_mod._low_addr, ddprof_mod._high_addr, bias,
+           ddprof_mod._build_id.c_str());
   }
 
   ddprof_mod._sym_bias = bias;

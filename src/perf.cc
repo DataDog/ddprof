@@ -10,6 +10,7 @@
 #include "perf.hpp"
 #include "user_override.hpp"
 
+#include <cassert>
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -89,8 +90,9 @@ perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
   attr.sample_type = watcher->sample_type;
   attr.sample_stack_user = watcher->sample_stack_size;
 
-  // If is_kernel is requested false --> exclude_kernel == true
-  attr.exclude_kernel = (watcher->options.is_kernel == kPerfWatcher_Off);
+  // If use_kernel is requested false --> exclude_kernel == true
+  if (watcher->options.use_kernel == PerfWatcherUseKernel::kTry)
+    attr.exclude_kernel = true;
 
   // Extras (metadata for tracking process state)
   if (extras) {
@@ -164,11 +166,61 @@ std::vector<perf_event_attr>
 all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras) {
   std::vector<perf_event_attr> ret_attr;
   ret_attr.push_back(perf_config_from_watcher(watcher, extras));
-  if (watcher->options.is_kernel == kPerfWatcher_Try) {
+  if (watcher->options.use_kernel == PerfWatcherUseKernel::kTry) {
     // duplicate the config, while excluding kernel
     ret_attr.push_back(ret_attr.back());
     ret_attr.back().exclude_kernel = true;
   }
   return ret_attr;
 }
+
+uint64_t perf_value_from_sample(const PerfWatcher *watcher,
+                                const perf_event_sample *sample) {
+  uint64_t val = 0;
+  if (watcher->value_source == EventConfValueSource::kRaw) {
+    if (PERF_SAMPLE_RAW & watcher->sample_type) {
+      uint64_t raw_offset = watcher->raw_off;
+      uint64_t raw_sz = watcher->raw_sz;
+      if (raw_sz + raw_offset <= sample->size_raw) {
+        assert(0 && "Overflow in raw event access");
+        LG_WRN("Overflow in raw event access");
+        return 0;
+      }
+      switch (raw_sz) {
+      case 1:
+        val = *(uint8_t *)(sample->data_raw + raw_offset);
+        break;
+      case 2:
+        val = *(uint16_t *)(sample->data_raw + raw_offset);
+        break;
+      case 4:
+        val = *(uint32_t *)(sample->data_raw + raw_offset);
+        break;
+      case 8:
+        val = *(uint64_t *)(sample->data_raw + raw_offset);
+        break;
+      default:
+        assert(0 && "Non-integral size for raw value");
+        LG_WRN("Non-integral size for raw value");
+        val = 0;
+        break;
+      }
+      return val;
+    } else { // unexpected config
+      assert(0 && "Inconsistent raw config between watcher and perf event");
+      LG_WRN("Unexpected watcher configuration -- No Raw events");
+      return 0;
+    }
+  }
+  // Register value
+  if (watcher->value_source == EventConfValueSource::kRegister) {
+    return sample->regs[watcher->regno];
+  }
+
+  // period by default
+  assert(watcher->value_source == EventConfValueSource::kSample &&
+         "All watcher types were considered");
+  return sample->period;
+}
+
 } // namespace ddprof

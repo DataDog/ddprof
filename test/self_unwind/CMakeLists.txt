@@ -7,8 +7,10 @@ add_exe(
   DEFINITIONS "MYNAME=\"selfuw\"" "STACK_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 
 disable_clangtidy(selfuw)
-static_link_cxx(TARGET selfuw)
+target_static_libcxx(selfuw)
 
 # slightly hacky : we should only include public headers
-target_include_directories(selfuw PRIVATE ../../include ../../include/lib)
+target_include_directories(
+  selfuw PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/include/lib
+                 ${CMAKE_SOURCE_DIR}/third_party)
 install(TARGETS selfuw DESTINATION selfuw)

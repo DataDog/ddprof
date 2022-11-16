@@ -6,45 +6,46 @@ ENV CXX=g++
 #MISSING
 # lcov
 # liblzma
-# libjemalloc
 # libexecinfo-dev # No static lib
 RUN apk update \
     && apk add --no-cache aws-cli \
-	 bash \
-	 binutils-dev \
-	 ca-certificates \
-	 gcovr \
-	 git \
-	 subversion \
-	 patch \
-	 curl \
-	 wget \
-	 make \
-	 cmake \
-	 m4 \
-	 autoconf \
-	 automake \
-	 unzip \
-	 gcc \
-	 g++ \
-	 clang \
+   bash \
+   binutils-dev \
+   bison \
+   ca-certificates \
+   gcovr \
+   git \
+   flex \
+   subversion \
+   patch \
+   curl \
+   wget \
+   make \
+   cmake \
+   m4 \
+   autoconf \
+   automake \
+   unzip \
+   gcc \
+   g++ \
+   clang \
    libcap-static \
    libunwind-dev \
-	 py3-pkgconfig \
-	 gtest-dev \
-	 cppcheck \
-	 openssh \
+   py3-pkgconfig \
+   gtest-dev \
+   cppcheck \
+   openssh \
    zlib-dev \
    zlib-static \
    bzip2-dev \
-	 xz-dev \
-	 argp-standalone \
-	 fts-dev \
-	 musl-obstack-dev \
-	 musl-libintl \
-	 musl-legacy-error \
-	 libcap-dev \
-	 netcat-openbsd \
+   xz-dev \
+   argp-standalone \
+   fts-dev \
+   musl-obstack-dev \
+   musl-libintl \
+   musl-legacy-error \
+   libcap-dev \
+   netcat-openbsd \
    util-linux
 
 # Tell docker to use bash as the default
@@ -103,3 +104,10 @@ RUN mkdir /patch
 ADD ./app/base-env-alpine/*.patch /patch/
 ADD ./app/base-env-alpine/error.h /patch/
 ADD ./app/base-env-alpine/libintl.h /patch/
+
+# jemalloc
+RUN git clone --branch 5.3.0 https://github.com/jemalloc/jemalloc.git && \
+    cd jemalloc && \
+    ./autogen.sh && \
+    make && \
+    make install

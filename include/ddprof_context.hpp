@@ -33,6 +33,7 @@ typedef struct DDProfContext {
     bool wait_on_socket;
     bool show_samples;
     cpu_set_t cpu_affinity;
+    const char *switch_user;
     const char *internal_stats;
     const char *tags;
   } params;
