@@ -23,9 +23,9 @@
 #include <cstddef>
 
 class OS {
-  public:
-    static const size_t page_size;
-    static const size_t page_mask;
+public:
+  static const size_t page_size;
+  static const size_t page_mask;
 };
 
 #endif // _OS_H

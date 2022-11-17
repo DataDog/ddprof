@@ -17,18 +17,18 @@
 #ifndef _SAFEACCESS_H
 #define _SAFEACCESS_H
 
-#include <stdint.h>
 #include "arch.h"
+#include <stdint.h>
 
 #ifdef __clang__
 #  define NOINLINE __attribute__((noinline))
 #else
-#  define NOINLINE __attribute__((noinline,noclone))
+#  define NOINLINE __attribute__((noinline, noclone))
 #endif
 
 namespace SafeAccess {
 
-NOINLINE __attribute__((aligned(16))) void* load(void** ptr);
+NOINLINE __attribute__((aligned(16))) void *load(void **ptr);
 
 }
 

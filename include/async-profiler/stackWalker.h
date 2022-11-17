@@ -25,9 +25,10 @@
 #include "codeCache.h"
 #include "stack_context.h"
 
-CodeCache *findLibraryByAddress(CodeCacheArray *cache, const void* address);
+CodeCache *findLibraryByAddress(CodeCacheArray *cache, const void *address);
 
-int stackWalk(CodeCacheArray *cache, ap::StackContext &sc, const ap::StackBuffer &buffer, 
-                const void** callchain, int max_depth, int skip);
+int stackWalk(CodeCacheArray *cache, ap::StackContext &sc,
+              const ap::StackBuffer &buffer, const void **callchain,
+              int max_depth, int skip);
 
 #endif // _STACKWALKER_H

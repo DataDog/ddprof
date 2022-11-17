@@ -316,11 +316,10 @@ add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 
 message(STATUS "Async profiler" ${ASYNC_PROFILER_SRC})
 
-add_unit_test(dwarf_unwind-ut dwarf_unwind-ut.cc ../src/lib/savecontext.cc ../src/lib/saveregisters.cc ${ASYNC_PROFILER_SRC}
-              LIBRARIES ${ELFUTILS_LIBRARIES})
+add_unit_test(
+  dwarf_unwind-ut dwarf_unwind-ut.cc ../src/lib/savecontext.cc ../src/lib/saveregisters.cc
+  ../src/async-profiler/stack_context.cpp ${ASYNC_PROFILER_SRC} LIBRARIES ${ELFUTILS_LIBRARIES})
 target_include_directories(dwarf_unwind-ut PRIVATE ${ASYNC_PROFILER_INCLUDE})
-
-
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
   add_exe(

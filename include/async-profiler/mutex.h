@@ -17,44 +17,39 @@
 #ifndef _MUTEX_H
 #define _MUTEX_H
 
-#include <pthread.h>
 #include "arch.h"
-
+#include <pthread.h>
 
 class Mutex {
-  protected:
-    pthread_mutex_t _mutex;
+protected:
+  pthread_mutex_t _mutex;
 
-  public:
-    Mutex();
+public:
+  Mutex();
 
-    void lock();
-    void unlock();
+  void lock();
+  void unlock();
 };
 
 class WaitableMutex : public Mutex {
-  protected:
-    pthread_cond_t _cond;
+protected:
+  pthread_cond_t _cond;
 
-  public:
-    WaitableMutex();
+public:
+  WaitableMutex();
 
-    bool waitUntil(u64 wall_time);
-    void notify();
+  bool waitUntil(u64 wall_time);
+  void notify();
 };
 
 class MutexLocker {
-  private:
-    Mutex* _mutex;
+private:
+  Mutex *_mutex;
 
-  public:
-    MutexLocker(Mutex& mutex) : _mutex(&mutex) {
-        _mutex->lock();
-    }
+public:
+  MutexLocker(Mutex &mutex) : _mutex(&mutex) { _mutex->lock(); }
 
-    ~MutexLocker() {
-        _mutex->unlock();
-    }
+  ~MutexLocker() { _mutex->unlock(); }
 };
 
 #endif // _MUTEX_H
