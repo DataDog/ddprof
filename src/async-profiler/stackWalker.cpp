@@ -116,7 +116,6 @@ bool stepStackContext(ap::StackContext &sc, const ap::StackBuffer &buffer,
         return false;
       }
     }
-    void *new_pc = stripPointer(SafeAccess::load((void **)sc.sp - 1));
     // Update the pc using return address
     if (!read_memory(reinterpret_cast<uint64_t>((void **)sc.sp - 1),
                      reinterpret_cast<uint64_t *>(&sc.pc), buffer)) {

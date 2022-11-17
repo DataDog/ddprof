@@ -44,14 +44,6 @@ size_t funcA(std::array<uint64_t, PERF_REGS_COUNT> &regs) {
   return funcB(regs);
 }
 
-void unwind_async_profiler() {}
-
-void unwind_libdwfl() {}
-
-namespace ap {
-
-}
-
 TEST(dwarf_unwind, simple) {
   // Load libraries
   CodeCacheArray cache_arary;
@@ -60,34 +52,24 @@ TEST(dwarf_unwind, simple) {
   size_t size_stack = funcA(regs);
   EXPECT_TRUE(size_stack);
 
-  { // IP
-    uint64_t ip = regs[REGNAME(PC)];
-    printf("%lx = ip\n", ip);
-
-    { // small useless test
-      CodeCache *code_cache =
-          findLibraryByAddress(&cache_arary, reinterpret_cast<void *>(ip));
-      EXPECT_TRUE(code_cache);
-    }
-  }
   ap::StackContext sc = ap::from_regs(std::span(regs));
   ap::StackBuffer buffer(stack, sc.sp, sc.sp + size_stack);
 
-  void *stack[128];
-  int n = stackWalk(&cache_arary, sc, buffer, const_cast<const void **>(stack),
+  void *callchain[128];
+  int n = stackWalk(&cache_arary, sc, buffer, const_cast<const void **>(callchain),
                     128, 0);
   const char* syms[128];
-
   for (int i = 0; i < n; ++i) {
     { // retrieve symbol
       CodeCache *code_cache = findLibraryByAddress(
-          &cache_arary, reinterpret_cast<void *>(stack[i]));
+          &cache_arary, reinterpret_cast<void *>(callchain[i]));
       if (code_cache) {
-        syms[i] = code_cache->binarySearch(stack[i]);
-        printf("IP = %p - %s\n", stack[i], syms[i]);
+        syms[i] = code_cache->binarySearch(callchain[i]);
+        printf("IP = %p - %s\n", callchain[i], syms[i]);
       }
     }
   }
+
   // Check that we found the expected functions during unwinding
   ASSERT_TRUE(std::string(syms[0]).find("save_context") != std::string::npos);
   ASSERT_TRUE(std::string(syms[1]).find("funcB") != std::string::npos);
