@@ -13,6 +13,76 @@
 
 #include <nlohmann/json.hpp>
 
+struct StringTable {
+  std::unordered_map<std::string, size_t> table;
+
+  size_t insert(const std::string &str) {
+    auto loc = table.find(str);
+    size_t ret;
+    if (loc == table.end()) {
+      ret = table.size();
+      table[str] = ret;
+    } else {
+      ret = loc->second;
+    }
+    return ret;
+  }
+
+  size_t insert(int n) {
+    return insert(std::to_string(n));
+  }
+
+  void serialize(nlohmann::json &array) {
+    std::map<size_t, const std::string *> aggr;
+    for (const auto &elem: table)
+      aggr[elem.second] = &elem.first;
+
+    for (const auto &elem: aggr)
+      array.emplace_back(*elem.second);
+  }
+};
+
+struct ThreadFrame {
+  const std::string _filename;
+  const std::string _package;
+  const std::string _class;
+  const std::string _method;
+  int _line;
+};
+
+bool operator<(const ThreadFrame &A, const ThreadFrame &B);
+
+struct ThreadFrameTable {
+  std::map<ThreadFrame, size_t> table;
+
+  size_t insert(const ThreadFrame &frame) {
+    auto loc = table.find(frame);
+    size_t ret;
+    if (loc == table.end()) {
+      ret = table.size();
+      table[frame] = ret;
+    } else {
+      ret = loc->second;
+    }
+    return ret;
+  }
+
+  void serialize(nlohmann::json &array, StringTable &stab) {
+    std::map<size_t, const ThreadFrame*> aggr;
+    for (const auto &elem: table)
+      aggr[elem.second] = &elem.first;
+
+    for (const auto &f : aggr) {
+      array.push_back(nlohmann::json::array());
+      array.back()[0] = stab.insert(f.second->_filename);
+      array.back()[1] = stab.insert(f.second->_package);
+      array.back()[2] = stab.insert(f.second->_class);
+      array.back()[3] = stab.insert(f.second->_method);
+      array.back()[4] = stab.insert(f.second->_line);
+    }
+  }
+};
+
 struct NoisyNeighborCpu {
   std::vector<uint64_t> time_start;
   std::vector<uint64_t> time_end;
@@ -68,85 +138,69 @@ struct NoisyNeighbors {
 
   nlohmann::json finalize(uint64_t t) {
     nlohmann::json ret{};
-    std::map<pid_t, uint64_t> pidtable = {};
     std::vector<std::string> thread_names = {};
-    ret["threads"] = nlohmann::json::object();
+
+    // String table (but don't serialize to JSON yet)
+    StringTable stab{};
+    stab.insert(""); // Always need an empty
+    size_t active_idx = stab.insert("ACTIVE");
+    size_t idle_idx = stab.insert("INACTIVE");
+
+    // Frame table
+    ThreadFrameTable frames{};
+
+    // Time
     ret["timeRange"] = nlohmann::json::object();
-    ret["strings"] = nlohmann::json::array();
-    ret["frames"] = nlohmann::json::array();
     ret["timeRange"]["endNs"] = t;
     ret["timeRange"]["startNs"] = t;
 
-    // Add some helpful entries to the pidtable
-    ret["strings"].push_back(""); // first is empty
-    size_t path_idx = ret["strings"].size();
-    ret["strings"].push_back("unknown.cpp");
-    size_t pkg_idx = ret["strings"].size();
-    ret["strings"].push_back("libwhatever.so");
-    size_t class_idx = ret["strings"].size();
-    ret["strings"].push_back("IHaveNoClass");
+    // Timelines
+    ret["timelines"] = nlohmann::json::object();
+    ret["timelines"]["gc"] = nlohmann::json::object();
+    ret["timelines"]["stw"] = nlohmann::json::object();
 
-    // Later on we'll refactor this properly, but for now just cheat.
-    size_t active_idx= ret["strings"].size();
-    ret["strings"].push_back("ACTIVE");
-    size_t inactive_idx= ret["strings"].size();
-    ret["strings"].push_back("INACTIVE");
+    // Noisy neighbor
+    {
+      auto &noisy = ret["timelines"]["noisyneighbor"] = nlohmann::json::object();
+      noisy["labelSchema"] = {"PID", "CPU_PCT_USED"};
+    }
 
-    for (size_t i = 0; i < T.size(); i++) {
-      // Populate placeholders.  We do this without checking size since we
-      // want a blank entry for idle cores
-      thread_names.push_back("CPU_" + std::to_string(i));
-      ret["threads"][thread_names.back()] = nlohmann::json::array();
+    // Threads
+    {
+      auto &thread = ret["timelines"]["threads"] = nlohmann::json::object();
+      thread["lines"] = nlohmann::json::object();
+      thread["frameSchema"] = {"filename", "package", "class", "method", "line"};
 
-      // First, check this CPU to see if it has a better start time.
-      if (!T[i].time_start.empty() && T[i].time_start[0] < ret["timeRange"]["startNs"])
-        ret["timeRange"]["startNs"] = T[i].time_start[0];
+      // Iterate through the CPUs
+      for (size_t i = 0; i < T.size(); i++) {
+        thread_names.push_back("thread-" + std::to_string(i));
+        auto &this_thread = thread["lines"][thread_names.back()] = nlohmann::json::array();
 
-      // Iterate through entries
-      for (size_t j = 0; j < T[i].pid.size(); j++) {
-        pid_t this_pid = T[i].pid[j];
-        size_t idx_pid = -1ull;
-        auto loc = pidtable.find(this_pid);
-        if (loc != pidtable.end()) {
-          idx_pid = loc->second;
-        } else {
-          idx_pid = ret["strings"].size();
-          if (!this_pid)
-            ret["strings"].push_back("Idle");
-          else
-            ret["strings"].push_back(std::to_string(this_pid));
-          pidtable.insert({this_pid, idx_pid});
+        // First, check this CPU to see if it has a better overall start time.
+        if (!T[i].time_start.empty() && T[i].time_start[0] < ret["timeRange"]["startNs"])
+          ret["timeRange"]["startNs"] = T[i].time_start[0];
+
+        // Iterate through entries on this CPU
+        for (size_t j = 0; j < T[i].pid.size(); j++) {
+          size_t frame_idx = frames.insert({"unknown.cpp", "libwhatever.so", "IHaveNoClass", "function_" + std::to_string(T[i].pid[j]), -1});
+          this_thread[j]["startNs"] = T[i].time_start[j];
+          this_thread[j]["endNs"] = T[i].time_start.size() == T[i].time_end.size() ? T[i].time_end[j] : t;
+          this_thread[j]["state"] = T[i].pid[j] > 0 ? active_idx : idle_idx;
+          this_thread[j]["stack"] = {frame_idx};
         }
-
-        ret["threads"][thread_names.back()][j]["stack"] = nlohmann::json::array();
-        ret["threads"][thread_names.back()][j]["stack"][0] = idx_pid;
-        ret["threads"][thread_names.back()][j]["startNs"] = T[i].time_start[j];
-
-        if (T[i].time_start.size() == T[i].time_end.size())
-          ret["threads"][thread_names.back()][j]["endNs"] = T[i].time_end[j];
-        else
-          ret["threads"][thread_names.back()][j]["endNs"] = t;
-
-        if (T[i].pid[j] != 0)
-          ret["threads"][thread_names.back()][j]["label"] = active_idx;
-        else
-          ret["threads"][thread_names.back()][j]["label"] = inactive_idx;
       }
     }
 
-    // Now that we've gone through everything, fill in the symbol table
+    // Now serialize the intermediates
+    ret["strings"] = nlohmann::json::array();
+    ret["frames"] = nlohmann::json::array();
+    frames.serialize(ret["frames"], stab);
+    stab.serialize(ret["strings"]);
 
-    for (size_t i = 0; i < pidtable.size(); i++) {
-      ret["frames"].push_back(nlohmann::json::array());
-      ret["frames"][i].push_back(path_idx);
-      ret["frames"][i].push_back(pkg_idx);
-      ret["frames"][i].push_back(class_idx);
-      ret["frames"][i].push_back(i);
-      ret["frames"][i].push_back(-1);
-    }
-
+    // OK done
     return ret;
-  };
+  }
+
 
   void clear() {
     for (auto &t : T)
