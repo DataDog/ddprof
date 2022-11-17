@@ -35,3 +35,7 @@ Oh wow, native func is stored in a char and we deduce pointer from the offset to
 we can use DSO information + file info
 Ensure the cache is at elf address (not base)
 Start is 0 or for non PIE,
+
+
+2) Find library is by absolute address
+- Keep that ?
