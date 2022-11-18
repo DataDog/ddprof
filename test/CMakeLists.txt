@@ -318,7 +318,9 @@ message(STATUS "Async profiler" ${ASYNC_PROFILER_SRC})
 
 add_unit_test(
   dwarf_unwind-ut dwarf_unwind-ut.cc ../src/lib/savecontext.cc ../src/lib/saveregisters.cc
-  ../src/async-profiler/stack_context.cpp ${ASYNC_PROFILER_SRC} LIBRARIES ${ELFUTILS_LIBRARIES})
+    ../src/async-profiler/stack_context.cpp ../src/lib/allocation_tracker.cc ../src/ringbuffer_utils.cc ../src/perf_ringbuffer.cc
+        ../src/perf.cc ../src/pevent_lib.cc ../src/sys_utils.cc ../src/user_override.cc ../src/perf_watcher.cc
+    ${ASYNC_PROFILER_SRC} LIBRARIES ${ELFUTILS_LIBRARIES})
 target_include_directories(dwarf_unwind-ut PRIVATE ${ASYNC_PROFILER_INCLUDE})
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
