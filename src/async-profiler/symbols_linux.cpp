@@ -509,6 +509,73 @@ void Symbols::parseKernelSymbols(CodeCache *cc) {
   // XXX(nick): omitted
 }
 
+
+void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array, bool kernel_symbols) {
+  std::set<const void *> parsed_libraries;
+  std::set<unsigned long> parsed_inodes;
+  MutexLocker ml(_parse_lock);
+  char proc_map_filename[1024] = {};
+  snprintf(proc_map_filename, std::size(proc_map_filename), "%s/proc/%d/maps", "", pid);
+  // todo plug the proc_map open functions (handles user switches)
+  FILE *f = fopen(proc_map_filename, "r");
+  if (f == NULL) {
+    return;
+  }
+
+  const char *last_readable_base = NULL;
+  const char *image_end = NULL;
+  char *str = NULL;
+  size_t str_size = 0;
+  ssize_t len;
+
+  while ((len = getline(&str, &str_size, f)) > 0) {
+    str[len - 1] = 0;
+
+    MemoryMapDesc map(str);
+    if (!map.isReadable() || map.file() == NULL || map.file()[0] == 0) {
+      continue;
+    }
+
+    const char *image_base = map.addr();
+    if (image_base != image_end)
+      last_readable_base = image_base;
+    image_end = map.end();
+
+    if (map.isExecutable()) {
+      if (!parsed_libraries.insert(image_base).second) {
+        continue; // the library was already parsed
+      }
+
+      int count = array->count();
+      if (count >= MAX_NATIVE_LIBS) {
+        break;
+      }
+
+      CodeCache *cc = new CodeCache(map.file(), count, image_base, image_end);
+
+      unsigned long inode = map.inode();
+      if (inode != 0) {
+        // Do not parse the same executable twice, e.g. on Alpine Linux
+        if (parsed_inodes.insert(map.dev() | inode << 16).second) {
+          // Be careful: executable file is not always ELF, e.g. classes.jsa
+          if ((image_base -= map.offs()) >= last_readable_base) {
+            ElfParser::parseProgramHeaders(cc, image_base);
+          }
+          ElfParser::parseFile(cc, image_base, map.file(), true);
+        }
+      } else if (strcmp(map.file(), "[vdso]") == 0) {
+        ElfParser::parseMem(cc, image_base);
+      }
+
+      cc->sort();
+      array->add(cc);
+    }
+  }
+
+  free(str);
+  fclose(f);
+}
+
 void Symbols::parseLibraries(CodeCacheArray *array, bool kernel_symbols) {
   // we can't use static global sets due to undefined initialization order stuff
   // (see
