@@ -42,10 +42,9 @@ static const DDPROF_STATS s_cycled_stats[] = {
 static const long k_clock_ticks_per_sec = sysconf(_SC_CLK_TCK);
 
 /// Human readable runtime information
-static void print_diagnostics(const DsoHdr &dso_hdr) {
+static void print_diagnostics(void) {
   LG_NFO("Printing internal diagnostics");
   ddprof_stats_print();
-  dso_hdr._stats.log();
 }
 
 static inline int64_t now_nanos() {
@@ -53,31 +52,6 @@ static inline int64_t now_nanos() {
   gettimeofday(&tv, NULL);
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
 }
-
-#ifndef DDPROF_NATIVE_LIB
-static DDRes report_lost_events(DDProfContext *ctx) {
-  for (int watcher_idx = 0; watcher_idx < ctx->num_watchers; ++watcher_idx) {
-    if (ctx->worker_ctx.lost_events_per_watcher[watcher_idx] > 0) {
-      PerfWatcher *watcher = &ctx->watchers[watcher_idx];
-      UnwindState *us = ctx->worker_ctx.us;
-      uw_output_clear(&us->output);
-      add_common_frame(us, SymbolErrors::lost_event);
-      LG_WRN("Reporting #%lu -> [%lu] lost samples for watcher #%d",
-             ctx->worker_ctx.lost_events_per_watcher[watcher_idx],
-             ctx->worker_ctx.lost_events_per_watcher[watcher_idx] *
-                 watcher->sample_period,
-             watcher_idx);
-      DDRES_CHECK_FWD(pprof_aggregate(
-          &us->output, &us->symbol_hdr, watcher->sample_period,
-          ctx->worker_ctx.lost_events_per_watcher[watcher_idx], watcher,
-          ctx->worker_ctx.pprof[ctx->worker_ctx.i_current_pprof]));
-      ctx->worker_ctx.lost_events_per_watcher[watcher_idx] = 0;
-    }
-  }
-
-  return {};
-}
-#endif
 
 static inline long export_time_convert(double upload_period) {
   return upload_period * 1000000000;
@@ -116,7 +90,6 @@ DDRes worker_library_init(DDProfContext *ctx,
       DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, false));
     }
     // Initialize the unwind state and library
-    unwind_init();
     ctx->worker_ctx.user_tags =
         new UserTags(ctx->params.tags, ctx->params.num_cpu);
 
@@ -152,8 +125,7 @@ DDRes worker_library_free(DDProfContext *ctx) {
 }
 
 /// Retrieve cpu / memory info
-static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr,
-                                 std::chrono::nanoseconds cycle_duration) {
+static DDRes worker_update_stats(ProcStatus *procstat, std::chrono::nanoseconds cycle_duration) {
   // Update the procstats, but first snapshot the utime so we can compute the
   // diff for the utime metric
   int64_t cpu_time_old = procstat->utime + procstat->stime;
@@ -164,11 +136,6 @@ static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr,
       (k_clock_ticks_per_sec * elapsed_nsec);
   ddprof_stats_set(STATS_PROFILER_RSS, get_page_size() * procstat->rss);
   ddprof_stats_set(STATS_PROFILER_CPU_USAGE, millicores);
-  ddprof_stats_set(STATS_DSO_UNHANDLED_SECTIONS,
-                   dso_hdr->_stats.sum_event_metric(DsoStats::kUnhandledDso));
-  ddprof_stats_set(STATS_DSO_NEW_DSO,
-                   dso_hdr->_stats.sum_event_metric(DsoStats::kNewDso));
-  ddprof_stats_set(STATS_DSO_SIZE, dso_hdr->get_nb_dso());
 
   long target_cpu_nsec;
   ddprof_stats_get(STATS_TARGET_CPU_USAGE, &target_cpu_nsec);
@@ -266,29 +233,19 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
   if (!IsDDResFatal(res) && EventConfMode::kCallgraph <= watcher->output_mode) {
-#ifndef DDPROF_NATIVE_LIB
     // Depending on the type of watcher, compute a value for sample
     uint64_t sample_val = perf_value_from_sample(watcher, sample);
 
     // in lib mode we don't aggregate (protect to avoid link failures)
     int i_export = ctx->worker_ctx.i_current_pprof;
     DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
-    DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr, sample_val, 1,
+
+    DDRES_CHECK_FWD(pprof_aggregate_v2(ddprof::span(us->output.callchain, us->output.nb_locs), us->code_cache[sample->pid], sample_val, 1,
                                     watcher, pprof));
     if (ctx->params.show_samples) {
-      ddprof_print_sample(us->output, us->symbol_hdr, sample->period, *watcher);
+      // todo show samples
+      //      ddprof_print_sample(us->output, us->symbol_hdr, sample->period, *watcher);
     }
-#else
-    // Call the user's stack handler
-    if (ctx->stack_handler) {
-      if (!ctx->stack_handler->apply(&us->output, ctx,
-                                     ctx->stack_handler->callback_ctx,
-                                     watcher_pos)) {
-        DDRES_RETURN_ERROR_LOG(DD_WHAT_STACK_HANDLE,
-                               "Stack handler returning errors");
-      }
-    }
-#endif
   }
 
   DDRES_CHECK_FWD(ddprof_stats_add(STATS_AGGREGATION_AVG_TIME,
@@ -353,7 +310,7 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
     return ddres_create(DD_SEVERROR, DD_WHAT_EXPORTER);
   }
 
-  DDRES_CHECK_FWD(report_lost_events(ctx));
+  // todo lost events
 
   // Dispatch to thread
   ctx->worker_ctx.exp_error = false;
@@ -383,11 +340,10 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
 
   // Scrape procfs for process usage statistics
   DDRES_CHECK_FWD(worker_update_stats(&ctx->worker_ctx.proc_status,
-                                      &ctx->worker_ctx.us->dso_hdr,
                                       cycle_duration));
 
   // And emit diagnostic output (if it's enabled)
-  print_diagnostics(ctx->worker_ctx.us->dso_hdr);
+  print_diagnostics();
   if (IsDDResNotOK(ddprof_stats_send(ctx->params.internal_stats))) {
     LG_WRN("Unable to utilize to statsd socket.  Suppressing future stats.");
     free((void *)ctx->params.internal_stats);
@@ -396,9 +352,6 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
 
   // Increase the counts of exports
   ctx->worker_ctx.count_worker += 1;
-
-  // allow new backpopulates
-  ctx->worker_ctx.us->dso_hdr.reset_backpopulate_state();
 
   // Update the time last sent
   ctx->worker_ctx.send_nanos += export_time_convert(ctx->params.upload_period);
@@ -424,9 +377,6 @@ void ddprof_pr_mmap(DDProfContext *ctx, const perf_event_mmap2 *map,
   LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx) %02u:%02u %lu", watcher_pos, map->pid,
          map->filename, map->addr, map->len, map->pgoff, map->maj, map->min,
          map->ino);
-  ddprof::Dso new_dso(map->pid, map->addr, map->addr + map->len - 1, map->pgoff,
-                      std::string(map->filename), true, map->ino);
-  ctx->worker_ctx.us->dso_hdr.insert_erase_overlap(std::move(new_dso));
 }
 
 void ddprof_pr_lost(DDProfContext *ctx, const perf_event_lost *lost,

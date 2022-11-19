@@ -10,7 +10,6 @@
 #include "loghandle.hpp"
 #include "pevent_lib_mocks.hpp"
 #include "symbol_hdr.hpp"
-#include "unwind_output_mock.hpp"
 
 #include <cstdlib>
 #include <fcntl.h>
@@ -67,15 +66,15 @@ TEST(DDProfPProf, aggregate) {
   SymbolTable &table = symbol_hdr._symbol_table;
   MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
 
-  fill_unwind_symbols(table, mapinfo_table, mock_output);
+  //  fill_unwind_symbols(table, mapinfo_table, mock_output);
   DDProfPProf pprof;
   DDProfContext ctx = {};
   ctx.watchers[0] = *ewatcher_from_str("sCPU");
   ctx.num_watchers = 1;
   DDRes res = pprof_create_profile(&pprof, &ctx);
   EXPECT_TRUE(IsDDResOK(res));
-  res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, 1, &ctx.watchers[0],
-                        &pprof);
+//  res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, 1, &ctx.watchers[0],
+//                        &pprof);
 
   EXPECT_TRUE(IsDDResOK(res));
 

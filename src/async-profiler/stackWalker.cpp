@@ -146,7 +146,7 @@ void populateStackContext(ap::StackContext &sc, void *ucontext) {
 }
 
 int stackWalk(CodeCacheArray *cache, ap::StackContext &sc,
-              const ap::StackBuffer &buffer, const void **callchain,
+              const ap::StackBuffer &buffer, void const **callchain,
               int max_depth, int skip) {
   int depth = -skip;
 

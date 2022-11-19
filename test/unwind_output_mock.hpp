@@ -43,7 +43,7 @@ static inline void fill_mapinfo_table_1(MapInfoTable &mapinfo_table) {
 }
 
 static inline void fill_unwind_output_1(UnwindOutput &uw_output) {
-  uw_output_clear(&uw_output);
+  //  uw_output_clear(&uw_output);
   uw_output.nb_locs = K_MOCK_LOC_SIZE;
 
   FunLoc *locs = uw_output.locs;

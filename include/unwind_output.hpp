@@ -11,7 +11,7 @@
 
 #include "ddprof_defs.hpp"
 #include "string_view.hpp"
-#include <array>
+#include <vector>
 
 typedef struct FunLoc {
   uint64_t ip; // Relative to file, not VMA
@@ -28,11 +28,9 @@ typedef struct UnwindOutput {
 } UnwindOutput;
 
 struct UnwindOutput_V2 {
-  std::array<void *, DD_MAX_STACK_DEPTH> callchain;
-  uint64_t nb_locs = {};
+  const void* callchain[DD_MAX_STACK_DEPTH];
+  uint64_t nb_locs;
   int pid = {};
   int tid = {};
   bool is_incomplete = false;
 };
-
-void uw_output_clear(UnwindOutput *);
