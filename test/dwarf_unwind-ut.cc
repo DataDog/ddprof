@@ -51,7 +51,7 @@ TEST(dwarf_unwind, simple) {
   size_t size_stack = funcA(regs);
   EXPECT_TRUE(size_stack);
 
-  ap::StackContext sc = ap::from_regs(std::span(regs));
+  ap::StackContext sc = ap::from_regs(ddprof::span(regs));
   ap::StackBuffer buffer(stack, sc.sp, sc.sp + size_stack);
 
   void *callchain[128];
@@ -81,6 +81,7 @@ TEST(dwarf_unwind, simple) {
 #include "ringbuffer_utils.hpp"
 #include "allocation_tracker.hpp"
 #include "perf_ringbuffer.hpp"
+#include "span.hpp"
 
 DDPROF_NOINLINE void func_save_sleep(size_t size);
 DDPROF_NOINLINE void func_intermediate(size_t size);
@@ -107,7 +108,6 @@ TEST(dwarf_unwind, remote) {
       ring_buffer.get_buffer_info());
 
   // Fork
-  pid_t parent_pid = getpid();
   pid_t temp_pid = fork();
   if (!temp_pid) {
     func_intermediate(10);
@@ -131,9 +131,9 @@ TEST(dwarf_unwind, remote) {
   // convert based on mask for this watcher (default in this case)
   perf_event_sample *sample = hdr2samp(hdr, perf_event_default_sample_type());
 
-  std::span<uint64_t, PERF_REGS_COUNT> regs_span{sample->regs, PERF_REGS_COUNT};
+  ddprof::span<uint64_t, PERF_REGS_COUNT> regs_span{sample->regs, PERF_REGS_COUNT};
   ap::StackContext sc = ap::from_regs(regs_span);
-  std::span<std::byte> stack{ reinterpret_cast<std::byte*>(sample->data_stack), sample->size_stack};
+  ddprof::span<std::byte> stack{ reinterpret_cast<std::byte*>(sample->data_stack), sample->size_stack};
   ap::StackBuffer buffer(stack, sc.sp, sc.sp + sample->size_stack);
 
   void *callchain[DD_MAX_STACK_DEPTH];

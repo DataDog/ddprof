@@ -5,7 +5,7 @@
 namespace ap {
 
 // Async profiler's unwinding only uses a subset of the registers
-StackContext from_regs(const std::span<uint64_t, PERF_REGS_COUNT> regs) {
+StackContext from_regs(const ddprof::span<uint64_t, PERF_REGS_COUNT> regs) {
   // context from saving state
   ap::StackContext sc;
   sc.pc = CAST_TO_VOID_STAR(regs[REGNAME(PC)]);

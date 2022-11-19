@@ -128,7 +128,7 @@ static DDRes get_library_path(TempFileHolder &libdd_profiling_path,
   }
 
   if (profiling_path.empty()) {
-    DDRES_CHECK_FWD(get_or_create_temp_file(
+    DDRES_CHECK_FWD(ddprof::get_or_create_temp_file(
         k_libdd_profiling_embedded_name,
         ddprof::as_bytes(ddprof::span{_binary_libdd_profiling_embedded_so_start,
                                       _binary_libdd_profiling_embedded_so_end}),

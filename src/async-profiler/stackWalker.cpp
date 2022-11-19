@@ -55,6 +55,7 @@ bool read_memory(uint64_t addr, uint64_t *res, const ap::StackBuffer &buffer) {
   return true;
 }
 
+// todo const correctness
 CodeCache *findLibraryByAddress(CodeCacheArray *cache, const void *address) {
   const int native_lib_count = cache->count();
   for (int i = 0; i < native_lib_count; i++) {

@@ -5,7 +5,6 @@
 
 #pragma once
 
-#if __cpp_lib_span
 
 #  include <span>
 
@@ -15,9 +14,3 @@ using std::as_writable_bytes;
 using std::span;
 } // namespace ddprof
 
-#else
-
-#  define TCB_SPAN_NAMESPACE_NAME ddprof
-#  include "tcb/span.hpp"
-
-#endif
