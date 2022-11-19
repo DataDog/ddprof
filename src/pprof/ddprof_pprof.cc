@@ -168,6 +168,91 @@ static void write_line(const ddprof::Symbol &symbol, ddog_Line *ffi_line) {
   ffi_line->line = symbol._lineno;
 }
 
+
+static void write_location_v2(const void* ip,
+                              const ddog_Slice_line *lines,
+                              ddog_Location *ffi_location) {
+  ffi_location->address = reinterpret_cast<uint64_t>(ip);
+  ffi_location->lines = *lines;
+  // Folded not handled for now
+  ffi_location->is_folded = false;
+}
+
+static void write_function_v2(const char* func,
+                              ddog_Function *ffi_func) {
+  ffi_func->name = to_CharSlice(string_view_create_strlen(func));
+}
+
+static void write_line_v2(const char* func, ddog_Line *ffi_line) {
+  write_function_v2(func, &ffi_line->function);
+  ffi_line->line = 0;
+}
+
+#include "async-profiler/codeCache.h"
+#include "async-profiler/stackWalker.h"
+
+DDRes pprof_aggregate_v2(ddprof::span<const void *> callchain, CodeCacheArray &cache_arary,
+                        uint64_t value, uint64_t count, const PerfWatcher *watcher,
+                        DDProfPProf *pprof) {
+  ddog_Profile *profile = pprof->_profile;
+
+  int64_t values[DDPROF_PWT_LENGTH] = {};
+  values[watcher->pprof_sample_idx] = value * count;
+  if (watcher_has_countable_sample_type(watcher)) {
+    values[watcher->pprof_count_sample_idx] = count;
+  }
+
+  ddog_Location locations_buff[DD_MAX_STACK_DEPTH];
+  // assumption of single line per loc for now
+  ddog_Line line_buff[DD_MAX_STACK_DEPTH];
+
+  // todo skip frames
+  unsigned cur_loc = 0;
+  for (const void *ip : callchain) {
+    const char *func = "unknown";
+    CodeCache *code_cache = findLibraryByAddress(&cache_arary, ip);
+    if (code_cache) {
+      func = code_cache->binarySearch(ip);
+    }
+
+    // possibly several lines to handle inlined function (not handled for now)
+    write_line_v2(func, &line_buff[cur_loc]);
+    ddog_Slice_line lines = {.ptr = &line_buff[cur_loc], .len = 1};
+    write_location_v2(ip, &lines, &locations_buff[cur_loc]);
+    ++cur_loc;
+  }
+
+  ddog_Label labels[PPROF_MAX_LABELS] = {};
+  size_t labels_num = 0;
+
+  // todo pid and tid things
+  if (watcher_has_tracepoint(watcher)) {
+    labels[labels_num].key = to_CharSlice("tracepoint_type");
+
+    // If the label is given, use that as the tracepoint type.  Otherwise
+    // default to the event name
+    if (!watcher->tracepoint_label.empty()) {
+      labels[labels_num].str = to_CharSlice(watcher->tracepoint_label.c_str());
+    } else {
+      labels[labels_num].str = to_CharSlice(watcher->tracepoint_event.c_str());
+    }
+    ++labels_num;
+  }
+  ddog_Sample sample = {
+      .locations = {.ptr = locations_buff, .len = cur_loc},
+      .values = {.ptr = values, .len = pprof->_nb_values},
+      .labels = {.ptr = labels, .len = labels_num},
+  };
+
+  uint64_t id_sample = ddog_Profile_add(profile, sample);
+  if (id_sample == 0) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile");
+  }
+
+  return ddres_init();
+
+}
+
 // Assumption of API is that sample is valid in a single type
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr *symbol_hdr, uint64_t value,

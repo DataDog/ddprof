@@ -23,6 +23,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #pragma once
 
+#include <stdint.h>
 #include "ddprof_base.hpp"
 #include "perf_archmap.hpp"
 #include "span.hpp"

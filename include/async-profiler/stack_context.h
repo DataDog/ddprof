@@ -3,7 +3,7 @@
 #pragma once
 
 #include <stdint.h>
-#include <span>
+#include "span.hpp"
 
 #include "perf_archmap.hpp"
 
@@ -21,12 +21,12 @@ struct StackContext {
 };
 
 // Async profiler's unwinding only uses a subset of the registers
-StackContext from_regs(const std::span<uint64_t, PERF_REGS_COUNT> regs);
+StackContext from_regs(const ddprof::span<uint64_t, PERF_REGS_COUNT> regs);
 
 struct StackBuffer {
-  StackBuffer(std::span<std::byte> bytes, uint64_t start, uint64_t end)
+  StackBuffer(ddprof::span<std::byte> bytes, uint64_t start, uint64_t end)
       : _bytes(bytes), sp_start(start), sp_end(end) {}
-  std::span<std::byte> _bytes;
+  ddprof::span<std::byte> _bytes;
   uint64_t sp_start; // initial SP (in context of the process)
   uint64_t sp_end;   // sp + size (so root functions = start of stack)
   /*

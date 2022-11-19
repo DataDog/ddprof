@@ -80,6 +80,16 @@ else()
 endif()
 
 # ---- Dependencies ----
+## -- Async profiler --
+set(ASYNC_PROFILER_LIB_DIR ${CMAKE_SOURCE_DIR})
+set(ASYNC_PROFILER_SRC_DIR ${ASYNC_PROFILER_LIB_DIR}/src/async-profiler)
+set(ASYNC_PROFILER_LIB_INCLUDE  ${ASYNC_PROFILER_LIB_DIR}/include/async-profiler)
+aux_source_directory(${ASYNC_PROFILER_SRC_DIR} ASYNC_PROFILER_SOURCES)
+add_library(async_prof_lib STATIC ${ASYNC_PROFILER_SOURCES})
+target_include_directories(async_prof_lib PUBLIC ${ASYNC_PROFILER_LIB_INCLUDE} ${CMAKE_SOURCE_DIR}/include)
+set_property(TARGET async_prof_lib PROPERTY POSITION_INDEPENDENT_CODE ON)
+add_library(DDProf::AsyncProf ALIAS async_prof_lib)
+# -------------------
 
 # libdatadog_profiling
 include(Findlibdatadog)
@@ -145,7 +155,7 @@ aux_source_directory(src/exe EXE_SRC)
 # Define all sources
 set(DDPROF_GLOBAL_SRC ${COMMON_SRC} ${PPROF_SRC} ${EXPORTER_SRC} ${EXE_SRC})
 
-set(DDPROF_LIBRARY_LIST DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
+set(DDPROF_LIBRARY_LIST DDProf::Parser DDProf::AsyncProf llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 
 if(ON)
   # Add the rust library - Refactoring ongoing. OFF for now

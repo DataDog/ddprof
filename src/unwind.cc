@@ -79,7 +79,7 @@ static bool is_stack_complete(UnwindState *us) {
 DDRes unwindstate__unwind(UnwindState *us) {
   DDRes res = ddres_init();
   if (us->pid != 0) { // we can not unwind pid 0
-    res = unwind_dwfl(us);
+
   }
   if (IsDDResNotOK(res)) {
     find_dso_add_error_frame(us);

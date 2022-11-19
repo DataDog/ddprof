@@ -153,7 +153,7 @@ add_unit_test(
 add_unit_test(
   ddprof_pprof-ut ../src/pprof/ddprof_pprof.cc ../src/unwind_output.cc ../src/perf_watcher.cc
   ddprof_pprof-ut.cc
-  LIBRARIES Datadog::Profiling DDProf::Parser
+  LIBRARIES Datadog::Profiling DDProf::Parser DDProf::AsyncProf
   DEFINITIONS MYNAME="ddprof_pprof-ut")
 
 add_unit_test(
@@ -165,7 +165,7 @@ add_unit_test(
   ../src/perf_watcher.cc
   ../src/tags.cc
   ddprof_exporter-ut.cc
-  LIBRARIES Datadog::Profiling DDProf::Parser
+  LIBRARIES Datadog::Profiling DDProf::Parser DDProf::AsyncProf
   DEFINITIONS MYNAME="ddprof_exporter-ut")
 
 add_unit_test(
