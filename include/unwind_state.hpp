@@ -14,6 +14,7 @@
 #include "perf_archmap.hpp"
 #include "symbol_hdr.hpp"
 #include "unwind_output.hpp"
+#include "async-profiler/codeCache.h"
 
 #include <sys/types.h>
 
@@ -37,17 +38,8 @@ struct UnwindRegisters {
 /// given through callbacks
 struct UnwindState {
   explicit UnwindState(int dd_profiling_fd = -1)
-      : _dwfl_wrapper(nullptr), dso_hdr("", dd_profiling_fd), pid(-1),
-        stack(nullptr), stack_sz(0), current_ip(0) {
-    output.clear();
-    output.locs.reserve(DD_MAX_STACK_DEPTH);
-  }
-
-  ddprof::DwflHdr dwfl_hdr;
-  ddprof::DwflWrapper *_dwfl_wrapper; // pointer to current dwfl element
-
-  ddprof::DsoHdr dso_hdr;
-  SymbolHdr symbol_hdr;
+      : pid(-1),
+        stack(nullptr), stack_sz(0), current_ip(0) {}
 
   pid_t pid;
   char *stack;
@@ -56,7 +48,8 @@ struct UnwindState {
   UnwindRegisters initial_regs;
   ProcessAddress_t current_ip;
 
-  UnwindOutput output;
+  std::unordered_map<pid_t , CodeCacheArray> code_cache;
+  UnwindOutput_V2 output;
 };
 
 static inline bool unwind_registers_equal(const UnwindRegisters *lhs,

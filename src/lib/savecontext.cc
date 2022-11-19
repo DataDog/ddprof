@@ -41,12 +41,13 @@ static DDPROF_NO_SANITIZER_ADDRESS size_t
 save_stack(ddprof::span<const std::byte> stack_bounds,
            const std::byte *stack_ptr, ddprof::span<std::byte> buffer) {
   // Safety check to ensure we are not in a fiber using a different stack
-  if (!(stack_ptr >= stack_bounds.begin() && stack_ptr < stack_bounds.end())) {
+  const std::byte* end_ptr = stack_bounds.data() + stack_bounds.size();
+  if (!(stack_ptr >= stack_bounds.data() && stack_ptr < end_ptr)) {
     return 0;
   }
   // take the min of current stack size and requested stack sample size~
   int64_t saved_stack_size = std::min(static_cast<intptr_t>(buffer.size()),
-                                      stack_bounds.end() - stack_ptr);
+                                      end_ptr - stack_ptr);
 
   if (saved_stack_size <= 0) {
     return 0;

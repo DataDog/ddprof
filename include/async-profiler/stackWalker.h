@@ -30,7 +30,7 @@
 CodeCache *findLibraryByAddress(CodeCacheArray *cache, const void *address);
 
 int stackWalk(CodeCacheArray *cache, ap::StackContext &sc,
-              const ap::StackBuffer &buffer, const void **callchain,
+              const ap::StackBuffer &buffer, void const **callchain,
               int max_depth, int skip);
 
 #endif // _STACKWALKER_H
