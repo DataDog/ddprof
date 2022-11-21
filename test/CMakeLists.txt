@@ -242,6 +242,46 @@ add_unit_test(
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
   DEFINITIONS MYNAME="savecontext-ut")
 
+add_benchmark(dwfl_unwind-bench dwfl_unwind-bench.cc
+        ../src/lib/allocation_tracker.cc
+        ../src/base_frame_symbol_lookup.cc
+        ../src/build_id.cc
+        ../src/common_mapinfo_lookup.cc
+        ../src/common_symbol_lookup.cc
+        ../src/ddprof_file_info.cc
+        ../src/ddprof_stats.cc
+        ../src/dso.cc
+        ../src/dso_hdr.cc
+        ../src/dso_symbol_lookup.cc
+        ../src/dwfl_hdr.cc
+        ../src/ddprof_module_lib.cc
+        ../src/dwfl_symbol.cc
+        ../src/dwfl_symbol_lookup.cc
+        ../src/dwfl_thread_callbacks.cc
+        ../src/failed_assumption.cc
+        ../src/pevent_lib.cc
+        ../src/perf.cc
+        ../src/perf_ringbuffer.cc
+        ../src/perf_watcher.cc
+        ../src/ringbuffer_utils.cc
+        ../src/lib/savecontext.cc
+        ../src/lib/saveregisters.cc
+        ../src/mapinfo_lookup.cc
+        ../src/procutils.cc
+        ../src/runtime_symbol_lookup.cc
+        ../src/symbol_map.cc
+        ../src/signal_helper.cc
+        ../src/statsd.cc
+        ../src/sys_utils.cc
+        ../src/user_override.cc
+        ../src/unwind.cc
+        ../src/unwind_dwfl.cc
+        ../src/unwind_helpers.cc
+        ../src/unwind_metrics.cc
+        ../src/unwind_output.cc
+        LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
+        DEFINITIONS ${DDPROF_DEFINITION_LIST})
+
 add_unit_test(
   allocation_tracker-ut
   allocation_tracker-ut.cc
