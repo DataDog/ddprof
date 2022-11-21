@@ -80,13 +80,14 @@ else()
 endif()
 
 # ---- Dependencies ----
-## -- Async profiler --
+# -- Async profiler --
 set(ASYNC_PROFILER_LIB_DIR ${CMAKE_SOURCE_DIR})
 set(ASYNC_PROFILER_SRC_DIR ${ASYNC_PROFILER_LIB_DIR}/src/async-profiler)
-set(ASYNC_PROFILER_LIB_INCLUDE  ${ASYNC_PROFILER_LIB_DIR}/include/async-profiler)
+set(ASYNC_PROFILER_LIB_INCLUDE ${ASYNC_PROFILER_LIB_DIR}/include/async-profiler)
 aux_source_directory(${ASYNC_PROFILER_SRC_DIR} ASYNC_PROFILER_SOURCES)
 add_library(async_prof_lib STATIC ${ASYNC_PROFILER_SOURCES})
-target_include_directories(async_prof_lib PUBLIC ${ASYNC_PROFILER_LIB_INCLUDE} ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(async_prof_lib PUBLIC ${ASYNC_PROFILER_LIB_INCLUDE}
+                                                 ${CMAKE_SOURCE_DIR}/include)
 set_property(TARGET async_prof_lib PROPERTY POSITION_INDEPENDENT_CODE ON)
 add_library(DDProf::AsyncProf ALIAS async_prof_lib)
 # -------------------
@@ -158,7 +159,8 @@ aux_source_directory(src/jit JIT_SRC)
 set(DDPROF_GLOBAL_SRC ${COMMON_SRC} ${DEMANGLER_SRC} ${PPROF_SRC} ${EXPORTER_SRC} ${EXE_SRC}
                       ${JIT_SRC})
 
-set(DDPROF_LIBRARY_LIST DDProf::Parser DDProf::AsyncProf llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
+set(DDPROF_LIBRARY_LIST DDProf::Parser DDProf::AsyncProf llvm-demangle ${ELFUTILS_LIBRARIES}
+                        Threads::Threads)
 
 if(ON)
   # Add the rust library - Refactoring ongoing. OFF for now

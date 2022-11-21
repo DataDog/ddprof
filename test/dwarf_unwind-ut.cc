@@ -1,16 +1,14 @@
 #include <gtest/gtest.h>
 
 #include "savecontext.hpp"
-#include "unwind_state.hpp"
-// #include "symbol.hpp"
 #include "stackWalker.h"
+#include "unwind_state.hpp"
 
 #include <array>
 
 #include "async-profiler/codeCache.h"
-#include "async-profiler/symbols.h"
-
 #include "async-profiler/stack_context.h"
+#include "async-profiler/symbols.h"
 
 // Retrieves instruction pointer
 #define _THIS_IP_                                                              \
@@ -24,7 +22,6 @@
 
 // temp copy pasta
 #define PERF_SAMPLE_STACK_SIZE (4096UL * 8)
-
 
 std::byte stack[PERF_SAMPLE_STACK_SIZE];
 
@@ -55,9 +52,9 @@ TEST(dwarf_unwind, simple) {
   ap::StackBuffer buffer(stack, sc.sp, sc.sp + size_stack);
 
   void *callchain[128];
-  int n = stackWalk(&cache_arary, sc, buffer, const_cast<const void **>(callchain),
-                    128, 0);
-  const char* syms[128];
+  int n = stackWalk(&cache_arary, sc, buffer,
+                    const_cast<const void **>(callchain), 128, 0);
+  const char *syms[128];
   for (int i = 0; i < n; ++i) {
     { // retrieve symbol
       CodeCache *code_cache = findLibraryByAddress(
@@ -75,27 +72,30 @@ TEST(dwarf_unwind, simple) {
   ASSERT_TRUE(std::string(syms[2]).find("funcA") != std::string::npos);
 }
 
-
-
-#include "ringbuffer_holder.hpp"
-#include "ringbuffer_utils.hpp"
 #include "allocation_tracker.hpp"
 #include "perf_ringbuffer.hpp"
+#include "ringbuffer_holder.hpp"
+#include "ringbuffer_utils.hpp"
 #include "span.hpp"
 
 DDPROF_NOINLINE void func_save_sleep(size_t size);
-DDPROF_NOINLINE void func_intermediate(size_t size);
+DDPROF_NOINLINE void func_intermediate_0(size_t size);
+DDPROF_NOINLINE void func_intermediate_1(size_t size);
 
 DDPROF_NOINLINE void func_save_sleep(size_t size) {
-  ddprof::AllocationTracker::track_allocation(0xdeadbeef, size);
-  // prevent tail call optimization
-  getpid();
-  sleep(1);
+  int i = 0;
+  while (++i < 100000) {
+    ddprof::AllocationTracker::track_allocation(0xdeadbeef, size);
+    // prevent tail call optimization
+    getpid();
+    usleep(100);
+    //    printf("Save context nb -- %d \n", i);
+  }
 }
 
-void func_intermediate(size_t size) {
-    func_save_sleep(size);
-}
+void func_intermediate_0(size_t size) { func_intermediate_1(size); }
+
+void func_intermediate_1(size_t size) { func_save_sleep(size); }
 
 TEST(dwarf_unwind, remote) {
   const uint64_t rate = 1;
@@ -110,7 +110,7 @@ TEST(dwarf_unwind, remote) {
   // Fork
   pid_t temp_pid = fork();
   if (!temp_pid) {
-    func_intermediate(10);
+    func_intermediate_0(10);
     return;
   }
 
@@ -131,16 +131,19 @@ TEST(dwarf_unwind, remote) {
   // convert based on mask for this watcher (default in this case)
   perf_event_sample *sample = hdr2samp(hdr, perf_event_default_sample_type());
 
-  ddprof::span<uint64_t, PERF_REGS_COUNT> regs_span{sample->regs, PERF_REGS_COUNT};
+  ddprof::span<uint64_t, PERF_REGS_COUNT> regs_span{sample->regs,
+                                                    PERF_REGS_COUNT};
   ap::StackContext sc = ap::from_regs(regs_span);
-  ddprof::span<std::byte> stack{ reinterpret_cast<std::byte*>(sample->data_stack), sample->size_stack};
+  ddprof::span<std::byte> stack{
+      reinterpret_cast<std::byte *>(sample->data_stack), sample->size_stack};
   ap::StackBuffer buffer(stack, sc.sp, sc.sp + sample->size_stack);
 
   void *callchain[DD_MAX_STACK_DEPTH];
-  int n = stackWalk(&cache_arary, sc, buffer, const_cast<const void **>(callchain),
-                    DD_MAX_STACK_DEPTH, 0);
+  int n =
+      stackWalk(&cache_arary, sc, buffer, const_cast<const void **>(callchain),
+                DD_MAX_STACK_DEPTH, 0);
 
-  std::array<const char*, DD_MAX_STACK_DEPTH> syms;
+  std::array<const char *, DD_MAX_STACK_DEPTH> syms;
   for (int i = 0; i < n; ++i) {
     { // retrieve symbol
       CodeCache *code_cache = findLibraryByAddress(
@@ -150,6 +153,7 @@ TEST(dwarf_unwind, remote) {
         printf("IP = %p - %s\n", callchain[i], syms[i]);
       }
     }
+    // cleanup the producer fork
+    kill(temp_pid, SIGTERM);
   }
-
 }

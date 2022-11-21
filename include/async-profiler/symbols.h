@@ -28,7 +28,8 @@ private:
 public:
   static void parseKernelSymbols(CodeCache *cc);
   static void parseLibraries(CodeCacheArray *array, bool kernel_symbols);
-  static void parsePidLibraries(pid_t pid, CodeCacheArray *array, bool kernel_symbols);
+  static void parsePidLibraries(pid_t pid, CodeCacheArray *array,
+                                bool kernel_symbols);
 
   static bool haveKernelSymbols() { return _have_kernel_symbols; }
 };

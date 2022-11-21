@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include <stdint.h>
 #include "span.hpp"
+#include <stdint.h>
 
 #include "perf_archmap.hpp"
 

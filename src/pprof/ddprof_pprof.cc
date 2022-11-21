@@ -167,9 +167,7 @@ static void write_line(const ddprof::Symbol &symbol, ddog_prof_Line *ffi_line) {
   ffi_line->line = symbol._lineno;
 }
 
-
-static void write_location_v2(const void* ip,
-                              const ddog_Slice_line *lines,
+static void write_location_v2(const void *ip, const ddog_Slice_line *lines,
                               ddog_Location *ffi_location) {
   ffi_location->address = reinterpret_cast<uint64_t>(ip);
   ffi_location->lines = *lines;
@@ -177,12 +175,11 @@ static void write_location_v2(const void* ip,
   ffi_location->is_folded = false;
 }
 
-static void write_function_v2(const char* func,
-                              ddog_Function *ffi_func) {
+static void write_function_v2(const char *func, ddog_Function *ffi_func) {
   ffi_func->name = to_CharSlice(string_view_create_strlen(func));
 }
 
-static void write_line_v2(const char* func, ddog_Line *ffi_line) {
+static void write_line_v2(const char *func, ddog_Line *ffi_line) {
   write_function_v2(func, &ffi_line->function);
   ffi_line->line = 0;
 }
@@ -190,9 +187,10 @@ static void write_line_v2(const char* func, ddog_Line *ffi_line) {
 #include "async-profiler/codeCache.h"
 #include "async-profiler/stackWalker.h"
 
-DDRes pprof_aggregate_v2(ddprof::span<const void *> callchain, CodeCacheArray &cache_arary,
-                        uint64_t value, uint64_t count, const PerfWatcher *watcher,
-                        DDProfPProf *pprof) {
+DDRes pprof_aggregate_v2(ddprof::span<const void *> callchain,
+                         CodeCacheArray &cache_arary, uint64_t value,
+                         uint64_t count, const PerfWatcher *watcher,
+                         DDProfPProf *pprof) {
   ddog_Profile *profile = pprof->_profile;
 
   int64_t values[DDPROF_PWT_LENGTH] = {};
@@ -249,7 +247,6 @@ DDRes pprof_aggregate_v2(ddprof::span<const void *> callchain, CodeCacheArray &c
   }
 
   return ddres_init();
-
 }
 
 // Assumption of API is that sample is valid in a single type

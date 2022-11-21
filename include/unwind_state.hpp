@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "async-profiler/codeCache.h"
 #include "ddprof_defs.hpp"
 #include "ddres_def.hpp"
 #include "dso_hdr.hpp"
@@ -14,7 +15,6 @@
 #include "perf_archmap.hpp"
 #include "symbol_hdr.hpp"
 #include "unwind_output.hpp"
-#include "async-profiler/codeCache.h"
 
 #include <sys/types.h>
 
@@ -38,8 +38,7 @@ struct UnwindRegisters {
 /// given through callbacks
 struct UnwindState {
   explicit UnwindState(int dd_profiling_fd = -1)
-      : pid(-1),
-        stack(nullptr), stack_sz(0), current_ip(0) {}
+      : pid(-1), stack(nullptr), stack_sz(0), current_ip(0) {}
 
   pid_t pid;
   char *stack;
@@ -48,7 +47,7 @@ struct UnwindState {
   UnwindRegisters initial_regs;
   ProcessAddress_t current_ip;
 
-  std::unordered_map<pid_t , CodeCacheArray> code_cache;
+  std::unordered_map<pid_t, CodeCacheArray> code_cache;
   UnwindOutput_V2 output;
 };
 

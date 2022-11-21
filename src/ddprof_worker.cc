@@ -141,7 +141,8 @@ static DDRes symbols_update_stats(const SymbolHdr &symbol_hdr) {
 }
 
 /// Retrieve cpu / memory info
-static DDRes worker_update_stats(ProcStatus *procstat, std::chrono::nanoseconds cycle_duration) {
+static DDRes worker_update_stats(ProcStatus *procstat,
+                                 std::chrono::nanoseconds cycle_duration) {
   // Update the procstats, but first snapshot the utime so we can compute the
   // diff for the utime metric
   int64_t cpu_time_old = procstat->utime + procstat->stime;
@@ -278,6 +279,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
       // Depending on the type of watcher, compute a value for sample
       uint64_t sample_val = perf_value_from_sample(watcher, sample);
 
+<<<<<<< HEAD
       // in lib mode we don't aggregate (protect to avoid link failures)
       int i_export = ctx->worker_ctx.i_current_pprof;
       DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
@@ -287,6 +289,19 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
 //        ddprof_print_sample(us->output, us->symbol_hdr, sample->period,
 //                            *watcher);
 //      }
+=======
+    // in lib mode we don't aggregate (protect to avoid link failures)
+    int i_export = ctx->worker_ctx.i_current_pprof;
+    DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
+
+    DDRES_CHECK_FWD(pprof_aggregate_v2(
+        ddprof::span(us->output.callchain, us->output.nb_locs),
+        us->code_cache[sample->pid], sample_val, 1, watcher, pprof));
+    if (ctx->params.show_samples) {
+      // todo show samples
+      //      ddprof_print_sample(us->output, us->symbol_hdr, sample->period,
+      //      *watcher);
+>>>>>>> 78e0957 (Adding a benchmark for the async profiler)
     }
   }
 
@@ -457,8 +472,8 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
   ctx->worker_ctx.cycle_start_time = cycle_now;
 
   // Scrape procfs for process usage statistics
-  DDRES_CHECK_FWD(worker_update_stats(&ctx->worker_ctx.proc_status,
-                                      cycle_duration));
+  DDRES_CHECK_FWD(
+      worker_update_stats(&ctx->worker_ctx.proc_status, cycle_duration));
 
   // And emit diagnostic output (if it's enabled)
   print_diagnostics();

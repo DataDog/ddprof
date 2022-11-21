@@ -12,8 +12,8 @@
 #include "tags.hpp"
 #include "unwind_output.hpp"
 
-#include "span.hpp"
 #include "async-profiler/codeCache.h"
+#include "span.hpp"
 
 struct ddog_prof_Profile;
 struct SymbolHdr;
@@ -28,8 +28,9 @@ struct DDProfPProf {
 
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx);
 
-DDRes pprof_aggregate_v2(ddprof::span<const void *> callchain, CodeCacheArray &cache_arary,
-                         uint64_t value, uint64_t count, const PerfWatcher *watcher,
+DDRes pprof_aggregate_v2(ddprof::span<const void *> callchain,
+                         CodeCacheArray &cache_arary, uint64_t value,
+                         uint64_t count, const PerfWatcher *watcher,
                          DDProfPProf *pprof);
 
 /**

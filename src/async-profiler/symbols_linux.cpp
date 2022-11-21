@@ -509,13 +509,14 @@ void Symbols::parseKernelSymbols(CodeCache *cc) {
   // XXX(nick): omitted
 }
 
-
-void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array, bool kernel_symbols) {
+void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array,
+                                bool kernel_symbols) {
   std::set<const void *> parsed_libraries;
   std::set<unsigned long> parsed_inodes;
   MutexLocker ml(_parse_lock);
   char proc_map_filename[1024] = {};
-  snprintf(proc_map_filename, std::size(proc_map_filename), "%s/proc/%d/maps", "", pid);
+  snprintf(proc_map_filename, std::size(proc_map_filename), "%s/proc/%d/maps",
+           "", pid);
   // todo plug the proc_map open functions (handles user switches)
   FILE *f = fopen(proc_map_filename, "r");
   if (f == NULL) {
@@ -552,7 +553,6 @@ void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array, bool kernel_sy
       }
 
       CodeCache *cc = new CodeCache(map.file(), count, image_base, image_end);
-
       unsigned long inode = map.inode();
       if (inode != 0) {
         // Do not parse the same executable twice, e.g. on Alpine Linux
