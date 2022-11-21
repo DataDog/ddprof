@@ -17,9 +17,9 @@
 #include <array>
 #include <string_view.hpp>
 
-#include "symbols.h"
-#include "stack_context.h"
 #include "stackWalker.h"
+#include "stack_context.h"
+#include "symbols.h"
 
 using namespace std::string_view_literals;
 
@@ -29,7 +29,8 @@ void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
                         pid_t sample_pid, uint64_t sample_size_stack,
                         char *sample_data_stack) {
   us->output.nb_locs = 0;
-  memcpy(&us->initial_regs.regs[0], sample_regs,K_NB_REGS_UNWIND * sizeof(uint64_t));
+  memcpy(&us->initial_regs.regs[0], sample_regs,
+         K_NB_REGS_UNWIND * sizeof(uint64_t));
   us->current_ip = us->initial_regs.regs[REGNAME(PC)];
   us->pid = sample_pid;
   us->stack_sz = sample_size_stack;
@@ -53,13 +54,17 @@ DDRes unwindstate__unwind(UnwindState *us) {
       // todo how do we avoid bouncing on this ?
     }
 
-    ddprof::span<uint64_t, PERF_REGS_COUNT> regs_span{us->initial_regs.regs, PERF_REGS_COUNT};
+    ddprof::span<uint64_t, PERF_REGS_COUNT> regs_span{us->initial_regs.regs,
+                                                      PERF_REGS_COUNT};
     ap::StackContext sc = ap::from_regs(regs_span);
-    ddprof::span<std::byte> stack{ reinterpret_cast<std::byte*>(us->stack), us->stack_sz};
+    ddprof::span<std::byte> stack{reinterpret_cast<std::byte *>(us->stack),
+                                  us->stack_sz};
     ap::StackBuffer buffer(stack, sc.sp, sc.sp + us->stack_sz);
 
     // todo remove char* in favour of uint64
-    us->output.nb_locs = stackWalk(&code_cache_array, sc, buffer, (us->output.callchain), DD_MAX_STACK_DEPTH, 0);
+    us->output.nb_locs =
+        stackWalk(&code_cache_array, sc, buffer, (us->output.callchain),
+                  DD_MAX_STACK_DEPTH, 0);
   }
   // todo error management (error frame)
 
@@ -69,12 +74,8 @@ DDRes unwindstate__unwind(UnwindState *us) {
   return res;
 }
 
-void unwind_pid_free(UnwindState *us, pid_t pid) {
-  us->code_cache.erase(pid);
-}
+void unwind_pid_free(UnwindState *us, pid_t pid) { us->code_cache.erase(pid); }
 
-void unwind_cycle(UnwindState *) {
-  unwind_metrics_reset();
-}
+void unwind_cycle(UnwindState *) { unwind_metrics_reset(); }
 
 } // namespace ddprof

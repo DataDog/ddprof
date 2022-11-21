@@ -7,4 +7,3 @@
 #include <string.h>
 
 #include "unwind_output.hpp"
-

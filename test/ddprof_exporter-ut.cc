@@ -143,7 +143,7 @@ TEST(DDProfExporter, simple) {
     SymbolTable &table = symbol_hdr._symbol_table;
     MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
 
-//    fill_unwind_symbols(table, mapinfo_table, mock_output);
+    //    fill_unwind_symbols(table, mapinfo_table, mock_output);
 
     DDProfContext ctx = {};
     ctx.watchers[0] = *ewatcher_from_str("sCPU");
@@ -151,8 +151,9 @@ TEST(DDProfExporter, simple) {
 
     res = pprof_create_profile(&pprofs, &ctx);
     EXPECT_TRUE(IsDDResOK(res));
-//    res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, 1, &ctx.watchers[0],
-//                          &pprofs);
+    //    res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, 1,
+    //    &ctx.watchers[0],
+    //                          &pprofs);
     EXPECT_TRUE(IsDDResOK(res));
   }
   {

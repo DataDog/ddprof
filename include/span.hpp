@@ -5,12 +5,10 @@
 
 #pragma once
 
-
-#  include <span>
+#include <span>
 
 namespace ddprof {
 using std::as_bytes;
 using std::as_writable_bytes;
 using std::span;
 } // namespace ddprof
-
