@@ -87,6 +87,11 @@ include(Findlibdatadog)
 # Event Parser
 add_subdirectory(src/event_parser)
 
+# Event Parser
+include(tests)
+include(fuzzing)
+add_subdirectory(third_party/libunwindstack)
+
 # elfutils
 include(Findelfutils)
 
