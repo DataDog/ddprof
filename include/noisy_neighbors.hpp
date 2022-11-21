@@ -6,12 +6,16 @@
 #pragma once
 
 #include <algorithm>
+#include <chrono>
+#include <fstream>
 #include <vector>
 #include <unordered_map>
 #include <set>
 #include <string>
 
 #include <nlohmann/json.hpp>
+
+#include "logger.hpp"
 
 struct StringTable {
   std::unordered_map<std::string, size_t> table;
@@ -87,27 +91,35 @@ struct NoisyNeighborCpu {
   std::vector<uint64_t> time_start;
   std::vector<uint64_t> time_end;
   std::vector<pid_t> pid;
+  uint64_t base_ns;
+
+  NoisyNeighborCpu(uint64_t _base) : base_ns{_base} {}
 
   void pid_on(pid_t p, uint64_t t) {
-    if (!pid.empty() && pid.back() == p)
-      return; // nothing to do
-    else if (!pid.empty() && pid.back() != p && pid.back() != 0) {
-      // Replacing a PID; invalidate old one
-      time_end.push_back(t);
+    if (pid.empty()) {
+      pid.push_back(p);
+      time_start.push_back(base_ns + t);
+      return;
+    }
+
+    // Ignore if the state isn't different
+    if (pid.back() == p)
+      return;
+
+    if (time_end.size() +1 != time_start.size()) {
+      LG_ERR("Incorrect time size");
     }
 
     pid.push_back(p);
-    time_start.push_back(t);
+    time_end.push_back(base_ns + t);   // Old end time
+    time_start.push_back(base_ns + t);
   };
 
   void pid_off(pid_t p, uint64_t t) {
-    // 1. p is not the latest PID, we missed something.  Invalidate the old one
-    // 2. p is the latest PID, invalidate it
-    // Either way it's the same, as long as the old PID isn't 0
-    if (!pid.empty() && pid.back() != p) {
-      time_end.push_back(t);
-      pid.push_back(0);
-      time_start.push_back(t);
+    if (pid.empty() || (!pid.empty() && pid.back() != p)) {
+      time_end.push_back(base_ns + t);
+      pid.push_back(p);
+      time_start.push_back(base_ns + t);
     }
   };
 
@@ -122,8 +134,25 @@ struct NoisyNeighbors {
   std::vector<NoisyNeighborCpu> T;
 
   NoisyNeighbors(int n) { 
+    // Read procfs to get the base time
+    uint64_t base_ns = get_uptime_ns();
     for (int i = 0; i < n; i++)
-      T.push_back(NoisyNeighborCpu{});
+      T.push_back(NoisyNeighborCpu{base_ns});
+  }
+
+  uint64_t get_uptime_ns() {
+    std::ifstream proc_up("/proc/uptime");
+
+    // Get system uptime in ns
+    uint64_t up; proc_up >> up; up *= 1e9;
+
+    // Get current epoch ns to get uptime ns
+    //
+    {
+      using namespace std::chrono;
+      up = duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count() - up;
+    }
+    return up;
   }
 
   void pid_on(pid_t p, unsigned cpu, uint64_t t) {
@@ -156,8 +185,6 @@ struct NoisyNeighbors {
 
     // Timelines
     ret["timelines"] = nlohmann::json::object();
-    ret["timelines"]["gc"] = nlohmann::json::object();
-    ret["timelines"]["stw"] = nlohmann::json::object();
 
     // Noisy neighbor
     {
@@ -173,7 +200,7 @@ struct NoisyNeighbors {
 
       // Iterate through the CPUs
       for (size_t i = 0; i < T.size(); i++) {
-        thread_names.push_back("thread-" + std::to_string(i));
+        thread_names.push_back("CPU-" + std::to_string(i));
         auto &this_thread = thread["lines"][thread_names.back()] = nlohmann::json::array();
 
         // First, check this CPU to see if it has a better overall start time.
@@ -182,9 +209,17 @@ struct NoisyNeighbors {
 
         // Iterate through entries on this CPU
         for (size_t j = 0; j < T[i].pid.size(); j++) {
-          size_t frame_idx = frames.insert({"unknown.cpp", "libwhatever.so", "IHaveNoClass", "function_" + std::to_string(T[i].pid[j]), -1});
+          size_t frame_idx = frames.insert({
+                               "unknown.cpp",                                // Filename
+                               "libwhatever.so",                             // Package/DSO
+                               "IHaveNoClass",                               // Class (lol)
+                               "function_" + std::to_string(T[i].pid[j]),    // method name
+                               -1});                                         // Line number
           this_thread[j]["startNs"] = T[i].time_start[j];
-          this_thread[j]["endNs"] = T[i].time_start.size() == T[i].time_end.size() ? T[i].time_end[j] : t;
+          if (j < T[i].time_end.size())
+            this_thread[j]["endNs"] = T[i].time_end[j];
+          else
+            this_thread[j]["endNs"] = t;
           this_thread[j]["state"] = T[i].pid[j] > 0 ? active_idx : idle_idx;
           this_thread[j]["stack"] = {frame_idx};
         }
