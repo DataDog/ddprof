@@ -22,14 +22,19 @@ DDPROF_NOINLINE size_t func_save(std::span<std::byte> stack, std::span<uint64_t,
   return save_context(retrieve_stack_end_address(), regs, stack);
 }
 
-size_t func_intermediate_1(int i, std::span<std::byte> stack, std::span<uint64_t, PERF_REGS_COUNT> regs) {
+DDPROF_NOINLINE size_t func_intermediate_1(int i, std::span<std::byte> stack, std::span<uint64_t, PERF_REGS_COUNT> regs) {
   while(i > 0){
-    return func_intermediate_1(--i, stack, regs);
+    size_t size = func_intermediate_1(--i, stack, regs);
+    DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
+    return size;
   }
-  return func_save(stack, regs);
+   size_t size = func_save(stack, regs);
+   DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
+   return size;
+
 }
 
-static void BM_SaveContext(benchmark::State &state) {
+static void BM_UnwindSameStack(benchmark::State &state) {
   CodeCacheArray cache_arary;
   Symbols::parseLibraries(&cache_arary, false);
 
@@ -52,6 +57,7 @@ static void BM_SaveContext(benchmark::State &state) {
         stackWalk(&cache_arary, sc, buffer,
                   const_cast<const void **>(callchain), DD_MAX_STACK_DEPTH, 0);
     if (unlikely(n < depth_walk)) {
+      printf("n = %d \n", n);
       exit(1);
     }
 
@@ -66,6 +72,7 @@ static void BM_SaveContext(benchmark::State &state) {
         }
         else {
           printf("error");
+          exit(1);
         }
         cpt += strlen(syms[i]);
       }
@@ -73,4 +80,4 @@ static void BM_SaveContext(benchmark::State &state) {
   }
 }
 
-BENCHMARK(BM_SaveContext);
+BENCHMARK(BM_UnwindSameStack);
