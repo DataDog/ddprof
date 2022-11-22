@@ -169,12 +169,18 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
       watcher->instrument_self = true;
       watcher->sample_type |= PERF_SAMPLE_RAW;
       watcher->options.is_kernel = kPerfWatcher_Try;
-    } else if (watcher->ddprof_event_type == DDPROF_PWE_tNOISYCPU) {
-      PRINT_NFO("Disabling call stacks for noisy neighbors");
-      PRINT_NFO("DISABLING SELF-INSTRUMENT for noisy neighbors");
+    } else if (watcher->ddprof_event_type == DDPROF_PWE_tNOISYCPU1) {
+      PRINT_NFO("Disabling call stacks for noisy neighbors1");
+      PRINT_NFO("DISABLING SELF-INSTRUMENT for noisy neighbors1");
       watcher->sample_stack_size = 0; // Disable for now
       watcher->sample_type |= PERF_SAMPLE_CPU | PERF_SAMPLE_IDENTIFIER;
       watcher->tracepoint_name = "sCPU";
+    } else if (watcher->ddprof_event_type == DDPROF_PWE_tNOISYCPU2) {
+      PRINT_NFO("Disabling call stacks for noisy neighbors");
+      watcher->sample_stack_size = 0; // Disable for now
+      watcher->instrument_self = true;
+      watcher->sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ID | PERF_SAMPLE_CPU | PERF_SAMPLE_PERIOD | PERF_SAMPLE_RAW | PERF_SAMPLE_IDENTIFIER;
+      watcher->options.is_kernel = kPerfWatcher_Try;
     }
   }
   return true;

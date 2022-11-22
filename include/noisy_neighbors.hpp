@@ -189,7 +189,47 @@ struct NoisyNeighbors {
     // Noisy neighbor
     {
       auto &noisy = ret["timelines"]["noisyneighbor"] = nlohmann::json::object();
-      noisy["labelSchema"] = {"PID", "CPU_PCT_USED"};
+      noisy["labelSchema"] = {"CPU_ID", "PID_A", "PID_B"};
+      noisy["frameSchema"] = {"filename", "package", "class", "method", "line"};
+
+      auto &lines = noisy["lines"]["noisy_cpu"]= nlohmann::json::array();
+      for (size_t i = 0; i < T.size(); i++) {
+        // Iterate through entries on this CPU
+        // For any given 4ms period, if there are more than one PID on-CPU, count
+        // it as a potential noise violation
+        if (T[i].time_end.size() < 1 || T[i].time_start.size() < 2)
+          continue;
+        for (size_t j = 0; j < T[i].pid.size() - 1; j++) {
+          uint64_t end_ns = T[i].time_end[j];
+          uint64_t this_pid = T[i].pid[j];
+          if (this_pid == 0)
+            continue;
+          for (size_t k = j + 1; j < T[i].pid.size(); k++) {
+            uint64_t start_ns = T[i].time_end[k];
+            if ( end_ns + 4000 > start_ns)
+              break;
+            uint64_t other_pid = T[i].pid[k];
+            // Since we're skipping pid 0, we may have come back to this PID.
+            // Ignore that case and pid 0
+            if (other_pid == 0 || other_pid == this_pid)
+              continue;
+
+            // If we're here, we found potentially conflicting PID
+            size_t frame_idx = frames.insert({
+                                 "unknown.cpp",                                // Filename
+                                 "libwhatever.so",                             // Package/DSO
+                                 "IHaveNoClass",                               // Class (lol)
+                                 "function_" + std::to_string(T[i].pid[j]),    // method name
+                                 -1});                                         // Line number
+            auto &line = lines.emplace_back(nlohmann::json::object());
+            line["startNs"] = end_ns;
+            line["endNs"] = start_ns;
+            line["labels"] = {stab.insert(i), stab.insert(this_pid), stab.insert(other_pid)};
+            line["stack"] = {frame_idx};
+            line["state"] = active_idx; // duh?
+          }
+        }
+      }
     }
 
     // Threads
@@ -201,7 +241,7 @@ struct NoisyNeighbors {
       // Iterate through the CPUs
       for (size_t i = 0; i < T.size(); i++) {
         thread_names.push_back("CPU-" + std::to_string(i));
-        auto &this_thread = thread["lines"][thread_names.back()] = nlohmann::json::array();
+        auto &lines = thread["lines"][thread_names.back()] = nlohmann::json::array();
 
         // First, check this CPU to see if it has a better overall start time.
         if (!T[i].time_start.empty() && T[i].time_start[0] < ret["timeRange"]["startNs"])
@@ -215,13 +255,13 @@ struct NoisyNeighbors {
                                "IHaveNoClass",                               // Class (lol)
                                "function_" + std::to_string(T[i].pid[j]),    // method name
                                -1});                                         // Line number
-          this_thread[j]["startNs"] = T[i].time_start[j];
+          lines[j]["startNs"] = T[i].time_start[j];
           if (j < T[i].time_end.size())
-            this_thread[j]["endNs"] = T[i].time_end[j];
+            lines[j]["endNs"] = T[i].time_end[j];
           else
-            this_thread[j]["endNs"] = t;
-          this_thread[j]["state"] = T[i].pid[j] > 0 ? active_idx : idle_idx;
-          this_thread[j]["stack"] = {frame_idx};
+            lines[j]["endNs"] = t;
+          lines[j]["state"] = T[i].pid[j] > 0 ? active_idx : idle_idx;
+          lines[j]["stack"] = {frame_idx};
         }
       }
     }

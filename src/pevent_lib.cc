@@ -71,12 +71,14 @@ static void pevent_add_child_fd(int child_fd, PEvent &pevent) {
 }
 
 struct LinkedPerfs {
-  const std::string tracepoint;
+  const std::string tracepoint_group;
+  const std::string tracepoint_name;
   bool has_stack;
+  bool extras;
 };
 
 bool operator==(LinkedPerfs const &A, LinkedPerfs const &B) {
-  return A.tracepoint == B.tracepoint;
+  return A.tracepoint_name == B.tracepoint_name && A.tracepoint_group == B.tracepoint_group;
 }
 
 using LinkedPerfConf = std::unordered_set<LinkedPerfs>;
@@ -84,40 +86,29 @@ using LinkedPerfConf = std::unordered_set<LinkedPerfs>;
 template<>
 struct std::hash<LinkedPerfs> {
   std::size_t operator()(LinkedPerfs const &A) const noexcept {
-    return std::hash<std::string>{}(A.tracepoint);
+    return std::hash<std::string>{}(A.tracepoint_group + ":" + A.tracepoint_name);
   }
 };
-
-static const LinkedPerfConf tallocsys1_conf = {
-      {"sys_exit_mmap", true},
-      {"sys_exit_munmap", false},
-      {"sys_exit_mremap", true}};
-
-static const LinkedPerfConf topenfd_conf = {
-      {"sys_exit_open", true},
-      {"sys_exit_openat", true},
-      {"sys_exit_close", false},
-      {"sys_exit_exit", false},
-      {"sys_exit_exit_group", false}};
 
 static DDRes link_perfs(PerfWatcher *watcher, int watcher_idx, pid_t pid,
                         int num_cpu, PEventHdr *pevent_hdr, const LinkedPerfConf &conf) {
   PerfWatcher watcher_copy = *watcher;
   PEvent *pes = pevent_hdr->pes;
 
-  std::unordered_map<std::string, int> tracepoint_ids;
+  std::unordered_map<LinkedPerfs, int> tracepoint_ids;
   for (auto &probe : conf)
-    tracepoint_ids[probe.tracepoint] = -1;
+    tracepoint_ids[probe] = -1;
 
   // Set the IDs
   for (const auto &probe : conf) {
-    long id = id_from_tracepoint("syscalls", probe.tracepoint.c_str());
+    long id = id_from_tracepoint(probe.tracepoint_group.c_str(), probe.tracepoint_name.c_str());
     if (-1 == id) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
-                             "Error opening tracefs for %s",
-                             probe.tracepoint.c_str());
+                             "Error opening tracefs for %s:%s",
+                             probe.tracepoint_group.c_str(),
+                             probe.tracepoint_name.c_str());
     }
-    tracepoint_ids[probe.tracepoint] = id;
+    tracepoint_ids[probe] = id;
   }
 
   // The idea is to instrument every probe on every CPU
@@ -127,14 +118,14 @@ static DDRes link_perfs(PerfWatcher *watcher, int watcher_idx, pid_t pid,
   std::map<int, int> cpu_pevent_idx = {};
   for (const auto &probe: conf) {
     // Setup the copy of the watcher with tracepoint stuff
-    watcher_copy.tracepoint_group = "syscalls";
-    watcher_copy.tracepoint_name = probe.tracepoint.c_str();
-    watcher_copy.config = tracepoint_ids[probe.tracepoint];
+    watcher_copy.tracepoint_group = probe.tracepoint_group.c_str();
+    watcher_copy.tracepoint_name = probe.tracepoint_name.c_str();
+    watcher_copy.config = tracepoint_ids[probe];
     watcher_copy.sample_stack_size = probe.has_stack ? watcher->sample_stack_size / 4 : 0;
 
     // Record perf_event_open() attr struct
     int attr_idx = pevent_hdr->nb_attrs++;
-    perf_event_attr attr = perf_config_from_watcher(&watcher_copy, true);
+    perf_event_attr attr = perf_config_from_watcher(&watcher_copy, probe.extras);
     pevent_hdr->attrs[attr_idx] = attr;
 
     bool watcher_failed = true;
@@ -157,7 +148,7 @@ static DDRes link_perfs(PerfWatcher *watcher, int watcher_idx, pid_t pid,
     // Ideally we'd invalidate the whole group, but we've stashed stuff now
     // TODO fix this
     if (watcher_failed) {
-      LG_ERR("Error calling perfopen on (%s)", probe.tracepoint.c_str());
+      LG_ERR("Error calling perfopen on (%s:%s)", probe.tracepoint_group.c_str(), probe.tracepoint_name.c_str());
     }
   }
   return ddres_init();
@@ -165,19 +156,37 @@ static DDRes link_perfs(PerfWatcher *watcher, int watcher_idx, pid_t pid,
 
 static DDRes tallocsys1_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
                              int num_cpu, PEventHdr *pevent_hdr) {
-  return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, tallocsys1_conf);
+  const LinkedPerfConf conf = {
+        {"syscalls", "sys_exit_mmap", true},
+        {"syscalls", "sys_exit_munmap"},
+        {"syscalls", "sys_exit_mremap", true}};
+  return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf);
 }
 
 static DDRes topenfd_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
                              int num_cpu, PEventHdr *pevent_hdr) {
-  PRINT_NFO("Instrumenting filedesc watcher");
-  return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, topenfd_conf);
+  const LinkedPerfConf conf = {
+        {"syscalls", "sys_exit_open", true},
+        {"syscalls", "sys_exit_openat"},
+        {"syscalls", "sys_exit_close"},
+        {"syscalls", "sys_exit_exit"},
+        {"syscalls", "sys_exit_exit_group"}};
+  return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf);
 }
 
-static DDRes tnoisycpu_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
+static DDRes tnoisycpu2_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
                             int num_cpu, PEventHdr *pevent_hdr) {
-  /* UNIMPLEMENTED */
-  return ddres_init();
+  const LinkedPerfConf conf = {
+        {"sched", "sched_switch", false, true},
+        {"sched", "sched_stat_wait"},
+        {"sched", "sched_stat_sleep"},
+        {"sched", "sched_stat_iowait"},
+        {"sched", "sched_stat_runtime"},
+        {"sched", "sched_process_fork"},
+        {"sched", "sched_wakeup"},
+        {"sched", "sched_wakeup_new"},
+        {"sched", "sched_migrate_task"}};
+  return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf);
 }
 
 
@@ -258,11 +267,9 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
         DDRES_CHECK_FWD(
             tallocsys1_open(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
         break;
-      case (DDPROF_PWE_tNOISYCPU):
-        // Noisy CPU should not have its own open sequence yet
-        LG_ERR("Noisy CPU is opening its own perf!");
+      case (DDPROF_PWE_tNOISYCPU2):
         DDRES_CHECK_FWD(
-            tnoisycpu_open(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
+            tnoisycpu2_open(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
         break;
       case DDPROF_PWE_tOPENFD:
         DDRES_CHECK_FWD(
