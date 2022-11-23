@@ -47,7 +47,7 @@ static void BM_UnwindSameStack(benchmark::State &state) {
   for (auto _ : state) {
     // looks like buffer is modified by async profiler
     // I need to save context at all loops
-    // This slightly modifies the bench
+    // This modifies what we are measuring
     size_t size_stack = func_intermediate_1(depth_walk, stack, regs);
     ap::StackContext sc = ap::from_regs(regs);
     ap::StackBuffer buffer(stack, sc.sp, sc.sp + size_stack);
