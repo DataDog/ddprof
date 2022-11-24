@@ -18,6 +18,7 @@ add_library(libbase STATIC)
 target_sources(libbase PRIVATE ${libbase_source_files})
 target_link_libraries(libbase PUBLIC liblog_headers)
 target_include_directories(libbase SYSTEM PUBLIC ${SRC_DIR}/include/)
+set_property(TARGET libbase PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 if(NOT MSVC)
   target_compile_options(libbase PRIVATE

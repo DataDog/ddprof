@@ -34,11 +34,13 @@ SHELL ["/bin/bash", "-c"]
 
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+  android-libbase-dev \
   apt-transport-https \
   awscli \
   binutils-dev \
   bison \
   ca-certificates \
+  libcapstone-dev \
   curl \
   flex \
   gcovr \
@@ -157,3 +159,6 @@ RUN pip3 install cmake_format
 # A specific user is required to get access to perf event ressources.
 # This enables unit testing using perf-event ressources
 RUN useradd -ms /bin/bash ddbuild
+
+# sudo apt-get install android-libbase-dev
+#

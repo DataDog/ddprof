@@ -207,6 +207,20 @@ add_unit_test(
 add_compile_definitions("DWFL_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 set_property(TARGET dwfl_module-ut PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 
+add_unit_test(libunwindstack-ut
+        libunwindstack-ut.cc
+        ../src/lib/savecontext.cc
+        ../src/lib/saveregisters.cc
+        ../src/lib/allocation_tracker.cc
+        ../src/ringbuffer_utils.cc
+        ../src/perf_ringbuffer.cc
+        ../src/perf.cc
+        ../src/pevent_lib.cc
+        ../src/sys_utils.cc
+        ../src/user_override.cc
+        ../src/perf_watcher.cc
+        LIBRARIES ${ELFUTILS_LIBRARIES} libunwindstack)
+
 add_unit_test(
   savecontext-ut
   savecontext-ut.cc

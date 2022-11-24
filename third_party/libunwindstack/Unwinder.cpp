@@ -152,6 +152,7 @@ void Unwinder::Unwind(
 
   // Clear any cached data from previous unwinds.
   process_memory_->Clear();
+  printf("PC --> %lx \n", regs_->pc());
 
   if (maps_->Find(regs_->pc()) == nullptr) {
     regs_->fallback_pc();

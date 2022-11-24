@@ -79,17 +79,25 @@ else()
   message(STATUS "IPO / LTO not supported: <${error}>")
 endif()
 
+find_package(ZLIB REQUIRED)
+
 # ---- Dependencies ----
+
+## Orbit unwinding depends on many things external deps (libunwindstack)
+include(tests)
+include(fuzzing)
+
+include(Findlibbase)
+include(Findliblog)
+include(Findlibprocinfo)
+include(FindLZMA)
+include(Findcapstone)
 
 # libdatadog_profiling
 include(Findlibdatadog)
 
 # Event Parser
 add_subdirectory(src/event_parser)
-
-# Event Parser
-include(tests)
-include(fuzzing)
 add_subdirectory(third_party/libunwindstack)
 
 # elfutils

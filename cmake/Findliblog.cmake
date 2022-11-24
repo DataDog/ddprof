@@ -25,6 +25,7 @@ list(FILTER liblog_source_files EXCLUDE REGEX "(event_tag_map|log_time)\.cpp$")
 target_sources(liblog_common PRIVATE ${liblog_source_files} ${SRC_DIR}/../libbase/logging.cpp)
 target_include_directories(liblog_common PUBLIC ${SRC_DIR}/include/)
 target_link_libraries(liblog_common PUBLIC libbase_headers libcutils_headers)
+set_property(TARGET liblog_common PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 if(NOT MSVC)
   target_compile_options(liblog_common PRIVATE

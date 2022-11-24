@@ -111,3 +111,7 @@ RUN git clone --branch 5.3.0 https://github.com/jemalloc/jemalloc.git && \
     ./autogen.sh && \
     make && \
     make install
+
+# Capstone
+# RUN apk update \
+#        && apk add --no-cache capstone
