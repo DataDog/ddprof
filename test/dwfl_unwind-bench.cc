@@ -17,9 +17,12 @@ DDPROF_NOINLINE size_t func_save(ddprof::span<std::byte> stack, ddprof::span<uin
 DDPROF_NOINLINE size_t func_intermediate_1(int i, ddprof::span<std::byte> stack, ddprof::span<uint64_t, PERF_REGS_COUNT> regs);
 
 DDPROF_NOINLINE size_t func_save(ddprof::span<std::byte> stack, ddprof::span<uint64_t, PERF_REGS_COUNT> regs) {
-  size_t size = save_context(retrieve_stack_end_address(), regs, stack);
+  static thread_local size_t tl_size = 0;
+  if (!tl_size) {
+    tl_size = save_context(retrieve_stack_end_address(), regs, stack);
+  }
   DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
-  return size;
+  return tl_size;
 }
 
 DDPROF_NOINLINE size_t func_intermediate_1(int i, ddprof::span<std::byte> stack, ddprof::span<uint64_t, PERF_REGS_COUNT> regs) {
@@ -42,11 +45,9 @@ static void BM_UnwindSameStack(benchmark::State &state) {
   constexpr unsigned depth_walk = 10;
   pid_t mypid = getpid();
   int cpt = 0;
+  size_t size_stack = func_intermediate_1(depth_walk, stack, regs);
+
   for (auto _ : state) {
-    // looks like buffer is modified by async profiler
-    // I need to save context at all loops
-    // This slightly modifies the bench
-    size_t size_stack = func_intermediate_1(depth_walk, stack, regs);
     ddprof::unwind_init_sample(&unwind_state, regs.data(), mypid,
                                size_stack, reinterpret_cast<char*>(stack));
     ddprof::unwindstate__unwind(&unwind_state);
