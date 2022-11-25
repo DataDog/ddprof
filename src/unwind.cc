@@ -17,10 +17,20 @@
 #include "unwind_metrics.hpp"
 #include "unwind_state.hpp"
 
+#include "regs_convert.hpp"
+#include <unwindstack/Arch.h>
+#include <unwindstack/Unwinder.h>
+
+#include <unwindstack/RegsX86_64.h>
+#include <unwindstack/UserX86_64.h>
+#include <unwindstack/UcontextX86_64.h>
+
 #include <algorithm>
 #include <array>
 #include <string_view.hpp>
 
+
+namespace uwstack = unwindstack;
 using namespace std::string_view_literals;
 
 namespace ddprof {
@@ -36,9 +46,11 @@ static void find_dso_add_error_frame(UnwindState *us) {
 void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
                         pid_t sample_pid, uint64_t sample_size_stack,
                         char *sample_data_stack) {
-  uw_output_clear(&us->output);
-  memcpy(&us->initial_regs.regs[0], sample_regs,
-         K_NB_REGS_UNWIND * sizeof(uint64_t));
+//  uw_output_clear(&us->output);
+//  memcpy(&us->initial_regs.regs[0], sample_regs,
+//         K_NB_REGS_UNWIND * sizeof(uint64_t));
+
+
   us->current_ip = us->initial_regs.regs[REGNAME(PC)];
   us->pid = sample_pid;
   us->stack_sz = sample_size_stack;
@@ -79,11 +91,27 @@ static bool is_stack_complete(UnwindState *us) {
 DDRes unwindstate__unwind(UnwindState *us) {
   DDRes res = ddres_init();
   if (us->pid != 0) { // we can not unwind pid 0
-    res = unwind_dwfl(us);
+    uwstack::x86_64_ucontext_t ucontext = uwstack::from_regs(ddprof::span(us->initial_regs.regs));
+    std::unique_ptr<uwstack::Regs> regs(uwstack::Regs::CreateFromUcontext(uwstack::ArchEnum::ARCH_X86_64, &ucontext));
+
+    //todo maps should be in dso hdr
+    unwindstack::RemoteMaps maps(us->pid);
+    if (!maps.Parse()) {
+      printf("Failed to parse maps. \n");
+      exit(1);
+    }
+    std::shared_ptr<uwstack::Memory> mem = uwstack::Memory::CreateOfflineMemory(
+        reinterpret_cast<uint8_t *>(us->stack),
+        us->initial_regs.regs[REGNAME(SP)],
+        us->initial_regs.regs[REGNAME(SP)] + us->stack_sz);
+
+    uwstack::Unwinder unwinder(DD_MAX_STACK_DEPTH, &maps, regs.get(), mem);
+    unwinder.Unwind();
   }
-  if (IsDDResNotOK(res)) {
-    find_dso_add_error_frame(us);
-  }
+
+//  if (IsDDResNotOK(res)) {
+//    find_dso_add_error_frame(us);
+//  }
 
   if (!is_stack_complete(us)) {
     us->output.is_incomplete = true;

@@ -25,6 +25,11 @@ struct DDProfPProf {
 
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx);
 
+DDRes pprof_aggregate_v2(const UnwindOutput *uw_output,
+                        const SymbolHdr *symbol_hdr, uint64_t value,
+                        uint64_t count, const PerfWatcher *watcher,
+                        DDProfPProf *pprof);
+
 /**
  * Aggregate to the existing profile the provided unwinding output.
  * @param uw_output

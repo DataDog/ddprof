@@ -165,7 +165,7 @@ add_unit_test(
   ../src/perf_watcher.cc
   ../src/tags.cc
   ddprof_exporter-ut.cc
-  LIBRARIES Datadog::Profiling DDProf::Parser
+  LIBRARIES Datadog::Profiling DDProf::Parser libunwindstack
   DEFINITIONS MYNAME="ddprof_exporter-ut")
 
 add_unit_test(
@@ -221,6 +221,20 @@ add_unit_test(libunwindstack-ut
         ../src/perf_watcher.cc
         LIBRARIES ${ELFUTILS_LIBRARIES} libunwindstack)
 
+add_benchmark(libunwindstack-bench
+        libunwindstack-bench.cc
+        ../src/lib/savecontext.cc
+        ../src/lib/saveregisters.cc
+        ../src/lib/allocation_tracker.cc
+        ../src/ringbuffer_utils.cc
+        ../src/perf_ringbuffer.cc
+        ../src/perf.cc
+        ../src/pevent_lib.cc
+        ../src/sys_utils.cc
+        ../src/user_override.cc
+        ../src/perf_watcher.cc
+        LIBRARIES ${ELFUTILS_LIBRARIES} libunwindstack)
+
 add_unit_test(
   savecontext-ut
   savecontext-ut.cc
@@ -253,7 +267,7 @@ add_unit_test(
   ../src/unwind_metrics.cc
   ../src/unwind_output.cc
   ../src/user_override.cc
-  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
+  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle libunwindstack
   DEFINITIONS MYNAME="savecontext-ut")
 
 add_unit_test(
@@ -295,7 +309,7 @@ add_unit_test(
   ../src/unwind_helpers.cc
   ../src/unwind_metrics.cc
   ../src/unwind_output.cc
-  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
+  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle libunwindstack
   DEFINITIONS ${DDPROF_DEFINITION_LIST})
 
 add_unit_test(sys_utils-ut sys_utils-ut.cc ../src/sys_utils.cc)
