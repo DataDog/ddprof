@@ -42,15 +42,16 @@ static void BM_UnwindSameStack(benchmark::State &state) {
   std::array<uint64_t, PERF_REGS_COUNT> regs;
 
   constexpr int depth_walk = 10;
+  // looks like buffer is modified by async profiler
+  // I need to save context at all loops
+  // This modifies what we are measuring
+  size_t size_stack = func_intermediate_1(depth_walk, stack, regs);
+  ap::StackContext sc = ap::from_regs(regs);
+  ap::StackBuffer buffer(stack, sc.sp, sc.sp + size_stack);
 
   int cpt = 0;
   for (auto _ : state) {
-    // looks like buffer is modified by async profiler
-    // I need to save context at all loops
-    // This modifies what we are measuring
-    size_t size_stack = func_intermediate_1(depth_walk, stack, regs);
     ap::StackContext sc = ap::from_regs(regs);
-    ap::StackBuffer buffer(stack, sc.sp, sc.sp + size_stack);
 
     void *callchain[DD_MAX_STACK_DEPTH];
     int n =
@@ -78,6 +79,7 @@ static void BM_UnwindSameStack(benchmark::State &state) {
       }
     }
   }
+  printf("total cpt = %d \n", cpt);
 }
 
 BENCHMARK(BM_UnwindSameStack);
