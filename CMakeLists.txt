@@ -90,19 +90,6 @@ add_subdirectory(src/event_parser)
 # elfutils
 include(Findelfutils)
 
-# -- Async profiler --
-set(ASYNC_PROFILER_LIB_DIR ${CMAKE_SOURCE_DIR})
-set(ASYNC_PROFILER_SRC_DIR ${ASYNC_PROFILER_LIB_DIR}/src/async-profiler)
-set(ASYNC_PROFILER_LIB_INCLUDE ${ASYNC_PROFILER_LIB_DIR}/include/async-profiler)
-aux_source_directory(${ASYNC_PROFILER_SRC_DIR} ASYNC_PROFILER_SOURCES)
-add_library(async_prof_lib STATIC ${ASYNC_PROFILER_SOURCES})
-target_include_directories(async_prof_lib PUBLIC ${ASYNC_PROFILER_LIB_INCLUDE}
-                                                 ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(async_prof_lib PRIVATE elf)
-set_property(TARGET async_prof_lib PROPERTY POSITION_INDEPENDENT_CODE ON)
-add_library(DDProf::AsyncProf ALIAS async_prof_lib)
-# -------------------
-
 # ---- Static analysis ----
 include(ClangTidy)
 include(Format)
