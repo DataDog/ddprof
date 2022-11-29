@@ -76,7 +76,7 @@ TEST(DDProfPProf, aggregate) {
   //  res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, 1,
   //  &ctx.watchers[0],
   //                        &pprof);
-  
+
   EXPECT_TRUE(IsDDResOK(res));
 
   test_pprof(&pprof);

@@ -26,15 +26,24 @@ for cxx_ver in g++-{12..9}; do
   fi
 done
 
+echoerr "Using DDPROF_CXX_DEFAULT=${DDPROF_CXX_DEFAULT}"
+echoerr "Using DDPROF_CC_DEFAULT=${DDPROF_CC_DEFAULT}"
+echoerr "Compiler can be overriden with CXX and CC variables when sourcing ${0}"
 
 SCRIPTDIR="$(cd -- $( dirname -- "${BASH_SOURCE[0]}" ) && pwd)" # no "$0" when sourcing
 DDPROF_INSTALL_PREFIX="../deliverables"
 DDPROF_BUILD_BENCH="ON"
+<<<<<<< HEAD
 COMPILER_SETTING="-DCMAKE_CXX_COMPILER=\"${CXX:-${DDPROF_CXX_DEFAULT}}\" -DCMAKE_C_COMPILER=\"${CC:-${DDPROF_CC_DEFAULT}}\""
 
 echoerr "Compiler can be overriden with CXX and CC variables when sourcing this script. Current value:"
 echoerr "${COMPILER_SETTING}"
 
+=======
+NATIVE_LIB="ON"
+COMPILER_SETTING="-DCMAKE_CXX_COMPILER=\"${CXX:-${DDPROF_CXX_DEFAULT}}\" -DCMAKE_C_COMPILER=\"${CC:-${DDPROF_CC_DEFAULT}}\""
+
+>>>>>>> f562ce9 (Minor fix for zsh)
 # Avoid having the vendors compiled in the same directory
 DDPROF_EXTENSION_CC=${CC:-"gcc"}
 # strip version number from compiler
@@ -56,10 +65,16 @@ GetDefaultAllocatorOptions() {
 }
 
 GetDirectoryExtention() {
+<<<<<<< HEAD
   echo "_${DDPROF_EXTENSION_CC}_${DDPROF_EXTENSION_OS}_${1}"
+=======
+  echo "_${EXTENSION_CC}_${EXTENSION_OS}_${1}"
+>>>>>>> f562ce9 (Minor fix for zsh)
 }
 
 COMMON_OPT="${COMPILER_SETTING} ${DEFAULT_ALLOCATOR_OPT} -DCMAKE_INSTALL_PREFIX=${DDPROF_INSTALL_PREFIX} -DBUILD_BENCHMARKS=${DDPROF_BUILD_BENCH}"
+
+# echoerr "Cmake settings--\n ${COMMON_OPT}"
 
 # echoerr "Cmake settings--\n ${COMMON_OPT}"
 
