@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <climits>
 #include <cstring>
+#include <functional>
 #include <sys/mman.h>
 #include <unistd.h>
 
