@@ -10,9 +10,9 @@
 #include <algorithm>
 #include <climits>
 #include <cstring>
+#include <functional>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <functional>
 
 #ifndef __ELF_NATIVE_CLASS
 #  define __ELF_NATIVE_CLASS 64
