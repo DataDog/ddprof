@@ -387,8 +387,8 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
 }
 
 void ddprof_context_free(DDProfContext *ctx) {
+  exporter_input_free(&ctx->exp_input);
   if (ctx->initialized) {
-    exporter_input_free(&ctx->exp_input);
     free((char *)ctx->params.internal_stats);
     free((char *)ctx->params.tags);
     free((char *)ctx->params.switch_user);

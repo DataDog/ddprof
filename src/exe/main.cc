@@ -181,6 +181,7 @@ static InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
     ddprof_context_free(ctx);
     return InputResult::kError;
   }
+
   // Adjust input parameters for execvp() (we do this even if unnecessary)
   *argv += input.nb_parsed_params;
   *argc -= input.nb_parsed_params;
@@ -425,7 +426,7 @@ int main(int argc, char *argv[]) {
   case InputResult::kSuccess:
     break;
   case InputResult::kError:
-    [[fallthrough]];
+    ddprof_context_free(&ctx);
   default:
     return -1;
   }
