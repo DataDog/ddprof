@@ -34,6 +34,11 @@
 #  include <sys/types.h>
 #  include <unistd.h>
 
+#  include <dlfcn.h>
+#  include <libelf.h>
+
+#  define LG_WRN(...) printf(__VA_ARGS__)
+
 class SymbolDesc {
 private:
   const char *_addr;
@@ -185,12 +190,16 @@ private:
   bool loadSymbolsUsingDebugLink();
   void loadSymbolTable(ElfSection *symtab);
   void addRelocationSymbols(ElfSection *reltab, const char *plt);
-
 public:
+  static const char* get_self_vdso(void);
   static void parseProgramHeaders(CodeCache *cc, const char *base);
+  static bool parseProgramHeadersRemote(Elf *elf, CodeCache *cc,
+                                        const char *base,
+                                        const char *mmap_addr);
   static bool parseFile(CodeCache *cc, const char *base, const char *file_name,
                         bool use_debug);
   static void parseMem(CodeCache *cc, const char *base);
+  static void parseMemRemote(CodeCache *cc, const char *base, const char *addr);
 };
 
 ElfSection *ElfParser::findSection(uint32_t type, const char *name) {
@@ -234,8 +243,7 @@ bool ElfParser::parseFile(CodeCache *cc, const char *base,
   close(fd);
 
   if (addr == MAP_FAILED) {
-    // Log::warn("Could not parse symbols from %s: %s", file_name,
-    // strerror(errno));
+    LG_WRN("Could not parse symbols from %s: %s", file_name, strerror(errno));
   } else {
     ElfParser elf(cc, base, addr, file_name);
     if (elf.validHeader()) {
@@ -246,11 +254,36 @@ bool ElfParser::parseFile(CodeCache *cc, const char *base,
   return true;
 }
 
+void ElfParser::parseMemRemote(CodeCache *cc, const char *base, const char *addr) {
+  ElfParser elf(cc, base, addr);
+  if (elf.validHeader()) {
+    elf.loadSymbols(false);
+  }
+}
+
 void ElfParser::parseMem(CodeCache *cc, const char *base) {
   ElfParser elf(cc, base, base);
   if (elf.validHeader()) {
     elf.loadSymbols(false);
   }
+}
+
+// remote opens the elf file
+bool ElfParser::parseProgramHeadersRemote(Elf *elf, CodeCache *cc,
+                                          const char *base,
+                                          const char *mmap_addr) {
+  // todo check if I can use base
+  ElfParser elf_remote(cc, reinterpret_cast<const char*>(mmap_addr), mmap_addr);
+  if (elf_remote.validHeader()) {
+    cc->setTextBase(mmap_addr);
+    elf_remote.parseDynamicSection();
+    elf_remote.parseDwarfInfo();
+    return true ;
+  }
+  else {
+    printf("invalid header \n");
+  }
+  return false;
 }
 
 void ElfParser::parseProgramHeaders(CodeCache *cc, const char *base) {
@@ -300,11 +333,12 @@ void ElfParser::parseDynamicSection() {
         break;
       }
     }
-
+    printf("relent = %d \n", relent);
     if (relent != 0) {
       if (pltrelsz != 0 && got_start != NULL) {
         // The number of entries in .got.plt section matches the number of
         // entries in .rela.plt
+        printf("GOT start == %p \n", got_start);
         _cc->setGlobalOffsetTable(got_start, got_start + pltrelsz / relent,
                                   false);
       } else if (rel != NULL && relsz != 0) {
@@ -333,6 +367,9 @@ void ElfParser::parseDynamicSection() {
       }
     }
   }
+  else {
+    printf("No dynamic section \n");
+  }
 }
 
 void ElfParser::parseDwarfInfo() {
@@ -343,6 +380,7 @@ void ElfParser::parseDwarfInfo() {
   if (eh_frame_hdr != NULL) {
     DwarfParser dwarf(_cc->name(), _base, at(eh_frame_hdr));
     _cc->setDwarfTable(dwarf.table(), dwarf.count());
+    printf("Created a number of dwarf entries = %d \n", dwarf.count());
   }
 }
 
@@ -509,6 +547,36 @@ void Symbols::parseKernelSymbols(CodeCache *cc) {
   // XXX(nick): omitted
 }
 
+
+const char* ElfParser::get_self_vdso(void) {
+  FILE *f = fopen("/proc/self/maps", "r");
+  const char *addr_vdso = nullptr;
+
+  if (f == NULL) {
+    return nullptr;
+  }
+  char *str = NULL;
+  size_t str_size = 0;
+  ssize_t len;
+
+  while ((len = getline(&str, &str_size, f)) > 0) {
+    str[len - 1] = 0;
+
+    MemoryMapDesc map(str);
+    if (!map.isReadable() || map.file() == NULL || map.file()[0] == 0) {
+      continue;
+    }
+    const char *image_base = map.addr();
+    if (map.isExecutable()) {
+      if (strcmp(map.file(), "[vdso]") == 0) {
+        addr_vdso = image_base; // found it
+        break;
+      }
+    }
+  }
+  return addr_vdso;
+}
+
 void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array,
                                 bool kernel_symbols) {
   std::set<const void *> parsed_libraries;
@@ -528,6 +596,8 @@ void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array,
   char *str = NULL;
   size_t str_size = 0;
   ssize_t len;
+  // tell elf what version we are using
+  elf_version(EV_CURRENT);
 
   while ((len = getline(&str, &str_size, f)) > 0) {
     str[len - 1] = 0;
@@ -554,17 +624,52 @@ void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array,
 
       CodeCache *cc = new CodeCache(map.file(), count, image_base, image_end);
       unsigned long inode = map.inode();
+      CodeCache *cc_remote = nullptr;
+      printf("Considering %s \n", map.file());
       if (inode != 0) {
+        // remote unwinding
+        int fd = open(map.file(), O_RDONLY);
+        if (-1 == fd) {
+          printf("error opening file %s \n", map.file());
+          continue;
+        }
+        size_t length = (size_t)lseek64(fd, 0, SEEK_END);
+        void *addr = mmap(NULL, length, PROT_READ, MAP_PRIVATE, fd, 0);
+        Elf *elf = elf_begin(fd, ELF_C_READ, NULL);
+        if (elf == NULL || addr == MAP_FAILED) {
+          LG_WRN("Invalid elf %s (efl:%p, addr_mmap:%p)\n", map.file(), elf,
+                 addr);
+          goto continue_loop;
+        }
+        // temp structure to load everything
+        cc_remote = new CodeCache(map.file(), count, addr, addr+length);
+
         // Do not parse the same executable twice, e.g. on Alpine Linux
         if (parsed_inodes.insert(map.dev() | inode << 16).second) {
           // Be careful: executable file is not always ELF, e.g. classes.jsa
           if ((image_base -= map.offs()) >= last_readable_base) {
-            ElfParser::parseProgramHeaders(cc, image_base);
+//            ElfParser::parseProgramHeaders(cc, image_base);
+            if (ElfParser::parseProgramHeadersRemote(elf, cc_remote, image_base, reinterpret_cast<const char*>(addr))) {
+              cc->setTextBase(image_base);
+              cc->setDwarfTable(cc_remote->_dwarf_table, cc_remote->_dwarf_table_length);
+              // avoid deleting it (move it)
+              cc_remote->setDwarfTable(nullptr, 0);
+            }
           }
+
           ElfParser::parseFile(cc, image_base, map.file(), true);
         }
+
+      continue_loop:
+        close(fd);
+        elf_end(elf); // no-op if null
+        munmap(addr, length);
+        // we transfered everything away so we can delete this
+        delete cc_remote;
       } else if (strcmp(map.file(), "[vdso]") == 0) {
-        ElfParser::parseMem(cc, image_base);
+        // find our self address for vdso
+        const char *addr_vdso = ElfParser::get_self_vdso();
+        ElfParser::parseMemRemote(cc, image_base, addr_vdso);
       }
 
       cc->sort();

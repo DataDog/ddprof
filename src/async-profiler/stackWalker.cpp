@@ -105,7 +105,14 @@ bool stepStackContext(ap::StackContext &sc, const ap::StackBuffer &buffer,
   if ((sc.sp & (sizeof(uintptr_t) - 1)) != 0) {
     return false;
   }
-
+  // high addr
+  //
+  // sp(2)
+  //
+  // sp(3) (-32 fp_off)
+  //
+  // red zone
+  // low addr
   if (f->fp_off & DW_PC_OFFSET) {
     sc.pc = (const char *)sc.pc + (f->fp_off >> 1);
   } else {
