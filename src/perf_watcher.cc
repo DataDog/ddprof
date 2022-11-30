@@ -9,11 +9,11 @@
 #include "perf.hpp"
 
 #include <fcntl.h>
-#include <unistd.h>
 #include <stddef.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #define BASE_STYPES                                                            \
   (PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_TID |          \
@@ -110,11 +110,9 @@ bool watcher_has_tracepoint(const PerfWatcher *watcher) {
 }
 
 const char *get_tracefs_root() {
-  static const char* tracepoint_root = NULL;
+  static const char *tracepoint_root = NULL;
   constexpr std::array<std::string_view, 2> candidate_paths = {
-    "/sys/kernel/tracing/events/",
-    "/sys/kernel/debug/tracing/events"
-  };
+      "/sys/kernel/tracing/events/", "/sys/kernel/debug/tracing/events"};
 
   if (!tracepoint_root) {
     struct stat sa;
@@ -141,9 +139,8 @@ unsigned int tracepoint_id_from_event(const char *eventname,
     return 0;
   }
   char *buf_copy = buf;
-  size_t pathsz =
-      snprintf(path, sizeof(path), "%s/%s/%s/id",
-               tracefs_root, groupname, eventname);
+  size_t pathsz = snprintf(path, sizeof(path), "%s/%s/%s/id", tracefs_root,
+                           groupname, eventname);
   if (pathsz >= sizeof(path))
     return 0;
   int fd = open(path, O_RDONLY);
@@ -164,4 +161,3 @@ unsigned int tracepoint_id_from_event(const char *eventname,
 
   return trace_id;
 }
-

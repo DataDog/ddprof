@@ -206,7 +206,8 @@ static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr,
   return ddres_init();
 }
 
-void ddprof_metric_aggregate(DDProfContext *ctx, PerfWatcher *watcher, uint64_t val) {
+void ddprof_metric_aggregate(DDProfContext *ctx, PerfWatcher *watcher,
+                             uint64_t val) {
   // Fallthrough sequence to figure out what we call this thing
   const char *metric_name = "unnameable_metric";
   if (!watcher->tracepoint_label.empty())
@@ -214,7 +215,7 @@ void ddprof_metric_aggregate(DDProfContext *ctx, PerfWatcher *watcher, uint64_t 
   else if (!watcher->desc.empty())
     metric_name = watcher->desc.c_str();
 
-  ctx->metrics.add(metric_name, val); 
+  ctx->metrics.add(metric_name, val);
 }
 
 /************************* perf_event_open() helpers **************************/
@@ -253,20 +254,22 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
     DDRes res = unwindstate__unwind(us);
 
     /* This test is not 100% accurate:
-     * Linux kernel does not take into account stack start (ie. end address since
-     * stack grows down) when capturing the stack, it starts from SP register and
-     * only limits the range with the requested size and user space end (cf.
+     * Linux kernel does not take into account stack start (ie. end address
+     * since stack grows down) when capturing the stack, it starts from SP
+     * register and only limits the range with the requested size and user space
+     * end (cf.
      * https://elixir.bootlin.com/linux/v5.19.3/source/kernel/events/core.c#L6582).
-     * Then it tries to copy this range, and stops when it encounters a non-mapped
-     * address
+     * Then it tries to copy this range, and stops when it encounters a
+     * non-mapped address
      * (https://elixir.bootlin.com/linux/v5.19.3/source/kernel/events/core.c#L6660).
-     * This works well for main thread since [stack] is at the top of the process
-     * user address space (and there is a gap between [vvar] and [stack]), but
-     * for threads, stack can be allocated anywhere on the heap and if address
-     * space below allocated stack is mapped, then kernel will happily copy the
-     * whole range up to the requested sample stack size, therefore always
-     * returning samples with `dyn_size` equals to the requested sample stack
-     * size, even if the end of captured stack is not actually part of the stack.
+     * This works well for main thread since [stack] is at the top of the
+     * process user address space (and there is a gap between [vvar] and
+     * [stack]), but for threads, stack can be allocated anywhere on the heap
+     * and if address space below allocated stack is mapped, then kernel will
+     * happily copy the whole range up to the requested sample stack size,
+     * therefore always returning samples with `dyn_size` equals to the
+     * requested sample stack size, even if the end of captured stack is not
+     * actually part of the stack.
      *
      * That's why we consider the stack as truncated in input only if it is also
      * detected as incomplete during unwinding.
@@ -275,20 +278,22 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
         us->output.is_incomplete) {
       ddprof_stats_add(STATS_UNWIND_TRUNCATED_INPUT, 1, nullptr);
     }
-  
+
     DDRES_CHECK_FWD(
         ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL));
-  
+
     // Aggregate if unwinding went well (todo : fatal error propagation)
-    if (!IsDDResFatal(res) && EventConfMode::kCallgraph <= watcher->output_mode) {
+    if (!IsDDResFatal(res) &&
+        EventConfMode::kCallgraph <= watcher->output_mode) {
 #ifndef DDPROF_NATIVE_LIB
       // in lib mode we don't aggregate (protect to avoid link failures)
       int i_export = ctx->worker_ctx.i_current_pprof;
       DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
-      DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr, sample_val, 1,
-                                      watcher, pprof));
+      DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr, sample_val,
+                                      1, watcher, pprof));
       if (ctx->params.show_samples) {
-        ddprof_print_sample(us->output, us->symbol_hdr, sample->period, *watcher);
+        ddprof_print_sample(us->output, us->symbol_hdr, sample->period,
+                            *watcher);
       }
 #else
       // Call the user's stack handler

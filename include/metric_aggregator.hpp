@@ -12,7 +12,7 @@
 #include "ddres.hpp"
 #include "statsd.hpp"
 
-struct MetricAggregator{
+struct MetricAggregator {
   std::string base_path = "profiler.native.";
   std::string sockpath = "/var/run/datadog-agent/statsd.sock";
   std::unordered_map<std::string, uint64_t> values;
@@ -25,9 +25,7 @@ struct MetricAggregator{
     values[safe_str] = values[safe_str] + val;
   }
 
-  void clear() {
-    values.clear();
-  }
+  void clear() { values.clear(); }
 
   bool send() {
     PRINT_NFO("Preparing to send metrics");
@@ -41,10 +39,12 @@ struct MetricAggregator{
     for (const auto &pair : values) {
       std::string metric_name = base_path + pair.first;
       void *coerced_val = (void *)&pair.second;
-      if (IsDDResNotOK(statsd_send(fd, metric_name.c_str(), coerced_val, STAT_GAUGE))) {
+      if (IsDDResNotOK(
+              statsd_send(fd, metric_name.c_str(), coerced_val, STAT_GAUGE))) {
         LG_ERR("Could not send metric %s on fd %d", metric_name.c_str(), fd);
       } else {
-        PRINT_NFO("Sent metric %s of value %lu", metric_name.c_str(), pair.second);
+        PRINT_NFO("Sent metric %s of value %lu", metric_name.c_str(),
+                  pair.second);
       }
     }
     statsd_close(fd);

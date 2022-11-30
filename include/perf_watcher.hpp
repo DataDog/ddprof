@@ -157,5 +157,6 @@ int sample_type_id_to_count_sample_type_id(int idx);
 
 // Other helper functions
 uint64_t perf_event_default_sample_type();
-unsigned int tracepoint_id_from_event(const char *eventname, const char*groupname);
+unsigned int tracepoint_id_from_event(const char *eventname,
+                                      const char *groupname);
 const char *get_tracefs_root();

@@ -10,8 +10,8 @@
 #include "ddprof_defs.hpp"
 #include "ddprof_worker_context.hpp"
 #include "exporter_input.hpp"
-#include "perf_watcher.hpp"
 #include "metric_aggregator.hpp"
+#include "perf_watcher.hpp"
 
 #include <sched.h>
 
