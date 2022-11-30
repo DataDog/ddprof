@@ -92,6 +92,13 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
     watcher->config = tracepoint_id;
   }
 
+  // The output mode isn't set as part of the configuration templates; we
+  // always default to callgraph mode
+  watcher->output_mode = EventConfMode::kCallgraph;
+  if (EventConfMode::kAll <= conf->mode) {
+    watcher->output_mode = conf->mode;
+  }
+
   // Configure some stuff relative to the mode
   if (!(EventConfMode::kCallgraph <= watcher->output_mode)) {
     watcher->sample_type &= ~PERF_SAMPLE_STACK_USER;
@@ -125,13 +132,6 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
 
   if (conf->value_scale != 0.0)
     watcher->value_scale = conf->value_scale;
-
-  // The output mode isn't set as part of the configuration templates; we
-  // always default to callgraph mode
-  watcher->output_mode = EventConfMode::kCallgraph;
-  if (EventConfMode::kAll <= conf->mode) {
-    watcher->output_mode = conf->mode;
-  }
 
   watcher->tracepoint_event = conf->eventname;
   watcher->tracepoint_group = conf->groupname;
