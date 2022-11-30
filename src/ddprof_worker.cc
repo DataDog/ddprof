@@ -216,7 +216,7 @@ static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr,
 
 void ddprof_metric_aggregate(DDProfContext *ctx, PerfWatcher *watcher, uint64_t val) {
   // Fallthrough sequence to figure out what we call this thing
-  const char *metric_name;
+  const char *metric_name = "unnameable_metric";
   if (!watcher->tracepoint_label.empty())
     metric_name = watcher->tracepoint_label.c_str();
   else if (!watcher->desc.empty())
