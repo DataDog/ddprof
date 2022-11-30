@@ -84,8 +84,6 @@ protected:
   void **_got_end;
   bool _got_patchable;
 
-  FrameDesc *_dwarf_table;
-  int _dwarf_table_length;
 
   int _capacity;
   int _count;
@@ -94,6 +92,10 @@ protected:
   void expand();
 
 public:
+  // todo fix hacky override for remote
+  FrameDesc *_dwarf_table;
+  int _dwarf_table_length;
+
   CodeCache(const char *name, short lib_index = -1,
             const void *min_address = NO_MIN_ADDRESS,
             const void *max_address = NO_MAX_ADDRESS);

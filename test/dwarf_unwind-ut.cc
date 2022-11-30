@@ -110,12 +110,15 @@ TEST(dwarf_unwind, remote) {
   // Fork
   pid_t temp_pid = fork();
   if (!temp_pid) {
-    func_intermediate_0(10);
+//    func_intermediate_0(10);
+    char*const  argList[] = {"sleep", "10", nullptr};
+    execvp("sleep", argList);
     return;
   }
 
   // Load libraries from the fork - Cache array is relent to a single pid
   CodeCacheArray cache_arary;
+  sleep(1);
   Symbols::parsePidLibraries(temp_pid, &cache_arary, false);
   // Establish a ring buffer ?
 
