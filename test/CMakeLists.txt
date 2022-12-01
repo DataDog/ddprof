@@ -414,3 +414,5 @@ add_test(
   NAME ddprof_help
   COMMAND ddprof -h
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_subdirectory(loader)

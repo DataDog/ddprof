@@ -718,6 +718,7 @@ void Symbols::parseLibraries(CodeCacheArray *array, bool kernel_symbols) {
       if (!parsed_libraries.insert(image_base).second) {
         continue; // the library was already parsed
       }
+      printf("Considering %s \n", map.file());
 
       int count = array->count();
       if (count >= MAX_NATIVE_LIBS) {
