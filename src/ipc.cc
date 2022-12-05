@@ -23,6 +23,7 @@ struct InternalResponseMessage {
   int32_t pid;
   int64_t mem_size;
   int64_t allocation_profiling_rate;
+  uint32_t allocaion_profiling_flags;
   int32_t ring_buffer_type;
 };
 
@@ -258,6 +259,7 @@ DDRes send(UnixSocket &socket, const ReplyMessage &msg) {
       .pid = msg.pid,
       .mem_size = msg.ring_buffer.mem_size,
       .allocation_profiling_rate = msg.allocation_profiling_rate,
+      .allocaion_profiling_flags = msg.allocation_profiling_flags,
       .ring_buffer_type = msg.ring_buffer.ring_buffer_type};
   socket.send(to_byte_span(&data), fd_span, ec);
   DDRES_CHECK_ERRORCODE(ec, DD_WHAT_SOCKET, "Unable to send response message");
@@ -288,6 +290,7 @@ DDRes receive(UnixSocket &socket, ReplyMessage &msg) {
   msg.pid = data.pid;
   msg.request = data.request;
   msg.allocation_profiling_rate = data.allocation_profiling_rate;
+  msg.allocation_profiling_flags = data.allocaion_profiling_flags;
   msg.ring_buffer.mem_size = data.mem_size;
   msg.ring_buffer.ring_buffer_type = data.ring_buffer_type;
   msg.ring_buffer.ring_fd = fds[0];

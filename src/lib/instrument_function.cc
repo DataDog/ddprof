@@ -289,7 +289,7 @@ DDRes instrument_function(std::string_view function_name,
   auto res = p.instrument_function_internal(-1, function_name, function_id, {},
                                             modules_or_error.value());
   if (res.has_error()) {
-    LG_ERR("Failed to instrumemnt function %s: %s",
+    LG_ERR("Failed to instrument function %s: %s",
            std::string(function_name).c_str(), res.error().message().c_str());
     return ddres_error(DD_WHAT_UKNW);
   }

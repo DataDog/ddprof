@@ -351,8 +351,19 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
         reply.ring_buffer.mem_size = event_it->ring_buffer_size;
         reply.ring_buffer.ring_buffer_type =
             static_cast<int>(event_it->ring_buffer_type);
-        reply.allocation_profiling_rate =
-            ctx->watchers[alloc_watcher_idx].sample_period;
+        auto &alloc_watcher = ctx->watchers[alloc_watcher_idx];
+        if (ctx->params.use_trampoline) {
+          reply.allocation_profiling_flags |= static_cast<uint32_t>(
+              ddprof::AllocationProfilingFlags::kUseTrampolineInstrumentation);
+          alloc_watcher.options.nb_frames_to_skip = 0;
+        }
+        if (alloc_watcher.sample_period < 0) {
+          reply.allocation_profiling_rate = -alloc_watcher.sample_period;
+          reply.allocation_profiling_flags |= static_cast<uint32_t>(
+              ddprof::AllocationProfilingFlags::kDeterministicSampling);
+        } else {
+          reply.allocation_profiling_rate = alloc_watcher.sample_period;
+        }
       }
     }
 

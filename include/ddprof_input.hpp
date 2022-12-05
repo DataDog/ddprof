@@ -38,6 +38,7 @@ typedef struct DDProfInput {
   char *socket;
   char *preset;
   char *switch_user;
+  char *use_trampoline;
   // Watcher presets
   PerfWatcher watchers[MAX_TYPE_WATCHER];
   int num_watchers;
@@ -102,7 +103,8 @@ typedef struct DDProfInput {
   XX(DD_PROFILING_NATIVE_PRESET,        preset,             D, 'D', 1, input, NULL, "", )                      \
   XX(DD_PROFILING_NATIVE_SHOW_SAMPLES,  show_samples,       y, 'y', 0, input, NULL, "", )                      \
   XX(DD_PROFILING_NATIVE_CPU_AFFINITY,  affinity,           a, 'a', 1, input, NULL, "", )                      \
-  XX(DD_PROFILING_NATIVE_SWITCH_USER,   switch_user,        W, 'W', 1, input, NULL, "", )
+  XX(DD_PROFILING_NATIVE_SWITCH_USER,   switch_user,        W, 'W', 1, input, NULL, "", )                      \
+  XX(DD_PROFILING_NATIVE_USE_TRAMPOLINE,use_trampoline,     t, 't', 0, input, NULL, "", )                      \
 // clang-format on
 
 #define X_ENUM(a, b, c, d, e, f, g, h, i) a,

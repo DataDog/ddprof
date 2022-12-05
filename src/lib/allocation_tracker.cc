@@ -43,28 +43,6 @@ struct LostEvent {
   uint64_t lost;
 };
 
-class ReentryGuard {
-public:
-  explicit ReentryGuard(bool *reentry_guard)
-      : _reentry_guard(reentry_guard), _ok(!*reentry_guard) {
-    *_reentry_guard = true;
-  }
-  ~ReentryGuard() {
-    if (_ok) {
-      *_reentry_guard = false;
-    }
-  }
-
-  explicit operator bool() const { return _ok; }
-
-  ReentryGuard(const ReentryGuard &) = delete;
-  ReentryGuard &operator=(const ReentryGuard &) = delete;
-
-private:
-  bool *_reentry_guard;
-  bool _ok;
-};
-
 AllocationTracker *AllocationTracker::_instance;
 thread_local TrackerThreadLocalState AllocationTracker::_tl_state;
 

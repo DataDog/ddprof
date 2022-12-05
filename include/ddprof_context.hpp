@@ -34,6 +34,7 @@ typedef struct DDProfContext {
     bool show_samples;
     cpu_set_t cpu_affinity;
     const char *switch_user;
+    bool use_trampoline;
     const char *internal_stats;
     const char *tags;
   } params;

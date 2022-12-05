@@ -248,16 +248,23 @@ int ddprof_start_profiling_internal() {
     if (info.allocation_profiling_rate != 0) {
       uint32_t flags{0};
       // Negative profiling rate is interpreted as deterministic sampling rate
-      if (info.allocation_profiling_rate < 0) {
+      if (info.allocation_profiling_flags &
+          static_cast<uint32_t>(
+              ddprof::AllocationProfilingFlags::kDeterministicSampling)) {
         flags |= ddprof::AllocationTracker::kDeterministicSampling;
-        info.allocation_profiling_rate = -info.allocation_profiling_rate;
       }
       if (IsDDResOK(ddprof::AllocationTracker::allocation_tracking_init(
               info.allocation_profiling_rate, flags, info.ring_buffer))) {
+        ddprof::AllocationTrackerDisablerForCurrentThread trackerDisabler;
         // \fixme{nsavoire} pthread_create should probably be overridden
         // at load time since we need to capture stack end addresses of all
         // threads in case allocation profiling is started later on
-        ddprof::setup_overrides(ddprof::OverrideMode::kGOTOverride);
+        ddprof::setup_overrides(
+            info.allocation_profiling_flags &
+                    static_cast<uint32_t>(ddprof::AllocationProfilingFlags::
+                                              kUseTrampolineInstrumentation)
+                ? ddprof::OverrideMode::kTrampoline
+                : ddprof::OverrideMode::kGOTOverride);
         // \fixme{nsavoire} what should we do when allocation tracker init
         // fails ?
         g_state.allocation_profiling_started = true;

@@ -8,8 +8,7 @@ include(FetchContent)
 FetchContent_Declare(
   absl
   GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
-  GIT_TAG        20220623.1
-)
+  GIT_TAG 20220623.1)
 
 # set(ABSL_PROPAGATE_CXX_STD ON CACHE INTERNAL "")
 FetchContent_MakeAvailable(absl)
