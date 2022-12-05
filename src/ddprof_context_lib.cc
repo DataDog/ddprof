@@ -94,6 +94,7 @@ void copy_cli_values(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
   ctx.params.loaded_libs_check_interval = ddprof_cli.loaded_libs_check_interval;
   ctx.params.socket_path = ddprof_cli.socket_path;
   ctx.params.pipefd_to_library = UniqueFd{ddprof_cli.pipefd_to_library};
+  ctx.params.use_trampoline = ddprof_cli.use_trampoline;
 }
 
 DDRes context_add_watchers(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {

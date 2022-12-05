@@ -126,23 +126,35 @@ ReplyMessage create_reply_message(const DDProfContext &ctx) {
                        return pevent.watcher_pos == alloc_watcher_idx;
                      });
     if (event_it != pevents.end()) {
+      auto &alloc_watcher = ctx.watchers[alloc_watcher_idx];
       reply.ring_buffer.event_fd = event_it->fd;
       reply.ring_buffer.ring_fd = event_it->mapfd;
       reply.ring_buffer.mem_size = event_it->ring_buffer_size;
       reply.ring_buffer.ring_buffer_type =
           static_cast<int>(event_it->ring_buffer_type);
-      reply.allocation_profiling_rate =
-          ctx.watchers[alloc_watcher_idx].sample_period;
-      reply.stack_sample_size =
-          ctx.watchers[alloc_watcher_idx].options.stack_sample_size;
+      reply.allocation_profiling_rate = alloc_watcher.sample_period;
+      reply.stack_sample_size = alloc_watcher.options.stack_sample_size;
       reply.initial_loaded_libs_check_delay_ms =
           ctx.params.initial_loaded_libs_check_delay.count();
       reply.loaded_libs_check_interval_ms =
           ctx.params.loaded_libs_check_interval.count();
 
-      if (ctx.watchers[alloc_watcher_idx].aggregation_mode ==
-          EventAggregationMode::kLiveSum) {
-        reply.allocation_flags |= ReplyMessage::kLiveSum;
+      if (alloc_watcher.sample_period < 0) {
+        reply.allocation_profiling_rate = -alloc_watcher.sample_period;
+        reply.allocation_profiling_flags |=
+            static_cast<uint32_t>(ReplyMessage::kDeterministicSampling);
+      } else {
+        reply.allocation_profiling_rate = alloc_watcher.sample_period;
+      }
+
+      if (alloc_watcher.aggregation_mode == EventAggregationMode::kLiveSum) {
+        reply.allocation_profiling_flags |= ReplyMessage::kLiveSum;
+      }
+
+      if (ctx.params.use_trampoline) {
+        reply.allocation_flags |= static_cast<uint32_t>(
+            AllocationProfilingFlags::kUseTrampolineInstrumentation);
+        watcher.options.nb_frames_to_skip = 0;
       }
     }
   }

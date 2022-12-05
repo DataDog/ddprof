@@ -339,6 +339,10 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
           ->check(CLI::NonNegativeNumber)
           ->envname("DD_PROFILING_LOADED_LIBS_CHECK_INTERVAL")
           ->group(""));
+  extended_options.push_back(app.add_flag("--use-trampoline", use_trampoline,
+                                          "Use trampoline instead of GOT "
+                                          "override for function interception")
+                                 ->group(""));
 
   // Parse
   CLI11_PARSE(app, argc, argv);

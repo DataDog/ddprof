@@ -38,6 +38,7 @@ struct DDProfContext {
     std::string tags;
     std::chrono::milliseconds initial_loaded_libs_check_delay{0};
     std::chrono::milliseconds loaded_libs_check_interval{0};
+    bool use_trampoline{false};
   } params;
 
   ddprof::UniqueFd socket_fd;

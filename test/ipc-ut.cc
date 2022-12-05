@@ -131,7 +131,7 @@ TEST(IPCTest, worker_server) {
   msg.loaded_libs_check_interval_ms = 789;
   msg.pid = 1234;
   msg.stack_sample_size = 5678;
-  msg.allocation_flags = 0xdeadbeef;
+  msg.allocation_profiling_flags = 0xdeadbeef;
   msg.ring_buffer.ring_buffer_type = 17;
   msg.ring_buffer.mem_size = 123456789;
   msg.ring_buffer.event_fd = eventfd(0, 0);
@@ -156,7 +156,8 @@ TEST(IPCTest, worker_server) {
         ASSERT_EQ(info.loaded_libs_check_interval_ms,
                   msg.loaded_libs_check_interval_ms);
         ASSERT_EQ(info.stack_sample_size, msg.stack_sample_size);
-        ASSERT_EQ(info.allocation_flags, msg.allocation_flags);
+        ASSERT_EQ(info.allocation_profiling_flags,
+                  msg.allocation_profiling_flags);
         ASSERT_EQ(info.ring_buffer.ring_buffer_type,
                   msg.ring_buffer.ring_buffer_type);
         ASSERT_EQ(info.ring_buffer.mem_size, msg.ring_buffer.mem_size);

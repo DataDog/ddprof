@@ -80,7 +80,12 @@ struct RingBufferInfo {
 };
 
 struct ReplyMessage {
-  enum { kLiveSum = 0x1 };
+  enum AllocationProfilingFlags {
+    kDeterministicSampling = 0x1,
+    kLiveSum = 0x2,
+    kUseTrampolineInstrumentation = 0x4
+  };
+
   // reply with the request flags from the request
   uint32_t request = 0;
   // profiler pid
@@ -90,7 +95,7 @@ struct ReplyMessage {
   RingBufferInfo ring_buffer;
   uint32_t initial_loaded_libs_check_delay_ms = 0;
   uint32_t loaded_libs_check_interval_ms = 0;
-  uint32_t allocation_flags = 0;
+  uint32_t allocation_profiling_flags = 0;
   uint32_t stack_sample_size = 0;
 };
 

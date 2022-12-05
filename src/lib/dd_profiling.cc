@@ -345,9 +345,14 @@ int ddprof_start_profiling_internal() {
         info.allocation_profiling_rate = -info.allocation_profiling_rate;
       }
 
-      if (info.allocation_flags & ReplyMessage::kLiveSum) {
+      if (info.allocation_profiling_flags & ReplyMessage::kLiveSum) {
         // tracking deallocations to allow a live view
         flags |= AllocationTracker::kTrackDeallocations;
+      }
+
+      if (info.allocation_profiling_flags &
+          ReplyMessage::kDeterministicSampling) {
+        flags |= AllocationTracker::kDeterministicSampling;
       }
 
       if (IsDDResOK(AllocationTracker::allocation_tracking_init(
@@ -361,7 +366,11 @@ int ddprof_start_profiling_internal() {
         // \fixme{nsavoire} pthread_create should probably be overridden
         // at load time since we need to capture stack end addresses of all
         // threads in case allocation profiling is started later on
-        setup_overrides(OverrideMode::kGOTOverride);
+        ddprof::setup_overrides(
+            info.allocation_profiling_flags &
+                    ReplyMessage::kUseTrampolineInstrumentation
+                ? OverrideMode::kTrampoline
+                : OverrideMode::kGOTOverride);
         // \fixme{nsavoire} what should we do when allocation tracker init
         // fails ?
         g_state.allocation_profiling_started = true;

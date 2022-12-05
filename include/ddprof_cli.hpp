@@ -71,6 +71,7 @@ public:
   int pipefd_to_library{-1};
   bool continue_exec{false};
   bool timeline{false};
+  bool use_trampoline{false};
 
   // args
   std::vector<std::string> command_line;
