@@ -396,6 +396,7 @@ void ddprof_context_free(DDProfContext *ctx) {
       close(ctx->params.sockfd);
     }
     *ctx = {};
+    ctx->metrics.~MetricAggregator();
   }
 
   LOG_close();
