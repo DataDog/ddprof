@@ -81,7 +81,8 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
   }
 
   if (exporter->_agent) {
-    exporter->_url = "http://" + exporter_input->host + ":" + exporter_input->port;
+    exporter->_url =
+        "http://" + exporter_input->host + ":" + exporter_input->port;
   } else {
     // site is the usual option for intake
     if (!exporter->_input.site.empty()) {
@@ -130,7 +131,6 @@ static DDRes fill_stable_tags(const UserTags *user_tags,
   // language is guaranteed to be filled
   DDRES_CHECK_FWD(
       add_single_tag(tags_exporter, "language", exporter->_input.language));
-                     
 
   if (!exporter->_input.environment.empty())
     DDRES_CHECK_FWD(
@@ -145,8 +145,8 @@ static DDRes fill_stable_tags(const UserTags *user_tags,
         add_single_tag(tags_exporter, "service", exporter->_input.service));
 
   if (!exporter->_input.profiler_version.empty())
-    DDRES_CHECK_FWD(add_single_tag(
-        tags_exporter, "profiler_version", exporter->_input.profiler_version));
+    DDRES_CHECK_FWD(add_single_tag(tags_exporter, "profiler_version",
+                                   exporter->_input.profiler_version));
 
   for (auto &el : user_tags->_tags) {
     DDRES_CHECK_FWD(add_single_tag(tags_exporter, el.first, el.second));
@@ -223,8 +223,7 @@ static DDRes fill_cycle_tags(const ddprof::Tags &additional_tags,
 
 DDRes ddprof_exporter_export(const ddog_Profile &profile,
                              const ddprof::Tags &additional_tags,
-                             uint32_t profile_seq,
-                             DDProfExporter &exporter) {
+                             uint32_t profile_seq, DDProfExporter &exporter) {
   DDRes res = ddres_init();
   ddog_SerializeResult serialized_result =
       ddog_Profile_serialize(&profile, nullptr, nullptr);
@@ -273,7 +272,8 @@ DDRes ddprof_exporter_export(const ddog_Profile &profile,
       defer { ddog_SendResult_drop(result); };
 
       if (result.tag == DDOG_SEND_RESULT_ERR) {
-        LG_WRN("Failure to establish connection, check url %s", exporter._url.c_str());
+        LG_WRN("Failure to establish connection, check url %s",
+               exporter._url.c_str());
         LG_WRN("Failure to send profiles (%.*s)", (int)result.err.len,
                result.err.ptr);
         // Free error buffer (prefer this API to the free API)

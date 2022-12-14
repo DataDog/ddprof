@@ -520,10 +520,10 @@ DDRes ddprof_worker_init(DDProfContext *ctx,
     DDRES_CHECK_FWD(
         ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp[1]));
     // warning : depends on unwind init
-    DDRES_CHECK_FWD(
-        ddprof_exporter_new(ctx->worker_ctx.user_tags, *ctx->worker_ctx.exp[0]));
-    DDRES_CHECK_FWD(
-        ddprof_exporter_new(ctx->worker_ctx.user_tags, *ctx->worker_ctx.exp[1]));
+    DDRES_CHECK_FWD(ddprof_exporter_new(ctx->worker_ctx.user_tags,
+                                        *ctx->worker_ctx.exp[0]));
+    DDRES_CHECK_FWD(ddprof_exporter_new(ctx->worker_ctx.user_tags,
+                                        *ctx->worker_ctx.exp[1]));
 
     DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[0], ctx));
     DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[1], ctx));

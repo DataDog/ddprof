@@ -20,7 +20,8 @@
 
 #define PPROF_MAX_LABELS 5
 
-DDRes pprof_create_profile(std::shared_ptr<DDProfPProf> &pprof, DDProfContext *ctx) {
+DDRes pprof_create_profile(std::shared_ptr<DDProfPProf> &pprof,
+                           DDProfContext *ctx) {
   PerfWatcher *watchers = ctx->watchers;
   size_t num_watchers = ctx->num_watchers;
   ddog_ValueType perf_value_type[DDPROF_PWT_LENGTH];

@@ -11,8 +11,8 @@
 
 #include "logger.hpp"
 
-#include <cstring>
 #include <cerrno>
+#include <cstring>
 #include <grp.h>
 #include <pwd.h>
 #include <sys/prctl.h>

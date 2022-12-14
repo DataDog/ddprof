@@ -8,9 +8,9 @@
 #include <stddef.h> // size_t
 #include <stdint.h> // uint64_t
 
-#include <vector>
 #include <string>
 #include <string_view>
+#include <vector>
 
 typedef struct PerfWatcher PerfWatcher;
 

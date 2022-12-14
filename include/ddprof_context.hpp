@@ -14,8 +14,8 @@
 #include "metric_aggregator.hpp"
 #include "perf_watcher.hpp"
 
-#include <string>
 #include <sched.h>
+#include <string>
 
 // forward declarations
 typedef struct StackHandler StackHandler;

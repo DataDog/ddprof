@@ -12,12 +12,13 @@
 #include <string_view>
 
 typedef struct ExporterInput {
-  std::string api_key;          // Datadog api key
-  std::string environment;      // ex: staging / local / prod
-  std::string host;             // agent host ex:162.184.2.1
-  std::string site;             // not used for now
-  std::string port;             // port appended to the host IP (ignored in agentless)
-  std::string service;          // service to identify the profiles (ex:prof-probe-native)
+  std::string api_key;     // Datadog api key
+  std::string environment; // ex: staging / local / prod
+  std::string host;        // agent host ex:162.184.2.1
+  std::string site;        // not used for now
+  std::string port; // port appended to the host IP (ignored in agentless)
+  std::string
+      service; // service to identify the profiles (ex:prof-probe-native)
   std::string service_version;    // appended to tags (example: 1.2.1)
   std::string do_export;          // prevent exports if needed (debug flag)
   std::string debug_pprof_prefix; // local pprof prefix (debug)
@@ -49,5 +50,4 @@ static inline DDRes exporter_input_copy(const ExporterInput *src,
 }
 
 // free the allocated strings
-static inline void exporter_input_free(ExporterInput *exporter_input) {
-}
+static inline void exporter_input_free(ExporterInput *exporter_input) {}

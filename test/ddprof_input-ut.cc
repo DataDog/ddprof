@@ -171,7 +171,6 @@ TEST_F(InputTest, event_from_env) {
     EXPECT_EQ(input.watchers[0].sample_period, 1000);
     EXPECT_EQ(input.watchers[1].sample_period, 123);
     EXPECT_EQ(input.watchers[2].sample_period, 456);
-
   }
 }
 

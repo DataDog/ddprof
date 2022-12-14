@@ -250,17 +250,17 @@ DDRes pevent_munmap(PEventHdr *pevent_hdr) {
 DDRes pevent_close_event(PEvent *event) {
   if (event->fd != -1) {
     if (close(event->fd) == -1) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
-                             "Error when closing fd=%d (watcher #%d) (%s)",
-                             event->fd, event->watcher_pos, std::strerror(errno));
+      DDRES_RETURN_ERROR_LOG(
+          DD_WHAT_PERFOPEN, "Error when closing fd=%d (watcher #%d) (%s)",
+          event->fd, event->watcher_pos, std::strerror(errno));
     }
     event->fd = -1;
   }
   if (event->custom_event && event->mapfd != -1) {
     if (close(event->mapfd) == -1) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
-                             "Error when closing mapfd=%d (watcher #%d) (%s)",
-                             event->mapfd, event->watcher_pos, std::strerror(errno));
+      DDRES_RETURN_ERROR_LOG(
+          DD_WHAT_PERFOPEN, "Error when closing mapfd=%d (watcher #%d) (%s)",
+          event->mapfd, event->watcher_pos, std::strerror(errno));
     }
   }
   return {};

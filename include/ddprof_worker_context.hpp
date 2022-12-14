@@ -9,8 +9,8 @@
 #include "proc_status.hpp"
 
 #include <array>
-#include <memory>
 #include <chrono>
+#include <memory>
 
 typedef struct DDProfExporter DDProfExporter;
 typedef struct DDProfPProf DDProfPProf;
@@ -23,7 +23,7 @@ typedef struct UserTags UserTags;
 struct DDProfWorkerContext {
   // Persistent reference to the state shared accross workers
   PersistentWorkerState *persistent_worker_state;
-  PEventHdr pevent_hdr;   // perf_event buffer holder
+  PEventHdr pevent_hdr;                   // perf_event buffer holder
   std::shared_ptr<DDProfExporter> exp[2]; // wrapper around rust exporter
   std::shared_ptr<DDProfPProf> pprof[2];  // wrapper around rust exporter
   int i_current_pprof;

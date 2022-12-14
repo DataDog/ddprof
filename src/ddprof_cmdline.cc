@@ -47,22 +47,20 @@ bool arg_inset(const char *str, char const *const *set, int sz_set) {
 }
 
 bool is_yes(const char *str) {
-  static std::vector<std::string_view> list = {"1", "on", "yes", "true", "enable", "enabled"};
+  static std::vector<std::string_view> list = {"1",    "on",     "yes",
+                                               "true", "enable", "enabled"};
   return arg_inlist(str, list);
 }
 
-bool is_yes(const std::string &str) {
-  return is_yes(str.c_str());
-}
+bool is_yes(const std::string &str) { return is_yes(str.c_str()); }
 
 bool is_no(const char *str) {
-  static std::vector<std::string_view> list = {"0", "off", "no", "false", "disable", "disabled"};
+  static std::vector<std::string_view> list = {"0",     "off",     "no",
+                                               "false", "disable", "disabled"};
   return arg_inlist(str, list);
 }
 
-bool is_no(const std::string &str) {
-  return is_no(str.c_str());
-}
+bool is_no(const std::string &str) { return is_no(str.c_str()); }
 
 // If this returns false, then the passed watcher should be regarded as invalid
 constexpr uint64_t kIgnoredWatcherID = -1ul;

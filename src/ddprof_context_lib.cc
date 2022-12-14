@@ -15,10 +15,10 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cstdlib>
+#include <cstring>
 #include <errno.h>
 #include <string_view>
-#include <cstring>
-#include <cstdlib>
 #include <sys/sysinfo.h>
 #include <unistd.h>
 
@@ -331,7 +331,7 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   } else {
     preset = input->preset.c_str();
   }
-  
+
   if (preset) {
     bool pid_or_global_mode = ctx->params.pid && ctx->params.sockfd == -1;
     DDRES_CHECK_FWD(add_preset(ctx, preset, pid_or_global_mode));
@@ -339,7 +339,8 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
 
   CPU_ZERO(&ctx->params.cpu_affinity);
   if (!input->affinity.empty()) {
-    if (!ddprof::parse_cpu_mask(input->affinity.c_str(), ctx->params.cpu_affinity)) {
+    if (!ddprof::parse_cpu_mask(input->affinity.c_str(),
+                                ctx->params.cpu_affinity)) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
                              "Invalid CPU affinity mask");
     }
