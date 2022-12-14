@@ -4,23 +4,7 @@
 // Datadog, Inc.
 
 #include "version.hpp"
-#include "string_view.hpp"
 
-#include <stdio.h>
+#include <cstdio>
 
-string_view str_version() {
-  static char profiler_version[1024] = {0};
-  string_view version_str;
-  if (*VER_REV)
-    version_str.len = snprintf(profiler_version, 1024, "%d.%d.%d+%s", VER_MAJ,
-                               VER_MIN, VER_PATCH, VER_REV);
-  else
-    version_str.len = snprintf(profiler_version, 1024, "%d.%d.%d", VER_MAJ,
-                               VER_MIN, VER_PATCH);
-
-  version_str.ptr = profiler_version;
-
-  return version_str;
-}
-
-void print_version() { printf(MYNAME " %s\n", str_version().ptr); }
+void print_version() { printf(MYNAME " %s\n", str_version().data()); }

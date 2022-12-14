@@ -5,7 +5,8 @@
 
 #pragma once
 
-#include "string_view.hpp"
+#include <string>
+#include <string_view>
 
 // Name and versions are defined in build system
 #ifndef MYNAME
@@ -25,7 +26,18 @@
 #  define VER_REV "custom"
 #endif
 
-/// Versions are updated in cmake files
-string_view str_version();
+#define _S(X) #X
+#define S(X) _S(X)
+
+// Versions are updated in cmake files
+constexpr std::string_view str_version() {
+  if (!*VER_REV)
+    return S(VER_MAJ) "." S(VER_MIN) "." S(VER_PATCH);
+  else
+    return S(VER_MAJ) "." S(VER_MIN) "." S(VER_PATCH) "+" VER_REV;
+}
 
 void print_version();
+
+#undef S
+#undef _S

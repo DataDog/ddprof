@@ -104,7 +104,7 @@ struct ProfilerAutoStart {
     // and library will not be loaded.
     bool autostart = false;
     const char *autostart_env = getenv(k_profiler_auto_start_env_variable);
-    if (autostart_env && arg_yesno(autostart_env, 1)) {
+    if (autostart_env && is_yes(autostart_env)) {
       autostart = true;
     } else {
       // if library is preloaded, autostart profiling since there is no way

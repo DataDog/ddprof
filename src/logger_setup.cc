@@ -56,3 +56,7 @@ void setup_logger(const char *log_mode, const char *log_level) {
     break;
   }
 }
+
+void setup_logger(const std::string &log_mode, const std::string &log_level) {
+  return setup_logger(log_mode.c_str(), log_level.c_str());
+}

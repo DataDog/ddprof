@@ -17,6 +17,16 @@
 #include "perf_archmap.hpp"
 #include "perf_watcher.hpp"
 
+int arg_which(const char *str, const std::vector<std::string_view> &list) {
+  size_t sz = strlen(str);
+  for (size_t i = 0; i < list.size(); ++i) {
+    const auto &el = list[i];
+    if (sz == el.size() && !strcasecmp(el.data(), str))
+      return static_cast<int>(i);
+  }
+  return -1;
+}
+
 int arg_which(const char *str, char const *const *set, int sz_set) {
   if (!str || !set)
     return -1;
@@ -27,21 +37,31 @@ int arg_which(const char *str, char const *const *set, int sz_set) {
   return -1;
 }
 
+bool arg_inlist(const char *str, const std::vector<std::string_view> &list) {
+  return -1 != arg_which(str, list);
+}
+
 bool arg_inset(const char *str, char const *const *set, int sz_set) {
   int ret = arg_which(str, set, sz_set);
   return !(-1 == ret);
 }
 
-bool arg_yesno(const char *str, int mode) {
-  const int sizeOfPatterns = 3;
-  static const char *yes_set[] = {"yes", "true", "on"}; // mode = 1
-  static const char *no_set[] = {"no", "false", "off"}; // mode = 0
-  assert(0 == mode || 1 == mode);
-  char const *const *set = (!mode) ? no_set : yes_set;
-  if (arg_which(str, set, sizeOfPatterns) != -1) {
-    return true;
-  }
-  return false;
+bool is_yes(const char *str) {
+  static std::vector<std::string_view> list = {"1", "on", "yes", "true", "enable", "enabled"};
+  return arg_inlist(str, list);
+}
+
+bool is_yes(const std::string &str) {
+  return is_yes(str.c_str());
+}
+
+bool is_no(const char *str) {
+  static std::vector<std::string_view> list = {"0", "off", "no", "false", "disable", "disabled"};
+  return arg_inlist(str, list);
+}
+
+bool is_no(const std::string &str) {
+  return is_no(str.c_str());
 }
 
 // If this returns false, then the passed watcher should be regarded as invalid

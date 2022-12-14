@@ -20,8 +20,9 @@
 
 #include <array>
 #include <cassert>
+#include <cerrno>
 #include <charconv>
-#include <errno.h>
+#include <cstring>
 #include <fcntl.h>
 #include <filesystem>
 #include <functional>
@@ -165,7 +166,6 @@ static InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
   LOG_setlevel(LL_WARNING);
 
   DDProfInput input = {};
-  defer { ddprof_input_free(&input); };
   bool continue_exec;
   DDRes res = ddprof_input_parse(*argc, *argv, &input, &continue_exec);
   if (IsDDResNotOK(res) || !continue_exec) {
@@ -178,7 +178,7 @@ static InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
   // cmdline args have been processed.  Set the ctx
   if (IsDDResNotOK(ddprof_context_set(&input, ctx))) {
     LG_ERR("Error setting up profiling context, exiting");
-    ddprof_context_free(ctx);
+    ctx->release();
     return InputResult::kError;
   }
 
@@ -211,7 +211,7 @@ static InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
 }
 
 static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
-  auto defer_context_free = make_defer([ctx] { ddprof_context_free(ctx); });
+  auto defer_context_free = make_defer([ctx] { ctx->release(); });
 
   is_profiler = false;
 
@@ -260,7 +260,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     }
 
     ctx->params.pid = getpid();
-    auto daemonize_res = ddprof::daemonize([ctx] { ddprof_context_free(ctx); });
+    auto daemonize_res = ddprof::daemonize([ctx] { ctx->release(); });
 
     if (daemonize_res.temp_pid == -1) {
       return -1;
@@ -314,7 +314,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
         0) {
       LG_ERR("Failed to set profiler CPU affinity to 0x%s: %s",
              ddprof::cpu_mask_to_string(ctx->params.cpu_affinity).c_str(),
-             strerror(errno));
+             std::strerror(errno));
       return -1;
     }
   }
@@ -426,13 +426,13 @@ int main(int argc, char *argv[]) {
   case InputResult::kSuccess:
     break;
   case InputResult::kError:
-    ddprof_context_free(&ctx);
+    ctx.release();
   default:
     return -1;
   }
 
   {
-    defer { ddprof_context_free(&ctx); };
+    defer { ctx.release(); };
     /****************************************************************************\
     |                             Run the Profiler |
     \****************************************************************************/
@@ -441,9 +441,9 @@ int main(int argc, char *argv[]) {
     // It only returns in the context of target process (ie. in non-PID mode)
     start_profiler(&ctx);
 
-    if (ctx.params.switch_user) {
-      if (!IsDDResOK(become_user(ctx.params.switch_user))) {
-        LG_ERR("Failed to switch to user %s", ctx.params.switch_user);
+    if (!ctx.params.switch_user.empty()) {
+      if (!IsDDResOK(become_user(ctx.params.switch_user.c_str()))) {
+        LG_ERR("Failed to switch to user %s", ctx.params.switch_user.c_str());
         return -1;
       }
     }
@@ -460,7 +460,7 @@ int main(int argc, char *argv[]) {
       LG_ERR("%s: permission denied", argv[0]);
       break;
     default:
-      LG_ERR("%s: failed to execute (%s)", argv[0], strerror(errno));
+      LG_ERR("%s: failed to execute (%s)", argv[0], std::strerror(errno));
       break;
     }
   }

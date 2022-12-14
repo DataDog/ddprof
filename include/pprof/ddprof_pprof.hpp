@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "ddprof_context.hpp"
 #include "ddprof_defs.hpp"
 #include "ddres_def.hpp"
@@ -23,7 +25,7 @@ struct DDProfPProf {
   ddprof::Tags _tags;
 };
 
-DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx);
+DDRes pprof_create_profile(std::shared_ptr<DDProfPProf> &pprof, DDProfContext *ctx);
 
 /**
  * Aggregate to the existing profile the provided unwinding output.
@@ -35,13 +37,13 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx);
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr *symbol_hdr, uint64_t value,
                       uint64_t count, const PerfWatcher *watcher,
-                      DDProfPProf *pprof);
+                      DDProfPProf &pprof);
 
-DDRes pprof_reset(DDProfPProf *pprof);
+DDRes pprof_reset(DDProfPProf &pprof);
 
-DDRes pprof_write_profile(const DDProfPProf *pprof, int fd);
+DDRes pprof_write_profile(const DDProfPProf &pprof, int fd);
 
-DDRes pprof_free_profile(DDProfPProf *pprof);
+DDRes pprof_free_profile(DDProfPProf &pprof);
 
 void ddprof_print_sample(const UnwindOutput &uw_output,
                          const SymbolHdr &symbol_hdr, uint64_t value,

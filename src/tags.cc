@@ -83,8 +83,8 @@ void split(const char *str, Tags &tags, char c) {
 
 } // namespace ddprof
 
-UserTags::UserTags(const char *tag_str, int nproc) {
-  ddprof::split(tag_str, _tags);
+UserTags::UserTags(const std::string &tag_str, int nproc) {
+  ddprof::split(tag_str.c_str(), _tags);
   _tags.push_back({"number_of_cpu_cores", std::to_string(nproc)});
   _tags.push_back({"number_hw_concurent_threads",
                    std::to_string(ddprof::get_nb_hw_thread())});

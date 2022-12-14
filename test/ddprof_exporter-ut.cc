@@ -85,10 +85,10 @@ void fill_mock_exporter_input(ExporterInput &exporter_input,
   exporter_input.service_version = "42";
   exporter_input.do_export = "yes";
   exporter_input.debug_pprof_prefix = "some_prefix";
-  exporter_input.user_agent = STRING_VIEW_LITERAL("DDPROF_MOCK");
-  exporter_input.language = STRING_VIEW_LITERAL("NATIVE");
-  exporter_input.family = STRING_VIEW_LITERAL("SANCHEZ");
-  exporter_input.profiler_version = STRING_VIEW_LITERAL("1.1.2");
+  exporter_input.user_agent = "DDPROF_MOCK";
+  exporter_input.language = "NATIVE";
+  exporter_input.family = "SANCHEZ";
+  exporter_input.profiler_version = "1.1.2";
 }
 
 TEST(DDProfExporter, url) {
@@ -98,26 +98,26 @@ TEST(DDProfExporter, url) {
   // Test the site / host / port / API logic
   // If API key --> use site
   fill_mock_exporter_input(exporter_input, url, true);
-  DDProfExporter exporter;
-  DDRes res = ddprof_exporter_init(&exporter_input, &exporter);
+  std::shared_ptr<DDProfExporter> exporter;
+  DDRes res = ddprof_exporter_init(&exporter_input, exporter);
   EXPECT_TRUE(IsDDResOK(res));
-  EXPECT_EQ(strcmp(exporter._url, "datadog_is_cool.com"), 0);
-  ddprof_exporter_free(&exporter);
+  EXPECT_TRUE(exporter->_url == url.first);
+  ddprof_exporter_free(*exporter);
 
   // Default to host if site not found
   // To be discussed : should we fail here ?
-  exporter_input.site = nullptr;
-  res = ddprof_exporter_init(&exporter_input, &exporter);
+  exporter_input.site = "";
+  res = ddprof_exporter_init(&exporter_input, exporter);
   EXPECT_TRUE(IsDDResOK(res));
-  EXPECT_EQ(strcmp(exporter._url, "25.04.1988.0"), 0);
-  ddprof_exporter_free(&exporter);
+  EXPECT_TRUE(exporter->_url == "25.04.1988.0");
+  ddprof_exporter_free(*exporter);
 
   // If no API key --> expect host
   fill_mock_exporter_input(exporter_input, url, false);
-  res = ddprof_exporter_init(&exporter_input, &exporter);
+  res = ddprof_exporter_init(&exporter_input, exporter);
   EXPECT_TRUE(IsDDResOK(res));
-  EXPECT_EQ(strcmp(exporter._url, "http://25.04.1988.0:1234"), 0);
-  ddprof_exporter_free(&exporter);
+  EXPECT_TRUE(exporter->_url == "http://25.04.1988.0:1234");
+  ddprof_exporter_free(*exporter);
 }
 
 TEST(DDProfExporter, simple) {
@@ -129,13 +129,13 @@ TEST(DDProfExporter, simple) {
   { // setup input parameters
     fill_mock_exporter_input(exporter_input, url, false);
   }
-  DDProfPProf pprofs;
-  DDProfExporter exporter;
-  DDRes res = ddprof_exporter_init(&exporter_input, &exporter);
+  std::shared_ptr<DDProfPProf> pprofs;
+  std::shared_ptr<DDProfExporter> exporter;
+  DDRes res = ddprof_exporter_init(&exporter_input, exporter);
   EXPECT_TRUE(IsDDResOK(res));
   { // override folder to write debug pprofs
     // You can view content using : pprof -raw ./test/data/ddprof_
-    exporter._debug_pprof_prefix = UNIT_TEST_DATA "/ddprof_";
+    exporter->_debug_pprof_prefix = UNIT_TEST_DATA "/ddprof_";
   }
 
   { // Aggregate pprofs
@@ -150,30 +150,30 @@ TEST(DDProfExporter, simple) {
     ctx.watchers[0] = *ewatcher_from_str("sCPU");
     ctx.num_watchers = 1;
 
-    res = pprof_create_profile(&pprofs, &ctx);
+    res = pprof_create_profile(pprofs, &ctx);
     EXPECT_TRUE(IsDDResOK(res));
     res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, 1, &ctx.watchers[0],
-                          &pprofs);
+                          *pprofs);
     EXPECT_TRUE(IsDDResOK(res));
   }
   {
-    UserTags user_tags(nullptr, 4);
+    UserTags user_tags("", 4);
 
-    res = ddprof_exporter_new(&user_tags, &exporter);
+    res = ddprof_exporter_new(&user_tags, *exporter);
     EXPECT_TRUE(IsDDResOK(res));
 
     if (get_url_from_env(K_RECEPTOR_ENV_ADDR)) {
       // receptor is defined
       Tags empty_tags;
-      res = ddprof_exporter_export(pprofs._profile, empty_tags, 0, &exporter);
+      res = ddprof_exporter_export(*pprofs->_profile, empty_tags, 0, *exporter);
       // We should not be able to send profiles (usually 404)
       EXPECT_FALSE(IsDDResOK(res));
     }
   }
-  res = ddprof_exporter_free(&exporter);
+  res = ddprof_exporter_free(*exporter);
   EXPECT_TRUE(IsDDResOK(res));
 
-  res = pprof_free_profile(&pprofs);
+  res = pprof_free_profile(*pprofs);
   EXPECT_TRUE(IsDDResOK(res));
 }
 

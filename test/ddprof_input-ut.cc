@@ -12,7 +12,6 @@
 #include "loghandle.hpp"
 #include "perf_watcher.hpp"
 #include "span.hpp"
-#include "string_view.hpp"
 
 #include <gtest/gtest.h>
 #include <string_view>
@@ -28,7 +27,6 @@ protected:
 
 bool s_version_called = false;
 void print_version() { s_version_called = true; }
-string_view str_version() { return STRING_VIEW_LITERAL("1.2.3"); }
 
 TEST_F(InputTest, default_values) {
   DDProfInput input;
@@ -36,12 +34,11 @@ TEST_F(InputTest, default_values) {
   EXPECT_TRUE(IsDDResOK(res));
   const char *env_serv = getenv("DD_SERVICE");
   if (env_serv != NULL) {
-    EXPECT_EQ(strcmp(input.exp_input.service, env_serv), 0);
+    EXPECT_TRUE(input.exp_input.service == env_serv);
   } else {
-    EXPECT_EQ(strcmp(input.exp_input.service, "myservice"), 0);
+    EXPECT_TRUE(input.exp_input.service == "myservice");
   }
-  EXPECT_EQ(strcmp(input.log_mode, "stdout"), 0);
-  ddprof_input_free(&input);
+  EXPECT_TRUE(input.log_mode == "stdout");
 }
 
 TEST_F(InputTest, version_called) {
@@ -54,7 +51,6 @@ TEST_F(InputTest, version_called) {
   EXPECT_TRUE(s_version_called);
   EXPECT_FALSE(contine_exec);
   EXPECT_EQ(input.nb_parsed_params, 2);
-  ddprof_input_free(&input);
 }
 
 TEST_F(InputTest, single_param) {
@@ -69,10 +65,9 @@ TEST_F(InputTest, single_param) {
       ddprof_input_parse(argc, (char **)input_values, &input, &contine_exec);
   EXPECT_TRUE(IsDDResOK(res));
   EXPECT_TRUE(contine_exec);
-  EXPECT_EQ(strcmp(input.core_dumps, "yes"), 0);
+  EXPECT_TRUE(input.core_dumps == "yes");
   EXPECT_EQ(input.nb_parsed_params, 3);
   ddprof_print_params(&input);
-  ddprof_input_free(&input);
 }
 
 TEST_F(InputTest, no_params) {
@@ -85,7 +80,6 @@ TEST_F(InputTest, no_params) {
   EXPECT_TRUE(IsDDResOK(res));
   EXPECT_TRUE(contine_exec);
   EXPECT_EQ(input.nb_parsed_params, 1);
-  ddprof_input_free(&input);
 }
 
 TEST_F(InputTest, dump_fixed) {
@@ -97,7 +91,6 @@ TEST_F(InputTest, dump_fixed) {
       ddprof_input_parse(argc, (char **)input_values, &input, &contine_exec);
   EXPECT_FALSE(IsDDResOK(res));
   EXPECT_FALSE(contine_exec);
-  ddprof_input_free(&input);
 }
 
 TEST_F(InputTest, event_from_env) {
@@ -119,7 +112,6 @@ TEST_F(InputTest, event_from_env) {
     EXPECT_NE(nullptr, watcher);
     EXPECT_EQ(watcher->config, input.watchers[0].config);
     EXPECT_EQ(input.watchers[0].sample_period, 1000);
-    ddprof_input_free(&input);
   }
   {
     DDProfInput input;
@@ -133,7 +125,6 @@ TEST_F(InputTest, event_from_env) {
     EXPECT_TRUE(contine_exec);
     EXPECT_EQ(input.nb_parsed_params, 1);
     EXPECT_EQ(input.num_watchers, 0);
-    ddprof_input_free(&input);
   }
   {
     DDProfInput input;
@@ -153,7 +144,6 @@ TEST_F(InputTest, event_from_env) {
     EXPECT_EQ(input.watchers[0].config, watcher->config);
     EXPECT_EQ(input.watchers[0].type, watcher->type);
     EXPECT_EQ(input.watchers[0].sample_period, 1000);
-    ddprof_input_free(&input);
   }
   {
     DDProfInput input;
@@ -182,7 +172,6 @@ TEST_F(InputTest, event_from_env) {
     EXPECT_EQ(input.watchers[1].sample_period, 123);
     EXPECT_EQ(input.watchers[2].sample_period, 456);
 
-    ddprof_input_free(&input);
   }
 }
 
@@ -204,8 +193,7 @@ TEST_F(InputTest, duplicate_events) {
     res = ddprof_context_set(&input, &ctx);
     EXPECT_FALSE(IsDDResOK(res));
 
-    ddprof_input_free(&input);
-    ddprof_context_free(&ctx);
+    ctx.release();
   }
   {
     // Duplicate events (except tracepoints) are disallowed
@@ -223,8 +211,7 @@ TEST_F(InputTest, duplicate_events) {
     res = ddprof_context_set(&input, &ctx);
     EXPECT_FALSE(IsDDResOK(res));
 
-    ddprof_input_free(&input);
-    ddprof_context_free(&ctx);
+    ctx.release();
   }
 }
 
@@ -259,8 +246,7 @@ TEST_F(InputTest, presets) {
                            }),
               watchers.end());
 
-    ddprof_input_free(&input);
-    ddprof_context_free(&ctx);
+    ctx.release();
   }
   {
     // Default preset for PID mode should be CPU
@@ -280,8 +266,7 @@ TEST_F(InputTest, presets) {
     EXPECT_EQ(ctx.num_watchers, 1);
     EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sCPU);
 
-    ddprof_input_free(&input);
-    ddprof_context_free(&ctx);
+    ctx.release();
   }
   {
     // Check cpu_only preset
@@ -303,8 +288,7 @@ TEST_F(InputTest, presets) {
     EXPECT_EQ(ctx.num_watchers, 1);
     EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sCPU);
 
-    ddprof_input_free(&input);
-    ddprof_context_free(&ctx);
+    ctx.release();
   }
   {
     // Check alloc_only preset
@@ -326,8 +310,7 @@ TEST_F(InputTest, presets) {
     EXPECT_EQ(ctx.watchers[1].ddprof_event_type, DDPROF_PWE_sALLOC);
     EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sDUM);
 
-    ddprof_input_free(&input);
-    ddprof_context_free(&ctx);
+    ctx.release();
   }
   {
     // Default preset should not be loaded if an event is given in input
@@ -347,8 +330,7 @@ TEST_F(InputTest, presets) {
     EXPECT_EQ(ctx.num_watchers, 1);
     EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sCPU);
 
-    ddprof_input_free(&input);
-    ddprof_context_free(&ctx);
+    ctx.release();
   }
   {
     // If preset is explicit given in input, then another event with the same
@@ -372,7 +354,6 @@ TEST_F(InputTest, presets) {
     EXPECT_EQ(ctx.watchers[0].sample_frequency, 1234);
     EXPECT_EQ(ctx.watchers[1].ddprof_event_type, DDPROF_PWE_sALLOC);
 
-    ddprof_input_free(&input);
-    ddprof_context_free(&ctx);
+    ctx.release();
   }
 }

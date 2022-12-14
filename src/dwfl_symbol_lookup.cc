@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstring>
 #include <string>
 
 // #define DEBUG

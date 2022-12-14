@@ -78,12 +78,12 @@ int main(int argc, char *const argv[]) {
                                       &input, &continue_exec))) {
     std::cerr << "unable to init input " << std::endl;
     ret = -1;
-    goto CLEANUP_INPUT;
+    goto CLEANUP;
   }
   if (!continue_exec) {
     std::cerr << "Bad arguments... EXIT" << std::endl;
     ret = -1;
-    goto CLEANUP_INPUT;
+    goto CLEANUP;
   }
 
   if (IsDDResNotOK(ddprof_context_set(&input, &ctx))) {
@@ -102,9 +102,7 @@ int main(int argc, char *const argv[]) {
   ret = compare_to_ref(exe_name, symbol_map, data_directory);
 
 CLEANUP:
-  ddprof_context_free(&ctx);
-CLEANUP_INPUT:
-  ddprof_input_free(&input);
+  ctx.release();
   return ret;
 }
 

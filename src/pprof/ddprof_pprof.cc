@@ -20,10 +20,11 @@
 
 #define PPROF_MAX_LABELS 5
 
-DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
+DDRes pprof_create_profile(std::shared_ptr<DDProfPProf> &pprof, DDProfContext *ctx) {
   PerfWatcher *watchers = ctx->watchers;
   size_t num_watchers = ctx->num_watchers;
   ddog_ValueType perf_value_type[DDPROF_PWT_LENGTH];
+  pprof = std::make_shared<DDProfPProf>();
 
   // Figure out which sample_type_ids are used by active watchers
   // We also record the watcher with the lowest valid sample_type id, since that
@@ -126,12 +127,12 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
   return ddres_init();
 }
 
-DDRes pprof_free_profile(DDProfPProf *pprof) {
-  if (pprof->_profile) {
-    ddog_Profile_free(pprof->_profile);
+DDRes pprof_free_profile(DDProfPProf &pprof) {
+  if (pprof._profile) {
+    ddog_Profile_free(pprof._profile);
   }
-  pprof->_profile = NULL;
-  pprof->_nb_values = 0;
+  pprof._profile = NULL;
+  pprof._nb_values = 0;
   return ddres_init();
 }
 
@@ -172,11 +173,11 @@ static void write_line(const ddprof::Symbol &symbol, ddog_Line *ffi_line) {
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr *symbol_hdr, uint64_t value,
                       uint64_t count, const PerfWatcher *watcher,
-                      DDProfPProf *pprof) {
+                      DDProfPProf &pprof) {
 
   const ddprof::SymbolTable &symbol_table = symbol_hdr->_symbol_table;
   const ddprof::MapInfoTable &mapinfo_table = symbol_hdr->_mapinfo_table;
-  ddog_Profile *profile = pprof->_profile;
+  ddog_Profile *profile = pprof._profile;
 
   int64_t values[DDPROF_PWT_LENGTH] = {};
   values[watcher->pprof_sample_idx] = value * count;
@@ -243,7 +244,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   }
   ddog_Sample sample = {
       .locations = {.ptr = locations_buff, .len = cur_loc},
-      .values = {.ptr = values, .len = pprof->_nb_values},
+      .values = {.ptr = values, .len = pprof._nb_values},
       .labels = {.ptr = labels, .len = labels_num},
   };
 
@@ -255,8 +256,8 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   return ddres_init();
 }
 
-DDRes pprof_reset(DDProfPProf *pprof) {
-  if (!ddog_Profile_reset(pprof->_profile, nullptr)) {
+DDRes pprof_reset(DDProfPProf &pprof) {
+  if (!ddog_Profile_reset(pprof._profile, nullptr)) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to reset profile");
   }
   return ddres_init();

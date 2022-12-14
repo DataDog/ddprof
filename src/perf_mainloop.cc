@@ -39,12 +39,16 @@ static inline int64_t now_nanos() {
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
 }
 
-static void handle_signal(int) {
+static void handle_signal(int signo) {
   g_termination_requested = true;
 
-  // forwarding signal to child
-  if (g_child_pid) {
-    kill(g_child_pid, SIGTERM);
+  // If we receive a terminal request, forward a SIGTERM to the child.
+  switch (signo) {
+  case SIGTERM:
+    if (g_child_pid) {
+      kill(g_child_pid, SIGTERM);
+    }
+    std::exit(0);
   }
 }
 
@@ -321,7 +325,7 @@ DDRes main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
     // Ensure worker does not return,
     // because we don't want to free resources (perf_event fds,...) that are
     // shared between processes. Only free the context.
-    ddprof_context_free(ctx);
+    ctx->release();
     exit(0);
   }
   return {};

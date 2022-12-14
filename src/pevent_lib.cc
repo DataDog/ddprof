@@ -14,7 +14,7 @@
 #include "user_override.hpp"
 
 #include <assert.h>
-#include <errno.h>
+#include <cerrno>
 #include <stddef.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -34,7 +34,9 @@ static DDRes pevent_create(PEventHdr *pevent_hdr, int watcher_idx,
 }
 
 void pevent_init(PEventHdr *pevent_hdr) {
-  memset(pevent_hdr, 0, sizeof(PEventHdr));
+  *pevent_hdr = {};
+  printf("SIZE: %ld\n", pevent_hdr->size);
+  fflush(stdout);
   pevent_hdr->max_size = MAX_NB_PERF_EVENT_OPEN;
   for (size_t k = 0; k < pevent_hdr->max_size; ++k) {
     pevent_hdr->pes[k].fd = -1;
@@ -95,7 +97,7 @@ static DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
     display_system_config();
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
                            "Error calling perfopen on watcher %d.0 (%s)",
-                           watcher_idx, strerror(errno));
+                           watcher_idx, std::strerror(errno));
   }
 
   return ddres_init();
@@ -120,7 +122,7 @@ static DDRes pevent_open_all_cpus(const PerfWatcher *watcher, int watcher_idx,
     if (fd == -1) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
                              "Error calling perfopen on watcher %d.%d (%s)",
-                             watcher_idx, cpu_idx, strerror(errno));
+                             watcher_idx, cpu_idx, std::strerror(errno));
     }
     pevent_set_info(fd, pes[template_pevent_idx].attr_idx, pes[pevent_idx]);
   }
@@ -152,7 +154,7 @@ DDRes pevent_mmap_event(PEvent *event) {
     if (!region) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
                              "Could not mmap memory for watcher #%d: %s",
-                             event->watcher_pos, strerror(errno));
+                             event->watcher_pos, std::strerror(errno));
     }
     if (!rb_init(&event->rb, region, event->ring_buffer_size,
                  event->ring_buffer_type)) {
@@ -250,7 +252,7 @@ DDRes pevent_close_event(PEvent *event) {
     if (close(event->fd) == -1) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
                              "Error when closing fd=%d (watcher #%d) (%s)",
-                             event->fd, event->watcher_pos, strerror(errno));
+                             event->fd, event->watcher_pos, std::strerror(errno));
     }
     event->fd = -1;
   }
@@ -258,7 +260,7 @@ DDRes pevent_close_event(PEvent *event) {
     if (close(event->mapfd) == -1) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
                              "Error when closing mapfd=%d (watcher #%d) (%s)",
-                             event->mapfd, event->watcher_pos, strerror(errno));
+                             event->mapfd, event->watcher_pos, std::strerror(errno));
     }
   }
   return {};

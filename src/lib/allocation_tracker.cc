@@ -281,7 +281,7 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
     if (write(_pevent.fd, &count, sizeof(count)) != sizeof(count)) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
                              "Error writing to memory allocation eventfd (%s)",
-                             strerror(errno));
+                             std::strerror(errno));
     }
   }
   return {};

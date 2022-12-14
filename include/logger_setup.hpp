@@ -4,5 +4,7 @@
 // Datadog, Inc.
 
 #pragma once
+#include <string>
 
 void setup_logger(const char *log_mode, const char *log_level);
+void setup_logger(const std::string &log_mode, const std::string &log_level);

@@ -17,8 +17,19 @@
 #include <charconv>
 #include <errno.h>
 #include <string_view>
+#include <cstring>
+#include <cstdlib>
 #include <sys/sysinfo.h>
 #include <unistd.h>
+
+void DDProfContext::release() noexcept {
+  if (params.sockfd >= 0) {
+    close(params.sockfd);
+  }
+  *this = {};
+  params.sockfd = -1;
+  LOG_close(); // weird because log context isn't owned by me here?
+}
 
 static const PerfWatcher *
 find_duplicate_event(ddprof::span<const PerfWatcher> watchers) {
@@ -160,62 +171,67 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
 
   // Process enable.  Note that we want the effect to hit an inner profile.
   // TODO das210603 do the semantics of this match other profilers?
-  ctx->params.enable = !arg_yesno(input->enable, 0); // default yes
+  ctx->params.enable = !is_no(input->enable); // Default yes
   if (ctx->params.enable)
     setenv("DD_PROFILING_ENABLED", "true", true);
   else
     setenv("DD_PROFILING_ENABLED", "false", true);
 
   // Process native profiler enablement override
-  if (input->native_enable) {
-    ctx->params.enable = arg_yesno(input->native_enable, 1);
+  if (!input->native_enable.empty()) {
+    ctx->params.enable = !is_no(input->native_enable);
   }
 
   // Process enablement for agent mode
-  ctx->exp_input.agentless = arg_yesno(input->agentless, 1); // default no
+  ctx->exp_input.agentless = is_yes(input->agentless);
 
   // process upload_period
-  if (input->upload_period) {
-    double x = strtod(input->upload_period, NULL);
-    if (x > 0.0)
-      ctx->params.upload_period = x;
+  if (!input->upload_period.empty()) {
+    char *ptr_end;
+    double val = std::strtod(input->upload_period.c_str(), &ptr_end);
+    if (ptr_end != input->upload_period.c_str() && val > 0.0)
+      ctx->params.upload_period = val;
   }
 
   ctx->params.worker_period = 240;
-  if (input->worker_period) {
-    char *ptr_period = input->worker_period;
-    int tmp_period = strtol(input->worker_period, &ptr_period, 10);
-    if (ptr_period != input->worker_period && tmp_period > 0)
-      ctx->params.worker_period = tmp_period;
+  if (!input->worker_period.empty()) {
+    char *ptr_end;
+    long val = std::strtol(input->worker_period.c_str(), &ptr_end, 10);
+    if (ptr_end != input->worker_period.c_str() && val > 0)
+      ctx->params.worker_period = val;
   }
 
   // Process fault_info
-  ctx->params.fault_info = arg_yesno(input->fault_info, 1); // default no
+  ctx->params.fault_info = is_yes(input->fault_info);
 
   // Process core_dumps
   // This probably makes no sense with fault_info enabled, but considering that
   // there are other dumpable signals, we ignore
-  ctx->params.core_dumps = arg_yesno(input->core_dumps, 1); // default no
+  ctx->params.core_dumps = is_yes(input->core_dumps); // default no
 
   // Process nice level
   // default value is -1 : nothing to override
   ctx->params.nice = -1;
-  if (input->nice) {
-    char *ptr_nice = input->nice;
-    int tmp_nice = strtol(input->nice, &ptr_nice, 10);
-    if (ptr_nice != input->nice)
-      ctx->params.nice = tmp_nice;
+  if (input->nice.c_str()) {
+    char *ptr_end;
+    long val = std::strtol(input->nice.c_str(), &ptr_end, 10);
+    if (ptr_end != input->nice.c_str() && val > 0)
+      ctx->params.nice = val;
   }
 
   ctx->params.num_cpu = ddprof::nprocessors_conf();
 
   // Adjust target PID
-  pid_t pid_tmp = 0;
-  if (input->pid && (pid_tmp = strtol(input->pid, NULL, 10)))
-    ctx->params.pid = pid_tmp;
+  if (!input->pid.empty()) {
+    char *ptr_end;
+    long val = std::strtol(input->pid.c_str(), &ptr_end, 10);
+    if (ptr_end != input->pid.c_str() && val > 1) {
+      ctx->params.pid = val;
+    }
+  }
 
   // Adjust global mode
-  ctx->params.global = arg_yesno(input->global, 1); // default no
+  ctx->params.global = is_yes(input->global);
   if (ctx->params.global) {
     if (ctx->params.pid) {
       LG_WRN("[INPUT] Ignoring PID (%d) in param due to global mode",
@@ -225,29 +241,21 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   }
 
   // Enable or disable the propagation of internal statistics
-  if (input->internal_stats) {
-    ctx->params.internal_stats = strdup(input->internal_stats);
-    if (!ctx->params.internal_stats) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
-                             "Unable to allocate string for internal_stats");
-    }
+  if (!input->internal_stats.empty()) {
+    ctx->params.internal_stats = input->internal_stats;
   }
 
   // Specify export tags
-  if (input->tags) {
-    ctx->params.tags = strdup(input->tags);
-    if (!ctx->params.tags) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
-                             "Unable to allocate string for tags");
-    }
+  if (input->tags.c_str()) {
+    ctx->params.tags = input->tags;
   }
 
   // URL-based host/port override
-  if (input->url && *input->url) {
-    LG_NTC("Processing URL: %s", input->url);
-    char *delim = strchr(input->url, ':');
-    char *host = input->url;
+  if (!input->url.empty()) {
+    char *host = (char *)input->url.c_str();
+    char *delim = strchr(host, ':');
     char *port = NULL;
+    LG_NTC("Processing URL: %s", host);
     if (delim && delim[1] == '/' && delim[2] == '/') {
       // A colon was found.
       // http://hostname:port -> (hostname, port)
@@ -258,8 +266,8 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
 
       // Drop the schema
       *delim = '\0';
-      if (!strncasecmp(input->url, "http", 4) ||
-          !strncasecmp(input->url, "https", 5)) {
+      if (!strncasecmp(input->url.c_str(), "http", 4) ||
+          !strncasecmp(input->url.c_str(), "https", 5)) {
         *delim = ':';
         host = delim + 3; // Navigate after schema
       }
@@ -281,16 +289,12 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     // unfortunate, but this way it harmonizes with the downstream movement of
     // host/port and the input arg pretty-printer.
     if (host) {
-      free((char *)input->exp_input.host);
-      free((char *)ctx->exp_input.host);
-      input->exp_input.host = strdup(host); // For the pretty-printer
-      ctx->exp_input.host = strdup(host);
+      input->exp_input.host = host; // For the pretty-printer
+      ctx->exp_input.host = host;
     }
     if (port) {
-      free((char *)input->exp_input.port);
-      free((char *)ctx->exp_input.port);
-      input->exp_input.port = strdup(port); // Merely for the pretty-printer
-      ctx->exp_input.port = strdup(port);
+      input->exp_input.port = port; // Merely for the pretty-printer
+      ctx->exp_input.port = port;
     }
 
     // Revert the delimiter in case we want to print the URL later
@@ -300,16 +304,16 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   }
 
   // If NULL, uses a default
-  if (input->metrics_socket && *input->metrics_socket)
+  if (!input->metrics_socket.empty())
     ctx->metrics.sockpath = input->metrics_socket;
   else
     ctx->metrics.sockpath = "/var/run/datadog-agent/statsd.sock";
 
   ctx->params.sockfd = -1;
   ctx->params.wait_on_socket = false;
-  if (input->socket && strlen(input->socket) > 0) {
-    std::string_view sv{input->socket};
+  if (!input->socket.empty()) {
     int sockfd;
+    std::string_view sv{input->socket};
     auto [ptr, ec] = std::from_chars(sv.data(), sv.end(), sockfd);
     if (ec == std::errc() && ptr == sv.end()) {
       ctx->params.sockfd = sockfd;
@@ -319,20 +323,23 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
 
   ctx->params.dd_profiling_fd = -1;
 
-  const char *preset = input->preset;
-  if (!preset && ctx->num_watchers == 0) {
-    // use `default` preset when no preset and no events were given in input
+  const char *preset;
+  if (input->preset.empty() && ctx->num_watchers == 0) {
     preset = "default";
+  } else if (input->preset.empty()) { // explicitly:  watchers disable preset
+    preset = NULL;
+  } else {
+    preset = input->preset.c_str();
   }
-
+  
   if (preset) {
     bool pid_or_global_mode = ctx->params.pid && ctx->params.sockfd == -1;
     DDRES_CHECK_FWD(add_preset(ctx, preset, pid_or_global_mode));
   }
 
   CPU_ZERO(&ctx->params.cpu_affinity);
-  if (input->affinity) {
-    if (!ddprof::parse_cpu_mask(input->affinity, ctx->params.cpu_affinity)) {
+  if (!input->affinity.empty()) {
+    if (!ddprof::parse_cpu_mask(input->affinity.c_str(), ctx->params.cpu_affinity)) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
                              "Invalid CPU affinity mask");
     }
@@ -356,7 +363,7 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   order_watchers({ctx->watchers, static_cast<size_t>(ctx->num_watchers)});
 
   // Process input printer (do this right before argv/c modification)
-  if (input->show_config && arg_yesno(input->show_config, 1)) {
+  if (!input->show_config.empty() && is_yes(input->show_config)) {
     PRINT_NFO("Printing parameters -->");
     ddprof_print_params(input);
 
@@ -366,7 +373,7 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     // Tell the user what mode is being used
     PRINT_NFO("  Profiling mode: %s",
               -1 == ctx->params.pid ? "global"
-                  : pid_tmp         ? "target"
+                  : ctx->params.pid ? "target"
                                     : "wrapper");
 
     // Show watchers
@@ -376,30 +383,14 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     }
   }
 
-  ctx->params.show_samples = input->show_samples != nullptr;
+  ctx->params.show_samples = is_yes(input->show_samples);
 
-  if (input->switch_user) {
-    ctx->params.switch_user = strdup(input->switch_user);
+  if (!input->switch_user.empty()) {
+    ctx->params.switch_user = input->switch_user;
   }
 
   ctx->initialized = true;
   return ddres_init();
-}
-
-void ddprof_context_free(DDProfContext *ctx) {
-  exporter_input_free(&ctx->exp_input);
-  if (ctx->initialized) {
-    free((char *)ctx->params.internal_stats);
-    free((char *)ctx->params.tags);
-    free((char *)ctx->params.switch_user);
-    if (ctx->params.sockfd != -1) {
-      close(ctx->params.sockfd);
-    }
-    *ctx = {};
-    ctx->metrics.~MetricAggregator();
-  }
-
-  LOG_close();
 }
 
 int ddprof_context_allocation_profiling_watcher_idx(const DDProfContext *ctx) {

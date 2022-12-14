@@ -10,9 +10,11 @@
 #include "ddprof_defs.hpp"
 #include "ddprof_worker_context.hpp"
 #include "exporter_input.hpp"
+#include "logger.hpp"
 #include "metric_aggregator.hpp"
 #include "perf_watcher.hpp"
 
+#include <string>
 #include <sched.h>
 
 // forward declarations
@@ -34,9 +36,9 @@ typedef struct DDProfContext {
     bool wait_on_socket;
     bool show_samples;
     cpu_set_t cpu_affinity;
-    const char *switch_user;
-    const char *internal_stats;
-    const char *tags;
+    std::string switch_user;
+    std::string internal_stats;
+    std::string tags;
   } params;
 
   bool initialized;
@@ -47,4 +49,6 @@ typedef struct DDProfContext {
   void *callback_ctx; // user state to be used in callback (lib mode)
   DDProfWorkerContext worker_ctx;
   MetricAggregator metrics;
+
+  void release() noexcept;
 } DDProfContext;

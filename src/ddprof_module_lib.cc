@@ -12,6 +12,7 @@
 #include "logger.hpp"
 #include "string_format.hpp"
 
+#include <cstring>
 #include <fcntl.h>
 #include <gelf.h>
 #include <libelf.h>

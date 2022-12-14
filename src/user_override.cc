@@ -11,10 +11,10 @@
 
 #include "logger.hpp"
 
+#include <cstring>
 #include <cerrno>
 #include <grp.h>
 #include <pwd.h>
-#include <string.h>
 #include <sys/prctl.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -83,11 +83,11 @@ DDRes user_override(uid_t uid, gid_t gid, UIDInfo *old_uids) {
   DumpableRestorer dumpable_restorer;
   if (gid != static_cast<uid_t>(-1)) {
     DDRES_CHECK_INT(setresgid(gid, gid, -1), DD_WHAT_USERID,
-                    "Unable to set gid %d (%s)", gid, strerror(errno));
+                    "Unable to set gid %d (%s)", gid, std::strerror(errno));
   }
   if (uid != static_cast<uid_t>(-1)) {
     DDRES_CHECK_INT(setresuid(uid, uid, -1), DD_WHAT_USERID,
-                    "Unable to set uid %d (%s)", uid, strerror(errno));
+                    "Unable to set uid %d (%s)", uid, std::strerror(errno));
   }
 
   return {};

@@ -70,7 +70,7 @@ static DDRes report_lost_events(DDProfContext *ctx) {
       DDRES_CHECK_FWD(pprof_aggregate(
           &us->output, &us->symbol_hdr, watcher->sample_period,
           ctx->worker_ctx.lost_events_per_watcher[watcher_idx], watcher,
-          ctx->worker_ctx.pprof[ctx->worker_ctx.i_current_pprof]));
+          *ctx->worker_ctx.pprof[ctx->worker_ctx.i_current_pprof]));
       ctx->worker_ctx.lost_events_per_watcher[watcher_idx] = 0;
     }
   }
@@ -288,7 +288,7 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
 #ifndef DDPROF_NATIVE_LIB
       // in lib mode we don't aggregate (protect to avoid link failures)
       int i_export = ctx->worker_ctx.i_current_pprof;
-      DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
+      DDProfPProf &pprof = *ctx->worker_ctx.pprof[i_export];
       DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr, sample_val,
                                       1, watcher, pprof));
       if (ctx->params.show_samples) {
@@ -336,9 +336,9 @@ void *ddprof_worker_export_thread(void *arg) {
   // gets joined forcefully, we should not resume on same value
   uint32_t profile_seq = (worker->persistent_worker_state->profile_seq)++;
 
-  if (IsDDResFatal(ddprof_exporter_export(worker->pprof[i]->_profile,
+  if (IsDDResFatal(ddprof_exporter_export(*worker->pprof[i]->_profile,
                                           worker->pprof[i]->_tags, profile_seq,
-                                          worker->exp[i]))) {
+                                          *worker->exp[i]))) {
     LG_NFO("Failed to export from worker");
     worker->exp_error = true;
   }
@@ -390,7 +390,7 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
   // Reset the current, ensuring the timestamp starts when we are about to write
   // to it
   DDRES_CHECK_FWD(
-      pprof_reset(ctx->worker_ctx.pprof[ctx->worker_ctx.i_current_pprof]));
+      pprof_reset(*ctx->worker_ctx.pprof[ctx->worker_ctx.i_current_pprof]));
 
   if (!synchronous_export) {
     pthread_create(&ctx->worker_ctx.exp_tid, NULL, ddprof_worker_export_thread,
@@ -413,10 +413,9 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
 
   // And emit diagnostic output (if it's enabled)
   print_diagnostics(ctx->worker_ctx.us->dso_hdr);
-  if (IsDDResNotOK(ddprof_stats_send(ctx->params.internal_stats))) {
+  if (IsDDResNotOK(ddprof_stats_send(ctx->params.internal_stats.c_str()))) {
     LG_WRN("Unable to utilize to statsd socket.  Suppressing future stats.");
-    free((void *)ctx->params.internal_stats);
-    ctx->params.internal_stats = NULL;
+    ctx->params.internal_stats = "";
   }
 
   // Increase the counts of exports
@@ -515,19 +514,6 @@ DDRes ddprof_worker_init(DDProfContext *ctx,
                          PersistentWorkerState *persistent_worker_state) {
   try {
     DDRES_CHECK_FWD(worker_library_init(ctx, persistent_worker_state));
-    ctx->worker_ctx.exp[0] =
-        (DDProfExporter *)calloc(1, sizeof(DDProfExporter));
-    ctx->worker_ctx.exp[1] =
-        (DDProfExporter *)calloc(1, sizeof(DDProfExporter));
-    ctx->worker_ctx.pprof[0] = new DDProfPProf();
-    ctx->worker_ctx.pprof[1] = new DDProfPProf();
-    if (!ctx->worker_ctx.exp[0] || !ctx->worker_ctx.exp[1]) {
-      free(ctx->worker_ctx.exp[0]);
-      free(ctx->worker_ctx.exp[1]);
-      delete ctx->worker_ctx.pprof[0];
-      delete ctx->worker_ctx.pprof[1];
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error creating exporter");
-    }
 
     DDRES_CHECK_FWD(
         ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp[0]));
@@ -535,9 +521,9 @@ DDRes ddprof_worker_init(DDProfContext *ctx,
         ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp[1]));
     // warning : depends on unwind init
     DDRES_CHECK_FWD(
-        ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[0]));
+        ddprof_exporter_new(ctx->worker_ctx.user_tags, *ctx->worker_ctx.exp[0]));
     DDRES_CHECK_FWD(
-        ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[1]));
+        ddprof_exporter_new(ctx->worker_ctx.user_tags, *ctx->worker_ctx.exp[1]));
 
     DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[0], ctx));
     DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[1], ctx));
@@ -563,16 +549,8 @@ DDRes ddprof_worker_free(DDProfContext *ctx) {
 
     DDRES_CHECK_FWD(worker_library_free(ctx));
     for (int i = 0; i < 2; i++) {
-      if (ctx->worker_ctx.exp[i]) {
-        DDRES_CHECK_FWD(ddprof_exporter_free(ctx->worker_ctx.exp[i]));
-        free(ctx->worker_ctx.exp[i]);
-        ctx->worker_ctx.exp[i] = nullptr;
-      }
-      if (ctx->worker_ctx.pprof[i]) {
-        DDRES_CHECK_FWD(pprof_free_profile(ctx->worker_ctx.pprof[i]));
-        delete ctx->worker_ctx.pprof[i];
-        ctx->worker_ctx.pprof[i] = nullptr;
-      }
+      DDRES_CHECK_FWD(ddprof_exporter_free(*ctx->worker_ctx.exp[i]));
+      DDRES_CHECK_FWD(pprof_free_profile(*ctx->worker_ctx.pprof[i]));
     }
   }
   CatchExcept2DDRes();

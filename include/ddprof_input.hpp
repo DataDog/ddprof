@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "ddprof_defs.hpp"
 #include "ddres_def.hpp"
 #include "exporter_input.hpp"
@@ -16,29 +18,29 @@ typedef int16_t watcher_index_t;
 typedef struct DDProfInput {
   int nb_parsed_params;
   // Parameters for interpretation
-  char *log_mode;
-  char *log_level;
+  std::string log_mode;
+  std::string log_level;
   // Input parameters
-  char *show_config;
-  char *show_samples;
-  char *affinity;
-  char *enable;
-  char *native_enable;
-  char *agentless;
-  char *upload_period;
-  char *fault_info;
-  char *core_dumps;
-  char *nice;
-  char *pid;
-  char *global;
-  char *worker_period;
-  char *internal_stats;
-  char *tags;
-  char *url;
-  char *socket;
-  char *metrics_socket;
-  char *preset;
-  char *switch_user;
+  std::string show_config;
+  std::string show_samples;
+  std::string affinity;
+  std::string enable;
+  std::string native_enable;
+  std::string agentless;
+  std::string upload_period;
+  std::string fault_info;
+  std::string core_dumps;
+  std::string nice;
+  std::string pid;
+  std::string global;
+  std::string worker_period;
+  std::string internal_stats;
+  std::string tags;
+  std::string url;
+  std::string socket;
+  std::string metrics_socket;
+  std::string preset;
+  std::string switch_user;
   // Watcher presets
   PerfWatcher watchers[MAX_TYPE_WATCHER];
   int num_watchers;
@@ -124,5 +126,3 @@ void ddprof_print_help();
 
 // Print help
 void ddprof_print_params(const DDProfInput *input);
-
-void ddprof_input_free(DDProfInput *input);

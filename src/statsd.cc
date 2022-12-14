@@ -8,7 +8,8 @@
 #include "ddres.hpp"
 
 #include <assert.h>
-#include <errno.h>
+#include <cerrno>
+#include <cstring>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -24,7 +25,7 @@ DDRes statsd_listen(const char *path, size_t sz_path, int *fd) {
   int socktype = SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK;
   if (-1 == (fd_sock = socket(AF_UNIX, socktype, 0))) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "[STATSD] Creating UDS failed (%s)",
-                          strerror(errno));
+                          std::strerror(errno));
   }
 
   // Attempt to bind to the given path.  This is necessary for datagram-type
@@ -40,7 +41,7 @@ DDRes statsd_listen(const char *path, size_t sz_path, int *fd) {
   if (bind(fd_sock, (struct sockaddr *)&addr_bind, sizeof(addr_bind))) {
     close(fd_sock);
     DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Binding UDS failed (%s)",
-                          strerror(errno));
+                          std::strerror(errno));
   }
 
   *fd = fd_sock;
@@ -71,7 +72,7 @@ DDRes statsd_connect(const char *path, size_t sz_path, int *fd) {
     close(fd_sock);
     DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD,
                           "[STATSD] Connecting to host failed (%s)",
-                          strerror(errno));
+                          std::strerror(errno));
   }
 
   // If we're here, then the connection has been fully established

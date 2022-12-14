@@ -8,6 +8,10 @@
 #include <stddef.h> // size_t
 #include <stdint.h> // uint64_t
 
+#include <vector>
+#include <string>
+#include <string_view>
+
 typedef struct PerfWatcher PerfWatcher;
 
 /**************************** Cmdline Helpers *********************************/
@@ -22,9 +26,13 @@ typedef struct PerfWatcher PerfWatcher;
 
 /// Returns index to element that compars to str, otherwise -1
 int arg_which(const char *str, char const *const *set, int sz_set);
+int arg_which(const char *str, const std::vector<std::string_view> &list);
 
 bool arg_inset(const char *str, char const *const *set, int sz_set);
 
-bool arg_yesno(const char *str, int mode);
+bool is_yes(const char *str);
+bool is_yes(const std::string &str);
+bool is_no(const char *str);
+bool is_no(const std::string &str);
 
 bool watcher_from_str(const char *str, PerfWatcher *watcher);

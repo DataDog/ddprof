@@ -9,6 +9,7 @@
 #include "defer.hpp"
 #include "sha1.h"
 
+#include <cstring>
 #include <fcntl.h>
 #include <filesystem>
 #include <sys/stat.h>

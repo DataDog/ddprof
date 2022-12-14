@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "ddprof_defs.hpp"
 #include "ddres_def.hpp"
 #include "exporter_input.hpp"
@@ -20,8 +22,8 @@ typedef struct UserTags UserTags;
 
 typedef struct DDProfExporter {
   ExporterInput _input;
-  char *_url;                      // url contains path and port
-  const char *_debug_pprof_prefix; // write pprofs to folder
+  std::string _url;                // url contains path and port
+  std::string _debug_pprof_prefix; // write pprofs to folder
   ddog_ProfileExporter *_exporter;
   bool _agent;
   bool _export; // debug mode : should we send profiles ?
@@ -30,12 +32,12 @@ typedef struct DDProfExporter {
 } DDProfExporter;
 
 DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
-                           DDProfExporter *exporter);
+                           std::shared_ptr<DDProfExporter> &exporter);
 
-DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter);
+DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter &exporter);
 
-DDRes ddprof_exporter_export(const struct ddog_Profile *profile,
+DDRes ddprof_exporter_export(const struct ddog_Profile &profile,
                              const ddprof::Tags &additional_tags,
-                             uint32_t profile_seq, DDProfExporter *exporter);
+                             uint32_t profile_seq, DDProfExporter &exporter);
 
-DDRes ddprof_exporter_free(DDProfExporter *exporter);
+DDRes ddprof_exporter_free(DDProfExporter &exporter);

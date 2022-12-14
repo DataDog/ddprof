@@ -24,14 +24,14 @@ namespace ddprof {
 DwflSymbolLookup::DwflSymbolLookup() : _lookup_setting(K_CACHE_ON) {}
 
 TEST(DDProfPProf, init_profiles) {
-  DDProfPProf pprof;
+  std::shared_ptr<DDProfPProf> pprof;
   DDProfContext ctx = {};
   ctx.watchers[0] = *ewatcher_from_str("sCPU");
   ctx.num_watchers = 1;
 
-  DDRes res = pprof_create_profile(&pprof, &ctx);
+  DDRes res = pprof_create_profile(pprof, &ctx);
   EXPECT_TRUE(IsDDResOK(res));
-  res = pprof_free_profile(&pprof);
+  res = pprof_free_profile(*pprof);
   EXPECT_TRUE(IsDDResOK(res));
 }
 
@@ -68,20 +68,20 @@ TEST(DDProfPProf, aggregate) {
   MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
 
   fill_unwind_symbols(table, mapinfo_table, mock_output);
-  DDProfPProf pprof;
+  std::shared_ptr<DDProfPProf> pprof;
   DDProfContext ctx = {};
   ctx.watchers[0] = *ewatcher_from_str("sCPU");
   ctx.num_watchers = 1;
-  DDRes res = pprof_create_profile(&pprof, &ctx);
+  DDRes res = pprof_create_profile(pprof, &ctx);
   EXPECT_TRUE(IsDDResOK(res));
   res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, 1, &ctx.watchers[0],
-                        &pprof);
+                        *pprof);
 
   EXPECT_TRUE(IsDDResOK(res));
 
-  test_pprof(&pprof);
+  test_pprof(&*pprof);
 
-  res = pprof_free_profile(&pprof);
+  res = pprof_free_profile(*pprof);
   EXPECT_TRUE(IsDDResOK(res));
 }
 

@@ -22,10 +22,10 @@ TEST(CmdLineTst, ArgWhich) {
 TEST(CmdLineTst, ArgYesNo) {
   const char *yesStr = "YeS";
   const char *noStr = "nO";
-  ASSERT_TRUE(arg_yesno(yesStr, 1));
-  ASSERT_FALSE(arg_yesno(noStr, 1));
-  ASSERT_TRUE(arg_yesno(noStr, 0));
-  ASSERT_FALSE(arg_yesno(yesStr, 0));
+  ASSERT_TRUE(is_yes(yesStr));
+  ASSERT_FALSE(is_yes(noStr));
+  ASSERT_TRUE(is_no(noStr));
+  ASSERT_FALSE(is_no(yesStr));
 }
 
 TEST(CmdLineTst, PartialFilled) {

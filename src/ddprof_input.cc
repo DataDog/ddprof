@@ -7,6 +7,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <cstring>
 #include <getopt.h>
 #include <sstream>
 #include <string>
@@ -17,7 +18,6 @@
 #include "version.hpp"
 
 /************************ Options Table Helper Macros *************************/
-#define X_FREE(a, b, c, d, e, f, g, h, i) FREE_EXP(i b, f);
 #define X_LOPT(a, b, c, d, e, f, g, h, i) {#b, e, 0, d},
 #define X_DFLT(a, b, c, d, e, f, g, h, i) DFLT_EXP(#a, i b, f, g, h);
 #define X_OSTR(a, b, c, d, e, f, g, h, i) #c ":"
@@ -26,32 +26,21 @@
 // TODO das210603 I don't think this needs to be inlined as a macro anymore
 #define DFLT_EXP(evar, key, targ, func, dfault)                                \
   {                                                                            \
-    char *_buf = NULL;                                                         \
-    if (!((targ)->key)) {                                                      \
+    if (((targ)->key).empty()) {                                               \
       if (getenv(evar))                                                        \
-        _buf = strdup(getenv(evar));                                           \
+        (targ)->key = getenv(evar);                                            \
       else if (*(dfault))                                                      \
-        _buf = strdup(dfault);                                                 \
-      (targ)->key = _buf;                                                      \
+        (targ)->key = dfault;                                                  \
     }                                                                          \
   }
 
 #define CASE_EXP(casechar, targ, key)                                          \
   case casechar:                                                               \
-    if ((targ)->key)                                                           \
-      free((void *)(targ)->key);                                               \
     if (optarg && *optarg)                                                     \
-      (targ)->key = strdup(optarg);                                            \
+      (targ)->key = optarg;                                                    \
     else                                                                       \
-      (targ)->key = strdup("");                                                \
+      (targ)->key = "";                                                        \
     break;
-
-// TODO das210603 I don't think this needs to be inlined as a macro anymore
-#define FREE_EXP(key, targ)                                                    \
-  {                                                                            \
-    free((void *)(targ)->key);                                                 \
-    (targ)->key = NULL;                                                        \
-  }
 
 #define X_HLPK(a, b, c, d, e, f, g, h, i)                                      \
   "  -" #c ", --" #b ", (envvar: " #a ")",
@@ -59,8 +48,8 @@
 // Helpers for expanding the OPT_TABLE here
 #define X_PRNT(a, b, c, d, e, f, g, h, i)                                      \
   {                                                                            \
-    if ((f)->i b) {                                                            \
-      PRINT_NFO("  " #b ": %s", (f)->i b);                                     \
+    if (!((f)->i b).empty()) {                                                 \
+      PRINT_NFO("  " #b ": %s", ((f)->i b).c_str());                           \
     }                                                                          \
   }
 
@@ -279,5 +268,3 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
 }
 
 void ddprof_print_params(const DDProfInput *input) { OPT_TABLE(X_PRNT); }
-
-void ddprof_input_free(DDProfInput *input) { OPT_TABLE(X_FREE); }

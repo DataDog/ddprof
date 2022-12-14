@@ -5,7 +5,8 @@
 
 #include "ddprof.hpp"
 
-#include <errno.h>
+#include <cerrno>
+#include <cstring>
 
 #include <signal.h>
 #include <stdio.h>
@@ -48,7 +49,7 @@ static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   size_t sz = backtrace(buf, 4096);
 #endif
   fprintf(stderr, "ddprof[%d]: <%s> has encountered an error and will exit\n",
-          getpid(), str_version().ptr);
+          getpid(), str_version().data());
   if (sig == SIGSEGV)
     printf("[DDPROF] Fault address: %p\n", si->si_addr);
 #ifdef __GLIBC__
@@ -157,7 +158,7 @@ void ddprof_attach_handler(DDProfContext *ctx,
   LG_NFO("Initiating Profiling");
   main_loop_lib(&perf_funs, ctx);
   if (errno)
-    LG_WRN("Profiling context no longer valid (%s)", strerror(errno));
+    LG_WRN("Profiling context no longer valid (%s)", std::strerror(errno));
   else
     LG_WRN("Profiling context no longer valid");
 

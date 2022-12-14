@@ -9,6 +9,8 @@
 #include "ddres_list.hpp"
 #include "logger.hpp"
 
+#include <cerrno>
+
 /// Replacement for variadic macro niladic expansion via `__VA_OPT__`, which
 /// is unsupported (boo!) in standards-compliant C static analysis tools and
 /// checkers.
@@ -58,7 +60,7 @@
       int e = errno;                                                           \
       LG_ERR(__VA_ARGS__);                                                     \
       LOG_ERROR_DETAILS(LG_ERR, what);                                         \
-      LG_ERR("errno(%d): %s", e, strerror(e));                                 \
+      LG_ERR("errno(%d): %s", e, std::strerror(e));                            \
       return ddres_error(what);                                                \
     }                                                                          \
   } while (0)
