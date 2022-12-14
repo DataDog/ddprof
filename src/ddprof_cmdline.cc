@@ -17,9 +17,10 @@
 #include "perf_archmap.hpp"
 #include "perf_watcher.hpp"
 
-int arg_which(const char *str, const std::vector<std::string_view> &list) {
+template <std::size_t N>
+int arg_which(const char *str, const std::string_view (&list)[N]) {
   size_t sz = strlen(str);
-  for (size_t i = 0; i < list.size(); ++i) {
+  for (size_t i = 0; i < N; ++i) {
     const auto &el = list[i];
     if (sz == el.size() && !strcasecmp(el.data(), str))
       return static_cast<int>(i);
@@ -37,7 +38,8 @@ int arg_which(const char *str, char const *const *set, int sz_set) {
   return -1;
 }
 
-bool arg_inlist(const char *str, const std::vector<std::string_view> &list) {
+template <std::size_t N>
+bool arg_inlist(const char *str, const std::string_view (&list)[N]) {
   return -1 != arg_which(str, list);
 }
 
@@ -47,16 +49,16 @@ bool arg_inset(const char *str, char const *const *set, int sz_set) {
 }
 
 bool is_yes(const char *str) {
-  static std::vector<std::string_view> list = {"1",    "on",     "yes",
-                                               "true", "enable", "enabled"};
+  constexpr std::string_view list[] = {"1",    "on",     "yes",
+                                       "true", "enable", "enabled"};
   return arg_inlist(str, list);
 }
 
 bool is_yes(const std::string &str) { return is_yes(str.c_str()); }
 
 bool is_no(const char *str) {
-  static std::vector<std::string_view> list = {"0",     "off",     "no",
-                                               "false", "disable", "disabled"};
+  constexpr std::string_view list[] = {"0",     "off",     "no",
+                                       "false", "disable", "disabled"};
   return arg_inlist(str, list);
 }
 

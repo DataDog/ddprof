@@ -4,6 +4,7 @@
 // Datadog, Inc.
 
 #include "daemonize.hpp"
+#include "ddprof_exit.hpp"
 
 #include <fcntl.h>
 #include <sys/wait.h>
@@ -37,12 +38,12 @@ DaemonizeResult daemonize(std::function<void()> cleanup_function) {
       // NOTE, current process is NOT expected to unblock here; rather it
       // ends by SIGTERM.  Exiting here is an error condition.
       waitpid(child_pid, NULL, 0);
-      exit(1);
+      ddprof::exit();
     } else {
       child_pid = getpid();
       if (write(pipefd[1], &child_pid, sizeof(child_pid)) !=
           sizeof(child_pid)) {
-        exit(1);
+        ddprof::exit();
       }
       close(pipefd[1]);
       // If I'm the child PID, then leave and attach profiler
@@ -62,6 +63,8 @@ DaemonizeResult daemonize(std::function<void()> cleanup_function) {
     waitpid(temp_pid, NULL, 0);
     return {0, parent_pid, grandchild_pid};
   }
+
+  return {-1, -1, -1};
 }
 
 } // namespace ddprof

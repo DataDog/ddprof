@@ -26,7 +26,6 @@ void DDProfContext::release() noexcept {
   if (params.sockfd >= 0) {
     close(params.sockfd);
   }
-  *this = {};
   params.sockfd = -1;
   LOG_close(); // weird because log context isn't owned by me here?
 }
@@ -146,7 +145,6 @@ static void log_watcher(const PerfWatcher *w, int idx) {
 
 /****************************  Argument Processor  ***************************/
 DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
-  *ctx = {};
   setup_logger(input->log_mode, input->log_level);
 
   if (const PerfWatcher *dup_watcher = find_duplicate_event(

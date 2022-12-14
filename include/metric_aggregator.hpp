@@ -28,12 +28,10 @@ struct MetricAggregator {
   void clear() { values.clear(); }
 
   bool send() {
-    PRINT_NFO("Preparing to send metrics");
-
     int fd = -1;
     if (IsDDResNotOK(statsd_connect(sockpath.c_str(), sockpath.size(), &fd)) ||
         -1 == fd) {
-      LG_ERR("Could not connect to socket %s", sockpath.c_str());
+      LG_WRN("Could not connect to socket %s", sockpath.c_str());
       return false;
     }
     for (const auto &pair : values) {

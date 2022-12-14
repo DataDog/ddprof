@@ -6,6 +6,7 @@
 #include "perf_mainloop.hpp"
 
 #include "ddprof_context_lib.hpp"
+#include "ddprof_exit.hpp"
 #include "ddprof_worker.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
@@ -39,8 +40,9 @@ static inline int64_t now_nanos() {
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
 }
 
+#include <iostream>
 static void handle_signal(int signo) {
-  g_termination_requested = true;
+  g_termination_requested = true; // for all signals
 
   // If we receive a terminal request, forward a SIGTERM to the child.
   switch (signo) {
@@ -48,7 +50,7 @@ static void handle_signal(int signo) {
     if (g_child_pid) {
       kill(g_child_pid, SIGTERM);
     }
-    std::exit(0);
+    throw ddprof::exit();
   }
 }
 
@@ -326,7 +328,7 @@ DDRes main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
     // because we don't want to free resources (perf_event fds,...) that are
     // shared between processes. Only free the context.
     ctx->release();
-    exit(0);
+    throw ddprof::exit();
   }
   return {};
 }

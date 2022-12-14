@@ -113,7 +113,7 @@ DDRes ddprof_stats_get(unsigned int stat, long *out) {
 }
 
 DDRes ddprof_stats_send(const char *statsd_socket) {
-  if (!statsd_socket) {
+  if (!statsd_socket || !*statsd_socket) {
     LG_NTC("No statsd socket provided");
     return ddres_init();
   }

@@ -19,6 +19,7 @@
 #include "ddprof_cmdline.hpp"
 #include "ddprof_context.hpp"
 #include "ddprof_context_lib.hpp"
+#include "ddprof_exit.hpp"
 #include "ddprof_input.hpp"
 #include "ddprof_stats.hpp"
 #include "ddprof_worker.hpp"
@@ -108,6 +109,8 @@ DDRes ddprof_setup(DDProfContext *ctx) {
     DDRES_CHECK_FWD(ddprof_stats_init());
 
     DDRES_CHECK_FWD(pevent_enable(pevent_hdr));
+  } catch (ddprof::exit const &_) {
+    throw;
   }
   CatchExcept2DDRes();
   return ddres_init();

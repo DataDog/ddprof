@@ -9,6 +9,7 @@
 #include "ddprof_context.hpp"
 #include "ddprof_context_lib.hpp"
 #include "ddprof_cpumask.hpp"
+#include "ddprof_exit.hpp"
 #include "ddprof_input.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
@@ -159,8 +160,6 @@ static DDRes get_library_path(TempFileHolder &libdd_profiling_path,
 
 // Parse input and initialize context
 static InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
-  //---- Inititiate structs
-  *ctx = {};
   // Set temporary logger for argument parsing
   LOG_open(LOG_STDERR, NULL);
   LOG_setlevel(LL_WARNING);
@@ -331,6 +330,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
   // after we finish instrumenting.  This will end that process, which in
   // turn will unblock the target from calling exec.
   if (temp_pid) {
+    printf("Killing temp pid %d\n", temp_pid); fflush(stdout);
     kill(temp_pid, SIGTERM);
   }
 
@@ -406,9 +406,9 @@ static void start_profiler(DDProfContext *ctx) {
   bool is_profiler = false;
 
   // ownership of context is passed to start_profiler_internal
-  int res = start_profiler_internal(ctx, is_profiler);
+  start_profiler_internal(ctx, is_profiler);
   if (is_profiler) {
-    exit(res);
+    throw ddprof::exit();
   }
   // In wrapper mode (ie. ctx->params.pid == 0), whatever happened to ddprof,
   // continue and start user process
@@ -417,7 +417,7 @@ static void start_profiler(DDProfContext *ctx) {
 
 /**************************** Program Entry Point *****************************/
 int main(int argc, char *argv[]) {
-  DDProfContext ctx;
+  DDProfContext ctx = {};
 
   // parse inputs and populate context
   switch (parse_input(&argc, &argv, &ctx)) {
@@ -434,12 +434,16 @@ int main(int argc, char *argv[]) {
   {
     defer { ctx.release(); };
     /****************************************************************************\
-    |                             Run the Profiler |
+    |                             Run the Profiler                               |
     \****************************************************************************/
     // Ownership of context is passed to start_profiler
     // This function does not return in the context of profiler process
     // It only returns in the context of target process (ie. in non-PID mode)
-    start_profiler(&ctx);
+    try {
+      start_profiler(&ctx);
+    } catch (ddprof::exit const &_) {
+      return -1;
+    }
 
     if (!ctx.params.switch_user.empty()) {
       if (!IsDDResOK(become_user(ctx.params.switch_user.c_str()))) {
