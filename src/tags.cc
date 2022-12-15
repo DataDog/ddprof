@@ -57,7 +57,7 @@ static Tag split_kv(const char *str, size_t end_pos, char c = ':') {
 }
 
 void split(const char *str, Tags &tags, char c) {
-  if (!str) {
+  if (!str || !*str) {
     // nothing to do
     return;
   }
