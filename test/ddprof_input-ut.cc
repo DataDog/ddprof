@@ -188,7 +188,7 @@ TEST_F(InputTest, duplicate_events) {
     EXPECT_TRUE(IsDDResOK(res));
     EXPECT_TRUE(contine_exec);
 
-    DDProfContext ctx;
+    DDProfContext ctx = {};
     res = ddprof_context_set(&input, &ctx);
     EXPECT_FALSE(IsDDResOK(res));
 
@@ -206,7 +206,7 @@ TEST_F(InputTest, duplicate_events) {
     EXPECT_TRUE(IsDDResOK(res));
     EXPECT_TRUE(contine_exec);
 
-    DDProfContext ctx;
+    DDProfContext ctx = {};
     res = ddprof_context_set(&input, &ctx);
     EXPECT_FALSE(IsDDResOK(res));
 
@@ -226,7 +226,7 @@ TEST_F(InputTest, presets) {
     EXPECT_TRUE(IsDDResOK(res));
     EXPECT_TRUE(contine_exec);
 
-    DDProfContext ctx;
+    DDProfContext ctx = {};
     res = ddprof_context_set(&input, &ctx);
     EXPECT_TRUE(IsDDResOK(res));
 
@@ -258,7 +258,7 @@ TEST_F(InputTest, presets) {
     EXPECT_TRUE(IsDDResOK(res));
     EXPECT_TRUE(contine_exec);
 
-    DDProfContext ctx;
+    DDProfContext ctx = {};
     res = ddprof_context_set(&input, &ctx);
     EXPECT_TRUE(IsDDResOK(res));
 
@@ -278,7 +278,7 @@ TEST_F(InputTest, presets) {
     EXPECT_TRUE(IsDDResOK(res));
     EXPECT_TRUE(contine_exec);
 
-    DDProfContext ctx;
+    DDProfContext ctx = {};
     res = ddprof_context_set(&input, &ctx);
     EXPECT_TRUE(IsDDResOK(res));
 
@@ -301,7 +301,7 @@ TEST_F(InputTest, presets) {
     EXPECT_TRUE(IsDDResOK(res));
     EXPECT_TRUE(contine_exec);
 
-    DDProfContext ctx;
+    DDProfContext ctx = {};
     res = ddprof_context_set(&input, &ctx);
     EXPECT_TRUE(IsDDResOK(res));
 
@@ -322,7 +322,7 @@ TEST_F(InputTest, presets) {
     EXPECT_TRUE(IsDDResOK(res));
     EXPECT_TRUE(contine_exec);
 
-    DDProfContext ctx;
+    DDProfContext ctx = {};
     res = ddprof_context_set(&input, &ctx);
     EXPECT_TRUE(IsDDResOK(res));
 
@@ -344,7 +344,7 @@ TEST_F(InputTest, presets) {
     EXPECT_TRUE(IsDDResOK(res));
     EXPECT_TRUE(contine_exec);
 
-    DDProfContext ctx;
+    DDProfContext ctx = {};
     res = ddprof_context_set(&input, &ctx);
     EXPECT_TRUE(IsDDResOK(res));
 
