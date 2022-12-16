@@ -857,13 +857,14 @@ void setup_overrides(OverrideMode mode) {
 
     g_symbol_overrides->apply_overrides();
   } else {
+    // standard allocation functions
     ddprof::instrument_function("calloc",
                                 static_cast<int>(AllocFunctionId::kCalloc));
     ddprof::instrument_function("realloc",
                                 static_cast<int>(AllocFunctionId::kRealloc));
-    // putting malloc first seems to crash...
     ddprof::instrument_function("malloc",
                                 static_cast<int>(AllocFunctionId::kMalloc));
+    // jemalloc in Rust
     ddprof::instrument_function("_rjem_mallocx",
                                 static_cast<int>(AllocFunctionId::kMalloc));
     ddprof::instrument_function("_rjem_rallocx",
@@ -872,6 +873,24 @@ void setup_overrides(OverrideMode mode) {
                                 static_cast<int>(AllocFunctionId::kMalloc));
     ddprof::instrument_function("_rjem_calloc",
                                 static_cast<int>(AllocFunctionId::kCalloc));
+
+    // tcmalloc provides its own version new
+    ddprof::instrument_function("operator new(unsigned long)",
+                                static_cast<int>(AllocFunctionId::kMalloc));
+    ddprof::instrument_function("operator new[](unsigned long)",
+                                static_cast<int>(AllocFunctionId::kMalloc));
+
+    /* \fixme{nsavoire} we should probably also instrument:
+       - other standard allocation functions: free, posix_memalign,
+         aligned_alloc, ...
+       - jemmalloc non-standard functions: mallocx, xallocx, rallocx, sallocx,
+         nallocx, sdallocx, ...
+       - other new operators for tcmalloc (and operator delete)
+       - nallocx/sdallocx for tcmalloc
+
+       Ideally instrumented function should not overlap each other, but it might
+       not always be possible (new operator from libstdc++ will call malloc).
+       */
   }
 }
 

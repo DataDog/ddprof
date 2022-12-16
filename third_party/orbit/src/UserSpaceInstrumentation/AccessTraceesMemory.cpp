@@ -7,9 +7,9 @@
 #include <absl/strings/numbers.h>
 #include <absl/strings/str_format.h>
 #include <absl/strings/str_split.h>
-#include <sys/mman.h>
+#include <absl/types/span.h>
 
-#include <memory>
+#include <algorithm>
 #include <string>
 
 #include "OrbitBase/File.h"
@@ -24,17 +24,16 @@ using orbit_base::ReadFileToString;
                                                                      uint64_t start_address,
                                                                      uint64_t length) {
   ORBIT_CHECK(length != 0);
-
-  std::vector<uint8_t> bytes(length);
-  if (pid == -1) {
-    // const uint64_t page_size = sysconf(_SC_PAGE_SIZE);
-    // auto addr = start_address & ~(page_size-1);
-    // auto len = ((start_address + length - addr + page_size - 1) / page_size) * page_size;
-    // mprotect((void*)addr, len, PROT_WRITE | PROT_EXEC);
+  if (pid == 0) {
+    std::vector<uint8_t> bytes(length);
+    // self-instrumentation: pid is the process itself
     memcpy(bytes.data(), reinterpret_cast<void*>(start_address), length);
-  } else {
+    return bytes;
+  }
+
   OUTCOME_TRY(auto&& fd, orbit_base::OpenFileForReading(absl::StrFormat("/proc/%d/mem", pid)));
 
+  std::vector<uint8_t> bytes(length);
   OUTCOME_TRY(auto&& result, ReadFullyAtOffset(fd, bytes.data(), length, start_address));
 
   if (result < length) {
@@ -42,25 +41,19 @@ using orbit_base::ReadFileToString;
         "Failed to read %u bytes from memory file of process %d. Only got %d bytes.", length, pid,
         result));
   }
-  }
+
   return bytes;
 }
 
 [[nodiscard]] ErrorMessageOr<void> WriteTraceesMemory(pid_t pid, uint64_t start_address,
-                                                      const std::vector<uint8_t>& bytes) {
+                                                      absl::Span<const uint8_t> bytes) {
   ORBIT_CHECK(!bytes.empty());
-
-  if (pid==-1) {
-    const uint64_t page_size = sysconf(_SC_PAGE_SIZE);
-    auto addr = start_address & ~(page_size-1);
-    auto len = ((start_address + bytes.size() - addr + page_size - 1) / page_size) * page_size;
-    mprotect((void*)addr, len, PROT_WRITE | PROT_EXEC);
-    memcpy(reinterpret_cast<void*>(start_address), bytes.data(), bytes.size());
-  } else {
+  if (pid ==0) {
+    pid = getpid();
+  }
   OUTCOME_TRY(auto&& fd, orbit_base::OpenFileForWriting(absl::StrFormat("/proc/%d/mem", pid)));
 
   OUTCOME_TRY(WriteFullyAtOffset(fd, bytes.data(), bytes.size(), start_address));
-  }
 
   return outcome::success();
 }
@@ -80,7 +73,7 @@ using orbit_base::ReadFileToString;
     if (tokens.size() >= 6 && (tokens[5] == "[vsyscall]" || tokens[5] == "[uprobes]")) continue;
     const std::vector<std::string> addresses = absl::StrSplit(tokens[0], '-');
     if (addresses.size() != 2) continue;
-    AddressRange result;
+    AddressRange result{};
     if (!absl::numbers_internal::safe_strtou64_base(addresses[0], &result.start, 16)) continue;
     if (!absl::numbers_internal::safe_strtou64_base(addresses[1], &result.end, 16)) continue;
     if (exclude_address >= result.start && exclude_address < result.end) continue;

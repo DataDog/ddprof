@@ -6,6 +6,7 @@
 
 #include <absl/base/casts.h>
 #include <absl/container/flat_hash_set.h>
+#include <absl/hash/hash.h>
 #include <absl/strings/str_cat.h>
 #include <absl/strings/str_format.h>
 #include <llvm/ADT/ArrayRef.h>
@@ -37,7 +38,6 @@
 #include <llvm/Support/MemoryBuffer.h>
 
 #include <algorithm>
-#include <cstdint>
 #include <cstring>
 #include <type_traits>
 #include <utility>
@@ -49,7 +49,6 @@
 #include "OrbitBase/File.h"
 #include "OrbitBase/Logging.h"
 #include "OrbitBase/Result.h"
-#include "llvm/DebugInfo/DWARF/DWARFUnitIndex.h"
 
 namespace orbit_object_utils {
 
@@ -451,7 +450,7 @@ ErrorMessageOr<ModuleSymbols> ElfFileImpl<ElfT>::LoadSymbolsFromDynsym() {
 template <typename ElfT>
 absl::flat_hash_set<uint64_t> ElfFileImpl<ElfT>::LoadHotpatchableAddresses() {
   if (!has_patchable_function_entries_section_) {
-    return absl::flat_hash_set<uint64_t>();
+    return {};
   }
   const llvm::object::ELFFile<ElfT>& elf_file = object_file_->getELFFile();
   llvm::Expected<typename ElfT::ShdrRange> sections_or_error = elf_file.sections();
@@ -459,7 +458,7 @@ absl::flat_hash_set<uint64_t> ElfFileImpl<ElfT>::LoadHotpatchableAddresses() {
     auto error_message = absl::StrFormat("Unable to load sections: %s",
                                          llvm::toString(sections_or_error.takeError()));
     ORBIT_ERROR("%s", error_message);
-    return absl::flat_hash_set<uint64_t>();
+    return {};
   }
 
   absl::flat_hash_set<uint64_t> patchable_symbols;
@@ -468,7 +467,7 @@ absl::flat_hash_set<uint64_t> ElfFileImpl<ElfT>::LoadHotpatchableAddresses() {
     if (!name_or_error) {
       ORBIT_ERROR("%s", absl::StrFormat("Unable to get section name: %s",
                                         llvm::toString(name_or_error.takeError())));
-      return absl::flat_hash_set<uint64_t>();
+      return {};
     }
     llvm::StringRef name = name_or_error.get();
     if (name.str() != "__patchable_function_entries") {

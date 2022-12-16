@@ -1,3 +1,12 @@
+// Copyright (c) 2021 The Orbit Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+/* \fixme{nsavoire} This file is mostly a duplicate of
+ * third_party/orbit/src/UserSpaceInstrumentation/InstrumentProcess.cpp modified
+ * for ddprof use case. Instead of duplicating we could probably modify the
+ * original file to adapt it. */
+
 #include "instrument_function.hpp"
 
 #include "ddres.hpp"
@@ -15,6 +24,7 @@
 #include "UserSpaceInstrumentation/FindFunctionAddress.h"
 #include "UserSpaceInstrumentation/InjectLibraryInTracee.h"
 #include "UserSpaceInstrumentation/Trampoline.h"
+#include <absl/strings/str_split.h>
 
 #include <capstone/capstone.h>
 
@@ -59,6 +69,18 @@ public:
   };
   // Maps function addresses to TrampolineData.
   absl::flat_hash_map<uint64_t, TrampolineData> trampoline_map_;
+
+  ErrorMessageOr<void>
+  ReleaseMostRecentlyAllocatedTrampolineMemory(AddressRange address_range) {
+    if (!trampolines_for_modules_.contains(address_range)) {
+      return ErrorMessage("Tried to release trampoline memory for a non "
+                          "existent address range");
+    }
+    trampolines_for_modules_.find(address_range)
+        ->second.back()
+        .first_available--;
+    return outcome::success();
+  }
 
   ErrorMessageOr<void> EnsureTrampolinesWritable() {
     for (auto &trampoline_for_module : trampolines_for_modules_) {
@@ -108,6 +130,12 @@ public:
       std::string_view module_path,
       const std::vector<orbit_grpc_protos::ModuleInfo> &modules) {
     ORBIT_LOG("Instrumenting functions in process %d", pid);
+    // \fixme{nsavoire}:
+    // Instrumentation is done from the process itself, no need to attach/stop.
+    // In a multithreaded process, this could cause issues if instruction
+    // pointer from another thread points to a code location that is overwritten
+    // by instrumentation
+
     //   OUTCOME_TRY(AttachAndStopProcess(pid));
     //   orbit_base::unique_resource detach_on_exit{
     //       pid, [](int32_t pid2) {
@@ -144,8 +172,14 @@ public:
     orbit_grpc_protos::SymbolInfo sym_info;
     uint64_t function_address = 0;
 
+    // Lookup function in loaded modules
+    // \fixme{nsavoire} if module_path is empty, function is looked up in all
+    // modules, but only the last match is instrumented
     for (const auto &module : modules) {
-      if (module_path.empty() || module_path == module.file_path()) {
+      if ((module_path.empty() &&
+           // hacky: avoid instrumenting ourselves
+           module.file_path().find("/libdd_profiling") == std::string::npos) ||
+          module_path == module.file_path()) {
         OUTCOME_TRY(auto &&elf_file,
                     orbit_object_utils::CreateElfFile(module.file_path()));
         if (elf_file->HasDebugSymbols()) {
@@ -226,9 +260,8 @@ public:
           "Can't instrument function \"%s\". Failed to create trampoline: %s",
           function_name, address_after_prologue_or_error.error().message());
       ORBIT_ERROR("%s", message);
-      // OUTCOME_TRY(
-      //     ReleaseMostRecentlyAllocatedTrampolineMemory(module_address_range));
-
+      OUTCOME_TRY(
+          ReleaseMostRecentlyAllocatedTrampolineMemory(module_address_range));
       return address_after_prologue_or_error.error();
     }
     OUTCOME_TRY(EnsureTrampolinesExecutable());
@@ -261,7 +294,9 @@ public:
       // result.instrumented_function_ids.insert(function_id);
     }
 
-    // Disable when we instrument ourselves
+    // \fixme{nsavoire} Don't instrumentation pointers when
+    // instrumentation is done from process itself.
+
     // MoveInstructionPointersOutOfOverwrittenCode(pid, relocation_map_);
 
     // OUTCOME_TRY(EnsureTrampolinesExecutable());
@@ -286,7 +321,7 @@ DDRes instrument_function(std::string_view function_name,
     return ddres_error(DD_WHAT_UKNW);
   }
   auto &p = getInstrumentedProcess();
-  auto res = p.instrument_function_internal(-1, function_name, function_id, {},
+  auto res = p.instrument_function_internal(0, function_name, function_id, {},
                                             modules_or_error.value());
   if (res.has_error()) {
     LG_ERR("Failed to instrument function %s: %s",
