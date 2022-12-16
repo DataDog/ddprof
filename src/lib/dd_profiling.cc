@@ -132,7 +132,7 @@ struct ProfilerAutoStart {
 
 ProfilerAutoStart g_autostart;
 
-int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
+int exec_ddprof(pid_t target_pid, int sock_fd) {
   char ddprof_str[] = "ddprof";
 
   char pid_buf[32];
@@ -150,8 +150,6 @@ int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
   // unset LD_PRELOAD, otherwise if libdd_profiling.so was preloaded, it
   // would trigger a fork bomb
   unsetenv("LD_PRELOAD");
-
-  kill(parent_pid, SIGTERM);
 
   if (const char *ddprof_exe = getenv(k_profiler_ddprof_exe_env_variable);
       ddprof_exe) {
@@ -218,19 +216,17 @@ int ddprof_start_profiling_internal() {
     auto defer_parent_socket_close =
         make_defer([&sockfds]() { close(sockfds[kParentIdx]); });
 
-    auto daemonize_res = ddprof::daemonize();
-    if (daemonize_res.temp_pid == -1) {
+    ddprof::DaemonizeResult daemonize_res{nullptr};
+    if (daemonize_res.is_failure()) {
       return -1;
     }
 
-    if (daemonize_res.temp_pid) {
-      // executed by daemonized process
-
+    if (daemonize_res.is_daemon()) {
       // close parent socket end
       defer_parent_socket_close.reset();
       defer_child_socket_close.release();
 
-      exec_ddprof(target_pid, daemonize_res.temp_pid, sockfds[kChildIdx]);
+      exec_ddprof(target_pid, sockfds[kChildIdx]);
       exit(1);
     }
 

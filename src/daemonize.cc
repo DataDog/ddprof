@@ -4,67 +4,70 @@
 // Datadog, Inc.
 
 #include "daemonize.hpp"
-#include "ddprof_exit.hpp"
-
-#include <fcntl.h>
-#include <sys/wait.h>
-#include <unistd.h>
+#include "logger.hpp"
 
 namespace ddprof {
-DaemonizeResult daemonize(std::function<void()> cleanup_function) {
-  int pipefd[2];
-  if (pipe2(pipefd, O_CLOEXEC) == -1) {
-    return {-1, -1, -1};
+DaemonizeResult::DaemonizeResult(std::function<void()> cleanup_function) {
+  if (!openpipes()) {
+    return;
   }
-
   pid_t parent_pid = getpid();
-  pid_t temp_pid = fork(); // "middle" (temporary) PID
+  pid_t temp_pid = fork(); // "middle"/"child" (temporary) PID
+  pid_t grandchild_pid = -1;
+  const size_t pid_sz = sizeof(grandchild_pid);
 
-  if (temp_pid == -1) {
-    return {-1, -1, -1};
-  }
-
-  if (!temp_pid) { // If I'm the temp PID enter branch
-    close(pipefd[0]);
-
+  if (!temp_pid) { // temp PID enter branch
+    close(pipe_read);
+    pipe_read = -1;
     temp_pid = getpid();
-    if (pid_t child_pid = fork();
-        child_pid) { // If I'm the temp PID again, enter branch
+
+    if ((grandchild_pid = fork())) { // temp PID enter branch
       if (cleanup_function) {
         cleanup_function();
       }
 
-      // Block until our child exits or sends us a kill signal
-      // NOTE, current process is NOT expected to unblock here; rather it
-      // ends by SIGTERM.  Exiting here is an error condition.
-      waitpid(child_pid, NULL, 0);
-      ddprof::exit();
-    } else {
-      child_pid = getpid();
-      if (write(pipefd[1], &child_pid, sizeof(child_pid)) !=
-          sizeof(child_pid)) {
-        ddprof::exit();
+      // Child (temporary) PID closes
+      std::exit(-1); 
+
+    } else { // grandchild (daemon) PID enter branch
+      grandchild_pid = getpid();
+      if (write(pipe_write, &grandchild_pid, pid_sz) != pid_sz) {
+        std::exit(-1);
       }
-      close(pipefd[1]);
-      // If I'm the child PID, then leave and attach profiler
-      return {temp_pid, parent_pid, child_pid};
-    }
-  } else {
-    close(pipefd[1]);
 
-    pid_t grandchild_pid;
-    if (read(pipefd[0], &grandchild_pid, sizeof(grandchild_pid)) !=
-        sizeof(grandchild_pid)) {
-      return {-1, -1, -1};
+      // Grandchild (target) PID returns
+      state = DaemonizeState::Daemon;
+      invoker_pid = parent_pid;
+      daemon_pid = grandchild_pid;
+      return;
+    }
+  } else if (temp_pid != -1) { // parent PID enter branch
+    close(pipe_write);
+    pipe_write = -1;
+    if (read(pipe_read, &grandchild_pid, pid_sz) != pid_sz) {
+      return; // error
     }
 
-    // If I'm the target PID, then now it's time to wait until my
-    // child, the middle PID, returns.
-    waitpid(temp_pid, NULL, 0);
-    return {0, parent_pid, grandchild_pid};
+    signal(SIGCHLD, SIG_IGN);
+    state = DaemonizeState::Invoker;
+    invoker_pid = parent_pid;
+    daemon_pid = grandchild_pid;
+    return;
   }
 
-  return {-1, -1, -1};
+  // Should only arrive here if the first-level fork failed, but add a sink
+  // to capture possible extraneous forks
+  if (getpid() != parent_pid) {
+    LG_WRN("Extraneous PID (%d) detected", getpid()); 
+    std::exit(-1);
+  }
+
+  state = DaemonizeState::Failure;
+  close(pipe_read);
+  close(pipe_write);
+  pipe_read = -1;
+  pipe_write = -1;
+  return;
 }
 
 } // namespace ddprof

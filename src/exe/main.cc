@@ -221,8 +221,8 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
 
   const bool in_wrapper_mode = ctx->params.pid == 0;
   TempFileHolder dd_profiling_lib_holder, dd_loader_lib_holder;
+  ddprof::DaemonizeResult daemonize_res{false};
 
-  pid_t temp_pid = 0;
   if (in_wrapper_mode) {
     // If no PID was specified earlier, we autodaemonize and target current pid
 
@@ -259,14 +259,15 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     }
 
     ctx->params.pid = getpid();
-    auto daemonize_res = ddprof::daemonize([ctx] { ctx->release(); });
+    daemonize_res = {[ctx] { ctx->release(); throw ddprof::exit();}};
 
-    if (daemonize_res.temp_pid == -1) {
+    if (daemonize_res.is_failure()) {
       return -1;
     }
 
-    temp_pid = daemonize_res.temp_pid;
-    if (!temp_pid) {
+    if (daemonize_res.is_invoker()) {
+      daemonize_res.finalize(); // Waits until the grandchild has finalized
+
       // non-daemon process: return control to caller
       defer_child_socket_close.reset();
       defer_context_free.release();
@@ -329,9 +330,8 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
   // If we have a temp PID, then it's waiting for us to send it a signal
   // after we finish instrumenting.  This will end that process, which in
   // turn will unblock the target from calling exec.
-  if (temp_pid) {
-    printf("Killing temp pid %d\n", temp_pid); fflush(stdout);
-    kill(temp_pid, SIGTERM);
+  if (daemonize_res.is_daemon()) {
+    daemonize_res.finalize();
   }
 
   if (ctx->params.sockfd != -1 && ctx->params.wait_on_socket) {

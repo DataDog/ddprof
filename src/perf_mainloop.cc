@@ -56,12 +56,11 @@ static void handle_signal(int signo) {
 
 static DDRes install_signal_handler() {
   sigset_t sigset;
-  struct sigaction sa;
+  struct sigaction sa = {};
   DDRES_CHECK_ERRNO(sigemptyset(&sigset), DD_WHAT_MAINLOOP_INIT,
                     "sigemptyset failed");
   sa.sa_handler = &handle_signal;
   sa.sa_mask = sigset;
-  sa.sa_flags = SA_RESTART;
   DDRES_CHECK_ERRNO(sigaction(SIGTERM, &sa, NULL), DD_WHAT_MAINLOOP_INIT,
                     "Setting SIGTERM handler failed");
   DDRES_CHECK_ERRNO(sigaction(SIGINT, &sa, NULL), DD_WHAT_MAINLOOP_INIT,
@@ -96,7 +95,9 @@ DDRes spawn_workers(PersistentWorkerState *persistent_worker_state,
       LG_NTC("Created child %d", child_pid);
       // unblock signals, we can now forward signals to child
       modify_sigprocmask(SIG_UNBLOCK);
+      printf("[%d] ======== [Parent?] Created and waiting on child %d\n", getpid(), g_child_pid);
       waitpid(g_child_pid, NULL, 0);
+      printf("[%d] ======== [Parent?] Resumed on child %d\n", getpid(), g_child_pid);
     }
 
     g_child_pid = 0;
@@ -324,10 +325,7 @@ DDRes main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
   }
   if (is_worker) {
     worker(ctx, attr, persistent_worker_state);
-    // Ensure worker does not return,
-    // because we don't want to free resources (perf_event fds,...) that are
-    // shared between processes. Only free the context.
-    ctx->release();
+//    ctx->release();
     throw ddprof::exit();
   }
   return {};
