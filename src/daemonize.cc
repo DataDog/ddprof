@@ -27,7 +27,7 @@ DaemonizeResult::DaemonizeResult(std::function<void()> cleanup_function) {
       }
 
       // Child (temporary) PID closes
-      std::exit(-1); 
+      std::exit(-1);
 
     } else { // grandchild (daemon) PID enter branch
       grandchild_pid = getpid();
@@ -58,7 +58,7 @@ DaemonizeResult::DaemonizeResult(std::function<void()> cleanup_function) {
   // Should only arrive here if the first-level fork failed, but add a sink
   // to capture possible extraneous forks
   if (getpid() != parent_pid) {
-    LG_WRN("Extraneous PID (%d) detected", getpid()); 
+    LG_WRN("Extraneous PID (%d) detected", getpid());
     std::exit(-1);
   }
 

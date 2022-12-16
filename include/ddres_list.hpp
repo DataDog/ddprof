@@ -20,7 +20,7 @@
   X(UKNWEXCEPT, "unknown exception caught")
 
 #define NATIVE_ERROR_TABLE(X)                                                  \
-  X(EXIT, "exiting process")                                                  \
+  X(EXIT, "exiting process")                                                   \
   X(DWFL_LIB_ERROR, "error withing dwfl library")                              \
   X(UW_CACHE_ERROR, "error from unwinding cache")                              \
   X(UW_ERROR, "error from unwinding code")                                     \

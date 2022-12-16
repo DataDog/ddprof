@@ -259,7 +259,10 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     }
 
     ctx->params.pid = getpid();
-    daemonize_res = {[ctx] { ctx->release(); throw ddprof::exit();}};
+    daemonize_res = {[ctx] {
+      ctx->release();
+      throw ddprof::exit();
+    }};
 
     if (daemonize_res.is_failure()) {
       return -1;
@@ -434,16 +437,14 @@ int main(int argc, char *argv[]) {
   {
     defer { ctx.release(); };
     /****************************************************************************\
-    |                             Run the Profiler                               |
+    |                             Run the Profiler |
     \****************************************************************************/
     // Ownership of context is passed to start_profiler
     // This function does not return in the context of profiler process
     // It only returns in the context of target process (ie. in non-PID mode)
     try {
       start_profiler(&ctx);
-    } catch (ddprof::exit const &_) {
-      return -1;
-    }
+    } catch (ddprof::exit const &_) { return -1; }
 
     if (!ctx.params.switch_user.empty()) {
       if (!IsDDResOK(become_user(ctx.params.switch_user.c_str()))) {

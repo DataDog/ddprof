@@ -6,6 +6,5 @@
 #pragma once
 
 namespace ddprof {
-struct exit : public std::exception {
-};
-}
+struct exit : public std::exception {};
+} // namespace ddprof

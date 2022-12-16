@@ -95,9 +95,11 @@ DDRes spawn_workers(PersistentWorkerState *persistent_worker_state,
       LG_NTC("Created child %d", child_pid);
       // unblock signals, we can now forward signals to child
       modify_sigprocmask(SIG_UNBLOCK);
-      printf("[%d] ======== [Parent?] Created and waiting on child %d\n", getpid(), g_child_pid);
+      printf("[%d] ======== [Parent?] Created and waiting on child %d\n",
+             getpid(), g_child_pid);
       waitpid(g_child_pid, NULL, 0);
-      printf("[%d] ======== [Parent?] Resumed on child %d\n", getpid(), g_child_pid);
+      printf("[%d] ======== [Parent?] Resumed on child %d\n", getpid(),
+             g_child_pid);
     }
 
     g_child_pid = 0;
@@ -325,7 +327,7 @@ DDRes main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
   }
   if (is_worker) {
     worker(ctx, attr, persistent_worker_state);
-//    ctx->release();
+    //    ctx->release();
     throw ddprof::exit();
   }
   return {};

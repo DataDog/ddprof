@@ -8,18 +8,13 @@
 #include <fcntl.h>
 #include <functional>
 #include <poll.h>
-#include <sys/types.h>
 #include <sys/signal.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 namespace ddprof {
 
-enum class DaemonizeState {
-  Failure = -1,
-  Invoker = 0,
-  Daemon = 1
-};
-
+enum class DaemonizeState { Failure = -1, Invoker = 0, Daemon = 1 };
 
 struct DaemonizeResult {
   DaemonizeState state = DaemonizeState::Failure;
@@ -37,12 +32,11 @@ struct DaemonizeResult {
       close(pipe_write);
       pipe_write = 1;
       break;
-    case DaemonizeState::Invoker:
-      {
-        struct pollfd pfd = {pipe_read, POLLIN};
-        poll(&pfd, 1, 5); // wait for 5 ms or until write/signal
-        signal(SIGCHLD, SIG_IGN);
-      }
+    case DaemonizeState::Invoker: {
+      struct pollfd pfd = {pipe_read, POLLIN};
+      poll(&pfd, 1, 5); // wait for 5 ms or until write/signal
+      signal(SIGCHLD, SIG_IGN);
+    }
       close(pipe_read);
       pipe_read = -1;
       break;
@@ -59,7 +53,7 @@ struct DaemonizeResult {
   DaemonizeResult(std::function<void()> cleanup_function);
 
   // Create an empty/error result
-  DaemonizeResult(bool _) {(void)_;};
+  DaemonizeResult(bool _) { (void)_; };
 
 private:
   int pipe_read = -1;
