@@ -130,19 +130,21 @@ public:
       std::string_view module_path,
       const std::vector<orbit_grpc_protos::ModuleInfo> &modules) {
     ORBIT_LOG("Instrumenting functions in process %d", pid);
-    // \fixme{nsavoire}:
-    // Instrumentation is done from the process itself, no need to attach/stop.
-    // In a multithreaded process, this could cause issues if instruction
-    // pointer from another thread points to a code location that is overwritten
-    // by instrumentation
 
-    //   OUTCOME_TRY(AttachAndStopProcess(pid));
-    //   orbit_base::unique_resource detach_on_exit{
-    //       pid, [](int32_t pid2) {
-    //         if (DetachAndContinueProcess(pid2).has_error()) {
-    //           ORBIT_ERROR("Detaching from %i", pid2);
-    //         }
-    //       }};
+    // \fixme{nsavoire}:
+    // When instrumentation is done from the process itself, no need to
+    // attach/stop. In a multithreaded process, this could cause issues if
+    // instruction pointer from another thread points to a code location that is
+    // overwritten by instrumentation
+    if (pid != 0) {
+      OUTCOME_TRY(AttachAndStopProcess(pid));
+    }
+    orbit_base::unique_resource detach_on_exit{
+        pid, [](int32_t pid) {
+          if (pid != 0 && DetachAndContinueProcess(pid).has_error()) {
+            ORBIT_ERROR("Detaching from %i", pid);
+          }
+        }};
 
     if (return_trampoline_address_ == 0) {
       OUTCOME_TRY(auto &&return_trampoline_memory,
@@ -294,34 +296,38 @@ public:
       // result.instrumented_function_ids.insert(function_id);
     }
 
-    // \fixme{nsavoire} Don't instrumentation pointers when
+    // \fixme{nsavoire} Don't move instrumentation pointers when
     // instrumentation is done from process itself.
+    if (pid != 0) {
+      MoveInstructionPointersOutOfOverwrittenCode(pid, relocation_map_);
+    }
 
-    // MoveInstructionPointersOutOfOverwrittenCode(pid, relocation_map_);
-
-    // OUTCOME_TRY(EnsureTrampolinesExecutable());
+    OUTCOME_TRY(EnsureTrampolinesExecutable());
 
     return outcome::success();
   }
 };
 
-InstrumentedProcess &getInstrumentedProcess() {
-  static InstrumentedProcess p((uint64_t)&EntryPayload, (uint64_t)&ExitPayload);
+InstrumentedProcess &getInstrumentedProcess(uint64_t entry_payload_address,
+                                            uint64_t exit_payload_address) {
+  static InstrumentedProcess p(entry_payload_address, exit_payload_address);
   return p;
 }
 } // namespace
 
 namespace ddprof {
-DDRes instrument_function(std::string_view function_name,
-                          uint64_t function_id) {
-  auto modules_or_error = orbit_module_utils::ReadModules(getpid());
+DDRes instrument_function(pid_t pid, std::string_view function_name,
+                          uint64_t function_id, uint64_t entry_payload_address,
+                          uint64_t exit_payload_address) {
+  auto modules_or_error =
+      orbit_module_utils::ReadModules(pid == 0 ? getpid() : pid);
   if (modules_or_error.has_error()) {
     LG_ERR("Failed to read modules: %s",
            modules_or_error.error().message().c_str());
     return ddres_error(DD_WHAT_UKNW);
   }
-  auto &p = getInstrumentedProcess();
-  auto res = p.instrument_function_internal(0, function_name, function_id, {},
+  auto &p = getInstrumentedProcess(entry_payload_address, exit_payload_address);
+  auto res = p.instrument_function_internal(pid, function_name, function_id, {},
                                             modules_or_error.value());
   if (res.has_error()) {
     LG_ERR("Failed to instrument function %s: %s",
@@ -331,4 +337,10 @@ DDRes instrument_function(std::string_view function_name,
 
   return {};
 }
+DDRes instrument_function(std::string_view function_name,
+                          uint64_t function_id) {
+  return instrument_function(0, function_name, function_id,
+                             (uint64_t)&EntryPayload, (uint64_t)&ExitPayload);
+}
+
 } // namespace ddprof

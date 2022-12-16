@@ -363,9 +363,9 @@ add_test(
 
 add_library(dummy SHARED dummy_lib.cc)
 add_exe(
-  inject inject.cc
+  inject inject.cc ../src/inject_library.cc ../src/lib/instrument_function.cc ../src/ddres_list.cc ../src/logger.cc 
   LIBRARIES orbit
   DEFINITIONS ${DDPROF_DEFINITION_LIST})
-target_include_directories(inject PRIVATE ${DDPROF_INCLUDE_LIST})
+target_include_directories(inject PRIVATE ${DDPROF_INCLUDE_LIST} ../include/lib)
 target_link_libraries(inject PRIVATE orbit)
 target_static_libcxx(inject)

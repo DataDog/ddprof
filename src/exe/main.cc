@@ -12,7 +12,7 @@
 #include "ddprof_input.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
-#include "inject_lib.hpp"
+#include "inject_library.hpp"
 #include "ipc.hpp"
 #include "logger.hpp"
 #include "tempfile.hpp"

@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <string_view>
+#include <unistd.h>
 
 // Payload called on entry of an instrumented function. Needs to record the
 // return address of the function (in order to have it available in
@@ -22,4 +23,8 @@ extern "C" uint64_t ExitPayload();
 
 namespace ddprof {
 DDRes instrument_function(std::string_view function_name, uint64_t function_id);
-}
+DDRes instrument_function(pid_t pid, std::string_view function_name,
+                          uint64_t function_id, uint64_t entry_payload_address,
+                          uint64_t exit_payload_address);
+
+} // namespace ddprof
