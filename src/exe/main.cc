@@ -12,7 +12,7 @@
 #include "ddprof_cpumask.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
-#include "inject_lib.hpp"
+#include "inject_library.hpp"
 #include "ipc.hpp"
 #include "libdd_profiling-embedded_hash.h"
 #include "logger.hpp"

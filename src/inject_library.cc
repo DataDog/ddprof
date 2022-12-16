@@ -1,4 +1,4 @@
-#include "inject_lib.hpp"
+#include "inject_library.hpp"
 
 #include "ddres.hpp"
 #include "logger.hpp"
@@ -96,7 +96,9 @@ ErrorMessageOr<void> WaitForThreadToExit(pid_t pid, pid_t tid) {
 
 ErrorMessageOr<void *>
 inject_lib_internal(std::string_view lib_path, pid_t pid,
-                    const std::vector<orbit_grpc_protos::ModuleInfo> &modules) {
+                    const std::vector<orbit_grpc_protos::ModuleInfo> &modules,
+                    uint64_t &entry_payload_address,
+                    uint64_t &exit_payload_address) {
   OUTCOME_TRY(orbit_user_space_instrumentation::AttachAndStopProcess(pid));
   orbit_base::unique_resource detach_on_exit_1{
       pid, [](int32_t pid2) {
@@ -125,20 +127,18 @@ inject_lib_internal(std::string_view lib_path, pid_t pid,
   }
   void *library_handle = library_handle_or_error.value();
 
-  //   constexpr const char *kEntryPayloadFunctionName = "EntryPayload";
-  //   constexpr const char *kExitPayloadFunctionName = "ExitPayload";
-  //   OUTCOME_TRY(void *entry_payload_function_address,
-  //               orbit_user_space_instrumentation::DlsymInTracee(
-  //                   pid, modules, library_handle,
-  //                   kEntryPayloadFunctionName));
-  //   entry_payload_function_address_ =
-  //       absl::bit_cast<uint64_t>(entry_payload_function_address);
-  //   OUTCOME_TRY(
-  //       void *exit_payload_function_address,
-  //       DlsymInTracee(pid, modules, library_handle,
-  //       kExitPayloadFunctionName));
-  //   exit_payload_function_address_ =
-  //       absl::bit_cast<uint64_t>(exit_payload_function_address);
+  constexpr const char *kEntryPayloadFunctionName = "EntryPayload";
+  constexpr const char *kExitPayloadFunctionName = "ExitPayload";
+  OUTCOME_TRY(void *entry_payload_function_address,
+              orbit_user_space_instrumentation::DlsymInTracee(
+                  pid, modules, library_handle, kEntryPayloadFunctionName));
+  entry_payload_address =
+      absl::bit_cast<uint64_t>(entry_payload_function_address);
+  OUTCOME_TRY(
+      void *exit_payload_function_address,
+      DlsymInTracee(pid, modules, library_handle, kExitPayloadFunctionName));
+  exit_payload_address =
+      absl::bit_cast<uint64_t>(exit_payload_function_address);
 
   //   // Get memory, create the return trampoline and make it executable.
   //   OUTCOME_TRY(auto &&return_trampoline_memory,
@@ -153,7 +153,9 @@ inject_lib_internal(std::string_view lib_path, pid_t pid,
 } // namespace
 
 namespace ddprof {
-DDRes inject_library(std::string_view lib_path, pid_t pid) {
+DDRes inject_library(std::string_view lib_path, pid_t pid,
+                     uint64_t &entry_payload_address,
+                     uint64_t &exit_payload_address) {
   auto modules_or_error = orbit_module_utils::ReadModules(pid);
   if (modules_or_error.has_error()) {
     LG_ERR("Failed to read modules for pid %d: %s", pid,
@@ -161,7 +163,8 @@ DDRes inject_library(std::string_view lib_path, pid_t pid) {
     return ddres_error(DD_WHAT_UKNW);
   }
   auto lib_or_error =
-      inject_lib_internal(lib_path, pid, modules_or_error.value());
+      inject_lib_internal(lib_path, pid, modules_or_error.value(),
+                          entry_payload_address, exit_payload_address);
   if (lib_or_error.has_error()) {
     printf("Failed to inject library: %s",
            lib_or_error.error().message().c_str());
