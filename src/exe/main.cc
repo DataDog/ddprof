@@ -206,16 +206,17 @@ static InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
 
 static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
   auto defer_context_free = make_defer([ctx] { ddprof_context_free(ctx); });
+  const bool in_wrapper_mode = ctx->params.pid == 0;
 
-  is_profiler = false;
+  is_profiler = !in_wrapper_mode;
 
   if (!ctx->params.enable) {
     LG_NFO("Profiling disabled");
     return 0;
   }
 
-  const bool in_wrapper_mode = ctx->params.pid == 0;
   TempFileHolder dd_profiling_lib_holder, dd_loader_lib_holder;
+  int alloc_watcher_idx = ddprof_context_allocation_profiling_watcher_idx(ctx);
 
   pid_t temp_pid = 0;
   if (in_wrapper_mode) {
@@ -294,8 +295,10 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     }
     defer_child_socket_close.release();
     defer_parent_socket_close.reset();
-  } else if (ctx->params.pid != -1) {
+  } else if (ctx->params.pid != -1 && alloc_watcher_idx != -1) {
     // ddprof::inject_library(ctx->params_pid)
+    LG_ERR("Library injection not implemented yet");
+    return -1;
   }
 
   // Now, we are the profiler process
@@ -335,8 +338,6 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     reply.request = ddprof::RequestMessage::kProfilerInfo;
     reply.pid = getpid();
 
-    int alloc_watcher_idx =
-        ddprof_context_allocation_profiling_watcher_idx(ctx);
     if (alloc_watcher_idx != -1) {
       ddprof::span pevents{ctx->worker_ctx.pevent_hdr.pes,
                            ctx->worker_ctx.pevent_hdr.size};
