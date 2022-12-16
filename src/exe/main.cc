@@ -203,6 +203,8 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
   TempFileHolder dd_profiling_lib_holder;
   TempFileHolder dd_loader_lib_holder;
 
+  int alloc_watcher_idx = ddprof_context_allocation_profiling_watcher_idx(ctx);
+
   pid_t temp_pid = 0;
   if (in_wrapper_mode) {
     // If no PID was specified earlier, we auto-daemonize and target current
@@ -270,7 +272,7 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
 
     // profiler process
     temp_pid = daemonize_res.temp_pid;
-  } else if (ctx->params.pid != -1) {
+  } else if (ctx->params.pid != -1 && alloc_watcher_idx != -1) {
     // ddprof::inject_library(ctx->params_pid)
     LG_ERR("Library injection not implemented yet");
     return -1;
