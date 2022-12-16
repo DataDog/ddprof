@@ -7,13 +7,13 @@
 #include <absl/base/casts.h>
 #include <absl/strings/str_format.h>
 #include <linux/seccomp.h>
-#include <signal.h>
-#include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/ptrace.h>
 #include <sys/wait.h>
 
+#include <csignal>
 #include <cstdint>
+#include <cstdlib>
 #include <optional>
 #include <string>
 #include <utility>
@@ -145,7 +145,7 @@ namespace {
   }
   const uint64_t result = return_value.GetGeneralPurposeRegisters()->x86_64.rax;
   // Syscalls return -4095, ..., -1 on failure. And these are actually (-1 * errno)
-  const int64_t result_as_int = absl::bit_cast<int64_t>(result);
+  const auto result_as_int = absl::bit_cast<int64_t>(result);
   if (result_as_int > -4096 && result_as_int < 0) {
     return ErrorMessage(absl::StrFormat("Syscall failed. Return value: %s (%d).%s",
                                         SafeStrerror(-result_as_int), result_as_int,
@@ -166,7 +166,7 @@ ErrorMessageOr<std::unique_ptr<MemoryInTracee>> MemoryInTracee::Create(pid_t pid
   // circumstances (personality setting READ_IMPLIES_EXEC) `PROT_READ` sets the flag permitting
   // execution and we want to avoid that.
   ErrorMessageOr<uint64_t> result_or_error = 0;
-  if (pid == -1) {
+  if (pid == 0) {
     auto res = mmap((void*)address, size, PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (res == MAP_FAILED) {
       result_or_error = ErrorMessage(absl::StrFormat(
@@ -204,7 +204,7 @@ ErrorMessageOr<std::unique_ptr<MemoryInTracee>> MemoryInTracee::Create(pid_t pid
 }
 
 ErrorMessageOr<void> MemoryInTracee::Free() {
-  if (pid_ == -1) {
+  if (pid_ == 0) {
     munmap((void*)address_, size_);
   } else {
     // Syscall will be equivalent to:
@@ -229,7 +229,7 @@ ErrorMessageOr<void> MemoryInTracee::EnsureMemoryExecutable() {
     return outcome::success();
   }
 
-  if (pid_ == -1) {
+  if (pid_ == 0) {
     if (auto res = mprotect((void*)address_, size_, PROT_EXEC | PROT_WRITE); res != 0) {
       return ErrorMessage(
           absl::StrFormat("Failed to execute mprotect syscall with parameters address=%#x size=%u "
@@ -257,7 +257,7 @@ ErrorMessageOr<void> MemoryInTracee::EnsureMemoryWritable() {
     return outcome::success();
   }
 
-  if (pid_ == 1) {
+  if (pid_ == 0) {
     if (auto res = mprotect((void*)address_, size_, PROT_WRITE); res != 0) {
       return ErrorMessage(
           absl::StrFormat("Failed to execute mprotect syscall with parameters address=%#x size=%u "
@@ -315,7 +315,7 @@ ErrorMessageOr<std::unique_ptr<AutomaticMemoryInTracee>> AutomaticMemoryInTracee
 }
 
 AutomaticMemoryInTracee::~AutomaticMemoryInTracee() {
-  if (address_ == 0) return;  // Freed manually already.
+  if (pid_ == -1) return;  // Freed manually already.
   auto result = Free();
   if (result.has_error()) {
     ORBIT_ERROR("Unable to free memory in tracee: %s", result.error().message());

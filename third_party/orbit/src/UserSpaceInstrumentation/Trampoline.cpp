@@ -5,11 +5,14 @@
 #include "Trampoline.h"
 
 #include <absl/base/casts.h>
+#include <absl/hash/hash.h>
 #include <absl/meta/type_traits.h>
 #include <absl/strings/numbers.h>
 #include <absl/strings/str_cat.h>
 #include <absl/strings/str_format.h>
 #include <absl/strings/str_split.h>
+#include <absl/types/span.h>
+#include <capstone/capstone.h>
 #include <capstone/x86.h>
 #include <cpuid.h>
 #include <unistd.h>
@@ -19,6 +22,7 @@
 #include <cstring>
 #include <limits>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 #include "AccessTraceesMemory.h"
@@ -78,7 +82,7 @@ constexpr uint64_t kOffsetOfFunctionIdInCallToEntryPayload = 34;
   return __get_cpuid(0x01, &eax, &ebx, &ecx, &edx) && (ecx & bit_AVX);
 }
 
-[[nodiscard]] std::string BytesAsString(const std::vector<uint8_t>& code) {
+[[nodiscard]] std::string BytesAsString(absl::Span<const uint8_t> code) {
   std::string result;
   for (const auto& c : code) {
     result.append(absl::StrFormat("%0.2x ", c));
@@ -97,7 +101,7 @@ constexpr uint64_t kOffsetOfFunctionIdInCallToEntryPayload = 34;
 // However analysing existing code shows that many of the problematic jumps are in small functions
 // that are written in assembly. These are detected by the function below.
 bool CheckForRelativeJumpIntoFirstFiveBytes(uint64_t function_address,
-                                            const std::vector<uint8_t>& function,
+                                            absl::Span<const uint8_t> function,
                                             csh capstone_handle) {
   cs_insn* instruction = cs_malloc(capstone_handle);
   ORBIT_FAIL_IF(instruction == nullptr, "Failed to allocate memory for capstone disassembler.");
@@ -250,6 +254,12 @@ void AppendBackupCode(MachineCode& trampoline) {
       .AppendBytes({0x41, 0x52})
       .AppendBytes({0x41, 0x53});
 #ifdef TEST_NS
+// push rbx          53
+// push rbp          55
+// push r12          41 54
+// push r13          41 55
+// push r14          41 56
+// push r15          41 57
   trampoline.AppendBytes({0x53})
       .AppendBytes({0x55})
       .AppendBytes({0x41, 0x54})
@@ -510,7 +520,7 @@ void AppendRestoreCode(MachineCode& trampoline) {
 // one are included (function_address will contain a valid instruction - the jump into the
 // trampoline - when we are done).
 [[nodiscard]] ErrorMessageOr<uint64_t> AppendRelocatedPrologueCode(
-    uint64_t function_address, const std::vector<uint8_t>& function, uint64_t trampoline_address,
+    uint64_t function_address, absl::Span<const uint8_t> function, uint64_t trampoline_address,
     csh capstone_handle, absl::flat_hash_map<uint64_t, uint64_t>& global_relocation_map,
     MachineCode& trampoline) {
   cs_insn* instruction = cs_malloc(capstone_handle);
@@ -881,7 +891,7 @@ bool DoAddressRangesOverlap(const AddressRange& a, const AddressRange& b) {
   return !(b.end <= a.start || b.start >= a.end);
 }
 
-std::optional<size_t> LowestIntersectingAddressRange(const std::vector<AddressRange>& ranges_sorted,
+std::optional<size_t> LowestIntersectingAddressRange(absl::Span<const AddressRange> ranges_sorted,
                                                      const AddressRange& range) {
   for (size_t i = 0; i < ranges_sorted.size(); i++) {
     if (DoAddressRangesOverlap(ranges_sorted[i], range)) {
@@ -891,8 +901,8 @@ std::optional<size_t> LowestIntersectingAddressRange(const std::vector<AddressRa
   return std::nullopt;
 }
 
-std::optional<size_t> HighestIntersectingAddressRange(
-    const std::vector<AddressRange>& ranges_sorted, const AddressRange& range) {
+std::optional<size_t> HighestIntersectingAddressRange(absl::Span<const AddressRange> ranges_sorted,
+                                                      const AddressRange& range) {
   for (int i = ranges_sorted.size() - 1; i >= 0; i--) {
     if (DoAddressRangesOverlap(ranges_sorted[i], range)) {
       return i;
@@ -910,7 +920,7 @@ ErrorMessageOr<std::vector<AddressRange>> GetUnavailableAddressRanges(pid_t pid)
   }
   result.emplace_back(0, mmap_min_addr_as_uint64);
 
-  if (pid == -1) {
+  if (pid == 0) {
     pid = getpid();
   }
   OUTCOME_TRY(auto&& maps, ReadFileToString(absl::StrFormat("/proc/%d/maps", pid)));
@@ -943,7 +953,7 @@ ErrorMessageOr<std::vector<AddressRange>> GetUnavailableAddressRanges(pid_t pid)
 }
 
 ErrorMessageOr<AddressRange> FindAddressRangeForTrampoline(
-    const std::vector<AddressRange>& unavailable_ranges, const AddressRange& code_range,
+    absl::Span<const AddressRange> unavailable_ranges, const AddressRange& code_range,
     uint64_t size) {
   constexpr uint64_t kMax32BitOffset = INT32_MAX;
   constexpr uint64_t kMax64BitAddress = UINT64_MAX;
@@ -1194,7 +1204,7 @@ uint64_t GetMaxTrampolineSize() {
 }
 
 ErrorMessageOr<uint64_t> CreateTrampoline(pid_t pid, uint64_t function_address,
-                                          const std::vector<uint8_t>& function,
+                                          absl::Span<const uint8_t> function,
                                           uint64_t trampoline_address,
                                           uint64_t entry_payload_function_address,
                                           uint64_t return_trampoline_address, csh capstone_handle,
@@ -1277,10 +1287,11 @@ ErrorMessageOr<void> InstrumentFunction(pid_t pid, uint64_t function_address, ui
   while (jump.GetResultAsVector().size() < address_after_prologue - function_address) {
     jump.AppendBytes({0x90});
   }
+  OUTCOME_TRY(WriteTraceesMemory(pid, function_address, jump.GetResultAsVector()));
+
   // Patch the trampoline to hand over the current function_id to the entry payload.
   MachineCode function_id_as_bytes;
   function_id_as_bytes.AppendImmediate64(function_id);
-  OUTCOME_TRY(WriteTraceesMemory(pid, function_address, jump.GetResultAsVector()));
   OUTCOME_TRY(WriteTraceesMemory(pid, trampoline_address + kOffsetOfFunctionIdInCallToEntryPayload,
                                  function_id_as_bytes.GetResultAsVector()));
 
