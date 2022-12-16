@@ -19,7 +19,6 @@ DaemonizeResult::DaemonizeResult(std::function<void()> cleanup_function) {
   if (!temp_pid) { // temp PID enter branch
     close(pipe_read);
     pipe_read = -1;
-    temp_pid = getpid();
 
     if ((grandchild_pid = fork())) { // temp PID enter branch
       if (cleanup_function) {
