@@ -34,7 +34,7 @@ struct DaemonizeResult {
       break;
     case DaemonizeState::Invoker: {
       struct pollfd pfd = {pipe_read, POLLIN};
-      poll(&pfd, 1, 5); // wait for 5 ms or until write/signal
+      poll(&pfd, 1, 1000); // wait for 1s or until write/signal
       signal(SIGCHLD, SIG_IGN);
     }
       close(pipe_read);

@@ -35,8 +35,6 @@ static DDRes pevent_create(PEventHdr *pevent_hdr, int watcher_idx,
 
 void pevent_init(PEventHdr *pevent_hdr) {
   *pevent_hdr = {};
-  printf("SIZE: %ld\n", pevent_hdr->size);
-  fflush(stdout);
   pevent_hdr->max_size = MAX_NB_PERF_EVENT_OPEN;
   for (size_t k = 0; k < pevent_hdr->max_size; ++k) {
     pevent_hdr->pes[k].fd = -1;
