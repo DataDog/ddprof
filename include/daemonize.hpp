@@ -50,10 +50,7 @@ struct DaemonizeResult {
   // Daemonization function
   // cleanup_function is a callable invoked in the context of the intermediate,
   // short-lived process that will be killed by daemon process.
-  DaemonizeResult(std::function<void()> cleanup_function);
-
-  // Create an empty/error result
-  DaemonizeResult(bool _) { (void)_; };
+  bool daemonize(std::function<void()> cleanup_function);
 
 private:
   int pipe_read = -1;

@@ -221,7 +221,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
 
   const bool in_wrapper_mode = ctx->params.pid == 0;
   TempFileHolder dd_profiling_lib_holder, dd_loader_lib_holder;
-  ddprof::DaemonizeResult daemonize_res{false};
+  ddprof::DaemonizeResult daemonize_res;
 
   if (in_wrapper_mode) {
     // If no PID was specified earlier, we autodaemonize and target current pid
@@ -259,10 +259,10 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     }
 
     ctx->params.pid = getpid();
-    daemonize_res = {[ctx] {
+    daemonize_res.daemonize({[ctx] {
       ctx->release();
       throw ddprof::exit();
-    }};
+    }});
 
     if (daemonize_res.is_failure()) {
       return -1;

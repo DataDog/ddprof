@@ -216,8 +216,8 @@ int ddprof_start_profiling_internal() {
     auto defer_parent_socket_close =
         make_defer([&sockfds]() { close(sockfds[kParentIdx]); });
 
-    ddprof::DaemonizeResult daemonize_res{nullptr};
-    if (daemonize_res.is_failure()) {
+    ddprof::DaemonizeResult daemonize_res;
+    if (!daemonize_res.daemonize(nullptr)) {
       return -1;
     }
 

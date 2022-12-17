@@ -7,9 +7,9 @@
 #include "logger.hpp"
 
 namespace ddprof {
-DaemonizeResult::DaemonizeResult(std::function<void()> cleanup_function) {
+bool DaemonizeResult::daemonize(std::function<void()> cleanup_function) {
   if (!openpipes()) {
-    return;
+    return false;
   }
   pid_t parent_pid = getpid();
   pid_t temp_pid = fork(); // "middle"/"child" (temporary) PID
@@ -38,20 +38,20 @@ DaemonizeResult::DaemonizeResult(std::function<void()> cleanup_function) {
       state = DaemonizeState::Daemon;
       invoker_pid = parent_pid;
       daemon_pid = grandchild_pid;
-      return;
+      return true;
     }
   } else if (temp_pid != -1) { // parent PID enter branch
     close(pipe_write);
     pipe_write = -1;
     if (read(pipe_read, &grandchild_pid, pid_sz) != pid_sz) {
-      return; // error
+      return false;
     }
 
     signal(SIGCHLD, SIG_IGN);
     state = DaemonizeState::Invoker;
     invoker_pid = parent_pid;
     daemon_pid = grandchild_pid;
-    return;
+    return true;
   }
 
   // Should only arrive here if the first-level fork failed, but add a sink
@@ -66,7 +66,6 @@ DaemonizeResult::DaemonizeResult(std::function<void()> cleanup_function) {
   close(pipe_write);
   pipe_read = -1;
   pipe_write = -1;
-  return;
+  return false;
 }
-
 } // namespace ddprof
