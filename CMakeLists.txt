@@ -192,7 +192,6 @@ endif()
 
 set(DD_PROFILING_SOURCES
     # cmake-format: sortable
-    src/daemonize.cc
     src/ddprof_cmdline.cc
     src/ddres_list.cc
     src/ipc.cc

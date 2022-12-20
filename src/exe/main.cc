@@ -269,7 +269,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     }
 
     if (daemonize_res.is_invoker()) {
-      daemonize_res.finalize(); // Waits until the grandchild has finalized
+      daemonize_res.barrier(); // Waits until the grandchild has finalized
 
       // non-daemon process: return control to caller
       defer_child_socket_close.reset();
@@ -334,7 +334,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
   // after we finish instrumenting.  This will end that process, which in
   // turn will unblock the target from calling exec.
   if (daemonize_res.is_daemon()) {
-    daemonize_res.finalize();
+    daemonize_res.barrier();
   }
 
   if (ctx->params.sockfd != -1 && ctx->params.wait_on_socket) {

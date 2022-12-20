@@ -5,12 +5,13 @@
 
 #pragma once
 
-#include <fcntl.h>
+#include "atomic_shared.hpp"
+
 #include <functional>
-#include <poll.h>
-#include <sys/signal.h>
-#include <sys/types.h>
-#include <unistd.h>
+
+#include "daemonize.hpp"
+#include "ddprof_exit.hpp"
+#include "logger.hpp"
 
 namespace ddprof {
 
@@ -21,24 +22,20 @@ struct DaemonizeResult {
   pid_t invoker_pid = -1;
   pid_t daemon_pid = -1;
 
-  void finalize() {
+  // A reusable barrier between parent/daemon
+  void barrier() {
     switch (state) {
     case DaemonizeState::Failure:
       break;
     case DaemonizeState::Daemon:
-      signal(SIGPIPE, SIG_IGN);
-      write(pipe_write, &daemon_pid, sizeof(pid_t));
-      signal(SIGPIPE, SIG_DFL);
-      close(pipe_write);
-      pipe_write = 1;
+      sem_daemon->store(true);
+      sem_invoker->value_timedwait(false, 200);
+      sem_invoker->store(false);
       break;
-    case DaemonizeState::Invoker: {
-      struct pollfd pfd = {pipe_read, POLLIN};
-      poll(&pfd, 1, 1000); // wait for 1s or until write/signal
-      signal(SIGCHLD, SIG_IGN);
-    }
-      close(pipe_read);
-      pipe_read = -1;
+    case DaemonizeState::Invoker:
+      sem_invoker->store(true);
+      sem_daemon->value_timedwait(false, 200);
+      sem_daemon->store(false);
       break;
     }
   };
@@ -50,22 +47,59 @@ struct DaemonizeResult {
   // Daemonization function
   // cleanup_function is a callable invoked in the context of the intermediate,
   // short-lived process that will be killed by daemon process.
-  bool daemonize(std::function<void()> cleanup_function);
+  bool daemonize(std::function<void()> cleanup_function = {}) {
+    invoker_pid = getpid();
+    pid_t temp_pid = fork(); // "middle"/"child" (temporary) PID
+    state = DaemonizeState::Failure;
+
+    if (!temp_pid) { // temp PID enter branch
+      if (fork()) {  // temp PID enter branch
+        if (cleanup_function) {
+          cleanup_function();
+        }
+
+        // Temporary PID exits to force re-init of grandchild (daemon)
+        throw ddprof::exit();
+        std::exit(0);
+
+      } else { // grandchild (daemon) PID enter branch
+        daemon_pid = getpid();
+
+        // Tell the invoker my PID.  What to do if it doesn't come back?
+        pid_transfer->store(daemon_pid);
+        if (!sem_invoker->value_timedwait(false, 200)) {
+          return false;
+        }
+        sem_invoker->store(false);
+        state = DaemonizeState::Daemon;
+        return true;
+      }
+    } else if (temp_pid != -1) { // parent PID enter branch
+      // Try to read the PID of the daemon from shared memory, then notify
+      if (!pid_transfer->value_timedwait(0, 200)) {
+        return false;
+      }
+      sem_invoker->store(true);
+      daemon_pid = pid_transfer->load();
+      state = DaemonizeState::Invoker;
+      return true;
+    }
+
+    // Should only arrive here if the first-level fork failed, but add sink to
+    if (getpid() != invoker_pid) {
+      LG_WRN("Extraneous PID (%d) detected", getpid());
+      throw ddprof::exit();
+      std::exit(-1);
+    }
+    return false;
+  }
 
 private:
-  int pipe_read = -1;
-  int pipe_write = -1;
-
-  bool openpipes() {
-    int pipefd[2];
-    if (pipe2(pipefd, O_CLOEXEC) == -1) {
-      return false;
-    }
-    pipe_read = pipefd[0];
-    pipe_write = pipefd[1];
-    return true;
-  };
+  std::unique_ptr<AtomicShared<pid_t>> pid_transfer =
+      std::make_unique<AtomicShared<pid_t>>(0);
+  std::unique_ptr<AtomicShared<bool>> sem_invoker =
+      std::make_unique<AtomicShared<bool>>(false);
+  std::unique_ptr<AtomicShared<bool>> sem_daemon =
+      std::make_unique<AtomicShared<bool>>(false);
 };
-
-DaemonizeResult daemonize(std::function<void()> cleanup_function = {});
 } // namespace ddprof
