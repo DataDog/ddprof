@@ -41,7 +41,7 @@ public:
     auto start = std::chrono::high_resolution_clock::now();
     auto end = std::chrono::milliseconds(timeout);
     if (timeout < 0) {
-      end = std::chrono::years::max();
+      end = std::chrono::hours::max();
     }
     int fast_checks = 3; // hardcoded
     do {

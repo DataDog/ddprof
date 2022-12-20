@@ -8,6 +8,8 @@
 #include "atomic_shared.hpp"
 
 #include <functional>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "daemonize.hpp"
 #include "ddprof_exit.hpp"
