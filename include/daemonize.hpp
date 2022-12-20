@@ -48,6 +48,15 @@ struct DaemonizeResult {
   // cleanup_function is a callable invoked in the context of the intermediate,
   // short-lived process that will be killed by daemon process.
   bool daemonize(std::function<void()> cleanup_function = {}) {
+    // Initialize
+    pid_transfer = std::make_unique<AtomicShared<pid_t>>();
+    sem_invoker = std::make_unique<AtomicShared<bool>>();
+    sem_daemon = std::make_unique<AtomicShared<bool>>();
+    pid_transfer->store(0);
+    sem_invoker->store(false);
+    sem_daemon->store(false);
+
+    // Start daemonizing
     invoker_pid = getpid();
     pid_t temp_pid = fork(); // "middle"/"child" (temporary) PID
     state = DaemonizeState::Failure;
@@ -95,11 +104,8 @@ struct DaemonizeResult {
   }
 
 private:
-  std::unique_ptr<AtomicShared<pid_t>> pid_transfer =
-      std::make_unique<AtomicShared<pid_t>>(0);
-  std::unique_ptr<AtomicShared<bool>> sem_invoker =
-      std::make_unique<AtomicShared<bool>>(false);
-  std::unique_ptr<AtomicShared<bool>> sem_daemon =
-      std::make_unique<AtomicShared<bool>>(false);
+  std::unique_ptr<AtomicShared<pid_t>> pid_transfer;
+  std::unique_ptr<AtomicShared<bool>> sem_invoker;
+  std::unique_ptr<AtomicShared<bool>> sem_daemon;
 };
 } // namespace ddprof
