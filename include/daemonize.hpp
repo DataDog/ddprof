@@ -31,12 +31,12 @@ struct DaemonizeResult {
       break;
     case DaemonizeState::Daemon:
       sem_daemon->store(true);
-      sem_invoker->value_timedwait(false, 200);
+      sem_invoker->value_timedwait(false, timeout_val);
       sem_invoker->store(false);
       break;
     case DaemonizeState::Invoker:
       sem_invoker->store(true);
-      sem_daemon->value_timedwait(false, 200);
+      sem_daemon->value_timedwait(false, timeout_val);
       sem_daemon->store(false);
       break;
     }
@@ -76,22 +76,20 @@ struct DaemonizeResult {
       } else { // grandchild (daemon) PID enter branch
         daemon_pid = getpid();
 
-        // Tell the invoker my PID.  What to do if it doesn't come back?
+        // Tell the invoker my PID, then wait until it gets changed again.
         pid_transfer->store(daemon_pid);
-        if (!sem_invoker->value_timedwait(false, 200)) {
+        if (!pid_transfer->value_timedwait(daemon_pid, timeout_val)) {
           return false;
         }
-        sem_invoker->store(false);
         state = DaemonizeState::Daemon;
         return true;
       }
     } else if (temp_pid != -1) { // parent PID enter branch
       // Try to read the PID of the daemon from shared memory, then notify
-      if (!pid_transfer->value_timedwait(0, 200)) {
+      if (!pid_transfer->value_timedwait(0, timeout_val)) {
         return false;
       }
-      sem_invoker->store(true);
-      daemon_pid = pid_transfer->load();
+      daemon_pid = pid_transfer->exchange(0); // consume + reset
       state = DaemonizeState::Invoker;
       return true;
     }
@@ -109,5 +107,6 @@ private:
   std::unique_ptr<AtomicShared<pid_t>> pid_transfer;
   std::unique_ptr<AtomicShared<bool>> sem_invoker;
   std::unique_ptr<AtomicShared<bool>> sem_daemon;
+  static constexpr size_t timeout_val = 1000; // 10 seconds
 };
 } // namespace ddprof

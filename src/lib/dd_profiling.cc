@@ -271,7 +271,8 @@ int ddprof_start_profiling_internal() {
 int ddprof_start_profiling() {
   try {
     return ddprof_start_profiling_internal();
-  } catch (...) {}
+  } catch (ddprof::exit const &_) { return 0; } catch (...) {
+  }
   return -1;
 }
 
