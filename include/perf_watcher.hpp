@@ -23,6 +23,7 @@ struct PerfWatcherOptions {
   bool is_overloaded; // Isn't actually needed, but makes it clear from this
                       // file that additional state is injected into the
                       // watcher in ddprof_cmdline.cc
+  bool no_regs; // disable registers
 };
 
 typedef struct PerfWatcher {

@@ -15,6 +15,9 @@
 #include "user_override.hpp"
 
 #include <map>
+#include <unordered_map>
+#include <set>
+#include <unordered_set>
 
 #include <assert.h>
 #include <errno.h>
@@ -71,6 +74,7 @@ static void pevent_add_child_fd(int child_fd, PEvent &pevent) {
 }
 
 struct LinkedPerfs {
+  int seq;
   const std::string tracepoint_group;
   const std::string tracepoint_name;
   bool has_stack;
@@ -81,7 +85,25 @@ bool operator==(LinkedPerfs const &A, LinkedPerfs const &B) {
   return A.tracepoint_name == B.tracepoint_name && A.tracepoint_group == B.tracepoint_group;
 }
 
-using LinkedPerfConf = std::unordered_set<LinkedPerfs>;
+std::unordered_map<long, std::string> id_stash = {};
+
+void stash_perf_id(long id, const LinkedPerfs &perf) {
+  id_stash[id] = perf.tracepoint_name;
+}
+
+const std::string &check_perf_stash(long id) {
+  static const std::string empty_str{""};
+  auto loc = id_stash.find(id);
+  if (loc == id_stash.end())
+    return empty_str; 
+  else
+    return loc->second;
+}
+
+using LinkedPerfConf = std::set<LinkedPerfs>;
+bool operator<(const LinkedPerfs &A, const LinkedPerfs &B) {
+  return A.seq < B.seq;
+}
 
 template<>
 struct std::hash<LinkedPerfs> {
@@ -135,9 +157,18 @@ static DDRes link_perfs(PerfWatcher *watcher, int watcher_idx, pid_t pid,
         continue;
       watcher_failed = false;
 
+      // Register this sample ID
+      uint64_t id;
+      if (-1 == ioctl(fd, PERF_EVENT_IOC_ID, &id)) {
+        LG_ERR("Error getting perf sample\n");
+      }
+      stash_perf_id(id, probe);
+
       if (cpu_pevent_idx.contains(cpu_idx)) {
+        PRINT_NFO("  <%d:%d> <==(%d) Attaching watcher for %s", cpu_idx, fd, cpu_pevent_idx[cpu_idx], probe.tracepoint_name.c_str());
         pevent_add_child_fd(fd, pes[cpu_pevent_idx[cpu_idx]]);
       } else {
+        PRINT_NFO("<%d:%d>(%d) Created watcher for %s", cpu_idx, fd, cpu_pevent_idx[cpu_idx], probe.tracepoint_name.c_str());
         size_t pevent_idx = -1;
         DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
         pevent_set_info(fd, attr_idx, pes[pevent_idx]);
@@ -157,35 +188,35 @@ static DDRes link_perfs(PerfWatcher *watcher, int watcher_idx, pid_t pid,
 static DDRes tallocsys1_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
                              int num_cpu, PEventHdr *pevent_hdr) {
   const LinkedPerfConf conf = {
-        {"syscalls", "sys_exit_mmap", true},
-        {"syscalls", "sys_exit_munmap"},
-        {"syscalls", "sys_exit_mremap", true}};
+        {1, "syscalls", "sys_exit_mmap", true},
+        {2, "syscalls", "sys_exit_munmap"},
+        {3, "syscalls", "sys_exit_mremap", true}};
   return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf);
 }
 
 static DDRes topenfd_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
                              int num_cpu, PEventHdr *pevent_hdr) {
   const LinkedPerfConf conf = {
-        {"syscalls", "sys_exit_open", true},
-        {"syscalls", "sys_exit_openat"},
-        {"syscalls", "sys_exit_close"},
-        {"syscalls", "sys_exit_exit"},
-        {"syscalls", "sys_exit_exit_group"}};
+        {1, "syscalls", "sys_exit_open", true},
+        {2, "syscalls", "sys_exit_openat"},
+        {3, "syscalls", "sys_exit_close"},
+        {4, "syscalls", "sys_exit_exit"},
+        {5, "syscalls", "sys_exit_exit_group"}};
   return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf);
 }
 
 static DDRes tnoisycpu2_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
                             int num_cpu, PEventHdr *pevent_hdr) {
   const LinkedPerfConf conf = {
-        {"sched", "sched_switch", false, true},
-        {"sched", "sched_stat_wait"},
-        {"sched", "sched_stat_sleep"},
-        {"sched", "sched_stat_iowait"},
-        {"sched", "sched_stat_runtime"},
-        {"sched", "sched_process_fork"},
-        {"sched", "sched_wakeup"},
-        {"sched", "sched_wakeup_new"},
-        {"sched", "sched_migrate_task"}};
+        {1, "sched", "sched_switch", false, true},
+        {2, "sched", "sched_stat_wait"},
+        {3, "sched", "sched_stat_sleep"},
+        {4, "sched", "sched_stat_iowait"},
+        {5, "sched", "sched_stat_runtime"},
+        {6, "sched", "sched_process_fork"},
+        {7, "sched", "sched_wakeup"},
+        {8, "sched", "sched_wakeup_new"},
+        {9, "sched", "sched_migrate_task"}};
   return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf);
 }
 
@@ -352,10 +383,12 @@ DDRes pevent_setup(DDProfContext *ctx, pid_t pid, int num_cpu,
   // closed until profiling is completed.
   for (unsigned i = 0; i < pevent_hdr->size; i++) {
     PEvent *pes = &pevent_hdr->pes[i];
-    if (ctx->watchers[pes->watcher_pos].instrument_self) {
+    if ( tx->watchers[pes->wateher_pos].instrument_self) {
       int fd = pes->fd;
+      PRINT_NFO("<%d> linking children", fd);
       for (int j = 0; j < pes->current_child_fd; ++j) {
         int child_fd = pes->child_fds[j];
+        PRINT_NFO("     <== (%d)", child_fd);
         if (ioctl(child_fd, PERF_EVENT_IOC_SET_OUTPUT, fd)) {
           DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
                                  "Could not ioctl() linked perf buffers");
@@ -370,10 +403,17 @@ DDRes pevent_enable(PEventHdr *pevent_hdr) {
   // Just before we enter the main loop, force the enablement of the perf
   // contexts
   for (size_t i = 0; i < pevent_hdr->size; ++i) {
-    if (!pevent_hdr->pes[i].custom_event) {
+    PEvent *pes = &pevent_hdr->pes[i];
+    if (!pes->custom_event) {
       DDRES_CHECK_INT(ioctl(pevent_hdr->pes[i].fd, PERF_EVENT_IOC_ENABLE),
                       DD_WHAT_IOCTL, "Error ioctl fd=%d (idx#%zu)",
                       pevent_hdr->pes[i].fd, i);
+      for (int j = 0; j < pes->current_child_fd; ++j) {
+        int child_fd = pes->child_fds[j];
+        ioctl(child_fd, PERF_EVENT_IOC_ENABLE);
+      }
+    } else {
+      PRINT_NFO("SKIPPING DUE TO CUSTOM EVENT");
     }
   }
   return ddres_init();

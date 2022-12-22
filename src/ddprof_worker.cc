@@ -426,7 +426,125 @@ DDRes ddprof_pr_noisy_neighbors2(DDProfContext *ctx, perf_event_sample *sample, 
 //  NoisyNeighbors &noisy= *ctx->worker_ctx.exp[i_export]->noisy_neighbors;
 //  noisy.pid_on(sample->pid, sample->cpu, sample->time);
 
-  PRINT_NFO("Got a sample (ID: %ld, CPU: %d)", sample->id, sample->cpu);
+#pragma pack(push,1)
+  struct RawBasic {
+    unsigned short common_type;
+    unsigned char common_flags;
+    unsigned char common_preempt_count;
+    int common_pid;
+  };
+  struct StatWait : public RawBasic {
+    char comm[16];
+    pid_t pid;
+    uint64_t delay;
+
+    void print() {
+      PRINT_NFO("[SCHED][WAIT] comm=%s pid=%d delay=%lu [ns]", comm, pid, delay);
+    }
+  };
+  struct StatRuntime : public RawBasic {
+    char comm[16];
+    pid_t pid;
+    uint64_t runtime;
+    uint64_t vruntime;
+
+    void print() {
+      PRINT_NFO("[SCHED][RUNTIME] comm=%s pid=%d runtime=%lu [ns] vruntime=%lu [ns]", comm, pid, runtime, vruntime);
+    }
+  };
+  struct Wakeup : public RawBasic {
+    char comm[16];
+    pid_t pid;
+    int prio;
+    int success;
+    int target_cpu;
+
+    void print() {
+      PRINT_NFO("[SCHED][WAKEUP] comm=%s pid=%d prio=%d target_cpu=%03d", comm, pid, prio, target_cpu);
+    }
+  };
+  struct SchedSwitch : public RawBasic {
+    char prev_comm[16];
+    pid_t prev_pid;
+    int prev_prio;
+    long prev_state;
+
+    char next_comm[16];
+    pid_t next_pid;
+    int next_prio;
+
+    void print() {
+      PRINT_NFO("[SCHED][SWITCH] prev_comm=%s prev_pid=%d prev_prio=%d prev_state=%ld ==> next_comm=%s next_pid=%d next_prio=%d",
+          prev_comm, prev_pid, prev_prio, prev_state, next_comm, next_pid, next_prio);
+    }
+  };
+  struct SchedProcessFork {
+    char parent_comm[16];
+    pid_t parent_pid;
+    char child_comm[16];
+    pid_t child_pid;
+
+    void print() {
+      PRINT_NFO("[SCHED][FORK] comm=%s pid=%d child_comm=%s child_pid=%d", parent_comm, parent_pid, child_comm, child_pid);
+    }
+  };
+  struct SchedMigrateTask : public RawBasic { 
+    char comm[16];
+    pid_t pid;
+    int prio;
+    int orig_cpu;
+    int dest_cpu;
+
+    void print() {
+      PRINT_NFO("[SCHED][MIGRATE_TASK] comm=%s pid=%d prio=%d orig_cpu=%d dest_cpu=%d", comm, pid, prio, orig_cpu, dest_cpu);
+    }
+  };
+
+  struct StatIowait : public StatWait {};
+  struct StatBlocked : public StatWait {};
+  struct StatSleep : public StatWait {};
+  struct SchedWakeupNew : public Wakeup {};
+
+
+#pragma pack(pop)
+
+  const auto& str = check_perf_stash(sample->id);
+  if (str == "sched_switch") {
+    SchedSwitch *raw = reinterpret_cast<SchedSwitch*>(sample->data_raw);
+  }
+  else if (str == "sched_stat_wait") {
+    StatWait *raw = reinterpret_cast<StatWait*>(sample->data_raw);
+    raw->print();
+  }
+  else if (str == "sched_stat_sleep") {
+    StatSleep *raw = reinterpret_cast<StatSleep*>(sample->data_raw);
+    raw->print();
+  }
+  else if (str == "sched_stat_iowait") {
+    StatIowait *raw = reinterpret_cast<StatIowait *>(sample->data_raw);
+    raw->print();
+  }
+  else if (str == "sched_stat_runtime") {
+    StatRuntime *raw = reinterpret_cast<StatRuntime *>(sample->data_raw);
+    raw->print();
+  }
+  else if (str == "sched_process_fork") {
+    SchedProcessFork *raw = reinterpret_cast<SchedProcessFork *>(sample->data_raw);
+    raw->print();
+  }
+  else if (str == "sched_wakeup") {
+    Wakeup *raw = reinterpret_cast<Wakeup*>(sample->data_raw);
+    raw->print();
+  }
+  else if (str == "sched_wakeup_new") {
+    SchedWakeupNew *raw = reinterpret_cast<SchedWakeupNew *>(sample->data_raw);
+    raw->print();
+  }
+  else if (str == "sched_migrate_task") {
+    SchedMigrateTask *raw = reinterpret_cast<SchedMigrateTask *>(sample->data_raw);
+    raw->print();
+  }
+
 
   return ddres_init();
 }
@@ -876,7 +994,7 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
     switch (hdr->type) {
     /* Cases where the target type has a PID */
     case PERF_RECORD_SAMPLE:
-      if (wpid->pid) {
+      if (true) {
         uint64_t mask = watcher->sample_type;
         perf_event_sample *sample = hdr2samp(hdr, mask);
 

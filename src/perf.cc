@@ -31,13 +31,13 @@ struct perf_event_attr g_dd_native_attr = {
     .disabled = 1,
     .inherit = 1,
     .exclude_kernel = 1,
-    .exclude_hv = 1,
+    .exclude_hv = 0,
     .mmap = 0, // keep track of executable mappings
     .comm = 0, // Follow exec()
     .inherit_stat = 0,
     .enable_on_exec = 1,
     .task = 0, // Follow fork/stop events
-    .precise_ip = 2,
+    .precise_ip = 0,
     .mmap_data = 0, // keep track of other mappings
     .sample_id_all = 1,
     .sample_regs_user = PERF_REGS_MASK,
@@ -97,6 +97,9 @@ perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
     attr.mmap2 = 1;
     attr.task = 1;
     attr.comm = 1;
+  }
+  if (watcher->options.no_regs) {
+    attr.sample_regs_user=0;
   }
   return attr;
 }

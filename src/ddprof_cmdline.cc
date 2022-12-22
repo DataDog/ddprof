@@ -179,8 +179,9 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
       PRINT_NFO("Disabling call stacks for noisy neighbors");
       watcher->sample_stack_size = 0; // Disable for now
       watcher->instrument_self = true;
-      watcher->sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ID | PERF_SAMPLE_CPU | PERF_SAMPLE_PERIOD | PERF_SAMPLE_RAW | PERF_SAMPLE_IDENTIFIER;
-      watcher->options.is_kernel = kPerfWatcher_Try;
+      watcher->sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ID | PERF_SAMPLE_CPU | PERF_SAMPLE_PERIOD | PERF_SAMPLE_RAW;
+      watcher->options.is_kernel = kPerfWatcher_Required;
+      watcher->options.no_regs = true;
     }
   }
   return true;

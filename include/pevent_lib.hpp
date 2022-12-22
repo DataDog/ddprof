@@ -43,3 +43,5 @@ DDRes pevent_mmap_event(PEvent *pevent);
 DDRes pevent_munmap_event(PEvent *pevent);
 
 DDRes pevent_close_event(PEvent *pevent);
+
+const std::string &check_perf_stash(long id);
