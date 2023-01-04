@@ -34,6 +34,7 @@
 #  include <sys/types.h>
 #  include <unistd.h>
 
+#  include "elf_helpers.h"
 #  include <dlfcn.h>
 #  include <libelf.h>
 
@@ -142,7 +143,7 @@ typedef Elf32_Dyn ElfDyn;
 #  endif // __musl__
 
 class ElfParser {
-private:
+public:
   CodeCache *_cc;
   const char *_base;
   const char *_file_name;
@@ -185,13 +186,15 @@ private:
 
   void parseDynamicSection();
   void parseDwarfInfo();
+  void parseDwarfInfoRemote(const char *eh_frame_data);
   void loadSymbols(bool use_debug);
   bool loadSymbolsUsingBuildId();
   bool loadSymbolsUsingDebugLink();
   void loadSymbolTable(ElfSection *symtab);
   void addRelocationSymbols(ElfSection *reltab, const char *plt);
+
 public:
-  static const char* get_self_vdso(void);
+  static const char *get_self_vdso(void);
   static void parseProgramHeaders(CodeCache *cc, const char *base);
   static bool parseProgramHeadersRemote(Elf *elf, CodeCache *cc,
                                         const char *base,
@@ -254,7 +257,8 @@ bool ElfParser::parseFile(CodeCache *cc, const char *base,
   return true;
 }
 
-void ElfParser::parseMemRemote(CodeCache *cc, const char *base, const char *addr) {
+void ElfParser::parseMemRemote(CodeCache *cc, const char *base,
+                               const char *addr) {
   ElfParser elf(cc, base, addr);
   if (elf.validHeader()) {
     elf.loadSymbols(false);
@@ -273,14 +277,13 @@ bool ElfParser::parseProgramHeadersRemote(Elf *elf, CodeCache *cc,
                                           const char *base,
                                           const char *mmap_addr) {
   // todo check if I can use base
-  ElfParser elf_remote(cc, reinterpret_cast<const char*>(mmap_addr), mmap_addr);
+  ElfParser elf_remote(cc, base, mmap_addr);
   if (elf_remote.validHeader()) {
     cc->setTextBase(mmap_addr);
     elf_remote.parseDynamicSection();
     elf_remote.parseDwarfInfo();
-    return true ;
-  }
-  else {
+    return true;
+  } else {
     printf("invalid header \n");
   }
   return false;
@@ -289,6 +292,7 @@ bool ElfParser::parseProgramHeadersRemote(Elf *elf, CodeCache *cc,
 void ElfParser::parseProgramHeaders(CodeCache *cc, const char *base) {
   ElfParser elf(cc, base, base);
   if (elf.validHeader()) {
+    printf("Setting text base = %p \n", base);
     cc->setTextBase(base);
     elf.parseDynamicSection();
     elf.parseDwarfInfo();
@@ -366,10 +370,16 @@ void ElfParser::parseDynamicSection() {
         }
       }
     }
-  }
-  else {
+  } else {
     printf("No dynamic section \n");
   }
+}
+
+void ElfParser::parseDwarfInfoRemote(const char *eh_frame_data) {
+  printf("Create dwarf with base:%p - eh_frame_hdr:%p\n", _base, eh_frame_data);
+  DwarfParser dwarf(_cc->name(), _base, eh_frame_data);
+  _cc->setDwarfTable(dwarf.table(), dwarf.count());
+  printf("Created a number of dwarf entries = %d \n", dwarf.count());
 }
 
 void ElfParser::parseDwarfInfo() {
@@ -377,7 +387,9 @@ void ElfParser::parseDwarfInfo() {
     return;
 
   ElfProgramHeader *eh_frame_hdr = findProgramHeader(PT_GNU_EH_FRAME);
+
   if (eh_frame_hdr != NULL) {
+    printf("Create dwarf with %lx - at:%lx \n", _base, at(eh_frame_hdr));
     DwarfParser dwarf(_cc->name(), _base, at(eh_frame_hdr));
     _cc->setDwarfTable(dwarf.table(), dwarf.count());
     printf("Created a number of dwarf entries = %d \n", dwarf.count());
@@ -493,7 +505,7 @@ bool ElfParser::loadSymbolsUsingDebugLink() {
 void ElfParser::loadSymbolTable(ElfSection *symtab) {
   ElfSection *strtab = section(symtab->sh_link);
   const char *strings = at(strtab);
-
+  int cpt = 0;
   const char *symbols = at(symtab);
   const char *symbols_end = symbols + symtab->sh_size;
   for (; symbols < symbols_end; symbols += symtab->sh_entsize) {
@@ -502,13 +514,15 @@ void ElfParser::loadSymbolTable(ElfSection *symtab) {
       // Skip special AArch64 mapping symbols: $x and $d
       if (sym->st_size != 0 || sym->st_info != 0 ||
           strings[sym->st_name] != '$') {
-        //                printf("Loading sym %s at 0x%lx (base=0x%lx)\n",
-        //                strings + sym->st_name, _base + sym->st_value, _base);
+//        printf("Loading sym %s at 0x%lx (base=0x%lx)\n", strings + sym->st_name,
+//               _base + sym->st_value, _base);
         _cc->add(_base + sym->st_value, (int)sym->st_size,
                  strings + sym->st_name);
+        ++cpt;
       }
     }
   }
+  printf("Considered %d symbols \n", cpt);
 }
 
 void ElfParser::addRelocationSymbols(ElfSection *reltab, const char *plt) {
@@ -547,8 +561,7 @@ void Symbols::parseKernelSymbols(CodeCache *cc) {
   // XXX(nick): omitted
 }
 
-
-const char* ElfParser::get_self_vdso(void) {
+const char *ElfParser::get_self_vdso(void) {
   FILE *f = fopen("/proc/self/maps", "r");
   const char *addr_vdso = nullptr;
 
@@ -591,6 +604,7 @@ void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array,
     return;
   }
 
+  // last readable is previous mmap
   const char *last_readable_base = NULL;
   const char *image_end = NULL;
   char *str = NULL;
@@ -624,7 +638,6 @@ void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array,
 
       CodeCache *cc = new CodeCache(map.file(), count, image_base, image_end);
       unsigned long inode = map.inode();
-      CodeCache *cc_remote = nullptr;
       printf("Considering %s \n", map.file());
       if (inode != 0) {
         // remote unwinding
@@ -635,28 +648,42 @@ void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array,
         }
         size_t length = (size_t)lseek64(fd, 0, SEEK_END);
         void *addr = mmap(NULL, length, PROT_READ, MAP_PRIVATE, fd, 0);
+        printf("mmap at %lx - size = %lx\n", addr, length);
         Elf *elf = elf_begin(fd, ELF_C_READ, NULL);
         if (elf == NULL || addr == MAP_FAILED) {
           LG_WRN("Invalid elf %s (efl:%p, addr_mmap:%p)\n", map.file(), elf,
                  addr);
           goto continue_loop;
         }
-        // temp structure to load everything
-        cc_remote = new CodeCache(map.file(), count, addr, addr+length);
+        Offset_t biais_offset;
+        ElfAddress_t vaddr;
+        ElfAddress_t text_base;
+        // Compute how to convert a process address
+        if (get_elf_offsets(elf, map.file(), vaddr, biais_offset, text_base)) {
+          printf("vaddr from get_elf_offset: %lx \n", vaddr);
+          printf("biais offset get_elf_offset: %lx \n", biais_offset);
+          printf("text base from get_elf_offset: %lx \n", text_base);
+        }
 
         // Do not parse the same executable twice, e.g. on Alpine Linux
         if (parsed_inodes.insert(map.dev() | inode << 16).second) {
           // Be careful: executable file is not always ELF, e.g. classes.jsa
-          if ((image_base -= map.offs()) >= last_readable_base) {
-//            ElfParser::parseProgramHeaders(cc, image_base);
-            if (ElfParser::parseProgramHeadersRemote(elf, cc_remote, image_base, reinterpret_cast<const char*>(addr))) {
-              cc->setTextBase(image_base);
-              cc->setDwarfTable(cc_remote->_dwarf_table, cc_remote->_dwarf_table_length);
-              // avoid deleting it (move it)
-              cc_remote->setDwarfTable(nullptr, 0);
+          if ((image_base -= vaddr) >= last_readable_base) {
+            ElfParser elf_remote(cc, image_base, addr);
+            if (elf_remote.validHeader()) {
+              // text base is supposed to be the entry point
+              cc->setTextBase(image_base + text_base);
+              const char* eh_frame_data_hdr = get_section_data(elf, ".eh_frame_hdr");
+              const char* eh_frame_data = get_section_data(elf, ".eh_frame");
+              printf("eh_frame_hdr = %p, eh_frame = %p \n", eh_frame_data_hdr, eh_frame_data);
+              if (eh_frame_data_hdr) {
+                process_fdes(elf);
+                elf_remote.parseDwarfInfoRemote(eh_frame_data_hdr);
+              }
+
+//              elf_remote.parseDwarfInfo();
             }
           }
-
           ElfParser::parseFile(cc, image_base, map.file(), true);
         }
 
@@ -664,8 +691,6 @@ void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array,
         close(fd);
         elf_end(elf); // no-op if null
         munmap(addr, length);
-        // we transfered everything away so we can delete this
-        delete cc_remote;
       } else if (strcmp(map.file(), "[vdso]") == 0) {
         // find our self address for vdso
         const char *addr_vdso = ElfParser::get_self_vdso();
@@ -732,6 +757,9 @@ void Symbols::parseLibraries(CodeCacheArray *array, bool kernel_symbols) {
         // Do not parse the same executable twice, e.g. on Alpine Linux
         if (parsed_inodes.insert(map.dev() | inode << 16).second) {
           // Be careful: executable file is not always ELF, e.g. classes.jsa
+          printf("image_base = %p, map.offs() = %p, last_readable_base = %p \n",
+                 image_base, map.offs(), last_readable_base);
+          // todo - read the biais from the vaddr field (open file?)
           if ((image_base -= map.offs()) >= last_readable_base) {
             ElfParser::parseProgramHeaders(cc, image_base);
           }
@@ -743,6 +771,7 @@ void Symbols::parseLibraries(CodeCacheArray *array, bool kernel_symbols) {
 
       cc->sort();
       array->add(cc);
+      break;
     }
   }
 

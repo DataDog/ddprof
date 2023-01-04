@@ -29,14 +29,14 @@ DDPROF_NOINLINE size_t funcA(std::array<uint64_t, PERF_REGS_COUNT> &regs);
 DDPROF_NOINLINE size_t funcB(std::array<uint64_t, PERF_REGS_COUNT> &regs);
 
 size_t funcB(std::array<uint64_t, PERF_REGS_COUNT> &regs) {
-  printf("Here we are in B %lx \n", _THIS_IP_);
+  printf("dwarf_unwind-ut:%s %lx \n",__FUNCTION__, _THIS_IP_);
   size_t size = save_context(retrieve_stack_end_address(), regs, stack);
 
   return size;
 }
 
 size_t funcA(std::array<uint64_t, PERF_REGS_COUNT> &regs) {
-  printf("Here we are in A %lx \n", _THIS_IP_);
+  printf("dwarf_unwind-ut:%s %lx \n",__FUNCTION__, _THIS_IP_);
   return funcB(regs);
 }
 
@@ -110,9 +110,9 @@ TEST(dwarf_unwind, remote) {
   // Fork
   pid_t temp_pid = fork();
   if (!temp_pid) {
-//    func_intermediate_0(10);
-    char*const  argList[] = {"sleep", "10", nullptr};
-    execvp("sleep", argList);
+    func_intermediate_0(10);
+//    char *const argList[] = {"sleep", "10", nullptr};
+//    execvp("sleep", argList);
     return;
   }
 
