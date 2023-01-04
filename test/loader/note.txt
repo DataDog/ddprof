@@ -1,0 +1,96 @@
+58f2362ea000-58f2362f2000 r--p 00000000 fd:06 34734311                   /home/r1viollet/go/src/github.com/DataDog/ddprof_2/build_gcc_unknown-linux-2.35_Deb/test/loader/async_prof_load
+58f2362f2000-58f23634b000 r-xp 00008000 fd:06 34734311                   /home/r1viollet/go/src/github.com/DataDog/ddprof_2/build_gcc_unknown-linux-2.35_Deb/test/loader/async_prof_load
+58f23634b000-58f23636f000 r--p 00061000 fd:06 34734311                   /home/r1viollet/go/src/github.com/DataDog/ddprof_2/build_gcc_unknown-linux-2.35_Deb/test/loader/async_prof_load
+58f23636f000-58f236371000 r--p 00084000 fd:06 34734311                   /home/r1viollet/go/src/github.com/DataDog/ddprof_2/build_gcc_unknown-linux-2.35_Deb/test/loader/async_prof_load
+58f236371000-58f236372000 rw-p 00086000 fd:06 34734311                   /home/r1viollet/go/src/github.com/DataDog/ddprof_2/build_gcc_unknown-linux-2.35_Deb/test/loader/async_prof_load
+58f236372000-58f23637a000 rw-p 00000000 00:00 0
+58f236914000-58f236bae000 rw-p 00000000 00:00 0                          [heap]
+79c36262f000-79c36265e000 rw-p 00000000 00:00 0
+79c363da0000-79c363dfe000 rw-p 00000000 00:00 0
+79c3643f2000-79c364453000 rw-p 00000000 00:00 0
+79c364453000-79c3644b4000 rw-p 00000000 00:00 0
+79c3644e5000-79c364577000 rw-p 00000000 00:00 0
+79c364577000-79c36458b000 r--p 00000000 fd:06 25825200                   /home/r1viollet/go/src/github.com/DataDog/ddprof_2/build_gcc_unknown-linux-2.35_Deb/libdd_profiling.so
+79c36458b000-79c364652000 r-xp 00014000 fd:06 25825200                   /home/r1viollet/go/src/github.com/DataDog/ddprof_2/build_gcc_unknown-linux-2.35_Deb/libdd_profiling.so
+79c364652000-79c3662b3000 r--p 000db000 fd:06 25825200                   /home/r1viollet/go/src/github.com/DataDog/ddprof_2/build_gcc_unknown-linux-2.35_Deb/libdd_profiling.so
+79c3662b3000-79c3662b4000 ---p 01d3c000 fd:06 25825200                   /home/r1viollet/go/src/github.com/DataDog/ddprof_2/build_gcc_unknown-linux-2.35_Deb/libdd_profiling.so
+79c3662b4000-79c3662bb000 r--p 01d3c000 fd:06 25825200                   /home/r1viollet/go/src/github.com/DataDog/ddprof_2/build_gcc_unknown-linux-2.35_Deb/libdd_profiling.so
+79c3662bb000-79c3662bc000 rw-p 01d43000 fd:06 25825200                   /home/r1viollet/go/src/github.com/DataDog/ddprof_2/build_gcc_unknown-linux-2.35_Deb/libdd_profiling.so
+
+79c364577000
+Considering /home/r1viollet/go/src/github.com/DataDog/ddprof_2/build_gcc_unknown-linux-2.35_Deb/libdd_profiling.so
+image_base = 0x79c36458b000, map.offs() = 0x14000, last_readable_base = 0x79c364577000
+
+
+
+// mmap at 7e1003515000 - size = 5880
+// Create dwarf with 7e1002c00000 - at:7e1003518354
+// GNU_EH_FRAME   0x003354 0x0000000000003354 0x0000000000003354 0x000144 0x000144 R   0x4
+
+
+// Create dwarf with 7ffff7800000 - at:7ffff7fb8354
+// 0x7ffff81b91f4
+
+// 7ffff8 --> wtf
+
+// Create dwarf with 0x0x555555554000 - at:0x0x555555858c00
+
+
+Considering /home/r1viollet/go/src/github.com/DataDog/ddprof_2/build_gcc_unknown-linux-2.35_Deb/test/dwarf_unwind-ut
+mmap at 7ffff75a0000 - size = 29e968
+d000 - d000 (vaddr - p_offset)
+vaddr from get_elf_offset: d000
+biais offset get_elf_offset: 0
+text base from get_elf_offset: f480
+.eh_frame_hdr section found at offset 0xaf120, size 38492
+Create dwarf with 0x0x555555554000 - at:0x0x555555858c00
+fde count = 4810
+
+
+Considering /home/r1viollet/go/src/github.com/DataDog/ddprof_2/build_gcc_unknown-linux-2.35_Deb/test/dwarf_unwind-ut
+image_base = 0x61043db82000, map.offs() = 0xd000, last_readable_base = 0x61043db75000
+Setting text base = 0x61043db75000
+relent = 24
+GOT start == 0x61043dc5c6c0
+Create dwarf with 61043db75000 - at:61043dc24120
+fde count = 4810
+Created a number of dwarf entries = 19700
+Considered 6429 symbols
+
+eh_frame_hdr = 0x60adf2e6ada0,
+eh_frame =     0x60adf2e74410
+
+eh_frame loaded just after the eh_frame hdr
+
+
+
+Considering /home/r1viollet/go/src/github.com/DataDog/ddprof_2/build_gcc_unknown-linux-2.35_Deb/test/dwarf_unwind-ut
+image_base = 0x555555561000, map.offs() = 0xd000, last_readable_base = 0x555555554000
+Setting text base = 0x555555554000
+relent = 24
+GOT start == 0x55555563c6c0
+Create dwarf with 555555554000 - at:555555604620
+eh_frame_ptr_enc = 1b
+table_enc = 3b
+fde count = 4817
+ptr = 55555560dce8, table offset = 96c8
+Change pointer to 55555560dcec - 34
+Created a number of dwarf entries = 19721
+Considered 6454 symbols
+
+
+Considering /home/r1viollet/go/src/github.com/DataDog/ddprof_2/build_gcc_unknown-linux-2.35_Deb/test/dwarf_unwind-ut
+mmap at 7ffff7591000 - size = 2adf78
+d000 - d000 (vaddr - p_offset)
+vaddr from get_elf_offset: d000
+biais offset get_elf_offset: 0
+text base from get_elf_offset: f480
+.eh_frame_hdr section found at offset 0xb0620, size 38548
+.eh_frame section found at offset 0xb9cb8, size 162072
+eh_frame_hdr = 0x555555859f50, eh_frame = 0x5555558635f0
+Create dwarf with base:0x555555554000 - eh_frame_hdr:0x555555859f50
+eh_frame_ptr_enc = 1b
+table_enc = 3b
+fde count = 4817
+ptr = 555555863618, table offset = 96c8
+Change pointer to 55555586361c - 0

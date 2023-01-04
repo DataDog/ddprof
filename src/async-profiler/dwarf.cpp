@@ -20,6 +20,10 @@
 #include "dwarf.h"
 #include <stdlib.h>
 
+#include <cstdio>
+
+#define DEBUG
+
 enum {
   DW_CFA_nop = 0x0,
   DW_CFA_set_loc = 0x1,
@@ -90,15 +94,23 @@ void DwarfParser::parse(const char *eh_frame_hdr) {
   u8 fde_count_enc = eh_frame_hdr[2];
   u8 table_enc = eh_frame_hdr[3];
 
+  printf("eh_frame_ptr_enc = %lx \n", eh_frame_ptr_enc);
+  printf("table_enc = %lx \n", table_enc);
   if (version != 1 || (eh_frame_ptr_enc & 0x7) != 0x3 ||
       (fde_count_enc & 0x7) != 0x3 || (table_enc & 0xf7) != 0x33) {
     return;
   }
 
   int fde_count = *(int *)(eh_frame_hdr + 8);
+#ifdef  DEBUG
+  printf("fde count = %d \n", fde_count);
+#endif
   int *table = (int *)(eh_frame_hdr + 16);
   for (int i = 0; i < fde_count; i++) {
     _ptr = eh_frame_hdr + table[i * 2];
+    if (i == 0) {
+      printf("ptr = %lx, table offset = %lx \n", _ptr, table[i * 2]);
+    }
     parseFde();
   }
 }
@@ -118,7 +130,9 @@ void DwarfParser::parseCie() {
 }
 
 void DwarfParser::parseFde() {
+
   u32 fde_len = get32();
+//  printf("fde len = %u \n", fde_len);
   if (fde_len == 0 || fde_len == 0xffffffff) {
     return;
   }
@@ -126,11 +140,14 @@ void DwarfParser::parseFde() {
   const char *fde_start = _ptr;
   u32 cie_offset = get32();
   if (_count == 0) {
+#ifdef  DEBUG
+    printf("Change pointer to %lx - %lx \n", fde_start, cie_offset);
+#endif
     _ptr = fde_start - cie_offset;
     parseCie();
     _ptr = fde_start + 4;
   }
-
+  // ptr - base = offset to the FDE
   u32 range_start = getPtr() - _image_base;
   u32 range_len = get32();
   _ptr += getLeb();

@@ -98,7 +98,7 @@ aux_source_directory(${ASYNC_PROFILER_SRC_DIR} ASYNC_PROFILER_SOURCES)
 add_library(async_prof_lib STATIC ${ASYNC_PROFILER_SOURCES})
 target_include_directories(async_prof_lib PUBLIC ${ASYNC_PROFILER_LIB_INCLUDE}
                                                  ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(async_prof_lib PRIVATE elf)
+target_link_libraries(async_prof_lib PRIVATE dw elf)
 set_property(TARGET async_prof_lib PROPERTY POSITION_INDEPENDENT_CODE ON)
 add_library(DDProf::AsyncProf ALIAS async_prof_lib)
 # -------------------

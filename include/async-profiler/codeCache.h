@@ -84,7 +84,6 @@ protected:
   void **_got_end;
   bool _got_patchable;
 
-
   int _capacity;
   int _count;
   CodeBlob *_blobs;
