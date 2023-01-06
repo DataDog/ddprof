@@ -186,7 +186,7 @@ public:
 
   void parseDynamicSection();
   void parseDwarfInfo();
-  void parseDwarfInfoRemote(const char *eh_frame_data);
+  void parseDwarfInfoRemote(const char *eh_frame_data, const char *base_remote);
   void loadSymbols(bool use_debug);
   bool loadSymbolsUsingBuildId();
   bool loadSymbolsUsingDebugLink();
@@ -291,6 +291,7 @@ bool ElfParser::parseProgramHeadersRemote(Elf *elf, CodeCache *cc,
 
 void ElfParser::parseProgramHeaders(CodeCache *cc, const char *base) {
   ElfParser elf(cc, base, base);
+
   if (elf.validHeader()) {
     printf("Setting text base = %p \n", base);
     cc->setTextBase(base);
@@ -375,9 +376,9 @@ void ElfParser::parseDynamicSection() {
   }
 }
 
-void ElfParser::parseDwarfInfoRemote(const char *eh_frame_data) {
+void ElfParser::parseDwarfInfoRemote(const char *eh_frame_data, const char *base_remote) {
   printf("Create dwarf with base:%p - eh_frame_hdr:%p\n", _base, eh_frame_data);
-  DwarfParser dwarf(_cc->name(), _base, eh_frame_data);
+  DwarfParser dwarf(_cc->name(), base_remote, eh_frame_data);
   _cc->setDwarfTable(dwarf.table(), dwarf.count());
   printf("Created a number of dwarf entries = %d \n", dwarf.count());
 }
@@ -647,9 +648,10 @@ void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array,
           continue;
         }
         size_t length = (size_t)lseek64(fd, 0, SEEK_END);
+        // todo : remove the mmap
         void *addr = mmap(NULL, length, PROT_READ, MAP_PRIVATE, fd, 0);
         printf("mmap at %lx - size = %lx\n", addr, length);
-        Elf *elf = elf_begin(fd, ELF_C_READ, NULL);
+        Elf *elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
         if (elf == NULL || addr == MAP_FAILED) {
           LG_WRN("Invalid elf %s (efl:%p, addr_mmap:%p)\n", map.file(), elf,
                  addr);
@@ -658,30 +660,41 @@ void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array,
         Offset_t biais_offset;
         ElfAddress_t vaddr;
         ElfAddress_t text_base;
+        Offset_t elf_offset;
+
         // Compute how to convert a process address
-        if (get_elf_offsets(elf, map.file(), vaddr, biais_offset, text_base)) {
+        if (get_elf_offsets(elf, map.file(), vaddr, elf_offset, biais_offset, text_base)) {
           printf("vaddr from get_elf_offset: %lx \n", vaddr);
           printf("biais offset get_elf_offset: %lx \n", biais_offset);
           printf("text base from get_elf_offset: %lx \n", text_base);
+          printf("offset from get_elf_offset: %lx \n", elf_offset);
+          printf("last readable: %lx \n", last_readable_base);
         }
 
         // Do not parse the same executable twice, e.g. on Alpine Linux
         if (parsed_inodes.insert(map.dev() | inode << 16).second) {
           // Be careful: executable file is not always ELF, e.g. classes.jsa
-          if ((image_base -= vaddr) >= last_readable_base) {
+          // image base is used to offset
+          if ((image_base -= map.offs()) >= last_readable_base) {
+            printf("image base = %lx \n", image_base);
             ElfParser elf_remote(cc, image_base, addr);
             if (elf_remote.validHeader()) {
-              // text base is supposed to be the entry point
-              cc->setTextBase(image_base + text_base);
-              const char* eh_frame_data_hdr = get_section_data(elf, ".eh_frame_hdr");
-              const char* eh_frame_data = get_section_data(elf, ".eh_frame");
+              Offset_t eh_frame_hdr_data_offset;
+              Offset_t eh_frame_data_offset;
+              // todo: This should be something with the biais instead
+              cc->setTextBase(image_base);
+              const char* eh_frame_data_hdr = get_section_data(elf, ".eh_frame_hdr",
+                                                               eh_frame_hdr_data_offset);
+              const char* eh_frame_data = get_section_data(elf, ".eh_frame",
+                                                           eh_frame_data_offset);
               printf("eh_frame_hdr = %p, eh_frame = %p \n", eh_frame_data_hdr, eh_frame_data);
               if (eh_frame_data_hdr) {
-                process_fdes(elf);
-                elf_remote.parseDwarfInfoRemote(eh_frame_data_hdr);
+                elf_remote.parseDwarfInfoRemote(eh_frame_data_hdr,
+                                                eh_frame_data_hdr - eh_frame_hdr_data_offset);
               }
-
-//              elf_remote.parseDwarfInfo();
+            }
+            else {
+              printf("Not a valid header - %s\n", map.file());
             }
           }
           ElfParser::parseFile(cc, image_base, map.file(), true);
@@ -760,6 +773,7 @@ void Symbols::parseLibraries(CodeCacheArray *array, bool kernel_symbols) {
           printf("image_base = %p, map.offs() = %p, last_readable_base = %p \n",
                  image_base, map.offs(), last_readable_base);
           // todo - read the biais from the vaddr field (open file?)
+
           if ((image_base -= map.offs()) >= last_readable_base) {
             ElfParser::parseProgramHeaders(cc, image_base);
           }
@@ -768,13 +782,10 @@ void Symbols::parseLibraries(CodeCacheArray *array, bool kernel_symbols) {
       } else if (strcmp(map.file(), "[vdso]") == 0) {
         ElfParser::parseMem(cc, image_base);
       }
-
       cc->sort();
       array->add(cc);
-      break;
     }
   }
-
   free(str);
   fclose(f);
 }

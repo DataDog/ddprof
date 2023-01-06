@@ -11,7 +11,7 @@
 
 #define LG_WRN(args...) printf(args)
 
-const char* get_section_data(Elf *elf, const char *section_name) {
+const char* get_section_data(Elf *elf, const char *section_name, Offset_t &elf_offset) {
   // Get the string table index for the section header strings
   size_t shstrndx;
   if (elf_getshdrstrndx(elf, &shstrndx) != 0) {
@@ -40,6 +40,7 @@ const char* get_section_data(Elf *elf, const char *section_name) {
     if (strcmp(name, section_name) == 0) {
       printf("%s section found at offset 0x%lx, size %ld\n", section_name, shdr.sh_offset, shdr.sh_size);
       // Get the data for the .eh_frame section
+      elf_offset = shdr.sh_offset;
       Elf_Data *data = elf_getdata(scn, NULL);
       if (data == NULL) {
         return nullptr;
@@ -53,6 +54,7 @@ const char* get_section_data(Elf *elf, const char *section_name) {
 }
 
 bool get_elf_offsets(Elf *elf, const char *filepath, ElfAddress_t &vaddr,
+                     Offset_t &elf_offset,
                      Offset_t &bias_offset, Offset_t &text_base) {
   vaddr = 0;
   bias_offset = 0;
@@ -90,6 +92,7 @@ bool get_elf_offsets(Elf *elf, const char *filepath, ElfAddress_t &vaddr,
             bias_offset = ph->p_vaddr - ph->p_offset;
             printf("%lx - %lx (vaddr - p_offset) \n", ph->p_vaddr,
                    ph->p_offset);
+            elf_offset = ph->p_offset;
             found_exec = true;
           } else {
             // There can be multiple executable load segments.
@@ -157,7 +160,7 @@ bool process_fdes(Elf *elf) {
       break;
     }
 
-    printf("cfi id = %lx\n", entry);
+//    printf("cfi id = %lx\n", entry);
     // Process the CFI record
     // ...
 

@@ -147,8 +147,13 @@ void DwarfParser::parseFde() {
     parseCie();
     _ptr = fde_start + 4;
   }
-  // ptr - base = offset to the FDE
+
   u32 range_start = getPtr() - _image_base;
+  if (_count == 0) {
+    printf("Dwarf range start: %lx (ptr) - %lx (image) = %lx \n", getPtr(), _image_base,
+           range_start);
+  }
+
   u32 range_len = get32();
   _ptr += getLeb();
   parseInstructions(range_start, fde_start + fde_len);
