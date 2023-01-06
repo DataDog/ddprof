@@ -127,7 +127,7 @@ private:
     return ptr + *(int *)add(4);
   }
 
-  void parse(const char *eh_frame_hdr);
+  void parse(const char *eh_frame_hdr, u64 adjust_eh_frame);
   void parseCie();
   void parseFde();
   void parseInstructions(u32 loc, const char *end);
@@ -138,13 +138,12 @@ private:
 
 public:
   DwarfParser(const char *name, const char *image_base,
-              const char *eh_frame_hdr);
+              const char *eh_frame_hdr, u64 adjust_eh_frame = 0);
 
   // manual parse of fde
   DwarfParser(const char *name, const char *image_base);
 
-
-  void addFde(const char* fde, const char *cie);
+  void addFde(const char *fde, const char *cie);
 
   FrameDesc *table() const { return _table; }
 

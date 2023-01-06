@@ -73,7 +73,7 @@ FrameDesc FrameDesc::default_frame = {0, DW_REG_FP | (2 * DW_STACK_SLOT) << 8,
                                       -2 * DW_STACK_SLOT};
 
 DwarfParser::DwarfParser(const char *name, const char *image_base,
-                         const char *eh_frame_hdr) {
+                         const char *eh_frame_hdr, u64 adjust_eh_frame) {
   _name = name;
   _image_base = image_base;
 
@@ -85,10 +85,10 @@ DwarfParser::DwarfParser(const char *name, const char *image_base,
   _code_align = sizeof(instruction_t);
   _data_align = -(int)sizeof(void *);
 
-  parse(eh_frame_hdr);
+  parse(eh_frame_hdr, adjust_eh_frame);
 }
 
-void DwarfParser::parse(const char *eh_frame_hdr) {
+void DwarfParser::parse(const char *eh_frame_hdr, u64 adjust_eh_frame) {
   u8 version = eh_frame_hdr[0];
   u8 eh_frame_ptr_enc = eh_frame_hdr[1];
   u8 fde_count_enc = eh_frame_hdr[2];
@@ -102,12 +102,12 @@ void DwarfParser::parse(const char *eh_frame_hdr) {
   }
 
   int fde_count = *(int *)(eh_frame_hdr + 8);
-#ifdef  DEBUG
+#ifdef DEBUG
   printf("fde count = %d \n", fde_count);
 #endif
   int *table = (int *)(eh_frame_hdr + 16);
   for (int i = 0; i < fde_count; i++) {
-    _ptr = eh_frame_hdr + table[i * 2];
+    _ptr = eh_frame_hdr + table[i * 2] - adjust_eh_frame;
     if (i == 0) {
       printf("ptr = %lx, table offset = %lx \n", _ptr, table[i * 2]);
     }
@@ -132,7 +132,7 @@ void DwarfParser::parseCie() {
 void DwarfParser::parseFde() {
 
   u32 fde_len = get32();
-//  printf("fde len = %u \n", fde_len);
+  //  printf("fde len = %u \n", fde_len);
   if (fde_len == 0 || fde_len == 0xffffffff) {
     return;
   }
@@ -140,7 +140,7 @@ void DwarfParser::parseFde() {
   const char *fde_start = _ptr;
   u32 cie_offset = get32();
   if (_count == 0) {
-#ifdef  DEBUG
+#ifdef DEBUG
     printf("Change pointer to %lx - %lx \n", fde_start, cie_offset);
 #endif
     _ptr = fde_start - cie_offset;
@@ -150,8 +150,8 @@ void DwarfParser::parseFde() {
 
   u32 range_start = getPtr() - _image_base;
   if (_count == 0) {
-    printf("Dwarf range start: %lx (ptr) - %lx (image) = %lx \n", getPtr(), _image_base,
-           range_start);
+    printf("Dwarf range start: %lx (ptr) - %lx (image) = %lx \n", getPtr(),
+           _image_base, range_start);
   }
 
   u32 range_len = get32();
