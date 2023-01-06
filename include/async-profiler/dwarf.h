@@ -140,6 +140,12 @@ public:
   DwarfParser(const char *name, const char *image_base,
               const char *eh_frame_hdr);
 
+  // manual parse of fde
+  DwarfParser(const char *name, const char *image_base);
+
+
+  void addFde(const char* fde, const char *cie);
+
   FrameDesc *table() const { return _table; }
 
   int count() const { return _count; }
