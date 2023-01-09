@@ -193,8 +193,8 @@ void DwarfParser::parseInstructions(u32 loc, const char *end) {
         // 16 bits alignement check
         if ((reinterpret_cast<unsigned long>(_ptr) & 0xf) != 0) {
           // The address is not 16-bit aligned here
-          printf("Addr is not aligned 0x%lx (code_align=%i)\n",
-                 _ptr, code_align);
+          printf("Addr is not aligned 0x%lx (code_align=%i)\n", _ptr,
+                 code_align);
           exit(1);
         }
 #endif

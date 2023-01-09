@@ -45,24 +45,30 @@ static bool is_ld(const std::string &path) {
   return path.starts_with("ld-");
 }
 
-
-bool utf8_check_is_valid(const std::string string)
-{
-  int c,i,ix,n,j;
-  for (i=0, ix=string.length(); i < ix; i++)
-  {
-    c = (unsigned char) string[i];
-    //if (c==0x09 || c==0x0a || c==0x0d || (0x20 <= c && c <= 0x7e) ) n = 0; // is_printable_ascii
-    if (0x00 <= c && c <= 0x7f) n=0; // 0bbbbbbb
-    else if ((c & 0xE0) == 0xC0) n=1; // 110bbbbb
-    else if ( c==0xed && i<(ix-1) && ((unsigned char)string[i+1] & 0xa0)==0xa0) return false; //U+d800 to U+dfff
-    else if ((c & 0xF0) == 0xE0) n=2; // 1110bbbb
-    else if ((c & 0xF8) == 0xF0) n=3; // 11110bbb
-    //else if (($c & 0xFC) == 0xF8) n=4; // 111110bb //byte 5, unnecessary in 4 byte UTF-8
-    //else if (($c & 0xFE) == 0xFC) n=5; // 1111110b //byte 6, unnecessary in 4 byte UTF-8
-    else return false;
-    for (j=0; j<n && i<ix; j++) { // n bytes matching 10bbbbbb follow ?
-      if ((++i == ix) || (( (unsigned char)string[i] & 0xC0) != 0x80))
+bool utf8_check_is_valid(const std::string string) {
+  int c, i, ix, n, j;
+  for (i = 0, ix = string.length(); i < ix; i++) {
+    c = (unsigned char)string[i];
+    // if (c==0x09 || c==0x0a || c==0x0d || (0x20 <= c && c <= 0x7e) ) n = 0; //
+    // is_printable_ascii
+    if (0x00 <= c && c <= 0x7f)
+      n = 0; // 0bbbbbbb
+    else if ((c & 0xE0) == 0xC0)
+      n = 1; // 110bbbbb
+    else if (c == 0xed && i < (ix - 1) &&
+             ((unsigned char)string[i + 1] & 0xa0) == 0xa0)
+      return false; // U+d800 to U+dfff
+    else if ((c & 0xF0) == 0xE0)
+      n = 2; // 1110bbbb
+    else if ((c & 0xF8) == 0xF0)
+      n = 3; // 11110bbb
+    // else if (($c & 0xFC) == 0xF8) n=4; // 111110bb //byte 5, unnecessary in 4
+    // byte UTF-8 else if (($c & 0xFE) == 0xFC) n=5; // 1111110b //byte 6,
+    // unnecessary in 4 byte UTF-8
+    else
+      return false;
+    for (j = 0; j < n && i < ix; j++) { // n bytes matching 10bbbbbb follow ?
+      if ((++i == ix) || (((unsigned char)string[i] & 0xC0) != 0x80))
         return false;
     }
   }
@@ -75,12 +81,11 @@ static DDRes symbolize(UnwindState *us) {
   CodeCacheArray &cache_arary = us->code_cache[us->pid];
   for (unsigned i = 0; i < callchain.size(); ++i) {
     output.symbols[i] = "unknown";
-    CodeCache *code_cache = findLibraryByAddress(&cache_arary,
-                                                 callchain[i]);
+    CodeCache *code_cache = findLibraryByAddress(&cache_arary, callchain[i]);
     if (code_cache) {
       output.symbols[i] = code_cache->binarySearch(callchain[i]);
 #ifdef DEBUG
-      if(!utf8_check_is_valid(std::string(output.symbols[i]))){
+      if (!utf8_check_is_valid(std::string(output.symbols[i]))) {
         printf("INVALID UTF8 = %s \n", output.symbols[i]);
         exit(1);
       }
@@ -110,7 +115,7 @@ DDRes unwindstate__unwind(UnwindState *us) {
     // todo remove char* in favour of uint64
     us->output.nb_locs =
         stackWalk(&code_cache_array, sc, buffer, (us->output.callchain),
-                  DD_MAX_STACK_DEPTH, 0);
+                  DD_MAX_STACK_DEPTH - 2, 0);
   }
   // todo error management (error frame)
   // Add a frame that identifies executable to which these belong
