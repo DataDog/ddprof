@@ -185,11 +185,8 @@ static void write_line_v2(const char *func, ddog_Line *ffi_line) {
   ffi_line->line = 0;
 }
 
-#include "async-profiler/codeCache.h"
-#include "async-profiler/stackWalker.h"
-
 DDRes pprof_aggregate_v2(ddprof::span<const void *> callchain,
-                         CodeCacheArray &cache_arary, uint64_t value,
+                         ddprof::span<const char *> symbols, uint64_t value,
                          uint64_t count, const PerfWatcher *watcher,
                          DDProfPProf *pprof) {
   ddog_Profile *profile = pprof->_profile;
@@ -205,19 +202,12 @@ DDRes pprof_aggregate_v2(ddprof::span<const void *> callchain,
   ddog_Line line_buff[DD_MAX_STACK_DEPTH];
 
   // todo skip frames
-  unsigned cur_loc = 0;
-  for (const void *ip : callchain) {
-    const char *func = "unknown";
-    CodeCache *code_cache = findLibraryByAddress(&cache_arary, ip);
-    if (code_cache) {
-      func = code_cache->binarySearch(ip);
-    }
-
+  for(int i = 0; i < symbols.size(); ++i ) {
+    assert(i < DD_MAX_STACK_DEPTH);
     // possibly several lines to handle inlined function (not handled for now)
-    write_line_v2(func, &line_buff[cur_loc]);
-    ddog_Slice_line lines = {.ptr = &line_buff[cur_loc], .len = 1};
-    write_location_v2(ip, &lines, &locations_buff[cur_loc]);
-    ++cur_loc;
+    write_line_v2(symbols[i], &line_buff[i]);
+    ddog_Slice_line lines = {.ptr = &line_buff[i], .len = 1};
+    write_location_v2(callchain[i], &lines, &locations_buff[i]);
   }
 
   ddog_Label labels[PPROF_MAX_LABELS] = {};
@@ -237,7 +227,7 @@ DDRes pprof_aggregate_v2(ddprof::span<const void *> callchain,
     ++labels_num;
   }
   ddog_Sample sample = {
-      .locations = {.ptr = locations_buff, .len = cur_loc},
+      .locations = {.ptr = locations_buff, .len = symbols.size()},
       .values = {.ptr = values, .len = pprof->_nb_values},
       .labels = {.ptr = labels, .len = labels_num},
   };
@@ -344,12 +334,10 @@ DDRes pprof_reset(DDProfPProf *pprof) {
   return ddres_init();
 }
 
-void ddprof_print_sample(const UnwindOutput &uw_output,
-                         const SymbolHdr &symbol_hdr, uint64_t value,
+void ddprof_print_sample(const UnwindOutput_V2 &uw_output, uint64_t value,
                          const PerfWatcher &watcher) {
 
-  auto &symbol_table = symbol_hdr._symbol_table;
-  ddprof::span locs{uw_output.locs, uw_output.nb_locs};
+  ddprof::span locs{uw_output.callchain, uw_output.nb_locs};
 
   const char *sample_name = sample_type_name_from_idx(
       sample_type_id_to_count_sample_type_id(watcher.sample_type_id));
@@ -358,26 +346,17 @@ void ddprof_print_sample(const UnwindOutput &uw_output,
       ddprof::string_format("sample[type=%s;pid=%ld;tid=%ld] ", sample_name,
                             uw_output.pid, uw_output.tid);
 
-  for (auto loc_it = locs.rbegin(); loc_it != locs.rend(); ++loc_it) {
-    auto &sym = symbol_table[loc_it->_symbol_idx];
-    if (loc_it != locs.rbegin()) {
+  for (int i = 0; i < uw_output.nb_locs; ++i) {
+    std::string_view cur_sym(uw_output.symbols[i]);
+    if (i==0){
       buf += ";";
     }
-    if (sym._symname.empty()) {
-      if (loc_it->ip == 0) {
-        std::string_view path{sym._srcpath};
-        auto pos = path.rfind('/');
-        buf += "(";
-        buf += path.substr(pos == std::string_view::npos ? 0 : pos + 1);
-        buf += ")";
-      } else {
-        buf += ddprof::string_format("%p", loc_it->ip);
-      }
+    // todo what if we don't have a sym ?
+    if (cur_sym.empty()) {
+      // todo add ip
     } else {
-      std::string_view func{sym._symname};
-      buf += func.substr(0, func.find('('));
+      buf += cur_sym.substr(0, cur_sym.find('('));
     }
   }
-
   PRINT_NFO("%s %ld", buf.c_str(), value);
 }
