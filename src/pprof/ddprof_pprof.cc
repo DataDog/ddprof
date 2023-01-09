@@ -201,7 +201,7 @@ DDRes pprof_aggregate_v2(ddprof::span<const void *> callchain,
   ddog_Line line_buff[DD_MAX_STACK_DEPTH];
 
   // todo skip frames
-  for(int i = 0; i < symbols.size(); ++i ) {
+  for (int i = 0; i < symbols.size(); ++i) {
     assert(i < DD_MAX_STACK_DEPTH);
     // possibly several lines to handle inlined function (not handled for now)
     write_line_v2(symbols[i], &line_buff[i]);
@@ -355,7 +355,7 @@ void ddprof_print_sample(const UnwindOutput_V2 &uw_output, uint64_t value,
 
   for (int i = 0; i < uw_output.nb_locs; ++i) {
     std::string_view cur_sym(uw_output.symbols[i]);
-    if (i==0){
+    if (i != 0) {
       buf += ";";
     }
     // todo what if we don't have a sym ?
@@ -365,5 +365,5 @@ void ddprof_print_sample(const UnwindOutput_V2 &uw_output, uint64_t value,
       buf += cur_sym.substr(0, cur_sym.find('('));
     }
   }
-  PRINT_NFO("%s %ld", buf.c_str(), value);
+  PRINT_NFO("(depth=%u) %s  %ld", uw_output.nb_locs, buf.c_str(), value);
 }

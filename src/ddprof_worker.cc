@@ -293,7 +293,6 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
           sample_val, 1,
           watcher, pprof));
     }
-
   }
 
   ddprof_stats_add(STATS_AGGREGATION_AVG_TIME,
