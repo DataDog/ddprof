@@ -279,30 +279,21 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
       // Depending on the type of watcher, compute a value for sample
       uint64_t sample_val = perf_value_from_sample(watcher, sample);
 
-<<<<<<< HEAD
       // in lib mode we don't aggregate (protect to avoid link failures)
       int i_export = ctx->worker_ctx.i_current_pprof;
       DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
-      DDRES_CHECK_FWD(pprof_aggregate_v2(ddprof::span(us->output.callchain, us->output.nb_locs), us->code_cache[sample->pid], sample_val, 1,
-                                         watcher, pprof));
-//      if (ctx->params.show_samples) {
-//        ddprof_print_sample(us->output, us->symbol_hdr, sample->period,
-//                            *watcher);
-//      }
-=======
-    // in lib mode we don't aggregate (protect to avoid link failures)
-    int i_export = ctx->worker_ctx.i_current_pprof;
-    DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
+      if (ctx->params.show_samples) {
+        ddprof_print_sample(us->output, sample->period, *watcher);
+      }
 
-    DDRES_CHECK_FWD(pprof_aggregate_v2(
-        ddprof::span(us->output.callchain, us->output.nb_locs),
-        us->code_cache[sample->pid], sample_val, 1, watcher, pprof));
-    if (ctx->params.show_samples) {
-      // todo show samples
-      //      ddprof_print_sample(us->output, us->symbol_hdr, sample->period,
-      //      *watcher);
->>>>>>> 78e0957 (Adding a benchmark for the async profiler)
+      DDRES_CHECK_FWD(pprof_aggregate_v2(
+          ddprof::span(us->output.callchain, us->output.nb_locs),
+          ddprof::span(us->output.symbols, us->output.nb_locs),
+          ddprof::span(us->output.code_cache, us->output.nb_locs),
+          sample_val, 1,
+          watcher, pprof));
     }
+
   }
 
   ddprof_stats_add(STATS_AGGREGATION_AVG_TIME,

@@ -159,16 +159,9 @@ TEST(DDProfExporter, simple) {
 
     res = pprof_create_profile(&pprofs, &ctx);
     EXPECT_TRUE(IsDDResOK(res));
-<<<<<<< HEAD
-
-    //    res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, 1, &ctx.watchers[0],
-    //                          &pprofs);
-
-=======
     //    res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, 1,
     //    &ctx.watchers[0],
     //                          &pprofs);
->>>>>>> 78e0957 (Adding a benchmark for the async profiler)
     EXPECT_TRUE(IsDDResOK(res));
   }
   {

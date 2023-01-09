@@ -29,7 +29,7 @@ struct DDProfPProf {
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx);
 
 DDRes pprof_aggregate_v2(ddprof::span<const void *> callchain,
-                         CodeCacheArray &cache_arary, uint64_t value,
+                         ddprof::span<const char *> symbols, uint64_t value,
                          uint64_t count, const PerfWatcher *watcher,
                          DDProfPProf *pprof);
 
@@ -51,6 +51,5 @@ DDRes pprof_write_profile(const DDProfPProf *pprof, int fd);
 
 DDRes pprof_free_profile(DDProfPProf *pprof);
 
-void ddprof_print_sample(const UnwindOutput &uw_output,
-                         const SymbolHdr &symbol_hdr, uint64_t value,
+void ddprof_print_sample(const UnwindOutput_V2 &uw_output, uint64_t value,
                          const PerfWatcher &watcher);
