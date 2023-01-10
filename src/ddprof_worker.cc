@@ -247,7 +247,9 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
 
     DDRES_CHECK_FWD(pprof_aggregate_v2(
         ddprof::span(us->output.callchain, us->output.nb_locs),
-        ddprof::span(us->output.symbols, us->output.nb_locs), sample_val, 1,
+        ddprof::span(us->output.symbols, us->output.nb_locs),
+        ddprof::span(us->output.code_cache, us->output.nb_locs),
+        sample_val, 1,
         watcher, pprof));
   }
 

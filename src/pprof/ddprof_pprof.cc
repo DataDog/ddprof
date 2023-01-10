@@ -144,6 +144,21 @@ static void write_function(const ddprof::Symbol &symbol,
   ffi_func->start_line = 0;
 }
 
+static void write_mapping_v2(const CodeCache *code_cache,
+                              ddog_Mapping *ffi_mapping) {
+  //  ffi_mapping->memory_start = (code_cache->minAddress());
+  ffi_mapping->memory_start = 0;
+  ffi_mapping->memory_limit = 0;
+  ffi_mapping->file_offset = 0;
+  if (code_cache) {
+    ffi_mapping->filename = to_CharSlice(code_cache->name());
+  }
+  else {
+    ffi_mapping->filename = to_CharSlice("unknown");
+  }
+  ffi_mapping->build_id = to_CharSlice("");
+}
+
 static void write_mapping(const ddprof::MapInfo &mapinfo,
                           ddog_Mapping *ffi_mapping) {
   ffi_mapping->memory_start = mapinfo._low_addr;
@@ -168,25 +183,33 @@ static void write_line(const ddprof::Symbol &symbol, ddog_Line *ffi_line) {
   ffi_line->line = symbol._lineno;
 }
 
-static void write_location_v2(const void *ip, const ddog_Slice_line *lines,
+static void write_location_v2(const void *ip,
+                              const ddog_Slice_line *lines,
+                              const CodeCache *code_cache,
                               ddog_Location *ffi_location) {
+  write_mapping_v2(code_cache, &ffi_location->mapping);
   ffi_location->address = reinterpret_cast<uint64_t>(ip);
   ffi_location->lines = *lines;
   // Folded not handled for now
   ffi_location->is_folded = false;
 }
 
-static void write_function_v2(const char *func, ddog_Function *ffi_func) {
+static void write_function_v2(const char *func, const char *filename, ddog_Function *ffi_func) {
+  // todo demangling
   ffi_func->name = to_CharSlice(string_view_create_strlen(func));
+  ffi_func->system_name = to_CharSlice(string_view_create_strlen(func));
+  ffi_func->filename = to_CharSlice(filename);
 }
 
-static void write_line_v2(const char *func, ddog_Line *ffi_line) {
-  write_function_v2(func, &ffi_line->function);
+static void write_line_v2(const char *func, const char *filename, ddog_Line *ffi_line) {
+  write_function_v2(func, filename, &ffi_line->function);
   ffi_line->line = 0;
 }
 
 DDRes pprof_aggregate_v2(ddprof::span<const void *> callchain,
-                         ddprof::span<const char *> symbols, uint64_t value,
+                         ddprof::span<const char *> symbols,
+                         ddprof::span<const CodeCache *> code_cache,
+                         uint64_t value,
                          uint64_t count, const PerfWatcher *watcher,
                          DDProfPProf *pprof) {
   ddog_Profile *profile = pprof->_profile;
@@ -205,9 +228,12 @@ DDRes pprof_aggregate_v2(ddprof::span<const void *> callchain,
   for (int i = 0; i < symbols.size(); ++i) {
     assert(i < DD_MAX_STACK_DEPTH);
     // possibly several lines to handle inlined function (not handled for now)
-    write_line_v2(symbols[i], &line_buff[i]);
+    // todo: get file name from dwarf
+    write_line_v2(symbols[i],
+                  code_cache[i]?code_cache[i]->name():"unknown",
+                  &line_buff[i]);
     ddog_Slice_line lines = {.ptr = &line_buff[i], .len = 1};
-    write_location_v2(callchain[i], &lines, &locations_buff[i]);
+    write_location_v2(callchain[i], &lines, code_cache[i], &locations_buff[i]);
   }
 
   ddog_Label labels[PPROF_MAX_LABELS] = {};
