@@ -41,7 +41,20 @@ bool read_memory(uint64_t addr, uint64_t *res, const ap::StackBuffer &buffer) {
   }
 
   if (addr < buffer.sp_start && addr > buffer.sp_start - 4096) {
-    // todo red zone thing
+    if (*res > buffer.sp_start && *res < buffer.sp_end) {
+      // todo this is true only on leaf function afaik ?
+      // printf("red zone optim (current value %lx) -- OK\n", *res);
+      // high addr
+      //
+      // sp(2)
+      //
+      // sp(3) (-32 fp_off)
+      //
+      // low addr
+      // red zone
+      return true;
+    }
+    //  printf("red zone optim (current value %lx) -- KO\n", *res);
     return false;
   } else if (addr < buffer.sp_start ||
              addr + sizeof(uint64_t) > buffer.sp_end) {
@@ -76,6 +89,8 @@ bool stepStackContext(ap::StackContext &sc, const ap::StackBuffer &buffer,
   if (cc == NULL || (f = cc->findFrameDesc(sc.pc)) == NULL) {
     f = &FrameDesc::default_frame;
   }
+//  const char *sym = cc?cc->binarySearch(sc.pc):"unknown";
+//  printf("-- Unwind from %s, %s \n", sym?sym:"unknown", cc?cc->name():"unknown");
   return stepStackContext(sc, buffer, f);
 }
 
@@ -93,9 +108,10 @@ bool stepStackContext(ap::StackContext &sc, const ap::StackBuffer &buffer,
   } else if (cfa_reg == DW_REG_PLT) {
     sc.sp += ((uintptr_t)sc.pc & 15) >= 11 ? cfa_off * 2 : cfa_off;
   } else {
+    // it is interesting to categorize these cases
+    // printf("unhandled reg \n");
     return false;
   }
-
   // Check if the next frame is below on the current stack
   if (sc.sp < prev_sp || sc.sp >= prev_sp + MAX_FRAME_SIZE || sc.sp >= bottom) {
     return false;
@@ -105,14 +121,7 @@ bool stepStackContext(ap::StackContext &sc, const ap::StackBuffer &buffer,
   if ((sc.sp & (sizeof(uintptr_t) - 1)) != 0) {
     return false;
   }
-  // high addr
-  //
-  // sp(2)
-  //
-  // sp(3) (-32 fp_off)
-  //
-  // red zone
-  // low addr
+
   if (f->fp_off & DW_PC_OFFSET) {
     sc.pc = (const char *)sc.pc + (f->fp_off >> 1);
   } else {
@@ -156,7 +165,6 @@ int stackWalk(CodeCacheArray *cache, ap::StackContext &sc,
               const ap::StackBuffer &buffer, void const **callchain,
               int max_depth, int skip) {
   int depth = -skip;
-
   // Walk until the bottom of the stack or until the first Java frame
   while (depth < max_depth) {
     int d = depth++;
@@ -167,6 +175,5 @@ int stackWalk(CodeCacheArray *cache, ap::StackContext &sc,
       break;
     }
   }
-
   return depth;
 }
