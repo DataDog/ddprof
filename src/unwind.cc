@@ -84,12 +84,18 @@ static DDRes symbolize(UnwindState *us) {
     CodeCache *code_cache = findLibraryByAddress(&cache_arary, callchain[i]);
     if (code_cache) {
       output.symbols[i] = code_cache->binarySearch(callchain[i]);
+      // Warning: assumption is that it stays valid until aggregation
+      output.code_cache[i] = code_cache;
 #ifdef DEBUG
+      // some issues with non utf 8 symbols
       if (!utf8_check_is_valid(std::string(output.symbols[i]))) {
         printf("INVALID UTF8 = %s \n", output.symbols[i]);
         exit(1);
       }
 #endif
+    }
+    else {
+      output.code_cache[i] = nullptr;
     }
   }
   return ddres_init();

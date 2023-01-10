@@ -11,6 +11,7 @@
 #include "perf_watcher.hpp"
 #include "tags.hpp"
 #include "unwind_output.hpp"
+#include "codeCache.h"
 
 #include "async-profiler/codeCache.h"
 #include "span.hpp"
@@ -29,7 +30,9 @@ struct DDProfPProf {
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx);
 
 DDRes pprof_aggregate_v2(ddprof::span<const void *> callchain,
-                         ddprof::span<const char *> symbols, uint64_t value,
+                         ddprof::span<const char *> symbols,
+                         ddprof::span<const CodeCache *> code_cache,
+                         uint64_t value,
                          uint64_t count, const PerfWatcher *watcher,
                          DDProfPProf *pprof);
 

@@ -694,6 +694,7 @@ void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array,
 
               // (vaddr_eh_frame - vaddr_eh_frame_hdr) - (offset_sec_1 -
               // offset_sec_2)
+              // If eh frame is not in the same segment
               Offset_t adjust_eh_frame =
                   (eh_frame_info._eh_frame._vaddr_sec -
                    eh_frame_info._eh_frame_hdr._vaddr_sec) -

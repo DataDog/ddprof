@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <vector>
 
+#include "codeCache.h"
 #include "ddprof_defs.hpp"
 #include "string_view.hpp"
 #include <vector>
@@ -38,6 +39,7 @@ struct UnwindOutput {
 struct UnwindOutput_V2 {
   const void *callchain[DD_MAX_STACK_DEPTH];
   const char *symbols[DD_MAX_STACK_DEPTH];
+  const CodeCache *code_cache[DD_MAX_STACK_DEPTH];
   uint64_t nb_locs;
   int pid = {};
   int tid = {};
