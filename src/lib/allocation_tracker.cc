@@ -222,7 +222,7 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
   lost_event->lost = lost_count;
   notify_needed = writer.commit(buffer);
   // Throttle future lost events, out of order write should not matter
-  _state.real_sample_pushed.store(false, std::memory_order_relaxed);
+  _state.real_sample_pushed.store(10, std::memory_order_relaxed);
   return {};
 }
 
@@ -233,7 +233,7 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
 
   bool timeout = false;
   if (unlikely(_state.lost_count.load(std::memory_order_relaxed))
-      && _state.real_sample_pushed.load(std::memory_order_acq_rel)) {
+      && (_state.real_sample_pushed.load(std::memory_order_relaxed) <= 0)) {
     DDRES_CHECK_FWD(push_lost_sample(writer, notify_consumer));
   }
 
@@ -278,7 +278,7 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
   event->dyn_size = save_context(tl_state.stack_end, event->regs,
                                  ddprof::Buffer{event->data, event->size});
   // Authorize the next lost events to be pushed
-  _state.real_sample_pushed.store(true, std::memory_order_acq_rel);
+  _state.real_sample_pushed.fetch_add(-1, std::memory_order_relaxed);
   if (writer.commit(buffer) || notify_consumer) {
     uint64_t count = 1;
     if (write(_pevent.fd, &count, sizeof(count)) != sizeof(count)) {

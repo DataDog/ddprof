@@ -64,7 +64,7 @@ private:
     std::atomic<bool> track_allocations = false;
     std::atomic<bool> track_deallocations = false;
     // The following flag avoids a flood of lost events
-    std::atomic<bool> real_sample_pushed = true;
+    std::atomic<int32_t> real_sample_pushed = 0;
     std::atomic<uint64_t> lost_count; // count number of lost events
     std::atomic<uint32_t> failure_count;
     std::atomic<pid_t> pid; // cache of pid
