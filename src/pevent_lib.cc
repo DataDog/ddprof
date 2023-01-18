@@ -165,10 +165,8 @@ static DDRes link_perfs(PerfWatcher *watcher, int watcher_idx, pid_t pid,
       stash_perf_id(id, probe);
 
       if (cpu_pevent_idx.contains(cpu_idx)) {
-        PRINT_NFO("  <%d:%d> <==(%d) Attaching watcher for %s", cpu_idx, fd, cpu_pevent_idx[cpu_idx], probe.tracepoint_name.c_str());
         pevent_add_child_fd(fd, pes[cpu_pevent_idx[cpu_idx]]);
       } else {
-        PRINT_NFO("<%d:%d>(%d) Created watcher for %s", cpu_idx, fd, cpu_pevent_idx[cpu_idx], probe.tracepoint_name.c_str());
         size_t pevent_idx = -1;
         DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
         pevent_set_info(fd, attr_idx, pes[pevent_idx]);
@@ -209,14 +207,15 @@ static DDRes tnoisycpu2_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
                             int num_cpu, PEventHdr *pevent_hdr) {
   const LinkedPerfConf conf = {
         {1, "sched", "sched_switch", false, true},
-        {2, "sched", "sched_stat_wait"},
-        {3, "sched", "sched_stat_sleep"},
-        {4, "sched", "sched_stat_iowait"},
+//        {2, "sched", "sched_stat_wait"},
+//        {3, "sched", "sched_stat_sleep"},
+//        {4, "sched", "sched_stat_iowait"},
         {5, "sched", "sched_stat_runtime"},
-        {6, "sched", "sched_process_fork"},
         {7, "sched", "sched_wakeup"},
-        {8, "sched", "sched_wakeup_new"},
-        {9, "sched", "sched_migrate_task"}};
+        {9, "sched", "sched_migrate_task"},
+        {10, "raw_syscalls", "sys_enter"},
+        {11, "raw_syscalls", "sys_exit"},
+  };
   return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf);
 }
 
@@ -383,12 +382,10 @@ DDRes pevent_setup(DDProfContext *ctx, pid_t pid, int num_cpu,
   // closed until profiling is completed.
   for (unsigned i = 0; i < pevent_hdr->size; i++) {
     PEvent *pes = &pevent_hdr->pes[i];
-    if ( tx->watchers[pes->wateher_pos].instrument_self) {
+    if ( ctx->watchers[pes->watcher_pos].instrument_self) {
       int fd = pes->fd;
-      PRINT_NFO("<%d> linking children", fd);
       for (int j = 0; j < pes->current_child_fd; ++j) {
         int child_fd = pes->child_fds[j];
-        PRINT_NFO("     <== (%d)", child_fd);
         if (ioctl(child_fd, PERF_EVENT_IOC_SET_OUTPUT, fd)) {
           DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
                                  "Could not ioctl() linked perf buffers");

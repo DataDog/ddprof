@@ -284,7 +284,9 @@ DDRes ddprof_exporter_export(const ddog_Profile *profile,
     if (exporter->_input.service_version)
       ret["version"] = exporter->_input.service_version;
 
-    std::ofstream jsoncpy("/tmp/noisy.timeline.json");
+    static int export_num = 0;
+    std::ofstream jsoncpy("/tmp/noisy.timeline." + std::to_string(export_num) + ".json");
+    export_num++;
     std::stringstream timeline_json = {};
     timeline_json << ret;
     std::string json_str = timeline_json.str();

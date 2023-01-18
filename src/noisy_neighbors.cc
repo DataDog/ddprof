@@ -7,8 +7,9 @@
 
 bool operator<(const ThreadFrame &A, const ThreadFrame &B) {
   if (A._method != B._method) return A._method < B._method;
-  if (A._filename != B._filename) return A._filename < B._filename;
-  if (A._class != B._class) return A._class < B._class;
-  if (A._package != B._package) return A._package < B._package;
+  if (A._line != B._line) return A._line < B._line;
+//  if (A._filename != B._filename) return A._filename < B._filename;
+//  if (A._class != B._class) return A._class < B._class;
+//  if (A._package != B._package) return A._package < B._package;
   return  false;
 }

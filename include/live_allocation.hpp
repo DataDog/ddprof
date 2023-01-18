@@ -37,7 +37,7 @@ public:
   using StackMap = std::unordered_map<uintptr_t, AllocationInfo>;
   using PidMap = std::unordered_map<pid_t, StackMap>;
 
-  PidMap _pid_map;
+  PidMap _pid_map = {};
 };
 
 } // namespace ddprof
