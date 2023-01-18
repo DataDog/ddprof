@@ -645,8 +645,15 @@ void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array,
       unsigned long inode = map.inode();
       printf("+++++ Considering %s ++++ \n", map.file());
       if (inode != 0) {
+        char proc_root_filename[1024] = {};
+        // use /proc/<pid>/root to access the file (whole host)
+        int n = snprintf(proc_root_filename, 1024, "%s/proc/%d/root%s", "", pid, map.file());
+        if (n < 0) {
+          printf("error encoding file %s \n", map.file());
+          continue;
+        }
+        int fd = open(proc_root_filename, O_RDONLY);
         // remote unwinding
-        int fd = open(map.file(), O_RDONLY);
         if (-1 == fd) {
           printf("error opening file %s \n", map.file());
           continue;
