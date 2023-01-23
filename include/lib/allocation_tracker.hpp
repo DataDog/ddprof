@@ -24,6 +24,7 @@ struct TrackerThreadLocalState {
   int64_t remaining_bytes; // remaining allocation bytes until next sample
   bool remaining_bytes_initialized; // false if remaining_bytes is not
                                     // initialized
+  const std::byte *stack_start;     // thread stack bounds
   const std::byte *stack_end;
   pid_t tid; // cache of tid
 

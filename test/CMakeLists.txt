@@ -371,6 +371,10 @@ if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endif()
 
+add_exe(coroutine_fibo coroutine_fibo.cc)
+
+add_exe(deep_recursive deep_recursive.cc LIBRARIES Threads::Threads)
+
 add_test(
   NAME ddprof_help
   COMMAND ddprof -h
