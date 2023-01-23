@@ -36,10 +36,11 @@ DDPROF_NOINLINE static void *get_stack_start_tls() {
 static void BM_SaveContext(benchmark::State &state) {
   uint64_t regs[PERF_REGS_COUNT];
   std::byte stack[PERF_SAMPLE_STACK_SIZE];
-  auto *stack_end = retrieve_stack_end_address();
+  const std::byte *stack_start, *stack_end = {};
+  int res = retrieve_stack_bounds(stack_start, stack_end);
 
   for (auto _ : state) {
-    save_context(stack_end, regs, stack);
+    save_context(stack_start, stack_end, regs, stack);
   }
 }
 
