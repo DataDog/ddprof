@@ -90,6 +90,9 @@ add_subdirectory(src/event_parser)
 # elfutils
 include(Findelfutils)
 
+# libunwind
+include(Findlibunwind)
+
 # ---- Static analysis ----
 include(ClangTidy)
 include(Format)

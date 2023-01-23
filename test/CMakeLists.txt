@@ -208,6 +208,21 @@ add_compile_definitions("DWFL_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 set_property(TARGET dwfl_module-ut PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 
 add_unit_test(
+  dwarf_unwind-ut
+  dwarf_unwind-ut.cc
+  ../src/lib/savecontext.cc
+  ../src/lib/saveregisters.cc
+  ../src/lib/allocation_tracker.cc
+  ../src/ringbuffer_utils.cc
+  ../src/perf_ringbuffer.cc
+  ../src/perf.cc
+  ../src/pevent_lib.cc
+  ../src/sys_utils.cc
+  ../src/user_override.cc
+  ../src/perf_watcher.cc
+  LIBRARIES ${ELFUTILS_LIBRARIES} libunwind)
+
+add_unit_test(
   savecontext-ut
   savecontext-ut.cc
   ../src/base_frame_symbol_lookup.cc
