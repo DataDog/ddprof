@@ -18,6 +18,12 @@
 #define DEFAULT_BUFF_SIZE_SHIFT 6
 // this does not count as pinned memory, use a larger size
 #define MPSC_BUFF_SIZE_SHIFT 8
+//    Discussion around size of the buffer
+// Events can be up to 4096 * 8 = 32768
+// With a shift of 8, we have a size of 1 052 672
+// So that is 1 052 672 / 32 768 ~= 32
+// Dyn sizes (actual size of stacks are smaller, sometimes 3 times)
+// Though we push fixed sizes to the ring buffer (to avoid an extra copy)
 
 #define PSAMPLE_DEFAULT_WAKEUP_MS 100 // sample frequency check
 
