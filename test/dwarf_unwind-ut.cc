@@ -28,7 +28,10 @@ DDPROF_NOINLINE size_t funcB(std::array<uint64_t, PERF_REGS_COUNT> &regs);
 
 size_t funcB(std::array<uint64_t, PERF_REGS_COUNT> &regs) {
   printf("Here we are in B %lx \n", _THIS_IP_);
-  size_t size = save_context(retrieve_stack_end_address(), regs, stack);
+  const std::byte *start, *end;
+  retrieve_stack_bounds(start, end);
+
+  size_t size = save_context(start, end, regs, stack);
 
   return size;
 }
@@ -45,8 +48,6 @@ TEST(dwarf_unwind, simple) {
   std::array<uint64_t, PERF_REGS_COUNT> regs;
   size_t size_stack = funcA(regs);
   EXPECT_TRUE(size_stack);
-
-
 
   //  ap::StackContext sc = ap::from_regs(ddprof::span(regs));
   //  ap::StackBuffer buffer(stack, sc.sp, sc.sp + size_stack);
@@ -78,6 +79,20 @@ TEST(dwarf_unwind, simple) {
 #include "ringbuffer_holder.hpp"
 #include "ringbuffer_utils.hpp"
 #include "span.hpp"
+
+int find_proc_info(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pip,
+                   int need_unwind_info, void *arg);
+void put_unwind_info(unw_addr_space_t as, unw_proc_info_t *pip, void *arg);
+int get_dyn_info_list_addr(unw_addr_space_t as, unw_word_t *dilap, void *arg);
+int access_mem(unw_addr_space_t as, unw_word_t addr, unw_word_t *valp,
+               int write, void *arg);
+int access_reg(unw_addr_space_t as, unw_regnum_t regnum, unw_word_t *valp,
+               int write, void *arg);
+int access_fpreg(unw_addr_space_t as, unw_regnum_t regnum, unw_fpreg_t *fpvalp,
+                 int write, void *arg);
+int resume(unw_addr_space_t as, unw_cursor_t *cp, void *arg);
+int get_proc_name(unw_addr_space_t as, unw_word_t addr, char *bufp,
+                  size_t buf_len, unw_word_t *offp, void *arg);
 
 DDPROF_NOINLINE void func_save_sleep(size_t size);
 DDPROF_NOINLINE void func_intermediate_0(size_t size);
@@ -116,6 +131,21 @@ TEST(dwarf_unwind, remote) {
     //    execvp("sleep", argList);
     return;
   }
+  unw_addr_space_t as;
+  unw_cursor_t cursor;
+  unw_word_t ip, sp;
+
+  unw_accessors_t ap;
+
+  //  unw_addr_space_t as = unw_create_addr_space(&ap, 0); // default byteorder
+  //
+  //  if (unw_init_remote(&cursor, as, (unw_word_t)temp_pid) < 0) {
+  //    fprintf(stderr, "unw_init_remote failed\n");
+  //    exit(1);
+  //  }
+  //
+  //  int res = unw_init_remote(unw_cursor_t *cursor, unw_addr_space_t as, void
+  //  *arg);
 
   // Load libraries from the fork - Cache array is relent to a single pid
   //  CodeCacheArray cache_arary;
@@ -161,5 +191,5 @@ TEST(dwarf_unwind, remote) {
   //    }
   // cleanup the producer fork
   kill(temp_pid, SIGTERM);
-//}
+  //}
 }
