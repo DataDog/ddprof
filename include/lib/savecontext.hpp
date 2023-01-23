@@ -18,7 +18,7 @@ DDPROF_NOIPO int retrieve_stack_bounds(const std::byte *&start,
 
 /** Save registers and stack for remote unwinding
  * Return saved stack size */
-DDPROF_NOIPO size_t save_context(const std::byte *start,
+DDPROF_NOIPO size_t save_context(const std::byte *stack_start,
                                  const std::byte *stack_end,
                                  ddprof::span<uint64_t, PERF_REGS_COUNT> regs,
                                  ddprof::span<std::byte> buffer);

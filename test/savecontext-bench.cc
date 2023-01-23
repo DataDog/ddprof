@@ -38,7 +38,9 @@ static void BM_SaveContext(benchmark::State &state) {
   std::byte stack[PERF_SAMPLE_STACK_SIZE];
   const std::byte *stack_start, *stack_end = {};
   int res = retrieve_stack_bounds(stack_start, stack_end);
-
+  if (res < 0) {
+    exit(1);
+  }
   for (auto _ : state) {
     save_context(stack_start, stack_end, regs, stack);
   }
