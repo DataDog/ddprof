@@ -17,21 +17,19 @@
 // Returns -1 in case of failure
 // Fills start (low address, so closer to SP) and end (stack end address is the
 // start of the stack since stack grows down)
-DDPROF_NOINLINE int retrieve_stack_bounds(const std::byte *&start,
-                                          const std::byte *&end) {
+DDPROF_NOINLINE ddprof::span<const std::byte> retrieve_stack_bounds() {
   void *stack_addr;
   size_t stack_size;
   pthread_attr_t attrs;
   if (pthread_getattr_np(pthread_self(), &attrs) != 0) {
-    return -1;
+    return {};
   }
   defer { pthread_attr_destroy(&attrs); };
   if (pthread_attr_getstack(&attrs, &stack_addr, &stack_size) != 0) {
-    return -1;
+    return {};
   }
-  start = static_cast<std::byte *>(stack_addr);
-  end = static_cast<std::byte *>(stack_addr) + stack_size;
-  return 0;
+  return {static_cast<std::byte *>(stack_addr),
+          static_cast<std::byte *>(stack_addr) + stack_size};
 }
 
 // Disable address sanitizer, otherwise it will report a stack-buffer-underflow
@@ -39,11 +37,15 @@ DDPROF_NOINLINE int retrieve_stack_bounds(const std::byte *&start,
 // intercepts memcpy and reports a satck underflow there, empirically it appears
 // that both attribute and a suppression are required.
 static DDPROF_NO_SANITIZER_ADDRESS size_t
-save_stack(const std::byte *stack_end, const std::byte *stack_ptr,
-           ddprof::span<std::byte> buffer) {
+save_stack(ddprof::span<const std::byte> stack_bounds,
+           const std::byte *stack_ptr, ddprof::span<std::byte> buffer) {
+  // Safety check to ensure we are not in a fiber using a different stack
+  if (stack_ptr <= stack_bounds.begin() && stack_ptr >= stack_bounds.end()) {
+    return 0;
+  }
   // take the min of current stack size and requested stack sample size~
-  int64_t saved_stack_size =
-      std::min(static_cast<intptr_t>(buffer.size()), stack_end - stack_ptr);
+  int64_t saved_stack_size = std::min(static_cast<intptr_t>(buffer.size()),
+                                      stack_bounds.end() - stack_ptr);
 
   if (saved_stack_size <= 0) {
     return 0;
@@ -54,18 +56,14 @@ save_stack(const std::byte *stack_end, const std::byte *stack_ptr,
   return saved_stack_size;
 }
 
-size_t save_context(const std::byte *stack_start, const std::byte *stack_end,
+size_t save_context(ddprof::span<const std::byte> stack_bounds,
                     ddprof::span<uint64_t, PERF_REGS_COUNT> regs,
                     ddprof::span<std::byte> buffer) {
   save_registers(regs);
-  // Safety check to ensure we are not in a fiber using a different stack
-  if (reinterpret_cast<const std::byte *>(regs[REGNAME(SP)]) > stack_start &&
-      reinterpret_cast<const std::byte *>(regs[REGNAME(SP)]) < stack_end) {
-    // save the stack just after saving registers, stack part above saved SP
-    // must no be changed between call to save_registers and call to save_stack
-    return save_stack(stack_end,
-                      reinterpret_cast<const std::byte *>(regs[REGNAME(SP)]),
-                      buffer);
-  }
+  // save the stack just after saving registers, stack part above saved SP
+  // must no be changed between call to save_registers and call to save_stack
+  return save_stack(stack_bounds,
+                    reinterpret_cast<const std::byte *>(regs[REGNAME(SP)]),
+                    buffer);
   return 0;
 }

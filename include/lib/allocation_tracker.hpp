@@ -8,6 +8,7 @@
 #include "ddprof_base.hpp"
 #include "ddres_def.hpp"
 #include "pevent.hpp"
+#include "span.hpp"
 #include "unlikely.hpp"
 
 #include <atomic>
@@ -24,8 +25,7 @@ struct TrackerThreadLocalState {
   int64_t remaining_bytes; // remaining allocation bytes until next sample
   bool remaining_bytes_initialized; // false if remaining_bytes is not
                                     // initialized
-  const std::byte *stack_start;     // thread stack bounds
-  const std::byte *stack_end;
+  ddprof::span<const byte> stack_bounds;
   pid_t tid; // cache of tid
 
   bool reentry_guard; // prevent reentry in AllocationTracker (eg. when

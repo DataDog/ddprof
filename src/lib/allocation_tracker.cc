@@ -263,9 +263,10 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
     tl_state.tid = ddprof::gettid();
   }
 
-  if (tl_state.stack_end == nullptr) {
+  if (tl_state.stack_bounds.size() == 0) {
     // This call should only occur on main thread
-    if (retrieve_stack_bounds(tl_state.stack_start, tl_state.stack_end) < 0) {
+    tl_state.stack_bounds = retrieve_stack_bounds();
+    if (tl_state.stack_bounds.size() == 0) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB, "Unable to get thread bounds");
     }
   }
@@ -275,9 +276,8 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
   event->period = allocated_size;
   event->size = PERF_SAMPLE_STACK_SIZE;
 
-  event->dyn_size =
-      save_context(tl_state.stack_start, tl_state.stack_end, event->regs,
-                   ddprof::Buffer{event->data, event->size});
+  event->dyn_size = save_context(tl_state.stack_bounds, event->regs,
+                                 ddprof::Buffer{event->data, event->size});
   // discard if dyn_size == 0, this way, we will skip over it
   if (writer.commit(buffer, (event->dyn_size == 0)) || notify_consumer) {
     uint64_t count = 1;
@@ -315,9 +315,8 @@ void AllocationTracker::notify_thread_start() {
   TrackerThreadLocalState &tl_state = AllocationTracker::_tl_state;
 
   ReentryGuard guard(&_tl_state.reentry_guard);
-  if (retrieve_stack_bounds(tl_state.stack_start, tl_state.stack_end) < 0) {
-    // error can not be propagated in thread create
-  }
+  tl_state.stack_bounds = retrieve_stack_bounds();
+  // error can not be propagated in thread create
 }
 
 void AllocationTracker::notify_fork() {
