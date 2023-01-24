@@ -13,7 +13,7 @@
 #include "span.hpp"
 
 /** Cache stack end from current thread in TLS for future use */
-DDPROF_NOINLINE ddprof::span<const std::byte> retrieve_stack_bounds();
+DDPROF_NOIPO ddprof::span<const std::byte> retrieve_stack_bounds();
 
 /** Save registers and stack for remote unwinding
  * Return saved stack size */
