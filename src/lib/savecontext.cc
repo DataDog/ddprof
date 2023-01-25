@@ -61,7 +61,7 @@ size_t save_context(ddprof::span<const std::byte> stack_bounds,
                     ddprof::span<std::byte> buffer) {
   save_registers(regs);
   // save the stack just after saving registers, stack part above saved SP
-  // must no be changed between call to save_registers and call to save_stack
+  // must not be changed between call to save_registers and call to save_stack
   return save_stack(stack_bounds,
                     reinterpret_cast<const std::byte *>(regs[REGNAME(SP)]),
                     buffer);

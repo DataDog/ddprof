@@ -27,8 +27,7 @@ std::byte stack[PERF_SAMPLE_STACK_SIZE];
 void funcB() {
   UnwindState state;
   uint64_t regs[K_NB_REGS_UNWIND];
-  ddprof::span<const std::byte> stack_bounds = retrieve_stack_bounds();
-  size_t stack_size = save_context(stack_bounds, regs, stack);
+  size_t stack_size = save_context(retrieve_stack_bounds(), regs, stack);
 
   ddprof::unwind_init_sample(&state, regs, getpid(), stack_size,
                              reinterpret_cast<char *>(stack));
@@ -66,8 +65,7 @@ static uint64_t regs[K_NB_REGS_UNWIND];
 static size_t stack_size;
 
 DDPROF_NO_SANITIZER_ADDRESS void handler(int sig) {
-  ddprof::span<const std::byte> stack_bounds = retrieve_stack_bounds();
-  stack_size = save_context(stack_bounds, regs, stack);
+  stack_size = save_context(retrieve_stack_bounds(), regs, stack);
   stop = true;
 }
 
