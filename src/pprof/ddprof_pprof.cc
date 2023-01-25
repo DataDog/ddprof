@@ -192,6 +192,12 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
 
   if (watcher->options.nb_frames_to_skip < locs.size()) {
     locs = locs.subspan(watcher->options.nb_frames_to_skip);
+  } else {
+    // Keep the last two frames. In the case of stacks that we could not unwind
+    // We will have the following stack: binary_name; [incomplete]
+    if (locs.size() >= 3) {
+      locs = locs.subspan(locs.size() - 2);
+    }
   }
 
   unsigned cur_loc = 0;

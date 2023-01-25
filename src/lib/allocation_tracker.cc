@@ -278,8 +278,9 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
 
   event->dyn_size = save_context(tl_state.stack_bounds, event->regs,
                                  ddprof::Buffer{event->data, event->size});
-  // discard if dyn_size == 0, this way, we will skip over it
-  if (writer.commit(buffer, (event->dyn_size == 0)) || notify_consumer) {
+  // Even if dyn_size == 0, we keep the sample
+  // This way, the overall accounting is correct (even with empty stacks)
+  if (writer.commit(buffer) || notify_consumer) {
     uint64_t count = 1;
     if (write(_pevent.fd, &count, sizeof(count)) != sizeof(count)) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
