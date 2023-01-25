@@ -14,7 +14,7 @@
 #include <cstring>
 #include <pthread.h>
 
-// Returns -1 in case of failure
+// Returns an empty span in case of failure
 // Fills start (low address, so closer to SP) and end (stack end address is the
 // start of the stack since stack grows down)
 DDPROF_NOINLINE ddprof::span<const std::byte> retrieve_stack_bounds() {
@@ -40,7 +40,7 @@ static DDPROF_NO_SANITIZER_ADDRESS size_t
 save_stack(ddprof::span<const std::byte> stack_bounds,
            const std::byte *stack_ptr, ddprof::span<std::byte> buffer) {
   // Safety check to ensure we are not in a fiber using a different stack
-  if (!(stack_ptr > stack_bounds.begin() && stack_ptr < stack_bounds.end())) {
+  if (!(stack_ptr >= stack_bounds.begin() && stack_ptr < stack_bounds.end())) {
     return 0;
   }
   // take the min of current stack size and requested stack sample size~

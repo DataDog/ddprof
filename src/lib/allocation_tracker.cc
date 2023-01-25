@@ -263,10 +263,10 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
     tl_state.tid = ddprof::gettid();
   }
 
-  if (tl_state.stack_bounds.size() == 0) {
+  if (tl_state.stack_bounds.empty()) {
     // This call should only occur on main thread
     tl_state.stack_bounds = retrieve_stack_bounds();
-    if (tl_state.stack_bounds.size() == 0) {
+    if (tl_state.stack_bounds.empty()) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB, "Unable to get thread bounds");
     }
   }

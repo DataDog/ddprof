@@ -37,7 +37,7 @@ static void BM_SaveContext(benchmark::State &state) {
   uint64_t regs[PERF_REGS_COUNT];
   std::byte stack[PERF_SAMPLE_STACK_SIZE];
   ddprof::span<const std::byte> stack_bounds = retrieve_stack_bounds();
-  if (stack_bounds.size() == 0) {
+  if (stack_bounds.empty()) {
     exit(1);
   }
   for (auto _ : state) {
