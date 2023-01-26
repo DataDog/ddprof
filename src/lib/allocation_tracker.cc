@@ -263,9 +263,12 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
     tl_state.tid = ddprof::gettid();
   }
 
-  if (tl_state.stack_end == nullptr) {
+  if (tl_state.stack_bounds.empty()) {
     // This call should only occur on main thread
-    tl_state.stack_end = retrieve_stack_end_address();
+    tl_state.stack_bounds = retrieve_stack_bounds();
+    if (tl_state.stack_bounds.empty()) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB, "Unable to get thread bounds");
+    }
   }
 
   event->sample_id.pid = _state.pid;
@@ -273,9 +276,10 @@ DDRes AllocationTracker::push_sample(uint64_t allocated_size,
   event->period = allocated_size;
   event->size = PERF_SAMPLE_STACK_SIZE;
 
-  event->dyn_size = save_context(tl_state.stack_end, event->regs,
+  event->dyn_size = save_context(tl_state.stack_bounds, event->regs,
                                  ddprof::Buffer{event->data, event->size});
-
+  // Even if dyn_size == 0, we keep the sample
+  // This way, the overall accounting is correct (even with empty stacks)
   if (writer.commit(buffer) || notify_consumer) {
     uint64_t count = 1;
     if (write(_pevent.fd, &count, sizeof(count)) != sizeof(count)) {
@@ -312,7 +316,8 @@ void AllocationTracker::notify_thread_start() {
   TrackerThreadLocalState &tl_state = AllocationTracker::_tl_state;
 
   ReentryGuard guard(&_tl_state.reentry_guard);
-  tl_state.stack_end = retrieve_stack_end_address();
+  tl_state.stack_bounds = retrieve_stack_bounds();
+  // error can not be propagated in thread create
 }
 
 void AllocationTracker::notify_fork() {

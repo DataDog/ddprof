@@ -12,11 +12,12 @@
 #include "perf_archmap.hpp"
 #include "span.hpp"
 
-/** Cache stack end from current thread in TLS for future use */
-DDPROF_NOIPO const std::byte *retrieve_stack_end_address();
+/**Retrieve stack bounds from current thread.
+   Return an empty span in case of failure.*/
+DDPROF_NOIPO ddprof::span<const std::byte> retrieve_stack_bounds();
 
 /** Save registers and stack for remote unwinding
  * Return saved stack size */
-DDPROF_NOIPO size_t save_context(const std::byte *stack_end,
+DDPROF_NOIPO size_t save_context(ddprof::span<const std::byte> stack_bounds,
                                  ddprof::span<uint64_t, PERF_REGS_COUNT> regs,
                                  ddprof::span<std::byte> buffer);
