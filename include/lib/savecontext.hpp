@@ -12,7 +12,8 @@
 #include "perf_archmap.hpp"
 #include "span.hpp"
 
-/** Cache stack bounds from current thread in TLS for future use */
+/**Retrieve stack bounds from current thread.
+   Return an empty span in case of failure.*/
 DDPROF_NOIPO ddprof::span<const std::byte> retrieve_stack_bounds();
 
 /** Save registers and stack for remote unwinding
