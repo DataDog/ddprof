@@ -46,11 +46,11 @@ void save_registers(ddprof::span<uint64_t, PERF_REGS_COUNT>) {
       "movq %%r14, %c[iR14]*8(%%rdi)\n"
       "movq %%r15, %c[iR15]*8(%%rdi)\n"
       // Bump the stack by 8 bytes to remove the return address,
-      // that way we will have the value of RSP after funtion return
+      // that way we will have the value of RSP after function return
       "leaq 8(%%rsp), %%rax\n"
       "movq %%rax, %c[iRSP]*8(%%rdi)\n"
       // 0(%rsp) contains the return address, this is the value of RIP after
-      // funtion return
+      // function return
       "movq 0(%%rsp), %%rax\n"
       "movq %%rax, %c[iRIP]*8(%%rdi)\n"
       "ret\n"
