@@ -309,6 +309,8 @@ add_unit_test(symbol_map-ut symbol_map-ut.cc ../src/symbol_map.cc)
 
 add_unit_test(build_id-ut build_id-ut.cc ../src/build_id.cc)
 
+add_unit_test(jitdump-ut jitdump-ut.cc ../src/jit/jitdump.cc)
+
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/savecontext.cc
               ../src/lib/saveregisters.cc)
 

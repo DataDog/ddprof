@@ -48,6 +48,7 @@
   X(INPUT_PROCESS, "")                                                         \
   X(STACK_HANDLE, "")                                                          \
   X(DSO, "")                                                                   \
+  X(JIT, "")                                                                   \
   X(UNHANDLED_DSO, "ignore dso type")                                          \
   X(WORKERLOOP_INIT, "error initializing the worker loop")                     \
   X(SYS_CONFIG, "error checking system configuration")                         \
