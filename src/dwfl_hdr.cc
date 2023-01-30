@@ -92,7 +92,7 @@ std::vector<pid_t> DwflHdr::get_unvisited() const {
   return pids_remove;
 }
 
-std::vector<pid_t> DwflHdr::reset_unvisited() {
+void DwflHdr::reset_unvisited() {
   // clear the list of visited for next cycle
   _visited_pid.clear();
 }
