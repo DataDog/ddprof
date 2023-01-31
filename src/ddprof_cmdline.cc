@@ -48,6 +48,67 @@ bool arg_yesno(const char *str, int mode) {
   return false;
 }
 
+long id_from_tracepoint(const char *gname, const char *tname) {
+  char path[2048] = {0}; // somewhat arbitrarily
+  size_t sz_path = sizeof(path);
+  char buf[64] = {0};
+  char *buf_copy = buf;
+
+  // Need to figure out whether we use debugfs or tracefs
+  static int use_tracefs = -1; // -2 error, -1 init, 0 no, 1 yes
+  static char tracefs_path[] = "/sys/kernel/tracing/events";
+  static char debugfs_path[] = "/sys/kernel/debug/tracing/events";
+
+  if (!gname || !*gname || !tname || !*tname) {
+    return -1;
+  }
+
+  if (use_tracefs == -2) {
+    // We checked in a previous loop and couldn't read tracef or debugfs
+    return -1;
+  } else if (use_tracefs == -1) {
+    struct stat sb;
+    if (stat(tracefs_path, &sb)) {
+      // If we're here, the stat failed so we can't use tracefs
+      if (stat(debugfs_path, &sb)) {
+        // If we're here, debugfs failed too, return error
+        use_tracefs = -2;
+        return -1;
+      }
+      use_tracefs = 0; // Use debugfs
+    } else {
+      use_tracefs = 1; // Use tracefs
+    }
+  }
+
+  // Check validity of given tracepoint
+  char *spath = use_tracefs ? tracefs_path : debugfs_path;
+  int pathsz = snprintf(path, sz_path, "%s/%s/%s/id", spath, gname, tname);
+  if (static_cast<size_t>(pathsz) >= sz_path) {
+    // Possibly ran out of room
+    return -1;
+  }
+  int fd = open(path, O_RDONLY);
+  if (-1 == fd) {
+    return -1;
+  }
+
+  // Read the data in an eintr-safe way
+  int read_ret = -1;
+  long trace_id = -1;
+  do {
+    read_ret = read(fd, buf, sizeof(buf));
+  } while (read_ret == -1 && errno == EINTR);
+  close(fd);
+  if (read_ret > 0)
+    trace_id = strtol(buf, &buf_copy, 10);
+  if (*buf_copy && *buf_copy != '\n') {
+    return -1;
+  }
+
+  return trace_id;
+}
+
 unsigned int tracepoint_id_from_event(const char *eventname,
                                       const char *groupname) {
   if (!eventname || !*eventname || !groupname || !*groupname)
@@ -169,5 +230,36 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   watcher->tracepoint_event = conf->eventname;
   watcher->tracepoint_group = conf->groupname;
   watcher->tracepoint_label = conf->label;
+
+  // Certain watcher configs get additional event information
+  if (watcher->config == kDDPROF_COUNT_ALLOCATIONS) {
+    watcher->sample_type |= PERF_SAMPLE_ADDR;
+  }
+
+  // Some profiling types get lots of additional state transplanted here
+  if (watcher->options.is_overloaded) {
+    if (watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS1) {
+      // tALLOCSY1 overrides perfopen to bind together many file descriptors
+      watcher->tracepoint_group = "syscalls";
+      watcher->tracepoint_label = "sys_exit_mmap";
+      watcher->instrument_self = true;
+      watcher->options.use_kernel = PerfWatcherUseKernel::kTry;
+      watcher->sample_stack_size /= 2; // Make this one smaller than normal
+
+    } else if (watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS2) {
+      // tALLOCSYS2 captures all syscalls; used to troubleshoot 1
+      watcher->tracepoint_group = "raw_syscalls";
+      watcher->tracepoint_label = "sys_exit";
+      long id = id_from_tracepoint("raw_syscalls", "sys_exit");
+      if (-1 == id) {
+        // We mutated the user's event, but it is invalid.
+        return false;
+      }
+      watcher->config = id;
+    }
+    watcher->sample_type |= PERF_SAMPLE_RAW;
+    watcher->options.use_kernel = PerfWatcherUseKernel::kTry;
+  }
+
   return true;
 }

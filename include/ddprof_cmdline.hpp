@@ -27,4 +27,6 @@ bool arg_inset(const char *str, char const *const *set, int sz_set);
 
 bool arg_yesno(const char *str, int mode);
 
+long id_from_tracepoint(const char *gname, const char *tname);
+
 bool watcher_from_str(const char *str, PerfWatcher *watcher);

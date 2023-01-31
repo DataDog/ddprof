@@ -5,6 +5,7 @@
 
 #include "pevent_lib.hpp"
 
+#include "ddprof_cmdline.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "perf.hpp"
@@ -61,6 +62,85 @@ static void pevent_set_info(int fd, int attr_idx, PEvent &pevent) {
   pevent.custom_event = false;
   pevent.ring_buffer_type = RingBufferType::kPerfRingBuffer;
   pevent.attr_idx = attr_idx;
+}
+
+static void pevent_add_child_fd(int child_fd, PEvent &pevent) {
+  pevent.child_fds[pevent.current_child_fd++] = child_fd;
+}
+
+static DDRes tallocsys1_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
+                             int num_cpu, PEventHdr *pevent_hdr) {
+  PerfWatcher watcher_copy = *watcher;
+  PEvent *pes = pevent_hdr->pes;
+
+  struct talloc_conf {
+    int fd;
+    bool enable_userstack;
+  };
+  std::unordered_map<std::string, talloc_conf> kprobes{
+      {"sys_exit_mmap", {-1, true}},
+      {"sys_exit_munmap", {-1, false}},
+      {"sys_exit_mremap", {-1, true}}};
+
+  // Set the IDs
+  for (auto &kprobe : kprobes) {
+    long id = id_from_tracepoint("syscalls", kprobe.first.c_str());
+    if (-1 == id) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
+                             "Error opening tracefs for tALLOCSYS1 on %s",
+                             kprobe.first.c_str());
+    }
+    kprobes[kprobe.first].fd = id;
+  }
+
+  // Iterate
+  for (int cpu_idx = 0; cpu_idx < num_cpu; ++cpu_idx) {
+    int fd = -1;
+    // Create the pevent which will consolidate this watcher
+    size_t pevent_idx = -1;
+    DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
+    perf_event_attr attr = {};
+    std::vector<int> cleanup_fds;
+
+    // This is very imperfect since failure leaves a dangling pevent
+    // TODO
+    for (auto &kprobe : kprobes) {
+      watcher_copy.tracepoint_group = "syscalls";
+      watcher_copy.tracepoint_label = kprobe.first.c_str();
+      watcher_copy.config = kprobe.second.fd;
+
+      // THIS IS WRONG
+      if (kprobe.second.enable_userstack) {
+        watcher_copy.sample_stack_size = watcher->sample_stack_size;
+      } else {
+        watcher_copy.sample_stack_size = 0;
+      }
+
+      attr = perf_config_from_watcher(&watcher_copy, true);
+      int fd_tmp = -1;
+      fd_tmp = perf_event_open(&attr, pid, cpu_idx, -1, PERF_FLAG_FD_CLOEXEC);
+
+      if (-1 == fd_tmp) {
+        for (auto cleanup_fd : cleanup_fds) {
+          close(cleanup_fd);
+        }
+        DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
+                               "Error calling perfopen for tALLOCSYS1 on %s",
+                               kprobe.first.c_str());
+      }
+      if (-1 != fd) {
+        pevent_add_child_fd(fd_tmp, pes[pevent_idx]);
+      } else {
+        fd = fd_tmp;
+      }
+      cleanup_fds.push_back(fd_tmp);
+    }
+    pevent_hdr->attrs[pevent_hdr->nb_attrs] = attr;
+    pevent_set_info(fd, pes[pevent_idx].attr_idx, pes[pevent_idx]);
+    ++pevent_hdr->nb_attrs;
+  }
+
+  return ddres_init();
 }
 
 static DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
@@ -131,9 +211,17 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
                   PEventHdr *pevent_hdr) {
   assert(pevent_hdr->size == 0); // check for previous init
   for (int watcher_idx = 0; watcher_idx < ctx->num_watchers; ++watcher_idx) {
-    if (ctx->watchers[watcher_idx].type < kDDPROF_TYPE_CUSTOM) {
-      DDRES_CHECK_FWD(pevent_open_all_cpus(
-          &ctx->watchers[watcher_idx], watcher_idx, pid, num_cpu, pevent_hdr));
+    PerfWatcher *watcher = &ctx->watchers[watcher_idx];
+    if (watcher->instrument_self) {
+      // Here we inline a lookup for the specific handler, but in reality this
+      // should be defined at the level of the watcher
+      if (watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS1) {
+        DDRES_CHECK_FWD(
+            tallocsys1_open(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
+      }
+    } else if (watcher->type < kDDPROF_TYPE_CUSTOM) {
+      DDRES_CHECK_FWD(
+          pevent_open_all_cpus(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
     } else {
       // custom event, eg.allocation profiling
       size_t pevent_idx = 0;
@@ -200,6 +288,23 @@ DDRes pevent_setup(DDProfContext *ctx, pid_t pid, int num_cpu,
   if (!IsDDResOK(pevent_mmap(pevent_hdr, true))) {
     LG_NTC("Retrying attachment without user override");
     DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, false));
+  }
+
+  // If any watchers have self-instrumentation, then they may have set up child
+  // fds which now need to be consolidated via ioctl.  These fds cannot be
+  // closed until profiling is completed.
+  for (unsigned i = 0; i < pevent_hdr->size; i++) {
+    PEvent *pes = &pevent_hdr->pes[i];
+    if (ctx->watchers[pes->watcher_pos].instrument_self) {
+      int fd = pes->fd;
+      for (int j = 0; j < pes->current_child_fd; ++j) {
+        int child_fd = pes->child_fds[j];
+        if (ioctl(child_fd, PERF_EVENT_IOC_SET_OUTPUT, fd)) {
+          DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
+                                 "Could not ioctl() tALLOCSYS1");
+        }
+      }
+    }
   }
   return ddres_init();
 }
