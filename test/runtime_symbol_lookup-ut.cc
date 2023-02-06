@@ -60,4 +60,26 @@ TEST(runtime_symbol_lookup, overflow) {
   }
 }
 
+TEST(runtime_symbol_lookup, jitdump_simple) {
+  LogHandle log_handle;
+  pid_t mypid = getpid();
+  SymbolTable symbol_table;
+  RuntimeSymbolLookup runtime_symbol_lookup(UNIT_TEST_DATA);
+  ProcessAddress_t pc = 0x7bea23b00390;
+  std::string jit_path =
+      std::string(UNIT_TEST_DATA) + "/" + std::string("jit.dump");
+  SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
+      mypid, pc, symbol_table, jit_path);
+  ASSERT_NE(symbol_idx, -1);
+  ASSERT_EQ(std::string("julia_b_11"), symbol_table[symbol_idx]._demangle_name);
+}
+
+TEST(runtime_symbol_lookup, jitdump_override) {
+  // test what happens when the file is altered
+}
+
+TEST(runtime_symbol_lookup, lock_file) {
+  // test that we are locking the file
+}
+
 } // namespace ddprof

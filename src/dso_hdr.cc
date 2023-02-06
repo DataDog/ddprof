@@ -58,50 +58,6 @@ FileHolder open_proc_maps(int pid, const char *path_to_proc = "") {
   }
   return FileHolder{f};
 }
-
-#ifndef NDEBUG
-static bool ip_in_procline(char *line, uint64_t ip) {
-  static const char spec[] = "%lx-%lx %4c %lx %*x:%*x %*d%n";
-  uint64_t m_start = 0;
-  uint64_t m_end = 0;
-  uint64_t m_off = 0;
-  char m_mode[4] = {0};
-  int m_p = 0;
-
-  if (4 != sscanf(line, spec, &m_start, &m_end, m_mode, &m_off, &m_p)) {
-    LG_WRN("Failed to scan mapfile line (search)");
-    return false;
-  }
-
-  return ip >= m_start && ip <= m_end;
-}
-
-static void pid_find_ip(int pid, uint64_t ip,
-                        const std::string &path_to_proc = "") {
-  auto proc_map_file_holder = open_proc_maps(pid, path_to_proc.c_str());
-  if (!proc_map_file_holder) {
-    if (process_is_alive(pid))
-      LG_DBG("Couldn't find ip:0x%lx for %d, process is dead", ip, pid);
-    else
-      LG_DBG("Couldn't find ip:0x%lx for %d, mysteriously", ip, pid);
-    return;
-  }
-
-  char *buf = nullptr;
-  defer { free(buf); };
-  size_t sz_buf = 0;
-  while (-1 != getline(&buf, &sz_buf, proc_map_file_holder.get())) {
-    if (ip_in_procline(buf, ip)) {
-      LG_DBG("[DSO] Found ip:0x%lx for %d", ip, pid);
-      LG_DBG("[DSO] %.*s", (int)strlen(buf) - 1, buf);
-      return;
-    }
-  }
-
-  LG_DBG("[DSO] Couldn't find ip:0x%lx for %d", ip, pid);
-  return;
-}
-#endif
 } // namespace
 
 /***************/
@@ -168,7 +124,7 @@ bool DsoHdr::find_exe_name(pid_t pid, std::string &exe_name) {
 }
 
 DsoFindRes DsoHdr::dso_find_first_std_executable(pid_t pid) {
-  const DsoMap &map = _map[pid];
+  const DsoMap &map = _pid_map[pid]._map;
   DsoMapConstIt it = map.lower_bound(0);
   // look for the first executable standard region
   while (it != map.end() && !it->second._executable &&
@@ -181,13 +137,12 @@ DsoFindRes DsoHdr::dso_find_first_std_executable(pid_t pid) {
   return {it, true};
 }
 
-DsoFindRes DsoHdr::dso_find_closest(const DsoMap &map, pid_t pid,
-                                    ElfAddress_t addr) {
+DsoFindRes DsoHdr::dso_find_closest(const DsoMap &map, ElfAddress_t addr) {
   bool is_within = false;
   // First element not less than (can match a start addr)
   DsoMapConstIt it = map.lower_bound(addr);
   if (it != map.end()) {
-    is_within = it->second.is_within(pid, addr);
+    is_within = it->second.is_within(addr);
     if (is_within) { // exact match
       return {it, is_within};
     }
@@ -198,13 +153,13 @@ DsoFindRes DsoHdr::dso_find_closest(const DsoMap &map, pid_t pid,
   } else { // map is empty
     return find_res_not_found(map);
   }
-  is_within = it->second.is_within(pid, addr);
+  is_within = it->second.is_within(addr);
   return {it, is_within};
 }
 
 // Find the closest and indicate if we found a dso matching this address
 DsoFindRes DsoHdr::dso_find_closest(pid_t pid, ElfAddress_t addr) {
-  return dso_find_closest(_map[pid], pid, addr);
+  return dso_find_closest(_pid_map[pid]._map, addr);
 }
 
 DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
@@ -341,17 +296,8 @@ FileInfoId_t DsoHdr::update_id_from_dso(const Dso &dso) {
   return update_id_from_path(dso);
 }
 
-bool DsoHdr::erase_overlap(const Dso &dso) {
-  DsoMap &map = _map[dso._pid];
-  DsoRange range = get_intersection(map, dso);
-  if (range.first != map.end()) {
-    erase_range(map, range);
-    return true;
-  }
-  return false;
-}
-
-DsoFindRes DsoHdr::insert_erase_overlap(DsoMap &map, Dso &&dso) {
+DsoFindRes DsoHdr::insert_erase_overlap(PidMapping &pid_mapping, Dso &&dso) {
+  DsoMap &map = pid_mapping._map;
   DsoFindRes find_res = dso_find_adjust_same(map, dso);
   // nothing to do if already exists
   if (find_res.second) {
@@ -364,6 +310,10 @@ DsoFindRes DsoHdr::insert_erase_overlap(DsoMap &map, Dso &&dso) {
   if (range.first != map.end()) {
     erase_range(map, range);
   }
+  // JITDump Marker was detected for this PID
+  if (dso._type == dso::kJITDump) {
+    pid_mapping._jitdump_addr = dso._start;
+  }
   _stats.incr_metric(DsoStats::kNewDso, dso._type);
   LG_DBG("[DSO] : Insert %s", dso.to_string().c_str());
   // warning rvalue : do not use dso after this line
@@ -371,45 +321,46 @@ DsoFindRes DsoHdr::insert_erase_overlap(DsoMap &map, Dso &&dso) {
 }
 
 DsoFindRes DsoHdr::insert_erase_overlap(Dso &&dso) {
-  return insert_erase_overlap(_map[dso._pid], std::move(dso));
+  return insert_erase_overlap(_pid_map[dso._pid], std::move(dso));
 }
 
-DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr) {
-  DsoMap &map = _map[pid];
+DsoFindRes DsoHdr::dso_find_or_backpopulate(PidMapping &pid_mapping, pid_t pid,
+                                            ElfAddress_t addr) {
   if (addr < 4095) {
     LG_DBG("[DSO] Skipping 0 page");
-    return find_res_not_found(map);
+    return find_res_not_found(pid_mapping._map);
   }
 
-  DsoFindRes find_res = dso_find_closest(map, pid, addr);
+  DsoFindRes find_res = dso_find_closest(pid_mapping._map, addr);
   if (!find_res.second) { // backpopulate
     LG_DBG("[DSO] Couldn't find DSO for [%d](0x%lx). backpopulate", pid, addr);
     int nb_elts_added = 0;
-    if (pid_backpopulate(map, pid, nb_elts_added) && nb_elts_added) {
-      find_res = dso_find_closest(map, pid, addr);
+    if (pid_backpopulate(pid_mapping, pid, nb_elts_added) && nb_elts_added) {
+      find_res = dso_find_closest(pid_mapping._map, addr);
     }
-#ifndef NDEBUG
-    if (!find_res.second) { // debug info
-      pid_find_ip(pid, addr, _path_to_proc);
-    }
-#endif
   }
   return find_res;
 }
 
+DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr) {
+  PidMapping &pid_mapping = _pid_map[pid];
+  return dso_find_or_backpopulate(pid_mapping, pid, addr);
+}
+
 void DsoHdr::pid_free(int pid) {
-  _map.erase(pid);
+  _pid_map.erase(pid);
   _backpopulate_state_map.erase(pid);
 }
 
 bool DsoHdr::pid_backpopulate(pid_t pid, int &nb_elts_added) {
-  return pid_backpopulate(_map[pid], pid, nb_elts_added);
+  return pid_backpopulate(_pid_map[pid], pid, nb_elts_added);
 }
 
 // Return false if proc map is not available
 // Return true proc map was found, use nb_elts_added for number of added
 // elements
-bool DsoHdr::pid_backpopulate(DsoMap &map, pid_t pid, int &nb_elts_added) {
+bool DsoHdr::pid_backpopulate(PidMapping &pid_mapping, pid_t pid,
+                              int &nb_elts_added) {
   // Following line creates the state for pid if it does not exist
   BackpopulateState &bp_state = _backpopulate_state_map[pid];
   ++bp_state._nbUnfoundDsos;
@@ -435,7 +386,7 @@ bool DsoHdr::pid_backpopulate(DsoMap &map, pid_t pid, int &nb_elts_added) {
     if (dso._pid == -1) { // invalid dso
       continue;
     }
-    if ((insert_erase_overlap(map, std::move(dso))).second) {
+    if ((insert_erase_overlap(pid_mapping, std::move(dso))).second) {
       ++nb_elts_added;
     }
   }
@@ -515,9 +466,10 @@ FileInfo DsoHdr::find_file_info(const Dso &dso) {
 
 int DsoHdr::get_nb_dso() const {
   unsigned total_nb_elts = 0;
-  std::for_each(_map.begin(), _map.end(), [&](DsoPidMap::value_type const &el) {
-    total_nb_elts += el.second.size();
-  });
+  std::for_each(_pid_map.begin(), _pid_map.end(),
+                [&](DsoPidMap::value_type const &el) {
+                  total_nb_elts += el.second._map.size();
+                });
   return total_nb_elts;
 }
 

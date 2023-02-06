@@ -64,6 +64,8 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
     _type = dso::kSocket;
   } else if (_filename[0] == '[') {
     _type = dso::kUndef;
+  } else if (is_jit_dump_str(_filename, pid)) {
+    _type = dso::kJITDump;
   } else { // check if this standard dso matches our internal dd_profiling lib
     std::size_t pos = _filename.rfind('/');
     if (pos != std::string::npos &&
@@ -72,6 +74,18 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
       _type = dso::kDDProfiling;
     }
   }
+}
+
+bool Dso::is_jit_dump_str(std::string_view file_path, pid_t pid) {
+  // test if we finish by .dump before creating a string
+  if (file_path.ends_with(".dump")) {
+    // llvm uses this format
+    std::string jit_dump_str = string_format("jit-%d.dump", pid);
+    if (file_path.ends_with(jit_dump_str)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 std::string Dso::to_string() const {
@@ -135,10 +149,7 @@ bool Dso::intersects(const Dso &o) const {
   return true;
 }
 
-bool Dso::is_within(pid_t pid, ElfAddress_t addr) const {
-  if (pid != _pid) {
-    return false;
-  }
+bool Dso::is_within(ElfAddress_t addr) const {
   return (addr >= _start) && (addr <= _end);
 }
 

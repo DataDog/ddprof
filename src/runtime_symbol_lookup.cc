@@ -10,10 +10,15 @@
 #include <string>
 #include <vector>
 
+#include "ddres.hpp"
 #include "defer.hpp"
 #include "logger.hpp"
 #include "runtime_symbol_lookup.hpp"
 #include "unlikely.hpp"
+
+#include "llvm/Demangle/Demangle.h"
+
+#include "jit/jitdump.hpp"
 
 namespace ddprof {
 
@@ -34,15 +39,54 @@ FILE *RuntimeSymbolLookup::perfmaps_open(int pid,
   return fopen(buf, "r");
 }
 
+DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
+                                             pid_t pid, SymbolMap &symbol_map,
+                                             SymbolTable &symbol_table) {
+
+  char buf[1024] = {0};
+  auto n = snprintf(buf, 1024, "%s/proc/%d/root%s", _path_to_proc.c_str(), pid,
+                    jitdump_path.data());
+  if (n >= 1024) { // unable to snprintf everything
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Unable to create path to jitdump");
+  }
+
+  JITDump jitdump;
+  if (IsDDResNotOK(jit_read(std::string_view(buf, n), jitdump))) {
+    if (IsDDResNotOK(jit_read(jitdump_path, jitdump))) {
+      // adding an empty element to avoid re-parsing this file
+      symbol_map.emplace(0, SymbolSpan());
+      return ddres_error(DD_WHAT_JIT);
+    }
+  }
+  auto it = symbol_map.end();
+
+  for (const JITRecordCodeLoad &code_load : jitdump.code_load) {
+    // elements are ordered
+    it = symbol_map.emplace_hint(
+        it, code_load.code_addr,
+        SymbolSpan(code_load.code_addr + code_load.code_size,
+                   symbol_table.size()));
+
+    std::string demangle_func = llvm::demangle(code_load.func_name);
+    symbol_table.emplace_back(
+        Symbol(code_load.func_name, demangle_func, 0, "jit"));
+    LG_DBG("insert %s - %s", code_load.func_name.c_str(),
+           demangle_func.c_str());
+  }
+  // todo we can add file and inlined functions with debug info
+  return ddres_init();
+}
+
 bool should_skip_symbol(const char *symbol) {
+  // dotnet symbols
   return strstr(symbol, "GenerateResolveStub") != nullptr ||
       strstr(symbol, "GenerateDispatchStub") != nullptr ||
       strstr(symbol, "GenerateLookupStub") != nullptr ||
       strstr(symbol, "AllocateTemporaryEntryPoints") != nullptr;
 }
 
-void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
-                                                 SymbolTable &symbol_table) {
+void RuntimeSymbolLookup::fill_from_perfmap(int pid, SymbolMap &symbol_map,
+                                            SymbolTable &symbol_table) {
   FILE *pmf = perfmaps_open(pid, "/tmp");
   symbol_map.clear();
   if (pmf == nullptr) {
@@ -90,9 +134,26 @@ void RuntimeSymbolLookup::fill_perfmap_from_file(int pid, SymbolMap &symbol_map,
     it = symbol_map.emplace_hint(it, address,
                                  SymbolSpan(end, symbol_table.size()));
     symbol_table.emplace_back(
-        Symbol(std::string(buffer), std::string(buffer), 0, "unknown"));
+        Symbol(std::string(buffer), std::string(buffer), 0, "jit"));
   }
   free(line);
+}
+
+SymbolIdx_t
+RuntimeSymbolLookup::get_or_insert_jitdump(pid_t pid, ProcessAddress_t pc,
+                                           SymbolTable &symbol_table,
+                                           std::string_view jitdump_path) {
+  SymbolMap &symbol_map = _pid_map[pid];
+  if (symbol_map.empty()) {
+    if (IsDDResNotOK(
+            fill_from_jitdump(jitdump_path, pid, symbol_map, symbol_table))) {
+      // It could be there was a write at that moment
+      LG_DBG("Error parsing jit dump %s", jitdump_path.data());
+      return -1;
+    }
+  }
+  SymbolMap::FindRes find_res = symbol_map.find_closest(pc);
+  return find_res.second ? find_res.first->second.get_symbol_idx() : -1;
 }
 
 SymbolIdx_t RuntimeSymbolLookup::get_or_insert(pid_t pid, ProcessAddress_t pc,
@@ -103,7 +164,7 @@ SymbolIdx_t RuntimeSymbolLookup::get_or_insert(pid_t pid, ProcessAddress_t pc,
   // handled ?
 
   if (symbol_map.empty()) {
-    fill_perfmap_from_file(pid, symbol_map, symbol_table);
+    fill_from_perfmap(pid, symbol_map, symbol_table);
   }
 
   SymbolMap::FindRes find_res = symbol_map.find_closest(pc);

@@ -18,6 +18,7 @@ enum DsoType {
   kRuntime,
   kSocket,
   kDDProfiling, // special case in which the library might be known internally
+  kJITDump,     // jit dump file (LLVM guarantee they mmap this as a marker)
   kNbDsoTypes
 };
 

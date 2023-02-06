@@ -30,12 +30,13 @@ public:
   Dso(const Dso &parent, pid_t new_pid) : Dso(parent) { _pid = new_pid; }
 
   // Check if the provided address falls within the provided dso
-  bool is_within(pid_t pid, ElfAddress_t addr) const;
+  bool is_within(ElfAddress_t addr) const;
   // Avoid use of strict == as we do not consider _end in comparison
   bool operator==(const Dso &o) const = delete;
   // perf gives larger regions than proc maps (keep the largest of them)
 
   bool intersects(const Dso &o) const;
+
   std::string to_string() const;
   std::string format_filename() const;
 
@@ -52,6 +53,9 @@ public:
   dso::DsoType _type;
   bool _executable;
   mutable FileInfoId_t _id;
+
+private:
+  static bool is_jit_dump_str(std::string_view file_path, pid_t pid);
 };
 
 std::ostream &operator<<(std::ostream &os, const Dso &dso);
