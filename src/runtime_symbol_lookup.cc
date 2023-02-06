@@ -53,7 +53,7 @@ DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
   JITDump jitdump;
   if (IsDDResNotOK(jit_read(std::string_view(buf, n), jitdump))) {
     if (IsDDResNotOK(jit_read(jitdump_path, jitdump))) {
-      // adding an empty element to avoid re-parsing this file
+      // adding an empty element to flag the fact there was an attempt
       symbol_map.emplace(0, SymbolSpan());
       return ddres_error(DD_WHAT_JIT);
     }
@@ -62,16 +62,19 @@ DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
 
   for (const JITRecordCodeLoad &code_load : jitdump.code_load) {
     // elements are ordered
-    it = symbol_map.emplace_hint(
-        it, code_load.code_addr,
-        SymbolSpan(code_load.code_addr + code_load.code_size,
-                   symbol_table.size()));
-
-    std::string demangle_func = llvm::demangle(code_load.func_name);
-    symbol_table.emplace_back(
-        Symbol(code_load.func_name, demangle_func, 0, "jit"));
-    LG_DBG("insert %s - %s", code_load.func_name.c_str(),
-           demangle_func.c_str());
+    SymbolMap::FindRes find_res = symbol_map.find_closest(code_load.code_addr);
+    // we assume that we already came across this symbol
+    if (!find_res.second) {
+      it = symbol_map.emplace_hint(
+          it, code_load.code_addr,
+          SymbolSpan(code_load.code_addr + code_load.code_size,
+                     symbol_table.size()));
+      // we don't need demangling in most languages.
+      // we can consider removing this if it becomes a hot path
+      std::string demangle_func = llvm::demangle(code_load.func_name);
+      symbol_table.emplace_back(
+          Symbol(code_load.func_name, demangle_func, 0, "jit"));
+    }
   }
   // todo we can add file and inlined functions with debug info
   return ddres_init();
@@ -153,6 +156,18 @@ RuntimeSymbolLookup::get_or_insert_jitdump(pid_t pid, ProcessAddress_t pc,
     }
   }
   SymbolMap::FindRes find_res = symbol_map.find_closest(pc);
+  if (!find_res.second) {
+    // refresh as we expect there to be new symbols
+    if (IsDDResNotOK(
+            fill_from_jitdump(jitdump_path, pid, symbol_map, symbol_table))) {
+      LG_DBG("Error parsing jit dump (refresh path) %s", jitdump_path.data());
+      if (symbol_map.size() == 1) {
+        // this means we already errored
+        // todo avoid bouncing on errors
+      }
+      return -1;
+    }
+  }
   return find_res.second ? find_res.first->second.get_symbol_idx() : -1;
 }
 

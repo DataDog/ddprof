@@ -82,7 +82,8 @@ DDRes jit_read_code_load(std::ifstream &file_stream,
   }
   int max_str_size = remaining_size - code_load.code_size;
   if (max_str_size > 1) {
-    code_load.func_name = std::string(reinterpret_cast<char*>(buf_64), max_str_size - 1);
+    code_load.func_name =
+        std::string(reinterpret_cast<char *>(buf_64), max_str_size - 1);
   }
   LG_DBG("Func name = %s, address = %lx (%lu)", code_load.func_name.c_str(),
          code_load.code_addr, code_load.code_size);
@@ -165,7 +166,7 @@ DDRes jit_read(const std::string_view file, JITDump &jit_dump) {
   std::ifstream file_stream(file.data(), std::ios::binary);
   // todo lock the file
   if (!file_stream.good()) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "File not readable");
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "File %s not readable", file.data());
   }
 
   LG_DBG("Opened %s", file.data());

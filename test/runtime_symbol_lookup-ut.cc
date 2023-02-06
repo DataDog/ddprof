@@ -64,7 +64,7 @@ TEST(runtime_symbol_lookup, jitdump_simple) {
   LogHandle log_handle;
   pid_t mypid = getpid();
   SymbolTable symbol_table;
-  RuntimeSymbolLookup runtime_symbol_lookup(UNIT_TEST_DATA);
+  RuntimeSymbolLookup runtime_symbol_lookup("");
   ProcessAddress_t pc = 0x7bea23b00390;
   std::string jit_path =
       std::string(UNIT_TEST_DATA) + "/" + std::string("jit.dump");
@@ -74,12 +74,41 @@ TEST(runtime_symbol_lookup, jitdump_simple) {
   ASSERT_EQ(std::string("julia_b_11"), symbol_table[symbol_idx]._demangle_name);
 }
 
+TEST(runtime_symbol_lookup, double_load) {
+  // ensure we don't increase number of symbols when we load several times
+  LogHandle log_handle;
+  pid_t mypid = getpid();
+  SymbolTable symbol_table;
+  RuntimeSymbolLookup runtime_symbol_lookup("");
+  ProcessAddress_t pc = 0xbadbeef;
+  std::string jit_path =
+      std::string(UNIT_TEST_DATA) + "/" + std::string("jit.dump");
+  SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
+      mypid, pc, symbol_table, jit_path);
+  ASSERT_EQ(symbol_idx, -1);
+  auto current_table_size = symbol_table.size();
+  symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
+      mypid, pc, symbol_table, jit_path);
+  auto new_table_size = symbol_table.size();
+  // Check that we did not grow in number of symbols (as they are the same)
+  ASSERT_EQ(current_table_size, new_table_size);
+}
+
 TEST(runtime_symbol_lookup, jitdump_override) {
   // test what happens when the file is altered
 }
 
-TEST(runtime_symbol_lookup, lock_file) {
-  // test that we are locking the file
+TEST(runtime_symbol_lookup, bad_file) {
+  LogHandle log_handle;
+  pid_t mypid = getpid();
+  SymbolTable symbol_table;
+  RuntimeSymbolLookup runtime_symbol_lookup("");
+  ProcessAddress_t pc = 0xbadbeef;
+  std::string jit_path =
+      std::string(UNIT_TEST_DATA) + "/" + std::string("bad_file.dump");
+  SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
+      mypid, pc, symbol_table, jit_path);
+  ASSERT_EQ(symbol_idx, -1);
 }
 
 } // namespace ddprof
