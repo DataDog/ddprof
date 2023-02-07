@@ -22,6 +22,14 @@
 
 namespace ddprof {
 
+const std::unordered_set<std::string> RuntimeSymbolLookup::_ignored_symbols = {
+    // dotnet symbols
+    std::string("GenerateResolveStub"),
+    std::string("GenerateDispatchStub"),
+    std::string("GenerateLookupStub"),
+    std::string("AllocateTemporaryEntryPoints"),
+};
+
 FILE *RuntimeSymbolLookup::perfmaps_open(int pid,
                                          const char *path_to_perfmap = "") {
   char buf[1024] = {0};
@@ -42,7 +50,6 @@ FILE *RuntimeSymbolLookup::perfmaps_open(int pid,
 DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
                                              pid_t pid, SymbolMap &symbol_map,
                                              SymbolTable &symbol_table) {
-
   char buf[1024] = {0};
   auto n = snprintf(buf, 1024, "%s/proc/%d/root%s", _path_to_proc.c_str(), pid,
                     jitdump_path.data());
@@ -54,19 +61,17 @@ DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
   if (IsDDResNotOK(jit_read(std::string_view(buf, n), jitdump))) {
     if (IsDDResNotOK(jit_read(jitdump_path, jitdump))) {
       // adding an empty element to flag the fact there was an attempt
-      symbol_map.emplace(0, SymbolSpan());
       return ddres_error(DD_WHAT_JIT);
     }
   }
-  auto it = symbol_map.end();
 
   for (const JITRecordCodeLoad &code_load : jitdump.code_load) {
     // elements are ordered
     SymbolMap::FindRes find_res = symbol_map.find_closest(code_load.code_addr);
     // we assume that we already came across this symbol
     if (!find_res.second) {
-      it = symbol_map.emplace_hint(
-          it, code_load.code_addr,
+      symbol_map.emplace_hint(
+          find_res.first, code_load.code_addr,
           SymbolSpan(code_load.code_addr + code_load.code_size,
                      symbol_table.size()));
       // we don't need demangling in most languages.
@@ -80,23 +85,16 @@ DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
   return ddres_init();
 }
 
-bool should_skip_symbol(const char *symbol) {
-  // dotnet symbols
-  return strstr(symbol, "GenerateResolveStub") != nullptr ||
-      strstr(symbol, "GenerateDispatchStub") != nullptr ||
-      strstr(symbol, "GenerateLookupStub") != nullptr ||
-      strstr(symbol, "AllocateTemporaryEntryPoints") != nullptr;
+bool RuntimeSymbolLookup::should_skip_symbol(const char *symbol) {
+  return _ignored_symbols.find(symbol) != _ignored_symbols.end();
 }
 
-void RuntimeSymbolLookup::fill_from_perfmap(int pid, SymbolMap &symbol_map,
-                                            SymbolTable &symbol_table) {
+DDRes RuntimeSymbolLookup::fill_from_perfmap(int pid, SymbolMap &symbol_map,
+                                             SymbolTable &symbol_table) {
   FILE *pmf = perfmaps_open(pid, "/tmp");
-  symbol_map.clear();
   if (pmf == nullptr) {
-    // Add a single fake symbol to avoid bouncing
-    symbol_map.emplace(0, SymbolSpan());
-    LG_DBG("No runtime symbols (PID%d)", pid);
-    return;
+    LG_DBG("Unable to read perfmap file (PID%d)", pid);
+    return ddres_error(DD_WHAT_JIT);
   }
   defer { fclose(pmf); };
 
@@ -104,7 +102,6 @@ void RuntimeSymbolLookup::fill_from_perfmap(int pid, SymbolMap &symbol_map,
   char *line = NULL;
   size_t sz_buf = 0;
   char buffer[2048];
-  auto it = symbol_map.end();
   while (-1 != getline(&line, &sz_buf, pmf)) {
     char address_buff[33]; // max size of 16 (as it should be hexa for uint64)
     char size_buff[33];
@@ -130,63 +127,62 @@ void RuntimeSymbolLookup::fill_from_perfmap(int pid, SymbolMap &symbol_map,
     if (unlikely(address >
                  std::numeric_limits<ProcessAddress_t>::max() - code_size)) {
       // Ignore overflow
+      LG_DBG("Overflow detected when parsing perfmap (%d)", pid);
       continue;
     }
-
-    // elements are ordered
-    it = symbol_map.emplace_hint(it, address,
-                                 SymbolSpan(end, symbol_table.size()));
-    symbol_table.emplace_back(
-        Symbol(std::string(buffer), std::string(buffer), 0, "jit"));
+    SymbolMap::FindRes find_res = symbol_map.find_closest(address);
+    if (!find_res.second) {
+      // elements are ordered, hints help
+      symbol_map.emplace_hint(find_res.first, address,
+                              SymbolSpan(end, symbol_table.size()));
+      symbol_table.emplace_back(
+          Symbol(std::string(buffer), std::string(buffer), 0, "jit"));
+    } else {
+      LG_DBG("buffer=%s", buffer);
+    }
   }
   free(line);
+  return ddres_init();
 }
 
 SymbolIdx_t
 RuntimeSymbolLookup::get_or_insert_jitdump(pid_t pid, ProcessAddress_t pc,
                                            SymbolTable &symbol_table,
                                            std::string_view jitdump_path) {
-  SymbolMap &symbol_map = _pid_map[pid];
-  if (symbol_map.empty()) {
-    if (IsDDResNotOK(
-            fill_from_jitdump(jitdump_path, pid, symbol_map, symbol_table))) {
-      // It could be there was a write at that moment
-      LG_DBG("Error parsing jit dump %s", jitdump_path.data());
+  SymbolInfo &symbol_info = _pid_map[pid];
+  SymbolMap::FindRes find_res = symbol_info._map.find_closest(pc);
+  if (!find_res.second && !has_lookup_failure(symbol_info, jitdump_path)) {
+    // refresh as we expect there to be new symbols
+    if (IsDDResNotOK(fill_from_jitdump(jitdump_path, pid, symbol_info._map,
+                                       symbol_table))) {
+      flag_lookup_failure(symbol_info, jitdump_path);
       return -1;
     }
   }
-  SymbolMap::FindRes find_res = symbol_map.find_closest(pc);
+  find_res = symbol_info._map.find_closest(pc);
+  // Avoid bouncing when we are failing lookups.
+  // !This could have a negative impact on symbolisation. To be studied
   if (!find_res.second) {
-    // refresh as we expect there to be new symbols
-    if (IsDDResNotOK(
-            fill_from_jitdump(jitdump_path, pid, symbol_map, symbol_table))) {
-      LG_DBG("Error parsing jit dump (refresh path) %s", jitdump_path.data());
-      if (symbol_map.size() == 1) {
-        // this means we already errored
-        // todo avoid bouncing on errors
-      }
-      return -1;
-    }
+    flag_lookup_failure(symbol_info, jitdump_path);
   }
   return find_res.second ? find_res.first->second.get_symbol_idx() : -1;
 }
 
 SymbolIdx_t RuntimeSymbolLookup::get_or_insert(pid_t pid, ProcessAddress_t pc,
                                                SymbolTable &symbol_table) {
-  SymbolMap &symbol_map = _pid_map[pid];
-  // TODO : how do we know we need to refresh the symbol map ?
-  // A solution can be to poll + inotify ? Though where would this poll be
-  // handled ?
+  SymbolInfo &symbol_info = _pid_map[pid];
+  SymbolMap::FindRes find_res = symbol_info._map.find_closest(pc);
 
-  if (symbol_map.empty()) {
-    fill_from_perfmap(pid, symbol_map, symbol_table);
+  // Only check the file if we did not get failures in this cycle (for this pid)
+  if (!find_res.second &&
+      !has_lookup_failure(symbol_info, std::string("perfmap"))) {
+    fill_from_perfmap(pid, symbol_info._map, symbol_table);
   }
-
-  SymbolMap::FindRes find_res = symbol_map.find_closest(pc);
-  if (find_res.second) {
-    return find_res.first->second.get_symbol_idx();
+  find_res = symbol_info._map.find_closest(pc);
+  if (!find_res.second) {
+    flag_lookup_failure(symbol_info, "perfmap");
   }
-  return -1;
+  return find_res.second ? find_res.first->second.get_symbol_idx() : -1;
 }
 
 } // namespace ddprof

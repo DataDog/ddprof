@@ -11,37 +11,57 @@
 
 #include "ddres_def.hpp"
 #include <unordered_map>
+#include <unordered_set>
 
 namespace ddprof {
 
 class RuntimeSymbolLookup {
 public:
-  enum JITFormat {
-    kJITDump,
-    kPerfMap,
-  };
-
   explicit RuntimeSymbolLookup(std::string_view path_to_proc)
-      : _path_to_proc(path_to_proc) {}
+      : _path_to_proc(path_to_proc), _cycle_counter(1) {}
+
   SymbolIdx_t get_or_insert_jitdump(pid_t pid, ProcessAddress_t pc,
                                     SymbolTable &symbol_table,
                                     std::string_view jitdump_path);
 
   SymbolIdx_t get_or_insert(pid_t pid, ProcessAddress_t pc,
                             SymbolTable &symbol_table);
+
   void erase(pid_t pid) { _pid_map.erase(pid); }
 
-private:
-  using PidUnorderedMap = std::unordered_map<pid_t, SymbolMap>;
-  DDRes fill_from_jitdump(std::string_view jitdump_path, pid_t pid,
-                          SymbolMap &symbol_map, SymbolTable &symbol_table);
+  void cycle() { ++_cycle_counter; }
 
-  void fill_from_perfmap(int pid, SymbolMap &symbol_map,
-                         SymbolTable &symbol_table);
+private:
+  using FailedCycle = std::unordered_map<std::string, uint32_t>;
+  struct SymbolInfo {
+    SymbolMap _map;
+    FailedCycle _failed_cycle;
+  };
+  using PidUnorderedMap = std::unordered_map<pid_t, SymbolInfo>;
+  DDRes fill_from_jitdump(std::string_view jitdump_path, pid_t pid,
+                          SymbolMap &symbol_map, SymbolTable &symbol_info);
+
+  DDRes fill_from_perfmap(int pid, SymbolMap &symbol_map,
+                          SymbolTable &symbol_table);
+
   FILE *perfmaps_open(int pid, const char *path_to_perfmap);
+
+  bool has_lookup_failure(SymbolInfo &symbol_info,
+                          std::string_view path) const {
+    return symbol_info._failed_cycle[std::string(path)] == _cycle_counter;
+  }
+
+  void flag_lookup_failure(SymbolInfo &symbol_info, std::string_view path) {
+    symbol_info._failed_cycle[std::string(path)] = _cycle_counter;
+  }
+
+  bool should_skip_symbol(const char *symbol);
+
+  static const std::unordered_set<std::string> _ignored_symbols;
 
   PidUnorderedMap _pid_map;
   std::string _path_to_proc;
+  uint32_t _cycle_counter;
 };
 
 } // namespace ddprof

@@ -109,6 +109,11 @@ TEST(runtime_symbol_lookup, bad_file) {
   SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
       mypid, pc, symbol_table, jit_path);
   ASSERT_EQ(symbol_idx, -1);
+
+  // this should not trigger another read
+  symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
+      mypid, pc, symbol_table, jit_path);
+  ASSERT_EQ(symbol_idx, -1);
 }
 
 } // namespace ddprof

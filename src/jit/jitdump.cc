@@ -56,7 +56,9 @@ bool jit_read_prefix(std::ifstream &file_stream, JITRecordPrefix &prefix) {
 DDRes jit_read_code_load(std::ifstream &file_stream,
                          JITRecordCodeLoad &code_load,
                          std::vector<char> &buff) {
+#ifdef DEBUG
   LG_DBG("----  Read code load  ----");
+#endif
   buff.resize(code_load.prefix.total_size - sizeof(JITRecordPrefix));
   file_stream.read(buff.data(),
                    code_load.prefix.total_size - sizeof(JITRecordPrefix));
@@ -85,15 +87,19 @@ DDRes jit_read_code_load(std::ifstream &file_stream,
     code_load.func_name =
         std::string(reinterpret_cast<char *>(buf_64), max_str_size - 1);
   }
+#ifdef DEBUG
   LG_DBG("Func name = %s, address = %lx (%lu)", code_load.func_name.c_str(),
          code_load.code_addr, code_load.code_size);
+#endif
   return ddres_init();
 }
 
 DDRes jit_read_debug_info(std::ifstream &file_stream,
                           JITRecordDebugInfo &debug_info,
                           std::vector<char> &buff) {
+#ifdef DEBUG
   LG_DBG("---- Read debug info ----");
+#endif
   buff.resize(debug_info.prefix.total_size - sizeof(JITRecordPrefix));
   file_stream.read(buff.data(), buff.size());
   if (!file_stream.good()) {
@@ -103,7 +109,7 @@ DDRes jit_read_debug_info(std::ifstream &file_stream,
   debug_info.code_addr = *buf++;
   debug_info.nr_entry = *buf++;
   debug_info.entries.resize(debug_info.nr_entry);
-  LG_DBG("Read %lu entries", debug_info.nr_entry);
+
   for (unsigned i = 0; i < debug_info.nr_entry; ++i) {
     debug_info.entries[i].addr = *buf++;
     int32_t *buf_32 = reinterpret_cast<int32_t *>(buf);
@@ -119,9 +125,10 @@ DDRes jit_read_debug_info(std::ifstream &file_stream,
     }
     debug_info.entries[i].name = std::string(buf_char);
     buf_char += debug_info.entries[i].name.size() + 1;
-
+#ifdef DEBUG
     LG_DBG("Name:line = %s:%d / %lx", debug_info.entries[i].name.c_str(),
            debug_info.entries[i].lineno, debug_info.entries[i].addr);
+#endif
     buf = reinterpret_cast<uint64_t *>(buf_char);
   }
   return ddres_init();
@@ -164,12 +171,13 @@ DDRes jit_read_records(std::ifstream &file_stream, JITDump &jit_dump) {
 
 DDRes jit_read(const std::string_view file, JITDump &jit_dump) {
   std::ifstream file_stream(file.data(), std::ios::binary);
-  // todo lock the file
+  // We are not locking, assumption is that even if we fail to read a given
+  // section we can always retry later. The aim is not to slow down the app
   if (!file_stream.good()) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "File %s not readable", file.data());
   }
 
-  LG_DBG("Opened %s", file.data());
+  LG_DBG("JITDump starting parse of %s", file.data());
   DDRES_CHECK_FWD(jit_read_header(file_stream, jit_dump.header));
 
   DDRES_CHECK_FWD(jit_read_records(file_stream, jit_dump));
