@@ -72,10 +72,13 @@ struct JITRecordCodeLoad {
   std::byte *raw_code; // not sure how this can be useful for now
 };
 
-// Nothing really useful in code close (end element)
-// struct JITRecordCodeClose {
-//  struct JITRecordPrefix p;
-//};
+#ifdef EXTENDED_JITDUMP_STRUCTS
+// Following structures are part of the spec, though not used for now
+// LLVM is not emitting these structures
+
+struct JITRecordCodeClose {
+  struct JITRecordPrefix p;
+};
 
 // Unused (as not emitted by LLVM as of now)
 struct JITRecordCodeMove {
@@ -89,12 +92,21 @@ struct JITRecordCodeMove {
   uint64_t code_index;
 };
 
+// Unused (as not emitted by LLVM as of now)
+struct JITRecordUnwindingInfo {
+  struct JITRecordPrefix prefix;
+  uint64_t unwinding_size;
+  uint64_t eh_frame_hdr_size;
+  uint64_t mapped_size;
+  std::vector<char> unwinding_data;
+};
+#endif
+
 struct DebugEntry {
   uint64_t addr;
-  int32_t lineno;   /* source line number starting at 1 */
-  int32_t discrim;  /* column discriminator, 0 is default */
-  std::string name; /* null terminated filename,
-                      \xff\0 if same as previous entry */
+  int32_t lineno; /* source line number starting at 1 */
+  int32_t discrim;
+  std::string name;
 };
 
 struct JITRecordDebugInfo {
@@ -104,24 +116,10 @@ struct JITRecordDebugInfo {
   std::vector<DebugEntry> entries;
 };
 
-// Unused (as not emitted by LLVM as of now)
-struct JITRecordUnwindingInfo {
-  struct JITRecordPrefix prefix;
-  uint64_t unwinding_size;
-  uint64_t eh_frame_hdr_size;
-  uint64_t mapped_size;
-  std::vector<char> unwinding_data;
-};
-
 struct JITDump {
   JITHeader header;
   std::vector<JITRecordCodeLoad> code_load;
-  //  std::vector<JITRecordCodeMove> code_move;
   std::vector<JITRecordDebugInfo> debug_info;
-  //  std::vector<JITRecordUnwindInfo> unwind_info;
-
-  // date at which the file was last modified
-  std::time_t last_modified;
 };
 
 DDRes jitdump_read(const std::string_view file, JITDump &jit_dump);

@@ -6,9 +6,6 @@
 #include <fstream>
 #include <vector>
 
-// has bswap_64/32/16
-#include <byteswap.h>
-
 namespace ddprof {
 
 DDRes jit_read_header(std::ifstream &file_stream, JITHeader &header) {
