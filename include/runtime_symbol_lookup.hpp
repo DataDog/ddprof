@@ -38,6 +38,23 @@ private:
     FailedCycle _failed_cycle;
   };
   using PidUnorderedMap = std::unordered_map<pid_t, SymbolInfo>;
+  
+  // Notes on JITDump strategy
+  //
+  // 1) Retrieve JITDump path
+  // Dso type will tell us that there is a JIT file.
+  // LLVM sources explain the logic about where we can find it. though we don't
+  // need that. The file is mmaped so we can get the path from there.
+  //
+  // We store in the DSOHdr the fact that we have a JITDump file for the pid.
+  //
+  // 2) Retrieve symbols
+  // Whenever we will come across the symbolisation of an unknown region,
+  // we use the runtime_symbol_lookup to check for existing symbols.
+  // If none are found, we parse the JITDump file if available.
+  // If not, we look for a perf-map file.
+  // Symbols are cached with the process's address.
+  //
   DDRes fill_from_jitdump(std::string_view jitdump_path, pid_t pid,
                           SymbolMap &symbol_map, SymbolTable &symbol_info);
 
