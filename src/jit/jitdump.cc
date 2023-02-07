@@ -169,7 +169,7 @@ DDRes jit_read_records(std::ifstream &file_stream, JITDump &jit_dump) {
   return ddres_init();
 }
 
-DDRes jit_read(const std::string_view file, JITDump &jit_dump) {
+DDRes jitdump_read(const std::string_view file, JITDump &jit_dump) {
   std::ifstream file_stream(file.data(), std::ios::binary);
   // We are not locking, assumption is that even if we fail to read a given
   // section we can always retry later. The aim is not to slow down the app

@@ -124,6 +124,6 @@ struct JITDump {
   std::time_t last_modified;
 };
 
-DDRes jit_read(const std::string_view file, JITDump &jit_dump);
+DDRes jitdump_read(const std::string_view file, JITDump &jit_dump);
 
 } // namespace ddprof

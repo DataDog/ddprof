@@ -58,8 +58,8 @@ DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
   }
 
   JITDump jitdump;
-  if (IsDDResNotOK(jit_read(std::string_view(buf, n), jitdump))) {
-    if (IsDDResNotOK(jit_read(jitdump_path, jitdump))) {
+  if (IsDDResNotOK(jitdump_read(std::string_view(buf, n), jitdump))) {
+    if (IsDDResNotOK(jitdump_read(jitdump_path, jitdump))) {
       // adding an empty element to flag the fact there was an attempt
       return ddres_error(DD_WHAT_JIT);
     }
