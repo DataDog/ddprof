@@ -38,7 +38,7 @@ private:
     FailedCycle _failed_cycle;
   };
   using PidUnorderedMap = std::unordered_map<pid_t, SymbolInfo>;
-  
+
   // Notes on JITDump strategy
   //
   // 1) Retrieve JITDump path

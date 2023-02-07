@@ -94,11 +94,21 @@ TEST(runtime_symbol_lookup, double_load) {
   ASSERT_EQ(current_table_size, new_table_size);
 }
 
-TEST(runtime_symbol_lookup, jitdump_override) {
-  // test what happens when the file is altered
+TEST(runtime_symbol_lookup, jitdump_partial) {
+  // Test what happens when the file is altered
+  LogHandle log_handle;
+  pid_t mypid = getpid();
+  SymbolTable symbol_table;
+  RuntimeSymbolLookup runtime_symbol_lookup("");
+  ProcessAddress_t pc = 0xbadbeef;
+  std::string jit_path =
+      std::string(UNIT_TEST_DATA) + "/" + std::string("jit-partial.dump");
+  SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
+      mypid, pc, symbol_table, jit_path);
+  ASSERT_EQ(symbol_idx, -1);
 }
 
-TEST(runtime_symbol_lookup, bad_file) {
+TEST(runtime_symbol_lookup, jitdump_bad_file) {
   LogHandle log_handle;
   pid_t mypid = getpid();
   SymbolTable symbol_table;

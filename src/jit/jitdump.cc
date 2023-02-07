@@ -177,11 +177,14 @@ DDRes jit_read(const std::string_view file, JITDump &jit_dump) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "File %s not readable", file.data());
   }
 
-  LG_DBG("JITDump starting parse of %s", file.data());
-  DDRES_CHECK_FWD(jit_read_header(file_stream, jit_dump.header));
+  try {
+    LG_DBG("JITDump starting parse of %s", file.data());
+    DDRES_CHECK_FWD(jit_read_header(file_stream, jit_dump.header));
 
-  DDRES_CHECK_FWD(jit_read_records(file_stream, jit_dump));
-
+    DDRES_CHECK_FWD(jit_read_records(file_stream, jit_dump));
+  }
+  // incomplete files can trigger exceptions
+  CatchExcept2DDRes();
   return ddres_init();
 }
 } // namespace ddprof
