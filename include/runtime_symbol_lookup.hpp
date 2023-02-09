@@ -74,13 +74,11 @@ private:
 
   bool should_skip_symbol(const std::string &symbol);
 
-  bool insert_or_replace(const std::string &symbol,
-                         ProcessAddress_t address,
-                         Offset_t size,
-                         SymbolMap &symbol_map,
+  bool insert_or_replace(const std::string &symbol, ProcessAddress_t address,
+                         Offset_t size, SymbolMap &symbol_map,
                          SymbolTable &symbol_table);
 
-  static const std::array<const char*, 1> _ignored_symbols_start;
+  static const std::array<const char *, 1> _ignored_symbols_start;
 
   PidUnorderedMap _pid_map;
   std::string _path_to_proc;

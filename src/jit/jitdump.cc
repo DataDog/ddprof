@@ -114,7 +114,8 @@ DDRes jit_read_debug_info(std::ifstream &file_stream,
     debug_info.entries[i].lineno = *buf_32++;
     debug_info.entries[i].discrim = *buf_32++;
     char *buf_char = reinterpret_cast<char *>(buf_32);
-    if (*buf_char == 0xff && *(buf_char + 1) == '\0') {
+    if (static_cast<unsigned char>(*buf_char) == 0xff &&
+        *(buf_char + 1) == '\0') {
       if (i >= 1) {
         debug_info.entries[i].name = debug_info.entries[i - 1].name;
       } else {

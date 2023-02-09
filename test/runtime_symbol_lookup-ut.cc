@@ -137,7 +137,6 @@ TEST(runtime_symbol_lookup, jitdump_vs_perfmap) {
       "HttpConnectionPool+<CreateHttp11ConnectionAsync>d__100]::.ctor()["
       "OptimizedTier1]";
 
-
   // load jitdump on one side
   SymbolTable symbol_table;
   RuntimeSymbolLookup runtime_symbol_lookup("");

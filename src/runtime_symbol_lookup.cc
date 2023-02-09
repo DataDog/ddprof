@@ -24,10 +24,11 @@ namespace ddprof {
 // 00007F78F52300D8 78 stub<2> AllocateTemporaryEntryPoints<PRECODE_STUB>
 // 00007F78F5230150 18 stub<3> AllocateTemporaryEntryPoints<PRECODE_STUB>
 
-const std::array<const char*, 1> RuntimeSymbolLookup::_ignored_symbols_start = {{
-    // dotnet symbols we skip all start by stub<
-    "stub<",
-}};
+const std::array<const char *, 1> RuntimeSymbolLookup::_ignored_symbols_start =
+    {{
+        // dotnet symbols we skip all start by stub<
+        "stub<",
+    }};
 
 FILE *RuntimeSymbolLookup::perfmaps_open(int pid,
                                          const char *path_to_perfmap = "") {
@@ -88,8 +89,8 @@ bool RuntimeSymbolLookup::insert_or_replace(const std::string &symbol,
     } else {
       // remove current element (as start can be different)
       symbol_map.erase(find_res.first);
-      symbol_map.emplace(address,
-          SymbolSpan(address + code_size - 1, symbol_table.size()));
+      symbol_map.emplace(
+          address, SymbolSpan(address + code_size - 1, symbol_table.size()));
       symbol_table[existing]._demangle_name = symbol;
       symbol_table[existing]._symname = symbol;
     }
@@ -117,11 +118,8 @@ DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
   }
 
   for (const JITRecordCodeLoad &code_load : jitdump.code_load) {
-    insert_or_replace(code_load.func_name,
-                      code_load.code_addr,
-                      code_load.code_size,
-                      symbol_map,
-                      symbol_table);
+    insert_or_replace(code_load.func_name, code_load.code_addr,
+                      code_load.code_size, symbol_map, symbol_table);
   }
   // todo we can add file and inlined functions with debug info
   return ddres_init();
