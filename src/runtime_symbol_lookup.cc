@@ -143,7 +143,7 @@ DDRes RuntimeSymbolLookup::fill_from_perfmap(int pid, SymbolMap &symbol_map,
   FILE *pmf = perfmaps_open(pid, "/tmp");
   if (pmf == nullptr) {
     LG_DBG("Unable to read perfmap file (PID%d)", pid);
-    return ddres_error(DD_WHAT_JIT);
+    return ddres_error(DD_WHAT_NO_JIT_FILE);
   }
   defer { fclose(pmf); };
 

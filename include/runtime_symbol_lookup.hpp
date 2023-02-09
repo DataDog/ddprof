@@ -63,9 +63,14 @@ private:
 
   FILE *perfmaps_open(int pid, const char *path_to_perfmap);
 
-  bool has_lookup_failure(SymbolInfo &symbol_info,
+  bool has_lookup_failure(const SymbolInfo &symbol_info,
                           std::string_view path) const {
-    return symbol_info._failed_cycle[std::string(path)] == _cycle_counter;
+    const auto it = symbol_info._failed_cycle.find(std::string(path));
+    if (it != symbol_info._failed_cycle.end()) {
+      // failure during this cycle
+      return it->second == _cycle_counter;
+    }
+    return false;
   }
 
   void flag_lookup_failure(SymbolInfo &symbol_info, std::string_view path) {

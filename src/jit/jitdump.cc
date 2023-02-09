@@ -6,7 +6,40 @@
 #include <fstream>
 #include <vector>
 
+// has bswap_64/32/16
+// #include <byteswap.h>
+
 namespace ddprof {
+
+namespace {
+uint64_t load64(const uint64_t *data) {
+  uint64_t Ret;
+  memcpy(&Ret, data, sizeof(uint64_t));
+  // #ifdef BIG_ENDIAN
+  //   bswap_64(Ret);
+  // #endif
+  return Ret;
+}
+
+int32_t load32(const int32_t *data) {
+  int32_t Ret;
+  memcpy(&Ret, data, sizeof(int32_t));
+  // #ifdef BIG_ENDIAN
+  //   bswap_32(Ret);
+  // #endif
+  return Ret;
+}
+
+uint16_t load16(const uint16_t *data) {
+  uint32_t Ret;
+  memcpy(&Ret, data, sizeof(uint16_t));
+  // #ifdef BIG_ENDIAN
+  //   bswap_16(Ret);
+  // #endif
+  return Ret;
+}
+
+} // namespace
 
 DDRes jit_read_header(std::ifstream &file_stream, JITHeader &header) {
   file_stream.read(reinterpret_cast<char *>(&header), sizeof(JITHeader));
@@ -68,10 +101,10 @@ DDRes jit_read_code_load(std::ifstream &file_stream,
   code_load.tid = *buf_32++;
 
   uint64_t *buf_64 = reinterpret_cast<uint64_t *>(buf_32);
-  code_load.vma = *buf_64++;
-  code_load.code_addr = *buf_64++;
-  code_load.code_size = *buf_64++;
-  code_load.code_index = *buf_64++;
+  code_load.vma = load64(buf_64++);
+  code_load.code_addr = load64(buf_64++);
+  code_load.code_size = load64(buf_64++);
+  code_load.code_index = load64(buf_64++);
   // remaining = total - (everything we read)
   int remaining_size = code_load.prefix.total_size - sizeof(JITRecordPrefix) -
       sizeof(uint32_t) * 2 - sizeof(uint64_t) * 4;
@@ -79,10 +112,10 @@ DDRes jit_read_code_load(std::ifstream &file_stream,
     // inconsistency
     DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Incomplete code load structure");
   }
-  int max_str_size = remaining_size - code_load.code_size;
-  if (max_str_size > 1) {
+  int str_size = remaining_size - code_load.code_size;
+  if (str_size > 1) {
     code_load.func_name =
-        std::string(reinterpret_cast<char *>(buf_64), max_str_size - 1);
+        std::string(reinterpret_cast<char *>(buf_64), str_size - 1);
   }
 #ifdef DEBUG
   LG_DBG("Func name = %s, address = %lx (%lu) time=%lu",
@@ -103,16 +136,16 @@ DDRes jit_read_debug_info(std::ifstream &file_stream,
   if (!file_stream.good()) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Incomplete debug info structure");
   }
-  uint64_t *buf = reinterpret_cast<uint64_t *>(buff.data());
-  debug_info.code_addr = *buf++;
-  debug_info.nr_entry = *buf++;
+  uint64_t *buf_64 = reinterpret_cast<uint64_t *>(buff.data());
+  debug_info.code_addr = load64(buf_64++);
+  debug_info.nr_entry = load64(buf_64++);
   debug_info.entries.resize(debug_info.nr_entry);
 
   for (unsigned i = 0; i < debug_info.nr_entry; ++i) {
-    debug_info.entries[i].addr = *buf++;
-    int32_t *buf_32 = reinterpret_cast<int32_t *>(buf);
-    debug_info.entries[i].lineno = *buf_32++;
-    debug_info.entries[i].discrim = *buf_32++;
+    debug_info.entries[i].addr = load64(buf_64++);
+    int32_t *buf_32 = reinterpret_cast<int32_t *>(buf_64);
+    debug_info.entries[i].lineno = load32(buf_32++);
+    debug_info.entries[i].discrim = load32(buf_32++);
     char *buf_char = reinterpret_cast<char *>(buf_32);
     if (static_cast<unsigned char>(*buf_char) == 0xff &&
         *(buf_char + 1) == '\0') {
@@ -129,7 +162,7 @@ DDRes jit_read_debug_info(std::ifstream &file_stream,
            debug_info.entries[i].name.c_str(), debug_info.entries[i].lineno,
            debug_info.entries[i].addr, debug_info.prefix.timestamp);
 #endif
-    buf = reinterpret_cast<uint64_t *>(buf_char);
+    buf_64 = reinterpret_cast<uint64_t *>(buf_char);
   }
   return ddres_init();
 }
@@ -181,7 +214,6 @@ DDRes jitdump_read(const std::string_view file, JITDump &jit_dump) {
   try {
     LG_DBG("JITDump starting parse of %s", file.data());
     DDRES_CHECK_FWD(jit_read_header(file_stream, jit_dump.header));
-
     DDRES_CHECK_FWD(jit_read_records(file_stream, jit_dump));
   }
   // incomplete files can trigger exceptions
