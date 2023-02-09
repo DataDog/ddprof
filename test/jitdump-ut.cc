@@ -8,7 +8,7 @@ namespace ddprof {
 TEST(JITTest, SimpleRead) {
   LogHandle handle;
   std::string jit_path =
-      std::string(UNIT_TEST_DATA) + "/" + std::string("jit.dump");
+      std::string(UNIT_TEST_DATA) + "/" + std::string("jit-simple-julia.dump");
   JITDump jit_dump;
   DDRes res = jitdump_read(jit_path, jit_dump);
   ASSERT_TRUE(IsDDResOK(res));
