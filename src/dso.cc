@@ -21,6 +21,7 @@ static const std::string_view s_heap_str = "[heap]";
 // anon and empty are the same (one comes from perf, the other from proc maps)
 static const std::string_view s_anon_str = "//anon";
 static const std::string_view s_jsa_str = ".jsa";
+static const std::string_view s_mem_fd_str = "/memfd";
 // Example of these include : anon_inode:[perf_event]
 static const std::string_view s_anon_inode_str = "anon_inode";
 // dll should not be considered as elf files
@@ -55,7 +56,8 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
   } else if (_filename.empty() || _filename.starts_with(s_anon_str) ||
              _filename.starts_with(s_anon_inode_str) ||
              _filename.starts_with(s_dev_zero_str) ||
-             _filename.starts_with(s_dev_null_str)) {
+             _filename.starts_with(s_dev_null_str) ||
+             _filename.starts_with(s_mem_fd_str)) {
     _type = dso::kAnon;
   } else if ( // ends with .jsa
       _filename.ends_with(s_jsa_str) || _filename.ends_with(s_dll_str)) {
