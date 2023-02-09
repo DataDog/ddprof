@@ -80,7 +80,7 @@ private:
                          SymbolMap &symbol_map,
                          SymbolTable &symbol_table);
 
-  static const std::array<std::string, 1> _ignored_symbols_start;
+  static const std::array<const char*, 1> _ignored_symbols_start;
 
   PidUnorderedMap _pid_map;
   std::string _path_to_proc;

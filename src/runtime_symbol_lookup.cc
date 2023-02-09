@@ -24,10 +24,10 @@ namespace ddprof {
 // 00007F78F52300D8 78 stub<2> AllocateTemporaryEntryPoints<PRECODE_STUB>
 // 00007F78F5230150 18 stub<3> AllocateTemporaryEntryPoints<PRECODE_STUB>
 
-const std::array<std::string, 1> RuntimeSymbolLookup::_ignored_symbols_start = {
+const std::array<const char*, 1> RuntimeSymbolLookup::_ignored_symbols_start = {{
     // dotnet symbols we skip all start by stub<
-    std::string("stub<"),
-};
+    "stub<",
+}};
 
 FILE *RuntimeSymbolLookup::perfmaps_open(int pid,
                                          const char *path_to_perfmap = "") {

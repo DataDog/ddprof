@@ -81,6 +81,10 @@ bool Dso::is_jit_dump_str(std::string_view file_path, pid_t pid) {
   if (file_path.ends_with(".dump")) {
     // llvm uses this format
     std::string jit_dump_str = string_format("jit-%d.dump", pid);
+    // this is to remove a gcc warning
+    if (jit_dump_str.size() >= PTRDIFF_MAX) {
+      return false;
+    }
     if (file_path.ends_with(jit_dump_str)) {
       return true;
     }
