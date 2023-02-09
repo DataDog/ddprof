@@ -10,8 +10,8 @@
 #include "symbol_table.hpp"
 
 #include "ddres_def.hpp"
+#include <array>
 #include <unordered_map>
-#include <unordered_set>
 
 namespace ddprof {
 
@@ -72,9 +72,15 @@ private:
     symbol_info._failed_cycle[std::string(path)] = _cycle_counter;
   }
 
-  bool should_skip_symbol(const char *symbol);
+  bool should_skip_symbol(const std::string &symbol);
 
-  static const std::unordered_set<std::string> _ignored_symbols;
+  bool insert_or_replace(const std::string &symbol,
+                         ProcessAddress_t address,
+                         Offset_t size,
+                         SymbolMap &symbol_map,
+                         SymbolTable &symbol_table);
+
+  static const std::array<std::string, 1> _ignored_symbols_start;
 
   PidUnorderedMap _pid_map;
   std::string _path_to_proc;

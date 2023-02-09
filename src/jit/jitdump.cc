@@ -61,7 +61,7 @@ DDRes jit_read_code_load(std::ifstream &file_stream,
                    code_load.prefix.total_size - sizeof(JITRecordPrefix));
   if (!file_stream.good()) {
     // can happen if we are in the middle of a write
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Incomplete code load structure");
+    DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Incomplete code load structure");
   }
   uint32_t *buf_32 = reinterpret_cast<uint32_t *>(buff.data());
   code_load.pid = *buf_32++;
@@ -85,8 +85,9 @@ DDRes jit_read_code_load(std::ifstream &file_stream,
         std::string(reinterpret_cast<char *>(buf_64), max_str_size - 1);
   }
 #ifdef DEBUG
-  LG_DBG("Func name = %s, address = %lx (%lu)", code_load.func_name.c_str(),
-         code_load.code_addr, code_load.code_size);
+  LG_DBG("Func name = %s, address = %lx (%lu) time=%lu",
+         code_load.func_name.c_str(), code_load.code_addr, code_load.code_size,
+         code_load.prefix.timestamp);
 #endif
   return ddres_init();
 }
@@ -100,7 +101,7 @@ DDRes jit_read_debug_info(std::ifstream &file_stream,
   buff.resize(debug_info.prefix.total_size - sizeof(JITRecordPrefix));
   file_stream.read(buff.data(), buff.size());
   if (!file_stream.good()) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Incomplete debug info structure");
+    DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Incomplete debug info structure");
   }
   uint64_t *buf = reinterpret_cast<uint64_t *>(buff.data());
   debug_info.code_addr = *buf++;
@@ -123,8 +124,9 @@ DDRes jit_read_debug_info(std::ifstream &file_stream,
     debug_info.entries[i].name = std::string(buf_char);
     buf_char += debug_info.entries[i].name.size() + 1;
 #ifdef DEBUG
-    LG_DBG("Name:line = %s:%d / %lx", debug_info.entries[i].name.c_str(),
-           debug_info.entries[i].lineno, debug_info.entries[i].addr);
+    LG_DBG("Name:line = %s:%d / %lx / time=%lu",
+           debug_info.entries[i].name.c_str(), debug_info.entries[i].lineno,
+           debug_info.entries[i].addr, debug_info.prefix.timestamp);
 #endif
     buf = reinterpret_cast<uint64_t *>(buf_char);
   }

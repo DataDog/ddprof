@@ -303,7 +303,7 @@ add_unit_test(timer-ut timer-ut.cc ../src/timer.cc ../src/perf.cc)
 add_unit_test(ddprof_file_info-ut ddprof_file_info-ut.cc ../src/ddprof_file_info.cc)
 
 add_unit_test(runtime_symbol_lookup-ut runtime_symbol_lookup-ut.cc ../src/runtime_symbol_lookup.cc
-              ../src/symbol_map.cc ../src/jit/jitdump.cc LIBRARIES llvm-demangle)
+              ../src/symbol_map.cc ../src/jit/jitdump.cc)
 
 add_unit_test(ddprof_cpumask-ut ddprof_cpumask-ut.cc ../src/ddprof_cpumask.cc)
 

@@ -126,4 +126,36 @@ TEST(runtime_symbol_lookup, jitdump_bad_file) {
   ASSERT_EQ(symbol_idx, -1);
 }
 
+TEST(runtime_symbol_lookup, jitdump_vs_perfmap) {
+  LogHandle log_handle;
+  pid_t mypid = 8;
+  // check that we are loading the same symbol on both sides
+  std::string expected_sym =
+      "instance void [System.Private.CoreLib] "
+      "System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1+"
+      "AsyncStateMachineBox`1[System.__Canon,System.Net.Http."
+      "HttpConnectionPool+<CreateHttp11ConnectionAsync>d__100]::.ctor()["
+      "OptimizedTier1]";
+
+
+  // load jitdump on one side
+  SymbolTable symbol_table;
+  RuntimeSymbolLookup runtime_symbol_lookup("");
+  ProcessAddress_t pc = 0x7fa12f0eac90;
+  std::string jit_path =
+      std::string(UNIT_TEST_DATA) + "/" + std::string("jit-8-stable.dump");
+  SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
+      mypid, pc, symbol_table, jit_path);
+  EXPECT_NE(symbol_idx, -1);
+  EXPECT_EQ(symbol_table[symbol_idx]._symname, expected_sym);
+
+  // load perfmap on the other
+  RuntimeSymbolLookup runtime_symbol_lookup_perfmap(UNIT_TEST_DATA);
+  SymbolTable symbol_table_perfmap;
+  symbol_idx = runtime_symbol_lookup_perfmap.get_or_insert(
+      mypid, pc, symbol_table_perfmap);
+  EXPECT_NE(symbol_idx, -1);
+  EXPECT_EQ(symbol_table_perfmap[symbol_idx]._symname, expected_sym);
+}
+
 } // namespace ddprof

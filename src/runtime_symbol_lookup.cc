@@ -16,18 +16,17 @@
 #include "runtime_symbol_lookup.hpp"
 #include "unlikely.hpp"
 
-#include "llvm/Demangle/Demangle.h"
-
 #include "jit/jitdump.hpp"
 
 namespace ddprof {
 
-const std::unordered_set<std::string> RuntimeSymbolLookup::_ignored_symbols = {
-    // dotnet symbols
-    std::string("GenerateResolveStub"),
-    std::string("GenerateDispatchStub"),
-    std::string("GenerateLookupStub"),
-    std::string("AllocateTemporaryEntryPoints"),
+// 00007F78F5230000 d8 stub<1> AllocateTemporaryEntryPoints<PRECODE_STUB>
+// 00007F78F52300D8 78 stub<2> AllocateTemporaryEntryPoints<PRECODE_STUB>
+// 00007F78F5230150 18 stub<3> AllocateTemporaryEntryPoints<PRECODE_STUB>
+
+const std::array<std::string, 1> RuntimeSymbolLookup::_ignored_symbols_start = {
+    // dotnet symbols we skip all start by stub<
+    std::string("stub<"),
 };
 
 FILE *RuntimeSymbolLookup::perfmaps_open(int pid,
@@ -44,7 +43,59 @@ FILE *RuntimeSymbolLookup::perfmaps_open(int pid,
   }
   // attempt in local namespace
   snprintf(buf, 1024, "%s/perf-%d.map", path_to_perfmap, pid);
+  LG_DBG("Open perf-map %s", buf);
   return fopen(buf, "r");
+}
+
+bool RuntimeSymbolLookup::insert_or_replace(const std::string &symbol,
+                                            ProcessAddress_t address,
+                                            Offset_t code_size,
+                                            SymbolMap &symbol_map,
+                                            SymbolTable &symbol_table) {
+  if (should_skip_symbol(symbol)) {
+    return false;
+  }
+
+  if (!address || !code_size ||
+      address == std::numeric_limits<ProcessAddress_t>::max() ||
+      code_size == std::numeric_limits<ProcessAddress_t>::max()) {
+    return false;
+  }
+
+  if (unlikely(address >
+               std::numeric_limits<ProcessAddress_t>::max() - code_size)) {
+    return false;
+  }
+
+  SymbolMap::FindRes find_res = symbol_map.find_closest(address);
+  if (!find_res.second) {
+    symbol_map.emplace_hint(
+        find_res.first, address,
+        SymbolSpan(address + code_size - 1, symbol_table.size()));
+    symbol_table.emplace_back(Symbol(symbol, symbol, 0, "jit"));
+  } else {
+    // todo managing range erase (we can overal with other syms)
+    SymbolIdx_t existing = find_res.first->second.get_symbol_idx();
+#ifdef DEBUG
+    LG_DBG("Existyng sym -- %s (%lx-%lx)",
+           symbol_table[existing]._demangle_name.c_str(), find_res.first->first,
+           find_res.first->second.get_end());
+    LG_DBG("New sym -- %s (%lx-%lx)", code_load.func_name.c_str(),
+           code_load.code_addr, code_load.code_size + code_load.code_addr);
+#endif
+    if (symbol_table[existing]._demangle_name == symbol) {
+      // nothing to do (unlikely size would change ?)
+    } else {
+      // remove current element (as start can be different)
+      symbol_map.erase(find_res.first);
+      symbol_map.emplace(address,
+          SymbolSpan(address + code_size - 1, symbol_table.size()));
+      symbol_table[existing]._demangle_name = symbol;
+      symbol_table[existing]._symname = symbol;
+    }
+  }
+
+  return true;
 }
 
 DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
@@ -66,27 +117,24 @@ DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
   }
 
   for (const JITRecordCodeLoad &code_load : jitdump.code_load) {
-    // elements are ordered
-    SymbolMap::FindRes find_res = symbol_map.find_closest(code_load.code_addr);
-    // we assume that we already came across this symbol
-    if (!find_res.second) {
-      symbol_map.emplace_hint(
-          find_res.first, code_load.code_addr,
-          SymbolSpan(code_load.code_addr + code_load.code_size,
-                     symbol_table.size()));
-      // we don't need demangling in most languages.
-      // we can consider removing this if it becomes a hot path
-      std::string demangle_func = llvm::demangle(code_load.func_name);
-      symbol_table.emplace_back(
-          Symbol(code_load.func_name, demangle_func, 0, "jit"));
-    }
+    insert_or_replace(code_load.func_name,
+                      code_load.code_addr,
+                      code_load.code_size,
+                      symbol_map,
+                      symbol_table);
   }
   // todo we can add file and inlined functions with debug info
   return ddres_init();
 }
 
-bool RuntimeSymbolLookup::should_skip_symbol(const char *symbol) {
-  return _ignored_symbols.find(symbol) != _ignored_symbols.end();
+bool RuntimeSymbolLookup::should_skip_symbol(const std::string &symbol) {
+  // we could consider making this more efficient if the table grows
+  for (const auto &el : _ignored_symbols_start) {
+    if (symbol.starts_with(el)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 DDRes RuntimeSymbolLookup::fill_from_perfmap(int pid, SymbolMap &symbol_map,
@@ -107,39 +155,13 @@ DDRes RuntimeSymbolLookup::fill_from_perfmap(int pid, SymbolMap &symbol_map,
     char size_buff[33];
     // Avoid considering any symbols beyond 300 chars
     if (3 !=
-            sscanf(line, "%16s %8s %300[^\t\n]", address_buff, size_buff,
-                   buffer) ||
-        should_skip_symbol(buffer)) {
+        sscanf(line, "%16s %8s %300[^\t\n]", address_buff, size_buff, buffer)) {
       continue;
     }
+    std::string sym = std::string(buffer);
     ProcessAddress_t address = std::strtoul(address_buff, nullptr, 16);
     Offset_t code_size = std::strtoul(size_buff, nullptr, 16);
-    // check for conversion issues
-    if (!address || !code_size ||
-        address == std::numeric_limits<ProcessAddress_t>::max() ||
-        code_size == std::numeric_limits<ProcessAddress_t>::max()) {
-      continue;
-    }
-    ProcessAddress_t end = address + code_size - 1;
-#ifdef DEBUG
-    LG_NFO("Attempt insert at %lx --> %lx / %s", address, end, buffer);
-#endif
-    if (unlikely(address >
-                 std::numeric_limits<ProcessAddress_t>::max() - code_size)) {
-      // Ignore overflow
-      LG_DBG("Overflow detected when parsing perfmap (%d)", pid);
-      continue;
-    }
-    SymbolMap::FindRes find_res = symbol_map.find_closest(address);
-    if (!find_res.second) {
-      // elements are ordered, hints help
-      symbol_map.emplace_hint(find_res.first, address,
-                              SymbolSpan(end, symbol_table.size()));
-      symbol_table.emplace_back(
-          Symbol(std::string(buffer), std::string(buffer), 0, "jit"));
-    } else {
-      LG_DBG("buffer=%s", buffer);
-    }
+    insert_or_replace(sym, address, code_size, symbol_map, symbol_table);
   }
   free(line);
   return ddres_init();
@@ -153,8 +175,9 @@ RuntimeSymbolLookup::get_or_insert_jitdump(pid_t pid, ProcessAddress_t pc,
   SymbolMap::FindRes find_res = symbol_info._map.find_closest(pc);
   if (!find_res.second && !has_lookup_failure(symbol_info, jitdump_path)) {
     // refresh as we expect there to be new symbols
-    if (IsDDResNotOK(fill_from_jitdump(jitdump_path, pid, symbol_info._map,
+    if (IsDDResFatal(fill_from_jitdump(jitdump_path, pid, symbol_info._map,
                                        symbol_table))) {
+      // Some warnings can be expected with incomplete files
       flag_lookup_failure(symbol_info, jitdump_path);
       return -1;
     }

@@ -48,6 +48,7 @@ public:
   using Map::emplace_hint;
   using Map::empty;
   using Map::end;
+  using Map::erase;
   using Map::size;
 
   static bool is_within(const Offset_t &norm_pc, const ValueType &kv);
