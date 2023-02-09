@@ -6,6 +6,7 @@
 #include <fstream>
 #include <vector>
 
+// If we want to consider big endian, we will need this
 // has bswap_64/32/16
 // #include <byteswap.h>
 
@@ -26,15 +27,6 @@ int32_t load32(const int32_t *data) {
   memcpy(&Ret, data, sizeof(int32_t));
   // #ifdef BIG_ENDIAN
   //   bswap_32(Ret);
-  // #endif
-  return Ret;
-}
-
-uint16_t load16(const uint16_t *data) {
-  uint32_t Ret;
-  memcpy(&Ret, data, sizeof(uint16_t));
-  // #ifdef BIG_ENDIAN
-  //   bswap_16(Ret);
   // #endif
   return Ret;
 }
