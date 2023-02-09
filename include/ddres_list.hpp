@@ -48,7 +48,8 @@
   X(INPUT_PROCESS, "")                                                         \
   X(STACK_HANDLE, "")                                                          \
   X(DSO, "")                                                                   \
-  X(JIT, "")                                                                   \
+  X(JIT, "Error parsing JIT files")                                            \
+  X(NO_JIT_FILE, "File not readable for JIT")                                  \
   X(UNHANDLED_DSO, "ignore dso type")                                          \
   X(WORKERLOOP_INIT, "error initializing the worker loop")                     \
   X(SYS_CONFIG, "error checking system configuration")                         \
