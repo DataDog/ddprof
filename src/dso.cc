@@ -20,6 +20,7 @@ static const std::string_view s_stack_str = "[stack]";
 static const std::string_view s_heap_str = "[heap]";
 // anon and empty are the same (one comes from perf, the other from proc maps)
 static const std::string_view s_anon_str = "//anon";
+static const std::string_view s_anon_2_str = "[anon";
 static const std::string_view s_jsa_str = ".jsa";
 static const std::string_view s_mem_fd_str = "/memfd";
 // Example of these include : anon_inode:[perf_event]
@@ -55,6 +56,7 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
     // Safeguard against other types of files we would not handle
   } else if (_filename.empty() || _filename.starts_with(s_anon_str) ||
              _filename.starts_with(s_anon_inode_str) ||
+             _filename.starts_with(s_anon_2_str) ||
              _filename.starts_with(s_dev_zero_str) ||
              _filename.starts_with(s_dev_null_str) ||
              _filename.starts_with(s_mem_fd_str)) {

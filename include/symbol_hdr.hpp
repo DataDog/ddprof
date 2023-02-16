@@ -51,6 +51,4 @@ struct SymbolHdr {
 
   // The mapping table
   ddprof::MapInfoTable _mapinfo_table;
-
-  struct ddprof::DwflSymbolLookupStats _stats;
 };

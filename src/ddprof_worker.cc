@@ -151,9 +151,21 @@ DDRes worker_library_free(DDProfContext *ctx) {
   return {};
 }
 
+static DDRes symbols_update_stats(const SymbolHdr &symbol_hdr) {
+  const auto &stats = symbol_hdr._runtime_symbol_lookup.get_stats();
+  DDRES_CHECK_FWD(
+      ddprof_stats_set(STATS_SYMBOLS_JIT_READS, stats._nb_jit_reads));
+  DDRES_CHECK_FWD(ddprof_stats_set(STATS_SYMBOLS_JIT_FAILED_LOOKUPS,
+                                   stats._nb_failed_lookups));
+  DDRES_CHECK_FWD(
+      ddprof_stats_set(STATS_SYMBOLS_JIT_COUNT, stats._count));
+  return ddres_init();
+}
+
 /// Retrieve cpu / memory info
-static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr,
+static DDRes worker_update_stats(ProcStatus *procstat, const UnwindState &us,
                                  std::chrono::nanoseconds cycle_duration) {
+  const DsoHdr &dso_hdr = us.dso_hdr;
   // Update the procstats, but first snapshot the utime so we can compute the
   // diff for the utime metric
   int64_t cpu_time_old = procstat->utime + procstat->stime;
@@ -165,10 +177,13 @@ static DDRes worker_update_stats(ProcStatus *procstat, const DsoHdr *dso_hdr,
   ddprof_stats_set(STATS_PROFILER_RSS, get_page_size() * procstat->rss);
   ddprof_stats_set(STATS_PROFILER_CPU_USAGE, millicores);
   ddprof_stats_set(STATS_DSO_UNHANDLED_SECTIONS,
-                   dso_hdr->_stats.sum_event_metric(DsoStats::kUnhandledDso));
+                   dso_hdr._stats.sum_event_metric(DsoStats::kUnhandledDso));
   ddprof_stats_set(STATS_DSO_NEW_DSO,
-                   dso_hdr->_stats.sum_event_metric(DsoStats::kNewDso));
-  ddprof_stats_set(STATS_DSO_SIZE, dso_hdr->get_nb_dso());
+                   dso_hdr._stats.sum_event_metric(DsoStats::kNewDso));
+  ddprof_stats_set(STATS_DSO_SIZE, dso_hdr.get_nb_dso());
+
+  // Symbol stats
+  DDRES_CHECK_FWD(symbols_update_stats(us.symbol_hdr));
 
   long target_cpu_nsec;
   ddprof_stats_get(STATS_TARGET_CPU_USAGE, &target_cpu_nsec);
@@ -383,8 +398,7 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
 
   // Scrape procfs for process usage statistics
   DDRES_CHECK_FWD(worker_update_stats(&ctx->worker_ctx.proc_status,
-                                      &ctx->worker_ctx.us->dso_hdr,
-                                      cycle_duration));
+                                      *ctx->worker_ctx.us, cycle_duration));
 
   // And emit diagnostic output (if it's enabled)
   print_diagnostics(ctx->worker_ctx.us->dso_hdr);

@@ -176,14 +176,15 @@ RuntimeSymbolLookup::get_or_insert_jitdump(pid_t pid, ProcessAddress_t pc,
   SymbolMap::FindRes find_res = symbol_info._map.find_closest(pc);
   if (!find_res.second && !has_lookup_failure(symbol_info, jitdump_path)) {
     // refresh as we expect there to be new symbols
+    ++_stats._nb_jit_reads;
     if (IsDDResFatal(fill_from_jitdump(jitdump_path, pid, symbol_info._map,
                                        symbol_table))) {
       // Some warnings can be expected with incomplete files
       flag_lookup_failure(symbol_info, jitdump_path);
       return -1;
     }
+    find_res = symbol_info._map.find_closest(pc);
   }
-  find_res = symbol_info._map.find_closest(pc);
   // Avoid bouncing when we are failing lookups.
   // !This could have a negative impact on symbolisation. To be studied
   if (!find_res.second) {
@@ -200,9 +201,10 @@ SymbolIdx_t RuntimeSymbolLookup::get_or_insert(pid_t pid, ProcessAddress_t pc,
   // Only check the file if we did not get failures in this cycle (for this pid)
   if (!find_res.second &&
       !has_lookup_failure(symbol_info, std::string("perfmap"))) {
+    ++_stats._nb_jit_reads;
     fill_from_perfmap(pid, symbol_info._map, symbol_table);
+    find_res = symbol_info._map.find_closest(pc);
   }
-  find_res = symbol_info._map.find_closest(pc);
   if (!find_res.second) {
     flag_lookup_failure(symbol_info, "perfmap");
   }

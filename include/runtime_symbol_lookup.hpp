@@ -17,8 +17,14 @@ namespace ddprof {
 
 class RuntimeSymbolLookup {
 public:
+  struct Stats {
+    uint32_t _nb_jit_reads = {};
+    uint32_t _nb_failed_lookups = {};
+    mutable uint32_t _count = {};
+  };
+
   explicit RuntimeSymbolLookup(std::string_view path_to_proc)
-      : _path_to_proc(path_to_proc), _cycle_counter(1) {}
+      : _path_to_proc(path_to_proc), _stats{}, _cycle_counter(1) {}
 
   SymbolIdx_t get_or_insert_jitdump(pid_t pid, ProcessAddress_t pc,
                                     SymbolTable &symbol_table,
@@ -29,7 +35,18 @@ public:
 
   void erase(pid_t pid) { _pid_map.erase(pid); }
 
-  void cycle() { ++_cycle_counter; }
+  void cycle() {
+    ++_cycle_counter;
+    _stats = {};
+  }
+
+  const Stats &get_stats() const {
+    _stats._count = 0;
+    for (const auto &map : _pid_map) {
+      _stats._count += map.second._map.size();
+    }
+    return _stats;
+  }
 
 private:
   using FailedCycle = std::unordered_map<std::string, uint32_t>;
@@ -75,6 +92,7 @@ private:
 
   void flag_lookup_failure(SymbolInfo &symbol_info, std::string_view path) {
     symbol_info._failed_cycle[std::string(path)] = _cycle_counter;
+    ++_stats._nb_failed_lookups;
   }
 
   bool should_skip_symbol(const std::string &symbol);
@@ -87,6 +105,7 @@ private:
 
   PidUnorderedMap _pid_map;
   std::string _path_to_proc;
+  Stats _stats;
   uint32_t _cycle_counter;
 };
 
