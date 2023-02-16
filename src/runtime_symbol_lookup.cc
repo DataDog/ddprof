@@ -24,15 +24,9 @@ namespace ddprof {
 // 00007F78F52300D8 78 stub<2> AllocateTemporaryEntryPoints<PRECODE_STUB>
 // 00007F78F5230150 18 stub<3> AllocateTemporaryEntryPoints<PRECODE_STUB>
 
-const std::array<const char *, 1> RuntimeSymbolLookup::_ignored_symbols_start =
-    {{
-        // dotnet symbols we skip all start by stub<
-        "stub<",
-    }};
-
 FILE *RuntimeSymbolLookup::perfmaps_open(int pid,
                                          const char *path_to_perfmap = "") {
-  char buf[1024] = {0};
+  char buf[1024];
   auto n = snprintf(buf, 1024, "%s/proc/%d/root%s/perf-%d.map",
                     _path_to_proc.c_str(), pid, path_to_perfmap, pid);
   if (n >= 1024) { // unable to snprintf everything
@@ -102,7 +96,7 @@ bool RuntimeSymbolLookup::insert_or_replace(const std::string &symbol,
 DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
                                              pid_t pid, SymbolMap &symbol_map,
                                              SymbolTable &symbol_table) {
-  char buf[1024] = {0};
+  char buf[1024];
   auto n = snprintf(buf, 1024, "%s/proc/%d/root%s", _path_to_proc.c_str(), pid,
                     jitdump_path.data());
   if (n >= 1024) { // unable to snprintf everything
@@ -128,7 +122,7 @@ DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
   return ddres_init();
 }
 
-bool RuntimeSymbolLookup::should_skip_symbol(const std::string &symbol) {
+bool RuntimeSymbolLookup::should_skip_symbol(const std::string &symbol) const {
   // we could consider making this more efficient if the table grows
   for (const auto &el : _ignored_symbols_start) {
     if (symbol.starts_with(el)) {

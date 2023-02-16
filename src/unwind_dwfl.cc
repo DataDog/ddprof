@@ -78,8 +78,9 @@ static void trace_unwinding_end(UnwindState *us) {
     DsoHdr::DsoFindRes find_res =
         us->dso_hdr.dso_find_closest(us->pid, us->current_ip);
     SymbolIdx_t symIdx = us->output.locs[us->output.nb_locs - 1]._symbol_idx;
-    std::string &last_func = us->symbol_hdr._symbol_table[symIdx]._symname;
     if (find_res.second) {
+      const std::string &last_func =
+          us->symbol_hdr._symbol_table[symIdx]._symname;
       LG_DBG("Stopped at %lx - dso %s - error %s (%s)", us->current_ip,
              find_res.first->second.to_string().c_str(), dwfl_errmsg(-1),
              last_func.c_str());

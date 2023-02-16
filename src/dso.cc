@@ -14,25 +14,25 @@
 
 namespace ddprof {
 
-static const std::string_view s_vdso_str = "[vdso]";
-static const std::string_view s_vsyscall_str = "[vsyscall]";
-static const std::string_view s_stack_str = "[stack]";
-static const std::string_view s_heap_str = "[heap]";
+constexpr std::string_view s_vdso_str = "[vdso]";
+constexpr std::string_view s_vsyscall_str = "[vsyscall]";
+constexpr std::string_view s_stack_str = "[stack]";
+constexpr std::string_view s_heap_str = "[heap]";
 // anon and empty are the same (one comes from perf, the other from proc maps)
-static const std::string_view s_anon_str = "//anon";
-static const std::string_view s_anon_2_str = "[anon";
-static const std::string_view s_jsa_str = ".jsa";
-static const std::string_view s_mem_fd_str = "/memfd";
+constexpr std::string_view s_anon_str = "//anon";
+constexpr std::string_view s_anon_2_str = "[anon";
+constexpr std::string_view s_jsa_str = ".jsa";
+constexpr std::string_view s_mem_fd_str = "/memfd";
 // Example of these include : anon_inode:[perf_event]
-static const std::string_view s_anon_inode_str = "anon_inode";
+constexpr std::string_view s_anon_inode_str = "anon_inode";
 // dll should not be considered as elf files
-static const std::string_view s_dll_str = ".dll";
+constexpr std::string_view s_dll_str = ".dll";
 // Example socket:[123456]
-static const std::string_view s_socket_str = "socket";
+constexpr std::string_view s_socket_str = "socket";
 // null elements
-static const std::string_view s_dev_zero_str = "/dev/zero";
-static const std::string_view s_dev_null_str = "/dev/null";
-static const std::string_view s_dd_profiling_str = k_libdd_profiling_name;
+constexpr std::string_view s_dev_zero_str = "/dev/zero";
+constexpr std::string_view s_dev_null_str = "/dev/null";
+constexpr std::string_view s_dd_profiling_str = k_libdd_profiling_name;
 
 // invalid element
 Dso::Dso()

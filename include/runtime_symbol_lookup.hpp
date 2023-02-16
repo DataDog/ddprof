@@ -49,7 +49,25 @@ public:
   }
 
 private:
-  using FailedCycle = std::unordered_map<std::string, uint32_t>;
+  struct hash_string {
+    // allow comparison between strings and string_views.
+    // This saves on some string creations
+    // as suggested by @sjanel
+    using is_transparent = void;
+    std::size_t operator()(const std::string &v) const {
+      return std::hash<std::string>{}(v);
+    }
+    std::size_t operator()(const char *v) const {
+      return std::hash<std::string_view>{}(v);
+    }
+
+    std::size_t operator()(const std::string_view &v) const {
+      return std::hash<std::string_view>{}(v);
+    }
+  };
+
+  using FailedCycle =
+      std::unordered_map<std::string, uint32_t, hash_string, std::equal_to<>>;
   struct SymbolInfo {
     SymbolMap _map;
     FailedCycle _failed_cycle;
@@ -82,7 +100,7 @@ private:
 
   bool has_lookup_failure(const SymbolInfo &symbol_info,
                           std::string_view path) const {
-    const auto it = symbol_info._failed_cycle.find(std::string(path));
+    const auto it = symbol_info._failed_cycle.find(path);
     if (it != symbol_info._failed_cycle.end()) {
       // failure during this cycle
       return it->second == _cycle_counter;
@@ -91,17 +109,28 @@ private:
   }
 
   void flag_lookup_failure(SymbolInfo &symbol_info, std::string_view path) {
-    symbol_info._failed_cycle[std::string(path)] = _cycle_counter;
+    const auto it = symbol_info._failed_cycle.find(path);
+    // Written this way, we save up on creating strings
+    // only the slow path will create a string for the path
+    if (it != symbol_info._failed_cycle.end()) {
+      ++(it->second);
+    } else {
+      symbol_info._failed_cycle[std::string(path)] = _cycle_counter;
+    }
     ++_stats._nb_failed_lookups;
   }
 
-  bool should_skip_symbol(const std::string &symbol);
+  bool should_skip_symbol(const std::string &symbol) const;
 
   bool insert_or_replace(const std::string &symbol, ProcessAddress_t address,
                          Offset_t size, SymbolMap &symbol_map,
                          SymbolTable &symbol_table);
 
-  static const std::array<const char *, 1> _ignored_symbols_start;
+  static constexpr std::array<const std::string_view, 1>
+      _ignored_symbols_start = {{
+          // dotnet symbols we skip all start by stub<
+          "stub<",
+      }};
 
   PidUnorderedMap _pid_map;
   std::string _path_to_proc;
