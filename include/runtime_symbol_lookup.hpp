@@ -120,7 +120,7 @@ private:
     ++_stats._nb_failed_lookups;
   }
 
-  bool should_skip_symbol(const std::string &symbol) const;
+  bool should_skip_symbol(std::string_view symbol) const;
 
   bool insert_or_replace(const std::string &symbol, ProcessAddress_t address,
                          Offset_t size, SymbolMap &symbol_map,

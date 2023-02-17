@@ -122,7 +122,7 @@ DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
   return ddres_init();
 }
 
-bool RuntimeSymbolLookup::should_skip_symbol(const std::string &symbol) const {
+bool RuntimeSymbolLookup::should_skip_symbol(std::string_view symbol) const {
   // we could consider making this more efficient if the table grows
   for (const auto &el : _ignored_symbols_start) {
     if (symbol.starts_with(el)) {

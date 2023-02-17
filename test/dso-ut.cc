@@ -207,23 +207,22 @@ TEST(DSOTest, path_type) {
 }
 
 // clang-format off
-static const char *s_exec_line = "55d7883a1000-55d7883a5000 r-xp 00002000 fe:01 3287864                    /usr/local/bin/BadBoggleSolver_run";
-static const char *s_exec_line2 = "55d788391000-55d7883a1000 r-xp 00002000 fe:01 0                    /usr/local/bin/BadBoggleSolver_run_2";
-static const char *s_exec_line3 = "55d788391000-55d7883a1001 r-xp 00002000 fe:01 0                    /usr/local/bin/BadBoggleSolver_run_3";
+static const char *const s_exec_line = "55d7883a1000-55d7883a5000 r-xp 00002000 fe:01 3287864                    /usr/local/bin/BadBoggleSolver_run";
+static const char *const s_exec_line2 = "55d788391000-55d7883a1000 r-xp 00002000 fe:01 0                    /usr/local/bin/BadBoggleSolver_run_2";
+static const char *const s_exec_line3 = "55d788391000-55d7883a1001 r-xp 00002000 fe:01 0                    /usr/local/bin/BadBoggleSolver_run_3";
 // same as number 3 though smaller
-static const char *s_exec_line4 = "55d788391000-55d7883a1000 r-xp 00002000 fe:01 0                    /usr/local/bin/BadBoggleSolver_run_3";
+static const char *const s_exec_line4 = "55d788391000-55d7883a1000 r-xp 00002000 fe:01 0                    /usr/local/bin/BadBoggleSolver_run_3";
 
-static const char *s_line_noexec = "7f531437a000-7f531437b000 r--p 00000000 fe:01 3932979                    /usr/lib/x86_64-linux-gnu/ld-2.31.so";
-static const char *s_vdso_lib = "7ffcd6ce6000-7ffcd6ce8000 r-xp 00000000 00:00 0                          [vdso]";
-static const char *s_stack_line = "7ffcd6c68000-7ffcd6c89000 rw-p 00000000 00:00 0                          [stack]";
-static const char *s_inode_line = "7ffcd6c89000-7ffcd6c92000 rw-p 00000000 00:00 0                          anon_inode:[perf_event]";
+static const char *const s_line_noexec = "7f531437a000-7f531437b000 r--p 00000000 fe:01 3932979                    /usr/lib/x86_64-linux-gnu/ld-2.31.so";
+static const char *const s_vdso_lib = "7ffcd6ce6000-7ffcd6ce8000 r-xp 00000000 00:00 0                          [vdso]";
+static const char *const s_stack_line = "7ffcd6c68000-7ffcd6c89000 rw-p 00000000 00:00 0                          [stack]";
+static const char *const s_inode_line = "7ffcd6c89000-7ffcd6c92000 rw-p 00000000 00:00 0                          anon_inode:[perf_event]";
 
-static const char *s_jsa_line = "0x800000000-0x800001fff rw-p 00000000 00:00 0                          /usr/local/openjdk-11/lib/server/classes.jsa";
+static const char *const s_jsa_line = "0x800000000-0x800001fff rw-p 00000000 00:00 0                          /usr/local/openjdk-11/lib/server/classes.jsa";
 
-static const char *s_dd_profiling = "0x800000000-0x800001fff rw-p 00000000 00:00 0                          /tmp/libdd_profiling.so.1234";
-static const char *s_dotnet_line = "7fbd4f1e4000-7fbd4f1ec000 r--s 00000000 ca:01 140372                     /usr/share/dotnet/shared/Microsoft.NETCore.App/6.0.5/System.Runtime.dll";
-static const char *s_jitdump_line = "7b5242e44000-7b5242e45000 r-xp 00000000 fd:06 22295230                   /home/r1viollet/.debug/jit/llvm-IR-jit-20230131-981d92/jit-3237589.dump";
-
+static const char *const s_dd_profiling = "0x800000000-0x800001fff rw-p 00000000 00:00 0                          /tmp/libdd_profiling.so.1234";
+static const char *const s_dotnet_line = "7fbd4f1e4000-7fbd4f1ec000 r--s 00000000 ca:01 140372                     /usr/share/dotnet/shared/Microsoft.NETCore.App/6.0.5/System.Runtime.dll";
+static const char *const s_jitdump_line = "7b5242e44000-7b5242e45000 r-xp 00000000 fd:06 22295230                   /home/r1viollet/.debug/jit/llvm-IR-jit-20230131-981d92/jit-3237589.dump";
 // clang-format on
 
 TEST(DSOTest, dso_from_procline) {

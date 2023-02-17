@@ -67,7 +67,7 @@ TEST(runtime_symbol_lookup, jitdump_simple) {
   RuntimeSymbolLookup runtime_symbol_lookup("");
   ProcessAddress_t pc = 0x7bea23b00390;
   std::string jit_path =
-      std::string(UNIT_TEST_DATA) + "/" + std::string("jit-simple-julia.dump");
+      std::string(UNIT_TEST_DATA) + "/" + "jit-simple-julia.dump";
   SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
       mypid, pc, symbol_table, jit_path);
   ASSERT_NE(symbol_idx, -1);
@@ -82,7 +82,7 @@ TEST(runtime_symbol_lookup, double_load) {
   RuntimeSymbolLookup runtime_symbol_lookup("");
   ProcessAddress_t pc = 0xbadbeef;
   std::string jit_path =
-      std::string(UNIT_TEST_DATA) + "/" + std::string("jit-simple-julia.dump");
+      std::string(UNIT_TEST_DATA) + "/" + "jit-simple-julia.dump";
   SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
       mypid, pc, symbol_table, jit_path);
   ASSERT_EQ(symbol_idx, -1);
@@ -102,15 +102,15 @@ TEST(runtime_symbol_lookup, jitdump_partial) {
   RuntimeSymbolLookup runtime_symbol_lookup("");
   ProcessAddress_t pc = 0xbadbeef;
   {
-    std::string jit_path = std::string(UNIT_TEST_DATA) + "/" +
-        std::string("jit-julia-partial.dump");
+    std::string jit_path =
+        std::string(UNIT_TEST_DATA) + "/" + "jit-julia-partial.dump";
     SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
         mypid, pc, symbol_table, jit_path);
     ASSERT_EQ(symbol_idx, -1);
   }
   {
-    std::string jit_path = std::string(UNIT_TEST_DATA) + "/" +
-        std::string("jit-dotnet-partial.dump");
+    std::string jit_path =
+        std::string(UNIT_TEST_DATA) + "/" + "jit-dotnet-partial.dump";
     SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
         mypid, pc, symbol_table, jit_path);
     ASSERT_EQ(symbol_idx, -1);
@@ -124,8 +124,7 @@ TEST(runtime_symbol_lookup, jitdump_bad_file) {
   SymbolTable symbol_table;
   RuntimeSymbolLookup runtime_symbol_lookup("");
   ProcessAddress_t pc = 0xbadbeef;
-  std::string jit_path =
-      std::string(UNIT_TEST_DATA) + "/" + std::string("bad_file.dump");
+  std::string jit_path = std::string(UNIT_TEST_DATA) + "/" + "bad_file.dump";
   SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
       mypid, pc, symbol_table, jit_path);
   ASSERT_EQ(symbol_idx, -1);
@@ -152,7 +151,7 @@ TEST(runtime_symbol_lookup, jitdump_vs_perfmap) {
   RuntimeSymbolLookup runtime_symbol_lookup("");
   ProcessAddress_t pc = 0x7fa12f0eac90;
   std::string jit_path =
-      std::string(UNIT_TEST_DATA) + "/" + std::string("jit-dotnet-8.dump");
+      std::string(UNIT_TEST_DATA) + "/" + "jit-dotnet-8.dump";
   SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
       mypid, pc, symbol_table, jit_path);
   ASSERT_NE(symbol_idx, -1);
