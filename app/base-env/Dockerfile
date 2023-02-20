@@ -142,9 +142,9 @@ RUN VERSION="3.10.5" \
   && rm -rf json json.tar.xz
 
 # Google benchmark
-RUN VERSION="1.6.1" \
+RUN VERSION="1.7.1" \
   && curl -LO "https://github.com/google/benchmark/archive/refs/tags/v${VERSION}.tar.gz" \
-  && SHA256="6132883bc8c9b0df5375b16ab520fac1a85dc9e4cf5be59480448ece74b278d4" \
+  && SHA256="6430e4092653380d9dc4ccb45a1e2dc9259d581f4866dc0759713126056bc1d7" \
   && (printf "${SHA256} v${VERSION}.tar.gz" | sha256sum --check --strict --status) \
   && tar xf v${VERSION}.tar.gz \
   && pushd benchmark-${VERSION} \
