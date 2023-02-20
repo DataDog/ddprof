@@ -142,17 +142,18 @@ RUN VERSION="3.10.5" \
   && rm -rf json json.tar.xz
 
 # Google benchmark
+# Command line includes a change
+# - in python which is missing on ubuntu 20.04, use python 3 instead
+# - in options_test.cc to fix a clang build issue (fixed after 1.7.1)
 RUN VERSION="1.7.1" \
   && curl -LO "https://github.com/google/benchmark/archive/refs/tags/v${VERSION}.tar.gz" \
   && SHA256="6430e4092653380d9dc4ccb45a1e2dc9259d581f4866dc0759713126056bc1d7" \
   && (printf "${SHA256} v${VERSION}.tar.gz" | sha256sum --check --strict --status) \
   && tar xf v${VERSION}.tar.gz \
   && pushd benchmark-${VERSION} \
-  # python is missing on ubuntu 20.04, use python 3 instead
   && { command -v python > /dev/null || { ln -s /usr/bin/python3 python && export PATH=$PWD:$PATH; }; } \
-  # This can be removed after version 1.7.1 (fix for clang builds)
-  && sed -i 's/^\s*size_t actual_iterations = 0;\s*$/  for (auto _ : state) {}/' ./test/options_test.cc && \
-  && sed -i 's/^\s*for (auto _ : state) ++actual_iterations;\s*$//' ./test/options_test.cc && \
+  && sed -i 's/^\s*size_t actual_iterations = 0;\s*$/  for (auto _ : state) {}/' ./test/options_test.cc \
+  && sed -i 's/^\s*for (auto _ : state) ++actual_iterations;\s*$//' ./test/options_test.cc \
   && cmake -DCMAKE_BUILD_TYPE=Release -DBENCHMARK_USE_BUNDLED_GTEST=OFF -GNinja -S . -B "build" \
   && cmake --build "build" --target install \
   && popd \
