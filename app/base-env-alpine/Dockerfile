@@ -1,4 +1,4 @@
-FROM alpine:3.16.0
+FROM alpine:3.17.2
 ARG COMPILER="gcc"
 ENV CC=gcc
 ENV CXX=g++
@@ -38,9 +38,8 @@ RUN apk update \
    zlib-dev \
    zlib-static \
    bzip2-dev \
-   xz-dev \
    argp-standalone \
-   fts-dev \
+   musl-fts-dev \
    musl-obstack-dev \
    musl-libintl \
    musl-legacy-error \
@@ -110,4 +109,14 @@ RUN git clone --branch 5.3.0 https://github.com/jemalloc/jemalloc.git && \
     cd jemalloc && \
     ./autogen.sh && \
     make && \
+    make install
+
+# lzma
+# The static version of lzma is no longer available in package xz-dev
+RUN git clone --branch v5.4 https://github.com/tukaani-project/xz.git && \
+    cd xz && \
+    mkdir Build && \
+    cd Build && \
+    cmake -DCMAKE_BUILD_TYPE=Release ../ && \
+    make -j && \
     make install
