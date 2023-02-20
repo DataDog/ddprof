@@ -43,6 +43,7 @@ if [ $# != 0 ] && [ "$1" == "-h" ]; then
 fi
 
 PERFORM_CLEAN=0
+# This default is to ensure that users that compile from source are likely to have a compatible libc
 UBUNTU_VERSION=18
 COMPILER="gcc"
 

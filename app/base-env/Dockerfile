@@ -1,11 +1,15 @@
 # Using a recent compiler version and recent OS (better tooling)
 # We'll implement libc version sanitization in the code itself
-ARG UBUNTU_VERSION=20
+ARG UBUNTU_VERSION=18
 ARG COMPILER="gcc"
 
 FROM ubuntu:${UBUNTU_VERSION}.04 as base
 ARG UBUNTU_VERSION
 ENV OS_IDENTIFIER="UB${UBUNTU_VERSION}"
+
+FROM base AS base-22
+ENV GCC_VERSION=12
+ENV CLANG_VERSION=15
 
 FROM base AS base-20
 ENV GCC_VERSION=11
