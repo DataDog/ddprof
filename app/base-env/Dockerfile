@@ -150,6 +150,9 @@ RUN VERSION="1.7.1" \
   && pushd benchmark-${VERSION} \
   # python is missing on ubuntu 20.04, use python 3 instead
   && { command -v python > /dev/null || { ln -s /usr/bin/python3 python && export PATH=$PWD:$PATH; }; } \
+  # This can be removed after version 1.7.1 (fix for clang builds)
+  && sed -i 's/^\s*size_t actual_iterations = 0;\s*$/  for (auto _ : state) {}/' ./test/options_test.cc && \
+  && sed -i 's/^\s*for (auto _ : state) ++actual_iterations;\s*$//' ./test/options_test.cc && \
   && cmake -DCMAKE_BUILD_TYPE=Release -DBENCHMARK_USE_BUNDLED_GTEST=OFF -GNinja -S . -B "build" \
   && cmake --build "build" --target install \
   && popd \
