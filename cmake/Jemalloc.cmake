@@ -20,13 +20,12 @@
 #  JEMALLOC_FOUND             System has jemalloc libs/headers
 #  JEMALLOC_LIBRARIES         The jemalloc library/libraries
 #  JEMALLOC_INCLUDE_DIR       The location of jemalloc headers
-
 find_path(JEMALLOC_ROOT_DIR
     NAMES include/jemalloc/jemalloc.h
 )
 
 find_library(JEMALLOC_LIBRARIES
-    NAMES jemalloc
+    NAMES libjemalloc.a
     HINTS ${JEMALLOC_ROOT_DIR}/lib
 )
 
