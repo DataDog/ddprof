@@ -111,7 +111,11 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     return ddres_init(); // invalid pc : do not add frame
   }
   us->current_ip = pc;
-
+  if (!pc) {
+    // Unwinding can end on a null address
+    // Example: alpine 3.17
+    return ddres_init();
+  }
   DsoHdr::DsoFindRes find_res =
       us->dso_hdr.dso_find_or_backpopulate(us->pid, pc);
   if (!find_res.second) {
