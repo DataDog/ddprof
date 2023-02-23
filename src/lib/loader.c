@@ -55,18 +55,21 @@ int timer_create(clockid_t clockid, struct sigevent *sevp, timer_t *timerid)
     __attribute__((weak));
 
 static void *s_libdl_handle = NULL;
+static __typeof(dlerror) *s_dlerror = NULL;
+static __typeof(dlopen) *dlopen_ptr = &dlopen;
 
 static void *my_dlopen(const char *filename, int flags) {
-  static __typeof(dlopen) *dlopen_ptr = &dlopen;
-
   if (!dlopen_ptr) {
     // if libdl.so is not loaded, use __libc_dlopen_mode
     dlopen_ptr = __libc_dlopen_mode;
   }
   if (dlopen_ptr) {
-    return dlopen_ptr(filename, flags);
+    void *ret = dlopen_ptr(filename, flags);
+    if (!ret && s_dlerror) {
+      fprintf(stderr, "Failed to dlopen %s (%s)\n", filename, s_dlerror());
+    }
+    return ret;
   }
-
   // Should not happen
   return NULL;
 }
@@ -261,6 +264,13 @@ static void __attribute__((constructor)) loader() {
   ensure_libm_is_loaded();
   ensure_libpthread_is_loaded();
   ensure_librt_is_loaded();
+
+  // now that we have loaded libdl, we can ensure that we use the real
+  // dlopen function (instead of internal libc function)
+  if (s_libdl_handle) {
+    dlopen_ptr = (__typeof(dlopen) *)my_dlsym(s_libdl_handle, "dlopen");
+    s_dlerror = (__typeof(dlerror) *)my_dlsym(s_libdl_handle, "dlerror");
+  }
 
   s_profiling_lib_handle = my_dlopen(lib_profiling_path, RTLD_LOCAL | RTLD_NOW);
   free(lib_profiling_path);

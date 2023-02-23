@@ -1,12 +1,10 @@
-#include <sys/random.h>
-#include <pthread.h>
 #include <errno.h>
-#include <sys/syscall.h>      /* Definition of SYS_* constants */
+#include <pthread.h>
+#include <sys/random.h>
+#include <sys/syscall.h> /* Definition of SYS_* constants */
 #include <unistd.h>
 
-
-int getentropy(void *buffer, size_t len)
-{
+int getentropy(void *buffer, size_t len) {
   int ret;
   char *pos = buffer;
   if (len > 256) {
@@ -30,7 +28,7 @@ int getentropy(void *buffer, size_t len)
     ret = 0;
   }
 
-//  pthread_setcancelstate(cs, 0);
+  //  pthread_setcancelstate(cs, 0);
 
   return ret;
 }
