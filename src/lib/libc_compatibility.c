@@ -1,6 +1,9 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the Apache License Version 2.0. This product includes software
+// developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
+// Datadog, Inc.
 #include <errno.h>
 #include <pthread.h>
-#include <sys/random.h>
 #include <sys/syscall.h> /* Definition of SYS_* constants */
 #include <unistd.h>
 
@@ -18,7 +21,7 @@ int getentropy(void *buffer, size_t len) {
 
   while (len) {
 
-    ret = syscall(SYS_getrandom, buffer, sizeof(buffer), 0);
+    ret = syscall(SYS_getrandom, pos, sizeof(buffer), 0);
     if (ret < 0) {
       return -1;
     }
