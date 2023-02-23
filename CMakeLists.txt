@@ -219,7 +219,7 @@ if(BUILD_UNIVERSAL_DDPROF)
 endif()
 
 # libddprofiling_embeded.so is the actual profiling library
-add_library(dd_profiling-embedded SHARED ${DD_PROFILING_SOURCES})
+add_library(dd_profiling-embedded SHARED ${DD_PROFILING_SOURCES} src/lib/libc_compatibility.c)
 target_include_directories(
   dd_profiling-embedded PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include
                                ${CMAKE_SOURCE_DIR}/third_party)
