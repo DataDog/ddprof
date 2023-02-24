@@ -200,6 +200,7 @@ set(DD_PROFILING_SOURCES
     src/lib/dd_profiling.cc
     src/lib/elfutils.cc
     src/lib/lib_embedded_data.c
+    src/lib/libc_compatibility.c
     src/lib/savecontext.cc
     src/lib/saveregisters.cc
     src/lib/symbol_overrides.cc
@@ -214,12 +215,8 @@ set(DD_PROFILING_SOURCES
     src/sys_utils.cc
     src/user_override.cc)
 
-if(BUILD_UNIVERSAL_DDPROF)
-  list(APPEND DD_PROFILING_SOURCES src/lib/glibc_fixes.c)
-endif()
-
 # libddprofiling_embeded.so is the actual profiling library
-add_library(dd_profiling-embedded SHARED ${DD_PROFILING_SOURCES} src/lib/libc_compatibility.c)
+add_library(dd_profiling-embedded SHARED ${DD_PROFILING_SOURCES})
 target_include_directories(
   dd_profiling-embedded PUBLIC ${CMAKE_SOURCE_DIR}/include/lib ${CMAKE_SOURCE_DIR}/include
                                ${CMAKE_SOURCE_DIR}/third_party)

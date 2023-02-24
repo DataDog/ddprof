@@ -4,6 +4,10 @@
 #include <sys/syscall.h> /* Definition of SYS_* constants */
 #include <unistd.h>
 
+// This is a port from the libc implementations
+// The aim is to guarantee that our library works even when depending on newer
+// libc APIs (like this one). The symbol should be private not to change
+// the behaviour of the application we are profiling
 int getentropy(void *buffer, size_t len) {
   int ret = 0;
   char *pos = buffer;
