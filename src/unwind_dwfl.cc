@@ -19,6 +19,13 @@ int frame_cb(Dwfl_Frame *, void *);
 
 namespace ddprof {
 
+namespace {
+// On musl, with debug information, we are unable to get out of the __clone
+// function. To mitigate this we can check for register issues.
+// Value on elfutils 0.188
+constexpr int k_dwfl_unknown_reg_value = 33;
+} // namespace
+
 DDRes unwind_init_dwfl(UnwindState *us) {
   // Create or get the dwfl object associated to cache
   us->_dwfl_wrapper = &(us->dwfl_hdr.get_or_insert(us->pid));
@@ -181,7 +188,7 @@ bool is_infinite_loop(UnwindState *us) {
   if (nb_locs <= nb_frames_to_check) {
     return false;
   }
-  for (unsigned i = 0; i < nb_frames_to_check; ++i) {
+  for (unsigned i = 1; i < nb_frames_to_check; ++i) {
     FunLoc &n_minus_one_loc = output.locs[nb_locs - i];
     FunLoc &n_minus_two_loc = output.locs[nb_locs - i - 1];
     if (n_minus_one_loc.ip != n_minus_two_loc.ip) {
@@ -200,7 +207,7 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
   int dwfl_error_value = dwfl_errno();
   if (dwfl_error_value) {
     // Check if dwarf unwinding was a failure we can get stuck in infinite loops
-    if (is_infinite_loop(us)) {
+    if (is_infinite_loop(us) || dwfl_error_value == k_dwfl_unknown_reg_value) {
       LG_DBG("Break out of unwinding (possible infinite loop)");
       return DWARF_CB_ABORT;
     }
@@ -208,11 +215,10 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
 #ifdef DEBUG
   // We often fallback to frame pointer unwinding (which logs an error)
   if (dwfl_error_value) {
-    LG_DBG("Error flagged at depth = %lu -- Error:%s ", us->output.nb_locs,
-           dwfl_errmsg(dwfl_error_value));
+    LG_DBG("Error flagged at depth = %lu -- %d Error:%s ", us->output.nb_locs,
+           dwfl_error_value, dwfl_errmsg(dwfl_error_value));
   }
 #endif
-
   // Before we potentially exit, record the fact that we're processing a frame
   ddprof_stats_add(STATS_UNWIND_FRAMES, 1, NULL);
 

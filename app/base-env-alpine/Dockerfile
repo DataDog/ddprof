@@ -31,6 +31,7 @@ RUN apk update \
    clang \
    libcap-static \
    libunwind-dev \
+   musl-dbg \
    py3-pkgconfig \
    gtest-dev \
    cppcheck \
