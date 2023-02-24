@@ -387,7 +387,8 @@ if(${BUILD_NATIVE_LIB})
   set(DDPROF_LIB_SRC ${COMMON_SRC} src/lib/ddprof_output.cc)
 
   # Libs to link
-  set(NATIVE_LIB_LIBRARY_LIST dl DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
+  set(NATIVE_LIB_LIBRARY_LIST dl DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES}
+                              Threads::Threads)
 
   if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
     list(PREPEND NATIVE_LIB_LIBRARY_LIST ${JEMALLOC_LIBRARIES})
