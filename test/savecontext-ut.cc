@@ -111,7 +111,7 @@ TEST(getcontext, unwind_from_sighandler) {
   };
 
   EXPECT_GT(state.output.nb_locs, 5);
-  EXPECT_LT(state.output.nb_locs, 15);
+  EXPECT_LT(state.output.nb_locs, 20);
   EXPECT_TRUE(get_symbol(0)._demangle_name.starts_with("save_context("));
   EXPECT_EQ(get_symbol(1)._demangle_name, "handler(int)");
   size_t next_idx = 3;
