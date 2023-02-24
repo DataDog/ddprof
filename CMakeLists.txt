@@ -200,7 +200,6 @@ set(DD_PROFILING_SOURCES
     src/lib/dd_profiling.cc
     src/lib/elfutils.cc
     src/lib/lib_embedded_data.c
-    src/lib/libc_compatibility.c
     src/lib/savecontext.cc
     src/lib/saveregisters.cc
     src/lib/symbol_overrides.cc
@@ -214,6 +213,11 @@ set(DD_PROFILING_SOURCES
     src/signal_helper.cc
     src/sys_utils.cc
     src/user_override.cc)
+
+if(BUILD_UNIVERSAL_DDPROF)
+  # Compiling on different libc, we need to ensure some symbols are available everywhere
+  list(APPEND DD_PROFILING_SOURCES src/lib/glibc_fixes.c src/lib/libc_compatibility.c)
+endif()
 
 # libddprofiling_embeded.so is the actual profiling library
 add_library(dd_profiling-embedded SHARED ${DD_PROFILING_SOURCES})
