@@ -19,13 +19,6 @@ int frame_cb(Dwfl_Frame *, void *);
 
 namespace ddprof {
 
-namespace {
-// On musl, with debug information, we are unable to get out of the __clone
-// function. To mitigate this we can check for register issues.
-// Value on elfutils 0.188
-constexpr int k_dwfl_unknown_reg_value = 33;
-} // namespace
-
 DDRes unwind_init_dwfl(UnwindState *us) {
   // Create or get the dwfl object associated to cache
   us->_dwfl_wrapper = &(us->dwfl_hdr.get_or_insert(us->pid));
@@ -207,7 +200,7 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
   int dwfl_error_value = dwfl_errno();
   if (dwfl_error_value) {
     // Check if dwarf unwinding was a failure we can get stuck in infinite loops
-    if (is_infinite_loop(us) || dwfl_error_value == k_dwfl_unknown_reg_value) {
+    if (is_infinite_loop(us)) {
       LG_DBG("Break out of unwinding (possible infinite loop)");
       return DWARF_CB_ABORT;
     }
