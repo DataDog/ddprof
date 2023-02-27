@@ -104,7 +104,7 @@ option(DDPROF_ALLOCATOR "Define the type of allocator (STANDARD / JEMALLOC)" STA
 if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
   # jemalloc for debug
   include(Jemalloc)
-  message(STATUS "Using Allocator Jemalloc from" ${JEMALLOC_ROOT_DIR})
+  message(STATUS "Using Allocator Jemalloc from:" ${JEMALLOC_LIBRARIES})
 endif()
 
 # Install lib cap to retrieve capabilities
@@ -153,7 +153,7 @@ if(ON)
 endif()
 
 if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
-  list(PREPEND DDPROF_LIBRARY_LIST jemalloc)
+  list(PREPEND DDPROF_LIBRARY_LIST ${JEMALLOC_LIBRARIES})
 endif()
 
 # libcap, can be removed from version distributed to client
@@ -215,7 +215,8 @@ set(DD_PROFILING_SOURCES
     src/user_override.cc)
 
 if(BUILD_UNIVERSAL_DDPROF)
-  list(APPEND DD_PROFILING_SOURCES src/lib/glibc_fixes.c)
+  # Compiling on different libc, we need to ensure some symbols are available everywhere
+  list(APPEND DD_PROFILING_SOURCES src/lib/glibc_fixes.c src/lib/libc_compatibility.c)
 endif()
 
 # libddprofiling_embeded.so is the actual profiling library
@@ -407,10 +408,11 @@ if(${BUILD_NATIVE_LIB})
   set(DDPROF_LIB_SRC ${COMMON_SRC} src/lib/ddprof_output.cc)
 
   # Libs to link
-  set(NATIVE_LIB_LIBRARY_LIST DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
+  set(NATIVE_LIB_LIBRARY_LIST dl DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES}
+                              Threads::Threads)
 
   if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
-    list(PREPEND NATIVE_LIB_LIBRARY_LIST jemalloc)
+    list(PREPEND NATIVE_LIB_LIBRARY_LIST ${JEMALLOC_LIBRARIES})
   endif()
 
   # Create the lib

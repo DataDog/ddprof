@@ -109,3 +109,22 @@ diff -ur elfutils-0.186/libdwfl/linux-pid-attach.c elfutils-0.186_patched/libdwf
  #ifdef HAVE_PROCESS_VM_READV
    if (read_cached_memory (pid_arg, addr, result))
      {
+diff -ur elfutils-0.188/src/src/readelf.c elfutils-0.188_patched/src/src/readelf.c
+--- elfutils-0.188/src/readelf.c   2023-02-20 16:57:42.054882047 +0100
++++ elfutils-0.188_patched/src/readelf.c       2023-02-20 16:53:16.996986189 +0100
+@@ -10226,7 +10226,6 @@
+   Dwarf_Off ncu = 0;
+   size_t hsize;
+   struct mac_culist *culist = NULL;
+-  size_t nculist = 0;
+   while (dwarf_nextcu (dbg, offset = ncu, &ncu, &hsize, NULL, NULL, NULL) == 0)
+     {
+       Dwarf_Die cudie;
+@@ -10247,7 +10246,6 @@
+       newp->files = NULL;
+       newp->next = culist;
+       culist = newp;
+-      ++nculist;
+     }
+
+   const unsigned char *readp = (const unsigned char *) data->d_buf;

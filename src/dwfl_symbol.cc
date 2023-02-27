@@ -24,12 +24,11 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
   bool symbol_success = false;
   const char *lsymname = dwfl_module_addrinfo(
       mod, process_pc, &loffset, &elf_sym, &lshndxp, &lelfp, &lbias);
-
 #ifdef DEBUG
   int dwfl_error_value = dwfl_errno();
   if (unlikely(dwfl_error_value)) {
-    LG_DBG("[DWFL_SYMB] addrinfo error -- Error:%s -- %s",
-           dwfl_errmsg(dwfl_error_value), lsymname);
+    LG_DBG("[DWFL_SYMB] addrinfo error -- Error:%s -- %lx",
+           dwfl_errmsg(dwfl_error_value), process_pc);
   }
 #else
   dwfl_errno();

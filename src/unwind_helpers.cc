@@ -223,7 +223,7 @@ void add_error_frame(const Dso *dso, UnwindState *us,
   ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
   if (dso) {
 // #define ADD_ADDR_IN_SYMB // creates more elements (but adds info on
-// addresses)
+//  addresses)
 #ifdef ADD_ADDR_IN_SYMB
     add_dso_frame(us, *dso, pc, "pc");
 #else
