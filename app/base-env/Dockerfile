@@ -1,11 +1,15 @@
 # Using a recent compiler version and recent OS (better tooling)
 # We'll implement libc version sanitization in the code itself
-ARG UBUNTU_VERSION=20
+ARG UBUNTU_VERSION=18
 ARG COMPILER="gcc"
 
 FROM ubuntu:${UBUNTU_VERSION}.04 as base
 ARG UBUNTU_VERSION
 ENV OS_IDENTIFIER="UB${UBUNTU_VERSION}"
+
+FROM base AS base-22
+ENV GCC_VERSION=12
+ENV CLANG_VERSION=15
 
 FROM base AS base-20
 ENV GCC_VERSION=11
@@ -138,14 +142,18 @@ RUN VERSION="3.10.5" \
   && rm -rf json json.tar.xz
 
 # Google benchmark
-RUN VERSION="1.6.1" \
+# Command line includes a change
+# - in python which is missing on ubuntu 20.04, use python 3 instead
+# - in options_test.cc to fix a clang build issue (fixed after 1.7.1)
+RUN VERSION="1.7.1" \
   && curl -LO "https://github.com/google/benchmark/archive/refs/tags/v${VERSION}.tar.gz" \
-  && SHA256="6132883bc8c9b0df5375b16ab520fac1a85dc9e4cf5be59480448ece74b278d4" \
+  && SHA256="6430e4092653380d9dc4ccb45a1e2dc9259d581f4866dc0759713126056bc1d7" \
   && (printf "${SHA256} v${VERSION}.tar.gz" | sha256sum --check --strict --status) \
   && tar xf v${VERSION}.tar.gz \
   && pushd benchmark-${VERSION} \
-  # python is missing on ubuntu 20.04, use python 3 instead
   && { command -v python > /dev/null || { ln -s /usr/bin/python3 python && export PATH=$PWD:$PATH; }; } \
+  && sed -i 's/^\s*size_t actual_iterations = 0;\s*$/  for (auto _ : state) {}/' ./test/options_test.cc \
+  && sed -i 's/^\s*for (auto _ : state) ++actual_iterations;\s*$//' ./test/options_test.cc \
   && cmake -DCMAKE_BUILD_TYPE=Release -DBENCHMARK_USE_BUNDLED_GTEST=OFF -GNinja -S . -B "build" \
   && cmake --build "build" --target install \
   && popd \
