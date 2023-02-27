@@ -43,6 +43,7 @@ if [ $# != 0 ] && [ "$1" == "-h" ]; then
 fi
 
 PERFORM_CLEAN=0
+# This default is to ensure that users that compile from source are likely to have a compatible libc
 UBUNTU_VERSION=18
 COMPILER="gcc"
 
@@ -120,16 +121,18 @@ echo "Considering docker image    : $DOCKER_NAME"
 echo "              Built from    : $BASE_DOCKERFILE"
 echo "           Mount command    : ${MOUNT_CMD}"
 
+CACHE_OPTION=""
 if [ $PERFORM_CLEAN -eq 1 ]; then
     echo "Clean image : ${DOCKER_NAME}"
     # if docker image does not exist, we should not fail
     docker image rm "${DOCKER_NAME}" || true
+    CACHE_OPTION="--no-cache"
 fi
 
 # Check if base image exists
 if [ ! ${CUSTOM_ID:-,,} == "yes" ] && ! docker images | awk '{print $1}'| grep -qE "^${DOCKER_NAME}$"; then
     echo "Building image"
-    BUILD_CMD="docker build -t ${DOCKER_NAME} --build-arg COMPILER=$COMPILER --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} -f $BASE_DOCKERFILE ."
+    BUILD_CMD="docker build $CACHE_OPTION -t ${DOCKER_NAME} --build-arg COMPILER=$COMPILER --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} -f $BASE_DOCKERFILE ."
     #echo "${BUILD_CMD}"
     eval "${BUILD_CMD}"
 else 

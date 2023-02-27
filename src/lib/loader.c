@@ -43,6 +43,7 @@
  * available, it falls back to using __libc_dlopen_mode, an internal libc.so.6
  * function implementing dlopen, in that case.
  */
+char *dlerror(void) __attribute__((weak));
 void *dlopen(const char *filename, int flags) __attribute__((weak));
 void *dlsym(void *handle, const char *symbol) __attribute__((weak));
 // NOLINTNEXTLINE cert-dcl51-cpp
@@ -55,44 +56,25 @@ int timer_create(clockid_t clockid, struct sigevent *sevp, timer_t *timerid)
     __attribute__((weak));
 
 static void *s_libdl_handle = NULL;
+static __typeof(dlerror) *s_dlerror = &dlerror;
+static __typeof(dlopen) *s_dlopen = &dlopen;
+
+static void ensure_libdl_is_loaded();
 
 static void *my_dlopen(const char *filename, int flags) {
-  static __typeof(dlopen) *dlopen_ptr = &dlopen;
-
-  if (!dlopen_ptr) {
+  if (!s_dlopen) {
     // if libdl.so is not loaded, use __libc_dlopen_mode
-    dlopen_ptr = __libc_dlopen_mode;
+    s_dlopen = __libc_dlopen_mode;
   }
-  if (dlopen_ptr) {
-    return dlopen_ptr(filename, flags);
+  if (s_dlopen) {
+    void *ret = s_dlopen(filename, flags);
+    if (!ret && s_dlerror) {
+      fprintf(stderr, "Failed to dlopen %s (%s)\n", filename, s_dlerror());
+    }
+    return ret;
   }
-
   // Should not happen
   return NULL;
-}
-
-static void ensure_libdl_is_loaded() {
-  if (!dlsym && !s_libdl_handle) {
-    s_libdl_handle = my_dlopen("libdl.so.2", RTLD_GLOBAL | RTLD_NOW);
-  }
-}
-
-static void ensure_libm_is_loaded() {
-  if (!log) {
-    my_dlopen("libm.so.6", RTLD_GLOBAL | RTLD_NOW);
-  }
-}
-
-static void ensure_libpthread_is_loaded() {
-  if (!pthread_cancel) {
-    my_dlopen("libpthread.so.0", RTLD_GLOBAL | RTLD_NOW);
-  }
-}
-
-static void ensure_librt_is_loaded() {
-  if (!timer_create) {
-    my_dlopen("librt.so.1", RTLD_GLOBAL | RTLD_NOW);
-  }
 }
 
 static void *my_dlsym(void *handle, const char *symbol) {
@@ -121,6 +103,41 @@ static void *my_dlsym(void *handle, const char *symbol) {
   }
 
   return dlsym_ptr(handle, symbol);
+}
+
+static void ensure_libdl_is_loaded() {
+  if (!dlsym && !s_libdl_handle) {
+    s_libdl_handle = my_dlopen("libdl.so.2", RTLD_GLOBAL | RTLD_NOW);
+  }
+
+  if (s_libdl_handle) {
+    // now that we have loaded libdl, we can ensure that we use the real
+    // dlopen function (instead of internal libc function)
+    if (s_dlopen == __libc_dlopen_mode) {
+      s_dlopen = (__typeof(dlopen) *)my_dlsym(s_libdl_handle, "dlopen");
+    }
+    if (!s_dlerror) {
+      s_dlerror = (__typeof(dlerror) *)my_dlsym(s_libdl_handle, "dlerror");
+    }
+  }
+}
+
+static void ensure_libm_is_loaded() {
+  if (!log) {
+    my_dlopen("libm.so.6", RTLD_GLOBAL | RTLD_NOW);
+  }
+}
+
+static void ensure_libpthread_is_loaded() {
+  if (!pthread_cancel) {
+    my_dlopen("libpthread.so.0", RTLD_GLOBAL | RTLD_NOW);
+  }
+}
+
+static void ensure_librt_is_loaded() {
+  if (!timer_create) {
+    my_dlopen("librt.so.1", RTLD_GLOBAL | RTLD_NOW);
+  }
 }
 
 static const char *temp_directory_path() {
