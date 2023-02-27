@@ -43,11 +43,7 @@
  * available, it falls back to using __libc_dlopen_mode, an internal libc.so.6
  * function implementing dlopen, in that case.
  */
-#ifdef __x86_64__
-const char *dlerror(void) __attribute__((weak));
-#else
 char *dlerror(void) __attribute__((weak));
-#endif
 void *dlopen(const char *filename, int flags) __attribute__((weak));
 void *dlsym(void *handle, const char *symbol) __attribute__((weak));
 // NOLINTNEXTLINE cert-dcl51-cpp
