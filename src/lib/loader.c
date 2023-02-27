@@ -43,7 +43,11 @@
  * available, it falls back to using __libc_dlopen_mode, an internal libc.so.6
  * function implementing dlopen, in that case.
  */
+#ifdef __x86_64__
 const char *dlerror(void) __attribute__((weak));
+#else
+char *dlerror(void) __attribute__((weak));
+#endif
 void *dlopen(const char *filename, int flags) __attribute__((weak));
 void *dlsym(void *handle, const char *symbol) __attribute__((weak));
 // NOLINTNEXTLINE cert-dcl51-cpp
@@ -59,6 +63,8 @@ static void *s_libdl_handle = NULL;
 static __typeof(dlerror) *s_dlerror = &dlerror;
 static __typeof(dlopen) *s_dlopen = &dlopen;
 
+static void ensure_libdl_is_loaded();
+
 static void *my_dlopen(const char *filename, int flags) {
   if (!s_dlopen) {
     // if libdl.so is not loaded, use __libc_dlopen_mode
@@ -73,6 +79,34 @@ static void *my_dlopen(const char *filename, int flags) {
   }
   // Should not happen
   return NULL;
+}
+
+static void *my_dlsym(void *handle, const char *symbol) {
+  static __typeof(dlsym) *dlsym_ptr = &dlsym;
+  if (!dlsym_ptr) {
+    // dlysm is not available: meaning we are on glibc and libdl.so was not
+    // loaded at startup
+
+    // First ensure that libdl.so is loaded
+    if (!s_libdl_handle) {
+      ensure_libdl_is_loaded();
+    }
+
+    if (s_libdl_handle) {
+      // locate dlsym in libdl.so by using internal libc.so.6 function
+      // __libc_dlsym.
+      // Note that we need dlsym because __libc_dlsym does not provide
+      // RTLD_DEFAULT/RTLD_NEXT functionality.
+      dlsym_ptr = (__typeof(dlsym_ptr))__libc_dlsym(s_libdl_handle, "dlsym");
+    }
+
+    // Should not happen
+    if (!dlsym_ptr) {
+      return NULL;
+    }
+  }
+
+  return dlsym_ptr(handle, symbol);
 }
 
 static void ensure_libdl_is_loaded() {
@@ -108,34 +142,6 @@ static void ensure_librt_is_loaded() {
   if (!timer_create) {
     my_dlopen("librt.so.1", RTLD_GLOBAL | RTLD_NOW);
   }
-}
-
-static void *my_dlsym(void *handle, const char *symbol) {
-  static __typeof(dlsym) *dlsym_ptr = &dlsym;
-  if (!dlsym_ptr) {
-    // dlysm is not available: meaning we are on glibc and libdl.so was not
-    // loaded at startup
-
-    // First ensure that libdl.so is loaded
-    if (!s_libdl_handle) {
-      ensure_libdl_is_loaded();
-    }
-
-    if (s_libdl_handle) {
-      // locate dlsym in libdl.so by using internal libc.so.6 function
-      // __libc_dlsym.
-      // Note that we need dlsym because __libc_dlsym does not provide
-      // RTLD_DEFAULT/RTLD_NEXT functionality.
-      dlsym_ptr = (__typeof(dlsym_ptr))__libc_dlsym(s_libdl_handle, "dlsym");
-    }
-
-    // Should not happen
-    if (!dlsym_ptr) {
-      return NULL;
-    }
-  }
-
-  return dlsym_ptr(handle, symbol);
 }
 
 static const char *temp_directory_path() {
