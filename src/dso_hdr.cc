@@ -147,23 +147,15 @@ DsoHdr::DsoFindRes DsoHdr::dso_find_first_std_executable(pid_t pid) {
 
 DsoHdr::DsoFindRes DsoHdr::dso_find_closest(const DsoMap &map,
                                             ElfAddress_t addr) {
-  bool is_within = false;
-  // First element not less than (can match a start addr)
-  auto it = map.lower_bound(addr);
-  if (it != map.end()) {
-    is_within = it->second.is_within(addr);
-    if (is_within) { // exact match
-      return {it, is_within};
-    }
-  }
-  // previous element is more likely to contain our addr
-  if (it != map.begin()) {
-    --it;
-  } else { // map is empty
+  // First element strictly greater than addr:
+  // addr can only belong to the previous one.
+  auto it = map.upper_bound(addr);
+
+  if (it == map.begin()) {
     return find_res_not_found(map);
   }
-  is_within = it->second.is_within(addr);
-  return {it, is_within};
+  --it;
+  return {it, it->second.is_within(addr)};
 }
 
 // Find the closest and indicate if we found a dso matching this address
@@ -184,48 +176,28 @@ DsoHdr::DsoConstRange DsoHdr::get_elf_range(const DsoMap &map,
   return {first.base(), last};
 }
 
-DsoHdr::DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
-  if (map.empty()) {
-    return {map.end(), map.end()};
-  }
-  // Get element after (with a start addr over the current)
-  auto first_el = map.lower_bound(dso._start);
-  // Lower bound will return the first over our current element.
-  //         <700--1050> <1100--1500> <1600--2200>
-  // Elt to insert :  <1000-------------2000>
-  // Go to previous as it could also overlap
-  while (first_el != map.begin()) {
-    --first_el;
-    // Stop when :
-    // - start of the list
-    // - end is before start
-    if (first_el->second._end < dso._start) {
-      break;
-    }
-  }
-  // init in case we don't find anything
-  auto start = map.end();
-  auto end = map.end();
+DsoHdr::DsoRange DsoHdr::get_intersection(pid_t pid, const Dso &dso) {
+  return get_intersection(_pid_map[pid]._map, dso);
+}
 
-  // Loop across the possible range keeping track of first and last
-  while (first_el != map.end()) {
-    if (dso.intersects(first_el->second)) {
-      if (start == map.end()) {
-        start = first_el;
-      }
-      end = first_el;
+DsoHdr::DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
+  // Find first element whose end is strictly after dso start
+  // This is the first element whose start is greater than dso start or the
+  // previous one.
+  auto first = map.upper_bound(dso._start);
+  if (first != map.begin()) {
+    auto p = std::prev(first);
+    if (p->second._end >= dso._start) {
+      first = p;
     }
-    // if we are past the dso (both different pid and start past the end)
-    if (first_el->second._start > dso._end) {
-      break;
-    }
-    ++first_el;
   }
-  // push end element (as it should be after the last element)
-  if (end != map.end()) {
-    ++end;
-  }
-  return {start, end};
+
+  // Find first element whose start is not less than dso end
+  // (beware, dso end is inclusive !)
+  auto last = (first == map.end() || first->first > dso._end)
+      ? first
+      : map.lower_bound(dso._end + 1);
+  return {first, last};
 }
 
 // erase range of elements
@@ -377,7 +349,7 @@ DsoHdr::DsoFindRes DsoHdr::insert_erase_overlap(PidMapping &pid_mapping,
 
   DsoRange const range = get_intersection(map, dso);
 
-  if (range.first != map.end()) {
+  if (range.first != range.second) {
     erase_range(map, range, dso);
   }
   // JITDump Marker was detected for this PID
