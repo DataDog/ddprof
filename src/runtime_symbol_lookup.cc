@@ -27,7 +27,7 @@ namespace ddprof {
 FILE *RuntimeSymbolLookup::perfmaps_open(int pid,
                                          const char *path_to_perfmap = "") {
   char buf[1024];
-  auto n = snprintf(buf, 1024, "%s/proc/%d/root%s/perf-%d.map",
+  auto n = snprintf(buf, std::size(buf), "%s/proc/%d/root%s/perf-%d.map",
                     _path_to_proc.c_str(), pid, path_to_perfmap, pid);
   if (n >= 1024) { // unable to snprintf everything
     return nullptr;
@@ -37,12 +37,12 @@ FILE *RuntimeSymbolLookup::perfmaps_open(int pid,
     return perfmap_file;
   }
   // attempt in local namespace
-  snprintf(buf, 1024, "%s/perf-%d.map", path_to_perfmap, pid);
+  snprintf(buf, std::size(buf), "%s/perf-%d.map", path_to_perfmap, pid);
   LG_DBG("Open perf-map %s", buf);
   return fopen(buf, "r");
 }
 
-bool RuntimeSymbolLookup::insert_or_replace(const std::string &symbol,
+bool RuntimeSymbolLookup::insert_or_replace(const char *symbol,
                                             ProcessAddress_t address,
                                             Offset_t code_size,
                                             SymbolMap &symbol_map,
@@ -97,9 +97,9 @@ DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
                                              pid_t pid, SymbolMap &symbol_map,
                                              SymbolTable &symbol_table) {
   char buf[1024];
-  auto n = snprintf(buf, 1024, "%s/proc/%d/root%s", _path_to_proc.c_str(), pid,
-                    jitdump_path.data());
-  if (n >= 1024) { // unable to snprintf everything
+  auto n = snprintf(buf, std::size(buf), "%s/proc/%d/root%s",
+                    _path_to_proc.c_str(), pid, jitdump_path.data());
+  if (n >= std::size(buf)) { // unable to snprintf everything
     DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Unable to create path to jitdump");
   }
 

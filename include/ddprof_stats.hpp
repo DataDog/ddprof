@@ -25,7 +25,7 @@
   X(UNWIND_AVG_STACK_DEPTH, "unwind.stack.avg_depth", STAT_GAUGE)              \
   X(SYMBOLS_JIT_READS, "symbols.jit.reads", STAT_GAUGE)                        \
   X(SYMBOLS_JIT_FAILED_LOOKUPS, "symbols.jit.failed_lookups", STAT_GAUGE)      \
-  X(SYMBOLS_JIT_COUNT, "symbols.jit.count", STAT_GAUGE)                        \
+  X(SYMBOLS_JIT_SYMBOL_COUNT, "symbols.jit.symbol_count", STAT_GAUGE)          \
   X(PROFILER_RSS, "profiler.rss", STAT_GAUGE)                                  \
   X(PROFILER_CPU_USAGE, "profiler.cpu_usage.millicores", STAT_GAUGE)           \
   X(DSO_UNHANDLED_SECTIONS, "dso.unhandled_sections", STAT_GAUGE)              \

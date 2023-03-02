@@ -13,22 +13,25 @@
 namespace ddprof {
 
 namespace {
+static constexpr uint32_t k_header_magic = 0x4A695444;
+static constexpr uint32_t k_header_magic_rev = 0x4454694A;
+
 uint64_t load64(const uint64_t *data) {
-  uint64_t Ret;
-  memcpy(&Ret, data, sizeof(uint64_t));
+  uint64_t ret;
+  memcpy(&ret, data, sizeof(uint64_t));
   // #ifdef BIG_ENDIAN
   //   bswap_64(Ret);
   // #endif
-  return Ret;
+  return ret;
 }
 
 int32_t load32(const int32_t *data) {
-  int32_t Ret;
-  memcpy(&Ret, data, sizeof(int32_t));
+  int32_t ret;
+  memcpy(&ret, data, sizeof(int32_t));
   // #ifdef BIG_ENDIAN
   //   bswap_32(Ret);
   // #endif
-  return Ret;
+  return ret;
 }
 
 } // namespace
@@ -46,11 +49,13 @@ DDRes jit_read_header(std::ifstream &file_stream, JITHeader &header) {
   } else {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Unknown jit format");
   }
-  auto remaining_size = header.total_size - sizeof(header);
-  if (remaining_size) {
+  int64_t remaining_size = header.total_size - sizeof(header);
+  if (remaining_size > 0) {
     std::vector<char> read_buf;
     read_buf.resize(remaining_size);
     file_stream.read(read_buf.data(), remaining_size);
+  } else {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Invalid header size");
   }
   if (header.version != k_jit_header_version) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Version not handled");
@@ -75,12 +80,21 @@ bool jit_read_prefix(std::ifstream &file_stream, JITRecordPrefix &prefix) {
   return true;
 }
 
+constexpr uint32_t k_size_code_load_integers =
+    sizeof(uint32_t) * 2 + sizeof(uint64_t) * 4;
+
 DDRes jit_read_code_load(std::ifstream &file_stream,
                          JITRecordCodeLoad &code_load,
                          std::vector<char> &buff) {
 #ifdef DEBUG
   LG_DBG("----  Read code load  ----");
 #endif
+  // we should at least have size for prefix / pid / tid / addr..
+  if ((code_load.prefix.total_size) <
+      (sizeof(JITRecordPrefix) + k_size_code_load_integers)) {
+    // Unlikely unless the write was truncated
+    DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Invalid code load structure");
+  }
   buff.resize(code_load.prefix.total_size - sizeof(JITRecordPrefix));
   file_stream.read(buff.data(),
                    code_load.prefix.total_size - sizeof(JITRecordPrefix));
@@ -99,10 +113,10 @@ DDRes jit_read_code_load(std::ifstream &file_stream,
   code_load.code_index = load64(buf_64++);
   // remaining = total - (everything we read)
   int remaining_size = code_load.prefix.total_size - sizeof(JITRecordPrefix) -
-      sizeof(uint32_t) * 2 - sizeof(uint64_t) * 4;
+      k_size_code_load_integers;
   if (remaining_size < static_cast<int>(code_load.code_size)) {
     // inconsistency
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Incomplete code load structure");
+    DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Incomplete code load structure");
   }
   int str_size = remaining_size - code_load.code_size;
   if (str_size > 1) {
@@ -185,7 +199,6 @@ DDRes jit_read_records(std::ifstream &file_stream, JITDump &jit_dump) {
       default: {
         // llvm seems to only emit the two above
         DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "jitdump record not handled");
-        valid_entry = false;
         break;
       }
       }
@@ -194,7 +207,7 @@ DDRes jit_read_records(std::ifstream &file_stream, JITDump &jit_dump) {
   return ddres_init();
 }
 
-DDRes jitdump_read(const std::string_view file, JITDump &jit_dump) {
+DDRes jitdump_read(std::string_view file, JITDump &jit_dump) {
   std::ifstream file_stream(file.data(), std::ios::binary);
   // We are not locking, assumption is that even if we fail to read a given
   // section we can always retry later. The aim is not to slow down the app

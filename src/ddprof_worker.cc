@@ -157,7 +157,8 @@ static DDRes symbols_update_stats(const SymbolHdr &symbol_hdr) {
       ddprof_stats_set(STATS_SYMBOLS_JIT_READS, stats._nb_jit_reads));
   DDRES_CHECK_FWD(ddprof_stats_set(STATS_SYMBOLS_JIT_FAILED_LOOKUPS,
                                    stats._nb_failed_lookups));
-  DDRES_CHECK_FWD(ddprof_stats_set(STATS_SYMBOLS_JIT_COUNT, stats._count));
+  DDRES_CHECK_FWD(
+      ddprof_stats_set(STATS_SYMBOLS_JIT_SYMBOL_COUNT, stats._symbol_count));
   return ddres_init();
 }
 

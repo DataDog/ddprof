@@ -20,7 +20,7 @@ public:
   struct Stats {
     uint32_t _nb_jit_reads = {};
     uint32_t _nb_failed_lookups = {};
-    mutable uint32_t _count = {};
+    uint32_t _symbol_count = {};
   };
 
   explicit RuntimeSymbolLookup(std::string_view path_to_proc)
@@ -40,10 +40,11 @@ public:
     _stats = {};
   }
 
-  const Stats &get_stats() const {
-    _stats._count = 0;
+  Stats get_stats() const {
+    Stats ret = _stats;
+    ret._symbol_count = 0;
     for (const auto &map : _pid_map) {
-      _stats._count += map.second._map.size();
+      ret._symbol_count += map.second._map.size();
     }
     return _stats;
   }
@@ -113,7 +114,7 @@ private:
     // Written this way, we save up on creating strings
     // only the slow path will create a string for the path
     if (it != symbol_info._failed_cycle.end()) {
-      ++(it->second);
+      it->second = _cycle_counter;
     } else {
       symbol_info._failed_cycle[std::string(path)] = _cycle_counter;
     }

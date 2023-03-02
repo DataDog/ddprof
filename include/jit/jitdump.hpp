@@ -26,9 +26,6 @@
 
 namespace ddprof {
 
-static constexpr uint32_t k_header_magic = 0x4A695444;
-static constexpr uint32_t k_header_magic_rev = 0x4454694A;
-
 struct JITHeader {
   uint32_t magic;      /* characters "jItD" */
   uint32_t version;    /* header version */
@@ -61,7 +58,7 @@ struct JITRecordPrefix {
 };
 
 struct JITRecordCodeLoad {
-  struct JITRecordPrefix prefix;
+  JITRecordPrefix prefix;
   uint32_t pid;
   uint32_t tid;
   uint64_t vma;
@@ -110,7 +107,7 @@ struct DebugEntry {
 };
 
 struct JITRecordDebugInfo {
-  struct JITRecordPrefix prefix;
+  JITRecordPrefix prefix;
   uint64_t code_addr;
   uint64_t nr_entry;
   std::vector<DebugEntry> entries;
@@ -122,6 +119,6 @@ struct JITDump {
   std::vector<JITRecordDebugInfo> debug_info;
 };
 
-DDRes jitdump_read(const std::string_view file, JITDump &jit_dump);
+DDRes jitdump_read(std::string_view file, JITDump &jit_dump);
 
 } // namespace ddprof
