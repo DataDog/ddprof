@@ -123,8 +123,8 @@ private:
 
   bool should_skip_symbol(std::string_view symbol) const;
 
-  bool insert_or_replace(const std::string &symbol, ProcessAddress_t address,
-                         Offset_t size, SymbolMap &symbol_map,
+  bool insert_or_replace(std::string_view symbol, ProcessAddress_t address,
+                         Offset_t code_size, SymbolMap &symbol_map,
                          SymbolTable &symbol_table);
 
   static constexpr std::array<const std::string_view, 1>
