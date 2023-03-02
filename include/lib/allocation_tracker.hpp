@@ -23,6 +23,11 @@ struct RingBufferInfo;
 
 struct TrackerThreadLocalState {
   int64_t remaining_bytes; // remaining allocation bytes until next sample
+  uint64_t
+      current_sampling_period; // the period we chose (used to compute size)
+#ifdef DEBUG
+  unsigned long total_size;
+#endif
   bool remaining_bytes_initialized; // false if remaining_bytes is not
                                     // initialized
   ddprof::span<const byte> stack_bounds;

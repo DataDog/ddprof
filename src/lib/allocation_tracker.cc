@@ -163,7 +163,9 @@ void AllocationTracker::track_allocation(uintptr_t, size_t size,
 
   if (unlikely(!tl_state.remaining_bytes_initialized)) {
     // tl_state.remaining bytes was not initialized yet for this thread
-    remaining_bytes -= next_sample_interval();
+    uint64_t sample_interval = next_sample_interval();
+    remaining_bytes -= sample_interval;
+    tl_state.current_sampling_period = sample_interval;
     tl_state.remaining_bytes_initialized = true;
     if (remaining_bytes < 0) {
       tl_state.remaining_bytes = remaining_bytes;
@@ -171,19 +173,26 @@ void AllocationTracker::track_allocation(uintptr_t, size_t size,
     }
   }
 
-  // compute number of samples this allocation should be accounted for
-  auto sampling_interval = _sampling_interval;
-  size_t nsamples = remaining_bytes / sampling_interval;
-  remaining_bytes = remaining_bytes % sampling_interval;
-
+  uint64_t sample_interval = 0;
   do {
-    remaining_bytes -= next_sample_interval();
-    ++nsamples;
+    // If we are exceeding the sampling period
+    // we should count everything in the current
+    // except the last period which should be counted for next time
+    tl_state.current_sampling_period += sample_interval;
+    sample_interval = next_sample_interval();
+    remaining_bytes -= sample_interval;
   } while (remaining_bytes >= 0);
 
   tl_state.remaining_bytes = remaining_bytes;
-  uint64_t total_size = nsamples * sampling_interval;
+  uint64_t total_size = tl_state.current_sampling_period;
+  // reset for next iteration
+  tl_state.current_sampling_period = sample_interval;
 
+#ifdef DEBUG
+  tl_state.total_size += total_size;
+  printf("Pushing sample with %lu (total = %lu)\n", total_size,
+         tl_state.total_size);
+#endif
   if (!IsDDResOK(push_sample(total_size, tl_state))) {
     ++_state.failure_count;
     if (_state.failure_count >= k_max_consecutive_failures) {
