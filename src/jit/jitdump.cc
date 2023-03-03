@@ -28,24 +28,27 @@ template <std::integral T> T load(const char **data) {
 DDRes jit_read_header(std::ifstream &file_stream, JITHeader &header) {
   file_stream.read(reinterpret_cast<char *>(&header), sizeof(JITHeader));
   if (!file_stream.good()) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "incomplete jit file");
+    DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "incomplete jit file");
   }
   if (header.magic == k_header_magic) {
     // expected value (no need to swap data)
   } else if (header.magic == k_header_magic_rev) {
     // todo everything should be swapped throughout the parsing (not handled)
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Swap data not handled");
+    DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Swap data not handled");
   } else {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Unknown jit format");
+    DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Unknown jit format");
   }
   int64_t remaining_size = header.total_size - sizeof(header);
   if (remaining_size > 0) {
     file_stream.seekg(remaining_size);
+    if (!file_stream.good()) {
+      DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "incomplete jit file");
+    }
   } else {
     // this is the expected code path
   }
   if (header.version != k_jit_header_version) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Version not handled");
+    DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Version not handled");
   }
   return ddres_init();
 }
