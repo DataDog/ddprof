@@ -169,7 +169,8 @@ TEST(runtime_symbol_lookup, jitdump_vs_perfmap) {
   ASSERT_NE(symbol_idx, -1);
   EXPECT_EQ(symbol_table_perfmap[symbol_idx]._symname, expected_sym);
   {
-    RuntimeSymbolLookup::Stats stats = runtime_symbol_lookup_perfmap.get_stats();
+    RuntimeSymbolLookup::Stats stats =
+        runtime_symbol_lookup_perfmap.get_stats();
     EXPECT_EQ(stats._symbol_count, 11605);
   }
 }

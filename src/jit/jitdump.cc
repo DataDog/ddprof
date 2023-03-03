@@ -44,8 +44,10 @@ DDRes jit_read_header(std::ifstream &file_stream, JITHeader &header) {
     if (!file_stream.good()) {
       DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "incomplete jit file");
     }
-  } else {
+  } else if (remaining_size == 0) {
     // this is the expected code path
+  } else { // afaik this should never happen
+    DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "incomplete jit file");
   }
   if (header.version != k_jit_header_version) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Version not handled");
