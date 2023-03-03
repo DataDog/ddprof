@@ -16,24 +16,13 @@ namespace {
 static constexpr uint32_t k_header_magic = 0x4A695444;
 static constexpr uint32_t k_header_magic_rev = 0x4454694A;
 
-uint64_t load64(const uint64_t *data) {
-  uint64_t ret;
-  memcpy(&ret, data, sizeof(uint64_t));
-  // #ifdef BIG_ENDIAN
-  //   bswap_64(Ret);
-  // #endif
+// todo bitswap
+template <std::integral T> T load(const char **data) {
+  T ret = {};
+  memcpy(&ret, *data, sizeof(T));
+  *data += sizeof(T);
   return ret;
 }
-
-int32_t load32(const int32_t *data) {
-  int32_t ret;
-  memcpy(&ret, data, sizeof(int32_t));
-  // #ifdef BIG_ENDIAN
-  //   bswap_32(Ret);
-  // #endif
-  return ret;
-}
-
 } // namespace
 
 DDRes jit_read_header(std::ifstream &file_stream, JITHeader &header) {
@@ -55,7 +44,7 @@ DDRes jit_read_header(std::ifstream &file_stream, JITHeader &header) {
     read_buf.resize(remaining_size);
     file_stream.read(read_buf.data(), remaining_size);
   } else {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Invalid header size");
+    // this is the expected code path
   }
   if (header.version != k_jit_header_version) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Version not handled");
@@ -80,9 +69,6 @@ bool jit_read_prefix(std::ifstream &file_stream, JITRecordPrefix &prefix) {
   return true;
 }
 
-constexpr uint32_t k_size_code_load_integers =
-    sizeof(uint32_t) * 2 + sizeof(uint64_t) * 4;
-
 DDRes jit_read_code_load(std::ifstream &file_stream,
                          JITRecordCodeLoad &code_load,
                          std::vector<char> &buff) {
@@ -91,7 +77,7 @@ DDRes jit_read_code_load(std::ifstream &file_stream,
 #endif
   // we should at least have size for prefix / pid / tid / addr..
   if ((code_load.prefix.total_size) <
-      (sizeof(JITRecordPrefix) + k_size_code_load_integers)) {
+      (sizeof(JITRecordPrefix) + JITRecordCodeLoad::k_size_integers)) {
     // Unlikely unless the write was truncated
     DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Invalid code load structure");
   }
@@ -102,26 +88,24 @@ DDRes jit_read_code_load(std::ifstream &file_stream,
     // can happen if we are in the middle of a write
     DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Incomplete code load structure");
   }
-  uint32_t *buf_32 = reinterpret_cast<uint32_t *>(buff.data());
-  code_load.pid = *buf_32++;
-  code_load.tid = *buf_32++;
+  const char *buf = buff.data();
+  code_load.pid = load<uint32_t>(&buf);
+  code_load.tid = load<uint32_t>(&buf);
 
-  uint64_t *buf_64 = reinterpret_cast<uint64_t *>(buf_32);
-  code_load.vma = load64(buf_64++);
-  code_load.code_addr = load64(buf_64++);
-  code_load.code_size = load64(buf_64++);
-  code_load.code_index = load64(buf_64++);
+  code_load.vma = load<uint64_t>(&buf);
+  code_load.code_addr = load<uint64_t>(&buf);
+  code_load.code_size = load<uint64_t>(&buf);
+  code_load.code_index = load<uint64_t>(&buf);
   // remaining = total - (everything we read)
   int remaining_size = code_load.prefix.total_size - sizeof(JITRecordPrefix) -
-      k_size_code_load_integers;
+      JITRecordCodeLoad::k_size_integers;
   if (remaining_size < static_cast<int>(code_load.code_size)) {
     // inconsistency
     DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Incomplete code load structure");
   }
   int str_size = remaining_size - code_load.code_size;
   if (str_size > 1) {
-    code_load.func_name =
-        std::string(reinterpret_cast<char *>(buf_64), str_size - 1);
+    code_load.func_name = std::string(buf, str_size - 1);
   }
 #ifdef DEBUG
   LG_DBG("Func name = %s, address = %lx (%lu) time=%lu",
@@ -137,38 +121,38 @@ DDRes jit_read_debug_info(std::ifstream &file_stream,
 #ifdef DEBUG
   LG_DBG("---- Read debug info ----");
 #endif
+  if (debug_info.prefix.total_size <
+      (sizeof(JITRecordPrefix) + JITRecordDebugInfo::k_size_integers)) {
+    DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Invalid debug info size");
+  }
   buff.resize(debug_info.prefix.total_size - sizeof(JITRecordPrefix));
   file_stream.read(buff.data(), buff.size());
   if (!file_stream.good()) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Incomplete debug info structure");
   }
-  uint64_t *buf_64 = reinterpret_cast<uint64_t *>(buff.data());
-  debug_info.code_addr = load64(buf_64++);
-  debug_info.nr_entry = load64(buf_64++);
+  const char *buf = buff.data();
+  debug_info.code_addr = load<uint64_t>(&buf);
+  debug_info.nr_entry = load<uint64_t>(&buf);
   debug_info.entries.resize(debug_info.nr_entry);
 
   for (unsigned i = 0; i < debug_info.nr_entry; ++i) {
-    debug_info.entries[i].addr = load64(buf_64++);
-    int32_t *buf_32 = reinterpret_cast<int32_t *>(buf_64);
-    debug_info.entries[i].lineno = load32(buf_32++);
-    debug_info.entries[i].discrim = load32(buf_32++);
-    char *buf_char = reinterpret_cast<char *>(buf_32);
-    if (static_cast<unsigned char>(*buf_char) == 0xff &&
-        *(buf_char + 1) == '\0') {
+    debug_info.entries[i].addr = load<uint64_t>(&buf);
+    debug_info.entries[i].lineno = load<int32_t>(&buf);
+    debug_info.entries[i].discrim = load<int32_t>(&buf);
+    if (static_cast<unsigned char>(*buf) == 0xff && *(buf + 1) == '\0') {
       if (i >= 1) {
         debug_info.entries[i].name = debug_info.entries[i - 1].name;
       } else {
         LG_WRN("Invalid attempt to copy previous debug entry\n");
       }
     }
-    debug_info.entries[i].name = std::string(buf_char);
-    buf_char += debug_info.entries[i].name.size() + 1;
+    debug_info.entries[i].name = std::string(buf);
+    buf += debug_info.entries[i].name.size() + 1;
 #ifdef DEBUG
     LG_DBG("Name:line = %s:%d / %lx / time=%lu",
            debug_info.entries[i].name.c_str(), debug_info.entries[i].lineno,
            debug_info.entries[i].addr, debug_info.prefix.timestamp);
 #endif
-    buf_64 = reinterpret_cast<uint64_t *>(buf_char);
   }
   return ddres_init();
 }
@@ -185,14 +169,14 @@ DDRes jit_read_records(std::ifstream &file_stream, JITDump &jit_dump) {
       case JITRecordType::JIT_CODE_LOAD: {
         JITRecordCodeLoad current;
         current.prefix = prefix;
-        DDRES_CHECK_FWD(jit_read_code_load(file_stream, current, buff));
+        DDRES_CHECK_FWD_STRICT(jit_read_code_load(file_stream, current, buff));
         jit_dump.code_load.push_back(std::move(current));
         break;
       }
       case JITRecordType::JIT_CODE_DEBUG_INFO: {
         JITRecordDebugInfo current;
         current.prefix = prefix;
-        DDRES_CHECK_FWD(jit_read_debug_info(file_stream, current, buff));
+        DDRES_CHECK_FWD_STRICT(jit_read_debug_info(file_stream, current, buff));
         jit_dump.debug_info.push_back(std::move(current));
         break;
       }
@@ -218,8 +202,8 @@ DDRes jitdump_read(std::string_view file, JITDump &jit_dump) {
 
   try {
     LG_DBG("JITDump starting parse of %s", file.data());
-    DDRES_CHECK_FWD(jit_read_header(file_stream, jit_dump.header));
-    DDRES_CHECK_FWD(jit_read_records(file_stream, jit_dump));
+    DDRES_CHECK_FWD_STRICT(jit_read_header(file_stream, jit_dump.header));
+    DDRES_CHECK_FWD_STRICT(jit_read_records(file_stream, jit_dump));
   }
   // incomplete files can trigger exceptions
   CatchExcept2DDRes();

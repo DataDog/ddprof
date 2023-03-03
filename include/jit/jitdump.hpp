@@ -58,6 +58,9 @@ struct JITRecordPrefix {
 };
 
 struct JITRecordCodeLoad {
+  // minimal size we will read
+  static constexpr uint32_t k_size_integers =
+      sizeof(uint32_t) * 2 + sizeof(uint64_t) * 4;
   JITRecordPrefix prefix;
   uint32_t pid;
   uint32_t tid;
@@ -107,6 +110,8 @@ struct DebugEntry {
 };
 
 struct JITRecordDebugInfo {
+  // minimal size we will read
+  static constexpr uint32_t k_size_integers = sizeof(uint64_t) * 2;
   JITRecordPrefix prefix;
   uint64_t code_addr;
   uint64_t nr_entry;
