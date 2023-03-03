@@ -196,8 +196,8 @@ DDRes jitdump_read(std::string_view file, JITDump &jit_dump) {
   // We are not locking, assumption is that even if we fail to read a given
   // section we can always retry later. The aim is not to slow down the app
   if (!file_stream.good()) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_NO_JIT_FILE, "File %s not readable",
-                           file.data());
+    // avoid logging as this can happen in standard path
+    return ddres_error(DD_WHAT_NO_JIT_FILE);
   }
 
   try {
