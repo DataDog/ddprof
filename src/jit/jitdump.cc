@@ -26,8 +26,7 @@ template <std::integral T> T load(const char **data) {
 } // namespace
 
 DDRes jit_read_header(std::ifstream &file_stream, JITHeader &header) {
-  file_stream.read(reinterpret_cast<char *>(&header), sizeof(JITHeader));
-  if (!file_stream.good()) {
+  if (!file_stream.read(reinterpret_cast<char *>(&header), sizeof(JITHeader))) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "incomplete jit file");
   }
   if (header.magic == k_header_magic) {
@@ -40,8 +39,7 @@ DDRes jit_read_header(std::ifstream &file_stream, JITHeader &header) {
   }
   int64_t remaining_size = header.total_size - sizeof(header);
   if (remaining_size > 0) {
-    file_stream.seekg(remaining_size);
-    if (!file_stream.good()) {
+    if (!file_stream.seekg(remaining_size)) {
       DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "incomplete jit file");
     }
   } else if (remaining_size == 0) {
@@ -57,8 +55,8 @@ DDRes jit_read_header(std::ifstream &file_stream, JITHeader &header) {
 
 // true if we should continue
 bool jit_read_prefix(std::ifstream &file_stream, JITRecordPrefix &prefix) {
-  file_stream.read(reinterpret_cast<char *>(&prefix), sizeof(JITRecordPrefix));
-  if (!file_stream.good()) {
+  if (!file_stream.read(reinterpret_cast<char *>(&prefix),
+                        sizeof(JITRecordPrefix))) {
     // It is expected that we reach EOF here
     return false;
   }
@@ -85,9 +83,8 @@ DDRes jit_read_code_load(std::ifstream &file_stream,
     DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Invalid code load structure");
   }
   buff.resize(code_load.prefix.total_size - sizeof(JITRecordPrefix));
-  file_stream.read(buff.data(),
-                   code_load.prefix.total_size - sizeof(JITRecordPrefix));
-  if (!file_stream.good()) {
+  if (!file_stream.read(
+          buff.data(), code_load.prefix.total_size - sizeof(JITRecordPrefix))) {
     // can happen if we are in the middle of a write
     DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Incomplete code load structure");
   }
@@ -129,8 +126,7 @@ DDRes jit_read_debug_info(std::ifstream &file_stream,
     DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Invalid debug info size");
   }
   buff.resize(debug_info.prefix.total_size - sizeof(JITRecordPrefix));
-  file_stream.read(buff.data(), buff.size());
-  if (!file_stream.good()) {
+  if (!file_stream.read(buff.data(), buff.size())) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Incomplete debug info structure");
   }
   const char *buf = buff.data();
@@ -199,7 +195,7 @@ DDRes jitdump_read(std::string_view file, JITDump &jit_dump) {
     std::ifstream file_stream(file.data(), std::ios::binary);
     // We are not locking, assumption is that even if we fail to read a given
     // section we can always retry later. The aim is not to slow down the app
-    if (!file_stream.good()) {
+    if (!file_stream) {
       // avoid logging as this can happen in standard path
       return ddres_error(DD_WHAT_NO_JIT_FILE);
     }
