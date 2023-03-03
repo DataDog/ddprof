@@ -9,10 +9,12 @@
 
 #include <stdint.h>
 
-#define DD_SEVOK 0
-#define DD_SEVNOTICE 1
-#define DD_SEVWARN 2
-#define DD_SEVERROR 3
+enum DD_RES_SEV {
+  DD_SEVOK = 0,
+  DD_SEVNOTICE = 1,
+  DD_SEVWARN = 2,
+  DD_SEVERROR = 3,
+};
 
 /// Result structure containing a what / severity
 typedef struct DDRes {
