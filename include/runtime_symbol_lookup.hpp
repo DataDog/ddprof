@@ -46,7 +46,7 @@ public:
     for (const auto &map : _pid_map) {
       ret._symbol_count += map.second._map.size();
     }
-    return _stats;
+    return ret;
   }
 
 private:

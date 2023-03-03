@@ -156,6 +156,10 @@ TEST(runtime_symbol_lookup, jitdump_vs_perfmap) {
       mypid, pc, symbol_table, jit_path);
   ASSERT_NE(symbol_idx, -1);
   EXPECT_EQ(symbol_table[symbol_idx]._symname, expected_sym);
+  {
+    RuntimeSymbolLookup::Stats stats = runtime_symbol_lookup.get_stats();
+    EXPECT_EQ(stats._symbol_count, 20809);
+  }
 
   // load perfmap on the other
   RuntimeSymbolLookup runtime_symbol_lookup_perfmap(UNIT_TEST_DATA);
@@ -164,6 +168,10 @@ TEST(runtime_symbol_lookup, jitdump_vs_perfmap) {
       mypid, pc, symbol_table_perfmap);
   ASSERT_NE(symbol_idx, -1);
   EXPECT_EQ(symbol_table_perfmap[symbol_idx]._symname, expected_sym);
+  {
+    RuntimeSymbolLookup::Stats stats = runtime_symbol_lookup_perfmap.get_stats();
+    EXPECT_EQ(stats._symbol_count, 11605);
+  }
 }
 
 } // namespace ddprof
