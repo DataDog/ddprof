@@ -173,6 +173,15 @@ void AllocationTracker::track_allocation(uintptr_t, size_t size,
     }
   }
 
+  {
+    // optim to avoid computing many sample intervals for big allocations
+    auto sampling_interval = _sampling_interval;
+    size_t nsamples = remaining_bytes / sampling_interval;
+    if (nsamples) {
+      remaining_bytes = remaining_bytes % sampling_interval;
+      tl_state.current_sampling_period += nsamples * sampling_interval;
+    }
+  }
   uint64_t sample_interval = 0;
   do {
     // If we are exceeding the sampling period
