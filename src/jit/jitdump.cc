@@ -40,9 +40,7 @@ DDRes jit_read_header(std::ifstream &file_stream, JITHeader &header) {
   }
   int64_t remaining_size = header.total_size - sizeof(header);
   if (remaining_size > 0) {
-    std::vector<char> read_buf;
-    read_buf.resize(remaining_size);
-    file_stream.read(read_buf.data(), remaining_size);
+    file_stream.seekg(remaining_size);
   } else {
     // this is the expected code path
   }
@@ -192,15 +190,14 @@ DDRes jit_read_records(std::ifstream &file_stream, JITDump &jit_dump) {
 }
 
 DDRes jitdump_read(std::string_view file, JITDump &jit_dump) {
-  std::ifstream file_stream(file.data(), std::ios::binary);
-  // We are not locking, assumption is that even if we fail to read a given
-  // section we can always retry later. The aim is not to slow down the app
-  if (!file_stream.good()) {
-    // avoid logging as this can happen in standard path
-    return ddres_error(DD_WHAT_NO_JIT_FILE);
-  }
-
   try {
+    std::ifstream file_stream(file.data(), std::ios::binary);
+    // We are not locking, assumption is that even if we fail to read a given
+    // section we can always retry later. The aim is not to slow down the app
+    if (!file_stream.good()) {
+      // avoid logging as this can happen in standard path
+      return ddres_error(DD_WHAT_NO_JIT_FILE);
+    }
     LG_DBG("JITDump starting parse of %s", file.data());
     DDRES_CHECK_FWD_STRICT(jit_read_header(file_stream, jit_dump.header));
     DDRES_CHECK_FWD_STRICT(jit_read_records(file_stream, jit_dump));
