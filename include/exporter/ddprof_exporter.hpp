@@ -9,7 +9,7 @@
 #include "ddres_def.hpp"
 #include "exporter_input.hpp"
 #include "perf_watcher.hpp"
-#include "noisy_neighbors.hpp"
+#include "timeline/noisy_neighbors.hpp"
 #include "string_view.hpp"
 #include "tags.hpp"
 

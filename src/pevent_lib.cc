@@ -203,18 +203,24 @@ static DDRes topenfd_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
   return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf);
 }
 
-static DDRes tnoisycpu2_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
-                            int num_cpu, PEventHdr *pevent_hdr) {
+static DDRes tnoisycpu_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
+                           int num_cpu, PEventHdr *pevent_hdr) {
   const LinkedPerfConf conf = {
         {1, "sched", "sched_switch", false, true},
-//        {2, "sched", "sched_stat_wait"},
-//        {3, "sched", "sched_stat_sleep"},
-//        {4, "sched", "sched_stat_iowait"},
-        {5, "sched", "sched_stat_runtime"},
-        {7, "sched", "sched_wakeup"},
-        {9, "sched", "sched_migrate_task"},
-        {10, "raw_syscalls", "sys_enter"},
-        {11, "raw_syscalls", "sys_exit"},
+        {2, "sched", "sched_stat_runtime"},
+        {3, "sched", "sched_wakeup"},
+        {4, "sched", "sched_migrate_task"},
+        {5, "raw_syscalls", "sys_enter"},
+        {6, "raw_syscalls", "sys_exit"},
+  };
+  return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf);
+}
+
+static DDRes tsyscalls(PerfWatcher *watcher, int watcher_idx, pid_t pid,
+                       int num_cpu, PEventHdr *pevent_hdr) {
+  const LinkedPerfConf conf = {
+        {1, "raw_syscalls", "sys_enter"},
+        {1, "raw_syscalls", "sys_exit"},
   };
   return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf);
 }
@@ -297,9 +303,9 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
         DDRES_CHECK_FWD(
             tallocsys1_open(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
         break;
-      case (DDPROF_PWE_tNOISYCPU2):
+      case (DDPROF_PWE_tNOISYCPU):
         DDRES_CHECK_FWD(
-            tnoisycpu2_open(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
+            tnoisycpu_open(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
         break;
       case DDPROF_PWE_tOPENFD:
         DDRES_CHECK_FWD(

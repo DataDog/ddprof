@@ -132,9 +132,10 @@ aux_source_directory(src COMMON_SRC)
 aux_source_directory(src/pprof PPROF_SRC)
 aux_source_directory(src/exporter EXPORTER_SRC)
 aux_source_directory(src/exe EXE_SRC)
+aux_source_directory(src/timeline TIMELINE_SRC)
 
 # Define all sources
-set(DDPROF_GLOBAL_SRC ${COMMON_SRC} ${PPROF_SRC} ${EXPORTER_SRC} ${EXE_SRC})
+set(DDPROF_GLOBAL_SRC ${COMMON_SRC} ${PPROF_SRC} ${EXPORTER_SRC} ${EXE_SRC} ${TIMELINE_SRC})
 
 set(DDPROF_LIBRARY_LIST llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 
@@ -203,7 +204,9 @@ set(DD_PROFILING_SOURCES
     src/ringbuffer_utils.cc
     src/signal_helper.cc
     src/sys_utils.cc
-    src/user_override.cc)
+    src/user_override.cc
+    src/timeline/timeline.cc
+   )
 
 if(BUILD_UNIVERSAL_DDPROF)
   list(APPEND DD_PROFILING_SOURCES src/lib/glibc_fixes.c)

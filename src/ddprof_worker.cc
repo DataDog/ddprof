@@ -422,33 +422,11 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
   return ddres_init();
 }
 
-DDRes ddprof_pr_noisy_neighbors1(DDProfContext *ctx, perf_event_sample *sample, int watcher_pos) {
-  int i_export = ctx->worker_ctx.i_current_pprof;
-  NoisyNeighbors &noisy= *ctx->worker_ctx.exp[i_export]->noisy_neighbors;
-  noisy.pid_on(sample->pid, sample->cpu, sample->time);
-
-  return ddres_init();
-}
-
-DDRes ddprof_pr_noisy_neighbors2(DDProfContext *ctx, perf_event_sample *sample, int watcher_pos) {
+DDRes ddprof_pr_noisy_neighbors(DDProfContext *ctx, perf_event_sample *sample, int watcher_pos) {
   int i_export = ctx->worker_ctx.i_current_pprof;
   NoisyNeighbors &noisy = *ctx->worker_ctx.exp[i_export]->noisy_neighbors;
-  const auto& str = check_perf_stash(sample->id);
-  if (str == "sched_switch") {
-    noisy.sched_switch(sample);
-  } else if (str == "sched_stat_runtime") {
-    noisy.sched_runtime(sample);
-  } else if (str == "sched_wakeup") {
-    noisy.sched_wakeup(sample);
-  } else if (str == "sched_migrate_task") {
-    noisy.sched_migrate(sample);
-  } else if(str == "syscall_enter") {
-    noisy.syscall_enter(sample);
-  } else if(str == "syscall_exit") {
-    noisy.syscall_exit(sample);
-  } else {
-    return ddres_init(); // ignore for now
-  }
+  const std::string &str = check_perf_stash(sample->id);
+  noisy.process_event(sample, str);
 
   g_scheduler_stats[str] += 1;
   return ddres_init();
@@ -915,12 +893,9 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
               watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS2) {
             DDRES_CHECK_FWD(
                 ddprof_pr_sysallocation_tracking(ctx, sample, watcher_pos));
-          } else if (watcher->ddprof_event_type == DDPROF_PWE_tNOISYCPU1) {
+          } else if (watcher->ddprof_event_type == DDPROF_PWE_tNOISYCPU) {
             DDRES_CHECK_FWD(
-                ddprof_pr_noisy_neighbors1(ctx, sample, watcher_pos));
-          } else if (watcher->ddprof_event_type == DDPROF_PWE_tNOISYCPU2) {
-            DDRES_CHECK_FWD(
-                ddprof_pr_noisy_neighbors2(ctx, sample, watcher_pos));
+                ddprof_pr_noisy_neighbors(ctx, sample, watcher_pos));
           } else if (watcher->ddprof_event_type == DDPROF_PWE_tOPENFD) {
             DDRES_CHECK_FWD(ddprof_pr_openfd_tracking(ctx, sample, watcher_pos));
           } else if (is_allocation && ctx->params.live_allocations) {
