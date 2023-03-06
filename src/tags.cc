@@ -13,24 +13,24 @@
 namespace {
 // From the DogFood repo. Credit goes to Garrett Sickles, who has an awesome
 // DogStatsD C++ library : https://github.com/garrettsickles/DogFood.git
-inline bool ValidateTags(const std::string &_tag) {
-  if (_tag.length() == 0 || _tag.length() > 200)
+inline bool ValidateTags(std::string_view tag) {
+  if (tag.length() == 0 || tag.length() > 200)
     return false;
 
   ////////////////////////////////////////////////////////
   // Verify the first character is a letter
-  if (!std::isalpha(_tag.at(0)))
+  if (!std::isalpha(tag.at(0)))
     return false;
 
   ////////////////////////////////////////////////////////
   // Verify end is not a colon
-  if (_tag.back() == ':')
+  if (tag.back() == ':')
     return false;
 
   ////////////////////////////////////////////////////////
   // Verify each character
-  for (size_t n = 0; n < _tag.length(); n++) {
-    const char c = _tag.at(n);
+  for (size_t n = 0; n < tag.length(); n++) {
+    const char c = tag.at(n);
     if (std::isalnum(c) || c == '_' || c == '-' || c == ':' || c == '.' ||
         c == '/' || c == '\\')
       continue;
@@ -67,17 +67,17 @@ void split(const char *str, Tags &tags, char c) {
     while (*str != c && *str != '\0')
       str++;
     // no need to +1 with size as we don't include the comma
+    if (!ValidateTags(std::string_view(begin, str - begin))) {
+      LG_WRN("[TAGS] Bad tag value - skip %s",
+             std::string_view(begin, str - begin).data());
+      continue;
+    }
     Tag current_tag = split_kv(begin, str - begin);
     if (current_tag == Tag()) {
       // skip this empty tag
       continue;
     }
-    if (!ValidateTags(current_tag.first) || !ValidateTags(current_tag.second)) {
-      LG_WRN("[TAGS] Bad tag value - skip %s:%s", current_tag.first.c_str(),
-             current_tag.second.c_str());
-    } else {
-      tags.push_back(std::move(current_tag));
-    }
+    tags.push_back(std::move(current_tag));
   } while ('\0' != *str++);
 }
 

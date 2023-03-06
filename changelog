@@ -1,3 +1,29 @@
+0.9.3 to 0.10.1 (14/11/2022)
+* Allocation profiling - instrument forks
+* Universal binary - remove dependency on libc
+This allows compatibility with older libc (like centos 7)
+* Formalize tracepoint grammar
+* Add build-id to mapping information
+* Use a temporary file to generate a library to load
+* Switch user if failing to read /proc/<pid>/maps
+* Changes in instrumentation mechanisms
+Periodically check for new loaded libraries
+Use GOT override instead of symbol interposition
+* Add information on lost events
+When ring buffer is full we flag them as "lost events".
+* Use jemalloc as default allocator
+This prevents a counter-performance on musl compilations
+
+0.8.2 to 0.9.3 (08/08/2022)
+* Allocation profiling
+Library mode and wrapper mode have an option to instrument allocations with low overhead.
+Limitation: This only works for dynamically linked allocators (example: standard allocator) and does not follow forks. If you are concerned by these limitations, please reach out with your requirements.
+* Samples are labeled with PID / TID
+* Preset option : adds defined presets to simplify configuration of the profiler (cpu_only, alloc_only)
+* Catch kernel activity (when permissions allow it)
+* Several improvements to unwinding
+* Alpine musl (built on 3.16)
+
 0.8.1 to 0.8.2 (14/04/2022)
 * Correctly convert Watcher frequency to pprof period (for time-based
 frequency)

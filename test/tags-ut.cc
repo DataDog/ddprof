@@ -48,6 +48,17 @@ TEST(Tags, more_tags) {
   EXPECT_EQ(tags[1].second, "anderson");
 }
 
+TEST(Tags, runtime_id) {
+  LogHandle handle;
+  const char *tag_input =
+      "someUUID:0dbe19c2-a86b-11ed-afa1-0242ac120002,123some:badtag";
+  Tags tags;
+  split(tag_input, tags);
+  ASSERT_EQ(tags.size(), 1);
+  EXPECT_EQ(tags[0].first, "someUUID");
+  EXPECT_EQ(tags[0].second, "0dbe19c2-a86b-11ed-afa1-0242ac120002");
+}
+
 TEST(Tags, user_tags) {
   LogHandle handle;
 

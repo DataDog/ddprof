@@ -27,7 +27,7 @@ std::byte stack[PERF_SAMPLE_STACK_SIZE];
 void funcB() {
   UnwindState state;
   uint64_t regs[K_NB_REGS_UNWIND];
-  size_t stack_size = save_context(retrieve_stack_end_address(), regs, stack);
+  size_t stack_size = save_context(retrieve_stack_bounds(), regs, stack);
 
   ddprof::unwind_init_sample(&state, regs, getpid(), stack_size,
                              reinterpret_cast<char *>(stack));
@@ -56,8 +56,11 @@ void funcA() {
 
 TEST(getcontext, getcontext) { funcA(); }
 
-// unwinding from signal handler does not work well on aarch64
-#ifdef __x86_64__
+#if defined(__x86_64__) && !defined(MUSL_LIBC)
+// The matrix of where it works well is slightly more complex
+// There are also differences depending on vdso (as this can be a kernel
+// mechanism). We should revisit if we needed.
+
 static std::atomic<bool> stop;
 static std::mutex mutex;
 static std::condition_variable cv;
@@ -65,7 +68,7 @@ static uint64_t regs[K_NB_REGS_UNWIND];
 static size_t stack_size;
 
 DDPROF_NO_SANITIZER_ADDRESS void handler(int sig) {
-  stack_size = save_context(retrieve_stack_end_address(), regs, stack);
+  stack_size = save_context(retrieve_stack_bounds(), regs, stack);
   stop = true;
 }
 

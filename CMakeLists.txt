@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.19)
 project(
   DDProf
   LANGUAGES C CXX
-  VERSION 0.9.3
+  VERSION 0.11.0
   DESCRIPTION "Datadog's native profiler for Linux")
 
 message(STATUS "Compiler ID: ${CMAKE_C_COMPILER_ID}")
@@ -100,12 +100,11 @@ add_dependencies(cppcheck DDProf::Parser)
 
 # ---- Libraries (needed by ut) ----
 
-option(DDPROF_JEMALLOC "Enable jemalloc stats" OFF)
-if(${DDPROF_JEMALLOC})
+option(DDPROF_ALLOCATOR "Define the type of allocator (STANDARD / JEMALLOC)" STANDARD)
+if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
   # jemalloc for debug
   include(Jemalloc)
-  message(STATUS "Adding jemalloc for DBG purpose" ${JEMALLOC_ROOT_DIR})
-  add_compile_definitions("DBG_JEMALLOC")
+  message(STATUS "Using Allocator Jemalloc from:" ${JEMALLOC_LIBRARIES})
 endif()
 
 # Install lib cap to retrieve capabilities
@@ -153,8 +152,8 @@ if(ON)
   list(PREPEND DDPROF_LIBRARY_LIST Datadog::Profiling)
 endif()
 
-if(${DDPROF_JEMALLOC})
-  list(PREPEND DDPROF_LIBRARY_LIST jemalloc)
+if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
+  list(PREPEND DDPROF_LIBRARY_LIST ${JEMALLOC_LIBRARIES})
 endif()
 
 # libcap, can be removed from version distributed to client
@@ -216,7 +215,8 @@ set(DD_PROFILING_SOURCES
     src/user_override.cc)
 
 if(BUILD_UNIVERSAL_DDPROF)
-  list(APPEND DD_PROFILING_SOURCES src/lib/glibc_fixes.c)
+  # Compiling on different libc, we need to ensure some symbols are available everywhere
+  list(APPEND DD_PROFILING_SOURCES src/lib/glibc_fixes.c src/lib/libc_compatibility.c)
 endif()
 
 # libddprofiling_embeded.so is the actual profiling library
@@ -388,10 +388,11 @@ if(${BUILD_NATIVE_LIB})
   set(DDPROF_LIB_SRC ${COMMON_SRC} src/lib/ddprof_output.cc)
 
   # Libs to link
-  set(NATIVE_LIB_LIBRARY_LIST DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
+  set(NATIVE_LIB_LIBRARY_LIST dl DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES}
+                              Threads::Threads)
 
-  if(${DDPROF_JEMALLOC})
-    list(PREPEND NATIVE_LIB_LIBRARY_LIST jemalloc)
+  if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
+    list(PREPEND NATIVE_LIB_LIBRARY_LIST ${JEMALLOC_LIBRARIES})
   endif()
 
   # Create the lib

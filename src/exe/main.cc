@@ -467,7 +467,7 @@ int main(int argc, char *argv[]) {
       LG_ERR("%s: permission denied", argv[0]);
       break;
     default:
-      LG_WRN("%s: failed to execute (%s)", argv[0], strerror(errno));
+      LG_ERR("%s: failed to execute (%s)", argv[0], strerror(errno));
       break;
     }
   }

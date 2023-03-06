@@ -111,7 +111,11 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     return ddres_init(); // invalid pc : do not add frame
   }
   us->current_ip = pc;
-
+  if (!pc) {
+    // Unwinding can end on a null address
+    // Example: alpine 3.17
+    return ddres_init();
+  }
   DsoHdr::DsoFindRes find_res =
       us->dso_hdr.dso_find_or_backpopulate(us->pid, pc);
   if (!find_res.second) {
@@ -177,7 +181,7 @@ bool is_infinite_loop(UnwindState *us) {
   if (nb_locs <= nb_frames_to_check) {
     return false;
   }
-  for (unsigned i = 0; i < nb_frames_to_check; ++i) {
+  for (unsigned i = 1; i < nb_frames_to_check; ++i) {
     FunLoc &n_minus_one_loc = output.locs[nb_locs - i];
     FunLoc &n_minus_two_loc = output.locs[nb_locs - i - 1];
     if (n_minus_one_loc.ip != n_minus_two_loc.ip) {
@@ -208,7 +212,6 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
            dwfl_errmsg(dwfl_error_value));
   }
 #endif
-
   // Before we potentially exit, record the fact that we're processing a frame
   ddprof_stats_add(STATS_UNWIND_FRAMES, 1, NULL);
 

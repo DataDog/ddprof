@@ -62,3 +62,24 @@ example:
 000000000015cbb9 rbp+16   c-16  c-8   
 000000000015cd1a rsp+8    c-16  c-8   
 ```
+
+### Checking allocator stats
+
+```
+MALLOC_CONF=stats_print:true ./ddprof -S test-service service_cmd
+```
+
+### Library issues (LD_PRELOAD or allocation profiling)
+
+You will want to instrument the loader function (loader.c) to figure out what is going on.
+You can do this by breaking in the loader and running gdb as follows. Example of GDB using LD_PRELOAD:
+
+```
+gdb <test_prog>
+set environment LD_PRELOAD=./libdd_profiling.so
+b loader
+run
+```
+
+Example of issue: 
+A symbol is missing from the libc (compared to the musl libc where the library was compiled) 
