@@ -71,7 +71,12 @@ class DsoHdr {
 public:
   /******* Structures and types **********/
   using DsoMap = std::map<ProcessAddress_t, Dso>;
-  using DsoPidMap = std::unordered_map<pid_t, DsoMap>;
+  struct PidMapping {
+    DsoMap _map;
+    // save the start addr of the jit dump info if available
+    ProcessAddress_t _jitdump_addr = {};
+  };
+  using DsoPidMap = std::unordered_map<pid_t, PidMapping>;
 
   using DsoMapConstIt = DsoMap::const_iterator;
   using DsoMapIt = DsoMap::iterator;
@@ -85,10 +90,7 @@ public:
 
   // Add the element check for overlap and remove them
   DsoFindRes insert_erase_overlap(Dso &&dso);
-  DsoFindRes insert_erase_overlap(DsoMap &map, Dso &&dso);
-
-  // true if it erases anything
-  bool erase_overlap(const Dso &dso);
+  DsoFindRes insert_erase_overlap(PidMapping &pid_mapping, Dso &&dso);
 
   // Clear all dsos and regions associated with this pid
   void pid_free(int pid);
@@ -100,13 +102,14 @@ public:
   // Find the closest dso to this pid and addr
   DsoFindRes dso_find_closest(pid_t pid, ElfAddress_t addr);
 
-  static DsoFindRes dso_find_closest(const DsoMap &map, pid_t pid,
-                                     ElfAddress_t addr);
+  static DsoFindRes dso_find_closest(const DsoMap &map, ElfAddress_t addr);
 
   // parse procfs to look for dso elements
   bool pid_backpopulate(pid_t pid, int &nb_elts_added);
 
   // find or parse procfs if allowed
+  DsoFindRes dso_find_or_backpopulate(PidMapping &pid_mapping, pid_t pid,
+                                      ElfAddress_t addr);
   DsoFindRes dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr);
 
   void reset_backpopulate_state();
@@ -126,7 +129,7 @@ public:
 
   DsoFindRes find_res_not_found(int pid) {
     // not const as it can create an element if the map does not exist for pid
-    return {_map[pid].end(), false};
+    return {_pid_map[pid]._map.end(), false};
   }
 
   // Access file and retrieve absolute path and ID
@@ -144,7 +147,7 @@ public:
   int get_nb_dso() const;
 
   // Unordered map (by pid) of sorted DSOs
-  DsoPidMap _map;
+  DsoPidMap _pid_map;
   DsoStats _stats;
 
 private:
@@ -167,7 +170,7 @@ private:
   static void erase_range(DsoMap &map, const DsoRange &range);
 
   // parse procfs to look for dso elements
-  bool pid_backpopulate(DsoMap &map, pid_t pid, int &nb_elts_added);
+  bool pid_backpopulate(PidMapping &pid_mapping, pid_t pid, int &nb_elts_added);
 
   FileInfoId_t update_id_from_dso(const Dso &dso);
 
@@ -181,7 +184,9 @@ private:
 
   FileInfoVector _file_info_vector;
   // /proc files can be mounted at various places (whole host profiling)
-  std::string _path_to_proc;
+  std::string _path_to_proc; // /proc files can be mounted at various places
+                             // (whole host profiling)
+
   int _dd_profiling_fd;
   // Assumption is that we have a single version of the dd_profiling library
   // accross all PIDs.

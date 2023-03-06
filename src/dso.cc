@@ -14,23 +14,25 @@
 
 namespace ddprof {
 
-static const std::string_view s_vdso_str = "[vdso]";
-static const std::string_view s_vsyscall_str = "[vsyscall]";
-static const std::string_view s_stack_str = "[stack]";
-static const std::string_view s_heap_str = "[heap]";
+constexpr std::string_view s_vdso_str = "[vdso]";
+constexpr std::string_view s_vsyscall_str = "[vsyscall]";
+constexpr std::string_view s_stack_str = "[stack]";
+constexpr std::string_view s_heap_str = "[heap]";
 // anon and empty are the same (one comes from perf, the other from proc maps)
-static const std::string_view s_anon_str = "//anon";
-static const std::string_view s_jsa_str = ".jsa";
+constexpr std::string_view s_anon_str = "//anon";
+constexpr std::string_view s_anon_2_str = "[anon";
+constexpr std::string_view s_jsa_str = ".jsa";
+constexpr std::string_view s_mem_fd_str = "/memfd";
 // Example of these include : anon_inode:[perf_event]
-static const std::string_view s_anon_inode_str = "anon_inode";
+constexpr std::string_view s_anon_inode_str = "anon_inode";
 // dll should not be considered as elf files
-static const std::string_view s_dll_str = ".dll";
+constexpr std::string_view s_dll_str = ".dll";
 // Example socket:[123456]
-static const std::string_view s_socket_str = "socket";
+constexpr std::string_view s_socket_str = "socket";
 // null elements
-static const std::string_view s_dev_zero_str = "/dev/zero";
-static const std::string_view s_dev_null_str = "/dev/null";
-static const std::string_view s_dd_profiling_str = k_libdd_profiling_name;
+constexpr std::string_view s_dev_zero_str = "/dev/zero";
+constexpr std::string_view s_dev_null_str = "/dev/null";
+constexpr std::string_view s_dd_profiling_str = k_libdd_profiling_name;
 
 // invalid element
 Dso::Dso()
@@ -54,8 +56,10 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
     // Safeguard against other types of files we would not handle
   } else if (_filename.empty() || _filename.starts_with(s_anon_str) ||
              _filename.starts_with(s_anon_inode_str) ||
+             _filename.starts_with(s_anon_2_str) ||
              _filename.starts_with(s_dev_zero_str) ||
-             _filename.starts_with(s_dev_null_str)) {
+             _filename.starts_with(s_dev_null_str) ||
+             _filename.starts_with(s_mem_fd_str)) {
     _type = dso::kAnon;
   } else if ( // ends with .jsa
       _filename.ends_with(s_jsa_str) || _filename.ends_with(s_dll_str)) {
@@ -64,6 +68,8 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
     _type = dso::kSocket;
   } else if (_filename[0] == '[') {
     _type = dso::kUndef;
+  } else if (is_jit_dump_str(_filename, pid)) {
+    _type = dso::kJITDump;
   } else { // check if this standard dso matches our internal dd_profiling lib
     std::size_t pos = _filename.rfind('/');
     if (pos != std::string::npos &&
@@ -72,6 +78,22 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
       _type = dso::kDDProfiling;
     }
   }
+}
+
+bool Dso::is_jit_dump_str(std::string_view file_path, pid_t pid) {
+  // test if we finish by .dump before creating a string
+  if (file_path.ends_with(".dump")) {
+    // llvm uses this format
+    std::string jit_dump_str = string_format("jit-%d.dump", pid);
+    // this is to remove a gcc warning
+    if (jit_dump_str.size() >= PTRDIFF_MAX) {
+      return false;
+    }
+    if (file_path.ends_with(jit_dump_str)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 std::string Dso::to_string() const {
@@ -135,10 +157,7 @@ bool Dso::intersects(const Dso &o) const {
   return true;
 }
 
-bool Dso::is_within(pid_t pid, ElfAddress_t addr) const {
-  if (pid != _pid) {
-    return false;
-  }
+bool Dso::is_within(ElfAddress_t addr) const {
   return (addr >= _start) && (addr <= _end);
 }
 

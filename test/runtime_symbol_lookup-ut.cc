@@ -60,4 +60,119 @@ TEST(runtime_symbol_lookup, overflow) {
   }
 }
 
+TEST(runtime_symbol_lookup, jitdump_simple) {
+  LogHandle log_handle;
+  pid_t mypid = getpid();
+  SymbolTable symbol_table;
+  RuntimeSymbolLookup runtime_symbol_lookup("");
+  ProcessAddress_t pc = 0x7bea23b00390;
+  std::string jit_path =
+      std::string(UNIT_TEST_DATA) + "/" + "jit-simple-julia.dump";
+  SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
+      mypid, pc, symbol_table, jit_path);
+  ASSERT_NE(symbol_idx, -1);
+  ASSERT_EQ(std::string("julia_b_11"), symbol_table[symbol_idx]._demangle_name);
+}
+
+TEST(runtime_symbol_lookup, double_load) {
+  // ensure we don't increase number of symbols when we load several times
+  LogHandle log_handle;
+  pid_t mypid = getpid();
+  SymbolTable symbol_table;
+  RuntimeSymbolLookup runtime_symbol_lookup("");
+  ProcessAddress_t pc = 0xbadbeef;
+  std::string jit_path =
+      std::string(UNIT_TEST_DATA) + "/" + "jit-simple-julia.dump";
+  SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
+      mypid, pc, symbol_table, jit_path);
+  ASSERT_EQ(symbol_idx, -1);
+  auto current_table_size = symbol_table.size();
+  symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
+      mypid, pc, symbol_table, jit_path);
+  auto new_table_size = symbol_table.size();
+  // Check that we did not grow in number of symbols (as they are the same)
+  ASSERT_EQ(current_table_size, new_table_size);
+}
+
+TEST(runtime_symbol_lookup, jitdump_partial) {
+  // Test what happens when the file is altered
+  LogHandle log_handle;
+  pid_t mypid = getpid();
+  SymbolTable symbol_table;
+  RuntimeSymbolLookup runtime_symbol_lookup("");
+  ProcessAddress_t pc = 0xbadbeef;
+  {
+    std::string jit_path =
+        std::string(UNIT_TEST_DATA) + "/" + "jit-julia-partial.dump";
+    SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
+        mypid, pc, symbol_table, jit_path);
+    ASSERT_EQ(symbol_idx, -1);
+  }
+  {
+    std::string jit_path =
+        std::string(UNIT_TEST_DATA) + "/" + "jit-dotnet-partial.dump";
+    SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
+        mypid, pc, symbol_table, jit_path);
+    ASSERT_EQ(symbol_idx, -1);
+    ASSERT_NE(symbol_table.size(), 0);
+  }
+}
+
+TEST(runtime_symbol_lookup, jitdump_bad_file) {
+  LogHandle log_handle;
+  pid_t mypid = getpid();
+  SymbolTable symbol_table;
+  RuntimeSymbolLookup runtime_symbol_lookup("");
+  ProcessAddress_t pc = 0xbadbeef;
+  std::string jit_path = std::string(UNIT_TEST_DATA) + "/" + "bad_file.dump";
+  SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
+      mypid, pc, symbol_table, jit_path);
+  ASSERT_EQ(symbol_idx, -1);
+
+  // this should not trigger another read
+  symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
+      mypid, pc, symbol_table, jit_path);
+  ASSERT_EQ(symbol_idx, -1);
+}
+
+TEST(runtime_symbol_lookup, jitdump_vs_perfmap) {
+  LogHandle log_handle;
+  pid_t mypid = 8;
+  // check that we are loading the same symbol on both sides
+  std::string expected_sym =
+      "instance void [System.Private.CoreLib] "
+      "System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1+"
+      "AsyncStateMachineBox`1[System.__Canon,System.Net.Http."
+      "HttpConnectionPool+<CreateHttp11ConnectionAsync>d__100]::.ctor()["
+      "OptimizedTier1]";
+
+  // load jitdump on one side
+  SymbolTable symbol_table;
+  RuntimeSymbolLookup runtime_symbol_lookup("");
+  ProcessAddress_t pc = 0x7fa12f0eac90;
+  std::string jit_path =
+      std::string(UNIT_TEST_DATA) + "/" + "jit-dotnet-8.dump";
+  SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
+      mypid, pc, symbol_table, jit_path);
+  ASSERT_NE(symbol_idx, -1);
+  EXPECT_EQ(symbol_table[symbol_idx]._symname, expected_sym);
+  {
+    RuntimeSymbolLookup::Stats stats = runtime_symbol_lookup.get_stats();
+    EXPECT_EQ(stats._symbol_count, 20809);
+  }
+
+  // load perfmap on the other
+  RuntimeSymbolLookup runtime_symbol_lookup_perfmap(UNIT_TEST_DATA);
+  SymbolTable symbol_table_perfmap;
+  symbol_idx = runtime_symbol_lookup_perfmap.get_or_insert(
+      mypid, pc, symbol_table_perfmap);
+  ASSERT_NE(symbol_idx, -1);
+  EXPECT_EQ(symbol_table_perfmap[symbol_idx]._symname, expected_sym);
+  {
+    RuntimeSymbolLookup::Stats stats =
+        runtime_symbol_lookup_perfmap.get_stats();
+    EXPECT_EQ(stats._symbol_count, 11605);
+  }
+}
+
 } // namespace ddprof

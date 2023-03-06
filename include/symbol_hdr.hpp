@@ -25,7 +25,10 @@ struct SymbolHdr {
     _dwfl_symbol_lookup._stats.display(_dwfl_symbol_lookup.size());
     _dso_symbol_lookup.stats_display();
   }
-  void cycle() { _dwfl_symbol_lookup._stats.reset(); }
+  void cycle() {
+    _dwfl_symbol_lookup._stats.reset();
+    _runtime_symbol_lookup.cycle();
+  }
 
   void clear(pid_t pid) {
     _base_frame_symbol_lookup.erase(pid);
@@ -50,6 +53,4 @@ struct SymbolHdr {
 
   // The mapping table
   ddprof::MapInfoTable _mapinfo_table;
-
-  struct ddprof::DwflSymbolLookupStats _stats;
 };

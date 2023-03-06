@@ -141,9 +141,10 @@ aux_source_directory(src COMMON_SRC)
 aux_source_directory(src/pprof PPROF_SRC)
 aux_source_directory(src/exporter EXPORTER_SRC)
 aux_source_directory(src/exe EXE_SRC)
+aux_source_directory(src/jit JIT_SRC)
 
 # Define all sources
-set(DDPROF_GLOBAL_SRC ${COMMON_SRC} ${PPROF_SRC} ${EXPORTER_SRC} ${EXE_SRC})
+set(DDPROF_GLOBAL_SRC ${COMMON_SRC} ${PPROF_SRC} ${EXPORTER_SRC} ${EXE_SRC} ${JIT_SRC})
 
 set(DDPROF_LIBRARY_LIST DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 
@@ -405,7 +406,7 @@ option(BUILD_NATIVE_LIB "Build a library out of the native profiler" ON)
 if(${BUILD_NATIVE_LIB})
 
   # Define all sources
-  set(DDPROF_LIB_SRC ${COMMON_SRC} src/lib/ddprof_output.cc)
+  set(DDPROF_LIB_SRC ${COMMON_SRC} ${JIT_SRC} src/lib/ddprof_output.cc)
 
   # Libs to link
   set(NATIVE_LIB_LIBRARY_LIST dl DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES}

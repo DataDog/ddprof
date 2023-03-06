@@ -106,7 +106,8 @@ TEST(DSOTest, intersections) {
   fill_mock_hdr(dso_hdr);
   {
     Dso dso_inter(10, 900, 1700);
-    DsoRange range = dso_hdr.get_intersection(dso_hdr._map[10], dso_inter);
+    DsoRange range =
+        dso_hdr.get_intersection(dso_hdr._pid_map[10]._map, dso_inter);
     EXPECT_EQ(range.first->second._pid, 10);
     EXPECT_EQ(range.first->second._start, 1000);
     // contains the 1500 -> 1999 element, WARNING the end element is after the
@@ -116,21 +117,24 @@ TEST(DSOTest, intersections) {
   }
   {
     Dso dso_no(10, 400, 500);
-    DsoRange range = dso_hdr.get_intersection(dso_hdr._map[10], dso_no);
+    DsoRange range =
+        dso_hdr.get_intersection(dso_hdr._pid_map[10]._map, dso_no);
     DsoHdr::DsoFindRes not_found = dso_hdr.find_res_not_found(10);
     EXPECT_EQ(range.first, not_found.first);
     EXPECT_EQ(range.second, not_found.first);
   }
   {
     Dso dso_other_pid(9, 900, 1700);
-    DsoRange range = dso_hdr.get_intersection(dso_hdr._map[9], dso_other_pid);
+    DsoRange range =
+        dso_hdr.get_intersection(dso_hdr._pid_map[9]._map, dso_other_pid);
     DsoHdr::DsoFindRes not_found = dso_hdr.find_res_not_found(9);
     EXPECT_EQ(range.first, not_found.first);
     EXPECT_EQ(range.second, not_found.first);
   }
   { // single element
     Dso dso_equal_addr(10, 1200, 1400);
-    DsoRange range = dso_hdr.get_intersection(dso_hdr._map[10], dso_equal_addr);
+    DsoRange range =
+        dso_hdr.get_intersection(dso_hdr._pid_map[10]._map, dso_equal_addr);
     DsoHdr::DsoFindRes not_found = dso_hdr.find_res_not_found(10);
     ASSERT_TRUE(range.first != not_found.first);
     ASSERT_TRUE(range.second != not_found.first);
@@ -154,7 +158,7 @@ TEST(DSOTest, find_same) {
   {
     Dso dso_equal_addr(10, 1000, 1400); // larger
     DsoFindRes find_res =
-        dso_hdr.dso_find_adjust_same(dso_hdr._map[10], dso_equal_addr);
+        dso_hdr.dso_find_adjust_same(dso_hdr._pid_map[10]._map, dso_equal_addr);
     ASSERT_FALSE(find_res.second);
     EXPECT_EQ(find_res.first->second._start, 1000);
   }
@@ -179,16 +183,17 @@ TEST(DSOTest, insert_erase_overlap) {
       Dso dso_overlap(10, 1100, 1700);
       dso_hdr.insert_erase_overlap(std::move(dso_overlap));
     }
-    DsoFindRes find_res =
-        dso_hdr.dso_find_adjust_same(dso_hdr._map[10], build_dso_10_1000());
+    DsoFindRes find_res = dso_hdr.dso_find_adjust_same(
+        dso_hdr._pid_map[10]._map, build_dso_10_1000());
     EXPECT_FALSE(find_res.second);
-    find_res =
-        dso_hdr.dso_find_adjust_same(dso_hdr._map[10], build_dso_10_1500());
+    find_res = dso_hdr.dso_find_adjust_same(dso_hdr._pid_map[10]._map,
+                                            build_dso_10_1500());
     EXPECT_FALSE(find_res.second);
     EXPECT_EQ(dso_hdr.get_nb_dso(), 3);
     {
       Dso dso_overlap_2(10, 1100, 1700);
-      find_res = dso_hdr.dso_find_adjust_same(dso_hdr._map[10], dso_overlap_2);
+      find_res = dso_hdr.dso_find_adjust_same(dso_hdr._pid_map[10]._map,
+                                              dso_overlap_2);
       EXPECT_TRUE(find_res.second);
     }
   }
@@ -202,21 +207,22 @@ TEST(DSOTest, path_type) {
 }
 
 // clang-format off
-static const char *s_exec_line = "55d7883a1000-55d7883a5000 r-xp 00002000 fe:01 3287864                    /usr/local/bin/BadBoggleSolver_run";
-static const char *s_exec_line2 = "55d788391000-55d7883a1000 r-xp 00002000 fe:01 0                    /usr/local/bin/BadBoggleSolver_run_2";
-static const char *s_exec_line3 = "55d788391000-55d7883a1001 r-xp 00002000 fe:01 0                    /usr/local/bin/BadBoggleSolver_run_3";
+static const char *const s_exec_line = "55d7883a1000-55d7883a5000 r-xp 00002000 fe:01 3287864                    /usr/local/bin/BadBoggleSolver_run";
+static const char *const s_exec_line2 = "55d788391000-55d7883a1000 r-xp 00002000 fe:01 0                    /usr/local/bin/BadBoggleSolver_run_2";
+static const char *const s_exec_line3 = "55d788391000-55d7883a1001 r-xp 00002000 fe:01 0                    /usr/local/bin/BadBoggleSolver_run_3";
 // same as number 3 though smaller
-static const char *s_exec_line4 = "55d788391000-55d7883a1000 r-xp 00002000 fe:01 0                    /usr/local/bin/BadBoggleSolver_run_3";
+static const char *const s_exec_line4 = "55d788391000-55d7883a1000 r-xp 00002000 fe:01 0                    /usr/local/bin/BadBoggleSolver_run_3";
 
-static const char *s_line_noexec = "7f531437a000-7f531437b000 r--p 00000000 fe:01 3932979                    /usr/lib/x86_64-linux-gnu/ld-2.31.so";
-static const char *s_vdso_lib = "7ffcd6ce6000-7ffcd6ce8000 r-xp 00000000 00:00 0                          [vdso]";
-static const char *s_stack_line = "7ffcd6c68000-7ffcd6c89000 rw-p 00000000 00:00 0                          [stack]";
-static const char *s_inode_line = "7ffcd6c89000-7ffcd6c92000 rw-p 00000000 00:00 0                          anon_inode:[perf_event]";
+static const char *const s_line_noexec = "7f531437a000-7f531437b000 r--p 00000000 fe:01 3932979                    /usr/lib/x86_64-linux-gnu/ld-2.31.so";
+static const char *const s_vdso_lib = "7ffcd6ce6000-7ffcd6ce8000 r-xp 00000000 00:00 0                          [vdso]";
+static const char *const s_stack_line = "7ffcd6c68000-7ffcd6c89000 rw-p 00000000 00:00 0                          [stack]";
+static const char *const s_inode_line = "7ffcd6c89000-7ffcd6c92000 rw-p 00000000 00:00 0                          anon_inode:[perf_event]";
 
-static const char *s_jsa_line = "0x800000000-0x800001fff rw-p 00000000 00:00 0                          /usr/local/openjdk-11/lib/server/classes.jsa";
+static const char *const s_jsa_line = "0x800000000-0x800001fff rw-p 00000000 00:00 0                          /usr/local/openjdk-11/lib/server/classes.jsa";
 
-static const char *s_dd_profiling = "0x800000000-0x800001fff rw-p 00000000 00:00 0                          /tmp/libdd_profiling.so.1234";
-static const char *s_dotnet_line = "7fbd4f1e4000-7fbd4f1ec000 r--s 00000000 ca:01 140372                     /usr/share/dotnet/shared/Microsoft.NETCore.App/6.0.5/System.Runtime.dll";
+static const char *const s_dd_profiling = "0x800000000-0x800001fff rw-p 00000000 00:00 0                          /tmp/libdd_profiling.so.1234";
+static const char *const s_dotnet_line = "7fbd4f1e4000-7fbd4f1ec000 r--s 00000000 ca:01 140372                     /usr/share/dotnet/shared/Microsoft.NETCore.App/6.0.5/System.Runtime.dll";
+static const char *const s_jitdump_line = "7b5242e44000-7b5242e45000 r-xp 00000000 fd:06 22295230                   /home/r1viollet/.debug/jit/llvm-IR-jit-20230131-981d92/jit-3237589.dump";
 // clang-format on
 
 TEST(DSOTest, dso_from_procline) {
@@ -289,6 +295,11 @@ TEST(DSOTest, dso_from_procline) {
         DsoHdr::dso_from_procline(10, const_cast<char *>(s_dd_profiling));
     EXPECT_EQ(dd_profiling_dso._type, dso::kDDProfiling);
   }
+  {
+    Dso jitdump_dso =
+        DsoHdr::dso_from_procline(3237589, const_cast<char *>(s_jitdump_line));
+    EXPECT_EQ(jitdump_dso._type, dso::kJITDump);
+  }
 }
 
 // Retrieves instruction pointer
@@ -318,7 +329,7 @@ TEST(DSOTest, backpopulate) {
 
   EXPECT_EQ(filename_procfs, filename_disk);
   // manually erase the unit test's binary
-  dso_hdr._map[getpid()].erase(find_res.first);
+  dso_hdr._pid_map[getpid()]._map.erase(find_res.first);
   find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
   EXPECT_FALSE(find_res.second);
 }
@@ -351,22 +362,35 @@ TEST(DSOTest, mmap_into_backpop) {
   int nb_elts;
   dso_hdr.pid_backpopulate(my_pid, nb_elts);
   EXPECT_TRUE(nb_elts);
-  DsoHdr::DsoMap &map = dso_hdr._map[my_pid];
+  DsoHdr::PidMapping &pid_mapping = dso_hdr._pid_map[my_pid];
   bool found = false;
-  for (auto &el : map) {
+  for (auto &el : pid_mapping._map) {
     Dso &dso = el.second;
     // emulate an insert of big size
     if (dso._filename.find("c++") != std::string::npos && dso._pgoff == 0) {
       Dso copy(dso);
       copy._end = copy._start + 0x388FFF;
       found = true;
-      dso_hdr.insert_erase_overlap(map, std::move(copy));
+      dso_hdr.insert_erase_overlap(pid_mapping, std::move(copy));
     }
   }
   EXPECT_TRUE(found);
-
   dso_hdr.pid_backpopulate(my_pid, nb_elts);
   // TODO: To be discussed - should we erase overlaping or not
+}
+
+TEST(DSOTest, insert_jitdump) {
+  // mmap the jitdump file
+  DsoHdr dso_hdr;
+  // pid from dso line (important for the jitdump name)
+  pid_t test_pid = 3237589;
+  Dso jitdump_dso =
+      DsoHdr::dso_from_procline(test_pid, const_cast<char *>(s_jitdump_line));
+  EXPECT_EQ(jitdump_dso._type, dso::kJITDump);
+  ProcessAddress_t start = jitdump_dso._start;
+  DsoHdr::PidMapping &pid_mapping = dso_hdr._pid_map[test_pid];
+  dso_hdr.insert_erase_overlap(pid_mapping, std::move(jitdump_dso));
+  EXPECT_EQ(start, pid_mapping._jitdump_addr);
 }
 
 TEST(DSOTest, exe_name) {
