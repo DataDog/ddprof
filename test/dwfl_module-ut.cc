@@ -33,7 +33,7 @@ TEST(DwflModule, inconsistency_test) {
 
   DwflWrapper dwfl_wrapper;
   // retrieve the map associated to pid
-  DsoHdr::DsoMap &dso_map = dso_hdr._map[my_pid];
+  DsoHdr::DsoMap &dso_map = dso_hdr._pid_map[my_pid]._map;
 
   for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
     Dso &dso = it->second;

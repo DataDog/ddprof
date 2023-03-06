@@ -51,7 +51,6 @@ compile_commands.json
 *.s
 *.bc
 *.swp
-*.dump
 .env
 .env_perso.yml
 test/configs/perso.yml

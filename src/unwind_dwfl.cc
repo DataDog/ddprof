@@ -26,7 +26,7 @@ DDRes unwind_init_dwfl(UnwindState *us) {
     // we need to add at least one module to figure out the architecture (to
     // create the unwinding backend)
 
-    DsoHdr::DsoMap &map = us->dso_hdr._map[us->pid];
+    DsoHdr::DsoMap &map = us->dso_hdr._pid_map[us->pid]._map;
     if (map.empty()) {
       int nb_elts;
       us->dso_hdr.pid_backpopulate(us->pid, nb_elts);
@@ -77,9 +77,13 @@ static void trace_unwinding_end(UnwindState *us) {
   if (LL_DEBUG <= LOG_getlevel()) {
     DsoHdr::DsoFindRes find_res =
         us->dso_hdr.dso_find_closest(us->pid, us->current_ip);
+    SymbolIdx_t symIdx = us->output.locs[us->output.nb_locs - 1]._symbol_idx;
     if (find_res.second) {
-      LG_DBG("Stopped at %lx - dso %s - error %s", us->current_ip,
-             find_res.first->second.to_string().c_str(), dwfl_errmsg(-1));
+      const std::string &last_func =
+          us->symbol_hdr._symbol_table[symIdx]._symname;
+      LG_DBG("Stopped at %lx - dso %s - error %s (%s)", us->current_ip,
+             find_res.first->second.to_string().c_str(), dwfl_errmsg(-1),
+             last_func.c_str());
     } else {
       LG_DBG("Unknown DSO %lx - error %s", us->current_ip, dwfl_errmsg(-1));
     }
@@ -91,11 +95,11 @@ static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
 
 // check for runtime symbols provided in /tmp files
 static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
-                                      ElfAddress_t pc);
+                                      ElfAddress_t pc,
+                                      std::string_view jitdump_path);
 
 // returns an OK status if we should continue unwinding
 static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
-
   if (is_max_stack_depth_reached(*us)) {
     add_common_frame(us, SymbolErrors::truncated_stack);
     LG_DBG("Max stack depth reached (depth#%lu)", us->output.nb_locs);
@@ -111,13 +115,15 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     return ddres_init(); // invalid pc : do not add frame
   }
   us->current_ip = pc;
+  DsoHdr &dsoHdr = us->dso_hdr;
+  DsoHdr::PidMapping &pid_mapping = dsoHdr._pid_map[us->pid];
   if (!pc) {
     // Unwinding can end on a null address
     // Example: alpine 3.17
     return ddres_init();
   }
   DsoHdr::DsoFindRes find_res =
-      us->dso_hdr.dso_find_or_backpopulate(us->pid, pc);
+      dsoHdr.dso_find_or_backpopulate(pid_mapping, us->pid, pc);
   if (!find_res.second) {
     // no matching file was found
     LG_DBG("[UW] (PID%d) DSO not found at 0x%lx (depth#%lu)", us->pid, pc,
@@ -126,8 +132,16 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     return ddres_init();
   }
   const Dso &dso = find_res.first->second;
+  std::string_view jitdump_path = {};
   if (dso::has_runtime_symbols(dso._type)) {
-    return add_runtime_symbol_frame(us, dso, pc);
+    if (pid_mapping._jitdump_addr) {
+      DsoHdr::DsoFindRes find_mapping =
+          DsoHdr::dso_find_closest(pid_mapping._map, pid_mapping._jitdump_addr);
+      if (find_mapping.second) { // jitdump exists
+        jitdump_path = find_mapping.first->second._filename;
+      }
+    }
+    return add_runtime_symbol_frame(us, dso, pc, jitdump_path);
   }
   // if not encountered previously, update file location / key
   FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
@@ -256,13 +270,20 @@ static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
 
 // check for runtime symbols provided in /tmp files
 static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
-                                      ElfAddress_t pc) {
+                                      ElfAddress_t pc,
+                                      std::string_view jitdump_path) {
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
   SymbolTable &symbol_table = unwind_symbol_hdr._symbol_table;
   RuntimeSymbolLookup &runtime_symbol_lookup =
       unwind_symbol_hdr._runtime_symbol_lookup;
-  SymbolIdx_t symbol_idx =
-      runtime_symbol_lookup.get_or_insert(dso._pid, pc, symbol_table);
+  SymbolIdx_t symbol_idx = -1;
+  if (jitdump_path.empty()) {
+    symbol_idx =
+        runtime_symbol_lookup.get_or_insert(dso._pid, pc, symbol_table);
+  } else {
+    symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
+        dso._pid, pc, symbol_table, jitdump_path);
+  }
   if (symbol_idx == -1) {
     add_dso_frame(us, dso, pc, "pc");
     return ddres_init();

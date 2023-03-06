@@ -71,6 +71,31 @@
     }                                                                          \
   } while (0)
 
+static inline int ddres_sev_to_log_level(int sev) {
+  switch (sev) {
+  case DD_SEVERROR:
+    return LL_ERROR;
+  case DD_SEVWARN:
+    return LL_WARNING;
+  case DD_SEVNOTICE:
+    return LL_DEBUG;
+  default: // no log
+    return LL_LENGTH;
+  }
+}
+
+/// Forward result if Fatal
+#define DDRES_CHECK_FWD_STRICT(ddres)                                          \
+  do {                                                                         \
+    DDRes lddres = ddres; /* single eval */                                    \
+    if (IsDDResNotOK(lddres)) {                                                \
+      LG_IF_LVL_OK(ddres_sev_to_log_level(lddres._sev),                        \
+                   "Forward error at %s:%u - %s", __FILE__, __LINE__,          \
+                   ddres_error_message(lddres._what));                         \
+      return lddres;                                                           \
+    }                                                                          \
+  } while (0)
+
 /// Forward result if Fatal
 #define DDRES_CHECK_FWD(ddres)                                                 \
   do {                                                                         \

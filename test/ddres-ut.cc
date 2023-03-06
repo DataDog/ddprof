@@ -41,6 +41,11 @@ DDRes mock_fatal_generator() {
                          "Test the log and return function %d", 42);
 }
 
+DDRes mock_warn_generator() {
+  ++s_call_counter;
+  DDRES_RETURN_WARN_LOG(DD_WHAT_UNITTEST,
+                        "Test the warn log and return function %d", 42);
+}
 DDRes mock_fatal_default_message() {
   ++s_call_counter;
   DDRES_RETURN_ERROR_LOG(DD_WHAT_UNITTEST, DDRES_NOLOG);
@@ -48,6 +53,11 @@ DDRes mock_fatal_default_message() {
 
 DDRes dderr_wrapper() {
   DDRES_CHECK_FWD(mock_fatal_generator());
+  return ddres_init();
+}
+
+DDRes ddwarn_wrapper() {
+  DDRES_CHECK_FWD_STRICT(mock_warn_generator());
   return ddres_init();
 }
 
@@ -80,6 +90,11 @@ TEST(DDRes, FillFatal) {
       ASSERT_TRUE(ddres_equal(ddres, ddres_error(DD_WHAT_UNITTEST)));
     }
     EXPECT_EQ(s_call_counter, 3);
+    {
+      DDRes ddres = ddwarn_wrapper();
+      ASSERT_TRUE(ddres_equal(ddres, ddres_warn(DD_WHAT_UNITTEST)));
+    }
+    EXPECT_EQ(s_call_counter, 4);
   }
 }
 
