@@ -7,19 +7,10 @@
 
 #include <assert.h>
 #include <cstring>
-#include <errno.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 
-#include "ddres_helpers.hpp"
 #include "event_config.hpp"
-#include "event_parser.h"
-#include "perf_archmap.hpp"
 #include "perf_watcher.hpp"
+#include "tracepoint_config.hpp"
 
 int arg_which(const char *str, char const *const *set, int sz_set) {
   if (!str || !set)
@@ -46,99 +37,6 @@ bool arg_yesno(const char *str, int mode) {
     return true;
   }
   return false;
-}
-
-long id_from_tracepoint(const char *gname, const char *tname) {
-  char path[2048] = {0}; // somewhat arbitrarily
-  size_t sz_path = sizeof(path);
-  char buf[64] = {0};
-  char *buf_copy = buf;
-
-  // Need to figure out whether we use debugfs or tracefs
-  static int use_tracefs = -1; // -2 error, -1 init, 0 no, 1 yes
-  static char tracefs_path[] = "/sys/kernel/tracing/events";
-  static char debugfs_path[] = "/sys/kernel/debug/tracing/events";
-
-  if (!gname || !*gname || !tname || !*tname) {
-    return -1;
-  }
-
-  if (use_tracefs == -2) {
-    // We checked in a previous loop and couldn't read tracef or debugfs
-    return -1;
-  } else if (use_tracefs == -1) {
-    struct stat sb;
-    if (stat(tracefs_path, &sb)) {
-      // If we're here, the stat failed so we can't use tracefs
-      if (stat(debugfs_path, &sb)) {
-        // If we're here, debugfs failed too, return error
-        use_tracefs = -2;
-        return -1;
-      }
-      use_tracefs = 0; // Use debugfs
-    } else {
-      use_tracefs = 1; // Use tracefs
-    }
-  }
-
-  // Check validity of given tracepoint
-  char *spath = use_tracefs ? tracefs_path : debugfs_path;
-  int pathsz = snprintf(path, sz_path, "%s/%s/%s/id", spath, gname, tname);
-  if (static_cast<size_t>(pathsz) >= sz_path) {
-    // Possibly ran out of room
-    return -1;
-  }
-  int fd = open(path, O_RDONLY);
-  if (-1 == fd) {
-    return -1;
-  }
-
-  // Read the data in an eintr-safe way
-  int read_ret = -1;
-  long trace_id = -1;
-  do {
-    read_ret = read(fd, buf, sizeof(buf));
-  } while (read_ret == -1 && errno == EINTR);
-  close(fd);
-  if (read_ret > 0)
-    trace_id = strtol(buf, &buf_copy, 10);
-  if (*buf_copy && *buf_copy != '\n') {
-    return -1;
-  }
-
-  return trace_id;
-}
-
-unsigned int tracepoint_id_from_event(const char *eventname,
-                                      const char *groupname) {
-  if (!eventname || !*eventname || !groupname || !*groupname)
-    return 0;
-
-  static char path[4096]; // Arbitrary, but path sizes limits are difficult
-  static char buf[sizeof("4294967296")]; // For reading 32-bit decimal int
-  char *buf_copy = buf;
-  size_t pathsz =
-      snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/id",
-               groupname, eventname);
-  if (pathsz >= sizeof(path))
-    return 0;
-  int fd = open(path, O_RDONLY);
-  if (-1 == fd)
-    return 0;
-
-  // Read the data in an eintr-safe way
-  int read_ret = -1;
-  long trace_id = 0;
-  do {
-    read_ret = read(fd, buf, sizeof(buf));
-  } while (read_ret == -1 && errno == EINTR);
-  close(fd);
-  if (read_ret > 0)
-    trace_id = strtol(buf, &buf_copy, 10);
-  if (*buf_copy && *buf_copy != '\n')
-    return 0;
-
-  return trace_id;
 }
 
 // If this returns false, then the passed watcher should be regarded as invalid
@@ -182,8 +80,7 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   if (conf->id > 0) {
     tracepoint_id = conf->id;
   } else {
-    tracepoint_id = tracepoint_id_from_event(conf->eventname.c_str(),
-                                             conf->groupname.c_str());
+    tracepoint_id = ddprof::tracepoint_get_id(conf->eventname, conf->groupname);
   }
 
   // 0 is an error, "-1" is ignored
@@ -251,7 +148,7 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
       // tALLOCSYS2 captures all syscalls; used to troubleshoot 1
       watcher->tracepoint_group = "raw_syscalls";
       watcher->tracepoint_label = "sys_exit";
-      long id = id_from_tracepoint("raw_syscalls", "sys_exit");
+      long id = ddprof::tracepoint_get_id("raw_syscalls", "sys_exit");
       if (-1 == id) {
         // We mutated the user's event, but it is invalid.
         return false;

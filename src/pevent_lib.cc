@@ -12,6 +12,7 @@
 #include "ringbuffer_utils.hpp"
 #include "sys_utils.hpp"
 #include "syscalls.hpp"
+#include "tracepoint_config.hpp"
 #include "user_override.hpp"
 
 #include <assert.h>
@@ -84,7 +85,7 @@ static DDRes tallocsys1_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
 
   // Set the IDs
   for (auto &kprobe : kprobes) {
-    long id = id_from_tracepoint("syscalls", kprobe.first.c_str());
+    long id = ddprof::tracepoint_get_id("syscalls", kprobe.first);
     if (-1 == id) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
                              "Error opening tracefs for tALLOCSYS1 on %s",
