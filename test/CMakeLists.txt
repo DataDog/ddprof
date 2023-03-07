@@ -87,8 +87,8 @@ endfunction()
 # Definition of unit tests
 add_compile_definitions("UNIT_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 
-add_unit_test(ddprofcmdline-ut ../src/ddprof_cmdline.cc ../src/perf_watcher.cc ddprofcmdline-ut.cc
-              LIBRARIES DDProf::Parser)
+add_unit_test(ddprofcmdline-ut ../src/ddprof_cmdline.cc ../src/perf_watcher.cc
+              ../src/tracepoint_config.cc ddprofcmdline-ut.cc LIBRARIES DDProf::Parser)
 
 add_unit_test(logger-ut logger-ut.cc)
 
@@ -131,19 +131,21 @@ add_unit_test(
   ../src/ddprof_cpumask.cc
   ../src/logger_setup.cc
   ../src/perf_watcher.cc
+  ../src/tracepoint_config.cc
   ddprof_input-ut.cc
   LIBRARIES DDProf::Parser
   DEFINITIONS MYNAME="ddprof_input-ut")
 
 add_unit_test(
   perf_ringbuffer-ut ../src/perf.cc ../src/perf_watcher.cc ../src/perf_ringbuffer.cc
-  perf_ringbuffer-ut.cc
+  ../src/tracepoint_config.cc perf_ringbuffer-ut.cc
   LIBRARIES DDProf::Parser
   DEFINITIONS MYNAME="perf_ringbuffer-ut")
 
 add_unit_test(
   pevent-ut
   ../src/ddprof_cmdline.cc
+  ../src/tracepoint_config.cc
   ../src/pevent_lib.cc
   ../src/user_override.cc
   ../src/perf.cc
@@ -164,6 +166,7 @@ add_unit_test(
   ddprof_exporter-ut
   ../src/exporter/ddprof_exporter.cc
   ../src/ddprof_cmdline.cc
+  ../src/tracepoint_config.cc
   ../src/pprof/ddprof_pprof.cc
   ../src/perf_watcher.cc
   ../src/tags.cc
@@ -278,6 +281,7 @@ add_unit_test(
   ../src/signal_helper.cc
   ../src/statsd.cc
   ../src/sys_utils.cc
+  ../src/tracepoint_config.cc
   ../src/user_override.cc
   ../src/unwind.cc
   ../src/unwind_dwfl.cc
@@ -292,6 +296,7 @@ add_unit_test(
   ringbuffer-ut
   ringbuffer-ut.cc
   ../src/ddprof_cmdline.cc
+  ../src/tracepoint_config.cc
   ../src/perf.cc
   ../src/perf_ringbuffer.cc
   ../src/perf_watcher.cc
@@ -313,6 +318,8 @@ add_unit_test(ddprof_cpumask-ut ddprof_cpumask-ut.cc ../src/ddprof_cpumask.cc)
 add_unit_test(symbol_map-ut symbol_map-ut.cc ../src/symbol_map.cc)
 
 add_unit_test(build_id-ut build_id-ut.cc ../src/build_id.cc)
+
+add_unit_test(tracepoint_config-ut tracepoint_config-ut.cc ../src/tracepoint_config.cc)
 
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/savecontext.cc
               ../src/lib/saveregisters.cc)

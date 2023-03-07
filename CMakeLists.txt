@@ -212,6 +212,7 @@ set(DD_PROFILING_SOURCES
     src/ringbuffer_utils.cc
     src/signal_helper.cc
     src/sys_utils.cc
+    src/tracepoint_config.cc
     src/user_override.cc)
 
 if(BUILD_UNIVERSAL_DDPROF)
