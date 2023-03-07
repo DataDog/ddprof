@@ -65,7 +65,7 @@ RUN apt-get update \
   zlib1g-dev
 
 # Codeql : static analysis tooling
-RUN curl -L https://github.com/github/codeql-action/releases/download/codeql-bundle-20210622/codeql-bundle-linux64.tar.gz -o - | tar -xz -C /usr/local
+RUN curl -L https://github.com/github/codeql-action/releases/download/codeql-bundle-20230304/codeql-bundle-linux64.tar.gz -o - | tar -xz -C /usr/local
 
 ####################
 ## LLVM/GCC SETUP ##
