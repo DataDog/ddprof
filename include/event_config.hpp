@@ -5,39 +5,40 @@
 
 #pragma once
 
+#include <stdint.h>
 #include <string>
 
-#include <stdint.h>
-
 // Defines how a sample is aggregated when it is received
-enum class EventConfMode {
+enum class EventConfMode : uint32_t {
   kDisabled = 0,
-  kCallgraph = 1 << 0,
-  kMetric = 1 << 1,
-  kAll = kCallgraph | kMetric,
+  kCallgraph = 1 << 0,     // flamegraph of resource usage
+  kMetric = 1 << 1,        // gauge of resource usage
+  kLiveCallgraph = 1 << 2, // report callgraph of resources still in use
+  kAll = kCallgraph | kMetric | kLiveCallgraph,
 };
 
-// EventConfMode &operator|=(EventConfMode &A, const EventConfMode &B);
-// EventConfMode operator&(const EventConfMode &A, const EventConfMode &B);
-// bool operator<=(const EventConfMode A, const EventConfMode B); // inclusion
-//
-constexpr EventConfMode &operator|=(EventConfMode &A, const EventConfMode &B) {
-  A = static_cast<EventConfMode>(static_cast<unsigned>(A) |
-                                 static_cast<unsigned>(B));
-  return A;
+constexpr EventConfMode operator|(EventConfMode A, const EventConfMode B) {
+  return static_cast<EventConfMode>(static_cast<uint32_t>(A) |
+                                    static_cast<uint32_t>(B));
 }
 
-constexpr EventConfMode operator&(const EventConfMode &A,
-                                  const EventConfMode &B) {
-  // & on bitmask enums is valid only in the space spanned by the values
-  return static_cast<EventConfMode>(static_cast<uint64_t>(A) &
-                                    static_cast<uint64_t>(B) &
-                                    static_cast<uint64_t>(EventConfMode::kAll));
+constexpr EventConfMode operator|=(EventConfMode &A, const EventConfMode B) {
+  return A = A | B;
 }
 
-// Bitmask inclusion
-constexpr bool operator<=(const EventConfMode A, const EventConfMode B) {
-  return EventConfMode::kDisabled != ((EventConfMode::kAll & A) & B);
+constexpr EventConfMode operator&(const EventConfMode A,
+                                  const EventConfMode B) {
+  return static_cast<EventConfMode>(static_cast<uint32_t>(A) &
+                                    static_cast<uint32_t>(B));
+}
+
+constexpr bool Any(EventConfMode arg) {
+  return arg != EventConfMode::kDisabled;
+}
+
+constexpr bool AnyCallgraph(EventConfMode arg) {
+  return Any((arg & EventConfMode::kLiveCallgraph) |
+             (arg & EventConfMode::kCallgraph));
 }
 
 // Defines how samples are weighted

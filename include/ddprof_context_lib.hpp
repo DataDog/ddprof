@@ -14,4 +14,6 @@ typedef struct PerfWatcher PerfWatcher;
 DDRes ddprof_context_set(DDProfInput *input, DDProfContext *);
 void ddprof_context_free(DDProfContext *);
 
+void log_watcher(const PerfWatcher *w, int idx);
+
 int ddprof_context_allocation_profiling_watcher_idx(const DDProfContext *ctx);

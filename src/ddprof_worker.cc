@@ -244,7 +244,7 @@ static DDRes ddprof_unwind_sample(DDProfContext *ctx, perf_event_sample *sample,
 
   // Attempt to fully unwind if the watcher has a callgraph type
   DDRes res = {};
-  if (EventConfMode::kCallgraph <= watcher->output_mode)
+  if (AnyCallgraph(watcher->output_mode))
     res = unwindstate__unwind(us);
 
   /* This test is not 100% accurate:
@@ -792,13 +792,13 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
         bool is_allocation = watcher->type == kDDPROF_TYPE_CUSTOM &&
             watcher->config == kDDPROF_COUNT_ALLOCATIONS;
         if (sample) {
-
           // Handle special profiling types first
           if (watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS1 ||
               watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS2) {
             DDRES_CHECK_FWD(
                 ddprof_pr_sysallocation_tracking(ctx, sample, watcher_pos));
-          } else if (is_allocation && ctx->params.live_allocations) {
+          } else if (is_allocation &&
+                     watcher->output_mode == EventConfMode::kLiveCallgraph) {
             DDRES_CHECK_FWD(
                 ddprof_pr_allocation_tracking(ctx, sample, watcher_pos));
           } else {
