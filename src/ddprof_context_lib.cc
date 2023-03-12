@@ -56,6 +56,7 @@ DDRes add_preset(DDProfContext *ctx, const char *preset,
       {"default-pid", {"sCPU"}},
       {"cpu_only", {"sCPU"}},
       {"alloc_only", {"sALLOC"}},
+      {"cpu_live_heap", {"sCPU", "sALLOC mode=l"}},
   };
 
   if (preset == "default"sv && pid_or_global_mode) {
@@ -99,7 +100,7 @@ DDRes add_preset(DDProfContext *ctx, const char *preset,
   return {};
 }
 
-static void log_watcher(const PerfWatcher *w, int idx) {
+void log_watcher(const PerfWatcher *w, int idx) {
   PRINT_NFO("    ID: %s, Pos: %d, Index: %lu", w->desc.c_str(), idx, w->config);
   switch (w->value_source) {
   case EventConfValueSource::kSample:
@@ -126,11 +127,12 @@ static void log_watcher(const PerfWatcher *w, int idx) {
     PRINT_NFO("    Cadence: Freq, Freq: %lu", w->sample_frequency);
   else
     PRINT_NFO("    Cadence: Period, Period: %lu", w->sample_period);
-
-  if (EventConfMode::kCallgraph <= w->output_mode)
+  if (Any(EventConfMode::kCallgraph & w->output_mode))
     PRINT_NFO("    Outputting to callgraph (flamegraph)");
-  if (EventConfMode::kMetric <= w->output_mode)
+  if (Any(EventConfMode::kMetric & w->output_mode))
     PRINT_NFO("    Outputting to metric");
+  if (Any(EventConfMode::kLiveCallgraph & w->output_mode))
+    PRINT_NFO("    Outputting to live callgraph");
 }
 
 /****************************  Argument Processor  ***************************/
@@ -381,8 +383,6 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   }
 
   ctx->params.show_samples = input->show_samples != nullptr;
-  ctx->params.live_allocations =
-      arg_yesno(input->live_allocations, 1); // default no
 
   if (input->switch_user) {
     ctx->params.switch_user = strdup(input->switch_user);

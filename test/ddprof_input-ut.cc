@@ -13,6 +13,7 @@
 #include "perf_watcher.hpp"
 #include "span.hpp"
 #include "string_view.hpp"
+#include "ddprof_cmdline.hpp"
 
 #include <gtest/gtest.h>
 #include <string_view>
@@ -29,6 +30,16 @@ protected:
 bool s_version_called = false;
 void print_version() { s_version_called = true; }
 string_view str_version() { return STRING_VIEW_LITERAL("1.2.3"); }
+
+TEST_F(InputTest, watcher_from_str) {
+  LogHandle handle;
+  const char* str_event = "sALLOC mode=l";
+  PerfWatcher watcher;
+  bool ret = watcher_from_str(str_event, &watcher);
+  ASSERT_TRUE(ret);
+  log_watcher(&watcher, 0);
+}
+
 
 TEST_F(InputTest, default_values) {
   DDProfInput input;
@@ -229,6 +240,7 @@ TEST_F(InputTest, duplicate_events) {
 }
 
 TEST_F(InputTest, presets) {
+  LogHandle handle;
   {
     // Default preset should be CPU + ALLOC
     DDProfInput input;
@@ -262,6 +274,7 @@ TEST_F(InputTest, presets) {
     ddprof_input_free(&input);
     ddprof_context_free(&ctx);
   }
+
   {
     // Default preset for PID mode should be CPU
     DDProfInput input;
@@ -325,6 +338,55 @@ TEST_F(InputTest, presets) {
     EXPECT_EQ(ctx.num_watchers, 2);
     EXPECT_EQ(ctx.watchers[1].ddprof_event_type, DDPROF_PWE_sALLOC);
     EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sDUM);
+
+    ddprof_input_free(&input);
+    ddprof_context_free(&ctx);
+  }
+  {
+    // Check manual setting of live allocation
+    DDProfInput input;
+    bool contine_exec = true;
+    const char *input_values[] = {MYNAME, "-e", "sALLOC mode=l", "my_program"};
+    DDRes res = ddprof_input_parse(
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
+
+    EXPECT_TRUE(IsDDResOK(res));
+    EXPECT_TRUE(contine_exec);
+
+    DDProfContext ctx;
+    res = ddprof_context_set(&input, &ctx);
+    EXPECT_TRUE(IsDDResOK(res));
+
+    EXPECT_EQ(ctx.num_watchers, 2);
+    EXPECT_EQ(ctx.watchers[1].ddprof_event_type, DDPROF_PWE_sALLOC);
+    EXPECT_EQ(ctx.watchers[1].output_mode, EventConfMode::kLiveCallgraph);
+    log_watcher(&ctx.watchers[0], 0);
+    log_watcher(&ctx.watchers[1], 1);
+
+    ddprof_input_free(&input);
+    ddprof_context_free(&ctx);
+  }
+  {
+    // Check cpu_live_heap preset
+    DDProfInput input;
+    bool contine_exec = true;
+    const char *input_values[] = {MYNAME, "--preset", "cpu_live_heap",
+                                  "my_program"};
+    DDRes res = ddprof_input_parse(
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
+
+    EXPECT_TRUE(IsDDResOK(res));
+    EXPECT_TRUE(contine_exec);
+
+    DDProfContext ctx;
+    res = ddprof_context_set(&input, &ctx);
+    EXPECT_TRUE(IsDDResOK(res));
+
+    EXPECT_EQ(ctx.num_watchers, 2);
+    EXPECT_EQ(ctx.watchers[1].ddprof_event_type, DDPROF_PWE_sALLOC);
+    EXPECT_EQ(ctx.watchers[1].output_mode, EventConfMode::kLiveCallgraph);
+    EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sCPU);
+    EXPECT_EQ(ctx.watchers[0].output_mode, EventConfMode::kCallgraph);
 
     ddprof_input_free(&input);
     ddprof_context_free(&ctx);

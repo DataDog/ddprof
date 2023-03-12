@@ -251,8 +251,7 @@ int ddprof_start_profiling_internal() {
         info.allocation_profiling_rate = -info.allocation_profiling_rate;
       }
 
-      if (info.allocation_flags &
-          (1 << ddprof::ReplyMessage::kLiveAllocation)) {
+      if (info.allocation_flags & (1 << ddprof::ReplyMessage::kLiveCallgraph)) {
         // tracking deallocations to allow a live view
         flags |= ddprof::AllocationTracker::kTrackDeallocations;
       }

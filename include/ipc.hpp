@@ -90,7 +90,7 @@ struct RingBufferInfo {
 };
 
 struct ReplyMessage {
-  enum { kLiveAllocation = 0 };
+  enum { kLiveCallgraph = 0 };
   // reply with the request flags from the request
   uint32_t request = 0;
   // profiler pid

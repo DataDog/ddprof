@@ -38,18 +38,24 @@ EventConfMode mode_from_str(const std::string &str) {
   EventConfMode mode = EventConfMode::kDisabled;
   if (str.empty())
     return mode;
-
-  const std::string m_str{"Mm"};
-  const std::string g_str{"Gg"};
   const std::string a_str{"Aa*"};
+  const std::string l_str{"Ll"};
+  const std::string g_str{"Gg"};
+  const std::string m_str{"Mm"};
 
   for (const char &c : str) {
-    if (m_str.find(c) != std::string::npos)
+    if (m_str.find(c) != std::string::npos) {
       mode |= EventConfMode::kMetric;
-    if (g_str.find(c) != std::string::npos)
+    }
+    if (g_str.find(c) != std::string::npos) {
       mode |= EventConfMode::kCallgraph;
-    if (a_str.find(c) != std::string::npos)
+    }
+    if (l_str.find(c) != std::string::npos) {
+        mode |= EventConfMode::kLiveCallgraph;
+    }
+    if (a_str.find(c) != std::string::npos) {
       mode |= EventConfMode::kAll;
+    }
   }
   return mode;
 }
@@ -89,7 +95,7 @@ void conf_print(const EventConf *tp) {
   else
     printf("  label: <generated from event/groupname>\n");
   
-  const char *modenames[] = {"ILLEGAL", "callgraph", "metric", "metric and callgraph"};
+  const char *modenames[] = {"ILLEGAL", "callgraph", "metric", "live callgraph", "metric and callgraph"};
   printf("  type: %s\n", modenames[static_cast<unsigned>(tp->mode)]);
 
 

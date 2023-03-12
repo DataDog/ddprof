@@ -144,6 +144,7 @@ enum DDProfCustomCountId {
   X(tALLOCSYS1, "System Allocations", PERF_TYPE_TRACEPOINT, kDDPROF_COUNT_SYSALLOCATIONS,          1,            DDPROF_PWT_ALLOC_SPACE, IS_OVERLOADED)           \
   X(tALLOCSYS2, "System Al. (heavy)", PERF_TYPE_TRACEPOINT, kDDPROF_COUNT_SYSALLOCATIONS,          1,            DDPROF_PWT_ALLOC_SPACE, IS_OVERLOADED)           \
   X(sALLOC,     "Allocations",        kDDPROF_TYPE_CUSTOM,  kDDPROF_COUNT_ALLOCATIONS,             524288,       DDPROF_PWT_ALLOC_SPACE, SKIP_FRAMES)
+
 // clang-format on
 
 #define X_ENUM(a, b, c, d, e, f, g) DDPROF_PWE_##a,

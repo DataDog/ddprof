@@ -147,8 +147,7 @@ const char* help_str[DD_KLEN] = {
   [DD_PROFILING_NATIVE_SHOW_SAMPLES] = STR_UNDF,
   [DD_PROFILING_NATIVE_CPU_AFFINITY] = STR_UNDF,
   [DD_PROFILING_NATIVE_SWITCH_USER] =
-  "    Run the target process under the given user.\n",
-  [DD_PROFILING_NATIVE_LIVE_ALLOC] = STR_UNDF,
+  "    Run the target process under the given user.\n"
 };
 // clang-format on
 

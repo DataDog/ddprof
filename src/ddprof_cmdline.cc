@@ -119,9 +119,11 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
 
   // The output mode isn't set as part of the configuration templates; we
   // always default to callgraph mode
-  watcher->output_mode = EventConfMode::kCallgraph;
-  if (EventConfMode::kAll <= conf->mode) {
+  if (conf->mode != EventConfMode::kDisabled) {
     watcher->output_mode = conf->mode;
+  }
+  else {
+    watcher->output_mode = EventConfMode::kCallgraph;
   }
 
   watcher->tracepoint_event = conf->eventname;
