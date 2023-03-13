@@ -3,6 +3,14 @@
 
 ## ddprof errors
 
+### Enabling debug logs
+
+You can increase the log level of the profiler with the `-l` option
+
+```bash
+./ddprof -l debug my_program
+```
+
 ### Failures to instrument
 
 ```bash
@@ -83,3 +91,52 @@ run
 
 Example of issue: 
 A symbol is missing from the libc (compared to the musl libc where the library was compiled) 
+
+## Speeding up builds on macOS
+
+### Bypassing the use of shared docker volumes on macOS
+
+Docker can be used if you are not already on a linux environment. You need an ssh configuration as some repositories are private.
+The following script create a docker container based on CI dockerfiles. It will:
+
+- Use your ssh configuration
+- Automatically pull down all dependencies (same as in CI)
+- Sync your files with the docker environment
+
+```bash
+./tools/launch_local_build.sh
+```
+
+To speed up builds, we recommend usage of docker-sync (shared filesystems are very slow).
+
+1 - create a docker-sync.yml file in the root of the repo.
+
+```yml
+version: "2"
+syncs:
+  ddprof-sync:
+    sync_strategy: "native_osx"
+    src: "./"
+    host_disk_mount_mode: "cached"
+```
+
+2 - Then create a docker volume and launch docker-sync
+
+```bash
+docker volume create ddprof-sync
+docker-sync start # launchs a watcher that syncs the files (takes a long time on first run)
+```
+
+3 - Use the docker build environment as usual (it will pick up the docker volume from the docker-sync file)
+
+```bash
+./tools/launch_local_build.sh
+```
+
+4 - You can stop and clean these volumes after usage
+
+```bash
+docker-sync stop
+docker-sync clean
+docker volume rm ddprof-sync
+```
