@@ -47,6 +47,7 @@ RUN apt-get update \
   flex \
   gcovr \
   git \
+  jq \
   lcov \
   libcap-dev \
   libjemalloc-dev \
