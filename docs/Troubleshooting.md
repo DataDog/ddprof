@@ -24,6 +24,12 @@ In order to instrument the system or target application, ddprof must call `mmap(
 - increasing the pinned memory limits
 - running fewer `ddprof` instances in parallel
 
+In container environments, you can troubleshoot these issues by adding capabilities to your container. `CAP_SYS_ADMIN` (or `CAP_PERFMON` on newer kernels).
+
+```bash
+docker run  --cap-add CAP_PERFMON my_docker_img
+```
+
 ## Reaching the agent host
 
 It is useful to verify that the target machine can connect to a Datadog agent.  Follow the Datadog troubleshooting guidelines.
