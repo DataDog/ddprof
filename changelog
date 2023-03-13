@@ -1,3 +1,8 @@
+0.10.1 to 0.11.0 (13/03/2023)
+* JITDump support
+* Fix crash when using custom stack (example: Fibers)
+* Fix tag validation
+
 0.9.3 to 0.10.1 (14/11/2022)
 * Allocation profiling - instrument forks
 * Universal binary - remove dependency on libc

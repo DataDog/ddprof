@@ -65,4 +65,4 @@ We're always happy to help contributors with their pull requests.
 
 ## Final word
 
-Many thanks to all of our contributors, and looking forward to seeing you on Github! :tada:
+Many thanks to all of our contributors, and looking forward to seeing you on Github!
