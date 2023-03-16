@@ -437,4 +437,21 @@ TEST(DSOTest, user_change) {
   }
 }
 
+TEST(DSOTest, large_backpopulate) {
+  LogHandle handle;
+  // This is a test of the same java application one minute apart
+  // This can be useful to bench the backpopulate
+  std::string path_to_proc = std::string(UNIT_TEST_DATA) + "/dso-ut/step-1";
+  DsoHdr dso_hdr(path_to_proc);
+  int elts_added;
+  dso_hdr.pid_backpopulate(2, elts_added);
+  path_to_proc = std::string(UNIT_TEST_DATA) + "/dso-ut/step-2";
+  ASSERT_EQ(dso_hdr.get_nb_dso(), 1759);
+  ASSERT_EQ(dso_hdr.get_nb_dso(), elts_added);
+  dso_hdr.reset_backpopulate_state(0);
+  dso_hdr.set_path_to_proc(path_to_proc);
+  dso_hdr.pid_backpopulate(2, elts_added);
+  // check that there is no growth
+  ASSERT_EQ(dso_hdr.get_nb_dso(), 1759);
+}
 } // namespace ddprof
