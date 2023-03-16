@@ -86,7 +86,7 @@ public:
   using DsoFindRes = std::pair<DsoMapConstIt, bool>;
 
   /******* MAIN APIS **********/
-  explicit DsoHdr(int dd_profiling_fd = -1);
+  explicit DsoHdr(std::string_view path_to_proc = "", int dd_profiling_fd = -1);
 
   // Add the element check for overlap and remove them
   DsoFindRes insert_erase_overlap(Dso &&dso);
@@ -112,7 +112,9 @@ public:
                                       ElfAddress_t addr);
   DsoFindRes dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr);
 
-  void reset_backpopulate_state();
+  void reset_backpopulate_state(
+      int reset_threshold =
+          BackpopulateState::_k_nb_requests_between_backpopulates);
   /******* HELPERS **********/
   // Find the dso if same
   static DsoFindRes dso_find_adjust_same(DsoMap &map, const Dso &dso);
@@ -142,6 +144,9 @@ public:
     return _file_info_vector[id];
   }
 
+  void set_path_to_proc(std::string_view path_to_proc) {
+    _path_to_proc = path_to_proc;
+  }
   const std::string &get_path_to_proc() const { return _path_to_proc; }
 
   int get_nb_dso() const;
