@@ -77,6 +77,18 @@ Options:
     Enables statsd metrics for ddprof. Value should point to a statsd socket.
     Example: /var/run/datadog-agent/statsd.sock
 
+  -D, --preset, (envvar: DD_PROFILING_NATIVE_PRESET)
+    Select a predefined profiling configuration.
+    Available presets:
+     - default: profile CPU and memory allocations
+       (profile only CPU when targeting a given PID)
+     - cpu_only: profile CPU
+     - alloc_only: profile memory allocations
+    If no --preset option is given, `default` preset is used.
+
+  -W, --switch_user, (envvar: DD_PROFILING_NATIVE_SWITCH_USER)
+    Run the target process under the given user.
+
   -v, --version:
     Prints the version of ddprof and exits.
 
