@@ -17,6 +17,11 @@ enum class EventConfMode : uint32_t {
   kAll = kCallgraph | kMetric | kLiveCallgraph,
 };
 
+bool operator<=(EventConfMode A, EventConfMode B) = delete;
+bool operator<(EventConfMode A, EventConfMode B) = delete;
+bool operator>(EventConfMode A, EventConfMode B) = delete;
+bool operator>=(EventConfMode A, EventConfMode B) = delete;
+
 constexpr EventConfMode operator|(EventConfMode A, const EventConfMode B) {
   return static_cast<EventConfMode>(static_cast<uint32_t>(A) |
                                     static_cast<uint32_t>(B));
@@ -140,7 +145,7 @@ enum class EventConfField {
 struct EventConf {
   EventConfMode mode;
 
-  uint64_t id;
+  int64_t id;
 
   std::string eventname;
   std::string groupname;

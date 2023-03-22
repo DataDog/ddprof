@@ -9,6 +9,7 @@
 #include <cstring>
 
 #include "event_config.hpp"
+#include "logger.hpp"
 #include "perf_watcher.hpp"
 #include "tracepoint_config.hpp"
 
@@ -40,7 +41,7 @@ bool arg_yesno(const char *str, int mode) {
 }
 
 // If this returns false, then the passed watcher should be regarded as invalid
-constexpr uint64_t kIgnoredWatcherID = -1ul;
+constexpr int64_t kIgnoredWatcherID = -1l;
 bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   EventConf *conf = EventConf_parse(str);
   if (!conf) {
@@ -71,22 +72,23 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
     return false;
   }
 
-  // The most likely thing to be invalid is the selection of the tracepoint
-  // from the trace events system.  If the conf has a nonzero number for the id
-  // we assume the user has privileged information and knows what they want.
-  // Else, we use the group/event combination to extract that id from the
-  // tracefs filesystem in the canonical way.
-  uint64_t tracepoint_id = 0;
-  if (conf->id > 0) {
-    tracepoint_id = conf->id;
-  } else {
-    tracepoint_id = ddprof::tracepoint_get_id(conf->eventname, conf->groupname);
-  }
-
-  // 0 is an error, "-1" is ignored
-  if (!tracepoint_id) {
-    return false;
-  } else if (tracepoint_id != kIgnoredWatcherID) {
+  if (conf->id != kIgnoredWatcherID) {
+    // The most likely thing to be invalid is the selection of the tracepoint
+    // from the trace events system.  If the conf has a nonzero number for the
+    // id we assume the user has privileged information and knows what they
+    // want. Else, we use the group/event combination to extract that id from
+    // the tracefs filesystem in the canonical way.
+    int64_t tracepoint_id = 0;
+    if (conf->id > 0) {
+      tracepoint_id = conf->id;
+    } else {
+      tracepoint_id =
+          ddprof::tracepoint_get_id(conf->eventname, conf->groupname);
+    }
+    // At this point we needed to find a valid tracepoint id
+    if (tracepoint_id == kIgnoredWatcherID) {
+      return false;
+    }
     watcher->config = tracepoint_id;
   }
 

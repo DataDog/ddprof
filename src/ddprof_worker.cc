@@ -295,7 +295,8 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   PerfWatcher *watcher = &ctx->watchers[watcher_pos];
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
-  if (!IsDDResFatal(res) && EventConfMode::kCallgraph <= watcher->output_mode) {
+  if (!IsDDResFatal(res) &&
+      Any(EventConfMode::kCallgraph & watcher->output_mode)) {
     struct UnwindState *us = ctx->worker_ctx.us;
 #ifndef DDPROF_NATIVE_LIB
     // Depending on the type of watcher, compute a value for sample
