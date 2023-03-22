@@ -8,6 +8,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <vector>
 
 #include "ddprof_defs.hpp"
 #include "string_view.hpp"
@@ -18,12 +19,13 @@ typedef struct FunLoc {
   MapInfoIdx_t _map_info_idx;
 } FunLoc;
 
-typedef struct UnwindOutput {
-  FunLoc locs[DD_MAX_STACK_DEPTH];
-  uint64_t nb_locs;
+struct UnwindOutput {
+  void clear() {
+    locs.clear();
+    is_incomplete = true;
+  }
+  std::vector<FunLoc> locs;
   int pid;
   int tid;
   bool is_incomplete;
-} UnwindOutput;
-
-void uw_output_clear(UnwindOutput *);
+};

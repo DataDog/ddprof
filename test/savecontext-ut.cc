@@ -35,12 +35,12 @@ void funcB() {
 
   auto &symbol_table = state.symbol_hdr._symbol_table;
 
-  for (size_t iloc = 0; iloc < state.output.nb_locs; ++iloc) {
+  for (size_t iloc = 0; iloc < state.output.locs.size(); ++iloc) {
     auto &symbol = symbol_table[state.output.locs[iloc]._symbol_idx];
     printf("%zu: %s\n", iloc, symbol._demangle_name.c_str());
   }
 
-  EXPECT_GT(state.output.nb_locs, 3);
+  EXPECT_GT(state.output.locs.size(), 3);
   auto &symbol0 = symbol_table[state.output.locs[0]._symbol_idx];
   EXPECT_TRUE(symbol0._demangle_name.starts_with("save_context("));
   auto &symbol1 = symbol_table[state.output.locs[1]._symbol_idx];
@@ -104,7 +104,7 @@ TEST(getcontext, unwind_from_sighandler) {
 
   auto &symbol_table = state.symbol_hdr._symbol_table;
 
-  for (size_t iloc = 0; iloc < state.output.nb_locs; ++iloc) {
+  for (size_t iloc = 0; iloc < state.output.locs.size(); ++iloc) {
     auto &symbol = symbol_table[state.output.locs[iloc]._symbol_idx];
     printf("%zu: %s %lx \n", iloc, symbol._demangle_name.c_str(),
            state.output.locs[iloc].ip);
@@ -113,12 +113,12 @@ TEST(getcontext, unwind_from_sighandler) {
     return symbol_table[state.output.locs[idx]._symbol_idx];
   };
 
-  EXPECT_GT(state.output.nb_locs, 5);
-  EXPECT_LT(state.output.nb_locs, 20);
+  EXPECT_GT(state.output.locs.size(), 5);
+  EXPECT_LT(state.output.locs.size(), 20);
   EXPECT_TRUE(get_symbol(0)._demangle_name.starts_with("save_context("));
   EXPECT_EQ(get_symbol(1)._demangle_name, "handler(int)");
   size_t next_idx = 3;
-  while (next_idx < state.output.nb_locs - 1 &&
+  while (next_idx < state.output.locs.size() - 1 &&
          get_symbol(next_idx)._demangle_name != "funcD()") {
     ++next_idx;
   }

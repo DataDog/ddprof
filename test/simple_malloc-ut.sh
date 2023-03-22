@@ -96,6 +96,9 @@ check "./ddprof ./test/simple_malloc ${opts}" 1
 # Test wrapper mode with forks + threads
 check "./ddprof ./test/simple_malloc ${opts} --fork 2 --threads 2" 2 4
 
+# Test wrapper mode with forks + threads
+# check "./ddprof --live_allocations yes ./test/simple_malloc ${opts} --fork 2 --threads 2 --skip-free 100" 2 4
+
 # Test slow profiler startup
 check "env DD_PROFILING_NATIVE_STARTUP_WAIT_MS=200 ./ddprof ./test/simple_malloc ${opts}" 1
 

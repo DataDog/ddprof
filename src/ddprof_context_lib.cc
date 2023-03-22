@@ -313,6 +313,8 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   }
 
   ctx->params.show_samples = input->show_samples != nullptr;
+  ctx->params.live_allocations =
+      arg_yesno(input->live_allocations, 1); // default no
 
   if (input->switch_user) {
     ctx->params.switch_user = strdup(input->switch_user);

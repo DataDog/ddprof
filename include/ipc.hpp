@@ -94,6 +94,7 @@ struct RingBufferInfo {
 };
 
 struct ReplyMessage {
+  enum { kLiveAllocation = 0 };
   // reply with the request flags from the request
   uint32_t request = 0;
   // profiler pid
@@ -102,6 +103,7 @@ struct ReplyMessage {
   // RingBufferInfo is returned if request & kRingBuffer
   // cppcheck-suppress unusedStructMember
   RingBufferInfo ring_buffer;
+  int32_t allocation_flags = 0;
 };
 
 class Client {

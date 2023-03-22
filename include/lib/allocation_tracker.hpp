@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <mutex>
 #include <random>
+#include <unordered_set>
 
 namespace ddprof {
 
@@ -38,6 +39,8 @@ public:
   AllocationTracker(const AllocationTracker &) = delete;
   AllocationTracker &operator=(const AllocationTracker &) = delete;
 
+  ~AllocationTracker() { free(); }
+
   enum AllocationTrackingFlags {
     kTrackDeallocations = 0x1,
     kDeterministicSampling = 0x2
@@ -60,6 +63,8 @@ public:
   static inline bool is_active();
 
 private:
+  using AdressSet = std::unordered_set<uintptr_t>;
+
   struct TrackerState {
     std::mutex mutex;
     std::atomic<bool> track_allocations = false;
@@ -82,16 +87,23 @@ private:
                         TrackerThreadLocalState &tl_state);
   void track_deallocation(uintptr_t addr, TrackerThreadLocalState &tl_state);
 
-  DDRes push_sample(uint64_t allocated_size, TrackerThreadLocalState &tl_state);
+  DDRes push_sample(uintptr_t addr, uint64_t allocated_size,
+                    TrackerThreadLocalState &tl_state);
 
   // Return true if consumer should be notified
   DDRes push_lost_sample(MPSCRingBufferWriter &writer, bool &notify_needed);
+
+  // Return true if consumer should be notified
+  DDRes push_dealloc_sample(uintptr_t addr, TrackerThreadLocalState &tl_state);
+
+  void free_on_consecutive_failures(bool success);
 
   TrackerState _state;
   uint64_t _sampling_interval;
   std::mt19937 _gen;
   PEvent _pevent;
   bool _deterministic_sampling;
+  AdressSet _address_set;
 
   static thread_local TrackerThreadLocalState _tl_state;
   static AllocationTracker *_instance;
@@ -128,7 +140,21 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size) {
   }
 }
 
-void AllocationTracker::track_deallocation(uintptr_t) {}
+void AllocationTracker::track_deallocation(uintptr_t addr) {
+  // same pattern as track_allocation
+  AllocationTracker *instance = _instance;
+
+  if (!instance) {
+    return;
+  }
+  TrackerThreadLocalState &tl_state = _tl_state;
+
+  if (instance->_state.track_deallocations.load(std::memory_order_relaxed)) {
+    // not cool as we are always calling this (high overhead). Can we do better
+    // ?
+    instance->track_deallocation(addr, tl_state);
+  }
+}
 
 bool AllocationTracker::is_active() {
   auto instance = _instance;

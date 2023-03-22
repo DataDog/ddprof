@@ -151,7 +151,7 @@ add_unit_test(
   DEFINITIONS MYNAME="pevent-ut")
 
 add_unit_test(
-  ddprof_pprof-ut ../src/pprof/ddprof_pprof.cc ../src/unwind_output.cc ../src/perf_watcher.cc
+  ddprof_pprof-ut ../src/pprof/ddprof_pprof.cc ../src/perf_watcher.cc
   ddprof_pprof-ut.cc
   LIBRARIES Datadog::Profiling DDProf::Parser
   DEFINITIONS MYNAME="ddprof_pprof-ut")
@@ -161,7 +161,6 @@ add_unit_test(
   ../src/exporter/ddprof_exporter.cc
   ../src/ddprof_cmdline.cc
   ../src/pprof/ddprof_pprof.cc
-  ../src/unwind_output.cc
   ../src/perf_watcher.cc
   ../src/tags.cc
   ddprof_exporter-ut.cc
@@ -240,7 +239,6 @@ add_unit_test(
   ../src/unwind_dwfl.cc
   ../src/unwind_helpers.cc
   ../src/unwind_metrics.cc
-  ../src/unwind_output.cc
   ../src/user_override.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
   DEFINITIONS MYNAME="savecontext-ut")
@@ -285,7 +283,6 @@ add_unit_test(
   ../src/unwind_dwfl.cc
   ../src/unwind_helpers.cc
   ../src/unwind_metrics.cc
-  ../src/unwind_output.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
   DEFINITIONS ${DDPROF_DEFINITION_LIST})
 
