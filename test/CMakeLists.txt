@@ -136,8 +136,9 @@ add_unit_test(
   LIBRARIES DDProf::Parser
   DEFINITIONS MYNAME="ddprof_input-ut")
 
-add_unit_test(perf_ringbuffer-ut ../src/perf.cc ../src/perf_watcher.cc ../src/perf_ringbuffer.cc ../src/tracepoint_config.cc
-              perf_ringbuffer-ut.cc DEFINITIONS MYNAME="perf_ringbuffer-ut")
+add_unit_test(
+  perf_ringbuffer-ut ../src/perf.cc ../src/perf_watcher.cc ../src/perf_ringbuffer.cc
+  ../src/tracepoint_config.cc perf_ringbuffer-ut.cc DEFINITIONS MYNAME="perf_ringbuffer-ut")
 
 add_unit_test(
   pevent-ut
