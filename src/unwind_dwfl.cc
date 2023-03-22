@@ -77,7 +77,8 @@ static void trace_unwinding_end(UnwindState *us) {
   if (LL_DEBUG <= LOG_getlevel()) {
     DsoHdr::DsoFindRes find_res =
         us->dso_hdr.dso_find_closest(us->pid, us->current_ip);
-    SymbolIdx_t symIdx = us->output.locs[us->output.nb_locs - 1]._symbol_idx;
+    SymbolIdx_t symIdx =
+        us->output.locs[us->output.locs.size() - 1]._symbol_idx;
     if (find_res.second) {
       const std::string &last_func =
           us->symbol_hdr._symbol_table[symIdx]._symname;
@@ -222,8 +223,9 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
 #ifdef DEBUG
   // We often fallback to frame pointer unwinding (which logs an error)
   if (dwfl_error_value) {
-    LG_DBG("Error flagged at depth = %lu -- %d Error:%s ", us->output.locs.size(),
-           dwfl_error_value, dwfl_errmsg(dwfl_error_value));
+    LG_DBG("Error flagged at depth = %lu -- %d Error:%s ",
+           us->output.locs.size(), dwfl_error_value,
+           dwfl_errmsg(dwfl_error_value));
   }
 #endif
   // Before we potentially exit, record the fact that we're processing a frame
