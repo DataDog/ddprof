@@ -24,7 +24,8 @@ bool Demangler::has_hash(const std::string &str) {
   }
 
   // Check that the string contains the hash prefix in the right position
-  if (str.compare(str.size() - hash_eg.size() - hash_pre.size(), hash_pre.size(), hash_pre)) {
+  if (str.compare(str.size() - hash_eg.size() - hash_pre.size(),
+                  hash_pre.size(), hash_pre)) {
     return false;
   }
 
@@ -60,7 +61,8 @@ bool Demangler::is_probably_rust_legacy(const std::string &str) {
         return false;
       }
     } else if (*ptr == '.') {
-      return !('.' == ptr[1] && '.' == ptr[2]); // '.' and '..' are fine, '...' is not
+      return !('.' == ptr[1] &&
+               '.' == ptr[2]); // '.' and '..' are fine, '...' is not
     }
   }
   return true;
@@ -72,9 +74,9 @@ bool Demangler::is_probably_rust_legacy(const std::string &str) {
 inline static int hex_to_int(char dig) {
   if (dig >= '0' && dig <= '9')
     return dig - '0';
-  else if (dig >='a' && dig <= 'f')
+  else if (dig >= 'a' && dig <= 'f')
     return dig - 'a' + 10;
-  else if (dig >='A' && dig <= 'F')
+  else if (dig >= 'A' && dig <= 'F')
     return dig - 'A' + 10;
   else
     return -1;
@@ -82,16 +84,9 @@ inline static int hex_to_int(char dig) {
 
 // Demangles a Rust string by building a copy piece-by-piece
 std::string Demangler::rust_demangle(const std::string &str) {
-  static const std::unordered_map<std::string, std::string> patterns {
-    {"..", "::"},
-    {"$C$", ","},
-    {"$BP$", "*"},
-    {"$GT$", ">"},
-    {"$LT$", "<"},
-    {"$LP$", "("},
-    {"$RP$", ")"},
-    {"$RF$", "&"},
-    {"$SP$", "@"},
+  static const std::unordered_map<std::string, std::string> patterns{
+      {"..", "::"},  {"$C$", ","},  {"$BP$", "*"}, {"$GT$", ">"}, {"$LT$", "<"},
+      {"$LP$", "("}, {"$RP$", ")"}, {"$RF$", "&"}, {"$SP$", "@"},
   };
 
   std::string ret;
@@ -104,7 +99,7 @@ std::string Demangler::rust_demangle(const std::string &str) {
     ++i;
 
   for (; i < str.size() - hash_pre.size() - hash_eg.size(); ++i) {
-    
+
     // Fast sieve for pattern-matching, since we know first chars
     if (str[i] == '.' || str[i] == '$') {
       bool replaced = false;
