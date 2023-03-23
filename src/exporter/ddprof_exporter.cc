@@ -113,7 +113,7 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
     exporter->_agent = true;
     LG_NTC("[EXPORTER] Targeting agent mode (no API key)");
   }
-  
+
   if (exporter->_agent) {
     const char *port_str = exporter_input->port;
 
@@ -123,20 +123,24 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
         port_str = nullptr;
       }
       // already port -> no port
-      if (contains_port(exporter_input->url)) {
+      else if (contains_port(exporter_input->url)) {
         port_str = nullptr;
       }
+      // check if schema is already available
       if (strstr(exporter_input->url, "://") != NULL) {
         exporter->_url = alloc_url_agent("", exporter_input->url, port_str);
       } else {
+        // not available, assume http
         exporter->_url =
             alloc_url_agent("http://", exporter_input->url, port_str);
       }
     } else {
+      // no url, use default host and port settings
       exporter->_url = alloc_url_agent("http://", exporter_input->host,
                                        exporter_input->port);
     }
   } else {
+    // agentless mode
     if (exporter->_input.url) {
       // warning : should not contain intake.profile. (prepended in
       // libdatadog_profiling)
