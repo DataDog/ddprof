@@ -5,7 +5,6 @@
 
 #include "demangler/demangler.hpp"
 
-#include <cctype> // isspace, isxdigit, islower
 #include <array>
 #include <utility>
 #include <string>
@@ -16,6 +15,10 @@
 // prefix followed by a 16-hexdigit hash, which must be removed
 constexpr std::string_view hash_pre = "::h";
 constexpr std::string_view hash_eg = "0123456789abcdef";
+
+static inline bool is_hexdig(const char c) {
+  return (c >= 'a' && c <= 'f') || (c >= '0' && c <= '9');
+}
 
 // Minimal check that a string can end, and does end, in a hashlike substring
 // Some tools check for entropy, we do not.
@@ -33,11 +36,9 @@ static inline bool has_hash(const std::string_view &str) {
 
   // Check that the string ends in lowercase hex digits
   for (size_t i = str.size() - hash_eg.size(); i < str.size(); ++i) {
-    if (!isxdigit(str[i]) || (!islower(str[i]) && !isdigit(str[i]))) {
+    if (!is_hexdig(str[i]))
       return false;
-    }
   }
-
   return true;
 }
 
