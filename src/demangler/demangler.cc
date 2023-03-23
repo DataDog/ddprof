@@ -17,7 +17,7 @@ constexpr std::string_view hash_eg = "0123456789abcdef";
 
 // Minimal check that a string can end, and does end, in a hashlike substring
 // Some tools check for entropy, we do not.
-bool Demangler::has_hash(const std::string &str) {
+static inline bool has_hash(const std::string &str) {
   // If the size can't conform, then the string is invalid
   if (str.size() <= hash_pre.size() + hash_eg.size()) {
     return false;
@@ -43,9 +43,9 @@ bool Demangler::has_hash(const std::string &str) {
 // supporting the use of '$' on some platforms as an informative token), this
 // implementation makes a minimal check indicating that a string is likely to
 // be a mangled Rust name.
-bool Demangler::is_probably_rust_legacy(const std::string &str) {
+static bool is_probably_rust_legacy(const std::string &str) {
   // Is the string too short to have a hash part in thefirst place?
-  if (!Demangler::has_hash(str))
+  if (!has_hash(str))
     return false;
 
   // Throw out `$$` and `$????$`, but not in-between
@@ -83,7 +83,7 @@ inline static int hex_to_int(char dig) {
 }
 
 // Demangles a Rust string by building a copy piece-by-piece
-std::string Demangler::rust_demangle(const std::string &str) {
+static std::string rust_demangle(const std::string &str) {
   static const std::unordered_map<std::string, std::string> patterns{
       {"..", "::"},  {"$C$", ","},  {"$BP$", "*"}, {"$GT$", ">"}, {"$LT$", "<"},
       {"$LP$", "("}, {"$RP$", ")"}, {"$RF$", "&"}, {"$SP$", "@"},
@@ -149,7 +149,7 @@ std::string Demangler::rust_demangle(const std::string &str) {
 // If it quacks like Rust, treat it like Rust
 std::string Demangler::demangle(const std::string &mangled) {
   auto demangled = llvm::demangle(mangled);
-  if (Demangler::is_probably_rust_legacy(demangled))
-    return Demangler::rust_demangle(demangled);
+  if (is_probably_rust_legacy(demangled))
+    return rust_demangle(demangled);
   return demangled;
 }
