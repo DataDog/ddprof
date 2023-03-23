@@ -152,9 +152,6 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     ctx->watchers[nwatchers] = input->watchers[nwatchers];
   }
   ctx->num_watchers = nwatchers;
-
-  DDRES_CHECK_FWD(exporter_input_copy(&input->exp_input, &ctx->exp_input));
-
   // Set defaults
   ctx->params.upload_period = 60.0;
 
@@ -242,63 +239,6 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     }
   }
 
-  // URL-based host/port override
-  if (input->url && *input->url) {
-    LG_NTC("Processing URL: %s", input->url);
-    char *delim = strchr(input->url, ':');
-    char *host = input->url;
-    char *port = NULL;
-    if (delim && delim[1] == '/' && delim[2] == '/') {
-      // A colon was found.
-      // http://hostname:port -> (hostname, port)
-      // ftp://hostname:port -> error
-      // hostname:port -> (hostname, port)
-      // hostname: -> (hostname, default_port)
-      // hostname -> (hostname, default_port)
-
-      // Drop the schema
-      *delim = '\0';
-      if (!strncasecmp(input->url, "http", 4) ||
-          !strncasecmp(input->url, "https", 5)) {
-        *delim = ':';
-        host = delim + 3; // Navigate after schema
-      }
-      delim = strchr(host, ':');
-    }
-
-    if (delim) {
-      // Check to see if there is another colon for the port
-      // We're going to treat this as the port.  This is slightly problematic,
-      // since an invalid port is going to invalidate the default and then throw
-      // an error later, but for now let's just do what the user told us even if
-      // it isn't what they wanted.  :)
-      *delim = '\0';
-      port = delim + 1;
-    }
-
-    // Modify the input structure to reflect the values from the URL.  This
-    // overwrites an otherwise immutable parameter, which is slightly
-    // unfortunate, but this way it harmonizes with the downstream movement of
-    // host/port and the input arg pretty-printer.
-    if (host) {
-      free((char *)input->exp_input.host);
-      free((char *)ctx->exp_input.host);
-      input->exp_input.host = strdup(host); // For the pretty-printer
-      ctx->exp_input.host = strdup(host);
-    }
-    if (port) {
-      free((char *)input->exp_input.port);
-      free((char *)ctx->exp_input.port);
-      input->exp_input.port = strdup(port); // Merely for the pretty-printer
-      ctx->exp_input.port = strdup(port);
-    }
-
-    // Revert the delimiter in case we want to print the URL later
-    if (delim) {
-      *delim = ':';
-    }
-  }
-
   ctx->params.sockfd = -1;
   ctx->params.wait_on_socket = false;
   if (input->socket && strlen(input->socket) > 0) {
@@ -331,6 +271,8 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
                              "Invalid CPU affinity mask");
     }
   }
+
+  DDRES_CHECK_FWD(exporter_input_copy(&input->exp_input, &ctx->exp_input));
 
   ddprof::span watchers{ctx->watchers, static_cast<size_t>(ctx->num_watchers)};
   if (std::find_if(watchers.begin(), watchers.end(), [](const auto &watcher) {

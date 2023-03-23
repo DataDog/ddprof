@@ -18,7 +18,7 @@ typedef struct ExporterInput {
   const char *api_key;     // Datadog api key
   const char *environment; // ex: staging / local / prod
   const char *host;        // agent host ex:162.184.2.1
-  const char *site;        // not used for now
+  const char *url;         // url (can contain port and schema)
   const char *port; // port appended to the host IP (ignored in agentless)
   const char
       *service; // service to identify the profiles (ex:prof-probe-native)
@@ -60,7 +60,7 @@ static inline DDRes exporter_input_copy(const ExporterInput *src,
   DUP_PARAM(api_key);
   DUP_PARAM(environment);
   DUP_PARAM(host);
-  DUP_PARAM(site);
+  DUP_PARAM(url);
   DUP_PARAM(port);
   DUP_PARAM(service);
   DUP_PARAM(service_version);
@@ -78,7 +78,7 @@ static inline void exporter_input_free(ExporterInput *exporter_input) {
   free((char *)exporter_input->api_key);
   free((char *)exporter_input->environment);
   free((char *)exporter_input->host);
-  free((char *)exporter_input->site);
+  free((char *)exporter_input->url);
   free((char *)exporter_input->port);
   free((char *)exporter_input->service);
   free((char *)exporter_input->service_version);

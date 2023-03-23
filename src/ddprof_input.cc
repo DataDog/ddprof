@@ -75,7 +75,6 @@ const char* help_str[DD_KLEN] = {
 "    The name of the environment to use in the Datadog UI.\n",
   [DD_AGENT_HOST] =
 "    The hostname of the agent. Port should also be specified.\n",
-  [DD_SITE] = STR_UNDF,
   [DD_TRACE_AGENT_PORT] =
 "    The communication port for the Datadog agent or backend system.\n",
   [DD_TRACE_AGENT_URL] =
