@@ -15,7 +15,7 @@
 
 namespace ddprof {
 
-// Maximum number of file descriptors that can be tansferred with
+// Maximum number of file descriptors that can be transferred with
 // sendmsg/recvmsg. Taken from default value for SCM_MAX_FD, which is a kernel
 // configuration. 253 is a common safe lower bound for that value.
 static constexpr size_t kMaxFD = 253;
@@ -26,14 +26,16 @@ using socket_t = int;
 
 class UnixSocket {
 public:
-  static inline constexpr socket_t kInvalidSocket = -1;
-  UnixSocket() noexcept : _handle(kInvalidSocket) {}
+  UnixSocket() noexcept = default;
+
   explicit UnixSocket(socket_t handle) noexcept : _handle(handle) {}
+
   UnixSocket(UnixSocket &&socket) noexcept : _handle(socket._handle) {
     socket._handle = kInvalidSocket;
   }
 
   UnixSocket(const UnixSocket &) = delete;
+
   ~UnixSocket();
 
   UnixSocket &operator=(const UnixSocket &) = delete;
@@ -72,7 +74,9 @@ public:
   }
 
 private:
-  socket_t _handle;
+  static constexpr socket_t kInvalidSocket = -1;
+
+  socket_t _handle = kInvalidSocket;
 };
 
 struct RequestMessage {
