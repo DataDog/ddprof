@@ -5,12 +5,11 @@
 
 #pragma once
 
-#include <string>
 #include <string_view>
 
 namespace Demangler {
 
 // Functions
-std::string demangle(const std::string &mangled);
+std::string demangle(const std::string_view &mangled);
 
 } // namespace Demangler

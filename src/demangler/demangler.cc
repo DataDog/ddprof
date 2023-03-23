@@ -5,8 +5,10 @@
 
 #include "demangler/demangler.hpp"
 
-#include <string.h> // isspace, isxdigit, islower
-#include <unordered_map>
+#include <cctype> // isspace, isxdigit, islower
+#include <array>
+#include <utility>
+#include <string>
 
 #include <llvm/Demangle/Demangle.h>
 
@@ -17,7 +19,7 @@ constexpr std::string_view hash_eg = "0123456789abcdef";
 
 // Minimal check that a string can end, and does end, in a hashlike substring
 // Some tools check for entropy, we do not.
-static inline bool has_hash(const std::string &str) {
+static inline bool has_hash(const std::string_view &str) {
   // If the size can't conform, then the string is invalid
   if (str.size() <= hash_pre.size() + hash_eg.size()) {
     return false;
@@ -43,13 +45,13 @@ static inline bool has_hash(const std::string &str) {
 // supporting the use of '$' on some platforms as an informative token), this
 // implementation makes a minimal check indicating that a string is likely to
 // be a mangled Rust name.
-static bool is_probably_rust_legacy(const std::string &str) {
+static bool is_probably_rust_legacy(const std::string_view &str) {
   // Is the string too short to have a hash part in thefirst place?
   if (!has_hash(str))
     return false;
 
   // Throw out `$$` and `$????$`, but not in-between
-  const char *ptr = str.c_str();
+  const char *ptr = str.data();
   const char *end = ptr + str.size() - hash_pre.size() - hash_eg.size();
   for (; ptr <= end; ++ptr) {
     if (*ptr == '$') {
@@ -83,14 +85,14 @@ inline static int hex_to_int(char dig) {
 }
 
 // Demangles a Rust string by building a copy piece-by-piece
-static std::string rust_demangle(const std::string &str) {
-  static const std::unordered_map<std::string, std::string> patterns{
+static std::string rust_demangle(const std::string_view &str) {
+  constexpr auto patterns =  std::to_array<std::pair<std::string_view, std::string_view>>({
       {"..", "::"},  {"$C$", ","},  {"$BP$", "*"}, {"$GT$", ">"}, {"$LT$", "<"},
       {"$LP$", "("}, {"$RP$", ")"}, {"$RF$", "&"}, {"$SP$", "@"},
-  };
+  });
 
   std::string ret;
-  ret.reserve(str.size());
+  ret.reserve(str.size() - hash_eg.size() - hash_pre.size());
 
   size_t i = 0;
 
@@ -106,8 +108,8 @@ static std::string rust_demangle(const std::string &str) {
 
       // Try to replace one of the patterns
       for (const auto &pair : patterns) {
-        const std::string &pattern = pair.first;
-        const std::string &replacement = pair.second;
+        const std::string_view &pattern = pair.first;
+        const std::string_view &replacement = pair.second;
         if (!str.compare(i, pattern.size(), pattern)) {
           ret += replacement;
           i += pattern.size() - 1; // -1 because iterator inc
@@ -142,13 +144,12 @@ static std::string rust_demangle(const std::string &str) {
     }
   }
 
-  ret.shrink_to_fit();
   return ret;
 }
 
 // If it quacks like Rust, treat it like Rust
-std::string Demangler::demangle(const std::string &mangled) {
-  auto demangled = llvm::demangle(mangled);
+std::string Demangler::demangle(const std::string_view &mangled) {
+  auto demangled = llvm::demangle({mangled.begin(), mangled.end()});
   if (is_probably_rust_legacy(demangled))
     return rust_demangle(demangled);
   return demangled;
