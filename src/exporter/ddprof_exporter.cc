@@ -113,7 +113,7 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
     exporter->_agent = true;
     LG_NTC("[EXPORTER] Targeting agent mode (no API key)");
   }
-
+  
   if (exporter->_agent) {
     const char *port_str = exporter_input->port;
 

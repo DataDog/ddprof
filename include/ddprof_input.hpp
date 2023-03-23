@@ -34,7 +34,6 @@ typedef struct DDProfInput {
   char *worker_period;
   char *internal_stats;
   char *tags;
-  char *url;
   char *socket;
   char *preset;
   char *switch_user;
@@ -77,7 +76,7 @@ typedef struct DDProfInput {
   XX(DD_ENV,                            environment,        E, 'E', 1, input, NULL, "",           exp_input.)  \
   XX(DD_AGENT_HOST,                     host,               H, 'H', 1, input, NULL, "localhost",  exp_input.)  \
   XX(DD_TRACE_AGENT_PORT,               port,               P, 'P', 1, input, NULL, "8126",       exp_input.)  \
-  XX(DD_TRACE_AGENT_URL,                url,                U, 'U', 1, input, NULL, "", )                      \
+  XX(DD_TRACE_AGENT_URL,                url,                U, 'U', 1, input, NULL, "",           exp_input.)  \
   XX(DD_SERVICE,                        service,            S, 'S', 1, input, NULL, "myservice",  exp_input.)  \
   XX(DD_VERSION,                        service_version,    V, 'V', 1, input, NULL, "",           exp_input.)  \
   XX(DD_PROFILING_EXPORT,               do_export,          X, 'X', 1, input, NULL, "yes",        exp_input.)  \

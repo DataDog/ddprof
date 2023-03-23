@@ -152,9 +152,6 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     ctx->watchers[nwatchers] = input->watchers[nwatchers];
   }
   ctx->num_watchers = nwatchers;
-
-  DDRES_CHECK_FWD(exporter_input_copy(&input->exp_input, &ctx->exp_input));
-
   // Set defaults
   ctx->params.upload_period = 60.0;
 
@@ -274,6 +271,8 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
                              "Invalid CPU affinity mask");
     }
   }
+
+  DDRES_CHECK_FWD(exporter_input_copy(&input->exp_input, &ctx->exp_input));
 
   ddprof::span watchers{ctx->watchers, static_cast<size_t>(ctx->num_watchers)};
   if (std::find_if(watchers.begin(), watchers.end(), [](const auto &watcher) {
