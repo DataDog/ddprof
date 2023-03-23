@@ -4,6 +4,9 @@
 // Datadog, Inc.
 #pragma once
 
+#include <algorithm>
+#include <cstddef>
+
 #include "span.hpp"
 
 namespace ddprof {
