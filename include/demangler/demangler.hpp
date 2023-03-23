@@ -11,9 +11,6 @@
 namespace Demangler {
 
 // Functions
-bool has_hash(const std::string &str);
-bool is_probably_rust_legacy(const std::string &str);
-std::string rust_demangle(const std::string &str);
 std::string demangle(const std::string &mangled);
 
 } // namespace Demangler
