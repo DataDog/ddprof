@@ -79,7 +79,7 @@ void fill_mock_exporter_input(ExporterInput &exporter_input,
   exporter_input.agentless = "yes";
   exporter_input.environment = "unit-test";
   exporter_input.host = url.first.c_str();
-  exporter_input.site = "datadog_is_cool.com";
+  exporter_input.url = "datadog_is_cool.com";
   exporter_input.port = url.second.c_str();
   exporter_input.service = MYNAME;
   exporter_input.service_version = "42";
@@ -104,19 +104,27 @@ TEST(DDProfExporter, url) {
   EXPECT_EQ(strcmp(exporter._url, "datadog_is_cool.com"), 0);
   ddprof_exporter_free(&exporter);
 
-  // Default to host if site not found
   // To be discussed : should we fail here ?
-  exporter_input.site = nullptr;
+  exporter_input.url = nullptr;
   res = ddprof_exporter_init(&exporter_input, &exporter);
   EXPECT_TRUE(IsDDResOK(res));
-  EXPECT_EQ(strcmp(exporter._url, "25.04.1988.0"), 0);
+  EXPECT_EQ(strcmp(exporter._url, "http://25.04.1988.0:1234"), 0);
   ddprof_exporter_free(&exporter);
 
   // If no API key --> expect host
   fill_mock_exporter_input(exporter_input, url, false);
+  exporter_input.url = nullptr;
   res = ddprof_exporter_init(&exporter_input, &exporter);
   EXPECT_TRUE(IsDDResOK(res));
   EXPECT_EQ(strcmp(exporter._url, "http://25.04.1988.0:1234"), 0);
+  ddprof_exporter_free(&exporter);
+
+  // UDS --> expect UDS
+  fill_mock_exporter_input(exporter_input, url, false);
+  exporter_input.url = "unix://some/uds/socket.sock";
+  res = ddprof_exporter_init(&exporter_input, &exporter);
+  EXPECT_TRUE(IsDDResOK(res));
+  EXPECT_EQ(strcmp(exporter._url, "unix://some/uds/socket.sock"), 0);
   ddprof_exporter_free(&exporter);
 }
 

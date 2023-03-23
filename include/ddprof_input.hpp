@@ -76,7 +76,6 @@ typedef struct DDProfInput {
   XX(DD_API_KEY,                        api_key,            A, 'A', 1, input, NULL, "",           exp_input.)  \
   XX(DD_ENV,                            environment,        E, 'E', 1, input, NULL, "",           exp_input.)  \
   XX(DD_AGENT_HOST,                     host,               H, 'H', 1, input, NULL, "localhost",  exp_input.)  \
-  XX(DD_SITE,                           site,               I, 'I', 1, input, NULL, "",           exp_input.)  \
   XX(DD_TRACE_AGENT_PORT,               port,               P, 'P', 1, input, NULL, "8126",       exp_input.)  \
   XX(DD_TRACE_AGENT_URL,                url,                U, 'U', 1, input, NULL, "", )                      \
   XX(DD_SERVICE,                        service,            S, 'S', 1, input, NULL, "myservice",  exp_input.)  \
