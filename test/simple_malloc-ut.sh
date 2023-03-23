@@ -97,7 +97,7 @@ check "./ddprof ./test/simple_malloc ${opts}" 1
 check "./ddprof ./test/simple_malloc ${opts} --fork 2 --threads 2" 2 4
 
 # Test leak mode with forks + threads
-# check "./ddprof --preset cpu_live_heap ./test/simple_malloc ${opts} --fork 2 --threads 2 --skip-free 100" 2 4
+check "./ddprof --preset cpu_live_heap ./test/simple_malloc ${opts} --fork 2 --threads 2 --skip-free 100" 2 4
 
 # Test slow profiler startup
 check "env DD_PROFILING_NATIVE_STARTUP_WAIT_MS=200 ./ddprof ./test/simple_malloc ${opts}" 1
