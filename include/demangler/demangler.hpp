@@ -10,6 +10,6 @@
 namespace Demangler {
 
 // Functions
-std::string demangle(const std::string_view &mangled);
+std::string demangle(const std::string &mangled);
 
 } // namespace Demangler

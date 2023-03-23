@@ -148,8 +148,8 @@ static std::string rust_demangle(const std::string_view &str) {
 }
 
 // If it quacks like Rust, treat it like Rust
-std::string Demangler::demangle(const std::string_view &mangled) {
-  auto demangled = llvm::demangle({mangled.begin(), mangled.end()});
+std::string Demangler::demangle(const std::string &mangled) {
+  auto demangled = llvm::demangle(mangled);
   if (is_probably_rust_legacy(demangled))
     return rust_demangle(demangled);
   return demangled;
