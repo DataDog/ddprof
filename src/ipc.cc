@@ -100,7 +100,6 @@ size_t UnixSocket::send_partial(ConstBuffer buffer,
   error_wrapper(ret, ec);
 
   return ec ? 0 : ret;
-  ;
 }
 
 void UnixSocket::send(ConstBuffer buffer, ddprof::span<const int> fds,
