@@ -28,13 +28,22 @@ static const int k_size_api_key = 32;
 
 static char *alloc_url_agent(const char *protocol, const char *host,
                              const char *port) {
-  size_t expected_size = snprintf(NULL, 0, "%s%s:%s", protocol, host, port);
-  char *url = (char *)malloc(expected_size + 1);
-  if (!url) // Early exit on alloc failure
-    return NULL;
+  if (port) {
+    size_t expected_size = snprintf(NULL, 0, "%s%s:%s", protocol, host, port);
+    char *url = (char *)malloc(expected_size + 1);
+    if (!url) // Early exit on alloc failure
+      return NULL;
 
-  snprintf(url, expected_size + 1, "%s%s:%s", protocol, host, port);
-  return url;
+    snprintf(url, expected_size + 1, "%s%s:%s", protocol, host, port);
+    return url;
+  } else {
+    size_t expected_size = snprintf(NULL, 0, "%s%s", protocol, host);
+    char *url = (char *)malloc(expected_size + 1);
+    if (!url) // Early exit on alloc failure
+      return NULL;
+    snprintf(url, expected_size + 1, "%s%s", protocol, host);
+    return url;
+  }
 }
 
 static DDRes create_pprof_file(ddog_Timespec start,
@@ -73,6 +82,21 @@ static DDRes write_pprof_file(const ddog_EncodedProfile *encoded_profile,
   return {};
 }
 
+bool contains_port(const char *url) {
+  const char *port_ptr = strrchr(url, ':');
+  if (port_ptr != NULL) {
+    // Check if the characters after the ':' are digits
+    for (const char *p = port_ptr + 1; *p != '\0'; p++) {
+      if (!isdigit(*p)) {
+        return false;
+      }
+    }
+    return true;
+  } else {
+    return false;
+  }
+}
+
 DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
                            DDProfExporter *exporter) {
   memset(exporter, 0, sizeof(DDProfExporter));
@@ -91,20 +115,43 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
   }
 
   if (exporter->_agent) {
-    exporter->_url =
-        alloc_url_agent("http://", exporter_input->host, exporter_input->port);
+    const char *port_str = exporter_input->port;
+
+    if (exporter_input->url) {
+      // uds -> no port
+      if (!strncasecmp(exporter_input->url, "unix", 4)) {
+        port_str = nullptr;
+      }
+      // already port -> no port
+      else if (contains_port(exporter_input->url)) {
+        port_str = nullptr;
+      }
+      // check if schema is already available
+      if (strstr(exporter_input->url, "://") != NULL) {
+        exporter->_url = alloc_url_agent("", exporter_input->url, port_str);
+      } else {
+        // not available, assume http
+        exporter->_url =
+            alloc_url_agent("http://", exporter_input->url, port_str);
+      }
+    } else {
+      // no url, use default host and port settings
+      exporter->_url = alloc_url_agent("http://", exporter_input->host,
+                                       exporter_input->port);
+    }
   } else {
-    // site is the usual option for intake
-    if (exporter->_input.site) {
+    // agentless mode
+    if (exporter->_input.url) {
       // warning : should not contain intake.profile. (prepended in
       // libdatadog_profiling)
-      exporter->_url = strdup(exporter_input->site);
+      exporter->_url = strdup(exporter_input->url);
     } else {
       LG_WRN(
           "[EXPORTER] Agentless - Attempting to use host (%s) instead of empty "
-          "site",
+          "url",
           exporter_input->host);
-      exporter->_url = strdup(exporter_input->host);
+      exporter->_url = alloc_url_agent("http://", exporter_input->host,
+                                       exporter_input->port);
     }
   }
   if (!exporter->_url) {
