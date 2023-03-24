@@ -5,6 +5,7 @@
 
 #include "demangler/demangler.hpp"
 
+#include <fstream>
 #include <gtest/gtest.h>
 
 namespace ddprof {
@@ -13,6 +14,100 @@ struct DemangleTestContent {
   std::string test;
   std::string answer;
 };
+
+struct ReferenceTest {
+  std::string format = "auto";
+  std::string input;
+  std::string expected;
+  bool no_params = false; 
+  bool is_v3_ctor = false;
+  bool is_v3_dtor = false;
+  bool ret_postfix = false;
+
+  // pretty-printer for diagnostics
+  void print() {
+    std::cout << "{" << "\n"
+              << "format: " << format << "\n"
+              << "input: " << input << "\n"
+              << "expected: " << expected << "\n"
+              << "no_params: " << no_params << "\n"
+              << "is_v3_ctor: " << is_v3_ctor << "\n"
+              << "is_v3_dtor: " << is_v3_dtor << "\n"
+              << "ret_postfix: " << ret_postfix << "\n"
+              << "}" << std::endl;
+  }
+
+  void clear() {
+    *this = ReferenceTest{};
+  }
+};
+
+bool get_next_reftest(std::istream &in, ReferenceTest &rt) {
+  rt.clear();
+  std::string line;
+  bool completed = false;
+  while (std::getline(in, line)) {
+    if (line.empty() || line[0] == '#')
+      break;
+    if (line[0] == '-') {
+      if (line == "--no-params")
+        rt.no_params = true;
+      else if (line == "--is-v3-ctor")
+        rt.is_v3_ctor = true;
+      else if (line == "--is-v3-dtor")
+        rt.is_v3_dtor = true;
+      else if (line == "--ret-postfix")
+        rt.ret_postfix = true;
+      else if (line.find("--format=") == 0)
+        rt.format = line.c_str() + sizeof("--format=") - 1;
+      else
+        break;
+    } else {
+      if (rt.input.empty()) {
+        rt.input = line;
+      } else if (rt.expected.empty()) {
+        rt.expected = line;
+        completed = true;
+      } else {
+        break;
+      }
+    }
+  }
+  return completed;
+}
+
+std::vector<ReferenceTest> g_reference_rust_tests;
+std::vector<ReferenceTest> g_reference_cpp_tests;
+
+bool init_rust_tests() {
+  static const std::string path = "demangling_references/rust-demangler-expected";
+  std::ifstream file(path);
+  if (!file.is_open()) {
+    return false;
+  }
+  do {
+    g_reference_rust_tests.push_back({});
+  } while (get_next_reftest(file, g_reference_rust_tests.back()));
+  file.close();
+  g_reference_rust_tests.pop_back(); // last entry wasn't populated successfully
+  // TODO error if the wrong number of tests were acquired
+  return true;
+}
+
+bool init_cpp_tests() {
+  static const std::string path = "demangling_references/demangler-expected";
+  std::ifstream file(path);
+  if (!file.is_open()) {
+    return false;
+  }
+  do {
+    g_reference_cpp_tests.push_back({});
+  } while (get_next_reftest(file, g_reference_cpp_tests.back()));
+  file.close();
+  g_reference_rust_tests.pop_back(); // last entry wasn't populated successfully
+  // TODO error if the wrong number of tests were acquired
+  return true;
+}
 
 // Partly borrowed from the LLVM unit tests
 std::vector<struct DemangleTestContent> s_demangle_cases = {
