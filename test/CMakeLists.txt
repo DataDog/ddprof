@@ -102,7 +102,7 @@ add_unit_test(statsd-ut ../src/statsd.cc statsd-ut.cc)
 add_unit_test(ddprof_stats-ut ../src/ddprof_stats.cc ../src/statsd.cc ddprof_stats-ut.cc)
 
 add_unit_test(
-  demangle-ut demangle-ut.cc
+  demangle-ut demangle-ut.cc ../src/demangler/demangler.cc
   LIBRARIES llvm-demangle
   DEFINITIONS MYNAME="demangle-ut")
 
@@ -184,7 +184,7 @@ add_unit_test(tags-ut tags-ut.cc ../src/tags.cc ../src/thread_info.cc DEFINITION
 target_include_directories(tags-ut PRIVATE ${DOGFOOD_INCLUDE_DIR})
 
 add_unit_test(
-  dwfl_symbol-ut dwfl_symbol-ut.cc ../src/dwfl_symbol.cc
+  dwfl_symbol-ut dwfl_symbol-ut.cc ../src/dwfl_symbol.cc ../src/demangler/demangler.cc
   LIBRARIES llvm-demangle ${ELFUTILS_LIBRARIES}
   DEFINITIONS MYNAME="dwfl_symbol-ut")
 
@@ -195,6 +195,7 @@ add_unit_test(
   ../src/dwfl_hdr.cc
   ../src/ddprof_module_lib.cc
   ../src/dwfl_symbol.cc
+  ../src/demangler/demangler.cc
   ../src/dso.cc
   ../src/dso_hdr.cc
   ../src/ddprof_file_info.cc
@@ -224,6 +225,7 @@ add_unit_test(
   ../src/dwfl_symbol.cc
   ../src/dwfl_symbol_lookup.cc
   ../src/dwfl_thread_callbacks.cc
+  ../src/demangler/demangler.cc
   ../src/jit/jitdump.cc
   ../src/failed_assumption.cc
   ../src/lib/savecontext.cc
@@ -262,6 +264,7 @@ add_unit_test(
   ../src/dwfl_symbol.cc
   ../src/dwfl_symbol_lookup.cc
   ../src/dwfl_thread_callbacks.cc
+  ../src/demangler/demangler.cc
   ../src/jit/jitdump.cc
   ../src/failed_assumption.cc
   ../src/pevent_lib.cc
