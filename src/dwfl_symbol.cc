@@ -9,7 +9,7 @@
 #include "logger.hpp"
 
 #include <cassert>
-#include <llvm/Demangle/Demangle.h>
+#include <demangler/demangler.hpp>
 #include <string_view>
 
 namespace ddprof {
@@ -36,7 +36,7 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
 
   if (lsymname) {
     symbol._symname = std::string(lsymname);
-    symbol._demangle_name = llvm::demangle(symbol._symname);
+    symbol._demangle_name = Demangler::demangle(symbol._symname);
     symbol_success = true;
   } else {
     return false;
