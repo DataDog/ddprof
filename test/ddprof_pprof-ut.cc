@@ -36,12 +36,12 @@ TEST(DDProfPProf, init_profiles) {
 }
 
 void test_pprof(const DDProfPProf *pprofs) {
-  const ddog_Profile *profile = pprofs->_profile;
+  const ddog_prof_Profile *profile = pprofs->_profile;
 
-  struct ddog_SerializeResult serialized_result =
-      ddog_Profile_serialize(profile, nullptr, nullptr);
+  struct ddog_prof_Profile_SerializeResult serialized_result =
+      ddog_prof_Profile_serialize(profile, nullptr, nullptr);
 
-  ASSERT_EQ(serialized_result.tag, DDOG_SERIALIZE_RESULT_OK);
+  ASSERT_EQ(serialized_result.tag, DDOG_PROF_PROFILE_SERIALIZE_RESULT_OK);
 
   ddog_Timespec start = serialized_result.ok.start;
 
@@ -49,7 +49,7 @@ void test_pprof(const DDProfPProf *pprofs) {
   time_t local_time = time(NULL);
   EXPECT_TRUE(local_time - start.seconds < 2);
 
-  ddog_Vec_u8 profile_vec = serialized_result.ok.buffer;
+  ddog_Vec_U8 profile_vec = serialized_result.ok.buffer;
 
   EXPECT_TRUE(profile_vec.ptr);
 
@@ -57,7 +57,7 @@ void test_pprof(const DDProfPProf *pprofs) {
   EXPECT_TRUE(profile_vec.len > 500);
   EXPECT_TRUE(profile_vec.capacity >= profile_vec.len);
 
-  ddog_SerializeResult_drop(serialized_result);
+  ddog_prof_EncodedProfile_drop(&serialized_result.ok);
 }
 
 TEST(DDProfPProf, aggregate) {
