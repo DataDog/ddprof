@@ -276,9 +276,9 @@ DDRes ddprof_exporter_export(const ddog_Profile *profile,
 
     uint64_t json_start = start.seconds*1e9 + start.nanoseconds;
     uint64_t json_end = end.seconds*1e9 + end.nanoseconds;
-    nlohmann::json ret = exporter->noisy_neighbors->finalize(json_end);
-    ret["timeRange"]["startNs"] = json_start;
-    ret["timeRange"]["endNs"] = json_end;
+    nlohmann::json ret = exporter->systracker->finalize(json_end);
+//    ret["timeRange"]["startNs"] = json_start;
+//    ret["timeRange"]["endNs"] = json_end;
 
     // Also add a version tag
     if (exporter->_input.service_version)
@@ -298,7 +298,7 @@ DDRes ddprof_exporter_export(const ddog_Profile *profile,
     };
 
     // Now reset the noisy neighbor state
-    exporter->noisy_neighbors->clear();
+    exporter->systracker->clear();
 
     // Backend has some logic based on the following naming
     ddog_File files_[] = {{

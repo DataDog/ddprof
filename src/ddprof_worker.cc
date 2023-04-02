@@ -390,7 +390,7 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
   // Only unwind if we will need to propagate unwinding information forward
   DDRes res = {};
   UnwindOutput *uwo = NULL;
-  if (id == ddprof::Syscall::mmap || id == ddprof::Syscall::mremap) {
+  if (id == Syscall::mmap || id == Syscall::mremap) {
     auto ticks0 = ddprof::get_tsc_cycles();
     res = ddprof_unwind_sample(ctx, sample, watcher_pos);
     auto unwind_ticks = ddprof::get_tsc_cycles();
@@ -403,18 +403,18 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
     }
   }
 
-  if (id == ddprof::Syscall::mmap) {
+  if (id == Syscall::mmap) {
     sysalloc.do_mmap(*uwo, sc_ret, sc_p2, sample->pid);
-  } else if (id == ddprof::Syscall::munmap) {
+  } else if (id == Syscall::munmap) {
     sysalloc.do_munmap(sc_p1, sc_p2, sample->pid);
-  } else if (id == ddprof::Syscall::madvise) {
+  } else if (id == Syscall::madvise) {
     // Unhandled, no need to handle
-  } else if (id == ddprof::Syscall::mremap) {
+  } else if (id == Syscall::mremap) {
     sysalloc.do_mremap(*uwo, sc_ret, sc_p1, sc_p2, sc_p3, sample->pid);
-  } else if (id == ddprof::Syscall::exit ||
-             id == ddprof::Syscall::exit_group ||
-             id == ddprof::Syscall::execve ||
-             id == ddprof::Syscall::execveat) {
+  } else if (id == Syscall::exit ||
+             id == Syscall::exit_group ||
+             id == Syscall::execve ||
+             id == Syscall::execveat) {
     // Erase upon exit or exec
     sysalloc.do_exit(sample->pid);
   }
@@ -423,12 +423,21 @@ DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
 }
 
 DDRes ddprof_pr_noisy_neighbors(DDProfContext *ctx, perf_event_sample *sample, int watcher_pos) {
-  int i_export = ctx->worker_ctx.i_current_pprof;
-  NoisyNeighbors &noisy = *ctx->worker_ctx.exp[i_export]->noisy_neighbors;
-  const std::string &str = check_perf_stash(sample->id);
-  noisy.process_event(sample, str);
+//  int i_export = ctx->worker_ctx.i_current_pprof;
+//  NoisyNeighbors &noisy = *ctx->worker_ctx.exp[i_export]->noisy_neighbors;
+//  const std::string &str = check_perf_stash(sample->id);
+//  noisy.process_event(sample, str);
+//
+//  g_scheduler_stats[str] += 1;
+  return ddres_init();
+}
 
-  g_scheduler_stats[str] += 1;
+DDRes ddprof_pr_syscalls(DDProfContext *ctx, perf_event_sample *sample, int watcher_pos) {
+  int i_export = ctx->worker_ctx.i_current_pprof;
+  Systracker &tracker = *ctx->worker_ctx.exp[i_export]->systracker;
+  const std::string &str = check_perf_stash(sample->id);
+  tracker.process_event(sample, str);
+
   return ddres_init();
 }
 
@@ -471,7 +480,7 @@ DDRes ddprof_pr_openfd_tracking(DDProfContext *ctx, perf_event_sample *sample, i
   // Only unwind if we will need to propagate unwinding information forward
   DDRes res = {};
   UnwindOutput *uwo = NULL;
-  if (id == ddprof::Syscall::open || id == ddprof::Syscall::openat) {
+  if (id == Syscall::open || id == Syscall::openat) {
     auto ticks0 = ddprof::get_tsc_cycles();
     res = ddprof_unwind_sample(ctx, sample, watcher_pos);
     auto unwind_ticks = ddprof::get_tsc_cycles();
@@ -485,14 +494,14 @@ DDRes ddprof_pr_openfd_tracking(DDProfContext *ctx, perf_event_sample *sample, i
   }
 
   // hardcoded syscall numbers; these are uniform between x86/arm
-  if (id == ddprof::Syscall::open || id == ddprof::Syscall::openat) {
+  if (id == Syscall::open || id == Syscall::openat) {
     fileopen.do_open(*uwo, sc_ret, sample->pid);
-  } else if (id == ddprof::Syscall::close) {
+  } else if (id == Syscall::close) {
     fileopen.do_close(sc_p1, sample->pid);
-  } else if (id == ddprof::Syscall::exit ||
-             id == ddprof::Syscall::exit_group ||
-             id == ddprof::Syscall::execve ||
-             id == ddprof::Syscall::execveat) {
+  } else if (id == Syscall::exit ||
+             id == Syscall::exit_group ||
+             id == Syscall::execve ||
+             id == Syscall::execveat) {
     // Erase upon exit or exec
     fileopen.do_exit(sample->pid);
   }
@@ -727,10 +736,14 @@ void ddprof_pr_lost(DDProfContext *ctx, const perf_event_lost *lost,
   ctx->worker_ctx.lost_events_per_watcher[watcher_pos] += lost->lost;
 }
 
+#warning Invalid way of reasoning about comms
 void ddprof_pr_comm(DDProfContext *ctx, const perf_event_comm *comm,
                     int watcher_pos) {
   // Change in process name (assuming exec) : clear all associated dso
+  int i_export = ctx->worker_ctx.i_current_pprof;
+  Systracker &tracker = *ctx->worker_ctx.exp[i_export]->systracker;
   if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC) {
+    tracker.set_comm(comm);
     LG_DBG("<%d>(COMM)%d -> %s", watcher_pos, comm->pid, comm->comm);
     unwind_pid_free(ctx->worker_ctx.us, comm->pid);
   }
@@ -808,8 +821,12 @@ DDRes ddprof_worker_init(DDProfContext *ctx,
         ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp[1]));
 
     // HACK TODO BAD WOW
-    ctx->worker_ctx.exp[0]->noisy_neighbors.reset(new NoisyNeighbors(ctx->params.num_cpu));
-    ctx->worker_ctx.exp[1]->noisy_neighbors.reset(new NoisyNeighbors(ctx->params.num_cpu));
+//    ctx->worker_ctx.exp[0]->noisy_neighbors.reset(new NoisyNeighbors());
+//    ctx->worker_ctx.exp[1]->noisy_neighbors.reset(new NoisyNeighbors());
+
+    // ALSO BAD
+    ctx->worker_ctx.exp[0]->systracker.reset(new Systracker());
+    ctx->worker_ctx.exp[1]->systracker.reset(new Systracker());
 
     // warning : depends on unwind init
     DDRES_CHECK_FWD(
@@ -896,6 +913,9 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
           } else if (watcher->ddprof_event_type == DDPROF_PWE_tNOISYCPU) {
             DDRES_CHECK_FWD(
                 ddprof_pr_noisy_neighbors(ctx, sample, watcher_pos));
+          } else if (watcher->ddprof_event_type == DDPROF_PWE_tSYSCALLS) {
+            DDRES_CHECK_FWD(
+                ddprof_pr_syscalls(ctx, sample, watcher_pos));
           } else if (watcher->ddprof_event_type == DDPROF_PWE_tOPENFD) {
             DDRES_CHECK_FWD(ddprof_pr_openfd_tracking(ctx, sample, watcher_pos));
           } else if (is_allocation && ctx->params.live_allocations) {

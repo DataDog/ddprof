@@ -14,9 +14,13 @@
     unsigned char common_preempt_count;
     int common_pid;
   };
-  struct RawSyscall : public RawBasic {  
+  struct RawSysEnter : public RawBasic {  
     long id;
     unsigned long args[6];
+  };
+  struct RawSysExit: public RawBasic {  
+    long id;
+    unsigned long ret;
   };
   struct SchedStatWait : public RawBasic {
     char comm[16];

@@ -21,7 +21,7 @@
 #include "perf.hpp"
 #include "logger.hpp"
 
-enum class SchedState {
+enum SchedState {
   Unseen,
   Running,
   WaitInterruptible,
@@ -95,7 +95,7 @@ struct NoisyNeighborCpu {
   };
 
   void syscall_enter(perf_event_sample *sample) {
-    RawSyscall *raw = reinterpret_cast<RawSyscall *>(sample->data_raw);
+    RawSysEnter *raw = reinterpret_cast<RawSysEnter*>(sample->data_raw);
     if (last_state.pid != -1) {
       last_state.state_end = base_ns + sample->time;
       complete_states.push_back(last_state);
@@ -129,7 +129,7 @@ struct NoisyNeighborCpu {
 
     last_state.pid = raw->pid;
     last_state.comm = raw->comm;
-    last_state.prio = raw->prio;
+//    last_state.prio = raw->prio;
     last_state.state = SchedState::Running;
     last_state.syscall_number = 0;
   };

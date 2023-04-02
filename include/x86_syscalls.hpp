@@ -378,22 +378,12 @@
   X(449, futex_waitv) \
   X(450, set_mempolicy_home_node)
 
-#define X_SYSMAP(a, b) {a, #b},
-std::map<int, const std::string> syscall_map = {
-  SYSCALL_TABLE(X_SYSMAP)
-};
-
 #define X_SYSENUM(a, b) b = a,
-
-namespace ddprof{
 enum class Syscall {
   SYSCALL_TABLE(X_SYSENUM)
 };
 
-bool operator==(const long int A, const Syscall &B) {
-  return A == static_cast<long int>(B);
-}
-}
+const std::string get_syscall(int id);
+bool operator==(const long int A, const Syscall &B);
 
-#undef X_SYSMAP
 #undef X_SYSENUM

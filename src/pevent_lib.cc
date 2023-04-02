@@ -87,6 +87,10 @@ bool operator==(LinkedPerfs const &A, LinkedPerfs const &B) {
 
 std::unordered_map<long, std::string> id_stash = {};
 
+void stash_perf_id(long id, const std::string &name) {
+  id_stash[id] = name;
+}
+
 void stash_perf_id(long id, const LinkedPerfs &perf) {
   id_stash[id] = perf.tracepoint_name;
 }
@@ -113,7 +117,7 @@ struct std::hash<LinkedPerfs> {
 };
 
 static DDRes link_perfs(PerfWatcher *watcher, int watcher_idx, pid_t pid,
-                        int num_cpu, PEventHdr *pevent_hdr, const LinkedPerfConf &conf) {
+                        int num_cpu, PEventHdr *pevent_hdr, const LinkedPerfConf &conf, std::map<int, int> &cpu_pevent_idx) {
   PerfWatcher watcher_copy = *watcher;
   PEvent *pes = pevent_hdr->pes;
 
@@ -137,7 +141,6 @@ static DDRes link_perfs(PerfWatcher *watcher, int watcher_idx, pid_t pid,
   // All probes on the same CPU are collected and will be `ioctl()`'d later
   // 
 
-  std::map<int, int> cpu_pevent_idx = {};
   for (const auto &probe: conf) {
     // Setup the copy of the watcher with tracepoint stuff
     watcher_copy.tracepoint_group = probe.tracepoint_group.c_str();
@@ -183,13 +186,62 @@ static DDRes link_perfs(PerfWatcher *watcher, int watcher_idx, pid_t pid,
   return ddres_init();
 }
 
+static DDRes link_perfs(PerfWatcher *watcher, int watcher_idx, pid_t pid,
+                        int num_cpu, PEventHdr *pevent_hdr, const LinkedPerfConf &conf,
+                        const std::string &extra_event, std::map<int, int> &cpu_pevent_idx) {
+  link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf, cpu_pevent_idx);
+
+  PerfWatcher tmp_watcher = *ewatcher_from_str(extra_event.c_str());
+  tmp_watcher.sample_stack_size = watcher->sample_stack_size;
+  tmp_watcher.options.is_kernel = watcher->options.is_kernel;
+  tmp_watcher.sample_type = watcher->sample_type;
+  tmp_watcher.options.no_regs = watcher->options.no_regs;
+  PEvent *pes = pevent_hdr->pes;
+
+  // Record perf_event_open() attr struct
+  int attr_idx = pevent_hdr->nb_attrs++;
+  perf_event_attr attr = perf_config_from_watcher(&tmp_watcher, true); 
+  pevent_hdr->attrs[attr_idx] = attr;
+
+  bool watcher_failed = true;
+  for (int cpu_idx = 0; cpu_idx < num_cpu; ++cpu_idx) {
+    int fd = perf_event_open(&attr, pid, cpu_idx, -1, PERF_FLAG_FD_CLOEXEC);
+    if (fd < 0)
+      continue;
+    watcher_failed = false;
+
+    // Register this sample ID
+    uint64_t id;
+    if (-1 == ioctl(fd, PERF_EVENT_IOC_ID, &id)) {
+      LG_ERR("Error getting perf sample\n");
+    }
+    stash_perf_id(id, extra_event);
+
+    if (cpu_pevent_idx.contains(cpu_idx)) {
+      pevent_add_child_fd(fd, pes[cpu_pevent_idx[cpu_idx]]);
+    } else {
+      size_t pevent_idx = -1;
+      DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
+      pevent_set_info(fd, attr_idx, pes[pevent_idx]);
+      cpu_pevent_idx[cpu_idx] = pevent_idx;
+    }
+  }
+
+  // Ideally we'd invalidate the whole group, but we've stashed stuff now
+  // TODO fix this
+  if (watcher_failed)
+    LG_ERR("Error calling perfopen on (%s)", extra_event.c_str());
+  return ddres_init();
+}
+
 static DDRes tallocsys1_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
                              int num_cpu, PEventHdr *pevent_hdr) {
   const LinkedPerfConf conf = {
         {1, "syscalls", "sys_exit_mmap", true},
         {2, "syscalls", "sys_exit_munmap"},
         {3, "syscalls", "sys_exit_mremap", true}};
-  return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf);
+  std::map<int, int> cpu_pevent_idx = {};
+  return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf, cpu_pevent_idx);
 }
 
 static DDRes topenfd_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
@@ -200,7 +252,8 @@ static DDRes topenfd_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
         {3, "syscalls", "sys_exit_close"},
         {4, "syscalls", "sys_exit_exit"},
         {5, "syscalls", "sys_exit_exit_group"}};
-  return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf);
+  std::map<int, int> cpu_pevent_idx = {};
+  return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf, cpu_pevent_idx);
 }
 
 static DDRes tnoisycpu_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
@@ -213,16 +266,18 @@ static DDRes tnoisycpu_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
         {5, "raw_syscalls", "sys_enter"},
         {6, "raw_syscalls", "sys_exit"},
   };
-  return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf);
+  std::map<int, int> cpu_pevent_idx = {};
+  return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf, cpu_pevent_idx);
 }
 
-static DDRes tsyscalls(PerfWatcher *watcher, int watcher_idx, pid_t pid,
+static DDRes tsyscalls_open(PerfWatcher *watcher, int watcher_idx, pid_t pid,
                        int num_cpu, PEventHdr *pevent_hdr) {
   const LinkedPerfConf conf = {
         {1, "raw_syscalls", "sys_enter"},
-        {1, "raw_syscalls", "sys_exit"},
+        {2, "raw_syscalls", "sys_exit"},
   };
-  return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf);
+  std::map<int, int> cpu_pevent_idx = {};
+  return link_perfs(watcher, watcher_idx, pid, num_cpu, pevent_hdr, conf, "sCPU", cpu_pevent_idx);
 }
 
 
@@ -306,6 +361,10 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
       case (DDPROF_PWE_tNOISYCPU):
         DDRES_CHECK_FWD(
             tnoisycpu_open(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
+        break;
+      case (DDPROF_PWE_tSYSCALLS):
+        DDRES_CHECK_FWD(
+            tsyscalls_open(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
         break;
       case DDPROF_PWE_tOPENFD:
         DDRES_CHECK_FWD(

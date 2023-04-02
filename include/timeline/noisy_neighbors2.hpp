@@ -10,6 +10,7 @@
 #include <vector>
 
 #include <linux/sched.h>
+#include <nlohmann/json.hpp>
 
 #include "perf.hpp"
 #include "logger.hpp"
@@ -28,11 +29,11 @@ struct ThreadState {
 struct NoisyNeighbors {
   std::vector<ThreadState> cpu_on;
   std::unordered_map<pid_t, ThreadState> cpu_off;
-  std::vector<std::vector<ThreadStates>> completed_states; // Per-CPU buffer of completed states
+  std::vector<std::vector<ThreadState>> completed_states; // Per-CPU buffer of completed states
 
   // Functions
   NoisyNeighbors(int num_cpu); 
-  process_event(perf_event_sample *sample, const std::string &str);
+  void process_event(perf_event_sample *sample, const std::string &str);
   nlohmann::json finalize(uint64_t last_time);
   void clear();
 

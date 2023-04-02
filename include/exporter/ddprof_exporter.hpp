@@ -9,7 +9,8 @@
 #include "ddres_def.hpp"
 #include "exporter_input.hpp"
 #include "perf_watcher.hpp"
-#include "timeline/noisy_neighbors.hpp"
+#include "timeline/noisy_neighbors2.hpp"
+#include "timeline/systracker.hpp"
 #include "string_view.hpp"
 #include "tags.hpp"
 
@@ -32,6 +33,7 @@ typedef struct DDProfExporter {
   int64_t _last_pprof_size;
   nlohmann::json timeline_data;
   std::unique_ptr<NoisyNeighbors> noisy_neighbors;
+  std::unique_ptr<Systracker> systracker;
 } DDProfExporter;
 
 DDRes ddprof_exporter_init(const ExporterInput *exporter_input,

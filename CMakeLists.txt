@@ -206,6 +206,7 @@ set(DD_PROFILING_SOURCES
     src/sys_utils.cc
     src/user_override.cc
     src/timeline/timeline.cc
+    src/x86_syscalls.cc
    )
 
 if(BUILD_UNIVERSAL_DDPROF)

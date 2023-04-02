@@ -176,6 +176,12 @@ bool watcher_from_event(const char *str, PerfWatcher *watcher) {
       watcher->sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ID | PERF_SAMPLE_CPU | PERF_SAMPLE_PERIOD | PERF_SAMPLE_RAW;
       watcher->options.is_kernel = kPerfWatcher_Required;
       watcher->options.no_regs = true;
+    } else if (watcher->ddprof_event_type == DDPROF_PWE_tSYSCALLS) {
+      PRINT_NFO("Disabling call stacks for syscalls");
+      watcher->sample_stack_size = 0; // Disable for now
+      watcher->instrument_self = true;
+      watcher->sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ID | PERF_SAMPLE_CPU | PERF_SAMPLE_PERIOD | PERF_SAMPLE_RAW;
+      watcher->options.is_kernel = kPerfWatcher_Required;
     }
   }
   return true;
