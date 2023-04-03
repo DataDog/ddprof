@@ -43,6 +43,12 @@ TAR_LIBDATADOG=libdatadog-${MARCH}-${DISTRIBUTION}.tar.gz
 GITHUB_URL_LIBDATADOG=https://github.com/DataDog/libdatadog/releases/download/${TAG_LIBDATADOG}/${TAR_LIBDATADOG}
 
 SHA256_LIBDATADOG=$(grep "${TAR_LIBDATADOG}" "${CHECKSUM_FILE}")
+if echo "${SHA256_LIBDATADOG}" | grep -qE '^[[:xdigit:]]{64}[[:space:]]{2}'; then
+  echo "Using libdatadog sha256: ${SHA256_LIBDATADOG}"
+else
+  echo "Badly formatted sha256. There should be 2 spaces between sha and file name."
+  exit 1
+fi
 
 mkdir -p "$TARGET_EXTRACT" || true
 cd "$TARGET_EXTRACT"
@@ -56,7 +62,7 @@ else
 fi
 
 echo "Checking libdatadog sha256"
-if ! echo "${SHA256_LIBDATADOG}" | sha256sum -c; then
+if ! echo "${SHA256_LIBDATADOG}" | sha256sum -c -; then
     echo "Error validating libdatadog SHA256"
     echo "Please clear $TARGET_EXTRACT before restarting"
     exit 1

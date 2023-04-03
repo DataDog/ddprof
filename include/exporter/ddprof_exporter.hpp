@@ -12,7 +12,7 @@
 #include "string_view.hpp"
 #include "tags.hpp"
 
-typedef struct ddog_ProfileExporter ddog_ProfileExporter;
+typedef struct ddog_prof_Exporter ddog_prof_Exporter;
 typedef struct ddog_Profile ddog_Profile;
 typedef struct UserTags UserTags;
 
@@ -22,7 +22,7 @@ typedef struct DDProfExporter {
   ExporterInput _input;
   char *_url;                      // url contains path and port
   const char *_debug_pprof_prefix; // write pprofs to folder
-  ddog_ProfileExporter *_exporter;
+  ddog_prof_Exporter *_exporter;
   bool _agent;
   bool _export; // debug mode : should we send profiles ?
   int32_t _nb_consecutive_errors;
@@ -34,7 +34,7 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
 
 DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter);
 
-DDRes ddprof_exporter_export(const struct ddog_Profile *profile,
+DDRes ddprof_exporter_export(const struct ddog_prof_Profile *profile,
                              const ddprof::Tags &additional_tags,
                              uint32_t profile_seq, DDProfExporter *exporter);
 

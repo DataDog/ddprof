@@ -12,13 +12,13 @@
 #include "tags.hpp"
 #include "unwind_output.hpp"
 
-struct ddog_Profile;
+struct ddog_prof_Profile;
 struct SymbolHdr;
 
 struct DDProfPProf {
   DDProfPProf() noexcept {}
   /* single profile gathering several value types */
-  ddog_Profile *_profile = nullptr;
+  ddog_prof_Profile *_profile = nullptr;
   unsigned _nb_values = 0;
   ddprof::Tags _tags;
 };
