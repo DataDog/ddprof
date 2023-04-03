@@ -219,6 +219,8 @@ static DDRes fill_stable_tags(const UserTags *user_tags,
 
 DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
   ddog_Vec_Tag tags_exporter = ddog_Vec_Tag_new();
+  defer{ ddog_Vec_Tag_drop(tags_exporter); };
+
   fill_stable_tags(user_tags, exporter, tags_exporter);
 
   ddog_CharSlice base_url = to_CharSlice(exporter->_url);
@@ -238,12 +240,10 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
   if (res_exporter.tag == DDOG_PROF_EXPORTER_NEW_RESULT_OK) {
     exporter->_exporter = res_exporter.ok;
   } else {
+    defer { ddog_Error_drop(&res_exporter.err); };
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failure creating exporter - %s",
                            res_exporter.err.message.ptr);
-    // todo : check that I don't need to drop here
-    //    ddog_prof_Exporter_drop(res_exporter);
   }
-  ddog_Vec_Tag_drop(tags_exporter);
   return ddres_init();
 }
 
@@ -342,7 +342,7 @@ DDRes ddprof_exporter_export(const ddog_prof_Profile *profile,
       // dropping the request is not useful if we have a send
       // however the send will replace the request by null when it takes
       // ownership
-      ddog_prof_Exporter_Request_drop(&request);
+      defer { ddog_prof_Exporter_Request_drop(&request); };
 
       ddog_prof_Exporter_SendResult result =
           ddog_prof_Exporter_send(exporter->_exporter, &request, nullptr);
