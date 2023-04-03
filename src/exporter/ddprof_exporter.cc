@@ -219,7 +219,7 @@ static DDRes fill_stable_tags(const UserTags *user_tags,
 
 DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
   ddog_Vec_Tag tags_exporter = ddog_Vec_Tag_new();
-  defer{ ddog_Vec_Tag_drop(tags_exporter); };
+  defer { ddog_Vec_Tag_drop(tags_exporter); };
 
   fill_stable_tags(user_tags, exporter, tags_exporter);
 
@@ -294,6 +294,7 @@ DDRes ddprof_exporter_export(const ddog_prof_Profile *profile,
   ddog_prof_Profile_SerializeResult serialized_result =
       ddog_prof_Profile_serialize(profile, nullptr, nullptr);
   if (serialized_result.tag != DDOG_PROF_PROFILE_SERIALIZE_RESULT_OK) {
+    defer { ddog_Error_drop(&serialized_result.err); };
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to serialize: %s",
                            serialized_result.err.message.ptr);
   }
