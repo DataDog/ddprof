@@ -6,8 +6,8 @@
 #include "demangler/demangler.hpp"
 
 #include <array>
-#include <utility>
 #include <string>
+#include <utility>
 
 #include <llvm/Demangle/Demangle.h>
 
@@ -87,10 +87,18 @@ inline static int hex_to_int(char dig) {
 
 // Demangles a Rust string by building a copy piece-by-piece
 static std::string rust_demangle(const std::string_view &str) {
-  constexpr auto patterns =  std::to_array<std::pair<std::string_view, std::string_view>>({
-      {"..", "::"},  {"$C$", ","},  {"$BP$", "*"}, {"$GT$", ">"}, {"$LT$", "<"},
-      {"$LP$", "("}, {"$RP$", ")"}, {"$RF$", "&"}, {"$SP$", "@"},
-  });
+  constexpr auto patterns =
+      std::to_array<std::pair<std::string_view, std::string_view>>({
+          {"..", "::"},
+          {"$C$", ","},
+          {"$BP$", "*"},
+          {"$GT$", ">"},
+          {"$LT$", "<"},
+          {"$LP$", "("},
+          {"$RP$", ")"},
+          {"$RF$", "&"},
+          {"$SP$", "@"},
+      });
 
   std::string ret;
   ret.reserve(str.size() - hash_eg.size() - hash_pre.size());
