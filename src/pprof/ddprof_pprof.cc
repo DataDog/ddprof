@@ -8,6 +8,7 @@
 #include "ddog_profiling_utils.hpp"
 #include "ddprof_defs.hpp"
 #include "ddres.hpp"
+#include "defer.hpp"
 #include "pevent_lib.hpp"
 #include "span.hpp"
 #include "string_format.hpp"
@@ -23,7 +24,7 @@
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
   PerfWatcher *watchers = ctx->watchers;
   size_t num_watchers = ctx->num_watchers;
-  ddog_ValueType perf_value_type[DDPROF_PWT_LENGTH];
+  ddog_prof_ValueType perf_value_type[DDPROF_PWT_LENGTH];
 
   // Figure out which sample_type_ids are used by active watchers
   // We also record the watcher with the lowest valid sample_type id, since that
@@ -90,10 +91,10 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
   }
 
   pprof->_nb_values = num_sample_type_ids;
-  ddog_Slice_value_type sample_types = {.ptr = perf_value_type,
-                                        .len = pprof->_nb_values};
+  ddog_prof_Slice_ValueType sample_types = {.ptr = perf_value_type,
+                                            .len = pprof->_nb_values};
 
-  ddog_Period period;
+  ddog_prof_Period period;
   if (num_sample_type_ids > 0) {
     // Populate the default.  If we have a frequency, assume it is given in
     // hertz and convert to a period in nanoseconds.  This is broken for many
@@ -108,7 +109,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
         .value = default_period,
     };
   }
-  pprof->_profile = ddog_Profile_new(
+  pprof->_profile = ddog_prof_Profile_new(
       sample_types, num_sample_type_ids > 0 ? &period : nullptr, nullptr);
   if (!pprof->_profile) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to create profile");
@@ -127,16 +128,14 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
 }
 
 DDRes pprof_free_profile(DDProfPProf *pprof) {
-  if (pprof->_profile) {
-    ddog_Profile_free(pprof->_profile);
-  }
+  ddog_prof_Profile_drop(pprof->_profile);
   pprof->_profile = NULL;
   pprof->_nb_values = 0;
   return ddres_init();
 }
 
 static void write_function(const ddprof::Symbol &symbol,
-                           ddog_Function *ffi_func) {
+                           ddog_prof_Function *ffi_func) {
   ffi_func->name = to_CharSlice(symbol._demangle_name);
   ffi_func->system_name = to_CharSlice(symbol._symname);
   ffi_func->filename = to_CharSlice(symbol._srcpath);
@@ -145,7 +144,7 @@ static void write_function(const ddprof::Symbol &symbol,
 }
 
 static void write_mapping(const ddprof::MapInfo &mapinfo,
-                          ddog_Mapping *ffi_mapping) {
+                          ddog_prof_Mapping *ffi_mapping) {
   ffi_mapping->memory_start = mapinfo._low_addr;
   ffi_mapping->memory_limit = mapinfo._high_addr;
   ffi_mapping->file_offset = mapinfo._offset;
@@ -154,8 +153,8 @@ static void write_mapping(const ddprof::MapInfo &mapinfo,
 }
 
 static void write_location(const FunLoc *loc, const ddprof::MapInfo &mapinfo,
-                           const ddog_Slice_line *lines,
-                           ddog_Location *ffi_location) {
+                           const ddog_prof_Slice_Line *lines,
+                           ddog_prof_Location *ffi_location) {
   write_mapping(mapinfo, &ffi_location->mapping);
   ffi_location->address = loc->ip;
   ffi_location->lines = *lines;
@@ -163,7 +162,7 @@ static void write_location(const FunLoc *loc, const ddprof::MapInfo &mapinfo,
   ffi_location->is_folded = false;
 }
 
-static void write_line(const ddprof::Symbol &symbol, ddog_Line *ffi_line) {
+static void write_line(const ddprof::Symbol &symbol, ddog_prof_Line *ffi_line) {
   write_function(symbol, &ffi_line->function);
   ffi_line->line = symbol._lineno;
 }
@@ -176,7 +175,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
 
   const ddprof::SymbolTable &symbol_table = symbol_hdr->_symbol_table;
   const ddprof::MapInfoTable &mapinfo_table = symbol_hdr->_mapinfo_table;
-  ddog_Profile *profile = pprof->_profile;
+  ddog_prof_Profile *profile = pprof->_profile;
 
   int64_t values[DDPROF_PWT_LENGTH] = {};
   values[watcher->pprof_sample_idx] = value * count;
@@ -184,9 +183,9 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     values[watcher->pprof_count_sample_idx] = count;
   }
 
-  ddog_Location locations_buff[DD_MAX_STACK_DEPTH];
+  ddog_prof_Location locations_buff[DD_MAX_STACK_DEPTH];
   // assumption of single line per loc for now
-  ddog_Line line_buff[DD_MAX_STACK_DEPTH];
+  ddog_prof_Line line_buff[DD_MAX_STACK_DEPTH];
 
   ddprof::span locs{uw_output->locs, uw_output->nb_locs};
 
@@ -204,7 +203,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   for (const FunLoc &loc : locs) {
     // possibly several lines to handle inlined function (not handled for now)
     write_line(symbol_table[loc._symbol_idx], &line_buff[cur_loc]);
-    ddog_Slice_line lines = {.ptr = &line_buff[cur_loc], .len = 1};
+    ddog_prof_Slice_Line lines = {.ptr = &line_buff[cur_loc], .len = 1};
     write_location(&loc, mapinfo_table[loc._map_info_idx], &lines,
                    &locations_buff[cur_loc]);
     ++cur_loc;
@@ -213,7 +212,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   // Create the labels for the sample.  Two samples are the same only when
   // their locations _and_ all labels are identical, so we admit a very limited
   // number of labels at present
-  ddog_Label labels[PPROF_MAX_LABELS] = {};
+  ddog_prof_Label labels[PPROF_MAX_LABELS] = {};
   size_t labels_num = 0;
   char pid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
   char tid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
@@ -247,22 +246,25 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     }
     ++labels_num;
   }
-  ddog_Sample sample = {
+  ddog_prof_Sample sample = {
       .locations = {.ptr = locations_buff, .len = cur_loc},
       .values = {.ptr = values, .len = pprof->_nb_values},
       .labels = {.ptr = labels, .len = labels_num},
   };
 
-  uint64_t id_sample = ddog_Profile_add(profile, sample);
-  if (id_sample == 0) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile");
+  //  uint64_t id_sample = ddog_prof_Profile_add(profile, sample);
+  ddog_prof_Profile_AddResult add_res = ddog_prof_Profile_add(profile, sample);
+  if (add_res.tag == DDOG_PROF_PROFILE_ADD_RESULT_ERR) {
+    defer { ddog_Error_drop(&add_res.err); };
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile: %s",
+                           add_res.err.message.ptr);
   }
 
   return ddres_init();
 }
 
 DDRes pprof_reset(DDProfPProf *pprof) {
-  if (!ddog_Profile_reset(pprof->_profile, nullptr)) {
+  if (!ddog_prof_Profile_reset(pprof->_profile, nullptr)) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to reset profile");
   }
   return ddres_init();
