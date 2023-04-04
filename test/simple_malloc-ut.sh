@@ -93,6 +93,9 @@ check "./test/simple_malloc-shared --profile ${opts}" 1
 # Test wrapper mode
 check "./ddprof ./test/simple_malloc ${opts}" 1
 
+# Test live heap mode
+check "./ddprof --preset cpu_live_heap ./test/simple_malloc ${opts} --skip-free 100" 1
+
 # Test wrapper mode with forks + threads
 check "./ddprof ./test/simple_malloc ${opts} --fork 2 --threads 2" 2 4
 

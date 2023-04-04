@@ -295,64 +295,52 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   PerfWatcher *watcher = &ctx->watchers[watcher_pos];
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
-  if (!IsDDResFatal(res) &&
-      Any(EventConfMode::kCallgraph & watcher->output_mode)) {
+  if (!IsDDResFatal(res)) {
     struct UnwindState *us = ctx->worker_ctx.us;
-#ifndef DDPROF_NATIVE_LIB
-    // Depending on the type of watcher, compute a value for sample
-    uint64_t sample_val = perf_value_from_sample(watcher, sample);
-
-    // in lib mode we don't aggregate (protect to avoid link failures)
-    int i_export = ctx->worker_ctx.i_current_pprof;
-    DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
-    DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr, sample_val, 1,
-                                    watcher, pprof));
-    if (ctx->params.show_samples) {
-      ddprof_print_sample(us->output, us->symbol_hdr, sample->period, *watcher);
-    }
-#else
-    // Call the user's stack handler
-    if (ctx->stack_handler) {
-      if (!ctx->stack_handler->apply(&us->output, ctx,
-                                     ctx->stack_handler->callback_ctx,
-                                     watcher_pos)) {
-        DDRES_RETURN_ERROR_LOG(DD_WHAT_STACK_HANDLE,
-                               "Stack handler returning errors");
+    if (Any(EventConfMode::kLiveCallgraph & watcher->output_mode)) {
+      // Live callgraph mode
+      if (watcher->ddprof_event_type == DDPROF_PWE_sALLOC) {
+        // for now we hard code the live aggregation mode
+        ctx->worker_ctx.live_allocation.register_allocation(
+            us->output, sample->addr, sample->period, watcher_pos, sample->pid);
       }
-    }
+      // live callgraph not compatible with all watcher types
+      else {
+        DDRES_RETURN_ERROR_LOG(DD_WHAT_UNHANDLED_CONFIG,
+                               "Live callgraph configuration unhandled");
+      }
+    } else if (Any(EventConfMode::kCallgraph & watcher->output_mode)) {
+#ifndef DDPROF_NATIVE_LIB
+      // Depending on the type of watcher, compute a value for sample
+      uint64_t sample_val = perf_value_from_sample(watcher, sample);
+
+      // in lib mode we don't aggregate (protect to avoid link failures)
+      int i_export = ctx->worker_ctx.i_current_pprof;
+      DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
+      DDRES_CHECK_FWD(pprof_aggregate(&us->output, &us->symbol_hdr, sample_val,
+                                      1, watcher, pprof));
+      if (ctx->params.show_samples) {
+        ddprof_print_sample(us->output, us->symbol_hdr, sample->period,
+                            *watcher);
+      }
+#else
+      // Call the user's stack handler
+      if (ctx->stack_handler) {
+        if (!ctx->stack_handler->apply(&us->output, ctx,
+                                       ctx->stack_handler->callback_ctx,
+                                       watcher_pos)) {
+          DDRES_RETURN_ERROR_LOG(DD_WHAT_STACK_HANDLE,
+                                 "Stack handler returning errors");
+        }
+      }
 #endif
+    }
   }
 
   ddprof_stats_add(STATS_AGGREGATION_AVG_TIME,
                    ddprof::get_tsc_cycles() - unwind_ticks, NULL);
 
   return {};
-}
-
-DDRes ddprof_pr_allocation_tracking(DDProfContext *ctx,
-                                    perf_event_sample *sample,
-                                    int watcher_pos) {
-  if (!sample)
-    return ddres_warn(DD_WHAT_PERFSAMP);
-
-  // If this is a SW_TASK_CLOCK-type event, then aggregate the time
-  if (ctx->watchers[watcher_pos].config == PERF_COUNT_SW_TASK_CLOCK)
-    ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
-
-  auto ticks0 = ddprof::get_tsc_cycles();
-  DDRes res = ddprof_unwind_sample(ctx, sample, watcher_pos);
-  auto unwind_ticks = ddprof::get_tsc_cycles();
-  ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL);
-
-  // Aggregate if unwinding went well (todo : fatal error propagation)
-  if (!IsDDResFatal(res)) {
-    struct UnwindState *us = ctx->worker_ctx.us;
-    ctx->worker_ctx.live_allocation.register_allocation(
-        us->output, sample->addr, sample->period, watcher_pos, sample->pid);
-  }
-
-  // TODO: propagate fatal
-  return ddres_init();
 }
 
 DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
@@ -787,21 +775,14 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
         uint64_t mask = watcher->sample_type;
         perf_event_sample *sample = hdr2samp(hdr, mask);
 
-        // Various checks for allocation profiling
-        // - sALLOC
-        // - mmap/munmap syscalls
-        bool is_allocation = watcher->type == kDDPROF_TYPE_CUSTOM &&
-            watcher->config == kDDPROF_COUNT_ALLOCATIONS;
         if (sample) {
           // Handle special profiling types first
           if (watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS1 ||
               watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS2) {
+            // For now we have a different path for
+            // - mmap/munmap syscalls
             DDRES_CHECK_FWD(
                 ddprof_pr_sysallocation_tracking(ctx, sample, watcher_pos));
-          } else if (is_allocation &&
-                     watcher->output_mode == EventConfMode::kLiveCallgraph) {
-            DDRES_CHECK_FWD(
-                ddprof_pr_allocation_tracking(ctx, sample, watcher_pos));
           } else {
             DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, watcher_pos));
           }
