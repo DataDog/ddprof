@@ -87,14 +87,15 @@ private:
                         TrackerThreadLocalState &tl_state);
   void track_deallocation(uintptr_t addr, TrackerThreadLocalState &tl_state);
 
-  DDRes push_sample(uintptr_t addr, uint64_t allocated_size,
-                    TrackerThreadLocalState &tl_state);
+  DDRes push_alloc_sample(uintptr_t addr, uint64_t allocated_size,
+                          TrackerThreadLocalState &tl_state);
 
-  // Return true if consumer should be notified
+  // If notify_needed is true, consumer should be notified
   DDRes push_lost_sample(MPSCRingBufferWriter &writer, bool &notify_needed);
 
-  // Return true if consumer should be notified
   DDRes push_dealloc_sample(uintptr_t addr, TrackerThreadLocalState &tl_state);
+
+  DDRes push_clear_live_allocation(TrackerThreadLocalState &tl_state);
 
   void free_on_consecutive_failures(bool success);
 

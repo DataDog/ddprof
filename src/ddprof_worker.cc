@@ -468,10 +468,6 @@ static DDRes aggregate_live_allocations(DDProfContext *ctx) {
     }
     LG_NTC("Number of Live allocations for PID%d = %lu ", stack_map.first,
            stack_map.second.size());
-    // Safety to avoid spending all the time reporting allocations
-    if (stack_map.second.size() >= LiveAllocation::kMaxTracked) {
-      stack_map.second.clear();
-    }
   }
   return ddres_init();
 }
@@ -659,6 +655,11 @@ void ddprof_pr_exit(DDProfContext *ctx, const perf_event_exit *ext,
   }
 }
 
+void ddprof_pr_clear_live_allocation(DDProfContext *ctx,
+                                     const ClearLiveAllocationEvent *event) {
+  ctx->worker_ctx.live_allocation.clear(event->sample_id.pid);
+}
+
 void ddprof_pr_deallocation(DDProfContext *ctx,
                             const DeallocationEvent *event) {
   ctx->worker_ctx.live_allocation.register_deallocation(event->ptr,
@@ -818,6 +819,9 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
     case PERF_CUSTOM_EVENT_DEALLOCATION:
       ddprof_pr_deallocation(ctx,
                              reinterpret_cast<const DeallocationEvent *>(hdr));
+    case PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION:
+      ddprof_pr_clear_live_allocation(
+          ctx, reinterpret_cast<const ClearLiveAllocationEvent *>(hdr));
     default:
       break;
     }

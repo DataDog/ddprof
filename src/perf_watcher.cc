@@ -5,6 +5,7 @@
 
 #include "perf_watcher.hpp"
 
+#include "logger.hpp"
 #include "perf.hpp"
 
 #include <stddef.h>
@@ -103,4 +104,39 @@ const PerfWatcher *tracepoint_default_watcher() {
 
 bool watcher_has_tracepoint(const PerfWatcher *watcher) {
   return DDPROF_PWT_TRACEPOINT == watcher->sample_type_id;
+}
+
+void log_watcher(const PerfWatcher *w, int idx) {
+  PRINT_NFO("    ID: %s, Pos: %d, Index: %lu", w->desc.c_str(), idx, w->config);
+  switch (w->value_source) {
+  case EventConfValueSource::kSample:
+    PRINT_NFO("    Location: Sample");
+    break;
+  case EventConfValueSource::kRegister:
+    PRINT_NFO("    Location: Register, regno: %d", w->regno);
+    break;
+  case EventConfValueSource::kRaw:
+    PRINT_NFO("    Location: Raw event, offset: %d, size: %d", w->raw_off,
+              w->raw_sz);
+    break;
+  default:
+    PRINT_NFO("    ILLEGAL LOCATION");
+    break;
+  }
+
+  PRINT_NFO("    Category: %s, EventName: %s, GroupName: %s, Label: %s",
+            sample_type_name_from_idx(w->sample_type_id),
+            w->tracepoint_event.c_str(), w->tracepoint_group.c_str(),
+            w->tracepoint_label.c_str());
+
+  if (w->options.is_freq)
+    PRINT_NFO("    Cadence: Freq, Freq: %lu", w->sample_frequency);
+  else
+    PRINT_NFO("    Cadence: Period, Period: %lu", w->sample_period);
+  if (Any(EventConfMode::kCallgraph & w->output_mode))
+    PRINT_NFO("    Outputting to callgraph (flamegraph)");
+  if (Any(EventConfMode::kMetric & w->output_mode))
+    PRINT_NFO("    Outputting to metric");
+  if (Any(EventConfMode::kLiveCallgraph & w->output_mode))
+    PRINT_NFO("    Outputting to live callgraph");
 }
