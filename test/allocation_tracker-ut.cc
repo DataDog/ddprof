@@ -7,6 +7,7 @@
 #include "ddprof_base.hpp"
 #include "ddprof_perf_event.hpp"
 #include "ipc.hpp"
+#include "live_allocation-c.hpp"
 #include "loghandle.hpp"
 #include "perf_watcher.hpp"
 #include "pevent_lib.hpp"
@@ -40,8 +41,6 @@ DDPROF_NOINLINE void my_func_calling_malloc(size_t size) {
 }
 }
 
-#define SOME_TEST
-#ifdef SOME_TEST
 TEST(allocation_tracker, start_stop) {
   const uint64_t rate = 1;
   const size_t buf_size_order = 5;
@@ -130,7 +129,6 @@ TEST(allocation_tracker, stale_lock) {
   ASSERT_FALSE(ddprof::AllocationTracker::is_active());
   ddprof::AllocationTracker::allocation_tracking_free();
 }
-#endif
 
 TEST(allocation_tracker, max_tracked_allocs) {
   const uint64_t rate = 1;
@@ -145,12 +143,12 @@ TEST(allocation_tracker, max_tracked_allocs) {
 
   ASSERT_TRUE(ddprof::AllocationTracker::is_active());
 
-  for (int i = 0; i <= 500001; ++i) {
+  for (int i = 0; i <= ddprof::liveallocation::kMaxTracked + 1; ++i) {
     my_malloc(1, 0x1000 + i);
     ddprof::MPSCRingBufferReader reader{ring_buffer.get_ring_buffer()};
     if (i <=
-        500000) { // check that we get the relevant info for this allocation
-      printf("Read number -- %u \n", i);
+        ddprof::liveallocation::kMaxTracked) { // check that we get the relevant
+                                               // info for this allocation
       ASSERT_GT(reader.available_size(), 0);
       auto buf = reader.read_sample();
       ASSERT_FALSE(buf.empty());
@@ -166,20 +164,22 @@ TEST(allocation_tracker, max_tracked_allocs) {
       ASSERT_EQ(sample->tid, ddprof::gettid());
       ASSERT_EQ(sample->addr, 0x1000 + i);
     } else {
-      {
-        auto buf = reader.read_sample();
-        ASSERT_FALSE(buf.empty());
+      bool clear_found = false;
+      int nb_read = 0;
+      ddprof::ConstBuffer buf;
+      do {
+        buf = reader.read_sample();
+        ++nb_read;
+        if (buf.empty())
+          break;
         const perf_event_header *hdr =
             reinterpret_cast<const perf_event_header *>(buf.data());
-        printf("Type = %u", hdr->type);
-      }
-      {
-        auto buf = reader.read_sample();
-        ASSERT_FALSE(buf.empty());
-        const perf_event_header *hdr =
-            reinterpret_cast<const perf_event_header *>(buf.data());
-        printf("Type = %u", hdr->type);
-      }
+        if (hdr->type == PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION) {
+          clear_found = true;
+        }
+      } while (true);
+      EXPECT_EQ(nb_read, 3);
+      EXPECT_TRUE(clear_found);
     }
   }
 }

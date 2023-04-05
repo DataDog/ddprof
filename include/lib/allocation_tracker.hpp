@@ -66,12 +66,19 @@ private:
   using AdressSet = std::unordered_set<uintptr_t>;
 
   struct TrackerState {
+    void init(bool track_alloc, bool track_dealloc) {
+      track_allocations = track_alloc;
+      track_deallocations = track_dealloc;
+      lost_count = 0;
+      failure_count = 0;
+      pid = 0;
+    }
     std::mutex mutex;
     std::atomic<bool> track_allocations = false;
     std::atomic<bool> track_deallocations = false;
     std::atomic<uint64_t> lost_count; // count number of lost events
     std::atomic<uint32_t> failure_count;
-    std::atomic<pid_t> pid; // cache of pid
+    std::atomic<pid_t> pid; // lazy cache of pid (0 is un-init value)
   };
 
   AllocationTracker();

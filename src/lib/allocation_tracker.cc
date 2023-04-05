@@ -98,8 +98,8 @@ DDRes AllocationTracker::allocation_tracking_init(
   DDRES_CHECK_FWD(instance->init(allocation_profiling_rate,
                                  flags & kDeterministicSampling, ring_buffer));
   _instance = instance;
-  state.track_allocations = true;
-  state.track_deallocations = flags & kTrackDeallocations;
+
+  state.init(true, flags & kTrackDeallocations);
 
   return {};
 }
@@ -210,8 +210,9 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
       if (IsDDResOK(push_clear_live_allocation(tl_state))) {
         _address_set.clear();
       } else {
-        LG_ERR("Stop allocation profiling. Unable to clear live allocation "
-               "tracking state");
+        fprintf(
+            stderr,
+            "Stop allocation profiling. Unable to clear live allocation \n");
         free();
       }
     }
@@ -287,7 +288,7 @@ DDRes AllocationTracker::push_clear_live_allocation(
       reinterpret_cast<ClearLiveAllocationEvent *>(buffer.data());
   event->hdr.misc = 0;
   event->hdr.size = sizeof(ClearLiveAllocationEvent);
-  event->hdr.type = PERF_RECORD_SAMPLE;
+  event->hdr.type = PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION;
   event->sample_id.time = 0;
   if (_state.pid == 0) {
     _state.pid = getpid();

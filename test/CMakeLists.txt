@@ -291,7 +291,7 @@ add_unit_test(
   ../src/unwind_helpers.cc
   ../src/unwind_metrics.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle DDProf::Parser
-  DEFINITIONS ${DDPROF_DEFINITION_LIST})
+  DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=100)
 
 add_unit_test(sys_utils-ut sys_utils-ut.cc ../src/sys_utils.cc)
 
