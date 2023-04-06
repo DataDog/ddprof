@@ -9,6 +9,7 @@
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "ipc.hpp"
+#include "live_allocation-c.hpp"
 #include "perf.hpp"
 #include "pevent_lib.hpp"
 #include "ringbuffer_utils.hpp"
@@ -97,8 +98,8 @@ DDRes AllocationTracker::allocation_tracking_init(
   DDRES_CHECK_FWD(instance->init(allocation_profiling_rate,
                                  flags & kDeterministicSampling, ring_buffer));
   _instance = instance;
-  state.track_allocations = true;
-  state.track_deallocations = flags & kTrackDeallocations;
+
+  state.init(true, flags & kTrackDeallocations);
 
   return {};
 }
@@ -199,11 +200,22 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
   tl_state.remaining_bytes = remaining_bytes;
   uint64_t total_size = nsamples * sampling_interval;
 
-  bool success = IsDDResOK(push_sample(addr, total_size, tl_state));
+  bool success = IsDDResOK(push_alloc_sample(addr, total_size, tl_state));
   free_on_consecutive_failures(success);
 
-  if (success) { // ensure we track this dealloc if it occurs
+  if (success && _state.track_deallocations) {
+    // ensure we track this dealloc if it occurs
     _address_set.insert(addr);
+    if (unlikely(_address_set.size() > ddprof::liveallocation::kMaxTracked)) {
+      if (IsDDResOK(push_clear_live_allocation(tl_state))) {
+        _address_set.clear();
+      } else {
+        fprintf(
+            stderr,
+            "Stop allocation profiling. Unable to clear live allocation \n");
+        free();
+      }
+    }
   }
 }
 
@@ -259,6 +271,46 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
 }
 
 // Return true if consumer should be notified
+DDRes AllocationTracker::push_clear_live_allocation(
+    TrackerThreadLocalState &tl_state) {
+  MPSCRingBufferWriter writer{_pevent.rb};
+  bool timeout = false;
+
+  auto buffer = writer.reserve(sizeof(ClearLiveAllocationEvent), &timeout);
+  if (buffer.empty()) {
+    // unable to push a clear is an error (we don't want to grow too much)
+    // No use pushing a lost event. As this is a sync mechanism.
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
+                           "Unable to get write lock on ring buffer");
+  }
+
+  ClearLiveAllocationEvent *event =
+      reinterpret_cast<ClearLiveAllocationEvent *>(buffer.data());
+  event->hdr.misc = 0;
+  event->hdr.size = sizeof(ClearLiveAllocationEvent);
+  event->hdr.type = PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION;
+  event->sample_id.time = 0;
+  if (_state.pid == 0) {
+    _state.pid = getpid();
+  }
+  if (tl_state.tid == 0) {
+    tl_state.tid = ddprof::gettid();
+  }
+  event->sample_id.pid = _state.pid;
+  event->sample_id.tid = tl_state.tid;
+
+  if (writer.commit(buffer)) {
+    uint64_t count = 1;
+    if (write(_pevent.fd, &count, sizeof(count)) != sizeof(count)) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
+                             "Error writing to memory allocation eventfd (%s)",
+                             strerror(errno));
+    }
+  }
+
+  return {};
+}
+
 DDRes AllocationTracker::push_dealloc_sample(
     uintptr_t addr, TrackerThreadLocalState &tl_state) {
   MPSCRingBufferWriter writer{_pevent.rb};
@@ -312,8 +364,9 @@ DDRes AllocationTracker::push_dealloc_sample(
   return {};
 }
 
-DDRes AllocationTracker::push_sample(uintptr_t addr, uint64_t allocated_size,
-                                     TrackerThreadLocalState &tl_state) {
+DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
+                                           uint64_t allocated_size,
+                                           TrackerThreadLocalState &tl_state) {
   MPSCRingBufferWriter writer{_pevent.rb};
   bool notify_consumer{false};
 

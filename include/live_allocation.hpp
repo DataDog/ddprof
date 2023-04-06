@@ -15,7 +15,6 @@ namespace ddprof {
 
 class LiveAllocation {
 public:
-  static constexpr auto kMaxTracked = 200000;
   void register_allocation(const UnwindOutput &stack, uintptr_t addr,
                            size_t size, int watcher_pos, pid_t pid) {
     StackMap &stack_map = _pid_map[pid];
@@ -29,6 +28,8 @@ public:
       LG_DBG("Unmatched deallocation at %lx of PID%d", addr, pid);
     }
   }
+
+  void clear(pid_t pid) { _pid_map[pid].clear(); }
 
   struct AllocationInfo {
     UnwindOutput _stack;

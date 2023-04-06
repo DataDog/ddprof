@@ -10,9 +10,13 @@
 
 // Extend the perf event types
 // There are <30 different perf events (starting at 1000 seems safe)
-constexpr uint32_t PERF_CUSTOM_EVENT_DEALLOCATION = 1000;
+enum : uint32_t {
+  PERF_CUSTOM_EVENT_DEALLOCATION = 1000,
+  PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION
+};
 
-static_assert(PERF_CUSTOM_EVENT_DEALLOCATION > PERF_RECORD_MAX,
+static_assert(static_cast<uint32_t>(PERF_CUSTOM_EVENT_DEALLOCATION) >
+                  PERF_RECORD_MAX,
               "Error from PERF_CUSTOM_EVENT_DEALLOCATION definition");
 
 namespace ddprof {
@@ -22,6 +26,12 @@ struct DeallocationEvent {
   perf_event_header hdr;
   struct sample_id sample_id;
   uintptr_t ptr;
+};
+
+// Event to notify we have tracked too many allocations
+struct ClearLiveAllocationEvent {
+  perf_event_header hdr;
+  struct sample_id sample_id;
 };
 
 } // namespace ddprof

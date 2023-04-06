@@ -66,12 +66,19 @@ private:
   using AdressSet = std::unordered_set<uintptr_t>;
 
   struct TrackerState {
+    void init(bool track_alloc, bool track_dealloc) {
+      track_allocations = track_alloc;
+      track_deallocations = track_dealloc;
+      lost_count = 0;
+      failure_count = 0;
+      pid = 0;
+    }
     std::mutex mutex;
     std::atomic<bool> track_allocations = false;
     std::atomic<bool> track_deallocations = false;
     std::atomic<uint64_t> lost_count; // count number of lost events
     std::atomic<uint32_t> failure_count;
-    std::atomic<pid_t> pid; // cache of pid
+    std::atomic<pid_t> pid; // lazy cache of pid (0 is un-init value)
   };
 
   AllocationTracker();
@@ -87,14 +94,15 @@ private:
                         TrackerThreadLocalState &tl_state);
   void track_deallocation(uintptr_t addr, TrackerThreadLocalState &tl_state);
 
-  DDRes push_sample(uintptr_t addr, uint64_t allocated_size,
-                    TrackerThreadLocalState &tl_state);
+  DDRes push_alloc_sample(uintptr_t addr, uint64_t allocated_size,
+                          TrackerThreadLocalState &tl_state);
 
-  // Return true if consumer should be notified
+  // If notify_needed is true, consumer should be notified
   DDRes push_lost_sample(MPSCRingBufferWriter &writer, bool &notify_needed);
 
-  // Return true if consumer should be notified
   DDRes push_dealloc_sample(uintptr_t addr, TrackerThreadLocalState &tl_state);
+
+  DDRes push_clear_live_allocation(TrackerThreadLocalState &tl_state);
 
   void free_on_consecutive_failures(bool success);
 
