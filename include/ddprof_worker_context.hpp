@@ -6,6 +6,7 @@
 #pragma once
 
 #include "live_allocation.hpp"
+#include "live_sysallocations.hpp"
 #include "pevent.hpp"
 #include "proc_status.hpp"
 
@@ -38,4 +39,5 @@ struct DDProfWorkerContext {
   uint32_t count_worker; // exports since last cache clear
   std::array<uint64_t, MAX_TYPE_WATCHER> lost_events_per_watcher;
   ddprof::LiveAllocation live_allocation;
+  ddprof::SystemAllocation sys_allocation;
 };
