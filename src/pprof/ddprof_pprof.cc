@@ -169,12 +169,12 @@ static void write_line(const ddprof::Symbol &symbol, ddog_prof_Line *ffi_line) {
 
 // Assumption of API is that sample is valid in a single type
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
-                      const SymbolHdr *symbol_hdr, uint64_t value,
+                      const SymbolHdr &symbol_hdr, uint64_t value,
                       uint64_t count, const PerfWatcher *watcher,
                       DDProfPProf *pprof) {
 
-  const ddprof::SymbolTable &symbol_table = symbol_hdr->_symbol_table;
-  const ddprof::MapInfoTable &mapinfo_table = symbol_hdr->_mapinfo_table;
+  const ddprof::SymbolTable &symbol_table = symbol_hdr._symbol_table;
+  const ddprof::MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
   ddog_prof_Profile *profile = pprof->_profile;
 
   int64_t values[DDPROF_PWT_LENGTH] = {};
