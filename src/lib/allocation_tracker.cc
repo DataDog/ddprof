@@ -396,7 +396,6 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   event->abi = PERF_SAMPLE_REGS_ABI_64;
   event->sample_id.time = 0;
   event->addr = addr;
-
   if (_state.pid == 0) {
     _state.pid = getpid();
   }
