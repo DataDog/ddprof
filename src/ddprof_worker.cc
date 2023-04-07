@@ -16,7 +16,6 @@
 #include "pevent_lib.hpp"
 #include "pprof/ddprof_pprof.hpp"
 #include "procutils.hpp"
-#include "signal_helper.hpp"
 #include "stack_handler.hpp"
 #include "tags.hpp"
 #include "timer.hpp"
@@ -576,9 +575,7 @@ static DDRes clear_unvisited_pids(DDProfContext *ctx) {
   UnwindState *us = ctx->worker_ctx.us;
   const std::vector<pid_t> pids_remove = us->dwfl_hdr.get_unvisited();
   for (pid_t el : pids_remove) {
-    if (!process_is_alive(el)) {
-      DDRES_CHECK_FWD(worker_pid_free(ctx, el));
-    }
+    DDRES_CHECK_FWD(worker_pid_free(ctx, el));
   }
   us->dwfl_hdr.reset_unvisited();
   return ddres_init();
