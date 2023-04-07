@@ -24,9 +24,6 @@ struct PerfWatcherOptions {
   uint8_t nb_frames_to_skip; // number of bottom frames to skip in stack trace
                              // (useful for allocation profiling to remove
                              // frames belonging to lib_ddprofiling.so)
-  bool is_overloaded; // Isn't actually needed, but makes it clear from this
-                      // file that additional state is injected into the
-                      // watcher in ddprof_cmdline.cc
 };
 
 struct PerfWatcher {
@@ -86,7 +83,6 @@ enum DDProfTypeId { kDDPROF_TYPE_CUSTOM = PERF_TYPE_MAX + 100 };
 
 enum DDProfCustomCountId {
   kDDPROF_COUNT_ALLOCATIONS = 0,
-  kDDPROF_COUNT_SYSALLOCATIONS,
 };
 
 // Kernel events are necessary to get a full accounting of CPU
@@ -109,9 +105,6 @@ enum DDProfCustomCountId {
 
 #define SKIP_FRAMES                                                            \
   { .nb_frames_to_skip = NB_FRAMES_TO_SKIP }
-
-#define IS_OVERLOADED                                                          \
-  { .is_overloaded = true }
 
 // Whereas tracepoints are dynamically configured and can be checked at runtime,
 // we lack the ability to inspect events of type other than TYPE_TRACEPOINT.
@@ -141,8 +134,6 @@ enum DDProfCustomCountId {
   X(sALGN,      "Align. Faults",      PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_ALIGNMENT_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(sEMU,       "Emu. Faults",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_EMULATION_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(sDUM,       "Dummy",              PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_DUMMY,                   1,            DDPROF_PWT_NOCOUNT,     {})                      \
-  X(tALLOCSYS1, "System Allocations", PERF_TYPE_TRACEPOINT, kDDPROF_COUNT_SYSALLOCATIONS,          1,            DDPROF_PWT_ALLOC_SPACE, IS_OVERLOADED)           \
-  X(tALLOCSYS2, "System Al. (heavy)", PERF_TYPE_TRACEPOINT, kDDPROF_COUNT_SYSALLOCATIONS,          1,            DDPROF_PWT_ALLOC_SPACE, IS_OVERLOADED)           \
   X(sALLOC,     "Allocations",        kDDPROF_TYPE_CUSTOM,  kDDPROF_COUNT_ALLOCATIONS,             524288,       DDPROF_PWT_ALLOC_SPACE, SKIP_FRAMES)
 
 // clang-format on

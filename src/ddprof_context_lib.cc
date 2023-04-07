@@ -120,16 +120,6 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   }
   ctx->num_watchers = nwatchers;
 
-  // Some profiling features, like system allocations, uses ctx storage and
-  // needs to associate a watcher (but only one watcher) to that storage.
-  for (int i = 0; i < ctx->num_watchers; ++i) {
-    if (ctx->watchers[i].ddprof_event_type == DDPROF_PWE_tALLOCSYS1 ||
-        ctx->watchers[i].ddprof_event_type == DDPROF_PWE_tALLOCSYS2) {
-      ctx->worker_ctx.sys_allocation.watcher_pos = i;
-      break;
-    }
-  }
-
   // Set defaults
   ctx->params.upload_period = 60.0;
 

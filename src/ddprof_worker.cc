@@ -346,77 +346,6 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
   return {};
 }
 
-DDRes ddprof_pr_sysallocation_tracking(DDProfContext *ctx,
-                                       perf_event_sample *sample,
-                                       int watcher_pos, bool &clear_pid) {
-  clear_pid = false;
-  // Syscall parameters.  Suppressing nags because it's annoying to look these
-  // up and it isn't totally appropriate to spin out a new header just
-  // for this
-  int64_t id;
-  memcpy(&id, sample->data_raw + 8, sizeof(id));
-  auto &sysalloc = ctx->worker_ctx.sys_allocation;
-
-#ifdef __x86_64__
-  [[maybe_unused]] uint64_t sc_ret = sample->regs[PAM_X86_RAX];
-  [[maybe_unused]] uint64_t sc_p1 = sample->regs[PAM_X86_RDI];
-  [[maybe_unused]] uint64_t sc_p2 = sample->regs[PAM_X86_RSI];
-  [[maybe_unused]] uint64_t sc_p3 = sample->regs[PAM_X86_RDX];
-  [[maybe_unused]] uint64_t sc_p4 = sample->regs[PAM_X86_R10];
-  [[maybe_unused]] uint64_t sc_p5 = sample->regs[PAM_X86_R8];
-  [[maybe_unused]] uint64_t sc_p6 = sample->regs[PAM_X86_R9];
-#elif __aarch64__
-  // Obviously ARM is totally broken here.
-  [[maybe_unused]] uint64_t sc_ret = sample->regs[PAM_ARM_X0];
-  [[maybe_unused]] uint64_t sc_p1 = sample->regs[PAM_ARM_X0];
-  [[maybe_unused]] uint64_t sc_p2 = sample->regs[PAM_ARM_X1];
-  [[maybe_unused]] uint64_t sc_p3 = sample->regs[PAM_ARM_X2];
-  [[maybe_unused]] uint64_t sc_p4 = sample->regs[PAM_ARM_X3];
-  [[maybe_unused]] uint64_t sc_p5 = sample->regs[PAM_ARM_X4];
-  [[maybe_unused]] uint64_t sc_p6 = sample->regs[PAM_ARM_X5];
-#else
-#  error Architecture not supported
-#endif
-  if (sc_ret > -4096UL) {
-    // If the syscall returned error, it didn't mutate state.  Skip!
-    // ("high" values are errors, as per standard)
-    return ddres_init();
-  }
-
-  // Only unwind if we will need to propagate unwinding information forward
-  DDRes res = {};
-  UnwindOutput *uwo = NULL;
-  if (id == 9 || id == 25) {
-    auto ticks0 = ddprof::get_tsc_cycles();
-    res = ddprof_unwind_sample(ctx, sample, watcher_pos);
-    auto unwind_ticks = ddprof::get_tsc_cycles();
-    ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL);
-    uwo = &ctx->worker_ctx.us->output;
-
-    // TODO: propagate fatal
-    if (IsDDResFatal(res)) {
-      return ddres_init();
-    }
-  }
-
-  // hardcoded syscall numbers; these are uniform between x86/arm
-  if (id == 9) {
-    sysalloc.do_mmap(*uwo, sc_ret, sc_p2, sample->pid);
-  } else if (id == 11) {
-    sysalloc.do_munmap(sc_p1, sc_p2, sample->pid);
-  } else if (id == 28) {
-    // Unhandled, no need to handle
-  } else if (id == 25) {
-    sysalloc.do_mremap(*uwo, sc_ret, sc_p1, sc_p2, sc_p3, sample->pid);
-  } else if (id == 60 || id == 231 || id == 59 || id == 322 || id == 520 ||
-             id == 545) {
-    // Erase upon exit or exec
-    clear_pid = true;
-  }
-
-  return ddres_init();
-}
-
 static void ddprof_reset_worker_stats() {
   for (unsigned i = 0; i < std::size(s_cycled_stats); ++i) {
     ddprof_stats_clear(s_cycled_stats[i]);
@@ -509,55 +438,11 @@ static DDRes aggregate_live_allocations(DDProfContext *ctx) {
   return ddres_init();
 }
 
-DDRes aggregate_sys_allocation_stack(const UnwindOutput *uw_output,
-                                     const SymbolHdr *symbol_hdr,
-                                     const PerfWatcher *watcher,
-                                     DDProfPProf *pprof) {
-  DDRES_CHECK_FWD(pprof_aggregate(uw_output, *symbol_hdr, get_page_size(), 1,
-                                  watcher, pprof));
-  return ddres_init();
-}
-
-static DDRes aggregate_sys_allocations_for_pid(DDProfContext *ctx, pid_t pid) {
-  struct UnwindState *us = ctx->worker_ctx.us;
-  SystemAllocation &sysallocs = ctx->worker_ctx.sys_allocation;
-  PerfWatcher *watcher = &ctx->watchers[sysallocs.watcher_pos];
-  int i_export = ctx->worker_ctx.i_current_pprof;
-  DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
-  const auto &stack_map = sysallocs._pid_map[pid];
-  for (const auto &page : stack_map) {
-    DDRES_CHECK_FWD(aggregate_sys_allocation_stack(
-        &page.second, &us->symbol_hdr, watcher, pprof));
-  }
-  return ddres_init();
-}
-
-static DDRes aggregate_sys_allocations(DDProfContext *ctx) {
-  struct UnwindState *us = ctx->worker_ctx.us;
-  SystemAllocation &sysallocs = ctx->worker_ctx.sys_allocation;
-  PerfWatcher *watcher = &ctx->watchers[sysallocs.watcher_pos];
-  int i_export = ctx->worker_ctx.i_current_pprof;
-  DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
-
-  // Iterate through each PID
-  for (auto &stack_map : sysallocs._pid_map) {
-    // Iterate through pages...
-    // TODO Probably aggregate into ranges of pages or something, but once per
-    //      page is just too much
-    for (const auto &page : stack_map.second) {
-      DDRES_CHECK_FWD(aggregate_sys_allocation_stack(
-          &page.second, &us->symbol_hdr, watcher, pprof));
-    }
-  }
-  return ddres_init();
-}
 
 static DDRes worker_pid_free(DDProfContext *ctx, pid_t el) {
-  DDRES_CHECK_FWD(aggregate_sys_allocations_for_pid(ctx, el));
   DDRES_CHECK_FWD(aggregate_live_allocations_for_pid(ctx, el));
   UnwindState *us = ctx->worker_ctx.us;
   unwind_pid_free(us, el);
-  ctx->worker_ctx.sys_allocation.clear_pid(el);
   ctx->worker_ctx.live_allocation.clear_pid(el);
   return ddres_init();
 }
@@ -565,7 +450,6 @@ static DDRes worker_pid_free(DDProfContext *ctx, pid_t el) {
 static DDRes worker_pid_free(DDProfContext *ctx, pid_t el) {
   UnwindState *us = ctx->worker_ctx.us;
   unwind_pid_free(us, el);
-  ctx->worker_ctx.sys_allocation.clear_pid(el);
   ctx->worker_ctx.live_allocation.clear_pid(el);
   return ddres_init();
 }
@@ -589,7 +473,6 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
   DDRES_CHECK_FWD(clear_unvisited_pids(ctx));
 #ifndef DDPROF_NATIVE_LIB
   DDRES_CHECK_FWD(aggregate_live_allocations(ctx));
-  DDRES_CHECK_FWD(aggregate_sys_allocations(ctx));
 
   // Take the current pprof contents and ship them to the backend.  This also
   // clears the pprof for reuse
@@ -855,24 +738,8 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
       if (wpid->pid) {
         uint64_t mask = watcher->sample_type;
         perf_event_sample *sample = hdr2samp(hdr, mask);
-
         if (sample) {
-          // Handle special profiling types first
-          if (watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS1 ||
-              watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS2) {
-            // For now we have a different path for
-            // - mmap/munmap syscalls
-            bool clear_pid = false;
-            DDRES_CHECK_FWD(ddprof_pr_sysallocation_tracking(
-                ctx, sample, watcher_pos, clear_pid));
-            if (clear_pid) {
-              LG_DBG("<%d>(SYSEXIT)%d", watcher_pos, wpid->pid);
-              // we could consider clearing the pid here
-              // though we could get other types of events
-            }
-          } else {
-            DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, watcher_pos));
-          }
+          DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, watcher_pos));
         }
       }
       break;
