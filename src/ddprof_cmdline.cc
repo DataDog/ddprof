@@ -131,9 +131,34 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   watcher->tracepoint_group = conf->groupname;
   watcher->tracepoint_label = conf->label;
 
-  // Allocation watcher, has an extra field to ensure we capture address
+  // Certain watcher configs get additional event information
   if (watcher->config == kDDPROF_COUNT_ALLOCATIONS) {
     watcher->sample_type |= PERF_SAMPLE_ADDR;
+  }
+
+  // Some profiling types get lots of additional state transplanted here
+  if (watcher->options.is_overloaded) {
+    if (watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS1) {
+      // tALLOCSY1 overrides perfopen to bind together many file descriptors
+      watcher->tracepoint_group = "syscalls";
+      watcher->tracepoint_label = "sys_exit_mmap";
+      watcher->instrument_self = true;
+      watcher->options.use_kernel = PerfWatcherUseKernel::kTry;
+      watcher->sample_stack_size /= 2; // Make this one smaller than normal
+
+    } else if (watcher->ddprof_event_type == DDPROF_PWE_tALLOCSYS2) {
+      // tALLOCSYS2 captures all syscalls; used to troubleshoot 1
+      watcher->tracepoint_group = "raw_syscalls";
+      watcher->tracepoint_label = "sys_exit";
+      long id = ddprof::tracepoint_get_id("raw_syscalls", "sys_exit");
+      if (-1 == id) {
+        // We mutated the user's event, but it is invalid.
+        return false;
+      }
+      watcher->config = id;
+    }
+    watcher->sample_type |= PERF_SAMPLE_RAW;
+    watcher->options.use_kernel = PerfWatcherUseKernel::kTry;
   }
 
   return true;
