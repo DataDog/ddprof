@@ -82,8 +82,50 @@ TEST(LiveAllocationTest, invalid_inputs) {
   // Register deallocation with invalid address
   EXPECT_NO_THROW(live_alloc.register_deallocation(0, watcher_pos, pid));
 }
+
+
+TEST(LiveAllocationTest, overlap_registrations) {
+  LogHandle handle;
+  LiveAllocation live_alloc;
+  int watcher_pos = 0;
+  pid_t pid = 12;
+  int64_t value = 10;
+  UnwindOutput uo;
+
+  uintptr_t addr = 0x10;
+  uo.pid = 123;
+  uo.tid = 456;
+  uo.is_incomplete = false;
+  uo.locs.push_back({0x1234, 0x5678, 0x9abc});
+
+  // Register the first allocation
+  live_alloc.register_allocation(uo, addr, value, watcher_pos, pid);
+  auto &pid_map = live_alloc._watcher_vector[0];
+  auto &pid_stacks = pid_map[pid];
+  EXPECT_EQ(pid_stacks._address_map.size(), 1);
+  EXPECT_EQ(pid_stacks._unique_stacks.size(), 1);
+
+  // Register a second allocation at the same address
+  // elements can arrive out of order, so this can be expected
+  live_alloc.register_allocation(uo, addr, value * 2, watcher_pos, pid);
+  EXPECT_EQ(pid_stacks._address_map.size(), 1);
+  EXPECT_EQ(pid_stacks._unique_stacks.size(), 1);
+
+  // Check that the value and count have the latest value
+  auto &el = pid_stacks._unique_stacks[uo];
+  EXPECT_EQ(el._value, value * 2);
+  EXPECT_EQ(el._count, 1);
+
+  // Deallocate the first allocation
+  live_alloc.register_deallocation(addr, watcher_pos, pid);
+  EXPECT_EQ(pid_stacks._address_map.size(), 0);
+  EXPECT_EQ(pid_stacks._unique_stacks.size(), 0);
+
+  // Deallocate the second allocation
+  live_alloc.register_deallocation(addr, watcher_pos, pid);
+  EXPECT_EQ(pid_stacks._address_map.size(), 0);
+  EXPECT_EQ(pid_stacks._unique_stacks.size(), 0);
 }
 
-// Other cases to consider
-// -- same address registered
-//
+}
+

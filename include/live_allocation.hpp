@@ -9,6 +9,8 @@
 #include "unlikely.hpp"
 #include "unwind_output_hash.hpp"
 
+#include <sys/types.h>
+#include <cstddef>
 #include <unordered_map>
 
 namespace ddprof {
@@ -33,6 +35,7 @@ public:
 
   using PprofStacks =
       std::unordered_map<UnwindOutput, ValueAndCount, UnwindOutputHash>;
+
   struct ValuePerAddress {
     int64_t _value = 0;
     PprofStacks::value_type *_unique_stack = nullptr;
