@@ -374,16 +374,15 @@ void *ddprof_worker_export_thread(void *arg) {
 #endif
 
 #ifndef DDPROF_NATIVE_LIB
-static DDRes
-aggregate_livealloc_stack(const LiveAllocation::AllocationInfo &alloc_info,
-                          DDProfContext *ctx,
-                          const PerfWatcher *watcher,
-                          DDProfPProf *pprof,
-                          const SymbolHdr &symbol_hdr) {
-  DDRES_CHECK_FWD(pprof_aggregate(&alloc_info._stack, symbol_hdr,
-                                  alloc_info._size, 1, watcher, pprof));
+static DDRes aggregate_livealloc_stack(
+    const LiveAllocation::PprofStacks::value_type &alloc_info,
+    DDProfContext *ctx, const PerfWatcher *watcher, DDProfPProf *pprof,
+    const SymbolHdr &symbol_hdr) {
+  DDRES_CHECK_FWD(pprof_aggregate(&alloc_info.first, symbol_hdr,
+                                  alloc_info.second._value,
+                                  alloc_info.second._count, watcher, pprof));
   if (ctx->params.show_samples) {
-    ddprof_print_sample(alloc_info._stack, symbol_hdr, alloc_info._size,
+    ddprof_print_sample(alloc_info.first, symbol_hdr, alloc_info.second._value,
                         *watcher);
   }
   return ddres_init();
@@ -399,10 +398,10 @@ static DDRes aggregate_live_allocations_for_pid(DDProfContext *ctx, pid_t pid) {
        watcher_pos < live_allocations._watcher_vector.size(); ++watcher_pos) {
     auto &pid_map = live_allocations._watcher_vector[watcher_pos];
     const PerfWatcher *watcher = &ctx->watchers[watcher_pos];
-    auto &stack_map = pid_map[pid];
-    for (const auto &alloc_info_pair : stack_map) {
-      DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info_pair.second, ctx,
-                                                watcher, pprof, symbol_hdr));
+    auto &pid_stacks = pid_map[pid];
+    for (const auto &alloc_info : pid_stacks._unique_stacks) {
+      DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info, ctx, watcher, pprof,
+                                                symbol_hdr));
     }
   }
   return ddres_init();
@@ -411,33 +410,27 @@ static DDRes aggregate_live_allocations_for_pid(DDProfContext *ctx, pid_t pid) {
 static DDRes aggregate_live_allocations(DDProfContext *ctx) {
   // this would be more efficient if we could reuse the same stacks in
   // libdatadog
-
   struct UnwindState *us = ctx->worker_ctx.us;
   int i_export = ctx->worker_ctx.i_current_pprof;
   DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
   const SymbolHdr &symbol_hdr = us->symbol_hdr;
-  LiveAllocation &live_allocations = ctx->worker_ctx.live_allocation;
-
+  const LiveAllocation &live_allocations = ctx->worker_ctx.live_allocation;
   for (unsigned watcher_pos = 0;
        watcher_pos < live_allocations._watcher_vector.size(); ++watcher_pos) {
-    auto &pid_map = live_allocations._watcher_vector[watcher_pos];
+    const auto &pid_map = live_allocations._watcher_vector[watcher_pos];
     const PerfWatcher *watcher = &ctx->watchers[watcher_pos];
-    for (auto &stack_map : pid_map) {
-      for (const auto &alloc_info_pair : stack_map.second) {
-        DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info_pair.second, ctx,
-                                                  watcher,
-                                                  pprof,
-                                                  symbol_hdr));
+    for (const auto &pid_vt : pid_map) {
+      for (const auto &alloc_info : pid_vt.second._unique_stacks) {
+        DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info, ctx, watcher,
+                                                  pprof, symbol_hdr));
       }
-      LG_NTC("<%u> Number of Live allocations for PID%d = %lu ",
-             watcher_pos,
-             stack_map.first,
-             stack_map.second.size());
+      LG_NTC("<%u> Number of Live allocations for PID%d=%lu, Unique stacks=%lu",
+             watcher_pos, pid_vt.first, pid_vt.second._address_map.size(),
+             pid_vt.second._unique_stacks.size());
     }
   }
   return ddres_init();
 }
-
 
 static DDRes worker_pid_free(DDProfContext *ctx, pid_t el) {
   DDRES_CHECK_FWD(aggregate_live_allocations_for_pid(ctx, el));
@@ -622,10 +615,9 @@ void ddprof_pr_clear_live_allocation(DDProfContext *ctx,
                                                         event->sample_id.pid);
 }
 
-void ddprof_pr_deallocation(DDProfContext *ctx,
-                            const DeallocationEvent *event, int watcher_pos) {
-  ctx->worker_ctx.live_allocation.register_deallocation(event->ptr,
-                                                        watcher_pos,
+void ddprof_pr_deallocation(DDProfContext *ctx, const DeallocationEvent *event,
+                            int watcher_pos) {
+  ctx->worker_ctx.live_allocation.register_deallocation(event->ptr, watcher_pos,
                                                         event->sample_id.pid);
 }
 
@@ -771,19 +763,18 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
                      watcher_pos);
       break;
     case PERF_CUSTOM_EVENT_DEALLOCATION:
-      ddprof_pr_deallocation(ctx,
-                             reinterpret_cast<const DeallocationEvent *>(hdr),
-                             watcher_pos);
+      ddprof_pr_deallocation(
+          ctx, reinterpret_cast<const DeallocationEvent *>(hdr), watcher_pos);
       break;
-    case PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION:
-      {
-        const ClearLiveAllocationEvent* event = reinterpret_cast<const ClearLiveAllocationEvent *>(hdr);
+    case PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION: {
+      const ClearLiveAllocationEvent *event =
+          reinterpret_cast<const ClearLiveAllocationEvent *>(hdr);
 #ifndef DDPROF_NATIVE_LIB
-        DDRES_CHECK_FWD(aggregate_live_allocations_for_pid(ctx, event->sample_id.pid));
+      DDRES_CHECK_FWD(
+          aggregate_live_allocations_for_pid(ctx, event->sample_id.pid));
 #endif
-        ddprof_pr_clear_live_allocation(ctx, event,watcher_pos);
-      }
-      break;
+      ddprof_pr_clear_live_allocation(ctx, event, watcher_pos);
+    } break;
     default:
       break;
     }

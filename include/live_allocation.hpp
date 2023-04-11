@@ -6,62 +6,84 @@
 #pragma once
 
 #include "ddprof_defs.hpp"
-#include "logger.hpp"
-#include "unwind_output.hpp"
 #include "unlikely.hpp"
+#include "unwind_output_hash.hpp"
 
 #include <unordered_map>
 
 namespace ddprof {
 
 template <typename T>
-T& access_resize(std::vector<T>& v, size_t index, const T& default_value = T()) {
+T &access_resize(std::vector<T> &v, size_t index,
+                 const T &default_value = T()) {
   if (unlikely(index >= v.size())) {
     v.resize(index + 1, default_value);
   }
   return v[index];
 }
 
-
 class LiveAllocation {
 public:
-  void register_allocation(const UnwindOutput &stack, uintptr_t addr,
-                           size_t size, int watcher_pos, pid_t pid) {
+  // For allocations Value is the size
+  // This is the cumulative value and count for a given stack
+  struct ValueAndCount {
+    int64_t _value = 0;
+    int64_t _count = 0;
+  };
+
+  using PprofStacks =
+      std::unordered_map<UnwindOutput, ValueAndCount, UnwindOutputHash>;
+  struct ValuePerAddress {
+    int64_t _value = 0;
+    PprofStacks::value_type *_unique_stack = nullptr;
+  };
+
+  using AddressMap = std::unordered_map<uintptr_t, ValuePerAddress>;
+  struct PidStacks {
+    AddressMap _address_map;
+    PprofStacks _unique_stacks;
+  };
+
+  using PidMap = std::unordered_map<pid_t, PidStacks>;
+  using WatcherVector = std::vector<PidMap>;
+  WatcherVector _watcher_vector;
+
+  // Allocation should be aggregated per stack trace
+  // instead of a stack, we would have a total size for this unique stack trace
+  // and a count.
+  void register_allocation(const UnwindOutput &uo, uintptr_t addr, size_t size,
+                           int watcher_pos, pid_t pid) {
     PidMap &pid_map = access_resize(_watcher_vector, watcher_pos);
-    StackMap &stack_map = pid_map[pid];
-    stack_map[addr] = AllocationInfo{
-        ._stack = stack, ._size = size, ._watcher_pos = watcher_pos};
+    PidStacks &pid_stacks = pid_map[pid];
+    register_allocation(uo, addr, size, pid_stacks._unique_stacks,
+                        pid_stacks._address_map);
   }
 
   void register_deallocation(uintptr_t addr, int watcher_pos, pid_t pid) {
     PidMap &pid_map = access_resize(_watcher_vector, watcher_pos);
-    StackMap &stack_map = pid_map[pid];
-    if (!stack_map.erase(addr)) {
-      LG_DBG("Unmatched deallocation at %lx of PID%d", addr, pid);
-    }
+    PidStacks &pid_stacks = pid_map[pid];
+    register_deallocation(addr, pid_stacks._unique_stacks,
+                          pid_stacks._address_map);
   }
 
   void clear_pid_for_watcher(int watcher_pos, pid_t pid) {
     PidMap &pid_map = access_resize(_watcher_vector, watcher_pos);
-    pid_map[pid].clear();
+    pid_map.erase(pid);
   }
 
   void clear_pid(pid_t pid) {
     for (auto &pid_map : _watcher_vector) {
-      pid_map[pid].clear();
+      pid_map.erase(pid);
     }
   }
 
-  struct AllocationInfo {
-    UnwindOutput _stack;
-    size_t _size;
-    int _watcher_pos;
-  };
+private:
+  static void register_deallocation(uintptr_t address, PprofStacks &stacks,
+                                    AddressMap &address_map);
 
-  using StackMap = std::unordered_map<uintptr_t, AllocationInfo>;
-  using PidMap = std::unordered_map<pid_t, StackMap>;
-  using WatcherVector = std::vector<PidMap>;
-  WatcherVector _watcher_vector;
+  static void register_allocation(const UnwindOutput &uo, uintptr_t address,
+                                  int64_t value, PprofStacks &stacks,
+                                  AddressMap &address_map);
 };
 
 } // namespace ddprof
