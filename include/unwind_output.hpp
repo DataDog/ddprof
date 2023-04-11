@@ -11,12 +11,13 @@
 #include <vector>
 
 #include "ddprof_defs.hpp"
-#include "string_view.hpp"
 
 typedef struct FunLoc {
   uint64_t ip; // Relative to file, not VMA
   SymbolIdx_t _symbol_idx;
   MapInfoIdx_t _map_info_idx;
+
+  auto operator<=>(const FunLoc &) const = default;
 } FunLoc;
 
 struct UnwindOutput {
@@ -28,4 +29,6 @@ struct UnwindOutput {
   int pid;
   int tid;
   bool is_incomplete;
+
+  auto operator<=>(const UnwindOutput &) const = default;
 };
