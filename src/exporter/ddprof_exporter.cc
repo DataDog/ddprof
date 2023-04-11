@@ -367,6 +367,7 @@ DDRes ddprof_exporter_export(const ddog_prof_Profile *profile,
         res = check_send_response_code(result.http_response.code);
       }
     } else {
+      defer { ddog_Error_drop(&res_request.err); };
       LG_ERR("[EXPORTER] Failure to build request: %s",
              res_request.err.message.ptr);
       res = ddres_error(DD_WHAT_EXPORTER);
