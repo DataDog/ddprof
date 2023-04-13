@@ -63,7 +63,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
     const char *value_name = sample_type_name_from_idx(i);
     const char *value_unit = sample_type_unit_from_idx(i);
     if (!value_name || !value_unit) {
-      LG_WRN("Malformed sample type (%d), ignoring", i);
+      LG_WRN("[PPROF] Malformed sample type (%d), ignoring", i);
       continue;
     }
     perf_value_type[num_sample_type_ids].type_ = to_CharSlice(value_name);
@@ -112,7 +112,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
   pprof->_profile = ddog_prof_Profile_new(
       sample_types, num_sample_type_ids > 0 ? &period : nullptr, nullptr);
   if (!pprof->_profile) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to create profile");
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "[PPROF] Unable to create profile");
   }
 
   // Add relevant tags
@@ -255,8 +255,9 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   //  uint64_t id_sample = ddog_prof_Profile_add(profile, sample);
   ddog_prof_Profile_AddResult add_res = ddog_prof_Profile_add(profile, sample);
   if (add_res.tag == DDOG_PROF_PROFILE_ADD_RESULT_ERR) {
-    defer { ddog_Error_drop(&add_res.err); };
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile: %s",
+    log_warn_and_drop_error("[PPROF] Error from ddog_prof_Profile_add",
+                            &add_res.err);
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "[PPROF] Unable to add profile: %s",
                            add_res.err.message.ptr);
   }
 
@@ -265,7 +266,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
 
 DDRes pprof_reset(DDProfPProf *pprof) {
   if (!ddog_prof_Profile_reset(pprof->_profile, nullptr)) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to reset profile");
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "[PPROF] Unable to reset profile");
   }
   return ddres_init();
 }
