@@ -71,8 +71,7 @@ void LiveAllocation::register_allocation(const UnwindOutput &uo,
       }
       // Should we erase the element here ?
       // only if we are sure it is not the same as the one we are inserting.
-      if (v._unique_stack != &unique_stack &&
-          !v._unique_stack->second._count) {
+      if (v._unique_stack != &unique_stack && !v._unique_stack->second._count) {
         stacks.erase(v._unique_stack->first);
       }
     }

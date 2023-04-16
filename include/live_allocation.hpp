@@ -9,8 +9,8 @@
 #include "unlikely.hpp"
 #include "unwind_output_hash.hpp"
 
-#include <sys/types.h>
 #include <cstddef>
+#include <sys/types.h>
 #include <unordered_map>
 
 namespace ddprof {

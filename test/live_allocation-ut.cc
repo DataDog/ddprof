@@ -26,9 +26,9 @@ TEST(LiveAllocationTest, simple) {
   int64_t nb_registered_allocs = 10;
   { // allocate 10
     uintptr_t addr = 0x10;
-    for (int i=0; i<nb_registered_allocs; ++i) {
+    for (int i = 0; i < nb_registered_allocs; ++i) {
       live_alloc.register_allocation(uo, addr, value, watcher_pos, pid);
-      addr+=0x10;
+      addr += 0x10;
     }
   }
   // Check that the hash values are equal
@@ -65,7 +65,8 @@ TEST(LiveAllocationTest, invalid_inputs) {
 
   // Register allocation with empty UnwindOutput
   uintptr_t addr = 0x10;
-  EXPECT_NO_THROW(live_alloc.register_allocation(uo, addr, value, watcher_pos, pid));
+  EXPECT_NO_THROW(
+      live_alloc.register_allocation(uo, addr, value, watcher_pos, pid));
   auto &pid_map = live_alloc._watcher_vector[0];
   auto &pid_stacks = pid_map[pid];
   // for now we don't consider them
@@ -78,11 +79,11 @@ TEST(LiveAllocationTest, invalid_inputs) {
   uo.is_incomplete = false;
   uo.locs.push_back({0x1234, 0x5678, 0x9abc});
   // We will register them (though probably cause a UI bug...)
-  EXPECT_NO_THROW(live_alloc.register_allocation(uo, addr, -1, watcher_pos, pid));
+  EXPECT_NO_THROW(
+      live_alloc.register_allocation(uo, addr, -1, watcher_pos, pid));
   // Register deallocation with invalid address
   EXPECT_NO_THROW(live_alloc.register_deallocation(0, watcher_pos, pid));
 }
-
 
 TEST(LiveAllocationTest, overlap_registrations) {
   LogHandle handle;
@@ -127,5 +128,4 @@ TEST(LiveAllocationTest, overlap_registrations) {
   EXPECT_EQ(pid_stacks._unique_stacks.size(), 0);
 }
 
-}
-
+} // namespace ddprof
