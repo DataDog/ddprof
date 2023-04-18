@@ -16,7 +16,6 @@
 #include "pevent_lib.hpp"
 #include "pprof/ddprof_pprof.hpp"
 #include "procutils.hpp"
-#include "stack_handler.hpp"
 #include "tags.hpp"
 #include "timer.hpp"
 #include "unwind.hpp"
@@ -60,7 +59,6 @@ static inline int64_t now_nanos() {
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
 }
 
-#ifndef DDPROF_NATIVE_LIB
 static DDRes report_lost_events(DDProfContext *ctx) {
   for (int watcher_idx = 0; watcher_idx < ctx->num_watchers; ++watcher_idx) {
     if (ctx->worker_ctx.lost_events_per_watcher[watcher_idx] > 0) {
@@ -83,7 +81,6 @@ static DDRes report_lost_events(DDProfContext *ctx) {
 
   return {};
 }
-#endif
 
 static inline long export_time_convert(double upload_period) {
   return upload_period * 1000000000;
@@ -313,7 +310,6 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
       ctx->worker_ctx.live_allocation.register_allocation(
           us->output, sample->addr, sample->period, watcher_pos, sample->pid);
     } else if (Any(EventConfMode::kCallgraph & watcher->output_mode)) {
-#ifndef DDPROF_NATIVE_LIB
       // Depending on the type of watcher, compute a value for sample
       uint64_t sample_val = perf_value_from_sample(watcher, sample);
 
@@ -326,17 +322,6 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
         ddprof_print_sample(us->output, us->symbol_hdr, sample->period,
                             *watcher);
       }
-#else
-      // Call the user's stack handler
-      if (ctx->stack_handler) {
-        if (!ctx->stack_handler->apply(&us->output, ctx,
-                                       ctx->stack_handler->callback_ctx,
-                                       watcher_pos)) {
-          DDRES_RETURN_ERROR_LOG(DD_WHAT_STACK_HANDLE,
-                                 "Stack handler returning errors");
-        }
-      }
-#endif
     }
   }
 
@@ -352,7 +337,6 @@ static void ddprof_reset_worker_stats() {
   }
 }
 
-#ifndef DDPROF_NATIVE_LIB
 void *ddprof_worker_export_thread(void *arg) {
   DDProfWorkerContext *worker = (DDProfWorkerContext *)arg;
   // export the one we are not writting to
@@ -371,9 +355,7 @@ void *ddprof_worker_export_thread(void *arg) {
 
   return nullptr;
 }
-#endif
 
-#ifndef DDPROF_NATIVE_LIB
 static DDRes aggregate_livealloc_stack(
     const LiveAllocation::PprofStacks::value_type &alloc_info,
     DDProfContext *ctx, const PerfWatcher *watcher, DDProfPProf *pprof,
@@ -439,14 +421,6 @@ static DDRes worker_pid_free(DDProfContext *ctx, pid_t el) {
   ctx->worker_ctx.live_allocation.clear_pid(el);
   return ddres_init();
 }
-#else
-static DDRes worker_pid_free(DDProfContext *ctx, pid_t el) {
-  UnwindState *us = ctx->worker_ctx.us;
-  unwind_pid_free(us, el);
-  ctx->worker_ctx.live_allocation.clear_pid(el);
-  return ddres_init();
-}
-#endif
 
 static DDRes clear_unvisited_pids(DDProfContext *ctx) {
   UnwindState *us = ctx->worker_ctx.us;
@@ -464,7 +438,6 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
 
   // Clearing unused PIDs will ensure we don't report them at next cycle
   DDRES_CHECK_FWD(clear_unvisited_pids(ctx));
-#ifndef DDPROF_NATIVE_LIB
   DDRES_CHECK_FWD(aggregate_live_allocations(ctx));
 
   // Take the current pprof contents and ship them to the backend.  This also
@@ -514,7 +487,6 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
       return ddres_create(DD_SEVERROR, DD_WHAT_EXPORTER);
     }
   }
-#endif
   auto cycle_now = std::chrono::steady_clock::now();
   auto cycle_duration = cycle_now - ctx->worker_ctx.cycle_start_time;
   ctx->worker_ctx.cycle_start_time = cycle_now;
@@ -638,7 +610,6 @@ DDRes ddprof_worker_maybe_export(DDProfContext *ctx, int64_t now_ns) {
   return ddres_init();
 }
 
-#ifndef DDPROF_NATIVE_LIB
 DDRes ddprof_worker_init(DDProfContext *ctx,
                          PersistentWorkerState *persistent_worker_state) {
   try {
@@ -706,7 +677,6 @@ DDRes ddprof_worker_free(DDProfContext *ctx) {
   CatchExcept2DDRes();
   return ddres_init();
 }
-#endif
 
 // Simple wrapper over perf_event_hdr in order to filter by PID in a uniform
 // way.  Whenver PID is a valid concept for the given event type, the
@@ -769,10 +739,8 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
     case PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION: {
       const ClearLiveAllocationEvent *event =
           reinterpret_cast<const ClearLiveAllocationEvent *>(hdr);
-#ifndef DDPROF_NATIVE_LIB
       DDRES_CHECK_FWD(
           aggregate_live_allocations_for_pid(ctx, event->sample_id.pid));
-#endif
       ddprof_pr_clear_live_allocation(ctx, event, watcher_pos);
     } break;
     default:

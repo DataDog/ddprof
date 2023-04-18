@@ -46,7 +46,6 @@
   X(EXPORT_TIMEOUT, "pending export failed to return in time")                 \
   X(ARGUMENT, "error writing arguments")                                       \
   X(INPUT_PROCESS, "")                                                         \
-  X(STACK_HANDLE, "")                                                          \
   X(DSO, "")                                                                   \
   X(JIT, "Error parsing JIT files")                                            \
   X(NO_JIT_FILE, "File not readable for JIT")                                  \
