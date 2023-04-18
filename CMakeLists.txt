@@ -383,41 +383,6 @@ install(
   ARCHIVE DESTINATION ddprof/lib
   PUBLIC_HEADER DESTINATION ddprof/include)
 
-# ---- Declaration of native library  ----
-option(BUILD_NATIVE_LIB "Build a library out of the native profiler" ON)
-if(${BUILD_NATIVE_LIB})
-
-  # Define all sources
-  set(DDPROF_LIB_SRC ${COMMON_SRC} ${DEMANGLER_SRC} ${JIT_SRC} src/lib/ddprof_output.cc)
-
-  # Libs to link
-  set(NATIVE_LIB_LIBRARY_LIST dl DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES}
-                              Threads::Threads)
-
-  if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
-    list(PREPEND NATIVE_LIB_LIBRARY_LIST ${JEMALLOC_LIBRARIES})
-  endif()
-
-  # Create the lib
-  add_library(ddprof-native ${DDPROF_LIB_SRC})
-
-  set_target_properties(ddprof-native PROPERTIES VERSION ${PROJECT_VERSION})
-  set_target_properties(ddprof-native PROPERTIES COMPILE_DEFINITIONS DDPROF_NATIVE_LIB)
-
-  # libcap, can be removed from version distributed to client
-  list(APPEND NATIVE_LIB_LIBRARY_LIST libcap)
-
-  target_include_directories(ddprof-native PRIVATE ${DDPROF_INCLUDE_LIST})
-
-  target_link_libraries(ddprof-native PRIVATE ${NATIVE_LIB_LIBRARY_LIST})
-  add_library(DDProf::Native ALIAS ddprof-native)
-
-  option(ACCURACY_TEST "Enable accuracy test" OFF)
-  if(${ACCURACY_TEST})
-    add_subdirectory(test/self_unwind)
-  endif()
-endif()
-
 # ---- Unit tests ----
 
 # Unit tests Add infrastructure for enabling tests
