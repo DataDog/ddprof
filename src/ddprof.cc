@@ -9,9 +9,7 @@
 
 #include <signal.h>
 #include <stdio.h>
-#include <sys/ioctl.h>
 #include <sys/resource.h>
-#include <sys/sysinfo.h>
 #include <unistd.h>
 
 #include "cap_display.hpp"
@@ -126,7 +124,6 @@ DDRes ddprof_teardown(DDProfContext *ctx) {
   return ddres_init();
 }
 
-#ifndef DDPROF_NATIVE_LIB
 /*************************  Instrumentation Helpers  **************************/
 DDRes ddprof_start_profiler(DDProfContext *ctx) {
   const WorkerAttr perf_funs = {
@@ -137,31 +134,4 @@ DDRes ddprof_start_profiler(DDProfContext *ctx) {
   // Enter the main loop -- this will not return unless there is an error.
   LG_NFO("Entering main loop");
   return main_loop(&perf_funs, ctx);
-}
-#endif
-
-void ddprof_attach_handler(DDProfContext *ctx,
-                           const StackHandler *stack_handler) {
-  const WorkerAttr perf_funs = {
-      .init_fun = worker_library_init,
-      .finish_fun = worker_library_free,
-  };
-
-  if (IsDDResNotOK(ddprof_setup(ctx))) {
-    LG_ERR("Error setting up ddprof");
-    return;
-  }
-  // User defined handler
-  ctx->stack_handler = stack_handler;
-  // Enter the main loop -- returns after a number of cycles.
-  LG_NFO("Initiating Profiling");
-  main_loop_lib(&perf_funs, ctx);
-  if (errno)
-    LG_WRN("Profiling context no longer valid (%s)", strerror(errno));
-  else
-    LG_WRN("Profiling context no longer valid");
-
-  if (IsDDResNotOK(ddprof_teardown(ctx)))
-    LG_ERR("Error when calling ddprof_teardown.");
-  return;
 }

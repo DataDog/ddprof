@@ -40,7 +40,6 @@ typedef struct DDProfContext {
 
   bool initialized;
   ExporterInput exp_input;
-  const StackHandler *stack_handler;
   PerfWatcher watchers[MAX_TYPE_WATCHER];
   int num_watchers;
   void *callback_ctx; // user state to be used in callback (lib mode)

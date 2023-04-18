@@ -6,7 +6,6 @@
 #pragma once
 
 #include "ddres_def.hpp"
-#include "stack_handler.hpp"
 
 #include <unistd.h>
 
@@ -19,11 +18,6 @@ DDRes ddprof_setup(DDProfContext *ctx);
 // Free perf event resources
 DDRes ddprof_teardown(DDProfContext *ctx);
 
-#ifndef DDPROF_NATIVE_LIB
 /*************************  Instrumentation Helpers  **************************/
 // Attach a profiler exporting results from a different fork
 DDRes ddprof_start_profiler(DDProfContext *);
-#endif
-
-// Stack handler should remain valid
-void ddprof_attach_handler(DDProfContext *, const StackHandler *stack_handler);
