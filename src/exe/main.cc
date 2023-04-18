@@ -172,13 +172,13 @@ static InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
     return IsDDResOK(res) ? InputResult::kStop : InputResult::kError;
   }
 
-  // logger can be closed (as it is opened in ddprof_context_set)
+  // logger can be closed (as it is opened in context_set)
   LOG_close();
 
   // cmdline args have been processed.  Set the ctx
-  if (IsDDResNotOK(ddprof_context_set(&input, ctx))) {
+  if (IsDDResNotOK(ddprof::context_set(&input, ctx))) {
     LG_ERR("Error setting up profiling context, exiting");
-    ddprof_context_free(ctx);
+    ddprof::context_free(ctx);
     return InputResult::kError;
   }
   // Adjust input parameters for execvp() (we do this even if unnecessary)
@@ -200,7 +200,7 @@ static InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
     return InputResult::kError;
   }
 
-  if (ddprof_context_allocation_profiling_watcher_idx(ctx) != -1 &&
+  if (ddprof::context_allocation_profiling_watcher_idx(ctx) != -1 &&
       ctx->params.pid && ctx->params.sockfd == -1) {
     LG_ERR("Memory allocation profiling is not supported in PID / global mode");
     return InputResult::kError;
@@ -210,7 +210,7 @@ static InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
 }
 
 static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
-  auto defer_context_free = make_defer([ctx] { ddprof_context_free(ctx); });
+  auto defer_context_free = make_defer([ctx] { ddprof::context_free(ctx); });
 
   is_profiler = false;
 
@@ -229,7 +229,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     // Determine if library should be injected into target process
     // (ie. only if allocation profiling is active)
     bool allocation_profiling_started_from_wrapper =
-        ddprof_context_allocation_profiling_watcher_idx(ctx) != -1;
+        ddprof::context_allocation_profiling_watcher_idx(ctx) != -1;
 
     enum { kParentIdx, kChildIdx };
     int sockfds[2] = {-1, -1};
@@ -259,7 +259,8 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     }
 
     ctx->params.pid = getpid();
-    auto daemonize_res = ddprof::daemonize([ctx] { ddprof_context_free(ctx); });
+    auto daemonize_res =
+        ddprof::daemonize([ctx] { ddprof::context_free(ctx); });
 
     if (daemonize_res.temp_pid == -1) {
       return -1;
@@ -339,7 +340,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     reply.pid = getpid();
 
     int alloc_watcher_idx =
-        ddprof_context_allocation_profiling_watcher_idx(ctx);
+        ddprof::context_allocation_profiling_watcher_idx(ctx);
     if (alloc_watcher_idx != -1) {
       ddprof::span pevents{ctx->worker_ctx.pevent_hdr.pes,
                            ctx->worker_ctx.pevent_hdr.size};
@@ -436,7 +437,7 @@ int main(int argc, char *argv[]) {
   }
 
   {
-    defer { ddprof_context_free(&ctx); };
+    defer { ddprof::context_free(&ctx); };
     /****************************************************************************\
     |                             Run the Profiler |
     \****************************************************************************/

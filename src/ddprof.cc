@@ -133,5 +133,5 @@ DDRes ddprof_start_profiler(DDProfContext *ctx) {
 
   // Enter the main loop -- this will not return unless there is an error.
   LG_NFO("Entering main loop");
-  return main_loop(&perf_funs, ctx);
+  return ddprof::main_loop(&perf_funs, ctx);
 }

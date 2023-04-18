@@ -30,6 +30,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+namespace ddprof {
 static pid_t g_child_pid = 0;
 static bool g_termination_requested = false;
 
@@ -321,7 +322,7 @@ DDRes main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
     // Ensure worker does not return,
     // because we don't want to free resources (perf_event fds,...) that are
     // shared between processes. Only free the context.
-    ddprof_context_free(ctx);
+    context_free(ctx);
     exit(0);
   }
   return {};
@@ -335,3 +336,5 @@ void main_loop_lib(const WorkerAttr *attr, DDProfContext *ctx) {
     LG_NFO("Request to exit");
   }
 }
+
+} // namespace ddprof

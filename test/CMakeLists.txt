@@ -131,7 +131,9 @@ add_unit_test(
   ../src/ddprof_cpumask.cc
   ../src/logger_setup.cc
   ../src/perf_watcher.cc
+  ../src/presets.cc
   ../src/tracepoint_config.cc
+  ../src/version.cc
   ddprof_input-ut.cc
   LIBRARIES DDProf::Parser
   DEFINITIONS MYNAME="ddprof_input-ut")
