@@ -36,7 +36,7 @@ static void find_dso_add_error_frame(UnwindState *us) {
 void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
                         pid_t sample_pid, uint64_t sample_size_stack,
                         char *sample_data_stack) {
-  uw_output_clear(&us->output);
+  us->output.clear();
   memcpy(&us->initial_regs.regs[0], sample_regs,
          K_NB_REGS_UNWIND * sizeof(uint64_t));
   us->current_ip = us->initial_regs.regs[REGNAME(PC)];
@@ -56,11 +56,11 @@ static bool is_stack_complete(UnwindState *us) {
   static constexpr std::array s_expected_root_frames{"_start"sv, "__clone"sv,
                                                      "_exit"sv};
 
-  if (us->output.nb_locs == 0) {
+  if (us->output.locs.size() == 0) {
     return false;
   }
 
-  const auto &root_loc = us->output.locs[us->output.nb_locs - 1];
+  const auto &root_loc = us->output.locs.back();
   const auto &root_mapping =
       us->symbol_hdr._mapinfo_table[root_loc._map_info_idx];
 
@@ -96,15 +96,11 @@ DDRes unwindstate__unwind(UnwindState *us) {
   } else {
     us->output.is_incomplete = false;
   }
-  ddprof_stats_add(STATS_UNWIND_AVG_STACK_DEPTH, us->output.nb_locs, nullptr);
+  ddprof_stats_add(STATS_UNWIND_AVG_STACK_DEPTH, us->output.locs.size(),
+                   nullptr);
 
   // Add a frame that identifies executable to which these belong
   add_virtual_base_frame(us);
-  if (us->_dwfl_wrapper->_inconsistent) {
-    // error detected on this pid
-    LG_WRN("(Inconsistent DWFL/DSOs)%d - Free associated objects", us->pid);
-    unwind_pid_free(us, us->pid);
-  }
   return res;
 }
 
@@ -119,7 +115,6 @@ void unwind_cycle(UnwindState *us) {
   us->symbol_hdr.cycle();
   // clean up pids that we did not see recently
   us->dwfl_hdr.display_stats();
-  us->dwfl_hdr.clear_unvisited();
 
   us->dso_hdr._stats.reset();
   unwind_metrics_reset();

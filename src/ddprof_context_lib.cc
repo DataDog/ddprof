@@ -56,6 +56,7 @@ DDRes add_preset(DDProfContext *ctx, const char *preset,
       {"default-pid", {"sCPU"}},
       {"cpu_only", {"sCPU"}},
       {"alloc_only", {"sALLOC"}},
+      {"cpu_live_heap", {"sCPU", "sALLOC mode=l"}},
   };
 
   if (preset == "default"sv && pid_or_global_mode) {
@@ -99,40 +100,6 @@ DDRes add_preset(DDProfContext *ctx, const char *preset,
   return {};
 }
 
-static void log_watcher(const PerfWatcher *w, int idx) {
-  PRINT_NFO("    ID: %s, Pos: %d, Index: %lu", w->desc.c_str(), idx, w->config);
-  switch (w->value_source) {
-  case EventConfValueSource::kSample:
-    PRINT_NFO("    Location: Sample");
-    break;
-  case EventConfValueSource::kRegister:
-    PRINT_NFO("    Location: Register, regno: %d", w->regno);
-    break;
-  case EventConfValueSource::kRaw:
-    PRINT_NFO("    Location: Raw event, offset: %d, size: %d", w->raw_off,
-              w->raw_sz);
-    break;
-  default:
-    PRINT_NFO("    ILLEGAL LOCATION");
-    break;
-  }
-
-  PRINT_NFO("    Category: %s, EventName: %s, GroupName: %s, Label: %s",
-            sample_type_name_from_idx(w->sample_type_id),
-            w->tracepoint_event.c_str(), w->tracepoint_group.c_str(),
-            w->tracepoint_label.c_str());
-
-  if (w->options.is_freq)
-    PRINT_NFO("    Cadence: Freq, Freq: %lu", w->sample_frequency);
-  else
-    PRINT_NFO("    Cadence: Period, Period: %lu", w->sample_period);
-
-  if (EventConfMode::kCallgraph <= w->output_mode)
-    PRINT_NFO("    Outputting to callgraph (flamegraph)");
-  if (EventConfMode::kMetric <= w->output_mode)
-    PRINT_NFO("    Outputting to metric");
-}
-
 /****************************  Argument Processor  ***************************/
 DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   *ctx = {};
@@ -152,6 +119,7 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
     ctx->watchers[nwatchers] = input->watchers[nwatchers];
   }
   ctx->num_watchers = nwatchers;
+
   // Set defaults
   ctx->params.upload_period = 60.0;
 

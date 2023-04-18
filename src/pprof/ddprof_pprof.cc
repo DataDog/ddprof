@@ -169,12 +169,12 @@ static void write_line(const ddprof::Symbol &symbol, ddog_prof_Line *ffi_line) {
 
 // Assumption of API is that sample is valid in a single type
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
-                      const SymbolHdr *symbol_hdr, uint64_t value,
+                      const SymbolHdr &symbol_hdr, uint64_t value,
                       uint64_t count, const PerfWatcher *watcher,
                       DDProfPProf *pprof) {
 
-  const ddprof::SymbolTable &symbol_table = symbol_hdr->_symbol_table;
-  const ddprof::MapInfoTable &mapinfo_table = symbol_hdr->_mapinfo_table;
+  const ddprof::SymbolTable &symbol_table = symbol_hdr._symbol_table;
+  const ddprof::MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
   ddog_prof_Profile *profile = pprof->_profile;
 
   int64_t values[DDPROF_PWT_LENGTH] = {};
@@ -187,7 +187,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   // assumption of single line per loc for now
   ddog_prof_Line line_buff[DD_MAX_STACK_DEPTH];
 
-  ddprof::span locs{uw_output->locs, uw_output->nb_locs};
+  ddprof::span locs{uw_output->locs};
 
   if (watcher->options.nb_frames_to_skip < locs.size()) {
     locs = locs.subspan(watcher->options.nb_frames_to_skip);
@@ -275,7 +275,7 @@ void ddprof_print_sample(const UnwindOutput &uw_output,
                          const PerfWatcher &watcher) {
 
   auto &symbol_table = symbol_hdr._symbol_table;
-  ddprof::span locs{uw_output.locs, uw_output.nb_locs};
+  ddprof::span locs{uw_output.locs};
 
   const char *sample_name = sample_type_name_from_idx(
       sample_type_id_to_count_sample_type_id(watcher.sample_type_id));

@@ -249,6 +249,12 @@ int ddprof_start_profiling_internal() {
         flags |= ddprof::AllocationTracker::kDeterministicSampling;
         info.allocation_profiling_rate = -info.allocation_profiling_rate;
       }
+
+      if (info.allocation_flags & (1 << ddprof::ReplyMessage::kLiveCallgraph)) {
+        // tracking deallocations to allow a live view
+        flags |= ddprof::AllocationTracker::kTrackDeallocations;
+      }
+
       if (IsDDResOK(ddprof::AllocationTracker::allocation_tracking_init(
               info.allocation_profiling_rate, flags, info.ring_buffer))) {
         // \fixme{nsavoire} pthread_create should probably be overridden

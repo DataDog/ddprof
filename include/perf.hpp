@@ -150,3 +150,6 @@ all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras);
 uint64_t perf_value_from_sample(const PerfWatcher *watcher,
                                 const perf_event_sample *sample);
 } // namespace ddprof
+
+perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
+                                         bool extras);

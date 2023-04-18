@@ -77,7 +77,8 @@ static void trace_unwinding_end(UnwindState *us) {
   if (LL_DEBUG <= LOG_getlevel()) {
     DsoHdr::DsoFindRes find_res =
         us->dso_hdr.dso_find_closest(us->pid, us->current_ip);
-    SymbolIdx_t symIdx = us->output.locs[us->output.nb_locs - 1]._symbol_idx;
+    SymbolIdx_t symIdx =
+        us->output.locs[us->output.locs.size() - 1]._symbol_idx;
     if (find_res.second) {
       const std::string &last_func =
           us->symbol_hdr._symbol_table[symIdx]._symname;
@@ -102,7 +103,7 @@ static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
 static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   if (is_max_stack_depth_reached(*us)) {
     add_common_frame(us, SymbolErrors::truncated_stack);
-    LG_DBG("Max stack depth reached (depth#%lu)", us->output.nb_locs);
+    LG_DBG("Max stack depth reached (depth#%lu)", us->output.locs.size());
     ddprof_stats_add(STATS_UNWIND_TRUNCATED_OUTPUT, 1, nullptr);
     return ddres_warn(DD_WHAT_UW_MAX_DEPTH);
   }
@@ -110,7 +111,7 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   Dwarf_Addr pc = 0;
   if (!dwfl_frame_pc(dwfl_frame, &pc, nullptr)) {
     LG_DBG("Failure to compute frame PC: %s (depth#%lu)", dwfl_errmsg(-1),
-           us->output.nb_locs);
+           us->output.locs.size());
     add_error_frame(nullptr, us, pc, SymbolErrors::dwfl_frame);
     return ddres_init(); // invalid pc : do not add frame
   }
@@ -127,7 +128,7 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   if (!find_res.second) {
     // no matching file was found
     LG_DBG("[UW] (PID%d) DSO not found at 0x%lx (depth#%lu)", us->pid, pc,
-           us->output.nb_locs);
+           us->output.locs.size());
     add_error_frame(nullptr, us, pc, SymbolErrors::unknown_dso);
     return ddres_init();
   }
@@ -173,7 +174,7 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
 
   if (!dwfl_frame_pc(dwfl_frame, &pc, &isactivation)) {
     LG_DBG("Failure to compute frame PC: %s (depth#%lu)", dwfl_errmsg(-1),
-           us->output.nb_locs);
+           us->output.locs.size());
     add_error_frame(nullptr, us, pc, SymbolErrors::dwfl_frame);
     return ddres_init(); // invalid pc : do not add frame
   }
@@ -190,7 +191,7 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
 
 bool is_infinite_loop(UnwindState *us) {
   UnwindOutput &output = us->output;
-  uint64_t nb_locs = output.nb_locs;
+  uint64_t nb_locs = output.locs.size();
   unsigned nb_frames_to_check = 3;
   if (nb_locs <= nb_frames_to_check) {
     return false;
@@ -209,7 +210,7 @@ bool is_infinite_loop(UnwindState *us) {
 static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
   UnwindState *us = (UnwindState *)arg;
 #ifdef DEBUG
-  LG_NFO("Beging depth %lu", us->output.nb_locs);
+  LG_NFO("Beging depth %lu", us->output.locs.size());
 #endif
   int dwfl_error_value = dwfl_errno();
   if (dwfl_error_value) {
@@ -222,8 +223,9 @@ static int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
 #ifdef DEBUG
   // We often fallback to frame pointer unwinding (which logs an error)
   if (dwfl_error_value) {
-    LG_DBG("Error flagged at depth = %lu -- %d Error:%s ", us->output.nb_locs,
-           dwfl_error_value, dwfl_errmsg(dwfl_error_value));
+    LG_DBG("Error flagged at depth = %lu -- %d Error:%s ",
+           us->output.locs.size(), dwfl_error_value,
+           dwfl_errmsg(dwfl_error_value));
   }
 #endif
   // Before we potentially exit, record the fact that we're processing a frame
@@ -248,8 +250,8 @@ DDRes unwind_dwfl(UnwindState *us) {
       0) {
     trace_unwinding_end(us);
   }
-  res = us->output.nb_locs > 0 ? ddres_init()
-                               : ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
+  res = us->output.locs.size() > 0 ? ddres_init()
+                                   : ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
   return res;
 }
 
