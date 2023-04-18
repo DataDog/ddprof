@@ -118,7 +118,7 @@ bool stack_addtomap(const UnwindOutput *unwind_output, const DDProfContext *ctx,
   assert(callback_ctx);
   suw::SymbolMap *symbol_map = reinterpret_cast<suw::SymbolMap *>(callback_ctx);
   assert(perf_option_pos == 0);
-  for (unsigned i = 0; i < unwind_output->nb_locs; ++i) {
+  for (unsigned i = 0; i < unwind_output->locs.size(); ++i) {
     const ddprof::Symbol &symbol = ddprof::get_symbol(ctx, unwind_output, i);
     if (symbol._demangle_name.find("0x") != std::string::npos) {
       // skip non symbolized frames

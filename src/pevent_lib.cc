@@ -5,12 +5,14 @@
 
 #include "pevent_lib.hpp"
 
+#include "ddprof_cmdline.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "perf.hpp"
 #include "ringbuffer_utils.hpp"
 #include "sys_utils.hpp"
 #include "syscalls.hpp"
+#include "tracepoint_config.hpp"
 #include "user_override.hpp"
 
 #include <assert.h>
@@ -131,7 +133,8 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
                   PEventHdr *pevent_hdr) {
   assert(pevent_hdr->size == 0); // check for previous init
   for (int watcher_idx = 0; watcher_idx < ctx->num_watchers; ++watcher_idx) {
-    if (ctx->watchers[watcher_idx].type < kDDPROF_TYPE_CUSTOM) {
+    PerfWatcher *watcher = &ctx->watchers[watcher_idx];
+    if (watcher->type < kDDPROF_TYPE_CUSTOM) {
       DDRES_CHECK_FWD(pevent_open_all_cpus(
           &ctx->watchers[watcher_idx], watcher_idx, pid, num_cpu, pevent_hdr));
     } else {
@@ -200,6 +203,23 @@ DDRes pevent_setup(DDProfContext *ctx, pid_t pid, int num_cpu,
   if (!IsDDResOK(pevent_mmap(pevent_hdr, true))) {
     LG_NTC("Retrying attachment without user override");
     DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, false));
+  }
+
+  // If any watchers have self-instrumentation, then they may have set up child
+  // fds which now need to be consolidated via ioctl.  These fds cannot be
+  // closed until profiling is completed.
+  for (unsigned i = 0; i < pevent_hdr->size; i++) {
+    PEvent *pes = &pevent_hdr->pes[i];
+    if (ctx->watchers[pes->watcher_pos].instrument_self) {
+      int fd = pes->fd;
+      for (int j = 0; j < pes->current_child_fd; ++j) {
+        int child_fd = pes->child_fds[j];
+        if (ioctl(child_fd, PERF_EVENT_IOC_SET_OUTPUT, fd)) {
+          DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
+                                 "Could not ioctl() tALLOCSYS1");
+        }
+      }
+    }
   }
   return ddres_init();
 }

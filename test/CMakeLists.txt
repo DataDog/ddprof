@@ -87,8 +87,8 @@ endfunction()
 # Definition of unit tests
 add_compile_definitions("UNIT_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 
-add_unit_test(ddprofcmdline-ut ../src/ddprof_cmdline.cc ../src/perf_watcher.cc ddprofcmdline-ut.cc
-              LIBRARIES DDProf::Parser)
+add_unit_test(ddprofcmdline-ut ../src/ddprof_cmdline.cc ../src/perf_watcher.cc
+              ../src/tracepoint_config.cc ddprofcmdline-ut.cc LIBRARIES DDProf::Parser)
 
 add_unit_test(logger-ut logger-ut.cc)
 
@@ -131,15 +131,19 @@ add_unit_test(
   ../src/ddprof_cpumask.cc
   ../src/logger_setup.cc
   ../src/perf_watcher.cc
+  ../src/tracepoint_config.cc
   ddprof_input-ut.cc
   LIBRARIES DDProf::Parser
   DEFINITIONS MYNAME="ddprof_input-ut")
 
-add_unit_test(perf_ringbuffer-ut ../src/perf.cc ../src/perf_watcher.cc ../src/perf_ringbuffer.cc
-              perf_ringbuffer-ut.cc DEFINITIONS MYNAME="perf_ringbuffer-ut")
+add_unit_test(
+  perf_ringbuffer-ut ../src/perf.cc ../src/perf_watcher.cc ../src/perf_ringbuffer.cc
+  ../src/tracepoint_config.cc perf_ringbuffer-ut.cc DEFINITIONS MYNAME="perf_ringbuffer-ut")
 
 add_unit_test(
   pevent-ut
+  ../src/ddprof_cmdline.cc
+  ../src/tracepoint_config.cc
   ../src/pevent_lib.cc
   ../src/user_override.cc
   ../src/perf.cc
@@ -148,11 +152,11 @@ add_unit_test(
   ../src/ringbuffer_utils.cc
   ../src/sys_utils.cc
   pevent-ut.cc
+  LIBRARIES DDProf::Parser
   DEFINITIONS MYNAME="pevent-ut")
 
 add_unit_test(
-  ddprof_pprof-ut ../src/pprof/ddprof_pprof.cc ../src/unwind_output.cc ../src/perf_watcher.cc
-  ddprof_pprof-ut.cc
+  ddprof_pprof-ut ../src/pprof/ddprof_pprof.cc ../src/perf_watcher.cc ddprof_pprof-ut.cc
   LIBRARIES Datadog::Profiling DDProf::Parser
   DEFINITIONS MYNAME="ddprof_pprof-ut")
 
@@ -160,8 +164,8 @@ add_unit_test(
   ddprof_exporter-ut
   ../src/exporter/ddprof_exporter.cc
   ../src/ddprof_cmdline.cc
+  ../src/tracepoint_config.cc
   ../src/pprof/ddprof_pprof.cc
-  ../src/unwind_output.cc
   ../src/perf_watcher.cc
   ../src/tags.cc
   ddprof_exporter-ut.cc
@@ -241,7 +245,6 @@ add_unit_test(
   ../src/unwind_dwfl.cc
   ../src/unwind_helpers.cc
   ../src/unwind_metrics.cc
-  ../src/unwind_output.cc
   ../src/user_override.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
   DEFINITIONS MYNAME="savecontext-ut")
@@ -254,6 +257,7 @@ add_unit_test(
   ../src/build_id.cc
   ../src/common_mapinfo_lookup.cc
   ../src/common_symbol_lookup.cc
+  ../src/ddprof_cmdline.cc
   ../src/ddprof_file_info.cc
   ../src/ddprof_stats.cc
   ../src/dso.cc
@@ -282,26 +286,30 @@ add_unit_test(
   ../src/signal_helper.cc
   ../src/statsd.cc
   ../src/sys_utils.cc
+  ../src/tracepoint_config.cc
   ../src/user_override.cc
   ../src/unwind.cc
   ../src/unwind_dwfl.cc
   ../src/unwind_helpers.cc
   ../src/unwind_metrics.cc
-  ../src/unwind_output.cc
-  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
-  DEFINITIONS ${DDPROF_DEFINITION_LIST})
+  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle DDProf::Parser
+  DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=100)
 
 add_unit_test(sys_utils-ut sys_utils-ut.cc ../src/sys_utils.cc)
 
 add_unit_test(
   ringbuffer-ut
   ringbuffer-ut.cc
+  ../src/ddprof_cmdline.cc
+  ../src/tracepoint_config.cc
   ../src/perf.cc
   ../src/perf_ringbuffer.cc
+  ../src/perf_watcher.cc
   ../src/pevent_lib.cc
   ../src/ringbuffer_utils.cc
   ../src/sys_utils.cc
-  ../src/user_override.cc)
+  ../src/user_override.cc
+  LIBRARIES DDProf::Parser)
 
 add_unit_test(timer-ut timer-ut.cc ../src/timer.cc ../src/perf.cc)
 
@@ -317,6 +325,10 @@ add_unit_test(symbol_map-ut symbol_map-ut.cc ../src/symbol_map.cc)
 add_unit_test(build_id-ut build_id-ut.cc ../src/build_id.cc)
 
 add_unit_test(jitdump-ut jitdump-ut.cc ../src/jit/jitdump.cc)
+
+add_unit_test(tracepoint_config-ut tracepoint_config-ut.cc ../src/tracepoint_config.cc)
+
+add_unit_test(live_allocation-ut live_allocation-ut.cc ../src/live_allocation.cc)
 
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/savecontext.cc
               ../src/lib/saveregisters.cc)

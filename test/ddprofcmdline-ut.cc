@@ -157,43 +157,75 @@ TEST(CmdLineTst, ParserKeyPatterns) {
 
   // Mode is permissive
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=magnanimous", &watcher));
-  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kCallgraph);
-  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kMetric);
+  ASSERT_TRUE(Any(watcher.output_mode & EventConfMode::kCallgraph));
+  ASSERT_TRUE(Any(watcher.output_mode & EventConfMode::kMetric));
 
   // A or a designate all
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=A", &watcher));
-  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kCallgraph);
-  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kMetric);
+  ASSERT_TRUE(Any(watcher.output_mode & EventConfMode::kCallgraph));
+  ASSERT_TRUE(Any(watcher.output_mode & EventConfMode::kMetric));
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=a", &watcher));
-  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kCallgraph);
-  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kMetric);
+  ASSERT_TRUE(Any(watcher.output_mode &
+                  EventConfMode::kCallgraph)); // watcher.output_mode <=
+                                               // EventConfMode::kCallgraph
+  ASSERT_TRUE(Any(
+      watcher.output_mode &
+      EventConfMode::kMetric)); // watcher.output_mode <= EventConfMode::kMetric
 
   // both m and g together designate all
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=MG", &watcher));
-  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kCallgraph);
-  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kMetric);
+  ASSERT_TRUE(Any(watcher.output_mode &
+                  EventConfMode::kCallgraph)); // watcher.output_mode <=
+                                               // EventConfMode::kCallgraph
+  ASSERT_TRUE(Any(
+      watcher.output_mode &
+      EventConfMode::kMetric)); // watcher.output_mode <= EventConfMode::kMetric
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=mg", &watcher));
-  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kCallgraph);
-  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kMetric);
+  ASSERT_TRUE(Any(watcher.output_mode &
+                  EventConfMode::kCallgraph)); // watcher.output_mode <=
+                                               // EventConfMode::kCallgraph
+  ASSERT_TRUE(Any(
+      watcher.output_mode &
+      EventConfMode::kMetric)); // watcher.output_mode <= EventConfMode::kMetric
 
   // M or m is a metric (no callgraph unless specified)
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=M", &watcher));
-  ASSERT_FALSE(watcher.output_mode <= EventConfMode::kCallgraph);
-  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kMetric);
+  ASSERT_FALSE(Any(watcher.output_mode &
+                   EventConfMode::kCallgraph)); // watcher.output_mode <=
+                                                // EventConfMode::kCallgraph
+  ASSERT_TRUE(Any(
+      watcher.output_mode &
+      EventConfMode::kMetric)); // watcher.output_mode <= EventConfMode::kMetric
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=m", &watcher));
-  ASSERT_FALSE(watcher.output_mode <= EventConfMode::kCallgraph);
-  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kMetric);
+  ASSERT_FALSE(Any(watcher.output_mode &
+                   EventConfMode::kCallgraph)); // watcher.output_mode <=
+                                                // EventConfMode::kCallgraph
+  ASSERT_TRUE(Any(
+      watcher.output_mode &
+      EventConfMode::kMetric)); // watcher.output_mode <= EventConfMode::kMetric
 
   // G or g designate callgraph (default)
   ASSERT_TRUE(watcher_from_str("e=hCPU", &watcher));
-  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kCallgraph);
-  ASSERT_FALSE(watcher.output_mode <= EventConfMode::kMetric);
+  ASSERT_TRUE(Any(watcher.output_mode &
+                  EventConfMode::kCallgraph)); // watcher.output_mode <=
+                                               // EventConfMode::kCallgraph
+  ASSERT_FALSE(Any(
+      watcher.output_mode &
+      EventConfMode::kMetric)); // watcher.output_mode <= EventConfMode::kMetric
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=G", &watcher));
-  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kCallgraph);
-  ASSERT_FALSE(watcher.output_mode <= EventConfMode::kMetric);
+  ASSERT_TRUE(Any(watcher.output_mode &
+                  EventConfMode::kCallgraph)); // watcher.output_mode <=
+                                               // EventConfMode::kCallgraph
+  ASSERT_FALSE(Any(
+      watcher.output_mode &
+      EventConfMode::kMetric)); // watcher.output_mode <= EventConfMode::kMetric
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=g", &watcher));
-  ASSERT_TRUE(watcher.output_mode <= EventConfMode::kCallgraph);
-  ASSERT_FALSE(watcher.output_mode <= EventConfMode::kMetric);
+  ASSERT_TRUE(Any(watcher.output_mode &
+                  EventConfMode::kCallgraph)); // watcher.output_mode <=
+                                               // EventConfMode::kCallgraph
+  ASSERT_FALSE(Any(
+      watcher.output_mode &
+      EventConfMode::kMetric)); // watcher.output_mode <= EventConfMode::kMetric
 
   // n|arg_num|argno
   ASSERT_TRUE(watcher_from_str("e=hCPU n=1", &watcher));

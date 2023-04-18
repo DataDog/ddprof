@@ -7,19 +7,11 @@
 
 #include <assert.h>
 #include <cstring>
-#include <errno.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 
-#include "ddres_helpers.hpp"
 #include "event_config.hpp"
-#include "event_parser.h"
-#include "perf_archmap.hpp"
+#include "logger.hpp"
 #include "perf_watcher.hpp"
+#include "tracepoint_config.hpp"
 
 int arg_which(const char *str, char const *const *set, int sz_set) {
   if (!str || !set)
@@ -48,40 +40,8 @@ bool arg_yesno(const char *str, int mode) {
   return false;
 }
 
-unsigned int tracepoint_id_from_event(const char *eventname,
-                                      const char *groupname) {
-  if (!eventname || !*eventname || !groupname || !*groupname)
-    return 0;
-
-  static char path[4096]; // Arbitrary, but path sizes limits are difficult
-  static char buf[sizeof("4294967296")]; // For reading 32-bit decimal int
-  char *buf_copy = buf;
-  size_t pathsz =
-      snprintf(path, sizeof(path), "/sys/kernel/tracing/events/%s/%s/id",
-               groupname, eventname);
-  if (pathsz >= sizeof(path))
-    return 0;
-  int fd = open(path, O_RDONLY);
-  if (-1 == fd)
-    return 0;
-
-  // Read the data in an eintr-safe way
-  int read_ret = -1;
-  long trace_id = 0;
-  do {
-    read_ret = read(fd, buf, sizeof(buf));
-  } while (read_ret == -1 && errno == EINTR);
-  close(fd);
-  if (read_ret > 0)
-    trace_id = strtol(buf, &buf_copy, 10);
-  if (*buf_copy && *buf_copy != '\n')
-    return 0;
-
-  return trace_id;
-}
-
 // If this returns false, then the passed watcher should be regarded as invalid
-constexpr uint64_t kIgnoredWatcherID = -1ul;
+constexpr int64_t kIgnoredWatcherID = -1l;
 bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   EventConf *conf = EventConf_parse(str);
   if (!conf) {
@@ -112,23 +72,23 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
     return false;
   }
 
-  // The most likely thing to be invalid is the selection of the tracepoint
-  // from the trace events system.  If the conf has a nonzero number for the id
-  // we assume the user has privileged information and knows what they want.
-  // Else, we use the group/event combination to extract that id from the
-  // tracefs filesystem in the canonical way.
-  uint64_t tracepoint_id = 0;
-  if (conf->id > 0) {
-    tracepoint_id = conf->id;
-  } else {
-    tracepoint_id = tracepoint_id_from_event(conf->eventname.c_str(),
-                                             conf->groupname.c_str());
-  }
-
-  // 0 is an error, "-1" is ignored
-  if (!tracepoint_id) {
-    return false;
-  } else if (tracepoint_id != kIgnoredWatcherID) {
+  if (conf->id != kIgnoredWatcherID) {
+    // The most likely thing to be invalid is the selection of the tracepoint
+    // from the trace events system.  If the conf has a nonzero number for the
+    // id we assume the user has privileged information and knows what they
+    // want. Else, we use the group/event combination to extract that id from
+    // the tracefs filesystem in the canonical way.
+    int64_t tracepoint_id = 0;
+    if (conf->id > 0) {
+      tracepoint_id = conf->id;
+    } else {
+      tracepoint_id =
+          ddprof::tracepoint_get_id(conf->eventname, conf->groupname);
+    }
+    // At this point we needed to find a valid tracepoint id
+    if (tracepoint_id == kIgnoredWatcherID) {
+      return false;
+    }
     watcher->config = tracepoint_id;
   }
 
@@ -161,13 +121,20 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
 
   // The output mode isn't set as part of the configuration templates; we
   // always default to callgraph mode
-  watcher->output_mode = EventConfMode::kCallgraph;
-  if (EventConfMode::kAll <= conf->mode) {
+  if (conf->mode != EventConfMode::kDisabled) {
     watcher->output_mode = conf->mode;
+  } else {
+    watcher->output_mode = EventConfMode::kCallgraph;
   }
 
   watcher->tracepoint_event = conf->eventname;
   watcher->tracepoint_group = conf->groupname;
   watcher->tracepoint_label = conf->label;
+
+  // Allocation watcher, has an extra field to ensure we capture address
+  if (watcher->config == kDDPROF_COUNT_ALLOCATIONS) {
+    watcher->sample_type |= PERF_SAMPLE_ADDR;
+  }
+
   return true;
 }
