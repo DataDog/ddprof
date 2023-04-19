@@ -20,6 +20,11 @@
 
 using namespace std::literals;
 
+// mocks
+bool s_version_called = false;
+void print_version() { s_version_called = true; }
+string_view str_version() { return STRING_VIEW_LITERAL("1.2.3"); }
+
 namespace ddprof {
 class InputTest : public ::testing::Test {
 protected:
@@ -27,10 +32,6 @@ protected:
 
   LogHandle _handle;
 };
-
-bool s_version_called = false;
-void print_version() { s_version_called = true; }
-string_view str_version() { return STRING_VIEW_LITERAL("1.2.3"); }
 
 TEST_F(InputTest, watcher_from_str) {
   LogHandle handle;

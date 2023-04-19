@@ -133,7 +133,6 @@ add_unit_test(
   ../src/perf_watcher.cc
   ../src/presets.cc
   ../src/tracepoint_config.cc
-  ../src/version.cc
   ddprof_input-ut.cc
   LIBRARIES DDProf::Parser
   DEFINITIONS MYNAME="ddprof_input-ut")
