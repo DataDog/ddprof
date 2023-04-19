@@ -18,6 +18,6 @@ trigger_internal_build:
     # Reliability environment downstream branch
     DDPROF_RELENV_BRANCH: ${DDPROF_RELENV_BRANCH-"master"}
   trigger:
-    project: DataDog/ddprof-build
+    project: DataDog/apm-reliability/ddprof-build
     strategy: depend
     branch: $DOWNSTREAM_BUILD_BRANCH
