@@ -176,7 +176,6 @@ add_unit_test(
   dso-ut
   ../src/dso.cc
   ../src/dso_hdr.cc
-  ../src/ddprof_file_info.cc
   ../src/procutils.cc
   ../src/signal_helper.cc
   ../src/user_override.cc
@@ -202,7 +201,6 @@ add_unit_test(
   ../src/demangler/demangler.cc
   ../src/dso.cc
   ../src/dso_hdr.cc
-  ../src/ddprof_file_info.cc
   ../src/failed_assumption.cc
   ../src/procutils.cc
   ../src/signal_helper.cc
@@ -219,7 +217,6 @@ add_unit_test(
   ../src/build_id.cc
   ../src/common_mapinfo_lookup.cc
   ../src/common_symbol_lookup.cc
-  ../src/ddprof_file_info.cc
   ../src/ddprof_stats.cc
   ../src/dso.cc
   ../src/dso_hdr.cc
@@ -258,7 +255,6 @@ add_unit_test(
   ../src/common_mapinfo_lookup.cc
   ../src/common_symbol_lookup.cc
   ../src/ddprof_cmdline.cc
-  ../src/ddprof_file_info.cc
   ../src/ddprof_stats.cc
   ../src/dso.cc
   ../src/dso_hdr.cc
@@ -313,7 +309,7 @@ add_unit_test(
 
 add_unit_test(timer-ut timer-ut.cc ../src/timer.cc ../src/perf.cc)
 
-add_unit_test(ddprof_file_info-ut ddprof_file_info-ut.cc ../src/ddprof_file_info.cc)
+add_unit_test(ddprof_file_info-ut ddprof_file_info-ut.cc)
 
 add_unit_test(runtime_symbol_lookup-ut runtime_symbol_lookup-ut.cc ../src/runtime_symbol_lookup.cc
               ../src/symbol_map.cc ../src/jit/jitdump.cc)
