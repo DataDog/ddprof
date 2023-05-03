@@ -12,6 +12,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+
 namespace ddprof {
 
 /// Defines file uniqueness
@@ -19,7 +20,7 @@ namespace ddprof {
 /// inodes
 struct FileInfoInodeKey {
   FileInfoInodeKey(inode_t inode, std::size_t sz) : _inode(inode), _sz(sz) {}
-  bool operator==(const FileInfoInodeKey &o) const;
+  bool operator==(const FileInfoInodeKey &o) const = default;
   // inode is used as a key (instead of path which can be the same for several
   // containers). TODO: inode could be the same across several filesystems (size
   // is there to mitigate)
@@ -54,26 +55,16 @@ struct FileInfo {
 /// Keeps metadata on the file associated to a key
 class FileInfoValue {
 public:
-  /// duplicates and holds the file descriptor
-  FileInfoValue(FileInfo &&info, FileInfoId_t id, int fd);
-  /// Opens a file descriptor to the file
-  FileInfoValue(FileInfo &&info, FileInfoId_t id);
-  FileInfoValue(const FileInfoValue &other) = delete;
-  FileInfoValue &operator=(const FileInfoValue &other) = delete;
-  FileInfoValue(FileInfoValue &&other);
-  FileInfoValue &operator=(FileInfoValue &&other);
-  ~FileInfoValue();
+  FileInfoValue(FileInfo &&info, FileInfoId_t id) : _info(info), _id(id) {}
+
   FileInfoId_t get_id() const { return _id; }
   int64_t get_size() const { return _info._size; }
   const std::string &get_path() const { return _info._path; }
-
   FileInfo _info;
-  int _fd;
 
   mutable bool _errored =
       false; // a flag to avoid trying to read in a loop bad files
 private:
-  void copy_values(const FileInfoValue &other);
   FileInfoId_t _id; // unique ID matching index in table
 };
 

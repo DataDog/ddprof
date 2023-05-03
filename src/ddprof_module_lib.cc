@@ -15,11 +15,32 @@
 #include <fcntl.h>
 #include <gelf.h>
 #include <libelf.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 namespace ddprof {
+
+class FileDescriptorHolder {
+public:
+  FileDescriptorHolder() : _fd(-1) {}
+  DDRes open_file(std::string_view path) {
+    _fd = ::open(path.data(), O_RDONLY);
+    if (_fd < 0) {
+      LG_WRN("[Mod] Couldn't open fd to module (%s)", path.data());
+      return ddres_warn(DD_WHAT_MODULE);
+    }
+    LG_DBG("[Mod] Success opening %s, ", path.data());
+    return ddres_init();
+  }
+
+  void take_ownership() { _fd = -1; }
+
+  ~FileDescriptorHolder() {
+    if (_fd > 0) {
+      close(_fd);
+    }
+  }
+  int _fd;
+};
 
 static bool get_elf_offsets(int fd, const std::string &filepath,
                             Offset_t &bias_offset) {
@@ -103,10 +124,13 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
     return ddres_warn(DD_WHAT_MODULE);
   }
 
+  FileDescriptorHolder fd_holder;
+  DDRES_CHECK_FWD_STRICT(fd_holder.open_file(filepath));
+
   // Load the file at a matching DSO address
   dwfl_errno(); // erase previous error
   Offset_t bias_offset{};
-  if (!get_elf_offsets(fileInfoValue._fd, filepath, bias_offset)) {
+  if (!get_elf_offsets(fd_holder._fd, filepath, bias_offset)) {
     fileInfoValue._errored = true;
     LG_WRN("Couldn't retrieve offsets from %s(%s)", module_name,
            fileInfoValue.get_path().c_str());
@@ -114,16 +138,8 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
   }
 
   Offset_t bias = dso._start - dso._pgoff - bias_offset;
-
-  // libdwfl takes ownership (which is not 100% expected)
-  int fd = dup(fileInfoValue._fd);
-  if (fd < 0) {
-    LG_WRN("Couldn't duplicate fd to module %s(%s)", module_name,
-           fileInfoValue.get_path().c_str());
-    return ddres_warn(DD_WHAT_MODULE);
-  }
-  ddprof_mod._mod =
-      dwfl_report_elf(dwfl, module_name, filepath.c_str(), fd, bias, true);
+  ddprof_mod._mod = dwfl_report_elf(dwfl, module_name, filepath.c_str(),
+                                    fd_holder._fd, bias, true);
 
   // Retrieve build id
   const unsigned char *bits = nullptr;
@@ -143,6 +159,8 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
            module_name, fileInfoValue.get_path().c_str());
     return ddres_warn(DD_WHAT_MODULE);
   } else {
+    // dwfl now has ownership of the file descriptor
+    fd_holder.take_ownership();
     dwfl_module_info(ddprof_mod._mod, 0, &ddprof_mod._low_addr,
                      &ddprof_mod._high_addr, 0, 0, 0, 0);
     LG_DBG("Loaded mod from file (%s[ID#%d]), (%s) mod[%lx-%lx] bias[%lx], "
@@ -151,7 +169,6 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
            dwfl_errmsg(-1), ddprof_mod._low_addr, ddprof_mod._high_addr, bias,
            ddprof_mod._build_id.c_str());
   }
-
   ddprof_mod._sym_bias = bias;
   return ddres_init();
 }
