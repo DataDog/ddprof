@@ -53,8 +53,15 @@ static bool is_ld(const std::string &path) {
 }
 
 static bool is_stack_complete(UnwindState *us) {
-  static constexpr std::array s_expected_root_frames{"_start"sv, "__clone"sv,
-                                                     "_exit"sv};
+  static constexpr std::array s_expected_root_frames{
+      "__clone"sv,
+      "__clone3"sv,
+      "_exit"sv,
+      "main"sv,
+      "runtime.goexit.abi0"sv,
+      "runtime.systemstack.abi0"sv,
+      "_start"sv,
+      "start_thread"sv};
 
   if (us->output.locs.size() == 0) {
     return false;
