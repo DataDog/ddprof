@@ -8,6 +8,7 @@
 #include "ddprof_context.hpp"
 #include "worker_attr.hpp"
 
+namespace ddprof {
 /**
  * Continuously poll for new events and process them accordingly
  *
@@ -23,3 +24,4 @@ DDRes main_loop(const WorkerAttr *, DDProfContext *);
 
 // Same as main loop without any forks
 void main_loop_lib(const WorkerAttr *attr, DDProfContext *ctx);
+} // namespace ddprof
