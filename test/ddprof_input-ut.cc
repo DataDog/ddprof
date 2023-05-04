@@ -20,16 +20,18 @@
 
 using namespace std::literals;
 
+// mocks
+bool s_version_called = false;
+void print_version() { s_version_called = true; }
+string_view str_version() { return STRING_VIEW_LITERAL("1.2.3"); }
+
+namespace ddprof {
 class InputTest : public ::testing::Test {
 protected:
   void SetUp() override {}
 
   LogHandle _handle;
 };
-
-bool s_version_called = false;
-void print_version() { s_version_called = true; }
-string_view str_version() { return STRING_VIEW_LITERAL("1.2.3"); }
 
 TEST_F(InputTest, watcher_from_str) {
   LogHandle handle;
@@ -211,11 +213,11 @@ TEST_F(InputTest, duplicate_events) {
     EXPECT_TRUE(contine_exec);
 
     DDProfContext ctx;
-    res = ddprof_context_set(&input, &ctx);
+    res = context_set(&input, &ctx);
     EXPECT_FALSE(IsDDResOK(res));
 
     ddprof_input_free(&input);
-    ddprof_context_free(&ctx);
+    context_free(&ctx);
   }
   {
     // Duplicate events (except tracepoints) are disallowed
@@ -230,11 +232,11 @@ TEST_F(InputTest, duplicate_events) {
     EXPECT_TRUE(contine_exec);
 
     DDProfContext ctx;
-    res = ddprof_context_set(&input, &ctx);
+    res = context_set(&input, &ctx);
     EXPECT_FALSE(IsDDResOK(res));
 
     ddprof_input_free(&input);
-    ddprof_context_free(&ctx);
+    context_free(&ctx);
   }
 }
 
@@ -252,7 +254,7 @@ TEST_F(InputTest, presets) {
     EXPECT_TRUE(contine_exec);
 
     DDProfContext ctx;
-    res = ddprof_context_set(&input, &ctx);
+    res = context_set(&input, &ctx);
     EXPECT_TRUE(IsDDResOK(res));
 
     ddprof::span watchers{ctx.watchers, static_cast<size_t>(ctx.num_watchers)};
@@ -271,7 +273,7 @@ TEST_F(InputTest, presets) {
               watchers.end());
 
     ddprof_input_free(&input);
-    ddprof_context_free(&ctx);
+    context_free(&ctx);
   }
 
   {
@@ -286,14 +288,14 @@ TEST_F(InputTest, presets) {
     EXPECT_TRUE(contine_exec);
 
     DDProfContext ctx;
-    res = ddprof_context_set(&input, &ctx);
+    res = context_set(&input, &ctx);
     EXPECT_TRUE(IsDDResOK(res));
 
     EXPECT_EQ(ctx.num_watchers, 1);
     EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sCPU);
 
     ddprof_input_free(&input);
-    ddprof_context_free(&ctx);
+    context_free(&ctx);
   }
   {
     // Check cpu_only preset
@@ -307,7 +309,7 @@ TEST_F(InputTest, presets) {
     EXPECT_TRUE(contine_exec);
 
     DDProfContext ctx;
-    res = ddprof_context_set(&input, &ctx);
+    res = context_set(&input, &ctx);
     EXPECT_TRUE(IsDDResOK(res));
 
     ddprof::span watchers{ctx.watchers, static_cast<size_t>(ctx.num_watchers)};
@@ -316,7 +318,7 @@ TEST_F(InputTest, presets) {
     EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sCPU);
 
     ddprof_input_free(&input);
-    ddprof_context_free(&ctx);
+    context_free(&ctx);
   }
   {
     // Check alloc_only preset
@@ -331,7 +333,7 @@ TEST_F(InputTest, presets) {
     EXPECT_TRUE(contine_exec);
 
     DDProfContext ctx;
-    res = ddprof_context_set(&input, &ctx);
+    res = context_set(&input, &ctx);
     EXPECT_TRUE(IsDDResOK(res));
 
     EXPECT_EQ(ctx.num_watchers, 2);
@@ -339,7 +341,7 @@ TEST_F(InputTest, presets) {
     EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sDUM);
 
     ddprof_input_free(&input);
-    ddprof_context_free(&ctx);
+    context_free(&ctx);
   }
   {
     // Check manual setting of live allocation
@@ -353,7 +355,7 @@ TEST_F(InputTest, presets) {
     EXPECT_TRUE(contine_exec);
 
     DDProfContext ctx;
-    res = ddprof_context_set(&input, &ctx);
+    res = context_set(&input, &ctx);
     EXPECT_TRUE(IsDDResOK(res));
 
     EXPECT_EQ(ctx.num_watchers, 2);
@@ -363,7 +365,7 @@ TEST_F(InputTest, presets) {
     log_watcher(&ctx.watchers[1], 1);
 
     ddprof_input_free(&input);
-    ddprof_context_free(&ctx);
+    context_free(&ctx);
   }
   {
     // Check cpu_live_heap preset
@@ -378,7 +380,7 @@ TEST_F(InputTest, presets) {
     EXPECT_TRUE(contine_exec);
 
     DDProfContext ctx;
-    res = ddprof_context_set(&input, &ctx);
+    res = context_set(&input, &ctx);
     EXPECT_TRUE(IsDDResOK(res));
 
     EXPECT_EQ(ctx.num_watchers, 2);
@@ -388,7 +390,7 @@ TEST_F(InputTest, presets) {
     EXPECT_EQ(ctx.watchers[0].output_mode, EventConfMode::kCallgraph);
 
     ddprof_input_free(&input);
-    ddprof_context_free(&ctx);
+    context_free(&ctx);
   }
   {
     // Default preset should not be loaded if an event is given in input
@@ -402,14 +404,14 @@ TEST_F(InputTest, presets) {
     EXPECT_TRUE(contine_exec);
 
     DDProfContext ctx;
-    res = ddprof_context_set(&input, &ctx);
+    res = context_set(&input, &ctx);
     EXPECT_TRUE(IsDDResOK(res));
 
     EXPECT_EQ(ctx.num_watchers, 1);
     EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sCPU);
 
     ddprof_input_free(&input);
-    ddprof_context_free(&ctx);
+    context_free(&ctx);
   }
   {
     // If preset is explicit given in input, then another event with the same
@@ -425,7 +427,7 @@ TEST_F(InputTest, presets) {
     EXPECT_TRUE(contine_exec);
 
     DDProfContext ctx;
-    res = ddprof_context_set(&input, &ctx);
+    res = context_set(&input, &ctx);
     EXPECT_TRUE(IsDDResOK(res));
 
     EXPECT_EQ(ctx.num_watchers, 2);
@@ -434,6 +436,7 @@ TEST_F(InputTest, presets) {
     EXPECT_EQ(ctx.watchers[1].ddprof_event_type, DDPROF_PWE_sALLOC);
 
     ddprof_input_free(&input);
-    ddprof_context_free(&ctx);
+    context_free(&ctx);
   }
 }
+} // namespace ddprof

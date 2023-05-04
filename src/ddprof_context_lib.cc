@@ -11,15 +11,15 @@
 #include "ddprof_input.hpp"
 #include "logger.hpp"
 #include "logger_setup.hpp"
+#include "presets.hpp"
 #include "span.hpp"
 
 #include <algorithm>
 #include <charconv>
-#include <errno.h>
 #include <string_view>
-#include <sys/sysinfo.h>
 #include <unistd.h>
 
+namespace ddprof {
 static const PerfWatcher *
 find_duplicate_event(ddprof::span<const PerfWatcher> watchers) {
   bool seen[DDPROF_PWE_LENGTH] = {};
@@ -42,66 +42,8 @@ static void order_watchers(ddprof::span<PerfWatcher> watchers) {
       });
 }
 
-struct Preset {
-  static constexpr size_t k_max_events = 10;
-  const char *name;
-  const char *events[k_max_events];
-};
-
-DDRes add_preset(DDProfContext *ctx, const char *preset,
-                 bool pid_or_global_mode) {
-  using namespace std::literals;
-  static Preset presets[] = {
-      {"default", {"sCPU", "sALLOC"}},
-      {"default-pid", {"sCPU"}},
-      {"cpu_only", {"sCPU"}},
-      {"alloc_only", {"sALLOC"}},
-      {"cpu_live_heap", {"sCPU", "sALLOC mode=l"}},
-  };
-
-  if (preset == "default"sv && pid_or_global_mode) {
-    preset = "default-pid";
-  }
-
-  ddprof::span presets_span{presets};
-  std::string_view preset_sv{preset};
-
-  auto it = std::find_if(presets_span.begin(), presets_span.end(),
-                         [&preset_sv](auto &e) { return e.name == preset_sv; });
-  if (it == presets_span.end()) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Unknown preset (%s)",
-                           preset);
-  }
-
-  for (const char *event : it->events) {
-    if (event == nullptr) {
-      break;
-    }
-    if (ctx->num_watchers == MAX_TYPE_WATCHER) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Too many input events");
-    }
-    PerfWatcher *watcher = &ctx->watchers[ctx->num_watchers];
-    if (!watcher_from_str(event, watcher)) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
-                             "Invalid event/tracepoint (%s)", event);
-    }
-    ddprof::span watchers{ctx->watchers,
-                          static_cast<size_t>(ctx->num_watchers)};
-
-    // ignore event if it was already present in watchers
-    if (watcher->ddprof_event_type == DDPROF_PWE_TRACEPOINT ||
-        std::find_if(watchers.begin(), watchers.end(), [&watcher](auto &w) {
-          return w.ddprof_event_type == watcher->ddprof_event_type;
-        }) == watchers.end()) {
-      ++ctx->num_watchers;
-    }
-  }
-
-  return {};
-}
-
 /****************************  Argument Processor  ***************************/
-DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
+DDRes context_set(DDProfInput *input, DDProfContext *ctx) {
   *ctx = {};
   setup_logger(input->log_mode, input->log_level);
 
@@ -290,7 +232,7 @@ DDRes ddprof_context_set(DDProfInput *input, DDProfContext *ctx) {
   return ddres_init();
 }
 
-void ddprof_context_free(DDProfContext *ctx) {
+void context_free(DDProfContext *ctx) {
   if (ctx->initialized) {
     exporter_input_free(&ctx->exp_input);
     free((char *)ctx->params.internal_stats);
@@ -305,7 +247,7 @@ void ddprof_context_free(DDProfContext *ctx) {
   LOG_close();
 }
 
-int ddprof_context_allocation_profiling_watcher_idx(const DDProfContext *ctx) {
+int context_allocation_profiling_watcher_idx(const DDProfContext *ctx) {
   ddprof::span watchers{ctx->watchers, static_cast<size_t>(ctx->num_watchers)};
   auto it =
       std::find_if(watchers.begin(), watchers.end(), [](const auto &watcher) {
@@ -318,3 +260,5 @@ int ddprof_context_allocation_profiling_watcher_idx(const DDProfContext *ctx) {
   }
   return -1;
 }
+
+} // namespace ddprof
