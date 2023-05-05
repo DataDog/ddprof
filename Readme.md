@@ -15,7 +15,7 @@ Our pre-built binaries are compatible with both musl and glibc. You should not n
 ### From binary [Recommended]
 
 An installation guide is available [here](https://docs.datadoghq.com/profiler/enabling/ddprof/?tab=environmentvariables).
-Check out our Release page for our [latest](https://github.com/DataDog/ddprof/releases/tag/latest) release. Download the release and extract `ddprof`.
+Check out our Release page for our [latest](https://github.com/DataDog/ddprof/releases/latest) release. Download the release and extract `ddprof`.
 Instrumenting your application should be as simple as adding `ddprof` in front of your usual command line.
 
 To install the profiler, check out our [installation-helpers](#Installation-helpers) bellow.
