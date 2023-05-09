@@ -5,7 +5,6 @@
 #include <gtest/gtest.h>
 
 #include "ddprof_module.hpp"
-#include "device_utils.hpp"
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
 #include "dwfl_internals.hpp"

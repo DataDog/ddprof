@@ -321,8 +321,6 @@ add_unit_test(build_id-ut build_id-ut.cc ../src/build_id.cc)
 
 add_unit_test(jitdump-ut jitdump-ut.cc ../src/jit/jitdump.cc)
 
-add_unit_test(resolve_ns-ut resolve_ns-ut.cc)
-
 add_unit_test(live_allocation-ut live_allocation-ut.cc ../src/live_allocation.cc)
 
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/savecontext.cc
