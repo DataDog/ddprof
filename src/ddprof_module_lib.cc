@@ -115,7 +115,7 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
     // There should not be a module already loaded at this address
     const char *main_name = nullptr;
     Dwarf_Addr low_addr, high_addr;
-    dwfl_module_info(mod, 0, &low_addr, &high_addr, 0, 0, &main_name, 0);
+    dwfl_module_info(mod, nullptr, &low_addr, &high_addr, 0, 0, &main_name, 0);
     LG_NTC("Incoherent modules[PID=%d]: module %s [%lx-%lx] is already "
            "loaded at %lx(%s[ID#%d])",
            dso._pid, main_name, low_addr, high_addr, pc, filepath.c_str(),

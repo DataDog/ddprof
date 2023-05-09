@@ -1,18 +1,23 @@
-#include "dso_hdr.hpp"
-#include "dwfl_hdr.hpp"
-
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the Apache License Version 2.0. This product includes software
+// developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
+// Datadog, Inc.
 #include <gtest/gtest.h>
-#include <stdio.h>
-#include <string>
-
-#include <filesystem>
 
 #include "ddprof_module.hpp"
-#include "ddprof_module_lib.hpp"
-
+#include "device_utils.hpp"
+#include "dso_hdr.hpp"
+#include "dwfl_hdr.hpp"
 #include "dwfl_internals.hpp"
 #include "dwfl_symbol.hpp"
 #include "loghandle.hpp"
+
+#include <filesystem>
+#include <stdio.h>
+#include <string>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 namespace ddprof {
 
@@ -64,7 +69,7 @@ TEST(DwflModule, inconsistency_test) {
           dso_hdr.get_file_info_value(file_info_id);
       DDProfMod *ddprof_mod =
           dwfl_wrapper.register_mod(dso._start, dso, file_info_value);
-      EXPECT_TRUE(ddprof_mod->_mod);
+      ASSERT_TRUE(ddprof_mod->_mod);
       if (find_res.first == it) {
         Symbol symbol;
         GElf_Sym elf_sym;
@@ -95,6 +100,80 @@ TEST(DwflModule, inconsistency_test) {
   int nb_fds_end = cound_fds(my_pid);
   printf("-- End open file descriptors: %d\n", nb_fds_end);
   EXPECT_EQ(nb_fds_start, nb_fds_end);
+}
+
+TEST(DwflModule, short_lived) {
+  // Here we are testing that short lived forks don't keep the reference of
+  // first file we encounter. By accessing the file through /proc we can fail to
+  // access the same file for later pids.
+  LogHandle handle;
+  // Load DSOs from our unit test
+  ElfAddress_t ip = _THIS_IP_;
+  DsoHdr dso_hdr;
+
+  pid_t child_pid = fork();
+  if (child_pid == 0) {
+    // First child process
+    sleep(1);
+    exit(0);
+  }
+  // Parse the first pid
+  dso_hdr.dso_find_or_backpopulate(child_pid, ip);
+
+  {
+    DwflWrapper dwfl_wrapper;
+    // retrieve the map associated to pid
+    DsoHdr::DsoMap &dso_map = dso_hdr._pid_map[child_pid]._map;
+
+    for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
+      Dso &dso = it->second;
+      if (!dso::has_relevant_path(dso._type) || !dso._executable) {
+        continue; // skip non exec / non standard (anon/vdso...)
+      }
+
+      FileInfoId_t file_info_id = dso_hdr.get_or_insert_file_info(dso);
+      ASSERT_TRUE(file_info_id > k_file_info_error);
+
+      const FileInfoValue &file_info_value =
+          dso_hdr.get_file_info_value(file_info_id);
+      DDProfMod *ddprof_mod =
+          dwfl_wrapper.register_mod(dso._start, dso, file_info_value);
+      ASSERT_TRUE(ddprof_mod->_mod);
+    }
+  }
+  // Wait for the first PID to die
+  waitpid(child_pid, nullptr, 0);
+
+  pid_t last_child_pid = fork();
+  if (last_child_pid == 0) {
+    // First child process
+    sleep(2);
+    exit(0);
+  }
+
+  // Parse the first pid
+  dso_hdr.dso_find_or_backpopulate(last_child_pid, ip);
+  {
+    DwflWrapper dwfl_wrapper;
+    // retrieve the map associated to pid
+    DsoHdr::DsoMap &dso_map = dso_hdr._pid_map[last_child_pid]._map;
+
+    for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
+      Dso &dso = it->second;
+      if (!dso::has_relevant_path(dso._type) || !dso._executable) {
+        continue; // skip non exec / non standard (anon/vdso...)
+      }
+
+      FileInfoId_t file_info_id = dso_hdr.get_or_insert_file_info(dso);
+      ASSERT_TRUE(file_info_id > k_file_info_error);
+
+      const FileInfoValue &file_info_value =
+          dso_hdr.get_file_info_value(file_info_id);
+      DDProfMod *ddprof_mod =
+          dwfl_wrapper.register_mod(dso._start, dso, file_info_value);
+      ASSERT_TRUE(ddprof_mod->_mod);
+    }
+  }
 }
 
 } // namespace ddprof
