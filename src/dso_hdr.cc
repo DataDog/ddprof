@@ -270,7 +270,6 @@ FileInfoId_t DsoHdr::update_id_from_path(const Dso &dso) {
   if (it == _file_info_inode_map.end()) {
     dso._id = _file_info_vector.size();
     _file_info_inode_map.emplace(std::move(key), dso._id);
-    // open the file descriptor to this file
     _file_info_vector.emplace_back(std::move(file_info), dso._id);
 #ifdef DEBUG
     LG_NTC("New file %d - %s - %ld", dso._id, file_info._path.c_str(),
@@ -279,8 +278,8 @@ FileInfoId_t DsoHdr::update_id_from_path(const Dso &dso) {
   } else { // already exists
     dso._id = it->second;
     // update with last location
-    if (_file_info_vector[dso._id]._errored &&
-        file_info._path != _file_info_vector[dso._id]._info._path) {
+    // looking up the actual path using mountinfo would prevent this
+    if (file_info._path != _file_info_vector[dso._id]._info._path) {
       _file_info_vector[dso._id] = FileInfoValue(std::move(file_info), dso._id);
     }
   }
