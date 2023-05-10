@@ -143,19 +143,19 @@ TEST(DwflModule, short_lived) {
   // Wait for the first PID to die
   waitpid(child_pid, nullptr, 0);
 
-  pid_t last_child_pid = fork();
-  if (last_child_pid == 0) {
-    // First child process
-    sleep(2);
+  pid_t second_child_pid = fork();
+  if (second_child_pid == 0) {
+    // Second child process
+    sleep(1);
     exit(0);
   }
 
-  // Parse the first pid
-  dso_hdr.dso_find_or_backpopulate(last_child_pid, ip);
+  // Parse the second pid
+  dso_hdr.dso_find_or_backpopulate(second_child_pid, ip);
   {
     DwflWrapper dwfl_wrapper;
     // retrieve the map associated to pid
-    DsoHdr::DsoMap &dso_map = dso_hdr._pid_map[last_child_pid]._map;
+    DsoHdr::DsoMap &dso_map = dso_hdr._pid_map[second_child_pid]._map;
 
     for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
       Dso &dso = it->second;
