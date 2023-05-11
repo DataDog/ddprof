@@ -19,7 +19,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define PPROF_MAX_LABELS 5
+#define PPROF_MAX_LABELS 6
 
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
   PerfWatcher *watchers = ctx->watchers;
@@ -123,6 +123,9 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
         std::string("include_kernel"),
         include_kernel ? std::string("true") : std::string("false")));
   }
+  {
+    pprof->_tags.push_back(std::make_pair(std::string("ddprof.custom_ctx"), std::string("container_id")));
+  }
 
   return ddres_init();
 }
@@ -217,6 +220,15 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   char pid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
   char tid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
 
+  // retrieve container ID label (whole host)
+  struct ddog_FfiOptionString container_id = get_container_id_ffi(uw_output->pid);
+  if (container_id.is_some) {
+    labels[labels_num].key = to_CharSlice("container_id");
+    labels[labels_num].str = to_CharSlice(container_id.data);
+//    LG_NTC("[PPROF] PID%d container_id is %s\n", uw_output->pid, container_id.data);
+    ++labels_num;
+  }
+
   // Add any configured labels.  Note that TID alone has the same cardinality as
   // (TID;PID) tuples, so except for symbol table overhead it doesn't matter
   // much if TID implies PID for clarity.
@@ -246,6 +258,8 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     }
     ++labels_num;
   }
+  assert(labels_num <= PPROF_MAX_LABELS);
+
   ddog_prof_Sample sample = {
       .locations = {.ptr = locations_buff, .len = cur_loc},
       .values = {.ptr = values, .len = pprof->_nb_values},
@@ -260,6 +274,9 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
                            add_res.err.message.ptr);
   }
 
+  if (container_id.is_some) {
+    free_container_id_ffi(const_cast<char*>(container_id.data));
+  }
   return ddres_init();
 }
 

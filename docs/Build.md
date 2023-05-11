@@ -34,3 +34,12 @@ MkBuildDir Rel
 RelCMake ../
 make -j 4 .
 ```
+
+### Updating libdatadog
+
+Head over to the libdatadog, do your changes and copy the library back to your vendor directory.
+
+```bash
+cp ${workdir}/libdatadog/headers/include/datadog/common.h ${workdir}/ddprof/vendor_gcc_unknown-linux-2.35_Debug/libdatadog-v2.1.0/include/datadog/common.h
+cp ${workdir}/libdatadog/headers/lib/libdatadog_profiling.a ${workdir}/ddprof/vendor_gcc_unknown-linux-2.35_Debug/libdatadog-v2.1.0/lib/
+```
