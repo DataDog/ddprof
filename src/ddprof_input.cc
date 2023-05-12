@@ -57,7 +57,7 @@
   "  -" #c ", --" #b ", (envvar: " #a ")",
 
 namespace {
-std::string mask_value(const std::string_view value) {
+std::string api_key_to_dbg_string(const std::string_view value) {
   if (value.size() != k_size_api_key) {
     return "invalid";
   }
@@ -66,7 +66,7 @@ std::string mask_value(const std::string_view value) {
   masked.replace(len - 4, 4, value.substr(len - 4));
   return masked;
 }
-}
+} // namespace
 
 #define X_PRNT(a, b, c, d, e, f, g, h, i)                                      \
   {                                                                            \
@@ -74,7 +74,7 @@ std::string mask_value(const std::string_view value) {
       if (strcmp(#b, "api_key") != 0) {                                        \
         PRINT_NFO("  " #b ": %s", (f)->i b);                                   \
       } else {                                                                 \
-        std::string masked_value = mask_value((f)->i b);                       \
+        std::string masked_value = api_key_to_dbg_string((f)->i b);            \
         PRINT_NFO("  " #b ": %s", masked_value.c_str());                       \
       }                                                                        \
     }                                                                          \
