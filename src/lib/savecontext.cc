@@ -7,6 +7,7 @@
 
 #include "ddprof_base.hpp"
 #include "defer.hpp"
+#include "pthread_fixes.hpp"
 #include "saveregisters.hpp"
 #include "unlikely.hpp"
 
@@ -21,7 +22,7 @@ DDPROF_NOINLINE ddprof::span<const std::byte> retrieve_stack_bounds() {
   void *stack_addr;
   size_t stack_size;
   pthread_attr_t attrs;
-  if (pthread_getattr_np(pthread_self(), &attrs) != 0) {
+  if (pthread_getattr_np_safe(pthread_self(), &attrs) != 0) {
     return {};
   }
   defer { pthread_attr_destroy(&attrs); };
