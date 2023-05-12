@@ -203,6 +203,7 @@ set(DD_PROFILING_SOURCES
     src/lib/dd_profiling.cc
     src/lib/elfutils.cc
     src/lib/lib_embedded_data.c
+    src/lib/pthread_fixes.cc
     src/lib/savecontext.cc
     src/lib/saveregisters.cc
     src/lib/symbol_overrides.cc
