@@ -230,6 +230,7 @@ add_unit_test(
   ../src/demangler/demangler.cc
   ../src/jit/jitdump.cc
   ../src/failed_assumption.cc
+  ../src/lib/pthread_fixes.cc
   ../src/lib/savecontext.cc
   ../src/lib/saveregisters.cc
   ../src/mapinfo_lookup.cc
@@ -272,6 +273,7 @@ add_unit_test(
   ../src/perf_ringbuffer.cc
   ../src/perf_watcher.cc
   ../src/ringbuffer_utils.cc
+  ../src/lib/pthread_fixes.cc
   ../src/lib/savecontext.cc
   ../src/lib/saveregisters.cc
   ../src/mapinfo_lookup.cc
@@ -325,8 +327,8 @@ add_unit_test(tracepoint_config-ut tracepoint_config-ut.cc ../src/tracepoint_con
 
 add_unit_test(live_allocation-ut live_allocation-ut.cc ../src/live_allocation.cc)
 
-add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/savecontext.cc
-              ../src/lib/saveregisters.cc)
+add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/pthread_fixes.cc
+              ../src/lib/savecontext.cc ../src/lib/saveregisters.cc)
 
 add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 
