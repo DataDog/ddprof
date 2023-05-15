@@ -24,7 +24,6 @@
 #include <vector>
 
 static const int k_timeout_ms = 10000;
-static const int k_size_api_key = 32;
 
 static char *alloc_url_agent(const char *protocol, const char *host,
                              const char *port) {
