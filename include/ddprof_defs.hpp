@@ -13,6 +13,8 @@
 // Maximum depth for a single stack
 #define DD_MAX_STACK_DEPTH 512
 
+constexpr int k_size_api_key = 32;
+
 // Linux Inode type
 typedef uint64_t inode_t;
 
