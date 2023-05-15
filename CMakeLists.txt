@@ -310,6 +310,10 @@ add_custom_command(
   COMMAND objcopy --rename-section .data=.rodata,alloc,load,readonly,data,contents
           ${DDPROF_EXE_OBJECT}
   DEPENDS ddprof)
+# add_custom_target is required here, because multiple targets depend on ${DDPROF_EXE_OBJECT}
+# Without add_custom_target (only add_custom_command), each dependent target will run the custom
+# command and they will race, leading to spurious failures.
+add_custom_target(generate_ddprof_object DEPENDS ${DDPROF_EXE_OBJECT})
 
 add_library(ddprof_exe_object OBJECT IMPORTED GLOBAL)
 set_target_properties(ddprof_exe_object PROPERTIES IMPORTED_OBJECTS "${DDPROF_EXE_OBJECT}")
