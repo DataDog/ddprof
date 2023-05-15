@@ -357,6 +357,12 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
     NAME simple_malloc
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/simple_malloc-ut.sh
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+  if(BUILD_UNIVERSAL_DDPROF)
+    add_test(NAME check-injected-lib
+             COMMAND ${CMAKE_SOURCE_DIR}/tools/check_for_unsafe_libc_functions.py
+                     $<TARGET_FILE:dd_profiling-embedded>)
+  endif()
 endif()
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
