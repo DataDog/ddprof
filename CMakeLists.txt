@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 3.19)
 project(
   DDProf
   LANGUAGES C CXX
-  VERSION 0.12.0
+  VERSION 0.13.0
   DESCRIPTION "Datadog's native profiler for Linux")
 
 message(STATUS "Compiler ID: ${CMAKE_C_COMPILER_ID}")
