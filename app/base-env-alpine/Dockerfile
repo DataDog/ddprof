@@ -121,3 +121,17 @@ RUN git clone --branch v5.4 https://github.com/tukaani-project/xz.git && \
     cmake -DCMAKE_BUILD_TYPE=Release ../ && \
     make -j && \
     make install
+
+
+## This does not work
+#RUN apk update \
+#    && apk add --no-cache argp-standalone
+#
+## Austin \
+## Todo: get a stable version here
+RUN git clone --branch r1viollet/libaustin https://github.com/r1viollet/austin.git && \
+    cd austin && \
+    autoreconf --install && \
+    ./configure && \
+    make && \
+    make install

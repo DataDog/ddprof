@@ -166,3 +166,24 @@ RUN pip3 install cmake_format
 # A specific user is required to get access to perf event ressources.
 # This enables unit testing using perf-event ressources
 RUN useradd -ms /bin/bash ddbuild
+
+RUN apt-get update \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+  autoconf
+
+
+#RUN git clone https://github.com/libunwind/libunwind.git && \
+#    cd libunwind && \
+#    autoreconf --install && \
+#    ./configure && \
+#    make && \
+#    make install
+
+# Austin \
+# Todo: get a stable version here
+RUN git clone --branch r1viollet/libaustin https://github.com/r1viollet/austin.git && \
+    cd austin && \
+    autoreconf --install && \
+    ./configure && \
+    make && \
+    make install
