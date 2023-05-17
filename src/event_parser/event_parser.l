@@ -73,7 +73,9 @@ z|raw_size|rawsz           DISPATCH(RawSize)
 	return EQ;
 }
 
-[ ,\t][ \t]*                {
+[ \t]* {}
+
+[ ,\t]                      {
 	BEGIN 0;
 	return OPTSEP;
 }

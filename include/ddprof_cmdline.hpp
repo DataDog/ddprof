@@ -7,8 +7,9 @@
 
 #include <stddef.h> // size_t
 #include <stdint.h> // uint64_t
+#include <vector>
 
-typedef struct PerfWatcher PerfWatcher;
+struct PerfWatcher;
 
 /**************************** Cmdline Helpers *********************************/
 // Helper functions for processing commandline arguments.
@@ -27,4 +28,4 @@ bool arg_inset(const char *str, char const *const *set, int sz_set);
 
 bool arg_yesno(const char *str, int mode);
 
-bool watcher_from_str(const char *str, PerfWatcher *watcher);
+bool watchers_from_str(const char *str, std::vector<PerfWatcher> &watchers);

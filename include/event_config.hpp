@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 #include <string>
+#include <vector>
 
 // Defines how a sample is aggregated when it is received
 enum class EventConfMode : uint32_t {
@@ -163,4 +164,6 @@ struct EventConf {
   void clear() { *this = EventConf{}; }
 };
 
-EventConf *EventConf_parse(const char *msg); // Provided by generated code
+int EventConf_parse(
+    const char *msg,
+    std::vector<EventConf> &event_configs); // Provided by generated code
