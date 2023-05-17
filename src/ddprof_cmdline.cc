@@ -40,13 +40,8 @@ bool arg_yesno(const char *str, int mode) {
   return false;
 }
 
-// If this returns false, then the passed watcher should be regarded as invalid
-constexpr int64_t kIgnoredWatcherID = -1l;
-bool watcher_from_str(const char *str, PerfWatcher *watcher) {
-  EventConf *conf = EventConf_parse(str);
-  if (!conf) {
-    return false;
-  }
+static bool watcher_from_config(EventConf *conf, PerfWatcher *watcher) {
+  constexpr int64_t kIgnoredWatcherID = -1l;
 
   // If there's no eventname, then this configuration is invalid
   if (conf->eventname.empty()) {
@@ -134,6 +129,24 @@ bool watcher_from_str(const char *str, PerfWatcher *watcher) {
   // Allocation watcher, has an extra field to ensure we capture address
   if (watcher->config == kDDPROF_COUNT_ALLOCATIONS) {
     watcher->sample_type |= PERF_SAMPLE_ADDR;
+  }
+
+  return true;
+}
+
+// If this returns false, then the passed watcher should be regarded as invalid
+bool watchers_from_str(const char *str, std::vector<PerfWatcher> &watchers) {
+  std::vector<EventConf> configs;
+  if (EventConf_parse(str, configs) != 0) {
+    return false;
+  }
+
+  for (auto &conf : configs) {
+    PerfWatcher watcher;
+    if (!watcher_from_config(&conf, &watcher)) {
+      return false;
+    }
+    watchers.push_back(std::move(watcher));
   }
 
   return true;

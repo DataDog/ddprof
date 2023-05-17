@@ -168,25 +168,29 @@ const char* help_str[DD_KLEN] = {
 
 const char *help_key[DD_KLEN] = {OPT_TABLE(X_HLPK)};
 
-static void ddprof_input_default_events(DDProfInput *input) {
+static DDRes ddprof_parse_events(const char *events, DDProfInput *input) {
+  std::vector<PerfWatcher> watchers;
+  if (!watchers_from_str(events, watchers)) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
+                           "Invalid event/tracepoint (%s)", events);
+  }
+  for (auto &watcher : watchers) {
+    if (input->num_watchers == MAX_TYPE_WATCHER) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Too many input events");
+    }
+    input->watchers[input->num_watchers++] = std::move(watcher);
+  }
+
+  return {};
+}
+
+static DDRes ddprof_input_default_events(DDProfInput *input) {
   const char *events = getenv(k_events_env_variable);
   if (!events) {
-    return;
+    return {};
   }
 
-  std::istringstream iss(events);
-  for (std::string event_str; std::getline(iss, event_str, ';');) {
-    if (event_str.empty()) {
-      continue;
-    }
-
-    PerfWatcher *watcher = &input->watchers[input->num_watchers];
-    if (!watcher_from_str(event_str.c_str(), watcher)) {
-      LG_WRN("Ignoring invalid event/tracepoint (%s)", event_str.c_str());
-    } else {
-      ++input->num_watchers;
-    }
-  }
+  return ddprof_parse_events(events, input);
 }
 
 // clang-format off
@@ -220,13 +224,11 @@ DDRes ddprof_input_default(DDProfInput *input) {
   // Populate default values (mutates ctx)
   OPT_TABLE(X_DFLT);
 
-  ddprof_input_default_events(input);
-  return ddres_init();
+  return ddprof_input_default_events(input);
 }
 
 DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
                          bool *continue_exec) {
-  DDRes res = ddres_init();
   LG_DBG("Start parsing args");
   int c = 0, oi = 0;
   *continue_exec = true;
@@ -237,13 +239,16 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
                            {NULL, 0, NULL, 0}};
 
   //---- Process Options
-  ddprof_input_default(input);
+  if (DDRes res = ddprof_input_default(input); !IsDDResOK(res)) {
+    *continue_exec = false;
+    return res;
+  }
 
   // Early exit if the user just ran the bare command
   if (argc <= 1) {
     ddprof_print_help();
     *continue_exec = false;
-    return ddres_init();
+    return {};
   }
 
   char opt_short[] = "+" OPT_TABLE(X_OSTR) "e:t:hv";
@@ -256,16 +261,9 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
       if (!optarg || !*optarg)
         continue;
 
-      if (input->num_watchers == MAX_TYPE_WATCHER) {
-        DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Too many input events");
-      }
-      PerfWatcher *watcher = &input->watchers[input->num_watchers];
-      if (!watcher_from_str(optarg, watcher)) {
+      if (DDRes res = ddprof_parse_events(optarg, input); !IsDDResOK(res)) {
         *continue_exec = false;
-        DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
-                               "Invalid event/tracepoint (%s)", optarg);
-      } else {
-        ++input->num_watchers;
+        return res;
       }
       break;
     }
@@ -289,7 +287,7 @@ DDRes ddprof_input_parse(int argc, char **argv, DDProfInput *input,
   }
   input->nb_parsed_params = optind;
 
-  return res;
+  return {};
 }
 
 void ddprof_print_params(const DDProfInput *input) { OPT_TABLE(X_PRNT); }

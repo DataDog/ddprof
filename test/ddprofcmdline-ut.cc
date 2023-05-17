@@ -11,6 +11,17 @@
 
 static char const *const sTestPaterns[] = {"cAn", "yUo", "eVen", "tYpe"};
 
+static bool watcher_from_str(const char *s, PerfWatcher *watcher) {
+  std::vector<PerfWatcher> watchers;
+  bool res = watchers_from_str(s, watchers);
+  if (!res) {
+    return false;
+  }
+  EXPECT_EQ(watchers.size(), 1);
+  *watcher = watchers.front();
+  return true;
+}
+
 TEST(CmdLineTst, ArgWhich) {
   ASSERT_EQ(arg_which("tYpe", sTestPaterns, 4), 3);
   ASSERT_EQ(arg_which("type", sTestPaterns, 4), 3);
@@ -47,14 +58,14 @@ TEST(CmdLineTst, NullPatterns) {
 
 TEST(CmdLineTst, FirstEventHit) {
   char const *str = "hCPU";
-  PerfWatcher watcher = {};
+  PerfWatcher watcher;
   ASSERT_TRUE(watcher_from_str(str, &watcher));
   ASSERT_EQ(watcher.type, PERF_TYPE_HARDWARE);
   ASSERT_EQ(watcher.type, PERF_COUNT_HW_CPU_CYCLES);
 }
 
 TEST(CmdLineTst, ParserKeyPatterns) {
-  PerfWatcher watcher = {};
+  PerfWatcher watcher;
 
   // Simple events without qualification are valid event names
   ASSERT_TRUE(watcher_from_str("hCPU", &watcher));
@@ -155,10 +166,8 @@ TEST(CmdLineTst, ParserKeyPatterns) {
   ASSERT_TRUE(watcher_from_str("e=hCPU m=g", &watcher));
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=g", &watcher));
 
-  // Mode is permissive
-  ASSERT_TRUE(watcher_from_str("e=hCPU mode=magnanimous", &watcher));
-  ASSERT_TRUE(Any(watcher.output_mode & EventConfMode::kCallgraph));
-  ASSERT_TRUE(Any(watcher.output_mode & EventConfMode::kMetric));
+  // Mode is not permissive
+  ASSERT_FALSE(watcher_from_str("e=hCPU mode=magnanimous", &watcher));
 
   // A or a designate all
   ASSERT_TRUE(watcher_from_str("e=hCPU mode=A", &watcher));
@@ -349,4 +358,18 @@ TEST(CmdLineTst, LiteralEventWithKindaBadValue) {
   char const *str = "hCPU period=123apples";
   PerfWatcher watcher = {};
   ASSERT_FALSE(watcher_from_str(str, &watcher));
+}
+
+TEST(CmdLineTst, EmptyConfigs) {
+  char const *str = "; sCPU   ; ;;;; ;;; ;;";
+  std::vector<PerfWatcher> watchers;
+  ASSERT_TRUE(watchers_from_str(str, watchers));
+  ASSERT_EQ(watchers.size(), 1);
+}
+
+TEST(CmdLineTst, MultipleEvents) {
+  char const *str = "; sCPU   ; sALLOC ;;;; ;;; ;;";
+  std::vector<PerfWatcher> watchers;
+  ASSERT_TRUE(watchers_from_str(str, watchers));
+  ASSERT_EQ(watchers.size(), 2);
 }

@@ -10,10 +10,12 @@
 %parse-param {void *scanner} // actually yyscan_t
 
 %{
+#include <optional>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string>
+#include <vector>
 
 #include "event_config.hpp"
 #include "event_parser.h"
@@ -34,7 +36,7 @@ extern int yylex_destroy(yyscan_t scanner);
 extern YY_BUFFER_STATE yy_scan_string(const char * str, yyscan_t scanner);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer, yyscan_t scanner);
 
-EventConfMode mode_from_str(const std::string &str) {
+std::optional<EventConfMode> mode_from_str(const std::string &str) {
   EventConfMode mode = EventConfMode::kDisabled;
   if (str.empty())
     return mode;
@@ -46,21 +48,20 @@ EventConfMode mode_from_str(const std::string &str) {
   for (const char &c : str) {
     if (m_str.find(c) != std::string::npos) {
       mode |= EventConfMode::kMetric;
-    }
-    if (g_str.find(c) != std::string::npos) {
+    } else if (g_str.find(c) != std::string::npos) {
       mode |= EventConfMode::kCallgraph;
-    }
-    if (l_str.find(c) != std::string::npos) {
+    } else if (l_str.find(c) != std::string::npos) {
         mode |= EventConfMode::kLiveCallgraph;
-    }
-    if (a_str.find(c) != std::string::npos) {
+    } else if (a_str.find(c) != std::string::npos) {
       mode |= EventConfMode::kAll;
+    } else {
+      return {};
     }
   }
   return mode;
 }
 
-void conf_finalize(EventConf *conf) {
+void conf_finalize(EventConf * conf, std::vector<EventConf> * configs) {
   // Generate label if needed
   // * if both, "<eventname>:<groupname>"
   // * if only event, "<eventname>"
@@ -80,6 +81,9 @@ void conf_finalize(EventConf *conf) {
   if (conf->cad_type == EventConfCadenceType::kUndefined) {
     conf->cad_type = EventConfCadenceType::kPeriod;
   }
+
+  configs->push_back(*conf);
+  conf->clear();
 }
 
 void conf_print(const EventConf *tp) {
@@ -94,7 +98,7 @@ void conf_print(const EventConf *tp) {
     printf("  label: %s\n", tp->label.c_str());
   else
     printf("  label: <generated from event/groupname>\n");
-  
+
   const char *modenames[] = {"ILLEGAL", "callgraph", "metric", "live callgraph", "metric and callgraph"};
   printf("  type: %s\n", modenames[static_cast<unsigned>(tp->mode)]);
 
@@ -114,11 +118,12 @@ void conf_print(const EventConf *tp) {
 }
 
 EventConf g_accum_event_conf = {};
+std::vector<EventConf>* g_event_configs;
 
 void yyerror(yyscan_t scanner, const char *str) {
 #ifdef EVENT_PARSER_MAIN
   fprintf(stderr, "err: %s\n", str);
-#endif 
+#endif
 }
 
 #define VAL_ERROR() \
@@ -127,8 +132,9 @@ void yyerror(yyscan_t scanner, const char *str) {
    YYABORT;  \
  } while(0)
 
-EventConf *EventConf_parse(const char *msg) {
+ int EventConf_parse(const char *msg, std::vector<EventConf>& event_configs) {
   g_accum_event_conf.clear();
+  g_event_configs = &event_configs;
   int ret = -1;
   yyscan_t scanner = NULL;
   YY_BUFFER_STATE buffer = NULL;
@@ -138,7 +144,7 @@ EventConf *EventConf_parse(const char *msg) {
   ret = yyparse(scanner);
   yy_delete_buffer(buffer, scanner);
   yylex_destroy(scanner);
-  return 0 == ret ? &g_accum_event_conf : NULL;
+  return ret;
 }
 
 #ifdef EVENT_PARSER_MAIN
@@ -176,7 +182,7 @@ int main(int c, char **v) {
 %token <str> WORD
 %token <str> KEY
 
-%type <num> integer 
+%type <num> integer
 %type <field> conf
 %type <field> opt
 
@@ -187,15 +193,17 @@ int main(int c, char **v) {
 // this only allows a single config to be processed at a time
 // ... and has ugly whitespace stripping
 confs:
-      conf { conf_finalize(&g_accum_event_conf); }
-      | confs CONFSEP conf // Unchained, subsequent configs ignored
+      conf { conf_finalize(&g_accum_event_conf, g_event_configs); }
+      | confs CONFSEP conf { conf_finalize(&g_accum_event_conf, g_event_configs); }
+      | confs CONFSEP
+      | %empty
       ;
 
 conf:
-    | opt | conf OPTSEP conf ;
+    opt | conf OPTSEP opt | conf opt;
 
 opt:
-   WORD { 
+   WORD {
      g_accum_event_conf.eventname = *$1;
      delete $1;
    }
@@ -211,8 +219,15 @@ opt:
            g_accum_event_conf.label = *$3;
            break;
          case EventConfField::kMode:
-           g_accum_event_conf.mode |= mode_from_str(*$3);
-           break;
+           {
+             auto mode = mode_from_str(*$3);
+             if (!mode) {
+               delete $3;
+               VAL_ERROR();
+             }
+             g_accum_event_conf.mode |= *mode;
+             break;
+           }
          default:
            delete $3;
            VAL_ERROR();

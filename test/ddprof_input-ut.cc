@@ -33,15 +33,6 @@ protected:
   LogHandle _handle;
 };
 
-TEST_F(InputTest, watcher_from_str) {
-  LogHandle handle;
-  const char *str_event = "sALLOC mode=l";
-  PerfWatcher watcher;
-  bool ret = watcher_from_str(str_event, &watcher);
-  ASSERT_TRUE(ret);
-  log_watcher(&watcher, 0);
-}
-
 TEST_F(InputTest, default_values) {
   DDProfInput input;
   DDRes res = ddprof_input_default(&input);

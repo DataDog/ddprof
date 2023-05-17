@@ -12,9 +12,8 @@
 namespace ddprof {
 
 struct Preset {
-  static constexpr size_t k_max_events = 10;
   const char *name;
-  const char *events[k_max_events];
+  const char *events;
 };
 
 DDRes add_preset(DDProfContext *ctx, const char *preset,
