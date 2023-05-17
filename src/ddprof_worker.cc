@@ -61,19 +61,19 @@ static inline int64_t now_nanos() {
 
 static DDRes report_lost_events(DDProfContext *ctx) {
   for (int watcher_idx = 0; watcher_idx < ctx->num_watchers; ++watcher_idx) {
-    if (ctx->worker_ctx.lost_events_per_watcher[watcher_idx] > 0) {
+    auto nb_lost = ctx->worker_ctx.lost_events_per_watcher[watcher_idx];
+
+    if (nb_lost > 0) {
       PerfWatcher *watcher = &ctx->watchers[watcher_idx];
       UnwindState *us = ctx->worker_ctx.us;
       us->output.clear();
       add_common_frame(us, SymbolErrors::lost_event);
-      LG_WRN("Reporting #%lu -> [%lu] lost samples for watcher #%d",
-             ctx->worker_ctx.lost_events_per_watcher[watcher_idx],
-             ctx->worker_ctx.lost_events_per_watcher[watcher_idx] *
-                 watcher->sample_period,
-             watcher_idx);
+
+      auto value = watcher->sample_period * nb_lost;
+      LG_WRN("Reporting #%lu -> [%lu] lost samples for watcher #%d", nb_lost,
+             value, watcher_idx);
       DDRES_CHECK_FWD(pprof_aggregate(
-          &us->output, us->symbol_hdr, watcher->sample_period,
-          ctx->worker_ctx.lost_events_per_watcher[watcher_idx], watcher,
+          &us->output, us->symbol_hdr, value, nb_lost, watcher,
           ctx->worker_ctx.pprof[ctx->worker_ctx.i_current_pprof]));
       ctx->worker_ctx.lost_events_per_watcher[watcher_idx] = 0;
     }
