@@ -268,7 +268,7 @@ target_link_libraries(dd_profiling-embedded PUBLIC dl pthread rt)
 # add libaustin
 add_library(austin SHARED IMPORTED)
 set_target_properties(austin PROPERTIES
-  IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/lib/libaustin.so"
+  IMPORTED_LOCATION "/austin/src/libaustin.a"
   INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/include/libaustin"
 )
 
