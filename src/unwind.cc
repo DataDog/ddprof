@@ -17,9 +17,9 @@
 #include <array>
 #include <string_view.hpp>
 
-#include "stackWalker.h"
-#include "stack_context.h"
-#include "symbols.h"
+#include "async-profiler/stackWalker.h"
+#include "async-profiler/stack_context.h"
+#include "async-profiler/symbols.h"
 
 using namespace std::string_view_literals;
 

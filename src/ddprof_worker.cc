@@ -9,7 +9,7 @@
 #include "ddprof_perf_event.hpp"
 #include "ddprof_stats.hpp"
 #include "dso_hdr.hpp"
-#include "dwfl_hdr.hpp"
+#include "live_allocation.hpp"
 #include "exporter/ddprof_exporter.hpp"
 #include "logger.hpp"
 #include "perf.hpp"
@@ -239,11 +239,6 @@ static DDRes ddprof_unwind_sample(DDProfContext *ctx, perf_event_sample *sample,
     ddprof_stats_add(STATS_UNWIND_TRUNCATED_INPUT, 1, nullptr);
   }
 
-  if (us->_dwfl_wrapper->_inconsistent) {
-    // Loaded modules were inconsistend, assume we should flush everything.
-    LG_WRN("(Inconsistent DWFL/DSOs)%d - Free associated objects", us->pid);
-    DDRES_CHECK_FWD(worker_pid_free(ctx, us->pid));
-  }
   return res;
 }
 
@@ -328,23 +323,21 @@ void *ddprof_worker_export_thread(void *arg) {
 
 static DDRes aggregate_livealloc_stack(
     const LiveAllocation::PprofStacks::value_type &alloc_info,
-    DDProfContext *ctx, const PerfWatcher *watcher, DDProfPProf *pprof,
-    const SymbolHdr &symbol_hdr) {
-  DDRES_CHECK_FWD(pprof_aggregate(&alloc_info.first, symbol_hdr,
-                                  alloc_info.second._value,
-                                  alloc_info.second._count, watcher, pprof));
+    DDProfContext *ctx, const PerfWatcher *watcher, DDProfPProf *pprof) {
+  DDRES_CHECK_FWD(pprof_aggregate_v2(ddprof::span(alloc_info.first.callchain, alloc_info.first.nb_locs),
+                                     ddprof::span(alloc_info.first.symbols, alloc_info.first.nb_locs),
+                                     ddprof::span(alloc_info.first.code_cache, alloc_info.first.nb_locs),
+                                    alloc_info.second._value,
+                                    alloc_info.second._count, watcher, pprof));
   if (ctx->params.show_samples) {
-    ddprof_print_sample(alloc_info.first, symbol_hdr, alloc_info.second._value,
-                        *watcher);
+    ddprof_print_sample(alloc_info.first, alloc_info.second._value, *watcher);
   }
   return ddres_init();
 }
 
 static DDRes aggregate_live_allocations_for_pid(DDProfContext *ctx, pid_t pid) {
-  struct UnwindState *us = ctx->worker_ctx.us;
   int i_export = ctx->worker_ctx.i_current_pprof;
   DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
-  const SymbolHdr &symbol_hdr = us->symbol_hdr;
   LiveAllocation &live_allocations = ctx->worker_ctx.live_allocation;
   for (unsigned watcher_pos = 0;
        watcher_pos < live_allocations._watcher_vector.size(); ++watcher_pos) {
@@ -352,8 +345,7 @@ static DDRes aggregate_live_allocations_for_pid(DDProfContext *ctx, pid_t pid) {
     const PerfWatcher *watcher = &ctx->watchers[watcher_pos];
     auto &pid_stacks = pid_map[pid];
     for (const auto &alloc_info : pid_stacks._unique_stacks) {
-      DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info, ctx, watcher, pprof,
-                                                symbol_hdr));
+      DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info, ctx, watcher, pprof));
     }
   }
   return ddres_init();
@@ -362,10 +354,8 @@ static DDRes aggregate_live_allocations_for_pid(DDProfContext *ctx, pid_t pid) {
 static DDRes aggregate_live_allocations(DDProfContext *ctx) {
   // this would be more efficient if we could reuse the same stacks in
   // libdatadog
-  struct UnwindState *us = ctx->worker_ctx.us;
   int i_export = ctx->worker_ctx.i_current_pprof;
   DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
-  const SymbolHdr &symbol_hdr = us->symbol_hdr;
   const LiveAllocation &live_allocations = ctx->worker_ctx.live_allocation;
   for (unsigned watcher_pos = 0;
        watcher_pos < live_allocations._watcher_vector.size(); ++watcher_pos) {
@@ -374,7 +364,7 @@ static DDRes aggregate_live_allocations(DDProfContext *ctx) {
     for (const auto &pid_vt : pid_map) {
       for (const auto &alloc_info : pid_vt.second._unique_stacks) {
         DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info, ctx, watcher,
-                                                  pprof, symbol_hdr));
+                                                  pprof));
       }
       LG_NTC("<%u> Number of Live allocations for PID%d=%lu, Unique stacks=%lu",
              watcher_pos, pid_vt.first, pid_vt.second._address_map.size(),
@@ -393,12 +383,12 @@ static DDRes worker_pid_free(DDProfContext *ctx, pid_t el) {
 }
 
 static DDRes clear_unvisited_pids(DDProfContext *ctx) {
-  UnwindState *us = ctx->worker_ctx.us;
-  const std::vector<pid_t> pids_remove = us->dwfl_hdr.get_unvisited();
-  for (pid_t el : pids_remove) {
-    DDRES_CHECK_FWD(worker_pid_free(ctx, el));
-  }
-  us->dwfl_hdr.reset_unvisited();
+  (void) ctx;
+//  const std::vector<pid_t> pids_remove = us->dwfl_hdr.get_unvisited();
+//  for (pid_t el : pids_remove) {
+//    DDRES_CHECK_FWD(worker_pid_free(ctx, el));
+//  }
+//  us->dwfl_hdr.reset_unvisited();
   return ddres_init();
 }
 

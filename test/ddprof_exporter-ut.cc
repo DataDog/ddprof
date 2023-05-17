@@ -148,9 +148,7 @@ TEST(DDProfExporter, simple) {
   { // Aggregate pprofs
     SymbolHdr symbol_hdr;
     UnwindOutput mock_output;
-    SymbolTable &table = symbol_hdr._symbol_table;
-    MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
-
+    //    MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
     //    fill_unwind_symbols(table, mapinfo_table, mock_output);
 
     DDProfContext ctx = {};

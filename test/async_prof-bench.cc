@@ -25,7 +25,7 @@ DDPROF_NOINLINE size_t func_save(ddprof::span<std::byte> stack,
                                  ddprof::span<uint64_t, PERF_REGS_COUNT> regs) {
   static thread_local size_t tl_size = 0;
   if (!tl_size) {
-    tl_size = save_context(retrieve_stack_end_address(), regs, stack);
+    tl_size = save_context(retrieve_stack_bounds(), regs, stack);
   }
   DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
   return tl_size;
@@ -55,9 +55,10 @@ static void BM_UnwindSameStack(benchmark::State &state) {
   // looks like buffer is modified by async profiler
   // I need to save context at all loops
   // This modifies what we are measuring
-  size_t size_stack = func_intermediate_1(depth_walk, stack, regs);
+  { // warm up
+    func_intermediate_1(depth_walk, stack, regs);
+  }
   ap::StackContext sc2 = ap::from_regs(regs);
-  ap::StackBuffer buffer(stack, sc2.sp, sc2.sp + size_stack);
 
   int cpt = 0;
   for (auto _ : state) {

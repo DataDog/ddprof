@@ -144,7 +144,7 @@ static void write_function(const ddprof::Symbol &symbol,
 }
 
 static void write_mapping_v2(const CodeCache *code_cache,
-                              ddog_Mapping *ffi_mapping) {
+                             ddog_prof_Mapping *ffi_mapping) {
   //  ffi_mapping->memory_start = (code_cache->minAddress());
   ffi_mapping->memory_start = 0;
   ffi_mapping->memory_limit = 0;
@@ -183,9 +183,9 @@ static void write_line(const ddprof::Symbol &symbol, ddog_prof_Line *ffi_line) {
 }
 
 static void write_location_v2(const void *ip,
-                              const ddog_Slice_line *lines,
+                              const ddog_prof_Slice_Line *lines,
                               const CodeCache *code_cache,
-                              ddog_Location *ffi_location) {
+                              ddog_prof_Location *ffi_location) {
   write_mapping_v2(code_cache, &ffi_location->mapping);
   ffi_location->address = reinterpret_cast<uint64_t>(ip);
   ffi_location->lines = *lines;
@@ -193,25 +193,25 @@ static void write_location_v2(const void *ip,
   ffi_location->is_folded = false;
 }
 
-static void write_function_v2(const char *func, const char *filename, ddog_Function *ffi_func) {
+static void write_function_v2(const char *func, const char *filename, ddog_prof_Function *ffi_func) {
   // todo demangling
   ffi_func->name = to_CharSlice(string_view_create_strlen(func));
   ffi_func->system_name = to_CharSlice(string_view_create_strlen(func));
   ffi_func->filename = to_CharSlice(filename);
 }
 
-static void write_line_v2(const char *func, const char *filename, ddog_Line *ffi_line) {
+static void write_line_v2(const char *func, const char *filename, ddog_prof_Line *ffi_line) {
   write_function_v2(func, filename, &ffi_line->function);
   ffi_line->line = 0;
 }
 
-DDRes pprof_aggregate_v2(ddprof::span<const void *> callchain,
-                         ddprof::span<const char *> symbols,
-                         ddprof::span<const CodeCache *> code_cache,
+DDRes pprof_aggregate_v2(ddprof::span<const void *const> callchain,
+                         ddprof::span<char const *const> symbols,
+                         ddprof::span<CodeCache const * const> code_cache,
                          uint64_t value,
                          uint64_t count, const PerfWatcher *watcher,
                          DDProfPProf *pprof) {
-  ddog_Profile *profile = pprof->_profile;
+  ddog_prof_Profile *profile = pprof->_profile;
 
   int64_t values[DDPROF_PWT_LENGTH] = {};
   values[watcher->pprof_sample_idx] = value * count;
@@ -219,23 +219,23 @@ DDRes pprof_aggregate_v2(ddprof::span<const void *> callchain,
     values[watcher->pprof_count_sample_idx] = count;
   }
 
-  ddog_Location locations_buff[DD_MAX_STACK_DEPTH];
+  ddog_prof_Location locations_buff[DD_MAX_STACK_DEPTH];
   // assumption of single line per loc for now
-  ddog_Line line_buff[DD_MAX_STACK_DEPTH];
+  ddog_prof_Line line_buff[DD_MAX_STACK_DEPTH];
 
   // todo skip frames
-  for (int i = 0; i < symbols.size(); ++i) {
+  for (unsigned i = 0; i < symbols.size(); ++i) {
     assert(i < DD_MAX_STACK_DEPTH);
     // possibly several lines to handle inlined function (not handled for now)
     // todo: get file name from dwarf
     write_line_v2(symbols[i],
                   code_cache[i]?code_cache[i]->name():"unknown",
                   &line_buff[i]);
-    ddog_Slice_line lines = {.ptr = &line_buff[i], .len = 1};
+    ddog_prof_Slice_Line lines = {.ptr = &line_buff[i], .len = 1};
     write_location_v2(callchain[i], &lines, code_cache[i], &locations_buff[i]);
   }
 
-  ddog_Label labels[PPROF_MAX_LABELS] = {};
+  ddog_prof_Label labels[PPROF_MAX_LABELS] = {};
   size_t labels_num = 0;
 
   // todo pid and tid things
@@ -251,17 +251,18 @@ DDRes pprof_aggregate_v2(ddprof::span<const void *> callchain,
     }
     ++labels_num;
   }
-  ddog_Sample sample = {
+  ddog_prof_Sample sample = {
       .locations = {.ptr = locations_buff, .len = symbols.size()},
       .values = {.ptr = values, .len = pprof->_nb_values},
       .labels = {.ptr = labels, .len = labels_num},
   };
 
-  uint64_t id_sample = ddog_Profile_add(profile, sample);
-  if (id_sample == 0) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile");
+  ddog_prof_Profile_AddResult add_res = ddog_prof_Profile_add(profile, sample);
+  if (add_res.tag == DDOG_PROF_PROFILE_ADD_RESULT_ERR) {
+    defer { ddog_Error_drop(&add_res.err); };
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile: %s",
+                           add_res.err.message.ptr);
   }
-
   return ddres_init();
 }
 
@@ -379,7 +380,7 @@ void ddprof_print_sample(const UnwindOutput_V2 &uw_output, uint64_t value,
       ddprof::string_format("sample[type=%s;pid=%ld;tid=%ld] ", sample_name,
                             uw_output.pid, uw_output.tid);
 
-  for (int i = 0; i < uw_output.nb_locs; ++i) {
+  for (unsigned i = 0; i < uw_output.nb_locs; ++i) {
     std::string_view cur_sym(uw_output.symbols[i]);
     if (i != 0) {
       buf += ";";
@@ -391,5 +392,5 @@ void ddprof_print_sample(const UnwindOutput_V2 &uw_output, uint64_t value,
       buf += cur_sym.substr(0, cur_sym.find('('));
     }
   }
-  PRINT_NFO("(depth=%u) %s  %ld", uw_output.nb_locs, buf.c_str(), value);
+  PRINT_NFO("(depth=%lu) %s  %lu", uw_output.nb_locs, buf.c_str(), value);
 }

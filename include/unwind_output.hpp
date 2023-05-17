@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <vector>
 
-#include "codeCache.h"
+#include "async-profiler/codeCache.h"
 #include "ddprof_defs.hpp"
 #include "string_view.hpp"
 #include <vector>
@@ -44,4 +44,7 @@ struct UnwindOutput_V2 {
   int pid = {};
   int tid = {};
   bool is_incomplete = false;
+
+  UnwindOutput_V2() = default;
+  auto operator<=>(const UnwindOutput_V2 &) const = default;
 };

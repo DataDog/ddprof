@@ -15,7 +15,7 @@ namespace ddprof {
 
 bool is_max_stack_depth_reached(const UnwindState &us) {
   // +2 to keep room for common base frame
-  return us.output.locs.size() + 2 >= DD_MAX_STACK_DEPTH;
+  return us.output.nb_locs + 2 >= DD_MAX_STACK_DEPTH;
 }
 
 // read a word from the given stack
@@ -123,7 +123,7 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, int regno,
     // requested when unwinding the leaf function for a register, we simply
     // return the initial register value.
     constexpr uint64_t k_red_zone_size = 128;
-    if (us->output.locs.size() <= 1 && regno != -1 &&
+    if (us->output.nb_locs <= 1 && regno != -1 &&
         addr >= sp_start - k_red_zone_size) {
       *result = us->initial_regs.regs[regno];
       return true;

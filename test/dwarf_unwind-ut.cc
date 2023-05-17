@@ -30,7 +30,8 @@ DDPROF_NOINLINE size_t funcB(std::array<uint64_t, PERF_REGS_COUNT> &regs);
 
 size_t funcB(std::array<uint64_t, PERF_REGS_COUNT> &regs) {
   printf("dwarf_unwind-ut:%s %lx \n", __FUNCTION__, _THIS_IP_);
-  size_t size = save_context(retrieve_stack_end_address(), regs, stack);
+  ddprof::span<const std::byte> bounds = retrieve_stack_bounds();
+  size_t size = save_context(bounds, regs, stack);
 
   return size;
 }
