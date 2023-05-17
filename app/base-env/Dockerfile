@@ -169,8 +169,8 @@ RUN useradd -ms /bin/bash ddbuild
 
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-  autoconf
-
+    autoconf \
+    libtool
 
 #RUN git clone https://github.com/libunwind/libunwind.git && \
 #    cd libunwind && \
