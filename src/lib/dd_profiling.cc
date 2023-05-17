@@ -219,11 +219,15 @@ int ddprof_start_profiling_internal() {
         make_defer([&sockfds]() { close(sockfds[kParentIdx]); });
 
     auto daemonize_res = ddprof::daemonize();
-    if (daemonize_res.temp_pid == -1) {
+    if (daemonize_res.state == ddprof::DaemonizeResult::Error) {
       return -1;
     }
 
-    if (daemonize_res.temp_pid) {
+    if (daemonize_res.state == ddprof::DaemonizeResult::IntermediateProcess) {
+      _exit(0);
+    }
+
+    if (daemonize_res.state == ddprof::DaemonizeResult::DaemonProcess) {
       // executed by daemonized process
 
       // close parent socket end

@@ -5,12 +5,13 @@
 
 #pragma once
 
-#include <functional>
 #include <sys/types.h>
 
 namespace ddprof {
 
 struct DaemonizeResult {
+  enum State { Error, InitialProcess, IntermediateProcess, DaemonProcess };
+  State state; // Only InitialProcess can return in a Failure state
   pid_t
       temp_pid; // -1 on failure, 0 for initial process, > 0 for daemon process
   pid_t parent_pid; // pid of process initiating daemonize
@@ -18,7 +19,6 @@ struct DaemonizeResult {
 };
 
 // Daemonization function
-// cleanup_function is a callable invoked in the context of the intermediate,
 // short-lived process that will be killed by daemon process.
-DaemonizeResult daemonize(std::function<void()> cleanup_function = {});
+DaemonizeResult daemonize();
 } // namespace ddprof

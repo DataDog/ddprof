@@ -259,15 +259,19 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     }
 
     ctx->params.pid = getpid();
-    auto daemonize_res =
-        ddprof::daemonize([ctx] { ddprof::context_free(ctx); });
+    auto daemonize_res = ddprof::daemonize();
 
-    if (daemonize_res.temp_pid == -1) {
+    if (daemonize_res.state == ddprof::DaemonizeResult::Error) {
       return -1;
     }
 
-    temp_pid = daemonize_res.temp_pid;
-    if (!temp_pid) {
+    if (daemonize_res.state == ddprof::DaemonizeResult::IntermediateProcess) {
+      // temp intermediate process,: return and exit
+      is_profiler = true;
+      return 0;
+    }
+
+    if (daemonize_res.state == ddprof::DaemonizeResult::InitialProcess) {
       // non-daemon process: return control to caller
       defer_child_socket_close.reset();
       defer_context_free.release();
@@ -298,6 +302,8 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
       defer_parent_socket_close.release();
       return 0;
     }
+
+    temp_pid = daemonize_res.temp_pid;
     defer_child_socket_close.release();
     defer_parent_socket_close.reset();
   }
