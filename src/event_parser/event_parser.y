@@ -116,9 +116,6 @@ void conf_print(const EventConf *tp) {
 EventConf g_accum_event_conf = {};
 
 void yyerror(yyscan_t scanner, const char *str) {
-#ifdef EVENT_PARSER_MAIN
-  fprintf(stderr, "err: %s\n", str);
-#endif 
 }
 
 #define VAL_ERROR() \
@@ -141,25 +138,6 @@ EventConf *EventConf_parse(const char *msg) {
   return 0 == ret ? &g_accum_event_conf : NULL;
 }
 
-#ifdef EVENT_PARSER_MAIN
-bool g_debugout_enable = false;
-int main(int c, char **v) {
-  g_debugout_enable = false;
-  if (c) {
-    printf(">\"%s\"\n", v[1]);
-    YY_BUFFER_STATE buffer = yy_scan_string(v[1]);
-    g_debugout_enable = true;
-    if (!yyparse())
-      conf_print(&g_accum_event_conf);
-    else
-      fprintf(stderr, "  ERROR\n");
-    yy_delete_buffer(buffer);
-  } else {
-    yyparse();
-  }
-  return 0;
-}
-#endif
 %}
 
 %union {
@@ -188,11 +166,18 @@ int main(int c, char **v) {
 // ... and has ugly whitespace stripping
 confs:
       conf { conf_finalize(&g_accum_event_conf); }
-      | confs CONFSEP conf // Unchained, subsequent configs ignored
+      | confs CONFSEP conf { }
       ;
 
 conf:
-    | opt | conf OPTSEP conf ;
+    opts;
+
+opts:
+    opt
+    | opts OPTSEP opt
+    | opts OPTSEP
+    | OPTSEP opts
+    ;
 
 opt:
    WORD { 

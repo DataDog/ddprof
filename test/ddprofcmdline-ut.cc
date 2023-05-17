@@ -58,6 +58,18 @@ TEST(CmdLineTst, ParserKeyPatterns) {
 
   // Simple events without qualification are valid event names
   ASSERT_TRUE(watcher_from_str("hCPU", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU ", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU  ", &watcher));
+  ASSERT_TRUE(watcher_from_str("e=hCPU   ", &watcher));
+
+  // Trailing whitespace is fine, but can't split on =
+  ASSERT_FALSE(watcher_from_str("e= hCPU", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=  hCPU", &watcher));
+  ASSERT_FALSE(watcher_from_str("e=   hCPU", &watcher));
+  ASSERT_FALSE(watcher_from_str("e= hCPU ", &watcher));
+  ASSERT_FALSE(watcher_from_str("e= hCPU  ", &watcher));
+  ASSERT_FALSE(watcher_from_str("e= hCPU   ", &watcher));
 
   // Events should be tolerant of padding whitespace
   // Three checks on each side to ensure fully recursive (base, 1, 2) stripping
