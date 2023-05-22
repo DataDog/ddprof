@@ -5,22 +5,31 @@
 
 #include "daemonize.hpp"
 
+#include <cstdlib>
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 namespace ddprof {
-DaemonizeResult daemonize(std::function<void()> cleanup_function) {
+
+namespace {
+void handle_signal(int) {}
+DaemonizeResult daemonize_error() {
+  return {DaemonizeResult::Error, -1, -1, -1};
+}
+} // namespace
+
+DaemonizeResult daemonize() {
   int pipefd[2];
   if (pipe2(pipefd, O_CLOEXEC) == -1) {
-    return {-1, -1, -1};
+    return daemonize_error();
   }
 
   pid_t parent_pid = getpid();
   pid_t temp_pid = fork(); // "middle" (temporary) PID
 
   if (temp_pid == -1) {
-    return {-1, -1, -1};
+    return daemonize_error();
   }
 
   if (!temp_pid) { // If I'm the temp PID enter branch
@@ -29,15 +38,24 @@ DaemonizeResult daemonize(std::function<void()> cleanup_function) {
     temp_pid = getpid();
     if (pid_t child_pid = fork();
         child_pid) { // If I'm the temp PID again, enter branch
-      if (cleanup_function) {
-        cleanup_function();
+
+      struct sigaction sa;
+      if (sigemptyset(&sa.sa_mask) == -1) {
+        exit(1);
+      }
+
+      sa.sa_handler = &handle_signal;
+      sa.sa_flags = 0;
+      if (sigaction(SIGTERM, &sa, NULL) == -1) {
+        exit(1);
       }
 
       // Block until our child exits or sends us a kill signal
       // NOTE, current process is NOT expected to unblock here; rather it
-      // ends by SIGTERM.  Exiting here is an error condition.
+      // ends by SIGTERM.
       waitpid(child_pid, NULL, 0);
-      exit(1);
+      return {DaemonizeResult::IntermediateProcess, temp_pid, parent_pid,
+              child_pid};
     } else {
       child_pid = getpid();
       if (write(pipefd[1], &child_pid, sizeof(child_pid)) !=
@@ -46,7 +64,7 @@ DaemonizeResult daemonize(std::function<void()> cleanup_function) {
       }
       close(pipefd[1]);
       // If I'm the child PID, then leave and attach profiler
-      return {temp_pid, parent_pid, child_pid};
+      return {DaemonizeResult::DaemonProcess, temp_pid, parent_pid, child_pid};
     }
   } else {
     close(pipefd[1]);
@@ -54,13 +72,14 @@ DaemonizeResult daemonize(std::function<void()> cleanup_function) {
     pid_t grandchild_pid;
     if (read(pipefd[0], &grandchild_pid, sizeof(grandchild_pid)) !=
         sizeof(grandchild_pid)) {
-      return {-1, -1, -1};
+      return daemonize_error();
     }
 
     // If I'm the target PID, then now it's time to wait until my
     // child, the middle PID, returns.
     waitpid(temp_pid, NULL, 0);
-    return {0, parent_pid, grandchild_pid};
+    return {DaemonizeResult::InitialProcess, temp_pid, parent_pid,
+            grandchild_pid};
   }
 }
 
