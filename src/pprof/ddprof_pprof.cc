@@ -178,7 +178,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   ddog_prof_Profile *profile = pprof->_profile;
 
   int64_t values[DDPROF_PWT_LENGTH] = {};
-  values[watcher->pprof_sample_idx] = value * count;
+  values[watcher->pprof_sample_idx] = value;
   if (watcher_has_countable_sample_type(watcher)) {
     values[watcher->pprof_count_sample_idx] = count;
   }
