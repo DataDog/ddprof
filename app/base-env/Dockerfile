@@ -177,6 +177,17 @@ RUN VERSION="3.21.0" \
 # Install cmake_format
 RUN pip3 install cmake_format
 
+RUN apt-get update \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    libtool
+
+RUN git clone --branch r1viollet/libaustin https://github.com/r1viollet/austin.git && \
+    cd austin && \
+    autoreconf --install && \
+    ./configure && \
+    make && \
+    make install
+
 # A specific user is required to get access to perf event ressources.
 # This enables unit testing using perf-event ressources
 RUN useradd -ms /bin/bash ddbuild
