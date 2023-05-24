@@ -176,8 +176,9 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, int regno,
     // requested when unwinding the leaf function for a register, we simply
     // return the initial register value.
     constexpr uint64_t k_red_zone_size = 128;
-    if (us->output.locs.size() <= 1 && regno != -1 &&
-        addr >= sp_start - k_red_zone_size) {
+    if (us->output.locs.size() <= 1 && addr >= sp_start - k_red_zone_size &&
+        regno >= 0 &&
+        regno < static_cast<int>(std::size(us->initial_regs.regs))) {
       *result = us->initial_regs.regs[regno];
       return true;
     }
