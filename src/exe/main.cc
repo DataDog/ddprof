@@ -384,11 +384,11 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
         if (!process_is_alive(ctx->params.pid)) {
           // Tell the user that process died
           // Most of the time this is an invalid command line
-          LG_ERR(
-              "Target process(%d) is not alive. Check command line validity.",
+          LG_WRN(
+              "Target process(%d) is not alive. Allocation profiling stopped.",
               ctx->params.pid);
-          // Avoiding returning
-          // We could still have a short lived process that forked
+          // We are not returning
+          // We could still have a short lived process that has forked
           // CPU profiling will stop on a later failure if process died.
         } else {
           // Failure in wrapper mode is not fatal:
@@ -474,16 +474,18 @@ int main(int argc, char *argv[]) {
 
   // Execute manages its own return path
   if (-1 == execvp(*argv, (char *const *)argv)) {
+    // Logger is not configured in the context of the parent process:
+    // We use stderr as a standard logging mechanism
     switch (errno) {
     case ENOENT:
-      LG_ERR("%s: file not found", argv[0]);
+      fprintf(stderr, "%s: executable not found", argv[0]);
       break;
     case ENOEXEC:
     case EACCES:
-      LG_ERR("%s: permission denied", argv[0]);
+      fprintf(stderr, "%s: permission denied", argv[0]);
       break;
     default:
-      LG_ERR("%s: failed to execute (%s)", argv[0], strerror(errno));
+      fprintf(stderr, "%s: failed to execute (%s)", argv[0], strerror(errno));
       break;
     }
   }
