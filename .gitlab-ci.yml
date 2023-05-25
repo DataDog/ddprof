@@ -8,6 +8,13 @@ variables:
     value: "main"
     description: "Run the build CI on this branch"
 
+workflow:
+  rules:
+    # If triggered by tag, run only for release tags and not rc
+    - if: '$CI_COMMIT_TAG != null && ($CI_COMMIT_TAG =~ /^v.*-rc$/ || $CI_COMMIT_TAG !~ /^v/)'
+      when: never
+    - when: always
+
 # Triggers a build within the Datadog infrastructure in the ddprof-build repository
 trigger_internal_build:
   variables:
