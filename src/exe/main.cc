@@ -14,6 +14,7 @@
 #include "defer.hpp"
 #include "ipc.hpp"
 #include "logger.hpp"
+#include "signal_helper.hpp"
 #include "tempfile.hpp"
 #include "timer.hpp"
 #include "user_override.hpp"
@@ -302,7 +303,6 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
       defer_parent_socket_close.release();
       return 0;
     }
-
     temp_pid = daemonize_res.temp_pid;
     defer_child_socket_close.release();
     defer_parent_socket_close.reset();
@@ -381,12 +381,24 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
           [&reply](const ddprof::RequestMessage &) { return reply; });
     } catch (const ddprof::DDException &e) {
       if (in_wrapper_mode) {
-        // Failture in wrapper mode is not fatal:
-        // LD_PRELOAD may fail because target exe is statically linked
-        // (eg. go binaries)
-        LG_WRN("Unable to connect to profiler library (target executable might "
-               "be statically linked and library cannot be preloaded). "
-               "Allocation profiling will be disabled.");
+        if (!process_is_alive(ctx->params.pid)) {
+          // Tell the user that process died
+          // Most of the time this is an invalid command line
+          LG_WRN(
+              "Target process(%d) is not alive. Allocation profiling stopped.",
+              ctx->params.pid);
+          // We are not returning
+          // We could still have a short lived process that has forked
+          // CPU profiling will stop on a later failure if process died.
+        } else {
+          // Failure in wrapper mode is not fatal:
+          // LD_PRELOAD may fail because target exe is statically linked
+          // (eg. go binaries)
+          LG_WRN(
+              "Unable to connect to profiler library (target executable might "
+              "be statically linked and library cannot be preloaded). "
+              "Allocation profiling will be disabled.");
+        }
       } else {
         LOG_ERROR_DETAILS(LG_ERR, e.get_DDRes()._what);
         return -1;
@@ -462,16 +474,18 @@ int main(int argc, char *argv[]) {
 
   // Execute manages its own return path
   if (-1 == execvp(*argv, (char *const *)argv)) {
+    // Logger is not configured in the context of the parent process:
+    // We use stderr as a standard logging mechanism
     switch (errno) {
     case ENOENT:
-      LG_ERR("%s: file not found", argv[0]);
+      fprintf(stderr, "%s: executable not found", argv[0]);
       break;
     case ENOEXEC:
     case EACCES:
-      LG_ERR("%s: permission denied", argv[0]);
+      fprintf(stderr, "%s: permission denied", argv[0]);
       break;
     default:
-      LG_ERR("%s: failed to execute (%s)", argv[0], strerror(errno));
+      fprintf(stderr, "%s: failed to execute (%s)", argv[0], strerror(errno));
       break;
     }
   }
