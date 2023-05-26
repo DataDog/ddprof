@@ -177,99 +177,96 @@ int main(int argc, char *argv[]) {
   sigaction_handlers.sa_flags = SA_SIGINFO;
   sigaction(SIGSEGV, &(sigaction_handlers), NULL);
 
-  try {
-    CLI::App app{"Simple allocation test"};
+  CLI::App app{"Simple allocation test"};
 
-    unsigned int nb_forks{1};
-    unsigned int nb_threads{1};
+  unsigned int nb_forks{1};
+  unsigned int nb_threads{1};
 
-    Options opts;
-    std::vector<std::string> exec_args;
+  Options opts;
+  std::vector<std::string> exec_args;
 
-    app.add_option("--fork", nb_forks, "Number of processes to create")
-        ->default_val(1);
-    app.add_option("--threads", nb_threads, "Number of threads to use")
-        ->default_val(1);
-    app.add_option("--exec", exec_args, "Exec the following command")
-        ->expected(-1);
-    app.add_option("--loop", opts.loop_count, "Number of loops")
-        ->default_val(-1);
-    app.add_option("--malloc", opts.malloc_size,
-                   "Malloc allocation size per loop")
-        ->default_val(1000);
-    app.add_option("--realloc", opts.realloc_size,
-                   "Realloc allocation size per loop")
-        ->default_val(2000);
-    app.add_option("--call-depth", opts.callstack_depth, "Callstack depth")
-        ->default_val(0);
-    app.add_option("--frame-size", opts.frame_size,
-                   "Size to allocate on the stack for each frame")
-        ->default_val(0);
-    app.add_option("--skip-free", opts.skip_free,
-                   "Only free every N allocations (default is 0)")
-        ->default_val(0);
+  app.add_option("--fork", nb_forks, "Number of processes to create")
+      ->default_val(1);
+  app.add_option("--threads", nb_threads, "Number of threads to use")
+      ->default_val(1);
+  app.add_option("--exec", exec_args, "Exec the following command")
+      ->expected(-1); // minus is to say at least 1
+  app.add_option("--loop", opts.loop_count, "Number of loops")->default_val(0);
+  app.add_option("--malloc", opts.malloc_size,
+                 "Malloc allocation size per loop")
+      ->default_val(1000);
+  app.add_option("--realloc", opts.realloc_size,
+                 "Realloc allocation size per loop")
+      ->default_val(2000);
+  app.add_option("--call-depth", opts.callstack_depth, "Callstack depth")
+      ->default_val(0);
+  app.add_option("--frame-size", opts.frame_size,
+                 "Size to allocate on the stack for each frame")
+      ->default_val(0);
+  app.add_option("--skip-free", opts.skip_free,
+                 "Only free every N allocations (default is 0)")
+      ->default_val(0);
 
-    app.add_option<std::chrono::milliseconds, int64_t>(
-           "--timeout", opts.timeout_duration, "Timeout after N milliseconds")
-        ->default_val(0)
-        ->check(CLI::NonNegativeNumber);
-    app.add_option<std::chrono::microseconds, int64_t>(
-           "--sleep", opts.sleep_duration_per_loop,
-           "Time to sleep (us) between allocations")
-        ->default_val(0)
-        ->check(CLI::NonNegativeNumber);
-    app.add_option<std::chrono::microseconds, int64_t>(
-           "--spin", opts.spin_duration_per_loop,
-           "Time to spin (us) between allocations")
-        ->default_val(0)
-        ->check(CLI::NonNegativeNumber);
+  app.add_option<std::chrono::milliseconds, int64_t>(
+         "--timeout", opts.timeout_duration, "Timeout after N milliseconds")
+      ->default_val(0)
+      ->check(CLI::NonNegativeNumber);
+  app.add_option<std::chrono::microseconds, int64_t>(
+         "--sleep", opts.sleep_duration_per_loop,
+         "Time to sleep (us) between allocations")
+      ->default_val(0)
+      ->check(CLI::NonNegativeNumber);
+  app.add_option<std::chrono::microseconds, int64_t>(
+         "--spin", opts.spin_duration_per_loop,
+         "Time to spin (us) between allocations")
+      ->default_val(0)
+      ->check(CLI::NonNegativeNumber);
 
 #ifdef USE_DD_PROFILING
-    bool start_profiling = false;
-    app.add_flag("--profile", start_profiling, "Enable profiling")
-        ->default_val(false);
+  bool start_profiling = false;
+  app.add_flag("--profile", start_profiling, "Enable profiling")
+      ->default_val(false);
 #endif
 
-    CLI11_PARSE(app, argc, argv);
+  CLI11_PARSE(app, argc, argv);
 
 #ifdef USE_DD_PROFILING
-    if (start_profiling && ddprof_start_profiling() != 0) {
-      fprintf(stderr, "Failed to start profiling\n");
-      return 1;
-    }
+  if (start_profiling && ddprof_start_profiling() != 0) {
+    fprintf(stderr, "Failed to start profiling\n");
+    return 1;
+  }
 #endif
-    if (exec_args.empty()) {
-      print_header();
-    }
+  if (exec_args.empty()) {
+    print_header();
+  }
 
-    for (unsigned int i = 1; i < nb_forks; ++i) {
-      if (fork()) {
-        break;
-      }
+  for (unsigned int i = 1; i < nb_forks; ++i) {
+    if (fork()) {
+      break;
     }
+  }
 
-    if (!exec_args.empty()) {
-      std::vector<char *> new_args;
-      for (auto &a : exec_args) {
-        new_args.push_back(a.data());
-      }
-      execvp(new_args[0], new_args.data());
-      perror("Exec failed: ");
-      return 1;
+  if (!exec_args.empty()) {
+    std::vector<char *> new_args;
+    for (auto &a : exec_args) {
+      new_args.push_back(a.data());
     }
+    execvp(new_args[0], new_args.data());
+    perror("Exec failed: ");
+    return 1;
+  }
 
-    std::vector<std::thread> threads;
-    std::vector<Stats> stats{nb_threads};
-    for (unsigned int i = 1; i < nb_threads; ++i) {
-      threads.emplace_back(wrapper, std::cref(opts), std::ref(stats[i]));
-    }
-    wrapper(opts, stats[0]);
-    for (auto &t : threads) {
-      t.join();
-    }
-    auto pid = getpid();
-    for (auto &stat : stats) {
-      print_stats(pid, stat);
-    }
-  } catch (...) { return 1; }
+  std::vector<std::thread> threads;
+  std::vector<Stats> stats{nb_threads};
+  for (unsigned int i = 1; i < nb_threads; ++i) {
+    threads.emplace_back(wrapper, std::cref(opts), std::ref(stats[i]));
+  }
+  wrapper(opts, stats[0]);
+  for (auto &t : threads) {
+    t.join();
+  }
+  auto pid = getpid();
+  for (auto &stat : stats) {
+    print_stats(pid, stat);
+  }
 }
