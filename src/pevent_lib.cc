@@ -205,22 +205,6 @@ DDRes pevent_setup(DDProfContext *ctx, pid_t pid, int num_cpu,
     DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, false));
   }
 
-  // If any watchers have self-instrumentation, then they may have set up child
-  // fds which now need to be consolidated via ioctl.  These fds cannot be
-  // closed until profiling is completed.
-  for (unsigned i = 0; i < pevent_hdr->size; i++) {
-    PEvent *pes = &pevent_hdr->pes[i];
-    if (ctx->watchers[pes->watcher_pos].instrument_self) {
-      int fd = pes->fd;
-      for (int j = 0; j < pes->current_child_fd; ++j) {
-        int child_fd = pes->child_fds[j];
-        if (ioctl(child_fd, PERF_EVENT_IOC_SET_OUTPUT, fd)) {
-          DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
-                                 "Could not ioctl() tALLOCSYS1");
-        }
-      }
-    }
-  }
   return ddres_init();
 }
 
