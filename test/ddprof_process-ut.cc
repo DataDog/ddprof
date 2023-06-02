@@ -7,11 +7,19 @@
 #include <unistd.h>
 
 namespace ddprof {
-TEST(DDProfProcess, cgroup) {
+TEST(DDProfProcess, simple_self) {
   LogHandle handle;
   pid_t mypid = getpid();
   Process p(mypid);
-  EXPECT_NE(p._cgroup.get_id(), 0);
-  LG_DBG("Cgroup id = %lu", p._cgroup.get_id());
+  EXPECT_NE(p._cgroup, Process::kCGroupIdNull);
+  LG_DBG("Cgroup id = %lu", p._cgroup);
 }
+
+TEST(DDProfProcess, no_file) {
+  LogHandle handle;
+  Process p(1430928460);
+  EXPECT_EQ(p._cgroup, Process::kCGroupIdNull);
+  LG_DBG("Cgroup id = %lu", p._cgroup);
+}
+
 } // namespace ddprof
