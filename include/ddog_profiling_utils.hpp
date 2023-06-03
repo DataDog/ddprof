@@ -6,9 +6,11 @@
 #pragma once
 
 extern "C" {
+#include "datadog/common.h"
 #include "datadog/profiling.h"
 }
 
+#include "defer.hpp"
 #include "string_view.hpp"
 #include <string_view>
 
@@ -18,4 +20,11 @@ inline ddog_CharSlice to_CharSlice(std::string_view str) {
 
 inline ddog_CharSlice to_CharSlice(string_view slice) {
   return {.ptr = slice.ptr, .len = slice.len};
+}
+
+inline void log_warn_and_drop_error(std::string_view message,
+                                    ddog_Error *error) {
+  defer { ddog_Error_drop(error); };
+  ddog_CharSlice char_slice = ddog_Error_message(error);
+  LG_WRN("%s (%.*s)", message.data(), (int)char_slice.len, char_slice.ptr);
 }
