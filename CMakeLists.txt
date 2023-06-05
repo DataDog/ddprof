@@ -3,7 +3,7 @@
 # (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
 
 cmake_minimum_required(VERSION 3.19)
-
+foobar()
 # ---- Global definitions  ----
 
 project(
