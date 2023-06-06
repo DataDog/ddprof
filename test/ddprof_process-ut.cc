@@ -22,4 +22,24 @@ TEST(DDProfProcess, no_file) {
   LG_DBG("Cgroup id = %lu", p._cgroup);
 }
 
+TEST(DDProfProcess, container_id) {
+  LogHandle handle;
+  std::string path_tests = std::string(UNIT_TEST_DATA) + "/" + "container_id/";
+  auto container_id =
+      Process::extract_container_id(path_tests + "cgroup.kubernetess");
+  if (container_id) {
+    LG_DBG("container id %s", container_id.value().c_str());
+  }
+}
+TEST(DDProfProcess, simple_pid_2) {
+  LogHandle handle;
+  ProcessHdr process_hdr(UNIT_TEST_DATA);
+
+  std::optional<std::string> opt_string = process_hdr.get_container_id(2);
+  ASSERT_TRUE(opt_string);
+  if (opt_string) {
+    LG_DBG("container id %s", opt_string.value().c_str());
+  }
+}
+
 } // namespace ddprof
