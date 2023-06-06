@@ -150,7 +150,6 @@ if [[ $OSTYPE == darwin* ]]; then
   MOUNT_SSH_AGENT="-v /run/host-services/ssh-auth.sock:/ssh-agent -e SSH_AUTH_SOCK=/ssh-agent"
 else
   if [[ $OSTYPE != darwin* ]]; then
-      echo "Script mainly configured for MacOS."
       echo "Not mounting ssh agent"
   fi
   MOUNT_SSH_AGENT=""

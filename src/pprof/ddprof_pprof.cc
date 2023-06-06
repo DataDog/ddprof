@@ -124,6 +124,8 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
         include_kernel ? std::string("true") : std::string("false")));
   }
   {
+    // custom context
+    // Allow the data to be split by container-id
     pprof->_tags.push_back(std::make_pair(std::string("ddprof.custom_ctx"),
                                           std::string("container_id")));
   }
@@ -222,15 +224,12 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   char tid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
 
   // retrieve container ID label (whole host)
-  struct ddog_FfiOptionString container_id =
-      get_container_id_ffi(uw_output->pid);
-  if (container_id.is_some) {
-    labels[labels_num].key = to_CharSlice("container_id");
-    labels[labels_num].str = to_CharSlice(container_id.data);
-    //    LG_NTC("[PPROF] PID%d container_id is %s\n", uw_output->pid,
-    //    container_id.data);
-    ++labels_num;
-  }
+
+  labels[labels_num].key = to_CharSlice("container_id");
+  labels[labels_num].str = to_CharSlice(uw_output->container_id);
+  //    LG_NTC("[PPROF] PID%d container_id is %s\n", uw_output->pid,
+  //    container_id.data);
+  ++labels_num;
 
   // Add any configured labels.  Note that TID alone has the same cardinality as
   // (TID;PID) tuples, so except for symbol table overhead it doesn't matter
@@ -275,10 +274,6 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     defer { ddog_Error_drop(&add_res.err); };
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile: %s",
                            add_res.err.message.ptr);
-  }
-
-  if (container_id.is_some) {
-    free_container_id_ffi(const_cast<char *>(container_id.data));
   }
   return ddres_init();
 }

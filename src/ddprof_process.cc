@@ -25,7 +25,7 @@ constexpr static std::string_view CONTAINER_SOURCE = "[0-9a-f]{64}";
 constexpr static std::string_view TASK_SOURCE = "[0-9a-f]{32}-\\d+";
 
 namespace {
-std::optional<std::string> extract_cgroup(const std::string &line) {
+std::optional<std::string> container_id_from_line(const std::string &line) {
   std::smatch line_matches;
   std::smatch container_matches;
   const std::regex LINE_REGEX(R"(^\d+:[^:]*:(.+)$)");
@@ -43,7 +43,6 @@ std::optional<std::string> extract_cgroup(const std::string &line) {
 }
 
 std::string format_cgroup_file(pid_t pid, std::string_view path_to_proc) {
-  LG_DBG("path = %s", path_to_proc.data());
   return string_format("%s/proc/%d/cgroup", path_to_proc.data(), pid);
 }
 
@@ -53,12 +52,13 @@ std::optional<std::string>
 Process::extract_container_id(const std::string &filepath) {
   std::ifstream cgroup_file(filepath);
   if (!cgroup_file) {
-    LG_WRN("Failed to open file: %s", filepath.data());
+    // short lived pids will log a lot here
+    LG_DBG("Failed to open file: %s", filepath.data());
     return std::nullopt;
   }
   std::string line;
   while (std::getline(cgroup_file, line)) {
-    auto container_id = extract_cgroup(line);
+    auto container_id = container_id_from_line(line);
     if (container_id) {
       return container_id;
     }
@@ -68,15 +68,14 @@ Process::extract_container_id(const std::string &filepath) {
 
 DDRes Process::read_cgroup_id(pid_t pid, std::string_view path_to_proc,
                               CGroupId_t &cgroup) {
-  cgroup = Process::kCGroupIdNull;
+  cgroup = Process::kCGroupIdError;
   std::string path =
       string_format("%s/proc/%d/ns/cgroup", path_to_proc.data(), pid);
   char buf[k_max_buf_cgroup_link];
   ssize_t len = readlink(path.c_str(), buf, k_max_buf_cgroup_link - 1);
-
   if (len == -1) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_CGROUP, "Unable to read link %s",
-                           path.c_str());
+    // avoid logging as this is frequent
+    return ddres_warn(DD_WHAT_CGROUP);
   }
 
   buf[len] = '\0'; // null terminate the string
@@ -102,26 +101,35 @@ DDRes Process::read_cgroup_id(pid_t pid, std::string_view path_to_proc,
   return {};
 }
 
-std::optional<std::string> ProcessHdr::get_container_id(pid_t pid) {
+std::optional<std::string> ProcessHdr::get_container_id(pid_t pid, bool force) {
   // lookup cgroup
   auto it = _process_map.find(pid);
   if (it == _process_map.end()) {
     // new process, parse cgroup
-    auto pair = _process_map.try_emplace(pid, pid, _path_to_proc);
+    auto pair = _process_map.try_emplace(pid, pid);
     if (pair.second) {
       it = pair.first;
     } else {
       return std::nullopt;
     }
   }
-  if (it->second._cgroup != Process::kCGroupIdNull) {
-    auto it_container = _container_id_map.find(it->second._cgroup);
+  ++(it->second._sample_counter);
+  if(!force && (it->second._sample_counter) < k_nb_samples_container_id_lookup) {
+    // avoid looking up short-lived pids
+    return std::nullopt;
+  }
+  Process::CGroupId_t cgroup_id = it->second.get_cgroup_id(_path_to_proc);
+  if (cgroup_id != Process::kCGroupIdNull) {
+    auto it_container = _container_id_map.find(cgroup_id);
     if (it_container == _container_id_map.end()) {
       // insert new container ID
       std::string cgroup_file = format_cgroup_file(pid, _path_to_proc);
       std::optional<std::string> container_id =
           Process::extract_container_id(cgroup_file);
-      auto pair = _container_id_map.emplace(it->second._cgroup,
+      if (container_id) {
+        LG_DBG("New container ID %s, PID%d", container_id->c_str(), pid);
+      }
+      auto pair = _container_id_map.emplace(cgroup_id,
                                             std::move(container_id));
       if (pair.second) {
         it_container = pair.first;

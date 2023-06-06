@@ -8,6 +8,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <string>
 #include <vector>
 
 #include "ddprof_defs.hpp"
@@ -24,8 +25,10 @@ struct UnwindOutput {
   void clear() {
     locs.clear();
     is_incomplete = true;
+    container_id = "undefined";
   }
   std::vector<FunLoc> locs;
+  std::string container_id;
   int pid;
   int tid;
   bool is_incomplete;
