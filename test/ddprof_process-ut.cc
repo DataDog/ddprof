@@ -11,20 +11,19 @@ TEST(DDProfProcess, simple_self) {
   LogHandle handle;
   pid_t mypid = getpid();
   Process p(mypid);
-  EXPECT_NE(p.get_cgroup_id(""), Process::kCGroupIdError);
+  EXPECT_NE(p.get_cgroup_ns(""), Process::kCGroupNsError);
 }
 
 TEST(DDProfProcess, no_file) {
   LogHandle handle;
   Process p(1430928460);
-  EXPECT_EQ(p.get_cgroup_id(""), Process::kCGroupIdError);
+  EXPECT_EQ(p.get_cgroup_ns(""), Process::kCGroupNsError);
 }
 
 TEST(DDProfProcess, container_id) {
   LogHandle handle;
   std::string path_tests = std::string(UNIT_TEST_DATA) + "/" + "container_id/";
-  auto container_id =
-      Process::extract_container_id(path_tests + "cgroup.kubernetess");
+  auto container_id = extract_container_id(path_tests + "cgroup.kubernetess");
   if (container_id) {
     LG_DBG("container id %s", container_id.value().c_str());
   }

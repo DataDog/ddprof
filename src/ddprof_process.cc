@@ -42,14 +42,14 @@ std::optional<std::string> container_id_from_line(const std::string &line) {
   return std::nullopt;
 }
 
-std::string format_cgroup_file(pid_t pid, std::string_view path_to_proc) {
+} // namespace
+
+std::string Process::format_cgroup_file(pid_t pid,
+                                        std::string_view path_to_proc) {
   return string_format("%s/proc/%d/cgroup", path_to_proc.data(), pid);
 }
 
-} // namespace
-
-std::optional<std::string>
-Process::extract_container_id(const std::string &filepath) {
+std::optional<std::string> extract_container_id(const std::string &filepath) {
   std::ifstream cgroup_file(filepath);
   if (!cgroup_file) {
     // short lived pids will log a lot here
@@ -66,9 +66,9 @@ Process::extract_container_id(const std::string &filepath) {
   return std::nullopt;
 }
 
-DDRes Process::read_cgroup_id(pid_t pid, std::string_view path_to_proc,
+DDRes Process::read_cgroup_ns(pid_t pid, std::string_view path_to_proc,
                               CGroupId_t &cgroup) {
-  cgroup = Process::kCGroupIdError;
+  cgroup = Process::kCGroupNsError;
   std::string path =
       string_format("%s/proc/%d/ns/cgroup", path_to_proc.data(), pid);
   char buf[k_max_buf_cgroup_link];
@@ -114,33 +114,12 @@ std::optional<std::string> ProcessHdr::get_container_id(pid_t pid, bool force) {
     }
   }
   ++(it->second._sample_counter);
-  if(!force && (it->second._sample_counter) < k_nb_samples_container_id_lookup) {
+  if (!force &&
+      (it->second._sample_counter) < k_nb_samples_container_id_lookup) {
     // avoid looking up short-lived pids
     return std::nullopt;
   }
-  Process::CGroupId_t cgroup_id = it->second.get_cgroup_id(_path_to_proc);
-  if (cgroup_id != Process::kCGroupIdNull) {
-    auto it_container = _container_id_map.find(cgroup_id);
-    if (it_container == _container_id_map.end()) {
-      // insert new container ID
-      std::string cgroup_file = format_cgroup_file(pid, _path_to_proc);
-      std::optional<std::string> container_id =
-          Process::extract_container_id(cgroup_file);
-      if (container_id) {
-        LG_DBG("New container ID %s, PID%d", container_id->c_str(), pid);
-      }
-      auto pair = _container_id_map.emplace(cgroup_id,
-                                            std::move(container_id));
-      if (pair.second) {
-        it_container = pair.first;
-      } else {
-        LG_WRN("Failed to insert container id %d \n", pid);
-        return std::nullopt;
-      }
-    }
-    return it_container->second;
-  }
-  return std::nullopt;
+  return it->second.get_container_id(_path_to_proc);
 }
 
 } // namespace ddprof
