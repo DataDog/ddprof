@@ -1,9 +1,13 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the Apache License Version 2.0. This product includes software
+// developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
+// Datadog, Inc.
+
 #include "ddprof_process.hpp"
 
 #include "loghandle.hpp"
 
 #include <gtest/gtest.h>
-#include <stdio.h>
 #include <unistd.h>
 
 namespace ddprof {
@@ -23,7 +27,11 @@ TEST(DDProfProcess, no_file) {
 TEST(DDProfProcess, container_id) {
   LogHandle handle;
   std::string path_tests = std::string(UNIT_TEST_DATA) + "/" + "container_id/";
-  auto container_id = extract_container_id(path_tests + "cgroup.kubernetess");
+  ContainerId container_id;
+  auto ddres =
+      extract_container_id(path_tests + "cgroup.kubernetess", container_id);
+  EXPECT_TRUE(IsDDResOK(ddres));
+  EXPECT_TRUE(container_id);
   if (container_id) {
     LG_DBG("container id %s", container_id.value().c_str());
   }

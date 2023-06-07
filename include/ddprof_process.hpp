@@ -19,18 +19,20 @@ using ContainerId = std::optional<std::string>;
 
 // Extract container id information
 // Expects the path to the /proc/<PID>/cgroup file
-ContainerId extract_container_id(const std::string &filepath);
+DDRes extract_container_id(const std::string &filepath,
+                           ContainerId &container_id);
 
 class Process {
 public:
+  explicit Process(pid_t pid) : _pid(pid), _cgroup_ns(kCGroupNsNull) {}
+
   using CGroupId_t = uint64_t;
   static constexpr CGroupId_t kCGroupNsNull =
       std::numeric_limits<CGroupId_t>::max();
   static constexpr CGroupId_t kCGroupNsError =
       std::numeric_limits<CGroupId_t>::max() - 1;
 
-  Process(pid_t pid) : _pid(pid), _cgroup_ns(kCGroupNsNull) {}
-
+  // API only relevant for cgroup v2
   // lazy read of cgroup id
   CGroupId_t get_cgroup_ns(std::string_view path_to_proc = "") {
     if (_cgroup_ns == kCGroupNsNull) {
@@ -39,22 +41,15 @@ public:
     return _cgroup_ns;
   }
 
+  // default container_id value in case of error
+  constexpr static std::string_view k_container_id_unknown = "unknown";
+
   // lazy read of container id
-  ContainerId get_container_id(std::string_view path_to_proc = "") {
-    if (!_container_id) {
-      _container_id =
-          extract_container_id(format_cgroup_file(_pid, path_to_proc));
-      if (!_container_id) {
-        _container_id = k_default_container_id;
-      }
-    }
-    return _container_id;
-  }
+  const ContainerId &get_container_id(std::string_view path_to_proc = "");
 
   uint64_t _sample_counter = {};
 
 private:
-  constexpr static std::string_view k_default_container_id = "undefined";
   std::string format_cgroup_file(pid_t pid, std::string_view path_to_proc);
 
   static DDRes read_cgroup_ns(pid_t pid, std::string_view path_to_proc,
@@ -68,7 +63,7 @@ private:
 class ProcessHdr {
 public:
   ProcessHdr(std::string path_to_proc = "") : _path_to_proc(path_to_proc) {}
-  ContainerId get_container_id(pid_t pid, bool force = false);
+  const ContainerId &get_container_id(pid_t pid, bool force = false);
   void clear(pid_t pid) { _process_map.erase(pid); }
 
 private:

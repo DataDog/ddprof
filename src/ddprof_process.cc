@@ -1,13 +1,14 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the Apache License Version 2.0. This product includes software
+// developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
+// Datadog, Inc.
+
 #include "ddprof_process.hpp"
 
 #include "ddres.hpp"
-#include "defer.hpp"
 #include "string_format.hpp"
 
 #include <charconv> // for std::from_chars
-#include <fcntl.h>
-#include <iostream>
-#include <sstream>
 #include <unistd.h>
 #include <vector>
 
@@ -49,21 +50,35 @@ std::string Process::format_cgroup_file(pid_t pid,
   return string_format("%s/proc/%d/cgroup", path_to_proc.data(), pid);
 }
 
-std::optional<std::string> extract_container_id(const std::string &filepath) {
+DDRes extract_container_id(const std::string &filepath,
+                           ContainerId &container_id) {
+  container_id = std::nullopt;
   std::ifstream cgroup_file(filepath);
   if (!cgroup_file) {
-    // short lived pids will log a lot here
+    // short lived pids can fail in this case
     LG_DBG("Failed to open file: %s", filepath.data());
-    return std::nullopt;
+    return ddres_warn(DD_WHAT_CGROUP);
   }
   std::string line;
   while (std::getline(cgroup_file, line)) {
-    auto container_id = container_id_from_line(line);
+    container_id = container_id_from_line(line);
     if (container_id) {
-      return container_id;
+      return {};
     }
   }
-  return std::nullopt;
+  container_id = "none";
+  return {};
+}
+
+const ContainerId &Process::get_container_id(std::string_view path_to_proc) {
+  if (!_container_id) {
+    extract_container_id(format_cgroup_file(_pid, path_to_proc), _container_id);
+    if (!_container_id) {
+      // file can be gone (short lived pid ?)
+      _container_id = k_container_id_unknown;
+    }
+  }
+  return _container_id;
 }
 
 DDRes Process::read_cgroup_ns(pid_t pid, std::string_view path_to_proc,
@@ -101,8 +116,10 @@ DDRes Process::read_cgroup_ns(pid_t pid, std::string_view path_to_proc,
   return {};
 }
 
-std::optional<std::string> ProcessHdr::get_container_id(pid_t pid, bool force) {
+const ContainerId &ProcessHdr::get_container_id(pid_t pid, bool force) {
   // lookup cgroup
+  static const ContainerId unknown_container_id =
+      ContainerId(Process::k_container_id_unknown);
   auto it = _process_map.find(pid);
   if (it == _process_map.end()) {
     // new process, parse cgroup
@@ -110,14 +127,15 @@ std::optional<std::string> ProcessHdr::get_container_id(pid_t pid, bool force) {
     if (pair.second) {
       it = pair.first;
     } else {
+      LG_WRN("[ProcessHdr] Unable to insert process element");
       return std::nullopt;
     }
   }
   ++(it->second._sample_counter);
   if (!force &&
       (it->second._sample_counter) < k_nb_samples_container_id_lookup) {
-    // avoid looking up short-lived pids
-    return std::nullopt;
+    // avoid looking up container_id too often for short-lived pids
+    return unknown_container_id;
   }
   return it->second.get_container_id(_path_to_proc);
 }
