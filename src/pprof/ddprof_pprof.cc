@@ -223,12 +223,8 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   char pid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
   char tid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
 
-  // retrieve container ID label (whole host)
-
   labels[labels_num].key = to_CharSlice("container_id");
   labels[labels_num].str = to_CharSlice(uw_output->container_id);
-  //    LG_NTC("[PPROF] PID%d container_id is %s\n", uw_output->pid,
-  //    container_id.data);
   ++labels_num;
 
   // Add any configured labels.  Note that TID alone has the same cardinality as
