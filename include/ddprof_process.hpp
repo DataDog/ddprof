@@ -11,6 +11,7 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <sys/types.h>
 #include <unordered_map>
 
 namespace ddprof {

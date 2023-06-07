@@ -128,7 +128,7 @@ const ContainerId &ProcessHdr::get_container_id(pid_t pid, bool force) {
       it = pair.first;
     } else {
       LG_WRN("[ProcessHdr] Unable to insert process element");
-      return std::nullopt;
+      return unknown_container_id;
     }
   }
   ++(it->second._sample_counter);
