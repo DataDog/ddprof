@@ -7,9 +7,11 @@
 
 #include <string_view>
 
+namespace ddprof {
 // default container_id value in case of:
 // - error example when PID is no longer available
 // - we did not lookup (for perf reasons), so this is really unknown
 constexpr static std::string_view k_container_id_unknown = "unknown";
 // no container_id was found within the cgroup file
 constexpr static std::string_view k_container_id_none = "none";
+} // namespace ddprof
