@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "container_id_defs.hpp"
 #include "ddprof_defs.hpp"
 
 typedef struct FunLoc {
@@ -25,7 +26,7 @@ struct UnwindOutput {
   void clear() {
     locs.clear();
     is_incomplete = true;
-    container_id = "unknown";
+    container_id = k_container_id_unknown;
   }
   std::vector<FunLoc> locs;
   std::string container_id;

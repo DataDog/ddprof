@@ -1,27 +1,20 @@
-//
-// Created by r1viollet on 30/05/23.
-//
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the Apache License Version 2.0. This product includes software
+// developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
+// Datadog, Inc.
 
 #pragma once
 
+#include "container_id.hpp"
 #include "ddprof_defs.hpp"
 #include "ddres_def.hpp"
 #include "logger.hpp"
 
 #include <limits>
-#include <optional>
-#include <string>
 #include <sys/types.h>
 #include <unordered_map>
 
 namespace ddprof {
-
-using ContainerId = std::optional<std::string>;
-
-// Extract container id information
-// Expects the path to the /proc/<PID>/cgroup file
-DDRes extract_container_id(const std::string &filepath,
-                           ContainerId &container_id);
 
 class Process {
 public:
@@ -35,15 +28,7 @@ public:
 
   // API only relevant for cgroup v2
   // lazy read of cgroup id
-  CGroupId_t get_cgroup_ns(std::string_view path_to_proc = "") {
-    if (_cgroup_ns == kCGroupNsNull) {
-      read_cgroup_ns(_pid, path_to_proc, _cgroup_ns);
-    }
-    return _cgroup_ns;
-  }
-
-  // default container_id value in case of error
-  constexpr static std::string_view k_container_id_unknown = "unknown";
+  CGroupId_t get_cgroup_ns(std::string_view path_to_proc = "");
 
   // lazy read of container id
   const ContainerId &get_container_id(std::string_view path_to_proc = "");
