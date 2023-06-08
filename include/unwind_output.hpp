@@ -26,7 +26,7 @@ struct UnwindOutput {
   void clear() {
     locs.clear();
     is_incomplete = true;
-    container_id = k_container_id_unknown;
+    container_id = ddprof::k_container_id_unknown;
   }
   std::vector<FunLoc> locs;
   std::string container_id;
