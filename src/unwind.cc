@@ -53,7 +53,6 @@ void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
   us->pid = sample_pid;
   us->stack_sz = sample_size_stack;
   us->stack = sample_data_stack;
-  us->austin_handle = austin_attach(sample_pid);
 }
 
 static bool is_ld(const std::string &path) {

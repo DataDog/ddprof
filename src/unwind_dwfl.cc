@@ -407,13 +407,9 @@ static DDRes add_python_frame(UnwindState *us, SymbolIdx_t symbol_idx,
                               ElfAddress_t pc, Dwfl_Frame *dwfl_frame) {
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
   SymbolTable &symbol_table = unwind_symbol_hdr._symbol_table;
-  std::string symname = symbol_table.at(symbol_idx)._symname;
-  if (us->austin_handle &&
-      (symname.find("PyEval_EvalFrameDefault") != std::string::npos ||
-       symname.find("PyEval_EvalFrameEx") != std::string::npos)) {
-    AustinSymbolLookup &austin_symbol_lookup =
-        unwind_symbol_hdr._austin_symbol_lookup;
-
+  austin_handle_t handle = us->process_hdr.get_process(us->pid).get_austin_handle();
+  if (handle && (symbol_table.at(symbol_idx)._is_python_frame)) {
+    AustinSymbolLookup &austin_symbol_lookup = unwind_symbol_hdr._austin_symbol_lookup;
     // The register we are interested in is RSI, but it doesn't seem to be
     // available. So we loop over the available registers and stop if we find
     // a register value that resolves correctly to a Python frame.
@@ -421,7 +417,7 @@ static DDRes add_python_frame(UnwindState *us, SymbolIdx_t symbol_idx,
     for (int i = 0; i < PERF_REGS_COUNT; i++) {
       if (__libdwfl_frame_reg_get(dwfl_frame, i, &val) && val) {
         austin_frame_t *frame =
-            austin_read_frame(us->austin_handle, (void *)val);
+            austin_read_frame(handle, (void *)val);
         if (frame) {
           symbol_idx = austin_symbol_lookup.get_or_insert(frame, symbol_table);
           return add_frame(symbol_idx, -1, pc, us);

@@ -32,5 +32,7 @@ public:
   // OUTPUT OF LINE INFO
   uint32_t _lineno;
   std::string _srcpath;
+
+  bool _is_python_frame;
 };
 } // namespace ddprof

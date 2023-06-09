@@ -249,7 +249,7 @@ add_unit_test(
   ../src/unwind_helpers.cc
   ../src/unwind_metrics.cc
   ../src/user_override.cc
-  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
+  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle austin
   DEFINITIONS MYNAME="savecontext-ut")
 
 add_unit_test(

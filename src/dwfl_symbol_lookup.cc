@@ -134,6 +134,12 @@ SymbolIdx_t DwflSymbolLookup::insert(const DDProfMod &ddprof_mod,
     table.push_back(std::move(symbol));
 
     Symbol &sym_ref = table.back();
+    // slightly hacky way to detect python frame we should replace
+    if (sym_ref._symname.find("PyEval_EvalFrameDefault") != std::string::npos ||
+        sym_ref._symname.find("PyEval_EvalFrameEx") != std::string::npos) {
+      // flag this as something we can replace
+      sym_ref._is_python_frame = true;
+    }
     if (sym_ref._srcpath.empty()) {
       // override with info from dso (this slightly mixes mappings and sources)
       // But it helps a lot at Datadog (as mappings are ignored for now in UI)
