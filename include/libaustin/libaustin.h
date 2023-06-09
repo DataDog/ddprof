@@ -26,43 +26,33 @@
 extern "C" {
 #endif
 
-#include <sys/types.h>
 #include <stdint.h>
-
+#include <sys/types.h>
 
 typedef void (*austin_callback_t)(pid_t, pid_t);
-typedef void * austin_handle_t;
+typedef void *austin_handle_t;
 typedef struct {
-  uintptr_t      key;  // private
-  char         * filename;
-  char         * scope;
-  unsigned int   line;
+  uintptr_t key; // private
+  char *filename;
+  char *scope;
+  unsigned int line;
 } austin_frame_t;
 
+extern int austin_up();
 
-extern int
-austin_up();
+extern void austin_down();
 
-extern void
-austin_down();
+extern austin_handle_t austin_attach(pid_t);
 
-extern austin_handle_t
-austin_attach(pid_t);
+extern void austin_detach(austin_handle_t);
 
-extern void
-austin_detach(austin_handle_t);
+extern int austin_sample(austin_handle_t, austin_callback_t);
 
-extern int
-austin_sample(austin_handle_t, austin_callback_t);
+extern int austin_sample_thread(austin_handle_t, pid_t);
 
-extern int
-austin_sample_thread(austin_handle_t, pid_t);
+extern austin_frame_t *austin_pop_frame();
 
-extern austin_frame_t *
-austin_pop_frame();
-
-austin_frame_t *
-austin_read_frame(austin_handle_t, void *);
+austin_frame_t *austin_read_frame(austin_handle_t, void *);
 
 #ifdef __cplusplus
 }

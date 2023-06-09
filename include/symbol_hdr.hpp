@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "austin_symbol_lookup.hpp"
 #include "base_frame_symbol_lookup.hpp"
 #include "common_mapinfo_lookup.hpp"
 #include "common_symbol_lookup.hpp"
@@ -14,7 +15,6 @@
 #include "logger.hpp"
 #include "mapinfo_lookup.hpp"
 #include "runtime_symbol_lookup.hpp"
-#include "austin_symbol_lookup.hpp"
 
 #include <stdlib.h>
 

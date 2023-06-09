@@ -22,6 +22,7 @@ public:
     }
     _austin_symbols.clear();
   }
+
 private:
   std::vector<SymbolIdx_t> _austin_symbols;
   std::vector<SymbolIdx_t> _free_list;

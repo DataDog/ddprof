@@ -97,7 +97,6 @@ __libdwfl_frame_reg_get (Dwfl_Frame *state, unsigned regno, Dwarf_Addr *val)
 
 // clang-format on
 
-
 int frame_cb(Dwfl_Frame *, void *);
 
 namespace ddprof {
@@ -189,7 +188,6 @@ void print_all_registers(Dwfl_Frame *dwfl_frame) {
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
                             const DDProfMod &ddprof_mod,
                             FileInfoId_t file_info_id, Dwfl_Frame *dwfl_frame);
-
 
 // check for runtime symbols provided in /tmp files
 static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
@@ -283,7 +281,8 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   us->current_ip = pc;
 
   // Now we register
-  if (IsDDResNotOK(add_dwfl_frame(us, dso, pc, *ddprof_mod, file_info_id, dwfl_frame))) {
+  if (IsDDResNotOK(
+          add_dwfl_frame(us, dso, pc, *ddprof_mod, file_info_id, dwfl_frame))) {
     return ddres_warn(DD_WHAT_UW_ERROR);
   }
   return ddres_init();
@@ -407,22 +406,49 @@ static DDRes add_python_frame(UnwindState *us, SymbolIdx_t symbol_idx,
                               ElfAddress_t pc, Dwfl_Frame *dwfl_frame) {
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
   SymbolTable &symbol_table = unwind_symbol_hdr._symbol_table;
-  austin_handle_t handle = us->process_hdr.get_process(us->pid).get_austin_handle();
+  Process &p = us->process_hdr.get_process(us->pid);
+  austin_handle_t handle = p.get_austin_handle();
+
   if (handle && (symbol_table.at(symbol_idx)._is_python_frame)) {
-    AustinSymbolLookup &austin_symbol_lookup = unwind_symbol_hdr._austin_symbol_lookup;
+    AustinSymbolLookup &austin_symbol_lookup =
+        unwind_symbol_hdr._austin_symbol_lookup;
     // The register we are interested in is RSI, but it doesn't seem to be
     // available. So we loop over the available registers and stop if we find
     // a register value that resolves correctly to a Python frame.
+    std::vector<int> &reg_indices = p._python_register_indices;
+    SymbolIdx_t python_sym_idx = -1;
+    static unsigned python_lookup_cpt = 0;
     uint64_t val = 0;
-    for (int i = 0; i < PERF_REGS_COUNT; i++) {
-      if (__libdwfl_frame_reg_get(dwfl_frame, i, &val) && val) {
-        austin_frame_t *frame =
-            austin_read_frame(handle, (void *)val);
-        if (frame) {
-          symbol_idx = austin_symbol_lookup.get_or_insert(frame, symbol_table);
-          return add_frame(symbol_idx, -1, pc, us);
+
+    // Hacky way of caching the regs that are actually useful
+    // They are stable
+    if (reg_indices.empty() || !(++python_lookup_cpt < 10) ||
+        !(python_lookup_cpt % 100)) {
+      for (int i = 0; i < PERF_REGS_COUNT; i++) {
+        if (__libdwfl_frame_reg_get(dwfl_frame, i, &val) && val) {
+          austin_frame_t *frame = austin_read_frame(handle, (void *)val);
+          if (frame) {
+            reg_indices.push_back(i);
+            python_sym_idx =
+                austin_symbol_lookup.get_or_insert(frame, symbol_table);
+            break;
+          }
         }
       }
+    } else {
+      for (int i : reg_indices) {
+        if (__libdwfl_frame_reg_get(dwfl_frame, i, &val) && val) {
+          austin_frame_t *frame = austin_read_frame(handle, (void *)val);
+          if (frame) {
+            python_sym_idx =
+                austin_symbol_lookup.get_or_insert(frame, symbol_table);
+            break;
+          }
+        }
+      }
+    }
+    if (python_sym_idx != -1) {
+      return add_frame(python_sym_idx, -1, pc, us);
     }
   }
 

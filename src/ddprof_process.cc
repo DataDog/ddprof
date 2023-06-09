@@ -8,10 +8,10 @@
 #include "ddres.hpp"
 #include "string_format.hpp"
 
+#include "libaustin.h"
 #include <charconv> // for std::from_chars
 #include <unistd.h>
 #include <vector>
-#include "libaustin.h"
 
 namespace ddprof {
 constexpr auto k_max_buf_cgroup_link = 1024;
@@ -88,15 +88,14 @@ DDRes Process::read_cgroup_ns(pid_t pid, std::string_view path_to_proc,
   return {};
 }
 
-Process& ProcessHdr::get_process(pid_t pid){
+Process &ProcessHdr::get_process(pid_t pid) {
   auto it = _process_map.find(pid);
   if (it == _process_map.end()) {
     // new process, parse cgroup
     auto pair = _process_map.try_emplace(pid, pid);
     if (pair.second) {
       it = pair.first;
-    }
-    else {
+    } else {
       // todo: probably not an exception
       LG_WRN("[ProcessHdr] Unable to insert process element");
       throw std::runtime_error("Unable to insert process element");

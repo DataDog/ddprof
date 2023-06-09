@@ -11,11 +11,10 @@
 
 #include "austin_symbol_lookup.hpp"
 
-
 namespace ddprof {
 
-
-SymbolIdx_t AustinSymbolLookup::get_or_insert(austin_frame_t * frame, SymbolTable &symbol_table) {
+SymbolIdx_t AustinSymbolLookup::get_or_insert(austin_frame_t *frame,
+                                              SymbolTable &symbol_table) {
   SymbolIdx_t idx = -1;
   // reuse elements to avoid growing the table
   if (!_free_list.empty()) {
@@ -29,7 +28,8 @@ SymbolIdx_t AustinSymbolLookup::get_or_insert(austin_frame_t * frame, SymbolTabl
     symbol_table.push_back(Symbol());
   }
   std::string symname = std::string(frame->scope);
-  symbol_table[idx] = Symbol(symname, symname, frame->line, std::string(frame->filename));
+  symbol_table[idx] =
+      Symbol(symname, symname, frame->line, std::string(frame->filename));
   return idx;
 }
 
