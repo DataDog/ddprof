@@ -105,6 +105,9 @@ namespace ddprof {
 DDRes unwind_init_dwfl(UnwindState *us) {
   // Create or get the dwfl object associated to cache
   us->_dwfl_wrapper = &(us->dwfl_hdr.get_or_insert(us->pid));
+  // clear at every iteration
+  us->symbol_hdr._austin_symbol_lookup.clear();
+
   if (!us->_dwfl_wrapper->_attached) {
     // we need to add at least one module to figure out the architecture (to
     // create the unwinding backend)
@@ -404,7 +407,6 @@ static DDRes add_python_frame(UnwindState *us, SymbolIdx_t symbol_idx,
                               ElfAddress_t pc, Dwfl_Frame *dwfl_frame) {
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
   SymbolTable &symbol_table = unwind_symbol_hdr._symbol_table;
-
   std::string symname = symbol_table.at(symbol_idx)._symname;
   if (us->austin_handle &&
       (symname.find("PyEval_EvalFrameDefault") != std::string::npos ||
@@ -413,11 +415,11 @@ static DDRes add_python_frame(UnwindState *us, SymbolIdx_t symbol_idx,
         unwind_symbol_hdr._austin_symbol_lookup;
 
     // The register we are interested in is RSI, but it doesn't seem to be
-    // available. So we loop over the first 64 registers and stop if we find
+    // available. So we loop over the available registers and stop if we find
     // a register value that resolves correctly to a Python frame.
-    uint64_t val;
-    for (int i = 0; i < (int)sizeof(*dwfl_frame->regs_set) * 8; i++) {
-      if (__libdwfl_frame_reg_get(dwfl_frame, i, &val)) {
+    uint64_t val = 0;
+    for (int i = 0; i < PERF_REGS_COUNT; i++) {
+      if (__libdwfl_frame_reg_get(dwfl_frame, i, &val) && val) {
         austin_frame_t *frame =
             austin_read_frame(us->austin_handle, (void *)val);
         if (frame) {

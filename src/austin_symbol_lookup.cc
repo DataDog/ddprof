@@ -16,20 +16,21 @@ namespace ddprof {
 
 
 SymbolIdx_t AustinSymbolLookup::get_or_insert(austin_frame_t * frame, SymbolTable &symbol_table) {
-  auto iter = _frame_key_map.find(frame->key);
-
-  if (iter != _frame_key_map.end()) {
-    return iter->second;
+  SymbolIdx_t idx = -1;
+  // reuse elements to avoid growing the table
+  if (!_free_list.empty()) {
+    auto el = _free_list.back();
+    _free_list.pop_back();
+    _austin_symbols.push_back(el);
+    idx = el;
   }
-
-  SymbolIdx_t index = symbol_table.size();
+  if (idx == -1) {
+    idx = symbol_table.size();
+    symbol_table.push_back(Symbol());
+  }
   std::string symname = std::string(frame->scope);
-
-  symbol_table.push_back(Symbol(symname, symname, frame->line, std::string(frame->filename)));
-
-  _frame_key_map.emplace(frame->key, index);
-
-  return index;
+  symbol_table[idx] = Symbol(symname, symname, frame->line, std::string(frame->filename));
+  return idx;
 }
 
 } // namespace ddprof

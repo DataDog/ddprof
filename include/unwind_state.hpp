@@ -44,7 +44,6 @@ struct UnwindState {
         stack(nullptr), stack_sz(0), current_ip(0), austin_handle(nullptr) {
     output.clear();
     output.locs.reserve(DD_MAX_STACK_DEPTH);
-
   }
 
   ddprof::DwflHdr dwfl_hdr;

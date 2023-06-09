@@ -16,10 +16,15 @@ namespace ddprof {
 class AustinSymbolLookup {
 public:
   SymbolIdx_t get_or_insert(austin_frame_t *frame, SymbolTable &symbol_table);
-
+  void clear() {
+    for (auto el : _austin_symbols) {
+      _free_list.push_back(el);
+    }
+    _austin_symbols.clear();
+  }
 private:
-  using FrameKeyMap = std::unordered_map<uintptr_t, SymbolIdx_t>;
-  FrameKeyMap _frame_key_map;
+  std::vector<SymbolIdx_t> _austin_symbols;
+  std::vector<SymbolIdx_t> _free_list;
 };
 
 } // namespace ddprof
