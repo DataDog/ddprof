@@ -267,7 +267,7 @@ target_link_libraries(dd_profiling-embedded PUBLIC dl pthread rt)
 # add libaustin
 add_library(austin SHARED IMPORTED)
 set_target_properties(
-  austin PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/lib/libaustin.so"
+  austin PROPERTIES IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/lib/libaustin.a"
                     INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/include/libaustin")
 
 set(LIBDD_PROFILING_EMBEDDED_OBJECT "${CMAKE_BINARY_DIR}/libdd_profiling-embedded.o")
