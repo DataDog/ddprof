@@ -56,6 +56,7 @@
   X(UNITTEST, "unit test error")                                               \
   X(SOCKET, "error during socket operation")                                   \
   X(TEMP_FILE, "error during temporary file creation")                         \
+  X(CGROUP, "error while reading cgroup information")                          \
   X(TSC, "failed to setup TSC")
 
 // generic erno errors available from /usr/include/asm-generic/errno.h

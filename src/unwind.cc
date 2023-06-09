@@ -33,6 +33,13 @@ static void find_dso_add_error_frame(UnwindState *us) {
                   us->current_ip);
 }
 
+static void add_container_id(UnwindState *us) {
+  auto container_id = us->process_hdr.get_container_id(us->pid);
+  if (container_id) {
+    us->output.container_id = *container_id;
+  }
+}
+
 void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
                         pid_t sample_pid, uint64_t sample_size_stack,
                         char *sample_data_stack) {
@@ -108,6 +115,7 @@ DDRes unwindstate__unwind(UnwindState *us) {
 
   // Add a frame that identifies executable to which these belong
   add_virtual_base_frame(us);
+  add_container_id(us);
   return res;
 }
 
@@ -115,14 +123,13 @@ void unwind_pid_free(UnwindState *us, pid_t pid) {
   us->dso_hdr.pid_free(pid);
   us->dwfl_hdr.clear_pid(pid);
   us->symbol_hdr.clear(pid);
+  us->process_hdr.clear(pid);
 }
 
 void unwind_cycle(UnwindState *us) {
   us->symbol_hdr.display_stats();
   us->symbol_hdr.cycle();
-  // clean up pids that we did not see recently
   us->dwfl_hdr.display_stats();
-
   us->dso_hdr._stats.reset();
   unwind_metrics_reset();
 }

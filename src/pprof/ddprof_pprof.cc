@@ -19,7 +19,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define PPROF_MAX_LABELS 5
+#define PPROF_MAX_LABELS 6
 
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
   PerfWatcher *watchers = ctx->watchers;
@@ -123,6 +123,12 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
         std::string("include_kernel"),
         include_kernel ? std::string("true") : std::string("false")));
   }
+  {
+    // custom context
+    // Allow the data to be split by container-id
+    pprof->_tags.push_back(std::make_pair(std::string("ddprof.custom_ctx"),
+                                          std::string("container_id")));
+  }
 
   return ddres_init();
 }
@@ -217,6 +223,10 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   char pid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
   char tid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
 
+  labels[labels_num].key = to_CharSlice("container_id");
+  labels[labels_num].str = to_CharSlice(uw_output->container_id);
+  ++labels_num;
+
   // Add any configured labels.  Note that TID alone has the same cardinality as
   // (TID;PID) tuples, so except for symbol table overhead it doesn't matter
   // much if TID implies PID for clarity.
@@ -246,6 +256,8 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     }
     ++labels_num;
   }
+  assert(labels_num <= PPROF_MAX_LABELS);
+
   ddog_prof_Sample sample = {
       .locations = {.ptr = locations_buff, .len = cur_loc},
       .values = {.ptr = values, .len = pprof->_nb_values},
@@ -259,7 +271,6 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile: %s",
                            add_res.err.message.ptr);
   }
-
   return ddres_init();
 }
 

@@ -6,6 +6,7 @@
 #pragma once
 
 #include "ddprof_defs.hpp"
+#include "ddprof_process.hpp"
 #include "ddres_def.hpp"
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
@@ -48,6 +49,7 @@ struct UnwindState {
 
   ddprof::DsoHdr dso_hdr;
   SymbolHdr symbol_hdr;
+  ddprof::ProcessHdr process_hdr;
 
   pid_t pid;
   char *stack;
