@@ -149,6 +149,21 @@ static void write_function(const ddprof::Symbol &symbol,
   ffi_func->start_line = 0;
 }
 
+static void write_mapping_v2(const CodeCache *code_cache,
+                             ddog_prof_Mapping *ffi_mapping) {
+  //  ffi_mapping->memory_start = (code_cache->minAddress());
+  ffi_mapping->memory_start = 0;
+  ffi_mapping->memory_limit = 0;
+  ffi_mapping->file_offset = 0;
+  if (code_cache) {
+    ffi_mapping->filename = to_CharSlice(code_cache->name());
+  }
+  else {
+    ffi_mapping->filename = to_CharSlice("unknown");
+  }
+  ffi_mapping->build_id = to_CharSlice("");
+}
+
 static void write_mapping(const ddprof::MapInfo &mapinfo,
                           ddog_prof_Mapping *ffi_mapping) {
   ffi_mapping->memory_start = mapinfo._low_addr;
@@ -171,6 +186,90 @@ static void write_location(const FunLoc *loc, const ddprof::MapInfo &mapinfo,
 static void write_line(const ddprof::Symbol &symbol, ddog_prof_Line *ffi_line) {
   write_function(symbol, &ffi_line->function);
   ffi_line->line = symbol._lineno;
+}
+
+static void write_location_v2(const void *ip,
+                              const ddog_prof_Slice_Line *lines,
+                              const CodeCache *code_cache,
+                              ddog_prof_Location *ffi_location) {
+  write_mapping_v2(code_cache, &ffi_location->mapping);
+  ffi_location->address = reinterpret_cast<uint64_t>(ip);
+  ffi_location->lines = *lines;
+  // Folded not handled for now
+  ffi_location->is_folded = false;
+}
+
+static void write_function_v2(const char *func, const char *filename, ddog_prof_Function *ffi_func) {
+  // todo demangling
+  ffi_func->name = to_CharSlice(string_view_create_strlen(func));
+  ffi_func->system_name = to_CharSlice(string_view_create_strlen(func));
+  ffi_func->filename = to_CharSlice(filename);
+}
+
+static void write_line_v2(const char *func, const char *filename, ddog_prof_Line *ffi_line) {
+  write_function_v2(func, filename, &ffi_line->function);
+  ffi_line->line = 0;
+}
+
+DDRes pprof_aggregate_v2(ddprof::span<const void *const> callchain,
+                         ddprof::span<char const *const> symbols,
+                         ddprof::span<CodeCache const * const> code_cache,
+                         uint64_t value,
+                         uint64_t count, const PerfWatcher *watcher,
+                         DDProfPProf *pprof) {
+  ddog_prof_Profile *profile = pprof->_profile;
+
+  int64_t values[DDPROF_PWT_LENGTH] = {};
+  values[watcher->pprof_sample_idx] = value * count;
+  if (watcher_has_countable_sample_type(watcher)) {
+    values[watcher->pprof_count_sample_idx] = count;
+  }
+
+  ddog_prof_Location locations_buff[DD_MAX_STACK_DEPTH];
+  // assumption of single line per loc for now
+  ddog_prof_Line line_buff[DD_MAX_STACK_DEPTH];
+
+  // todo skip frames
+  for (unsigned i = 0; i < symbols.size(); ++i) {
+    assert(i < DD_MAX_STACK_DEPTH);
+    // possibly several lines to handle inlined function (not handled for now)
+    // todo: get file name from dwarf
+    write_line_v2(symbols[i],
+                  code_cache[i]?code_cache[i]->name():"unknown",
+                  &line_buff[i]);
+    ddog_prof_Slice_Line lines = {.ptr = &line_buff[i], .len = 1};
+    write_location_v2(callchain[i], &lines, code_cache[i], &locations_buff[i]);
+  }
+
+  ddog_prof_Label labels[PPROF_MAX_LABELS] = {};
+  size_t labels_num = 0;
+
+  // todo pid and tid things
+  if (watcher_has_tracepoint(watcher)) {
+    labels[labels_num].key = to_CharSlice("tracepoint_type");
+
+    // If the label is given, use that as the tracepoint type.  Otherwise
+    // default to the event name
+    if (!watcher->tracepoint_label.empty()) {
+      labels[labels_num].str = to_CharSlice(watcher->tracepoint_label.c_str());
+    } else {
+      labels[labels_num].str = to_CharSlice(watcher->tracepoint_event.c_str());
+    }
+    ++labels_num;
+  }
+  ddog_prof_Sample sample = {
+      .locations = {.ptr = locations_buff, .len = symbols.size()},
+      .values = {.ptr = values, .len = pprof->_nb_values},
+      .labels = {.ptr = labels, .len = labels_num},
+  };
+
+  ddog_prof_Profile_AddResult add_res = ddog_prof_Profile_add(profile, sample);
+  if (add_res.tag == DDOG_PROF_PROFILE_ADD_RESULT_ERR) {
+    defer { ddog_Error_drop(&add_res.err); };
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile: %s",
+                           add_res.err.message.ptr);
+  }
+  return ddres_init();
 }
 
 // Assumption of API is that sample is valid in a single type
@@ -281,12 +380,9 @@ DDRes pprof_reset(DDProfPProf *pprof) {
   return ddres_init();
 }
 
-void ddprof_print_sample(const UnwindOutput &uw_output,
-                         const SymbolHdr &symbol_hdr, uint64_t value,
+void ddprof_print_sample(const UnwindOutput_V2 &uw_output, uint64_t value,
                          const PerfWatcher &watcher) {
-
-  auto &symbol_table = symbol_hdr._symbol_table;
-  ddprof::span locs{uw_output.locs};
+  ddprof::span locs{uw_output.callchain, uw_output.nb_locs};
 
   const char *sample_name = sample_type_name_from_idx(
       sample_type_id_to_count_sample_type_id(watcher.sample_type_id));
@@ -295,26 +391,17 @@ void ddprof_print_sample(const UnwindOutput &uw_output,
       ddprof::string_format("sample[type=%s;pid=%ld;tid=%ld] ", sample_name,
                             uw_output.pid, uw_output.tid);
 
-  for (auto loc_it = locs.rbegin(); loc_it != locs.rend(); ++loc_it) {
-    auto &sym = symbol_table[loc_it->_symbol_idx];
-    if (loc_it != locs.rbegin()) {
+  for (unsigned i = 0; i < uw_output.nb_locs; ++i) {
+    std::string_view cur_sym(uw_output.symbols[i]);
+    if (i != 0) {
       buf += ";";
     }
-    if (sym._symname.empty()) {
-      if (loc_it->ip == 0) {
-        std::string_view path{sym._srcpath};
-        auto pos = path.rfind('/');
-        buf += "(";
-        buf += path.substr(pos == std::string_view::npos ? 0 : pos + 1);
-        buf += ")";
-      } else {
-        buf += ddprof::string_format("%p", loc_it->ip);
-      }
+    // todo what if we don't have a sym ?
+    if (cur_sym.empty()) {
+      // todo add ip
     } else {
-      std::string_view func{sym._symname};
-      buf += func.substr(0, func.find('('));
+      buf += cur_sym.substr(0, cur_sym.find('('));
     }
   }
-
-  PRINT_NFO("%s %ld", buf.c_str(), value);
+  PRINT_NFO("(depth=%lu) %s  %lu", uw_output.nb_locs, buf.c_str(), value);
 }

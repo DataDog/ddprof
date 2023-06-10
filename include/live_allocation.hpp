@@ -34,7 +34,7 @@ public:
   };
 
   using PprofStacks =
-      std::unordered_map<UnwindOutput, ValueAndCount, UnwindOutputHash>;
+      std::unordered_map<UnwindOutput_V2, ValueAndCount, UnwindOutputHash>;
 
   struct ValuePerAddress {
     int64_t _value = 0;
@@ -54,7 +54,7 @@ public:
   // Allocation should be aggregated per stack trace
   // instead of a stack, we would have a total size for this unique stack trace
   // and a count.
-  void register_allocation(const UnwindOutput &uo, uintptr_t addr, size_t size,
+  void register_allocation(const UnwindOutput_V2 &uo, uintptr_t addr, size_t size,
                            int watcher_pos, pid_t pid) {
     PidMap &pid_map = access_resize(_watcher_vector, watcher_pos);
     PidStacks &pid_stacks = pid_map[pid];
@@ -84,7 +84,7 @@ private:
   static void register_deallocation(uintptr_t address, PprofStacks &stacks,
                                     AddressMap &address_map);
 
-  static void register_allocation(const UnwindOutput &uo, uintptr_t address,
+  static void register_allocation(const UnwindOutput_V2 &uo, uintptr_t address,
                                   int64_t value, PprofStacks &stacks,
                                   AddressMap &address_map);
 };

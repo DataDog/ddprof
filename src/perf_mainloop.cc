@@ -172,7 +172,7 @@ static inline DDRes worker_process_ring_buffers(PEvent *pes, int pe_len,
           // \fixme{nsavoire} free slot as soon as possible ?
           // reader.advance(hdr->size);
 
-          buffer = remaining(buffer, hdr->size);
+          buffer = ddprof::remaining(buffer, hdr->size);
         }
       } else {
         ddprof::MPSCRingBufferReader reader{ring_buffer};

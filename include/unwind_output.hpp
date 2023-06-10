@@ -12,7 +12,10 @@
 #include <vector>
 
 #include "container_id_defs.hpp"
+#include "async-profiler/codeCache.h"
 #include "ddprof_defs.hpp"
+#include "string_view.hpp"
+#include <vector>
 
 typedef struct FunLoc {
   uint64_t ip; // Relative to file, not VMA
@@ -35,4 +38,18 @@ struct UnwindOutput {
   bool is_incomplete;
 
   auto operator<=>(const UnwindOutput &) const = default;
+};
+
+struct UnwindOutput_V2 {
+  std::string container_id;
+  const void *callchain[DD_MAX_STACK_DEPTH];
+  const char *symbols[DD_MAX_STACK_DEPTH];
+  const CodeCache *code_cache[DD_MAX_STACK_DEPTH];
+  uint64_t nb_locs;
+  int pid = {};
+  int tid = {};
+  bool is_incomplete = false;
+
+  UnwindOutput_V2() = default;
+  auto operator<=>(const UnwindOutput_V2 &) const = default;
 };

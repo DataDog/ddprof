@@ -58,6 +58,7 @@ static bool get_elf_offsets(int fd, const std::string &filepath,
   }
 
   bool found_exec = false;
+
   switch (ehdr->e_type) {
   case ET_EXEC:
   case ET_CORE:
@@ -69,6 +70,7 @@ static bool get_elf_offsets(int fd, const std::string &filepath,
     }
     for (size_t i = 0; i < phnum; ++i) {
       GElf_Phdr phdr_mem;
+      // Retrieve the program header
       GElf_Phdr *ph = gelf_getphdr(elf, i, &phdr_mem);
       if (unlikely(ph == NULL)) {
         LG_WRN("Invalid elf %s", filepath.c_str());
@@ -81,6 +83,9 @@ static bool get_elf_offsets(int fd, const std::string &filepath,
             bias_offset = ph->p_vaddr - ph->p_offset;
             found_exec = true;
           } else {
+            // There can be multiple load segments.
+            // The first one should be considered (this is valid)
+            // Leaving the failure for now as it allows me to find test cases
             report_failed_assumption(ddprof::string_format(
                 "Multiple exec LOAD segments: %s", filepath.c_str()));
           }

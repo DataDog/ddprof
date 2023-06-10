@@ -1,0 +1,184 @@
+image_base = 0x407000, map.offs() = 0x7000, last_readable_base = 0x400000
+
+// Adjust ptr 407020 - 400000 = 7020
+// During stack walking, we do:
+// pc - text_base
+
+// base is set at image_base - offset
+// It should be biais instead...
+
+
+// Remote...
+
+// pc - text_base
+// So text base should still be the same
+// Adjust ptr 75bc67ddf020 - 400000
+//
+// Adjust between file eh_frame_hdr and binary
+// 75bc67ddf020 -
+// (eh_frame_hdr - offset = base)
+
+.eh_frame_hdr section found at offset 0x1373880, size 349044
+.eh_frame section found at offset 0x13c8d10, size 3201136
+eh_frame_hdr = 0x75bc667ad880, eh_frame = 0x75bc66802d10
+--> 75BC6543A000
+
+75BC67DD8000
+
+// Adjust between file and loaded mem
+ + eh_frame_hdr.vaddr - eh_frame_hdr.offset
+
+eh_frame_hdr = 0x75bc67e520e0, eh_frame = 0x75bc67e584e8
+Create dwarf with base:0x400000 - eh_frame_hdr:0x75bc67e520e0
+eh_frame_ptr_enc = 1b
+table_enc = 3b
+fde count = 3199
+ptr = 75bc67e58528, table offset = 6448
+Change pointer to 75bc67e5852c - 44
+Adjust ptr 75bc67ddf020 - 400000
+==> 75bc67ddf020 - 75BC67DD8000
+= 7020
+
+Considering /usr/lib/x86_64-linux-gnu/libnvidia-glvkspirv.so.525.60.11
+image_base = 0x718900600000, map.offs() = (nil), last_readable_base = 0x718900600000
+Setting text base = 0x718900600000
+relent = 24
+GOT start == 0x718901f60018
+Create dwarf with 718900600000 - at:718901973880
+eh_frame_ptr_enc = 1b
+table_enc = 3b
+fde count = 43629
+ptr = 718901bc8d28, table offset = 2554a8
+Change pointer to 718901bc8d2c - 1c
+718901bc99f4 (ptr) - 718900600000 (image) = c9d00
+Created a number of dwarf entries = 326475
+Considered 14 symbols
+
+
+Considering /usr/lib/x86_64-linux-gnu/libnvidia-glvkspirv.so.525.60.11
+mmap at 7188fe39a000 - size = 17e26d8
+0 - 0 (vaddr - p_offset)
+vaddr from get_elf_offset: 0
+biais offset get_elf_offset: 0
+text base from get_elf_offset: ca9d0
+offset from get_elf_offset: 0
+last readable: 718900600000
+image base = 718900600000
+.eh_frame_hdr section found at offset 0x1373880, size 349044
+.eh_frame section found at offset 0x13c8d10, size 3201136
+eh_frame_hdr = 0x7188fdf2a880, eh_frame = 0x7188fdf7fd10
+Create dwarf with base:0x718900600000 - eh_frame_hdr:0x7188fdf2a880
+eh_frame_ptr_enc = 1b
+table_enc = 3b
+fde count = 43629
+ptr = 7188fe17fd28, table offset = 2554a8
+Change pointer to 7188fe17fd2c - 104
+7188fe17fd36 (ptr) - 7188fcbb7000 (image) = 57c9b30
+loader[2949720]: has encountered an error and will exit
+
+
+it should be something like
+
+
+// eh_frame_hdr
+eh_frame_hdr->offset
+
+// eh_frame
+eh_frame->offset
+
+  OffSeg1            OffSeg2
+// OffsetScn1 [x]    OffsetScn2 [Y]
+
+What we expect
+
+// VAddr1 [x]    VAddr2 [Y]
+
+
+
+// off + (vaddr1 - offset1) - (vaddr2 - offset2)
+
+
+x - offset 1
+
+Considering /usr/lib/x86_64-linux-gnu/libnvidia-glvkspirv.so.525.60.11
+image_base = 0x7bb4bb800000, map.offs() = (nil), last_readable_base = 0x7bb4bb800000
+Setting text base = 0x7bb4bb800000
+relent = 24
+GOT start == 0x7bb4bd160018
+Create dwarf with 7bb4bb800000 - at:7bb4bcb73880
+eh_frame_ptr_enc = 1b
+table_enc = 3b
+fde count = 43629
+ptr = 7bb4bcdc8d28, table offset = 2554a8
+Change pointer to 7bb4bcdc8d2c - 1c
+Dwarf range start: 7bb4bcdc99f4 (ptr) - 7bb4bb800000 (image) = c9d00
+Created a number of dwarf entries = 326475
+Considered 14 symbols
+
+
+Considering /usr/lib/x86_64-linux-gnu/libnvidia-glvkspirv.so.525.60.11
+0 - 0 (vaddr - p_offset)
+vaddr from get_elf_offset: 0
+biais offset get_elf_offset: 0
+text base from get_elf_offset: ca9d0
+offset from get_elf_offset: 0
+last readable: 7bb4bb800000
+.eh_frame_hdr section found at offset 0x1373880, size 349044, vaddr 1373880
+.eh_frame section found at offset 0x13c8d10, size 3201136, vaddr 15c8d10
+.eh_frame_hdr section found at offset 0x1373880, size 349044
+.eh_frame section found at offset 0x13c8d10, size 3201136
+eh_frame_hdr = 0x7bb4ba84c880, eh_frame = 0x7bb4ba8a1d10
+image base = 7bb4bb800000
+adjust eh_frame 200000
+Create dwarf with base:0x7bb4bb800000 - eh_frame_hdr:0x7bb4ba84c880
+eh_frame_ptr_enc = 1b
+table_enc = 3b
+fde count = 43629
+ptr = 7bb4baca1d28, table offset = 2554a8
+Change pointer to 7bb4baca1d2c - 5f5e544a
+
+
+
+-- backup code --
+
+
+  // Look for matching segments
+  GElf_Ehdr ehdr_mem;
+  GElf_Ehdr *ehdr = gelf_getehdr(elf, &ehdr_mem);
+  if (ehdr == nullptr) {
+    LG_WRN("Unable to retrieve elf header");
+    return false;
+  }
+  size_t phnum;
+  if (unlikely(elf_getphdrnum(elf, &phnum) != 0)) {
+    LG_WRN("Unable to retrieve number of program headers \n");
+    return false;
+  }
+  bool found_ph = false;
+  for (size_t i = 0; i < phnum; ++i) {
+    GElf_Phdr phdr_mem;
+    // Retrieve the program header
+    GElf_Phdr *ph = gelf_getphdr(elf, i, &phdr_mem);
+    if (unlikely(ph == NULL)) {
+      LG_WRN("Unable to retrieve program header \n");
+      return false;
+    }
+    printf("Section %lx - segment %lx/size(%lx)=%lx\n",
+           shdr.sh_offset, ph->p_offset, ph->p_filesz, ph->p_offset + ph->p_filesz);
+    printf("%s - %s \n", (shdr.sh_offset >= ph->p_offset)?"true":"false",
+           shdr.sh_offset < (ph->p_offset + ph->p_filesz)?"true":"false");
+    // If we are included in this segment
+    if (shdr.sh_offset >= ph->p_offset && shdr.sh_offset < (ph->p_offset + ph->p_filesz)) {
+      printf("We found program header for the section %lx, %lx \n",
+             ph->p_offset,
+             ph->p_vaddr);
+      found_ph = true;
+      section_info._vaddr_seg = ph->p_vaddr;
+      section_info._offset_seg = ph->p_offset;
+      break;
+    }
+  }
+  if (!found_ph) {
+    LG_WRN("Unable to find matching program header \n");
+    return false;
+  }
