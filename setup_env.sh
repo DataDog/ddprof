@@ -26,6 +26,9 @@ for cxx_ver in g++-{12..9}; do
   fi
 done
 
+echoerr "Using DDPROF_CXX_DEFAULT=${DDPROF_CXX_DEFAULT}"
+echoerr "Using DDPROF_CC_DEFAULT=${DDPROF_CC_DEFAULT}"
+echoerr "Compiler can be overriden with CXX and CC variables when sourcing ${0}"
 
 SCRIPTDIR="$(cd -- $( dirname -- "${BASH_SOURCE[0]}" ) && pwd)" # no "$0" when sourcing
 DDPROF_INSTALL_PREFIX="../deliverables"
@@ -60,6 +63,8 @@ GetDirectoryExtention() {
 }
 
 COMMON_OPT="${COMPILER_SETTING} ${DEFAULT_ALLOCATOR_OPT} -DCMAKE_INSTALL_PREFIX=${DDPROF_INSTALL_PREFIX} -DBUILD_BENCHMARKS=${DDPROF_BUILD_BENCH}"
+
+# echoerr "Cmake settings--\n ${COMMON_OPT}"
 
 # echoerr "Cmake settings--\n ${COMMON_OPT}"
 

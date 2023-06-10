@@ -1,0 +1,87 @@
+## things by pid
+#################
+DsoHdr
+-- DSO
+
+Lookups
+-- pid / bin maps
+-- mappings
+-- runtime
+
+DwflHdr
+-- DwflWrapper
+-- Visited pids
+
+## Not by pid
+#############
+-- File info (dso_hdr)
+-- Lookup
+Dwarf symbol lookup
+-- Symbol table
+
+## Async profiler
+
+parseLibraries parses everything in proc self.
+
+### Step 1 -- ensure we can have one code array per PID
+
+### Step 2 -- ensure symbols are shared across PIDs
+
+### Step 3 -- ensure unwinding tables are shared across PIDs
+
+
+### Junk notes
+Write an API that can work with ddprof object model
+
+LoadSymbolTable loads at a given base address
+We want to store all symbols at an elf address
+
+1) Rewrite parseLibraries <Hard>
+we can use DSO information + file info
+Ensure the cache is at elf address (not base)
+Start is 0 or for non PIE,
+
+
+2) Find library is by absolute address
+- Keep that ?
+
+
+### Issues
+
+- We are moving from a lazy to an absolute load
+- We don't have enough tests
+
+- We are not consider elf versions (though do we care ?)
+- read past sp --> check with 
+
+
+
+### Async profiler load in symbols_linux
+
+--> Create code cache
+library name
+Index --> count of lib
+image base --> start
+image end --> end
+
+--> Parse program headers
+text_base --> set as base
+---> parseDynamicSection
+global offset table --> Example (Shit it is absolute)
+GOT start == 0x5555556226b0
+GOT start == 0x7ffff7ffd018
+
+relocation -> relent size of relocation entry
+!We already have ways to parse GOT, we don't care
+
+---> parseDwarfInfo
+parseDwarfInfo()
+looks like the values are relative (wouhou)
+then we set the dwarf table (so nothing to change)
+
+-> VDSO
+--> parse memory
+
+
+// TODO tree of life
+

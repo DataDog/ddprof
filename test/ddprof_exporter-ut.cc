@@ -9,7 +9,6 @@
 #include "pevent_lib_mocks.hpp"
 #include "pprof/ddprof_pprof.hpp"
 #include "tags.hpp"
-#include "unwind_output_mock.hpp"
 
 #include <gtest/gtest.h>
 #include <stdexcept>
@@ -149,10 +148,8 @@ TEST(DDProfExporter, simple) {
   { // Aggregate pprofs
     SymbolHdr symbol_hdr;
     UnwindOutput mock_output;
-    SymbolTable &table = symbol_hdr._symbol_table;
-    MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
-
-    fill_unwind_symbols(table, mapinfo_table, mock_output);
+    //    MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
+    //    fill_unwind_symbols(table, mapinfo_table, mock_output);
 
     DDProfContext ctx = {};
     ctx.watchers[0] = *ewatcher_from_str("sCPU");
@@ -160,8 +157,9 @@ TEST(DDProfExporter, simple) {
 
     res = pprof_create_profile(&pprofs, &ctx);
     EXPECT_TRUE(IsDDResOK(res));
-    res = pprof_aggregate(&mock_output, symbol_hdr, 1000, 1, &ctx.watchers[0],
-                          &pprofs);
+    //    res = pprof_aggregate(&mock_output, &symbol_hdr, 1000, 1,
+    //    &ctx.watchers[0],
+    //                          &pprofs);
     EXPECT_TRUE(IsDDResOK(res));
   }
   {

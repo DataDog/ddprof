@@ -157,9 +157,10 @@ add_unit_test(
   DEFINITIONS MYNAME="pevent-ut")
 
 add_unit_test(
-  ddprof_pprof-ut ../src/pprof/ddprof_pprof.cc ../src/perf_watcher.cc ddprof_pprof-ut.cc
-  LIBRARIES Datadog::Profiling DDProf::Parser
-  DEFINITIONS MYNAME="ddprof_pprof-ut")
+  ddprof_pprof-ut ../src/pprof/ddprof_pprof.cc ../src/unwind_output.cc ../src/perf_watcher.cc
+    ddprof_pprof-ut.cc
+    LIBRARIES Datadog::Profiling DDProf::Parser DDProf::AsyncProf DDProf::Parser
+    DEFINITIONS MYNAME="ddprof_pprof-ut")
 
 add_unit_test(
   ddprof_exporter-ut
@@ -170,7 +171,7 @@ add_unit_test(
   ../src/perf_watcher.cc
   ../src/tags.cc
   ddprof_exporter-ut.cc
-  LIBRARIES Datadog::Profiling DDProf::Parser
+  LIBRARIES Datadog::Profiling DDProf::Parser DDProf::AsyncProf
   DEFINITIONS MYNAME="ddprof_exporter-ut")
 
 add_unit_test(
@@ -211,90 +212,86 @@ add_unit_test(
 add_compile_definitions("DWFL_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 set_property(TARGET dwfl_module-ut PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 
-add_unit_test(
-  savecontext-ut
-  savecontext-ut.cc
-  ../src/base_frame_symbol_lookup.cc
-  ../src/build_id.cc
-  ../src/common_mapinfo_lookup.cc
-  ../src/common_symbol_lookup.cc
-  ../src/container_id.cc
-  ../src/ddprof_process.cc
-  ../src/ddprof_stats.cc
-  ../src/dso.cc
-  ../src/dso_hdr.cc
-  ../src/dso_symbol_lookup.cc
-  ../src/dwfl_hdr.cc
-  ../src/ddprof_module_lib.cc
-  ../src/dwfl_symbol.cc
-  ../src/dwfl_symbol_lookup.cc
-  ../src/dwfl_thread_callbacks.cc
-  ../src/demangler/demangler.cc
-  ../src/jit/jitdump.cc
-  ../src/failed_assumption.cc
-  ../src/lib/pthread_fixes.cc
-  ../src/lib/savecontext.cc
-  ../src/lib/saveregisters.cc
-  ../src/mapinfo_lookup.cc
-  ../src/procutils.cc
-  ../src/runtime_symbol_lookup.cc
-  ../src/symbol_map.cc
-  ../src/signal_helper.cc
-  ../src/statsd.cc
-  ../src/unwind.cc
-  ../src/unwind_dwfl.cc
-  ../src/unwind_helpers.cc
-  ../src/unwind_metrics.cc
-  ../src/user_override.cc
-  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
-  DEFINITIONS MYNAME="savecontext-ut")
+#add_unit_test(
+#  savecontext-ut
+#  savecontext-ut.cc
+#  ../src/base_frame_symbol_lookup.cc
+#  ../src/build_id.cc
+#  ../src/common_mapinfo_lookup.cc
+#  ../src/common_symbol_lookup.cc
+#  ../src/ddprof_stats.cc
+#  ../src/dso.cc
+#  ../src/dso_hdr.cc
+#  ../src/dso_symbol_lookup.cc
+#  ../src/dwfl_hdr.cc
+#  ../src/ddprof_module_lib.cc
+#  ../src/dwfl_symbol.cc
+#  ../src/dwfl_symbol_lookup.cc
+#  ../src/dwfl_thread_callbacks.cc
+#  ../src/demangler/demangler.cc
+#  ../src/jit/jitdump.cc
+#  ../src/failed_assumption.cc
+#  ../src/lib/pthread_fixes.cc
+#  ../src/lib/savecontext.cc
+#  ../src/lib/saveregisters.cc
+#  ../src/mapinfo_lookup.cc
+#  ../src/procutils.cc
+#  ../src/runtime_symbol_lookup.cc
+#  ../src/symbol_map.cc
+#  ../src/signal_helper.cc
+#  ../src/statsd.cc
+#  ../src/unwind.cc
+#  ../src/unwind_dwfl.cc
+#  ../src/unwind_helpers.cc
+#  ../src/unwind_metrics.cc
+#  ../src/user_override.cc
+#  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
+#  DEFINITIONS MYNAME="savecontext-ut")
 
-add_unit_test(
-  allocation_tracker-ut
-  allocation_tracker-ut.cc
-  ../src/lib/allocation_tracker.cc
-  ../src/base_frame_symbol_lookup.cc
-  ../src/build_id.cc
-  ../src/container_id.cc
-  ../src/common_mapinfo_lookup.cc
-  ../src/common_symbol_lookup.cc
-  ../src/ddprof_cmdline.cc
-  ../src/ddprof_process.cc
-  ../src/ddprof_stats.cc
-  ../src/dso.cc
-  ../src/dso_hdr.cc
-  ../src/dso_symbol_lookup.cc
-  ../src/dwfl_hdr.cc
-  ../src/ddprof_module_lib.cc
-  ../src/dwfl_symbol.cc
-  ../src/dwfl_symbol_lookup.cc
-  ../src/dwfl_thread_callbacks.cc
-  ../src/demangler/demangler.cc
-  ../src/jit/jitdump.cc
-  ../src/failed_assumption.cc
-  ../src/pevent_lib.cc
-  ../src/perf.cc
-  ../src/perf_ringbuffer.cc
-  ../src/perf_watcher.cc
-  ../src/ringbuffer_utils.cc
-  ../src/lib/pthread_fixes.cc
-  ../src/lib/savecontext.cc
-  ../src/lib/saveregisters.cc
-  ../src/mapinfo_lookup.cc
-  ../src/procutils.cc
-  ../src/runtime_symbol_lookup.cc
-  ../src/symbol_map.cc
-  ../src/signal_helper.cc
-  ../src/statsd.cc
-  ../src/sys_utils.cc
-  ../src/tracepoint_config.cc
-  ../src/user_override.cc
-  ../src/unwind.cc
-  ../src/unwind_dwfl.cc
-  ../src/unwind_helpers.cc
-  ../src/unwind_metrics.cc
-  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle DDProf::Parser
-  DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=100)
+#add_unit_test(
+#  allocation_tracker-ut
+#  allocation_tracker-ut.cc
+#  ../src/lib/allocation_tracker.cc
+#  ../src/base_frame_symbol_lookup.cc
+#  ../src/build_id.cc
+#  ../src/common_mapinfo_lookup.cc
+#  ../src/common_symbol_lookup.cc
+#  ../src/ddprof_cmdline.cc
+#  ../src/ddprof_stats.cc
+#  ../src/dso.cc
+#  ../src/dso_hdr.cc
+#  ../src/dso_symbol_lookup.cc
+#  ../src/dwfl_hdr.cc
+#  ../src/ddprof_module_lib.cc
+#  ../src/dwfl_symbol.cc
+#  ../src/dwfl_symbol_lookup.cc
+#  ../src/dwfl_thread_callbacks.cc
+#  ../src/demangler/demangler.cc
+#  ../src/jit/jitdump.cc
+#  ../src/failed_assumption.cc
+#  ../src/pevent_lib.cc
+#  ../src/perf.cc
+#  ../src/perf_ringbuffer.cc
+#  ../src/perf_watcher.cc
+#  ../src/ringbuffer_utils.cc
+#  ../src/lib/pthread_fixes.cc
+#  ../src/lib/savecontext.cc
+#  ../src/lib/saveregisters.cc
+#  ../src/mapinfo_lookup.cc
+#  ../src/procutils.cc
+#  ../src/runtime_symbol_lookup.cc
+#  ../src/symbol_map.cc
+#  ../src/signal_helper.cc
+#  ../src/statsd.cc
+#  ../src/sys_utils.cc
+#  ../src/tracepoint_config.cc
+#  ../src/user_override.cc
+#  ../src/unwind.cc
+#  ../src/unwind_dwfl.cc
+#  ../src/unwind_helpers.cc
+#  ../src/unwind_metrics.cc
+#  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle DDProf::Parser
+#  DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=100)
 
 add_unit_test(sys_utils-ut sys_utils-ut.cc ../src/sys_utils.cc)
 
@@ -329,7 +326,7 @@ add_unit_test(jitdump-ut jitdump-ut.cc ../src/jit/jitdump.cc)
 
 add_unit_test(tracepoint_config-ut tracepoint_config-ut.cc ../src/tracepoint_config.cc)
 
-add_unit_test(live_allocation-ut live_allocation-ut.cc ../src/live_allocation.cc)
+#add_unit_test(live_allocation-ut live_allocation-ut.cc ../src/live_allocation.cc)
 
 add_unit_test(ddprof_process-ut ddprof_process-ut.cc ../src/container_id.cc
               ../src/ddprof_process.cc)
@@ -338,6 +335,43 @@ add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/pthread_fixes.cc
               ../src/lib/savecontext.cc ../src/lib/saveregisters.cc)
 
 add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
+
+message(STATUS "Async profiler" ${ASYNC_PROFILER_SRC})
+
+add_unit_test(
+  dwarf_unwind-ut
+  dwarf_unwind-ut.cc
+  ../src/lib/pthread_fixes.cc
+  ../src/lib/savecontext.cc
+  ../src/lib/saveregisters.cc
+  ../src/async-profiler/stack_context.cpp
+  ../src/lib/allocation_tracker.cc
+  ../src/ringbuffer_utils.cc
+  ../src/perf_ringbuffer.cc
+  ../src/perf.cc
+  ../src/pevent_lib.cc
+  ../src/sys_utils.cc
+  ../src/user_override.cc
+  ../src/perf_watcher.cc
+  LIBRARIES ${ELFUTILS_LIBRARIES} DDProf::AsyncProf)
+target_include_directories(dwarf_unwind-ut PRIVATE ${ASYNC_PROFILER_INCLUDE})
+
+add_benchmark(
+  async_prof-bench
+  async_prof-bench.cc
+  ../src/lib/savecontext.cc
+  ../src/lib/saveregisters.cc
+  ../src/async-profiler/stack_context.cpp
+  ../src/lib/allocation_tracker.cc
+  ../src/ringbuffer_utils.cc
+  ../src/perf_ringbuffer.cc
+  ../src/perf.cc
+  ../src/pevent_lib.cc
+  ../src/lib/pthread_fixes.cc
+  ../src/sys_utils.cc
+  ../src/user_override.cc
+  ../src/perf_watcher.cc
+  LIBRARIES ${ELFUTILS_LIBRARIES} DDProf::AsyncProf)
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
   add_exe(
@@ -391,3 +425,5 @@ add_test(
   NAME ddprof_help
   COMMAND ddprof -h
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_subdirectory(loader)

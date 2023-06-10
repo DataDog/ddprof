@@ -15,60 +15,7 @@ namespace ddprof {
 
 bool is_max_stack_depth_reached(const UnwindState &us) {
   // +2 to keep room for common base frame
-  return us.output.locs.size() + 2 >= DD_MAX_STACK_DEPTH;
-}
-
-DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
-                UnwindState *us) {
-  UnwindOutput *output = &us->output;
-  if (output->locs.size() >= DD_MAX_STACK_DEPTH) {
-    DDRES_RETURN_WARN_LOG(DD_WHAT_UW_MAX_DEPTH,
-                          "Max stack depth reached"); // avoid overflow
-  }
-  FunLoc current;
-  current._symbol_idx = symbol_idx;
-  current.ip = pc;
-  if (map_idx == -1) {
-    // just add an empty element for mapping info
-    current._map_info_idx = us->symbol_hdr._common_mapinfo_lookup.get_or_insert(
-        CommonMapInfoLookup::MappingErrors::empty,
-        us->symbol_hdr._mapinfo_table);
-  } else {
-    current._map_info_idx = map_idx;
-  }
-#ifdef DEBUG
-  LG_NTC("Considering frame with IP : %lx / %s ", pc,
-         us->symbol_hdr._symbol_table[current._symbol_idx]._symname.c_str());
-#endif
-  output->locs.push_back(current);
-
-  return ddres_init();
-}
-
-static void add_frame_without_mapping(UnwindState *us, SymbolIdx_t symbol_idx) {
-  add_frame(symbol_idx, -1, 0, us);
-}
-
-void add_common_frame(UnwindState *us, SymbolErrors lookup_case) {
-  add_frame_without_mapping(us,
-                            us->symbol_hdr._common_symbol_lookup.get_or_insert(
-                                lookup_case, us->symbol_hdr._symbol_table));
-}
-
-void add_dso_frame(UnwindState *us, const Dso &dso,
-                   ElfAddress_t normalized_addr, std::string_view addr_type) {
-  add_frame_without_mapping(
-      us,
-      us->symbol_hdr._dso_symbol_lookup.get_or_insert(
-          normalized_addr, dso, us->symbol_hdr._symbol_table, addr_type));
-}
-
-void add_virtual_base_frame(UnwindState *us) {
-  add_frame_without_mapping(
-      us,
-      us->symbol_hdr._base_frame_symbol_lookup.get_or_insert(
-          us->pid, us->symbol_hdr._symbol_table,
-          us->symbol_hdr._dso_symbol_lookup, us->dso_hdr));
+  return us.output.nb_locs + 2 >= DD_MAX_STACK_DEPTH;
 }
 
 // read a word from the given stack
@@ -176,7 +123,7 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, int regno,
     // requested when unwinding the leaf function for a register, we simply
     // return the initial register value.
     constexpr uint64_t k_red_zone_size = 128;
-    if (us->output.locs.size() <= 1 && addr >= sp_start - k_red_zone_size &&
+    if (us->output.nb_locs <= 1 && addr >= sp_start - k_red_zone_size &&
         regno >= 0 &&
         regno < static_cast<int>(std::size(us->initial_regs.regs))) {
       *result = us->initial_regs.regs[regno];
@@ -214,23 +161,5 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, int regno,
   }
   *result = *(ElfWord_t *)(us->stack + stack_idx);
   return true;
-}
-
-void add_error_frame(const Dso *dso, UnwindState *us,
-                     [[maybe_unused]] ProcessAddress_t pc,
-                     SymbolErrors error_case) {
-  ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
-  if (dso) {
-// #define ADD_ADDR_IN_SYMB // creates more elements (but adds info on
-//  addresses)
-#ifdef ADD_ADDR_IN_SYMB
-    add_dso_frame(us, *dso, pc, "pc");
-#else
-    add_dso_frame(us, *dso, 0x0, "pc");
-#endif
-  } else {
-    add_common_frame(us, error_case);
-  }
-  LG_DBG("Error frame (depth#%lu)", us->output.locs.size());
 }
 } // namespace ddprof

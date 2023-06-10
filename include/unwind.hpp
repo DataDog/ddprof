@@ -12,8 +12,6 @@
 typedef struct UnwindState UnwindState;
 
 namespace ddprof {
-void unwind_init(void);
-
 // Fill sample info to prepare for unwinding
 void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
                         pid_t sample_pid, uint64_t sample_size_stack,

@@ -26,7 +26,7 @@ struct TrackerThreadLocalState {
   int64_t remaining_bytes; // remaining allocation bytes until next sample
   bool remaining_bytes_initialized; // false if remaining_bytes is not
                                     // initialized
-  ddprof::span<const byte> stack_bounds;
+  ddprof::span<const std::byte> stack_bounds;
   pid_t tid; // cache of tid
 
   bool reentry_guard; // prevent reentry in AllocationTracker (eg. when
@@ -76,6 +76,8 @@ private:
     std::mutex mutex;
     std::atomic<bool> track_allocations = false;
     std::atomic<bool> track_deallocations = false;
+    // The following flag avoids a flood of lost events
+    std::atomic<bool> real_sample_pushed = true;
     std::atomic<uint64_t> lost_count; // count number of lost events
     std::atomic<uint32_t> failure_count;
     std::atomic<pid_t> pid; // lazy cache of pid (0 is un-init value)

@@ -26,6 +26,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include "ddprof_base.hpp"
 #include "perf_archmap.hpp"
 #include "span.hpp"
+#include <stdint.h>
 
 #if defined(__x86_64__)
 

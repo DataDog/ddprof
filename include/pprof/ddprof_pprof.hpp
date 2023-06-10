@@ -11,6 +11,10 @@
 #include "perf_watcher.hpp"
 #include "tags.hpp"
 #include "unwind_output.hpp"
+#include "codeCache.h"
+
+#include "async-profiler/codeCache.h"
+#include "span.hpp"
 
 struct ddog_prof_Profile;
 struct SymbolHdr;
@@ -24,6 +28,13 @@ struct DDProfPProf {
 };
 
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx);
+
+DDRes pprof_aggregate_v2(ddprof::span<const void * const> callchain,
+                         ddprof::span<const char * const> symbols,
+                         ddprof::span<const CodeCache * const> code_cache,
+                         uint64_t value,
+                         uint64_t count, const PerfWatcher *watcher,
+                         DDProfPProf *pprof);
 
 /**
  * Aggregate to the existing profile the provided unwinding output.
@@ -43,6 +54,5 @@ DDRes pprof_write_profile(const DDProfPProf *pprof, int fd);
 
 DDRes pprof_free_profile(DDProfPProf *pprof);
 
-void ddprof_print_sample(const UnwindOutput &uw_output,
-                         const SymbolHdr &symbol_hdr, uint64_t value,
+void ddprof_print_sample(const UnwindOutput_V2 &uw_output, uint64_t value,
                          const PerfWatcher &watcher);
