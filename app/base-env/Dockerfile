@@ -179,12 +179,17 @@ RUN pip3 install cmake_format
 
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    libtool
+    libtool \
+    libiberty-dev
 
-RUN git clone --branch r1viollet/libaustin https://github.com/r1viollet/austin.git && \
+
+# possibly useful command
+# CFLAGS="-g -O0 -DTRACE" ./configure
+# Valid commit : git checkout a7a292b3f5a1058051b017c0d339a678efdec704
+RUN git clone --branch r1viollet/libaustin_v2 https://github.com/r1viollet/austin.git && \
     cd austin && \
     autoreconf --install && \
-    ./configure && \
+    CFLAGS="-g -O0 -DTRACE" ./configure && \
     make && \
     make install
 

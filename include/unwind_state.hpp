@@ -54,6 +54,7 @@ struct UnwindState {
   ddprof::ProcessHdr process_hdr;
 
   pid_t pid;
+  pid_t tid;
   char *stack;
   size_t stack_sz;
 

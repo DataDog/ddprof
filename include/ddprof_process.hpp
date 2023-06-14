@@ -36,7 +36,7 @@ public:
   // lazy read of container id
   const ContainerId &get_container_id(std::string_view path_to_proc = "");
 
-  austin_handle_t get_austin_handle();
+  austin_handle_t get_austin_handle(pid_t tid);
 
   uint64_t _sample_counter = {};
 

@@ -44,13 +44,14 @@ static void add_container_id(UnwindState *us) {
 }
 
 void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
-                        pid_t sample_pid, uint64_t sample_size_stack,
+                        pid_t sample_pid, pid_t sample_tid, uint64_t sample_size_stack,
                         char *sample_data_stack) {
   us->output.clear();
   memcpy(&us->initial_regs.regs[0], sample_regs,
          K_NB_REGS_UNWIND * sizeof(uint64_t));
   us->current_ip = us->initial_regs.regs[REGNAME(PC)];
   us->pid = sample_pid;
+  us->tid = sample_tid;
   us->stack_sz = sample_size_stack;
   us->stack = sample_data_stack;
 }

@@ -406,10 +406,14 @@ static DDRes add_python_frame(UnwindState *us, SymbolIdx_t symbol_idx,
                               ElfAddress_t pc, Dwfl_Frame *dwfl_frame) {
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
   SymbolTable &symbol_table = unwind_symbol_hdr._symbol_table;
-  Process &p = us->process_hdr.get_process(us->pid);
-  austin_handle_t handle = p.get_austin_handle();
 
-  if (handle && (symbol_table.at(symbol_idx)._is_python_frame)) {
+  if (symbol_table.at(symbol_idx)._is_python_frame) {
+    // only attempt to attach on python frames
+    Process &p = us->process_hdr.get_process(us->pid);
+    austin_handle_t handle = p.get_austin_handle(us->tid);
+    if (!handle) {
+      return ddres_error(1);
+    }
     AustinSymbolLookup &austin_symbol_lookup =
         unwind_symbol_hdr._austin_symbol_lookup;
     // The register we are interested in is RSI, but it doesn't seem to be

@@ -16,7 +16,7 @@ void unwind_init(void);
 
 // Fill sample info to prepare for unwinding
 void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
-                        pid_t sample_pid, uint64_t sample_size_stack,
+                        pid_t sample_pid, pid_t sample_tid, uint64_t sample_size_stack,
                         char *sample_data_stack);
 
 // Main unwind API
