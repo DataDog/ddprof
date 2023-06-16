@@ -8,9 +8,9 @@
 #include <cassert>
 #include <cstdio>
 #include <getopt.h>
-#include <sstream>
 #include <string>
 
+#include "CLI/CLI11.hpp"
 #include "constants.hpp"
 #include "ddprof_cmdline.hpp"
 #include "perf_watcher.hpp"

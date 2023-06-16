@@ -30,13 +30,6 @@
 #  include <execinfo.h>
 #endif
 
-static void disable_core_dumps(void) {
-  struct rlimit core_limit;
-  core_limit.rlim_cur = 0;
-  core_limit.rlim_max = 0;
-  setrlimit(RLIMIT_CORE, &core_limit);
-}
-
 /*****************************  SIGSEGV Handler *******************************/
 static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   // TODO this really shouldn't call printf-family functions...
@@ -88,10 +81,6 @@ DDRes ddprof_setup(DDProfContext *ctx) {
       sigaction_handlers.sa_sigaction = sigsegv_handler;
       sigaction_handlers.sa_flags = SA_SIGINFO;
       sigaction(SIGSEGV, &(sigaction_handlers), NULL);
-    }
-    // Disable core dumps (unless enabled)
-    if (!ctx->params.core_dumps) {
-      disable_core_dumps();
     }
 
     // Set the nice level, but only if it was overridden because 0 is valid

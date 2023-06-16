@@ -20,10 +20,8 @@
 #include "user_override.hpp"
 
 #include <array>
-#include <cassert>
 #include <charconv>
 #include <errno.h>
-#include <fcntl.h>
 #include <filesystem>
 #include <functional>
 #include <string.h>

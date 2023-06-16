@@ -32,6 +32,24 @@ typedef struct ExporterInput {
   bool agentless; // Whether or not to actually use API key/intake
 } ExporterInput;
 
+struct ExporterInput_V2 {
+  std::string api_key;     // Datadog api key [hidden]
+  std::string environment; // ex: staging / local / prod
+  std::string service;
+  std::string service_version; // appended to tags (example: 1.2.1)
+  std::string host;            // agent host ex:162.184.2.1
+  std::string url;             // url (can contain port and schema)
+  std::string port; // port appended to the host IP (ignored in agentless)
+  std::string debug_pprof_prefix; // local pprof prefix (debug)
+  bool do_export;                 // prevent exports if needed (debug flag)
+
+  string_view user_agent; // ignored for now (override in shared lib)
+  string_view language;   // appended to the tags (set to native)
+  string_view family;
+  string_view profiler_version;
+  bool agentless; // Whether or not to actually use API key/intake
+};
+
 // Proposals for other arguments (tags)
 // - intake version : Not handled (set inside libddprof)
 // - runtime

@@ -334,6 +334,8 @@ add_unit_test(live_allocation-ut live_allocation-ut.cc ../src/live_allocation.cc
 add_unit_test(ddprof_process-ut ddprof_process-ut.cc ../src/container_id.cc
               ../src/ddprof_process.cc)
 
+add_unit_test(ddprof_cli-ut ddprof_cli-ut.cc ../src/ddprof_cli.cc)
+
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/pthread_fixes.cc
               ../src/lib/savecontext.cc ../src/lib/saveregisters.cc)
 
