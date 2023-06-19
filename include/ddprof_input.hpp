@@ -83,8 +83,8 @@ typedef struct DDProfInput {
   XX(DD_PROFILING_PPROF_PREFIX,         debug_pprof_prefix, O, 'O', 1, input, NULL, "",           exp_input.)  /* ok 1 */\
   XX(DD_PROFILING_AGENTLESS,            agentless,          L, 'L', 1, input, NULL, "", )                     /* ok 1 */  \
   XX(DD_TAGS,                           tags,               T, 'T', 1, input, NULL, "", )                     /* ok */ \
-  XX(DD_PROFILING_ENABLED,              enable,             d, 'd', 1, input, NULL, "yes", )                  /* no ?*/ \
-  XX(DD_PROFILING_NATIVE_ENABLED,       native_enable,      n, 'n', 1, input, NULL, "", )                     /* ok 1 */ \
+  XX(DD_PROFILING_ENABLED,              enable,             d, 'd', 1, input, NULL, "yes", )                  /* ok 1*/ \
+  XX(DD_PROFILING_NATIVE_ENABLED,       native_enable,      n, 'n', 1, input, NULL, "", )                     /* no */ \
   XX(DD_PROFILING_UPLOAD_PERIOD,        upload_period,      u, 'u', 1, input, NULL, "59", )                    /*ok*/ \
   XX(DD_PROFILING_NATIVE_WORKER_PERIOD, worker_period,      w, 'w', 1, input, NULL, "240", )                   /*ok*/ \
   XX(DD_PROFILING_NATIVE_FAULT_INFO,    fault_info,         s, 's', 1, input, NULL, "yes", )                  /*ok*/ \
@@ -96,7 +96,7 @@ typedef struct DDProfInput {
   XX(DD_PROFILING_NATIVE_TARGET_PID,    pid,                p, 'p', 1, input, NULL, "", )                     /*ok*/ \
   XX(DD_PROFILING_NATIVE_GLOBAL,        global,             g, 'g', 1, input, NULL, "", )                     /*ok*/ \
   XX(DD_PROFILING_INTERNAL_STATS,       internal_stats,     b, 'b', 1, input, NULL, "", )                     /*ok*/ \
-  XX(DD_PROFILING_NATIVE_SOCKET,        socket,             z, 'z', 1, input, NULL, "", )                      \
+  XX(DD_PROFILING_NATIVE_SOCKET,        socket,             z, 'z', 1, input, NULL, "", )                     /*ok*/  \
   XX(DD_PROFILING_NATIVE_PRESET,        preset,             D, 'D', 1, input, NULL, "", )                     /*ok*/\
   XX(DD_PROFILING_NATIVE_SHOW_SAMPLES,  show_samples,       y, 'y', 0, input, NULL, "", )                     /*ok*/ \
   XX(DD_PROFILING_NATIVE_CPU_AFFINITY,  affinity,           a, 'a', 1, input, NULL, "", )                     /*ok*/ \

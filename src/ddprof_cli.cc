@@ -1,9 +1,33 @@
 #include "ddprof_cli.hpp"
 
+#include "version.hpp"
+
 #include "CLI/CLI11.hpp"
 #include "ddres.hpp"
+#include "constants.hpp"
+#include "ddprof_cmdline.hpp"
+
+#include "logger.hpp"
+#include "ddprof_defs.hpp"
 
 namespace ddprof {
+
+namespace {
+std::string api_key_to_dbg_string(const std::string_view value) {
+  if (value.size() != k_size_api_key) {
+    return "invalid";
+  }
+  size_t len = value.length();
+  std::string masked(len, '*');
+  masked.replace(len - 4, 4, value.substr(len - 4));
+  return masked;
+}
+} // namespace
+
+void DDProfCLI::help_events() {
+  // requested in a ticket
+  std::cout << "This is not yet implemented" << std::endl;
+}
 
 int DDProfCLI::parse(int argc, const char *argv[]) {
   CLI::App app{ MYNAME " is a command line utility to gather profiling data and "
@@ -74,7 +98,7 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       ->excludes(exec_option);
 
   app.add_option("--upload_period,-u", upload_period,
-                 "Upload period for profiles.\n")
+                 "Upload period for profiles (in seconds).\n")
       ->default_val(59)
       ->group("Profiling settings")
       ->envname("DD_PROFILING_UPLOAD_PERIOD");
@@ -82,7 +106,9 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
   app.add_option("--event,-e", events,
                  "Customize the events we instrument."
                  " For more help, use -e help.")
-      ->group("Profiling settings");
+      ->group("Profiling settings")
+      ->envname(k_events_env_variable);
+
   app.add_option("--preset", preset,
                  "Select a predefined profiling configuration."
                  "Available presets:\n"
@@ -127,6 +153,16 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
                "Display captured samples as logs.\n")
       ->default_val(false)
       ->group("Debug options");
+  app.add_flag("--version,-v", version,
+               "Display the profiler's version.\n")
+      ->default_val(false)
+      ->group("Debug options");
+  app.add_flag("--enable", version,
+               "Option to disable the profiler.\n"
+               "The profiler then acts as a passthrough.\n")
+      ->default_val(true)
+      ->envname("DD_PROFILING_ENABLED")
+      ->group("Debug options");
 
   // HIDDEN OPTIONS
   std::vector<CLI::Option *> hidden_options;
@@ -145,7 +181,8 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
 
   hidden_options.push_back(
       app.add_option("--cpu_affinity", cpu_affinity,
-                     "Hexadecimal value of the cpu affinity")
+                     "Hexadecimal value of the cpu affinity"
+                     " eg: 0xa4")
           ->group(""));
 
   hidden_options.push_back(
@@ -170,16 +207,35 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       app.add_flag("--help_hidden", help_hidden, "Show hidden options")
           ->default_val(false)
           ->group(""));
+  hidden_options.push_back(
+      app.add_option("--socket", socket, "Profiler's IPC socket, as a file descriptor")
+          ->default_val(-1)
+          ->envname("DD_PROFILING_NATIVE_SOCKET")
+          ->group(""));
 
   // Parse
   CLI11_PARSE(app, argc, argv);
 
+  // Help on hidden options
   if (help_hidden) {
+    // Adjust the groups before calling help function
     for (auto el : hidden_options) {
       el->group("Hidden options");
     }
     std::cout << app.help() << std::endl;
-    return static_cast<int>(CLI::ExitCodes::Success);;
+    return static_cast<int>(CLI::ExitCodes::Success);
+  }
+
+  // Version then exit
+  if (version) {
+    print_version();
+    return static_cast<int>(CLI::ExitCodes::Success);
+  }
+
+  // Help option specifically on events
+  if (events.size() && events.front() == "help") {
+    help_events();
+    return static_cast<int>(CLI::ExitCodes::Success);
   }
 
   // Are we setup to do something ?
@@ -187,8 +243,24 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
     fprintf(stderr, "Please specify a target to profile \n");
     return static_cast<int>(CLI::ExitCodes::RequiredError);
   }
+
   continue_exec = true;
   return static_cast<int>(CLI::ExitCodes::Success);;
+}
+
+DDRes DDProfCLI::add_watchers_from_events(std::vector<PerfWatcher> &watcher) const {
+  std::vector<PerfWatcher> watchers;
+  for (const auto &el : events) {
+    if (!watchers_from_str(el.c_str(), watchers)) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
+                             "Invalid event/tracepoint (%s)", el.c_str());
+    }
+  }
+  return {};
+}
+
+void DDProfCLI::print() const {
+
 }
 
 } // namespace ddprof

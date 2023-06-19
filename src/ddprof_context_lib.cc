@@ -13,6 +13,7 @@
 #include "logger_setup.hpp"
 #include "presets.hpp"
 #include "span.hpp"
+#include "ddprof_cli.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -40,6 +41,85 @@ static void order_watchers(ddprof::span<PerfWatcher> watchers) {
       watchers.begin(), watchers.end(), [](const auto &lhs, const auto &rhs) {
         return lhs.type < PERF_TYPE_MAX && rhs.type >= PERF_TYPE_MAX;
       });
+}
+
+namespace {
+void copy_cli_values(const DDProfCLI &ddprof_cli, DDProfContext_V2 &ctx) {
+
+  // possible std::move here ?
+  ctx.exp_input = ddprof_cli.exporter_input;
+  // todo avoid manual copies
+  ctx.params.tags = ddprof_cli.tags;
+  // Profiling settings
+  ctx.params.pid = ddprof_cli.pid;
+  ctx.params.global = ddprof_cli.global;
+  ctx.params.upload_period = ddprof_cli.upload_period;
+  // todo : naming ?
+  ctx.params.worker_period = ddprof_cli.profiler_reset;
+  // Advanced
+  ctx.params.switch_user = ddprof_cli.switch_user;
+  ctx.params.nice = ddprof_cli.nice;
+  // Debug
+  ctx.params.internal_stats = ddprof_cli.internal_stats;
+  ctx.params.enable = ddprof_cli.enable;
+  // todo check if this is reasonable ?
+  if (!ddprof_cli.enable) {
+    setenv("DD_PROFILING_ENABLED", "false", true);
+  }
+  // hidden
+  if (!ddprof_cli.cpu_affinity.empty() && !parse_cpu_mask(ddprof_cli.cpu_affinity, ctx.params.cpu_affinity)) {
+    LG_WRN("Unable to parse cpu_affinity setting");
+  }
+
+  ctx.params.show_samples = ddprof_cli.show_samples;
+  ctx.params.fault_info = ddprof_cli.fault_info;
+
+  ctx.params.sockfd = ddprof_cli.socket;
+  if (ctx.params.sockfd != -1) {
+    ctx.params.wait_on_socket = true;
+  }
+}
+
+DDRes setup_watchers(const DDProfCLI &ddprof_cli, DDProfContext_V2 &ctx) {
+  std::vector<PerfWatcher> watchers;
+  DDRES_CHECK_FWD(ddprof_cli.add_watchers_from_events(watchers));
+  if (const PerfWatcher *dup_watcher = find_duplicate_event(watchers);
+      dup_watcher != nullptr) {
+    DDRES_RETURN_ERROR_LOG(
+        DD_WHAT_INPUT_PROCESS, "Duplicate event found in input: %s",
+        event_type_name_from_idx(dup_watcher->ddprof_event_type));
+  }
+
+  std::string preset = ddprof_cli.preset;
+
+  if (!preset.empty() && watchers.size() == 0) {
+    // use `default` preset when no preset and no events were given in input
+    preset = "default";
+  }
+
+  if (!preset.empty()) {
+    bool pid_or_global_mode = (ddprof_cli.global || ddprof_cli.pid)
+        && ctx.params.sockfd == -1;
+    DDRES_CHECK_FWD(add_preset_v2(preset, pid_or_global_mode, watchers));
+  }
+  ctx.watchers = std::move(watchers);
+  return {};
+}
+}
+
+DDRes context_set_v2(const DDProfCLI &ddprof_cli, DDProfContext_V2 &ctx) {
+  setup_logger(ddprof_cli.log_mode.c_str(), ddprof_cli.log_level.c_str());
+
+  copy_cli_values(ddprof_cli, ctx);
+
+  DDRES_CHECK_FWD(setup_watchers(ddprof_cli, ctx));
+
+  if (ddprof_cli.show_config) {
+    ddprof_cli.print();
+    // print watcher values
+  }
+
+  return {};
 }
 
 /****************************  Argument Processor  ***************************/

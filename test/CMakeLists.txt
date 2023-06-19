@@ -126,6 +126,7 @@ add_unit_test(procutils-ut ../src/procutils.cc procutils-ut.cc DEFINITIONS MYNAM
 add_unit_test(
   ddprof_input-ut
   ../src/ddprof_cmdline.cc
+  ../src/ddprof_cli.cc # todo remove
   ../src/ddprof_input.cc
   ../src/ddprof_context_lib.cc
   ../src/ddprof_cpumask.cc
@@ -136,6 +137,22 @@ add_unit_test(
   ddprof_input-ut.cc
   LIBRARIES DDProf::Parser
   DEFINITIONS MYNAME="ddprof_input-ut")
+
+add_unit_test(
+        ddprof_context-ut
+        ../src/ddprof_cmdline.cc
+        ../src/ddprof_cli.cc
+        ../src/ddprof_context_lib.cc
+        ../src/ddprof_cpumask.cc
+        ../src/ddprof_input.cc # todo remove
+        ../src/logger_setup.cc
+        ../src/perf_watcher.cc
+        ../src/presets.cc
+        ../src/tracepoint_config.cc
+        ddprof_context-ut.cc
+        LIBRARIES DDProf::Parser
+        DEFINITIONS MYNAME="ddprof_context-ut"
+)
 
 add_unit_test(
   perf_ringbuffer-ut ../src/perf.cc ../src/perf_watcher.cc ../src/perf_ringbuffer.cc
@@ -334,7 +351,8 @@ add_unit_test(live_allocation-ut live_allocation-ut.cc ../src/live_allocation.cc
 add_unit_test(ddprof_process-ut ddprof_process-ut.cc ../src/container_id.cc
               ../src/ddprof_process.cc)
 
-add_unit_test(ddprof_cli-ut ddprof_cli-ut.cc ../src/ddprof_cli.cc)
+add_unit_test(ddprof_cli-ut ddprof_cli-ut.cc ../src/ddprof_cli.cc ../src/version.cc ../src/ddprof_cmdline.cc ../src/perf_watcher.cc
+        ../src/tracepoint_config.cc LIBRARIES DDProf::Parser)
 
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/pthread_fixes.cc
               ../src/lib/savecontext.cc ../src/lib/saveregisters.cc)

@@ -13,6 +13,14 @@ TEST(ddprof_cli, help) {
   EXPECT_EQ(0, res);
   EXPECT_FALSE(ddprof_cli.continue_exec);
 }
+TEST(ddprof_cli, help_events) {
+  const char *argv[] = {{MYNAME}, {"--event"}, {"help"}};
+  int argc = sizeof(argv) / sizeof(argv[0]);
+  ddprof::DDProfCLI ddprof_cli;
+  int res = ddprof_cli.parse(argc, argv);
+  EXPECT_EQ(0, res);
+  EXPECT_FALSE(ddprof_cli.continue_exec);
+}
 
 TEST(ddprof_cli, show_hidden) {
   const char *argv[] = {{MYNAME}, {"--help_hidden"}};

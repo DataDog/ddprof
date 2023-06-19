@@ -15,6 +15,45 @@
 
 namespace ddprof {
 
+DDRes add_preset_v2(std::string_view preset, bool pid_or_global_mode, std::vector<PerfWatcher> &watchers) {
+  using namespace std::literals;
+  static Preset presets[] = {
+      {"default", "sCPU;sALLOC"},
+      {"default-pid", "sCPU"},
+      {"cpu_only", "sCPU"},
+      {"alloc_only", "sALLOC"},
+      {"cpu_live_heap", "sCPU;sALLOC mode=l"},
+  };
+
+  if (preset == "default"sv && pid_or_global_mode) {
+    preset = "default-pid"sv;
+  }
+  ddprof::span presets_span{presets};
+  auto it = std::find_if(presets_span.begin(), presets_span.end(),
+                         [&preset](auto &e) { return e.name == preset; });
+  if (it == presets_span.end()) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Unknown preset (%s)",
+                           preset.data());
+  }
+
+  std::vector<PerfWatcher> new_watchers;
+  if (!watchers_from_str(it->events, new_watchers)) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
+                           "Invalid event/tracepoint (%s)", it->events);
+  }
+
+  for (auto &watcher : new_watchers) {
+    // todo: missing management of several modes for live heap
+    // ignore event if it was already present in watchers
+    if (watcher.ddprof_event_type == DDPROF_PWE_TRACEPOINT ||
+        std::find_if(watchers.begin(), watchers.end(), [&watcher](auto &w) {
+          return w.ddprof_event_type == watcher.ddprof_event_type;
+        }) == watchers.end()) {
+      watchers.push_back(std::move(watcher));
+    }
+  }
+}
+
 DDRes add_preset(DDProfContext *ctx, const char *preset,
                  bool pid_or_global_mode) {
   using namespace std::literals;

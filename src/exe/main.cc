@@ -165,6 +165,7 @@ static InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
 
   DDProfInput input = {};
   defer { ddprof_input_free(&input); };
+
   bool continue_exec;
   DDRes res = ddprof_input_parse(*argc, *argv, &input, &continue_exec);
   if (IsDDResNotOK(res) || !continue_exec) {

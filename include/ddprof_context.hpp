@@ -17,6 +17,34 @@
 // forward declarations
 typedef struct StackHandler StackHandler;
 
+struct DDProfContext_V2 {
+  // todo avoid manual copy
+  struct {
+    bool enable;
+    unsigned upload_period;
+    bool fault_info;
+    bool core_dumps;
+    int nice;
+    int num_cpu;
+    pid_t pid; // ! only use for perf attach (can be -1 in global mode)
+    bool global;
+    uint32_t worker_period; // exports between worker refreshes
+    int dd_profiling_fd;    // opened file descriptor to our internal lib
+    int sockfd;
+    bool wait_on_socket;
+    bool show_samples;
+    cpu_set_t cpu_affinity;
+    std::string switch_user;
+    std::string internal_stats;
+    std::string tags;
+  } params;
+
+  std::vector<PerfWatcher> watchers;
+  ExporterInput_V2 exp_input;
+  DDProfWorkerContext worker_ctx;
+};
+
+
 typedef struct DDProfContext {
   struct {
     bool enable;

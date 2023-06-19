@@ -18,5 +18,6 @@ struct Preset {
 
 DDRes add_preset(DDProfContext *ctx, const char *preset,
                  bool pid_or_global_mode);
+DDRes add_preset_v2(std::string_view preset, bool pid_or_global_mode, std::vector<PerfWatcher> &watchers);
 
 } // namespace ddprof

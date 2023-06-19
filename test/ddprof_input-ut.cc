@@ -429,5 +429,17 @@ TEST_F(InputTest, presets) {
     ddprof_input_free(&input);
     context_free(&ctx);
   }
+  {
+    DDProfInput input;
+    bool contine_exec = true;
+
+    const char *input_values[] = {MYNAME,     "-e",      "sCPU per=1234",
+                                  "-e", "sALLOC per=11234"
+                                  "--preset", "cpu_live_heap", "my_program"};
+    DDRes res = ddprof_input_parse(
+        std::size(input_values), (char **)input_values, &input, &contine_exec);
+    EXPECT_TRUE(IsDDResOK(res));
+#warning clarify expected
+  }
 }
 } // namespace ddprof
