@@ -9,6 +9,7 @@
 #include "ddprof_cmdline.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
+#include "string_format.hpp"
 #include "tags.hpp"
 
 #include <algorithm>
@@ -25,23 +26,13 @@
 
 static const int k_timeout_ms = 10000;
 
-static char *alloc_url_agent(const char *protocol, const char *host,
-                             const char *port) {
-  if (port) {
-    size_t expected_size = snprintf(NULL, 0, "%s%s:%s", protocol, host, port);
-    char *url = (char *)malloc(expected_size + 1);
-    if (!url) // Early exit on alloc failure
-      return NULL;
-
-    snprintf(url, expected_size + 1, "%s%s:%s", protocol, host, port);
-    return url;
+std::string alloc_url_agent(std::string_view protocol, std::string_view host,
+                            std::string_view port) {
+  if (!port.empty()) {
+    return ddprof::string_format("%s%s:%s", protocol.data(), host.data(),
+                                 port.data());
   } else {
-    size_t expected_size = snprintf(NULL, 0, "%s%s", protocol, host);
-    char *url = (char *)malloc(expected_size + 1);
-    if (!url) // Early exit on alloc failure
-      return NULL;
-    snprintf(url, expected_size + 1, "%s%s", protocol, host);
-    return url;
+    return ddprof::string_format("%s%s", protocol.data(), host.data());
   }
 }
 
@@ -82,8 +73,11 @@ static DDRes write_pprof_file(const ddog_prof_EncodedProfile *encoded_profile,
   return {};
 }
 
-bool contains_port(const char *url) {
-  const char *port_ptr = strrchr(url, ':');
+bool contains_port(std::string_view url) {
+  if (url.empty()) {
+    return false;
+  }
+  const char *port_ptr = strrchr(url.data(), ':');
   if (port_ptr != NULL) {
     // Check if the characters after the ':' are digits
     for (const char *p = port_ptr + 1; *p != '\0'; p++) {
@@ -97,16 +91,14 @@ bool contains_port(const char *url) {
   }
 }
 
-DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
+DDRes ddprof_exporter_init(const ExporterInput &exporter_input,
                            DDProfExporter *exporter) {
-  memset(exporter, 0, sizeof(DDProfExporter));
-
-  DDRES_CHECK_FWD(exporter_input_copy(exporter_input, &exporter->_input));
+  exporter->_input = exporter_input;
   // if we have an API key we assume we are heading for intake (slightly
   // fragile #TODO add a parameter)
 
-  if (exporter_input->agentless && exporter_input->api_key &&
-      strlen(exporter_input->api_key) >= k_size_api_key) {
+  if (exporter_input.agentless && !exporter_input.api_key.empty() &&
+      exporter_input.api_key.size() >= k_size_api_key) {
     LG_NTC("[EXPORTER] Targeting intake instead of agent (API Key available)");
     exporter->_agent = false;
   } else {
@@ -115,56 +107,53 @@ DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
   }
 
   if (exporter->_agent) {
-    const char *port_str = exporter_input->port;
+    std::string port_str = exporter_input.port;
 
-    if (exporter_input->url) {
+    if (!exporter_input.url.empty()) {
       // uds -> no port
-      if (!strncasecmp(exporter_input->url, "unix", 4)) {
-        port_str = nullptr;
+      if (!strncasecmp(exporter_input.url.c_str(), "unix", 4)) {
+        port_str = {};
       }
       // already port -> no port
-      else if (contains_port(exporter_input->url)) {
-        port_str = nullptr;
+      else if (contains_port(exporter_input.url)) {
+        port_str = {};
       }
       // check if schema is already available
-      if (strstr(exporter_input->url, "://") != NULL) {
-        exporter->_url = alloc_url_agent("", exporter_input->url, port_str);
+      if (strstr(exporter_input.url.c_str(), "://") != NULL) {
+        exporter->_url = alloc_url_agent("", exporter_input.url, port_str);
       } else {
         // not available, assume http
         exporter->_url =
-            alloc_url_agent("http://", exporter_input->url, port_str);
+            alloc_url_agent("http://", exporter_input.url, port_str);
       }
     } else {
       // no url, use default host and port settings
-      exporter->_url = alloc_url_agent("http://", exporter_input->host,
-                                       exporter_input->port);
+      exporter->_url =
+          alloc_url_agent("http://", exporter_input.host, exporter_input.port);
     }
   } else {
     // agentless mode
-    if (exporter->_input.url) {
+    if (!exporter->_input.url.empty()) {
       // warning : should not contain intake.profile. (prepended in
       // libdatadog_profiling)
-      exporter->_url = strdup(exporter_input->url);
+      exporter->_url = exporter->_input.url;
     } else {
       LG_WRN(
           "[EXPORTER] Agentless - Attempting to use host (%s) instead of empty "
           "url",
-          exporter_input->host);
-      exporter->_url = alloc_url_agent("http://", exporter_input->host,
-                                       exporter_input->port);
+          exporter_input.host.c_str());
+      exporter->_url = alloc_url_agent("http://", exporter_input.host.c_str(),
+                                       exporter_input.port);
     }
   }
-  if (!exporter->_url) {
+  if (exporter->_url.empty()) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to write url");
   }
-  LG_NTC("[EXPORTER] URL %s", exporter->_url);
+  LG_NTC("[EXPORTER] URL %s", exporter->_url.c_str());
 
   // Debug process : capture pprof to a folder
   exporter->_debug_pprof_prefix = exporter->_input.debug_pprof_prefix;
-  exporter->_export = arg_yesno(exporter->_input.do_export, 1);
-
-  exporter->_last_pprof_size = -1;
-
+  exporter->_export = exporter->_input.do_export;
   return ddres_init();
 }
 
@@ -189,26 +178,26 @@ static DDRes fill_stable_tags(const UserTags *user_tags,
   // language is guaranteed to be filled
   DDRES_CHECK_FWD(
       add_single_tag(tags_exporter, "language",
-                     std::string_view(exporter->_input.language.ptr,
-                                      exporter->_input.language.len)));
+                     std::string_view(exporter->_input.language.data(),
+                                      exporter->_input.language.size())));
 
-  if (exporter->_input.environment)
+  if (!exporter->_input.environment.empty())
     DDRES_CHECK_FWD(
         add_single_tag(tags_exporter, "env", exporter->_input.environment));
 
-  if (exporter->_input.service_version)
+  if (!exporter->_input.service_version.empty())
     DDRES_CHECK_FWD(add_single_tag(tags_exporter, "version",
                                    exporter->_input.service_version));
 
-  if (exporter->_input.service)
+  if (!exporter->_input.service.empty())
     DDRES_CHECK_FWD(
         add_single_tag(tags_exporter, "service", exporter->_input.service));
 
-  if (exporter->_input.profiler_version.len)
+  if (!exporter->_input.profiler_version.empty())
     DDRES_CHECK_FWD(add_single_tag(
         tags_exporter, "profiler_version",
-        std::string_view(exporter->_input.profiler_version.ptr,
-                         exporter->_input.profiler_version.len)));
+        std::string_view(exporter->_input.profiler_version.data(),
+                         exporter->_input.profiler_version.size())));
 
   for (auto &el : user_tags->_tags) {
     DDRES_CHECK_FWD(add_single_tag(tags_exporter, el.first, el.second));
@@ -301,8 +290,8 @@ DDRes ddprof_exporter_export(const ddog_prof_Profile *profile,
   ddog_prof_EncodedProfile *encoded_profile = &serialized_result.ok;
   defer { ddog_prof_EncodedProfile_drop(encoded_profile); };
 
-  if (exporter->_debug_pprof_prefix) {
-    write_pprof_file(encoded_profile, exporter->_debug_pprof_prefix);
+  if (!exporter->_debug_pprof_prefix.empty()) {
+    write_pprof_file(encoded_profile, exporter->_debug_pprof_prefix.c_str());
   }
 
   ddog_Timespec start = encoded_profile->start;
@@ -312,8 +301,6 @@ DDRes ddprof_exporter_export(const ddog_prof_Profile *profile,
       .ptr = encoded_profile->buffer.ptr,
       .len = encoded_profile->buffer.len,
   };
-
-  exporter->_last_pprof_size = profile_data.len;
 
   if (exporter->_export) {
     ddog_Vec_Tag ffi_additional_tags = ddog_Vec_Tag_new();
@@ -349,7 +336,8 @@ DDRes ddprof_exporter_export(const ddog_prof_Profile *profile,
 
       if (result.tag == DDOG_PROF_EXPORTER_SEND_RESULT_ERR) {
         defer { ddog_Error_drop(&result.err); };
-        LG_WRN("Failure to establish connection, check url %s", exporter->_url);
+        LG_WRN("Failure to establish connection, check url %s",
+               exporter->_url.c_str());
         LG_WRN("Failure to send profiles (%.*s)", (int)result.err.message.len,
                result.err.message.ptr);
         // Free error buffer (prefer this API to the free API)
@@ -379,8 +367,5 @@ DDRes ddprof_exporter_free(DDProfExporter *exporter) {
   if (exporter->_exporter)
     ddog_prof_Exporter_drop(exporter->_exporter);
   exporter->_exporter = nullptr;
-  exporter_input_free(&exporter->_input);
-  free(exporter->_url);
-  exporter->_url = nullptr;
   return ddres_init();
 }

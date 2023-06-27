@@ -1,15 +1,10 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+#set -euo pipefail
 
-export DD_PROFILING_EXPORT=no
-export DD_PROFILING_NATIVE_SHOW_SAMPLES=1
 export DD_PROFILING_NATIVE_USE_EMBEDDED_LIB=1
-export DD_PROFILING_NATIVE_LOG_LEVEL=debug
 export LD_LIBRARY_PATH=$PWD
-export DD_PROFILING_NATIVE_PRESET=default
-# force deterministic sampling
-export DD_PROFILING_NATIVE_EVENTS="sALLOC period=-524288"
+export DD_PROFILING_NATIVE_CONFIG="${PWD}/../test/configs/simple_malloc_config.toml"
 
 # Get available cpus
 # ddprof will be allowed to run on those cpus

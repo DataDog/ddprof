@@ -15,20 +15,21 @@
 TEST(StatsDTest, Connection) {
   // This takes advantage of the fact that UDP domain sockets opened in the way
   // statsd does it are full-duplex
-  const char path_listen[] = "/tmp/my_statsd_listener";
-  unlink(path_listen); // Make sure the default listening path is available
+  std::string_view path_listen = "/tmp/my_statsd_listener";
+  unlink(
+      path_listen.data()); // Make sure the default listening path is available
 
   int fd_listener;
-  DDRes lres = statsd_listen(path_listen, strlen(path_listen), &fd_listener);
+  DDRes lres = statsd_listen(path_listen, &fd_listener);
   int fd_client;
-  DDRes cres = statsd_connect(path_listen, strlen(path_listen), &fd_client);
+  DDRes cres = statsd_connect(path_listen, &fd_client);
   EXPECT_TRUE(IsDDResOK(lres));
   EXPECT_TRUE(IsDDResOK(cres));
 
   // Cleanup
   close(fd_listener);
   close(fd_client);
-  unlink(path_listen);
+  unlink(path_listen.data());
 }
 
 TEST(StatsDTest, BadConnection) {
@@ -40,9 +41,9 @@ TEST(StatsDTest, BadConnection) {
   unlink(path_try);
 
   int fd_listener;
-  DDRes lres = statsd_listen(path_listen, strlen(path_listen), &fd_listener);
+  DDRes lres = statsd_listen(path_listen, &fd_listener);
   int fd_client;
-  DDRes cres = statsd_connect(path_try, strlen(path_try), &fd_client);
+  DDRes cres = statsd_connect(path_try, &fd_client);
   EXPECT_TRUE(IsDDResOK(lres));
   EXPECT_FALSE(IsDDResOK(cres));
 
@@ -60,9 +61,9 @@ TEST(StatsDTest, Format) {
   unlink(path_listen); // Make sure the default listening path is available
 
   int fd_listener;
-  DDRes lres = statsd_listen(path_listen, strlen(path_listen), &fd_listener);
+  DDRes lres = statsd_listen(path_listen, &fd_listener);
   int fd_client;
-  DDRes cres = statsd_connect(path_listen, strlen(path_listen), &fd_client);
+  DDRes cres = statsd_connect(path_listen, &fd_client);
 
   // This should pass if the previous test passed, but we check anyway
   EXPECT_TRUE(IsDDResOK(lres));

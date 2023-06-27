@@ -8,6 +8,7 @@
 #include "logger.hpp"
 #include "mpscringbuffer.hpp"
 
+#include <cstring>
 #include <stdlib.h>
 
 bool rb_init(RingBuffer *rb, void *base, size_t size,

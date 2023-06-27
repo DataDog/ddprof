@@ -5,9 +5,11 @@
 
 #pragma once
 
-#include "ddprof_context.hpp"
 #include "ddres_def.hpp"
+#include "perf_watcher.hpp"
 #include <cstddef>
+#include <string_view>
+#include <vector>
 
 namespace ddprof {
 
@@ -16,7 +18,7 @@ struct Preset {
   const char *events;
 };
 
-DDRes add_preset(DDProfContext *ctx, const char *preset,
-                 bool pid_or_global_mode);
+DDRes add_preset(std::string_view preset, bool pid_or_global_mode,
+                 std::vector<PerfWatcher> &watchers);
 
 } // namespace ddprof

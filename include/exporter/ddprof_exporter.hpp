@@ -20,16 +20,15 @@ typedef struct UserTags UserTags;
 
 typedef struct DDProfExporter {
   ExporterInput _input;
-  char *_url;                      // url contains path and port
-  const char *_debug_pprof_prefix; // write pprofs to folder
-  ddog_prof_Exporter *_exporter;
-  bool _agent;
-  bool _export; // debug mode : should we send profiles ?
-  int32_t _nb_consecutive_errors;
-  int64_t _last_pprof_size;
+  std::string _url;                // url contains path and port
+  std::string _debug_pprof_prefix; // write pprofs to folder
+  ddog_prof_Exporter *_exporter{nullptr};
+  bool _agent{false};
+  bool _export{false}; // debug mode : should we send profiles ?
+  int32_t _nb_consecutive_errors{0};
 } DDProfExporter;
 
-DDRes ddprof_exporter_init(const ExporterInput *exporter_input,
+DDRes ddprof_exporter_init(const ExporterInput &exporter_input,
                            DDProfExporter *exporter);
 
 DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter);

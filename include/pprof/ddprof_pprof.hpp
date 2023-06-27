@@ -23,7 +23,7 @@ struct DDProfPProf {
   ddprof::Tags _tags;
 };
 
-DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx);
+DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx);
 
 /**
  * Aggregate to the existing profile the provided unwinding output.

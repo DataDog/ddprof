@@ -86,7 +86,8 @@ static DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
       assert(pevent_hdr->nb_attrs <= MAX_TYPE_WATCHER);
       break;
     } else {
-      LG_NFO("Failed to perf_event_open for watcher: %s - with attr.type=%s, "
+      LG_NFO("Expected failure (we retry with different settings) "
+             "perf_event_open for watcher: %s - with attr.type=%s, "
              "exclude_kernel=%d",
              watcher->desc.c_str(), perf_type_str(attr.type),
              static_cast<int>(attr.exclude_kernel));
@@ -129,14 +130,15 @@ static DDRes pevent_open_all_cpus(const PerfWatcher *watcher, int watcher_idx,
   return ddres_init();
 }
 
-DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
+DDRes pevent_open(DDProfContext &ctx, pid_t pid, int num_cpu,
                   PEventHdr *pevent_hdr) {
   assert(pevent_hdr->size == 0); // check for previous init
-  for (int watcher_idx = 0; watcher_idx < ctx->num_watchers; ++watcher_idx) {
-    PerfWatcher *watcher = &ctx->watchers[watcher_idx];
+  for (unsigned long watcher_idx = 0; watcher_idx < ctx.watchers.size();
+       ++watcher_idx) {
+    PerfWatcher *watcher = &ctx.watchers[watcher_idx];
     if (watcher->type < kDDPROF_TYPE_CUSTOM) {
-      DDRES_CHECK_FWD(pevent_open_all_cpus(
-          &ctx->watchers[watcher_idx], watcher_idx, pid, num_cpu, pevent_hdr));
+      DDRES_CHECK_FWD(
+          pevent_open_all_cpus(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
     } else {
       // custom event, eg.allocation profiling
       size_t pevent_idx = 0;
@@ -197,7 +199,7 @@ DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
   return {};
 }
 
-DDRes pevent_setup(DDProfContext *ctx, pid_t pid, int num_cpu,
+DDRes pevent_setup(DDProfContext &ctx, pid_t pid, int num_cpu,
                    PEventHdr *pevent_hdr) {
   DDRES_CHECK_FWD(pevent_open(ctx, pid, num_cpu, pevent_hdr));
   if (!IsDDResOK(pevent_mmap(pevent_hdr, true))) {

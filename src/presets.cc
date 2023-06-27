@@ -15,8 +15,8 @@
 
 namespace ddprof {
 
-DDRes add_preset(DDProfContext *ctx, const char *preset,
-                 bool pid_or_global_mode) {
+DDRes add_preset(std::string_view preset, bool pid_or_global_mode,
+                 std::vector<PerfWatcher> &watchers) {
   using namespace std::literals;
   static Preset presets[] = {
       {"default", "sCPU;sALLOC"},
@@ -27,22 +27,16 @@ DDRes add_preset(DDProfContext *ctx, const char *preset,
   };
 
   if (preset == "default"sv && pid_or_global_mode) {
-    preset = "default-pid";
+    preset = "default-pid"sv;
   }
-
   ddprof::span presets_span{presets};
-  std::string_view preset_sv{preset};
-
   auto it = std::find_if(presets_span.begin(), presets_span.end(),
-                         [&preset_sv](auto &e) { return e.name == preset_sv; });
+                         [&preset](auto &e) { return e.name == preset; });
   if (it == presets_span.end()) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Unknown preset (%s)",
-                           preset);
+                           preset.data());
   }
 
-  if (ctx->num_watchers == MAX_TYPE_WATCHER) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Too many input events");
-  }
   std::vector<PerfWatcher> new_watchers;
   if (!watchers_from_str(it->events, new_watchers)) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
@@ -50,22 +44,16 @@ DDRes add_preset(DDProfContext *ctx, const char *preset,
   }
 
   for (auto &watcher : new_watchers) {
-    ddprof::span watchers{ctx->watchers,
-                          static_cast<size_t>(ctx->num_watchers)};
-
+    // todo: missing management of several modes for live heap
     // ignore event if it was already present in watchers
     if (watcher.ddprof_event_type == DDPROF_PWE_TRACEPOINT ||
         std::find_if(watchers.begin(), watchers.end(), [&watcher](auto &w) {
           return w.ddprof_event_type == watcher.ddprof_event_type;
         }) == watchers.end()) {
-
-      if (ctx->num_watchers == MAX_TYPE_WATCHER) {
-        DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Too many input events");
-      }
-      ctx->watchers[ctx->num_watchers++] = std::move(watcher);
+      watchers.push_back(std::move(watcher));
     }
   }
-
   return {};
 }
+
 } // namespace ddprof

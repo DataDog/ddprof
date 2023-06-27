@@ -1,0 +1,17 @@
+# A test configuration to force pprof creation every 3 seconds
+# Profiler Resets after 2 periods
+# Exports are deactivated to measure performances (without network)
+service="ddprof-bench"
+environment="ci"
+do_export=0
+fault_info=1
+upload_period=3
+worker_period=2
+log_level="informational"
+log_mode="stdout"
+show_config=1
+enable=1
+event="sCPU,period=1000"
+event="sALLOC"
+# You can add your command line args
+# command_line=["BadBoggleSolver_run", 30]

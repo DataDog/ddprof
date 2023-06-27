@@ -142,7 +142,7 @@ static DDRes signalfd_setup(pollfd *pfd) {
 }
 
 static inline DDRes worker_process_ring_buffers(PEvent *pes, int pe_len,
-                                                DDProfContext *ctx,
+                                                DDProfContext &ctx,
                                                 int64_t *now_ns,
                                                 int *ring_buffer_start_idx) {
   // While there are events to process, iterate through them
@@ -205,15 +205,15 @@ static inline DDRes worker_process_ring_buffers(PEvent *pes, int pe_len,
   return {};
 }
 
-static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
+static DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
                          PersistentWorkerState *persistent_worker_state) {
 
   // Setup poll() to watch perf_event file descriptors
-  int pe_len = ctx->worker_ctx.pevent_hdr.size;
+  int pe_len = ctx.worker_ctx.pevent_hdr.size;
   // one extra slot in pfd to accomodate for signal fd
   struct pollfd pfds[MAX_NB_PERF_EVENT_OPEN + 1];
   int pfd_len = 0;
-  pollfd_setup(&ctx->worker_ctx.pevent_hdr, pfds, &pfd_len);
+  pollfd_setup(&ctx.worker_ctx.pevent_hdr, pfds, &pfd_len);
 
   DDRES_CHECK_FWD(signalfd_setup(&pfds[pfd_len]));
   int signal_pos = pfd_len++;
@@ -232,7 +232,7 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
   // Worker poll loop
   while (!stop) {
     // Convenience structs
-    PEvent *pes = ctx->worker_ctx.pevent_hdr.pes;
+    PEvent *pes = ctx.worker_ctx.pevent_hdr.pes;
 
     int n = poll(pfds, pfd_len, PSAMPLE_DEFAULT_WAKEUP_MS);
 
@@ -265,7 +265,7 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
                                                 &ring_buffer_start_idx));
     DDRES_CHECK_FWD(ddprof_worker_maybe_export(ctx, now_ns));
 
-    if (ctx->worker_ctx.persistent_worker_state->restart_worker) {
+    if (ctx.worker_ctx.persistent_worker_state->restart_worker) {
       // return directly no need to do a final export
       return {};
     }
@@ -276,7 +276,7 @@ static DDRes worker_loop(DDProfContext *ctx, const WorkerAttr *attr,
   return {};
 }
 
-static void worker(DDProfContext *ctx, const WorkerAttr *attr,
+static void worker(DDProfContext &ctx, const WorkerAttr *attr,
                    PersistentWorkerState *persistent_worker_state) {
   persistent_worker_state->restart_worker = false;
   persistent_worker_state->errors = true;
@@ -318,23 +318,14 @@ DDRes main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
     return res;
   }
   if (is_worker) {
-    worker(ctx, attr, persistent_worker_state);
+    worker(*ctx, attr, persistent_worker_state);
     // Ensure worker does not return,
     // because we don't want to free resources (perf_event fds,...) that are
     // shared between processes. Only free the context.
-    context_free(ctx);
+    delete ctx;
     exit(0);
   }
   return {};
-}
-
-void main_loop_lib(const WorkerAttr *attr, DDProfContext *ctx) {
-  PersistentWorkerState persistent_worker_state = {};
-  // no fork. TODO : give exit trigger to user
-  worker(ctx, attr, &persistent_worker_state);
-  if (!persistent_worker_state.restart_worker) {
-    LG_NFO("Request to exit");
-  }
 }
 
 } // namespace ddprof

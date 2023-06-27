@@ -6,7 +6,6 @@
 #include "pprof/ddprof_pprof.hpp"
 
 #include "ddog_profiling_utils.hpp"
-#include "ddprof_input.hpp"
 #include "loghandle.hpp"
 #include "pevent_lib_mocks.hpp"
 #include "symbol_hdr.hpp"
@@ -26,10 +25,8 @@ DwflSymbolLookup::DwflSymbolLookup() : _lookup_setting(K_CACHE_ON) {}
 TEST(DDProfPProf, init_profiles) {
   DDProfPProf pprof;
   DDProfContext ctx = {};
-  ctx.watchers[0] = *ewatcher_from_str("sCPU");
-  ctx.num_watchers = 1;
-
-  DDRes res = pprof_create_profile(&pprof, &ctx);
+  ctx.watchers.push_back(*ewatcher_from_str("sCPU"));
+  DDRes res = pprof_create_profile(&pprof, ctx);
   EXPECT_TRUE(IsDDResOK(res));
   res = pprof_free_profile(&pprof);
   EXPECT_TRUE(IsDDResOK(res));
@@ -70,9 +67,9 @@ TEST(DDProfPProf, aggregate) {
   fill_unwind_symbols(table, mapinfo_table, mock_output);
   DDProfPProf pprof;
   DDProfContext ctx = {};
-  ctx.watchers[0] = *ewatcher_from_str("sCPU");
-  ctx.num_watchers = 1;
-  DDRes res = pprof_create_profile(&pprof, &ctx);
+
+  ctx.watchers.push_back(*ewatcher_from_str("sCPU"));
+  DDRes res = pprof_create_profile(&pprof, ctx);
   EXPECT_TRUE(IsDDResOK(res));
   res = pprof_aggregate(&mock_output, symbol_hdr, 1000, 1, &ctx.watchers[0],
                         &pprof);

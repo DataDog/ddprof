@@ -64,7 +64,7 @@ DDRes ddprof_stats_clear(unsigned int stat);
 DDRes ddprof_stats_get(unsigned int stat, long *out);
 
 // Send all the registered values
-DDRes ddprof_stats_send(const char *statsd_socket);
+DDRes ddprof_stats_send(std::string_view statsd_socket);
 
 // Print all known stats to the configured log
 void ddprof_stats_print();

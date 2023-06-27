@@ -9,6 +9,8 @@
 #include "ddres_list.hpp"
 #include "logger.hpp"
 
+#include <cstring>
+
 /// Replacement for variadic macro niladic expansion via `__VA_OPT__`, which
 /// is unsupported (boo!) in standards-compliant C static analysis tools and
 /// checkers.

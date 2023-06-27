@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstring>
 #include <fcntl.h>
 #include <memory>
 #include <numeric>

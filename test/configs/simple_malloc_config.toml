@@ -1,0 +1,10 @@
+service="ddprof-bench"
+environment="ci"
+do_export=0
+fault_info=1
+log_level="debug"
+show_config=1
+enable=1
+event="sALLOC period=-524288;sCPU"
+show_samples=1
+# You can add your command line args

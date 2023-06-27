@@ -18,6 +18,6 @@ void split(const char *str, Tags &tags, char c = ',');
 } // namespace ddprof
 
 struct UserTags {
-  UserTags(const char *tag_str, int nproc);
+  UserTags(std::string_view tag_str, int nproc);
   ddprof::Tags _tags;
 };

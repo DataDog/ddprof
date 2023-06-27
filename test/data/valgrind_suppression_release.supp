@@ -1,0 +1,30 @@
+{
+   <command_line_leak>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:strdup
+   fun:_ZNK6ddprof9DDProfCLI21get_user_command_lineEv
+   fun:main
+}
+{
+   <command_line_leak_2>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:_Znwm
+   fun:_ZNSt15__new_allocatorIPcE8allocateEmPKv
+   fun:allocate
+   ...
+   fun:_ZNK6ddprof9DDProfCLI21get_user_command_lineEv
+   fun:main
+}
+{
+   <eh_alloc>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:_GLOBAL__sub_I_eh_alloc.cc
+   fun:call_init
+   fun:__libc_start_main@@GLIBC_2.34
+   fun:(below main)
+}

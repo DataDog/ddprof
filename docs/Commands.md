@@ -1,95 +1,92 @@
 # ddprof Commands
 
 ```bash
- usage: ddprof [--help] [PROFILER_OPTIONS] COMMAND [COMMAND_ARGS]
+ddprof is a command line utility to gather profiling data and visualize it in the Datadog UI.
+You can continuously inspect where your application is spending CPU and memory.
  eg: ddprof -S service_name -H localhost -P 8192 redis-server /etc/redis/redis.conf
 
+Usage: ddprof [OPTIONS] [command_line...]
+
+Positionals:
+  command_line TEXT ... Excludes: --pid --global
+                              Your command line (including arguments)
+                              This runs profiling on the given command line.
+                              Incompatible with PID or Global modes.
+
 Options:
-  -E, --environment, (envvar: DD_ENV)
-    The name of the environment to use in the Datadog UI.
+  -h,--help                   Print this help message and exit
+  -S,--service TEXT [myservice]  (Env:DD_SERVICE)
+                              The name of the profiled service. Profiles are grouped by service.
+  -E,--environment TEXT (Env:DD_ENV)
+                              The name of the environment to use in the Datadog UI.
+  -V,--service_version TEXT (Env:DD_VERSION)
+                              Version of the service being profiled.
+  -U,--url TEXT (Env:DD_TRACE_AGENT_URL)
+                              A <hostname>:<port> URL.  Either <hostname>:<port>, http://<hostname>:<port>
+                              or https://<hostname>:<port> 
+                              or unix:///run/apm.sock
+                              
+  -H,--host TEXT [localhost]  (Env:DD_AGENT_HOST)
+                              The hostname of the agent. This is combined with the port option to generate a URL
+                              
+  -P,--port TEXT [8126]  (Env:DD_AGENT_HOST)
+                              The communication port for the Datadog agent. This is combined with the host option to generate a URL
+                              
+  -T,--tags TEXT (Env:DD_TAGS)
+                              Tags attached to the profiler's data
+                              Specified as a list of tags, ie: key1:value1,key2:value2
+                              
 
-  -H, --host, (envvar: DD_AGENT_HOST)
-    The hostname of the agent. Port should also be specified.
 
-  -P, --port, (envvar: DD_TRACE_AGENT_PORT)
-    The communication port for the Datadog agent or backend system.
+Profiling settings:
+  -p,--pid INT Excludes: command_line --global
+                              Instrument the given PID rather than launching a new process.
+  -g,--global Excludes: command_line --pid
+                              Instrument all processes.
+                              Requires specific capabilities or a perf_event_paranoid value of less than 1.
+  -u,--upload_period UINT [59]  (Env:DD_PROFILING_UPLOAD_PERIOD)
+                              Upload period for profiles (in seconds).
+                              
+  -e,--event TEXT ... (Env:DD_PROFILING_NATIVE_EVENTS)
+                              Customize the events we instrument. For more help, use -e help.
+  --preset TEXT (Env:DD_PROFILING_NATIVE_PRESET)
+                              Select a predefined profiling configuration.Available presets:
+                                - default: profile CPU and memory allocations
+                                   (profile only CPU when targeting a given PID)
+                                - cpu_only: profile CPU
+                                - alloc_only: profile memory allocations
+                                - cpu_live_heap: profile live allocations and CPU
+                              
 
-  -U, --url, (envvar: DD_TRACE_AGENT_URL)
-    A <hostname>:<port> URL.  Either <hostname>:<port>, http://<hostname>:<port>
-    or https://<hostname>:<port> are valid.  Overrides any other specification for
-    the host or port, except if the URL is specified without a port, such as
-    http://myhost.domain.com, in which case the port can be specified separately
-    by the user.
 
-  -S, --service, (envvar: DD_SERVICE)
-    The name of this service.  It is useful to populate this field, as it will
-    make it easier to locate and filter interesting profiles.
-    For global mode, note that all application-level profiles are consolidated in
-    the same view.
+Advanced settings:
+  --switch_user TEXT          Run my application with a different user.
+                              
+  --nice INT                  Niceness (priority of process) for the profiler.
+                              Higher value means nicer (lower priority).
+                              
+  --config [./ddprof.toml]    A configuration file
+                              Check the capture_config to generate the initial file
 
-  -V, --service_version, (envvar: DD_VERSION)
-    Version of the service being profiled. Added to the tags during export.
-    This is an optional field, but it is useful for locating and filtering
-    regressions or interesting behavior.
 
-  -T, --tags, (envvar: DD_TAGS)
-    Tags sent with both profiler metrics and profiles.
-    Refer to the Datadog tag section to understand what is supported.
-
-  -d, --enable, (envvar: DD_PROFILING_ENABLED)
-    Whether to enable Datadog profiling.  If this is true, then ddprof as well
-    as any other Datadog profilers are enabled.  If false, they are all disabled.
-    Note: if this is set, the native profiler will set the DD_PROFILING_ENABLED
-    environment variable in all sub-environments, thereby enabling Datadog profilers.
-    default: on
-
-  -n, --native_enable, (envvar: DD_PROFILING_NATIVE_ENABLED)
-    Whether to enable ddprof specifically, without altering how other Datadog
-    profilers are run.  For example, DD_PROFILING_ENABLED can be used to disable
-    an inner profile, whilst setting DD_PROFILING_NATIVE_ENABLED to enable ddprof
-
-  -i, --nice, (envvar: DD_PROFILING_NATIVE_NICE)
-    Sets the nice level of ddprof without affecting any instrumented
-    processes.  This is useful on small containers with spiky workloads.
-    If this parameter isn't given, then the nice level is unchanged.
-
-  -c, --show_config, (envvar: DD_PROFILING_NATIVE_SHOW_CONFIG)
-    Whether or not to print configuration parameters to the trace log.  Can
-    be `yes` or `no` (default: `no`).
-
-  -o, --log_mode, (envvar: DD_PROFILING_NATIVE_LOG_MODE)
-    One of `stdout`, `stderr`, `syslog`, or `disabled`.  Default is `stdout`.
-    If a value is given but it does not match the above, it is treated as a
-    filesystem path and a log will be appended there.  Log files are not
-    cleared between runs and a service restart is needed for log rotation.
-
-  -l, --log_level, (envvar: DD_PROFILING_NATIVE_LOG_LEVEL)
-    One of `debug`, `notice`, `warn`, `error`.  Default is `warn`.
-
-  -p, --pid, (envvar: DD_PROFILING_NATIVE_TARGET_PID)
-    Instrument the given PID rather than launching a new process.
-
-  -g, --global, (envvar: DD_PROFILING_NATIVE_GLOBAL)
-    Instruments the whole system.  Overrides DD_PROFILING_NATIVE_TARGET_PID.
-    Requires specific permissions or a perf_event_paranoid value of less than 1.
-
-  -b, --internal_stats, (envvar: DD_PROFILING_INTERNAL_STATS)
-    Enables statsd metrics for ddprof. Value should point to a statsd socket.
-    Example: /var/run/datadog-agent/statsd.sock
-
-  -D, --preset, (envvar: DD_PROFILING_NATIVE_PRESET)
-    Select a predefined profiling configuration.
-    Available presets:
-     - default: profile CPU and memory allocations
-       (profile only CPU when targeting a given PID)
-     - cpu_only: profile CPU
-     - alloc_only: profile memory allocations
-    If no --preset option is given, `default` preset is used.
-
-  -W, --switch_user, (envvar: DD_PROFILING_NATIVE_SWITCH_USER)
-    Run the target process under the given user.
-
-  -v, --version:
-    Prints the version of ddprof and exits.
+Debug options:
+  -l,--log_level TEXT [error]  (Env:DD_PROFILING_NATIVE_LOG_LEVEL)
+                              One of debug, notice, warn, error.
+  -o,--log_mode TEXT [stdout]  (Env:DD_PROFILING_NATIVE_LOG_MODE)
+                              log_level, One of stdout, stderr, syslog, or disabled.
+  --show_config [0]           Display the configuration.
+  -b,--internal_stats TEXT    Enables statsd metrics for " MYNAME ". Value should point to a statsd socket..
+                              Example: /var/run/datadog-agent/statsd.sock
+  --show_samples              Display captured samples as logs.
+                              
+  -v,--version                Display the profiler's version.
+                              
+  --enable BOOLEAN [1]  (Env:DD_PROFILING_ENABLED)
+                              Option to disable the profiler.
+                              The profiler then acts as a passthrough.
+                              
+  --capture_config TEXT       Capture the current configuration to a file.
+                              You can then give this configuration through --config.
+                              
 
 ```

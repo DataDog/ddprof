@@ -107,7 +107,7 @@ bool watcher_has_tracepoint(const PerfWatcher *watcher) {
 }
 
 void log_watcher(const PerfWatcher *w, int idx) {
-  PRINT_NFO("    ID: %s, Pos: %d, Index: %lu", w->desc.c_str(), idx, w->config);
+  PRINT_NFO("  - ID: %s, Pos: %d, Index: %lu", w->desc.c_str(), idx, w->config);
   switch (w->value_source) {
   case EventConfValueSource::kSample:
     PRINT_NFO("    Location: Sample");
@@ -139,4 +139,52 @@ void log_watcher(const PerfWatcher *w, int idx) {
     PRINT_NFO("    Outputting to metric");
   if (Any(EventConfMode::kLiveCallgraph & w->output_mode))
     PRINT_NFO("    Outputting to live callgraph");
+}
+
+std::string_view watcher_help_text() {
+  static const std::string help_text =
+      // clang-format off
+      "\nEvent Configuration Documentation\n"
+"===================================\n"
+"Events define " + std::string(MYNAME) + "'s instrumentation settings.\n\n"
+"General Syntax for Event Configuration:\n"
+"---------------------------------------\n"
+"Events are defined by their type and associated key value settings:\n\n"
+"<type Of event> <key1>:<value1>\n"
+"Or using comma as a separator: \n"
+"<type Of event>,<key1>:<value1>\n"
+"Events are repeatable\n\n"
+"Common Examples:\n"
+"----------------\n"
+"1. CPU profiling with a custom sampling frequency: -e \"sCPU p=50\"\n"
+"2. Live Allocation Tracking (leak detection):\n"
+"  -e sALLOC,mode=l\n\n"
+"Event Types:\n"
+"------------\n"
+"The most common types are:\n"
+"- sCPU for CPU Time \n"
+"- sALLOC for allocations (only available in wrapper mode) \n"
+"Please consult the `https://github.com/DataDog/ddprof/blob/main/include/perf_watcher.hpp#L117-L138` for an up to date list of available events. \n"
+"Note: Some events may require hardware support and elevated permissions.\n\n"
+"Configuration Keys:\n"
+"-------------------\n"
+"- `s|value_scale|scale`: Scaling factor for the event.\n"
+"- `f|frequency|freq`: Frequency at which the event occurs.\n"
+"- `e|event|eventname|ev`: Name of the event.\n"
+"- `g|group|groupname|gr`: Name of the group to which the event belongs.\n"
+"- `i|id`: Identifier for the event.\n"
+"- `l|label`: Label for the event.\n"
+"- `m|mode`: Mode of the event.\n"
+"- `n|arg_num|argno`: Argument number to retrieve a value associated with this event.\n"
+"- `p|period|per`: Period of the event.\n"
+"- `r|register|regno`: Register to retrieve the value associated with this event.\n"
+"- `o|raw_offset|rawoff`: Raw offset to retrieve the value associated with this event.\n"
+"- `z|raw_size|rawsz`: Raw size associated to raw offset.\n\n"
+"Disclaimer:\n"
+"-----------\n"
+"Please note that this documentation is currently under construction. We recommend the use of presets.\n"
+"Not all options may be fully supported within the Datadog UI at present, and the described grammar is subject to change.\n"
+"Exercise caution and double-check your configurations before implementation.\n";
+  // clang-format on
+  return help_text;
 }

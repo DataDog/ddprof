@@ -162,3 +162,5 @@ int sample_type_id_to_count_sample_type_id(int idx);
 // Helper functions, mostly for tests
 uint64_t perf_event_default_sample_type();
 void log_watcher(const PerfWatcher *w, int idx);
+
+std::string_view watcher_help_text();

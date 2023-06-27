@@ -112,15 +112,14 @@ DDRes ddprof_stats_get(unsigned int stat, long *out) {
   return ddres_init();
 }
 
-DDRes ddprof_stats_send(const char *statsd_socket) {
-  if (!statsd_socket) {
+DDRes ddprof_stats_send(std::string_view statsd_socket) {
+  if (statsd_socket.empty()) {
     LG_NTC("No statsd socket provided");
     return ddres_init();
   }
   int fd_statsd = -1;
 
-  if (IsDDResNotOK(
-          statsd_connect(statsd_socket, strlen(statsd_socket), &fd_statsd))) {
+  if (IsDDResNotOK(statsd_connect(statsd_socket, &fd_statsd))) {
     // Invalid socket. No use trying to send data (and avoid flood of logs).
     return ddres_init();
   }

@@ -20,8 +20,6 @@ namespace ddprof {
  *
  * @return
  */
-DDRes main_loop(const WorkerAttr *, DDProfContext *);
+DDRes main_loop(const WorkerAttr *, DDProfContext *ctx);
 
-// Same as main loop without any forks
-void main_loop_lib(const WorkerAttr *attr, DDProfContext *ctx);
 } // namespace ddprof

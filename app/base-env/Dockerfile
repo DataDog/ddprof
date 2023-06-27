@@ -160,6 +160,20 @@ RUN VERSION="1.7.1" \
   && popd \
   && rm -rf benchmark-${VERSION} v${VERSION}.tar.gz
 
+# Valgrind with dwarf 5 support
+RUN VERSION="3.21.0" \
+    && curl -LO "https://sourceware.org/pub/valgrind/valgrind-${VERSION}.tar.bz2" \
+    && SHA1="817d769743d278b5d07526e85115082054e9bf9c" \
+    && (printf "${SHA1} valgrind-${VERSION}.tar.bz2" | sha1sum --check --strict --status) \
+    && tar xvf valgrind-${VERSION}.tar.bz2 \
+    && pushd valgrind-${VERSION} \
+    && ./configure --prefix /usr/local \
+    && make -j 4 \
+    && make install \
+    && valgrind --version \
+    && popd \
+    && rm -Rf valgrind-${VERSION} valgrind-${VERSION}.tar.bz2
+
 # Install cmake_format
 RUN pip3 install cmake_format
 

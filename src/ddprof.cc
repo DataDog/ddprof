@@ -16,7 +16,6 @@
 #include "ddprof_cmdline.hpp"
 #include "ddprof_context.hpp"
 #include "ddprof_context_lib.hpp"
-#include "ddprof_input.hpp"
 #include "ddprof_stats.hpp"
 #include "ddprof_worker.hpp"
 #include "ddres.hpp"
@@ -30,13 +29,6 @@
 #  include <execinfo.h>
 #endif
 
-static void disable_core_dumps(void) {
-  struct rlimit core_limit;
-  core_limit.rlim_cur = 0;
-  core_limit.rlim_max = 0;
-  setrlimit(RLIMIT_CORE, &core_limit);
-}
-
 /*****************************  SIGSEGV Handler *******************************/
 static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   // TODO this really shouldn't call printf-family functions...
@@ -46,7 +38,7 @@ static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   size_t sz = backtrace(buf, 4096);
 #endif
   fprintf(stderr, "ddprof[%d]: <%s> has encountered an error and will exit\n",
-          getpid(), str_version().ptr);
+          getpid(), str_version().data());
   if (sig == SIGSEGV)
     printf("[DDPROF] Fault address: %p\n", si->si_addr);
 #ifdef __GLIBC__
@@ -69,8 +61,8 @@ void display_system_info(void) {
   }
 }
 
-DDRes ddprof_setup(DDProfContext *ctx) {
-  PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
+DDRes ddprof_setup(DDProfContext &ctx) {
+  PEventHdr *pevent_hdr = &ctx.worker_ctx.pevent_hdr;
   try {
     pevent_init(pevent_hdr);
 
@@ -80,25 +72,21 @@ DDRes ddprof_setup(DDProfContext *ctx) {
     // mmaps from perf fds will be lost after fork, that why we mmap them again
     // in worker (but kernel only accounts for the pinned memory once).
     DDRES_CHECK_FWD(
-        pevent_setup(ctx, ctx->params.pid, ctx->params.num_cpu, pevent_hdr));
+        pevent_setup(ctx, ctx.params.pid, ctx.params.num_cpu, pevent_hdr));
 
     // Setup signal handler if defined
-    if (ctx->params.fault_info) {
+    if (ctx.params.fault_info) {
       struct sigaction sigaction_handlers = {};
       sigaction_handlers.sa_sigaction = sigsegv_handler;
       sigaction_handlers.sa_flags = SA_SIGINFO;
       sigaction(SIGSEGV, &(sigaction_handlers), NULL);
     }
-    // Disable core dumps (unless enabled)
-    if (!ctx->params.core_dumps) {
-      disable_core_dumps();
-    }
 
     // Set the nice level, but only if it was overridden because 0 is valid
-    if (ctx->params.nice != -1) {
-      setpriority(PRIO_PROCESS, 0, ctx->params.nice);
+    if (ctx.params.nice != -1) {
+      setpriority(PRIO_PROCESS, 0, ctx.params.nice);
       if (errno) {
-        LG_WRN("Requested nice level (%d) could not be set", ctx->params.nice);
+        LG_WRN("Requested nice level (%d) could not be set", ctx.params.nice);
       }
     }
 
@@ -110,8 +98,8 @@ DDRes ddprof_setup(DDProfContext *ctx) {
   return ddres_init();
 }
 
-DDRes ddprof_teardown(DDProfContext *ctx) {
-  PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
+DDRes ddprof_teardown(DDProfContext &ctx) {
+  PEventHdr *pevent_hdr = &ctx.worker_ctx.pevent_hdr;
 
   if (IsDDResNotOK(pevent_cleanup(pevent_hdr))) {
     LG_WRN("Error when calling pevent_cleanup.");
@@ -124,7 +112,7 @@ DDRes ddprof_teardown(DDProfContext *ctx) {
   return ddres_init();
 }
 
-/*************************  Instrumentation Helpers  **************************/
+/*************************   Instrumentation Helpers **************************/
 DDRes ddprof_start_profiler(DDProfContext *ctx) {
   const WorkerAttr perf_funs = {
       .init_fun = ddprof_worker_init,
