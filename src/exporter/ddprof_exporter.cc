@@ -29,10 +29,14 @@ static const int k_timeout_ms = 10000;
 std::string alloc_url_agent(std::string_view protocol, std::string_view host,
                             std::string_view port) {
   if (!port.empty()) {
-    return ddprof::string_format("%s%s:%s", protocol.data(), host.data(),
-                                 port.data());
+    return ddprof::string_format(
+        "%.*s%.*s:%.*s", static_cast<int>(protocol.size()), protocol.data(),
+        static_cast<int>(host.size()), host.data(),
+        static_cast<int>(port.size()), port.data());
   } else {
-    return ddprof::string_format("%s%s", protocol.data(), host.data());
+    return ddprof::string_format("%.*s%.*s", static_cast<int>(protocol.size()),
+                                 protocol.data(), static_cast<int>(host.size()),
+                                 host.data());
   }
 }
 
@@ -77,18 +81,12 @@ bool contains_port(std::string_view url) {
   if (url.empty()) {
     return false;
   }
-  const char *port_ptr = strrchr(url.data(), ':');
-  if (port_ptr != NULL) {
-    // Check if the characters after the ':' are digits
-    for (const char *p = port_ptr + 1; *p != '\0'; p++) {
-      if (!isdigit(*p)) {
-        return false;
-      }
-    }
-    return true;
-  } else {
-    return false;
+  auto pos = url.rfind(':'); // Find the last occurrence of ':'
+  if (pos == std::string_view::npos) {
+    return false; // No ':' found
   }
+  auto port_sv = url.substr(pos + 1);
+  return std::all_of(port_sv.begin(), port_sv.end(), ::isdigit);
 }
 
 DDRes ddprof_exporter_init(const ExporterInput &exporter_input,

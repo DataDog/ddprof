@@ -33,8 +33,8 @@ DDRes add_preset(std::string_view preset, bool pid_or_global_mode,
   auto it = std::find_if(presets_span.begin(), presets_span.end(),
                          [&preset](auto &e) { return e.name == preset; });
   if (it == presets_span.end()) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Unknown preset (%s)",
-                           preset.data());
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS, "Unknown preset (%.*s)",
+                           static_cast<int>(preset.size()), preset.data());
   }
 
   std::vector<PerfWatcher> new_watchers;

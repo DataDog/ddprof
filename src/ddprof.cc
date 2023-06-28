@@ -37,8 +37,9 @@ static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   static void *buf[4096] = {0};
   size_t sz = backtrace(buf, 4096);
 #endif
-  fprintf(stderr, "ddprof[%d]: <%s> has encountered an error and will exit\n",
-          getpid(), str_version().data());
+  fprintf(stderr, "ddprof[%d]: <%.*s> has encountered an error and will exit\n",
+          getpid(), static_cast<int>(str_version().size()),
+          str_version().data());
   if (sig == SIGSEGV)
     printf("[DDPROF] Fault address: %p\n", si->si_addr);
 #ifdef __GLIBC__

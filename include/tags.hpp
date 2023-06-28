@@ -13,7 +13,7 @@ namespace ddprof {
 using Tag = std::pair<std::string, std::string>;
 using Tags = std::vector<Tag>;
 
-void split(const char *str, Tags &tags, char c = ',');
+void split(std::string_view str_view, Tags &tags, char c = ',');
 
 } // namespace ddprof
 
