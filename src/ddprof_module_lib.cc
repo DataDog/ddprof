@@ -23,13 +23,14 @@ namespace ddprof {
 class FileDescriptorHolder {
 public:
   FileDescriptorHolder() : _fd(-1) {}
-  DDRes open_file(std::string_view path) {
-    _fd = ::open(path.data(), O_RDONLY);
+  DDRes open_file(const std::string &path) {
+    _fd = ::open(path.c_str(), O_RDONLY);
     if (_fd < 0) {
       LG_WRN("[Mod] Couldn't open fd to module (%s)", path.data());
       return ddres_warn(DD_WHAT_MODULE);
     }
-    LG_DBG("[Mod] Success opening %s, ", path.data());
+    LG_DBG("[Mod] Success opening %.*s, ", static_cast<int>(path.size()),
+           path.data());
     return ddres_init();
   }
 

@@ -23,4 +23,7 @@ std::string_view str_version() {
   return std::string_view{profiler_version, static_cast<unsigned>(len)};
 }
 
-void print_version() { printf(MYNAME " %s\n", str_version().data()); }
+void print_version() {
+  printf(MYNAME " %.*s\n", static_cast<int>(str_version().size()),
+         str_version().data());
+}
