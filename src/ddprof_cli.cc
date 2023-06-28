@@ -190,8 +190,8 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       ->group("Debug options");
   //
   app.add_option("--internal_stats,-b", internal_stats,
-                 "Enables statsd metrics for \" MYNAME \". Value should point "
-                 "to a statsd socket..\n"
+                 "Enables statsd metrics for " MYNAME ". Value should point "
+                 "to a statsd socket.\n"
                  "Example: /var/run/datadog-agent/statsd.sock")
       ->group("Debug options")
       ->envname("DD_PROFILING_INTERNAL_STATS");
