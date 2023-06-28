@@ -29,3 +29,5 @@ DDRes statsd_close(int);
 
 /* Private */
 DDRes statsd_listen(std::string_view path, int *fd);
+
+std::string_view adjust_uds_path(std::string_view path);

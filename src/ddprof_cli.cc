@@ -193,7 +193,9 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
                  "Enables statsd metrics for \" MYNAME \". Value should point "
                  "to a statsd socket..\n"
                  "Example: /var/run/datadog-agent/statsd.sock")
-      ->group("Debug options");
+      ->group("Debug options")
+      ->envname("DD_PROFILING_INTERNAL_STATS");
+
   app.add_flag("--show_samples", show_samples,
                "Display captured samples as logs.\n")
       ->group("Debug options");
