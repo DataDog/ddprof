@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-#set -euo pipefail
+set -euo pipefail
 
 export DD_PROFILING_NATIVE_USE_EMBEDDED_LIB=1
 export LD_LIBRARY_PATH=$PWD

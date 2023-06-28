@@ -21,7 +21,7 @@
 namespace ddprof {
 
 namespace {
-std::string api_key_to_dbg_string(const std::string_view value) {
+std::string api_key_to_dbg_string(std::string_view value) {
   if (value.size() != k_size_api_key) {
     LG_WRN("API key does not have the expected %u size", k_size_api_key);
   }
@@ -35,15 +35,11 @@ std::string get_default_config_file() {
   // The CLI docs says config files are compatible with envname, however the
   // _process_env function is called after the file function
   // Hence this hack to set the default to the actual env variable
-  std::optional<std::string> default_file;
-  char *env_config_path = std::getenv("DD_PROFILING_NATIVE_CONFIG");
-  if (env_config_path != nullptr) {
-    default_file = env_config_path;
+  if (char *env_config_path = std::getenv("DD_PROFILING_NATIVE_CONFIG");
+      env_config_path != nullptr) {
+    return env_config_path;
   }
-  if (!default_file.has_value()) {
-    default_file = "./ddprof.toml";
-  }
-  return default_file.value();
+  return "./ddprof.toml";
 }
 } // namespace
 
@@ -52,7 +48,7 @@ void DDProfCLI::help_events() { std::cout << watcher_help_text(); }
 namespace {
 void write_config_file(const CLI::App &app, const std::string &file_path) {
   std::ofstream out_file;
-  out_file.open(file_path, std::ios::out);
+  out_file.open(file_path);
   if (!out_file) {
     // logger is not configured
     fprintf(stderr, "ddprof_cli: cannot open the file %s", file_path.c_str());
