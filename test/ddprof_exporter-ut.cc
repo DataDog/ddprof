@@ -85,10 +85,10 @@ void fill_mock_exporter_input(ExporterInput &exporter_input,
   exporter_input.service_version = "42";
   exporter_input.do_export = "yes";
   exporter_input.debug_pprof_prefix = "some_prefix";
-  exporter_input.user_agent = STRING_VIEW_LITERAL("DDPROF_MOCK");
-  exporter_input.language = STRING_VIEW_LITERAL("NATIVE");
-  exporter_input.family = STRING_VIEW_LITERAL("SANCHEZ");
-  exporter_input.profiler_version = STRING_VIEW_LITERAL("1.1.2");
+  exporter_input.user_agent = "DDPROF_MOCK";
+  exporter_input.language = "NATIVE";
+  exporter_input.family = "SANCHEZ";
+  exporter_input.profiler_version = "1.1.2";
 }
 
 TEST(DDProfExporter, url) {
@@ -99,32 +99,32 @@ TEST(DDProfExporter, url) {
   // If API key --> use site
   fill_mock_exporter_input(exporter_input, url, true);
   DDProfExporter exporter;
-  DDRes res = ddprof_exporter_init(&exporter_input, &exporter);
+  DDRes res = ddprof_exporter_init(exporter_input, &exporter);
   EXPECT_TRUE(IsDDResOK(res));
-  EXPECT_EQ(strcmp(exporter._url, "datadog_is_cool.com"), 0);
+  EXPECT_EQ(exporter._url, "datadog_is_cool.com");
   ddprof_exporter_free(&exporter);
 
   // To be discussed : should we fail here ?
-  exporter_input.url = nullptr;
-  res = ddprof_exporter_init(&exporter_input, &exporter);
+  exporter_input.url = {};
+  res = ddprof_exporter_init(exporter_input, &exporter);
   EXPECT_TRUE(IsDDResOK(res));
-  EXPECT_EQ(strcmp(exporter._url, "http://25.04.1988.0:1234"), 0);
+  EXPECT_EQ(exporter._url, "http://25.04.1988.0:1234");
   ddprof_exporter_free(&exporter);
 
   // If no API key --> expect host
   fill_mock_exporter_input(exporter_input, url, false);
-  exporter_input.url = nullptr;
-  res = ddprof_exporter_init(&exporter_input, &exporter);
+  exporter_input.url = {};
+  res = ddprof_exporter_init(exporter_input, &exporter);
   EXPECT_TRUE(IsDDResOK(res));
-  EXPECT_EQ(strcmp(exporter._url, "http://25.04.1988.0:1234"), 0);
+  EXPECT_EQ(exporter._url, "http://25.04.1988.0:1234");
   ddprof_exporter_free(&exporter);
 
   // UDS --> expect UDS
   fill_mock_exporter_input(exporter_input, url, false);
-  exporter_input.url = "unix://some/uds/socket.sock";
-  res = ddprof_exporter_init(&exporter_input, &exporter);
+  exporter_input.url = "unix:///some/uds/socket.sock";
+  res = ddprof_exporter_init(exporter_input, &exporter);
   EXPECT_TRUE(IsDDResOK(res));
-  EXPECT_EQ(strcmp(exporter._url, "unix://some/uds/socket.sock"), 0);
+  EXPECT_EQ(exporter._url, "unix:///some/uds/socket.sock");
   ddprof_exporter_free(&exporter);
 }
 
@@ -139,7 +139,7 @@ TEST(DDProfExporter, simple) {
   }
   DDProfPProf pprofs;
   DDProfExporter exporter;
-  DDRes res = ddprof_exporter_init(&exporter_input, &exporter);
+  DDRes res = ddprof_exporter_init(exporter_input, &exporter);
   EXPECT_TRUE(IsDDResOK(res));
   { // override folder to write debug pprofs
     // You can view content using : pprof -raw ./test/data/ddprof_
@@ -155,17 +155,15 @@ TEST(DDProfExporter, simple) {
     fill_unwind_symbols(table, mapinfo_table, mock_output);
 
     DDProfContext ctx = {};
-    ctx.watchers[0] = *ewatcher_from_str("sCPU");
-    ctx.num_watchers = 1;
-
-    res = pprof_create_profile(&pprofs, &ctx);
+    ctx.watchers.push_back(*ewatcher_from_str("sCPU"));
+    res = pprof_create_profile(&pprofs, ctx);
     EXPECT_TRUE(IsDDResOK(res));
     res = pprof_aggregate(&mock_output, symbol_hdr, 1000, 1, &ctx.watchers[0],
                           &pprofs);
     EXPECT_TRUE(IsDDResOK(res));
   }
   {
-    UserTags user_tags(nullptr, 4);
+    UserTags user_tags({}, 4);
 
     res = ddprof_exporter_new(&user_tags, &exporter);
     EXPECT_TRUE(IsDDResOK(res));

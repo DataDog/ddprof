@@ -42,9 +42,9 @@ static const DDPROF_STATS s_cycled_stats[] = {
 static const long k_clock_ticks_per_sec = sysconf(_SC_CLK_TCK);
 
 /// Remove all structures related to
-static DDRes worker_pid_free(DDProfContext *ctx, pid_t el);
+static DDRes worker_pid_free(DDProfContext &ctx, pid_t el);
 
-static DDRes clear_unvisited_pids(DDProfContext *ctx);
+static DDRes clear_unvisited_pids(DDProfContext &ctx);
 
 /// Human readable runtime information
 static void print_diagnostics(const DsoHdr &dso_hdr) {
@@ -59,13 +59,14 @@ static inline int64_t now_nanos() {
   return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
 }
 
-static DDRes report_lost_events(DDProfContext *ctx) {
-  for (int watcher_idx = 0; watcher_idx < ctx->num_watchers; ++watcher_idx) {
-    auto nb_lost = ctx->worker_ctx.lost_events_per_watcher[watcher_idx];
+static DDRes report_lost_events(DDProfContext &ctx) {
+  for (unsigned watcher_idx = 0; watcher_idx < ctx.watchers.size();
+       ++watcher_idx) {
+    auto nb_lost = ctx.worker_ctx.lost_events_per_watcher[watcher_idx];
 
     if (nb_lost > 0) {
-      PerfWatcher *watcher = &ctx->watchers[watcher_idx];
-      UnwindState *us = ctx->worker_ctx.us;
+      PerfWatcher *watcher = &ctx.watchers[watcher_idx];
+      UnwindState *us = ctx.worker_ctx.us;
       us->output.clear();
       add_common_frame(us, SymbolErrors::lost_event);
 
@@ -74,8 +75,8 @@ static DDRes report_lost_events(DDProfContext *ctx) {
              value, watcher_idx);
       DDRES_CHECK_FWD(pprof_aggregate(
           &us->output, us->symbol_hdr, value, nb_lost, watcher,
-          ctx->worker_ctx.pprof[ctx->worker_ctx.i_current_pprof]));
-      ctx->worker_ctx.lost_events_per_watcher[watcher_idx] = 0;
+          ctx.worker_ctx.pprof[ctx.worker_ctx.i_current_pprof]));
+      ctx.worker_ctx.lost_events_per_watcher[watcher_idx] = 0;
     }
   }
 
@@ -86,30 +87,29 @@ static inline long export_time_convert(double upload_period) {
   return upload_period * 1000000000;
 }
 
-static inline void export_time_set(DDProfContext *ctx) {
-  assert(ctx);
-  ctx->worker_ctx.send_nanos =
-      now_nanos() + export_time_convert(ctx->params.upload_period);
+static inline void export_time_set(DDProfContext &ctx) {
+  ctx.worker_ctx.send_nanos =
+      now_nanos() + export_time_convert(ctx.params.upload_period);
 }
 
-DDRes worker_library_init(DDProfContext *ctx,
+DDRes worker_library_init(DDProfContext &ctx,
                           PersistentWorkerState *persistent_worker_state) {
   try {
     // Set the initial time
     export_time_set(ctx);
     // Make sure worker-related counters are reset
-    ctx->worker_ctx.count_worker = 0;
+    ctx.worker_ctx.count_worker = 0;
     // Make sure worker index is initialized correctly
-    ctx->worker_ctx.i_current_pprof = 0;
-    ctx->worker_ctx.exp_tid = {0};
-    ctx->worker_ctx.us = new UnwindState(ctx->params.dd_profiling_fd);
-    std::fill(ctx->worker_ctx.lost_events_per_watcher.begin(),
-              ctx->worker_ctx.lost_events_per_watcher.end(), 0UL);
+    ctx.worker_ctx.i_current_pprof = 0;
+    ctx.worker_ctx.exp_tid = {0};
+    ctx.worker_ctx.us = new UnwindState(ctx.params.dd_profiling_fd);
+    std::fill(ctx.worker_ctx.lost_events_per_watcher.begin(),
+              ctx.worker_ctx.lost_events_per_watcher.end(), 0UL);
 
     // register the existing persistent storage for the state
-    ctx->worker_ctx.persistent_worker_state = persistent_worker_state;
+    ctx.worker_ctx.persistent_worker_state = persistent_worker_state;
 
-    PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
+    PEventHdr *pevent_hdr = &ctx.worker_ctx.pevent_hdr;
 
     // If we're here, then we are a child spawned during the startup operation.
     // That means we need to iterate through the perf_event_open() handles and
@@ -120,37 +120,38 @@ DDRes worker_library_init(DDProfContext *ctx,
     }
     // Initialize the unwind state and library
     unwind_init();
-    ctx->worker_ctx.user_tags =
-        new UserTags(ctx->params.tags, ctx->params.num_cpu);
+    ctx.worker_ctx.user_tags =
+        new UserTags(ctx.params.tags, ctx.params.num_cpu);
 
     // Zero out pointers to dynamically allocated memory
-    ctx->worker_ctx.exp[0] = nullptr;
-    ctx->worker_ctx.exp[1] = nullptr;
-    ctx->worker_ctx.pprof[0] = nullptr;
-    ctx->worker_ctx.pprof[1] = nullptr;
+    ctx.worker_ctx.exp[0] = nullptr;
+    ctx.worker_ctx.exp[1] = nullptr;
+    ctx.worker_ctx.pprof[0] = nullptr;
+    ctx.worker_ctx.pprof[1] = nullptr;
   }
   CatchExcept2DDRes();
   return ddres_init();
 }
 
-DDRes worker_library_free(DDProfContext *ctx) {
+DDRes worker_library_free(DDProfContext &ctx) {
   try {
-    delete ctx->worker_ctx.user_tags;
-    ctx->worker_ctx.user_tags = nullptr;
+    delete ctx.worker_ctx.user_tags;
+    ctx.worker_ctx.user_tags = nullptr;
 
-    PEventHdr *pevent_hdr = &ctx->worker_ctx.pevent_hdr;
+    PEventHdr *pevent_hdr = &ctx.worker_ctx.pevent_hdr;
     DDRES_CHECK_FWD(pevent_munmap(pevent_hdr));
 
-    delete ctx->worker_ctx.us;
-    ctx->worker_ctx.us = nullptr;
+    delete ctx.worker_ctx.us;
+    ctx.worker_ctx.us = nullptr;
   }
   CatchExcept2DDRes();
   return ddres_init();
 }
 
-[[maybe_unused]] static DDRes worker_init_stats(DDProfWorkerContext *ctx) {
-  DDRES_CHECK_FWD(proc_read(&ctx->proc_status));
-  ctx->cycle_start_time = std::chrono::steady_clock::now();
+[[maybe_unused]] static DDRes
+worker_init_stats(DDProfWorkerContext *worker_ctx) {
+  DDRES_CHECK_FWD(proc_read(&worker_ctx->proc_status));
+  worker_ctx->cycle_start_time = std::chrono::steady_clock::now();
   return {};
 }
 
@@ -224,10 +225,10 @@ static DDRes worker_update_stats(ProcStatus *procstat, const UnwindState &us,
   return ddres_init();
 }
 
-static DDRes ddprof_unwind_sample(DDProfContext *ctx, perf_event_sample *sample,
+static DDRes ddprof_unwind_sample(DDProfContext &ctx, perf_event_sample *sample,
                                   int watcher_pos) {
-  struct UnwindState *us = ctx->worker_ctx.us;
-  PerfWatcher *watcher = &ctx->watchers[watcher_pos];
+  struct UnwindState *us = ctx.worker_ctx.us;
+  PerfWatcher *watcher = &ctx.watchers[watcher_pos];
 
   ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
   ddprof_stats_add(STATS_UNWIND_AVG_STACK_SIZE, sample->size_stack, nullptr);
@@ -268,7 +269,7 @@ static DDRes ddprof_unwind_sample(DDProfContext *ctx, perf_event_sample *sample,
    * That's why we consider the stack as truncated in input only if it is also
    * detected as incomplete during unwinding.
    */
-  if (sample->size_stack == ctx->watchers[watcher_pos].sample_stack_size &&
+  if (sample->size_stack == ctx.watchers[watcher_pos].sample_stack_size &&
       us->output.is_incomplete) {
     ddprof_stats_add(STATS_UNWIND_TRUNCATED_INPUT, 1, nullptr);
   }
@@ -283,13 +284,13 @@ static DDRes ddprof_unwind_sample(DDProfContext *ctx, perf_event_sample *sample,
 
 /************************* perf_event_open() helpers **************************/
 /// Entry point for sample aggregation
-DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
+DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
                        int watcher_pos) {
   if (!sample)
     return ddres_warn(DD_WHAT_PERFSAMP);
 
   // If this is a SW_TASK_CLOCK-type event, then aggregate the time
-  if (ctx->watchers[watcher_pos].config == PERF_COUNT_SW_TASK_CLOCK)
+  if (ctx.watchers[watcher_pos].config == PERF_COUNT_SW_TASK_CLOCK)
     ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
 
   auto ticks0 = ddprof::get_tsc_cycles();
@@ -299,26 +300,26 @@ DDRes ddprof_pr_sample(DDProfContext *ctx, perf_event_sample *sample,
 
   // Usually we want to send the sample_val, but sometimes we need to process
   // the event to get the desired value
-  PerfWatcher *watcher = &ctx->watchers[watcher_pos];
+  PerfWatcher *watcher = &ctx.watchers[watcher_pos];
 
   // Aggregate if unwinding went well (todo : fatal error propagation)
   if (!IsDDResFatal(res)) {
-    struct UnwindState *us = ctx->worker_ctx.us;
+    struct UnwindState *us = ctx.worker_ctx.us;
     if (Any(EventConfMode::kLiveCallgraph & watcher->output_mode)) {
       // Live callgraph mode
       // for now we hard code the live aggregation mode
-      ctx->worker_ctx.live_allocation.register_allocation(
+      ctx.worker_ctx.live_allocation.register_allocation(
           us->output, sample->addr, sample->period, watcher_pos, sample->pid);
     } else if (Any(EventConfMode::kCallgraph & watcher->output_mode)) {
       // Depending on the type of watcher, compute a value for sample
       uint64_t sample_val = perf_value_from_sample(watcher, sample);
 
       // in lib mode we don't aggregate (protect to avoid link failures)
-      int i_export = ctx->worker_ctx.i_current_pprof;
-      DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
+      int i_export = ctx.worker_ctx.i_current_pprof;
+      DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
       DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbol_hdr, sample_val,
                                       1, watcher, pprof));
-      if (ctx->params.show_samples) {
+      if (ctx.params.show_samples) {
         ddprof_print_sample(us->output, us->symbol_hdr, sample->period,
                             *watcher);
       }
@@ -358,28 +359,28 @@ void *ddprof_worker_export_thread(void *arg) {
 
 static DDRes aggregate_livealloc_stack(
     const LiveAllocation::PprofStacks::value_type &alloc_info,
-    DDProfContext *ctx, const PerfWatcher *watcher, DDProfPProf *pprof,
+    DDProfContext &ctx, const PerfWatcher *watcher, DDProfPProf *pprof,
     const SymbolHdr &symbol_hdr) {
   DDRES_CHECK_FWD(pprof_aggregate(&alloc_info.first, symbol_hdr,
                                   alloc_info.second._value,
                                   alloc_info.second._count, watcher, pprof));
-  if (ctx->params.show_samples) {
+  if (ctx.params.show_samples) {
     ddprof_print_sample(alloc_info.first, symbol_hdr, alloc_info.second._value,
                         *watcher);
   }
   return ddres_init();
 }
 
-static DDRes aggregate_live_allocations_for_pid(DDProfContext *ctx, pid_t pid) {
-  struct UnwindState *us = ctx->worker_ctx.us;
-  int i_export = ctx->worker_ctx.i_current_pprof;
-  DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
+static DDRes aggregate_live_allocations_for_pid(DDProfContext &ctx, pid_t pid) {
+  struct UnwindState *us = ctx.worker_ctx.us;
+  int i_export = ctx.worker_ctx.i_current_pprof;
+  DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
   const SymbolHdr &symbol_hdr = us->symbol_hdr;
-  LiveAllocation &live_allocations = ctx->worker_ctx.live_allocation;
+  LiveAllocation &live_allocations = ctx.worker_ctx.live_allocation;
   for (unsigned watcher_pos = 0;
        watcher_pos < live_allocations._watcher_vector.size(); ++watcher_pos) {
     auto &pid_map = live_allocations._watcher_vector[watcher_pos];
-    const PerfWatcher *watcher = &ctx->watchers[watcher_pos];
+    const PerfWatcher *watcher = &ctx.watchers[watcher_pos];
     auto &pid_stacks = pid_map[pid];
     for (const auto &alloc_info : pid_stacks._unique_stacks) {
       DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info, ctx, watcher, pprof,
@@ -389,18 +390,18 @@ static DDRes aggregate_live_allocations_for_pid(DDProfContext *ctx, pid_t pid) {
   return ddres_init();
 }
 
-static DDRes aggregate_live_allocations(DDProfContext *ctx) {
+static DDRes aggregate_live_allocations(DDProfContext &ctx) {
   // this would be more efficient if we could reuse the same stacks in
   // libdatadog
-  struct UnwindState *us = ctx->worker_ctx.us;
-  int i_export = ctx->worker_ctx.i_current_pprof;
-  DDProfPProf *pprof = ctx->worker_ctx.pprof[i_export];
+  struct UnwindState *us = ctx.worker_ctx.us;
+  int i_export = ctx.worker_ctx.i_current_pprof;
+  DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
   const SymbolHdr &symbol_hdr = us->symbol_hdr;
-  const LiveAllocation &live_allocations = ctx->worker_ctx.live_allocation;
+  const LiveAllocation &live_allocations = ctx.worker_ctx.live_allocation;
   for (unsigned watcher_pos = 0;
        watcher_pos < live_allocations._watcher_vector.size(); ++watcher_pos) {
     const auto &pid_map = live_allocations._watcher_vector[watcher_pos];
-    const PerfWatcher *watcher = &ctx->watchers[watcher_pos];
+    const PerfWatcher *watcher = &ctx.watchers[watcher_pos];
     for (const auto &pid_vt : pid_map) {
       for (const auto &alloc_info : pid_vt.second._unique_stacks) {
         DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info, ctx, watcher,
@@ -414,16 +415,16 @@ static DDRes aggregate_live_allocations(DDProfContext *ctx) {
   return ddres_init();
 }
 
-static DDRes worker_pid_free(DDProfContext *ctx, pid_t el) {
+static DDRes worker_pid_free(DDProfContext &ctx, pid_t el) {
   DDRES_CHECK_FWD(aggregate_live_allocations_for_pid(ctx, el));
-  UnwindState *us = ctx->worker_ctx.us;
+  UnwindState *us = ctx.worker_ctx.us;
   unwind_pid_free(us, el);
-  ctx->worker_ctx.live_allocation.clear_pid(el);
+  ctx.worker_ctx.live_allocation.clear_pid(el);
   return ddres_init();
 }
 
-static DDRes clear_unvisited_pids(DDProfContext *ctx) {
-  UnwindState *us = ctx->worker_ctx.us;
+static DDRes clear_unvisited_pids(DDProfContext &ctx) {
+  UnwindState *us = ctx.worker_ctx.us;
   const std::vector<pid_t> pids_remove = us->dwfl_hdr.get_unvisited();
   for (pid_t el : pids_remove) {
     DDRES_CHECK_FWD(worker_pid_free(ctx, el));
@@ -433,7 +434,7 @@ static DDRes clear_unvisited_pids(DDProfContext *ctx) {
 }
 
 /// Cycle operations : export, sync metrics, update counters
-DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
+DDRes ddprof_worker_cycle(DDProfContext &ctx, int64_t now,
                           [[maybe_unused]] bool synchronous_export) {
 
   // Clearing unused PIDs will ensure we don't report them at next cycle
@@ -448,79 +449,78 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
   // failing
 
   // If something is pending, return error
-  if (ctx->worker_ctx.exp_tid) {
+  if (ctx.worker_ctx.exp_tid) {
     struct timespec waittime;
     clock_gettime(CLOCK_REALTIME, &waittime);
-    int waitsec = DDPROF_EXPORT_TIMEOUT_MAX - ctx->params.upload_period;
+    int waitsec = DDPROF_EXPORT_TIMEOUT_MAX - ctx.params.upload_period;
     waitsec = waitsec > 1 ? waitsec : 1;
     waittime.tv_sec += waitsec;
-    if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime)) {
+    if (pthread_timedjoin_np(ctx.worker_ctx.exp_tid, NULL, &waittime)) {
       LG_WRN("Exporter took too long");
       return ddres_create(DD_SEVERROR, DD_WHAT_EXPORT_TIMEOUT);
     }
-    ctx->worker_ctx.exp_tid = 0;
+    ctx.worker_ctx.exp_tid = 0;
   }
-  if (ctx->worker_ctx.exp_error) {
+  if (ctx.worker_ctx.exp_error) {
     return ddres_create(DD_SEVERROR, DD_WHAT_EXPORTER);
   }
 
   DDRES_CHECK_FWD(report_lost_events(ctx));
 
   // Dispatch to thread
-  ctx->worker_ctx.exp_error = false;
+  ctx.worker_ctx.exp_error = false;
 
   // switch before we async export to avoid any possible race conditions (then
   // take into account the switch)
-  ctx->worker_ctx.i_current_pprof = 1 - ctx->worker_ctx.i_current_pprof;
+  ctx.worker_ctx.i_current_pprof = 1 - ctx.worker_ctx.i_current_pprof;
 
   // Reset the current, ensuring the timestamp starts when we are about to write
   // to it
   DDRES_CHECK_FWD(
-      pprof_reset(ctx->worker_ctx.pprof[ctx->worker_ctx.i_current_pprof]));
+      pprof_reset(ctx.worker_ctx.pprof[ctx.worker_ctx.i_current_pprof]));
 
   if (!synchronous_export) {
-    pthread_create(&ctx->worker_ctx.exp_tid, NULL, ddprof_worker_export_thread,
-                   &ctx->worker_ctx);
+    pthread_create(&ctx.worker_ctx.exp_tid, NULL, ddprof_worker_export_thread,
+                   &ctx.worker_ctx);
   } else {
-    ddprof_worker_export_thread(reinterpret_cast<void *>(&ctx->worker_ctx));
-    if (ctx->worker_ctx.exp_error) {
+    ddprof_worker_export_thread(reinterpret_cast<void *>(&ctx.worker_ctx));
+    if (ctx.worker_ctx.exp_error) {
       return ddres_create(DD_SEVERROR, DD_WHAT_EXPORTER);
     }
   }
   auto cycle_now = std::chrono::steady_clock::now();
-  auto cycle_duration = cycle_now - ctx->worker_ctx.cycle_start_time;
-  ctx->worker_ctx.cycle_start_time = cycle_now;
+  auto cycle_duration = cycle_now - ctx.worker_ctx.cycle_start_time;
+  ctx.worker_ctx.cycle_start_time = cycle_now;
 
   // Scrape procfs for process usage statistics
-  DDRES_CHECK_FWD(worker_update_stats(&ctx->worker_ctx.proc_status,
-                                      *ctx->worker_ctx.us, cycle_duration));
+  DDRES_CHECK_FWD(worker_update_stats(&ctx.worker_ctx.proc_status,
+                                      *ctx.worker_ctx.us, cycle_duration));
 
   // And emit diagnostic output (if it's enabled)
-  print_diagnostics(ctx->worker_ctx.us->dso_hdr);
-  if (IsDDResNotOK(ddprof_stats_send(ctx->params.internal_stats))) {
+  print_diagnostics(ctx.worker_ctx.us->dso_hdr);
+  if (IsDDResNotOK(ddprof_stats_send(ctx.params.internal_stats))) {
     LG_WRN("Unable to utilize to statsd socket.  Suppressing future stats.");
-    free((void *)ctx->params.internal_stats);
-    ctx->params.internal_stats = NULL;
+    ctx.params.internal_stats = {};
   }
 
   // Increase the counts of exports
-  ctx->worker_ctx.count_worker += 1;
+  ctx.worker_ctx.count_worker += 1;
 
   // allow new backpopulates
-  ctx->worker_ctx.us->dso_hdr.reset_backpopulate_state();
+  ctx.worker_ctx.us->dso_hdr.reset_backpopulate_state();
 
   // Update the time last sent
-  ctx->worker_ctx.send_nanos += export_time_convert(ctx->params.upload_period);
+  ctx.worker_ctx.send_nanos += export_time_convert(ctx.params.upload_period);
 
   // If the clock was frozen for some reason, we need to detect situations
   // where we'll have catchup windows and reset the export timer.  This can
   // easily happen under temporary load when the profiler is off-CPU, if the
   // process is put in the cgroup freezer, or if we're being emulated.
-  if (now > ctx->worker_ctx.send_nanos) {
+  if (now > ctx.worker_ctx.send_nanos) {
     LG_WRN("Timer skew detected; frequent warnings may suggest system issue");
     export_time_set(ctx);
   }
-  unwind_cycle(ctx->worker_ctx.us);
+  unwind_cycle(ctx.worker_ctx.us);
 
   // Reset stats relevant to a single cycle
   ddprof_reset_worker_stats();
@@ -528,23 +528,23 @@ DDRes ddprof_worker_cycle(DDProfContext *ctx, int64_t now,
   return ddres_init();
 }
 
-void ddprof_pr_mmap(DDProfContext *ctx, const perf_event_mmap2 *map,
+void ddprof_pr_mmap(DDProfContext &ctx, const perf_event_mmap2 *map,
                     int watcher_pos) {
   LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx) %02u:%02u %lu", watcher_pos, map->pid,
          map->filename, map->addr, map->len, map->pgoff, map->maj, map->min,
          map->ino);
   ddprof::Dso new_dso(map->pid, map->addr, map->addr + map->len - 1, map->pgoff,
                       std::string(map->filename), true, map->ino);
-  ctx->worker_ctx.us->dso_hdr.insert_erase_overlap(std::move(new_dso));
+  ctx.worker_ctx.us->dso_hdr.insert_erase_overlap(std::move(new_dso));
 }
 
-void ddprof_pr_lost(DDProfContext *ctx, const perf_event_lost *lost,
+void ddprof_pr_lost(DDProfContext &ctx, const perf_event_lost *lost,
                     int watcher_pos) {
   ddprof_stats_add(STATS_EVENT_LOST, lost->lost, NULL);
-  ctx->worker_ctx.lost_events_per_watcher[watcher_pos] += lost->lost;
+  ctx.worker_ctx.lost_events_per_watcher[watcher_pos] += lost->lost;
 }
 
-DDRes ddprof_pr_comm(DDProfContext *ctx, const perf_event_comm *comm,
+DDRes ddprof_pr_comm(DDProfContext &ctx, const perf_event_comm *comm,
                      int watcher_pos) {
   // Change in process name (assuming exec) : clear all associated dso
   if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC) {
@@ -554,7 +554,7 @@ DDRes ddprof_pr_comm(DDProfContext *ctx, const perf_event_comm *comm,
   return ddres_init();
 }
 
-DDRes ddprof_pr_fork(DDProfContext *ctx, const perf_event_fork *frk,
+DDRes ddprof_pr_fork(DDProfContext &ctx, const perf_event_fork *frk,
                      int watcher_pos) {
   LG_DBG("<%d>(FORK)%d -> %d/%d", watcher_pos, frk->ppid, frk->pid, frk->tid);
   if (frk->ppid != frk->pid) {
@@ -564,7 +564,7 @@ DDRes ddprof_pr_fork(DDProfContext *ctx, const perf_event_fork *frk,
   return ddres_init();
 }
 
-void ddprof_pr_exit(DDProfContext *ctx, const perf_event_exit *ext,
+void ddprof_pr_exit(DDProfContext &ctx, const perf_event_exit *ext,
                     int watcher_pos) {
   // On Linux, it seems that the thread group leader is the one whose task ID
   // matches the process ID of the group.  Moreover, it seems that it is the
@@ -579,98 +579,86 @@ void ddprof_pr_exit(DDProfContext *ctx, const perf_event_exit *ext,
   }
 }
 
-void ddprof_pr_clear_live_allocation(DDProfContext *ctx,
+void ddprof_pr_clear_live_allocation(DDProfContext &ctx,
                                      const ClearLiveAllocationEvent *event,
                                      int watcher_pos) {
   LG_DBG("<%d>(CLEAR LIVE)%d", watcher_pos, event->sample_id.pid);
-  ctx->worker_ctx.live_allocation.clear_pid_for_watcher(watcher_pos,
-                                                        event->sample_id.pid);
+  ctx.worker_ctx.live_allocation.clear_pid_for_watcher(watcher_pos,
+                                                       event->sample_id.pid);
 }
 
-void ddprof_pr_deallocation(DDProfContext *ctx, const DeallocationEvent *event,
+void ddprof_pr_deallocation(DDProfContext &ctx, const DeallocationEvent *event,
                             int watcher_pos) {
-  ctx->worker_ctx.live_allocation.register_deallocation(event->ptr, watcher_pos,
-                                                        event->sample_id.pid);
+  ctx.worker_ctx.live_allocation.register_deallocation(event->ptr, watcher_pos,
+                                                       event->sample_id.pid);
 }
 
 /********************************** callbacks *********************************/
-DDRes ddprof_worker_maybe_export(DDProfContext *ctx, int64_t now_ns) {
+DDRes ddprof_worker_maybe_export(DDProfContext &ctx, int64_t now_ns) {
   try {
-    if (now_ns > ctx->worker_ctx.send_nanos) {
+    if (now_ns > ctx.worker_ctx.send_nanos) {
       // restart worker if number of uploads is reached
-      ctx->worker_ctx.persistent_worker_state->restart_worker =
-          (ctx->worker_ctx.count_worker + 1 >= ctx->params.worker_period);
+      ctx.worker_ctx.persistent_worker_state->restart_worker =
+          (ctx.worker_ctx.count_worker + 1 >= ctx.params.worker_period);
       // when restarting worker, do a synchronous export
       DDRES_CHECK_FWD(ddprof_worker_cycle(
-          ctx, now_ns,
-          ctx->worker_ctx.persistent_worker_state->restart_worker));
+          ctx, now_ns, ctx.worker_ctx.persistent_worker_state->restart_worker));
     }
   }
   CatchExcept2DDRes();
   return ddres_init();
 }
 
-DDRes ddprof_worker_init(DDProfContext *ctx,
+DDRes ddprof_worker_init(DDProfContext &ctx,
                          PersistentWorkerState *persistent_worker_state) {
   try {
     DDRES_CHECK_FWD(worker_library_init(ctx, persistent_worker_state));
-    ctx->worker_ctx.exp[0] =
-        (DDProfExporter *)calloc(1, sizeof(DDProfExporter));
-    ctx->worker_ctx.exp[1] =
-        (DDProfExporter *)calloc(1, sizeof(DDProfExporter));
-    ctx->worker_ctx.pprof[0] = new DDProfPProf();
-    ctx->worker_ctx.pprof[1] = new DDProfPProf();
-    if (!ctx->worker_ctx.exp[0] || !ctx->worker_ctx.exp[1]) {
-      free(ctx->worker_ctx.exp[0]);
-      free(ctx->worker_ctx.exp[1]);
-      delete ctx->worker_ctx.pprof[0];
-      delete ctx->worker_ctx.pprof[1];
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "Error creating exporter");
-    }
+    ctx.worker_ctx.exp[0] = new DDProfExporter();
+    ctx.worker_ctx.exp[1] = new DDProfExporter();
+    ctx.worker_ctx.pprof[0] = new DDProfPProf();
+    ctx.worker_ctx.pprof[1] = new DDProfPProf();
 
-    DDRES_CHECK_FWD(
-        ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp[0]));
-    DDRES_CHECK_FWD(
-        ddprof_exporter_init(&ctx->exp_input, ctx->worker_ctx.exp[1]));
+    DDRES_CHECK_FWD(ddprof_exporter_init(ctx.exp_input, ctx.worker_ctx.exp[0]));
+    DDRES_CHECK_FWD(ddprof_exporter_init(ctx.exp_input, ctx.worker_ctx.exp[1]));
     // warning : depends on unwind init
     DDRES_CHECK_FWD(
-        ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[0]));
+        ddprof_exporter_new(ctx.worker_ctx.user_tags, ctx.worker_ctx.exp[0]));
     DDRES_CHECK_FWD(
-        ddprof_exporter_new(ctx->worker_ctx.user_tags, ctx->worker_ctx.exp[1]));
+        ddprof_exporter_new(ctx.worker_ctx.user_tags, ctx.worker_ctx.exp[1]));
 
-    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[0], ctx));
-    DDRES_CHECK_FWD(pprof_create_profile(ctx->worker_ctx.pprof[1], ctx));
-    DDRES_CHECK_FWD(worker_init_stats(&ctx->worker_ctx));
+    DDRES_CHECK_FWD(pprof_create_profile(ctx.worker_ctx.pprof[0], ctx));
+    DDRES_CHECK_FWD(pprof_create_profile(ctx.worker_ctx.pprof[1], ctx));
+    DDRES_CHECK_FWD(worker_init_stats(&ctx.worker_ctx));
   }
   CatchExcept2DDRes();
   return ddres_init();
 }
 
-DDRes ddprof_worker_free(DDProfContext *ctx) {
+DDRes ddprof_worker_free(DDProfContext &ctx) {
   try {
     // First, see if there are any outstanding requests and give them a token
     // amount of time to complete
-    if (ctx->worker_ctx.exp_tid) {
+    if (ctx.worker_ctx.exp_tid) {
       struct timespec waittime;
       clock_gettime(CLOCK_REALTIME, &waittime);
       waittime.tv_sec += 5;
-      if (pthread_timedjoin_np(ctx->worker_ctx.exp_tid, NULL, &waittime)) {
-        pthread_cancel(ctx->worker_ctx.exp_tid);
+      if (pthread_timedjoin_np(ctx.worker_ctx.exp_tid, NULL, &waittime)) {
+        pthread_cancel(ctx.worker_ctx.exp_tid);
       }
-      ctx->worker_ctx.exp_tid = 0;
+      ctx.worker_ctx.exp_tid = 0;
     }
 
     DDRES_CHECK_FWD(worker_library_free(ctx));
     for (int i = 0; i < 2; i++) {
-      if (ctx->worker_ctx.exp[i]) {
-        DDRES_CHECK_FWD(ddprof_exporter_free(ctx->worker_ctx.exp[i]));
-        free(ctx->worker_ctx.exp[i]);
-        ctx->worker_ctx.exp[i] = nullptr;
+      if (ctx.worker_ctx.exp[i]) {
+        DDRES_CHECK_FWD(ddprof_exporter_free(ctx.worker_ctx.exp[i]));
+        delete ctx.worker_ctx.exp[i];
+        ctx.worker_ctx.exp[i] = nullptr;
       }
-      if (ctx->worker_ctx.pprof[i]) {
-        DDRES_CHECK_FWD(pprof_free_profile(ctx->worker_ctx.pprof[i]));
-        delete ctx->worker_ctx.pprof[i];
-        ctx->worker_ctx.pprof[i] = nullptr;
+      if (ctx.worker_ctx.pprof[i]) {
+        DDRES_CHECK_FWD(pprof_free_profile(ctx.worker_ctx.pprof[i]));
+        delete ctx.worker_ctx.pprof[i];
+        ctx.worker_ctx.pprof[i] = nullptr;
       }
     }
   }
@@ -687,13 +675,13 @@ struct perf_event_hdr_wpid : perf_event_header {
 };
 
 DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
-                                  DDProfContext *ctx) {
+                                  DDProfContext &ctx) {
   // global try catch to avoid leaking exceptions to main loop
   try {
     ddprof_stats_add(STATS_EVENT_COUNT, 1, NULL);
     const perf_event_hdr_wpid *wpid =
         static_cast<const perf_event_hdr_wpid *>(hdr);
-    PerfWatcher *watcher = &ctx->watchers[watcher_pos];
+    PerfWatcher *watcher = &ctx.watchers[watcher_pos];
     switch (hdr->type) {
     /* Cases where the target type has a PID */
     case PERF_RECORD_SAMPLE:

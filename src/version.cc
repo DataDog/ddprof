@@ -4,23 +4,26 @@
 // Datadog, Inc.
 
 #include "version.hpp"
-#include "string_view.hpp"
 
 #include <stdio.h>
 
-string_view str_version() {
+std::string_view str_version() {
   static char profiler_version[1024] = {0};
-  string_view version_str;
+  int len = 0;
   if (*VER_REV)
-    version_str.len = snprintf(profiler_version, 1024, "%d.%d.%d+%s", VER_MAJ,
-                               VER_MIN, VER_PATCH, VER_REV);
+    len = snprintf(profiler_version, 1024, "%d.%d.%d+%s", VER_MAJ, VER_MIN,
+                   VER_PATCH, VER_REV);
   else
-    version_str.len = snprintf(profiler_version, 1024, "%d.%d.%d", VER_MAJ,
-                               VER_MIN, VER_PATCH);
+    len = snprintf(profiler_version, 1024, "%d.%d.%d", VER_MAJ, VER_MIN,
+                   VER_PATCH);
 
-  version_str.ptr = profiler_version;
-
-  return version_str;
+  if (len < 0) {
+    return "bad-version";
+  }
+  return std::string_view{profiler_version, static_cast<unsigned>(len)};
 }
 
-void print_version() { printf(MYNAME " %s\n", str_version().ptr); }
+void print_version() {
+  printf(MYNAME " %.*s\n", static_cast<int>(str_version().size()),
+         str_version().data());
+}

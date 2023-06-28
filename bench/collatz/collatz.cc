@@ -186,7 +186,7 @@ int main(int c, char **v) {
   int fd_statsd = -1;
   char *path_statsd = NULL;
   if ((path_statsd = getenv("DD_DOGSTATSD_SOCKET"))) {
-    statsd_connect(path_statsd, strlen(path_statsd), &fd_statsd);
+    statsd_connect(std::string_view(path_statsd), &fd_statsd);
   }
 
   // OK, so we want to wait until everyone has started, but if we have more

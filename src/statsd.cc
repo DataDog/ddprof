@@ -15,12 +15,17 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-DDRes statsd_listen(const char *path, size_t sz_path, int *fd) {
+DDRes statsd_listen(std::string_view path, int *fd) {
   struct sockaddr_un addr_bind = {.sun_family = AF_UNIX};
   int fd_sock = -1;
 
   // Open the socket
-  memcpy(addr_bind.sun_path, path, sz_path);
+  if (path.size() >= sizeof(addr_bind.sun_path) - 1) {
+    DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "[STATSD] %.*s path is too long",
+                          static_cast<int>(path.size()), path.data());
+  }
+  strncpy(addr_bind.sun_path, path.data(), path.size());
+  addr_bind.sun_path[path.size()] = '\0';
   int socktype = SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK;
   if (-1 == (fd_sock = socket(AF_UNIX, socktype, 0))) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "[STATSD] Creating UDS failed (%s)",
@@ -47,9 +52,8 @@ DDRes statsd_listen(const char *path, size_t sz_path, int *fd) {
   return ddres_init();
 }
 
-DDRes statsd_connect(const char *path, size_t sz_path, int *fd) {
-  assert(path);
-  assert(sz_path);
+DDRes statsd_connect(std::string_view statsd_socket, int *fd) {
+  assert(statsd_socket.size());
   assert(fd);
 
   char path_listen[] = "/tmp/" MYNAME ".1234567890";
@@ -59,8 +63,14 @@ DDRes statsd_connect(const char *path, size_t sz_path, int *fd) {
   struct sockaddr_un addr_peer = {.sun_family = AF_UNIX};
   int fd_sock = -1;
 
-  memcpy(addr_peer.sun_path, path, sz_path);
-  DDRes res = statsd_listen(path_listen, sz, &fd_sock);
+  if (statsd_socket.size() >= sizeof(addr_peer.sun_path) - 1) {
+    DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "[STATSD] %.*s path is too long",
+                          static_cast<int>(statsd_socket.size()),
+                          statsd_socket.data());
+  }
+  strncpy(addr_peer.sun_path, statsd_socket.data(), statsd_socket.size());
+  addr_peer.sun_path[statsd_socket.size()] = '\0';
+  DDRes res = statsd_listen(std::string_view(path_listen, sz), &fd_sock);
   unlink(path_listen);
   if (IsDDResNotOK(res)) {
     return res;

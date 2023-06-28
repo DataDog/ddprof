@@ -18,8 +18,7 @@ TEST(ddprof_statsTest, Connect) {
 
   // Initiate "server"
   int fd_listener;
-  EXPECT_TRUE(
-      IsDDResOK(statsd_listen(path_listen, strlen(path_listen), &fd_listener)));
+  EXPECT_TRUE(IsDDResOK(statsd_listen(path_listen, &fd_listener)));
 
   // Connect to server using ddprof_stats rather than statsd directly
   EXPECT_TRUE(IsDDResOK(ddprof_stats_init()));
@@ -37,8 +36,7 @@ TEST(ddprof_statsTest, Reconnect) {
 
   // Initiate "server"
   int fd_listener;
-  EXPECT_TRUE(
-      IsDDResOK(statsd_listen(path_listen, strlen(path_listen), &fd_listener)));
+  EXPECT_TRUE(IsDDResOK(statsd_listen(path_listen, &fd_listener)));
 
   // Connect to server using ddprof_stats rather than statsd directly
   EXPECT_TRUE(IsDDResOK(ddprof_stats_init()));
@@ -60,8 +58,7 @@ TEST(ddprof_statsTest, ConnectAndSet) {
 
   // Initiate "server"
   int fd_listener;
-  EXPECT_TRUE(
-      IsDDResOK(statsd_listen(path_listen, strlen(path_listen), &fd_listener)));
+  EXPECT_TRUE(IsDDResOK(statsd_listen(path_listen, &fd_listener)));
 
   // Connect to server using ddprof_stats rather than statsd directly
   EXPECT_TRUE(IsDDResOK(ddprof_stats_init()));
@@ -87,8 +84,7 @@ TEST(ddprof_statsTest, Arithmetic) {
 
   // Initiate "server"
   int fd_listener;
-  EXPECT_TRUE(
-      IsDDResOK(statsd_listen(path_listen, strlen(path_listen), &fd_listener)));
+  EXPECT_TRUE(IsDDResOK(statsd_listen(path_listen, &fd_listener)));
 
   // Connect to server using ddprof_stats rather than statsd directly
   EXPECT_TRUE(IsDDResOK(ddprof_stats_init()));
@@ -123,8 +119,7 @@ TEST(ddprof_statsTest, BadConnection) {
 
   // Initiate "server"
   int fd_listener;
-  EXPECT_TRUE(
-      IsDDResOK(statsd_listen(path_listen, strlen(path_listen), &fd_listener)));
+  EXPECT_TRUE(IsDDResOK(statsd_listen(path_listen, &fd_listener)));
   EXPECT_TRUE(IsDDResOK(ddprof_stats_init()));
   EXPECT_TRUE(IsDDResOK(ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL)));
 
@@ -140,8 +135,7 @@ TEST(ddprof_statsTest, MiscellaneousStats) {
 
   // Initiate "server"
   int fd_listener;
-  EXPECT_TRUE(
-      IsDDResOK(statsd_listen(path_listen, strlen(path_listen), &fd_listener)));
+  EXPECT_TRUE(IsDDResOK(statsd_listen(path_listen, &fd_listener)));
   EXPECT_TRUE(IsDDResOK(ddprof_stats_init()));
 
   // Submit a bad metric

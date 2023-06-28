@@ -21,31 +21,30 @@
 
 #define PPROF_MAX_LABELS 6
 
-DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
-  PerfWatcher *watchers = ctx->watchers;
-  size_t num_watchers = ctx->num_watchers;
+DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
+  size_t num_watchers = ctx.watchers.size();
   ddog_prof_ValueType perf_value_type[DDPROF_PWT_LENGTH];
 
   // Figure out which sample_type_ids are used by active watchers
   // We also record the watcher with the lowest valid sample_type id, since that
   // will serve as the default for the pprof
   bool active_ids[DDPROF_PWT_LENGTH] = {};
-  PerfWatcher *default_watcher = watchers;
+  PerfWatcher *default_watcher = &ctx.watchers[0];
   for (unsigned i = 0; i < num_watchers; ++i) {
-    int this_id = watchers[i].sample_type_id;
+    int this_id = ctx.watchers[i].sample_type_id;
     int count_id = sample_type_id_to_count_sample_type_id(this_id);
     if (this_id < 0 || this_id == DDPROF_PWT_NOCOUNT ||
         this_id >= DDPROF_PWT_LENGTH) {
       if (this_id != DDPROF_PWT_NOCOUNT) {
         DDRES_RETURN_ERROR_LOG(
             DD_WHAT_PPROF, "Watcher \"%s\" (%d) has invalid sample_type_id %d",
-            watchers[i].desc.c_str(), i, this_id);
+            ctx.watchers[i].desc.c_str(), i, this_id);
       }
       continue;
     }
 
     if (this_id <= default_watcher->sample_type_id) // update default
-      default_watcher = &watchers[i];
+      default_watcher = &ctx.watchers[i];
     active_ids[this_id] = true; // update mask
     if (count_id != DDPROF_PWT_NOCOUNT)
       active_ids[count_id] = true; // if the count is valid, update mask for it
@@ -76,17 +75,18 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
 
   // Update each watcher
   for (unsigned i = 0; i < num_watchers; ++i) {
-    int this_id = watchers[i].sample_type_id;
+    int this_id = ctx.watchers[i].sample_type_id;
     if (this_id < 0 || this_id == DDPROF_PWT_NOCOUNT ||
         this_id >= DDPROF_PWT_LENGTH) {
       continue;
     }
-    int permuted_id = pv[watchers[i].sample_type_id];
-    int permuted_count_id = pv[watcher_to_count_sample_type_id(&watchers[i])];
+    int permuted_id = pv[ctx.watchers[i].sample_type_id];
+    int permuted_count_id =
+        pv[watcher_to_count_sample_type_id(&ctx.watchers[i])];
 
-    watchers[i].pprof_sample_idx = permuted_id;
-    if (watcher_has_countable_sample_type(&watchers[i])) {
-      watchers[i].pprof_count_sample_idx = permuted_count_id;
+    ctx.watchers[i].pprof_sample_idx = permuted_id;
+    if (watcher_has_countable_sample_type(&ctx.watchers[i])) {
+      ctx.watchers[i].pprof_count_sample_idx = permuted_count_id;
     }
   }
 
@@ -118,7 +118,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext *ctx) {
   // Add relevant tags
   {
     bool include_kernel =
-        pevent_include_kernel_events(&ctx->worker_ctx.pevent_hdr);
+        pevent_include_kernel_events(&ctx.worker_ctx.pevent_hdr);
     pprof->_tags.push_back(std::make_pair(
         std::string("include_kernel"),
         include_kernel ? std::string("true") : std::string("false")));

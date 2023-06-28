@@ -3,6 +3,7 @@
 #include "logger.hpp"
 #include "span.hpp"
 
+#include <cstring>
 #include <fstream>
 #include <vector>
 

@@ -29,5 +29,5 @@ FILE=${TOP_LVL_DIR}/docs/Commands.md
 echo "# ddprof Commands" > ${FILE}
 echo "" >> ${FILE}
 echo '```bash' >> ${FILE}
-${BUILD_FOLDER}/ddprof >> ${FILE}
+${BUILD_FOLDER}/ddprof --help >> ${FILE}
 echo '```' >> ${FILE}

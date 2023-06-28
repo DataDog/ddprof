@@ -13,11 +13,11 @@ typedef struct DDProfInput DDProfInput;
 typedef struct DDProfContext DDProfContext;
 
 // Setup perf event open according to watchers
-DDRes ddprof_setup(DDProfContext *ctx);
+DDRes ddprof_setup(DDProfContext &ctx);
 
 // Free perf event resources
-DDRes ddprof_teardown(DDProfContext *ctx);
+DDRes ddprof_teardown(DDProfContext &ctx);
 
 /*************************  Instrumentation Helpers  **************************/
 // Attach a profiler exporting results from a different fork
-DDRes ddprof_start_profiler(DDProfContext *);
+DDRes ddprof_start_profiler(DDProfContext *ctx);

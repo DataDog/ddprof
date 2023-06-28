@@ -6,10 +6,10 @@
 #include "constants.hpp"
 #include "daemonize.hpp"
 #include "ddprof.hpp"
+#include "ddprof_cli.hpp"
 #include "ddprof_context.hpp"
 #include "ddprof_context_lib.hpp"
 #include "ddprof_cpumask.hpp"
-#include "ddprof_input.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "ipc.hpp"
@@ -20,10 +20,8 @@
 #include "user_override.hpp"
 
 #include <array>
-#include <cassert>
 #include <charconv>
 #include <errno.h>
-#include <fcntl.h>
 #include <filesystem>
 #include <functional>
 #include <string.h>
@@ -157,66 +155,34 @@ static DDRes get_library_path(TempFileHolder &libdd_profiling_path,
   return {};
 }
 
-// Parse input and initialize context
-static InputResult parse_input(int *argc, char ***argv, DDProfContext *ctx) {
-  //---- Inititiate structs
-  *ctx = {};
-  // Set temporary logger for argument parsing
-  LOG_open(LOG_STDERR, NULL);
-  LOG_setlevel(LL_WARNING);
-
-  DDProfInput input = {};
-  defer { ddprof_input_free(&input); };
-  bool continue_exec;
-  DDRes res = ddprof_input_parse(*argc, *argv, &input, &continue_exec);
-  if (IsDDResNotOK(res) || !continue_exec) {
-    return IsDDResOK(res) ? InputResult::kStop : InputResult::kError;
+namespace {
+DDRes check_incompatible_options(const DDProfContext &ctx) {
+  if (ddprof::context_allocation_profiling_watcher_idx(ctx) != -1 &&
+      ctx.params.pid && ctx.params.sockfd == -1) {
+    DDRES_RETURN_ERROR_LOG(
+        DD_WHAT_INPUT_PROCESS,
+        "Memory allocation profiling is not supported in PID / global mode");
   }
-
-  // logger can be closed (as it is opened in context_set)
-  LOG_close();
+  return {};
+}
+} // namespace
+// Parse input and initialize context
+static DDRes parse_input(const ddprof::DDProfCLI &ddprof_cli,
+                         DDProfContext &ctx) {
 
   // cmdline args have been processed.  Set the ctx
-  if (IsDDResNotOK(ddprof::context_set(&input, ctx))) {
-    LG_ERR("Error setting up profiling context, exiting");
-    ddprof::context_free(ctx);
-    return InputResult::kError;
-  }
-  // Adjust input parameters for execvp() (we do this even if unnecessary)
-  *argv += input.nb_parsed_params;
-  *argc -= input.nb_parsed_params;
+  DDRES_CHECK_FWD(ddprof::context_set(ddprof_cli, ctx));
 
-  // Only throw an error if we needed the user to pass an arg
-  if (ctx->params.pid) {
-    if (*argc > 0) {
-      LG_ERR("Unexpected trailing arguments in PID mode");
-      return InputResult::kError;
-    }
-    if (ctx->params.pid == -1)
-      LG_NFO("Instrumenting whole system");
-    else
-      LG_NFO("Instrumenting PID %d", ctx->params.pid);
-  } else if (*argc <= 0) {
-    LG_ERR("No target specified, exiting");
-    return InputResult::kError;
-  }
+  DDRES_CHECK_FWD(check_incompatible_options(ctx));
 
-  if (ddprof::context_allocation_profiling_watcher_idx(ctx) != -1 &&
-      ctx->params.pid && ctx->params.sockfd == -1) {
-    LG_ERR("Memory allocation profiling is not supported in PID / global mode");
-    return InputResult::kError;
-  }
-
-  return InputResult::kSuccess;
+  return {};
 }
 
 static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
-  auto defer_context_free = make_defer([ctx] { ddprof::context_free(ctx); });
-
   is_profiler = false;
 
   if (!ctx->params.enable) {
-    LG_NFO("Profiling disabled");
+    LG_WRN("Profiling disabled");
     return 0;
   }
 
@@ -230,7 +196,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     // Determine if library should be injected into target process
     // (ie. only if allocation profiling is active)
     bool allocation_profiling_started_from_wrapper =
-        ddprof::context_allocation_profiling_watcher_idx(ctx) != -1;
+        ddprof::context_allocation_profiling_watcher_idx(*ctx) != -1;
 
     enum { kParentIdx, kChildIdx };
     int sockfds[2] = {-1, -1};
@@ -275,7 +241,6 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     if (daemonize_res.state == ddprof::DaemonizeResult::InitialProcess) {
       // non-daemon process: return control to caller
       defer_child_socket_close.reset();
-      defer_context_free.release();
 
       std::string dd_loader_lib_path = dd_loader_lib_holder.release();
       std::string dd_profiling_lib_path = dd_profiling_lib_holder.release();
@@ -326,12 +291,12 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
   }
 
   // Attach the profiler
-  if (IsDDResNotOK(ddprof_setup(ctx))) {
+  if (IsDDResNotOK(ddprof_setup(*ctx))) {
     LG_ERR("Failed to initialize profiling");
     return -1;
   }
 
-  defer { ddprof_teardown(ctx); };
+  defer { ddprof_teardown(*ctx); };
 
   // If we have a temp PID, then it's waiting for us to send it a signal
   // after we finish instrumenting.  This will end that process, which in
@@ -346,7 +311,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     reply.pid = getpid();
 
     int alloc_watcher_idx =
-        ddprof::context_allocation_profiling_watcher_idx(ctx);
+        ddprof::context_allocation_profiling_watcher_idx(*ctx);
     if (alloc_watcher_idx != -1) {
       ddprof::span pevents{ctx->worker_ctx.pevent_hdr.pes,
                            ctx->worker_ctx.pevent_hdr.size};
@@ -431,6 +396,7 @@ static void start_profiler(DDProfContext *ctx) {
   // ownership of context is passed to start_profiler_internal
   int res = start_profiler_internal(ctx, is_profiler);
   if (is_profiler) {
+    delete ctx;
     exit(res);
   }
   // In wrapper mode (ie. ctx->params.pid == 0), whatever happened to ddprof,
@@ -440,40 +406,50 @@ static void start_profiler(DDProfContext *ctx) {
 
 /**************************** Program Entry Point *****************************/
 int main(int argc, char *argv[]) {
-  DDProfContext ctx;
-
-  // parse inputs and populate context
-  switch (parse_input(&argc, &argv, &ctx)) {
-  case InputResult::kStop:
-    return 0;
-  case InputResult::kSuccess:
-    break;
-  case InputResult::kError:
-    [[fallthrough]];
-  default:
-    return -1;
-  }
-
+  ddprof::CommandLineWrapper cmd_line({});
   {
-    defer { ddprof::context_free(&ctx); };
-    /****************************************************************************\
+    // Use a dynamic allocation to allow clean up
+    // in other exit flows
+    DDProfContext *ctx = new DDProfContext();
+    defer { delete ctx; };
+    {
+      ddprof::DDProfCLI cli;
+      int res = cli.parse(argc, const_cast<const char **>(argv));
+      if (!cli.continue_exec) {
+        return res;
+      }
+
+      // parse inputs and populate context
+      if (IsDDResNotOK(parse_input(cli, *ctx))) {
+        return -1;
+      }
+      cmd_line = cli.get_user_command_line(); // Get the command line before cli
+                                              // goes out of scope.
+
+    } // cli is destroyed here (prevents forks from having an instance of CLI
+
+    /**************************************************************************\
     |                             Run the Profiler |
-    \****************************************************************************/
+    \**************************************************************************/
     // Ownership of context is passed to start_profiler
     // This function does not return in the context of profiler process
     // It only returns in the context of target process (ie. in non-PID mode)
-    start_profiler(&ctx);
+    start_profiler(ctx);
 
-    if (ctx.params.switch_user) {
-      if (!IsDDResOK(become_user(ctx.params.switch_user))) {
-        LG_ERR("Failed to switch to user %s", ctx.params.switch_user);
+    if (!ctx->params.switch_user.empty()) {
+      if (!IsDDResOK(become_user(ctx->params.switch_user.c_str()))) {
+        LG_ERR("Failed to switch to user %s", ctx->params.switch_user.c_str());
         return -1;
       }
     }
-  }
 
-  // Execute manages its own return path
-  if (-1 == execvp(*argv, (char *const *)argv)) {
+    if (cmd_line.get().empty()) {
+      fprintf(stderr, "Empty command line. Exiting");
+      return -1;
+    }
+  } // ctx end of life
+
+  if (-1 == execvp(cmd_line.get()[0], cmd_line.get().data())) {
     // Logger is not configured in the context of the parent process:
     // We use stderr as a standard logging mechanism
     switch (errno) {

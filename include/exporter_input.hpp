@@ -14,74 +14,21 @@
 #define LANGUAGE_DEFAULT "native"
 #define FAMILY_DEFAULT "native"
 
-typedef struct ExporterInput {
-  const char *api_key;     // Datadog api key
-  const char *environment; // ex: staging / local / prod
-  const char *host;        // agent host ex:162.184.2.1
-  const char *url;         // url (can contain port and schema)
-  const char *port; // port appended to the host IP (ignored in agentless)
-  const char
-      *service; // service to identify the profiles (ex:prof-probe-native)
-  const char *service_version;    // appended to tags (example: 1.2.1)
-  const char *do_export;          // prevent exports if needed (debug flag)
-  const char *debug_pprof_prefix; // local pprof prefix (debug)
-  string_view user_agent;         // ignored for now (override in shared lib)
-  string_view language;           // appended to the tags (set to native)
-  string_view family;
-  string_view profiler_version;
-  bool agentless; // Whether or not to actually use API key/intake
-} ExporterInput;
-
-// Proposals for other arguments (tags)
-// - intake version : Not handled (set inside libddprof)
-// - runtime
-// - OS
-
-// Possible improvement : create X table to factorize this code
-
-#define DUP_PARAM(key_name)                                                    \
-  if (src->key_name) {                                                         \
-    dest->key_name = strdup(src->key_name);                                    \
-    if (!dest->key_name) {                                                     \
-      return ddres_error(DD_WHAT_ARGUMENT);                                    \
-    }                                                                          \
-  } else                                                                       \
-    dest->key_name = NULL;
-
-static inline void exporter_input_dflt(ExporterInput *exp_input) {
-  exp_input->family = STRING_VIEW_LITERAL(FAMILY_DEFAULT);
-  exp_input->language = STRING_VIEW_LITERAL(LANGUAGE_DEFAULT);
-  exp_input->user_agent = STRING_VIEW_LITERAL(USERAGENT_DEFAULT);
-  exp_input->profiler_version = str_version();
-}
-
-static inline DDRes exporter_input_copy(const ExporterInput *src,
-                                        ExporterInput *dest) {
-  DUP_PARAM(api_key);
-  DUP_PARAM(environment);
-  DUP_PARAM(host);
-  DUP_PARAM(url);
-  DUP_PARAM(port);
-  DUP_PARAM(service);
-  DUP_PARAM(service_version);
-  DUP_PARAM(do_export);
-  DUP_PARAM(debug_pprof_prefix);
-  dest->user_agent = src->user_agent;
-  dest->language = src->language;
-  dest->family = src->family;
-  dest->profiler_version = src->profiler_version;
-  return ddres_init();
-}
-
-// free the allocated strings
-static inline void exporter_input_free(ExporterInput *exporter_input) {
-  free((char *)exporter_input->api_key);
-  free((char *)exporter_input->environment);
-  free((char *)exporter_input->host);
-  free((char *)exporter_input->url);
-  free((char *)exporter_input->port);
-  free((char *)exporter_input->service);
-  free((char *)exporter_input->service_version);
-  free((char *)exporter_input->do_export);
-  free((char *)exporter_input->debug_pprof_prefix);
-}
+struct ExporterInput {
+  std::string api_key;     // Datadog api key [hidden]
+  std::string environment; // ex: staging / local / prod
+  std::string service;
+  std::string service_version; // appended to tags (example: 1.2.1)
+  std::string host;            // agent host ex:162.184.2.1
+  std::string url;             // url (can contain port and schema)
+  std::string port; // port appended to the host IP (ignored in agentless)
+  std::string debug_pprof_prefix; // local pprof prefix (debug)
+  bool do_export{true};           // prevent exports if needed (debug flag)
+  std::string_view user_agent{
+      USERAGENT_DEFAULT}; // ignored for now (override in shared lib)
+  std::string_view language{
+      LANGUAGE_DEFAULT}; // appended to the tags (set to native)
+  std::string_view family{FAMILY_DEFAULT};
+  std::string_view profiler_version;
+  bool agentless{false}; // Whether or not to actually use API key/intake
+};

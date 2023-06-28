@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "string_view.hpp"
+#include <string_view>
 
 // Name and versions are defined in build system
 #ifndef MYNAME
@@ -26,6 +26,6 @@
 #endif
 
 /// Versions are updated in cmake files
-string_view str_version();
+std::string_view str_version();
 
 void print_version();

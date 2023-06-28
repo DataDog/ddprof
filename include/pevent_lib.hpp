@@ -20,7 +20,7 @@ DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
 DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override);
 
 /// Setup watchers = setup mmap + setup perfevent
-DDRes pevent_setup(DDProfContext *ctx, pid_t pid, int num_cpu,
+DDRes pevent_setup(DDProfContext &ctx, pid_t pid, int num_cpu,
                    PEventHdr *pevent_hdr);
 
 /// Call ioctl PERF_EVENT_IOC_ENABLE on available file descriptors
