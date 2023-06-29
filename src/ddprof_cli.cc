@@ -242,7 +242,8 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
   extended_options.push_back(
       app.add_option("--debug_pprof_prefix", exporter_input.debug_pprof_prefix,
                      "Prefix path to capture pprof files locally")
-          ->group(""));
+          ->group("")
+          ->envname("DD_PROFILING_PPROF_PREFIX"));
   extended_options.push_back(
       app.add_option("--agentless", exporter_input.agentless,
                      "Allow sending profiles directly to Datadog intake")
