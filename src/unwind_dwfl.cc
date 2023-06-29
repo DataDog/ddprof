@@ -19,6 +19,18 @@ int frame_cb(Dwfl_Frame *, void *);
 
 namespace ddprof {
 
+static DDRes check_for_jitdump_symbol(UnwindState *us, ElfAddress_t pc,
+                                      std::string_view jitdump_path,
+                                      bool &symbol_found);
+
+static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
+                            const DDProfMod &ddprof_mod,
+                            FileInfoId_t file_info_id);
+
+// check for runtime symbols provided in /tmp files
+static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
+                                      ElfAddress_t pc);
+
 DDRes unwind_init_dwfl(UnwindState *us) {
   // Create or get the dwfl object associated to cache
   us->_dwfl_wrapper = &(us->dwfl_hdr.get_or_insert(us->pid));
@@ -90,14 +102,6 @@ static void trace_unwinding_end(UnwindState *us) {
     }
   }
 }
-static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
-                            const DDProfMod &ddprof_mod,
-                            FileInfoId_t file_info_id);
-
-// check for runtime symbols provided in /tmp files
-static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
-                                      ElfAddress_t pc,
-                                      std::string_view jitdump_path);
 
 // returns an OK status if we should continue unwinding
 static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
@@ -123,6 +127,24 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     // Example: alpine 3.17
     return ddres_init();
   }
+
+  // Check for JIT
+  // if JIT exists, we don't need the DSO
+  // We will rely on frame pointer unwinding (until we add dwarf JIT Info)
+  if (pid_mapping._jitdump_addr) {
+    DsoHdr::DsoFindRes find_mapping =
+        DsoHdr::dso_find_closest(pid_mapping._map, pid_mapping._jitdump_addr);
+    if (find_mapping.second) { // jitdump exists
+      std::string_view jitdump_path = find_mapping.first->second._filename;
+      bool symbol_found;
+      DDRES_CHECK_FWD(
+          check_for_jitdump_symbol(us, pc, jitdump_path, symbol_found));
+      if (symbol_found) {
+        return ddres_init();
+      }
+    }
+  }
+
   DsoHdr::DsoFindRes find_res =
       dsoHdr.dso_find_or_backpopulate(pid_mapping, us->pid, pc);
   if (!find_res.second) {
@@ -133,16 +155,9 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     return ddres_init();
   }
   const Dso &dso = find_res.first->second;
-  std::string_view jitdump_path = {};
   if (dso::has_runtime_symbols(dso._type)) {
-    if (pid_mapping._jitdump_addr) {
-      DsoHdr::DsoFindRes find_mapping =
-          DsoHdr::dso_find_closest(pid_mapping._map, pid_mapping._jitdump_addr);
-      if (find_mapping.second) { // jitdump exists
-        jitdump_path = find_mapping.first->second._filename;
-      }
-    }
-    return add_runtime_symbol_frame(us, dso, pc, jitdump_path);
+    // Check for perf maps or add generic frame
+    return add_runtime_symbol_frame(us, dso, pc);
   }
   // if not encountered previously, update file location / key
   FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
@@ -270,30 +285,38 @@ static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
   return add_frame(symbol_idx, map_idx, pc, us);
 }
 
-// check for runtime symbols provided in /tmp files
-static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
-                                      ElfAddress_t pc,
-                                      std::string_view jitdump_path) {
+static DDRes check_for_jitdump_symbol(UnwindState *us, ElfAddress_t pc,
+                                      std::string_view jitdump_path,
+                                      bool &symbol_found) {
+  assert(!jitdump_path.empty());
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
   SymbolTable &symbol_table = unwind_symbol_hdr._symbol_table;
   RuntimeSymbolLookup &runtime_symbol_lookup =
       unwind_symbol_hdr._runtime_symbol_lookup;
-  SymbolIdx_t symbol_idx = -1;
-  if (jitdump_path.empty()) {
-    symbol_idx =
-        runtime_symbol_lookup.get_or_insert(dso._pid, pc, symbol_table);
-  } else {
-    symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
-        dso._pid, pc, symbol_table, jitdump_path);
+  SymbolIdx_t symbol_idx =
+      runtime_symbol_lookup.get_or_insert(us->pid, pc, symbol_table);
+  symbol_found = symbol_idx == -1 ? false : true;
+  if (symbol_found) {
+    return add_frame(symbol_idx, -1, pc, us);
   }
+  return ddres_init();
+}
+
+// check for runtime symbols provided in /tmp files
+static DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso,
+                                      ElfAddress_t pc) {
+  SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
+  SymbolTable &symbol_table = unwind_symbol_hdr._symbol_table;
+  RuntimeSymbolLookup &runtime_symbol_lookup =
+      unwind_symbol_hdr._runtime_symbol_lookup;
+  SymbolIdx_t symbol_idx =
+      runtime_symbol_lookup.get_or_insert(dso._pid, pc, symbol_table);
   if (symbol_idx == -1) {
     add_dso_frame(us, dso, pc, "pc");
     return ddres_init();
   }
-
   MapInfoIdx_t map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
       us->pid, us->symbol_hdr._mapinfo_table, dso, {});
-
   return add_frame(symbol_idx, map_idx, pc, us);
 }
 

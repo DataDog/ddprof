@@ -16,6 +16,7 @@ typedef struct UnwindState UnwindState;
 namespace ddprof {
 bool is_max_stack_depth_reached(const UnwindState &us);
 
+// mapping can have -1 value for empty mapping
 DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
                 UnwindState *us);
 
