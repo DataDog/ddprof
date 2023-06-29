@@ -75,7 +75,8 @@ Debug options:
   -o,--log_mode TEXT [stdout]  (Env:DD_PROFILING_NATIVE_LOG_MODE)
                               log_level, One of stdout, stderr, syslog, or disabled.
   --show_config [0]           Display the configuration.
-  -b,--internal_stats TEXT    Enables statsd metrics for " MYNAME ". Value should point to a statsd socket..
+  -b,--internal_stats TEXT (Env:DD_PROFILING_INTERNAL_STATS)
+                              Enables statsd metrics for ddprof. Value should point to a statsd socket.
                               Example: /var/run/datadog-agent/statsd.sock
   --show_samples              Display captured samples as logs.
                               

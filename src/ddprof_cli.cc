@@ -190,10 +190,12 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       ->group("Debug options");
   //
   app.add_option("--internal_stats,-b", internal_stats,
-                 "Enables statsd metrics for \" MYNAME \". Value should point "
-                 "to a statsd socket..\n"
+                 "Enables statsd metrics for " MYNAME ". Value should point "
+                 "to a statsd socket.\n"
                  "Example: /var/run/datadog-agent/statsd.sock")
-      ->group("Debug options");
+      ->group("Debug options")
+      ->envname("DD_PROFILING_INTERNAL_STATS");
+
   app.add_flag("--show_samples", show_samples,
                "Display captured samples as logs.\n")
       ->group("Debug options");
@@ -240,7 +242,8 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
   extended_options.push_back(
       app.add_option("--debug_pprof_prefix", exporter_input.debug_pprof_prefix,
                      "Prefix path to capture pprof files locally")
-          ->group(""));
+          ->group("")
+          ->envname("DD_PROFILING_PPROF_PREFIX"));
   extended_options.push_back(
       app.add_option("--agentless", exporter_input.agentless,
                      "Allow sending profiles directly to Datadog intake")

@@ -15,10 +15,19 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+static std::string_view adjust_uds_path(std::string_view path) {
+  // Check if the socket_path starts with unix://
+  static constexpr std::string_view prefix{"unix://"};
+  if (path.starts_with(prefix)) {
+    path.remove_prefix(prefix.length());
+  }
+  return path;
+}
+
 DDRes statsd_listen(std::string_view path, int *fd) {
   struct sockaddr_un addr_bind = {.sun_family = AF_UNIX};
   int fd_sock = -1;
-
+  path = adjust_uds_path(path);
   // Open the socket
   if (path.size() >= sizeof(addr_bind.sun_path) - 1) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "[STATSD] %.*s path is too long",
@@ -63,6 +72,7 @@ DDRes statsd_connect(std::string_view statsd_socket, int *fd) {
   struct sockaddr_un addr_peer = {.sun_family = AF_UNIX};
   int fd_sock = -1;
 
+  statsd_socket = adjust_uds_path(statsd_socket);
   if (statsd_socket.size() >= sizeof(addr_peer.sun_path) - 1) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "[STATSD] %.*s path is too long",
                           static_cast<int>(statsd_socket.size()),

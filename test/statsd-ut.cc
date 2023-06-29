@@ -56,7 +56,7 @@ TEST(StatsDTest, BadConnection) {
 TEST(StatsDTest, Format) {
   // Note that the result is hardcoded, based on what the spec says it should
   // be; we don't bring in any kind of statsd validation lib or compare types
-  const char path_listen[] = "/tmp/my_statsd_listener";
+  const char path_listen[] = "unix:///tmp/my_statsd_listener";
   const char answer[] = "foo:9999|g";
   unlink(path_listen); // Make sure the default listening path is available
 
