@@ -15,10 +15,11 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-std::string_view adjust_uds_path(std::string_view path) {
+static std::string_view adjust_uds_path(std::string_view path) {
   // Check if the socket_path starts with unix://
-  if (path.substr(0, 7) == "unix://") {
-    path.remove_prefix(7);
+  static constexpr std::string_view prefix{"unix://"};
+  if (path.starts_with(prefix)) {
+    path.remove_prefix(prefix.length());
   }
   return path;
 }
