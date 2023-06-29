@@ -69,7 +69,7 @@ private:
   SymbolIdx_t insert(const DDProfMod &ddprof_mod, SymbolTable &table,
                      DsoSymbolLookup &dso_symbol_lookup,
                      ProcessAddress_t process_pc, const Dso &dso,
-                     SymbolMap &map);
+                     SymbolMap &map, SymbolMap::It &it);
 
   // Symbols are ordered by file.
   // The assumption is that the elf addresses are the same across processes

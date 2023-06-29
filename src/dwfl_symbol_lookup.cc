@@ -81,14 +81,16 @@ SymbolIdx_t DwflSymbolLookup::get_or_insert(const DDProfMod &ddprof_mod,
     return find_res.first->second.get_symbol_idx();
   }
 
-  return insert(ddprof_mod, table, dso_symbol_lookup, process_pc, dso, map);
+  return insert(ddprof_mod, table, dso_symbol_lookup, process_pc, dso, map,
+                find_res.first);
 }
 
 SymbolIdx_t DwflSymbolLookup::insert(const DDProfMod &ddprof_mod,
                                      SymbolTable &table,
                                      DsoSymbolLookup &dso_symbol_lookup,
                                      ProcessAddress_t process_pc,
-                                     const Dso &dso, SymbolMap &map) {
+                                     const Dso &dso, SymbolMap &map,
+                                     SymbolMap::It &it) {
 
   Symbol symbol;
   GElf_Sym elf_sym;
@@ -128,6 +130,18 @@ SymbolIdx_t DwflSymbolLookup::insert(const DDProfMod &ddprof_mod,
     assert(0);
   }
 
+  // previous element was not within bounds, but it still matches
+  // We adjust assuming this is still the same symbol
+  if (it != map.end() &&
+      table[it->second.get_symbol_idx()]._symname == symbol._symname) {
+    if (elf_pc > it->second.get_end()) {
+#ifdef DEBUG
+      LG_NTC("Adjust to pc --> %lx - %lx", elf_pc, it->second.get_end());
+#endif
+      it->second.set_end(elf_pc);
+    }
+    return it->second.get_symbol_idx();
+  }
   {
     ElfAddress_t start_sym;
     ElfAddress_t end_sym;
@@ -146,7 +160,7 @@ SymbolIdx_t DwflSymbolLookup::insert(const DDProfMod &ddprof_mod,
       // elf section does not add up to something that makes sense
       // insert this PC without considering elf section
       start_sym = elf_pc;
-      end_sym = elf_pc + 1;
+      end_sym = elf_pc;
 #ifdef DEBUG
       LG_DBG("elf_range failure --> Insert: %lx,%lx -> %s,%d / shndx=%d",
              start_sym, end_sym, sym_ref._symname.c_str(), symbol_idx,
