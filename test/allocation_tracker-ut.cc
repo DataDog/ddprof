@@ -4,21 +4,17 @@
 // Datadog, Inc.
 #include "allocation_tracker.hpp"
 
-#include "ddprof_base.hpp"
 #include "ddprof_perf_event.hpp"
 #include "ipc.hpp"
 #include "live_allocation-c.hpp"
 #include "loghandle.hpp"
-#include "perf_watcher.hpp"
 #include "pevent_lib.hpp"
 #include "ringbuffer_holder.hpp"
-#include "ringbuffer_utils.hpp"
 #include "syscalls.hpp"
 #include "unwind.hpp"
 #include "unwind_state.hpp"
 
 #include <gtest/gtest.h>
-#include <sys/syscall.h>
 #include <unistd.h>
 
 DDPROF_NOINLINE void my_malloc(size_t size, uintptr_t addr = 0xdeadbeef) {
