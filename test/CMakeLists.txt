@@ -349,6 +349,24 @@ add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/pthread_fixes.cc
 
 add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 
+add_benchmark(
+  allocation_tracker-bench
+  allocation_tracker-bench.cc
+  ../src/lib/allocation_tracker.cc
+  ../src/pevent_lib.cc
+  ../src/perf.cc
+  ../src/perf_ringbuffer.cc
+  ../src/perf_watcher.cc
+  ../src/ringbuffer_utils.cc
+  ../src/lib/pthread_fixes.cc
+  ../src/lib/savecontext.cc
+  ../src/lib/saveregisters.cc
+  ../src/procutils.cc
+  ../src/user_override.cc
+  ../src/sys_utils.cc
+  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle DDProf::Parser
+  DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=10000)
+
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
   add_exe(
     simple_malloc-static simple_malloc.cc
