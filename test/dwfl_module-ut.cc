@@ -175,4 +175,10 @@ TEST(DwflModule, short_lived) {
   }
 }
 
+
+TEST(DwflModule, inlined) {
+
+
+}
+
 } // namespace ddprof

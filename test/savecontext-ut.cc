@@ -56,7 +56,7 @@ void funcA() {
 
 TEST(getcontext, getcontext) { funcA(); }
 
-#if defined(__x86_64__) && !defined(MUSL_LIBC)
+//#if defined(__x86_64__) && !defined(MUSL_LIBC)
 // The matrix of where it works well is slightly more complex
 // There are also differences depending on vdso (as this can be a kernel
 // mechanism). We should revisit if we needed.
@@ -125,4 +125,41 @@ TEST(getcontext, unwind_from_sighandler) {
   EXPECT_EQ(get_symbol(next_idx)._demangle_name, "funcD()");
   EXPECT_EQ(get_symbol(next_idx + 1)._demangle_name, "funcC()");
 }
-#endif
+//#endif
+
+// Retrieves instruction pointer
+#define _THIS_IP_                                                              \
+  ({                                                                           \
+    __label__ __here;                                                          \
+  __here:                                                                      \
+    (unsigned long)&&__here;                                                   \
+  })
+
+__attribute__((always_inline)) inline ElfAddress_t inlined_function() {
+  ElfAddress_t ip = _THIS_IP_;
+  LG_DBG("I captured the IP \n");
+  stack_size = save_context(retrieve_stack_bounds(), regs, stack);
+  return ip;
+}
+
+ElfAddress_t my_custom_function() {
+  ElfAddress_t ip = inlined_function();
+  LG_DBG("The ip = %lx \n", ip);
+  return ip;
+}
+
+
+TEST(getcontext, unwinding_inlined) {
+  LogHandle handle;
+  my_custom_function();
+  UnwindState state;
+  ddprof::unwind_init_sample(&state, regs, getpid(), stack_size,
+                             reinterpret_cast<char *>(stack));
+  ddprof::unwindstate__unwind(&state);
+  size_t next_idx = 0;
+  while (next_idx < state.output.locs.size() - 1) {
+    SymbolIdx_t symbol_idx = state.output.locs[next_idx]._symbol_idx;
+    LG_DBG("symbol = %s ", state.symbol_hdr._symbol_table[symbol_idx]._symname.c_str());
+    ++next_idx;
+  }
+}

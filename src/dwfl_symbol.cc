@@ -6,6 +6,7 @@
 #include "dwfl_symbol.hpp"
 
 #include "dwfl_internals.hpp"
+//#include "elfutils/dwarf.h"
 #include "logger.hpp"
 
 #include <cassert>
@@ -69,6 +70,10 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
       symbol._srcpath = std::string(localsrcpath);
       symbol._lineno = static_cast<uint32_t>(linep);
     }
+    LG_DBG("Lets try from line %u / %s / %s / %lx / %lx\n",
+           symbol._lineno,
+           symbol._srcpath.c_str(),
+           symbol._demangle_name.c_str(), process_pc, lbias);
 #ifdef DEBUG
     dwfl_error_value = dwfl_errno();
     if (unlikely(dwfl_error_value)) {
@@ -79,6 +84,26 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
 #else
     dwfl_errno();
 #endif
+    Dwarf_Addr addr = process_pc;  // The address at which you want to check inlining information.
+    Dwarf_Die *cudie = dwfl_linecu(line); // The compilation unit DIE.
+    Dwarf_Die *scopes;
+    int nscopes = dwarf_getscopes_die(cudie, &scopes);
+    LG_DBG("Found %d scopes \n", nscopes);
+    for (int i = 0; i < nscopes; ++i) {
+      LG_DBG("dwarf tag = %d - %s\n", dwarf_tag(&scopes[i]),
+             dwarf_diename(&scopes[i]));
+    }
+    Dwarf_Addr dw_bias;
+    Dwarf *dwarf = dwfl_module_getdwarf(mod, &dw_bias);
+    Dwarf_Line *dwarf_line = dwfl_dwarf_line (line, &dw_bias);
+    LG_DBG("dwarf %p - dwarf_line %p\n", dwarf, dwarf_line);
+    if (dwarf && line) {
+      const char *inline_func_name = dwarf_linefunctionname(dwarf, dwarf_line);
+      LG_DBG("inlined func = %p\n", inline_func_name);
+      if (inline_func_name) {
+        LG_DBG("Inlined function %s \n", inline_func_name);
+      }
+    }
   }
   return symbol_success;
 }

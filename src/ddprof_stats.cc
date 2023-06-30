@@ -54,7 +54,7 @@ DDRes ddprof_stats_free() {
 
 DDRes ddprof_stats_add(unsigned int stat, long in, long *out) {
   if (!ddprof_stats)
-    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Stats backend uninitialized");
+    return ddres_init();
   if (stat >= STATS_LEN)
     DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Invalid stat");
 
@@ -67,7 +67,7 @@ DDRes ddprof_stats_add(unsigned int stat, long in, long *out) {
 
 DDRes ddprof_stats_set(unsigned int stat, long n) {
   if (!ddprof_stats)
-    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Stats backend uninitialized");
+    return ddres_init();
   if (stat >= STATS_LEN)
     DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Invalid stat");
   ddprof_stats[stat] = n;
@@ -76,7 +76,7 @@ DDRes ddprof_stats_set(unsigned int stat, long n) {
 
 DDRes ddprof_stats_divide(unsigned int stat, long n) {
   if (!ddprof_stats)
-    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Stats backend uninitialized");
+    return ddres_init();
   if (stat >= STATS_LEN)
     DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Invalid stat");
   ddprof_stats[stat] /= n;
@@ -89,7 +89,7 @@ DDRes ddprof_stats_clear(unsigned int stat) {
 
 DDRes ddprof_stats_clear_all() {
   if (!ddprof_stats)
-    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Stats backend uninitialized");
+    return ddres_init();
 
   // Note:  we leave the DDRes returns here uncollected, since the loop bounds
   //        are strongly within the ddprof_stats bounds and we've already
@@ -103,7 +103,7 @@ DDRes ddprof_stats_clear_all() {
 
 DDRes ddprof_stats_get(unsigned int stat, long *out) {
   if (!ddprof_stats)
-    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Stats backend uninitialized");
+    return ddres_init();
   if (stat >= STATS_LEN)
     DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Invalid stat");
 
