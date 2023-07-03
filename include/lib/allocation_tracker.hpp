@@ -16,6 +16,7 @@
 #include <mutex>
 #include <random>
 #include <unordered_set>
+#include <junction/ConcurrentMap_Grampa.h>
 
 namespace ddprof {
 
