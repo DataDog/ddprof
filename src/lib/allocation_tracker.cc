@@ -98,6 +98,7 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
                               const RingBufferInfo &ring_buffer) {
   _sampling_interval = mem_profile_interval;
   _deterministic_sampling = deterministic_sampling;
+  _sample_stack_user = sample_stack_user;
   if (ring_buffer.ring_buffer_type !=
       static_cast<int>(RingBufferType::kMPSCRingBuffer)) {
     return ddres_error(DD_WHAT_PERFRB);
@@ -364,8 +365,8 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
     DDRES_CHECK_FWD(push_lost_sample(writer, notify_consumer));
   }
 
-  auto buffer = writer.reserve(sizeof(AllocationEvent) + _sample_stack_user - 1,
-                               &timeout);
+  auto buffer =
+      writer.reserve(SizeOfAllocationEvent(_sample_stack_user), &timeout);
 
   if (buffer.empty()) {
     // ring buffer is full, increase lost count
@@ -381,7 +382,7 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
 
   AllocationEvent *event = reinterpret_cast<AllocationEvent *>(buffer.data());
   event->hdr.misc = 0;
-  event->hdr.size = sizeof(AllocationEvent);
+  event->hdr.size = SizeOfAllocationEvent(_sample_stack_user);
   event->hdr.type = PERF_RECORD_SAMPLE;
   event->abi = PERF_SAMPLE_REGS_ABI_64;
   event->sample_id.time = 0;
@@ -404,10 +405,15 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
   event->period = allocated_size;
-  event->size = _sample_stack_user;
+  event->size_stack = _sample_stack_user;
 
-  event->dyn_size = save_context(tl_state.stack_bounds, event->regs,
-                                 ddprof::Buffer{event->data, event->size});
+  std::byte *dyn_size_pos = event->data + _sample_stack_user;
+  uint64_t *dyn_size = reinterpret_cast<uint64_t *>(dyn_size_pos);
+
+  assert(reinterpret_cast<uintptr_t>(dyn_size) % alignof(uint64_t) == 0);
+
+  (*dyn_size) = save_context(tl_state.stack_bounds, event->regs,
+                             ddprof::Buffer{event->data, event->size_stack});
   // Even if dyn_size == 0, we keep the sample
   // This way, the overall accounting is correct (even with empty stacks)
   if (writer.commit(buffer) || notify_consumer) {

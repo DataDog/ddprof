@@ -237,7 +237,6 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
   }
   if (PERF_SAMPLE_STACK_USER & mask) {
     uint64_t size_stack = *buf++;
-
     // Empirically, it seems that the size of the static stack is either 0 or
     // the amount requested in the call to `perf_event_open()`.  We don't
     // check for that, since there isn't much we'd be able to do anyway.
@@ -252,7 +251,6 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
 
       // If the size was specified, we also have a dyn_size
       dynsz_stack = *buf++;
-
       // If the dyn_size is too big, zero out the stack size since it is
       // likely an error
       sample.size_stack = size_stack < dynsz_stack ? 0 : dynsz_stack;
