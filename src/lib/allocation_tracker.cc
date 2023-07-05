@@ -5,6 +5,7 @@
 
 #include "allocation_tracker.hpp"
 
+#include "allocation_event.hpp"
 #include "ddprof_perf_event.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
@@ -20,24 +21,10 @@
 #include <cassert>
 #include <cstdint>
 #include <cstdlib>
-#include <linux/perf_event.h>
-#include <sys/types.h>
+
 #include <unistd.h>
 
 namespace ddprof {
-
-struct AllocationEvent {
-  perf_event_header hdr;
-  struct sample_id sample_id;
-  uint64_t addr; /* if PERF_SAMPLE_ADDR */
-  uint64_t period;
-  uint64_t abi;                   /* if PERF_SAMPLE_REGS_USER */
-  uint64_t regs[PERF_REGS_COUNT]; /* if PERF_SAMPLE_REGS_USER */
-  uint64_t size;                  /* if PERF_SAMPLE_STACK_USER */
-  std::byte data[1]; /* if PERF_SAMPLE_STACK_USER, the actual size will be
-                        determined at runtime */
-  uint64_t dyn_size; /* if PERF_SAMPLE_STACK_USER && size != 0 */
-};
 
 struct LostEvent {
   perf_event_header hdr;

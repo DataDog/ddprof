@@ -262,8 +262,9 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
           ->group(""));
   extended_options.push_back(
       app.add_option("--sample_stack_user", default_sample_stack_user,
-                     "Default sample size for the user's stack."
-                     "This setting can help with truncated stack traces.")
+                     "Sample size for the user's stack."
+                     "This setting can help with truncated stack traces."
+                     "Maximum value is 65528 (<USHORT_MAX and 8Bytes aligned).")
           ->default_val(k_default_perf_sample_stack_user)
           ->envname("DD_PROFILING_SAMPLE_STACK_USER")
           ->group(""));
