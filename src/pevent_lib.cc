@@ -75,11 +75,16 @@ int pevent_compute_min_mmap_order(int min_buffer_size_order,
 // set info for a perf_event_open type of buffer
 static void pevent_set_info(int fd, int attr_idx, PEvent &pevent,
                             uint32_t sample_stack_user) {
+  static bool log_once = true;
   pevent.fd = fd;
   pevent.mapfd = fd;
   int buffer_size_order =
       pevent_compute_min_mmap_order(DEFAULT_BUFF_SIZE_SHIFT, sample_stack_user);
-  LG_NTC("Buffer size order = %d", buffer_size_order);
+  if (buffer_size_order > DEFAULT_BUFF_SIZE_SHIFT && log_once) {
+    LG_NTC("Increasing size order of the ring buffer to %d (from %d)",
+           buffer_size_order, DEFAULT_BUFF_SIZE_SHIFT);
+    log_once = false; // avoid flooding for all CPUs
+  }
   pevent.ring_buffer_size = perf_mmap_size(buffer_size_order);
   pevent.custom_event = false;
   pevent.ring_buffer_type = RingBufferType::kPerfRingBuffer;
