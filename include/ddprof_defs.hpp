@@ -13,8 +13,10 @@
 // Maximum depth for a single stack
 #define DD_MAX_STACK_DEPTH 512
 
-// default stack size for perf_event_open
-constexpr unsigned long k_default_perf_sample_stack_user = (4096UL * 8);
+// Sample stack size must a multiple of 8 and strictly inferior to 2^16
+// The type is uint32 to be consistent with the perf_event interface
+// Check linux sources for a reference to this check
+constexpr uint32_t k_default_perf_sample_stack_user = (4096UL * 8);
 
 constexpr int k_size_api_key = 32;
 

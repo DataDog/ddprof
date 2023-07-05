@@ -59,6 +59,22 @@ void write_config_file(const CLI::App &app, const std::string &file_path) {
   out_file << app.config_to_str();
   out_file.close();
 }
+
+using Validator = CLI::Validator;
+struct SampleStackSizeValidator : public Validator {
+  SampleStackSizeValidator() {
+    name_ = "SAMPLE_STACK_SIZE";
+    func_ = [](const std::string &str) {
+      int value = std::stoi(str);
+      if (value >= USHRT_MAX || value % 8 != 0) {
+        return std::string("Invalid sample_stack_user value. Value should be "
+                           "less than USHRT_MAX and a multiple of 8.");
+      } else {
+        return std::string();
+      }
+    };
+  }
+};
 } // namespace
 
 int DDProfCLI::parse(int argc, const char *argv[]) {
@@ -267,7 +283,8 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
                      "Maximum value is 65528 (<USHORT_MAX and 8Bytes aligned).")
           ->default_val(k_default_perf_sample_stack_user)
           ->envname("DD_PROFILING_SAMPLE_STACK_USER")
-          ->group(""));
+          ->group("")
+          ->check(SampleStackSizeValidator()));
 
   // Parse
   CLI11_PARSE(app, argc, argv);

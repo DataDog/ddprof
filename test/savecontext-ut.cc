@@ -13,7 +13,6 @@
 #include "unwind.hpp"
 #include "unwind_state.hpp"
 
-#include "ddprof_defs.hpp"
 #include <algorithm>
 #include <condition_variable>
 #include <mutex>

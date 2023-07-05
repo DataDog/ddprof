@@ -21,9 +21,6 @@
 
 #define PSAMPLE_DEFAULT_WAKEUP_MS 100 // sample frequency check
 
-// Sample stack size must a multiple of 8 and strictly inferior to 2^32
-// #define PERF_SAMPLE_STACK_SIZE (4096U * 8)
-
 struct read_format {
   uint64_t value;        // The value of the event
   uint64_t time_enabled; // if PERF_FORMAT_TOTAL_TIME_ENABLED
