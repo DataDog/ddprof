@@ -16,6 +16,7 @@
 namespace ddprof {
 
 DDRes add_preset(std::string_view preset, bool pid_or_global_mode,
+                 uint32_t default_sample_stack_user,
                  std::vector<PerfWatcher> &watchers) {
   using namespace std::literals;
   static Preset presets[] = {
@@ -38,7 +39,7 @@ DDRes add_preset(std::string_view preset, bool pid_or_global_mode,
   }
 
   std::vector<PerfWatcher> new_watchers;
-  if (!watchers_from_str(it->events, new_watchers)) {
+  if (!watchers_from_str(it->events, new_watchers, default_sample_stack_user)) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
                            "Invalid event/tracepoint (%s)", it->events);
   }

@@ -300,7 +300,9 @@ opt:
              g_accum_event_conf.raw_offset = $3;
            }
            break;
-
+         case EventConfField::kSampleStackUser:
+            g_accum_event_conf.sample_stack_user = $3;
+            break;
          case EventConfField::kPeriod:
          case EventConfField::kFrequency:
            // If the cadence has already been set, it's an error
@@ -315,7 +317,6 @@ opt:
            if ($$ == EventConfField::kFrequency)
              g_accum_event_conf.cad_type = EventConfCadenceType::kFrequency;
            break;
-
          default: VAL_ERROR(); break;
        }
      }

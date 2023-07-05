@@ -53,6 +53,7 @@ public:
 
   static DDRes allocation_tracking_init(uint64_t allocation_profiling_rate,
                                         uint32_t flags,
+                                        uint32_t sample_stack_user,
                                         const RingBufferInfo &ring_buffer);
   static void allocation_tracking_free();
 
@@ -85,7 +86,7 @@ private:
   uint64_t next_sample_interval();
 
   DDRes init(uint64_t mem_profile_interval, bool deterministic_sampling,
-             const RingBufferInfo &ring_buffer);
+             uint32_t sample_stack_user, const RingBufferInfo &ring_buffer);
   void free();
 
   static AllocationTracker *create_instance();
@@ -108,6 +109,7 @@ private:
 
   TrackerState _state;
   uint64_t _sampling_interval;
+  uint32_t _sample_stack_user;
   std::mt19937 _gen;
   PEvent _pevent;
   bool _deterministic_sampling;

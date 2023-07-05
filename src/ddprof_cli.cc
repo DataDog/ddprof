@@ -260,6 +260,13 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
                      "Profiler's IPC socket, as a file descriptor")
           ->envname("DD_PROFILING_NATIVE_SOCKET")
           ->group(""));
+  extended_options.push_back(
+      app.add_option("--sample_stack_user", default_sample_stack_user,
+                     "Default sample size for the user's stack."
+                     "This setting can help with truncated stack traces.")
+          ->default_val(k_default_perf_sample_stack_user)
+          ->envname("DD_PROFILING_SAMPLE_STACK_USER")
+          ->group(""));
 
   // Parse
   CLI11_PARSE(app, argc, argv);
@@ -304,7 +311,7 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
 DDRes DDProfCLI::add_watchers_from_events(
     std::vector<PerfWatcher> &watchers) const {
   for (const auto &el : events) {
-    if (!watchers_from_str(el.c_str(), watchers)) {
+    if (!watchers_from_str(el.c_str(), watchers, default_sample_stack_user)) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
                              "Invalid event/tracepoint (%s)", el.c_str());
     }
@@ -387,6 +394,11 @@ void DDProfCLI::print() const {
     PRINT_NFO("  - show_samples: %s", show_samples ? "true" : "false");
   }
   PRINT_NFO("  - fault_info: %s", fault_info ? "true" : "false");
+
+  if (default_sample_stack_user != k_default_perf_sample_stack_user) {
+    PRINT_NFO("Extended:");
+    PRINT_NFO("  - sample_stack_user: %u", default_sample_stack_user);
+  }
 }
 
 CommandLineWrapper DDProfCLI::get_user_command_line() const {

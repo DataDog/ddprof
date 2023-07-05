@@ -381,5 +381,46 @@ TEST(DDProfContext, env_variable_with_extra_semicolons) {
   EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sCPU);
   EXPECT_EQ(ctx.watchers[0].sample_period, 1000);
 }
+TEST(DDProfContext, stack_size) {
+  LogHandle handle;
+  // Set environment variable
+  setenv(k_events_env_variable, "sCPU sample_stack_user=65536;", 1);
+  defer { unsetenv(k_events_env_variable); };
+
+  // Init CLI and parse inputs
+  DDProfCLI ddprof_cli;
+  const char *input_values[] = {MYNAME, "my_program"};
+
+  int res = ddprof_cli.parse(std::size(input_values), input_values);
+  ASSERT_EQ(res, 0);
+  ASSERT_EQ(ddprof_cli.command_line.size(), 1);
+  EXPECT_EQ(ddprof_cli.command_line.back(), "my_program");
+
+  // Assert parsed parameters
+  ASSERT_EQ(ddprof_cli.events.size(), 1);
+
+  DDProfContext ctx;
+  DDRes ddres = context_set(ddprof_cli, ctx);
+  EXPECT_TRUE(IsDDResOK(ddres));
+
+  ASSERT_EQ(ctx.watchers.size(), 1);
+  EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sCPU);
+  EXPECT_EQ(ctx.watchers[0].options.sample_stack_user, 65536);
+}
+
+TEST(DDProfContext, default_stack_size) {
+  LogHandle handle;
+  // Init CLI and parse inputs
+  DDProfCLI ddprof_cli;
+  const char *input_values[] = {MYNAME, "--sample_stack_user", "65536",
+                                "--show_config", "my_program"};
+  int res = ddprof_cli.parse(std::size(input_values), input_values);
+  ASSERT_EQ(res, 0);
+  DDProfContext ctx;
+  DDRes ddres = context_set(ddprof_cli, ctx);
+  EXPECT_TRUE(IsDDResOK(ddres));
+  EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sCPU);
+  EXPECT_EQ(ctx.watchers[0].options.sample_stack_user, 65536);
+}
 
 } // namespace ddprof

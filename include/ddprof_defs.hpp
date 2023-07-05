@@ -13,6 +13,9 @@
 // Maximum depth for a single stack
 #define DD_MAX_STACK_DEPTH 512
 
+// default stack size for perf_event_open
+constexpr unsigned long k_default_perf_sample_stack_user = (4096UL * 8);
+
 constexpr int k_size_api_key = 32;
 
 // Linux Inode type

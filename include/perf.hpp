@@ -21,11 +21,8 @@
 
 #define PSAMPLE_DEFAULT_WAKEUP_MS 100 // sample frequency check
 
-// Sample stack size must a multiple of 8 and strictly inferior to 2^16
-// Note that since maximum perf_event_hdr size is 2^16-1 and there are other
-// data/headers in perf_event struct, actual maximum stack sample size returned
-// as `size_stack` might be smaller then the requested size
-#define PERF_SAMPLE_STACK_SIZE (4096UL * 8)
+// Sample stack size must a multiple of 8 and strictly inferior to 2^32
+// #define PERF_SAMPLE_STACK_SIZE (4096U * 8)
 
 struct read_format {
   uint64_t value;        // The value of the event

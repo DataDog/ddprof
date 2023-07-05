@@ -31,12 +31,12 @@ struct AllocationEvent {
   struct sample_id sample_id;
   uint64_t addr; /* if PERF_SAMPLE_ADDR */
   uint64_t period;
-  uint64_t abi;                           /* if PERF_SAMPLE_REGS_USER */
-  uint64_t regs[PERF_REGS_COUNT];         /* if PERF_SAMPLE_REGS_USER */
-  uint64_t size;                          /* if PERF_SAMPLE_STACK_USER */
-  std::byte data[PERF_SAMPLE_STACK_SIZE]; /* if PERF_SAMPLE_STACK_USER */
-  uint64_t dyn_size;                      /* if PERF_SAMPLE_STACK_USER &&
-                                        size != 0 */
+  uint64_t abi;                   /* if PERF_SAMPLE_REGS_USER */
+  uint64_t regs[PERF_REGS_COUNT]; /* if PERF_SAMPLE_REGS_USER */
+  uint64_t size;                  /* if PERF_SAMPLE_STACK_USER */
+  std::byte data[1]; /* if PERF_SAMPLE_STACK_USER, the actual size will be
+                        determined at runtime */
+  uint64_t dyn_size; /* if PERF_SAMPLE_STACK_USER && size != 0 */
 };
 
 struct LostEvent {
@@ -79,7 +79,7 @@ AllocationTracker *AllocationTracker::create_instance() {
 
 DDRes AllocationTracker::allocation_tracking_init(
     uint64_t allocation_profiling_rate, uint32_t flags,
-    const RingBufferInfo &ring_buffer) {
+    uint32_t sample_stack_user, const RingBufferInfo &ring_buffer) {
   ReentryGuard guard(&_tl_state.reentry_guard);
 
   AllocationTracker *instance = create_instance();
@@ -96,7 +96,8 @@ DDRes AllocationTracker::allocation_tracking_init(
   ::free(p);
 
   DDRES_CHECK_FWD(instance->init(allocation_profiling_rate,
-                                 flags & kDeterministicSampling, ring_buffer));
+                                 flags & kDeterministicSampling,
+                                 sample_stack_user, ring_buffer));
   _instance = instance;
 
   state.init(true, flags & kTrackDeallocations);
@@ -106,6 +107,7 @@ DDRes AllocationTracker::allocation_tracking_init(
 
 DDRes AllocationTracker::init(uint64_t mem_profile_interval,
                               bool deterministic_sampling,
+                              uint32_t sample_stack_user,
                               const RingBufferInfo &ring_buffer) {
   _sampling_interval = mem_profile_interval;
   _deterministic_sampling = deterministic_sampling;
@@ -375,7 +377,8 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
     DDRES_CHECK_FWD(push_lost_sample(writer, notify_consumer));
   }
 
-  auto buffer = writer.reserve(sizeof(AllocationEvent), &timeout);
+  auto buffer = writer.reserve(sizeof(AllocationEvent) + _sample_stack_user - 1,
+                               &timeout);
 
   if (buffer.empty()) {
     // ring buffer is full, increase lost count
@@ -414,7 +417,7 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
   event->period = allocated_size;
-  event->size = PERF_SAMPLE_STACK_SIZE;
+  event->size = _sample_stack_user;
 
   event->dyn_size = save_context(tl_state.stack_bounds, event->regs,
                                  ddprof::Buffer{event->data, event->size});

@@ -13,6 +13,7 @@
 #include "unwind.hpp"
 #include "unwind_state.hpp"
 
+#include "ddprof_defs.hpp"
 #include <algorithm>
 #include <condition_variable>
 #include <mutex>
@@ -22,7 +23,7 @@
 DDPROF_NOINLINE void funcA();
 DDPROF_NOINLINE void funcB();
 
-std::byte stack[PERF_SAMPLE_STACK_SIZE];
+std::byte stack[k_default_perf_sample_stack_user];
 
 void funcB() {
   UnwindState state;

@@ -328,6 +328,8 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
             static_cast<int>(event_it->ring_buffer_type);
         reply.allocation_profiling_rate =
             ctx->watchers[alloc_watcher_idx].sample_period;
+        reply.sample_stack_user =
+            ctx->watchers[alloc_watcher_idx].options.sample_stack_user;
 
         if (ctx->watchers[alloc_watcher_idx].output_mode ==
             EventConfMode::kLiveCallgraph) {

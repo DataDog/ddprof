@@ -269,7 +269,8 @@ static DDRes ddprof_unwind_sample(DDProfContext &ctx, perf_event_sample *sample,
    * That's why we consider the stack as truncated in input only if it is also
    * detected as incomplete during unwinding.
    */
-  if (sample->size_stack == ctx.watchers[watcher_pos].sample_stack_size &&
+  if (sample->size_stack ==
+          ctx.watchers[watcher_pos].options.sample_stack_user &&
       us->output.is_incomplete) {
     ddprof_stats_add(STATS_UNWIND_TRUNCATED_INPUT, 1, nullptr);
   }

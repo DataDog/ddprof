@@ -52,7 +52,7 @@ bool watcher_has_countable_sample_type(const PerfWatcher *watcher) {
 }
 
 #define X_EVENTS(a, b, c, d, e, f, g)                                          \
-  {DDPROF_PWE_##a, b, BASE_STYPES, c, d, {e}, f, PERF_SAMPLE_STACK_SIZE, g},
+  {DDPROF_PWE_##a, b, BASE_STYPES, c, d, {e}, f, g},
 
 #define X_STR(a, b, c, d, e, f, g) #a,
 const char *event_type_name_from_idx(int idx) {
@@ -95,7 +95,6 @@ const PerfWatcher *tracepoint_default_watcher() {
       .type = PERF_TYPE_TRACEPOINT,
       .sample_period = 1,
       .sample_type_id = DDPROF_PWT_TRACEPOINT,
-      .sample_stack_size = PERF_SAMPLE_STACK_SIZE,
       .options = {.use_kernel = PerfWatcherUseKernel::kRequired},
       .value_scale = 1.0,
   };
@@ -128,6 +127,7 @@ void log_watcher(const PerfWatcher *w, int idx) {
             sample_type_name_from_idx(w->sample_type_id),
             w->tracepoint_event.c_str(), w->tracepoint_group.c_str(),
             w->tracepoint_label.c_str());
+  PRINT_NFO("    Sample user Stack Size: %u", w->options.sample_stack_user);
 
   if (w->options.is_freq)
     PRINT_NFO("    Cadence: Freq, Freq: %lu", w->sample_frequency);

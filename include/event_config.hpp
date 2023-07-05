@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "ddprof_defs.hpp"
+
 #include <stdint.h>
 #include <string>
 #include <vector>
@@ -141,25 +143,31 @@ enum class EventConfField {
    *  The `perf_event` register number to use for sample normalization.  In a
    *  future patch, the user will be able to use register names.
    */
+  kSampleStackUser,
+  /*
+   *  The `perf_event` sample stack user, which can define if unwinding
+   *  will be truncated (bsased on size of the stacks).
+   */
 };
 
 struct EventConf {
-  EventConfMode mode;
+  EventConfMode mode{};
 
-  int64_t id;
+  int64_t id{};
 
-  std::string eventname;
-  std::string groupname;
-  std::string label;
+  std::string eventname{};
+  std::string groupname{};
+  std::string label{};
 
-  EventConfValueSource value_source;
-  uint8_t register_num;
-  uint8_t raw_size;
-  uint64_t raw_offset;
-  double value_scale;
+  EventConfValueSource value_source{};
+  uint8_t register_num{};
+  uint8_t raw_size{};
+  uint64_t raw_offset{};
+  uint32_t sample_stack_user{k_default_perf_sample_stack_user};
+  double value_scale{};
 
-  EventConfCadenceType cad_type;
-  int64_t cadence;
+  EventConfCadenceType cad_type{};
+  int64_t cadence{};
 
   void clear() { *this = EventConf{}; }
 };
