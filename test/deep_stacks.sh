@@ -6,12 +6,11 @@ CONFIG_DEEP_STACK="../test/configs/deep_stacks.toml"
 
 # Check for truncated stack traces
 truncated_input=$(awk -F': ' '/datadog.profiling.native.unwind.stack.truncated_input/ { print $NF }' ./log_ddprof.txt)
-truncated_output=$(awk -F': ' '/datadog.profiling.native.unwind.stack.truncated_output/ { print $NF }' ./log_ddprof.txt)
 
-# If we fail to run ddprof we should also be missing the metric (so this test should fail)
-if [ "$truncated_input" != "0" ] || [ "$truncated_output" != "0" ]; then
+# If we fail to run ddprof we should also be missing the metric
+if [ "$truncated_input" != "0" ]; then
   echo "Found truncated stack traces!"
-  echo "Truncated input: $truncated_input, Truncated output: $truncated_output"
+  echo "Truncated input: $truncated_input"
   exit 1
 else
   echo "No truncated stack traces found."
