@@ -23,7 +23,7 @@ struct InternalResponseMessage {
   int32_t pid;
   int64_t mem_size;
   int64_t allocation_profiling_rate;
-  uint32_t sample_stack_user;
+  uint32_t stack_sample_size;
   int32_t ring_buffer_type;
   int32_t allocation_flags;
 };
@@ -259,7 +259,7 @@ DDRes send(UnixSocket &socket, const ReplyMessage &msg) {
       .pid = msg.pid,
       .mem_size = msg.ring_buffer.mem_size,
       .allocation_profiling_rate = msg.allocation_profiling_rate,
-      .sample_stack_user = msg.sample_stack_user,
+      .stack_sample_size = msg.stack_sample_size,
       .ring_buffer_type = msg.ring_buffer.ring_buffer_type,
       .allocation_flags = msg.allocation_flags};
   socket.send(to_byte_span(&data), fd_span, ec);
@@ -291,7 +291,7 @@ DDRes receive(UnixSocket &socket, ReplyMessage &msg) {
   msg.pid = data.pid;
   msg.request = data.request;
   msg.allocation_profiling_rate = data.allocation_profiling_rate;
-  msg.sample_stack_user = data.sample_stack_user;
+  msg.stack_sample_size = data.stack_sample_size;
   msg.ring_buffer.mem_size = data.mem_size;
   msg.ring_buffer.ring_buffer_type = data.ring_buffer_type;
   msg.ring_buffer.ring_fd = fds[0];

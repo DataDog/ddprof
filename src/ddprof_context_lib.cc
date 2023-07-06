@@ -101,7 +101,7 @@ DDRes context_add_watchers(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
     bool pid_or_global_mode =
         (ddprof_cli.global || ddprof_cli.pid) && ctx.params.sockfd == -1;
     DDRES_CHECK_FWD(add_preset(preset, pid_or_global_mode,
-                               ddprof_cli.default_sample_stack_user, watchers));
+                               ddprof_cli.default_stack_sample_size, watchers));
   }
 
   // Add a dummy watcher if needed

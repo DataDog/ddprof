@@ -127,7 +127,7 @@ void log_watcher(const PerfWatcher *w, int idx) {
             sample_type_name_from_idx(w->sample_type_id),
             w->tracepoint_event.c_str(), w->tracepoint_group.c_str(),
             w->tracepoint_label.c_str());
-  PRINT_NFO("    Sample user Stack Size: %u", w->options.sample_stack_user);
+  PRINT_NFO("    Sample user Stack Size: %u", w->options.stack_sample_size);
 
   if (w->options.is_freq)
     PRINT_NFO("    Cadence: Freq, Freq: %lu", w->sample_frequency);
@@ -178,6 +178,7 @@ std::string_view watcher_help_text() {
 "- `n|arg_num|argno`: Argument number to retrieve a value associated with this event.\n"
 "- `p|period|per`: Period of the event.\n"
 "- `r|register|regno`: Register to retrieve the value associated with this event.\n"
+"- `st|stack_sample_size|stcksz : Same as the stack_sample_size input option for this event."
 "- `o|raw_offset|rawoff`: Raw offset to retrieve the value associated with this event.\n"
 "- `z|raw_size|rawsz`: Raw size associated to raw offset.\n\n"
 "Disclaimer:\n"

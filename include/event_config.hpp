@@ -143,11 +143,11 @@ enum class EventConfField {
    *  The `perf_event` register number to use for sample normalization.  In a
    *  future patch, the user will be able to use register names.
    */
-  kSampleStackUser,
+  kStackSampleSize,
   /*
-   *  The `perf_event` sample stack user. Defines the size of samples that are
-   *  copied from the user application. This also relates to how far we can
-   *  unwind.
+   *  The `perf_event` setting on stack size. Defines the size of samples that
+   * are copied from the user application. This will define how far we can
+   * unwind.
    */
 };
 
@@ -164,7 +164,7 @@ struct EventConf {
   uint8_t register_num{};
   uint8_t raw_size{};
   uint64_t raw_offset{};
-  uint32_t sample_stack_user{k_default_perf_sample_stack_user};
+  uint32_t stack_sample_size{k_default_perf_stack_sample_size};
   double value_scale{};
 
   EventConfCadenceType cad_type{};
@@ -173,6 +173,5 @@ struct EventConf {
   void clear() { *this = EventConf{}; }
 };
 
-int EventConf_parse(
-    const char *msg,
-    std::vector<EventConf> &event_configs); // Provided by generated code
+int EventConf_parse(const char *msg, const EventConf &template_conf,
+                    std::vector<EventConf> &event_configs);

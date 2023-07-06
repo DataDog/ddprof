@@ -56,7 +56,7 @@ public:
 
   // extended
   std::string cpu_affinity;
-  uint32_t default_sample_stack_user{k_default_perf_sample_stack_user};
+  uint32_t default_stack_sample_size{k_default_perf_stack_sample_size};
   bool show_samples{false};
   bool fault_info{true};
   bool help_extended{false};

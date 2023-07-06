@@ -65,7 +65,7 @@ m|mode                      DISPATCH(Mode)
 n|arg_num|argno             DISPATCH(Parameter)
 o|raw_offset|rawoff         DISPATCH(RawOffset)
 p|period|per                DISPATCH(Period)
-s|sample_stack_user|stckusr DISPATCH(SampleStackUser)
+st|stack_sample_size|stcksz DISPATCH(StackSampleSize)
 r|register|regno            DISPATCH(Register)
 z|raw_size|rawsz            DISPATCH(RawSize)
 

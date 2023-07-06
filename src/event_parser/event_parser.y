@@ -109,7 +109,7 @@ void conf_print(const EventConf *tp) {
     printf("  location: register (%d)\n", tp->register_num);
   else if (tp->value_source == EventConfValueSource::kRaw)
     printf("  location: raw event (%lu with size %d bytes)\n", tp->raw_offset, tp->raw_size);
-
+  printf("  stack_sample_size: %u\n", tp->stack_sample_size);
   if (tp->value_scale != 0)
     printf("  scaling factor: %f\n", tp->value_scale);
 
@@ -132,8 +132,8 @@ void yyerror(yyscan_t scanner, const char *str) {
    YYABORT;  \
  } while(0)
 
- int EventConf_parse(const char *msg, std::vector<EventConf>& event_configs) {
-  g_accum_event_conf.clear();
+ int EventConf_parse(const char *msg, const EventConf &template_conf, std::vector<EventConf>& event_configs) {
+  g_accum_event_conf = template_conf;
   g_event_configs = &event_configs;
   int ret = -1;
   yyscan_t scanner = NULL;
@@ -300,8 +300,9 @@ opt:
              g_accum_event_conf.raw_offset = $3;
            }
            break;
-         case EventConfField::kSampleStackUser:
-            g_accum_event_conf.sample_stack_user = $3;
+         case EventConfField::kStackSampleSize:
+            g_accum_event_conf.stack_sample_size = $3;
+            printf("set value to %u \n", g_accum_event_conf.stack_sample_size);
             break;
          case EventConfField::kPeriod:
          case EventConfField::kFrequency:

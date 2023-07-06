@@ -6,6 +6,7 @@
 #pragma once
 
 #include "ddprof_defs.hpp"
+
 #include <stddef.h> // size_t
 #include <stdint.h> // uint64_t
 #include <vector>
@@ -31,4 +32,4 @@ bool arg_yesno(const char *str, int mode);
 
 bool watchers_from_str(
     const char *str, std::vector<PerfWatcher> &watchers,
-    uint32_t sample_stack_user = k_default_perf_sample_stack_user);
+    uint32_t stack_sample_size = k_default_perf_stack_sample_size);

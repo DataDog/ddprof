@@ -14,9 +14,17 @@
 #define DD_MAX_STACK_DEPTH 512
 
 // Sample stack size must a multiple of 8 and strictly inferior to 2^16
+// Note that since maximum perf_event_hdr size is 2^16-1 and there are other
+// data/headers in perf_event struct, actual maximum stack sample size returned
+// as `size_stack` might be smaller then the requested size
 // The type is uint32 to be consistent with the perf_event interface
-// Check linux sources for a reference to this check
-constexpr uint32_t k_default_perf_sample_stack_user = (4096UL * 8);
+// Check linux sources for a reference to the sample size check
+constexpr uint32_t k_default_perf_stack_sample_size = (4096UL * 8);
+
+// considering sample size, we adjust the size of ring buffers.
+// Following is considered as a minimum number of samples to be fit in the
+// ring buffer.
+constexpr auto k_min_number_samples_per_ring_buffer = 8;
 
 constexpr int k_size_api_key = 32;
 

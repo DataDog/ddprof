@@ -9,6 +9,7 @@
 #include <cstring>
 
 #include "event_config.hpp"
+#include "logger.hpp"
 #include "perf_watcher.hpp"
 #include "tracepoint_config.hpp"
 
@@ -124,7 +125,7 @@ static bool watcher_from_config(EventConf *conf, PerfWatcher *watcher) {
   watcher->tracepoint_event = conf->eventname;
   watcher->tracepoint_group = conf->groupname;
   watcher->tracepoint_label = conf->label;
-  watcher->options.sample_stack_user = conf->sample_stack_user;
+  watcher->options.stack_sample_size = conf->stack_sample_size;
   // Allocation watcher, has an extra field to ensure we capture address
 
   if (watcher->config == kDDPROF_COUNT_ALLOCATIONS) {
@@ -136,18 +137,14 @@ static bool watcher_from_config(EventConf *conf, PerfWatcher *watcher) {
 
 // If this returns false, then the passed watcher should be regarded as invalid
 bool watchers_from_str(const char *str, std::vector<PerfWatcher> &watchers,
-                       uint32_t sample_stack_user) {
+                       uint32_t stack_sample_size) {
   std::vector<EventConf> configs;
-  if (EventConf_parse(str, configs) != 0) {
+  EventConf template_conf{.stack_sample_size = stack_sample_size};
+  if (EventConf_parse(str, template_conf, configs) != 0) {
     return false;
   }
 
   for (auto &conf : configs) {
-    // todo{@r1viollet}: ideally here we would want to change the template
-    // value of the event conf. Instead we override the conf value.
-    if (conf.sample_stack_user == k_default_perf_sample_stack_user) {
-      conf.sample_stack_user = sample_stack_user;
-    }
     PerfWatcher watcher;
     if (!watcher_from_config(&conf, &watcher)) {
       return false;

@@ -46,7 +46,7 @@ TEST(allocation_tracker, start_stop) {
       rate,
       ddprof::AllocationTracker::kDeterministicSampling |
           ddprof::AllocationTracker::kTrackDeallocations,
-      k_default_perf_sample_stack_user, ring_buffer.get_buffer_info());
+      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info());
 
   ASSERT_TRUE(ddprof::AllocationTracker::is_active());
   my_func_calling_malloc(1);
@@ -113,7 +113,7 @@ TEST(allocation_tracker, stale_lock) {
       rate,
       ddprof::AllocationTracker::kDeterministicSampling |
           ddprof::AllocationTracker::kTrackDeallocations,
-      k_default_perf_sample_stack_user, ring_buffer.get_buffer_info());
+      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info());
 
   // simulate stale lock
   ring_buffer.get_ring_buffer().spinlock->lock();
@@ -135,7 +135,7 @@ TEST(allocation_tracker, max_tracked_allocs) {
       rate,
       ddprof::AllocationTracker::kDeterministicSampling |
           ddprof::AllocationTracker::kTrackDeallocations,
-      k_default_perf_sample_stack_user, ring_buffer.get_buffer_info());
+      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info());
 
   ASSERT_TRUE(ddprof::AllocationTracker::is_active());
 

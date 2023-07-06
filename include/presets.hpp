@@ -19,7 +19,7 @@ struct Preset {
 };
 
 DDRes add_preset(std::string_view preset, bool pid_or_global_mode,
-                 uint32_t default_sample_stack_user,
+                 uint32_t default_stack_sample_size,
                  std::vector<PerfWatcher> &watchers);
 
 } // namespace ddprof

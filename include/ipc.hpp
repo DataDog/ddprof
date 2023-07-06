@@ -104,7 +104,7 @@ struct ReplyMessage {
   // cppcheck-suppress unusedStructMember
   RingBufferInfo ring_buffer;
   int32_t allocation_flags = 0;
-  uint32_t sample_stack_user = 0;
+  uint32_t stack_sample_size = 0;
 };
 
 class Client {

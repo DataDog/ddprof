@@ -13,7 +13,6 @@ namespace ddprof {
 // This represent a sampled allocation.
 // We Keep the same layout as a perf event to unify the code paths.
 struct AllocationEvent {
-  static constexpr unsigned k_data_fake_size = 8; // 8 to keep aligned struct
   perf_event_header hdr;
   struct sample_id sample_id;
   uint64_t addr; /* if PERF_SAMPLE_ADDR */
@@ -27,7 +26,7 @@ struct AllocationEvent {
 // An extra field is added after the end to communicate the dyn_size
 //  uint64_t dyn_size_stack;
 
-static inline size_t SizeOfAllocationEvent(uint32_t stack_sample_user) {
+inline size_t sizeof_allocation_event(uint32_t stack_sample_user) {
   // stack_sample_user is 8 byte aligned
   // (Size of the event) + (stack size - 1) + sizeof(dyn_size field)
   return sizeof(AllocationEvent) + stack_sample_user + sizeof(uint64_t);

@@ -66,7 +66,7 @@ AllocationTracker *AllocationTracker::create_instance() {
 
 DDRes AllocationTracker::allocation_tracking_init(
     uint64_t allocation_profiling_rate, uint32_t flags,
-    uint32_t sample_stack_user, const RingBufferInfo &ring_buffer) {
+    uint32_t stack_sample_size, const RingBufferInfo &ring_buffer) {
   ReentryGuard guard(&_tl_state.reentry_guard);
 
   AllocationTracker *instance = create_instance();
@@ -84,7 +84,7 @@ DDRes AllocationTracker::allocation_tracking_init(
 
   DDRES_CHECK_FWD(instance->init(allocation_profiling_rate,
                                  flags & kDeterministicSampling,
-                                 sample_stack_user, ring_buffer));
+                                 stack_sample_size, ring_buffer));
   _instance = instance;
 
   state.init(true, flags & kTrackDeallocations);
@@ -94,11 +94,11 @@ DDRes AllocationTracker::allocation_tracking_init(
 
 DDRes AllocationTracker::init(uint64_t mem_profile_interval,
                               bool deterministic_sampling,
-                              uint32_t sample_stack_user,
+                              uint32_t stack_sample_size,
                               const RingBufferInfo &ring_buffer) {
   _sampling_interval = mem_profile_interval;
   _deterministic_sampling = deterministic_sampling;
-  _sample_stack_user = sample_stack_user;
+  _stack_sample_size = stack_sample_size;
   if (ring_buffer.ring_buffer_type !=
       static_cast<int>(RingBufferType::kMPSCRingBuffer)) {
     return ddres_error(DD_WHAT_PERFRB);
@@ -366,7 +366,7 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   }
 
   auto buffer =
-      writer.reserve(SizeOfAllocationEvent(_sample_stack_user), &timeout);
+      writer.reserve(sizeof_allocation_event(_stack_sample_size), &timeout);
 
   if (buffer.empty()) {
     // ring buffer is full, increase lost count
@@ -382,7 +382,7 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
 
   AllocationEvent *event = reinterpret_cast<AllocationEvent *>(buffer.data());
   event->hdr.misc = 0;
-  event->hdr.size = SizeOfAllocationEvent(_sample_stack_user);
+  event->hdr.size = sizeof_allocation_event(_stack_sample_size);
   event->hdr.type = PERF_RECORD_SAMPLE;
   event->abi = PERF_SAMPLE_REGS_ABI_64;
   event->sample_id.time = 0;
@@ -405,9 +405,9 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
   event->period = allocated_size;
-  event->size_stack = _sample_stack_user;
+  event->size_stack = _stack_sample_size;
 
-  std::byte *dyn_size_pos = event->data + _sample_stack_user;
+  std::byte *dyn_size_pos = event->data + _stack_sample_size;
   uint64_t *dyn_size = reinterpret_cast<uint64_t *>(dyn_size_pos);
 
   assert(reinterpret_cast<uintptr_t>(dyn_size) % alignof(uint64_t) == 0);

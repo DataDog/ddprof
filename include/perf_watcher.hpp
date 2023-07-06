@@ -24,8 +24,8 @@ struct PerfWatcherOptions {
   uint8_t nb_frames_to_skip; // number of bottom frames to skip in stack trace
                              // (useful for allocation profiling to remove
                              // frames belonging to lib_ddprofiling.so)
-  uint32_t sample_stack_user{
-      k_default_perf_sample_stack_user}; // size of the user stack to capture
+  uint32_t stack_sample_size{
+      k_default_perf_stack_sample_size}; // size of the user stack to capture
 };
 
 struct PerfWatcher {

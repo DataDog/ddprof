@@ -35,7 +35,7 @@ DDPROF_NOINLINE static void *get_stack_start_tls() {
 
 static void BM_SaveContext(benchmark::State &state) {
   uint64_t regs[PERF_REGS_COUNT];
-  std::byte stack[k_default_perf_sample_stack_user];
+  std::byte stack[k_default_perf_stack_sample_size];
   ddprof::span<const std::byte> stack_bounds = retrieve_stack_bounds();
   if (stack_bounds.empty()) {
     exit(1);

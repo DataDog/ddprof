@@ -22,7 +22,8 @@ DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override);
 /// Compute minimum size for a given ring buffer
 /// This is adjusted using the number of samples we can fit in a buffer
 int pevent_compute_min_mmap_order(int min_buffer_size_order,
-                                  uint32_t sample_stack_user);
+                                  uint32_t stack_sample_size,
+                                  unsigned min_number_samples);
 
 /// Setup watchers = setup mmap + setup perfevent
 DDRes pevent_setup(DDProfContext &ctx, pid_t pid, int num_cpu,

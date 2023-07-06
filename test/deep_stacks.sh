@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-CONFIG_DEEP_STACK="../test/configs/deep_stacks.toml"
+set -euo pipefail
 
-./ddprof --config ${CONFIG_DEEP_STACK} ./test/deep_stacks | tee ./log_ddprof.txt
+./ddprof --stack_sample_size=65528 -l notice ./test/deep_stacks | tee ./log_ddprof.txt
 
 # Check for truncated stack traces
 truncated_input=$(awk -F': ' '/datadog.profiling.native.unwind.stack.truncated_input/ { print $NF }' ./log_ddprof.txt)

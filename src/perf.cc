@@ -88,7 +88,7 @@ perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
   attr.sample_period = watcher->sample_period; // Equivalently, freq
   attr.freq = watcher->options.is_freq;
   attr.sample_type = watcher->sample_type;
-  attr.sample_stack_user = watcher->options.sample_stack_user;
+  attr.sample_stack_user = watcher->options.stack_sample_size;
 
   // If use_kernel==off means we exclude_kernel
   attr.exclude_kernel =
