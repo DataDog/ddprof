@@ -185,9 +185,6 @@ DDRes pevent_mmap_event(PEvent *event) {
   if (event->mapfd != -1) {
     void *region = perfown_sz(event->mapfd, event->ring_buffer_size);
     if (!region) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
-                             "Could not mmap memory for watcher #%d: %s",
-                             event->watcher_pos, strerror(errno));
       DDRES_RETURN_ERROR_LOG(
           DD_WHAT_PERFMMAP,
           "Could not mmap memory for watcher #%d: %s. "

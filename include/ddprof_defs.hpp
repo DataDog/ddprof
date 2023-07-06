@@ -24,7 +24,7 @@ constexpr uint32_t k_default_perf_stack_sample_size = (4096UL * 8);
 // considering sample size, we adjust the size of ring buffers.
 // Following is considered as a minimum number of samples to be fit in the
 // ring buffer.
-constexpr auto k_min_number_samples_per_ring_buffer = 8;
+constexpr auto k_min_number_samples_per_ring_buffer = 7;
 
 constexpr int k_size_api_key = 32;
 
