@@ -169,8 +169,6 @@ struct EventConf {
 
   EventConfCadenceType cad_type{};
   int64_t cadence{};
-
-  void clear() { *this = EventConf{}; }
 };
 
 int EventConf_parse(const char *msg, const EventConf &template_conf,

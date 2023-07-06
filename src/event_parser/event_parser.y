@@ -36,6 +36,11 @@ extern int yylex_destroy(yyscan_t scanner);
 extern YY_BUFFER_STATE yy_scan_string(const char * str, yyscan_t scanner);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer, yyscan_t scanner);
 
+
+EventConf g_accum_event_conf = {};
+EventConf g_template_event_conf = {};
+std::vector<EventConf>* g_event_configs;
+
 std::optional<EventConfMode> mode_from_str(const std::string &str) {
   EventConfMode mode = EventConfMode::kDisabled;
   if (str.empty())
@@ -83,7 +88,7 @@ void conf_finalize(EventConf * conf, std::vector<EventConf> * configs) {
   }
 
   configs->push_back(*conf);
-  conf->clear();
+  g_accum_event_conf = g_template_event_conf;
 }
 
 void conf_print(const EventConf *tp) {
@@ -117,9 +122,6 @@ void conf_print(const EventConf *tp) {
 
 }
 
-EventConf g_accum_event_conf = {};
-std::vector<EventConf>* g_event_configs;
-
 void yyerror(yyscan_t scanner, const char *str) {
 #ifdef EVENT_PARSER_MAIN
   fprintf(stderr, "err: %s\n", str);
@@ -133,7 +135,8 @@ void yyerror(yyscan_t scanner, const char *str) {
  } while(0)
 
  int EventConf_parse(const char *msg, const EventConf &template_conf, std::vector<EventConf>& event_configs) {
-  g_accum_event_conf = template_conf;
+  g_template_event_conf = template_conf;
+  g_accum_event_conf = g_template_event_conf;
   g_event_configs = &event_configs;
   int ret = -1;
   yyscan_t scanner = NULL;
