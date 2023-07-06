@@ -27,7 +27,7 @@ template <int N> DDPROF_NOINLINE std::string compute() {
 int main() {
   using namespace std::chrono;
   auto start = high_resolution_clock::now();
-  auto end = start + seconds(2); // set a time limit of 10 seconds
+  auto end = start + seconds(2);
   while (high_resolution_clock::now() < end) {
     auto str = compute<3000>();
     ddprof::DoNotOptimize(str);

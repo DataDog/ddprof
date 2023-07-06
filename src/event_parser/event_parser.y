@@ -305,7 +305,6 @@ opt:
            break;
          case EventConfField::kStackSampleSize:
             g_accum_event_conf.stack_sample_size = $3;
-            printf("set value to %u \n", g_accum_event_conf.stack_sample_size);
             break;
          case EventConfField::kPeriod:
          case EventConfField::kFrequency:

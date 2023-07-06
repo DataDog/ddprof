@@ -27,8 +27,7 @@ struct AllocationEvent {
 //  uint64_t dyn_size_stack;
 
 inline size_t sizeof_allocation_event(uint32_t stack_sample_user) {
-  // stack_sample_user is 8 byte aligned
-  // (Size of the event) + (stack size - 1) + sizeof(dyn_size field)
+  // (Size of the event) + + sizeof(dyn_size field)
   return sizeof(AllocationEvent) + stack_sample_user + sizeof(uint64_t);
 }
 } // namespace ddprof
