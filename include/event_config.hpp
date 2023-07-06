@@ -145,8 +145,9 @@ enum class EventConfField {
    */
   kSampleStackUser,
   /*
-   *  The `perf_event` sample stack user, which can define if unwinding
-   *  will be truncated (bsased on size of the stacks).
+   *  The `perf_event` sample stack user. Defines the size of samples that are
+   *  copied from the user application. This also relates to how far we can
+   *  unwind.
    */
 };
 
