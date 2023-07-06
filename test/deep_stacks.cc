@@ -29,7 +29,7 @@ int main() {
   auto start = high_resolution_clock::now();
   auto end = start + seconds(2); // set a time limit of 10 seconds
   while (high_resolution_clock::now() < end) {
-    volatile auto str = compute<3000>();
+    auto str = compute<3000>();
     ddprof::DoNotOptimize(str);
     //    std::cout << str;
   }
