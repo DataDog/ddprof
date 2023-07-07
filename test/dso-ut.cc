@@ -331,7 +331,7 @@ TEST(DSOTest, backpopulate) {
   // manually erase the unit test's binary
   dso_hdr._pid_map[getpid()]._map.erase(find_res.first);
   find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
-  EXPECT_FALSE(find_res.second);
+  EXPECT_TRUE(find_res.second);
 }
 
 TEST(DSOTest, missing_dso) {

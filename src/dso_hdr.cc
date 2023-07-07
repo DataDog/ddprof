@@ -371,7 +371,6 @@ bool DsoHdr::pid_backpopulate(PidMapping &pid_mapping, pid_t pid,
   if (bp_state._perm != kAllowed) { // retry
     return false;
   }
-  bp_state._perm = kForbidden;
   nb_elts_added = 0;
   LG_DBG("[DSO] Backpopulating PID %d", pid);
   auto proc_map_file_holder = open_proc_maps(pid, _path_to_proc.c_str());
@@ -393,6 +392,9 @@ bool DsoHdr::pid_backpopulate(PidMapping &pid_mapping, pid_t pid,
     if ((insert_erase_overlap(pid_mapping, std::move(dso))).second) {
       ++nb_elts_added;
     }
+  }
+  if (!nb_elts_added) {
+    bp_state._perm = kForbidden;
   }
   return true;
 }
