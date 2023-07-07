@@ -36,6 +36,11 @@ extern int yylex_destroy(yyscan_t scanner);
 extern YY_BUFFER_STATE yy_scan_string(const char * str, yyscan_t scanner);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer, yyscan_t scanner);
 
+
+EventConf g_accum_event_conf = {};
+EventConf g_template_event_conf = {};
+std::vector<EventConf>* g_event_configs;
+
 std::optional<EventConfMode> mode_from_str(const std::string &str) {
   EventConfMode mode = EventConfMode::kDisabled;
   if (str.empty())
@@ -83,7 +88,7 @@ void conf_finalize(EventConf * conf, std::vector<EventConf> * configs) {
   }
 
   configs->push_back(*conf);
-  conf->clear();
+  g_accum_event_conf = g_template_event_conf;
 }
 
 void conf_print(const EventConf *tp) {
@@ -109,16 +114,13 @@ void conf_print(const EventConf *tp) {
     printf("  location: register (%d)\n", tp->register_num);
   else if (tp->value_source == EventConfValueSource::kRaw)
     printf("  location: raw event (%lu with size %d bytes)\n", tp->raw_offset, tp->raw_size);
-
+  printf("  stack_sample_size: %u\n", tp->stack_sample_size);
   if (tp->value_scale != 0)
     printf("  scaling factor: %f\n", tp->value_scale);
 
   printf("\n");
 
 }
-
-EventConf g_accum_event_conf = {};
-std::vector<EventConf>* g_event_configs;
 
 void yyerror(yyscan_t scanner, const char *str) {
 #ifdef EVENT_PARSER_MAIN
@@ -132,8 +134,9 @@ void yyerror(yyscan_t scanner, const char *str) {
    YYABORT;  \
  } while(0)
 
- int EventConf_parse(const char *msg, std::vector<EventConf>& event_configs) {
-  g_accum_event_conf.clear();
+ int EventConf_parse(const char *msg, const EventConf &template_conf, std::vector<EventConf>& event_configs) {
+  g_template_event_conf = template_conf;
+  g_accum_event_conf = g_template_event_conf;
   g_event_configs = &event_configs;
   int ret = -1;
   yyscan_t scanner = NULL;
@@ -300,7 +303,9 @@ opt:
              g_accum_event_conf.raw_offset = $3;
            }
            break;
-
+         case EventConfField::kStackSampleSize:
+            g_accum_event_conf.stack_sample_size = $3;
+            break;
          case EventConfField::kPeriod:
          case EventConfField::kFrequency:
            // If the cadence has already been set, it's an error
@@ -315,7 +320,6 @@ opt:
            if ($$ == EventConfField::kFrequency)
              g_accum_event_conf.cad_type = EventConfCadenceType::kFrequency;
            break;
-
          default: VAL_ERROR(); break;
        }
      }

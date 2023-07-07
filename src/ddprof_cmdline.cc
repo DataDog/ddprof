@@ -125,8 +125,9 @@ static bool watcher_from_config(EventConf *conf, PerfWatcher *watcher) {
   watcher->tracepoint_event = conf->eventname;
   watcher->tracepoint_group = conf->groupname;
   watcher->tracepoint_label = conf->label;
-
+  watcher->options.stack_sample_size = conf->stack_sample_size;
   // Allocation watcher, has an extra field to ensure we capture address
+
   if (watcher->config == kDDPROF_COUNT_ALLOCATIONS) {
     watcher->sample_type |= PERF_SAMPLE_ADDR;
   }
@@ -135,9 +136,11 @@ static bool watcher_from_config(EventConf *conf, PerfWatcher *watcher) {
 }
 
 // If this returns false, then the passed watcher should be regarded as invalid
-bool watchers_from_str(const char *str, std::vector<PerfWatcher> &watchers) {
+bool watchers_from_str(const char *str, std::vector<PerfWatcher> &watchers,
+                       uint32_t stack_sample_size) {
   std::vector<EventConf> configs;
-  if (EventConf_parse(str, configs) != 0) {
+  EventConf template_conf{.stack_sample_size = stack_sample_size};
+  if (EventConf_parse(str, template_conf, configs) != 0) {
     return false;
   }
 
@@ -148,6 +151,5 @@ bool watchers_from_str(const char *str, std::vector<PerfWatcher> &watchers) {
     }
     watchers.push_back(std::move(watcher));
   }
-
   return true;
 }

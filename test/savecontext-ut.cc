@@ -22,7 +22,7 @@
 DDPROF_NOINLINE void funcA();
 DDPROF_NOINLINE void funcB();
 
-std::byte stack[PERF_SAMPLE_STACK_SIZE];
+std::byte stack[k_default_perf_stack_sample_size];
 
 void funcB() {
   UnwindState state;

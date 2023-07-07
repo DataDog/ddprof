@@ -56,12 +56,12 @@ public:
 
   // extended
   std::string cpu_affinity;
+  uint32_t default_stack_sample_size{k_default_perf_stack_sample_size};
   bool show_samples{false};
   bool fault_info{true};
   bool help_extended{false};
   int socket{-1};
-  // valid state to continue ?
-  bool continue_exec = {false};
+  bool continue_exec{false};
 
   // args
   std::vector<std::string> command_line;

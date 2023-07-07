@@ -8,6 +8,7 @@
 #include "ddprof_cmdline.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
+#include "lib/allocation_event.hpp"
 #include "perf.hpp"
 #include "ringbuffer_utils.hpp"
 #include "sys_utils.hpp"
@@ -55,11 +56,35 @@ static void display_system_config(void) {
   }
 }
 
+int pevent_compute_min_mmap_order(int min_buffer_size_order,
+                                  uint32_t stack_sample_size,
+                                  unsigned min_number_samples) {
+  int ret_order = min_buffer_size_order;
+  // perf events and allocation events should be roughly the same size
+  size_t single_event_size = ddprof::sizeof_allocation_event(stack_sample_size);
+  // Ensure we can at least fit 8 samples within one buffer
+  while (((perf_mmap_size(ret_order) - get_page_size()) / single_event_size) <
+         min_number_samples) {
+    ++ret_order;
+  }
+  return ret_order;
+}
+
 // set info for a perf_event_open type of buffer
-static void pevent_set_info(int fd, int attr_idx, PEvent &pevent) {
+static void pevent_set_info(int fd, int attr_idx, PEvent &pevent,
+                            uint32_t stack_sample_size) {
+  static bool log_once = true;
   pevent.fd = fd;
   pevent.mapfd = fd;
-  pevent.ring_buffer_size = perf_mmap_size(DEFAULT_BUFF_SIZE_SHIFT);
+  int buffer_size_order =
+      pevent_compute_min_mmap_order(DEFAULT_BUFF_SIZE_SHIFT, stack_sample_size,
+                                    k_min_number_samples_per_ring_buffer);
+  if (buffer_size_order > DEFAULT_BUFF_SIZE_SHIFT && log_once) {
+    LG_NTC("Increasing size order of the ring buffer to %d (from %d)",
+           buffer_size_order, DEFAULT_BUFF_SIZE_SHIFT);
+    log_once = false; // avoid flooding for all CPUs
+  }
+  pevent.ring_buffer_size = perf_mmap_size(buffer_size_order);
   pevent.custom_event = false;
   pevent.ring_buffer_type = RingBufferType::kPerfRingBuffer;
   pevent.attr_idx = attr_idx;
@@ -81,7 +106,8 @@ static DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
     if (fd != -1) {
       // Copy the successful config
       pevent_hdr->attrs[pevent_hdr->nb_attrs] = attr;
-      pevent_set_info(fd, pevent_hdr->nb_attrs, pes[pevent_idx]);
+      pevent_set_info(fd, pevent_hdr->nb_attrs, pes[pevent_idx],
+                      watcher->options.stack_sample_size);
       ++pevent_hdr->nb_attrs;
       assert(pevent_hdr->nb_attrs <= MAX_TYPE_WATCHER);
       break;
@@ -125,7 +151,8 @@ static DDRes pevent_open_all_cpus(const PerfWatcher *watcher, int watcher_idx,
                              "Error calling perfopen on watcher %d.%d (%s)",
                              watcher_idx, cpu_idx, strerror(errno));
     }
-    pevent_set_info(fd, pes[template_pevent_idx].attr_idx, pes[pevent_idx]);
+    pevent_set_info(fd, pes[template_pevent_idx].attr_idx, pes[pevent_idx],
+                    watcher->options.stack_sample_size);
   }
   return ddres_init();
 }
@@ -143,9 +170,12 @@ DDRes pevent_open(DDProfContext &ctx, pid_t pid, int num_cpu,
       // custom event, eg.allocation profiling
       size_t pevent_idx = 0;
       DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
-      DDRES_CHECK_FWD(ddprof::ring_buffer_create(
-          MPSC_BUFF_SIZE_SHIFT, RingBufferType::kMPSCRingBuffer, true,
-          &pevent_hdr->pes[pevent_idx]));
+      int order = pevent_compute_min_mmap_order(
+          MPSC_BUFF_SIZE_SHIFT, watcher->options.stack_sample_size,
+          k_min_number_samples_per_ring_buffer);
+      DDRES_CHECK_FWD(
+          ddprof::ring_buffer_create(order, RingBufferType::kMPSCRingBuffer,
+                                     true, &pevent_hdr->pes[pevent_idx]));
     }
   }
   return ddres_init();
@@ -155,9 +185,12 @@ DDRes pevent_mmap_event(PEvent *event) {
   if (event->mapfd != -1) {
     void *region = perfown_sz(event->mapfd, event->ring_buffer_size);
     if (!region) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
-                             "Could not mmap memory for watcher #%d: %s",
-                             event->watcher_pos, strerror(errno));
+      DDRES_RETURN_ERROR_LOG(
+          DD_WHAT_PERFMMAP,
+          "Could not mmap memory for watcher #%d: %s. "
+          "Please increase kernel limits on pinned memory (ulimit -l). "
+          "OR associate the IPC_LOCK capability to this process.",
+          event->watcher_pos, strerror(errno));
     }
     if (!rb_init(&event->rb, region, event->ring_buffer_size,
                  event->ring_buffer_type)) {

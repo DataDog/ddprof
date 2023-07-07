@@ -59,6 +59,23 @@ void write_config_file(const CLI::App &app, const std::string &file_path) {
   out_file << app.config_to_str();
   out_file.close();
 }
+
+using Validator = CLI::Validator;
+struct SampleStackSizeValidator : public Validator {
+  SampleStackSizeValidator() {
+    name_ = "SAMPLE_STACK_SIZE";
+    func_ = [](const std::string &str) {
+      int value = std::stoi(str);
+      if (value >= USHRT_MAX || value % 8 != 0) {
+        return std::string("Invalid stack_sample_size value. Value should be "
+                           "less than " +
+                           std::to_string(USHRT_MAX) + " and a multiple of 8.");
+      } else {
+        return std::string();
+      }
+    };
+  }
+};
 } // namespace
 
 int DDProfCLI::parse(int argc, const char *argv[]) {
@@ -260,6 +277,15 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
                      "Profiler's IPC socket, as a file descriptor")
           ->envname("DD_PROFILING_NATIVE_SOCKET")
           ->group(""));
+  extended_options.push_back(
+      app.add_option("--stack_sample_size", default_stack_sample_size,
+                     "Sample size for the user's stack."
+                     "This setting can help with truncated stack traces."
+                     "Maximum value is 65528 (<USHORT_MAX and 8Bytes aligned).")
+          ->default_val(k_default_perf_stack_sample_size)
+          ->envname("DD_PROFILING_SAMPLE_STACK_USER")
+          ->group("")
+          ->check(SampleStackSizeValidator()));
 
   // Parse
   CLI11_PARSE(app, argc, argv);
@@ -304,7 +330,7 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
 DDRes DDProfCLI::add_watchers_from_events(
     std::vector<PerfWatcher> &watchers) const {
   for (const auto &el : events) {
-    if (!watchers_from_str(el.c_str(), watchers)) {
+    if (!watchers_from_str(el.c_str(), watchers, default_stack_sample_size)) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
                              "Invalid event/tracepoint (%s)", el.c_str());
     }
@@ -387,6 +413,11 @@ void DDProfCLI::print() const {
     PRINT_NFO("  - show_samples: %s", show_samples ? "true" : "false");
   }
   PRINT_NFO("  - fault_info: %s", fault_info ? "true" : "false");
+
+  if (default_stack_sample_size != k_default_perf_stack_sample_size) {
+    PRINT_NFO("Extended:");
+    PRINT_NFO("  - stack_sample_size: %u", default_stack_sample_size);
+  }
 }
 
 CommandLineWrapper DDProfCLI::get_user_command_line() const {

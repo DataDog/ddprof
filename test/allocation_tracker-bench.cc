@@ -28,7 +28,7 @@ void perform_memory_operations(bool track_allocations,
         rate,
         ddprof::AllocationTracker::kDeterministicSampling |
             ddprof::AllocationTracker::kTrackDeallocations,
-        ring_buffer.get_buffer_info());
+        k_default_perf_stack_sample_size, ring_buffer.get_buffer_info());
   }
 
   int nb_threads = 4;

@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "ddprof_defs.hpp"
+
 #include <stdint.h>
 #include <string>
 #include <vector>
@@ -141,29 +143,33 @@ enum class EventConfField {
    *  The `perf_event` register number to use for sample normalization.  In a
    *  future patch, the user will be able to use register names.
    */
+  kStackSampleSize,
+  /*
+   *  The `perf_event` setting on stack size. Defines the size of samples that
+   * are copied from the user application. This will define how far we can
+   * unwind.
+   */
 };
 
 struct EventConf {
-  EventConfMode mode;
+  EventConfMode mode{};
 
-  int64_t id;
+  int64_t id{};
 
-  std::string eventname;
-  std::string groupname;
-  std::string label;
+  std::string eventname{};
+  std::string groupname{};
+  std::string label{};
 
-  EventConfValueSource value_source;
-  uint8_t register_num;
-  uint8_t raw_size;
-  uint64_t raw_offset;
-  double value_scale;
+  EventConfValueSource value_source{};
+  uint8_t register_num{};
+  uint8_t raw_size{};
+  uint64_t raw_offset{};
+  uint32_t stack_sample_size{k_default_perf_stack_sample_size};
+  double value_scale{};
 
-  EventConfCadenceType cad_type;
-  int64_t cadence;
-
-  void clear() { *this = EventConf{}; }
+  EventConfCadenceType cad_type{};
+  int64_t cadence{};
 };
 
-int EventConf_parse(
-    const char *msg,
-    std::vector<EventConf> &event_configs); // Provided by generated code
+int EventConf_parse(const char *msg, const EventConf &template_conf,
+                    std::vector<EventConf> &event_configs);

@@ -5,8 +5,8 @@
 
 #pragma once
 
+#include "ddprof_defs.hpp"
 #include "event_config.hpp"
-
 #include <string>
 
 #include <linux/perf_event.h>
@@ -24,6 +24,8 @@ struct PerfWatcherOptions {
   uint8_t nb_frames_to_skip; // number of bottom frames to skip in stack trace
                              // (useful for allocation profiling to remove
                              // frames belonging to lib_ddprofiling.so)
+  uint32_t stack_sample_size{
+      k_default_perf_stack_sample_size}; // size of the user stack to capture
 };
 
 struct PerfWatcher {
@@ -38,7 +40,6 @@ struct PerfWatcher {
     uint64_t sample_frequency;
   };
   int sample_type_id; // index into the sample types defined in this header
-  uint16_t sample_stack_size; // size of the stack to capture
 
   // perf_event_open configs
   struct PerfWatcherOptions options;
