@@ -4,6 +4,7 @@
 #include "ringbuffer_holder.hpp"
 #include <thread>
 
+
 DDPROF_NOINLINE void my_malloc(size_t size, uintptr_t addr = 0xdeadbeef) {
   ddprof::AllocationTracker::track_allocation(addr, size);
   // prevent tail call optimization
@@ -18,7 +19,7 @@ DDPROF_NOINLINE void my_free(uintptr_t addr) {
 // Function to perform allocations and deallocations
 void perform_memory_operations(bool track_allocations,
                                benchmark::State &state) {
-  const uint64_t rate = 1;
+  const uint64_t rate = 524288;
   const size_t buf_size_order = 5;
   ddprof::RingBufferHolder ring_buffer{buf_size_order,
                                        RingBufferType::kMPSCRingBuffer};

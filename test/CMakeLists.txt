@@ -344,6 +344,8 @@ add_unit_test(
   ../src/tracepoint_config.cc
   LIBRARIES DDProf::Parser)
 
+add_unit_test(address_tree-ut address_tree-ut.cc)
+
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/pthread_fixes.cc
               ../src/lib/savecontext.cc ../src/lib/saveregisters.cc)
 
