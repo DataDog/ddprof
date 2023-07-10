@@ -15,7 +15,8 @@
 #include <cstddef>
 #include <mutex>
 #include <random>
-#include <unordered_set>
+
+#include "address_tree.hpp"
 
 namespace ddprof {
 
@@ -64,7 +65,8 @@ public:
   static inline bool is_active();
 
 private:
-  using AdressSet = std::unordered_set<uintptr_t>;
+//  using AdressSet = std::unordered_set<uintptr_t>;
+  using AdressSet = ddprof::AddressTree;
 
   struct TrackerState {
     void init(bool track_alloc, bool track_dealloc) {

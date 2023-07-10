@@ -5,73 +5,119 @@
 
 #pragma once
 
-#include <unordered_map>
 #include <memory>
-#include <mutex>          // std::mutex, std::unique_lock
+#include <mutex> // std::mutex, std::unique_lock
 #include <shared_mutex>
+#include <unordered_map>
+#include <unordered_set>
+#include <atomic>
+
+namespace ddprof {
 
 constexpr int BITS_PER_LEVEL = 16;
 
-class AddressNode {
+template <int BITS_PER_LEVEL, int LEVEL> class Node {
 public:
-  AddressNode(int level) : _level(level) {}
+  static constexpr int _level = LEVEL;
 
-  // Returns true if a new node was inserted, false if it already existed
-  bool Insert(uintptr_t address) {
+  bool insert(uintptr_t address) {
     auto index = (address >> _level) & ((1 << BITS_PER_LEVEL) - 1);
     std::unique_lock lock{_mutex};
-    auto &child = _children[index];
-    if (!child) {
-      child = std::make_unique<AddressNode>(_level - BITS_PER_LEVEL);
-    }
+    auto &value = _children[index];
     lock.unlock();
-    if (_level == 0) {
-      return true;
-    } else {
-      return child->Insert(address);
-    }
+    return value.insert(address);
   }
 
-  // Returns true if a node was erased, false if it did not exist
-  bool Erase(uintptr_t address) {
-    auto index = (address >> _level) & ((1 << BITS_PER_LEVEL) - 1);
+  // we actually don't erase unless we are a leaf
+  bool erase(uintptr_t address) {
+    uint64_t index = (address >> _level) & ((1 << BITS_PER_LEVEL) - 1);
     std::unique_lock lock{_mutex};
     auto it = _children.find(index);
     if (it == _children.end()) {
       return false;
     }
-    if (_level == 0 || it->second->Erase(address)) {
-      _children.erase(it);
-      return true;
-    }
+    auto &val = it->second;
     lock.unlock();
-    return false;
+    return val.erase(address);
+  }
+
+  void clear() {
+    std::unique_lock lock{_mutex};
+    for (auto &el : _children) {
+      el.second.clear();
+    }
   }
 
 private:
+  std::mutex _mutex;
+  std::unordered_map<uintptr_t, Node<BITS_PER_LEVEL, LEVEL - BITS_PER_LEVEL>>
+      _children;
+};
 
-  int _level;
-  std::unordered_map<uintptr_t, std::unique_ptr<AddressNode>> _children;
-  std::shared_mutex _mutex;
+template <int BITS_PER_LEVEL> class Node<BITS_PER_LEVEL, 0> {
+public:
+  static constexpr int _level = 0;
 
-  friend class AddressTree;
+  bool insert(uintptr_t address) {
+    auto index = address & ((1 << BITS_PER_LEVEL) - 1);
+    std::unique_lock lock{_mutex};
+    auto [_, inserted] = _addresses.insert(index);
+    return inserted;
+  }
+
+  bool erase(uintptr_t address) {
+    auto index = address & ((1 << BITS_PER_LEVEL) - 1);
+    std::unique_lock lock{_mutex};
+    return _addresses.erase(index) > 0;
+  }
+
+  bool empty() const {
+    std::unique_lock lock{_mutex};
+    return _addresses.empty();
+  }
+
+  void clear() {
+    std::unique_lock lock{_mutex};
+    _addresses.clear();
+  }
+
+private:
+  std::mutex _mutex;
+  std::unordered_set<uintptr_t> _addresses;
 };
 
 class AddressTree {
 public:
-  AddressTree()
-      : _root(sizeof(uintptr_t) * 8 - BITS_PER_LEVEL) {}
+  AddressTree() : _root() {}
 
-  // Insert an address into the tree. Returns true if the address was not already in the tree
-  bool Insert(uintptr_t address) {
-    return _root.Insert(address);
+  // insert an address into the tree. Returns true if the address was not
+  // already in the tree
+  bool insert(uintptr_t address) {
+    _size.fetch_add(1, std::memory_order_relaxed);
+    return _root.insert(address);
   }
 
-  // Erase an address from the tree. Returns true if the address was in the tree
-  bool Erase(uintptr_t address) {
-    return _root.Erase(address);
+  // erase an address from the tree. Returns true if the address was in the tree
+  bool erase(uintptr_t address) {
+    if (_root.erase(address) ) {
+      _size.fetch_add(-1, std::memory_order_relaxed);
+    }
+    return false;
+  }
+
+  void clear() {
+    _size.exchange(0, std::memory_order_relaxed);
+    _root.clear();
+  }
+
+  size_t size() {
+    return _size.load(std::memory_order_relaxed);
   }
 
 private:
-  AddressNode _root;
+  Node<BITS_PER_LEVEL, 64 - BITS_PER_LEVEL> _root;
+  std::atomic<size_t> _size {};
+  // todo we need to add some kind of global cleanup
 };
+
+} // namespace ddprof

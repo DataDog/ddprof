@@ -209,6 +209,9 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
   }
 }
 
+//#define OLD_IMPLEM
+
+#ifdef OLD_IMPLEM
 void AllocationTracker::track_deallocation(uintptr_t addr,
                                            TrackerThreadLocalState &tl_state) {
   // Prevent reentrancy to avoid dead lock on mutex
@@ -218,19 +221,46 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
     // This is an internal dealloc, so we don't need to keep track of this
     return;
   }
+
   std::lock_guard lock{_state.mutex};
 
-  // recheck if profiling is enabled
-  if (!_state.track_deallocations) {
-    return;
-  }
 
   // Inserting / Erasing addresses is done within the lock
   if (_address_set.erase(addr)) {
+    // recheck if profiling is enabled
+    if (!_state.track_deallocations) {
+      return;
+    }
+
     bool success = IsDDResOK(push_dealloc_sample(addr, tl_state));
     free_on_consecutive_failures(success);
   }
 }
+#else
+void AllocationTracker::track_deallocation(uintptr_t addr,
+                                           TrackerThreadLocalState &tl_state) {
+  // Inserting / Erasing addresses is done within the lock
+  if (_address_set.erase(addr)) {
+    // Prevent reentrancy to avoid dead lock on mutex
+    ReentryGuard guard(&tl_state.reentry_guard);
+
+    if (!guard) {
+      // This is an internal dealloc, so we don't need to keep track of this
+      return;
+    }
+
+    std::lock_guard lock{_state.mutex};
+
+    // recheck if profiling is enabled
+    if (!_state.track_deallocations) {
+      return;
+    }
+
+    bool success = IsDDResOK(push_dealloc_sample(addr, tl_state));
+    free_on_consecutive_failures(success);
+  }
+}
+#endif
 
 DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
                                           bool &notify_needed) {

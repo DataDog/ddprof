@@ -84,8 +84,7 @@ endif()
 # libdatadog_profiling
 include(Findlibdatadog)
 
-# Lock free map
-# include(Findjunction)
+# Lock free map include(Findjunction)
 
 # Event Parser
 add_subdirectory(src/event_parser)
@@ -280,7 +279,6 @@ add_library(libddprofiling_embedded_object OBJECT IMPORTED GLOBAL)
 set_target_properties(libddprofiling_embedded_object
                       PROPERTIES IMPORTED_OBJECTS "${LIBDD_PROFILING_EMBEDDED_OBJECT}")
 
-
 # It is important to force most libraries as static
 add_exe(
   ddprof ${DDPROF_GLOBAL_SRC}
@@ -292,9 +290,8 @@ if(USE_LOADER)
   target_link_libraries(ddprof PRIVATE libdd_loader_object)
 endif()
 
-# junction
-# target_link_libraries(ddprof PRIVATE junction)
-# target_include_directories(ddprof PRIVATE ${JUNCTION_INCLUDE_DIRECTORY})
+# junction target_link_libraries(ddprof PRIVATE junction) target_include_directories(ddprof PRIVATE
+# ${JUNCTION_INCLUDE_DIRECTORY})
 
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 target_static_libcxx(ddprof)

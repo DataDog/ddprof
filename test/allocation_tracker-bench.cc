@@ -1,9 +1,9 @@
 #include <benchmark/benchmark.h>
 
+#include "loghandle.hpp"
 #include "allocation_tracker.hpp"
 #include "ringbuffer_holder.hpp"
 #include <thread>
-
 
 DDPROF_NOINLINE void my_malloc(size_t size, uintptr_t addr = 0xdeadbeef) {
   ddprof::AllocationTracker::track_allocation(addr, size);
@@ -19,10 +19,12 @@ DDPROF_NOINLINE void my_free(uintptr_t addr) {
 // Function to perform allocations and deallocations
 void perform_memory_operations(bool track_allocations,
                                benchmark::State &state) {
+  LogHandle handle;
   const uint64_t rate = 524288;
-  const size_t buf_size_order = 5;
+  const size_t buf_size_order = 8;
   ddprof::RingBufferHolder ring_buffer{buf_size_order,
                                        RingBufferType::kMPSCRingBuffer};
+  ddprof::MPSCRingBufferReader reader{ring_buffer.get_ring_buffer()};
 
   if (track_allocations) {
     ddprof::AllocationTracker::allocation_tracking_init(
@@ -54,6 +56,7 @@ void perform_memory_operations(bool track_allocations,
         for (int j = 0; j < num_allocations; ++j) {
           uintptr_t addr = dis(gen);
           my_malloc(1024, addr);
+          auto buf = reader.read_sample(); // ensure buffer is empty
           thread_addresses[i].push_back(addr);
         }
       });
@@ -70,6 +73,7 @@ void perform_memory_operations(bool track_allocations,
       threads.emplace_back([&, i] {
         for (auto addr : thread_addresses[i]) {
           my_free(addr);
+          auto buf = reader.read_sample(); // ensure buffer is empty
         }
       });
     }
