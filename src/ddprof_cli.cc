@@ -125,7 +125,7 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
   app.add_option("--port,-P", exporter_input.port,
                  "The communication port for the Datadog agent. This is "
                  "combined with the host option to generate a URL\n")
-      ->envname("DD_AGENT_HOST")
+      ->envname("DD_TRACE_AGENT_PORT")
       ->default_val("8126");
 
   app.add_option("--tags,-T", tags,
