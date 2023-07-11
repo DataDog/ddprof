@@ -29,7 +29,7 @@ Options:
   -H,--host TEXT [localhost]  (Env:DD_AGENT_HOST)
                               The hostname of the agent. This is combined with the port option to generate a URL
                               
-  -P,--port TEXT [8126]  (Env:DD_AGENT_HOST)
+  -P,--port TEXT [8126]  (Env:DD_TRACE_AGENT_PORT)
                               The communication port for the Datadog agent. This is combined with the host option to generate a URL
                               
   -T,--tags TEXT (Env:DD_TAGS)
