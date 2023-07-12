@@ -5,12 +5,12 @@
 
 #pragma once
 
+#include <atomic>
 #include <memory>
 #include <mutex> // std::mutex, std::unique_lock
 #include <shared_mutex>
 #include <unordered_map>
 #include <unordered_set>
-#include <atomic>
 
 namespace ddprof {
 
@@ -99,7 +99,7 @@ public:
 
   // erase an address from the tree. Returns true if the address was in the tree
   bool erase(uintptr_t address) {
-    if (_root.erase(address) ) {
+    if (_root.erase(address)) {
       _size.fetch_add(-1, std::memory_order_relaxed);
     }
     return false;
@@ -110,13 +110,11 @@ public:
     _root.clear();
   }
 
-  size_t size() {
-    return _size.load(std::memory_order_relaxed);
-  }
+  size_t size() { return _size.load(std::memory_order_relaxed); }
 
 private:
   Node<BITS_PER_LEVEL, 64 - BITS_PER_LEVEL> _root;
-  std::atomic<size_t> _size {};
+  std::atomic<size_t> _size{};
   // todo we need to add some kind of global cleanup
 };
 

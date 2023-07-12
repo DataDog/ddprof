@@ -9,6 +9,5 @@ TEST(address_tree, simple) {
   EXPECT_TRUE(address_tree.insert(0xfafaeeeedeadbeef));
   EXPECT_EQ(address_tree.size(), 1);
   EXPECT_TRUE(address_tree.erase(0xfafaeeeedeadbeef));
-
 }
 } // namespace ddprof

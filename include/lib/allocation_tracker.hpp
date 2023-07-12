@@ -32,6 +32,10 @@ struct TrackerThreadLocalState {
 
   bool reentry_guard; // prevent reentry in AllocationTracker (eg. when
                       // allocation are done inside AllocationTracker)
+
+  // In the choice of random generators, this one is smaller
+  // - smaller than mt19937 (8 vs 5K)
+  std::minstd_rand _gen{std::random_device{}()};
 };
 
 class AllocationTracker {
@@ -65,8 +69,12 @@ public:
   static inline bool is_active();
 
 private:
-//  using AdressSet = std::unordered_set<uintptr_t>;
+#define OLD_IMPLEM
+#ifdef OLD_IMPLEM
+  using AdressSet = std::unordered_set<uintptr_t>;
+#else
   using AdressSet = ddprof::AddressTree;
+#endif
 
   struct TrackerState {
     void init(bool track_alloc, bool track_dealloc) {
@@ -85,7 +93,7 @@ private:
   };
 
   AllocationTracker();
-  uint64_t next_sample_interval();
+  uint64_t next_sample_interval(std::minstd_rand &gen);
 
   DDRes init(uint64_t mem_profile_interval, bool deterministic_sampling,
              uint32_t stack_sample_size, const RingBufferInfo &ring_buffer);

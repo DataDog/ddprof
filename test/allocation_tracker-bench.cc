@@ -1,7 +1,7 @@
 #include <benchmark/benchmark.h>
 
-#include "loghandle.hpp"
 #include "allocation_tracker.hpp"
+#include "loghandle.hpp"
 #include "ringbuffer_holder.hpp"
 #include <thread>
 
@@ -19,6 +19,7 @@ DDPROF_NOINLINE void my_free(uintptr_t addr) {
 // Function to perform allocations and deallocations
 void perform_memory_operations(bool track_allocations,
                                benchmark::State &state) {
+
   LogHandle handle;
   const uint64_t rate = 524288;
   const size_t buf_size_order = 8;
@@ -42,7 +43,7 @@ void perform_memory_operations(bool track_allocations,
   std::mt19937 gen(rd());
 
   for (auto _ : state) {
-    state.PauseTiming();
+    //    state.PauseTiming();
 
     // Initialize threads and clear addresses
     threads.clear();
@@ -66,7 +67,7 @@ void perform_memory_operations(bool track_allocations,
       t.join();
     }
 
-    state.ResumeTiming();
+    //    state.ResumeTiming();
 
     threads.clear();
     for (int i = 0; i < nb_threads; ++i) {
