@@ -7,6 +7,10 @@ FROM ubuntu:${UBUNTU_VERSION}.04 as base
 ARG UBUNTU_VERSION
 ENV OS_IDENTIFIER="UB${UBUNTU_VERSION}"
 
+FROM base AS base-23
+ENV GCC_VERSION=13
+ENV CLANG_VERSION=16
+
 FROM base AS base-22
 ENV GCC_VERSION=12
 ENV CLANG_VERSION=15
@@ -62,6 +66,7 @@ RUN apt-get update \
   ssh-client \
   subversion \
   unzip \
+  valgrind \
   wget \
   zlib1g-dev
 
@@ -91,11 +96,11 @@ RUN VERSION="3.22.2" \
   && tar --no-same-owner -C /usr/local --strip-components=1 -xf ${TAR_NAME} \
   && rm ${TAR_NAME}
 
-# Ninja build 1.10.2
-RUN VERSION="1.10.2" \
-  && SHA256="ce35865411f0490368a8fc383f29071de6690cbadc27704734978221f25e2bed" \
+# Ninja build 1.11.1
+RUN VERSION="1.11.1" \
+  && SHA256="31747ae633213f1eda3842686f83c2aa1412e0f5691d1c14dbbcc67fe7400cea" \
   && curl -LO https://github.com/ninja-build/ninja/archive/refs/tags/v${VERSION}.tar.gz \
-  && (printf "${SHA256} v${VERSION}.tar.gz" | sha256sum --check --strict --status) \
+  && (printf "${SHA256}  v${VERSION}.tar.gz" | sha256sum -c) \
   && tar xvfz v${VERSION}.tar.gz \
   && cd ninja-${VERSION} \
   && cmake -Bbuild-cmake \
@@ -146,36 +151,20 @@ RUN VERSION="3.10.5" \
 # Command line includes a change
 # - in python which is missing on ubuntu 20.04, use python 3 instead
 # - in options_test.cc to fix a clang build issue (fixed after 1.7.1)
-RUN VERSION="1.7.1" \
+RUN VERSION="1.8.2" \
   && curl -LO "https://github.com/google/benchmark/archive/refs/tags/v${VERSION}.tar.gz" \
-  && SHA256="6430e4092653380d9dc4ccb45a1e2dc9259d581f4866dc0759713126056bc1d7" \
+  && SHA256="2aab2980d0376137f969d92848fbb68216abb07633034534fc8c65cc4e7a0e93" \
   && (printf "${SHA256} v${VERSION}.tar.gz" | sha256sum --check --strict --status) \
   && tar xf v${VERSION}.tar.gz \
   && pushd benchmark-${VERSION} \
   && { command -v python > /dev/null || { ln -s /usr/bin/python3 python && export PATH=$PWD:$PATH; }; } \
-  && sed -i 's/^\s*size_t actual_iterations = 0;\s*$/  for (auto _ : state) {}/' ./test/options_test.cc \
-  && sed -i 's/^\s*for (auto _ : state) ++actual_iterations;\s*$//' ./test/options_test.cc \
   && cmake -DCMAKE_BUILD_TYPE=Release -DBENCHMARK_USE_BUNDLED_GTEST=OFF -GNinja -S . -B "build" \
   && cmake --build "build" --target install \
   && popd \
   && rm -rf benchmark-${VERSION} v${VERSION}.tar.gz
 
-# Valgrind with dwarf 5 support
-RUN VERSION="3.21.0" \
-    && curl -LO "https://sourceware.org/pub/valgrind/valgrind-${VERSION}.tar.bz2" \
-    && SHA1="817d769743d278b5d07526e85115082054e9bf9c" \
-    && (printf "${SHA1} valgrind-${VERSION}.tar.bz2" | sha1sum --check --strict --status) \
-    && tar xvf valgrind-${VERSION}.tar.bz2 \
-    && pushd valgrind-${VERSION} \
-    && ./configure --prefix /usr/local \
-    && make -j 4 \
-    && make install \
-    && valgrind --version \
-    && popd \
-    && rm -Rf valgrind-${VERSION} valgrind-${VERSION}.tar.bz2
-
 # Install cmake_format
-RUN pip3 install cmake_format
+RUN pip3  install --break-system-packages cmake-format
 
 # A specific user is required to get access to perf event ressources.
 # This enables unit testing using perf-event ressources

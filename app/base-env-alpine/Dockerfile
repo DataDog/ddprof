@@ -58,7 +58,7 @@ ENV PATH="/usr/lib/llvm-${CLANG_VERSION}/bin/:$PATH"
 
 ### Alpine has newer cmake
 
-# Ninja build 1.10.2
+# Ninja build 1.11.1
 RUN VERSION="1.11.1" \
   && SHA256="31747ae633213f1eda3842686f83c2aa1412e0f5691d1c14dbbcc67fe7400cea" \
   && curl -LO https://github.com/ninja-build/ninja/archive/refs/tags/v${VERSION}.tar.gz \
