@@ -139,7 +139,7 @@ static DDRes get_library_path(TempFileHolder &libdd_profiling_path,
 
 #ifdef DDPROF_USE_LOADER
   if (loader_path.empty()) {
-    DDRES_CHECK_FWD(get_or_create_temp_file(
+    DDRES_CHECK_FWD(ddprof::get_or_create_temp_file(
         k_libdd_loader_name,
         ddprof::as_bytes(ddprof::span{_binary_libdd_loader_so_start,
                                       _binary_libdd_loader_so_end}),
@@ -151,7 +151,6 @@ static DDRes get_library_path(TempFileHolder &libdd_profiling_path,
 #else
   (void)libdd_loader_path;
 #endif
-
   return {};
 }
 

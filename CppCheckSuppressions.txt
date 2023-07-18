@@ -5,8 +5,5 @@
 // config of cpp checks needs more includes
 missingInclude
 
-// Ignore warnings from third parties
-*:*/third_party/*
-
 // Ignore Lex and Yacc defects
 *:*/event_parser/*
