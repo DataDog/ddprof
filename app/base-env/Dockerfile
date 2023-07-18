@@ -164,7 +164,11 @@ RUN VERSION="1.8.2" \
   && rm -rf benchmark-${VERSION} v${VERSION}.tar.gz
 
 # Install cmake_format
-RUN pip3  install --break-system-packages cmake-format
+RUN if [ "$UBUNTU_VERSION" -eq 23 ]; then \
+        pip3 install --break-system-packages cmake-format; \
+    else \
+        pip3 install cmake-format; \
+    fi
 
 # A specific user is required to get access to perf event ressources.
 # This enables unit testing using perf-event ressources

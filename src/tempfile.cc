@@ -18,7 +18,7 @@
 namespace ddprof {
 
 DDRes get_or_create_temp_file(std::string_view prefix,
-                              ddprof::span<const std::byte> data, mode_t mode,
+                              span<const std::byte> data, mode_t mode,
                               std::string &path) {
   unsigned char digest[20];
   char str_digest[41];
@@ -45,9 +45,8 @@ DDRes get_or_create_temp_file(std::string_view prefix,
   return {};
 }
 
-DDRes create_temp_file(std::string_view prefix,
-                       ddprof::span<const std::byte> data, mode_t mode,
-                       std::string &path) {
+DDRes create_temp_file(std::string_view prefix, span<const std::byte> data,
+                       mode_t mode, std::string &path) {
   std::error_code ec;
   auto template_str =
       std::string{std::filesystem::temp_directory_path(ec) / prefix} +

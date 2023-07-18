@@ -27,10 +27,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include "perf_archmap.hpp"
 #include "span.hpp"
 
+#include <cstdint>
+
 #if defined(__x86_64__)
 
 DDPROF_NOINLINE __attribute__((naked)) void
-    save_registers(ddprof::span<uint64_t, PERF_REGS_COUNT>);
+    save_registers(ddprof::span<std::uint64_t, PERF_REGS_COUNT>);
 
 #elif defined(__aarch64__)
 
