@@ -24,8 +24,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include "saveregisters.hpp"
 
-#ifdef __x86_64__
-
+#define __force_i686__
+#if defined(__i686__) || defined(__force_i686__)
+void save_registers(ddprof::span<uint64_t, PERF_REGS_COUNT>) {
+}
+#elif __x86_64__
 #  define INPUT_REG(reg) [i##reg] "i"(REGNAME(reg))
 
 void save_registers(ddprof::span<uint64_t, PERF_REGS_COUNT>) {

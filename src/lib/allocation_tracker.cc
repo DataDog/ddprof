@@ -193,8 +193,9 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
 
     // \fixme{r1viollet} avoid locking here
     // change the tracking strategy
+#ifdef OLD_IMPLEM
     std::lock_guard lock{_state.mutex};
-
+#endif
     // ensure we track this dealloc if it occurs
     _address_set.insert(addr);
     if (unlikely(_address_set.size() > ddprof::liveallocation::kMaxTracked)) {
@@ -221,13 +222,11 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
     return;
   }
 
-  {
+  { // global lock around set manipulations
     std::lock_guard lock{_state.mutex};
-
     // Inserting / Erasing addresses is done within the lock
-    if (!_address_set.erase(addr) || !_state.track_deallocations) {
+    if (!_state.track_deallocations || !_address_set.erase(addr)) {
       // recheck if profiling is enabled
-
       return;
     }
   }
@@ -237,6 +236,9 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
 #else
 void AllocationTracker::track_deallocation(uintptr_t addr,
                                            TrackerThreadLocalState &tl_state) {
+  if (!_state.track_deallocations) {
+    return;
+  }
   // Inserting / Erasing addresses is done within the lock
   if (_address_set.erase(addr)) {
     // Prevent reentrancy to avoid dead lock on mutex
@@ -244,13 +246,6 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
 
     if (!guard) {
       // This is an internal dealloc, so we don't need to keep track of this
-      return;
-    }
-
-    std::lock_guard lock{_state.mutex};
-
-    // recheck if profiling is enabled
-    if (!_state.track_deallocations) {
       return;
     }
 

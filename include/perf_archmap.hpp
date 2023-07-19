@@ -8,8 +8,37 @@
 #include <array> // for std::size()
 
 // Architecture mapfile
+#define force_i868
+#if defined(force_i868)
+// Registers 0-11
+#  define PERF_REGS_COUNT 12
+#  define PERF_REGS_MASK 0xfff
+#  define REGNAME(x) PAM_I686_##x
+enum PERF_ARCHMAP_I686 {
+  PAM_I686_EAX,
+  PAM_I686_EBX,
+  PAM_I686_ECX,
+  PAM_I686_EDX,
+  PAM_I686_ESI,
+  PAM_I686_EDI,
+  PAM_I686_EBP,
+  PAM_I686_ESP,
+  PAM_I686_SP = PAM_I686_ESP, // For uniformity
+  PAM_I686_EIP,
+  PAM_I686_PC = PAM_I686_EIP, // For uniformity
+  PAM_I686_EFL,
+  PAM_I686_CS,
+  PAM_I686_SS,
+  /*
+    PAM_I686_DS,  // These segment registers cannot be read using common user
+    PAM_I686_ES,  // permissions. Accordingly, they are omitted from the mask.
+    PAM_I686_FS,  // They are retained here for documentation.
+    PAM_I686_GS,  // <-- and this one too
+  */
+  PAM_I686_MAX,
+};
 
-#ifdef __x86_64__
+#elif defined(__x86_64__)
 // Registers 0-11, 16-23
 #  define PERF_REGS_COUNT 20
 #  define PERF_REGS_MASK 0xff0fff
@@ -95,7 +124,12 @@ enum PERF_ARCHMAP_ARM {
 // F[i] = y_i; where i is the DWARF regno and y_i is the Linux perf regno
 constexpr unsigned int dwarf_to_perf_regno(unsigned int i) {
   constexpr unsigned int lookup[] = {
-#ifdef __x86_64__
+#define __force_i686__
+#if defined(__i686__) || defined(__force_i686__)
+      REGNAME(EAX), REGNAME(EDX), REGNAME(ECX), REGNAME(EBX), REGNAME(ESI),
+      REGNAME(EDI), REGNAME(EBP), REGNAME(SP),  REGNAME(EIP), REGNAME(EFL),
+      REGNAME(CS),  REGNAME(SS),
+#elif __x86_64__
       REGNAME(RAX), REGNAME(RDX), REGNAME(RCX), REGNAME(RBX), REGNAME(RSI),
       REGNAME(RDI), REGNAME(RBP), REGNAME(SP),  REGNAME(R8),  REGNAME(R9),
       REGNAME(R10), REGNAME(R11), REGNAME(R12), REGNAME(R13), REGNAME(R14),
@@ -120,10 +154,14 @@ constexpr unsigned int dwarf_to_perf_regno(unsigned int i) {
   return lookup[i];
 };
 
+
 constexpr unsigned int param_to_perf_regno(unsigned int param_no) {
 // Populate lookups for converting parameter number (1-indexed) to regno
+#define __force_i686__
 #define R(x) REGNAME(x)
-#ifdef __x86_64__
+#if defined(__i686__) || defined(__force_i686__)
+  constexpr int reg_lookup[] = {-1,     R(EAX), R(EDX), R(ECX)};
+#elif __x86_64__
   constexpr int reg_lookup[] = {-1,     R(RDI), R(RSI), R(RDX),
                                 R(RCX), R(R8),  R(R9)};
 #elif __aarch64__

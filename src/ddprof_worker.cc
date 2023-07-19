@@ -733,6 +733,7 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
       ddprof_pr_clear_live_allocation(ctx, event, watcher_pos);
     } break;
     default:
+      LG_NTC("unknown sample type %d", hdr->type);
       break;
     }
   }
