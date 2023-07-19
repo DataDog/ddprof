@@ -4,16 +4,27 @@ By Steve Reid <steve@edmweb.com>
 100% Public Domain
 
 Test Vectors (from FIPS PUB 180-1)
-"abc"
-  A9993E36 4706816A BA3E2571 7850C26C 9CD0D89D
-"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"
-  84983E44 1C3BD26E BAAE4AA1 F95129E5 E54670F1
-A million repetitions of "a"
-  34AA973C D4C4DAA4 F61EEB2B DBAD2731 6534016F
-*/
+        "abc"
+    A9993E36 4706816A BA3E2571 7850C26C 9CD0D89D
+    "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"
+    84983E44 1C3BD26E BAAE4AA1 F95129E5 E54670F1
+    A million repetitions of "a"
+    34AA973C D4C4DAA4 F61EEB2B DBAD2731 6534016F
+    */
 
 /* #define LITTLE_ENDIAN * This should be #define'd already, if true. */
 /* #define SHA1HANDSOFF * Copies data before messing with it. */
+
+// gcc 13 and lto seem to fail when compiling sha1. This is related to the
+// fortify feature.
+/// usr/include/fortify/stdio.h:73:28: error: inlining failed in call to
+/// 'always_inline' 'vsnprintf': function body can be overwritten at link time
+//   73 | _FORTIFY_FN(vsnprintf) int vsnprintf(char * _FORTIFY_POS0 __s, size_t
+//   __n,
+//      |                            ^
+#pragma push_macro("_FORTIFY_SOURCE")
+#undef _FORTIFY_SOURCE
+#define _FORTIFY_SOURCE 1
 
 #define SHA1HANDSOFF
 
@@ -65,7 +76,8 @@ A million repetitions of "a"
 void SHA1Transform(uint32_t state[5], const unsigned char buffer[64]) {
   uint32_t a, b, c, d, e;
 
-  typedef struct {
+  typedef union {
+    unsigned char c[64];
     uint32_t l[16];
   } CHAR64LONG16;
 
@@ -174,6 +186,8 @@ void SHA1Transform(uint32_t state[5], const unsigned char buffer[64]) {
   state[2] += c;
   state[3] += d;
   state[4] += e;
+  /* Wipe variables */
+  a = b = c = d = e = 0;
 #ifdef SHA1HANDSOFF
   memset(block, '\0', sizeof(block));
 #endif
@@ -263,18 +277,20 @@ void SHA1Final(unsigned char digest[20], SHA1_CTX *context) {
   memset(&finalcount, '\0', sizeof(finalcount));
 }
 
-void SHA1(unsigned char digest[20], const char *str, int len) {
+void SHA1(char *hash_out, const char *str, uint32_t len) {
   SHA1_CTX ctx;
   unsigned int ii;
 
   SHA1Init(&ctx);
   for (ii = 0; ii < len; ii += 1)
     SHA1Update(&ctx, (const unsigned char *)str + ii, 1);
-  SHA1Final(digest, &ctx);
+  SHA1Final((unsigned char *)hash_out, &ctx);
 }
 
-void SHA1StrDigest(const unsigned char digest[20], char str_digest[41]) {
+void SHA1StrDigest(const char digest[20], char str_digest[41]) {
   for (int i = 0; i < 20; ++i) {
     sprintf(str_digest + 2 * i, "%02x", digest[i]);
   }
 }
+
+#pragma pop_macro("_FORTIFY_SOURCE")
