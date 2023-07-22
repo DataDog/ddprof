@@ -5,7 +5,7 @@
 
 #pragma once
 
-#if __cpp_lib_span
+#if __cplusplus >= 202002L
 
 #  include <span>
 

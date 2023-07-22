@@ -1,4 +1,4 @@
-FROM alpine:3.17.2
+FROM alpine:3.18.0
 ARG COMPILER="gcc"
 ENV CC=gcc
 ENV CXX=g++
@@ -56,11 +56,11 @@ SHELL ["/bin/bash", "-c"]
 # Provides the llvm-symbolizer (better debug information in case of sanitizer issue)
 ENV PATH="/usr/lib/llvm-${CLANG_VERSION}/bin/:$PATH"
 
-### Alpine has cmake 3.23
+### Alpine has newer cmake
 
-# Ninja build 1.10.2
-RUN VERSION="1.10.2" \
-  && SHA256="ce35865411f0490368a8fc383f29071de6690cbadc27704734978221f25e2bed" \
+# Ninja build 1.11.1
+RUN VERSION="1.11.1" \
+  && SHA256="31747ae633213f1eda3842686f83c2aa1412e0f5691d1c14dbbcc67fe7400cea" \
   && curl -LO https://github.com/ninja-build/ninja/archive/refs/tags/v${VERSION}.tar.gz \
   && (printf "${SHA256}  v${VERSION}.tar.gz" | sha256sum -c) \
   && tar xvfz v${VERSION}.tar.gz \
@@ -73,9 +73,9 @@ RUN VERSION="1.10.2" \
 ## Alpine has cppcheck 2.8.1-r0
 
 # C++ json library (used for test purpose)
-RUN VERSION="3.10.5" \
+RUN VERSION="3.11.2" \
   && curl -LO https://github.com/nlohmann/json/releases/download/v${VERSION}/json.tar.xz \
-  && SHA256="344be97b757a36c5b180f1c8162f6c5f6ebd760b117f6e64b77866e97b217280" \
+  && SHA256="8c4b26bf4b422252e13f332bc5e388ec0ab5c3443d24399acb675e68278d341f" \
   && (printf "${SHA256}  json.tar.xz" | sha256sum -c) \
   && tar xf json.tar.xz \
   && cd json \
@@ -86,9 +86,9 @@ RUN VERSION="3.10.5" \
   && rm -rf json json.tar.xz
 
 # Google benchmark
-RUN VERSION="1.6.1" \
+RUN VERSION="1.8.2" \
   && curl -LO "https://github.com/google/benchmark/archive/refs/tags/v${VERSION}.tar.gz" \
-  && SHA256="6132883bc8c9b0df5375b16ab520fac1a85dc9e4cf5be59480448ece74b278d4" \
+  && SHA256="2aab2980d0376137f969d92848fbb68216abb07633034534fc8c65cc4e7a0e93" \
   && (printf "${SHA256}  v${VERSION}.tar.gz" | sha256sum -c) \
   && tar xf v${VERSION}.tar.gz \
   && cd benchmark-${VERSION} \

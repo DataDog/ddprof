@@ -5,6 +5,7 @@
 
 #include "ddprof_cpumask.hpp"
 
+#include <cstdint>
 #include <dirent.h>
 #include <sys/sysinfo.h>
 #include <sys/types.h>

@@ -26,7 +26,7 @@ struct TrackerThreadLocalState {
   int64_t remaining_bytes; // remaining allocation bytes until next sample
   bool remaining_bytes_initialized; // false if remaining_bytes is not
                                     // initialized
-  ddprof::span<const byte> stack_bounds;
+  ddprof::span<const std::byte> stack_bounds;
   pid_t tid; // cache of tid
 
   bool reentry_guard; // prevent reentry in AllocationTracker (eg. when
