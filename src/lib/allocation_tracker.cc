@@ -54,8 +54,11 @@ private:
   bool _ok;
 };
 
+// needs to be global
+pthread_once_t AllocationTracker::_key_once = PTHREAD_ONCE_INIT;
+
 AllocationTracker *AllocationTracker::_instance;
-thread_local TrackerThreadLocalState AllocationTracker::_tl_state;
+pthread_key_t AllocationTracker::tl_state_key;
 
 AllocationTracker::AllocationTracker() : _gen(std::random_device{}()) {}
 
@@ -67,7 +70,16 @@ AllocationTracker *AllocationTracker::create_instance() {
 DDRes AllocationTracker::allocation_tracking_init(
     uint64_t allocation_profiling_rate, uint32_t flags,
     uint32_t stack_sample_size, const RingBufferInfo &ring_buffer) {
-  ReentryGuard guard(&_tl_state.reentry_guard);
+  pthread_once(&_key_once, make_key);
+  TrackerThreadLocalState* tl_state = (TrackerThreadLocalState*)pthread_getspecific(tl_state_key);
+  if (!tl_state) {
+    tl_state = init_tl_state();
+    if (!tl_state) {
+      return ddres_error(DD_WHAT_DWFL_LIB_ERROR);
+    }
+  }
+
+  ReentryGuard guard(&tl_state->reentry_guard);
 
   AllocationTracker *instance = create_instance();
   auto &state = instance->_state;
@@ -114,7 +126,7 @@ void AllocationTracker::free() {
 
   // Do not destroy the object:
   // there is an inherent race condition between checking
-  // `_state.track_allocation` and calling `_instance->track_allocation`.
+  // `_state. ` and calling `_instance->track_allocation`.
   // That's why AllocationTracker is kept in a usable state and
   // `_track_allocation` is checked again in `_instance->track_allocation` while
   // taking the mutex lock.
@@ -126,7 +138,17 @@ void AllocationTracker::allocation_tracking_free() {
   if (!instance) {
     return;
   }
-  ReentryGuard guard(&_tl_state.reentry_guard);
+
+  pthread_once(&_key_once, make_key);
+  TrackerThreadLocalState* tl_state = (TrackerThreadLocalState*)pthread_getspecific(tl_state_key);
+  if (unlikely(!tl_state)) {
+    tl_state = init_tl_state();
+    if (!tl_state) {
+      instance->free();
+      return;
+    }
+  }
+  ReentryGuard guard(&tl_state->reentry_guard);
   std::lock_guard lock{instance->_state.mutex};
   instance->free();
 }
@@ -449,17 +471,32 @@ uint64_t AllocationTracker::next_sample_interval() {
 }
 
 void AllocationTracker::notify_thread_start() {
-  TrackerThreadLocalState &tl_state = AllocationTracker::_tl_state;
+  pthread_once(&_key_once, make_key);
+  TrackerThreadLocalState* tl_state = (TrackerThreadLocalState*)pthread_getspecific(tl_state_key);
+  if (unlikely(!tl_state)) {
+    tl_state = init_tl_state();
+    if (!tl_state) {
+      return;
+    }
+  }
 
-  ReentryGuard guard(&_tl_state.reentry_guard);
-  tl_state.stack_bounds = retrieve_stack_bounds();
+  ReentryGuard guard(&tl_state->reentry_guard);
+  tl_state->stack_bounds = retrieve_stack_bounds();
   // error can not be propagated in thread create
 }
 
 void AllocationTracker::notify_fork() {
   if (_instance) {
     _instance->_state.pid = 0;
-    _tl_state.tid = 0;
+    pthread_once(&_key_once, make_key);
+    TrackerThreadLocalState* tl_state = (TrackerThreadLocalState*)pthread_getspecific(tl_state_key);
+    if (unlikely(!tl_state)) {
+      tl_state = init_tl_state();
+      if (!tl_state) {
+        return;
+      }
+    }
+    tl_state->tid = 0;
   }
 }
 
