@@ -256,6 +256,7 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
 }
 
 void AllocationTracker::free() {
+  fprintf(stderr, "Lost count = %ld \n", _state.lost_count.load());
   _state.track_allocations = false;
   _state.track_deallocations = false;
 
