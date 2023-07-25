@@ -64,7 +64,7 @@ public:
 
   static inline bool is_active();
 
-  static inline TrackerThreadLocalState* init_tl_state();
+  static TrackerThreadLocalState* init_tl_state();
 
 private:
   using AdressSet = std::unordered_set<uintptr_t>;
@@ -128,39 +128,14 @@ private:
   AdressSet _address_set;
 
 
+  // These can not be tied to the internal state of the instance.
+  // The creation of the instance depends on this
   static pthread_once_t _key_once;
   static pthread_key_t tl_state_key;
 
   static AllocationTracker *_instance;
 };
 
-TrackerThreadLocalState* AllocationTracker::init_tl_state() {
-  static std::mutex init_tl_mutex = {};
-  TrackerThreadLocalState* tl_state = nullptr;
-  int res_set = 0;
-
-  if (!init_tl_mutex.try_lock()) {
-#define DEBUG
-#ifdef  DEBUG
-    fprintf(stderr, "Unable to get lock %s \n", __FUNCTION__);
-#endif
-    return tl_state;
-  }
-
-  tl_state = new TrackerThreadLocalState();
-  res_set = pthread_setspecific(tl_state_key, tl_state);
-
-  // unlock before clearing the instance
-  init_tl_mutex.unlock();
-  if (res_set) {
-    // should return 0
-    fprintf(stderr, "Unable to store tl_state, stopping profiler. error %d \n",
-            res_set);
-    delete tl_state;
-    tl_state = nullptr;
-  }
-  return tl_state;
-}
 
 void AllocationTracker::track_allocation(uintptr_t addr, size_t size) {
   AllocationTracker *instance = _instance;

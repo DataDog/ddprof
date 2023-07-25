@@ -22,6 +22,8 @@
 #include <cstdint>
 #include <cstdlib>
 
+#include <set>
+
 #include <unistd.h>
 
 namespace ddprof {
@@ -32,6 +34,97 @@ struct LostEvent {
   uint64_t lost;
 };
 
+#ifdef MUTEX_VERSION
+class ThreadEntries {
+public:
+  std::set<pid_t> thread_set;
+  std::mutex thread_set_mutex;
+};
+
+class TLReentryGuard {
+public:
+  explicit TLReentryGuard(ThreadEntries& entries, pid_t tid)
+      : _entries(entries), _tid(tid), _ok(false) {
+    std::lock_guard<std::mutex> lock(_entries.thread_set_mutex);
+    if (_entries.thread_set.find(_tid) == _entries.thread_set.end()) {
+      _entries.thread_set.insert(_tid);
+      _ok = true;
+    }
+  }
+
+  ~TLReentryGuard() {
+    if (_ok) {
+      std::lock_guard<std::mutex> lock(_entries.thread_set_mutex);
+      _entries.thread_set.erase(_tid);
+    }
+  }
+
+  explicit operator bool() const { return _ok; }
+
+  TLReentryGuard(const TLReentryGuard&) = delete;
+  TLReentryGuard& operator=(const TLReentryGuard&) = delete;
+
+private:
+  ThreadEntries& _entries;
+  pid_t _tid;
+  bool _ok;
+};
+
+
+#else
+class ThreadEntries {
+public:
+  static constexpr size_t max_threads = 10;
+  std::array<std::atomic<pid_t>, max_threads> thread_entries;
+
+  ThreadEntries() {
+    for(auto& entry : thread_entries) {
+      entry.store(-1, std::memory_order_relaxed);
+    }
+  }
+};
+
+class TLReentryGuard {
+public:
+  explicit TLReentryGuard(ThreadEntries& entries, pid_t tid)
+      : _entries(entries), _tid(tid), _ok(false), _index(-1) {
+    while(true) {
+      for(size_t i = 0; i < ThreadEntries::max_threads; ++i) {
+        pid_t expected = -1;
+        if(_entries.thread_entries[i].compare_exchange_strong(expected, tid, std::memory_order_relaxed)) {
+          _ok = true;
+          _index = i;
+          return;
+        }
+        else if(expected == tid) {
+          // This thread is already in the entries.
+          return;
+        }
+      }
+      // If we've reached here, all slots are occupied and none of them belongs to this thread.
+      // Let's yield to other threads and then try again.
+      std::this_thread::yield();
+    }
+  }
+
+  ~TLReentryGuard() {
+    if(_ok) {
+      _entries.thread_entries[_index].store(-1, std::memory_order_relaxed);
+    }
+  }
+
+  explicit operator bool() const { return _ok; }
+
+  TLReentryGuard(const TLReentryGuard&) = delete;
+  TLReentryGuard& operator=(const TLReentryGuard&) = delete;
+
+private:
+  ThreadEntries& _entries;
+  pid_t _tid;
+  bool _ok;
+  int _index;
+};
+#endif
 class ReentryGuard {
 public:
   explicit ReentryGuard(bool *reentry_guard)
@@ -54,11 +147,55 @@ private:
   bool _ok;
 };
 
-// needs to be global
 pthread_once_t AllocationTracker::_key_once = PTHREAD_ONCE_INIT;
 
 AllocationTracker *AllocationTracker::_instance;
 pthread_key_t AllocationTracker::tl_state_key;
+
+TrackerThreadLocalState* AllocationTracker::init_tl_state() {
+  static ThreadEntries thread_entries;
+
+  TrackerThreadLocalState* tl_state = nullptr;
+  int res_set = 0;
+
+  pid_t tid = ddprof::gettid();
+  TLReentryGuard tl_reentry_guard(thread_entries, tid);
+  // Why am I locking ? What am I afraid of ?
+  // Some other thread is changing this ?
+  // -> Don't care, this is per thread
+  //
+  // Infinite Recursive loop -> Yes, this will always happen
+  //
+  // -> Can I not just have a thread local ? (haha)
+  // We would need another thread local reentry guard.
+  // -> Can I not just count on the notify thread start to create this ?
+  // no, the new inside the init will for sure try to create a new state.
+  // -> Can I add a boolean to make sure we spin lock if needed ?
+  // Yes, this will slow down creation of threads
+  // -> Can I get the TID and create a table to avoid locking this ?
+  // Yes though that is an extra syscall
+  if (!tl_reentry_guard) {
+#define DEBUG
+#ifdef  DEBUG
+    fprintf(stderr, "Unable to get lock %s \n", __FUNCTION__);
+#endif
+    return tl_state;
+  }
+
+  tl_state = new TrackerThreadLocalState();
+  res_set = pthread_setspecific(tl_state_key, tl_state);
+  tl_state->tid = tid;
+
+  if (res_set) {
+    // should return 0
+    fprintf(stderr, "Unable to store tl_state, stopping profiler. error %d \n",
+            res_set);
+    delete tl_state;
+    tl_state = nullptr;
+  }
+  return tl_state;
+}
+
 
 AllocationTracker::AllocationTracker() : _gen(std::random_device{}()) {}
 
@@ -496,7 +633,9 @@ void AllocationTracker::notify_fork() {
         return;
       }
     }
-    tl_state->tid = 0;
+    else {
+      tl_state->tid = 0;
+    }
   }
 }
 
