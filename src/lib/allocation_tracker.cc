@@ -57,7 +57,7 @@ private:
 AllocationTracker *AllocationTracker::_instance;
 thread_local TrackerThreadLocalState AllocationTracker::_tl_state;
 
-AllocationTracker::AllocationTracker() : _gen(std::random_device{}()) {}
+AllocationTracker::AllocationTracker() {}
 
 AllocationTracker *AllocationTracker::create_instance() {
   static AllocationTracker tracker;
@@ -156,10 +156,6 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
     return;
   }
 
-  // \fixme{nsavoire} reduce the scope of the mutex:
-  // change prng/make it thread local
-  std::lock_guard lock{_state.mutex};
-
   // recheck if profiling is enabled
   if (!_state.track_allocations) {
     return;
@@ -169,7 +165,7 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
 
   if (unlikely(!tl_state.remaining_bytes_initialized)) {
     // tl_state.remaining bytes was not initialized yet for this thread
-    remaining_bytes -= next_sample_interval();
+    remaining_bytes -= next_sample_interval(tl_state._gen);
     tl_state.remaining_bytes_initialized = true;
     if (remaining_bytes < 0) {
       tl_state.remaining_bytes = remaining_bytes;
@@ -183,7 +179,7 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
   remaining_bytes = remaining_bytes % sampling_interval;
 
   do {
-    remaining_bytes -= next_sample_interval();
+    remaining_bytes -= next_sample_interval(tl_state._gen);
     ++nsamples;
   } while (remaining_bytes >= 0);
 
@@ -194,6 +190,10 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
   free_on_consecutive_failures(success);
 
   if (success && _state.track_deallocations) {
+    // \fixme{r1viollet} adjust set to be lock free
+    // We should still lock the clear of live allocations (which is unlikely)
+    std::lock_guard lock{_state.mutex};
+
     // ensure we track this dealloc if it occurs
     _address_set.insert(addr);
     if (unlikely(_address_set.size() > ddprof::liveallocation::kMaxTracked)) {
@@ -218,18 +218,16 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
     // This is an internal dealloc, so we don't need to keep track of this
     return;
   }
-  std::lock_guard lock{_state.mutex};
 
-  // recheck if profiling is enabled
-  if (!_state.track_deallocations) {
-    return;
+  { // Grab the lock to check if this allocation was stored in the set
+    std::lock_guard lock{_state.mutex};
+    if (!_state.track_deallocations || !_address_set.erase(addr)) {
+      return;
+    }
   }
 
-  // Inserting / Erasing addresses is done within the lock
-  if (_address_set.erase(addr)) {
-    bool success = IsDDResOK(push_dealloc_sample(addr, tl_state));
-    free_on_consecutive_failures(success);
-  }
+  bool success = IsDDResOK(push_dealloc_sample(addr, tl_state));
+  free_on_consecutive_failures(success);
 }
 
 DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
@@ -427,7 +425,7 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   return {};
 }
 
-uint64_t AllocationTracker::next_sample_interval() {
+uint64_t AllocationTracker::next_sample_interval(std::minstd_rand &gen) {
   if (_sampling_interval == 1) {
     return 1;
   }
@@ -436,7 +434,7 @@ uint64_t AllocationTracker::next_sample_interval() {
   }
   double sampling_rate = 1.0 / static_cast<double>(_sampling_interval);
   std::exponential_distribution<> dist(sampling_rate);
-  double value = dist(_gen);
+  double value = dist(gen);
   const size_t max_value = _sampling_interval * 20;
   const size_t min_value = 8;
   if (value > max_value) {

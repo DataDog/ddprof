@@ -27,6 +27,11 @@ struct TrackerThreadLocalState {
   bool remaining_bytes_initialized; // false if remaining_bytes is not
                                     // initialized
   ddprof::span<const byte> stack_bounds;
+
+  // In the choice of random generators, this one is smaller
+  // - smaller than mt19937 (8 vs 5K)
+  std::minstd_rand _gen{std::random_device{}()};
+
   pid_t tid; // cache of tid
 
   bool reentry_guard; // prevent reentry in AllocationTracker (eg. when
@@ -83,7 +88,8 @@ private:
   };
 
   AllocationTracker();
-  uint64_t next_sample_interval();
+
+  uint64_t next_sample_interval(std::minstd_rand &gen);
 
   DDRes init(uint64_t mem_profile_interval, bool deterministic_sampling,
              uint32_t stack_sample_size, const RingBufferInfo &ring_buffer);
@@ -110,7 +116,6 @@ private:
   TrackerState _state;
   uint64_t _sampling_interval;
   uint32_t _stack_sample_size;
-  std::mt19937 _gen;
   PEvent _pevent;
   bool _deterministic_sampling;
   AdressSet _address_set;

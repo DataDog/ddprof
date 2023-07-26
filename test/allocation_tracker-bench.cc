@@ -1,34 +1,39 @@
 #include <benchmark/benchmark.h>
 
 #include "allocation_tracker.hpp"
+#include "loghandle.hpp"
 #include "ringbuffer_holder.hpp"
+
 #include <thread>
 
 DDPROF_NOINLINE void my_malloc(size_t size, uintptr_t addr = 0xdeadbeef) {
   ddprof::AllocationTracker::track_allocation(addr, size);
   // prevent tail call optimization
-  getpid();
+  DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
 }
 
 DDPROF_NOINLINE void my_free(uintptr_t addr) {
   ddprof::AllocationTracker::track_deallocation(addr);
   // prevent tail call optimization
-  getpid();
+  DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
 }
 // Function to perform allocations and deallocations
 void perform_memory_operations(bool track_allocations,
                                benchmark::State &state) {
+  LogHandle handle;
   const uint64_t rate = 1;
-  const size_t buf_size_order = 5;
+  const size_t buf_size_order = 8;
+  uint32_t flags = ddprof::AllocationTracker::kDeterministicSampling;
+  //  uint32_t flags = ddprof::AllocationTracker::kDeterministicSampling |
+  //      ddprof::AllocationTracker::kTrackDeallocations;
+
   ddprof::RingBufferHolder ring_buffer{buf_size_order,
                                        RingBufferType::kMPSCRingBuffer};
 
   if (track_allocations) {
     ddprof::AllocationTracker::allocation_tracking_init(
-        rate,
-        ddprof::AllocationTracker::kDeterministicSampling |
-            ddprof::AllocationTracker::kTrackDeallocations,
-        k_default_perf_stack_sample_size, ring_buffer.get_buffer_info());
+        rate, flags, k_default_perf_stack_sample_size,
+        ring_buffer.get_buffer_info());
   }
 
   int nb_threads = 4;
@@ -39,7 +44,7 @@ void perform_memory_operations(bool track_allocations,
   std::mt19937 gen(rd());
 
   for (auto _ : state) {
-    state.PauseTiming();
+    //    state.PauseTiming();
 
     // Initialize threads and clear addresses
     threads.clear();
@@ -62,7 +67,7 @@ void perform_memory_operations(bool track_allocations,
       t.join();
     }
 
-    state.ResumeTiming();
+    //    state.ResumeTiming();
 
     threads.clear();
     for (int i = 0; i < nb_threads; ++i) {
