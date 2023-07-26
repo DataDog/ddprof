@@ -69,7 +69,7 @@ public:
 
   static inline bool is_active();
 
-  static TrackerThreadLocalState* init_tl_state();
+  static TrackerThreadLocalState *init_tl_state();
 
 private:
   using AdressSet = std::unordered_set<uintptr_t>;
@@ -100,7 +100,7 @@ private:
 
   static AllocationTracker *create_instance();
 
-  static void delete_tl_state(void* tl_state);
+  static void delete_tl_state(void *tl_state);
 
   static void make_key();
 
@@ -127,7 +127,6 @@ private:
   bool _deterministic_sampling;
   AdressSet _address_set;
 
-
   // These can not be tied to the internal state of the instance.
   // The creation of the instance depends on this
   static pthread_once_t _key_once; // ensures we call key creation a single time
@@ -135,7 +134,6 @@ private:
 
   static AllocationTracker *_instance;
 };
-
 
 void AllocationTracker::track_allocation(uintptr_t addr, size_t size) {
   AllocationTracker *instance = _instance;
@@ -153,7 +151,8 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size) {
   // tls_get_addr can call into malloc, which can create a recursive loop
   // instead we call pthread APIs to control the creation of TLS objects
   pthread_once(&_key_once, make_key);
-  TrackerThreadLocalState* tl_state = (TrackerThreadLocalState*)pthread_getspecific(tl_state_key);
+  TrackerThreadLocalState *tl_state =
+      (TrackerThreadLocalState *)pthread_getspecific(tl_state_key);
   if (unlikely(!tl_state)) {
     tl_state = init_tl_state();
     if (!tl_state) {
@@ -185,7 +184,8 @@ void AllocationTracker::track_deallocation(uintptr_t addr) {
   }
 
   pthread_once(&_key_once, make_key);
-  TrackerThreadLocalState* tl_state = (TrackerThreadLocalState*)pthread_getspecific(tl_state_key);
+  TrackerThreadLocalState *tl_state =
+      (TrackerThreadLocalState *)pthread_getspecific(tl_state_key);
   if (unlikely(!tl_state)) {
     tl_state = init_tl_state();
     if (!tl_state) {

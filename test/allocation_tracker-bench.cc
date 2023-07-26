@@ -1,14 +1,14 @@
 #include <benchmark/benchmark.h>
 
-#include <thread>
-#include <condition_variable>
-#include <vector>
-#include <mutex>
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <random>
+#include <thread>
+#include <vector>
 
-#include "loghandle.hpp"
 #include "allocation_tracker.hpp"
+#include "loghandle.hpp"
 #include "ringbuffer_holder.hpp"
 
 // Global bench settings
@@ -23,7 +23,7 @@ std::atomic<bool> reader_continue{true};
 // Reader worker thread function
 void read_buffer(ddprof::RingBufferHolder &holder) {
   int nb_samples = 0;
-  while(reader_continue){
+  while (reader_continue) {
     ddprof::MPSCRingBufferReader reader(holder.get_ring_buffer());
     auto buf = reader.read_sample();
     if (!buf.empty()) {
@@ -141,7 +141,7 @@ public:
     worker_thread = std::thread([this] {
       while (!stop) {
         std::unique_lock<std::mutex> lock(mutex);
-        cv.wait(lock, [this]{ return perform_task || stop; });
+        cv.wait(lock, [this] { return perform_task || stop; });
         if (stop)
           return;
 
@@ -161,7 +161,7 @@ public:
     });
   }
 
-  void signal_task(bool allocate_task, const std::vector<uintptr_t>& addrs) {
+  void signal_task(bool allocate_task, const std::vector<uintptr_t> &addrs) {
     {
       std::lock_guard<std::mutex> lock(mutex);
       addresses = addrs;
@@ -188,15 +188,15 @@ private:
 };
 
 void perform_memory_operations_2(bool track_allocations,
-                                benchmark::State &state) {
+                                 benchmark::State &state) {
   LogHandle handle;
   const uint64_t rate = k_rate;
   const size_t buf_size_order = 8;
 #ifndef LIVE_HEAP
   uint32_t flags = ddprof::AllocationTracker::kDeterministicSampling;
 #else
-    uint32_t flags = ddprof::AllocationTracker::kDeterministicSampling |
-        ddprof::AllocationTracker::kTrackDeallocations;
+  uint32_t flags = ddprof::AllocationTracker::kDeterministicSampling |
+      ddprof::AllocationTracker::kTrackDeallocations;
 #endif
   ddprof::RingBufferHolder ring_buffer{buf_size_order,
                                        RingBufferType::kMPSCRingBuffer};
@@ -261,7 +261,6 @@ static void BM_LongLived_NoTracking(benchmark::State &state) {
 static void BM_LongLived_Tracking(benchmark::State &state) {
   perform_memory_operations_2(true, state);
 }
-
 
 // short lived threads
 BENCHMARK(BM_ShortLived_NoTracking)->MeasureProcessCPUTime()->UseRealTime();
