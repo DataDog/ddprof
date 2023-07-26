@@ -16,6 +16,7 @@
 #include "ringbuffer_utils.hpp"
 #include "savecontext.hpp"
 #include "syscalls.hpp"
+#include "lib_logger.hpp"
 
 #include <atomic>
 #include <cassert>
@@ -159,21 +160,9 @@ TrackerThreadLocalState* AllocationTracker::init_tl_state() {
   int res_set = 0;
 
   pid_t tid = ddprof::gettid();
+  // As we allocate within this function, this will be called twice
+  // We could store the TID in a different thread local context.
   TLReentryGuard tl_reentry_guard(thread_entries, tid);
-  // Why am I locking ? What am I afraid of ?
-  // Some other thread is changing this ?
-  // -> Don't care, this is per thread
-  //
-  // Infinite Recursive loop -> Yes, this will always happen
-  //
-  // -> Can I not just have a thread local ? (haha)
-  // We would need another thread local reentry guard.
-  // -> Can I not just count on the notify thread start to create this ?
-  // no, the new inside the init will for sure try to create a new state.
-  // -> Can I add a boolean to make sure we spin lock if needed ?
-  // Yes, this will slow down creation of threads
-  // -> Can I get the TID and create a table to avoid locking this ?
-  // Yes though that is an extra syscall
   if (!tl_reentry_guard) {
 #define DEBUG
 #ifdef  DEBUG
@@ -188,14 +177,13 @@ TrackerThreadLocalState* AllocationTracker::init_tl_state() {
 
   if (res_set) {
     // should return 0
-    fprintf(stderr, "Unable to store tl_state, stopping profiler. error %d \n",
+    log_once("Error: Unable to store tl_state, stopping profiler. error %d \n",
             res_set);
     delete tl_state;
     tl_state = nullptr;
   }
   return tl_state;
 }
-
 
 AllocationTracker::AllocationTracker() : _gen(std::random_device{}()) {}
 
@@ -256,7 +244,6 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
 }
 
 void AllocationTracker::free() {
-  fprintf(stderr, "Lost count = %ld \n", _state.lost_count.load());
   _state.track_allocations = false;
   _state.track_deallocations = false;
 
@@ -282,6 +269,7 @@ void AllocationTracker::allocation_tracking_free() {
   if (unlikely(!tl_state)) {
     tl_state = init_tl_state();
     if (!tl_state) {
+      log_once("Error: Unable to find tl_state during %s\n", __FUNCTION__);
       instance->free();
       return;
     }
@@ -360,8 +348,7 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
       if (IsDDResOK(push_clear_live_allocation(tl_state))) {
         _address_set.clear();
       } else {
-        fprintf(
-            stderr,
+        log_once("Error: %s",
             "Stop allocation profiling. Unable to clear live allocation \n");
         free();
       }
@@ -614,6 +601,8 @@ void AllocationTracker::notify_thread_start() {
   if (unlikely(!tl_state)) {
     tl_state = init_tl_state();
     if (!tl_state) {
+      log_once("Error: Unable to start allocation profiling on thread %d",
+              ddprof::gettid());
       return;
     }
   }
@@ -631,6 +620,8 @@ void AllocationTracker::notify_fork() {
     if (unlikely(!tl_state)) {
       tl_state = init_tl_state();
       if (!tl_state) {
+        log_once("Error: Unable to retrieve tl state after fork thread %d",
+                 ddprof::gettid());
         return;
       }
     }

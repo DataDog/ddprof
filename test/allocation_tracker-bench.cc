@@ -1,35 +1,68 @@
 #include <benchmark/benchmark.h>
 
+#include <thread>
+#include <condition_variable>
+#include <vector>
+#include <mutex>
+#include <atomic>
+#include <random>
+
+#include "loghandle.hpp"
 #include "allocation_tracker.hpp"
 #include "ringbuffer_holder.hpp"
-#include <thread>
+
+// Global bench settings
+#define LIVE_HEAP
+// default rate is 524288
+static constexpr uint64_t k_rate = 200000;
+
+std::atomic<bool> reader_continue{true};
+
+// Reader worker thread function
+void read_buffer(ddprof::RingBufferHolder &holder) {
+  int nb_samples = 0;
+  while(reader_continue){
+    ddprof::MPSCRingBufferReader reader(holder.get_ring_buffer());
+    auto buf = reader.read_sample();
+    if (!buf.empty()) {
+      ++nb_samples;
+      //      fprintf(stderr, "Yep, got sample ! \n");
+    }
+    std::chrono::microseconds(10000);
+  }
+  fprintf(stderr, "Reader thread exit, nb_samples=%d\n", nb_samples);
+}
 
 DDPROF_NOINLINE void my_malloc(size_t size, uintptr_t addr = 0xdeadbeef) {
   ddprof::AllocationTracker::track_allocation(addr, size);
-  // prevent tail call optimization
-  getpid();
+  DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
 }
 
 DDPROF_NOINLINE void my_free(uintptr_t addr) {
   ddprof::AllocationTracker::track_deallocation(addr);
-  // prevent tail call optimization
-  getpid();
+  DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
 }
 
 // Function to perform allocations and deallocations
 void perform_memory_operations(bool track_allocations,
                                benchmark::State &state) {
-  const uint64_t rate = 1;
-  const size_t buf_size_order = 5;
+  LogHandle handle;
+  const uint64_t rate = k_rate;
+  const size_t buf_size_order = 8;
+#ifndef LIVE_HEAP
+  uint32_t flags = ddprof::AllocationTracker::kDeterministicSampling;
+#else
+  uint32_t flags = ddprof::AllocationTracker::kDeterministicSampling |
+      ddprof::AllocationTracker::kTrackDeallocations;
+#endif
+
   ddprof::RingBufferHolder ring_buffer{buf_size_order,
                                        RingBufferType::kMPSCRingBuffer};
 
   if (track_allocations) {
     ddprof::AllocationTracker::allocation_tracking_init(
-        rate,
-        ddprof::AllocationTracker::kDeterministicSampling |
-            ddprof::AllocationTracker::kTrackDeallocations,
-        k_default_perf_stack_sample_size, ring_buffer.get_buffer_info());
+        rate, flags, k_default_perf_stack_sample_size,
+        ring_buffer.get_buffer_info());
   }
 
   int nb_threads = 4;
@@ -38,6 +71,10 @@ void perform_memory_operations(bool track_allocations,
   size_t page_size = 0x1000;
   std::random_device rd;
   std::mt19937 gen(rd());
+
+  // create reader worker thread
+  reader_continue = true;
+  std::thread reader_thread{read_buffer, std::ref(ring_buffer)};
 
   for (auto _ : state) {
     state.PauseTiming();
@@ -78,6 +115,10 @@ void perform_memory_operations(bool track_allocations,
       t.join();
     }
   }
+
+  reader_continue = false;
+  reader_thread.join();
+
   ddprof::AllocationTracker::allocation_tracking_free();
 }
 
@@ -92,15 +133,10 @@ static void BM_ShortLived_Tracking(benchmark::State &state) {
 }
 
 // short lived threads
-//BENCHMARK(BM_ShortLived_NoTracking);
-//BENCHMARK(BM_ShortLived_Tracking);
+BENCHMARK(BM_ShortLived_NoTracking)->MeasureProcessCPUTime()->UseRealTime();
+BENCHMARK(BM_ShortLived_Tracking)->MeasureProcessCPUTime()->UseRealTime();
 
 
-#include <condition_variable>
-#include <vector>
-#include <mutex>
-#include <atomic>
-#include <random>
 
 class WorkerThread {
 public:
@@ -159,6 +195,27 @@ private:
 
 void perform_memory_operations_2(bool track_allocations,
                                 benchmark::State &state) {
+  LogHandle handle;
+  const uint64_t rate = k_rate;
+  const size_t buf_size_order = 8;
+#ifndef LIVE_HEAP
+  uint32_t flags = ddprof::AllocationTracker::kDeterministicSampling;
+#else
+    uint32_t flags = ddprof::AllocationTracker::kDeterministicSampling |
+        ddprof::AllocationTracker::kTrackDeallocations;
+#endif
+  ddprof::RingBufferHolder ring_buffer{buf_size_order,
+                                       RingBufferType::kMPSCRingBuffer};
+
+  if (track_allocations) {
+    ddprof::AllocationTracker::allocation_tracking_init(
+        rate, flags, k_default_perf_stack_sample_size,
+        ring_buffer.get_buffer_info());
+  }
+
+  reader_continue = true;
+  std::thread reader_thread{read_buffer, std::ref(ring_buffer)};
+
   const int nb_threads = 4;
   std::vector<WorkerThread> workers(nb_threads);
   std::vector<std::vector<uintptr_t>> thread_addresses(nb_threads);
@@ -191,6 +248,11 @@ void perform_memory_operations_2(bool track_allocations,
     // Add delay
     std::this_thread::sleep_for(std::chrono::microseconds(100));
   }
+
+  reader_continue = false;
+  reader_thread.join();
+
+  ddprof::AllocationTracker::allocation_tracking_free();
 }
 
 // Benchmark without allocation tracking
@@ -203,5 +265,5 @@ static void BM_LongLived_Tracking(benchmark::State &state) {
   perform_memory_operations_2(true, state);
 }
 
-//BENCHMARK(BM_LongLived_NoTracking);
-BENCHMARK(BM_LongLived_Tracking);
+BENCHMARK(BM_LongLived_NoTracking)->MeasureProcessCPUTime();
+BENCHMARK(BM_LongLived_Tracking)->MeasureProcessCPUTime();
