@@ -21,6 +21,7 @@ test_cpu_mask=$(python3 -c 'import random,os;print(hex(1 << random.choice(list(o
 
 opts="--loop 1000 --spin 100"
 log_file=$(mktemp "${PWD}/log.XXXXXX")
+echo "logs available here $log_file"
 rm "${log_file}"
 export DD_PROFILING_NATIVE_LOG_MODE="${log_file}"
 
@@ -36,6 +37,7 @@ check() {
     expected_pids="$2"
     expected_tids="${3-$2}"
     # shellcheck disable=SC2086
+    echo "runnint :${cmd}"
     taskset "${test_cpu_mask}" ${cmd}
     if [[ "${expected_pids}" -eq 1 ]]; then
         # Ugly workaround for tail bug that makes it wait indefinitely for new lines when `grep -q` exists:

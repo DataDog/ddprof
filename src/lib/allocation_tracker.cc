@@ -8,14 +8,13 @@
 #include "allocation_event.hpp"
 #include "ddprof_perf_event.hpp"
 #include "ddres.hpp"
-#include "defer.hpp"
 #include "ipc.hpp"
 #include "live_allocation-c.hpp"
-#include "perf.hpp"
 #include "pevent_lib.hpp"
 #include "ringbuffer_utils.hpp"
 #include "savecontext.hpp"
 #include "syscalls.hpp"
+#include "lib_logger.hpp"
 
 #include <atomic>
 #include <cassert>
@@ -30,6 +29,59 @@ struct LostEvent {
   perf_event_header hdr;
   uint64_t id;
   uint64_t lost;
+};
+
+class ThreadEntries {
+public:
+  static constexpr size_t max_threads = 10;
+  std::array<std::atomic<pid_t>, max_threads> thread_entries;
+
+  ThreadEntries() {
+    for(auto& entry : thread_entries) {
+      entry.store(-1, std::memory_order_relaxed);
+    }
+  }
+};
+
+class TLReentryGuard {
+public:
+  explicit TLReentryGuard(ThreadEntries& entries, pid_t tid)
+      : _entries(entries), _tid(tid), _ok(false), _index(-1) {
+    while(true) {
+      for(size_t i = 0; i < ThreadEntries::max_threads; ++i) {
+        pid_t expected = -1;
+        if(_entries.thread_entries[i].compare_exchange_strong(expected, tid, std::memory_order_relaxed)) {
+          _ok = true;
+          _index = i;
+          return;
+        }
+        else if(expected == tid) {
+          // This thread is already in the entries.
+          return;
+        }
+      }
+      // If we've reached here, all slots are occupied and none of them belongs to this thread.
+      // Let's yield to other threads and then try again.
+      std::this_thread::yield();
+    }
+  }
+
+  ~TLReentryGuard() {
+    if(_ok) {
+      _entries.thread_entries[_index].store(-1, std::memory_order_relaxed);
+    }
+  }
+
+  explicit operator bool() const { return _ok; }
+
+  TLReentryGuard(const TLReentryGuard&) = delete;
+  TLReentryGuard& operator=(const TLReentryGuard&) = delete;
+
+private:
+  ThreadEntries& _entries;
+  pid_t _tid;
+  bool _ok;
+  int _index;
 };
 
 class ReentryGuard {
@@ -54,8 +106,40 @@ private:
   bool _ok;
 };
 
+pthread_once_t AllocationTracker::_key_once = PTHREAD_ONCE_INIT;
+
 AllocationTracker *AllocationTracker::_instance;
-thread_local TrackerThreadLocalState AllocationTracker::_tl_state;
+pthread_key_t AllocationTracker::tl_state_key;
+
+TrackerThreadLocalState* AllocationTracker::init_tl_state() {
+  static ThreadEntries thread_entries;
+
+  TrackerThreadLocalState* tl_state = nullptr;
+  int res_set = 0;
+
+  pid_t tid = ddprof::gettid();
+  // As we allocate within this function, this can be called twice
+  TLReentryGuard tl_reentry_guard(thread_entries, tid);
+  if (!tl_reentry_guard) {
+#ifdef  DEBUG
+    fprintf(stderr, "Unable to reentry guard %s \n", __FUNCTION__);
+#endif
+    return tl_state;
+  }
+
+  tl_state = new TrackerThreadLocalState();
+  res_set = pthread_setspecific(tl_state_key, tl_state);
+  tl_state->tid = tid;
+
+  if (res_set) {
+    // should return 0
+    log_once("Error: Unable to store tl_state, stopping profiler. error %d \n",
+            res_set);
+    delete tl_state;
+    tl_state = nullptr;
+  }
+  return tl_state;
+}
 
 AllocationTracker::AllocationTracker() {}
 
@@ -64,10 +148,29 @@ AllocationTracker *AllocationTracker::create_instance() {
   return &tracker;
 }
 
+void AllocationTracker::delete_tl_state(void* tl_state) {
+  delete (TrackerThreadLocalState*) tl_state;
+}
+
+void AllocationTracker::make_key(){
+  // delete is called on all key objects
+  pthread_key_create(&tl_state_key, delete_tl_state);
+}
+
+
 DDRes AllocationTracker::allocation_tracking_init(
     uint64_t allocation_profiling_rate, uint32_t flags,
     uint32_t stack_sample_size, const RingBufferInfo &ring_buffer) {
-  ReentryGuard guard(&_tl_state.reentry_guard);
+  pthread_once(&_key_once, make_key);
+  TrackerThreadLocalState* tl_state = (TrackerThreadLocalState*)pthread_getspecific(tl_state_key);
+  if (!tl_state) {
+    tl_state = init_tl_state();
+    if (!tl_state) {
+      return ddres_error(DD_WHAT_DWFL_LIB_ERROR);
+    }
+  }
+
+  ReentryGuard guard(&tl_state->reentry_guard);
 
   AllocationTracker *instance = create_instance();
   auto &state = instance->_state;
@@ -114,7 +217,7 @@ void AllocationTracker::free() {
 
   // Do not destroy the object:
   // there is an inherent race condition between checking
-  // `_state.track_allocation` and calling `_instance->track_allocation`.
+  // `_state. ` and calling `_instance->track_allocation`.
   // That's why AllocationTracker is kept in a usable state and
   // `_track_allocation` is checked again in `_instance->track_allocation` while
   // taking the mutex lock.
@@ -126,7 +229,18 @@ void AllocationTracker::allocation_tracking_free() {
   if (!instance) {
     return;
   }
-  ReentryGuard guard(&_tl_state.reentry_guard);
+
+  pthread_once(&_key_once, make_key);
+  TrackerThreadLocalState* tl_state = (TrackerThreadLocalState*)pthread_getspecific(tl_state_key);
+  if (unlikely(!tl_state)) {
+    tl_state = init_tl_state();
+    if (!tl_state) {
+      log_once("Error: Unable to find tl_state during %s\n", __FUNCTION__);
+      instance->free();
+      return;
+    }
+  }
+  ReentryGuard guard(&tl_state->reentry_guard);
   std::lock_guard lock{instance->_state.mutex};
   instance->free();
 }
@@ -200,8 +314,7 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
       if (IsDDResOK(push_clear_live_allocation(tl_state))) {
         _address_set.clear();
       } else {
-        fprintf(
-            stderr,
+        log_once("Error: %s",
             "Stop allocation profiling. Unable to clear live allocation \n");
         free();
       }
@@ -447,17 +560,38 @@ uint64_t AllocationTracker::next_sample_interval(std::minstd_rand &gen) {
 }
 
 void AllocationTracker::notify_thread_start() {
-  TrackerThreadLocalState &tl_state = AllocationTracker::_tl_state;
+  pthread_once(&_key_once, make_key);
+  TrackerThreadLocalState* tl_state = (TrackerThreadLocalState*)pthread_getspecific(tl_state_key);
+  if (unlikely(!tl_state)) {
+    tl_state = init_tl_state();
+    if (!tl_state) {
+      log_once("Error: Unable to start allocation profiling on thread %d",
+              ddprof::gettid());
+      return;
+    }
+  }
 
-  ReentryGuard guard(&_tl_state.reentry_guard);
-  tl_state.stack_bounds = retrieve_stack_bounds();
+  ReentryGuard guard(&tl_state->reentry_guard);
+  tl_state->stack_bounds = retrieve_stack_bounds();
   // error can not be propagated in thread create
 }
 
 void AllocationTracker::notify_fork() {
   if (_instance) {
     _instance->_state.pid = 0;
-    _tl_state.tid = 0;
+    pthread_once(&_key_once, make_key);
+    TrackerThreadLocalState* tl_state = (TrackerThreadLocalState*)pthread_getspecific(tl_state_key);
+    if (unlikely(!tl_state)) {
+      tl_state = init_tl_state();
+      if (!tl_state) {
+        log_once("Error: Unable to retrieve tl state after fork thread %d",
+                 ddprof::gettid());
+        return;
+      }
+    }
+    else {
+      tl_state->tid = 0;
+    }
   }
 }
 

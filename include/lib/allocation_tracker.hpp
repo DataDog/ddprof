@@ -14,6 +14,7 @@
 #include <atomic>
 #include <cstddef>
 #include <mutex>
+#include <pthread.h>
 #include <random>
 #include <unordered_set>
 
@@ -68,6 +69,8 @@ public:
 
   static inline bool is_active();
 
+  static TrackerThreadLocalState* init_tl_state();
+
 private:
   using AdressSet = std::unordered_set<uintptr_t>;
 
@@ -97,6 +100,10 @@ private:
 
   static AllocationTracker *create_instance();
 
+  static void delete_tl_state(void* tl_state);
+
+  static void make_key();
+
   void track_allocation(uintptr_t addr, size_t size,
                         TrackerThreadLocalState &tl_state);
   void track_deallocation(uintptr_t addr, TrackerThreadLocalState &tl_state);
@@ -120,9 +127,15 @@ private:
   bool _deterministic_sampling;
   AdressSet _address_set;
 
-  static thread_local TrackerThreadLocalState _tl_state;
+
+  // These can not be tied to the internal state of the instance.
+  // The creation of the instance depends on this
+  static pthread_once_t _key_once; // ensures we call key creation a single time
+  static pthread_key_t tl_state_key;
+
   static AllocationTracker *_instance;
 };
+
 
 void AllocationTracker::track_allocation(uintptr_t addr, size_t size) {
   AllocationTracker *instance = _instance;
@@ -137,21 +150,29 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size) {
   }
 
   // In shared libraries, TLS access requires a call to tls_get_addr,
-  // therefore obtain a pointer on TLS state once and pass it around
-  TrackerThreadLocalState &tl_state = _tl_state;
+  // tls_get_addr can call into malloc, which can create a recursive loop
+  // instead we call pthread APIs to control the creation of TLS objects
+  pthread_once(&_key_once, make_key);
+  TrackerThreadLocalState* tl_state = (TrackerThreadLocalState*)pthread_getspecific(tl_state_key);
+  if (unlikely(!tl_state)) {
+    tl_state = init_tl_state();
+    if (!tl_state) {
+      return;
+    }
+  }
 
-  tl_state.remaining_bytes += size;
-  if (likely(tl_state.remaining_bytes < 0)) {
+  tl_state->remaining_bytes += size;
+  if (likely(tl_state->remaining_bytes < 0)) {
     return;
   }
 
   if (likely(
           instance->_state.track_allocations.load(std::memory_order_relaxed))) {
-    instance->track_allocation(addr, size, tl_state);
+    instance->track_allocation(addr, size, *tl_state);
   } else {
     // allocation tracking is disabled, reset state
-    tl_state.remaining_bytes_initialized = false;
-    tl_state.remaining_bytes = 0;
+    tl_state->remaining_bytes_initialized = false;
+    tl_state->remaining_bytes = 0;
   }
 }
 
@@ -162,12 +183,18 @@ void AllocationTracker::track_deallocation(uintptr_t addr) {
   if (!instance) {
     return;
   }
-  TrackerThreadLocalState &tl_state = _tl_state;
+
+  pthread_once(&_key_once, make_key);
+  TrackerThreadLocalState* tl_state = (TrackerThreadLocalState*)pthread_getspecific(tl_state_key);
+  if (unlikely(!tl_state)) {
+    tl_state = init_tl_state();
+    if (!tl_state) {
+      return;
+    }
+  }
 
   if (instance->_state.track_deallocations.load(std::memory_order_relaxed)) {
-    // not cool as we are always calling this (high overhead). Can we do better
-    // ?
-    instance->track_deallocation(addr, tl_state);
+    instance->track_deallocation(addr, *tl_state);
   }
 }
 
