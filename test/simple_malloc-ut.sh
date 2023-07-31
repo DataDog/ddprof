@@ -21,7 +21,7 @@ test_cpu_mask=$(python3 -c 'import random,os;print(hex(1 << random.choice(list(o
 
 opts="--loop 1000 --spin 100"
 log_file=$(mktemp "${PWD}/log.XXXXXX")
-echo "logs available here $log_file"
+# echo "logs available here $log_file"
 rm "${log_file}"
 export DD_PROFILING_NATIVE_LOG_MODE="${log_file}"
 
