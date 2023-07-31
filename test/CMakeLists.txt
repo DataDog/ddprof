@@ -336,6 +336,8 @@ add_unit_test(ddprof_process-ut ddprof_process-ut.cc ../src/container_id.cc
 
 add_unit_test(glibc_fixes-ut glibc_fixes-ut.cc ../src/lib/glibc_fixes.c LIBRARIES pthread)
 
+add_unit_test(reentry_guard-ut reentry_guard-ut.cc)
+
 add_unit_test(
   ddprof_cli-ut
   ddprof_cli-ut.cc

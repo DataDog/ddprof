@@ -8,6 +8,7 @@
 #include "ddprof_base.hpp"
 #include "ddres_def.hpp"
 #include "pevent.hpp"
+#include "reentry_guard.hpp"
 #include "span.hpp"
 #include "unlikely.hpp"
 
@@ -73,18 +74,6 @@ public:
 
 private:
   using AdressSet = std::unordered_set<uintptr_t>;
-  friend class TLReentryGuard;
-  class ThreadEntries {
-  public:
-    static constexpr size_t max_threads = 10;
-    std::array<std::atomic<pid_t>, max_threads> thread_entries;
-    ThreadEntries() { reset(); }
-    void reset() {
-      for (auto &entry : thread_entries) {
-        entry.store(-1, std::memory_order_relaxed);
-      }
-    }
-  };
 
   struct TrackerState {
     void init(bool track_alloc, bool track_dealloc) {

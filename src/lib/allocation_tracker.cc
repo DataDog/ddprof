@@ -31,76 +31,11 @@ struct LostEvent {
   uint64_t lost;
 };
 
-class TLReentryGuard {
-public:
-  explicit TLReentryGuard(AllocationTracker::ThreadEntries &entries, pid_t tid)
-      : _entries(entries), _tid(tid), _ok(false), _index(-1) {
-    while (true) {
-      for (size_t i = 0; i < AllocationTracker::ThreadEntries::max_threads;
-           ++i) {
-        pid_t expected = -1;
-        if (_entries.thread_entries[i].compare_exchange_strong(
-                expected, tid, std::memory_order_acq_rel)) {
-          _ok = true;
-          _index = i;
-          return;
-        } else if (expected == tid) {
-          // This thread is already in the entries.
-          return;
-        }
-      }
-      // If we've reached here, all slots are occupied and none of them belongs
-      // to this thread. Let's yield to other threads and then try again.
-      std::this_thread::yield();
-    }
-  }
-
-  ~TLReentryGuard() {
-    if (_ok) {
-      // todo @r1viollet this could be weaker
-      _entries.thread_entries[_index].store(-1, std::memory_order_seq_cst);
-    }
-  }
-
-  explicit operator bool() const { return _ok; }
-
-  TLReentryGuard(const TLReentryGuard &) = delete;
-  TLReentryGuard &operator=(const TLReentryGuard &) = delete;
-
-private:
-  AllocationTracker::ThreadEntries &_entries;
-  pid_t _tid;
-  bool _ok;
-  int _index;
-};
-
-class ReentryGuard {
-public:
-  explicit ReentryGuard(bool *reentry_guard)
-      : _reentry_guard(reentry_guard), _ok(!*reentry_guard) {
-    *_reentry_guard = true;
-  }
-  ~ReentryGuard() {
-    if (_ok) {
-      *_reentry_guard = false;
-    }
-  }
-
-  explicit operator bool() const { return _ok; }
-
-  ReentryGuard(const ReentryGuard &) = delete;
-  ReentryGuard &operator=(const ReentryGuard &) = delete;
-
-private:
-  bool *_reentry_guard;
-  bool _ok;
-};
-
 // Static declarations
 pthread_once_t AllocationTracker::_key_once = PTHREAD_ONCE_INIT;
 
 pthread_key_t AllocationTracker::_tl_state_key;
-AllocationTracker::ThreadEntries AllocationTracker::_thread_entries;
+ThreadEntries AllocationTracker::_thread_entries;
 
 AllocationTracker *AllocationTracker::_instance;
 
