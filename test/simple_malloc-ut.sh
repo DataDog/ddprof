@@ -37,7 +37,7 @@ check() {
     expected_pids="$2"
     expected_tids="${3-$2}"
     # shellcheck disable=SC2086
-    echo "runnint :${cmd}"
+    # echo "running :${cmd}"
     taskset "${test_cpu_mask}" ${cmd}
     if [[ "${expected_pids}" -eq 1 ]]; then
         # Ugly workaround for tail bug that makes it wait indefinitely for new lines when `grep -q` exists:

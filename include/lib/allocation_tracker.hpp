@@ -73,6 +73,18 @@ public:
 
 private:
   using AdressSet = std::unordered_set<uintptr_t>;
+  friend class TLReentryGuard;
+  class ThreadEntries {
+  public:
+    static constexpr size_t max_threads = 10;
+    std::array<std::atomic<pid_t>, max_threads> thread_entries;
+    ThreadEntries() { reset(); }
+    void reset() {
+      for (auto &entry : thread_entries) {
+        entry.store(-1, std::memory_order_relaxed);
+      }
+    }
+  };
 
   struct TrackerState {
     void init(bool track_alloc, bool track_dealloc) {
@@ -130,7 +142,9 @@ private:
   // These can not be tied to the internal state of the instance.
   // The creation of the instance depends on this
   static pthread_once_t _key_once; // ensures we call key creation a single time
-  static pthread_key_t tl_state_key;
+  static pthread_key_t _tl_state_key;
+  // For Thread reentry guard of init_tl_state
+  static ThreadEntries _thread_entries;
 
   static AllocationTracker *_instance;
 };
@@ -152,12 +166,12 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size) {
   // instead we call pthread APIs to control the creation of TLS objects
   pthread_once(&_key_once, make_key);
   TrackerThreadLocalState *tl_state =
-      (TrackerThreadLocalState *)pthread_getspecific(tl_state_key);
+      (TrackerThreadLocalState *)pthread_getspecific(_tl_state_key);
   if (unlikely(!tl_state)) {
-    tl_state = init_tl_state();
-    if (!tl_state) {
-      return;
-    }
+    // This code path is expected
+    // We expect to run thread init before being able to track allocations
+    // Allocations can happen in between
+    return;
   }
 
   tl_state->remaining_bytes += size;
@@ -182,18 +196,13 @@ void AllocationTracker::track_deallocation(uintptr_t addr) {
   if (!instance) {
     return;
   }
-
-  pthread_once(&_key_once, make_key);
-  TrackerThreadLocalState *tl_state =
-      (TrackerThreadLocalState *)pthread_getspecific(tl_state_key);
-  if (unlikely(!tl_state)) {
-    tl_state = init_tl_state();
-    if (!tl_state) {
+  if (instance->_state.track_deallocations.load(std::memory_order_relaxed)) {
+    pthread_once(&_key_once, make_key);
+    TrackerThreadLocalState *tl_state =
+        (TrackerThreadLocalState *)pthread_getspecific(_tl_state_key);
+    if (unlikely(!tl_state)) {
       return;
     }
-  }
-
-  if (instance->_state.track_deallocations.load(std::memory_order_relaxed)) {
     instance->track_deallocation(addr, *tl_state);
   }
 }

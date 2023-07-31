@@ -31,27 +31,16 @@ struct LostEvent {
   uint64_t lost;
 };
 
-class ThreadEntries {
-public:
-  static constexpr size_t max_threads = 10;
-  std::array<std::atomic<pid_t>, max_threads> thread_entries;
-
-  ThreadEntries() {
-    for (auto &entry : thread_entries) {
-      entry.store(-1, std::memory_order_relaxed);
-    }
-  }
-};
-
 class TLReentryGuard {
 public:
-  explicit TLReentryGuard(ThreadEntries &entries, pid_t tid)
+  explicit TLReentryGuard(AllocationTracker::ThreadEntries &entries, pid_t tid)
       : _entries(entries), _tid(tid), _ok(false), _index(-1) {
     while (true) {
-      for (size_t i = 0; i < ThreadEntries::max_threads; ++i) {
+      for (size_t i = 0; i < AllocationTracker::ThreadEntries::max_threads;
+           ++i) {
         pid_t expected = -1;
         if (_entries.thread_entries[i].compare_exchange_strong(
-                expected, tid, std::memory_order_relaxed)) {
+                expected, tid, std::memory_order_acq_rel)) {
           _ok = true;
           _index = i;
           return;
@@ -68,7 +57,8 @@ public:
 
   ~TLReentryGuard() {
     if (_ok) {
-      _entries.thread_entries[_index].store(-1, std::memory_order_relaxed);
+      // todo @r1viollet this could be weaker
+      _entries.thread_entries[_index].store(-1, std::memory_order_seq_cst);
     }
   }
 
@@ -78,7 +68,7 @@ public:
   TLReentryGuard &operator=(const TLReentryGuard &) = delete;
 
 private:
-  ThreadEntries &_entries;
+  AllocationTracker::ThreadEntries &_entries;
   pid_t _tid;
   bool _ok;
   int _index;
@@ -106,35 +96,35 @@ private:
   bool _ok;
 };
 
+// Static declarations
 pthread_once_t AllocationTracker::_key_once = PTHREAD_ONCE_INIT;
 
+pthread_key_t AllocationTracker::_tl_state_key;
+AllocationTracker::ThreadEntries AllocationTracker::_thread_entries;
+
 AllocationTracker *AllocationTracker::_instance;
-pthread_key_t AllocationTracker::tl_state_key;
 
 TrackerThreadLocalState *AllocationTracker::init_tl_state() {
-  static ThreadEntries thread_entries;
-
   TrackerThreadLocalState *tl_state = nullptr;
   int res_set = 0;
 
   pid_t tid = ddprof::gettid();
   // As we allocate within this function, this can be called twice
-  TLReentryGuard tl_reentry_guard(thread_entries, tid);
+  TLReentryGuard tl_reentry_guard(_thread_entries, tid);
   if (!tl_reentry_guard) {
 #ifdef DEBUG
-    fprintf(stderr, "Unable to reentry guard %s \n", __FUNCTION__);
+    fprintf(stderr, "Unable to grab reentry guard %d \n", tid);
 #endif
     return tl_state;
   }
 
   tl_state = new TrackerThreadLocalState();
-  res_set = pthread_setspecific(tl_state_key, tl_state);
+  res_set = pthread_setspecific(_tl_state_key, tl_state);
   tl_state->tid = tid;
 
   if (res_set) {
     // should return 0
-    log_once("Error: Unable to store tl_state, stopping profiler. error %d \n",
-             res_set);
+    log_once("Error: Unable to store tl_state. error %d \n", res_set);
     delete tl_state;
     tl_state = nullptr;
   }
@@ -154,7 +144,7 @@ void AllocationTracker::delete_tl_state(void *tl_state) {
 
 void AllocationTracker::make_key() {
   // delete is called on all key objects
-  pthread_key_create(&tl_state_key, delete_tl_state);
+  pthread_key_create(&_tl_state_key, delete_tl_state);
 }
 
 DDRes AllocationTracker::allocation_tracking_init(
@@ -162,8 +152,10 @@ DDRes AllocationTracker::allocation_tracking_init(
     uint32_t stack_sample_size, const RingBufferInfo &ring_buffer) {
   pthread_once(&_key_once, make_key);
   TrackerThreadLocalState *tl_state =
-      (TrackerThreadLocalState *)pthread_getspecific(tl_state_key);
+      (TrackerThreadLocalState *)pthread_getspecific(_tl_state_key);
   if (!tl_state) {
+    // This is the time at which the init_tl_state should not fail
+    // We will not attempt to re-create it in other code paths
     tl_state = init_tl_state();
     if (!tl_state) {
       return ddres_error(DD_WHAT_DWFL_LIB_ERROR);
@@ -232,14 +224,11 @@ void AllocationTracker::allocation_tracking_free() {
 
   pthread_once(&_key_once, make_key);
   TrackerThreadLocalState *tl_state =
-      (TrackerThreadLocalState *)pthread_getspecific(tl_state_key);
+      (TrackerThreadLocalState *)pthread_getspecific(_tl_state_key);
   if (unlikely(!tl_state)) {
-    tl_state = init_tl_state();
-    if (!tl_state) {
-      log_once("Error: Unable to find tl_state during %s\n", __FUNCTION__);
-      instance->free();
-      return;
-    }
+    log_once("Error: Unable to find tl_state during %s\n", __FUNCTION__);
+    instance->free();
+    return;
   }
   ReentryGuard guard(&tl_state->reentry_guard);
   std::lock_guard lock{instance->_state.mutex};
@@ -564,7 +553,7 @@ uint64_t AllocationTracker::next_sample_interval(std::minstd_rand &gen) {
 void AllocationTracker::notify_thread_start() {
   pthread_once(&_key_once, make_key);
   TrackerThreadLocalState *tl_state =
-      (TrackerThreadLocalState *)pthread_getspecific(tl_state_key);
+      (TrackerThreadLocalState *)pthread_getspecific(_tl_state_key);
   if (unlikely(!tl_state)) {
     tl_state = init_tl_state();
     if (!tl_state) {
@@ -580,21 +569,21 @@ void AllocationTracker::notify_thread_start() {
 }
 
 void AllocationTracker::notify_fork() {
+  _thread_entries.reset();
   if (_instance) {
     _instance->_state.pid = 0;
-    pthread_once(&_key_once, make_key);
-    TrackerThreadLocalState *tl_state =
-        (TrackerThreadLocalState *)pthread_getspecific(tl_state_key);
-    if (unlikely(!tl_state)) {
-      tl_state = init_tl_state();
-      if (!tl_state) {
-        log_once("Error: Unable to retrieve tl state after fork thread %d",
-                 ddprof::gettid());
-        return;
-      }
-    } else {
-      tl_state->tid = 0;
-    }
+  }
+  pthread_once(&_key_once, make_key);
+  TrackerThreadLocalState *tl_state =
+      (TrackerThreadLocalState *)pthread_getspecific(_tl_state_key);
+  if (unlikely(!tl_state)) {
+    // The state should already exist if we forked.
+    // This would mean that we were not able to create the state before forking
+    log_once("Error: Unable to retrieve tl state after fork thread %d",
+             ddprof::gettid());
+    return;
+  } else {
+    tl_state->tid = 0;
   }
 }
 
