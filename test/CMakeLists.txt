@@ -334,6 +334,8 @@ add_unit_test(live_allocation-ut live_allocation-ut.cc ../src/live_allocation.cc
 add_unit_test(ddprof_process-ut ddprof_process-ut.cc ../src/container_id.cc
               ../src/ddprof_process.cc)
 
+add_unit_test(glibc_fixes-ut glibc_fixes-ut.cc ../src/lib/glibc_fixes.c LIBRARIES pthread)
+
 add_unit_test(
   ddprof_cli-ut
   ddprof_cli-ut.cc
@@ -343,6 +345,8 @@ add_unit_test(
   ../src/perf_watcher.cc
   ../src/tracepoint_config.cc
   LIBRARIES DDProf::Parser)
+
+add_unit_test(pthread_tls-ut pthread_tls-ut.cc)
 
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/pthread_fixes.cc
               ../src/lib/savecontext.cc ../src/lib/saveregisters.cc)

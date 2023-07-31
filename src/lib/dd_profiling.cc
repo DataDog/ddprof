@@ -12,11 +12,13 @@
 #include "defer.hpp"
 #include "ipc.hpp"
 #include "lib_embedded_data.h"
+#include "lib_logger.hpp"
 #include "logger_setup.hpp"
 #include "signal_helper.hpp"
 #include "symbol_overrides.hpp"
 #include "syscalls.hpp"
 
+#include <cassert>
 #include <cerrno>
 #include <charconv>
 #include <chrono>
@@ -269,12 +271,19 @@ int ddprof_start_profiling_internal() {
         // \fixme{nsavoire} what should we do when allocation tracker init
         // fails ?
         g_state.allocation_profiling_started = true;
+      } else {
+        ddprof::log_once("Error: %s",
+                         "Failure to start allocation profiling\n");
       }
     }
   } catch (const ddprof::DDException &e) { return -1; }
 
   if (g_state.allocation_profiling_started) {
-    pthread_atfork(nullptr, nullptr, notify_fork);
+    int res = pthread_atfork(nullptr, nullptr, notify_fork);
+    if (res) {
+      ddprof::log_once("Error:%s", "Unable to setup notify fork");
+      assert(0);
+    }
   }
   g_state.started = true;
   set_profiler_library_active();
