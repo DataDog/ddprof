@@ -433,6 +433,8 @@ void uninstall_timer() {
 }
 
 int install_timer() {
+  return 0;
+
   if (g_timer_active) {
     return 0;
   }

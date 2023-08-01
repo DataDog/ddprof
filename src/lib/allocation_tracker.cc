@@ -23,6 +23,8 @@
 
 #include <unistd.h>
 
+#define DEBUG
+
 namespace ddprof {
 
 struct LostEvent {
@@ -45,6 +47,8 @@ TrackerThreadLocalState *AllocationTracker::init_tl_state() {
 
   pid_t tid = ddprof::gettid();
   // As we allocate within this function, this can be called twice
+  fprintf(stderr, "Before creation of tl_reentry_guard - %d \n", tid);
+
   TLReentryGuard tl_reentry_guard(_thread_entries, tid);
   if (!tl_reentry_guard) {
 #ifdef DEBUG
@@ -53,9 +57,11 @@ TrackerThreadLocalState *AllocationTracker::init_tl_state() {
     return tl_state;
   }
 
+  fprintf(stderr, "After creation of tl_reentry_guard\n");
   tl_state = new TrackerThreadLocalState();
   res_set = pthread_setspecific(_tl_state_key, tl_state);
   tl_state->tid = tid;
+  fprintf(stderr, "After pthread_setspecific\n");
 
   if (res_set) {
     // should return 0
@@ -85,9 +91,12 @@ void AllocationTracker::make_key() {
 DDRes AllocationTracker::allocation_tracking_init(
     uint64_t allocation_profiling_rate, uint32_t flags,
     uint32_t stack_sample_size, const RingBufferInfo &ring_buffer) {
+  fprintf(stderr, "Before pthread_once \n");
   pthread_once(&_key_once, make_key);
+  fprintf(stderr, "after pthread_once \n");
   TrackerThreadLocalState *tl_state =
       (TrackerThreadLocalState *)pthread_getspecific(_tl_state_key);
+  fprintf(stderr, "after pthread_getspecific \n");
   if (!tl_state) {
     // This is the time at which the init_tl_state should not fail
     // We will not attempt to re-create it in other code paths
@@ -494,6 +503,10 @@ void AllocationTracker::notify_thread_start() {
     if (!tl_state) {
       log_once("Error: Unable to start allocation profiling on thread %d",
                ddprof::gettid());
+      assert(0);
+      if (_instance) {
+        _instance->free();
+      }
       return;
     }
   }
