@@ -68,7 +68,8 @@ static bool is_stack_complete(UnwindState *us) {
       "runtime.goexit.abi0"sv,
       "runtime.systemstack.abi0"sv,
       "_start"sv,
-      "start_thread"sv};
+      "start_thread"sv,
+      "start_task"sv};
 
   if (us->output.locs.size() == 0) {
     return false;
