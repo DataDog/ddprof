@@ -36,7 +36,8 @@ void read_buffer(ddprof::RingBufferHolder &holder) {
 }
 
 DDPROF_NOINLINE void my_malloc(size_t size, uintptr_t addr = 0xdeadbeef) {
-  ddprof::AllocationTracker::track_allocation(addr, size);
+  ddprof::ReentryGuard guard(nullptr);
+  ddprof::AllocationTracker::track_allocation(addr, size, guard);
   DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
 }
 

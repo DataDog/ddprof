@@ -18,7 +18,8 @@
 #include <unistd.h>
 
 DDPROF_NOINLINE void my_malloc(size_t size, uintptr_t addr = 0xdeadbeef) {
-  ddprof::AllocationTracker::track_allocation(addr, size);
+  ddprof::ReentryGuard guard(nullptr);
+  ddprof::AllocationTracker::track_allocation(addr, size, guard);
   // prevent tail call optimization
   getpid();
 }
@@ -120,7 +121,8 @@ TEST(allocation_tracker, stale_lock) {
 
   for (uint32_t i = 0;
        i < ddprof::AllocationTracker::k_max_consecutive_failures; ++i) {
-    ddprof::AllocationTracker::track_allocation(0xdeadbeef, 1);
+    ddprof::ReentryGuard guard(nullptr);
+    ddprof::AllocationTracker::track_allocation(0xdeadbeef, 1, guard);
   }
   ASSERT_FALSE(ddprof::AllocationTracker::is_active());
   ddprof::AllocationTracker::allocation_tracking_free();

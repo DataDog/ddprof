@@ -18,6 +18,20 @@ TEST(ReentryGuardTest, basic) {
   EXPECT_FALSE(reentry_guard);
 }
 
+TEST(ReentryGuardTest, null_init) {
+  bool reentry_guard = false;
+  {
+    ddprof::ReentryGuard guard(nullptr);
+    EXPECT_FALSE(guard);
+    guard.register_guard(&reentry_guard);
+    EXPECT_TRUE(guard);
+    {
+      ddprof::ReentryGuard guard(&reentry_guard);
+      EXPECT_FALSE(guard);
+    }
+  }
+}
+
 TEST(TLReentryGuardTest, basic) {
   ddprof::ThreadEntries entries;
   pid_t tid = ddprof::gettid();

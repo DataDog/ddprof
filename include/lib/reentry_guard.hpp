@@ -67,13 +67,30 @@ private:
 class ReentryGuard {
 public:
   explicit ReentryGuard(bool *reentry_guard)
-      : _reentry_guard(reentry_guard), _ok(!*reentry_guard) {
-    *_reentry_guard = true;
+      : _reentry_guard(reentry_guard), _ok(false) {
+    if (_reentry_guard) {
+      _ok = (!*_reentry_guard);
+      *_reentry_guard = true;
+    }
   }
+
   ~ReentryGuard() {
     if (_ok) {
       *_reentry_guard = false;
     }
+  }
+
+  bool register_guard(bool *reentry_guard) {
+    if (_reentry_guard) {
+      // not supported (already registered to other bool)
+      return false;
+    }
+    if (reentry_guard) {
+      _reentry_guard = reentry_guard;
+      _ok = (!*_reentry_guard);
+      *_reentry_guard = true;
+    }
+    return _ok;
   }
 
   explicit operator bool() const { return _ok; }
