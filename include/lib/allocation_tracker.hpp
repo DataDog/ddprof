@@ -36,8 +36,9 @@ struct TrackerThreadLocalState {
 
   pid_t tid; // cache of tid
 
-  bool reentry_guard; // prevent reentry in AllocationTracker (eg. when
-                      // allocation are done inside AllocationTracker)
+  bool reentry_guard;         // prevent reentry in AllocationTracker (eg. when
+                              // allocation are done inside AllocationTracker)
+  bool double_tracking_guard; // prevent mmap tracking within a malloc
 };
 
 class AllocationTracker {
@@ -64,8 +65,10 @@ public:
                                         const RingBufferInfo &ring_buffer);
   static void allocation_tracking_free();
 
+  // The double tracking guard should be initialized with a null guard
   static inline DDPROF_NO_SANITIZER_ADDRESS void
-  track_allocation(uintptr_t addr, size_t size);
+  track_allocation(uintptr_t addr, size_t size,
+                   ReentryGuard &double_tracking_guard);
   static inline void track_deallocation(uintptr_t addr);
 
   static inline bool is_active();
@@ -138,7 +141,8 @@ private:
   static AllocationTracker *_instance;
 };
 
-void AllocationTracker::track_allocation(uintptr_t addr, size_t size) {
+void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
+                                         ReentryGuard &double_tracking_guard) {
   AllocationTracker *instance = _instance;
 
   // Be safe, if allocation tracker has not been initialized, just bail out
@@ -162,6 +166,11 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size) {
     // Allocations can happen in between
     return;
   }
+
+  // Register the guard for this thread, to make sure we don't count a potential
+  // allocation within this allocation.
+  if (!double_tracking_guard.register_guard(&(tl_state->double_tracking_guard)))
+    return;
 
   tl_state->remaining_bytes += size;
   if (likely(tl_state->remaining_bytes < 0)) {
