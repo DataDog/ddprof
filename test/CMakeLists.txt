@@ -5,6 +5,8 @@
 find_package(GTest REQUIRED)
 find_package(benchmark REQUIRED)
 
+add_subdirectory(no_tls)
+
 enable_testing()
 
 # On arm builds Leak Detection is barely usable: https://github.com/google/sanitizers/issues/703
@@ -395,6 +397,11 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
   add_test(
     NAME simple_malloc
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/simple_malloc-ut.sh
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+  add_test(
+    NAME check_no_tls
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/check_no_tls-ut.sh
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
   if(BUILD_UNIVERSAL_DDPROF)
