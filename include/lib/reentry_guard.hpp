@@ -30,7 +30,7 @@ public:
     while (true) {
       for (size_t i = 0; i < ThreadEntries::max_threads; ++i) {
         pid_t expected = -1;
-        if (_entries.thread_entries[i].compare_exchange_strong(
+        if (_entries.thread_entries[i].compare_exchange_weak(
                 expected, tid, std::memory_order_acq_rel)) {
           _ok = true;
           _index = i;

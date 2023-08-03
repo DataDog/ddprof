@@ -5,41 +5,23 @@
 
 #pragma once
 
+#include "allocation_tracker_tls.hpp"
 #include "ddprof_base.hpp"
 #include "ddres_def.hpp"
 #include "pevent.hpp"
 #include "reentry_guard.hpp"
-#include "span.hpp"
 #include "unlikely.hpp"
 
 #include <atomic>
 #include <cstddef>
 #include <mutex>
 #include <pthread.h>
-#include <random>
 #include <unordered_set>
 
 namespace ddprof {
 
 class MPSCRingBufferWriter;
 struct RingBufferInfo;
-
-struct TrackerThreadLocalState {
-  int64_t remaining_bytes; // remaining allocation bytes until next sample
-  bool remaining_bytes_initialized; // false if remaining_bytes is not
-                                    // initialized
-  ddprof::span<const byte> stack_bounds;
-
-  // In the choice of random generators, this one is smaller
-  // - smaller than mt19937 (8 vs 5K)
-  std::minstd_rand _gen{std::random_device{}()};
-
-  pid_t tid; // cache of tid
-
-  bool reentry_guard;         // prevent reentry in AllocationTracker (eg. when
-                              // allocation are done inside AllocationTracker)
-  bool double_tracking_guard; // prevent mmap tracking within a malloc
-};
 
 class AllocationTracker {
 public:
@@ -65,15 +47,17 @@ public:
                                         const RingBufferInfo &ring_buffer);
   static void allocation_tracking_free();
 
-  // The double tracking guard should be initialized with a null guard
   static inline DDPROF_NO_SANITIZER_ADDRESS void
-  track_allocation(uintptr_t addr, size_t size,
-                   ReentryGuard &double_tracking_guard);
-  static inline void track_deallocation(uintptr_t addr);
+  track_allocation_s(uintptr_t addr, size_t size,
+                     TrackerThreadLocalState &tl_state);
+
+  static inline void track_deallocation_s(uintptr_t addr);
 
   static inline bool is_active();
 
   static TrackerThreadLocalState *init_tl_state();
+  // can return null (does not init)
+  static TrackerThreadLocalState *get_tl_state();
 
 private:
   using AdressSet = std::unordered_set<uintptr_t>;
@@ -141,8 +125,8 @@ private:
   static AllocationTracker *_instance;
 };
 
-void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
-                                         ReentryGuard &double_tracking_guard) {
+void AllocationTracker::track_allocation_s(uintptr_t addr, size_t size,
+                                           TrackerThreadLocalState &tl_state) {
   AllocationTracker *instance = _instance;
 
   // Be safe, if allocation tracker has not been initialized, just bail out
@@ -154,50 +138,29 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
     return;
   }
 
-  // In shared libraries, TLS access requires a call to tls_get_addr,
-  // tls_get_addr can call into malloc, which can create a recursive loop
-  // instead we call pthread APIs to control the creation of TLS objects
-  pthread_once(&_key_once, make_key);
-  TrackerThreadLocalState *tl_state =
-      (TrackerThreadLocalState *)pthread_getspecific(_tl_state_key);
-  if (unlikely(!tl_state)) {
-    // This code path is expected
-    // We expect to run thread init before being able to track allocations
-    // Allocations can happen in between
-    return;
-  }
-
-  // Register the guard for this thread, to make sure we don't count a potential
-  // allocation within this allocation.
-  if (!double_tracking_guard.register_guard(&(tl_state->double_tracking_guard)))
-    return;
-
-  tl_state->remaining_bytes += size;
-  if (likely(tl_state->remaining_bytes < 0)) {
+  tl_state.remaining_bytes += size;
+  if (likely(tl_state.remaining_bytes < 0)) {
     return;
   }
 
   if (likely(
           instance->_state.track_allocations.load(std::memory_order_relaxed))) {
-    instance->track_allocation(addr, size, *tl_state);
+    instance->track_allocation(addr, size, tl_state);
   } else {
     // allocation tracking is disabled, reset state
-    tl_state->remaining_bytes_initialized = false;
-    tl_state->remaining_bytes = 0;
+    tl_state.remaining_bytes_initialized = false;
+    tl_state.remaining_bytes = 0;
   }
 }
 
-void AllocationTracker::track_deallocation(uintptr_t addr) {
+void AllocationTracker::track_deallocation_s(uintptr_t addr) {
   // same pattern as track_allocation
   AllocationTracker *instance = _instance;
-
   if (!instance) {
     return;
   }
   if (instance->_state.track_deallocations.load(std::memory_order_relaxed)) {
-    pthread_once(&_key_once, make_key);
-    TrackerThreadLocalState *tl_state =
-        (TrackerThreadLocalState *)pthread_getspecific(_tl_state_key);
+    TrackerThreadLocalState *tl_state = get_tl_state();
     if (unlikely(!tl_state)) {
       return;
     }

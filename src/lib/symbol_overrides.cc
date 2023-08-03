@@ -72,10 +72,15 @@ struct malloc {
 
   static void *hook(size_t size) noexcept {
     check_libraries();
-    ddprof::ReentryGuard guard(nullptr);
+    ddprof::TrackerThreadLocalState *tl_state =
+        ddprof::AllocationTracker::get_tl_state();
+    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
+                                        : nullptr);
     auto ptr = ref(size);
-    ddprof::AllocationTracker::track_allocation(
-        reinterpret_cast<uintptr_t>(ptr), size, guard);
+    if (guard) {
+      ddprof::AllocationTracker::track_allocation_s(
+          reinterpret_cast<uintptr_t>(ptr), size, *tl_state);
+    }
     return ptr;
   }
 };
@@ -91,7 +96,7 @@ struct free {
       return;
     }
 
-    ddprof::AllocationTracker::track_deallocation(
+    ddprof::AllocationTracker::track_deallocation_s(
         reinterpret_cast<uintptr_t>(ptr));
     ref(ptr);
   }
@@ -104,10 +109,15 @@ struct calloc {
 
   static void *hook(size_t nmemb, size_t size) noexcept {
     check_libraries();
-    ddprof::ReentryGuard guard(nullptr);
+    ddprof::TrackerThreadLocalState *tl_state =
+        ddprof::AllocationTracker::get_tl_state();
+    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
+                                        : nullptr);
     auto ptr = ref(nmemb, size);
-    ddprof::AllocationTracker::track_allocation(
-        reinterpret_cast<uintptr_t>(ptr), size * nmemb, guard);
+    if (guard) {
+      ddprof::AllocationTracker::track_allocation_s(
+          reinterpret_cast<uintptr_t>(ptr), size * nmemb, *tl_state);
+    }
     return ptr;
   }
 };
@@ -120,15 +130,18 @@ struct realloc {
   static void *hook(void *ptr, size_t size) noexcept {
     check_libraries();
     if (likely(ptr)) {
-      ddprof::AllocationTracker::track_deallocation(
+      ddprof::AllocationTracker::track_deallocation_s(
           reinterpret_cast<uintptr_t>(ptr));
     }
-
+    ddprof::TrackerThreadLocalState *tl_state =
+        ddprof::AllocationTracker::get_tl_state();
+    // lifetime of guard should exceed the call to ref function
+    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
+                                        : nullptr);
     auto newptr = ref(ptr, size);
-    if (likely(size)) {
-      ddprof::ReentryGuard guard(nullptr);
-      ddprof::AllocationTracker::track_allocation(
-          reinterpret_cast<uintptr_t>(newptr), size, guard);
+    if (likely(size) && guard) {
+      ddprof::AllocationTracker::track_allocation_s(
+          reinterpret_cast<uintptr_t>(newptr), size, *tl_state);
     }
 
     return newptr;
@@ -142,11 +155,14 @@ struct posix_memalign {
 
   static int hook(void **memptr, size_t alignment, size_t size) noexcept {
     check_libraries();
+    ddprof::TrackerThreadLocalState *tl_state =
+        ddprof::AllocationTracker::get_tl_state();
+    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
+                                        : nullptr);
     auto ret = ref(memptr, alignment, size);
-    if (likely(!ret)) {
-      ddprof::ReentryGuard guard(nullptr);
-      ddprof::AllocationTracker::track_allocation(
-          reinterpret_cast<uintptr_t>(*memptr), size, guard);
+    if (likely(!ret) && guard) {
+      ddprof::AllocationTracker::track_allocation_s(
+          reinterpret_cast<uintptr_t>(*memptr), size, *tl_state);
     }
     return ret;
   }
@@ -159,11 +175,15 @@ struct aligned_alloc {
 
   static void *hook(size_t alignment, size_t size) noexcept {
     check_libraries();
+    ddprof::TrackerThreadLocalState *tl_state =
+        ddprof::AllocationTracker::get_tl_state();
+    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
+                                        : nullptr);
     auto ptr = ref(alignment, size);
-    ddprof::ReentryGuard guard(nullptr);
-    ddprof::AllocationTracker::track_allocation(
-        reinterpret_cast<uintptr_t>(ptr), size, guard);
-
+    if (ptr && guard) {
+      ddprof::AllocationTracker::track_allocation_s(
+          reinterpret_cast<uintptr_t>(ptr), size, *tl_state);
+    }
     return ptr;
   }
 };
@@ -175,11 +195,15 @@ struct memalign {
 
   static void *hook(size_t alignment, size_t size) noexcept {
     check_libraries();
+    ddprof::TrackerThreadLocalState *tl_state =
+        ddprof::AllocationTracker::get_tl_state();
+    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
+                                        : nullptr);
     auto ptr = ref(alignment, size);
-    ddprof::ReentryGuard guard(nullptr);
-    ddprof::AllocationTracker::track_allocation(
-        reinterpret_cast<uintptr_t>(ptr), size, guard);
-
+    if (ptr && guard) {
+      ddprof::AllocationTracker::track_allocation_s(
+          reinterpret_cast<uintptr_t>(ptr), size, *tl_state);
+    }
     return ptr;
   }
 };
@@ -191,11 +215,15 @@ struct pvalloc {
 
   static void *hook(size_t size) noexcept {
     check_libraries();
-    ddprof::ReentryGuard guard(nullptr);
+    ddprof::TrackerThreadLocalState *tl_state =
+        ddprof::AllocationTracker::get_tl_state();
+    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
+                                        : nullptr);
     auto ptr = ref(size);
-    ddprof::AllocationTracker::track_allocation(
-        reinterpret_cast<uintptr_t>(ptr), size, guard);
-
+    if (ptr && guard) {
+      ddprof::AllocationTracker::track_allocation_s(
+          reinterpret_cast<uintptr_t>(ptr), size, *tl_state);
+    }
     return ptr;
   }
 };
@@ -207,11 +235,15 @@ struct valloc {
 
   static void *hook(size_t size) noexcept {
     check_libraries();
-    ddprof::ReentryGuard guard(nullptr);
+    ddprof::TrackerThreadLocalState *tl_state =
+        ddprof::AllocationTracker::get_tl_state();
+    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
+                                        : nullptr);
     auto ptr = ref(size);
-    ddprof::AllocationTracker::track_allocation(
-        reinterpret_cast<uintptr_t>(ptr), size, guard);
-
+    if (ptr && guard) {
+      ddprof::AllocationTracker::track_allocation_s(
+          reinterpret_cast<uintptr_t>(ptr), size, *tl_state);
+    }
     return ptr;
   }
 };
@@ -223,14 +255,19 @@ struct reallocarray {
 
   static void *hook(void *ptr, size_t nmemb, size_t size) noexcept {
     check_libraries();
-    ddprof::ReentryGuard guard(nullptr);
     if (ptr) {
-      ddprof::AllocationTracker::track_deallocation(
+      ddprof::AllocationTracker::track_deallocation_s(
           reinterpret_cast<uintptr_t>(ptr));
     }
+    ddprof::TrackerThreadLocalState *tl_state =
+        ddprof::AllocationTracker::get_tl_state();
+    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
+                                        : nullptr);
     auto newptr = ref(ptr, nmemb, size);
-    ddprof::AllocationTracker::track_allocation(
-        reinterpret_cast<uintptr_t>(ptr), size * nmemb, guard);
+    if (newptr && guard) {
+      ddprof::AllocationTracker::track_allocation_s(
+          reinterpret_cast<uintptr_t>(newptr), size * nmemb, *tl_state);
+    }
     return newptr;
   }
 };
@@ -294,12 +331,14 @@ struct mmap {
 
   static void *hook(void *addr, size_t length, int prot, int flags, int fd,
                     off_t offset) noexcept {
+    ddprof::TrackerThreadLocalState *tl_state =
+        ddprof::AllocationTracker::get_tl_state();
+    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
+                                        : nullptr);
     void *ptr = ref(addr, length, prot, flags, fd, offset);
-
-    if (addr == nullptr && fd == -1 && ptr != nullptr) {
-      ddprof::ReentryGuard guard(nullptr);
-      ddprof::AllocationTracker::track_allocation(
-          reinterpret_cast<uintptr_t>(ptr), length, guard);
+    if (addr == nullptr && fd == -1 && ptr != nullptr && guard) {
+      ddprof::AllocationTracker::track_allocation_s(
+          reinterpret_cast<uintptr_t>(ptr), length, *tl_state);
     }
     return ptr;
   }
@@ -312,12 +351,14 @@ struct mmap_ {
 
   static void *hook(void *addr, size_t length, int prot, int flags, int fd,
                     off_t offset) noexcept {
+    ddprof::TrackerThreadLocalState *tl_state =
+        ddprof::AllocationTracker::get_tl_state();
+    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
+                                        : nullptr);
     void *ptr = ref(addr, length, prot, flags, fd, offset);
-
-    if (addr == nullptr && fd == -1 && ptr != nullptr) {
-      ddprof::ReentryGuard guard(nullptr);
-      ddprof::AllocationTracker::track_allocation(
-          reinterpret_cast<uintptr_t>(ptr), length, guard);
+    if (addr == nullptr && fd == -1 && ptr != nullptr && guard) {
+      ddprof::AllocationTracker::track_allocation_s(
+          reinterpret_cast<uintptr_t>(ptr), length, *tl_state);
     }
     return ptr;
   }
@@ -330,12 +371,14 @@ struct mmap64_ {
 
   static void *hook(void *addr, size_t length, int prot, int flags, int fd,
                     off_t offset) noexcept {
+    ddprof::TrackerThreadLocalState *tl_state =
+        ddprof::AllocationTracker::get_tl_state();
+    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
+                                        : nullptr);
     void *ptr = ref(addr, length, prot, flags, fd, offset);
-
-    if (addr == nullptr && fd == -1 && ptr != nullptr) {
-      ddprof::ReentryGuard guard(nullptr);
-      ddprof::AllocationTracker::track_allocation(
-          reinterpret_cast<uintptr_t>(ptr), length, guard);
+    if (addr == nullptr && fd == -1 && ptr != nullptr && guard) {
+      ddprof::AllocationTracker::track_allocation_s(
+          reinterpret_cast<uintptr_t>(ptr), length, *tl_state);
     }
     return ptr;
   }
@@ -347,7 +390,7 @@ struct munmap {
   static inline bool ref_checked = false;
 
   static int hook(void *addr, size_t length) noexcept {
-    ddprof::AllocationTracker::track_deallocation(
+    ddprof::AllocationTracker::track_deallocation_s(
         reinterpret_cast<uintptr_t>(addr));
     return ref(addr, length);
   }
@@ -359,7 +402,7 @@ struct munmap_ {
   static inline bool ref_checked = false;
 
   static int hook(void *addr, size_t length) noexcept {
-    ddprof::AllocationTracker::track_deallocation(
+    ddprof::AllocationTracker::track_deallocation_s(
         reinterpret_cast<uintptr_t>(addr));
     return ref(addr, length);
   }

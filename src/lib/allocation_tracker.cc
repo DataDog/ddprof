@@ -18,7 +18,6 @@
 
 #include <atomic>
 #include <cassert>
-#include <cstdint>
 #include <cstdlib>
 
 #include <unistd.h>
@@ -38,6 +37,16 @@ pthread_key_t AllocationTracker::_tl_state_key;
 ThreadEntries AllocationTracker::_thread_entries;
 
 AllocationTracker *AllocationTracker::_instance;
+
+TrackerThreadLocalState *AllocationTracker::get_tl_state() {
+  // In shared libraries, TLS access requires a call to tls_get_addr,
+  // tls_get_addr can call into malloc, which can create a recursive loop
+  // instead we call pthread APIs to control the creation of TLS objects
+  pthread_once(&_key_once, make_key);
+  TrackerThreadLocalState *tl_state =
+      (TrackerThreadLocalState *)pthread_getspecific(_tl_state_key);
+  return tl_state;
+}
 
 TrackerThreadLocalState *AllocationTracker::init_tl_state() {
   TrackerThreadLocalState *tl_state = nullptr;
@@ -85,9 +94,7 @@ void AllocationTracker::make_key() {
 DDRes AllocationTracker::allocation_tracking_init(
     uint64_t allocation_profiling_rate, uint32_t flags,
     uint32_t stack_sample_size, const RingBufferInfo &ring_buffer) {
-  pthread_once(&_key_once, make_key);
-  TrackerThreadLocalState *tl_state =
-      (TrackerThreadLocalState *)pthread_getspecific(_tl_state_key);
+  TrackerThreadLocalState *tl_state = get_tl_state();
   if (!tl_state) {
     // This is the time at which the init_tl_state should not fail
     // We will not attempt to re-create it in other code paths
@@ -144,7 +151,7 @@ void AllocationTracker::free() {
 
   // Do not destroy the object:
   // there is an inherent race condition between checking
-  // `_state. ` and calling `_instance->track_allocation`.
+  // `_state.track_allocations ` and calling `_instance->track_allocation`.
   // That's why AllocationTracker is kept in a usable state and
   // `_track_allocation` is checked again in `_instance->track_allocation` while
   // taking the mutex lock.
@@ -156,10 +163,7 @@ void AllocationTracker::allocation_tracking_free() {
   if (!instance) {
     return;
   }
-
-  pthread_once(&_key_once, make_key);
-  TrackerThreadLocalState *tl_state =
-      (TrackerThreadLocalState *)pthread_getspecific(_tl_state_key);
+  TrackerThreadLocalState *tl_state = get_tl_state();
   if (unlikely(!tl_state)) {
     log_once("Error: Unable to find tl_state during %s\n", __FUNCTION__);
     instance->free();
@@ -486,9 +490,7 @@ uint64_t AllocationTracker::next_sample_interval(std::minstd_rand &gen) {
 }
 
 void AllocationTracker::notify_thread_start() {
-  pthread_once(&_key_once, make_key);
-  TrackerThreadLocalState *tl_state =
-      (TrackerThreadLocalState *)pthread_getspecific(_tl_state_key);
+  TrackerThreadLocalState *tl_state = get_tl_state();
   if (unlikely(!tl_state)) {
     tl_state = init_tl_state();
     if (!tl_state) {
@@ -508,9 +510,7 @@ void AllocationTracker::notify_fork() {
   if (_instance) {
     _instance->_state.pid = 0;
   }
-  pthread_once(&_key_once, make_key);
-  TrackerThreadLocalState *tl_state =
-      (TrackerThreadLocalState *)pthread_getspecific(_tl_state_key);
+  TrackerThreadLocalState *tl_state = get_tl_state();
   if (unlikely(!tl_state)) {
     // The state should already exist if we forked.
     // This would mean that we were not able to create the state before forking

@@ -18,14 +18,19 @@
 #include <unistd.h>
 
 DDPROF_NOINLINE void my_malloc(size_t size, uintptr_t addr = 0xdeadbeef) {
-  ddprof::ReentryGuard guard(nullptr);
-  ddprof::AllocationTracker::track_allocation(addr, size, guard);
+  ddprof::TrackerThreadLocalState *tl_state =
+      ddprof::AllocationTracker::get_tl_state();
+  ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
+                                      : nullptr);
+  if (guard) {
+    ddprof::AllocationTracker::track_allocation_s(addr, size, *tl_state);
+  }
   // prevent tail call optimization
   getpid();
 }
 
 DDPROF_NOINLINE void my_free(uintptr_t addr) {
-  ddprof::AllocationTracker::track_deallocation(addr);
+  ddprof::AllocationTracker::track_deallocation_s(addr);
   // prevent tail call optimization
   getpid();
 }
@@ -121,8 +126,12 @@ TEST(allocation_tracker, stale_lock) {
 
   for (uint32_t i = 0;
        i < ddprof::AllocationTracker::k_max_consecutive_failures; ++i) {
-    ddprof::ReentryGuard guard(nullptr);
-    ddprof::AllocationTracker::track_allocation(0xdeadbeef, 1, guard);
+    ddprof::TrackerThreadLocalState *tl_state =
+        ddprof::AllocationTracker::get_tl_state();
+    assert(tl_state);
+    if (tl_state) {
+      ddprof::AllocationTracker::track_allocation_s(0xdeadbeef, 1, *tl_state);
+    }
   }
   ASSERT_FALSE(ddprof::AllocationTracker::is_active());
   ddprof::AllocationTracker::allocation_tracking_free();
