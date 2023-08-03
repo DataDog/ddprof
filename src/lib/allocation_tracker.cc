@@ -8,10 +8,9 @@
 #include "allocation_event.hpp"
 #include "ddprof_perf_event.hpp"
 #include "ddres.hpp"
-#include "defer.hpp"
 #include "ipc.hpp"
+#include "lib_logger.hpp"
 #include "live_allocation-c.hpp"
-#include "perf.hpp"
 #include "pevent_lib.hpp"
 #include "ringbuffer_utils.hpp"
 #include "savecontext.hpp"
@@ -19,7 +18,6 @@
 
 #include <atomic>
 #include <cassert>
-#include <cstdint>
 #include <cstdlib>
 
 #include <unistd.h>
@@ -32,30 +30,50 @@ struct LostEvent {
   uint64_t lost;
 };
 
-class ReentryGuard {
-public:
-  explicit ReentryGuard(bool *reentry_guard)
-      : _reentry_guard(reentry_guard), _ok(!*reentry_guard) {
-    *_reentry_guard = true;
-  }
-  ~ReentryGuard() {
-    if (_ok) {
-      *_reentry_guard = false;
-    }
-  }
+// Static declarations
+pthread_once_t AllocationTracker::_key_once = PTHREAD_ONCE_INIT;
 
-  explicit operator bool() const { return _ok; }
-
-  ReentryGuard(const ReentryGuard &) = delete;
-  ReentryGuard &operator=(const ReentryGuard &) = delete;
-
-private:
-  bool *_reentry_guard;
-  bool _ok;
-};
+pthread_key_t AllocationTracker::_tl_state_key;
+ThreadEntries AllocationTracker::_thread_entries;
 
 AllocationTracker *AllocationTracker::_instance;
-thread_local TrackerThreadLocalState AllocationTracker::_tl_state;
+
+TrackerThreadLocalState *AllocationTracker::get_tl_state() {
+  // In shared libraries, TLS access requires a call to tls_get_addr,
+  // tls_get_addr can call into malloc, which can create a recursive loop
+  // instead we call pthread APIs to control the creation of TLS objects
+  pthread_once(&_key_once, make_key);
+  TrackerThreadLocalState *tl_state =
+      (TrackerThreadLocalState *)pthread_getspecific(_tl_state_key);
+  return tl_state;
+}
+
+TrackerThreadLocalState *AllocationTracker::init_tl_state() {
+  TrackerThreadLocalState *tl_state = nullptr;
+  int res_set = 0;
+
+  pid_t tid = ddprof::gettid();
+  // As we allocate within this function, this can be called twice
+  TLReentryGuard tl_reentry_guard(_thread_entries, tid);
+  if (!tl_reentry_guard) {
+#ifdef DEBUG
+    fprintf(stderr, "Unable to grab reentry guard %d \n", tid);
+#endif
+    return tl_state;
+  }
+
+  tl_state = new TrackerThreadLocalState();
+  res_set = pthread_setspecific(_tl_state_key, tl_state);
+  tl_state->tid = tid;
+
+  if (res_set) {
+    // should return 0
+    log_once("Error: Unable to store tl_state. error %d \n", res_set);
+    delete tl_state;
+    tl_state = nullptr;
+  }
+  return tl_state;
+}
 
 AllocationTracker::AllocationTracker() {}
 
@@ -64,10 +82,29 @@ AllocationTracker *AllocationTracker::create_instance() {
   return &tracker;
 }
 
+void AllocationTracker::delete_tl_state(void *tl_state) {
+  delete (TrackerThreadLocalState *)tl_state;
+}
+
+void AllocationTracker::make_key() {
+  // delete is called on all key objects
+  pthread_key_create(&_tl_state_key, delete_tl_state);
+}
+
 DDRes AllocationTracker::allocation_tracking_init(
     uint64_t allocation_profiling_rate, uint32_t flags,
     uint32_t stack_sample_size, const RingBufferInfo &ring_buffer) {
-  ReentryGuard guard(&_tl_state.reentry_guard);
+  TrackerThreadLocalState *tl_state = get_tl_state();
+  if (!tl_state) {
+    // This is the time at which the init_tl_state should not fail
+    // We will not attempt to re-create it in other code paths
+    tl_state = init_tl_state();
+    if (!tl_state) {
+      return ddres_error(DD_WHAT_DWFL_LIB_ERROR);
+    }
+  }
+
+  ReentryGuard guard(&tl_state->reentry_guard);
 
   AllocationTracker *instance = create_instance();
   auto &state = instance->_state;
@@ -114,7 +151,7 @@ void AllocationTracker::free() {
 
   // Do not destroy the object:
   // there is an inherent race condition between checking
-  // `_state.track_allocation` and calling `_instance->track_allocation`.
+  // `_state.track_allocations ` and calling `_instance->track_allocation`.
   // That's why AllocationTracker is kept in a usable state and
   // `_track_allocation` is checked again in `_instance->track_allocation` while
   // taking the mutex lock.
@@ -126,7 +163,13 @@ void AllocationTracker::allocation_tracking_free() {
   if (!instance) {
     return;
   }
-  ReentryGuard guard(&_tl_state.reentry_guard);
+  TrackerThreadLocalState *tl_state = get_tl_state();
+  if (unlikely(!tl_state)) {
+    log_once("Error: Unable to find tl_state during %s\n", __FUNCTION__);
+    instance->free();
+    return;
+  }
+  ReentryGuard guard(&tl_state->reentry_guard);
   std::lock_guard lock{instance->_state.mutex};
   instance->free();
 }
@@ -200,8 +243,8 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
       if (IsDDResOK(push_clear_live_allocation(tl_state))) {
         _address_set.clear();
       } else {
-        fprintf(
-            stderr,
+        log_once(
+            "Error: %s",
             "Stop allocation profiling. Unable to clear live allocation \n");
         free();
       }
@@ -447,17 +490,35 @@ uint64_t AllocationTracker::next_sample_interval(std::minstd_rand &gen) {
 }
 
 void AllocationTracker::notify_thread_start() {
-  TrackerThreadLocalState &tl_state = AllocationTracker::_tl_state;
+  TrackerThreadLocalState *tl_state = get_tl_state();
+  if (unlikely(!tl_state)) {
+    tl_state = init_tl_state();
+    if (!tl_state) {
+      log_once("Error: Unable to start allocation profiling on thread %d",
+               ddprof::gettid());
+      return;
+    }
+  }
 
-  ReentryGuard guard(&_tl_state.reentry_guard);
-  tl_state.stack_bounds = retrieve_stack_bounds();
+  ReentryGuard guard(&tl_state->reentry_guard);
+  tl_state->stack_bounds = retrieve_stack_bounds();
   // error can not be propagated in thread create
 }
 
 void AllocationTracker::notify_fork() {
+  _thread_entries.reset();
   if (_instance) {
     _instance->_state.pid = 0;
-    _tl_state.tid = 0;
+  }
+  TrackerThreadLocalState *tl_state = get_tl_state();
+  if (unlikely(!tl_state)) {
+    // The state should already exist if we forked.
+    // This would mean that we were not able to create the state before forking
+    log_once("Error: Unable to retrieve tl state after fork thread %d",
+             ddprof::gettid());
+    return;
+  } else {
+    tl_state->tid = 0;
   }
 }
 

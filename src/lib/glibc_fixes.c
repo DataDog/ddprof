@@ -3,9 +3,17 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
+#define _GNU_SOURCE // required for RTLD_NEXT
+
+#include <assert.h>
 #include <dlfcn.h>
 #include <stddef.h>
 #include <sys/stat.h>
+
+#ifdef DEBUG
+#  include <stdio.h>
+#  include <stdlib.h>
+#endif
 
 #ifndef _STAT_VER_LINUX
 #  ifndef __x86_64__
@@ -47,6 +55,7 @@ __attribute__((unused)) int __fstat(int fd, struct stat *buf) {
   }
 
   // Should not happen
+  assert(0);
   return -1;
 }
 
@@ -67,6 +76,7 @@ __attribute__((unused)) int __stat(const char *pathname, struct stat *buf) {
   }
 
   // Should not happen
+  assert(0);
   return -1;
 }
 
@@ -84,20 +94,43 @@ extern int pthread_atfork(void (*prepare)(void), void (*parent)(void),
  * to provide our own definition... */
 int __pthread_atfork(void (*prepare)(void), void (*parent)(void),
                      void (*child)(void)) {
+  static __typeof(pthread_atfork) *s_func = NULL;
+
   // if __register_atfork is available (glibc), call it directly
   if (__register_atfork) {
+#ifdef DEBUG
+    fprintf(stderr, "We call __register_atfork \n");
+#endif
     return __register_atfork(prepare, parent, child, __dso_handle);
   }
 
-  static __typeof(pthread_atfork) *s_func = NULL;
   // we must be on musl, look up pthread_atfork
   if (s_func == NULL && dlsym) {
+#ifdef DEBUG
+    fprintf(stderr, "We look for pthread_atfork (musl code path)\n");
+#endif
     s_func = (__typeof(s_func))dlsym(RTLD_NEXT, "pthread_atfork");
+    if (s_func == NULL) {
+      // We need to look for default symbol when preloading
+      s_func = (__typeof(s_func))dlsym(RTLD_DEFAULT, "pthread_atfork");
+      if (s_func == &__pthread_atfork) {
+        // prevent infinite loop
+        s_func = NULL;
+      }
+    }
   }
+
   if (s_func) {
+#ifdef DEBUG
+    fprintf(stderr, "return through s_func \n");
+#endif
     return s_func(prepare, parent, child);
   }
 
   // Should not happen
+#ifdef DEBUG
+  fprintf(stderr, "FAIL \n");
+#endif
+  assert(0);
   return -1;
 }

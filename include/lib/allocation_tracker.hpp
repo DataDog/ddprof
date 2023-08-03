@@ -5,38 +5,23 @@
 
 #pragma once
 
+#include "allocation_tracker_tls.hpp"
 #include "ddprof_base.hpp"
 #include "ddres_def.hpp"
 #include "pevent.hpp"
-#include "span.hpp"
+#include "reentry_guard.hpp"
 #include "unlikely.hpp"
 
 #include <atomic>
 #include <cstddef>
 #include <mutex>
-#include <random>
+#include <pthread.h>
 #include <unordered_set>
 
 namespace ddprof {
 
 class MPSCRingBufferWriter;
 struct RingBufferInfo;
-
-struct TrackerThreadLocalState {
-  int64_t remaining_bytes; // remaining allocation bytes until next sample
-  bool remaining_bytes_initialized; // false if remaining_bytes is not
-                                    // initialized
-  ddprof::span<const byte> stack_bounds;
-
-  // In the choice of random generators, this one is smaller
-  // - smaller than mt19937 (8 vs 5K)
-  std::minstd_rand _gen{std::random_device{}()};
-
-  pid_t tid; // cache of tid
-
-  bool reentry_guard; // prevent reentry in AllocationTracker (eg. when
-                      // allocation are done inside AllocationTracker)
-};
 
 class AllocationTracker {
 public:
@@ -63,10 +48,16 @@ public:
   static void allocation_tracking_free();
 
   static inline DDPROF_NO_SANITIZER_ADDRESS void
-  track_allocation(uintptr_t addr, size_t size);
-  static inline void track_deallocation(uintptr_t addr);
+  track_allocation_s(uintptr_t addr, size_t size,
+                     TrackerThreadLocalState &tl_state);
+
+  static inline void track_deallocation_s(uintptr_t addr);
 
   static inline bool is_active();
+
+  static TrackerThreadLocalState *init_tl_state();
+  // can return null (does not init)
+  static TrackerThreadLocalState *get_tl_state();
 
 private:
   using AdressSet = std::unordered_set<uintptr_t>;
@@ -97,6 +88,10 @@ private:
 
   static AllocationTracker *create_instance();
 
+  static void delete_tl_state(void *tl_state);
+
+  static void make_key();
+
   void track_allocation(uintptr_t addr, size_t size,
                         TrackerThreadLocalState &tl_state);
   void track_deallocation(uintptr_t addr, TrackerThreadLocalState &tl_state);
@@ -120,11 +115,18 @@ private:
   bool _deterministic_sampling;
   AdressSet _address_set;
 
-  static thread_local TrackerThreadLocalState _tl_state;
+  // These can not be tied to the internal state of the instance.
+  // The creation of the instance depends on this
+  static pthread_once_t _key_once; // ensures we call key creation a single time
+  static pthread_key_t _tl_state_key;
+  // For Thread reentry guard of init_tl_state
+  static ThreadEntries _thread_entries;
+
   static AllocationTracker *_instance;
 };
 
-void AllocationTracker::track_allocation(uintptr_t addr, size_t size) {
+void AllocationTracker::track_allocation_s(uintptr_t addr, size_t size,
+                                           TrackerThreadLocalState &tl_state) {
   AllocationTracker *instance = _instance;
 
   // Be safe, if allocation tracker has not been initialized, just bail out
@@ -135,10 +137,6 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size) {
   if (!instance) {
     return;
   }
-
-  // In shared libraries, TLS access requires a call to tls_get_addr,
-  // therefore obtain a pointer on TLS state once and pass it around
-  TrackerThreadLocalState &tl_state = _tl_state;
 
   tl_state.remaining_bytes += size;
   if (likely(tl_state.remaining_bytes < 0)) {
@@ -155,19 +153,18 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size) {
   }
 }
 
-void AllocationTracker::track_deallocation(uintptr_t addr) {
+void AllocationTracker::track_deallocation_s(uintptr_t addr) {
   // same pattern as track_allocation
   AllocationTracker *instance = _instance;
-
   if (!instance) {
     return;
   }
-  TrackerThreadLocalState &tl_state = _tl_state;
-
   if (instance->_state.track_deallocations.load(std::memory_order_relaxed)) {
-    // not cool as we are always calling this (high overhead). Can we do better
-    // ?
-    instance->track_deallocation(addr, tl_state);
+    TrackerThreadLocalState *tl_state = get_tl_state();
+    if (unlikely(!tl_state)) {
+      return;
+    }
+    instance->track_deallocation(addr, *tl_state);
   }
 }
 

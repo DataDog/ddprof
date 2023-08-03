@@ -5,6 +5,8 @@
 find_package(GTest REQUIRED)
 find_package(benchmark REQUIRED)
 
+add_subdirectory(no_tls)
+
 enable_testing()
 
 # On arm builds Leak Detection is barely usable: https://github.com/google/sanitizers/issues/703
@@ -334,6 +336,10 @@ add_unit_test(live_allocation-ut live_allocation-ut.cc ../src/live_allocation.cc
 add_unit_test(ddprof_process-ut ddprof_process-ut.cc ../src/container_id.cc
               ../src/ddprof_process.cc)
 
+add_unit_test(glibc_fixes-ut glibc_fixes-ut.cc ../src/lib/glibc_fixes.c LIBRARIES pthread)
+
+add_unit_test(reentry_guard-ut reentry_guard-ut.cc)
+
 add_unit_test(
   ddprof_cli-ut
   ddprof_cli-ut.cc
@@ -343,6 +349,8 @@ add_unit_test(
   ../src/perf_watcher.cc
   ../src/tracepoint_config.cc
   LIBRARIES DDProf::Parser)
+
+add_unit_test(pthread_tls-ut pthread_tls-ut.cc)
 
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/pthread_fixes.cc
               ../src/lib/savecontext.cc ../src/lib/saveregisters.cc)
@@ -389,6 +397,11 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
   add_test(
     NAME simple_malloc
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/simple_malloc-ut.sh
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+  add_test(
+    NAME check_no_tls
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/check_no_tls-ut.sh
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
   if(BUILD_UNIVERSAL_DDPROF)
