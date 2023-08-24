@@ -90,6 +90,7 @@ static void trace_unwinding_end(UnwindState *us) {
     }
   }
 }
+
 static DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
                             const DDProfMod &ddprof_mod,
                             FileInfoId_t file_info_id);
