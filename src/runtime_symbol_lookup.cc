@@ -93,23 +93,39 @@ bool RuntimeSymbolLookup::insert_or_replace(std::string_view symbol,
 
   return true;
 }
+namespace {
+bool is_absolute_path(std::string_view path) { return path.front() == '/'; }
+} // namespace
 
 DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
                                              pid_t pid, SymbolMap &symbol_map,
                                              SymbolTable &symbol_table) {
   char buf[1024];
-  auto n = snprintf(buf, std::size(buf), "%s/proc/%d/root%s",
-                    _path_to_proc.c_str(), pid, jitdump_path.data());
-  if (unsigned(n) >= std::size(buf)) { // unable to snprintf everything
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Unable to create path to jitdump");
+  int n = 0;
+  if (is_absolute_path(jitdump_path)) {
+    n = snprintf(buf, std::size(buf), "%s/proc/%d/root%s",
+                 _path_to_proc.c_str(), pid, jitdump_path.data());
+    if (unsigned(n) >= std::size(buf)) { // unable to snprintf everything
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Unable to create path to jitdump");
+    }
+  } else { // For relative path, use the current working directory
+    n = snprintf(buf, std::size(buf), "%s/proc/%d/cwd/%s",
+                 _path_to_proc.c_str(), pid, jitdump_path.data());
+    if (unsigned(n) >= std::size(buf)) { // unable to snprintf everything
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Unable to create path to jitdump");
+    }
   }
 
   JITDump jitdump;
   DDRes res = jitdump_read(std::string_view(buf, n), jitdump);
   if (IsDDResNotOK(res) && res._what == DD_WHAT_NO_JIT_FILE) {
-    // retry different path
+    // retry with different path
     res = jitdump_read(jitdump_path, jitdump);
     if (IsDDResFatal(res)) {
+      if (res._what == DD_WHAT_NO_JIT_FILE) {
+        LG_WRN("Unable to read jitdump file at %.*s",
+               static_cast<int>(jitdump_path.size()), jitdump_path.data());
+      }
       // Stop if fatal error
       return res;
     }

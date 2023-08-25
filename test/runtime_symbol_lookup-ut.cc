@@ -14,7 +14,6 @@
 namespace ddprof {
 
 TEST(runtime_symbol_lookup, no_map) {
-  LogHandle log_handle;
   SymbolTable symbol_table;
   RuntimeSymbolLookup runtime_symbol_lookup(UNIT_TEST_DATA);
   ProcessAddress_t pc = 0x7FB0614BB980;
@@ -26,7 +25,6 @@ TEST(runtime_symbol_lookup, no_map) {
 }
 
 TEST(runtime_symbol_lookup, parse_map) {
-  LogHandle log_handle;
   SymbolTable symbol_table;
   RuntimeSymbolLookup runtime_symbol_lookup(UNIT_TEST_DATA);
   // reads a file with symbols generated from .NET
@@ -40,7 +38,6 @@ TEST(runtime_symbol_lookup, parse_map) {
 }
 
 TEST(runtime_symbol_lookup, overflow) {
-  LogHandle log_handle;
   SymbolTable symbol_table;
   RuntimeSymbolLookup runtime_symbol_lookup(UNIT_TEST_DATA);
   // reads a file with symbols generated from .NET
@@ -61,7 +58,6 @@ TEST(runtime_symbol_lookup, overflow) {
 }
 
 TEST(runtime_symbol_lookup, jitdump_simple) {
-  LogHandle log_handle;
   pid_t mypid = getpid();
   SymbolTable symbol_table;
   RuntimeSymbolLookup runtime_symbol_lookup("");
@@ -76,7 +72,6 @@ TEST(runtime_symbol_lookup, jitdump_simple) {
 
 TEST(runtime_symbol_lookup, double_load) {
   // ensure we don't increase number of symbols when we load several times
-  LogHandle log_handle;
   pid_t mypid = getpid();
   SymbolTable symbol_table;
   RuntimeSymbolLookup runtime_symbol_lookup("");
@@ -96,7 +91,6 @@ TEST(runtime_symbol_lookup, double_load) {
 
 TEST(runtime_symbol_lookup, jitdump_partial) {
   // Test what happens when the file is altered
-  LogHandle log_handle;
   pid_t mypid = getpid();
   SymbolTable symbol_table;
   RuntimeSymbolLookup runtime_symbol_lookup("");
@@ -119,7 +113,6 @@ TEST(runtime_symbol_lookup, jitdump_partial) {
 }
 
 TEST(runtime_symbol_lookup, jitdump_bad_file) {
-  LogHandle log_handle;
   pid_t mypid = getpid();
   SymbolTable symbol_table;
   RuntimeSymbolLookup runtime_symbol_lookup("");
@@ -135,8 +128,24 @@ TEST(runtime_symbol_lookup, jitdump_bad_file) {
   ASSERT_EQ(symbol_idx, -1);
 }
 
+TEST(runtime_symbol_lookup, relative_path) {
+  std::string jit_path =
+      std::string(".debug/jit/llvm-something/jit-1560413.dump");
+  // specify a fake /proc directory
+  RuntimeSymbolLookup runtime_symbol_lookup(UNIT_TEST_DATA);
+  ProcessAddress_t pc = 0x7e1304b00a30;
+  SymbolTable symbol_table;
+  SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
+      42, pc, symbol_table, jit_path);
+  ASSERT_NE(symbol_idx, -1);
+  EXPECT_EQ(symbol_table[symbol_idx]._symname, "julia_b_11");
+  {
+    RuntimeSymbolLookup::Stats stats = runtime_symbol_lookup.get_stats();
+    EXPECT_EQ(stats._symbol_count, 20);
+  }
+}
+
 TEST(runtime_symbol_lookup, jitdump_vs_perfmap) {
-  LogHandle log_handle;
   pid_t mypid = 8;
   // check that we are loading the same symbol on both sides
   std::string expected_sym =

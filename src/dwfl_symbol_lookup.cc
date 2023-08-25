@@ -17,8 +17,6 @@
 #include <cstring>
 #include <string>
 
-// #define DEBUG
-
 namespace ddprof {
 
 DwflSymbolLookup::DwflSymbolLookup() : _lookup_setting(K_CACHE_ON) {
