@@ -80,28 +80,32 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
   }
 }
 
-bool Dso::is_jit_dump_str(std::string_view file_path, pid_t pid) {
-  // Test if we finish by .dump before creating a string
-  constexpr std::string_view suffix = ".dump";
-  constexpr std::string_view prefix = "jit-";
-  if (file_path.ends_with(suffix)) {
-    // The string should end with: "jit-[0-9]+\\.dump"
-    // and the number should be the pid, however, in wholehost mode
-    // we don't have visibility on the namespace's PID value.
-    // So here we just check for the presence of "jit-"
-    size_t pos = file_path.rfind(prefix);
-    if (pos != std::string::npos) {
-      // Select the string in between (with the PID number)
-      std::string_view number_str = file_path.substr(
-          pos + prefix.size(),
-          file_path.size() - suffix.size() - (pos + prefix.size()));
-      // we should not find anything not a number (this avoids use of regex)
-      if (number_str.find_first_not_of("0123456789") == std::string::npos) {
-        return true;
-      }
+bool is_digits(std::string_view str) {
+  for (char ch : str) {
+    if (!isdigit(ch)) {
+      return false;
     }
   }
-  return false;
+  return true;
+}
+
+// The string should end with: "jit-[0-9]+\\.dump"
+// and the number should be the pid, however, in wholehost mode
+// we don't have visibility on the namespace's PID value.
+bool Dso::is_jit_dump_str(std::string_view file_path, pid_t pid) {
+  const std::string_view prefix = "jit-";
+  const std::string_view ext = ".dump";
+  if (!file_path.ends_with(ext))
+    return false;
+  file_path = file_path.substr(0, file_path.size() - ext.size());
+  auto pos = file_path.rfind('/');
+  if (pos != std::string_view::npos) {
+    file_path = file_path.substr(pos + 1);
+  }
+  if (!file_path.starts_with(prefix))
+    return false;
+  file_path = file_path.substr(prefix.size());
+  return is_digits(file_path);
 }
 
 std::string Dso::to_string() const {
