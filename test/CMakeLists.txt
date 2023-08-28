@@ -284,6 +284,7 @@ set(ALLOCATION_TRACKER_UT_SRCS
     ../src/perf_ringbuffer.cc
     ../src/perf_watcher.cc
     ../src/ringbuffer_utils.cc
+    ../src/lib/address_bitset.cc
     ../src/lib/pthread_fixes.cc
     ../src/lib/savecontext.cc
     ../src/lib/saveregisters.cc
@@ -384,6 +385,7 @@ add_benchmark(
 add_benchmark(
   allocation_tracker-bench
   allocation_tracker-bench.cc
+  ../src/lib/address_bitset.cc
   ../src/lib/allocation_tracker.cc
   ../src/pevent_lib.cc
   ../src/perf.cc

@@ -19,7 +19,6 @@
 #include <atomic>
 #include <cassert>
 #include <cstdlib>
-
 #include <unistd.h>
 
 namespace ddprof {
@@ -222,26 +221,33 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
   tl_state.remaining_bytes = remaining_bytes;
   uint64_t const total_size = nsamples * sampling_interval;
 
+  if (_state.track_deallocations) {
+    if (_dealloc_bitset.set(addr)) {
+      if (unlikely(_dealloc_bitset.nb_elements() >
+                   ddprof::liveallocation::kMaxTracked)) {
+        // Check if we reached max number of elements
+        // Clear elements if we reach too many
+        // todo: should we just stop new live tracking (like java) ?
+        if (IsDDResOK(push_clear_live_allocation(tl_state))) {
+          _dealloc_bitset.clear();
+          // still set this as we are pushing the allocation to ddprof
+          _dealloc_bitset.set(addr);
+        } else {
+          log_once(
+              "Error: %s",
+              "Stop allocation profiling. Unable to clear live allocation \n");
+          free();
+        }
+      }
+    } else {
+      // we won't track this allocation as we can't double count in the bitset
+      return;
+    }
+  }
   bool const success = IsDDResOK(push_alloc_sample(addr, total_size, tl_state));
   free_on_consecutive_failures(success);
-
-  if (success && _state.track_deallocations) {
-    // \fixme{r1viollet} adjust set to be lock free
-    // We should still lock the clear of live allocations (which is unlikely)
-    std::lock_guard const lock{_state.mutex};
-
-    // ensure we track this dealloc if it occurs
-    _address_set.insert(addr);
-    if (unlikely(_address_set.size() > ddprof::liveallocation::kMaxTracked)) {
-      if (IsDDResOK(push_clear_live_allocation(tl_state))) {
-        _address_set.clear();
-      } else {
-        log_once(
-            "Error: %s",
-            "Stop allocation profiling. Unable to clear live allocation \n");
-        free();
-      }
-    }
+  if (unlikely(!success) && _state.track_deallocations) {
+    _dealloc_bitset.unset(addr);
   }
 }
 
@@ -251,8 +257,9 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
   // TrackerThreadLocalState::reentry_guard).
 
   { // Grab the lock to check if this allocation was stored in the set
+
     std::lock_guard const lock{_state.mutex};
-    if (!_state.track_deallocations || !_address_set.erase(addr)) {
+    if (!_state.track_deallocations || !_dealloc_bitset.unset(addr)) {
       return;
     }
   }
