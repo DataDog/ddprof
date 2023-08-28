@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "address_bitset.hpp"
 #include "allocation_tracker_tls.hpp"
 #include "ddprof_base.hpp"
 #include "ddres_def.hpp"
@@ -113,7 +114,9 @@ private:
   uint32_t _stack_sample_size;
   PEvent _pevent;
   bool _deterministic_sampling;
-  AdressSet _address_set;
+
+  // AdressSet _address_set;
+  AddressBitset _dealloc_bitset;
 
   // These can not be tied to the internal state of the instance.
   // The creation of the instance depends on this

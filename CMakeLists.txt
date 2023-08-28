@@ -198,6 +198,7 @@ set(DD_PROFILING_SOURCES
     src/ddprof_cmdline.cc
     src/ddres_list.cc
     src/ipc.cc
+    src/lib/address_bitset.cc
     src/lib/allocation_tracker.cc
     src/lib/dd_profiling.cc
     src/lib/elfutils.cc

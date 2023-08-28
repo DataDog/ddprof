@@ -255,6 +255,7 @@ add_unit_test(
   allocation_tracker-ut
   allocation_tracker-ut.cc
   ../src/lib/allocation_tracker.cc
+  ../src/lib/address_bitset.cc
   ../src/base_frame_symbol_lookup.cc
   ../src/build_id.cc
   ../src/container_id.cc
@@ -360,6 +361,7 @@ add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 add_benchmark(
   allocation_tracker-bench
   allocation_tracker-bench.cc
+  ../src/lib/address_bitset.cc
   ../src/lib/allocation_tracker.cc
   ../src/pevent_lib.cc
   ../src/perf.cc
