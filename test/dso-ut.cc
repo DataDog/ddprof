@@ -300,6 +300,11 @@ TEST(DSOTest, dso_from_procline) {
         DsoHdr::dso_from_procline(3237589, const_cast<char *>(s_jitdump_line));
     EXPECT_EQ(jitdump_dso._type, dso::kJITDump);
   }
+  { // jitdump with a name different from PID (for wholehost)
+    Dso jitdump_dso =
+        DsoHdr::dso_from_procline(12, const_cast<char *>(s_jitdump_line));
+    EXPECT_EQ(jitdump_dso._type, dso::kJITDump);
+  }
 }
 
 // Retrieves instruction pointer

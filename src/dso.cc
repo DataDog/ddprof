@@ -83,13 +83,12 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
 bool Dso::is_jit_dump_str(std::string_view file_path, pid_t pid) {
   // test if we finish by .dump before creating a string
   if (file_path.ends_with(".dump")) {
-    // llvm uses this format
-    std::string jit_dump_str = string_format("jit-%d.dump", pid);
-    // this is to remove a gcc warning
-    if (jit_dump_str.size() >= PTRDIFF_MAX) {
-      return false;
-    }
-    if (file_path.ends_with(jit_dump_str)) {
+    // The string should end with: "jit-[0-9]+\\.dump"
+    // and the number should be the pid, however, in wholehost mode
+    // we don't have visibility on the namespace's PID value.
+    // So here we just check for the presence of "jit-"
+    size_t pos = file_path.rfind("jit-");
+    if (pos != std::string::npos) {
       return true;
     }
   }

@@ -30,13 +30,14 @@ DDRes jit_read_header(std::ifstream &file_stream, JITHeader &header) {
   if (!file_stream.read(reinterpret_cast<char *>(&header), sizeof(JITHeader))) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "incomplete jit file");
   }
+
   if (header.magic == k_header_magic) {
     // expected value (no need to swap data)
   } else if (header.magic == k_header_magic_rev) {
     // todo everything should be swapped throughout the parsing (not handled)
     DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Swap data not handled");
   } else {
-    DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Unknown jit format");
+    DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Unknown jit format(%x)", header.magic);
   }
   int64_t remaining_size = header.total_size - sizeof(header);
   if (remaining_size > 0) {
