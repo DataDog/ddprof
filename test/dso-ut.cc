@@ -399,7 +399,6 @@ TEST(DSOTest, insert_jitdump) {
 }
 
 TEST(DSOTest, exe_name) {
-  LogHandle handle;
   ElfAddress_t ip = _THIS_IP_;
   DsoHdr dso_hdr;
   DsoFindRes find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
