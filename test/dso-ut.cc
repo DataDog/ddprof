@@ -300,6 +300,11 @@ TEST(DSOTest, dso_from_procline) {
         DsoHdr::dso_from_procline(3237589, const_cast<char *>(s_jitdump_line));
     EXPECT_EQ(jitdump_dso._type, dso::kJITDump);
   }
+  { // jitdump with a name different from PID (for wholehost)
+    Dso jitdump_dso =
+        DsoHdr::dso_from_procline(12, const_cast<char *>(s_jitdump_line));
+    EXPECT_EQ(jitdump_dso._type, dso::kJITDump);
+  }
 }
 
 // Retrieves instruction pointer
@@ -394,7 +399,6 @@ TEST(DSOTest, insert_jitdump) {
 }
 
 TEST(DSOTest, exe_name) {
-  LogHandle handle;
   ElfAddress_t ip = _THIS_IP_;
   DsoHdr dso_hdr;
   DsoFindRes find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);

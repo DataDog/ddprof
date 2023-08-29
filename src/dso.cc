@@ -10,6 +10,7 @@
 #include "logger.hpp"
 #include "string_format.hpp"
 
+#include <algorithm>
 #include <string_view>
 
 namespace ddprof {
@@ -80,20 +81,25 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
   }
 }
 
+// The string should end with: "jit-[0-9]+\\.dump"
+// and the number should be the pid, however, in wholehost mode
+// we don't have visibility on the namespace's PID value.
 bool Dso::is_jit_dump_str(std::string_view file_path, pid_t pid) {
-  // test if we finish by .dump before creating a string
-  if (file_path.ends_with(".dump")) {
-    // llvm uses this format
-    std::string jit_dump_str = string_format("jit-%d.dump", pid);
-    // this is to remove a gcc warning
-    if (jit_dump_str.size() >= PTRDIFF_MAX) {
-      return false;
-    }
-    if (file_path.ends_with(jit_dump_str)) {
-      return true;
-    }
+  const std::string_view prefix = "jit-";
+  const std::string_view ext = ".dump";
+  if (!file_path.ends_with(ext))
+    return false;
+  file_path = file_path.substr(0, file_path.size() - ext.size());
+  auto pos = file_path.rfind('/');
+  if (pos != std::string_view::npos) {
+    file_path = file_path.substr(pos + 1);
   }
-  return false;
+  if (!file_path.starts_with(prefix))
+    return false;
+  file_path = file_path.substr(prefix.size());
+  return std::all_of(file_path.begin(), file_path.end(), [](char c) {
+    return std::isdigit(static_cast<unsigned char>(c));
+  });
 }
 
 std::string Dso::to_string() const {
