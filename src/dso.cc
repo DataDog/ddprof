@@ -10,6 +10,7 @@
 #include "logger.hpp"
 #include "string_format.hpp"
 
+#include <algorithm>
 #include <string_view>
 
 namespace ddprof {
@@ -80,15 +81,6 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
   }
 }
 
-bool is_digits(std::string_view str) {
-  for (char ch : str) {
-    if (!isdigit(ch)) {
-      return false;
-    }
-  }
-  return true;
-}
-
 // The string should end with: "jit-[0-9]+\\.dump"
 // and the number should be the pid, however, in wholehost mode
 // we don't have visibility on the namespace's PID value.
@@ -105,7 +97,9 @@ bool Dso::is_jit_dump_str(std::string_view file_path, pid_t pid) {
   if (!file_path.starts_with(prefix))
     return false;
   file_path = file_path.substr(prefix.size());
-  return is_digits(file_path);
+  return std::all_of(file_path.begin(), file_path.end(), [](char c) {
+    return std::isdigit(static_cast<unsigned char>(c));
+  });
 }
 
 std::string Dso::to_string() const {
