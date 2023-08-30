@@ -161,6 +161,9 @@ void AllocationTracker::allocation_tracking_free() {
   if (!instance) {
     return;
   }
+  if (instance->_state.track_deallocations) {
+    instance->_dealloc_bitset.clear();
+  }
   TrackerThreadLocalState *tl_state = get_tl_state();
   if (unlikely(!tl_state)) {
     log_once("Error: Unable to find tl_state during %s\n", __FUNCTION__);

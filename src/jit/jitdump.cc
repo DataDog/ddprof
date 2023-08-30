@@ -7,8 +7,6 @@
 #include <span>
 #include <vector>
 
-#define DEBUG
-
 // If we want to consider big endian, we will need this
 // has bswap_64/32/16
 // #include <byteswap.h>

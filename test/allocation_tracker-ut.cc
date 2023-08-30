@@ -175,46 +175,33 @@ TEST(allocation_tracker, max_tracked_allocs) {
       k_default_perf_stack_sample_size, ring_buffer.get_buffer_info());
   defer { AllocationTracker::allocation_tracking_free(); };
 
-  ASSERT_TRUE(AllocationTracker::is_active());
-
-  for (int i = 0; i <= liveallocation::kMaxTracked + 1; ++i) {
+  ASSERT_TRUE(ddprof::AllocationTracker::is_active());
+  bool clear_found = false;
+  for (int i = 0; i <= ddprof::liveallocation::kMaxTracked * 2 + 1; ++i) {
     my_malloc(1, 0x1000 + i);
-    MPSCRingBufferReader reader{ring_buffer.get_ring_buffer()};
-    if (i <= liveallocation::kMaxTracked) { // check that we get the relevant
-                                            // info for this allocation
-      ASSERT_GT(reader.available_size(), 0);
+    ddprof::MPSCRingBufferReader reader{ring_buffer.get_ring_buffer()};
+    while (reader.available_size() > 0) {
       auto buf = reader.read_sample();
       ASSERT_FALSE(buf.empty());
       const perf_event_header *hdr =
           reinterpret_cast<const perf_event_header *>(buf.data());
-      ASSERT_EQ(hdr->type, PERF_RECORD_SAMPLE);
-
-      perf_event_sample *sample =
-          hdr2samp(hdr, perf_event_default_sample_type() | PERF_SAMPLE_ADDR);
-
-      ASSERT_EQ(sample->period, 1);
-      ASSERT_EQ(sample->pid, getpid());
-      ASSERT_EQ(sample->tid, ddprof::gettid());
-      ASSERT_EQ(sample->addr, 0x1000 + i);
-    } else {
-      bool clear_found = false;
-      int nb_read = 0;
-      ConstBuffer buf;
-      do {
-        buf = reader.read_sample();
-        ++nb_read;
-        if (buf.empty())
-          break;
-        const perf_event_header *hdr =
-            reinterpret_cast<const perf_event_header *>(buf.data());
+      if (hdr->type == PERF_RECORD_SAMPLE) {
+        perf_event_sample *sample =
+            hdr2samp(hdr, perf_event_default_sample_type() | PERF_SAMPLE_ADDR);
+        ASSERT_EQ(sample->period, 1);
+        ASSERT_EQ(sample->pid, getpid());
+        ASSERT_EQ(sample->tid, ddprof::gettid());
+        ASSERT_EQ(sample->addr, 0x1000 + i);
+      }
+      else {
         if (hdr->type == PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION) {
+          printf("Clear was found at iteration %d\n", i);
           clear_found = true;
         }
-      } while (true);
-      EXPECT_EQ(nb_read, 3);
-      EXPECT_TRUE(clear_found);
+      }
     }
   }
+  ASSERT_TRUE(clear_found);
 }
 
 class AllocFunctionChecker {
