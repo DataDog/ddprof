@@ -36,7 +36,7 @@ DDRes unwind_init_dwfl(UnwindState *us) {
     // Find an elf file we can load for this PID
     for (auto it = map.cbegin(); it != map.cend(); ++it) {
       const Dso &dso = it->second;
-      if (dso._executable) {
+      if (dso.is_executable()) {
         FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
         if (file_info_id <= k_file_info_error) {
           LG_DBG("Unable to find file for DSO %s", dso.to_string().c_str());
@@ -45,9 +45,11 @@ DDRes unwind_init_dwfl(UnwindState *us) {
         const FileInfoValue &file_info_value =
             us->dso_hdr.get_file_info_value(file_info_id);
 
-        DDProfMod *ddprof_mod = us->_dwfl_wrapper->register_mod(
-            us->current_ip, dso, file_info_value);
-        if (ddprof_mod) {
+        DDProfMod *ddprof_mod = nullptr;
+        auto res = us->_dwfl_wrapper->register_mod(
+            us->current_ip, us->dso_hdr.get_elf_range(map, it), file_info_value,
+            &ddprof_mod);
+        if (IsDDResOK(res)) {
           // one success is fine
           success = true;
           break;
@@ -122,50 +124,73 @@ static DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   if (!pc) {
     // Unwinding can end on a null address
     // Example: alpine 3.17
-    return ddres_init();
+    return {};
   }
-  DsoHdr::DsoFindRes find_res =
-      dsoHdr.dso_find_or_backpopulate(pid_mapping, us->pid, pc);
-  if (!find_res.second) {
-    // no matching file was found
-    LG_DBG("[UW] (PID%d) DSO not found at 0x%lx (depth#%lu)", us->pid, pc,
-           us->output.locs.size());
-    add_error_frame(nullptr, us, pc, SymbolErrors::unknown_dso);
-    return ddres_init();
-  }
-  const Dso &dso = find_res.first->second;
-  std::string_view jitdump_path = {};
-  if (dso::has_runtime_symbols(dso._type)) {
-    if (pid_mapping._jitdump_addr) {
-      DsoHdr::DsoFindRes find_mapping =
-          DsoHdr::dso_find_closest(pid_mapping._map, pid_mapping._jitdump_addr);
-      if (find_mapping.second) { // jitdump exists
-        jitdump_path = find_mapping.first->second._filename;
+
+  // When LOAD segments are ambiguous, do a backpopulate and a second attempt at
+  // registering module
+  bool retry = false;
+  DsoHdr::DsoFindRes find_res;
+  DDProfMod *ddprof_mod = nullptr;
+  FileInfoId_t file_info_id;
+  do {
+    find_res = dsoHdr.dso_find_or_backpopulate(pid_mapping, us->pid, pc);
+    if (!find_res.second) {
+      // no matching file was found
+      LG_DBG("[UW] (PID%d) DSO not found at 0x%lx (depth#%lu)", us->pid, pc,
+             us->output.locs.size());
+      add_error_frame(nullptr, us, pc, SymbolErrors::unknown_dso);
+      return ddres_init();
+    }
+    const Dso &dso = find_res.first->second;
+    std::string_view jitdump_path = {};
+    if (dso::has_runtime_symbols(dso._type)) {
+      if (pid_mapping._jitdump_addr) {
+        DsoHdr::DsoFindRes find_mapping = DsoHdr::dso_find_closest(
+            pid_mapping._map, pid_mapping._jitdump_addr);
+        if (find_mapping.second) { // jitdump exists
+          jitdump_path = find_mapping.first->second._filename;
+        }
+      }
+      return add_runtime_symbol_frame(us, dso, pc, jitdump_path);
+    }
+    // if not encountered previously, update file location / key
+    file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
+    if (file_info_id <= k_file_info_error) {
+      // unable to acces file: add available info from dso
+      add_dso_frame(us, dso, pc, "pc");
+      // We could stop here or attempt to continue in the dwarf unwinding
+      // sometimes frame pointer lets us go further -> So we continue
+      return {};
+    }
+    const FileInfoValue &file_info_value =
+        us->dso_hdr.get_file_info_value(file_info_id);
+    ddprof_mod = us->_dwfl_wrapper->unsafe_get(file_info_id);
+    if (!ddprof_mod) {
+      auto dsoRange =
+          us->dso_hdr.get_elf_range(pid_mapping._map, find_res.first);
+      // ensure unwinding backend has access to this module (and check
+      // consistency)
+      auto res = us->_dwfl_wrapper->register_mod(pc, dsoRange, file_info_value,
+                                                 &ddprof_mod);
+
+      if (!IsDDResOK(res)) {
+        int nb_elts_added = 0;
+        if (!retry && res._what == DD_WHAT_AMBIGUOUS_LOAD_SEGMENT &&
+            dsoHdr.pid_backpopulate(us->pid, nb_elts_added) &&
+            nb_elts_added > 0) {
+          // ambiguous LOAD segments detected, retry after backpopulate
+          retry = true;
+          // clear errored state to allow retry
+          file_info_value._errored = false;
+        } else {
+          return ddres_warn(DD_WHAT_UW_ERROR);
+        }
       }
     }
-    return add_runtime_symbol_frame(us, dso, pc, jitdump_path);
-  }
-  // if not encountered previously, update file location / key
-  FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
-  if (file_info_id <= k_file_info_error) {
-    // unable to acces file: add available info from dso
-    add_dso_frame(us, dso, pc, "pc");
-    // We could stop here or attempt to continue in the dwarf unwinding
-    // sometimes frame pointer lets us go further -> So we continue
-    return ddres_init();
-  }
-  const FileInfoValue &file_info_value =
-      us->dso_hdr.get_file_info_value(file_info_id);
-  DDProfMod *ddprof_mod = us->_dwfl_wrapper->unsafe_get(file_info_id);
-  if (!ddprof_mod) {
-    // ensure unwinding backend has access to this module (and check
-    // consistency)
-    ddprof_mod = us->_dwfl_wrapper->register_mod(pc, dso, file_info_value);
-    // Updates in DSO layout can create inconsistencies
-    if (!ddprof_mod) {
-      return ddres_warn(DD_WHAT_UW_ERROR);
-    }
-  }
+  } while (retry);
+
+  const Dso &dso = find_res.first->second;
 
   // To check that we are in an activation frame, we unwind the current frame
   // This means we need access to the module information.

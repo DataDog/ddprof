@@ -37,13 +37,13 @@ constexpr std::string_view s_dd_profiling_str = k_libdd_profiling_name;
 
 // invalid element
 Dso::Dso()
-    : _pid(-1), _start(), _end(), _pgoff(), _filename(), _inode(),
-      _type(dso::kUndef), _executable(false), _id(k_file_info_error) {}
+    : _pid(-1), _start(), _end(), _pgoff(), _filename(), _inode(), _prot(),
+      _type(dso::kUndef), _id(k_file_info_error) {}
 
 Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
-         std::string &&filename, bool executable, inode_t inode)
+         std::string &&filename, inode_t inode, uint32_t prot)
     : _pid(pid), _start(start), _end(end), _pgoff(pgoff), _filename(filename),
-      _inode(inode), _type(dso::kStandard), _executable(executable),
+      _inode(inode), _prot(prot), _type(dso::kStandard),
       _id(k_file_info_undef) {
   // note that substr manages the case where len str < len vdso_str
   if (_filename.substr(0, s_vdso_str.length()) == s_vdso_str) {
@@ -103,9 +103,11 @@ bool Dso::is_jit_dump_str(std::string_view file_path, pid_t pid) {
 }
 
 std::string Dso::to_string() const {
-  return string_format("PID[%d] %lx-%lx %lx (%s)(T-%s)(%c)(ID#%d)", _pid,
+  return string_format("PID[%d] %lx-%lx %lx (%s)(T-%s)(%c%c%c)(ID#%d)", _pid,
                        _start, _end, _pgoff, _filename.c_str(),
-                       dso::dso_type_str(_type), _executable ? 'x' : '-', _id);
+                       dso::dso_type_str(_type), _prot & PROT_READ ? 'r' : '-',
+                       _prot & PROT_WRITE ? 'w' : '-',
+                       _prot & PROT_EXEC ? 'x' : '-', _id);
 }
 
 std::string Dso::format_filename() const {
@@ -141,7 +143,7 @@ bool Dso::adjust_same(const Dso &o) {
       (_filename != o._filename || _inode != o._inode)) {
     return false;
   }
-  if (_executable != o._executable) {
+  if (_prot != o._prot) {
     return false;
   }
   _end = o._end;
@@ -166,5 +168,7 @@ bool Dso::intersects(const Dso &o) const {
 bool Dso::is_within(ElfAddress_t addr) const {
   return (addr >= _start) && (addr <= _end);
 }
+
+bool Dso::is_executable() const { return _prot & PROT_EXEC; }
 
 } // namespace ddprof

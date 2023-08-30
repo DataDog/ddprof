@@ -87,7 +87,7 @@ TEST(DSOTest, is_within) {
   DsoFindRes find_res = dso_hdr.dso_find_closest(10, 1300);
   EXPECT_TRUE(find_res.second);
   std::string dso_str = find_res.first->second.to_string();
-  EXPECT_EQ(dso_str, "PID[10] 3e8-5db 0 (bar.so.1)(T-Standard)(x)(ID#-1)");
+  EXPECT_EQ(dso_str, "PID[10] 3e8-5db 0 (bar.so.1)(T-Standard)(--x)(ID#-1)");
   DsoHdr::DsoFindRes not_found = dso_hdr.find_res_not_found(10);
   ASSERT_FALSE(find_res == not_found);
   EXPECT_EQ(find_res.first->second._pid, 10);
@@ -230,7 +230,7 @@ TEST(DSOTest, dso_from_procline) {
   Dso no_exec =
       DsoHdr::dso_from_procline(10, const_cast<char *>(s_line_noexec));
   EXPECT_EQ(no_exec._type, dso::kStandard);
-  EXPECT_EQ(no_exec._executable, false);
+  EXPECT_EQ(no_exec._prot, PROT_READ);
   EXPECT_EQ(no_exec._pid, 10);
   Dso standard_dso =
       DsoHdr::dso_from_procline(10, const_cast<char *>(s_exec_line));

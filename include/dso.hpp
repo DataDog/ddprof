@@ -12,6 +12,7 @@
 
 #include <iostream>
 #include <string>
+#include <sys/mman.h>
 #include <utility>
 
 // Out of namespace to allow holding it in C object
@@ -25,7 +26,8 @@ public:
   // pid, start, end, offset, filename (copied once to avoid creating 3
   // different APIs)
   Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff = 0,
-      std::string &&filename = "", bool executable = true, inode_t inode = 0);
+      std::string &&filename = "", inode_t inode = 0,
+      uint32_t prot = PROT_EXEC);
   // copy parent and update pid
   Dso(const Dso &parent, pid_t new_pid) : Dso(parent) { _pid = new_pid; }
 
@@ -40,6 +42,8 @@ public:
   std::string to_string() const;
   std::string format_filename() const;
 
+  bool is_executable() const;
+
   // Adjust as linker can reduce size of mmap
   bool adjust_same(const Dso &o);
   size_t size() const { return _end - _start; }
@@ -50,8 +54,8 @@ public:
   ElfAddress_t _pgoff;
   std::string _filename; // path as perceived by the user
   inode_t _inode;
+  uint32_t _prot;
   dso::DsoType _type;
-  bool _executable;
   mutable FileInfoId_t _id;
 
 private:

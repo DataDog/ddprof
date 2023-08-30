@@ -68,17 +68,22 @@ DDProfMod *DwflWrapper::unsafe_get(FileInfoId_t file_info_id) {
   return &it->second;
 }
 
-DDProfMod *DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
-                                     const FileInfoValue &fileInfoValue) {
+DDRes DwflWrapper::register_mod(ProcessAddress_t pc,
+                                const DsoHdr::DsoConstRange &dsoRange,
+                                const FileInfoValue &fileInfoValue,
+                                DDProfMod **mod) {
 
   DDProfMod new_mod;
-  DDRes res = report_module(_dwfl, pc, dso, fileInfoValue, new_mod);
+  DDRes res = report_module(_dwfl, pc, dsoRange, fileInfoValue, new_mod);
   _inconsistent = new_mod._status == DDProfMod::kInconsistent;
+
   if (IsDDResNotOK(res)) {
-    return nullptr;
+    *mod = nullptr;
+    return res;
   }
-  return &_ddprof_mods.insert_or_assign(fileInfoValue.get_id(), new_mod)
+  *mod = &_ddprof_mods.insert_or_assign(fileInfoValue.get_id(), new_mod)
               .first->second;
+  return res;
 }
 
 std::vector<pid_t> DwflHdr::get_unvisited() const {

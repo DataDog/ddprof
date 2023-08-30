@@ -57,7 +57,10 @@
   X(SOCKET, "error during socket operation")                                   \
   X(TEMP_FILE, "error during temporary file creation")                         \
   X(CGROUP, "error while reading cgroup information")                          \
-  X(TSC, "failed to setup TSC")
+  X(TSC, "failed to setup TSC")                                                \
+  X(INVALID_ELF, "invalid elf file")                                           \
+  X(AMBIGUOUS_LOAD_SEGMENT, "ambiguous executable LOAD segment")               \
+  X(NO_MATCHING_LOAD_SEGMENT, "unable to find a LOAD segment matching mapping")
 
 // generic erno errors available from /usr/include/asm-generic/errno.h
 

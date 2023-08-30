@@ -83,6 +83,7 @@ public:
 
   /* Range is assumed as [start, end) */
   using DsoRange = std::pair<DsoMapIt, DsoMapIt>;
+  using DsoConstRange = std::pair<DsoMapConstIt, DsoMapConstIt>;
   using DsoFindRes = std::pair<DsoMapConstIt, bool>;
 
   /******* MAIN APIS **********/
@@ -121,6 +122,9 @@ public:
 
   // Returns a range that points on _map.end() if nothing was found
   static DsoRange get_intersection(DsoMap &map, const Dso &dso);
+
+  // Return whole mapping range associated with the same elf file
+  DsoConstRange get_elf_range(const DsoMap &map, DsoMapConstIt it);
 
   // Helper to create a dso from a line in /proc/pid/maps
   static Dso dso_from_procline(int pid, char *line);

@@ -21,7 +21,7 @@ typedef struct DDRes {
   union {
     // Not Enums as I could not specify size (except with gcc or c++)
     struct {
-      int16_t _what; // Type of result (define your lisqt of results)
+      int16_t _what; // Type of result (define your list of results)
       int16_t _sev;  // fatal, warn, OK...
     };
     int32_t _val;
