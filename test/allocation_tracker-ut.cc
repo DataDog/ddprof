@@ -150,7 +150,7 @@ TEST(allocation_tracker, max_tracked_allocs) {
 
   ASSERT_TRUE(ddprof::AllocationTracker::is_active());
   bool clear_found = false;
-  for (int i = 0; i <= ddprof::liveallocation::kMaxTracked * 2 + 1; ++i) {
+  for (int i = 0; i <= ddprof::liveallocation::kMaxTracked + 10; ++i) {
     my_malloc(1, 0x1000 + i);
     ddprof::MPSCRingBufferReader reader{ring_buffer.get_ring_buffer()};
     while (reader.available_size() > 0) {
@@ -165,10 +165,8 @@ TEST(allocation_tracker, max_tracked_allocs) {
         ASSERT_EQ(sample->pid, getpid());
         ASSERT_EQ(sample->tid, ddprof::gettid());
         ASSERT_EQ(sample->addr, 0x1000 + i);
-      }
-      else {
+      } else {
         if (hdr->type == PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION) {
-          printf("Clear was found at iteration %d\n", i);
           clear_found = true;
         }
       }

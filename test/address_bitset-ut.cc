@@ -17,8 +17,8 @@ TEST(address_bitset, many_addresses) {
   AddressBitset address_bitset;
   std::random_device rd;
   std::mt19937 gen(rd());
-  std::uniform_int_distribution<uintptr_t> dis(0,
-                                               std::numeric_limits<uintptr_t>::max());
+  std::uniform_int_distribution<uintptr_t> dis(
+      0, std::numeric_limits<uintptr_t>::max());
 
   std::vector<uintptr_t> addresses;
   unsigned nb_elements = 100000;
@@ -34,4 +34,4 @@ TEST(address_bitset, many_addresses) {
   }
   EXPECT_EQ(0, address_bitset.nb_elements());
 }
-}
+} // namespace ddprof

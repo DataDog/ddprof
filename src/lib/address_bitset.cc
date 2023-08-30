@@ -49,7 +49,8 @@ bool AddressBitset::unset(uintptr_t addr) {
     new_value ^= static_cast<uint64_t>(1) << bit_offset;
     success = _address_bitset[index_array].compare_exchange_weak(old_value,
                                                                  new_value);
-  } while (unlikely(!success) && attempt++ < 3);
+  } while (unlikely(!success) && ++attempt < 4);
+  assert(attempt < 4); // This can desync our live heap view (Should not happen)
   if (success && _nb_elements.load(std::memory_order_relaxed) >= 0) {
     // a reset could hit us, just prior to decrementing
     --_nb_elements; // fetch_add - 1

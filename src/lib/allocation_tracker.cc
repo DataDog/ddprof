@@ -271,11 +271,8 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
     return;
   }
 
-  { // Grab the lock to check if this allocation was stored in the set
-    std::lock_guard lock{_state.mutex};
-    if (!_state.track_deallocations || !_dealloc_bitset.unset(addr)) {
-      return;
-    }
+  if (!_state.track_deallocations || !_dealloc_bitset.unset(addr)) {
+    return;
   }
 
   bool success = IsDDResOK(push_dealloc_sample(addr, tl_state));
