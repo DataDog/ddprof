@@ -531,11 +531,12 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx, int64_t now,
 
 void ddprof_pr_mmap(DDProfContext &ctx, const perf_event_mmap2 *map,
                     int watcher_pos) {
-  LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx) %02u:%02u %lu", watcher_pos, map->pid,
-         map->filename, map->addr, map->len, map->pgoff, map->maj, map->min,
-         map->ino);
+  LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx) %c%c%c %02u:%02u %lu", watcher_pos,
+         map->pid, map->filename, map->addr, map->len, map->pgoff,
+         map->prot & PROT_READ ? 'r' : '-', map->prot & PROT_WRITE ? 'w' : '-',
+         map->prot & PROT_EXEC ? 'x' : '-', map->maj, map->min, map->ino);
   ddprof::Dso new_dso(map->pid, map->addr, map->addr + map->len - 1, map->pgoff,
-                      std::string(map->filename), true, map->ino);
+                      std::string(map->filename), map->ino, map->prot);
   ctx.worker_ctx.us->dso_hdr.insert_erase_overlap(std::move(new_dso));
 }
 

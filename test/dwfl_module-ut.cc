@@ -57,7 +57,7 @@ TEST(DwflModule, inconsistency_test) {
 
     for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
       Dso &dso = it->second;
-      if (!dso::has_relevant_path(dso._type) || !dso._executable) {
+      if (!dso::has_relevant_path(dso._type) || !dso.is_executable()) {
         continue; // skip non exec / non standard (anon/vdso...)
       }
 
@@ -66,23 +66,25 @@ TEST(DwflModule, inconsistency_test) {
 
       const FileInfoValue &file_info_value =
           dso_hdr.get_file_info_value(file_info_id);
-      DDProfMod *ddprof_mod =
-          dwfl_wrapper.register_mod(dso._start, dso, file_info_value);
+      DDProfMod *ddprof_mod = nullptr;
+      auto res = dwfl_wrapper.register_mod(dso._start,
+                                           dso_hdr.get_elf_range(dso_map, it),
+                                           file_info_value, &ddprof_mod);
+
+      ASSERT_TRUE(IsDDResOK(res));
       ASSERT_TRUE(ddprof_mod->_mod);
       if (find_res.first == it) {
         Symbol symbol;
         GElf_Sym elf_sym;
         Offset_t lbiais;
-        bool res =
-            symbol_get_from_dwfl(ddprof_mod->_mod, ip, symbol, elf_sym, lbiais);
-        EXPECT_TRUE(res);
+        EXPECT_TRUE(symbol_get_from_dwfl(ddprof_mod->_mod, ip, symbol, elf_sym,
+                                         lbiais));
         EXPECT_EQ("ddprof::DwflModule_inconsistency_test_Test::TestBody()",
                   symbol._demangle_name);
         EXPECT_EQ(lbiais, ddprof_mod->_sym_bias);
         FileAddress_t elf_addr = ip - ddprof_mod->_sym_bias;
         FileAddress_t start_sym, end_sym = {};
-        res = compute_elf_range(elf_addr, elf_sym, start_sym, end_sym);
-        EXPECT_TRUE(res);
+        EXPECT_TRUE(compute_elf_range(elf_addr, elf_sym, start_sym, end_sym));
         printf("Start --> 0x%lx - end %lx - lbiais 0x%lx <--\n", start_sym,
                end_sym, lbiais);
         EXPECT_GE(elf_addr, start_sym);
@@ -126,7 +128,7 @@ TEST(DwflModule, short_lived) {
 
     for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
       Dso &dso = it->second;
-      if (!dso::has_relevant_path(dso._type) || !dso._executable) {
+      if (!dso::has_relevant_path(dso._type) || !dso.is_executable()) {
         continue; // skip non exec / non standard (anon/vdso...)
       }
 
@@ -135,8 +137,11 @@ TEST(DwflModule, short_lived) {
 
       const FileInfoValue &file_info_value =
           dso_hdr.get_file_info_value(file_info_id);
-      DDProfMod *ddprof_mod =
-          dwfl_wrapper.register_mod(dso._start, dso, file_info_value);
+      DDProfMod *ddprof_mod = nullptr;
+      auto res = dwfl_wrapper.register_mod(dso._start,
+                                           dso_hdr.get_elf_range(dso_map, it),
+                                           file_info_value, &ddprof_mod);
+      ASSERT_TRUE(IsDDResOK(res));
       ASSERT_TRUE(ddprof_mod->_mod);
     }
   }
@@ -159,7 +164,7 @@ TEST(DwflModule, short_lived) {
 
     for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
       Dso &dso = it->second;
-      if (!dso::has_relevant_path(dso._type) || !dso._executable) {
+      if (!dso::has_relevant_path(dso._type) || !dso.is_executable()) {
         continue; // skip non exec / non standard (anon/vdso...)
       }
 
@@ -168,8 +173,11 @@ TEST(DwflModule, short_lived) {
 
       const FileInfoValue &file_info_value =
           dso_hdr.get_file_info_value(file_info_id);
-      DDProfMod *ddprof_mod =
-          dwfl_wrapper.register_mod(dso._start, dso, file_info_value);
+      DDProfMod *ddprof_mod = nullptr;
+      auto res = dwfl_wrapper.register_mod(dso._start,
+                                           dso_hdr.get_elf_range(dso_map, it),
+                                           file_info_value, &ddprof_mod);
+      ASSERT_TRUE(IsDDResOK(res));
       ASSERT_TRUE(ddprof_mod->_mod);
     }
   }

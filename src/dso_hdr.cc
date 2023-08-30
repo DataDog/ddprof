@@ -24,12 +24,14 @@
 
 namespace ddprof {
 
-using DsoFindRes = DsoHdr::DsoFindRes;
-using DsoRange = DsoHdr::DsoRange;
-
 namespace {
 
 using FileHolder = std::unique_ptr<FILE, decltype([](FILE *f) { fclose(f); })>;
+
+uint32_t mode_string_to_prot(const char mode[4]) {
+  return ((mode[0] == 'r') ? PROT_READ : 0) |
+      ((mode[1] == 'w') ? PROT_WRITE : 0) | ((mode[2] == 'x') ? PROT_EXEC : 0);
+}
 
 FileHolder open_proc_maps(int pid, const char *path_to_proc = "") {
   char proc_map_filename[1024] = {};
@@ -129,11 +131,11 @@ bool DsoHdr::find_exe_name(pid_t pid, std::string &exe_name) {
   return string_readlink(exe_link, exe_name);
 }
 
-DsoFindRes DsoHdr::dso_find_first_std_executable(pid_t pid) {
+DsoHdr::DsoFindRes DsoHdr::dso_find_first_std_executable(pid_t pid) {
   const DsoMap &map = _pid_map[pid]._map;
   DsoMapConstIt it = map.lower_bound(0);
   // look for the first executable standard region
-  while (it != map.end() && !it->second._executable &&
+  while (it != map.end() && !it->second.is_executable() &&
          it->second._type != dso::kStandard) {
     ++it;
   }
@@ -143,7 +145,8 @@ DsoFindRes DsoHdr::dso_find_first_std_executable(pid_t pid) {
   return {it, true};
 }
 
-DsoFindRes DsoHdr::dso_find_closest(const DsoMap &map, ElfAddress_t addr) {
+DsoHdr::DsoFindRes DsoHdr::dso_find_closest(const DsoMap &map,
+                                            ElfAddress_t addr) {
   bool is_within = false;
   // First element not less than (can match a start addr)
   DsoMapConstIt it = map.lower_bound(addr);
@@ -164,11 +167,24 @@ DsoFindRes DsoHdr::dso_find_closest(const DsoMap &map, ElfAddress_t addr) {
 }
 
 // Find the closest and indicate if we found a dso matching this address
-DsoFindRes DsoHdr::dso_find_closest(pid_t pid, ElfAddress_t addr) {
+DsoHdr::DsoFindRes DsoHdr::dso_find_closest(pid_t pid, ElfAddress_t addr) {
   return dso_find_closest(_pid_map[pid]._map, addr);
 }
 
-DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
+DsoHdr::DsoConstRange DsoHdr::get_elf_range(const DsoMap &map,
+                                            DsoMapConstIt it) {
+  const Dso &dso = it->second;
+  auto not_same_file = [&dso](const DsoMap::value_type &x) {
+    return dso._inode != x.second._inode || dso._filename != x.second._filename;
+  };
+  auto first =
+      std::find_if(std::make_reverse_iterator(it), map.rend(), not_same_file);
+  auto last = std::find_if(++it, map.end(), not_same_file);
+
+  return {first.base(), last};
+}
+
+DsoHdr::DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
   if (map.empty()) {
     return {map.end(), map.end()};
   }
@@ -218,7 +234,7 @@ void DsoHdr::erase_range(DsoMap &map, const DsoRange &range) {
   map.erase(range.first, range.second);
 }
 
-DsoFindRes DsoHdr::dso_find_adjust_same(DsoMap &map, const Dso &dso) {
+DsoHdr::DsoFindRes DsoHdr::dso_find_adjust_same(DsoMap &map, const Dso &dso) {
   bool found_same = false;
   DsoMapIt it = map.find(dso._start);
 
@@ -300,7 +316,8 @@ FileInfoId_t DsoHdr::update_id_from_dso(const Dso &dso) {
   return update_id_from_path(dso);
 }
 
-DsoFindRes DsoHdr::insert_erase_overlap(PidMapping &pid_mapping, Dso &&dso) {
+DsoHdr::DsoFindRes DsoHdr::insert_erase_overlap(PidMapping &pid_mapping,
+                                                Dso &&dso) {
   DsoMap &map = pid_mapping._map;
   DsoFindRes find_res = dso_find_adjust_same(map, dso);
   // nothing to do if already exists
@@ -324,12 +341,13 @@ DsoFindRes DsoHdr::insert_erase_overlap(PidMapping &pid_mapping, Dso &&dso) {
   return map.insert({dso._start, std::move(dso)});
 }
 
-DsoFindRes DsoHdr::insert_erase_overlap(Dso &&dso) {
+DsoHdr::DsoFindRes DsoHdr::insert_erase_overlap(Dso &&dso) {
   return insert_erase_overlap(_pid_map[dso._pid], std::move(dso));
 }
 
-DsoFindRes DsoHdr::dso_find_or_backpopulate(PidMapping &pid_mapping, pid_t pid,
-                                            ElfAddress_t addr) {
+DsoHdr::DsoFindRes DsoHdr::dso_find_or_backpopulate(PidMapping &pid_mapping,
+                                                    pid_t pid,
+                                                    ElfAddress_t addr) {
   if (addr < 4095) {
     LG_DBG("[DSO] Skipping 0 page");
     return find_res_not_found(pid_mapping._map);
@@ -346,7 +364,8 @@ DsoFindRes DsoHdr::dso_find_or_backpopulate(PidMapping &pid_mapping, pid_t pid,
   return find_res;
 }
 
-DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr) {
+DsoHdr::DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid,
+                                                    ElfAddress_t addr) {
   PidMapping &pid_mapping = _pid_map[pid];
   return dso_find_or_backpopulate(pid_mapping, pid, addr);
 }
@@ -444,8 +463,8 @@ Dso DsoHdr::dso_from_procline(int pid, char *line) {
     *q = '\0';
 
   // Should we store non exec dso ?
-  return Dso(pid, m_start, m_end - 1, m_off, std::string(p), 'x' == m_mode[2],
-             m_inode);
+  return Dso(pid, m_start, m_end - 1, m_off, std::string(p), m_inode,
+             mode_string_to_prot(m_mode));
 }
 
 FileInfo DsoHdr::find_file_info(const Dso &dso) {

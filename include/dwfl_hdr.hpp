@@ -10,6 +10,7 @@
 #include "ddprof_module.hpp"
 #include "ddres.hpp"
 #include "dso.hpp"
+#include "dso_hdr.hpp"
 #include "dwfl_internals.hpp"
 
 #include <sys/types.h>
@@ -43,8 +44,8 @@ struct DwflWrapper {
   DDProfMod *unsafe_get(FileInfoId_t file_info_id);
 
   // safe get
-  DDProfMod *register_mod(ProcessAddress_t pc, const Dso &dso,
-                          const FileInfoValue &fileInfoValue);
+  DDRes register_mod(ProcessAddress_t pc, const DsoHdr::DsoConstRange &dsoRange,
+                     const FileInfoValue &fileInfoValue, DDProfMod **mod);
 
   ~DwflWrapper();
 
