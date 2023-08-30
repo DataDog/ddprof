@@ -19,7 +19,9 @@ namespace ddprof {
 // Sampling rate: default rate is 524288
 static constexpr uint64_t k_rate = 200000;
 
-#define READER_THREAD
+// The reader thread is interesting, though it starts dominating the CPU
+// the benchmark focuses on the capture of allocation events.
+// #define READER_THREAD
 std::atomic<bool> reader_continue{true};
 std::atomic<bool> error_in_reader{false};
 
@@ -29,17 +31,14 @@ void read_buffer(ddprof::RingBufferHolder &holder) {
   error_in_reader = false;
   while (reader_continue) {
     ddprof::MPSCRingBufferReader reader(holder.get_ring_buffer());
-//    fprintf(stderr, "size = %lu! \n", reader.available_size());
+    //    fprintf(stderr, "size = %lu! \n", reader.available_size());
     auto buf = reader.read_sample();
     if (!buf.empty()) {
       ++nb_samples;
-//      fprintf(stderr, "Yep, got sample ! \n");
     }
     std::chrono::microseconds(10000);
   }
-#ifdef  DEBUG
   fprintf(stderr, "Reader thread exit, nb_samples=%d\n", nb_samples);
-#endif
   if (nb_samples == 0) {
     error_in_reader = true;
   }
@@ -76,7 +75,6 @@ void perform_memory_operations(bool track_allocations,
       ddprof::AllocationTracker::kTrackDeallocations;
 #endif
 
-
   int nb_threads = 4;
   std::vector<std::thread> threads;
   int num_allocations = 1000;
@@ -104,9 +102,11 @@ void perform_memory_operations(bool track_allocations,
 
     for (int i = 0; i < nb_threads; ++i) {
       threads.emplace_back([&, i] {
+        // in theory we automatically hook in thread creation
+        // though in the benchmark we can not do this.
         ddprof::AllocationTracker::init_tl_state();
         std::uniform_int_distribution<uintptr_t> dis(i * page_size,
-                                                (i + 1) * page_size - 1);
+                                                     (i + 1) * page_size - 1);
 
         for (int j = 0; j < num_allocations; ++j) {
           uintptr_t addr = dis(gen);
@@ -122,7 +122,6 @@ void perform_memory_operations(bool track_allocations,
 
     threads.clear();
     for (int i = 0; i < nb_threads; ++i) {
-      ddprof::AllocationTracker::init_tl_state();
       threads.emplace_back([&, i] {
         ddprof::AllocationTracker::init_tl_state();
         for (auto addr : thread_addresses[i]) {
@@ -135,8 +134,6 @@ void perform_memory_operations(bool track_allocations,
       t.join();
     }
   }
-
-
 
 #ifdef READER_THREAD
   reader_continue = false;

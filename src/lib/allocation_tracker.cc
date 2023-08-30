@@ -259,12 +259,9 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
   // Reentrancy should be prevented by caller (by using ReentryGuard on
   // TrackerThreadLocalState::reentry_guard).
 
-  { // Grab the lock to check if this allocation was stored in the set
 
-    std::lock_guard const lock{_state.mutex};
-    if (!_state.track_deallocations || !_dealloc_bitset.unset(addr)) {
-      return;
-    }
+  if (!_state.track_deallocations || !_dealloc_bitset.unset(addr)) {
+    return;
   }
 
   bool const success = IsDDResOK(push_dealloc_sample(addr, tl_state));
