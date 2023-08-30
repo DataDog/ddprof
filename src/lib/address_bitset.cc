@@ -25,7 +25,9 @@ bool AddressBitset::set(uintptr_t addr) {
     success = _address_bitset[index_array].compare_exchange_weak(old_value,
                                                                  new_value);
   } while (unlikely(!success && attempt++ < 3));
-  _nb_elements += success ? 1 : 0;
+  if (success) {
+    ++_nb_elements;
+  }
   return success;
 }
 
@@ -41,15 +43,17 @@ bool AddressBitset::unset(uintptr_t addr) {
     uint64_t old_value = _address_bitset[index_array].load();
     if (!(old_value & (static_cast<uint64_t>(1) << bit_offset))) {
       // element is not already set (unexpected?)
-      return false;
+      break;
     }
     uint64_t new_value = old_value;
     new_value ^= static_cast<uint64_t>(1) << bit_offset;
     success = _address_bitset[index_array].compare_exchange_weak(old_value,
                                                                  new_value);
-  } while (unlikely(!success && attempt++ < 3));
-  _nb_elements -= success ? 1 : 0;
-  assert(_nb_elements >= 0);
+  } while (unlikely(!success) && attempt++ < 3);
+  if (success && _nb_elements.load(std::memory_order_relaxed) >= 0) {
+    // a reset could hit us, just prior to decrementing
+    --_nb_elements; // fetch_add - 1
+  }
   return success;
 }
 

@@ -353,6 +353,8 @@ add_unit_test(
 
 add_unit_test(pthread_tls-ut pthread_tls-ut.cc)
 
+add_unit_test(address_bitset-ut address_bitset-ut.cc ../src/lib/address_bitset.cc)
+
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/pthread_fixes.cc
               ../src/lib/savecontext.cc ../src/lib/saveregisters.cc)
 

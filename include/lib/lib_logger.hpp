@@ -12,7 +12,7 @@
 namespace ddprof {
 template <typename... Args>
 void log_once(char const *const format, Args... args) {
-#ifndef DEBUG
+#ifdef NDEBUG
   static std::once_flag flag;
   std::call_once(flag, [&, format]() { fprintf(stderr, format, args...); });
 #else

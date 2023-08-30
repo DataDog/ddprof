@@ -13,8 +13,10 @@ public:
   // returns true if the element was removed
   bool unset(uintptr_t addr);
   void clear() {
-    std::fill(_address_bitset.begin(), _address_bitset.end(), 0);
-    _nb_elements = 0;
+    for (auto& element : _address_bitset) {
+      element.store(0, std::memory_order_relaxed);
+    }
+    _nb_elements.store(0);
   };
   int nb_elements() const { return _nb_elements; }
 
@@ -25,6 +27,6 @@ private:
   constexpr static unsigned _nb_bits_mask = _nb_bits - 1;
   // We can not use an actual bitset (for atomicity reasons)
   std::array<std::atomic<uint64_t>, _k_nb_elements> _address_bitset = {};
-  int _nb_elements = 0;
+  std::atomic<int> _nb_elements = 0;
 };
 } // namespace ddprof
