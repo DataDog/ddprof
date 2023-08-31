@@ -115,7 +115,6 @@ private:
   PEvent _pevent;
   bool _deterministic_sampling;
 
-  // AdressSet _address_set;
   AddressBitset _dealloc_bitset;
 
   // These can not be tied to the internal state of the instance.
