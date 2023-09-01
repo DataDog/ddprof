@@ -186,10 +186,10 @@ RUN apt-get update \
 # possibly useful command
 # CFLAGS="-g -O0 -DTRACE" ./configure
 # Valid commit : git checkout a7a292b3f5a1058051b017c0d339a678efdec704
-RUN git clone --branch r1viollet/libaustin_v2 https://github.com/r1viollet/austin.git && \
+RUN git clone --branch libaustin https://github.com/P403n1x87/austin.git && \
     cd austin && \
     autoreconf --install && \
-    CFLAGS="-g -O0 -DTRACE" ./configure && \
+    CFLAGS="-O2" ./configure && \
     make && \
     make install
 
