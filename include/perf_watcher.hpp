@@ -66,13 +66,14 @@ struct PerfWatcher {
 // The last column is a dependent type which is always aggregated as a count
 // whenever the main type is aggregated.
 #define PROFILE_TYPE_TABLE(X)                                                  \
-  X(NOCOUNT, "nocount", nocount, NOCOUNT)                                      \
-  X(TRACEPOINT, "tracepoint", events, NOCOUNT)                                 \
-  X(CPU_NANOS, "cpu-time", nanoseconds, CPU_SAMPLE)                            \
-  X(CPU_SAMPLE, "cpu-samples", count, NOCOUNT)                                 \
-  X(ALLOC_SAMPLE, "alloc-samples", count, NOCOUNT)                             \
-  X(ALLOC_SPACE, "alloc-space", bytes, ALLOC_SAMPLE)
+  X(NOCOUNT, "nocount", nocount, "undef")                                      \
+  X(TRACEPOINT, "tracepoint", events, "undef")                                 \
+  X(CPU_NANOS, "cpu-time", nanoseconds, "undef")                               \
+  X(CPU_SAMPLE, "cpu-samples", count, "undef" )                                \
+  X(ALLOC_SAMPLE, "alloc-samples", count, "heap-live-samples")                 \
+  X(ALLOC_SPACE, "alloc-space", bytes, "heap-live-size")
 
+// defines enum of profile types
 #define X_ENUM(a, b, c, d) DDPROF_PWT_##a,
 typedef enum DDPROF_SAMPLE_TYPES {
   PROFILE_TYPE_TABLE(X_ENUM) DDPROF_PWT_LENGTH,

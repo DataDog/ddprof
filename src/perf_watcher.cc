@@ -17,12 +17,16 @@
 
 uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
 
-#define X_STR(a, b, c, d) b,
-const char *sample_type_name_from_idx(int idx) {
-  static const char *sample_names[] = {PROFILE_TYPE_TABLE(X_STR)};
+#define X_STR(a, b, c, d) {b,d},
+const char *sample_type_name_from_idx(int idx, bool live) {
+  static const std::array<std::pair<const char *,const char *>>sample_names
+      = {PROFILE_TYPE_TABLE(X_STR)};
   if (idx < 0 || idx >= DDPROF_PWT_LENGTH)
     return NULL;
-  return sample_names[idx];
+  if (live) {
+    return sample_names[idx].second;
+  }
+  return sample_names[idx].first;
 }
 #undef X_STR
 #define X_STR(a, b, c, d) #c,
