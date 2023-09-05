@@ -4,20 +4,40 @@
 // Datadog, Inc.
 #include "address_bitset.hpp"
 
-#include <cassert>
+#include <algorithm>
 #include <functional>
 #include <unlikely.hpp>
 
 namespace ddprof {
 
 namespace {
-// instead of a hash function we just remove lower bits
-// the assumption is that we sample, so we should have less address ranges
-// that are close to each other.
-// We can't use the sample period as we can still have addresses
-// that are close due to sequences of allocations / frees
-inline uint64_t remove_lower_bits(uintptr_t h1) { return h1 >> 8; }
+int most_significant_bit_pos(int n) {
+  if (n == 0)
+    return 0;
+  int msb = 0;
+  n = n / 2;
+  while (n != 0) {
+    n = n / 2;
+    msb++;
+  }
+  return msb;
+}
 } // namespace
+
+void AddressBitset::init(int sampling_period, unsigned max_addresses) {
+  _lower_bits_ignored = most_significant_bit_pos(sampling_period);
+  // we avoid ignoring too many of the lower bits
+  _lower_bits_ignored = std::min<int>(_k_max_bits_ignored, _lower_bits_ignored);
+  if (_address_bitset) {
+    _address_bitset.reset();
+  }
+  _nb_bits = max_addresses;
+  _k_nb_elements = (_nb_bits) / (_nb_bits_per_elt);
+  if (_nb_bits) {
+    _nb_bits_mask = _nb_bits - 1;
+    _address_bitset = std::make_unique<std::atomic<uint64_t>[]>(_k_nb_elements);
+  }
+}
 
 bool AddressBitset::set(uintptr_t addr) {
   uint64_t hash_addr = remove_lower_bits(addr);
@@ -27,51 +47,37 @@ bool AddressBitset::set(uintptr_t addr) {
   // Also, the usage of a power of two value allows for bit operations
   unsigned index_array = significant_bits / 64;
   unsigned bit_offset = significant_bits % 64;
-  bool success = false;
-  int attempt = 0;
-  do {
-    uint64_t old_value = _address_bitset[index_array].load();
-    if (old_value & (static_cast<uint64_t>(1) << bit_offset)) {
-      // element is already set (collisions are expected)
-      return false;
-    }
-    uint64_t new_value = old_value;
-    new_value |= static_cast<uint64_t>(1) << bit_offset;
-    success = _address_bitset[index_array].compare_exchange_weak(old_value,
-                                                                 new_value);
-  } while (unlikely(!success && ++attempt < _k_max_write_attempts));
-  if (success) {
-    ++_nb_addresses;
+  uint64_t bit_in_element = (1UL << bit_offset);
+  uint64_t old_value = _address_bitset[index_array].load();
+  if (old_value & bit_in_element) {
+    // element is already set (collisions are expected)
+    return false;
   }
-  return success;
+  // there is a possible race between checking the value
+  // and setting it
+  _address_bitset[index_array].fetch_or(bit_in_element);
+  ++_nb_addresses;
+  return true;
 }
 
 bool AddressBitset::unset(uintptr_t addr) {
   uint64_t hash_addr = remove_lower_bits(addr);
   int significant_bits = hash_addr & _nb_bits_mask;
-  auto res = std::div(significant_bits, _nb_bits_per_elt);
-  unsigned index_array = res.quot;
-  unsigned bit_offset = res.rem;
-  bool success = false;
-  int attempt = 0;
-  do {
-    uint64_t old_value = _address_bitset[index_array].load();
-    if (!(old_value & (static_cast<uint64_t>(1) << bit_offset))) {
-      // element is not already set (unexpected?)
-      break;
-    }
-    uint64_t new_value = old_value;
-    new_value ^= static_cast<uint64_t>(1) << bit_offset;
-    success = _address_bitset[index_array].compare_exchange_weak(old_value,
-                                                                 new_value);
-  } while (unlikely(!success && ++attempt < _k_max_write_attempts));
-  assert(attempt < _k_max_write_attempts); // This can desync our live heap view
-                                           // (Should not happen)
-  if (success && _nb_addresses.load(std::memory_order_relaxed) >= 0) {
-    // a reset could hit us, just prior to decrementing
+  unsigned index_array = significant_bits / 64;
+  unsigned bit_offset = significant_bits % 64;
+  uint64_t bit_in_element = (1UL << bit_offset);
+  uint64_t old_value = _address_bitset[index_array].load();
+  if (!(old_value & bit_in_element)) {
+    // element is not already unset de-sync
+    return false;
+  }
+  _address_bitset[index_array].fetch_xor(bit_in_element);
+  // a reset could hit us, just prior to decrementing
+  // How important is avoiding a negative value? (vs avoiding this check?)
+  if (likely(_nb_addresses.load(std::memory_order_relaxed) >= 0)) {
     --_nb_addresses; // fetch_add - 1
   }
-  return success;
+  return true;
 }
 
 void AddressBitset::clear() {
