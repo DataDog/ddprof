@@ -87,7 +87,8 @@ private:
   uint64_t next_sample_interval(std::minstd_rand &gen) const;
 
   DDRes init(uint64_t mem_profile_interval, bool deterministic_sampling,
-             uint32_t stack_sample_size, const RingBufferInfo &ring_buffer);
+             bool track_deallocations, uint32_t stack_sample_size,
+             const RingBufferInfo &ring_buffer);
   void free();
 
   static AllocationTracker *create_instance();
@@ -118,7 +119,7 @@ private:
   PEvent _pevent;
   bool _deterministic_sampling;
 
-  AddressBitset _dealloc_bitset;
+  AddressBitset _allocated_address_set;
 
   // These can not be tied to the internal state of the instance.
   // The creation of the instance depends on this

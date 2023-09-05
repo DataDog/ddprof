@@ -11,7 +11,7 @@ namespace liveallocation {
 // build time override to reduce execution time of test
 static constexpr auto kMaxTracked = KMAX_TRACKED_ALLOCATIONS;
 #else
-static constexpr auto kMaxTracked = 500000;
+static constexpr auto kMaxTracked = 524288; // 2^19
 #endif
 } // namespace liveallocation
 } // namespace ddprof
