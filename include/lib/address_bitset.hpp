@@ -21,21 +21,10 @@ class AddressBitset {
 public:
   // Publish 1 Meg as default
   constexpr static unsigned _k_default_max_addresses = 8 * 1024 * 1024;
-  AddressBitset(unsigned max_addresses = 0) { init(max_addresses); }
-
-  void init(unsigned max_addresses) {
-    if (_address_bitset) {
-      _address_bitset.reset();
-    }
-    _nb_bits = max_addresses;
-    _k_nb_elements = (_nb_bits) / (_nb_bits_per_elt);
-    if (_nb_bits) {
-      _nb_bits_mask = _nb_bits - 1;
-      _address_bitset =
-          std::make_unique<std::atomic<uint64_t>[]>(_k_nb_elements);
-    }
+  AddressBitset(int sampling_period = 1, unsigned max_addresses = 0) {
+    init(sampling_period, max_addresses);
   }
-
+  void init(int sampling_period, unsigned max_addresses);
   // returns true if the element was inserted
   bool set(uintptr_t addr);
   // returns true if the element was removed
@@ -44,7 +33,8 @@ public:
   int nb_addresses() const { return _nb_addresses; }
 
 private:
-  constexpr static auto _k_max_write_attempts = 4;
+  static constexpr unsigned _k_max_bits_ignored = 8;
+  unsigned _lower_bits_ignored;
   // element type
   using Elt_t = uint64_t;
   constexpr static unsigned _nb_bits_per_elt = sizeof(Elt_t) * 8;
@@ -57,5 +47,11 @@ private:
   // We can not use an actual bitset (for atomicity reasons)
   std::unique_ptr<std::atomic<uint64_t>[]> _address_bitset;
   std::atomic<int> _nb_addresses = 0;
+  // instead of a hash function we just remove lower bits
+  // the assumption is that we sample, so we should have less address ranges
+  // that are close to each other.
+  // We can't use the sample period as we can still have addresses
+  // that are close due to sequences of allocations / frees
+  uint64_t remove_lower_bits(uintptr_t h1) { return h1 >> _lower_bits_ignored; }
 };
 } // namespace ddprof

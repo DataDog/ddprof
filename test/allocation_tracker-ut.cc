@@ -150,8 +150,15 @@ TEST(allocation_tracker, max_tracked_allocs) {
 
   ASSERT_TRUE(ddprof::AllocationTracker::is_active());
   bool clear_found = false;
-  for (int i = 0; i <= ddprof::liveallocation::kMaxTracked + 10; ++i) {
-    my_malloc(1, 0x1000 + i);
+  uint64_t nb_samples = 0;
+  for (int i = 0; i <= ddprof::liveallocation::kMaxTracked +
+           ddprof::liveallocation::kMaxTracked / 10;
+       ++i) {
+    // We can find pathological allocation patterns that we track badly
+    // example : 0x1000 + (i*128);
+    //    this will prevent us from using the first bits of the bitset
+    uintptr_t addr = 0x1000 + (i);
+    my_malloc(1, addr);
     ddprof::MPSCRingBufferReader reader{ring_buffer.get_ring_buffer()};
     while (reader.available_size() > 0) {
       auto buf = reader.read_sample();
@@ -159,12 +166,13 @@ TEST(allocation_tracker, max_tracked_allocs) {
       const perf_event_header *hdr =
           reinterpret_cast<const perf_event_header *>(buf.data());
       if (hdr->type == PERF_RECORD_SAMPLE) {
+        ++nb_samples;
         perf_event_sample *sample =
             hdr2samp(hdr, perf_event_default_sample_type() | PERF_SAMPLE_ADDR);
         ASSERT_EQ(sample->period, 1);
         ASSERT_EQ(sample->pid, getpid());
         ASSERT_EQ(sample->tid, ddprof::gettid());
-        ASSERT_EQ(sample->addr, 0x1000 + i);
+        ASSERT_EQ(sample->addr, addr);
       } else {
         if (hdr->type == PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION) {
           clear_found = true;
@@ -172,5 +180,7 @@ TEST(allocation_tracker, max_tracked_allocs) {
       }
     }
   }
-  ASSERT_TRUE(clear_found);
+  fprintf(stderr, "Number of found samples %lu (vs max = %d) \n", nb_samples,
+          ddprof::liveallocation::kMaxTracked);
+  EXPECT_TRUE(clear_found);
 }

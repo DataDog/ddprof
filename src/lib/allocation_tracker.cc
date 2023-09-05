@@ -142,7 +142,8 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
   }
   if (track_deallocations) {
     // 16 times as we want to probability of collision to be low enough
-    _allocated_address_set.init(liveallocation::kMaxTracked * 16);
+    _allocated_address_set.init(_sampling_interval,
+                                liveallocation::kMaxTracked * 16);
   }
   return ddprof::ring_buffer_attach(ring_buffer, &_pevent);
 }

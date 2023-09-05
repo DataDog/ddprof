@@ -297,7 +297,7 @@ add_unit_test(
   ../src/unwind_helpers.cc
   ../src/unwind_metrics.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle DDProf::Parser
-  DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=100)
+  DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384)
 
 add_unit_test(sys_utils-ut sys_utils-ut.cc ../src/sys_utils.cc)
 
@@ -377,7 +377,7 @@ add_benchmark(
   ../src/user_override.cc
   ../src/sys_utils.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle DDProf::Parser
-  DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=10000)
+  DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384)
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
   add_exe(
