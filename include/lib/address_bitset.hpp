@@ -4,8 +4,8 @@
 // Datadog, Inc.
 #pragma once
 
-#include <array>
 #include <atomic>
+#include <memory>
 #include <stdint.h>
 #include <string.h>
 
@@ -19,27 +19,43 @@ class AddressBitset {
   // Addr -> Hash -> Mask (to get useable bits) -> Position in the bitset
   // Note: the hashing step might be bad for cache locality.
 public:
+  // Publish 1 Meg as default
+  constexpr static unsigned _k_default_max_addresses = 8 * 1024 * 1024;
+  AddressBitset(unsigned max_addresses = 0) { init(max_addresses); }
+
+  void init(unsigned max_addresses) {
+    if (_address_bitset) {
+      _address_bitset.reset();
+    }
+    _nb_bits = max_addresses;
+    _k_nb_elements = (_nb_bits) / (_nb_bits_per_elt);
+    if (_nb_bits) {
+      _nb_bits_mask = _nb_bits - 1;
+      _address_bitset =
+          std::make_unique<std::atomic<uint64_t>[]>(_k_nb_elements);
+    }
+  }
+
   // returns true if the element was inserted
   bool set(uintptr_t addr);
   // returns true if the element was removed
   bool unset(uintptr_t addr);
-  void clear() {
-    for (auto &element : _address_bitset) {
-      element.store(0, std::memory_order_relaxed);
-    }
-    _nb_elements.store(0);
-  };
-  int nb_elements() const { return _nb_elements; }
+  void clear();
+  int nb_addresses() const { return _nb_addresses; }
 
 private:
+  constexpr static auto _k_max_write_attempts = 4;
+  // element type
+  using Elt_t = uint64_t;
+  constexpr static unsigned _nb_bits_per_elt = sizeof(Elt_t) * 8;
   // 1 Meg divided in uint64's size
   // The probability of collision is proportional to the number of elements
   // already within the bitset
-  constexpr static unsigned _nb_bits = 8 * 1024 * 1024;
-  constexpr static unsigned _k_nb_elements = (_nb_bits) / (64);
-  constexpr static unsigned _nb_bits_mask = _nb_bits - 1;
+  unsigned _nb_bits = {};
+  unsigned _k_nb_elements = {};
+  unsigned _nb_bits_mask = {};
   // We can not use an actual bitset (for atomicity reasons)
-  std::array<std::atomic<uint64_t>, _k_nb_elements> _address_bitset = {};
-  std::atomic<int> _nb_elements = 0;
+  std::unique_ptr<std::atomic<uint64_t>[]> _address_bitset;
+  std::atomic<int> _nb_addresses = 0;
 };
 } // namespace ddprof

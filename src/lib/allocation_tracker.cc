@@ -118,9 +118,9 @@ DDRes AllocationTracker::allocation_tracking_init(
   void *volatile p = ::malloc(1);
   ::free(p);
 
-  DDRES_CHECK_FWD(instance->init(allocation_profiling_rate,
-                                 flags & kDeterministicSampling,
-                                 stack_sample_size, ring_buffer));
+  DDRES_CHECK_FWD(instance->init(
+      allocation_profiling_rate, flags & kDeterministicSampling,
+      flags & kTrackDeallocations, stack_sample_size, ring_buffer));
   _instance = instance;
 
   state.init(true, flags & kTrackDeallocations);
@@ -130,6 +130,7 @@ DDRes AllocationTracker::allocation_tracking_init(
 
 DDRes AllocationTracker::init(uint64_t mem_profile_interval,
                               bool deterministic_sampling,
+                              bool track_deallocations,
                               uint32_t stack_sample_size,
                               const RingBufferInfo &ring_buffer) {
   _sampling_interval = mem_profile_interval;
@@ -138,6 +139,10 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
   if (ring_buffer.ring_buffer_type !=
       static_cast<int>(RingBufferType::kMPSCRingBuffer)) {
     return ddres_error(DD_WHAT_PERFRB);
+  }
+  if (track_deallocations) {
+    // 16 times as we want to probability of collision to be low enough
+    _allocated_address_set.init(liveallocation::kMaxTracked * 16);
   }
   return ddprof::ring_buffer_attach(ring_buffer, &_pevent);
 }
@@ -161,9 +166,6 @@ void AllocationTracker::allocation_tracking_free() {
   AllocationTracker *instance = _instance;
   if (!instance) {
     return;
-  }
-  if (instance->_state.track_deallocations) {
-    instance->_dealloc_bitset.clear();
   }
   TrackerThreadLocalState *tl_state = get_tl_state();
   if (unlikely(!tl_state)) {
@@ -232,16 +234,16 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
   uint64_t total_size = nsamples * sampling_interval;
 
   if (_state.track_deallocations) {
-    if (_dealloc_bitset.set(addr)) {
-      if (unlikely(_dealloc_bitset.nb_elements() >
+    if (_allocated_address_set.set(addr)) {
+      if (unlikely(_allocated_address_set.nb_addresses() >
                    ddprof::liveallocation::kMaxTracked)) {
         // Check if we reached max number of elements
         // Clear elements if we reach too many
         // todo: should we just stop new live tracking (like java) ?
         if (IsDDResOK(push_clear_live_allocation(tl_state))) {
-          _dealloc_bitset.clear();
+          _allocated_address_set.clear();
           // still set this as we are pushing the allocation to ddprof
-          _dealloc_bitset.set(addr);
+          _allocated_address_set.set(addr);
         } else {
           log_once(
               "Error: %s",
@@ -257,7 +259,7 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
   bool success = IsDDResOK(push_alloc_sample(addr, total_size, tl_state));
   free_on_consecutive_failures(success);
   if (unlikely(!success) && _state.track_deallocations) {
-    _dealloc_bitset.unset(addr);
+    _allocated_address_set.unset(addr);
   }
 }
 
@@ -271,7 +273,7 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
     return;
   }
 
-  if (!_state.track_deallocations || !_dealloc_bitset.unset(addr)) {
+  if (!_state.track_deallocations || !_allocated_address_set.unset(addr)) {
     return;
   }
 
