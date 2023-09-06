@@ -31,7 +31,7 @@ austin_handle_t Process::get_austin_handle(pid_t tid) {
   if (!_austin_handle) {
     LG_NTC("Attaching to PID %d/%d", _pid, tid);
     _austin_handle = austin_attach(_pid);
-    LG_NTC("Result of attach %p", _austin_handle);
+    LG_NTC("Result of attach %s", _austin_handle?"Success":"Failure");
   }
   return _austin_handle;
 }
