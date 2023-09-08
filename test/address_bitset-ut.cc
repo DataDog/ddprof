@@ -42,13 +42,19 @@ TEST(address_bitset, many_addresses) {
   EXPECT_EQ(0, address_bitset.nb_addresses());
 }
 
-// This test is mostly to tune the hash approach (it would slow down CI)
+// This test to tune the hash approach
+// Collision rate is around 5.7%, which will have an impact on sampling
 #ifdef COLLISION_TEST
 // Your hash function
 #  ifdef TEST_IDENTITY
 inline uint64_t my_hash(uintptr_t h1) { return h1; }
 #  else
-inline uint64_t my_hash(uintptr_t h1) { return h1 >> 8; }
+inline uint64_t my_hash(uintptr_t h1) {
+  h1 = h1 >> 4;
+  uint32_t high = (uint32_t)(h1 >> 32);
+  uint32_t low = (uint32_t)h1;
+  return high ^ low;
+}
 #  endif
 
 TEST(address_bitset, hash_function) {
