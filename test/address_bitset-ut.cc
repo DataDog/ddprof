@@ -14,14 +14,14 @@
 namespace ddprof {
 
 TEST(address_bitset, simple) {
-  AddressBitset address_bitset(1, AddressBitset::_k_default_max_addresses);
+  AddressBitset address_bitset(AddressBitset::_k_default_max_addresses);
   EXPECT_TRUE(address_bitset.set(0xbadbeef));
   EXPECT_FALSE(address_bitset.set(0xbadbeef));
   EXPECT_TRUE(address_bitset.unset(0xbadbeef));
 }
 
 TEST(address_bitset, many_addresses) {
-  AddressBitset address_bitset(1, AddressBitset::_k_default_max_addresses);
+  AddressBitset address_bitset(AddressBitset::_k_default_max_addresses);
   std::random_device rd;
   std::mt19937 gen(rd());
   std::uniform_int_distribution<uintptr_t> dis(

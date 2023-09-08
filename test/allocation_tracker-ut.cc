@@ -154,10 +154,7 @@ TEST(allocation_tracker, max_tracked_allocs) {
   for (int i = 0; i <= ddprof::liveallocation::kMaxTracked +
            ddprof::liveallocation::kMaxTracked / 10;
        ++i) {
-    // We can find pathological allocation patterns that we track badly
-    // example : 0x1000 + (i*128);
-    //    this will prevent us from using the first bits of the bitset
-    uintptr_t addr = 0x1000 + (i);
+    uintptr_t addr = 0x1000 + (i * 16);
     my_malloc(1, addr);
     ddprof::MPSCRingBufferReader reader{ring_buffer.get_ring_buffer()};
     while (reader.available_size() > 0) {
