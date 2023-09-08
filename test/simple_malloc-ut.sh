@@ -29,7 +29,19 @@ count() {
     log_file="$1"
     sample_type="$2"
     pid_or_tid="$3"
-    grep "sample\[type=${sample_type};.*;do_lot_of_allocations" "${log_file}" | grep -o "${pid_or_tid}=[0-9]*" | sort -u | wc -l
+    local result
+    set +e
+    set +o pipefail
+    result=$(grep "sample\[type=${sample_type};.*;do_lot_of_allocations" "${log_file}" | grep -o "${pid_or_tid}=[0-9]*" | sort -u | wc -l)
+    local exit_status=$?
+    # Re-enable exit on error and pipefail
+    set -e
+    set -o pipefail
+    if [ $exit_status -ne 0 ]; then
+        echo "Error occurred while counting for sample_type=${sample_type} and pid_or_tid=${pid_or_tid}" >&2
+        exit $exit_status
+    fi
+    echo $result
 }
 
 check() {
@@ -48,7 +60,6 @@ check() {
         kill "$COPROC_PID"
     fi
     if [[ "${expected_pids}" -ne 0 ]]; then
-
         counted_pids_alloc=$(count "${log_file}" "alloc-samples" "pid")
         counted_pids_cpu=$(count "${log_file}" "cpu-samples" "pid")
         counted_tids_alloc=$(count "${log_file}" "alloc-samples" "tid")
