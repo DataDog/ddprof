@@ -10,24 +10,10 @@
 
 namespace ddprof {
 
-namespace {
-int most_significant_bit_pos(int n) {
-  if (n == 0)
-    return 0;
-  int msb = 0;
-  n = n / 2;
-  while (n != 0) {
-    n = n / 2;
-    msb++;
-  }
-  return msb;
-}
-} // namespace
-
-void AddressBitset::init(int sampling_period, unsigned max_addresses) {
-  _lower_bits_ignored = most_significant_bit_pos(sampling_period);
-  // we avoid ignoring too many of the lower bits
-  _lower_bits_ignored = std::min<int>(_k_max_bits_ignored, _lower_bits_ignored);
+void AddressBitset::init(unsigned max_addresses) {
+  // Due to memory alignment, on 64 bits we can assume that the first 4
+  // bits can be ignored
+  _lower_bits_ignored = _k_max_bits_ignored;
   if (_address_bitset) {
     _address_bitset.reset();
   }
@@ -40,8 +26,7 @@ void AddressBitset::init(int sampling_period, unsigned max_addresses) {
 }
 
 bool AddressBitset::set(uintptr_t addr) {
-  uint64_t hash_addr = remove_lower_bits(addr);
-  unsigned significant_bits = hash_addr & _nb_bits_mask;
+  uint32_t significant_bits = remove_lower_bits(addr);
   // As per nsavoire's comment, it is better to use separate operators
   // than to use the div instruction which generates an extra function call
   // Also, the usage of a power of two value allows for bit operations

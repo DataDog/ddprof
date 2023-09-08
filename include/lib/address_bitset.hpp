@@ -21,10 +21,8 @@ class AddressBitset {
 public:
   // Publish 1 Meg as default
   constexpr static unsigned _k_default_max_addresses = 8 * 1024 * 1024;
-  AddressBitset(int sampling_period = 1, unsigned max_addresses = 0) {
-    init(sampling_period, max_addresses);
-  }
-  void init(int sampling_period, unsigned max_addresses);
+  AddressBitset(unsigned max_addresses = 0) { init(max_addresses); }
+  void init(unsigned max_addresses);
   // returns true if the element was inserted
   bool set(uintptr_t addr);
   // returns true if the element was removed
@@ -33,7 +31,7 @@ public:
   int nb_addresses() const { return _nb_addresses; }
 
 private:
-  static constexpr unsigned _k_max_bits_ignored = 8;
+  static constexpr unsigned _k_max_bits_ignored = 4;
   unsigned _lower_bits_ignored;
   // element type
   using Elt_t = uint64_t;
@@ -47,11 +45,17 @@ private:
   // We can not use an actual bitset (for atomicity reasons)
   std::unique_ptr<std::atomic<uint64_t>[]> _address_bitset;
   std::atomic<int> _nb_addresses = 0;
-  // instead of a hash function we just remove lower bits
-  // the assumption is that we sample, so we should have less address ranges
-  // that are close to each other.
-  // We can't use the sample period as we can still have addresses
-  // that are close due to sequences of allocations / frees
-  uint64_t remove_lower_bits(uintptr_t h1) { return h1 >> _lower_bits_ignored; }
+
+  // This is a kind of hash function
+  // We remove the lower bits (as the alignment constraints makes them useless)
+  // We fold the address
+  // Then we only keep the bits that matter for the order in the bitmap
+  uint32_t remove_lower_bits(uintptr_t h1) {
+    uint64_t intermediate = h1 >> _lower_bits_ignored;
+    uint32_t high = (uint32_t)(intermediate >> 32);
+    uint32_t low = (uint32_t)intermediate;
+    uint32_t res = high ^ low;
+    return res & _nb_bits_mask;
+  }
 };
 } // namespace ddprof
