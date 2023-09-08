@@ -33,16 +33,16 @@ bool AddressBitset::set(uintptr_t addr) {
   unsigned index_array = significant_bits / 64;
   unsigned bit_offset = significant_bits % 64;
   uint64_t bit_in_element = (1UL << bit_offset);
-  uint64_t old_value = _address_bitset[index_array].load();
-  if (old_value & bit_in_element) {
-    // element is already set (collisions are expected)
-    return false;
-  }
   // there is a possible race between checking the value
   // and setting it
-  _address_bitset[index_array].fetch_or(bit_in_element);
-  ++_nb_addresses;
-  return true;
+  if (!(_address_bitset[index_array].fetch_or(bit_in_element) &
+        bit_in_element)) {
+    // check that the element was not already set
+    ++_nb_addresses;
+    return true;
+  }
+  // Collision, element was already set
+  return false;
 }
 
 bool AddressBitset::unset(uintptr_t addr) {
@@ -51,18 +51,13 @@ bool AddressBitset::unset(uintptr_t addr) {
   unsigned index_array = significant_bits / 64;
   unsigned bit_offset = significant_bits % 64;
   uint64_t bit_in_element = (1UL << bit_offset);
-  uint64_t old_value = _address_bitset[index_array].load();
-  if (!(old_value & bit_in_element)) {
-    // element is not already unset de-sync
-    return false;
-  }
-  _address_bitset[index_array].fetch_xor(bit_in_element);
-  // a reset could hit us, just prior to decrementing
-  // How important is avoiding a negative value? (vs avoiding this check?)
-  if (likely(_nb_addresses.load(std::memory_order_relaxed) >= 0)) {
+  if ((_address_bitset[index_array].fetch_xor(bit_in_element) &
+       bit_in_element) &&
+      likely(_nb_addresses.load(std::memory_order_relaxed) >= 0)) {
     --_nb_addresses; // fetch_add - 1
+    return true;
   }
-  return true;
+  return false;
 }
 
 void AddressBitset::clear() {
