@@ -28,6 +28,17 @@ struct PerfWatcherOptions {
       k_default_perf_stack_sample_size}; // size of the user stack to capture
 };
 
+enum PprofPos_t {
+  kCallgraph = 0,
+  kLive,
+  kNbPprofPos,
+};
+
+struct PProfIndices {
+  int pprof_index = -1;
+  int pprof_count_index = -1;
+};
+
 struct PerfWatcher {
   int ddprof_event_type; // ddprof event type from DDPROF_EVENT_NAMES enum
   std::string desc;
@@ -55,26 +66,28 @@ struct PerfWatcher {
   // Other configs
   bool suppress_pid;
   bool suppress_tid;
-  int pprof_sample_idx;       // index into the SampleType in the pprof
-  int pprof_count_sample_idx; // index into the pprof for the count
-  bool instrument_self;       // do my own perfopen, etc
-  EventConfMode output_mode;  // defines how sample data is aggregated
+  PProfIndices pprof_indices[kNbPprofPos]; // std and live
+  bool instrument_self;                    // do my own perfopen, etc
+  // Defalut output is callgraph
+  EventConfMode output_mode = EventConfMode::kCallgraph;
 };
 
 // The Datadog backend only understands pre-configured event types.  Those
 // types are defined here, and then referenced in the watcher
 // The last column is a dependent type which is always aggregated as a count
 // whenever the main type is aggregated.
+//  type,    pprof,     unit, live-pprof,  sample_type,
+//     a,        b,        c,          d,            e,
 #define PROFILE_TYPE_TABLE(X)                                                  \
-  X(NOCOUNT, "nocount", nocount, "undef")                                      \
-  X(TRACEPOINT, "tracepoint", events, "undef")                                 \
-  X(CPU_NANOS, "cpu-time", nanoseconds, "undef")                               \
-  X(CPU_SAMPLE, "cpu-samples", count, "undef" )                                \
-  X(ALLOC_SAMPLE, "alloc-samples", count, "heap-live-samples")                 \
-  X(ALLOC_SPACE, "alloc-space", bytes, "heap-live-size")
+  X(NOCOUNT, "nocount", nocount, "undef", NOCOUNT)                             \
+  X(TRACEPOINT, "tracepoint", events, "undef", NOCOUNT)                        \
+  X(CPU_NANOS, "cpu-time", nanoseconds, "undef", CPU_SAMPLE)                   \
+  X(CPU_SAMPLE, "cpu-samples", count, "undef", NOCOUNT)                        \
+  X(ALLOC_SAMPLE, "alloc-samples", count, "heap-live-samples", NOCOUNT)        \
+  X(ALLOC_SPACE, "alloc-space", bytes, "heap-live-size", ALLOC_SAMPLE)
 
 // defines enum of profile types
-#define X_ENUM(a, b, c, d) DDPROF_PWT_##a,
+#define X_ENUM(a, b, c, d, e) DDPROF_PWT_##a,
 typedef enum DDPROF_SAMPLE_TYPES {
   PROFILE_TYPE_TABLE(X_ENUM) DDPROF_PWT_LENGTH,
 } DDPROF_SAMPLE_TYPES;
@@ -157,7 +170,7 @@ int watcher_to_count_sample_type_id(const PerfWatcher *watcher);
 const char *event_type_name_from_idx(int idx);
 
 // Helper functions for sample types
-const char *sample_type_name_from_idx(int idx);
+const char *sample_type_name_from_idx(int idx, bool live);
 const char *sample_type_unit_from_idx(int idx);
 int sample_type_id_to_count_sample_type_id(int idx);
 

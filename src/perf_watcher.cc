@@ -17,10 +17,11 @@
 
 uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
 
-#define X_STR(a, b, c, d) {b,d},
+#define X_STR(a, b, c, d, e) std::pair{b, d},
 const char *sample_type_name_from_idx(int idx, bool live) {
-  static const std::array<std::pair<const char *,const char *>>sample_names
-      = {PROFILE_TYPE_TABLE(X_STR)};
+  static const std::array<std::pair<const char *, const char *>,
+                          DDPROF_PWT_LENGTH>
+      sample_names = {PROFILE_TYPE_TABLE(X_STR)};
   if (idx < 0 || idx >= DDPROF_PWT_LENGTH)
     return NULL;
   if (live) {
@@ -29,7 +30,7 @@ const char *sample_type_name_from_idx(int idx, bool live) {
   return sample_names[idx].first;
 }
 #undef X_STR
-#define X_STR(a, b, c, d) #c,
+#define X_STR(a, b, c, d, e) #c,
 const char *sample_type_unit_from_idx(int idx) {
   static const char *sample_units[] = {PROFILE_TYPE_TABLE(X_STR)};
   if (idx < 0 || idx >= DDPROF_PWT_LENGTH)
@@ -37,7 +38,7 @@ const char *sample_type_unit_from_idx(int idx) {
   return sample_units[idx];
 }
 #undef X_STR
-#define X_DEP(a, b, c, d) DDPROF_PWT_##d,
+#define X_DEP(a, b, c, d, e) DDPROF_PWT_##e,
 int sample_type_id_to_count_sample_type_id(int idx) {
   static const int count_ids[] = {PROFILE_TYPE_TABLE(X_DEP)};
   if (idx < 0 || idx >= DDPROF_PWT_LENGTH)
@@ -128,7 +129,9 @@ void log_watcher(const PerfWatcher *w, int idx) {
   }
 
   PRINT_NFO("    Category: %s, EventName: %s, GroupName: %s, Label: %s",
-            sample_type_name_from_idx(w->sample_type_id),
+            sample_type_name_from_idx(
+                w->sample_type_id,
+                Any(EventConfMode::kLiveCallgraph & w->output_mode)),
             w->tracepoint_event.c_str(), w->tracepoint_group.c_str(),
             w->tracepoint_label.c_str());
   PRINT_NFO("    Sample user Stack Size: %u", w->options.stack_sample_size);

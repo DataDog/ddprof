@@ -34,7 +34,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx);
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr &symbol_hdr, uint64_t value,
                       uint64_t count, const PerfWatcher *watcher,
-                      DDProfPProf *pprof);
+                      const PProfIndices &pprof_indices, DDProfPProf *pprof);
 
 DDRes pprof_reset(DDProfPProf *pprof);
 

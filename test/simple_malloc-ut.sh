@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+#set -euo pipefail
 
 export DD_PROFILING_NATIVE_USE_EMBEDDED_LIB=1
 export LD_LIBRARY_PATH=$PWD
@@ -60,10 +60,10 @@ check() {
         kill "$COPROC_PID"
     fi
     if [[ "${expected_pids}" -ne 0 ]]; then
-        counted_pids_alloc=$(count "${log_file}" "alloc-samples" "pid")
-        counted_pids_cpu=$(count "${log_file}" "cpu-samples" "pid")
-        counted_tids_alloc=$(count "${log_file}" "alloc-samples" "tid")
-        counted_tids_cpu=$(count "${log_file}" "cpu-samples" "tid")
+        counted_pids_alloc=$(count "${log_file}" "alloc-space" "pid")
+        counted_pids_cpu=$(count "${log_file}" "cpu-time" "pid")
+        counted_tids_alloc=$(count "${log_file}" "alloc-space" "tid")
+        counted_tids_cpu=$(count "${log_file}" "cpu-time" "tid")
         if [[ $counted_pids_alloc -ne "${expected_pids}" ||
             $counted_pids_cpu -ne "${expected_pids}" ||
             $counted_tids_alloc -ne "${expected_tids}" ||

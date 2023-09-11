@@ -75,6 +75,7 @@ static DDRes report_lost_events(DDProfContext &ctx) {
              value, watcher_idx);
       DDRES_CHECK_FWD(pprof_aggregate(
           &us->output, us->symbol_hdr, value, nb_lost, watcher,
+          watcher->pprof_indices[kCallgraph],
           ctx.worker_ctx.pprof[ctx.worker_ctx.i_current_pprof]));
       ctx.worker_ctx.lost_events_per_watcher[watcher_idx] = 0;
     }
@@ -315,11 +316,11 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
       // Depending on the type of watcher, compute a value for sample
       uint64_t sample_val = perf_value_from_sample(watcher, sample);
 
-      // in lib mode we don't aggregate (protect to avoid link failures)
       int i_export = ctx.worker_ctx.i_current_pprof;
       DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
-      DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbol_hdr, sample_val,
-                                      1, watcher, pprof));
+      DDRES_CHECK_FWD(
+          pprof_aggregate(&us->output, us->symbol_hdr, sample_val, 1, watcher,
+                          watcher->pprof_indices[kCallgraph], pprof));
       if (ctx.params.show_samples) {
         ddprof_print_sample(us->output, us->symbol_hdr, sample->period,
                             *watcher);
@@ -362,9 +363,9 @@ static DDRes aggregate_livealloc_stack(
     const LiveAllocation::PprofStacks::value_type &alloc_info,
     DDProfContext &ctx, const PerfWatcher *watcher, DDProfPProf *pprof,
     const SymbolHdr &symbol_hdr) {
-  DDRES_CHECK_FWD(pprof_aggregate(&alloc_info.first, symbol_hdr,
-                                  alloc_info.second._value,
-                                  alloc_info.second._count, watcher, pprof));
+  DDRES_CHECK_FWD(pprof_aggregate(
+      &alloc_info.first, symbol_hdr, alloc_info.second._value,
+      alloc_info.second._count, watcher, watcher->pprof_indices[kLive], pprof));
   if (ctx.params.show_samples) {
     ddprof_print_sample(alloc_info.first, symbol_hdr, alloc_info.second._value,
                         *watcher);

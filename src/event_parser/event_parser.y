@@ -42,14 +42,11 @@ EventConf g_template_event_conf = {};
 std::vector<EventConf>* g_event_configs;
 
 std::optional<EventConfMode> mode_from_str(const std::string &str) {
-  EventConfMode mode = EventConfMode::kDisabled;
-  if (str.empty())
-    return mode;
   const std::string a_str{"Aa*"};
   const std::string l_str{"Ll"};
   const std::string g_str{"Gg"};
   const std::string m_str{"Mm"};
-
+  EventConfMode mode = EventConfMode::kDisabled;
   for (const char &c : str) {
     if (m_str.find(c) != std::string::npos) {
       mode |= EventConfMode::kMetric;
@@ -60,7 +57,8 @@ std::optional<EventConfMode> mode_from_str(const std::string &str) {
     } else if (a_str.find(c) != std::string::npos) {
       mode |= EventConfMode::kAll;
     } else {
-      return {};
+      fprintf(stderr, "Warning, unexpected mode %c \n", c);
+      return {}; // unexpected mode
     }
   }
   return mode;
@@ -228,7 +226,8 @@ opt:
                delete $3;
                VAL_ERROR();
              }
-             g_accum_event_conf.mode |= *mode;
+             // override mode if present
+             g_accum_event_conf.mode = *mode;
              break;
            }
          default:

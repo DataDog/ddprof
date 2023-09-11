@@ -113,15 +113,7 @@ static bool watcher_from_config(EventConf *conf, PerfWatcher *watcher) {
 
   if (conf->value_scale != 0.0)
     watcher->value_scale = conf->value_scale;
-
-  // The output mode isn't set as part of the configuration templates; we
-  // always default to callgraph mode
-  if (conf->mode != EventConfMode::kDisabled) {
-    watcher->output_mode = conf->mode;
-  } else {
-    watcher->output_mode = EventConfMode::kCallgraph;
-  }
-
+  watcher->output_mode = conf->mode;
   watcher->tracepoint_event = conf->eventname;
   watcher->tracepoint_group = conf->groupname;
   watcher->tracepoint_label = conf->label;
@@ -139,7 +131,10 @@ static bool watcher_from_config(EventConf *conf, PerfWatcher *watcher) {
 bool watchers_from_str(const char *str, std::vector<PerfWatcher> &watchers,
                        uint32_t stack_sample_size) {
   std::vector<EventConf> configs;
-  EventConf template_conf{.stack_sample_size = stack_sample_size};
+  EventConf template_conf{
+      .mode = EventConfMode::kCallgraph,
+      .stack_sample_size = stack_sample_size,
+  };
   if (EventConf_parse(str, template_conf, configs) != 0) {
     return false;
   }

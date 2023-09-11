@@ -21,96 +21,165 @@
 
 #define PPROF_MAX_LABELS 6
 
-DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
-  size_t num_watchers = ctx.watchers.size();
-  ddog_prof_ValueType perf_value_type[DDPROF_PWT_LENGTH];
+struct ActiveIdsResult {
+  EventConfMode output_mode[DDPROF_PWT_LENGTH] = {};
+  PerfWatcher *default_watcher = nullptr;
+};
 
-  // Figure out which sample_type_ids are used by active watchers
-  // We also record the watcher with the lowest valid sample_type id, since that
-  // will serve as the default for the pprof
-  bool active_ids[DDPROF_PWT_LENGTH] = {};
-  PerfWatcher *default_watcher = &ctx.watchers[0];
-  for (unsigned i = 0; i < num_watchers; ++i) {
-    int this_id = ctx.watchers[i].sample_type_id;
-    int count_id = sample_type_id_to_count_sample_type_id(this_id);
-    if (this_id < 0 || this_id == DDPROF_PWT_NOCOUNT ||
-        this_id >= DDPROF_PWT_LENGTH) {
-      if (this_id != DDPROF_PWT_NOCOUNT) {
-        DDRES_RETURN_ERROR_LOG(
-            DD_WHAT_PPROF, "Watcher \"%s\" (%d) has invalid sample_type_id %d",
-            ctx.watchers[i].desc.c_str(), i, this_id);
+// Figure out which sample_type_ids are used by active watchers
+// We also record the watcher with the lowest valid sample_type id, since that
+// will serve as the default for the pprof
+DDRes get_active_ids(std::span<PerfWatcher> watchers, ActiveIdsResult &result) {
+  result.default_watcher = &watchers[0];
+
+  for (unsigned i = 0; i < watchers.size(); ++i) {
+    int sample_type_id = watchers[i].sample_type_id;
+    int count_id = sample_type_id_to_count_sample_type_id(sample_type_id);
+    if (sample_type_id < 0 || sample_type_id == DDPROF_PWT_NOCOUNT ||
+        sample_type_id >= DDPROF_PWT_LENGTH) {
+      if (sample_type_id != DDPROF_PWT_NOCOUNT) {
+        DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF,
+                               "Watcher %s (%d) has invalid sample_type_id %d",
+                               watchers[i].desc.c_str(), i, sample_type_id);
       }
       continue;
     }
+    if (sample_type_id <=
+        result.default_watcher->sample_type_id) // update default
+      result.default_watcher = &watchers[i];
 
-    if (this_id <= default_watcher->sample_type_id) // update default
-      default_watcher = &ctx.watchers[i];
-    active_ids[this_id] = true; // update mask
+    result.output_mode[sample_type_id] |=
+        watchers[i].output_mode; // update mask
     if (count_id != DDPROF_PWT_NOCOUNT)
-      active_ids[count_id] = true; // if the count is valid, update mask for it
+      // if the count is valid, update mask for it
+      result.output_mode[count_id] = watchers[i].output_mode;
   }
+  return ddres_init();
+}
 
-  // Convert the mask into a lookup.  While we're at it, populate the metadata
-  // for the pprof
-  int pv[DDPROF_PWT_LENGTH] = {};
-  int num_sample_type_ids = 0;
+struct PProfValues {
+  PProfIndices pv[DDPROF_PWT_LENGTH][kNbPprofPos];
+  ddog_prof_ValueType perf_value_type[DDPROF_PWT_LENGTH * kNbPprofPos];
+  int num_sample_type_ids;
+};
+
+PProfValues compute_pprof_values(const ActiveIdsResult &active_ids) {
+  PProfValues result = {};
   for (int i = 0; i < DDPROF_PWT_LENGTH; ++i) {
-    if (!active_ids[i])
+    if (active_ids.output_mode[i] == EventConfMode::kDisabled)
       continue;
     assert(i != DDPROF_PWT_NOCOUNT);
 
-    const char *value_name = sample_type_name_from_idx(i);
-    const char *value_unit = sample_type_unit_from_idx(i);
-    if (!value_name || !value_unit) {
-      LG_WRN("Malformed sample type (%d), ignoring", i);
-      continue;
+    if (Any(active_ids.output_mode[i] & EventConfMode::kCallgraph)) {
+      const char *value_name = sample_type_name_from_idx(i, false);
+      const char *value_unit = sample_type_unit_from_idx(i);
+      if (!value_name || !value_unit) {
+        LG_WRN("Malformed sample type (%d), ignoring", i);
+        continue;
+      }
+      result.perf_value_type[result.num_sample_type_ids].type_ =
+          to_CharSlice(value_name);
+      result.perf_value_type[result.num_sample_type_ids].unit =
+          to_CharSlice(value_unit);
+
+      // Update the pv
+      result.pv[i][kCallgraph].pprof_index = result.num_sample_type_ids;
+      ++result.num_sample_type_ids;
     }
-    perf_value_type[num_sample_type_ids].type_ = to_CharSlice(value_name);
-    perf_value_type[num_sample_type_ids].unit = to_CharSlice(value_unit);
 
-    // Update the pv
-    pv[i] = num_sample_type_ids;
-    ++num_sample_type_ids;
+    if (Any(active_ids.output_mode[i] & EventConfMode::kLiveCallgraph)) {
+      const char *value_name = sample_type_name_from_idx(i, true);
+      const char *value_unit = sample_type_unit_from_idx(i);
+      if (!value_name || !value_unit) {
+        LG_WRN("Malformed sample type (%d), ignoring", i);
+        continue;
+      }
+      result.perf_value_type[result.num_sample_type_ids].type_ =
+          to_CharSlice(value_name);
+      result.perf_value_type[result.num_sample_type_ids].unit =
+          to_CharSlice(value_unit);
+
+      // Update the pv
+      result.pv[i][kLive].pprof_index = result.num_sample_type_ids;
+      ++result.num_sample_type_ids;
+    }
   }
+  return result;
+}
 
-  // Update each watcher
+DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
+  size_t num_watchers = ctx.watchers.size();
+
+  ActiveIdsResult active_ids = {};
+  DDRES_CHECK_FWD(get_active_ids(std::span(ctx.watchers), active_ids));
+#define DEBUG
+#ifdef DEBUG
+  LG_DBG("Active IDs :");
+  for (int i = 0; i < DDPROF_PWT_LENGTH; ++i) {
+    LG_DBG("%s --> %d ", sample_type_name_from_idx(i, false),
+           static_cast<int>(active_ids.output_mode[i]));
+  }
+#endif
+
+  // Based on active IDs, prepare the list pf pprof values
+  PProfValues pprof_values = compute_pprof_values(active_ids);
+
+  // Update each watcher with matching types
   for (unsigned i = 0; i < num_watchers; ++i) {
     int this_id = ctx.watchers[i].sample_type_id;
     if (this_id < 0 || this_id == DDPROF_PWT_NOCOUNT ||
         this_id >= DDPROF_PWT_LENGTH) {
       continue;
     }
-    int permuted_id = pv[ctx.watchers[i].sample_type_id];
-    int permuted_count_id =
-        pv[watcher_to_count_sample_type_id(&ctx.watchers[i])];
-
-    ctx.watchers[i].pprof_sample_idx = permuted_id;
-    if (watcher_has_countable_sample_type(&ctx.watchers[i])) {
-      ctx.watchers[i].pprof_count_sample_idx = permuted_count_id;
+    ctx.watchers[i].pprof_indices[kCallgraph] =
+        pprof_values.pv[ctx.watchers[i].sample_type_id][kCallgraph];
+    int count_id =
+        sample_type_id_to_count_sample_type_id(ctx.watchers[i].sample_type_id);
+    if (count_id != DDPROF_PWT_NOCOUNT) {
+      ctx.watchers[i].pprof_indices[kCallgraph].pprof_count_index =
+          pprof_values.pv[count_id][kCallgraph].pprof_index;
+    }
+    ctx.watchers[i].pprof_indices[kLive] =
+        pprof_values.pv[ctx.watchers[i].sample_type_id][kLive];
+    if (count_id != DDPROF_PWT_NOCOUNT) {
+      ctx.watchers[i].pprof_indices[kLive].pprof_count_index =
+          pprof_values.pv[count_id][kLive].pprof_index;
     }
   }
 
-  pprof->_nb_values = num_sample_type_ids;
-  ddog_prof_Slice_ValueType sample_types = {.ptr = perf_value_type,
+  pprof->_nb_values = pprof_values.num_sample_type_ids;
+  ddog_prof_Slice_ValueType sample_types = {.ptr = pprof_values.perf_value_type,
                                             .len = pprof->_nb_values};
 
   ddog_prof_Period period;
-  if (num_sample_type_ids > 0) {
+  if (pprof->_nb_values > 0) {
     // Populate the default.  If we have a frequency, assume it is given in
     // hertz and convert to a period in nanoseconds.  This is broken for many
     // event- based types (but providing frequency would also be broken in those
     // cases)
-    int64_t default_period = default_watcher->sample_period;
-    if (default_watcher->options.is_freq)
+    int64_t default_period = active_ids.default_watcher->sample_period;
+    if (active_ids.default_watcher->options.is_freq) {
+      // convert to period (nano seconds)
       default_period = 1e9 / default_period;
+    }
 
+#warning does this work with only memory only? do we have a period ?
+    int default_index =
+        active_ids.default_watcher->pprof_indices[kCallgraph].pprof_index;
+    if (default_index == -1) {
+      default_index =
+          active_ids.default_watcher->pprof_indices[kLive].pprof_index;
+    }
+    assert(default_index != -1);
+    // period is the default watcher's type.
     period = {
-        .type_ = perf_value_type[pv[default_watcher->pprof_sample_idx]],
+        .type_ = pprof_values.perf_value_type[default_index],
         .value = default_period,
     };
   }
   pprof->_profile = ddog_prof_Profile_new(
-      sample_types, num_sample_type_ids > 0 ? &period : nullptr, nullptr);
+      sample_types, pprof_values.num_sample_type_ids > 0 ? &period : nullptr,
+      nullptr);
 
   // Add relevant tags
   {
@@ -168,16 +237,18 @@ static void write_location(const FunLoc *loc, const ddprof::MapInfo &mapinfo,
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr &symbol_hdr, uint64_t value,
                       uint64_t count, const PerfWatcher *watcher,
-                      DDProfPProf *pprof) {
+                      const PProfIndices &pprof_indices, DDProfPProf *pprof) {
 
   const ddprof::SymbolTable &symbol_table = symbol_hdr._symbol_table;
   const ddprof::MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
   ddog_prof_Profile *profile = &pprof->_profile;
 
   int64_t values[DDPROF_PWT_LENGTH] = {};
-  values[watcher->pprof_sample_idx] = value;
+  assert(pprof_indices.pprof_index != -1);
+  values[pprof_indices.pprof_index] = value;
   if (watcher_has_countable_sample_type(watcher)) {
-    values[watcher->pprof_count_sample_idx] = count;
+    assert(pprof_indices.pprof_count_index != -1);
+    values[pprof_indices.pprof_count_index] = count;
   }
 
   ddog_prof_Location locations_buff[DD_MAX_STACK_DEPTH];
@@ -279,8 +350,8 @@ void ddprof_print_sample(const UnwindOutput &uw_output,
   std::span locs{uw_output.locs};
 
   const char *sample_name = sample_type_name_from_idx(
-      sample_type_id_to_count_sample_type_id(watcher.sample_type_id));
-
+      watcher.sample_type_id,
+      Any(EventConfMode::kLiveCallgraph & watcher.output_mode));
   std::string buf =
       ddprof::string_format("sample[type=%s;pid=%ld;tid=%ld] ", sample_name,
                             uw_output.pid, uw_output.tid);
