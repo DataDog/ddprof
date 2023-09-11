@@ -28,12 +28,6 @@ struct PerfWatcherOptions {
       k_default_perf_stack_sample_size}; // size of the user stack to capture
 };
 
-// enum PprofPos_t {
-//   kCallgraph = 0,
-//   kLive,
-//   kNbPprofPos,
-// };
-
 struct PProfIndices {
   int pprof_index = -1;
   int pprof_count_index = -1;

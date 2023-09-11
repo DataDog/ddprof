@@ -44,10 +44,10 @@ std::vector<EventConf>* g_event_configs;
 std::optional<EventValueMode> mode_from_str(const std::string &str) {
   const std::string a_str{"Aa*"};
   const std::string l_str{"Ll"};
-  const std::string g_str{"Gg"};
+  const std::string o_str{"Oo"};
   EventValueMode mode = EventValueMode::kDisabled;
   for (const char &c : str) {
-    if (g_str.find(c) != std::string::npos) {
+    if (o_str.find(c) != std::string::npos) {
       mode |= EventValueMode::kOccurence;
     } else if (l_str.find(c) != std::string::npos) {
         mode |= EventValueMode::kLiveUsage;
