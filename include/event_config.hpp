@@ -12,7 +12,6 @@
 #include <string>
 #include <vector>
 
-constexpr int k_nb_conf_modes = 2;
 enum EventValueModePos {
   kOccurencePos = 0,
   kLiveUsagePos = 1,

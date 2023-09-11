@@ -306,14 +306,11 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
   if (!IsDDResFatal(res)) {
     struct UnwindState *us = ctx.worker_ctx.us;
     if (Any(EventValueMode::kLiveUsage & watcher->output_mode)) {
-      // Live callgraph mode
-      // for now we hard code the live aggregation mode
       ctx.worker_ctx.live_allocation.register_allocation(
           us->output, sample->addr, sample->period, watcher_pos, sample->pid);
     } else if (Any(EventValueMode::kOccurence & watcher->output_mode)) {
       // Depending on the type of watcher, compute a value for sample
       uint64_t sample_val = perf_value_from_sample(watcher, sample);
-
       int i_export = ctx.worker_ctx.i_current_pprof;
       DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
       DDRES_CHECK_FWD(

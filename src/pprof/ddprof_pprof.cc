@@ -21,6 +21,8 @@
 
 #define PPROF_MAX_LABELS 6
 
+constexpr int k_max_value_types = DDPROF_PWT_LENGTH * static_cast<int>(kNbEventValueModes);
+
 struct ActiveIdsResult {
   EventValueMode output_mode[DDPROF_PWT_LENGTH] = {};
   PerfWatcher *default_watcher = nullptr;
@@ -59,7 +61,8 @@ DDRes get_active_ids(std::span<PerfWatcher> watchers, ActiveIdsResult &result) {
 struct PProfValues {
   // for every watcher type / value mdoe, index of matching pprof
   int pprof_value_indices[DDPROF_PWT_LENGTH][kNbEventValueModes];
-  ddog_prof_ValueType perf_value_type[DDPROF_PWT_LENGTH * kNbEventValueModes];
+  // Maximum is watcher types x different ways of reporting for this watcher
+  ddog_prof_ValueType perf_value_type[k_max_value_types];
   int num_sample_type_ids;
 };
 
@@ -112,7 +115,6 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
 
   ActiveIdsResult active_ids = {};
   DDRES_CHECK_FWD(get_active_ids(std::span(ctx.watchers), active_ids));
-#define DEBUG
 #ifdef DEBUG
   LG_DBG("Active IDs :");
   for (int i = 0; i < DDPROF_PWT_LENGTH; ++i) {
@@ -245,7 +247,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   const ddprof::MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
   ddog_prof_Profile *profile = &pprof->_profile;
 
-  int64_t values[DDPROF_PWT_LENGTH] = {};
+  int64_t values[k_max_value_types] = {};
   assert(pprof_indices.pprof_index != -1);
   values[pprof_indices.pprof_index] = value;
   if (watcher_has_countable_sample_type(watcher)) {
