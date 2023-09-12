@@ -74,8 +74,7 @@ static DDRes report_lost_events(DDProfContext &ctx) {
       LG_WRN("Reporting #%lu -> [%lu] lost samples for watcher #%d", nb_lost,
              value, watcher_idx);
       DDRES_CHECK_FWD(pprof_aggregate(
-          &us->output, us->symbol_hdr, value, nb_lost, watcher,
-          watcher->pprof_indices[kOccurencePos],
+          &us->output, us->symbol_hdr, value, nb_lost, watcher, kOccurencePos,
           ctx.worker_ctx.pprof[ctx.worker_ctx.i_current_pprof]));
       ctx.worker_ctx.lost_events_per_watcher[watcher_idx] = 0;
     }
@@ -313,9 +312,8 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
       uint64_t sample_val = perf_value_from_sample(watcher, sample);
       int i_export = ctx.worker_ctx.i_current_pprof;
       DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
-      DDRES_CHECK_FWD(
-          pprof_aggregate(&us->output, us->symbol_hdr, sample_val, 1, watcher,
-                          watcher->pprof_indices[kOccurencePos], pprof));
+      DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbol_hdr, sample_val,
+                                      1, watcher, kOccurencePos, pprof));
       if (ctx.params.show_samples) {
         ddprof_print_sample(us->output, us->symbol_hdr, sample->period,
                             kOccurencePos, *watcher);
@@ -360,8 +358,7 @@ static DDRes aggregate_livealloc_stack(
     const SymbolHdr &symbol_hdr) {
   DDRES_CHECK_FWD(
       pprof_aggregate(&alloc_info.first, symbol_hdr, alloc_info.second._value,
-                      alloc_info.second._count, watcher,
-                      watcher->pprof_indices[kLiveUsagePos], pprof));
+                      alloc_info.second._count, watcher, kLiveUsagePos, pprof));
   if (ctx.params.show_samples) {
     ddprof_print_sample(alloc_info.first, symbol_hdr, alloc_info.second._value,
                         kLiveUsagePos, *watcher);

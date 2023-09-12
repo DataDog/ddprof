@@ -76,7 +76,7 @@ TEST(DDProfPProf, aggregate) {
   EXPECT_TRUE(ctx.watchers[0].pprof_indices[kOccurencePos].pprof_count_index !=
               -1);
   res = pprof_aggregate(&mock_output, symbol_hdr, 1000, 1, &ctx.watchers[0],
-                        ctx.watchers[0].pprof_indices[kOccurencePos], &pprof);
+                        kOccurencePos, &pprof);
 
   EXPECT_TRUE(IsDDResOK(res));
 
@@ -116,7 +116,7 @@ TEST(DDProfPProf, just_live) {
   EXPECT_TRUE(ctx.watchers[1].pprof_indices[kLiveUsagePos].pprof_count_index !=
               -1);
   res = pprof_aggregate(&mock_output, symbol_hdr, 1000, 1, &ctx.watchers[0],
-                        ctx.watchers[1].pprof_indices[kLiveUsagePos], &pprof);
+                        kLiveUsagePos, &pprof);
   EXPECT_TRUE(IsDDResOK(res));
   test_pprof(&pprof);
   res = pprof_free_profile(&pprof);

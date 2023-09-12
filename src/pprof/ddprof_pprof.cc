@@ -236,12 +236,13 @@ static void write_location(const FunLoc *loc, const ddprof::MapInfo &mapinfo,
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr &symbol_hdr, uint64_t value,
                       uint64_t count, const PerfWatcher *watcher,
-                      const PProfIndices &pprof_indices, DDProfPProf *pprof) {
+                      EventValueModePos value_pos, DDProfPProf *pprof) {
 
   const ddprof::SymbolTable &symbol_table = symbol_hdr._symbol_table;
   const ddprof::MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
-  ddog_prof_Profile *profile = &pprof->_profile;
 
+  ddog_prof_Profile *profile = &pprof->_profile;
+  const PProfIndices &pprof_indices = watcher->pprof_indices[value_pos];
   int64_t values[k_max_value_types] = {};
   assert(pprof_indices.pprof_index != -1);
   values[pprof_indices.pprof_index] = value;
