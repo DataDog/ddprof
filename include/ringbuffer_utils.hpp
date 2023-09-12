@@ -296,6 +296,7 @@ public:
     return {reinterpret_cast<std::byte *>(hdr + 1), sz};
   }
 
+  // Update ring buffer reader pos (usually done by destructor)
   void advance() {
     _initial_tail = _tail;
     __atomic_store_n(_rb.reader_pos, _initial_tail, __ATOMIC_RELEASE);

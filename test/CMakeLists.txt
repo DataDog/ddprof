@@ -251,52 +251,63 @@ add_unit_test(
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
   DEFINITIONS MYNAME="savecontext-ut")
 
+set(ALLOCATION_TRACKER_UT_SRCS
+    allocation_tracker-ut.cc
+    ../src/lib/allocation_tracker.cc
+    ../src/lib/elfutils.cc
+    ../src/lib/symbol_overrides.cc
+    ../src/base_frame_symbol_lookup.cc
+    ../src/build_id.cc
+    ../src/container_id.cc
+    ../src/common_mapinfo_lookup.cc
+    ../src/common_symbol_lookup.cc
+    ../src/ddprof_cmdline.cc
+    ../src/ddprof_process.cc
+    ../src/ddprof_stats.cc
+    ../src/dso.cc
+    ../src/dso_hdr.cc
+    ../src/dso_symbol_lookup.cc
+    ../src/dwfl_hdr.cc
+    ../src/ddprof_module_lib.cc
+    ../src/dwfl_symbol.cc
+    ../src/dwfl_symbol_lookup.cc
+    ../src/dwfl_thread_callbacks.cc
+    ../src/demangler/demangler.cc
+    ../src/jit/jitdump.cc
+    ../src/failed_assumption.cc
+    ../src/pevent_lib.cc
+    ../src/perf.cc
+    ../src/perf_ringbuffer.cc
+    ../src/perf_watcher.cc
+    ../src/ringbuffer_utils.cc
+    ../src/lib/pthread_fixes.cc
+    ../src/lib/savecontext.cc
+    ../src/lib/saveregisters.cc
+    ../src/mapinfo_lookup.cc
+    ../src/procutils.cc
+    ../src/runtime_symbol_lookup.cc
+    ../src/symbol_map.cc
+    ../src/signal_helper.cc
+    ../src/statsd.cc
+    ../src/sys_utils.cc
+    ../src/tracepoint_config.cc
+    ../src/user_override.cc
+    ../src/unwind.cc
+    ../src/unwind_dwfl.cc
+    ../src/unwind_helpers.cc
+    ../src/unwind_metrics.cc)
+
 add_unit_test(
-  allocation_tracker-ut
-  allocation_tracker-ut.cc
-  ../src/lib/allocation_tracker.cc
-  ../src/base_frame_symbol_lookup.cc
-  ../src/build_id.cc
-  ../src/container_id.cc
-  ../src/common_mapinfo_lookup.cc
-  ../src/common_symbol_lookup.cc
-  ../src/ddprof_cmdline.cc
-  ../src/ddprof_process.cc
-  ../src/ddprof_stats.cc
-  ../src/dso.cc
-  ../src/dso_hdr.cc
-  ../src/dso_symbol_lookup.cc
-  ../src/dwfl_hdr.cc
-  ../src/ddprof_module_lib.cc
-  ../src/dwfl_symbol.cc
-  ../src/dwfl_symbol_lookup.cc
-  ../src/dwfl_thread_callbacks.cc
-  ../src/demangler/demangler.cc
-  ../src/jit/jitdump.cc
-  ../src/failed_assumption.cc
-  ../src/pevent_lib.cc
-  ../src/perf.cc
-  ../src/perf_ringbuffer.cc
-  ../src/perf_watcher.cc
-  ../src/ringbuffer_utils.cc
-  ../src/lib/pthread_fixes.cc
-  ../src/lib/savecontext.cc
-  ../src/lib/saveregisters.cc
-  ../src/mapinfo_lookup.cc
-  ../src/procutils.cc
-  ../src/runtime_symbol_lookup.cc
-  ../src/symbol_map.cc
-  ../src/signal_helper.cc
-  ../src/statsd.cc
-  ../src/sys_utils.cc
-  ../src/tracepoint_config.cc
-  ../src/user_override.cc
-  ../src/unwind.cc
-  ../src/unwind_dwfl.cc
-  ../src/unwind_helpers.cc
-  ../src/unwind_metrics.cc
-  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle DDProf::Parser
+  allocation_tracker-ut ${ALLOCATION_TRACKER_UT_SRCS}
+  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle DDProf::Parser dl rt
   DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=100)
+
+if(TARGET JeMalloc::JeMalloc)
+  add_unit_test(
+    allocation_tracker_jemalloc-ut ${ALLOCATION_TRACKER_UT_SRCS}
+    LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle DDProf::Parser dl rt JeMalloc::JeMallocShared
+    DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=100 USE_JEMALLOC=1)
+endif()
 
 add_unit_test(sys_utils-ut sys_utils-ut.cc ../src/sys_utils.cc)
 

@@ -190,14 +190,8 @@ void AllocationTracker::free_on_consecutive_failures(bool success) {
 
 void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
                                          TrackerThreadLocalState &tl_state) {
-  // Prevent reentrancy to avoid dead lock on mutex
-  ReentryGuard guard(&tl_state.reentry_guard);
-
-  if (!guard) {
-    // Don't count internal allocations
-    tl_state.remaining_bytes -= size;
-    return;
-  }
+  // Reentrancy should be prevented by caller (by using ReentryGuard on
+  // TrackerThreadLocalState::reentry_guard).
 
   // recheck if profiling is enabled
   if (!_state.track_allocations) {
@@ -254,13 +248,8 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
 
 void AllocationTracker::track_deallocation(uintptr_t addr,
                                            TrackerThreadLocalState &tl_state) {
-  // Prevent reentrancy to avoid dead lock on mutex
-  ReentryGuard guard(&tl_state.reentry_guard);
-
-  if (!guard) {
-    // This is an internal dealloc, so we don't need to keep track of this
-    return;
-  }
+  // Reentrancy should be prevented by caller (by using ReentryGuard on
+  // TrackerThreadLocalState::reentry_guard).
 
   { // Grab the lock to check if this allocation was stored in the set
     std::lock_guard lock{_state.mutex};

@@ -29,6 +29,11 @@ find_library(JEMALLOC_LIBRARIES
     HINTS ${JEMALLOC_ROOT_DIR}/lib
 )
 
+find_library(JEMALLOC_SHARED_LIBRARIES
+    NAMES libjemalloc.so
+    HINTS ${JEMALLOC_ROOT_DIR}/lib
+)
+
 find_path(JEMALLOC_INCLUDE_DIR
     NAMES jemalloc/jemalloc.h
     HINTS ${JEMALLOC_ROOT_DIR}/include
@@ -37,6 +42,7 @@ find_path(JEMALLOC_INCLUDE_DIR
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(JeMalloc DEFAULT_MSG
     JEMALLOC_LIBRARIES
+    JEMALLOC_SHARED_LIBRARIES
     JEMALLOC_INCLUDE_DIR
 )
 
@@ -45,4 +51,17 @@ mark_as_advanced(
     JEMALLOC_LIBRARIES
     JEMALLOC_INCLUDE_DIR
 )
+if(JeMalloc_FOUND AND NOT (TARGET JeMalloc::JeMalloc))
+   add_library(JeMalloc::JeMalloc STATIC IMPORTED)
+   set_target_properties(JeMalloc::JeMalloc PROPERTIES
+   INTERFACE_INCLUDE_DIRECTORIES "${JEMALLOC_INCLUDE_DIR}"
+   IMPORTED_LINK_INTERFACE_LANGUAGES "C"
+   IMPORTED_LOCATION "${JEMALLOC_LIBRARIES}")
+
+   add_library(JeMalloc::JeMallocShared SHARED IMPORTED)
+   set_target_properties(JeMalloc::JeMallocShared PROPERTIES
+   INTERFACE_INCLUDE_DIRECTORIES "${JEMALLOC_INCLUDE_DIR}"
+   IMPORTED_LINK_INTERFACE_LANGUAGES "C"
+   IMPORTED_LOCATION "${JEMALLOC_SHARED_LIBRARIES}")
+endif()
 # cmake-format: on

@@ -51,9 +51,12 @@ public:
   track_allocation_s(uintptr_t addr, size_t size,
                      TrackerThreadLocalState &tl_state);
 
-  static inline void track_deallocation_s(uintptr_t addr);
+  static inline void track_deallocation_s(uintptr_t addr,
+                                          TrackerThreadLocalState &tl_state);
 
   static inline bool is_active();
+
+  static inline bool is_deallocation_tracking_active();
 
   static TrackerThreadLocalState *init_tl_state();
   // can return null (does not init)
@@ -153,24 +156,26 @@ void AllocationTracker::track_allocation_s(uintptr_t addr, size_t size,
   }
 }
 
-void AllocationTracker::track_deallocation_s(uintptr_t addr) {
+void AllocationTracker::track_deallocation_s(
+    uintptr_t addr, TrackerThreadLocalState &tl_state) {
   // same pattern as track_allocation
   AllocationTracker *instance = _instance;
   if (!instance) {
     return;
   }
   if (instance->_state.track_deallocations.load(std::memory_order_relaxed)) {
-    TrackerThreadLocalState *tl_state = get_tl_state();
-    if (unlikely(!tl_state)) {
-      return;
-    }
-    instance->track_deallocation(addr, *tl_state);
+    instance->track_deallocation(addr, tl_state);
   }
 }
 
 bool AllocationTracker::is_active() {
   auto instance = _instance;
   return instance && instance->_state.track_allocations;
+}
+
+bool AllocationTracker::is_deallocation_tracking_active() {
+  auto instance = _instance;
+  return instance && instance->_state.track_deallocations;
 }
 
 } // namespace ddprof
