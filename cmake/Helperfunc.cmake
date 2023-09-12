@@ -55,6 +55,17 @@ function(target_static_libc target)
   target_link_options(${target} PRIVATE "-static")
 endfunction()
 
+function(target_static_sanitizer target)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    target_link_options(${target} PRIVATE $<$<CONFIG:SanitizedDebug>:-static-libsan>)
+  else()
+    target_link_options(${target} PRIVATE $<$<CONFIG:SanitizedDebug>:-static-libasan
+                        -static-libubsan>)
+    target_link_options(${target} PRIVATE $<$<CONFIG:ThreadSanitizedDebug>:-static-libtsan
+                        -static-libubsan>)
+  endif()
+endfunction()
+
 function(detect_libc output_variable)
   file(WRITE "${CMAKE_BINARY_DIR}/temp.c" "int main() {}")
   try_compile(

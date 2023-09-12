@@ -31,6 +31,14 @@ __attribute__((weak)) void *reallocarray(void *ptr, size_t nmemb,
 __attribute__((weak)) void *pvalloc(size_t size) NOEXCEPT;
 // NOLINTNEXTLINE cert-dcl51-cpp
 __attribute__((weak)) int __libc_allocate_rtsig(int high) NOEXCEPT;
+
+// jemalloc Non-standard API
+__attribute__((weak)) void *mallocx(size_t size, int flags);
+__attribute__((weak)) void *rallocx(void *ptr, size_t size, int flags);
+__attribute__((weak)) size_t xallocx(void *ptr, size_t size, size_t extra,
+                                     int flags);
+__attribute__((weak)) void dallocx(void *ptr, int flags);
+__attribute__((weak)) void sdallocx(void *ptr, size_t size, int flags);
 }
 
 namespace {
@@ -67,22 +75,168 @@ void check_libraries() {
   }
 }
 
+struct AllocTrackerHelper {
+  AllocTrackerHelper()
+      : tl_state{ddprof::AllocationTracker::get_tl_state()},
+        guard{tl_state ? &(tl_state->reentry_guard) : nullptr} {
+    check_libraries();
+  }
+
+  void track(void *ptr, size_t size) {
+    if (guard) {
+      ddprof::AllocationTracker::track_allocation_s(
+          reinterpret_cast<uintptr_t>(ptr), size, *tl_state);
+    }
+  }
+
+  ddprof::TrackerThreadLocalState *tl_state;
+  ddprof::ReentryGuard guard;
+};
+
+struct DeallocTrackerHelper {
+  DeallocTrackerHelper()
+      : tl_state{ddprof::AllocationTracker::is_deallocation_tracking_active()
+                     ? ddprof::AllocationTracker::get_tl_state()
+                     : nullptr},
+        guard{tl_state ? &(tl_state->reentry_guard) : nullptr} {}
+
+  void track(void *ptr) {
+    if (guard) {
+      ddprof::AllocationTracker::track_deallocation_s(
+          reinterpret_cast<uintptr_t>(ptr), *tl_state);
+    }
+  }
+
+  ddprof::TrackerThreadLocalState *tl_state;
+  ddprof::ReentryGuard guard;
+};
+
 struct malloc {
   static constexpr auto name = "malloc";
   static inline auto ref = &::malloc;
   static inline bool ref_checked = false;
 
   static void *hook(size_t size) noexcept {
-    check_libraries();
-    ddprof::TrackerThreadLocalState *tl_state =
-        ddprof::AllocationTracker::get_tl_state();
-    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
-                                        : nullptr);
+    AllocTrackerHelper helper;
     auto ptr = ref(size);
-    if (guard) {
-      ddprof::AllocationTracker::track_allocation_s(
-          reinterpret_cast<uintptr_t>(ptr), size, *tl_state);
-    }
+    helper.track(ptr, size);
+    return ptr;
+  }
+};
+
+struct new_ {
+  static constexpr auto name = "_Znwm";
+  static inline auto ref = static_cast<void *(*)(size_t)>(&::operator new);
+  static inline bool ref_checked = false;
+
+  static void *hook(size_t size) {
+    AllocTrackerHelper helper;
+    auto ptr = ref(size);
+    helper.track(ptr, size);
+    return ptr;
+  }
+};
+
+struct new_nothrow {
+  static constexpr auto name = "_ZnwmRKSt9nothrow_t";
+  static inline auto ref =
+      static_cast<void *(*)(size_t, const std::nothrow_t &) noexcept>(
+          &::operator new);
+  static inline bool ref_checked = false;
+
+  static void *hook(size_t size, const std::nothrow_t &tag) noexcept {
+    AllocTrackerHelper helper;
+    auto ptr = ref(size, tag);
+    helper.track(ptr, size);
+    return ptr;
+  }
+};
+
+struct new_align {
+  static constexpr auto name = "_ZnwmSt11align_val_t";
+  static inline auto ref =
+      static_cast<void *(*)(size_t, std::align_val_t)>(&::operator new);
+  static inline bool ref_checked = false;
+
+  static void *hook(std::size_t size, std::align_val_t al) {
+    AllocTrackerHelper helper;
+    auto ptr = ref(size, al);
+    helper.track(ptr, size);
+    return ptr;
+  }
+};
+
+struct new_align_nothrow {
+  static constexpr auto name = "_ZnwmSt11align_val_tRKSt9nothrow_t";
+  static inline auto ref =
+      static_cast<void *(*)(size_t, std::align_val_t,
+                            const std::nothrow_t &) noexcept>(&::operator new);
+  static inline bool ref_checked = false;
+
+  static void *hook(std::size_t size, std::align_val_t al,
+                    const std::nothrow_t &tag) noexcept {
+    AllocTrackerHelper helper;
+    auto ptr = ref(size, al, tag);
+    helper.track(ptr, size);
+    return ptr;
+  }
+};
+
+struct new_array {
+  static constexpr auto name = "_Znam";
+  static inline auto ref = static_cast<void *(*)(size_t)>(&::operator new[]);
+  static inline bool ref_checked = false;
+
+  static void *hook(size_t size) {
+    AllocTrackerHelper helper;
+    auto ptr = ref(size);
+    helper.track(ptr, size);
+    return ptr;
+  }
+};
+
+struct new_array_nothrow {
+  static constexpr auto name = "_ZnamRKSt9nothrow_t";
+  static inline auto ref =
+      static_cast<void *(*)(size_t, const std::nothrow_t &) noexcept>(
+          &::operator new[]);
+  static inline bool ref_checked = false;
+
+  static void *hook(size_t size, const std::nothrow_t &tag) noexcept {
+    AllocTrackerHelper helper;
+    auto ptr = ref(size, tag);
+    helper.track(ptr, size);
+    return ptr;
+  }
+};
+
+struct new_array_align {
+  static constexpr auto name = "_ZnamSt11align_val_t";
+  static inline auto ref =
+      static_cast<void *(*)(size_t, std::align_val_t)>(&::operator new[]);
+  static inline bool ref_checked = false;
+
+  static void *hook(std::size_t size, std::align_val_t al) {
+    AllocTrackerHelper helper;
+    auto ptr = ref(size, al);
+    helper.track(ptr, size);
+    return ptr;
+  }
+};
+
+struct new_array_align_nothrow {
+  static constexpr auto name = "_ZnamSt11align_val_tRKSt9nothrow_t";
+  static inline auto ref =
+      static_cast<void *(*)(size_t, std::align_val_t,
+                            const std::nothrow_t &) noexcept>(
+          &::operator new[]);
+  static inline bool ref_checked = false;
+
+  static void *hook(std::size_t size, std::align_val_t al,
+                    const std::nothrow_t &tag) noexcept {
+    AllocTrackerHelper helper;
+    auto ptr = ref(size, al, tag);
+    helper.track(ptr, size);
     return ptr;
   }
 };
@@ -93,14 +247,215 @@ struct free {
   static inline bool ref_checked = false;
 
   static void hook(void *ptr) noexcept {
-    check_libraries();
+    DeallocTrackerHelper helper;
     if (ptr == nullptr) {
       return;
     }
 
-    ddprof::AllocationTracker::track_deallocation_s(
-        reinterpret_cast<uintptr_t>(ptr));
+    helper.track(ptr);
     ref(ptr);
+  }
+};
+
+struct delete_ {
+  static constexpr auto name = "_ZdlPv";
+  static inline auto ref =
+      static_cast<void (*)(void *) noexcept>(&::operator delete);
+  static inline bool ref_checked = false;
+
+  static void hook(void *ptr) noexcept {
+    DeallocTrackerHelper helper;
+    if (ptr == nullptr) {
+      return;
+    }
+    helper.track(ptr);
+    ref(ptr);
+  }
+};
+
+struct delete_array {
+  static constexpr auto name = "_ZdaPv";
+  static inline auto ref =
+      static_cast<void (*)(void *) noexcept>(&::operator delete[]);
+  static inline bool ref_checked = false;
+
+  static void hook(void *ptr) noexcept {
+    DeallocTrackerHelper helper;
+    if (ptr == nullptr) {
+      return;
+    }
+    helper.track(ptr);
+    ref(ptr);
+  }
+};
+
+struct delete_nothrow {
+  static constexpr auto name = "_ZdlPvRKSt9nothrow_t";
+  static inline auto ref =
+      static_cast<void (*)(void *, const std::nothrow_t &) noexcept>(
+          &::operator delete);
+  static inline bool ref_checked = false;
+
+  static void hook(void *ptr, const std::nothrow_t &tag) noexcept {
+    DeallocTrackerHelper helper;
+    if (ptr == nullptr) {
+      return;
+    }
+    helper.track(ptr);
+    ref(ptr, tag);
+  }
+};
+
+struct delete_array_nothrow {
+  static constexpr auto name = "_ZdaPvRKSt9nothrow_t";
+  static inline auto ref =
+      static_cast<void (*)(void *, const std::nothrow_t &) noexcept>(
+          &::operator delete[]);
+  static inline bool ref_checked = false;
+
+  static void hook(void *ptr, const std::nothrow_t &tag) noexcept {
+    DeallocTrackerHelper helper;
+    if (ptr == nullptr) {
+      return;
+    }
+    helper.track(ptr);
+    ref(ptr, tag);
+  }
+};
+
+struct delete_align {
+  static constexpr auto name = "_ZdlPvSt11align_val_t";
+  static inline auto ref =
+      static_cast<void (*)(void *, std::align_val_t) noexcept>(
+          &::operator delete);
+  static inline bool ref_checked = false;
+
+  static void hook(void *ptr, std::align_val_t al) noexcept {
+    DeallocTrackerHelper helper;
+    if (ptr == nullptr) {
+      return;
+    }
+    helper.track(ptr);
+    ref(ptr, al);
+  }
+};
+
+struct delete_array_align {
+  static constexpr auto name = "_ZdaPvSt11align_val_t";
+  static inline auto ref =
+      static_cast<void (*)(void *, std::align_val_t) noexcept>(
+          &::operator delete[]);
+  static inline bool ref_checked = false;
+
+  static void hook(void *ptr, std::align_val_t al) noexcept {
+    DeallocTrackerHelper helper;
+    if (ptr == nullptr) {
+      return;
+    }
+    helper.track(ptr);
+    ref(ptr, al);
+  }
+};
+
+struct delete_align_nothrow {
+  static constexpr auto name = "_ZdlPvSt11align_val_tRKSt9nothrow_t";
+  static inline auto ref = static_cast<void (*)(
+      void *, std::align_val_t, const std::nothrow_t &) noexcept>(
+      &::operator delete);
+  static inline bool ref_checked = false;
+
+  static void hook(void *ptr, std::align_val_t al,
+                   const std::nothrow_t &tag) noexcept {
+    DeallocTrackerHelper helper;
+    if (ptr == nullptr) {
+      return;
+    }
+    helper.track(ptr);
+    ref(ptr, al, tag);
+  }
+};
+
+struct delete_array_align_nothrow {
+  static constexpr auto name = "_ZdaPvSt11align_val_tRKSt9nothrow_t";
+  static inline auto ref = static_cast<void (*)(
+      void *, std::align_val_t, const std::nothrow_t &) noexcept>(
+      &::operator delete[]);
+  static inline bool ref_checked = false;
+
+  static void hook(void *ptr, std::align_val_t al,
+                   const std::nothrow_t &tag) noexcept {
+    DeallocTrackerHelper helper;
+    if (ptr == nullptr) {
+      return;
+    }
+    helper.track(ptr);
+    ref(ptr, al, tag);
+  }
+};
+
+struct delete_sized {
+  static constexpr auto name = "_ZdlPvm";
+  static inline auto ref =
+      static_cast<void (*)(void *, std::size_t) noexcept>(&::operator delete);
+  static inline bool ref_checked = false;
+
+  static void hook(void *ptr, std::size_t size) noexcept {
+    DeallocTrackerHelper helper;
+    if (ptr == nullptr) {
+      return;
+    }
+    helper.track(ptr);
+    ref(ptr, size);
+  }
+};
+
+struct delete_array_sized {
+  static constexpr auto name = "_ZdaPvm";
+  static inline auto ref =
+      static_cast<void (*)(void *, std::size_t) noexcept>(&::operator delete[]);
+  static inline bool ref_checked = false;
+
+  static void hook(void *ptr, std::size_t size) noexcept {
+    DeallocTrackerHelper helper;
+    if (ptr == nullptr) {
+      return;
+    }
+    helper.track(ptr);
+    ref(ptr, size);
+  }
+};
+
+struct delete_sized_align {
+  static constexpr auto name = "_ZdlPvmSt11align_val_t";
+  static inline auto ref =
+      static_cast<void (*)(void *, std::size_t, std::align_val_t) noexcept>(
+          &::operator delete);
+  static inline bool ref_checked = false;
+
+  static void hook(void *ptr, std::size_t size, std::align_val_t al) noexcept {
+    DeallocTrackerHelper helper;
+    if (ptr == nullptr) {
+      return;
+    }
+    helper.track(ptr);
+    ref(ptr, size, al);
+  }
+};
+
+struct delete_array_sized_align {
+  static constexpr auto name = "_ZdaPvmSt11align_val_t";
+  static inline auto ref =
+      static_cast<void (*)(void *, std::size_t, std::align_val_t) noexcept>(
+          &::operator delete[]);
+  static inline bool ref_checked = false;
+
+  static void hook(void *ptr, std::size_t size, std::align_val_t al) noexcept {
+    DeallocTrackerHelper helper;
+    if (ptr == nullptr) {
+      return;
+    }
+    helper.track(ptr);
+    ref(ptr, size, al);
   }
 };
 
@@ -110,16 +465,9 @@ struct calloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t nmemb, size_t size) noexcept {
-    check_libraries();
-    ddprof::TrackerThreadLocalState *tl_state =
-        ddprof::AllocationTracker::get_tl_state();
-    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
-                                        : nullptr);
+    AllocTrackerHelper helper;
     auto ptr = ref(nmemb, size);
-    if (guard) {
-      ddprof::AllocationTracker::track_allocation_s(
-          reinterpret_cast<uintptr_t>(ptr), size * nmemb, *tl_state);
-    }
+    helper.track(ptr, size * nmemb);
     return ptr;
   }
 };
@@ -130,20 +478,14 @@ struct realloc {
   static inline bool ref_checked = false;
 
   static void *hook(void *ptr, size_t size) noexcept {
-    check_libraries();
-    if (likely(ptr)) {
+    AllocTrackerHelper helper;
+    if (likely(ptr) && helper.guard) {
       ddprof::AllocationTracker::track_deallocation_s(
-          reinterpret_cast<uintptr_t>(ptr));
+          reinterpret_cast<uintptr_t>(ptr), *helper.tl_state);
     }
-    ddprof::TrackerThreadLocalState *tl_state =
-        ddprof::AllocationTracker::get_tl_state();
-    // lifetime of guard should exceed the call to ref function
-    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
-                                        : nullptr);
     auto newptr = ref(ptr, size);
-    if (likely(size) && guard) {
-      ddprof::AllocationTracker::track_allocation_s(
-          reinterpret_cast<uintptr_t>(newptr), size, *tl_state);
+    if (likely(size)) {
+      helper.track(newptr, size);
     }
 
     return newptr;
@@ -156,15 +498,10 @@ struct posix_memalign {
   static inline bool ref_checked = false;
 
   static int hook(void **memptr, size_t alignment, size_t size) noexcept {
-    check_libraries();
-    ddprof::TrackerThreadLocalState *tl_state =
-        ddprof::AllocationTracker::get_tl_state();
-    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
-                                        : nullptr);
+    AllocTrackerHelper helper;
     auto ret = ref(memptr, alignment, size);
-    if (likely(!ret) && guard) {
-      ddprof::AllocationTracker::track_allocation_s(
-          reinterpret_cast<uintptr_t>(*memptr), size, *tl_state);
+    if (likely(!ret)) {
+      helper.track(*memptr, size);
     }
     return ret;
   }
@@ -176,15 +513,10 @@ struct aligned_alloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t alignment, size_t size) noexcept {
-    check_libraries();
-    ddprof::TrackerThreadLocalState *tl_state =
-        ddprof::AllocationTracker::get_tl_state();
-    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
-                                        : nullptr);
+    AllocTrackerHelper helper;
     auto ptr = ref(alignment, size);
-    if (ptr && guard) {
-      ddprof::AllocationTracker::track_allocation_s(
-          reinterpret_cast<uintptr_t>(ptr), size, *tl_state);
+    if (ptr) {
+      helper.track(ptr, size);
     }
     return ptr;
   }
@@ -196,15 +528,10 @@ struct memalign {
   static inline bool ref_checked = false;
 
   static void *hook(size_t alignment, size_t size) noexcept {
-    check_libraries();
-    ddprof::TrackerThreadLocalState *tl_state =
-        ddprof::AllocationTracker::get_tl_state();
-    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
-                                        : nullptr);
+    AllocTrackerHelper helper;
     auto ptr = ref(alignment, size);
-    if (ptr && guard) {
-      ddprof::AllocationTracker::track_allocation_s(
-          reinterpret_cast<uintptr_t>(ptr), size, *tl_state);
+    if (ptr) {
+      helper.track(ptr, size);
     }
     return ptr;
   }
@@ -216,15 +543,10 @@ struct pvalloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t size) noexcept {
-    check_libraries();
-    ddprof::TrackerThreadLocalState *tl_state =
-        ddprof::AllocationTracker::get_tl_state();
-    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
-                                        : nullptr);
+    AllocTrackerHelper helper;
     auto ptr = ref(size);
-    if (ptr && guard) {
-      ddprof::AllocationTracker::track_allocation_s(
-          reinterpret_cast<uintptr_t>(ptr), size, *tl_state);
+    if (ptr) {
+      helper.track(ptr, size);
     }
     return ptr;
   }
@@ -236,15 +558,10 @@ struct valloc {
   static inline bool ref_checked = false;
 
   static void *hook(size_t size) noexcept {
-    check_libraries();
-    ddprof::TrackerThreadLocalState *tl_state =
-        ddprof::AllocationTracker::get_tl_state();
-    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
-                                        : nullptr);
+    AllocTrackerHelper helper;
     auto ptr = ref(size);
-    if (ptr && guard) {
-      ddprof::AllocationTracker::track_allocation_s(
-          reinterpret_cast<uintptr_t>(ptr), size, *tl_state);
+    if (ptr) {
+      helper.track(ptr, size);
     }
     return ptr;
   }
@@ -256,19 +573,14 @@ struct reallocarray {
   static inline bool ref_checked = false;
 
   static void *hook(void *ptr, size_t nmemb, size_t size) noexcept {
-    check_libraries();
-    if (ptr) {
+    AllocTrackerHelper helper;
+    if (ptr && helper.guard) {
       ddprof::AllocationTracker::track_deallocation_s(
-          reinterpret_cast<uintptr_t>(ptr));
+          reinterpret_cast<uintptr_t>(ptr), *helper.tl_state);
     }
-    ddprof::TrackerThreadLocalState *tl_state =
-        ddprof::AllocationTracker::get_tl_state();
-    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
-                                        : nullptr);
     auto newptr = ref(ptr, nmemb, size);
-    if (newptr && guard) {
-      ddprof::AllocationTracker::track_allocation_s(
-          reinterpret_cast<uintptr_t>(newptr), size * nmemb, *tl_state);
+    if (newptr) {
+      helper.track(newptr, size * nmemb);
     }
     return newptr;
   }
@@ -285,6 +597,80 @@ struct dlopen {
       setup_hooks(false);
     }
     return ret;
+  }
+};
+
+struct mallocx {
+  static constexpr auto name = "mallocx";
+  static inline auto ref = &::mallocx;
+  static inline bool ref_checked = false;
+
+  static void *hook(size_t size, int flags) noexcept {
+    AllocTrackerHelper helper;
+    auto ptr = ref(size, flags);
+    helper.track(ptr, size);
+    return ptr;
+  }
+};
+
+struct rallocx {
+  static constexpr auto name = "rallocx";
+  static inline auto ref = &::rallocx;
+  static inline bool ref_checked = false;
+
+  static void *hook(void *ptr, size_t size, int flags) noexcept {
+    AllocTrackerHelper helper;
+    if (likely(ptr) && helper.guard) {
+      ddprof::AllocationTracker::track_deallocation_s(
+          reinterpret_cast<uintptr_t>(ptr), *helper.tl_state);
+    }
+    auto newptr = ref(ptr, size, flags);
+    if (likely(size)) {
+      helper.track(newptr, size);
+    }
+
+    return newptr;
+  }
+};
+
+struct xallocx {
+  static constexpr auto name = "xallocx";
+  static inline auto ref = &::xallocx;
+  static inline bool ref_checked = false;
+
+  static size_t hook(void *ptr, size_t size, size_t extra, int flags) noexcept {
+    AllocTrackerHelper helper;
+    if (helper.guard) {
+      ddprof::AllocationTracker::track_deallocation_s(
+          reinterpret_cast<uintptr_t>(ptr), *helper.tl_state);
+    }
+    auto newsize = ref(ptr, size, extra, flags);
+    helper.track(ptr, newsize);
+    return newsize;
+  }
+};
+
+struct dallocx {
+  static constexpr auto name = "dallocx";
+  static inline auto ref = &::dallocx;
+  static inline bool ref_checked = false;
+
+  static void hook(void *ptr, int flags) noexcept {
+    DeallocTrackerHelper helper;
+    ref(ptr, flags);
+    helper.track(ptr);
+  }
+};
+
+struct sdallocx {
+  static constexpr auto name = "sdallocx";
+  static inline auto ref = &::sdallocx;
+  static inline bool ref_checked = false;
+
+  static void hook(void *ptr, size_t size, int flags) noexcept {
+    DeallocTrackerHelper helper;
+    ref(ptr, size, flags);
+    helper.track(ptr);
   }
 };
 
@@ -333,14 +719,10 @@ struct mmap {
 
   static void *hook(void *addr, size_t length, int prot, int flags, int fd,
                     off_t offset) noexcept {
-    ddprof::TrackerThreadLocalState *tl_state =
-        ddprof::AllocationTracker::get_tl_state();
-    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
-                                        : nullptr);
+    AllocTrackerHelper helper;
     void *ptr = ref(addr, length, prot, flags, fd, offset);
-    if (addr == nullptr && fd == -1 && ptr != nullptr && guard) {
-      ddprof::AllocationTracker::track_allocation_s(
-          reinterpret_cast<uintptr_t>(ptr), length, *tl_state);
+    if (addr == nullptr && fd == -1 && ptr != nullptr) {
+      helper.track(ptr, length);
     }
     return ptr;
   }
@@ -353,14 +735,10 @@ struct mmap_ {
 
   static void *hook(void *addr, size_t length, int prot, int flags, int fd,
                     off_t offset) noexcept {
-    ddprof::TrackerThreadLocalState *tl_state =
-        ddprof::AllocationTracker::get_tl_state();
-    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
-                                        : nullptr);
+    AllocTrackerHelper helper;
     void *ptr = ref(addr, length, prot, flags, fd, offset);
-    if (addr == nullptr && fd == -1 && ptr != nullptr && guard) {
-      ddprof::AllocationTracker::track_allocation_s(
-          reinterpret_cast<uintptr_t>(ptr), length, *tl_state);
+    if (addr == nullptr && fd == -1 && ptr != nullptr) {
+      helper.track(ptr, length);
     }
     return ptr;
   }
@@ -373,14 +751,10 @@ struct mmap64_ {
 
   static void *hook(void *addr, size_t length, int prot, int flags, int fd,
                     off_t offset) noexcept {
-    ddprof::TrackerThreadLocalState *tl_state =
-        ddprof::AllocationTracker::get_tl_state();
-    ddprof::ReentryGuard guard(tl_state ? &(tl_state->double_tracking_guard)
-                                        : nullptr);
+    AllocTrackerHelper helper;
     void *ptr = ref(addr, length, prot, flags, fd, offset);
-    if (addr == nullptr && fd == -1 && ptr != nullptr && guard) {
-      ddprof::AllocationTracker::track_allocation_s(
-          reinterpret_cast<uintptr_t>(ptr), length, *tl_state);
+    if (addr == nullptr && fd == -1 && ptr != nullptr) {
+      helper.track(ptr, length);
     }
     return ptr;
   }
@@ -392,8 +766,8 @@ struct munmap {
   static inline bool ref_checked = false;
 
   static int hook(void *addr, size_t length) noexcept {
-    ddprof::AllocationTracker::track_deallocation_s(
-        reinterpret_cast<uintptr_t>(addr));
+    DeallocTrackerHelper helper;
+    helper.track(addr);
     return ref(addr, length);
   }
 };
@@ -404,8 +778,8 @@ struct munmap_ {
   static inline bool ref_checked = false;
 
   static int hook(void *addr, size_t length) noexcept {
-    ddprof::AllocationTracker::track_deallocation_s(
-        reinterpret_cast<uintptr_t>(addr));
+    DeallocTrackerHelper helper;
+    helper.track(addr);
     return ref(addr, length);
   }
 };
@@ -414,7 +788,7 @@ template <typename T> void install_hook(bool restore) {
   // On ubuntu 16, some symbols might be bound to <symbol>@plt symbols
   // in exe and since we override the symbols in the exe, this would cause
   // infinite recursion. To workaround this, we do an explicit lookup (we don't
-  // use dlsym since it would return the same <symbol>>@plt symbol).
+  // use dlsym since it would return the same <symbol>@plt symbol).
   if (!restore && !T::ref_checked) {
     ElfW(Sym) sym = ddprof::lookup_symbol(T::name, true);
     if (sym.st_size == 0 &&
@@ -521,11 +895,39 @@ void setup_hooks(bool restore) {
   install_hook<memalign>(restore);
   install_hook<valloc>(restore);
 
+  install_hook<new_>(restore);
+  install_hook<new_array>(restore);
+  install_hook<new_nothrow>(restore);
+  install_hook<new_array_nothrow>(restore);
+  install_hook<new_align>(restore);
+  install_hook<new_array_align>(restore);
+  install_hook<new_align_nothrow>(restore);
+  install_hook<new_array_align_nothrow>(restore);
+
+  install_hook<delete_>(restore);
+  install_hook<delete_array>(restore);
+  install_hook<delete_nothrow>(restore);
+  install_hook<delete_array_nothrow>(restore);
+  install_hook<delete_align>(restore);
+  install_hook<delete_array_align>(restore);
+  install_hook<delete_align_nothrow>(restore);
+  install_hook<delete_array_align_nothrow>(restore);
+  install_hook<delete_sized>(restore);
+  install_hook<delete_array_sized>(restore);
+  install_hook<delete_sized_align>(restore);
+  install_hook<delete_array_sized_align>(restore);
+
   install_hook<mmap>(restore);
   install_hook<mmap64_>(restore);
   install_hook<munmap>(restore);
   install_hook<mmap_>(restore);
   install_hook<munmap_>(restore);
+
+  install_hook<mallocx>(restore);
+  install_hook<rallocx>(restore);
+  install_hook<xallocx>(restore);
+  install_hook<dallocx>(restore);
+  install_hook<sdallocx>(restore);
 
   if (reallocarray::ref) {
     install_hook<reallocarray>(restore);

@@ -19,9 +19,10 @@ struct TrackerThreadLocalState {
 
   pid_t tid; // cache of tid
 
-  bool reentry_guard;         // prevent reentry in AllocationTracker (eg. when
-                              // allocation are done inside AllocationTracker)
-  bool double_tracking_guard; // prevent mmap tracking within a malloc
+  bool reentry_guard; // prevent reentry in AllocationTracker (eg. when
+                      // allocation are done inside AllocationTracker) and
+                      // double counting of allocations (eg. when new calls
+                      // malloc, or malloc calls mmap internally)
 };
 
 } // namespace ddprof

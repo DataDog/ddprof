@@ -45,8 +45,12 @@ DDPROF_NOINLINE void my_malloc(size_t size, uintptr_t addr = 0xdeadbeef) {
 }
 
 DDPROF_NOINLINE void my_free(uintptr_t addr) {
-  ddprof::AllocationTracker::track_deallocation_s(addr);
-  DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
+  ddprof::TrackerThreadLocalState *tl_state =
+      ddprof::AllocationTracker::get_tl_state();
+  if (tl_state) {
+    ddprof::AllocationTracker::track_deallocation_s(addr, *tl_state);
+    DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
+  }
 }
 
 // Function to perform allocations and deallocations

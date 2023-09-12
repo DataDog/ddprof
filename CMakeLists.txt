@@ -156,7 +156,7 @@ if(ON)
 endif()
 
 if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
-  list(PREPEND DDPROF_LIBRARY_LIST ${JEMALLOC_LIBRARIES})
+  list(PREPEND DDPROF_LIBRARY_LIST JeMalloc::JeMalloc)
 endif()
 
 # libcap, can be removed from version distributed to client
@@ -174,6 +174,7 @@ if(USE_LOADER)
   set_target_properties(dd_loader PROPERTIES LINK_DEPENDS "${dd_profiling_linker_script}")
   target_link_options(dd_loader PRIVATE "LINKER:--version-script=${dd_profiling_linker_script}")
   target_static_libcxx(dd_loader)
+  target_static_sanitizer(dd_loader)
 
   if(BUILD_UNIVERSAL_DDPROF)
     target_link_options(dd_loader PRIVATE "-nolibc")
@@ -232,6 +233,7 @@ set_target_properties(dd_profiling-embedded
 
 # Link libstdc++/libgcc statically and export only profiler API
 target_static_libcxx(dd_profiling-embedded)
+target_static_sanitizer(dd_profiling-embedded)
 set_target_properties(dd_profiling-embedded PROPERTIES LINK_DEPENDS "${dd_profiling_linker_script}")
 target_link_options(dd_profiling-embedded PRIVATE
                     "LINKER:--version-script=${dd_profiling_linker_script}")
@@ -288,6 +290,7 @@ endif()
 
 target_include_directories(ddprof PRIVATE ${DDPROF_INCLUDE_LIST})
 target_static_libcxx(ddprof)
+target_static_sanitizer(ddprof)
 if(BUILD_UNIVERSAL_DDPROF)
   target_static_libc(ddprof)
 endif()
@@ -359,6 +362,7 @@ else()
 endif()
 
 target_static_libcxx(dd_profiling-shared)
+target_static_sanitizer(dd_profiling-shared)
 set_target_properties(dd_profiling-shared PROPERTIES LINK_DEPENDS "${dd_profiling_linker_script}")
 target_link_options(dd_profiling-shared PRIVATE
                     "LINKER:--version-script=${dd_profiling_linker_script}")
