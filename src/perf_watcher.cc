@@ -132,7 +132,7 @@ void log_watcher(const PerfWatcher *w, int idx) {
   if (w->options.is_freq)
     PRINT_NFO("    Cadence: Freq, Freq: %lu", w->sample_frequency);
   else
-    PRINT_NFO("    Cadence: Period, Period: %lu", w->sample_period);
+    PRINT_NFO("    Cadence: Period, Period: %ld", w->sample_period);
   if (Any(EventConfMode::kCallgraph & w->output_mode))
     PRINT_NFO("    Outputting to callgraph (flamegraph)");
   if (Any(EventConfMode::kMetric & w->output_mode))
