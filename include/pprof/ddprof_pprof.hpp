@@ -44,4 +44,5 @@ DDRes pprof_free_profile(DDProfPProf *pprof);
 
 void ddprof_print_sample(const UnwindOutput &uw_output,
                          const SymbolHdr &symbol_hdr, uint64_t value,
+                         EventValueModePos value_mode_pos,
                          const PerfWatcher &watcher);

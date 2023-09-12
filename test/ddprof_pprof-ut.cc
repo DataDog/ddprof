@@ -86,4 +86,41 @@ TEST(DDProfPProf, aggregate) {
   EXPECT_TRUE(IsDDResOK(res));
 }
 
+TEST(DDProfPProf, just_live) {
+  LogHandle handle;
+  SymbolHdr symbol_hdr;
+  UnwindOutput mock_output;
+  SymbolTable &table = symbol_hdr._symbol_table;
+  MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
+
+  fill_unwind_symbols(table, mapinfo_table, mock_output);
+  DDProfPProf pprof;
+  DDProfContext ctx = {};
+  {
+    bool ok = watchers_from_str("sDUM", ctx.watchers);
+    EXPECT_TRUE(ok);
+  }
+  {
+    bool ok = watchers_from_str("sALLOC mode=l", ctx.watchers);
+    EXPECT_TRUE(ok);
+  }
+  log_watcher(&(ctx.watchers[0]), 0);
+  log_watcher(&(ctx.watchers[1]), 1);
+
+  DDRes res = pprof_create_profile(&pprof, ctx);
+  EXPECT_TRUE(ctx.watchers[0].pprof_indices[kOccurencePos].pprof_index == -1);
+  EXPECT_TRUE(ctx.watchers[0].pprof_indices[kOccurencePos].pprof_count_index ==
+              -1);
+
+  EXPECT_TRUE(ctx.watchers[1].pprof_indices[kLiveUsagePos].pprof_index != -1);
+  EXPECT_TRUE(ctx.watchers[1].pprof_indices[kLiveUsagePos].pprof_count_index !=
+              -1);
+  res = pprof_aggregate(&mock_output, symbol_hdr, 1000, 1, &ctx.watchers[0],
+                        ctx.watchers[1].pprof_indices[kLiveUsagePos], &pprof);
+  EXPECT_TRUE(IsDDResOK(res));
+  test_pprof(&pprof);
+  res = pprof_free_profile(&pprof);
+  EXPECT_TRUE(IsDDResOK(res));
+}
+
 } // namespace ddprof

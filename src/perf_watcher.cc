@@ -17,17 +17,14 @@
 
 uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
 
-#define X_STR(a, b, c, d, e) std::pair{b, d},
-const char *sample_type_name_from_idx(int idx, bool live) {
-  static const std::array<std::pair<const char *, const char *>,
-                          DDPROF_PWT_LENGTH>
-      sample_names = {PROFILE_TYPE_TABLE(X_STR)};
+#define X_STR(a, b, c, d, e) std::array{b, d},
+const char *sample_type_name_from_idx(int idx, EventValueModePos pos) {
+  static constexpr std::array<std::array<const char *, kNbEventValueModes>,
+                              DDPROF_PWT_LENGTH + 1>
+      sample_names = {PROFILE_TYPE_TABLE(X_STR){nullptr, nullptr}};
   if (idx < 0 || idx >= DDPROF_PWT_LENGTH)
     return NULL;
-  if (live) {
-    return sample_names[idx].second;
-  }
-  return sample_names[idx].first;
+  return sample_names[idx][pos];
 }
 #undef X_STR
 #define X_STR(a, b, c, d, e) #c,
@@ -128,12 +125,21 @@ void log_watcher(const PerfWatcher *w, int idx) {
     break;
   }
 
-  PRINT_NFO(
-      "    Category: %s, EventName: %s, GroupName: %s, Label: %s",
-      sample_type_name_from_idx(
-          w->sample_type_id, Any(EventValueMode::kLiveUsage & w->output_mode)),
-      w->tracepoint_event.c_str(), w->tracepoint_group.c_str(),
-      w->tracepoint_label.c_str());
+  // check all associated reported values
+  std::string category;
+  for (int i = 0; i < kNbEventValueModes; ++i) {
+    if (Any(static_cast<EventValueMode>(1 << i) & w->output_mode)) {
+      if (!category.empty()) {
+        category += ",";
+      }
+      category += std::string(sample_type_name_from_idx(
+          w->sample_type_id, static_cast<EventValueModePos>(i)));
+    }
+  }
+  PRINT_NFO("    Category: %s", category.c_str());
+  PRINT_NFO("    EventName: %s, GroupName: %s, Label: %s",
+            w->tracepoint_event.c_str(), w->tracepoint_group.c_str(),
+            w->tracepoint_label.c_str());
   PRINT_NFO("    Sample user Stack Size: %u", w->options.stack_sample_size);
 
   if (w->options.is_freq)

@@ -318,7 +318,7 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
                           watcher->pprof_indices[kOccurencePos], pprof));
       if (ctx.params.show_samples) {
         ddprof_print_sample(us->output, us->symbol_hdr, sample->period,
-                            *watcher);
+                            kOccurencePos, *watcher);
       }
     }
   }
@@ -364,7 +364,7 @@ static DDRes aggregate_livealloc_stack(
                       watcher->pprof_indices[kLiveUsagePos], pprof));
   if (ctx.params.show_samples) {
     ddprof_print_sample(alloc_info.first, symbol_hdr, alloc_info.second._value,
-                        *watcher);
+                        kLiveUsagePos, *watcher);
   }
   return ddres_init();
 }

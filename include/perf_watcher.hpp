@@ -163,7 +163,7 @@ int watcher_to_count_sample_type_id(const PerfWatcher *watcher);
 const char *event_type_name_from_idx(int idx);
 
 // Helper functions for sample types
-const char *sample_type_name_from_idx(int idx, bool live);
+const char *sample_type_name_from_idx(int idx, EventValueModePos pos);
 const char *sample_type_unit_from_idx(int idx);
 int sample_type_id_to_count_sample_type_id(int idx);
 
