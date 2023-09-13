@@ -20,22 +20,22 @@ class AddressBitset {
   // Note: the hashing step might be bad for cache locality.
 public:
   // Publish 1 Meg as default
-  constexpr static unsigned _k_default_max_addresses = 8 * 1024 * 1024;
+  constexpr static unsigned _k_default_bitset_size = 8 * 1024 * 1024;
   AddressBitset(unsigned max_addresses = 0) { init(max_addresses); }
   void init(unsigned max_addresses);
   // returns true if the element was inserted
-  bool set(uintptr_t addr);
+  bool add(uintptr_t addr);
   // returns true if the element was removed
-  bool unset(uintptr_t addr);
+  bool remove(uintptr_t addr);
   void clear();
-  int nb_addresses() const { return _nb_addresses; }
+  int count() const { return _nb_addresses; }
 
 private:
   static constexpr unsigned _k_max_bits_ignored = 4;
   unsigned _lower_bits_ignored;
   // element type
-  using Elt_t = uint64_t;
-  constexpr static unsigned _nb_bits_per_elt = sizeof(Elt_t) * 8;
+  using Word_t = uint64_t;
+  constexpr static unsigned _nb_bits_per_elt = sizeof(Word_t) * 8;
   // 1 Meg divided in uint64's size
   // The probability of collision is proportional to the number of elements
   // already within the bitset
@@ -46,11 +46,13 @@ private:
   std::unique_ptr<std::atomic<uint64_t>[]> _address_bitset;
   std::atomic<int> _nb_addresses = 0;
 
+  static unsigned int count_set_bits(Word_t w);
+
   // This is a kind of hash function
   // We remove the lower bits (as the alignment constraints makes them useless)
   // We fold the address
   // Then we only keep the bits that matter for the order in the bitmap
-  uint32_t remove_lower_bits(uintptr_t h1) {
+  uint32_t hash_significant_bits(uintptr_t h1) {
     uint64_t intermediate = h1 >> _lower_bits_ignored;
     uint32_t high = (uint32_t)(intermediate >> 32);
     uint32_t low = (uint32_t)intermediate;

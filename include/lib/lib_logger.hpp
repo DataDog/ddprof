@@ -10,13 +10,24 @@
 #include <mutex>
 
 namespace ddprof {
-template <typename... Args>
-void log_once(char const *const format, Args... args) {
+
 #ifdef NDEBUG
-  static std::once_flag flag;
-  std::call_once(flag, [&, format]() { fprintf(stderr, format, args...); });
+template <typename Func>
+void log_once_helper(std::once_flag &flag, Func &&func) {
+  std::call_once(flag, std::forward<Func>(func));
 #else
-  fprintf(stderr, format, args...);
+template <typename Func> void log_once_helper(std::once_flag &, Func &&func) {
+  func();
 #endif
 }
+
+// create a once flag for the line and file where this is called:
+#define LOG_ONCE(format, ...)                                                  \
+  do {                                                                         \
+    static std::once_flag UNIQUE_ONCE_FLAG_##__LINE__##__FILE__;               \
+    ddprof::log_once_helper(UNIQUE_ONCE_FLAG_##__LINE__##__FILE__, [&]() {     \
+      fprintf(stderr, (format), ##__VA_ARGS__);                                \
+    });                                                                        \
+  } while (0)
+
 } // namespace ddprof
