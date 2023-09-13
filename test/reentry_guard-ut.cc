@@ -26,8 +26,8 @@ TEST(ReentryGuardTest, null_init) {
     guard.register_guard(&reentry_guard);
     EXPECT_TRUE(guard);
     {
-      ddprof::ReentryGuard guard(&reentry_guard);
-      EXPECT_FALSE(guard);
+      ddprof::ReentryGuard guard2(&reentry_guard);
+      EXPECT_FALSE(guard2);
     }
   }
 }

@@ -14,14 +14,14 @@
 namespace ddprof {
 
 TEST(address_bitset, simple) {
-  AddressBitset address_bitset(AddressBitset::_k_default_max_addresses);
-  EXPECT_TRUE(address_bitset.set(0xbadbeef));
-  EXPECT_FALSE(address_bitset.set(0xbadbeef));
-  EXPECT_TRUE(address_bitset.unset(0xbadbeef));
+  AddressBitset address_bitset(AddressBitset::_k_default_bitset_size);
+  EXPECT_TRUE(address_bitset.add(0xbadbeef));
+  EXPECT_FALSE(address_bitset.add(0xbadbeef));
+  EXPECT_TRUE(address_bitset.remove(0xbadbeef));
 }
 
 TEST(address_bitset, many_addresses) {
-  AddressBitset address_bitset(AddressBitset::_k_default_max_addresses);
+  AddressBitset address_bitset(AddressBitset::_k_default_bitset_size);
   std::random_device rd;
   std::mt19937 gen(rd());
   std::uniform_int_distribution<uintptr_t> dis(
@@ -31,15 +31,15 @@ TEST(address_bitset, many_addresses) {
   unsigned nb_elements = 100000;
   for (unsigned i = 0; i < nb_elements; ++i) {
     uintptr_t addr = dis(gen);
-    if (address_bitset.set(addr)) {
+    if (address_bitset.add(addr)) {
       addresses.push_back(addr);
     }
   }
   EXPECT_TRUE(nb_elements - (nb_elements / 10) < addresses.size());
   for (auto addr : addresses) {
-    EXPECT_TRUE(address_bitset.unset(addr));
+    EXPECT_TRUE(address_bitset.remove(addr));
   }
-  EXPECT_EQ(0, address_bitset.nb_addresses());
+  EXPECT_EQ(0, address_bitset.count());
 }
 
 // This test to tune the hash approach

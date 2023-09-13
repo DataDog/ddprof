@@ -67,7 +67,7 @@ TrackerThreadLocalState *AllocationTracker::init_tl_state() {
 
   if (res_set) {
     // should return 0
-    log_once("Error: Unable to store tl_state. error %d \n", res_set);
+    LOG_ONCE("Error: Unable to store tl_state. error %d \n", res_set);
     delete tl_state;
     tl_state = nullptr;
   }
@@ -169,7 +169,7 @@ void AllocationTracker::allocation_tracking_free() {
   }
   TrackerThreadLocalState *tl_state = get_tl_state();
   if (unlikely(!tl_state)) {
-    log_once("Error: Unable to find tl_state during %s\n", __FUNCTION__);
+    LOG_ONCE("Error: Unable to find tl_state during %s\n", __FUNCTION__);
     instance->free();
     return;
   }
@@ -234,8 +234,8 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
   uint64_t total_size = nsamples * sampling_interval;
 
   if (_state.track_deallocations) {
-    if (_allocated_address_set.set(addr)) {
-      if (unlikely(_allocated_address_set.nb_addresses() >
+    if (_allocated_address_set.add(addr)) {
+      if (unlikely(_allocated_address_set.count() >
                    ddprof::liveallocation::kMaxTracked)) {
         // Check if we reached max number of elements
         // Clear elements if we reach too many
@@ -243,9 +243,9 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
         if (IsDDResOK(push_clear_live_allocation(tl_state))) {
           _allocated_address_set.clear();
           // still set this as we are pushing the allocation to ddprof
-          _allocated_address_set.set(addr);
+          _allocated_address_set.add(addr);
         } else {
-          log_once(
+          LOG_ONCE(
               "Error: %s",
               "Stop allocation profiling. Unable to clear live allocation \n");
           free();
@@ -259,7 +259,7 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
   bool success = IsDDResOK(push_alloc_sample(addr, total_size, tl_state));
   free_on_consecutive_failures(success);
   if (unlikely(!success) && _state.track_deallocations) {
-    _allocated_address_set.unset(addr);
+    _allocated_address_set.remove(addr);
   }
 }
 
@@ -273,7 +273,7 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
     return;
   }
 
-  if (!_state.track_deallocations || !_allocated_address_set.unset(addr)) {
+  if (!_state.track_deallocations || !_allocated_address_set.remove(addr)) {
     return;
   }
 
@@ -502,7 +502,7 @@ void AllocationTracker::notify_thread_start() {
   if (unlikely(!tl_state)) {
     tl_state = init_tl_state();
     if (!tl_state) {
-      log_once("Error: Unable to start allocation profiling on thread %d",
+      LOG_ONCE("Error: Unable to start allocation profiling on thread %d",
                ddprof::gettid());
       return;
     }
@@ -522,7 +522,7 @@ void AllocationTracker::notify_fork() {
   if (unlikely(!tl_state)) {
     // The state should already exist if we forked.
     // This would mean that we were not able to create the state before forking
-    log_once("Error: Unable to retrieve tl state after fork thread %d",
+    LOG_ONCE("Error: Unable to retrieve tl state after fork thread %d",
              ddprof::gettid());
     return;
   } else {

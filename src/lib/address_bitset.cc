@@ -10,6 +10,25 @@
 
 namespace ddprof {
 
+namespace {
+unsigned round_to_power_of_two(unsigned num) {
+  if (num == 0) {
+    return num;
+  }
+  // If max_addresses is already a power of two
+  if ((num & (num - 1)) == 0) {
+    return num;
+  }
+  // not a power of two
+  unsigned count = 0;
+  while (num) {
+    num >>= 1;
+    count++;
+  }
+  return 1 << count;
+}
+} // namespace
+
 void AddressBitset::init(unsigned max_addresses) {
   // Due to memory alignment, on 64 bits we can assume that the first 4
   // bits can be ignored
@@ -17,7 +36,7 @@ void AddressBitset::init(unsigned max_addresses) {
   if (_address_bitset) {
     _address_bitset.reset();
   }
-  _nb_bits = max_addresses;
+  _nb_bits = round_to_power_of_two(max_addresses);
   _k_nb_elements = (_nb_bits) / (_nb_bits_per_elt);
   if (_nb_bits) {
     _nb_bits_mask = _nb_bits - 1;
@@ -25,14 +44,14 @@ void AddressBitset::init(unsigned max_addresses) {
   }
 }
 
-bool AddressBitset::set(uintptr_t addr) {
-  uint32_t significant_bits = remove_lower_bits(addr);
+bool AddressBitset::add(uintptr_t addr) {
+  uint32_t significant_bits = hash_significant_bits(addr);
   // As per nsavoire's comment, it is better to use separate operators
   // than to use the div instruction which generates an extra function call
   // Also, the usage of a power of two value allows for bit operations
-  unsigned index_array = significant_bits / 64;
-  unsigned bit_offset = significant_bits % 64;
-  uint64_t bit_in_element = (1UL << bit_offset);
+  unsigned index_array = significant_bits / sizeof(Word_t);
+  unsigned bit_offset = significant_bits % sizeof(Word_t);
+  Word_t bit_in_element = (1UL << bit_offset);
   // there is a possible race between checking the value
   // and setting it
   if (!(_address_bitset[index_array].fetch_or(bit_in_element) &
@@ -45,26 +64,39 @@ bool AddressBitset::set(uintptr_t addr) {
   return false;
 }
 
-bool AddressBitset::unset(uintptr_t addr) {
-  uint64_t hash_addr = remove_lower_bits(addr);
-  int significant_bits = hash_addr & _nb_bits_mask;
-  unsigned index_array = significant_bits / 64;
-  unsigned bit_offset = significant_bits % 64;
-  uint64_t bit_in_element = (1UL << bit_offset);
+bool AddressBitset::remove(uintptr_t addr) {
+  int significant_bits = hash_significant_bits(addr);
+  unsigned index_array = significant_bits / sizeof(Word_t);
+  unsigned bit_offset = significant_bits % sizeof(Word_t);
+  Word_t bit_in_element = (1UL << bit_offset);
   if ((_address_bitset[index_array].fetch_xor(bit_in_element) &
-       bit_in_element) &&
-      likely(_nb_addresses.load(std::memory_order_relaxed) >= 0)) {
-    --_nb_addresses; // fetch_add - 1
+       bit_in_element)) {
+    _nb_addresses.fetch_sub(1, std::memory_order_relaxed);
+    // in the unlikely event of a clear right at the wrong time, we could
+    // have a negative number of elements (though count desyncs are acceptable)
     return true;
   }
   return false;
 }
 
+unsigned int AddressBitset::count_set_bits(Word_t w) {
+  unsigned int count = 0;
+  while (w) {
+    count += w & 1;
+    w >>= 1;
+  }
+  return count;
+}
+
 void AddressBitset::clear() {
   for (unsigned i = 0; i < _k_nb_elements; ++i) {
-    _address_bitset[i].store(0, std::memory_order_relaxed);
+    Word_t original_value = _address_bitset[i].exchange(0);
+    // Count number of set bits in original_value
+    int num_set_bits = count_set_bits(original_value);
+    if (num_set_bits > 0) {
+      _nb_addresses.fetch_sub(num_set_bits, std::memory_order_relaxed);
+    }
   }
-  _nb_addresses.store(0);
 }
 
 } // namespace ddprof
