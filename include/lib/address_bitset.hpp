@@ -21,7 +21,7 @@ class AddressBitset {
 public:
   // Publish 1 Meg as default
   constexpr static unsigned _k_default_bitset_size = 8 * 1024 * 1024;
-  AddressBitset(unsigned max_addresses = 0) { init(max_addresses); }
+  explicit AddressBitset(unsigned max_addresses = 0) { init(max_addresses); }
   void init(unsigned max_addresses);
   // returns true if the element was inserted
   bool add(uintptr_t addr);
