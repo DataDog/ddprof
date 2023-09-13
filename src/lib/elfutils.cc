@@ -5,12 +5,11 @@
 
 #include "elfutils.hpp"
 
-#include "span.hpp"
-
 #include <algorithm>
 #include <climits>
 #include <cstring>
 #include <functional>
+#include <span>
 #include <sys/mman.h>
 #include <unistd.h>
 
@@ -60,10 +59,10 @@ bool check(const ElfW(Sym) & sym, const char *symname, std::string_view name) {
 
 struct DynamicInfo {
   std::string_view strtab;
-  ddprof::span<const ElfW(Sym)> symtab;
-  ddprof::span<const ElfW(Rel)> rels;
-  ddprof::span<const ElfW(Rela)> relas;
-  ddprof::span<const ElfW(Rela)> jmprels;
+  std::span<const ElfW(Sym)> symtab;
+  std::span<const ElfW(Rel)> rels;
+  std::span<const ElfW(Rela)> relas;
+  std::span<const ElfW(Rela)> jmprels;
   const uint32_t *elf_hash;
   const uint32_t *gnu_hash;
   ElfW(Addr) base;

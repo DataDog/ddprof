@@ -28,7 +28,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #  define INPUT_REG(reg) [i##reg] "i"(REGNAME(reg))
 
-void save_registers(ddprof::span<uint64_t, PERF_REGS_COUNT>) {
+void save_registers(std::span<uint64_t, PERF_REGS_COUNT>) {
   // The goal here is to capture the state of registers after the return of this
   // function. That is why this function must not be inlined.
 

@@ -10,11 +10,11 @@
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "pevent_lib.hpp"
-#include "span.hpp"
 #include "string_format.hpp"
 #include "symbol_hdr.hpp"
 
 #include <errno.h>
+#include <span>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -193,7 +193,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   // assumption of single line per loc for now
   ddog_prof_Line line_buff[DD_MAX_STACK_DEPTH];
 
-  ddprof::span locs{uw_output->locs};
+  std::span locs{uw_output->locs};
 
   if (watcher->options.nb_frames_to_skip < locs.size()) {
     locs = locs.subspan(watcher->options.nb_frames_to_skip);
@@ -286,7 +286,7 @@ void ddprof_print_sample(const UnwindOutput &uw_output,
                          const PerfWatcher &watcher) {
 
   auto &symbol_table = symbol_hdr._symbol_table;
-  ddprof::span locs{uw_output.locs};
+  std::span locs{uw_output.locs};
 
   const char *sample_name = sample_type_name_from_idx(
       sample_type_id_to_count_sample_type_id(watcher.sample_type_id));

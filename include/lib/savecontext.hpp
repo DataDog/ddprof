@@ -7,17 +7,17 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <span>
 
 #include "ddprof_base.hpp"
 #include "perf_archmap.hpp"
-#include "span.hpp"
 
 /**Retrieve stack bounds from current thread.
    Return an empty span in case of failure.*/
-DDPROF_NOIPO ddprof::span<const std::byte> retrieve_stack_bounds();
+DDPROF_NOIPO std::span<const std::byte> retrieve_stack_bounds();
 
 /** Save registers and stack for remote unwinding
  * Return saved stack size */
-DDPROF_NOIPO size_t save_context(ddprof::span<const std::byte> stack_bounds,
-                                 ddprof::span<uint64_t, PERF_REGS_COUNT> regs,
-                                 ddprof::span<std::byte> buffer);
+DDPROF_NOIPO size_t save_context(std::span<const std::byte> stack_bounds,
+                                 std::span<uint64_t, PERF_REGS_COUNT> regs,
+                                 std::span<std::byte> buffer);

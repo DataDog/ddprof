@@ -18,7 +18,7 @@
 // Returns an empty span in case of failure
 // Fills start (low address, so closer to SP) and end (stack end address is the
 // start of the stack since stack grows down)
-DDPROF_NOINLINE ddprof::span<const std::byte> retrieve_stack_bounds() {
+DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds() {
   void *stack_addr;
   size_t stack_size;
   pthread_attr_t attrs;
@@ -38,15 +38,17 @@ DDPROF_NOINLINE ddprof::span<const std::byte> retrieve_stack_bounds() {
 // intercepts memcpy and reports a satck underflow there, empirically it appears
 // that both attribute and a suppression are required.
 static DDPROF_NO_SANITIZER_ADDRESS size_t
-save_stack(ddprof::span<const std::byte> stack_bounds,
-           const std::byte *stack_ptr, ddprof::span<std::byte> buffer) {
+save_stack(std::span<const std::byte> stack_bounds, const std::byte *stack_ptr,
+           std::span<std::byte> buffer) {
   // Safety check to ensure we are not in a fiber using a different stack
-  if (!(stack_ptr >= stack_bounds.begin() && stack_ptr < stack_bounds.end())) {
+  if (!(stack_ptr >= to_address(stack_bounds.begin()) &&
+        stack_ptr < to_address(stack_bounds.end()))) {
     return 0;
   }
   // take the min of current stack size and requested stack sample size~
-  int64_t saved_stack_size = std::min(static_cast<intptr_t>(buffer.size()),
-                                      stack_bounds.end() - stack_ptr);
+  int64_t saved_stack_size =
+      std::min(static_cast<intptr_t>(buffer.size()),
+               to_address(stack_bounds.end()) - stack_ptr);
 
   if (saved_stack_size <= 0) {
     return 0;
@@ -57,9 +59,9 @@ save_stack(ddprof::span<const std::byte> stack_bounds,
   return saved_stack_size;
 }
 
-size_t save_context(ddprof::span<const std::byte> stack_bounds,
-                    ddprof::span<uint64_t, PERF_REGS_COUNT> regs,
-                    ddprof::span<std::byte> buffer) {
+size_t save_context(std::span<const std::byte> stack_bounds,
+                    std::span<uint64_t, PERF_REGS_COUNT> regs,
+                    std::span<std::byte> buffer) {
   save_registers(regs);
   // save the stack just after saving registers, stack part above saved SP
   // must not be changed between call to save_registers and call to save_stack

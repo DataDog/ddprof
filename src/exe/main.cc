@@ -127,10 +127,10 @@ static DDRes get_library_path(TempFileHolder &libdd_profiling_path,
   }
 
   if (profiling_path.empty()) {
-    DDRES_CHECK_FWD(get_or_create_temp_file(
+    DDRES_CHECK_FWD(ddprof::get_or_create_temp_file(
         k_libdd_profiling_embedded_name,
-        ddprof::as_bytes(ddprof::span{_binary_libdd_profiling_embedded_so_start,
-                                      _binary_libdd_profiling_embedded_so_end}),
+        as_bytes(std::span{_binary_libdd_profiling_embedded_so_start,
+                           _binary_libdd_profiling_embedded_so_end}),
         0644, profiling_path));
     libdd_profiling_path = TempFileHolder{profiling_path, false};
   } else {
@@ -139,10 +139,10 @@ static DDRes get_library_path(TempFileHolder &libdd_profiling_path,
 
 #ifdef DDPROF_USE_LOADER
   if (loader_path.empty()) {
-    DDRES_CHECK_FWD(get_or_create_temp_file(
+    DDRES_CHECK_FWD(ddprof::get_or_create_temp_file(
         k_libdd_loader_name,
-        ddprof::as_bytes(ddprof::span{_binary_libdd_loader_so_start,
-                                      _binary_libdd_loader_so_end}),
+        as_bytes(std::span{_binary_libdd_loader_so_start,
+                           _binary_libdd_loader_so_end}),
         0644, loader_path));
     libdd_loader_path = TempFileHolder{loader_path, false};
   } else {
@@ -313,8 +313,8 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     int alloc_watcher_idx =
         ddprof::context_allocation_profiling_watcher_idx(*ctx);
     if (alloc_watcher_idx != -1) {
-      ddprof::span pevents{ctx->worker_ctx.pevent_hdr.pes,
-                           ctx->worker_ctx.pevent_hdr.size};
+      std::span pevents{ctx->worker_ctx.pevent_hdr.pes,
+                        ctx->worker_ctx.pevent_hdr.size};
       auto event_it =
           std::find_if(pevents.begin(), pevents.end(),
                        [alloc_watcher_idx](const auto &pevent) {

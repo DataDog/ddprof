@@ -42,11 +42,11 @@ struct timeval to_timeval(std::chrono::microseconds duration) noexcept {
 
 } // namespace
 
-template <typename T> ddprof::span<std::byte> to_byte_span(T *obj) {
+template <typename T> std::span<std::byte> to_byte_span(T *obj) {
   return {reinterpret_cast<std::byte *>(obj), sizeof(T)};
 }
 
-template <typename T> ddprof::span<const std::byte> to_byte_span(const T *obj) {
+template <typename T> std::span<const std::byte> to_byte_span(const T *obj) {
   return {reinterpret_cast<const std::byte *>(obj), sizeof(T)};
 }
 
@@ -104,7 +104,7 @@ size_t UnixSocket::send_partial(ConstBuffer buffer,
   return ec ? 0 : ret;
 }
 
-void UnixSocket::send(ConstBuffer buffer, ddprof::span<const int> fds,
+void UnixSocket::send(ConstBuffer buffer, std::span<const int> fds,
                       std::error_code &ec) noexcept {
   size_t written = send_partial(buffer, fds, ec);
 
@@ -113,7 +113,7 @@ void UnixSocket::send(ConstBuffer buffer, ddprof::span<const int> fds,
   }
 }
 
-size_t UnixSocket::send_partial(ConstBuffer buffer, ddprof::span<const int> fds,
+size_t UnixSocket::send_partial(ConstBuffer buffer, std::span<const int> fds,
                                 std::error_code &ec) noexcept {
   msghdr msg = {};
   if (fds.size() > kMaxFD || buffer.empty()) {
@@ -155,7 +155,7 @@ size_t UnixSocket::send_partial(ConstBuffer buffer, ddprof::span<const int> fds,
   return ec ? 0 : ret;
 }
 
-size_t UnixSocket::receive(ddprof::span<std::byte> buffer,
+size_t UnixSocket::receive(std::span<std::byte> buffer,
                            std::error_code &ec) noexcept {
   size_t read = 0;
 
@@ -166,7 +166,7 @@ size_t UnixSocket::receive(ddprof::span<std::byte> buffer,
   return read;
 }
 
-size_t UnixSocket::receive_partial(ddprof::span<std::byte> buffer,
+size_t UnixSocket::receive_partial(std::span<std::byte> buffer,
                                    std::error_code &ec) noexcept {
   ssize_t ret;
   do {
@@ -177,8 +177,8 @@ size_t UnixSocket::receive_partial(ddprof::span<std::byte> buffer,
   return ret < 0 ? 0 : ret;
 }
 
-std::pair<size_t, size_t> UnixSocket::receive(ddprof::span<std::byte> buffer,
-                                              ddprof::span<int> fds,
+std::pair<size_t, size_t> UnixSocket::receive(std::span<std::byte> buffer,
+                                              std::span<int> fds,
                                               std::error_code &ec) noexcept {
   auto [read, read_fds] = receive_partial(buffer, fds, ec);
   if (!ec && read < buffer.size()) {
@@ -188,8 +188,7 @@ std::pair<size_t, size_t> UnixSocket::receive(ddprof::span<std::byte> buffer,
 }
 
 std::pair<size_t, size_t>
-UnixSocket::receive_partial(ddprof::span<std::byte> buffer,
-                            ddprof::span<int> fds,
+UnixSocket::receive_partial(std::span<std::byte> buffer, std::span<int> fds,
                             std::error_code &ec) noexcept {
 
   msghdr msgh = {};
@@ -252,7 +251,7 @@ DDRes send(UnixSocket &socket, const RequestMessage &msg) {
 
 DDRes send(UnixSocket &socket, const ReplyMessage &msg) {
   int fds[2] = {msg.ring_buffer.ring_fd, msg.ring_buffer.event_fd};
-  ddprof::span<int> fd_span{fds, (msg.ring_buffer.mem_size != -1) ? 2ul : 0ul};
+  std::span<int> fd_span{fds, (msg.ring_buffer.mem_size != -1) ? 2ul : 0ul};
   std::error_code ec;
   InternalResponseMessage data = {
       .request = msg.request,
