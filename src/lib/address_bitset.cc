@@ -37,10 +37,10 @@ void AddressBitset::init(unsigned max_addresses) {
     _address_bitset.reset();
   }
   _nb_bits = round_to_power_of_two(max_addresses);
-  _k_nb_elements = (_nb_bits) / (_nb_bits_per_elt);
+  _k_nb_words = (_nb_bits) / (_nb_bits_per_word);
   if (_nb_bits) {
     _nb_bits_mask = _nb_bits - 1;
-    _address_bitset = std::make_unique<std::atomic<uint64_t>[]>(_k_nb_elements);
+    _address_bitset = std::make_unique<std::atomic<uint64_t>[]>(_k_nb_words);
   }
 }
 
@@ -49,8 +49,8 @@ bool AddressBitset::add(uintptr_t addr) {
   // As per nsavoire's comment, it is better to use separate operators
   // than to use the div instruction which generates an extra function call
   // Also, the usage of a power of two value allows for bit operations
-  unsigned index_array = significant_bits / sizeof(Word_t);
-  unsigned bit_offset = significant_bits % sizeof(Word_t);
+  unsigned index_array = significant_bits / _nb_bits_per_word;
+  unsigned bit_offset = significant_bits % _nb_bits_per_word;
   Word_t bit_in_element = (1UL << bit_offset);
   // there is a possible race between checking the value
   // and setting it
@@ -66,8 +66,8 @@ bool AddressBitset::add(uintptr_t addr) {
 
 bool AddressBitset::remove(uintptr_t addr) {
   int significant_bits = hash_significant_bits(addr);
-  unsigned index_array = significant_bits / sizeof(Word_t);
-  unsigned bit_offset = significant_bits % sizeof(Word_t);
+  unsigned index_array = significant_bits / _nb_bits_per_word;
+  unsigned bit_offset = significant_bits % _nb_bits_per_word;
   Word_t bit_in_element = (1UL << bit_offset);
   if ((_address_bitset[index_array].fetch_xor(bit_in_element) &
        bit_in_element)) {
@@ -89,7 +89,7 @@ unsigned int AddressBitset::count_set_bits(Word_t w) {
 }
 
 void AddressBitset::clear() {
-  for (unsigned i = 0; i < _k_nb_elements; ++i) {
+  for (unsigned i = 0; i < _k_nb_words; ++i) {
     Word_t original_value = _address_bitset[i].exchange(0);
     // Count number of set bits in original_value
     int num_set_bits = count_set_bits(original_value);

@@ -35,12 +35,12 @@ private:
   unsigned _lower_bits_ignored;
   // element type
   using Word_t = uint64_t;
-  constexpr static unsigned _nb_bits_per_elt = sizeof(Word_t) * 8;
+  constexpr static unsigned _nb_bits_per_word = sizeof(Word_t) * 8;
   // 1 Meg divided in uint64's size
   // The probability of collision is proportional to the number of elements
   // already within the bitset
   unsigned _nb_bits = {};
-  unsigned _k_nb_elements = {};
+  unsigned _k_nb_words = {};
   unsigned _nb_bits_mask = {};
   // We can not use an actual bitset (for atomicity reasons)
   std::unique_ptr<std::atomic<uint64_t>[]> _address_bitset;
