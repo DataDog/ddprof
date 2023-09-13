@@ -6,6 +6,7 @@
 #pragma once
 
 #include "ddprof_defs.hpp"
+#include "enum_flags.hpp"
 
 #include <stdint.h>
 #include <string>
@@ -20,25 +21,7 @@ enum class EventConfMode : uint32_t {
   kAll = kCallgraph | kMetric | kLiveCallgraph,
 };
 
-bool operator<=(EventConfMode A, EventConfMode B) = delete;
-bool operator<(EventConfMode A, EventConfMode B) = delete;
-bool operator>(EventConfMode A, EventConfMode B) = delete;
-bool operator>=(EventConfMode A, EventConfMode B) = delete;
-
-constexpr EventConfMode operator|(EventConfMode A, const EventConfMode B) {
-  return static_cast<EventConfMode>(static_cast<uint32_t>(A) |
-                                    static_cast<uint32_t>(B));
-}
-
-constexpr EventConfMode operator|=(EventConfMode &A, const EventConfMode B) {
-  return A = A | B;
-}
-
-constexpr EventConfMode operator&(const EventConfMode A,
-                                  const EventConfMode B) {
-  return static_cast<EventConfMode>(static_cast<uint32_t>(A) &
-                                    static_cast<uint32_t>(B));
-}
+ALLOW_FLAGS_FOR_ENUM(EventConfMode)
 
 constexpr bool Any(EventConfMode arg) {
   return arg != EventConfMode::kDisabled;
