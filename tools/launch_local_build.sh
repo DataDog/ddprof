@@ -126,7 +126,7 @@ if [ $PERFORM_CLEAN -eq 1 ]; then
     echo "Clean image : ${DOCKER_NAME}"
     # if docker image does not exist, we should not fail
     docker image rm "${DOCKER_NAME}" || true
-    CACHE_OPTION="--no-cache"
+    #CACHE_OPTION="--no-cache"
 fi
 
 # Check if base image exists

@@ -1,0 +1,2 @@
+FROM python:slim
+

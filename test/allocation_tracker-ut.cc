@@ -75,7 +75,7 @@ TEST(allocation_tracker, start_stop) {
     ASSERT_EQ(sample->addr, 0xdeadbeef);
 
     UnwindState state;
-    ddprof::unwind_init_sample(&state, sample->regs, sample->pid,
+    ddprof::unwind_init_sample(&state, sample->regs, sample->pid, sample->tid,
                                sample->size_stack, sample->data_stack);
     ddprof::unwindstate__unwind(&state);
 

@@ -29,7 +29,7 @@ void funcB() {
   uint64_t regs[K_NB_REGS_UNWIND];
   size_t stack_size = save_context(retrieve_stack_bounds(), regs, stack);
 
-  ddprof::unwind_init_sample(&state, regs, getpid(), stack_size,
+  ddprof::unwind_init_sample(&state, regs, getpid(), 0, stack_size,
                              reinterpret_cast<char *>(stack));
   ddprof::unwindstate__unwind(&state);
 
@@ -98,7 +98,7 @@ TEST(getcontext, unwind_from_sighandler) {
   t.join();
 
   UnwindState state;
-  ddprof::unwind_init_sample(&state, regs, getpid(), stack_size,
+  ddprof::unwind_init_sample(&state, regs, getpid(), 0, stack_size,
                              reinterpret_cast<char *>(stack));
   ddprof::unwindstate__unwind(&state);
 

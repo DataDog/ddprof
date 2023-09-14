@@ -177,6 +177,22 @@ RUN VERSION="3.21.0" \
 # Install cmake_format
 RUN pip3 install cmake_format
 
+RUN apt-get update \
+  && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    libtool \
+    libiberty-dev
+
+
+# possibly useful command
+# CFLAGS="-g -O0 -DTRACE" ./configure
+# Valid commit : git checkout a7a292b3f5a1058051b017c0d339a678efdec704
+RUN git clone --branch libaustin https://github.com/P403n1x87/austin.git && \
+    cd austin && \
+    autoreconf --install && \
+    CFLAGS="-O2" ./configure && \
+    make && \
+    make install
+
 # A specific user is required to get access to perf event ressources.
 # This enables unit testing using perf-event ressources
 RUN useradd -ms /bin/bash ddbuild

@@ -28,6 +28,9 @@ set(LIBELF_PATH ${ELFUTILS_PATH}/lib/libelf.a)
 
 set(ELFUTILS_INCLUDE_DIRS ${ELFUTILS_PATH}/include)
 
+set(PRIVATE_EBL_DIRS ${ELFUTILS_PATH}/src/libebl)
+set(LIBDW_INCLUDE_DIRS ${ELFUTILS_PATH}/include/elfutils)
+
 if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Release" AND NOT "${CMAKE_BUILD_TYPE}" STREQUAL
                                                     "RelWithDebInfo")
   # Variable can contain several args as it is quoted
@@ -59,5 +62,8 @@ set_target_properties(
              INTERFACE_INCLUDE_DIRECTORIES ${ELFUTILS_INCLUDE_DIRS}
              INTERFACE_LINK_LIBRARIES "${LIBLZMA_LIBRARIES};${ZLIB_LIBRARIES}")
 
+add_library(private_ebl INTERFACE)
+target_include_directories(private_ebl INTERFACE ${PRIVATE_EBL_DIRS} ${LIBDW_INCLUDE_DIRS})
+
 # Elf libraries
-set(ELFUTILS_LIBRARIES dw elf)
+set(ELFUTILS_LIBRARIES dw elf private_ebl)

@@ -234,7 +234,7 @@ static DDRes ddprof_unwind_sample(DDProfContext &ctx, perf_event_sample *sample,
   ddprof_stats_add(STATS_UNWIND_AVG_STACK_SIZE, sample->size_stack, nullptr);
 
   // copy the sample context into the unwind structure
-  unwind_init_sample(us, sample->regs, sample->pid, sample->size_stack,
+  unwind_init_sample(us, sample->regs, sample->pid, sample->tid, sample->size_stack,
                      sample->data_stack);
 
   // If a sample has a PID, it has a TID.  Include it for downstream labels

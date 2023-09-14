@@ -13,13 +13,16 @@
 #include <limits>
 #include <sys/types.h>
 #include <unordered_map>
+#include <vector>
+
+typedef void *austin_handle_t;
 
 namespace ddprof {
 
 class Process {
 public:
   explicit Process(pid_t pid) : _pid(pid), _cgroup_ns(kCGroupNsNull) {}
-
+  ~Process();
   using CGroupId_t = uint64_t;
   static constexpr CGroupId_t kCGroupNsNull =
       std::numeric_limits<CGroupId_t>::max();
@@ -33,7 +36,11 @@ public:
   // lazy read of container id
   const ContainerId &get_container_id(std::string_view path_to_proc = "");
 
+  austin_handle_t get_austin_handle(pid_t tid);
+
   uint64_t _sample_counter = {};
+
+  std::vector<int> _python_register_indices;
 
 private:
   std::string format_cgroup_file(pid_t pid, std::string_view path_to_proc);
@@ -44,6 +51,8 @@ private:
   pid_t _pid;
   CGroupId_t _cgroup_ns;
   ContainerId _container_id;
+
+  austin_handle_t _austin_handle = nullptr;
 };
 
 class ProcessHdr {
@@ -52,6 +61,8 @@ public:
       : _path_to_proc(path_to_proc) {}
   const ContainerId &get_container_id(pid_t pid, bool force = false);
   void clear(pid_t pid) { _process_map.erase(pid); }
+
+  Process &get_process(pid_t pid);
 
 private:
   constexpr static auto k_nb_samples_container_id_lookup = 100;

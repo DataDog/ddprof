@@ -268,8 +268,9 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   ddog_prof_Profile_AddResult add_res = ddog_prof_Profile_add(profile, sample);
   if (add_res.tag == DDOG_PROF_PROFILE_ADD_RESULT_ERR) {
     defer { ddog_Error_drop(&add_res.err); };
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile: %s",
-                           add_res.err.message.ptr);
+    LG_NTC("Unable to add profile - continue execution.");
+//    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile: %s",
+//                           add_res.err.message.ptr);
   }
   return ddres_init();
 }

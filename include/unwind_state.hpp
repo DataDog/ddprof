@@ -16,6 +16,8 @@
 #include "symbol_hdr.hpp"
 #include "unwind_output.hpp"
 
+#include "libaustin.h"
+
 #include <sys/types.h>
 
 typedef struct Dwfl Dwfl;
@@ -52,6 +54,7 @@ struct UnwindState {
   ddprof::ProcessHdr process_hdr;
 
   pid_t pid;
+  pid_t tid;
   char *stack;
   size_t stack_sz;
 

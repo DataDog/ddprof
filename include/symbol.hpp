@@ -21,7 +21,7 @@ public:
   Symbol(std::string symname, std::string demangle_name, uint32_t lineno,
          std::string srcpath)
       : _symname(std::move(symname)), _demangle_name(std::move(demangle_name)),
-        _lineno(lineno), _srcpath(std::move(srcpath)) {}
+        _lineno(lineno), _srcpath(std::move(srcpath)), _is_python_frame(false) {}
 
   // OUTPUT OF ADDRINFO
   std::string _symname;
@@ -32,5 +32,7 @@ public:
   // OUTPUT OF LINE INFO
   uint32_t _lineno;
   std::string _srcpath;
+
+  bool _is_python_frame;
 };
 } // namespace ddprof

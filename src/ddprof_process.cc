@@ -8,6 +8,7 @@
 #include "ddres.hpp"
 #include "string_format.hpp"
 
+#include "libaustin.h"
 #include <charconv> // for std::from_chars
 #include <unistd.h>
 #include <vector>
@@ -18,6 +19,21 @@ constexpr auto k_max_buf_cgroup_link = 1024;
 std::string Process::format_cgroup_file(pid_t pid,
                                         std::string_view path_to_proc) {
   return string_format("%s/proc/%d/cgroup", path_to_proc.data(), pid);
+}
+
+Process::~Process() {
+  if (_austin_handle) {
+    austin_detach(_austin_handle);
+  }
+}
+
+austin_handle_t Process::get_austin_handle(pid_t tid) {
+  if (!_austin_handle) {
+    LG_NTC("Attaching to PID %d/%d", _pid, tid);
+    _austin_handle = austin_attach(_pid);
+    LG_NTC("Result of attach %s", _austin_handle?"Success":"Failure");
+  }
+  return _austin_handle;
 }
 
 const ContainerId &Process::get_container_id(std::string_view path_to_proc) {
@@ -72,6 +88,22 @@ DDRes Process::read_cgroup_ns(pid_t pid, std::string_view path_to_proc,
                           pid);
   }
   return {};
+}
+
+Process &ProcessHdr::get_process(pid_t pid) {
+  auto it = _process_map.find(pid);
+  if (it == _process_map.end()) {
+    // new process, parse cgroup
+    auto pair = _process_map.try_emplace(pid, pid);
+    if (pair.second) {
+      it = pair.first;
+    } else {
+      // todo: probably not an exception
+      LG_WRN("[ProcessHdr] Unable to insert process element");
+      throw std::runtime_error("Unable to insert process element");
+    }
+  }
+  return it->second;
 }
 
 const ContainerId &ProcessHdr::get_container_id(pid_t pid, bool force) {
