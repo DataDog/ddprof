@@ -136,7 +136,7 @@ add_unit_test(
   ../src/presets.cc
   ../src/tracepoint_config.cc
   ddprof_context-ut.cc
-  LIBRARIES DDProf::Parser
+  LIBRARIES DDProf::Parser CLI11
   DEFINITIONS MYNAME="ddprof_context-ut")
 
 add_unit_test(
@@ -348,7 +348,7 @@ add_unit_test(
   ../src/ddprof_cmdline.cc
   ../src/perf_watcher.cc
   ../src/tracepoint_config.cc
-  LIBRARIES DDProf::Parser)
+  LIBRARIES DDProf::Parser CLI11)
 
 add_unit_test(pthread_tls-ut pthread_tls-ut.cc)
 
@@ -378,21 +378,18 @@ add_benchmark(
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
   add_exe(
     simple_malloc-static simple_malloc.cc
-    LIBRARIES Threads::Threads dd_profiling-static
+    LIBRARIES Threads::Threads dd_profiling-static CLI11
     DEFINITIONS USE_DD_PROFILING)
-  target_include_directories(simple_malloc-static PRIVATE ${CMAKE_SOURCE_DIR}/include
-                                                          ${CMAKE_SOURCE_DIR}/third_party)
+  target_include_directories(simple_malloc-static PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
   add_exe(
     simple_malloc-shared simple_malloc.cc
-    LIBRARIES dd_profiling-shared Threads::Threads
+    LIBRARIES dd_profiling-shared Threads::Threads CLI11
     DEFINITIONS USE_DD_PROFILING)
-  target_include_directories(simple_malloc-shared PRIVATE ${CMAKE_SOURCE_DIR}/include
-                                                          ${CMAKE_SOURCE_DIR}/third_party)
+  target_include_directories(simple_malloc-shared PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
-  add_exe(simple_malloc simple_malloc.cc LIBRARIES Threads::Threads)
-  target_include_directories(simple_malloc PRIVATE ${CMAKE_SOURCE_DIR}/include
-                                                   ${CMAKE_SOURCE_DIR}/third_party)
+  add_exe(simple_malloc simple_malloc.cc LIBRARIES Threads::Threads CLI11)
+  target_include_directories(simple_malloc PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
   add_test(
     NAME simple_malloc
