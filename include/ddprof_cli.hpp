@@ -12,6 +12,7 @@
 #include "event_parser.h"
 #include "perf_watcher.hpp"
 
+#include <chrono>
 #include <string>
 #include <vector>
 
@@ -57,6 +58,9 @@ public:
   // extended
   std::string cpu_affinity;
   uint32_t default_stack_sample_size{k_default_perf_stack_sample_size};
+  std::chrono::milliseconds initial_loaded_libs_check_delay{0};
+  std::chrono::milliseconds loaded_libs_check_interval{0};
+
   bool show_samples{false};
   bool fault_info{true};
   bool help_extended{false};

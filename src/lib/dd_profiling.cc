@@ -179,7 +179,10 @@ int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
   return -1;
 }
 
-void notify_fork() { ddprof::AllocationTracker::notify_fork(); }
+void notify_fork() {
+  ddprof::AllocationTracker::notify_fork();
+  ddprof::reinstall_timer_after_fork();
+}
 
 int ddprof_start_profiling_internal() {
   // Refuse to start profiler if already started by this process or if active in
@@ -267,7 +270,9 @@ int ddprof_start_profiling_internal() {
         // \fixme{nsavoire} pthread_create should probably be overridden
         // at load time since we need to capture stack end addresses of all
         // threads in case allocation profiling is started later on
-        ddprof::setup_overrides();
+        ddprof::setup_overrides(
+            std::chrono::milliseconds{info.initial_loaded_libs_check_delay_ms},
+            std::chrono::milliseconds{info.loaded_libs_check_interval_ms});
         // \fixme{nsavoire} what should we do when allocation tracker init
         // fails ?
         g_state.allocation_profiling_started = true;

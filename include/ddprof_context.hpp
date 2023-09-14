@@ -39,6 +39,8 @@ struct DDProfContext {
     std::string switch_user;
     std::string internal_stats;
     std::string tags;
+    std::chrono::milliseconds initial_loaded_libs_check_delay{0};
+    std::chrono::milliseconds loaded_libs_check_interval{0};
   } params;
 
   std::vector<PerfWatcher> watchers;

@@ -9,7 +9,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <dlfcn.h>
 #include <functional>
+#include <iostream>
 #include <signal.h>
 #include <sstream>
 #include <thread>
@@ -17,9 +19,12 @@
 #include <unistd.h>
 
 #include "ddprof_base.hpp"
+#include "enum_flags.hpp"
 #include "syscalls.hpp"
 
-#include "CLI/CLI11.hpp"
+#ifndef SIMPLE_MALLOC_SHARED_LIBRARY
+#  include "CLI/CLI11.hpp"
+#endif
 
 #ifdef USE_DD_PROFILING
 #  include "dd_profiling.h"
@@ -29,23 +34,30 @@
 #  include <execinfo.h>
 #endif
 
-/*****************************  SIGSEGV Handler *******************************/
-static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
-  // TODO this really shouldn't call printf-family functions...
-  (void)uc;
-#ifdef __GLIBC__
-  static void *buf[4096] = {0};
-  size_t sz = backtrace(buf, 4096);
-#endif
-  fprintf(stderr, "simplemalloc[%d]:has encountered an error and will exit\n",
-          getpid());
-  if (sig == SIGSEGV)
-    printf("Fault address: %p\n", si->si_addr);
-#ifdef __GLIBC__
-  backtrace_symbols_fd(buf, sz, STDERR_FILENO);
-#endif
-  exit(-1);
-}
+class Voidify final {
+public:
+  // This has to be an operator with a precedence lower than << but higher than
+  // ?:
+  template <typename T> void operator&&(const T &) const && {}
+};
+
+class LogMessageFatal {
+public:
+  LogMessageFatal(const char *file, int line, const char *failure_msg) {
+    InternalStream() << "Check failed: " << failure_msg << " ";
+  }
+  ~LogMessageFatal() {
+    std::cerr << std::endl;
+    abort();
+  }
+  std::ostream &InternalStream() { return std::cerr; }
+};
+
+#define CHECK_IMPL(condition, condition_text)                                  \
+  (condition) ? (void)0                                                        \
+              : Voidify() &&                                                   \
+          LogMessageFatal(__FILE__, __LINE__, condition_text).InternalStream()
+#define CHECK(condition) CHECK_IMPL((condition), #condition)
 
 struct thread_cpu_clock {
   using duration = std::chrono::nanoseconds;
@@ -78,9 +90,12 @@ struct Options {
   std::chrono::microseconds spin_duration_per_loop;
   std::chrono::microseconds sleep_duration_per_loop;
   std::chrono::milliseconds timeout_duration;
+  std::chrono::milliseconds initial_delay;
   uint32_t callstack_depth;
   uint32_t frame_size;
   uint32_t skip_free;
+  bool use_shared_library = false;
+  bool avoid_dlopen_hook = false;
 };
 
 extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
@@ -160,6 +175,27 @@ extern "C" DDPROF_NOINLINE void wrapper(const Options &options, Stats &stats) {
   recursive_call(options, stats, options.callstack_depth);
 }
 
+using WrapperFuncPtr = decltype(&wrapper);
+
+#ifndef SIMPLE_MALLOC_SHARED_LIBRARY
+/*****************************  SIGSEGV Handler *******************************/
+static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
+  // TODO this really shouldn't call printf-family functions...
+  (void)uc;
+#  ifdef __GLIBC__
+  static void *buf[4096] = {0};
+  size_t sz = backtrace(buf, 4096);
+#  endif
+  fprintf(stderr, "simplemalloc[%d]:has encountered an error and will exit\n",
+          getpid());
+  if (sig == SIGSEGV)
+    printf("Fault address: %p\n", si->si_addr);
+#  ifdef __GLIBC__
+  backtrace_symbols_fd(buf, sz, STDERR_FILENO);
+#  endif
+  exit(-1);
+}
+
 void print_header() {
   printf("TestHeaders:%-8s,%-8s,%-14s,%-14s,%-14s,%-14s\n", "PID", "TID",
          "alloc_samples", "alloc_bytes", "wall_time", "cpu_time");
@@ -169,6 +205,44 @@ void print_stats(pid_t pid, const Stats &stats) {
   printf("TestStats  :%-8d,%-8d,%-14lu,%-14lu,%-14lu,%-14lu\n", pid, stats.tid,
          stats.nb_allocations, stats.allocated_bytes, stats.wall_time.count(),
          stats.cpu_time.count());
+}
+
+enum class WrapperOpts {
+  kNone = 0x0,
+  kUseSharedLibrary = 0x1,
+  kAvoidDLOpenHook = 0x2
+};
+
+ALLOW_FLAGS_FOR_ENUM(WrapperOpts);
+
+std::string get_shared_library_path() {
+  return std::filesystem::canonical(std::filesystem::path("/proc/self/exe"))
+             .parent_path() /
+      "libsimplemalloc.so";
+}
+
+WrapperFuncPtr get_wrapper_func(WrapperOpts opts) {
+  static_assert(ddprof::EnableBitMaskOperators<WrapperOpts>::value);
+  if ((opts & WrapperOpts::kUseSharedLibrary) == WrapperOpts::kNone) {
+    return &wrapper;
+  }
+  auto dlopen_func = &::dlopen;
+  if ((opts & WrapperOpts::kAvoidDLOpenHook) != WrapperOpts::kNone) {
+    // Do not use dlopen function directly to avoid dlopen hook
+    dlopen_func =
+        reinterpret_cast<decltype(dlopen_func)>(dlsym(RTLD_DEFAULT, "dlopen"));
+  }
+  CHECK(dlopen_func) << "Unable to find dlopen: " << dlerror();
+
+  auto library_path = get_shared_library_path();
+  void *handle = dlopen_func(library_path.c_str(), RTLD_NOW);
+  CHECK(handle) << "Unable to dlopen " << library_path.c_str() << ": "
+                << dlerror();
+
+  WrapperFuncPtr wrapper_func =
+      reinterpret_cast<WrapperFuncPtr>(dlsym(handle, "wrapper"));
+  CHECK(wrapper_func) << "Unable to find wrapper func: " << dlerror();
+  return wrapper_func;
 }
 
 int main(int argc, char *argv[]) {
@@ -221,21 +295,27 @@ int main(int argc, char *argv[]) {
          "Time to spin (us) between allocations")
       ->default_val(0)
       ->check(CLI::NonNegativeNumber);
+  app.add_flag("--use-shared-library", opts.use_shared_library,
+               "Make libsimplemalloc.so (with dlopen) do the allocations");
+  app.add_flag("--avoid-dlopen-hook", opts.avoid_dlopen_hook,
+               "Avoid dlopen hook when loading libsimplemalloc.so");
+  app.add_option("--initial-delay", opts.initial_delay, "Initial delay (ms)")
+      ->default_val(0)
+      ->check(CLI::NonNegativeNumber);
 
-#ifdef USE_DD_PROFILING
+#  ifdef USE_DD_PROFILING
   bool start_profiling = false;
   app.add_flag("--profile", start_profiling, "Enable profiling")
       ->default_val(false);
-#endif
+#  endif
 
   CLI11_PARSE(app, argc, argv);
-
-#ifdef USE_DD_PROFILING
+#  ifdef USE_DD_PROFILING
   if (start_profiling && ddprof_start_profiling() != 0) {
     fprintf(stderr, "Failed to start profiling\n");
     return 1;
   }
-#endif
+#  endif
   if (exec_args.empty()) {
     print_header();
   }
@@ -256,17 +336,39 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  auto wrapper_func =
+      get_wrapper_func((opts.use_shared_library ? WrapperOpts::kUseSharedLibrary
+                                                : WrapperOpts::kNone) |
+                       (opts.avoid_dlopen_hook ? WrapperOpts::kAvoidDLOpenHook
+                                               : WrapperOpts::kNone));
+
+  if (opts.initial_delay.count() > 0) {
+    std::this_thread::sleep_for(opts.initial_delay);
+  }
+
+  if (opts.avoid_dlopen_hook) {
+    // Do an allocation to force a recheck of loaded libraries:
+    // Loaded libs check is requested in a signal handler triggered by a timer,
+    // but check is done next time a hook is called.
+    void *p = malloc(1);
+    ddprof::DoNotOptimize(p);
+    free(p);
+  }
+
   std::vector<std::thread> threads;
   std::vector<Stats> stats{nb_threads};
   for (unsigned int i = 1; i < nb_threads; ++i) {
-    threads.emplace_back(wrapper, std::cref(opts), std::ref(stats[i]));
+    threads.emplace_back(wrapper_func, std::cref(opts), std::ref(stats[i]));
   }
-  wrapper(opts, stats[0]);
+  wrapper_func(opts, stats[0]);
   for (auto &t : threads) {
     t.join();
   }
+
   auto pid = getpid();
   for (auto &stat : stats) {
     print_stats(pid, stat);
   }
 }
+
+#endif

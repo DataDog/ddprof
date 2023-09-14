@@ -80,16 +80,16 @@ private:
 
 struct RequestMessage {
   // Request flags
-  enum { kProfilerInfo = 1 };
+  enum { kProfilerInfo = 0x1 };
   // request is bit mask of request flags
   uint32_t request = 0;
 };
 
 struct RingBufferInfo {
   int64_t mem_size = -1;
-  int ring_fd = -1;
-  int event_fd = -1;
-  int ring_buffer_type = 0;
+  int32_t ring_fd = -1;
+  int32_t event_fd = -1;
+  int32_t ring_buffer_type = 0;
 };
 
 struct ReplyMessage {
@@ -102,7 +102,9 @@ struct ReplyMessage {
   // RingBufferInfo is returned if request & kRingBuffer
   // cppcheck-suppress unusedStructMember
   RingBufferInfo ring_buffer;
-  int32_t allocation_flags = 0;
+  uint32_t initial_loaded_libs_check_delay_ms = 0;
+  uint32_t loaded_libs_check_interval_ms = 0;
+  uint32_t allocation_flags = 0;
   uint32_t stack_sample_size = 0;
 };
 

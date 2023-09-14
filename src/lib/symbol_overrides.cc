@@ -34,16 +34,18 @@ __attribute__((weak)) int __libc_allocate_rtsig(int high) NOEXCEPT;
 }
 
 namespace {
-constexpr int k_timer_initial_interval_sec = 5;
-constexpr int k_timer_interval_sec = 59;
 constexpr int k_sigrtmax_offset = 3;
 
+std::chrono::milliseconds g_initial_loaded_libs_check_delay;
+std::chrono::milliseconds g_loaded_libs_check_interval;
 bool g_symbols_overridden = false;
 bool g_check_libraries = false;
 bool g_timer_active = false;
 timer_t g_timerid;
 int g_timer_sig = -1;
 int g_nb_loaded_libraries = -1;
+
+void setup_hooks(bool restore);
 
 DDPROF_NOINLINE bool loaded_libraries_have_changed() {
   int nb = ddprof::count_loaded_libraries();
@@ -59,7 +61,7 @@ void check_libraries() {
   // atomic ?
   if (g_check_libraries) {
     if (g_symbols_overridden && loaded_libraries_have_changed()) {
-      ddprof::setup_overrides();
+      setup_hooks(false);
     }
     g_check_libraries = false;
   }
@@ -280,7 +282,7 @@ struct dlopen {
   static void *hook(const char *filename, int flags) noexcept {
     void *ret = ref(filename, flags);
     if (g_symbols_overridden) {
-      ddprof::setup_overrides();
+      setup_hooks(false);
     }
     return ret;
   }
@@ -450,8 +452,18 @@ void uninstall_timer() {
   g_timer_active = false;
 }
 
-int install_timer() {
-  if (g_timer_active) {
+constexpr timespec duration_to_timespec(std::chrono::milliseconds d) {
+  auto nsecs = std::chrono::duration_cast<std::chrono::seconds>(d);
+  d -= nsecs;
+
+  return timespec{nsecs.count(), std::chrono::nanoseconds(d).count()};
+}
+
+int install_timer(std::chrono::milliseconds initial_loaded_libs_check_delay,
+                  std::chrono::milliseconds loaded_libs_check_interval) {
+  if (g_timer_active ||
+      (initial_loaded_libs_check_delay.count() == 0 &&
+       loaded_libs_check_interval.count() == 0)) {
     return 0;
   }
 
@@ -485,14 +497,17 @@ int install_timer() {
     return -1;
   }
 
-  itimerspec its = {.it_interval = {.tv_sec = k_timer_interval_sec},
-                    .it_value = {.tv_sec = k_timer_initial_interval_sec}};
+  itimerspec its = {
+      .it_interval = duration_to_timespec(loaded_libs_check_interval),
+      .it_value = duration_to_timespec(initial_loaded_libs_check_delay)};
   if (timer_settime(g_timerid, 0, &its, NULL) == -1) {
     uninstall_timer();
     return -1;
   }
 
   g_timer_active = true;
+  g_initial_loaded_libs_check_delay = initial_loaded_libs_check_delay;
+  g_loaded_libs_check_interval = loaded_libs_check_interval;
   return 0;
 }
 
@@ -523,21 +538,29 @@ void setup_hooks(bool restore) {
   install_hook<dlopen>(restore);
 
   g_symbols_overridden = !restore;
-  if (restore && g_timer_active) {
-    uninstall_timer();
-  } else if (!restore && !g_timer_active) {
-    install_timer();
-  }
 }
 
 } // namespace
 
 namespace ddprof {
-void setup_overrides() { setup_hooks(false); }
-void restore_overrides() { setup_hooks(true); }
+void setup_overrides(std::chrono::milliseconds initial_loaded_libs_check_delay,
+                     std::chrono::milliseconds loaded_libs_check_interval) {
+  setup_hooks(false);
+  install_timer(initial_loaded_libs_check_delay, loaded_libs_check_interval);
+}
+
+void restore_overrides() {
+  setup_hooks(true);
+  if (g_timer_active) {
+    uninstall_timer();
+  }
+}
+
 void reinstall_timer_after_fork() {
+  g_timer_active = false;
   if (g_symbols_overridden) {
-    install_timer();
+    install_timer(g_initial_loaded_libs_check_delay,
+                  g_loaded_libs_check_interval);
   }
 }
 } // namespace ddprof

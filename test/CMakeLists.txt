@@ -378,18 +378,23 @@ add_benchmark(
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
   add_exe(
     simple_malloc-static simple_malloc.cc
-    LIBRARIES Threads::Threads dd_profiling-static CLI11
+    LIBRARIES Threads::Threads dd_profiling-static CLI11 dl
     DEFINITIONS USE_DD_PROFILING)
   target_include_directories(simple_malloc-static PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
   add_exe(
     simple_malloc-shared simple_malloc.cc
-    LIBRARIES dd_profiling-shared Threads::Threads CLI11
+    LIBRARIES dd_profiling-shared Threads::Threads CLI11 dl
     DEFINITIONS USE_DD_PROFILING)
   target_include_directories(simple_malloc-shared PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
-  add_exe(simple_malloc simple_malloc.cc LIBRARIES Threads::Threads CLI11)
+  add_exe(simple_malloc simple_malloc.cc LIBRARIES Threads::Threads CLI11 dl)
   target_include_directories(simple_malloc PRIVATE ${CMAKE_SOURCE_DIR}/include)
+
+  add_library(simple_malloc_lib SHARED simple_malloc.cc)
+  target_compile_definitions(simple_malloc_lib PRIVATE "SIMPLE_MALLOC_SHARED_LIBRARY")
+  set_target_properties(simple_malloc_lib PROPERTIES OUTPUT_NAME "simplemalloc")
+  target_include_directories(simple_malloc_lib PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
   add_test(
     NAME simple_malloc
