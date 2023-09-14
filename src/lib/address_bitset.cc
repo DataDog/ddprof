@@ -80,12 +80,12 @@ bool AddressBitset::remove(uintptr_t addr) {
 }
 
 unsigned int AddressBitset::count_set_bits(Word_t w) {
-  unsigned int count = 0;
+  unsigned int set_bits = 0;
   while (w) {
-    count += w & 1;
+    set_bits += w & 1;
     w >>= 1;
   }
-  return count;
+  return set_bits;
 }
 
 void AddressBitset::clear() {
