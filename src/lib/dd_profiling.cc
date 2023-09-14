@@ -179,7 +179,10 @@ int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
   return -1;
 }
 
-void notify_fork() { ddprof::AllocationTracker::notify_fork(); }
+void notify_fork() {
+  ddprof::AllocationTracker::notify_fork();
+  ddprof::reinstall_timer_after_fork();
+}
 
 int ddprof_start_profiling_internal() {
   // Refuse to start profiler if already started by this process or if active in
