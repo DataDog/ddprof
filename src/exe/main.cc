@@ -330,6 +330,10 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
             ctx->watchers[alloc_watcher_idx].sample_period;
         reply.stack_sample_size =
             ctx->watchers[alloc_watcher_idx].options.stack_sample_size;
+        reply.initial_loaded_libs_check_delay_ms =
+            ctx->params.initial_loaded_libs_check_delay.count();
+        reply.loaded_libs_check_interval_ms =
+            ctx->params.loaded_libs_check_interval.count();
 
         if (ctx->watchers[alloc_watcher_idx].output_mode ==
             EventConfMode::kLiveCallgraph) {

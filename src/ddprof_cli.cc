@@ -286,6 +286,21 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
           ->envname("DD_PROFILING_SAMPLE_STACK_USER")
           ->group("")
           ->check(SampleStackSizeValidator()));
+  extended_options.push_back(
+      app.add_option("--initial-loaded-libs-check-delay",
+                     initial_loaded_libs_check_delay,
+                     "Initial delay (ms) before check for newly loaded libs.")
+          ->default_val(5000)
+          ->check(CLI::NonNegativeNumber)
+          ->envname("DD_PROFILING_INITIAL_LOADED_LIBS_CHECK_DELAY")
+          ->group(""));
+  extended_options.push_back(
+      app.add_option("--loaded-libs-check-interval", loaded_libs_check_interval,
+                     "Interval (ms) between checks for newly loaded libs.")
+          ->default_val(59000)
+          ->check(CLI::NonNegativeNumber)
+          ->envname("DD_PROFILING_LOADED_LIBS_CHECK_INTERVAL")
+          ->group(""));
 
   // Parse
   CLI11_PARSE(app, argc, argv);
