@@ -6,15 +6,14 @@
 
 #include <algorithm>
 #include <cstddef>
-
-#include "span.hpp"
+#include <span>
 
 namespace ddprof {
-using Buffer = ddprof::span<std::byte>;
-using ConstBuffer = ddprof::span<const std::byte>;
+using Buffer = std::span<std::byte>;
+using ConstBuffer = std::span<const std::byte>;
 
 template <typename T>
-ddprof::span<T> remaining(ddprof::span<T> buffer, size_t offset) {
+std::span<T> remaining(std::span<T> buffer, size_t offset) {
   offset = std::min(offset, buffer.size());
   return {buffer.data() + offset, buffer.size() - offset};
 }

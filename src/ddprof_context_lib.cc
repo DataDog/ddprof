@@ -12,16 +12,16 @@
 #include "logger.hpp"
 #include "logger_setup.hpp"
 #include "presets.hpp"
-#include "span.hpp"
 
 #include <algorithm>
 #include <charconv>
+#include <span>
 #include <string_view>
 #include <unistd.h>
 
 namespace ddprof {
 static const PerfWatcher *
-find_duplicate_event(ddprof::span<const PerfWatcher> watchers) {
+find_duplicate_event(std::span<const PerfWatcher> watchers) {
   bool seen[DDPROF_PWE_LENGTH] = {};
   for (auto &watcher : watchers) {
     if (watcher.ddprof_event_type != DDPROF_PWE_TRACEPOINT &&
@@ -33,7 +33,7 @@ find_duplicate_event(ddprof::span<const PerfWatcher> watchers) {
   return nullptr;
 }
 
-static void order_watchers(ddprof::span<PerfWatcher> watchers) {
+static void order_watchers(std::span<PerfWatcher> watchers) {
   // Ensure that non-perf watchers are last because they might depend on
   // processing perf events before (comm, mmap, ...)
   std::stable_sort(
@@ -140,7 +140,7 @@ DDRes context_set(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
 }
 
 int context_allocation_profiling_watcher_idx(const DDProfContext &ctx) {
-  ddprof::span watchers{ctx.watchers};
+  std::span watchers{ctx.watchers};
   auto it =
       std::find_if(watchers.begin(), watchers.end(), [](const auto &watcher) {
         return watcher.type == kDDPROF_TYPE_CUSTOM &&

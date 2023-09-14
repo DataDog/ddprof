@@ -5,12 +5,11 @@
 
 #include "presets.hpp"
 
+#include "ddprof_cmdline.hpp"
 #include "ddres.hpp"
 
-#include "ddprof_cmdline.hpp"
-#include "span.hpp"
-
 #include <algorithm>
+#include <span>
 #include <string_view>
 
 namespace ddprof {
@@ -30,7 +29,7 @@ DDRes add_preset(std::string_view preset, bool pid_or_global_mode,
   if (preset == "default"sv && pid_or_global_mode) {
     preset = "default-pid"sv;
   }
-  ddprof::span presets_span{presets};
+  std::span presets_span{presets};
   auto it = std::find_if(presets_span.begin(), presets_span.end(),
                          [&preset](auto &e) { return e.name == preset; });
   if (it == presets_span.end()) {

@@ -4,6 +4,5 @@ libcap,"https://git.kernel.org/pub/scm/libs/libcap/libcap.git/",BSD-3-Clause,Fre
 liblzma,"https://github.com/kobolabs/liblzma",Public-Domain,NA
 libunwind,"https://github.com/libunwind/libunwind",MIT License
 llvm-demangle,"https://github.com/llvm/llvm-project",Apache-2.0,llvm-project
-tcbrindle/span,"https://github.com/tcbrindle/span",Boost Software License 1.0
 dpdk/lib/eal,"https://github.com/DPDK/dpdk",BSD-3-Clause
 CLI11,"https://github.com/CLIUtils/CLI11",BSD-3-Clause

@@ -7,10 +7,10 @@
 
 #include "ddprof_buffer.hpp"
 #include "ddres.hpp"
-#include "span.hpp"
 
 #include <chrono>
 #include <functional>
+#include <span>
 #include <system_error>
 
 namespace ddprof {
@@ -52,16 +52,15 @@ public:
 
   void send(ConstBuffer buffer, std::error_code &ec) noexcept;
   size_t send_partial(ConstBuffer buffer, std::error_code &ec) noexcept;
-  void send(ConstBuffer buffer, ddprof::span<const int> fds,
+  void send(ConstBuffer buffer, std::span<const int> fds,
             std::error_code &ec) noexcept;
-  size_t send_partial(ConstBuffer buffer, ddprof::span<const int> fds,
+  size_t send_partial(ConstBuffer buffer, std::span<const int> fds,
                       std::error_code &ec) noexcept;
 
-  std::pair<size_t, size_t> receive(Buffer buffer, ddprof::span<int> fds,
+  std::pair<size_t, size_t> receive(Buffer buffer, std::span<int> fds,
                                     std::error_code &ec) noexcept;
 
-  std::pair<size_t, size_t> receive_partial(Buffer buffer,
-                                            ddprof::span<int> fds,
+  std::pair<size_t, size_t> receive_partial(Buffer buffer, std::span<int> fds,
                                             std::error_code &ec) noexcept;
 
   size_t receive(Buffer buffer, std::error_code &ec) noexcept;
