@@ -49,9 +49,9 @@ check() {
     expected_pids="$2"
     expected_tids="${3-$2}"
     # shellcheck disable=SC2086
-    # echo "running :${cmd}"
+    echo "Running: ${cmd}"
     taskset "${test_cpu_mask}" ${cmd}
-    if [[ "${expected_pids}" -eq 1 ]]; then
+    if [[ "${expected_pids}" -ne 0 ]]; then
         # Ugly workaround for tail bug that makes it wait indefinitely for new lines when `grep -q` exists:
         # https://debbugs.gnu.org/cgi/bugreport.cgi?bug=13183
         # https://superuser.com/questions/270529/monitoring-a-file-until-a-string-is-found
@@ -108,6 +108,15 @@ check "./ddprof --show_config --event "${event}" ./test/simple_malloc ${opts} --
 # Test wrapper mode with forks + threads
 opts_more_spin="--loop 1000 --spin 400"
 check "./ddprof ./test/simple_malloc ${opts_more_spin} --fork 2 --threads 2" 2 4
+
+# Test dlopen 
+check "./ddprof ./test/simple_malloc --use-shared-library ${opts}" 1
+
+# Test loaded libs check (with dlopen that avoids hook)
+check "./ddprof --initial-loaded-libs-check-delay 500 ./test/simple_malloc --use-shared-library --avoid-dlopen-hook --initial-delay 1000 ${opts}" 1
+
+# Test loaded libs check (fork + dlopen that avoids hook)
+check "./ddprof --initial-loaded-libs-check-delay 500 ./test/simple_malloc --use-shared-library --avoid-dlopen-hook --fork 2 --initial-delay 1000 ${opts}" 2
 
 # Test slow profiler startup
 check "env DD_PROFILING_NATIVE_STARTUP_WAIT_MS=200 ./ddprof ./test/simple_malloc ${opts}" 1
