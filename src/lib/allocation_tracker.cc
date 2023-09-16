@@ -142,7 +142,7 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
   }
   if (track_deallocations) {
     // 16 times as we want to probability of collision to be low enough
-    _allocated_address_set.init(liveallocation::kMaxTracked * 16);
+    _allocated_address_set = AddressBitset(liveallocation::kMaxTracked * 16);
   }
   return ddprof::ring_buffer_attach(ring_buffer, &_pevent);
 }
@@ -252,13 +252,15 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
         }
       }
     } else {
-      // we won't track this allocation as we can't double count in the bitset
-      return;
+      // null the address to avoid using this for live heap profiling
+      // pushing a sample is still good to have a good representation
+      // of the allocations.
+      addr = 0;
     }
   }
   bool success = IsDDResOK(push_alloc_sample(addr, total_size, tl_state));
   free_on_consecutive_failures(success);
-  if (unlikely(!success) && _state.track_deallocations) {
+  if (unlikely(!success) && _state.track_deallocations && addr) {
     _allocated_address_set.remove(addr);
   }
 }

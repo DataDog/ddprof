@@ -21,8 +21,13 @@ class AddressBitset {
 public:
   // Publish 1 Meg as default
   constexpr static unsigned _k_default_bitset_size = 8 * 1024 * 1024;
-  explicit AddressBitset(unsigned max_addresses = 0) { init(max_addresses); }
-  void init(unsigned max_addresses);
+  explicit AddressBitset(unsigned bitset_size = 0) { init(bitset_size); }
+  AddressBitset(AddressBitset &&other) noexcept;
+  AddressBitset &operator=(AddressBitset &&other) noexcept;
+
+  AddressBitset(AddressBitset &other) = delete;
+  AddressBitset &operator=(AddressBitset &other) = delete;
+
   // returns true if the element was inserted
   bool add(uintptr_t addr);
   // returns true if the element was removed
@@ -39,15 +44,16 @@ private:
   // 1 Meg divided in uint64's size
   // The probability of collision is proportional to the number of elements
   // already within the bitset
-  unsigned _nb_bits = {};
+  unsigned _bitset_size = {};
   unsigned _k_nb_words = {};
   unsigned _nb_bits_mask = {};
   // We can not use an actual bitset (for atomicity reasons)
   std::unique_ptr<std::atomic<uint64_t>[]> _address_bitset;
   std::atomic<int> _nb_addresses = 0;
 
-  static unsigned int count_set_bits(Word_t w);
+  void init(unsigned bitset_size);
 
+  void move_from(AddressBitset &other) noexcept;
   // This is a kind of hash function
   // We remove the lower bits (as the alignment constraints makes them useless)
   // We fold the address
