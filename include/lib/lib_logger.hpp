@@ -24,8 +24,8 @@ template <typename Func> void log_once_helper(std::once_flag &, Func &&func) {
 // create a once flag for the line and file where this is called:
 #define LOG_ONCE(format, ...)                                                  \
   do {                                                                         \
-    static std::once_flag UNIQUE_ONCE_FLAG_##__LINE__##__FILE__;               \
-    ddprof::log_once_helper(UNIQUE_ONCE_FLAG_##__LINE__##__FILE__, [&]() {     \
+    static std::once_flag UNIQUE_ONCE_FLAG_##__COUNTER__;                      \
+    ddprof::log_once_helper(UNIQUE_ONCE_FLAG_##__COUNTER__, [&]() {            \
       fprintf(stderr, (format), ##__VA_ARGS__);                                \
     });                                                                        \
   } while (0)

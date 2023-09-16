@@ -385,7 +385,9 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
   // Aggregate if unwinding went well (todo : fatal error propagation)
   if (!IsDDResFatal(res)) {
     struct UnwindState *us = ctx.worker_ctx.us;
-    if (Any(EventAggregationMode::kLiveSum & watcher->aggregation_mode)) {
+    if (Any(EventAggregationMode::kLiveSum & watcher->aggregation_mode)
+        && sample->addr) {
+      // null address means we should not account it
       ctx.worker_ctx.live_allocation.register_allocation(
           us->output, sample->addr, sample->period, watcher_pos, sample->pid);
     }
