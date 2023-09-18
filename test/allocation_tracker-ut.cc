@@ -149,7 +149,7 @@ TEST(allocation_tracker, max_tracked_allocs) {
       k_default_perf_stack_sample_size, ring_buffer.get_buffer_info());
 
   ASSERT_TRUE(ddprof::AllocationTracker::is_active());
-  bool clear_found = false;
+  bool max_reached = false;
   uint64_t nb_samples = 0;
   for (int i = 0; i <= ddprof::liveallocation::kMaxTracked +
            ddprof::liveallocation::kMaxTracked / 10;
@@ -169,15 +169,16 @@ TEST(allocation_tracker, max_tracked_allocs) {
         ASSERT_EQ(sample->period, 1);
         ASSERT_EQ(sample->pid, getpid());
         ASSERT_EQ(sample->tid, ddprof::gettid());
-        ASSERT_EQ(sample->addr, addr);
-      } else {
-        if (hdr->type == PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION) {
-          clear_found = true;
+        if (sample->addr == 0) {
+          max_reached = true;
+        }
+        else {
+          EXPECT_EQ(sample->addr, addr);
         }
       }
     }
   }
   fprintf(stderr, "Number of found samples %lu (vs max = %d) \n", nb_samples,
           ddprof::liveallocation::kMaxTracked);
-  EXPECT_TRUE(clear_found);
+  EXPECT_TRUE(max_reached);
 }

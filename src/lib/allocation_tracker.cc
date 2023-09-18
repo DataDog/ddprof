@@ -142,7 +142,7 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
   }
   if (track_deallocations) {
     // 16 times as we want to probability of collision to be low enough
-    _allocated_address_set = AddressBitset(liveallocation::kMaxTracked * 16);
+    _allocated_address_set = std::make_unique<AddressBitset>();
   }
   return ddprof::ring_buffer_attach(ring_buffer, &_pevent);
 }
@@ -234,23 +234,9 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
   uint64_t total_size = nsamples * sampling_interval;
 
   if (_state.track_deallocations) {
-    if (_allocated_address_set.add(addr)) {
-      if (unlikely(_allocated_address_set.count() >
-                   ddprof::liveallocation::kMaxTracked)) {
-        // Check if we reached max number of elements
-        // Clear elements if we reach too many
-        // todo: should we just stop new live tracking (like java) ?
-        if (IsDDResOK(push_clear_live_allocation(tl_state))) {
-          _allocated_address_set.clear();
-          // still set this as we are pushing the allocation to ddprof
-          _allocated_address_set.add(addr);
-        } else {
-          LOG_ONCE(
-              "Error: %s",
-              "Stop allocation profiling. Unable to clear live allocation \n");
-          free();
-        }
-      }
+    if (_allocated_address_set->count() <
+        ddprof::liveallocation::kMaxTracked &&
+        _allocated_address_set->add(addr)) {
     } else {
       // null the address to avoid using this for live heap profiling
       // pushing a sample is still good to have a good representation
@@ -261,7 +247,7 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
   bool success = IsDDResOK(push_alloc_sample(addr, total_size, tl_state));
   free_on_consecutive_failures(success);
   if (unlikely(!success) && _state.track_deallocations && addr) {
-    _allocated_address_set.remove(addr);
+    _allocated_address_set->remove(addr);
   }
 }
 
@@ -275,7 +261,7 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
     return;
   }
 
-  if (!_state.track_deallocations || !_allocated_address_set.remove(addr)) {
+  if (!_state.track_deallocations || !_allocated_address_set->remove(addr)) {
     return;
   }
 

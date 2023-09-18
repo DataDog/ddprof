@@ -14,19 +14,27 @@
 namespace ddprof {
 
 TEST(address_bitset, simple) {
-  AddressBitset address_bitset(AddressBitset::_k_default_bitset_size);
+  AddressBitset address_bitset{};
   EXPECT_TRUE(address_bitset.add(0xbadbeef));
   EXPECT_FALSE(address_bitset.add(0xbadbeef));
   EXPECT_TRUE(address_bitset.remove(0xbadbeef));
 }
 
+
 TEST(address_bitset, many_addresses) {
-  AddressBitset address_bitset(AddressBitset::_k_default_bitset_size);
+  AddressBitset address_bitset{};
   std::random_device rd;
   std::mt19937 gen(rd());
+#ifdef WORST_CASE
+  // if addresses are too spread out, we just can not
+  // keep track of everything
   std::uniform_int_distribution<uintptr_t> dis(
       0, std::numeric_limits<uintptr_t>::max());
-
+#else
+  // with more reasonable ranges, we are OK
+  std::uniform_int_distribution<uintptr_t> dis(
+      0x1000, 0x100000);
+#endif
   std::vector<uintptr_t> addresses;
   unsigned nb_elements = 100000;
   for (unsigned i = 0; i < nb_elements; ++i) {

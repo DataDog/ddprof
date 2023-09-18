@@ -116,7 +116,7 @@ private:
   PEvent _pevent;
   bool _deterministic_sampling;
 
-  AddressBitset _allocated_address_set;
+  std::unique_ptr<AddressBitset> _allocated_address_set;
 
   // These can not be tied to the internal state of the instance.
   // The creation of the instance depends on this

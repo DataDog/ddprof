@@ -11,20 +11,9 @@
 
 namespace ddprof {
 class AddressBitset {
-  // Number of bits is the number of addresses we can store
-  // We have one address per individual bit).
-  // so lets say you have 1111, you can store 4 addresses.
-  // We hash the address to a number (to have an equal probability of using
-  // all bits). Then we use the mask to position this address in our bitset.
-  // Addr -> Hash -> Mask (to get useable bits) -> Position in the bitset
-  // Note: the hashing step might be bad for cache locality.
 public:
-  // Publish 1 Meg as default
-  constexpr static unsigned _k_default_bitset_size = 8 * 1024 * 1024;
-  explicit AddressBitset(unsigned bitset_size = 0) { init(bitset_size); }
-  AddressBitset(AddressBitset &&other) noexcept;
-  AddressBitset &operator=(AddressBitset &&other) noexcept;
-
+  explicit AddressBitset() {}
+  ~AddressBitset();
   AddressBitset(AddressBitset &other) = delete;
   AddressBitset &operator=(AddressBitset &other) = delete;
 
@@ -36,34 +25,22 @@ public:
   int count() const { return _nb_addresses; }
 
 private:
-  static constexpr unsigned _k_max_bits_ignored = 4;
-  unsigned _lower_bits_ignored;
+  static constexpr unsigned _lower_bits_ignored = 4;
   // element type
   using Word_t = uint64_t;
   constexpr static unsigned _nb_bits_per_word = sizeof(Word_t) * 8;
-  // 1 Meg divided in uint64's size
-  // The probability of collision is proportional to the number of elements
-  // already within the bitset
-  unsigned _bitset_size = {};
-  unsigned _k_nb_words = {};
-  unsigned _nb_bits_mask = {};
-  // We can not use an actual bitset (for atomicity reasons)
-  std::unique_ptr<std::atomic<uint64_t>[]> _address_bitset;
-  std::atomic<int> _nb_addresses = 0;
+  static constexpr unsigned _k_nb_words = 4096 / 64; // (64)
+  static constexpr unsigned _nb_entries_per_level = 65536;  // 2^16
 
-  void init(unsigned bitset_size);
+  struct LeafLevel {
+    std::atomic<Word_t> leaf[_k_nb_words];
+  };
 
-  void move_from(AddressBitset &other) noexcept;
-  // This is a kind of hash function
-  // We remove the lower bits (as the alignment constraints makes them useless)
-  // We fold the address
-  // Then we only keep the bits that matter for the order in the bitmap
-  uint32_t hash_significant_bits(uintptr_t h1) {
-    uint64_t intermediate = h1 >> _lower_bits_ignored;
-    uint32_t high = (uint32_t)(intermediate >> 32);
-    uint32_t low = (uint32_t)intermediate;
-    uint32_t res = high ^ low;
-    return res & _nb_bits_mask;
-  }
+  struct MidLevel {
+    std::atomic<LeafLevel*> mid[_nb_entries_per_level];
+  };
+
+  std::atomic<MidLevel*> _top_level[_nb_entries_per_level];
+  std::atomic<int> _nb_addresses;
 };
 } // namespace ddprof
