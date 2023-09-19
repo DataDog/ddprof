@@ -26,7 +26,7 @@ public:
 class TLReentryGuard {
 public:
   explicit TLReentryGuard(ThreadEntries &entries, pid_t tid)
-      : _entries(entries), _tid(tid), _ok(false), _index(-1) {
+      : _entries(entries), _ok(false), _index(-1) {
     while (true) {
       for (size_t i = 0; i < ThreadEntries::max_threads; ++i) {
         pid_t expected = -1;
@@ -59,7 +59,6 @@ public:
 
 private:
   ThreadEntries &_entries;
-  pid_t _tid;
   bool _ok;
   int _index;
 };
