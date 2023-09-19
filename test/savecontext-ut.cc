@@ -66,9 +66,10 @@ static std::mutex mutex;
 static std::condition_variable cv;
 static uint64_t regs[K_NB_REGS_UNWIND];
 static size_t stack_size;
+static std::span<const std::byte> thread_stack_bounds;
 
 DDPROF_NO_SANITIZER_ADDRESS void handler(int sig) {
-  stack_size = save_context(retrieve_stack_bounds(), regs, stack);
+  stack_size = save_context(thread_stack_bounds, regs, stack);
   stop = true;
 }
 
@@ -81,6 +82,7 @@ DDPROF_NOINLINE void funcD() {
 }
 
 DDPROF_NOINLINE void funcC() {
+  thread_stack_bounds = retrieve_stack_bounds();
   signal(SIGUSR1, &handler);
   defer { signal(SIGUSR1, SIG_DFL); };
   stop = false;

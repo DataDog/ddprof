@@ -35,8 +35,8 @@ DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds() {
 
 // Disable address sanitizer, otherwise it will report a stack-buffer-underflow
 // when we are grabbing the stack. But this is not enough, because ASAN
-// intercepts memcpy and reports a satck underflow there, empirically it appears
-// that both attribute and a suppression are required.
+// intercepts memcpy and reports a stack underflow there, empirically it appears
+// that both attributes and a suppression are required.
 static DDPROF_NO_SANITIZER_ADDRESS size_t
 save_stack(std::span<const std::byte> stack_bounds, const std::byte *stack_ptr,
            std::span<std::byte> buffer) {
