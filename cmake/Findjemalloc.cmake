@@ -18,13 +18,14 @@
 # Variables defined by this module:
 #
 #  JEMALLOC_FOUND             System has jemalloc libs/headers
-#  JEMALLOC_LIBRARIES         The jemalloc library/libraries
+#  JEMALLOC_SHARED_LIBRARIES  The jemalloc shared library/libraries
+#  JEMALLOC_STATIC_LIBRARIES  The jemalloc static library/libraries
 #  JEMALLOC_INCLUDE_DIR       The location of jemalloc headers
 find_path(JEMALLOC_ROOT_DIR
     NAMES include/jemalloc/jemalloc.h
 )
 
-find_library(JEMALLOC_LIBRARIES
+find_library(JEMALLOC_STATIC_LIBRARIES
     NAMES libjemalloc.a
     HINTS ${JEMALLOC_ROOT_DIR}/lib
 )
@@ -40,26 +41,27 @@ find_path(JEMALLOC_INCLUDE_DIR
 )
 
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(JeMalloc DEFAULT_MSG
-    JEMALLOC_LIBRARIES
+find_package_handle_standard_args(jemalloc DEFAULT_MSG
     JEMALLOC_SHARED_LIBRARIES
+    JEMALLOC_STATIC_LIBRARIES    
     JEMALLOC_INCLUDE_DIR
 )
 
 mark_as_advanced(
     JEMALLOC_ROOT_DIR
-    JEMALLOC_LIBRARIES
+    JEMALLOC_SHARED_LIBRARIES
+    JEMALLOC_STATIC_LIBRARIES    
     JEMALLOC_INCLUDE_DIR
 )
-if(JeMalloc_FOUND)
-   add_library(JeMalloc::JeMalloc STATIC IMPORTED)
-   set_target_properties(JeMalloc::JeMalloc PROPERTIES
+if(jemalloc_FOUND)
+   add_library(jemalloc::jemalloc_static STATIC IMPORTED)
+   set_target_properties(jemalloc::jemalloc_static PROPERTIES
    INTERFACE_INCLUDE_DIRECTORIES "${JEMALLOC_INCLUDE_DIR}"
    IMPORTED_LINK_INTERFACE_LANGUAGES "C"
-   IMPORTED_LOCATION "${JEMALLOC_LIBRARIES}")
+   IMPORTED_LOCATION "${JEMALLOC_STATIC_LIBRARIES}")
 
-   add_library(JeMalloc::JeMallocShared SHARED IMPORTED)
-   set_target_properties(JeMalloc::JeMallocShared PROPERTIES
+   add_library(jemalloc::jemalloc_shared SHARED IMPORTED)
+   set_target_properties(jemalloc::jemalloc_shared PROPERTIES
    INTERFACE_INCLUDE_DIRECTORIES "${JEMALLOC_INCLUDE_DIR}"
    IMPORTED_LINK_INTERFACE_LANGUAGES "C"
    IMPORTED_LOCATION "${JEMALLOC_SHARED_LIBRARIES}")

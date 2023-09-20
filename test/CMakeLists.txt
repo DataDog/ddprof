@@ -302,10 +302,10 @@ add_unit_test(
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle DDProf::Parser dl rt
   DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=100)
 
-if(TARGET JeMalloc::JeMalloc)
+if(TARGET jemalloc::jemalloc_shared)
   add_unit_test(
     allocation_tracker_jemalloc-ut ${ALLOCATION_TRACKER_UT_SRCS}
-    LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle DDProf::Parser dl rt JeMalloc::JeMallocShared
+    LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle DDProf::Parser dl rt jemalloc::jemalloc_shared
     DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=100 USE_JEMALLOC=1)
 endif()
 
