@@ -171,7 +171,7 @@ TEST(DDProfExporter, simple) {
     if (get_url_from_env(K_RECEPTOR_ENV_ADDR)) {
       // receptor is defined
       Tags empty_tags;
-      res = ddprof_exporter_export(pprofs._profile, empty_tags, 0, &exporter);
+      res = ddprof_exporter_export(&pprofs._profile, empty_tags, 0, &exporter);
       // We should not be able to send profiles (usually 404)
       EXPECT_FALSE(IsDDResOK(res));
     }

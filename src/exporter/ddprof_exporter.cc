@@ -273,7 +273,7 @@ static DDRes fill_cycle_tags(const ddprof::Tags &additional_tags,
   return ddres_init();
 }
 
-DDRes ddprof_exporter_export(const ddog_prof_Profile *profile,
+DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
                              const ddprof::Tags &additional_tags,
                              uint32_t profile_seq, DDProfExporter *exporter) {
   DDRes res = ddres_init();
@@ -318,7 +318,7 @@ DDRes ddprof_exporter_export(const ddog_prof_Profile *profile,
 
     ddog_prof_Exporter_Request_BuildResult res_request =
         ddog_prof_Exporter_Request_build(exporter->_exporter, start, end, files,
-                                         &ffi_additional_tags, nullptr,
+                                         &ffi_additional_tags, nullptr, nullptr,
                                          k_timeout_ms);
 
     if (res_request.tag == DDOG_PROF_EXPORTER_REQUEST_BUILD_RESULT_OK) {
