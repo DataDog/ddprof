@@ -1,58 +1,62 @@
 FROM alpine:3.18
-ARG COMPILER="gcc"
 ENV CC=gcc
 ENV CXX=g++
+
+# Fix issues when uid/gid are stored in tarball and tar tries to preserve them because it thinks its running as root
+# (https://github.com/habitat-sh/builder/issues/365#issuecomment-382862233)
+ENV TAR_OPTIONS="--no-same-owner"
 
 #MISSING
 # lcov
 # libexecinfo-dev # No static lib
 RUN apk update \
-    && apk add --no-cache aws-cli \
-   bash \
-   binutils-dev \
-   bison \
-   ca-certificates \
-   gcovr \
-   gdb \
-   git \
-   flex \
-   subversion \
-   patch \
-   curl \
-   wget \
-   make \
-   cmake \
-   m4 \
-   autoconf \
-   automake \
-   unzip \
-   gcc \
-   g++ \
-   clang \
-   libcap-static \
-   libunwind-dev \
-   ninja-build \
-   musl-dbg \
-   py3-pkgconfig \
-   gtest-dev \
-   cppcheck \
-   openssh \
-   zlib-dev \
-   zlib-static \
-   bzip2-dev \
-   bzip2-static \
-   xz-dev \
-   xz-static \   
-   zstd-dev \
-   zstd-static \   
-   argp-standalone \
-   musl-fts-dev \
-   musl-obstack-dev \
-   musl-libintl \
-   musl-legacy-error \
-   libcap-dev \
-   netcat-openbsd \
-   util-linux
+  && apk add --no-cache \
+    argp-standalone \
+    autoconf \
+    automake \
+    aws-cli \
+    bash \
+    binutils-dev \
+    bison \
+    bzip2-dev \
+    bzip2-static \
+    ca-certificates \
+    clang \
+    cmake \
+    cppcheck \
+    curl \
+    flex \
+    g++ \
+    gcc \
+    gcovr \
+    gdb \
+    git \
+    gtest-dev \
+    libcap-dev \
+    libcap-static \
+    libunwind-dev \
+    m4 \
+    make \
+    musl-dbg \
+    musl-fts-dev \
+    musl-legacy-error \
+    musl-libintl \
+    musl-obstack-dev \
+    netcat-openbsd \
+    openssh \
+    patch \
+    py3-pkgconfig \
+    samurai \
+    subversion \
+    unzip \
+    util-linux \
+    wget \
+    xz-dev \
+    xz-static \
+    zlib-dev \
+    zlib-static \
+    zstd-dev \
+    zstd-static
 
 # Tell docker to use bash as the default
 SHELL ["/bin/bash", "-c"]

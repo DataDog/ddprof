@@ -36,6 +36,10 @@ FROM base-${COMPILER} AS final
 # Tell docker to use bash as the default
 SHELL ["/bin/bash", "-c"]
 
+# Fix issues when uid/gid are stored in tarball and tar tries to preserve them because it thinks its running as root
+# (https://github.com/habitat-sh/builder/issues/365#issuecomment-382862233)
+ENV TAR_OPTIONS="--no-same-owner"
+
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y \
   apt-transport-https \
