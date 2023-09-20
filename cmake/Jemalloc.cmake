@@ -51,7 +51,7 @@ mark_as_advanced(
     JEMALLOC_LIBRARIES
     JEMALLOC_INCLUDE_DIR
 )
-if(JeMalloc_FOUND AND NOT (TARGET JeMalloc::JeMalloc))
+if(JeMalloc_FOUND)
    add_library(JeMalloc::JeMalloc STATIC IMPORTED)
    set_target_properties(JeMalloc::JeMalloc PROPERTIES
    INTERFACE_INCLUDE_DIRECTORIES "${JEMALLOC_INCLUDE_DIR}"
