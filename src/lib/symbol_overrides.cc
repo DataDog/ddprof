@@ -32,6 +32,11 @@ __attribute__((weak)) void *pvalloc(size_t size) NOEXCEPT;
 // NOLINTNEXTLINE cert-dcl51-cpp
 __attribute__((weak)) int __libc_allocate_rtsig(int high) NOEXCEPT;
 
+// sized free functions (C23, not yet available in glibc)
+__attribute__((weak)) void free_sized(void *ptr, size_t size);
+__attribute__((weak)) void free_aligned_sized(void *ptr, size_t alignment,
+                                              size_t size);
+
 // jemalloc Non-standard API
 __attribute__((weak)) void *mallocx(size_t size, int flags);
 __attribute__((weak)) void *rallocx(void *ptr, size_t size, int flags);
@@ -254,6 +259,38 @@ struct free {
 
     helper.track(ptr);
     ref(ptr);
+  }
+};
+
+struct free_sized {
+  static constexpr auto name = "free_sized";
+  static inline auto ref = &::free_sized;
+  static inline bool ref_checked = false;
+
+  static void hook(void *ptr, size_t size) noexcept {
+    DeallocTrackerHelper helper;
+    if (ptr == nullptr) {
+      return;
+    }
+
+    helper.track(ptr);
+    ref(ptr, size);
+  }
+};
+
+struct free_aligned_sized {
+  static constexpr auto name = "free_aligned_sized";
+  static inline auto ref = &::free_aligned_sized;
+  static inline bool ref_checked = false;
+
+  static void hook(void *ptr, size_t alignment, size_t size) noexcept {
+    DeallocTrackerHelper helper;
+    if (ptr == nullptr) {
+      return;
+    }
+
+    helper.track(ptr);
+    ref(ptr, alignment, size);
   }
 };
 
@@ -888,6 +925,8 @@ int install_timer(std::chrono::milliseconds initial_loaded_libs_check_delay,
 void setup_hooks(bool restore) {
   install_hook<malloc>(restore);
   install_hook<free>(restore);
+  install_hook<free_sized>(restore);
+  install_hook<free_aligned_sized>(restore);
   install_hook<calloc>(restore);
   install_hook<realloc>(restore);
   install_hook<posix_memalign>(restore);
