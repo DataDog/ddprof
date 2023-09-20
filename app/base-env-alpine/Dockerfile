@@ -1,11 +1,10 @@
-FROM alpine:3.17.2
+FROM alpine:3.18
 ARG COMPILER="gcc"
 ENV CC=gcc
 ENV CXX=g++
 
 #MISSING
 # lcov
-# liblzma
 # libexecinfo-dev # No static lib
 RUN apk update \
     && apk add --no-cache aws-cli \
@@ -31,6 +30,7 @@ RUN apk update \
    clang \
    libcap-static \
    libunwind-dev \
+   ninja-build \
    musl-dbg \
    py3-pkgconfig \
    gtest-dev \
@@ -39,6 +39,11 @@ RUN apk update \
    zlib-dev \
    zlib-static \
    bzip2-dev \
+   bzip2-static \
+   xz-dev \
+   xz-static \   
+   zstd-dev \
+   zstd-static \   
    argp-standalone \
    musl-fts-dev \
    musl-obstack-dev \
@@ -51,53 +56,44 @@ RUN apk update \
 # Tell docker to use bash as the default
 SHELL ["/bin/bash", "-c"]
 
-## Alpine 3.16 has gcc 11 and clang 14
+## Alpine 3.16 has gcc 12 and clang 16
 
 # Provides the llvm-symbolizer (better debug information in case of sanitizer issue)
 ENV PATH="/usr/lib/llvm-${CLANG_VERSION}/bin/:$PATH"
 
-### Alpine has cmake 3.23
+## Alpine has cmake 3.26.5
 
-# Ninja build 1.10.2
-RUN VERSION="1.10.2" \
-  && SHA256="ce35865411f0490368a8fc383f29071de6690cbadc27704734978221f25e2bed" \
-  && curl -LO https://github.com/ninja-build/ninja/archive/refs/tags/v${VERSION}.tar.gz \
-  && (printf "${SHA256}  v${VERSION}.tar.gz" | sha256sum -c) \
-  && tar xvfz v${VERSION}.tar.gz \
-  && cd ninja-${VERSION} \
-  && cmake -Bbuild-cmake \
-  && cmake --build build-cmake  -j $(nproc) -t install
+## Alpine has ninja 1.11.1-r2 Ninja build
 
-## Alpine has gtest 1.12
+## Alpine has gtest 1.13.0-r1
 
-## Alpine has cppcheck 2.8.1-r0
+## Alpine has cppcheck 2.10.3
 
 # C++ json library (used for test purpose)
-RUN VERSION="3.10.5" \
-  && curl -LO https://github.com/nlohmann/json/releases/download/v${VERSION}/json.tar.xz \
-  && SHA256="344be97b757a36c5b180f1c8162f6c5f6ebd760b117f6e64b77866e97b217280" \
-  && (printf "${SHA256}  json.tar.xz" | sha256sum -c) \
-  && tar xf json.tar.xz \
-  && cd json \
-  && mkdir build && cd build \
-  && cmake -GNinja -DJSON_BuildTests=Off ../ \
-  && cmake --build . -t install \
-  && cd ../ \
-  && rm -rf json json.tar.xz
+RUN VERSION="3.11.2" \
+  && TAR_NAME="json.tar.xz" \
+  && curl -fsSLO "https://github.com/nlohmann/json/releases/download/v${VERSION}/json.tar.xz" \
+  && SHA256="8c4b26bf4b422252e13f332bc5e388ec0ab5c3443d24399acb675e68278d341f" \
+  && (printf "${SHA256} ${TAR_NAME}" | sha256sum -c) \
+  && tar xf "${TAR_NAME}" \
+  && pushd json \
+  && cmake -GNinja -Bbuild -DCMAKE_BUILD_TYPE=Release -DJSON_BuildTests=Off \
+  && cmake --build build -t install \
+  && popd \
+  && rm -rf json "${TAR_NAME}"
 
 # Google benchmark
-RUN VERSION="1.6.1" \
-  && curl -LO "https://github.com/google/benchmark/archive/refs/tags/v${VERSION}.tar.gz" \
-  && SHA256="6132883bc8c9b0df5375b16ab520fac1a85dc9e4cf5be59480448ece74b278d4" \
-  && (printf "${SHA256}  v${VERSION}.tar.gz" | sha256sum -c) \
-  && tar xf v${VERSION}.tar.gz \
-  && cd benchmark-${VERSION} \
-  # python is missing on ubuntu 20.04, use python 3 instead
-  && { command -v python > /dev/null || { ln -s /usr/bin/python3 python && export PATH=$PWD:$PATH; }; } \
-  && cmake -DCMAKE_BUILD_TYPE=Release -DBENCHMARK_USE_BUNDLED_GTEST=OFF -GNinja -S . -B "build" \
-  && cmake --build "build" --target install \
-  && cd ../ \
-  && rm -rf benchmark-${VERSION} v${VERSION}.tar.gz
+RUN VERSION="1.8.3" \
+  && TAR_NAME="v${VERSION}.tar.gz" \
+  && curl -fsSLO "https://github.com/google/benchmark/archive/refs/tags/v${VERSION}.tar.gz" \
+  && SHA256="6bc180a57d23d4d9515519f92b0c83d61b05b5bab188961f36ac7b06b0d9e9ce" \
+  && (printf "${SHA256} ${TAR_NAME}" | sha256sum -c) \
+  && tar xf "${TAR_NAME}" \
+  && pushd benchmark-${VERSION} \
+  && cmake -GNinja -Bbuild -DCMAKE_BUILD_TYPE=Release -DBENCHMARK_USE_BUNDLED_GTEST=OFF \
+  && cmake --build build -t install \
+  && popd \
+  && rm -rf "benchmark-${VERSION}" "${TAR_NAME}"
 
 # Patch to fix compilation of elfutils
 RUN mkdir /patch
@@ -106,18 +102,15 @@ ADD ./app/base-env-alpine/error.h /patch/
 ADD ./app/base-env-alpine/libintl.h /patch/
 
 # jemalloc
-RUN git clone --branch 5.3.0 https://github.com/jemalloc/jemalloc.git && \
-    cd jemalloc && \
-    ./autogen.sh && \
-    make && \
-    make install
-
-# lzma
-# The static version of lzma is no longer available in package xz-dev
-RUN git clone --branch v5.4 https://github.com/tukaani-project/xz.git && \
-    cd xz && \
-    mkdir Build && \
-    cd Build && \
-    cmake -DCMAKE_BUILD_TYPE=Release ../ && \
-    make -j && \
-    make install
+RUN VERSION="5.3.0" \
+  && TAR_NAME="jemalloc-${VERSION}.tar.bz2" \
+  && curl -fsSLO "https://github.com/jemalloc/jemalloc/releases/download/${VERSION}/jemalloc-${VERSION}.tar.bz2" \
+  && SHA256="2db82d1e7119df3e71b7640219b6dfe84789bc0537983c3b7ac4f7189aecfeaa" \
+  && (printf "${SHA256} ${TAR_NAME}" | sha256sum -c) \
+  && tar xf "${TAR_NAME}" \
+  && pushd "jemalloc-${VERSION}" \
+  && ./configure --enable-experimental-smallocx  --disable-doc \
+  && make -j$(nproc) \
+  && make install \
+  && popd \
+  && rm -rf "jemalloc-${VERSION}" "${TAR_NAME}"
