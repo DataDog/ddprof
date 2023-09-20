@@ -46,6 +46,7 @@ RUN apt-get update \
   curl \
   flex \
   gcovr \
+  gdb \
   git \
   jq \
   lcov \

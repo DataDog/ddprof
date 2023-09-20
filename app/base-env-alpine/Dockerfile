@@ -13,6 +13,7 @@ RUN apk update \
    bison \
    ca-certificates \
    gcovr \
+   gdb \
    git \
    flex \
    subversion \
