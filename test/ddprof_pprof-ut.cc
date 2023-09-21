@@ -32,8 +32,8 @@ TEST(DDProfPProf, init_profiles) {
   EXPECT_TRUE(IsDDResOK(res));
 }
 
-void test_pprof(const DDProfPProf *pprofs) {
-  const ddog_prof_Profile *profile = pprofs->_profile;
+void test_pprof(DDProfPProf *pprofs) {
+  ddog_prof_Profile *profile = &pprofs->_profile;
 
   struct ddog_prof_Profile_SerializeResult serialized_result =
       ddog_prof_Profile_serialize(profile, nullptr, nullptr);

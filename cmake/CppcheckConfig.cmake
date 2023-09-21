@@ -11,7 +11,7 @@ if(CPP_CHECK_COMMAND)
   list(
     APPEND
     CPP_CHECK_COMMAND
-    "--enable=warning,performance,portability,information,style"
+    "--enable=warning,performance,portability,information,style,missingInclude"
     "--template=${CPPCHECK_TEMPLATE}"
     "--library=googletest"
     "--quiet"

@@ -3,7 +3,7 @@
 //arithOperationsOnVoidPointer:*/ddprof.cc:12
 
 // config of cpp checks needs more includes
-missingInclude
+missingIncludeSystem
 
 // Ignore Lex and Yacc defects
 *:*/event_parser/*

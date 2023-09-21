@@ -348,7 +348,7 @@ void *ddprof_worker_export_thread(void *arg) {
   // gets joined forcefully, we should not resume on same value
   uint32_t profile_seq = (worker->persistent_worker_state->profile_seq)++;
 
-  if (IsDDResFatal(ddprof_exporter_export(worker->pprof[i]->_profile,
+  if (IsDDResFatal(ddprof_exporter_export(&worker->pprof[i]->_profile,
                                           worker->pprof[i]->_tags, profile_seq,
                                           worker->exp[i]))) {
     LG_NFO("Failed to export from worker");

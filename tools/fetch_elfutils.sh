@@ -9,7 +9,7 @@ IFS=$'\n\t'
 
 usage() {
     echo "Usage :"
-    echo "$0 <version> <md5> <path> <c-compiler> <c-flags-override>"
+    echo "$0 <version> <sha256> <path> <c-compiler> <c-flags-override>"
     echo ""
     echo "The extra c flags should be a single arg (hence quoted)"
     echo "If specified, the default c flags should include \" -g -O2\""
@@ -45,9 +45,9 @@ else
     curl -fsSLO "${URL_ELF}"
 fi
 
-echo "Checking elfutils sha512"
-if ! echo "${SHA512_ELF}  ${TAR_ELF}" | sha512sum -c ; then
-    echo "Error validating elfutils SHA512"
+echo "Checking elfutils sha256"
+if ! echo "${SHA512_ELF}  ${TAR_ELF}" | sha256sum -c ; then
+    echo "Error validating elfutils SHA256"
     echo "Please clear $TARGET_EXTRACT before restarting"
     exit 1
 fi
@@ -95,6 +95,6 @@ fi
 
 echo "Compiling elfutils using ${C_COMPILER} / flags=${CFLAGS-""}"
 
-./configure CC="${C_COMPILER}" --without-bzlib --without-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning --prefix "${TARGET_EXTRACT}"
+./configure CC="${C_COMPILER}" --with-zlib --with-bzlib --with-lzma --with-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning --prefix "${TARGET_EXTRACT}"
 
 make "-j$(nproc)" install

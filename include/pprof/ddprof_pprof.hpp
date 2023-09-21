@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "ddog_profiling_utils.hpp"
 #include "ddprof_context.hpp"
 #include "ddprof_defs.hpp"
 #include "ddres_def.hpp"
@@ -12,13 +13,11 @@
 #include "tags.hpp"
 #include "unwind_output.hpp"
 
-struct ddog_prof_Profile;
 struct SymbolHdr;
 
 struct DDProfPProf {
-  DDProfPProf() noexcept {}
   /* single profile gathering several value types */
-  ddog_prof_Profile *_profile = nullptr;
+  ddog_prof_Profile _profile{};
   unsigned _nb_values = 0;
   ddprof::Tags _tags;
 };

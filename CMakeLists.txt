@@ -103,8 +103,8 @@ add_dependencies(cppcheck DDProf::Parser)
 option(DDPROF_ALLOCATOR "Define the type of allocator (STANDARD / JEMALLOC)" STANDARD)
 if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
   # jemalloc for debug
-  include(Jemalloc)
-  message(STATUS "Using Allocator Jemalloc from:" ${JEMALLOC_LIBRARIES})
+  find_package(jemalloc REQUIRED)
+  message(STATUS "Using Allocator jemalloc from:" ${JEMALLOC_LIBRARIES})
 endif()
 
 # Install lib cap to retrieve capabilities
@@ -156,7 +156,7 @@ if(ON)
 endif()
 
 if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
-  list(PREPEND DDPROF_LIBRARY_LIST JeMalloc::JeMalloc)
+  list(PREPEND DDPROF_LIBRARY_LIST jemalloc::jemalloc_static)
 endif()
 
 # libcap, can be removed from version distributed to client

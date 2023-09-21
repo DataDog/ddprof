@@ -3,6 +3,13 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
+// clang-format off
+// https://gitlab.alpinelinux.org/alpine/aports/-/issues/8626
+// /usr/include/fortify/stdio.h:73:28: error: inlining failed in call to 'always_inline' 'vsnprintf': function body can be overwritten at link time
+// 73 | _FORTIFY_FN(vsnprintf) int vsnprintf(char * _FORTIFY_POS0 __s, size_t __n,
+// clang-format on
+#undef _FORTIFY_SOURCE
+
 #include "ddprof_cli.hpp"
 
 #include "CLI/CLI11.hpp"

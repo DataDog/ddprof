@@ -111,9 +111,6 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
   }
   pprof->_profile = ddog_prof_Profile_new(
       sample_types, num_sample_type_ids > 0 ? &period : nullptr, nullptr);
-  if (!pprof->_profile) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to create profile");
-  }
 
   // Add relevant tags
   {
@@ -134,8 +131,8 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
 }
 
 DDRes pprof_free_profile(DDProfPProf *pprof) {
-  ddog_prof_Profile_drop(pprof->_profile);
-  pprof->_profile = NULL;
+  ddog_prof_Profile_drop(&pprof->_profile);
+  pprof->_profile = {};
   pprof->_nb_values = 0;
   return ddres_init();
 }
@@ -159,18 +156,12 @@ static void write_mapping(const ddprof::MapInfo &mapinfo,
 }
 
 static void write_location(const FunLoc *loc, const ddprof::MapInfo &mapinfo,
-                           const ddog_prof_Slice_Line *lines,
+                           const ddprof::Symbol &symbol,
                            ddog_prof_Location *ffi_location) {
   write_mapping(mapinfo, &ffi_location->mapping);
+  write_function(symbol, &ffi_location->function);
   ffi_location->address = loc->ip;
-  ffi_location->lines = *lines;
-  // Folded not handled for now
-  ffi_location->is_folded = false;
-}
-
-static void write_line(const ddprof::Symbol &symbol, ddog_prof_Line *ffi_line) {
-  write_function(symbol, &ffi_line->function);
-  ffi_line->line = symbol._lineno;
+  ffi_location->line = symbol._lineno;
 }
 
 // Assumption of API is that sample is valid in a single type
@@ -181,7 +172,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
 
   const ddprof::SymbolTable &symbol_table = symbol_hdr._symbol_table;
   const ddprof::MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
-  ddog_prof_Profile *profile = pprof->_profile;
+  ddog_prof_Profile *profile = &pprof->_profile;
 
   int64_t values[DDPROF_PWT_LENGTH] = {};
   values[watcher->pprof_sample_idx] = value;
@@ -190,9 +181,6 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   }
 
   ddog_prof_Location locations_buff[DD_MAX_STACK_DEPTH];
-  // assumption of single line per loc for now
-  ddog_prof_Line line_buff[DD_MAX_STACK_DEPTH];
-
   std::span locs{uw_output->locs};
 
   if (watcher->options.nb_frames_to_skip < locs.size()) {
@@ -208,10 +196,8 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   unsigned cur_loc = 0;
   for (const FunLoc &loc : locs) {
     // possibly several lines to handle inlined function (not handled for now)
-    write_line(symbol_table[loc._symbol_idx], &line_buff[cur_loc]);
-    ddog_prof_Slice_Line lines = {.ptr = &line_buff[cur_loc], .len = 1};
-    write_location(&loc, mapinfo_table[loc._map_info_idx], &lines,
-                   &locations_buff[cur_loc]);
+    write_location(&loc, mapinfo_table[loc._map_info_idx],
+                   symbol_table[loc._symbol_idx], &locations_buff[cur_loc]);
     ++cur_loc;
   }
 
@@ -264,21 +250,25 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
       .labels = {.ptr = labels, .len = labels_num},
   };
 
-  //  uint64_t id_sample = ddog_prof_Profile_add(profile, sample);
-  ddog_prof_Profile_AddResult add_res = ddog_prof_Profile_add(profile, sample);
-  if (add_res.tag == DDOG_PROF_PROFILE_ADD_RESULT_ERR) {
-    defer { ddog_Error_drop(&add_res.err); };
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile: %s",
-                           add_res.err.message.ptr);
+  auto res = ddog_prof_Profile_add(profile, sample);
+  if (res.tag != DDOG_PROF_PROFILE_RESULT_OK) {
+    defer { ddog_Error_drop(&res.err); };
+    auto msg = ddog_Error_message(&res.err);
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile: %*s",
+                           static_cast<int>(msg.len), msg.ptr);
   }
-  return ddres_init();
+  return {};
 }
 
 DDRes pprof_reset(DDProfPProf *pprof) {
-  if (!ddog_prof_Profile_reset(pprof->_profile, nullptr)) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to reset profile");
+  auto res = ddog_prof_Profile_reset(&pprof->_profile, nullptr);
+  if (res.tag != DDOG_PROF_PROFILE_RESULT_OK) {
+    defer { ddog_Error_drop(&res.err); };
+    auto msg = ddog_Error_message(&res.err);
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to reset profile: %*s",
+                           static_cast<int>(msg.len), msg.ptr);
   }
-  return ddres_init();
+  return {};
 }
 
 void ddprof_print_sample(const UnwindOutput &uw_output,

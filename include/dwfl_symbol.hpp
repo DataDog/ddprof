@@ -8,7 +8,7 @@
 #include "ddprof_defs.hpp"
 #include "symbol.hpp"
 
-#include "gelf.h"
+#include <gelf.h>
 
 struct Dwfl_Module;
 
