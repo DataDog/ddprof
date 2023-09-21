@@ -6,115 +6,165 @@
 
 #include <algorithm>
 #include <bit>
+#include <cassert>
 #include <functional>
+#include <lib_logger.hpp>
 #include <unlikely.hpp>
 
 namespace ddprof {
 
-namespace {
-unsigned round_up_to_power_of_two(unsigned num) {
-  if (num == 0) {
-    return num;
-  }
-  // If num is already a power of two
-  if ((num & (num - 1)) == 0) {
-    return num;
-  }
-  // not a power of two
-  unsigned count = 0;
-  while (num) {
-    num >>= 1;
-    count++;
-  }
-  return 1 << count;
-}
-} // namespace
-
-AddressBitset::AddressBitset(AddressBitset &&other) noexcept {
-  move_from(other);
-}
-
-AddressBitset &AddressBitset::operator=(AddressBitset &&other) noexcept {
-  if (this != &other) {
-    move_from(other);
-  }
-  return *this;
-}
-
-void AddressBitset::move_from(AddressBitset &other) noexcept {
-  _lower_bits_ignored = other._lower_bits_ignored;
-  _bitset_size = other._bitset_size;
-  _k_nb_words = other._k_nb_words;
-  _nb_bits_mask = other._nb_bits_mask;
-  _address_bitset = std::move(other._address_bitset);
-  _nb_addresses.store(other._nb_addresses.load());
-
-  // Reset the state of 'other'
-  other._bitset_size = 0;
-  other._k_nb_words = 0;
-  other._nb_bits_mask = 0;
-  other._nb_addresses = 0;
-}
-
-void AddressBitset::init(unsigned bitset_size) {
-  // Due to memory alignment, on 64 bits we can assume that the first 4
-  // bits can be ignored
-  _lower_bits_ignored = _k_max_bits_ignored;
-  if (_address_bitset) {
-    _address_bitset.reset();
-  }
-  _bitset_size = round_up_to_power_of_two(bitset_size);
-  _k_nb_words = (_bitset_size) / (_nb_bits_per_word);
-  if (_bitset_size) {
-    _nb_bits_mask = _bitset_size - 1;
-    _address_bitset = std::make_unique<std::atomic<uint64_t>[]>(_k_nb_words);
-  }
-}
-
 bool AddressBitset::add(uintptr_t addr) {
-  uint32_t significant_bits = hash_significant_bits(addr);
-  // As per nsavoire's comment, it is better to use separate operators
-  // than to use the div instruction which generates an extra function call
-  // Also, the usage of a power of two value allows for bit operations
-  unsigned index_array = significant_bits / _nb_bits_per_word;
-  unsigned bit_offset = significant_bits % _nb_bits_per_word;
+  // Extract top 16 bits for top-level index
+  unsigned top_index = (addr >> 32) & 0xFFFF;
+
+  // If the entry at this index is null, allocate and try to atomically set it
+  MidLevel *expected_mid =
+      _top_level[top_index].load(std::memory_order_relaxed);
+  if (!expected_mid) {
+    if (_nb_mid_levels >= _k_default_max_mid_levels) {
+      // Every new level adds half a meg of overhead
+      LOG_ALWAYS_ONCE(
+          "<Warn> ddprof: Address bitset reached maximum number of mid levels\n");
+      return false;
+    }
+    expected_mid = new MidLevel();
+    MidLevel *old_mid = nullptr;
+    if (!_top_level[top_index].compare_exchange_strong(old_mid, expected_mid)) {
+      delete expected_mid;
+      expected_mid = old_mid;
+    } else {
+      ++_nb_mid_levels;
+    }
+    assert(expected_mid);
+    if (!expected_mid) {
+      // something went wrong
+      return false;
+    }
+  }
+
+  // Extract middle 16 bits for mid-level index
+  unsigned mid_index = (addr >> 16) & 0xFFFF;
+
+  // If the entry at this mid-level index is null, allocate and try to
+  // atomically set it
+  LeafLevel *expected_leaf =
+      expected_mid->mid[mid_index].load(std::memory_order_acquire);
+  if (!expected_leaf) {
+    expected_leaf = new LeafLevel();
+    LeafLevel *old_leaf = nullptr;
+    if (!expected_mid->mid[mid_index].compare_exchange_strong(old_leaf,
+                                                              expected_leaf)) {
+      delete expected_leaf;
+      expected_leaf = old_leaf;
+    }
+    assert(expected_leaf);
+    if (!expected_leaf) {
+      // something went wrong
+      return false;
+    }
+  }
+
+  // Extract lower 16 bits and ignore lower bits (12 remain)
+  unsigned leaf_index = (addr & 0xFFFF) >> _lower_bits_ignored;
+  unsigned index_array = leaf_index / _nb_bits_per_word;
+  assert(index_array < _k_nb_words);
+  unsigned bit_offset = leaf_index % _nb_bits_per_word;
   Word_t bit_in_element = (1UL << bit_offset);
-  // there is a possible race between checking the value
-  // and setting it
-  if (!(_address_bitset[index_array].fetch_or(bit_in_element) &
+
+  if (!(expected_leaf->leaf[index_array].fetch_or(bit_in_element) &
         bit_in_element)) {
-    // check that the element was not already set
     ++_nb_addresses;
     return true;
   }
-  // Collision, element was already set
-  return false;
+  return false; // Collision
 }
 
 bool AddressBitset::remove(uintptr_t addr) {
-  int significant_bits = hash_significant_bits(addr);
-  unsigned index_array = significant_bits / _nb_bits_per_word;
-  unsigned bit_offset = significant_bits % _nb_bits_per_word;
+  // Extract top 16 bits for top-level index
+  unsigned top_index = (addr >> 32) & 0xFFFF;
+
+  // Try to get the mid-level pointer. If it's null, return false.
+  MidLevel *mid = _top_level[top_index].load(std::memory_order_acquire);
+  if (unlikely(!mid)) {
+    return false;
+  }
+
+  // Extract middle 16 bits for mid-level index
+  unsigned mid_index = (addr >> 16) & 0xFFFF;
+
+  // Try to get the leaf-level pointer from the mid-level. If it's null, return
+  // false.
+  LeafLevel *leaf = mid->mid[mid_index].load(std::memory_order_acquire);
+  if (unlikely(!leaf)) {
+    return false;
+  }
+
+  // Extract lower 16 bits and ignore lower bits (12 remain)
+  unsigned leaf_index = (addr & 0xFFFF) >> _lower_bits_ignored;
+  unsigned index_array = leaf_index / _nb_bits_per_word;
+  assert(index_array < _k_nb_words);
+  unsigned bit_offset = leaf_index % _nb_bits_per_word;
   Word_t bit_in_element = (1UL << bit_offset);
-  if ((_address_bitset[index_array].fetch_xor(bit_in_element) &
-       bit_in_element)) {
+
+  // Use fetch_and to zero the bit
+  if (leaf->leaf[index_array].fetch_and(~bit_in_element) & bit_in_element) {
     _nb_addresses.fetch_sub(1, std::memory_order_relaxed);
-    // in the unlikely event of a clear right at the wrong time, we could
-    // have a negative number of elements (though count desyncs are acceptable)
     return true;
   }
+  // Otherwise, the bit wasn't set to begin with, so return false
   return false;
 }
 
+// TODO: the performance of this clear is horrible
+// For now we will avoid calling it
 void AddressBitset::clear() {
-  for (unsigned i = 0; i < _k_nb_words; ++i) {
-    Word_t original_value = _address_bitset[i].exchange(0);
-    // Count number of set bits in original_value
-    int num_set_bits = std::popcount(original_value);
-    if (num_set_bits > 0) {
-      _nb_addresses.fetch_sub(num_set_bits, std::memory_order_relaxed);
+  for (unsigned t = 0; t < _nb_entries_per_level; ++t) {
+    MidLevel *mid = _top_level[t].load(std::memory_order_acquire);
+    if (mid) { // if mid-level exists
+      for (unsigned m = 0; m < _nb_entries_per_level; ++m) {
+        LeafLevel *leaf = mid->mid[m].load(std::memory_order_acquire);
+        if (leaf) { // if leaf-level exists
+          for (unsigned l = 0; l < _k_nb_words; ++l) {
+            Word_t original_value = leaf->leaf[l].exchange(0);
+            // Count number of set bits in original_value
+            int num_set_bits = std::popcount(original_value);
+            if (num_set_bits > 0) {
+              _nb_addresses.fetch_sub(num_set_bits, std::memory_order_relaxed);
+            }
+          }
+        }
+      }
     }
   }
+}
+
+AddressBitset::~AddressBitset() {
+#ifdef DEBUG
+  unsigned mid_count = 0;
+  unsigned leaf_count = 0;
+#endif
+  for (unsigned t = 0; t < _nb_entries_per_level; ++t) {
+    MidLevel *mid = _top_level[t].load(std::memory_order_acquire);
+    if (mid) { // if mid-level exists
+#ifdef DEBUG
+      ++mid_count;
+#endif
+      for (unsigned m = 0; m < _nb_entries_per_level; ++m) {
+        LeafLevel *leaf = mid->mid[m].load(std::memory_order_acquire);
+        if (leaf) { // if leaf-level exists
+#ifdef DEBUG
+          ++leaf_count;
+#endif
+          delete leaf;
+        }
+      }
+      delete mid;
+    }
+  }
+#ifdef DEBUG
+  fprintf(stderr, "Mid count = %u \n", mid_count);
+  fprintf(stderr, "Leaf count = %u \n", leaf_count);
+#endif
 }
 
 } // namespace ddprof
