@@ -26,21 +26,23 @@ public:
 
 private:
   static constexpr unsigned _lower_bits_ignored = 4;
+  static constexpr int _k_default_max_mid_levels = 10;
   // element type
   using Word_t = uint64_t;
   constexpr static unsigned _nb_bits_per_word = sizeof(Word_t) * 8;
-  static constexpr unsigned _k_nb_words = 4096 / 64; // (64)
-  static constexpr unsigned _nb_entries_per_level = 65536;  // 2^16
+  static constexpr unsigned _k_nb_words = 4096 / 64;       // (64)
+  static constexpr unsigned _nb_entries_per_level = 65536; // 2^16
 
   struct LeafLevel {
-    std::atomic<Word_t> leaf[_k_nb_words];
+    std::atomic<Word_t> leaf[_k_nb_words] = {};
   };
 
   struct MidLevel {
-    std::atomic<LeafLevel*> mid[_nb_entries_per_level];
+    std::atomic<LeafLevel *> mid[_nb_entries_per_level] = {};
   };
 
-  std::atomic<MidLevel*> _top_level[_nb_entries_per_level];
-  std::atomic<int> _nb_addresses;
+  std::atomic<MidLevel *> _top_level[_nb_entries_per_level] = {};
+  std::atomic<int> _nb_addresses = 0;
+  std::atomic<int> _nb_mid_levels = 0;
 };
 } // namespace ddprof

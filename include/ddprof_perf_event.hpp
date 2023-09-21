@@ -8,6 +8,8 @@
 #include <linux/perf_event.h>
 #include <type_traits>
 
+#include "perf.hpp"
+
 // Extend the perf event types
 // There are <30 different perf events (starting at 1000 seems safe)
 enum : uint32_t {

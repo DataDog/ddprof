@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "allocation_tracker.hpp"
+#include "ddprof_perf_event.hpp"
 #include "loghandle.hpp"
 #include "ringbuffer_holder.hpp"
 
@@ -19,25 +20,44 @@ static constexpr uint64_t k_rate = 200000;
 
 // The reader thread is interesting, though it starts dominating the CPU
 // the benchmark focuses on the capture of allocation events.
-// #define READER_THREAD
+#define READER_THREAD
 std::atomic<bool> reader_continue{true};
 std::atomic<bool> error_in_reader{false};
 
 // Reader worker thread function
 void read_buffer(ddprof::RingBufferHolder &holder) {
-  int nb_samples = 0;
+  int nb_alloc_samples = 0;
+  int nb_dealloc_samples = 0;
+  int nb_unknown_samples = 0;
+
   error_in_reader = false;
   while (reader_continue) {
     ddprof::MPSCRingBufferReader reader(holder.get_ring_buffer());
     //    fprintf(stderr, "size = %lu! \n", reader.available_size());
     auto buf = reader.read_sample();
     if (!buf.empty()) {
-      ++nb_samples;
+      const perf_event_header *hdr =
+          reinterpret_cast<const perf_event_header *>(buf.data());
+
+      if (hdr->type == PERF_RECORD_SAMPLE) {
+
+        ++nb_alloc_samples;
+
+      } else if (hdr->type == PERF_CUSTOM_EVENT_DEALLOCATION) {
+        ++nb_dealloc_samples;
+      } else {
+        ++nb_unknown_samples;
+      }
     }
     std::chrono::microseconds(10000);
   }
-  fprintf(stderr, "Reader thread exit, nb_samples=%d\n", nb_samples);
-  if (nb_samples == 0) {
+  fprintf(stderr,
+          "Reader thread exit,"
+          "nb_alloc_samples=%d,"
+          "nb_dealloc_samples=%d,"
+          "nb_unknown_samples=%d\n",
+          nb_alloc_samples, nb_dealloc_samples, nb_unknown_samples);
+  if (nb_alloc_samples == 0) {
     error_in_reader = true;
   }
 }
@@ -103,7 +123,7 @@ void perform_memory_operations(bool track_allocations,
                                                      (i + 1) * page_size - 1);
 
         for (int j = 0; j < num_allocations; ++j) {
-          uintptr_t addr = dis(gen);
+          uintptr_t addr = dis(gen) << 4;
           my_malloc(1024, addr);
           thread_addresses[i].push_back(addr);
         }
@@ -128,6 +148,9 @@ void perform_memory_operations(bool track_allocations,
       t.join();
     }
   }
+
+  // wait for the reader thread to receive all samples
+  std::this_thread::sleep_for(std::chrono::microseconds(5000));
 
 #ifdef READER_THREAD
   reader_continue = false;
@@ -244,7 +267,7 @@ void perform_memory_operations_2(bool track_allocations,
     std::uniform_int_distribution<uintptr_t> dis(i * page_size,
                                                  (i + 1) * page_size - 1);
     for (int j = 0; j < num_allocations; ++j) {
-      uintptr_t addr = dis(gen);
+      uintptr_t addr = dis(gen) << 4;
       thread_addresses[i].push_back(addr);
     }
   }
@@ -264,6 +287,9 @@ void perform_memory_operations_2(bool track_allocations,
     // Add delay
     std::this_thread::sleep_for(std::chrono::microseconds(100));
   }
+
+  // wait for the reader thread to receive all samples
+  std::this_thread::sleep_for(std::chrono::microseconds(1000));
 
 #ifdef READER_THREAD
   reader_continue = false;

@@ -21,6 +21,19 @@ template <typename Func> void log_once_helper(std::once_flag &, Func &&func) {
 #endif
 }
 
+template <typename Func>
+void log_always_once_helper(std::once_flag &flag, Func &&func) {
+  std::call_once(flag, std::forward<Func>(func));
+}
+
+#define LOG_ALWAYS_ONCE(format, ...)                                           \
+  do {                                                                         \
+    static std::once_flag UNIQUE_ONCE_FLAG_##__COUNTER__;                      \
+    ddprof::log_always_once_helper(UNIQUE_ONCE_FLAG_##__COUNTER__, [&]() {     \
+      fprintf(stderr, (format), ##__VA_ARGS__);                                \
+    });                                                                        \
+  } while (0)
+
 // create a once flag for the line and file where this is called:
 #define LOG_ONCE(format, ...)                                                  \
   do {                                                                         \

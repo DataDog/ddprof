@@ -234,8 +234,7 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
   uint64_t total_size = nsamples * sampling_interval;
 
   if (_state.track_deallocations) {
-    if (_allocated_address_set->count() <
-        ddprof::liveallocation::kMaxTracked &&
+    if (_allocated_address_set->count() < ddprof::liveallocation::kMaxTracked &&
         _allocated_address_set->add(addr)) {
     } else {
       // null the address to avoid using this for live heap profiling
