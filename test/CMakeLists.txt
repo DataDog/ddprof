@@ -36,25 +36,26 @@ add_unit_test(myexe src1.cpp)
 add_unit_test(myexe src1.cpp DEFINITIONS UNIT_TEST)
 #]]
 function(add_unit_test name)
-  set(options NO_DETECT_LEAKS)
-  set(oneValueArgs)
-  set(multiValueArgs)
-  cmake_parse_arguments(PARSE_ARGV 1 MY "${options}" "${oneValueArgs}" "${multiValueArgs}")
   message(STATUS "Creating unit test : " ${name})
 
   # # Create exe with sources. Always add logger and error management in the unit tests
-  add_exe(${name} ../src/ddres_list.cc ../src/logger.cc ${MY_UNPARSED_ARGUMENTS})
+  add_exe(${name} ../src/ddres_list.cc ../src/logger.cc ${ARGN})
 
   target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
   target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST} ${GTEST_INCLUDE_DIRS}
                                              ${CMAKE_SOURCE_DIR}/include/lib)
 
   add_test(NAME ${name} COMMAND ${name})
+  # detect_stack_use_after_return is enabled by default in gcc 13 and causes massive slowdown for
+  # processes that do lot of functions calls, especially on ARM, causing timeouts in tests (eg.
+  # runtime_symbol_lookup-ut). Therefore disable it for aarch64 architecture.
   set_tests_properties(
     ${name}
     PROPERTIES
       ENVIRONMENT
-      "UBSAN_OPTIONS=halt_on_error=1 abort_on_error=1 print_stacktrace=1;LSAN_OPTIONS=detect_leaks=$<BOOL:${DDPROF_DETECT_LEAK}> malloc_context_size=2 print_suppressions=0;ASAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/cmake/asan.supp"
+      "UBSAN_OPTIONS=halt_on_error=1 abort_on_error=1 print_stacktrace=1;\
+LSAN_OPTIONS=detect_leaks=$<BOOL:${DDPROF_DETECT_LEAK}> malloc_context_size=2 print_suppressions=0;\
+ASAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/cmake/asan.supp detect_stack_use_after_return=$<NOT:$<STREQUAL:${CMAKE_SYSTEM_PROCESSOR},aarch64>>"
   )
   disable_clangtidy(${name})
 endfunction()
@@ -71,14 +72,10 @@ add_benchmark(myexe src1.cpp)
 add_benchmark(myexe src1.cpp DEFINITIONS UNIT_TEST)
 #]]
 function(add_benchmark name)
-  set(options)
-  set(oneValueArgs)
-  set(multiValueArgs)
-  cmake_parse_arguments(PARSE_ARGV 1 MY "${options}" "${oneValueArgs}" "${multiValueArgs}")
   message(STATUS "Creating unit test : " ${name})
 
   # # Create exe with sources. Always add logger and error management in the unit tests
-  add_exe(${name} ../src/ddres_list.cc ../src/logger.cc ${MY_UNPARSED_ARGUMENTS})
+  add_exe(${name} ../src/ddres_list.cc ../src/logger.cc ${ARGN})
 
   target_link_libraries(${name} PRIVATE Threads::Threads benchmark::benchmark
                                         benchmark::benchmark_main)
