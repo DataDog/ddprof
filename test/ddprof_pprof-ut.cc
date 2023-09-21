@@ -69,15 +69,14 @@ TEST(DDProfPProf, aggregate) {
   DDProfPProf pprof;
   DDProfContext ctx = {};
 
-  //  ctx.watchers.push_back(*ewatcher_from_str("sCPU"));
   bool ok = watchers_from_str("sCPU", ctx.watchers);
   EXPECT_TRUE(ok);
   DDRes res = pprof_create_profile(&pprof, ctx);
-  EXPECT_TRUE(ctx.watchers[0].pprof_indices[kCallgraph].pprof_index != -1);
-  EXPECT_TRUE(ctx.watchers[0].pprof_indices[kCallgraph].pprof_count_index !=
+  EXPECT_TRUE(ctx.watchers[0].pprof_indices[kOccurencePos].pprof_index != -1);
+  EXPECT_TRUE(ctx.watchers[0].pprof_indices[kOccurencePos].pprof_count_index !=
               -1);
   res = pprof_aggregate(&mock_output, symbol_hdr, 1000, 1, &ctx.watchers[0],
-                        ctx.watchers[0].pprof_indices[kCallgraph], &pprof);
+                        ctx.watchers[0].pprof_indices[kOccurencePos], &pprof);
 
   EXPECT_TRUE(IsDDResOK(res));
 

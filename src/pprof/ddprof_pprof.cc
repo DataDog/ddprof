@@ -22,7 +22,7 @@
 #define PPROF_MAX_LABELS 6
 
 struct ActiveIdsResult {
-  EventConfMode output_mode[DDPROF_PWT_LENGTH] = {};
+  EventValueMode output_mode[DDPROF_PWT_LENGTH] = {};
   PerfWatcher *default_watcher = nullptr;
 };
 
@@ -48,8 +48,7 @@ DDRes get_active_ids(std::span<PerfWatcher> watchers, ActiveIdsResult &result) {
         result.default_watcher->sample_type_id) // update default
       result.default_watcher = &watchers[i];
 
-    result.output_mode[sample_type_id] |=
-        watchers[i].output_mode; // update mask
+    result.output_mode[sample_type_id] |= watchers[i].output_mode;
     if (count_id != DDPROF_PWT_NOCOUNT)
       // if the count is valid, update mask for it
       result.output_mode[count_id] = watchers[i].output_mode;
@@ -58,19 +57,20 @@ DDRes get_active_ids(std::span<PerfWatcher> watchers, ActiveIdsResult &result) {
 }
 
 struct PProfValues {
-  PProfIndices pv[DDPROF_PWT_LENGTH][kNbPprofPos];
-  ddog_prof_ValueType perf_value_type[DDPROF_PWT_LENGTH * kNbPprofPos];
+  // for every watcher type / value mdoe, index of matching pprof
+  int pprof_value_indices[DDPROF_PWT_LENGTH][kNbEventValueModes];
+  ddog_prof_ValueType perf_value_type[DDPROF_PWT_LENGTH * kNbEventValueModes];
   int num_sample_type_ids;
 };
 
 PProfValues compute_pprof_values(const ActiveIdsResult &active_ids) {
   PProfValues result = {};
   for (int i = 0; i < DDPROF_PWT_LENGTH; ++i) {
-    if (active_ids.output_mode[i] == EventConfMode::kDisabled)
+    if (active_ids.output_mode[i] == EventValueMode::kDisabled)
       continue;
     assert(i != DDPROF_PWT_NOCOUNT);
 
-    if (Any(active_ids.output_mode[i] & EventConfMode::kCallgraph)) {
+    if (Any(active_ids.output_mode[i] & EventValueMode::kOccurence)) {
       const char *value_name = sample_type_name_from_idx(i, false);
       const char *value_unit = sample_type_unit_from_idx(i);
       if (!value_name || !value_unit) {
@@ -83,11 +83,11 @@ PProfValues compute_pprof_values(const ActiveIdsResult &active_ids) {
           to_CharSlice(value_unit);
 
       // Update the pv
-      result.pv[i][kCallgraph].pprof_index = result.num_sample_type_ids;
+      result.pprof_value_indices[i][kOccurencePos] = result.num_sample_type_ids;
       ++result.num_sample_type_ids;
     }
 
-    if (Any(active_ids.output_mode[i] & EventConfMode::kLiveCallgraph)) {
+    if (Any(active_ids.output_mode[i] & EventValueMode::kLiveUsage)) {
       const char *value_name = sample_type_name_from_idx(i, true);
       const char *value_unit = sample_type_unit_from_idx(i);
       if (!value_name || !value_unit) {
@@ -100,7 +100,7 @@ PProfValues compute_pprof_values(const ActiveIdsResult &active_ids) {
           to_CharSlice(value_unit);
 
       // Update the pv
-      result.pv[i][kLive].pprof_index = result.num_sample_type_ids;
+      result.pprof_value_indices[i][kLiveUsagePos] = result.num_sample_type_ids;
       ++result.num_sample_type_ids;
     }
   }
@@ -131,19 +131,21 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
         this_id >= DDPROF_PWT_LENGTH) {
       continue;
     }
-    ctx.watchers[i].pprof_indices[kCallgraph] =
-        pprof_values.pv[ctx.watchers[i].sample_type_id][kCallgraph];
+    ctx.watchers[i].pprof_indices[kOccurencePos].pprof_index =
+        pprof_values
+            .pprof_value_indices[ctx.watchers[i].sample_type_id][kOccurencePos];
     int count_id =
         sample_type_id_to_count_sample_type_id(ctx.watchers[i].sample_type_id);
     if (count_id != DDPROF_PWT_NOCOUNT) {
-      ctx.watchers[i].pprof_indices[kCallgraph].pprof_count_index =
-          pprof_values.pv[count_id][kCallgraph].pprof_index;
+      ctx.watchers[i].pprof_indices[kOccurencePos].pprof_count_index =
+          pprof_values.pprof_value_indices[count_id][kOccurencePos];
     }
-    ctx.watchers[i].pprof_indices[kLive] =
-        pprof_values.pv[ctx.watchers[i].sample_type_id][kLive];
+    ctx.watchers[i].pprof_indices[kLiveUsagePos].pprof_index =
+        pprof_values
+            .pprof_value_indices[ctx.watchers[i].sample_type_id][kLiveUsagePos];
     if (count_id != DDPROF_PWT_NOCOUNT) {
-      ctx.watchers[i].pprof_indices[kLive].pprof_count_index =
-          pprof_values.pv[count_id][kLive].pprof_index;
+      ctx.watchers[i].pprof_indices[kLiveUsagePos].pprof_count_index =
+          pprof_values.pprof_value_indices[count_id][kLiveUsagePos];
     }
   }
 
@@ -165,10 +167,10 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
 
 #warning does this work with only memory only? do we have a period ?
     int default_index =
-        active_ids.default_watcher->pprof_indices[kCallgraph].pprof_index;
+        active_ids.default_watcher->pprof_indices[kOccurencePos].pprof_index;
     if (default_index == -1) {
       default_index =
-          active_ids.default_watcher->pprof_indices[kLive].pprof_index;
+          active_ids.default_watcher->pprof_indices[kLiveUsagePos].pprof_index;
     }
     assert(default_index != -1);
     // period is the default watcher's type.
@@ -351,7 +353,7 @@ void ddprof_print_sample(const UnwindOutput &uw_output,
 
   const char *sample_name = sample_type_name_from_idx(
       watcher.sample_type_id,
-      Any(EventConfMode::kLiveCallgraph & watcher.output_mode));
+      Any(EventValueMode::kLiveUsage & watcher.output_mode));
   std::string buf =
       ddprof::string_format("sample[type=%s;pid=%ld;tid=%ld] ", sample_name,
                             uw_output.pid, uw_output.tid);

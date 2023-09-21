@@ -75,7 +75,7 @@ static DDRes report_lost_events(DDProfContext &ctx) {
              value, watcher_idx);
       DDRES_CHECK_FWD(pprof_aggregate(
           &us->output, us->symbol_hdr, value, nb_lost, watcher,
-          watcher->pprof_indices[kCallgraph],
+          watcher->pprof_indices[kOccurencePos],
           ctx.worker_ctx.pprof[ctx.worker_ctx.i_current_pprof]));
       ctx.worker_ctx.lost_events_per_watcher[watcher_idx] = 0;
     }
@@ -246,10 +246,8 @@ static DDRes ddprof_unwind_sample(DDProfContext &ctx, perf_event_sample *sample,
   if (watcher->config == PERF_COUNT_SW_TASK_CLOCK)
     ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
 
-  // Attempt to fully unwind if the watcher has a callgraph type
-  DDRes res = {};
-  if (AnyCallgraph(watcher->output_mode))
-    res = unwindstate__unwind(us);
+  // Attempt to fully unwind for this watcher
+  DDRes res = unwindstate__unwind(us);
 
   /* This test is not 100% accurate:
    * Linux kernel does not take into account stack start (ie. end address since
@@ -307,12 +305,12 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
   // Aggregate if unwinding went well (todo : fatal error propagation)
   if (!IsDDResFatal(res)) {
     struct UnwindState *us = ctx.worker_ctx.us;
-    if (Any(EventConfMode::kLiveCallgraph & watcher->output_mode)) {
+    if (Any(EventValueMode::kLiveUsage & watcher->output_mode)) {
       // Live callgraph mode
       // for now we hard code the live aggregation mode
       ctx.worker_ctx.live_allocation.register_allocation(
           us->output, sample->addr, sample->period, watcher_pos, sample->pid);
-    } else if (Any(EventConfMode::kCallgraph & watcher->output_mode)) {
+    } else if (Any(EventValueMode::kOccurence & watcher->output_mode)) {
       // Depending on the type of watcher, compute a value for sample
       uint64_t sample_val = perf_value_from_sample(watcher, sample);
 
@@ -320,7 +318,7 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
       DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
       DDRES_CHECK_FWD(
           pprof_aggregate(&us->output, us->symbol_hdr, sample_val, 1, watcher,
-                          watcher->pprof_indices[kCallgraph], pprof));
+                          watcher->pprof_indices[kOccurencePos], pprof));
       if (ctx.params.show_samples) {
         ddprof_print_sample(us->output, us->symbol_hdr, sample->period,
                             *watcher);
@@ -363,9 +361,10 @@ static DDRes aggregate_livealloc_stack(
     const LiveAllocation::PprofStacks::value_type &alloc_info,
     DDProfContext &ctx, const PerfWatcher *watcher, DDProfPProf *pprof,
     const SymbolHdr &symbol_hdr) {
-  DDRES_CHECK_FWD(pprof_aggregate(
-      &alloc_info.first, symbol_hdr, alloc_info.second._value,
-      alloc_info.second._count, watcher, watcher->pprof_indices[kLive], pprof));
+  DDRES_CHECK_FWD(
+      pprof_aggregate(&alloc_info.first, symbol_hdr, alloc_info.second._value,
+                      alloc_info.second._count, watcher,
+                      watcher->pprof_indices[kLiveUsagePos], pprof));
   if (ctx.params.show_samples) {
     ddprof_print_sample(alloc_info.first, symbol_hdr, alloc_info.second._value,
                         *watcher);

@@ -132,7 +132,7 @@ bool watchers_from_str(const char *str, std::vector<PerfWatcher> &watchers,
                        uint32_t stack_sample_size) {
   std::vector<EventConf> configs;
   EventConf template_conf{
-      .mode = EventConfMode::kCallgraph,
+      .mode = EventValueMode::kOccurence,
       .stack_sample_size = stack_sample_size,
   };
   if (EventConf_parse(str, template_conf, configs) != 0) {

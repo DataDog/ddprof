@@ -158,8 +158,9 @@ TEST(DDProfExporter, simple) {
     ctx.watchers.push_back(*ewatcher_from_str("sCPU"));
     res = pprof_create_profile(&pprofs, ctx);
     EXPECT_TRUE(IsDDResOK(res));
-    res = pprof_aggregate(&mock_output, symbol_hdr, 1000, 1, &ctx.watchers[0],
-                          ctx.watchers[0].pprof_indices[kCallgraph], &pprofs);
+    res =
+        pprof_aggregate(&mock_output, symbol_hdr, 1000, 1, &ctx.watchers[0],
+                        ctx.watchers[0].pprof_indices[kOccurencePos], &pprofs);
     EXPECT_TRUE(IsDDResOK(res));
   }
   {

@@ -28,11 +28,11 @@ struct PerfWatcherOptions {
       k_default_perf_stack_sample_size}; // size of the user stack to capture
 };
 
-enum PprofPos_t {
-  kCallgraph = 0,
-  kLive,
-  kNbPprofPos,
-};
+// enum PprofPos_t {
+//   kCallgraph = 0,
+//   kLive,
+//   kNbPprofPos,
+// };
 
 struct PProfIndices {
   int pprof_index = -1;
@@ -66,10 +66,9 @@ struct PerfWatcher {
   // Other configs
   bool suppress_pid;
   bool suppress_tid;
-  PProfIndices pprof_indices[kNbPprofPos]; // std and live
-  bool instrument_self;                    // do my own perfopen, etc
-  // Defalut output is callgraph
-  EventConfMode output_mode = EventConfMode::kCallgraph;
+  PProfIndices pprof_indices[kNbEventValueModes]; // std and live
+  bool instrument_self;                           // do my own perfopen, etc
+  EventValueMode output_mode{EventValueMode::kOccurence};
 };
 
 // The Datadog backend only understands pre-configured event types.  Those

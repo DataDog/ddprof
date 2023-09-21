@@ -41,21 +41,18 @@ EventConf g_accum_event_conf = {};
 EventConf g_template_event_conf = {};
 std::vector<EventConf>* g_event_configs;
 
-std::optional<EventConfMode> mode_from_str(const std::string &str) {
+std::optional<EventValueMode> mode_from_str(const std::string &str) {
   const std::string a_str{"Aa*"};
   const std::string l_str{"Ll"};
   const std::string g_str{"Gg"};
-  const std::string m_str{"Mm"};
-  EventConfMode mode = EventConfMode::kDisabled;
+  EventValueMode mode = EventValueMode::kDisabled;
   for (const char &c : str) {
-    if (m_str.find(c) != std::string::npos) {
-      mode |= EventConfMode::kMetric;
-    } else if (g_str.find(c) != std::string::npos) {
-      mode |= EventConfMode::kCallgraph;
+    if (g_str.find(c) != std::string::npos) {
+      mode |= EventValueMode::kOccurence;
     } else if (l_str.find(c) != std::string::npos) {
-        mode |= EventConfMode::kLiveCallgraph;
+        mode |= EventValueMode::kLiveUsage;
     } else if (a_str.find(c) != std::string::npos) {
-      mode |= EventConfMode::kAll;
+      mode |= EventValueMode::kAll;
     } else {
       fprintf(stderr, "Warning, unexpected mode %c \n", c);
       return {}; // unexpected mode
@@ -269,7 +266,7 @@ opt:
            g_accum_event_conf.value_scale = 0.0 + $3;
            break;
          case EventConfField::kMode:
-           g_accum_event_conf.mode = static_cast<EventConfMode>($3) & EventConfMode::kAll;
+           g_accum_event_conf.mode = static_cast<EventValueMode>($3) & EventValueMode::kAll;
            break;
 
          case EventConfField::kParameter:

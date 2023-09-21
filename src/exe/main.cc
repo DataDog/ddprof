@@ -336,7 +336,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
             ctx->params.loaded_libs_check_interval.count();
 
         if (ctx->watchers[alloc_watcher_idx].output_mode ==
-            EventConfMode::kLiveCallgraph) {
+            EventValueMode::kLiveUsage) {
           reply.allocation_flags |= (1 << ddprof::ReplyMessage::kLiveCallgraph);
         }
       }

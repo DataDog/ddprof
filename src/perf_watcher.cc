@@ -128,23 +128,21 @@ void log_watcher(const PerfWatcher *w, int idx) {
     break;
   }
 
-  PRINT_NFO("    Category: %s, EventName: %s, GroupName: %s, Label: %s",
-            sample_type_name_from_idx(
-                w->sample_type_id,
-                Any(EventConfMode::kLiveCallgraph & w->output_mode)),
-            w->tracepoint_event.c_str(), w->tracepoint_group.c_str(),
-            w->tracepoint_label.c_str());
+  PRINT_NFO(
+      "    Category: %s, EventName: %s, GroupName: %s, Label: %s",
+      sample_type_name_from_idx(
+          w->sample_type_id, Any(EventValueMode::kLiveUsage & w->output_mode)),
+      w->tracepoint_event.c_str(), w->tracepoint_group.c_str(),
+      w->tracepoint_label.c_str());
   PRINT_NFO("    Sample user Stack Size: %u", w->options.stack_sample_size);
 
   if (w->options.is_freq)
     PRINT_NFO("    Cadence: Freq, Freq: %lu", w->sample_frequency);
   else
     PRINT_NFO("    Cadence: Period, Period: %ld", w->sample_period);
-  if (Any(EventConfMode::kCallgraph & w->output_mode))
+  if (Any(EventValueMode::kOccurence & w->output_mode))
     PRINT_NFO("    Outputting to callgraph (flamegraph)");
-  if (Any(EventConfMode::kMetric & w->output_mode))
-    PRINT_NFO("    Outputting to metric");
-  if (Any(EventConfMode::kLiveCallgraph & w->output_mode))
+  if (Any(EventValueMode::kLiveUsage & w->output_mode))
     PRINT_NFO("    Outputting to live callgraph");
 }
 
