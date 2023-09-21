@@ -44,7 +44,7 @@ void LOG_setfacility(int fac) {
     log_ctx->facility = fac;
 }
 
-bool LOG_setname(char *name) {
+bool LOG_setname(const char *name) {
   if (log_ctx->name)
     free(log_ctx->name);
   log_ctx->name = strdup(name);
@@ -188,7 +188,7 @@ void vlprintfln(int lvl, int fac, const char *name, const char *format,
 
   // Write the body into the buffer
   ssize_t cap = LOG_MSG_CAP - sz_h - 2; // Room for optional newline and \0
-  sz = vsnprintf((char *)&buf[sz_h], cap, format, args);
+  sz = vsnprintf(&buf[sz_h], cap, format, args);
 
   if (sz > cap)
     sz = cap;

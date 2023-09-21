@@ -206,9 +206,9 @@ int main(int c, char **v) {
     // Print to statsd, if configured
     if (-1 != fd_statsd) {
       work_end = ddprof::get_tsc_cycles();
-      static char key_ticks[] = "app.collatz.ticks";
-      static char key_stacks[] = "app.collatz.stacks";
-      static char key_funs[] = "app.collatz.functions";
+      static const char key_ticks[] = "app.collatz.ticks";
+      static const char key_stacks[] = "app.collatz.stacks";
+      static const char key_funs[] = "app.collatz.functions";
       long val = static_cast<long>(work_end - work_start);
       statsd_send(fd_statsd, key_ticks, &val, STAT_GAUGE);
       statsd_send(fd_statsd, key_stacks, &kj, STAT_GAUGE);

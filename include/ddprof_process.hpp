@@ -48,7 +48,7 @@ private:
 
 class ProcessHdr {
 public:
-  ProcessHdr(std::string_view path_to_proc = "")
+  explicit ProcessHdr(std::string_view path_to_proc = "")
       : _path_to_proc(path_to_proc) {}
   const ContainerId &get_container_id(pid_t pid, bool force = false);
   void clear(pid_t pid) { _process_map.erase(pid); }

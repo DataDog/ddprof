@@ -51,7 +51,8 @@ DDRes statsd_listen(std::string_view path, int *fd) {
   // create and use a node somewhere on the VFS, then they cannot open a
   // listen-type datagram UDS.
   // TODO: is this true?  Can we relax this constraint?
-  if (bind(fd_sock, (struct sockaddr *)&addr_bind, sizeof(addr_bind))) {
+  if (bind(fd_sock, reinterpret_cast<struct sockaddr *>(&addr_bind),
+           sizeof(addr_bind))) {
     close(fd_sock);
     DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Binding UDS failed (%s)",
                           strerror(errno));
@@ -87,7 +88,8 @@ DDRes statsd_connect(std::string_view statsd_socket, int *fd) {
   }
 
   // Now connect to the specified listening path
-  if (connect(fd_sock, (struct sockaddr *)&addr_peer, sizeof(addr_peer))) {
+  if (connect(fd_sock, reinterpret_cast<struct sockaddr *>(&addr_peer),
+              sizeof(addr_peer))) {
     close(fd_sock);
     DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD,
                           "[STATSD] Connecting to host failed (%s)",
@@ -99,26 +101,26 @@ DDRes statsd_connect(std::string_view statsd_socket, int *fd) {
   return ddres_init();
 }
 
-DDRes statsd_send(int fd_sock, const char *key, void *val, int type) {
+DDRes statsd_send(int fd_sock, const char *key, const void *val, int type) {
   char buf[1024] = {0};
   size_t sz = 0;
   switch (type) {
   default:
   case STAT_MS_LONG:
     sz = snprintf(buf, sizeof(buf), "%s:%ld|%s", key,
-                  *reinterpret_cast<long *>(val), "ms");
+                  *reinterpret_cast<const long *>(val), "ms");
     break;
   case STAT_MS_FLOAT:
     sz = snprintf(buf, sizeof(buf), "%s:%f|%s", key,
-                  *reinterpret_cast<float *>(val), "ms");
+                  *reinterpret_cast<const float *>(val), "ms");
     break;
   case STAT_COUNT:
     sz = snprintf(buf, sizeof(buf), "%s:%ld|%s", key,
-                  *reinterpret_cast<long *>(val), "c");
+                  *reinterpret_cast<const long *>(val), "c");
     break;
   case STAT_GAUGE:
     sz = snprintf(buf, sizeof(buf), "%s:%ld|%s", key,
-                  *reinterpret_cast<long *>(val), "g");
+                  *reinterpret_cast<const long *>(val), "g");
     break;
   }
 

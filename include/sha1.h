@@ -7,7 +7,7 @@
    100% Public Domain
  */
 
-#include "stdint.h"
+#include <stdint.h>
 
 #if defined(__cplusplus)
 extern "C" {

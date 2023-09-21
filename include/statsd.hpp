@@ -22,7 +22,7 @@ typedef enum STAT_TYPES {
 DDRes statsd_connect(std::string_view statsd_socket, int *);
 
 /// Send the stats in a statsd format, returns a ddres
-DDRes statsd_send(int, const char *, void *, int);
+DDRes statsd_send(int, const char *, const void *, int);
 
 /// Close the socket, returns a ddres with matching status
 DDRes statsd_close(int);

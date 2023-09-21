@@ -3,6 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
+#include <algorithm>
 #include <iostream>
 #include <limits>
 #include <stdio.h>
@@ -141,12 +142,9 @@ DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
 
 bool RuntimeSymbolLookup::should_skip_symbol(std::string_view symbol) const {
   // we could consider making this more efficient if the table grows
-  for (const auto &el : _ignored_symbols_start) {
-    if (symbol.starts_with(el)) {
-      return true;
-    }
-  }
-  return false;
+  return std::ranges::any_of(_ignored_symbols_start, [&symbol](auto &el) {
+    return symbol.starts_with(el);
+  });
 }
 
 DDRes RuntimeSymbolLookup::fill_from_perfmap(int pid, SymbolMap &symbol_map,

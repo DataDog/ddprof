@@ -86,7 +86,7 @@ printflike(4, 5) void olprintfln(int, int, const char *, const char *, ...);
 void vlprintfln(int, int, const char *, const char *, va_list);
 
 // Setters for global logger context
-bool LOG_setname(char *);
+bool LOG_setname(const char *);
 void LOG_setlevel(int);
 int LOG_getlevel();
 void LOG_setfacility(int);
