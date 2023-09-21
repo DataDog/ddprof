@@ -171,8 +171,7 @@ TEST(allocation_tracker, max_tracked_allocs) {
         ASSERT_EQ(sample->tid, ddprof::gettid());
         if (sample->addr == 0) {
           max_reached = true;
-        }
-        else {
+        } else {
           EXPECT_EQ(sample->addr, addr);
         }
       }
