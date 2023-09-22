@@ -63,7 +63,7 @@ report_gitlab_CI_status:
   stage: .post
   script:
     - if [ "$STATUS" -eq 1 ]; then
-    -   echo "If you see this failing, it means downstream pipeline failed. Follow the link to the pipeline in the riht panel and check downstream pipeline."
+    -   echo "If you see this failing, it means downstream pipeline failed. Follow the link to the pipeline in the right panel and check downstream pipeline."
     -   echo "To update pipeline status first retry the failed jobs in the downstream pipeline and once they succeed rerun this job."
     - fi
     - exit ${STATUS}
