@@ -44,10 +44,26 @@ report_failure:
     reports:
       dotenv: .env
 
+report_success:
+  tags: ["arch:amd64"]
+  when: on_success
+  needs: [trigger_internal_build]
+  # allow_failure: true prevents the job from showing up in github statuses (because it's filtered by gitsync)
+  allow_failure: true
+  script:
+    - echo "STATUS=0" >> .env
+  artifacts:
+    reports:
+      dotenv: .env
+
 # Final job that will show in github statuses
 report_gitlab_CI_status:
   tags: ["arch:amd64"]
   when: always
   stage: .post
   script:
+    - if [ "$STATUS" -eq 1 ]; then
+    -   echo "If you see this failing, it means downstream pipeline failed. Follow the link to the pipeline in the riht panel and check downstream pipeline."
+    -   echo "To update pipeline status first retry the failed jobs in the downstream pipeline and once they succeed rerun this job."
+    - fi
     - exit ${STATUS}
