@@ -307,7 +307,8 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
     if (Any(EventValueMode::kLiveUsage & watcher->output_mode)) {
       ctx.worker_ctx.live_allocation.register_allocation(
           us->output, sample->addr, sample->period, watcher_pos, sample->pid);
-    } else if (Any(EventValueMode::kOccurence & watcher->output_mode)) {
+    }
+    if (Any(EventValueMode::kOccurence & watcher->output_mode)) {
       // Depending on the type of watcher, compute a value for sample
       uint64_t sample_val = perf_value_from_sample(watcher, sample);
       int i_export = ctx.worker_ctx.i_current_pprof;
