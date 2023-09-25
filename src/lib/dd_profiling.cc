@@ -195,8 +195,6 @@ int ddprof_start_profiling_internal() {
 
   // no socket -> library will spawn a profiler and create socket pair
   if (sockfd == -1) {
-    enum { kParentIdx, kChildIdx };
-
     // Create a socket pair to establish a commuication channel between library
     // and profiler Communication occurs only during profiler setup and sockets
     // are closed once profiler is attached.
@@ -218,10 +216,8 @@ int ddprof_start_profiling_internal() {
       return -1;
     }
 
-    auto defer_child_socket_close =
-        make_defer([&sockfds]() { close(sockfds[kChildIdx]); });
-    auto defer_parent_socket_close =
-        make_defer([&sockfds]() { close(sockfds[kParentIdx]); });
+    auto parent_socket = ddprof::unique_resource(sockfds[0], &::close);
+    auto child_socket = ddprof::unique_resource(sockfds[1], &::close);
 
     auto daemonize_res = ddprof::daemonize();
     if (daemonize_res.state == ddprof::DaemonizeResult::Error) {
@@ -236,15 +232,16 @@ int ddprof_start_profiling_internal() {
       // executed by daemonized process
 
       // close parent socket end
-      defer_parent_socket_close.reset();
-      defer_child_socket_close.release();
+      parent_socket.reset();
+      auto child_socket_fd = child_socket.get();
+      child_socket.release();
 
-      exec_ddprof(target_pid, daemonize_res.temp_pid, sockfds[kChildIdx]);
+      exec_ddprof(target_pid, daemonize_res.temp_pid, child_socket_fd);
       exit(1);
     }
 
-    defer_parent_socket_close.release();
-    sockfd = sockfds[kParentIdx];
+    sockfd = parent_socket.get();
+    parent_socket.release();
   }
 
   try {

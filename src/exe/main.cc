@@ -198,30 +198,26 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     bool allocation_profiling_started_from_wrapper =
         ddprof::context_allocation_profiling_watcher_idx(*ctx) != -1;
 
-    enum { kParentIdx, kChildIdx };
-    int sockfds[2] = {-1, -1};
-
-    auto defer_child_socket_close = make_defer([&sockfds]() {
-      if (sockfds[kChildIdx] != -1)
-        close(sockfds[kChildIdx]);
-    });
-    auto defer_parent_socket_close = make_defer([&sockfds]() {
-      if (sockfds[kParentIdx] != -1)
-        close(sockfds[kParentIdx]);
-    });
+    using socket_resource = ddprof::unique_resource<int, decltype(&::close)>;
+    socket_resource child_socket;
+    socket_resource parent_socket;
 
     if (allocation_profiling_started_from_wrapper) {
+      int sockfds[2] = {-1, -1};
       if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sockfds) == -1) {
         return -1;
       }
+      parent_socket = ddprof::unique_resource{sockfds[0], &::close};
+      child_socket = ddprof::unique_resource(sockfds[1], &::close);
+
       if (!IsDDResOK(get_library_path(dd_profiling_lib_holder,
                                       dd_loader_lib_holder))) {
         return -1;
       }
       LG_DBG("ctx->params.dd_profiling_fd = %d - sockfds %d, %d",
-             ctx->params.dd_profiling_fd, sockfds[kChildIdx],
-             sockfds[kParentIdx]);
-      ctx->params.sockfd = sockfds[kChildIdx];
+             ctx->params.dd_profiling_fd, child_socket.get(),
+             parent_socket.get());
+      ctx->params.sockfd = child_socket.get();
       ctx->params.wait_on_socket = true;
     }
 
@@ -240,7 +236,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
 
     if (daemonize_res.state == ddprof::DaemonizeResult::InitialProcess) {
       // non-daemon process: return control to caller
-      defer_child_socket_close.reset();
+      child_socket.reset();
 
       std::string dd_loader_lib_path = dd_loader_lib_holder.release();
       std::string dd_profiling_lib_path = dd_profiling_lib_holder.release();
@@ -261,16 +257,16 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
           setenv("DD_PROFILING_NATIVE_LIBRARY", dd_profiling_lib_path.c_str(),
                  1);
         }
-        auto sock_str = std::to_string(sockfds[kParentIdx]);
+        auto sock_str = std::to_string(parent_socket.get());
         setenv(k_profiler_lib_socket_env_variable, sock_str.c_str(), 1);
       }
 
-      defer_parent_socket_close.release();
+      parent_socket.release();
       return 0;
     }
     temp_pid = daemonize_res.temp_pid;
-    defer_child_socket_close.release();
-    defer_parent_socket_close.reset();
+    child_socket.release();
+    parent_socket.reset();
   }
 
   // Now, we are the profiler process
