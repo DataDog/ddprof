@@ -48,7 +48,7 @@ std::optional<EventValueMode> mode_from_str(const std::string &str) {
   EventValueMode mode = EventValueMode::kDisabled;
   for (const char &c : str) {
     if (o_str.find(c) != std::string::npos) {
-      mode |= EventValueMode::kOccurence;
+      mode |= EventValueMode::kOccurrence;
     } else if (l_str.find(c) != std::string::npos) {
         mode |= EventValueMode::kLiveUsage;
     } else if (a_str.find(c) != std::string::npos) {
@@ -99,7 +99,7 @@ void conf_print(const EventConf *tp) {
   else
     printf("  label: <generated from event/groupname>\n");
 
-  const char *modenames[] = {"ILLEGAL", "callgraph", "metric", "live callgraph", "metric and callgraph"};
+  const char *modenames[] = {"ILLEGAL", "occurrence", "live usage"};
   printf("  type: %s\n", modenames[static_cast<unsigned>(tp->mode)]);
 
 

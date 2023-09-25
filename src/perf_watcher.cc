@@ -146,10 +146,10 @@ void log_watcher(const PerfWatcher *w, int idx) {
     PRINT_NFO("    Cadence: Freq, Freq: %lu", w->sample_frequency);
   else
     PRINT_NFO("    Cadence: Period, Period: %ld", w->sample_period);
-  if (Any(EventValueMode::kOccurence & w->output_mode))
-    PRINT_NFO("    Outputting to callgraph (flamegraph)");
+  if (Any(EventValueMode::kOccurrence & w->output_mode))
+    PRINT_NFO("    Outputting occurrences");
   if (Any(EventValueMode::kLiveUsage & w->output_mode))
-    PRINT_NFO("    Outputting to live callgraph");
+    PRINT_NFO("    Outputting live usage");
 }
 
 std::string_view watcher_help_text() {

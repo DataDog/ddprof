@@ -13,7 +13,7 @@
 #include <vector>
 
 enum EventValueModePos {
-  kOccurencePos = 0,
+  kOccurrencePos = 0,
   kLiveUsagePos = 1,
   kNbEventValueModes
 };
@@ -21,9 +21,9 @@ enum EventValueModePos {
 // Defines how a sample is aggregated when it is received
 enum class EventValueMode : uint32_t {
   kDisabled = 0,
-  kOccurence = 1 << kOccurencePos, // Show occurences (example CPU usage)
-  kLiveUsage = 1 << kLiveUsagePos, // Report live usage (example heap live)
-  kAll = kOccurence | kLiveUsage,
+  kOccurrence = 1 << kOccurrencePos, // Occurrences (example CPU usage)
+  kLiveUsage = 1 << kLiveUsagePos,   // Report live usage (example memory leaks)
+  kAll = kOccurrence | kLiveUsage,
 };
 
 ALLOW_FLAGS_FOR_ENUM(EventValueMode)

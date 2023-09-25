@@ -188,7 +188,7 @@ TEST(DDProfContext, cpu_live_heap_preset) {
   EXPECT_EQ(ctx.watchers[1].ddprof_event_type, DDPROF_PWE_sALLOC);
   EXPECT_EQ(ctx.watchers[1].output_mode, EventValueMode::kLiveUsage);
   EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sCPU);
-  EXPECT_EQ(ctx.watchers[0].output_mode, EventValueMode::kOccurence);
+  EXPECT_EQ(ctx.watchers[0].output_mode, EventValueMode::kOccurrence);
 }
 
 TEST(DDProfContext, manual_live_allocation_setting) {

@@ -62,7 +62,7 @@ struct PerfWatcher {
   bool suppress_tid;
   PProfIndices pprof_indices[kNbEventValueModes]; // std and live
   bool instrument_self;                           // do my own perfopen, etc
-  EventValueMode output_mode{EventValueMode::kOccurence};
+  EventValueMode output_mode{EventValueMode::kOccurrence};
 };
 
 // The Datadog backend only understands pre-configured event types.  Those

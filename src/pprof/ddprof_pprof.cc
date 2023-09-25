@@ -114,7 +114,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
 #ifdef DEBUG
   LG_DBG("Active IDs :");
   for (int i = 0; i < DDPROF_PWT_LENGTH; ++i) {
-    LG_DBG("%s --> %d ", sample_type_name_from_idx(i, kOccurencePos),
+    LG_DBG("%s --> %d ", sample_type_name_from_idx(i, kOccurrencePos),
            static_cast<int>(active_ids.output_mode[i]));
   }
 #endif

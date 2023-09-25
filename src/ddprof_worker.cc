@@ -74,7 +74,7 @@ static DDRes report_lost_events(DDProfContext &ctx) {
       LG_WRN("Reporting #%lu -> [%lu] lost samples for watcher #%d", nb_lost,
              value, watcher_idx);
       DDRES_CHECK_FWD(pprof_aggregate(
-          &us->output, us->symbol_hdr, value, nb_lost, watcher, kOccurencePos,
+          &us->output, us->symbol_hdr, value, nb_lost, watcher, kOccurrencePos,
           ctx.worker_ctx.pprof[ctx.worker_ctx.i_current_pprof]));
       ctx.worker_ctx.lost_events_per_watcher[watcher_idx] = 0;
     }
@@ -308,16 +308,16 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
       ctx.worker_ctx.live_allocation.register_allocation(
           us->output, sample->addr, sample->period, watcher_pos, sample->pid);
     }
-    if (Any(EventValueMode::kOccurence & watcher->output_mode)) {
+    if (Any(EventValueMode::kOccurrence & watcher->output_mode)) {
       // Depending on the type of watcher, compute a value for sample
       uint64_t sample_val = perf_value_from_sample(watcher, sample);
       int i_export = ctx.worker_ctx.i_current_pprof;
       DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
       DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbol_hdr, sample_val,
-                                      1, watcher, kOccurencePos, pprof));
+                                      1, watcher, kOccurrencePos, pprof));
       if (ctx.params.show_samples) {
         ddprof_print_sample(us->output, us->symbol_hdr, sample->period,
-                            kOccurencePos, *watcher);
+                            kOccurrencePos, *watcher);
       }
     }
   }
