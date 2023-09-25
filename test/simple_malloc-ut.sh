@@ -48,6 +48,7 @@ check() {
     cmd="$1"
     expected_pids="$2"
     expected_tids="${3-$2}"
+    alloc_sample_string=${4-"alloc-space"}
     # shellcheck disable=SC2086
     echo "Running: ${cmd}"
     taskset "${test_cpu_mask}" ${cmd}
@@ -60,9 +61,9 @@ check() {
         kill "$COPROC_PID"
     fi
     if [[ "${expected_pids}" -ne 0 ]]; then
-        counted_pids_alloc=$(count "${log_file}" "alloc-space" "pid")
+        counted_pids_alloc=$(count "${log_file}" ${alloc_sample_string} "pid")
         counted_pids_cpu=$(count "${log_file}" "cpu-time" "pid")
-        counted_tids_alloc=$(count "${log_file}" "alloc-space" "tid")
+        counted_tids_alloc=$(count "${log_file}" ${alloc_sample_string} "tid")
         counted_tids_cpu=$(count "${log_file}" "cpu-time" "tid")
         if [[ $counted_pids_alloc -ne "${expected_pids}" ||
             $counted_pids_cpu -ne "${expected_pids}" ||
@@ -101,9 +102,9 @@ check "./test/simple_malloc-shared --profile ${opts}" 1
 # Test wrapper mode
 check "./ddprof ./test/simple_malloc ${opts}" 1
 
-# Test live heap mode
+# Test live heap mode, CPU events are given through configuration file
 event="sALLOC,period=-524288,mode=l;sCPU"
-check "./ddprof --show_config --event "${event}" ./test/simple_malloc ${opts} --skip-free 100" 1
+check "./ddprof --show_config --event "${event}" ./test/simple_malloc ${opts} --skip-free 100" 1 1 "heap-live-size"
 
 # Test wrapper mode with forks + threads
 opts_more_spin="--loop 1000 --spin 400"

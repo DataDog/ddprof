@@ -115,7 +115,7 @@ TEST(DDProfPProf, just_live) {
   EXPECT_TRUE(ctx.watchers[1].pprof_indices[kLiveUsagePos].pprof_index != -1);
   EXPECT_TRUE(ctx.watchers[1].pprof_indices[kLiveUsagePos].pprof_count_index !=
               -1);
-  res = pprof_aggregate(&mock_output, symbol_hdr, 1000, 1, &ctx.watchers[0],
+  res = pprof_aggregate(&mock_output, symbol_hdr, 1000, 1, &ctx.watchers[1],
                         kLiveUsagePos, &pprof);
   EXPECT_TRUE(IsDDResOK(res));
   test_pprof(&pprof);
