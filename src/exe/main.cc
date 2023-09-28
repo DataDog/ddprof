@@ -17,6 +17,7 @@
 #include "signal_helper.hpp"
 #include "tempfile.hpp"
 #include "timer.hpp"
+#include "unique_fd.hpp"
 #include "user_override.hpp"
 
 #include <array>
@@ -31,6 +32,7 @@
 #include <thread>
 #include <unistd.h>
 
+using namespace ddprof;
 namespace fs = std::filesystem;
 
 enum class InputResult { kSuccess, kStop, kError };
@@ -157,8 +159,8 @@ static DDRes get_library_path(TempFileHolder &libdd_profiling_path,
 
 namespace {
 DDRes check_incompatible_options(const DDProfContext &ctx) {
-  if (ddprof::context_allocation_profiling_watcher_idx(ctx) != -1 &&
-      ctx.params.pid && ctx.params.sockfd == -1) {
+  if (context_allocation_profiling_watcher_idx(ctx) != -1 && ctx.params.pid &&
+      !ctx.params.sockfd) {
     DDRES_RETURN_ERROR_LOG(
         DD_WHAT_INPUT_PROCESS,
         "Memory allocation profiling is not supported in PID / global mode");
@@ -198,27 +200,24 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     bool allocation_profiling_started_from_wrapper =
         ddprof::context_allocation_profiling_watcher_idx(*ctx) != -1;
 
-    using socket_resource = ddprof::unique_resource<int, decltype(&::close)>;
-    socket_resource child_socket;
-    socket_resource parent_socket;
+    ddprof::UniqueFd child_socket;
+    ddprof::UniqueFd parent_socket;
 
     if (allocation_profiling_started_from_wrapper) {
       int sockfds[2] = {-1, -1};
       if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sockfds) == -1) {
         return -1;
       }
-      parent_socket = ddprof::unique_resource{sockfds[0], &::close};
-      child_socket = ddprof::unique_resource(sockfds[1], &::close);
+      parent_socket.reset(sockfds[0]);
+      child_socket.reset(sockfds[1]);
 
       if (!IsDDResOK(get_library_path(dd_profiling_lib_holder,
                                       dd_loader_lib_holder))) {
         return -1;
       }
       LG_DBG("ctx->params.dd_profiling_fd = %d - sockfds %d, %d",
-             ctx->params.dd_profiling_fd, child_socket.get(),
-             parent_socket.get());
-      ctx->params.sockfd = child_socket.get();
-      ctx->params.wait_on_socket = true;
+             ctx->params.dd_profiling_fd, child_socket.get().get(),
+             parent_socket.get().get());
     }
 
     ctx->params.pid = getpid();
@@ -264,9 +263,10 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
       parent_socket.release();
       return 0;
     }
+
+    // profiler process
+    ctx->params.sockfd = std::move(child_socket);
     temp_pid = daemonize_res.temp_pid;
-    child_socket.release();
-    parent_socket.reset();
   }
 
   // Now, we are the profiler process
@@ -301,9 +301,9 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     kill(temp_pid, SIGTERM);
   }
 
-  if (ctx->params.sockfd != -1 && ctx->params.wait_on_socket) {
-    ddprof::ReplyMessage reply;
-    reply.request = ddprof::RequestMessage::kProfilerInfo;
+  if (ctx->params.sockfd) {
+    ReplyMessage reply;
+    reply.request = RequestMessage::kProfilerInfo;
     reply.pid = getpid();
 
     int alloc_watcher_idx =
@@ -341,8 +341,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
     try {
       // Takes ownership of the open socket, socket will be closed when
       // exiting this block
-      ddprof::Server server{ddprof::UnixSocket{ctx->params.sockfd}};
-      ctx->params.sockfd = -1;
+      Server server{UnixSocket{ctx->params.sockfd.release()}};
 
       server.waitForRequest(
           [&reply](const ddprof::RequestMessage &) { return reply; });
