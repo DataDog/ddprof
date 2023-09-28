@@ -50,10 +50,10 @@ DaemonizeResult daemonize() {
         exit(1);
       }
 
-      // Block until our child exits or sends us a kill signal
-      // NOTE, current process is NOT expected to unblock here; rather it
-      // ends by SIGTERM.
-      waitpid(child_pid, NULL, 0);
+      // Block until our child exits or sends us a SIGTERM signal
+      // In the happy path, child will send us a SIGTERM signal, that we catch
+      // and then exit normally (to free resources and make valgrind happy).
+      waitpid(child_pid, nullptr, 0);
       return {DaemonizeResult::IntermediateProcess, temp_pid, parent_pid,
               child_pid};
     } else {
