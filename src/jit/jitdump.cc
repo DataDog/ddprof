@@ -14,8 +14,8 @@
 namespace ddprof {
 
 namespace {
-static constexpr uint32_t k_header_magic = 0x4A695444;
-static constexpr uint32_t k_header_magic_rev = 0x4454694A;
+constexpr uint32_t k_header_magic = 0x4A695444;
+constexpr uint32_t k_header_magic_rev = 0x4454694A;
 
 // todo bitswap
 template <std::integral T> T load(const char **data) {
@@ -140,6 +140,7 @@ DDRes jit_read_debug_info(std::ifstream &file_stream,
     debug_info.entries[i].addr = load<uint64_t>(&buf);
     debug_info.entries[i].lineno = load<int32_t>(&buf);
     debug_info.entries[i].discrim = load<int32_t>(&buf);
+    // NOLINTNEXTLINE(readability-magic-numbers)
     if (static_cast<unsigned char>(*buf) == 0xff && *(buf + 1) == '\0') {
       if (i >= 1) {
         debug_info.entries[i].name = debug_info.entries[i - 1].name;

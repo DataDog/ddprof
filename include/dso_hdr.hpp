@@ -124,7 +124,7 @@ public:
   static DsoRange get_intersection(DsoMap &map, const Dso &dso);
 
   // Return whole mapping range associated with the same elf file
-  DsoConstRange get_elf_range(const DsoMap &map, DsoMapConstIt it);
+  static DsoConstRange get_elf_range(const DsoMap &map, DsoMapConstIt it);
 
   // Helper to create a dso from a line in /proc/pid/maps
   static Dso dso_from_procline(int pid, char *line);

@@ -9,8 +9,10 @@
 
 #include <unistd.h>
 
-typedef struct DDProfInput DDProfInput;
-typedef struct DDProfContext DDProfContext;
+namespace ddprof {
+
+struct DDProfInput;
+struct DDProfContext;
 
 // Setup perf event open according to watchers
 DDRes ddprof_setup(DDProfContext &ctx);
@@ -21,3 +23,5 @@ DDRes ddprof_teardown(DDProfContext &ctx);
 /*************************  Instrumentation Helpers  **************************/
 // Attach a profiler exporting results from a different fork
 DDRes ddprof_start_profiler(DDProfContext *ctx);
+
+} // namespace ddprof

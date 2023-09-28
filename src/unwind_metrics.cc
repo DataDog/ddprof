@@ -13,6 +13,7 @@ static const DDPROF_STATS s_cycled_stats[] = {
     STATS_UNWIND_AVG_STACK_DEPTH};
 
 void unwind_metrics_reset(void) {
-  for (unsigned i = 0; i < std::size(s_cycled_stats); ++i)
+  for (unsigned i = 0; i < std::size(s_cycled_stats); ++i) {
     ddprof_stats_clear(s_cycled_stats[i]);
+  }
 }

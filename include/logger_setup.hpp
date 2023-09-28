@@ -5,4 +5,6 @@
 
 #pragma once
 
+namespace ddprof {
 void setup_logger(const char *log_mode, const char *log_level);
+}

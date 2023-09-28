@@ -5,13 +5,14 @@
 
 #pragma once
 
-#include "ddres.hpp"
+#include "ddres_def.hpp"
 
 #include <sys/types.h>
 
-typedef struct UnwindState UnwindState;
-
 namespace ddprof {
+
+struct UnwindState;
+
 void unwind_init(void);
 
 // Fill sample info to prepare for unwinding

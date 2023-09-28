@@ -16,13 +16,14 @@
 #include <sched.h>
 #include <unistd.h>
 
+namespace ddprof {
 struct DDProfContext {
   DDProfContext() = default;
   ~DDProfContext() = default;
 
   struct {
     bool enable{true};
-    unsigned upload_period{};
+    std::chrono::seconds upload_period{};
     bool fault_info{true};
     int nice{-1};
     int num_cpu{};
@@ -50,3 +51,4 @@ private:
   DDProfContext(DDProfContext &&other) = delete;
   DDProfContext &operator=(const DDProfContext &&) = delete;
 };
+} // namespace ddprof

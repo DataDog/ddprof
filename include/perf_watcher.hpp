@@ -12,6 +12,8 @@
 #include <linux/perf_event.h>
 #include <stdint.h>
 
+namespace ddprof {
+
 enum class PerfWatcherUseKernel {
   kOff = 0,  // always off
   kRequired, // always on
@@ -165,3 +167,5 @@ uint64_t perf_event_default_sample_type();
 void log_watcher(const PerfWatcher *w, int idx);
 
 std::string_view watcher_help_text();
+
+} // namespace ddprof

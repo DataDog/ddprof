@@ -13,13 +13,41 @@
 #include "string_format.hpp"
 #include "symbol_hdr.hpp"
 
-#include <errno.h>
+#include <cerrno>
+#include <cstdio>
+#include <cstring>
 #include <span>
-#include <stdio.h>
-#include <string.h>
 #include <unistd.h>
 
-#define PPROF_MAX_LABELS 6
+namespace ddprof {
+
+namespace {
+constexpr size_t k_max_pprof_labels{6};
+
+void write_function(const Symbol &symbol, ddog_prof_Function *ffi_func) {
+  ffi_func->name = to_CharSlice(symbol._demangle_name);
+  ffi_func->system_name = to_CharSlice(symbol._symname);
+  ffi_func->filename = to_CharSlice(symbol._srcpath);
+  // Not filed (can be computed if needed using the start range from elf)
+  ffi_func->start_line = 0;
+}
+
+void write_mapping(const MapInfo &mapinfo, ddog_prof_Mapping *ffi_mapping) {
+  ffi_mapping->memory_start = mapinfo._low_addr;
+  ffi_mapping->memory_limit = mapinfo._high_addr;
+  ffi_mapping->file_offset = mapinfo._offset;
+  ffi_mapping->filename = to_CharSlice(mapinfo._sopath);
+  ffi_mapping->build_id = to_CharSlice(mapinfo._build_id);
+}
+
+void write_location(const FunLoc *loc, const MapInfo &mapinfo,
+                    const Symbol &symbol, ddog_prof_Location *ffi_location) {
+  write_mapping(mapinfo, &ffi_location->mapping);
+  write_function(symbol, &ffi_location->function);
+  ffi_location->address = loc->ip;
+  ffi_location->line = symbol._lineno;
+}
+} // namespace
 
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
   size_t num_watchers = ctx.watchers.size();
@@ -29,7 +57,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
   // We also record the watcher with the lowest valid sample_type id, since that
   // will serve as the default for the pprof
   bool active_ids[DDPROF_PWT_LENGTH] = {};
-  PerfWatcher *default_watcher = &ctx.watchers[0];
+  PerfWatcher *default_watcher = ctx.watchers.data();
   for (unsigned i = 0; i < num_watchers; ++i) {
     int this_id = ctx.watchers[i].sample_type_id;
     int count_id = sample_type_id_to_count_sample_type_id(this_id);
@@ -43,11 +71,13 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
       continue;
     }
 
-    if (this_id <= default_watcher->sample_type_id) // update default
+    if (this_id <= default_watcher->sample_type_id) { // update default
       default_watcher = &ctx.watchers[i];
+    }
     active_ids[this_id] = true; // update mask
-    if (count_id != DDPROF_PWT_NOCOUNT)
+    if (count_id != DDPROF_PWT_NOCOUNT) {
       active_ids[count_id] = true; // if the count is valid, update mask for it
+    }
   }
 
   // Convert the mask into a lookup.  While we're at it, populate the metadata
@@ -55,8 +85,9 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
   int pv[DDPROF_PWT_LENGTH] = {};
   int num_sample_type_ids = 0;
   for (int i = 0; i < DDPROF_PWT_LENGTH; ++i) {
-    if (!active_ids[i])
+    if (!active_ids[i]) {
       continue;
+    }
     assert(i != DDPROF_PWT_NOCOUNT);
 
     const char *value_name = sample_type_name_from_idx(i);
@@ -101,8 +132,11 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
     // event- based types (but providing frequency would also be broken in those
     // cases)
     int64_t default_period = default_watcher->sample_period;
-    if (default_watcher->options.is_freq)
-      default_period = 1e9 / default_period;
+    if (default_watcher->options.is_freq) {
+      default_period =
+          std::chrono::nanoseconds(std::chrono::seconds{1}).count() /
+          default_period;
+    }
 
     period = {
         .type_ = perf_value_type[pv[default_watcher->pprof_sample_idx]],
@@ -137,41 +171,14 @@ DDRes pprof_free_profile(DDProfPProf *pprof) {
   return ddres_init();
 }
 
-static void write_function(const ddprof::Symbol &symbol,
-                           ddog_prof_Function *ffi_func) {
-  ffi_func->name = to_CharSlice(symbol._demangle_name);
-  ffi_func->system_name = to_CharSlice(symbol._symname);
-  ffi_func->filename = to_CharSlice(symbol._srcpath);
-  // Not filed (can be computed if needed using the start range from elf)
-  ffi_func->start_line = 0;
-}
-
-static void write_mapping(const ddprof::MapInfo &mapinfo,
-                          ddog_prof_Mapping *ffi_mapping) {
-  ffi_mapping->memory_start = mapinfo._low_addr;
-  ffi_mapping->memory_limit = mapinfo._high_addr;
-  ffi_mapping->file_offset = mapinfo._offset;
-  ffi_mapping->filename = to_CharSlice(mapinfo._sopath);
-  ffi_mapping->build_id = to_CharSlice(mapinfo._build_id);
-}
-
-static void write_location(const FunLoc *loc, const ddprof::MapInfo &mapinfo,
-                           const ddprof::Symbol &symbol,
-                           ddog_prof_Location *ffi_location) {
-  write_mapping(mapinfo, &ffi_location->mapping);
-  write_function(symbol, &ffi_location->function);
-  ffi_location->address = loc->ip;
-  ffi_location->line = symbol._lineno;
-}
-
 // Assumption of API is that sample is valid in a single type
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr &symbol_hdr, uint64_t value,
                       uint64_t count, const PerfWatcher *watcher,
                       DDProfPProf *pprof) {
 
-  const ddprof::SymbolTable &symbol_table = symbol_hdr._symbol_table;
-  const ddprof::MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
+  const SymbolTable &symbol_table = symbol_hdr._symbol_table;
+  const MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
   ddog_prof_Profile *profile = &pprof->_profile;
 
   int64_t values[DDPROF_PWT_LENGTH] = {};
@@ -204,7 +211,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   // Create the labels for the sample.  Two samples are the same only when
   // their locations _and_ all labels are identical, so we admit a very limited
   // number of labels at present
-  ddog_prof_Label labels[PPROF_MAX_LABELS] = {};
+  ddog_prof_Label labels[k_max_pprof_labels] = {};
   size_t labels_num = 0;
   char pid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
   char tid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
@@ -236,13 +243,13 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     // If the label is given, use that as the tracepoint type.  Otherwise
     // default to the event name
     if (!watcher->tracepoint_label.empty()) {
-      labels[labels_num].str = to_CharSlice(watcher->tracepoint_label.c_str());
+      labels[labels_num].str = to_CharSlice(watcher->tracepoint_label);
     } else {
-      labels[labels_num].str = to_CharSlice(watcher->tracepoint_event.c_str());
+      labels[labels_num].str = to_CharSlice(watcher->tracepoint_event);
     }
     ++labels_num;
   }
-  assert(labels_num <= PPROF_MAX_LABELS);
+  assert(labels_num <= k_max_pprof_labels);
 
   ddog_prof_Sample sample = {
       .locations = {.ptr = locations_buff, .len = cur_loc},
@@ -275,18 +282,17 @@ void ddprof_print_sample(const UnwindOutput &uw_output,
                          const SymbolHdr &symbol_hdr, uint64_t value,
                          const PerfWatcher &watcher) {
 
-  auto &symbol_table = symbol_hdr._symbol_table;
+  const auto &symbol_table = symbol_hdr._symbol_table;
   std::span locs{uw_output.locs};
 
   const char *sample_name = sample_type_name_from_idx(
       sample_type_id_to_count_sample_type_id(watcher.sample_type_id));
 
-  std::string buf =
-      ddprof::string_format("sample[type=%s;pid=%ld;tid=%ld] ", sample_name,
-                            uw_output.pid, uw_output.tid);
+  std::string buf = string_format("sample[type=%s;pid=%ld;tid=%ld] ",
+                                  sample_name, uw_output.pid, uw_output.tid);
 
   for (auto loc_it = locs.rbegin(); loc_it != locs.rend(); ++loc_it) {
-    auto &sym = symbol_table[loc_it->_symbol_idx];
+    const auto &sym = symbol_table[loc_it->_symbol_idx];
     if (loc_it != locs.rbegin()) {
       buf += ";";
     }
@@ -298,7 +304,7 @@ void ddprof_print_sample(const UnwindOutput &uw_output,
         buf += path.substr(pos == std::string_view::npos ? 0 : pos + 1);
         buf += ")";
       } else {
-        buf += ddprof::string_format("%p", loc_it->ip);
+        buf += string_format("%p", loc_it->ip);
       }
     } else {
       std::string_view func{sym._symname};
@@ -308,3 +314,4 @@ void ddprof_print_sample(const UnwindOutput &uw_output,
 
   PRINT_NFO("%s %ld", buf.c_str(), value);
 }
+} // namespace ddprof

@@ -81,12 +81,13 @@ DDRes get_executable_segments(int fd, const std::string &filepath,
   return {};
 }
 
+namespace {
 /** Find segment that matches mapping among segments.
  * If several segments match, return {firs_matching_segment, true}
  * If no segment matches, return {nullptr, false}
  * If one segment matches, return {segment, false}
  */
-static std::pair<const Segment *, bool>
+std::pair<const Segment *, bool>
 find_matching_segment(std::span<const Segment> segments,
                       const Mapping &mapping) {
   const Segment *matching_segment = nullptr;
@@ -104,38 +105,10 @@ find_matching_segment(std::span<const Segment> segments,
   return {matching_segment, false};
 }
 
-MatchResult find_match(std::span<const Mapping> executable_mappings,
-                       std::span<const Segment> elf_load_segments) {
-  int nb_mappings = executable_mappings.size();
-
-  MatchResult res = {nullptr, nullptr, false};
-  int max_segments =
-      std::min(nb_mappings, static_cast<int>(elf_load_segments.size()));
-  for (int mapping_idx = max_segments - 1; mapping_idx >= 0; --mapping_idx) {
-    const auto &mapping = executable_mappings[mapping_idx];
-    assert(static_cast<unsigned>(mapping_idx) < elf_load_segments.size());
-    auto [matching_segment, ambiguous] = find_matching_segment(
-        std::span{elf_load_segments}.subspan(mapping_idx), mapping);
-    if (matching_segment) {
-      res.load_segment = matching_segment;
-      res.mapping = &mapping;
-    }
-    if (!ambiguous) {
-      return res;
-    } else {
-      res.is_ambiguous = true;
-    }
-  }
-
-  return res;
-}
-
-static DDRes compute_elf_bias(int fd, const std::string &filepath,
-                              const DsoHdr::DsoConstRange &dsoRange,
-                              Offset_t &bias) {
-
+DDRes compute_elf_bias(int fd, const std::string &filepath,
+                       const DsoHdr::DsoConstRange &dsoRange, Offset_t &bias) {
   // To compute elf bias, we need to match a Dso (ie. a mapping in process
-  // address space) with the coresponding LOAD segment in elf file. We consider
+  // address space) with the corresponding LOAD segment in elf file. We consider
   // only executable mappings LOAD segments (because we configure perf in such
   // a way that we receive only executable mmap events).
   // The matching is done by comparing mapping offset with aligned file offset
@@ -172,11 +145,39 @@ static DDRes compute_elf_bias(int fd, const std::string &filepath,
     return ddres_error(DD_WHAT_NO_MATCHING_LOAD_SEGMENT);
   }
 
-  auto &mapping = *match_result.mapping;
-  auto &segment = *match_result.load_segment;
+  const auto &mapping = *match_result.mapping;
+  const auto &segment = *match_result.load_segment;
   bias = mapping.addr - mapping.offset - (segment.addr - segment.offset);
 
   return {};
+}
+} // namespace
+
+MatchResult find_match(std::span<const Mapping> executable_mappings,
+                       std::span<const Segment> elf_load_segments) {
+  // in some weird cases, number of mappings is bigger than number of segments
+  // eg. with dotnet libcoreclr.so
+  int nb_mappings =
+      std::min(executable_mappings.size(), elf_load_segments.size());
+
+  MatchResult res = {nullptr, nullptr, false};
+  for (int mapping_idx = nb_mappings - 1; mapping_idx >= 0; --mapping_idx) {
+    const auto &mapping = executable_mappings[mapping_idx];
+    assert(static_cast<unsigned>(mapping_idx) < elf_load_segments.size());
+    auto [matching_segment, ambiguous] = find_matching_segment(
+        std::span{elf_load_segments}.subspan(mapping_idx), mapping);
+
+    if (matching_segment) {
+      res.load_segment = matching_segment;
+      res.mapping = &mapping;
+    }
+    if (!ambiguous) {
+      return res;
+    }
+    res.is_ambiguous = true;
+  }
+
+  return res;
 }
 
 DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc,
@@ -194,7 +195,8 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc,
   if (mod) {
     // There should not be a module already loaded at this address
     const char *main_name = nullptr;
-    Dwarf_Addr low_addr, high_addr;
+    Dwarf_Addr low_addr;
+    Dwarf_Addr high_addr;
     dwfl_module_info(mod, nullptr, &low_addr, &high_addr, 0, 0, &main_name, 0);
     LG_NTC("Incoherent modules[PID=%d]: module %s [%lx-%lx] is already "
            "loaded at %lx(%s[ID#%d])",
@@ -242,17 +244,16 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc,
     LG_WRN("Couldn't addrmodule (%s)[0x%lx], MOD:%s (%s)", dwfl_errmsg(-1), pc,
            module_name, fileInfoValue.get_path().c_str());
     return ddres_warn(DD_WHAT_MODULE);
-  } else {
-    // dwfl now has ownership of the file descriptor
-    fd_holder.release();
-    dwfl_module_info(ddprof_mod._mod, 0, &ddprof_mod._low_addr,
-                     &ddprof_mod._high_addr, 0, 0, 0, 0);
-    LG_DBG("Loaded mod from file (%s[ID#%d]), (%s) mod[%lx-%lx] bias[%lx], "
-           "build-id: %s",
-           fileInfoValue.get_path().c_str(), fileInfoValue.get_id(),
-           dwfl_errmsg(-1), ddprof_mod._low_addr, ddprof_mod._high_addr, bias,
-           ddprof_mod._build_id.c_str());
-  }
+  } // dwfl now has ownership of the file descriptor
+  fd_holder.release();
+  dwfl_module_info(ddprof_mod._mod, 0, &ddprof_mod._low_addr,
+                   &ddprof_mod._high_addr, 0, 0, 0, 0);
+  LG_DBG("Loaded mod from file (%s[ID#%d]), (%s) mod[%lx-%lx] bias[%lx], "
+         "build-id: %s",
+         fileInfoValue.get_path().c_str(), fileInfoValue.get_id(),
+         dwfl_errmsg(-1), ddprof_mod._low_addr, ddprof_mod._high_addr, bias,
+         ddprof_mod._build_id.c_str());
+
   ddprof_mod._sym_bias = bias;
   return {};
 }

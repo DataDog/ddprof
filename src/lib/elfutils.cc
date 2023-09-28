@@ -19,6 +19,7 @@
 
 namespace ddprof {
 namespace {
+// NOLINTBEGIN(readability-magic-numbers)
 uint32_t gnu_hash(std::string_view name) {
   uint32_t h = 5381;
 
@@ -33,11 +34,12 @@ uint32_t elf_hash(std::string_view name) {
   uint32_t h = 0;
   for (auto c : name) {
     h = (h << 4) + c;
-    uint32_t g = h & 0xf0000000;
+    uint32_t const g = h & 0xf0000000;
     h ^= g >> 24;
   }
   return h & 0x0fffffff;
 }
+// NOLINTEND(readability-magic-numbers)
 
 bool check(const ElfW(Sym) & sym, const char *symname, std::string_view name) {
   auto stt = ELF64_ST_TYPE(sym.st_info);
@@ -166,7 +168,7 @@ DynamicInfo retrieve_dynamic_info(const ElfW(Dyn) * dyn_begin,
 }
 
 template <typename F>
-int callback_wrapper(dl_phdr_info *info, size_t, bool exclude_self,
+int callback_wrapper(dl_phdr_info *info, size_t /*size*/, bool exclude_self,
                      const F &func) {
   const ElfW(Phdr) *phdr_dynamic = nullptr;
 
@@ -190,7 +192,8 @@ int callback_wrapper(dl_phdr_info *info, size_t, bool exclude_self,
     const ElfW(Dyn) *dyn_begin = reinterpret_cast<const ElfW(Dyn) *>(
         info->dlpi_addr + phdr_dynamic->p_vaddr);
 
-    DynamicInfo dyn_info = retrieve_dynamic_info(dyn_begin, info->dlpi_addr);
+    DynamicInfo const dyn_info =
+        retrieve_dynamic_info(dyn_begin, info->dlpi_addr);
 
     if (dyn_info.strtab.empty() || dyn_info.symtab.empty() ||
         !(dyn_info.elf_hash || dyn_info.gnu_hash)) {
@@ -241,7 +244,8 @@ public:
       : _symname(symname), _not_sym(not_sym), _sym{},
         _accept_null_sized_symbol(accept_null_sized_symbol) {}
 
-  bool operator()(std::string_view, const DynamicInfo &dyn_info) {
+  bool operator()(std::string_view /*object_name*/,
+                  const DynamicInfo &dyn_info) {
     const ElfW(Sym) *s = nullptr;
     if (dyn_info.gnu_hash) {
       s = gnu_hash_lookup(dyn_info.strtab.data(), dyn_info.symtab.data(),
@@ -269,8 +273,8 @@ private:
 };
 
 void override_entry(ElfW(Addr) entry_addr, uint64_t new_value) {
-  static long page_size = sysconf(_SC_PAGESIZE);
-  auto aligned_addr = reinterpret_cast<void *>(entry_addr & ~(page_size - 1));
+  static long const page_size = sysconf(_SC_PAGESIZE);
+  auto *aligned_addr = reinterpret_cast<void *>(entry_addr & ~(page_size - 1));
   if (mprotect(aligned_addr, page_size, PROT_READ | PROT_WRITE) == 0) {
     memcpy(reinterpret_cast<void *>(entry_addr), &new_value, sizeof(new_value));
   }
@@ -295,9 +299,10 @@ public:
     }
   }
 
-  bool operator()(std::string_view name, const DynamicInfo &dyn_info) const {
-    if (name.find("linux-vdso") != std::string_view::npos ||
-        name.find("/ld-linux") != std::string_view::npos) {
+  bool operator()(std::string_view object_name,
+                  const DynamicInfo &dyn_info) const {
+    if (object_name.find("linux-vdso") != std::string_view::npos ||
+        object_name.find("/ld-linux") != std::string_view::npos) {
       return false;
     }
 
@@ -316,6 +321,11 @@ private:
   uint64_t _do_not_override_this_symbol = 0;
 };
 
+int count_callback(dl_phdr_info * /*info*/, size_t /*size*/, void *data) {
+  ++(*reinterpret_cast<int *>(data));
+  return 0;
+}
+
 } // namespace
 
 // https://flapenguin.me/elf-dt-hash
@@ -332,7 +342,7 @@ const ElfW(Sym) *
 
   for (auto symidx = buckets[hash % nbuckets]; symidx != STN_UNDEF;
        symidx = chain[symidx]) {
-    auto &sym = symtab[symidx];
+    const auto &sym = symtab[symidx];
     if (check(sym, strtab + sym.st_name, symname)) {
       return &sym;
     }
@@ -362,8 +372,8 @@ const ElfW(Sym) *
 
   ElfW(Addr) bitmask_word =
       bloom[(hash / __ELF_NATIVE_CLASS) & (bloom_size - 1)];
-  uint32_t hashbit1 = hash & (__ELF_NATIVE_CLASS - 1);
-  uint32_t hashbit2 = (hash >> bloom_shift) & (__ELF_NATIVE_CLASS - 1);
+  uint32_t const hashbit1 = hash & (__ELF_NATIVE_CLASS - 1);
+  uint32_t const hashbit2 = (hash >> bloom_shift) & (__ELF_NATIVE_CLASS - 1);
 
   if (!((bitmask_word >> hashbit1) & (bitmask_word >> hashbit2) & 1)) {
     return nullptr;
@@ -377,7 +387,7 @@ const ElfW(Sym) *
   while (true) {
     const uint32_t h = chain_zero[symidx];
     if (((h ^ hash) >> 1) == 0) {
-      auto &sym = symtab[symidx];
+      const auto &sym = symtab[symidx];
       if (check(sym, strtab + sym.st_name, symname)) {
         return &sym;
       }
@@ -400,7 +410,7 @@ uint32_t gnu_hash_symbol_count(const uint32_t *hashtab) {
   const uint32_t symbias = *(hashtab++);
   const uint32_t bloom_size = *(hashtab++);
   ++hashtab;
-  hashtab += __ELF_NATIVE_CLASS / (sizeof(uint32_t) * 8) * bloom_size;
+  hashtab += __ELF_NATIVE_CLASS / (sizeof(uint32_t) * CHAR_BIT) * bloom_size;
   const uint32_t *buckets = hashtab;
   hashtab += nbuckets;
   const uint32_t *chain_zero = hashtab - symbias;
@@ -429,11 +439,6 @@ void override_symbol(std::string_view symbol_name, void *new_symbol,
       symbol_name, reinterpret_cast<uint64_t>(new_symbol),
       reinterpret_cast<uint64_t>(do_not_override_this_symbol)};
   dl_iterate_phdr_wrapper(std::ref(symbol_override));
-}
-
-static int count_callback(dl_phdr_info *, size_t, void *data) {
-  ++(*reinterpret_cast<int *>(data));
-  return 0;
 }
 
 int count_loaded_libraries() {

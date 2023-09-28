@@ -107,7 +107,8 @@ static inline int ddres_sev_to_log_level(int sev) {
         LG_ERR("Forward error at %s:%u - %s", __FILE__, __LINE__,              \
                ddres_error_message(lddres._what));                             \
         return lddres;                                                         \
-      } else if (lddres._sev == DD_SEVWARN) {                                  \
+      }                                                                        \
+      if (lddres._sev == DD_SEVWARN) {                                         \
         LG_WRN("Recover from sev=%d at %s:%u - %s", lddres._sev, __FILE__,     \
                __LINE__, ddres_error_message(lddres._what));                   \
       } else {                                                                 \

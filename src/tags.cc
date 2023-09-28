@@ -10,40 +10,44 @@
 
 #include <utility>
 
+namespace ddprof {
+
 namespace {
+constexpr size_t k_max_tag_length = 200;
+
 // From the DogFood repo. Credit goes to Garrett Sickles, who has an awesome
 // DogStatsD C++ library : https://github.com/garrettsickles/DogFood.git
 inline bool ValidateTags(std::string_view tag) {
-  if (tag.length() == 0 || tag.length() > 200)
+  if (tag.length() == 0 || tag.length() > k_max_tag_length) {
     return false;
+  }
 
   ////////////////////////////////////////////////////////
   // Verify the first character is a letter
-  if (!std::isalpha(tag.at(0)))
+  if (!std::isalpha(tag.at(0))) {
     return false;
+  }
 
   ////////////////////////////////////////////////////////
   // Verify end is not a colon
-  if (tag.back() == ':')
+  if (tag.back() == ':') {
     return false;
+  }
 
   ////////////////////////////////////////////////////////
   // Verify each character
   for (size_t n = 0; n < tag.length(); n++) {
     const char c = tag.at(n);
     if (std::isalnum(c) || c == '_' || c == '-' || c == ':' || c == '.' ||
-        c == '/' || c == '\\')
+        c == '/' || c == '\\') {
       continue;
-    else
-      return false;
+    }
+    return false;
   }
   return true;
 }
 
-} // namespace
-namespace ddprof {
-
-static Tag split_kv(std::string_view str_view, char c = ':') {
+Tag split_kv(std::string_view str_view, char c = ':') {
   size_t pos = str_view.find(c);
 
   // Check if no ':' character was found or if it's the last character
@@ -55,6 +59,8 @@ static Tag split_kv(std::string_view str_view, char c = ':') {
   return {std::string(str_view.substr(0, pos)),
           std::string(str_view.substr(pos + 1))};
 }
+
+} // namespace
 
 void split(std::string_view str_view, Tags &tags, char c) {
   size_t begin = 0;
@@ -85,13 +91,13 @@ void split(std::string_view str_view, Tags &tags, char c) {
   }
 }
 
-} // namespace ddprof
-
 UserTags::UserTags(std::string_view tag_str, int nproc) {
   if (!tag_str.empty()) {
-    ddprof::split(tag_str, _tags);
+    split(tag_str, _tags);
   }
   _tags.push_back({"number_of_cpu_cores", std::to_string(nproc)});
-  _tags.push_back({"number_hw_concurent_threads",
-                   std::to_string(ddprof::get_nb_hw_thread())});
+  _tags.push_back(
+      {"number_hw_concurent_threads", std::to_string(get_nb_hw_thread())});
 }
+
+} // namespace ddprof

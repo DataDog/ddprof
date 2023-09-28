@@ -33,14 +33,13 @@ DDRes ring_buffer_attach(const RingBufferInfo &info, PEvent *pevent) {
   return pevent_mmap_event(pevent);
 }
 
-DDRes ring_buffer_attach(PEvent &pe) { return pevent_mmap_event(&pe); }
+DDRes ring_buffer_attach(PEvent &event) { return pevent_mmap_event(&event); }
 
 DDRes ring_buffer_create(size_t buffer_size_page_order,
                          RingBufferType ring_buffer_type, bool custom_event,
                          PEvent *pevent) {
-  size_t buffer_size = perf_mmap_size(buffer_size_page_order);
-  pevent->mapfd =
-      ddprof::memfd_create("allocation_ring_buffer", 1U /*MFD_CLOEXEC*/);
+  size_t const buffer_size = perf_mmap_size(buffer_size_page_order);
+  pevent->mapfd = memfd_create("allocation_ring_buffer", 1U /*MFD_CLOEXEC*/);
   if (pevent->mapfd == -1) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
                            "Error calling memfd_create on watcher %d (%s)",
@@ -77,8 +76,8 @@ DDRes ring_buffer_setup(size_t buffer_size_page_order,
 }
 
 DDRes ring_buffer_cleanup(PEvent &event) {
-  DDRes res = ring_buffer_detach(event);
-  DDRes res2 = ring_buffer_close(event);
+  DDRes const res = ring_buffer_detach(event);
+  DDRes const res2 = ring_buffer_close(event);
 
   return !IsDDResOK(res) ? res : res2;
 }

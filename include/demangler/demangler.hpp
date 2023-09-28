@@ -7,9 +7,12 @@
 
 #include <string_view>
 
+namespace ddprof {
 namespace Demangler {
 
 // Functions
 std::string demangle(const std::string &mangled);
 
 } // namespace Demangler
+
+} // namespace ddprof

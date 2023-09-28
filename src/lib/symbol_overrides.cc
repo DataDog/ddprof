@@ -6,17 +6,18 @@
 #include "symbol_overrides.hpp"
 
 #include "allocation_tracker.hpp"
+#include "chrono_utils.hpp"
 #include "ddprof_base.hpp"
 #include "elfutils.hpp"
 #include "reentry_guard.hpp"
 #include "unlikely.hpp"
 
+#include <csignal>
 #include <cstdlib>
+#include <ctime>
 #include <dlfcn.h>
 #include <malloc.h>
-#include <signal.h>
 #include <sys/mman.h>
-#include <time.h>
 
 #if defined(__GNUC__) && !defined(__clang__)
 #  define NOEXCEPT noexcept
@@ -25,12 +26,13 @@
 #endif
 
 extern "C" {
+// NOLINTBEGIN
 // Declaration of reallocarray is only available starting from glibc 2.28
 __attribute__((weak)) void *reallocarray(void *ptr, size_t nmemb,
-                                         size_t size) NOEXCEPT;
+                                         size_t nmenb) NOEXCEPT;
 __attribute__((weak)) void *pvalloc(size_t size) NOEXCEPT;
-// NOLINTNEXTLINE cert-dcl51-cpp
 __attribute__((weak)) int __libc_allocate_rtsig(int high) NOEXCEPT;
+// NOLINTEND
 
 // sized free functions (C23, not yet available in glibc)
 __attribute__((weak)) void free_sized(void *ptr, size_t size);
@@ -46,6 +48,7 @@ __attribute__((weak)) void dallocx(void *ptr, int flags);
 __attribute__((weak)) void sdallocx(void *ptr, size_t size, int flags);
 }
 
+namespace ddprof {
 namespace {
 constexpr int k_sigrtmax_offset = 3;
 
@@ -61,7 +64,7 @@ int g_nb_loaded_libraries = -1;
 void setup_hooks(bool restore);
 
 DDPROF_NOINLINE bool loaded_libraries_have_changed() {
-  int nb = ddprof::count_loaded_libraries();
+  int const nb = ddprof::count_loaded_libraries();
   if (nb != g_nb_loaded_libraries) {
     g_nb_loaded_libraries = nb;
     return true;
@@ -80,40 +83,50 @@ void check_libraries() {
   }
 }
 
-struct AllocTrackerHelper {
+class AllocTrackerHelper {
+public:
   AllocTrackerHelper()
-      : tl_state{ddprof::AllocationTracker::get_tl_state()},
-        guard{tl_state ? &(tl_state->reentry_guard) : nullptr} {
+      : _tl_state{ddprof::AllocationTracker::get_tl_state()},
+        _guard{_tl_state ? &(_tl_state->reentry_guard) : nullptr} {
     check_libraries();
   }
 
   void track(void *ptr, size_t size) {
-    if (guard) {
+    if (_guard) {
       ddprof::AllocationTracker::track_allocation_s(
-          reinterpret_cast<uintptr_t>(ptr), size, *tl_state);
+          reinterpret_cast<uintptr_t>(ptr), size, *_tl_state);
     }
   }
 
-  ddprof::TrackerThreadLocalState *tl_state;
-  ddprof::ReentryGuard guard;
+  explicit operator bool() const { return static_cast<bool>(_guard); }
+  ddprof::TrackerThreadLocalState *tl_state() { return _tl_state; }
+
+private:
+  ddprof::TrackerThreadLocalState *_tl_state;
+  ddprof::ReentryGuard _guard;
 };
 
-struct DeallocTrackerHelper {
+class DeallocTrackerHelper {
+public:
   DeallocTrackerHelper()
-      : tl_state{ddprof::AllocationTracker::is_deallocation_tracking_active()
-                     ? ddprof::AllocationTracker::get_tl_state()
-                     : nullptr},
-        guard{tl_state ? &(tl_state->reentry_guard) : nullptr} {}
+      : _tl_state{ddprof::AllocationTracker::is_deallocation_tracking_active()
+                      ? ddprof::AllocationTracker::get_tl_state()
+                      : nullptr},
+        _guard{_tl_state ? &(_tl_state->reentry_guard) : nullptr} {}
 
   void track(void *ptr) {
-    if (guard) {
+    if (_guard) {
       ddprof::AllocationTracker::track_deallocation_s(
-          reinterpret_cast<uintptr_t>(ptr), *tl_state);
+          reinterpret_cast<uintptr_t>(ptr), *_tl_state);
     }
   }
 
-  ddprof::TrackerThreadLocalState *tl_state;
-  ddprof::ReentryGuard guard;
+  explicit operator bool() const { return static_cast<bool>(_guard); }
+  ddprof::TrackerThreadLocalState *tl_state() { return _tl_state; }
+
+private:
+  ddprof::TrackerThreadLocalState *_tl_state;
+  ddprof::ReentryGuard _guard;
 };
 
 struct malloc {
@@ -123,7 +136,7 @@ struct malloc {
 
   static void *hook(size_t size) noexcept {
     AllocTrackerHelper helper;
-    auto ptr = ref(size);
+    auto *ptr = ref(size);
     helper.track(ptr, size);
     return ptr;
   }
@@ -136,7 +149,7 @@ struct new_ {
 
   static void *hook(size_t size) {
     AllocTrackerHelper helper;
-    auto ptr = ref(size);
+    auto *ptr = ref(size);
     helper.track(ptr, size);
     return ptr;
   }
@@ -151,7 +164,7 @@ struct new_nothrow {
 
   static void *hook(size_t size, const std::nothrow_t &tag) noexcept {
     AllocTrackerHelper helper;
-    auto ptr = ref(size, tag);
+    auto *ptr = ref(size, tag);
     helper.track(ptr, size);
     return ptr;
   }
@@ -165,7 +178,7 @@ struct new_align {
 
   static void *hook(std::size_t size, std::align_val_t al) {
     AllocTrackerHelper helper;
-    auto ptr = ref(size, al);
+    auto *ptr = ref(size, al);
     helper.track(ptr, size);
     return ptr;
   }
@@ -181,7 +194,7 @@ struct new_align_nothrow {
   static void *hook(std::size_t size, std::align_val_t al,
                     const std::nothrow_t &tag) noexcept {
     AllocTrackerHelper helper;
-    auto ptr = ref(size, al, tag);
+    auto *ptr = ref(size, al, tag);
     helper.track(ptr, size);
     return ptr;
   }
@@ -194,7 +207,7 @@ struct new_array {
 
   static void *hook(size_t size) {
     AllocTrackerHelper helper;
-    auto ptr = ref(size);
+    auto *ptr = ref(size);
     helper.track(ptr, size);
     return ptr;
   }
@@ -209,7 +222,7 @@ struct new_array_nothrow {
 
   static void *hook(size_t size, const std::nothrow_t &tag) noexcept {
     AllocTrackerHelper helper;
-    auto ptr = ref(size, tag);
+    auto *ptr = ref(size, tag);
     helper.track(ptr, size);
     return ptr;
   }
@@ -223,7 +236,7 @@ struct new_array_align {
 
   static void *hook(std::size_t size, std::align_val_t al) {
     AllocTrackerHelper helper;
-    auto ptr = ref(size, al);
+    auto *ptr = ref(size, al);
     helper.track(ptr, size);
     return ptr;
   }
@@ -240,7 +253,7 @@ struct new_array_align_nothrow {
   static void *hook(std::size_t size, std::align_val_t al,
                     const std::nothrow_t &tag) noexcept {
     AllocTrackerHelper helper;
-    auto ptr = ref(size, al, tag);
+    auto *ptr = ref(size, al, tag);
     helper.track(ptr, size);
     return ptr;
   }
@@ -503,7 +516,7 @@ struct calloc {
 
   static void *hook(size_t nmemb, size_t size) noexcept {
     AllocTrackerHelper helper;
-    auto ptr = ref(nmemb, size);
+    auto *ptr = ref(nmemb, size);
     helper.track(ptr, size * nmemb);
     return ptr;
   }
@@ -516,11 +529,11 @@ struct realloc {
 
   static void *hook(void *ptr, size_t size) noexcept {
     AllocTrackerHelper helper;
-    if (likely(ptr) && helper.guard) {
+    if (likely(ptr) && helper) {
       ddprof::AllocationTracker::track_deallocation_s(
-          reinterpret_cast<uintptr_t>(ptr), *helper.tl_state);
+          reinterpret_cast<uintptr_t>(ptr), *helper.tl_state());
     }
-    auto newptr = ref(ptr, size);
+    auto *newptr = ref(ptr, size);
     if (likely(size)) {
       helper.track(newptr, size);
     }
@@ -551,7 +564,7 @@ struct aligned_alloc {
 
   static void *hook(size_t alignment, size_t size) noexcept {
     AllocTrackerHelper helper;
-    auto ptr = ref(alignment, size);
+    auto *ptr = ref(alignment, size);
     if (ptr) {
       helper.track(ptr, size);
     }
@@ -566,7 +579,7 @@ struct memalign {
 
   static void *hook(size_t alignment, size_t size) noexcept {
     AllocTrackerHelper helper;
-    auto ptr = ref(alignment, size);
+    auto *ptr = ref(alignment, size);
     if (ptr) {
       helper.track(ptr, size);
     }
@@ -581,7 +594,7 @@ struct pvalloc {
 
   static void *hook(size_t size) noexcept {
     AllocTrackerHelper helper;
-    auto ptr = ref(size);
+    auto *ptr = ref(size);
     if (ptr) {
       helper.track(ptr, size);
     }
@@ -596,7 +609,7 @@ struct valloc {
 
   static void *hook(size_t size) noexcept {
     AllocTrackerHelper helper;
-    auto ptr = ref(size);
+    auto *ptr = ref(size);
     if (ptr) {
       helper.track(ptr, size);
     }
@@ -611,11 +624,11 @@ struct reallocarray {
 
   static void *hook(void *ptr, size_t nmemb, size_t size) noexcept {
     AllocTrackerHelper helper;
-    if (ptr && helper.guard) {
+    if (ptr && helper) {
       ddprof::AllocationTracker::track_deallocation_s(
-          reinterpret_cast<uintptr_t>(ptr), *helper.tl_state);
+          reinterpret_cast<uintptr_t>(ptr), *helper.tl_state());
     }
-    auto newptr = ref(ptr, nmemb, size);
+    auto *newptr = ref(ptr, nmemb, size);
     if (newptr) {
       helper.track(newptr, size * nmemb);
     }
@@ -644,7 +657,7 @@ struct mallocx {
 
   static void *hook(size_t size, int flags) noexcept {
     AllocTrackerHelper helper;
-    auto ptr = ref(size, flags);
+    auto *ptr = ref(size, flags);
     helper.track(ptr, size);
     return ptr;
   }
@@ -657,11 +670,11 @@ struct rallocx {
 
   static void *hook(void *ptr, size_t size, int flags) noexcept {
     AllocTrackerHelper helper;
-    if (likely(ptr) && helper.guard) {
+    if (likely(ptr) && helper) {
       ddprof::AllocationTracker::track_deallocation_s(
-          reinterpret_cast<uintptr_t>(ptr), *helper.tl_state);
+          reinterpret_cast<uintptr_t>(ptr), *helper.tl_state());
     }
-    auto newptr = ref(ptr, size, flags);
+    auto *newptr = ref(ptr, size, flags);
     if (likely(size)) {
       helper.track(newptr, size);
     }
@@ -677,9 +690,9 @@ struct xallocx {
 
   static size_t hook(void *ptr, size_t size, size_t extra, int flags) noexcept {
     AllocTrackerHelper helper;
-    if (helper.guard) {
+    if (helper) {
       ddprof::AllocationTracker::track_deallocation_s(
-          reinterpret_cast<uintptr_t>(ptr), *helper.tl_state);
+          reinterpret_cast<uintptr_t>(ptr), *helper.tl_state());
     }
     auto newsize = ref(ptr, size, extra, flags);
     helper.track(ptr, newsize);
@@ -844,7 +857,7 @@ template <typename T> void install_hook(bool restore) {
       T::name, reinterpret_cast<void *>(restore ? T::ref : &T::hook), &T::ref);
 }
 
-void timer_handler(int, siginfo_t *, void *) {
+void timer_handler(int /*sig*/, siginfo_t * /*info*/, void * /*ucontext*/) {
   // check libraries only if symbols are overriden
   g_check_libraries = g_symbols_overridden;
 }
@@ -861,13 +874,6 @@ void uninstall_timer() {
   uninstall_handler();
   timer_delete(g_timerid);
   g_timer_active = false;
-}
-
-constexpr timespec duration_to_timespec(std::chrono::milliseconds d) {
-  auto nsecs = std::chrono::duration_cast<std::chrono::seconds>(d);
-  d -= nsecs;
-
-  return timespec{nsecs.count(), std::chrono::nanoseconds(d).count()};
 }
 
 int install_timer(std::chrono::milliseconds initial_loaded_libs_check_delay,
@@ -908,7 +914,7 @@ int install_timer(std::chrono::milliseconds initial_loaded_libs_check_delay,
     return -1;
   }
 
-  itimerspec its = {
+  itimerspec const its = {
       .it_interval = duration_to_timespec(loaded_libs_check_interval),
       .it_value = duration_to_timespec(initial_loaded_libs_check_delay)};
   if (timer_settime(g_timerid, 0, &its, NULL) == -1) {
@@ -983,7 +989,6 @@ void setup_hooks(bool restore) {
 
 } // namespace
 
-namespace ddprof {
 void setup_overrides(std::chrono::milliseconds initial_loaded_libs_check_delay,
                      std::chrono::milliseconds loaded_libs_check_interval) {
   setup_hooks(false);

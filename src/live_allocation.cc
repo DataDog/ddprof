@@ -44,7 +44,7 @@ void LiveAllocation::register_allocation(const UnwindOutput &uo,
                                          uintptr_t address, int64_t value,
                                          PprofStacks &stacks,
                                          AddressMap &address_map) {
-  if (!uo.locs.size()) {
+  if (uo.locs.empty()) {
     // avoid sending empty stacks
     LG_DBG("(LIVE_ALLOC) Avoid registering empty stack");
     return;

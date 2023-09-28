@@ -11,9 +11,10 @@
 #include "symbol_hdr.hpp"
 #include <string_view>
 
-typedef struct UnwindState UnwindState;
-
 namespace ddprof {
+
+struct UnwindState;
+
 bool is_max_stack_depth_reached(const UnwindState &us);
 
 DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
@@ -21,7 +22,8 @@ DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
 
 void add_common_frame(UnwindState *us, SymbolErrors lookup_case);
 
-void add_dso_frame(UnwindState *us, const Dso &dso, ProcessAddress_t pc,
+void add_dso_frame(UnwindState *us, const Dso &dso,
+                   ProcessAddress_t normalized_addr,
                    std::string_view addr_type);
 
 void add_virtual_base_frame(UnwindState *us);

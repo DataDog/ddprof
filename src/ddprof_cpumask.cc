@@ -5,12 +5,15 @@
 
 #include "ddprof_cpumask.hpp"
 
+#include <climits>
 #include <cstdint>
 #include <dirent.h>
 #include <sys/sysinfo.h>
 #include <sys/types.h>
 
 namespace ddprof {
+
+constexpr uint8_t k_a_hex_value = 0xa;
 
 /* Parse cpu mask given as hexa string (with optional 0x prefix) */
 bool parse_cpu_mask(std::string_view sv, cpu_set_t &cpu_mask) {
@@ -34,9 +37,9 @@ bool parse_cpu_mask(std::string_view sv, cpu_set_t &cpu_mask) {
     if (c >= '0' && c <= '9') {
       v = c - '0';
     } else if (c >= 'A' && c <= 'F') {
-      v = c - 'A' + 10;
+      v = c - 'A' + k_a_hex_value;
     } else if (c >= 'a' && c <= 'f') {
-      v = c - 'a' + 10;
+      v = c - 'a' + k_a_hex_value;
     } else {
       return false;
     }
@@ -53,7 +56,7 @@ bool parse_cpu_mask(std::string_view sv, cpu_set_t &cpu_mask) {
 }
 
 std::string cpu_mask_to_string(const cpu_set_t &cpu_mask) {
-  int nb_cpus = sizeof(cpu_set_t) * 8;
+  int nb_cpus = sizeof(cpu_set_t) * CHAR_BIT;
 
   bool one_cpu_set = false;
   std::string s;
@@ -74,8 +77,8 @@ std::string cpu_mask_to_string(const cpu_set_t &cpu_mask) {
       }
     }
 
-    if (v >= 10) {
-      v = v - 10 + 'a';
+    if (v >= k_a_hex_value) {
+      v = v - k_a_hex_value + 'a';
     } else {
       v = v + '0';
     }

@@ -12,7 +12,7 @@
 
 namespace ddprof {
 //  mimic: std::hardware_destructive_interference_size, C++17
-constexpr std::size_t hardware_destructive_interference_size = 128;
+inline constexpr std::size_t hardware_destructive_interference_size = 128;
 
 class SpinLock {
 public:

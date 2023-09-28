@@ -35,6 +35,8 @@
 #include <thread>
 #include <unistd.h>
 
+namespace ddprof {
+
 namespace {
 int ddprof_start_profiling_internal();
 
@@ -137,7 +139,7 @@ void set_profiler_library_inactive() {
 
 void allocation_profiling_stop() {
   if (g_state.allocation_profiling_started) {
-    ddprof::AllocationTracker::allocation_tracking_free();
+    AllocationTracker::allocation_tracking_free();
     g_state.allocation_profiling_started = false;
   }
 }
@@ -146,7 +148,7 @@ void allocation_profiling_stop() {
 int get_ddprof_socket() {
   const char *socket_str = g_state.getenv(k_profiler_lib_socket_env_variable);
   if (socket_str) {
-    std::string_view sv{socket_str};
+    std::string_view const sv{socket_str};
     int sockfd = -1;
     if (auto [ptr, ec] = std::from_chars(sv.begin(), sv.end(), sockfd);
         ec == std::errc() && ptr == sv.end()) {
@@ -211,7 +213,7 @@ struct ProfilerAutoStart {
     if (autostart) {
       try {
         ddprof_start_profiling_internal();
-      } catch (...) {}
+      } catch (...) {} // NOLINT(bugprone-empty-catch)
     }
   }
 
@@ -225,10 +227,10 @@ ProfilerAutoStart g_autostart;
 int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
   char ddprof_str[] = "ddprof";
 
-  char pid_buf[32];
-  snprintf(pid_buf, sizeof(pid_buf), "%d", target_pid);
-  char sock_buf[32];
-  snprintf(sock_buf, sizeof(sock_buf), "%d", sock_fd);
+  char pid_buf[std::numeric_limits<pid_t>::digits10 + 1];
+  (void)snprintf(pid_buf, sizeof(pid_buf), "%d", target_pid);
+  char sock_buf[std::numeric_limits<int>::digits10 + 1];
+  (void)snprintf(sock_buf, sizeof(sock_buf), "%d", sock_fd);
 
   char pid_opt_str[] = "-p";
   char sock_opt_str[] = "--socket";
@@ -252,7 +254,7 @@ int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
     if (exe_data.size == 0) {
       return -1;
     }
-    int fd = ddprof::memfd_create(ddprof_str, 1U /*MFD_CLOEXEC*/);
+    int fd = memfd_create(ddprof_str, 1U /*MFD_CLOEXEC*/);
     if (fd == -1) {
       return -1;
     }
@@ -269,8 +271,8 @@ int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
 }
 
 void notify_fork() {
-  ddprof::AllocationTracker::notify_fork();
-  ddprof::reinstall_timer_after_fork();
+  AllocationTracker::notify_fork();
+  reinstall_timer_after_fork();
 }
 
 int ddprof_start_profiling_internal() {
@@ -280,7 +282,7 @@ int ddprof_start_profiling_internal() {
     return -1;
   }
   int sockfd = get_ddprof_socket();
-  pid_t target_pid = getpid();
+  pid_t const target_pid = getpid();
 
   // no socket -> library will spawn a profiler and create socket pair
   if (sockfd == -1) {
@@ -305,19 +307,19 @@ int ddprof_start_profiling_internal() {
       return -1;
     }
 
-    ddprof::UniqueFd parent_socket{sockfds[0]};
-    ddprof::UniqueFd child_socket{sockfds[1]};
+    UniqueFd parent_socket{sockfds[0]};
+    UniqueFd child_socket{sockfds[1]};
 
-    auto daemonize_res = ddprof::daemonize();
-    if (daemonize_res.state == ddprof::DaemonizeResult::Error) {
+    auto daemonize_res = daemonize();
+    if (daemonize_res.state == DaemonizeResult::Error) {
       return -1;
     }
 
-    if (daemonize_res.state == ddprof::DaemonizeResult::IntermediateProcess) {
+    if (daemonize_res.state == DaemonizeResult::IntermediateProcess) {
       _exit(0);
     }
 
-    if (daemonize_res.state == ddprof::DaemonizeResult::DaemonProcess) {
+    if (daemonize_res.state == DaemonizeResult::DaemonProcess) {
       // executed by daemonized process
 
       // close parent socket end
@@ -332,45 +334,44 @@ int ddprof_start_profiling_internal() {
   }
 
   try {
-    ddprof::Client client{ddprof::UnixSocket{sockfd}};
+    Client client{UnixSocket{sockfd}};
     auto info = client.get_profiler_info();
     g_state.profiler_pid = info.pid;
     if (info.allocation_profiling_rate != 0) {
       uint32_t flags{0};
       // Negative profiling rate is interpreted as deterministic sampling rate
       if (info.allocation_profiling_rate < 0) {
-        flags |= ddprof::AllocationTracker::kDeterministicSampling;
+        flags |= AllocationTracker::kDeterministicSampling;
         info.allocation_profiling_rate = -info.allocation_profiling_rate;
       }
 
-      if (info.allocation_flags & (1 << ddprof::ReplyMessage::kLiveCallgraph)) {
+      if (info.allocation_flags & (1 << ReplyMessage::kLiveCallgraph)) {
         // tracking deallocations to allow a live view
-        flags |= ddprof::AllocationTracker::kTrackDeallocations;
+        flags |= AllocationTracker::kTrackDeallocations;
       }
 
-      if (IsDDResOK(ddprof::AllocationTracker::allocation_tracking_init(
+      if (IsDDResOK(AllocationTracker::allocation_tracking_init(
               info.allocation_profiling_rate, flags, info.stack_sample_size,
               info.ring_buffer))) {
         // \fixme{nsavoire} pthread_create should probably be overridden
         // at load time since we need to capture stack end addresses of all
         // threads in case allocation profiling is started later on
-        ddprof::setup_overrides(
+        setup_overrides(
             std::chrono::milliseconds{info.initial_loaded_libs_check_delay_ms},
             std::chrono::milliseconds{info.loaded_libs_check_interval_ms});
         // \fixme{nsavoire} what should we do when allocation tracker init
         // fails ?
         g_state.allocation_profiling_started = true;
       } else {
-        ddprof::log_once("Error: %s",
-                         "Failure to start allocation profiling\n");
+        log_once("Error: %s", "Failure to start allocation profiling\n");
       }
     }
-  } catch (const ddprof::DDException &e) { return -1; }
+  } catch (const DDException &e) { return -1; }
 
   if (g_state.allocation_profiling_started) {
-    int res = pthread_atfork(nullptr, nullptr, notify_fork);
+    int const res = pthread_atfork(nullptr, nullptr, notify_fork);
     if (res) {
-      ddprof::log_once("Error:%s", "Unable to setup notify fork");
+      log_once("Error:%s", "Unable to setup notify fork");
       assert(0);
     }
   }
@@ -381,14 +382,18 @@ int ddprof_start_profiling_internal() {
 
 } // namespace
 
+} // namespace ddprof
+
 int ddprof_start_profiling() {
   try {
-    return ddprof_start_profiling_internal();
-  } catch (...) {}
+    return ddprof::ddprof_start_profiling_internal();
+  } catch (...) {} // NOLINT(bugprone-empty-catch)
   return -1;
 }
 
 void ddprof_stop_profiling(int timeout_ms) {
+  using namespace ddprof;
+
   if (!g_state.started) {
     return;
   }

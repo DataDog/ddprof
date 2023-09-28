@@ -322,8 +322,8 @@ public:
             std::exchange(that.execute_on_destruction, false)) {}
 
   unique_resource &operator=(unique_resource &&that) noexcept(
-      is_nothrow_delete_v &&std::is_nothrow_move_assignable_v<R>
-          &&std::is_nothrow_move_assignable_v<D>) {
+      is_nothrow_delete_v && std::is_nothrow_move_assignable_v<R> &&
+      std::is_nothrow_move_assignable_v<D>) {
     static_assert(
         std::is_nothrow_move_assignable<R>::value ||
             std::is_copy_assignable<R>::value,
@@ -405,8 +405,8 @@ unique_resource(R, D, bool) -> unique_resource<R, D>;
 template <typename R, typename D, typename S>
 [[nodiscard]] auto make_unique_resource_checked(
     R &&r, const S &invalid,
-    D &&d) noexcept(std::is_nothrow_constructible_v<std::decay_t<R>, R>
-                        &&std::is_nothrow_constructible_v<std::decay_t<D>, D>)
+    D &&d) noexcept(std::is_nothrow_constructible_v<std::decay_t<R>, R> &&
+                    std::is_nothrow_constructible_v<std::decay_t<D>, D>)
     -> unique_resource<std::decay_t<R>, std::decay_t<D>> {
   bool const mustrelease(r == invalid);
   unique_resource resource{std::forward<R>(r), std::forward<D>(d),

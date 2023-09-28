@@ -27,9 +27,8 @@ MapInfoIdx_t MapInfoLookup::get_or_insert(pid_t pid,
                                build_id ? *build_id : BuildIdStr{});
     addr_map.emplace(dso._start, map_info_idx);
     return map_info_idx;
-  } else {
-    return it->second;
   }
+  return it->second;
 }
 
 } // namespace ddprof

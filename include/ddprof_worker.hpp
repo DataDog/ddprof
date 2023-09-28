@@ -5,19 +5,23 @@
 
 #pragma once
 
+#include <chrono>
 #include <linux/perf_event.h>
 
 #include "ddres.hpp"
 #include "persistent_worker_state.hpp"
 #include "pevent.hpp"
 
-typedef struct DDProfContext DDProfContext;
+namespace ddprof {
+struct DDProfContext;
 
 DDRes ddprof_worker_init(DDProfContext &ctx,
                          PersistentWorkerState *persistent_worker_state);
 DDRes ddprof_worker_free(DDProfContext &ctx);
-DDRes ddprof_worker_maybe_export(DDProfContext &ctx, int64_t now_ns);
-DDRes ddprof_worker_cycle(DDProfContext &ctx, int64_t now,
+DDRes ddprof_worker_maybe_export(DDProfContext &ctx,
+                                 std::chrono::steady_clock::time_point now_ns);
+DDRes ddprof_worker_cycle(DDProfContext &ctx,
+                          std::chrono::steady_clock::time_point now,
                           bool synchronous_export);
 DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
                                   DDProfContext &ctx);
@@ -26,3 +30,4 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
 DDRes worker_library_init(DDProfContext &ctx,
                           PersistentWorkerState *persistent_worker_state);
 DDRes worker_library_free(DDProfContext &ctx);
+} // namespace ddprof

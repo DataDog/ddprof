@@ -13,6 +13,8 @@
 
 #include <thread>
 
+namespace ddprof {
+
 DDPROF_NOINLINE static void *get_stack_start() {
   void *stack_addr;
   size_t stack_size;
@@ -34,7 +36,7 @@ DDPROF_NOINLINE static void *get_stack_start_tls() {
 }
 
 static void BM_SaveContext(benchmark::State &state) {
-  uint64_t regs[PERF_REGS_COUNT];
+  uint64_t regs[k_perf_register_count];
   std::byte stack[k_default_perf_stack_sample_size];
   std::span<const std::byte> stack_bounds = retrieve_stack_bounds();
   if (stack_bounds.empty()) {
@@ -100,3 +102,5 @@ static void BM_GetTID(benchmark::State &state) {
 }
 
 BENCHMARK(BM_GetTID);
+
+} // namespace ddprof

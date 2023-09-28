@@ -19,6 +19,8 @@
 #include <thread>
 #include <unistd.h>
 
+namespace ddprof {
+
 DDPROF_NOINLINE void funcA();
 DDPROF_NOINLINE void funcB();
 
@@ -26,12 +28,12 @@ std::byte stack[k_default_perf_stack_sample_size];
 
 void funcB() {
   UnwindState state;
-  uint64_t regs[K_NB_REGS_UNWIND];
+  uint64_t regs[k_nb_registers_to_unwind];
   size_t stack_size = save_context(retrieve_stack_bounds(), regs, stack);
 
-  ddprof::unwind_init_sample(&state, regs, getpid(), stack_size,
-                             reinterpret_cast<char *>(stack));
-  ddprof::unwindstate__unwind(&state);
+  unwind_init_sample(&state, regs, getpid(), stack_size,
+                     reinterpret_cast<char *>(stack));
+  unwindstate__unwind(&state);
 
   auto &symbol_table = state.symbol_hdr._symbol_table;
 
@@ -64,7 +66,7 @@ TEST(getcontext, getcontext) { funcA(); }
 static std::atomic<bool> stop;
 static std::mutex mutex;
 static std::condition_variable cv;
-static uint64_t regs[K_NB_REGS_UNWIND];
+static uint64_t regs[k_nb_registers_to_unwind];
 static size_t stack_size;
 static std::span<const std::byte> thread_stack_bounds;
 
@@ -100,9 +102,9 @@ TEST(getcontext, unwind_from_sighandler) {
   t.join();
 
   UnwindState state;
-  ddprof::unwind_init_sample(&state, regs, getpid(), stack_size,
-                             reinterpret_cast<char *>(stack));
-  ddprof::unwindstate__unwind(&state);
+  unwind_init_sample(&state, regs, getpid(), stack_size,
+                     reinterpret_cast<char *>(stack));
+  unwindstate__unwind(&state);
 
   auto &symbol_table = state.symbol_hdr._symbol_table;
 
@@ -128,3 +130,5 @@ TEST(getcontext, unwind_from_sighandler) {
   EXPECT_EQ(get_symbol(next_idx + 1)._demangle_name, "funcC()");
 }
 #endif
+
+} // namespace ddprof

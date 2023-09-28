@@ -1,4 +1,4 @@
-Checks: 'bugprone-*,-bugprone-easily-swappable-parameters,-bugprone-narrowing-conversions,cert-*,clang-analyzer-*,-clang-diagnostic-c99-designator,misc-*'
+Checks: 'bugprone-*,-bugprone-easily-swappable-parameters,-bugprone-narrowing-conversions,cert-*,-cert-err33-c,clang-analyzer-*,cppcoreguidelines-rvalue-reference-param-not-moved,misc-*,-misc-include-cleaner,-misc-const-correctness,modernize-deprecated-headers,readability-*,-readability-identifier-length,-readability-implicit-bool-conversion,-readability-function-cognitive-complexity'
 FormatStyle: 'file'
 WarningsAsErrors: '*'
 # performance-*,modernize-*,cppcoreguidelines-*

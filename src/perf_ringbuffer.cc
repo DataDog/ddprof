@@ -8,8 +8,11 @@
 #include "logger.hpp"
 #include "mpscringbuffer.hpp"
 
+#include <bit>
+#include <cstdlib>
 #include <cstring>
-#include <stdlib.h>
+
+namespace ddprof {
 
 bool rb_init(RingBuffer *rb, void *base, size_t size,
              RingBufferType ring_buffer_type) {
@@ -28,8 +31,8 @@ bool rb_init(RingBuffer *rb, void *base, size_t size,
     break;
   }
   case RingBufferType::kMPSCRingBuffer: {
-    ddprof::MPSCRingBufferMetaDataPage *meta =
-        reinterpret_cast<ddprof::MPSCRingBufferMetaDataPage *>(rb->base);
+    MPSCRingBufferMetaDataPage *meta =
+        reinterpret_cast<MPSCRingBufferMetaDataPage *>(rb->base);
     rb->reader_pos = &meta->reader_pos;
     rb->writer_pos = &meta->writer_pos;
     rb->spinlock = &meta->spinlock;
@@ -45,21 +48,27 @@ bool rb_init(RingBuffer *rb, void *base, size_t size,
 void rb_free(RingBuffer *rb) {}
 
 // aligned block into two 4-byte blocks easier
-typedef union flipper {
+union flipper {
   uint64_t full;
   uint32_t half[2];
-} flipper;
+};
 
 #define SZ_CHECK                                                               \
-  if ((sz += 8) >= sz_hdr)                                                     \
-  return false
+  do {                                                                         \
+    sz += 8;                                                                   \
+    if (sz >= sz_hdr) {                                                        \
+      return false;                                                            \
+    }                                                                          \
+  } while (0);
+
 bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,
               size_t sz_hdr, uint64_t mask) {
   // There is absolutely no point for this interface except testing
 
   // Presumes that the user has allocated enough room for the whole sample
-  if (!hdr || !sz_hdr || sz_hdr < sizeof(struct perf_event_header))
+  if (!hdr || !sz_hdr || sz_hdr < sizeof(struct perf_event_header)) {
     return false;
+  }
   memset(hdr, 0, sz_hdr);
 
   // Initiate
@@ -69,8 +78,9 @@ bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,
 
   uint64_t *buf = (uint64_t *)&hdr[1]; // buffer starts at sample
 
-  if (sz >= sz_hdr)
+  if (sz >= sz_hdr) {
     return false;
+  }
 
   if (PERF_SAMPLE_IDENTIFIER & mask) {
     *buf++ = sample->sample_id;
@@ -113,19 +123,22 @@ bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,
   }
   if (PERF_SAMPLE_READ & mask) {
     *((struct read_format *)buf) = *sample->v;
-    buf += sizeof(struct read_format) / 8; // read_format is uint64_t's
+    buf += sizeof(struct read_format) /
+        sizeof(size_t); // read_format is uint64_t's
     sz += sizeof(struct read_format);
-    if (sz >= sz_hdr)
+    if (sz >= sz_hdr) {
       return false;
+    }
   }
   if (PERF_SAMPLE_CALLCHAIN & mask) {
     *buf++ = sample->nr;
     SZ_CHECK;
 
     // Copy the values
-    sz += 8 * sample->nr; // early check
-    if (sz >= sz_hdr)
+    sz += sizeof(size_t) * sample->nr; // early check
+    if (sz >= sz_hdr) {
       return false;
+    }
     memcpy(buf, sample->ips, sample->nr);
     buf += sample->nr;
   }
@@ -141,12 +154,14 @@ bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,
     SZ_CHECK;
 
     // Copy the values
-    sz += static_cast<size_t>(8 *
-                              PERF_REGS_COUNT); // TODO pass this in the watcher
-    if (sz >= sz_hdr)
+    sz += static_cast<size_t>(
+        sizeof(size_t) *
+        k_perf_register_count); // TODO pass this in the watcher
+    if (sz >= sz_hdr) {
       return false;
-    memcpy(buf, sample->regs, PERF_REGS_COUNT);
-    buf += PERF_REGS_COUNT;
+    }
+    memcpy(buf, sample->regs, k_perf_register_count);
+    buf += k_perf_register_count;
   }
   if (PERF_SAMPLE_STACK_USER & mask) {
     *buf++ = sample->size_stack;
@@ -154,10 +169,12 @@ bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,
 
     if (sample->size_stack) {
       sz += sample->size_stack;
-      if (sz >= sz_hdr)
+      if (sz >= sz_hdr) {
         return false;
+      }
       memcpy(buf, sample->data_stack, sample->size_stack);
-      buf += ((sample->size_stack + 0x7) & ~0x7) / 8; // align and convert
+      buf += (sample->size_stack + sizeof(uint64_t) - 1) /
+          sizeof(uint64_t); // align and convert
       *buf++ = sample->dyn_size_stack;
       SZ_CHECK;
     }
@@ -233,10 +250,10 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
       return NULL;
     }
     sample.regs = buf;
-    buf += PERF_REGS_COUNT;
+    buf += k_perf_register_count;
   }
   if (PERF_SAMPLE_STACK_USER & mask) {
-    uint64_t size_stack = *buf++;
+    uint64_t const size_stack = *buf++;
     // Empirically, it seems that the size of the static stack is either 0 or
     // the amount requested in the call to `perf_event_open()`.  We don't
     // check for that, since there isn't much we'd be able to do anyway.
@@ -247,7 +264,8 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
     } else {
       uint64_t dynsz_stack = 0;
       sample.data_stack = (char *)buf;
-      buf += ((size_stack + 0x7UL) & ~0x7UL) / 8; // align (/8 as it is uint64)
+      buf += (size_stack + sizeof(uint64_t) - 1) /
+          sizeof(uint64_t); // align (/8 as it is uint64)
 
       // If the size was specified, we also have a dyn_size
       dynsz_stack = *buf++;
@@ -270,18 +288,10 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
   return &sample;
 }
 
-inline static int get_bits(uint64_t val) {
-  int count = 0;
-  while (val) {
-    count += val & 1;
-    val >>= 1;
-  }
-  return count;
-}
-
 uint64_t hdr_time(struct perf_event_header *hdr, uint64_t mask) {
-  if (!(mask & PERF_SAMPLE_TIME))
+  if (!(mask & PERF_SAMPLE_TIME)) {
     return 0;
+  }
 
   uint64_t sampleid_mask_bits;
   uint8_t *buf;
@@ -296,7 +306,8 @@ uint64_t hdr_time(struct perf_event_header *hdr, uint64_t mask) {
     buf = (uint8_t *)&hdr[1];
     uint64_t mbits = PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_IP | PERF_SAMPLE_TID;
     mbits &= mask;
-    return *(uint64_t *)&buf[static_cast<ptrdiff_t>(8 * get_bits(mbits))];
+    return *(uint64_t *)&buf[static_cast<ptrdiff_t>(sizeof(uint64_t) *
+                                                    std::popcount(mbits))];
   }
   // For non-sample type events, the time is in the sample_id struct which is
   // at the very end of the feed.  We seek to the top of the header, which
@@ -313,11 +324,14 @@ uint64_t hdr_time(struct perf_event_header *hdr, uint64_t mask) {
     sampleid_mask_bits = mask;
     sampleid_mask_bits &= PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ID |
         PERF_SAMPLE_STREAM_ID | PERF_SAMPLE_CPU | PERF_SAMPLE_IDENTIFIER;
-    sampleid_mask_bits = get_bits(sampleid_mask_bits);
+    sampleid_mask_bits = std::popcount(sampleid_mask_bits);
     buf = ((uint8_t *)hdr) + hdr->size - sizeof(uint64_t) * sampleid_mask_bits;
-    return *(
-        uint64_t *)&buf[static_cast<ptrdiff_t>(8 * !!(mask & PERF_SAMPLE_TID))];
+    return *(uint64_t *)&buf[(mask & PERF_SAMPLE_TID) ? sizeof(uint64_t) : 0];
+  default:
+    break;
   }
 
   return 0;
 }
+
+} // namespace ddprof

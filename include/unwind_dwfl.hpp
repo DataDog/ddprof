@@ -7,8 +7,9 @@
 
 #include "ddres_def.hpp"
 
-typedef struct UnwindState UnwindState;
 namespace ddprof {
+
+struct UnwindState;
 
 DDRes unwind_init_dwfl(UnwindState *us);
 

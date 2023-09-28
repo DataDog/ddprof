@@ -29,10 +29,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include <cstdint>
 #include <span>
 
+namespace ddprof {
+
 #if defined(__x86_64__)
 
 DDPROF_NOINLINE __attribute__((naked)) void
-    save_registers(std::span<uint64_t, PERF_REGS_COUNT>);
+    save_registers(std::span<uint64_t, k_perf_register_count>);
 
 #elif defined(__aarch64__)
 
@@ -66,3 +68,4 @@ DDPROF_NOINLINE __attribute__((naked)) void
     })
 
 #endif
+} // namespace ddprof

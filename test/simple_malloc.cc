@@ -6,16 +6,16 @@
 #include <alloca.h>
 #include <chrono>
 #include <cmath>
+#include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <dlfcn.h>
 #include <functional>
 #include <iostream>
-#include <signal.h>
 #include <sstream>
 #include <thread>
-#include <time.h>
 #include <unistd.h>
 
 #include "ddprof_base.hpp"
@@ -33,24 +33,24 @@
 #ifdef __GLIBC__
 #  include <execinfo.h>
 #endif
-
 class Voidify final {
 public:
   // This has to be an operator with a precedence lower than << but higher than
   // ?:
-  template <typename T> void operator&&(const T &) const && {}
+  template <typename T> void operator&&(const T & /*unused*/) const && {}
 };
 
 class LogMessageFatal {
 public:
   LogMessageFatal(const char *file, int line, const char *failure_msg) {
-    InternalStream() << "Check failed: " << failure_msg << " ";
+    InternalStream() << "Check failed " << file << ':' << line << ':'
+                     << failure_msg << " ";
   }
   ~LogMessageFatal() {
     std::cerr << std::endl;
     abort();
   }
-  std::ostream &InternalStream() { return std::cerr; }
+  static std::ostream &InternalStream() { return std::cerr; }
 };
 
 #define CHECK_IMPL(condition, condition_text)                                  \
@@ -58,6 +58,8 @@ public:
               : Voidify() &&                                                   \
           LogMessageFatal(__FILE__, __LINE__, condition_text).InternalStream()
 #define CHECK(condition) CHECK_IMPL((condition), #condition)
+
+namespace ddprof {
 
 struct thread_cpu_clock {
   using duration = std::chrono::nanoseconds;
@@ -98,6 +100,7 @@ struct Options {
   bool avoid_dlopen_hook = false;
 };
 
+// NOLINTBEGIN(clang-analyzer-unix.Malloc)
 extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
                                                       Stats &stats) {
   uint64_t nb_alloc{0};
@@ -114,7 +117,7 @@ extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
       ++nb_alloc;
       alloc_bytes += options.malloc_size;
     }
-    ddprof::DoNotOptimize(p);
+    DoNotOptimize(p);
     void *p2;
     if (options.realloc_size) {
       p2 = realloc(p, options.realloc_size);
@@ -123,7 +126,7 @@ extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
     } else {
       p2 = p;
     }
-    ddprof::DoNotOptimize(p2);
+    DoNotOptimize(p2);
 
     if (skip_free++ >= options.skip_free) {
       free(p2);
@@ -138,7 +141,9 @@ extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
           std::chrono::steady_clock::now() + options.spin_duration_per_loop;
       do {
         volatile uint64_t sum = 1;
-        for (uint64_t j = 0; j < 100; ++j) {
+        constexpr size_t nb_work_iterations = 10;
+        ;
+        for (uint64_t j = 0; j < nb_work_iterations; ++j) {
           sum = std::sqrt(sum) + std::sqrt(sum);
         }
       } while (std::chrono::steady_clock::now() < target_time);
@@ -155,13 +160,14 @@ extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
            ddprof::gettid()};
 }
 
+// NOLINTNEXTLINE(misc-no-recursion)
 extern "C" DDPROF_NOINLINE void recursive_call(const Options &options,
                                                Stats &stats, uint32_t depth) {
   void *stack_alloc = nullptr;
   if (options.frame_size) {
     stack_alloc = alloca(options.frame_size);
   }
-  ddprof::DoNotOptimize(stack_alloc);
+  DoNotOptimize(stack_alloc);
 
   if (depth == 0) {
     do_lot_of_allocations(options, stats);
@@ -174,22 +180,29 @@ extern "C" DDPROF_NOINLINE void recursive_call(const Options &options,
 extern "C" DDPROF_NOINLINE void wrapper(const Options &options, Stats &stats) {
   recursive_call(options, stats, options.callstack_depth);
 }
+// NOLINTEND(clang-analyzer-unix.Malloc)
 
 using WrapperFuncPtr = decltype(&wrapper);
 
+} // namespace ddprof
+
 #ifndef SIMPLE_MALLOC_SHARED_LIBRARY
+namespace ddprof {
+
 /*****************************  SIGSEGV Handler *******************************/
-static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
+void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   // TODO this really shouldn't call printf-family functions...
   (void)uc;
 #  ifdef __GLIBC__
-  static void *buf[4096] = {0};
-  size_t sz = backtrace(buf, 4096);
+  constexpr size_t k_stacktrace_buffer_size = 4096;
+  static void *buf[k_stacktrace_buffer_size] = {0};
+  size_t sz = backtrace(buf, std::size(buf));
 #  endif
   fprintf(stderr, "simplemalloc[%d]:has encountered an error and will exit\n",
           getpid());
-  if (sig == SIGSEGV)
+  if (sig == SIGSEGV) {
     printf("Fault address: %p\n", si->si_addr);
+  }
 #  ifdef __GLIBC__
   backtrace_symbols_fd(buf, sz, STDERR_FILENO);
 #  endif
@@ -213,8 +226,11 @@ enum class WrapperOpts {
   kAvoidDLOpenHook = 0x2
 };
 
-ALLOW_FLAGS_FOR_ENUM(WrapperOpts);
+} // namespace ddprof
 
+ALLOW_FLAGS_FOR_ENUM(ddprof::WrapperOpts);
+
+namespace ddprof {
 std::string get_shared_library_path() {
   return std::filesystem::canonical(std::filesystem::path("/proc/self/exe"))
              .parent_path() /
@@ -244,130 +260,139 @@ WrapperFuncPtr get_wrapper_func(WrapperOpts opts) {
   CHECK(wrapper_func) << "Unable to find wrapper func: " << dlerror();
   return wrapper_func;
 }
+} // namespace ddprof
 
 int main(int argc, char *argv[]) {
-  struct sigaction sigaction_handlers = {};
-  sigaction_handlers.sa_sigaction = sigsegv_handler;
-  sigaction_handlers.sa_flags = SA_SIGINFO;
-  sigaction(SIGSEGV, &(sigaction_handlers), NULL);
+  using namespace ddprof;
+  try {
+    struct sigaction sigaction_handlers = {};
+    sigaction_handlers.sa_sigaction = sigsegv_handler;
+    sigaction_handlers.sa_flags = SA_SIGINFO;
+    sigaction(SIGSEGV, &(sigaction_handlers), NULL);
 
-  CLI::App app{"Simple allocation test"};
+    CLI::App app{"Simple allocation test"};
 
-  unsigned int nb_forks{1};
-  unsigned int nb_threads{1};
+    unsigned int nb_forks{1};
+    unsigned int nb_threads{1};
 
-  Options opts;
-  std::vector<std::string> exec_args;
+    Options opts;
+    std::vector<std::string> exec_args;
 
-  app.add_option("--fork", nb_forks, "Number of processes to create")
-      ->default_val(1);
-  app.add_option("--threads", nb_threads, "Number of threads to use")
-      ->default_val(1);
-  app.add_option("--exec", exec_args, "Exec the following command")
-      ->expected(-1); // minus is to say at least 1
-  app.add_option("--loop", opts.loop_count, "Number of loops")->default_val(0);
-  app.add_option("--malloc", opts.malloc_size,
-                 "Malloc allocation size per loop")
-      ->default_val(1000);
-  app.add_option("--realloc", opts.realloc_size,
-                 "Realloc allocation size per loop")
-      ->default_val(2000);
-  app.add_option("--call-depth", opts.callstack_depth, "Callstack depth")
-      ->default_val(0);
-  app.add_option("--frame-size", opts.frame_size,
-                 "Size to allocate on the stack for each frame")
-      ->default_val(0);
-  app.add_option("--skip-free", opts.skip_free,
-                 "Only free every N allocations (default is 0)")
-      ->default_val(0);
+    constexpr size_t k_default_malloc_size{1000};
+    constexpr size_t k_default_realloc_size{2000};
+    app.add_option("--fork", nb_forks, "Number of processes to create")
+        ->default_val(1);
+    app.add_option("--threads", nb_threads, "Number of threads to use")
+        ->default_val(1);
+    app.add_option("--exec", exec_args, "Exec the following command")
+        ->expected(-1); // minus is to say at least 1
+    app.add_option("--loop", opts.loop_count, "Number of loops")
+        ->default_val(0);
+    app.add_option("--malloc", opts.malloc_size,
+                   "Malloc allocation size per loop")
+        ->default_val(k_default_malloc_size);
+    app.add_option("--realloc", opts.realloc_size,
+                   "Realloc allocation size per loop")
+        ->default_val(k_default_realloc_size);
+    app.add_option("--call-depth", opts.callstack_depth, "Callstack depth")
+        ->default_val(0);
+    app.add_option("--frame-size", opts.frame_size,
+                   "Size to allocate on the stack for each frame")
+        ->default_val(0);
+    app.add_option("--skip-free", opts.skip_free,
+                   "Only free every N allocations (default is 0)")
+        ->default_val(0);
 
-  app.add_option<std::chrono::milliseconds, int64_t>(
-         "--timeout", opts.timeout_duration, "Timeout after N milliseconds")
-      ->default_val(0)
-      ->check(CLI::NonNegativeNumber);
-  app.add_option<std::chrono::microseconds, int64_t>(
-         "--sleep", opts.sleep_duration_per_loop,
-         "Time to sleep (us) between allocations")
-      ->default_val(0)
-      ->check(CLI::NonNegativeNumber);
-  app.add_option<std::chrono::microseconds, int64_t>(
-         "--spin", opts.spin_duration_per_loop,
-         "Time to spin (us) between allocations")
-      ->default_val(0)
-      ->check(CLI::NonNegativeNumber);
-  app.add_flag("--use-shared-library", opts.use_shared_library,
-               "Make libsimplemalloc.so (with dlopen) do the allocations");
-  app.add_flag("--avoid-dlopen-hook", opts.avoid_dlopen_hook,
-               "Avoid dlopen hook when loading libsimplemalloc.so");
-  app.add_option("--initial-delay", opts.initial_delay, "Initial delay (ms)")
-      ->default_val(0)
-      ->check(CLI::NonNegativeNumber);
+    app.add_option<std::chrono::milliseconds, int64_t>(
+           "--timeout", opts.timeout_duration, "Timeout after N milliseconds")
+        ->default_val(0)
+        ->check(CLI::NonNegativeNumber);
+    app.add_option<std::chrono::microseconds, int64_t>(
+           "--sleep", opts.sleep_duration_per_loop,
+           "Time to sleep (us) between allocations")
+        ->default_val(0)
+        ->check(CLI::NonNegativeNumber);
+    app.add_option<std::chrono::microseconds, int64_t>(
+           "--spin", opts.spin_duration_per_loop,
+           "Time to spin (us) between allocations")
+        ->default_val(0)
+        ->check(CLI::NonNegativeNumber);
+    app.add_flag("--use-shared-library", opts.use_shared_library,
+                 "Make libsimplemalloc.so (with dlopen) do the allocations");
+    app.add_flag("--avoid-dlopen-hook", opts.avoid_dlopen_hook,
+                 "Avoid dlopen hook when loading libsimplemalloc.so");
+    app.add_option("--initial-delay", opts.initial_delay, "Initial delay (ms)")
+        ->default_val(0)
+        ->check(CLI::NonNegativeNumber);
 
 #  ifdef USE_DD_PROFILING
-  bool start_profiling = false;
-  app.add_flag("--profile", start_profiling, "Enable profiling")
-      ->default_val(false);
+    bool start_profiling = false;
+    app.add_flag("--profile", start_profiling, "Enable profiling")
+        ->default_val(false);
 #  endif
 
-  CLI11_PARSE(app, argc, argv);
+    CLI11_PARSE(app, argc, argv);
 #  ifdef USE_DD_PROFILING
-  if (start_profiling && ddprof_start_profiling() != 0) {
-    fprintf(stderr, "Failed to start profiling\n");
-    return 1;
-  }
+    if (start_profiling && ddprof_start_profiling() != 0) {
+      fprintf(stderr, "Failed to start profiling\n");
+      return 1;
+    }
 #  endif
-  if (exec_args.empty()) {
-    print_header();
-  }
-
-  for (unsigned int i = 1; i < nb_forks; ++i) {
-    if (fork()) {
-      break;
+    if (exec_args.empty()) {
+      print_header();
     }
-  }
 
-  if (!exec_args.empty()) {
-    std::vector<char *> new_args;
-    for (auto &a : exec_args) {
-      new_args.push_back(a.data());
+    for (unsigned int i = 1; i < nb_forks; ++i) {
+      if (fork()) {
+        break;
+      }
     }
-    execvp(new_args[0], new_args.data());
-    perror("Exec failed: ");
-    return 1;
-  }
 
-  auto wrapper_func =
-      get_wrapper_func((opts.use_shared_library ? WrapperOpts::kUseSharedLibrary
-                                                : WrapperOpts::kNone) |
-                       (opts.avoid_dlopen_hook ? WrapperOpts::kAvoidDLOpenHook
-                                               : WrapperOpts::kNone));
+    if (!exec_args.empty()) {
+      std::vector<char *> new_args;
+      for (auto &a : exec_args) {
+        new_args.push_back(a.data());
+      }
+      execvp(new_args[0], new_args.data());
+      perror("Exec failed: ");
+      return 1;
+    }
 
-  if (opts.initial_delay.count() > 0) {
-    std::this_thread::sleep_for(opts.initial_delay);
-  }
+    auto wrapper_func = get_wrapper_func(
+        (opts.use_shared_library ? WrapperOpts::kUseSharedLibrary
+                                 : WrapperOpts::kNone) |
+        (opts.avoid_dlopen_hook ? WrapperOpts::kAvoidDLOpenHook
+                                : WrapperOpts::kNone));
 
-  if (opts.avoid_dlopen_hook) {
-    // Do an allocation to force a recheck of loaded libraries:
-    // Loaded libs check is requested in a signal handler triggered by a timer,
-    // but check is done next time a hook is called.
-    void *p = malloc(1);
-    ddprof::DoNotOptimize(p);
-    free(p);
-  }
+    if (opts.initial_delay.count() > 0) {
+      std::this_thread::sleep_for(opts.initial_delay);
+    }
 
-  std::vector<std::thread> threads;
-  std::vector<Stats> stats{nb_threads};
-  for (unsigned int i = 1; i < nb_threads; ++i) {
-    threads.emplace_back(wrapper_func, std::cref(opts), std::ref(stats[i]));
-  }
-  wrapper_func(opts, stats[0]);
-  for (auto &t : threads) {
-    t.join();
-  }
+    if (opts.avoid_dlopen_hook) {
+      // Do an allocation to force a recheck of loaded libraries:
+      // Loaded libs check is requested in a signal handler triggered by a
+      // timer, but check is done next time a hook is called.
+      void *p = malloc(1);
+      ddprof::DoNotOptimize(p);
+      free(p);
+    }
 
-  auto pid = getpid();
-  for (auto &stat : stats) {
-    print_stats(pid, stat);
+    std::vector<std::thread> threads;
+    std::vector<Stats> stats{nb_threads};
+    for (unsigned int i = 1; i < nb_threads; ++i) {
+      threads.emplace_back(wrapper_func, std::cref(opts), std::ref(stats[i]));
+    }
+    wrapper_func(opts, stats[0]);
+    for (auto &t : threads) {
+      t.join();
+    }
+
+    auto pid = getpid();
+    for (auto &stat : stats) {
+      print_stats(pid, stat);
+    }
+  } catch (const std::exception &e) {
+    fprintf(stderr, "Caught exception: %s\n", e.what());
   }
 }
 

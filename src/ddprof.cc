@@ -5,10 +5,10 @@
 
 #include "ddprof.hpp"
 
-#include <errno.h>
+#include <cerrno>
 
-#include <signal.h>
-#include <stdio.h>
+#include <csignal>
+#include <cstdio>
 #include <sys/resource.h>
 #include <unistd.h>
 
@@ -29,38 +29,43 @@
 #  include <execinfo.h>
 #endif
 
+namespace ddprof {
+namespace {
 /*****************************  SIGSEGV Handler *******************************/
-static void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
+void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   // TODO this really shouldn't call printf-family functions...
   (void)uc;
 #ifdef __GLIBC__
-  static void *buf[4096] = {0};
-  size_t sz = backtrace(buf, 4096);
+  constexpr size_t k_stacktrace_buffer_size = 4096;
+  static void *buf[k_stacktrace_buffer_size] = {};
+  size_t sz = backtrace(buf, std::size(buf));
 #endif
-  fprintf(stderr, "ddprof[%d]: <%.*s> has encountered an error and will exit\n",
-          getpid(), static_cast<int>(str_version().size()),
-          str_version().data());
-  if (sig == SIGSEGV)
+  (void)fprintf(
+      stderr, "ddprof[%d]: <%.*s> has encountered an error and will exit\n",
+      getpid(), static_cast<int>(str_version().size()), str_version().data());
+  if (sig == SIGSEGV) {
     printf("[DDPROF] Fault address: %p\n", si->si_addr);
+  }
 #ifdef __GLIBC__
   backtrace_symbols_fd(buf, sz, STDERR_FILENO);
 #endif
   exit(-1);
 }
 
-void display_system_info(void) {
+void display_system_info() {
 
   // Don't stop if error as this is only for debug purpose
   if (IsDDResNotOK(log_capabilities(false))) {
     LG_ERR("Error when printing capabilities, continuing...");
   }
   int val;
-  if (IsDDResOK(ddprof::sys_perf_event_paranoid(val))) {
+  if (IsDDResOK(sys_perf_event_paranoid(val))) {
     LG_NFO("perf_event_paranoid : %d", val);
   } else {
     LG_WRN("Unable to access perf_event_paranoid setting");
   }
 }
+} // namespace
 
 DDRes ddprof_setup(DDProfContext &ctx) {
   PEventHdr *pevent_hdr = &ctx.worker_ctx.pevent_hdr;
@@ -122,5 +127,6 @@ DDRes ddprof_start_profiler(DDProfContext *ctx) {
 
   // Enter the main loop -- this will not return unless there is an error.
   LG_NFO("Entering main loop");
-  return ddprof::main_loop(&perf_funs, ctx);
+  return main_loop(&perf_funs, ctx);
 }
+} // namespace ddprof

@@ -12,12 +12,14 @@
 #include <array>
 #include <chrono>
 
-typedef struct DDProfExporter DDProfExporter;
-typedef struct DDProfPProf DDProfPProf;
-typedef struct PersistentWorkerState PersistentWorkerState;
-typedef struct StackHandler StackHandler;
-typedef struct UnwindState UnwindState;
-typedef struct UserTags UserTags;
+namespace ddprof {
+
+struct DDProfExporter;
+struct DDProfPProf;
+struct PersistentWorkerState;
+struct StackHandler;
+struct UnwindState;
+struct UserTags;
 
 // Mutable states within a worker
 struct DDProfWorkerContext {
@@ -33,9 +35,12 @@ struct DDProfWorkerContext {
   UserTags *user_tags{};
   ProcStatus proc_status{};
   std::chrono::steady_clock::time_point
-      cycle_start_time{};   // time at which current export cycle was started
-  int64_t send_nanos{0};    // Last time an export was sent
+      cycle_start_time{}; // time at which current export cycle was started
+  std::chrono::steady_clock::time_point
+      send_time{};          // Last time an export was sent
   uint32_t count_worker{0}; // exports since last cache clear
   std::array<uint64_t, MAX_TYPE_WATCHER> lost_events_per_watcher{};
-  ddprof::LiveAllocation live_allocation;
+  LiveAllocation live_allocation;
 };
+
+} // namespace ddprof

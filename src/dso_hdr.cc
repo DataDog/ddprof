@@ -34,7 +34,7 @@ uint32_t mode_string_to_prot(const char mode[4]) {
 }
 
 FileHolder open_proc_maps(int pid, const char *path_to_proc = "") {
-  char proc_map_filename[1024] = {};
+  char proc_map_filename[PATH_MAX] = {};
   auto n = snprintf(proc_map_filename, std::size(proc_map_filename),
                     "%s/proc/%d/maps", path_to_proc, pid);
   if (n < 0 ||
@@ -101,7 +101,8 @@ DsoHdr::DsoHdr(std::string_view path_to_proc, int dd_profiling_fd)
     // corresponding namespace, so this is easy to check
     char pid_str[sizeof("1073741824")] = {}; // Linux max pid/tid is 2^30
     if (-1 != readlink("/host/proc/self", pid_str, sizeof(pid_str)) &&
-        getpid() == strtol(pid_str, NULL, 10)) {
+        getpid() ==
+            strtol(pid_str, NULL, 10)) { // NOLINT(readability-magic-numbers)
       // @Datadog we often mount to /host the /proc files
       _path_to_proc = "/host";
     }
@@ -114,7 +115,7 @@ DsoHdr::DsoHdr(std::string_view path_to_proc, int dd_profiling_fd)
 
 namespace {
 bool string_readlink(const char *path, std::string &link_name) {
-  char buff[1024];
+  char buff[PATH_MAX];
   ssize_t len = ::readlink(path, buff, sizeof(buff) - 1);
   if (len != -1) {
     buff[len] = '\0';
@@ -126,7 +127,7 @@ bool string_readlink(const char *path, std::string &link_name) {
 } // namespace
 
 bool DsoHdr::find_exe_name(pid_t pid, std::string &exe_name) {
-  char exe_link[1024];
+  char exe_link[PATH_MAX];
   sprintf(exe_link, "%s/proc/%d/exe", _path_to_proc.c_str(), pid);
   return string_readlink(exe_link, exe_name);
 }
@@ -348,7 +349,8 @@ DsoHdr::DsoFindRes DsoHdr::insert_erase_overlap(Dso &&dso) {
 DsoHdr::DsoFindRes DsoHdr::dso_find_or_backpopulate(PidMapping &pid_mapping,
                                                     pid_t pid,
                                                     ElfAddress_t addr) {
-  if (addr < 4095) {
+  constexpr uint64_t k_zero_page_limit = 4096;
+  if (addr < k_zero_page_limit) {
     LG_DBG("[DSO] Skipping 0 page");
     return find_res_not_found(pid_mapping._map);
   }
@@ -395,8 +397,9 @@ bool DsoHdr::pid_backpopulate(PidMapping &pid_mapping, pid_t pid,
   auto proc_map_file_holder = open_proc_maps(pid, _path_to_proc.c_str());
   if (!proc_map_file_holder) {
     LG_DBG("[DSO] Failed to open procfs for %d", pid);
-    if (!process_is_alive(pid))
+    if (!process_is_alive(pid)) {
       LG_DBG("[DSO] Process nonexistant");
+    }
     return false;
   }
   char *buf = NULL;
@@ -448,7 +451,8 @@ Dso DsoHdr::dso_from_procline(int pid, char *line) {
   uint64_t m_inode = 0;
 
   // Check for formatting errors
-  if (7 !=
+  constexpr int k_expected_number_of_matches = 7;
+  if (k_expected_number_of_matches !=
       sscanf(line, spec, &m_start, &m_end, m_mode, &m_off, &m_dev_major,
              &m_dev_minor, &m_inode, &m_p)) {
     LG_ERR("[DSO] Failed to scan mapfile line");
@@ -456,11 +460,15 @@ Dso DsoHdr::dso_from_procline(int pid, char *line) {
   }
 
   // Make sure the name index points to a valid char
-  char *p = &line[m_p], *q;
-  while (isspace(*p))
+  char *p = &line[m_p];
+  char *q;
+  while (isspace(*p)) {
     p++;
-  if ((q = strchr(p, '\n')))
+  }
+  q = strchr(p, '\n');
+  if (q) {
     *q = '\0';
+  }
 
   // Should we store non exec dso ?
   return Dso(pid, m_start, m_end - 1, m_off, std::string(p), m_inode,

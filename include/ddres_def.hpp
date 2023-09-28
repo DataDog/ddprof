@@ -17,7 +17,7 @@ enum DD_RES_SEV {
 };
 
 /// Result structure containing a what / severity
-typedef struct DDRes {
+struct DDRes {
   union {
     // Not Enums as I could not specify size (except with gcc or c++)
     struct {
@@ -26,7 +26,7 @@ typedef struct DDRes {
     };
     int32_t _val;
   };
-} DDRes;
+};
 
 #define FillDDRes(res, sev, what)                                              \
   do {                                                                         \

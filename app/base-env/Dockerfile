@@ -78,7 +78,7 @@ RUN curl -L https://github.com/github/codeql-action/releases/download/codeql-bun
 ## LLVM/GCC SETUP ##
 ####################
 ADD ./app/base-env/llvm.sh ./app/base-env/gcc.sh /
-RUN /llvm.sh ${CLANG_VERSION}
+RUN /llvm.sh ${CLANG_VERSION} all
 RUN /gcc.sh ${GCC_VERSION}
 
 # Provides the llvm-symbolizer (better debug information in case of sanitizer issue)

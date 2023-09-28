@@ -15,6 +15,8 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
+namespace ddprof {
+
 // Simple test to see if mlock fails for large sizes
 TEST(MMapTest, Mlock32KB) {
   const int alloc_size = 32 * 1024; // 32 KB
@@ -105,3 +107,5 @@ TEST(MMapTest, Mirroring) {
   close(fd);
   ASSERT_EQ(perfdisown(region, mmap_size), 0);
 }
+
+} // namespace ddprof

@@ -83,7 +83,7 @@ private:
 
   AllocationTracker();
 
-  uint64_t next_sample_interval(std::minstd_rand &gen);
+  uint64_t next_sample_interval(std::minstd_rand &gen) const;
 
   DDRes init(uint64_t mem_profile_interval, bool deterministic_sampling,
              uint32_t stack_sample_size, const RingBufferInfo &ring_buffer);

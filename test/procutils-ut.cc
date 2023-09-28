@@ -9,6 +9,8 @@
 
 #include <unistd.h>
 
+namespace ddprof {
+
 TEST(ProcUtilsTest, proc_read) {
 
   ProcStatus procstat;
@@ -60,3 +62,5 @@ TEST(ProcUtilsTest, inode) {
     ASSERT_EQ(size, size_link);
   }
 }
+
+} // namespace ddprof

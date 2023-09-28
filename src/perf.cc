@@ -9,8 +9,8 @@
 #include "logger.hpp"
 
 #include <cassert>
+#include <cstring>
 #include <fcntl.h>
-#include <string.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
@@ -19,7 +19,11 @@
 
 #define DEFAULT_PAGE_SIZE 4096 // Concerned about hugepages?
 
-static long s_page_size = 0;
+namespace ddprof {
+
+namespace {
+long s_page_size = 0;
+}
 
 struct perf_event_attr g_dd_native_attr = {
     .size = sizeof(struct perf_event_attr),
@@ -35,15 +39,16 @@ struct perf_event_attr g_dd_native_attr = {
     .precise_ip = 2,
     .mmap_data = 0, // keep track of other mappings
     .sample_id_all = 1,
-    .sample_regs_user = PERF_REGS_MASK,
+    .sample_regs_user = k_perf_register_mask,
 };
 
 long get_page_size(void) {
   if (!s_page_size) {
     s_page_size = sysconf(_SC_PAGESIZE);
     // log if we have an unusual page size
-    if (s_page_size != DEFAULT_PAGE_SIZE)
+    if (s_page_size != DEFAULT_PAGE_SIZE) {
       LG_WRN("Page size is %ld", s_page_size);
+    }
   }
   return s_page_size;
 }
@@ -110,12 +115,13 @@ size_t get_mask_from_size(size_t size) {
 void *perfown_sz(int fd, size_t size_of_buffer) {
   // Map in the region representing the ring buffer, map the buffer twice
   // (minus metadata size) to avoid handling boundaries.
-  size_t total_length = 2 * size_of_buffer - get_page_size();
+  size_t const total_length = 2 * size_of_buffer - get_page_size();
   // Reserve twice the size of the buffer
   void *region =
       mmap(NULL, total_length, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  if (MAP_FAILED == region || !region)
+  if (MAP_FAILED == region || !region) {
     return NULL;
+  }
 
   auto defer_munmap = make_defer([&]() { perfdisown(region, size_of_buffer); });
 
@@ -125,14 +131,17 @@ void *perfown_sz(int fd, size_t size_of_buffer) {
   // That's why starts by mapping buffer on the second half of reserved
   // space and ensure that metadata page overlaps on the first part
   if (mmap(ptr + size_of_buffer - get_page_size(), size_of_buffer,
-           PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0) == MAP_FAILED)
+           PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd,
+           0) == MAP_FAILED) {
     return NULL;
+  }
 
   // Map buffer a second time on the first half of reserved space
   // It will overlap the metadata page of the previous mapping.
   if (mmap(ptr, size_of_buffer, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED,
-           fd, 0) == MAP_FAILED)
+           fd, 0) == MAP_FAILED) {
     return NULL;
+  }
 
   defer_munmap.release();
 
@@ -153,7 +162,6 @@ int perfdisown(void *region, size_t size) {
       : -1;
 }
 
-namespace ddprof {
 // return attr sorted by priority
 std::vector<perf_event_attr>
 all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras) {
@@ -172,8 +180,8 @@ uint64_t perf_value_from_sample(const PerfWatcher *watcher,
   uint64_t val = 0;
   if (watcher->value_source == EventConfValueSource::kRaw) {
     if (PERF_SAMPLE_RAW & watcher->sample_type) {
-      uint64_t raw_offset = watcher->raw_off;
-      uint64_t raw_sz = watcher->raw_sz;
+      uint64_t const raw_offset = watcher->raw_off;
+      uint64_t const raw_sz = watcher->raw_sz;
       if (raw_sz + raw_offset <= sample->size_raw) {
         assert(0 && "Overflow in raw event access");
         LG_WRN("Overflow in raw event access");
@@ -189,7 +197,7 @@ uint64_t perf_value_from_sample(const PerfWatcher *watcher,
       case 4:
         val = *(uint32_t *)(sample->data_raw + raw_offset);
         break;
-      case 8:
+      case 8: // NOLINT(readability-magic-numbers)
         val = *(uint64_t *)(sample->data_raw + raw_offset);
         break;
       default:
@@ -199,11 +207,10 @@ uint64_t perf_value_from_sample(const PerfWatcher *watcher,
         break;
       }
       return val;
-    } else { // unexpected config
-      assert(0 && "Inconsistent raw config between watcher and perf event");
-      LG_WRN("Unexpected watcher configuration -- No Raw events");
-      return 0;
-    }
+    } // unexpected config
+    assert(0 && "Inconsistent raw config between watcher and perf event");
+    LG_WRN("Unexpected watcher configuration -- No Raw events");
+    return 0;
   }
   // Register value
   if (watcher->value_source == EventConfValueSource::kRegister) {

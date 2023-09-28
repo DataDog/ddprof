@@ -25,7 +25,10 @@
 #  define VER_REV "custom"
 #endif
 
+namespace ddprof {
 /// Versions are updated in cmake files
 std::string_view str_version();
 
 void print_version();
+
+} // namespace ddprof

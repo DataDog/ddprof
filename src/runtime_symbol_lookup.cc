@@ -4,10 +4,10 @@
 // Datadog, Inc.
 
 #include <algorithm>
+#include <cstdio>
+#include <cstring>
 #include <iostream>
 #include <limits>
-#include <stdio.h>
-#include <string.h>
 #include <string>
 #include <vector>
 
@@ -27,7 +27,7 @@ namespace ddprof {
 
 FILE *RuntimeSymbolLookup::perfmaps_open(int pid,
                                          const char *path_to_perfmap = "") {
-  char buf[1024];
+  char buf[PATH_MAX];
   auto n = snprintf(buf, std::size(buf), "%s/proc/%d/root%s/perf-%d.map",
                     _path_to_proc.c_str(), pid, path_to_perfmap, pid);
   if (unsigned(n) >= std::size(buf)) { // unable to snprintf everything
@@ -101,7 +101,7 @@ bool is_absolute_path(std::string_view path) { return path.front() == '/'; }
 DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
                                              pid_t pid, SymbolMap &symbol_map,
                                              SymbolTable &symbol_table) {
-  char buf[1024];
+  char buf[PATH_MAX];
   int n = 0;
   if (is_absolute_path(jitdump_path)) {
     n = snprintf(buf, std::size(buf), "%s/proc/%d/root%s",
@@ -140,7 +140,7 @@ DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
   return ddres_init();
 }
 
-bool RuntimeSymbolLookup::should_skip_symbol(std::string_view symbol) const {
+bool RuntimeSymbolLookup::should_skip_symbol(std::string_view symbol) {
   // we could consider making this more efficient if the table grows
   return std::ranges::any_of(_ignored_symbols_start, [&symbol](auto &el) {
     return symbol.starts_with(el);
@@ -159,17 +159,21 @@ DDRes RuntimeSymbolLookup::fill_from_perfmap(int pid, SymbolMap &symbol_map,
   LG_DBG("Loading runtime symbols from (PID%d)", pid);
   char *line = NULL;
   size_t sz_buf = 0;
-  char buffer[2048];
+  char buffer[PATH_MAX];
   while (-1 != getline(&line, &sz_buf, pmf)) {
-    char address_buff[33]; // max size of 16 (as it should be hexa for uint64)
-    char size_buff[33];
+    constexpr size_t k_uint64_hex_rep_size = 2 * sizeof(uint64_t) + 1;
+    char address_buff[k_uint64_hex_rep_size]; // max size of 16 (as it should be
+                                              // hexa for uint64)
+    char size_buff[k_uint64_hex_rep_size];
     // Avoid considering any symbols beyond 300 chars
     if (3 !=
         sscanf(line, "%16s %8s %300[^\t\n]", address_buff, size_buff, buffer)) {
       continue;
     }
-    ProcessAddress_t address = std::strtoul(address_buff, nullptr, 16);
-    Offset_t code_size = std::strtoul(size_buff, nullptr, 16);
+    constexpr int hexadecimal_base = 16;
+    ProcessAddress_t address =
+        std::strtoul(address_buff, nullptr, hexadecimal_base);
+    Offset_t code_size = std::strtoul(size_buff, nullptr, hexadecimal_base);
     insert_or_replace(buffer, address, code_size, symbol_map, symbol_table);
   }
   free(line);

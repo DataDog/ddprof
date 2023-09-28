@@ -12,13 +12,11 @@ namespace ddprof {
 BuildIdStr format_build_id(BuildIdSpan build_id_span) {
   std::string build_id_str;
   // We encode every char on 2 hexa string characters
-  build_id_str.resize(build_id_span.size() * 2 + 1);
+  build_id_str.resize(build_id_span.size() * 2);
   for (unsigned i = 0; i < build_id_span.size(); ++i) {
-    snprintf(&build_id_str[static_cast<unsigned>(2 * i)], 3, "%02x",
-             static_cast<unsigned>(build_id_span[i]));
+    (void)snprintf(&build_id_str[static_cast<unsigned>(2 * i)], 3, "%02x",
+                   static_cast<unsigned>(build_id_span[i]));
   }
-  // remove trailing '\0'
-  build_id_str.resize(2 * build_id_span.size());
   return build_id_str;
 }
 

@@ -10,10 +10,12 @@
 
 #include <sys/types.h>
 
-// Takes into account number of watchers * number of CPUs
-#define MAX_NB_PERF_EVENT_OPEN 450
+namespace ddprof {
 
-typedef struct PEvent {
+// Takes into account number of watchers * number of CPUs
+inline constexpr size_t k_max_nb_perf_event_open{450};
+
+struct PEvent {
   int watcher_pos; // Index to the watcher (containing perf event config)
   int fd; // Underlying perf event FD for perf_events, otherwise an eventfd that
           // signals data is available in ring buffer
@@ -24,13 +26,15 @@ typedef struct PEvent {
   bool custom_event; // true if custom event (not handled by perf, eg. memory
                      // allocations)
   RingBuffer rb;     // metadata and buffers for processing perf ringbuffer
-} PEvent;
+};
 
-typedef struct PEventHdr {
-  PEvent pes[MAX_NB_PERF_EVENT_OPEN];
+struct PEventHdr {
+  PEvent pes[k_max_nb_perf_event_open];
   // Attributes of successful perf event opens
   size_t size;
   size_t max_size;
   perf_event_attr attrs[MAX_TYPE_WATCHER];
   size_t nb_attrs;
-} PEventHdr;
+};
+
+} // namespace ddprof

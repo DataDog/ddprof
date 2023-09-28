@@ -42,7 +42,7 @@ union pthread_attr_safe_t {
 
   // extra size to match glibc size
   // cppcheck-suppress unusedStructMember
-  char reserved[64];
+  char reserved[64]; // NOLINT(readability-magic-numbers)
 };
 } // namespace
 
@@ -51,7 +51,7 @@ int pthread_getattr_np_safe(pthread_t th, pthread_attr_t *attr) {
   // pad pthread_getattr_np argument with extra space to avoid out-of-bound
   // write on the stack
   pthread_attr_safe_t safe_attrs;
-  int res = pthread_getattr_np(th, &safe_attrs.attrs);
+  int const res = pthread_getattr_np(th, &safe_attrs.attrs);
   if (!res) {
     *attr = safe_attrs.attrs;
   }

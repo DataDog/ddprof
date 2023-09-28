@@ -9,17 +9,21 @@
 #include "perf_archmap.hpp"
 #include "perf_watcher.hpp"
 
+#include <chrono>
+#include <csignal>
 #include <linux/perf_event.h>
-#include <signal.h>
 #include <stdint.h>
 #include <vector>
 
-// defaut ring buffer size expressed as a power-of-two in number of pages
-#define DEFAULT_BUFF_SIZE_SHIFT 6
-// this does not count as pinned memory, use a larger size
-#define MPSC_BUFF_SIZE_SHIFT 8
+namespace ddprof {
 
-#define PSAMPLE_DEFAULT_WAKEUP_MS 100 // sample frequency check
+// defaut ring buffer size expressed as a power-of-two in number of pages
+inline constexpr int k_default_buffer_size_shift{8};
+// this does not count as pinned memory, use a larger size
+inline constexpr int k_mpsc_buffer_size_shift{8};
+
+// sample frequency check
+inline constexpr std::chrono::milliseconds k_sample_default_wakeup{100};
 
 struct read_format {
   uint64_t value;        // The value of the event
@@ -137,13 +141,13 @@ long get_page_size(void);
 size_t get_mask_from_size(size_t size);
 const char *perf_type_str(int type_id);
 
-namespace ddprof {
 std::vector<perf_event_attr>
 all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras);
 
 uint64_t perf_value_from_sample(const PerfWatcher *watcher,
                                 const perf_event_sample *sample);
-} // namespace ddprof
 
 perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
                                          bool extras);
+
+} // namespace ddprof

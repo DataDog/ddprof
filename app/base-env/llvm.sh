@@ -20,7 +20,7 @@ usage() {
     exit 1;
 }
 
-CURRENT_LLVM_STABLE=15
+CURRENT_LLVM_STABLE=17
 BASE_URL="http://apt.llvm.org"
 
 # Check for required tools
@@ -50,9 +50,9 @@ source /etc/os-release
 DISTRO=${DISTRO,,}
 case ${DISTRO} in
     debian)
-        if [[ "${VERSION}" == "unstable" ]] || [[ "${VERSION}" == "testing" ]] || [[ "${VERSION_CODENAME}" == "bookworm" ]]; then
-            # For now, bookworm == sid.
-            # TODO change when bookworm is released
+        # Debian Trixie has a workaround because of
+        # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1038383
+        if [[ "${VERSION}" == "unstable" ]] || [[ "${VERSION}" == "testing" ]] || [[ "${VERSION_CODENAME}" == "trixie" ]]; then
             CODENAME=unstable
             LINKNAME=
         else
@@ -125,7 +125,8 @@ LLVM_VERSION_PATTERNS[13]="-13"
 LLVM_VERSION_PATTERNS[14]="-14"
 LLVM_VERSION_PATTERNS[15]="-15"
 LLVM_VERSION_PATTERNS[16]="-16"
-LLVM_VERSION_PATTERNS[17]=""
+LLVM_VERSION_PATTERNS[17]="-17"
+LLVM_VERSION_PATTERNS[18]=""
 
 if [ ! ${LLVM_VERSION_PATTERNS[$LLVM_VERSION]+_} ]; then
     echo "This script does not support LLVM version $LLVM_VERSION"
@@ -163,11 +164,11 @@ if [[ -z "`apt-key list 2> /dev/null | grep -i llvm`" ]]; then
 fi
 add-apt-repository "${REPO_NAME}"
 apt-get update
-PKG="clang-$LLVM_VERSION lldb-$LLVM_VERSION lld-$LLVM_VERSION clangd-$LLVM_VERSION clang-format-$LLVM_VERSION"
+PKG="clang-$LLVM_VERSION lldb-$LLVM_VERSION lld-$LLVM_VERSION clangd-$LLVM_VERSION"
 if [[ $ALL -eq 1 ]]; then
     # same as in test-install.sh
     # No worries if we have dups
-    PKG="$PKG clang-tidy-$LLVM_VERSION clang-tools-$LLVM_VERSION llvm-$LLVM_VERSION-dev lld-$LLVM_VERSION lldb-$LLVM_VERSION llvm-$LLVM_VERSION-tools libomp-$LLVM_VERSION-dev libc++-$LLVM_VERSION-dev libc++abi-$LLVM_VERSION-dev libclang-common-$LLVM_VERSION-dev libclang-$LLVM_VERSION-dev libclang-cpp$LLVM_VERSION-dev libunwind-$LLVM_VERSION-dev"
+    PKG="$PKG clang-tidy-$LLVM_VERSION clang-format-$LLVM_VERSION clang-tools-$LLVM_VERSION llvm-$LLVM_VERSION-dev lld-$LLVM_VERSION lldb-$LLVM_VERSION llvm-$LLVM_VERSION-tools libomp-$LLVM_VERSION-dev libc++-$LLVM_VERSION-dev libc++abi-$LLVM_VERSION-dev libclang-common-$LLVM_VERSION-dev libclang-$LLVM_VERSION-dev libclang-cpp$LLVM_VERSION-dev libunwind-$LLVM_VERSION-dev"
     if test $LLVM_VERSION -gt 14; then
         PKG="$PKG libclang-rt-$LLVM_VERSION-dev libpolly-$LLVM_VERSION-dev"
     fi

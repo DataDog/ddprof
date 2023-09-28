@@ -15,9 +15,9 @@ using Tags = std::vector<Tag>;
 
 void split(std::string_view str_view, Tags &tags, char c = ',');
 
-} // namespace ddprof
-
 struct UserTags {
   UserTags(std::string_view tag_str, int nproc);
-  ddprof::Tags _tags;
+  Tags _tags;
 };
+
+} // namespace ddprof

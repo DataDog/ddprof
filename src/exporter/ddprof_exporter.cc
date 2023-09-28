@@ -13,51 +13,56 @@
 #include "tags.hpp"
 
 #include <algorithm>
-#include <assert.h>
-#include <errno.h>
+#include <cassert>
+#include <cerrno>
+#include <cstdio>
+#include <cstdlib>
+#include <ctime>
 #include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string>
 #include <string_view>
-#include <time.h>
 #include <unistd.h>
 #include <vector>
 
-static const int k_timeout_ms = 10000;
+namespace ddprof {
+
+namespace {
+constexpr int k_timeout_ms{10000};
+constexpr int k_max_nb_consecutive_errors_allowed{3};
 
 std::string alloc_url_agent(std::string_view protocol, std::string_view host,
                             std::string_view port) {
   if (!port.empty()) {
-    return ddprof::string_format(
-        "%.*s%.*s:%.*s", static_cast<int>(protocol.size()), protocol.data(),
-        static_cast<int>(host.size()), host.data(),
-        static_cast<int>(port.size()), port.data());
-  } else {
-    return ddprof::string_format("%.*s%.*s", static_cast<int>(protocol.size()),
-                                 protocol.data(), static_cast<int>(host.size()),
-                                 host.data());
+    return string_format("%.*s%.*s:%.*s", static_cast<int>(protocol.size()),
+                         protocol.data(), static_cast<int>(host.size()),
+                         host.data(), static_cast<int>(port.size()),
+                         port.data());
   }
+  return string_format("%.*s%.*s", static_cast<int>(protocol.size()),
+                       protocol.data(), static_cast<int>(host.size()),
+                       host.data());
 }
 
-static DDRes create_pprof_file(ddog_Timespec start,
-                               const char *dbg_pprof_prefix, int *fd) {
-  char time_start[128] = {};
+DDRes create_pprof_file(ddog_Timespec start, const char *dbg_pprof_prefix,
+                        int *fd) {
+  constexpr size_t k_max_time_length = 128;
+  char time_start[k_max_time_length] = {};
   tm tm_storage;
   tm *tm_start = gmtime_r(&start.seconds, &tm_storage);
-  strftime(time_start, sizeof time_start, "%Y%m%dT%H%M%SZ", tm_start);
+  strftime(time_start, std::size(time_start), "%Y%m%dT%H%M%SZ", tm_start);
 
-  char filename[400];
-  snprintf(filename, 400, "%s%s.pprof", dbg_pprof_prefix, time_start);
+  char filename[PATH_MAX];
+  snprintf(filename, std::size(filename), "%s%s.pprof", dbg_pprof_prefix,
+           time_start);
   LG_NTC("[EXPORTER] Writing pprof to file %s", filename);
-  (*fd) = open(filename, O_CREAT | O_RDWR, 0600);
+  constexpr int read_write_user_only = 0600;
+  (*fd) = open(filename, O_CREAT | O_RDWR, read_write_user_only);
   DDRES_CHECK_INT((*fd), DD_WHAT_EXPORTER, "Failure to create pprof file");
   return ddres_init();
 }
 
 /// Write pprof to a valid file descriptor : allows to use pprof tools
-static DDRes write_profile(const ddog_prof_EncodedProfile *encoded_profile,
-                           int fd) {
+DDRes write_profile(const ddog_prof_EncodedProfile *encoded_profile, int fd) {
   const ddog_Vec_U8 *buffer = &encoded_profile->buffer;
   if (write(fd, buffer->ptr, buffer->len) == 0) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER,
@@ -67,8 +72,8 @@ static DDRes write_profile(const ddog_prof_EncodedProfile *encoded_profile,
   return ddres_init();
 }
 
-static DDRes write_pprof_file(const ddog_prof_EncodedProfile *encoded_profile,
-                              const char *dbg_pprof_prefix) {
+DDRes write_pprof_file(const ddog_prof_EncodedProfile *encoded_profile,
+                       const char *dbg_pprof_prefix) {
   int fd = -1;
   DDRES_CHECK_FWD(
       create_pprof_file(encoded_profile->start, dbg_pprof_prefix, &fd));
@@ -89,6 +94,106 @@ bool contains_port(std::string_view url) {
   return std::all_of(port_sv.begin(), port_sv.end(), ::isdigit);
 }
 
+DDRes add_single_tag(ddog_Vec_Tag &tags_exporter, std::string_view key,
+                     std::string_view value) {
+  ddog_Vec_Tag_PushResult push_tag_res =
+      ddog_Vec_Tag_push(&tags_exporter, to_CharSlice(key), to_CharSlice(value));
+  if (push_tag_res.tag == DDOG_VEC_TAG_PUSH_RESULT_ERR) {
+    defer { ddog_Error_drop(&push_tag_res.err); };
+
+    LG_ERR("[EXPORTER] Failure generate tag (%.*s)",
+           (int)push_tag_res.err.message.len, push_tag_res.err.message.ptr);
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to generate tags");
+  }
+  return ddres_init();
+}
+
+DDRes fill_stable_tags(const UserTags *user_tags,
+                       const DDProfExporter *exporter,
+                       ddog_Vec_Tag &tags_exporter) {
+
+  // language is guaranteed to be filled
+  DDRES_CHECK_FWD(
+      add_single_tag(tags_exporter, "language",
+                     std::string_view(exporter->_input.language.data(),
+                                      exporter->_input.language.size())));
+
+  if (!exporter->_input.environment.empty()) {
+    DDRES_CHECK_FWD(
+        add_single_tag(tags_exporter, "env", exporter->_input.environment));
+  }
+
+  if (!exporter->_input.service_version.empty()) {
+    DDRES_CHECK_FWD(add_single_tag(tags_exporter, "version",
+                                   exporter->_input.service_version));
+  }
+
+  if (!exporter->_input.service.empty()) {
+    DDRES_CHECK_FWD(
+        add_single_tag(tags_exporter, "service", exporter->_input.service));
+  }
+
+  if (!exporter->_input.profiler_version.empty()) {
+    DDRES_CHECK_FWD(add_single_tag(
+        tags_exporter, "profiler_version",
+        std::string_view(exporter->_input.profiler_version.data(),
+                         exporter->_input.profiler_version.size())));
+  }
+
+  for (const auto &el : user_tags->_tags) {
+    DDRES_CHECK_FWD(add_single_tag(tags_exporter, el.first, el.second));
+  }
+  return ddres_init();
+}
+
+DDRes check_send_response_code(uint16_t send_response_code) {
+  constexpr int k_http_gateway_timeout = 504;
+  constexpr int k_http_forbidden = 403;
+  constexpr int k_http_not_found = 404;
+  constexpr int k_http_ok = 200;
+  constexpr int k_http_multiple_choices = 300;
+
+  LG_DBG("[EXPORTER] HTTP Response code: %u", send_response_code);
+  if (send_response_code >= k_http_ok &&
+      send_response_code < k_http_multiple_choices) {
+    // Although we expect only 200, this range represents sucessful sends
+    if (send_response_code != k_http_ok) {
+      LG_NTC("[EXPORTER] HTTP Response code %u (success)", send_response_code);
+    }
+    return ddres_init();
+  }
+  if (send_response_code == k_http_gateway_timeout) {
+    LG_WRN("[EXPORTER] Error 504 (Timeout) - Dropping profile");
+    // TODO - implement retry
+    return ddres_init();
+  }
+  if (send_response_code == k_http_forbidden) {
+    LG_ERR("[EXPORTER] Error 403 (Forbidden) - Check API key");
+    return ddres_error(DD_WHAT_EXPORTER);
+  }
+  if (send_response_code == k_http_not_found) {
+    LG_ERR("[EXPORTER] Error 404 (Not found) - Profiles not accepted");
+    return ddres_error(DD_WHAT_EXPORTER);
+  }
+  LG_WRN("[EXPORTER] Error sending data - HTTP code %u (continue profiling)",
+         send_response_code);
+  return ddres_init();
+}
+
+DDRes fill_cycle_tags(const Tags &additional_tags, uint32_t profile_seq,
+                      ddog_Vec_Tag &ffi_additional_tags) {
+
+  DDRES_CHECK_FWD(add_single_tag(ffi_additional_tags, "profile_seq",
+                                 std::to_string(profile_seq)));
+
+  for (const auto &el : additional_tags) {
+    DDRES_CHECK_FWD(add_single_tag(ffi_additional_tags, el.first, el.second));
+  }
+  return ddres_init();
+}
+
+} // namespace
+
 DDRes ddprof_exporter_init(const ExporterInput &exporter_input,
                            DDProfExporter *exporter) {
   exporter->_input = exporter_input;
@@ -108,12 +213,9 @@ DDRes ddprof_exporter_init(const ExporterInput &exporter_input,
     std::string port_str = exporter_input.port;
 
     if (!exporter_input.url.empty()) {
-      // uds -> no port
-      if (!strncasecmp(exporter_input.url.c_str(), "unix", 4)) {
-        port_str = {};
-      }
-      // already port -> no port
-      else if (contains_port(exporter_input.url)) {
+      // uds or already port -> no port
+      if (!strncasecmp(exporter_input.url.c_str(), "unix", 4) ||
+          contains_port(exporter_input.url)) {
         port_str = {};
       }
       // check if schema is already available
@@ -140,8 +242,8 @@ DDRes ddprof_exporter_init(const ExporterInput &exporter_input,
           "[EXPORTER] Agentless - Attempting to use host (%s) instead of empty "
           "url",
           exporter_input.host.c_str());
-      exporter->_url = alloc_url_agent("http://", exporter_input.host.c_str(),
-                                       exporter_input.port);
+      exporter->_url =
+          alloc_url_agent("http://", exporter_input.host, exporter_input.port);
     }
   }
   if (exporter->_url.empty()) {
@@ -152,54 +254,6 @@ DDRes ddprof_exporter_init(const ExporterInput &exporter_input,
   // Debug process : capture pprof to a folder
   exporter->_debug_pprof_prefix = exporter->_input.debug_pprof_prefix;
   exporter->_export = exporter->_input.do_export;
-  return ddres_init();
-}
-
-static DDRes add_single_tag(ddog_Vec_Tag &tags_exporter, std::string_view key,
-                            std::string_view value) {
-  ddog_Vec_Tag_PushResult push_tag_res =
-      ddog_Vec_Tag_push(&tags_exporter, to_CharSlice(key), to_CharSlice(value));
-  if (push_tag_res.tag == DDOG_VEC_TAG_PUSH_RESULT_ERR) {
-    defer { ddog_Error_drop(&push_tag_res.err); };
-
-    LG_ERR("[EXPORTER] Failure generate tag (%.*s)",
-           (int)push_tag_res.err.message.len, push_tag_res.err.message.ptr);
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to generate tags");
-  }
-  return ddres_init();
-}
-
-static DDRes fill_stable_tags(const UserTags *user_tags,
-                              const DDProfExporter *exporter,
-                              ddog_Vec_Tag &tags_exporter) {
-
-  // language is guaranteed to be filled
-  DDRES_CHECK_FWD(
-      add_single_tag(tags_exporter, "language",
-                     std::string_view(exporter->_input.language.data(),
-                                      exporter->_input.language.size())));
-
-  if (!exporter->_input.environment.empty())
-    DDRES_CHECK_FWD(
-        add_single_tag(tags_exporter, "env", exporter->_input.environment));
-
-  if (!exporter->_input.service_version.empty())
-    DDRES_CHECK_FWD(add_single_tag(tags_exporter, "version",
-                                   exporter->_input.service_version));
-
-  if (!exporter->_input.service.empty())
-    DDRES_CHECK_FWD(
-        add_single_tag(tags_exporter, "service", exporter->_input.service));
-
-  if (!exporter->_input.profiler_version.empty())
-    DDRES_CHECK_FWD(add_single_tag(
-        tags_exporter, "profiler_version",
-        std::string_view(exporter->_input.profiler_version.data(),
-                         exporter->_input.profiler_version.size())));
-
-  for (auto &el : user_tags->_tags) {
-    DDRES_CHECK_FWD(add_single_tag(tags_exporter, el.first, el.second));
-  }
   return ddres_init();
 }
 
@@ -233,49 +287,9 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
   return ddres_init();
 }
 
-static DDRes check_send_response_code(uint16_t send_response_code) {
-  LG_DBG("[EXPORTER] HTTP Response code: %u", send_response_code);
-  if (send_response_code >= 200 && send_response_code < 300) {
-    // Although we expect only 200, this range represents sucessful sends
-    if (send_response_code != 200) {
-      LG_NTC("[EXPORTER] HTTP Response code %u (success)", send_response_code);
-    }
-    return ddres_init();
-  }
-  if (send_response_code == 504) {
-    LG_WRN("[EXPORTER] Error 504 (Timeout) - Dropping profile");
-    // TODO - implement retry
-    return ddres_init();
-  }
-  if (send_response_code == 403) {
-    LG_ERR("[EXPORTER] Error 403 (Forbidden) - Check API key");
-    return ddres_error(DD_WHAT_EXPORTER);
-  }
-  if (send_response_code == 404) {
-    LG_ERR("[EXPORTER] Error 404 (Not found) - Profiles not accepted");
-    return ddres_error(DD_WHAT_EXPORTER);
-  }
-  LG_WRN("[EXPORTER] Error sending data - HTTP code %u (continue profiling)",
-         send_response_code);
-  return ddres_init();
-}
-
-static DDRes fill_cycle_tags(const ddprof::Tags &additional_tags,
-                             uint32_t profile_seq,
-                             ddog_Vec_Tag &ffi_additional_tags) {
-
-  DDRES_CHECK_FWD(add_single_tag(ffi_additional_tags, "profile_seq",
-                                 std::to_string(profile_seq)));
-
-  for (const auto &el : additional_tags) {
-    DDRES_CHECK_FWD(add_single_tag(ffi_additional_tags, el.first, el.second));
-  }
-  return ddres_init();
-}
-
 DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
-                             const ddprof::Tags &additional_tags,
-                             uint32_t profile_seq, DDProfExporter *exporter) {
+                             const Tags &additional_tags, uint32_t profile_seq,
+                             DDProfExporter *exporter) {
   DDRes res = ddres_init();
   ddog_prof_Profile_SerializeResult serialized_result =
       ddog_prof_Profile_serialize(profile, nullptr, nullptr);
@@ -340,7 +354,7 @@ DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
                result.err.message.ptr);
         // Free error buffer (prefer this API to the free API)
         if (exporter->_nb_consecutive_errors++ >=
-            K_NB_CONSECUTIVE_ERRORS_ALLOWED) {
+            k_max_nb_consecutive_errors_allowed) {
           // this will shut down profiler
           res = ddres_error(DD_WHAT_EXPORTER);
         } else {
@@ -362,8 +376,11 @@ DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
 }
 
 DDRes ddprof_exporter_free(DDProfExporter *exporter) {
-  if (exporter->_exporter)
+  if (exporter->_exporter) {
     ddog_prof_Exporter_drop(exporter->_exporter);
+  }
   exporter->_exporter = nullptr;
   return ddres_init();
 }
+
+} // namespace ddprof

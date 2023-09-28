@@ -13,6 +13,13 @@
 
 namespace ddprof {
 
+namespace {
+void add_frame_without_mapping(UnwindState *us, SymbolIdx_t symbol_idx) {
+  add_frame(symbol_idx, -1, 0, us);
+}
+
+} // namespace
+
 bool is_max_stack_depth_reached(const UnwindState &us) {
   // +2 to keep room for common base frame
   return us.output.locs.size() + 2 >= DD_MAX_STACK_DEPTH;
@@ -45,10 +52,6 @@ DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
   return ddres_init();
 }
 
-static void add_frame_without_mapping(UnwindState *us, SymbolIdx_t symbol_idx) {
-  add_frame(symbol_idx, -1, 0, us);
-}
-
 void add_common_frame(UnwindState *us, SymbolErrors lookup_case) {
   add_frame_without_mapping(us,
                             us->symbol_hdr._common_symbol_lookup.get_or_insert(
@@ -77,13 +80,15 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, int regno,
   *result = 0;
   struct UnwindState *us = (UnwindState *)arg;
 
-  if (addr < 4095) {
+  constexpr uint64_t k_zero_page_limit = 4096;
+  if (addr < k_zero_page_limit) {
     LG_DBG("[MEMREAD] Skipping 0 page");
     return false;
   }
 
-  if ((addr & 0x7) != 0) {
-    // The address is not 8-bit aligned here
+  constexpr uint64_t k_expected_address_alignment = 8;
+  if ((addr & (k_expected_address_alignment - 1)) != 0) {
+    // The address is not 8 bytes aligned here
     LG_DBG("Addr is not aligned 0x%lx", addr);
     return false;
   }
@@ -109,7 +114,8 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, int regno,
   uint64_t sp_start = us->initial_regs.regs[REGNAME(SP)];
   uint64_t sp_end = sp_start + us->stack_sz;
 
-  if (addr < sp_start && addr > sp_start - 4096) {
+  uint64_t constexpr k_page_size = 4096;
+  if (addr < sp_start && addr > sp_start - k_page_size) {
     // Sometime DWARF emits CFI instructions that require reads below SP
     // (in the 128-byte red zone beyond SP)
     // This often occurs in function epilogues, for example in libc-2.31.so
@@ -192,7 +198,8 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, int regno,
     LG_DBG("Invalid stack access:%lu before SP", sp_start - addr);
 #endif
     return false;
-  } else if (addr < sp_start || addr + sizeof(ElfWord_t) > sp_end) {
+  }
+  if (addr < sp_start || addr + sizeof(ElfWord_t) > sp_end) {
     // We used to look within the binaries when then matched mapped binaries.
     // Though looking at the cases when this occured, it was not useful.
     // Dwarf should not need to look inside binaries to define how to unwind.

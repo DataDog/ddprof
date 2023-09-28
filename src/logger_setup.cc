@@ -10,10 +10,12 @@
 
 #include <array>
 
+namespace ddprof {
+
 void setup_logger(const char *log_mode, const char *log_level) {
   // Process logging mode
   char const *logpattern[] = {"stdout", "stderr", "syslog", "disabled"};
-  int idx_log_mode = log_mode
+  int const idx_log_mode = log_mode
       ? arg_which(log_mode, logpattern, std::size(logpattern))
       : 0; // default to stdout
   switch (idx_log_mode) {
@@ -47,12 +49,15 @@ void setup_logger(const char *log_mode, const char *log_level) {
   case 2:
     LOG_setlevel(LL_NOTICE);
     break;
-  case -1: // default
-  case 3:
-    LOG_setlevel(LL_WARNING);
-    break;
   case 4:
     LOG_setlevel(LL_ERROR);
     break;
+  case -1: // default
+  case 3:
+  default:
+    LOG_setlevel(LL_WARNING);
+    break;
   }
 }
+
+} // namespace ddprof

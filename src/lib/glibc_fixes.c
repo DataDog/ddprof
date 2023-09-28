@@ -38,7 +38,7 @@ extern int fstat(int fd, struct stat *buf)
 extern int stat(const char *pathname, struct stat *buf)
     __attribute__((weak, alias("__stat")));
 
-// NOLINTNEXTLINE cert-dcl51-cpp
+// NOLINTNEXTLINE(cert-dcl51-cpp)
 __attribute__((unused)) int __fstat(int fd, struct stat *buf) {
   if (__fxstat) {
     // __fxstat is available call it directly
@@ -59,7 +59,7 @@ __attribute__((unused)) int __fstat(int fd, struct stat *buf) {
   return -1;
 }
 
-// NOLINTNEXTLINE cert-dcl51-cpp
+// NOLINTNEXTLINE(cert-dcl51-cpp)
 __attribute__((unused)) int __stat(const char *pathname, struct stat *buf) {
   if (__xstat) {
     // __xstat is available call it directly

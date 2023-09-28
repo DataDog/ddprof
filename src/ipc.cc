@@ -5,11 +5,11 @@
 
 #include "ipc.hpp"
 
-#include <errno.h>
+#include <cerrno>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <netinet/in.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -71,7 +71,7 @@ void UnixSocket::set_read_timeout(std::chrono::microseconds duration,
       ec);
 }
 
-void UnixSocket::send(ConstBuffer buffer, std::error_code &ec) noexcept {
+void UnixSocket::send(ConstBuffer buffer, std::error_code &ec) const noexcept {
   size_t written = 0;
   do {
     written += send_partial(remaining(buffer, written), ec);
@@ -79,7 +79,7 @@ void UnixSocket::send(ConstBuffer buffer, std::error_code &ec) noexcept {
 }
 
 size_t UnixSocket::send_partial(ConstBuffer buffer,
-                                std::error_code &ec) noexcept {
+                                std::error_code &ec) const noexcept {
   ssize_t ret;
   do {
     ret = ::send(_handle.get(), buffer.data(), buffer.size(), 0);
@@ -91,8 +91,8 @@ size_t UnixSocket::send_partial(ConstBuffer buffer,
 }
 
 void UnixSocket::send(ConstBuffer buffer, std::span<const int> fds,
-                      std::error_code &ec) noexcept {
-  size_t written = send_partial(buffer, fds, ec);
+                      std::error_code &ec) const noexcept {
+  size_t const written = send_partial(buffer, fds, ec);
 
   if (!ec && written < buffer.size()) {
     send(remaining(buffer, written), ec);
@@ -100,7 +100,7 @@ void UnixSocket::send(ConstBuffer buffer, std::span<const int> fds,
 }
 
 size_t UnixSocket::send_partial(ConstBuffer buffer, std::span<const int> fds,
-                                std::error_code &ec) noexcept {
+                                std::error_code &ec) const noexcept {
   msghdr msg = {};
   if (fds.size() > kMaxFD || buffer.empty()) {
     return -1;
@@ -124,7 +124,7 @@ size_t UnixSocket::send_partial(ConstBuffer buffer, std::span<const int> fds,
     cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
     // musl use a smaller type for cmsg_len with extra padding
     // if this padding is not initialized to zero, if will be wrongly
-    // interpreted as part of cmsg_len by glic
+    // interpreted as part of cmsg_len by glibc
     *cmsg = {};
     cmsg->cmsg_level = SOL_SOCKET;
     cmsg->cmsg_type = SCM_RIGHTS;
@@ -142,7 +142,7 @@ size_t UnixSocket::send_partial(ConstBuffer buffer, std::span<const int> fds,
 }
 
 size_t UnixSocket::receive(std::span<std::byte> buffer,
-                           std::error_code &ec) noexcept {
+                           std::error_code &ec) const noexcept {
   size_t read = 0;
 
   do {
@@ -153,7 +153,7 @@ size_t UnixSocket::receive(std::span<std::byte> buffer,
 }
 
 size_t UnixSocket::receive_partial(std::span<std::byte> buffer,
-                                   std::error_code &ec) noexcept {
+                                   std::error_code &ec) const noexcept {
   ssize_t ret;
   do {
     ret = ::recv(_handle.get(), buffer.data(), buffer.size(), 0);
@@ -169,9 +169,9 @@ size_t UnixSocket::receive_partial(std::span<std::byte> buffer,
   return ret < 0 ? 0 : ret;
 }
 
-std::pair<size_t, size_t> UnixSocket::receive(std::span<std::byte> buffer,
-                                              std::span<int> fds,
-                                              std::error_code &ec) noexcept {
+std::pair<size_t, size_t>
+UnixSocket::receive(std::span<std::byte> buffer, std::span<int> fds,
+                    std::error_code &ec) const noexcept {
   auto [read, read_fds] = receive_partial(buffer, fds, ec);
   if (!ec && read < buffer.size()) {
     read += receive(remaining(buffer, read), ec);
@@ -181,7 +181,7 @@ std::pair<size_t, size_t> UnixSocket::receive(std::span<std::byte> buffer,
 
 std::pair<size_t, size_t>
 UnixSocket::receive_partial(std::span<std::byte> buffer, std::span<int> fds,
-                            std::error_code &ec) noexcept {
+                            std::error_code &ec) const noexcept {
 
   msghdr msgh = {};
 
@@ -224,7 +224,7 @@ UnixSocket::receive_partial(std::span<std::byte> buffer, std::span<int> fds,
     return {nr, 0};
   }
 
-  int nfds =
+  int const nfds =
       (cmsgp->cmsg_len - CMSG_ALIGN(sizeof(struct cmsghdr))) / sizeof(int);
   if (nfds == 0) {
     return {nr, 0};
@@ -249,7 +249,8 @@ DDRes send(UnixSocket &socket, const RequestMessage &msg) {
 
 DDRes send(UnixSocket &socket, const ReplyMessage &msg) {
   int fds[2] = {msg.ring_buffer.ring_fd, msg.ring_buffer.event_fd};
-  std::span<int> fd_span{fds, (msg.ring_buffer.mem_size != -1) ? 2ul : 0ul};
+  std::span<int> const fd_span{fds,
+                               (msg.ring_buffer.mem_size != -1) ? 2UL : 0UL};
   std::error_code ec;
   socket.send(to_byte_span(&msg), fd_span, ec);
   DDRES_CHECK_ERRORCODE(ec, DD_WHAT_SOCKET, "Unable to send response message");
@@ -295,10 +296,10 @@ Client::Client(UnixSocket &&socket, std::chrono::microseconds timeout)
 }
 
 ReplyMessage Client::get_profiler_info() {
-  RequestMessage request = {.request = RequestMessage::kProfilerInfo};
-  DDRES_CHECK_THROW_EXCEPTION(send(_socket, request));
+  RequestMessage const request = {.request = RequestMessage::kProfilerInfo};
+  send(_socket, request);
   ReplyMessage reply;
-  DDRES_CHECK_THROW_EXCEPTION(ddprof::receive(_socket, reply));
+  receive(_socket, reply);
   return reply;
 }
 
@@ -317,9 +318,9 @@ Server::Server(UnixSocket &&socket, std::chrono::microseconds timeout)
 
 void Server::waitForRequest(ReplyFunc func) {
   RequestMessage request;
-  DDRES_CHECK_THROW_EXCEPTION(ddprof::receive(_socket, request));
-  ReplyMessage reply = func(request);
-  DDRES_CHECK_THROW_EXCEPTION(ddprof::send(_socket, reply));
+  receive(_socket, request);
+  ReplyMessage const reply = func(request);
+  send(_socket, reply);
 }
 
 } // namespace ddprof

@@ -12,9 +12,9 @@
 #include "logger.hpp"
 
 #include <cerrno>
+#include <cstring>
 #include <grp.h>
 #include <pwd.h>
-#include <string.h>
 #include <sys/prctl.h>
 #include <sys/types.h>
 #include <unistd.h>

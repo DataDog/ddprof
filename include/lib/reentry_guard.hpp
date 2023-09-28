@@ -15,8 +15,8 @@ class ThreadEntries {
 public:
   static constexpr size_t max_threads = 10;
   std::array<std::atomic<pid_t>, max_threads> thread_entries;
-  ThreadEntries() { reset(); }
-  void reset() {
+  ThreadEntries() noexcept { reset(); }
+  void reset() noexcept {
     for (auto &entry : thread_entries) {
       entry.store(-1, std::memory_order_relaxed);
     }

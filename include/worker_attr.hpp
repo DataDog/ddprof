@@ -5,10 +5,16 @@
 
 #pragma once
 
-typedef struct DDProfContext DDProfContext;
-typedef struct PersistentWorkerState PersistentWorkerState;
+#include "ddres_def.hpp"
 
-typedef struct WorkerAttr {
+namespace ddprof {
+
+struct DDProfContext;
+struct PersistentWorkerState;
+
+struct WorkerAttr {
   DDRes (*init_fun)(DDProfContext &ctx, PersistentWorkerState *);
   DDRes (*finish_fun)(DDProfContext &ctx);
-} WorkerAttr;
+};
+
+} // namespace ddprof

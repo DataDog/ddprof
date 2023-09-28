@@ -9,6 +9,8 @@
 #include <gtest/gtest.h>
 #include <stdio.h>
 
+namespace ddprof {
+
 const char cmp_fmt[] = "Mismatch in %s, 0x%lx != 0x%lx";
 #define SAMPLE_COMPARE(field)                                                  \
   if (s1->field != s2->field) {                                                \
@@ -71,8 +73,8 @@ TEST(PerfRingbufferTest, SampleSymmetryx86) {
   char default_raw[16] = {0};
   for (uint64_t i = 0; i < sizeof(default_raw) / sizeof(*default_raw); i++)
     default_raw[i] = (i + 11) & 255;
-  uint64_t default_regs[PERF_REGS_COUNT] = {};
-  for (int i = 0; i < PERF_REGS_COUNT; ++i) {
+  uint64_t default_regs[k_perf_register_count] = {};
+  for (size_t i = 0; i < k_perf_register_count; ++i) {
     default_regs[i] = 1ull << i;
   }
   struct perf_event_sample sample = {};
@@ -107,3 +109,5 @@ TEST(PerfRingbufferTest, SampleSymmetryx86) {
   // Compare
   ASSERT_TRUE(sample_eq(&sample, sample_new));
 }
+
+} // namespace ddprof

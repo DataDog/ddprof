@@ -17,9 +17,9 @@
 #include <unordered_map>
 #include <unordered_set>
 
-typedef struct UnwindState UnwindState;
-
 namespace ddprof {
+
+struct UnwindState;
 
 struct DwflWrapper {
   explicit DwflWrapper();

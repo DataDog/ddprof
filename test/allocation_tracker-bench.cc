@@ -11,6 +11,8 @@
 #include "loghandle.hpp"
 #include "ringbuffer_holder.hpp"
 
+namespace ddprof {
+
 // Global bench settings
 // Activate live heap tracking
 // #define LIVE_HEAP
@@ -277,3 +279,5 @@ BENCHMARK(BM_ShortLived_Tracking)->MeasureProcessCPUTime()->UseRealTime();
 // longer lived threads (worker threads)
 BENCHMARK(BM_LongLived_NoTracking)->MeasureProcessCPUTime();
 BENCHMARK(BM_LongLived_Tracking)->MeasureProcessCPUTime();
+
+} // namespace ddprof

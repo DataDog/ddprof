@@ -5,11 +5,11 @@
 
 #include "signal_helper.hpp"
 
-#include <errno.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <cerrno>
+#include <csignal>
+#include <cstdio>
+#include <cstdlib>
 
 bool process_is_alive(int pidId) {
-  return !(-1 == kill(pidId, 0) && errno == ESRCH);
+  return -1 != kill(pidId, 0) || errno != ESRCH;
 }

@@ -5,7 +5,9 @@
 
 #pragma once
 
-typedef struct ProcStatus {
+namespace ddprof {
+
+struct ProcStatus {
   int pid;
   char comm[32];
   char state;
@@ -58,4 +60,6 @@ typedef struct ProcStatus {
   unsigned long env_start;
   unsigned long env_end;
   int exit_code;
-} ProcStatus;
+};
+
+} // namespace ddprof

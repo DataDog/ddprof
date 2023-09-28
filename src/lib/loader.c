@@ -19,8 +19,8 @@
 #include <time.h>
 #include <unistd.h>
 
-/* Role of loader is to ensure that all dependencies (libdl/lim/lipthread) of
- * libdd_profiling-embedded.so are satisfied before dlopening it.
+/* Role of loader is to ensure that all dependencies (libdl/lim/libpthread) of
+ * libdd_profiling-embedded.so are satisfied before dlopen'ing it.
  * On musl, all libc features are in libc.so and hence are available once libc
  * is loaded.
  * Whereas on glibc, some features are in their own lib (this is
@@ -35,20 +35,20 @@
  * dependencies are available.
  * Note that libdd_profiling cannot depend on libdl/libm/libpthread since those
  * do not exist on musl. Even libc has a different name (libc.so.6 vs
- * libc.musl-x86_64.so.1), that is why libloader and libdd_profiling do not
+ * libc.musl-x86_64.so.1), that is why libdd_loader and libdd_profiling do not
  * depend explicitly on libc but rely on the target process loading libc (this
  * will not work if target process does not depend on libc, but in that case,
  * libdd_profiling will not be able to intercept allocations anyway).
- * Loader load missing dependencies by dlopening them., since dlopen may not be
+ * Loader load missing dependencies by dlopen'ing them, since dlopen may not be
  * available, it falls back to using __libc_dlopen_mode, an internal libc.so.6
  * function implementing dlopen, in that case.
  */
 char *dlerror(void) __attribute__((weak));
 void *dlopen(const char *filename, int flags) __attribute__((weak));
 void *dlsym(void *handle, const char *symbol) __attribute__((weak));
-// NOLINTNEXTLINE cert-dcl51-cpp
+// NOLINTNEXTLINE(cert-dcl51-cpp)
 void *__libc_dlopen_mode(const char *filename, int flag) __attribute__((weak));
-// NOLINTNEXTLINE cert-dcl51-cpp
+// NOLINTNEXTLINE(cert-dcl51-cpp)
 void *__libc_dlsym(void *handle, const char *symbol) __attribute__((weak));
 int pthread_cancel(pthread_t thread) __attribute__((weak));
 double log(double x) __attribute__((weak));
@@ -80,7 +80,7 @@ static void *my_dlopen(const char *filename, int flags) {
 static void *my_dlsym(void *handle, const char *symbol) {
   static __typeof(dlsym) *dlsym_ptr = &dlsym;
   if (!dlsym_ptr) {
-    // dlysm is not available: meaning we are on glibc and libdl.so was not
+    // dlsym is not available: meaning we are on glibc and libdl.so was not
     // loaded at startup
 
     // First ensure that libdl.so is loaded

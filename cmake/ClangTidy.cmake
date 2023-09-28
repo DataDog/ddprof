@@ -2,10 +2,7 @@ option(ENABLE_CLANG_TIDY "Run clang-tidy with the compiler." OFF)
 if(ENABLE_CLANG_TIDY)
   find_program(CLANG_TIDY_COMMAND NAMES clang-tidy)
   if(NOT CLANG_TIDY_COMMAND)
-    message(WARNING "CMake_RUN_CLANG_TIDY is ON but clang-tidy is not found!")
-    set(CMAKE_CXX_CLANG_TIDY
-        ""
-        CACHE STRING "" FORCE)
+    message(ERROR "CMake_RUN_CLANG_TIDY is ON but clang-tidy is not found!")
   else()
     set(CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND};-header-filter='${CMAKE_SOURCE_DIR}/include/*'")
   endif()
