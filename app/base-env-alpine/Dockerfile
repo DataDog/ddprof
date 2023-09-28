@@ -23,6 +23,7 @@ RUN apk update \
     ca-certificates \
     clang \
     cmake \
+    coreutils \
     cppcheck \
     curl \
     flex \
@@ -31,6 +32,7 @@ RUN apk update \
     gcovr \
     gdb \
     git \
+    grep \
     gtest-dev \
     libcap-dev \
     libcap-static \
