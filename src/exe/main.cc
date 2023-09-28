@@ -123,6 +123,8 @@ static DDRes get_library_path(TempFileHolder &libdd_profiling_path,
   std::string profiling_path;
   std::string loader_path;
 
+  // If not forbidden by env variable, try first to locate profiling and loader
+  // libs in ddprof exe directory. This makes debugging easier.
   if (!getenv(k_profiler_use_embedded_libdd_profiling_env_variable)) {
     profiling_path = find_lib(k_libdd_profiling_embedded_name);
     loader_path = find_lib(k_libdd_loader_name);
