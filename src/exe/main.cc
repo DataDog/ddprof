@@ -182,8 +182,9 @@ static DDRes parse_input(const ddprof::DDProfCLI &ddprof_cli,
   return {};
 }
 
-static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
-  is_profiler = false;
+int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
+                            bool &exit_on_return) {
+  exit_on_return = false;
 
   if (!ctx->params.enable) {
     LG_WRN("Profiling disabled");
@@ -231,7 +232,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
 
     if (daemonize_res.state == ddprof::DaemonizeResult::IntermediateProcess) {
       // temp intermediate process,: return and exit
-      is_profiler = true;
+      exit_on_return = true;
       return 0;
     }
 
@@ -272,7 +273,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
   }
 
   // Now, we are the profiler process
-  is_profiler = true;
+  exit_on_return = true;
 
   ddprof::init_tsc();
 
@@ -379,7 +380,7 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
   maybe_slowdown_startup();
 
   // Now enter profiling
-  DDRes res = ddprof_start_profiler(ctx);
+  DDRes const res = ddprof_start_profiler(ctx.get());
   if (IsDDResNotOK(res)) {
     // Some kind of error; tell the user about what happened in one line
     LG_ERR("Profiling terminated (%s)", ddres_error_message(res._what));
@@ -393,13 +394,12 @@ static int start_profiler_internal(DDProfContext *ctx, bool &is_profiler) {
 }
 
 // This function only returns in wrapper mode for control (non-ddprof) process
-static void start_profiler(DDProfContext *ctx) {
-  bool is_profiler = false;
+static void start_profiler(std::unique_ptr<DDProfContext> ctx) {
+  bool exit_on_return = false;
 
   // ownership of context is passed to start_profiler_internal
-  int res = start_profiler_internal(ctx, is_profiler);
-  if (is_profiler) {
-    delete ctx;
+  int res = start_profiler_internal(std::move(ctx), exit_on_return);
+  if (exit_on_return) {
     exit(res);
   }
   // In wrapper mode (ie. ctx->params.pid == 0), whatever happened to ddprof,
@@ -413,8 +413,7 @@ int main(int argc, char *argv[]) {
   {
     // Use a dynamic allocation to allow clean up
     // in other exit flows
-    DDProfContext *ctx = new DDProfContext();
-    defer { delete ctx; };
+    auto ctx = std::make_unique<DDProfContext>();
     {
       ddprof::DDProfCLI cli;
       int res = cli.parse(argc, const_cast<const char **>(argv));
@@ -431,17 +430,20 @@ int main(int argc, char *argv[]) {
 
     } // cli is destroyed here (prevents forks from having an instance of CLI
 
+    // Save switch_user since ctx will be destroyed after call to start_profiler
+    std::string switch_user = ctx->params.switch_user;
+
     /**************************************************************************\
     |                             Run the Profiler |
     \**************************************************************************/
     // Ownership of context is passed to start_profiler
     // This function does not return in the context of profiler process
     // It only returns in the context of target process (ie. in non-PID mode)
-    start_profiler(ctx);
+    start_profiler(std::move(ctx));
 
-    if (!ctx->params.switch_user.empty()) {
-      if (!IsDDResOK(become_user(ctx->params.switch_user.c_str()))) {
-        LG_ERR("Failed to switch to user %s", ctx->params.switch_user.c_str());
+    if (!switch_user.empty()) {
+      if (!IsDDResOK(become_user(switch_user.c_str()))) {
+        LG_ERR("Failed to switch to user %s", switch_user.c_str());
         return -1;
       }
     }
