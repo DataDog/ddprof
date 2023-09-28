@@ -80,7 +80,7 @@ template <typename T> class box {
 public:
   template <typename TT, typename GG>
     requires std::is_constructible_v<T, TT>
-  explicit box(TT &&t, GG &&guard) noexcept(noexcept(box((T &&)t)))
+  explicit box(TT &&t, GG &&guard) noexcept(noexcept(box((T &&) t)))
       : box(std::forward<TT>(t)) {
     guard.release();
   }
@@ -102,7 +102,7 @@ template <typename T> class box<T &> {
 public:
   template <typename TT, typename GG>
     requires std::is_convertible_v<TT, T &>
-  box(TT &&t, GG &&guard) noexcept(noexcept(static_cast<T &>((TT &&)t)))
+  box(TT &&t, GG &&guard) noexcept(noexcept(static_cast<T &>((TT &&) t)))
       : value(static_cast<T &>(t)) {
     guard.release();
   }
@@ -265,8 +265,8 @@ public: // should be private
                                          detail::_empty_scope_exit>
   unique_resource(RR &&r, DD &&d, bool should_run) noexcept(
       noexcept(detail::box<R>(std::forward<RR>(r), detail::_empty_scope_exit{}))
-          && noexcept(detail::box<D>(std::forward<DD>(d),
-                                     detail::_empty_scope_exit{})))
+          &&noexcept(detail::box<D>(std::forward<DD>(d),
+                                    detail::_empty_scope_exit{})))
       : resource(std::forward<RR>(r), scope_exit([&] {
                    if (should_run)
                      d(r);
@@ -302,16 +302,16 @@ public:
                                          detail::_empty_scope_exit>
   unique_resource(RR &&r, DD &&d) noexcept(
       noexcept(detail::box<R>(std::forward<RR>(r), detail::_empty_scope_exit{}))
-          && noexcept(detail::box<D>(std::forward<DD>(d),
-                                     detail::_empty_scope_exit{})))
+          &&noexcept(detail::box<D>(std::forward<DD>(d),
+                                    detail::_empty_scope_exit{})))
       : resource(std::forward<RR>(r), scope_exit([&] { d(r); })),
         deleter(std::forward<DD>(d), scope_exit([&, this] { d(get()); })),
         execute_on_destruction{true} {}
   unique_resource(unique_resource &&that) noexcept(
       noexcept(detail::box<R>(that.resource.move(),
                               detail::_empty_scope_exit{}))
-          && noexcept(detail::box<D>(that.deleter.move(),
-                                     detail::_empty_scope_exit{})))
+          &&noexcept(detail::box<D>(that.deleter.move(),
+                                    detail::_empty_scope_exit{})))
       : resource(that.resource.move(), detail::_empty_scope_exit{}),
         deleter(that.deleter.move(), scope_exit([&, this] {
                   if (that.execute_on_destruction)

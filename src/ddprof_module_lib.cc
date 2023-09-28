@@ -10,6 +10,7 @@
 #include "defer.hpp"
 #include "logger.hpp"
 
+#include <algorithm>
 #include <cstring>
 #include <fcntl.h>
 #include <gelf.h>
@@ -104,14 +105,16 @@ find_matching_segment(std::span<const Segment> segments,
 
 MatchResult find_match(std::span<const Mapping> executable_mappings,
                        std::span<const Segment> elf_load_segments) {
-  int nb_mappings = executable_mappings.size();
+  unsigned nb_mappings = executable_mappings.size();
 
   MatchResult res = {nullptr, nullptr, false};
-  for (int mapping_idx = nb_mappings - 1; mapping_idx >= 0; --mapping_idx) {
+  int max_segments =
+      std::min(nb_mappings, static_cast<unsigned>(elf_load_segments.size()));
+  for (int mapping_idx = max_segments - 1; mapping_idx >= 0; --mapping_idx) {
     const auto &mapping = executable_mappings[mapping_idx];
+    assert(static_cast<unsigned>(mapping_idx) < elf_load_segments.size());
     auto [matching_segment, ambiguous] = find_matching_segment(
         std::span{elf_load_segments}.subspan(mapping_idx), mapping);
-
     if (matching_segment) {
       res.load_segment = matching_segment;
       res.mapping = &mapping;
