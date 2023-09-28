@@ -301,7 +301,7 @@ int ddprof_start_profiling_internal() {
     //    for a request and replies
     //  * both library and profiler close their socket and continue
     int sockfds[2];
-    if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sockfds) == -1) {
+    if (socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sockfds) == -1) {
       return -1;
     }
 

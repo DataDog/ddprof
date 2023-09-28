@@ -23,7 +23,7 @@ TEST(IPCTest, Positive) {
   std::string payload = "Interesting test.";
 
   int sockets[2] = {-1, -1};
-  ASSERT_EQ(socketpair(AF_UNIX, SOCK_DGRAM, 0, sockets), 0);
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sockets), 0);
   // Fork
   pid_t child_pid = fork();
   if (!child_pid) {
@@ -74,7 +74,7 @@ TEST(IPCTest, Positive) {
 
 TEST(IPCTest, timeout) {
   int sockets[2] = {-1, -1};
-  ASSERT_EQ(socketpair(AF_UNIX, SOCK_DGRAM, 0, sockets), 0);
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sockets), 0);
   ddprof::UnixSocket sock1(sockets[0]);
   ddprof::UnixSocket sock2(sockets[1]);
   std::error_code ec;

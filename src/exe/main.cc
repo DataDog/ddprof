@@ -208,7 +208,7 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
 
     if (allocation_profiling_started_from_wrapper) {
       int sockfds[2] = {-1, -1};
-      if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sockfds) == -1) {
+      if (socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sockfds) == -1) {
         return -1;
       }
       parent_socket.reset(sockfds[0]);
