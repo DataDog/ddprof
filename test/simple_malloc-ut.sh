@@ -19,9 +19,10 @@ export DD_PROFILING_NATIVE_CPU_AFFINITY=${ddprof_cpu_mask}
 # (seeing cpu event before mmap events because of a cpu migration)
 test_cpu_mask=$(python3 -c 'import random,os;print(hex(1 << random.choice(list(os.sched_getaffinity(0)))))')
 
+timeout_sec=30
 opts="--loop 1000 --spin 100"
 log_file=$(mktemp "${PWD}/log.XXXXXX")
-# echo "logs available here $log_file"
+echo "Logs available in $log_file"
 rm "${log_file}"
 export DD_PROFILING_NATIVE_LOG_MODE="${log_file}"
 
@@ -41,23 +42,28 @@ count() {
         echo "Error occurred while counting for sample_type=${sample_type} and pid_or_tid=${pid_or_tid}" >&2
         exit $exit_status
     fi
-    echo $result
+    echo "$result"
 }
 
 check() {
     cmd="$1"
     expected_pids="$2"
     expected_tids="${3-$2}"
-    # shellcheck disable=SC2086
     echo "Running: ${cmd}"
-    taskset "${test_cpu_mask}" ${cmd}
+    # shellcheck disable=SC2086
+    taskset "${test_cpu_mask}" ${cmd} || ( echo "Command failed: ${cmd}" && cat "${log_file}" && exit 1 )
     if [[ "${expected_pids}" -ne 0 ]]; then
-        # Ugly workaround for tail bug that makes it wait indefinitely for new lines when `grep -q` exists:
-        # https://debbugs.gnu.org/cgi/bugreport.cgi?bug=13183
-        # https://superuser.com/questions/270529/monitoring-a-file-until-a-string-is-found
-        coproc tail -F "${log_file}"
-        grep -Fq "Profiling terminated" <&"${COPROC[0]}"
-        kill "$COPROC_PID"
+        sync "${log_file}"
+        # -P requires GNU grep
+        ddprof_pid=$(grep -m1 -oP ' ddprof\[\K[0-9]+(?=\]: Starting profiler)' "${log_file}" || true)
+        if [ -z "${ddprof_pid}" ]; then
+            echo "Unable to find profiler pid"
+            cat "${log_file}"
+            exit 1
+        fi
+        # --pid requires GNU tail
+        timeout "$timeout_sec" tail --pid="$ddprof_pid" -f /dev/null
+        sync "${log_file}"
     fi
     if [[ "${expected_pids}" -ne 0 ]]; then
         counted_pids_alloc=$(count "${log_file}" "alloc-samples" "pid")
@@ -103,13 +109,13 @@ check "./ddprof ./test/simple_malloc ${opts}" 1
 
 # Test live heap mode
 event="sALLOC,period=-524288,mode=l;sCPU"
-check "./ddprof --show_config --event "${event}" ./test/simple_malloc ${opts} --skip-free 100" 1
+check "./ddprof --show_config --event ${event} ./test/simple_malloc ${opts} --skip-free 100" 1
 
 # Test wrapper mode with forks + threads
 opts_more_spin="--loop 1000 --spin 400"
 check "./ddprof ./test/simple_malloc ${opts_more_spin} --fork 2 --threads 2" 2 4
 
-# Test dlopen 
+# Test dlopen
 check "./ddprof ./test/simple_malloc --use-shared-library ${opts}" 1
 
 # Test loaded libs check (with dlopen that avoids hook)
