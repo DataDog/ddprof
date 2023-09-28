@@ -256,11 +256,15 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
         LG_DBG("Setting LD_PRELOAD=%s", preload_str.c_str());
         setenv("LD_PRELOAD", preload_str.c_str(), 1);
         if (!dd_loader_lib_path.empty()) {
-          setenv("DD_PROFILING_NATIVE_LIBRARY", dd_profiling_lib_path.c_str(),
-                 1);
+          setenv(k_profiler_lib_env_variable, dd_profiling_lib_path.c_str(), 1);
         }
         auto sock_str = std::to_string(parent_socket.get());
         setenv(k_profiler_lib_socket_env_variable, sock_str.c_str(), 1);
+        // Preset the env variable to determine if allocation profiler is
+        // active.
+        // This avoids having to create a new env variable in the target
+        // process.
+        setenv(k_profiler_active_env_variable, "0", 1);
       }
 
       parent_socket.release();

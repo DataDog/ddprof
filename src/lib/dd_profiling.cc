@@ -25,6 +25,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <dlfcn.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
@@ -38,9 +39,19 @@ namespace {
 int ddprof_start_profiling_internal();
 
 struct ProfilerState {
+  bool initialized = false;
   bool started = false;
   bool allocation_profiling_started = false;
   pid_t profiler_pid = 0;
+
+  decltype(&::getenv) getenv = &::getenv;
+  decltype(&::putenv) putenv = &::putenv;
+  decltype(&::unsetenv) unsetenv = &::unsetenv;
+
+  // Pointer on [01] char for "<k_profiler_active_env_variable>=[01]" env
+  // variable. This allows to modify environment without calling putenv / setenv
+  // in a thread safe way.
+  char *profiler_active_indicator;
 
   static constexpr size_t profiler_active_len =
       std::char_traits<char>::length(k_profiler_active_env_variable) +
@@ -50,32 +61,78 @@ struct ProfilerState {
   // "<k_profiler_active_env_variable>=[01]"
   char profiler_active_str[profiler_active_len + 1];
 };
+
 ProfilerState g_state;
 
-void init_profiler_library_active() {
-  const char *s = getenv(k_profiler_active_env_variable);
-  bool profiler_active = s && strcmp(s, "1") == 0;
-  sprintf(g_state.profiler_active_str, "%s=%d", k_profiler_active_env_variable,
-          profiler_active ? 1 : 0);
+void retrieve_original_env_functions() {
+  /* Bash defines its own getenv/putenv functions
+     Use dlsym with RTLD_NEXT to retrieve original functions from libc.
+   */
+  auto *getenv_ptr =
+      reinterpret_cast<decltype(&::getenv)>(dlsym(RTLD_NEXT, "getenv"));
+  if (getenv_ptr) {
+    g_state.getenv = getenv_ptr;
+  }
+  auto *putenv_ptr =
+      reinterpret_cast<decltype(&::putenv)>(dlsym(RTLD_NEXT, "putenv"));
+  if (putenv_ptr) {
+    g_state.putenv = putenv_ptr;
+  }
+  auto *unsetenv_ptr =
+      reinterpret_cast<decltype(&::unsetenv)>(dlsym(RTLD_NEXT, "putenv"));
+  if (unsetenv_ptr) {
+    g_state.unsetenv = unsetenv_ptr;
+  }
+}
 
-  // profiler_active_str is passed to putenv (putenv does not copy it and it
-  // becomes part of the environment). This allows to modify the environment
-  // without calling setenv/putenv which are not thread safe.
-  // Calling putenv here should be safe since we are in the library constructor.
-  putenv(g_state.profiler_active_str);
+void init_profiler_library_active() {
+  char *s = g_state.getenv(k_profiler_active_env_variable);
+
+  if (!s || strlen(s) != 1 || (s[0] != '0' && s[0] != '1')) {
+    (void)snprintf(g_state.profiler_active_str,
+                   std::size(g_state.profiler_active_str), "%s=0",
+                   k_profiler_active_env_variable);
+    g_state.putenv(g_state.profiler_active_str);
+    g_state.profiler_active_indicator = g_state.profiler_active_str +
+        std::char_traits<char>::length(k_profiler_active_env_variable) + 1;
+  } else {
+    g_state.profiler_active_indicator = s;
+  }
+}
+
+void init_state() {
+  if (g_state.initialized) {
+    return;
+  }
+
+  retrieve_original_env_functions();
+  init_profiler_library_active();
+  g_state.initialized = true;
 }
 
 // return true if this profiler is active for this process or one of its parent
 bool is_profiler_library_active() {
-  return g_state.profiler_active_str[g_state.profiler_active_len - 1] == '1';
+  if (!g_state.initialized) {
+    // should not happen
+    return false;
+  }
+  return *g_state.profiler_active_indicator == '1';
 }
 
 void set_profiler_library_active() {
-  g_state.profiler_active_str[g_state.profiler_active_len - 1] = '1';
+  if (!g_state.initialized) {
+    // should not happen
+    return;
+  }
+  *g_state.profiler_active_indicator = '1';
 }
 
 void set_profiler_library_inactive() {
-  g_state.profiler_active_str[g_state.profiler_active_len - 1] = '0';
+  if (!g_state.initialized) {
+    // should not happen
+    return;
+  }
+  *g_state.profiler_active_indicator = '0';
 }
 
 void allocation_profiling_stop() {
@@ -87,7 +144,7 @@ void allocation_profiling_stop() {
 
 // Return socket created by ddprof when injecting lib if present
 int get_ddprof_socket() {
-  const char *socket_str = getenv(k_profiler_lib_socket_env_variable);
+  const char *socket_str = g_state.getenv(k_profiler_lib_socket_env_variable);
   if (socket_str) {
     std::string_view sv{socket_str};
     int sockfd = -1;
@@ -101,11 +158,14 @@ int get_ddprof_socket() {
 
 struct ProfilerAutoStart {
   ProfilerAutoStart() noexcept {
+    init_state();
+
     // Note that library needs to be linked with `--no-as-needed` when using
     // autostart, otherwise linker will completely remove library from DT_NEEDED
     // and library will not be loaded.
     bool autostart = false;
-    const char *autostart_env = getenv(k_profiler_auto_start_env_variable);
+    const char *autostart_env =
+        g_state.getenv(k_profiler_auto_start_env_variable);
     if (autostart_env && arg_yesno(autostart_env, 1)) {
       autostart = true;
     } else {
@@ -151,11 +211,12 @@ int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
 
   // unset LD_PRELOAD, otherwise if libdd_profiling.so was preloaded, it
   // would trigger a fork bomb
-  unsetenv("LD_PRELOAD");
+  g_state.unsetenv("LD_PRELOAD");
 
   kill(parent_pid, SIGTERM);
 
-  if (const char *ddprof_exe = getenv(k_profiler_ddprof_exe_env_variable);
+  if (const char *ddprof_exe =
+          g_state.getenv(k_profiler_ddprof_exe_env_variable);
       ddprof_exe) {
     execve(ddprof_exe, argv, environ);
   } else {
