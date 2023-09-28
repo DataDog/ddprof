@@ -9,6 +9,7 @@
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "logger.hpp"
+#include "unique_fd.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -203,9 +204,8 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc,
     return ddres_warn(DD_WHAT_MODULE);
   }
 
-  auto fd_holder = ddprof::make_unique_resource_checked(
-      ::open(filepath.c_str(), O_RDONLY), -1, &::close);
-  if (fd_holder.get() < 0) {
+  UniqueFd fd_holder{::open(filepath.c_str(), O_RDONLY)};
+  if (!fd_holder) {
     LG_WRN("[Mod] Couldn't open fd to module (%s)", filepath.c_str());
     return ddres_warn(DD_WHAT_MODULE);
   }

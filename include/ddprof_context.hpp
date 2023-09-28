@@ -11,18 +11,15 @@
 #include "ddprof_worker_context.hpp"
 #include "exporter_input.hpp"
 #include "perf_watcher.hpp"
+#include "unique_fd.hpp"
 
 #include <sched.h>
 #include <unistd.h>
 
 struct DDProfContext {
   DDProfContext() = default;
-  ~DDProfContext() {
-    if (params.sockfd != -1) {
-      close(params.sockfd);
-      params.sockfd = -1;
-    }
-  }
+  ~DDProfContext() = default;
+
   struct {
     bool enable{true};
     unsigned upload_period{};
@@ -32,8 +29,7 @@ struct DDProfContext {
     pid_t pid{0}; // ! only use for perf attach (can be -1 in global mode)
     uint32_t worker_period{}; // exports between worker refreshes
     int dd_profiling_fd{-1};  // opened file descriptor to our internal lib
-    int sockfd{-1};
-    bool wait_on_socket{false};
+    ddprof::UniqueFd sockfd;
     bool show_samples{false};
     cpu_set_t cpu_affinity{};
     std::string switch_user;

@@ -51,28 +51,24 @@ inline ReturnType error_wrapper(ReturnType return_value,
   return return_value;
 }
 
-UnixSocket::~UnixSocket() {
-  if (_handle != kInvalidSocket) {
-    ::close(_handle);
-  }
-}
-
 void UnixSocket::close(std::error_code &ec) noexcept {
-  error_wrapper(::close(_handle), ec);
+  error_wrapper(::close(_handle.release()), ec);
 }
 
 void UnixSocket::set_write_timeout(std::chrono::microseconds duration,
-                                   std::error_code &ec) noexcept {
+                                   std::error_code &ec) const noexcept {
   timeval tv = to_timeval(duration);
-  error_wrapper(::setsockopt(_handle, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)),
-                ec);
+  error_wrapper(
+      ::setsockopt(_handle.get(), SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)),
+      ec);
 }
 
 void UnixSocket::set_read_timeout(std::chrono::microseconds duration,
-                                  std::error_code &ec) noexcept {
+                                  std::error_code &ec) const noexcept {
   timeval tv = to_timeval(duration);
-  error_wrapper(::setsockopt(_handle, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)),
-                ec);
+  error_wrapper(
+      ::setsockopt(_handle.get(), SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)),
+      ec);
 }
 
 void UnixSocket::send(ConstBuffer buffer, std::error_code &ec) noexcept {
@@ -86,7 +82,7 @@ size_t UnixSocket::send_partial(ConstBuffer buffer,
                                 std::error_code &ec) noexcept {
   ssize_t ret;
   do {
-    ret = ::send(_handle, buffer.data(), buffer.size(), 0);
+    ret = ::send(_handle.get(), buffer.data(), buffer.size(), 0);
   } while (ret < 0 && errno == EINTR);
 
   error_wrapper(ret, ec);
@@ -138,7 +134,7 @@ size_t UnixSocket::send_partial(ConstBuffer buffer, std::span<const int> fds,
 
   ssize_t ret;
   do {
-    ret = ::sendmsg(_handle, &msg, 0);
+    ret = ::sendmsg(_handle.get(), &msg, 0);
   } while (ret < 0 && errno == EINTR);
   error_wrapper(ret, ec);
 
@@ -160,7 +156,7 @@ size_t UnixSocket::receive_partial(std::span<std::byte> buffer,
                                    std::error_code &ec) noexcept {
   ssize_t ret;
   do {
-    ret = ::recv(_handle, buffer.data(), buffer.size(), 0);
+    ret = ::recv(_handle.get(), buffer.data(), buffer.size(), 0);
   } while (ret < 0 && errno == EINTR);
   error_wrapper(ret, ec);
 
@@ -203,7 +199,7 @@ UnixSocket::receive_partial(std::span<std::byte> buffer, std::span<int> fds,
 
   ssize_t nr;
   do {
-    nr = ::recvmsg(_handle, &msgh, 0);
+    nr = ::recvmsg(_handle.get(), &msgh, 0);
   } while (nr < 0 && errno == EINTR);
   error_wrapper(nr, ec);
   if (ec) {

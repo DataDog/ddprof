@@ -7,6 +7,7 @@
 
 #include "ddprof_buffer.hpp"
 #include "ddres.hpp"
+#include "unique_fd.hpp"
 
 #include <chrono>
 #include <functional>
@@ -22,33 +23,25 @@ static constexpr size_t kMaxFD = 253;
 
 static constexpr auto kDefaultSocketTimeout = std::chrono::seconds{2};
 
-using socket_t = int;
-
 class UnixSocket {
 public:
+  using socket_t = int;
   UnixSocket() noexcept = default;
 
   explicit UnixSocket(socket_t handle) noexcept : _handle(handle) {}
 
-  UnixSocket(UnixSocket &&socket) noexcept : _handle(socket._handle) {
-    socket._handle = kInvalidSocket;
-  }
-
+  UnixSocket(UnixSocket &&socket) noexcept = default;
   UnixSocket(const UnixSocket &) = delete;
 
-  ~UnixSocket();
-
   UnixSocket &operator=(const UnixSocket &) = delete;
-  UnixSocket &operator=(UnixSocket &&socket) noexcept {
-    std::swap(socket._handle, _handle);
-    return *this;
-  }
+  UnixSocket &operator=(UnixSocket &&socket) noexcept = default;
 
   void close(std::error_code &ec) noexcept;
+
   void set_write_timeout(std::chrono::microseconds duration,
-                         std::error_code &ec) noexcept;
+                         std::error_code &ec) const noexcept;
   void set_read_timeout(std::chrono::microseconds duration,
-                        std::error_code &ec) noexcept;
+                        std::error_code &ec) const noexcept;
 
   void send(ConstBuffer buffer, std::error_code &ec) noexcept;
   size_t send_partial(ConstBuffer buffer, std::error_code &ec) noexcept;
@@ -66,16 +59,12 @@ public:
   size_t receive(Buffer buffer, std::error_code &ec) noexcept;
   size_t receive_partial(Buffer buffer, std::error_code &ec) noexcept;
 
-  socket_t release() noexcept {
-    socket_t h = _handle;
-    _handle = kInvalidSocket;
-    return h;
-  }
+  // cppcheck thinks we are returning an address here, but is completely wrong
+  // cppcheck-suppress CastAddressToIntegerAtReturn
+  socket_t release() noexcept { return _handle.release(); }
 
 private:
-  static constexpr socket_t kInvalidSocket = -1;
-
-  socket_t _handle = kInvalidSocket;
+  UniqueFd _handle;
 };
 
 struct RequestMessage {

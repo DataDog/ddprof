@@ -77,10 +77,7 @@ void copy_cli_values(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
       ddprof_cli.initial_loaded_libs_check_delay;
   ctx.params.loaded_libs_check_interval = ddprof_cli.loaded_libs_check_interval;
 
-  ctx.params.sockfd = ddprof_cli.socket;
-  if (ctx.params.sockfd != -1) {
-    ctx.params.wait_on_socket = true;
-  }
+  ctx.params.sockfd.reset(ddprof_cli.socket);
 }
 
 DDRes context_add_watchers(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
@@ -101,8 +98,8 @@ DDRes context_add_watchers(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
   }
 
   if (!preset.empty()) {
-    bool pid_or_global_mode =
-        (ddprof_cli.global || ddprof_cli.pid) && ctx.params.sockfd == -1;
+    const bool pid_or_global_mode =
+        (ddprof_cli.global || ddprof_cli.pid) && !ctx.params.sockfd;
     DDRES_CHECK_FWD(add_preset(preset, pid_or_global_mode,
                                ddprof_cli.default_stack_sample_size, watchers));
   }
