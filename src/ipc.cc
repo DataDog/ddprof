@@ -158,7 +158,13 @@ size_t UnixSocket::receive_partial(std::span<std::byte> buffer,
   do {
     ret = ::recv(_handle.get(), buffer.data(), buffer.size(), 0);
   } while (ret < 0 && errno == EINTR);
-  error_wrapper(ret, ec);
+
+  // 0 return means the other end has shutdown
+  if (ret == 0) {
+    ec = std::error_code(EAGAIN, std::system_category());
+  } else {
+    error_wrapper(ret, ec);
+  }
 
   return ret < 0 ? 0 : ret;
 }
@@ -201,7 +207,13 @@ UnixSocket::receive_partial(std::span<std::byte> buffer, std::span<int> fds,
   do {
     nr = ::recvmsg(_handle.get(), &msgh, 0);
   } while (nr < 0 && errno == EINTR);
-  error_wrapper(nr, ec);
+  // 0 return means the other end has shutdown
+  if (nr == 0) {
+    ec = std::error_code(EAGAIN, std::system_category());
+  } else {
+    error_wrapper(nr, ec);
+  }
+
   if (ec) {
     return {0, 0};
   }
