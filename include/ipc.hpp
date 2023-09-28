@@ -114,7 +114,7 @@ public:
                   std::chrono::microseconds timeout = kDefaultSocketTimeout);
 
   using ReplyFunc = std::function<ReplyMessage(const RequestMessage &)>;
-  void waitForRequest(ReplyFunc func);
+  void waitForRequest(const ReplyFunc &func);
 
 private:
   UnixSocket _socket;

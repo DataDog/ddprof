@@ -5,6 +5,8 @@
 
 #include "ipc.hpp"
 
+#include "chrono_utils.hpp"
+
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
@@ -15,22 +17,6 @@
 #include <unistd.h>
 
 namespace ddprof {
-
-namespace {
-
-struct timeval to_timeval(std::chrono::microseconds duration) noexcept {
-  const std::chrono::seconds sec =
-      std::chrono::duration_cast<std::chrono::seconds>(duration);
-
-  struct timeval tv;
-  tv.tv_sec = time_t(sec.count());
-  tv.tv_usec = suseconds_t(
-      std::chrono::duration_cast<std::chrono::microseconds>(duration - sec)
-          .count());
-  return tv;
-}
-
-} // namespace
 
 template <typename T> std::span<std::byte> to_byte_span(T *obj) {
   return {reinterpret_cast<std::byte *>(obj), sizeof(T)};
@@ -57,7 +43,7 @@ void UnixSocket::close(std::error_code &ec) noexcept {
 
 void UnixSocket::set_write_timeout(std::chrono::microseconds duration,
                                    std::error_code &ec) const noexcept {
-  timeval tv = to_timeval(duration);
+  timeval tv = duration_to_timeval(duration);
   error_wrapper(
       ::setsockopt(_handle.get(), SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)),
       ec);
@@ -65,7 +51,7 @@ void UnixSocket::set_write_timeout(std::chrono::microseconds duration,
 
 void UnixSocket::set_read_timeout(std::chrono::microseconds duration,
                                   std::error_code &ec) const noexcept {
-  timeval tv = to_timeval(duration);
+  timeval tv = duration_to_timeval(duration);
   error_wrapper(
       ::setsockopt(_handle.get(), SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)),
       ec);
@@ -220,7 +206,7 @@ UnixSocket::receive_partial(std::span<std::byte> buffer, std::span<int> fds,
 
   cmsghdr *cmsgp = CMSG_FIRSTHDR(&msgh);
 
-  if (cmsgp == NULL) {
+  if (cmsgp == nullptr) {
     return {nr, 0};
   }
 
@@ -240,14 +226,14 @@ UnixSocket::receive_partial(std::span<std::byte> buffer, std::span<int> fds,
   return {nr, nfds};
 }
 
-DDRes send(UnixSocket &socket, const RequestMessage &msg) {
+DDRes send(const UnixSocket &socket, const RequestMessage &msg) {
   std::error_code ec;
   socket.send(to_byte_span(&msg), ec);
   DDRES_CHECK_ERRORCODE(ec, DD_WHAT_SOCKET, "Unable to send request message");
   return {};
 }
 
-DDRes send(UnixSocket &socket, const ReplyMessage &msg) {
+DDRes send(const UnixSocket &socket, const ReplyMessage &msg) {
   int fds[2] = {msg.ring_buffer.ring_fd, msg.ring_buffer.event_fd};
   std::span<int> const fd_span{fds,
                                (msg.ring_buffer.mem_size != -1) ? 2UL : 0UL};
@@ -257,7 +243,7 @@ DDRes send(UnixSocket &socket, const ReplyMessage &msg) {
   return {};
 }
 
-DDRes receive(UnixSocket &socket, RequestMessage &msg) {
+DDRes receive(const UnixSocket &socket, RequestMessage &msg) {
   std::error_code ec;
   socket.receive(to_byte_span(&msg), ec);
   DDRES_CHECK_ERRORCODE(ec, DD_WHAT_SOCKET,
@@ -266,7 +252,7 @@ DDRes receive(UnixSocket &socket, RequestMessage &msg) {
   return {};
 }
 
-DDRes receive(UnixSocket &socket, ReplyMessage &msg) {
+DDRes receive(const UnixSocket &socket, ReplyMessage &msg) {
   int fds[2] = {-1, -1};
   std::error_code ec;
   auto res = socket.receive(to_byte_span(&msg), fds, ec);
@@ -316,7 +302,7 @@ Server::Server(UnixSocket &&socket, std::chrono::microseconds timeout)
   }
 }
 
-void Server::waitForRequest(ReplyFunc func) {
+void Server::waitForRequest(const ReplyFunc &func) {
   RequestMessage request;
   receive(_socket, request);
   ReplyMessage const reply = func(request);

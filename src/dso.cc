@@ -72,7 +72,7 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
   } else if (is_jit_dump_str(_filename)) {
     _type = dso::kJITDump;
   } else { // check if this standard dso matches our internal dd_profiling lib
-    std::size_t pos = _filename.rfind('/');
+    std::size_t const pos = _filename.rfind('/');
     if (pos != std::string::npos &&
         _filename.substr(pos + 1, s_dd_profiling_str.length()) ==
             s_dd_profiling_str) {
@@ -120,7 +120,7 @@ std::string Dso::format_filename() const {
 }
 
 std::ostream &operator<<(std::ostream &os, const Dso &dso) {
-  os << dso.to_string() << std::endl;
+  os << dso.to_string() << '\n';
   return os;
 }
 

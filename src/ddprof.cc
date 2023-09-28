@@ -38,7 +38,7 @@ void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
 #ifdef __GLIBC__
   constexpr size_t k_stacktrace_buffer_size = 4096;
   static void *buf[k_stacktrace_buffer_size] = {};
-  size_t sz = backtrace(buf, std::size(buf));
+  size_t const sz = backtrace(buf, std::size(buf));
 #endif
   (void)fprintf(
       stderr, "ddprof[%d]: <%.*s> has encountered an error and will exit\n",
@@ -85,7 +85,7 @@ DDRes ddprof_setup(DDProfContext &ctx) {
       struct sigaction sigaction_handlers = {};
       sigaction_handlers.sa_sigaction = sigsegv_handler;
       sigaction_handlers.sa_flags = SA_SIGINFO;
-      sigaction(SIGSEGV, &(sigaction_handlers), NULL);
+      sigaction(SIGSEGV, &(sigaction_handlers), nullptr);
     }
 
     // Set the nice level, but only if it was overridden because 0 is valid

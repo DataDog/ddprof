@@ -219,7 +219,7 @@ DDRes ddprof_exporter_init(const ExporterInput &exporter_input,
         port_str = {};
       }
       // check if schema is already available
-      if (strstr(exporter_input.url.c_str(), "://") != NULL) {
+      if (strstr(exporter_input.url.c_str(), "://") != nullptr) {
         exporter->_url = alloc_url_agent("", exporter_input.url, port_str);
       } else {
         // not available, assume http
@@ -263,12 +263,12 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
 
   fill_stable_tags(user_tags, exporter, tags_exporter);
 
-  ddog_CharSlice base_url = to_CharSlice(exporter->_url);
+  ddog_CharSlice const base_url = to_CharSlice(exporter->_url);
   ddog_Endpoint endpoint;
   if (exporter->_agent) {
     endpoint = ddog_Endpoint_agent(base_url);
   } else {
-    ddog_CharSlice api_key = to_CharSlice(exporter->_input.api_key);
+    ddog_CharSlice const api_key = to_CharSlice(exporter->_input.api_key);
     endpoint = ddog_Endpoint_agentless(base_url, api_key);
   }
 
@@ -306,10 +306,10 @@ DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
     write_pprof_file(encoded_profile, exporter->_debug_pprof_prefix.c_str());
   }
 
-  ddog_Timespec start = encoded_profile->start;
-  ddog_Timespec end = encoded_profile->end;
+  ddog_Timespec const start = encoded_profile->start;
+  ddog_Timespec const end = encoded_profile->end;
 
-  ddog_ByteSlice profile_data = {
+  ddog_ByteSlice const profile_data = {
       .ptr = encoded_profile->buffer.ptr,
       .len = encoded_profile->buffer.len,
   };
@@ -327,8 +327,8 @@ DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
         .name = to_CharSlice("auto.pprof"),
         .file = profile_data,
     }};
-    ddog_prof_Exporter_Slice_File files = {.ptr = files_,
-                                           .len = std::size(files_)};
+    ddog_prof_Exporter_Slice_File const files = {.ptr = files_,
+                                                 .len = std::size(files_)};
 
     ddog_prof_Exporter_Request_BuildResult res_request =
         ddog_prof_Exporter_Request_build(exporter->_exporter, start, end, files,

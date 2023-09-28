@@ -35,11 +35,11 @@ DDPROF_NOINLINE void fun1() {
 int main() {
   struct sigaction sa {};
   sa.sa_handler = &timer_handler;
-  sigaction(SIGPROF, &sa, NULL);
+  sigaction(SIGPROF, &sa, nullptr);
 
   constexpr std::chrono::milliseconds timer_delay{200};
-  itimerval val{.it_interval = {},
-                .it_value = ddprof::duration_to_timeval(timer_delay)};
+  const itimerval val{.it_interval = {},
+                      .it_value = ddprof::duration_to_timeval(timer_delay)};
   setitimer(ITIMER_PROF, &val, nullptr);
   fun1();
 }

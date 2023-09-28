@@ -102,10 +102,10 @@ DDRes worker_update_stats(ProcStatus *procstat, const UnwindState &us,
   const DsoHdr &dso_hdr = us.dso_hdr;
   // Update the procstats, but first snapshot the utime so we can compute the
   // diff for the utime metric
-  int64_t cpu_time_old = procstat->utime + procstat->stime;
+  int64_t const cpu_time_old = procstat->utime + procstat->stime;
   DDRES_CHECK_FWD(proc_read(procstat));
-  int64_t elapsed_nsec = std::chrono::nanoseconds{cycle_duration}.count();
-  int64_t millicores =
+  int64_t const elapsed_nsec = std::chrono::nanoseconds{cycle_duration}.count();
+  int64_t const millicores =
       ((procstat->utime + procstat->stime - cpu_time_old) * std::nano::den *
        1000) / // NOLINT(readability-magic-numbers)
       (k_clock_ticks_per_sec * elapsed_nsec);
@@ -123,7 +123,7 @@ DDRes worker_update_stats(ProcStatus *procstat, const UnwindState &us,
   long target_cpu_nsec;
   ddprof_stats_get(STATS_TARGET_CPU_USAGE, &target_cpu_nsec);
   // NOLINTNEXTLINE(readability-magic-numbers)
-  int64_t target_millicores = (target_cpu_nsec * 1000) / elapsed_nsec;
+  int64_t const target_millicores = (target_cpu_nsec * 1000) / elapsed_nsec;
   ddprof_stats_set(STATS_TARGET_CPU_USAGE, target_millicores);
 
   long nsamples = 0;
@@ -131,13 +131,13 @@ DDRes worker_update_stats(ProcStatus *procstat, const UnwindState &us,
 
   long tsc_cycles;
   ddprof_stats_get(STATS_UNWIND_AVG_TIME, &tsc_cycles);
-  int64_t avg_unwind_ns =
+  int64_t const avg_unwind_ns =
       nsamples > 0 ? tsc_cycles_to_ns(tsc_cycles) / nsamples : -1;
 
   ddprof_stats_set(STATS_UNWIND_AVG_TIME, avg_unwind_ns);
 
   ddprof_stats_get(STATS_AGGREGATION_AVG_TIME, &tsc_cycles);
-  int64_t avg_aggregation_ns =
+  int64_t const avg_aggregation_ns =
       nsamples > 0 ? tsc_cycles_to_ns(tsc_cycles) / nsamples : -1;
 
   ddprof_stats_set(STATS_AGGREGATION_AVG_TIME, avg_aggregation_ns);
@@ -162,7 +162,7 @@ DDRes ddprof_unwind_sample(DDProfContext &ctx, perf_event_sample *sample,
   struct UnwindState *us = ctx.worker_ctx.us;
   PerfWatcher *watcher = &ctx.watchers[watcher_pos];
 
-  ddprof_stats_add(STATS_SAMPLE_COUNT, 1, NULL);
+  ddprof_stats_add(STATS_SAMPLE_COUNT, 1, nullptr);
   ddprof_stats_add(STATS_UNWIND_AVG_STACK_SIZE, sample->size_stack, nullptr);
 
   // copy the sample context into the unwind structure
@@ -175,7 +175,7 @@ DDRes ddprof_unwind_sample(DDProfContext &ctx, perf_event_sample *sample,
 
   // If this is a SW_TASK_CLOCK-type event, then aggregate the time
   if (watcher->config == PERF_COUNT_SW_TASK_CLOCK) {
-    ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
+    ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, nullptr);
   }
 
   // Attempt to fully unwind if the watcher has a callgraph type
@@ -218,8 +218,8 @@ DDRes ddprof_unwind_sample(DDProfContext &ctx, perf_event_sample *sample,
 }
 
 void ddprof_reset_worker_stats() {
-  for (unsigned i = 0; i < std::size(s_cycled_stats); ++i) {
-    ddprof_stats_clear(s_cycled_stats[i]);
+  for (auto s_cycled_stat : s_cycled_stats) {
+    ddprof_stats_clear(s_cycled_stat);
   }
 }
 
@@ -239,7 +239,7 @@ DDRes aggregate_livealloc_stack(
 
 DDRes aggregate_live_allocations_for_pid(DDProfContext &ctx, pid_t pid) {
   struct UnwindState *us = ctx.worker_ctx.us;
-  int i_export = ctx.worker_ctx.i_current_pprof;
+  int const i_export = ctx.worker_ctx.i_current_pprof;
   DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
   const SymbolHdr &symbol_hdr = us->symbol_hdr;
   LiveAllocation &live_allocations = ctx.worker_ctx.live_allocation;
@@ -260,7 +260,7 @@ DDRes aggregate_live_allocations(DDProfContext &ctx) {
   // this would be more efficient if we could reuse the same stacks in
   // libdatadog
   struct UnwindState *us = ctx.worker_ctx.us;
-  int i_export = ctx.worker_ctx.i_current_pprof;
+  int const i_export = ctx.worker_ctx.i_current_pprof;
   DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
   const SymbolHdr &symbol_hdr = us->symbol_hdr;
   const LiveAllocation &live_allocations = ctx.worker_ctx.live_allocation;
@@ -292,7 +292,7 @@ DDRes worker_pid_free(DDProfContext &ctx, pid_t el) {
 DDRes clear_unvisited_pids(DDProfContext &ctx) {
   UnwindState *us = ctx.worker_ctx.us;
   const std::vector<pid_t> pids_remove = us->dwfl_hdr.get_unvisited();
-  for (pid_t el : pids_remove) {
+  for (pid_t const el : pids_remove) {
     DDRES_CHECK_FWD(worker_pid_free(ctx, el));
   }
   us->dwfl_hdr.reset_unvisited();
@@ -373,13 +373,13 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
 
   // If this is a SW_TASK_CLOCK-type event, then aggregate the time
   if (ctx.watchers[watcher_pos].config == PERF_COUNT_SW_TASK_CLOCK) {
-    ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, NULL);
+    ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, nullptr);
   }
 
   auto ticks0 = get_tsc_cycles();
-  DDRes res = ddprof_unwind_sample(ctx, sample, watcher_pos);
+  DDRes const res = ddprof_unwind_sample(ctx, sample, watcher_pos);
   auto unwind_ticks = get_tsc_cycles();
-  ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, NULL);
+  ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, nullptr);
 
   // Usually we want to send the sample_val, but sometimes we need to process
   // the event to get the desired value
@@ -395,10 +395,10 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
           us->output, sample->addr, sample->period, watcher_pos, sample->pid);
     } else if (Any(EventConfMode::kCallgraph & watcher->output_mode)) {
       // Depending on the type of watcher, compute a value for sample
-      uint64_t sample_val = perf_value_from_sample(watcher, sample);
+      uint64_t const sample_val = perf_value_from_sample(watcher, sample);
 
       // in lib mode we don't aggregate (protect to avoid link failures)
-      int i_export = ctx.worker_ctx.i_current_pprof;
+      int const i_export = ctx.worker_ctx.i_current_pprof;
       DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
       DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbol_hdr, sample_val,
                                       1, watcher, pprof));
@@ -410,19 +410,19 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
   }
 
   ddprof_stats_add(STATS_AGGREGATION_AVG_TIME, get_tsc_cycles() - unwind_ticks,
-                   NULL);
+                   nullptr);
 
   return {};
 }
 
 void *ddprof_worker_export_thread(void *arg) {
-  DDProfWorkerContext *worker = (DDProfWorkerContext *)arg;
+  auto *worker = static_cast<DDProfWorkerContext *>(arg);
   // export the one we are not writting to
-  int i = 1 - worker->i_current_pprof;
+  int const i = 1 - worker->i_current_pprof;
   // Increase number of sequences in persistent storage
   // This should start at 0, and if exporter thread
   // gets joined forcefully, we should not resume on same value
-  uint32_t profile_seq = (worker->persistent_worker_state->profile_seq)++;
+  uint32_t const profile_seq = (worker->persistent_worker_state->profile_seq)++;
 
   if (IsDDResFatal(ddprof_exporter_export(&worker->pprof[i]->_profile,
                                           worker->pprof[i]->_tags, profile_seq,
@@ -459,7 +459,7 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx,
             .count();
     waitsec = waitsec > 1 ? waitsec : 1;
     waittime.tv_sec += waitsec;
-    if (pthread_timedjoin_np(ctx.worker_ctx.exp_tid, NULL, &waittime)) {
+    if (pthread_timedjoin_np(ctx.worker_ctx.exp_tid, nullptr, &waittime)) {
       LG_WRN("Exporter took too long");
       return ddres_create(DD_SEVERROR, DD_WHAT_EXPORT_TIMEOUT);
     }
@@ -484,8 +484,8 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx,
       pprof_reset(ctx.worker_ctx.pprof[ctx.worker_ctx.i_current_pprof]));
 
   if (!synchronous_export) {
-    pthread_create(&ctx.worker_ctx.exp_tid, NULL, ddprof_worker_export_thread,
-                   &ctx.worker_ctx);
+    pthread_create(&ctx.worker_ctx.exp_tid, nullptr,
+                   ddprof_worker_export_thread, &ctx.worker_ctx);
   } else {
     ddprof_worker_export_thread(reinterpret_cast<void *>(&ctx.worker_ctx));
     if (ctx.worker_ctx.exp_error) {
@@ -545,7 +545,7 @@ void ddprof_pr_mmap(DDProfContext &ctx, const perf_event_mmap2 *map,
 
 void ddprof_pr_lost(DDProfContext &ctx, const perf_event_lost *lost,
                     int watcher_pos) {
-  ddprof_stats_add(STATS_EVENT_LOST, lost->lost, NULL);
+  ddprof_stats_add(STATS_EVENT_LOST, lost->lost, nullptr);
   ctx.worker_ctx.lost_events_per_watcher[watcher_pos] += lost->lost;
 }
 
@@ -650,7 +650,7 @@ DDRes ddprof_worker_free(DDProfContext &ctx) {
       constexpr std::chrono::seconds k_export_thread_join_timeout{5};
       waittime.tv_sec +=
           std::chrono::seconds(k_export_thread_join_timeout).count();
-      if (pthread_timedjoin_np(ctx.worker_ctx.exp_tid, NULL, &waittime)) {
+      if (pthread_timedjoin_np(ctx.worker_ctx.exp_tid, nullptr, &waittime)) {
         pthread_cancel(ctx.worker_ctx.exp_tid);
       }
       ctx.worker_ctx.exp_tid = 0;
@@ -686,15 +686,14 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
                                   DDProfContext &ctx) {
   // global try catch to avoid leaking exceptions to main loop
   try {
-    ddprof_stats_add(STATS_EVENT_COUNT, 1, NULL);
-    const perf_event_hdr_wpid *wpid =
-        static_cast<const perf_event_hdr_wpid *>(hdr);
+    ddprof_stats_add(STATS_EVENT_COUNT, 1, nullptr);
+    const auto *wpid = static_cast<const perf_event_hdr_wpid *>(hdr);
     PerfWatcher *watcher = &ctx.watchers[watcher_pos];
     switch (hdr->type) {
     /* Cases where the target type has a PID */
     case PERF_RECORD_SAMPLE:
       if (wpid->pid) {
-        uint64_t mask = watcher->sample_type;
+        uint64_t const mask = watcher->sample_type;
         perf_event_sample *sample = hdr2samp(hdr, mask);
         if (sample) {
           DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, watcher_pos));
@@ -737,7 +736,7 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
           ctx, reinterpret_cast<const DeallocationEvent *>(hdr), watcher_pos);
       break;
     case PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION: {
-      const ClearLiveAllocationEvent *event =
+      const auto *event =
           reinterpret_cast<const ClearLiveAllocationEvent *>(hdr);
       DDRES_CHECK_FWD(
           aggregate_live_allocations_for_pid(ctx, event->sample_id.pid));

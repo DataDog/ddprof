@@ -40,7 +40,7 @@ DDRes DwflWrapper::attach(pid_t pid, const Dwfl_Thread_Callbacks *callbacks,
   if (_attached) {
     return ddres_init();
   }
-  if (!dwfl_attach_state(_dwfl, NULL, pid, callbacks, us)) {
+  if (!dwfl_attach_state(_dwfl, nullptr, pid, callbacks, us)) {
     LG_DBG("Failed attaching dwfl on pid %d (%s)", pid, dwfl_errmsg(-1));
     return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
   }

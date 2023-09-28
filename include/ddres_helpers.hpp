@@ -57,7 +57,7 @@
 #define DDRES_CHECK_ERRNO(eval, what, ...)                                     \
   do {                                                                         \
     if (unlikely((eval) == -1)) {                                              \
-      int e = errno;                                                           \
+      const int e = errno;                                                     \
       LG_ERR(__VA_ARGS__);                                                     \
       LOG_ERROR_DETAILS(LG_ERR, what);                                         \
       LG_ERR("errno(%d): %s", e, strerror(e));                                 \
@@ -125,7 +125,7 @@ static inline int ddres_sev_to_log_level(int sev) {
 /// Evaluate function and return error if -1 (add an error log)
 #define DDRES_CHECK_ERRORCODE(eval, what, ...)                                 \
   do {                                                                         \
-    std::error_code err = (eval);                                              \
+    const std::error_code err = (eval);                                        \
     if (err) {                                                                 \
       LG_ERR(__VA_ARGS__);                                                     \
       LOG_ERROR_DETAILS(LG_ERR, what);                                         \

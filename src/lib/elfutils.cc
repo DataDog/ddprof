@@ -219,7 +219,7 @@ template <typename F> struct CallbackWrapper : CallbackWrapperBase {
 };
 
 int dl_iterate_hdr_callback(dl_phdr_info *info, size_t size, void *data) {
-  CallbackWrapperBase *callback = reinterpret_cast<CallbackWrapperBase *>(data);
+  auto *callback = reinterpret_cast<CallbackWrapperBase *>(data);
   return callback->fun(info, size, callback);
 }
 

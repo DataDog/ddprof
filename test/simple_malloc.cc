@@ -47,9 +47,12 @@ public:
                      << failure_msg << " ";
   }
   ~LogMessageFatal() {
-    std::cerr << std::endl;
+    std::cerr << '\n';
     abort();
   }
+  LogMessageFatal(const LogMessageFatal &) = delete;
+  LogMessageFatal &operator=(const LogMessageFatal &) = delete;
+
   static std::ostream &InternalStream() { return std::cerr; }
 };
 
@@ -195,8 +198,8 @@ void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   (void)uc;
 #  ifdef __GLIBC__
   constexpr size_t k_stacktrace_buffer_size = 4096;
-  static void *buf[k_stacktrace_buffer_size] = {0};
-  size_t sz = backtrace(buf, std::size(buf));
+  static void *buf[k_stacktrace_buffer_size] = {};
+  const size_t sz = backtrace(buf, std::size(buf));
 #  endif
   fprintf(stderr, "simplemalloc[%d]:has encountered an error and will exit\n",
           getpid());
@@ -255,7 +258,7 @@ WrapperFuncPtr get_wrapper_func(WrapperOpts opts) {
   CHECK(handle) << "Unable to dlopen " << library_path.c_str() << ": "
                 << dlerror();
 
-  WrapperFuncPtr wrapper_func =
+  auto wrapper_func =
       reinterpret_cast<WrapperFuncPtr>(dlsym(handle, "wrapper"));
   CHECK(wrapper_func) << "Unable to find wrapper func: " << dlerror();
   return wrapper_func;
@@ -268,7 +271,7 @@ int main(int argc, char *argv[]) {
     struct sigaction sigaction_handlers = {};
     sigaction_handlers.sa_sigaction = sigsegv_handler;
     sigaction_handlers.sa_flags = SA_SIGINFO;
-    sigaction(SIGSEGV, &(sigaction_handlers), NULL);
+    sigaction(SIGSEGV, &(sigaction_handlers), nullptr);
 
     CLI::App app{"Simple allocation test"};
 
@@ -350,6 +353,7 @@ int main(int argc, char *argv[]) {
 
     if (!exec_args.empty()) {
       std::vector<char *> new_args;
+      new_args.reserve(exec_args.size());
       for (auto &a : exec_args) {
         new_args.push_back(a.data());
       }

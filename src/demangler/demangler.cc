@@ -144,8 +144,8 @@ std::string rust_demangle(const std::string_view &str) {
       } else if (!replaced && !str.compare(i, 2, "$u") && str[i + 4] == '$') {
         constexpr size_t k_nb_read_chars = 5;
         constexpr int hexa_base = 16;
-        int hi = hex_to_int(str[i + 2]);
-        int lo = hex_to_int(str[i + 3]);
+        int const hi = hex_to_int(str[i + 2]);
+        int const lo = hex_to_int(str[i + 3]);
         if (hi != -1 && lo != -1) {
           ret += static_cast<unsigned char>(lo + hexa_base * hi);
           i += k_nb_read_chars - 1; // - 1 because iterator inc

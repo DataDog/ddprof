@@ -8,6 +8,7 @@
 #include <climits>
 #include <cstdint>
 #include <dirent.h>
+#include <ranges>
 #include <sys/sysinfo.h>
 #include <sys/types.h>
 
@@ -25,9 +26,7 @@ bool parse_cpu_mask(std::string_view sv, cpu_set_t &cpu_mask) {
   CPU_ZERO(&cpu_mask);
 
   int cpu_idx = 0;
-  for (auto it = sv.rbegin(); it != sv.rend(); ++it) {
-    const char c = *it;
-
+  for (char const c : std::ranges::reverse_view(sv)) {
     // input mask can use comma as separator
     if (c == ',') {
       continue;
@@ -56,7 +55,7 @@ bool parse_cpu_mask(std::string_view sv, cpu_set_t &cpu_mask) {
 }
 
 std::string cpu_mask_to_string(const cpu_set_t &cpu_mask) {
-  int nb_cpus = sizeof(cpu_set_t) * CHAR_BIT;
+  int const nb_cpus = sizeof(cpu_set_t) * CHAR_BIT;
 
   bool one_cpu_set = false;
   std::string s;

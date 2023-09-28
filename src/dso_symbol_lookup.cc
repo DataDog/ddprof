@@ -17,16 +17,16 @@ namespace ddprof {
 namespace {
 
 Symbol symbol_from_unhandled_dso(const Dso &dso) {
-  return Symbol(std::string(), std::string(), 0, dso::dso_type_str(dso._type));
+  return {std::string(), std::string(), 0, dso::dso_type_str(dso._type)};
 }
 
 Symbol symbol_from_dso(ElfAddress_t normalized_addr, const Dso &dso,
                        std::string_view addr_type) {
   // address that means something for our user (addr)
-  std::string dso_dbg_str = normalized_addr
+  std::string const dso_dbg_str = normalized_addr
       ? string_format("[%p:%s]", normalized_addr, addr_type.data())
       : "";
-  return Symbol(dso_dbg_str, dso_dbg_str, 0, dso.format_filename());
+  return {dso_dbg_str, dso_dbg_str, 0, dso.format_filename()};
 }
 } // namespace
 

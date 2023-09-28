@@ -176,7 +176,7 @@ private:
   typedef std::unordered_map<pid_t, BackpopulateState> BackpopulateStateMap;
 
   // erase range of elements
-  static void erase_range(DsoMap &map, const DsoRange &range);
+  static void erase_range(DsoMap &map, const DsoConstRange &range);
 
   // parse procfs to look for dso elements
   bool pid_backpopulate(PidMapping &pid_mapping, pid_t pid, int &nb_elts_added);

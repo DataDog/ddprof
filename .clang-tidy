@@ -1,4 +1,61 @@
-Checks: 'bugprone-*,-bugprone-easily-swappable-parameters,-bugprone-narrowing-conversions,cert-*,-cert-err33-c,clang-analyzer-*,cppcoreguidelines-rvalue-reference-param-not-moved,misc-*,-misc-include-cleaner,-misc-const-correctness,modernize-deprecated-headers,readability-*,-readability-identifier-length,-readability-implicit-bool-conversion,-readability-function-cognitive-complexity'
+Checks: 
+    - bugprone-*
+    - -bugprone-easily-swappable-parameters
+    - -bugprone-narrowing-conversions
+    - cert-*
+    - -cert-err33-c
+    - clang-analyzer-*
+    - cppcoreguidelines-avoid-const-or-ref-data-members
+    # - cppcoreguidelines-init-variables
+    - cppcoreguidelines-interfaces-global-init
+    - cppcoreguidelines-misleading-capture-default-by-value
+    - cppcoreguidelines-missing-std-forward
+    - cppcoreguidelines-prefer-member-initializer
+    - cppcoreguidelines-pro-type-cstyle-cast
+    # - cppcoreguidelines-pro-type-member-init
+    - cppcoreguidelines-special-member-functions
+    - cppcoreguidelines-virtual-class-destructor
+    - cppcoreguidelines-rvalue-reference-param-not-moved
+    - cppcoreguidelines-slicing
+    - google-explicit-constructor
+    - google-readability-casting
+    - misc-*
+    - -misc-include-cleaner
+    - modernize-avoid-bind
+    - modernize-concat-nested-namespaces
+    - modernize-deprecated-headers    
+    - modernize-deprecated-ios-base-aliases
+    - modernize-loop-convert
+    - modernize-macro-to-enum        
+    - modernize-make-shared
+    - modernize-make-unique
+    - modernize-pass-by-value
+    - modernize-raw-string-literal
+    - modernize-redundant-void-arg
+    - modernize-replace-auto-ptr
+    - modernize-return-braced-init-list
+    - modernize-shrink-to-fit
+    - modernize-type-traits
+    - modernize-unary-static-assert
+    - modernize-use-auto
+    - modernize-use-bool-literals
+    - modernize-use-constraints
+    - modernize-use-default
+    - modernize-use-default-member-init
+    - modernize-use-emplace
+    - modernize-use-equals-default
+    - modernize-use-equals-delete
+    - modernize-use-nodiscard
+    - modernize-use-nullptr
+    - modernize-use-override
+    - modernize-use-using
+    - performance-*
+    - -performance-no-int-to-ptr
+    - readability-*
+    - -readability-identifier-length
+    - -readability-implicit-bool-conversion
+    - -readability-function-cognitive-complexity
 FormatStyle: 'file'
 WarningsAsErrors: '*'
-# performance-*,modernize-*,cppcoreguidelines-*
+CheckOptions:
+    cppcoreguidelines-special-member-functions.AllowMissingMoveFunctionsWhenCopyIsDeleted: true

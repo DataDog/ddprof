@@ -44,11 +44,11 @@ void funcB() {
 
   EXPECT_GT(state.output.locs.size(), 3);
   auto &symbol0 = symbol_table[state.output.locs[0]._symbol_idx];
-  EXPECT_TRUE(symbol0._demangle_name.starts_with("save_context("));
+  EXPECT_TRUE(symbol0._demangle_name.starts_with("ddprof::save_context("));
   auto &symbol1 = symbol_table[state.output.locs[1]._symbol_idx];
-  EXPECT_EQ(symbol1._demangle_name, "funcB()");
+  EXPECT_EQ(symbol1._demangle_name, "ddprof::funcB()");
   auto &symbol2 = symbol_table[state.output.locs[2]._symbol_idx];
-  EXPECT_EQ(symbol2._demangle_name, "funcA()");
+  EXPECT_EQ(symbol2._demangle_name, "ddprof::funcA()");
 }
 
 void funcA() {
@@ -119,15 +119,16 @@ TEST(getcontext, unwind_from_sighandler) {
 
   EXPECT_GT(state.output.locs.size(), 5);
   EXPECT_LT(state.output.locs.size(), 25);
-  EXPECT_TRUE(get_symbol(0)._demangle_name.starts_with("save_context("));
-  EXPECT_EQ(get_symbol(1)._demangle_name, "handler(int)");
+  EXPECT_TRUE(
+      get_symbol(0)._demangle_name.starts_with("ddprof::save_context("));
+  EXPECT_EQ(get_symbol(1)._demangle_name, "ddprof::handler(int)");
   size_t next_idx = 3;
   while (next_idx < state.output.locs.size() - 1 &&
-         get_symbol(next_idx)._demangle_name != "funcD()") {
+         get_symbol(next_idx)._demangle_name != "ddprof::funcD()") {
     ++next_idx;
   }
-  EXPECT_EQ(get_symbol(next_idx)._demangle_name, "funcD()");
-  EXPECT_EQ(get_symbol(next_idx + 1)._demangle_name, "funcC()");
+  EXPECT_EQ(get_symbol(next_idx)._demangle_name, "ddprof::funcD()");
+  EXPECT_EQ(get_symbol(next_idx + 1)._demangle_name, "ddprof::funcC()");
 }
 #endif
 

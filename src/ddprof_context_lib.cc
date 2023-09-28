@@ -143,7 +143,7 @@ DDRes context_set(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
 }
 
 int context_allocation_profiling_watcher_idx(const DDProfContext &ctx) {
-  std::span watchers{ctx.watchers};
+  const std::span watchers{ctx.watchers};
   auto it =
       std::find_if(watchers.begin(), watchers.end(), [](const auto &watcher) {
         return watcher.type == kDDPROF_TYPE_CUSTOM &&

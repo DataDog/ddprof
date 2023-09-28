@@ -30,7 +30,8 @@ FILE *RuntimeSymbolLookup::perfmaps_open(int pid,
   char buf[PATH_MAX];
   auto n = snprintf(buf, std::size(buf), "%s/proc/%d/root%s/perf-%d.map",
                     _path_to_proc.c_str(), pid, path_to_perfmap, pid);
-  if (unsigned(n) >= std::size(buf)) { // unable to snprintf everything
+  if (static_cast<unsigned>(n) >=
+      std::size(buf)) { // unable to snprintf everything
     return nullptr;
   }
   FILE *perfmap_file = fopen(buf, "r");
@@ -63,16 +64,16 @@ bool RuntimeSymbolLookup::insert_or_replace(std::string_view symbol,
     return false;
   }
 
-  SymbolMap::FindRes find_res = symbol_map.find_closest(address);
+  SymbolMap::FindRes const find_res = symbol_map.find_closest(address);
   if (!find_res.second) {
     symbol_map.emplace_hint(
         find_res.first, address,
         SymbolSpan(address + code_size - 1, symbol_table.size()));
-    symbol_table.emplace_back(
-        Symbol(std::string(symbol), std::string(symbol), 0, "jit"));
+    symbol_table.emplace_back(std::string(symbol), std::string(symbol), 0,
+                              "jit");
   } else {
     // todo managing range erase (we can overal with other syms)
-    SymbolIdx_t existing = find_res.first->second.get_symbol_idx();
+    SymbolIdx_t const existing = find_res.first->second.get_symbol_idx();
 #ifdef DEBUG
     LG_DBG("Existyng sym -- %s (%lx-%lx)",
            symbol_table[existing]._demangle_name.c_str(), find_res.first->first,
@@ -106,13 +107,15 @@ DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
   if (is_absolute_path(jitdump_path)) {
     n = snprintf(buf, std::size(buf), "%s/proc/%d/root%s",
                  _path_to_proc.c_str(), pid, jitdump_path.data());
-    if (unsigned(n) >= std::size(buf)) { // unable to snprintf everything
+    if (static_cast<unsigned>(n) >=
+        std::size(buf)) { // unable to snprintf everything
       DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Unable to create path to jitdump");
     }
   } else { // For relative path, use the current working directory
     n = snprintf(buf, std::size(buf), "%s/proc/%d/cwd/%s",
                  _path_to_proc.c_str(), pid, jitdump_path.data());
-    if (unsigned(n) >= std::size(buf)) { // unable to snprintf everything
+    if (static_cast<unsigned>(n) >=
+        std::size(buf)) { // unable to snprintf everything
       DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Unable to create path to jitdump");
     }
   }
@@ -157,7 +160,7 @@ DDRes RuntimeSymbolLookup::fill_from_perfmap(int pid, SymbolMap &symbol_map,
   defer { fclose(pmf); };
 
   LG_DBG("Loading runtime symbols from (PID%d)", pid);
-  char *line = NULL;
+  char *line = nullptr;
   size_t sz_buf = 0;
   char buffer[PATH_MAX];
   while (-1 != getline(&line, &sz_buf, pmf)) {
@@ -171,9 +174,10 @@ DDRes RuntimeSymbolLookup::fill_from_perfmap(int pid, SymbolMap &symbol_map,
       continue;
     }
     constexpr int hexadecimal_base = 16;
-    ProcessAddress_t address =
+    ProcessAddress_t const address =
         std::strtoul(address_buff, nullptr, hexadecimal_base);
-    Offset_t code_size = std::strtoul(size_buff, nullptr, hexadecimal_base);
+    Offset_t const code_size =
+        std::strtoul(size_buff, nullptr, hexadecimal_base);
     insert_or_replace(buffer, address, code_size, symbol_map, symbol_table);
   }
   free(line);

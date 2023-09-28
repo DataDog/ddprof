@@ -56,7 +56,7 @@ bool LOG_setname(const char *name) {
 
 bool LOG_syslog_open() {
   const sockaddr_un sa = {AF_UNIX, "/dev/log"};
-  int fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+  int const fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0);
 
   if (0 > fd) {
     return false;
@@ -181,7 +181,7 @@ void vlprintfln(int lvl, int fac, const char *name, const char *format,
 
   if (log_ctx->mode == LOG_SYSLOG) {
     sz_h = snprintf(buf, LOG_MSG_CAP,
-                    "<%d>%s.%06lu %s[%d]: ", lvl + fac * LL_LENGTH, tm_str,
+                    "<%d>%s.%06ld %s[%d]: ", lvl + fac * LL_LENGTH, tm_str,
                     d_us.count(), name, pid);
   } else {
     const char *levels[LL_LENGTH] = {
@@ -218,7 +218,7 @@ void vlprintfln(int lvl, int fac, const char *name, const char *format,
   // Flush to file descriptor
   do {
     if (log_ctx->mode == LOG_SYSLOG) {
-      rc = sendto(log_ctx->fd, buf, sz, MSG_NOSIGNAL, NULL, 0);
+      rc = sendto(log_ctx->fd, buf, sz, MSG_NOSIGNAL, nullptr, 0);
     } else {
       rc = write(log_ctx->fd, buf, sz);
     }

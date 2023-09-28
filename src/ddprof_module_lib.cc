@@ -37,7 +37,7 @@ get_executable_mappings(const DsoHdr::DsoConstRange &dsoRange) {
 
 DDRes get_executable_segments(int fd, const std::string &filepath,
                               std::vector<Segment> &segments) {
-  Elf *elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
+  Elf *elf = elf_begin(fd, ELF_C_READ_MMAP, nullptr);
   if (elf == nullptr) {
     LG_WRN("Invalid elf %s", filepath.c_str());
     return ddres_error(DD_WHAT_INVALID_ELF);
@@ -62,7 +62,7 @@ DDRes get_executable_segments(int fd, const std::string &filepath,
     for (size_t i = 0; i < phnum; ++i) {
       GElf_Phdr phdr_mem;
       GElf_Phdr *ph = gelf_getphdr(elf, i, &phdr_mem);
-      if (unlikely(ph == NULL)) {
+      if (unlikely(ph == nullptr)) {
         LG_WRN("Invalid elf %s", filepath.c_str());
         return ddres_error(DD_WHAT_INVALID_ELF);
       }
@@ -134,7 +134,8 @@ DDRes compute_elf_bias(int fd, const std::string &filepath,
   }
 
   auto executable_mappings = get_executable_mappings(dsoRange);
-  MatchResult match_result = find_match(executable_mappings, elf_segments);
+  MatchResult const match_result =
+      find_match(executable_mappings, elf_segments);
 
   if (match_result.is_ambiguous) {
     LG_WRN("Multiple matching segments: %s", filepath.c_str());
@@ -155,9 +156,11 @@ DDRes compute_elf_bias(int fd, const std::string &filepath,
 
 MatchResult find_match(std::span<const Mapping> executable_mappings,
                        std::span<const Segment> elf_load_segments) {
-  // in some weird cases, number of mappings is bigger than number of segments
-  // eg. with dotnet libcoreclr.so
-  int nb_mappings =
+  // In some weird cases, number of mappings is bigger than number of segments
+  // (eg. with dotnet libcoreclr.so)
+  // For now just cap the number of considered mappings with the number of
+  // segments.
+  int const nb_mappings =
       std::min(executable_mappings.size(), elf_load_segments.size());
 
   MatchResult res = {nullptr, nullptr, false};
@@ -197,7 +200,8 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc,
     const char *main_name = nullptr;
     Dwarf_Addr low_addr;
     Dwarf_Addr high_addr;
-    dwfl_module_info(mod, nullptr, &low_addr, &high_addr, 0, 0, &main_name, 0);
+    dwfl_module_info(mod, nullptr, &low_addr, &high_addr, nullptr, nullptr,
+                     &main_name, nullptr);
     LG_NTC("Incoherent modules[PID=%d]: module %s [%lx-%lx] is already "
            "loaded at %lx(%s[ID#%d])",
            dsoRange.first->second._pid, main_name, low_addr, high_addr, pc,
@@ -230,7 +234,7 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc,
   // Retrieve build id
   const unsigned char *bits = nullptr;
   GElf_Addr vaddr;
-  if (int size = dwfl_module_build_id(ddprof_mod._mod, &bits, &vaddr);
+  if (int const size = dwfl_module_build_id(ddprof_mod._mod, &bits, &vaddr);
       size > 0) {
     // ensure we called dwfl_module_getelf first (or this can fail)
     // returns the size
@@ -244,10 +248,11 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc,
     LG_WRN("Couldn't addrmodule (%s)[0x%lx], MOD:%s (%s)", dwfl_errmsg(-1), pc,
            module_name, fileInfoValue.get_path().c_str());
     return ddres_warn(DD_WHAT_MODULE);
-  } // dwfl now has ownership of the file descriptor
-  fd_holder.release();
-  dwfl_module_info(ddprof_mod._mod, 0, &ddprof_mod._low_addr,
-                   &ddprof_mod._high_addr, 0, 0, 0, 0);
+  }
+  // dwfl now has ownership of the file descriptor
+  (void)fd_holder.release();
+  dwfl_module_info(ddprof_mod._mod, nullptr, &ddprof_mod._low_addr,
+                   &ddprof_mod._high_addr, nullptr, nullptr, nullptr, nullptr);
   LG_DBG("Loaded mod from file (%s[ID#%d]), (%s) mod[%lx-%lx] bias[%lx], "
          "build-id: %s",
          fileInfoValue.get_path().c_str(), fileInfoValue.get_id(),

@@ -26,9 +26,9 @@ DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
 
 void trace_unwinding_end(UnwindState *us) {
   if (LL_DEBUG <= LOG_getlevel()) {
-    DsoHdr::DsoFindRes find_res =
+    DsoHdr::DsoFindRes const find_res =
         us->dso_hdr.dso_find_closest(us->pid, us->current_ip);
-    SymbolIdx_t symIdx =
+    SymbolIdx_t const symIdx =
         us->output.locs[us->output.locs.size() - 1]._symbol_idx;
     if (find_res.second) {
       const std::string &last_func =
@@ -44,14 +44,14 @@ void trace_unwinding_end(UnwindState *us) {
 
 bool is_infinite_loop(UnwindState *us) {
   UnwindOutput &output = us->output;
-  uint64_t nb_locs = output.locs.size();
-  unsigned nb_frames_to_check = 3;
+  uint64_t const nb_locs = output.locs.size();
+  unsigned const nb_frames_to_check = 3;
   if (nb_locs <= nb_frames_to_check) {
     return false;
   }
   for (unsigned i = 1; i < nb_frames_to_check; ++i) {
-    FunLoc &n_minus_one_loc = output.locs[nb_locs - i];
-    FunLoc &n_minus_two_loc = output.locs[nb_locs - i - 1];
+    FunLoc const &n_minus_one_loc = output.locs[nb_locs - i];
+    FunLoc const &n_minus_two_loc = output.locs[nb_locs - i - 1];
     if (n_minus_one_loc.ip != n_minus_two_loc.ip) {
       return false;
     }
@@ -107,7 +107,7 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     std::string_view jitdump_path = {};
     if (dso::has_runtime_symbols(dso._type)) {
       if (pid_mapping._jitdump_addr) {
-        DsoHdr::DsoFindRes find_mapping = DsoHdr::dso_find_closest(
+        DsoHdr::DsoFindRes const find_mapping = DsoHdr::dso_find_closest(
             pid_mapping._map, pid_mapping._jitdump_addr);
         if (find_mapping.second) { // jitdump exists
           jitdump_path = find_mapping.first->second._filename;
@@ -178,11 +178,11 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
 
 // frame_cb callback at every frame for the dwarf unwinding
 int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
-  UnwindState *us = (UnwindState *)arg;
+  auto *us = static_cast<UnwindState *>(arg);
 #ifdef DEBUG
   LG_NFO("Beging depth %lu", us->output.locs.size());
 #endif
-  int dwfl_error_value = dwfl_errno();
+  int const dwfl_error_value = dwfl_errno();
   if (dwfl_error_value) {
     // Check if dwarf unwinding was a failure we can get stuck in infinite loops
     if (is_infinite_loop(us)) {
@@ -199,7 +199,7 @@ int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
   }
 #endif
   // Before we potentially exit, record the fact that we're processing a frame
-  ddprof_stats_add(STATS_UNWIND_FRAMES, 1, NULL);
+  ddprof_stats_add(STATS_UNWIND_FRAMES, 1, nullptr);
 
   if (IsDDResNotOK(add_symbol(dwfl_frame, us))) {
     return DWARF_CB_ABORT;
@@ -214,10 +214,11 @@ DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
 
   // get or create the dwfl symbol
-  SymbolIdx_t symbol_idx = unwind_symbol_hdr._dwfl_symbol_lookup.get_or_insert(
-      ddprof_mod, unwind_symbol_hdr._symbol_table,
-      unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso);
-  MapInfoIdx_t map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
+  SymbolIdx_t const symbol_idx =
+      unwind_symbol_hdr._dwfl_symbol_lookup.get_or_insert(
+          ddprof_mod, unwind_symbol_hdr._symbol_table,
+          unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso);
+  MapInfoIdx_t const map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
       us->pid, us->symbol_hdr._mapinfo_table, dso, ddprof_mod._build_id);
   return add_frame(symbol_idx, map_idx, pc, us);
 }
@@ -242,7 +243,7 @@ DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
     return ddres_init();
   }
 
-  MapInfoIdx_t map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
+  MapInfoIdx_t const map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
       us->pid, us->symbol_hdr._mapinfo_table, dso, {});
 
   return add_frame(symbol_idx, map_idx, pc, us);
@@ -256,7 +257,7 @@ DDRes unwind_init_dwfl(UnwindState *us) {
     // we need to add at least one module to figure out the architecture (to
     // create the unwinding backend)
 
-    DsoHdr::DsoMap &map = us->dso_hdr._pid_map[us->pid]._map;
+    DsoHdr::DsoMap const &map = us->dso_hdr._pid_map[us->pid]._map;
     if (map.empty()) {
       int nb_elts;
       us->dso_hdr.pid_backpopulate(us->pid, nb_elts);
@@ -267,7 +268,8 @@ DDRes unwind_init_dwfl(UnwindState *us) {
     for (auto it = map.cbegin(); it != map.cend(); ++it) {
       const Dso &dso = it->second;
       if (dso.is_executable()) {
-        FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
+        FileInfoId_t const file_info_id =
+            us->dso_hdr.get_or_insert_file_info(dso);
         if (file_info_id <= k_file_info_error) {
           LG_DBG("Unable to find file for DSO %s", dso.to_string().c_str());
           continue;

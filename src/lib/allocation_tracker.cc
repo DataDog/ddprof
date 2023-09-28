@@ -43,8 +43,8 @@ TrackerThreadLocalState *AllocationTracker::get_tl_state() {
   // tls_get_addr can call into malloc, which can create a recursive loop
   // instead we call pthread APIs to control the creation of TLS objects
   pthread_once(&_key_once, make_key);
-  TrackerThreadLocalState *tl_state =
-      (TrackerThreadLocalState *)pthread_getspecific(_tl_state_key);
+  auto *tl_state = static_cast<TrackerThreadLocalState *>(
+      pthread_getspecific(_tl_state_key));
   return tl_state;
 }
 
@@ -75,7 +75,7 @@ TrackerThreadLocalState *AllocationTracker::init_tl_state() {
   return tl_state;
 }
 
-AllocationTracker::AllocationTracker() {}
+AllocationTracker::AllocationTracker() = default;
 
 AllocationTracker *AllocationTracker::create_instance() {
   static AllocationTracker tracker;
@@ -83,7 +83,7 @@ AllocationTracker *AllocationTracker::create_instance() {
 }
 
 void AllocationTracker::delete_tl_state(void *tl_state) {
-  delete (TrackerThreadLocalState *)tl_state;
+  delete static_cast<TrackerThreadLocalState *>(tl_state);
 }
 
 void AllocationTracker::make_key() {
@@ -278,7 +278,7 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
     return {};
   }
 
-  LostEvent *lost_event = reinterpret_cast<LostEvent *>(buffer.data());
+  auto *lost_event = reinterpret_cast<LostEvent *>(buffer.data());
   lost_event->hdr.size = sizeof(LostEvent);
   lost_event->hdr.misc = 0;
   lost_event->hdr.type = PERF_RECORD_LOST;
@@ -303,8 +303,7 @@ DDRes AllocationTracker::push_clear_live_allocation(
                            "Unable to get write lock on ring buffer");
   }
 
-  ClearLiveAllocationEvent *event =
-      reinterpret_cast<ClearLiveAllocationEvent *>(buffer.data());
+  auto *event = reinterpret_cast<ClearLiveAllocationEvent *>(buffer.data());
   event->hdr.misc = 0;
   event->hdr.size = sizeof(ClearLiveAllocationEvent);
   event->hdr.type = PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION;
@@ -353,8 +352,7 @@ DDRes AllocationTracker::push_dealloc_sample(
     return {};
   }
 
-  DeallocationEvent *event =
-      reinterpret_cast<DeallocationEvent *>(buffer.data());
+  auto *event = reinterpret_cast<DeallocationEvent *>(buffer.data());
   event->hdr.misc = 0;
   event->hdr.size = sizeof(DeallocationEvent);
   event->hdr.type = PERF_CUSTOM_EVENT_DEALLOCATION;
@@ -409,7 +407,7 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
     return {};
   }
 
-  AllocationEvent *event = reinterpret_cast<AllocationEvent *>(buffer.data());
+  auto *event = reinterpret_cast<AllocationEvent *>(buffer.data());
   event->hdr.misc = 0;
   event->hdr.size = sizeof_allocation_event(_stack_sample_size);
   event->hdr.type = PERF_RECORD_SAMPLE;
@@ -437,7 +435,7 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   event->size_stack = _stack_sample_size;
 
   std::byte *dyn_size_pos = event->data + _stack_sample_size;
-  uint64_t *dyn_size = reinterpret_cast<uint64_t *>(dyn_size_pos);
+  auto *dyn_size = reinterpret_cast<uint64_t *>(dyn_size_pos);
 
   assert(reinterpret_cast<uintptr_t>(dyn_size) % alignof(uint64_t) == 0);
 

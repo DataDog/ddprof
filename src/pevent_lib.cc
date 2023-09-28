@@ -39,7 +39,7 @@ DDRes pevent_create(PEventHdr *pevent_hdr, int watcher_idx,
   return {};
 }
 
-void display_system_config(void) {
+void display_system_config() {
   int val;
   DDRes const res = sys_perf_event_paranoid(val);
   if (IsDDResOK(res)) {
@@ -266,7 +266,7 @@ DDRes pevent_munmap_event(PEvent *event) {
                              "Error when using perfdisown for watcher #%d",
                              event->watcher_pos);
     }
-    event->rb.base = NULL;
+    event->rb.base = nullptr;
   }
   rb_free(&event->rb);
   return {};
@@ -332,10 +332,10 @@ DDRes pevent_cleanup(PEventHdr *pevent_hdr) {
   DDRes ret = ddres_init();
 
   // Cleanup both, storing the error if one was generated
-  if (DDRes ret_tmp = pevent_munmap(pevent_hdr); !IsDDResOK((ret_tmp))) {
+  if (DDRes const ret_tmp = pevent_munmap(pevent_hdr); !IsDDResOK((ret_tmp))) {
     ret = ret_tmp;
   }
-  if (DDRes ret_tmp = pevent_close(pevent_hdr); !IsDDResOK((ret_tmp))) {
+  if (DDRes const ret_tmp = pevent_close(pevent_hdr); !IsDDResOK((ret_tmp))) {
     ret = ret_tmp;
   }
   return ret;

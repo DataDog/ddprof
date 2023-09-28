@@ -21,7 +21,7 @@ void LiveAllocation::register_deallocation(uintptr_t address,
     LG_DBG("Unmatched de-allocation at %lx", address);
     return;
   }
-  ValuePerAddress &v = map_iter->second;
+  ValuePerAddress const &v = map_iter->second;
 
   // Decrement count and value of the corresponding PprofStacks::value_type
   // object

@@ -28,7 +28,7 @@ std::optional<std::string> container_id_from_line(const std::string &line) {
       "|" + std::string(TASK_SOURCE) + ")(?:.scope)? *$");
 
   if (std::regex_search(line, line_matches, LINE_REGEX)) {
-    std::string match = line_matches[1].str();
+    std::string const match = line_matches[1].str();
     if (std::regex_search(match, container_matches, CONTAINER_REGEX)) {
       return container_matches[1].str();
     }

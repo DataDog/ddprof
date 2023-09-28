@@ -23,7 +23,7 @@ uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
 const char *sample_type_name_from_idx(int idx) {
   static const char *sample_names[] = {PROFILE_TYPE_TABLE(X_STR)};
   if (idx < 0 || idx >= DDPROF_PWT_LENGTH) {
-    return NULL;
+    return nullptr;
   }
   return sample_names[idx];
 }
@@ -32,7 +32,7 @@ const char *sample_type_name_from_idx(int idx) {
 const char *sample_type_unit_from_idx(int idx) {
   static const char *sample_units[] = {PROFILE_TYPE_TABLE(X_STR)};
   if (idx < 0 || idx >= DDPROF_PWT_LENGTH) {
-    return NULL;
+    return nullptr;
   }
   return sample_units[idx];
 }
@@ -63,7 +63,7 @@ bool watcher_has_countable_sample_type(const PerfWatcher *watcher) {
 const char *event_type_name_from_idx(int idx) {
   static const char *event_names[] = {EVENT_CONFIG_TABLE(X_STR)}; // NOLINT
   if (idx < 0 || idx >= DDPROF_PWE_LENGTH) {
-    return NULL;
+    return nullptr;
   }
   return event_names[idx];
 }
@@ -86,7 +86,7 @@ int str_to_event_idx(const char *str) {
 
 const PerfWatcher *ewatcher_from_idx(int idx) {
   if (idx < 0 || idx >= DDPROF_PWE_LENGTH) {
-    return NULL;
+    return nullptr;
   }
   static const PerfWatcher events[] = {EVENT_CONFIG_TABLE(X_EVENTS)};
   return &events[idx];

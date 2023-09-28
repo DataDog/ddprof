@@ -50,7 +50,7 @@ void write_location(const FunLoc *loc, const MapInfo &mapinfo,
 } // namespace
 
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
-  size_t num_watchers = ctx.watchers.size();
+  size_t const num_watchers = ctx.watchers.size();
   ddog_prof_ValueType perf_value_type[DDPROF_PWT_LENGTH];
 
   // Figure out which sample_type_ids are used by active watchers
@@ -59,8 +59,8 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
   bool active_ids[DDPROF_PWT_LENGTH] = {};
   PerfWatcher *default_watcher = ctx.watchers.data();
   for (unsigned i = 0; i < num_watchers; ++i) {
-    int this_id = ctx.watchers[i].sample_type_id;
-    int count_id = sample_type_id_to_count_sample_type_id(this_id);
+    int const this_id = ctx.watchers[i].sample_type_id;
+    int const count_id = sample_type_id_to_count_sample_type_id(this_id);
     if (this_id < 0 || this_id == DDPROF_PWT_NOCOUNT ||
         this_id >= DDPROF_PWT_LENGTH) {
       if (this_id != DDPROF_PWT_NOCOUNT) {
@@ -106,13 +106,13 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
 
   // Update each watcher
   for (unsigned i = 0; i < num_watchers; ++i) {
-    int this_id = ctx.watchers[i].sample_type_id;
+    int const this_id = ctx.watchers[i].sample_type_id;
     if (this_id < 0 || this_id == DDPROF_PWT_NOCOUNT ||
         this_id >= DDPROF_PWT_LENGTH) {
       continue;
     }
-    int permuted_id = pv[ctx.watchers[i].sample_type_id];
-    int permuted_count_id =
+    int const permuted_id = pv[ctx.watchers[i].sample_type_id];
+    int const permuted_count_id =
         pv[watcher_to_count_sample_type_id(&ctx.watchers[i])];
 
     ctx.watchers[i].pprof_sample_idx = permuted_id;
@@ -122,8 +122,8 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
   }
 
   pprof->_nb_values = num_sample_type_ids;
-  ddog_prof_Slice_ValueType sample_types = {.ptr = perf_value_type,
-                                            .len = pprof->_nb_values};
+  ddog_prof_Slice_ValueType const sample_types = {.ptr = perf_value_type,
+                                                  .len = pprof->_nb_values};
 
   ddog_prof_Period period;
   if (num_sample_type_ids > 0) {
@@ -148,17 +148,17 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
 
   // Add relevant tags
   {
-    bool include_kernel =
+    bool const include_kernel =
         pevent_include_kernel_events(&ctx.worker_ctx.pevent_hdr);
-    pprof->_tags.push_back(std::make_pair(
-        std::string("include_kernel"),
-        include_kernel ? std::string("true") : std::string("false")));
+    pprof->_tags.emplace_back(std::string("include_kernel"),
+                              include_kernel ? std::string("true")
+                                             : std::string("false"));
   }
   {
     // custom context
     // Allow the data to be split by container-id
-    pprof->_tags.push_back(std::make_pair(std::string("ddprof.custom_ctx"),
-                                          std::string("container_id")));
+    pprof->_tags.emplace_back(std::string("ddprof.custom_ctx"),
+                              std::string("container_id"));
   }
 
   return ddres_init();
@@ -251,7 +251,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   }
   assert(labels_num <= k_max_pprof_labels);
 
-  ddog_prof_Sample sample = {
+  ddog_prof_Sample const sample = {
       .locations = {.ptr = locations_buff, .len = cur_loc},
       .values = {.ptr = values, .len = pprof->_nb_values},
       .labels = {.ptr = labels, .len = labels_num},
@@ -283,7 +283,7 @@ void ddprof_print_sample(const UnwindOutput &uw_output,
                          const PerfWatcher &watcher) {
 
   const auto &symbol_table = symbol_hdr._symbol_table;
-  std::span locs{uw_output.locs};
+  std::span const locs{uw_output.locs};
 
   const char *sample_name = sample_type_name_from_idx(
       sample_type_id_to_count_sample_type_id(watcher.sample_type_id));
@@ -298,7 +298,7 @@ void ddprof_print_sample(const UnwindOutput &uw_output,
     }
     if (sym._symname.empty()) {
       if (loc_it->ip == 0) {
-        std::string_view path{sym._srcpath};
+        std::string_view const path{sym._srcpath};
         auto pos = path.rfind('/');
         buf += "(";
         buf += path.substr(pos == std::string_view::npos ? 0 : pos + 1);
@@ -307,7 +307,7 @@ void ddprof_print_sample(const UnwindOutput &uw_output,
         buf += string_format("%p", loc_it->ip);
       }
     } else {
-      std::string_view func{sym._symname};
+      std::string_view const func{sym._symname};
       buf += func.substr(0, func.find('('));
     }
   }

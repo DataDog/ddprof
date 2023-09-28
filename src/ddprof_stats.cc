@@ -22,10 +22,10 @@ const unsigned int stats_types[] = {STATS_TABLE(X_TYPES)};
 #undef X_TYPES
 
 // Region (to be mmap'd here) for backend store
-long *ddprof_stats = NULL;
+long *ddprof_stats = nullptr;
 } // namespace
 
-DDRes ddprof_stats_init(void) {
+DDRes ddprof_stats_init() {
   // This interface cannot be used to reset the existing mapping; to do so free
   // and then re-initialize.
 
@@ -33,7 +33,7 @@ DDRes ddprof_stats_init(void) {
     return ddres_init();
   }
 
-  ddprof_stats = static_cast<long *>(mmap(NULL, sizeof(long) * STATS_LEN,
+  ddprof_stats = static_cast<long *>(mmap(nullptr, sizeof(long) * STATS_LEN,
                                           PROT_READ | PROT_WRITE,
                                           MAP_SHARED | MAP_ANONYMOUS, -1, 0));
   if (MAP_FAILED == ddprof_stats) {
@@ -52,7 +52,7 @@ DDRes ddprof_stats_free() {
     DDRES_CHECK_INT(munmap(ddprof_stats, sizeof(long) * STATS_LEN),
                     DD_WHAT_DDPROF_STATS, "Error from munmap");
   }
-  ddprof_stats = NULL;
+  ddprof_stats = nullptr;
 
   return ddres_init();
 }
@@ -65,7 +65,7 @@ DDRes ddprof_stats_add(unsigned int stat, long in, long *out) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Invalid stat");
   }
 
-  long retval = __sync_add_and_fetch(&ddprof_stats[stat], in);
+  long const retval = __sync_add_and_fetch(&ddprof_stats[stat], in);
 
   if (out) {
     *out = retval;

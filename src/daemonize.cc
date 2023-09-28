@@ -48,11 +48,11 @@ DaemonizeResult daemonize() {
 
       sa.sa_handler = &handle_signal;
       sa.sa_flags = 0;
-      if (sigaction(SIGTERM, &sa, NULL) == -1) {
+      if (sigaction(SIGTERM, &sa, nullptr) == -1) {
         exit(1);
       }
 
-      // Block until our child exits or sends us a SIGTERM signal
+      // Block until our child exits or sends us a SIGTERM signal.
       // In the happy path, child will send us a SIGTERM signal, that we catch
       // and then exit normally (to free resources and make valgrind happy).
       waitpid(child_pid, nullptr, 0);
@@ -79,7 +79,7 @@ DaemonizeResult daemonize() {
 
   // If I'm the target PID, then now it's time to wait until my
   // child, the middle PID, returns.
-  waitpid(temp_pid, NULL, 0);
+  waitpid(temp_pid, nullptr, 0);
   return {DaemonizeResult::InitialProcess, temp_pid, parent_pid,
           grandchild_pid};
 }

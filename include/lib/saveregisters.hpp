@@ -40,7 +40,9 @@ DDPROF_NOINLINE __attribute__((naked)) void
 
 #  define save_registers(regs)                                                 \
     ({                                                                         \
-      register uint64_t base_ptr __asm__("x0") = (uint64_t)(regs).data();      \
+      /* NOLINTNEXTLINE(misc-const-correctness) */                             \
+      register uint64_t base_ptr __asm__("x0") =                               \
+          reinterpret_cast<uint64_t>((regs).data());                           \
       __asm__ __volatile__("stp x0, x1, [%[base], #0]\n"                       \
                            "stp x2, x3, [%[base], #16]\n"                      \
                            "stp x4, x5, [%[base], #32]\n"                      \

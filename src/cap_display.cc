@@ -22,10 +22,10 @@ static const struct CapFlag2Text s_cap_flag_text[] = {
     {"CAP_PERMITTED", CAP_PERMITTED},
 };
 
-#define SZ_CAP_2_TEXT 3
+enum { SZ_CAP_2_TEXT = 3 };
 
 DDRes log_capabilities(bool verbose) {
-  pid_t pid = getpid();
+  pid_t const pid = getpid();
   cap_t cap_struct = cap_get_pid(pid);
   ssize_t text_size = 0;
   char *pcap_text = cap_to_text(cap_struct, &text_size);
@@ -35,11 +35,10 @@ DDRes log_capabilities(bool verbose) {
     for (int i = 0; i < CAP_LAST_CAP; ++i) {
       char *lcap = cap_to_name(i);
       cap_flag_value_t value;
-      for (int flag_idx = 0; flag_idx < SZ_CAP_2_TEXT; ++flag_idx) {
-        DDRES_CHECK_INT(cap_get_flag(cap_struct, i,
-                                     s_cap_flag_text[flag_idx]._value, &value),
+      for (auto flag_idx : s_cap_flag_text) {
+        DDRES_CHECK_INT(cap_get_flag(cap_struct, i, flag_idx._value, &value),
                         DD_WHAT_CAPLIB, "Error retrieving capabilities.");
-        LG_NTC("Cap=%s, flag=%s --> %s", lcap, s_cap_flag_text[flag_idx]._text,
+        LG_NTC("Cap=%s, flag=%s --> %s", lcap, flag_idx._text,
                value == CAP_SET ? "ON" : "OFF");
       }
       cap_free(lcap);

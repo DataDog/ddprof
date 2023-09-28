@@ -54,7 +54,7 @@ struct UnwindState {
   ProcessHdr process_hdr;
 
   pid_t pid;
-  char *stack;
+  const char *stack;
   size_t stack_sz;
 
   UnwindRegisters initial_regs;

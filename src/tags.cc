@@ -8,6 +8,7 @@
 #include "logger.hpp"
 #include "thread_info.hpp"
 
+#include <algorithm>
 #include <utility>
 
 namespace ddprof {
@@ -36,24 +37,19 @@ inline bool ValidateTags(std::string_view tag) {
 
   ////////////////////////////////////////////////////////
   // Verify each character
-  for (size_t n = 0; n < tag.length(); n++) {
-    const char c = tag.at(n);
-    if (std::isalnum(c) || c == '_' || c == '-' || c == ':' || c == '.' ||
-        c == '/' || c == '\\') {
-      continue;
-    }
-    return false;
-  }
-  return true;
+  return std::ranges::all_of(tag, [](auto c) {
+    return std::isalnum(c) || c == '_' || c == '-' || c == ':' || c == '.' ||
+        c == '/' || c == '\\';
+  });
 }
 
 Tag split_kv(std::string_view str_view, char c = ':') {
-  size_t pos = str_view.find(c);
+  size_t const pos = str_view.find(c);
 
   // Check if no ':' character was found or if it's the last character
   if (pos == std::string_view::npos || pos == str_view.size() - 1) {
     LG_WRN("[TAGS] Error, bad tag value %s", str_view.data());
-    return Tag();
+    return {};
   }
 
   return {std::string(str_view.substr(0, pos)),
@@ -71,7 +67,7 @@ void split(std::string_view str_view, Tags &tags, char c) {
       end = str_view.size();
     }
 
-    std::string_view tag = str_view.substr(begin, end - begin);
+    std::string_view const tag = str_view.substr(begin, end - begin);
 
     if (!ValidateTags(tag)) {
       LG_WRN("[TAGS] Bad tag value - skip %s", tag.data());
@@ -95,9 +91,9 @@ UserTags::UserTags(std::string_view tag_str, int nproc) {
   if (!tag_str.empty()) {
     split(tag_str, _tags);
   }
-  _tags.push_back({"number_of_cpu_cores", std::to_string(nproc)});
-  _tags.push_back(
-      {"number_hw_concurent_threads", std::to_string(get_nb_hw_thread())});
+  _tags.emplace_back("number_of_cpu_cores", std::to_string(nproc));
+  _tags.emplace_back("number_hw_concurent_threads",
+                     std::to_string(get_nb_hw_thread()));
 }
 
 } // namespace ddprof

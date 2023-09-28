@@ -867,7 +867,7 @@ void uninstall_handler() {
   sigemptyset(&sa.sa_mask);
   sa.sa_flags = 0;
   sa.sa_handler = SIG_IGN;
-  sigaction(g_timer_sig, &sa, NULL);
+  sigaction(g_timer_sig, &sa, nullptr);
 }
 
 void uninstall_timer() {
@@ -901,7 +901,7 @@ int install_timer(std::chrono::milliseconds initial_loaded_libs_check_delay,
   sa.sa_flags = SA_SIGINFO | SA_RESTART;
   sa.sa_sigaction = timer_handler;
   sigemptyset(&sa.sa_mask);
-  if (sigaction(g_timer_sig, &sa, NULL) == -1) {
+  if (sigaction(g_timer_sig, &sa, nullptr) == -1) {
     return -1;
   }
 
@@ -917,7 +917,7 @@ int install_timer(std::chrono::milliseconds initial_loaded_libs_check_delay,
   itimerspec const its = {
       .it_interval = duration_to_timespec(loaded_libs_check_interval),
       .it_value = duration_to_timespec(initial_loaded_libs_check_delay)};
-  if (timer_settime(g_timerid, 0, &its, NULL) == -1) {
+  if (timer_settime(g_timerid, 0, &its, nullptr) == -1) {
     uninstall_timer();
     return -1;
   }

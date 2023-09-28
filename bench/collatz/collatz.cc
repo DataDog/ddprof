@@ -5,10 +5,10 @@
 
 #include <array>
 #include <chrono>
-#include <pthread.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <pthread.h>
 #include <sys/mman.h>
 #include <sys/sysinfo.h>
 #include <sys/types.h>
@@ -33,13 +33,13 @@
 #  define VER_REV "custom"
 #endif
 
-unsigned long *counter = NULL;
+unsigned long *counter = nullptr;
 unsigned long my_counter = 0;
 
 // Helper for processing input
 #define P(s, d)                                                                \
   ({                                                                           \
-    long _t = strtoll(s, NULL, 10);                                            \
+    const long _t = strtoll(s, NULL, 10);                                      \
     if (_t)                                                                    \
       (d) = _t;                                                                \
   })
@@ -47,7 +47,7 @@ unsigned long my_counter = 0;
 // This is the function body for every expanded function in the X-table
 #define FUNBOD                                                                 \
   {                                                                            \
-    int64_t n = x & 1 ? x * 3 + 1 : x / 2;                                     \
+    const int64_t n = x & 1 ? x * 3 + 1 : x / 2;                               \
     my_counter += 1;                                                           \
     return 1 >= n ? 1 : funs[n % funlen](n);                                   \
   }
@@ -84,7 +84,8 @@ void print_version() {
   printf("\n");
 }
 
-#define MAX_PROCS 1000
+constexpr int k_max_procs{1000};
+
 // Program entrypoint
 int main(int c, char **v) {
   // Define and ingest parameters
@@ -124,8 +125,8 @@ int main(int c, char **v) {
     if (n < 0) {
       n = get_nprocs();
     }
-    if (n > MAX_PROCS) {
-      n = MAX_PROCS;
+    if (n > k_max_procs) {
+      n = k_max_procs;
     }
   }
   if (c > 2) {
@@ -159,16 +160,16 @@ int main(int c, char **v) {
   static thread_local unsigned long work_start;
   static thread_local unsigned long work_end;
   static thread_local unsigned long last_counter = 0;
-  unsigned long *start_tick = static_cast<unsigned long *>(
-      mmap(NULL, MAX_PROCS * sizeof(unsigned long), PROT_READ | PROT_WRITE,
+  auto *start_tick = static_cast<unsigned long *>(
+      mmap(nullptr, k_max_procs * sizeof(unsigned long), PROT_READ | PROT_WRITE,
            MAP_SHARED | MAP_ANONYMOUS, -1, 0));
-  unsigned long *end_tick = static_cast<unsigned long *>(
-      mmap(NULL, MAX_PROCS * sizeof(unsigned long), PROT_READ | PROT_WRITE,
+  auto *end_tick = static_cast<unsigned long *>(
+      mmap(nullptr, k_max_procs * sizeof(unsigned long), PROT_READ | PROT_WRITE,
            MAP_SHARED | MAP_ANONYMOUS, -1, 0));
-  pid_t pids[MAX_PROCS] = {};
+  pid_t pids[k_max_procs] = {};
   pids[0] = getpid();
   counter = static_cast<unsigned long *>(
-      mmap(NULL, sizeof(unsigned long), PROT_READ | PROT_WRITE,
+      mmap(nullptr, sizeof(unsigned long), PROT_READ | PROT_WRITE,
            MAP_SHARED | MAP_ANONYMOUS, -1, 0));
   *counter = 0;
 
@@ -181,8 +182,8 @@ int main(int c, char **v) {
 
   // Setup barrier for coordination
   pthread_barrierattr_t bat = {};
-  pthread_barrier_t *pb = static_cast<pthread_barrier_t *>(
-      mmap(NULL, sizeof(pthread_barrier_t), PROT_READ | PROT_WRITE,
+  auto *pb = static_cast<pthread_barrier_t *>(
+      mmap(nullptr, sizeof(pthread_barrier_t), PROT_READ | PROT_WRITE,
            MAP_SHARED | MAP_ANONYMOUS, -1, 0));
   pthread_barrierattr_init(&bat);
   pthread_barrierattr_setpshared(&bat, 1);
@@ -211,7 +212,7 @@ int main(int c, char **v) {
 
     work_start = ddprof::get_tsc_cycles();
     for (int i = 0; i < kj; i++) {
-      int arg = t ? t : i;
+      const int arg = t ? t : i;
       funs[arg % funlen](arg);
     }
 
@@ -247,10 +248,10 @@ int main(int c, char **v) {
   // Print results
   if (getpid() == pids[0]) {
     printf("%lu, %llu, %f\n", *counter, ticks,
-           ((double)ticks) / ((double)*counter));
+           static_cast<double>(ticks) / (*counter));
 
 #ifdef USE_DD_PROFILING
-    std::chrono::seconds stop_timeout{1};
+    const std::chrono::seconds stop_timeout{1};
     ddprof_stop_profiling(std::chrono::seconds(stop_timeout).count());
 #endif
   }

@@ -17,13 +17,12 @@
 #include <unistd.h>
 #include <vector>
 
-#define DEFAULT_PAGE_SIZE 4096 // Concerned about hugepages?
-
 namespace ddprof {
 
 namespace {
 long s_page_size = 0;
-}
+constexpr size_t k_default_page_size{4096}; // Concerned about hugepages?
+} // namespace
 
 struct perf_event_attr g_dd_native_attr = {
     .size = sizeof(struct perf_event_attr),
@@ -42,11 +41,11 @@ struct perf_event_attr g_dd_native_attr = {
     .sample_regs_user = k_perf_register_mask,
 };
 
-long get_page_size(void) {
+long get_page_size() {
   if (!s_page_size) {
     s_page_size = sysconf(_SC_PAGESIZE);
     // log if we have an unusual page size
-    if (s_page_size != DEFAULT_PAGE_SIZE) {
+    if (s_page_size != k_default_page_size) {
       LG_WRN("Page size is %ld", s_page_size);
     }
   }
@@ -117,15 +116,15 @@ void *perfown_sz(int fd, size_t size_of_buffer) {
   // (minus metadata size) to avoid handling boundaries.
   size_t const total_length = 2 * size_of_buffer - get_page_size();
   // Reserve twice the size of the buffer
-  void *region =
-      mmap(NULL, total_length, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  void *region = mmap(nullptr, total_length, PROT_NONE,
+                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (MAP_FAILED == region || !region) {
-    return NULL;
+    return nullptr;
   }
 
   auto defer_munmap = make_defer([&]() { perfdisown(region, size_of_buffer); });
 
-  std::byte *ptr = static_cast<std::byte *>(region);
+  auto *ptr = static_cast<std::byte *>(region);
 
   // Each mapping of fd must have a size of 2^n+1 pages
   // That's why starts by mapping buffer on the second half of reserved
@@ -133,14 +132,14 @@ void *perfown_sz(int fd, size_t size_of_buffer) {
   if (mmap(ptr + size_of_buffer - get_page_size(), size_of_buffer,
            PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd,
            0) == MAP_FAILED) {
-    return NULL;
+    return nullptr;
   }
 
   // Map buffer a second time on the first half of reserved space
   // It will overlap the metadata page of the previous mapping.
   if (mmap(ptr, size_of_buffer, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED,
            fd, 0) == MAP_FAILED) {
-    return NULL;
+    return nullptr;
   }
 
   defer_munmap.release();
@@ -153,7 +152,7 @@ void *perfown_sz(int fd, size_t size_of_buffer) {
 }
 
 int perfdisown(void *region, size_t size) {
-  std::byte *ptr = static_cast<std::byte *>(region);
+  auto *ptr = static_cast<std::byte *>(region);
 
   return (munmap(ptr + size - get_page_size(), size) == 0) &&
           (munmap(ptr, size) == 0) &&
@@ -189,16 +188,19 @@ uint64_t perf_value_from_sample(const PerfWatcher *watcher,
       }
       switch (raw_sz) {
       case 1:
-        val = *(uint8_t *)(sample->data_raw + raw_offset);
+        val = *reinterpret_cast<const uint8_t *>(sample->data_raw + raw_offset);
         break;
       case 2:
-        val = *(uint16_t *)(sample->data_raw + raw_offset);
+        val =
+            *reinterpret_cast<const uint16_t *>(sample->data_raw + raw_offset);
         break;
       case 4:
-        val = *(uint32_t *)(sample->data_raw + raw_offset);
+        val =
+            *reinterpret_cast<const uint32_t *>(sample->data_raw + raw_offset);
         break;
       case 8: // NOLINT(readability-magic-numbers)
-        val = *(uint64_t *)(sample->data_raw + raw_offset);
+        val =
+            *reinterpret_cast<const uint64_t *>(sample->data_raw + raw_offset);
         break;
       default:
         assert(0 && "Non-integral size for raw value");

@@ -36,13 +36,13 @@ using namespace ddprof;
 namespace fs = std::filesystem;
 
 // NOLINTBEGIN(bugprone-reserved-identifier,cert-dcl37-c*,cert-dcl51-c*,)
-// address of embedded libddprofiling shared library
+// address of embedded libdd_profiling shared library
 extern const char _binary_libdd_profiling_embedded_so_start[];
 extern const char _binary_libdd_profiling_embedded_so_end[];
 // NOLINTEND(bugprone-reserved-identifier,cert-dcl37-c*,cert-dcl51-c*,)
 
 #ifdef DDPROF_USE_LOADER
-// address of embedded libddloader shared library
+// address of embedded libdd_loader shared library
 extern const char _binary_libdd_loader_so_start[]; // NOLINT(cert-dcl51-cpp)
 extern const char _binary_libdd_loader_so_end[];   // NOLINT(cert-dcl51-cpp)
 #endif
@@ -56,7 +56,7 @@ enum class InputResult { kSuccess, kStop, kError };
 void maybe_slowdown_startup() {
   // Simulate startup slowdown if requested
   if (const char *s = getenv(k_startup_wait_ms_env_variable); s != nullptr) {
-    std::string_view sv{s};
+    std::string_view const sv{s};
     int wait_ms = 0;
     auto [ptr, ec] = std::from_chars(sv.begin(), sv.end(), wait_ms);
     if (ec == std::errc() && ptr == sv.end() && wait_ms > 0) {
@@ -95,20 +95,20 @@ public:
   TempFileHolder(const TempFileHolder &) = delete;
   TempFileHolder &operator=(const TempFileHolder &) = delete;
 
-  TempFileHolder(TempFileHolder &&other) : TempFileHolder() {
+  TempFileHolder(TempFileHolder &&other) noexcept : TempFileHolder() {
     *this = std::move(other);
   }
 
-  TempFileHolder &operator=(TempFileHolder &&other) {
+  TempFileHolder &operator=(TempFileHolder &&other) noexcept {
     using std::swap;
     swap(_path, other._path);
     swap(_is_temporary, other._is_temporary);
     return *this;
   }
 
-  const std::string &path() const { return _path; }
+  [[nodiscard]] const std::string &path() const { return _path; }
 
-  bool is_temporary() const { return _is_temporary; }
+  [[nodiscard]] bool is_temporary() const { return _is_temporary; }
 
   std::string release() {
     std::string s = std::move(_path);
@@ -203,7 +203,7 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
 
     // Determine if library should be injected into target process
     // (ie. only if allocation profiling is active)
-    bool allocation_profiling_started_from_wrapper =
+    bool const allocation_profiling_started_from_wrapper =
         context_allocation_profiling_watcher_idx(*ctx) != -1;
 
     UniqueFd child_socket;
@@ -243,8 +243,9 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
       // non-daemon process: return control to caller
       child_socket.reset();
 
-      std::string dd_loader_lib_path = dd_loader_lib_holder.release();
-      std::string dd_profiling_lib_path = dd_profiling_lib_holder.release();
+      std::string const dd_loader_lib_path = dd_loader_lib_holder.release();
+      std::string const dd_profiling_lib_path =
+          dd_profiling_lib_holder.release();
 
       // Allocation profiling activated, inject dd_profiling library with
       // LD_PRELOAD
@@ -270,7 +271,7 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
         setenv(k_profiler_active_env_variable, "0", 1);
       }
 
-      parent_socket.release();
+      (void)parent_socket.release();
       return 0;
     }
 
@@ -318,8 +319,8 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
 
     int alloc_watcher_idx = context_allocation_profiling_watcher_idx(*ctx);
     if (alloc_watcher_idx != -1) {
-      std::span pevents{ctx->worker_ctx.pevent_hdr.pes,
-                        ctx->worker_ctx.pevent_hdr.size};
+      std::span const pevents{ctx->worker_ctx.pevent_hdr.pes,
+                              ctx->worker_ctx.pevent_hdr.size};
       auto event_it =
           std::find_if(pevents.begin(), pevents.end(),
                        [alloc_watcher_idx](const auto &pevent) {
@@ -396,11 +397,11 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
 }
 
 // This function only returns in wrapper mode for control (non-ddprof) process
-static void start_profiler(std::unique_ptr<DDProfContext> ctx) {
+void start_profiler(std::unique_ptr<DDProfContext> ctx) {
   bool exit_on_return = false;
 
   // ownership of context is passed to start_profiler_internal
-  int res = start_profiler_internal(std::move(ctx), exit_on_return);
+  int const res = start_profiler_internal(std::move(ctx), exit_on_return);
   if (exit_on_return) {
     exit(res);
   }
@@ -422,7 +423,7 @@ int main(int argc, char *argv[]) {
     auto ctx = std::make_unique<DDProfContext>();
     {
       DDProfCLI cli;
-      int res = cli.parse(argc, const_cast<const char **>(argv));
+      int const res = cli.parse(argc, const_cast<const char **>(argv));
       if (!cli.continue_exec) {
         return res;
       }
@@ -437,7 +438,7 @@ int main(int argc, char *argv[]) {
     } // cli is destroyed here (prevents forks from having an instance of CLI
 
     // Save switch_user since ctx will be destroyed after call to start_profiler
-    std::string switch_user = ctx->params.switch_user;
+    std::string const switch_user = ctx->params.switch_user;
 
     /**************************************************************************\
     |                             Run the Profiler |

@@ -13,8 +13,8 @@ namespace ddprof {
 
 namespace {
 Symbol symbol_from_pid(pid_t pid) {
-  std::string pid_str = string_format("pid_%d", pid);
-  return Symbol(std::string(), std::string(), 0, pid_str);
+  std::string const pid_str = string_format("pid_%d", pid);
+  return {std::string(), std::string(), 0, pid_str};
 }
 } // namespace
 
@@ -24,7 +24,8 @@ BaseFrameSymbolLookup::insert_bin_symbol(pid_t pid, SymbolTable &symbol_table,
                                          DsoHdr &dso_hdr) {
   SymbolIdx_t symbol_idx = -1;
 
-  DsoHdr::DsoFindRes find_res = dso_hdr.dso_find_first_std_executable(pid);
+  DsoHdr::DsoFindRes const find_res =
+      dso_hdr.dso_find_first_std_executable(pid);
   if (find_res.second && dso::has_relevant_path(find_res.first->second._type)) {
     // todo : how to tie lifetime of DSO to this ?
     symbol_idx =
@@ -32,7 +33,7 @@ BaseFrameSymbolLookup::insert_bin_symbol(pid_t pid, SymbolTable &symbol_table,
     _bin_map.insert({pid, symbol_idx});
   } else {
     std::string exe_name;
-    bool exe_found = dso_hdr.find_exe_name(pid, exe_name);
+    bool const exe_found = dso_hdr.find_exe_name(pid, exe_name);
     if (exe_found) {
       symbol_idx = symbol_table.size();
       symbol_table.emplace_back(Symbol({}, {}, 0, exe_name));

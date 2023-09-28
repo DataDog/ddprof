@@ -24,15 +24,13 @@ bool rb_init(RingBuffer *rb, void *base, size_t size,
   rb->type = ring_buffer_type;
   switch (ring_buffer_type) {
   case RingBufferType::kPerfRingBuffer: {
-    perf_event_mmap_page *meta =
-        reinterpret_cast<perf_event_mmap_page *>(rb->base);
+    auto *meta = reinterpret_cast<perf_event_mmap_page *>(rb->base);
     rb->reader_pos = reinterpret_cast<uint64_t *>(&meta->data_tail);
     rb->writer_pos = reinterpret_cast<uint64_t *>(&meta->data_head);
     break;
   }
   case RingBufferType::kMPSCRingBuffer: {
-    MPSCRingBufferMetaDataPage *meta =
-        reinterpret_cast<MPSCRingBufferMetaDataPage *>(rb->base);
+    auto *meta = reinterpret_cast<MPSCRingBufferMetaDataPage *>(rb->base);
     rb->reader_pos = &meta->reader_pos;
     rb->writer_pos = &meta->writer_pos;
     rb->spinlock = &meta->spinlock;
@@ -76,7 +74,7 @@ bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,
   *hdr = sample->header;
   hdr->size = 0; // update size at end
 
-  uint64_t *buf = (uint64_t *)&hdr[1]; // buffer starts at sample
+  auto *buf = reinterpret_cast<uint64_t *>(&hdr[1]); // buffer starts at sample
 
   if (sz >= sz_hdr) {
     return false;
@@ -91,8 +89,8 @@ bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,
     SZ_CHECK;
   }
   if (PERF_SAMPLE_TID & mask) {
-    ((flipper *)buf)->half[0] = sample->pid;
-    ((flipper *)buf)->half[1] = sample->tid;
+    (reinterpret_cast<flipper *>(buf))->half[0] = sample->pid;
+    (reinterpret_cast<flipper *>(buf))->half[1] = sample->tid;
     buf++;
     SZ_CHECK;
   }
@@ -113,8 +111,8 @@ bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,
     SZ_CHECK;
   }
   if (PERF_SAMPLE_CPU & mask) {
-    ((flipper *)buf)->half[0] = sample->cpu;
-    ((flipper *)buf)->half[1] = sample->res;
+    (reinterpret_cast<flipper *>(buf))->half[0] = sample->cpu;
+    (reinterpret_cast<flipper *>(buf))->half[1] = sample->res;
     SZ_CHECK;
   }
   if (PERF_SAMPLE_PERIOD & mask) {
@@ -122,7 +120,7 @@ bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,
     SZ_CHECK;
   }
   if (PERF_SAMPLE_READ & mask) {
-    *((struct read_format *)buf) = *sample->v;
+    *(reinterpret_cast<struct read_format *>(buf)) = *sample->v;
     buf += sizeof(struct read_format) /
         sizeof(size_t); // read_format is uint64_t's
     sz += sizeof(struct read_format);
@@ -143,8 +141,9 @@ bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,
     buf += sample->nr;
   }
   if (PERF_SAMPLE_RAW & mask) {
-    ((flipper *)buf)->half[0] = sample->size_raw;
-    memcpy(&((flipper *)buf)->half[1], sample->data_raw, sample->size_raw);
+    (reinterpret_cast<flipper *>(buf))->half[0] = sample->size_raw;
+    memcpy(&(reinterpret_cast<flipper *>(buf))->half[1], sample->data_raw,
+           sample->size_raw);
     buf += 1 + (sample->size_raw / sizeof(*buf));
     SZ_CHECK;
   }
@@ -192,7 +191,8 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
   static perf_event_sample sample = {};
   sample.header = *hdr;
 
-  uint64_t *buf = (uint64_t *)&hdr[1]; // sample starts after header
+  const auto *buf =
+      reinterpret_cast<const uint64_t *>(&hdr[1]); // sample starts after header
 
   if (PERF_SAMPLE_IDENTIFIER & mask) {
     sample.sample_id = *buf++;
@@ -201,8 +201,8 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
     sample.ip = *buf++;
   }
   if (PERF_SAMPLE_TID & mask) {
-    sample.pid = ((flipper *)buf)->half[0];
-    sample.tid = ((flipper *)buf)->half[1];
+    sample.pid = (reinterpret_cast<const flipper *>(buf))->half[0];
+    sample.tid = (reinterpret_cast<const flipper *>(buf))->half[1];
     buf++;
   }
   if (PERF_SAMPLE_TIME & mask) {
@@ -218,15 +218,15 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
     sample.stream_id = *buf++;
   }
   if (PERF_SAMPLE_CPU & mask) {
-    sample.cpu = ((flipper *)buf)->half[0];
-    sample.res = ((flipper *)buf)->half[1];
+    sample.cpu = (reinterpret_cast<const flipper *>(buf))->half[0];
+    sample.res = (reinterpret_cast<const flipper *>(buf))->half[1];
     buf++;
   }
   if (PERF_SAMPLE_PERIOD & mask) {
     sample.period = *buf++;
   }
   if (PERF_SAMPLE_READ & mask) {
-    sample.v = (struct read_format *)buf++;
+    sample.v = reinterpret_cast<const struct read_format *>(buf++);
   }
 
   if (PERF_SAMPLE_CALLCHAIN & mask) {
@@ -236,9 +236,11 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
   }
   if (PERF_SAMPLE_RAW & mask) {
     // size_raw is a 32-bit integer!
-    sample.size_raw = ((flipper *)buf)->half[0];
-    sample.data_raw =
-        sample.size_raw ? (char *)&((flipper *)buf)->half[1] : NULL;
+    sample.size_raw = (reinterpret_cast<const flipper *>(buf))->half[0];
+    sample.data_raw = sample.size_raw
+        ? reinterpret_cast<const char *>(
+              &(reinterpret_cast<const flipper *>(buf))->half[1])
+        : nullptr;
     buf += 1 + (sample.size_raw / sizeof(*buf)); // Advance + align
   }
   if (PERF_SAMPLE_BRANCH_STACK & mask) {}
@@ -247,7 +249,7 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
     // ddprof only has register definitions for 64-bit processors.  Reject
     // everything else for now.
     if (sample.abi != PERF_SAMPLE_REGS_ABI_64) {
-      return NULL;
+      return nullptr;
     }
     sample.regs = buf;
     buf += k_perf_register_count;
@@ -260,10 +262,10 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
     if (size_stack == 0) {
       sample.size_stack = 0;
       sample.dyn_size_stack = 0;
-      sample.data_stack = NULL;
+      sample.data_stack = nullptr;
     } else {
       uint64_t dynsz_stack = 0;
-      sample.data_stack = (char *)buf;
+      sample.data_stack = reinterpret_cast<const char *>(buf);
       buf += (size_stack + sizeof(uint64_t) - 1) /
           sizeof(uint64_t); // align (/8 as it is uint64)
 
@@ -303,11 +305,11 @@ uint64_t hdr_time(struct perf_event_header *hdr, uint64_t mask) {
   // full sample2hdr computation, we do an abbreviated lookup from the top of
   // the header
   case PERF_RECORD_SAMPLE: {
-    buf = (uint8_t *)&hdr[1];
+    buf = reinterpret_cast<uint8_t *>(&hdr[1]);
     uint64_t mbits = PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_IP | PERF_SAMPLE_TID;
     mbits &= mask;
-    return *(uint64_t *)&buf[static_cast<ptrdiff_t>(sizeof(uint64_t) *
-                                                    std::popcount(mbits))];
+    return *reinterpret_cast<uint64_t *>(
+        &buf[static_cast<ptrdiff_t>(sizeof(uint64_t) * std::popcount(mbits))]);
   }
   // For non-sample type events, the time is in the sample_id struct which is
   // at the very end of the feed.  We seek to the top of the header, which
@@ -325,8 +327,10 @@ uint64_t hdr_time(struct perf_event_header *hdr, uint64_t mask) {
     sampleid_mask_bits &= PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ID |
         PERF_SAMPLE_STREAM_ID | PERF_SAMPLE_CPU | PERF_SAMPLE_IDENTIFIER;
     sampleid_mask_bits = std::popcount(sampleid_mask_bits);
-    buf = ((uint8_t *)hdr) + hdr->size - sizeof(uint64_t) * sampleid_mask_bits;
-    return *(uint64_t *)&buf[(mask & PERF_SAMPLE_TID) ? sizeof(uint64_t) : 0];
+    buf = (reinterpret_cast<uint8_t *>(hdr)) + hdr->size -
+        sizeof(uint64_t) * sampleid_mask_bits;
+    return *reinterpret_cast<uint64_t *>(
+        &buf[(mask & PERF_SAMPLE_TID) ? sizeof(uint64_t) : 0]);
   default:
     break;
   }

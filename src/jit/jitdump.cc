@@ -39,7 +39,7 @@ DDRes jit_read_header(std::ifstream &file_stream, JITHeader &header) {
   } else {
     DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Unknown jit format(%x)", header.magic);
   }
-  int64_t remaining_size = header.total_size - sizeof(header);
+  int64_t const remaining_size = header.total_size - sizeof(header);
   if (remaining_size > 0) {
     if (!file_stream.seekg(remaining_size)) {
       DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "incomplete jit file");
@@ -99,13 +99,13 @@ DDRes jit_read_code_load(std::ifstream &file_stream,
   code_load.code_size = load<uint64_t>(&buf);
   code_load.code_index = load<uint64_t>(&buf);
   // remaining = total - (everything we read)
-  int remaining_size = code_load.prefix.total_size - sizeof(JITRecordPrefix) -
-      JITRecordCodeLoad::k_size_integers;
+  int const remaining_size = code_load.prefix.total_size -
+      sizeof(JITRecordPrefix) - JITRecordCodeLoad::k_size_integers;
   if (remaining_size < static_cast<int>(code_load.code_size)) {
     // inconsistency
     DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Incomplete code load structure");
   }
-  int str_size = remaining_size - code_load.code_size;
+  int const str_size = remaining_size - code_load.code_size;
   if (str_size > 1) {
     code_load.func_name = std::string(buf, str_size - 1);
   }

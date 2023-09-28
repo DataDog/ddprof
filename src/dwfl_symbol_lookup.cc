@@ -52,14 +52,14 @@ SymbolIdx_t DwflSymbolLookup::get_or_insert(const DDProfMod &ddprof_mod,
                                             ProcessAddress_t process_pc,
                                             const Dso &dso) {
   ++_stats._calls;
-  ElfAddress_t elf_pc = process_pc - ddprof_mod._sym_bias;
+  ElfAddress_t const elf_pc = process_pc - ddprof_mod._sym_bias;
 
 #ifdef DEBUG
   LG_DBG("Looking for : %lx = (%lx - %lx) / dso:%s", elf_pc, process_pc,
          ddprof_mod._low_addr, dso._filename.c_str());
 #endif
   SymbolMap &map = _file_info_map[file_info_id];
-  SymbolMap::FindRes find_res = map.find_closest(elf_pc);
+  SymbolMap::FindRes const find_res = map.find_closest(elf_pc);
   if (find_res.second) { // already found the correct symbol
 #ifdef DEBUG
     LG_DBG("Match : %lx,%lx -> %s,%d", find_res.first->first,
@@ -92,7 +92,7 @@ SymbolIdx_t DwflSymbolLookup::insert(const DDProfMod &ddprof_mod,
   GElf_Sym elf_sym;
   Offset_t lbias;
 
-  ElfAddress_t elf_pc = process_pc - ddprof_mod._sym_bias;
+  ElfAddress_t const elf_pc = process_pc - ddprof_mod._sym_bias;
 
   if (!symbol_get_from_dwfl(ddprof_mod._mod, process_pc, symbol, elf_sym,
                             lbias)) {
@@ -100,7 +100,7 @@ SymbolIdx_t DwflSymbolLookup::insert(const DDProfMod &ddprof_mod,
     // Override with info from dso
     // Avoid bouncing on these requests and insert an element
     Offset_t start_sym = elf_pc;
-    Offset_t end_sym = start_sym + 1; // minimum range
+    Offset_t const end_sym = start_sym + 1; // minimum range
 // #define ADD_ADDR_IN_SYMB // creates more elements (but adds info on
 // addresses)
 #ifdef ADD_ADDR_IN_SYMB
@@ -109,7 +109,7 @@ SymbolIdx_t DwflSymbolLookup::insert(const DDProfMod &ddprof_mod,
     SymbolIdx_t symbol_idx =
         dso_symbol_lookup.get_or_insert(elf_pc, dso, table);
 #else
-    SymbolIdx_t symbol_idx = dso_symbol_lookup.get_or_insert(dso, table);
+    SymbolIdx_t const symbol_idx = dso_symbol_lookup.get_or_insert(dso, table);
 #endif
 #ifdef DEBUG
     LG_NTC("Insert (dwfl failure): %lx,%lx -> %s,%d,%s", start_sym, end_sym,
@@ -130,7 +130,7 @@ SymbolIdx_t DwflSymbolLookup::insert(const DDProfMod &ddprof_mod,
     ElfAddress_t start_sym;
     ElfAddress_t end_sym;
     // All paths bellow will insert symbol in the table
-    SymbolIdx_t symbol_idx = table.size();
+    SymbolIdx_t const symbol_idx = table.size();
     table.push_back(std::move(symbol));
 
     Symbol &sym_ref = table.back();

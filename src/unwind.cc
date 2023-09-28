@@ -65,7 +65,7 @@ bool is_stack_complete(UnwindState *us) {
 }
 
 void find_dso_add_error_frame(UnwindState *us) {
-  DsoHdr::DsoFindRes find_res =
+  DsoHdr::DsoFindRes const find_res =
       us->dso_hdr.dso_find_closest(us->pid, us->current_ip);
   add_error_frame(find_res.second ? &(find_res.first->second) : nullptr, us,
                   us->current_ip);
@@ -79,11 +79,11 @@ void add_container_id(UnwindState *us) {
 }
 } // namespace
 
-void unwind_init(void) { elf_version(EV_CURRENT); }
+void unwind_init() { elf_version(EV_CURRENT); }
 
-void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
+void unwind_init_sample(UnwindState *us, const uint64_t *sample_regs,
                         pid_t sample_pid, uint64_t sample_size_stack,
-                        char *sample_data_stack) {
+                        const char *sample_data_stack) {
   us->output.clear();
   memcpy(&us->initial_regs.regs[0], sample_regs,
          k_nb_registers_to_unwind * sizeof(uint64_t));

@@ -78,7 +78,7 @@ void add_virtual_base_frame(UnwindState *us) {
 bool memory_read(ProcessAddress_t addr, ElfWord_t *result, int regno,
                  void *arg) {
   *result = 0;
-  struct UnwindState *us = (UnwindState *)arg;
+  auto *us = static_cast<UnwindState *>(arg);
 
   constexpr uint64_t k_zero_page_limit = 4096;
   if (addr < k_zero_page_limit) {
@@ -111,8 +111,8 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, int regno,
 
   // stack grows down, so end of stack is start
   // us->initial_regs.sp does not have to be aligned
-  uint64_t sp_start = us->initial_regs.regs[REGNAME(SP)];
-  uint64_t sp_end = sp_start + us->stack_sz;
+  uint64_t const sp_start = us->initial_regs.regs[REGNAME(SP)];
+  uint64_t const sp_end = sp_start + us->stack_sz;
 
   uint64_t constexpr k_page_size = 4096;
   if (addr < sp_start && addr > sp_start - k_page_size) {
@@ -214,19 +214,19 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, int regno,
   // If we're here, we're going to read from the stack.  Just the same, we need
   // to protect stack reads carefully, so split the indexing into a
   // precomputation followed by a bounds check
-  uint64_t stack_idx = addr - sp_start;
+  uint64_t const stack_idx = addr - sp_start;
   if (stack_idx > addr) {
     LG_WRN("Stack miscalculation: %lx - %lx != %lx", addr, sp_start, stack_idx);
     return false;
   }
-  *result = *(ElfWord_t *)(us->stack + stack_idx);
+  *result = *reinterpret_cast<const ElfWord_t *>(us->stack + stack_idx);
   return true;
 }
 
 void add_error_frame(const Dso *dso, UnwindState *us,
                      [[maybe_unused]] ProcessAddress_t pc,
                      SymbolErrors error_case) {
-  ddprof_stats_add(STATS_UNWIND_ERRORS, 1, NULL);
+  ddprof_stats_add(STATS_UNWIND_ERRORS, 1, nullptr);
   if (dso) {
 // #define ADD_ADDR_IN_SYMB // creates more elements (but adds info on
 //  addresses)

@@ -53,9 +53,9 @@ DDRes install_signal_handler() {
   sa.sa_handler = &handle_signal;
   sa.sa_mask = sigset;
   sa.sa_flags = SA_RESTART;
-  DDRES_CHECK_ERRNO(sigaction(SIGTERM, &sa, NULL), DD_WHAT_MAINLOOP_INIT,
+  DDRES_CHECK_ERRNO(sigaction(SIGTERM, &sa, nullptr), DD_WHAT_MAINLOOP_INIT,
                     "Setting SIGTERM handler failed");
-  DDRES_CHECK_ERRNO(sigaction(SIGINT, &sa, NULL), DD_WHAT_MAINLOOP_INIT,
+  DDRES_CHECK_ERRNO(sigaction(SIGINT, &sa, nullptr), DD_WHAT_MAINLOOP_INIT,
                     "Setting SIGINT handler failed");
   return {};
 }
@@ -65,7 +65,7 @@ void modify_sigprocmask(int how) {
   sigemptyset(&mask);
   sigaddset(&mask, SIGINT);
   sigaddset(&mask, SIGTERM);
-  sigprocmask(how, &mask, NULL);
+  sigprocmask(how, &mask, nullptr);
 }
 
 DDRes spawn_workers(PersistentWorkerState *persistent_worker_state,
@@ -87,7 +87,7 @@ DDRes spawn_workers(PersistentWorkerState *persistent_worker_state,
       LG_NTC("Created child %d", child_pid);
       // unblock signals, we can now forward signals to child
       modify_sigprocmask(SIG_UNBLOCK);
-      waitpid(g_child_pid, NULL, 0);
+      waitpid(g_child_pid, nullptr, 0);
     }
 
     g_child_pid = 0;
@@ -129,7 +129,7 @@ DDRes signalfd_setup(pollfd *pfd) {
   sigaddset(&mask, SIGTERM);
 
   // no need to block signal, since we inherited sigprocmask from parent
-  int sfd = signalfd(-1, &mask, 0);
+  int const sfd = signalfd(-1, &mask, 0);
   DDRES_CHECK_ERRNO(sfd, DD_WHAT_WORKERLOOP_INIT, "Could not set signalfd");
 
   pfd->fd = sfd;
@@ -203,14 +203,14 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
                   PersistentWorkerState *persistent_worker_state) {
 
   // Setup poll() to watch perf_event file descriptors
-  int pe_len = ctx.worker_ctx.pevent_hdr.size;
+  int const pe_len = ctx.worker_ctx.pevent_hdr.size;
   // one extra slot in pfd to accomodate for signal fd
   struct pollfd pfds[k_max_nb_perf_event_open + 1];
   int pfd_len = 0;
   pollfd_setup(&ctx.worker_ctx.pevent_hdr, pfds, &pfd_len);
 
   DDRES_CHECK_FWD(signalfd_setup(&pfds[pfd_len]));
-  int signal_pos = pfd_len++;
+  int const signal_pos = pfd_len++;
 
   // Perform user-provided initialization
   defer { attr->finish_fun(ctx); };
@@ -220,7 +220,7 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
   // processing loop should restart if it was interrupted in the middle of the
   // loop by timeout.
   // Not used yet, because currently we process all ring buffers or none
-  int ring_buffer_start_idx = 0;
+  int const ring_buffer_start_idx = 0;
   bool stop = false;
 
   // Worker poll loop
@@ -228,8 +228,9 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
     // Convenience structs
     PEvent *pes = ctx.worker_ctx.pevent_hdr.pes;
 
-    int n = poll(pfds, pfd_len,
-                 std::chrono::milliseconds{k_sample_default_wakeup}.count());
+    int const n =
+        poll(pfds, pfd_len,
+             std::chrono::milliseconds{k_sample_default_wakeup}.count());
 
     // If there was an issue, return and let the caller check errno
     if (-1 == n && errno == EINTR) {
@@ -243,7 +244,7 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
     }
 
     for (int i = 0; i < pe_len; ++i) {
-      pollfd &pfd = pfds[i];
+      pollfd const &pfd = pfds[i];
       if (pfd.revents & POLLHUP) {
         stop = true;
       } else if (pfd.revents & POLLIN && pes[i].custom_event) {
@@ -276,7 +277,7 @@ void worker(DDProfContext &ctx, const WorkerAttr *attr,
   persistent_worker_state->restart_worker = false;
   persistent_worker_state->errors = true;
 
-  DDRes res = worker_loop(ctx, attr, persistent_worker_state);
+  DDRes const res = worker_loop(ctx, attr, persistent_worker_state);
   if (IsDDResFatal(res)) {
     LG_WRN("[PERF] Shut down worker (what:%s).",
            ddres_error_message(res._what));
@@ -294,11 +295,10 @@ void worker(DDProfContext &ctx, const WorkerAttr *attr,
 DDRes main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
   // Setup a shared memory region between the parent and child processes.  This
   // is used to communicate terminal profiling state
-  int mmap_prot = PROT_READ | PROT_WRITE;
-  int mmap_flags = MAP_ANONYMOUS | MAP_SHARED;
-  PersistentWorkerState *persistent_worker_state =
-      (PersistentWorkerState *)mmap(0, sizeof(PersistentWorkerState), mmap_prot,
-                                    mmap_flags, -1, 0);
+  int const mmap_prot = PROT_READ | PROT_WRITE;
+  int const mmap_flags = MAP_ANONYMOUS | MAP_SHARED;
+  auto *persistent_worker_state = static_cast<PersistentWorkerState *>(mmap(
+      nullptr, sizeof(PersistentWorkerState), mmap_prot, mmap_flags, -1, 0));
   if (MAP_FAILED == persistent_worker_state) {
     // Allocation failure : stop the profiling
     LG_ERR("Could not initialize profiler");

@@ -190,6 +190,9 @@ bool is_preloaded() {
 }
 
 struct ProfilerAutoStart {
+  ProfilerAutoStart(const ProfilerAutoStart &) = delete;
+  ProfilerAutoStart &operator=(const ProfilerAutoStart &) = delete;
+
   ProfilerAutoStart() noexcept {
     init_state();
 
@@ -199,9 +202,7 @@ struct ProfilerAutoStart {
     bool autostart = false;
     const char *autostart_env =
         g_state.getenv(k_profiler_auto_start_env_variable);
-    if (autostart_env && arg_yesno(autostart_env, 1)) {
-      autostart = true;
-    } else if (is_preloaded()) {
+    if ((autostart_env && arg_yesno(autostart_env, 1)) || is_preloaded()) {
       // if library is preloaded, autostart profiling since there is no way
       // otherwise to start profiling
       autostart = true;
@@ -217,9 +218,7 @@ struct ProfilerAutoStart {
     }
   }
 
-  ~ProfilerAutoStart() {
-    // profiler will stop when process exits
-  }
+  ~ProfilerAutoStart() = default;
 };
 
 ProfilerAutoStart g_autostart;
@@ -237,7 +236,7 @@ int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
 
   // cppcheck-suppress variableScope
   char *argv[] = {ddprof_str,   pid_opt_str, pid_buf,
-                  sock_opt_str, sock_buf,    NULL};
+                  sock_opt_str, sock_buf,    nullptr};
 
   // unset LD_PRELOAD, otherwise if libdd_profiling.so was preloaded, it
   // would trigger a fork bomb
@@ -324,7 +323,7 @@ int ddprof_start_profiling_internal() {
 
       // close parent socket end
       parent_socket.reset();
-      int child_socket_fd = child_socket.release();
+      int const child_socket_fd = child_socket.release();
 
       exec_ddprof(target_pid, daemonize_res.temp_pid, child_socket_fd);
       exit(1);

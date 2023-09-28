@@ -17,11 +17,11 @@ MapInfoIdx_t MapInfoLookup::get_or_insert(pid_t pid,
   auto it = addr_map.find(dso._start);
 
   if (it == addr_map.end()) { // create a mapinfo from dso element
-    size_t pos = dso._filename.rfind('/');
+    size_t const pos = dso._filename.rfind('/');
     std::string sname_str = (pos == std::string::npos)
         ? dso._filename
         : dso._filename.substr(pos + 1);
-    MapInfoIdx_t map_info_idx = mapinfo_table.size();
+    MapInfoIdx_t const map_info_idx = mapinfo_table.size();
     mapinfo_table.emplace_back(dso._start, dso._end, dso._pgoff,
                                std::move(sname_str),
                                build_id ? *build_id : BuildIdStr{});
