@@ -521,4 +521,15 @@ void DsoHdr::reset_backpopulate_state(int reset_threshold) {
   }
 }
 
+void DsoHdr::pid_fork(pid_t pid, pid_t parent_pid) {
+  auto pid_mapping_it = _pid_map.find(parent_pid);
+  if (pid_mapping_it == _pid_map.end()) {
+    return;
+  }
+  auto &new_pid_mapping = _pid_map[pid];
+  for (const auto &mapping : pid_mapping_it->second._map) {
+    new_pid_mapping._map[mapping.first] = Dso{mapping.second, pid};
+  }
+}
+
 } // namespace ddprof
