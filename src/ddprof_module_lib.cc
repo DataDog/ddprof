@@ -105,11 +105,11 @@ find_matching_segment(std::span<const Segment> segments,
 
 MatchResult find_match(std::span<const Mapping> executable_mappings,
                        std::span<const Segment> elf_load_segments) {
-  unsigned nb_mappings = executable_mappings.size();
+  int nb_mappings = executable_mappings.size();
 
   MatchResult res = {nullptr, nullptr, false};
   int max_segments =
-      std::min(nb_mappings, static_cast<unsigned>(elf_load_segments.size()));
+      std::min(nb_mappings, static_cast<int>(elf_load_segments.size()));
   for (int mapping_idx = max_segments - 1; mapping_idx >= 0; --mapping_idx) {
     const auto &mapping = executable_mappings[mapping_idx];
     assert(static_cast<unsigned>(mapping_idx) < elf_load_segments.size());

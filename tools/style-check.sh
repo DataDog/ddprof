@@ -10,12 +10,12 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd "$SCRIPT_DIR/.."
 
 # Find most recent clang-format, defaulting to an unqualified default
-CLANG_FORMAT=$(command -v clang-format{-15,-13,-12,-11,-10,-9,} | head -n1)
+CLANG_FORMAT=$(command -v clang-format{-16,-15,-13,-12,-11,-10,-9,} | head -n1)
 if [ -z "${CLANG_FORMAT}" ]; then
-  echo "No suitable clang-format found"
+  echo "Please use clang format 16"
   exit 1
 fi
-
+eval "$CLANG_FORMAT --version"
 # Process arguments
 [[ -z "${APPLY:-}" ]] && APPLY="no"
 [[ "${1:-,,}" == "apply" ]] && APPLY="yes"
