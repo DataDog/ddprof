@@ -156,6 +156,37 @@ int get_ddprof_socket() {
   return -1;
 }
 
+bool contains_lib(std::string_view ldpreload_str, std::string_view libname) {
+  auto pos = ldpreload_str.find(libname);
+  if (pos == std::string_view::npos) {
+    return false;
+  }
+
+  if (pos > 0 && ldpreload_str[pos - 1] != '/') {
+    return false;
+  }
+
+  auto remaining_str = ldpreload_str.substr(pos + libname.size());
+  if (!remaining_str.empty()) {
+    char const c = remaining_str.front();
+    // space and colon are the allowed separators in LD_PRELOAD, dash is present
+    // when hash is appended to libdd-profiling-embedded.so
+    return c == ' ' || c == ':' || c == '-';
+  }
+
+  return true;
+}
+
+bool is_preloaded() {
+  const char *ldpreload_str = g_state.getenv("LD_PRELOAD");
+  if (!ldpreload_str) {
+    return false;
+  }
+  return contains_lib(ldpreload_str, k_libdd_profiling_name) ||
+      contains_lib(ldpreload_str, k_libdd_profiling_embedded_name) ||
+      contains_lib(ldpreload_str, k_libdd_loader_name);
+}
+
 struct ProfilerAutoStart {
   ProfilerAutoStart() noexcept {
     init_state();
@@ -168,19 +199,16 @@ struct ProfilerAutoStart {
         g_state.getenv(k_profiler_auto_start_env_variable);
     if (autostart_env && arg_yesno(autostart_env, 1)) {
       autostart = true;
-    } else {
+    } else if (is_preloaded()) {
       // if library is preloaded, autostart profiling since there is no way
       // otherwise to start profiling
-      const char *ldpreload_env = getenv("LD_PRELOAD");
-      if (ldpreload_env && strstr(ldpreload_env, k_libdd_profiling_name)) {
-        autostart = true;
-      }
+      autostart = true;
     }
 
     init_profiler_library_active();
 
     // autostart if library is injected by ddprof
-    if (autostart || get_ddprof_socket() != -1) {
+    if (autostart) {
       try {
         ddprof_start_profiling_internal();
       } catch (...) {}
@@ -256,7 +284,7 @@ int ddprof_start_profiling_internal() {
 
   // no socket -> library will spawn a profiler and create socket pair
   if (sockfd == -1) {
-    // Create a socket pair to establish a commuication channel between library
+    // Create a socket pair to establish a communication channel between library
     // and profiler Communication occurs only during profiler setup and sockets
     // are closed once profiler is attached.
     // This channel is used to:
@@ -264,7 +292,7 @@ int ddprof_start_profiling_internal() {
     //    from ddprof_start_profiling
     //  * retrieve PID of profiler on library side
     //  * retrieve ring buffer information for allocation profiling on library
-    //    side. This requires passing file descriptors between procressers,
+    //    side. This requires passing file descriptors between processes,
     //    that's why unix socket are used here.
     // Overview of the communication process:
     //  * library create socket pair and fork + exec into ddprof executable
@@ -277,8 +305,8 @@ int ddprof_start_profiling_internal() {
       return -1;
     }
 
-    auto parent_socket = ddprof::unique_resource(sockfds[0], &::close);
-    auto child_socket = ddprof::unique_resource(sockfds[1], &::close);
+    ddprof::UniqueFd parent_socket{sockfds[0]};
+    ddprof::UniqueFd child_socket{sockfds[1]};
 
     auto daemonize_res = ddprof::daemonize();
     if (daemonize_res.state == ddprof::DaemonizeResult::Error) {
@@ -294,15 +322,13 @@ int ddprof_start_profiling_internal() {
 
       // close parent socket end
       parent_socket.reset();
-      auto child_socket_fd = child_socket.get();
-      child_socket.release();
+      int child_socket_fd = child_socket.release();
 
       exec_ddprof(target_pid, daemonize_res.temp_pid, child_socket_fd);
       exit(1);
     }
 
-    sockfd = parent_socket.get();
-    parent_socket.release();
+    sockfd = parent_socket.release();
   }
 
   try {
