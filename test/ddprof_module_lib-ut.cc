@@ -76,4 +76,13 @@ TEST(ddprof_module_lib, complex) {
   ASSERT_TRUE(res.is_ambiguous);
 }
 
+TEST(ddprof_module_lib, libcoreclr) {
+  Mapping mappings[] = {mapping(0x0), mapping(0x383000), mapping(0x384000),
+                        mapping(0x5d9000)};
+  Segment segments[] = {segment(0x000000, PROT_EXEC),
+                        segment(0x6b7ec0, PROT_READ)};
+  auto res = find_match(mappings, segments);
+  ASSERT_FALSE(res.is_ambiguous);
+}
+
 } // namespace ddprof
