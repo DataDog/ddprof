@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 usage() {
   echo "Usage: $0 -c CONFIG_FILE [-d DDPROF_EXECUTABLE] -- [additional profiling args]"
-  echo "   -c    path to configuration file"
+  echo "   -c    path to ddprof configuration file"
+  echo "   -s    path to suppression file"
   echo "   -d    (optional) path to ddprof executable (default is './ddprof')"
-
   echo "   -h    display help"
   exit 1
 }
@@ -34,11 +36,11 @@ check_valgrind_errors() {
 
 DDPROF_EXECUTABLE="./ddprof"
 VALGRIND_SUPPRESSION="../test/data/valgrind_suppression_release.supp"
-while getopts ":c:d:h:s" opt; do
+while getopts ":c:d:s:h" opt; do
   case ${opt} in
     c) CONFIG_FILE="${OPTARG}" ;;
     d) DDPROF_EXECUTABLE="${OPTARG}" ;;
-    s) VALGRIND_SUPPRESSION="$OPTARG" ;;
+    s) VALGRIND_SUPPRESSION="${OPTARG}" ;;
     h) usage ;;
     \?) echo "Invalid option: -$OPTARG" 1>&2 ; usage ;;
     :) echo "Option -$OPTARG requires an argument" 1>&2 ; usage ;;
@@ -47,13 +49,23 @@ done
 shift $((OPTIND -1))
 
 if [ ! -e "${VALGRIND_SUPPRESSION}" ]; then
-  echo "Please specify a valgrind suppression file"
+  echo "Please specify a valgrind suppression file ${VALGRIND_SUPPRESSION}"
+  usage
 fi
 if [ -z "${CONFIG_FILE}" ]; then
-  echo "Config file must be provided" ; usage
+  echo "Config file must be provided"
+  usage
+fi
+if [ ! -e ${DDPROF_EXECUTABLE} ]; then
+  echo "ddprof executable not found at ${DDPROF_EXECUTABLE}"
+  usage
 fi
 
+
 TARGET_PROFILING=$@
+if [ -z "${TARGET_PROFILING}" ]; then
+  echo "Please provide a target to profile" ; usage
+fi
 
 TOP_LEVEL_DDPROF="/home/r1viollet/dd/ddprof_2"
 OUTPUT_VALGRIND=$(mktemp)

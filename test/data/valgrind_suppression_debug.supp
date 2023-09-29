@@ -1,0 +1,115 @@
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:strdup
+   fun:_ZNK6ddprof9DDProfCLI21get_user_command_lineEv
+   fun:main
+}
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:_Znwm
+   fun:_ZNSt15__new_allocatorIPcE8allocateEmPKv
+   fun:allocate
+   fun:_ZNSt16allocator_traitsISaIPcEE8allocateERS1_m
+   fun:_ZNSt12_Vector_baseIPcSaIS0_EE11_M_allocateEm
+   fun:_ZNSt12_Vector_baseIPcSaIS0_EE17_M_create_storageEm
+   fun:_ZNSt12_Vector_baseIPcSaIS0_EEC1EmRKS1_
+   fun:_ZNSt6vectorIPcSaIS0_EEC1ERKS2_
+   fun:_ZNK6ddprof9DDProfCLI21get_user_command_lineEv
+   fun:main
+}
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:_GLOBAL__sub_I_eh_alloc.cc
+   fun:call_init
+   fun:__libc_start_main@@GLIBC_2.34
+   fun:(below main)
+}
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Param
+   sendmsg(msg.msg_iov[0])
+   fun:sendmsg
+   fun:_ZN6ddprof10UnixSocket12send_partialESt4spanIKSt4byteLm18446744073709551615EES1_IKiLm18446744073709551615EERSt10error_code
+   fun:_ZN6ddprof10UnixSocket4sendESt4spanIKSt4byteLm18446744073709551615EES1_IKiLm18446744073709551615EERSt10error_code
+   fun:_ZN6ddprof4sendERNS_10UnixSocketERKNS_12ReplyMessageE
+   fun:_ZN6ddprof6Server14waitForRequestESt8functionIFNS_12ReplyMessageERKNS_14RequestMessageEEE
+   fun:_ZL23start_profiler_internalP13DDProfContextRb
+   fun:_ZL14start_profilerP13DDProfContext
+   fun:main
+}
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   ...
+   fun:build_https_connector
+   fun:new
+   fun:__static_ref_initialize
+   fun:call_once<fn() -> ddcommon::connector::Connector, ()>
+   fun:{closure#0}<ddcommon::connector::Connector, fn() -> ddcommon::connector::Connector>
+   fun:{closure#0}<lazy_static::lazy::{impl#0}::get::{closure_env#0}<ddcommon::connector::Connector, fn() -> ddcommon::connector::Connector>>
+   fun:_ZN3std10sys_common4once5futex4Once4call17hfe0c68e23083bc59E
+   ...
+   fun:new<alloc::string::String, alloc::string::String, alloc::string::String>
+   fun:ddog_prof_exporter_new_impl
+   fun:ddog_prof_Exporter_new
+   fun:_Z19ddprof_exporter_newPK8UserTagsP14DDProfExporter
+   fun:_Z18ddprof_worker_initR13DDProfContextP21PersistentWorkerState
+   fun:_ZN6ddprofL11worker_loopER13DDProfContextPK10WorkerAttrP21PersistentWorkerState
+   fun:_ZN6ddprofL6workerER13DDProfContextPK10WorkerAttrP21PersistentWorkerState
+   fun:_ZN6ddprof9main_loopEPK10WorkerAttrP13DDProfContext
+   fun:_Z21ddprof_start_profilerP13DDProfContext
+   fun:_ZL23start_profiler_internalP13DDProfContextRb
+   fun:_ZL14start_profilerP13DDProfContext
+   fun:main
+}
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   ...
+   fun:new
+   fun:__static_ref_initialize
+   fun:call_once<fn() -> ddcommon::connector::Connector, ()>
+   fun:{closure#0}<ddcommon::connector::Connector, fn() -> ddcommon::connector::Connector>
+   fun:{closure#0}<lazy_static::lazy::{impl#0}::get::{closure_env#0}<ddcommon::connector::Connector, fn() -> ddcommon::connector::Connector>>
+   fun:_ZN3std10sys_common4once5futex4Once4call17hfe0c68e23083bc59E
+   ...
+   fun:new<alloc::string::String, alloc::string::String, alloc::string::String>
+   fun:ddog_prof_exporter_new_impl
+   fun:ddog_prof_Exporter_new
+   fun:_Z19ddprof_exporter_newPK8UserTagsP14DDProfExporter
+   fun:_Z18ddprof_worker_initR13DDProfContextP21PersistentWorkerState
+   fun:_ZN6ddprofL11worker_loopER13DDProfContextPK10WorkerAttrP21PersistentWorkerState
+   fun:_ZN6ddprofL6workerER13DDProfContextPK10WorkerAttrP21PersistentWorkerState
+   fun:_ZN6ddprof9main_loopEPK10WorkerAttrP13DDProfContext
+   fun:_Z21ddprof_start_profilerP13DDProfContext
+   fun:_ZL23start_profiler_internalP13DDProfContextRb
+   fun:_ZL14start_profilerP13DDProfContext
+   fun:main
+}
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:_Znwm
+   fun:_ZNSt15__new_allocatorIPcE8allocateEmPKv
+   fun:allocate
+   fun:_ZNSt16allocator_traitsISaIPcEE8allocateERS1_m
+   fun:_ZNSt12_Vector_baseIPcSaIS0_EE11_M_allocateEm
+   fun:_ZNSt12_Vector_baseIPcSaIS0_EE17_M_create_storageEm
+   fun:_ZNSt12_Vector_baseIPcSaIS0_EEC1EmRKS1_
+   fun:_ZNSt6vectorIPcSaIS0_EEC1ERKS2_
+   fun:_ZNK6ddprof9DDProfCLI21get_user_command_lineEv
+   fun:main
+}
