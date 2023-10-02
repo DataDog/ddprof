@@ -74,7 +74,7 @@ static DDRes report_lost_events(DDProfContext &ctx) {
       LG_WRN("Reporting #%lu -> [%lu] lost samples for watcher #%d", nb_lost,
              value, watcher_idx);
       DDRES_CHECK_FWD(pprof_aggregate(
-          &us->output, us->symbol_hdr, value, nb_lost, watcher, kOccurrencePos,
+          &us->output, us->symbol_hdr, value, nb_lost, watcher, kSumPos,
           ctx.worker_ctx.pprof[ctx.worker_ctx.i_current_pprof]));
       ctx.worker_ctx.lost_events_per_watcher[watcher_idx] = 0;
     }
@@ -304,20 +304,20 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
   // Aggregate if unwinding went well (todo : fatal error propagation)
   if (!IsDDResFatal(res)) {
     struct UnwindState *us = ctx.worker_ctx.us;
-    if (Any(EventValueMode::kLiveUsage & watcher->output_mode)) {
+    if (Any(EventAggregationMode::kLiveSum & watcher->aggregation_mode)) {
       ctx.worker_ctx.live_allocation.register_allocation(
           us->output, sample->addr, sample->period, watcher_pos, sample->pid);
     }
-    if (Any(EventValueMode::kOccurrence & watcher->output_mode)) {
+    if (Any(EventAggregationMode::kSum & watcher->aggregation_mode)) {
       // Depending on the type of watcher, compute a value for sample
       uint64_t sample_val = perf_value_from_sample(watcher, sample);
       int i_export = ctx.worker_ctx.i_current_pprof;
       DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
       DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbol_hdr, sample_val,
-                                      1, watcher, kOccurrencePos, pprof));
+                                      1, watcher, kSumPos, pprof));
       if (ctx.params.show_samples) {
-        ddprof_print_sample(us->output, us->symbol_hdr, sample->period,
-                            kOccurrencePos, *watcher);
+        ddprof_print_sample(us->output, us->symbol_hdr, sample->period, kSumPos,
+                            *watcher);
       }
     }
   }
@@ -359,10 +359,10 @@ static DDRes aggregate_livealloc_stack(
     const SymbolHdr &symbol_hdr) {
   DDRES_CHECK_FWD(
       pprof_aggregate(&alloc_info.first, symbol_hdr, alloc_info.second._value,
-                      alloc_info.second._count, watcher, kLiveUsagePos, pprof));
+                      alloc_info.second._count, watcher, kLiveSumPos, pprof));
   if (ctx.params.show_samples) {
     ddprof_print_sample(alloc_info.first, symbol_hdr, alloc_info.second._value,
-                        kLiveUsagePos, *watcher);
+                        kLiveSumPos, *watcher);
   }
   return ddres_init();
 }

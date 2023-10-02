@@ -34,7 +34,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx);
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr &symbol_hdr, uint64_t value,
                       uint64_t count, const PerfWatcher *watcher,
-                      EventValueModePos value_pos, DDProfPProf *pprof);
+                      EventAggregationModePos value_pos, DDProfPProf *pprof);
 
 DDRes pprof_reset(DDProfPProf *pprof);
 
@@ -44,5 +44,5 @@ DDRes pprof_free_profile(DDProfPProf *pprof);
 
 void ddprof_print_sample(const UnwindOutput &uw_output,
                          const SymbolHdr &symbol_hdr, uint64_t value,
-                         EventValueModePos value_mode_pos,
+                         EventAggregationModePos value_mode_pos,
                          const PerfWatcher &watcher);

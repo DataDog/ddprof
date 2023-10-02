@@ -72,11 +72,10 @@ TEST(DDProfPProf, aggregate) {
   bool ok = watchers_from_str("sCPU", ctx.watchers);
   EXPECT_TRUE(ok);
   DDRes res = pprof_create_profile(&pprof, ctx);
-  EXPECT_TRUE(ctx.watchers[0].pprof_indices[kOccurrencePos].pprof_index != -1);
-  EXPECT_TRUE(ctx.watchers[0].pprof_indices[kOccurrencePos].pprof_count_index !=
-              -1);
+  EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_index != -1);
+  EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_count_index != -1);
   res = pprof_aggregate(&mock_output, symbol_hdr, 1000, 1, &ctx.watchers[0],
-                        kOccurrencePos, &pprof);
+                        kSumPos, &pprof);
 
   EXPECT_TRUE(IsDDResOK(res));
 
@@ -108,15 +107,14 @@ TEST(DDProfPProf, just_live) {
   log_watcher(&(ctx.watchers[1]), 1);
 
   DDRes res = pprof_create_profile(&pprof, ctx);
-  EXPECT_TRUE(ctx.watchers[0].pprof_indices[kOccurrencePos].pprof_index == -1);
-  EXPECT_TRUE(ctx.watchers[0].pprof_indices[kOccurrencePos].pprof_count_index ==
-              -1);
+  EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_index == -1);
+  EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_count_index == -1);
 
-  EXPECT_TRUE(ctx.watchers[1].pprof_indices[kLiveUsagePos].pprof_index != -1);
-  EXPECT_TRUE(ctx.watchers[1].pprof_indices[kLiveUsagePos].pprof_count_index !=
+  EXPECT_TRUE(ctx.watchers[1].pprof_indices[kLiveSumPos].pprof_index != -1);
+  EXPECT_TRUE(ctx.watchers[1].pprof_indices[kLiveSumPos].pprof_count_index !=
               -1);
   res = pprof_aggregate(&mock_output, symbol_hdr, 1000, 1, &ctx.watchers[1],
-                        kLiveUsagePos, &pprof);
+                        kLiveSumPos, &pprof);
   EXPECT_TRUE(IsDDResOK(res));
   test_pprof(&pprof);
   res = pprof_free_profile(&pprof);

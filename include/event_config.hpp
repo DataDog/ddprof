@@ -12,24 +12,24 @@
 #include <string>
 #include <vector>
 
-enum EventValueModePos {
-  kOccurrencePos = 0,
-  kLiveUsagePos = 1,
-  kNbEventValueModes
+enum EventAggregationModePos {
+  kSumPos = 0,
+  kLiveSumPos = 1,
+  kNbEventAggregationModes
 };
 
 // Defines how a sample is aggregated when it is received
-enum class EventValueMode : uint32_t {
+enum class EventAggregationMode : uint32_t {
   kDisabled = 0,
-  kOccurrence = 1 << kOccurrencePos, // Occurrences (example CPU usage)
-  kLiveUsage = 1 << kLiveUsagePos,   // Report live usage (example memory leaks)
-  kAll = kOccurrence | kLiveUsage,
+  kSum = 1 << kSumPos,         // Sum of usage (example: overall CPU usage)
+  kLiveSum = 1 << kLiveSumPos, // Report live usage (example memory leaks)
+  kAll = kSum | kLiveSum,
 };
 
-ALLOW_FLAGS_FOR_ENUM(EventValueMode)
+ALLOW_FLAGS_FOR_ENUM(EventAggregationMode)
 
-constexpr bool Any(EventValueMode arg) {
-  return arg != EventValueMode::kDisabled;
+constexpr bool Any(EventAggregationMode arg) {
+  return arg != EventAggregationMode::kDisabled;
 }
 
 // Defines how samples are weighted
@@ -135,7 +135,7 @@ enum class EventConfField {
 };
 
 struct EventConf {
-  EventValueMode mode{};
+  EventAggregationMode mode{};
 
   int64_t id{};
 

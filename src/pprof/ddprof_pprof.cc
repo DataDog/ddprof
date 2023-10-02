@@ -22,10 +22,10 @@
 #define PPROF_MAX_LABELS 6
 
 constexpr int k_max_value_types =
-    DDPROF_PWT_LENGTH * static_cast<int>(kNbEventValueModes);
+    DDPROF_PWT_LENGTH * static_cast<int>(kNbEventAggregationModes);
 
 struct ActiveIdsResult {
-  EventValueMode output_mode[DDPROF_PWT_LENGTH] = {};
+  EventAggregationMode output_mode[DDPROF_PWT_LENGTH] = {};
   PerfWatcher *default_watcher = nullptr;
 };
 
@@ -51,23 +51,23 @@ DDRes get_active_ids(std::span<PerfWatcher> watchers, ActiveIdsResult &result) {
         sample_type_id <= result.default_watcher->sample_type_id)
       result.default_watcher = &watchers[i]; // update default
 
-    result.output_mode[sample_type_id] |= watchers[i].output_mode;
+    result.output_mode[sample_type_id] |= watchers[i].aggregation_mode;
     if (count_id != DDPROF_PWT_NOCOUNT) {
       // if the count is valid, update mask for it
-      result.output_mode[count_id] |= watchers[i].output_mode;
+      result.output_mode[count_id] |= watchers[i].aggregation_mode;
     }
   }
   return ddres_init();
 }
 
 struct PProfValues {
-  int pprof_value_indices[DDPROF_PWT_LENGTH][kNbEventValueModes];
+  int pprof_value_indices[DDPROF_PWT_LENGTH][kNbEventAggregationModes];
   ddog_prof_ValueType perf_value_type[k_max_value_types] = {};
   int num_sample_type_ids = 0;
 
   PProfValues() {
     for (int i = 0; i < DDPROF_PWT_LENGTH; ++i) {
-      for (int j = 0; j < kNbEventValueModes; ++j) {
+      for (int j = 0; j < kNbEventAggregationModes; ++j) {
         pprof_value_indices[i][j] = -1;
       }
     }
@@ -77,14 +77,14 @@ struct PProfValues {
 PProfValues compute_pprof_values(const ActiveIdsResult &active_ids) {
   PProfValues result = {};
   for (int i = 0; i < DDPROF_PWT_LENGTH; ++i) {
-    if (active_ids.output_mode[i] == EventValueMode::kDisabled)
+    if (active_ids.output_mode[i] == EventAggregationMode::kDisabled)
       continue;
     assert(i != DDPROF_PWT_NOCOUNT);
-    for (int value_pos = 0; value_pos < kNbEventValueModes; ++value_pos) {
+    for (int value_pos = 0; value_pos < kNbEventAggregationModes; ++value_pos) {
       if (Any(active_ids.output_mode[i] &
-              static_cast<EventValueMode>(1 << value_pos))) {
+              static_cast<EventAggregationMode>(1 << value_pos))) {
         const char *value_name = sample_type_name_from_idx(
-            i, static_cast<EventValueModePos>(value_pos));
+            i, static_cast<EventAggregationModePos>(value_pos));
         const char *value_unit = sample_type_unit_from_idx(i);
         if (!value_name || !value_unit) {
           LG_WRN("Malformed sample type (%d), ignoring", i);
@@ -96,9 +96,8 @@ PProfValues compute_pprof_values(const ActiveIdsResult &active_ids) {
             to_CharSlice(value_unit);
 
         // Update the pv
-        result
-            .pprof_value_indices[i][static_cast<EventValueModePos>(value_pos)] =
-            result.num_sample_type_ids;
+        result.pprof_value_indices[i][static_cast<EventAggregationModePos>(
+            value_pos)] = result.num_sample_type_ids;
         ++result.num_sample_type_ids;
       }
     }
@@ -128,7 +127,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
         this_id >= DDPROF_PWT_LENGTH) {
       continue;
     }
-    for (int value_pos = 0; value_pos < kNbEventValueModes; ++value_pos) {
+    for (int value_pos = 0; value_pos < kNbEventAggregationModes; ++value_pos) {
       ctx.watchers[i].pprof_indices[value_pos].pprof_index =
           pprof_values
               .pprof_value_indices[ctx.watchers[i].sample_type_id][value_pos];
@@ -161,7 +160,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
     int default_index = -1;
     int value_pos = 0;
     while (default_index == -1 &&
-           value_pos < EventValueModePos::kNbEventValueModes) {
+           value_pos < EventAggregationModePos::kNbEventAggregationModes) {
       default_index =
           active_ids.default_watcher->pprof_indices[value_pos].pprof_index;
       ++value_pos;
@@ -236,7 +235,7 @@ static void write_location(const FunLoc *loc, const ddprof::MapInfo &mapinfo,
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr &symbol_hdr, uint64_t value,
                       uint64_t count, const PerfWatcher *watcher,
-                      EventValueModePos value_pos, DDProfPProf *pprof) {
+                      EventAggregationModePos value_pos, DDProfPProf *pprof) {
 
   const ddprof::SymbolTable &symbol_table = symbol_hdr._symbol_table;
   const ddprof::MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
@@ -344,7 +343,7 @@ DDRes pprof_reset(DDProfPProf *pprof) {
 
 void ddprof_print_sample(const UnwindOutput &uw_output,
                          const SymbolHdr &symbol_hdr, uint64_t value,
-                         EventValueModePos value_mode_pos,
+                         EventAggregationModePos value_mode_pos,
                          const PerfWatcher &watcher) {
 
   auto &symbol_table = symbol_hdr._symbol_table;

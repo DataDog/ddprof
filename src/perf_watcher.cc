@@ -18,9 +18,9 @@
 uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
 
 #define X_STR(a, b, c, d, e) std::array{b, d},
-const char *sample_type_name_from_idx(int idx, EventValueModePos pos) {
-  static constexpr std::array<std::array<const char *, kNbEventValueModes>,
-                              DDPROF_PWT_LENGTH + 1>
+const char *sample_type_name_from_idx(int idx, EventAggregationModePos pos) {
+  static constexpr std::array<
+      std::array<const char *, kNbEventAggregationModes>, DDPROF_PWT_LENGTH + 1>
       sample_names = {PROFILE_TYPE_TABLE(X_STR){nullptr, nullptr}};
   if (idx < 0 || idx >= DDPROF_PWT_LENGTH)
     return NULL;
@@ -74,7 +74,7 @@ bool watcher_has_countable_sample_type(const PerfWatcher *watcher) {
    .suppress_tid = false,                                                      \
    .pprof_indices = {{}},                                                      \
    .instrument_self = false,                                                   \
-   .output_mode = EventValueMode::kOccurrence},
+   .aggregation_mode = EventAggregationMode::kSum},
 
 #define X_STR(a, b, c, d, e, f, g) #a,
 const char *event_type_name_from_idx(int idx) {
@@ -131,7 +131,7 @@ const PerfWatcher *tracepoint_default_watcher() {
       .suppress_tid = false,
       .pprof_indices = {},
       .instrument_self = false,
-      .output_mode = EventValueMode::kOccurrence,
+      .aggregation_mode = EventAggregationMode::kSum,
   };
   return &tracepoint_template;
 }
@@ -160,13 +160,13 @@ void log_watcher(const PerfWatcher *w, int idx) {
 
   // check all associated reported values
   std::string category;
-  for (int i = 0; i < kNbEventValueModes; ++i) {
-    if (Any(static_cast<EventValueMode>(1 << i) & w->output_mode)) {
+  for (int i = 0; i < kNbEventAggregationModes; ++i) {
+    if (Any(static_cast<EventAggregationMode>(1 << i) & w->aggregation_mode)) {
       if (!category.empty()) {
         category += ",";
       }
       category += std::string(sample_type_name_from_idx(
-          w->sample_type_id, static_cast<EventValueModePos>(i)));
+          w->sample_type_id, static_cast<EventAggregationModePos>(i)));
     }
   }
   PRINT_NFO("    Category: %s", category.c_str());
@@ -179,9 +179,9 @@ void log_watcher(const PerfWatcher *w, int idx) {
     PRINT_NFO("    Cadence: Freq, Freq: %lu", w->sample_frequency);
   else
     PRINT_NFO("    Cadence: Period, Period: %ld", w->sample_period);
-  if (Any(EventValueMode::kOccurrence & w->output_mode))
+  if (Any(EventAggregationMode::kSum & w->aggregation_mode))
     PRINT_NFO("    Outputting occurrences");
-  if (Any(EventValueMode::kLiveUsage & w->output_mode))
+  if (Any(EventAggregationMode::kLiveSum & w->aggregation_mode))
     PRINT_NFO("    Outputting live usage");
 }
 

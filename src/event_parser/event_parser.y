@@ -41,18 +41,18 @@ EventConf g_accum_event_conf = {};
 EventConf g_template_event_conf = {};
 std::vector<EventConf>* g_event_configs;
 
-std::optional<EventValueMode> mode_from_str(const std::string &str) {
+std::optional<EventAggregationMode> mode_from_str(const std::string &str) {
   const std::string a_str{"Aa*"};
-  const std::string l_str{"Ll"};
-  const std::string o_str{"Oo"};
-  EventValueMode mode = EventValueMode::kDisabled;
+  const std::string l_str{"Ll"}; // live sum
+  const std::string s_str{"Ss"}; // sum
+  EventAggregationMode mode = EventAggregationMode::kDisabled;
   for (const char &c : str) {
-    if (o_str.find(c) != std::string::npos) {
-      mode |= EventValueMode::kOccurrence;
+    if (s_str.find(c) != std::string::npos) {
+      mode |= EventAggregationMode::kSum;
     } else if (l_str.find(c) != std::string::npos) {
-        mode |= EventValueMode::kLiveUsage;
+        mode |= EventAggregationMode::kLiveSum;
     } else if (a_str.find(c) != std::string::npos) {
-      mode |= EventValueMode::kAll;
+      mode |= EventAggregationMode::kAll;
     } else {
       fprintf(stderr, "Warning, unexpected mode %c \n", c);
       return {}; // unexpected mode
@@ -99,7 +99,7 @@ void conf_print(const EventConf *tp) {
   else
     printf("  label: <generated from event/groupname>\n");
 
-  const char *modenames[] = {"ILLEGAL", "occurrence", "live usage"};
+  const char *modenames[] = {"ILLEGAL", "sum usage", "live usage"};
   printf("  type: %s\n", modenames[static_cast<unsigned>(tp->mode)]);
 
 
@@ -266,7 +266,7 @@ opt:
            g_accum_event_conf.value_scale = 0.0 + $3;
            break;
          case EventConfField::kMode:
-           g_accum_event_conf.mode = static_cast<EventValueMode>($3) & EventValueMode::kAll;
+           g_accum_event_conf.mode = static_cast<EventAggregationMode>($3) & EventAggregationMode::kAll;
            break;
 
          case EventConfField::kParameter:

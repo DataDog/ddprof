@@ -60,9 +60,9 @@ struct PerfWatcher {
   // Other configs
   bool suppress_pid;
   bool suppress_tid;
-  PProfIndices pprof_indices[kNbEventValueModes]; // std and live
-  bool instrument_self;                           // do my own perfopen, etc
-  EventValueMode output_mode;
+  PProfIndices pprof_indices[kNbEventAggregationModes]; // std and live
+  bool instrument_self; // do my own perfopen, etc
+  EventAggregationMode aggregation_mode;
 };
 
 // The Datadog backend only understands pre-configured event types.  Those
@@ -76,8 +76,8 @@ struct PerfWatcher {
   X(TRACEPOINT, "tracepoint", events, "undef", NOCOUNT)                        \
   X(CPU_NANOS, "cpu-time", nanoseconds, "undef", CPU_SAMPLE)                   \
   X(CPU_SAMPLE, "cpu-samples", count, "undef", NOCOUNT)                        \
-  X(ALLOC_SAMPLE, "alloc-samples", count, "heap-live-samples", NOCOUNT)        \
-  X(ALLOC_SPACE, "alloc-space", bytes, "heap-live-size", ALLOC_SAMPLE)
+  X(ALLOC_SAMPLE, "alloc-samples", count, "inuse-objects", NOCOUNT)            \
+  X(ALLOC_SPACE, "alloc-space", bytes, "inuse-space", ALLOC_SAMPLE)
 
 // defines enum of profile types
 #define X_ENUM(a, b, c, d, e) DDPROF_PWT_##a,
@@ -163,7 +163,7 @@ int watcher_to_count_sample_type_id(const PerfWatcher *watcher);
 const char *event_type_name_from_idx(int idx);
 
 // Helper functions for sample types
-const char *sample_type_name_from_idx(int idx, EventValueModePos pos);
+const char *sample_type_name_from_idx(int idx, EventAggregationModePos pos);
 const char *sample_type_unit_from_idx(int idx);
 int sample_type_id_to_count_sample_type_id(int idx);
 

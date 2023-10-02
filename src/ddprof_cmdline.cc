@@ -113,7 +113,7 @@ static bool watcher_from_config(EventConf *conf, PerfWatcher *watcher) {
 
   if (conf->value_scale != 0.0)
     watcher->value_scale = conf->value_scale;
-  watcher->output_mode = conf->mode;
+  watcher->aggregation_mode = conf->mode;
   watcher->tracepoint_event = conf->eventname;
   watcher->tracepoint_group = conf->groupname;
   watcher->tracepoint_label = conf->label;
@@ -132,7 +132,7 @@ bool watchers_from_str(const char *str, std::vector<PerfWatcher> &watchers,
                        uint32_t stack_sample_size) {
   std::vector<EventConf> configs;
   EventConf template_conf{
-      .mode = EventValueMode::kOccurrence,
+      .mode = EventAggregationMode::kSum,
       .stack_sample_size = stack_sample_size,
   };
   if (EventConf_parse(str, template_conf, configs) != 0) {

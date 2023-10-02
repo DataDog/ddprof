@@ -102,11 +102,11 @@ check "./ddprof ./test/simple_malloc ${opts}" 1
 
 # Test live heap mode, CPU events are given through configuration file
 event="sALLOC,period=-524288,mode=l;sCPU"
-check "./ddprof --show_config --event "${event}" ./test/simple_malloc ${opts} --skip-free 100" 1 1 "heap-live-size,cpu-time"
+check "./ddprof --show_config --event "${event}" ./test/simple_malloc ${opts} --skip-free 100" 1 1 "inuse-space,cpu-time"
 
 # Test live heap mode, with allocations, CPU events are given through configuration file
-event="sALLOC,period=-524288,mode=ol;sCPU"
-check "./ddprof --show_config --event "${event}" ./test/simple_malloc ${opts} --skip-free 100" 1 1 "heap-live-size,alloc-space,cpu-time"
+event="sALLOC,period=-524288,mode=sl;sCPU"
+check "./ddprof --show_config --event "${event}" ./test/simple_malloc ${opts} --skip-free 100" 1 1 "inuse-space,alloc-space,cpu-time"
 
 # Test wrapper mode with forks + threads
 opts_more_spin="--loop 1000 --spin 400"
