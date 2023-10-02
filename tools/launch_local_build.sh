@@ -162,6 +162,6 @@ else
   MOUNT_TOOLS_DIR=""
 fi
 
-CMD="docker run -it --rm  -w /app ${MOUNT_SSH_AGENT} ${MOUNT_TOOLS_DIR} --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} \"${DOCKER_NAME}${DOCKER_TAG}\" /bin/bash"
+CMD="docker run -it --rm -u $(id -u):$(id -g) -w /app ${MOUNT_SSH_AGENT} ${MOUNT_TOOLS_DIR} --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} \"${DOCKER_NAME}${DOCKER_TAG}\" /bin/bash"
 
 eval "$CMD"

@@ -6,6 +6,7 @@
 #include "pprof/ddprof_pprof.hpp"
 
 #include "ddog_profiling_utils.hpp"
+#include "ddprof_cmdline.hpp"
 #include "loghandle.hpp"
 #include "pevent_lib_mocks.hpp"
 #include "symbol_hdr.hpp"
@@ -68,16 +69,54 @@ TEST(DDProfPProf, aggregate) {
   DDProfPProf pprof;
   DDProfContext ctx = {};
 
-  ctx.watchers.push_back(*ewatcher_from_str("sCPU"));
+  bool ok = watchers_from_str("sCPU", ctx.watchers);
+  EXPECT_TRUE(ok);
   DDRes res = pprof_create_profile(&pprof, ctx);
-  EXPECT_TRUE(IsDDResOK(res));
+  EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_index != -1);
+  EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_count_index != -1);
   res = pprof_aggregate(&mock_output, symbol_hdr, 1000, 1, &ctx.watchers[0],
-                        &pprof);
+                        kSumPos, &pprof);
 
   EXPECT_TRUE(IsDDResOK(res));
 
   test_pprof(&pprof);
 
+  res = pprof_free_profile(&pprof);
+  EXPECT_TRUE(IsDDResOK(res));
+}
+
+TEST(DDProfPProf, just_live) {
+  LogHandle handle;
+  SymbolHdr symbol_hdr;
+  UnwindOutput mock_output;
+  SymbolTable &table = symbol_hdr._symbol_table;
+  MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
+
+  fill_unwind_symbols(table, mapinfo_table, mock_output);
+  DDProfPProf pprof;
+  DDProfContext ctx = {};
+  {
+    bool ok = watchers_from_str("sDUM", ctx.watchers);
+    EXPECT_TRUE(ok);
+  }
+  {
+    bool ok = watchers_from_str("sALLOC mode=l", ctx.watchers);
+    EXPECT_TRUE(ok);
+  }
+  log_watcher(&(ctx.watchers[0]), 0);
+  log_watcher(&(ctx.watchers[1]), 1);
+
+  DDRes res = pprof_create_profile(&pprof, ctx);
+  EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_index == -1);
+  EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_count_index == -1);
+
+  EXPECT_TRUE(ctx.watchers[1].pprof_indices[kLiveSumPos].pprof_index != -1);
+  EXPECT_TRUE(ctx.watchers[1].pprof_indices[kLiveSumPos].pprof_count_index !=
+              -1);
+  res = pprof_aggregate(&mock_output, symbol_hdr, 1000, 1, &ctx.watchers[1],
+                        kLiveSumPos, &pprof);
+  EXPECT_TRUE(IsDDResOK(res));
+  test_pprof(&pprof);
   res = pprof_free_profile(&pprof);
   EXPECT_TRUE(IsDDResOK(res));
 }
