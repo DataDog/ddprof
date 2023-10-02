@@ -8,12 +8,14 @@
 #include "ddprof_context.hpp"
 #include "ddres_def.hpp"
 
-typedef struct DDProfInput DDProfInput;
-typedef struct PerfWatcher PerfWatcher;
-
 namespace ddprof {
+
+struct DDProfInput;
+struct PerfWatcher;
+
 /***************************** Context Management *****************************/
 DDRes context_set(const DDProfCLI &ddprof_cli, DDProfContext &ctx);
 
 int context_allocation_profiling_watcher_idx(const DDProfContext &ctx);
+
 } // namespace ddprof

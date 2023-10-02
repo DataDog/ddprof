@@ -5,17 +5,21 @@
 
 #include "version.hpp"
 
-#include <stdio.h>
+#include <cstdio>
+
+namespace ddprof {
 
 std::string_view str_version() {
-  static char profiler_version[1024] = {0};
+  constexpr size_t k_max_version_length = 1024;
+  static char profiler_version[k_max_version_length] = {};
   int len = 0;
-  if (*VER_REV)
-    len = snprintf(profiler_version, 1024, "%d.%d.%d+%s", VER_MAJ, VER_MIN,
-                   VER_PATCH, VER_REV);
-  else
-    len = snprintf(profiler_version, 1024, "%d.%d.%d", VER_MAJ, VER_MIN,
-                   VER_PATCH);
+  if (*VER_REV) {
+    len = snprintf(profiler_version, std::size(profiler_version), "%d.%d.%d+%s",
+                   VER_MAJ, VER_MIN, VER_PATCH, VER_REV);
+  } else {
+    len = snprintf(profiler_version, std::size(profiler_version), "%d.%d.%d",
+                   VER_MAJ, VER_MIN, VER_PATCH);
+  }
 
   if (len < 0) {
     return "bad-version";
@@ -27,3 +31,5 @@ void print_version() {
   printf(MYNAME " %.*s\n", static_cast<int>(str_version().size()),
          str_version().data());
 }
+
+} // namespace ddprof

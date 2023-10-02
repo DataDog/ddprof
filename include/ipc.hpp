@@ -43,21 +43,21 @@ public:
   void set_read_timeout(std::chrono::microseconds duration,
                         std::error_code &ec) const noexcept;
 
-  void send(ConstBuffer buffer, std::error_code &ec) noexcept;
-  size_t send_partial(ConstBuffer buffer, std::error_code &ec) noexcept;
+  void send(ConstBuffer buffer, std::error_code &ec) const noexcept;
+  size_t send_partial(ConstBuffer buffer, std::error_code &ec) const noexcept;
   void send(ConstBuffer buffer, std::span<const int> fds,
-            std::error_code &ec) noexcept;
+            std::error_code &ec) const noexcept;
   size_t send_partial(ConstBuffer buffer, std::span<const int> fds,
-                      std::error_code &ec) noexcept;
+                      std::error_code &ec) const noexcept;
 
   std::pair<size_t, size_t> receive(Buffer buffer, std::span<int> fds,
-                                    std::error_code &ec) noexcept;
+                                    std::error_code &ec) const noexcept;
 
   std::pair<size_t, size_t> receive_partial(Buffer buffer, std::span<int> fds,
-                                            std::error_code &ec) noexcept;
+                                            std::error_code &ec) const noexcept;
 
-  size_t receive(Buffer buffer, std::error_code &ec) noexcept;
-  size_t receive_partial(Buffer buffer, std::error_code &ec) noexcept;
+  size_t receive(Buffer buffer, std::error_code &ec) const noexcept;
+  size_t receive_partial(Buffer buffer, std::error_code &ec) const noexcept;
 
   // cppcheck thinks we are returning an address here, but is completely wrong
   // cppcheck-suppress CastAddressToIntegerAtReturn
@@ -114,7 +114,7 @@ public:
                   std::chrono::microseconds timeout = kDefaultSocketTimeout);
 
   using ReplyFunc = std::function<ReplyMessage(const RequestMessage &)>;
-  void waitForRequest(ReplyFunc func);
+  void waitForRequest(const ReplyFunc &func);
 
 private:
   UnixSocket _socket;

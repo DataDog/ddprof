@@ -5,12 +5,14 @@
 
 #include "ddprof_base.hpp"
 
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include "chrono_utils.hpp"
+
+#include <csignal>
+#include <cstdio>
+#include <cstdlib>
 #include <sys/time.h>
 
-void timer_handler(int) { exit(0); }
+void timer_handler(int /*sig*/) { exit(0); }
 
 DDPROF_NOINLINE __attribute__((naked)) void fun2() {
   asm("pushq  %rbp\n"
@@ -33,10 +35,11 @@ DDPROF_NOINLINE void fun1() {
 int main() {
   struct sigaction sa {};
   sa.sa_handler = &timer_handler;
-  sigaction(SIGPROF, &sa, NULL);
+  sigaction(SIGPROF, &sa, nullptr);
 
-  itimerval val{};
-  val.it_value.tv_usec = 200000;
+  constexpr std::chrono::milliseconds timer_delay{200};
+  const itimerval val{.it_interval = {},
+                      .it_value = ddprof::duration_to_timeval(timer_delay)};
   setitimer(ITIMER_PROF, &val, nullptr);
   fun1();
 }

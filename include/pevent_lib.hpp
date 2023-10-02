@@ -9,6 +9,8 @@
 #include "ddres_def.hpp"
 #include "pevent.hpp"
 
+namespace ddprof {
+
 /// Sets initial state for every pevent in the pevent_hdr
 void pevent_init(PEventHdr *pevent_hdr);
 
@@ -49,3 +51,5 @@ DDRes pevent_mmap_event(PEvent *pevent);
 DDRes pevent_munmap_event(PEvent *pevent);
 
 DDRes pevent_close_event(PEvent *pevent);
+
+} // namespace ddprof

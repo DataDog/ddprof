@@ -16,16 +16,19 @@
 #include "tracepoint_config.hpp"
 #include "user_override.hpp"
 
-#include <assert.h>
-#include <errno.h>
-#include <stddef.h>
-#include <string.h>
+#include <cassert>
+#include <cerrno>
+#include <cstddef>
+#include <cstring>
 #include <sys/ioctl.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
-static DDRes pevent_create(PEventHdr *pevent_hdr, int watcher_idx,
-                           size_t *pevent_idx) {
+namespace ddprof {
+
+namespace {
+DDRes pevent_create(PEventHdr *pevent_hdr, int watcher_idx,
+                    size_t *pevent_idx) {
   if (pevent_hdr->size >= pevent_hdr->max_size) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
                            "Reached max number of watchers (%lu)",
@@ -36,19 +39,9 @@ static DDRes pevent_create(PEventHdr *pevent_hdr, int watcher_idx,
   return {};
 }
 
-void pevent_init(PEventHdr *pevent_hdr) {
-  memset(pevent_hdr, 0, sizeof(PEventHdr));
-  pevent_hdr->max_size = MAX_NB_PERF_EVENT_OPEN;
-  for (size_t k = 0; k < pevent_hdr->max_size; ++k) {
-    pevent_hdr->pes[k].fd = -1;
-    pevent_hdr->pes[k].mapfd = -1;
-    pevent_hdr->pes[k].attr_idx = -1;
-  }
-}
-
-static void display_system_config(void) {
+void display_system_config() {
   int val;
-  DDRes res = ddprof::sys_perf_event_paranoid(val);
+  DDRes const res = sys_perf_event_paranoid(val);
   if (IsDDResOK(res)) {
     LG_WRN("Check System Configuration - perf_event_paranoid=%d", val);
   } else {
@@ -56,32 +49,18 @@ static void display_system_config(void) {
   }
 }
 
-int pevent_compute_min_mmap_order(int min_buffer_size_order,
-                                  uint32_t stack_sample_size,
-                                  unsigned min_number_samples) {
-  int ret_order = min_buffer_size_order;
-  // perf events and allocation events should be roughly the same size
-  size_t single_event_size = ddprof::sizeof_allocation_event(stack_sample_size);
-  // Ensure we can at least fit 8 samples within one buffer
-  while (((perf_mmap_size(ret_order) - get_page_size()) / single_event_size) <
-         min_number_samples) {
-    ++ret_order;
-  }
-  return ret_order;
-}
-
 // set info for a perf_event_open type of buffer
-static void pevent_set_info(int fd, int attr_idx, PEvent &pevent,
-                            uint32_t stack_sample_size) {
+void pevent_set_info(int fd, int attr_idx, PEvent &pevent,
+                     uint32_t stack_sample_size) {
   static bool log_once = true;
   pevent.fd = fd;
   pevent.mapfd = fd;
-  int buffer_size_order =
-      pevent_compute_min_mmap_order(DEFAULT_BUFF_SIZE_SHIFT, stack_sample_size,
-                                    k_min_number_samples_per_ring_buffer);
-  if (buffer_size_order > DEFAULT_BUFF_SIZE_SHIFT && log_once) {
+  int const buffer_size_order = pevent_compute_min_mmap_order(
+      k_default_buffer_size_shift, stack_sample_size,
+      k_min_number_samples_per_ring_buffer);
+  if (buffer_size_order > k_default_buffer_size_shift && log_once) {
     LG_NTC("Increasing size order of the ring buffer to %d (from %d)",
-           buffer_size_order, DEFAULT_BUFF_SIZE_SHIFT);
+           buffer_size_order, k_default_buffer_size_shift);
     log_once = false; // avoid flooding for all CPUs
   }
   pevent.ring_buffer_size = perf_mmap_size(buffer_size_order);
@@ -90,19 +69,19 @@ static void pevent_set_info(int fd, int attr_idx, PEvent &pevent,
   pevent.attr_idx = attr_idx;
 }
 
-static DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
-                                   pid_t pid, PEventHdr *pevent_hdr,
-                                   size_t &pevent_idx) {
+DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
+                            pid_t pid, PEventHdr *pevent_hdr,
+                            size_t &pevent_idx) {
   // register cpu 0 and find a working config
   PEvent *pes = pevent_hdr->pes;
   std::vector<perf_event_attr> perf_event_data =
-      ddprof::all_perf_configs_from_watcher(watcher, true);
+      all_perf_configs_from_watcher(watcher, true);
   DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
 
   // attempt with different configs
   for (auto &attr : perf_event_data) {
     // register cpu 0
-    int fd = perf_event_open(&attr, pid, 0, -1, PERF_FLAG_FD_CLOEXEC);
+    int const fd = perf_event_open(&attr, pid, 0, -1, PERF_FLAG_FD_CLOEXEC);
     if (fd != -1) {
       // Copy the successful config
       pevent_hdr->attrs[pevent_hdr->nb_attrs] = attr;
@@ -111,13 +90,12 @@ static DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
       ++pevent_hdr->nb_attrs;
       assert(pevent_hdr->nb_attrs <= MAX_TYPE_WATCHER);
       break;
-    } else {
-      LG_NFO("Expected failure (we retry with different settings) "
-             "perf_event_open for watcher: %s - with attr.type=%s, "
-             "exclude_kernel=%d",
-             watcher->desc.c_str(), perf_type_str(attr.type),
-             static_cast<int>(attr.exclude_kernel));
     }
+    LG_NFO("Expected failure (we retry with different settings) "
+           "perf_event_open for watcher: %s - with attr.type=%s, "
+           "exclude_kernel=%d",
+           watcher->desc.c_str(), perf_type_str(attr.type),
+           static_cast<int>(attr.exclude_kernel));
   }
   // check if one of the configs was successful
   if (pes[pevent_idx].attr_idx == -1) {
@@ -130,22 +108,22 @@ static DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
   return ddres_init();
 }
 
-static DDRes pevent_open_all_cpus(const PerfWatcher *watcher, int watcher_idx,
-                                  pid_t pid, int num_cpu,
-                                  PEventHdr *pevent_hdr) {
+DDRes pevent_open_all_cpus(const PerfWatcher *watcher, int watcher_idx,
+                           pid_t pid, int num_cpu, PEventHdr *pevent_hdr) {
   PEvent *pes = pevent_hdr->pes;
 
   size_t template_pevent_idx = -1;
   DDRES_CHECK_FWD(pevent_register_cpu_0(watcher, watcher_idx, pid, pevent_hdr,
                                         template_pevent_idx));
-  int template_attr_idx = pes[template_pevent_idx].attr_idx;
+  int const template_attr_idx = pes[template_pevent_idx].attr_idx;
   perf_event_attr *attr = &pevent_hdr->attrs[template_attr_idx];
 
   // used the fixed attr for the others
   for (int cpu_idx = 1; cpu_idx < num_cpu; ++cpu_idx) {
     size_t pevent_idx = -1;
     DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
-    int fd = perf_event_open(attr, pid, cpu_idx, -1, PERF_FLAG_FD_CLOEXEC);
+    int const fd =
+        perf_event_open(attr, pid, cpu_idx, -1, PERF_FLAG_FD_CLOEXEC);
     if (fd == -1) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
                              "Error calling perfopen on watcher %d.%d (%s)",
@@ -155,6 +133,32 @@ static DDRes pevent_open_all_cpus(const PerfWatcher *watcher, int watcher_idx,
                     watcher->options.stack_sample_size);
   }
   return ddres_init();
+}
+
+} // namespace
+
+void pevent_init(PEventHdr *pevent_hdr) {
+  memset(pevent_hdr, 0, sizeof(PEventHdr));
+  pevent_hdr->max_size = k_max_nb_perf_event_open;
+  for (size_t k = 0; k < pevent_hdr->max_size; ++k) {
+    pevent_hdr->pes[k].fd = -1;
+    pevent_hdr->pes[k].mapfd = -1;
+    pevent_hdr->pes[k].attr_idx = -1;
+  }
+}
+
+int pevent_compute_min_mmap_order(int min_buffer_size_order,
+                                  uint32_t stack_sample_size,
+                                  unsigned min_number_samples) {
+  int ret_order = min_buffer_size_order;
+  // perf events and allocation events should be roughly the same size
+  size_t const single_event_size = sizeof_allocation_event(stack_sample_size);
+  // Ensure we can at least fit 8 samples within one buffer
+  while (((perf_mmap_size(ret_order) - get_page_size()) / single_event_size) <
+         min_number_samples) {
+    ++ret_order;
+  }
+  return ret_order;
 }
 
 DDRes pevent_open(DDProfContext &ctx, pid_t pid, int num_cpu,
@@ -170,12 +174,11 @@ DDRes pevent_open(DDProfContext &ctx, pid_t pid, int num_cpu,
       // custom event, eg.allocation profiling
       size_t pevent_idx = 0;
       DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
-      int order = pevent_compute_min_mmap_order(
-          MPSC_BUFF_SIZE_SHIFT, watcher->options.stack_sample_size,
+      int const order = pevent_compute_min_mmap_order(
+          k_mpsc_buffer_size_shift, watcher->options.stack_sample_size,
           k_min_number_samples_per_ring_buffer);
-      DDRES_CHECK_FWD(
-          ddprof::ring_buffer_create(order, RingBufferType::kMPSCRingBuffer,
-                                     true, &pevent_hdr->pes[pevent_idx]));
+      DDRES_CHECK_FWD(ring_buffer_create(order, RingBufferType::kMPSCRingBuffer,
+                                         true, &pevent_hdr->pes[pevent_idx]));
     }
   }
   return ddres_init();
@@ -263,7 +266,7 @@ DDRes pevent_munmap_event(PEvent *event) {
                              "Error when using perfdisown for watcher #%d",
                              event->watcher_pos);
     }
-    event->rb.base = NULL;
+    event->rb.base = nullptr;
   }
   rb_free(&event->rb);
   return {};
@@ -275,7 +278,7 @@ DDRes pevent_munmap(PEventHdr *pevent_hdr) {
   DDRes res{};
 
   for (size_t k = 0; k < pevent_hdr->size; ++k) {
-    DDRes local_res = pevent_munmap_event(&pes[k]);
+    DDRes const local_res = pevent_munmap_event(&pes[k]);
     if (!IsDDResOK(local_res)) {
       res = local_res;
     }
@@ -307,7 +310,7 @@ DDRes pevent_close(PEventHdr *pevent_hdr) {
   PEvent *pes = pevent_hdr->pes;
   DDRes res{};
   for (size_t k = 0; k < pevent_hdr->size; ++k) {
-    DDRes local_res = pevent_close_event(&pes[k]);
+    DDRes const local_res = pevent_close_event(&pes[k]);
     if (!IsDDResOK(local_res)) {
       res = local_res;
     }
@@ -327,12 +330,14 @@ bool pevent_include_kernel_events(const PEventHdr *pevent_hdr) {
 
 DDRes pevent_cleanup(PEventHdr *pevent_hdr) {
   DDRes ret = ddres_init();
-  DDRes ret_tmp;
 
   // Cleanup both, storing the error if one was generated
-  if (!IsDDResOK(ret_tmp = pevent_munmap(pevent_hdr)))
+  if (DDRes const ret_tmp = pevent_munmap(pevent_hdr); !IsDDResOK((ret_tmp))) {
     ret = ret_tmp;
-  if (!IsDDResOK(ret_tmp = pevent_close(pevent_hdr)))
+  }
+  if (DDRes const ret_tmp = pevent_close(pevent_hdr); !IsDDResOK((ret_tmp))) {
     ret = ret_tmp;
+  }
   return ret;
 }
+} // namespace ddprof

@@ -9,6 +9,7 @@
 #include "ddprof_cmdline.hpp"
 #include "ddprof_context.hpp"
 #include "ddprof_cpumask.hpp"
+#include "ddres.hpp"
 #include "logger.hpp"
 #include "logger_setup.hpp"
 #include "presets.hpp"
@@ -20,10 +21,12 @@
 #include <unistd.h>
 
 namespace ddprof {
-static const PerfWatcher *
-find_duplicate_event(std::span<const PerfWatcher> watchers) {
+
+namespace {
+
+const PerfWatcher *find_duplicate_event(std::span<const PerfWatcher> watchers) {
   bool seen[DDPROF_PWE_LENGTH] = {};
-  for (auto &watcher : watchers) {
+  for (const auto &watcher : watchers) {
     if (watcher.ddprof_event_type != DDPROF_PWE_TRACEPOINT &&
         seen[watcher.ddprof_event_type]) {
       return &watcher;
@@ -33,7 +36,7 @@ find_duplicate_event(std::span<const PerfWatcher> watchers) {
   return nullptr;
 }
 
-static void order_watchers(std::span<PerfWatcher> watchers) {
+void order_watchers(std::span<PerfWatcher> watchers) {
   // Ensure that non-perf watchers are last because they might depend on
   // processing perf events before (comm, mmap, ...)
   std::stable_sort(
@@ -42,7 +45,6 @@ static void order_watchers(std::span<PerfWatcher> watchers) {
       });
 }
 
-namespace {
 void copy_cli_values(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
 
   // Do we want to std::move more ?
@@ -92,7 +94,7 @@ DDRes context_add_watchers(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
 
   std::string preset = ddprof_cli.preset;
 
-  if (preset.empty() && watchers.size() == 0) {
+  if (preset.empty() && watchers.empty()) {
     // use `default` preset when no preset and no events were given in input
     preset = "default";
   }
@@ -117,6 +119,7 @@ DDRes context_add_watchers(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
   ctx.watchers = std::move(watchers);
   return {};
 }
+
 } // namespace
 
 DDRes context_set(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
@@ -124,7 +127,7 @@ DDRes context_set(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
 
   copy_cli_values(ddprof_cli, ctx);
 
-  ctx.params.num_cpu = ddprof::nprocessors_conf();
+  ctx.params.num_cpu = nprocessors_conf();
 
   DDRES_CHECK_FWD(context_add_watchers(ddprof_cli, ctx));
 
@@ -140,7 +143,7 @@ DDRes context_set(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
 }
 
 int context_allocation_profiling_watcher_idx(const DDProfContext &ctx) {
-  std::span watchers{ctx.watchers};
+  const std::span watchers{ctx.watchers};
   auto it =
       std::find_if(watchers.begin(), watchers.end(), [](const auto &watcher) {
         return watcher.type == kDDPROF_TYPE_CUSTOM &&

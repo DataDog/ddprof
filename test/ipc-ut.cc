@@ -15,6 +15,8 @@
 
 using namespace std::chrono_literals;
 
+namespace ddprof {
+
 static const int kParentIdx = 0;
 static const int kChildIdx = 1;
 
@@ -30,7 +32,7 @@ TEST(IPCTest, Positive) {
     FILE *tmp_file = std::tmpfile();
     // I am the child, close parent socket (dupe)
     close(sockets[kParentIdx]);
-    ddprof::UnixSocket socket(sockets[kChildIdx]);
+    UnixSocket socket(sockets[kChildIdx]);
     int fileFd = fileno(tmp_file);
     // Send something from child
     size_t writeRet = write(fileFd, payload.c_str(), payload.size());
@@ -46,7 +48,7 @@ TEST(IPCTest, Positive) {
   } else {
     // I am a parent
     close(sockets[kChildIdx]);
-    ddprof::UnixSocket socket(sockets[kParentIdx]);
+    UnixSocket socket(sockets[kParentIdx]);
     int fd;
     std::byte buf[1];
     std::error_code ec;
@@ -74,9 +76,9 @@ TEST(IPCTest, Positive) {
 
 TEST(IPCTest, timeout) {
   int sockets[2] = {-1, -1};
-  ASSERT_EQ(socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sockets), 0);
-  ddprof::UnixSocket sock1(sockets[0]);
-  ddprof::UnixSocket sock2(sockets[1]);
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_DGRAM, 0, sockets), 0);
+  UnixSocket sock1(sockets[0]);
+  UnixSocket sock2(sockets[1]);
   std::error_code ec;
 
   auto timeout = 50ms;
@@ -118,3 +120,5 @@ TEST(IPCTest, timeout) {
     }
   }
 }
+
+} // namespace ddprof

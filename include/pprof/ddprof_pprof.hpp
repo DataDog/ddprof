@@ -13,13 +13,15 @@
 #include "tags.hpp"
 #include "unwind_output.hpp"
 
+namespace ddprof {
+
 struct SymbolHdr;
 
 struct DDProfPProf {
   /* single profile gathering several value types */
   ddog_prof_Profile _profile{};
   unsigned _nb_values = 0;
-  ddprof::Tags _tags;
+  Tags _tags;
 };
 
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx);
@@ -45,3 +47,5 @@ DDRes pprof_free_profile(DDProfPProf *pprof);
 void ddprof_print_sample(const UnwindOutput &uw_output,
                          const SymbolHdr &symbol_hdr, uint64_t value,
                          const PerfWatcher &watcher);
+
+} // namespace ddprof

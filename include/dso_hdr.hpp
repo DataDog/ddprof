@@ -124,7 +124,7 @@ public:
   static DsoRange get_intersection(DsoMap &map, const Dso &dso);
 
   // Return whole mapping range associated with the same elf file
-  DsoConstRange get_elf_range(const DsoMap &map, DsoMapConstIt it);
+  static DsoConstRange get_elf_range(const DsoMap &map, DsoMapConstIt it);
 
   // Helper to create a dso from a line in /proc/pid/maps
   static Dso dso_from_procline(int pid, char *line);
@@ -176,7 +176,7 @@ private:
   typedef std::unordered_map<pid_t, BackpopulateState> BackpopulateStateMap;
 
   // erase range of elements
-  static void erase_range(DsoMap &map, const DsoRange &range);
+  static void erase_range(DsoMap &map, const DsoConstRange &range);
 
   // parse procfs to look for dso elements
   bool pid_backpopulate(PidMapping &pid_mapping, pid_t pid, int &nb_elts_added);

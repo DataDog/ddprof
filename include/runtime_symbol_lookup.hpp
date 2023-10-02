@@ -92,7 +92,7 @@ private:
   // Symbols are cached with the process's address.
   //
   DDRes fill_from_jitdump(std::string_view jitdump_path, pid_t pid,
-                          SymbolMap &symbol_map, SymbolTable &symbol_info);
+                          SymbolMap &symbol_map, SymbolTable &symbol_table);
 
   DDRes fill_from_perfmap(int pid, SymbolMap &symbol_map,
                           SymbolTable &symbol_table);
@@ -121,11 +121,12 @@ private:
     ++_stats._nb_failed_lookups;
   }
 
-  bool should_skip_symbol(std::string_view symbol) const;
+  static bool should_skip_symbol(std::string_view symbol);
 
-  bool insert_or_replace(std::string_view symbol, ProcessAddress_t address,
-                         Offset_t code_size, SymbolMap &symbol_map,
-                         SymbolTable &symbol_table);
+  static bool insert_or_replace(std::string_view symbol,
+                                ProcessAddress_t address, Offset_t code_size,
+                                SymbolMap &symbol_map,
+                                SymbolTable &symbol_table);
 
   static constexpr std::array<const std::string_view, 1>
       _ignored_symbols_start = {{

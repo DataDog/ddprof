@@ -17,11 +17,11 @@
 #include "unwind.h"
 
 #include <algorithm>
-#include <assert.h>
-#include <errno.h>
+#include <cassert>
+#include <cerrno>
+#include <cstdlib>
+#include <cstring>
 #include <poll.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/mman.h>
 #include <sys/signalfd.h>
 #include <sys/socket.h>
@@ -31,16 +31,12 @@
 #include <unistd.h>
 
 namespace ddprof {
-static pid_t g_child_pid = 0;
-static bool g_termination_requested = false;
+namespace {
 
-static inline int64_t now_nanos() {
-  static struct timeval tv = {};
-  gettimeofday(&tv, NULL);
-  return (tv.tv_sec * 1000000 + tv.tv_usec) * 1000;
-}
+pid_t g_child_pid = 0;
+bool g_termination_requested = false;
 
-static void handle_signal(int) {
+void handle_signal(int /*unused*/) {
   g_termination_requested = true;
 
   // forwarding signal to child
@@ -49,7 +45,7 @@ static void handle_signal(int) {
   }
 }
 
-static DDRes install_signal_handler() {
+DDRes install_signal_handler() {
   sigset_t sigset;
   struct sigaction sa;
   DDRES_CHECK_ERRNO(sigemptyset(&sigset), DD_WHAT_MAINLOOP_INIT,
@@ -57,19 +53,19 @@ static DDRes install_signal_handler() {
   sa.sa_handler = &handle_signal;
   sa.sa_mask = sigset;
   sa.sa_flags = SA_RESTART;
-  DDRES_CHECK_ERRNO(sigaction(SIGTERM, &sa, NULL), DD_WHAT_MAINLOOP_INIT,
+  DDRES_CHECK_ERRNO(sigaction(SIGTERM, &sa, nullptr), DD_WHAT_MAINLOOP_INIT,
                     "Setting SIGTERM handler failed");
-  DDRES_CHECK_ERRNO(sigaction(SIGINT, &sa, NULL), DD_WHAT_MAINLOOP_INIT,
+  DDRES_CHECK_ERRNO(sigaction(SIGINT, &sa, nullptr), DD_WHAT_MAINLOOP_INIT,
                     "Setting SIGINT handler failed");
   return {};
 }
 
-static void modify_sigprocmask(int how) {
+void modify_sigprocmask(int how) {
   sigset_t mask;
   sigemptyset(&mask);
   sigaddset(&mask, SIGINT);
   sigaddset(&mask, SIGTERM);
-  sigprocmask(how, &mask, NULL);
+  sigprocmask(how, &mask, nullptr);
 }
 
 DDRes spawn_workers(PersistentWorkerState *persistent_worker_state,
@@ -91,7 +87,7 @@ DDRes spawn_workers(PersistentWorkerState *persistent_worker_state,
       LG_NTC("Created child %d", child_pid);
       // unblock signals, we can now forward signals to child
       modify_sigprocmask(SIG_UNBLOCK);
-      waitpid(g_child_pid, NULL, 0);
+      waitpid(g_child_pid, nullptr, 0);
     }
 
     g_child_pid = 0;
@@ -113,8 +109,8 @@ DDRes spawn_workers(PersistentWorkerState *persistent_worker_state,
   return {};
 }
 
-static void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
-                         int *pfd_len) {
+void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
+                  int *pfd_len) {
   *pfd_len = pevent_hdr->size;
   const PEvent *pes = pevent_hdr->pes;
   // Setup poll() to watch perf_event file descriptors
@@ -125,7 +121,7 @@ static void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
   }
 }
 
-static DDRes signalfd_setup(pollfd *pfd) {
+DDRes signalfd_setup(pollfd *pfd) {
   sigset_t mask;
 
   sigemptyset(&mask);
@@ -133,7 +129,7 @@ static DDRes signalfd_setup(pollfd *pfd) {
   sigaddset(&mask, SIGTERM);
 
   // no need to block signal, since we inherited sigprocmask from parent
-  int sfd = signalfd(-1, &mask, 0);
+  int const sfd = signalfd(-1, &mask, 0);
   DDRES_CHECK_ERRNO(sfd, DD_WHAT_WORKERLOOP_INIT, "Could not set signalfd");
 
   pfd->fd = sfd;
@@ -141,14 +137,14 @@ static DDRes signalfd_setup(pollfd *pfd) {
   return {};
 }
 
-static inline DDRes worker_process_ring_buffers(PEvent *pes, int pe_len,
-                                                DDProfContext &ctx,
-                                                int64_t *now_ns,
-                                                int *ring_buffer_start_idx) {
+inline DDRes
+worker_process_ring_buffers(PEvent *pes, int pe_len, DDProfContext &ctx,
+                            std::chrono::steady_clock::time_point *now,
+                            const int *ring_buffer_start_idx) {
   // While there are events to process, iterate through them
-  // while limiting time spent in loop to at most PSAMPLE_DEFAULT_WAKEUP_MS
-  int64_t loop_start_ns = now_nanos();
-  int64_t local_now_ns;
+  // while limiting time spent in loop to at most k_sample_default_wakeup
+  auto loop_start = std::chrono::steady_clock::now();
+  std::chrono::steady_clock::time_point local_now;
 
   int start_idx = *ring_buffer_start_idx;
   bool events;
@@ -157,11 +153,11 @@ static inline DDRes worker_process_ring_buffers(PEvent *pes, int pe_len,
     for (int i = start_idx; i < pe_len; ++i) {
       auto &ring_buffer = pes[i].rb;
       if (ring_buffer.type == RingBufferType::kPerfRingBuffer) {
-        ddprof::PerfRingBufferReader reader(ring_buffer);
+        PerfRingBufferReader reader(ring_buffer);
 
-        ddprof::ConstBuffer buffer = reader.read_all_available();
+        ConstBuffer buffer = reader.read_all_available();
         while (!buffer.empty()) {
-          auto *hdr =
+          const auto *hdr =
               reinterpret_cast<const perf_event_header *>(buffer.data());
           DDRes res = ddprof_worker_process_event(hdr, pes[i].watcher_pos, ctx);
 
@@ -175,10 +171,10 @@ static inline DDRes worker_process_ring_buffers(PEvent *pes, int pe_len,
           buffer = remaining(buffer, hdr->size);
         }
       } else {
-        ddprof::MPSCRingBufferReader reader{ring_buffer};
-        for (ddprof::ConstBuffer buffer{reader.read_sample()}; !buffer.empty();
+        MPSCRingBufferReader reader{ring_buffer};
+        for (ConstBuffer buffer{reader.read_sample()}; !buffer.empty();
              buffer = reader.read_sample()) {
-          auto *hdr =
+          const auto *hdr =
               reinterpret_cast<const perf_event_header *>(buffer.data());
           DDRes res = ddprof_worker_process_event(hdr, pes[i].watcher_pos, ctx);
 
@@ -196,27 +192,25 @@ static inline DDRes worker_process_ring_buffers(PEvent *pes, int pe_len,
       // read position
     }
     start_idx = 0;
-    local_now_ns = now_nanos();
-  } while (events &&
-           (local_now_ns - loop_start_ns) <
-               PSAMPLE_DEFAULT_WAKEUP_MS * 1000000L);
+    local_now = std::chrono::steady_clock::now();
+  } while (events && (local_now - loop_start) < k_sample_default_wakeup);
 
-  *now_ns = local_now_ns;
+  *now = local_now;
   return {};
 }
 
-static DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
-                         PersistentWorkerState *persistent_worker_state) {
+DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
+                  PersistentWorkerState *persistent_worker_state) {
 
   // Setup poll() to watch perf_event file descriptors
-  int pe_len = ctx.worker_ctx.pevent_hdr.size;
+  int const pe_len = ctx.worker_ctx.pevent_hdr.size;
   // one extra slot in pfd to accomodate for signal fd
-  struct pollfd pfds[MAX_NB_PERF_EVENT_OPEN + 1];
+  struct pollfd pfds[k_max_nb_perf_event_open + 1];
   int pfd_len = 0;
   pollfd_setup(&ctx.worker_ctx.pevent_hdr, pfds, &pfd_len);
 
   DDRES_CHECK_FWD(signalfd_setup(&pfds[pfd_len]));
-  int signal_pos = pfd_len++;
+  int const signal_pos = pfd_len++;
 
   // Perform user-provided initialization
   defer { attr->finish_fun(ctx); };
@@ -226,7 +220,7 @@ static DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
   // processing loop should restart if it was interrupted in the middle of the
   // loop by timeout.
   // Not used yet, because currently we process all ring buffers or none
-  int ring_buffer_start_idx = 0;
+  int const ring_buffer_start_idx = 0;
   bool stop = false;
 
   // Worker poll loop
@@ -234,7 +228,9 @@ static DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
     // Convenience structs
     PEvent *pes = ctx.worker_ctx.pevent_hdr.pes;
 
-    int n = poll(pfds, pfd_len, PSAMPLE_DEFAULT_WAKEUP_MS);
+    int const n =
+        poll(pfds, pfd_len,
+             std::chrono::milliseconds{k_sample_default_wakeup}.count());
 
     // If there was an issue, return and let the caller check errno
     if (-1 == n && errno == EINTR) {
@@ -248,7 +244,7 @@ static DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
     }
 
     for (int i = 0; i < pe_len; ++i) {
-      pollfd &pfd = pfds[i];
+      pollfd const &pfd = pfds[i];
       if (pfd.revents & POLLHUP) {
         stop = true;
       } else if (pfd.revents & POLLIN && pes[i].custom_event) {
@@ -260,10 +256,10 @@ static DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
       }
     }
 
-    int64_t now_ns = 0;
-    DDRES_CHECK_FWD(worker_process_ring_buffers(pes, pe_len, ctx, &now_ns,
+    std::chrono::steady_clock::time_point now;
+    DDRES_CHECK_FWD(worker_process_ring_buffers(pes, pe_len, ctx, &now,
                                                 &ring_buffer_start_idx));
-    DDRES_CHECK_FWD(ddprof_worker_maybe_export(ctx, now_ns));
+    DDRES_CHECK_FWD(ddprof_worker_maybe_export(ctx, now));
 
     if (ctx.worker_ctx.persistent_worker_state->restart_worker) {
       // return directly no need to do a final export
@@ -272,16 +268,16 @@ static DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
   }
 
   // export current samples before exiting
-  DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, 0, true));
+  DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, {}, true));
   return {};
 }
 
-static void worker(DDProfContext &ctx, const WorkerAttr *attr,
-                   PersistentWorkerState *persistent_worker_state) {
+void worker(DDProfContext &ctx, const WorkerAttr *attr,
+            PersistentWorkerState *persistent_worker_state) {
   persistent_worker_state->restart_worker = false;
   persistent_worker_state->errors = true;
 
-  DDRes res = worker_loop(ctx, attr, persistent_worker_state);
+  DDRes const res = worker_loop(ctx, attr, persistent_worker_state);
   if (IsDDResFatal(res)) {
     LG_WRN("[PERF] Shut down worker (what:%s).",
            ddres_error_message(res._what));
@@ -294,14 +290,15 @@ static void worker(DDProfContext &ctx, const WorkerAttr *attr,
   }
 }
 
+} // namespace
+
 DDRes main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
   // Setup a shared memory region between the parent and child processes.  This
   // is used to communicate terminal profiling state
-  int mmap_prot = PROT_READ | PROT_WRITE;
-  int mmap_flags = MAP_ANONYMOUS | MAP_SHARED;
-  PersistentWorkerState *persistent_worker_state =
-      (PersistentWorkerState *)mmap(0, sizeof(PersistentWorkerState), mmap_prot,
-                                    mmap_flags, -1, 0);
+  int const mmap_prot = PROT_READ | PROT_WRITE;
+  int const mmap_flags = MAP_ANONYMOUS | MAP_SHARED;
+  auto *persistent_worker_state = static_cast<PersistentWorkerState *>(mmap(
+      nullptr, sizeof(PersistentWorkerState), mmap_prot, mmap_flags, -1, 0));
   if (MAP_FAILED == persistent_worker_state) {
     // Allocation failure : stop the profiling
     LG_ERR("Could not initialize profiler");

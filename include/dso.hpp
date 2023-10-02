@@ -59,7 +59,7 @@ public:
   mutable FileInfoId_t _id;
 
 private:
-  static bool is_jit_dump_str(std::string_view file_path, pid_t pid);
+  static bool is_jit_dump_str(std::string_view file_path);
 };
 
 std::ostream &operator<<(std::ostream &os, const Dso &dso);

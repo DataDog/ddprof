@@ -8,10 +8,12 @@
 #include "lib/reentry_guard.hpp"
 #include "syscalls.hpp"
 
+namespace ddprof {
+
 TEST(ReentryGuardTest, basic) {
   bool reentry_guard = false;
   {
-    ddprof::ReentryGuard guard(&reentry_guard);
+    ReentryGuard guard(&reentry_guard);
     EXPECT_TRUE(static_cast<bool>(guard));
     EXPECT_TRUE(reentry_guard);
   }
@@ -21,37 +23,37 @@ TEST(ReentryGuardTest, basic) {
 TEST(ReentryGuardTest, null_init) {
   bool reentry_guard = false;
   {
-    ddprof::ReentryGuard guard(nullptr);
+    ReentryGuard guard(nullptr);
     EXPECT_FALSE(guard);
     guard.register_guard(&reentry_guard);
     EXPECT_TRUE(guard);
     {
-      ddprof::ReentryGuard guard2(&reentry_guard);
+      ReentryGuard guard2(&reentry_guard);
       EXPECT_FALSE(guard2);
     }
   }
 }
 
 TEST(TLReentryGuardTest, basic) {
-  ddprof::ThreadEntries entries;
-  pid_t tid = ddprof::gettid();
+  ThreadEntries entries;
+  pid_t tid = gettid();
 
   {
-    ddprof::TLReentryGuard guard(entries, tid);
+    TLReentryGuard guard(entries, tid);
     EXPECT_TRUE(static_cast<bool>(guard));
     // Reenter a second time
-    ddprof::TLReentryGuard guard2(entries, tid);
+    TLReentryGuard guard2(entries, tid);
     EXPECT_FALSE(static_cast<bool>(guard2));
   }
 }
 
 TEST(TLReentryGuardTest, many_threads) {
-  ddprof::ThreadEntries entries;
+  ThreadEntries entries;
   std::vector<std::thread> threads;
   for (int i = 0; i < 100; ++i) {
     threads.emplace_back([&]() {
-      pid_t tid = ddprof::gettid();
-      ddprof::TLReentryGuard guard(entries, tid);
+      pid_t tid = gettid();
+      TLReentryGuard guard(entries, tid);
       EXPECT_TRUE(static_cast<bool>(guard));
       // Sleep to simulate work
       std::this_thread::sleep_for(std::chrono::milliseconds(5));
@@ -68,22 +70,22 @@ TEST(TLReentryGuardTest, many_threads) {
 }
 
 TEST(TLReentryGuardTest, reqcuisition_many_threads) {
-  ddprof::ThreadEntries entries;
+  ThreadEntries entries;
   std::vector<std::thread> threads;
   for (int i = 0; i < 100; ++i) {
     threads.emplace_back([&]() {
-      pid_t tid = ddprof::gettid();
+      pid_t tid = gettid();
 
       // First acquisition
       {
-        ddprof::TLReentryGuard guard(entries, tid);
+        TLReentryGuard guard(entries, tid);
         EXPECT_TRUE(static_cast<bool>(guard));
         // Sleep to simulate work
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
       }
       // Re-acquisition
       {
-        ddprof::TLReentryGuard guard(entries, tid);
+        TLReentryGuard guard(entries, tid);
         EXPECT_TRUE(static_cast<bool>(guard));
       }
     });
@@ -99,3 +101,5 @@ TEST(TLReentryGuardTest, reqcuisition_many_threads) {
     EXPECT_EQ(entry.load(), -1);
   }
 }
+
+} // namespace ddprof

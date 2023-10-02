@@ -19,47 +19,20 @@
 
 #include <algorithm>
 #include <array>
-#include <string_view.hpp>
 
 using namespace std::string_view_literals;
 
 namespace ddprof {
-void unwind_init(void) { elf_version(EV_CURRENT); }
 
-static void find_dso_add_error_frame(UnwindState *us) {
-  DsoHdr::DsoFindRes find_res =
-      us->dso_hdr.dso_find_closest(us->pid, us->current_ip);
-  add_error_frame(find_res.second ? &(find_res.first->second) : nullptr, us,
-                  us->current_ip);
-}
-
-static void add_container_id(UnwindState *us) {
-  auto container_id = us->process_hdr.get_container_id(us->pid);
-  if (container_id) {
-    us->output.container_id = *container_id;
-  }
-}
-
-void unwind_init_sample(UnwindState *us, uint64_t *sample_regs,
-                        pid_t sample_pid, uint64_t sample_size_stack,
-                        char *sample_data_stack) {
-  us->output.clear();
-  memcpy(&us->initial_regs.regs[0], sample_regs,
-         K_NB_REGS_UNWIND * sizeof(uint64_t));
-  us->current_ip = us->initial_regs.regs[REGNAME(PC)];
-  us->pid = sample_pid;
-  us->stack_sz = sample_size_stack;
-  us->stack = sample_data_stack;
-}
-
-static bool is_ld(const std::string &path) {
+namespace {
+bool is_ld(const std::string &path) {
   // path is expected to not contain slashes
   assert(path.rfind('/') == std::string::npos);
 
   return path.starts_with("ld-");
 }
 
-static bool is_stack_complete(UnwindState *us) {
+bool is_stack_complete(UnwindState *us) {
   static constexpr std::array s_expected_root_frames{
       "__clone"sv,
       "__clone3"sv,
@@ -71,7 +44,7 @@ static bool is_stack_complete(UnwindState *us) {
       "start_thread"sv,
       "start_task"sv};
 
-  if (us->output.locs.size() == 0) {
+  if (us->output.locs.empty()) {
     return false;
   }
 
@@ -89,6 +62,35 @@ static bool is_stack_complete(UnwindState *us) {
       us->symbol_hdr._symbol_table[root_loc._symbol_idx]._symname;
   return std::find(s_expected_root_frames.begin(), s_expected_root_frames.end(),
                    root_func) != s_expected_root_frames.end();
+}
+
+void find_dso_add_error_frame(UnwindState *us) {
+  DsoHdr::DsoFindRes const find_res =
+      us->dso_hdr.dso_find_closest(us->pid, us->current_ip);
+  add_error_frame(find_res.second ? &(find_res.first->second) : nullptr, us,
+                  us->current_ip);
+}
+
+void add_container_id(UnwindState *us) {
+  auto container_id = us->process_hdr.get_container_id(us->pid);
+  if (container_id) {
+    us->output.container_id = *container_id;
+  }
+}
+} // namespace
+
+void unwind_init() { elf_version(EV_CURRENT); }
+
+void unwind_init_sample(UnwindState *us, const uint64_t *sample_regs,
+                        pid_t sample_pid, uint64_t sample_size_stack,
+                        const char *sample_data_stack) {
+  us->output.clear();
+  memcpy(&us->initial_regs.regs[0], sample_regs,
+         k_nb_registers_to_unwind * sizeof(uint64_t));
+  us->current_ip = us->initial_regs.regs[REGNAME(PC)];
+  us->pid = sample_pid;
+  us->stack_sz = sample_size_stack;
+  us->stack = sample_data_stack;
 }
 
 DDRes unwindstate__unwind(UnwindState *us) {

@@ -7,12 +7,12 @@
 #include "loghandle.hpp"
 #include "version.hpp"
 
+namespace ddprof {
+
 // mocks
 bool s_version_called = false;
 void print_version() { s_version_called = true; }
 std::string_view str_version() { return "1.2.3"; }
-
-namespace ddprof {
 
 TEST(DDProfContext, default_values) {
   LogHandle handle;

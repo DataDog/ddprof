@@ -34,7 +34,7 @@ uint32_t mode_string_to_prot(const char mode[4]) {
 }
 
 FileHolder open_proc_maps(int pid, const char *path_to_proc = "") {
-  char proc_map_filename[1024] = {};
+  char proc_map_filename[PATH_MAX] = {};
   auto n = snprintf(proc_map_filename, std::size(proc_map_filename),
                     "%s/proc/%d/maps", path_to_proc, pid);
   if (n < 0 ||
@@ -101,7 +101,8 @@ DsoHdr::DsoHdr(std::string_view path_to_proc, int dd_profiling_fd)
     // corresponding namespace, so this is easy to check
     char pid_str[sizeof("1073741824")] = {}; // Linux max pid/tid is 2^30
     if (-1 != readlink("/host/proc/self", pid_str, sizeof(pid_str)) &&
-        getpid() == strtol(pid_str, NULL, 10)) {
+        getpid() ==
+            strtol(pid_str, nullptr, 10)) { // NOLINT(readability-magic-numbers)
       // @Datadog we often mount to /host the /proc files
       _path_to_proc = "/host";
     }
@@ -114,8 +115,8 @@ DsoHdr::DsoHdr(std::string_view path_to_proc, int dd_profiling_fd)
 
 namespace {
 bool string_readlink(const char *path, std::string &link_name) {
-  char buff[1024];
-  ssize_t len = ::readlink(path, buff, sizeof(buff) - 1);
+  char buff[PATH_MAX];
+  ssize_t const len = ::readlink(path, buff, sizeof(buff) - 1);
   if (len != -1) {
     buff[len] = '\0';
     link_name = std::string(buff);
@@ -126,14 +127,14 @@ bool string_readlink(const char *path, std::string &link_name) {
 } // namespace
 
 bool DsoHdr::find_exe_name(pid_t pid, std::string &exe_name) {
-  char exe_link[1024];
+  char exe_link[PATH_MAX];
   sprintf(exe_link, "%s/proc/%d/exe", _path_to_proc.c_str(), pid);
   return string_readlink(exe_link, exe_name);
 }
 
 DsoHdr::DsoFindRes DsoHdr::dso_find_first_std_executable(pid_t pid) {
   const DsoMap &map = _pid_map[pid]._map;
-  DsoMapConstIt it = map.lower_bound(0);
+  auto it = map.lower_bound(0);
   // look for the first executable standard region
   while (it != map.end() && !it->second.is_executable() &&
          it->second._type != dso::kStandard) {
@@ -149,7 +150,7 @@ DsoHdr::DsoFindRes DsoHdr::dso_find_closest(const DsoMap &map,
                                             ElfAddress_t addr) {
   bool is_within = false;
   // First element not less than (can match a start addr)
-  DsoMapConstIt it = map.lower_bound(addr);
+  auto it = map.lower_bound(addr);
   if (it != map.end()) {
     is_within = it->second.is_within(addr);
     if (is_within) { // exact match
@@ -189,7 +190,7 @@ DsoHdr::DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
     return {map.end(), map.end()};
   }
   // Get element after (with a start addr over the current)
-  DsoMapIt first_el = map.lower_bound(dso._start);
+  auto first_el = map.lower_bound(dso._start);
   // Lower bound will return the first over our current element.
   //         <700--1050> <1100--1500> <1600--2200>
   // Elt to insert :  <1000-------------2000>
@@ -204,8 +205,8 @@ DsoHdr::DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
     }
   }
   // init in case we don't find anything
-  DsoMapIt start = map.end();
-  DsoMapIt end = map.end();
+  auto start = map.end();
+  auto end = map.end();
 
   // Loop accross the possible range keeping track of first and last
   while (first_el != map.end()) {
@@ -229,14 +230,16 @@ DsoHdr::DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
 }
 
 // erase range of elements
-void DsoHdr::erase_range(DsoMap &map, const DsoRange &range) {
+void DsoHdr::erase_range(DsoMap &map, const DsoConstRange &range) {
   // region maps are kept (as they are used for several pids)
   map.erase(range.first, range.second);
 }
 
+// cppcheck-suppress constParameterReference; cppcheck incorrectly warns that
+// map could be a const reference
 DsoHdr::DsoFindRes DsoHdr::dso_find_adjust_same(DsoMap &map, const Dso &dso) {
   bool found_same = false;
-  DsoMapIt it = map.find(dso._start);
+  auto const it = map.find(dso._start);
 
   // comparator only looks at start ptr
   if (it != map.end()) {
@@ -282,11 +285,11 @@ FileInfoId_t DsoHdr::update_id_from_path(const Dso &dso) {
   }
 
   // check if we already encountered binary
-  FileInfoInodeKey key(file_info._inode, file_info._size);
+  const FileInfoInodeKey key(file_info._inode, file_info._size);
   auto it = _file_info_inode_map.find(key);
   if (it == _file_info_inode_map.end()) {
     dso._id = _file_info_vector.size();
-    _file_info_inode_map.emplace(std::move(key), dso._id);
+    _file_info_inode_map.emplace(key, dso._id);
     _file_info_vector.emplace_back(std::move(file_info), dso._id);
 #ifdef DEBUG
     LG_NTC("New file %d - %s - %ld", dso._id, file_info._path.c_str(),
@@ -326,7 +329,7 @@ DsoHdr::DsoFindRes DsoHdr::insert_erase_overlap(PidMapping &pid_mapping,
     return find_res;
   }
 
-  DsoRange range = get_intersection(map, dso);
+  DsoConstRange const range = get_intersection(map, dso);
 
   if (range.first != map.end()) {
     erase_range(map, range);
@@ -348,7 +351,8 @@ DsoHdr::DsoFindRes DsoHdr::insert_erase_overlap(Dso &&dso) {
 DsoHdr::DsoFindRes DsoHdr::dso_find_or_backpopulate(PidMapping &pid_mapping,
                                                     pid_t pid,
                                                     ElfAddress_t addr) {
-  if (addr < 4095) {
+  constexpr uint64_t k_zero_page_limit = 4096;
+  if (addr < k_zero_page_limit) {
     LG_DBG("[DSO] Skipping 0 page");
     return find_res_not_found(pid_mapping._map);
   }
@@ -395,11 +399,12 @@ bool DsoHdr::pid_backpopulate(PidMapping &pid_mapping, pid_t pid,
   auto proc_map_file_holder = open_proc_maps(pid, _path_to_proc.c_str());
   if (!proc_map_file_holder) {
     LG_DBG("[DSO] Failed to open procfs for %d", pid);
-    if (!process_is_alive(pid))
+    if (!process_is_alive(pid)) {
       LG_DBG("[DSO] Process nonexistant");
+    }
     return false;
   }
-  char *buf = NULL;
+  char *buf = nullptr;
   defer { free(buf); };
   size_t sz_buf = 0;
 
@@ -448,7 +453,8 @@ Dso DsoHdr::dso_from_procline(int pid, char *line) {
   uint64_t m_inode = 0;
 
   // Check for formatting errors
-  if (7 !=
+  constexpr int k_expected_number_of_matches = 7;
+  if (k_expected_number_of_matches !=
       sscanf(line, spec, &m_start, &m_end, m_mode, &m_off, &m_dev_major,
              &m_dev_minor, &m_inode, &m_p)) {
     LG_ERR("[DSO] Failed to scan mapfile line");
@@ -456,15 +462,24 @@ Dso DsoHdr::dso_from_procline(int pid, char *line) {
   }
 
   // Make sure the name index points to a valid char
-  char *p = &line[m_p], *q;
-  while (isspace(*p))
+  char *p = &line[m_p];
+  char *q;
+  while (isspace(*p)) {
     p++;
-  if ((q = strchr(p, '\n')))
+  }
+  q = strchr(p, '\n');
+  if (q) {
     *q = '\0';
+  }
 
   // Should we store non exec dso ?
-  return Dso(pid, m_start, m_end - 1, m_off, std::string(p), m_inode,
-             mode_string_to_prot(m_mode));
+  return {pid,
+          m_start,
+          m_end - 1,
+          m_off,
+          std::string(p),
+          m_inode,
+          mode_string_to_prot(m_mode)};
 }
 
 FileInfo DsoHdr::find_file_info(const Dso &dso) {
@@ -474,19 +489,19 @@ FileInfo DsoHdr::find_file_info(const Dso &dso) {
   // through proc maps
   // Example : /proc/<pid>/root/usr/local/bin/exe_file
   //   or      /host/proc/<pid>/root/usr/local/bin/exe_file
-  std::string proc_path = _path_to_proc + "/proc/" + std::to_string(dso._pid) +
-      "/root" + dso._filename;
+  std::string const proc_path = _path_to_proc + "/proc/" +
+      std::to_string(dso._pid) + "/root" + dso._filename;
   if (get_file_inode(proc_path.c_str(), &inode, &size) && inode == dso._inode) {
-    return FileInfo(proc_path, size, inode);
+    return {proc_path, size, inode};
   }
   // Try to find file in profiler mount namespace
   if (get_file_inode(dso._filename.c_str(), &inode, &size) &&
       inode == dso._inode) {
-    return FileInfo(dso._filename, size, inode);
+    return {dso._filename, size, inode};
   }
 
   LG_DBG("[DSO] Unable to find path to %s", dso._filename.c_str());
-  return FileInfo();
+  return {};
 }
 
 int DsoHdr::get_nb_dso() const {

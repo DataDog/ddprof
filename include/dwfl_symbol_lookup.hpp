@@ -48,8 +48,8 @@ public:
   // Get symbol from internal cache or fetch through dwarf
   SymbolIdx_t get_or_insert(const DDProfMod &ddprof_mod, SymbolTable &table,
                             DsoSymbolLookup &dso_symbol_lookup,
-                            FileInfoId_t file_id, ProcessAddress_t process_pc,
-                            const Dso &dso);
+                            FileInfoId_t file_info_id,
+                            ProcessAddress_t process_pc, const Dso &dso);
 
   void erase(FileInfoId_t file_info_id) { _file_info_map.erase(file_info_id); }
 
@@ -79,7 +79,7 @@ private:
   using FileInfo2SymbolVT = FileInfo2SymbolMap::value_type;
 
   static bool symbol_lookup_check(Dwfl_Module *mod, ElfAddress_t process_pc,
-                                  const Symbol &info);
+                                  const Symbol &symbol);
 
   // unordered map of DSO elements
   FileInfo2SymbolMap _file_info_map;

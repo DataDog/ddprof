@@ -9,13 +9,14 @@
 #include "ddres_def.hpp"
 #include "exporter_input.hpp"
 #include "perf_watcher.hpp"
-#include "string_view.hpp"
 #include "tags.hpp"
 
-typedef struct ddog_prof_Exporter ddog_prof_Exporter;
-typedef struct UserTags UserTags;
+struct ddog_prof_Exporter;
+struct ddog_prof_Profile;
 
-#define K_NB_CONSECUTIVE_ERRORS_ALLOWED 3
+namespace ddprof {
+
+struct UserTags;
 
 struct DDProfExporter {
   ExporterInput _input;
@@ -32,8 +33,10 @@ DDRes ddprof_exporter_init(const ExporterInput &exporter_input,
 
 DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter);
 
-DDRes ddprof_exporter_export(struct ddog_prof_Profile *profile,
-                             const ddprof::Tags &additional_tags,
-                             uint32_t profile_seq, DDProfExporter *exporter);
+DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
+                             const Tags &additional_tags, uint32_t profile_seq,
+                             DDProfExporter *exporter);
 
 DDRes ddprof_exporter_free(DDProfExporter *exporter);
+
+} // namespace ddprof

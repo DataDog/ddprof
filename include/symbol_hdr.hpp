@@ -15,8 +15,9 @@
 #include "mapinfo_lookup.hpp"
 #include "runtime_symbol_lookup.hpp"
 
-#include <stdlib.h>
+#include <cstdlib>
 
+namespace ddprof {
 struct SymbolHdr {
   SymbolHdr(std::string_view path_to_proc = "")
       : _runtime_symbol_lookup(path_to_proc) {}
@@ -37,18 +38,20 @@ struct SymbolHdr {
   }
 
   // Cache symbol associations
-  ddprof::BaseFrameSymbolLookup _base_frame_symbol_lookup;
-  ddprof::CommonSymbolLookup _common_symbol_lookup;
-  ddprof::DsoSymbolLookup _dso_symbol_lookup;
-  ddprof::DwflSymbolLookup _dwfl_symbol_lookup;
-  ddprof::RuntimeSymbolLookup _runtime_symbol_lookup;
+  BaseFrameSymbolLookup _base_frame_symbol_lookup;
+  CommonSymbolLookup _common_symbol_lookup;
+  DsoSymbolLookup _dso_symbol_lookup;
+  DwflSymbolLookup _dwfl_symbol_lookup;
+  RuntimeSymbolLookup _runtime_symbol_lookup;
   // Symbol table (contains the references to strings)
-  ddprof::SymbolTable _symbol_table;
+  SymbolTable _symbol_table;
 
   // Cache mapping associations
-  ddprof::CommonMapInfoLookup _common_mapinfo_lookup;
-  ddprof::MapInfoLookup _mapinfo_lookup;
+  CommonMapInfoLookup _common_mapinfo_lookup;
+  MapInfoLookup _mapinfo_lookup;
 
   // The mapping table
-  ddprof::MapInfoTable _mapinfo_table;
+  MapInfoTable _mapinfo_table;
 };
+
+} // namespace ddprof

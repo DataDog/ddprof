@@ -21,11 +21,11 @@
 #include "user_override.hpp"
 
 #include <array>
+#include <cerrno>
 #include <charconv>
-#include <errno.h>
+#include <cstring>
 #include <filesystem>
 #include <functional>
-#include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -35,24 +35,28 @@
 using namespace ddprof;
 namespace fs = std::filesystem;
 
-enum class InputResult { kSuccess, kStop, kError };
-
-// address of embedded libddprofiling shared library
-extern const char
-    _binary_libdd_profiling_embedded_so_start[]; // NOLINT cert-dcl51-cpp
-extern const char
-    _binary_libdd_profiling_embedded_so_end[]; // NOLINT cert-dcl51-cpp
+// NOLINTBEGIN(bugprone-reserved-identifier,cert-dcl37-c*,cert-dcl51-c*,)
+// address of embedded libdd_profiling shared library
+extern const char _binary_libdd_profiling_embedded_so_start[];
+extern const char _binary_libdd_profiling_embedded_so_end[];
+// NOLINTEND(bugprone-reserved-identifier,cert-dcl37-c*,cert-dcl51-c*,)
 
 #ifdef DDPROF_USE_LOADER
-// address of embedded libddloader shared library
-extern const char _binary_libdd_loader_so_start[]; // NOLINT cert-dcl51-cpp
-extern const char _binary_libdd_loader_so_end[];   // NOLINT cert-dcl51-cpp
+// address of embedded libdd_loader shared library
+extern const char _binary_libdd_loader_so_start[]; // NOLINT(cert-dcl51-cpp)
+extern const char _binary_libdd_loader_so_end[];   // NOLINT(cert-dcl51-cpp)
 #endif
 
-static void maybe_slowdown_startup() {
+namespace ddprof {
+
+namespace {
+
+enum class InputResult { kSuccess, kStop, kError };
+
+void maybe_slowdown_startup() {
   // Simulate startup slowdown if requested
   if (const char *s = getenv(k_startup_wait_ms_env_variable); s != nullptr) {
-    std::string_view sv{s};
+    std::string_view const sv{s};
     int wait_ms = 0;
     auto [ptr, ec] = std::from_chars(sv.begin(), sv.end(), wait_ms);
     if (ec == std::errc() && ptr == sv.end() && wait_ms > 0) {
@@ -61,7 +65,7 @@ static void maybe_slowdown_startup() {
   }
 }
 
-static std::string find_lib(std::string_view lib_name) {
+std::string find_lib(std::string_view lib_name) {
   auto exe_path = fs::read_symlink("/proc/self/exe");
   auto lib_path = exe_path.parent_path() / lib_name;
   // first, check if libdd_profiling.so exists in same directory as exe or in
@@ -91,20 +95,20 @@ public:
   TempFileHolder(const TempFileHolder &) = delete;
   TempFileHolder &operator=(const TempFileHolder &) = delete;
 
-  TempFileHolder(TempFileHolder &&other) : TempFileHolder() {
+  TempFileHolder(TempFileHolder &&other) noexcept : TempFileHolder() {
     *this = std::move(other);
   }
 
-  TempFileHolder &operator=(TempFileHolder &&other) {
+  TempFileHolder &operator=(TempFileHolder &&other) noexcept {
     using std::swap;
     swap(_path, other._path);
     swap(_is_temporary, other._is_temporary);
     return *this;
   }
 
-  const std::string &path() const { return _path; }
+  [[nodiscard]] const std::string &path() const { return _path; }
 
-  bool is_temporary() const { return _is_temporary; }
+  [[nodiscard]] bool is_temporary() const { return _is_temporary; }
 
   std::string release() {
     std::string s = std::move(_path);
@@ -118,8 +122,8 @@ private:
   bool _is_temporary = false;
 };
 
-static DDRes get_library_path(TempFileHolder &libdd_profiling_path,
-                              TempFileHolder &libdd_loader_path) {
+DDRes get_library_path(TempFileHolder &libdd_profiling_path,
+                       TempFileHolder &libdd_loader_path) {
   std::string profiling_path;
   std::string loader_path;
 
@@ -131,7 +135,7 @@ static DDRes get_library_path(TempFileHolder &libdd_profiling_path,
   }
 
   if (profiling_path.empty()) {
-    DDRES_CHECK_FWD(ddprof::get_or_create_temp_file(
+    DDRES_CHECK_FWD(get_or_create_temp_file(
         k_libdd_profiling_embedded_name,
         as_bytes(std::span{_binary_libdd_profiling_embedded_so_start,
                            _binary_libdd_profiling_embedded_so_end}),
@@ -143,7 +147,7 @@ static DDRes get_library_path(TempFileHolder &libdd_profiling_path,
 
 #ifdef DDPROF_USE_LOADER
   if (loader_path.empty()) {
-    DDRES_CHECK_FWD(ddprof::get_or_create_temp_file(
+    DDRES_CHECK_FWD(get_or_create_temp_file(
         k_libdd_loader_name,
         as_bytes(std::span{_binary_libdd_loader_so_start,
                            _binary_libdd_loader_so_end}),
@@ -159,7 +163,6 @@ static DDRes get_library_path(TempFileHolder &libdd_profiling_path,
   return {};
 }
 
-namespace {
 DDRes check_incompatible_options(const DDProfContext &ctx) {
   if (context_allocation_profiling_watcher_idx(ctx) != -1 && ctx.params.pid &&
       !ctx.params.sockfd) {
@@ -169,13 +172,12 @@ DDRes check_incompatible_options(const DDProfContext &ctx) {
   }
   return {};
 }
-} // namespace
+
 // Parse input and initialize context
-static DDRes parse_input(const ddprof::DDProfCLI &ddprof_cli,
-                         DDProfContext &ctx) {
+DDRes parse_input(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
 
   // cmdline args have been processed.  Set the ctx
-  DDRES_CHECK_FWD(ddprof::context_set(ddprof_cli, ctx));
+  DDRES_CHECK_FWD(context_set(ddprof_cli, ctx));
 
   DDRES_CHECK_FWD(check_incompatible_options(ctx));
 
@@ -192,7 +194,8 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
   }
 
   const bool in_wrapper_mode = ctx->params.pid == 0;
-  TempFileHolder dd_profiling_lib_holder, dd_loader_lib_holder;
+  TempFileHolder dd_profiling_lib_holder;
+  TempFileHolder dd_loader_lib_holder;
 
   pid_t temp_pid = 0;
   if (in_wrapper_mode) {
@@ -200,11 +203,11 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
 
     // Determine if library should be injected into target process
     // (ie. only if allocation profiling is active)
-    bool allocation_profiling_started_from_wrapper =
-        ddprof::context_allocation_profiling_watcher_idx(*ctx) != -1;
+    bool const allocation_profiling_started_from_wrapper =
+        context_allocation_profiling_watcher_idx(*ctx) != -1;
 
-    ddprof::UniqueFd child_socket;
-    ddprof::UniqueFd parent_socket;
+    UniqueFd child_socket;
+    UniqueFd parent_socket;
 
     if (allocation_profiling_started_from_wrapper) {
       int sockfds[2] = {-1, -1};
@@ -224,24 +227,25 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
     }
 
     ctx->params.pid = getpid();
-    auto daemonize_res = ddprof::daemonize();
+    auto daemonize_res = daemonize();
 
-    if (daemonize_res.state == ddprof::DaemonizeResult::Error) {
+    if (daemonize_res.state == DaemonizeResult::Error) {
       return -1;
     }
 
-    if (daemonize_res.state == ddprof::DaemonizeResult::IntermediateProcess) {
+    if (daemonize_res.state == DaemonizeResult::IntermediateProcess) {
       // temp intermediate process,: return and exit
       exit_on_return = true;
       return 0;
     }
 
-    if (daemonize_res.state == ddprof::DaemonizeResult::InitialProcess) {
+    if (daemonize_res.state == DaemonizeResult::InitialProcess) {
       // non-daemon process: return control to caller
       child_socket.reset();
 
-      std::string dd_loader_lib_path = dd_loader_lib_holder.release();
-      std::string dd_profiling_lib_path = dd_profiling_lib_holder.release();
+      std::string const dd_loader_lib_path = dd_loader_lib_holder.release();
+      std::string const dd_profiling_lib_path =
+          dd_profiling_lib_holder.release();
 
       // Allocation profiling activated, inject dd_profiling library with
       // LD_PRELOAD
@@ -267,7 +271,7 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
         setenv(k_profiler_active_env_variable, "0", 1);
       }
 
-      parent_socket.release();
+      (void)parent_socket.release();
       return 0;
     }
 
@@ -279,15 +283,15 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
   // Now, we are the profiler process
   exit_on_return = true;
 
-  ddprof::init_tsc();
+  init_tsc();
 
   if (CPU_COUNT(&ctx->params.cpu_affinity) > 0) {
     LG_DBG("Setting affinity to 0x%s",
-           ddprof::cpu_mask_to_string(ctx->params.cpu_affinity).c_str());
+           cpu_mask_to_string(ctx->params.cpu_affinity).c_str());
     if (sched_setaffinity(0, sizeof(cpu_set_t), &ctx->params.cpu_affinity) !=
         0) {
       LG_ERR("Failed to set profiler CPU affinity to 0x%s: %s",
-             ddprof::cpu_mask_to_string(ctx->params.cpu_affinity).c_str(),
+             cpu_mask_to_string(ctx->params.cpu_affinity).c_str(),
              strerror(errno));
       return -1;
     }
@@ -313,11 +317,10 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
     reply.request = RequestMessage::kProfilerInfo;
     reply.pid = getpid();
 
-    int alloc_watcher_idx =
-        ddprof::context_allocation_profiling_watcher_idx(*ctx);
+    int alloc_watcher_idx = context_allocation_profiling_watcher_idx(*ctx);
     if (alloc_watcher_idx != -1) {
-      std::span pevents{ctx->worker_ctx.pevent_hdr.pes,
-                        ctx->worker_ctx.pevent_hdr.size};
+      std::span const pevents{ctx->worker_ctx.pevent_hdr.pes,
+                              ctx->worker_ctx.pevent_hdr.size};
       auto event_it =
           std::find_if(pevents.begin(), pevents.end(),
                        [alloc_watcher_idx](const auto &pevent) {
@@ -340,7 +343,7 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
 
         if (ctx->watchers[alloc_watcher_idx].output_mode ==
             EventConfMode::kLiveCallgraph) {
-          reply.allocation_flags |= (1 << ddprof::ReplyMessage::kLiveCallgraph);
+          reply.allocation_flags |= (1 << ReplyMessage::kLiveCallgraph);
         }
       }
     }
@@ -349,10 +352,8 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
       // Takes ownership of the open socket, socket will be closed when
       // exiting this block
       Server server{UnixSocket{ctx->params.sockfd.release()}};
-
-      server.waitForRequest(
-          [&reply](const ddprof::RequestMessage &) { return reply; });
-    } catch (const ddprof::DDException &e) {
+      server.waitForRequest([&reply](const RequestMessage &) { return reply; });
+    } catch (const DDException &e) {
       if (in_wrapper_mode) {
         if (!process_is_alive(ctx->params.pid)) {
           // Tell the user that process died
@@ -389,38 +390,40 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
     // Some kind of error; tell the user about what happened in one line
     LG_ERR("Profiling terminated (%s)", ddres_error_message(res._what));
     return -1;
-  } else {
-    // Normal error -- don't overcommunicate
-    LG_NTC("Profiling terminated");
-  }
+  } // Normal error -- don't overcommunicate
+  LG_NTC("Profiling terminated");
 
   return 0;
 }
 
 // This function only returns in wrapper mode for control (non-ddprof) process
-static void start_profiler(std::unique_ptr<DDProfContext> ctx) {
+void start_profiler(std::unique_ptr<DDProfContext> ctx) {
   bool exit_on_return = false;
 
   // ownership of context is passed to start_profiler_internal
-  int res = start_profiler_internal(std::move(ctx), exit_on_return);
+  int const res = start_profiler_internal(std::move(ctx), exit_on_return);
   if (exit_on_return) {
     exit(res);
   }
   // In wrapper mode (ie. ctx->params.pid == 0), whatever happened to ddprof,
   // continue and start user process
-  return;
 }
+
+} // namespace
+} // namespace ddprof
 
 /**************************** Program Entry Point *****************************/
 int main(int argc, char *argv[]) {
-  ddprof::CommandLineWrapper cmd_line({});
+  using namespace ddprof;
+
+  CommandLineWrapper cmd_line({});
   {
     // Use a dynamic allocation to allow clean up
     // in other exit flows
     auto ctx = std::make_unique<DDProfContext>();
     {
-      ddprof::DDProfCLI cli;
-      int res = cli.parse(argc, const_cast<const char **>(argv));
+      DDProfCLI cli;
+      int const res = cli.parse(argc, const_cast<const char **>(argv));
       if (!cli.continue_exec) {
         return res;
       }
@@ -435,7 +438,7 @@ int main(int argc, char *argv[]) {
     } // cli is destroyed here (prevents forks from having an instance of CLI
 
     // Save switch_user since ctx will be destroyed after call to start_profiler
-    std::string switch_user = ctx->params.switch_user;
+    std::string const switch_user = ctx->params.switch_user;
 
     /**************************************************************************\
     |                             Run the Profiler |

@@ -11,6 +11,7 @@
 
 #include "event_parser.h"
 #include "perf_watcher.hpp"
+#include "version.hpp"
 
 #include <chrono>
 #include <string>
@@ -38,7 +39,7 @@ public:
   // Profiling options
   int pid{0};
   bool global{false};
-  unsigned upload_period;
+  std::chrono::seconds upload_period;
   unsigned worker_period; // worker_period
   std::vector<std::string> events;
   std::string preset;
@@ -71,7 +72,7 @@ public:
   std::vector<std::string> command_line;
 
 private:
-  void help_events();
+  static void help_events();
 
   DDProfCLI(const DDProfCLI &) = delete;
   DDProfCLI &operator=(const DDProfCLI &) = delete;

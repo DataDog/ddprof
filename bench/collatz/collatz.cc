@@ -4,10 +4,11 @@
 // Datadog, Inc.
 
 #include <array>
+#include <chrono>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <pthread.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/mman.h>
 #include <sys/sysinfo.h>
 #include <sys/types.h>
@@ -32,21 +33,21 @@
 #  define VER_REV "custom"
 #endif
 
-unsigned long *counter = NULL;
+unsigned long *counter = nullptr;
 unsigned long my_counter = 0;
 
 // Helper for processing input
 #define P(s, d)                                                                \
   ({                                                                           \
-    long _t = strtoll(s, NULL, 10);                                            \
+    const long _t = strtoll(s, NULL, 10);                                      \
     if (_t)                                                                    \
-      d = _t;                                                                  \
+      (d) = _t;                                                                \
   })
 
 // This is the function body for every expanded function in the X-table
 #define FUNBOD                                                                 \
   {                                                                            \
-    int64_t n = x & 1 ? x * 3 + 1 : x / 2;                                     \
+    const int64_t n = x & 1 ? x * 3 + 1 : x / 2;                               \
     my_counter += 1;                                                           \
     return 1 >= n ? 1 : funs[n % funlen](n);                                   \
   }
@@ -77,24 +78,29 @@ COLLATZ(DEFN)
 
 void print_version() {
   printf(MYNAME " %d.%d.%d", VER_MAJ, VER_MIN, VER_PATCH);
-  if (*VER_REV)
+  if (*VER_REV) {
     printf("+%s", VER_REV);
+  }
   printf("\n");
 }
 
-#define MAX_PROCS 1000
+constexpr int k_max_procs{1000};
+
 // Program entrypoint
 int main(int c, char **v) {
   // Define and ingest parameters
-  int ki = 1e1;
-  int kj = 1e6;
+  constexpr int k_default_outer_iterations = 1e1;
+  constexpr int k_default_inner_iterations = 1e6;
+  int ki = k_default_outer_iterations;
+  int kj = k_default_inner_iterations;
   int t = 0;
   int n = 1 + get_nprocs() / 2;
   if (c > 1) {
     if (!strcmp(v[1], "-v") || !strcmp(v[1], "--version")) {
       print_version();
       return 0;
-    } else if (!strcmp(v[1], "-h") || !strcmp(v[1], "--help")) {
+    }
+    if (!strcmp(v[1], "-h") || !strcmp(v[1], "--help")) {
       // clang-format off
       printf("collatz <CPUs> <outer index> <inner index> <target value>\n");
       printf("  CPUs -- number of CPUs to use (defaults to 1/2 + 1 of total)\n");
@@ -116,18 +122,23 @@ int main(int c, char **v) {
       return 0;
     }
     P(v[1], n);
-    if (n < 0)
+    if (n < 0) {
       n = get_nprocs();
-    if (n > MAX_PROCS)
-      n = MAX_PROCS;
+    }
+    if (n > k_max_procs) {
+      n = k_max_procs;
+    }
   }
-  if (c > 2)
+  if (c > 2) {
     P(v[2], ki);
-  if (c > 3)
+  }
+  if (c > 3) {
     P(v[3], kj);
+  }
   if (c > 4) {
     switch (*v[4]) {
       // clang-format off
+      // NOLINTBEGIN(readability-magic-numbers)
       case 'A': case 'a': t = 7;         break;
       case 'B': case 'b': t = 27;        break;
       case 'C': case 'c': t = 703;       break;
@@ -136,27 +147,29 @@ int main(int c, char **v) {
       case 'F': case 'f': t = 77031;     break;
       case 'G': case 'g': t = 837799;    break;
       case 'H': case 'h': t = 780657630; break;
+      // NOLINTEND(readability-magic-numbers)
       // clang-format on
     default:
       P(v[4], t);
     }
   }
   printf("%d, %d, %d, %d, ", n, ki, kj, t);
-  fflush(stdout);
+  (void)fflush(stdout);
 
   // Setup
-  static __thread unsigned long work_start, work_end;
-  static __thread unsigned long last_counter = 0;
-  unsigned long *start_tick = static_cast<unsigned long *>(
-      mmap(NULL, MAX_PROCS * sizeof(unsigned long), PROT_READ | PROT_WRITE,
+  static thread_local unsigned long work_start;
+  static thread_local unsigned long work_end;
+  static thread_local unsigned long last_counter = 0;
+  auto *start_tick = static_cast<unsigned long *>(
+      mmap(nullptr, k_max_procs * sizeof(unsigned long), PROT_READ | PROT_WRITE,
            MAP_SHARED | MAP_ANONYMOUS, -1, 0));
-  unsigned long *end_tick = static_cast<unsigned long *>(
-      mmap(NULL, MAX_PROCS * sizeof(unsigned long), PROT_READ | PROT_WRITE,
+  auto *end_tick = static_cast<unsigned long *>(
+      mmap(nullptr, k_max_procs * sizeof(unsigned long), PROT_READ | PROT_WRITE,
            MAP_SHARED | MAP_ANONYMOUS, -1, 0));
-  pid_t pids[MAX_PROCS] = {};
+  pid_t pids[k_max_procs] = {};
   pids[0] = getpid();
   counter = static_cast<unsigned long *>(
-      mmap(NULL, sizeof(unsigned long), PROT_READ | PROT_WRITE,
+      mmap(nullptr, sizeof(unsigned long), PROT_READ | PROT_WRITE,
            MAP_SHARED | MAP_ANONYMOUS, -1, 0));
   *counter = 0;
 
@@ -169,8 +182,8 @@ int main(int c, char **v) {
 
   // Setup barrier for coordination
   pthread_barrierattr_t bat = {};
-  pthread_barrier_t *pb = static_cast<pthread_barrier_t *>(
-      mmap(NULL, sizeof(pthread_barrier_t), PROT_READ | PROT_WRITE,
+  auto *pb = static_cast<pthread_barrier_t *>(
+      mmap(nullptr, sizeof(pthread_barrier_t), PROT_READ | PROT_WRITE,
            MAP_SHARED | MAP_ANONYMOUS, -1, 0));
   pthread_barrierattr_init(&bat);
   pthread_barrierattr_setpshared(&bat, 1);
@@ -184,8 +197,8 @@ int main(int c, char **v) {
 
   // Now that we're in a fork, set up my local statsd socket
   int fd_statsd = -1;
-  char *path_statsd = NULL;
-  if ((path_statsd = getenv("DD_DOGSTATSD_SOCKET"))) {
+  if (const char *path_statsd = getenv("DD_DOGSTATSD_SOCKET");
+      path_statsd != nullptr) {
     statsd_connect(std::string_view(path_statsd), &fd_statsd);
   }
 
@@ -199,7 +212,7 @@ int main(int c, char **v) {
 
     work_start = ddprof::get_tsc_cycles();
     for (int i = 0; i < kj; i++) {
-      int arg = t ? t : i;
+      const int arg = t ? t : i;
       funs[arg % funlen](arg);
     }
 
@@ -224,19 +237,22 @@ int main(int c, char **v) {
   pthread_barrier_wait(pb);
   end_tick[me] = ddprof::get_tsc_cycles();
   pthread_barrier_wait(pb);
-  if (getpid() != pids[0])
+  if (getpid() != pids[0]) {
     return 0;
+  }
   unsigned long long ticks = 0;
-  for (int i = 0; i < n; i++)
+  for (int i = 0; i < n; i++) {
     ticks += end_tick[i] - start_tick[i];
+  }
 
   // Print results
   if (getpid() == pids[0]) {
     printf("%lu, %llu, %f\n", *counter, ticks,
-           ((double)ticks) / ((double)*counter));
+           static_cast<double>(ticks) / (*counter));
 
 #ifdef USE_DD_PROFILING
-    ddprof_stop_profiling(1000);
+    const std::chrono::seconds stop_timeout{1};
+    ddprof_stop_profiling(std::chrono::seconds(stop_timeout).count());
 #endif
   }
   return 0;

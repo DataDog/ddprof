@@ -8,6 +8,8 @@
 #include <gtest/gtest.h>
 #include <string>
 
+namespace ddprof {
+
 TEST(VersionTest, VersionStr) {
   std::string expectedStr;
   expectedStr += std::to_string(VER_MAJ) + "." + std::to_string(VER_MIN) + "." +
@@ -15,3 +17,5 @@ TEST(VersionTest, VersionStr) {
   std::string apiStr(str_version().data(), str_version().size());
   EXPECT_TRUE(apiStr.find(expectedStr) != std::string::npos);
 }
+
+} // namespace ddprof

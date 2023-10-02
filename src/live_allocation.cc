@@ -21,7 +21,7 @@ void LiveAllocation::register_deallocation(uintptr_t address,
     LG_DBG("Unmatched de-allocation at %lx", address);
     return;
   }
-  ValuePerAddress &v = map_iter->second;
+  ValuePerAddress const &v = map_iter->second;
 
   // Decrement count and value of the corresponding PprofStacks::value_type
   // object
@@ -44,7 +44,7 @@ void LiveAllocation::register_allocation(const UnwindOutput &uo,
                                          uintptr_t address, int64_t value,
                                          PprofStacks &stacks,
                                          AddressMap &address_map) {
-  if (!uo.locs.size()) {
+  if (uo.locs.empty()) {
     // avoid sending empty stacks
     LG_DBG("(LIVE_ALLOC) Avoid registering empty stack");
     return;

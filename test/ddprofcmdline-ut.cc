@@ -9,9 +9,11 @@
 
 #include <gtest/gtest.h>
 
-static char const *const sTestPaterns[] = {"cAn", "yUo", "eVen", "tYpe"};
+namespace ddprof {
+namespace {
+char const *const sTestPaterns[] = {"cAn", "yUo", "eVen", "tYpe"};
 
-static bool watcher_from_str(const char *s, PerfWatcher *watcher) {
+bool watcher_from_str(const char *s, PerfWatcher *watcher) {
   std::vector<PerfWatcher> watchers;
   bool res = watchers_from_str(s, watchers);
   if (!res) {
@@ -21,6 +23,7 @@ static bool watcher_from_str(const char *s, PerfWatcher *watcher) {
   *watcher = watchers.front();
   return true;
 }
+} // namespace
 
 TEST(CmdLineTst, ArgWhich) {
   ASSERT_EQ(arg_which("tYpe", sTestPaterns, 4), 3);
@@ -373,3 +376,4 @@ TEST(CmdLineTst, MultipleEvents) {
   ASSERT_TRUE(watchers_from_str(str, watchers));
   ASSERT_EQ(watchers.size(), 2);
 }
+} // namespace ddprof

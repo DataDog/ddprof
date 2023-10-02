@@ -17,7 +17,7 @@ public:
                             RingBufferType ring_buffer_type,
                             bool custom_event = true)
       : _pevent{} {
-    DDRES_CHECK_THROW_EXCEPTION(ddprof::ring_buffer_setup(
+    DDRES_CHECK_THROW_EXCEPTION(ring_buffer_setup(
         buffer_size_order, ring_buffer_type, custom_event, &_pevent));
   }
 

@@ -5,13 +5,16 @@
 
 #pragma once
 
+namespace ddprof {
 // Workers are reset by creating new forks. This structure is shared accross
 // processes
-typedef struct PersistentWorkerState {
+struct PersistentWorkerState {
   volatile bool restart_worker;
   volatile bool errors;
   // Number of sequences since the beginning of the app / profiling
   // Why not volatile ? Although several threads can update the number of
   // cycles, by design Only a single thread reads and writes to this variable.
   uint32_t profile_seq;
-} PersistentWorkerState;
+};
+
+} // namespace ddprof

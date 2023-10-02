@@ -24,11 +24,13 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
 #include "saveregisters.hpp"
 
+namespace ddprof {
+
 #ifdef __x86_64__
 
 #  define INPUT_REG(reg) [i##reg] "i"(REGNAME(reg))
 
-void save_registers(std::span<uint64_t, PERF_REGS_COUNT>) {
+void save_registers(std::span<uint64_t, k_perf_register_count> /*registers*/) {
   // The goal here is to capture the state of registers after the return of this
   // function. That is why this function must not be inlined.
 
@@ -64,3 +66,5 @@ void save_registers(std::span<uint64_t, PERF_REGS_COUNT>) {
       :);
 }
 #endif
+
+} // namespace ddprof

@@ -9,17 +9,21 @@
 
 #include "../include/ddprof_base.hpp"
 
+static constexpr size_t k_work_amount = 3000;
+static constexpr size_t k_work_amount_decrease_per_call = 100;
+
 template <int N> DDPROF_NOINLINE std::string compute() {
   char arr[N];
+  constexpr size_t k_nb_letters{26};
 
   for (int i = 0; i < N - 1; ++i) {
-    arr[i] = 'a' + i % 26;
+    arr[i] = 'a' + i % k_nb_letters;
   }
   arr[N - 1] = '\0';
 
   std::string ret_arr(arr, N);
-  if constexpr (N > 100) {
-    ret_arr = ret_arr + compute<N - 100>();
+  if constexpr (N > k_work_amount_decrease_per_call) {
+    ret_arr = ret_arr + compute<N - k_work_amount_decrease_per_call>();
   }
   return ret_arr;
 }
@@ -29,7 +33,7 @@ int main() {
   auto start = high_resolution_clock::now();
   auto end = start + seconds(2);
   while (high_resolution_clock::now() < end) {
-    auto str = compute<3000>();
+    auto str = compute<k_work_amount>();
     ddprof::DoNotOptimize(str);
     //    std::cout << str;
   }

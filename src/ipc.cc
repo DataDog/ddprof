@@ -5,32 +5,18 @@
 
 #include "ipc.hpp"
 
-#include <errno.h>
+#include "chrono_utils.hpp"
+
+#include <cerrno>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <netinet/in.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
 
 namespace ddprof {
-
-namespace {
-
-struct timeval to_timeval(std::chrono::microseconds duration) noexcept {
-  const std::chrono::seconds sec =
-      std::chrono::duration_cast<std::chrono::seconds>(duration);
-
-  struct timeval tv;
-  tv.tv_sec = time_t(sec.count());
-  tv.tv_usec = suseconds_t(
-      std::chrono::duration_cast<std::chrono::microseconds>(duration - sec)
-          .count());
-  return tv;
-}
-
-} // namespace
 
 template <typename T> std::span<std::byte> to_byte_span(T *obj) {
   return {reinterpret_cast<std::byte *>(obj), sizeof(T)};
@@ -57,7 +43,7 @@ void UnixSocket::close(std::error_code &ec) noexcept {
 
 void UnixSocket::set_write_timeout(std::chrono::microseconds duration,
                                    std::error_code &ec) const noexcept {
-  timeval tv = to_timeval(duration);
+  timeval tv = duration_to_timeval(duration);
   error_wrapper(
       ::setsockopt(_handle.get(), SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)),
       ec);
@@ -65,13 +51,13 @@ void UnixSocket::set_write_timeout(std::chrono::microseconds duration,
 
 void UnixSocket::set_read_timeout(std::chrono::microseconds duration,
                                   std::error_code &ec) const noexcept {
-  timeval tv = to_timeval(duration);
+  timeval tv = duration_to_timeval(duration);
   error_wrapper(
       ::setsockopt(_handle.get(), SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)),
       ec);
 }
 
-void UnixSocket::send(ConstBuffer buffer, std::error_code &ec) noexcept {
+void UnixSocket::send(ConstBuffer buffer, std::error_code &ec) const noexcept {
   size_t written = 0;
   do {
     written += send_partial(remaining(buffer, written), ec);
@@ -79,7 +65,7 @@ void UnixSocket::send(ConstBuffer buffer, std::error_code &ec) noexcept {
 }
 
 size_t UnixSocket::send_partial(ConstBuffer buffer,
-                                std::error_code &ec) noexcept {
+                                std::error_code &ec) const noexcept {
   ssize_t ret;
   do {
     ret = ::send(_handle.get(), buffer.data(), buffer.size(), 0);
@@ -91,8 +77,8 @@ size_t UnixSocket::send_partial(ConstBuffer buffer,
 }
 
 void UnixSocket::send(ConstBuffer buffer, std::span<const int> fds,
-                      std::error_code &ec) noexcept {
-  size_t written = send_partial(buffer, fds, ec);
+                      std::error_code &ec) const noexcept {
+  size_t const written = send_partial(buffer, fds, ec);
 
   if (!ec && written < buffer.size()) {
     send(remaining(buffer, written), ec);
@@ -100,7 +86,7 @@ void UnixSocket::send(ConstBuffer buffer, std::span<const int> fds,
 }
 
 size_t UnixSocket::send_partial(ConstBuffer buffer, std::span<const int> fds,
-                                std::error_code &ec) noexcept {
+                                std::error_code &ec) const noexcept {
   msghdr msg = {};
   if (fds.size() > kMaxFD || buffer.empty()) {
     return -1;
@@ -124,7 +110,7 @@ size_t UnixSocket::send_partial(ConstBuffer buffer, std::span<const int> fds,
     cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
     // musl use a smaller type for cmsg_len with extra padding
     // if this padding is not initialized to zero, if will be wrongly
-    // interpreted as part of cmsg_len by glic
+    // interpreted as part of cmsg_len by glibc
     *cmsg = {};
     cmsg->cmsg_level = SOL_SOCKET;
     cmsg->cmsg_type = SCM_RIGHTS;
@@ -142,7 +128,7 @@ size_t UnixSocket::send_partial(ConstBuffer buffer, std::span<const int> fds,
 }
 
 size_t UnixSocket::receive(std::span<std::byte> buffer,
-                           std::error_code &ec) noexcept {
+                           std::error_code &ec) const noexcept {
   size_t read = 0;
 
   do {
@@ -153,7 +139,7 @@ size_t UnixSocket::receive(std::span<std::byte> buffer,
 }
 
 size_t UnixSocket::receive_partial(std::span<std::byte> buffer,
-                                   std::error_code &ec) noexcept {
+                                   std::error_code &ec) const noexcept {
   ssize_t ret;
   do {
     ret = ::recv(_handle.get(), buffer.data(), buffer.size(), 0);
@@ -169,9 +155,9 @@ size_t UnixSocket::receive_partial(std::span<std::byte> buffer,
   return ret < 0 ? 0 : ret;
 }
 
-std::pair<size_t, size_t> UnixSocket::receive(std::span<std::byte> buffer,
-                                              std::span<int> fds,
-                                              std::error_code &ec) noexcept {
+std::pair<size_t, size_t>
+UnixSocket::receive(std::span<std::byte> buffer, std::span<int> fds,
+                    std::error_code &ec) const noexcept {
   auto [read, read_fds] = receive_partial(buffer, fds, ec);
   if (!ec && read < buffer.size()) {
     read += receive(remaining(buffer, read), ec);
@@ -181,7 +167,7 @@ std::pair<size_t, size_t> UnixSocket::receive(std::span<std::byte> buffer,
 
 std::pair<size_t, size_t>
 UnixSocket::receive_partial(std::span<std::byte> buffer, std::span<int> fds,
-                            std::error_code &ec) noexcept {
+                            std::error_code &ec) const noexcept {
 
   msghdr msgh = {};
 
@@ -220,11 +206,11 @@ UnixSocket::receive_partial(std::span<std::byte> buffer, std::span<int> fds,
 
   cmsghdr *cmsgp = CMSG_FIRSTHDR(&msgh);
 
-  if (cmsgp == NULL) {
+  if (cmsgp == nullptr) {
     return {nr, 0};
   }
 
-  int nfds =
+  int const nfds =
       (cmsgp->cmsg_len - CMSG_ALIGN(sizeof(struct cmsghdr))) / sizeof(int);
   if (nfds == 0) {
     return {nr, 0};
@@ -240,23 +226,24 @@ UnixSocket::receive_partial(std::span<std::byte> buffer, std::span<int> fds,
   return {nr, nfds};
 }
 
-DDRes send(UnixSocket &socket, const RequestMessage &msg) {
+DDRes send(const UnixSocket &socket, const RequestMessage &msg) {
   std::error_code ec;
   socket.send(to_byte_span(&msg), ec);
   DDRES_CHECK_ERRORCODE(ec, DD_WHAT_SOCKET, "Unable to send request message");
   return {};
 }
 
-DDRes send(UnixSocket &socket, const ReplyMessage &msg) {
+DDRes send(const UnixSocket &socket, const ReplyMessage &msg) {
   int fds[2] = {msg.ring_buffer.ring_fd, msg.ring_buffer.event_fd};
-  std::span<int> fd_span{fds, (msg.ring_buffer.mem_size != -1) ? 2ul : 0ul};
+  std::span<int> const fd_span{fds,
+                               (msg.ring_buffer.mem_size != -1) ? 2UL : 0UL};
   std::error_code ec;
   socket.send(to_byte_span(&msg), fd_span, ec);
   DDRES_CHECK_ERRORCODE(ec, DD_WHAT_SOCKET, "Unable to send response message");
   return {};
 }
 
-DDRes receive(UnixSocket &socket, RequestMessage &msg) {
+DDRes receive(const UnixSocket &socket, RequestMessage &msg) {
   std::error_code ec;
   socket.receive(to_byte_span(&msg), ec);
   DDRES_CHECK_ERRORCODE(ec, DD_WHAT_SOCKET,
@@ -265,7 +252,7 @@ DDRes receive(UnixSocket &socket, RequestMessage &msg) {
   return {};
 }
 
-DDRes receive(UnixSocket &socket, ReplyMessage &msg) {
+DDRes receive(const UnixSocket &socket, ReplyMessage &msg) {
   int fds[2] = {-1, -1};
   std::error_code ec;
   auto res = socket.receive(to_byte_span(&msg), fds, ec);
@@ -295,10 +282,10 @@ Client::Client(UnixSocket &&socket, std::chrono::microseconds timeout)
 }
 
 ReplyMessage Client::get_profiler_info() {
-  RequestMessage request = {.request = RequestMessage::kProfilerInfo};
-  DDRES_CHECK_THROW_EXCEPTION(send(_socket, request));
+  RequestMessage const request = {.request = RequestMessage::kProfilerInfo};
+  send(_socket, request);
   ReplyMessage reply;
-  DDRES_CHECK_THROW_EXCEPTION(ddprof::receive(_socket, reply));
+  receive(_socket, reply);
   return reply;
 }
 
@@ -315,11 +302,11 @@ Server::Server(UnixSocket &&socket, std::chrono::microseconds timeout)
   }
 }
 
-void Server::waitForRequest(ReplyFunc func) {
+void Server::waitForRequest(const ReplyFunc &func) {
   RequestMessage request;
-  DDRES_CHECK_THROW_EXCEPTION(ddprof::receive(_socket, request));
-  ReplyMessage reply = func(request);
-  DDRES_CHECK_THROW_EXCEPTION(ddprof::send(_socket, reply));
+  receive(_socket, request);
+  ReplyMessage const reply = func(request);
+  send(_socket, reply);
 }
 
 } // namespace ddprof

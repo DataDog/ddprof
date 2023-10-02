@@ -20,8 +20,10 @@ namespace ddprof {
 DDRes get_or_create_temp_file(std::string_view prefix,
                               std::span<const std::byte> data, mode_t mode,
                               std::string &path) {
-  unsigned char digest[20];
-  char str_digest[41];
+  constexpr size_t k_sha1_digest_len = 20;
+  constexpr size_t k_ascii_sha1_digest_len = 41;
+  unsigned char digest[k_sha1_digest_len];
+  char str_digest[k_ascii_sha1_digest_len];
   SHA1(digest, reinterpret_cast<const char *>(data.data()), data.size());
   SHA1StrDigest(digest, str_digest);
 

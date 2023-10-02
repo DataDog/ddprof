@@ -7,11 +7,11 @@
 
 #include "perf.hpp"
 
+namespace ddprof {
+
 enum class RingBufferType : uint8_t { kPerfRingBuffer, kMPSCRingBuffer };
 
-namespace ddprof {
 class SpinLock;
-}
 
 struct RingBuffer {
   RingBufferType type;
@@ -23,7 +23,7 @@ struct RingBuffer {
 
   uint64_t *writer_pos;
   uint64_t *reader_pos;
-  ddprof::SpinLock *spinlock;
+  SpinLock *spinlock;
 };
 
 bool rb_init(RingBuffer *rb, void *base, size_t size, RingBufferType type);
@@ -35,3 +35,5 @@ bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,
 perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask);
 
 uint64_t hdr_time(const perf_event_header *hdr, uint64_t mask);
+
+} // namespace ddprof

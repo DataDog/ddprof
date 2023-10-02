@@ -5,18 +5,23 @@
 
 #include "procutils.hpp"
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include "logger.hpp"
 
-static char StatusLine[] =
+namespace ddprof {
+
+namespace {
+char StatusLine[] =
     "%d %s %c %d %d %d %d %u %lu %lu %lu %lu %lu %ld %ld %ld %ld %ld %ld "
     "%llu %lu %ld %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %d %d %u "
     "%u %llu %lu %ld %lu %lu %lu %lu %lu %lu %d";
+
+}
 
 DDRes proc_read(ProcStatus *procstat) {
   FILE *ststream = fopen("/proc/self/stat", "r");
@@ -54,7 +59,8 @@ bool check_file_type(const char *pathname, int file_type) {
 
   if (stat(pathname, &info) != 0) {
     return false;
-  } else if (info.st_mode & file_type) {
+  }
+  if (info.st_mode & file_type) {
     return true;
   }
   return false;
@@ -67,9 +73,10 @@ bool get_file_inode(const char *pathname, inode_t *inode, int64_t *size) {
     *inode = 0;
     *size = 0;
     return false;
-  } else {
-    *inode = info.st_ino;
-    *size = info.st_size;
-    return true;
   }
+  *inode = info.st_ino;
+  *size = info.st_size;
+  return true;
 }
+
+} // namespace ddprof

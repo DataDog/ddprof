@@ -5,14 +5,12 @@
 
 #pragma once
 
-#include "ddres.hpp"
-#include "string_view.hpp"
+#include "ddres_def.hpp"
 
-#include <stdlib.h>
+#include <string>
+#include <string_view>
 
-#define USERAGENT_DEFAULT "ddprof"
-#define LANGUAGE_DEFAULT "native"
-#define FAMILY_DEFAULT "native"
+namespace ddprof {
 
 struct ExporterInput {
   std::string api_key;     // Datadog api key [hidden]
@@ -25,10 +23,11 @@ struct ExporterInput {
   std::string debug_pprof_prefix; // local pprof prefix (debug)
   bool do_export{true};           // prevent exports if needed (debug flag)
   std::string_view user_agent{
-      USERAGENT_DEFAULT}; // ignored for now (override in shared lib)
-  std::string_view language{
-      LANGUAGE_DEFAULT}; // appended to the tags (set to native)
-  std::string_view family{FAMILY_DEFAULT};
+      "ddprof"}; // ignored for now (override in shared lib)
+  std::string_view language{"native"}; // appended to the tags (set to native)
+  std::string_view family{"native"};
   std::string_view profiler_version;
   bool agentless{false}; // Whether or not to actually use API key/intake
 };
+
+} // namespace ddprof

@@ -94,7 +94,7 @@ void LOG_setfacility(int);
 /******************************* Logging Macros *******************************/
 #define ABS(__x)                                                               \
   ({                                                                           \
-    typeof(__x) _x = (__x);                                                    \
+    const typeof(__x) _x = (__x);                                              \
     _x < 0 ? -1 * _x : _x;                                                     \
   })
 

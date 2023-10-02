@@ -14,19 +14,21 @@
 #include "container_id_defs.hpp"
 #include "ddprof_defs.hpp"
 
-typedef struct FunLoc {
+namespace ddprof {
+
+struct FunLoc {
   uint64_t ip; // Relative to file, not VMA
   SymbolIdx_t _symbol_idx;
   MapInfoIdx_t _map_info_idx;
 
   auto operator<=>(const FunLoc &) const = default;
-} FunLoc;
+};
 
 struct UnwindOutput {
   void clear() {
     locs.clear();
     is_incomplete = true;
-    container_id = ddprof::k_container_id_unknown;
+    container_id = k_container_id_unknown;
   }
   std::vector<FunLoc> locs;
   std::string container_id;
@@ -36,3 +38,5 @@ struct UnwindOutput {
 
   auto operator<=>(const UnwindOutput &) const = default;
 };
+
+} // namespace ddprof

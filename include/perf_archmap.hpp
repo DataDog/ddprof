@@ -6,13 +6,17 @@
 #pragma once
 
 #include <array> // for std::size()
+#include <cstddef>
+#include <cstdint>
 
+namespace ddprof {
 // Architecture mapfile
 
 #ifdef __x86_64__
 // Registers 0-11, 16-23
-#  define PERF_REGS_COUNT 20
-#  define PERF_REGS_MASK 0xff0fff
+inline constexpr size_t k_perf_register_count = 20;
+inline constexpr uint64_t k_perf_register_mask = 0xff0fff;
+
 #  define REGNAME(x) PAM_X86_##x
 enum PERF_ARCHMAP_X86 {
   PAM_X86_RAX,
@@ -47,8 +51,10 @@ enum PERF_ARCHMAP_X86 {
 };
 #elif __aarch64__
 // Registers 0-32
-#  define PERF_REGS_COUNT 33
-#  define PERF_REGS_MASK (~(~0ull << PERF_REGS_COUNT))
+inline constexpr size_t k_perf_register_count = 33;
+inline constexpr uint64_t k_perf_register_mask =
+    ~(~0ULL << k_perf_register_count);
+
 #  define REGNAME(x) PAM_ARM_##x
 enum PERF_ARCHMAP_ARM {
   PAM_ARM_X0,
@@ -120,7 +126,7 @@ constexpr unsigned int dwarf_to_perf_regno(unsigned int i) {
   return lookup[i];
 };
 
-constexpr unsigned int param_to_perf_regno(unsigned int param_no) {
+inline constexpr unsigned int param_to_perf_regno(unsigned int param_no) {
 // Populate lookups for converting parameter number (1-indexed) to regno
 #define R(x) REGNAME(x)
 #ifdef __x86_64__
@@ -130,7 +136,7 @@ constexpr unsigned int param_to_perf_regno(unsigned int param_no) {
   constexpr int reg_lookup[] = {-1,    R(X0), R(X1), R(X2),
                                 R(X3), R(X4), R(X5), R(X6)};
 #else
-// cppcheck-suppress preprocessorErrorDirective
+  // cppcheck-suppress preprocessorErrorDirective
 #  error Architecture not supported
 #endif
 #undef R
@@ -140,3 +146,4 @@ constexpr unsigned int param_to_perf_regno(unsigned int param_no) {
 
   return reg_lookup[param_no];
 }
+} // namespace ddprof

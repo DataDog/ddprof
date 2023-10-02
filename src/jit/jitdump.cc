@@ -14,8 +14,8 @@
 namespace ddprof {
 
 namespace {
-static constexpr uint32_t k_header_magic = 0x4A695444;
-static constexpr uint32_t k_header_magic_rev = 0x4454694A;
+constexpr uint32_t k_header_magic = 0x4A695444;
+constexpr uint32_t k_header_magic_rev = 0x4454694A;
 
 // todo bitswap
 template <std::integral T> T load(const char **data) {
@@ -39,7 +39,7 @@ DDRes jit_read_header(std::ifstream &file_stream, JITHeader &header) {
   } else {
     DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Unknown jit format(%x)", header.magic);
   }
-  int64_t remaining_size = header.total_size - sizeof(header);
+  int64_t const remaining_size = header.total_size - sizeof(header);
   if (remaining_size > 0) {
     if (!file_stream.seekg(remaining_size)) {
       DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "incomplete jit file");
@@ -99,13 +99,13 @@ DDRes jit_read_code_load(std::ifstream &file_stream,
   code_load.code_size = load<uint64_t>(&buf);
   code_load.code_index = load<uint64_t>(&buf);
   // remaining = total - (everything we read)
-  int remaining_size = code_load.prefix.total_size - sizeof(JITRecordPrefix) -
-      JITRecordCodeLoad::k_size_integers;
+  int const remaining_size = code_load.prefix.total_size -
+      sizeof(JITRecordPrefix) - JITRecordCodeLoad::k_size_integers;
   if (remaining_size < static_cast<int>(code_load.code_size)) {
     // inconsistency
     DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Incomplete code load structure");
   }
-  int str_size = remaining_size - code_load.code_size;
+  int const str_size = remaining_size - code_load.code_size;
   if (str_size > 1) {
     code_load.func_name = std::string(buf, str_size - 1);
   }
@@ -140,6 +140,7 @@ DDRes jit_read_debug_info(std::ifstream &file_stream,
     debug_info.entries[i].addr = load<uint64_t>(&buf);
     debug_info.entries[i].lineno = load<int32_t>(&buf);
     debug_info.entries[i].discrim = load<int32_t>(&buf);
+    // NOLINTNEXTLINE(readability-magic-numbers)
     if (static_cast<unsigned char>(*buf) == 0xff && *(buf + 1) == '\0') {
       if (i >= 1) {
         debug_info.entries[i].name = debug_info.entries[i - 1].name;

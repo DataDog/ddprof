@@ -15,24 +15,30 @@
 #include "CLI/CLI11.hpp"
 #include "constants.hpp"
 #include "ddprof_cmdline.hpp"
+#include "ddprof_defs.hpp"
 #include "ddres.hpp"
+#include "logger.hpp"
 #include "version.hpp"
 
-#include "ddprof_defs.hpp"
-#include "logger.hpp"
-
+#include <chrono>
+#include <cstring>
 #include <fstream>
 #include <optional>
-#include <string.h>
 
 namespace ddprof {
 
 namespace {
+constexpr size_t k_required_stack_sample_size_alignment{8};
+constexpr std::chrono::seconds k_default_upload_period{59};
+constexpr size_t k_default_worker_period{240};
+constexpr std::chrono::milliseconds k_default_loaded_libs_check_delay{5000};
+constexpr std::chrono::milliseconds k_default_loaded_libs_check_interval{59000};
+
 std::string api_key_to_dbg_string(std::string_view value) {
   if (value.size() != k_size_api_key) {
     LG_WRN("API key does not have the expected %u size", k_size_api_key);
   }
-  size_t len = value.length();
+  size_t const len = value.length();
   std::string masked(len, '*');
   masked.replace(len - 4, 4, value.substr(len - 4));
   return masked;
@@ -58,7 +64,8 @@ void write_config_file(const CLI::App &app, const std::string &file_path) {
   out_file.open(file_path);
   if (!out_file) {
     // logger is not configured
-    fprintf(stderr, "ddprof_cli: cannot open the file %s", file_path.c_str());
+    (void)fprintf(stderr, "ddprof_cli: cannot open the file %s",
+                  file_path.c_str());
     return;
   }
   // Write the configuration (include defaults and descriptions)
@@ -72,14 +79,15 @@ struct SampleStackSizeValidator : public Validator {
   SampleStackSizeValidator() {
     name_ = "SAMPLE_STACK_SIZE";
     func_ = [](const std::string &str) {
-      int value = std::stoi(str);
-      if (value >= USHRT_MAX || value % 8 != 0) {
-        return std::string("Invalid stack_sample_size value. Value should be "
-                           "less than " +
-                           std::to_string(USHRT_MAX) + " and a multiple of 8.");
-      } else {
-        return std::string();
+      int const value = std::stoi(str);
+      if (value >= USHRT_MAX ||
+          value % k_required_stack_sample_size_alignment != 0) {
+        return static_cast<std::string>(
+            "Invalid k_required_stack_sample_size_alignment "
+            "value. Value should be less than " +
+            std::to_string(USHRT_MAX) + " and a multiple of 8.");
       }
+      return std::string();
     };
   }
 };
@@ -155,9 +163,11 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       ->excludes(pid_opt)
       ->excludes(exec_option);
 
-  app.add_option("--upload_period,-u", upload_period,
-                 "Upload period for profiles (in seconds).\n")
-      ->default_val(59)
+  app.add_option<std::chrono::seconds, unsigned>(
+         "--upload_period,-u", upload_period,
+         "Upload period for profiles (in seconds).\n")
+      ->default_val(
+          static_cast<std::chrono::seconds>(k_default_upload_period).count())
       ->group("Profiling settings")
       ->envname("DD_PROFILING_UPLOAD_PERIOD");
 
@@ -243,7 +253,7 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
              "--worker_period", worker_period,
              "Period at which the profiler resets it's internal state.\n"
              "The unit is the number of exports (so default is ~4 hours)")
-          ->default_val(240)
+          ->default_val(k_default_worker_period)
           ->group(""));
 
   extended_options.push_back(
@@ -294,17 +304,23 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
           ->group("")
           ->check(SampleStackSizeValidator()));
   extended_options.push_back(
-      app.add_option("--initial-loaded-libs-check-delay",
-                     initial_loaded_libs_check_delay,
-                     "Initial delay (ms) before check for newly loaded libs.")
-          ->default_val(5000)
+      app.add_option<std::chrono::milliseconds, unsigned>(
+             "--initial-loaded-libs-check-delay",
+             initial_loaded_libs_check_delay,
+             "Initial delay (ms) before check for newly loaded libs.")
+          ->default_val(static_cast<std::chrono::milliseconds>(
+                            k_default_loaded_libs_check_delay)
+                            .count())
           ->check(CLI::NonNegativeNumber)
           ->envname("DD_PROFILING_INITIAL_LOADED_LIBS_CHECK_DELAY")
           ->group(""));
   extended_options.push_back(
-      app.add_option("--loaded-libs-check-interval", loaded_libs_check_interval,
-                     "Interval (ms) between checks for newly loaded libs.")
-          ->default_val(59000)
+      app.add_option<std::chrono::milliseconds, unsigned>(
+             "--loaded-libs-check-interval", loaded_libs_check_interval,
+             "Interval (ms) between checks for newly loaded libs.")
+          ->default_val(static_cast<std::chrono::milliseconds>(
+                            k_default_loaded_libs_check_interval)
+                            .count())
           ->check(CLI::NonNegativeNumber)
           ->envname("DD_PROFILING_LOADED_LIBS_CHECK_INTERVAL")
           ->group(""));
@@ -312,7 +328,7 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
   // Parse
   CLI11_PARSE(app, argc, argv);
 
-  // Dump comfig file
+  // Dump config file
   if (!capture_config.empty()) {
     write_config_file(app, capture_config);
   }
@@ -320,10 +336,10 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
   // Help on Extended options
   if (help_extended) {
     // Adjust the groups before calling help function
-    for (auto el : extended_options) {
+    for (auto *el : extended_options) {
       el->group("Extended options");
     }
-    std::cout << app.help() << std::endl;
+    std::cout << app.help() << '\n';
     return static_cast<int>(CLI::ExitCodes::Success);
   }
 
@@ -334,14 +350,14 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
   }
 
   // Help option specifically on events
-  if (events.size() && events.front() == "help") {
+  if (!events.empty() && events.front() == "help") {
     help_events();
     return static_cast<int>(CLI::ExitCodes::Success);
   }
 
   // Are we setup to do something ?
-  if (command_line.empty() && pid == 0 && global == false) {
-    fprintf(stderr, "Please specify a target to profile \n");
+  if (command_line.empty() && pid == 0 && !global) {
+    (void)fprintf(stderr, "Please specify a target to profile \n");
     return static_cast<int>(CLI::ExitCodes::RequiredError);
   }
 
@@ -364,7 +380,8 @@ void DDProfCLI::print() const {
   PRINT_NFO("Version: %s", str_version().data());
   PRINT_NFO("Exporter Input:");
   if (!exporter_input.api_key.empty()) {
-    std::string api_key_dbg = api_key_to_dbg_string(exporter_input.api_key);
+    std::string const api_key_dbg =
+        api_key_to_dbg_string(exporter_input.api_key);
     PRINT_NFO("  - api key: %s", exporter_input.api_key.c_str());
   }
   PRINT_NFO("  - service: %s", exporter_input.service.c_str());
@@ -395,7 +412,8 @@ void DDProfCLI::print() const {
   if (!command_line.empty()) {
     PRINT_NFO("  - command line(wrapper mode): %s", command_line[0].c_str());
   }
-  PRINT_NFO("  - upload_period: %d", upload_period);
+  PRINT_NFO("  - upload_period: %lds",
+            std::chrono::seconds{upload_period}.count());
   PRINT_NFO("  - worker_period: %d", worker_period);
 
   if (!events.empty()) {
@@ -444,11 +462,12 @@ void DDProfCLI::print() const {
 
 CommandLineWrapper DDProfCLI::get_user_command_line() const {
   std::vector<char *> cargs;
+  cargs.reserve(command_line.size());
   for (const auto &a : command_line) {
     cargs.push_back(strdup(a.c_str()));
   }
   cargs.push_back(nullptr); // execvp expects a null-terminated array.
-  return CommandLineWrapper(cargs);
+  return {cargs};
 }
 
 void CommandLineWrapper::free_user_command_line(

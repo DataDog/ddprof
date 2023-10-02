@@ -5,7 +5,8 @@
 
 #pragma once
 
-#include <limits.h>
+#include <climits>
+#include <cstdint>
 
 #define DD_COMMON_START_RANGE 1000
 #define DD_NATIVE_START_RANGE 2000

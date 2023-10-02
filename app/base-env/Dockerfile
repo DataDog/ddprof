@@ -9,15 +9,15 @@ ENV OS_IDENTIFIER="UB${UBUNTU_VERSION}"
 
 FROM base AS base-22
 ENV GCC_VERSION=13
-ENV CLANG_VERSION=16
+ENV CLANG_VERSION=17
 
 FROM base AS base-20
 ENV GCC_VERSION=11
-ENV CLANG_VERSION=13
+ENV CLANG_VERSION=17
 
 FROM base AS base-18
 ENV GCC_VERSION=11
-ENV CLANG_VERSION=13
+ENV CLANG_VERSION=17
 
 FROM base AS base-16
 ENV GCC_VERSION=9
@@ -78,7 +78,7 @@ RUN curl -L https://github.com/github/codeql-action/releases/download/codeql-bun
 ## LLVM/GCC SETUP ##
 ####################
 ADD ./app/base-env/llvm.sh ./app/base-env/gcc.sh /
-RUN /llvm.sh ${CLANG_VERSION}
+RUN /llvm.sh ${CLANG_VERSION} all
 RUN /gcc.sh ${GCC_VERSION}
 
 # Provides the llvm-symbolizer (better debug information in case of sanitizer issue)

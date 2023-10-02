@@ -283,7 +283,7 @@ opt:
            }
            if ($$ == EventConfField::kParameter) {
              g_accum_event_conf.value_source = EventConfValueSource::kRegister;
-             unsigned int regno = param_to_perf_regno($3);
+             unsigned int regno = ddprof::param_to_perf_regno($3);
              if (regno == -1u) {
                VAL_ERROR();
                break;
@@ -291,7 +291,7 @@ opt:
              g_accum_event_conf.register_num = regno;
            }
            if ($$ == EventConfField::kRegister) {
-             if ($3 >= PERF_REGS_COUNT) {
+             if ($3 >= static_cast<int64_t>(ddprof::k_perf_register_count)) {
                VAL_ERROR();
                break;
              }

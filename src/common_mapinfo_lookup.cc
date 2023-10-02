@@ -10,11 +10,11 @@ namespace ddprof {
 MapInfo mapinfo_from_common(CommonMapInfoLookup::MappingErrors lookup_case) {
   switch (lookup_case) {
   case CommonMapInfoLookup::MappingErrors::empty:
-    return MapInfo();
+    return {};
   default:
     break;
   }
-  return MapInfo();
+  return {};
 }
 
 MapInfoIdx_t CommonMapInfoLookup::get_or_insert(

@@ -18,7 +18,13 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "Coverage")
   include(CodeCoverage)
   set(COVERAGE_EXCLUDES "vendor/*")
   setup_target_for_coverage_gcovr_xml(
-    NAME ctest_coverage EXECUTABLE ctest -j ${PROCESSOR_COUNT} # Executable in PROJECT_BINARY_DIR
+    NAME
+    ctest_coverage
+    EXECUTABLE
+    ctest
+    --output-on-failure
+    -j
+    ${PROCESSOR_COUNT} # Executable in PROJECT_BINARY_DIR
   )
 endif()
 

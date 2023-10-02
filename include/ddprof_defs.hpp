@@ -19,14 +19,14 @@
 // as `size_stack` might be smaller then the requested size
 // The type is uint32 to be consistent with the perf_event interface
 // Check linux sources for a reference to the sample size check
-constexpr uint32_t k_default_perf_stack_sample_size = 32000;
+inline constexpr uint32_t k_default_perf_stack_sample_size = 32000;
 
 // considering sample size, we adjust the size of ring buffers.
 // Following is considered as a minimum number of samples to be fit in the
 // ring buffer.
-constexpr auto k_min_number_samples_per_ring_buffer = 8;
+inline constexpr auto k_min_number_samples_per_ring_buffer = 8;
 
-constexpr int k_size_api_key = 32;
+inline constexpr int k_size_api_key = 32;
 
 // Linux Inode type
 typedef uint64_t inode_t;
@@ -35,7 +35,7 @@ typedef int32_t SymbolIdx_t;
 typedef int32_t MapInfoIdx_t;
 // Elf address (same as the address used with addr2line)
 typedef uint64_t ElfAddress_t;
-// Offset types : add or substract to address types
+// Offset types : add or subtract to address types
 typedef ElfAddress_t Offset_t;
 // Absolute address (needs to be adjusted with the start address of binary)
 typedef ElfAddress_t ProcessAddress_t;

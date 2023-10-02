@@ -7,15 +7,16 @@
 
 #include "ddres.hpp"
 
-#include <assert.h>
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <cassert>
+#include <cerrno>
+#include <cstdio>
+#include <cstdlib>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
 
-static std::string_view adjust_uds_path(std::string_view path) {
+namespace {
+std::string_view adjust_uds_path(std::string_view path) {
   // Check if the socket_path starts with unix://
   static constexpr std::string_view prefix{"unix://"};
   if (path.starts_with(prefix)) {
@@ -23,10 +24,10 @@ static std::string_view adjust_uds_path(std::string_view path) {
   }
   return path;
 }
+} // namespace
 
 DDRes statsd_listen(std::string_view path, int *fd) {
   struct sockaddr_un addr_bind = {.sun_family = AF_UNIX};
-  int fd_sock = -1;
   path = adjust_uds_path(path);
   // Open the socket
   if (path.size() >= sizeof(addr_bind.sun_path) - 1) {
@@ -35,8 +36,9 @@ DDRes statsd_listen(std::string_view path, int *fd) {
   }
   strncpy(addr_bind.sun_path, path.data(), path.size());
   addr_bind.sun_path[path.size()] = '\0';
-  int socktype = SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK;
-  if (-1 == (fd_sock = socket(AF_UNIX, socktype, 0))) {
+  const int socktype = SOCK_DGRAM | SOCK_CLOEXEC | SOCK_NONBLOCK;
+  const int fd_sock = socket(AF_UNIX, socktype, 0);
+  if (-1 == fd_sock) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "[STATSD] Creating UDS failed (%s)",
                           strerror(errno));
   }
@@ -63,7 +65,7 @@ DDRes statsd_listen(std::string_view path, int *fd) {
 }
 
 DDRes statsd_connect(std::string_view statsd_socket, int *fd) {
-  assert(statsd_socket.size());
+  assert(!statsd_socket.empty());
   assert(fd);
 
   char path_listen[] = "/tmp/" MYNAME ".1234567890";
@@ -102,7 +104,8 @@ DDRes statsd_connect(std::string_view statsd_socket, int *fd) {
 }
 
 DDRes statsd_send(int fd_sock, const char *key, const void *val, int type) {
-  char buf[1024] = {0};
+  constexpr size_t k_max_msg_length = 1024;
+  char buf[k_max_msg_length] = {0};
   size_t sz = 0;
   switch (type) {
   default:
@@ -132,12 +135,14 @@ DDRes statsd_send(int fd_sock, const char *key, const void *val, int type) {
   }
 
   // Nothing to do if the write fails
-  while (sz != (size_t)write(fd_sock, buf, sz) && errno == EINTR) {
+  while (static_cast<ssize_t>(sz) != write(fd_sock, buf, sz) &&
+         errno == EINTR) {
     // Don't consider this as fatal.
-    if (errno == EWOULDBLOCK || errno == EAGAIN)
+    if (errno == EWOULDBLOCK || errno == EAGAIN) {
       DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Write failed (sys buffer full)");
-    else
+    } else {
       DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Write failed");
+    }
   }
   return ddres_init();
 }

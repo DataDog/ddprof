@@ -19,6 +19,8 @@
 #include <thread>
 #include <unistd.h>
 
+namespace ddprof {
+
 DDPROF_NOINLINE void funcA();
 DDPROF_NOINLINE void funcB();
 
@@ -26,12 +28,12 @@ std::byte stack[k_default_perf_stack_sample_size];
 
 void funcB() {
   UnwindState state;
-  uint64_t regs[K_NB_REGS_UNWIND];
+  uint64_t regs[k_nb_registers_to_unwind];
   size_t stack_size = save_context(retrieve_stack_bounds(), regs, stack);
 
-  ddprof::unwind_init_sample(&state, regs, getpid(), stack_size,
-                             reinterpret_cast<char *>(stack));
-  ddprof::unwindstate__unwind(&state);
+  unwind_init_sample(&state, regs, getpid(), stack_size,
+                     reinterpret_cast<char *>(stack));
+  unwindstate__unwind(&state);
 
   auto &symbol_table = state.symbol_hdr._symbol_table;
 
@@ -42,11 +44,11 @@ void funcB() {
 
   EXPECT_GT(state.output.locs.size(), 3);
   auto &symbol0 = symbol_table[state.output.locs[0]._symbol_idx];
-  EXPECT_TRUE(symbol0._demangle_name.starts_with("save_context("));
+  EXPECT_TRUE(symbol0._demangle_name.starts_with("ddprof::save_context("));
   auto &symbol1 = symbol_table[state.output.locs[1]._symbol_idx];
-  EXPECT_EQ(symbol1._demangle_name, "funcB()");
+  EXPECT_EQ(symbol1._demangle_name, "ddprof::funcB()");
   auto &symbol2 = symbol_table[state.output.locs[2]._symbol_idx];
-  EXPECT_EQ(symbol2._demangle_name, "funcA()");
+  EXPECT_EQ(symbol2._demangle_name, "ddprof::funcA()");
 }
 
 void funcA() {
@@ -64,7 +66,7 @@ TEST(getcontext, getcontext) { funcA(); }
 static std::atomic<bool> stop;
 static std::mutex mutex;
 static std::condition_variable cv;
-static uint64_t regs[K_NB_REGS_UNWIND];
+static uint64_t regs[k_nb_registers_to_unwind];
 static size_t stack_size;
 static std::span<const std::byte> thread_stack_bounds;
 
@@ -100,9 +102,9 @@ TEST(getcontext, unwind_from_sighandler) {
   t.join();
 
   UnwindState state;
-  ddprof::unwind_init_sample(&state, regs, getpid(), stack_size,
-                             reinterpret_cast<char *>(stack));
-  ddprof::unwindstate__unwind(&state);
+  unwind_init_sample(&state, regs, getpid(), stack_size,
+                     reinterpret_cast<char *>(stack));
+  unwindstate__unwind(&state);
 
   auto &symbol_table = state.symbol_hdr._symbol_table;
 
@@ -117,14 +119,17 @@ TEST(getcontext, unwind_from_sighandler) {
 
   EXPECT_GT(state.output.locs.size(), 5);
   EXPECT_LT(state.output.locs.size(), 25);
-  EXPECT_TRUE(get_symbol(0)._demangle_name.starts_with("save_context("));
-  EXPECT_EQ(get_symbol(1)._demangle_name, "handler(int)");
+  EXPECT_TRUE(
+      get_symbol(0)._demangle_name.starts_with("ddprof::save_context("));
+  EXPECT_EQ(get_symbol(1)._demangle_name, "ddprof::handler(int)");
   size_t next_idx = 3;
   while (next_idx < state.output.locs.size() - 1 &&
-         get_symbol(next_idx)._demangle_name != "funcD()") {
+         get_symbol(next_idx)._demangle_name != "ddprof::funcD()") {
     ++next_idx;
   }
-  EXPECT_EQ(get_symbol(next_idx)._demangle_name, "funcD()");
-  EXPECT_EQ(get_symbol(next_idx + 1)._demangle_name, "funcC()");
+  EXPECT_EQ(get_symbol(next_idx)._demangle_name, "ddprof::funcD()");
+  EXPECT_EQ(get_symbol(next_idx + 1)._demangle_name, "ddprof::funcC()");
 }
 #endif
+
+} // namespace ddprof

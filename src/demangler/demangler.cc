@@ -11,18 +11,21 @@
 
 #include <llvm/Demangle/Demangle.h>
 
+namespace ddprof {
+
+namespace {
 // With some exceptions we don't handle here, v0 Rust symbols can end in a
 // prefix followed by a 16-hexdigit hash, which must be removed
 constexpr std::string_view hash_pre = "::h";
 constexpr std::string_view hash_eg = "0123456789abcdef";
 
-static inline bool is_hexdig(const char c) {
+inline bool is_hexdig(const char c) {
   return (c >= 'a' && c <= 'f') || (c >= '0' && c <= '9');
 }
 
 // Minimal check that a string can end, and does end, in a hashlike substring
 // Some tools check for entropy, we do not.
-static inline bool has_hash(const std::string_view &str) {
+inline bool has_hash(const std::string_view &str) {
   // If the size can't conform, then the string is invalid
   if (str.size() <= hash_pre.size() + hash_eg.size()) {
     return false;
@@ -36,8 +39,9 @@ static inline bool has_hash(const std::string_view &str) {
 
   // Check that the string ends in lowercase hex digits
   for (size_t i = str.size() - hash_eg.size(); i < str.size(); ++i) {
-    if (!is_hexdig(str[i]))
+    if (!is_hexdig(str[i])) {
       return false;
+    }
   }
   return true;
 }
@@ -46,26 +50,26 @@ static inline bool has_hash(const std::string_view &str) {
 // supporting the use of '$' on some platforms as an informative token), this
 // implementation makes a minimal check indicating that a string is likely to
 // be a mangled Rust name.
-static bool is_probably_rust_legacy(const std::string_view &str) {
+bool is_probably_rust_legacy(const std::string_view &str) {
   // Is the string too short to have a hash part in thefirst place?
-  if (!has_hash(str))
+  if (!has_hash(str)) {
     return false;
+  }
 
   // Throw out `$$` and `$????$`, but not in-between
   const char *ptr = str.data();
   const char *end = ptr + str.size() - hash_pre.size() - hash_eg.size();
   for (; ptr <= end; ++ptr) {
     if (*ptr == '$') {
+      // NOLINTNEXTLINE: bugprone-branch-clone
       if (ptr[1] == '$') {
         return false;
-      } else if (ptr[2] == '$' || ptr[3] == '$' || ptr[4] == '$') {
-        return true;
-      } else {
-        return false;
       }
-    } else if (*ptr == '.') {
-      return !('.' == ptr[1] &&
-               '.' == ptr[2]); // '.' and '..' are fine, '...' is not
+      return ptr[2] == '$' || ptr[3] == '$' || ptr[4] == '$';
+    }
+    if (*ptr == '.') {
+      return '.' != ptr[1] ||
+          '.' != ptr[2]; // '.' and '..' are fine, '...' is not
     }
   }
   return true;
@@ -74,20 +78,23 @@ static bool is_probably_rust_legacy(const std::string_view &str) {
 // Simple conversion from hex digit to integer
 // Includes capitals out of completeness, but this should not be necessary for
 // the implementation
-inline static int hex_to_int(char dig) {
-  if (dig >= '0' && dig <= '9')
+inline int hex_to_int(char dig) {
+  constexpr int k_a_hex_value = 0xa;
+  if (dig >= '0' && dig <= '9') {
     return dig - '0';
-  else if (dig >= 'a' && dig <= 'f')
-    return dig - 'a' + 10;
-  else if (dig >= 'A' && dig <= 'F')
-    return dig - 'A' + 10;
-  else
-    return -1;
+  }
+  if (dig >= 'a' && dig <= 'f') {
+    return dig - 'a' + k_a_hex_value;
+  }
+  if (dig >= 'A' && dig <= 'F') {
+    return dig - 'A' + k_a_hex_value;
+  }
+  return -1;
 }
 
 // Demangles a Rust string by building a copy piece-by-piece
-static std::string rust_demangle(const std::string_view &str) {
-  constexpr auto patterns =
+std::string rust_demangle(const std::string_view &str) {
+  static constexpr auto patterns =
       std::to_array<std::pair<std::string_view, std::string_view>>({
           {"..", "::"},
           {"$C$", ","},
@@ -106,8 +113,9 @@ static std::string rust_demangle(const std::string_view &str) {
   size_t i = 0;
 
   // Special-case for repairing C++ demangling defect for Rust
-  if (str[0] == '_' && str[1] == '$')
+  if (str[0] == '_' && str[1] == '$') {
     ++i;
+  }
 
   for (; i < str.size() - hash_pre.size() - hash_eg.size(); ++i) {
 
@@ -134,16 +142,18 @@ static std::string rust_demangle(const std::string_view &str) {
         // Special-case for '.'
         ret += '-';
       } else if (!replaced && !str.compare(i, 2, "$u") && str[i + 4] == '$') {
-        int hi = hex_to_int(str[i + 2]);
-        int lo = hex_to_int(str[i + 3]);
+        constexpr size_t k_nb_read_chars = 5;
+        constexpr int hexa_base = 16;
+        int const hi = hex_to_int(str[i + 2]);
+        int const lo = hex_to_int(str[i + 3]);
         if (hi != -1 && lo != -1) {
-          ret += static_cast<unsigned char>(lo + 16 * hi);
-          i += 5 - 1; // - 1 because iterator inc
+          ret += static_cast<unsigned char>(lo + hexa_base * hi);
+          i += k_nb_read_chars - 1; // - 1 because iterator inc
         } else {
           // We didn't have valid unicode values, but we should still skip
           // the $u??$ sequence
-          ret += str.substr(i, 5);
-          i += 5 - 1; // -1 because iterator inc
+          ret += str.substr(i, k_nb_read_chars);
+          i += k_nb_read_chars - 1; // -1 because iterator inc
         }
       } else if (!replaced) {
         ret += str[i];
@@ -156,10 +166,15 @@ static std::string rust_demangle(const std::string_view &str) {
   return ret;
 }
 
+} // namespace
+
 // If it quacks like Rust, treat it like Rust
 std::string Demangler::demangle(const std::string &mangled) {
   auto demangled = llvm::demangle(mangled);
-  if (is_probably_rust_legacy(demangled))
+  if (is_probably_rust_legacy(demangled)) {
     return rust_demangle(demangled);
+  }
   return demangled;
 }
+
+} // namespace ddprof

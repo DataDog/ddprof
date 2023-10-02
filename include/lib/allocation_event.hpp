@@ -17,11 +17,11 @@ struct AllocationEvent {
   struct sample_id sample_id;
   uint64_t addr; /* if PERF_SAMPLE_ADDR */
   uint64_t period;
-  uint64_t abi;                   /* if PERF_SAMPLE_REGS_USER */
-  uint64_t regs[PERF_REGS_COUNT]; /* if PERF_SAMPLE_REGS_USER */
-  uint64_t size_stack;            /* if PERF_SAMPLE_STACK_USER */
-  std::byte data[];               /* requires PERF_SAMPLE_STACK_USER, dyn size
-                                      will contain the actual size */
+  uint64_t abi;                         /* if PERF_SAMPLE_REGS_USER */
+  uint64_t regs[k_perf_register_count]; /* if PERF_SAMPLE_REGS_USER */
+  uint64_t size_stack;                  /* if PERF_SAMPLE_STACK_USER */
+  std::byte data[]; /* requires PERF_SAMPLE_STACK_USER, dyn size
+                        will contain the actual size */
 };
 // An extra field is added after the end to communicate the dyn_size
 //  uint64_t dyn_size_stack;

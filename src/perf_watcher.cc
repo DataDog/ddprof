@@ -8,8 +8,10 @@
 #include "logger.hpp"
 #include "perf.hpp"
 
-#include <stddef.h>
-#include <string.h>
+#include <cstddef>
+#include <cstring>
+
+namespace ddprof {
 
 #define BASE_STYPES                                                            \
   (PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_TID |          \
@@ -20,30 +22,33 @@ uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
 #define X_STR(a, b, c, d) b,
 const char *sample_type_name_from_idx(int idx) {
   static const char *sample_names[] = {PROFILE_TYPE_TABLE(X_STR)};
-  if (idx < 0 || idx >= DDPROF_PWT_LENGTH)
-    return NULL;
+  if (idx < 0 || idx >= DDPROF_PWT_LENGTH) {
+    return nullptr;
+  }
   return sample_names[idx];
 }
 #undef X_STR
 #define X_STR(a, b, c, d) #c,
 const char *sample_type_unit_from_idx(int idx) {
   static const char *sample_units[] = {PROFILE_TYPE_TABLE(X_STR)};
-  if (idx < 0 || idx >= DDPROF_PWT_LENGTH)
-    return NULL;
+  if (idx < 0 || idx >= DDPROF_PWT_LENGTH) {
+    return nullptr;
+  }
   return sample_units[idx];
 }
 #undef X_STR
 #define X_DEP(a, b, c, d) DDPROF_PWT_##d,
 int sample_type_id_to_count_sample_type_id(int idx) {
   static const int count_ids[] = {PROFILE_TYPE_TABLE(X_DEP)};
-  if (idx < 0 || idx >= DDPROF_PWT_LENGTH)
+  if (idx < 0 || idx >= DDPROF_PWT_LENGTH) {
     return DDPROF_PWT_NOCOUNT;
+  }
   return count_ids[idx];
 }
 #undef X_DEP
 
 int watcher_to_count_sample_type_id(const PerfWatcher *watcher) {
-  int idx = watcher->sample_type_id;
+  int const idx = watcher->sample_type_id;
   return sample_type_id_to_count_sample_type_id(idx);
 }
 
@@ -57,28 +62,32 @@ bool watcher_has_countable_sample_type(const PerfWatcher *watcher) {
 #define X_STR(a, b, c, d, e, f, g) #a,
 const char *event_type_name_from_idx(int idx) {
   static const char *event_names[] = {EVENT_CONFIG_TABLE(X_STR)}; // NOLINT
-  if (idx < 0 || idx >= DDPROF_PWE_LENGTH)
-    return NULL;
+  if (idx < 0 || idx >= DDPROF_PWE_LENGTH) {
+    return nullptr;
+  }
   return event_names[idx];
 }
 #undef X_STR
 
 int str_to_event_idx(const char *str) {
-  if (!str || !*str)
+  if (!str || !*str) {
     return -1;
-  size_t sz_input = strlen(str);
+  }
+  size_t const sz_input = strlen(str);
   for (int type = 0; type < DDPROF_PWE_LENGTH; ++type) {
     const char *event_name = event_type_name_from_idx(type);
-    size_t sz_this = strlen(event_name);
-    if (sz_input == sz_this && !strncmp(str, event_name, sz_this))
+    size_t const sz_this = strlen(event_name);
+    if (sz_input == sz_this && !strncmp(str, event_name, sz_this)) {
       return type;
+    }
   }
   return -1;
 }
 
 const PerfWatcher *ewatcher_from_idx(int idx) {
-  if (idx < 0 || idx >= DDPROF_PWE_LENGTH)
-    return NULL;
+  if (idx < 0 || idx >= DDPROF_PWE_LENGTH) {
+    return nullptr;
+  }
   static const PerfWatcher events[] = {EVENT_CONFIG_TABLE(X_EVENTS)};
   return &events[idx];
 }
@@ -129,16 +138,20 @@ void log_watcher(const PerfWatcher *w, int idx) {
             w->tracepoint_label.c_str());
   PRINT_NFO("    Sample user Stack Size: %u", w->options.stack_sample_size);
 
-  if (w->options.is_freq)
+  if (w->options.is_freq) {
     PRINT_NFO("    Cadence: Freq, Freq: %lu", w->sample_frequency);
-  else
+  } else {
     PRINT_NFO("    Cadence: Period, Period: %ld", w->sample_period);
-  if (Any(EventConfMode::kCallgraph & w->output_mode))
+  }
+  if (Any(EventConfMode::kCallgraph & w->output_mode)) {
     PRINT_NFO("    Outputting to callgraph (flamegraph)");
-  if (Any(EventConfMode::kMetric & w->output_mode))
+  }
+  if (Any(EventConfMode::kMetric & w->output_mode)) {
     PRINT_NFO("    Outputting to metric");
-  if (Any(EventConfMode::kLiveCallgraph & w->output_mode))
+  }
+  if (Any(EventConfMode::kLiveCallgraph & w->output_mode)) {
     PRINT_NFO("    Outputting to live callgraph");
+  }
 }
 
 std::string_view watcher_help_text() {
@@ -189,3 +202,5 @@ std::string_view watcher_help_text() {
   // clang-format on
   return help_text;
 }
+
+} // namespace ddprof

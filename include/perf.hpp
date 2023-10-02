@@ -9,17 +9,22 @@
 #include "perf_archmap.hpp"
 #include "perf_watcher.hpp"
 
+#include <chrono>
+#include <csignal>
 #include <linux/perf_event.h>
-#include <signal.h>
 #include <stdint.h>
 #include <vector>
 
-// defaut ring buffer size expressed as a power-of-two in number of pages
-#define DEFAULT_BUFF_SIZE_SHIFT 6
-// this does not count as pinned memory, use a larger size
-#define MPSC_BUFF_SIZE_SHIFT 8
+namespace ddprof {
 
-#define PSAMPLE_DEFAULT_WAKEUP_MS 100 // sample frequency check
+// defaut ring buffer size expressed as a power-of-two in number of pages
+inline constexpr int k_default_buffer_size_shift{6};
+
+// this does not count as pinned memory, use a larger size
+inline constexpr int k_mpsc_buffer_size_shift{8};
+
+// sample frequency check
+inline constexpr std::chrono::milliseconds k_sample_default_wakeup{100};
 
 struct read_format {
   uint64_t value;        // The value of the event
@@ -103,17 +108,17 @@ struct perf_event_sample {
   uint64_t    stream_id;                // if PERF_SAMPLE_STREAM_ID
   uint32_t    cpu, res;                 // if PERF_SAMPLE_CPU
   uint64_t    period;                   // if PERF_SAMPLE_PERIOD
-  struct      read_format *v;           // if PERF_SAMPLE_READ
+  const struct read_format *v;          // if PERF_SAMPLE_READ
   uint64_t    nr;                       // if PERF_SAMPLE_CALLCHAIN
-  uint64_t    *ips;                     // if PERF_SAMPLE_CALLCHAIN
+  const uint64_t *ips;                  // if PERF_SAMPLE_CALLCHAIN
   uint32_t    size_raw;                 // if PERF_SAMPLE_RAW
-  char        *data_raw;                // if PERF_SAMPLE_RAW
+  const char  *data_raw;                // if PERF_SAMPLE_RAW
   uint64_t    bnr;                      // if PERF_SAMPLE_BRANCH_STACK
   struct      perf_branch_entry *lbr;   // if PERF_SAMPLE_BRANCH_STACK
   uint64_t    abi;                      // if PERF_SAMPLE_REGS_USER
-  uint64_t    *regs;                    // if PERF_SAMPLE_REGS_USER
+  const uint64_t *regs;                 // if PERF_SAMPLE_REGS_USER
   uint64_t    size_stack;               // if PERF_SAMPLE_STACK_USER
-  char        *data_stack;              // if PERF_SAMPLE_STACK_USER
+  const char  *data_stack;              // if PERF_SAMPLE_STACK_USER
   uint64_t    dyn_size_stack;           // if PERF_SAMPLE_STACK_USER
   uint64_t    weight;                   // if PERF_SAMPLE_WEIGHT
   uint64_t    data_src;                 // if PERF_SAMPLE_DATA_SRC
@@ -137,13 +142,13 @@ long get_page_size(void);
 size_t get_mask_from_size(size_t size);
 const char *perf_type_str(int type_id);
 
-namespace ddprof {
 std::vector<perf_event_attr>
 all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras);
 
 uint64_t perf_value_from_sample(const PerfWatcher *watcher,
                                 const perf_event_sample *sample);
-} // namespace ddprof
 
 perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
                                          bool extras);
+
+} // namespace ddprof

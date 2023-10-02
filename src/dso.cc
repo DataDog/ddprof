@@ -37,14 +37,14 @@ constexpr std::string_view s_dd_profiling_str = k_libdd_profiling_name;
 
 // invalid element
 Dso::Dso()
-    : _pid(-1), _start(), _end(), _pgoff(), _filename(), _inode(), _prot(),
+    : _pid(-1), _start(), _end(), _pgoff(), _inode(), _prot(),
       _type(dso::kUndef), _id(k_file_info_error) {}
 
 Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
          std::string &&filename, inode_t inode, uint32_t prot)
-    : _pid(pid), _start(start), _end(end), _pgoff(pgoff), _filename(filename),
-      _inode(inode), _prot(prot), _type(dso::kStandard),
-      _id(k_file_info_undef) {
+    : _pid(pid), _start(start), _end(end), _pgoff(pgoff),
+      _filename(std::move(filename)), _inode(inode), _prot(prot),
+      _type(dso::kStandard), _id(k_file_info_undef) {
   // note that substr manages the case where len str < len vdso_str
   if (_filename.substr(0, s_vdso_str.length()) == s_vdso_str) {
     _type = dso::kVdso;
@@ -69,10 +69,10 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
     _type = dso::kSocket;
   } else if (_filename[0] == '[') {
     _type = dso::kUndef;
-  } else if (is_jit_dump_str(_filename, pid)) {
+  } else if (is_jit_dump_str(_filename)) {
     _type = dso::kJITDump;
   } else { // check if this standard dso matches our internal dd_profiling lib
-    std::size_t pos = _filename.rfind('/');
+    std::size_t const pos = _filename.rfind('/');
     if (pos != std::string::npos &&
         _filename.substr(pos + 1, s_dd_profiling_str.length()) ==
             s_dd_profiling_str) {
@@ -84,18 +84,20 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
 // The string should end with: "jit-[0-9]+\\.dump"
 // and the number should be the pid, however, in wholehost mode
 // we don't have visibility on the namespace's PID value.
-bool Dso::is_jit_dump_str(std::string_view file_path, pid_t pid) {
+bool Dso::is_jit_dump_str(std::string_view file_path) {
   const std::string_view prefix = "jit-";
   const std::string_view ext = ".dump";
-  if (!file_path.ends_with(ext))
+  if (!file_path.ends_with(ext)) {
     return false;
+  }
   file_path = file_path.substr(0, file_path.size() - ext.size());
   auto pos = file_path.rfind('/');
   if (pos != std::string_view::npos) {
     file_path = file_path.substr(pos + 1);
   }
-  if (!file_path.starts_with(prefix))
+  if (!file_path.starts_with(prefix)) {
     return false;
+  }
   file_path = file_path.substr(prefix.size());
   return std::all_of(file_path.begin(), file_path.end(), [](char c) {
     return std::isdigit(static_cast<unsigned char>(c));
@@ -113,13 +115,12 @@ std::string Dso::to_string() const {
 std::string Dso::format_filename() const {
   if (dso::has_relevant_path(_type)) {
     return _filename;
-  } else {
-    return dso::dso_type_str(_type);
   }
+  return dso::dso_type_str(_type);
 }
 
 std::ostream &operator<<(std::ostream &os, const Dso &dso) {
-  os << dso.to_string() << std::endl;
+  os << dso.to_string() << '\n';
   return os;
 }
 

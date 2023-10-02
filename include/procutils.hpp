@@ -12,6 +12,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+namespace ddprof {
+
 // Get internal stats from /proc/self/stat
 DDRes proc_read(ProcStatus *);
 
@@ -20,3 +22,5 @@ bool check_file_type(const char *pathname, int file_type);
 
 // Returns false if it can not find the matching file
 bool get_file_inode(const char *pathname, inode_t *inode, int64_t *size);
+
+} // namespace ddprof

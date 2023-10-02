@@ -29,16 +29,20 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 #include <cstdint>
 #include <span>
 
+namespace ddprof {
+
 #if defined(__x86_64__)
 
 DDPROF_NOINLINE __attribute__((naked)) void
-    save_registers(std::span<uint64_t, PERF_REGS_COUNT>);
+    save_registers(std::span<uint64_t, k_perf_register_count>);
 
 #elif defined(__aarch64__)
 
 #  define save_registers(regs)                                                 \
     ({                                                                         \
-      register uint64_t base_ptr __asm__("x0") = (uint64_t)(regs).data();      \
+      /* NOLINTNEXTLINE(misc-const-correctness) */                             \
+      register uint64_t base_ptr __asm__("x0") =                               \
+          reinterpret_cast<uint64_t>((regs).data());                           \
       __asm__ __volatile__("stp x0, x1, [%[base], #0]\n"                       \
                            "stp x2, x3, [%[base], #16]\n"                      \
                            "stp x4, x5, [%[base], #32]\n"                      \
@@ -66,3 +70,4 @@ DDPROF_NOINLINE __attribute__((naked)) void
     })
 
 #endif
+} // namespace ddprof

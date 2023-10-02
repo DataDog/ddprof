@@ -40,7 +40,7 @@ DDRes DwflWrapper::attach(pid_t pid, const Dwfl_Thread_Callbacks *callbacks,
   if (_attached) {
     return ddres_init();
   }
-  if (!dwfl_attach_state(_dwfl, NULL, pid, callbacks, us)) {
+  if (!dwfl_attach_state(_dwfl, nullptr, pid, callbacks, us)) {
     LG_DBG("Failed attaching dwfl on pid %d (%s)", pid, dwfl_errmsg(-1));
     return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
   }
@@ -88,7 +88,7 @@ DDRes DwflWrapper::register_mod(ProcessAddress_t pc,
 
 std::vector<pid_t> DwflHdr::get_unvisited() const {
   std::vector<pid_t> pids_remove;
-  for (auto &el : _dwfl_map) {
+  for (const auto &el : _dwfl_map) {
     if (_visited_pid.find(el.first) == _visited_pid.end()) {
       // clear this element as it was not visited
       pids_remove.push_back(el.first);

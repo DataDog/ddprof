@@ -57,7 +57,7 @@
 #define DDRES_CHECK_ERRNO(eval, what, ...)                                     \
   do {                                                                         \
     if (unlikely((eval) == -1)) {                                              \
-      int e = errno;                                                           \
+      const int e = errno;                                                     \
       LG_ERR(__VA_ARGS__);                                                     \
       LOG_ERROR_DETAILS(LG_ERR, what);                                         \
       LG_ERR("errno(%d): %s", e, strerror(e));                                 \
@@ -107,7 +107,8 @@ static inline int ddres_sev_to_log_level(int sev) {
         LG_ERR("Forward error at %s:%u - %s", __FILE__, __LINE__,              \
                ddres_error_message(lddres._what));                             \
         return lddres;                                                         \
-      } else if (lddres._sev == DD_SEVWARN) {                                  \
+      }                                                                        \
+      if (lddres._sev == DD_SEVWARN) {                                         \
         LG_WRN("Recover from sev=%d at %s:%u - %s", lddres._sev, __FILE__,     \
                __LINE__, ddres_error_message(lddres._what));                   \
       } else {                                                                 \
@@ -124,7 +125,7 @@ static inline int ddres_sev_to_log_level(int sev) {
 /// Evaluate function and return error if -1 (add an error log)
 #define DDRES_CHECK_ERRORCODE(eval, what, ...)                                 \
   do {                                                                         \
-    std::error_code err = (eval);                                              \
+    const std::error_code err = (eval);                                        \
     if (err) {                                                                 \
       LG_ERR(__VA_ARGS__);                                                     \
       LOG_ERROR_DETAILS(LG_ERR, what);                                         \

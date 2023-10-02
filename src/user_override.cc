@@ -12,9 +12,9 @@
 #include "logger.hpp"
 
 #include <cerrno>
+#include <cstring>
 #include <grp.h>
 #include <pwd.h>
-#include <string.h>
 #include <sys/prctl.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -25,8 +25,11 @@ constexpr uid_t s_root_user = 0;
 
 struct DumpableRestorer {
 public:
-  DumpableRestorer() { _dumpable = prctl(PR_GET_DUMPABLE); }
+  DumpableRestorer() : _dumpable{prctl(PR_GET_DUMPABLE)} {}
   ~DumpableRestorer() { prctl(PR_SET_DUMPABLE, _dumpable); }
+
+  DumpableRestorer(const DumpableRestorer &) = delete;
+  DumpableRestorer operator=(const DumpableRestorer &) = delete;
 
 private:
   int _dumpable;
@@ -80,7 +83,7 @@ DDRes user_override(uid_t uid, gid_t gid, UIDInfo *old_uids) {
   // (ie. parent process) needs to be able to read ddprof /proc/<pid>/fd/*,
   // that's why we set dumpable attribute back to its intial value at each
   // effective user id change.
-  DumpableRestorer dumpable_restorer;
+  DumpableRestorer const dumpable_restorer;
   if (gid != static_cast<uid_t>(-1)) {
     DDRES_CHECK_INT(setresgid(gid, gid, -1), DD_WHAT_USERID,
                     "Unable to set gid %d (%s)", gid, strerror(errno));
@@ -97,15 +100,15 @@ DDRes become_user(const char *username) {
   // Inspired from
   // https://github.com/netdata/netdata/blob/71cb1ad68707718671ef57c901dfa2041f15bbe6/daemon/daemon.c#L77
 
-  DumpableRestorer dumpable_restorer;
-  struct passwd *pw = getpwnam(username);
+  const DumpableRestorer dumpable_restorer;
+  const struct passwd *pw = getpwnam(username);
 
   if (!pw) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_USERID, "Unable to find user %s", username);
   }
 
-  uid_t uid = pw->pw_uid;
-  gid_t gid = pw->pw_gid;
+  const uid_t uid = pw->pw_uid;
+  const gid_t gid = pw->pw_gid;
 
   if (initgroups(pw->pw_name, gid) != 0) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_USERID, "Cannot init group list for %s",

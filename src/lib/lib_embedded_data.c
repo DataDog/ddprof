@@ -6,23 +6,23 @@
 #include "lib_embedded_data.h"
 
 #ifdef DDPROF_EMBEDDED_LIB_DATA
-// NOLINTNEXTLINE cert-dcl51-cpp
+// NOLINTNEXTLINE(cert-dcl51-cpp)
 extern const char _binary_libdd_profiling_embedded_so_start[];
-// NOLINTNEXTLINE cert-dcl51-cpp
+// NOLINTNEXTLINE(cert-dcl51-cpp)
 extern const char _binary_libdd_profiling_embedded_so_end[];
 #else
-// NOLINTNEXTLINE cert-dcl51-cpp
+// NOLINTNEXTLINE(cert-dcl51-cpp)
 static const char _binary_libdd_profiling_embedded_so_start[] = {};
-// NOLINTNEXTLINE cert-dcl51-cpp
+// NOLINTNEXTLINE(cert-dcl51-cpp)
 static const char _binary_libdd_profiling_embedded_so_end[] = {};
 #endif
 
 #ifdef DDPROF_EMBEDDED_EXE_DATA
-extern const char _binary_ddprof_start[]; // NOLINT cert-dcl51-cpp
-extern const char _binary_ddprof_end[];   // NOLINT cert-dcl51-cpp
+extern const char _binary_ddprof_start[]; // NOLINT(cert-dcl51-cpp)
+extern const char _binary_ddprof_end[];   // NOLINT(cert-dcl51-cpp)
 #else
-static const char _binary_ddprof_start[] = {}; // NOLINT cert-dcl51-cpp
-static const char _binary_ddprof_end[] = {};   // NOLINT cert-dcl51-cpp
+static const char _binary_ddprof_start[] = {}; // NOLINT(cert-dcl51-cpp)
+static const char _binary_ddprof_end[] = {};   // NOLINT(cert-dcl51-cpp)
 #endif
 
 EmbeddedData profiling_lib_data() {

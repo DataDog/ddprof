@@ -36,7 +36,8 @@ public:
   uint64_t _sample_counter = {};
 
 private:
-  std::string format_cgroup_file(pid_t pid, std::string_view path_to_proc);
+  static std::string format_cgroup_file(pid_t pid,
+                                        std::string_view path_to_proc);
 
   static DDRes read_cgroup_ns(pid_t pid, std::string_view path_to_proc,
                               CGroupId_t &cgroup);

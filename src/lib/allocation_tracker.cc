@@ -43,8 +43,8 @@ TrackerThreadLocalState *AllocationTracker::get_tl_state() {
   // tls_get_addr can call into malloc, which can create a recursive loop
   // instead we call pthread APIs to control the creation of TLS objects
   pthread_once(&_key_once, make_key);
-  TrackerThreadLocalState *tl_state =
-      (TrackerThreadLocalState *)pthread_getspecific(_tl_state_key);
+  auto *tl_state = static_cast<TrackerThreadLocalState *>(
+      pthread_getspecific(_tl_state_key));
   return tl_state;
 }
 
@@ -52,9 +52,9 @@ TrackerThreadLocalState *AllocationTracker::init_tl_state() {
   TrackerThreadLocalState *tl_state = nullptr;
   int res_set = 0;
 
-  pid_t tid = ddprof::gettid();
+  pid_t const tid = ddprof::gettid();
   // As we allocate within this function, this can be called twice
-  TLReentryGuard tl_reentry_guard(_thread_entries, tid);
+  TLReentryGuard const tl_reentry_guard(_thread_entries, tid);
   if (!tl_reentry_guard) {
 #ifdef DEBUG
     fprintf(stderr, "Unable to grab reentry guard %d \n", tid);
@@ -75,7 +75,7 @@ TrackerThreadLocalState *AllocationTracker::init_tl_state() {
   return tl_state;
 }
 
-AllocationTracker::AllocationTracker() {}
+AllocationTracker::AllocationTracker() = default;
 
 AllocationTracker *AllocationTracker::create_instance() {
   static AllocationTracker tracker;
@@ -83,7 +83,7 @@ AllocationTracker *AllocationTracker::create_instance() {
 }
 
 void AllocationTracker::delete_tl_state(void *tl_state) {
-  delete (TrackerThreadLocalState *)tl_state;
+  delete static_cast<TrackerThreadLocalState *>(tl_state);
 }
 
 void AllocationTracker::make_key() {
@@ -104,11 +104,11 @@ DDRes AllocationTracker::allocation_tracking_init(
     }
   }
 
-  ReentryGuard guard(&tl_state->reentry_guard);
+  ReentryGuard const guard(&tl_state->reentry_guard);
 
   AllocationTracker *instance = create_instance();
   auto &state = instance->_state;
-  std::lock_guard lock{state.mutex};
+  std::lock_guard const lock{state.mutex};
 
   if (state.track_allocations) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW, "Allocation profiler already started");
@@ -119,9 +119,8 @@ DDRes AllocationTracker::allocation_tracking_init(
   void *volatile p = ::malloc(1);
   ::free(p);
 
-  DDRES_CHECK_FWD(instance->init(allocation_profiling_rate,
-                                 flags & kDeterministicSampling,
-                                 stack_sample_size, ring_buffer));
+  (instance->init(allocation_profiling_rate, flags & kDeterministicSampling,
+                  stack_sample_size, ring_buffer));
   _instance = instance;
 
   state.init(true, flags & kTrackDeallocations);
@@ -169,8 +168,8 @@ void AllocationTracker::allocation_tracking_free() {
     instance->free();
     return;
   }
-  ReentryGuard guard(&tl_state->reentry_guard);
-  std::lock_guard lock{instance->_state.mutex};
+  ReentryGuard const guard(&tl_state->reentry_guard);
+  std::lock_guard const lock{instance->_state.mutex};
   instance->free();
 }
 
@@ -188,7 +187,7 @@ void AllocationTracker::free_on_consecutive_failures(bool success) {
   }
 }
 
-void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
+void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
                                          TrackerThreadLocalState &tl_state) {
   // Reentrancy should be prevented by caller (by using ReentryGuard on
   // TrackerThreadLocalState::reentry_guard).
@@ -221,15 +220,15 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t size,
   } while (remaining_bytes >= 0);
 
   tl_state.remaining_bytes = remaining_bytes;
-  uint64_t total_size = nsamples * sampling_interval;
+  uint64_t const total_size = nsamples * sampling_interval;
 
-  bool success = IsDDResOK(push_alloc_sample(addr, total_size, tl_state));
+  bool const success = IsDDResOK(push_alloc_sample(addr, total_size, tl_state));
   free_on_consecutive_failures(success);
 
   if (success && _state.track_deallocations) {
     // \fixme{r1viollet} adjust set to be lock free
     // We should still lock the clear of live allocations (which is unlikely)
-    std::lock_guard lock{_state.mutex};
+    std::lock_guard const lock{_state.mutex};
 
     // ensure we track this dealloc if it occurs
     _address_set.insert(addr);
@@ -252,13 +251,13 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
   // TrackerThreadLocalState::reentry_guard).
 
   { // Grab the lock to check if this allocation was stored in the set
-    std::lock_guard lock{_state.mutex};
+    std::lock_guard const lock{_state.mutex};
     if (!_state.track_deallocations || !_address_set.erase(addr)) {
       return;
     }
   }
 
-  bool success = IsDDResOK(push_dealloc_sample(addr, tl_state));
+  bool const success = IsDDResOK(push_dealloc_sample(addr, tl_state));
   free_on_consecutive_failures(success);
 }
 
@@ -279,7 +278,7 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
     return {};
   }
 
-  LostEvent *lost_event = reinterpret_cast<LostEvent *>(buffer.data());
+  auto *lost_event = reinterpret_cast<LostEvent *>(buffer.data());
   lost_event->hdr.size = sizeof(LostEvent);
   lost_event->hdr.misc = 0;
   lost_event->hdr.type = PERF_RECORD_LOST;
@@ -304,8 +303,7 @@ DDRes AllocationTracker::push_clear_live_allocation(
                            "Unable to get write lock on ring buffer");
   }
 
-  ClearLiveAllocationEvent *event =
-      reinterpret_cast<ClearLiveAllocationEvent *>(buffer.data());
+  auto *event = reinterpret_cast<ClearLiveAllocationEvent *>(buffer.data());
   event->hdr.misc = 0;
   event->hdr.size = sizeof(ClearLiveAllocationEvent);
   event->hdr.type = PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION;
@@ -338,7 +336,7 @@ DDRes AllocationTracker::push_dealloc_sample(
 
   bool timeout = false;
   if (unlikely(_state.lost_count.load(std::memory_order_relaxed))) {
-    DDRES_CHECK_FWD(push_lost_sample(writer, notify_consumer));
+    (push_lost_sample(writer, notify_consumer));
   }
 
   auto buffer = writer.reserve(sizeof(DeallocationEvent), &timeout);
@@ -354,8 +352,7 @@ DDRes AllocationTracker::push_dealloc_sample(
     return {};
   }
 
-  DeallocationEvent *event =
-      reinterpret_cast<DeallocationEvent *>(buffer.data());
+  auto *event = reinterpret_cast<DeallocationEvent *>(buffer.data());
   event->hdr.misc = 0;
   event->hdr.size = sizeof(DeallocationEvent);
   event->hdr.type = PERF_CUSTOM_EVENT_DEALLOCATION;
@@ -392,7 +389,7 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
 
   bool timeout = false;
   if (unlikely(_state.lost_count.load(std::memory_order_relaxed))) {
-    DDRES_CHECK_FWD(push_lost_sample(writer, notify_consumer));
+    (push_lost_sample(writer, notify_consumer));
   }
 
   auto buffer =
@@ -410,7 +407,7 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
     return {};
   }
 
-  AllocationEvent *event = reinterpret_cast<AllocationEvent *>(buffer.data());
+  auto *event = reinterpret_cast<AllocationEvent *>(buffer.data());
   event->hdr.misc = 0;
   event->hdr.size = sizeof_allocation_event(_stack_sample_size);
   event->hdr.type = PERF_RECORD_SAMPLE;
@@ -438,7 +435,7 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   event->size_stack = _stack_sample_size;
 
   std::byte *dyn_size_pos = event->data + _stack_sample_size;
-  uint64_t *dyn_size = reinterpret_cast<uint64_t *>(dyn_size_pos);
+  auto *dyn_size = reinterpret_cast<uint64_t *>(dyn_size_pos);
 
   assert(reinterpret_cast<uintptr_t>(dyn_size) % alignof(uint64_t) == 0);
 
@@ -457,14 +454,14 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   return {};
 }
 
-uint64_t AllocationTracker::next_sample_interval(std::minstd_rand &gen) {
+uint64_t AllocationTracker::next_sample_interval(std::minstd_rand &gen) const {
   if (_sampling_interval == 1) {
     return 1;
   }
   if (_deterministic_sampling) {
     return _sampling_interval;
   }
-  double sampling_rate = 1.0 / static_cast<double>(_sampling_interval);
+  double const sampling_rate = 1.0 / static_cast<double>(_sampling_interval);
   std::exponential_distribution<> dist(sampling_rate);
   double value = dist(gen);
   const size_t max_value = _sampling_interval * 20;
@@ -489,7 +486,7 @@ void AllocationTracker::notify_thread_start() {
     }
   }
 
-  ReentryGuard guard(&tl_state->reentry_guard);
+  ReentryGuard const guard(&tl_state->reentry_guard);
   tl_state->stack_bounds = retrieve_stack_bounds();
   // error can not be propagated in thread create
 }
@@ -506,9 +503,8 @@ void AllocationTracker::notify_fork() {
     log_once("Error: Unable to retrieve tl state after fork thread %d",
              ddprof::gettid());
     return;
-  } else {
-    tl_state->tid = 0;
   }
+  tl_state->tid = 0;
 }
 
 } // namespace ddprof

@@ -20,17 +20,19 @@
 
 typedef struct Dwfl Dwfl;
 
+namespace ddprof {
+
 // This is not a strict mirror of the register values acquired by perf; rather
 // it's an array whose individual positions each have semantic value in the
 // context of DWARF; accordingly, the size is arch-dependent.
 // It is possible to provide SIMD registers on x86, but we don't do that here.
 
 // This is the max register index supported across all architectures
-#define K_NB_REGS_UNWIND PERF_REGS_COUNT
+static constexpr size_t k_nb_registers_to_unwind = k_perf_register_count;
 
 // The layout below follows kernel arch/<ARCH>/include/uapi/asm/perf_regs.h
 struct UnwindRegisters {
-  uint64_t regs[K_NB_REGS_UNWIND] = {};
+  uint64_t regs[k_nb_registers_to_unwind] = {};
 };
 
 /// UnwindState
@@ -44,15 +46,15 @@ struct UnwindState {
     output.locs.reserve(DD_MAX_STACK_DEPTH);
   }
 
-  ddprof::DwflHdr dwfl_hdr;
-  ddprof::DwflWrapper *_dwfl_wrapper; // pointer to current dwfl element
+  DwflHdr dwfl_hdr;
+  DwflWrapper *_dwfl_wrapper; // pointer to current dwfl element
 
-  ddprof::DsoHdr dso_hdr;
+  DsoHdr dso_hdr;
   SymbolHdr symbol_hdr;
-  ddprof::ProcessHdr process_hdr;
+  ProcessHdr process_hdr;
 
   pid_t pid;
-  char *stack;
+  const char *stack;
   size_t stack_sz;
 
   UnwindRegisters initial_regs;
@@ -63,7 +65,7 @@ struct UnwindState {
 
 static inline bool unwind_registers_equal(const UnwindRegisters *lhs,
                                           const UnwindRegisters *rhs) {
-  for (unsigned i = 0; i < K_NB_REGS_UNWIND; ++i) {
+  for (unsigned i = 0; i < k_nb_registers_to_unwind; ++i) {
     if (lhs->regs[i] != rhs->regs[i]) {
       return false;
     }
@@ -72,7 +74,8 @@ static inline bool unwind_registers_equal(const UnwindRegisters *lhs,
 }
 
 static inline void unwind_registers_clear(UnwindRegisters *unwind_registers) {
-  for (unsigned i = 0; i < K_NB_REGS_UNWIND; ++i) {
+  for (unsigned i = 0; i < k_nb_registers_to_unwind; ++i) {
     unwind_registers->regs[i] = 0;
   }
 }
+} // namespace ddprof

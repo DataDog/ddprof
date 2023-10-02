@@ -10,20 +10,19 @@ namespace ddprof {
 Symbol symbol_from_common(SymbolErrors lookup_case) {
   switch (lookup_case) {
   case SymbolErrors::truncated_stack:
-    return Symbol(std::string(), std::string("[truncated]"), 0, std::string());
+    return {std::string(), std::string("[truncated]"), 0, std::string()};
   case SymbolErrors::unknown_dso:
-    return Symbol(std::string(), std::string("[unknown_dso]"), 0,
-                  std::string());
+    return {std::string(), std::string("[unknown_dso]"), 0, std::string()};
   case SymbolErrors::dwfl_frame:
-    return Symbol(std::string(), std::string("[dwfl_frame]"), 0, std::string());
+    return {std::string(), std::string("[dwfl_frame]"), 0, std::string()};
   case SymbolErrors::incomplete_stack:
-    return Symbol(std::string(), std::string("[incomplete]"), 0, std::string());
+    return {std::string(), std::string("[incomplete]"), 0, std::string()};
   case SymbolErrors::lost_event:
-    return Symbol(std::string(), std::string("[lost]"), 0, std::string());
+    return {std::string(), std::string("[lost]"), 0, std::string()};
   default:
     break;
   }
-  return Symbol();
+  return {};
 }
 
 SymbolIdx_t CommonSymbolLookup::get_or_insert(SymbolErrors lookup_case,
