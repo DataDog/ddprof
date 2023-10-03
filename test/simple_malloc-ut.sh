@@ -49,6 +49,9 @@ check() {
     cmd="$1"
     expected_pids="$2"
     expected_tids="${3-$2}"
+    # Create a list of profile types with comma as separator
+    IFS=',' read -ra list_of_profile_types_to_count <<< "${4-"alloc-space,cpu-time"}"
+    # shellcheck disable=SC2086
     echo "Running: ${cmd}"
     # shellcheck disable=SC2086
     taskset "${test_cpu_mask}" ${cmd} || ( echo "Command failed: ${cmd}" && cat "${log_file}" && exit 1 )
@@ -66,22 +69,19 @@ check() {
         sync "${log_file}"
     fi
     if [[ "${expected_pids}" -ne 0 ]]; then
-        counted_pids_alloc=$(count "${log_file}" "alloc-samples" "pid")
-        counted_pids_cpu=$(count "${log_file}" "cpu-samples" "pid")
-        counted_tids_alloc=$(count "${log_file}" "alloc-samples" "tid")
-        counted_tids_cpu=$(count "${log_file}" "cpu-samples" "tid")
-        if [[ $counted_pids_alloc -ne "${expected_pids}" ||
-            $counted_pids_cpu -ne "${expected_pids}" ||
-            $counted_tids_alloc -ne "${expected_tids}" ||
-            $counted_tids_cpu -ne "${expected_tids}" ]]; then
-            echo "Incorrect number of sample found for: $cmd"
-            echo "counted_pids_alloc = $counted_pids_alloc"
-            echo "counted_pids_cpu = ${counted_pids_cpu}"
-            echo "counted_tids_alloc = ${counted_tids_alloc}"
-            echo "counted_tids_cpu = ${counted_tids_cpu}"
-            cat "${log_file}"
-            exit 1
-        fi
+        for profile_type in "${list_of_profile_types_to_count[@]}"; do
+            counted_pids=$(count "${log_file}" "${profile_type}" "pid")
+            counted_tids=$(count "${log_file}" "${profile_type}" "tid")
+            if [[ $counted_pids -ne "${expected_pids}"||
+                $counted_tids -ne "${expected_tids}" ]]; then
+              echo "Incorrect number of sample found for: $cmd"
+              echo "profile-type:${profile_type}"
+              echo "counted_pids = ${counted_pids}"
+              echo "counted_tids = ${counted_tids}"
+              cat "${log_file}"
+              exit 1
+            fi
+        done
     else
         if [ -f "${log_file}" ]; then
             echo "Unexpected samples for $cmd"
@@ -107,9 +107,13 @@ check "./test/simple_malloc-shared --profile ${opts}" 1
 # Test wrapper mode
 check "./ddprof ./test/simple_malloc ${opts}" 1
 
-# Test live heap mode
+# Test live heap mode, CPU events are given through configuration file
 event="sALLOC,period=-524288,mode=l;sCPU"
-check "./ddprof --show_config --event ${event} ./test/simple_malloc ${opts} --skip-free 100" 1
+check "./ddprof --show_config --event "${event}" ./test/simple_malloc ${opts} --skip-free 100" 1 1 "inuse-space,cpu-time"
+
+# Test live heap mode, with allocations, CPU events are given through configuration file
+event="sALLOC,period=-524288,mode=sl;sCPU"
+check "./ddprof --show_config --event "${event}" ./test/simple_malloc ${opts} --skip-free 100" 1 1 "inuse-space,alloc-space,cpu-time"
 
 # Test wrapper mode with forks + threads
 opts_more_spin="--loop 1000 --spin 400"

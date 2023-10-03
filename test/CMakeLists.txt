@@ -162,7 +162,8 @@ add_unit_test(
   DEFINITIONS MYNAME="pevent-ut")
 
 add_unit_test(
-  ddprof_pprof-ut ../src/pprof/ddprof_pprof.cc ../src/perf_watcher.cc ddprof_pprof-ut.cc
+  ddprof_pprof-ut ddprof_pprof-ut.cc ../src/ddprof_cmdline.cc ../src/pprof/ddprof_pprof.cc
+  ../src/perf_watcher.cc ../src/tracepoint_config.cc
   LIBRARIES Datadog::Profiling DDProf::Parser
   DEFINITIONS MYNAME="ddprof_pprof-ut")
 

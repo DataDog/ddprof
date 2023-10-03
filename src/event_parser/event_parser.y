@@ -41,26 +41,21 @@ EventConf g_accum_event_conf = {};
 EventConf g_template_event_conf = {};
 std::vector<EventConf>* g_event_configs;
 
-std::optional<EventConfMode> mode_from_str(const std::string &str) {
-  EventConfMode mode = EventConfMode::kDisabled;
-  if (str.empty())
-    return mode;
+std::optional<EventAggregationMode> mode_from_str(const std::string &str) {
   const std::string a_str{"Aa*"};
-  const std::string l_str{"Ll"};
-  const std::string g_str{"Gg"};
-  const std::string m_str{"Mm"};
-
+  const std::string l_str{"Ll"}; // live sum
+  const std::string s_str{"Ss"}; // sum
+  EventAggregationMode mode = EventAggregationMode::kDisabled;
   for (const char &c : str) {
-    if (m_str.find(c) != std::string::npos) {
-      mode |= EventConfMode::kMetric;
-    } else if (g_str.find(c) != std::string::npos) {
-      mode |= EventConfMode::kCallgraph;
+    if (s_str.find(c) != std::string::npos) {
+      mode |= EventAggregationMode::kSum;
     } else if (l_str.find(c) != std::string::npos) {
-        mode |= EventConfMode::kLiveCallgraph;
+        mode |= EventAggregationMode::kLiveSum;
     } else if (a_str.find(c) != std::string::npos) {
-      mode |= EventConfMode::kAll;
+      mode |= EventAggregationMode::kAll;
     } else {
-      return {};
+      fprintf(stderr, "Warning, unexpected mode %c \n", c);
+      return {}; // unexpected mode
     }
   }
   return mode;
@@ -104,7 +99,7 @@ void conf_print(const EventConf *tp) {
   else
     printf("  label: <generated from event/groupname>\n");
 
-  const char *modenames[] = {"ILLEGAL", "callgraph", "metric", "live callgraph", "metric and callgraph"};
+  const char *modenames[] = {"ILLEGAL", "sum usage", "live usage"};
   printf("  type: %s\n", modenames[static_cast<unsigned>(tp->mode)]);
 
 
@@ -228,7 +223,8 @@ opt:
                delete $3;
                VAL_ERROR();
              }
-             g_accum_event_conf.mode |= *mode;
+             // override mode if present
+             g_accum_event_conf.mode = *mode;
              break;
            }
          default:
@@ -270,7 +266,7 @@ opt:
            g_accum_event_conf.value_scale = 0.0 + $3;
            break;
          case EventConfField::kMode:
-           g_accum_event_conf.mode = static_cast<EventConfMode>($3) & EventConfMode::kAll;
+           g_accum_event_conf.mode = static_cast<EventAggregationMode>($3) & EventAggregationMode::kAll;
            break;
 
          case EventConfField::kParameter:

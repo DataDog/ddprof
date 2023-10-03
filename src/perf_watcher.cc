@@ -19,16 +19,18 @@ namespace ddprof {
 
 uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
 
-#define X_STR(a, b, c, d) b,
-const char *sample_type_name_from_idx(int idx) {
-  static const char *sample_names[] = {PROFILE_TYPE_TABLE(X_STR)};
+#define X_STR(a, b, c, d, e) std::array{b, d},
+const char *sample_type_name_from_idx(int idx, EventAggregationModePos pos) {
+  static constexpr std::array<
+      std::array<const char *, kNbEventAggregationModes>, DDPROF_PWT_LENGTH + 1>
+      sample_names = {PROFILE_TYPE_TABLE(X_STR){nullptr, nullptr}};
   if (idx < 0 || idx >= DDPROF_PWT_LENGTH) {
     return nullptr;
   }
-  return sample_names[idx];
+  return sample_names[idx][pos];
 }
 #undef X_STR
-#define X_STR(a, b, c, d) #c,
+#define X_STR(a, b, c, d, e) #c,
 const char *sample_type_unit_from_idx(int idx) {
   static const char *sample_units[] = {PROFILE_TYPE_TABLE(X_STR)};
   if (idx < 0 || idx >= DDPROF_PWT_LENGTH) {
@@ -37,7 +39,7 @@ const char *sample_type_unit_from_idx(int idx) {
   return sample_units[idx];
 }
 #undef X_STR
-#define X_DEP(a, b, c, d) DDPROF_PWT_##d,
+#define X_DEP(a, b, c, d, e) DDPROF_PWT_##e,
 int sample_type_id_to_count_sample_type_id(int idx) {
   static const int count_ids[] = {PROFILE_TYPE_TABLE(X_DEP)};
   if (idx < 0 || idx >= DDPROF_PWT_LENGTH) {
@@ -56,8 +58,31 @@ bool watcher_has_countable_sample_type(const PerfWatcher *watcher) {
   return DDPROF_PWT_NOCOUNT != watcher_to_count_sample_type_id(watcher);
 }
 
+// putting parentheses around "g" param breaks compilation
+// NOLINTBEGIN(bugprone-macro-parentheses)
 #define X_EVENTS(a, b, c, d, e, f, g)                                          \
-  {DDPROF_PWE_##a, b, BASE_STYPES, c, d, {e}, f, g},
+  {.ddprof_event_type = DDPROF_PWE_##a,                                        \
+   .desc = (b),                                                                \
+   .sample_type = BASE_STYPES,                                                 \
+   .type = (c),                                                                \
+   .config = (d),                                                              \
+   .sample_frequency = (e),                                                    \
+   .sample_type_id = (f),                                                      \
+   .options = g,                                                               \
+   .value_source = EventConfValueSource::kSample,                              \
+   .regno = 0,                                                                 \
+   .raw_off = 0,                                                               \
+   .raw_sz = 0,                                                                \
+   .value_scale = 0,                                                           \
+   .tracepoint_event = "",                                                     \
+   .tracepoint_group = "",                                                     \
+   .tracepoint_label = "",                                                     \
+   .suppress_pid = false,                                                      \
+   .suppress_tid = false,                                                      \
+   .pprof_indices = {},                                                        \
+   .instrument_self = false,                                                   \
+   .aggregation_mode = EventAggregationMode::kSum},
+// NOLINTEND(bugprone-macro-parentheses)
 
 #define X_STR(a, b, c, d, e, f, g) #a,
 const char *event_type_name_from_idx(int idx) {
@@ -102,10 +127,23 @@ const PerfWatcher *tracepoint_default_watcher() {
       .desc = "Tracepoint",
       .sample_type = BASE_STYPES,
       .type = PERF_TYPE_TRACEPOINT,
+      .config = 0,
       .sample_period = 1,
       .sample_type_id = DDPROF_PWT_TRACEPOINT,
       .options = {.use_kernel = PerfWatcherUseKernel::kRequired},
+      .value_source = EventConfValueSource::kSample,
+      .regno = 0,
+      .raw_off = 0,
+      .raw_sz = 0,
       .value_scale = 1.0,
+      .tracepoint_event = {},
+      .tracepoint_group = {},
+      .tracepoint_label = {},
+      .suppress_pid = false,
+      .suppress_tid = false,
+      .pprof_indices = {},
+      .instrument_self = false,
+      .aggregation_mode = EventAggregationMode::kSum,
   };
   return &tracepoint_template;
 }
@@ -132,8 +170,19 @@ void log_watcher(const PerfWatcher *w, int idx) {
     break;
   }
 
-  PRINT_NFO("    Category: %s, EventName: %s, GroupName: %s, Label: %s",
-            sample_type_name_from_idx(w->sample_type_id),
+  // check all associated reported values
+  std::string sample_types;
+  for (int i = 0; i < kNbEventAggregationModes; ++i) {
+    if (Any(static_cast<EventAggregationMode>(1 << i) & w->aggregation_mode)) {
+      if (!sample_types.empty()) {
+        sample_types += ",";
+      }
+      sample_types += std::string(sample_type_name_from_idx(
+          w->sample_type_id, static_cast<EventAggregationModePos>(i)));
+    }
+  }
+  PRINT_NFO("    SampleTypes: %s", sample_types.c_str());
+  PRINT_NFO("    EventName: %s, GroupName: %s, Label: %s",
             w->tracepoint_event.c_str(), w->tracepoint_group.c_str(),
             w->tracepoint_label.c_str());
   PRINT_NFO("    Sample user Stack Size: %u", w->options.stack_sample_size);
@@ -143,14 +192,11 @@ void log_watcher(const PerfWatcher *w, int idx) {
   } else {
     PRINT_NFO("    Cadence: Period, Period: %ld", w->sample_period);
   }
-  if (Any(EventConfMode::kCallgraph & w->output_mode)) {
-    PRINT_NFO("    Outputting to callgraph (flamegraph)");
+  if (Any(EventAggregationMode::kSum & w->aggregation_mode)) {
+    PRINT_NFO("    Outputting sum of usage");
   }
-  if (Any(EventConfMode::kMetric & w->output_mode)) {
-    PRINT_NFO("    Outputting to metric");
-  }
-  if (Any(EventConfMode::kLiveCallgraph & w->output_mode)) {
-    PRINT_NFO("    Outputting to live callgraph");
+  if (Any(EventAggregationMode::kLiveSum & w->aggregation_mode)) {
+    PRINT_NFO("    Outputting live usage");
   }
 }
 

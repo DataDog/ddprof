@@ -35,6 +35,21 @@ RelCMake ../
 make -j 4 .
 ```
 
+### Running static analysis
+
+cppcheck is run with a dedicated build target from within a build folder.
+```bash
+make cppcheck
+```
+
+Clang tidy checks require llvm 17 to be installed.
+Using the build image will guarantee this.
+```bash
+CXX=clang++-17 CC=clang-17 source ./setup_env.sh
+MkBuildDir ClangDeb
+    DebCMake -DENABLE_CLANG_TIDY=ON ../
+```
+
 ### Updating libdatadog
 
 Head over to the libdatadog, do your changes and copy the library back to your vendor directory.

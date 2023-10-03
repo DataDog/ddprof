@@ -12,24 +12,24 @@
 #include <string>
 #include <vector>
 
-// Defines how a sample is aggregated when it is received
-enum class EventConfMode : uint32_t {
-  kDisabled = 0,
-  kCallgraph = 1 << 0,     // flamegraph of resource usage
-  kMetric = 1 << 1,        // gauge of resource usage
-  kLiveCallgraph = 1 << 2, // report callgraph of resources still in use
-  kAll = kCallgraph | kMetric | kLiveCallgraph,
+enum EventAggregationModePos {
+  kSumPos = 0,
+  kLiveSumPos = 1,
+  kNbEventAggregationModes
 };
 
-ALLOW_FLAGS_FOR_ENUM(EventConfMode)
+// Defines how a sample is aggregated when it is received
+enum class EventAggregationMode : uint32_t {
+  kDisabled = 0,
+  kSum = 1 << kSumPos,         // Sum of usage (example: overall CPU usage)
+  kLiveSum = 1 << kLiveSumPos, // Report live usage (example memory leaks)
+  kAll = kSum | kLiveSum,
+};
 
-constexpr bool Any(EventConfMode arg) {
-  return arg != EventConfMode::kDisabled;
-}
+ALLOW_FLAGS_FOR_ENUM(EventAggregationMode)
 
-constexpr bool AnyCallgraph(EventConfMode arg) {
-  return Any((arg & EventConfMode::kLiveCallgraph) |
-             (arg & EventConfMode::kCallgraph));
+constexpr bool Any(EventAggregationMode arg) {
+  return arg != EventAggregationMode::kDisabled;
 }
 
 // Defines how samples are weighted
@@ -135,7 +135,7 @@ enum class EventConfField {
 };
 
 struct EventConf {
-  EventConfMode mode{};
+  EventAggregationMode mode{};
 
   int64_t id{};
 

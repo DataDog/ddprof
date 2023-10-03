@@ -186,9 +186,9 @@ TEST(DDProfContext, cpu_live_heap_preset) {
 
   ASSERT_EQ(ctx.watchers.size(), 2);
   EXPECT_EQ(ctx.watchers[1].ddprof_event_type, DDPROF_PWE_sALLOC);
-  EXPECT_EQ(ctx.watchers[1].output_mode, EventConfMode::kLiveCallgraph);
+  EXPECT_EQ(ctx.watchers[1].aggregation_mode, EventAggregationMode::kLiveSum);
   EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sCPU);
-  EXPECT_EQ(ctx.watchers[0].output_mode, EventConfMode::kCallgraph);
+  EXPECT_EQ(ctx.watchers[0].aggregation_mode, EventAggregationMode::kSum);
 }
 
 TEST(DDProfContext, manual_live_allocation_setting) {
@@ -208,7 +208,7 @@ TEST(DDProfContext, manual_live_allocation_setting) {
   // there is a dummy in addition to the allocations
   ASSERT_EQ(ctx.watchers.size(), 2);
   EXPECT_EQ(ctx.watchers[1].ddprof_event_type, DDPROF_PWE_sALLOC);
-  EXPECT_EQ(ctx.watchers[1].output_mode, EventConfMode::kLiveCallgraph);
+  EXPECT_EQ(ctx.watchers[1].aggregation_mode, EventAggregationMode::kLiveSum);
 
   log_watcher(&ctx.watchers[0], 0);
   log_watcher(&ctx.watchers[1], 1);
