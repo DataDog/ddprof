@@ -469,7 +469,7 @@ bool DsoHdr::pid_backpopulate(PidMapping &pid_mapping, pid_t pid,
   return true;
 }
 
-Dso DsoHdr::dso_from_proc_line(int pid, char *line) {
+Dso DsoHdr::dso_from_proc_line(int pid, const char *line) {
   // clang-format off
   // Example of format
   /*
@@ -508,22 +508,20 @@ Dso DsoHdr::dso_from_proc_line(int pid, char *line) {
     return {};
   }
 
-  // Make sure the name index points to a valid char
-  char *p = &line[m_p];
-  char *q;
-  while (isspace(*p)) {
-    p++;
-  }
-  q = strchr(p, '\n');
-  if (q) {
-    *q = '\0';
+  // trim spaces on the left
+  std::string_view remaining{line + m_p};
+  remaining.remove_prefix(
+      +std::min(remaining.find_first_not_of(" \t"), remaining.size()));
+  // remove new line at end if present
+  if (remaining.ends_with('\n')) {
+    remaining.remove_suffix(1);
   }
 
   return {pid,
           m_start,
           m_end - 1,
           m_off,
-          std::string(p),
+          std::string(remaining),
           m_inode,
           mode_string_to_prot(m_mode),
           DsoOrigin::kProcMaps};
