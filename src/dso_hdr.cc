@@ -455,7 +455,7 @@ bool DsoHdr::pid_backpopulate(PidMapping &pid_mapping, pid_t pid,
   size_t sz_buf = 0;
 
   while (-1 != getline(&buf, &sz_buf, proc_map_file_holder.get())) {
-    Dso dso = dso_from_procline(pid, buf);
+    Dso dso = dso_from_proc_line(pid, buf);
     if (dso._pid == -1) { // invalid dso
       continue;
     }
@@ -469,7 +469,7 @@ bool DsoHdr::pid_backpopulate(PidMapping &pid_mapping, pid_t pid,
   return true;
 }
 
-Dso DsoHdr::dso_from_procline(int pid, char *line) {
+Dso DsoHdr::dso_from_proc_line(int pid, char *line) {
   // clang-format off
   // Example of format
   /*
