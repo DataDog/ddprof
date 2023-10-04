@@ -47,13 +47,13 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
       _type(dso::kStandard), _id(k_file_info_undef) {
   // note that substr manages the case where len str < len vdso_str
   if (_filename.substr(0, s_vdso_str.length()) == s_vdso_str) {
-    _type = dso::kVdso;
+    _type = DsoType::kVdso;
   } else if (_filename.substr(0, s_vsyscall_str.length()) == s_vsyscall_str) {
-    _type = dso::kVsysCall;
+    _type = DsoType::kVsysCall;
   } else if (_filename.substr(0, s_stack_str.length()) == s_stack_str) {
-    _type = dso::kStack;
+    _type = DsoType::kStack;
   } else if (_filename.substr(0, s_heap_str.length()) == s_heap_str) {
-    _type = dso::kHeap;
+    _type = DsoType::kHeap;
     // Safeguard against other types of files we would not handle
   } else if (_filename.empty() || _filename.starts_with(s_anon_str) ||
              _filename.starts_with(s_anon_inode_str) ||
@@ -61,22 +61,22 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
              _filename.starts_with(s_dev_zero_str) ||
              _filename.starts_with(s_dev_null_str) ||
              _filename.starts_with(s_mem_fd_str)) {
-    _type = dso::kAnon;
+    _type = DsoType::kAnon;
   } else if ( // ends with .jsa
       _filename.ends_with(s_jsa_str) || _filename.ends_with(s_dll_str)) {
-    _type = dso::kRuntime;
+    _type = DsoType::kRuntime;
   } else if (_filename.substr(0, s_socket_str.length()) == s_socket_str) {
-    _type = dso::kSocket;
+    _type = DsoType::kSocket;
   } else if (_filename[0] == '[') {
-    _type = dso::kUndef;
+    _type = DsoType::kUndef;
   } else if (is_jit_dump_str(_filename)) {
-    _type = dso::kJITDump;
+    _type = DsoType::kJITDump;
   } else { // check if this standard dso matches our internal dd_profiling lib
     std::size_t const pos = _filename.rfind('/');
     if (pos != std::string::npos &&
         _filename.substr(pos + 1, s_dd_profiling_str.length()) ==
             s_dd_profiling_str) {
-      _type = dso::kDDProfiling;
+      _type = DsoType::kDDProfiling;
     }
   }
 }
@@ -106,17 +106,17 @@ bool Dso::is_jit_dump_str(std::string_view file_path) {
 
 std::string Dso::to_string() const {
   return string_format("PID[%d] %lx-%lx %lx (%s)(T-%s)(%c%c%c)(ID#%d)", _pid,
-                       _start, _end, _pgoff, _filename.c_str(),
-                       dso::dso_type_str(_type), _prot & PROT_READ ? 'r' : '-',
+                       _start, _end, _offset, _filename.c_str(),
+                       dso_type_str(_type), _prot & PROT_READ ? 'r' : '-',
                        _prot & PROT_WRITE ? 'w' : '-',
                        _prot & PROT_EXEC ? 'x' : '-', _id);
 }
 
 std::string Dso::format_filename() const {
-  if (dso::has_relevant_path(_type)) {
+  if (has_relevant_path(_type)) {
     return _filename;
   }
-  return dso::dso_type_str(_type);
+  return dso_type_str(_type);
 }
 
 std::ostream &operator<<(std::ostream &os, const Dso &dso) {
@@ -140,7 +140,7 @@ bool Dso::adjust_same(const Dso &o) {
     return false;
   }
   // only compare filename if we are backed by real files
-  if (_type == dso::kStandard &&
+  if (_type == DsoType::kStandard &&
       (_filename != o._filename || _inode != o._inode)) {
     return false;
   }

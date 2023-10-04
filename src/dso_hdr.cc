@@ -73,12 +73,11 @@ const char *DsoStats::s_event_dbg_str[] = {
 void DsoStats::log() const {
   for (int event_type = 0; event_type < kNbDsoEventTypes; ++event_type) {
     const auto &metric_vec = _metrics[event_type];
-    for (int i = 0; i < dso::kNbDsoTypes; ++i) {
+    for (int i = 0; i < static_cast<int>(DsoType::kNbDsoTypes); ++i) {
       if (metric_vec[i]) {
-        const char *dso_type_str =
-            dso::dso_type_str(static_cast<dso::DsoType>(i));
+        const char *dso_type = dso_type_str(static_cast<DsoType>(i));
         LG_NTC("[DSO] %10s | %10s | %8lu |", s_event_dbg_str[event_type],
-               dso_type_str, metric_vec[i]);
+               dso_type, metric_vec[i]);
       }
     }
   }
@@ -137,7 +136,7 @@ DsoHdr::DsoFindRes DsoHdr::dso_find_first_std_executable(pid_t pid) {
   auto it = map.lower_bound(0);
   // look for the first executable standard region
   while (it != map.end() && !it->second.is_executable() &&
-         it->second._type != dso::kStandard) {
+         it->second._type != DsoType::kStandard) {
     ++it;
   }
   if (it == map.end()) {
@@ -307,12 +306,12 @@ FileInfoId_t DsoHdr::update_id_from_path(const Dso &dso) {
 }
 
 FileInfoId_t DsoHdr::update_id_from_dso(const Dso &dso) {
-  if (!dso::has_relevant_path(dso._type)) {
+  if (!has_relevant_path(dso._type)) {
     dso._id = k_file_info_error; // no file associated
     return dso._id;
   }
 
-  if (dso._type == dso::DsoType::kDDProfiling) {
+  if (dso._type == DsoType::kDDProfiling) {
     return update_id_dd_profiling(dso);
   }
 
@@ -335,7 +334,7 @@ DsoHdr::DsoFindRes DsoHdr::insert_erase_overlap(PidMapping &pid_mapping,
     erase_range(map, range);
   }
   // JITDump Marker was detected for this PID
-  if (dso._type == dso::kJITDump) {
+  if (dso._type == DsoType::kJITDump) {
     pid_mapping._jitdump_addr = dso._start;
   }
   _stats.incr_metric(DsoStats::kNewDso, dso._type);

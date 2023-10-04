@@ -36,8 +36,7 @@ private:
   typedef std::unordered_map<std::string, AddressMap> DsoPathMap;
   DsoPathMap _map_dso_path;
   // For non-standard DSO types, address is not relevant
-  std::unordered_map<dso::DsoType, SymbolIdx_t, EnumClassHash>
-      _map_unhandled_dso;
+  std::unordered_map<DsoType, SymbolIdx_t, EnumClassHash> _map_unhandled_dso;
 };
 
 } // namespace ddprof

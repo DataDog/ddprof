@@ -17,7 +17,7 @@ namespace ddprof {
 namespace {
 
 Symbol symbol_from_unhandled_dso(const Dso &dso) {
-  return {std::string(), std::string(), 0, dso::dso_type_str(dso._type)};
+  return {std::string(), std::string(), 0, dso_type_str(dso._type)};
 }
 
 Symbol symbol_from_dso(ElfAddress_t normalized_addr, const Dso &dso,
@@ -51,8 +51,8 @@ SymbolIdx_t DsoSymbolLookup::get_or_insert(FileAddress_t normalized_addr,
                                            SymbolTable &symbol_table,
                                            std::string_view addr_type) {
   // Only add address information for relevant dso types
-  if (!dso::has_relevant_path(dso._type) && dso._type != dso::kVdso &&
-      dso._type != dso::kVsysCall) {
+  if (!has_relevant_path(dso._type) && dso._type != DsoType::kVdso &&
+      dso._type != DsoType::kVsysCall) {
     return get_or_insert_unhandled_type(dso, symbol_table);
   }
   // Note: using file ID could be more generic

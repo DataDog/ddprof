@@ -55,7 +55,7 @@ public:
   std::string _filename; // path as perceived by the user
   inode_t _inode;
   uint32_t _prot;
-  dso::DsoType _type;
+  DsoType _type;
   mutable FileInfoId_t _id;
 
 private:

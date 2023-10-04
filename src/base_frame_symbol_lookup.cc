@@ -26,7 +26,7 @@ BaseFrameSymbolLookup::insert_bin_symbol(pid_t pid, SymbolTable &symbol_table,
 
   DsoHdr::DsoFindRes const find_res =
       dso_hdr.dso_find_first_std_executable(pid);
-  if (find_res.second && dso::has_relevant_path(find_res.first->second._type)) {
+  if (find_res.second && has_relevant_path(find_res.first->second._type)) {
     // todo : how to tie lifetime of DSO to this ?
     symbol_idx =
         dso_symbol_lookup.get_or_insert(find_res.first->second, symbol_table);

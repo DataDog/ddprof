@@ -62,7 +62,7 @@ Dso build_dso_file_10_2500() {
 
 void fill_mock_hdr(DsoHdr &dso_hdr) {
   auto insert_res = dso_hdr.insert_erase_overlap(build_dso_5_1500());
-  EXPECT_TRUE(insert_res.first->second._type == dso::kStandard);
+  EXPECT_TRUE(insert_res.first->second._type == DsoType::kStandard);
   EXPECT_TRUE(insert_res.second);
 
   insert_res = dso_hdr.insert_erase_overlap(build_dso_10_1000());
@@ -78,7 +78,7 @@ void fill_mock_hdr(DsoHdr &dso_hdr) {
 
   insert_res = dso_hdr.insert_erase_overlap(build_dso_10_1500());
   EXPECT_TRUE(insert_res.second);
-  EXPECT_TRUE(insert_res.first->second._type == dso::kAnon);
+  EXPECT_TRUE(insert_res.first->second._type == DsoType::kAnon);
 }
 
 TEST(DSOTest, is_within) {
@@ -201,9 +201,9 @@ TEST(DSOTest, insert_erase_overlap) {
 
 TEST(DSOTest, path_type) {
   Dso vdso_dso = build_dso_vdso();
-  EXPECT_TRUE(vdso_dso._type == dso::kVdso);
+  EXPECT_TRUE(vdso_dso._type == DsoType::kVdso);
   Dso syscall_dso = build_dso_vsyscall();
-  EXPECT_TRUE(syscall_dso._type == dso::kVsysCall);
+  EXPECT_TRUE(syscall_dso._type == DsoType::kVsysCall);
 }
 
 // clang-format off
@@ -229,46 +229,46 @@ TEST(DSOTest, dso_from_procline) {
   LogHandle handle;
   Dso no_exec =
       DsoHdr::dso_from_procline(10, const_cast<char *>(s_line_noexec));
-  EXPECT_EQ(no_exec._type, dso::kStandard);
+  EXPECT_EQ(no_exec._type, DsoType::kStandard);
   EXPECT_EQ(no_exec._prot, PROT_READ);
   EXPECT_EQ(no_exec._pid, 10);
   Dso standard_dso =
       DsoHdr::dso_from_procline(10, const_cast<char *>(s_exec_line));
   { // standard
-    EXPECT_EQ(standard_dso._type, dso::kStandard);
+    EXPECT_EQ(standard_dso._type, DsoType::kStandard);
   }
   { // vdso
     Dso vdso_dso =
         DsoHdr::dso_from_procline(10, const_cast<char *>(s_vdso_lib));
-    EXPECT_EQ(vdso_dso._type, dso::kVdso);
+    EXPECT_EQ(vdso_dso._type, DsoType::kVdso);
   }
   { // stack
     Dso stack_dso =
         DsoHdr::dso_from_procline(10, const_cast<char *>(s_stack_line));
-    EXPECT_EQ(stack_dso._type, dso::kStack);
+    EXPECT_EQ(stack_dso._type, DsoType::kStack);
   }
   { // inode
     Dso inode_dso =
         DsoHdr::dso_from_procline(10, const_cast<char *>(s_inode_line));
-    EXPECT_EQ(inode_dso._type, dso::kAnon);
+    EXPECT_EQ(inode_dso._type, DsoType::kAnon);
   }
   {
     // jsa
     Dso jsa_dso = DsoHdr::dso_from_procline(10, const_cast<char *>(s_jsa_line));
-    EXPECT_EQ(jsa_dso._type, dso::kRuntime);
+    EXPECT_EQ(jsa_dso._type, DsoType::kRuntime);
   }
   {
     // dotnet dll
     Dso dll_dso =
         DsoHdr::dso_from_procline(10, const_cast<char *>(s_dotnet_line));
-    EXPECT_EQ(dll_dso._type, dso::kRuntime);
+    EXPECT_EQ(dll_dso._type, DsoType::kRuntime);
   }
   DsoHdr dso_hdr;
   {
     // check that we don't overlap between lines that end on same byte
     Dso standard_dso_2 =
         DsoHdr::dso_from_procline(10, const_cast<char *>(s_exec_line2));
-    EXPECT_EQ(standard_dso._type, dso::kStandard);
+    EXPECT_EQ(standard_dso._type, DsoType::kStandard);
     dso_hdr.insert_erase_overlap(std::move(standard_dso_2));
     dso_hdr.insert_erase_overlap(std::move(standard_dso));
     EXPECT_EQ(dso_hdr.get_nb_dso(), 2);
@@ -277,7 +277,7 @@ TEST(DSOTest, dso_from_procline) {
     // check that we erase everything if we have an overlap
     Dso standard_dso_3 =
         DsoHdr::dso_from_procline(10, const_cast<char *>(s_exec_line3));
-    EXPECT_EQ(standard_dso._type, dso::kStandard);
+    EXPECT_EQ(standard_dso._type, DsoType::kStandard);
     dso_hdr.insert_erase_overlap(std::move(standard_dso_3));
     EXPECT_EQ(dso_hdr.get_nb_dso(), 1);
   }
@@ -293,17 +293,17 @@ TEST(DSOTest, dso_from_procline) {
   {
     Dso dd_profiling_dso =
         DsoHdr::dso_from_procline(10, const_cast<char *>(s_dd_profiling));
-    EXPECT_EQ(dd_profiling_dso._type, dso::kDDProfiling);
+    EXPECT_EQ(dd_profiling_dso._type, DsoType::kDDProfiling);
   }
   {
     Dso jitdump_dso =
         DsoHdr::dso_from_procline(3237589, const_cast<char *>(s_jitdump_line));
-    EXPECT_EQ(jitdump_dso._type, dso::kJITDump);
+    EXPECT_EQ(jitdump_dso._type, DsoType::kJITDump);
   }
   { // jitdump with a name different from PID (for wholehost)
     Dso jitdump_dso =
         DsoHdr::dso_from_procline(12, const_cast<char *>(s_jitdump_line));
-    EXPECT_EQ(jitdump_dso._type, dso::kJITDump);
+    EXPECT_EQ(jitdump_dso._type, DsoType::kJITDump);
   }
 }
 
@@ -391,7 +391,7 @@ TEST(DSOTest, insert_jitdump) {
   pid_t test_pid = 3237589;
   Dso jitdump_dso =
       DsoHdr::dso_from_procline(test_pid, const_cast<char *>(s_jitdump_line));
-  EXPECT_EQ(jitdump_dso._type, dso::kJITDump);
+  EXPECT_EQ(jitdump_dso._type, DsoType::kJITDump);
   ProcessAddress_t start = jitdump_dso._start;
   DsoHdr::PidMapping &pid_mapping = dso_hdr._pid_map[test_pid];
   dso_hdr.insert_erase_overlap(pid_mapping, std::move(jitdump_dso));

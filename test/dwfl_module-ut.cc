@@ -57,7 +57,7 @@ TEST(DwflModule, inconsistency_test) {
 
     for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
       Dso &dso = it->second;
-      if (!dso::has_relevant_path(dso._type) || !dso.is_executable()) {
+      if (!has_relevant_path(dso._type) || !dso.is_executable()) {
         continue; // skip non exec / non standard (anon/vdso...)
       }
 
@@ -98,7 +98,7 @@ TEST(DwflModule, inconsistency_test) {
       EXPECT_EQ(ddprof_mod->_status, DDProfMod::kUnknown);
     }
   }
-  int nb_fds_end = cound_fds(my_pid);
+  int nb_fds_end = count_fds(my_pid);
   printf("-- End open file descriptors: %d\n", nb_fds_end);
   EXPECT_EQ(nb_fds_start, nb_fds_end);
 }
@@ -128,7 +128,7 @@ TEST(DwflModule, short_lived) {
 
     for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
       Dso &dso = it->second;
-      if (!dso::has_relevant_path(dso._type) || !dso.is_executable()) {
+      if (!has_relevant_path(dso._type) || !dso.is_executable()) {
         continue; // skip non exec / non standard (anon/vdso...)
       }
 
@@ -164,7 +164,7 @@ TEST(DwflModule, short_lived) {
 
     for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
       Dso &dso = it->second;
-      if (!dso::has_relevant_path(dso._type) || !dso.is_executable()) {
+      if (!has_relevant_path(dso._type) || !dso.is_executable()) {
         continue; // skip non exec / non standard (anon/vdso...)
       }
 
