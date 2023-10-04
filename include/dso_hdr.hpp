@@ -131,7 +131,7 @@ public:
   static DsoConstRange get_elf_range(const DsoMap &map, DsoMapConstIt it);
 
   // Helper to create a dso from a line in /proc/pid/maps
-  static Dso dso_from_proc_line(int pid, char *line);
+  static Dso dso_from_proc_line(int pid, const char *line);
 
   static DsoFindRes find_res_not_found(const DsoMap &map) {
     return {map.end(), false};
