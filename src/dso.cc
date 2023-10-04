@@ -35,16 +35,12 @@ constexpr std::string_view s_dev_zero_str = "/dev/zero";
 constexpr std::string_view s_dev_null_str = "/dev/null";
 constexpr std::string_view s_dd_profiling_str = k_libdd_profiling_name;
 
-// invalid element
-Dso::Dso()
-    : _pid(-1), _start(), _end(), _pgoff(), _inode(), _prot(),
-      _type(dso::kUndef), _id(k_file_info_error) {}
-
-Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
-         std::string &&filename, inode_t inode, uint32_t prot)
-    : _pid(pid), _start(start), _end(end), _pgoff(pgoff),
-      _filename(std::move(filename)), _inode(inode), _prot(prot),
-      _type(dso::kStandard), _id(k_file_info_undef) {
+Dso::Dso(pid_t pid, ProcessAddress_t start, ProcessAddress_t end,
+         Offset_t offset, std::string &&filename, inode_t inode, uint32_t prot,
+         DsoOrigin origin)
+    : _start(start), _end(end), _offset(offset), _filename(std::move(filename)),
+      _inode(inode), _pid(pid), _prot(prot), _id(k_file_info_undef),
+      _type(DsoType::kStandard), _origin(origin) {
   // note that substr manages the case where len str < len vdso_str
   if (_filename.substr(0, s_vdso_str.length()) == s_vdso_str) {
     _type = DsoType::kVdso;
@@ -133,7 +129,7 @@ bool Dso::adjust_same(const Dso &o) {
   if (_start != o._start) {
     return false;
   }
-  if (_pgoff != o._pgoff) {
+  if (_offset != o._offset) {
     return false;
   }
   if (_type != o._type) {
@@ -148,6 +144,7 @@ bool Dso::adjust_same(const Dso &o) {
     return false;
   }
   _end = o._end;
+  _origin = o._origin;
   return true;
 }
 
