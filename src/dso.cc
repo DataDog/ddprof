@@ -127,11 +127,15 @@ std::ostream &operator<<(std::ostream &os, const Dso &dso) {
 bool Dso::adjust_same(const Dso &o) {
   if (is_same_or_smaller(o)) {
     _end = o._end;
-     _origin = o._origin;
+    _origin = o._origin;
     return true;
   }
   return false;
 }
+
+void Dso::adjust_end(ProcessAddress_t new_end) { _end = new_end; }
+
+void Dso::adjust_start(ProcessAddress_t new_start) { _start = new_start; }
 
 bool Dso::is_same_or_smaller(const Dso &o) const {
   if (_start != o._start) {
@@ -152,6 +156,11 @@ bool Dso::is_same_or_smaller(const Dso &o) const {
     return false;
   }
   return o._end <= _end;
+}
+
+bool Dso::is_same_file(const Dso &o) const {
+  return _type == o._type && (_type == DsoType::kStandard) &&
+      _filename == o._filename && _inode == o._inode;
 }
 
 bool Dso::intersects(const Dso &o) const {

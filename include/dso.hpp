@@ -35,9 +35,9 @@ public:
 
   // Check if the provided address falls within the provided dso
   bool is_within(ProcessAddress_t addr) const;
-  // Avoid use of strict == as we do not consider _end in comparison
-  bool operator==(const Dso &o) const = delete;
-  // perf gives larger regions than proc maps (keep the largest of them)
+
+  // strict comparison
+  bool operator==(const Dso &o) const = default;
 
   bool intersects(const Dso &o) const;
 
@@ -48,6 +48,13 @@ public:
 
   // Adjust as linker can reduce size of mmap
   bool adjust_same(const Dso &o);
+  void adjust_end(ProcessAddress_t new_end);
+  void adjust_start(ProcessAddress_t new_start);
+
+  // check that o is the same as this except for the size that can be smaller
+  bool is_same_or_smaller(const Dso &o) const;
+  bool is_same_file(const Dso &o) const;
+
   size_t size() const { return _end - _start; }
   ProcessAddress_t start() const { return _start; }
   // Beware, end is inclusive !
