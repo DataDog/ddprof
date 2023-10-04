@@ -54,7 +54,7 @@ Dso build_dso_file_10_2500() {
  <1500----1999>
 
  PID 10
- <1000----1200> 1300 <1500----1999> <2000----2500>
+ <1000----1199> 1300 <1500----1999> <2000----2500>
                   ^
  Example looking for 1300 with lower bound should give us the element just after
  that.
@@ -169,7 +169,7 @@ TEST(DSOTest, find_same) {
  <1500----1999>
 
  PID 10
- <1000----1200>  <1500----1999> <2000----2500>
+ <1000----1199>  <1500----1999> <2000----2500>
 
  insert :
     <1100 ------------1700>
@@ -189,7 +189,7 @@ TEST(DSOTest, insert_erase_overlap) {
     find_res = dso_hdr.dso_find_adjust_same(dso_hdr._pid_map[10]._map,
                                             build_dso_10_1500());
     EXPECT_FALSE(find_res.second);
-    EXPECT_EQ(dso_hdr.get_nb_dso(), 3);
+    EXPECT_EQ(dso_hdr.get_nb_dso(), 4);
     {
       Dso dso_overlap_2(10, 1100, 1700);
       find_res = dso_hdr.dso_find_adjust_same(dso_hdr._pid_map[10]._map,
@@ -369,17 +369,18 @@ TEST(DSOTest, mmap_into_backpop) {
   EXPECT_TRUE(nb_elts);
   DsoHdr::PidMapping &pid_mapping = dso_hdr._pid_map[my_pid];
   bool found = false;
+  Dso copy;
   for (auto &el : pid_mapping._map) {
     Dso &dso = el.second;
     // emulate an insert of big size
     if (dso._filename.find("c++") != std::string::npos && dso._offset == 0) {
-      Dso copy(dso);
+      copy = dso;
       copy._end = copy._start + 0x388FFF;
       found = true;
-      dso_hdr.insert_erase_overlap(pid_mapping, std::move(copy));
     }
   }
   EXPECT_TRUE(found);
+  dso_hdr.insert_erase_overlap(pid_mapping, std::move(copy));
   dso_hdr.pid_backpopulate(my_pid, nb_elts);
   // TODO: To be discussed - should we erase overlapping or not
 }
@@ -458,4 +459,124 @@ TEST(DSOTest, large_backpopulate) {
   // check that there is no growth
   ASSERT_EQ(dso_hdr.get_nb_dso(), 1759);
 }
+
+TEST(DSOTest, elf_load_simple) {
+  DsoHdr dso_hdr;
+  Dso dso1{5, 0x1000, 0x4fff, 0, "libfoo.so.1", 0, PROT_READ};
+  // map whole file
+  dso_hdr.insert_erase_overlap(Dso{dso1});
+
+  // map second segment
+  Dso dso2{5, 0x2000, 0x4fff, 0x1000, "libfoo.so.1", 0, PROT_READ | PROT_EXEC};
+  dso_hdr.insert_erase_overlap(Dso{dso2});
+
+  ASSERT_EQ(dso_hdr.get_nb_dso(), 2);
+
+  auto [it1, found1] = dso_hdr.dso_find_closest(5, 0x1000);
+  ASSERT_TRUE(found1);
+  ASSERT_EQ(it1->first, 0x1000);
+  ASSERT_TRUE(dso1.is_same_or_smaller(it1->second));
+  ASSERT_EQ(it1->second.end(), 0x1fff);
+
+  auto [it2, found2] = dso_hdr.dso_find_closest(5, 0x2000);
+  ASSERT_TRUE(found2);
+  ASSERT_EQ(it2->first, 0x2000);
+  ASSERT_EQ(it2->second, dso2);
+}
+
+TEST(DSOTest, elf_load) {
+  DsoHdr dso_hdr;
+  const Dso dso1{5, 0x1000, 0x5fff, 0, "libfoo.so.1", 0, PROT_READ};
+  // map whole file
+  dso_hdr.insert_erase_overlap(Dso{dso1});
+
+  // map 2nd segment
+  const Dso dso2{
+      5, 0x2000, 0x3fff, 0x1000, "libfoo.so.1", 0, PROT_READ | PROT_EXEC};
+  dso_hdr.insert_erase_overlap(Dso{dso2});
+
+  ASSERT_EQ(dso_hdr.get_nb_dso(), 3);
+
+  {
+    auto [it1, found1] = dso_hdr.dso_find_closest(5, 0x1000);
+    ASSERT_TRUE(found1);
+    ASSERT_EQ(it1->first, 0x1000);
+    ASSERT_TRUE(dso1.is_same_or_smaller(it1->second));
+    ASSERT_EQ(it1->second.end(), 0x1fff);
+
+    auto [it2, found2] = dso_hdr.dso_find_closest(5, 0x2000);
+    ASSERT_TRUE(found2);
+    ASSERT_EQ(it2->first, 0x2000);
+    ASSERT_EQ(it2->second, dso2);
+
+    Dso dso1_right{dso1};
+    dso1_right.adjust_start(0x4000);
+    auto [it3, found3] = dso_hdr.dso_find_closest(5, 0x4000);
+    ASSERT_TRUE(found3);
+    ASSERT_EQ(it3->first, 0x4000);
+    ASSERT_EQ(it3->second, dso1_right);
+  }
+
+  // map 2rd segment
+  const Dso dso3{
+      5, 0x4000, 0x4fff, 0x2000, "libfoo.so.1", 0, PROT_READ | PROT_WRITE};
+  dso_hdr.insert_erase_overlap(Dso{dso3});
+
+  ASSERT_EQ(dso_hdr.get_nb_dso(), 4);
+
+  {
+    auto [it1, found1] = dso_hdr.dso_find_closest(5, 0x1000);
+    ASSERT_TRUE(found1);
+    ASSERT_EQ(it1->first, 0x1000);
+    ASSERT_TRUE(dso1.is_same_or_smaller(it1->second));
+    ASSERT_EQ(it1->second.end(), 0x1fff);
+
+    auto [it2, found2] = dso_hdr.dso_find_closest(5, 0x2000);
+    ASSERT_TRUE(found2);
+    ASSERT_EQ(it2->first, 0x2000);
+    ASSERT_EQ(it2->second, dso2);
+
+    auto [it3, found3] = dso_hdr.dso_find_closest(5, 0x4000);
+    ASSERT_TRUE(found3);
+    ASSERT_EQ(it3->first, 0x4000);
+    ASSERT_EQ(it3->second, dso3);
+
+    Dso dso1_right{dso1};
+    dso1_right.adjust_start(0x5000);
+    auto [it4, found4] = dso_hdr.dso_find_closest(5, 0x5000);
+    ASSERT_TRUE(found3);
+    ASSERT_EQ(it4->first, 0x5000);
+    ASSERT_EQ(it4->second, dso1_right);
+  }
+
+  // anonymous mapping at the end
+  const Dso dso4{5, 0x5000, 0x5fff};
+  dso_hdr.insert_erase_overlap(Dso{dso4});
+
+  ASSERT_EQ(dso_hdr.get_nb_dso(), 4);
+
+  {
+    auto [it1, found1] = dso_hdr.dso_find_closest(5, 0x1000);
+    ASSERT_TRUE(found1);
+    ASSERT_EQ(it1->first, 0x1000);
+    ASSERT_TRUE(dso1.is_same_or_smaller(it1->second));
+    ASSERT_EQ(it1->second.end(), 0x1fff);
+
+    auto [it2, found2] = dso_hdr.dso_find_closest(5, 0x2000);
+    ASSERT_TRUE(found2);
+    ASSERT_EQ(it2->first, 0x2000);
+    ASSERT_EQ(it2->second, dso2);
+
+    auto [it3, found3] = dso_hdr.dso_find_closest(5, 0x4000);
+    ASSERT_TRUE(found3);
+    ASSERT_EQ(it3->first, 0x4000);
+    ASSERT_EQ(it3->second, dso3);
+
+    auto [it4, found4] = dso_hdr.dso_find_closest(5, 0x5000);
+    ASSERT_TRUE(found3);
+    ASSERT_EQ(it4->first, 0x5000);
+    ASSERT_EQ(it4->second, dso4);
+  }
+}
+
 } // namespace ddprof

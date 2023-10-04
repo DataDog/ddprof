@@ -229,8 +229,55 @@ DsoHdr::DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
 }
 
 // erase range of elements
-void DsoHdr::erase_range(DsoMap &map, const DsoConstRange &range) {
-  // region maps are kept (as they are used for several pids)
+void DsoHdr::erase_range(DsoMap &map, DsoRange range, const Dso &new_mapping) {
+  if (range.first == range.second) {
+    return;
+  }
+  auto last = std::prev(range.second);
+  auto &last_mapping = last->second;
+  // Truncate last mapping if files match or new mapping is anonymous:
+  // a LOAD segment can have filesize < memsize as a size optimization when
+  // the end of segment is all zeros (eg. bss). In that case elf loader /
+  // dlopen will map the whole file + some extra space to cover the difference
+  // between memsize and file size and then map an anonymous mapping over the
+  // part not in the file.
+  if (new_mapping.end() < last_mapping.end()) {
+
+    if (new_mapping._start > last_mapping._start &&
+        last_mapping.is_same_file(new_mapping)) {
+      // New mapping fully inside the initial mapping:
+      // split the initial mapping in two if mapped file is the same.
+      Dso right_part{last_mapping};
+      right_part.adjust_start(new_mapping.end() + 1);
+      map[right_part.start()] = std::move(right_part);
+      last_mapping.adjust_end(new_mapping._start - 1);
+      --range.second;
+    } else if (new_mapping._start <= last_mapping._start &&
+               (last_mapping.is_same_file(new_mapping) ||
+                last_mapping._type == DsoType::kAnon)) {
+      // New mapping truncates the start of the initial mapping:
+      // update start of initial mapping
+      auto node_handle = map.extract(last);
+      node_handle.mapped().adjust_start(new_mapping._end + 1);
+      node_handle.key() = last_mapping._start;
+      map.insert(std::move(node_handle));
+      --range.second;
+    }
+  }
+
+  if (range.first == range.second) {
+    return;
+  }
+
+  auto &first_mapping = range.first->second;
+  if (first_mapping.is_same_file(new_mapping) &&
+      new_mapping._start > first_mapping._start) {
+    // Truncate first mapping if files match:
+    // elf loader / dlopen first map the whole file and then remap segments
+    // inside the first mapping
+    first_mapping.adjust_end(new_mapping._start - 1);
+    ++range.first;
+  }
   map.erase(range.first, range.second);
 }
 
@@ -328,10 +375,10 @@ DsoHdr::DsoFindRes DsoHdr::insert_erase_overlap(PidMapping &pid_mapping,
     return find_res;
   }
 
-  DsoConstRange const range = get_intersection(map, dso);
+  DsoRange const range = get_intersection(map, dso);
 
   if (range.first != map.end()) {
-    erase_range(map, range);
+    erase_range(map, range, dso);
   }
   // JITDump Marker was detected for this PID
   if (dso._type == DsoType::kJITDump) {
