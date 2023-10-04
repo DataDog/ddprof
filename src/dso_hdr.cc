@@ -471,14 +471,14 @@ Dso DsoHdr::dso_from_procline(int pid, char *line) {
     *q = '\0';
   }
 
-  // Should we store non exec dso ?
   return {pid,
           m_start,
           m_end - 1,
           m_off,
           std::string(p),
           m_inode,
-          mode_string_to_prot(m_mode)};
+          mode_string_to_prot(m_mode),
+          DsoOrigin::kProcMaps};
 }
 
 FileInfo DsoHdr::find_file_info(const Dso &dso) {

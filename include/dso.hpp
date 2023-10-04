@@ -19,20 +19,22 @@
 
 namespace ddprof {
 
+enum class DsoOrigin : uint8_t { kPerfMmapEvent, kProcMaps };
+
 // DSO definition
 class Dso {
 public:
-  Dso();
+  Dso() = default; // invalid element
   // pid, start, end, offset, filename (copied once to avoid creating 3
   // different APIs)
-  Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff = 0,
-      std::string &&filename = "", inode_t inode = 0,
-      uint32_t prot = PROT_EXEC);
+  Dso(pid_t pid, ProcessAddress_t start, ProcessAddress_t end,
+      Offset_t offset = 0, std::string &&filename = "", inode_t inode = 0,
+      uint32_t prot = PROT_EXEC, DsoOrigin origin = DsoOrigin::kPerfMmapEvent);
   // copy parent and update pid
   Dso(const Dso &parent, pid_t new_pid) : Dso(parent) { _pid = new_pid; }
 
   // Check if the provided address falls within the provided dso
-  bool is_within(ElfAddress_t addr) const;
+  bool is_within(ProcessAddress_t addr) const;
   // Avoid use of strict == as we do not consider _end in comparison
   bool operator==(const Dso &o) const = delete;
   // perf gives larger regions than proc maps (keep the largest of them)
@@ -47,16 +49,20 @@ public:
   // Adjust as linker can reduce size of mmap
   bool adjust_same(const Dso &o);
   size_t size() const { return _end - _start; }
+  ProcessAddress_t start() const { return _start; }
+  // Beware, end is inclusive !
+  ProcessAddress_t end() const { return _end; }
 
-  pid_t _pid;
-  ElfAddress_t _start;
-  ElfAddress_t _end;
-  ElfAddress_t _pgoff;
-  std::string _filename; // path as perceived by the user
-  inode_t _inode;
-  uint32_t _prot;
-  DsoType _type;
-  mutable FileInfoId_t _id;
+  ProcessAddress_t _start{};
+  ProcessAddress_t _end{}; // Beware, end is inclusive !
+  Offset_t _offset{};      // file offset
+  std::string _filename;   // path as perceived by the user
+  inode_t _inode{};
+  pid_t _pid{-1};
+  uint32_t _prot{};
+  mutable FileInfoId_t _id{k_file_info_error};
+  DsoType _type{DsoType::kUndef};
+  DsoOrigin _origin{DsoOrigin::kPerfMmapEvent};
 
 private:
   static bool is_jit_dump_str(std::string_view file_path);
