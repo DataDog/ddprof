@@ -223,6 +223,10 @@ static const char *const s_jsa_line = "0x800000000-0x800001fff rw-p 00000000 00:
 static const char *const s_dd_profiling = "0x800000000-0x800001fff rw-p 00000000 00:00 0                          /tmp/libdd_profiling.so.1234";
 static const char *const s_dotnet_line = "7fbd4f1e4000-7fbd4f1ec000 r--s 00000000 ca:01 140372                     /usr/share/dotnet/shared/Microsoft.NETCore.App/6.0.5/System.Runtime.dll";
 static const char *const s_jitdump_line = "7b5242e44000-7b5242e45000 r-xp 00000000 fd:06 22295230                   /home/r1viollet/.debug/jit/llvm-IR-jit-20230131-981d92/jit-3237589.dump";
+
+static const char *const s_empty_file_line = "7f9b650b1000-7f9b650b4000 rw-p 00000000 00:00 0                 \n";
+static const char *const s_bad_line = "7b5242e44000-7b5242e45000 r-xp  00000000 fd:06";
+
 // clang-format on
 
 TEST(DSOTest, dso_from_procline) {
@@ -300,10 +304,20 @@ TEST(DSOTest, dso_from_procline) {
         DsoHdr::dso_from_procline(3237589, const_cast<char *>(s_jitdump_line));
     EXPECT_EQ(jitdump_dso._type, DsoType::kJITDump);
   }
-  { // jitdump with a name different from PID (for wholehost)
+  { // jitdump with a name different from PID (for whole host)
     Dso jitdump_dso =
         DsoHdr::dso_from_procline(12, const_cast<char *>(s_jitdump_line));
     EXPECT_EQ(jitdump_dso._type, DsoType::kJITDump);
+  }
+  {
+    // empty file proc line
+    Dso dso = DsoHdr::dso_from_procline(12, const_cast<char *>(s_empty_file_line));
+    EXPECT_EQ(dso._type, DsoType::kAnon);
+  }
+  {
+    // bad proc line
+    Dso dso = DsoHdr::dso_from_procline(12, const_cast<char *>(s_bad_line));
+    EXPECT_EQ(dso._pid, -1);
   }
 }
 

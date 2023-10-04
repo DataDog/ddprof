@@ -488,7 +488,6 @@ Dso DsoHdr::dso_from_procline(int pid, char *line) {
     ffffffffff600000-ffffffffff601000 r-xp 00000000 00:00 0                  [vsyscall]
   */
   // clang-format on
-  static const char spec[] = "%lx-%lx %4c %lx %x:%x %lu%n";
   uint64_t m_start = 0;
   uint64_t m_end = 0;
   uint64_t m_off = 0;
@@ -498,13 +497,15 @@ Dso DsoHdr::dso_from_procline(int pid, char *line) {
   uint32_t m_dev_minor = 0;
   uint64_t m_inode = 0;
 
-  // Check for formatting errors
+  // %n specifier does not increase count returned by sscanf
   constexpr int k_expected_number_of_matches = 7;
+  // Check for formatting errors
   if (k_expected_number_of_matches !=
-      sscanf(line, spec, &m_start, &m_end, m_mode, &m_off, &m_dev_major,
-             &m_dev_minor, &m_inode, &m_p)) {
-    LG_ERR("[DSO] Failed to scan mapfile line");
-    throw DDException(DD_SEVERROR, DD_WHAT_DSO);
+      // NOLINTNEXTLINE(cert-err34-c)
+      sscanf(line, "%lx-%lx %4c %lx %x:%x %lu%n", &m_start, &m_end, m_mode,
+             &m_off, &m_dev_major, &m_dev_minor, &m_inode, &m_p)) {
+    LG_ERR("[DSO] Failed to scan proc line: %s", line);
+    return {};
   }
 
   // Make sure the name index points to a valid char
