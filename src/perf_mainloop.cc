@@ -204,12 +204,12 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
 
   // Setup poll() to watch perf_event file descriptors
   int const pe_len = ctx.worker_ctx.pevent_hdr.size;
-  // one extra slot in pfd to accomodate for signal fd
-  struct pollfd pfds[k_max_nb_perf_event_open + 1];
+  // one extra slot in pfd to accommodate for signal fd
+  struct pollfd poll_fds[k_max_nb_perf_event_open + 1];
   int pfd_len = 0;
-  pollfd_setup(&ctx.worker_ctx.pevent_hdr, pfds, &pfd_len);
+  pollfd_setup(&ctx.worker_ctx.pevent_hdr, poll_fds, &pfd_len);
 
-  DDRES_CHECK_FWD(signalfd_setup(&pfds[pfd_len]));
+  DDRES_CHECK_FWD(signalfd_setup(&poll_fds[pfd_len]));
   int const signal_pos = pfd_len++;
 
   // Perform user-provided initialization
@@ -229,7 +229,7 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
     PEvent *pes = ctx.worker_ctx.pevent_hdr.pes;
 
     int const n =
-        poll(pfds, pfd_len,
+        poll(poll_fds, pfd_len,
              std::chrono::milliseconds{k_sample_default_wakeup}.count());
 
     // If there was an issue, return and let the caller check errno
@@ -238,13 +238,13 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
     }
     DDRES_CHECK_ERRNO(n, DD_WHAT_POLLERROR, "poll failed");
 
-    if (pfds[signal_pos].revents & POLLIN) {
+    if (poll_fds[signal_pos].revents & POLLIN) {
       LG_NFO("Received termination signal");
       break;
     }
 
     for (int i = 0; i < pe_len; ++i) {
-      pollfd const &pfd = pfds[i];
+      pollfd const &pfd = poll_fds[i];
       if (pfd.revents & POLLHUP) {
         stop = true;
       } else if (pfd.revents & POLLIN && pes[i].custom_event) {

@@ -30,7 +30,7 @@ private:
   SymbolIdx_t get_or_insert_unhandled_type(const Dso &dso,
                                            SymbolTable &symbol_table);
   // map of maps --> the aim is to monitor usage of some maps and clear them
-  // toghether
+  // together
   // TODO : find efficient clear on symbol table before we do this
   typedef std::unordered_map<FileAddress_t, SymbolIdx_t> AddressMap;
   typedef std::unordered_map<std::string, AddressMap> DsoPathMap;

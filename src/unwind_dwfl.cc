@@ -118,7 +118,7 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     // if not encountered previously, update file location / key
     file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
     if (file_info_id <= k_file_info_error) {
-      // unable to acces file: add available info from dso
+      // unable to access file: add available info from dso
       add_dso_frame(us, dso, pc, "pc");
       // We could stop here or attempt to continue in the dwarf unwinding
       // sometimes frame pointer lets us go further -> So we continue
@@ -156,15 +156,15 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   // This means we need access to the module information.
   // Now that we have loaded the module, we can check if we are an activation
   // frame
-  bool isactivation = false;
+  bool is_activation = false;
 
-  if (!dwfl_frame_pc(dwfl_frame, &pc, &isactivation)) {
+  if (!dwfl_frame_pc(dwfl_frame, &pc, &is_activation)) {
     LG_DBG("Failure to compute frame PC: %s (depth#%lu)", dwfl_errmsg(-1),
            us->output.locs.size());
     add_error_frame(nullptr, us, pc, SymbolErrors::dwfl_frame);
     return ddres_init(); // invalid pc : do not add frame
   }
-  if (!isactivation) {
+  if (!is_activation) {
     --pc;
   }
   us->current_ip = pc;
@@ -180,7 +180,7 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
 int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
   auto *us = static_cast<UnwindState *>(arg);
 #ifdef DEBUG
-  LG_NFO("Beging depth %lu", us->output.locs.size());
+  LG_NFO("Begin depth %lu", us->output.locs.size());
 #endif
   int const dwfl_error_value = dwfl_errno();
   if (dwfl_error_value) {

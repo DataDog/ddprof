@@ -175,7 +175,7 @@ private:
     BackpopulatePermission _perm;
   };
 
-  // Associate pid to a backpopulation state
+  // Associate pid to a backpopulate state
   typedef std::unordered_map<pid_t, BackpopulateState> BackpopulateStateMap;
 
   // erase range of elements
@@ -201,7 +201,7 @@ private:
 
   int _dd_profiling_fd;
   // Assumption is that we have a single version of the dd_profiling library
-  // accross all PIDs.
+  // across all PIDs.
   FileInfoId_t _dd_profiling_file_info = k_file_info_undef;
 };
 

@@ -101,7 +101,7 @@ DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
   if (pes[pevent_idx].attr_idx == -1) {
     display_system_config();
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
-                           "Error calling perfopen on watcher %d.0 (%s)",
+                           "Error calling perf_event_open on watcher %d.0 (%s)",
                            watcher_idx, strerror(errno));
   }
 

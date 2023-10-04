@@ -208,7 +208,7 @@ DsoHdr::DsoRange DsoHdr::get_intersection(DsoMap &map, const Dso &dso) {
   auto start = map.end();
   auto end = map.end();
 
-  // Loop accross the possible range keeping track of first and last
+  // Loop across the possible range keeping track of first and last
   while (first_el != map.end()) {
     if (dso.intersects(first_el->second)) {
       if (start == map.end()) {
