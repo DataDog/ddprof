@@ -229,49 +229,49 @@ static const char *const s_bad_line = "7b5242e44000-7b5242e45000 r-xp  00000000 
 
 // clang-format on
 
-TEST(DSOTest, dso_from_procline) {
+TEST(DSOTest, dso_from_proc_line) {
   LogHandle handle;
   Dso no_exec =
-      DsoHdr::dso_from_procline(10, const_cast<char *>(s_line_noexec));
+      DsoHdr::dso_from_proc_line(10, const_cast<char *>(s_line_noexec));
   EXPECT_EQ(no_exec._type, DsoType::kStandard);
   EXPECT_EQ(no_exec._prot, PROT_READ);
   EXPECT_EQ(no_exec._pid, 10);
   Dso standard_dso =
-      DsoHdr::dso_from_procline(10, const_cast<char *>(s_exec_line));
+      DsoHdr::dso_from_proc_line(10, const_cast<char *>(s_exec_line));
   { // standard
     EXPECT_EQ(standard_dso._type, DsoType::kStandard);
   }
   { // vdso
     Dso vdso_dso =
-        DsoHdr::dso_from_procline(10, const_cast<char *>(s_vdso_lib));
+        DsoHdr::dso_from_proc_line(10, const_cast<char *>(s_vdso_lib));
     EXPECT_EQ(vdso_dso._type, DsoType::kVdso);
   }
   { // stack
     Dso stack_dso =
-        DsoHdr::dso_from_procline(10, const_cast<char *>(s_stack_line));
+        DsoHdr::dso_from_proc_line(10, const_cast<char *>(s_stack_line));
     EXPECT_EQ(stack_dso._type, DsoType::kStack);
   }
   { // inode
     Dso inode_dso =
-        DsoHdr::dso_from_procline(10, const_cast<char *>(s_inode_line));
+        DsoHdr::dso_from_proc_line(10, const_cast<char *>(s_inode_line));
     EXPECT_EQ(inode_dso._type, DsoType::kAnon);
   }
   {
     // jsa
-    Dso jsa_dso = DsoHdr::dso_from_procline(10, const_cast<char *>(s_jsa_line));
+    Dso jsa_dso = DsoHdr::dso_from_proc_line(10, const_cast<char *>(s_jsa_line));
     EXPECT_EQ(jsa_dso._type, DsoType::kRuntime);
   }
   {
     // dotnet dll
     Dso dll_dso =
-        DsoHdr::dso_from_procline(10, const_cast<char *>(s_dotnet_line));
+        DsoHdr::dso_from_proc_line(10, const_cast<char *>(s_dotnet_line));
     EXPECT_EQ(dll_dso._type, DsoType::kRuntime);
   }
   DsoHdr dso_hdr;
   {
     // check that we don't overlap between lines that end on same byte
     Dso standard_dso_2 =
-        DsoHdr::dso_from_procline(10, const_cast<char *>(s_exec_line2));
+        DsoHdr::dso_from_proc_line(10, const_cast<char *>(s_exec_line2));
     EXPECT_EQ(standard_dso._type, DsoType::kStandard);
     dso_hdr.insert_erase_overlap(std::move(standard_dso_2));
     dso_hdr.insert_erase_overlap(std::move(standard_dso));
@@ -280,7 +280,7 @@ TEST(DSOTest, dso_from_procline) {
   {
     // check that we erase everything if we have an overlap
     Dso standard_dso_3 =
-        DsoHdr::dso_from_procline(10, const_cast<char *>(s_exec_line3));
+        DsoHdr::dso_from_proc_line(10, const_cast<char *>(s_exec_line3));
     EXPECT_EQ(standard_dso._type, DsoType::kStandard);
     dso_hdr.insert_erase_overlap(std::move(standard_dso_3));
     EXPECT_EQ(dso_hdr.get_nb_dso(), 1);
@@ -288,7 +288,7 @@ TEST(DSOTest, dso_from_procline) {
   {
     // check that we still match element number 3
     Dso standard_dso_4 =
-        DsoHdr::dso_from_procline(10, const_cast<char *>(s_exec_line4));
+        DsoHdr::dso_from_proc_line(10, const_cast<char *>(s_exec_line4));
     ProcessAddress_t end_4 = standard_dso_4._end;
     DsoFindRes findres =
         dso_hdr.insert_erase_overlap(std::move(standard_dso_4));
@@ -296,27 +296,27 @@ TEST(DSOTest, dso_from_procline) {
   }
   {
     Dso dd_profiling_dso =
-        DsoHdr::dso_from_procline(10, const_cast<char *>(s_dd_profiling));
+        DsoHdr::dso_from_proc_line(10, const_cast<char *>(s_dd_profiling));
     EXPECT_EQ(dd_profiling_dso._type, DsoType::kDDProfiling);
   }
   {
     Dso jitdump_dso =
-        DsoHdr::dso_from_procline(3237589, const_cast<char *>(s_jitdump_line));
+        DsoHdr::dso_from_proc_line(3237589, const_cast<char *>(s_jitdump_line));
     EXPECT_EQ(jitdump_dso._type, DsoType::kJITDump);
   }
   { // jitdump with a name different from PID (for whole host)
     Dso jitdump_dso =
-        DsoHdr::dso_from_procline(12, const_cast<char *>(s_jitdump_line));
+        DsoHdr::dso_from_proc_line(12, const_cast<char *>(s_jitdump_line));
     EXPECT_EQ(jitdump_dso._type, DsoType::kJITDump);
   }
   {
     // empty file proc line
-    Dso dso = DsoHdr::dso_from_procline(12, const_cast<char *>(s_empty_file_line));
+    Dso dso = DsoHdr::dso_from_proc_line(12, const_cast<char *>(s_empty_file_line));
     EXPECT_EQ(dso._type, DsoType::kAnon);
   }
   {
     // bad proc line
-    Dso dso = DsoHdr::dso_from_procline(12, const_cast<char *>(s_bad_line));
+    Dso dso = DsoHdr::dso_from_proc_line(12, const_cast<char *>(s_bad_line));
     EXPECT_EQ(dso._pid, -1);
   }
 }
@@ -405,7 +405,7 @@ TEST(DSOTest, insert_jitdump) {
   // pid from dso line (important for the jitdump name)
   pid_t test_pid = 3237589;
   Dso jitdump_dso =
-      DsoHdr::dso_from_procline(test_pid, const_cast<char *>(s_jitdump_line));
+      DsoHdr::dso_from_proc_line(test_pid, const_cast<char *>(s_jitdump_line));
   EXPECT_EQ(jitdump_dso._type, DsoType::kJITDump);
   ProcessAddress_t start = jitdump_dso._start;
   DsoHdr::PidMapping &pid_mapping = dso_hdr._pid_map[test_pid];
