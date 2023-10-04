@@ -20,23 +20,24 @@
 
 namespace ddprof {
 
-std::vector<Mapping>
-get_executable_mappings(const DsoHdr::DsoConstRange &dsoRange) {
-  std::vector<Mapping> exec_mappings;
+std::vector<Mapping> get_mappings(const DsoHdr::DsoConstRange &dso_range,
+                                  bool keep_only_executable_mappings) {
+  std::vector<Mapping> mappings;
 
-  for (auto it = dsoRange.first; it != dsoRange.second; ++it) {
+  for (auto it = dso_range.first; it != dso_range.second; ++it) {
     const Dso &mapping = it->second;
-    if (mapping.is_executable()) {
-      exec_mappings.push_back(Mapping{.addr = mapping._start,
-                                      .offset = mapping._pgoff,
-                                      .prot = mapping._prot});
+    if (!keep_only_executable_mappings || mapping.is_executable()) {
+      mappings.push_back(Mapping{.addr = mapping._start,
+                                 .offset = mapping._offset,
+                                 .prot = mapping._prot});
     }
   }
-  return exec_mappings;
+  return mappings;
 }
 
-DDRes get_executable_segments(int fd, const std::string &filepath,
-                              std::vector<Segment> &segments) {
+DDRes get_elf_load_segments(int fd, const std::string &filepath,
+                            bool keep_only_executable_segments,
+                            std::vector<Segment> &segments) {
   Elf *elf = elf_begin(fd, ELF_C_READ_MMAP, nullptr);
   if (elf == nullptr) {
     LG_WRN("Invalid elf %s", filepath.c_str());
@@ -66,7 +67,8 @@ DDRes get_executable_segments(int fd, const std::string &filepath,
         LG_WRN("Invalid elf %s", filepath.c_str());
         return ddres_error(DD_WHAT_INVALID_ELF);
       }
-      if (ph->p_type == PT_LOAD && (ph->p_flags & PF_X)) {
+      if (ph->p_type == PT_LOAD &&
+          (!keep_only_executable_segments || (ph->p_flags & PF_X))) {
         segments.push_back(Segment{ph->p_vaddr, ph->p_offset, ph->p_align,
                                    elf_flags_to_prot(ph->p_flags)});
       }
@@ -106,7 +108,7 @@ find_matching_segment(std::span<const Segment> segments,
 }
 
 DDRes compute_elf_bias(int fd, const std::string &filepath,
-                       const DsoHdr::DsoConstRange &dsoRange, Offset_t &bias) {
+                       const DsoHdr::DsoConstRange &dso_range, Offset_t &bias) {
   // To compute elf bias, we need to match a Dso (ie. a mapping in process
   // address space) with the corresponding LOAD segment in elf file. We consider
   // only executable mappings LOAD segments (because we configure perf in such
@@ -126,16 +128,23 @@ DDRes compute_elf_bias(int fd, const std::string &filepath,
   // exec segments. If last mapping leads to an ambiguous match, we try again
   // with the second to last mapping and so on...
 
-  // todo: use small/inlined vector
-  std::vector<Segment> elf_segments;
-  auto res = get_executable_segments(fd, filepath, elf_segments);
-  if (!IsDDResOK(res)) {
-    return res;
+  if (dso_range.first == dso_range.second) {
+    LG_WRN("Empty mappings for %s", filepath.c_str());
+    return ddres_error(DD_WHAT_NO_MATCHING_LOAD_SEGMENT);
   }
 
-  auto executable_mappings = get_executable_mappings(dsoRange);
+  bool const useOnlyExecSegments =
+      (dso_range.first->second._origin == DsoOrigin::kPerfMmapEvent);
+
+  // todo: use small/inlined vector
+  std::vector<Segment> elf_segments;
+
+  DDRES_CHECK_FWD_STRICT(
+      get_elf_load_segments(fd, filepath, useOnlyExecSegments, elf_segments));
+
+  auto executable_mappings = get_mappings(dso_range, useOnlyExecSegments);
   MatchResult const match_result =
-      find_match(executable_mappings, elf_segments);
+      find_match(executable_mappings, elf_segments, useOnlyExecSegments);
 
   if (match_result.is_ambiguous) {
     LG_WRN("Multiple matching segments: %s", filepath.c_str());
@@ -155,9 +164,19 @@ DDRes compute_elf_bias(int fd, const std::string &filepath,
 } // namespace
 
 MatchResult find_match(std::span<const Mapping> executable_mappings,
-                       std::span<const Segment> elf_load_segments) {
+                       std::span<const Segment> elf_load_segments,
+                       bool possible_missing_mappings) {
+
+  if (!possible_missing_mappings && !executable_mappings.empty() &&
+      !elf_load_segments.empty()) {
+    // Easy case: all mappings are present, just use the first LOAD segment
+    return {executable_mappings.data(), elf_load_segments.data(), false};
+  }
+
   // In some weird cases, number of mappings is bigger than number of segments
-  // (eg. with dotnet libcoreclr.so)
+  // (eg. with dotnet libcoreclr.so) because code changes the permissions of
+  // some memory ranges inside the mappings, hence splitting the mapping into
+  // several parts.
   // For now just cap the number of considered mappings with the number of
   // segments.
   int const nb_mappings =

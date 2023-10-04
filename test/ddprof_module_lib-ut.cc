@@ -17,7 +17,7 @@ Mapping mapping(Offset_t offset, uint32_t prot = PROT_EXEC | PROT_READ) {
 }
 
 TEST(ddprof_module_lib, empty) {
-  auto res = find_match({}, {});
+  auto res = find_match({}, {}, true);
   ASSERT_EQ(res.load_segment, nullptr);
   ASSERT_EQ(res.mapping, nullptr);
   ASSERT_FALSE(res.is_ambiguous);
@@ -25,7 +25,7 @@ TEST(ddprof_module_lib, empty) {
 
 TEST(ddprof_module_lib, empty_segments) {
   Mapping mappings[] = {mapping(0)};
-  auto res = find_match(mappings, {});
+  auto res = find_match(mappings, {}, true);
   ASSERT_EQ(res.load_segment, nullptr);
   ASSERT_EQ(res.mapping, nullptr);
   ASSERT_FALSE(res.is_ambiguous);
@@ -33,7 +33,7 @@ TEST(ddprof_module_lib, empty_segments) {
 
 TEST(ddprof_module_lib, empty_mappings) {
   Segment segments[] = {segment(0x128)};
-  auto res = find_match({}, segments);
+  auto res = find_match({}, segments, true);
   ASSERT_EQ(res.load_segment, nullptr);
   ASSERT_EQ(res.mapping, nullptr);
   ASSERT_FALSE(res.is_ambiguous);
@@ -42,7 +42,7 @@ TEST(ddprof_module_lib, empty_mappings) {
 TEST(ddprof_module_lib, simple) {
   Mapping mappings[] = {mapping(0)};
   Segment segments[] = {segment(0x128)};
-  auto res = find_match(mappings, segments);
+  auto res = find_match(mappings, segments, true);
   ASSERT_EQ(res.load_segment, &segments[0]);
   ASSERT_EQ(res.mapping, &mappings[0]);
   ASSERT_FALSE(res.is_ambiguous);
@@ -51,7 +51,7 @@ TEST(ddprof_module_lib, simple) {
 TEST(ddprof_module_lib, simple2) {
   Mapping mappings[] = {mapping(0)};
   Segment segments[] = {segment(0, PROT_EXEC)};
-  auto res = find_match(mappings, segments);
+  auto res = find_match(mappings, segments, true);
   ASSERT_EQ(res.load_segment, nullptr);
   ASSERT_EQ(res.mapping, nullptr);
   ASSERT_FALSE(res.is_ambiguous);
@@ -60,7 +60,7 @@ TEST(ddprof_module_lib, simple2) {
 TEST(ddprof_module_lib, ambiguous) {
   Mapping mappings[] = {mapping(0)};
   Segment segments[] = {segment(0x128), segment(0x201)};
-  auto res = find_match(mappings, segments);
+  auto res = find_match(mappings, segments, true);
   ASSERT_EQ(res.load_segment, &segments[0]);
   ASSERT_EQ(res.mapping, &mappings[0]);
   ASSERT_TRUE(res.is_ambiguous);
@@ -70,7 +70,7 @@ TEST(ddprof_module_lib, complex) {
   Mapping mappings[] = {mapping(0x1000), mapping(0x5000)};
   Segment segments[] = {segment(0x1100, PROT_EXEC), segment(0x1200),
                         segment(0x5128), segment(0x5457)};
-  auto res = find_match(mappings, segments);
+  auto res = find_match(mappings, segments, true);
   ASSERT_EQ(res.load_segment, &segments[1]);
   ASSERT_EQ(res.mapping, &mappings[0]);
   ASSERT_TRUE(res.is_ambiguous);
@@ -81,7 +81,7 @@ TEST(ddprof_module_lib, libcoreclr) {
                         mapping(0x5d9000)};
   Segment segments[] = {segment(0x000000, PROT_EXEC),
                         segment(0x6b7ec0, PROT_READ)};
-  auto res = find_match(mappings, segments);
+  auto res = find_match(mappings, segments, true);
   ASSERT_FALSE(res.is_ambiguous);
 }
 

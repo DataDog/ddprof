@@ -38,9 +38,10 @@ struct Mapping {
 std::vector<Mapping>
 get_executable_mappings(const DsoHdr::DsoConstRange &dsoRange);
 
-// Retrieve executable LOAD segments from a elf file
-DDRes get_executable_segments(int fd, const std::string &filepath,
-                              std::vector<Segment> &segments);
+// Retrieve LOAD segments from a elf file
+DDRes get_elf_load_segments(int fd, const std::string &filepath,
+                            bool keep_only_executable_segments,
+                            std::vector<Segment> &segments);
 
 struct MatchResult {
   const Mapping *mapping;
@@ -49,8 +50,9 @@ struct MatchResult {
 };
 
 // Find a matching mapping / load segment pair
-MatchResult find_match(std::span<const Mapping> executable_mappings,
-                       std::span<const Segment> elf_load_segments);
+MatchResult find_match(std::span<const Mapping> mappings,
+                       std::span<const Segment> elf_load_segments,
+                       bool possible_missing_mappings);
 
 // From a dso object (and the matching file), attach the module to the dwfl
 // object, return the associated Dwfl_Module
