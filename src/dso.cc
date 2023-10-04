@@ -124,8 +124,16 @@ std::ostream &operator<<(std::ostream &os, const Dso &dso) {
 // Example :
 // PID<1> 7f763019e000-7f76304ddfff (//anon)
 // PID<1> 7f763019e000-7f76304de000 ()
-
 bool Dso::adjust_same(const Dso &o) {
+  if (is_same_or_smaller(o)) {
+    _end = o._end;
+     _origin = o._origin;
+    return true;
+  }
+  return false;
+}
+
+bool Dso::is_same_or_smaller(const Dso &o) const {
   if (_start != o._start) {
     return false;
   }
@@ -143,9 +151,7 @@ bool Dso::adjust_same(const Dso &o) {
   if (_prot != o._prot) {
     return false;
   }
-  _end = o._end;
-  _origin = o._origin;
-  return true;
+  return o._end <= _end;
 }
 
 bool Dso::intersects(const Dso &o) const {
