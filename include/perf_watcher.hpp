@@ -25,7 +25,7 @@ struct PerfWatcherOptions {
   bool is_freq;
   uint8_t nb_frames_to_skip; // number of bottom frames to skip in stack trace
                              // (useful for allocation profiling to remove
-                             // frames belonging to lib_ddprofiling.so)
+                             // frames belonging to libdd_profiling.so)
   uint32_t stack_sample_size{
       k_default_perf_stack_sample_size}; // size of the user stack to capture
 };
@@ -63,7 +63,7 @@ struct PerfWatcher {
   bool suppress_pid;
   bool suppress_tid;
   PProfIndices pprof_indices[kNbEventAggregationModes]; // std and live
-  bool instrument_self; // do my own perfopen, etc
+  bool instrument_self; // do my own perf_event_open, etc
   EventAggregationMode aggregation_mode;
 };
 

@@ -372,7 +372,7 @@ TEST(DSOTest, mmap_into_backpop) {
   for (auto &el : pid_mapping._map) {
     Dso &dso = el.second;
     // emulate an insert of big size
-    if (dso._filename.find("c++") != std::string::npos && dso._pgoff == 0) {
+    if (dso._filename.find("c++") != std::string::npos && dso._offset == 0) {
       Dso copy(dso);
       copy._end = copy._start + 0x388FFF;
       found = true;
@@ -381,7 +381,7 @@ TEST(DSOTest, mmap_into_backpop) {
   }
   EXPECT_TRUE(found);
   dso_hdr.pid_backpopulate(my_pid, nb_elts);
-  // TODO: To be discussed - should we erase overlaping or not
+  // TODO: To be discussed - should we erase overlapping or not
 }
 
 TEST(DSOTest, insert_jitdump) {

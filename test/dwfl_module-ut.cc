@@ -30,7 +30,7 @@ namespace ddprof {
 
 namespace fs = std::filesystem;
 
-int cound_fds(pid_t pid) {
+int count_fds(pid_t pid) {
   std::string proc_dir = "/proc/" + std::to_string(pid) + "/fd";
   int fd_count = 0;
   for ([[maybe_unused]] const auto &entry : fs::directory_iterator(proc_dir)) {
@@ -41,7 +41,7 @@ int cound_fds(pid_t pid) {
 
 TEST(DwflModule, inconsistency_test) {
   pid_t my_pid = getpid();
-  int nb_fds_start = cound_fds(my_pid);
+  int nb_fds_start = count_fds(my_pid);
   printf("-- Start open file descriptors: %d\n", nb_fds_start);
   LogHandle handle;
   // Load DSOs from our unit test
@@ -76,17 +76,17 @@ TEST(DwflModule, inconsistency_test) {
       if (find_res.first == it) {
         Symbol symbol;
         GElf_Sym elf_sym;
-        Offset_t lbiais;
-        EXPECT_TRUE(symbol_get_from_dwfl(ddprof_mod->_mod, ip, symbol, elf_sym,
-                                         lbiais));
+        Offset_t bias;
+        EXPECT_TRUE(
+            symbol_get_from_dwfl(ddprof_mod->_mod, ip, symbol, elf_sym, bias));
         EXPECT_EQ("ddprof::DwflModule_inconsistency_test_Test::TestBody()",
                   symbol._demangle_name);
-        EXPECT_EQ(lbiais, ddprof_mod->_sym_bias);
+        EXPECT_EQ(bias, ddprof_mod->_sym_bias);
         FileAddress_t elf_addr = ip - ddprof_mod->_sym_bias;
         FileAddress_t start_sym, end_sym = {};
         EXPECT_TRUE(compute_elf_range(elf_addr, elf_sym, start_sym, end_sym));
-        printf("Start --> 0x%lx - end %lx - lbiais 0x%lx <--\n", start_sym,
-               end_sym, lbiais);
+        printf("Start --> 0x%lx - end %lx - bias 0x%lx <--\n", start_sym,
+               end_sym, bias);
         EXPECT_GE(elf_addr, start_sym);
         EXPECT_LE(elf_addr, end_sym);
 

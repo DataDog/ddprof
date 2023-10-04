@@ -82,7 +82,7 @@ Dso::Dso(pid_t pid, ElfAddress_t start, ElfAddress_t end, ElfAddress_t pgoff,
 }
 
 // The string should end with: "jit-[0-9]+\\.dump"
-// and the number should be the pid, however, in wholehost mode
+// and the number should be the pid, however, in whole host mode
 // we don't have visibility on the namespace's PID value.
 bool Dso::is_jit_dump_str(std::string_view file_path) {
   const std::string_view prefix = "jit-";
@@ -153,7 +153,7 @@ bool Dso::adjust_same(const Dso &o) {
 
 bool Dso::intersects(const Dso &o) const {
   // Check order of points
-  // Test that we have lowest-start <-> lowest-end  ... highiest-start
+  // Test that we have lowest-start <-> lowest-end  ... highest-start
   if (_start < o._start) {
     // this Dso comes first check then it ends before the other
     if (_end < o._start) {

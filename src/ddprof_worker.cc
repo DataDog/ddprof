@@ -207,7 +207,7 @@ DDRes ddprof_unwind_sample(DDProfContext &ctx, perf_event_sample *sample,
   }
 
   if (us->_dwfl_wrapper->_inconsistent) {
-    // Loaded modules were inconsistend, assume we should flush everything.
+    // Loaded modules were inconsistent, assume we should flush everything.
     LG_WRN("(Inconsistent DWFL/DSOs)%d - Free associated objects", us->pid);
     DDRES_CHECK_FWD(worker_pid_free(ctx, us->pid));
   }
@@ -413,7 +413,7 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
 
 void *ddprof_worker_export_thread(void *arg) {
   auto *worker = static_cast<DDProfWorkerContext *>(arg);
-  // export the one we are not writting to
+  // export the one we are not writing to
   int const i = 1 - worker->i_current_pprof;
   // Increase number of sequences in persistent storage
   // This should start at 0, and if exporter thread
@@ -450,11 +450,11 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx,
   if (ctx.worker_ctx.exp_tid) {
     struct timespec waittime;
     clock_gettime(CLOCK_REALTIME, &waittime);
-    auto waitsec =
+    auto wait_sec =
         std::chrono::seconds{k_export_timeout - ctx.params.upload_period}
             .count();
-    waitsec = waitsec > 1 ? waitsec : 1;
-    waittime.tv_sec += waitsec;
+    wait_sec = wait_sec > 1 ? wait_sec : 1;
+    waittime.tv_sec += wait_sec;
     if (pthread_timedjoin_np(ctx.worker_ctx.exp_tid, nullptr, &waittime)) {
       LG_WRN("Exporter took too long");
       return ddres_create(DD_SEVERROR, DD_WHAT_EXPORT_TIMEOUT);
@@ -672,7 +672,7 @@ DDRes ddprof_worker_free(DDProfContext &ctx) {
 }
 
 // Simple wrapper over perf_event_hdr in order to filter by PID in a uniform
-// way.  Whenver PID is a valid concept for the given event type, the
+// way.  Whenever PID is a valid concept for the given event type, the
 // interface uniformly presents PID as the element immediately after the
 // header.
 struct perf_event_hdr_wpid : perf_event_header {
