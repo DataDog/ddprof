@@ -105,7 +105,7 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     }
     const Dso &dso = find_res.first->second;
     std::string_view jitdump_path = {};
-    if (dso::has_runtime_symbols(dso._type)) {
+    if (has_runtime_symbols(dso._type)) {
       if (pid_mapping._jitdump_addr) {
         DsoHdr::DsoFindRes const find_mapping = DsoHdr::dso_find_closest(
             pid_mapping._map, pid_mapping._jitdump_addr);

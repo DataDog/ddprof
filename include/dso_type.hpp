@@ -5,9 +5,11 @@
 
 #pragma once
 
+#include <cstdint>
+
 namespace ddprof {
-namespace dso {
-enum DsoType {
+
+enum class DsoType : uint8_t {
   kStandard = 0, // meaning backed by a file that we can open
   kVdso,
   kVsysCall,
@@ -22,49 +24,48 @@ enum DsoType {
   kNbDsoTypes
 };
 
-static inline bool has_relevant_path(dso::DsoType dso_type) {
-  if (dso_type == kDDProfiling) {
+inline bool has_relevant_path(DsoType dso_type) {
+  if (dso_type == DsoType::kDDProfiling) {
     return true;
   }
-  if (dso_type == kStandard) {
+  if (dso_type == DsoType::kStandard) {
     return true;
   }
   return false;
 }
 
 // some runtimes such as java or .NET can publish maps to populate the symbols
-static inline bool has_runtime_symbols(dso::DsoType dso_type) {
-  return dso_type == kRuntime || dso_type == kAnon;
+inline bool has_runtime_symbols(DsoType dso_type) {
+  return dso_type == DsoType::kRuntime || dso_type == DsoType::kAnon;
 }
 
 // todo : find an enum that supports to_str
-static inline const char *dso_type_str(DsoType path_type) {
+inline const char *dso_type_str(DsoType path_type) {
   switch (path_type) {
-  case kStandard:
+  case DsoType::kStandard:
     return "Standard";
-  case kVdso:
+  case DsoType::kVdso:
     return "Vdso";
-  case kVsysCall:
+  case DsoType::kVsysCall:
     return "VsysCall";
-  case kStack:
+  case DsoType::kStack:
     return "Stack";
-  case kHeap:
+  case DsoType::kHeap:
     return "Heap";
-  case kUndef:
+  case DsoType::kUndef:
     return "Undefined";
-  case kAnon:
+  case DsoType::kAnon:
     return "Anonymous";
-  case kRuntime:
+  case DsoType::kRuntime:
     return "Runtime";
-  case kSocket:
+  case DsoType::kSocket:
     return "kSocket";
-  case kDDProfiling:
+  case DsoType::kDDProfiling:
     return "kDDProfiling";
   default:
     break;
   }
   return "Unhandled";
 }
-} // namespace dso
 
 } // namespace ddprof

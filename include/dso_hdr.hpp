@@ -35,9 +35,9 @@ public:
     DSO_EVENT_TABLE(X_DSO_EVENT_ENUM) kNbDsoEventTypes,
   };
 
-  void incr_metric(DsoEventType dso_event, dso::DsoType path_type) {
+  void incr_metric(DsoEventType dso_event, DsoType path_type) {
     assert(dso_event < kNbDsoEventTypes);
-    ++_metrics[dso_event][path_type];
+    ++_metrics[dso_event][static_cast<size_t>(path_type)];
   }
 
   uint64_t sum_event_metric(DsoEventType dso_event) const;
@@ -49,13 +49,14 @@ public:
   }
 
 private:
+  using MetricPerDsoType =
+      std::array<uint64_t, static_cast<size_t>(DsoType::kNbDsoTypes)>;
   static const char *s_event_dbg_str[kNbDsoEventTypes];
-  static void
-  reset_event_metric(std::array<uint64_t, dso::kNbDsoTypes> &metric_array) {
+  static void reset_event_metric(MetricPerDsoType &metric_array) {
     std::fill(metric_array.begin(), metric_array.end(), 0);
   }
   // log events according to dso types
-  std::array<std::array<uint64_t, dso::kNbDsoTypes>, kNbDsoEventTypes> _metrics;
+  std::array<MetricPerDsoType, kNbDsoEventTypes> _metrics;
 };
 
 /**************
