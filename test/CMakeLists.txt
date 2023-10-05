@@ -373,6 +373,15 @@ add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/pthread_fixes.cc
 add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
 
 add_benchmark(
+  backpopulate-bench
+  backpopulate-bench.cc
+  ../src/dso_hdr.cc
+  ../src/dso.cc
+  ../src/procutils.cc
+  ../src/signal_helper.cc
+  ../src/user_override.cc)
+
+add_benchmark(
   allocation_tracker-bench
   allocation_tracker-bench.cc
   ../src/lib/allocation_tracker.cc
