@@ -561,6 +561,7 @@ DDRes ddprof_pr_fork(DDProfContext &ctx, const perf_event_fork *frk,
   if (frk->ppid != frk->pid) {
     // Clear everything and populate at next error or with coming samples
     DDRES_CHECK_FWD(worker_pid_free(ctx, frk->pid));
+    ctx.worker_ctx.us->dso_hdr.pid_fork(frk->pid, frk->ppid);
   }
   return ddres_init();
 }

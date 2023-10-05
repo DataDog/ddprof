@@ -96,6 +96,9 @@ public:
   // Clear all dsos and regions associated with this pid
   void pid_free(int pid);
 
+  // Duplicate mapping info from parent_pid into pid
+  void pid_fork(pid_t pid, pid_t parent_pid);
+
   // Find the first associated to this pid
   bool find_exe_name(pid_t pid, std::string &exe_name);
   DsoFindRes dso_find_first_std_executable(pid_t pid);
