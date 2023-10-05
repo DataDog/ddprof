@@ -42,13 +42,13 @@ Dso::Dso(pid_t pid, ProcessAddress_t start, ProcessAddress_t end,
       _inode(inode), _pid(pid), _prot(prot), _id(k_file_info_undef),
       _type(DsoType::kStandard), _origin(origin) {
   // note that substr manages the case where len str < len vdso_str
-  if (_filename.substr(0, s_vdso_str.length()) == s_vdso_str) {
+  if (_filename.starts_with(s_vdso_str)) {
     _type = DsoType::kVdso;
-  } else if (_filename.substr(0, s_vsyscall_str.length()) == s_vsyscall_str) {
+  } else if (_filename.starts_with(s_vsyscall_str)) {
     _type = DsoType::kVsysCall;
-  } else if (_filename.substr(0, s_stack_str.length()) == s_stack_str) {
+  } else if (_filename.starts_with(s_stack_str)) {
     _type = DsoType::kStack;
-  } else if (_filename.substr(0, s_heap_str.length()) == s_heap_str) {
+  } else if (_filename.starts_with(s_heap_str)) {
     _type = DsoType::kHeap;
     // Safeguard against other types of files we would not handle
   } else if (_filename.empty() || _filename.starts_with(s_anon_str) ||
@@ -61,17 +61,17 @@ Dso::Dso(pid_t pid, ProcessAddress_t start, ProcessAddress_t end,
   } else if ( // ends with .jsa
       _filename.ends_with(s_jsa_str) || _filename.ends_with(s_dll_str)) {
     _type = DsoType::kRuntime;
-  } else if (_filename.substr(0, s_socket_str.length()) == s_socket_str) {
+  } else if (_filename.starts_with(s_socket_str)) {
     _type = DsoType::kSocket;
   } else if (_filename[0] == '[') {
     _type = DsoType::kUndef;
   } else if (is_jit_dump_str(_filename)) {
     _type = DsoType::kJITDump;
   } else { // check if this standard dso matches our internal dd_profiling lib
-    std::size_t const pos = _filename.rfind('/');
+    auto path = std::string_view{_filename};
+    std::size_t const pos = path.rfind('/');
     if (pos != std::string::npos &&
-        _filename.substr(pos + 1, s_dd_profiling_str.length()) ==
-            s_dd_profiling_str) {
+        path.substr(pos + 1).starts_with(s_dd_profiling_str)) {
       _type = DsoType::kDDProfiling;
     }
   }
