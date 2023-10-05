@@ -19,7 +19,7 @@ public:
   MapInfo(ElfAddress_t low_addr, ElfAddress_t high_addr, Offset_t offset,
           std::string &&sopath, BuildIdStr build_id)
       : _low_addr(low_addr), _high_addr(high_addr), _offset(offset),
-        _sopath(sopath), _build_id(std::move(build_id)) {}
+        _sopath(std::move(sopath)), _build_id(std::move(build_id)) {}
   ElfAddress_t _low_addr;
   ElfAddress_t _high_addr;
   Offset_t _offset;
