@@ -219,8 +219,9 @@ public:
 
     // Atomic operation required to synchronize with reader load_acquire
     __atomic_store_n(_rb.writer_pos, new_writer_pos, __ATOMIC_RELEASE);
-
-    return {reinterpret_cast<std::byte *>(hdr + 1), n};
+    std::byte *ptr_buffer = reinterpret_cast<std::byte *>(hdr);
+    ptr_buffer += sizeof(MPSCRingBufferHeader);
+    return {ptr_buffer, n};
   }
 
   // Return true if notification to consumer is necesssary
