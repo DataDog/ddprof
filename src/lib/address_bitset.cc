@@ -96,7 +96,8 @@ bool AddressBitset::remove(uintptr_t addr) {
   unsigned index_array = significant_bits / _nb_bits_per_word;
   unsigned bit_offset = significant_bits % _nb_bits_per_word;
   Word_t bit_in_element = (1UL << bit_offset);
-  if (_address_bitset[index_array].fetch_and(~bit_in_element) & bit_in_element) {
+  if (_address_bitset[index_array].fetch_and(~bit_in_element) &
+      bit_in_element) {
     _nb_addresses.fetch_sub(1, std::memory_order_relaxed);
     // in the unlikely event of a clear right at the wrong time, we could
     // have a negative number of elements (though count desyncs are acceptable)

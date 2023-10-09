@@ -22,7 +22,7 @@ static constexpr uint64_t k_rate = 200000;
 
 // The reader thread is interesting, though it starts dominating the CPU
 // the benchmark focuses on the capture of allocation events.
-//#define READER_THREAD
+// #define READER_THREAD
 std::atomic<bool> reader_continue{true};
 std::atomic<bool> error_in_reader{false};
 

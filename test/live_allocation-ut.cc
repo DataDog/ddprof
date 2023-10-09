@@ -128,4 +128,14 @@ TEST(LiveAllocationTest, overlap_registrations) {
   EXPECT_EQ(pid_stacks._unique_stacks.size(), 0);
 }
 
+TEST(LiveAllocationTest, stats) {
+  LogHandle handle;
+  LiveAllocation live_alloc;
+  live_alloc.register_deallocation(0xbadbeef, 0, 1);
+  live_alloc.register_deallocation(0xbadbeef, 0, 1);
+  EXPECT_EQ(live_alloc.get_nb_unmatched_deallocations(), 2);
+  live_alloc.cycle();
+  EXPECT_EQ(live_alloc.get_nb_unmatched_deallocations(), 0);
+}
+
 } // namespace ddprof

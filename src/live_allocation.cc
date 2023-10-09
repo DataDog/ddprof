@@ -9,7 +9,7 @@
 
 namespace ddprof {
 
-void LiveAllocation::register_deallocation(uintptr_t address,
+bool LiveAllocation::register_deallocation(uintptr_t address,
                                            PprofStacks &stacks,
                                            AddressMap &address_map) {
   // Find the ValuePerAddress object corresponding to the address
@@ -19,7 +19,7 @@ void LiveAllocation::register_deallocation(uintptr_t address,
     // This means we lost previous events, leading to de-sync between
     // the state of the profiler and the state of the library.
     LG_DBG("Unmatched de-allocation at %lx", address);
-    return;
+    return false;
   }
   ValuePerAddress const &v = map_iter->second;
 
@@ -38,16 +38,17 @@ void LiveAllocation::register_deallocation(uintptr_t address,
 
   // Remove the element from the address map
   address_map.erase(map_iter);
+  return true;
 }
 
-void LiveAllocation::register_allocation(const UnwindOutput &uo,
+bool LiveAllocation::register_allocation(const UnwindOutput &uo,
                                          uintptr_t address, int64_t value,
                                          PprofStacks &stacks,
                                          AddressMap &address_map) {
   if (uo.locs.empty()) {
     // avoid sending empty stacks
     LG_DBG("(LIVE_ALLOC) Avoid registering empty stack");
-    return;
+    return false;
   }
   // Find or create the PprofStacks::value_type object corresponding to the
   // UnwindOutput
@@ -81,6 +82,7 @@ void LiveAllocation::register_allocation(const UnwindOutput &uo,
   v._unique_stack = &unique_stack;
   v._unique_stack->second._value += value;
   ++(v._unique_stack->second._count);
+  return true;
 }
 
 } // namespace ddprof

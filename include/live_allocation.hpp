@@ -65,8 +65,10 @@ public:
   void register_deallocation(uintptr_t addr, int watcher_pos, pid_t pid) {
     PidMap &pid_map = access_resize(_watcher_vector, watcher_pos);
     PidStacks &pid_stacks = pid_map[pid];
-    register_deallocation(addr, pid_stacks._unique_stacks,
-                          pid_stacks._address_map);
+    if (!register_deallocation(addr, pid_stacks._unique_stacks,
+                               pid_stacks._address_map)) {
+      ++_stats._unmatched_deallocations;
+    }
   }
 
   void clear_pid_for_watcher(int watcher_pos, pid_t pid) {
@@ -80,13 +82,24 @@ public:
     }
   }
 
+  unsigned get_nb_unmatched_deallocations() const {
+    return _stats._unmatched_deallocations;
+  }
+
+  void cycle() { _stats = {}; }
+
 private:
-  static void register_deallocation(uintptr_t address, PprofStacks &stacks,
+  // returns true if the deallocation was registered
+  static bool register_deallocation(uintptr_t address, PprofStacks &stacks,
                                     AddressMap &address_map);
 
-  static void register_allocation(const UnwindOutput &uo, uintptr_t address,
+  // returns true if the allocation was registerd
+  static bool register_allocation(const UnwindOutput &uo, uintptr_t address,
                                   int64_t value, PprofStacks &stacks,
                                   AddressMap &address_map);
+  struct {
+    unsigned _unmatched_deallocations = {};
+  } _stats;
 };
 
 } // namespace ddprof
