@@ -117,29 +117,36 @@ TEST(DSOTest, intersections) {
   }
   {
     Dso dso_no(10, 400, 500);
-    DsoRange range =
-        dso_hdr.get_intersection(dso_hdr._pid_map[10]._map, dso_no);
-    DsoHdr::DsoFindRes not_found = dso_hdr.find_res_not_found(10);
-    EXPECT_EQ(range.first, not_found.first);
-    EXPECT_EQ(range.second, not_found.first);
+    DsoRange range = dso_hdr.get_intersection(10, dso_no);
+    EXPECT_EQ(range.first, range.second);
   }
   {
     Dso dso_other_pid(9, 900, 1700);
-    DsoRange range =
-        dso_hdr.get_intersection(dso_hdr._pid_map[9]._map, dso_other_pid);
-    DsoHdr::DsoFindRes not_found = dso_hdr.find_res_not_found(9);
-    EXPECT_EQ(range.first, not_found.first);
-    EXPECT_EQ(range.second, not_found.first);
+    DsoRange range = dso_hdr.get_intersection(9, dso_other_pid);
+    EXPECT_EQ(range.first, range.second);
   }
   { // single element
     Dso dso_equal_addr(10, 1200, 1400);
-    DsoRange range =
-        dso_hdr.get_intersection(dso_hdr._pid_map[10]._map, dso_equal_addr);
+    DsoRange range = dso_hdr.get_intersection(10, dso_equal_addr);
     DsoHdr::DsoFindRes not_found = dso_hdr.find_res_not_found(10);
     ASSERT_TRUE(range.first != not_found.first);
     ASSERT_TRUE(range.second != not_found.first);
     EXPECT_EQ(range.first->second._start, 1000);
     EXPECT_EQ(range.second->second._start, 1500);
+  }
+  {
+    Dso dso_inter(10, 1500, 1999);
+    DsoRange range = dso_hdr.get_intersection(10, dso_inter);
+    EXPECT_EQ(range.first->second._pid, 10);
+    EXPECT_EQ(range.first->second._start, 1500);
+    EXPECT_EQ(range.second->second._start, 2000);
+  }
+  {
+    Dso dso_inter(10, 1499, 2000);
+    DsoRange range = dso_hdr.get_intersection(10, dso_inter);
+    EXPECT_EQ(range.first->second._pid, 10);
+    EXPECT_EQ(range.first->second._start, 1000);
+    EXPECT_EQ(range.second, dso_hdr._pid_map[10]._map.end());
   }
 }
 

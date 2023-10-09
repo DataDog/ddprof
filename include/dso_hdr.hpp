@@ -124,7 +124,10 @@ public:
   // Find the dso if same
   static DsoFindRes dso_find_adjust_same(DsoMap &map, const Dso &dso);
 
-  // Returns a range that points on _map.end() if nothing was found
+  // Returns an empty range if nothing was found
+  DsoRange get_intersection(pid_t pid, const Dso &dso);
+
+  // Returns an empty range if nothing was found
   static DsoRange get_intersection(DsoMap &map, const Dso &dso);
 
   // Return whole mapping range associated with the same elf file
