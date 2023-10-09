@@ -94,6 +94,9 @@ DDRes ddprof_setup(DDProfContext &ctx) {
       if (errno) {
         LG_WRN("Requested nice level (%d) could not be set", ctx.params.nice);
       }
+      else {
+        LG_NTC("Success overriding nice level (%d)", ctx.params.nice);
+      }
     }
 
     DDRES_CHECK_FWD(ddprof_stats_init());

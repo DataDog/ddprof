@@ -17,6 +17,7 @@
 #include <sstream>
 #include <thread>
 #include <unistd.h>
+#include <sys/resource.h>
 
 #include "ddprof_base.hpp"
 #include "enum_flags.hpp"
@@ -267,6 +268,9 @@ WrapperFuncPtr get_wrapper_func(WrapperOpts opts) {
 
 int main(int argc, char *argv[]) {
   using namespace ddprof;
+  // ensure ddprof can run with higher priority to reduce flaky tests
+  setpriority(PRIO_PROCESS, 0, 19);
+
   try {
     struct sigaction sigaction_handlers = {};
     sigaction_handlers.sa_sigaction = sigsegv_handler;
