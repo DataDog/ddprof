@@ -215,8 +215,7 @@ SymbolIdx_t RuntimeSymbolLookup::get_or_insert(pid_t pid, ProcessAddress_t pc,
   SymbolMap::FindRes find_res = symbol_info._map.find_closest(pc);
 
   // Only check the file if we did not get failures in this cycle (for this pid)
-  if (!find_res.second &&
-      !has_lookup_failure(symbol_info, std::string("perfmap"))) {
+  if (!find_res.second && !has_lookup_failure(symbol_info, "perfmap")) {
     ++_stats._nb_jit_reads;
     fill_from_perfmap(pid, symbol_info._map, symbol_table);
     find_res = symbol_info._map.find_closest(pc);
