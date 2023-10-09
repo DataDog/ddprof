@@ -64,7 +64,7 @@ public:
   static TrackerThreadLocalState *get_tl_state();
 
 private:
-  using AdressSet = std::unordered_set<uintptr_t>;
+  static constexpr unsigned k_ratio_max_elt_to_bitset_size = 16;
 
   struct TrackerState {
     void init(bool track_alloc, bool track_dealloc) {

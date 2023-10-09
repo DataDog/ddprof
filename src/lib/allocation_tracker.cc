@@ -142,7 +142,8 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
   }
   if (track_deallocations) {
     // 16 times as we want to probability of collision to be low enough
-    _allocated_address_set = AddressBitset(liveallocation::kMaxTracked * 16);
+    _allocated_address_set = AddressBitset(liveallocation::kMaxTracked *
+                                           k_ratio_max_elt_to_bitset_size);
   }
   return ddprof::ring_buffer_attach(ring_buffer, &_pevent);
 }
@@ -169,7 +170,8 @@ void AllocationTracker::allocation_tracking_free() {
   }
   TrackerThreadLocalState *tl_state = get_tl_state();
   if (unlikely(!tl_state)) {
-    LOG_ONCE("Error: Unable to find tl_state during %s\n", __FUNCTION__);
+    const char *func_name = __FUNCTION__;
+    LOG_ONCE("Error: Unable to find tl_state during %s\n", func_name);
     instance->free();
     return;
   }
@@ -263,7 +265,6 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
                                            TrackerThreadLocalState &tl_state) {
   // Reentrancy should be prevented by caller (by using ReentryGuard on
   // TrackerThreadLocalState::reentry_guard).
-
 
   if (!_state.track_deallocations || !_allocated_address_set.remove(addr)) {
     return;

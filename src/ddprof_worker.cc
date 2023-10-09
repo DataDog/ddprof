@@ -118,8 +118,9 @@ DDRes worker_update_stats(DDProfWorkerContext &worker_context,
   ddprof_stats_set(STATS_DSO_NEW_DSO,
                    dso_hdr._stats.sum_event_metric(DsoStats::kNewDso));
   ddprof_stats_set(STATS_DSO_SIZE, dso_hdr.get_nb_dso());
-  ddprof_stats_set(STATS_UNMATCHED_DEALLOCATION_COUNT,
-                   worker_context.live_allocation.get_nb_unmatched_deallocations());
+  ddprof_stats_set(
+      STATS_UNMATCHED_DEALLOCATION_COUNT,
+      worker_context.live_allocation.get_nb_unmatched_deallocations());
   // Symbol stats
   DDRES_CHECK_FWD(symbols_update_stats(us.symbol_hdr));
 
@@ -387,8 +388,8 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
   // Aggregate if unwinding went well (todo : fatal error propagation)
   if (!IsDDResFatal(res)) {
     struct UnwindState *us = ctx.worker_ctx.us;
-    if (Any(EventAggregationMode::kLiveSum & watcher->aggregation_mode)
-        && sample->addr) {
+    if (Any(EventAggregationMode::kLiveSum & watcher->aggregation_mode) &&
+        sample->addr) {
       // null address means we should not account it
       ctx.worker_ctx.live_allocation.register_allocation(
           us->output, sample->addr, sample->period, watcher_pos, sample->pid);
