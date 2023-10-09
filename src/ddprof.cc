@@ -93,8 +93,7 @@ DDRes ddprof_setup(DDProfContext &ctx) {
       setpriority(PRIO_PROCESS, 0, ctx.params.nice);
       if (errno) {
         LG_WRN("Requested nice level (%d) could not be set", ctx.params.nice);
-      }
-      else {
+      } else {
         LG_NTC("Success overriding nice level (%d)", ctx.params.nice);
       }
     }

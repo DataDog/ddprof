@@ -15,9 +15,9 @@
 #include <functional>
 #include <iostream>
 #include <sstream>
+#include <sys/resource.h>
 #include <thread>
 #include <unistd.h>
-#include <sys/resource.h>
 
 #include "ddprof_base.hpp"
 #include "enum_flags.hpp"
@@ -100,6 +100,7 @@ struct Options {
   uint32_t callstack_depth;
   uint32_t frame_size;
   uint32_t skip_free;
+  int nice;
   bool use_shared_library = false;
   bool avoid_dlopen_hook = false;
 };
@@ -268,9 +269,6 @@ WrapperFuncPtr get_wrapper_func(WrapperOpts opts) {
 
 int main(int argc, char *argv[]) {
   using namespace ddprof;
-  // ensure ddprof can run with higher priority to reduce flaky tests
-  setpriority(PRIO_PROCESS, 0, 19);
-
   try {
     struct sigaction sigaction_handlers = {};
     sigaction_handlers.sa_sigaction = sigsegv_handler;
@@ -331,6 +329,16 @@ int main(int argc, char *argv[]) {
     app.add_option("--initial-delay", opts.initial_delay, "Initial delay (ms)")
         ->default_val(0)
         ->check(CLI::NonNegativeNumber);
+    app.add_option("--nice", opts.nice, "Linux niceness setting")
+        ->default_val(19)
+        ->check(CLI::Bound(-20, 19));
+
+    setpriority(PRIO_PROCESS, 0, opts.nice);
+    if (errno) {
+      fprintf(stderr, "Requested nice level (%d) could not be set \n",
+              opts.nice);
+      return 1;
+    }
 
 #  ifdef USE_DD_PROFILING
     bool start_profiling = false;
