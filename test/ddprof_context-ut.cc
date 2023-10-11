@@ -186,7 +186,8 @@ TEST(DDProfContext, cpu_live_heap_preset) {
 
   ASSERT_EQ(ctx.watchers.size(), 2);
   EXPECT_EQ(ctx.watchers[1].ddprof_event_type, DDPROF_PWE_sALLOC);
-  EXPECT_EQ(ctx.watchers[1].aggregation_mode, EventAggregationMode::kLiveSum);
+  EXPECT_EQ(ctx.watchers[1].aggregation_mode,
+            EventAggregationMode::kLiveSum | EventAggregationMode::kSum);
   EXPECT_EQ(ctx.watchers[0].ddprof_event_type, DDPROF_PWE_sCPU);
   EXPECT_EQ(ctx.watchers[0].aggregation_mode, EventAggregationMode::kSum);
 }
