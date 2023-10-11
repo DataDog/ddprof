@@ -28,12 +28,14 @@ public:
   AddressBitset(AddressBitset &other) = delete;
   AddressBitset &operator=(AddressBitset &other) = delete;
 
+  ~AddressBitset() = default;
+
   // returns true if the element was inserted
   bool add(uintptr_t addr);
   // returns true if the element was removed
   bool remove(uintptr_t addr);
   void clear();
-  int count() const { return _nb_addresses; }
+  [[nodiscard]] int count() const { return _nb_addresses; }
 
 private:
   static constexpr unsigned _k_max_bits_ignored = 4;
@@ -58,11 +60,11 @@ private:
   // We remove the lower bits (as the alignment constraints makes them useless)
   // We fold the address
   // Then we only keep the bits that matter for the order in the bitmap
-  uint32_t hash_significant_bits(uintptr_t h1) {
-    uint64_t intermediate = h1 >> _lower_bits_ignored;
-    uint32_t high = (uint32_t)(intermediate >> 32);
-    uint32_t low = (uint32_t)intermediate;
-    uint32_t res = high ^ low;
+  [[nodiscard]] uint32_t hash_significant_bits(uintptr_t h1) const {
+    uint64_t const intermediate = h1 >> _lower_bits_ignored;
+    auto const high = static_cast<uint32_t>(intermediate >> 32);
+    auto const low = static_cast<uint32_t>(intermediate);
+    uint32_t const res = high ^ low;
     return res & _nb_bits_mask;
   }
 };

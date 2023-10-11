@@ -31,13 +31,14 @@ public:
       Offset_t offset = 0, std::string &&filename = "", inode_t inode = 0,
       uint32_t prot = PROT_EXEC, DsoOrigin origin = DsoOrigin::kPerfMmapEvent);
   // copy parent and update pid
-  Dso(const Dso &parent, pid_t new_pid) : Dso(parent) { _pid = new_pid; }
+  // NOLINTNEXTLINE(cppcoreguidelines-prefer-member-initializer)
+  Dso(Dso parent, pid_t new_pid) : Dso(std::move(parent)) { _pid = new_pid; }
 
   // Check if the provided address falls within the provided dso
   bool is_within(ProcessAddress_t addr) const;
 
   // strict comparison
-  bool operator==(const Dso &o) const = default;
+  friend bool operator==(const Dso &, const Dso &) = default;
 
   bool intersects(const Dso &o) const;
 

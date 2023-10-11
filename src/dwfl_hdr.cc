@@ -16,8 +16,7 @@
 
 namespace ddprof {
 
-DwflWrapper::DwflWrapper()
-    : _dwfl(nullptr), _attached(false), _inconsistent(false) {
+DwflWrapper::DwflWrapper() {
   // for split debug, we can fill the debuginfo_path
   static const Dwfl_Callbacks proc_callbacks = {
       .find_elf = dwfl_linux_proc_find_elf,
@@ -38,14 +37,14 @@ DwflWrapper::~DwflWrapper() { dwfl_end(_dwfl); }
 DDRes DwflWrapper::attach(pid_t pid, const Dwfl_Thread_Callbacks *callbacks,
                           struct UnwindState *us) {
   if (_attached) {
-    return ddres_init();
+    return {};
   }
   if (!dwfl_attach_state(_dwfl, nullptr, pid, callbacks, us)) {
     LG_DBG("Failed attaching dwfl on pid %d (%s)", pid, dwfl_errmsg(-1));
     return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
   }
   _attached = true;
-  return ddres_init();
+  return {};
 }
 
 DwflWrapper &DwflHdr::get_or_insert(pid_t pid) {

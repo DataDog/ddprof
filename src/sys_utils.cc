@@ -21,14 +21,14 @@ DDRes sys_read_int_from_file(const char *filename, int32_t &val) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_SYS_CONFIG, "Unable read value from file %s",
                            filename);
   }
-  return ddres_init();
+  return {};
 }
 
 DDRes sys_perf_event_paranoid(int32_t &val) {
   val = std::numeric_limits<int32_t>::max();
   DDRES_CHECK_FWD(
       sys_read_int_from_file("/proc/sys/kernel/perf_event_paranoid", val));
-  return ddres_init();
+  return {};
 }
 
 } // namespace ddprof

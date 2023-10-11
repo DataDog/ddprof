@@ -61,7 +61,7 @@ DDRes statsd_listen(std::string_view path, int *fd) {
   }
 
   *fd = fd_sock;
-  return ddres_init();
+  return {};
 }
 
 DDRes statsd_connect(std::string_view statsd_socket, int *fd) {
@@ -100,7 +100,7 @@ DDRes statsd_connect(std::string_view statsd_socket, int *fd) {
 
   // If we're here, then the connection has been fully established
   *fd = fd_sock;
-  return ddres_init();
+  return {};
 }
 
 DDRes statsd_send(int fd_sock, const char *key, const void *val, int type) {
@@ -144,10 +144,10 @@ DDRes statsd_send(int fd_sock, const char *key, const void *val, int type) {
       DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Write failed");
     }
   }
-  return ddres_init();
+  return {};
 }
 
 DDRes statsd_close(int fd_sock) {
   DDRES_CHECK_INT(close(fd_sock), DD_WHAT_STATSD, "Error while closing socket");
-  return ddres_init();
+  return {};
 }

@@ -53,12 +53,12 @@ DDRes mock_fatal_default_message() {
 
 DDRes dderr_wrapper() {
   DDRES_CHECK_FWD(mock_fatal_generator());
-  return ddres_init();
+  return {};
 }
 
 DDRes ddwarn_wrapper() {
   DDRES_CHECK_FWD_STRICT(mock_warn_generator());
-  return ddres_init();
+  return {};
 }
 
 int minus_one_generator(void) { return -1; }
@@ -98,7 +98,7 @@ TEST(DDRes, FillFatal) {
   }
 }
 
-void mock_except1() { throw DDException(DD_SEVERROR, DD_WHAT_UNITTEST); }
+void mock_except1() { throw DDException(DD_SEV_ERROR, DD_WHAT_UNITTEST); }
 
 void mock_except2() { throw std::bad_alloc(); }
 
@@ -119,7 +119,7 @@ DDRes mock_wrapper(int idx) {
     }
   }
   CatchExcept2DDRes();
-  return ddres_init();
+  return {};
 }
 
 // Check that an exception can be caught and converted back to a C result
@@ -127,16 +127,16 @@ TEST(DDRes, ConvertException) {
   LogHandle handle;
   try {
     DDRes ddres = mock_wrapper(1);
-    ASSERT_EQ(ddres, ddres_create(DD_SEVERROR, DD_WHAT_UNITTEST));
+    ASSERT_EQ(ddres, ddres_create(DD_SEV_ERROR, DD_WHAT_UNITTEST));
     ddres = mock_wrapper(2);
-    ASSERT_EQ(ddres, ddres_create(DD_SEVERROR, DD_WHAT_BADALLOC));
+    ASSERT_EQ(ddres, ddres_create(DD_SEV_ERROR, DD_WHAT_BADALLOC));
     ddres = mock_wrapper(3);
-    ASSERT_EQ(ddres, ddres_create(DD_SEVERROR, DD_WHAT_UNITTEST));
+    ASSERT_EQ(ddres, ddres_create(DD_SEV_ERROR, DD_WHAT_UNITTEST));
     ddres = mock_wrapper(4);
     ASSERT_TRUE(IsDDResOK(ddres));
 
     ddres = mock_wrapper(5);
-    ASSERT_EQ(ddres, ddres_create(DD_SEVERROR, DD_WHAT_UNITTEST));
+    ASSERT_EQ(ddres, ddres_create(DD_SEV_ERROR, DD_WHAT_UNITTEST));
 
   } catch (...) { ASSERT_TRUE(false); }
 }

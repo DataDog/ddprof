@@ -53,7 +53,7 @@ TEST(DwflModule, inconsistency_test) {
   {
     DwflWrapper dwfl_wrapper;
     // retrieve the map associated to pid
-    DsoHdr::DsoMap &dso_map = dso_hdr._pid_map[my_pid]._map;
+    DsoHdr::DsoMap &dso_map = dso_hdr.get_pid_mapping(my_pid)._map;
 
     for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
       Dso &dso = it->second;
@@ -124,7 +124,7 @@ TEST(DwflModule, short_lived) {
   {
     DwflWrapper dwfl_wrapper;
     // retrieve the map associated to pid
-    DsoHdr::DsoMap &dso_map = dso_hdr._pid_map[child_pid]._map;
+    DsoHdr::DsoMap &dso_map = dso_hdr.get_pid_mapping(child_pid)._map;
 
     for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
       Dso &dso = it->second;
@@ -160,7 +160,7 @@ TEST(DwflModule, short_lived) {
   {
     DwflWrapper dwfl_wrapper;
     // retrieve the map associated to pid
-    DsoHdr::DsoMap &dso_map = dso_hdr._pid_map[second_child_pid]._map;
+    DsoHdr::DsoMap &dso_map = dso_hdr.get_pid_mapping(second_child_pid)._map;
 
     for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
       Dso &dso = it->second;

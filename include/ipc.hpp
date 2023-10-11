@@ -26,15 +26,8 @@ static constexpr auto kDefaultSocketTimeout = std::chrono::seconds{2};
 class UnixSocket {
 public:
   using socket_t = int;
-  UnixSocket() noexcept = default;
 
   explicit UnixSocket(socket_t handle) noexcept : _handle(handle) {}
-
-  UnixSocket(UnixSocket &&socket) noexcept = default;
-  UnixSocket(const UnixSocket &) = delete;
-
-  UnixSocket &operator=(const UnixSocket &) = delete;
-  UnixSocket &operator=(UnixSocket &&socket) noexcept = default;
 
   void close(std::error_code &ec) noexcept;
 

@@ -6,14 +6,18 @@
 #include "unwind_metrics.hpp"
 #include "ddprof_stats.hpp"
 
-static const DDPROF_STATS s_cycled_stats[] = {
+namespace ddprof {
+namespace {
+constexpr DDPROF_STATS s_cycled_stats[] = {
     STATS_UNWIND_FRAMES,           STATS_UNWIND_ERRORS,
     STATS_UNWIND_TRUNCATED_INPUT,  STATS_UNWIND_TRUNCATED_OUTPUT,
     STATS_UNWIND_INCOMPLETE_STACK, STATS_UNWIND_AVG_STACK_SIZE,
     STATS_UNWIND_AVG_STACK_DEPTH};
+}
 
 void unwind_metrics_reset() {
   for (auto s_cycled_stat : s_cycled_stats) {
     ddprof_stats_clear(s_cycled_stat);
   }
 }
+} // namespace ddprof

@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include "logger.hpp"
+#include "unique_fd.hpp"
 
 namespace ddprof {
 
@@ -24,12 +25,12 @@ char StatusLine[] =
 }
 
 DDRes proc_read(ProcStatus *procstat) {
-  FILE *ststream = fopen("/proc/self/stat", "r");
-  if (!ststream) {
+  UniqueFile const f{fopen("/proc/self/stat", "r")};
+  if (!f) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PROCSTATE, "Failed to open /proc/self/stat");
   }
 
-  if (0 > fscanf(ststream, StatusLine, &procstat->pid, &procstat->comm,
+  if (0 > fscanf(f.get(), StatusLine, &procstat->pid, &procstat->comm,
                  &procstat->state, &procstat->ppid, &procstat->pgrp,
                  &procstat->session, &procstat->tty_nr, &procstat->tpgid,
                  &procstat->flags, &procstat->minflt, &procstat->cminflt,
@@ -50,8 +51,7 @@ DDRes proc_read(ProcStatus *procstat) {
                  &procstat->env_start, &procstat->env_end)) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PROCSTATE, "Failed to read /proc/self/stat");
   }
-  fclose(ststream);
-  return ddres_init();
+  return {};
 }
 
 bool check_file_type(const char *pathname, int file_type) {

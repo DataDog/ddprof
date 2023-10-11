@@ -40,12 +40,13 @@ public:
     ++_metrics[dso_event][static_cast<size_t>(path_type)];
   }
 
-  uint64_t sum_event_metric(DsoEventType dso_event) const;
+  [[nodiscard]] uint64_t sum_event_metric(DsoEventType dso_event) const;
 
   void log() const;
   void reset() {
-    for (auto &metric_array : _metrics)
+    for (auto &metric_array : _metrics) {
       reset_event_metric(metric_array);
+    }
   }
 
 private:
@@ -119,7 +120,7 @@ public:
 
   void reset_backpopulate_state(
       int reset_threshold =
-          BackpopulateState::_k_nb_requests_between_backpopulates);
+          BackpopulateState::k_nb_requests_between_backpopulates);
   /******* HELPERS **********/
   // Find the dso if same
   static DsoFindRes dso_find_adjust_same(DsoMap &map, const Dso &dso);
@@ -162,9 +163,10 @@ public:
 
   int get_nb_dso() const;
 
-  // Unordered map (by pid) of sorted DSOs
-  DsoPidMap _pid_map;
-  DsoStats _stats;
+  const DsoStats &stats() const { return _stats; }
+  DsoStats &stats() { return _stats; }
+
+  PidMapping &get_pid_mapping(pid_t pid) { return _pid_map[pid]; }
 
 private:
   enum BackpopulatePermission {
@@ -173,14 +175,13 @@ private:
   };
 
   struct BackpopulateState {
-    BackpopulateState() : _nbUnfoundDsos(), _perm(kAllowed) {}
-    static const int _k_nb_requests_between_backpopulates = 10;
-    int _nbUnfoundDsos;
-    BackpopulatePermission _perm;
+    static constexpr int k_nb_requests_between_backpopulates = 10;
+    int nb_unfound_dsos{};
+    BackpopulatePermission perm{kAllowed};
   };
 
   // Associate pid to a backpopulate state
-  typedef std::unordered_map<pid_t, BackpopulateState> BackpopulateStateMap;
+  using BackpopulateStateMap = std::unordered_map<pid_t, BackpopulateState>;
 
   // erase range of elements
   static void erase_range(DsoMap &map, DsoRange range, const Dso &new_mapping);
@@ -194,15 +195,14 @@ private:
 
   FileInfoId_t update_id_from_path(const Dso &dso);
 
+  // Unordered map (by pid) of sorted DSOs
+  DsoPidMap _pid_map;
+  DsoStats _stats;
   BackpopulateStateMap _backpopulate_state_map;
-
   FileInfoInodeMap _file_info_inode_map;
-
   FileInfoVector _file_info_vector;
-  // /proc files can be mounted at various places (whole host profiling)
   std::string _path_to_proc; // /proc files can be mounted at various places
                              // (whole host profiling)
-
   int _dd_profiling_fd;
   // Assumption is that we have a single version of the dd_profiling library
   // across all PIDs.

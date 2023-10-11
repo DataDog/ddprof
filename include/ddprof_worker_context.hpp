@@ -39,7 +39,7 @@ struct DDProfWorkerContext {
   std::chrono::steady_clock::time_point
       send_time{};          // Last time an export was sent
   uint32_t count_worker{0}; // exports since last cache clear
-  std::array<uint64_t, MAX_TYPE_WATCHER> lost_events_per_watcher{};
+  std::array<uint64_t, kMaxTypeWatcher> lost_events_per_watcher{};
   LiveAllocation live_allocation;
 };
 

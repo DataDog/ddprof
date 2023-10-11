@@ -30,7 +30,7 @@ DDRes ddprof_stats_init() {
   // and then re-initialize.
 
   if (ddprof_stats) {
-    return ddres_init();
+    return {};
   }
 
   ddprof_stats = static_cast<long *>(mmap(nullptr, sizeof(long) * STATS_LEN,
@@ -44,7 +44,7 @@ DDRes ddprof_stats_init() {
   memset(ddprof_stats, 0, sizeof(long) * STATS_LEN);
 
   // Perform other initialization (returns warnings on statsd failure)
-  return ddres_init();
+  return {};
 }
 
 DDRes ddprof_stats_free() {
@@ -54,7 +54,7 @@ DDRes ddprof_stats_free() {
   }
   ddprof_stats = nullptr;
 
-  return ddres_init();
+  return {};
 }
 
 DDRes ddprof_stats_add(unsigned int stat, long in, long *out) {
@@ -70,7 +70,7 @@ DDRes ddprof_stats_add(unsigned int stat, long in, long *out) {
   if (out) {
     *out = retval;
   }
-  return ddres_init();
+  return {};
 }
 
 DDRes ddprof_stats_set(unsigned int stat, long n) {
@@ -81,7 +81,7 @@ DDRes ddprof_stats_set(unsigned int stat, long n) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Invalid stat");
   }
   ddprof_stats[stat] = n;
-  return ddres_init();
+  return {};
 }
 
 DDRes ddprof_stats_divide(unsigned int stat, long n) {
@@ -92,7 +92,7 @@ DDRes ddprof_stats_divide(unsigned int stat, long n) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Invalid stat");
   }
   ddprof_stats[stat] /= n;
-  return ddres_init();
+  return {};
 }
 
 DDRes ddprof_stats_clear(unsigned int stat) {
@@ -112,7 +112,7 @@ DDRes ddprof_stats_clear_all() {
     ddprof_stats_clear(i);
   }
 
-  return ddres_init();
+  return {};
 }
 
 DDRes ddprof_stats_get(unsigned int stat, long *out) {
@@ -126,19 +126,19 @@ DDRes ddprof_stats_get(unsigned int stat, long *out) {
   if (out) {
     *out = ddprof_stats[stat];
   }
-  return ddres_init();
+  return {};
 }
 
 DDRes ddprof_stats_send(std::string_view statsd_socket) {
   if (statsd_socket.empty()) {
     LG_NTC("No statsd socket provided");
-    return ddres_init();
+    return {};
   }
   int fd_statsd = -1;
 
   if (IsDDResNotOK(statsd_connect(statsd_socket, &fd_statsd))) {
     // Invalid socket. No use trying to send data (and avoid flood of logs).
-    return ddres_init();
+    return {};
   }
 
   for (unsigned int i = 0; i < STATS_LEN; i++) {

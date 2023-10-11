@@ -122,6 +122,7 @@ extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
       ++nb_alloc;
       alloc_bytes += options.malloc_size;
     }
+    // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
     DoNotOptimize(p);
     void *p2;
     if (options.realloc_size) {
@@ -131,6 +132,7 @@ extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
     } else {
       p2 = p;
     }
+    // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
     DoNotOptimize(p2);
 
     if (skip_free++ >= options.skip_free) {
@@ -331,7 +333,7 @@ int main(int argc, char *argv[]) {
         ->check(CLI::NonNegativeNumber);
     app.add_option("--nice", opts.nice, "Linux niceness setting")
         ->default_val(0)
-        ->check(CLI::Bound(-20, 19));
+        ->check(CLI::Bound(-20, 19)); // NOLINT(readability-magic-numbers)
 
     if (opts.nice != 0) {
       setpriority(PRIO_PROCESS, 0, opts.nice);

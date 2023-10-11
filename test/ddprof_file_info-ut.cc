@@ -12,6 +12,6 @@ TEST(FileInfo, move) {
   std::string file_path = UNIT_TEST_DATA "/test_int_value.txt";
   FileInfo file_info(file_path, 24, 25);
   FileInfoValue value(std::move(file_info), 1);
-  EXPECT_EQ(value._info._path, file_path);
+  EXPECT_EQ(value.info()._path, file_path);
 }
 } // namespace ddprof

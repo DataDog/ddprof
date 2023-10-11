@@ -13,7 +13,7 @@ namespace ddprof {
 
 struct UnwindState;
 
-void unwind_init(void);
+void unwind_init();
 
 // Fill sample info to prepare for unwinding
 void unwind_init_sample(UnwindState *us, const uint64_t *sample_regs,
@@ -21,7 +21,7 @@ void unwind_init_sample(UnwindState *us, const uint64_t *sample_regs,
                         const char *sample_data_stack);
 
 // Main unwind API
-DDRes unwindstate__unwind(UnwindState *us);
+DDRes unwindstate_unwind(UnwindState *us);
 
 // Mark a cycle: garbadge collection, stats
 void unwind_cycle(UnwindState *us);

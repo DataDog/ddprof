@@ -12,6 +12,8 @@
 #include <string>
 #include <vector>
 
+namespace ddprof {
+
 enum EventAggregationModePos {
   kSumPos = 0,
   kLiveSumPos = 1,
@@ -25,8 +27,6 @@ enum class EventAggregationMode : uint32_t {
   kLiveSum = 1 << kLiveSumPos, // Report live usage (example memory leaks)
   kAll = kSum | kLiveSum,
 };
-
-ALLOW_FLAGS_FOR_ENUM(EventAggregationMode)
 
 constexpr bool Any(EventAggregationMode arg) {
   return arg != EventAggregationMode::kDisabled;
@@ -156,3 +156,7 @@ struct EventConf {
 
 int EventConf_parse(const char *msg, const EventConf &template_conf,
                     std::vector<EventConf> &event_configs);
+
+} // namespace ddprof
+
+ALLOW_FLAGS_FOR_ENUM(ddprof::EventAggregationMode)

@@ -82,7 +82,7 @@ DDRes get_active_ids(std::span<PerfWatcher> watchers, ActiveIdsResult &result) {
       result.output_mode[count_id] |= watchers[i].aggregation_mode;
     }
   }
-  return ddres_init();
+  return {};
 }
 
 class ProfValueTypes {
@@ -248,14 +248,14 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
                               std::string("container_id"));
   }
 
-  return ddres_init();
+  return {};
 }
 
 DDRes pprof_free_profile(DDProfPProf *pprof) {
   ddog_prof_Profile_drop(&pprof->_profile);
   pprof->_profile = {};
   pprof->_nb_values = 0;
-  return ddres_init();
+  return {};
 }
 
 // Assumption of API is that sample is valid in a single type
@@ -277,7 +277,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     values[pprof_indices.pprof_count_index] = count;
   }
 
-  ddog_prof_Location locations_buff[DD_MAX_STACK_DEPTH];
+  ddog_prof_Location locations_buff[kMaxStackDepth];
   std::span locs{uw_output->locs};
 
   if (watcher->options.nb_frames_to_skip < locs.size()) {

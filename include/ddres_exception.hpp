@@ -18,11 +18,11 @@ class DDException : public std::exception {
 public:
   explicit DDException(DDRes ddres) : _ddres(ddres) {}
   DDException(int16_t sev, int16_t what) : _ddres(ddres_create(sev, what)) {}
-  DDRes get_DDRes() const { return _ddres; }
+  [[nodiscard]] DDRes get_DDRes() const { return _ddres; }
 
 private:
   // TODO: Possibly inherit from runtime exceptions to pass string
-  const DDRes _ddres;
+  DDRes _ddres;
 };
 } // namespace ddprof
 
@@ -41,7 +41,7 @@ private:
         LG_ERR("Forward error at %s:%u - %s", __FILE__, __LINE__,              \
                ddres_error_message(lddres._what));                             \
         throw ddprof::DDException(lddres);                                     \
-      } else if (lddres._sev == DD_SEVWARN) {                                  \
+      } else if (lddres._sev == DD_SEV_WARN) {                                 \
         LG_WRN("Recover from sev=%d at %s:%u - %s", lddres._sev, __FILE__,     \
                __LINE__, ddres_error_message(lddres._what));                   \
       } else {                                                                 \

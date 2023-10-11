@@ -93,7 +93,7 @@ void unwind_init_sample(UnwindState *us, const uint64_t *sample_regs,
   us->stack = sample_data_stack;
 }
 
-DDRes unwindstate__unwind(UnwindState *us) {
+DDRes unwindstate_unwind(UnwindState *us) {
   DDRes res = ddres_init();
   if (us->pid != 0) { // we can not unwind pid 0
     res = unwind_dwfl(us);
@@ -133,7 +133,7 @@ void unwind_cycle(UnwindState *us) {
   us->symbol_hdr.display_stats();
   us->symbol_hdr.cycle();
   us->dwfl_hdr.display_stats();
-  us->dso_hdr._stats.reset();
+  us->dso_hdr.stats().reset();
   unwind_metrics_reset();
 }
 

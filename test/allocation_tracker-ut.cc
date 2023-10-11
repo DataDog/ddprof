@@ -31,6 +31,10 @@
 #  define NOEXCEPT
 #endif
 
+#ifndef __clang__
+#  pragma GCC diagnostic ignored "-Wuse-after-free"
+#endif
+
 extern "C" {
 // Declaration of reallocarray is only available starting from glibc 2.28
 __attribute__((weak)) void *reallocarray(void *ptr, size_t nmemb,
@@ -88,7 +92,7 @@ TEST(allocation_tracker, start_stop) {
   ASSERT_TRUE(AllocationTracker::is_active());
   my_func_calling_malloc(1);
   { // check that we get the relevant info for this allocation
-    MPSCRingBufferReader reader{ring_buffer.get_ring_buffer()};
+    MPSCRingBufferReader reader{&ring_buffer.get_ring_buffer()};
     ASSERT_GT(reader.available_size(), 0);
 
     auto buf = reader.read_sample();
@@ -108,7 +112,7 @@ TEST(allocation_tracker, start_stop) {
     UnwindState state;
     unwind_init_sample(&state, sample->regs, sample->pid, sample->size_stack,
                        sample->data_stack);
-    unwindstate__unwind(&state);
+    unwindstate_unwind(&state);
 
     const auto &symbol_table = state.symbol_hdr._symbol_table;
     ASSERT_GT(state.output.locs.size(), NB_FRAMES_TO_SKIP);
@@ -119,7 +123,7 @@ TEST(allocation_tracker, start_stop) {
   my_free(0xdeadbeef);
   // ensure we get a deallocation event
   {
-    MPSCRingBufferReader reader{ring_buffer.get_ring_buffer()};
+    MPSCRingBufferReader reader{&ring_buffer.get_ring_buffer()};
     ASSERT_GT(reader.available_size(), 0);
 
     auto buf = reader.read_sample();
@@ -133,7 +137,7 @@ TEST(allocation_tracker, start_stop) {
   }
   my_free(0xcafebabe);
   {
-    MPSCRingBufferReader reader{ring_buffer.get_ring_buffer()};
+    MPSCRingBufferReader reader{&ring_buffer.get_ring_buffer()};
     ASSERT_EQ(reader.available_size(), 0);
   }
   AllocationTracker::allocation_tracking_free();
@@ -183,7 +187,7 @@ TEST(allocation_tracker, max_tracked_allocs) {
        ++i) {
     uintptr_t addr = 0x1000 + (i * 16);
     my_malloc(1, addr);
-    ddprof::MPSCRingBufferReader reader{ring_buffer.get_ring_buffer()};
+    ddprof::MPSCRingBufferReader reader{&ring_buffer.get_ring_buffer()};
     while (reader.available_size() > 0) {
       auto buf = reader.read_sample();
       ASSERT_FALSE(buf.empty());
@@ -215,7 +219,7 @@ public:
       : _ring_buffer(ring_buffer), _alloc_size(alloc_size) {}
 
   void check_alloc(void *ptr, size_t alloc_size, void **ptr2 = nullptr) {
-    MPSCRingBufferReader reader{_ring_buffer};
+    MPSCRingBufferReader reader{&_ring_buffer};
     ASSERT_GT(reader.available_size(), 0);
 
     auto buf = reader.read_sample();
@@ -241,7 +245,7 @@ public:
   }
 
   void check_dealloc(void *ptr, bool only_last_one = false) {
-    MPSCRingBufferReader reader{_ring_buffer};
+    MPSCRingBufferReader reader{&_ring_buffer};
     ASSERT_GT(reader.available_size(), 0);
     auto buf = reader.read_sample();
     if (only_last_one) {
@@ -261,7 +265,7 @@ public:
   }
 
   void check_empty() {
-    MPSCRingBufferReader reader{_ring_buffer};
+    MPSCRingBufferReader reader{&_ring_buffer};
     ASSERT_EQ(reader.available_size(), 0);
   }
 
@@ -319,7 +323,7 @@ public:
   }
 
   void empty_ring_buffer() {
-    MPSCRingBufferReader reader{_ring_buffer};
+    MPSCRingBufferReader reader{&_ring_buffer};
     for (auto buf = reader.read_sample(); !buf.empty();
          buf = reader.read_sample()) {}
   }

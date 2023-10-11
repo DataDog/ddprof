@@ -36,6 +36,7 @@ extern int yylex_destroy(yyscan_t scanner);
 extern YY_BUFFER_STATE yy_scan_string(const char * str, yyscan_t scanner);
 extern void yy_delete_buffer(YY_BUFFER_STATE buffer, yyscan_t scanner);
 
+using namespace ddprof;
 
 EventConf g_accum_event_conf = {};
 EventConf g_template_event_conf = {};
@@ -129,6 +130,7 @@ void yyerror(yyscan_t scanner, const char *str) {
    YYABORT;  \
  } while(0)
 
+namespace ddprof {
  int EventConf_parse(const char *msg, const EventConf &template_conf, std::vector<EventConf>& event_configs) {
   g_template_event_conf = template_conf;
   g_accum_event_conf = g_template_event_conf;
@@ -143,6 +145,7 @@ void yyerror(yyscan_t scanner, const char *str) {
   yy_delete_buffer(buffer, scanner);
   yylex_destroy(scanner);
   return ret;
+}
 }
 
 #ifdef EVENT_PARSER_MAIN
@@ -171,7 +174,7 @@ int main(int c, char **v) {
 	std::string *str;
 	char typ;
 	double fpnum;
-	EventConfField field;
+	ddprof::EventConfField field;
 };
 
 %token EQ OPTSEP CONFSEP

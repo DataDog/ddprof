@@ -11,7 +11,8 @@ namespace details {
 
 struct DeferDummy {};
 
-template <class F> ddprof::scope_exit<F> operator*(DeferDummy, F &&f) {
+template <class F>
+ddprof::scope_exit<F> operator*(DeferDummy /*unused*/, F &&f) {
   return ddprof::scope_exit<F>{std::forward<F>(f)};
 }
 

@@ -66,6 +66,7 @@ public:
 private:
   static constexpr unsigned k_ratio_max_elt_to_bitset_size = 16;
 
+  // NOLINTBEGIN(misc-non-private-member-variables-in-classes)
   struct TrackerState {
     void init(bool track_alloc, bool track_dealloc) {
       track_allocations = track_alloc;
@@ -81,6 +82,7 @@ private:
     std::atomic<uint32_t> failure_count;
     std::atomic<pid_t> pid; // lazy cache of pid (0 is un-init value)
   };
+  // NOLINTEND(misc-non-private-member-variables-in-classes)
 
   AllocationTracker();
 
@@ -172,12 +174,12 @@ void AllocationTracker::track_deallocation_s(
 }
 
 bool AllocationTracker::is_active() {
-  auto instance = _instance;
+  auto *instance = _instance;
   return instance && instance->_state.track_allocations;
 }
 
 bool AllocationTracker::is_deallocation_tracking_active() {
-  auto instance = _instance;
+  auto *instance = _instance;
   return instance && instance->_state.track_deallocations;
 }
 

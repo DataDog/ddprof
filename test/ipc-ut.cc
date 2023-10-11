@@ -5,6 +5,8 @@
 
 #include "ipc.hpp"
 
+#include "unique_fd.hpp"
+
 #include <cstdlib>
 #include <fcntl.h>
 #include <string>
@@ -17,23 +19,23 @@ using namespace std::chrono_literals;
 
 namespace ddprof {
 
-static const int kParentIdx = 0;
-static const int kChildIdx = 1;
-
 TEST(IPCTest, Positive) {
   // Create a socket pair
   std::string payload = "Interesting test.";
 
   int sockets[2] = {-1, -1};
   ASSERT_EQ(socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sockets), 0);
+  UniqueFd parent_socket{sockets[0]};
+  UniqueFd child_socket{sockets[1]};
+
   // Fork
   pid_t child_pid = fork();
   if (!child_pid) {
-    FILE *tmp_file = std::tmpfile();
+    UniqueFile tmp_file{std::tmpfile()};
     // I am the child, close parent socket (dupe)
-    close(sockets[kParentIdx]);
-    UnixSocket socket(sockets[kChildIdx]);
-    int fileFd = fileno(tmp_file);
+    parent_socket.reset();
+    UnixSocket socket(child_socket.release());
+    int fileFd = fileno(tmp_file.get());
     // Send something from child
     size_t writeRet = write(fileFd, payload.c_str(), payload.size());
     EXPECT_GT(writeRet, 0);
@@ -42,31 +44,27 @@ TEST(IPCTest, Positive) {
     std::error_code ec;
     socket.send({&dummy, 1}, {&fileFd, 1}, ec);
     EXPECT_FALSE(ec);
-    close(sockets[kChildIdx]);
-    close(fileFd);
     exit(0);
   } else {
     // I am a parent
-    close(sockets[kChildIdx]);
-    UnixSocket socket(sockets[kParentIdx]);
-    int fd;
+    child_socket.reset();
+    UnixSocket socket(parent_socket.release());
     std::byte buf[1];
     std::error_code ec;
-    auto res = socket.receive(buf, {&fd, 1}, ec);
+    int fds[1] = {-1};
+    auto res = socket.receive(buf, fds, ec);
     EXPECT_FALSE(ec);
     EXPECT_EQ(res.first, 1);
     EXPECT_EQ(res.second, 1);
-    EXPECT_NE(fcntl(fd, F_GETFD, 0), -1);
+    UniqueFd fd{fds[0]};
+    EXPECT_NE(fcntl(fd.get(), F_GETFD, 0), -1);
     // reset the cursor
-    lseek(fd, 0, SEEK_SET);
-    char *buffer = static_cast<char *>(malloc(payload.size()));
-    int readRet = read(fd, buffer, payload.size());
+    lseek(fd.get(), 0, SEEK_SET);
+    auto buffer = std::make_unique<char[]>(payload.size());
+    int readRet = read(fd.get(), buffer.get(), payload.size());
     EXPECT_TRUE(readRet > 0);
     // Check it in the parent
-    EXPECT_EQ(memcmp(payload.c_str(), buffer, payload.size()), 0);
-    close(sockets[kParentIdx]);
-    free(buffer);
-    close(fd);
+    EXPECT_EQ(memcmp(payload.c_str(), buffer.get(), payload.size()), 0);
     int wstatus;
     EXPECT_EQ(child_pid, waitpid(child_pid, &wstatus, 0));
     EXPECT_TRUE(WIFEXITED(wstatus));

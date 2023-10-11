@@ -17,8 +17,8 @@
 #include <iostream>
 #include <unordered_map>
 
-typedef struct Dwfl Dwfl;
-typedef struct Dwfl_Module Dwfl_Module;
+using Dwfl = struct Dwfl;
+using Dwfl_Module = struct Dwfl_Module;
 
 namespace ddprof {
 
@@ -26,14 +26,14 @@ namespace ddprof {
 struct DwflWrapper;
 
 struct DwflSymbolLookupStats {
-  DwflSymbolLookupStats()
-      : _hit(0), _calls(0), _errors(0), _no_dwfl_symbols(0) {}
+  DwflSymbolLookupStats() = default;
+
   void reset();
   void display(unsigned nb_elts) const;
-  int _hit;
-  int _calls;
-  int _errors;
-  int _no_dwfl_symbols;
+  int _hit{0};
+  int _calls{0};
+  int _errors{0};
+  int _no_dwfl_symbols{0};
 };
 
 /*********************/
@@ -53,18 +53,19 @@ public:
 
   void erase(FileInfoId_t file_info_id) { _file_info_map.erase(file_info_id); }
 
-  DwflSymbolLookupStats _stats;
-
   unsigned size() const;
+
+  const DwflSymbolLookupStats &stats() const { return _stats; }
+  DwflSymbolLookupStats &stats() { return _stats; }
 
 private:
   /// Set through env var (DDPROF_CACHE_SETTING) in case of doubts on cache
-  typedef enum SymbolLookupSetting {
+  enum SymbolLookupSetting {
     K_CACHE_ON = 0,
     K_CACHE_VALIDATE,
-  } SymbolLookupSetting;
+  };
 
-  SymbolLookupSetting _lookup_setting;
+  SymbolLookupSetting _lookup_setting{K_CACHE_ON};
 
   SymbolIdx_t insert(const DDProfMod &ddprof_mod, SymbolTable &table,
                      DsoSymbolLookup &dso_symbol_lookup,
@@ -83,6 +84,7 @@ private:
 
   // unordered map of DSO elements
   FileInfo2SymbolMap _file_info_map;
+  DwflSymbolLookupStats _stats;
 };
 
 } // namespace ddprof

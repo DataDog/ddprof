@@ -33,7 +33,7 @@ public:
   // lazy read of container id
   const ContainerId &get_container_id(std::string_view path_to_proc = "");
 
-  uint64_t _sample_counter = {};
+  uint64_t increment_counter() { return ++_sample_counter; }
 
 private:
   static std::string format_cgroup_file(pid_t pid,
@@ -45,6 +45,7 @@ private:
   pid_t _pid;
   CGroupId_t _cgroup_ns;
   ContainerId _container_id;
+  uint64_t _sample_counter = {};
 };
 
 class ProcessHdr {

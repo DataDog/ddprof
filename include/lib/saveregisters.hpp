@@ -33,8 +33,8 @@ namespace ddprof {
 
 #if defined(__x86_64__)
 
-DDPROF_NOINLINE __attribute__((naked)) void
-    save_registers(std::span<uint64_t, k_perf_register_count>);
+DDPROF_NOINLINE __attribute__((naked)) void save_registers(
+    std::span<uint64_t, k_perf_register_count> /*read in ASM code*/);
 
 #elif defined(__aarch64__)
 

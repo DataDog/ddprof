@@ -36,35 +36,44 @@ struct PProfIndices {
 };
 
 struct PerfWatcher {
-  int ddprof_event_type; // ddprof event type from DDPROF_EVENT_NAMES enum
-  std::string desc;
   uint64_t sample_type; // perf sample type: specifies values included in sample
+  unsigned long config; // specifies which perf event is requested
+  double value_scale;
+  std::string desc;
+
+  // tracepoint configuration
+  std::string tracepoint_event;
+  std::string tracepoint_group;
+  std::string tracepoint_label;
+
+  int ddprof_event_type; // ddprof event type from DDPROF_EVENT_NAMES enum
+
   int type; // perf event type (software / hardware / tracepoint / ... or custom
             // for non-perf events)
-  unsigned long config; // specifies which perf event is requested
+
   union {
     int64_t sample_period;
     uint64_t sample_frequency;
   };
   int sample_type_id; // index into the sample types defined in this header
 
+  EventConfValueSource value_source; // how to normalize the sample value
+  EventAggregationMode aggregation_mode;
+
   // perf_event_open configs
   struct PerfWatcherOptions options;
-  // tracepoint configuration
-  EventConfValueSource value_source; // how to normalize the sample value
+
+  PProfIndices pprof_indices[kNbEventAggregationModes]; // std and live
+
   uint8_t regno;
   uint8_t raw_off;
   uint8_t raw_sz;
-  double value_scale;
-  std::string tracepoint_event;
-  std::string tracepoint_group;
-  std::string tracepoint_label;
+
   // Other configs
   bool suppress_pid;
   bool suppress_tid;
-  PProfIndices pprof_indices[kNbEventAggregationModes]; // std and live
+
   bool instrument_self; // do my own perf_event_open, etc
-  EventAggregationMode aggregation_mode;
 };
 
 // The Datadog backend only understands pre-configured event types.  Those
@@ -83,9 +92,9 @@ struct PerfWatcher {
 
 // defines enum of profile types
 #define X_ENUM(a, b, c, d, e) DDPROF_PWT_##a,
-typedef enum DDPROF_SAMPLE_TYPES {
+enum DDPROF_SAMPLE_TYPES {
   PROFILE_TYPE_TABLE(X_ENUM) DDPROF_PWT_LENGTH,
-} DDPROF_SAMPLE_TYPES;
+};
 #undef X_ENUM
 
 // Define our own event type on top of perf event types
@@ -149,10 +158,10 @@ enum DDProfCustomCountId {
 // clang-format on
 
 #define X_ENUM(a, b, c, d, e, f, g) DDPROF_PWE_##a,
-typedef enum DDPROF_EVENT_NAMES {
+enum DDPROF_EVENT_NAMES {
   DDPROF_PWE_TRACEPOINT = -1,
   EVENT_CONFIG_TABLE(X_ENUM) DDPROF_PWE_LENGTH,
-} DDPROF_EVENT_NAMES;
+};
 #undef X_ENUM
 
 // Helper functions for event-type watcher lookups

@@ -19,7 +19,7 @@ public:
                             SymbolTable &symbol_table);
 
 private:
-  std::unordered_map<SymbolErrors, SymbolIdx_t, EnumClassHash> _map;
+  std::unordered_map<SymbolErrors, SymbolIdx_t> _map;
 };
 
 } // namespace ddprof

@@ -21,17 +21,8 @@ TEST(ReentryGuardTest, basic) {
 }
 
 TEST(ReentryGuardTest, null_init) {
-  bool reentry_guard = false;
-  {
-    ReentryGuard guard(nullptr);
-    EXPECT_FALSE(guard);
-    guard.register_guard(&reentry_guard);
-    EXPECT_TRUE(guard);
-    {
-      ReentryGuard guard2(&reentry_guard);
-      EXPECT_FALSE(guard2);
-    }
-  }
+  ReentryGuard guard(nullptr);
+  EXPECT_FALSE(guard);
 }
 
 TEST(TLReentryGuardTest, basic) {
@@ -64,8 +55,8 @@ TEST(TLReentryGuardTest, many_threads) {
     thread.join();
   }
   // Check that all entries are reset
-  for (auto &entry : entries.thread_entries) {
-    EXPECT_EQ(entry.load(), -1);
+  for (size_t i = 0; i < ThreadEntries::max_threads; ++i) {
+    EXPECT_EQ(entries.get_entry(i).load(), -1);
   }
 }
 
@@ -97,8 +88,8 @@ TEST(TLReentryGuardTest, reqcuisition_many_threads) {
   }
 
   // Check that all entries are reset
-  for (auto &entry : entries.thread_entries) {
-    EXPECT_EQ(entry.load(), -1);
+  for (size_t i = 0; i < ThreadEntries::max_threads; ++i) {
+    EXPECT_EQ(entries.get_entry(i).load(), -1);
   }
 }
 

@@ -47,5 +47,5 @@ DDRes log_capabilities(bool verbose) {
 
   cap_free(pcap_text);
   cap_free(cap_struct);
-  return ddres_init();
+  return {};
 }

@@ -24,10 +24,12 @@ inline DDPROF_ALWAYS_INLINE void DoNotOptimize(Tp const &value) {
 }
 
 template <class Tp> inline DDPROF_ALWAYS_INLINE void DoNotOptimize(Tp &value) {
-#if defined(__clang__)
+#ifndef __clang_analyzer__
+#  if defined(__clang__)
   asm volatile("" : "+r,m"(value) : : "memory");
-#else
+#  else
   asm volatile("" : "+m,r"(value) : : "memory");
+#  endif
 #endif
 }
 } // namespace ddprof

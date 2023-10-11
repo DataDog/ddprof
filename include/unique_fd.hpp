@@ -13,15 +13,15 @@ namespace ddprof {
 template <typename T, T NullValue = T()> class Handle {
 public:
   // cppcheck-suppress noExplicitConstructor
-  Handle(std::nullptr_t) {}
+  Handle(std::nullptr_t) {} // NOLINT(google-explicit-constructor)
   // cppcheck-suppress noExplicitConstructor
-  Handle(T x) : _val(x) {}
+  Handle(T x) : _val(x) {} // NOLINT(google-explicit-constructor)
   Handle() = default;
 
   explicit operator bool() const { return _val != NullValue; }
-  operator T() const { return _val; }
+  operator T() const { return _val; } // NOLINT(google-explicit-constructor)
 
-  T get() const { return _val; }
+  [[nodiscard]] T get() const { return _val; }
 
   friend bool operator==(Handle a, Handle b) = default;
 
@@ -37,8 +37,11 @@ template <typename Handle, typename Deleter> struct HandleDeleter {
 };
 
 inline constexpr auto fdclose = [](auto fd) { ::close(fd); };
+inline constexpr auto fclose = [](FILE *f) { ::fclose(f); };
 
 using UniqueFd =
     std::unique_ptr<int, HandleDeleter<FdHandle, decltype(fdclose)>>;
+
+using UniqueFile = std::unique_ptr<FILE, decltype(fclose)>;
 
 } // namespace ddprof

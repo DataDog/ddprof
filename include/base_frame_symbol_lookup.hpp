@@ -28,10 +28,9 @@ private:
                                 DsoHdr &dso_hdr);
   static const int k_nb_bin_lookups = 10;
   struct PidSymbol {
-    explicit PidSymbol(SymbolIdx_t symb_idx)
-        : _symb_idx(symb_idx), _nb_bin_lookups(1) {}
+    explicit PidSymbol(SymbolIdx_t symb_idx) : _symb_idx(symb_idx) {}
     SymbolIdx_t _symb_idx;
-    int _nb_bin_lookups;
+    int _nb_bin_lookups{1};
   };
   std::unordered_map<pid_t, SymbolIdx_t> _bin_map;
   // holds generic symbol for this pid and a number of lookups to keep track of

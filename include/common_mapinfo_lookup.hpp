@@ -24,7 +24,7 @@ public:
                             MapInfoTable &mapinfo_table);
 
 private:
-  std::unordered_map<MappingErrors, MapInfoIdx_t, EnumClassHash> _map;
+  std::unordered_map<MappingErrors, MapInfoIdx_t> _map;
 };
 
 } // namespace ddprof

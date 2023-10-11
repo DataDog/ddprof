@@ -207,7 +207,7 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc,
                     const FileInfoValue &fileInfoValue, DDProfMod &ddprof_mod) {
   const std::string &filepath = fileInfoValue.get_path();
   const char *module_name = strrchr(filepath.c_str(), '/') + 1;
-  if (fileInfoValue._errored) { // avoid bouncing on errors
+  if (fileInfoValue.errored()) { // avoid bouncing on errors
     LG_DBG("DSO Previously errored - mod (%s)", module_name);
     return ddres_warn(DD_WHAT_MODULE);
   }
@@ -241,7 +241,7 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc,
   Offset_t bias = 0;
   auto res = compute_elf_bias(fd_holder.get(), filepath, dsoRange, bias);
   if (!IsDDResOK(res)) {
-    fileInfoValue._errored = true;
+    fileInfoValue.set_errored();
     LG_WRN("Couldn't retrieve offsets from %s(%s)", module_name,
            fileInfoValue.get_path().c_str());
     return res;
@@ -263,7 +263,7 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc,
   if (!ddprof_mod._mod) {
     // Ideally we would differentiate pid errors from file errors.
     // For perf reasons we will just flag the file as errored
-    fileInfoValue._errored = true;
+    fileInfoValue.set_errored();
     LG_WRN("Couldn't addrmodule (%s)[0x%lx], MOD:%s (%s)", dwfl_errmsg(-1), pc,
            module_name, fileInfoValue.get_path().c_str());
     return ddres_warn(DD_WHAT_MODULE);

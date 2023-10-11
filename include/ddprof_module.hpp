@@ -9,9 +9,7 @@
 
 #include "build_id.hpp"
 
-extern "C" {
-typedef struct Dwfl_Module Dwfl_Module;
-}
+using Dwfl_Module = struct Dwfl_Module;
 
 namespace ddprof {
 struct DDProfModRange {
@@ -25,23 +23,21 @@ struct DDProfMod {
     kInconsistent,
   };
 
-  DDProfMod()
-      : _mod(nullptr), _low_addr(0), _high_addr(0),
-        _sym_bias(static_cast<Offset_t>(-1)), _status(kUnknown) {}
+  DDProfMod() = default;
 
-  explicit DDProfMod(Status status) : DDProfMod() { _status = status; }
+  explicit DDProfMod(Status status) : _status(status) {}
 
   void set_build_id(BuildIdSpan x) { _build_id = format_build_id(x); }
 
   // build id (string that displays the hexadecimal value)
   BuildIdStr _build_id;
   // In the current version of dwfl, the dwfl_module addresses are stable
-  Dwfl_Module *_mod;
-  ProcessAddress_t _low_addr;
-  ProcessAddress_t _high_addr;
-  // The symbol biais (0 for position dependant)
-  Offset_t _sym_bias;
-  Status _status;
+  Dwfl_Module *_mod = nullptr;
+  ProcessAddress_t _low_addr{};
+  ProcessAddress_t _high_addr{};
+  // The symbol bias (0 for position dependant)
+  Offset_t _sym_bias{static_cast<Offset_t>(-1)};
+  Status _status{kUnknown};
 };
 
 } // namespace ddprof

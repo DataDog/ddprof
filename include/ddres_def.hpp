@@ -10,10 +10,10 @@
 #include <stdint.h>
 
 enum DD_RES_SEV {
-  DD_SEVOK = 0,
-  DD_SEVNOTICE = 1,
-  DD_SEVWARN = 2,
-  DD_SEVERROR = 3,
+  DD_SEV_OK = 0,
+  DD_SEV_NOTICE = 1,
+  DD_SEV_WARN = 2,
+  DD_SEV_ERROR = 3,
 };
 
 /// Result structure containing a what / severity
@@ -39,7 +39,7 @@ struct DDRes {
     (res)._val = 0;                                                            \
   } while (0)
 
-#define FillDDResFatal(res, what) FillDDRes((res), DD_SEVERROR, what)
+#define FillDDResFatal(res, what) FillDDRes((res), DD_SEV_ERROR, what)
 
 /******** STANDARD APIs TO USE BELLOW **********/
 // In C you should be careful of static inline vs extern inline vs inline
@@ -53,16 +53,16 @@ static inline DDRes ddres_create(int16_t sev, int16_t what) {
 
 /// Creates a DDRes taking an error code (what)
 static inline DDRes ddres_error(int16_t what) {
-  return ddres_create(DD_SEVERROR, what);
+  return ddres_create(DD_SEV_ERROR, what);
 }
 
 /// Creates a DDRes with a warning taking an error code (what)
 static inline DDRes ddres_warn(int16_t what) {
-  return ddres_create(DD_SEVWARN, what);
+  return ddres_create(DD_SEV_WARN, what);
 }
 
 /// Create an OK DDRes
-static inline DDRes ddres_init(void) {
+static inline DDRes ddres_init() {
   DDRes ddres = {};
   return ddres;
 }
@@ -72,15 +72,15 @@ static inline bool ddres_equal(DDRes lhs, DDRes rhs) {
   return lhs._val == rhs._val;
 }
 
-// Assumption behind these is that SEVERROR does not occur often
+// Assumption behind these is that SEV_ERROR does not occur often
 
 /// true if ddres is not OK (unlikely)
-#define IsDDResNotOK(res) unlikely((res)._sev != DD_SEVOK)
+#define IsDDResNotOK(res) unlikely((res)._sev != DD_SEV_OK)
 
 /// true if ddres is OK (likely)
-#define IsDDResOK(res) likely((res)._sev == DD_SEVOK)
+#define IsDDResOK(res) likely((res)._sev == DD_SEV_OK)
 
 /// true if ddres is fatal (unlikely)
-#define IsDDResFatal(res) unlikely((res)._sev == DD_SEVERROR)
+#define IsDDResFatal(res) unlikely((res)._sev == DD_SEV_ERROR)
 
 inline bool operator==(DDRes lhs, DDRes rhs) { return ddres_equal(lhs, rhs); }

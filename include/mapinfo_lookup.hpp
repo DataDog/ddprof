@@ -29,8 +29,8 @@ public:
   }
 
 private:
-  typedef std::unordered_map<ElfAddress_t, MapInfoIdx_t> MapInfoAddrMap;
-  typedef std::unordered_map<pid_t, MapInfoAddrMap> MapInfoPidMap;
+  using MapInfoAddrMap = std::unordered_map<ElfAddress_t, MapInfoIdx_t>;
+  using MapInfoPidMap = std::unordered_map<pid_t, MapInfoAddrMap>;
 
   MapInfoPidMap _mapinfo_pidmap;
 };

@@ -77,11 +77,11 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     LG_DBG("Failure to compute frame PC: %s (depth#%lu)", dwfl_errmsg(-1),
            us->output.locs.size());
     add_error_frame(nullptr, us, pc, SymbolErrors::dwfl_frame);
-    return ddres_init(); // invalid pc : do not add frame
+    return {}; // invalid pc : do not add frame
   }
   us->current_ip = pc;
   DsoHdr &dsoHdr = us->dso_hdr;
-  DsoHdr::PidMapping &pid_mapping = dsoHdr._pid_map[us->pid];
+  DsoHdr::PidMapping &pid_mapping = dsoHdr.get_pid_mapping(us->pid);
   if (!pc) {
     // Unwinding can end on a null address
     // Example: alpine 3.17
@@ -101,7 +101,7 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
       LG_DBG("[UW] (PID%d) DSO not found at 0x%lx (depth#%lu)", us->pid, pc,
              us->output.locs.size());
       add_error_frame(nullptr, us, pc, SymbolErrors::unknown_dso);
-      return ddres_init();
+      return {};
     }
     const Dso &dso = find_res.first->second;
     std::string_view jitdump_path = {};
@@ -142,7 +142,7 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
           // ambiguous LOAD segments detected, retry after backpopulate
           retry = true;
           // clear errored state to allow retry
-          file_info_value._errored = false;
+          file_info_value.reset_errored();
         } else {
           return ddres_warn(DD_WHAT_UW_ERROR);
         }
@@ -162,7 +162,7 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     LG_DBG("Failure to compute frame PC: %s (depth#%lu)", dwfl_errmsg(-1),
            us->output.locs.size());
     add_error_frame(nullptr, us, pc, SymbolErrors::dwfl_frame);
-    return ddres_init(); // invalid pc : do not add frame
+    return {}; // invalid pc : do not add frame
   }
   if (!is_activation) {
     --pc;
@@ -173,7 +173,7 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   if (IsDDResNotOK(add_dwfl_frame(us, dso, pc, *ddprof_mod, file_info_id))) {
     return ddres_warn(DD_WHAT_UW_ERROR);
   }
-  return ddres_init();
+  return {};
 }
 
 // frame_cb callback at every frame for the dwarf unwinding
@@ -240,7 +240,7 @@ DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
   }
   if (symbol_idx == -1) {
     add_dso_frame(us, dso, pc, "pc");
-    return ddres_init();
+    return {};
   }
 
   MapInfoIdx_t const map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
@@ -257,7 +257,7 @@ DDRes unwind_init_dwfl(UnwindState *us) {
     // we need to add at least one module to figure out the architecture (to
     // create the unwinding backend)
 
-    DsoHdr::DsoMap const &map = us->dso_hdr._pid_map[us->pid]._map;
+    DsoHdr::DsoMap const &map = us->dso_hdr.get_pid_mapping(us->pid)._map;
     if (map.empty()) {
       int nb_elts;
       us->dso_hdr.pid_backpopulate(us->pid, nb_elts);
@@ -304,7 +304,7 @@ DDRes unwind_init_dwfl(UnwindState *us) {
     // Creates the dwfl unwinding backend
     return us->_dwfl_wrapper->attach(us->pid, &dwfl_callbacks, us);
   }
-  return ddres_init();
+  return {};
 }
 
 DDRes unwind_dwfl(UnwindState *us) {

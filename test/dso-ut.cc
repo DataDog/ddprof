@@ -107,7 +107,7 @@ TEST(DSOTest, intersections) {
   {
     Dso dso_inter(10, 900, 1700);
     DsoRange range =
-        dso_hdr.get_intersection(dso_hdr._pid_map[10]._map, dso_inter);
+        dso_hdr.get_intersection(dso_hdr.get_pid_mapping(10)._map, dso_inter);
     EXPECT_EQ(range.first->second._pid, 10);
     EXPECT_EQ(range.first->second._start, 1000);
     // contains the 1500 -> 1999 element, WARNING the end element is after the
@@ -146,7 +146,7 @@ TEST(DSOTest, intersections) {
     DsoRange range = dso_hdr.get_intersection(10, dso_inter);
     EXPECT_EQ(range.first->second._pid, 10);
     EXPECT_EQ(range.first->second._start, 1000);
-    EXPECT_EQ(range.second, dso_hdr._pid_map[10]._map.end());
+    EXPECT_EQ(range.second, dso_hdr.get_pid_mapping(10)._map.end());
   }
 }
 
@@ -164,8 +164,8 @@ TEST(DSOTest, find_same) {
   fill_mock_hdr(dso_hdr);
   {
     Dso dso_equal_addr(10, 1000, 1400); // larger
-    DsoFindRes find_res =
-        dso_hdr.dso_find_adjust_same(dso_hdr._pid_map[10]._map, dso_equal_addr);
+    DsoFindRes find_res = dso_hdr.dso_find_adjust_same(
+        dso_hdr.get_pid_mapping(10)._map, dso_equal_addr);
     ASSERT_FALSE(find_res.second);
     EXPECT_EQ(find_res.first->second._start, 1000);
   }
@@ -191,15 +191,15 @@ TEST(DSOTest, insert_erase_overlap) {
       dso_hdr.insert_erase_overlap(std::move(dso_overlap));
     }
     DsoFindRes find_res = dso_hdr.dso_find_adjust_same(
-        dso_hdr._pid_map[10]._map, build_dso_10_1000());
+        dso_hdr.get_pid_mapping(10)._map, build_dso_10_1000());
     EXPECT_FALSE(find_res.second);
-    find_res = dso_hdr.dso_find_adjust_same(dso_hdr._pid_map[10]._map,
+    find_res = dso_hdr.dso_find_adjust_same(dso_hdr.get_pid_mapping(10)._map,
                                             build_dso_10_1500());
     EXPECT_FALSE(find_res.second);
     EXPECT_EQ(dso_hdr.get_nb_dso(), 4);
     {
       Dso dso_overlap_2(10, 1100, 1700);
-      find_res = dso_hdr.dso_find_adjust_same(dso_hdr._pid_map[10]._map,
+      find_res = dso_hdr.dso_find_adjust_same(dso_hdr.get_pid_mapping(10)._map,
                                               dso_overlap_2);
       EXPECT_TRUE(find_res.second);
     }
@@ -343,7 +343,7 @@ TEST(DSOTest, backpopulate) {
 
   EXPECT_EQ(filename_procfs, filename_disk);
   // manually erase the unit test's binary
-  dso_hdr._pid_map[getpid()]._map.erase(find_res.first);
+  dso_hdr.get_pid_mapping(getpid())._map.erase(find_res.first);
   find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
   EXPECT_TRUE(find_res.second);
 }
@@ -376,7 +376,7 @@ TEST(DSOTest, mmap_into_backpop) {
   int nb_elts;
   dso_hdr.pid_backpopulate(my_pid, nb_elts);
   EXPECT_TRUE(nb_elts);
-  DsoHdr::PidMapping &pid_mapping = dso_hdr._pid_map[my_pid];
+  DsoHdr::PidMapping &pid_mapping = dso_hdr.get_pid_mapping(my_pid);
   bool found = false;
   Dso copy;
   for (auto &el : pid_mapping._map) {
@@ -402,7 +402,7 @@ TEST(DSOTest, insert_jitdump) {
   Dso jitdump_dso = DsoHdr::dso_from_proc_line(test_pid, s_jitdump_line);
   EXPECT_EQ(jitdump_dso._type, DsoType::kJITDump);
   ProcessAddress_t start = jitdump_dso._start;
-  DsoHdr::PidMapping &pid_mapping = dso_hdr._pid_map[test_pid];
+  DsoHdr::PidMapping &pid_mapping = dso_hdr.get_pid_mapping(test_pid);
   dso_hdr.insert_erase_overlap(pid_mapping, std::move(jitdump_dso));
   EXPECT_EQ(start, pid_mapping._jitdump_addr);
 }

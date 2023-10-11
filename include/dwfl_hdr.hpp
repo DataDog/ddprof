@@ -24,12 +24,9 @@ struct UnwindState;
 struct DwflWrapper {
   explicit DwflWrapper();
 
-  DwflWrapper(DwflWrapper &&other)
-      : _dwfl(nullptr), _attached(false), _inconsistent(false) {
-    swap(*this, other);
-  }
+  DwflWrapper(DwflWrapper &&other) noexcept { swap(*this, other); }
 
-  DwflWrapper &operator=(DwflWrapper &&other) {
+  DwflWrapper &operator=(DwflWrapper &&other) noexcept {
     swap(*this, other);
     return *this;
   }
@@ -54,9 +51,9 @@ struct DwflWrapper {
     std::swap(first._attached, second._attached);
   }
 
-  Dwfl *_dwfl;
-  bool _attached;
-  bool _inconsistent;
+  Dwfl *_dwfl{nullptr};
+  bool _attached{false};
+  bool _inconsistent{false};
 
   // Keep track of the files we added to the dwfl object
   std::unordered_map<FileInfoId_t, DDProfMod> _ddprof_mods;

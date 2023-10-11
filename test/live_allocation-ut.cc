@@ -36,7 +36,7 @@ TEST(LiveAllocationTest, simple) {
   auto &pid_map = live_alloc._watcher_vector[0];
   EXPECT_EQ(pid_map.size(), 1);
   auto &pid_stacks = pid_map[pid];
-  // all allocations are registerd
+  // all allocations are registered
   EXPECT_EQ(pid_stacks._address_map.size(), nb_registered_allocs);
   // though the stack is the same
   ASSERT_EQ(pid_stacks._unique_stacks.size(), 1);

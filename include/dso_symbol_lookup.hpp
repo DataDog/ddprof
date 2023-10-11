@@ -32,11 +32,11 @@ private:
   // map of maps --> the aim is to monitor usage of some maps and clear them
   // together
   // TODO : find efficient clear on symbol table before we do this
-  typedef std::unordered_map<FileAddress_t, SymbolIdx_t> AddressMap;
-  typedef std::unordered_map<std::string, AddressMap> DsoPathMap;
+  using AddressMap = std::unordered_map<FileAddress_t, SymbolIdx_t>;
+  using DsoPathMap = std::unordered_map<std::string, AddressMap>;
   DsoPathMap _map_dso_path;
   // For non-standard DSO types, address is not relevant
-  std::unordered_map<DsoType, SymbolIdx_t, EnumClassHash> _map_unhandled_dso;
+  std::unordered_map<DsoType, SymbolIdx_t> _map_unhandled_dso;
 };
 
 } // namespace ddprof

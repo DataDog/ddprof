@@ -14,10 +14,10 @@
 #include "event_config.hpp"
 #include "event_parser.h"
 
-#define DISPATCH(type)                       \
-{                                            \
-	yylval->field = (EventConfField::k##type);         \
-	return KEY;                          \
+#define DISPATCH(type)                                 \
+{                                                      \
+	yylval->field = (ddprof::EventConfField::k##type); \
+	return KEY;                                        \
 }
 
 %}

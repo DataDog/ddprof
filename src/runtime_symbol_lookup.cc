@@ -25,8 +25,8 @@ namespace ddprof {
 // 00007F78F52300D8 78 stub<2> AllocateTemporaryEntryPoints<PRECODE_STUB>
 // 00007F78F5230150 18 stub<3> AllocateTemporaryEntryPoints<PRECODE_STUB>
 
-FILE *RuntimeSymbolLookup::perfmaps_open(int pid,
-                                         const char *path_to_perfmap = "") {
+UniqueFile
+RuntimeSymbolLookup::perfmaps_open(int pid, const char *path_to_perfmap = "") {
   char buf[PATH_MAX];
   auto n = snprintf(buf, std::size(buf), "%s/proc/%d/root%s/perf-%d.map",
                     _path_to_proc.c_str(), pid, path_to_perfmap, pid);
@@ -34,14 +34,14 @@ FILE *RuntimeSymbolLookup::perfmaps_open(int pid,
       std::size(buf)) { // unable to snprintf everything
     return nullptr;
   }
-  FILE *perfmap_file = fopen(buf, "r");
+  UniqueFile perfmap_file{fopen(buf, "r")};
   if (perfmap_file) {
     return perfmap_file;
   }
   // attempt in local namespace
   snprintf(buf, std::size(buf), "%s/perf-%d.map", path_to_perfmap, pid);
   LG_DBG("Open perf-map %s", buf);
-  return fopen(buf, "r");
+  return UniqueFile{fopen(buf, "r")};
 }
 
 bool RuntimeSymbolLookup::insert_or_replace(std::string_view symbol,
@@ -140,7 +140,7 @@ DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
                       code_load.code_size, symbol_map, symbol_table);
   }
   // todo we can add file and inlined functions with debug info
-  return ddres_init();
+  return {};
 }
 
 bool RuntimeSymbolLookup::should_skip_symbol(std::string_view symbol) {
@@ -152,18 +152,17 @@ bool RuntimeSymbolLookup::should_skip_symbol(std::string_view symbol) {
 
 DDRes RuntimeSymbolLookup::fill_from_perfmap(int pid, SymbolMap &symbol_map,
                                              SymbolTable &symbol_table) {
-  FILE *pmf = perfmaps_open(pid, "/tmp");
-  if (pmf == nullptr) {
+  auto pmf{perfmaps_open(pid, "/tmp")};
+  if (!pmf) {
     LG_DBG("Unable to read perfmap file (PID%d)", pid);
     return ddres_error(DD_WHAT_NO_JIT_FILE);
   }
-  defer { fclose(pmf); };
 
   LG_DBG("Loading runtime symbols from (PID%d)", pid);
   char *line = nullptr;
   size_t sz_buf = 0;
   char buffer[PATH_MAX];
-  while (-1 != getline(&line, &sz_buf, pmf)) {
+  while (-1 != getline(&line, &sz_buf, pmf.get())) {
     constexpr size_t k_uint64_hex_rep_size = 2 * sizeof(uint64_t) + 1;
     char address_buff[k_uint64_hex_rep_size]; // max size of 16 (as it should be
                                               // hexa for uint64)
@@ -181,7 +180,7 @@ DDRes RuntimeSymbolLookup::fill_from_perfmap(int pid, SymbolMap &symbol_map,
     insert_or_replace(buffer, address, code_size, symbol_map, symbol_table);
   }
   free(line);
-  return ddres_init();
+  return {};
 }
 
 SymbolIdx_t

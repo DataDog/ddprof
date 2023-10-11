@@ -7,17 +7,17 @@
 
 namespace {
 const char *s_common_error_messages[] = {
-    "Common start range", COMMOM_ERROR_TABLE(EXPAND_ERROR_MESSAGE)};
+    "Common start range", COMMON_ERROR_TABLE(EXPAND_ERROR_MESSAGE)};
 
 const char *s_native_error_messages[] = {
     "native start range", NATIVE_ERROR_TABLE(EXPAND_ERROR_MESSAGE)};
 } // namespace
 
 const char *ddres_error_message(int16_t what) {
-  if (what < DD_WHAT_MIN_ERNO) {
+  if (what < DD_WHAT_MIN_ERRNO) {
     // should we handle errno here ?
     return "Check errno";
-    // Range of [DD_WHAT_MIN_ERNO; COMMON_ERROR_SIZE[ range
+    // Range of [DD_WHAT_MIN_ERRNO; COMMON_ERROR_SIZE[ range
   }
   if (what < COMMON_ERROR_SIZE) {
     return s_common_error_messages[what - DD_COMMON_START_RANGE];

@@ -14,28 +14,35 @@ namespace ddprof {
 class ThreadEntries {
 public:
   static constexpr size_t max_threads = 10;
-  std::array<std::atomic<pid_t>, max_threads> thread_entries;
   ThreadEntries() noexcept { reset(); }
   void reset() noexcept {
-    for (auto &entry : thread_entries) {
+    for (auto &entry : _thread_entries) {
       entry.store(-1, std::memory_order_relaxed);
     }
   }
+
+  std::atomic<pid_t> &get_entry(size_t idx) noexcept {
+    return _thread_entries[idx];
+  }
+
+private:
+  std::array<std::atomic<pid_t>, max_threads> _thread_entries;
 };
 
 class TLReentryGuard {
 public:
   explicit TLReentryGuard(ThreadEntries &entries, pid_t tid)
-      : _entries(entries), _ok(false), _index(-1) {
+      : _entries(entries) {
     while (true) {
       for (size_t i = 0; i < ThreadEntries::max_threads; ++i) {
         pid_t expected = -1;
-        if (_entries.thread_entries[i].compare_exchange_weak(
+        if (_entries.get_entry(i).compare_exchange_weak(
                 expected, tid, std::memory_order_acq_rel)) {
           _ok = true;
           _index = i;
           return;
-        } else if (expected == tid) {
+        }
+        if (expected == tid) {
           // This thread is already in the entries.
           return;
         }
@@ -48,7 +55,7 @@ public:
 
   ~TLReentryGuard() {
     if (_ok) {
-      _entries.thread_entries[_index].store(-1, std::memory_order_release);
+      _entries.get_entry(_index).store(-1, std::memory_order_release);
     }
   }
 
@@ -59,14 +66,13 @@ public:
 
 private:
   ThreadEntries &_entries;
-  bool _ok;
-  int _index;
+  bool _ok{false};
+  int _index{-1};
 };
 
 class ReentryGuard {
 public:
-  explicit ReentryGuard(bool *reentry_guard)
-      : _reentry_guard(reentry_guard), _ok(false) {
+  explicit ReentryGuard(bool *reentry_guard) : _reentry_guard(reentry_guard) {
     if (_reentry_guard) {
       _ok = (!*_reentry_guard);
       *_reentry_guard = true;
@@ -79,19 +85,6 @@ public:
     }
   }
 
-  bool register_guard(bool *reentry_guard) {
-    if (_reentry_guard) {
-      // not supported (already registered to other bool)
-      return false;
-    }
-    if (reentry_guard) {
-      _reentry_guard = reentry_guard;
-      _ok = (!*_reentry_guard);
-      *_reentry_guard = true;
-    }
-    return _ok;
-  }
-
   explicit operator bool() const { return _ok; }
 
   ReentryGuard(const ReentryGuard &) = delete;
@@ -99,7 +92,7 @@ public:
 
 private:
   bool *_reentry_guard;
-  bool _ok;
+  bool _ok{false};
 };
 
 } // namespace ddprof

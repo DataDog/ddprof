@@ -18,9 +18,6 @@
 
 namespace ddprof {
 struct DDProfContext {
-  DDProfContext() = default;
-  ~DDProfContext() = default;
-
   struct {
     bool enable{true};
     std::chrono::seconds upload_period{};
@@ -43,12 +40,5 @@ struct DDProfContext {
   std::vector<PerfWatcher> watchers;
   ExporterInput exp_input;
   DDProfWorkerContext worker_ctx;
-
-private:
-  DDProfContext(const DDProfContext &) = delete;
-  DDProfContext &operator=(const DDProfContext &) = delete;
-  // we could make it moveable (though not needed afaik)
-  DDProfContext(DDProfContext &&other) = delete;
-  DDProfContext &operator=(const DDProfContext &&) = delete;
 };
 } // namespace ddprof
