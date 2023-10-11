@@ -11,6 +11,7 @@
 #include "logger.hpp"
 #include "procutils.hpp"
 #include "signal_helper.hpp"
+#include "unique_fd.hpp"
 #include "user_override.hpp"
 
 #include <algorithm>
@@ -26,14 +27,12 @@ namespace ddprof {
 
 namespace {
 
-using FileHolder = std::unique_ptr<FILE, decltype([](FILE *f) { fclose(f); })>;
-
 uint32_t mode_string_to_prot(const char mode[4]) {
   return ((mode[0] == 'r') ? PROT_READ : 0) |
       ((mode[1] == 'w') ? PROT_WRITE : 0) | ((mode[2] == 'x') ? PROT_EXEC : 0);
 }
 
-FileHolder open_proc_maps(int pid, const char *path_to_proc = "") {
+UniqueFile open_proc_maps(int pid, const char *path_to_proc = "") {
   char proc_map_filename[PATH_MAX] = {};
   auto n = snprintf(proc_map_filename, std::size(proc_map_filename),
                     "%s/proc/%d/maps", path_to_proc, pid);
@@ -43,7 +42,7 @@ FileHolder open_proc_maps(int pid, const char *path_to_proc = "") {
     return {};
   }
 
-  FILE *f = fopen(proc_map_filename, "r");
+  UniqueFile f{fopen(proc_map_filename, "r")};
   if (!f) {
     // Check if the file exists
     struct stat info;
@@ -51,15 +50,12 @@ FileHolder open_proc_maps(int pid, const char *path_to_proc = "") {
     if (stat(proc_map_filename, &info) == 0 &&
         // try to switch to file user
         IsDDResOK(user_override(info.st_uid, info.st_gid, &old_uids))) {
-      f = fopen(proc_map_filename, "r");
+      f.reset(fopen(proc_map_filename, "r"));
       // switch back to initial user
       user_override(old_uids.uid, old_uids.gid);
     }
   }
-  if (!f) {
-    return {};
-  }
-  return FileHolder{f};
+  return f;
 }
 } // namespace
 
@@ -317,7 +313,7 @@ FileInfoId_t DsoHdr::update_id_from_path(const Dso &dso) {
     dso._id = it->second;
     // update with last location
     // looking up the actual path using mountinfo would prevent this
-    if (file_info._path != _file_info_vector[dso._id]._info._path) {
+    if (file_info._path != _file_info_vector[dso._id].info()._path) {
       _file_info_vector[dso._id] = FileInfoValue(std::move(file_info), dso._id);
     }
   }
@@ -408,8 +404,8 @@ bool DsoHdr::pid_backpopulate(PidMapping &pid_mapping, pid_t pid,
                               int &nb_elts_added) {
   // Following line creates the state for pid if it does not exist
   BackpopulateState &bp_state = _backpopulate_state_map[pid];
-  ++bp_state._nbUnfoundDsos;
-  if (bp_state._perm != kAllowed) { // retry
+  ++bp_state.nb_unfound_dsos;
+  if (bp_state.perm != kAllowed) { // retry
     return false;
   }
   nb_elts_added = 0;
@@ -436,7 +432,7 @@ bool DsoHdr::pid_backpopulate(PidMapping &pid_mapping, pid_t pid,
     }
   }
   if (!nb_elts_added) {
-    bp_state._perm = kForbidden;
+    bp_state.perm = kForbidden;
   }
   return true;
 }
@@ -532,7 +528,7 @@ int DsoHdr::get_nb_dso() const {
 
 void DsoHdr::reset_backpopulate_state(int reset_threshold) {
   for (auto &el : _backpopulate_state_map) {
-    if (el.second._nbUnfoundDsos >= reset_threshold) {
+    if (el.second.nb_unfound_dsos >= reset_threshold) {
       el.second = BackpopulateState();
     }
   }

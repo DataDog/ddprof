@@ -21,15 +21,17 @@ namespace ddprof {
 
 class CommandLineWrapper;
 
+// NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding)
 struct DDProfCLI {
 public:
   DDProfCLI() { exporter_input.profiler_version = str_version(); }
+
   int parse(int argc, const char *argv[]);
 
   // based on input events, add the appropriate watchers
   DDRes add_watchers_from_events(std::vector<PerfWatcher> &watcher) const;
 
-  CommandLineWrapper get_user_command_line() const;
+  [[nodiscard]] CommandLineWrapper get_user_command_line() const;
 
   void print() const;
   // Basic options
@@ -73,17 +75,11 @@ public:
 
 private:
   static void help_events();
-
-  DDProfCLI(const DDProfCLI &) = delete;
-  DDProfCLI &operator=(const DDProfCLI &) = delete;
-  // we could make it moveable (though not needed afaik)
-  DDProfCLI(DDProfCLI &&other) = delete;
-  DDProfCLI &operator=(const DDProfCLI &&) = delete;
 };
 
 class CommandLineWrapper {
 public:
-  CommandLineWrapper(std::vector<char *> lines)
+  explicit CommandLineWrapper(std::vector<char *> lines)
       : commandLines(std::move(lines)) {}
   ~CommandLineWrapper() { free_user_command_line(commandLines); }
 
@@ -92,7 +88,7 @@ public:
   CommandLineWrapper(CommandLineWrapper &&) = default;
   CommandLineWrapper &operator=(CommandLineWrapper &&) = default;
 
-  const std::vector<char *> &get() const { return commandLines; }
+  [[nodiscard]] const std::vector<char *> &get() const { return commandLines; }
 
 private:
   std::vector<char *> commandLines;

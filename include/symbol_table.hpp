@@ -11,6 +11,6 @@
 
 namespace ddprof {
 
-typedef std::vector<Symbol> SymbolTable;
+using SymbolTable = std::vector<Symbol>;
 
 } // namespace ddprof

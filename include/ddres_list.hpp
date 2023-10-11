@@ -8,13 +8,12 @@
 #include <climits>
 #include <cstdint>
 
-#define DD_COMMON_START_RANGE 1000
-#define DD_NATIVE_START_RANGE 2000
+enum { DD_COMMON_START_RANGE = 1000, DD_NATIVE_START_RANGE = 2000 };
 
 #define EXPAND_ENUM(a, b) DD_WHAT_##a,
 #define EXPAND_ERROR_MESSAGE(a, b) #a ": " b,
 
-#define COMMOM_ERROR_TABLE(X)                                                  \
+#define COMMON_ERROR_TABLE(X)                                                  \
   X(UKNW, "undocumented error")                                                \
   X(BADALLOC, "allocation error")                                              \
   X(STDEXCEPT, "standard exception caught")                                    \
@@ -66,10 +65,10 @@
 // generic erno errors available from /usr/include/asm-generic/errno.h
 
 enum DDRes_What {
-  // erno starts after ELAST 106 as of now
-  DD_WHAT_MIN_ERNO = DD_COMMON_START_RANGE,
+  // errno starts after ELAST 106 as of now
+  DD_WHAT_MIN_ERRNO = DD_COMMON_START_RANGE,
   // common errors
-  COMMOM_ERROR_TABLE(EXPAND_ENUM) COMMON_ERROR_SIZE,
+  COMMON_ERROR_TABLE(EXPAND_ENUM) COMMON_ERROR_SIZE,
   DD_WHAT_MIN_NATIVE = DD_NATIVE_START_RANGE,
   NATIVE_ERROR_TABLE(EXPAND_ENUM) NATIVE_ERROR_SIZE,
   // max

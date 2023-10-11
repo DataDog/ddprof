@@ -305,7 +305,7 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
 // Return true if consumer should be notified
 DDRes AllocationTracker::push_clear_live_allocation(
     TrackerThreadLocalState &tl_state) {
-  MPSCRingBufferWriter writer{_pevent.rb};
+  MPSCRingBufferWriter writer{&_pevent.rb};
   bool timeout = false;
 
   auto buffer = writer.reserve(sizeof(ClearLiveAllocationEvent), &timeout);
@@ -344,7 +344,7 @@ DDRes AllocationTracker::push_clear_live_allocation(
 
 DDRes AllocationTracker::push_dealloc_sample(
     uintptr_t addr, TrackerThreadLocalState &tl_state) {
-  MPSCRingBufferWriter writer{_pevent.rb};
+  MPSCRingBufferWriter writer{&_pevent.rb};
   bool notify_consumer{false};
 
   bool timeout = false;
@@ -397,7 +397,7 @@ DDRes AllocationTracker::push_dealloc_sample(
 DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
                                            uint64_t allocated_size,
                                            TrackerThreadLocalState &tl_state) {
-  MPSCRingBufferWriter writer{_pevent.rb};
+  MPSCRingBufferWriter writer{&_pevent.rb};
   bool notify_consumer{false};
 
   bool timeout = false;

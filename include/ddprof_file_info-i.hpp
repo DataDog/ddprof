@@ -7,8 +7,8 @@
 
 namespace ddprof {
 // unique identifier to serve as a key for Dso
-typedef int32_t FileInfoId_t;
-static const int k_file_info_undef = -1;
-static const int k_file_info_error = 0;
-static const int k_file_info_dd_profiling = 1;
+using FileInfoId_t = int32_t;
+inline constexpr int k_file_info_undef = -1;
+inline constexpr int k_file_info_error = 0;
+inline constexpr int k_file_info_dd_profiling = 1;
 } // namespace ddprof

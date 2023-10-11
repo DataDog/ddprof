@@ -11,6 +11,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace ddprof {
@@ -33,9 +34,10 @@ struct FileInfoInodeKey {
 namespace std {
 template <> struct hash<ddprof::FileInfoInodeKey> {
   std::size_t operator()(const ddprof::FileInfoInodeKey &k) const {
-    std::size_t hash_val = ddprof::hash_combine(hash<inode_t>()(k._inode),
-                                                hash<Offset_t>()(k._sz));
-    return hash_val;
+    std::size_t seed = 0;
+    ddprof::hash_combine(seed, k._inode);
+    ddprof::hash_combine(seed, k._sz);
+    return seed;
   }
 };
 
@@ -44,8 +46,8 @@ template <> struct hash<ddprof::FileInfoInodeKey> {
 namespace ddprof {
 struct FileInfo {
   FileInfo() : _size(0), _inode(0) {}
-  FileInfo(const std::string &path, int64_t size, inode_t inode)
-      : _path(path), _size(size), _inode(inode) {}
+  FileInfo(std::string path, int64_t size, inode_t inode)
+      : _path(std::move(path)), _size(size), _inode(inode) {}
   // we update with latest location
   std::string _path;
   int64_t _size;
@@ -55,20 +57,28 @@ struct FileInfo {
 /// Keeps metadata on the file associated to a key
 class FileInfoValue {
 public:
-  FileInfoValue(FileInfo &&info, FileInfoId_t id) : _info(info), _id(id) {}
+  FileInfoValue(FileInfo &&info, FileInfoId_t id)
+      : _info(std::move(info)), _id(id) {}
 
   FileInfoId_t get_id() const { return _id; }
   int64_t get_size() const { return _info._size; }
   const std::string &get_path() const { return _info._path; }
-  FileInfo _info;
 
+  bool errored() const { return _errored; }
+  void set_errored() const { _errored = true; }
+  void reset_errored() const { _errored = false; }
+
+  const FileInfo &info() const { return _info; }
+
+private:
+  FileInfo _info;
   mutable bool _errored =
       false; // a flag to avoid trying to read in a loop bad files
-private:
+
   FileInfoId_t _id; // unique ID matching index in table
 };
 
-typedef std::unordered_map<FileInfoInodeKey, FileInfoId_t> FileInfoInodeMap;
-typedef std::vector<FileInfoValue> FileInfoVector;
+using FileInfoInodeMap = std::unordered_map<FileInfoInodeKey, FileInfoId_t>;
+using FileInfoVector = std::vector<FileInfoValue>;
 
 } // namespace ddprof

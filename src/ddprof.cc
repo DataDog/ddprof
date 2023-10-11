@@ -103,7 +103,7 @@ DDRes ddprof_setup(DDProfContext &ctx) {
     DDRES_CHECK_FWD(pevent_enable(pevent_hdr));
   }
   CatchExcept2DDRes();
-  return ddres_init();
+  return {};
 }
 
 DDRes ddprof_teardown(DDProfContext &ctx) {
@@ -117,7 +117,7 @@ DDRes ddprof_teardown(DDProfContext &ctx) {
     LG_WRN("Error when calling ddprof_stats_free.");
   }
 
-  return ddres_init();
+  return {};
 }
 
 /*************************   Instrumentation Helpers **************************/

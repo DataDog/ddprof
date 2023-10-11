@@ -16,8 +16,9 @@ template <typename Func>
 void log_once_helper(std::once_flag &flag, Func &&func) {
   std::call_once(flag, std::forward<Func>(func));
 #else
-template <typename Func> void log_once_helper(std::once_flag &, Func &&func) {
-  func();
+template <typename Func>
+void log_once_helper(std::once_flag & /*unused*/, Func &&func) {
+  std::forward<Func>(func)();
 #endif
 }
 

@@ -33,7 +33,7 @@ void funcB() {
 
   unwind_init_sample(&state, regs, getpid(), stack_size,
                      reinterpret_cast<char *>(stack));
-  unwindstate__unwind(&state);
+  unwindstate_unwind(&state);
 
   auto &symbol_table = state.symbol_hdr._symbol_table;
 
@@ -104,7 +104,7 @@ TEST(getcontext, unwind_from_sighandler) {
   UnwindState state;
   unwind_init_sample(&state, regs, getpid(), stack_size,
                      reinterpret_cast<char *>(stack));
-  unwindstate__unwind(&state);
+  unwindstate_unwind(&state);
 
   auto &symbol_table = state.symbol_hdr._symbol_table;
 

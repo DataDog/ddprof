@@ -11,11 +11,15 @@
 extern "C" {
 #endif
 
-typedef struct EmbeddedData {
-  const char *data;
+struct EmbeddedData {
+  const unsigned char *data;
   size_t size;
   const char *digest;
-} EmbeddedData;
+};
+
+#ifndef __cplusplus
+typedef struct EmbeddedData EmbeddedData;
+#endif
 
 EmbeddedData profiling_lib_data();
 EmbeddedData profiler_exe_data();

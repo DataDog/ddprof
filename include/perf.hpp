@@ -17,7 +17,7 @@
 
 namespace ddprof {
 
-// defaut ring buffer size expressed as a power-of-two in number of pages
+// default ring buffer size expressed as a power-of-two in number of pages
 inline constexpr int k_default_buffer_size_shift{6};
 
 // this does not count as pinned memory, use a larger size
@@ -134,11 +134,12 @@ struct perf_samplestacku {
   // uint64_t    dyn_size;   // Don't forget!
 };
 
-int perf_event_open(struct perf_event_attr *, pid_t, int, int, unsigned long);
+int perf_event_open(struct perf_event_attr *attr, pid_t pid, int cpu, int gfd,
+                    unsigned long flags);
 size_t perf_mmap_size(int buf_size_shift);
 void *perfown_sz(int fd, size_t size_of_buffer);
 int perfdisown(void *region, size_t size);
-long get_page_size(void);
+long get_page_size();
 size_t get_mask_from_size(size_t size);
 const char *perf_type_str(int type_id);
 

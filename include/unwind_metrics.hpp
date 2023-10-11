@@ -7,5 +7,7 @@
 
 #include "ddprof_defs.hpp"
 
+namespace ddprof {
 // Resets the metrics
-void unwind_metrics_reset(void);
+void unwind_metrics_reset();
+} // namespace ddprof

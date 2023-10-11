@@ -10,8 +10,8 @@
 
 namespace ddprof {
 
-pid_t next_thread(Dwfl *, void *, void **);
-bool set_initial_registers(Dwfl_Thread *, void *);
+pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp);
+bool set_initial_registers(Dwfl_Thread *thread, void *arg);
 bool memory_read_dwfl(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
                       int regno, void *arg);
 

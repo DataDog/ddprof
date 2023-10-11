@@ -21,9 +21,9 @@ public:
       _end = end;
     }
   }
-  Offset_t get_end() const { return _end; }
+  [[nodiscard]] Offset_t get_end() const { return _end; }
 
-  SymbolIdx_t get_symbol_idx() const { return _symbol_idx; }
+  [[nodiscard]] SymbolIdx_t get_symbol_idx() const { return _symbol_idx; }
 
 private:
   // symbol end within the segment (considering file offset)

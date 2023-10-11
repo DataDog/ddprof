@@ -88,7 +88,7 @@ DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
       pevent_set_info(fd, pevent_hdr->nb_attrs, pes[pevent_idx],
                       watcher->options.stack_sample_size);
       ++pevent_hdr->nb_attrs;
-      assert(pevent_hdr->nb_attrs <= MAX_TYPE_WATCHER);
+      assert(pevent_hdr->nb_attrs <= kMaxTypeWatcher);
       break;
     }
     LG_NFO("Expected failure (we retry with different settings) "
@@ -105,7 +105,7 @@ DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
                            watcher_idx, strerror(errno));
   }
 
-  return ddres_init();
+  return {};
 }
 
 DDRes pevent_open_all_cpus(const PerfWatcher *watcher, int watcher_idx,
@@ -132,7 +132,7 @@ DDRes pevent_open_all_cpus(const PerfWatcher *watcher, int watcher_idx,
     pevent_set_info(fd, pes[template_pevent_idx].attr_idx, pes[pevent_idx],
                     watcher->options.stack_sample_size);
   }
-  return ddres_init();
+  return {};
 }
 
 } // namespace
@@ -181,7 +181,7 @@ DDRes pevent_open(DDProfContext &ctx, pid_t pid, int num_cpu,
                                          true, &pevent_hdr->pes[pevent_idx]));
     }
   }
-  return ddres_init();
+  return {};
 }
 
 DDRes pevent_mmap_event(PEvent *event) {
@@ -243,7 +243,7 @@ DDRes pevent_setup(DDProfContext &ctx, pid_t pid, int num_cpu,
     DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, false));
   }
 
-  return ddres_init();
+  return {};
 }
 
 DDRes pevent_enable(PEventHdr *pevent_hdr) {
@@ -256,7 +256,7 @@ DDRes pevent_enable(PEventHdr *pevent_hdr) {
                       pevent_hdr->pes[i].fd, i);
     }
   }
-  return ddres_init();
+  return {};
 }
 
 DDRes pevent_munmap_event(PEvent *event) {

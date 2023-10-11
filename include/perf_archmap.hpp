@@ -120,7 +120,7 @@ constexpr unsigned int dwarf_to_perf_regno(unsigned int i) {
   };
 
   if (i >= std::size(lookup)) {
-    return -1u; // implicit sentinel value
+    return -1U; // implicit sentinel value
   }
 
   return lookup[i];
@@ -141,8 +141,9 @@ inline constexpr unsigned int param_to_perf_regno(unsigned int param_no) {
 #endif
 #undef R
 
-  if (!param_no || param_no >= std::size(reg_lookup))
-    return -1u;
+  if (!param_no || param_no >= std::size(reg_lookup)) {
+    return -1U;
+  }
 
   return reg_lookup[param_no];
 }

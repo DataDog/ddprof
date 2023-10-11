@@ -91,9 +91,8 @@ const ContainerId &ProcessHdr::get_container_id(pid_t pid, bool force) {
   }
   // uint64 is big enough that overflow is not a concern
   // also consequence is just miss-labelling container-id
-  ++(it->second._sample_counter);
   if (!force &&
-      (it->second._sample_counter) < k_nb_samples_container_id_lookup) {
+      (it->second.increment_counter() < k_nb_samples_container_id_lookup)) {
     // avoid looking up container_id too often for short-lived pids
     return unknown_container_id;
   }

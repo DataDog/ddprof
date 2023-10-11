@@ -21,9 +21,10 @@ struct FunLoc {
   SymbolIdx_t _symbol_idx;
   MapInfoIdx_t _map_info_idx;
 
-  auto operator<=>(const FunLoc &) const = default;
+  friend auto operator<=>(const FunLoc &, const FunLoc &) = default;
 };
 
+// NOLINTBEGIN(misc-non-private-member-variables-in-classes)
 struct UnwindOutput {
   void clear() {
     locs.clear();
@@ -36,7 +37,8 @@ struct UnwindOutput {
   int tid;
   bool is_incomplete;
 
-  auto operator<=>(const UnwindOutput &) const = default;
+  friend auto operator<=>(const UnwindOutput &, const UnwindOutput &) = default;
 };
+// NOLINTEND(misc-non-private-member-variables-in-classes)
 
 } // namespace ddprof

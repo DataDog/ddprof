@@ -33,7 +33,7 @@ struct PEventHdr {
   // Attributes of successful perf event opens
   size_t size;
   size_t max_size;
-  perf_event_attr attrs[MAX_TYPE_WATCHER];
+  perf_event_attr attrs[kMaxTypeWatcher];
   size_t nb_attrs;
 };
 

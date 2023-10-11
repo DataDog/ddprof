@@ -153,7 +153,7 @@ worker_process_ring_buffers(PEvent *pes, int pe_len, DDProfContext &ctx,
     for (int i = start_idx; i < pe_len; ++i) {
       auto &ring_buffer = pes[i].rb;
       if (ring_buffer.type == RingBufferType::kPerfRingBuffer) {
-        PerfRingBufferReader reader(ring_buffer);
+        PerfRingBufferReader reader(&ring_buffer);
 
         ConstBuffer buffer = reader.read_all_available();
         while (!buffer.empty()) {
@@ -171,7 +171,7 @@ worker_process_ring_buffers(PEvent *pes, int pe_len, DDProfContext &ctx,
           buffer = remaining(buffer, hdr->size);
         }
       } else {
-        MPSCRingBufferReader reader{ring_buffer};
+        MPSCRingBufferReader reader{&ring_buffer};
         for (ConstBuffer buffer{reader.read_sample()}; !buffer.empty();
              buffer = reader.read_sample()) {
           const auto *hdr =

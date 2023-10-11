@@ -52,7 +52,7 @@ DDRes jit_read_header(std::ifstream &file_stream, JITHeader &header) {
   if (header.version != k_jit_header_version) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_JIT, "Version not handled");
   }
-  return ddres_init();
+  return {};
 }
 
 // true if we should continue
@@ -114,7 +114,7 @@ DDRes jit_read_code_load(std::ifstream &file_stream,
          code_load.func_name.c_str(), code_load.code_addr, code_load.code_size,
          code_load.prefix.timestamp);
 #endif
-  return ddres_init();
+  return {};
 }
 
 DDRes jit_read_debug_info(std::ifstream &file_stream,
@@ -156,7 +156,7 @@ DDRes jit_read_debug_info(std::ifstream &file_stream,
            debug_info.entries[i].addr, debug_info.prefix.timestamp);
 #endif
   }
-  return ddres_init();
+  return {};
 }
 
 DDRes jit_read_records(std::ifstream &file_stream, JITDump &jit_dump) {
@@ -190,7 +190,7 @@ DDRes jit_read_records(std::ifstream &file_stream, JITDump &jit_dump) {
       }
     }
   } while (valid_entry);
-  return ddres_init();
+  return {};
 }
 
 DDRes jitdump_read(std::string_view file, JITDump &jit_dump) {
@@ -208,6 +208,6 @@ DDRes jitdump_read(std::string_view file, JITDump &jit_dump) {
   }
   // incomplete files can trigger exceptions
   CatchExcept2DDRes();
-  return ddres_init();
+  return {};
 }
 } // namespace ddprof

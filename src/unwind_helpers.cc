@@ -22,13 +22,13 @@ void add_frame_without_mapping(UnwindState *us, SymbolIdx_t symbol_idx) {
 
 bool is_max_stack_depth_reached(const UnwindState &us) {
   // +2 to keep room for common base frame
-  return us.output.locs.size() + 2 >= DD_MAX_STACK_DEPTH;
+  return us.output.locs.size() + 2 >= kMaxStackDepth;
 }
 
 DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
                 UnwindState *us) {
   UnwindOutput *output = &us->output;
-  if (output->locs.size() >= DD_MAX_STACK_DEPTH) {
+  if (output->locs.size() >= kMaxStackDepth) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_UW_MAX_DEPTH,
                           "Max stack depth reached"); // avoid overflow
   }
@@ -49,7 +49,7 @@ DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
 #endif
   output->locs.push_back(current);
 
-  return ddres_init();
+  return {};
 }
 
 void add_common_frame(UnwindState *us, SymbolErrors lookup_case) {

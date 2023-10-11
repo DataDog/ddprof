@@ -7,9 +7,13 @@
 
 namespace ddprof {
 
+// TASK_COMM_LEN is 16 bytes (including null terminator)
+// (https://man7.org/linux/man-pages/man5/proc.5.html)
+inline constexpr size_t kTaskCommLen = 16;
+
 struct ProcStatus {
   int pid;
-  char comm[32];
+  char comm[kTaskCommLen];
   char state;
   int ppid;
   int pgrp;

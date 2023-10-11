@@ -75,11 +75,11 @@
 
 static inline int ddres_sev_to_log_level(int sev) {
   switch (sev) {
-  case DD_SEVERROR:
+  case DD_SEV_ERROR:
     return LL_ERROR;
-  case DD_SEVWARN:
+  case DD_SEV_WARN:
     return LL_WARNING;
-  case DD_SEVNOTICE:
+  case DD_SEV_NOTICE:
     return LL_DEBUG;
   default: // no log
     return LL_LENGTH;
@@ -108,7 +108,7 @@ static inline int ddres_sev_to_log_level(int sev) {
                ddres_error_message(lddres._what));                             \
         return lddres;                                                         \
       }                                                                        \
-      if (lddres._sev == DD_SEVWARN) {                                         \
+      if (lddres._sev == DD_SEV_WARN) {                                        \
         LG_WRN("Recover from sev=%d at %s:%u - %s", lddres._sev, __FILE__,     \
                __LINE__, ddres_error_message(lddres._what));                   \
       } else {                                                                 \

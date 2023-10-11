@@ -61,27 +61,29 @@ bool watcher_has_countable_sample_type(const PerfWatcher *watcher) {
 // putting parentheses around "g" param breaks compilation
 // NOLINTBEGIN(bugprone-macro-parentheses)
 #define X_EVENTS(a, b, c, d, e, f, g)                                          \
-  {.ddprof_event_type = DDPROF_PWE_##a,                                        \
-   .desc = (b),                                                                \
-   .sample_type = BASE_STYPES,                                                 \
-   .type = (c),                                                                \
-   .config = (d),                                                              \
-   .sample_frequency = (e),                                                    \
-   .sample_type_id = (f),                                                      \
-   .options = g,                                                               \
-   .value_source = EventConfValueSource::kSample,                              \
-   .regno = 0,                                                                 \
-   .raw_off = 0,                                                               \
-   .raw_sz = 0,                                                                \
-   .value_scale = 0,                                                           \
-   .tracepoint_event = "",                                                     \
-   .tracepoint_group = "",                                                     \
-   .tracepoint_label = "",                                                     \
-   .suppress_pid = false,                                                      \
-   .suppress_tid = false,                                                      \
-   .pprof_indices = {},                                                        \
-   .instrument_self = false,                                                   \
-   .aggregation_mode = EventAggregationMode::kSum},
+  {                                                                            \
+      .sample_type = BASE_STYPES,                                              \
+      .config = (d),                                                           \
+      .value_scale = 0,                                                        \
+      .desc = (b),                                                             \
+      .tracepoint_event = "",                                                  \
+      .tracepoint_group = "",                                                  \
+      .tracepoint_label = "",                                                  \
+      .ddprof_event_type = DDPROF_PWE_##a,                                     \
+      .type = (c),                                                             \
+      .sample_frequency = (e),                                                 \
+      .sample_type_id = (f),                                                   \
+      .value_source = EventConfValueSource::kSample,                           \
+      .aggregation_mode = EventAggregationMode::kSum,                          \
+      .options = g,                                                            \
+      .pprof_indices = {},                                                     \
+      .regno = 0,                                                              \
+      .raw_off = 0,                                                            \
+      .raw_sz = 0,                                                             \
+      .suppress_pid = false,                                                   \
+      .suppress_tid = false,                                                   \
+      .instrument_self = false,                                                \
+  },
 // NOLINTEND(bugprone-macro-parentheses)
 
 #define X_STR(a, b, c, d, e, f, g) #a,
@@ -123,27 +125,27 @@ const PerfWatcher *ewatcher_from_str(const char *str) {
 
 const PerfWatcher *tracepoint_default_watcher() {
   static const PerfWatcher tracepoint_template = {
-      .ddprof_event_type = DDPROF_PWE_TRACEPOINT,
-      .desc = "Tracepoint",
       .sample_type = BASE_STYPES,
-      .type = PERF_TYPE_TRACEPOINT,
       .config = 0,
-      .sample_period = 1,
-      .sample_type_id = DDPROF_PWT_TRACEPOINT,
-      .options = {.use_kernel = PerfWatcherUseKernel::kRequired},
-      .value_source = EventConfValueSource::kSample,
-      .regno = 0,
-      .raw_off = 0,
-      .raw_sz = 0,
       .value_scale = 1.0,
+      .desc = "Tracepoint",
       .tracepoint_event = {},
       .tracepoint_group = {},
       .tracepoint_label = {},
+      .ddprof_event_type = DDPROF_PWE_TRACEPOINT,
+      .type = PERF_TYPE_TRACEPOINT,
+      .sample_period = 1,
+      .sample_type_id = DDPROF_PWT_TRACEPOINT,
+      .value_source = EventConfValueSource::kSample,
+      .aggregation_mode = EventAggregationMode::kSum,
+      .options = {.use_kernel = PerfWatcherUseKernel::kRequired},
+      .pprof_indices = {},
+      .regno = 0,
+      .raw_off = 0,
+      .raw_sz = 0,
       .suppress_pid = false,
       .suppress_tid = false,
-      .pprof_indices = {},
       .instrument_self = false,
-      .aggregation_mode = EventAggregationMode::kSum,
   };
   return &tracepoint_template;
 }

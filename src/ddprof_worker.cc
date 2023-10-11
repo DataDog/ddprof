@@ -53,7 +53,7 @@ DDRes clear_unvisited_pids(DDProfContext &ctx);
 void print_diagnostics(const DsoHdr &dso_hdr) {
   LG_NFO("Printing internal diagnostics");
   ddprof_stats_print();
-  dso_hdr._stats.log();
+  dso_hdr.stats().log();
 }
 
 DDRes report_lost_events(DDProfContext &ctx) {
@@ -99,7 +99,7 @@ DDRes symbols_update_stats(const SymbolHdr &symbol_hdr) {
                                    stats._nb_failed_lookups));
   DDRES_CHECK_FWD(
       ddprof_stats_set(STATS_SYMBOLS_JIT_SYMBOL_COUNT, stats._symbol_count));
-  return ddres_init();
+  return {};
 }
 
 /// Retrieve cpu / memory info
@@ -120,9 +120,9 @@ DDRes worker_update_stats(DDProfWorkerContext &worker_context,
   ddprof_stats_set(STATS_PROFILER_RSS, get_page_size() * procstat->rss);
   ddprof_stats_set(STATS_PROFILER_CPU_USAGE, millicores);
   ddprof_stats_set(STATS_DSO_UNHANDLED_SECTIONS,
-                   dso_hdr._stats.sum_event_metric(DsoStats::kUnhandledDso));
+                   dso_hdr.stats().sum_event_metric(DsoStats::kUnhandledDso));
   ddprof_stats_set(STATS_DSO_NEW_DSO,
-                   dso_hdr._stats.sum_event_metric(DsoStats::kNewDso));
+                   dso_hdr.stats().sum_event_metric(DsoStats::kNewDso));
   ddprof_stats_set(STATS_DSO_SIZE, dso_hdr.get_nb_dso());
   ddprof_stats_set(
       STATS_UNMATCHED_DEALLOCATION_COUNT,
@@ -163,7 +163,7 @@ DDRes worker_update_stats(DDProfWorkerContext &worker_context,
       STATS_PROFILE_DURATION,
       std::chrono::duration_cast<std::chrono::milliseconds>(cycle_duration)
           .count());
-  return ddres_init();
+  return {};
 }
 
 DDRes ddprof_unwind_sample(DDProfContext &ctx, perf_event_sample *sample,
@@ -188,7 +188,7 @@ DDRes ddprof_unwind_sample(DDProfContext &ctx, perf_event_sample *sample,
   }
 
   // Attempt to fully unwind if the watcher has a callgraph type
-  DDRes res = unwindstate__unwind(us);
+  DDRes res = unwindstate_unwind(us);
 
   /* This test is not 100% accurate:
    * Linux kernel does not take into account stack start (ie. end address since
@@ -240,7 +240,7 @@ DDRes aggregate_livealloc_stack(
     ddprof_print_sample(alloc_info.first, symbol_hdr, alloc_info.second._value,
                         kLiveSumPos, *watcher);
   }
-  return ddres_init();
+  return {};
 }
 
 DDRes aggregate_live_allocations_for_pid(DDProfContext &ctx, pid_t pid) {
@@ -259,13 +259,13 @@ DDRes aggregate_live_allocations_for_pid(DDProfContext &ctx, pid_t pid) {
                                                 symbol_hdr));
     }
   }
-  return ddres_init();
+  return {};
 }
 
 DDRes aggregate_live_allocations(DDProfContext &ctx) {
   // this would be more efficient if we could reuse the same stacks in
   // libdatadog
-  struct UnwindState *us = ctx.worker_ctx.us;
+  UnwindState *us = ctx.worker_ctx.us;
   int const i_export = ctx.worker_ctx.i_current_pprof;
   DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
   const SymbolHdr &symbol_hdr = us->symbol_hdr;
@@ -284,7 +284,7 @@ DDRes aggregate_live_allocations(DDProfContext &ctx) {
              pid_vt.second._unique_stacks.size());
     }
   }
-  return ddres_init();
+  return {};
 }
 
 DDRes worker_pid_free(DDProfContext &ctx, pid_t el) {
@@ -292,7 +292,7 @@ DDRes worker_pid_free(DDProfContext &ctx, pid_t el) {
   UnwindState *us = ctx.worker_ctx.us;
   unwind_pid_free(us, el);
   ctx.worker_ctx.live_allocation.clear_pid(el);
-  return ddres_init();
+  return {};
 }
 
 DDRes clear_unvisited_pids(DDProfContext &ctx) {
@@ -302,7 +302,7 @@ DDRes clear_unvisited_pids(DDProfContext &ctx) {
     DDRES_CHECK_FWD(worker_pid_free(ctx, el));
   }
   us->dwfl_hdr.reset_unvisited();
-  return ddres_init();
+  return {};
 }
 
 [[maybe_unused]] DDRes worker_init_stats(DDProfWorkerContext *worker_ctx) {
@@ -351,7 +351,7 @@ DDRes worker_library_init(DDProfContext &ctx,
     ctx.worker_ctx.pprof[1] = nullptr;
   }
   CatchExcept2DDRes();
-  return ddres_init();
+  return {};
 }
 
 DDRes worker_library_free(DDProfContext &ctx) {
@@ -366,7 +366,7 @@ DDRes worker_library_free(DDProfContext &ctx) {
     ctx.worker_ctx.us = nullptr;
   }
   CatchExcept2DDRes();
-  return ddres_init();
+  return {};
 }
 
 /************************* perf_event_open() helpers **************************/
@@ -468,12 +468,12 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx,
     waittime.tv_sec += wait_sec;
     if (pthread_timedjoin_np(ctx.worker_ctx.exp_tid, nullptr, &waittime)) {
       LG_WRN("Exporter took too long");
-      return ddres_create(DD_SEVERROR, DD_WHAT_EXPORT_TIMEOUT);
+      return ddres_create(DD_SEV_ERROR, DD_WHAT_EXPORT_TIMEOUT);
     }
     ctx.worker_ctx.exp_tid = 0;
   }
   if (ctx.worker_ctx.exp_error) {
-    return ddres_create(DD_SEVERROR, DD_WHAT_EXPORTER);
+    return ddres_create(DD_SEV_ERROR, DD_WHAT_EXPORTER);
   }
 
   DDRES_CHECK_FWD(report_lost_events(ctx));
@@ -496,7 +496,7 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx,
   } else {
     ddprof_worker_export_thread(reinterpret_cast<void *>(&ctx.worker_ctx));
     if (ctx.worker_ctx.exp_error) {
-      return ddres_create(DD_SEVERROR, DD_WHAT_EXPORTER);
+      return ddres_create(DD_SEV_ERROR, DD_WHAT_EXPORTER);
     }
   }
   auto cycle_now = std::chrono::steady_clock::now();
@@ -535,7 +535,7 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx,
   // Reset stats relevant to a single cycle
   ddprof_reset_worker_stats();
 
-  return ddres_init();
+  return {};
 }
 
 void ddprof_pr_mmap(DDProfContext &ctx, const perf_event_mmap2 *map,
@@ -562,7 +562,7 @@ DDRes ddprof_pr_comm(DDProfContext &ctx, const perf_event_comm *comm,
     LG_DBG("<%d>(COMM)%d -> %s", watcher_pos, comm->pid, comm->comm);
     DDRES_CHECK_FWD(worker_pid_free(ctx, comm->pid));
   }
-  return ddres_init();
+  return {};
 }
 
 DDRes ddprof_pr_fork(DDProfContext &ctx, const perf_event_fork *frk,
@@ -573,7 +573,7 @@ DDRes ddprof_pr_fork(DDProfContext &ctx, const perf_event_fork *frk,
     DDRES_CHECK_FWD(worker_pid_free(ctx, frk->pid));
     ctx.worker_ctx.us->dso_hdr.pid_fork(frk->pid, frk->ppid);
   }
-  return ddres_init();
+  return {};
 }
 
 void ddprof_pr_exit(DDProfContext &ctx, const perf_event_exit *ext,
@@ -619,7 +619,7 @@ DDRes ddprof_worker_maybe_export(DDProfContext &ctx,
     }
   }
   CatchExcept2DDRes();
-  return ddres_init();
+  return {};
 }
 
 DDRes ddprof_worker_init(DDProfContext &ctx,
@@ -644,7 +644,7 @@ DDRes ddprof_worker_init(DDProfContext &ctx,
     DDRES_CHECK_FWD(worker_init_stats(&ctx.worker_ctx));
   }
   CatchExcept2DDRes();
-  return ddres_init();
+  return {};
 }
 
 DDRes ddprof_worker_free(DDProfContext &ctx) {
@@ -678,7 +678,7 @@ DDRes ddprof_worker_free(DDProfContext &ctx) {
     }
   }
   CatchExcept2DDRes();
-  return ddres_init();
+  return {};
 }
 
 // Simple wrapper over perf_event_hdr in order to filter by PID in a uniform
@@ -754,6 +754,6 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
     }
   }
   CatchExcept2DDRes();
-  return ddres_init();
+  return {};
 }
 } // namespace ddprof

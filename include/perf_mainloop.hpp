@@ -15,11 +15,11 @@ namespace ddprof {
  * The main loop handles forking to contain potential memory growth.
  *
  * @param pevent_hdr objects to manage incoming events and api with
- * perf_event_opem
+ * perf_event_open
  * @param WorkerAttr set of functions to customize worker behaviour
  *
  * @return
  */
-DDRes main_loop(const WorkerAttr *, DDProfContext *ctx);
+DDRes main_loop(const WorkerAttr *attr, DDProfContext *ctx);
 
 } // namespace ddprof

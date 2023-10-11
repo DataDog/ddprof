@@ -74,12 +74,12 @@ private:
 
 void perf_reader_fun(RingBuffer *rb, size_t nb_elements, bool use_new_object,
                      bool advance_eagerly) {
-  std::optional<PerfRingBufferReader> reader(*rb);
+  std::optional<PerfRingBufferReader> reader(rb);
 
   size_t count = 0;
   while (count < nb_elements) {
     if (use_new_object) {
-      reader.emplace(*rb);
+      reader.emplace(rb);
     }
     while (reader->available_size() == 0) {
       sched_yield();
@@ -109,11 +109,11 @@ void perf_reader_fun(RingBuffer *rb, size_t nb_elements, bool use_new_object,
 
 void perf_writer_fun(RingBuffer *rb, size_t nb_elements, bool use_new_object,
                      bool use_reserve) {
-  std::optional<PerfRingBufferWriter> writer(*rb);
+  std::optional<PerfRingBufferWriter> writer(rb);
 
   for (int64_t i = 0; i < static_cast<int64_t>(nb_elements); ++i) {
     if (use_new_object) {
-      writer.emplace(*rb);
+      writer.emplace(rb);
     }
     while (writer->available_size() < sizeof(MyElement)) {
       sched_yield();
@@ -190,7 +190,7 @@ TEST(ringbuffer, perf_ring_buffer) {
 TEST(ringbuffer, edge_cases) {
   const size_t buf_size_order = 0;
   RingBufferHolder ring_buffer{buf_size_order, RingBufferType::kPerfRingBuffer};
-  PerfRingBufferWriter writer{ring_buffer.get_ring_buffer()};
+  PerfRingBufferWriter writer{&ring_buffer.get_ring_buffer()};
 
   auto buf = writer.reserve(0);
   ASSERT_TRUE(buf.empty());
@@ -208,7 +208,7 @@ TEST(ringbuffer, edge_cases) {
   *buf.data() = std::byte{'z'};
   writer.commit();
 
-  PerfRingBufferReader reader{ring_buffer.get_ring_buffer()};
+  PerfRingBufferReader reader{&ring_buffer.get_ring_buffer()};
   auto read_buf = reader.read_all_available();
   ASSERT_FALSE(read_buf.empty());
   ASSERT_EQ(*read_buf.data(), std::byte{'z'});
@@ -229,8 +229,8 @@ TEST(ringbuffer, edge_cases) {
 TEST(ringbuffer, full) {
   const size_t buf_size_order = 0;
   RingBufferHolder ring_buffer{buf_size_order, RingBufferType::kPerfRingBuffer};
-  PerfRingBufferWriter writer{ring_buffer.get_ring_buffer()};
-  PerfRingBufferReader reader{ring_buffer.get_ring_buffer()};
+  PerfRingBufferWriter writer{&ring_buffer.get_ring_buffer()};
+  PerfRingBufferReader reader{&ring_buffer.get_ring_buffer()};
   EXPECT_EQ(reader.available_size(), 0);
 
   auto sz = writer.available_size();
@@ -254,13 +254,13 @@ TEST(ringbuffer, full) {
 
 void mpsc_reader_fun(RingBuffer *rb, size_t nb_elements, size_t nb_producers,
                      bool use_new_object, bool advance_eagerly) {
-  std::optional<MPSCRingBufferReader> reader(*rb);
+  std::optional<MPSCRingBufferReader> reader(rb);
 
   std::vector<size_t> counts(nb_producers);
   size_t total_count = 0;
   while (total_count < nb_elements * nb_producers) {
     if (use_new_object) {
-      reader.emplace(*rb);
+      reader.emplace(rb);
     } else {
       reader->update_available();
     }
@@ -291,11 +291,11 @@ void mpsc_reader_fun(RingBuffer *rb, size_t nb_elements, size_t nb_producers,
 
 void mpsc_writer_fun(RingBuffer *rb, size_t nb_elements, size_t producer_idx,
                      bool use_new_object) {
-  std::optional<MPSCRingBufferWriter> writer(*rb);
+  std::optional<MPSCRingBufferWriter> writer(rb);
 
   for (int64_t i = 0; i < static_cast<int64_t>(nb_elements); ++i) {
     if (use_new_object) {
-      writer.emplace(*rb);
+      writer.emplace(rb);
     }
     auto buf = writer->reserve(sizeof(MyElement));
     while (buf.empty()) {
@@ -320,8 +320,8 @@ void mpsc_writer_fun(RingBuffer *rb, size_t nb_elements, size_t producer_idx,
 TEST(ringbuffer, mpsc_ring_buffer_simple) {
   const size_t buf_size_order = 1;
   RingBufferHolder ring_buffer{buf_size_order, RingBufferType::kMPSCRingBuffer};
-  MPSCRingBufferWriter writer{ring_buffer.get_ring_buffer()};
-  MPSCRingBufferReader reader{ring_buffer.get_ring_buffer()};
+  MPSCRingBufferWriter writer{&ring_buffer.get_ring_buffer()};
+  MPSCRingBufferReader reader{&ring_buffer.get_ring_buffer()};
   auto buf = writer.reserve(4);
   ASSERT_EQ(buf.size(), 4);
   *reinterpret_cast<uint32_t *>(buf.data()) = 0xdeadbeef;
@@ -386,7 +386,7 @@ TEST(ringbuffer, mpsc_ring_buffer_multiple_producer) {
 TEST(ringbuffer, mpsc_ring_buffer_stale_lock) {
   const size_t buf_size_order = 0;
   RingBufferHolder ring_buffer{buf_size_order, RingBufferType::kMPSCRingBuffer};
-  MPSCRingBufferWriter writer{ring_buffer.get_ring_buffer()};
+  MPSCRingBufferWriter writer{&ring_buffer.get_ring_buffer()};
 
   // simulate stale lock
   ring_buffer.get_ring_buffer().spinlock->lock();

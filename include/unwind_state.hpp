@@ -18,7 +18,7 @@
 
 #include <sys/types.h>
 
-typedef struct Dwfl Dwfl;
+using Dwfl = struct Dwfl;
 
 namespace ddprof {
 
@@ -40,25 +40,24 @@ struct UnwindRegisters {
 /// given through callbacks
 struct UnwindState {
   explicit UnwindState(int dd_profiling_fd = -1)
-      : _dwfl_wrapper(nullptr), dso_hdr("", dd_profiling_fd), pid(-1),
-        stack(nullptr), stack_sz(0), current_ip(0) {
+      : dso_hdr("", dd_profiling_fd) {
     output.clear();
-    output.locs.reserve(DD_MAX_STACK_DEPTH);
+    output.locs.reserve(kMaxStackDepth);
   }
 
   DwflHdr dwfl_hdr;
-  DwflWrapper *_dwfl_wrapper; // pointer to current dwfl element
+  DwflWrapper *_dwfl_wrapper{nullptr}; // pointer to current dwfl element
 
   DsoHdr dso_hdr;
   SymbolHdr symbol_hdr;
   ProcessHdr process_hdr;
 
-  pid_t pid;
-  const char *stack;
-  size_t stack_sz;
+  pid_t pid{-1};
+  const char *stack{nullptr};
+  size_t stack_sz{0};
 
   UnwindRegisters initial_regs;
-  ProcessAddress_t current_ip;
+  ProcessAddress_t current_ip{0};
 
   UnwindOutput output;
 };
@@ -74,8 +73,8 @@ static inline bool unwind_registers_equal(const UnwindRegisters *lhs,
 }
 
 static inline void unwind_registers_clear(UnwindRegisters *unwind_registers) {
-  for (unsigned i = 0; i < k_nb_registers_to_unwind; ++i) {
-    unwind_registers->regs[i] = 0;
+  for (unsigned long &reg : unwind_registers->regs) {
+    reg = 0;
   }
 }
 } // namespace ddprof

@@ -34,8 +34,7 @@ void read_buffer(ddprof::RingBufferHolder &holder) {
 
   error_in_reader = false;
   while (reader_continue) {
-    ddprof::MPSCRingBufferReader reader(holder.get_ring_buffer());
-    //    fprintf(stderr, "size = %lu! \n", reader.available_size());
+    ddprof::MPSCRingBufferReader reader(&holder.get_ring_buffer());
     auto buf = reader.read_sample();
     if (!buf.empty()) {
       const perf_event_header *hdr =

@@ -58,7 +58,7 @@ DDRes create_pprof_file(ddog_Timespec start, const char *dbg_pprof_prefix,
   constexpr int read_write_user_only = 0600;
   (*fd) = open(filename, O_CREAT | O_RDWR, read_write_user_only);
   DDRES_CHECK_INT((*fd), DD_WHAT_EXPORTER, "Failure to create pprof file");
-  return ddres_init();
+  return {};
 }
 
 /// Write pprof to a valid file descriptor : allows to use pprof tools
@@ -69,7 +69,7 @@ DDRes write_profile(const ddog_prof_EncodedProfile *encoded_profile, int fd) {
                            "Failed to write byte buffer to stdout! %s\n",
                            strerror(errno));
   }
-  return ddres_init();
+  return {};
 }
 
 DDRes write_pprof_file(const ddog_prof_EncodedProfile *encoded_profile,
@@ -105,7 +105,7 @@ DDRes add_single_tag(ddog_Vec_Tag &tags_exporter, std::string_view key,
            (int)push_tag_res.err.message.len, push_tag_res.err.message.ptr);
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to generate tags");
   }
-  return ddres_init();
+  return {};
 }
 
 DDRes fill_stable_tags(const UserTags *user_tags,
@@ -143,7 +143,7 @@ DDRes fill_stable_tags(const UserTags *user_tags,
   for (const auto &el : user_tags->_tags) {
     DDRES_CHECK_FWD(add_single_tag(tags_exporter, el.first, el.second));
   }
-  return ddres_init();
+  return {};
 }
 
 DDRes check_send_response_code(uint16_t send_response_code) {
@@ -160,12 +160,12 @@ DDRes check_send_response_code(uint16_t send_response_code) {
     if (send_response_code != k_http_ok) {
       LG_NTC("[EXPORTER] HTTP Response code %u (success)", send_response_code);
     }
-    return ddres_init();
+    return {};
   }
   if (send_response_code == k_http_gateway_timeout) {
     LG_WRN("[EXPORTER] Error 504 (Timeout) - Dropping profile");
     // TODO - implement retry
-    return ddres_init();
+    return {};
   }
   if (send_response_code == k_http_forbidden) {
     LG_ERR("[EXPORTER] Error 403 (Forbidden) - Check API key");
@@ -177,7 +177,7 @@ DDRes check_send_response_code(uint16_t send_response_code) {
   }
   LG_WRN("[EXPORTER] Error sending data - HTTP code %u (continue profiling)",
          send_response_code);
-  return ddres_init();
+  return {};
 }
 
 DDRes fill_cycle_tags(const Tags &additional_tags, uint32_t profile_seq,
@@ -189,7 +189,7 @@ DDRes fill_cycle_tags(const Tags &additional_tags, uint32_t profile_seq,
   for (const auto &el : additional_tags) {
     DDRES_CHECK_FWD(add_single_tag(ffi_additional_tags, el.first, el.second));
   }
-  return ddres_init();
+  return {};
 }
 
 } // namespace
@@ -254,7 +254,7 @@ DDRes ddprof_exporter_init(const ExporterInput &exporter_input,
   // Debug process : capture pprof to a folder
   exporter->_debug_pprof_prefix = exporter->_input.debug_pprof_prefix;
   exporter->_export = exporter->_input.do_export;
-  return ddres_init();
+  return {};
 }
 
 DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
@@ -284,7 +284,7 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failure creating exporter - %s",
                            res_exporter.err.message.ptr);
   }
-  return ddres_init();
+  return {};
 }
 
 DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
@@ -380,7 +380,7 @@ DDRes ddprof_exporter_free(DDProfExporter *exporter) {
     ddog_prof_Exporter_drop(exporter->_exporter);
   }
   exporter->_exporter = nullptr;
-  return ddres_init();
+  return {};
 }
 
 } // namespace ddprof

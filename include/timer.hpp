@@ -72,15 +72,17 @@ inline TscState get_tsc_state() { return g_tsc_conversion.state; }
 inline TscCycles get_tsc_cycles() { return read_tsc(); }
 
 inline uint64_t tsc_cycles_to_ns(TscCycles cycles) {
-  uint32_t al = cycles;
-  uint32_t ah = cycles >> 32;
+  constexpr auto bit_shift = 32;
+  uint32_t const al = cycles;
+  uint32_t const ah = cycles >> bit_shift;
 
-  uint16_t shift = g_tsc_conversion.shift;
-  uint32_t b = g_tsc_conversion.mult;
+  uint16_t const shift = g_tsc_conversion.shift;
+  uint32_t const b = g_tsc_conversion.mult;
 
-  uint64_t ret = ((uint64_t)al * b) >> shift;
-  if (ah)
-    ret += ((uint64_t)ah * b) << (32 - shift);
+  uint64_t ret = (static_cast<uint64_t>(al) * b) >> shift;
+  if (ah) {
+    ret += (static_cast<uint64_t>(ah) * b) << (bit_shift - shift);
+  }
 
   return ret;
 }

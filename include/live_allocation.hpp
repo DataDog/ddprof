@@ -49,6 +49,7 @@ public:
 
   using PidMap = std::unordered_map<pid_t, PidStacks>;
   using WatcherVector = std::vector<PidMap>;
+  // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
   WatcherVector _watcher_vector;
 
   // Allocation should be aggregated per stack trace
@@ -82,7 +83,7 @@ public:
     }
   }
 
-  unsigned get_nb_unmatched_deallocations() const {
+  [[nodiscard]] [[nodiscard]] unsigned get_nb_unmatched_deallocations() const {
     return _stats._unmatched_deallocations;
   }
 

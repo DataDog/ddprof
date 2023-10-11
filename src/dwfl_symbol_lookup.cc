@@ -19,7 +19,7 @@
 
 namespace ddprof {
 
-DwflSymbolLookup::DwflSymbolLookup() : _lookup_setting(K_CACHE_ON) {
+DwflSymbolLookup::DwflSymbolLookup() {
   if (const char *env_p = std::getenv("DDPROF_CACHE_SETTING")) {
     if (strcmp(env_p, "VALIDATE") == 0) {
       // Allows to compare the accuracy of the cache

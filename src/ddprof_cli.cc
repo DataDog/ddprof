@@ -467,7 +467,7 @@ CommandLineWrapper DDProfCLI::get_user_command_line() const {
     cargs.push_back(strdup(a.c_str()));
   }
   cargs.push_back(nullptr); // execvp expects a null-terminated array.
-  return {cargs};
+  return CommandLineWrapper{cargs};
 }
 
 void CommandLineWrapper::free_user_command_line(

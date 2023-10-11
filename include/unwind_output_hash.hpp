@@ -5,12 +5,9 @@
 
 #include "unwind_output.hpp"
 
-namespace ddprof {
+#include "hash_helper.hpp"
 
-template <class T> inline void hash_combine(std::size_t &seed, const T &v) {
-  std::hash<T> hasher;
-  seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-}
+namespace ddprof {
 
 struct UnwindOutputHash {
   std::size_t operator()(const UnwindOutput &uo) const noexcept {

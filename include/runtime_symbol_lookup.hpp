@@ -6,10 +6,11 @@
 #pragma once
 
 #include "ddprof_defs.hpp"
+#include "ddres_def.hpp"
 #include "symbol_map.hpp"
 #include "symbol_table.hpp"
+#include "unique_fd.hpp"
 
-#include "ddres_def.hpp"
 #include <array>
 #include <unordered_map>
 
@@ -24,7 +25,7 @@ public:
   };
 
   explicit RuntimeSymbolLookup(std::string_view path_to_proc)
-      : _path_to_proc(path_to_proc), _stats{}, _cycle_counter(1) {}
+      : _path_to_proc(path_to_proc), _stats{} {}
 
   SymbolIdx_t get_or_insert_jitdump(pid_t pid, ProcessAddress_t pc,
                                     SymbolTable &symbol_table,
@@ -97,7 +98,7 @@ private:
   DDRes fill_from_perfmap(int pid, SymbolMap &symbol_map,
                           SymbolTable &symbol_table);
 
-  FILE *perfmaps_open(int pid, const char *path_to_perfmap);
+  UniqueFile perfmaps_open(int pid, const char *path_to_perfmap);
 
   bool has_lookup_failure(const SymbolInfo &symbol_info,
                           std::string_view path) const {
@@ -137,7 +138,7 @@ private:
   PidUnorderedMap _pid_map;
   std::string _path_to_proc;
   Stats _stats;
-  uint32_t _cycle_counter;
+  uint32_t _cycle_counter{1};
 };
 
 } // namespace ddprof

@@ -75,13 +75,13 @@ DDRes user_override(uid_t uid, gid_t gid, UIDInfo *old_uids) {
   // /proc/self/fd/* files unreadable by parent processes.
   // Note that this is quite strange since with dumpable
   // attribute set to 0, ownership of /proc<pid>/ is set to root, this should
-  // to be an issue since we change euid only when root, but strangely doing
+  // not be an issue since we change euid only when root, but strangely doing
   // this, parent process loses the permission to read /proc/<ddprof_pid>/fd/*
   // (but not /proc/<ddprof_pid>/maps).
   // When injecting libdd_profiling.so into target process, we use
   // LD_PRELOAD=/proc/<ddprof_pid>/fd/<temp_file>, and therefore target process
   // (ie. parent process) needs to be able to read ddprof /proc/<pid>/fd/*,
-  // that's why we set dumpable attribute back to its intial value at each
+  // that's why we set dumpable attribute back to its initial value at each
   // effective user id change.
   DumpableRestorer const dumpable_restorer;
   if (gid != static_cast<uid_t>(-1)) {
