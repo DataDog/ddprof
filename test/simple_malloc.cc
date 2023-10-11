@@ -330,14 +330,16 @@ int main(int argc, char *argv[]) {
         ->default_val(0)
         ->check(CLI::NonNegativeNumber);
     app.add_option("--nice", opts.nice, "Linux niceness setting")
-        ->default_val(19)
+        ->default_val(0)
         ->check(CLI::Bound(-20, 19));
 
-    setpriority(PRIO_PROCESS, 0, opts.nice);
-    if (errno) {
-      fprintf(stderr, "Requested nice level (%d) could not be set \n",
-              opts.nice);
-      return 1;
+    if (opts.nice != 0) {
+      setpriority(PRIO_PROCESS, 0, opts.nice);
+      if (errno) {
+        fprintf(stderr, "Requested nice level (%d) could not be set \n",
+                opts.nice);
+        return 1;
+      }
     }
 
 #  ifdef USE_DD_PROFILING
