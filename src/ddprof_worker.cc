@@ -67,9 +67,15 @@ DDRes report_lost_events(DDProfContext &ctx) {
       us->output.clear();
       add_common_frame(us, SymbolErrors::lost_event);
 
-      auto value = watcher->sample_period * nb_lost;
-      LG_WRN("Reporting #%lu -> [%lu] lost samples for watcher #%d", nb_lost,
-             value, watcher_idx);
+      auto period = (watcher->options.is_freq)
+          ? std::chrono::nanoseconds(std::chrono::seconds{1}).count() /
+              watcher->sample_frequency
+          : watcher->sample_period;
+
+      auto value = period * nb_lost;
+      LG_WRN("Reporting %lu lost samples (cumulated lost value: %lu) for "
+             "watcher #%d",
+             nb_lost, value, watcher_idx);
       DDRES_CHECK_FWD(pprof_aggregate(
           &us->output, us->symbol_hdr, value, nb_lost, watcher, kSumPos,
           ctx.worker_ctx.pprof[ctx.worker_ctx.i_current_pprof]));
