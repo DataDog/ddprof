@@ -13,6 +13,7 @@
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "ipc.hpp"
+#include "libdd_profiling-embedded_hash.h"
 #include "logger.hpp"
 #include "signal_helper.hpp"
 #include "tempfile.hpp"
@@ -42,6 +43,9 @@ extern const char _binary_libdd_profiling_embedded_so_end[];
 // NOLINTEND(bugprone-reserved-identifier,cert-dcl37-c*,cert-dcl51-c*,)
 
 #ifdef DDPROF_USE_LOADER
+// cppcheck-suppress missingInclude
+#  include "libdd_loader_hash.h"
+
 // address of embedded libdd_loader shared library
 extern const char _binary_libdd_loader_so_start[]; // NOLINT(cert-dcl51-cpp)
 extern const char _binary_libdd_loader_so_end[];   // NOLINT(cert-dcl51-cpp)
@@ -139,7 +143,7 @@ DDRes get_library_path(TempFileHolder &libdd_profiling_path,
         k_libdd_profiling_embedded_name,
         as_bytes(std::span{_binary_libdd_profiling_embedded_so_start,
                            _binary_libdd_profiling_embedded_so_end}),
-        0644, profiling_path));
+        libdd_profiling_embedded_hash, 0644, profiling_path));
     libdd_profiling_path = TempFileHolder{profiling_path, false};
   } else {
     libdd_profiling_path = TempFileHolder{profiling_path, false};
@@ -151,7 +155,7 @@ DDRes get_library_path(TempFileHolder &libdd_profiling_path,
         k_libdd_loader_name,
         as_bytes(std::span{_binary_libdd_loader_so_start,
                            _binary_libdd_loader_so_end}),
-        0644, loader_path));
+        libdd_loader_hash, 0644, loader_path));
     libdd_loader_path = TempFileHolder{loader_path, false};
   } else {
     libdd_loader_path = TempFileHolder{loader_path, false};

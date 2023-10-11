@@ -7,7 +7,6 @@
 
 #include "ddres_helpers.hpp"
 #include "defer.hpp"
-#include "sha1.h"
 
 #include <fcntl.h>
 #include <filesystem>
@@ -18,18 +17,12 @@
 namespace ddprof {
 
 DDRes get_or_create_temp_file(std::string_view prefix,
-                              std::span<const std::byte> data, mode_t mode,
+                              std::span<const std::byte> data,
+                              std::string_view digest, mode_t mode,
                               std::string &path) {
-  constexpr size_t k_sha1_digest_len = 20;
-  constexpr size_t k_ascii_sha1_digest_len = 41;
-  unsigned char digest[k_sha1_digest_len];
-  char str_digest[k_ascii_sha1_digest_len];
-  SHA1(digest, reinterpret_cast<const char *>(data.data()), data.size());
-  SHA1StrDigest(digest, str_digest);
-
   std::error_code ec;
   path = std::string{std::filesystem::temp_directory_path(ec) / prefix} + "-" +
-      std::string{str_digest};
+      std::string{digest};
   DDRES_CHECK_ERRORCODE(ec, DD_WHAT_TEMP_FILE,
                         "Failed to determine temp directory path");
 

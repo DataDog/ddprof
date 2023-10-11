@@ -6,6 +6,9 @@
 #include "lib_embedded_data.h"
 
 #ifdef DDPROF_EMBEDDED_LIB_DATA
+// cppcheck-suppress missingInclude
+#  include "libdd_profiling-embedded_hash.h"
+
 // NOLINTNEXTLINE(cert-dcl51-cpp)
 extern const char _binary_libdd_profiling_embedded_so_start[];
 // NOLINTNEXTLINE(cert-dcl51-cpp)
@@ -14,28 +17,35 @@ extern const char _binary_libdd_profiling_embedded_so_end[];
 // NOLINTNEXTLINE(cert-dcl51-cpp)
 static const char _binary_libdd_profiling_embedded_so_start[] = {};
 // NOLINTNEXTLINE(cert-dcl51-cpp)
+static const char *libdd_profiling_embedded_hash = "";
 static const char _binary_libdd_profiling_embedded_so_end[] = {};
 #endif
 
 #ifdef DDPROF_EMBEDDED_EXE_DATA
+// cppcheck-suppress missingInclude
+#  include "ddprof_exe_hash.h"
+
 extern const char _binary_ddprof_start[]; // NOLINT(cert-dcl51-cpp)
 extern const char _binary_ddprof_end[];   // NOLINT(cert-dcl51-cpp)
 #else
 static const char _binary_ddprof_start[] = {}; // NOLINT(cert-dcl51-cpp)
 static const char _binary_ddprof_end[] = {};   // NOLINT(cert-dcl51-cpp)
+static const char *ddprof_exe_hash = "";
 #endif
 
 EmbeddedData profiling_lib_data() {
   EmbeddedData data = {.data = _binary_libdd_profiling_embedded_so_start,
                        // cppcheck-suppress comparePointers
                        .size = _binary_libdd_profiling_embedded_so_end -
-                           _binary_libdd_profiling_embedded_so_start};
+                           _binary_libdd_profiling_embedded_so_start,
+                       .digest = libdd_profiling_embedded_hash};
   return data;
 }
 
 EmbeddedData profiler_exe_data() {
   EmbeddedData data = {.data = _binary_ddprof_start,
                        // cppcheck-suppress comparePointers
-                       .size = _binary_ddprof_end - _binary_ddprof_start};
+                       .size = _binary_ddprof_end - _binary_ddprof_start,
+                       .digest = ddprof_exe_hash};
   return data;
 }
