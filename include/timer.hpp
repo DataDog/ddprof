@@ -7,6 +7,7 @@
 #include "ddres_def.hpp"
 
 #include <chrono>
+#include <string>
 
 #ifdef __x86_64__
 #  include <x86intrin.h>
@@ -15,14 +16,17 @@
 namespace ddprof {
 
 enum class TscState { kUninitialized, kUnavailable, kOK };
+enum class TscCalibrationMethod { kAuto, kPerf, kCpuArch, kClockMonotonicRaw };
 
 struct TscConversion {
   uint16_t shift;
   uint32_t mult;
   TscState state;
+  TscCalibrationMethod calibration_method;
 };
 
-inline TscConversion g_tsc_conversion = {0, 1UL, TscState::kUninitialized};
+inline TscConversion g_tsc_conversion = {0, 1UL, TscState::kUninitialized,
+                                         TscCalibrationMethod::kAuto};
 
 using TscCycles = uint64_t;
 
@@ -39,9 +43,29 @@ inline TscCycles read_tsc() {
 inline TscCycles read_tsc() { return 0; }
 #endif
 
-enum class TscCalibrationMethod { kAuto, kPerf, kCpuArch, kClockMonotonicRaw };
-
 DDRes init_tsc(TscCalibrationMethod method = TscCalibrationMethod::kAuto);
+
+inline TscCalibrationMethod get_tsc_calibration_method() {
+  return g_tsc_conversion.calibration_method;
+}
+
+inline std::string
+tsc_calibration_method_to_string(TscCalibrationMethod method) {
+  switch (method) {
+  case TscCalibrationMethod::kClockMonotonicRaw:
+    return "ClockMonotonicRaw";
+  case TscCalibrationMethod::kCpuArch:
+    return "CpuArch";
+  case TscCalibrationMethod::kPerf:
+    return "perf";
+  case TscCalibrationMethod::kAuto:
+    return "Auto";
+  default:
+    break;
+  }
+
+  return "undef";
+}
 
 inline TscState get_tsc_state() { return g_tsc_conversion.state; }
 
