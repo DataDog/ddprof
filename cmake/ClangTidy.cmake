@@ -4,7 +4,7 @@ if(ENABLE_CLANG_TIDY)
   if(NOT CLANG_TIDY_COMMAND)
     message(ERROR "CMake_RUN_CLANG_TIDY is ON but clang-tidy is not found!")
   else()
-    set(CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND};-header-filter='${CMAKE_SOURCE_DIR}/include/*'")
+    set(CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND};-header-filter=${CMAKE_SOURCE_DIR}/include/.*")
   endif()
 
   # Create a preprocessor definition that depends on .clang-tidy content so the compile command will
