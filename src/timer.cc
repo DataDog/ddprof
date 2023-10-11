@@ -215,18 +215,22 @@ DDRes init_tsc(TscCalibrationMethod method) {
   if ((method == TscCalibrationMethod::kAuto ||
        method == TscCalibrationMethod::kPerf) &&
       !init_from_perf(g_tsc_conversion)) {
+    g_tsc_conversion.calibration_method = TscCalibrationMethod::kPerf;
     return {};
   }
   uint64_t tsc_hz = 0;
 
   if (method == TscCalibrationMethod::kAuto ||
       method == TscCalibrationMethod::kCpuArch) {
+    g_tsc_conversion.calibration_method = TscCalibrationMethod::kCpuArch;
     tsc_hz = get_tsc_freq_arch();
   }
 
   if (!tsc_hz &&
       (method == TscCalibrationMethod::kAuto ||
        method == TscCalibrationMethod::kClockMonotonicRaw)) {
+    g_tsc_conversion.calibration_method =
+        TscCalibrationMethod::kClockMonotonicRaw;
     tsc_hz = estimate_tsc_freq();
   }
 

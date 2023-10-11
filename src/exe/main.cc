@@ -283,7 +283,13 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
   // Now, we are the profiler process
   exit_on_return = true;
 
-  init_tsc();
+  if (IsDDResOK(init_tsc())) {
+    LG_NTC(
+        "Successfully calibrated TSC from %s",
+        tsc_calibration_method_to_string(get_tsc_calibration_method()).c_str());
+  } else {
+    LG_WRN("Failed to initialize TSC");
+  }
 
   if (CPU_COUNT(&ctx->params.cpu_affinity) > 0) {
     LG_DBG("Setting affinity to 0x%s",
