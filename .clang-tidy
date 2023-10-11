@@ -59,3 +59,4 @@ FormatStyle: 'file'
 WarningsAsErrors: '*'
 CheckOptions:
     cppcoreguidelines-special-member-functions.AllowMissingMoveFunctionsWhenCopyIsDeleted: true
+    misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic: true
