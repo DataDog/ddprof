@@ -14,6 +14,7 @@ extern "C" {
 typedef struct EmbeddedData {
   const char *data;
   size_t size;
+  const char *digest;
 } EmbeddedData;
 
 EmbeddedData profiling_lib_data();

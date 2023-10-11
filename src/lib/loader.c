@@ -6,7 +6,6 @@
 #include "constants.hpp"
 #include "dd_profiling.h"
 #include "lib_embedded_data.h"
-#include "sha1.h"
 
 #include <dlfcn.h>
 #include <fcntl.h>
@@ -204,13 +203,8 @@ static char *get_or_create_temp_file(const char *prefix, EmbeddedData data,
     return NULL;
   }
 
-  unsigned char digest[20];
-  char str_digest[41];
-  SHA1(digest, data.data, data.size);
-  SHA1StrDigest(digest, str_digest);
-
   char *path =
-      malloc(strlen(tmp_dir) + strlen(prefix) + sizeof(str_digest) + 2);
+      malloc(strlen(tmp_dir) + strlen(prefix) + strlen(data.digest) + 2);
   if (path == NULL) {
     return NULL;
   }
@@ -218,7 +212,7 @@ static char *get_or_create_temp_file(const char *prefix, EmbeddedData data,
   strcat(path, "/");
   strcat(path, prefix);
   strcat(path, "-");
-  strcat(path, str_digest);
+  strcat(path, data.digest);
 
   // Check if file already exists
   struct stat st;

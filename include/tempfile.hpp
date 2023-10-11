@@ -14,7 +14,8 @@
 
 namespace ddprof {
 DDRes get_or_create_temp_file(std::string_view prefix,
-                              std::span<const std::byte> data, mode_t mode,
+                              std::span<const std::byte> data,
+                              std::string_view digest, mode_t mode,
                               std::string &path);
 
 DDRes create_temp_file(std::string_view prefix, std::span<const std::byte> data,

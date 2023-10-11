@@ -167,8 +167,7 @@ set(dd_profiling_linker_script "${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")
 
 if(USE_LOADER)
   # Build small loader lib that is in charge of dlopening libdd_profiling-embedded.so
-  add_library(dd_loader SHARED src/lib/glibc_fixes.c src/lib/lib_embedded_data.c src/lib/loader.c
-                               src/sha1.c)
+  add_library(dd_loader SHARED src/lib/glibc_fixes.c src/lib/lib_embedded_data.c src/lib/loader.c)
   target_include_directories(dd_loader PRIVATE ${CMAKE_SOURCE_DIR}/include
                                                ${CMAKE_SOURCE_DIR}/include/lib)
   set_target_properties(dd_loader PROPERTIES LINK_DEPENDS "${dd_profiling_linker_script}")
@@ -181,6 +180,7 @@ if(USE_LOADER)
   endif()
 
   set(LIBDD_LOADER_OBJECT "${CMAKE_BINARY_DIR}/libdd_loader.o")
+  set(LIBDD_LOADER_HASH_HEADER "${CMAKE_BINARY_DIR}/libdd_loader_hash.h")
   add_custom_command(
     OUTPUT ${LIBDD_LOADER_OBJECT}
     # taken from https://dvdhrm.wordpress.com/2013/03/08/linking-binary-data/
@@ -188,9 +188,13 @@ if(USE_LOADER)
             $<TARGET_FILE_NAME:dd_loader>
     COMMAND objcopy --rename-section .data=.rodata,alloc,load,readonly,data,contents
             ${LIBDD_LOADER_OBJECT}
+    COMMAND ${CMAKE_SOURCE_DIR}/tools/generate_hash_header.sh ${LIBDD_LOADER_OBJECT}
+            libdd_loader_hash ${LIBDD_LOADER_HASH_HEADER}
     DEPENDS dd_loader)
   add_library(libdd_loader_object OBJECT IMPORTED GLOBAL)
-  set_target_properties(libdd_loader_object PROPERTIES IMPORTED_OBJECTS "${LIBDD_LOADER_OBJECT}")
+  set_target_properties(
+    libdd_loader_object PROPERTIES IMPORTED_OBJECTS "${LIBDD_LOADER_OBJECT}"
+                                   INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}")
 endif()
 
 set(DD_PROFILING_SOURCES
@@ -266,17 +270,21 @@ target_link_libraries(
 target_link_libraries(dd_profiling-embedded PUBLIC dl pthread rt)
 
 set(LIBDD_PROFILING_EMBEDDED_OBJECT "${CMAKE_BINARY_DIR}/libdd_profiling-embedded.o")
+set(LIBDD_PROFILING_EMBEDDED_HASH_HEADER "${CMAKE_BINARY_DIR}/libdd_profiling-embedded_hash.h")
 add_custom_command(
-  OUTPUT ${LIBDD_PROFILING_EMBEDDED_OBJECT}
+  OUTPUT ${LIBDD_PROFILING_EMBEDDED_OBJECT} ${LIBDD_PROFILING_EMBEDDED_HASH_HEADER}
   # taken from https://dvdhrm.wordpress.com/2013/03/08/linking-binary-data/
   COMMAND ld -r -o ${LIBDD_PROFILING_EMBEDDED_OBJECT} -z noexecstack --format=binary
           $<TARGET_FILE_NAME:dd_profiling-embedded>
   COMMAND objcopy --rename-section .data=.rodata,alloc,load,readonly,data,contents
           ${LIBDD_PROFILING_EMBEDDED_OBJECT}
+  COMMAND ${CMAKE_SOURCE_DIR}/tools/generate_hash_header.sh ${LIBDD_PROFILING_EMBEDDED_OBJECT}
+          libdd_profiling_embedded_hash ${LIBDD_PROFILING_EMBEDDED_HASH_HEADER}
   DEPENDS dd_profiling-embedded)
 add_library(libddprofiling_embedded_object OBJECT IMPORTED GLOBAL)
-set_target_properties(libddprofiling_embedded_object
-                      PROPERTIES IMPORTED_OBJECTS "${LIBDD_PROFILING_EMBEDDED_OBJECT}")
+set_target_properties(
+  libddprofiling_embedded_object PROPERTIES IMPORTED_OBJECTS "${LIBDD_PROFILING_EMBEDDED_OBJECT}"
+                                            INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}")
 
 # It is important to force most libraries as static
 add_exe(
@@ -305,36 +313,42 @@ message(STATUS "Install destination " ${CMAKE_INSTALL_PREFIX})
 install(FILES LICENSE LICENSE-3rdparty.csv LICENSE.LGPLV3 NOTICE DESTINATION ddprof)
 
 set(DDPROF_EXE_OBJECT "${CMAKE_BINARY_DIR}/ddprof.o")
+set(DDPROF_EXE_HASH_HEADER "${CMAKE_BINARY_DIR}/ddprof_exe_hash.h")
 add_custom_command(
-  OUTPUT ${DDPROF_EXE_OBJECT}
+  OUTPUT ${DDPROF_EXE_OBJECT} ${DDPROF_EXE_HASH_HEADER}
   # taken from https://dvdhrm.wordpress.com/2013/03/08/linking-binary-data/
   COMMAND ld -r -o ${DDPROF_EXE_OBJECT} -z noexecstack --format=binary $<TARGET_FILE_NAME:ddprof>
   COMMAND objcopy --rename-section .data=.rodata,alloc,load,readonly,data,contents
           ${DDPROF_EXE_OBJECT}
+  COMMAND ${CMAKE_SOURCE_DIR}/tools/generate_hash_header.sh ${DDPROF_EXE_OBJECT} ddprof_exe_hash
+          ${DDPROF_EXE_HASH_HEADER}
   DEPENDS ddprof)
+
 # add_custom_target is required here, because multiple targets depend on ${DDPROF_EXE_OBJECT}
 # Without add_custom_target (only add_custom_command), each dependent target will run the custom
 # command and they will race, leading to spurious failures.
 add_custom_target(generate_ddprof_object DEPENDS ${DDPROF_EXE_OBJECT})
 
 add_library(ddprof_exe_object OBJECT IMPORTED GLOBAL)
-set_target_properties(ddprof_exe_object PROPERTIES IMPORTED_OBJECTS "${DDPROF_EXE_OBJECT}")
+set_target_properties(
+  ddprof_exe_object PROPERTIES IMPORTED_OBJECTS "${DDPROF_EXE_OBJECT}" INTERFACE_INCLUDE_DIRECTORIES
+                                                                       "${CMAKE_BINARY_DIR}")
 
-add_library(dd_profiling-static STATIC ${DD_PROFILING_SOURCES} $<TARGET_OBJECTS:ddprof_exe_object>)
+add_library(dd_profiling-static STATIC ${DD_PROFILING_SOURCES})
 set_target_properties(dd_profiling-static PROPERTIES OUTPUT_NAME dd_profiling)
 target_compile_definitions(dd_profiling-static PRIVATE DDPROF_EMBEDDED_EXE_DATA)
 target_include_directories(dd_profiling-static PUBLIC ${CMAKE_SOURCE_DIR}/include/lib
                                                       ${CMAKE_SOURCE_DIR}/include)
 set_target_properties(dd_profiling-static
                       PROPERTIES PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
-target_link_libraries(dd_profiling-static PRIVATE DDProf::Parser)
+target_link_libraries(dd_profiling-static PRIVATE DDProf::Parser ddprof_exe_object)
 target_link_libraries(dd_profiling-static PUBLIC dl pthread rt)
 
 if(USE_LOADER)
   # When using a loader, libdd_profiling.so is a loader that embeds both libdd_profiling-embedded.so
   # and ddprof executable.
   add_library(dd_profiling-shared SHARED src/lib/glibc_fixes.c src/lib/lib_embedded_data.c
-                                         src/lib/loader.c src/sha1.c)
+                                         src/lib/loader.c)
   target_link_libraries(dd_profiling-shared PRIVATE libddprofiling_embedded_object
                                                     ddprof_exe_object)
   target_compile_definitions(dd_profiling-shared PRIVATE DDPROF_EMBEDDED_LIB_DATA
