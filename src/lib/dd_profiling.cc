@@ -362,7 +362,7 @@ int ddprof_start_profiling_internal() {
         // fails ?
         g_state.allocation_profiling_started = true;
       } else {
-        log_once("Error: %s", "Failure to start allocation profiling\n");
+        LOG_ONCE("Error: %s", "Failure to start allocation profiling\n");
       }
     }
   } catch (const DDException &e) { return -1; }
@@ -370,7 +370,7 @@ int ddprof_start_profiling_internal() {
   if (g_state.allocation_profiling_started) {
     int const res = pthread_atfork(nullptr, nullptr, notify_fork);
     if (res) {
-      log_once("Error:%s", "Unable to setup notify fork");
+      LOG_ONCE("Error:%s", "Unable to setup notify fork");
       assert(0);
     }
   }

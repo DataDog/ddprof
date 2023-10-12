@@ -19,7 +19,6 @@
 #include <atomic>
 #include <cassert>
 #include <cstdlib>
-
 #include <unistd.h>
 
 namespace ddprof {
@@ -68,7 +67,7 @@ TrackerThreadLocalState *AllocationTracker::init_tl_state() {
 
   if (res_set) {
     // should return 0
-    log_once("Error: Unable to store tl_state. error %d \n", res_set);
+    LOG_ONCE("Error: Unable to store tl_state. error %d \n", res_set);
     delete tl_state;
     tl_state = nullptr;
   }
@@ -119,8 +118,9 @@ DDRes AllocationTracker::allocation_tracking_init(
   void *volatile p = ::malloc(1);
   ::free(p);
 
-  (instance->init(allocation_profiling_rate, flags & kDeterministicSampling,
-                  stack_sample_size, ring_buffer));
+  DDRES_CHECK_FWD(instance->init(
+      allocation_profiling_rate, flags & kDeterministicSampling,
+      flags & kTrackDeallocations, stack_sample_size, ring_buffer));
   _instance = instance;
 
   state.init(true, flags & kTrackDeallocations);
@@ -130,6 +130,7 @@ DDRes AllocationTracker::allocation_tracking_init(
 
 DDRes AllocationTracker::init(uint64_t mem_profile_interval,
                               bool deterministic_sampling,
+                              bool track_deallocations,
                               uint32_t stack_sample_size,
                               const RingBufferInfo &ring_buffer) {
   _sampling_interval = mem_profile_interval;
@@ -138,6 +139,11 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
   if (ring_buffer.ring_buffer_type !=
       static_cast<int>(RingBufferType::kMPSCRingBuffer)) {
     return ddres_error(DD_WHAT_PERFRB);
+  }
+  if (track_deallocations) {
+    // 16 times as we want to probability of collision to be low enough
+    _allocated_address_set = AddressBitset(liveallocation::kMaxTracked *
+                                           k_ratio_max_elt_to_bitset_size);
   }
   return ddprof::ring_buffer_attach(ring_buffer, &_pevent);
 }
@@ -164,7 +170,8 @@ void AllocationTracker::allocation_tracking_free() {
   }
   TrackerThreadLocalState *tl_state = get_tl_state();
   if (unlikely(!tl_state)) {
-    log_once("Error: Unable to find tl_state during %s\n", __FUNCTION__);
+    const char *func_name = __FUNCTION__;
+    LOG_ONCE("Error: Unable to find tl_state during %s\n", func_name);
     instance->free();
     return;
   }
@@ -222,26 +229,35 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
   tl_state.remaining_bytes = remaining_bytes;
   uint64_t const total_size = nsamples * sampling_interval;
 
+  if (_state.track_deallocations) {
+    if (_allocated_address_set.add(addr)) {
+      if (unlikely(_allocated_address_set.count() >
+                   ddprof::liveallocation::kMaxTracked)) {
+        // Check if we reached max number of elements
+        // Clear elements if we reach too many
+        // todo: should we just stop new live tracking (like java) ?
+        if (IsDDResOK(push_clear_live_allocation(tl_state))) {
+          _allocated_address_set.clear();
+          // still set this as we are pushing the allocation to ddprof
+          _allocated_address_set.add(addr);
+        } else {
+          LOG_ONCE(
+              "Error: %s",
+              "Stop allocation profiling. Unable to clear live allocation \n");
+          free();
+        }
+      }
+    } else {
+      // null the address to avoid using this for live heap profiling
+      // pushing a sample is still good to have a good representation
+      // of the allocations.
+      addr = 0;
+    }
+  }
   bool const success = IsDDResOK(push_alloc_sample(addr, total_size, tl_state));
   free_on_consecutive_failures(success);
-
-  if (success && _state.track_deallocations) {
-    // \fixme{r1viollet} adjust set to be lock free
-    // We should still lock the clear of live allocations (which is unlikely)
-    std::lock_guard const lock{_state.mutex};
-
-    // ensure we track this dealloc if it occurs
-    _address_set.insert(addr);
-    if (unlikely(_address_set.size() > ddprof::liveallocation::kMaxTracked)) {
-      if (IsDDResOK(push_clear_live_allocation(tl_state))) {
-        _address_set.clear();
-      } else {
-        log_once(
-            "Error: %s",
-            "Stop allocation profiling. Unable to clear live allocation \n");
-        free();
-      }
-    }
+  if (unlikely(!success) && _state.track_deallocations && addr) {
+    _allocated_address_set.remove(addr);
   }
 }
 
@@ -250,11 +266,8 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
   // Reentrancy should be prevented by caller (by using ReentryGuard on
   // TrackerThreadLocalState::reentry_guard).
 
-  { // Grab the lock to check if this allocation was stored in the set
-    std::lock_guard const lock{_state.mutex};
-    if (!_state.track_deallocations || !_address_set.erase(addr)) {
-      return;
-    }
+  if (!_state.track_deallocations || !_allocated_address_set.remove(addr)) {
+    return;
   }
 
   bool const success = IsDDResOK(push_dealloc_sample(addr, tl_state));
@@ -480,7 +493,7 @@ void AllocationTracker::notify_thread_start() {
   if (unlikely(!tl_state)) {
     tl_state = init_tl_state();
     if (!tl_state) {
-      log_once("Error: Unable to start allocation profiling on thread %d",
+      LOG_ONCE("Error: Unable to start allocation profiling on thread %d",
                ddprof::gettid());
       return;
     }
@@ -500,7 +513,7 @@ void AllocationTracker::notify_fork() {
   if (unlikely(!tl_state)) {
     // The state should already exist if we forked.
     // This would mean that we were not able to create the state before forking
-    log_once("Error: Unable to retrieve tl state after fork thread %d",
+    LOG_ONCE("Error: Unable to retrieve tl state after fork thread %d",
              ddprof::gettid());
     return;
   }

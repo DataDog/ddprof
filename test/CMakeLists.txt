@@ -284,6 +284,7 @@ set(ALLOCATION_TRACKER_UT_SRCS
     ../src/perf_ringbuffer.cc
     ../src/perf_watcher.cc
     ../src/ringbuffer_utils.cc
+    ../src/lib/address_bitset.cc
     ../src/lib/pthread_fixes.cc
     ../src/lib/savecontext.cc
     ../src/lib/saveregisters.cc
@@ -304,13 +305,13 @@ set(ALLOCATION_TRACKER_UT_SRCS
 add_unit_test(
   allocation_tracker-ut ${ALLOCATION_TRACKER_UT_SRCS}
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle DDProf::Parser dl rt
-  DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=100)
+  DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384)
 
 if(TARGET jemalloc::jemalloc_shared)
   add_unit_test(
     allocation_tracker_jemalloc-ut ${ALLOCATION_TRACKER_UT_SRCS}
     LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle DDProf::Parser dl rt jemalloc::jemalloc_shared
-    DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=100 USE_JEMALLOC=1)
+    DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384 USE_JEMALLOC=1)
 endif()
 
 add_unit_test(sys_utils-ut sys_utils-ut.cc ../src/sys_utils.cc)
@@ -367,6 +368,10 @@ add_unit_test(
 
 add_unit_test(pthread_tls-ut pthread_tls-ut.cc)
 
+add_unit_test(address_bitset-ut address_bitset-ut.cc ../src/lib/address_bitset.cc)
+
+add_unit_test(lib_logger-ut ./lib_logger-ut.cc)
+
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/pthread_fixes.cc
               ../src/lib/savecontext.cc ../src/lib/saveregisters.cc)
 
@@ -384,6 +389,7 @@ add_benchmark(
 add_benchmark(
   allocation_tracker-bench
   allocation_tracker-bench.cc
+  ../src/lib/address_bitset.cc
   ../src/lib/allocation_tracker.cc
   ../src/pevent_lib.cc
   ../src/perf.cc
@@ -397,7 +403,7 @@ add_benchmark(
   ../src/user_override.cc
   ../src/sys_utils.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle DDProf::Parser
-  DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=10000)
+  DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384)
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
   add_exe(

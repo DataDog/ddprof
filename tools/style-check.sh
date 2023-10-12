@@ -10,7 +10,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd "$SCRIPT_DIR/.."
 
 # Find most recent clang-format, defaulting to an unqualified default
-CLANG_FORMAT=$(command -v clang-format{-16,-15,-13,-12,-11,-10,-9,} | head -n1)
+CLANG_FORMAT=$(command -v clang-format{-17,-16,-15,-13,-12,-11,-10,-9,} | head -n1)
 if [ -z "${CLANG_FORMAT}" ]; then
   echo "Please install clang-format"
   exit 1

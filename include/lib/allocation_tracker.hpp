@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "address_bitset.hpp"
 #include "allocation_tracker_tls.hpp"
 #include "ddprof_base.hpp"
 #include "ddres_def.hpp"
@@ -63,7 +64,7 @@ public:
   static TrackerThreadLocalState *get_tl_state();
 
 private:
-  using AdressSet = std::unordered_set<uintptr_t>;
+  static constexpr unsigned k_ratio_max_elt_to_bitset_size = 16;
 
   struct TrackerState {
     void init(bool track_alloc, bool track_dealloc) {
@@ -86,7 +87,8 @@ private:
   uint64_t next_sample_interval(std::minstd_rand &gen) const;
 
   DDRes init(uint64_t mem_profile_interval, bool deterministic_sampling,
-             uint32_t stack_sample_size, const RingBufferInfo &ring_buffer);
+             bool track_deallocations, uint32_t stack_sample_size,
+             const RingBufferInfo &ring_buffer);
   void free();
 
   static AllocationTracker *create_instance();
@@ -116,7 +118,8 @@ private:
   uint32_t _stack_sample_size;
   PEvent _pevent;
   bool _deterministic_sampling;
-  AdressSet _address_set;
+
+  AddressBitset _allocated_address_set;
 
   // These can not be tied to the internal state of the instance.
   // The creation of the instance depends on this

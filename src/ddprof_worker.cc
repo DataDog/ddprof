@@ -103,8 +103,10 @@ DDRes symbols_update_stats(const SymbolHdr &symbol_hdr) {
 }
 
 /// Retrieve cpu / memory info
-DDRes worker_update_stats(ProcStatus *procstat, const UnwindState &us,
+DDRes worker_update_stats(DDProfWorkerContext &worker_context,
                           std::chrono::nanoseconds cycle_duration) {
+  ProcStatus *procstat = &worker_context.proc_status;
+  const UnwindState &us = *worker_context.us;
   const DsoHdr &dso_hdr = us.dso_hdr;
   // Update the procstats, but first snapshot the utime so we can compute the
   // diff for the utime metric
@@ -122,7 +124,9 @@ DDRes worker_update_stats(ProcStatus *procstat, const UnwindState &us,
   ddprof_stats_set(STATS_DSO_NEW_DSO,
                    dso_hdr._stats.sum_event_metric(DsoStats::kNewDso));
   ddprof_stats_set(STATS_DSO_SIZE, dso_hdr.get_nb_dso());
-
+  ddprof_stats_set(
+      STATS_UNMATCHED_DEALLOCATION_COUNT,
+      worker_context.live_allocation.get_nb_unmatched_deallocations());
   // Symbol stats
   DDRES_CHECK_FWD(symbols_update_stats(us.symbol_hdr));
 
@@ -134,7 +138,6 @@ DDRes worker_update_stats(ProcStatus *procstat, const UnwindState &us,
 
   long nsamples = 0;
   ddprof_stats_get(STATS_SAMPLE_COUNT, &nsamples);
-
   long tsc_cycles;
   ddprof_stats_get(STATS_UNWIND_AVG_TIME, &tsc_cycles);
   int64_t const avg_unwind_ns =
@@ -391,7 +394,9 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
   // Aggregate if unwinding went well (todo : fatal error propagation)
   if (!IsDDResFatal(res)) {
     struct UnwindState *us = ctx.worker_ctx.us;
-    if (Any(EventAggregationMode::kLiveSum & watcher->aggregation_mode)) {
+    if (Any(EventAggregationMode::kLiveSum & watcher->aggregation_mode) &&
+        sample->addr) {
+      // null address means we should not account it
       ctx.worker_ctx.live_allocation.register_allocation(
           us->output, sample->addr, sample->period, watcher_pos, sample->pid);
     }
@@ -499,8 +504,7 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx,
   ctx.worker_ctx.cycle_start_time = cycle_now;
 
   // Scrape procfs for process usage statistics
-  DDRES_CHECK_FWD(worker_update_stats(&ctx.worker_ctx.proc_status,
-                                      *ctx.worker_ctx.us, cycle_duration));
+  DDRES_CHECK_FWD(worker_update_stats(ctx.worker_ctx, cycle_duration));
 
   // And emit diagnostic output (if it's enabled)
   print_diagnostics(ctx.worker_ctx.us->dso_hdr);
@@ -527,7 +531,7 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx,
     export_time_set(ctx);
   }
   unwind_cycle(ctx.worker_ctx.us);
-
+  ctx.worker_ctx.live_allocation.cycle();
   // Reset stats relevant to a single cycle
   ddprof_reset_worker_stats();
 
