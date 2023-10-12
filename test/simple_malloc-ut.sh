@@ -20,7 +20,8 @@ export DD_PROFILING_NATIVE_CPU_AFFINITY=${ddprof_cpu_mask}
 test_cpu_mask=$(python3 -c 'import random,os;print(hex(1 << random.choice(list(os.sched_getaffinity(0)))))')
 
 timeout_sec=30
-opts="--loop 1000 --spin 100"
+# Setting a nice value for simple malloc will help ddprof get scheduled
+opts="--loop 1000 --spin 100 --nice 19"
 log_file=$(mktemp "${PWD}/log.XXXXXX")
 echo "Logs available in $log_file"
 rm "${log_file}"

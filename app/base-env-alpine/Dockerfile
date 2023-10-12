@@ -107,6 +107,7 @@ RUN mkdir /patch
 ADD ./app/base-env-alpine/*.patch /patch/
 ADD ./app/base-env-alpine/error.h /patch/
 ADD ./app/base-env-alpine/libintl.h /patch/
+RUN chmod 644 /patch/*
 
 # jemalloc
 RUN VERSION="5.3.0" \

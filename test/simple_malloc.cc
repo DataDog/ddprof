@@ -15,6 +15,7 @@
 #include <functional>
 #include <iostream>
 #include <sstream>
+#include <sys/resource.h>
 #include <thread>
 #include <unistd.h>
 
@@ -99,6 +100,7 @@ struct Options {
   uint32_t callstack_depth;
   uint32_t frame_size;
   uint32_t skip_free;
+  int nice;
   bool use_shared_library = false;
   bool avoid_dlopen_hook = false;
 };
@@ -327,6 +329,18 @@ int main(int argc, char *argv[]) {
     app.add_option("--initial-delay", opts.initial_delay, "Initial delay (ms)")
         ->default_val(0)
         ->check(CLI::NonNegativeNumber);
+    app.add_option("--nice", opts.nice, "Linux niceness setting")
+        ->default_val(0)
+        ->check(CLI::Bound(-20, 19));
+
+    if (opts.nice != 0) {
+      setpriority(PRIO_PROCESS, 0, opts.nice);
+      if (errno) {
+        fprintf(stderr, "Requested nice level (%d) could not be set \n",
+                opts.nice);
+        return 1;
+      }
+    }
 
 #  ifdef USE_DD_PROFILING
     bool start_profiling = false;
