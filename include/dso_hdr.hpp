@@ -15,6 +15,7 @@
 #include "ddprof_module.hpp"
 #include "ddres_def.hpp"
 #include "dso.hpp"
+#include "perf_clock.hpp"
 
 namespace ddprof {
 
@@ -73,8 +74,22 @@ class DsoHdr {
 public:
   /******* Structures and types **********/
   using DsoMap = std::map<ProcessAddress_t, Dso>;
+
+  enum BackpopulatePermission {
+    kForbidden,
+    kAllowed,
+  };
+
+  struct BackpopulateState {
+    static constexpr int k_nb_requests_between_backpopulates = 10;
+    int nb_unfound_dsos{};
+    PerfClock::time_point last_backpopulate_time{};
+    BackpopulatePermission perm{kAllowed};
+  };
+
   struct PidMapping {
     DsoMap _map;
+    BackpopulateState _backpopulate_state;
     // save the start addr of the jit dump info if available
     ProcessAddress_t _jitdump_addr = {};
   };
@@ -94,6 +109,13 @@ public:
   // Add the element check for overlap and remove them
   DsoFindRes insert_erase_overlap(Dso &&dso);
   DsoFindRes insert_erase_overlap(PidMapping &pid_mapping, Dso &&dso);
+
+  /// @brief Insert DSO if timestamp is posterior to latest backpopulate
+  /// @param dso Dso to insert
+  /// @param timestamp Timestamp of mmap event
+  /// @return false if Dso is discarded because timestamp is too old, true
+  ///         otherwise
+  bool maybe_insert_erase_overlap(Dso &&dso, PerfClock::time_point timestamp);
 
   // Clear all dsos and regions associated with this pid
   void pid_free(int pid);
@@ -169,20 +191,6 @@ public:
   PidMapping &get_pid_mapping(pid_t pid) { return _pid_map[pid]; }
 
 private:
-  enum BackpopulatePermission {
-    kForbidden,
-    kAllowed,
-  };
-
-  struct BackpopulateState {
-    static constexpr int k_nb_requests_between_backpopulates = 10;
-    int nb_unfound_dsos{};
-    BackpopulatePermission perm{kAllowed};
-  };
-
-  // Associate pid to a backpopulate state
-  using BackpopulateStateMap = std::unordered_map<pid_t, BackpopulateState>;
-
   // erase range of elements
   static void erase_range(DsoMap &map, DsoRange range, const Dso &new_mapping);
 
@@ -198,7 +206,6 @@ private:
   // Unordered map (by pid) of sorted DSOs
   DsoPidMap _pid_map;
   DsoStats _stats;
-  BackpopulateStateMap _backpopulate_state_map;
   FileInfoInodeMap _file_info_inode_map;
   FileInfoVector _file_info_vector;
   std::string _path_to_proc; // /proc files can be mounted at various places
