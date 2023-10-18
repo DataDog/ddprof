@@ -16,6 +16,7 @@
 #include "libdd_profiling-embedded_hash.h"
 #include "logger.hpp"
 #include "signal_helper.hpp"
+#include "system_checks.hpp"
 #include "tempfile.hpp"
 #include "timer.hpp"
 #include "unique_fd.hpp"
@@ -289,11 +290,19 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
 
   if (IsDDResOK(init_tsc())) {
     LG_NTC(
-        "Successfully calibrated TSC from %s",
-        tsc_calibration_method_to_string(get_tsc_calibration_method()).c_str());
+        "Successfully calibrated TSC from %s (mult: %u, shift: %u, offset: "
+        "%lu)",
+        tsc_calibration_method_to_string(get_tsc_calibration_method()).c_str(),
+        g_tsc_conversion.mult, g_tsc_conversion.shift, g_tsc_conversion.offset);
   } else {
     LG_WRN("Failed to initialize TSC");
   }
+
+  if (IsDDResFatal(run_system_checks())) {
+    LG_ERR("System checks failed.");
+    return -1;
+  }
+
 
   if (CPU_COUNT(&ctx->params.cpu_affinity) > 0) {
     LG_DBG("Setting affinity to 0x%s",
