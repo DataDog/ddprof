@@ -290,13 +290,13 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
   return &sample;
 }
 
-uint64_t hdr_time(struct perf_event_header *hdr, uint64_t mask) {
+uint64_t hdr_time(const perf_event_header *hdr, uint64_t mask) {
   if (!(mask & PERF_SAMPLE_TIME)) {
     return 0;
   }
 
   uint64_t sampleid_mask_bits;
-  uint8_t *buf;
+  const uint8_t *buf;
 
   switch (hdr->type) {
 
@@ -305,10 +305,10 @@ uint64_t hdr_time(struct perf_event_header *hdr, uint64_t mask) {
   // full sample2hdr computation, we do an abbreviated lookup from the top of
   // the header
   case PERF_RECORD_SAMPLE: {
-    buf = reinterpret_cast<uint8_t *>(&hdr[1]);
+    buf = reinterpret_cast<const uint8_t *>(&hdr[1]);
     uint64_t mbits = PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_IP | PERF_SAMPLE_TID;
     mbits &= mask;
-    return *reinterpret_cast<uint64_t *>(
+    return *reinterpret_cast<const uint64_t *>(
         &buf[static_cast<ptrdiff_t>(sizeof(uint64_t) * std::popcount(mbits))]);
   }
   // For non-sample type events, the time is in the sample_id struct which is
@@ -327,9 +327,9 @@ uint64_t hdr_time(struct perf_event_header *hdr, uint64_t mask) {
     sampleid_mask_bits &= PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ID |
         PERF_SAMPLE_STREAM_ID | PERF_SAMPLE_CPU | PERF_SAMPLE_IDENTIFIER;
     sampleid_mask_bits = std::popcount(sampleid_mask_bits);
-    buf = (reinterpret_cast<uint8_t *>(hdr)) + hdr->size -
+    buf = (reinterpret_cast<const uint8_t *>(hdr)) + hdr->size -
         sizeof(uint64_t) * sampleid_mask_bits;
-    return *reinterpret_cast<uint64_t *>(
+    return *reinterpret_cast<const uint64_t *>(
         &buf[(mask & PERF_SAMPLE_TID) ? sizeof(uint64_t) : 0]);
   default:
     break;
