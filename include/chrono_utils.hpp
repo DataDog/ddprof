@@ -32,4 +32,13 @@ constexpr timeval duration_to_timeval(Duration d) {
       std::chrono::duration_cast<std::chrono::microseconds>(d).count()};
 }
 
+constexpr std::chrono::nanoseconds timespec_to_duration(timespec ts) {
+  return std::chrono::seconds{ts.tv_sec} + std::chrono::nanoseconds{ts.tv_nsec};
+}
+
+constexpr std::chrono::microseconds timeval_to_duration(timeval tv) {
+  return std::chrono::seconds{tv.tv_sec} +
+      std::chrono::microseconds{tv.tv_usec};
+}
+
 } // namespace ddprof
