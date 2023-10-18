@@ -8,6 +8,7 @@
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "perf.hpp"
+#include "unique_fd.hpp"
 
 #ifdef __x86_64__
 #  include <cpuid.h>
@@ -143,11 +144,11 @@ uint64_t get_tsc_freq() {
   timespec const sleeptime = {.tv_nsec = k_ns_per_sec / 50}; /* 1/50 second */
 
   timespec t_start;
-  if (clock_gettime(CLOCK_MONOTONIC_RAW, &t_start) == 0) {
+  if (clock_gettime(CLOCK_MONOTONIC, &t_start) == 0) {
     uint64_t const start = read_tsc();
     nanosleep(&sleeptime, nullptr);
     timespec t_end;
-    clock_gettime(CLOCK_MONOTONIC_RAW, &t_end);
+    clock_gettime(CLOCK_MONOTONIC, &t_end);
     uint64_t const end = read_tsc();
     uint64_t ns = ((t_end.tv_sec - t_start.tv_sec) * k_ns_per_sec);
     ns += (t_end.tv_nsec - t_start.tv_nsec);
@@ -184,14 +185,13 @@ int init_from_perf(TscConversion &conv) {
                         .disabled = 1,
                         .exclude_kernel = 1,
                         .exclude_hv = 1};
-  int fd = perf_event_open(&pe, 0, 0, -1, 0);
-  if (fd == -1) {
+  UniqueFd const fd{perf_event_open(&pe, 0, 0, -1, 0)};
+  if (!fd) {
     return -1;
   }
-  defer { close(fd); };
 
   const uint64_t sz = get_page_size();
-  void *addr = mmap(nullptr, sz, PROT_READ, MAP_SHARED, fd, 0);
+  void *addr = mmap(nullptr, sz, PROT_READ, MAP_SHARED, fd.get(), 0);
   if (!addr) {
     return -1;
   }
@@ -205,6 +205,7 @@ int init_from_perf(TscConversion &conv) {
 
   conv.mult = pc->time_mult;
   conv.shift = pc->time_shift;
+  conv.offset = pc->cap_user_time_zero ? pc->time_zero : 0;
   conv.state = TscState::kOK;
   return 0;
 }
@@ -240,6 +241,7 @@ DDRes init_tsc(TscCalibrationMethod method) {
   }
 
   g_tsc_conversion.state = TscState::kOK;
+  g_tsc_conversion.offset = 0;
   g_tsc_conversion.shift = 31;
   g_tsc_conversion.mult =
       (k_ns_per_sec * (1UL << g_tsc_conversion.shift) + tsc_hz / 2) / tsc_hz;

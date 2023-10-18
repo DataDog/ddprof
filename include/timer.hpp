@@ -19,13 +19,14 @@ enum class TscState { kUninitialized, kUnavailable, kOK };
 enum class TscCalibrationMethod { kAuto, kPerf, kCpuArch, kClockMonotonicRaw };
 
 struct TscConversion {
-  uint16_t shift;
+  uint64_t offset;
   uint32_t mult;
+  uint16_t shift;
   TscState state;
   TscCalibrationMethod calibration_method;
 };
 
-inline TscConversion g_tsc_conversion = {0, 1UL, TscState::kUninitialized,
+inline TscConversion g_tsc_conversion = {0UL, 1U, 0U, TscState::kUninitialized,
                                          TscCalibrationMethod::kAuto};
 
 using TscCycles = uint64_t;
@@ -72,19 +73,11 @@ inline TscState get_tsc_state() { return g_tsc_conversion.state; }
 inline TscCycles get_tsc_cycles() { return read_tsc(); }
 
 inline uint64_t tsc_cycles_to_ns(TscCycles cycles) {
-  constexpr auto bit_shift = 32;
-  uint32_t const al = cycles;
-  uint32_t const ah = cycles >> bit_shift;
-
-  uint16_t const shift = g_tsc_conversion.shift;
-  uint32_t const b = g_tsc_conversion.mult;
-
-  uint64_t ret = (static_cast<uint64_t>(al) * b) >> shift;
-  if (ah) {
-    ret += (static_cast<uint64_t>(ah) * b) << (bit_shift - shift);
-  }
-
-  return ret;
+  using uint128_t = unsigned __int128;
+  return static_cast<uint64_t>(
+             (static_cast<uint128_t>(cycles) * g_tsc_conversion.mult) >>
+             g_tsc_conversion.shift) +
+      g_tsc_conversion.offset;
 }
 
 inline std::chrono::nanoseconds tsc_cycles_to_duration(TscCycles cycles) {
