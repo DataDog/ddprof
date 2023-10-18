@@ -81,7 +81,7 @@ void retrieve_original_env_functions() {
     g_state.putenv = putenv_ptr;
   }
   auto *unsetenv_ptr =
-      reinterpret_cast<decltype(&::unsetenv)>(dlsym(RTLD_NEXT, "putenv"));
+      reinterpret_cast<decltype(&::unsetenv)>(dlsym(RTLD_NEXT, "unsetenv"));
   if (unsetenv_ptr) {
     g_state.unsetenv = unsetenv_ptr;
   }
