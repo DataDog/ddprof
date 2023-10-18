@@ -15,6 +15,7 @@
 #include "ipc.hpp"
 #include "libdd_profiling-embedded_hash.h"
 #include "logger.hpp"
+#include "perf_clock.hpp"
 #include "signal_helper.hpp"
 #include "system_checks.hpp"
 #include "tempfile.hpp"
@@ -303,6 +304,7 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
     return -1;
   }
 
+  ctx->perf_clock_source = PerfClock::determine_perf_clock_source();
 
   if (CPU_COUNT(&ctx->params.cpu_affinity) > 0) {
     LG_DBG("Setting affinity to 0x%s",

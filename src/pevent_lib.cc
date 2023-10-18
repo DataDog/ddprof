@@ -70,12 +70,12 @@ void pevent_set_info(int fd, int attr_idx, PEvent &pevent,
 }
 
 DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
-                            pid_t pid, PEventHdr *pevent_hdr,
-                            size_t &pevent_idx) {
+                            pid_t pid, PerfClockSource perf_clock_source,
+                            PEventHdr *pevent_hdr, size_t &pevent_idx) {
   // register cpu 0 and find a working config
   PEvent *pes = pevent_hdr->pes;
   std::vector<perf_event_attr> perf_event_data =
-      all_perf_configs_from_watcher(watcher, true);
+      all_perf_configs_from_watcher(watcher, true, perf_clock_source);
   DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
 
   // attempt with different configs
@@ -109,11 +109,14 @@ DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
 }
 
 DDRes pevent_open_all_cpus(const PerfWatcher *watcher, int watcher_idx,
-                           pid_t pid, int num_cpu, PEventHdr *pevent_hdr) {
+                           pid_t pid, int num_cpu,
+                           PerfClockSource perf_clock_source,
+                           PEventHdr *pevent_hdr) {
   PEvent *pes = pevent_hdr->pes;
 
   size_t template_pevent_idx = -1;
-  DDRES_CHECK_FWD(pevent_register_cpu_0(watcher, watcher_idx, pid, pevent_hdr,
+  DDRES_CHECK_FWD(pevent_register_cpu_0(watcher, watcher_idx, pid,
+                                        perf_clock_source, pevent_hdr,
                                         template_pevent_idx));
   int const template_attr_idx = pes[template_pevent_idx].attr_idx;
   perf_event_attr *attr = &pevent_hdr->attrs[template_attr_idx];
@@ -168,8 +171,8 @@ DDRes pevent_open(DDProfContext &ctx, pid_t pid, int num_cpu,
        ++watcher_idx) {
     PerfWatcher *watcher = &ctx.watchers[watcher_idx];
     if (watcher->type < kDDPROF_TYPE_CUSTOM) {
-      DDRES_CHECK_FWD(
-          pevent_open_all_cpus(watcher, watcher_idx, pid, num_cpu, pevent_hdr));
+      DDRES_CHECK_FWD(pevent_open_all_cpus(watcher, watcher_idx, pid, num_cpu,
+                                           ctx.perf_clock_source, pevent_hdr));
     } else {
       // custom event, eg.allocation profiling
       size_t pevent_idx = 0;

@@ -22,6 +22,15 @@ namespace ddprof {
 namespace {
 long s_page_size = 0;
 constexpr size_t k_default_page_size{4096}; // Concerned about hugepages?
+
+void set_perf_clock_source(perf_event_attr &attr,
+                           PerfClockSource perf_clock_source) {
+  attr.use_clockid = 0;
+  if (perf_clock_source < PerfClockSource::kMaxPosixClock) {
+    attr.use_clockid = 1;
+    attr.clockid = static_cast<clockid_t>(perf_clock_source);
+  }
+}
 } // namespace
 
 struct perf_event_attr g_dd_native_attr = {
@@ -78,7 +87,8 @@ const char *perf_type_str(int type_id) {
 }
 
 perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
-                                         bool extras) {
+                                         bool extras,
+                                         PerfClockSource perf_clock_source) {
   struct perf_event_attr attr = g_dd_native_attr;
   attr.type = watcher->type;
   attr.config = watcher->config;
@@ -97,7 +107,12 @@ perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
     attr.mmap2 = 1;
     attr.task = 1;
     attr.comm = 1;
+    attr.use_clockid = 1;
+    attr.clockid = CLOCK_MONOTONIC;
   }
+
+  set_perf_clock_source(attr, perf_clock_source);
+
   return attr;
 }
 
@@ -163,13 +178,16 @@ int perfdisown(void *region, size_t size) {
 
 // return attr sorted by priority
 std::vector<perf_event_attr>
-all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras) {
+all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras,
+                              PerfClockSource perf_clock_source) {
   std::vector<perf_event_attr> ret_attr;
-  ret_attr.push_back(perf_config_from_watcher(watcher, extras));
+  auto attr = perf_config_from_watcher(watcher, extras, perf_clock_source);
+
+  ret_attr.push_back(attr);
   if (watcher->options.use_kernel == PerfWatcherUseKernel::kTry) {
     // duplicate the config, while excluding kernel
-    ret_attr.push_back(ret_attr.back());
-    ret_attr.back().exclude_kernel = true;
+    attr.exclude_kernel = true;
+    ret_attr.push_back(attr);
   }
   return ret_attr;
 }

@@ -10,6 +10,7 @@
 #include "ddprof_defs.hpp"
 #include "ddprof_worker_context.hpp"
 #include "exporter_input.hpp"
+#include "perf_clock.hpp"
 #include "perf_watcher.hpp"
 #include "unique_fd.hpp"
 
@@ -37,6 +38,7 @@ struct DDProfContext {
     std::chrono::milliseconds loaded_libs_check_interval{0};
   } params;
 
+  PerfClockSource perf_clock_source{PerfClockSource::kNoClock};
   std::vector<PerfWatcher> watchers;
   ExporterInput exp_input;
   DDProfWorkerContext worker_ctx;
