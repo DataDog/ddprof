@@ -7,6 +7,7 @@
 
 #include "logger.hpp"
 
+namespace ddprof {
 class LogHandle {
 public:
   explicit LogHandle(int lvl = LL_DEBUG) {
@@ -15,3 +16,4 @@ public:
   }
   ~LogHandle() { LOG_close(); }
 };
+} // namespace ddprof
