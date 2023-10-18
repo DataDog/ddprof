@@ -333,13 +333,29 @@ FileInfoId_t DsoHdr::update_id_from_dso(const Dso &dso) {
   return update_id_from_path(dso);
 }
 
+bool DsoHdr::maybe_insert_erase_overlap(Dso &&dso,
+                                        PerfClock::time_point timestamp) {
+  auto &pid_mapping = _pid_map[dso._pid];
+
+  // If mmap event happened earlier than last backpopulate, just ignore it
+  // Note that if no perf clock was found or not backpopulate was done,
+  // last_backpopulate_time will be zero and therefore test will correctly
+  // fail.
+  if (timestamp < pid_mapping._backpopulate_state.last_backpopulate_time) {
+    return false;
+  }
+
+  insert_erase_overlap(pid_mapping, std::move(dso));
+  return true;
+}
+
 DsoHdr::DsoFindRes DsoHdr::insert_erase_overlap(PidMapping &pid_mapping,
                                                 Dso &&dso) {
   DsoMap &map = pid_mapping._map;
+
   DsoFindRes find_res = dso_find_adjust_same(map, dso);
   // nothing to do if already exists
   if (find_res.second) {
-    // TODO: should we erase overlaps here ?
     return find_res;
   }
 
@@ -388,10 +404,7 @@ DsoHdr::DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid,
   return dso_find_or_backpopulate(pid_mapping, pid, addr);
 }
 
-void DsoHdr::pid_free(int pid) {
-  _pid_map.erase(pid);
-  _backpopulate_state_map.erase(pid);
-}
+void DsoHdr::pid_free(int pid) { _pid_map.erase(pid); }
 
 bool DsoHdr::pid_backpopulate(pid_t pid, int &nb_elts_added) {
   return pid_backpopulate(_pid_map[pid], pid, nb_elts_added);
@@ -403,13 +416,14 @@ bool DsoHdr::pid_backpopulate(pid_t pid, int &nb_elts_added) {
 bool DsoHdr::pid_backpopulate(PidMapping &pid_mapping, pid_t pid,
                               int &nb_elts_added) {
   // Following line creates the state for pid if it does not exist
-  BackpopulateState &bp_state = _backpopulate_state_map[pid];
+  BackpopulateState &bp_state = pid_mapping._backpopulate_state;
   ++bp_state.nb_unfound_dsos;
   if (bp_state.perm != kAllowed) { // retry
     return false;
   }
   nb_elts_added = 0;
   LG_DBG("[DSO] Backpopulating PID %d", pid);
+  bp_state.last_backpopulate_time = PerfClock::now();
   auto proc_map_file_holder = open_proc_maps(pid, _path_to_proc.c_str());
   if (!proc_map_file_holder) {
     LG_DBG("[DSO] Failed to open procfs for %d", pid);
@@ -527,9 +541,10 @@ int DsoHdr::get_nb_dso() const {
 }
 
 void DsoHdr::reset_backpopulate_state(int reset_threshold) {
-  for (auto &el : _backpopulate_state_map) {
-    if (el.second.nb_unfound_dsos >= reset_threshold) {
-      el.second = BackpopulateState();
+  for (auto &[_, pid_mapping] : _pid_map) {
+    auto &backpopulate_state = pid_mapping._backpopulate_state;
+    if (backpopulate_state.nb_unfound_dsos >= reset_threshold) {
+      backpopulate_state = {};
     }
   }
 }
