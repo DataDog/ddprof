@@ -41,7 +41,8 @@ TEST(MMapTest, PerfOpen) {
 
     const PerfWatcher *watcher = ewatcher_from_idx(i);
     std::vector<perf_event_attr> perf_event_data =
-        ddprof::all_perf_configs_from_watcher(watcher, true);
+        ddprof::all_perf_configs_from_watcher(watcher, true,
+                                              PerfClockSource::kNoClock);
     // test with the least restrictive conf
     int perf_fd = perf_event_open(&perf_event_data.back(), pid, 0, -1,
                                   PERF_FLAG_FD_CLOEXEC);

@@ -7,6 +7,7 @@
 
 #include "ddres_def.hpp"
 #include "perf_archmap.hpp"
+#include "perf_clock.hpp"
 #include "perf_watcher.hpp"
 
 #include <chrono>
@@ -65,6 +66,7 @@ struct perf_event_mmap {
   uint64_t len;
   uint64_t pgoff;
   char filename[];
+  // struct sample_id sample_id;
 };
 
 struct perf_event_mmap2 {
@@ -80,6 +82,7 @@ struct perf_event_mmap2 {
   uint32_t prot;
   uint32_t flags;
   char filename[];
+  // struct sample_id sample_id;
 };
 
 struct perf_event_comm {
@@ -87,6 +90,7 @@ struct perf_event_comm {
   uint32_t pid;
   uint32_t tid;
   char comm[];
+  // struct sample_id sample_id;
 };
 
 struct perf_event_lost {
@@ -144,12 +148,14 @@ size_t get_mask_from_size(size_t size);
 const char *perf_type_str(int type_id);
 
 std::vector<perf_event_attr>
-all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras);
+all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras,
+                              PerfClockSource perf_clock_source);
 
 uint64_t perf_value_from_sample(const PerfWatcher *watcher,
                                 const perf_event_sample *sample);
 
 perf_event_attr perf_config_from_watcher(const PerfWatcher *watcher,
-                                         bool extras);
+                                         bool extras,
+                                         PerfClockSource perf_clock_source);
 
 } // namespace ddprof
