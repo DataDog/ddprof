@@ -71,7 +71,6 @@ size_t save_context(std::span<const std::byte> stack_bounds,
   return save_stack(stack_bounds,
                     reinterpret_cast<const std::byte *>(regs[REGNAME(SP)]),
                     buffer);
-  return 0;
 }
 
 } // namespace ddprof
