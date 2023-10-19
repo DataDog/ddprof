@@ -336,7 +336,7 @@ add_unit_test(
   ../src/user_override.cc
   LIBRARIES DDProf::Parser)
 
-add_unit_test(timer-ut timer-ut.cc ../src/timer.cc ../src/perf.cc)
+add_unit_test(timer-ut timer-ut.cc ../src/tsc_clock.cc ../src/perf.cc)
 
 add_unit_test(ddprof_file_info-ut ddprof_file_info-ut.cc)
 
@@ -381,7 +381,7 @@ add_unit_test(lib_logger-ut ./lib_logger-ut.cc)
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/pthread_fixes.cc
               ../src/lib/savecontext.cc ../src/lib/saveregisters.cc)
 
-add_benchmark(timer-bench timer-bench.cc ../src/timer.cc ../src/perf.cc)
+add_benchmark(timer-bench timer-bench.cc ../src/tsc_clock.cc ../src/perf.cc)
 
 add_benchmark(
   backpopulate-bench

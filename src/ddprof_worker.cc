@@ -18,7 +18,7 @@
 #include "pprof/ddprof_pprof.hpp"
 #include "procutils.hpp"
 #include "tags.hpp"
-#include "timer.hpp"
+#include "tsc_clock.hpp"
 #include "unwind.hpp"
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
@@ -141,14 +141,16 @@ DDRes worker_update_stats(DDProfWorkerContext &worker_context,
   ddprof_stats_get(STATS_SAMPLE_COUNT, &nsamples);
   long tsc_cycles;
   ddprof_stats_get(STATS_UNWIND_AVG_TIME, &tsc_cycles);
-  int64_t const avg_unwind_ns =
-      nsamples > 0 ? tsc_cycles_to_ns(tsc_cycles) / nsamples : -1;
+  int64_t const avg_unwind_ns = nsamples > 0
+      ? TscClock::cycles_to_duration(tsc_cycles).count() / nsamples
+      : -1;
 
   ddprof_stats_set(STATS_UNWIND_AVG_TIME, avg_unwind_ns);
 
   ddprof_stats_get(STATS_AGGREGATION_AVG_TIME, &tsc_cycles);
-  int64_t const avg_aggregation_ns =
-      nsamples > 0 ? tsc_cycles_to_ns(tsc_cycles) / nsamples : -1;
+  int64_t const avg_aggregation_ns = nsamples > 0
+      ? TscClock::cycles_to_duration(tsc_cycles).count() / nsamples
+      : -1;
 
   ddprof_stats_set(STATS_AGGREGATION_AVG_TIME, avg_aggregation_ns);
 
@@ -383,9 +385,9 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
     ddprof_stats_add(STATS_TARGET_CPU_USAGE, sample->period, nullptr);
   }
 
-  auto ticks0 = get_tsc_cycles();
+  auto ticks0 = TscClock::cycles_now();
   DDRes const res = ddprof_unwind_sample(ctx, sample, watcher_pos);
-  auto unwind_ticks = get_tsc_cycles();
+  auto unwind_ticks = TscClock::cycles_now();
   ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, nullptr);
 
   // Usually we want to send the sample_val, but sometimes we need to process
@@ -417,8 +419,8 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
     }
   }
 
-  ddprof_stats_add(STATS_AGGREGATION_AVG_TIME, get_tsc_cycles() - unwind_ticks,
-                   nullptr);
+  ddprof_stats_add(STATS_AGGREGATION_AVG_TIME,
+                   TscClock::cycles_now() - unwind_ticks, nullptr);
 
   return {};
 }
