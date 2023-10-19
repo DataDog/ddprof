@@ -12,6 +12,7 @@
 
 #include "defer.hpp"
 #include "loghandle.hpp"
+#include "perf_clock.hpp"
 #include "user_override.hpp"
 
 namespace ddprof {
@@ -346,6 +347,37 @@ TEST(DSOTest, backpopulate) {
   dso_hdr.get_pid_mapping(getpid())._map.erase(find_res.first);
   find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
   EXPECT_TRUE(find_res.second);
+}
+
+TEST(DSOTest, backpopulate_with_perf_clock) {
+  ElfAddress_t ip = _THIS_IP_;
+
+  // PerfClock will return 0
+  PerfClock::reset();
+  {
+    DsoHdr dso_hdr;
+    auto old_timestamp = PerfClock::now();
+    DsoFindRes find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
+    ASSERT_TRUE(find_res.second);
+
+    auto &my_dso = find_res.first->second;
+    EXPECT_TRUE(dso_hdr.maybe_insert_erase_overlap(Dso{my_dso, getpid()},
+                                                   old_timestamp));
+  }
+  // Init perf clock
+  PerfClock::determine_perf_clock_source();
+  {
+    DsoHdr dso_hdr;
+    auto old_timestamp = PerfClock::now();
+    DsoFindRes find_res = dso_hdr.dso_find_or_backpopulate(getpid(), ip);
+    ASSERT_TRUE(find_res.second);
+
+    auto &my_dso = find_res.first->second;
+    EXPECT_FALSE(dso_hdr.maybe_insert_erase_overlap(Dso{my_dso, getpid()},
+                                                    old_timestamp));
+    EXPECT_TRUE(dso_hdr.maybe_insert_erase_overlap(Dso{my_dso, getpid()},
+                                                   PerfClock::now()));
+  }
 }
 
 TEST(DSOTest, missing_dso) {
