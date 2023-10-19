@@ -7,6 +7,8 @@
 #include <sys/times.h>
 #include <time.h>
 
+#include "loghandle.hpp"
+#include "perf_clock.hpp"
 #include "tsc_clock.hpp"
 
 static void BM_clock_monotonic_raw(benchmark::State &state) {
@@ -27,6 +29,15 @@ static void BM_clock_monotonic(benchmark::State &state) {
 }
 
 BENCHMARK(BM_clock_monotonic);
+
+static void BM_clock_boottime(benchmark::State &state) {
+  for (auto _ : state) {
+    timespec tp;
+    clock_gettime(CLOCK_BOOTTIME, &tp);
+  }
+}
+
+BENCHMARK(BM_clock_boottime);
 
 static void BM_rdtsc(benchmark::State &state) {
   for (auto _ : state) {
@@ -61,3 +72,14 @@ static void BM_times(benchmark::State &state) {
 }
 
 BENCHMARK(BM_times);
+
+static void BM_perf_clock(benchmark::State &state) {
+  ddprof::LogHandle log_handle;
+  ddprof::PerfClock::determine_perf_clock_source();
+  for (auto _ : state) {
+    auto t = ddprof::PerfClock::now();
+    benchmark::DoNotOptimize(t);
+  }
+}
+
+BENCHMARK(BM_perf_clock);

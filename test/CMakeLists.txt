@@ -381,7 +381,8 @@ add_unit_test(lib_logger-ut ./lib_logger-ut.cc)
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/pthread_fixes.cc
               ../src/lib/savecontext.cc ../src/lib/saveregisters.cc)
 
-add_benchmark(timer-bench timer-bench.cc ../src/tsc_clock.cc ../src/perf.cc)
+add_benchmark(timer-bench timer-bench.cc ../src/tsc_clock.cc ../src/perf.cc ../src/perf_clock.cc
+              ../src/perf_ringbuffer.cc)
 
 add_benchmark(
   backpopulate-bench
