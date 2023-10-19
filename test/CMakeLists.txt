@@ -183,8 +183,14 @@ add_unit_test(
   dso-ut
   ../src/dso.cc
   ../src/dso_hdr.cc
+  ../src/perf.cc
+  ../src/perf_clock.cc
+  ../src/perf_ringbuffer.cc
+  ../src/pevent_lib.cc
   ../src/procutils.cc
+  ../src/ringbuffer_utils.cc
   ../src/signal_helper.cc
+  ../src/sys_utils.cc
   ../src/user_override.cc
   dso-ut.cc
   DEFINITIONS MYNAME="dso-ut")
