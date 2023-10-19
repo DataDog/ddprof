@@ -5,25 +5,27 @@
 
 #include <gtest/gtest.h>
 
-#include "timer.hpp"
+#include "tsc_clock.hpp"
 
 #include <chrono>
 #include <thread>
 
-using namespace ddprof;
+namespace ddprof {
 
 TEST(Timer, simple) {
   using namespace std::chrono_literals;
 
-  ASSERT_TRUE(IsDDResOK(ddprof::init_tsc()));
+  ASSERT_TRUE(IsDDResOK(TscClock::init()));
 
   auto start = std::chrono::high_resolution_clock::now();
-  TscCycles c1 = get_tsc_cycles();
+  auto c1 = TscClock::cycles_now();
   std::this_thread::sleep_for(50ms);
   auto end = std::chrono::high_resolution_clock::now();
-  TscCycles c2 = get_tsc_cycles();
+  auto c2 = TscClock::cycles_now();
   auto d1 = end - start;
-  auto d2 = tsc_cycles_to_duration(c2 - c1);
+  auto d2 = TscClock::cycles_to_duration(c2 - c1);
   ASSERT_LE(std::abs((d1 - d2).count() / static_cast<double>(d1.count())),
             0.01);
 }
+
+} // namespace ddprof

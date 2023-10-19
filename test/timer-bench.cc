@@ -7,7 +7,7 @@
 #include <sys/times.h>
 #include <time.h>
 
-#include "timer.hpp"
+#include "tsc_clock.hpp"
 
 static void BM_clock_monotonic_raw(benchmark::State &state) {
   // Code inside this loop is measured repeatedly
@@ -30,7 +30,7 @@ BENCHMARK(BM_clock_monotonic);
 
 static void BM_rdtsc(benchmark::State &state) {
   for (auto _ : state) {
-    ddprof::get_tsc_cycles();
+    ddprof::TscClock::cycles_now();
   }
 }
 

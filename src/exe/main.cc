@@ -19,7 +19,7 @@
 #include "signal_helper.hpp"
 #include "system_checks.hpp"
 #include "tempfile.hpp"
-#include "timer.hpp"
+#include "tsc_clock.hpp"
 #include "unique_fd.hpp"
 #include "user_override.hpp"
 
@@ -289,12 +289,13 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
   // Now, we are the profiler process
   exit_on_return = true;
 
-  if (IsDDResOK(init_tsc())) {
-    LG_NTC(
-        "Successfully calibrated TSC from %s (mult: %u, shift: %u, offset: "
-        "%lu)",
-        tsc_calibration_method_to_string(get_tsc_calibration_method()).c_str(),
-        g_tsc_conversion.mult, g_tsc_conversion.shift, g_tsc_conversion.offset);
+  if (IsDDResOK(TscClock::init())) {
+    const auto &calibration = TscClock::calibration();
+    LG_NTC("Successfully calibrated TSC from %s (mult: %u, shift: %u, offset: "
+           "%ld)",
+           to_string(calibration.method).c_str(), calibration.params.mult,
+           calibration.params.shift,
+           calibration.params.offset.time_since_epoch().count());
   } else {
     LG_WRN("Failed to initialize TSC");
   }

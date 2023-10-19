@@ -3,7 +3,7 @@
  */
 // Code taken from https://github.com/DPDK/dpdk
 
-#include "timer.hpp"
+#include "tsc_clock.hpp"
 
 #include "ddres.hpp"
 #include "defer.hpp"
@@ -177,8 +177,10 @@ uint64_t estimate_tsc_freq() {
 
   return freqs[(nb_measurements + 1) / 2];
 }
+} // namespace
 
-int init_from_perf(TscConversion &conv) {
+bool TscClock::init_from_perf(Calibration &calibration) {
+  calibration.state = State::kUnavailable;
   perf_event_attr pe = {.type = PERF_TYPE_SOFTWARE,
                         .size = sizeof(struct perf_event_attr),
                         .config = PERF_COUNT_SW_DUMMY,
@@ -187,64 +189,63 @@ int init_from_perf(TscConversion &conv) {
                         .exclude_hv = 1};
   UniqueFd const fd{perf_event_open(&pe, 0, 0, -1, 0)};
   if (!fd) {
-    return -1;
+    return false;
   }
 
   const uint64_t sz = get_page_size();
   void *addr = mmap(nullptr, sz, PROT_READ, MAP_SHARED, fd.get(), 0);
   if (!addr) {
-    return -1;
+    return false;
   }
 
   defer { munmap(addr, sz); };
 
   auto *pc = reinterpret_cast<perf_event_mmap_page *>(addr);
   if (pc == MAP_FAILED || pc->cap_user_time != 1) {
-    return -1;
+    return false;
   }
 
-  conv.mult = pc->time_mult;
-  conv.shift = pc->time_shift;
-  conv.offset = pc->cap_user_time_zero ? pc->time_zero : 0;
-  conv.state = TscState::kOK;
-  return 0;
+  calibration.params.mult = pc->time_mult;
+  calibration.params.shift = pc->time_shift;
+  calibration.params.offset = pc->cap_user_time_zero
+      ? TscClock::time_point{std::chrono::nanoseconds{pc->time_zero}}
+      : TscClock::time_point{};
+  calibration.method = CalibrationMethod::kPerf;
+  calibration.state = State::kOK;
+  return true;
 }
 
-} // namespace
-
-DDRes init_tsc(TscCalibrationMethod method) {
-  if ((method == TscCalibrationMethod::kAuto ||
-       method == TscCalibrationMethod::kPerf) &&
-      !init_from_perf(g_tsc_conversion)) {
-    g_tsc_conversion.calibration_method = TscCalibrationMethod::kPerf;
+DDRes TscClock::init(CalibrationMethod method) {
+  if ((method == CalibrationMethod::kAuto ||
+       method == CalibrationMethod::kPerf) &&
+      init_from_perf(_calibration)) {
     return {};
   }
   uint64_t tsc_hz = 0;
 
-  if (method == TscCalibrationMethod::kAuto ||
-      method == TscCalibrationMethod::kCpuArch) {
-    g_tsc_conversion.calibration_method = TscCalibrationMethod::kCpuArch;
+  if (method == CalibrationMethod::kAuto ||
+      method == CalibrationMethod::kCpuArch) {
+    _calibration.method = CalibrationMethod::kCpuArch;
     tsc_hz = get_tsc_freq_arch();
   }
 
   if (!tsc_hz &&
-      (method == TscCalibrationMethod::kAuto ||
-       method == TscCalibrationMethod::kClockMonotonicRaw)) {
-    g_tsc_conversion.calibration_method =
-        TscCalibrationMethod::kClockMonotonicRaw;
+      (method == CalibrationMethod::kAuto ||
+       method == CalibrationMethod::kClockMonotonicRaw)) {
+    _calibration.method = CalibrationMethod::kClockMonotonicRaw;
     tsc_hz = estimate_tsc_freq();
   }
 
   if (!tsc_hz) {
-    g_tsc_conversion.state = TscState::kUnavailable;
+    _calibration.state = State::kUnavailable;
     return ddres_error(DD_WHAT_TSC);
   }
 
-  g_tsc_conversion.state = TscState::kOK;
-  g_tsc_conversion.offset = 0;
-  g_tsc_conversion.shift = 31;
-  g_tsc_conversion.mult =
-      (k_ns_per_sec * (1UL << g_tsc_conversion.shift) + tsc_hz / 2) / tsc_hz;
+  _calibration.state = State::kOK;
+  auto &params = _calibration.params;
+  params.offset = time_point{};
+  params.shift = 31;
+  params.mult = (k_ns_per_sec * (1UL << params.shift) + tsc_hz / 2) / tsc_hz;
 
   return {};
 }

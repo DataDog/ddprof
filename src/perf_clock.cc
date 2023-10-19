@@ -11,7 +11,7 @@
 #include "perf.hpp"
 #include "perf_ringbuffer.hpp"
 #include "ringbuffer_utils.hpp"
-#include "timer.hpp"
+#include "tsc_clock.hpp"
 #include "unique_fd.hpp"
 
 #include <chrono>
@@ -124,11 +124,11 @@ PerfClockSource PerfClock::determine_perf_clock_source() {
   sched_setaffinity(0, sizeof(new_affinity), &new_affinity);
   defer { sched_setaffinity(0, sizeof(old_affinity), &old_affinity); };
 
-  if (get_tsc_state() == TscState::kOK &&
-      g_tsc_conversion.calibration_method == TscCalibrationMethod::kPerf) {
+  if (TscClock::state() == TscClock::State::kOK &&
+      TscClock::calibration().method == TscClock::CalibrationMethod::kPerf) {
 
     PerfClock::_clock_func = []() {
-      return tsc_cycles_to_duration(get_tsc_cycles());
+      return TscClock::now().time_since_epoch();
     };
 
     if (test_clock(PerfClockSource::kTSC, current_cpu)) {
