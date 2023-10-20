@@ -74,7 +74,7 @@ DDRes report_lost_events(DDProfContext &ctx) {
               watcher->sample_frequency
           : watcher->sample_period;
 
-      int64_t value = period * nb_lost;
+      const int64_t value = period * nb_lost;
       LG_WRN("Reporting %lu lost samples (cumulated lost value: %lu) for "
              "watcher #%d",
              nb_lost, value, watcher_idx);
@@ -237,7 +237,7 @@ DDRes aggregate_livealloc_stack(
     const LiveAllocation::PprofStacks::value_type &alloc_info,
     DDProfContext &ctx, const PerfWatcher *watcher, DDProfPProf *pprof,
     const SymbolHdr &symbol_hdr) {
-  DDProfValuePack pack{
+  const DDProfValuePack pack{
       alloc_info.second._value,
       static_cast<uint64_t>(std::max<int64_t>(0, alloc_info.second._count)), 0};
 
@@ -414,7 +414,7 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
       // in lib mode we don't aggregate (protect to avoid link failures)
       int const i_export = ctx.worker_ctx.i_current_pprof;
       DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
-      DDProfValuePack pack{static_cast<int64_t>(sample_val), 1,
+      const DDProfValuePack pack{static_cast<int64_t>(sample_val), 1,
                            ctx.params.timeline ? sample->time : 0};
       DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbol_hdr, pack,
                                       watcher, kSumPos, pprof));
