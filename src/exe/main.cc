@@ -305,7 +305,7 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
     return -1;
   }
 
-  ctx->perf_clock_source = PerfClock::determine_perf_clock_source();
+  ctx->perf_clock_source = PerfClock::init();
 
   if (CPU_COUNT(&ctx->params.cpu_affinity) > 0) {
     LG_DBG("Setting affinity to 0x%s",

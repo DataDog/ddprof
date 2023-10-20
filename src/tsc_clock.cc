@@ -215,7 +215,13 @@ bool TscClock::init_from_perf(Calibration &calibration) {
   return true;
 }
 
-DDRes TscClock::init(CalibrationMethod method) {
+void TscClock::init(CalibrationParams params) noexcept {
+  _calibration.params = params;
+  _calibration.method = CalibrationMethod::kManual;
+  _calibration.state = State::kOK;
+}
+
+DDRes TscClock::init(CalibrationMethod method) noexcept {
   if ((method == CalibrationMethod::kAuto ||
        method == CalibrationMethod::kPerf) &&
       init_from_perf(_calibration)) {

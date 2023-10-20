@@ -32,7 +32,11 @@ public:
 
   static time_point now() noexcept { return time_point{_clock_func()}; }
 
-  static PerfClockSource determine_perf_clock_source();
+  // Determine which perf clock source to use
+  static PerfClockSource init() noexcept;
+
+  static void init(PerfClockSource clock_source) noexcept;
+
   static PerfClockSource perf_clock_source() { return _clock_source; }
 
   // Reset PerfClock to its initial state (just return 0)

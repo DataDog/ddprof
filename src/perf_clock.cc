@@ -23,6 +23,22 @@ namespace ddprof {
 
 namespace {
 
+constexpr auto g_clock_monotonic_func = []() {
+  timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return timespec_to_duration(ts);
+};
+
+constexpr auto g_clock_monotonic_raw_func = []() {
+  timespec ts;
+  clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+  return timespec_to_duration(ts);
+};
+
+constexpr auto g_tsc_clock_func = []() {
+  return TscClock::now().time_since_epoch();
+};
+
 bool test_clock(PerfClockSource perf_clock_source, int current_cpu) {
   bool use_clockid = false;
   clockid_t clockid = 0;
@@ -113,7 +129,7 @@ bool test_clock(PerfClockSource perf_clock_source, int current_cpu) {
 
 } // namespace
 
-PerfClockSource PerfClock::determine_perf_clock_source() {
+PerfClockSource PerfClock::init() noexcept {
   auto current_cpu = sched_getcpu();
   cpu_set_t old_affinity;
   CPU_ZERO(&old_affinity);
@@ -124,13 +140,11 @@ PerfClockSource PerfClock::determine_perf_clock_source() {
   sched_setaffinity(0, sizeof(new_affinity), &new_affinity);
   defer { sched_setaffinity(0, sizeof(old_affinity), &old_affinity); };
 
-  if (TscClock::state() == TscClock::State::kOK &&
-      TscClock::calibration().method == TscClock::CalibrationMethod::kPerf) {
+  const auto &calibration = TscClock::calibration();
+  if (calibration.state == TscClock::State::kOK &&
+      calibration.method == TscClock::CalibrationMethod::kPerf) {
 
-    PerfClock::_clock_func = []() {
-      return TscClock::now().time_since_epoch();
-    };
-
+    PerfClock::_clock_func = g_tsc_clock_func;
     if (test_clock(PerfClockSource::kTSC, current_cpu)) {
       LG_NTC("Using TSC as perf clock source.");
       _clock_source = PerfClockSource::kTSC;
@@ -139,12 +153,7 @@ PerfClockSource PerfClock::determine_perf_clock_source() {
     LG_DBG("Failed to use TSC as perf clock source.");
   }
 
-  PerfClock::_clock_func = []() {
-    timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return timespec_to_duration(ts);
-  };
-
+  PerfClock::_clock_func = g_clock_monotonic_func;
   if (test_clock(PerfClockSource::kClockMonotonic, current_cpu)) {
     LG_NTC("Using ClockMonotonic as perf clock source.");
     _clock_source = PerfClockSource::kClockMonotonic;
@@ -153,12 +162,7 @@ PerfClockSource PerfClock::determine_perf_clock_source() {
 
   LG_DBG("Failed to use ClockMonotonic as perf clock source.");
 
-  PerfClock::_clock_func = []() {
-    timespec ts;
-    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
-    return timespec_to_duration(ts);
-  };
-
+  PerfClock::_clock_func = g_clock_monotonic_raw_func;
   if (test_clock(PerfClockSource::kClockMonotonicRaw, current_cpu)) {
     LG_NTC("Using ClockMonotonicRaw as perf clock source.");
     _clock_source = PerfClockSource::kClockMonotonicRaw;
@@ -167,11 +171,29 @@ PerfClockSource PerfClock::determine_perf_clock_source() {
   LG_DBG("Failed to use ClockMonotonicRaw as perf clock source.");
 
   LG_WRN("Failed to find a usable clock source for perf.");
-  PerfClock::_clock_func = []() { return std::chrono::nanoseconds{}; };
+  PerfClock::_clock_func = null_clock;
 
   _clock_source = PerfClockSource::kNoClock;
 
   return _clock_source;
+}
+
+void PerfClock::init(PerfClockSource clock_source) noexcept {
+  _clock_source = clock_source;
+  switch (clock_source) {
+  case PerfClockSource::kClockMonotonic:
+    _clock_func = g_clock_monotonic_func;
+    break;
+  case PerfClockSource::kClockMonotonicRaw:
+    _clock_func = g_clock_monotonic_raw_func;
+    break;
+  case PerfClockSource::kTSC:
+    _clock_func = g_tsc_clock_func;
+    break;
+  default:
+    _clock_source = PerfClockSource::kNoClock;
+    _clock_func = null_clock;
+  }
 }
 
 } // namespace ddprof

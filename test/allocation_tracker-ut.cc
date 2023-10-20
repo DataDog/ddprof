@@ -9,10 +9,12 @@
 #include "ipc.hpp"
 #include "live_allocation-c.hpp"
 #include "loghandle.hpp"
+#include "perf_clock.hpp"
 #include "pevent_lib.hpp"
 #include "ringbuffer_holder.hpp"
 #include "symbol_overrides.hpp"
 #include "syscalls.hpp"
+#include "tsc_clock.hpp"
 #include "unwind.hpp"
 #include "unwind_state.hpp"
 
@@ -49,12 +51,16 @@ namespace ddprof {
 
 static const uint64_t k_sampling_rate = 1;
 static const size_t k_buf_size_order = 5;
+static PerfClock::time_point before;
+static PerfClock::time_point after;
 
 DDPROF_NOINLINE void my_malloc(size_t size, uintptr_t addr = 0xdeadbeef) {
   TrackerThreadLocalState *tl_state = AllocationTracker::get_tl_state();
   ReentryGuard guard(tl_state ? &(tl_state->reentry_guard) : nullptr);
   if (guard) {
+    before = PerfClock::now();
     AllocationTracker::track_allocation_s(addr, size, *tl_state);
+    after = PerfClock::now();
   }
   // prevent tail call optimization
   DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
@@ -79,6 +85,8 @@ DDPROF_NOINLINE void my_func_calling_malloc(size_t size) {
 }
 
 TEST(allocation_tracker, start_stop) {
+  TscClock::init();
+  PerfClock::init();
   RingBufferHolder ring_buffer{k_buf_size_order,
                                RingBufferType::kMPSCRingBuffer};
   AllocationTracker::allocation_tracking_init(
@@ -108,6 +116,8 @@ TEST(allocation_tracker, start_stop) {
     ASSERT_EQ(sample->pid, getpid());
     ASSERT_EQ(sample->tid, ddprof::gettid());
     ASSERT_EQ(sample->addr, 0xdeadbeef);
+    ASSERT_GE(sample->time, before.time_since_epoch().count());
+    ASSERT_LE(sample->time, after.time_since_epoch().count());
 
     UnwindState state;
     unwind_init_sample(&state, sample->regs, sample->pid, sample->size_stack,

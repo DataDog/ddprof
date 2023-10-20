@@ -365,7 +365,7 @@ TEST(DSOTest, backpopulate_with_perf_clock) {
                                                    old_timestamp));
   }
   // Init perf clock
-  PerfClock::determine_perf_clock_source();
+  PerfClock::init();
   {
     DsoHdr dso_hdr;
     auto old_timestamp = PerfClock::now();

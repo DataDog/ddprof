@@ -215,6 +215,7 @@ set(DD_PROFILING_SOURCES
     src/logger.cc
     src/logger_setup.cc
     src/perf.cc
+    src/perf_clock.cc
     src/perf_ringbuffer.cc
     src/perf_watcher.cc
     src/pevent_lib.cc
@@ -222,6 +223,7 @@ set(DD_PROFILING_SOURCES
     src/signal_helper.cc
     src/sys_utils.cc
     src/tracepoint_config.cc
+    src/tsc_clock.cc
     src/user_override.cc)
 
 if(BUILD_UNIVERSAL_DDPROF)

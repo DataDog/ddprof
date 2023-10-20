@@ -11,10 +11,12 @@
 #include "ipc.hpp"
 #include "lib_logger.hpp"
 #include "live_allocation-c.hpp"
+#include "perf_clock.hpp"
 #include "pevent_lib.hpp"
 #include "ringbuffer_utils.hpp"
 #include "savecontext.hpp"
 #include "syscalls.hpp"
+#include "tsc_clock.hpp"
 
 #include <atomic>
 #include <cassert>
@@ -145,7 +147,18 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
     _allocated_address_set = AddressBitset(liveallocation::kMaxTracked *
                                            k_ratio_max_elt_to_bitset_size);
   }
-  return ddprof::ring_buffer_attach(ring_buffer, &_pevent);
+  DDRES_CHECK_FWD(ddprof::ring_buffer_attach(ring_buffer, &_pevent));
+
+  const auto &rb = _pevent.rb;
+  if (rb.tsc_available) {
+    TscClock::init(TscClock::CalibrationParams{
+        .offset = TscClock::time_point{TscClock::duration{rb.time_zero}},
+        .mult = rb.time_mult,
+        .shift = rb.time_shift});
+  }
+  PerfClock::init(static_cast<PerfClockSource>(rb.perf_clock_source));
+
+  return {};
 }
 
 void AllocationTracker::free() {
@@ -320,7 +333,7 @@ DDRes AllocationTracker::push_clear_live_allocation(
   event->hdr.misc = 0;
   event->hdr.size = sizeof(ClearLiveAllocationEvent);
   event->hdr.type = PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION;
-  event->sample_id.time = 0;
+  event->sample_id.time = PerfClock::now().time_since_epoch().count();
   if (_state.pid == 0) {
     _state.pid = getpid();
   }
@@ -369,7 +382,7 @@ DDRes AllocationTracker::push_dealloc_sample(
   event->hdr.misc = 0;
   event->hdr.size = sizeof(DeallocationEvent);
   event->hdr.type = PERF_CUSTOM_EVENT_DEALLOCATION;
-  event->sample_id.time = 0;
+  event->sample_id.time = PerfClock::now().time_since_epoch().count();
 
   if (_state.pid == 0) {
     _state.pid = getpid();
@@ -425,7 +438,7 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   event->hdr.size = sizeof_allocation_event(_stack_sample_size);
   event->hdr.type = PERF_RECORD_SAMPLE;
   event->abi = PERF_SAMPLE_REGS_ABI_64;
-  event->sample_id.time = 0;
+  event->sample_id.time = PerfClock::now().time_since_epoch().count();
   event->addr = addr;
   if (_state.pid == 0) {
     _state.pid = getpid();

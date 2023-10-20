@@ -22,6 +22,8 @@ bool rb_init(RingBuffer *rb, void *base, size_t size,
   rb->data_size = size - rb->meta_size;
   rb->mask = get_mask_from_size(size);
   rb->type = ring_buffer_type;
+  rb->spinlock = nullptr;
+
   switch (ring_buffer_type) {
   case RingBufferType::kPerfRingBuffer: {
     auto *meta = reinterpret_cast<perf_event_mmap_page *>(rb->base);
@@ -34,6 +36,11 @@ bool rb_init(RingBuffer *rb, void *base, size_t size,
     rb->reader_pos = &meta->reader_pos;
     rb->writer_pos = &meta->writer_pos;
     rb->spinlock = &meta->spinlock;
+    rb->perf_clock_source = meta->perf_clock_source;
+    rb->time_mult = meta->time_mult;
+    rb->time_shift = meta->time_shift;
+    rb->time_zero = meta->time_zero;
+    rb->tsc_available = meta->tsc_available;
     break;
   }
   default:

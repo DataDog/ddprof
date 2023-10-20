@@ -287,6 +287,7 @@ set(ALLOCATION_TRACKER_UT_SRCS
     ../src/failed_assumption.cc
     ../src/pevent_lib.cc
     ../src/perf.cc
+    ../src/perf_clock.cc
     ../src/perf_ringbuffer.cc
     ../src/perf_watcher.cc
     ../src/ringbuffer_utils.cc
@@ -302,6 +303,7 @@ set(ALLOCATION_TRACKER_UT_SRCS
     ../src/statsd.cc
     ../src/sys_utils.cc
     ../src/tracepoint_config.cc
+    ../src/tsc_clock.cc
     ../src/user_override.cc
     ../src/unwind.cc
     ../src/unwind_dwfl.cc
@@ -406,7 +408,9 @@ add_benchmark(
   ../src/lib/pthread_fixes.cc
   ../src/lib/savecontext.cc
   ../src/lib/saveregisters.cc
+  ../src/perf_clock.cc
   ../src/procutils.cc
+  ../src/tsc_clock.cc
   ../src/user_override.cc
   ../src/sys_utils.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle DDProf::Parser
