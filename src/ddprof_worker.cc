@@ -23,6 +23,7 @@
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <cstddef>
@@ -73,12 +74,12 @@ DDRes report_lost_events(DDProfContext &ctx) {
               watcher->sample_frequency
           : watcher->sample_period;
 
-      auto value = period * nb_lost;
+      int64_t value = period * nb_lost;
       LG_WRN("Reporting %lu lost samples (cumulated lost value: %lu) for "
              "watcher #%d",
              nb_lost, value, watcher_idx);
       DDRES_CHECK_FWD(pprof_aggregate(
-          &us->output, us->symbol_hdr, value, nb_lost, watcher, kSumPos,
+          &us->output, us->symbol_hdr, {value, nb_lost, 0}, watcher, kSumPos,
           ctx.worker_ctx.pprof[ctx.worker_ctx.i_current_pprof]));
       ctx.worker_ctx.lost_events_per_watcher[watcher_idx] = 0;
     }
@@ -236,9 +237,14 @@ DDRes aggregate_livealloc_stack(
     const LiveAllocation::PprofStacks::value_type &alloc_info,
     DDProfContext &ctx, const PerfWatcher *watcher, DDProfPProf *pprof,
     const SymbolHdr &symbol_hdr) {
+    DDProfValuePack pack{
+      alloc_info.second._value,
+      static_cast<uint64_t>(std::max<int64_t>(0, alloc_info.second._count)),
+      0
+    };
+
   DDRES_CHECK_FWD(
-      pprof_aggregate(&alloc_info.first, symbol_hdr, alloc_info.second._value,
-                      alloc_info.second._count, watcher, kLiveSumPos, pprof));
+      pprof_aggregate(&alloc_info.first, symbol_hdr, pack, watcher, kLiveSumPos, pprof));
   if (ctx.params.show_samples) {
     ddprof_print_sample(alloc_info.first, symbol_hdr, alloc_info.second._value,
                         kLiveSumPos, *watcher);
@@ -410,8 +416,8 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
       // in lib mode we don't aggregate (protect to avoid link failures)
       int const i_export = ctx.worker_ctx.i_current_pprof;
       DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
-      DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbol_hdr, sample_val,
-                                      1, watcher, kSumPos, pprof));
+      DDProfValuePack pack{static_cast<int64_t>(sample_val), 1, sample->time};
+      DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbol_hdr, pack, watcher, kSumPos, pprof));
       if (ctx.params.show_samples) {
         ddprof_print_sample(us->output, us->symbol_hdr, sample->period, kSumPos,
                             *watcher);

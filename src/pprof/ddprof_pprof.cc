@@ -229,9 +229,15 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
         .value = default_period,
     };
   }
-  pprof->_profile = ddog_prof_Profile_new(
+  auto prof_res = ddog_prof_Profile_new(
       sample_types,
       pprof_values.get_num_sample_type_ids() > 0 ? &period : nullptr, nullptr);
+
+  if (prof_res.tag != DDOG_PROF_PROFILE_NEW_RESULT_OK) {
+      ddog_Error_drop(&prof_res.err);
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to create new profile");
+  }
+  pprof->_profile = prof_res.ok;
 
   // Add relevant tags
   {
@@ -260,8 +266,9 @@ DDRes pprof_free_profile(DDProfPProf *pprof) {
 
 // Assumption of API is that sample is valid in a single type
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
-                      const SymbolHdr &symbol_hdr, uint64_t value,
-                      uint64_t count, const PerfWatcher *watcher,
+                      const SymbolHdr &symbol_hdr,
+                      const DDProfValuePack &pack,
+                      const PerfWatcher *watcher,
                       EventAggregationModePos value_pos, DDProfPProf *pprof) {
 
   const ddprof::SymbolTable &symbol_table = symbol_hdr._symbol_table;
@@ -271,10 +278,10 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   const PProfIndices &pprof_indices = watcher->pprof_indices[value_pos];
   int64_t values[k_max_value_types] = {};
   assert(pprof_indices.pprof_index != -1);
-  values[pprof_indices.pprof_index] = value;
+  values[pprof_indices.pprof_index] = pack.value;
   if (watcher_has_countable_sample_type(watcher)) {
     assert(pprof_indices.pprof_count_index != -1);
-    values[pprof_indices.pprof_count_index] = count;
+    values[pprof_indices.pprof_count_index] = pack.count;
   }
 
   ddog_prof_Location locations_buff[kMaxStackDepth];
@@ -347,7 +354,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
       .labels = {.ptr = labels, .len = labels_num},
   };
 
-  auto res = ddog_prof_Profile_add(profile, sample);
+  auto res = ddog_prof_Profile_add(profile, sample, pack.timestamp);
   if (res.tag != DDOG_PROF_PROFILE_RESULT_OK) {
     defer { ddog_Error_drop(&res.err); };
     auto msg = ddog_Error_message(&res.err);
