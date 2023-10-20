@@ -237,14 +237,12 @@ DDRes aggregate_livealloc_stack(
     const LiveAllocation::PprofStacks::value_type &alloc_info,
     DDProfContext &ctx, const PerfWatcher *watcher, DDProfPProf *pprof,
     const SymbolHdr &symbol_hdr) {
-    DDProfValuePack pack{
+  DDProfValuePack pack{
       alloc_info.second._value,
-      static_cast<uint64_t>(std::max<int64_t>(0, alloc_info.second._count)),
-      0
-    };
+      static_cast<uint64_t>(std::max<int64_t>(0, alloc_info.second._count)), 0};
 
-  DDRES_CHECK_FWD(
-      pprof_aggregate(&alloc_info.first, symbol_hdr, pack, watcher, kLiveSumPos, pprof));
+  DDRES_CHECK_FWD(pprof_aggregate(&alloc_info.first, symbol_hdr, pack, watcher,
+                                  kLiveSumPos, pprof));
   if (ctx.params.show_samples) {
     ddprof_print_sample(alloc_info.first, symbol_hdr, alloc_info.second._value,
                         kLiveSumPos, *watcher);
@@ -420,7 +418,8 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
       if (ctx.params.use_timestamps) {
         pack.timestamp = sample->time;
       }
-      DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbol_hdr, pack, watcher, kSumPos, pprof));
+      DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbol_hdr, pack,
+                                      watcher, kSumPos, pprof));
       if (ctx.params.show_samples) {
         ddprof_print_sample(us->output, us->symbol_hdr, sample->period, kSumPos,
                             *watcher);

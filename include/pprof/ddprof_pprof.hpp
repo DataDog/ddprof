@@ -40,8 +40,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx);
  * @param pprof
  */
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
-                      const SymbolHdr &symbol_hdr,
-                      const DDProfValuePack &pack,
+                      const SymbolHdr &symbol_hdr, const DDProfValuePack &pack,
                       const PerfWatcher *watcher,
                       EventAggregationModePos value_pos, DDProfPProf *pprof);
 

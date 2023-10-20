@@ -234,8 +234,8 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
       pprof_values.get_num_sample_type_ids() > 0 ? &period : nullptr, nullptr);
 
   if (prof_res.tag != DDOG_PROF_PROFILE_NEW_RESULT_OK) {
-      ddog_Error_drop(&prof_res.err);
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to create new profile");
+    ddog_Error_drop(&prof_res.err);
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to create new profile");
   }
   pprof->_profile = prof_res.ok;
 
@@ -266,8 +266,7 @@ DDRes pprof_free_profile(DDProfPProf *pprof) {
 
 // Assumption of API is that sample is valid in a single type
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
-                      const SymbolHdr &symbol_hdr,
-                      const DDProfValuePack &pack,
+                      const SymbolHdr &symbol_hdr, const DDProfValuePack &pack,
                       const PerfWatcher *watcher,
                       EventAggregationModePos value_pos, DDProfPProf *pprof) {
 
