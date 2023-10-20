@@ -30,7 +30,7 @@ struct DDProfContext {
     int dd_profiling_fd{-1};  // opened file descriptor to our internal lib
     ddprof::UniqueFd sockfd;
     bool show_samples{false};
-    bool use_timestamps{false};
+    bool timeline{false};
     cpu_set_t cpu_affinity{};
     std::string switch_user;
     std::string internal_stats;

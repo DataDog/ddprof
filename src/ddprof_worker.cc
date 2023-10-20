@@ -414,10 +414,8 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
       // in lib mode we don't aggregate (protect to avoid link failures)
       int const i_export = ctx.worker_ctx.i_current_pprof;
       DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
-      DDProfValuePack pack{static_cast<int64_t>(sample_val), 1, 0};
-      if (ctx.params.use_timestamps) {
-        pack.timestamp = sample->time;
-      }
+      DDProfValuePack pack{static_cast<int64_t>(sample_val), 1,
+                           ctx.params.timeline ? sample->time : 0};
       DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbol_hdr, pack,
                                       watcher, kSumPos, pprof));
       if (ctx.params.show_samples) {

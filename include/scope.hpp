@@ -79,8 +79,8 @@ template <typename T> class box {
 
 public:
   template <typename TT, typename GG>
-  requires std::is_constructible_v<T, TT>
-  explicit box(TT &&t, GG &&guard) noexcept(noexcept(box((T &&) t)))
+    requires std::is_constructible_v<T, TT>
+  explicit box(TT &&t, GG &&guard) noexcept(noexcept(box((T &&)t)))
       : box(std::forward<TT>(t)) {
     guard.release();
   }
@@ -101,8 +101,9 @@ template <typename T> class box<T &> {
 
 public:
   template <typename TT, typename GG>
-  requires std::is_convertible_v<TT, T &> box(TT &&t, GG &&guard)
-  noexcept(noexcept(static_cast<T &>((TT &&) t))) : value(static_cast<T &>(t)) {
+    requires std::is_convertible_v<TT, T &>
+  box(TT &&t, GG &&guard) noexcept(noexcept(static_cast<T &>((TT &&)t)))
+      : value(static_cast<T &>(t)) {
     guard.release();
   }
   T &get() const noexcept { return value.get(); }
@@ -212,8 +213,8 @@ class [[nodiscard]] basic_scope_exit : Policy {
 
 public:
   template <typename EFP>
-  requires _ctor_from<EFP>::value explicit basic_scope_exit(EFP &&ef) noexcept(
-      _noexcept_ctor_from<EFP>::value)
+    requires _ctor_from<EFP>::value
+  explicit basic_scope_exit(EFP &&ef) noexcept(_noexcept_ctor_from<EFP>::value)
       : exit_function(std::forward<EFP>(ef),
                       _make_failsafe(_noexcept_ctor_from<EFP>{}, &ef)) {}
   basic_scope_exit(basic_scope_exit &&that) noexcept(
@@ -258,14 +259,14 @@ template <typename R, typename D> class unique_resource {
 
 public: // should be private
   template <typename RR, typename DD>
-  requires std::is_constructible_v<detail::box<R>, RR,
-                                   detail::_empty_scope_exit> &&
-      std::is_constructible_v<detail::box<D>, DD, detail::_empty_scope_exit>
-      unique_resource(RR &&r, DD &&d, bool should_run)
-  noexcept(noexcept(detail::box<R>(std::forward<RR>(r),
-                                   detail::_empty_scope_exit{}))
-               &&noexcept(detail::box<D>(std::forward<DD>(d),
-                                         detail::_empty_scope_exit{})))
+    requires std::is_constructible_v<detail::box<R>, RR,
+                                     detail::_empty_scope_exit> &&
+                 std::is_constructible_v<detail::box<D>, DD,
+                                         detail::_empty_scope_exit>
+  unique_resource(RR &&r, DD &&d, bool should_run) noexcept(
+      noexcept(detail::box<R>(std::forward<RR>(r), detail::_empty_scope_exit{}))
+          && noexcept(detail::box<D>(std::forward<DD>(d),
+                                     detail::_empty_scope_exit{})))
       : resource(std::forward<RR>(r), scope_exit([&] {
                    if (should_run)
                      d(r);
@@ -295,22 +296,22 @@ public:
   unique_resource() = default;
 
   template <typename RR, typename DD>
-  requires std::is_constructible_v<detail::box<R>, RR,
-                                   detail::_empty_scope_exit> &&
-      std::is_constructible_v<detail::box<D>, DD, detail::_empty_scope_exit>
-      unique_resource(RR &&r, DD &&d)
-  noexcept(noexcept(detail::box<R>(std::forward<RR>(r),
-                                   detail::_empty_scope_exit{}))
-               &&noexcept(detail::box<D>(std::forward<DD>(d),
-                                         detail::_empty_scope_exit{})))
+    requires std::is_constructible_v<detail::box<R>, RR,
+                                     detail::_empty_scope_exit> &&
+                 std::is_constructible_v<detail::box<D>, DD,
+                                         detail::_empty_scope_exit>
+  unique_resource(RR &&r, DD &&d) noexcept(
+      noexcept(detail::box<R>(std::forward<RR>(r), detail::_empty_scope_exit{}))
+          && noexcept(detail::box<D>(std::forward<DD>(d),
+                                     detail::_empty_scope_exit{})))
       : resource(std::forward<RR>(r), scope_exit([&] { d(r); })),
         deleter(std::forward<DD>(d), scope_exit([&, this] { d(get()); })),
         execute_on_destruction{true} {}
   unique_resource(unique_resource &&that) noexcept(
       noexcept(detail::box<R>(that.resource.move(),
                               detail::_empty_scope_exit{}))
-          &&noexcept(detail::box<D>(that.deleter.move(),
-                                    detail::_empty_scope_exit{})))
+          && noexcept(detail::box<D>(that.deleter.move(),
+                                     detail::_empty_scope_exit{})))
       : resource(that.resource.move(), detail::_empty_scope_exit{}),
         deleter(that.deleter.move(), scope_exit([&, this] {
                   if (that.execute_on_destruction)
@@ -321,8 +322,8 @@ public:
             std::exchange(that.execute_on_destruction, false)) {}
 
   unique_resource &operator=(unique_resource &&that) noexcept(
-      is_nothrow_delete_v &&std::is_nothrow_move_assignable_v<R>
-          &&std::is_nothrow_move_assignable_v<D>) {
+      is_nothrow_delete_v && std::is_nothrow_move_assignable_v<R> &&
+      std::is_nothrow_move_assignable_v<D>) {
     static_assert(
         std::is_nothrow_move_assignable<R>::value ||
             std::is_copy_assignable<R>::value,
@@ -378,16 +379,17 @@ public:
   decltype(auto) get() const noexcept { return resource.get(); }
   decltype(auto) get_deleter() const noexcept { return deleter.get(); }
   template <typename RR = R>
-  requires std::is_pointer_v<RR>
+    requires std::is_pointer_v<RR>
   auto operator->() const
       noexcept //(noexcept(detail::for_noexcept_on_copy_construction(this_.get())))
       -> decltype(get()) {
     return get();
   }
   template <typename RR = R>
-  requires std::is_pointer_v<RR> &&(!std::is_void_v<std::remove_pointer_t<RR>>)
-      std::add_lvalue_reference_t<std::remove_pointer_t<R>>
-      operator*() const noexcept {
+    requires std::is_pointer_v<RR> &&
+      (!std::is_void_v<std::remove_pointer_t<RR>>)
+  std::add_lvalue_reference_t<std::remove_pointer_t<R>>
+  operator*() const noexcept {
     return *get();
   }
 
@@ -403,8 +405,8 @@ unique_resource(R, D, bool) -> unique_resource<R, D>;
 template <typename R, typename D, typename S>
 [[nodiscard]] auto make_unique_resource_checked(
     R &&r, const S &invalid,
-    D &&d) noexcept(std::is_nothrow_constructible_v<std::decay_t<R>, R>
-                        &&std::is_nothrow_constructible_v<std::decay_t<D>, D>)
+    D &&d) noexcept(std::is_nothrow_constructible_v<std::decay_t<R>, R> &&
+                    std::is_nothrow_constructible_v<std::decay_t<D>, D>)
     -> unique_resource<std::decay_t<R>, std::decay_t<D>> {
   bool const mustrelease(r == invalid);
   unique_resource resource{std::forward<R>(r), std::forward<D>(d),
