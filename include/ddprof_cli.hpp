@@ -69,6 +69,7 @@ public:
   bool help_extended{false};
   int socket{-1};
   bool continue_exec{false};
+  bool use_timestamps{false};
 
   // args
   std::vector<std::string> command_line;

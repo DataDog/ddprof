@@ -37,7 +37,7 @@ void test_pprof(DDProfPProf *pprofs) {
   ddog_prof_Profile *profile = &pprofs->_profile;
 
   struct ddog_prof_Profile_SerializeResult serialized_result =
-      ddog_prof_Profile_serialize(profile, nullptr, nullptr);
+      ddog_prof_Profile_serialize(profile, nullptr, nullptr, nullptr);
 
   ASSERT_EQ(serialized_result.tag, DDOG_PROF_PROFILE_SERIALIZE_RESULT_OK);
 
@@ -74,7 +74,7 @@ TEST(DDProfPProf, aggregate) {
   DDRes res = pprof_create_profile(&pprof, ctx);
   EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_index != -1);
   EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_count_index != -1);
-  res = pprof_aggregate(&mock_output, symbol_hdr, 1000, 1, &ctx.watchers[0],
+  res = pprof_aggregate(&mock_output, symbol_hdr, {1000, 1, 0}, &ctx.watchers[0],
                         kSumPos, &pprof);
 
   EXPECT_TRUE(IsDDResOK(res));
@@ -113,7 +113,7 @@ TEST(DDProfPProf, just_live) {
   EXPECT_TRUE(ctx.watchers[1].pprof_indices[kLiveSumPos].pprof_index != -1);
   EXPECT_TRUE(ctx.watchers[1].pprof_indices[kLiveSumPos].pprof_count_index !=
               -1);
-  res = pprof_aggregate(&mock_output, symbol_hdr, 1000, 1, &ctx.watchers[1],
+  res = pprof_aggregate(&mock_output, symbol_hdr, {1000, 1, 0}, &ctx.watchers[1],
                         kLiveSumPos, &pprof);
   EXPECT_TRUE(IsDDResOK(res));
   test_pprof(&pprof);

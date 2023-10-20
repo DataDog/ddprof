@@ -233,6 +233,9 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
   app.add_flag("--show_samples", show_samples,
                "Display captured samples as logs.\n")
       ->group("Debug options");
+  app.add_flag("--use_timestamps", use_timestamps,
+               "Put timestamps on sampled events.\n")
+      ->group("Debug options");
   app.add_flag("--version,-v", version, "Display the profiler's version.\n")
       ->group("Debug options");
   app.add_option("--enable", enable,
@@ -451,6 +454,9 @@ void DDProfCLI::print() const {
   }
   if (show_samples) {
     PRINT_NFO("  - show_samples: %s", show_samples ? "true" : "false");
+  }
+  if (use_timestamps) {
+    PRINT_NFO("  - use_timestamps: %s", use_timestamps ? "true" : "false");
   }
   PRINT_NFO("  - fault_info: %s", fault_info ? "true" : "false");
 

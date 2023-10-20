@@ -74,6 +74,7 @@ void copy_cli_values(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
   }
 
   ctx.params.show_samples = ddprof_cli.show_samples;
+  ctx.params.use_timestamps = ddprof_cli.use_timestamps;
   ctx.params.fault_info = ddprof_cli.fault_info;
   ctx.params.initial_loaded_libs_check_delay =
       ddprof_cli.initial_loaded_libs_check_delay;
