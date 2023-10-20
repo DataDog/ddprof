@@ -163,10 +163,11 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       ->excludes(pid_opt)
       ->excludes(exec_option);
 
-  app.add_flag("--timeline", timeline,
+  app.add_flag("--timeline,-t", timeline,
                "Enables Timeline view in the Datadog UI.\n"
                "Works by adding timestmaps to certain events.")
-      ->group("Profiling settings");
+      ->group("Profiling settings")
+      ->envname("DD_PROFILING_TIMELINE_ENABLE");
 
   app.add_option<std::chrono::seconds, unsigned>(
          "--upload_period,-u", upload_period,
