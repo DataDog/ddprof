@@ -23,7 +23,14 @@ struct RingBuffer {
 
   uint64_t *writer_pos;
   uint64_t *reader_pos;
+
+  // only used for MPSCRingBuffer
   SpinLock *spinlock;
+  uint64_t time_zero;
+  uint32_t time_mult;
+  uint16_t time_shift;
+  uint8_t perf_clock_source;
+  bool tsc_available;
 };
 
 bool rb_init(RingBuffer *rb, void *base, size_t size, RingBufferType type);

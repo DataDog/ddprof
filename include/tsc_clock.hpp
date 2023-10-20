@@ -39,7 +39,13 @@ public:
   using Cycles = uint64_t;
 
   enum class State { kUninitialized, kUnavailable, kOK };
-  enum class CalibrationMethod { kAuto, kPerf, kCpuArch, kClockMonotonicRaw };
+  enum class CalibrationMethod {
+    kAuto,
+    kPerf,
+    kCpuArch,
+    kClockMonotonicRaw,
+    kManual
+  };
 
   struct CalibrationParams {
     time_point offset;
@@ -53,16 +59,14 @@ public:
     CalibrationMethod method;
   };
 
-  static DDRes init(CalibrationMethod method = CalibrationMethod::kAuto);
-  static CalibrationMethod get_calibration_method() noexcept {
-    return _calibration.method;
-  }
+  static DDRes
+  init(CalibrationMethod method = CalibrationMethod::kAuto) noexcept;
+  static void init(CalibrationParams params) noexcept;
 
   static Cycles cycles_now() noexcept { return read_tsc(); }
   static time_point now() noexcept {
     return cycles_to_time_point(cycles_now());
   }
-  static State state() noexcept { return _calibration.state; }
   static const Calibration &calibration() noexcept { return _calibration; }
 
   static duration cycles_to_duration(Cycles cycles) noexcept {
@@ -94,6 +98,8 @@ inline std::string to_string(TscClock::CalibrationMethod method) {
     return "perf";
   case TscClock::CalibrationMethod::kAuto:
     return "Auto";
+  case TscClock::CalibrationMethod::kManual:
+    return "Manual";
   default:
     break;
   }

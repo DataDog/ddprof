@@ -75,7 +75,7 @@ BENCHMARK(BM_times);
 
 static void BM_perf_clock(benchmark::State &state) {
   ddprof::LogHandle log_handle;
-  ddprof::PerfClock::determine_perf_clock_source();
+  ddprof::PerfClock::init();
   for (auto _ : state) {
     auto t = ddprof::PerfClock::now();
     benchmark::DoNotOptimize(t);

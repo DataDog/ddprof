@@ -7,13 +7,29 @@
 
 #include "ddres_helpers.hpp"
 #include "ipc.hpp"
+#include "perf_clock.hpp"
 #include "pevent.hpp"
 #include "pevent_lib.hpp"
 #include "syscalls.hpp"
+#include "tsc_clock.hpp"
 
 #include <sys/eventfd.h>
 
 namespace ddprof {
+
+namespace {
+void init_metadata_page(MPSCRingBufferMetaDataPage *page) {
+  const auto &calibration = TscClock::calibration();
+  if (calibration.state == TscClock::State::kOK) {
+    page->tsc_available = true;
+    page->time_mult = calibration.params.mult;
+    page->time_shift = calibration.params.shift;
+    page->time_zero = calibration.params.offset.time_since_epoch().count();
+  }
+  page->perf_clock_source =
+      static_cast<uint8_t>(PerfClock::perf_clock_source());
+}
+} // namespace
 
 DDRes ring_buffer_attach(const RingBufferInfo &info, PEvent *pevent) {
   pevent->fd = info.event_fd;
@@ -59,6 +75,20 @@ DDRes ring_buffer_create(size_t buffer_size_page_order,
   pevent->custom_event = custom_event;
   pevent->ring_buffer_type = ring_buffer_type;
   pevent->ring_buffer_size = buffer_size;
+
+  if (ring_buffer_type == RingBufferType::kMPSCRingBuffer) {
+    // For MPSC ring buffer, we need to initialize some data in metadata page
+    // (for PerfRingbuffer, zero initialization is OK).
+    // That's why we mmap the page, initialize it and then unmap it.
+    // Doing the init in pevent_mmap_event would have have avoided this, but
+    // would have required to distinguish when pevent_mmap_event is called
+    // after ring buffer creation and called for ring buffer attachment.
+    pevent_mmap_event(pevent);
+    init_metadata_page(
+        reinterpret_cast<MPSCRingBufferMetaDataPage *>(pevent->rb.base));
+    pevent_munmap_event(pevent);
+  }
+
   return {};
 }
 
