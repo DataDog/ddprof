@@ -44,6 +44,9 @@ Profiling settings:
   -g,--global Excludes: command_line --pid
                               Instrument all processes.
                               Requires specific capabilities or a perf_event_paranoid value of less than 1.
+  -t,--timeline (Env:DD_PROFILING_TIMELINE_ENABLE)
+                              Enables Timeline view in the Datadog UI.
+                              Works by adding timestmaps to certain events.
   -u,--upload_period UINT [59]  (Env:DD_PROFILING_UPLOAD_PERIOD)
                               Upload period for profiles (in seconds).
                               
