@@ -292,7 +292,7 @@ DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
                              DDProfExporter *exporter) {
   DDRes res = ddres_init();
   ddog_prof_Profile_SerializeResult serialized_result =
-      ddog_prof_Profile_serialize(profile, nullptr, nullptr);
+      ddog_prof_Profile_serialize(profile, nullptr, nullptr, nullptr);
   if (serialized_result.tag != DDOG_PROF_PROFILE_SERIALIZE_RESULT_OK) {
     defer { ddog_Error_drop(&serialized_result.err); };
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to serialize: %s",
@@ -309,31 +309,27 @@ DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
   ddog_Timespec const start = encoded_profile->start;
   ddog_Timespec const end = encoded_profile->end;
 
-  ddog_ByteSlice const profile_data = {
-      .ptr = encoded_profile->buffer.ptr,
-      .len = encoded_profile->buffer.len,
-  };
-
   if (exporter->_export) {
     ddog_Vec_Tag ffi_additional_tags = ddog_Vec_Tag_new();
     defer { ddog_Vec_Tag_drop(ffi_additional_tags); };
     DDRES_CHECK_FWD(
         fill_cycle_tags(additional_tags, profile_seq, ffi_additional_tags););
 
-    LG_NTC("[EXPORTER] Export buffer of size %lu", profile_data.len);
+    LG_NTC("[EXPORTER] Export buffer of size %lu", encoded_profile->buffer.len);
 
     // Backend has some logic based on the following naming
     ddog_prof_Exporter_File files_[] = {{
         .name = to_CharSlice("auto.pprof"),
-        .file = profile_data,
+        .file = ddog_Vec_U8_as_slice(&encoded_profile->buffer),
     }};
     ddog_prof_Exporter_Slice_File const files = {.ptr = files_,
                                                  .len = std::size(files_)};
 
     ddog_prof_Exporter_Request_BuildResult res_request =
-        ddog_prof_Exporter_Request_build(exporter->_exporter, start, end, files,
-                                         &ffi_additional_tags, nullptr, nullptr,
-                                         k_timeout_ms);
+        ddog_prof_Exporter_Request_build(exporter->_exporter, start, end,
+                                         ddog_prof_Exporter_Slice_File_empty(),
+                                         files, &ffi_additional_tags, nullptr,
+                                         nullptr, k_timeout_ms);
 
     if (res_request.tag == DDOG_PROF_EXPORTER_REQUEST_BUILD_RESULT_OK) {
       ddog_prof_Exporter_Request *request = res_request.ok;

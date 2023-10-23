@@ -163,6 +163,12 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       ->excludes(pid_opt)
       ->excludes(exec_option);
 
+  app.add_flag("--timeline,-t", timeline,
+               "Enables Timeline view in the Datadog UI.\n"
+               "Works by adding timestmaps to certain events.")
+      ->group("Profiling settings")
+      ->envname("DD_PROFILING_TIMELINE_ENABLE");
+
   app.add_option<std::chrono::seconds, unsigned>(
          "--upload_period,-u", upload_period,
          "Upload period for profiles (in seconds).\n")
@@ -451,6 +457,9 @@ void DDProfCLI::print() const {
   }
   if (show_samples) {
     PRINT_NFO("  - show_samples: %s", show_samples ? "true" : "false");
+  }
+  if (timeline) {
+    PRINT_NFO("  - timeline: %s", timeline ? "true" : "false");
   }
   PRINT_NFO("  - fault_info: %s", fault_info ? "true" : "false");
 

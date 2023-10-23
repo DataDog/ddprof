@@ -24,18 +24,24 @@ struct DDProfPProf {
   Tags _tags;
 };
 
+struct DDProfValuePack {
+  int64_t value;
+  uint64_t count;
+  uint64_t timestamp;
+};
+
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx);
 
 /**
  * Aggregate to the existing profile the provided unwinding output.
  * @param uw_output
- * @param value matching the watcher type (ex : cpu period)
+ * @param pack combines the value, count, and timestamp of an event
  * @param watcher_idx matches the registered order at profile creation
  * @param pprof
  */
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
-                      const SymbolHdr &symbol_hdr, uint64_t value,
-                      uint64_t count, const PerfWatcher *watcher,
+                      const SymbolHdr &symbol_hdr, const DDProfValuePack &pack,
+                      const PerfWatcher *watcher,
                       EventAggregationModePos value_pos, DDProfPProf *pprof);
 
 DDRes pprof_reset(DDProfPProf *pprof);
