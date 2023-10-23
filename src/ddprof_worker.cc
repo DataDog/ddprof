@@ -432,10 +432,9 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
       int const i_export = ctx.worker_ctx.i_current_pprof;
       DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
 
-      uint64_t timestamp = 0;
-
       // If timeline is specified, then add the time and adjust to
       // CLOCK_REALTIME
+      uint64_t timestamp = 0;
       if (ctx.params.timeline && sample->time != 0) {
         timestamp = sample->time + ctx.worker_ctx.mono_to_realtime_offset;
       }
