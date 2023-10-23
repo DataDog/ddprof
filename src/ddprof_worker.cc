@@ -88,9 +88,26 @@ DDRes report_lost_events(DDProfContext &ctx) {
   return {};
 }
 
+inline int64_t get_mono_to_realtime_offset(
+    const std::chrono::steady_clock::time_point &steady_now) {
+  // Finds the offset between the two clocksources.  This doesn't account for
+  // NTP adjustments for now.
+  timespec ts_monotonic_raw{};
+
+  clock_gettime(CLOCK_MONOTONIC_RAW, &ts_monotonic_raw);
+
+  auto ns_realtime = steady_now.time_since_epoch().count();
+  auto ns_monotonic_raw = timespec_to_duration(ts_monotonic_raw).count();
+
+  return ns_realtime - ns_monotonic_raw;
+}
+
 inline void export_time_set(DDProfContext &ctx) {
-  ctx.worker_ctx.send_time =
-      std::chrono::steady_clock::now() + ctx.params.upload_period;
+  auto steady_now = std::chrono::steady_clock::now();
+  ctx.worker_ctx.send_time = steady_now + ctx.params.upload_period;
+
+  ctx.worker_ctx.mono_to_realtime_offset =
+      get_mono_to_realtime_offset(steady_now);
 }
 
 DDRes symbols_update_stats(const SymbolHdr &symbol_hdr) {
@@ -414,8 +431,17 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
       // in lib mode we don't aggregate (protect to avoid link failures)
       int const i_export = ctx.worker_ctx.i_current_pprof;
       DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
+
+      uint64_t timestamp = 0;
+
+      // If timeline is specified, then add the time and adjust to
+      // CLOCK_REALTIME
+      if (ctx.params.timeline && sample->time != 0) {
+        timestamp = sample->time + ctx.worker_ctx.mono_to_realtime_offset;
+      }
       const DDProfValuePack pack{static_cast<int64_t>(sample_val), 1,
-                                 ctx.params.timeline ? sample->time : 0};
+                                 timestamp};
+
       DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbol_hdr, pack,
                                       watcher, kSumPos, pprof));
       if (ctx.params.show_samples) {

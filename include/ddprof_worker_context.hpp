@@ -41,6 +41,7 @@ struct DDProfWorkerContext {
   uint32_t count_worker{0}; // exports since last cache clear
   std::array<uint64_t, kMaxTypeWatcher> lost_events_per_watcher{};
   LiveAllocation live_allocation;
+  int64_t mono_to_realtime_offset{0};
 };
 
 } // namespace ddprof
