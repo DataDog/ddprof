@@ -5,7 +5,7 @@
 
 #include "presets.hpp"
 
-#include "ddprof_cmdline.hpp"
+#include "ddprof_cmdline_watcher.hpp"
 #include "ddres.hpp"
 
 #include <algorithm>

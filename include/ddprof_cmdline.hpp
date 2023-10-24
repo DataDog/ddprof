@@ -5,15 +5,10 @@
 
 #pragma once
 
-#include "ddprof_defs.hpp"
-
 #include <cstddef>
 #include <cstdint>
-#include <vector>
 
 namespace ddprof {
-
-struct PerfWatcher;
 
 /**************************** Cmdline Helpers *********************************/
 // Helper functions for processing commandline arguments.
@@ -31,9 +26,5 @@ int arg_which(const char *str, char const *const *set, int sz_set);
 bool arg_inset(const char *str, char const *const *set, int sz_set);
 
 bool arg_yesno(const char *str, int mode);
-
-bool watchers_from_str(
-    const char *str, std::vector<PerfWatcher> &watchers,
-    uint32_t stack_sample_size = k_default_perf_stack_sample_size);
 
 } // namespace ddprof

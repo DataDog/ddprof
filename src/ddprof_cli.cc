@@ -15,6 +15,7 @@
 #include "CLI/CLI11.hpp"
 #include "constants.hpp"
 #include "ddprof_cmdline.hpp"
+#include "ddprof_cmdline_watcher.hpp"
 #include "ddprof_defs.hpp"
 #include "ddres.hpp"
 #include "logger.hpp"
