@@ -164,9 +164,9 @@ class function_ref<Sig, R(Args...)> // freestanding
         : fptr_(
               [](storage this_, _param_t<Args>... args) noexcept(noex) -> R
               {
-                  cvref<T> obj = *get<T>(this_);
+                  cvref<T> obj2 = *get<T>(this_);
                   return std23::invoke_r<R>(
-                      f, obj, static_cast<decltype(args)>(args)...);
+                      f, obj2, static_cast<decltype(args)>(args)...);
               }),
           obj_(std::addressof(obj))
     {
