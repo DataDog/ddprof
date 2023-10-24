@@ -48,7 +48,7 @@ save_stack(std::span<const std::byte> stack_bounds, const std::byte *stack_ptr,
       stack_ptr >= to_address(stack_bounds.end())) {
     return 0;
   }
-  // take the min of current stack size and requested stack sample size~
+  // take the min of current stack size and requested stack sample size
   int64_t const saved_stack_size =
       std::min(static_cast<intptr_t>(buffer.size()),
                to_address(stack_bounds.end()) - stack_ptr);
@@ -56,12 +56,13 @@ save_stack(std::span<const std::byte> stack_bounds, const std::byte *stack_ptr,
   if (saved_stack_size <= 0) {
     return 0;
   }
-  // Use memmove to stay on the safe side on case caller put `buffer` on the
+  // Use memmove to stay on the safe side in case caller has put `buffer` on the
   // stack
   memmove(buffer.data(), stack_ptr, saved_stack_size);
   return saved_stack_size;
 }
 } // namespace
+
 size_t save_context(std::span<const std::byte> stack_bounds,
                     std::span<uint64_t, k_perf_register_count> regs,
                     std::span<std::byte> buffer) {
