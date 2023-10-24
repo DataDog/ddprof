@@ -213,7 +213,6 @@ set(DD_PROFILING_SOURCES
     src/lib/saveregisters.cc
     src/lib/symbol_overrides.cc
     src/logger.cc
-    src/logger_setup.cc
     src/perf.cc
     src/perf_clock.cc
     src/perf_ringbuffer.cc
@@ -253,8 +252,6 @@ if(BUILD_UNIVERSAL_DDPROF)
     target_compile_definitions(dd_profiling-embedded PRIVATE DDPROF_MISSING_FSTAT)
   endif()
 endif()
-
-target_link_libraries(dd_profiling-embedded PRIVATE DDProf::Parser)
 
 # Fix for link error in sanitizeddebug build mode with gcc:
 # ~~~
@@ -343,7 +340,7 @@ target_include_directories(dd_profiling-static PUBLIC ${CMAKE_SOURCE_DIR}/includ
                                                       ${CMAKE_SOURCE_DIR}/include)
 set_target_properties(dd_profiling-static
                       PROPERTIES PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
-target_link_libraries(dd_profiling-static PRIVATE DDProf::Parser ddprof_exe_object)
+target_link_libraries(dd_profiling-static PRIVATE ddprof_exe_object)
 target_link_libraries(dd_profiling-static PUBLIC dl pthread rt)
 
 if(USE_LOADER)
@@ -359,7 +356,7 @@ else()
   # Without loader, libdd_profiling.so is basically the same as libdd_profiling-embedded.so plus an
   # embedded ddprof executable.
   add_library(dd_profiling-shared SHARED ${DD_PROFILING_SOURCES} src/lib/lib_embedded_data.c)
-  target_link_libraries(dd_profiling-shared PRIVATE DDProf::Parser ddprof_exe_object)
+  target_link_libraries(dd_profiling-shared PRIVATE ddprof_exe_object)
   target_compile_definitions(dd_profiling-shared PRIVATE DDPROF_EMBEDDED_EXE_DATA)
 
   # Fix for link error in sanitizeddebug build mode with gcc:

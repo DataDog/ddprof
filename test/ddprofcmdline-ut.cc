@@ -4,6 +4,7 @@
 // Datadog, Inc.
 
 #include "ddprof_cmdline.hpp"
+#include "ddprof_cmdline_watcher.hpp"
 #include "perf_archmap.hpp"
 #include "perf_watcher.hpp"
 

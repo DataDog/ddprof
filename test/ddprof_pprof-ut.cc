@@ -7,6 +7,7 @@
 
 #include "ddog_profiling_utils.hpp"
 #include "ddprof_cmdline.hpp"
+#include "ddprof_cmdline_watcher.hpp"
 #include "loghandle.hpp"
 #include "pevent_lib_mocks.hpp"
 #include "symbol_hdr.hpp"
