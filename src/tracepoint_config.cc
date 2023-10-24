@@ -23,6 +23,8 @@ int64_t tracepoint_get_id(std::string_view global_name,
     fs_path = "/sys/kernel/tracing/events";
   } else if (stat("/sys/kernel/debug/tracing/events", &sb) == 0) {
     fs_path = "/sys/kernel/debug/tracing/events";
+  } else if (stat("/proc/1/root/sys/kernel/debug/tracing/events", &sb) == 0) {
+    fs_path = "/proc/1/root/sys/kernel/debug/tracing/events";
   } else {
     return -1; // Neither debugfs nor tracefs is available.
   }
