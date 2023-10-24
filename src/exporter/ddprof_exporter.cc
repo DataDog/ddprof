@@ -52,7 +52,7 @@ DDRes create_pprof_file(ddog_Timespec start, const char *dbg_pprof_prefix,
   strftime(time_start, std::size(time_start), "%Y%m%dT%H%M%SZ", tm_start);
 
   char filename[PATH_MAX];
-  snprintf(filename, std::size(filename), "%s%s.pprof", dbg_pprof_prefix,
+  snprintf(filename, std::size(filename), "%s%s.pprof.lz4", dbg_pprof_prefix,
            time_start);
   LG_NTC("[EXPORTER] Writing pprof to file %s", filename);
   constexpr int read_write_user_only = 0600;
