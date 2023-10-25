@@ -68,17 +68,14 @@ void display_system_info() {
 } // namespace
 
 DDRes ddprof_setup(DDProfContext &ctx) {
-  PEventHdr *pevent_hdr = &ctx.worker_ctx.pevent_hdr;
   try {
-    pevent_init(pevent_hdr);
-
     display_system_info();
 
     // Open perf events and mmap events right now to start receiving events
-    // mmaps from perf fds will be lost after fork, that why we mmap them again
-    // in worker (but kernel only accounts for the pinned memory once).
-    DDRES_CHECK_FWD(
-        pevent_setup(ctx, ctx.params.pid, ctx.params.num_cpu, pevent_hdr));
+    auto pe_table = PEventTable::get_instance();
+    for (auto *watcher : ctx.watchers) {
+      pe_table.open_watcher(watcher, pid, num_cpu, ctx.perf_clock_source);
+    }
 
     // Setup signal handler if defined
     if (ctx.params.fault_info) {
@@ -100,17 +97,17 @@ DDRes ddprof_setup(DDProfContext &ctx) {
 
     DDRES_CHECK_FWD(ddprof_stats_init());
 
-    DDRES_CHECK_FWD(pevent_enable(pevent_hdr));
+    DDRES_CHECK_FWD(pe_table.enable_all());
   }
   CatchExcept2DDRes();
   return {};
 }
 
-DDRes ddprof_teardown(DDProfContext &ctx) {
-  PEventHdr *pevent_hdr = &ctx.worker_ctx.pevent_hdr;
-
-  if (IsDDResNotOK(pevent_cleanup(pevent_hdr))) {
-    LG_WRN("Error when calling pevent_cleanup.");
+DDRes ddprof_teardown() {
+  
+  auto &pe_table = PEventTable::get_instance();
+  if (IsDDResNotOK(pe_table.cleanup())) {
+    LG_WRN("Error when calling pe_table.cleanup.");
   }
 
   if (IsDDResNotOK(ddprof_stats_free())) {

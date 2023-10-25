@@ -337,7 +337,7 @@ DDRes worker_library_init(DDProfContext &ctx,
     // register the existing persistent storage for the state
     ctx.worker_ctx.persistent_worker_state = persistent_worker_state;
 
-    PEventHdr *pevent_hdr = &ctx.worker_ctx.pevent_hdr;
+    auto &pe_table = PETable::get_instance();
 
     // If we're here, then we are a child spawned during the startup operation.
     // That means we need to iterate through the perf_event_open() handles and
