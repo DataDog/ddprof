@@ -67,23 +67,20 @@ DDRes pevent_mmap_event(PEvent *event) {
     DDRES_CHECK_FWD(user_override_to_nobody_if_root(&info));
 
     if (!(region = perfown_sz(event->mapfd, event->ring_buffer_size))) {
-#     warning TODO return some kind of error here?
-//      DDRES_RETURN_ERROR_LOG(
-//          DD_WHAT_PERFMMAP,
-//          "Could not mmap memory for watcher #%d: %s. "
-//          "Please increase kernel limits on pinned memory (ulimit -l). "
-//          "OR associate the IPC_LOCK capability to this process.",
-//          event->watcher_pos, strerror(errno));
-//      }
+      DDRES_RETURN_ERROR_LOG(
+          DD_WHAT_PERFMMAP,
+          "Could not mmap memory for watcher"
+          "Please increase kernel limits on pinned memory (ulimit -l). "
+          "OR associate the IPC_LOCK capability to this process.");
+      }
   }
 
   if (!rb_init(&event->rb, region, event->ring_buffer_size,
-//               event->ring_buffer_type)) {
-#   warning TODO add even more errors here
-//      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
-//                             "Could not initialize ring buffer for watcher #%d",
-//                             event->watcher_pos);
+               event->ring_buffer_type)) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
+                             "Could not initialize ring buffer for watcher");
   }
+  return {};
 }
 
 
