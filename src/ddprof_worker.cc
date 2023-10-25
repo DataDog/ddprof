@@ -88,26 +88,22 @@ DDRes report_lost_events(DDProfContext &ctx) {
   return {};
 }
 
-inline int64_t get_mono_to_realtime_offset(
-    const std::chrono::steady_clock::time_point &steady_now) {
-  // Finds the offset between the two clocksources.  This doesn't account for
-  // NTP adjustments for now.
-  timespec ts_monotonic_raw{};
+int64_t get_perfclock_offset() {
+  auto system_now = std::chrono::system_clock::now();
+  auto perf_now = ddprof::PerfClock::now();
 
-  clock_gettime(CLOCK_MONOTONIC_RAW, &ts_monotonic_raw);
+  auto system_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                       system_now.time_since_epoch())
+                       .count();
+  auto perf_ns = perf_now.time_since_epoch().count(); // assumes offset is in ns
 
-  auto ns_realtime = steady_now.time_since_epoch().count();
-  auto ns_monotonic_raw = timespec_to_duration(ts_monotonic_raw).count();
-
-  return ns_realtime - ns_monotonic_raw;
+  return system_ns - perf_ns;
 }
 
 inline void export_time_set(DDProfContext &ctx) {
-  auto steady_now = std::chrono::steady_clock::now();
-  ctx.worker_ctx.send_time = steady_now + ctx.params.upload_period;
-
-  ctx.worker_ctx.mono_to_realtime_offset =
-      get_mono_to_realtime_offset(steady_now);
+  ctx.worker_ctx.send_time =
+      std::chrono::steady_clock::now() + ctx.params.upload_period;
+  ctx.worker_ctx.perfclock_offset = get_perfclock_offset();
 }
 
 DDRes symbols_update_stats(const SymbolHdr &symbol_hdr) {
@@ -436,7 +432,7 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
       // CLOCK_REALTIME
       uint64_t timestamp = 0;
       if (ctx.params.timeline && sample->time != 0) {
-        timestamp = sample->time + ctx.worker_ctx.mono_to_realtime_offset;
+        timestamp = sample->time + ctx.worker_ctx.perfclock_offset;
       }
       const DDProfValuePack pack{static_cast<int64_t>(sample_val), 1,
                                  timestamp};
