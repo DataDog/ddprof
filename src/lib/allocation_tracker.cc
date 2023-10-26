@@ -415,11 +415,36 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
 
   bool timeout = false;
   if (unlikely(_state.lost_count.load(std::memory_order_relaxed))) {
-    (push_lost_sample(writer, notify_consumer));
+    push_lost_sample(writer, notify_consumer);
   }
 
-  auto buffer =
-      writer.reserve(sizeof_allocation_event(_stack_sample_size), &timeout);
+  if (tl_state.stack_bounds.empty()) {
+    // This call should only occur on main thread
+    tl_state.stack_bounds = retrieve_stack_bounds();
+    if (tl_state.stack_bounds.empty()) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB, "Unable to get thread bounds");
+    }
+  }
+
+  // estimate sample stack size
+  void *p;
+  const auto *stack_base_ptr = reinterpret_cast<const std::byte *>(&p);
+  auto stack_size = to_address(tl_state.stack_bounds.end()) - stack_base_ptr;
+
+  // stack will be saved in save_context, add some margin to account for call
+  // frames
+#ifdef NDEBUG
+  constexpr int64_t kStackMargin = 192;
+#else
+  constexpr int64_t kStackMargin = 720;
+#endif
+  uint32_t const sample_stack_size =
+      align_up(std::min(std::max(stack_size + kStackMargin, 0L),
+                        static_cast<int64_t>(_stack_sample_size)),
+               sizeof(uint64_t));
+
+  auto event_size = sizeof_allocation_event(sample_stack_size);
+  auto buffer = writer.reserve(event_size, &timeout);
 
   if (buffer.empty()) {
     // ring buffer is full, increase lost count
@@ -434,8 +459,16 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   }
 
   auto *event = reinterpret_cast<AllocationEvent *>(buffer.data());
+  std::byte *dyn_size_pos = event->data + sample_stack_size;
+  auto *dyn_size = reinterpret_cast<uint64_t *>(dyn_size_pos);
+
+  assert(reinterpret_cast<uintptr_t>(dyn_size) % alignof(uint64_t) == 0);
+
+  (*dyn_size) = save_context(tl_state.stack_bounds, event->regs,
+                             ddprof::Buffer{event->data, sample_stack_size});
+
   event->hdr.misc = 0;
-  event->hdr.size = sizeof_allocation_event(_stack_sample_size);
+  event->hdr.size = event_size;
   event->hdr.type = PERF_RECORD_SAMPLE;
   event->abi = PERF_SAMPLE_REGS_ABI_64;
   event->sample_id.time = PerfClock::now().time_since_epoch().count();
@@ -447,26 +480,11 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
     tl_state.tid = ddprof::gettid();
   }
 
-  if (tl_state.stack_bounds.empty()) {
-    // This call should only occur on main thread
-    tl_state.stack_bounds = retrieve_stack_bounds();
-    if (tl_state.stack_bounds.empty()) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB, "Unable to get thread bounds");
-    }
-  }
-
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
   event->period = allocated_size;
-  event->size_stack = _stack_sample_size;
+  event->size_stack = sample_stack_size;
 
-  std::byte *dyn_size_pos = event->data + _stack_sample_size;
-  auto *dyn_size = reinterpret_cast<uint64_t *>(dyn_size_pos);
-
-  assert(reinterpret_cast<uintptr_t>(dyn_size) % alignof(uint64_t) == 0);
-
-  (*dyn_size) = save_context(tl_state.stack_bounds, event->regs,
-                             ddprof::Buffer{event->data, event->size_stack});
   // Even if dyn_size == 0, we keep the sample
   // This way, the overall accounting is correct (even with empty stacks)
   if (writer.commit(buffer) || notify_consumer) {
@@ -480,7 +498,8 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   return {};
 }
 
-uint64_t AllocationTracker::next_sample_interval(std::minstd_rand &gen) const {
+DDPROF_NOINLINE uint64_t
+AllocationTracker::next_sample_interval(std::minstd_rand &gen) const {
   if (_sampling_interval == 1) {
     return 1;
   }

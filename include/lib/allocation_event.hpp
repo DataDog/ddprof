@@ -26,8 +26,8 @@ struct AllocationEvent {
 // An extra field is added after the end to communicate the dyn_size
 //  uint64_t dyn_size_stack;
 
-inline size_t sizeof_allocation_event(uint32_t stack_sample_user) {
-  // (Size of the event) + + sizeof(dyn_size field)
-  return sizeof(AllocationEvent) + stack_sample_user + sizeof(uint64_t);
+inline size_t sizeof_allocation_event(uint32_t stack_size) {
+  // (Size of the event) + stack_size + sizeof(dyn_size field)
+  return sizeof(AllocationEvent) + stack_size + sizeof(uint64_t);
 }
 } // namespace ddprof
