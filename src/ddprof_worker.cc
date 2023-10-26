@@ -88,22 +88,18 @@ DDRes report_lost_events(DDProfContext &ctx) {
   return {};
 }
 
-int64_t get_perfclock_offset() {
-  auto system_now = std::chrono::system_clock::now();
-  auto perf_now = ddprof::PerfClock::now();
-
-  auto system_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                       system_now.time_since_epoch())
-                       .count();
-  auto perf_ns = perf_now.time_since_epoch().count(); // assumes offset is in ns
-
-  return system_ns - perf_ns;
+std::chrono::system_clock::time_point perf_clock_epoch_to_system_time() {
+  return std::chrono::system_clock::now() -
+      ddprof::PerfClock::now().time_since_epoch();
 }
 
 inline void export_time_set(DDProfContext &ctx) {
   ctx.worker_ctx.send_time =
       std::chrono::steady_clock::now() + ctx.params.upload_period;
-  ctx.worker_ctx.perfclock_offset = get_perfclock_offset();
+  ctx.worker_ctx.perfclock_offset =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+          perf_clock_epoch_to_system_time().time_since_epoch())
+          .count();
 }
 
 DDRes symbols_update_stats(const SymbolHdr &symbol_hdr) {
