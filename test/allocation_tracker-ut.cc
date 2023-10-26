@@ -4,6 +4,7 @@
 // Datadog, Inc.
 #include "allocation_tracker.hpp"
 
+#include "allocation_event.hpp"
 #include "ddprof_perf_event.hpp"
 #include "defer.hpp"
 #include "ipc.hpp"
@@ -118,6 +119,9 @@ TEST(allocation_tracker, start_stop) {
     ASSERT_EQ(sample->addr, 0xdeadbeef);
     ASSERT_GE(sample->time, before.time_since_epoch().count());
     ASSERT_LE(sample->time, after.time_since_epoch().count());
+
+    // check that the stack was not truncated due to a too small kStackMargin
+    ASSERT_LT(sample->dyn_size_stack, hdr->size - sizeof_allocation_event(0));
 
     UnwindState state;
     unwind_init_sample(&state, sample->regs, sample->pid, sample->size_stack,
