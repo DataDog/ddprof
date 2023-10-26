@@ -88,7 +88,7 @@ DDRes report_lost_events(DDProfContext &ctx) {
   return {};
 }
 
-std::chrono::system_clock::time_point perf_clock_epoch_to_system_time() {
+std::chrono::system_clock::time_point perfclock_epoch_to_system_time() {
   return std::chrono::system_clock::now() -
       ddprof::PerfClock::now().time_since_epoch();
 }
@@ -98,7 +98,7 @@ inline void export_time_set(DDProfContext &ctx) {
       std::chrono::steady_clock::now() + ctx.params.upload_period;
   ctx.worker_ctx.perfclock_offset =
       std::chrono::duration_cast<std::chrono::nanoseconds>(
-          perf_clock_epoch_to_system_time().time_since_epoch())
+          perfclock_epoch_to_system_time().time_since_epoch())
           .count();
 }
 
@@ -424,8 +424,9 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
       int const i_export = ctx.worker_ctx.i_current_pprof;
       DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
 
-      // If timeline is specified, then add the time and adjust to
-      // CLOCK_REALTIME
+      // We want to emit 0 for the time unless timeline is specified, and if
+      // it is, we also want to adjust the source to be in the system_time
+      // frame
       uint64_t timestamp = 0;
       if (ctx.params.timeline && sample->time != 0) {
         timestamp = sample->time + ctx.worker_ctx.perfclock_offset;
