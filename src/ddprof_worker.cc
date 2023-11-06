@@ -88,9 +88,18 @@ DDRes report_lost_events(DDProfContext &ctx) {
   return {};
 }
 
+std::chrono::system_clock::time_point perfclock_epoch_to_system_time() {
+  return std::chrono::system_clock::now() -
+      ddprof::PerfClock::now().time_since_epoch();
+}
+
 inline void export_time_set(DDProfContext &ctx) {
   ctx.worker_ctx.send_time =
       std::chrono::steady_clock::now() + ctx.params.upload_period;
+  ctx.worker_ctx.perfclock_offset =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+          perfclock_epoch_to_system_time().time_since_epoch())
+          .count();
 }
 
 DDRes symbols_update_stats(const SymbolHdr &symbol_hdr) {
@@ -414,8 +423,17 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
       // in lib mode we don't aggregate (protect to avoid link failures)
       int const i_export = ctx.worker_ctx.i_current_pprof;
       DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
+
+      // We want to emit 0 for the time unless timeline is specified, and if
+      // it is, we also want to adjust the source to be in the system_time
+      // frame
+      uint64_t timestamp = 0;
+      if (ctx.params.timeline && sample->time != 0) {
+        timestamp = sample->time + ctx.worker_ctx.perfclock_offset;
+      }
       const DDProfValuePack pack{static_cast<int64_t>(sample_val), 1,
-                                 ctx.params.timeline ? sample->time : 0};
+                                 timestamp};
+
       DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbol_hdr, pack,
                                       watcher, kSumPos, pprof));
       if (ctx.params.show_samples) {
