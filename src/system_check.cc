@@ -44,33 +44,41 @@ void check_clock_source() {
 void check_clock_vdso() {
   // This function continuously calls std::chrono::steady_clock::now during 5
   // kernel ticks and then check with getrusage that system cpu time consumed
-  // is less than 10% of total cpu time consumed during this period.
+  // is less than 20% of total cpu time consumed during this period.
   // If not, it implies that significant time was spent in the kernel, and
   // therefore that either the call to clock_gettime is not vdso accelerated
-  // or that the vsdo function falls back to the kernel (eg. this happens if
+  // or that the vdso function falls back to the kernel (eg. this happens if
   // clock source is xen).
-  constexpr auto kMeasureDurationInClocks = 5;
+  constexpr auto kMeasureDuration = std::chrono::milliseconds{10};
+  constexpr auto kMinCpuTime = std::chrono::milliseconds{5};
   constexpr auto kMaxSystemTimePercentage = 10;
 
-  auto kernel_clocks_per_sec = sysconf(_SC_CLK_TCK);
+  std::chrono::microseconds user_time{};
+  std::chrono::microseconds system_time{};
 
-  auto measure_duration = std::chrono::nanoseconds{std::chrono::seconds{1}} *
-      kMeasureDurationInClocks / kernel_clocks_per_sec;
+  while (true) {
+    rusage ru_before;
+    if (getrusage(RUSAGE_SELF, &ru_before) != 0) {
+      return;
+    }
 
-  rusage ru_before;
-  if (getrusage(RUSAGE_SELF, &ru_before) != 0) {
-    return;
+    auto deadline = std::chrono::steady_clock::now() + kMeasureDuration;
+    while (std::chrono::steady_clock::now() < deadline) {}
+
+    rusage ru_after;
+    if (getrusage(RUSAGE_SELF, &ru_after) != 0) {
+      return;
+    }
+
+    user_time += timeval_to_duration(ru_after.ru_utime) -
+        timeval_to_duration(ru_before.ru_utime);
+    system_time += timeval_to_duration(ru_after.ru_stime) -
+        timeval_to_duration(ru_before.ru_stime);
+
+    if (user_time + system_time >= kMinCpuTime) {
+      break;
+    }
   }
-  auto deadline = std::chrono::steady_clock::now() + measure_duration;
-  while (std::chrono::steady_clock::now() < deadline) {}
-  rusage ru_after;
-  if (getrusage(RUSAGE_SELF, &ru_after) != 0) {
-    return;
-  }
-  auto user_time = timeval_to_duration(ru_after.ru_utime) -
-      timeval_to_duration(ru_before.ru_utime);
-  auto system_time = timeval_to_duration(ru_after.ru_stime) -
-      timeval_to_duration(ru_before.ru_stime);
 
   if (system_time >= (user_time + system_time) * kMaxSystemTimePercentage /
           100) { // NOLINT(readability-magic-numbers)
