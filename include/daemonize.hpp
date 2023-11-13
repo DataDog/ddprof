@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "unique_fd.hpp"
+
 #include <sys/types.h>
 
 namespace ddprof {
@@ -16,6 +18,8 @@ struct DaemonizeResult {
       temp_pid; // -1 on failure, 0 for initial process, > 0 for daemon process
   pid_t parent_pid; // pid of process initiating daemonize
   pid_t daemon_pid; // pid of daemon process
+  UniqueFd
+      pipe_fd; // pipe to communicate from daemon process to initial process
 };
 
 // Daemonization function

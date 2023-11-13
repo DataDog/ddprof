@@ -5,7 +5,9 @@
 
 #include "daemonize.hpp"
 
-#include <csignal> //
+#include "unique_fd.hpp"
+
+#include <csignal>
 #include <cstdlib>
 #include <fcntl.h>
 #include <sys/types.h>
@@ -23,23 +25,26 @@ DaemonizeResult daemonize_error() {
 
 DaemonizeResult daemonize() {
   int pipefd[2];
-  if (pipe2(pipefd, O_CLOEXEC) == -1) {
+  if (pipe2(pipefd, 0) == -1) {
     return daemonize_error();
   }
 
+  UniqueFd readfd{pipefd[0]};
+  UniqueFd writefd{pipefd[1]};
+
   const pid_t parent_pid = getpid();
-  pid_t temp_pid = fork(); // "middle" (temporary) PID
+  pid_t temp_pid = fork();
 
   if (temp_pid == -1) {
     return daemonize_error();
   }
 
-  if (temp_pid == 0) { // If I'm the temp PID enter branch
-    close(pipefd[0]);
+  if (temp_pid == 0) { // Intermediate (temporary) process
+    readfd.reset();
 
     temp_pid = getpid();
     pid_t child_pid = fork();
-    if (child_pid != 0) { // If I'm the temp PID again, enter branch
+    if (child_pid != 0) { // Intermediate (temporary) process again
 
       struct sigaction sa;
       if (sigemptyset(&sa.sa_mask) == -1) {
@@ -60,28 +65,29 @@ DaemonizeResult daemonize() {
               child_pid};
     }
 
+    // Daemon process
     child_pid = getpid();
-    if (write(pipefd[1], &child_pid, sizeof(child_pid)) != sizeof(child_pid)) {
+    if (write(writefd.get(), &child_pid, sizeof(child_pid)) !=
+        sizeof(child_pid)) {
       exit(1);
     }
-    close(pipefd[1]);
-    // If I'm the child PID, then leave and attach profiler
-    return {DaemonizeResult::DaemonProcess, temp_pid, parent_pid, child_pid};
+    return {DaemonizeResult::DaemonProcess, temp_pid, parent_pid, child_pid,
+            std::move(writefd)};
   }
 
-  close(pipefd[1]);
+  // Initial process
+  writefd.reset();
 
   pid_t grandchild_pid;
-  if (read(pipefd[0], &grandchild_pid, sizeof(grandchild_pid)) !=
+  if (read(readfd.get(), &grandchild_pid, sizeof(grandchild_pid)) !=
       sizeof(grandchild_pid)) {
     return daemonize_error();
   }
 
-  // If I'm the target PID, then now it's time to wait until my
-  // child, the middle PID, returns.
+  // Wait until intermediate process terminates
   waitpid(temp_pid, nullptr, 0);
-  return {DaemonizeResult::InitialProcess, temp_pid, parent_pid,
-          grandchild_pid};
+  return {DaemonizeResult::InitialProcess, temp_pid, parent_pid, grandchild_pid,
+          std::move(readfd)};
 }
 
 } // namespace ddprof
