@@ -12,7 +12,7 @@
 
 namespace ddprof {
 namespace {
-char const *const sTestPaterns[] = {"cAn", "yUo", "eVen", "tYpe"};
+const std::string_view sTestPaterns[] = {"cAn", "yUo", "eVen", "tYpe"};
 
 bool watcher_from_str(const char *s, PerfWatcher *watcher) {
   std::vector<PerfWatcher> watchers;
@@ -27,36 +27,30 @@ bool watcher_from_str(const char *s, PerfWatcher *watcher) {
 } // namespace
 
 TEST(CmdLineTst, ArgWhich) {
-  ASSERT_EQ(arg_which("tYpe", sTestPaterns, 4), 3);
-  ASSERT_EQ(arg_which("type", sTestPaterns, 4), 3);
-  ASSERT_EQ(arg_which("typo", sTestPaterns, 4), -1);
-  ASSERT_FALSE(arg_inset("typo", sTestPaterns, 4));
-  ASSERT_TRUE(arg_inset("tYpe", sTestPaterns, 4));
+  ASSERT_EQ(arg_which("tYpe", sTestPaterns), 3);
+  ASSERT_EQ(arg_which("type", sTestPaterns), 3);
+  ASSERT_EQ(arg_which("typo", sTestPaterns), -1);
 }
 
 TEST(CmdLineTst, ArgYesNo) {
   const char *yesStr = "YeS";
   const char *noStr = "nO";
-  ASSERT_TRUE(arg_yesno(yesStr, 1));
-  ASSERT_FALSE(arg_yesno(noStr, 1));
-  ASSERT_TRUE(arg_yesno(noStr, 0));
-  ASSERT_FALSE(arg_yesno(yesStr, 0));
+  ASSERT_TRUE(arg_yes(yesStr));
+  ASSERT_FALSE(arg_yes(noStr));
+  ASSERT_TRUE(arg_no(noStr));
+  ASSERT_FALSE(arg_no(yesStr));
 }
 
 TEST(CmdLineTst, PartialFilled) {
-  const char *partialPaterns[] = {"cAn", "temp", "eVen", "tYpe"};
-  ASSERT_EQ(arg_which("temp", partialPaterns, 4), 1);
-  partialPaterns[1] = nullptr; // one of the strings is null
-  ASSERT_EQ(arg_which("typo", partialPaterns, 4),
+  std::string_view partialPaterns[] = {"cAn", "temp", "eVen", "tYpe"};
+  ASSERT_EQ(arg_which("temp", partialPaterns), 1);
+  partialPaterns[1] = {};
+  ASSERT_EQ(arg_which("typo", partialPaterns),
             -1); // Check that we can iterate safely over everything
-  ASSERT_TRUE(arg_inset("tYpe", partialPaterns, 4));
 }
 
 TEST(CmdLineTst, NullPatterns) {
-  char const *const *testPaterns =
-      nullptr; // the actual pointers are not const, only the value inside of
-               // the pointers
-  ASSERT_EQ(arg_which("typo", testPaterns, 4),
+  ASSERT_EQ(arg_which("typo", {}),
             -1); // Check that we can iterate safely over everything
 }
 

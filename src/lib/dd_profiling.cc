@@ -202,7 +202,7 @@ struct ProfilerAutoStart {
     bool autostart = false;
     const char *autostart_env =
         g_state.getenv(k_profiler_auto_start_env_variable);
-    if ((autostart_env && arg_yesno(autostart_env, 1)) || is_preloaded()) {
+    if ((autostart_env && arg_yes(autostart_env)) || is_preloaded()) {
       // if library is preloaded, autostart profiling since there is no way
       // otherwise to start profiling
       autostart = true;
