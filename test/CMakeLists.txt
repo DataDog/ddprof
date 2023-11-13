@@ -374,6 +374,8 @@ add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/pthread_fixes.cc
 add_benchmark(timer-bench timer-bench.cc ../src/tsc_clock.cc ../src/perf.cc ../src/perf_clock.cc
               ../src/perf_ringbuffer.cc)
 
+add_benchmark(prng-bench prng-bench.cc)
+
 add_benchmark(
   backpopulate-bench
   backpopulate-bench.cc
