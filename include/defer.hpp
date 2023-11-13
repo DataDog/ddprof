@@ -22,6 +22,12 @@ template <class F> ddprof::scope_exit<F> make_defer(F &&f) {
   return ddprof::scope_exit<F>{std::forward<F>(f)};
 }
 
+// Allows to execute a deferred operation early (before scope end)
+template <typename F> void exec_defer(ddprof::scope_exit<F> &&scope_object) {
+  const ddprof::scope_exit<F> local{std::move(scope_object)};
+  (void)local;
+}
+
 #define DEFER_(LINE) zz_defer##LINE
 #define DEFER(LINE) DEFER_(LINE)
 #define defer                                                                  \
