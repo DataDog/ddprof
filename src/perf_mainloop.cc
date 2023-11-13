@@ -9,11 +9,13 @@
 #include "ddprof_worker.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
+#include "ipc.hpp"
 #include "logger.hpp"
 #include "perf.hpp"
 #include "persistent_worker_state.hpp"
 #include "pevent.hpp"
 #include "ringbuffer_utils.hpp"
+#include "unique_fd.hpp"
 #include "unwind.h"
 
 #include <algorithm>
@@ -109,6 +111,45 @@ DDRes spawn_workers(PersistentWorkerState *persistent_worker_state,
   return {};
 }
 
+ReplyMessage create_reply_message(const DDProfContext &ctx) {
+  ReplyMessage reply;
+  reply.request = RequestMessage::kProfilerInfo;
+  reply.pid = getpid();
+
+  int alloc_watcher_idx = context_allocation_profiling_watcher_idx(ctx);
+  if (alloc_watcher_idx != -1) {
+    std::span const pevents{ctx.worker_ctx.pevent_hdr.pes,
+                            ctx.worker_ctx.pevent_hdr.size};
+    auto event_it =
+        std::find_if(pevents.begin(), pevents.end(),
+                     [alloc_watcher_idx](const auto &pevent) {
+                       return pevent.watcher_pos == alloc_watcher_idx;
+                     });
+    if (event_it != pevents.end()) {
+      reply.ring_buffer.event_fd = event_it->fd;
+      reply.ring_buffer.ring_fd = event_it->mapfd;
+      reply.ring_buffer.mem_size = event_it->ring_buffer_size;
+      reply.ring_buffer.ring_buffer_type =
+          static_cast<int>(event_it->ring_buffer_type);
+      reply.allocation_profiling_rate =
+          ctx.watchers[alloc_watcher_idx].sample_period;
+      reply.stack_sample_size =
+          ctx.watchers[alloc_watcher_idx].options.stack_sample_size;
+      reply.initial_loaded_libs_check_delay_ms =
+          ctx.params.initial_loaded_libs_check_delay.count();
+      reply.loaded_libs_check_interval_ms =
+          ctx.params.loaded_libs_check_interval.count();
+
+      if (ctx.watchers[alloc_watcher_idx].aggregation_mode ==
+          EventAggregationMode::kLiveSum) {
+        reply.allocation_flags |= (1 << ReplyMessage::kLiveCallgraph);
+      }
+    }
+  }
+
+  return reply;
+}
+
 void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
                   int *pfd_len) {
   *pfd_len = pevent_hdr->size;
@@ -117,7 +158,7 @@ void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
   for (int i = 0; i < *pfd_len; ++i) {
     // NOTE: if fd is negative, it will be ignored
     pfd[i].fd = pes[i].fd;
-    pfd[i].events = POLLIN | POLLERR | POLLHUP;
+    pfd[i].events = POLLIN;
   }
 }
 
@@ -205,12 +246,15 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
   // Setup poll() to watch perf_event file descriptors
   int const pe_len = ctx.worker_ctx.pevent_hdr.size;
   // one extra slot in pfd to accommodate for signal fd
-  struct pollfd poll_fds[k_max_nb_perf_event_open + 1];
+  pollfd poll_fds[k_max_nb_perf_event_open + 1];
   int pfd_len = 0;
   pollfd_setup(&ctx.worker_ctx.pevent_hdr, poll_fds, &pfd_len);
 
   DDRES_CHECK_FWD(signalfd_setup(&poll_fds[pfd_len]));
   int const signal_pos = pfd_len++;
+
+  WorkerServer const server =
+      start_worker_server(ctx.socket_fd.get(), create_reply_message(ctx));
 
   // Perform user-provided initialization
   defer { attr->finish_fun(ctx); };

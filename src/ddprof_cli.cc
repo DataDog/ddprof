@@ -297,9 +297,13 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       app.add_flag("--help_extended", help_extended, "Show extended options")
           ->group(""));
   extended_options.push_back(
-      app.add_option("--socket", socket,
-                     "Profiler's IPC socket, as a file descriptor")
+      app.add_option("--socket", socket_path, "Profiler socket path")
           ->envname("DD_PROFILING_NATIVE_SOCKET")
+          ->group(""));
+  extended_options.push_back(
+      app.add_option("--pipefd", pipefd_to_library,
+                     "Pipe file descriptor to communicate with library that "
+                     "spawned the profiler")
           ->group(""));
   extended_options.push_back(
       app.add_option("--stack_sample_size", default_stack_sample_size,

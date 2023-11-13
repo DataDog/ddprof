@@ -11,8 +11,10 @@
 
 #include <chrono>
 #include <functional>
+#include <latch>
 #include <span>
 #include <system_error>
+#include <thread>
 
 namespace ddprof {
 
@@ -28,6 +30,8 @@ public:
   using socket_t = int;
 
   explicit UnixSocket(socket_t handle) noexcept : _handle(handle) {}
+  explicit UnixSocket(UniqueFd &&handle) noexcept
+      : _handle(std::move(handle)) {}
 
   void close(std::error_code &ec) noexcept;
 
@@ -65,6 +69,7 @@ struct RequestMessage {
   enum { kProfilerInfo = 0x1 };
   // request is bit mask of request flags
   uint32_t request = 0;
+  pid_t pid = -1;
 };
 
 struct RingBufferInfo {
@@ -90,27 +95,36 @@ struct ReplyMessage {
   uint32_t stack_sample_size = 0;
 };
 
-class Client {
-public:
-  explicit Client(UnixSocket &&socket,
-                  std::chrono::microseconds timeout = kDefaultSocketTimeout);
+DDRes send(const UnixSocket &socket, const RequestMessage &msg);
+DDRes send(const UnixSocket &socket, const ReplyMessage &msg);
+DDRes receive(const UnixSocket &socket, RequestMessage &msg);
+DDRes receive(const UnixSocket &socket, ReplyMessage &msg);
 
-  ReplyMessage get_profiler_info();
+UniqueFd create_server_socket(std::string_view path) noexcept;
+UniqueFd create_client_socket(std::string_view path) noexcept;
+DDRes get_profiler_info(UniqueFd &&socket, std::chrono::microseconds timeout,
+                        ReplyMessage *reply) noexcept;
+
+bool is_socket_abstract(std::string_view path) noexcept;
+
+class WorkerServer {
+public:
+  WorkerServer(const WorkerServer &) = delete;
+  WorkerServer &operator=(const WorkerServer &) = delete;
+  ~WorkerServer();
 
 private:
-  UnixSocket _socket;
+  friend WorkerServer start_worker_server(int socket, const ReplyMessage &msg);
+
+  WorkerServer(int socket, const ReplyMessage &msg);
+  void event_loop();
+
+  int _socket;
+  std::latch _latch;
+  ReplyMessage _msg;
+  std::jthread _loop_thread;
 };
 
-class Server {
-public:
-  explicit Server(UnixSocket &&socket,
-                  std::chrono::microseconds timeout = kDefaultSocketTimeout);
-
-  using ReplyFunc = std::function<ReplyMessage(const RequestMessage &)>;
-  void waitForRequest(const ReplyFunc &func);
-
-private:
-  UnixSocket _socket;
-};
+WorkerServer start_worker_server(int socket, const ReplyMessage &msg);
 
 } // namespace ddprof

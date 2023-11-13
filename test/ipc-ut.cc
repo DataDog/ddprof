@@ -5,11 +5,13 @@
 
 #include "ipc.hpp"
 
+#include "syscalls.hpp"
 #include "unique_fd.hpp"
 
 #include <cstdlib>
 #include <fcntl.h>
 #include <string>
+#include <sys/eventfd.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -116,6 +118,50 @@ TEST(IPCTest, timeout) {
       ASSERT_GE(d, timeout - timeout_tolerance);
       break;
     }
+  }
+}
+
+TEST(IPCTest, worker_server) {
+  constexpr auto kSocketName = "@foo";
+  auto server_socket = create_server_socket(kSocketName);
+  ReplyMessage msg;
+  msg.request = RequestMessage::kProfilerInfo;
+  msg.allocation_profiling_rate = 123;
+  msg.initial_loaded_libs_check_delay_ms = 456;
+  msg.loaded_libs_check_interval_ms = 789;
+  msg.pid = 1234;
+  msg.stack_sample_size = 5678;
+  msg.allocation_flags = 0xdeadbeef;
+  msg.ring_buffer.ring_buffer_type = 17;
+  msg.ring_buffer.mem_size = 123456789;
+  msg.ring_buffer.event_fd = eventfd(0, 0);
+  msg.ring_buffer.ring_fd = memfd_create("foo", 0);
+
+  auto server = start_worker_server(server_socket.get(), msg);
+  constexpr auto kNbThreads = 10;
+  constexpr auto kNbIterations = 100;
+  std::vector<std::jthread> threads;
+  for (int i = 0; i < kNbThreads; ++i) {
+    threads.push_back(std::jthread{[&]() {
+      for (int j = 0; j < kNbIterations; ++j) {
+        ReplyMessage info;
+        ASSERT_TRUE(IsDDResOK(get_profiler_info(
+            create_client_socket(kSocketName), kDefaultSocketTimeout, &info)));
+        ASSERT_EQ(info.request, RequestMessage::kProfilerInfo);
+        ASSERT_EQ(info.pid, msg.pid);
+        ASSERT_EQ(info.allocation_profiling_rate,
+                  msg.allocation_profiling_rate);
+        ASSERT_EQ(info.initial_loaded_libs_check_delay_ms,
+                  msg.initial_loaded_libs_check_delay_ms);
+        ASSERT_EQ(info.loaded_libs_check_interval_ms,
+                  msg.loaded_libs_check_interval_ms);
+        ASSERT_EQ(info.stack_sample_size, msg.stack_sample_size);
+        ASSERT_EQ(info.allocation_flags, msg.allocation_flags);
+        ASSERT_EQ(info.ring_buffer.ring_buffer_type,
+                  msg.ring_buffer.ring_buffer_type);
+        ASSERT_EQ(info.ring_buffer.mem_size, msg.ring_buffer.mem_size);
+      }
+    }});
   }
 }
 

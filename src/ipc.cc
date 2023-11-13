@@ -8,16 +8,22 @@
 #include "chrono_utils.hpp"
 
 #include <cerrno>
+#include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <netinet/in.h>
+#include <poll.h>
+#include <random>
+#include <sys/signalfd.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 namespace ddprof {
 
+namespace {
 template <typename T> std::span<std::byte> to_byte_span(T *obj) {
   return {reinterpret_cast<std::byte *>(obj), sizeof(T)};
 }
@@ -36,6 +42,7 @@ inline ReturnType error_wrapper(ReturnType return_value,
   }
   return return_value;
 }
+} // namespace
 
 void UnixSocket::close(std::error_code &ec) noexcept {
   error_wrapper(::close(_handle.release()), ec);
@@ -268,45 +275,171 @@ DDRes receive(const UnixSocket &socket, ReplyMessage &msg) {
   return {};
 }
 
-Client::Client(UnixSocket &&socket, std::chrono::microseconds timeout)
-    : _socket(std::move(socket)) {
+DDRes get_profiler_info(UniqueFd &&client_socket,
+                        std::chrono::microseconds timeout,
+                        ReplyMessage *reply) noexcept {
+  UnixSocket const socket{std::move(client_socket)};
   std::error_code ec;
-  _socket.set_read_timeout(timeout, ec);
-  if (ec) {
-    DDRES_THROW_EXCEPTION(DD_WHAT_SOCKET, "Unable to set timeout on socket");
-  }
-  _socket.set_write_timeout(timeout, ec);
-  if (ec) {
-    DDRES_THROW_EXCEPTION(DD_WHAT_SOCKET, "Unable to set timeout on socket");
-  }
+  socket.set_read_timeout(timeout, ec);
+  DDRES_CHECK_ERRORCODE(ec, DD_WHAT_SOCKET,
+                        "Unable to set read timeout on socket");
+  socket.set_write_timeout(timeout, ec);
+  DDRES_CHECK_ERRORCODE(ec, DD_WHAT_SOCKET,
+                        "Unable to set write timeout on socket");
+
+  RequestMessage const request = {.request = RequestMessage::kProfilerInfo,
+                                  .pid = getpid()};
+  DDRES_CHECK_FWD(send(socket, request));
+  DDRES_CHECK_FWD(receive(socket, *reply));
+  return {};
 }
 
-ReplyMessage Client::get_profiler_info() {
-  RequestMessage const request = {.request = RequestMessage::kProfilerInfo};
-  send(_socket, request);
-  ReplyMessage reply;
-  receive(_socket, reply);
-  return reply;
+UniqueFd create_server_socket(std::string_view socket_path) noexcept {
+  UniqueFd fd{::socket(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0)};
+  if (fd.get() < 0) {
+    LG_ERR("Unable to create server socket: %s",
+           std::error_code(errno, std::system_category()).message().c_str());
+    return {};
+  }
+
+  sockaddr_un addr = {};
+  addr.sun_family = AF_UNIX;
+  if (socket_path.size() >= sizeof(addr.sun_path)) {
+    LG_ERR("Unable to bind socket, socket path too long: %s",
+           std::string{socket_path}.c_str());
+    return {};
+  }
+  std::copy(socket_path.begin(), socket_path.end(), addr.sun_path);
+  if (is_socket_abstract(socket_path)) {
+    addr.sun_path[0] = '\0';
+  }
+
+  if (::bind(fd.get(), reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
+    LG_ERR("Unable to bind server socket: %s",
+           std::error_code(errno, std::system_category()).message().c_str());
+    return {};
+  }
+
+  constexpr auto kMaxConn = 128;
+  if (::listen(fd.get(), kMaxConn) < 0) {
+    LG_ERR("Unable to listen to server socket: %s",
+           std::error_code(errno, std::system_category()).message().c_str());
+    return {};
+  }
+
+  return fd;
 }
 
-Server::Server(UnixSocket &&socket, std::chrono::microseconds timeout)
-    : _socket(std::move(socket)) {
-  std::error_code ec;
-  _socket.set_read_timeout(timeout, ec);
-  if (ec) {
-    DDRES_THROW_EXCEPTION(DD_WHAT_SOCKET, "Unable to set timeout on socket");
+UniqueFd create_client_socket(std::string_view socket_path) noexcept {
+  UniqueFd fd{::socket(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0)};
+  if (fd.get() < 0) {
+    LG_ERR("Unable to create client socket: %s",
+           std::error_code(errno, std::system_category()).message().c_str());
+    return {};
   }
-  _socket.set_write_timeout(timeout, ec);
-  if (ec) {
-    DDRES_THROW_EXCEPTION(DD_WHAT_SOCKET, "Unable to set timeout on socket");
+
+  sockaddr_un addr = {};
+  addr.sun_family = AF_UNIX;
+  if (socket_path.size() >= sizeof(addr.sun_path)) {
+    LG_ERR("Unable to connect to socket, socket path too long: %s",
+           std::string{socket_path}.c_str());
+    return {};
   }
+  std::copy(socket_path.begin(), socket_path.end(), addr.sun_path);
+  if (is_socket_abstract(socket_path)) {
+    addr.sun_path[0] = '\0';
+  }
+
+  if (::connect(fd.get(), reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) <
+      0) {
+    LG_ERR("Unable to connect to socket: %s",
+           std::error_code(errno, std::system_category()).message().c_str());
+    return {};
+  }
+
+  return fd;
 }
 
-void Server::waitForRequest(const ReplyFunc &func) {
-  RequestMessage request;
-  receive(_socket, request);
-  ReplyMessage const reply = func(request);
-  send(_socket, reply);
+WorkerServer::WorkerServer(int socket, const ReplyMessage &msg)
+    : _socket(socket), _latch(1), _msg(msg),
+      _loop_thread(&WorkerServer::event_loop, this) {
+  // wait for loop thread to be ready
+  _latch.wait();
+}
+
+WorkerServer::~WorkerServer() {
+  pthread_kill(_loop_thread.native_handle(), SIGUSR1);
+  // _loop_thread destructor will join the thread
+}
+
+WorkerServer start_worker_server(int socket, const ReplyMessage &msg) {
+  return WorkerServer{socket, msg};
+}
+
+void WorkerServer::event_loop() {
+  // block SIGUSR1
+  sigset_t mask;
+  ::sigemptyset(&mask);
+  ::sigaddset(&mask, SIGUSR1);
+  ::sigprocmask(SIG_BLOCK, &mask, nullptr);
+  int const sfd = ::signalfd(-1, &mask, 0);
+
+  // signal launch thread that we are ready
+  _latch.count_down();
+
+  std::vector<pollfd> poll_fds;
+  poll_fds.push_back({.fd = _socket, .events = POLLIN});
+  poll_fds.push_back({.fd = sfd, .events = POLLIN});
+
+  while (true) {
+    int const ret = poll(poll_fds.data(), poll_fds.size(), -1);
+    if (ret < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      return;
+    }
+    if (poll_fds[1].revents & POLLIN) {
+      break;
+    }
+    auto first = poll_fds.begin() + 2;
+    auto last = poll_fds.end();
+    while (first != last) {
+      if (first->revents) {
+        UnixSocket const sock(first->fd);
+        if (first->revents & POLLIN) {
+          RequestMessage request;
+          if (IsDDResOK(receive(sock, request))) {
+            LG_DBG("Received request from pid: %d", request.pid);
+            send(sock, _msg);
+          }
+        }
+        last = std::prev(last);
+        std::swap(*first, *last);
+      } else {
+        ++first;
+      }
+    }
+    poll_fds.erase(last, poll_fds.end());
+    if (poll_fds[0].revents & POLLIN) {
+      int const new_socket = ::accept(poll_fds[0].fd, nullptr, nullptr);
+      if (new_socket != -1) {
+        auto tv = duration_to_timeval(kDefaultSocketTimeout);
+        ::setsockopt(new_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+        ::setsockopt(new_socket, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+        poll_fds.push_back({.fd = new_socket, .events = POLLIN});
+      }
+    }
+  }
+
+  // close all remaining connections
+  for_each(poll_fds.begin() + 1, poll_fds.end(),
+           [](pollfd &fd) { ::close(fd.fd); });
+}
+
+bool is_socket_abstract(std::string_view path) noexcept {
+  // interpret @ as first character as request for an abstract socket
+  return path.starts_with("@");
 }
 
 } // namespace ddprof
