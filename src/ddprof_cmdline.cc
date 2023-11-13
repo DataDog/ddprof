@@ -5,34 +5,30 @@
 
 #include "ddprof_cmdline.hpp"
 
+#include <algorithm>
 #include <cassert>
+#include <span>
+#include <string_view>
 #include <strings.h>
 
 namespace ddprof {
 
-int arg_which(const char *str, char const *const *set, int sz_set) {
-  if (!str || !set) {
-    return -1;
-  }
-  for (int i = 0; i < sz_set; i++) {
-    if (set[i] && !strcasecmp(str, set[i])) {
-      return i;
-    }
-  }
-  return -1;
+int arg_which(std::string_view str, std::span<const std::string_view> str_set) {
+  auto it = std::ranges::find_if(str_set, [&str](std::string_view s) {
+    return s.size() == str.size() &&
+        !strncasecmp(str.data(), s.data(), s.size());
+  });
+  return (it == str_set.end()) ? -1 : std::distance(str_set.begin(), it);
 }
 
-bool arg_inset(const char *str, char const *const *set, int sz_set) {
-  return !(-1 == arg_which(str, set, sz_set));
+bool arg_yes(std::string_view str) {
+  static constexpr std::string_view yes_set[] = {"yes", "true", "on", "1"};
+  return arg_which(str, yes_set) != -1;
 }
 
-bool arg_yesno(const char *str, int mode) {
-  const int sizeOfPatterns = 3;
-  static const char *yes_set[] = {"yes", "true", "on"}; // mode = 1
-  static const char *no_set[] = {"no", "false", "off"}; // mode = 0
-  assert(0 == mode || 1 == mode);
-  char const *const *set = (!mode) ? no_set : yes_set;
-  return arg_which(str, set, sizeOfPatterns) != -1;
+bool arg_no(std::string_view str) {
+  static constexpr std::string_view no_set[] = {"no", "false", "off", "0"};
+  return arg_which(str, no_set) != -1;
 }
 
 } // namespace ddprof

@@ -9,15 +9,16 @@
 #include "logger.hpp"
 
 #include <array>
+#include <string_view>
 
 namespace ddprof {
 
 void setup_logger(const char *log_mode, const char *log_level) {
   // Process logging mode
-  char const *logpattern[] = {"stdout", "stderr", "syslog", "disabled"};
-  int const idx_log_mode = log_mode
-      ? arg_which(log_mode, logpattern, std::size(logpattern))
-      : 0; // default to stdout
+  const std::string_view logpattern[] = {"stdout", "stderr", "syslog",
+                                         "disabled"};
+  int const idx_log_mode =
+      log_mode ? arg_which(log_mode, logpattern) : 0; // default to stdout
   switch (idx_log_mode) {
   case 0:
     LOG_open(LOG_STDOUT, "");
@@ -37,9 +38,9 @@ void setup_logger(const char *log_mode, const char *log_level) {
   }
 
   // Process logging level
-  char const *loglpattern[] = {"debug", "informational", "notice", "warn",
-                               "error"};
-  switch (arg_which(log_level, loglpattern, std::size(loglpattern))) {
+  const std::string_view loglpattern[] = {"debug", "informational", "notice",
+                                          "warn", "error"};
+  switch (log_level ? arg_which(log_level, loglpattern) : -1) {
   case 0:
     LOG_setlevel(LL_DEBUG);
     break;
