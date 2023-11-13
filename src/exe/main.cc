@@ -171,7 +171,7 @@ DDRes get_library_path(TempFileHolder &libdd_profiling_path,
 
 DDRes check_incompatible_options(const DDProfContext &ctx) {
   if (context_allocation_profiling_watcher_idx(ctx) != -1 && ctx.params.pid &&
-      !ctx.params.sockfd) {
+      !ctx.params.pipefd_to_library) {
     DDRES_RETURN_ERROR_LOG(
         DD_WHAT_INPUT_PROCESS,
         "Memory allocation profiling is not supported in PID / global mode");
@@ -184,7 +184,6 @@ DDRes parse_input(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
 
   // cmdline args have been processed.  Set the ctx
   DDRES_CHECK_FWD(context_set(ddprof_cli, ctx));
-
   DDRES_CHECK_FWD(check_incompatible_options(ctx));
 
   return {};
@@ -205,31 +204,21 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
 
   pid_t temp_pid = 0;
   if (in_wrapper_mode) {
-    // If no PID was specified earlier, we autodaemonize and target current pid
+    // If no PID was specified earlier, we auto-daemonize and target current
+    // pid
 
     // Determine if library should be injected into target process
     // (ie. only if allocation profiling is active)
     bool const allocation_profiling_started_from_wrapper =
         context_allocation_profiling_watcher_idx(*ctx) != -1;
 
-    UniqueFd child_socket;
-    UniqueFd parent_socket;
-
     if (allocation_profiling_started_from_wrapper) {
-      int sockfds[2] = {-1, -1};
-      if (socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sockfds) == -1) {
-        return -1;
-      }
-      parent_socket.reset(sockfds[0]);
-      child_socket.reset(sockfds[1]);
-
       if (!IsDDResOK(get_library_path(dd_profiling_lib_holder,
                                       dd_loader_lib_holder))) {
         return -1;
       }
-      LG_DBG("ctx->params.dd_profiling_fd = %d - sockfds %d, %d",
-             ctx->params.dd_profiling_fd, child_socket.get().get(),
-             parent_socket.get().get());
+      LG_DBG("ctx->params.dd_profiling_fd = %d - socket_path = %s",
+             ctx->params.dd_profiling_fd, ctx->params.socket_path.c_str());
     }
 
     ctx->params.pid = getpid();
@@ -247,8 +236,6 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
 
     if (daemonize_res.state == DaemonizeResult::InitialProcess) {
       // non-daemon process: return control to caller
-      child_socket.reset();
-
       std::string const dd_loader_lib_path = dd_loader_lib_holder.release();
       std::string const dd_profiling_lib_path =
           dd_profiling_lib_holder.release();
@@ -268,8 +255,8 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
         if (!dd_loader_lib_path.empty()) {
           setenv(k_profiler_lib_env_variable, dd_profiling_lib_path.c_str(), 1);
         }
-        auto sock_str = std::to_string(parent_socket.get());
-        setenv(k_profiler_lib_socket_env_variable, sock_str.c_str(), 1);
+        setenv(k_profiler_lib_socket_env_variable,
+               ctx->params.socket_path.c_str(), 1);
         // Preset the env variable to determine if allocation profiler is
         // active.
         // This avoids having to create a new env variable in the target
@@ -277,17 +264,23 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
         setenv(k_profiler_active_env_variable, "0", 1);
       }
 
-      (void)parent_socket.release();
       return 0;
     }
 
     // profiler process
-    ctx->params.sockfd = std::move(child_socket);
     temp_pid = daemonize_res.temp_pid;
   }
 
   // Now, we are the profiler process
   exit_on_return = true;
+
+  // If we have a temp PID, then it's waiting for us to send it a signal
+  // after we finish instrumenting.
+  auto defer_kill_temp_pid = make_defer([&]() {
+    if (temp_pid) {
+      kill(temp_pid, SIGTERM);
+    }
+  });
 
   if (IsDDResOK(TscClock::init())) {
     const auto &calibration = TscClock::calibration();
@@ -327,78 +320,29 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
 
   defer { ddprof_teardown(*ctx); };
 
-  // If we have a temp PID, then it's waiting for us to send it a signal
-  // after we finish instrumenting.  This will end that process, which in
-  // turn will unblock the target from calling exec.
-  if (temp_pid) {
-    kill(temp_pid, SIGTERM);
+  // create server socket
+  UniqueFd socket_fd = create_server_socket(ctx->params.socket_path);
+  if (!socket_fd) {
+    LG_ERR("Failed to create server socket");
+    return -1;
   }
+  ctx->socket_fd = std::move(socket_fd);
 
-  if (ctx->params.sockfd) {
-    ReplyMessage reply;
-    reply.request = RequestMessage::kProfilerInfo;
-    reply.pid = getpid();
-
-    int alloc_watcher_idx = context_allocation_profiling_watcher_idx(*ctx);
-    if (alloc_watcher_idx != -1) {
-      std::span const pevents{ctx->worker_ctx.pevent_hdr.pes,
-                              ctx->worker_ctx.pevent_hdr.size};
-      auto event_it =
-          std::find_if(pevents.begin(), pevents.end(),
-                       [alloc_watcher_idx](const auto &pevent) {
-                         return pevent.watcher_pos == alloc_watcher_idx;
-                       });
-      if (event_it != pevents.end()) {
-        reply.ring_buffer.event_fd = event_it->fd;
-        reply.ring_buffer.ring_fd = event_it->mapfd;
-        reply.ring_buffer.mem_size = event_it->ring_buffer_size;
-        reply.ring_buffer.ring_buffer_type =
-            static_cast<int>(event_it->ring_buffer_type);
-        reply.allocation_profiling_rate =
-            ctx->watchers[alloc_watcher_idx].sample_period;
-        reply.stack_sample_size =
-            ctx->watchers[alloc_watcher_idx].options.stack_sample_size;
-        reply.initial_loaded_libs_check_delay_ms =
-            ctx->params.initial_loaded_libs_check_delay.count();
-        reply.loaded_libs_check_interval_ms =
-            ctx->params.loaded_libs_check_interval.count();
-
-        if (ctx->watchers[alloc_watcher_idx].aggregation_mode ==
-            EventAggregationMode::kLiveSum) {
-          reply.allocation_flags |= (1 << ReplyMessage::kLiveCallgraph);
-        }
-      }
+  defer {
+    if (!is_socket_abstract(ctx->params.socket_path)) {
+      unlink(ctx->params.socket_path.c_str());
     }
+  };
 
-    try {
-      // Takes ownership of the open socket, socket will be closed when
-      // exiting this block
-      Server server{UnixSocket{ctx->params.sockfd.release()}};
-      server.waitForRequest([&reply](const RequestMessage &) { return reply; });
-    } catch (const DDException &e) {
-      if (in_wrapper_mode) {
-        if (!process_is_alive(ctx->params.pid)) {
-          // Tell the user that process died
-          // Most of the time this is an invalid command line
-          LG_WRN(
-              "Target process(%d) is not alive. Allocation profiling stopped.",
-              ctx->params.pid);
-          // We are not returning
-          // We could still have a short lived process that has forked
-          // CPU profiling will stop on a later failure if process died.
-        } else {
-          // Failure in wrapper mode is not fatal:
-          // LD_PRELOAD may fail because target exe is statically linked
-          // (eg. go binaries)
-          LG_WRN(
-              "Unable to connect to profiler library (target executable might "
-              "be statically linked and library cannot be preloaded). "
-              "Allocation profiling will be disabled.");
-        }
-      } else {
-        LOG_ERROR_DETAILS(LG_ERR, e.get_DDRes()._what);
-        return -1;
-      }
+  exec_defer(std::move(defer_kill_temp_pid));
+
+  if (ctx->params.pipefd_to_library) {
+    // send the socket path to the library if profiler was spawned by library
+    const ssize_t sz = ctx->params.socket_path.size() + 1;
+    if (::write(ctx->params.pipefd_to_library.get(),
+                ctx->params.socket_path.c_str(), sz) != sz) {
+      LG_ERR("Failed to send socket path to library: %s", strerror(errno));
+      return -1;
     }
   }
 

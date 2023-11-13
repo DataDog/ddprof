@@ -10,9 +10,11 @@
 #include "ddprof_context.hpp"
 #include "ddprof_cpumask.hpp"
 #include "ddres.hpp"
+#include "ipc.hpp"
 #include "logger.hpp"
 #include "logger_setup.hpp"
 #include "presets.hpp"
+#include "prng.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -23,6 +25,17 @@
 namespace ddprof {
 
 namespace {
+
+// Generate a pseudo-random unique socket path
+std::string generate_socket_path() {
+  char path[PATH_MAX];
+  static xoshiro256ss engine{std::random_device{}()};
+  constexpr auto kSuffixLen = 8;
+  auto random_suffix = generate_random_string(engine, kSuffixLen);
+  snprintf(path, sizeof(path), "@/tmp/ddprof-%d-%s.sock", getpid(),
+           random_suffix.c_str());
+  return path;
+}
 
 const PerfWatcher *find_duplicate_event(std::span<const PerfWatcher> watchers) {
   bool seen[DDPROF_PWE_LENGTH] = {};
@@ -79,8 +92,8 @@ void copy_cli_values(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
   ctx.params.initial_loaded_libs_check_delay =
       ddprof_cli.initial_loaded_libs_check_delay;
   ctx.params.loaded_libs_check_interval = ddprof_cli.loaded_libs_check_interval;
-
-  ctx.params.sockfd.reset(ddprof_cli.socket);
+  ctx.params.socket_path = ddprof_cli.socket_path;
+  ctx.params.pipefd_to_library = UniqueFd{ddprof_cli.pipefd_to_library};
 }
 
 DDRes context_add_watchers(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
@@ -102,7 +115,7 @@ DDRes context_add_watchers(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
 
   if (!preset.empty()) {
     const bool pid_or_global_mode =
-        (ddprof_cli.global || ddprof_cli.pid) && !ctx.params.sockfd;
+        (ddprof_cli.global || ddprof_cli.pid) && !ctx.params.pipefd_to_library;
     DDRES_CHECK_FWD(add_preset(preset, pid_or_global_mode,
                                ddprof_cli.default_stack_sample_size, watchers));
   }
@@ -131,6 +144,10 @@ DDRes context_set(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
   ctx.params.num_cpu = nprocessors_conf();
 
   DDRES_CHECK_FWD(context_add_watchers(ddprof_cli, ctx));
+
+  if (ctx.params.socket_path.empty()) {
+    ctx.params.socket_path = generate_socket_path();
+  }
 
   if (ddprof_cli.show_config) {
     ddprof_cli.print();

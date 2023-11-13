@@ -28,7 +28,8 @@ struct DDProfContext {
     pid_t pid{0}; // ! only use for perf attach (can be -1 in global mode)
     uint32_t worker_period{}; // exports between worker refreshes
     int dd_profiling_fd{-1};  // opened file descriptor to our internal lib
-    ddprof::UniqueFd sockfd;
+    std::string socket_path;
+    UniqueFd pipefd_to_library;
     bool show_samples{false};
     bool timeline{false};
     cpu_set_t cpu_affinity{};
@@ -39,6 +40,7 @@ struct DDProfContext {
     std::chrono::milliseconds loaded_libs_check_interval{0};
   } params;
 
+  ddprof::UniqueFd socket_fd;
   PerfClockSource perf_clock_source{PerfClockSource::kNoClock};
   std::vector<PerfWatcher> watchers;
   ExporterInput exp_input;

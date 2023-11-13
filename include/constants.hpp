@@ -48,6 +48,10 @@ DDPROF_CONSTREXPR const char *k_profiler_lib_env_variable =
 DDPROF_CONSTREXPR const char *k_startup_wait_ms_env_variable =
     "DD_PROFILING_NATIVE_STARTUP_WAIT_MS";
 
+// Env variable to disable allocation profiling of of exec'd processes
+DDPROF_CONSTREXPR const char *k_allocation_profiling_follow_execs =
+    "DD_PROFILING_NATIVE_ALLOCATION_PROFILING_FOLLOW_EXECS";
+
 DDPROF_CONSTREXPR const char *k_libdd_profiling_name = "libdd_profiling.so";
 
 DDPROF_CONSTREXPR const char *k_libdd_profiling_embedded_name =

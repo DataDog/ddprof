@@ -67,7 +67,8 @@ public:
   bool show_samples{false};
   bool fault_info{true};
   bool help_extended{false};
-  int socket{-1};
+  std::string socket_path;
+  int pipefd_to_library{-1};
   bool continue_exec{false};
   bool timeline{false};
 

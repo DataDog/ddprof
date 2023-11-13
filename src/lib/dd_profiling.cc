@@ -44,10 +44,12 @@ struct ProfilerState {
   bool initialized = false;
   bool started = false;
   bool allocation_profiling_started = false;
+  bool follow_execs = true;
   pid_t profiler_pid = 0;
 
   decltype(&::getenv) getenv = &::getenv;
   decltype(&::putenv) putenv = &::putenv;
+  decltype(&::setenv) setenv = &::setenv;
   decltype(&::unsetenv) unsetenv = &::unsetenv;
 
   // Pointer on [01] char for "<k_profiler_active_env_variable>=[01]" env
@@ -85,6 +87,11 @@ void retrieve_original_env_functions() {
   if (unsetenv_ptr) {
     g_state.unsetenv = unsetenv_ptr;
   }
+  auto *setenv_ptr =
+      reinterpret_cast<decltype(&::setenv)>(dlsym(RTLD_NEXT, "setenv"));
+  if (setenv_ptr) {
+    g_state.setenv = setenv_ptr;
+  }
 }
 
 void init_profiler_library_active() {
@@ -109,6 +116,9 @@ void init_state() {
 
   retrieve_original_env_functions();
   init_profiler_library_active();
+
+  auto *follow_execs_env = g_state.getenv(k_allocation_profiling_follow_execs);
+  g_state.follow_execs = !(follow_execs_env && arg_no(follow_execs_env));
   g_state.initialized = true;
 }
 
@@ -145,17 +155,16 @@ void allocation_profiling_stop() {
 }
 
 // Return socket created by ddprof when injecting lib if present
-int get_ddprof_socket() {
+std::string get_ddprof_socket_path() {
   const char *socket_str = g_state.getenv(k_profiler_lib_socket_env_variable);
-  if (socket_str) {
-    std::string_view const sv{socket_str};
-    int sockfd = -1;
-    if (auto [ptr, ec] = std::from_chars(sv.begin(), sv.end(), sockfd);
-        ec == std::errc() && ptr == sv.end()) {
-      return sockfd;
-    }
-  }
-  return -1;
+  return socket_str ? socket_str : "";
+}
+
+// Get profiler socket path from pipefd
+std::string get_ddprof_socket_path(int pipefd) {
+  char socket_str[PATH_MAX];
+  auto r = ::read(pipefd, socket_str, sizeof(socket_str));
+  return r <= 0 ? "" : socket_str;
 }
 
 bool contains_lib(std::string_view ldpreload_str, std::string_view libname) {
@@ -223,20 +232,21 @@ struct ProfilerAutoStart {
 
 ProfilerAutoStart g_autostart;
 
-int exec_ddprof(pid_t target_pid, pid_t parent_pid, int sock_fd) {
+int exec_ddprof(pid_t target_pid, pid_t parent_pid,
+                int pipefd_to_library) noexcept {
   char ddprof_str[] = "ddprof";
 
   char pid_buf[std::numeric_limits<pid_t>::digits10 + 1];
   (void)snprintf(pid_buf, sizeof(pid_buf), "%d", target_pid);
-  char sock_buf[std::numeric_limits<int>::digits10 + 1];
-  (void)snprintf(sock_buf, sizeof(sock_buf), "%d", sock_fd);
+  char pipefd_buf[std::numeric_limits<int>::digits10 + 1];
+  (void)snprintf(pipefd_buf, sizeof(pipefd_buf), "%d", pipefd_to_library);
 
   char pid_opt_str[] = "-p";
-  char sock_opt_str[] = "--socket";
+  char pipefd_opt_str[] = "--pipefd";
 
   // cppcheck-suppress variableScope
-  char *argv[] = {ddprof_str,   pid_opt_str, pid_buf,
-                  sock_opt_str, sock_buf,    nullptr};
+  char *argv[] = {ddprof_str,     pid_opt_str, pid_buf,
+                  pipefd_opt_str, pipefd_buf,  nullptr};
 
   // unset LD_PRELOAD, otherwise if libdd_profiling.so was preloaded, it
   // would trigger a fork bomb
@@ -277,38 +287,63 @@ void notify_fork() {
 int ddprof_start_profiling_internal() {
   // Refuse to start profiler if already started by this process or if active in
   // one of its ancestors
-  if (g_state.started || is_profiler_library_active()) {
+  if (g_state.started ||
+      (!g_state.follow_execs && is_profiler_library_active())) {
     return -1;
   }
-  int sockfd = get_ddprof_socket();
+
+  // Library communicates with profiler through a unix socket.
+  // Socket creation is the responsibility of the profiler.
+  // By default ddprof creates an random abstract socket, that does not exist on
+  // the filesystem: "\0/tmp/ddprof-<pid>-<random_string>.sock" but unix socket
+  // path can be overridden with profiler --socket input option.
+  // Profiler worker process accepts and handles connections on this socket in a
+  // separate thread and sends ring buffer information upon request.
+  //
+  // Overview of the communication process (wrapper mode):
+  //  * Profiler starts, set `DD_PROFILING_NATIVE_LIB_SOCKET` env variable with
+  //    socket path and daemonizes.
+  //  * Target process starts and blocks on intermediate process termination
+  //  * Profiler creates socket and listen on it, and then unblock target
+  //    process by killing intermediate process.
+  //  * Profiler forks into worker process and worker process starts accepting
+  //    connections.
+  //  * Library get socket path from `DD_PROFILING_NATIVE_LIB_SOCKET`, connects
+  //    to it, retrieve ring buffer information and closes connection.
+  //  * Exec'd processes from target process inherit
+  //  DD_PROFILING_NATIVE_LIB_SOCKET
+  //    env variable and connect to profiler in the same manner.
+  //
+  // Overview of the communication process (library mode):
+  //  * Library starts, checks if `DD_PROFILING_NATIVE_LIB_SOCKET` is set.
+  //  * If `DD_PROFILING_NATIVE_LIB_SOCKET` is set:
+  //    * Library connects to socket, retrieve ring buffer information and
+  //      closes connection.
+  //  * Otherwise:
+  //    * Library daemonizes into the profiler.
+  //    * Profiler blocks on intermediate process termination.
+  //    * Library unblocks profiler by killing intermediate process.
+  //    * Library blocks on reading socket path from pipe created during
+  //     daemonization.
+  //    * Profiler starts, creates socket and listen on socket.
+  //    * Profiler creates socket, listen on it and then sends socket path to
+  //      library through pipe created during daemonization.
+  //      Pipe allows library to retrieve socket path from profiler and to
+  //      ensure that library tries to connect to socket after it has been
+  //      created by profiler.
+  //    * Library connects to socket, retrieve ring buffer information and
+  //      closes connection.
+  //    * Library sets environment variable `DD_PROFILING_NATIVE_LIB_SOCKET`
+  //      with socket path so that socket is used by future exec'd processes.
+  //    * Exec'd processes from target process inherit
+  //      `DD_PROFILING_NATIVE_LIB_SOCKET` env variable and connect to profiler
+  //      in the same manner as in wrapper mode.
+
+  auto socket_path = get_ddprof_socket_path();
   pid_t const target_pid = getpid();
 
-  // no socket -> library will spawn a profiler and create socket pair
-  if (sockfd == -1) {
-    // Create a socket pair to establish a communication channel between library
-    // and profiler Communication occurs only during profiler setup and sockets
-    // are closed once profiler is attached.
-    // This channel is used to:
-    //  * ensure that profiler is attached before returning
-    //    from ddprof_start_profiling
-    //  * retrieve PID of profiler on library side
-    //  * retrieve ring buffer information for allocation profiling on library
-    //    side. This requires passing file descriptors between processes,
-    //    that's why unix socket are used here.
-    // Overview of the communication process:
-    //  * library create socket pair and fork + exec into ddprof executable
-    //  * library sends a message requesting profiler PID and waits for a reply
-    //  * ddprof starts up, attaches itself to the target process, then waits
-    //    for a request and replies
-    //  * both library and profiler close their socket and continue
-    int sockfds[2];
-    if (socketpair(AF_UNIX, SOCK_SEQPACKET, 0, sockfds) == -1) {
-      return -1;
-    }
-
-    UniqueFd parent_socket{sockfds[0]};
-    UniqueFd child_socket{sockfds[1]};
-
+  if (socket_path.empty()) {
+    // no socket -> library will spawn a profiler
     auto daemonize_res = daemonize();
     if (daemonize_res.state == DaemonizeResult::Error) {
       return -1;
@@ -320,21 +355,34 @@ int ddprof_start_profiling_internal() {
 
     if (daemonize_res.state == DaemonizeResult::DaemonProcess) {
       // executed by daemonized process
-
-      // close parent socket end
-      parent_socket.reset();
-      int const child_socket_fd = child_socket.release();
-
-      exec_ddprof(target_pid, daemonize_res.temp_pid, child_socket_fd);
+      exec_ddprof(target_pid, daemonize_res.temp_pid,
+                  daemonize_res.pipe_fd.get());
       exit(1);
     }
 
-    sockfd = parent_socket.release();
+    // executed by initial process
+
+    // wait for profiler process to be ready
+    socket_path = get_ddprof_socket_path(daemonize_res.pipe_fd.get());
+    if (socket_path.empty()) {
+      return -1;
+    }
+
+    g_state.setenv(k_profiler_lib_socket_env_variable, socket_path.c_str(), 1);
   }
 
   try {
-    Client client{UnixSocket{sockfd}};
-    auto info = client.get_profiler_info();
+    ReplyMessage info;
+    auto client_socket = create_client_socket(socket_path);
+    if (!client_socket) {
+      return -1;
+    }
+
+    if (!IsDDResOK(get_profiler_info(std::move(client_socket),
+                                     kDefaultSocketTimeout, &info))) {
+      return -1;
+    }
+
     g_state.profiler_pid = info.pid;
     if (info.allocation_profiling_rate != 0) {
       uint32_t flags{0};
@@ -380,7 +428,6 @@ int ddprof_start_profiling_internal() {
 }
 
 } // namespace
-
 } // namespace ddprof
 
 int ddprof_start_profiling() {
