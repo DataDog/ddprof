@@ -17,61 +17,6 @@ struct MyElement {
   int64_t x, y, z;
 };
 
-class jthread {
-public:
-  using id = std::thread::id;
-  using native_handle_type = std::thread::native_handle_type;
-
-  jthread() noexcept {}
-
-  template <typename _Callable, typename... _Args,
-            typename = std::enable_if_t<
-                !std::is_same_v<std::remove_cvref_t<_Callable>, jthread>>>
-  explicit jthread(_Callable &&f, _Args &&...args)
-      : _thread{std::forward<_Callable>(f), std::forward<_Args>(args)...} {}
-
-  jthread(const jthread &) = delete;
-  jthread(jthread &&) noexcept = default;
-
-  ~jthread() {
-    if (joinable()) {
-      join();
-    }
-  }
-
-  jthread &operator=(const jthread &) = delete;
-
-  jthread &operator=(jthread &&other) noexcept {
-    jthread(std::move(other)).swap(*this);
-    return *this;
-  }
-
-  void swap(jthread &other) noexcept { std::swap(_thread, other._thread); }
-
-  [[nodiscard]] bool joinable() const noexcept { return _thread.joinable(); }
-
-  void join() { _thread.join(); }
-
-  void detach() { _thread.detach(); }
-
-  [[nodiscard]] id get_id() const noexcept { return _thread.get_id(); }
-
-  [[nodiscard]] native_handle_type native_handle() {
-    return _thread.native_handle();
-  }
-
-  [[nodiscard]] static unsigned hardware_concurrency() noexcept {
-    return std::thread::hardware_concurrency();
-  }
-
-  friend void swap(jthread &__lhs, jthread &__rhs) noexcept {
-    __lhs.swap(__rhs);
-  }
-
-private:
-  std::thread _thread;
-};
-
 void perf_reader_fun(RingBuffer *rb, size_t nb_elements, bool use_new_object,
                      bool advance_eagerly) {
   std::optional<PerfRingBufferReader> reader(rb);
@@ -175,12 +120,12 @@ TEST(ringbuffer, perf_ring_buffer) {
            ++consumer_use_new_object) {
         for (int consumer_advance_eagerly = 0; consumer_advance_eagerly < 2;
              ++consumer_advance_eagerly) {
-          jthread producer{perf_writer_fun, &ring_buffer.get_ring_buffer(),
-                           nelem, producer_use_new_object,
-                           producer_use_reserve};
-          jthread consumer{perf_reader_fun, &ring_buffer.get_ring_buffer(),
-                           nelem, consumer_use_new_object,
-                           consumer_advance_eagerly};
+          std::jthread producer{perf_writer_fun, &ring_buffer.get_ring_buffer(),
+                                nelem, producer_use_new_object,
+                                producer_use_reserve};
+          std::jthread consumer{perf_reader_fun, &ring_buffer.get_ring_buffer(),
+                                nelem, consumer_use_new_object,
+                                consumer_advance_eagerly};
         }
       }
     }
@@ -344,9 +289,9 @@ TEST(ringbuffer, mpsc_ring_buffer_single_producer) {
          ++consumer_use_new_object) {
       for (int consumer_advance_eagerly = 0; consumer_advance_eagerly < 2;
            ++consumer_advance_eagerly) {
-        jthread producer{mpsc_writer_fun, &ring_buffer.get_ring_buffer(), nelem,
-                         0, producer_use_new_object};
-        jthread consumer{
+        std::jthread producer{mpsc_writer_fun, &ring_buffer.get_ring_buffer(),
+                              nelem, 0, producer_use_new_object};
+        std::jthread consumer{
             mpsc_reader_fun,         &ring_buffer.get_ring_buffer(), nelem, 1,
             consumer_use_new_object, consumer_advance_eagerly};
       }
@@ -366,18 +311,18 @@ TEST(ringbuffer, mpsc_ring_buffer_multiple_producer) {
          ++consumer_use_new_object) {
       for (int consumer_advance_eagerly = 0; consumer_advance_eagerly < 2;
            ++consumer_advance_eagerly) {
-        std::vector<jthread> producers;
+        std::vector<std::jthread> producers;
         for (size_t i = 0; i < nproducer; ++i) {
           producers.emplace_back(mpsc_writer_fun,
                                  &ring_buffer.get_ring_buffer(), nelem, i,
                                  producer_use_new_object);
         }
-        jthread consumer{mpsc_reader_fun,
-                         &ring_buffer.get_ring_buffer(),
-                         nelem,
-                         nproducer,
-                         consumer_use_new_object,
-                         consumer_advance_eagerly};
+        std::jthread consumer{mpsc_reader_fun,
+                              &ring_buffer.get_ring_buffer(),
+                              nelem,
+                              nproducer,
+                              consumer_use_new_object,
+                              consumer_advance_eagerly};
       }
     }
   }
