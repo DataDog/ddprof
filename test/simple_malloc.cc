@@ -373,6 +373,7 @@ int main(int argc, char *argv[]) {
       for (auto &a : exec_args) {
         new_args.push_back(a.data());
       }
+      new_args.push_back(nullptr);
       execvp(new_args[0], new_args.data());
       perror("Exec failed: ");
       return 1;
