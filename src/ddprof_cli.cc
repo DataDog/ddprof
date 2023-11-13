@@ -421,7 +421,13 @@ void DDProfCLI::print() const {
     PRINT_NFO("  - global: %s", global ? "true" : "false");
   }
   if (!command_line.empty()) {
-    PRINT_NFO("  - command line(wrapper mode): %s", command_line[0].c_str());
+    std::string command_line_str = "[" + command_line[0];
+    std::for_each(std::next(command_line.begin()), command_line.end(),
+                  [&command_line_str](const std::string &el) {
+                    command_line_str += ", " + el;
+                  });
+    command_line_str += "]";
+    PRINT_NFO("  - command line(wrapper mode): %s", command_line_str.c_str());
   }
   PRINT_NFO("  - upload_period: %lds",
             std::chrono::seconds{upload_period}.count());
