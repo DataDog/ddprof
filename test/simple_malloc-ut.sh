@@ -55,8 +55,8 @@ check() {
     # shellcheck disable=SC2086
     echo "Running: ${cmd}"
     # shellcheck disable=SC2086
-    taskset "${test_cpu_mask}" ${cmd} || ( echo "Command failed: ${cmd}" && cat "${log_file}" && exit 1 )
-    if [[ "${expected_pids}" -ne 0 ]]; then
+    eval taskset "${test_cpu_mask}" ${cmd} || ( echo "Command failed: ${cmd}" && cat "${log_file}" && exit 1 )
+    if [[ "${expected_pids}" -ne -1 ]]; then
         sync "${log_file}"
         # -P requires GNU grep
         ddprof_pid=$(grep -m1 -oP ' ddprof\[\K[0-9]+(?=\]: Starting profiler)' "${log_file}" || true)
@@ -69,7 +69,7 @@ check() {
         timeout "$timeout_sec" tail --pid="$ddprof_pid" -f /dev/null
         sync "${log_file}"
     fi
-    if [[ "${expected_pids}" -ne 0 ]]; then
+    if [[ "${expected_pids}" -ne -1 ]]; then
         for profile_type in "${list_of_profile_types_to_count[@]}"; do
             counted_pids=$(count "${log_file}" "${profile_type}" "pid")
             counted_tids=$(count "${log_file}" "${profile_type}" "tid")
@@ -94,13 +94,13 @@ check() {
 }
 
 # Test disabled static lib mode
-check "./test/simple_malloc-static ${opts}" 0
+check "./test/simple_malloc-static ${opts}" -1
 
 # Test enabled static lib mode
 check "./test/simple_malloc-static --profile ${opts}" 1
 
 # Test disabled shared lib mode
-check "./test/simple_malloc-shared ${opts}" 0
+check "./test/simple_malloc-shared ${opts}" -1
 
 # Test enabled shared lib mode
 check "./test/simple_malloc-shared --profile ${opts}" 1
@@ -110,11 +110,11 @@ check "./ddprof ./test/simple_malloc ${opts}" 1
 
 # Test live heap mode, CPU events are given through configuration file
 event="sALLOC,period=-524288,mode=l;sCPU"
-check "./ddprof --show_config --event "${event}" ./test/simple_malloc ${opts} --skip-free 100" 1 1 "inuse-space,cpu-time"
+check "./ddprof --show_config --event \"${event}\" ./test/simple_malloc ${opts} --skip-free 100" 1 1 "inuse-space,cpu-time"
 
 # Test live heap mode, with allocations, CPU events are given through configuration file
 event="sALLOC,period=-524288,mode=sl;sCPU"
-check "./ddprof --show_config --event "${event}" ./test/simple_malloc ${opts} --skip-free 100" 1 1 "inuse-space,alloc-space,cpu-time"
+check "./ddprof --show_config --event \"${event}\" ./test/simple_malloc ${opts} --skip-free 100" 1 1 "inuse-space,alloc-space,cpu-time"
 
 # Test wrapper mode with forks + threads
 opts_more_spin="--loop 1000 --spin 400"
@@ -131,6 +131,12 @@ check "./ddprof --initial-loaded-libs-check-delay 500 ./test/simple_malloc --use
 
 # Test slow profiler startup
 check "env DD_PROFILING_NATIVE_STARTUP_WAIT_MS=200 ./ddprof ./test/simple_malloc ${opts}" 1
+
+# Test follow execs
+check "./ddprof bash -c \"./test/simple_malloc ${opts}\"" 1
+
+# Test disabling follow execs
+check "env DD_PROFILING_NATIVE_ALLOCATION_PROFILING_FOLLOW_EXECS=0 DD_PROFILING_NATIVE_STARTUP_WAIT_MS=200 ./ddprof bash -c \"./test/simple_malloc ${opts}\"" 0 0 "inuse-space"
 
 # Test switching user
 if runuser -u ddbuild /usr/bin/true &> /dev/null; then
