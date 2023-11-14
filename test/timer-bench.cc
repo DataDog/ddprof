@@ -30,6 +30,15 @@ static void BM_clock_monotonic(benchmark::State &state) {
 
 BENCHMARK(BM_clock_monotonic);
 
+static void BM_clock_monotonic_coarse(benchmark::State &state) {
+  for (auto _ : state) {
+    timespec tp;
+    clock_gettime(CLOCK_MONOTONIC_COARSE, &tp);
+  }
+}
+
+BENCHMARK(BM_clock_monotonic_coarse);
+
 static void BM_clock_boottime(benchmark::State &state) {
   for (auto _ : state) {
     timespec tp;
