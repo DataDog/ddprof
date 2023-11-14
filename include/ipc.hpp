@@ -80,13 +80,12 @@ struct RingBufferInfo {
 };
 
 struct ReplyMessage {
-  enum { kLiveCallgraph = 0 };
+  enum { kLiveSum = 0x1 };
   // reply with the request flags from the request
   uint32_t request = 0;
   // profiler pid
   int32_t pid = -1;
   int64_t allocation_profiling_rate = 0;
-  // RingBufferInfo is returned if request & kRingBuffer
   // cppcheck-suppress unusedStructMember
   RingBufferInfo ring_buffer;
   uint32_t initial_loaded_libs_check_delay_ms = 0;
