@@ -45,7 +45,7 @@ function(add_unit_test name)
   message(STATUS "Creating unit test : " ${name})
 
   # # Create exe with sources. Always add logger and error management in the unit tests
-  add_exe(${name} ../src/ddres_list.cc ../src/logger.cc ${ARGN})
+  add_exe(${name} ../src/ddres_list.cc ../src/logger.cc ../src/ratelimiter.cc ${ARGN})
 
   target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock)
   target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST} ${GTEST_INCLUDE_DIRS}
@@ -81,7 +81,7 @@ function(add_benchmark name)
   message(STATUS "Creating unit test : " ${name})
 
   # # Create exe with sources. Always add logger and error management in the unit tests
-  add_exe(${name} ../src/ddres_list.cc ../src/logger.cc ${ARGN})
+  add_exe(${name} ../src/ddres_list.cc ../src/logger.cc ../src/ratelimiter.cc ${ARGN})
 
   target_link_libraries(${name} PRIVATE Threads::Threads benchmark::benchmark
                                         benchmark::benchmark_main)

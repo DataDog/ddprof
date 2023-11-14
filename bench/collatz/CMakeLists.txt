@@ -1,10 +1,6 @@
 # Reuse the same statsd implem as ddprof
-set(STATSD_SRC_FILE ../../src/statsd.cc)
-set(LOGGER_SRC_FILE ../../src/logger.cc)
-set(DDRESLIST_SRC_FILE ../../src/ddres_list.cc)
 set(STATSD_INCLUDE_DIR ../../include)
-
-set(COLLATZ_SRC collatz.cc ${STATSD_SRC_FILE} ${LOGGER_SRC_FILE} ${DDRESLIST_SRC_FILE})
+set(COLLATZ_SRC collatz.cc ../../src/statsd.cc ../../src/logger.cc ../../src/ratelimiter.cc ../../src/ddres_list.cc)
 list(APPEND COLLATZ_DEFINITION_LIST "MYNAME=\"collatz\"" "VER_REV=\"${BUILD_REV}\"")
 
 add_exe(

@@ -12,7 +12,8 @@
 
 namespace ddprof {
 
-void setup_logger(const char *log_mode, const char *log_level) {
+void setup_logger(const char *log_mode, const char *log_level,
+                  uint64_t max_log_per_sec_for_non_debug) {
   // Process logging mode
   char const *logpattern[] = {"stdout", "stderr", "syslog", "disabled"};
   int const idx_log_mode = log_mode
@@ -57,6 +58,10 @@ void setup_logger(const char *log_mode, const char *log_level) {
   default:
     LOG_setlevel(LL_WARNING);
     break;
+  }
+
+  if (LOG_getlevel() > LL_DEBUG) {
+    LOG_setratelimit(max_log_per_sec_for_non_debug, std::chrono::seconds(1));
   }
 }
 
