@@ -142,7 +142,7 @@ ReplyMessage create_reply_message(const DDProfContext &ctx) {
 
       if (ctx.watchers[alloc_watcher_idx].aggregation_mode ==
           EventAggregationMode::kLiveSum) {
-        reply.allocation_flags |= (1 << ReplyMessage::kLiveCallgraph);
+        reply.allocation_flags |= ReplyMessage::kLiveSum;
       }
     }
   }
