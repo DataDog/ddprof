@@ -73,8 +73,8 @@ Advanced settings:
 
 
 Debug options:
-  -l,--log_level TEXT [error]  (Env:DD_PROFILING_NATIVE_LOG_LEVEL)
-                              One of debug, notice, warn, error.
+  -l,--log_level TEXT:{debug,informational,notice,warn,error} [error]  (Env:DD_PROFILING_NATIVE_LOG_LEVEL)
+                              One of debug, informational, notice, warn, error.
   -o,--log_mode TEXT [stdout]  (Env:DD_PROFILING_NATIVE_LOG_MODE)
                               log_level, One of stdout, stderr, syslog, or disabled.
   --show_config [0]           Display the configuration.

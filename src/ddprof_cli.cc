@@ -215,8 +215,10 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
 
   // Debug
   app.add_option("--log_level,-l", log_level,
-                 "One of debug, notice, warn, error.")
+                 "One of debug, informational, notice, warn, error.")
       ->default_val("error")
+      ->check(
+          CLI::IsMember({"debug", "informational", "notice", "warn", "error"}))
       ->group("Debug options")
       ->envname("DD_PROFILING_NATIVE_LOG_LEVEL");
   //
