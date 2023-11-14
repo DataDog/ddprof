@@ -19,6 +19,7 @@
 #include <thread>
 #include <unistd.h>
 
+#include "clocks.hpp"
 #include "ddprof_base.hpp"
 #include "enum_flags.hpp"
 #include "syscalls.hpp"
@@ -65,22 +66,6 @@ public:
 
 namespace ddprof {
 
-struct thread_cpu_clock {
-  using duration = std::chrono::nanoseconds;
-  using rep = duration::rep;
-  using period = duration::period;
-  using time_point = std::chrono::time_point<thread_cpu_clock, duration>;
-
-  static constexpr bool is_steady = true;
-
-  static time_point now() noexcept {
-    timespec tp;
-    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &tp);
-    return time_point(duration(std::chrono::seconds{tp.tv_sec} +
-                               std::chrono::nanoseconds{tp.tv_nsec}));
-  }
-};
-
 struct Stats {
   uint64_t nb_allocations;
   uint64_t allocated_bytes;
@@ -113,7 +98,7 @@ extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
 
   auto start_time = std::chrono::steady_clock::now();
   auto deadline_time = start_time + options.timeout_duration;
-  auto start_cpu = thread_cpu_clock::now();
+  auto start_cpu = ThreadCpuClock::now();
   unsigned skip_free = 0;
   for (uint64_t i = 0; i < options.loop_count; ++i) {
     void *p = nullptr;
@@ -161,7 +146,7 @@ extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
       break;
     }
   }
-  auto end_cpu = thread_cpu_clock::now();
+  auto end_cpu = ThreadCpuClock::now();
   auto end_time = std::chrono::steady_clock::now();
   stats = {nb_alloc, alloc_bytes, end_time - start_time, end_cpu - start_cpu,
            ddprof::gettid()};
