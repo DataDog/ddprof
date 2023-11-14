@@ -297,7 +297,9 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       app.add_flag("--help_extended", help_extended, "Show extended options")
           ->group(""));
   extended_options.push_back(
-      app.add_option("--socket", socket_path, "Profiler socket path")
+      app.add_option(
+             "--socket", socket_path,
+             "Override the automatically created socket with a specific path")
           ->envname("DD_PROFILING_NATIVE_SOCKET")
           ->group(""));
   extended_options.push_back(
