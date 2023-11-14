@@ -12,6 +12,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+namespace ddprof {
+
 TEST(StatsDTest, Connection) {
   // This takes advantage of the fact that UDP domain sockets opened in the way
   // statsd does it are full-duplex
@@ -85,3 +87,5 @@ TEST(StatsDTest, Format) {
   close(fd_client);
   unlink(path_listen);
 }
+
+} // namespace ddprof

@@ -7,4 +7,6 @@
 
 #include "ddres_def.hpp"
 
+namespace ddprof {
 DDRes log_capabilities(bool verbose);
+}

@@ -15,6 +15,8 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+namespace ddprof {
+
 namespace {
 std::string_view adjust_uds_path(std::string_view path) {
   // Check if the socket_path starts with unix://
@@ -151,3 +153,5 @@ DDRes statsd_close(int fd_sock) {
   DDRES_CHECK_INT(close(fd_sock), DD_WHAT_STATSD, "Error while closing socket");
   return {};
 }
+
+} // namespace ddprof

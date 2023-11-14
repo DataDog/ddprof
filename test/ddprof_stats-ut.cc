@@ -12,6 +12,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+namespace ddprof {
+
 TEST(ddprof_statsTest, Connect) {
   const char path_listen[] = "/tmp/my_statsd_listener";
   unlink(path_listen); // make sure node is available, OK if this fails
@@ -152,3 +154,5 @@ TEST(ddprof_statsTest, MiscellaneousStats) {
   EXPECT_TRUE(IsDDResOK(ddprof_stats_free()));
   close(fd_listener);
 }
+
+} // namespace ddprof

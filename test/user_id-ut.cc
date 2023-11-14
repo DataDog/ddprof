@@ -12,6 +12,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+namespace ddprof {
+
 // Test setuid reversion
 TEST(UserIDTest, simple) {
   {
@@ -69,3 +71,5 @@ TEST(UserIDTest, api) {
   EXPECT_TRUE(IsDDResOK(res));
   EXPECT_EQ(old_user, getuid());
 }
+
+} // namespace ddprof

@@ -19,6 +19,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+namespace ddprof {
+
 namespace {
 constexpr const char *const s_user_nobody = "nobody";
 constexpr uid_t s_root_user = 0;
@@ -146,3 +148,5 @@ DDRes become_user(const char *username) {
 
   return {};
 }
+
+} // namespace ddprof
