@@ -10,7 +10,7 @@
 #include "unlikely.hpp"
 #include "version.hpp"
 
-extern char *LOG_IGNORE;
+namespace ddprof {
 
 enum LOG_OPTS {
   LOG_DISABLE = 0,
@@ -116,3 +116,5 @@ void LOG_setfacility(int fac);
 #define LG_NFO(...) LG_IF_LVL_OK(LL_INFORMATIONAL, __VA_ARGS__)
 #define LG_DBG(...) LG_IF_LVL_OK(LL_DEBUG, __VA_ARGS__)
 #define PRINT_NFO(...) LG_IF_LVL_OK(-1 * LL_INFORMATIONAL, __VA_ARGS__)
+
+} // namespace ddprof

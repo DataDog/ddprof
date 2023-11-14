@@ -15,7 +15,22 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#include "logger.hpp"
+// TODO this is a unix-ism and not portable to Windows.
+#if defined(__APPLE__) || defined(__FreeBSD__)
+char *name_default = getprogname();
+#elif defined(__linux__)
+extern char *__progname;
+#  define name_default __progname
+#else
+char *name_default = "ddprof";
+#endif
+#ifndef LOG_MSG_CAP
+#  define LOG_MSG_CAP 4096
+#endif
+
+namespace ddprof {
+
+namespace {
 
 struct LoggerContext {
   int fd;
@@ -240,3 +255,4 @@ void lprintfln(int lvl, int fac, const char *name, const char *fmt, ...) {
   vlprintfln(lvl, fac, name, fmt, args);
   va_end(args);
 }
+} // namespace ddprof

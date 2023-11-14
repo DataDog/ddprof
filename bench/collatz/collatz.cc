@@ -199,7 +199,7 @@ int main(int c, char **v) {
   int fd_statsd = -1;
   if (const char *path_statsd = getenv("DD_DOGSTATSD_SOCKET");
       path_statsd != nullptr) {
-    statsd_connect(std::string_view(path_statsd), &fd_statsd);
+    ddprof::statsd_connect(std::string_view(path_statsd), &fd_statsd);
   }
 
   // OK, so we want to wait until everyone has started, but if we have more
@@ -223,11 +223,12 @@ int main(int c, char **v) {
       static const char key_stacks[] = "app.collatz.stacks";
       static const char key_funs[] = "app.collatz.functions";
       long val = static_cast<long>(work_end - work_start);
-      statsd_send(fd_statsd, key_ticks, &val, STAT_GAUGE);
-      statsd_send(fd_statsd, key_stacks, &kj, STAT_GAUGE);
+      ddprof::statsd_send(fd_statsd, key_ticks, &val, ddprof::STAT_GAUGE);
+      ddprof::statsd_send(fd_statsd, key_stacks, &kj, ddprof::STAT_GAUGE);
       val = my_counter - last_counter;
-      statsd_send(fd_statsd, key_funs, &val,
-                  STAT_GAUGE); // technically can overflow, but whatever
+      ddprof::statsd_send(
+          fd_statsd, key_funs, &val,
+          ddprof::STAT_GAUGE); // technically can overflow, but whatever
       last_counter = my_counter;
     }
   }

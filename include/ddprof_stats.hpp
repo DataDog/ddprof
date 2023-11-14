@@ -9,6 +9,8 @@
 #include "logger.hpp"
 #include "statsd.hpp"
 
+namespace ddprof {
+
 #define X_ENUM(a, b, c) STATS_##a,
 #define STATS_TABLE(X)                                                         \
   X(EVENT_COUNT, "event.count", STAT_GAUGE)                                    \
@@ -69,3 +71,5 @@ DDRes ddprof_stats_send(std::string_view statsd_socket);
 
 // Print all known stats to the configured log
 void ddprof_stats_print();
+
+} // namespace ddprof

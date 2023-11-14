@@ -6,7 +6,10 @@
 #pragma once
 
 #include "ddres.hpp"
+
 #include <sys/types.h>
+
+namespace ddprof {
 
 struct UIDInfo {
   uid_t uid = -1;
@@ -22,3 +25,5 @@ bool is_root();
 
 // Irreversibly switch to user `user`
 DDRes become_user(const char *user);
+
+} // namespace ddprof

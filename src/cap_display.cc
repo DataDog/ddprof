@@ -11,18 +11,21 @@
 #include <sys/capability.h>
 #include <unistd.h>
 
+namespace ddprof {
+
+namespace {
 struct CapFlag2Text {
   const char *_text;
   cap_flag_t _value;
 };
 
-static const struct CapFlag2Text s_cap_flag_text[] = {
+const struct CapFlag2Text s_cap_flag_text[] = {
     {"CAP_EFFECTIVE", CAP_EFFECTIVE},
     {"CAP_INHERITABLE", CAP_INHERITABLE},
     {"CAP_PERMITTED", CAP_PERMITTED},
 };
 
-enum { SZ_CAP_2_TEXT = 3 };
+} // namespace
 
 DDRes log_capabilities(bool verbose) {
   pid_t const pid = getpid();
@@ -49,3 +52,5 @@ DDRes log_capabilities(bool verbose) {
   cap_free(cap_struct);
   return {};
 }
+
+} // namespace ddprof

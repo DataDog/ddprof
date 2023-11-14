@@ -9,6 +9,8 @@
 #include <cstring>
 #include <sys/mman.h>
 
+namespace ddprof {
+
 namespace {
 
 // Expand the statsd paths
@@ -159,3 +161,5 @@ void ddprof_stats_print() {
     LG_NTC("%s: %ld", stats_paths[i], ddprof_stats[i]);
   }
 }
+
+} // namespace ddprof

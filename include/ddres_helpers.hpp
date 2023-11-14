@@ -10,13 +10,16 @@
 #include "logger.hpp"
 
 #include <cstring>
+#include <system_error>
+
+namespace ddprof {
 
 /// Replacement for variadic macro niladic expansion via `__VA_OPT__`, which
 /// is unsupported (boo!) in standards-compliant C static analysis tools and
 /// checkers.
 #define DDRES_NOLOG NULL
 
-/// Standardized way of formating error log
+/// Standardized way of formatting error log
 #define LOG_ERROR_DETAILS(log_func, what)                                      \
   log_func("%s at %s:%u", ddres_error_message(what), __FILE__, __LINE__);
 
@@ -73,7 +76,7 @@
     }                                                                          \
   } while (0)
 
-static inline int ddres_sev_to_log_level(int sev) {
+inline int ddres_sev_to_log_level(int sev) {
   switch (sev) {
   case DD_SEV_ERROR:
     return LL_ERROR;
@@ -118,10 +121,6 @@ static inline int ddres_sev_to_log_level(int sev) {
     }                                                                          \
   } while (0)
 
-// possible improvement : flag to consider warnings as errors
-
-#include <system_error>
-
 /// Evaluate function and return error if -1 (add an error log)
 #define DDRES_CHECK_ERRORCODE(eval, what, ...)                                 \
   do {                                                                         \
@@ -133,3 +132,5 @@ static inline int ddres_sev_to_log_level(int sev) {
       return ddres_error(what);                                                \
     }                                                                          \
   } while (0)
+
+} // namespace ddprof

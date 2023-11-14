@@ -10,6 +10,8 @@
 
 #include "ddres_def.hpp"
 
+namespace ddprof {
+
 enum STAT_TYPES {
   STAT_MS_LONG,
   STAT_MS_FLOAT,
@@ -29,3 +31,5 @@ DDRes statsd_close(int fd);
 
 /* Private */
 DDRes statsd_listen(std::string_view path, int *fd);
+
+} // namespace ddprof
