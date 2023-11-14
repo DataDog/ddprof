@@ -109,18 +109,6 @@ DDRes spawn_workers(PersistentWorkerState *persistent_worker_state,
   return {};
 }
 
-void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
-                  int *pfd_len) {
-  *pfd_len = pevent_hdr->size;
-  const PEvent *pes = pevent_hdr->pes;
-  // Setup poll() to watch perf_event file descriptors
-  for (int i = 0; i < *pfd_len; ++i) {
-    // NOTE: if fd is negative, it will be ignored
-    pfd[i].fd = pes[i].fd;
-    pfd[i].events = POLLIN | POLLERR | POLLHUP;
-  }
-}
-
 DDRes signalfd_setup(pollfd *pfd) {
   sigset_t mask;
 

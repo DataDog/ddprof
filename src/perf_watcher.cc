@@ -13,9 +13,9 @@
 
 namespace ddprof {
 
-#define BASE_STYPES                                                            \
-  (PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER | PERF_SAMPLE_TID |          \
-   PERF_SAMPLE_TIME | PERF_SAMPLE_PERIOD)
+#define BASE_STYPES                                                          \
+  (PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_STACK_USER | PERF_SAMPLE_REGS_USER | \
+   PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_PERIOD)
 
 uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
 

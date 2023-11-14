@@ -72,7 +72,6 @@ DDRes ring_buffer_create(size_t buffer_size_page_order,
                            "Error calling evenfd on watcher %d (%s)",
                            pevent->watcher_pos, strerror(errno));
   }
-  pevent->custom_event = custom_event;
   pevent->ring_buffer_type = ring_buffer_type;
   pevent->ring_buffer_size = buffer_size;
 
