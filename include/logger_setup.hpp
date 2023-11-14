@@ -5,6 +5,13 @@
 
 #pragma once
 
+#include <cstdint>
+
 namespace ddprof {
-void setup_logger(const char *log_mode, const char *log_level);
-}
+inline constexpr auto kMaxLogPerSecForNonDebug = 100;
+
+void setup_logger(
+    const char *log_mode, const char *log_level,
+    uint64_t max_log_per_sec_for_non_debug = kMaxLogPerSecForNonDebug);
+
+} // namespace ddprof

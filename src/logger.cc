@@ -3,6 +3,11 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
+#include "logger.hpp"
+
+#include "ratelimiter.hpp"
+
+#include <atomic>
 #include <cassert>
 #include <cerrno>
 #include <chrono>
@@ -11,6 +16,7 @@
 #include <cstring>
 #include <ctime>
 #include <fcntl.h>
+#include <optional>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -33,41 +39,34 @@ namespace ddprof {
 namespace {
 
 struct LoggerContext {
-  int fd;
-  int mode;
-  int level;
-  int facility;
-  char *name;
-  int namelen;
+  int fd{-1};
+  int mode{LOG_STDERR};
+  int level{LL_ERROR};
+  int facility{LF_USER};
+  std::string name;
+  std::optional<IntervalRateLimiter> rate_limiter;
 };
 
-LoggerContext base_log_context = (LoggerContext){
-    .fd = -1, .mode = LOG_STDERR, .level = LL_ERROR, .facility = LF_USER};
-LoggerContext *log_ctx = &base_log_context;
+LoggerContext log_ctx{.fd = -1, .mode = LOG_STDERR, .level = LL_ERROR};
+} // namespace
 
 void LOG_setlevel(int lvl) {
   assert(lvl >= LL_EMERGENCY && lvl <= LL_DEBUG);
   if (lvl >= LL_EMERGENCY && lvl <= LL_DEBUG) {
-    log_ctx->level = lvl;
+    log_ctx.level = lvl;
   }
 }
 
-int LOG_getlevel() { return log_ctx->level; }
+int LOG_getlevel() { return log_ctx.level; }
 
 void LOG_setfacility(int fac) {
   assert(fac >= LF_KERNEL && fac <= LF_LOCAL7);
   if (fac >= LF_KERNEL && fac <= LF_LOCAL7) {
-    log_ctx->facility = fac;
+    log_ctx.facility = fac;
   }
 }
 
-bool LOG_setname(const char *name) {
-  if (log_ctx->name) {
-    free(log_ctx->name);
-  }
-  log_ctx->name = strdup(name);
-  return log_ctx->name != nullptr;
-}
+void LOG_setname(const char *name) { log_ctx.name = name; }
 
 bool LOG_syslog_open() {
   const sockaddr_un sa = {AF_UNIX, "/dev/log"};
@@ -82,28 +81,28 @@ bool LOG_syslog_open() {
     return false;
   }
 
-  log_ctx->fd = fd;
+  log_ctx.fd = fd;
   return true;
 }
 
 void LOG_close() {
-  if (LOG_SYSLOG == log_ctx->mode || LOG_FILE == log_ctx->mode) {
-    close(log_ctx->fd);
+  if (LOG_SYSLOG == log_ctx.mode || LOG_FILE == log_ctx.mode) {
+    close(log_ctx.fd);
   }
-  log_ctx->fd = -1;
+  log_ctx.fd = -1;
 }
 
 bool LOG_open(int mode, const char *opts) {
-  if (log_ctx->fd >= 0) {
+  if (log_ctx.fd >= 0) {
     LOG_close();
   }
 
   // Preemptively reset to initial state
-  log_ctx->mode = mode;
+  log_ctx.mode = mode;
 
   switch (mode) {
   case LOG_DISABLE:
-    log_ctx->fd = -1;
+    log_ctx.fd = -1;
     break;
   case LOG_SYSLOG:
     if (!LOG_syslog_open()) {
@@ -112,10 +111,10 @@ bool LOG_open(int mode, const char *opts) {
     break;
   default:
   case LOG_STDOUT:
-    log_ctx->fd = STDOUT_FILENO;
+    log_ctx.fd = STDOUT_FILENO;
     break;
   case LOG_STDERR:
-    log_ctx->fd = STDERR_FILENO;
+    log_ctx.fd = STDERR_FILENO;
     break;
   case LOG_FILE: {
     int const fd = open(opts, O_RDWR | O_APPEND | O_CREAT | O_CLOEXEC, 0755);
@@ -123,28 +122,20 @@ bool LOG_open(int mode, const char *opts) {
     if (-1 == fd) {
       return false;
     }
-    log_ctx->fd = fd;
+    log_ctx.fd = fd;
     break;
   }
   }
 
   // Finalize
-  log_ctx->mode = mode;
+  log_ctx.mode = mode;
   return true;
 }
 
-// TODO this is a unix-ism and not portable to Windows.
-#if defined(__APPLE__) || defined(__FreeBSD__)
-char *name_default = getprogname();
-#elif defined(__linux__)
-extern char *__progname;
-#  define name_default __progname
-#else
-char *name_default = "ddprof";
-#endif
-#ifndef LOG_MSG_CAP
-#  define LOG_MSG_CAP 4096
-#endif
+void LOG_setratelimit(uint64_t max_log_per_interval,
+                      std::chrono::nanoseconds interval) {
+  log_ctx.rate_limiter.emplace(max_log_per_interval, interval);
+}
 
 // The message buffer shall be a static, thread-local region defined by the
 // LOG_MSG_CAP compile-time parameter.  The accessible storage amount shall be
@@ -158,19 +149,23 @@ void vlprintfln(int lvl, int fac, const char *name, const char *format,
   ssize_t sz_h = -1;
   int rc = 0;
 
+  if (log_ctx.rate_limiter && !log_ctx.rate_limiter->check()) {
+    return;
+  }
+
   // Special value handling
   if (lvl == -1) {
-    lvl = log_ctx->level;
+    lvl = log_ctx.level;
   }
   if (fac == -1) {
-    fac = log_ctx->mode;
+    fac = log_ctx.facility;
   }
   if (!name || !*name) {
-    name = (!log_ctx->name || !*log_ctx->name) ? log_ctx->name : name_default;
+    name = !log_ctx.name.empty() ? log_ctx.name.c_str() : name_default;
   }
 
   // Sanity checks
-  if (log_ctx->fd < 0) {
+  if (log_ctx.fd < 0) {
     return;
   }
   if (!format) {
@@ -194,7 +189,7 @@ void vlprintfln(int lvl, int fac, const char *name, const char *format,
   // Get the PID; overriding if necessary (allow for testing overflow)
   pid_t const pid = getpid();
 
-  if (log_ctx->mode == LOG_SYSLOG) {
+  if (log_ctx.mode == LOG_SYSLOG) {
     sz_h = snprintf(buf, LOG_MSG_CAP,
                     "<%d>%s.%06ld %s[%d]: ", lvl + fac * LL_LENGTH, tm_str,
                     d_us.count(), name, pid);
@@ -224,7 +219,7 @@ void vlprintfln(int lvl, int fac, const char *name, const char *format,
   sz += sz_h;
 
   // Some consumers expect newline-delimited logs.
-  if (log_ctx->mode != LOG_SYSLOG) {
+  if (log_ctx.mode != LOG_SYSLOG) {
     buf[sz] = '\n';
     buf[sz + 1] = '\0';
     sz++;
@@ -232,10 +227,10 @@ void vlprintfln(int lvl, int fac, const char *name, const char *format,
 
   // Flush to file descriptor
   do {
-    if (log_ctx->mode == LOG_SYSLOG) {
-      rc = sendto(log_ctx->fd, buf, sz, MSG_NOSIGNAL, nullptr, 0);
+    if (log_ctx.mode == LOG_SYSLOG) {
+      rc = sendto(log_ctx.fd, buf, sz, MSG_NOSIGNAL, nullptr, 0);
     } else {
-      rc = write(log_ctx->fd, buf, sz);
+      rc = write(log_ctx.fd, buf, sz);
     }
   } while (rc < 0 && errno == EINTR);
 }
@@ -255,4 +250,5 @@ void lprintfln(int lvl, int fac, const char *name, const char *fmt, ...) {
   vlprintfln(lvl, fac, name, fmt, args);
   va_end(args);
 }
+
 } // namespace ddprof

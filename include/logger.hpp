@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <stdarg.h>
 
 #include "unlikely.hpp"
@@ -90,10 +91,13 @@ void vlprintfln(int lvl, int fac, const char *name, const char *format,
                 va_list args);
 
 // Setters for global logger context
-bool LOG_setname(const char *name);
+void LOG_setname(const char *name);
 void LOG_setlevel(int lvl);
 int LOG_getlevel();
 void LOG_setfacility(int fac);
+
+void LOG_setratelimit(uint64_t max_log_per_interval,
+                      std::chrono::nanoseconds interval);
 
 /******************************* Logging Macros *******************************/
 #define ABS(__x)                                                               \

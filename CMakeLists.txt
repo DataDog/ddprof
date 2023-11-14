@@ -218,6 +218,7 @@ set(DD_PROFILING_SOURCES
     src/perf_ringbuffer.cc
     src/perf_watcher.cc
     src/pevent_lib.cc
+    src/ratelimiter.cc
     src/ringbuffer_utils.cc
     src/signal_helper.cc
     src/sys_utils.cc
