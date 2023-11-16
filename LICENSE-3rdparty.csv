@@ -6,3 +6,4 @@ libunwind,"https://github.com/libunwind/libunwind",MIT License
 llvm-demangle,"https://github.com/llvm/llvm-project",Apache-2.0,llvm-project
 dpdk/lib/eal,"https://github.com/DPDK/dpdk",BSD-3-Clause
 CLI11,"https://github.com/CLIUtils/CLI11",BSD-3-Clause
+abseil-cpp,"https://github.com/abseil/abseil-cpp",Apache-2.0,Google Inc.
