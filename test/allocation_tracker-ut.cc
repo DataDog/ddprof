@@ -50,8 +50,8 @@ __attribute__((weak)) int __munmap(void *addr, size_t length);
 
 namespace ddprof {
 
-static const uint64_t k_sampling_rate = 1;
-static const size_t k_buf_size_order = 5;
+static const uint64_t kSamplingRate = 1;
+static const size_t kBufSizeOrder = 8;
 static PerfClock::time_point before;
 static PerfClock::time_point after;
 
@@ -88,13 +88,12 @@ DDPROF_NOINLINE void my_func_calling_malloc(size_t size) {
 TEST(allocation_tracker, start_stop) {
   TscClock::init();
   PerfClock::init();
-  RingBufferHolder ring_buffer{k_buf_size_order,
-                               RingBufferType::kMPSCRingBuffer};
+  RingBufferHolder ring_buffer{kBufSizeOrder, RingBufferType::kMPSCRingBuffer};
   AllocationTracker::allocation_tracking_init(
-      k_sampling_rate,
+      kSamplingRate,
       AllocationTracker::kDeterministicSampling |
           AllocationTracker::kTrackDeallocations,
-      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info());
+      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info(), {});
 
   defer { AllocationTracker::allocation_tracking_free(); };
 
@@ -167,7 +166,7 @@ TEST(allocation_tracker, stale_lock) {
       rate,
       AllocationTracker::kDeterministicSampling |
           AllocationTracker::kTrackDeallocations,
-      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info());
+      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info(), {});
   defer { AllocationTracker::allocation_tracking_free(); };
 
   // simulate stale lock
@@ -184,13 +183,12 @@ TEST(allocation_tracker, stale_lock) {
 }
 
 TEST(allocation_tracker, max_tracked_allocs) {
-  RingBufferHolder ring_buffer{k_buf_size_order,
-                               RingBufferType::kMPSCRingBuffer};
+  RingBufferHolder ring_buffer{kBufSizeOrder, RingBufferType::kMPSCRingBuffer};
   AllocationTracker::allocation_tracking_init(
-      k_sampling_rate,
+      kSamplingRate,
       AllocationTracker::kDeterministicSampling |
           AllocationTracker::kTrackDeallocations,
-      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info());
+      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info(), {});
   defer { AllocationTracker::allocation_tracking_free(); };
 
   ASSERT_TRUE(ddprof::AllocationTracker::is_active());
@@ -629,27 +627,25 @@ DDPROF_NOINLINE void test_allocation_functions(RingBuffer &ring_buffer) {
 }
 
 TEST(allocation_tracker, test_allocation_functions) {
-  RingBufferHolder ring_buffer{k_buf_size_order,
-                               RingBufferType::kMPSCRingBuffer};
+  RingBufferHolder ring_buffer{kBufSizeOrder, RingBufferType::kMPSCRingBuffer};
   AllocationTracker::allocation_tracking_init(
-      k_sampling_rate,
+      kSamplingRate,
       AllocationTracker::kDeterministicSampling |
           AllocationTracker::kTrackDeallocations,
-      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info());
+      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info(), {});
   defer { AllocationTracker::allocation_tracking_free(); };
 
   ASSERT_TRUE(AllocationTracker::is_active());
-  ddprof::setup_overrides(std::chrono::milliseconds{0},
-                          std::chrono::milliseconds{0});
+  setup_overrides();
 
-  // Put all tests in another nmn-inlined functions otherwise compiler may
+  // Put all tests in another non-inlined functions otherwise compiler may
   // compute `&::malloc` and other allocation function addresses before
   // overrides are setup, and thus effectively calling the true allocation
   // functions instead of hooks. I observed this on clang/ARM, and even a
   // compiler barrier did not prevent the compiler to reorder the computation of
   // these addresses before `setup_overrides`.
   test_allocation_functions(ring_buffer.get_ring_buffer());
-  ddprof::restore_overrides();
+  restore_overrides();
 }
 
 } // namespace ddprof

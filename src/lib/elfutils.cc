@@ -7,8 +7,10 @@
 
 #include <algorithm>
 #include <climits>
+#include <cstdio>
 #include <cstring>
 #include <functional>
+#include <optional>
 #include <span>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -18,7 +20,32 @@
 #endif
 
 namespace ddprof {
+
+struct DynamicInfo {
+  std::string_view strtab;
+  std::span<const ElfW(Sym)> symtab;
+  std::span<const ElfW(Rel)> rels;
+  std::span<const ElfW(Rela)> relas;
+  std::span<const ElfW(Rela)> jmprels;
+  const uint32_t *elf_hash;
+  const uint32_t *gnu_hash;
+  ElfW(Addr) base_address;
+};
+
 namespace {
+
+uint64_t load64(uintptr_t addr) {
+  uint64_t result;
+  const auto *p = reinterpret_cast<const char *>(addr);
+  memcpy(&result, p, sizeof(result));
+  return result;
+}
+
+void write64(uintptr_t addr, uint64_t value) {
+  auto *p = reinterpret_cast<char *>(addr);
+  memcpy(p, &value, sizeof(value));
+}
+
 // NOLINTBEGIN(readability-magic-numbers)
 uint32_t gnu_hash(std::string_view name) {
   uint32_t h = 5381;
@@ -44,9 +71,7 @@ uint32_t elf_hash(std::string_view name) {
 bool check(const ElfW(Sym) & sym, const char *symname, std::string_view name) {
   auto stt = ELF64_ST_TYPE(sym.st_info);
 
-  if (sym.st_value == 0 && sym.st_shndx != SHN_ABS && stt != STT_TLS
-      //|| (type_class & (sym->st_shndx == SHN_UNDEF))))
-  ) {
+  if (sym.st_value == 0 && sym.st_shndx != SHN_ABS && stt != STT_TLS) {
     return false;
   }
 
@@ -59,27 +84,16 @@ bool check(const ElfW(Sym) & sym, const char *symname, std::string_view name) {
   return name == symname;
 }
 
-struct DynamicInfo {
-  std::string_view strtab;
-  std::span<const ElfW(Sym)> symtab;
-  std::span<const ElfW(Rel)> rels;
-  std::span<const ElfW(Rela)> relas;
-  std::span<const ElfW(Rela)> jmprels;
-  const uint32_t *elf_hash;
-  const uint32_t *gnu_hash;
-  ElfW(Addr) base;
-};
-
 DynamicInfo retrieve_dynamic_info(const ElfW(Dyn) * dyn_begin,
                                   // cppcheck-suppress unknownMacro
-                                  ElfW(Addr) base) {
+                                  ElfW(Addr) base_address) {
 
   // Addresses are sometimes relative sometimes absolute
   // * on musl, addresses are relative
-  // * on glic, addresses are absolutes
+  // * on glibc, addresses are absolutes
   // (https://elixir.bootlin.com/glibc/glibc-2.36/source/elf/get-dynamic-info.h#L84)
-  auto correct_address = [base](ElfW(Addr) ptr) {
-    return ptr > base ? ptr : base + ptr;
+  auto correct_address = [base_address](ElfW(Addr) ptr) {
+    return ptr > base_address ? ptr : base_address + ptr;
   };
 
   const char *strtab = nullptr;
@@ -164,77 +178,45 @@ DynamicInfo retrieve_dynamic_info(const ElfW(Dyn) * dyn_begin,
           .jmprels = {jmprels, jmprels_size / sizeof(ElfW(Rela))},
           .elf_hash = elf_hash,
           .gnu_hash = gnu_hash,
-          .base = base};
+          .base_address = base_address};
 }
 
-template <typename F>
-int callback_wrapper(dl_phdr_info *info, size_t /*size*/, bool exclude_self,
-                     const F &func) {
+std::optional<DynamicInfo> retrieve_dynamic_info(const dl_phdr_info &info,
+                                                 bool exclude_self = false) {
   const ElfW(Phdr) *phdr_dynamic = nullptr;
 
-  for (auto phdr = info->dlpi_phdr, end = phdr + info->dlpi_phnum; phdr != end;
+  for (auto phdr = info.dlpi_phdr, end = phdr + info.dlpi_phnum; phdr != end;
        ++phdr) {
     if (phdr->p_type == PT_DYNAMIC) {
       phdr_dynamic = phdr;
     }
     // Exclude this DSO
     if (exclude_self && phdr->p_type == PT_LOAD && phdr->p_flags & PF_X) {
-      ElfW(Addr) local_symbol_addr =
-          reinterpret_cast<ElfW(Addr)>(&retrieve_dynamic_info);
-      if (phdr->p_vaddr + info->dlpi_addr <= local_symbol_addr &&
-          local_symbol_addr < phdr->p_vaddr + info->dlpi_addr + phdr->p_memsz) {
-        return 0;
+      ElfW(Addr) local_symbol_addr = reinterpret_cast<ElfW(Addr)>(
+          static_cast<std::optional<DynamicInfo> (*)(
+              const dl_phdr_info &, bool)>(&retrieve_dynamic_info));
+      if (phdr->p_vaddr + info.dlpi_addr <= local_symbol_addr &&
+          local_symbol_addr < phdr->p_vaddr + info.dlpi_addr + phdr->p_memsz) {
+        return std::nullopt;
       }
     }
   }
 
-  if (phdr_dynamic) {
-    const ElfW(Dyn) *dyn_begin = reinterpret_cast<const ElfW(Dyn) *>(
-        info->dlpi_addr + phdr_dynamic->p_vaddr);
-
-    DynamicInfo const dyn_info =
-        retrieve_dynamic_info(dyn_begin, info->dlpi_addr);
-
-    if (dyn_info.strtab.empty() || dyn_info.symtab.empty() ||
-        !(dyn_info.elf_hash || dyn_info.gnu_hash)) {
-      return 0;
-    }
-
-    if (func(info->dlpi_name, dyn_info)) {
-      return 1;
-    }
+  if (!phdr_dynamic) {
+    return std::nullopt;
   }
 
-  return 0;
-}
+  const ElfW(Dyn) *dyn_begin = reinterpret_cast<const ElfW(Dyn) *>(
+      info.dlpi_addr + phdr_dynamic->p_vaddr);
 
-struct CallbackWrapperBase {
-  using Fun = int (*)(dl_phdr_info *info, size_t size, void *data);
-  Fun fun;
-  bool exclude_self;
-};
+  DynamicInfo dyn_info = retrieve_dynamic_info(dyn_begin, info.dlpi_addr);
 
-template <typename F> struct CallbackWrapper : CallbackWrapperBase {
-  F callback;
-};
+  if (dyn_info.strtab.empty() || dyn_info.symtab.empty() ||
+      !(dyn_info.elf_hash || dyn_info.gnu_hash)) {
+    return std::nullopt;
+  }
 
-int dl_iterate_hdr_callback(dl_phdr_info *info, size_t size, void *data) {
-  auto *callback = reinterpret_cast<CallbackWrapperBase *>(data);
-  return callback->fun(info, size, callback);
-}
-
-template <typename F>
-int dl_iterate_phdr_wrapper(F callback, bool exclude_self = false) {
-  CallbackWrapper<F> my_callback{
-      {[](dl_phdr_info *info, size_t size, void *data) {
-         auto *wrapper = static_cast<CallbackWrapper<F> *>(data);
-         return callback_wrapper(info, size, wrapper->exclude_self,
-                                 wrapper->callback);
-       },
-       exclude_self},
-      std::move(callback),
-  };
-  return dl_iterate_phdr(dl_iterate_hdr_callback, &my_callback);
+  return dyn_info;
 }
 
 class SymbolLookup {
@@ -244,8 +226,7 @@ public:
       : _symname(symname), _not_sym(not_sym), _sym{},
         _accept_null_sized_symbol(accept_null_sized_symbol) {}
 
-  bool operator()(std::string_view /*object_name*/,
-                  const DynamicInfo &dyn_info) {
+  bool operator()(std::string_view object_name, const DynamicInfo &dyn_info) {
     const ElfW(Sym) *s = nullptr;
     if (dyn_info.gnu_hash) {
       s = gnu_hash_lookup(dyn_info.strtab.data(), dyn_info.symtab.data(),
@@ -255,20 +236,22 @@ public:
                           dyn_info.elf_hash, _symname);
     }
     if (s && (_accept_null_sized_symbol || s->st_size > 0) &&
-        (s->st_value + dyn_info.base != _not_sym)) {
+        (s->st_value + dyn_info.base_address != _not_sym)) {
       _sym = *s;
-      _sym.st_value = s->st_value + dyn_info.base;
+      _sym.st_value = s->st_value + dyn_info.base_address;
+      _object_name = object_name;
       return true;
     }
     return false;
   }
 
-  ElfW(Sym) result() const { return _sym; }
+  LookupResult result() { return {_sym, _object_name}; }
 
 private:
   std::string_view _symname;
   uint64_t _not_sym;
   ElfW(Sym) _sym;
+  std::string _object_name;
   bool _accept_null_sized_symbol;
 };
 
@@ -276,54 +259,8 @@ void override_entry(ElfW(Addr) entry_addr, uint64_t new_value) {
   static long const page_size = sysconf(_SC_PAGESIZE);
   auto *aligned_addr = reinterpret_cast<void *>(entry_addr & ~(page_size - 1));
   if (mprotect(aligned_addr, page_size, PROT_READ | PROT_WRITE) == 0) {
-    memcpy(reinterpret_cast<void *>(entry_addr), &new_value, sizeof(new_value));
+    write64(entry_addr, new_value);
   }
-}
-
-class SymbolOverride {
-public:
-  explicit SymbolOverride(std::string_view symname, uint64_t new_symbol,
-                          uint64_t do_not_override_this_symbol)
-      : _symname(symname), _new_symbol(new_symbol),
-        _do_not_override_this_symbol(do_not_override_this_symbol) {}
-
-  template <typename Reloc>
-  void process_relocation(Reloc &reloc, const DynamicInfo &dyn_info) const {
-    auto index = ELF64_R_SYM(reloc.r_info);
-    // \fixme{nsavoire} size of symtab seems incorrect on CentOS 7
-    auto symname =
-        dyn_info.strtab.data() + dyn_info.symtab.data()[index].st_name;
-    auto addr = reloc.r_offset + dyn_info.base;
-    if (symname == _symname && addr != _do_not_override_this_symbol) {
-      override_entry(addr, _new_symbol);
-    }
-  }
-
-  bool operator()(std::string_view object_name,
-                  const DynamicInfo &dyn_info) const {
-    if (object_name.find("linux-vdso") != std::string_view::npos ||
-        object_name.find("/ld-linux") != std::string_view::npos) {
-      return false;
-    }
-
-    std::for_each(dyn_info.rels.begin(), dyn_info.rels.end(),
-                  [&](auto &rel) { process_relocation(rel, dyn_info); });
-    std::for_each(dyn_info.relas.begin(), dyn_info.relas.end(),
-                  [&](auto &rel) { process_relocation(rel, dyn_info); });
-    std::for_each(dyn_info.jmprels.begin(), dyn_info.jmprels.end(),
-                  [&](auto &rel) { process_relocation(rel, dyn_info); });
-    return false;
-  }
-
-private:
-  std::string_view _symname;
-  uint64_t _new_symbol = 0;
-  uint64_t _do_not_override_this_symbol = 0;
-};
-
-int count_callback(dl_phdr_info * /*info*/, size_t /*size*/, void *data) {
-  ++(*reinterpret_cast<int *>(data));
-  return 0;
 }
 
 } // namespace
@@ -425,25 +362,223 @@ uint32_t gnu_hash_symbol_count(const uint32_t *hashtab) {
   return idx + 1;
 }
 
-ElfW(Sym) lookup_symbol(std::string_view symbol_name,
-                        bool accept_null_sized_symbol, void *not_this_symbol) {
-  SymbolLookup lookup{symbol_name, accept_null_sized_symbol,
-                      reinterpret_cast<uint64_t>(not_this_symbol)};
-  dl_iterate_phdr_wrapper(std::ref(lookup));
+class SymbolOverride {
+public:
+  explicit SymbolOverride(std::string_view symname, uint64_t new_symbol,
+                          uint64_t do_not_override_this_symbol)
+      : _symname(symname), _new_symbol(new_symbol),
+        _do_not_override_this_symbol(do_not_override_this_symbol) {}
+
+  template <typename Reloc>
+  void process_relocation(Reloc &reloc, const DynamicInfo &dyn_info) const {
+    auto index = ELF64_R_SYM(reloc.r_info);
+    // \fixme{nsavoire} size of symtab seems incorrect on CentOS 7
+    auto symname =
+        dyn_info.strtab.data() + dyn_info.symtab.data()[index].st_name;
+    auto addr = reloc.r_offset + dyn_info.base_address;
+    if (symname == _symname && addr != _do_not_override_this_symbol) {
+      override_entry(addr, _new_symbol);
+    }
+  }
+
+  bool operator()(std::string_view object_name, const DynamicInfo &dyn_info) {
+    if (object_name.find("linux-vdso") != std::string_view::npos ||
+        object_name.find("/ld-linux") != std::string_view::npos) {
+      return false;
+    }
+
+    std::for_each(dyn_info.rels.begin(), dyn_info.rels.end(),
+                  [&](auto &rel) { process_relocation(rel, dyn_info); });
+    std::for_each(dyn_info.relas.begin(), dyn_info.relas.end(),
+                  [&](auto &rel) { process_relocation(rel, dyn_info); });
+    std::for_each(dyn_info.jmprels.begin(), dyn_info.jmprels.end(),
+                  [&](auto &rel) { process_relocation(rel, dyn_info); });
+    return false;
+  }
+
+private:
+  std::string_view _symname;
+  uint64_t _new_symbol = 0;
+  uint64_t _do_not_override_this_symbol = 0;
+};
+
+LookupResult lookup_symbol(std::string_view symbol_name,
+                           bool accept_null_sized_symbol,
+                           uintptr_t not_this_symbol) {
+  SymbolLookup lookup{symbol_name, accept_null_sized_symbol, not_this_symbol};
+  iterate_over_loaded_libraries([&](const dl_phdr_info &info) {
+    auto dyn_info = retrieve_dynamic_info(info);
+    if (dyn_info) {
+      return lookup(info.dlpi_name, *dyn_info)
+          ? LibraryCallbackStatus::Stop
+          : LibraryCallbackStatus::Continue;
+    }
+    return LibraryCallbackStatus::Continue;
+  });
   return lookup.result();
 }
 
-void override_symbol(std::string_view symbol_name, void *new_symbol,
-                     void *do_not_override_this_symbol) {
-  SymbolOverride symbol_override{
-      symbol_name, reinterpret_cast<uint64_t>(new_symbol),
-      reinterpret_cast<uint64_t>(do_not_override_this_symbol)};
-  dl_iterate_phdr_wrapper(std::ref(symbol_override));
+void override_symbol(std::string_view symbol_name, uintptr_t new_symbol,
+                     uintptr_t do_not_override_this_symbol) {
+  SymbolOverride symbol_override{symbol_name, new_symbol,
+                                 do_not_override_this_symbol};
+  iterate_over_loaded_libraries([&](const dl_phdr_info &info) {
+    auto dyn_info = retrieve_dynamic_info(info);
+    if (dyn_info) {
+      symbol_override(info.dlpi_name, *dyn_info);
+    }
+    return LibraryCallbackStatus::Continue;
+  });
 }
 
 int count_loaded_libraries() {
   int count = 0;
-  dl_iterate_phdr(&count_callback, &count);
+  iterate_over_loaded_libraries([&](const dl_phdr_info &info) {
+    count = info.dlpi_adds;
+    return LibraryCallbackStatus::Stop;
+  });
   return count;
 }
+
+LibraryCallbackStatus iterate_over_loaded_libraries(LibraryCallback callback) {
+  return static_cast<LibraryCallbackStatus>(dl_iterate_phdr(
+      [](dl_phdr_info *info, size_t /*size*/, void *data) {
+        auto *local_callback = static_cast<LibraryCallback *>(data);
+        return static_cast<int>((*local_callback)(*info));
+      },
+      &callback));
+}
+
+bool SymbolOverrides::register_override(std::string_view symbol_name,
+                                        uintptr_t new_symbol,
+                                        uintptr_t *ref_symbol,
+                                        uintptr_t do_not_override_this_symbol) {
+  return _overrides
+      .try_emplace(std::string{symbol_name}, ref_symbol, new_symbol,
+                   do_not_override_this_symbol)
+      .second;
+}
+
+void SymbolOverrides::apply_overrides() {
+  for (auto &[symbol_name, override] : _overrides) {
+    // On ubuntu 16, some symbols might be bound to <symbol>@plt symbols
+    // in exe and since we override the symbols in the exe, this would cause
+    // infinite recursion. To workaround this, we do an explicit lookup (we
+    // don't use dlsym since it would return the same <symbol>@plt symbol).
+
+    auto result = ddprof::lookup_symbol(symbol_name, true);
+
+    if (result.symbol.st_size == 0 &&
+        result.symbol.st_value == *override.ref_symbol) {
+      // null sized symbol, look for a non-null sized symbol
+      result = ddprof::lookup_symbol(symbol_name, false);
+      if (result.symbol.st_value && result.symbol.st_size) {
+        *override.ref_symbol = result.symbol.st_value;
+      }
+    }
+  }
+
+  update_overrides();
+}
+
+void SymbolOverrides::restore_overrides() {
+  iterate_over_loaded_libraries([&](const dl_phdr_info &info) {
+    restore_library_overrides(info.dlpi_name, info.dlpi_addr);
+    return LibraryCallbackStatus::Continue;
+  });
+}
+
+void SymbolOverrides::restore_library_overrides(std::string_view library_name,
+                                                uintptr_t base_address) {
+  auto it = _revert_info_per_library.find(base_address);
+  if (it == _revert_info_per_library.end() ||
+      it->second.library_name != library_name) {
+    return;
+  }
+
+  auto &revert_info = it->second;
+  for (auto &[address, old_value] : revert_info.old_value_per_address) {
+    write64(address, old_value);
+  }
+}
+
+void SymbolOverrides::update_overrides() {
+  auto nb_loaded_libraries = count_loaded_libraries();
+  if (nb_loaded_libraries == _nb_loaded_libs) {
+    return;
+  }
+
+  _nb_loaded_libs = nb_loaded_libraries;
+
+  for (auto &[base_address, revert_info] : _revert_info_per_library) {
+    revert_info.processed = false;
+  }
+
+  iterate_over_loaded_libraries([this](const dl_phdr_info &info) {
+    auto maybe_dyn_info = retrieve_dynamic_info(info);
+    if (maybe_dyn_info) {
+      apply_overrides_to_library(*maybe_dyn_info, info.dlpi_name);
+    }
+    return LibraryCallbackStatus::Continue;
+  });
+
+  auto it = _revert_info_per_library.begin();
+  while (it != _revert_info_per_library.end()) {
+    if (!it->second.processed) {
+      // library not present, remove it
+      it = _revert_info_per_library.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
+
+void SymbolOverrides::apply_overrides_to_library(
+    const DynamicInfo &dyn_info, std::string_view library_name) {
+
+  if (library_name.find("linux-vdso") != std::string_view::npos ||
+      library_name.find("/ld-linux") != std::string_view::npos) {
+    return;
+  }
+
+  auto [it, inserted] =
+      _revert_info_per_library.try_emplace(dyn_info.base_address, library_name);
+
+  LibraryRevertInfo &revert_info = it->second;
+  revert_info.processed = true;
+
+  // not a new library, skip
+  if (!inserted) {
+    return;
+  }
+
+  process_relocations(dyn_info, dyn_info.rels, revert_info);
+  process_relocations(dyn_info, dyn_info.relas, revert_info);
+  process_relocations(dyn_info, dyn_info.jmprels, revert_info);
+}
+
+template <typename Reloc>
+void SymbolOverrides::process_relocations(const DynamicInfo &dyn_info,
+                                          std::span<Reloc> relocs,
+                                          LibraryRevertInfo &revert_info) {
+  auto end = _overrides.end();
+
+  for (auto &reloc : relocs) {
+    auto index = ELF64_R_SYM(reloc.r_info);
+    auto symname =
+        dyn_info.strtab.data() + dyn_info.symtab.data()[index].st_name;
+
+    auto it = _overrides.find(symname);
+    if (it != end) {
+      auto &override = it->second;
+      auto addr = reloc.r_offset + dyn_info.base_address;
+      if (addr != override.do_not_override_this_symbol &&
+          !revert_info.old_value_per_address.contains(addr)) {
+        revert_info.old_value_per_address[addr] = load64(addr);
+        override_entry(addr, override.new_symbol);
+      }
+    }
+  }
+}
+
 } // namespace ddprof

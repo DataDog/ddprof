@@ -15,6 +15,7 @@
 
 #include <atomic>
 #include <cstddef>
+#include <functional>
 #include <mutex>
 #include <pthread.h>
 #include <unordered_set>
@@ -37,6 +38,16 @@ public:
     kDeterministicSampling = 0x2
   };
 
+  struct IntervalTimerCheck {
+    [[nodiscard]] bool is_set() const {
+      return callback && (initial_delay.count() > 0 || interval.count() > 0);
+    }
+
+    std::function<void()> callback;
+    std::chrono::milliseconds initial_delay{0};
+    std::chrono::milliseconds interval{0};
+  };
+
   static inline constexpr uint32_t k_max_consecutive_failures{5};
 
   static void notify_thread_start();
@@ -45,7 +56,8 @@ public:
   static DDRes allocation_tracking_init(uint64_t allocation_profiling_rate,
                                         uint32_t flags,
                                         uint32_t stack_sample_size,
-                                        const RingBufferInfo &ring_buffer);
+                                        const RingBufferInfo &ring_buffer,
+                                        const IntervalTimerCheck &timer_check);
   static void allocation_tracking_free();
 
   static inline DDPROF_NO_SANITIZER_ADDRESS void
@@ -81,6 +93,7 @@ private:
     std::atomic<uint64_t> lost_count; // count number of lost events
     std::atomic<uint32_t> failure_count;
     std::atomic<pid_t> pid; // lazy cache of pid (0 is un-init value)
+    std::atomic<PerfClock::time_point> next_check_time;
   };
   // NOLINTEND(misc-non-private-member-variables-in-classes)
 
@@ -90,7 +103,8 @@ private:
 
   DDRes init(uint64_t mem_profile_interval, bool deterministic_sampling,
              bool track_deallocations, uint32_t stack_sample_size,
-             const RingBufferInfo &ring_buffer);
+             const RingBufferInfo &ring_buffer,
+             const IntervalTimerCheck &timer_check);
   void free();
 
   static AllocationTracker *create_instance();
@@ -115,6 +129,8 @@ private:
 
   void free_on_consecutive_failures(bool success);
 
+  DDPROF_NOINLINE void update_timer(PerfClock::time_point now);
+
   TrackerState _state;
   uint64_t _sampling_interval;
   uint32_t _stack_sample_size;
@@ -122,6 +138,7 @@ private:
   bool _deterministic_sampling;
 
   AddressBitset _allocated_address_set;
+  IntervalTimerCheck _interval_timer_check;
 
   // These can not be tied to the internal state of the instance.
   // The creation of the instance depends on this

@@ -376,9 +376,9 @@ int main(int argc, char *argv[]) {
 
     if (opts.avoid_dlopen_hook) {
       // Do an allocation to force a recheck of loaded libraries:
-      // Loaded libs check is requested in a signal handler triggered by a
-      // timer, but check is done next time a hook is called.
-      void *p = malloc(1);
+      // Check is done when a sample is sent.
+      constexpr auto kBigAlloc = 1024 * 1024;
+      void *p = malloc(kBigAlloc);
       ddprof::DoNotOptimize(p);
       free(p);
     }

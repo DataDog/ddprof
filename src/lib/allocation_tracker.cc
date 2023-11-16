@@ -94,7 +94,8 @@ void AllocationTracker::make_key() {
 
 DDRes AllocationTracker::allocation_tracking_init(
     uint64_t allocation_profiling_rate, uint32_t flags,
-    uint32_t stack_sample_size, const RingBufferInfo &ring_buffer) {
+    uint32_t stack_sample_size, const RingBufferInfo &ring_buffer,
+    const IntervalTimerCheck &timer_check) {
   TrackerThreadLocalState *tl_state = get_tl_state();
   if (!tl_state) {
     // This is the time at which the init_tl_state should not fail
@@ -120,9 +121,10 @@ DDRes AllocationTracker::allocation_tracking_init(
   void *volatile p = ::malloc(1);
   ::free(p);
 
-  DDRES_CHECK_FWD(instance->init(
-      allocation_profiling_rate, flags & kDeterministicSampling,
-      flags & kTrackDeallocations, stack_sample_size, ring_buffer));
+  DDRES_CHECK_FWD(instance->init(allocation_profiling_rate,
+                                 flags & kDeterministicSampling,
+                                 flags & kTrackDeallocations, stack_sample_size,
+                                 ring_buffer, timer_check));
   _instance = instance;
 
   state.init(true, flags & kTrackDeallocations);
@@ -134,7 +136,8 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
                               bool deterministic_sampling,
                               bool track_deallocations,
                               uint32_t stack_sample_size,
-                              const RingBufferInfo &ring_buffer) {
+                              const RingBufferInfo &ring_buffer,
+                              const IntervalTimerCheck &timer_check) {
   _sampling_interval = mem_profile_interval;
   _deterministic_sampling = deterministic_sampling;
   _stack_sample_size = stack_sample_size;
@@ -157,6 +160,18 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
         .shift = rb.time_shift});
   }
   PerfClock::init(static_cast<PerfClockSource>(rb.perf_clock_source));
+
+  _interval_timer_check = timer_check;
+  if (_interval_timer_check.is_set()) {
+    _state.next_check_time.store(
+        _interval_timer_check.initial_delay.count()
+            ? PerfClock::now() + _interval_timer_check.initial_delay
+            : PerfClock::now() + _interval_timer_check.interval,
+        std::memory_order_release);
+  } else {
+    _state.next_check_time.store(PerfClock::time_point::max(),
+                                 std::memory_order_release);
+  }
 
   return {};
 }
@@ -454,6 +469,7 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
                              "Unable to get write lock on ring buffer");
     }
+
     // not an error
     return {};
   }
@@ -471,7 +487,8 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   event->hdr.size = event_size;
   event->hdr.type = PERF_RECORD_SAMPLE;
   event->abi = PERF_SAMPLE_REGS_ABI_64;
-  event->sample_id.time = PerfClock::now().time_since_epoch().count();
+  auto now = PerfClock::now();
+  event->sample_id.time = now.time_since_epoch().count();
   event->addr = addr;
   if (_state.pid == 0) {
     _state.pid = getpid();
@@ -495,7 +512,32 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
                              strerror(errno));
     }
   }
+
+  if (now > _state.next_check_time.load(std::memory_order_acquire)) {
+    update_timer(now);
+  }
+
   return {};
+}
+
+void AllocationTracker::update_timer(PerfClock::time_point now) {
+  std::lock_guard const lock{_state.mutex};
+
+  // recheck that we are the thread that should update the timer
+  if (now <= _state.next_check_time.load()) {
+    return;
+  }
+
+  if (!_interval_timer_check.is_set() ||
+      _interval_timer_check.interval.count() == 0) {
+    _state.next_check_time.store(PerfClock::time_point::max(),
+                                 std::memory_order_release);
+    return;
+  }
+
+  _state.next_check_time.store(now + _interval_timer_check.interval,
+                               std::memory_order_release);
+  _interval_timer_check.callback();
 }
 
 DDPROF_NOINLINE uint64_t

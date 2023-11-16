@@ -45,6 +45,7 @@
 // This class is trivial to copy and should be passed by value.
 
 // clang-format off
+// NOLINTBEGIN
 #ifndef ABSL_FUNCTIONAL_FUNCTION_REF_H_
 #define ABSL_FUNCTIONAL_FUNCTION_REF_H_
 
@@ -233,4 +234,5 @@ class FunctionRef<R(Args...) const> : public FunctionRef<R(Args...)> {
 }  // namespace absl
 
 #endif  // ABSL_FUNCTIONAL_FUNCTION_REF_H_
+// NOLINTEND
 // clang-format on
