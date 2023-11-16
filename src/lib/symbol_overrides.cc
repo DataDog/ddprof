@@ -18,6 +18,7 @@
 #include <dlfcn.h>
 #include <malloc.h>
 #include <sys/mman.h>
+#include <unordered_map>
 
 #if defined(__GNUC__) && !defined(__clang__)
 #  define NOEXCEPT noexcept
@@ -49,47 +50,31 @@ __attribute__((weak)) void sdallocx(void *ptr, size_t size, int flags);
 }
 
 namespace ddprof {
+
 namespace {
-constexpr int k_sigrtmax_offset = 3;
 
-std::chrono::milliseconds g_initial_loaded_libs_check_delay;
-std::chrono::milliseconds g_loaded_libs_check_interval;
-bool g_symbols_overridden = false;
-bool g_check_libraries = false;
-bool g_timer_active = false;
-timer_t g_timerid;
-int g_timer_sig = -1;
-int g_nb_loaded_libraries = -1;
+std::unique_ptr<SymbolOverrides> g_symbol_overrides;
+std::mutex g_mutex;
 
-void setup_hooks(bool restore);
+class MaybeReentryGuard {
+public:
+  MaybeReentryGuard()
+      : _tl_state{ddprof::AllocationTracker::get_tl_state()},
+        _guard{_tl_state ? &(_tl_state->reentry_guard) : nullptr} {}
 
-DDPROF_NOINLINE bool loaded_libraries_have_changed() {
-  int const nb = ddprof::count_loaded_libraries();
-  if (nb != g_nb_loaded_libraries) {
-    g_nb_loaded_libraries = nb;
-    return true;
-  }
-  return false;
-}
+  explicit operator bool() const { return static_cast<bool>(_guard); }
+  ddprof::TrackerThreadLocalState *tl_state() { return _tl_state; }
 
-void check_libraries() {
-  // \fixme{nsavoire} Race condition here, convert g_check_libraries to an
-  // atomic ?
-  if (g_check_libraries) {
-    if (g_symbols_overridden && loaded_libraries_have_changed()) {
-      setup_hooks(false);
-    }
-    g_check_libraries = false;
-  }
-}
+private:
+  ddprof::TrackerThreadLocalState *_tl_state;
+  ddprof::ReentryGuard _guard;
+};
 
 class AllocTrackerHelper {
 public:
   AllocTrackerHelper()
       : _tl_state{ddprof::AllocationTracker::get_tl_state()},
-        _guard{_tl_state ? &(_tl_state->reentry_guard) : nullptr} {
-    check_libraries();
-  }
+        _guard{_tl_state ? &(_tl_state->reentry_guard) : nullptr} {}
 
   void track(void *ptr, size_t size) {
     if (_guard) {
@@ -129,10 +114,13 @@ private:
   ddprof::ReentryGuard _guard;
 };
 
-struct malloc {
+struct HookBase {
+  // static inline bool ref_checked = false;
+};
+
+struct MallocHook : HookBase {
   static constexpr auto name = "malloc";
   static inline auto ref = &::malloc;
-  static inline bool ref_checked = false;
 
   static void *hook(size_t size) noexcept {
     AllocTrackerHelper helper;
@@ -142,10 +130,9 @@ struct malloc {
   }
 };
 
-struct new_ {
+struct NewHook : HookBase {
   static constexpr auto name = "_Znwm";
   static inline auto ref = static_cast<void *(*)(size_t)>(&::operator new);
-  static inline bool ref_checked = false;
 
   static void *hook(size_t size) {
     AllocTrackerHelper helper;
@@ -155,12 +142,11 @@ struct new_ {
   }
 };
 
-struct new_nothrow {
+struct NewNoThrowHook : HookBase {
   static constexpr auto name = "_ZnwmRKSt9nothrow_t";
   static inline auto ref =
       static_cast<void *(*)(size_t, const std::nothrow_t &) noexcept>(
           &::operator new);
-  static inline bool ref_checked = false;
 
   static void *hook(size_t size, const std::nothrow_t &tag) noexcept {
     AllocTrackerHelper helper;
@@ -170,11 +156,10 @@ struct new_nothrow {
   }
 };
 
-struct new_align {
+struct NewAlignHook : HookBase {
   static constexpr auto name = "_ZnwmSt11align_val_t";
   static inline auto ref =
       static_cast<void *(*)(size_t, std::align_val_t)>(&::operator new);
-  static inline bool ref_checked = false;
 
   static void *hook(std::size_t size, std::align_val_t al) {
     AllocTrackerHelper helper;
@@ -184,12 +169,11 @@ struct new_align {
   }
 };
 
-struct new_align_nothrow {
+struct NewAlignNoThrowHook : HookBase {
   static constexpr auto name = "_ZnwmSt11align_val_tRKSt9nothrow_t";
   static inline auto ref =
       static_cast<void *(*)(size_t, std::align_val_t,
                             const std::nothrow_t &) noexcept>(&::operator new);
-  static inline bool ref_checked = false;
 
   static void *hook(std::size_t size, std::align_val_t al,
                     const std::nothrow_t &tag) noexcept {
@@ -200,10 +184,9 @@ struct new_align_nothrow {
   }
 };
 
-struct new_array {
+struct NewArrayHook : HookBase {
   static constexpr auto name = "_Znam";
   static inline auto ref = static_cast<void *(*)(size_t)>(&::operator new[]);
-  static inline bool ref_checked = false;
 
   static void *hook(size_t size) {
     AllocTrackerHelper helper;
@@ -213,12 +196,11 @@ struct new_array {
   }
 };
 
-struct new_array_nothrow {
+struct NewArrayNoThrowHook : HookBase {
   static constexpr auto name = "_ZnamRKSt9nothrow_t";
   static inline auto ref =
       static_cast<void *(*)(size_t, const std::nothrow_t &) noexcept>(
           &::operator new[]);
-  static inline bool ref_checked = false;
 
   static void *hook(size_t size, const std::nothrow_t &tag) noexcept {
     AllocTrackerHelper helper;
@@ -228,11 +210,10 @@ struct new_array_nothrow {
   }
 };
 
-struct new_array_align {
+struct NewArrayAlignHook : HookBase {
   static constexpr auto name = "_ZnamSt11align_val_t";
   static inline auto ref =
       static_cast<void *(*)(size_t, std::align_val_t)>(&::operator new[]);
-  static inline bool ref_checked = false;
 
   static void *hook(std::size_t size, std::align_val_t al) {
     AllocTrackerHelper helper;
@@ -242,13 +223,12 @@ struct new_array_align {
   }
 };
 
-struct new_array_align_nothrow {
+struct NewArrayAlignNoThrowHook : HookBase {
   static constexpr auto name = "_ZnamSt11align_val_tRKSt9nothrow_t";
   static inline auto ref =
       static_cast<void *(*)(size_t, std::align_val_t,
                             const std::nothrow_t &) noexcept>(
           &::operator new[]);
-  static inline bool ref_checked = false;
 
   static void *hook(std::size_t size, std::align_val_t al,
                     const std::nothrow_t &tag) noexcept {
@@ -259,10 +239,9 @@ struct new_array_align_nothrow {
   }
 };
 
-struct free {
+struct FreeHook : HookBase {
   static constexpr auto name = "free";
   static inline auto ref = &::free;
-  static inline bool ref_checked = false;
 
   static void hook(void *ptr) noexcept {
     DeallocTrackerHelper helper;
@@ -275,10 +254,9 @@ struct free {
   }
 };
 
-struct free_sized {
+struct FreeSizedHook : HookBase {
   static constexpr auto name = "free_sized";
   static inline auto ref = &::free_sized;
-  static inline bool ref_checked = false;
 
   static void hook(void *ptr, size_t size) noexcept {
     DeallocTrackerHelper helper;
@@ -291,10 +269,9 @@ struct free_sized {
   }
 };
 
-struct free_aligned_sized {
+struct FreeAlignedSizedHook : HookBase {
   static constexpr auto name = "free_aligned_sized";
   static inline auto ref = &::free_aligned_sized;
-  static inline bool ref_checked = false;
 
   static void hook(void *ptr, size_t alignment, size_t size) noexcept {
     DeallocTrackerHelper helper;
@@ -307,11 +284,10 @@ struct free_aligned_sized {
   }
 };
 
-struct delete_ {
+struct DeleteHook : HookBase {
   static constexpr auto name = "_ZdlPv";
   static inline auto ref =
       static_cast<void (*)(void *) noexcept>(&::operator delete);
-  static inline bool ref_checked = false;
 
   static void hook(void *ptr) noexcept {
     DeallocTrackerHelper helper;
@@ -323,11 +299,10 @@ struct delete_ {
   }
 };
 
-struct delete_array {
+struct DeleteArrayHook : HookBase {
   static constexpr auto name = "_ZdaPv";
   static inline auto ref =
       static_cast<void (*)(void *) noexcept>(&::operator delete[]);
-  static inline bool ref_checked = false;
 
   static void hook(void *ptr) noexcept {
     DeallocTrackerHelper helper;
@@ -339,12 +314,11 @@ struct delete_array {
   }
 };
 
-struct delete_nothrow {
+struct DeleteNoThrowHook : HookBase {
   static constexpr auto name = "_ZdlPvRKSt9nothrow_t";
   static inline auto ref =
       static_cast<void (*)(void *, const std::nothrow_t &) noexcept>(
           &::operator delete);
-  static inline bool ref_checked = false;
 
   static void hook(void *ptr, const std::nothrow_t &tag) noexcept {
     DeallocTrackerHelper helper;
@@ -356,12 +330,11 @@ struct delete_nothrow {
   }
 };
 
-struct delete_array_nothrow {
+struct DeleteArrayNoThrowHook : HookBase {
   static constexpr auto name = "_ZdaPvRKSt9nothrow_t";
   static inline auto ref =
       static_cast<void (*)(void *, const std::nothrow_t &) noexcept>(
           &::operator delete[]);
-  static inline bool ref_checked = false;
 
   static void hook(void *ptr, const std::nothrow_t &tag) noexcept {
     DeallocTrackerHelper helper;
@@ -373,12 +346,11 @@ struct delete_array_nothrow {
   }
 };
 
-struct delete_align {
+struct DeleteAlignHook : HookBase {
   static constexpr auto name = "_ZdlPvSt11align_val_t";
   static inline auto ref =
       static_cast<void (*)(void *, std::align_val_t) noexcept>(
           &::operator delete);
-  static inline bool ref_checked = false;
 
   static void hook(void *ptr, std::align_val_t al) noexcept {
     DeallocTrackerHelper helper;
@@ -390,12 +362,11 @@ struct delete_align {
   }
 };
 
-struct delete_array_align {
+struct DeleteArrayAlignHook : HookBase {
   static constexpr auto name = "_ZdaPvSt11align_val_t";
   static inline auto ref =
       static_cast<void (*)(void *, std::align_val_t) noexcept>(
           &::operator delete[]);
-  static inline bool ref_checked = false;
 
   static void hook(void *ptr, std::align_val_t al) noexcept {
     DeallocTrackerHelper helper;
@@ -407,12 +378,11 @@ struct delete_array_align {
   }
 };
 
-struct delete_align_nothrow {
+struct DeleteAlignNoThrowHook : HookBase {
   static constexpr auto name = "_ZdlPvSt11align_val_tRKSt9nothrow_t";
   static inline auto ref = static_cast<void (*)(
       void *, std::align_val_t, const std::nothrow_t &) noexcept>(
       &::operator delete);
-  static inline bool ref_checked = false;
 
   static void hook(void *ptr, std::align_val_t al,
                    const std::nothrow_t &tag) noexcept {
@@ -425,12 +395,11 @@ struct delete_align_nothrow {
   }
 };
 
-struct delete_array_align_nothrow {
+struct DeleteArrayAlignNoThrowHook : HookBase {
   static constexpr auto name = "_ZdaPvSt11align_val_tRKSt9nothrow_t";
   static inline auto ref = static_cast<void (*)(
       void *, std::align_val_t, const std::nothrow_t &) noexcept>(
       &::operator delete[]);
-  static inline bool ref_checked = false;
 
   static void hook(void *ptr, std::align_val_t al,
                    const std::nothrow_t &tag) noexcept {
@@ -443,11 +412,10 @@ struct delete_array_align_nothrow {
   }
 };
 
-struct delete_sized {
+struct DeleteSizedHook : HookBase {
   static constexpr auto name = "_ZdlPvm";
   static inline auto ref =
       static_cast<void (*)(void *, std::size_t) noexcept>(&::operator delete);
-  static inline bool ref_checked = false;
 
   static void hook(void *ptr, std::size_t size) noexcept {
     DeallocTrackerHelper helper;
@@ -459,11 +427,10 @@ struct delete_sized {
   }
 };
 
-struct delete_array_sized {
+struct DeleteArraySizedHook : HookBase {
   static constexpr auto name = "_ZdaPvm";
   static inline auto ref =
       static_cast<void (*)(void *, std::size_t) noexcept>(&::operator delete[]);
-  static inline bool ref_checked = false;
 
   static void hook(void *ptr, std::size_t size) noexcept {
     DeallocTrackerHelper helper;
@@ -475,12 +442,11 @@ struct delete_array_sized {
   }
 };
 
-struct delete_sized_align {
+struct DeleteSizedAlignHook : HookBase {
   static constexpr auto name = "_ZdlPvmSt11align_val_t";
   static inline auto ref =
       static_cast<void (*)(void *, std::size_t, std::align_val_t) noexcept>(
           &::operator delete);
-  static inline bool ref_checked = false;
 
   static void hook(void *ptr, std::size_t size, std::align_val_t al) noexcept {
     DeallocTrackerHelper helper;
@@ -492,12 +458,11 @@ struct delete_sized_align {
   }
 };
 
-struct delete_array_sized_align {
+struct DeleteArraySizedAlignHook : HookBase {
   static constexpr auto name = "_ZdaPvmSt11align_val_t";
   static inline auto ref =
       static_cast<void (*)(void *, std::size_t, std::align_val_t) noexcept>(
           &::operator delete[]);
-  static inline bool ref_checked = false;
 
   static void hook(void *ptr, std::size_t size, std::align_val_t al) noexcept {
     DeallocTrackerHelper helper;
@@ -509,10 +474,9 @@ struct delete_array_sized_align {
   }
 };
 
-struct calloc {
+struct CallocHook : HookBase {
   static constexpr auto name = "calloc";
   static inline auto ref = &::calloc;
-  static inline bool ref_checked = false;
 
   static void *hook(size_t nmemb, size_t size) noexcept {
     AllocTrackerHelper helper;
@@ -522,10 +486,9 @@ struct calloc {
   }
 };
 
-struct realloc {
+struct ReallocHook : HookBase {
   static constexpr auto name = "realloc";
   static inline auto ref = &::realloc;
-  static inline bool ref_checked = false;
 
   static void *hook(void *ptr, size_t size) noexcept {
     AllocTrackerHelper helper;
@@ -542,10 +505,9 @@ struct realloc {
   }
 };
 
-struct posix_memalign {
+struct PosixMemalignHook : HookBase {
   static constexpr auto name = "posix_memalign";
   static inline auto ref = &::posix_memalign;
-  static inline bool ref_checked = false;
 
   static int hook(void **memptr, size_t alignment, size_t size) noexcept {
     AllocTrackerHelper helper;
@@ -557,10 +519,9 @@ struct posix_memalign {
   }
 };
 
-struct aligned_alloc {
+struct AlignedAllocHook : HookBase {
   static constexpr auto name = "aligned_alloc";
   static inline auto ref = &::aligned_alloc;
-  static inline bool ref_checked = false;
 
   static void *hook(size_t alignment, size_t size) noexcept {
     AllocTrackerHelper helper;
@@ -572,10 +533,9 @@ struct aligned_alloc {
   }
 };
 
-struct memalign {
+struct MemalignHook : HookBase {
   static constexpr auto name = "memalign";
   static inline auto ref = &::memalign;
-  static inline bool ref_checked = false;
 
   static void *hook(size_t alignment, size_t size) noexcept {
     AllocTrackerHelper helper;
@@ -587,10 +547,9 @@ struct memalign {
   }
 };
 
-struct pvalloc {
+struct PvallocHook : HookBase {
   static constexpr auto name = "pvalloc";
   static inline auto ref = &::pvalloc;
-  static inline bool ref_checked = false;
 
   static void *hook(size_t size) noexcept {
     AllocTrackerHelper helper;
@@ -602,10 +561,9 @@ struct pvalloc {
   }
 };
 
-struct valloc {
+struct VallocHook : HookBase {
   static constexpr auto name = "valloc";
   static inline auto ref = &::valloc;
-  static inline bool ref_checked = false;
 
   static void *hook(size_t size) noexcept {
     AllocTrackerHelper helper;
@@ -617,10 +575,9 @@ struct valloc {
   }
 };
 
-struct reallocarray {
+struct ReallocArrayHook : HookBase {
   static constexpr auto name = "reallocarray";
   static inline auto ref = &::reallocarray;
-  static inline bool ref_checked = false;
 
   static void *hook(void *ptr, size_t nmemb, size_t size) noexcept {
     AllocTrackerHelper helper;
@@ -636,24 +593,20 @@ struct reallocarray {
   }
 };
 
-struct dlopen {
+struct DlopenHook : HookBase {
   static constexpr auto name = "dlopen";
   static inline auto ref = &::dlopen;
-  static inline bool ref_checked = false;
 
   static void *hook(const char *filename, int flags) noexcept {
     void *ret = ref(filename, flags);
-    if (g_symbols_overridden) {
-      setup_hooks(false);
-    }
+    update_overrides();
     return ret;
   }
 };
 
-struct mallocx {
+struct MallocxHook : HookBase {
   static constexpr auto name = "mallocx";
   static inline auto ref = &::mallocx;
-  static inline bool ref_checked = false;
 
   static void *hook(size_t size, int flags) noexcept {
     AllocTrackerHelper helper;
@@ -663,10 +616,9 @@ struct mallocx {
   }
 };
 
-struct rallocx {
+struct RallocxHook : HookBase {
   static constexpr auto name = "rallocx";
   static inline auto ref = &::rallocx;
-  static inline bool ref_checked = false;
 
   static void *hook(void *ptr, size_t size, int flags) noexcept {
     AllocTrackerHelper helper;
@@ -683,10 +635,9 @@ struct rallocx {
   }
 };
 
-struct xallocx {
+struct XallocxHook : HookBase {
   static constexpr auto name = "xallocx";
   static inline auto ref = &::xallocx;
-  static inline bool ref_checked = false;
 
   static size_t hook(void *ptr, size_t size, size_t extra, int flags) noexcept {
     AllocTrackerHelper helper;
@@ -700,10 +651,9 @@ struct xallocx {
   }
 };
 
-struct dallocx {
+struct DallocxHook : HookBase {
   static constexpr auto name = "dallocx";
   static inline auto ref = &::dallocx;
-  static inline bool ref_checked = false;
 
   static void hook(void *ptr, int flags) noexcept {
     DeallocTrackerHelper helper;
@@ -712,10 +662,9 @@ struct dallocx {
   }
 };
 
-struct sdallocx {
+struct SdallocxHook : HookBase {
   static constexpr auto name = "sdallocx";
   static inline auto ref = &::sdallocx;
-  static inline bool ref_checked = false;
 
   static void hook(void *ptr, size_t size, int flags) noexcept {
     DeallocTrackerHelper helper;
@@ -726,7 +675,7 @@ struct sdallocx {
 
 using Args = std::tuple<void *(*)(void *), void *>;
 
-void *mystart(void *arg) {
+void *my_start(void *arg) {
   ddprof::AllocationTracker::notify_thread_start();
   Args *args = reinterpret_cast<Args *>(arg);
   auto [start_routine, start_arg] = *args;
@@ -740,8 +689,8 @@ void *mystart(void *arg) {
  * thread calls pthread_getattr:
  * - pthread_getattr takes a lock in pthread object
  * - pthread_getattr itself does an allocation
- * - AllocationTracker tracks the allocation and calls savecontext
- * - savecontext calls pthread_getattr to get stack end address
+ * - AllocationTracker tracks the allocation and calls save_context
+ * - save_context calls pthread_getattr to get stack end address
  * - pthread_getattr is reentered and attempts to take the lock again leading to
  * a deadlock.
  *
@@ -749,23 +698,21 @@ void *mystart(void *arg) {
  * cache stack end address while temporarily disabling allocation profiling for
  * current thread before calling user code.
  * */
-struct pthread_create {
+struct PthreadCreateHook : HookBase {
   static constexpr auto name = "pthread_create";
   static inline auto ref = &::pthread_create;
-  static inline bool ref_checked = false;
 
   static int hook(pthread_t *thread, const pthread_attr_t *attr,
                   void *(*start_routine)(void *), void *arg) noexcept {
     Args *args = new (std::nothrow) Args{start_routine, arg};
-    return args ? ref(thread, attr, &mystart, args)
+    return args ? ref(thread, attr, &my_start, args)
                 : ref(thread, attr, start_routine, arg);
   }
 };
 
-struct mmap {
+struct MmapHook : HookBase {
   static constexpr auto name = "mmap";
   static inline auto ref = &::mmap;
-  static inline bool ref_checked = false;
 
   static void *hook(void *addr, size_t length, int prot, int flags, int fd,
                     off_t offset) noexcept {
@@ -778,10 +725,9 @@ struct mmap {
   }
 };
 
-struct mmap_ {
+struct Mmap_Hook : HookBase {
   static constexpr auto name = "__mmap";
   static inline auto ref = &::mmap;
-  static inline bool ref_checked = false;
 
   static void *hook(void *addr, size_t length, int prot, int flags, int fd,
                     off_t offset) noexcept {
@@ -794,10 +740,9 @@ struct mmap_ {
   }
 };
 
-struct mmap64_ {
+struct Mmap64Hook : HookBase {
   static constexpr auto name = "mmap64";
   static inline auto ref = &::mmap64;
-  static inline bool ref_checked = false;
 
   static void *hook(void *addr, size_t length, int prot, int flags, int fd,
                     off_t offset) noexcept {
@@ -810,10 +755,9 @@ struct mmap64_ {
   }
 };
 
-struct munmap {
+struct MunmapHook : HookBase {
   static constexpr auto name = "munmap";
   static inline auto ref = &::munmap;
-  static inline bool ref_checked = false;
 
   static int hook(void *addr, size_t length) noexcept {
     DeallocTrackerHelper helper;
@@ -822,10 +766,9 @@ struct munmap {
   }
 };
 
-struct munmap_ {
+struct Munmap_Hook : HookBase {
   static constexpr auto name = "__munmap";
   static inline auto ref = &::munmap;
-  static inline bool ref_checked = false;
 
   static int hook(void *addr, size_t length) noexcept {
     DeallocTrackerHelper helper;
@@ -834,179 +777,103 @@ struct munmap_ {
   }
 };
 
-template <typename T> void install_hook(bool restore) {
-  // On ubuntu 16, some symbols might be bound to <symbol>@plt symbols
-  // in exe and since we override the symbols in the exe, this would cause
-  // infinite recursion. To workaround this, we do an explicit lookup (we don't
-  // use dlsym since it would return the same <symbol>@plt symbol).
-  if (!restore && !T::ref_checked) {
-    ElfW(Sym) sym = ddprof::lookup_symbol(T::name, true);
-    if (sym.st_size == 0 &&
-        reinterpret_cast<decltype(T::ref)>(sym.st_value) == T::ref) {
-      // null sized symbol, look for a non-null sized symbol
-      sym = ddprof::lookup_symbol(T::name, false);
-      if (sym.st_value && sym.st_size) {
-        T::ref = reinterpret_cast<decltype(T::ref)>(sym.st_value);
-      }
-    }
-    T::ref_checked = true;
-  }
+template <typename T> void register_hook() {
   // Be careful not to override T::ref (compiler/linker may emit T::ref as a
   // relocation pointing on malloc/realloc/calloc/...)
-  ddprof::override_symbol(
-      T::name, reinterpret_cast<void *>(restore ? T::ref : &T::hook), &T::ref);
+  g_symbol_overrides->register_override(T::name,
+                                        reinterpret_cast<uintptr_t>(&T::hook),
+                                        reinterpret_cast<uintptr_t *>(&T::ref),
+                                        reinterpret_cast<uintptr_t>(&T::ref));
 }
 
-void timer_handler(int /*sig*/, siginfo_t * /*info*/, void * /*ucontext*/) {
-  // check libraries only if symbols are overriden
-  g_check_libraries = g_symbols_overridden;
-}
+void register_hooks() {
+  register_hook<MallocHook>();
+  register_hook<FreeHook>();
+  register_hook<FreeSizedHook>();
+  register_hook<FreeAlignedSizedHook>();
+  register_hook<CallocHook>();
+  register_hook<ReallocHook>();
+  register_hook<PosixMemalignHook>();
+  register_hook<AlignedAllocHook>();
+  register_hook<MemalignHook>();
+  register_hook<VallocHook>();
 
-void uninstall_handler() {
-  struct sigaction sa;
-  sigemptyset(&sa.sa_mask);
-  sa.sa_flags = 0;
-  sa.sa_handler = SIG_IGN;
-  sigaction(g_timer_sig, &sa, nullptr);
-}
+  register_hook<NewHook>();
+  register_hook<NewArrayHook>();
+  register_hook<NewNoThrowHook>();
+  register_hook<NewArrayNoThrowHook>();
+  register_hook<NewAlignHook>();
+  register_hook<NewArrayAlignHook>();
+  register_hook<NewAlignNoThrowHook>();
+  register_hook<NewArrayAlignNoThrowHook>();
 
-void uninstall_timer() {
-  uninstall_handler();
-  timer_delete(g_timerid);
-  g_timer_active = false;
-}
+  register_hook<DeleteHook>();
+  register_hook<DeleteArrayHook>();
+  register_hook<DeleteNoThrowHook>();
+  register_hook<DeleteArrayNoThrowHook>();
+  register_hook<DeleteAlignHook>();
+  register_hook<DeleteArrayAlignHook>();
+  register_hook<DeleteAlignNoThrowHook>();
+  register_hook<DeleteArrayAlignNoThrowHook>();
+  register_hook<DeleteSizedHook>();
+  register_hook<DeleteArraySizedHook>();
+  register_hook<DeleteSizedAlignHook>();
+  register_hook<DeleteArraySizedAlignHook>();
 
-int install_timer(std::chrono::milliseconds initial_loaded_libs_check_delay,
-                  std::chrono::milliseconds loaded_libs_check_interval) {
-  if (g_timer_active ||
-      (initial_loaded_libs_check_delay.count() == 0 &&
-       loaded_libs_check_interval.count() == 0)) {
-    return 0;
+  register_hook<MmapHook>();
+  register_hook<Mmap64Hook>();
+  register_hook<MunmapHook>();
+  register_hook<Mmap_Hook>();
+  register_hook<Munmap_Hook>();
+
+  register_hook<MallocxHook>();
+  register_hook<RallocxHook>();
+  register_hook<XallocxHook>();
+  register_hook<DallocxHook>();
+  register_hook<SdallocxHook>();
+
+  if (ReallocArrayHook::ref) {
+    register_hook<ReallocArrayHook>();
+  }
+  if (PvallocHook::ref) {
+    register_hook<PvallocHook>();
   }
 
-  if (g_timer_sig == -1) {
-    if (__libc_allocate_rtsig) {
-      // If available, use private libc function to allocate a free signal
-      g_timer_sig = __libc_allocate_rtsig(1);
-    } else {
-      // Pick an arbitrary signal
-      g_timer_sig = std::max(SIGRTMIN, SIGRTMAX - k_sigrtmax_offset);
-    }
-  }
-  if (g_timer_sig == -1) {
-    return -1;
-  }
-
-  struct sigaction sa;
-  sa.sa_flags = SA_SIGINFO | SA_RESTART;
-  sa.sa_sigaction = timer_handler;
-  sigemptyset(&sa.sa_mask);
-  if (sigaction(g_timer_sig, &sa, nullptr) == -1) {
-    return -1;
-  }
-
-  sigevent sev;
-  sev.sigev_notify = SIGEV_SIGNAL;
-  sev.sigev_signo = g_timer_sig;
-  sev.sigev_value.sival_ptr = &g_timerid;
-  if (timer_create(CLOCK_MONOTONIC, &sev, &g_timerid) == -1) {
-    uninstall_handler();
-    return -1;
-  }
-
-  itimerspec const its = {
-      .it_interval = duration_to_timespec(loaded_libs_check_interval),
-      .it_value = duration_to_timespec(initial_loaded_libs_check_delay)};
-  if (timer_settime(g_timerid, 0, &its, nullptr) == -1) {
-    uninstall_timer();
-    return -1;
-  }
-
-  g_timer_active = true;
-  g_initial_loaded_libs_check_delay = initial_loaded_libs_check_delay;
-  g_loaded_libs_check_interval = loaded_libs_check_interval;
-  return 0;
-}
-
-void setup_hooks(bool restore) {
-  install_hook<malloc>(restore);
-  install_hook<free>(restore);
-  install_hook<free_sized>(restore);
-  install_hook<free_aligned_sized>(restore);
-  install_hook<calloc>(restore);
-  install_hook<realloc>(restore);
-  install_hook<posix_memalign>(restore);
-  install_hook<aligned_alloc>(restore);
-  install_hook<memalign>(restore);
-  install_hook<valloc>(restore);
-
-  install_hook<new_>(restore);
-  install_hook<new_array>(restore);
-  install_hook<new_nothrow>(restore);
-  install_hook<new_array_nothrow>(restore);
-  install_hook<new_align>(restore);
-  install_hook<new_array_align>(restore);
-  install_hook<new_align_nothrow>(restore);
-  install_hook<new_array_align_nothrow>(restore);
-
-  install_hook<delete_>(restore);
-  install_hook<delete_array>(restore);
-  install_hook<delete_nothrow>(restore);
-  install_hook<delete_array_nothrow>(restore);
-  install_hook<delete_align>(restore);
-  install_hook<delete_array_align>(restore);
-  install_hook<delete_align_nothrow>(restore);
-  install_hook<delete_array_align_nothrow>(restore);
-  install_hook<delete_sized>(restore);
-  install_hook<delete_array_sized>(restore);
-  install_hook<delete_sized_align>(restore);
-  install_hook<delete_array_sized_align>(restore);
-
-  install_hook<mmap>(restore);
-  install_hook<mmap64_>(restore);
-  install_hook<munmap>(restore);
-  install_hook<mmap_>(restore);
-  install_hook<munmap_>(restore);
-
-  install_hook<mallocx>(restore);
-  install_hook<rallocx>(restore);
-  install_hook<xallocx>(restore);
-  install_hook<dallocx>(restore);
-  install_hook<sdallocx>(restore);
-
-  if (reallocarray::ref) {
-    install_hook<reallocarray>(restore);
-  }
-  if (pvalloc::ref) {
-    install_hook<pvalloc>(restore);
-  }
-
-  install_hook<pthread_create>(restore);
-  install_hook<dlopen>(restore);
-
-  g_symbols_overridden = !restore;
+  register_hook<PthreadCreateHook>();
+  register_hook<DlopenHook>();
 }
 
 } // namespace
 
-void setup_overrides(std::chrono::milliseconds initial_loaded_libs_check_delay,
-                     std::chrono::milliseconds loaded_libs_check_interval) {
-  setup_hooks(false);
-  install_timer(initial_loaded_libs_check_delay, loaded_libs_check_interval);
+void setup_overrides() {
+  std::lock_guard const lock(g_mutex);
+  MaybeReentryGuard const guard; // avoid tracking allocations
+
+  if (!g_symbol_overrides) {
+    g_symbol_overrides = std::make_unique<SymbolOverrides>();
+    register_hooks();
+  }
+
+  g_symbol_overrides->apply_overrides();
 }
 
 void restore_overrides() {
-  setup_hooks(true);
-  if (g_timer_active) {
-    uninstall_timer();
+  std::lock_guard const lock(g_mutex);
+  MaybeReentryGuard const guard; // avoid tracking allocations
+
+  if (g_symbol_overrides) {
+    g_symbol_overrides->restore_overrides();
+    g_symbol_overrides.reset();
   }
 }
 
-void reinstall_timer_after_fork() {
-  g_timer_active = false;
-  if (g_symbols_overridden) {
-    install_timer(g_initial_loaded_libs_check_delay,
-                  g_loaded_libs_check_interval);
+void update_overrides() {
+  std::lock_guard const lock(g_mutex);
+  MaybeReentryGuard const guard; // avoid tracking allocations
+
+  if (g_symbol_overrides) {
+    g_symbol_overrides->update_overrides();
   }
 }
+
 } // namespace ddprof

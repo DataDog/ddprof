@@ -8,8 +8,12 @@
 #include <chrono>
 
 namespace ddprof {
-void setup_overrides(std::chrono::milliseconds initial_loaded_libs_check_delay,
-                     std::chrono::milliseconds loaded_libs_check_interval);
+
+void setup_overrides();
+
 void restore_overrides();
-void reinstall_timer_after_fork();
+
+// check if new libs have been loaded and update overrides accordingly
+void update_overrides();
+
 } // namespace ddprof

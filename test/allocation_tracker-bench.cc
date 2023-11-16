@@ -111,7 +111,7 @@ void perform_memory_operations(bool track_allocations,
   if (track_allocations) {
     ddprof::AllocationTracker::allocation_tracking_init(
         rate, flags, k_default_perf_stack_sample_size,
-        ring_buffer.get_buffer_info());
+        ring_buffer.get_buffer_info(), {});
   }
 
   for (auto _ : state) {
@@ -252,7 +252,7 @@ void perform_memory_operations_2(bool track_allocations,
   if (track_allocations) {
     ddprof::AllocationTracker::allocation_tracking_init(
         rate, flags, k_default_perf_stack_sample_size,
-        ring_buffer.get_buffer_info());
+        ring_buffer.get_buffer_info(), {});
   }
 
 #ifdef READER_THREAD
