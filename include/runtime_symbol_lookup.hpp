@@ -7,6 +7,7 @@
 
 #include "ddprof_defs.hpp"
 #include "ddres_def.hpp"
+#include "map_utils.hpp"
 #include "symbol_map.hpp"
 #include "symbol_table.hpp"
 #include "unique_fd.hpp"
@@ -51,25 +52,8 @@ public:
   }
 
 private:
-  struct hash_string {
-    // allow comparison between strings and string_views.
-    // This saves on some string creations
-    // as suggested by @sjanel
-    using is_transparent = void;
-    std::size_t operator()(const std::string &v) const {
-      return std::hash<std::string>{}(v);
-    }
-    std::size_t operator()(const char *v) const {
-      return std::hash<std::string_view>{}(v);
-    }
+  using FailedCycle = HeterogeneousLookupStringMap<uint32_t>;
 
-    std::size_t operator()(const std::string_view &v) const {
-      return std::hash<std::string_view>{}(v);
-    }
-  };
-
-  using FailedCycle =
-      std::unordered_map<std::string, uint32_t, hash_string, std::equal_to<>>;
   struct SymbolInfo {
     SymbolMap _map;
     FailedCycle _failed_cycle;
