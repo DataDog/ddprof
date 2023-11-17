@@ -121,7 +121,9 @@ private:
                           TrackerThreadLocalState &tl_state);
 
   // If notify_needed is true, consumer should be notified
-  DDRes push_lost_sample(MPSCRingBufferWriter &writer, bool &notify_needed);
+  DDRes push_lost_sample(MPSCRingBufferWriter &writer,
+                         TrackerThreadLocalState &tl_state,
+                         bool &notify_needed);
 
   DDRes push_dealloc_sample(uintptr_t addr, TrackerThreadLocalState &tl_state);
 
