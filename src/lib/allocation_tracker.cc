@@ -25,12 +25,6 @@
 
 namespace ddprof {
 
-struct LostEvent {
-  perf_event_header hdr;
-  uint64_t id;
-  uint64_t lost;
-};
-
 // Static declarations
 pthread_once_t AllocationTracker::_key_once = PTHREAD_ONCE_INIT;
 
@@ -303,13 +297,14 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
 }
 
 DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
+                                          TrackerThreadLocalState &tl_state,
                                           bool &notify_needed) {
   auto lost_count = _state.lost_count.exchange(0, std::memory_order_acq_rel);
   if (lost_count == 0) {
     return {};
   }
   bool timeout = false;
-  auto buffer = writer.reserve(sizeof(LostEvent), &timeout);
+  auto buffer = writer.reserve(sizeof(perf_event_lost), &timeout);
   if (buffer.empty()) {
     // buffer is full, put back lost samples
     _state.lost_count.fetch_add(lost_count, std::memory_order_acq_rel);
@@ -319,13 +314,29 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
     return {};
   }
 
-  auto *lost_event = reinterpret_cast<LostEvent *>(buffer.data());
-  lost_event->hdr.size = sizeof(LostEvent);
-  lost_event->hdr.misc = 0;
-  lost_event->hdr.type = PERF_RECORD_LOST;
-  lost_event->id = 0;
-  lost_event->lost = lost_count;
+  auto *event = reinterpret_cast<perf_event_lost *>(buffer.data());
+  event->header.size = sizeof(perf_event_lost);
+  event->header.misc = 0;
+  event->header.type = PERF_RECORD_LOST;
+  auto now = PerfClock::now();
+  event->sample_id.time = now.time_since_epoch().count();
+  if (_state.pid == 0) {
+    _state.pid = getpid();
+  }
+  if (tl_state.tid == 0) {
+    tl_state.tid = ddprof::gettid();
+  }
+  event->sample_id.pid = _state.pid;
+  event->sample_id.tid = tl_state.tid;
+
+  event->id = 0;
+  event->lost = lost_count;
+
   notify_needed = writer.commit(buffer);
+
+  if (now > _state.next_check_time.load(std::memory_order_acquire)) {
+    update_timer(now);
+  }
 
   return {};
 }
@@ -348,7 +359,8 @@ DDRes AllocationTracker::push_clear_live_allocation(
   event->hdr.misc = 0;
   event->hdr.size = sizeof(ClearLiveAllocationEvent);
   event->hdr.type = PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION;
-  event->sample_id.time = PerfClock::now().time_since_epoch().count();
+  auto now = PerfClock::now();
+  event->sample_id.time = now.time_since_epoch().count();
   if (_state.pid == 0) {
     _state.pid = getpid();
   }
@@ -367,6 +379,10 @@ DDRes AllocationTracker::push_clear_live_allocation(
     }
   }
 
+  if (now > _state.next_check_time.load(std::memory_order_acquire)) {
+    update_timer(now);
+  }
+
   return {};
 }
 
@@ -377,7 +393,7 @@ DDRes AllocationTracker::push_dealloc_sample(
 
   bool timeout = false;
   if (unlikely(_state.lost_count.load(std::memory_order_relaxed))) {
-    (push_lost_sample(writer, notify_consumer));
+    (push_lost_sample(writer, tl_state, notify_consumer));
   }
 
   auto buffer = writer.reserve(sizeof(DeallocationEvent), &timeout);
@@ -397,7 +413,8 @@ DDRes AllocationTracker::push_dealloc_sample(
   event->hdr.misc = 0;
   event->hdr.size = sizeof(DeallocationEvent);
   event->hdr.type = PERF_CUSTOM_EVENT_DEALLOCATION;
-  event->sample_id.time = PerfClock::now().time_since_epoch().count();
+  auto now = PerfClock::now();
+  event->sample_id.time = now.time_since_epoch().count();
 
   if (_state.pid == 0) {
     _state.pid = getpid();
@@ -419,6 +436,11 @@ DDRes AllocationTracker::push_dealloc_sample(
                              strerror(errno));
     }
   }
+
+  if (now > _state.next_check_time.load(std::memory_order_acquire)) {
+    update_timer(now);
+  }
+
   return {};
 }
 
@@ -430,7 +452,7 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
 
   bool timeout = false;
   if (unlikely(_state.lost_count.load(std::memory_order_relaxed))) {
-    push_lost_sample(writer, notify_consumer);
+    push_lost_sample(writer, tl_state, notify_consumer);
   }
 
   if (tl_state.stack_bounds.empty()) {
