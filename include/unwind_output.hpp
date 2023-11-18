@@ -17,10 +17,10 @@
 namespace ddprof {
 
 struct FunLoc {
-  uint64_t ip; // Relative to file, not VMA
-  SymbolIdx_t _symbol_idx;
-  MapInfoIdx_t _map_info_idx;
-
+  uint64_t ip{};
+  uint32_t _lineno{};
+  SymbolIdx_t _symbol_idx{-1};
+  MapInfoIdx_t _map_info_idx{-1};
   friend auto operator<=>(const FunLoc &, const FunLoc &) = default;
 };
 

@@ -27,8 +27,7 @@ void write_function(const Symbol &symbol, ddog_prof_Function *ffi_func) {
   ffi_func->name = to_CharSlice(symbol._demangle_name);
   ffi_func->system_name = to_CharSlice(symbol._symname);
   ffi_func->filename = to_CharSlice(symbol._srcpath);
-  // Not filed (can be computed if needed using the start range from elf)
-  ffi_func->start_line = 0;
+  ffi_func->start_line = symbol._func_start_lineno;
 }
 
 void write_mapping(const MapInfo &mapinfo, ddog_prof_Mapping *ffi_mapping) {
@@ -44,7 +43,7 @@ void write_location(const FunLoc *loc, const MapInfo &mapinfo,
   write_mapping(mapinfo, &ffi_location->mapping);
   write_function(symbol, &ffi_location->function);
   ffi_location->address = loc->ip;
-  ffi_location->line = symbol._lineno;
+  ffi_location->line = loc->_lineno;
 }
 
 constexpr int k_max_value_types =

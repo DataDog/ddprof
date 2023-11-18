@@ -24,62 +24,14 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
   bool symbol_success = false;
   const char *lsymname = dwfl_module_addrinfo(
       mod, process_pc, &loffset, &elf_sym, &lshndxp, &lelfp, &lbias);
-#ifdef DEBUG
-  int dwfl_error_value = dwfl_errno();
-  if (unlikely(dwfl_error_value)) {
-    LG_DBG("[DWFL_SYMB] addrinfo error -- Error:%s -- %lx",
-           dwfl_errmsg(dwfl_error_value), process_pc);
-  }
-#else
-  dwfl_errno();
-#endif
-
   if (lsymname) {
     symbol._symname = std::string(lsymname);
     symbol._demangle_name = Demangler::demangle(symbol._symname);
     symbol_success = true;
   } else {
-    return false;
-  }
-
-// #define FLAG_SYMBOL
-// A small mechanism to create a trace around the expected function
-#ifdef FLAG_SYMBOL
-  static constexpr std::string_view look_for_symb = "$x";
-  if (symbol._demangle_name.find(look_for_symb) != std::string::npos) {
-    LG_NFO("DGB:: GOING THROUGH EXPECTED FUNC: %s", look_for_symb.data());
-  }
-#endif
-  Dwfl_Line *line = dwfl_module_getsrc(mod, process_pc);
-#ifdef DEBUG
-  dwfl_error_value = dwfl_errno();
-  if (unlikely(dwfl_error_value)) {
-    LG_DBG("[DWFL_SYMB] dwfl_src error pc=%lx : Error:%s (Sym=%s)", process_pc,
-           dwfl_errmsg(dwfl_error_value), symbol._demangle_name.c_str());
-  }
-#else
-  dwfl_errno();
-#endif
-
-  if (line) {
-    int linep;
-    const char *localsrcpath =
-        dwfl_lineinfo(line, &process_pc, static_cast<int *>(&linep), nullptr,
-                      nullptr, nullptr);
-    if (localsrcpath) {
-      symbol._srcpath = std::string(localsrcpath);
-      symbol._lineno = static_cast<uint32_t>(linep);
-    }
-#ifdef DEBUG
-    dwfl_error_value = dwfl_errno();
-    if (unlikely(dwfl_error_value)) {
-      LG_DBG("[DWFL_SYMB] dwfl_lineinfo error pc=%lx : Error:%s (Sym=%s)",
-             process_pc, dwfl_errmsg(dwfl_error_value),
-             symbol._demangle_name.c_str());
-    }
-#else
+    // reset error state in case of dwfl error
     dwfl_errno();
-#endif
+    symbol_success = false;
   }
   return symbol_success;
 }

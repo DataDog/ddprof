@@ -8,6 +8,7 @@
 #include "ddprof_defs.hpp"
 #include "ddprof_file_info-i.hpp"
 #include "ddprof_module.hpp"
+#include "ddres.hpp"
 #include "dso.hpp"
 #include "dso_symbol_lookup.hpp"
 #include "hash_helper.hpp"
@@ -42,16 +43,20 @@ struct DwflSymbolLookupStats {
 
 class DwflSymbolLookup {
 public:
+  using SymbolRange = std::pair<ElfAddress_t, ElfAddress_t>;
   // build and check env var to know check setting
   DwflSymbolLookup();
 
   // Get symbol from internal cache or fetch through dwarf
-  SymbolIdx_t get_or_insert(const DDProfMod &ddprof_mod, SymbolTable &table,
+  SymbolIdx_t get_or_insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
+                            SymbolTable &table,
                             DsoSymbolLookup &dso_symbol_lookup,
                             FileInfoId_t file_info_id,
                             ProcessAddress_t process_pc, const Dso &dso);
 
-  void erase(FileInfoId_t file_info_id) { _file_info_map.erase(file_info_id); }
+  void erase(FileInfoId_t file_info_id) {
+    _file_info_function_map.erase(file_info_id);
+  }
 
   unsigned size() const;
 
@@ -59,6 +64,12 @@ public:
   DwflSymbolLookupStats &stats() { return _stats; }
 
 private:
+  struct Line {
+    uint32_t _line;
+    ElfAddress_t _addr;
+    // possibly add a symbol ?
+  };
+  using LineMap = std::map<ElfAddress_t, Line>;
   /// Set through env var (DDPROF_CACHE_SETTING) in case of doubts on cache
   enum SymbolLookupSetting {
     K_CACHE_ON = 0,
@@ -67,23 +78,30 @@ private:
 
   SymbolLookupSetting _lookup_setting{K_CACHE_ON};
 
-  SymbolIdx_t insert(const DDProfMod &ddprof_mod, SymbolTable &table,
-                     DsoSymbolLookup &dso_symbol_lookup,
+  SymbolIdx_t insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
+                     SymbolTable &table, DsoSymbolLookup &dso_symbol_lookup,
                      ProcessAddress_t process_pc, const Dso &dso,
-                     SymbolMap &map);
+                     SymbolMap &func_map, LineMap &line_map);
 
   // Symbols are ordered by file.
   // The assumption is that the elf addresses are the same across processes
   // The unordered map stores symbols per file,
   // The map stores symbols per address range
   using FileInfo2SymbolMap = std::unordered_map<FileInfoId_t, SymbolMap>;
+  using FileInfo2LineMap = std::unordered_map<FileInfoId_t, LineMap>;
   using FileInfo2SymbolVT = FileInfo2SymbolMap::value_type;
+
+  static DDRes parse_lines(Dwfl *dwfl, const DDProfMod &mod,
+                           ProcessAddress_t process_pc, ElfAddress_t start_sym,
+                           ElfAddress_t end_sym, LineMap &line_map,
+                           SymbolTable &table, SymbolIdx_t current_sym);
 
   static bool symbol_lookup_check(Dwfl_Module *mod, ElfAddress_t process_pc,
                                   const Symbol &symbol);
 
   // unordered map of DSO elements
-  FileInfo2SymbolMap _file_info_map;
+  FileInfo2SymbolMap _file_info_function_map;
+  FileInfo2LineMap _file_info_inlining_map;
   DwflSymbolLookupStats _stats;
 };
 

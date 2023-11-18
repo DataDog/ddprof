@@ -34,7 +34,7 @@ DwflSymbolLookup::DwflSymbolLookup() {
 unsigned DwflSymbolLookup::size() const {
   unsigned total_nb_elts = 0;
   std::for_each(
-      _file_info_map.begin(), _file_info_map.end(),
+      _file_info_function_map.begin(), _file_info_function_map.end(),
       [&](FileInfo2SymbolVT const &el) { total_nb_elts += el.second.size(); });
   return total_nb_elts;
 }
@@ -44,12 +44,10 @@ unsigned DwflSymbolLookup::size() const {
 /****************/
 
 // Retrieve existing symbol or attempt to read from dwarf
-SymbolIdx_t DwflSymbolLookup::get_or_insert(const DDProfMod &ddprof_mod,
-                                            SymbolTable &table,
-                                            DsoSymbolLookup &dso_symbol_lookup,
-                                            FileInfoId_t file_info_id,
-                                            ProcessAddress_t process_pc,
-                                            const Dso &dso) {
+SymbolIdx_t DwflSymbolLookup::get_or_insert(
+    Dwfl *dwfl, const DDProfMod &ddprof_mod, SymbolTable &table,
+    DsoSymbolLookup &dso_symbol_lookup, FileInfoId_t file_info_id,
+    ProcessAddress_t process_pc, const Dso &dso) {
   ++_stats._calls;
   ElfAddress_t const elf_pc = process_pc - ddprof_mod._sym_bias;
 
@@ -57,7 +55,8 @@ SymbolIdx_t DwflSymbolLookup::get_or_insert(const DDProfMod &ddprof_mod,
   LG_DBG("Looking for : %lx = (%lx - %lx) / dso:%s", elf_pc, process_pc,
          ddprof_mod._low_addr, dso._filename.c_str());
 #endif
-  SymbolMap &map = _file_info_map[file_info_id];
+  SymbolMap &map = _file_info_function_map[file_info_id];
+  LineMap &line_map = _file_info_inlining_map[file_info_id];
   SymbolMap::FindRes const find_res = map.find_closest(elf_pc);
   if (find_res.second) { // already found the correct symbol
 #ifdef DEBUG
@@ -77,15 +76,17 @@ SymbolIdx_t DwflSymbolLookup::get_or_insert(const DDProfMod &ddprof_mod,
     ++_stats._hit;
     return find_res.first->second.get_symbol_idx();
   }
-
-  return insert(ddprof_mod, table, dso_symbol_lookup, process_pc, dso, map);
+  // todo get line no
+  return insert(dwfl, ddprof_mod, table, dso_symbol_lookup, process_pc, dso,
+                map, line_map);
 }
 
-SymbolIdx_t DwflSymbolLookup::insert(const DDProfMod &ddprof_mod,
+SymbolIdx_t DwflSymbolLookup::insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
                                      SymbolTable &table,
                                      DsoSymbolLookup &dso_symbol_lookup,
                                      ProcessAddress_t process_pc,
-                                     const Dso &dso, SymbolMap &map) {
+                                     const Dso &dso, SymbolMap &func_map,
+                                     LineMap &line_map) {
 
   Symbol symbol;
   GElf_Sym elf_sym;
@@ -115,7 +116,7 @@ SymbolIdx_t DwflSymbolLookup::insert(const DDProfMod &ddprof_mod,
            table[symbol_idx]._symname.c_str(), symbol_idx,
            dso.to_string().c_str());
 #endif
-    map.emplace(start_sym, SymbolSpan(end_sym, symbol_idx));
+    func_map.emplace(start_sym, SymbolSpan(end_sym, symbol_idx));
     return symbol_idx;
   }
 
@@ -133,31 +134,33 @@ SymbolIdx_t DwflSymbolLookup::insert(const DDProfMod &ddprof_mod,
     table.push_back(std::move(symbol));
 
     Symbol &sym_ref = table.back();
-    if (sym_ref._srcpath.empty()) {
-      // override with info from dso (this slightly mixes mappings and sources)
-      // But it helps a lot at Datadog (as mappings are ignored for now in UI)
-      sym_ref._srcpath = dso.format_filename();
-    }
+    if (sym_ref._srcpath.empty()) {}
 
     if (!compute_elf_range(elf_pc, elf_sym, start_sym, end_sym)) {
       // elf section does not add up to something that makes sense
       // insert this PC without considering elf section
       start_sym = elf_pc;
       end_sym = elf_pc;
-#ifdef DEBUG
-      LG_DBG("elf_range failure --> Insert: %lx,%lx -> %s,%d / shndx=%d",
+      LG_DBG("elf_range failure --> Insert: %lx,%lx -> %s, %d / shndx=%d",
              start_sym, end_sym, sym_ref._symname.c_str(), symbol_idx,
              elf_sym.st_shndx);
-#endif
-      map.emplace(start_sym, SymbolSpan(end_sym, symbol_idx));
-      return symbol_idx;
     }
 
 #ifdef DEBUG
     LG_DBG("Insert: %lx,%lx -> %s,%d / shndx=%d", start_sym, end_sym,
            sym_ref._symname.c_str(), symbol_idx, elf_sym.st_shndx);
 #endif
-    map.emplace(start_sym, SymbolSpan(end_sym, symbol_idx));
+    if (IsDDResNotOK(parse_lines(dwfl, ddprof_mod, process_pc, start_sym,
+                                 end_sym, line_map, table, symbol_idx))) {
+      LG_DBG("Error when parsing line information for %s (%s)",
+             sym_ref._demangle_name.c_str(), dso._filename.c_str());
+    }
+    if (sym_ref._srcpath.empty()) {
+      // override with info from dso (this slightly mixes mappings and sources)
+      // But it helps a lot at Datadog (as mappings are ignored for now in UI)
+      sym_ref._srcpath = dso.format_filename();
+    }
+    func_map.emplace(start_sym, SymbolSpan(end_sym, symbol_idx));
     return symbol_idx;
   }
 }
@@ -224,6 +227,110 @@ void DwflSymbolLookupStats::reset() {
   _hit = 0;
   _calls = 0;
   _errors = 0;
+}
+
+size_t binary_search_start_index(Dwarf_Lines *lines, size_t nlines,
+                                 ElfAddress_t start_sym) {
+  size_t low = 0;
+  size_t high = nlines - 1;
+
+  while (low <= high) {
+    size_t mid = low + (high - low) / 2;
+    Dwarf_Line *mid_line = dwarf_onesrcline(lines, mid);
+    Dwarf_Addr mid_addr;
+    dwarf_lineaddr(mid_line, &mid_addr);
+
+    if (mid_addr < start_sym) {
+      low = mid + 1;
+    } else if (mid_addr > start_sym) {
+      high = mid - 1;
+    } else {
+      return mid;
+    }
+
+    if (low == high) {
+      return low;
+    }
+  }
+
+  return 0; // Return a default value if no suitable index is found
+}
+
+DDRes DwflSymbolLookup::parse_lines(Dwfl *dwfl, const DDProfMod &mod,
+                                    ProcessAddress_t process_pc,
+                                    ElfAddress_t start_sym,
+                                    ElfAddress_t end_sym, LineMap &line_map,
+                                    SymbolTable &table,
+                                    SymbolIdx_t current_sym) {
+  Dwarf_Addr bias;
+  // This will lazily load the dwarf file
+  // the decompression can take time
+  // todo use dw access to avoid opening PID times
+  Dwarf_Die *cudie = dwfl_addrdie(dwfl, process_pc, &bias);
+  Dwarf *dwarf = dwfl_module_getdwarf(mod._mod, &bias);
+  //  ElfAddress_t elf_address = process_pc - bias;
+  LG_DBG("Start %lx - end %lx", start_sym, end_sym);
+
+  if (!cudie) {
+    // This will fail in case of no debug info
+    return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
+  }
+
+  Dwarf_Lines *lines;
+  size_t nlines;
+  if (dwarf_getsrclines(cudie, &lines, &nlines) != 0) {
+    LG_DBG("Unable to find source lines");
+    return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
+  }
+  auto it = line_map.begin();
+
+  // for now we care about first source file
+  const char *current_line_file = nullptr;
+
+  size_t start_index = binary_search_start_index(lines, nlines, start_sym);
+  int start_lineno = -1;
+  int end_lineno = -1;
+  {
+    size_t end_index = binary_search_start_index(lines, nlines, end_sym);
+    Dwarf_Line *line = dwarf_onesrcline(lines, end_index);
+
+    if (dwarf_lineno(line, &end_lineno) == -1) {
+      end_lineno = std::numeric_limits<int>::max();
+    }
+  }
+
+  Symbol &ref_sym = table[current_sym];
+
+  // todo: different files
+  for (size_t i = start_index; i < nlines; ++i) {
+    Dwarf_Line *line = dwarf_onesrcline(lines, i);
+    Dwarf_Addr line_addr;
+    int lineno;
+    dwarf_lineaddr(line, &line_addr);
+    if (line_addr < start_sym) {
+      continue;
+    }
+    if (line_addr > end_sym) {
+      break;
+    }
+    current_line_file = dwarf_linesrc(line, nullptr, nullptr);
+    if (current_line_file && ref_sym._srcpath.empty()) {
+      ref_sym._srcpath = std::string(current_line_file);
+    }
+    if (dwarf_lineno(line, &lineno) == -1) {
+      lineno = 0;
+    } else if (!ref_sym._func_start_lineno) {
+      start_lineno = lineno;
+      ref_sym._func_start_lineno = lineno;
+    }
+    // ... Process line information here ...
+    LG_DBG("Dwarf file = %s / %d / %lx", current_line_file, lineno, line_addr);
+    it = line_map.insert(it,
+                         std::pair<ElfAddress_t, Line>(
+                             static_cast<ElfAddress_t>(line_addr),
+                             Line{static_cast<uint32_t>(lineno), line_addr}));
+  }
+  return {};
 }
 
 } // namespace ddprof
