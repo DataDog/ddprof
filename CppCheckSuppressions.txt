@@ -7,3 +7,6 @@ missingIncludeSystem
 
 // Ignore Lex and Yacc defects
 *:*/event_parser/*
+
+// Abseil makes cppcheck choke because of missing defines
+*:*/_deps/absl-src/absl/base/policy_checks.h
