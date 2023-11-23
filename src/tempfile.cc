@@ -8,6 +8,7 @@
 #include "ddres_helpers.hpp"
 #include "defer.hpp"
 
+#include <absl/strings/substitute.h>
 #include <fcntl.h>
 #include <filesystem>
 #include <sys/stat.h>
@@ -21,8 +22,9 @@ DDRes get_or_create_temp_file(std::string_view prefix,
                               std::string_view digest, mode_t mode,
                               std::string &path) {
   std::error_code ec;
-  path = std::string{std::filesystem::temp_directory_path(ec) / prefix} + "-" +
-      std::string{digest};
+  path = absl::Substitute("$0/$1-$2",
+                          std::filesystem::temp_directory_path(ec).string(),
+                          prefix, digest);
   DDRES_CHECK_ERRORCODE(ec, DD_WHAT_TEMP_FILE,
                         "Failed to determine temp directory path");
 
@@ -43,9 +45,9 @@ DDRes get_or_create_temp_file(std::string_view prefix,
 DDRes create_temp_file(std::string_view prefix, std::span<const std::byte> data,
                        mode_t mode, std::string &path) {
   std::error_code ec;
-  auto template_str =
-      std::string{std::filesystem::temp_directory_path(ec) / prefix} +
-      ".XXXXXX";
+  auto template_str = absl::Substitute(
+      "$0/$1.XXXXXX", std::filesystem::temp_directory_path(ec).string(),
+      prefix);
   DDRES_CHECK_ERRORCODE(ec, DD_WHAT_TEMP_FILE,
                         "Failed to determine temp directory path");
 
