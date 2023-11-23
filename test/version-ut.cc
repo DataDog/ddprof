@@ -5,17 +5,16 @@
 
 #include "version.hpp"
 
+#include <absl/strings/substitute.h>
 #include <gtest/gtest.h>
 #include <string>
 
 namespace ddprof {
 
 TEST(VersionTest, VersionStr) {
-  std::string expectedStr;
-  expectedStr += std::to_string(VER_MAJ) + "." + std::to_string(VER_MIN) + "." +
-      std::to_string(VER_PATCH);
-  std::string apiStr(str_version().data(), str_version().size());
-  EXPECT_TRUE(apiStr.find(expectedStr) != std::string::npos);
+  std::string expectedStr =
+      absl::Substitute("$0.$1.$2", VER_MAJ, VER_MIN, VER_PATCH);
+  EXPECT_TRUE(str_version().starts_with(expectedStr));
 }
 
 } // namespace ddprof

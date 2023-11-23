@@ -5,26 +5,17 @@
 
 #include "version.hpp"
 
+#include <absl/strings/substitute.h>
 #include <cstdio>
 
 namespace ddprof {
 
 std::string_view str_version() {
-  constexpr size_t k_max_version_length = 1024;
-  static char profiler_version[k_max_version_length] = {};
-  int len = 0;
-  if (*VER_REV) {
-    len = snprintf(profiler_version, std::size(profiler_version), "%d.%d.%d+%s",
-                   VER_MAJ, VER_MIN, VER_PATCH, VER_REV);
-  } else {
-    len = snprintf(profiler_version, std::size(profiler_version), "%d.%d.%d",
-                   VER_MAJ, VER_MIN, VER_PATCH);
-  }
+  static std::string const version_str = *VER_REV
+      ? absl::Substitute("$0.$1.$2+$3", VER_MAJ, VER_MIN, VER_PATCH, VER_REV)
+      : absl::Substitute("$0.$1.$2", VER_MAJ, VER_MIN, VER_PATCH);
 
-  if (len < 0) {
-    return "bad-version";
-  }
-  return std::string_view{profiler_version, static_cast<unsigned>(len)};
+  return std::string_view{version_str};
 }
 
 void print_version() {
