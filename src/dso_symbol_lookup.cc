@@ -8,8 +8,8 @@
 #include "ddprof_file_info-i.hpp"
 #include "dso_type.hpp"
 #include "logger.hpp"
-#include "string_format.hpp"
 
+#include <absl/strings/str_format.h>
 #include <algorithm>
 
 namespace ddprof {
@@ -24,7 +24,7 @@ Symbol symbol_from_dso(ElfAddress_t normalized_addr, const Dso &dso,
                        std::string_view addr_type) {
   // address that means something for our user (addr)
   std::string const dso_dbg_str = normalized_addr
-      ? string_format("[%p:%s]", normalized_addr, addr_type.data())
+      ? absl::StrFormat("[%#x:%s]", normalized_addr, addr_type)
       : "";
   return {dso_dbg_str, dso_dbg_str, 0, dso.format_filename()};
 }

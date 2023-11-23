@@ -7,14 +7,14 @@
 
 #include "dso_type.hpp"
 #include "logger.hpp"
-#include "string_format.hpp"
+
+#include <absl/strings/str_cat.h>
 
 namespace ddprof {
 
 namespace {
 Symbol symbol_from_pid(pid_t pid) {
-  std::string const pid_str = string_format("pid_%d", pid);
-  return {std::string(), std::string(), 0, pid_str};
+  return {{}, {}, 0, absl::StrCat("pid_", pid)};
 }
 } // namespace
 

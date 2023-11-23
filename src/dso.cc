@@ -8,8 +8,8 @@
 #include "constants.hpp"
 #include "ddprof_defs.hpp"
 #include "logger.hpp"
-#include "string_format.hpp"
 
+#include <absl/strings/str_format.h>
 #include <algorithm>
 #include <string_view>
 
@@ -113,11 +113,10 @@ Dso::Dso(pid_t pid, ProcessAddress_t start, ProcessAddress_t end,
       _type(determine_dso_type(_filename)), _origin(origin) {}
 
 std::string Dso::to_string() const {
-  return string_format("PID[%d] %lx-%lx %lx (%s)(T-%s)(%c%c%c)(ID#%d)", _pid,
-                       _start, _end, _offset, _filename.c_str(),
-                       dso_type_str(_type), _prot & PROT_READ ? 'r' : '-',
-                       _prot & PROT_WRITE ? 'w' : '-',
-                       _prot & PROT_EXEC ? 'x' : '-', _id);
+  return absl::StrFormat(
+      "PID[%d] %x-%x %x (%s)(T-%s)(%c%c%c)(ID#%d)", _pid, _start, _end, _offset,
+      _filename, dso_type_str(_type), _prot & PROT_READ ? 'r' : '-',
+      _prot & PROT_WRITE ? 'w' : '-', _prot & PROT_EXEC ? 'x' : '-', _id);
 }
 
 std::string Dso::format_filename() const {

@@ -10,9 +10,10 @@
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "pevent_lib.hpp"
-#include "string_format.hpp"
 #include "symbol_hdr.hpp"
 
+#include <absl/strings/str_format.h>
+#include <absl/strings/substitute.h>
 #include <cstdio>
 #include <cstring>
 #include <span>
@@ -384,9 +385,8 @@ void ddprof_print_sample(const UnwindOutput &uw_output,
 
   const char *sample_name =
       sample_type_name_from_idx(watcher.sample_type_id, value_mode_pos);
-  std::string buf =
-      ddprof::string_format("sample[type=%s;pid=%ld;tid=%ld] ", sample_name,
-                            uw_output.pid, uw_output.tid);
+  std::string buf = absl::Substitute("sample[type=$0;pid=$1;tid=$2] ",
+                                     sample_name, uw_output.pid, uw_output.tid);
 
   for (auto loc_it = locs.rbegin(); loc_it != locs.rend(); ++loc_it) {
     const auto &sym = symbol_table[loc_it->_symbol_idx];
@@ -401,7 +401,7 @@ void ddprof_print_sample(const UnwindOutput &uw_output,
         buf += path.substr(pos == std::string_view::npos ? 0 : pos + 1);
         buf += ")";
       } else {
-        buf += string_format("%p", loc_it->ip);
+        absl::StrAppendFormat(&buf, "%#x", loc_it->ip);
       }
     } else {
       std::string_view const func{sym._symname};

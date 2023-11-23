@@ -6,8 +6,8 @@
 #include "ddprof_process.hpp"
 
 #include "ddres.hpp"
-#include "string_format.hpp"
 
+#include <absl/strings/str_cat.h>
 #include <charconv> // for std::from_chars
 #include <unistd.h>
 #include <vector>
@@ -17,7 +17,7 @@ constexpr auto k_max_buf_cgroup_link = 1024;
 
 std::string Process::format_cgroup_file(pid_t pid,
                                         std::string_view path_to_proc) {
-  return string_format("%s/proc/%d/cgroup", path_to_proc.data(), pid);
+  return absl::StrCat(path_to_proc, "/proc/", pid, "/cgroup");
 }
 
 const ContainerId &Process::get_container_id(std::string_view path_to_proc) {
@@ -43,7 +43,7 @@ DDRes Process::read_cgroup_ns(pid_t pid, std::string_view path_to_proc,
                               CGroupId_t &cgroup) {
   cgroup = Process::kCGroupNsError;
   std::string const path =
-      string_format("%s/proc/%d/ns/cgroup", path_to_proc.data(), pid);
+      absl::StrCat(path_to_proc, "/proc/", pid, "/ns/cgroup");
   char buf[k_max_buf_cgroup_link];
   ssize_t const len = readlink(path.c_str(), buf, k_max_buf_cgroup_link - 1);
   if (len == -1) {
