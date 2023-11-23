@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include "symbol_map.hpp"
+#include "loghandle.hpp"
 
 namespace ddprof {
 
@@ -22,6 +23,28 @@ TEST(SymbolMap, Map) {
   SymbolMap map;
   SymbolSpan span0_1000(0x1000, 12);
   map.emplace(0, span0_1000);
+  SymbolMap::FindRes res = map.find_closest(50);
+  EXPECT_TRUE(res.second);
+}
+
+
+TEST(SymbolMap, NestedSymbolMap) {
+  LogHandle handle;
+  NestedSymbolMap map;
+  NestedSymbolSpan span100_1000(0x1000, 0);
+  map.emplace(0x100, span100_1000);
+  NestedSymbolSpan span150_300(0x300, 1, 0x100);
+  map.emplace(0x150, span150_300);
+  {
+    NestedSymbolMap::FindRes res = map.find_closest(0x150);
+    EXPECT_TRUE(res.second);
+    EXPECT_EQ(res.first->second.get_symbol_idx(), 1);
+  }
+  {
+    NestedSymbolMap::FindRes res = map.find_closest(0x400);
+    EXPECT_TRUE(res.second);
+    EXPECT_EQ(res.first->second.get_symbol_idx(), 0);
+  }
 }
 
 } // namespace ddprof

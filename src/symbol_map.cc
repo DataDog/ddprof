@@ -19,7 +19,6 @@ bool SymbolMap::is_within(const Offset_t &norm_pc,
 }
 
 SymbolMap::FindRes SymbolMap::find_closest(Offset_t norm_pc) {
-
   // First element not less than (can match exactly a start addr)
   auto it = lower_bound(norm_pc);
   if (it != end()) { // map is empty
@@ -35,7 +34,43 @@ SymbolMap::FindRes SymbolMap::find_closest(Offset_t norm_pc) {
     return {end(), false};
   }
   // element can not be end (as we reversed or exit)
-  return {it, SymbolMap::is_within(norm_pc, *it)};
+  return {it, is_within(norm_pc, *it)};
+}
+
+
+NestedSymbolMap::FindRes NestedSymbolMap::find_closest(Offset_t norm_pc) {
+  auto it = lower_bound(norm_pc);
+  if (it != end()) { // map is empty
+    if (is_within(norm_pc, *it)) {
+      return {it, true};
+    }
+  }
+  if (it != begin()) {
+    --it;
+  }
+  // Iteratively check the current symbol and its parent symbols
+  while (it != end()) {
+    if (is_within(norm_pc, *it)) {
+      return {it, true};
+    }
+    // Traverse to the parent symbol if available
+    if (it->second.get_parent_addr() != 0) {
+      it = find(it->second.get_parent_addr());
+    } else {
+      break; // No parent, stop the search
+    }
+  }
+  return {end(), false};
+}
+
+bool NestedSymbolMap::is_within(const Offset_t &norm_pc, const NestedSymbolMap::ValueType &kv) {
+  if (norm_pc < kv.first) {
+    return false;
+  }
+  if (norm_pc > kv.second.get_end()) {
+    return false;
+  }
+  return true;
 }
 
 } // namespace ddprof

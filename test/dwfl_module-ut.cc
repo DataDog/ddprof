@@ -187,12 +187,15 @@ TEST(DwflModule, short_lived) {
 }
 #endif
 __attribute__((always_inline)) inline ElfAddress_t deeper_function() {
+  // Without these instructions we can fall in the calling function
+  LG_DBG("Adding some logging instructions");
   ElfAddress_t ip = _THIS_IP_;
-  LG_DBG("I'm deep!!");
+  LG_DBG("I'm capturing the ip = %lx", ip);
   return ip;
 }
 
 __attribute__((always_inline)) inline ElfAddress_t inlined_function() {
+  LG_DBG("Before the call to deeper func!!");
   ElfAddress_t ip = deeper_function();
   LG_DBG("I'm going up!!");
   return ip;
@@ -241,6 +244,9 @@ TEST(DwflModule, inlined_func) {
         SymbolIdx_t symbol_idx =
             symbol_lookup.get_or_insert(dwfl_wrapper._dwfl, *ddprof_mod, table,
                                         dso_lookup, file_info_id, ip, dso);
+        const auto &sym = table[symbol_idx];
+        LG_DBG("Sym = %s", sym._demangle_name.c_str());
+        EXPECT_EQ(sym._demangle_name, "deeper_function");
       }
     }
   }

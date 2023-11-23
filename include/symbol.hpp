@@ -19,10 +19,10 @@ public:
 
   // Warning : Generates some string copies (these are not rvalues)
   Symbol(std::string symname, std::string demangle_name, uint32_t lineno,
-         std::string srcpath)
+         std::string srcpath, int parent_idx = -1)
       : _symname(std::move(symname)), _demangle_name(std::move(demangle_name)),
         _func_start_lineno(lineno), _srcpath(std::move(srcpath)),
-        _parent_idx(-1) {}
+        _parent_idx(parent_idx) {}
 
   // OUTPUT OF ADDRINFO
   std::string _symname;

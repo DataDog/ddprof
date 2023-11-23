@@ -14,9 +14,60 @@
 #include <algorithm>
 #include <cassert>
 #include <cstring>
+#include <numeric> // For std::iota
+#include <queue>
+#include <set>
 #include <string>
 
+#define DEBUG
+
+
 namespace ddprof {
+
+namespace {
+struct DieInformation {
+  struct Function {
+    ElfAddress_t start_addr{};
+    ElfAddress_t end_addr{};
+    const char *func_name{};
+    int parent_pos{-1}; // position within the die vector
+    SymbolIdx_t symbol_idx = -1;
+  };
+  std::vector<Function> die_mem_vec{};
+};
+
+struct DieSearchParam {
+  Dwarf_Addr addr;
+  Dwarf_Die *die_mem;
+};
+
+size_t binary_search_start_index(Dwarf_Lines *lines, size_t nlines,
+                                 ElfAddress_t start_sym) {
+  size_t low = 0;
+  size_t high = nlines - 1;
+
+  while (low <= high) {
+    size_t mid = low + (high - low) / 2;
+    Dwarf_Line *mid_line = dwarf_onesrcline(lines, mid);
+    Dwarf_Addr mid_addr;
+    dwarf_lineaddr(mid_line, &mid_addr);
+
+    if (mid_addr < start_sym) {
+      low = mid + 1;
+    } else if (mid_addr > start_sym) {
+      high = mid - 1;
+    } else {
+      return mid;
+    }
+
+    if (low == high) {
+      return low;
+    }
+  }
+
+  return 0; // Return a default value if no suitable index is found
+}
+} // namespace
 
 DwflSymbolLookup::DwflSymbolLookup() {
   if (const char *env_p = std::getenv("DDPROF_CACHE_SETTING")) {
@@ -35,13 +86,9 @@ unsigned DwflSymbolLookup::size() const {
   unsigned total_nb_elts = 0;
   std::for_each(
       _file_info_function_map.begin(), _file_info_function_map.end(),
-      [&](FileInfo2SymbolVT const &el) { total_nb_elts += el.second.size(); });
+      [&](FileInfo2SymbolVT const &el) { total_nb_elts += el.second._symbol_map.size(); });
   return total_nb_elts;
 }
-
-/****************/
-/* Range implem */
-/****************/
 
 // Retrieve existing symbol or attempt to read from dwarf
 SymbolIdx_t DwflSymbolLookup::get_or_insert(
@@ -55,8 +102,8 @@ SymbolIdx_t DwflSymbolLookup::get_or_insert(
   LG_DBG("Looking for : %lx = (%lx - %lx) / dso:%s", elf_pc, process_pc,
          ddprof_mod._low_addr, dso._filename.c_str());
 #endif
-  SymbolMap &map = _file_info_function_map[file_info_id];
-  LineMap &line_map = _file_info_inlining_map[file_info_id];
+  SymbolWrapper &symbol_wrapper = _file_info_function_map[file_info_id];
+  SymbolMap &map = symbol_wrapper._symbol_map;
   SymbolMap::FindRes const find_res = map.find_closest(elf_pc);
   if (find_res.second) { // already found the correct symbol
 #ifdef DEBUG
@@ -76,24 +123,206 @@ SymbolIdx_t DwflSymbolLookup::get_or_insert(
     ++_stats._hit;
     return find_res.first->second.get_symbol_idx();
   }
-  // todo get line no
-  return insert(dwfl, ddprof_mod, table, dso_symbol_lookup, process_pc, dso,
-                map, line_map);
+  return insert(dwfl, ddprof_mod, table, dso_symbol_lookup, process_pc, dso, symbol_wrapper);
+}
+
+/* die_find callback for non-inlined function search */
+static int die_search_func_cb(Dwarf_Die *fn_die, void *data) {
+  DieSearchParam *ad = reinterpret_cast<DieSearchParam *>(data);
+  if (dwarf_tag(fn_die) == DW_TAG_subprogram && dwarf_haspc(fn_die, ad->addr)) {
+    memcpy(ad->die_mem, fn_die, sizeof(Dwarf_Die));
+    return DWARF_CB_ABORT;
+  }
+  return DWARF_CB_OK;
+}
+
+Dwarf_Die *die_find_realfunc(Dwarf_Die *cu_die, Dwarf_Addr addr,
+                             Dwarf_Die *die_mem) {
+  DieSearchParam ad;
+  ad.addr = addr;
+  ad.die_mem = die_mem;
+  /* dwarf_getscopes can't find subprogram. */
+  if (!dwarf_getfuncs(cu_die, die_search_func_cb, &ad, 0))
+    return NULL;
+  else
+    return die_mem;
+}
+
+// return index to added element, else returns -1
+static int store_die_information(Dwarf_Die *sc_die, int parent_index,
+                                 DieInformation &data) {
+  // function or inlined function
+  int tag_val = dwarf_tag(sc_die);
+  if (tag_val == DW_TAG_subprogram || tag_val == DW_TAG_inlined_subroutine) {
+    DieInformation::Function function{};
+    // die_name is usually the raw function name (no mangling info)
+    // link name can have mangling info
+    function.func_name = dwarf_diename(sc_die);
+    Dwarf_Attribute attr_mem;
+    Dwarf_Attribute *attr;
+    if ((attr = dwarf_attr(sc_die, DW_AT_low_pc, &attr_mem))) {
+      if (attr) {
+        Dwarf_Addr ret_value;
+        if (dwarf_formaddr(attr, &ret_value) == 0) {
+          function.start_addr = ret_value;
+        }
+      }
+    }
+    // end is stored as a unsigned (not as a pointer)
+    if ((attr = dwarf_attr(sc_die, DW_AT_high_pc, &attr_mem))) {
+      if (attr) {
+        Dwarf_Word return_uval;
+        if (dwarf_formudata(attr, &return_uval) == 0) {
+          function.end_addr = function.start_addr + return_uval;
+        }
+      }
+    }
+
+    function.parent_pos = parent_index;
+    data.die_mem_vec.push_back(std::move(function));
+    return (data.die_mem_vec.size() - 1);
+  }
+  return -1;
+}
+
+static Dwarf_Die *find_functions_in_child_die(Dwarf_Die *current_die,
+                                              int parent_index,
+                                              DieInformation &die_info,
+                                              Dwarf_Die *die_mem) {
+  Dwarf_Die child_die;
+  int ret;
+  ret = dwarf_child(current_die, die_mem);
+  if (ret != 0)
+    return nullptr;
+  do {
+    int current_idx = store_die_information(die_mem, parent_index, die_info);
+    // todo: can their be childs outside of subprograms / inlined funcs ?
+    // Current assumption is that that is impossible
+    if (current_idx != -1) {
+      find_functions_in_child_die(die_mem, current_idx, die_info, &child_die);
+    }
+  } while (dwarf_siblingof(die_mem, die_mem) == 0);
+  return nullptr;
+}
+
+static DDRes parse_die_information(Dwfl *dwfl, ProcessAddress_t process_pc,
+                                   DieInformation &die_information) {
+  Dwarf_Addr bias;
+  Dwarf_Die *cudie = dwfl_addrdie(dwfl, process_pc, &bias);
+  ElfAddress_t elf_addr = process_pc - bias;
+  Dwarf_Die die_mem;
+  Dwarf_Die *sc_die = die_find_realfunc(cudie, elf_addr, &die_mem);
+  if (sc_die == nullptr) {
+    DDRES_RETURN_WARN_LOG(DD_WHAT_DWFL_LIB_ERROR, "Unable to retrieve sc_die");
+  }
+  // store parent function at index 0
+  if (store_die_information(sc_die, -1, die_information) == -1) {
+    DDRES_RETURN_WARN_LOG(DD_WHAT_DWFL_LIB_ERROR,
+                          "Unable to store the parent function");
+  }
+
+  find_functions_in_child_die(sc_die, 0, die_information, &die_mem);
+
+  for (auto &el : die_information.die_mem_vec) {
+    LG_DBG("Inlined func = %s / start=%lx / end=%lx / parent=%d",
+           el.func_name, el.start_addr, el.end_addr, el.parent_pos);
+  }
+  return {};
+}
+
+int findClosestAfter(const std::vector<int> &values, int reference) {
+  int closest = -1;
+  for (int val : values) {
+    if (val > reference && (closest == -1 || val < closest)) {
+      closest = val;
+    }
+  }
+  return closest;
+}
+
+static DDRes parse_lines(Dwfl *dwfl, const DDProfMod &mod,
+                         ProcessAddress_t process_pc, SymbolMap &func_map,
+                         DwflSymbolLookup::LineMap &line_map,
+                         SymbolTable &table, DieInformation &die_information) {
+  Dwarf_Addr bias;
+  // This will lazily load the dwarf file
+  // the decompression can take time
+  // todo use dw access to avoid opening PID times
+
+  Dwarf_Die *cudie = dwfl_addrdie(dwfl, process_pc, &bias);
+
+  if (!cudie) {
+    // This will fail in case of no debug info
+    return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
+  }
+
+  Dwarf_Lines *lines;
+  size_t nlines;
+  if (dwarf_getsrclines(cudie, &lines, &nlines) != 0) {
+    LG_DBG("Unable to find source lines");
+    return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
+  }
+  auto it = line_map.begin();
+  for (size_t func_pos = 0; func_pos <die_information.die_mem_vec.size(); ++func_pos) {
+    const DieInformation::Function &current_func =
+        die_information.die_mem_vec[func_pos];
+
+    int start_index = binary_search_start_index(lines,
+                                                nlines,
+                                                current_func.start_addr);
+    // retrieve dwarf source line
+    Symbol &ref_sym = table[current_func.symbol_idx];
+    Dwarf_Line *line = dwarf_onesrcline(lines, start_index);
+    int lineno;
+    if (dwarf_lineno(line, &lineno) == -1) {
+      lineno = 0;
+    } else {
+      ref_sym._func_start_lineno = lineno;
+    }
+    const char *current_file = dwarf_linesrc(line, nullptr, nullptr);
+    if (current_file) {
+      ref_sym._srcpath = std::string(current_file);
+    }
+    it = line_map.insert(
+        it,
+        std::pair<ElfAddress_t, DwflSymbolLookup::Line>(
+            static_cast<ElfAddress_t>(current_func.start_addr),
+            DwflSymbolLookup::Line{static_cast<uint32_t>(lineno),
+                                   current_func.start_addr,
+                                   current_func.symbol_idx}));
+
+    int end_index = binary_search_start_index(lines,
+                                              nlines,
+                                              current_func.end_addr);
+
+    line = dwarf_onesrcline(lines, end_index);
+    if (dwarf_lineno(line, &lineno) == -1) {
+      lineno = 0;
+    }
+    line_map.insert(
+        it,
+        std::pair<ElfAddress_t, DwflSymbolLookup::Line>(
+            static_cast<ElfAddress_t>(current_func.end_addr),
+            DwflSymbolLookup::Line{static_cast<uint32_t>(lineno),
+                                   current_func.end_addr,
+                                   current_func.symbol_idx}));
+  }
+  return {};
 }
 
 SymbolIdx_t DwflSymbolLookup::insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
                                      SymbolTable &table,
                                      DsoSymbolLookup &dso_symbol_lookup,
                                      ProcessAddress_t process_pc,
-                                     const Dso &dso, SymbolMap &func_map,
-                                     LineMap &line_map) {
+                                     const Dso &dso,
+                                     SymbolWrapper &symbol_wrapper) {
 
   Symbol symbol;
   GElf_Sym elf_sym;
   Offset_t lbias;
+  SymbolMap &func_map = symbol_wrapper._symbol_map;
 
   ElfAddress_t const elf_pc = process_pc - ddprof_mod._sym_bias;
-
   if (!symbol_get_from_dwfl(ddprof_mod._mod, process_pc, symbol, elf_sym,
                             lbias)) {
     ++_stats._no_dwfl_symbols;
@@ -145,22 +374,76 @@ SymbolIdx_t DwflSymbolLookup::insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
              start_sym, end_sym, sym_ref._symname.c_str(), symbol_idx,
              elf_sym.st_shndx);
     }
-
+#define DEBUG
 #ifdef DEBUG
+    LG_DBG("-------------------------------");
     LG_DBG("Insert: %lx,%lx -> %s,%d / shndx=%d", start_sym, end_sym,
            sym_ref._symname.c_str(), symbol_idx, elf_sym.st_shndx);
 #endif
-    if (IsDDResNotOK(parse_lines(dwfl, ddprof_mod, process_pc, start_sym,
-                                 end_sym, line_map, table, symbol_idx))) {
+    auto res_emplace = func_map.emplace(start_sym, SymbolSpan(end_sym, symbol_idx));
+    LineMap &line_map = symbol_wrapper._line_map;
+    DieInformation die_information;
+    if (!IsDDResOK(parse_die_information(dwfl, process_pc, die_information))) {
+      LG_DBG("Error when parsing die information for %s (%s)",
+             sym_ref._demangle_name.c_str(), dso._filename.c_str());
+      return symbol_idx;
+    }
+    if (die_information.die_mem_vec[0].end_addr > end_sym) {
+      // assume dwarf is more accurate
+      res_emplace.first->second.set_end(die_information.die_mem_vec[0].end_addr);
+    }
+    // Create associated symbols
+    assert(die_information.die_mem_vec.size());
+    if (die_information.die_mem_vec.size() <= 1) {
+      // no inlining info
+      return symbol_idx;
+    }
+    // todo: ensure we group the inlined symbols to avoid dupes
+    // todo move this part
+    die_information.die_mem_vec[0].symbol_idx = symbol_idx;
+
+
+    // TODO: Think of what we should do with functions that do not have start
+    // or end
+    NestedSymbolMap &inline_map = symbol_wrapper._inline_map;
+    for (unsigned pos = 1; pos < die_information.die_mem_vec.size(); ++pos) {
+      DieInformation::Function &current_func = die_information.die_mem_vec[pos];
+      table.emplace_back(
+          Symbol({},
+                 current_func.func_name,
+                 0,
+                 {},
+                 // Symbol associated to inlined function will be pos + symbol idx
+                 current_func.parent_pos + symbol_idx));
+      current_func.symbol_idx = table.size() - 1;
+      // add to the lookup
+      inline_map.emplace(current_func.start_addr,
+                         NestedSymbolSpan(
+                             current_func.end_addr,
+                             current_func.symbol_idx,
+                             die_information.die_mem_vec[current_func.parent_pos].start_addr));
+    }
+    // associate line information to die information (includes file info)
+    if (IsDDResNotOK(parse_lines(dwfl, ddprof_mod, process_pc, func_map,
+                                 line_map, table, die_information))) {
       LG_DBG("Error when parsing line information for %s (%s)",
              sym_ref._demangle_name.c_str(), dso._filename.c_str());
     }
-    if (sym_ref._srcpath.empty()) {
-      // override with info from dso (this slightly mixes mappings and sources)
-      // But it helps a lot at Datadog (as mappings are ignored for now in UI)
-      sym_ref._srcpath = dso.format_filename();
+
+    for (unsigned pos = 1; pos < die_information.die_mem_vec.size(); ++pos) {
+      DieInformation::Function &func = die_information.die_mem_vec[pos];
+      auto &sym = table[func.symbol_idx];
+      if (sym._srcpath.empty()) {
+        // override with info from dso (this slightly mixes mappings and sources)
+        // But it helps a lot at Datadog (as mappings are ignored for now in UI)
+        sym._srcpath = dso.format_filename();
+      }
     }
-    func_map.emplace(start_sym, SymbolSpan(end_sym, symbol_idx));
+    NestedSymbolMap::FindRes const find_res = inline_map.find_closest(elf_pc);
+    if (find_res.second) {
+      // in case we match an inlined symbol
+      return find_res.first->second.get_symbol_idx();
+    }
     return symbol_idx;
   }
 }
@@ -227,110 +510,6 @@ void DwflSymbolLookupStats::reset() {
   _hit = 0;
   _calls = 0;
   _errors = 0;
-}
-
-size_t binary_search_start_index(Dwarf_Lines *lines, size_t nlines,
-                                 ElfAddress_t start_sym) {
-  size_t low = 0;
-  size_t high = nlines - 1;
-
-  while (low <= high) {
-    size_t mid = low + (high - low) / 2;
-    Dwarf_Line *mid_line = dwarf_onesrcline(lines, mid);
-    Dwarf_Addr mid_addr;
-    dwarf_lineaddr(mid_line, &mid_addr);
-
-    if (mid_addr < start_sym) {
-      low = mid + 1;
-    } else if (mid_addr > start_sym) {
-      high = mid - 1;
-    } else {
-      return mid;
-    }
-
-    if (low == high) {
-      return low;
-    }
-  }
-
-  return 0; // Return a default value if no suitable index is found
-}
-
-DDRes DwflSymbolLookup::parse_lines(Dwfl *dwfl, const DDProfMod &mod,
-                                    ProcessAddress_t process_pc,
-                                    ElfAddress_t start_sym,
-                                    ElfAddress_t end_sym, LineMap &line_map,
-                                    SymbolTable &table,
-                                    SymbolIdx_t current_sym) {
-  Dwarf_Addr bias;
-  // This will lazily load the dwarf file
-  // the decompression can take time
-  // todo use dw access to avoid opening PID times
-  Dwarf_Die *cudie = dwfl_addrdie(dwfl, process_pc, &bias);
-  Dwarf *dwarf = dwfl_module_getdwarf(mod._mod, &bias);
-  //  ElfAddress_t elf_address = process_pc - bias;
-  LG_DBG("Start %lx - end %lx", start_sym, end_sym);
-
-  if (!cudie) {
-    // This will fail in case of no debug info
-    return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
-  }
-
-  Dwarf_Lines *lines;
-  size_t nlines;
-  if (dwarf_getsrclines(cudie, &lines, &nlines) != 0) {
-    LG_DBG("Unable to find source lines");
-    return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
-  }
-  auto it = line_map.begin();
-
-  // for now we care about first source file
-  const char *current_line_file = nullptr;
-
-  size_t start_index = binary_search_start_index(lines, nlines, start_sym);
-  int start_lineno = -1;
-  int end_lineno = -1;
-  {
-    size_t end_index = binary_search_start_index(lines, nlines, end_sym);
-    Dwarf_Line *line = dwarf_onesrcline(lines, end_index);
-
-    if (dwarf_lineno(line, &end_lineno) == -1) {
-      end_lineno = std::numeric_limits<int>::max();
-    }
-  }
-
-  Symbol &ref_sym = table[current_sym];
-
-  // todo: different files
-  for (size_t i = start_index; i < nlines; ++i) {
-    Dwarf_Line *line = dwarf_onesrcline(lines, i);
-    Dwarf_Addr line_addr;
-    int lineno;
-    dwarf_lineaddr(line, &line_addr);
-    if (line_addr < start_sym) {
-      continue;
-    }
-    if (line_addr > end_sym) {
-      break;
-    }
-    current_line_file = dwarf_linesrc(line, nullptr, nullptr);
-    if (current_line_file && ref_sym._srcpath.empty()) {
-      ref_sym._srcpath = std::string(current_line_file);
-    }
-    if (dwarf_lineno(line, &lineno) == -1) {
-      lineno = 0;
-    } else if (!ref_sym._func_start_lineno) {
-      start_lineno = lineno;
-      ref_sym._func_start_lineno = lineno;
-    }
-    // ... Process line information here ...
-    LG_DBG("Dwarf file = %s / %d / %lx", current_line_file, lineno, line_addr);
-    it = line_map.insert(it,
-                         std::pair<ElfAddress_t, Line>(
-                             static_cast<ElfAddress_t>(line_addr),
-                             Line{static_cast<uint32_t>(lineno), line_addr}));
-  }
-  return {};
 }
 
 } // namespace ddprof

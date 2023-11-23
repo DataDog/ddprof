@@ -63,13 +63,19 @@ public:
   const DwflSymbolLookupStats &stats() const { return _stats; }
   DwflSymbolLookupStats &stats() { return _stats; }
 
-private:
   struct Line {
-    uint32_t _line;
-    ElfAddress_t _addr;
-    // possibly add a symbol ?
+    uint32_t _line{};
+    ElfAddress_t _addr{};
+    SymbolIdx_t _symbol_idx{-1};
   };
   using LineMap = std::map<ElfAddress_t, Line>;
+  using InlineMap = NestedSymbolMap;
+  struct SymbolWrapper {
+    LineMap _line_map;
+    SymbolMap _symbol_map;
+    InlineMap _inline_map;
+  };
+private:
   /// Set through env var (DDPROF_CACHE_SETTING) in case of doubts on cache
   enum SymbolLookupSetting {
     K_CACHE_ON = 0,
@@ -81,26 +87,21 @@ private:
   SymbolIdx_t insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
                      SymbolTable &table, DsoSymbolLookup &dso_symbol_lookup,
                      ProcessAddress_t process_pc, const Dso &dso,
-                     SymbolMap &func_map, LineMap &line_map);
+                     SymbolWrapper &symbol_wrapper);
 
   // Symbols are ordered by file.
   // The assumption is that the elf addresses are the same across processes
   // The unordered map stores symbols per file,
   // The map stores symbols per address range
-  using FileInfo2SymbolMap = std::unordered_map<FileInfoId_t, SymbolMap>;
+  using FileInfo2SymbolWrapper = std::unordered_map<FileInfoId_t, SymbolWrapper>;
   using FileInfo2LineMap = std::unordered_map<FileInfoId_t, LineMap>;
-  using FileInfo2SymbolVT = FileInfo2SymbolMap::value_type;
-
-  static DDRes parse_lines(Dwfl *dwfl, const DDProfMod &mod,
-                           ProcessAddress_t process_pc, ElfAddress_t start_sym,
-                           ElfAddress_t end_sym, LineMap &line_map,
-                           SymbolTable &table, SymbolIdx_t current_sym);
+  using FileInfo2SymbolVT = FileInfo2SymbolWrapper::value_type;
 
   static bool symbol_lookup_check(Dwfl_Module *mod, ElfAddress_t process_pc,
                                   const Symbol &symbol);
 
   // unordered map of DSO elements
-  FileInfo2SymbolMap _file_info_function_map;
+  FileInfo2SymbolWrapper _file_info_function_map;
   FileInfo2LineMap _file_info_inlining_map;
   DwflSymbolLookupStats _stats;
 };
