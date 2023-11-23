@@ -13,7 +13,6 @@
 #include <vector>
 
 namespace ddprof {
-constexpr auto k_max_buf_cgroup_link = 1024;
 
 std::string Process::format_cgroup_file(pid_t pid,
                                         std::string_view path_to_proc) {
@@ -44,9 +43,9 @@ DDRes Process::read_cgroup_ns(pid_t pid, std::string_view path_to_proc,
   cgroup = Process::kCGroupNsError;
   std::string const path =
       absl::StrCat(path_to_proc, "/proc/", pid, "/ns/cgroup");
-  char buf[k_max_buf_cgroup_link];
-  ssize_t const len = readlink(path.c_str(), buf, k_max_buf_cgroup_link - 1);
-  if (len == -1) {
+  char buf[PATH_MAX];
+  ssize_t const len = readlink(path.c_str(), buf, std::size(buf));
+  if (len == -1 || len == std::ssize(buf)) {
     // avoid logging as this is frequent
     return ddres_warn(DD_WHAT_CGROUP);
   }
@@ -57,9 +56,8 @@ DDRes Process::read_cgroup_ns(pid_t pid, std::string_view path_to_proc,
   size_t const start = linkTarget.find_last_of('[');
   size_t const end = linkTarget.find_last_of(']');
 
-  if (start == std::string::npos || end == std::string::npos) {
-    DDRES_RETURN_WARN_LOG(DD_WHAT_CGROUP, "Unable to find id %s",
-                          linkTarget.data());
+  if (start == std::string::npos || end == std::string::npos || start >= end) {
+    DDRES_RETURN_WARN_LOG(DD_WHAT_CGROUP, "Unable to find id %s", buf);
   }
 
   std::string_view const id_str = linkTarget.substr(start + 1, end - start - 1);
