@@ -82,6 +82,7 @@ endif()
 # ---- Dependencies ----
 
 find_package(absl REQUIRED)
+find_package(fmt REQUIRED)
 
 # libdatadog_profiling
 include(Findlibdatadog)
