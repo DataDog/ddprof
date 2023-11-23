@@ -7,8 +7,8 @@
 
 #include "ddres.hpp"
 
+#include <absl/strings/numbers.h>
 #include <absl/strings/str_cat.h>
-#include <charconv> // for std::from_chars
 #include <unistd.h>
 #include <vector>
 
@@ -64,10 +64,7 @@ DDRes Process::read_cgroup_ns(pid_t pid, std::string_view path_to_proc,
 
   std::string_view const id_str = linkTarget.substr(start + 1, end - start - 1);
 
-  auto [p, ec] =
-      std::from_chars(id_str.data(), id_str.data() + id_str.size(), cgroup);
-  if (ec == std::errc::invalid_argument ||
-      ec == std::errc::result_out_of_range) {
+  if (!absl::SimpleAtoi(id_str, &cgroup)) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_CGROUP, "Unable to cgroup to number PID%d",
                           pid);
   }

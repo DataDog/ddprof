@@ -23,9 +23,9 @@
 #include "unique_fd.hpp"
 #include "user_override.hpp"
 
+#include <absl/strings/numbers.h>
 #include <array>
 #include <cerrno>
-#include <charconv>
 #include <cstring>
 #include <filesystem>
 #include <functional>
@@ -64,8 +64,7 @@ void maybe_slowdown_startup() {
   if (const char *s = getenv(k_startup_wait_ms_env_variable); s != nullptr) {
     std::string_view const sv{s};
     int wait_ms = 0;
-    auto [ptr, ec] = std::from_chars(sv.begin(), sv.end(), wait_ms);
-    if (ec == std::errc() && ptr == sv.end() && wait_ms > 0) {
+    if (absl::SimpleAtoi(s, &wait_ms) && wait_ms > 0) {
       std::this_thread::sleep_for(std::chrono::milliseconds(wait_ms));
     }
   }
