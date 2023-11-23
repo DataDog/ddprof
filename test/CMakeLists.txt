@@ -47,7 +47,8 @@ function(add_unit_test name)
   # # Create exe with sources. Always add logger and error management in the unit tests
   add_exe(${name} ../src/ddres_list.cc ../src/logger.cc ../src/ratelimiter.cc ${ARGN})
 
-  target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock absl::base)
+  target_link_libraries(${name} PRIVATE gtest Threads::Threads gmock_main gmock absl::base
+                                        absl::str_format)
   target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST} ${GTEST_INCLUDE_DIRS}
                                              ${CMAKE_SOURCE_DIR}/include/lib)
 
@@ -84,7 +85,7 @@ function(add_benchmark name)
   add_exe(${name} ../src/ddres_list.cc ../src/logger.cc ../src/ratelimiter.cc ${ARGN})
 
   target_link_libraries(${name} PRIVATE Threads::Threads benchmark::benchmark
-                                        benchmark::benchmark_main)
+                                        benchmark::benchmark_main absl::base absl::str_format)
   target_include_directories(${name} PRIVATE ${DDPROF_INCLUDE_LIST} ${CMAKE_SOURCE_DIR}/include/lib)
   disable_clangtidy(${name})
 endfunction()

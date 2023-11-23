@@ -9,9 +9,10 @@
 #include "ddprof_cmdline.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
-#include "string_format.hpp"
 #include "tags.hpp"
 
+#include <absl/strings/str_cat.h>
+#include <absl/strings/substitute.h>
 #include <algorithm>
 #include <cassert>
 #include <cerrno>
@@ -33,14 +34,9 @@ constexpr int k_max_nb_consecutive_errors_allowed{3};
 std::string alloc_url_agent(std::string_view protocol, std::string_view host,
                             std::string_view port) {
   if (!port.empty()) {
-    return string_format("%.*s%.*s:%.*s", static_cast<int>(protocol.size()),
-                         protocol.data(), static_cast<int>(host.size()),
-                         host.data(), static_cast<int>(port.size()),
-                         port.data());
+    return absl::Substitute("$0$1:$2", protocol, host, port);
   }
-  return string_format("%.*s%.*s", static_cast<int>(protocol.size()),
-                       protocol.data(), static_cast<int>(host.size()),
-                       host.data());
+  return absl::StrCat(protocol, host);
 }
 
 DDRes create_pprof_file(ddog_Timespec start, const char *dbg_pprof_prefix,

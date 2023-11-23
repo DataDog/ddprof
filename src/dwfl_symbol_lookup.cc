@@ -10,7 +10,6 @@
 #include "dwfl_internals.hpp"
 #include "dwfl_symbol.hpp"
 #include "logger.hpp"
-#include "string_format.hpp"
 
 #include <algorithm>
 #include <cassert>
