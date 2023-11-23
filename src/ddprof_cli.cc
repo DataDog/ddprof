@@ -392,7 +392,9 @@ DDRes DDProfCLI::add_watchers_from_events(
 }
 
 void DDProfCLI::print() const {
-  PRINT_NFO("Version: %s", str_version().data());
+  auto version_str = str_version();
+  PRINT_NFO("Version: %.*s", static_cast<int>(version_str.size()),
+            version_str.data());
   PRINT_NFO("Exporter Input:");
   if (!exporter_input.api_key.empty()) {
     std::string const api_key_dbg =

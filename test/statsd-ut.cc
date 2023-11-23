@@ -18,8 +18,8 @@ TEST(StatsDTest, Connection) {
   // This takes advantage of the fact that UDP domain sockets opened in the way
   // statsd does it are full-duplex
   std::string_view path_listen = "/tmp/my_statsd_listener";
-  unlink(
-      path_listen.data()); // Make sure the default listening path is available
+  unlink(std::string{path_listen}
+             .c_str()); // Make sure the default listening path is available
 
   int fd_listener;
   DDRes lres = statsd_listen(path_listen, &fd_listener);
@@ -31,7 +31,7 @@ TEST(StatsDTest, Connection) {
   // Cleanup
   close(fd_listener);
   close(fd_client);
-  unlink(path_listen.data());
+  unlink(std::string{path_listen}.c_str());
 }
 
 TEST(StatsDTest, BadConnection) {

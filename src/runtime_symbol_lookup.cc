@@ -3,6 +3,15 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
+#include "runtime_symbol_lookup.hpp"
+
+#include "ddres.hpp"
+#include "defer.hpp"
+#include "jit/jitdump.hpp"
+#include "logger.hpp"
+#include "unlikely.hpp"
+
+#include <absl/strings/substitute.h>
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -10,14 +19,6 @@
 #include <limits>
 #include <string>
 #include <vector>
-
-#include "ddres.hpp"
-#include "defer.hpp"
-#include "logger.hpp"
-#include "runtime_symbol_lookup.hpp"
-#include "unlikely.hpp"
-
-#include "jit/jitdump.hpp"
 
 namespace ddprof {
 
@@ -102,26 +103,14 @@ bool is_absolute_path(std::string_view path) { return path.front() == '/'; }
 DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
                                              pid_t pid, SymbolMap &symbol_map,
                                              SymbolTable &symbol_table) {
-  char buf[PATH_MAX];
-  int n = 0;
-  if (is_absolute_path(jitdump_path)) {
-    n = snprintf(buf, std::size(buf), "%s/proc/%d/root%s",
-                 _path_to_proc.c_str(), pid, jitdump_path.data());
-    if (static_cast<unsigned>(n) >=
-        std::size(buf)) { // unable to snprintf everything
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Unable to create path to jitdump");
-    }
-  } else { // For relative path, use the current working directory
-    n = snprintf(buf, std::size(buf), "%s/proc/%d/cwd/%s",
-                 _path_to_proc.c_str(), pid, jitdump_path.data());
-    if (static_cast<unsigned>(n) >=
-        std::size(buf)) { // unable to snprintf everything
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_JIT, "Unable to create path to jitdump");
-    }
-  }
+  const std::string path = is_absolute_path(jitdump_path)
+      ? absl::Substitute("$0/proc/$1/root$2", _path_to_proc, pid,
+                         jitdump_path)
+      : // For relative path, use the current working directory
+      absl::Substitute("$0/proc/$1/cwd/$2", _path_to_proc, pid, jitdump_path);
 
   JITDump jitdump;
-  DDRes res = jitdump_read(std::string_view(buf, n), jitdump);
+  DDRes res = jitdump_read(path, jitdump);
   if (IsDDResNotOK(res) && res._what == DD_WHAT_NO_JIT_FILE) {
     // retry with different path
     res = jitdump_read(jitdump_path, jitdump);

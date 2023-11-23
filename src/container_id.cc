@@ -44,7 +44,7 @@ DDRes extract_container_id(const std::string &filepath,
   std::ifstream cgroup_file(filepath);
   if (!cgroup_file) {
     // short lived pids can fail in this case
-    LG_DBG("Failed to open file: %s", filepath.data());
+    LG_DBG("Failed to open file: %s", filepath.c_str());
     return ddres_warn(DD_WHAT_CGROUP);
   }
   std::string line;

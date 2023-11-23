@@ -305,8 +305,8 @@ UniqueFd create_server_socket(std::string_view socket_path) noexcept {
   sockaddr_un addr = {};
   addr.sun_family = AF_UNIX;
   if (socket_path.size() >= sizeof(addr.sun_path)) {
-    LG_ERR("Unable to bind socket, socket path too long: %s",
-           std::string{socket_path}.c_str());
+    LG_ERR("Unable to bind socket, socket path too long: %.*s",
+           static_cast<int>(socket_path.size()), socket_path.data());
     return {};
   }
   std::copy(socket_path.begin(), socket_path.end(), addr.sun_path);
@@ -341,8 +341,8 @@ UniqueFd create_client_socket(std::string_view socket_path) noexcept {
   sockaddr_un addr = {};
   addr.sun_family = AF_UNIX;
   if (socket_path.size() >= sizeof(addr.sun_path)) {
-    LG_ERR("Unable to connect to socket, socket path too long: %s",
-           std::string{socket_path}.c_str());
+    LG_ERR("Unable to connect to socket, socket path too long: %.*s",
+           static_cast<int>(socket_path.size()), socket_path.data());
     return {};
   }
   std::copy(socket_path.begin(), socket_path.end(), addr.sun_path);

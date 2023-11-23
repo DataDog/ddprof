@@ -110,9 +110,7 @@ DDRes fill_stable_tags(const UserTags *user_tags,
 
   // language is guaranteed to be filled
   DDRES_CHECK_FWD(
-      add_single_tag(tags_exporter, "language",
-                     std::string_view(exporter->_input.language.data(),
-                                      exporter->_input.language.size())));
+      add_single_tag(tags_exporter, "language", exporter->_input.language));
 
   if (!exporter->_input.environment.empty()) {
     DDRES_CHECK_FWD(
@@ -130,10 +128,8 @@ DDRes fill_stable_tags(const UserTags *user_tags,
   }
 
   if (!exporter->_input.profiler_version.empty()) {
-    DDRES_CHECK_FWD(add_single_tag(
-        tags_exporter, "profiler_version",
-        std::string_view(exporter->_input.profiler_version.data(),
-                         exporter->_input.profiler_version.size())));
+    DDRES_CHECK_FWD(add_single_tag(tags_exporter, "profiler_version",
+                                   exporter->_input.profiler_version));
   }
 
   for (const auto &el : user_tags->_tags) {
