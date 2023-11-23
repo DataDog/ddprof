@@ -48,11 +48,13 @@ public:
   DwflSymbolLookup();
 
   // Get symbol from internal cache or fetch through dwarf
-  SymbolIdx_t get_or_insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
-                            SymbolTable &table,
-                            DsoSymbolLookup &dso_symbol_lookup,
-                            FileInfoId_t file_info_id,
-                            ProcessAddress_t process_pc, const Dso &dso);
+  void get_or_insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
+                    SymbolTable &table,
+                    DsoSymbolLookup &dso_symbol_lookup,
+                    FileInfoId_t file_info_id,
+                    ProcessAddress_t process_pc,
+                    const Dso &dso,
+                    std::vector<SymbolIdx_t> &symbol_indices);
 
   void erase(FileInfoId_t file_info_id) {
     _file_info_function_map.erase(file_info_id);
@@ -88,6 +90,19 @@ private:
                      SymbolTable &table, DsoSymbolLookup &dso_symbol_lookup,
                      ProcessAddress_t process_pc, const Dso &dso,
                      SymbolWrapper &symbol_wrapper);
+
+  static DDRes insert_inlining_info(Dwfl *dwfl,
+                              const DDProfMod &ddprof_mod,
+                              SymbolTable &table,
+                              DsoSymbolLookup &dso_symbol_lookup,
+                              ProcessAddress_t process_pc,
+                              const Dso &dso,
+                              SymbolWrapper &symbol_wrapper,
+                              SymbolIdx_t parent_sym_idx);
+
+  static void get_inlined(const SymbolWrapper &symbol_wrapper,
+                          ElfAddress_t elf_pc,
+                          std::vector<SymbolIdx_t> &inlined_symbols);
 
   // Symbols are ordered by file.
   // The assumption is that the elf addresses are the same across processes

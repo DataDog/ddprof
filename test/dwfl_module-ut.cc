@@ -241,10 +241,11 @@ TEST(DwflModule, inlined_func) {
       ASSERT_TRUE(IsDDResOK(res));
       ASSERT_TRUE(ddprof_mod->_mod);
       if (find_res.first == it) {
-        SymbolIdx_t symbol_idx =
+        std::vector<SymbolIdx_t> symbol_indices;
             symbol_lookup.get_or_insert(dwfl_wrapper._dwfl, *ddprof_mod, table,
-                                        dso_lookup, file_info_id, ip, dso);
-        const auto &sym = table[symbol_idx];
+                                        dso_lookup, file_info_id, ip, dso,
+                                    symbol_indices);
+        const auto &sym = table[symbol_indices.back()];
         LG_DBG("Sym = %s", sym._demangle_name.c_str());
         EXPECT_EQ(sym._demangle_name, "deeper_function");
       }

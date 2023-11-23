@@ -59,34 +59,40 @@ public:
 };
 
 
-class NestedSymbolSpan {
+class NestedSymbolValue {
 public:
-  NestedSymbolSpan() : _end(0), _symbol_idx(-1), _parent_addr(0) {}
-  NestedSymbolSpan(Offset_t end, SymbolIdx_t symbol_idx,
-                   ElfAddress_t parent = 0)
-      : _end(end), _symbol_idx(symbol_idx), _parent_addr(parent) {}
-  void set_end(Offset_t end) {
-    if (end > _end) {
-      _end = end;
-    }
-  }
-  [[nodiscard]] Offset_t get_end() const { return _end; }
+  NestedSymbolValue() : _symbol_idx(-1), _parent_addr(0) {}
+  NestedSymbolValue(SymbolIdx_t symbol_idx, ElfAddress_t parent = 0)
+      : _symbol_idx(symbol_idx), _parent_addr(parent) {}
   [[nodiscard]] SymbolIdx_t get_symbol_idx() const { return _symbol_idx; }
   [[nodiscard]] ElfAddress_t get_parent_addr() const{
     return _parent_addr;
   }
-
 private:
-  Offset_t _end;
   SymbolIdx_t _symbol_idx;
   ElfAddress_t _parent_addr;
 };
-class NestedSymbolMap : private std::map<ElfAddress_t, NestedSymbolSpan> {
+
+struct NestedSymbolKey {
+  ElfAddress_t start;
+  ElfAddress_t end;
+  NestedSymbolKey(ElfAddress_t s, ElfAddress_t e) : start(s), end(e) {}
+  bool operator<(const NestedSymbolKey & other) const {
+    if (start != other.start) {
+      return start < other.start;
+    }
+    // Sort by end address in descending order if start addresses are equal
+    return end > other.end;
+  }
+};
+
+
+class NestedSymbolMap : private std::map<NestedSymbolKey, NestedSymbolValue> {
 public:
-  using Map = std::map<ElfAddress_t, NestedSymbolSpan>;
+  using Map = std::map<NestedSymbolKey, NestedSymbolValue>;
   using It = Map::iterator;
   using ConstIt = Map::const_iterator;
-  using FindRes = std::pair<It, bool>;
+  using FindRes = std::pair<ConstIt, bool>;
   using ValueType = Map::value_type;
   using Map::begin;
   using Map::clear;
@@ -97,7 +103,10 @@ public:
   using Map::erase;
   using Map::size;
 
-  FindRes find_closest(Offset_t norm_pc);
+  FindRes find_parent(ConstIt it,
+                         Offset_t norm_pc) const;
+
+  FindRes find_closest(Offset_t norm_pc) const;
 
   static bool is_within(const Offset_t &norm_pc, const ValueType &kv);
 };

@@ -212,13 +212,13 @@ DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
                      const DDProfMod &ddprof_mod, FileInfoId_t file_info_id) {
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
   // get or create the dwfl symbol
-  SymbolIdx_t const symbol_idx =
-      unwind_symbol_hdr._dwfl_symbol_lookup.get_or_insert(
-          us->_dwfl_wrapper->_dwfl, ddprof_mod, unwind_symbol_hdr._symbol_table,
-          unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso);
+  std::vector<SymbolIdx_t> symbol_indices{};
+  unwind_symbol_hdr._dwfl_symbol_lookup.get_or_insert(
+      us->_dwfl_wrapper->_dwfl, ddprof_mod, unwind_symbol_hdr._symbol_table,
+      unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso, symbol_indices);
   MapInfoIdx_t const map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
       us->pid, us->symbol_hdr._mapinfo_table, dso, ddprof_mod._build_id);
-  return add_frame(symbol_idx, map_idx, pc, us);
+  return add_frame(symbol_indices, map_idx, pc, us);
 }
 
 // check for runtime symbols provided in /tmp files

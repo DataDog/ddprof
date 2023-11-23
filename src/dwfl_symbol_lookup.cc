@@ -91,10 +91,11 @@ unsigned DwflSymbolLookup::size() const {
 }
 
 // Retrieve existing symbol or attempt to read from dwarf
-SymbolIdx_t DwflSymbolLookup::get_or_insert(
+void DwflSymbolLookup::get_or_insert(
     Dwfl *dwfl, const DDProfMod &ddprof_mod, SymbolTable &table,
     DsoSymbolLookup &dso_symbol_lookup, FileInfoId_t file_info_id,
-    ProcessAddress_t process_pc, const Dso &dso) {
+    ProcessAddress_t process_pc, const Dso &dso,
+    std::vector<SymbolIdx_t> &symbol_indices) {
   ++_stats._calls;
   ElfAddress_t const elf_pc = process_pc - ddprof_mod._sym_bias;
 
@@ -121,9 +122,19 @@ SymbolIdx_t DwflSymbolLookup::get_or_insert(
       }
     }
     ++_stats._hit;
-    return find_res.first->second.get_symbol_idx();
+    symbol_indices.push_back(find_res.first->second.get_symbol_idx());
   }
-  return insert(dwfl, ddprof_mod, table, dso_symbol_lookup, process_pc, dso, symbol_wrapper);
+  else {
+    // insert symbols using elf info
+    SymbolIdx_t elf_sym_idx = insert(dwfl, ddprof_mod, table, dso_symbol_lookup, process_pc, dso, symbol_wrapper);
+    symbol_indices.push_back(elf_sym_idx);
+    // parse associated dwarf info
+    insert_inlining_info(dwfl, ddprof_mod, table, dso_symbol_lookup, process_pc, dso, symbol_wrapper, elf_sym_idx);
+  }
+  get_inlined(symbol_wrapper,
+              elf_pc,
+              symbol_indices);
+  return;
 }
 
 /* die_find callback for non-inlined function search */
@@ -152,32 +163,32 @@ Dwarf_Die *die_find_realfunc(Dwarf_Die *cu_die, Dwarf_Addr addr,
 static int store_die_information(Dwarf_Die *sc_die, int parent_index,
                                  DieInformation &data) {
   // function or inlined function
-  int tag_val = dwarf_tag(sc_die);
-  if (tag_val == DW_TAG_subprogram || tag_val == DW_TAG_inlined_subroutine) {
-    DieInformation::Function function{};
-    // die_name is usually the raw function name (no mangling info)
-    // link name can have mangling info
-    function.func_name = dwarf_diename(sc_die);
-    Dwarf_Attribute attr_mem;
-    Dwarf_Attribute *attr;
-    if ((attr = dwarf_attr(sc_die, DW_AT_low_pc, &attr_mem))) {
-      if (attr) {
-        Dwarf_Addr ret_value;
-        if (dwarf_formaddr(attr, &ret_value) == 0) {
-          function.start_addr = ret_value;
-        }
+  DieInformation::Function function{};
+  // die_name is usually the raw function name (no mangling info)
+  // link name can have mangling info
+  function.func_name = dwarf_diename(sc_die);
+  Dwarf_Attribute attr_mem;
+  Dwarf_Attribute *attr;
+  if ((attr = dwarf_attr(sc_die, DW_AT_low_pc, &attr_mem))) {
+    if (attr) {
+      Dwarf_Addr ret_value;
+      if (dwarf_formaddr(attr, &ret_value) == 0) {
+        function.start_addr = ret_value;
       }
     }
-    // end is stored as a unsigned (not as a pointer)
-    if ((attr = dwarf_attr(sc_die, DW_AT_high_pc, &attr_mem))) {
-      if (attr) {
-        Dwarf_Word return_uval;
-        if (dwarf_formudata(attr, &return_uval) == 0) {
-          function.end_addr = function.start_addr + return_uval;
-        }
+  }
+  // end is stored as a unsigned (not as a pointer)
+  if ((attr = dwarf_attr(sc_die, DW_AT_high_pc, &attr_mem))) {
+    if (attr) {
+      Dwarf_Word return_uval;
+      if (dwarf_formudata(attr, &return_uval) == 0) {
+        function.end_addr = function.start_addr + return_uval;
       }
     }
-
+  }
+  // we often can find duplicates within the dwarf information
+  // some of the tags don't have the start and end info
+  if (function.start_addr && function.end_addr) {
     function.parent_pos = parent_index;
     data.die_mem_vec.push_back(std::move(function));
     return (data.die_mem_vec.size() - 1);
@@ -195,12 +206,15 @@ static Dwarf_Die *find_functions_in_child_die(Dwarf_Die *current_die,
   if (ret != 0)
     return nullptr;
   do {
-    int current_idx = store_die_information(die_mem, parent_index, die_info);
-    // todo: can their be childs outside of subprograms / inlined funcs ?
-    // Current assumption is that that is impossible
-    if (current_idx != -1) {
-      find_functions_in_child_die(die_mem, current_idx, die_info, &child_die);
+    int tag_val = dwarf_tag(die_mem);
+    int next_parent_idx = parent_index;
+    if (tag_val == DW_TAG_subprogram || tag_val == DW_TAG_inlined_subroutine) {
+      int current_idx = store_die_information(die_mem, parent_index, die_info);
+      next_parent_idx = (current_idx != -1 ? current_idx:next_parent_idx);
     }
+    //
+    // todo: optimize the exploration to avoid going through soo many elements
+    find_functions_in_child_die(die_mem, next_parent_idx, die_info, &child_die);
   } while (dwarf_siblingof(die_mem, die_mem) == 0);
   return nullptr;
 }
@@ -209,6 +223,9 @@ static DDRes parse_die_information(Dwfl *dwfl, ProcessAddress_t process_pc,
                                    DieInformation &die_information) {
   Dwarf_Addr bias;
   Dwarf_Die *cudie = dwfl_addrdie(dwfl, process_pc, &bias);
+  if (cudie == nullptr) {
+    DDRES_RETURN_WARN_LOG(DD_WHAT_NO_DWARF, "Unable to retrieve cu die");
+  }
   ElfAddress_t elf_addr = process_pc - bias;
   Dwarf_Die die_mem;
   Dwarf_Die *sc_die = die_find_realfunc(cudie, elf_addr, &die_mem);
@@ -217,10 +234,10 @@ static DDRes parse_die_information(Dwfl *dwfl, ProcessAddress_t process_pc,
   }
   // store parent function at index 0
   if (store_die_information(sc_die, -1, die_information) == -1) {
-    DDRES_RETURN_WARN_LOG(DD_WHAT_DWFL_LIB_ERROR,
-                          "Unable to store the parent function");
+    LG_DBG("Unable to store the parent function");
+    // todo figure this out. (example : dl_iterate_phdr)
+    return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
   }
-
   find_functions_in_child_die(sc_die, 0, die_information, &die_mem);
 
   for (auto &el : die_information.die_mem_vec) {
@@ -230,7 +247,7 @@ static DDRes parse_die_information(Dwfl *dwfl, ProcessAddress_t process_pc,
   return {};
 }
 
-int findClosestAfter(const std::vector<int> &values, int reference) {
+int find_closest_after(const std::vector<int> &values, int reference) {
   int closest = -1;
   for (int val : values) {
     if (val > reference && (closest == -1 || val < closest)) {
@@ -310,13 +327,82 @@ static DDRes parse_lines(Dwfl *dwfl, const DDProfMod &mod,
   return {};
 }
 
+DDRes DwflSymbolLookup::insert_inlining_info(Dwfl *dwfl,
+                                             const DDProfMod &ddprof_mod,
+                                             SymbolTable &table,
+                                             DsoSymbolLookup &dso_symbol_lookup,
+                                             ProcessAddress_t process_pc,
+                                             const Dso &dso,
+                                             SymbolWrapper &symbol_wrapper,
+                                             SymbolIdx_t parent_sym_idx) {
+  SymbolMap &func_map = symbol_wrapper._symbol_map;
+  DieInformation die_information;
+  Symbol &parent_sym = table[parent_sym_idx];
+  if (!IsDDResOK(parse_die_information(dwfl, process_pc, die_information))) {
+    LG_DBG("Error when parsing die information for %s (%s)",
+           parent_sym._demangle_name.c_str(), dso._filename.c_str());
+    return ddres_warn(DD_WHAT_NO_DWARF);
+  }
+  // todo : is there value in extending the elf span using dwarf info ?
+  // Create associated symbols
+  assert(die_information.die_mem_vec.size());
+  if (die_information.die_mem_vec.size() <= 1) {
+    // no inlining info
+    return {};
+  }
+  // todo: ensure we group the inlined symbols to avoid dupes
+  // todo move this part
+  die_information.die_mem_vec[0].symbol_idx = parent_sym_idx;
+
+  NestedSymbolMap &inline_map = symbol_wrapper._inline_map;
+  for (unsigned pos = 1; pos < die_information.die_mem_vec.size(); ++pos) {
+    DieInformation::Function &current_func = die_information.die_mem_vec[pos];
+    table.emplace_back(
+        Symbol({},
+               current_func.func_name,
+               0, // no line for now
+               {}));
+    current_func.symbol_idx = table.size() - 1;
+    // add to the lookup
+    assert(current_func.parent_pos != -1);
+    // Parent function (position 0) is not added to the inlined functions
+    ElfAddress_t start_addr_parent = current_func.parent_pos?
+                                      die_information.die_mem_vec[current_func.parent_pos].start_addr:0;
+    LG_DBG("adding %lx - %lx: %s",
+           current_func.start_addr,
+           current_func.end_addr,
+           current_func.func_name);
+    inline_map.emplace(
+        NestedSymbolKey{current_func.start_addr, current_func.end_addr},
+        NestedSymbolValue(current_func.symbol_idx,
+                          start_addr_parent));
+  }
+  // associate line information to die information (includes file info)
+  LineMap &line_map = symbol_wrapper._line_map;
+  if (IsDDResNotOK(parse_lines(dwfl, ddprof_mod, process_pc, func_map,
+                               line_map, table, die_information))) {
+    LG_DBG("Error when parsing line information for %s (%s)",
+           parent_sym._demangle_name.c_str(), dso._filename.c_str());
+  }
+
+  for (unsigned pos = 0; pos < die_information.die_mem_vec.size(); ++pos) {
+    DieInformation::Function &func = die_information.die_mem_vec[pos];
+    auto &sym = table[func.symbol_idx];
+    if (sym._srcpath.empty()) {
+      // override with info from dso (this slightly mixes mappings and sources)
+      // But it helps a lot at Datadog (as mappings are ignored for now in UI)
+      sym._srcpath = dso.format_filename();
+    }
+  }
+  return {};
+}
+
 SymbolIdx_t DwflSymbolLookup::insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
                                      SymbolTable &table,
                                      DsoSymbolLookup &dso_symbol_lookup,
                                      ProcessAddress_t process_pc,
                                      const Dso &dso,
                                      SymbolWrapper &symbol_wrapper) {
-
   Symbol symbol;
   GElf_Sym elf_sym;
   Offset_t lbias;
@@ -380,71 +466,39 @@ SymbolIdx_t DwflSymbolLookup::insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
     LG_DBG("Insert: %lx,%lx -> %s,%d / shndx=%d", start_sym, end_sym,
            sym_ref._symname.c_str(), symbol_idx, elf_sym.st_shndx);
 #endif
-    auto res_emplace = func_map.emplace(start_sym, SymbolSpan(end_sym, symbol_idx));
-    LineMap &line_map = symbol_wrapper._line_map;
-    DieInformation die_information;
-    if (!IsDDResOK(parse_die_information(dwfl, process_pc, die_information))) {
-      LG_DBG("Error when parsing die information for %s (%s)",
-             sym_ref._demangle_name.c_str(), dso._filename.c_str());
-      return symbol_idx;
-    }
-    if (die_information.die_mem_vec[0].end_addr > end_sym) {
-      // assume dwarf is more accurate
-      res_emplace.first->second.set_end(die_information.die_mem_vec[0].end_addr);
-    }
-    // Create associated symbols
-    assert(die_information.die_mem_vec.size());
-    if (die_information.die_mem_vec.size() <= 1) {
-      // no inlining info
-      return symbol_idx;
-    }
-    // todo: ensure we group the inlined symbols to avoid dupes
-    // todo move this part
-    die_information.die_mem_vec[0].symbol_idx = symbol_idx;
+    func_map.emplace(start_sym, SymbolSpan(end_sym, symbol_idx));
 
-
-    // TODO: Think of what we should do with functions that do not have start
-    // or end
-    NestedSymbolMap &inline_map = symbol_wrapper._inline_map;
-    for (unsigned pos = 1; pos < die_information.die_mem_vec.size(); ++pos) {
-      DieInformation::Function &current_func = die_information.die_mem_vec[pos];
-      table.emplace_back(
-          Symbol({},
-                 current_func.func_name,
-                 0,
-                 {},
-                 // Symbol associated to inlined function will be pos + symbol idx
-                 current_func.parent_pos + symbol_idx));
-      current_func.symbol_idx = table.size() - 1;
-      // add to the lookup
-      inline_map.emplace(current_func.start_addr,
-                         NestedSymbolSpan(
-                             current_func.end_addr,
-                             current_func.symbol_idx,
-                             die_information.die_mem_vec[current_func.parent_pos].start_addr));
-    }
-    // associate line information to die information (includes file info)
-    if (IsDDResNotOK(parse_lines(dwfl, ddprof_mod, process_pc, func_map,
-                                 line_map, table, die_information))) {
-      LG_DBG("Error when parsing line information for %s (%s)",
-             sym_ref._demangle_name.c_str(), dso._filename.c_str());
-    }
-
-    for (unsigned pos = 1; pos < die_information.die_mem_vec.size(); ++pos) {
-      DieInformation::Function &func = die_information.die_mem_vec[pos];
-      auto &sym = table[func.symbol_idx];
-      if (sym._srcpath.empty()) {
-        // override with info from dso (this slightly mixes mappings and sources)
-        // But it helps a lot at Datadog (as mappings are ignored for now in UI)
-        sym._srcpath = dso.format_filename();
-      }
-    }
-    NestedSymbolMap::FindRes const find_res = inline_map.find_closest(elf_pc);
-    if (find_res.second) {
-      // in case we match an inlined symbol
-      return find_res.first->second.get_symbol_idx();
-    }
     return symbol_idx;
+  }
+}
+
+void DwflSymbolLookup::get_inlined(const SymbolWrapper &symbol_wrapper,
+                                   ElfAddress_t elf_pc,
+                                   std::vector<SymbolIdx_t> &inlined_symbols) {
+  const InlineMap& inline_map = symbol_wrapper._inline_map;
+
+  NestedSymbolMap::FindRes find_res = inline_map.find_closest(elf_pc);
+  std::vector<SymbolIdx_t> temp_symbols;
+  LG_DBG("Looking for %lx (%u)- matched %lx - %lx\n",
+         elf_pc, inline_map.size(),
+         find_res.second?find_res.first->first.start:0,
+         find_res.second?find_res.first->first.end:0);
+
+  while (find_res.second) {
+    temp_symbols.push_back(find_res.first->second.get_symbol_idx());
+    if (find_res.first->second.get_parent_addr()) {
+      find_res = inline_map.find_parent(
+          find_res.first, find_res.first->second.get_parent_addr());
+      assert(find_res.second);
+    } else {
+      break;
+    }
+  }
+
+  // Reverse iterate through temp_symbols and add them to inlined_symbols
+  for (auto it = temp_symbols.rbegin(); it != temp_symbols.rend(); ++it) {
+    LG_DBG("Adding %d \n", *it);
+    inlined_symbols.push_back(*it);
   }
 }
 
