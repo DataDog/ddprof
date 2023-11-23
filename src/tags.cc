@@ -48,7 +48,8 @@ Tag split_kv(std::string_view str_view, char c = ':') {
 
   // Check if no ':' character was found or if it's the last character
   if (pos == std::string_view::npos || pos == str_view.size() - 1) {
-    LG_WRN("[TAGS] Error, bad tag value %s", str_view.data());
+    LG_WRN("[TAGS] Error, bad tag value %.*s",
+           static_cast<int>(str_view.size()), str_view.data());
     return {};
   }
 
@@ -70,7 +71,8 @@ void split(std::string_view str_view, Tags &tags, char c) {
     std::string_view const tag = str_view.substr(begin, end - begin);
 
     if (!ValidateTags(tag)) {
-      LG_WRN("[TAGS] Bad tag value - skip %s", tag.data());
+      LG_WRN("[TAGS] Bad tag value - skip %.*s", static_cast<int>(tag.size()),
+             tag.data());
       begin = end + 1;
       continue;
     }
