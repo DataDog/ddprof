@@ -49,12 +49,9 @@ public:
 
   // Get symbol from internal cache or fetch through dwarf
   void get_or_insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
-                    SymbolTable &table,
-                    DsoSymbolLookup &dso_symbol_lookup,
-                    FileInfoId_t file_info_id,
-                    ProcessAddress_t process_pc,
-                    const Dso &dso,
-                    std::vector<SymbolIdx_t> &symbol_indices);
+                     SymbolTable &table, DsoSymbolLookup &dso_symbol_lookup,
+                     FileInfoId_t file_info_id, ProcessAddress_t process_pc,
+                     const Dso &dso, std::vector<SymbolIdx_t> &symbol_indices);
 
   void erase(FileInfoId_t file_info_id) {
     _file_info_function_map.erase(file_info_id);
@@ -77,6 +74,7 @@ public:
     SymbolMap _symbol_map;
     InlineMap _inline_map;
   };
+
 private:
   /// Set through env var (DDPROF_CACHE_SETTING) in case of doubts on cache
   enum SymbolLookupSetting {
@@ -86,29 +84,29 @@ private:
 
   SymbolLookupSetting _lookup_setting{K_CACHE_ON};
 
-  SymbolIdx_t insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
-                     SymbolTable &table, DsoSymbolLookup &dso_symbol_lookup,
-                     ProcessAddress_t process_pc, const Dso &dso,
-                     SymbolWrapper &symbol_wrapper);
+  SymbolMap::ValueType &insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
+                               SymbolTable &table,
+                               DsoSymbolLookup &dso_symbol_lookup,
+                               ProcessAddress_t process_pc, const Dso &dso,
+                               SymbolWrapper &symbol_wrapper);
 
-  static DDRes insert_inlining_info(Dwfl *dwfl,
-                              const DDProfMod &ddprof_mod,
-                              SymbolTable &table,
-                              DsoSymbolLookup &dso_symbol_lookup,
-                              ProcessAddress_t process_pc,
-                              const Dso &dso,
-                              SymbolWrapper &symbol_wrapper,
-                              SymbolIdx_t parent_sym_idx);
+  static DDRes insert_inlining_info(Dwfl *dwfl, const DDProfMod &ddprof_mod,
+                                    SymbolTable &table,
+                                    ProcessAddress_t process_pc, const Dso &dso,
+                                    SymbolWrapper &symbol_wrapper,
+                                    SymbolMap::ValueType &parent_func);
 
   static void get_inlined(const SymbolWrapper &symbol_wrapper,
                           ElfAddress_t elf_pc,
+                          const SymbolMap::ValueType &parent_sym,
                           std::vector<SymbolIdx_t> &inlined_symbols);
 
   // Symbols are ordered by file.
   // The assumption is that the elf addresses are the same across processes
   // The unordered map stores symbols per file,
   // The map stores symbols per address range
-  using FileInfo2SymbolWrapper = std::unordered_map<FileInfoId_t, SymbolWrapper>;
+  using FileInfo2SymbolWrapper =
+      std::unordered_map<FileInfoId_t, SymbolWrapper>;
   using FileInfo2LineMap = std::unordered_map<FileInfoId_t, LineMap>;
   using FileInfo2SymbolVT = FileInfo2SymbolWrapper::value_type;
 

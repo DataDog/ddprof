@@ -242,8 +242,8 @@ TEST(DwflModule, inlined_func) {
       ASSERT_TRUE(ddprof_mod->_mod);
       if (find_res.first == it) {
         std::vector<SymbolIdx_t> symbol_indices;
-            symbol_lookup.get_or_insert(dwfl_wrapper._dwfl, *ddprof_mod, table,
-                                        dso_lookup, file_info_id, ip, dso,
+        symbol_lookup.get_or_insert(dwfl_wrapper._dwfl, *ddprof_mod, table,
+                                    dso_lookup, file_info_id, ip, dso,
                                     symbol_indices);
         const auto &sym = table[symbol_indices.back()];
         LG_DBG("Sym = %s", sym._demangle_name.c_str());

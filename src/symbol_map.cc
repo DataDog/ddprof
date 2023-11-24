@@ -4,8 +4,8 @@
 // Datadog, Inc.
 
 #include "symbol_map.hpp"
-#include <limits>
 #include <cassert>
+#include <limits>
 
 namespace ddprof {
 
@@ -39,58 +39,40 @@ SymbolMap::FindRes SymbolMap::find_closest(Offset_t norm_pc) {
   return {it, is_within(norm_pc, *it)};
 }
 
-NestedSymbolMap::FindRes NestedSymbolMap::find_parent(NestedSymbolMap::ConstIt it,
-                                                      Offset_t norm_pc) const {
-  // Handle case where start addresses are equal
-  // We do not want to return the same element, we are looking for parent
-  if (it != begin() && it->first.start == norm_pc) {
+// parent span acts as a bound
+NestedSymbolMap::FindRes
+NestedSymbolMap::find_parent(NestedSymbolMap::ConstIt it,
+                             const NestedSymbolKey &parent_bound,
+                             Offset_t norm_pc) const {
+  while (it != begin()) {
     --it;
+    if (it->first < parent_bound) {
+      return {end(), false};
+    }
     if (is_within(norm_pc, *it)) {
       return {it, true};
-    }
-  }
-  while (it != begin() && it->first.start > norm_pc) {
-    --it;
-  }
-  return {it, is_within(norm_pc, *it)};
-}
-
-NestedSymbolMap::FindRes NestedSymbolMap::find_closest(Offset_t norm_pc) const {
-  // Use the element with the lowest end possible, to ensure we find the
-  // deepest element
-  auto it = lower_bound(NestedSymbolKey{norm_pc,
-                                        0});
-  if (it != end()) { // map is empty
-    if (is_within(norm_pc, *it)) {
-      return {it, true};
-    }
-  }
-  if (it != begin()) {
-    --it;
-  }
-  // Iteratively check the current symbol and its parent symbols
-  while (it != end()) {
-    if (is_within(norm_pc, *it)) {
-      return {it, true};
-    }
-    // Traverse to the parent symbol if available
-    if (it->second.get_parent_addr() != 0) {
-      FindRes res = find_parent(it, it->second.get_parent_addr());
-      if (res.second) {
-        it = res.first;
-      }
-      else {
-        assert(0);
-        break;
-      }
-    } else {
-      break; // No parent, stop the search
     }
   }
   return {end(), false};
 }
 
-bool NestedSymbolMap::is_within(const Offset_t &norm_pc, const NestedSymbolMap::ValueType &kv) {
+NestedSymbolMap::FindRes
+NestedSymbolMap::find_closest(Offset_t norm_pc,
+                              const NestedSymbolKey &parent_bound) const {
+  // Use the element with the lowest end possible, to ensure we find the
+  // deepest element
+  auto it = lower_bound(NestedSymbolKey{norm_pc, 0});
+  if (it != end()) { // map not empty
+    LG_DBG("Found %lx - %lx ", it->first.start, it->first.end);
+    if (is_within(norm_pc, *it)) {
+      return {it, true};
+    }
+  }
+  return find_parent(it, parent_bound, norm_pc);
+}
+
+bool NestedSymbolMap::is_within(const Offset_t &norm_pc,
+                                const NestedSymbolMap::ValueType &kv) {
   if (norm_pc < kv.first.start) {
     return false;
   }

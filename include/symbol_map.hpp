@@ -33,8 +33,6 @@ private:
   SymbolIdx_t _symbol_idx;
 };
 
-
-
 class SymbolMap : private std::map<ElfAddress_t, SymbolSpan> {
 public:
   using Map = std::map<ElfAddress_t, SymbolSpan>;
@@ -58,16 +56,14 @@ public:
   FindRes find_closest(Offset_t norm_pc);
 };
 
-
 class NestedSymbolValue {
 public:
   NestedSymbolValue() : _symbol_idx(-1), _parent_addr(0) {}
   NestedSymbolValue(SymbolIdx_t symbol_idx, ElfAddress_t parent = 0)
       : _symbol_idx(symbol_idx), _parent_addr(parent) {}
   [[nodiscard]] SymbolIdx_t get_symbol_idx() const { return _symbol_idx; }
-  [[nodiscard]] ElfAddress_t get_parent_addr() const{
-    return _parent_addr;
-  }
+  [[nodiscard]] ElfAddress_t get_parent_addr() const { return _parent_addr; }
+
 private:
   SymbolIdx_t _symbol_idx;
   ElfAddress_t _parent_addr;
@@ -77,7 +73,7 @@ struct NestedSymbolKey {
   ElfAddress_t start;
   ElfAddress_t end;
   NestedSymbolKey(ElfAddress_t s, ElfAddress_t e) : start(s), end(e) {}
-  bool operator<(const NestedSymbolKey & other) const {
+  bool operator<(const NestedSymbolKey &other) const {
     if (start != other.start) {
       return start < other.start;
     }
@@ -85,7 +81,6 @@ struct NestedSymbolKey {
     return end > other.end;
   }
 };
-
 
 class NestedSymbolMap : private std::map<NestedSymbolKey, NestedSymbolValue> {
 public:
@@ -103,10 +98,11 @@ public:
   using Map::erase;
   using Map::size;
 
-  FindRes find_parent(ConstIt it,
-                         Offset_t norm_pc) const;
+  FindRes find_parent(ConstIt it, const NestedSymbolKey &parent_bound,
+                      Offset_t norm_pc) const;
 
-  FindRes find_closest(Offset_t norm_pc) const;
+  FindRes find_closest(Offset_t norm_pc,
+                       const NestedSymbolKey &parent_bound) const;
 
   static bool is_within(const Offset_t &norm_pc, const ValueType &kv);
 };

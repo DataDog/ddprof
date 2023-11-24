@@ -25,11 +25,8 @@ bool is_max_stack_depth_reached(const UnwindState &us) {
   return us.output.locs.size() + 2 >= kMaxStackDepth;
 }
 
-
-DDRes add_frame(std::vector<SymbolIdx_t> symbol_indices,
-                MapInfoIdx_t map_idx,
-                ElfAddress_t pc,
-                UnwindState *us) {
+DDRes add_frame(std::vector<SymbolIdx_t> symbol_indices, MapInfoIdx_t map_idx,
+                ElfAddress_t pc, UnwindState *us) {
 
   for (auto const el : symbol_indices) {
     DDRES_CHECK_FWD(add_frame(el, map_idx, pc, us));
@@ -37,8 +34,7 @@ DDRes add_frame(std::vector<SymbolIdx_t> symbol_indices,
   return {};
 }
 
-DDRes add_frame(SymbolIdx_t symbol_idx,
-                MapInfoIdx_t map_idx, ElfAddress_t pc,
+DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
                 UnwindState *us) {
   UnwindOutput *output = &us->output;
   if (output->locs.size() >= kMaxStackDepth) {
