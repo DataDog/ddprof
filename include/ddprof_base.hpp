@@ -9,6 +9,7 @@
 #define DDPROF_NOINLINE __attribute__((noinline))
 #define DDPROF_ALWAYS_INLINE __attribute__((always_inline))
 #define DDPROF_NO_SANITIZER_ADDRESS __attribute__((no_sanitize("address")))
+#define DDPROF_WEAK __attribute__((weak))
 
 #if defined(__clang__)
 #  define DDPROF_NOIPO __attribute__((noinline))

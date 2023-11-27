@@ -184,7 +184,7 @@ if(USE_LOADER)
   set(LIBDD_LOADER_OBJECT "${CMAKE_BINARY_DIR}/libdd_loader.o")
   set(LIBDD_LOADER_HASH_HEADER "${CMAKE_BINARY_DIR}/libdd_loader_hash.h")
   add_custom_command(
-    OUTPUT ${LIBDD_LOADER_OBJECT}
+    OUTPUT ${LIBDD_LOADER_OBJECT} ${LIBDD_LOADER_HASH_HEADER}
     # taken from https://dvdhrm.wordpress.com/2013/03/08/linking-binary-data/
     COMMAND ld -r -o ${LIBDD_LOADER_OBJECT} -z noexecstack --format=binary
             $<TARGET_FILE_NAME:dd_loader>
@@ -193,10 +193,14 @@ if(USE_LOADER)
     COMMAND ${CMAKE_SOURCE_DIR}/tools/generate_hash_header.sh ${LIBDD_LOADER_OBJECT}
             libdd_loader_hash ${LIBDD_LOADER_HASH_HEADER}
     DEPENDS dd_loader)
+
+  add_custom_target(generate_libdd_loader_object DEPENDS ${LIBDD_LOADER_OBJECT}
+                                                         ${LIBDD_LOADER_HASH_HEADER})
   add_library(libdd_loader_object OBJECT IMPORTED GLOBAL)
   set_target_properties(
     libdd_loader_object PROPERTIES IMPORTED_OBJECTS "${LIBDD_LOADER_OBJECT}"
                                    INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}")
+  add_dependencies(libdd_loader_object generate_libdd_loader_object)
 endif()
 
 set(DD_PROFILING_SOURCES
@@ -283,10 +287,15 @@ add_custom_command(
   COMMAND ${CMAKE_SOURCE_DIR}/tools/generate_hash_header.sh ${LIBDD_PROFILING_EMBEDDED_OBJECT}
           libdd_profiling_embedded_hash ${LIBDD_PROFILING_EMBEDDED_HASH_HEADER}
   DEPENDS dd_profiling-embedded)
+
+add_custom_target(
+  generate_libddprofiling_embedded_object DEPENDS ${LIBDD_PROFILING_EMBEDDED_OBJECT}
+                                                  ${LIBDD_PROFILING_EMBEDDED_HASH_HEADER})
 add_library(libddprofiling_embedded_object OBJECT IMPORTED GLOBAL)
 set_target_properties(
   libddprofiling_embedded_object PROPERTIES IMPORTED_OBJECTS "${LIBDD_PROFILING_EMBEDDED_OBJECT}"
                                             INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}")
+add_dependencies(libddprofiling_embedded_object generate_libddprofiling_embedded_object)
 
 # It is important to force most libraries as static
 add_exe(
@@ -335,6 +344,7 @@ add_library(ddprof_exe_object OBJECT IMPORTED GLOBAL)
 set_target_properties(
   ddprof_exe_object PROPERTIES IMPORTED_OBJECTS "${DDPROF_EXE_OBJECT}" INTERFACE_INCLUDE_DIRECTORIES
                                                                        "${CMAKE_BINARY_DIR}")
+add_dependencies(ddprof_exe_object generate_ddprof_object)
 
 add_library(dd_profiling-static STATIC ${DD_PROFILING_SOURCES})
 set_target_properties(dd_profiling-static PROPERTIES OUTPUT_NAME dd_profiling)

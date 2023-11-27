@@ -453,6 +453,11 @@ bool SymbolOverrides::register_override(std::string_view symbol_name,
                                         uintptr_t new_symbol,
                                         uintptr_t *ref_symbol,
                                         uintptr_t do_not_override_this_symbol) {
+  // refuse to override symbol if ref symbol is not defined
+  if (*ref_symbol == 0) {
+    return false;
+  }
+
   return _overrides
       .try_emplace(std::string{symbol_name}, ref_symbol, new_symbol,
                    do_not_override_this_symbol)
