@@ -23,6 +23,15 @@
 #include <gtest/gtest.h>
 #ifdef USE_JEMALLOC
 #  include <jemalloc/jemalloc.h>
+#else
+extern "C" {
+DDPROF_WEAK void *mallocx(size_t size, int flags);
+DDPROF_WEAK void *rallocx(void *ptr, size_t size, int flags);
+DDPROF_WEAK size_t xallocx(void *ptr, size_t size, size_t extra, int flags);
+DDPROF_WEAK size_t sallocx(void *ptr, int flags);
+DDPROF_WEAK void dallocx(void *ptr, int flags);
+DDPROF_WEAK void sdallocx(void *ptr, size_t size, int flags);
+}
 #endif
 #include <malloc.h>
 #include <sys/mman.h>
@@ -40,12 +49,11 @@
 
 extern "C" {
 // Declaration of reallocarray is only available starting from glibc 2.28
-__attribute__((weak)) void *reallocarray(void *ptr, size_t nmemb,
-                                         size_t size) NOEXCEPT;
-__attribute__((weak)) void *pvalloc(size_t size) NOEXCEPT;
-__attribute__((weak)) void *__mmap(void *addr, size_t length, int prot,
-                                   int flags, int fd, off_t offset);
-__attribute__((weak)) int __munmap(void *addr, size_t length);
+DDPROF_WEAK void *reallocarray(void *ptr, size_t nmemb, size_t size) NOEXCEPT;
+DDPROF_WEAK void *pvalloc(size_t size) NOEXCEPT;
+DDPROF_WEAK void *__mmap(void *addr, size_t length, int prot, int flags, int fd,
+                         off_t offset);
+DDPROF_WEAK int __munmap(void *addr, size_t length);
 }
 
 namespace ddprof {
@@ -408,6 +416,13 @@ DDPROF_NOINLINE void test_allocation_functions(RingBuffer &ring_buffer) {
     SCOPED_TRACE("pvalloc/free");
     checker.test_alloc(&::pvalloc);
   }
+
+  ASSERT_FALSE(::mallocx);
+  ASSERT_FALSE(::rallocx);
+  ASSERT_FALSE(::xallocx);
+  ASSERT_FALSE(::sallocx);
+  ASSERT_FALSE(::dallocx);
+  ASSERT_FALSE(::sdallocx);
 #else
   {
     SCOPED_TRACE("mallocx/dallocx");

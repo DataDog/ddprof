@@ -29,24 +29,21 @@
 extern "C" {
 // NOLINTBEGIN
 // Declaration of reallocarray is only available starting from glibc 2.28
-__attribute__((weak)) void *reallocarray(void *ptr, size_t nmemb,
-                                         size_t nmenb) NOEXCEPT;
-__attribute__((weak)) void *pvalloc(size_t size) NOEXCEPT;
-__attribute__((weak)) int __libc_allocate_rtsig(int high) NOEXCEPT;
+DDPROF_WEAK void *reallocarray(void *ptr, size_t nmemb, size_t nmenb) NOEXCEPT;
+DDPROF_WEAK void *pvalloc(size_t size) NOEXCEPT;
+DDPROF_WEAK int __libc_allocate_rtsig(int high) NOEXCEPT;
 // NOLINTEND
 
 // sized free functions (C23, not yet available in glibc)
-__attribute__((weak)) void free_sized(void *ptr, size_t size);
-__attribute__((weak)) void free_aligned_sized(void *ptr, size_t alignment,
-                                              size_t size);
+DDPROF_WEAK void free_sized(void *ptr, size_t size);
+DDPROF_WEAK void free_aligned_sized(void *ptr, size_t alignment, size_t size);
 
 // jemalloc Non-standard API
-__attribute__((weak)) void *mallocx(size_t size, int flags);
-__attribute__((weak)) void *rallocx(void *ptr, size_t size, int flags);
-__attribute__((weak)) size_t xallocx(void *ptr, size_t size, size_t extra,
-                                     int flags);
-__attribute__((weak)) void dallocx(void *ptr, int flags);
-__attribute__((weak)) void sdallocx(void *ptr, size_t size, int flags);
+DDPROF_WEAK void *mallocx(size_t size, int flags);
+DDPROF_WEAK void *rallocx(void *ptr, size_t size, int flags);
+DDPROF_WEAK size_t xallocx(void *ptr, size_t size, size_t extra, int flags);
+DDPROF_WEAK void dallocx(void *ptr, int flags);
+DDPROF_WEAK void sdallocx(void *ptr, size_t size, int flags);
 }
 
 namespace ddprof {
