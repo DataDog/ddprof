@@ -191,7 +191,7 @@ RUN VERSION="5.3.0" \
   && rm -rf "jemalloc-${VERSION}" "${TAR_NAME}"
 
 # Install cmake_format and sarif-tools (for codeql filtering)
-RUN pip3 install cmake_format sarif-tools
+RUN pip3 install cmake_format && ([ "${UBUNTU_VERSION}" -ge 22 ] && pip3 install sarif-tools || true)
 
 # A specific user is required to get access to perf event ressources.
 # This enables unit testing using perf-event ressources
