@@ -245,7 +245,7 @@ TEST(DwflModule, inlined_func) {
         symbol_lookup.get_or_insert(dwfl_wrapper._dwfl, *ddprof_mod, table,
                                     dso_lookup, file_info_id, ip, dso,
                                     symbol_indices);
-        const auto &sym = table[symbol_indices.back()];
+        const auto &sym = table[symbol_indices[0]];
         LG_DBG("Sym = %s", sym._demangle_name.c_str());
         EXPECT_EQ(sym._demangle_name, "deeper_function");
       }

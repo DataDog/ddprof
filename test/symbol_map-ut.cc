@@ -33,9 +33,9 @@ TEST(NestedSymbolMap, simple) {
   NestedSymbolKey parent_key{0x50, 0x1000};
   LogHandle handle;
   NestedSymbolMap map;
-  NestedSymbolValue span100_1000(0, 0);
+  NestedSymbolValue span100_1000(0);
   map.emplace(NestedSymbolKey{0x100, 0x1000}, span100_1000);
-  NestedSymbolValue span150_300(1, 0x100);
+  NestedSymbolValue span150_300(1);
   map.emplace(NestedSymbolKey{0x150, 0x300}, span150_300);
   for (auto &el : map) {
     LG_DBG("Idx = %d", el.second.get_symbol_idx());
@@ -58,7 +58,7 @@ TEST(NestedSymbolMap, same_addr) {
   NestedSymbolKey parent_key{0x50, 0x1000};
   NestedSymbolValue span100_1000(0);
   map.emplace(NestedSymbolKey{0x100, 0x1000}, span100_1000);
-  NestedSymbolValue span100_300(1, 0x100);
+  NestedSymbolValue span100_300(1);
   map.emplace(NestedSymbolKey{0x100, 0x300}, span100_300);
   for (auto &el : map) {
     LG_DBG("Idx = %d", el.second.get_symbol_idx());
@@ -76,16 +76,16 @@ TEST(NestedSymbolMap, InlinedFunctionLookup) {
   LogHandle handle;
   NestedSymbolMap map;
   // Insert main function
-  map.emplace(NestedSymbolKey{0x1180, 0x128a}, NestedSymbolValue(34, 0));
+  map.emplace(NestedSymbolKey{0x1180, 0x128a}, NestedSymbolValue(34));
   // Insert inlined functions as per the log
-  map.emplace(NestedSymbolKey{0x11bd, 0x11bd}, NestedSymbolValue(1, 0x1180));
-  map.emplace(NestedSymbolKey{0x11bd, 0x11c4}, NestedSymbolValue(2, 0x1180));
-  map.emplace(NestedSymbolKey{0x11bd, 0x11bd}, NestedSymbolValue(3, 0x1180));
-  map.emplace(NestedSymbolKey{0x11bd, 0x11bd}, NestedSymbolValue(4, 0x1180));
-  map.emplace(NestedSymbolKey{0x11bd, 0x11bd}, NestedSymbolValue(5, 0x1180));
-  map.emplace(NestedSymbolKey{0x11d0, 0x1203}, NestedSymbolValue(6, 0x1180));
-  map.emplace(NestedSymbolKey{0x11fe, 0x11fe}, NestedSymbolValue(7, 0x11d0));
-  map.emplace(NestedSymbolKey{0x11d0, 0x11d0}, NestedSymbolValue(8, 0x11d0));
+  map.emplace(NestedSymbolKey{0x11bd, 0x11bd}, NestedSymbolValue(1));
+  map.emplace(NestedSymbolKey{0x11bd, 0x11c4}, NestedSymbolValue(2));
+  map.emplace(NestedSymbolKey{0x11bd, 0x11bd}, NestedSymbolValue(3));
+  map.emplace(NestedSymbolKey{0x11bd, 0x11bd}, NestedSymbolValue(4));
+  map.emplace(NestedSymbolKey{0x11bd, 0x11bd}, NestedSymbolValue(5));
+  map.emplace(NestedSymbolKey{0x11d0, 0x1203}, NestedSymbolValue(6));
+  map.emplace(NestedSymbolKey{0x11fe, 0x11fe}, NestedSymbolValue(7));
+  map.emplace(NestedSymbolKey{0x11d0, 0x11d0}, NestedSymbolValue(8));
 
   NestedSymbolKey parent_key{0x1180, 0x1300};
   // Test for a specific address

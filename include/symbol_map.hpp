@@ -58,15 +58,12 @@ public:
 
 class NestedSymbolValue {
 public:
-  NestedSymbolValue() : _symbol_idx(-1), _parent_addr(0) {}
-  NestedSymbolValue(SymbolIdx_t symbol_idx, ElfAddress_t parent = 0)
-      : _symbol_idx(symbol_idx), _parent_addr(parent) {}
+  NestedSymbolValue() : _symbol_idx(-1) {}
+  NestedSymbolValue(SymbolIdx_t symbol_idx) : _symbol_idx(symbol_idx) {}
   [[nodiscard]] SymbolIdx_t get_symbol_idx() const { return _symbol_idx; }
-  [[nodiscard]] ElfAddress_t get_parent_addr() const { return _parent_addr; }
 
 private:
   SymbolIdx_t _symbol_idx;
-  ElfAddress_t _parent_addr;
 };
 
 struct NestedSymbolKey {
