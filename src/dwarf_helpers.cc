@@ -13,7 +13,7 @@
 namespace ddprof {
 
 const char *get_attribute_name(int attrCode) {
-  // Should not get init unless called
+  // Should not get init unless cablled
   // Something like following awk can help generate this map:
   // cat file_with_dwarf_attributes.txt |
   //      awk '!/\/\*/ { print  "{ "$1", \""$1"\"},"}'

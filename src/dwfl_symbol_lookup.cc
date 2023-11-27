@@ -132,6 +132,7 @@ void DwflSymbolLookup::get_or_insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
     // then add the elf symbol
     symbol_indices.push_back(find_res.first->second.get_symbol_idx());
   } else {
+    const size_t previous_table_size = table.size();
     // insert symbols using elf info
     SymbolMap::ValueType &elf_sym =
         insert(dwfl, ddprof_mod, table, dso_symbol_lookup, process_pc, dso,
@@ -142,6 +143,16 @@ void DwflSymbolLookup::get_or_insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
     get_inlined(symbol_wrapper, elf_pc, elf_sym, symbol_indices);
     // add elf symbol after
     symbol_indices.push_back(elf_sym.second.get_symbol_idx());
+    // For newly added symbols, insure we don't leave a blank file name
+    for (unsigned i = previous_table_size; i < table.size(); ++i) {
+      auto &sym = table[i];
+      if (sym._srcpath.empty()) {
+        // override with info from dso (this slightly mixes mappings and
+        // sources) But it helps a lot at Datadog (as mappings are ignored for
+        // now in UI)
+        sym._srcpath = dso.format_filename();
+      }
+    }
   }
   return;
 }
@@ -172,14 +183,14 @@ Dwarf_Die *die_find_realfunc(Dwarf_Die *cu_die, Dwarf_Addr addr,
 static int store_die_information(Dwarf_Die *sc_die, int parent_index,
                                  DieInformation &data,
                                  Dwarf_Files *dwarf_files) {
+#ifdef DEEP_DEBUG
   dwarf_getattrs(sc_die, print_attribute, nullptr, 0);
-
+#endif
   // function or inlined function
   DieInformation::Function function{};
   // die_name is usually the raw function name (no mangling info)
   // link name can have mangling info
   function.func_name = dwarf_diename(sc_die);
-  LG_DBG("Storing func = %s", function.func_name);
   Dwarf_Attribute attr_mem;
   Dwarf_Attribute *attr;
   if ((attr = dwarf_attr(sc_die, DW_AT_low_pc, &attr_mem))) {
@@ -215,7 +226,6 @@ static int store_die_information(Dwarf_Die *sc_die, int parent_index,
       const char *file = dwarf_filesrc(dwarf_files, fileIdx, NULL, NULL);
       // Store or process the file name
       function.file_name = file;
-      LG_DBG("File associated with function: %s", file);
     }
   }
 
@@ -224,7 +234,6 @@ static int store_die_information(Dwarf_Die *sc_die, int parent_index,
     Dwarf_Word return_uval;
     if (dwarf_formudata(attr, &return_uval) == 0) {
       function.line_number = return_uval;
-      LG_DBG("Line number associated with function: %u", function.line_number);
     }
   }
 
@@ -265,9 +274,7 @@ static DDRes parse_die_information(Dwarf_Die *cudie, ElfAddress_t elf_addr,
                                    DieInformation &die_information) {
   Dwarf_Files *files = nullptr;
   size_t nfiles = 0;
-  if (cudie == nullptr) {
-    DDRES_RETURN_WARN_LOG(DD_WHAT_NO_DWARF, "Unable to retrieve cu die");
-  }
+  assert(cudie);
   // cached within the CU
   if (dwarf_getsrcfiles(cudie, &files, &nfiles) != 0) {
     files = nullptr;
@@ -275,7 +282,8 @@ static DDRes parse_die_information(Dwarf_Die *cudie, ElfAddress_t elf_addr,
   Dwarf_Die die_mem;
   Dwarf_Die *sc_die = die_find_realfunc(cudie, elf_addr, &die_mem);
   if (sc_die == nullptr) {
-    DDRES_RETURN_WARN_LOG(DD_WHAT_DWFL_LIB_ERROR, "Unable to retrieve sc_die");
+    LG_DBG("Unable to retrieve sc_die at %lx", elf_addr);
+    return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
   }
   // store parent function at index 0
   if (store_die_information(sc_die, -1, die_information, files) == -1) {
@@ -293,16 +301,19 @@ static DDRes parse_die_information(Dwarf_Die *cudie, ElfAddress_t elf_addr,
 }
 
 static DDRes parse_lines(Dwarf_Die *cudie, const DDProfMod &mod,
-                         ProcessAddress_t process_pc, SymbolMap &func_map,
-                         DwflSymbolLookup::LineMap &line_map,
+                         ProcessAddress_t process_pc,
+                         DwflSymbolLookup::SymbolWrapper &symbol_wrapper,
                          SymbolTable &table, DieInformation &die_information) {
 
+  DwflSymbolLookup::LineMap &line_map = symbol_wrapper._line_map;
+  DwflSymbolLookup::InlineMap &inline_map = symbol_wrapper._inline_map;
   Dwarf_Lines *lines;
   size_t nlines;
   if (dwarf_getsrclines(cudie, &lines, &nlines) != 0) {
     LG_DBG("Unable to find source lines");
     return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
   }
+#ifdef V1
   for (size_t func_pos = 0; func_pos < die_information.die_mem_vec.size();
        ++func_pos) {
     const DieInformation::Function &current_func =
@@ -321,21 +332,80 @@ static DDRes parse_lines(Dwarf_Die *cudie, const DDProfMod &mod,
     }
     const char *current_file = dwarf_linesrc(line, nullptr, nullptr);
     if (current_file) {
+      LG_DBG("Start file = %s vs %s", current_file, ref_sym._srcpath.c_str());
       ref_sym._srcpath = std::string(current_file);
     }
   }
-  // todo loop on all lines to get real line numbers and cache them
-  //  auto it = line_map.begin();
-  //  line_map.insert(it,
-  //                  std::pair<ElfAddress_t, DwflSymbolLookup::Line>(
-  //                      static_cast<ElfAddress_t>(current_func.end_addr),
-  //                      DwflSymbolLookup::Line{static_cast<uint32_t>(lineno),
-  //                                             current_func.end_addr,
-  //                                             current_func.symbol_idx}));
+#endif
+  const DieInformation::Function &parent_func = die_information.die_mem_vec[0];
+  NestedSymbolKey parent_bound{parent_func.start_addr, parent_func.end_addr};
+  int start_index =
+      binary_search_start_index(lines, nlines, parent_bound.start);
+  std::unordered_map<SymbolIdx_t, std::unordered_map<const char *, int>>
+      file_frequencies;
+
+  auto it = line_map.begin();
+  for (size_t line_index = start_index; line_index < nlines; ++line_index) {
+    Dwarf_Line *line = dwarf_onesrcline(lines, line_index);
+    Dwarf_Addr line_addr;
+    dwarf_lineaddr(line, &line_addr);
+    if (line_addr > parent_bound.end) {
+      break;
+    }
+
+    int lineno;
+    if (dwarf_lineno(line, &lineno) == -1) {
+      lineno = 0; // Handle the case where line number is not available
+    }
+
+    // Determine the associated function for this line
+    const auto leaf_func = inline_map.find_closest(line_addr, parent_bound);
+    SymbolIdx_t symbol_idx;
+    if (!leaf_func.second) {
+      symbol_idx = parent_func.symbol_idx;
+    } else {
+      symbol_idx = leaf_func.first->second.get_symbol_idx();
+    }
+    Symbol &ref_sym = table[symbol_idx];
+    // Update the source path if necessary
+    const char *current_file = dwarf_linesrc(line, nullptr, nullptr);
+    file_frequencies[symbol_idx][current_file]++;
+
+    LG_DBG("Associate %d / %s to %s (vs %s)", lineno,
+           current_file ? current_file : "undef",
+           ref_sym._demangle_name.c_str(), ref_sym._srcpath.c_str());
+
+    // Insert into the line map
+    it = line_map.insert(
+        it,
+        std::make_pair(static_cast<ElfAddress_t>(line_addr),
+                       DwflSymbolLookup::Line{static_cast<uint32_t>(lineno),
+                                              line_addr, symbol_idx}));
+  }
+  for (auto &symbol_entry : file_frequencies) {
+    SymbolIdx_t symbol_idx = symbol_entry.first;
+    Symbol &ref_sym = table[symbol_idx];
+    const char *most_frequent_file = nullptr;
+    int max_frequency = 0;
+
+    for (auto &file_entry : symbol_entry.second) {
+      if (file_entry.second > max_frequency) {
+        max_frequency = file_entry.second;
+        most_frequent_file = file_entry.first;
+      }
+    }
+
+    if (most_frequent_file) {
+      LG_DBG("Associate to sym %s file %s", ref_sym._demangle_name.c_str(),
+             most_frequent_file);
+      ref_sym._srcpath = most_frequent_file;
+    }
+  }
 
   return {};
 }
 
+// todo: put dso part in parent
 DDRes DwflSymbolLookup::insert_inlining_info(
     Dwfl *dwfl, const DDProfMod &ddprof_mod, SymbolTable &table,
     ProcessAddress_t process_pc, const Dso &dso, SymbolWrapper &symbol_wrapper,
@@ -348,11 +418,9 @@ DDRes DwflSymbolLookup::insert_inlining_info(
     Symbol &parent_sym = table[parent_sym_idx];
     LG_DBG("No debug information for %s (%s)",
            parent_sym._demangle_name.c_str(), dso._filename.c_str());
-    parent_sym._srcpath = dso.format_filename();
     return ddres_warn(DD_WHAT_NO_DWARF);
   }
   ElfAddress_t elf_addr = process_pc - bias;
-  SymbolMap &func_map = symbol_wrapper._symbol_map;
   DieInformation die_information;
   if (!IsDDResOK(parse_die_information(cudie, elf_addr, die_information)) ||
       die_information.die_mem_vec.size() == 0) {
@@ -387,28 +455,15 @@ DDRes DwflSymbolLookup::insert_inlining_info(
                current_func.file_name ? current_func.file_name : ""));
     current_func.symbol_idx = table.size() - 1;
     // add to the lookup
-    LG_DBG("adding %lx - %lx: %s", current_func.start_addr,
-           current_func.end_addr, current_func.func_name);
     inline_map.emplace(
         NestedSymbolKey{current_func.start_addr, current_func.end_addr},
         NestedSymbolValue(current_func.symbol_idx));
   }
 
   // associate line information to die information (includes file info)
-  LineMap &line_map = symbol_wrapper._line_map;
-  if (IsDDResNotOK(parse_lines(cudie, ddprof_mod, process_pc, func_map,
-                               line_map, table, die_information))) {
+  if (IsDDResNotOK(parse_lines(cudie, ddprof_mod, process_pc, symbol_wrapper,
+                               table, die_information))) {
     LG_DBG("Error when parsing line information (%s)", dso._filename.c_str());
-  }
-
-  for (unsigned pos = 0; pos < die_information.die_mem_vec.size(); ++pos) {
-    DieInformation::Function &func = die_information.die_mem_vec[pos];
-    auto &sym = table[func.symbol_idx];
-    if (sym._srcpath.empty()) {
-      // override with info from dso (this slightly mixes mappings and sources)
-      // But it helps a lot at Datadog (as mappings are ignored for now in UI)
-      sym._srcpath = dso.format_filename();
-    }
   }
   return {};
 }
@@ -440,11 +495,6 @@ DwflSymbolLookup::insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
         dso_symbol_lookup.get_or_insert(elf_pc, dso, table);
 #else
     SymbolIdx_t const symbol_idx = dso_symbol_lookup.get_or_insert(dso, table);
-#endif
-#ifdef DEBUG
-    LG_NTC("Insert (dwfl failure): %lx,%lx -> %s,%d,%s", start_sym, end_sym,
-           table[symbol_idx]._symname.c_str(), symbol_idx,
-           dso.to_string().c_str());
 #endif
     auto res_emplace =
         func_map.emplace(start_sym, SymbolSpan(end_sym, symbol_idx));

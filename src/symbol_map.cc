@@ -63,7 +63,6 @@ NestedSymbolMap::find_closest(Offset_t norm_pc,
   // deepest element
   auto it = lower_bound(NestedSymbolKey{norm_pc, 0});
   if (it != end()) { // map not empty
-    LG_DBG("Found %lx - %lx ", it->first.start, it->first.end);
     if (is_within(norm_pc, *it)) {
       return {it, true};
     }
