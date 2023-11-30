@@ -217,8 +217,8 @@ static DDRes parse_lines(Dwarf_Die *cudie, const DDProfMod &mod,
              current_file ? current_file : "undef",
              ref_sym->_demangle_name.c_str(), ref_sym->_srcpath.c_str());
 #endif
-      // todo: this can be more efficient with hint
-      current_func = inline_map.find_closest(line_addr, parent_bound);
+      current_func = inline_map.find_closest_hint(line_addr, parent_bound,
+                                                  current_func.first);
       if (!current_func.second) {
         symbol_idx = parent_func.symbol_idx;
       } else {
@@ -228,7 +228,7 @@ static DDRes parse_lines(Dwarf_Die *cudie, const DDProfMod &mod,
       ref_sym = &table[symbol_idx];
     }
     // keep line, if it matches the symbol
-    // todo can be optimized to avoid conversion
+    // todo can be optimized to avoid conversion to string
     closest_lines[std::string(current_file)] = lineno;
     previous_addr = line_addr;
   }

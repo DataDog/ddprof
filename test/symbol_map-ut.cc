@@ -60,9 +60,6 @@ TEST(NestedSymbolMap, same_addr) {
   map.emplace(NestedSymbolKey{0x100, 0x1000}, span100_1000);
   NestedSymbolValue span100_300(1);
   map.emplace(NestedSymbolKey{0x100, 0x300}, span100_300);
-  for (auto &el : map) {
-    LG_DBG("Idx = %d", el.second.get_symbol_idx());
-  }
 
   { // always return the deeper element
     NestedSymbolMap::FindRes res = map.find_closest(0x100, parent_key);
@@ -93,6 +90,30 @@ TEST(NestedSymbolMap, InlinedFunctionLookup) {
   ASSERT_TRUE(res.second);
   EXPECT_EQ(res.first->second.get_symbol_idx(),
             6); // Expecting the most specific (deepest) symbol for this address
+}
+
+TEST(NestedSymbolMap, closest_hint) {
+  LogHandle handle;
+  NestedSymbolMap map;
+  NestedSymbolKey parent_key{0x50, 0x1000};
+  NestedSymbolValue span100_1000(0);
+  map.emplace(NestedSymbolKey{0x100, 0x1000}, span100_1000);
+  NestedSymbolValue span100_300(1);
+  map.emplace(NestedSymbolKey{0x100, 0x300}, span100_300);
+  NestedSymbolValue span300_400(2);
+  map.emplace(NestedSymbolKey{0x300, 0x400}, span300_400);
+
+
+  { // always return the deeper element
+    NestedSymbolMap::FindRes res = map.find_closest(0x100, parent_key);
+    EXPECT_TRUE(res.second);
+    EXPECT_EQ(res.first->second.get_symbol_idx(), 1);
+
+    NestedSymbolMap::FindRes res_2 =
+        map.find_closest_hint(0x350, parent_key, res.first);
+    EXPECT_TRUE(res_2.second);
+    EXPECT_EQ(res_2.first->second.get_symbol_idx(), 2);
+  }
 }
 
 } // namespace ddprof

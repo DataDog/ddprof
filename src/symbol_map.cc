@@ -88,25 +88,28 @@ NestedSymbolMap::FindRes NestedSymbolMap::find_closest_hint(
   }
   const NestedSymbolKey leaf_element{norm_pc, 0};
   const NestedSymbolKey high_bound{parent_bound.end, 0};
+  NestedSymbolMap::FindRes res{end(), false};
 
+  auto it = hint;
   if (hint->first < leaf_element) {
     // If the current element is less than or equal to norm_pc, move forward
-    for (auto it = hint; it != end() && it->first.start <= norm_pc; ++it) {
-      // Find the lower bound
+    for (; it != end(); ++it) {
+      // we will test when looping back from highest to lowest element
       if (leaf_element < it->first) {
         // find first element that contains this
-        return find_parent(it, parent_bound, norm_pc);
+        break;
       }
+      // we could be looking for an out of bound element ?
       if (high_bound < it->first) {
         break;
       }
     }
-  } else {
-    auto it = ++hint;
-    // always move forward to make sure we can return current element
     return find_parent(it, parent_bound, norm_pc);
+  } else {
+    ++it;
+    // always move forward to make sure we can return current element
   }
-  return {end(), false};
+  return find_parent(it, parent_bound, norm_pc);
 }
 
 } // namespace ddprof
