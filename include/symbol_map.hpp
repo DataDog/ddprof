@@ -58,12 +58,15 @@ public:
 
 class NestedSymbolValue {
 public:
-  NestedSymbolValue() : _symbol_idx(-1) {}
-  NestedSymbolValue(SymbolIdx_t symbol_idx) : _symbol_idx(symbol_idx) {}
+  NestedSymbolValue() : _symbol_idx(-1), _call_line_number(0) {}
+  NestedSymbolValue(SymbolIdx_t symbol_idx, int call_line_number = 0)
+      : _symbol_idx(symbol_idx), _call_line_number(call_line_number) {}
   [[nodiscard]] SymbolIdx_t get_symbol_idx() const { return _symbol_idx; }
+  [[nodiscard]] int get_call_line_number() const { return _call_line_number; }
 
 private:
   SymbolIdx_t _symbol_idx;
+  int _call_line_number;
 };
 
 struct NestedSymbolKey {
@@ -100,6 +103,10 @@ public:
 
   FindRes find_closest(Offset_t norm_pc,
                        const NestedSymbolKey &parent_bound) const;
+
+  FindRes find_closest_hint(Offset_t norm_pc,
+                            const NestedSymbolKey &parent_bound,
+                            ConstIt hint) const;
 
   static bool is_within(const Offset_t &norm_pc, const ValueType &kv);
 };

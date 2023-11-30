@@ -15,7 +15,7 @@ struct UnwindOutputHash {
     hash_combine(seed, uo.pid);
     hash_combine(seed, uo.tid);
     for (const auto &fl : uo.locs) {
-      hash_combine(seed, fl.ip);
+      hash_combine(seed, fl._ip);
       hash_combine(seed, fl._symbol_idx);
       hash_combine(seed, fl._map_info_idx);
     }

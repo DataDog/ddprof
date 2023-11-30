@@ -17,7 +17,7 @@
 namespace ddprof {
 
 struct FunLoc {
-  uint64_t ip{};
+  uint64_t _ip{};
   uint32_t _lineno{};
   SymbolIdx_t _symbol_idx{-1};
   MapInfoIdx_t _map_info_idx{-1};

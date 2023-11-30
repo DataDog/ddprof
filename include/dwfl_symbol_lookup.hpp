@@ -14,6 +14,7 @@
 #include "hash_helper.hpp"
 #include "symbol_map.hpp"
 #include "symbol_table.hpp"
+#include "unwind_output.hpp"
 
 #include <iostream>
 #include <unordered_map>
@@ -51,7 +52,7 @@ public:
   void get_or_insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
                      SymbolTable &table, DsoSymbolLookup &dso_symbol_lookup,
                      FileInfoId_t file_info_id, ProcessAddress_t process_pc,
-                     const Dso &dso, std::vector<SymbolIdx_t> &symbol_indices);
+                     const Dso &dso, std::vector<FunLoc> &func_locs);
 
   void erase(FileInfoId_t file_info_id) {
     _file_info_function_map.erase(file_info_id);
@@ -62,12 +63,8 @@ public:
   const DwflSymbolLookupStats &stats() const { return _stats; }
   DwflSymbolLookupStats &stats() { return _stats; }
 
-  struct Line {
-    uint32_t _line{};
-    ElfAddress_t _addr{};
-    SymbolIdx_t _symbol_idx{-1};
-  };
-  using LineMap = std::map<ElfAddress_t, Line>;
+  // todo: we can have a better type than symbol idx for the line
+  using LineMap = SymbolMap;
   using InlineMap = NestedSymbolMap;
   struct SymbolWrapper {
     LineMap _line_map;
@@ -90,16 +87,21 @@ private:
                                ProcessAddress_t process_pc, const Dso &dso,
                                SymbolWrapper &symbol_wrapper);
 
+  static void add_fun_loc(DwflSymbolLookup::SymbolWrapper &symbol_wrapper,
+                          const SymbolMap::ValueType &parent_sym,
+                          ElfAddress_t elf_pc, ProcessAddress_t process_pc,
+                          std::vector<FunLoc> &func_locs);
+
   static DDRes insert_inlining_info(Dwfl *dwfl, const DDProfMod &ddprof_mod,
                                     SymbolTable &table,
                                     ProcessAddress_t process_pc, const Dso &dso,
                                     SymbolWrapper &symbol_wrapper,
                                     SymbolMap::ValueType &parent_func);
 
-  static void get_inlined(const SymbolWrapper &symbol_wrapper,
-                          ElfAddress_t elf_pc,
-                          const SymbolMap::ValueType &parent_sym,
-                          std::vector<SymbolIdx_t> &inlined_symbols);
+  static NestedSymbolMap::FindRes
+  get_inlined(SymbolWrapper &symbol_wrapper, ElfAddress_t process_pc,
+              ElfAddress_t elf_pc, const SymbolMap::ValueType &parent_sym,
+              std::vector<FunLoc> &func_locs);
 
   // Symbols are ordered by file.
   // The assumption is that the elf addresses are the same across processes

@@ -81,4 +81,32 @@ bool NestedSymbolMap::is_within(const Offset_t &norm_pc,
   return true;
 }
 
+NestedSymbolMap::FindRes NestedSymbolMap::find_closest_hint(
+    Offset_t norm_pc, const NestedSymbolKey &parent_bound, ConstIt hint) const {
+  if (hint == end() || hint == begin()) {
+    return find_closest(norm_pc, parent_bound);
+  }
+  const NestedSymbolKey leaf_element{norm_pc, 0};
+  const NestedSymbolKey high_bound{parent_bound.end, 0};
+
+  if (hint->first < leaf_element) {
+    // If the current element is less than or equal to norm_pc, move forward
+    for (auto it = hint; it != end() && it->first.start <= norm_pc; ++it) {
+      // Find the lower bound
+      if (leaf_element < it->first) {
+        // find first element that contains this
+        return find_parent(it, parent_bound, norm_pc);
+      }
+      if (high_bound < it->first) {
+        break;
+      }
+    }
+  } else {
+    auto it = ++hint;
+    // always move forward to make sure we can return current element
+    return find_parent(it, parent_bound, norm_pc);
+  }
+  return {end(), false};
+}
+
 } // namespace ddprof

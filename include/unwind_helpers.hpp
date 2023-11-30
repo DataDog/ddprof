@@ -17,6 +17,8 @@ struct UnwindState;
 
 bool is_max_stack_depth_reached(const UnwindState &us);
 
+DDRes add_frame(const std::vector<FunLoc> &fun_locs, UnwindState *us);
+
 DDRes add_frame(std::vector<SymbolIdx_t> symbol_indices, MapInfoIdx_t map_idx,
                 ElfAddress_t pc, UnwindState *us);
 

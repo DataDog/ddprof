@@ -42,7 +42,7 @@ void write_location(const FunLoc *loc, const MapInfo &mapinfo,
                     const Symbol &symbol, ddog_prof_Location *ffi_location) {
   write_mapping(mapinfo, &ffi_location->mapping);
   write_function(symbol, &ffi_location->function);
-  ffi_location->address = loc->ip;
+  ffi_location->address = loc->_ip;
   ffi_location->line = loc->_lineno;
 }
 
@@ -393,14 +393,14 @@ void ddprof_print_sample(const UnwindOutput &uw_output,
       buf += ";";
     }
     if (sym._symname.empty()) {
-      if (loc_it->ip == 0) {
+      if (loc_it->_ip == 0) {
         std::string_view const path{sym._srcpath};
         auto pos = path.rfind('/');
         buf += "(";
         buf += path.substr(pos == std::string_view::npos ? 0 : pos + 1);
         buf += ")";
       } else {
-        absl::StrAppendFormat(&buf, "%#x", loc_it->ip);
+        absl::StrAppendFormat(&buf, "%#x", loc_it->_ip);
       }
     } else {
       std::string_view const func{sym._symname};

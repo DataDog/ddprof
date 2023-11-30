@@ -76,6 +76,12 @@ CmakeWithOptions() {
   eval ${cmake_cmd}
 }
 
+
+RelDebCMake() {
+  local BUILD_TYPE=RelWithDebInfo
+  CmakeWithOptions ${BUILD_TYPE} $@
+}
+
 RelCMake() {
   local BUILD_TYPE=Release
   CmakeWithOptions ${BUILD_TYPE} $@

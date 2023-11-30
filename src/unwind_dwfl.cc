@@ -52,7 +52,7 @@ bool is_infinite_loop(UnwindState *us) {
   for (unsigned i = 1; i < nb_frames_to_check; ++i) {
     FunLoc const &n_minus_one_loc = output.locs[nb_locs - i];
     FunLoc const &n_minus_two_loc = output.locs[nb_locs - i - 1];
-    if (n_minus_one_loc.ip != n_minus_two_loc.ip) {
+    if (n_minus_one_loc._ip != n_minus_two_loc._ip) {
       return false;
     }
   }
@@ -212,14 +212,16 @@ DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
                      const DDProfMod &ddprof_mod, FileInfoId_t file_info_id) {
   SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
   // get or create the dwfl symbol
-  std::vector<SymbolIdx_t> symbol_indices{};
+  std::vector<FunLoc> fun_locs{};
   unwind_symbol_hdr._dwfl_symbol_lookup.get_or_insert(
       us->_dwfl_wrapper->_dwfl, ddprof_mod, unwind_symbol_hdr._symbol_table,
-      unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso,
-      symbol_indices);
+      unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso, fun_locs);
   MapInfoIdx_t const map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
       us->pid, us->symbol_hdr._mapinfo_table, dso, ddprof_mod._build_id);
-  return add_frame(symbol_indices, map_idx, pc, us);
+  for (auto &el : fun_locs) {
+    el._map_info_idx = map_idx;
+  }
+  return add_frame(fun_locs, us);
 }
 
 // check for runtime symbols provided in /tmp files
