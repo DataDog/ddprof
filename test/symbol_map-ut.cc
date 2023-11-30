@@ -13,10 +13,10 @@ namespace ddprof {
 TEST(SymbolMap, Span) {
   SymbolSpan span1;
   EXPECT_EQ(span1.get_end(), 0);
-  EXPECT_EQ(span1.get_symbol_idx(), -1);
+  EXPECT_EQ(span1.get_value(), -1);
   SymbolSpan span2(0x1000, 12);
   EXPECT_EQ(span2.get_end(), 0x1000);
-  EXPECT_EQ(span2.get_symbol_idx(), 12);
+  EXPECT_EQ(span2.get_value(), 12);
 }
 
 TEST(SymbolMap, Map) {

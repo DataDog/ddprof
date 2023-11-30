@@ -163,7 +163,7 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       ->group("Profiling settings")
       ->excludes(pid_opt)
       ->excludes(exec_option);
-  
+
   app.add_option("--inlining", inlining, "Add inlining information.\n")
       ->group("Profiling settings")
       ->default_val(true);

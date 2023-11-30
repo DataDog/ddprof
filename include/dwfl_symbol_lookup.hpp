@@ -64,7 +64,6 @@ public:
   DwflSymbolLookupStats &stats() { return _stats; }
 
   // todo: we can have a better type than symbol idx for the line
-  using LineMap = SymbolMap;
   using InlineMap = NestedSymbolMap;
   struct SymbolWrapper {
     LineMap _line_map;

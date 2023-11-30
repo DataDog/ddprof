@@ -86,14 +86,13 @@ void DwflSymbolLookup::add_fun_loc(
     // line can be associated to parent
     const auto line_find = symbol_wrapper._line_map.find_closest(elf_pc);
     if (line_find.second) {
-      line = line_find.first->second.get_symbol_idx();
+      line = line_find.first->second.get_value();
     }
   }
-  func_locs.emplace_back(
-      FunLoc{._ip = process_pc,
-             ._lineno = line,
-             ._symbol_idx = parent_sym.second.get_symbol_idx(),
-             ._map_info_idx = -1});
+  func_locs.emplace_back(FunLoc{._ip = process_pc,
+                                ._lineno = line,
+                                ._symbol_idx = parent_sym.second.get_value(),
+                                ._map_info_idx = -1});
 }
 
 // Retrieve existing symbol or attempt to read from dwarf
@@ -117,14 +116,14 @@ void DwflSymbolLookup::get_or_insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
 #ifdef DEBUG
     LG_DBG("Match: %lx,%lx -> %s,%d", find_res.first->first,
            find_res.first->second.get_end(),
-           table[find_res.first->second.get_symbol_idx()]._symname.c_str(),
-           find_res.first->second.get_symbol_idx());
+           table[find_res.first->second.get_value()]._symname.c_str(),
+           find_res.first->second.get_value());
 #endif
     // cache validation mechanism: force dwfl lookup to compare with matched
     // symbols
     if (_lookup_setting == K_CACHE_VALIDATE) {
       if (symbol_lookup_check(ddprof_mod._mod, process_pc,
-                              table[find_res.first->second.get_symbol_idx()])) {
+                              table[find_res.first->second.get_value()])) {
         ++_stats._errors;
       }
     }
@@ -160,7 +159,7 @@ static DDRes parse_lines(Dwarf_Die *cudie, const DDProfMod &mod,
                          DwflSymbolLookup::SymbolWrapper &symbol_wrapper,
                          SymbolTable &table, DieInformation &die_information) {
 
-  DwflSymbolLookup::LineMap &line_map = symbol_wrapper._line_map;
+  LineMap &line_map = symbol_wrapper._line_map;
   DwflSymbolLookup::InlineMap &inline_map = symbol_wrapper._inline_map;
   Dwarf_Lines *lines;
   size_t nlines;
@@ -184,7 +183,7 @@ static DDRes parse_lines(Dwarf_Die *cudie, const DDProfMod &mod,
   Dwarf_Addr previous_addr = 0;
   NestedSymbolMap::FindRes current_func{inline_map.end(), false};
   // store closest line per file (to avoid missmatches)
-  std::unordered_map<std::string, int> closest_lines;
+  std::unordered_map<std::string, uint32_t> closest_lines;
   for (size_t line_index = start_index; line_index < nlines; ++line_index) {
     Dwarf_Line *line = dwarf_onesrcline(lines, line_index);
     Dwarf_Addr line_addr;
@@ -201,8 +200,7 @@ static DDRes parse_lines(Dwarf_Die *cudie, const DDProfMod &mod,
 
     if (previous_addr && line_addr != previous_addr) {
       if (hint_line != line_map.end() &&
-          hint_line->second.get_symbol_idx() ==
-              closest_lines[ref_sym->_srcpath]) {
+          hint_line->second.get_value() == closest_lines[ref_sym->_srcpath]) {
         // extend previous element
         hint_line->second.set_end(previous_addr);
       } else {
@@ -211,7 +209,7 @@ static DDRes parse_lines(Dwarf_Die *cudie, const DDProfMod &mod,
             hint_line,
             std::make_pair(
                 previous_addr,
-                SymbolSpan{line_addr - 1, closest_lines[ref_sym->_srcpath]}));
+                LineSpan{line_addr - 1, closest_lines[ref_sym->_srcpath]}));
       }
 #ifdef DEBUG
       LG_DBG("Associate %d (%lx->%lx) / %s to %s (vs %s)",
@@ -231,7 +229,7 @@ static DDRes parse_lines(Dwarf_Die *cudie, const DDProfMod &mod,
     }
     // keep line, if it matches the symbol
     // todo can be optimized to avoid conversion to string
-    closest_lines[std::string(current_file)] = lineno;
+    closest_lines[std::string(current_file)] = static_cast<uint32_t>(lineno);
     previous_addr = line_addr;
   }
   return {};
@@ -242,7 +240,7 @@ DDRes DwflSymbolLookup::insert_inlining_info(
     ProcessAddress_t process_pc, const Dso &dso, SymbolWrapper &symbol_wrapper,
     SymbolMap::ValueType &parent_func) {
 
-  SymbolIdx_t parent_sym_idx = parent_func.second.get_symbol_idx();
+  SymbolIdx_t parent_sym_idx = parent_func.second.get_value();
   Dwarf_Addr bias;
   Dwarf_Die *cudie = dwfl_addrdie(dwfl, process_pc, &bias);
   if (!cudie) {
@@ -388,7 +386,7 @@ NestedSymbolMap::FindRes DwflSymbolLookup::get_inlined(
     } else {
       auto find_line = symbol_wrapper._line_map.find_closest(elf_pc);
       if (find_line.second) {
-        line = find_line.first->second.get_symbol_idx();
+        line = find_line.first->second.get_value();
       }
     }
     func_locs.emplace_back(

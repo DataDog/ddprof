@@ -11,12 +11,10 @@
 
 namespace ddprof {
 
-// template<typename T>
-class SymbolSpan {
+template <typename T, T DefaultValue = T()> class TSpan {
 public:
-  SymbolSpan() : _end(0), _symbol_idx(-1) {}
-  SymbolSpan(Offset_t end, SymbolIdx_t symbol_idx)
-      : _end(end), _symbol_idx(symbol_idx) {}
+  TSpan() : _end(0), _value(DefaultValue) {}
+  TSpan(Offset_t end, T value) : _end(end), _value(value) {}
   // push end further
   void set_end(Offset_t end) {
     if (end > _end) {
@@ -25,23 +23,27 @@ public:
   }
   [[nodiscard]] Offset_t get_end() const { return _end; }
 
-  [[nodiscard]] SymbolIdx_t get_symbol_idx() const { return _symbol_idx; }
+  [[nodiscard]] T get_value() const { return _value; }
 
 private:
   // symbol end within the segment (considering file offset)
   Offset_t _end;
   // element inside internal symbol cache
-  SymbolIdx_t _symbol_idx;
+  T _value;
 };
 
-class SymbolMap : private std::map<ElfAddress_t, SymbolSpan> {
+using SymbolSpan = TSpan<SymbolIdx_t, -1>;
+using LineSpan = TSpan<uint32_t, 0>;
+
+template <typename TSpan>
+class SpanMap : private std::map<ElfAddress_t, TSpan> {
 public:
-  using Map = std::map<ElfAddress_t, SymbolSpan>;
-  using It = Map::iterator;
-  using ConstIt = Map::const_iterator;
+  using Map = std::map<ElfAddress_t, TSpan>;
+  using It = typename Map::iterator;
+  using ConstIt = typename Map::const_iterator;
   using FindRes = std::pair<It, bool>;
   using ValueType =
-      Map::value_type; // key value pair ElfAddress_t, SymbolSpanMap
+      typename Map::value_type; // key value pair ElfAddress_t, SymbolSpanMap
   // Functions we forward from underlying map type
 
   using Map::begin;
@@ -53,9 +55,38 @@ public:
   using Map::erase;
   using Map::size;
 
-  static bool is_within(const Offset_t &norm_pc, const ValueType &kv);
-  FindRes find_closest(Offset_t norm_pc);
+  bool is_within(const Offset_t &norm_pc, const SpanMap::ValueType &kv) {
+    if (norm_pc < kv.first) {
+      return false;
+    }
+    if (norm_pc > kv.second.get_end()) {
+      return false;
+    }
+    return true;
+  }
+
+  FindRes find_closest(Offset_t norm_pc) {
+    // First element not less than (can match exactly a start addr)
+    auto it = Map::lower_bound(norm_pc);
+    if (it != end()) { // map is empty
+      if (SpanMap::is_within(norm_pc, *it)) {
+        return {it, true};
+      }
+    }
+
+    // previous element is more likely to contain our addr
+    if (it != begin()) {
+      --it;
+    } else { // map is empty
+      return {end(), false};
+    }
+    // element can not be end (as we reversed or exit)
+    return {it, is_within(norm_pc, *it)};
+  }
 };
+
+using SymbolMap = SpanMap<SymbolSpan>;
+using LineMap = SpanMap<LineSpan>;
 
 class NestedSymbolValue {
 public:
@@ -99,9 +130,12 @@ public:
   using Map::erase;
   using Map::size;
 
+  // todo: possible improvement to return a table of all elements matching
+
   FindRes find_parent(ConstIt it, const NestedSymbolKey &parent_bound,
                       Offset_t norm_pc) const;
 
+  // returns the element that is the most leaf
   FindRes find_closest(Offset_t norm_pc,
                        const NestedSymbolKey &parent_bound) const;
 
