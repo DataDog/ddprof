@@ -5,12 +5,8 @@
 
 #include "dwfl_symbol_lookup.hpp"
 
-#include "ddprof_module.hpp"
 #include "dwarf_helpers.hpp"
-#include "dwfl_hdr.hpp"
-#include "dwfl_internals.hpp"
 #include "dwfl_symbol.hpp"
-#include "logger.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -18,7 +14,6 @@
 #include <numeric> // For std::iota
 #include <queue>
 #include <set>
-#include <string>
 #include <string_view>
 
 #define DEBUG
@@ -26,24 +21,6 @@
 namespace ddprof {
 
 namespace {
-struct DieInformation {
-  struct Function {
-    ElfAddress_t start_addr{};
-    ElfAddress_t end_addr{};
-    const char *func_name{};
-    const char *file_name{};
-    int decl_line_number{0};
-    int call_line_number{0};
-    int parent_pos{-1}; // position within the die vector
-    SymbolIdx_t symbol_idx = -1;
-  };
-  std::vector<Function> die_mem_vec{};
-};
-
-struct DieSearchParam {
-  Dwarf_Addr addr;
-  Dwarf_Die *die_mem;
-};
 
 size_t binary_search_start_index(Dwarf_Lines *lines, size_t nlines,
                                  ElfAddress_t start_sym) {
@@ -177,160 +154,6 @@ void DwflSymbolLookup::get_or_insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
   return;
 }
 
-/* die_find callback for non-inlined function search */
-static int die_search_func_cb(Dwarf_Die *fn_die, void *data) {
-  DieSearchParam *ad = reinterpret_cast<DieSearchParam *>(data);
-  if (dwarf_tag(fn_die) == DW_TAG_subprogram && dwarf_haspc(fn_die, ad->addr)) {
-    memcpy(ad->die_mem, fn_die, sizeof(Dwarf_Die));
-    return DWARF_CB_ABORT;
-  }
-  return DWARF_CB_OK;
-}
-
-Dwarf_Die *die_find_realfunc(Dwarf_Die *cu_die, Dwarf_Addr addr,
-                             Dwarf_Die *die_mem) {
-  DieSearchParam ad;
-  ad.addr = addr;
-  ad.die_mem = die_mem;
-  /* dwarf_getscopes can't find subprogram. */
-  if (!dwarf_getfuncs(cu_die, die_search_func_cb, &ad, 0))
-    return NULL;
-  else
-    return die_mem;
-}
-
-// return index to added element, else returns -1
-static int store_die_information(Dwarf_Die *sc_die, int parent_index,
-                                 DieInformation &data,
-                                 Dwarf_Files *dwarf_files) {
-#ifdef DEEP_DEBUG
-  // dwarf_dieoffset is good to figure out what element we are working on
-  dwarf_getattrs(sc_die, print_attribute, nullptr, 0);
-#endif
-
-  // function or inlined function
-  DieInformation::Function function{};
-  // die_name is usually the raw function name (no mangling info)
-  // link name can have mangling info
-  function.func_name = dwarf_diename(sc_die);
-  Dwarf_Attribute attr_mem;
-  Dwarf_Attribute *attr;
-  if ((attr = dwarf_attr(sc_die, DW_AT_low_pc, &attr_mem))) {
-    if (attr) {
-      Dwarf_Addr ret_value;
-      if (dwarf_formaddr(attr, &ret_value) == 0) {
-        function.start_addr = ret_value;
-      }
-    }
-  }
-  // end is stored as a unsigned (not as a pointer)
-  if ((attr = dwarf_attr(sc_die, DW_AT_high_pc, &attr_mem))) {
-    if (attr) {
-      Dwarf_Word return_uval;
-      if (dwarf_formudata(attr, &return_uval) == 0) {
-        function.end_addr = function.start_addr + return_uval;
-      }
-    }
-  }
-  // some of the functions don't have the start and end info
-  if (!function.start_addr || !function.end_addr) {
-    return -1;
-  }
-
-  // declaration files come with an indirection
-  // dwarf_attr_integrate follows the indirections
-  // for inlined functions, we could cache this access (as we are making several
-  // of them)
-  if (dwarf_files &&
-      ((attr = dwarf_attr_integrate(sc_die, DW_AT_decl_file, &attr_mem)))) {
-    Dwarf_Word fileIdx = 0;
-    if (dwarf_formudata(attr, &fileIdx) == 0) {
-      const char *file = dwarf_filesrc(dwarf_files, fileIdx, NULL, NULL);
-      // Store or process the file name
-      function.file_name = file;
-    }
-  }
-
-  if ((attr = dwarf_attr_integrate(sc_die, DW_AT_decl_line, &attr_mem))) {
-    Dwarf_Word return_uval;
-    if (dwarf_formudata(attr, &return_uval) == 0) {
-      function.decl_line_number = return_uval;
-    }
-  }
-
-  if ((attr = dwarf_attr(sc_die, DW_AT_call_line, &attr_mem))) {
-    Dwarf_Word return_uval;
-    if (dwarf_formudata(attr, &return_uval) == 0) {
-      function.call_line_number = return_uval;
-    }
-  }
-  // other fields of interest
-  // - DW_AT_call_file
-  // - DW_AT_call_line to define parent line
-
-  // we often can find duplicates within the dwarf information
-  function.parent_pos = parent_index;
-  data.die_mem_vec.push_back(std::move(function));
-  return (data.die_mem_vec.size() - 1);
-}
-
-static Dwarf_Die *find_functions_in_child_die(Dwarf_Die *current_die,
-                                              int parent_index,
-                                              DieInformation &die_info,
-                                              Dwarf_Die *die_mem,
-                                              Dwarf_Files *dwarf_files) {
-  Dwarf_Die child_die;
-  int ret;
-  ret = dwarf_child(current_die, die_mem);
-  if (ret != 0)
-    return nullptr;
-  do {
-    int tag_val = dwarf_tag(die_mem);
-    int next_parent_idx = parent_index;
-    if (tag_val == DW_TAG_subprogram || tag_val == DW_TAG_inlined_subroutine) {
-      int current_idx =
-          store_die_information(die_mem, parent_index, die_info, dwarf_files);
-      next_parent_idx = (current_idx != -1 ? current_idx : next_parent_idx);
-    }
-    //
-    // todo: optimize the exploration to avoid going through soo many elements
-    // Child dies can have functions, even without being a child of another func
-    find_functions_in_child_die(die_mem, next_parent_idx, die_info, &child_die,
-                                dwarf_files);
-  } while (dwarf_siblingof(die_mem, die_mem) == 0);
-  return nullptr;
-}
-
-static DDRes parse_die_information(Dwarf_Die *cudie, ElfAddress_t elf_addr,
-                                   DieInformation &die_information) {
-  Dwarf_Files *files = nullptr;
-  size_t nfiles = 0;
-  assert(cudie);
-  // cached within the CU
-  if (dwarf_getsrcfiles(cudie, &files, &nfiles) != 0) {
-    files = nullptr;
-  }
-  Dwarf_Die die_mem;
-  Dwarf_Die *sc_die = die_find_realfunc(cudie, elf_addr, &die_mem);
-  if (sc_die == nullptr) {
-    LG_DBG("Unable to retrieve sc_die at %lx", elf_addr);
-    return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
-  }
-  // store parent function at index 0
-  if (store_die_information(sc_die, -1, die_information, files) == -1) {
-    LG_DBG("Incomplete die information for parent function");
-    // On some functions we are unable to find start / end info
-    return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
-  }
-  find_functions_in_child_die(sc_die, 0, die_information, &die_mem, files);
-
-  for (auto &el : die_information.die_mem_vec) {
-    LG_DBG("Inlined func start=%lx / end=%lx / Sym = %s / file=%s",
-           el.start_addr, el.end_addr, el.func_name, el.file_name);
-  }
-  return {};
-}
-
 static DDRes parse_lines(Dwarf_Die *cudie, const DDProfMod &mod,
                          DwflSymbolLookup::SymbolWrapper &symbol_wrapper,
                          SymbolTable &table, DieInformation &die_information) {
@@ -348,7 +171,7 @@ static DDRes parse_lines(Dwarf_Die *cudie, const DDProfMod &mod,
     return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
   }
   NestedSymbolKey parent_bound{parent_func.start_addr, parent_func.end_addr};
-  int start_index =
+  size_t start_index =
       binary_search_start_index(lines, nlines, parent_bound.start);
   if (start_index >= nlines) {
     LG_DBG("Unable to match lines for %s", ref_sym->_symname.c_str());
@@ -468,8 +291,8 @@ DDRes DwflSymbolLookup::insert_inlining_info(
   }
 
   // associate line information to die information (includes file info)
-  if (IsDDResNotOK(parse_lines(cudie, ddprof_mod, symbol_wrapper,
-                               table, die_information))) {
+  if (IsDDResNotOK(parse_lines(cudie, ddprof_mod, symbol_wrapper, table,
+                               die_information))) {
     LG_DBG("Error when parsing line information (%s)", dso._filename.c_str());
   }
   return {};
