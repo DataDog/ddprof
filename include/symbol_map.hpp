@@ -11,6 +11,7 @@
 
 namespace ddprof {
 
+// template<typename T>
 class SymbolSpan {
 public:
   SymbolSpan() : _end(0), _symbol_idx(-1) {}

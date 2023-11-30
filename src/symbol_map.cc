@@ -96,7 +96,7 @@ NestedSymbolMap::FindRes NestedSymbolMap::find_closest_hint(
     for (; it != end(); ++it) {
       // we will test when looping back from highest to lowest element
       if (leaf_element < it->first) {
-        // find first element that contains this
+        // We reached an element that was higher
         break;
       }
       // we could be looking for an out of bound element ?

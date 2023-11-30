@@ -46,7 +46,7 @@ class DwflSymbolLookup {
 public:
   using SymbolRange = std::pair<ElfAddress_t, ElfAddress_t>;
   // build and check env var to know check setting
-  DwflSymbolLookup();
+  DwflSymbolLookup(bool inlining = true);
 
   // Get symbol from internal cache or fetch through dwarf
   void get_or_insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
@@ -87,10 +87,9 @@ private:
                                ProcessAddress_t process_pc, const Dso &dso,
                                SymbolWrapper &symbol_wrapper);
 
-  static void add_fun_loc(DwflSymbolLookup::SymbolWrapper &symbol_wrapper,
-                          const SymbolMap::ValueType &parent_sym,
-                          ElfAddress_t elf_pc, ProcessAddress_t process_pc,
-                          std::vector<FunLoc> &func_locs);
+  void add_fun_loc(DwflSymbolLookup::SymbolWrapper &symbol_wrapper,
+                   const SymbolMap::ValueType &parent_sym, ElfAddress_t elf_pc,
+                   ProcessAddress_t process_pc, std::vector<FunLoc> &func_locs);
 
   static DDRes insert_inlining_info(Dwfl *dwfl, const DDProfMod &ddprof_mod,
                                     SymbolTable &table,
@@ -119,6 +118,7 @@ private:
   FileInfo2SymbolWrapper _file_info_function_map;
   FileInfo2LineMap _file_info_inlining_map;
   DwflSymbolLookupStats _stats;
+  bool _inlining;
 };
 
 } // namespace ddprof

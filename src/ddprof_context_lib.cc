@@ -72,6 +72,8 @@ void copy_cli_values(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
     ctx.params.pid = ddprof_cli.pid;
   }
   ctx.params.upload_period = ddprof_cli.upload_period;
+  ctx.params.inlining = ddprof_cli.inlining;
+
   // todo : naming ?
   ctx.params.worker_period = ddprof_cli.worker_period;
   // Advanced

@@ -50,7 +50,7 @@ size_t binary_search_start_index(Dwarf_Lines *lines, size_t nlines,
 }
 } // namespace
 
-DwflSymbolLookup::DwflSymbolLookup() {
+DwflSymbolLookup::DwflSymbolLookup(bool inlining) : _inlining(inlining) {
   if (const char *env_p = std::getenv("DDPROF_CACHE_SETTING")) {
     if (strcmp(env_p, "VALIDATE") == 0) {
       // Allows to compare the accuracy of the cache
@@ -76,8 +76,9 @@ void DwflSymbolLookup::add_fun_loc(
     DwflSymbolLookup::SymbolWrapper &symbol_wrapper,
     const SymbolMap::ValueType &parent_sym, ElfAddress_t elf_pc,
     ProcessAddress_t process_pc, std::vector<FunLoc> &func_locs) {
-  auto last_inlined =
-      get_inlined(symbol_wrapper, process_pc, elf_pc, parent_sym, func_locs);
+  const auto last_inlined = _inlining
+      ? get_inlined(symbol_wrapper, process_pc, elf_pc, parent_sym, func_locs)
+      : NestedSymbolMap::FindRes{symbol_wrapper._inline_map.end(), false};
   uint32_t line = 0;
   if (last_inlined.second) {
     line = last_inlined.first->second.get_call_line_number();
@@ -88,7 +89,6 @@ void DwflSymbolLookup::add_fun_loc(
       line = line_find.first->second.get_symbol_idx();
     }
   }
-  LG_DBG("Adding parent = %d", parent_sym.second.get_symbol_idx());
   func_locs.emplace_back(
       FunLoc{._ip = process_pc,
              ._lineno = line,
@@ -136,9 +136,11 @@ void DwflSymbolLookup::get_or_insert(Dwfl *dwfl, const DDProfMod &ddprof_mod,
     SymbolMap::ValueType &elf_sym =
         insert(dwfl, ddprof_mod, table, dso_symbol_lookup, process_pc, dso,
                symbol_wrapper);
-    // parse associated dwarf info
-    insert_inlining_info(dwfl, ddprof_mod, table, process_pc, dso,
-                         symbol_wrapper, elf_sym);
+    if (_inlining) {
+      // parse associated dwarf info
+      insert_inlining_info(dwfl, ddprof_mod, table, process_pc, dso,
+                           symbol_wrapper, elf_sym);
+    }
     // For newly added symbols, insure we don't leave a blank file name
     for (unsigned i = previous_table_size; i < table.size(); ++i) {
       auto &sym = table[i];

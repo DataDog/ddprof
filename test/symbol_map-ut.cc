@@ -21,7 +21,6 @@ TEST(SymbolMap, Span) {
 
 TEST(SymbolMap, Map) {
   LogHandle handle;
-  LG_DBG("Size of SymbolMap::ValueType: %lu", sizeof(SymbolMap::ValueType));
   SymbolMap map;
   SymbolSpan span0_1000(0x1000, 12);
   map.emplace(0, span0_1000);
@@ -37,9 +36,6 @@ TEST(NestedSymbolMap, simple) {
   map.emplace(NestedSymbolKey{0x100, 0x1000}, span100_1000);
   NestedSymbolValue span150_300(1);
   map.emplace(NestedSymbolKey{0x150, 0x300}, span150_300);
-  for (auto &el : map) {
-    LG_DBG("Idx = %d", el.second.get_symbol_idx());
-  }
   {
     NestedSymbolMap::FindRes res = map.find_closest(0x150, parent_key);
     EXPECT_TRUE(res.second);
@@ -103,7 +99,6 @@ TEST(NestedSymbolMap, closest_hint) {
   NestedSymbolValue span300_400(2);
   map.emplace(NestedSymbolKey{0x300, 0x400}, span300_400);
 
-
   { // always return the deeper element
     NestedSymbolMap::FindRes res = map.find_closest(0x100, parent_key);
     EXPECT_TRUE(res.second);
@@ -113,6 +108,11 @@ TEST(NestedSymbolMap, closest_hint) {
         map.find_closest_hint(0x350, parent_key, res.first);
     EXPECT_TRUE(res_2.second);
     EXPECT_EQ(res_2.first->second.get_symbol_idx(), 2);
+
+    NestedSymbolMap::FindRes res_3 =
+        map.find_closest_hint(0x900, parent_key, res_2.first);
+    EXPECT_TRUE(res_3.second);
+    EXPECT_EQ(res_3.first->second.get_symbol_idx(), 0);
   }
 }
 

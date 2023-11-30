@@ -163,6 +163,10 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       ->group("Profiling settings")
       ->excludes(pid_opt)
       ->excludes(exec_option);
+  
+  app.add_option("--inlining", inlining, "Add inlining information.\n")
+      ->group("Profiling settings")
+      ->default_val(true);
 
   app.add_flag("--timeline,-t", timeline,
                "Enables Timeline view in the Datadog UI.\n"
@@ -469,6 +473,8 @@ void DDProfCLI::print() const {
   if (!enable) {
     PRINT_NFO("  - enable: %s", enable ? "true" : "false");
   }
+  PRINT_NFO("  - inlining: %s", inlining ? "true" : "false");
+
   if (!cpu_affinity.empty()) {
     PRINT_NFO("  - cpu_affinity: %s", cpu_affinity.c_str());
   }

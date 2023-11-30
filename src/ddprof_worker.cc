@@ -339,7 +339,8 @@ DDRes worker_library_init(DDProfContext &ctx,
     // Make sure worker index is initialized correctly
     ctx.worker_ctx.i_current_pprof = 0;
     ctx.worker_ctx.exp_tid = {0};
-    ctx.worker_ctx.us = new UnwindState(ctx.params.dd_profiling_fd);
+    ctx.worker_ctx.us =
+        new UnwindState(ctx.params.dd_profiling_fd, ctx.params.inlining);
     std::fill(ctx.worker_ctx.lost_events_per_watcher.begin(),
               ctx.worker_ctx.lost_events_per_watcher.end(), 0UL);
 
