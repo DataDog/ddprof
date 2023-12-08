@@ -10,7 +10,6 @@
 #include <absl/strings/str_cat.h>
 #include <absl/strings/str_format.h>
 #include <llvm/ADT/ArrayRef.h>
-#include <llvm/ADT/Optional.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/ADT/iterator.h>
 #include <llvm/BinaryFormat/Dwarf.h>
@@ -325,7 +324,7 @@ ErrorMessageOr<void> ElfFileImpl<ElfT>::InitSections() {
       for (const typename ElfT::Note& note : elf_file.notes(section, error)) {
         if (note.getType() != llvm::ELF::NT_GNU_BUILD_ID) continue;
 
-        llvm::ArrayRef<uint8_t> desc = note.getDesc();
+        llvm::ArrayRef<uint8_t> desc = note.getDesc(section.sh_addralign);
         for (const uint8_t& byte : desc) {
           absl::StrAppend(&build_id_, absl::Hex(byte, absl::kZeroPad2));
         }
