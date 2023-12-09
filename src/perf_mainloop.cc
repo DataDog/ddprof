@@ -23,6 +23,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
+#include <bpf/libbpf.h>
 #include <poll.h>
 #include <sys/mman.h>
 #include <sys/signalfd.h>
@@ -152,13 +153,14 @@ ReplyMessage create_reply_message(const DDProfContext &ctx) {
 
 void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
                   int *pfd_len) {
-  *pfd_len = pevent_hdr->size;
+  *pfd_len = 0;
   const PEvent *pes = pevent_hdr->pes;
   // Setup poll() to watch perf_event file descriptors
-  for (int i = 0; i < *pfd_len; ++i) {
+  for (int i = 0; i < pevent_hdr->size; ++i) {
     // NOTE: if fd is negative, it will be ignored
-    pfd[i].fd = pes[i].fd;
-    pfd[i].events = POLLIN;
+    pfd[*pfd_len].fd = pes[i].fd;
+    pfd[*pfd_len].events = POLLIN;
+    ++(*pfd_len);
   }
 }
 
@@ -240,6 +242,20 @@ worker_process_ring_buffers(PEvent *pes, int pe_len, DDProfContext &ctx,
   return {};
 }
 
+void bpf_event_polling(DDProfContext& ctx) {
+  if (ctx.worker_ctx.pevent_hdr.bpf_ring_buf) {
+    int nb_events = 0;
+    LG_DBG("Entering BPF loop");
+    while (ring_buffer__poll(ctx.worker_ctx.pevent_hdr.bpf_ring_buf, 100) >= 0) {
+      LG_DBG("--- process event ");
+      if (++nb_events >= 100000) {
+        LG_DBG("--- Stop processing events ");
+        break;
+      }
+    }
+  }
+}
+
 DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
                   PersistentWorkerState *persistent_worker_state) {
 
@@ -266,6 +282,9 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
   // Not used yet, because currently we process all ring buffers or none
   int const ring_buffer_start_idx = 0;
   bool stop = false;
+
+  // bpf loop
+  std::jthread bpf_thread(bpf_event_polling, std::ref(ctx));
 
   // Worker poll loop
   while (!stop) {
@@ -310,6 +329,9 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
       return {};
     }
   }
+
+  bpf_thread.join();
+  LG_DBG("On exit ebpf events=%lu", ctx.worker_ctx._bpf_events._events.size());
 
   // export current samples before exiting
   DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, {}, true));

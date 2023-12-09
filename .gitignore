@@ -13,6 +13,8 @@ vendor*
 .vs
 .vscode
 docker-sync.yml
+/third_party/libbpf
+/third_party/bpftool
 
 #==============================================================================#
 # Directories to ignore only in root directory

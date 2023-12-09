@@ -151,6 +151,7 @@ add_unit_test(perf_ringbuffer-ut ../src/perf.cc ../src/perf_watcher.cc ../src/pe
 add_unit_test(
   pevent-ut
   ../src/pevent_lib.cc
+        ../src/ebpf_sample_handler.c
   ../src/user_override.cc
   ../src/perf.cc
   ../src/perf_watcher.cc
@@ -158,7 +159,8 @@ add_unit_test(
   ../src/ringbuffer_utils.cc
   ../src/sys_utils.cc
   pevent-ut.cc
-  DEFINITIONS MYNAME="pevent-ut")
+  LIBRARIES sample_processor_skel
+  DEFINITIONS MYNAME="pevent-ut" EBPF_UNWINDING)
 
 add_unit_test(
   ddprof_pprof-ut ddprof_pprof-ut.cc ../src/ddprof_cmdline_watcher.cc ../src/pprof/ddprof_pprof.cc
@@ -179,9 +181,7 @@ add_unit_test(
   ../src/perf.cc
   ../src/perf_clock.cc
   ../src/perf_ringbuffer.cc
-  ../src/pevent_lib.cc
   ../src/procutils.cc
-  ../src/ringbuffer_utils.cc
   ../src/signal_helper.cc
   ../src/sys_utils.cc
   ../src/user_override.cc
@@ -256,6 +256,7 @@ add_unit_test(
 
 set(ALLOCATION_TRACKER_UT_SRCS
     allocation_tracker-ut.cc
+        ../src/ebpf_sample_handler.c
     ../src/lib/allocation_tracker.cc
     ../src/lib/elfutils.cc
     ../src/lib/symbol_overrides.cc
@@ -299,7 +300,9 @@ set(ALLOCATION_TRACKER_UT_SRCS
     ../src/unwind.cc
     ../src/unwind_dwfl.cc
     ../src/unwind_helpers.cc
-    ../src/unwind_metrics.cc)
+    ../src/unwind_metrics.cc
+    LIBRARIES
+    sample_processor_skel)
 
 add_unit_test(
   allocation_tracker-ut ${ALLOCATION_TRACKER_UT_SRCS}
@@ -324,7 +327,8 @@ add_unit_test(
   ../src/pevent_lib.cc
   ../src/ringbuffer_utils.cc
   ../src/sys_utils.cc
-  ../src/user_override.cc)
+  ../src/user_override.cc
+  LIBRARIES sample_processor_skel)
 
 add_unit_test(timer-ut timer-ut.cc ../src/tsc_clock.cc ../src/perf.cc)
 
@@ -392,6 +396,7 @@ add_benchmark(
   ../src/lib/address_bitset.cc
   ../src/lib/allocation_tracker.cc
   ../src/pevent_lib.cc
+        ../src/ebpf_sample_handler.c
   ../src/perf.cc
   ../src/perf_ringbuffer.cc
   ../src/perf_watcher.cc
@@ -404,7 +409,7 @@ add_benchmark(
   ../src/tsc_clock.cc
   ../src/user_override.cc
   ../src/sys_utils.cc
-  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
+  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle sample_processor_skel
   DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384)
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")

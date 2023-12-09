@@ -10,6 +10,10 @@
 
 #include <sys/types.h>
 
+// fwd declaration of bpf typ
+struct sample_processor_bpf;
+struct bpf_link;
+struct ring_buffer; // ebpf ring buffer
 namespace ddprof {
 
 // Takes into account number of watchers * number of CPUs
@@ -19,6 +23,7 @@ struct PEvent {
   int watcher_pos; // Index to the watcher (containing perf event config)
   int fd; // Underlying perf event FD for perf_events, otherwise an eventfd that
           // signals data is available in ring buffer
+  // or usual stack sample ring buffer
   int mapfd;               // FD for ring buffer, same as `fd` for perf events
   int attr_idx;            // matching perf_event_attr
   size_t ring_buffer_size; // size of the ring buffer
@@ -28,8 +33,20 @@ struct PEvent {
   RingBuffer rb;     // metadata and buffers for processing perf ringbuffer
 };
 
+struct BPFPevent {
+  int watcher_pos; // Index to the watcher (containing perf event config)
+  int fd; // Underlying perf event FD for perf_events, otherwise an eventfd that
+                   // signals data is available in ring buffer
+  // bpf link (includes its own ring buffers)
+  bpf_link *link;
+};
+
 struct PEventHdr {
   PEvent pes[k_max_nb_perf_event_open];
+  std::vector<BPFPevent> bpf_pes;
+  // loaded sample processor program
+  sample_processor_bpf *sample_processor;
+  ring_buffer *bpf_ring_buf;
   // Attributes of successful perf event opens
   size_t size;
   size_t max_size;

@@ -147,6 +147,14 @@ long get_page_size();
 size_t get_mask_from_size(size_t size);
 const char *perf_type_str(int type_id);
 
+std::vector<perf_event_attr> bpf_config_from_watcher(const PerfWatcher *watcher,
+                                                     bool extras,
+                                                     PerfClockSource perf_clock_source);
+
+perf_event_attr perf_bpf_config(const PerfWatcher *watcher,
+                                bool extras,
+                                PerfClockSource perf_clock_source);
+
 std::vector<perf_event_attr>
 all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras,
                               PerfClockSource perf_clock_source);

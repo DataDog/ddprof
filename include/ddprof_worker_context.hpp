@@ -21,6 +21,9 @@ struct StackHandler;
 struct UnwindState;
 struct UserTags;
 
+struct BPFEvents{
+  std::vector<int> _events;
+};
 // Mutable states within a worker
 struct DDProfWorkerContext {
   // Persistent reference to the state shared accross workers
@@ -32,6 +35,9 @@ struct DDProfWorkerContext {
   volatile bool exp_error{false};
   pthread_t exp_tid{0};
   UnwindState *us{};
+
+  BPFEvents _bpf_events;
+
   UserTags *user_tags{};
   ProcStatus proc_status{};
   std::chrono::steady_clock::time_point

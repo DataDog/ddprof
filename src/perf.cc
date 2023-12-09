@@ -176,6 +176,30 @@ int perfdisown(void *region, size_t size) {
       : -1;
 }
 
+perf_event_attr perf_bpf_config(const PerfWatcher *watcher,
+                                bool extras,
+                                PerfClockSource perf_clock_source) {
+  // todo review this
+  perf_event_attr attr;
+  memset(&attr, 0, sizeof(attr));
+  attr.type = watcher->type;
+  attr.size = sizeof(attr);
+  attr.config = watcher->config;
+  attr.sample_period = watcher->sample_period; // Equivalently, freq
+  attr.freq = watcher->options.is_freq;
+  set_perf_clock_source(attr, perf_clock_source);
+
+//   hardcoded config for tests
+//    memset(&attr, 0, sizeof(attr));
+//    attr.type = PERF_TYPE_HARDWARE;
+//    attr.size = sizeof(attr);
+//    attr.config = PERF_COUNT_HW_CPU_CYCLES;
+//    attr.sample_freq = 10;
+//    attr.freq = 1;
+
+  return attr;
+}
+
 // return attr sorted by priority
 std::vector<perf_event_attr>
 all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras,

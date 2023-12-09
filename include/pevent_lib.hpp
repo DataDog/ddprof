@@ -18,6 +18,11 @@ void pevent_init(PEventHdr *pevent_hdr);
 DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
                   PEventHdr *pevent_hdr);
 
+DDRes pevent_open_bpf(DDProfContext &ctx, pid_t pid, int num_cpu,
+                      PEventHdr *pevent_hdr);
+
+DDRes pevent_link_bpf(PEventHdr *pevent_hdr);
+
 /// Setup mmap buffers according to content of peventhdr
 DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override);
 
