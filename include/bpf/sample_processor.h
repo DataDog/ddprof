@@ -1,6 +1,5 @@
 /* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
 /* Copyright (c) 2022 Meta Platforms, Inc. */
-// from the profile example within the libbpf-bootstrap repository
 #pragma once
 
 #ifndef TASK_COMM_LEN

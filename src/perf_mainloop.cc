@@ -244,14 +244,9 @@ worker_process_ring_buffers(PEvent *pes, int pe_len, DDProfContext &ctx,
 
 void bpf_event_polling(DDProfContext& ctx) {
   if (ctx.worker_ctx.pevent_hdr.bpf_ring_buf) {
-    int nb_events = 0;
     LG_DBG("Entering BPF loop");
-    while (ring_buffer__poll(ctx.worker_ctx.pevent_hdr.bpf_ring_buf, 100) >= 0) {
-      LG_DBG("--- process event ");
-      if (++nb_events >= 100000) {
-        LG_DBG("--- Stop processing events ");
-        break;
-      }
+    while (ctx.worker_ctx._bpf_events.keep_running &&
+           ring_buffer__poll(ctx.worker_ctx.pevent_hdr.bpf_ring_buf, 100) >= 0) {
     }
   }
 }
@@ -324,14 +319,20 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
                                                 &ring_buffer_start_idx));
     DDRES_CHECK_FWD(ddprof_worker_maybe_export(ctx, now));
 
+    // symbolize bpf events
+    int cpt = 0;
+    if (!ctx.worker_ctx._bpf_events._events.empty() && ++cpt < 1000) {
+      DDRES_CHECK_FWD(ddprof_worker_process_bpf_events(ctx));
+    }
+
     if (ctx.worker_ctx.persistent_worker_state->restart_worker) {
       // return directly no need to do a final export
       return {};
     }
   }
 
+  ctx.worker_ctx._bpf_events.keep_running = false;
   bpf_thread.join();
-  LG_DBG("On exit ebpf events=%lu", ctx.worker_ctx._bpf_events._events.size());
 
   // export current samples before exiting
   DDRES_CHECK_FWD(ddprof_worker_cycle(ctx, {}, true));

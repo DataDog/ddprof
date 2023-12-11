@@ -100,6 +100,9 @@ set(BPFOBJECT_CLANG_EXE "clang-17")
 # Path to the bpftool executable
 set(BPFOBJECT_BPFTOOL_EXE ${CMAKE_CURRENT_BINARY_DIR}/third_party/bpftool/bootstrap/bpftool)
 
+set(LIBBPF_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}/third_party/libbpf)
+set(LIBBPF_LIBRARIES ${CMAKE_CURRENT_BINARY_DIR}/third_party/libbpf/libbpf.a)
+
 # Path where vmlinux.h will be generated
 set(BPFOBJECT_VMLINUX_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/vmlinux/${ARCH})
 set(BPFOBJECT_VMLINUX_H ${BPFOBJECT_VMLINUX_DIR}/vmlinux.h)
@@ -114,10 +117,7 @@ add_custom_command(
           ${BPFOBJECT_VMLINUX_H}
   DEPENDS ${BPFOBJECT_BPFTOOL_EXE} ${BPFOBJECT_VMLINUX_DIR}
   COMMENT "Generating vmlinux.h")
-add_custom_target(generate_vmlinux_h ALL DEPENDS ${BPFOBJECT_VMLINUX_H} bpftool-build)
-
-set(LIBBPF_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}/third_party/libbpf)
-set(LIBBPF_LIBRARIES ${CMAKE_CURRENT_BINARY_DIR}/third_party/libbpf/libbpf.a)
+add_custom_target(generate_vmlinux_h ALL DEPENDS ${BPFOBJECT_VMLINUX_H} bpftool-build libbpf-build)
 
 find_package(BpfObject REQUIRED)
 

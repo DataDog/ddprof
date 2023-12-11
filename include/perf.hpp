@@ -25,7 +25,7 @@ inline constexpr int k_default_buffer_size_shift{6};
 inline constexpr int k_mpsc_buffer_size_shift{8};
 
 // sample frequency check
-inline constexpr std::chrono::milliseconds k_sample_default_wakeup{100};
+inline constexpr std::chrono::milliseconds k_sample_default_wakeup{10};
 
 struct read_format {
   uint64_t value;        // The value of the event

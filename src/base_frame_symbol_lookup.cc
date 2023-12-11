@@ -74,4 +74,21 @@ BaseFrameSymbolLookup::get_or_insert(pid_t pid, SymbolTable &symbol_table,
   return symbol_idx;
 }
 
+SymbolIdx_t BaseFrameSymbolLookup::get_or_insert_comm(const char*comm, SymbolTable &symbol_table){
+  // todo: make hashable
+  std::string comm_string = comm;
+  auto const it_comm = _comm_map.find(comm_string);
+  int symbol_idx = -1;
+  if (it_comm != _comm_map.end()) {
+    symbol_idx = it_comm->second;
+  } else {
+    symbol_idx = symbol_table.size();
+    //   Symbol(std::string symname, std::string demangle_name, uint32_t lineno,
+    //         std::string srcpath)
+    symbol_table.push_back(Symbol{{}, comm, 0, {}});
+    _comm_map[comm_string] = symbol_idx;
+  }
+  return symbol_idx;
+}
+
 } // namespace ddprof

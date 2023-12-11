@@ -26,6 +26,8 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx,
 DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
                                   DDProfContext &ctx);
 
+DDRes ddprof_worker_process_bpf_events(DDProfContext &ctx);
+
 // Only init unwinding elements
 DDRes worker_library_init(DDProfContext &ctx,
                           PersistentWorkerState *persistent_worker_state);

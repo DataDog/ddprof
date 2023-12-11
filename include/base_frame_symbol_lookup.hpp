@@ -16,6 +16,8 @@ public:
                             DsoSymbolLookup &dso_symbol_lookup,
                             DsoHdr &dso_hdr);
 
+  SymbolIdx_t get_or_insert_comm(const char*comm, SymbolTable &symbol_table);
+
   // Erase symbol lookup for this pid (warning symbols still exist)
   void erase(pid_t pid) {
     _bin_map.erase(pid);
@@ -36,6 +38,8 @@ private:
   // holds generic symbol for this pid and a number of lookups to keep track of
   // failures looking for a given binary
   std::unordered_map<pid_t, PidSymbol> _pid_map;
+
+  std::unordered_map<std::string, SymbolIdx_t> _comm_map;
 };
 
 } // namespace ddprof

@@ -24,7 +24,7 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
-// #define EBPF_UNWINDING
+//#define EBPF_UNWINDING
 #ifdef EBPF_UNWINDING
 extern "C" {
 #  include "bpf/sample_processor.h"
@@ -37,19 +37,25 @@ extern "C" {
 /* Receive events from the ring buffer. */
 static int event_handler(void *_ctx, void *data, size_t size) {
   stacktrace_event *event = reinterpret_cast<stacktrace_event *>(data);
+#ifdef DEBUG
   fprintf(stderr, "Event[%d] -- COMM:%s, CPU=%d\n",
           event->pid,
           event->comm,
           event->cpu_id);
-
+#endif
   if (event->kstack_sz <= 0 && event->ustack_sz <= 0) {
-    fprintf(stderr, "error in bpf handler %d", __LINE__);
+    fprintf(stderr, "error in bpf handler %d \n", __LINE__);
     return 1;
   }
-  fprintf(stderr, "\n");
+
   if (_ctx) {
     ddprof::BPFEvents *bpf_events = reinterpret_cast<ddprof::BPFEvents*>(_ctx);
-    bpf_events->_events.push_back(event->cpu_id);
+
+    if (bpf_events->_events.try_push(*event)) {
+#ifdef DEBUG
+      fprintf(stderr, "Success pushing bpf event \n");
+#endif
+    }
   }
   return 0;
 }
@@ -218,8 +224,8 @@ DDRes pevent_open_bpf(DDProfContext &ctx, pid_t pid, int num_cpu,
                                            ctx.perf_clock_source);
     // used the fixed attr for the others
     for (int cpu_idx = 0; cpu_idx < num_cpu; ++cpu_idx) {
-      LG_DBG("Create BPF perf event with %d", pid);
       int const fd = perf_event_open(&attr, pid, cpu_idx, -1, PERF_FLAG_FD_CLOEXEC);
+      LG_DBG("Create BPF perf event with fd = %d", fd);
       if (fd == -1) {
         DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
                                "Error (BPF flow) calling perf_event_open on watcher %u.%d (%s)",
@@ -502,4 +508,4 @@ DDRes pevent_cleanup(PEventHdr *pevent_hdr) {
 #endif
   return ret;
 }
-} // namespace ddprof
+}

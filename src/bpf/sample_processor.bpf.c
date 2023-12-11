@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
-// inspired from the examples given within BPF repository
+// inspired from the examples given within libbpf repository
 
 #include "vmlinux.h"
 #include <bpf/bpf_core_read.h>
@@ -29,7 +29,6 @@ int process_sample(struct bpf_perf_event_data *ctx) {
     event->comm[0] = 0;
 
   // todo: how good is this versus storing stack ids ?
-
   event->kstack_sz =
       bpf_get_stack(ctx, event->kstack, sizeof(event->kstack), 0);
   event->ustack_sz = bpf_get_stack(ctx, event->ustack, sizeof(event->ustack),
