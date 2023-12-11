@@ -13,9 +13,10 @@ set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
 find_package(BZip2)
 find_package(LibLZMA)
 find_package(ZLIB)
-find_package(zstd)
 # Restore CMAKE_FIND_LIBRARY_SUFFIXES
 set(CMAKE_FIND_LIBRARY_SUFFIXES ${ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
+
+find_package(zstd)
 
 set(SHA256_ELF
     "39bd8f1a338e2b7cd4abc3ff11a0eddc6e690f69578a57478d8179b4148708c8"
@@ -53,7 +54,7 @@ set_target_properties(
   PROPERTIES IMPORTED_LOCATION ${LIBDW_PATH}
              INTERFACE_INCLUDE_DIRECTORIES ${ELFUTILS_INCLUDE_DIRS}
              INTERFACE_LINK_LIBRARIES
-             "${BZIP2_LIBRARIES};${LIBLZMA_LIBRARIES};${ZLIB_LIBRARIES};${zstd_LIBRARIES}")
+             "${BZIP2_LIBRARIES};${LIBLZMA_LIBRARIES};${ZLIB_LIBRARIES};zstd::libzstd_static")
 
 add_library(elf STATIC IMPORTED)
 set_target_properties(
@@ -61,7 +62,7 @@ set_target_properties(
   PROPERTIES IMPORTED_LOCATION ${LIBELF_PATH}
              INTERFACE_INCLUDE_DIRECTORIES ${ELFUTILS_INCLUDE_DIRS}
              INTERFACE_LINK_LIBRARIES
-             "${BZIP2_LIBRARIES};${LIBLZMA_LIBRARIES};${ZLIB_LIBRARIES};${zstd_LIBRARIES}")
+             "${BZIP2_LIBRARIES};${LIBLZMA_LIBRARIES};${ZLIB_LIBRARIES};zstd::libzstd_static")
 
 # Elf libraries
 set(ELFUTILS_LIBRARIES dw elf)

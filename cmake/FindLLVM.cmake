@@ -1,4 +1,13 @@
-find_package(LLVM CONFIG 17)
+set(ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+find_package(ZLIB)
+# Restore CMAKE_FIND_LIBRARY_SUFFIXES
+set(CMAKE_FIND_LIBRARY_SUFFIXES ${ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
+find_package(zstd)
+set_target_properties(zstd::libzstd_shared PROPERTIES
+          IMPORTED_LOCATION "${zstd_STATIC_LIBRARY}")
+
+find_package(LLVM CONFIG 17 REQUIRED)
 
 add_library(LLVMHeaders INTERFACE IMPORTED)
 target_include_directories(LLVMHeaders INTERFACE ${LLVM_INCLUDE_DIRS})

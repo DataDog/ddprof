@@ -258,6 +258,7 @@ set(ALLOCATION_TRACKER_UT_SRCS
     allocation_tracker-ut.cc
     ../src/lib/allocation_tracker.cc
     ../src/lib/elfutils.cc
+    ../src/lib/instrument_function.cc
     ../src/lib/symbol_overrides.cc
     ../src/base_frame_symbol_lookup.cc
     ../src/build_id.cc
@@ -303,13 +304,13 @@ set(ALLOCATION_TRACKER_UT_SRCS
 
 add_unit_test(
   allocation_tracker-ut ${ALLOCATION_TRACKER_UT_SRCS}
-  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle dl rt
+  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle dl rt orbit
   DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384)
 
 if(TARGET jemalloc::jemalloc_shared)
   add_unit_test(
     allocation_tracker_jemalloc-ut ${ALLOCATION_TRACKER_UT_SRCS}
-    LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle dl rt jemalloc::jemalloc_shared
+    LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle dl rt jemalloc::jemalloc_shared orbit
     DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384 USE_JEMALLOC=1)
 endif()
 
@@ -474,7 +475,7 @@ add_unit_test(ddprof_module_lib-ut ddprof_module_lib-ut.cc ../src/ddprof_module_
 
 add_library(dummy SHARED dummy_lib.cc)
 add_exe(
-  inject inject.cc ../src/inject_library.cc ../src/lib/instrument_function.cc ../src/ddres_list.cc ../src/logger.cc 
+  inject inject.cc ../src/inject_library.cc ../src/lib/instrument_function.cc ../src/ddres_list.cc ../src/logger.cc ../src/ratelimiter.cc 
   LIBRARIES orbit
   DEFINITIONS ${DDPROF_DEFINITION_LIST})
 target_include_directories(inject PRIVATE ${DDPROF_INCLUDE_LIST} ../include/lib)

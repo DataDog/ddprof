@@ -3,6 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
+#define _LARGEFILE64_SOURCE
 #include "symbol_overrides.hpp"
 
 #include "allocation_tracker.hpp"
@@ -849,7 +850,7 @@ void setup_overrides(OverrideMode mode) {
   std::lock_guard const lock(g_mutex);
   MaybeReentryGuard const guard; // avoid tracking allocations
 
-  if (mode == kGOTOverride) {
+  if (mode == OverrideMode::kGOTOverride) {
     if (!g_symbol_overrides) {
       g_symbol_overrides = std::make_unique<SymbolOverrides>();
       register_hooks();
@@ -919,26 +920,34 @@ void EntryPayload(uint64_t return_address, uint64_t function_id,
                   uint64_t stack_pointer, uint64_t return_trampoline_address) {
 
   uint64_t *stackp = reinterpret_cast<uint64_t *>(stack_pointer);
-  AllocFunctionId alloc_func_id = static_cast<AllocFunctionId>(function_id);
+  ddprof::AllocFunctionId alloc_func_id =
+      static_cast<ddprof::AllocFunctionId>(function_id);
   uint64_t arg1 = stackp[-5];
   uint64_t arg2 = stackp[-4];
   uint64_t size = 0;
 
   switch (alloc_func_id) {
-  case AllocFunctionId::kMalloc:
+  case ddprof::AllocFunctionId::kMalloc:
     size = arg1;
     break;
-  case AllocFunctionId::kCalloc:
+  case ddprof::AllocFunctionId::kCalloc:
     size = arg1 * arg2;
     break;
-  case AllocFunctionId::kRealloc:
+  case ddprof::AllocFunctionId::kRealloc:
     size = arg2;
     break;
   }
-  ddprof::AllocationTracker::track_allocation(0, size, stackp);
+  auto *tl_state = ddprof::AllocationTracker::get_tl_state();
+
+  if (tl_state) {
+    ddprof::ReentryGuard guard{&tl_state->reentry_guard};
+    if (guard) {
+      ddprof::AllocationTracker::track_allocation_s(0, size, *tl_state, stackp);
+    }
+  }
 }
 
-extern "C" uint64_t ExitPayload() {
+uint64_t ExitPayload() {
   printf("ExitPayload\n");
   return 0;
 }

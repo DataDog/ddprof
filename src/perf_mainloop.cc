@@ -152,9 +152,8 @@ ReplyMessage create_reply_message(const DDProfContext &ctx) {
       }
 
       if (ctx.params.use_trampoline) {
-        reply.allocation_flags |= static_cast<uint32_t>(
-            AllocationProfilingFlags::kUseTrampolineInstrumentation);
-        watcher.options.nb_frames_to_skip = 0;
+        reply.allocation_profiling_flags |= static_cast<uint32_t>(
+            ReplyMessage::kUseTrampolineInstrumentation);
       }
     }
   }

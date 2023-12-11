@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#undef _GNU_SOURCE
 #include "OrbitBase/SafeStrerror.h"
 
 #include <array>
@@ -13,6 +14,7 @@ const char* SafeStrerror(int errnum) {
   strerror_s(buf.data(), buf.size(), errnum);
   return buf.data();
 #else
-  return strerror_r(errnum, buf.data(), buf.size());
+  strerror_r(errnum, buf.data(), buf.size());
+  return buf.data();
 #endif
 }

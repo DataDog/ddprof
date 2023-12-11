@@ -1,6 +1,7 @@
 // Copyright (c) 2021 The Orbit Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+#define _LARGEFILE64_SOURCE
 
 #include "OrbitBase/File.h"
 
@@ -33,6 +34,15 @@ int64_t lseek64(int fd, int64_t offset, int origin) { return _lseeki64(fd, offse
 
 }  // namespace
 
+#else
+#ifndef TEMP_FAILURE_RETRY
+#define TEMP_FAILURE_RETRY(expression) \
+  (__extension__                                                              \
+   ({ long int __result;                                                     \
+       do __result = (long int) (expression);                                 \
+       while (__result == -1L && errno == EINTR);                             \
+       __result; }))
+#endif
 #endif
 
 namespace {

@@ -1,6 +1,7 @@
 // Copyright (c) 2020 The Orbit Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+#define _LARGEFILE64_SOURCE
 
 #include "OrbitBase/ReadFileToString.h"
 
@@ -24,6 +25,15 @@
 #if defined(_WIN32)
 // Windows never returns EINTR - so there is no need for TEMP_FAILURE_RETRY implementation
 #define TEMP_FAILURE_RETRY(expression) (expression)
+#else
+#ifndef TEMP_FAILURE_RETRY
+#define TEMP_FAILURE_RETRY(expression) \
+  (__extension__                                                              \
+   ({ long int __result;                                                     \
+       do __result = (long int) (expression);                                 \
+       while (__result == -1L && errno == EINTR);                             \
+       __result; }))
+#endif
 #endif
 
 namespace orbit_base {

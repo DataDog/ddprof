@@ -19,11 +19,15 @@ set(LLVM_DEMANGLE_SRC_FILES
     ${LLVM_DEMANGLE_SRC}/DLangDemangle.cpp
     )
 
-add_library(llvm-demangle STATIC
-            ${LLVM_DEMANGLE_SRC_FILES})
+# add_library(llvm-demangle STATIC
+#             ${LLVM_DEMANGLE_SRC_FILES})
 
-# disable warnings for third party
-target_compile_options(llvm-demangle PRIVATE "-w")
-disable_clangtidy(llvm-demangle)
+# # disable warnings for third party
+# target_compile_options(llvm-demangle PRIVATE "-w")
+# disable_clangtidy(llvm-demangle)
 
-target_include_directories(llvm-demangle PUBLIC include)
+# target_include_directories(llvm-demangle PUBLIC include)
+
+add_library(llvm-demangle INTERFACE)
+target_link_libraries(llvm-demangle INTERFACE LLVMDemangle)
+target_link_libraries(llvm-demangle INTERFACE LLVMHeaders)

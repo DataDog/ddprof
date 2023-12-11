@@ -87,8 +87,6 @@ find_package(absl REQUIRED)
 find_package(capstone REQUIRED)
 find_package(LLVM REQUIRED)
 
-find_package(absl REQUIRED)
-
 # libdatadog_profiling
 include(Findlibdatadog)
 
@@ -156,7 +154,7 @@ aux_source_directory(src/jit JIT_SRC)
 set(DDPROF_GLOBAL_SRC ${COMMON_SRC} ${DEMANGLER_SRC} ${PPROF_SRC} ${EXPORTER_SRC} ${EXE_SRC}
                       ${JIT_SRC})
 
-set(DDPROF_LIBRARY_LIST DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
+set(DDPROF_LIBRARY_LIST DDProf::Parser LLVMDemangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 
 if(ON)
   # Add the rust library - Refactoring ongoing. OFF for now

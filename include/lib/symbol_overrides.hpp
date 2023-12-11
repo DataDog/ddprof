@@ -10,7 +10,7 @@
 namespace ddprof {
 enum class OverrideMode { kGOTOverride, kTrampoline };
 
-void setup_overrides(OverrideMode mode);
+void setup_overrides(OverrideMode mode = OverrideMode::kGOTOverride);
 void restore_overrides();
 
 // check if new libs have been loaded and update overrides accordingly

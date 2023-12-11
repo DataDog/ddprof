@@ -203,7 +203,13 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
   TempFileHolder dd_profiling_lib_holder;
   TempFileHolder dd_loader_lib_holder;
 
-  int alloc_watcher_idx = ddprof_context_allocation_profiling_watcher_idx(ctx);
+  int alloc_watcher_idx = context_allocation_profiling_watcher_idx(*ctx);
+
+  // \fixme{nsavoire}: This is a temporary hack to modify number of frames to
+  // skip in trampoline mode
+  if (alloc_watcher_idx != -1 && ctx->params.use_trampoline) {
+    ctx->watchers[alloc_watcher_idx].options.nb_frames_to_skip = 0;
+  }
 
   pid_t temp_pid = 0;
   if (in_wrapper_mode) {
@@ -272,7 +278,8 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
 
     // profiler process
     temp_pid = daemonize_res.temp_pid;
-  } else if (ctx->params.pid != -1 && alloc_watcher_idx != -1) {
+  } else if (ctx->params.pid != -1 && alloc_watcher_idx != -1 &&
+             !ctx->params.pipefd_to_library) {
     // ddprof::inject_library(ctx->params_pid)
     LG_ERR("Library injection not implemented yet");
     return -1;
