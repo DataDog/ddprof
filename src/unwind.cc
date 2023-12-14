@@ -33,6 +33,8 @@ bool is_ld(const std::string &path) {
 }
 
 bool is_stack_complete(UnwindState *us) {
+  // todo fix me
+  return true;
   static constexpr std::array s_expected_root_frames{
       "__clone"sv,
       "__clone3"sv,

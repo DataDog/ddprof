@@ -12,6 +12,9 @@
 #include "perf_watcher.hpp"
 #include "tags.hpp"
 #include "unwind_output.hpp"
+#include "ddprof_file_info.hpp"
+
+struct blaze_symbolizer;
 
 namespace ddprof {
 
@@ -40,9 +43,13 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx);
  * @param pprof
  */
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
-                      const SymbolHdr &symbol_hdr, const DDProfValuePack &pack,
+                      const SymbolHdr &symbol_hdr,
+                      blaze_symbolizer *symbolizer,
+                      const DDProfValuePack &pack,
                       const PerfWatcher *watcher,
-                      EventAggregationModePos value_pos, DDProfPProf *pprof);
+                      const FileInfoVector &vector,
+                      EventAggregationModePos value_pos,
+                      DDProfPProf *pprof);
 
 DDRes pprof_reset(DDProfPProf *pprof);
 

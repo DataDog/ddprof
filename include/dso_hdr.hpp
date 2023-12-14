@@ -177,6 +177,9 @@ public:
   const FileInfoValue &get_file_info_value(FileInfoId_t id) const {
     return _file_info_vector[id];
   }
+  const FileInfoVector &get_file_info_vector() const {
+    return _file_info_vector;
+  }
 
   void set_path_to_proc(std::string_view path_to_proc) {
     _path_to_proc = path_to_proc;

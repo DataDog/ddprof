@@ -12,6 +12,8 @@
 #include <array>
 #include <chrono>
 
+
+struct blaze_symbolizer;
 namespace ddprof {
 
 struct DDProfExporter;
@@ -28,6 +30,7 @@ struct DDProfWorkerContext {
   PEventHdr pevent_hdr;     // perf_event buffer holder
   DDProfExporter *exp[2]{}; // wrapper around rust exporter
   DDProfPProf *pprof[2]{};  // wrapper around rust exporter
+  blaze_symbolizer *symbolizer;
   int i_current_pprof{0};
   volatile bool exp_error{false};
   pthread_t exp_tid{0};

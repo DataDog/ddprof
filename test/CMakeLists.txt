@@ -161,15 +161,18 @@ add_unit_test(
   DEFINITIONS MYNAME="pevent-ut")
 
 add_unit_test(
-  ddprof_pprof-ut ddprof_pprof-ut.cc ../src/ddprof_cmdline_watcher.cc ../src/pprof/ddprof_pprof.cc
-  ../src/perf_watcher.cc ../src/tracepoint_config.cc
-  LIBRARIES Datadog::Profiling DDProf::Parser
+  ddprof_pprof-ut
+        ddprof_pprof-ut.cc
+        ../src/ddprof_cmdline_watcher.cc
+        ../src/pprof/ddprof_pprof.cc
+        ../src/perf_watcher.cc ../src/tracepoint_config.cc
+  LIBRARIES Datadog::Profiling DDProf::Parser ${BLAZE_LIBRARY}
   DEFINITIONS MYNAME="ddprof_pprof-ut")
 
 add_unit_test(
   ddprof_exporter-ut ../src/exporter/ddprof_exporter.cc ../src/pprof/ddprof_pprof.cc
   ../src/perf_watcher.cc ../src/tags.cc ddprof_exporter-ut.cc
-  LIBRARIES Datadog::Profiling DDProf::Parser
+  LIBRARIES Datadog::Profiling DDProf::Parser ${BLAZE_LIBRARY}
   DEFINITIONS MYNAME="ddprof_exporter-ut")
 
 add_unit_test(

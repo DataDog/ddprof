@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <cstring>
 #include <span>
+#include "blazesym.h"
 
 namespace ddprof {
 
@@ -27,6 +28,15 @@ void write_function(const Symbol &symbol, ddog_prof_Function *ffi_func) {
   ffi_func->name = to_CharSlice(symbol._demangle_name);
   ffi_func->system_name = to_CharSlice(symbol._symname);
   ffi_func->filename = to_CharSlice(symbol._srcpath);
+  // Not filed (can be computed if needed using the start range from elf)
+  ffi_func->start_line = 0;
+}
+
+void write_function(const char *demangle_name, const char* file_name,
+                    ddog_prof_Function *ffi_func) {
+  ffi_func->name = to_CharSlice(demangle_name);
+  ffi_func->system_name = {};
+  ffi_func->filename = to_CharSlice(file_name);
   // Not filed (can be computed if needed using the start range from elf)
   ffi_func->start_line = 0;
 }
@@ -45,6 +55,43 @@ void write_location(const FunLoc *loc, const MapInfo &mapinfo,
   write_function(symbol, &ffi_location->function);
   ffi_location->address = loc->ip;
   ffi_location->line = symbol._lineno;
+}
+
+static DDRes write_location_blaze(const FunLoc &loc,
+                                  const MapInfo &mapinfo,
+                                  const blaze_sym* blaze_sym,
+                                  unsigned &cur_loc,
+                                  ddog_prof_Location *locations_buff) {
+  if (cur_loc >= kMaxStackDepth) {
+    return ddres_warn(DD_WHAT_UW_MAX_DEPTH);
+  }
+
+  for (unsigned i = 0; i < blaze_sym->inlined_cnt && cur_loc < kMaxStackDepth; ++i) {
+    const blaze_symbolize_inlined_fn* inlined_fn = blaze_sym->inlined;
+    ddog_prof_Location &ffi_location = locations_buff[cur_loc];
+    write_mapping(mapinfo, &ffi_location.mapping);
+    write_function(inlined_fn->name?
+                      inlined_fn->name:"[undefined](inlined)",
+                   inlined_fn->code_info.file?
+                      inlined_fn->code_info.file:mapinfo._sopath.c_str(),
+                   &ffi_location.function);
+    ffi_location.address = loc.ip;
+    ffi_location.line = blaze_sym->code_info.line;
+    ++cur_loc;
+  }
+  if (cur_loc >= kMaxStackDepth) {
+    return ddres_warn(DD_WHAT_UW_MAX_DEPTH);
+  }
+  ddog_prof_Location &ffi_location = locations_buff[cur_loc];
+  write_mapping(mapinfo, &ffi_location.mapping);
+  write_function(blaze_sym->name?blaze_sym->name:"[undefined]",
+                 blaze_sym->code_info.file?
+                             blaze_sym->code_info.file:mapinfo._sopath.c_str(),
+                 &ffi_location.function);
+  ffi_location.address = loc.ip;
+  ffi_location.line = blaze_sym->code_info.line;
+  ++cur_loc;
+  return {};
 }
 
 constexpr int k_max_value_types =
@@ -267,9 +314,13 @@ DDRes pprof_free_profile(DDProfPProf *pprof) {
 
 // Assumption of API is that sample is valid in a single type
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
-                      const SymbolHdr &symbol_hdr, const DDProfValuePack &pack,
+                      const SymbolHdr &symbol_hdr,
+                      blaze_symbolizer *symbolizer,
+                      const DDProfValuePack &pack,
                       const PerfWatcher *watcher,
-                      EventAggregationModePos value_pos, DDProfPProf *pprof) {
+                      const FileInfoVector &file_infos,
+                      EventAggregationModePos value_pos,
+                      DDProfPProf *pprof) {
 
   const ddprof::SymbolTable &symbol_table = symbol_hdr._symbol_table;
   const ddprof::MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
@@ -286,7 +337,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
 
   ddog_prof_Location locations_buff[kMaxStackDepth];
   std::span locs{uw_output->locs};
-
+  std::vector<const blaze_result *>blaze_results {};
   if (watcher->options.nb_frames_to_skip < locs.size()) {
     locs = locs.subspan(watcher->options.nb_frames_to_skip);
   } else {
@@ -297,12 +348,70 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     }
   }
 
-  unsigned cur_loc = 0;
-  for (const FunLoc &loc : locs) {
-    // possibly several lines to handle inlined function (not handled for now)
-    write_location(&loc, mapinfo_table[loc._map_info_idx],
-                   symbol_table[loc._symbol_idx], &locations_buff[cur_loc]);
-    ++cur_loc;
+  // free all the blaze results after aggregation
+  defer{ for (auto & el : blaze_results) { if (el) {
+        blaze_result_free(el);
+        el = nullptr;
+      } }; };
+
+  unsigned index = 0;
+  unsigned write_index = 0;
+  while (index < locs.size() && write_index < kMaxStackDepth) {
+    if (locs[index]._symbol_idx != -1) {
+      // already symbolized
+      const FunLoc &loc = locs[index];
+      write_location(&loc, mapinfo_table[loc._map_info_idx],
+                     symbol_table[loc._symbol_idx], &locations_buff[write_index++]);
+      ++index;
+      continue;
+    }
+
+    if (locs[index]._file_info_id <= k_file_info_error) {
+      // We should either have an index or a file to write the symbol
+      assert(0);
+      ++index;
+      continue;
+    }
+
+    FileInfoId_t file_id = locs[index]._file_info_id;
+    const std::string &currentFilePath = file_infos[file_id].get_path();
+    std::vector<uintptr_t> addresses;
+    // Collect all consecutive locations for the same file
+    unsigned start_index = index;
+    while (index < locs.size() &&
+               locs[index]._file_info_id == file_id) {
+      addresses.push_back(locs[index]._elf_addr);
+      ++index;
+      if (locs[index]._symbol_idx != -1) {
+        break;
+      }
+    }
+
+    // Process the batch of addresses for the current file
+    blaze_symbolize_src_elf src_elf {
+        .path = currentFilePath.c_str(),
+        .debug_syms = true,
+    };
+
+    const blaze_result *blaze_res = blaze_symbolize_elf_file_addrs(
+        symbolizer, &src_elf, addresses.data(), addresses.size());
+
+    if (blaze_res) {
+      blaze_results.push_back(blaze_res);
+      for (unsigned i = 0; i < addresses.size(); ++i) {
+        const blaze_sym *cur_sym = blaze_res->syms + i;
+        unsigned loc_index = start_index + i;
+        // write index updated in the write_location
+        if(IsDDResNotOK(write_location_blaze(locs[loc_index],
+                                              mapinfo_table[locs[loc_index]._map_info_idx],
+                                              cur_sym,
+                                              write_index,
+                                              locations_buff))) {
+          // reached max syms
+          break;
+        }
+      }
+    }
   }
 
   // Create the labels for the sample.  Two samples are the same only when
@@ -349,7 +458,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   assert(labels_num <= k_max_pprof_labels);
 
   ddog_prof_Sample const sample = {
-      .locations = {.ptr = locations_buff, .len = cur_loc},
+      .locations = {.ptr = locations_buff, .len = write_index},
       .values = {.ptr = values, .len = pprof->_nb_values},
       .labels = {.ptr = labels, .len = labels_num},
   };

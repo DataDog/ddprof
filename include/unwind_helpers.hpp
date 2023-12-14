@@ -17,8 +17,12 @@ struct UnwindState;
 
 bool is_max_stack_depth_reached(const UnwindState &us);
 
-DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
-                UnwindState *us);
+DDRes add_frame(SymbolIdx_t symbol_idx,
+          FileInfoId_t file_info_id,
+          MapInfoIdx_t map_idx,
+          ProcessAddress_t pc,
+          ProcessAddress_t elf_addr,
+          UnwindState *us);
 
 void add_common_frame(UnwindState *us, SymbolErrors lookup_case);
 

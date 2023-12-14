@@ -5,6 +5,7 @@
 
 #include "ddprof_worker.hpp"
 
+#include "blazesym.h"
 #include "chrono_utils.hpp"
 #include "ddprof_context.hpp"
 #include "ddprof_perf_event.hpp"
@@ -22,6 +23,7 @@
 #include "unwind.hpp"
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
+#include "blaze_symbol_lookup.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -79,7 +81,12 @@ DDRes report_lost_events(DDProfContext &ctx) {
              "watcher #%d",
              nb_lost, value, watcher_idx);
       DDRES_CHECK_FWD(pprof_aggregate(
-          &us->output, us->symbol_hdr, {value, nb_lost, 0}, watcher, kSumPos,
+          &us->output, us->symbol_hdr,
+          ctx.worker_ctx.symbolizer,
+          {value, nb_lost, 0},
+          watcher,
+          ctx.worker_ctx.us->dso_hdr.get_file_info_vector(),
+          kSumPos,
           ctx.worker_ctx.pprof[ctx.worker_ctx.i_current_pprof]));
       ctx.worker_ctx.lost_events_per_watcher[watcher_idx] = 0;
     }
@@ -250,7 +257,10 @@ DDRes aggregate_livealloc_stack(
       alloc_info.second._value,
       static_cast<uint64_t>(std::max<int64_t>(0, alloc_info.second._count)), 0};
 
-  DDRES_CHECK_FWD(pprof_aggregate(&alloc_info.first, symbol_hdr, pack, watcher,
+  DDRES_CHECK_FWD(pprof_aggregate(&alloc_info.first, symbol_hdr,
+                                  ctx.worker_ctx.symbolizer,
+                                  pack, watcher,
+                                  ctx.worker_ctx.us->dso_hdr.get_file_info_vector(),
                                   kLiveSumPos, pprof));
   if (ctx.params.show_samples) {
     ddprof_print_sample(alloc_info.first, symbol_hdr, alloc_info.second._value,
@@ -360,6 +370,13 @@ DDRes worker_library_init(DDProfContext &ctx,
     ctx.worker_ctx.user_tags =
         new UserTags(ctx.params.tags, ctx.params.num_cpu);
 
+    constexpr blaze_symbolizer_opts opts {
+        .code_info = true,
+        .inlined_fns = false,
+        .demangle = false,
+    };
+    ctx.worker_ctx.symbolizer = blaze_symbolizer_new_opts(&opts);
+
     // Zero out pointers to dynamically allocated memory
     ctx.worker_ctx.exp[0] = nullptr;
     ctx.worker_ctx.exp[1] = nullptr;
@@ -434,8 +451,13 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
       const DDProfValuePack pack{static_cast<int64_t>(sample_val), 1,
                                  timestamp};
 
-      DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbol_hdr, pack,
-                                      watcher, kSumPos, pprof));
+      DDRES_CHECK_FWD(pprof_aggregate(&us->output,
+                                      us->symbol_hdr,
+                                      ctx.worker_ctx.symbolizer,
+                                      pack,
+                                      watcher,
+                                      us->dso_hdr.get_file_info_vector(),
+                                      kSumPos, pprof));
       if (ctx.params.show_samples) {
         ddprof_print_sample(us->output, us->symbol_hdr, sample->period, kSumPos,
                             *watcher);

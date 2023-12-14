@@ -14,13 +14,16 @@
 #include "container_id_defs.hpp"
 #include "ddprof_defs.hpp"
 
+#include "ddprof_file_info-i.hpp"
+
 namespace ddprof {
 
 struct FunLoc {
-  uint64_t ip; // Relative to file, not VMA
+  ProcessAddress_t ip;
+  ElfAddress_t _elf_addr;
+  FileInfoId_t _file_info_id;
   SymbolIdx_t _symbol_idx;
   MapInfoIdx_t _map_info_idx;
-
   friend auto operator<=>(const FunLoc &, const FunLoc &) = default;
 };
 
