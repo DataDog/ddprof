@@ -24,7 +24,7 @@ find_program(CARGO_EXISTS cargo)
 if(CARGO_EXISTS)
   ExternalProject_Add(blazesym
           PREFIX blazesym
-          GIT_REPOSITORY git@github.com:libbpf/blazesym.git
+          GIT_REPOSITORY https://github.com/libbpf/blazesym.git
           GIT_TAG v0.2.0-alpha.9
           SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/blazesym
           CONFIGURE_COMMAND ""
