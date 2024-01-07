@@ -25,12 +25,9 @@ bool is_max_stack_depth_reached(const UnwindState &us) {
   return us.output.locs.size() + 2 >= kMaxStackDepth;
 }
 
-DDRes add_frame(SymbolIdx_t symbol_idx,
-                FileInfoId_t file_info_id,
-                MapInfoIdx_t map_idx,
-                ProcessAddress_t pc,
-                ProcessAddress_t elf_addr,
-                UnwindState *us) {
+DDRes add_frame(SymbolIdx_t symbol_idx, FileInfoId_t file_info_id,
+                MapInfoIdx_t map_idx, ProcessAddress_t pc,
+                ProcessAddress_t elf_addr, UnwindState *us) {
   UnwindOutput *output = &us->output;
   if (output->locs.size() >= kMaxStackDepth) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_UW_MAX_DEPTH,
@@ -42,12 +39,11 @@ DDRes add_frame(SymbolIdx_t symbol_idx,
         CommonMapInfoLookup::MappingErrors::empty,
         us->symbol_hdr._mapinfo_table);
   }
-  output->locs.emplace_back(FunLoc{
-  .ip = pc,
-  ._elf_addr = elf_addr,
-  ._file_info_id = file_info_id,
-  ._symbol_idx = symbol_idx,
-  ._map_info_idx = map_idx});
+  output->locs.emplace_back(FunLoc{.ip = pc,
+                                   ._elf_addr = elf_addr,
+                                   ._file_info_id = file_info_id,
+                                   ._symbol_idx = symbol_idx,
+                                   ._map_info_idx = map_idx});
   return {};
 }
 

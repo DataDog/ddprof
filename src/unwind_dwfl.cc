@@ -215,12 +215,8 @@ DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
       us->pid, us->symbol_hdr._mapinfo_table, dso, ddprof_mod._build_id);
 
   // todo: we should also pass the PC
-  return add_frame(symbol_idx,
-                   file_info_id,
-                   map_idx,
-                   pc,
-                   pc - ddprof_mod._sym_bias,
-                   us);
+  return add_frame(symbol_idx, file_info_id, map_idx, pc,
+                   pc - ddprof_mod._sym_bias, us);
 }
 
 // check for runtime symbols provided in /tmp files

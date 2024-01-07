@@ -19,26 +19,6 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
   message(FATAL_ERROR "Non Linux systems are not handled in ddprof")
 endif()
 
-include(ExternalProject)
-find_program(CARGO_EXISTS cargo)
-if(CARGO_EXISTS)
-  ExternalProject_Add(blazesym
-          PREFIX blazesym
-          GIT_REPOSITORY https://github.com/libbpf/blazesym.git
-          GIT_TAG v0.2.0-alpha.9
-          SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/blazesym
-          CONFIGURE_COMMAND ""
-          # todo switch betwee release / not release
-          BUILD_COMMAND cargo build --release && cd capi && cargo build --release
-          BUILD_IN_SOURCE TRUE
-          INSTALL_COMMAND ""
-          STEP_TARGETS build)
-
-  SET(BLAZE_INCLUDE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/third_party/blazesym/capi/include/)
-  # To switch to static we need to push it through libdatadog
-  SET(BLAZE_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/third_party/blazesym/target/release/libblazesym_c.so)
-endif()
-
 # Debug command to get gcc command lines
 # ~~~
 # set(CMAKE_VERBOSE_MAKEFILE on)
@@ -156,7 +136,7 @@ include(Version)
 string(APPEND CMAKE_C_FLAGS " ${FRAME_PTR_FLAG}")
 string(APPEND CMAKE_CXX_FLAGS " ${FRAME_PTR_FLAG}")
 
-list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include ${BLAZE_INCLUDE_DIRECTORY})
+list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include)
 
 # Find the source files
 aux_source_directory(src COMMON_SRC)
@@ -170,7 +150,7 @@ aux_source_directory(src/jit JIT_SRC)
 set(DDPROF_GLOBAL_SRC ${COMMON_SRC} ${DEMANGLER_SRC} ${PPROF_SRC} ${EXPORTER_SRC} ${EXE_SRC}
                       ${JIT_SRC})
 
-set(DDPROF_LIBRARY_LIST DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads ${BLAZE_LIBRARY})
+set(DDPROF_LIBRARY_LIST DDProf::Parser llvm-demangle ${ELFUTILS_LIBRARIES} Threads::Threads)
 
 if(ON)
   # Add the rust library - Refactoring ongoing. OFF for now

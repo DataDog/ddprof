@@ -162,17 +162,26 @@ add_unit_test(
 
 add_unit_test(
   ddprof_pprof-ut
-        ddprof_pprof-ut.cc
-        ../src/ddprof_cmdline_watcher.cc
-        ../src/pprof/ddprof_pprof.cc
-        ../src/perf_watcher.cc ../src/tracepoint_config.cc
-  LIBRARIES Datadog::Profiling DDProf::Parser ${BLAZE_LIBRARY}
+  ddprof_pprof-ut.cc
+  ../src/ddprof_cmdline_watcher.cc
+  ../src/pprof/ddprof_pprof.cc
+  ../src/symbolizer.cc
+  ../src/demangler/demangler.cc
+  ../src/perf_watcher.cc
+  ../src/tracepoint_config.cc
+  LIBRARIES Datadog::Profiling DDProf::Parser llvm-demangle
   DEFINITIONS MYNAME="ddprof_pprof-ut")
 
 add_unit_test(
-  ddprof_exporter-ut ../src/exporter/ddprof_exporter.cc ../src/pprof/ddprof_pprof.cc
-  ../src/perf_watcher.cc ../src/tags.cc ddprof_exporter-ut.cc
-  LIBRARIES Datadog::Profiling DDProf::Parser ${BLAZE_LIBRARY}
+  ddprof_exporter-ut
+  ../src/exporter/ddprof_exporter.cc
+  ../src/pprof/ddprof_pprof.cc
+  ../src/perf_watcher.cc
+  ../src/symbolizer.cc
+  ../src/demangler/demangler.cc
+  ../src/tags.cc
+  ddprof_exporter-ut.cc
+  LIBRARIES Datadog::Profiling DDProf::Parser llvm-demangle
   DEFINITIONS MYNAME="ddprof_exporter-ut")
 
 add_unit_test(
