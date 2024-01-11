@@ -48,6 +48,7 @@ TrackerThreadLocalState *AllocationTracker::init_tl_state() {
   // allocation.
   auto tl_state = std::make_unique<TrackerThreadLocalState>();
   tl_state->tid = ddprof::gettid();
+  tl_state->stack_bounds = retrieve_stack_bounds();
 
   if (int res = pthread_setspecific(_tl_state_key, tl_state.get()); res != 0) {
     // should return 0
@@ -443,14 +444,6 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
     push_lost_sample(writer, tl_state, notify_consumer);
   }
 
-  if (tl_state.stack_bounds.empty()) {
-    // This call should only occur on main thread
-    tl_state.stack_bounds = retrieve_stack_bounds();
-    if (tl_state.stack_bounds.empty()) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB, "Unable to get thread bounds");
-    }
-  }
-
   // estimate sample stack size
   void *p;
   const auto *stack_base_ptr = reinterpret_cast<const std::byte *>(&p);
@@ -582,10 +575,6 @@ void AllocationTracker::notify_thread_start() {
       return;
     }
   }
-
-  ReentryGuard const guard(&tl_state->reentry_guard);
-  tl_state->stack_bounds = retrieve_stack_bounds();
-  // error can not be propagated in thread create
 }
 
 void AllocationTracker::notify_fork() {
