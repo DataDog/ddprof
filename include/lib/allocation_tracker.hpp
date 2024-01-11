@@ -129,6 +129,9 @@ private:
 
   DDRes push_clear_live_allocation(TrackerThreadLocalState &tl_state);
 
+  void check_timer(PerfClock::time_point now,
+                   TrackerThreadLocalState &tl_state);
+
   void free_on_consecutive_failures(bool success);
 
   DDPROF_NOINLINE void update_timer(PerfClock::time_point now);
