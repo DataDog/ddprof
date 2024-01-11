@@ -249,7 +249,7 @@ target_static_libcxx(dd_profiling-embedded)
 target_static_sanitizer(dd_profiling-embedded)
 set_target_properties(dd_profiling-embedded PROPERTIES LINK_DEPENDS "${dd_profiling_linker_script}")
 target_link_options(dd_profiling-embedded PRIVATE
-                    "LINKER:--version-script=${dd_profiling_linker_script}")
+                    "LINKER:--version-script=${dd_profiling_linker_script};LINKER:-Bsymbolic")
 if(BUILD_UNIVERSAL_DDPROF)
   target_link_options(dd_profiling-embedded PRIVATE "-nolibc")
   if(USE_AUXILIARY)
@@ -393,7 +393,7 @@ target_static_libcxx(dd_profiling-shared)
 target_static_sanitizer(dd_profiling-shared)
 set_target_properties(dd_profiling-shared PROPERTIES LINK_DEPENDS "${dd_profiling_linker_script}")
 target_link_options(dd_profiling-shared PRIVATE
-                    "LINKER:--version-script=${dd_profiling_linker_script}")
+                    "LINKER:--version-script=${dd_profiling_linker_script};LINKER:-Bsymbolic")
 
 set_target_properties(dd_profiling-shared PROPERTIES OUTPUT_NAME dd_profiling)
 target_include_directories(dd_profiling-shared PUBLIC ${CMAKE_SOURCE_DIR}/include/lib

@@ -9,8 +9,9 @@
 extern "C" {
 #endif
 
-int ddprof_start_profiling();
-void ddprof_stop_profiling(int timeout_ms);
+__attribute__((__visibility__("default"))) int ddprof_start_profiling();
+__attribute__((__visibility__("default"))) void
+ddprof_stop_profiling(int timeout_ms);
 
 #ifdef __cplusplus
 }

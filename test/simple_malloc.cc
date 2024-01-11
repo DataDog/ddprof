@@ -169,7 +169,8 @@ extern "C" DDPROF_NOINLINE void recursive_call(const Options &options,
   DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
 }
 
-extern "C" DDPROF_NOINLINE void wrapper(const Options &options, Stats &stats) {
+extern "C" DDPROF_EXPORT DDPROF_NOINLINE void wrapper(const Options &options,
+                                                      Stats &stats) {
   recursive_call(options, stats, options.callstack_depth);
 }
 // NOLINTEND(clang-analyzer-unix.Malloc)
