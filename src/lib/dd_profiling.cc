@@ -122,6 +122,44 @@ void init_state() {
   g_state.initialized = true;
 }
 
+std::string get_log_mode() {
+  auto *log_mode_env = g_state.getenv("DD_PROFILING_NATIVE_LIBRARY_LOG_MODE");
+
+  if (!log_mode_env) {
+    log_mode_env = g_state.getenv("DD_PROFILING_NATIVE_LOG_MODE");
+  }
+
+  return log_mode_env ? log_mode_env : "stderr";
+}
+
+std::string get_log_level() {
+  auto *log_level_env = g_state.getenv("DD_PROFILING_NATIVE_LIBRARY_LOG_LEVEL");
+
+  if (!log_level_env) {
+    log_level_env = g_state.getenv("DD_PROFILING_NATIVE_LOG_LEVEL");
+  }
+
+  return log_level_env ? log_level_env : "error";
+}
+
+void init_logger() {
+  if (g_state.initialized) {
+    return;
+  }
+
+  auto log_level = get_log_level();
+  auto log_mode = get_log_mode();
+  setup_logger(log_mode.c_str(), log_level.c_str());
+
+  LOG_setname("ddprof-library");
+
+  // Disable logging when allocations are not allowed
+  LOG_set_logs_allowed_function([]() {
+    auto *tl_state = AllocationTracker::get_tl_state();
+    return !tl_state || tl_state->allocation_allowed;
+  });
+}
+
 // return true if this profiler is active for this process or one of its parent
 bool is_profiler_library_active() {
   if (!g_state.initialized) {
@@ -204,6 +242,7 @@ struct ProfilerAutoStart {
 
   ProfilerAutoStart() noexcept {
     init_state();
+    init_logger();
 
     // Note that library needs to be linked with `--no-as-needed` when using
     // autostart, otherwise linker will completely remove library from DT_NEEDED
