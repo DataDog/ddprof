@@ -218,7 +218,7 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
 
   if (unlikely(!tl_state.remaining_bytes_initialized)) {
     // tl_state.remaining bytes was not initialized yet for this thread
-    remaining_bytes -= next_sample_interval(tl_state._gen);
+    remaining_bytes -= next_sample_interval(tl_state.gen);
     tl_state.remaining_bytes_initialized = true;
     if (remaining_bytes < 0) {
       tl_state.remaining_bytes = remaining_bytes;
@@ -232,7 +232,7 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
   remaining_bytes = remaining_bytes % sampling_interval;
 
   do {
-    remaining_bytes -= next_sample_interval(tl_state._gen);
+    remaining_bytes -= next_sample_interval(tl_state.gen);
     ++nsamples;
   } while (remaining_bytes >= 0);
 
@@ -308,12 +308,6 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
   event->header.type = PERF_RECORD_LOST;
   auto now = PerfClock::now();
   event->sample_id.time = now.time_since_epoch().count();
-  if (_state.pid == 0) {
-    _state.pid = getpid();
-  }
-  if (tl_state.tid == 0) {
-    tl_state.tid = ddprof::gettid();
-  }
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
 
@@ -349,12 +343,6 @@ DDRes AllocationTracker::push_clear_live_allocation(
   event->hdr.type = PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION;
   auto now = PerfClock::now();
   event->sample_id.time = now.time_since_epoch().count();
-  if (_state.pid == 0) {
-    _state.pid = getpid();
-  }
-  if (tl_state.tid == 0) {
-    tl_state.tid = ddprof::gettid();
-  }
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
 
@@ -403,13 +391,6 @@ DDRes AllocationTracker::push_dealloc_sample(
   event->hdr.type = PERF_CUSTOM_EVENT_DEALLOCATION;
   auto now = PerfClock::now();
   event->sample_id.time = now.time_since_epoch().count();
-
-  if (_state.pid == 0) {
-    _state.pid = getpid();
-  }
-  if (tl_state.tid == 0) {
-    tl_state.tid = ddprof::gettid();
-  }
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
 
@@ -500,13 +481,6 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   auto now = PerfClock::now();
   event->sample_id.time = now.time_since_epoch().count();
   event->addr = addr;
-  if (_state.pid == 0) {
-    _state.pid = getpid();
-  }
-  if (tl_state.tid == 0) {
-    tl_state.tid = ddprof::gettid();
-  }
-
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
   event->period = allocated_size;
@@ -590,7 +564,7 @@ void AllocationTracker::notify_thread_start() {
 
 void AllocationTracker::notify_fork() {
   if (_instance) {
-    _instance->_state.pid = 0;
+    _instance->_state.pid = getpid();
   }
   TrackerThreadLocalState *tl_state = get_tl_state();
   if (unlikely(!tl_state)) {
@@ -600,7 +574,7 @@ void AllocationTracker::notify_fork() {
              ddprof::gettid());
     return;
   }
-  tl_state->tid = 0;
+  tl_state->tid = ddprof::gettid();
 }
 
 } // namespace ddprof
