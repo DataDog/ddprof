@@ -99,7 +99,7 @@ inline DDRes write_location_blaze(
                        : mapinfo._sopath,
                    &ffi_location.function);
     ffi_location.address = ip;
-    ffi_location.line = blaze_sym->code_info.line;
+    ffi_location.line = inlined_fn->code_info.line;
     ++cur_loc;
   }
 
