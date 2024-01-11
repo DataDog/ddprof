@@ -45,6 +45,7 @@ struct LoggerContext {
   int facility{LF_USER};
   std::string name;
   std::optional<IntervalRateLimiter> rate_limiter;
+  LogsAllowedCallback logs_allowed_function;
 };
 
 LoggerContext log_ctx{.fd = -1, .mode = LOG_STDERR, .level = LL_ERROR};
@@ -149,10 +150,6 @@ void vlprintfln(int lvl, int fac, const char *name, const char *format,
   ssize_t sz_h = -1;
   int rc = 0;
 
-  if (log_ctx.rate_limiter && !log_ctx.rate_limiter->check()) {
-    return;
-  }
-
   // Special value handling
   if (lvl == -1) {
     lvl = log_ctx.level;
@@ -249,6 +246,16 @@ void lprintfln(int lvl, int fac, const char *name, const char *fmt, ...) {
   va_start(args, fmt);
   vlprintfln(lvl, fac, name, fmt, args);
   va_end(args);
+}
+
+void LOG_set_logs_allowed_function(LogsAllowedCallback logs_allowed_function) {
+  log_ctx.logs_allowed_function = std::move(logs_allowed_function);
+}
+
+bool LOG_is_logging_enabled_for_level(int level) {
+  return (level <= log_ctx.level) &&
+      (!log_ctx.logs_allowed_function || log_ctx.logs_allowed_function()) &&
+      (!log_ctx.rate_limiter || log_ctx.rate_limiter->check());
 }
 
 } // namespace ddprof
