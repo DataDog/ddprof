@@ -29,7 +29,6 @@ namespace ddprof {
 pthread_once_t AllocationTracker::_key_once = PTHREAD_ONCE_INIT;
 
 pthread_key_t AllocationTracker::_tl_state_key;
-ThreadEntries AllocationTracker::_thread_entries;
 
 AllocationTracker *AllocationTracker::_instance;
 
@@ -44,30 +43,19 @@ TrackerThreadLocalState *AllocationTracker::get_tl_state() {
 }
 
 TrackerThreadLocalState *AllocationTracker::init_tl_state() {
-  TrackerThreadLocalState *tl_state = nullptr;
-  int res_set = 0;
+  // Since init_tl_state is only called in allocation_tracking_init and
+  // notify_thread_start, there is no danger of reentering it when doing an
+  // allocation.
+  auto tl_state = std::make_unique<TrackerThreadLocalState>();
+  tl_state->tid = ddprof::gettid();
 
-  pid_t const tid = ddprof::gettid();
-  // As we allocate within this function, this can be called twice
-  TLReentryGuard const tl_reentry_guard(_thread_entries, tid);
-  if (!tl_reentry_guard) {
-#ifdef DEBUG
-    fprintf(stderr, "Unable to grab reentry guard %d \n", tid);
-#endif
-    return tl_state;
-  }
-
-  tl_state = new TrackerThreadLocalState();
-  res_set = pthread_setspecific(_tl_state_key, tl_state);
-  tl_state->tid = tid;
-
-  if (res_set) {
+  if (int res = pthread_setspecific(_tl_state_key, tl_state.get()); res != 0) {
     // should return 0
-    LOG_ONCE("Error: Unable to store tl_state. error %d \n", res_set);
-    delete tl_state;
-    tl_state = nullptr;
+    LOG_ONCE("Error: Unable to store tl_state. error %d \n", res);
+    tl_state.reset();
   }
-  return tl_state;
+
+  return tl_state.release();
 }
 
 AllocationTracker::AllocationTracker() = default;
@@ -601,7 +589,6 @@ void AllocationTracker::notify_thread_start() {
 }
 
 void AllocationTracker::notify_fork() {
-  _thread_entries.reset();
   if (_instance) {
     _instance->_state.pid = 0;
   }

@@ -146,8 +146,6 @@ private:
   // The creation of the instance depends on this
   static pthread_once_t _key_once; // ensures we call key creation a single time
   static pthread_key_t _tl_state_key;
-  // For Thread reentry guard of init_tl_state
-  static ThreadEntries _thread_entries;
 
   static AllocationTracker *_instance;
 };
