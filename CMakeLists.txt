@@ -222,6 +222,7 @@ set(DD_PROFILING_SOURCES
     src/lib/saveregisters.cc
     src/lib/symbol_overrides.cc
     src/logger.cc
+    src/logger_setup.cc
     src/perf.cc
     src/perf_clock.cc
     src/perf_ringbuffer.cc

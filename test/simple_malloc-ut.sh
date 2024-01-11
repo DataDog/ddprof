@@ -78,7 +78,7 @@ check_logs() {
             fi
         done
     else
-        if [ -f "${log_file}" ]; then
+        if [ -s "${log_file}" ]; then
             echo "Unexpected samples for $cmd"
             cat "${log_file}"
             exit 1

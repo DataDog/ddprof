@@ -109,6 +109,40 @@ void init_profiler_library_active() {
   }
 }
 
+std::string get_log_mode() {
+  auto *log_mode_env = g_state.getenv("DD_PROFILING_NATIVE_LIBRARY_LOG_MODE");
+
+  if (!log_mode_env) {
+    log_mode_env = g_state.getenv("DD_PROFILING_NATIVE_LOG_MODE");
+  }
+
+  return log_mode_env ? log_mode_env : "stderr";
+}
+
+std::string get_log_level() {
+  auto *log_level_env = g_state.getenv("DD_PROFILING_NATIVE_LIBRARY_LOG_LEVEL");
+
+  if (!log_level_env) {
+    log_level_env = g_state.getenv("DD_PROFILING_NATIVE_LOG_LEVEL");
+  }
+
+  return log_level_env ? log_level_env : "error";
+}
+
+void init_logger() {
+  auto log_level = get_log_level();
+  auto log_mode = get_log_mode();
+  setup_logger(log_mode.c_str(), log_level.c_str());
+
+  LOG_setname("ddprof-library");
+
+  // Disable logging when allocations are not allowed
+  LOG_set_logs_allowed_function([]() {
+    auto *tl_state = AllocationTracker::get_tl_state();
+    return !tl_state || tl_state->allocation_allowed;
+  });
+}
+
 void init_state() {
   if (g_state.initialized) {
     return;
@@ -119,6 +153,8 @@ void init_state() {
 
   auto *follow_execs_env = g_state.getenv(k_allocation_profiling_follow_execs);
   g_state.follow_execs = !(follow_execs_env && arg_no(follow_execs_env));
+
+  init_logger();
   g_state.initialized = true;
 }
 
