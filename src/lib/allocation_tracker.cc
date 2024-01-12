@@ -312,9 +312,7 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
 
   notify_needed = writer.commit(buffer);
 
-  if (now > _state.next_check_time.load(std::memory_order_acquire)) {
-    update_timer(now);
-  }
+  check_timer(now, tl_state);
 
   return {};
 }
@@ -351,9 +349,7 @@ DDRes AllocationTracker::push_clear_live_allocation(
     }
   }
 
-  if (now > _state.next_check_time.load(std::memory_order_acquire)) {
-    update_timer(now);
-  }
+  check_timer(now, tl_state);
 
   return {};
 }
@@ -402,9 +398,7 @@ DDRes AllocationTracker::push_dealloc_sample(
     }
   }
 
-  if (now > _state.next_check_time.load(std::memory_order_acquire)) {
-    update_timer(now);
-  }
+  check_timer(now, tl_state);
 
   return {};
 }
@@ -485,11 +479,17 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
     }
   }
 
-  if (now > _state.next_check_time.load(std::memory_order_acquire)) {
-    update_timer(now);
-  }
+  check_timer(now, tl_state);
 
   return {};
+}
+
+void AllocationTracker::check_timer(PerfClock::time_point now,
+                                    TrackerThreadLocalState &tl_state) {
+  if (tl_state.allocation_allowed &&
+      now > _state.next_check_time.load(std::memory_order_acquire)) {
+    update_timer(now);
+  }
 }
 
 void AllocationTracker::update_timer(PerfClock::time_point now) {

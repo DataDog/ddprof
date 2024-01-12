@@ -20,6 +20,11 @@ struct TrackerThreadLocalState {
                              // and double counting of allocations (eg. when new
                              // calls malloc, or malloc calls mmap internally)
 
+  bool allocation_allowed{true}; // Indicate if allocation is allowed or not
+                                 // (eg. when we are in mmap hook, we
+                                 // should not allocate because we might already
+                                 // be inside an allocation)
+
   // In the choice of random generators, this one is smaller
   // - smaller than mt19937 (8 vs 5K)
   std::minstd_rand gen{std::random_device{}()};
