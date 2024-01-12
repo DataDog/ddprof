@@ -99,11 +99,6 @@ DDRes AllocationTracker::allocation_tracking_init(
     DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW, "Allocation profiler already started");
   }
 
-  // force initialization of malloc wrappers if not done yet
-  // volatile prevents compiler from optimizing out calls to malloc/free
-  void *volatile p = ::malloc(1);
-  ::free(p);
-
   DDRES_CHECK_FWD(instance->init(allocation_profiling_rate,
                                  flags & kDeterministicSampling,
                                  flags & kTrackDeallocations, stack_sample_size,
