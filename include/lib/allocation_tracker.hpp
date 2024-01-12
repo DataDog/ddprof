@@ -85,7 +85,7 @@ private:
       track_deallocations = track_dealloc;
       lost_count = 0;
       failure_count = 0;
-      pid = 0;
+      pid = getpid();
     }
     std::mutex mutex;
     std::atomic<bool> track_allocations = false;
