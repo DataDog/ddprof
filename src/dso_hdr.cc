@@ -518,12 +518,18 @@ FileInfo DsoHdr::find_file_info(const Dso &dso) {
   //   or      /host/proc/<pid>/root/usr/local/bin/exe_file
   std::string const proc_path = _path_to_proc + "/proc/" +
       std::to_string(dso._pid) + "/root" + dso._filename;
-  if (get_file_inode(proc_path.c_str(), &inode, &size) && inode == dso._inode) {
+  if (get_file_inode(proc_path.c_str(), &inode, &size)) {
+    if (inode != dso._inode) {
+      LG_DBG("[DSO] inode mismatch for %s", proc_path.c_str());
+    }
     return {proc_path, size, inode};
   }
   // Try to find file in profiler mount namespace
-  if (get_file_inode(dso._filename.c_str(), &inode, &size) &&
-      inode == dso._inode) {
+  if (get_file_inode(dso._filename.c_str(), &inode, &size)) {
+    if (inode != dso._inode) {
+      // There are cases where binaries self modify
+      LG_DBG("[DSO] inode mismatch for %s", dso._filename.c_str());
+    }
     return {dso._filename, size, inode};
   }
 
