@@ -64,11 +64,15 @@ bool is_stack_complete(UnwindState *us) {
                    root_func) != s_expected_root_frames.end();
 }
 
-void find_dso_add_error_frame(UnwindState *us) {
-  DsoHdr::DsoFindRes const find_res =
-      us->dso_hdr.dso_find_closest(us->pid, us->current_ip);
-  add_error_frame(find_res.second ? &(find_res.first->second) : nullptr, us,
-                  us->current_ip);
+void find_dso_add_error_frame(DDRes ddres, UnwindState *us) {
+  if (ddres._what == DD_WHAT_UW_MAX_PIDS) {
+    add_common_frame(us, SymbolErrors::max_pids);
+  } else {
+    DsoHdr::DsoFindRes const find_res =
+        us->dso_hdr.dso_find_closest(us->pid, us->current_ip);
+    add_error_frame(find_res.second ? &(find_res.first->second) : nullptr, us,
+                    us->current_ip);
+  }
 }
 
 void add_container_id(UnwindState *us) {
@@ -99,17 +103,14 @@ DDRes unwindstate_unwind(UnwindState *us) {
     res = unwind_dwfl(us);
   }
   if (IsDDResNotOK(res)) {
-    find_dso_add_error_frame(us);
-  }
-
-  if (!is_stack_complete(us)) {
+    find_dso_add_error_frame(res, us);
+  } else if (!is_stack_complete(us)) {
     us->output.is_incomplete = true;
     ddprof_stats_add(STATS_UNWIND_INCOMPLETE_STACK, 1, nullptr);
     // Only add [incomplete] virtual frame if stack is not already truncated !
     if (!is_max_stack_depth_reached(*us)) {
       add_common_frame(us, SymbolErrors::incomplete_stack);
     }
-
   } else {
     us->output.is_incomplete = false;
   }

@@ -61,7 +61,8 @@ struct DwflWrapper {
 
 class DwflHdr {
 public:
-  DwflWrapper &get_or_insert(pid_t pid);
+  // checks against maximum number of PIDs
+  DwflWrapper *get_or_insert(pid_t pid);
   std::vector<pid_t> get_unvisited() const;
   void reset_unvisited();
   void clear_pid(pid_t pid);

@@ -47,16 +47,19 @@ DDRes DwflWrapper::attach(pid_t pid, const Dwfl_Thread_Callbacks *callbacks,
   return {};
 }
 
-DwflWrapper &DwflHdr::get_or_insert(pid_t pid) {
+DwflWrapper *DwflHdr::get_or_insert(pid_t pid) {
   _visited_pid.insert(pid);
   auto it = _dwfl_map.find(pid);
   if (it == _dwfl_map.end()) {
+    if (_dwfl_map.size() >= kMaxProfiledPids) {
+      return nullptr;
+    }
     // insert new dwfl for this pid
     auto pair = _dwfl_map.emplace(pid, DwflWrapper());
     assert(pair.second); // expect insertion to be OK
-    return pair.first->second;
+    return &pair.first->second;
   }
-  return it->second;
+  return &it->second;
 }
 
 DDProfMod *DwflWrapper::unsafe_get(FileInfoId_t file_info_id) {

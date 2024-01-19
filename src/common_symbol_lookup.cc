@@ -19,6 +19,8 @@ Symbol symbol_from_common(SymbolErrors lookup_case) {
     return {std::string(), std::string("[incomplete]"), 0, std::string()};
   case SymbolErrors::lost_event:
     return {std::string(), std::string("[lost]"), 0, std::string()};
+  case SymbolErrors::max_pids:
+    return {std::string(), std::string("[maximum pids]"), 0, std::string()};
   default:
     break;
   }
