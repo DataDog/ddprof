@@ -228,7 +228,7 @@ DDRes ddprof_unwind_sample(DDProfContext &ctx, perf_event_sample *sample,
     ddprof_stats_add(STATS_UNWIND_TRUNCATED_INPUT, 1, nullptr);
   }
 
-  if (us->_dwfl_wrapper->_inconsistent) {
+  if (us->_dwfl_wrapper && us->_dwfl_wrapper->_inconsistent) {
     // Loaded modules were inconsistent, assume we should flush everything.
     LG_WRN("(Inconsistent DWFL/DSOs)%d - Free associated objects", us->pid);
     DDRES_CHECK_FWD(worker_pid_free(ctx, us->pid));

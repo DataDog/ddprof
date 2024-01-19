@@ -12,6 +12,7 @@ enum SymbolErrors {
   unknown_dso,
   dwfl_frame,
   incomplete_stack,
+  max_pids,
   lost_event,
 };
 

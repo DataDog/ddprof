@@ -252,7 +252,10 @@ DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
 
 DDRes unwind_init_dwfl(UnwindState *us) {
   // Create or get the dwfl object associated to cache
-  us->_dwfl_wrapper = &(us->dwfl_hdr.get_or_insert(us->pid));
+  us->_dwfl_wrapper = us->dwfl_hdr.get_or_insert(us->pid);
+  if (!us->_dwfl_wrapper) {
+    return ddres_warn(DD_WHAT_UW_MAX_PIDS);
+  }
   if (!us->_dwfl_wrapper->_attached) {
     // we need to add at least one module to figure out the architecture (to
     // create the unwinding backend)
@@ -267,7 +270,7 @@ DDRes unwind_init_dwfl(UnwindState *us) {
     // Find an elf file we can load for this PID
     for (auto it = map.cbegin(); it != map.cend(); ++it) {
       const Dso &dso = it->second;
-      if (dso.is_executable()) {
+      if (dso.is_executable() && dso._type == DsoType::kStandard) {
         FileInfoId_t const file_info_id =
             us->dso_hdr.get_or_insert_file_info(dso);
         if (file_info_id <= k_file_info_error) {
