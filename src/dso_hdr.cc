@@ -404,6 +404,15 @@ DsoHdr::DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid,
   return dso_find_or_backpopulate(pid_mapping, pid, addr);
 }
 
+bool DsoHdr::pid_free(int pid, PerfClock::time_point timestamp) {
+  const auto &pid_mapping = _pid_map[pid];
+  if (timestamp < pid_mapping._backpopulate_state.last_backpopulate_time) {
+    return false;
+  }
+  pid_free(pid);
+  return true;
+}
+
 void DsoHdr::pid_free(int pid) { _pid_map.erase(pid); }
 
 bool DsoHdr::pid_backpopulate(pid_t pid, int &nb_elts_added) {

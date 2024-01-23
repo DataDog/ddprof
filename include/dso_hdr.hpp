@@ -118,6 +118,7 @@ public:
   bool maybe_insert_erase_overlap(Dso &&dso, PerfClock::time_point timestamp);
 
   // Clear all dsos and regions associated with this pid
+  bool pid_free(int pid, PerfClock::time_point timestamp);
   void pid_free(int pid);
 
   // Duplicate mapping info from parent_pid into pid
