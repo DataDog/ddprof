@@ -24,12 +24,11 @@ inline uint32_t elf_flags_to_prot(Elf64_Word flags) {
 struct Segment {
   ElfAddress_t addr;
   Offset_t offset;
-  uint64_t alignment;
   uint32_t prot;
 };
 
 struct Mapping {
-  ElfAddress_t addr;
+  ProcessAddress_t addr;
   Offset_t offset;
   uint32_t prot;
 };

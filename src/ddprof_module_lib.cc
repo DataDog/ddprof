@@ -9,6 +9,7 @@
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "logger.hpp"
+#include "perf.hpp"
 #include "unique_fd.hpp"
 
 #include <algorithm>
@@ -19,6 +20,10 @@
 #include <unistd.h>
 
 namespace ddprof {
+
+namespace {
+const uint64_t k_page_size = getpagesize();
+}
 
 std::vector<Mapping> get_mappings(const DsoHdr::DsoConstRange &dso_range,
                                   bool keep_only_executable_mappings) {
@@ -69,8 +74,8 @@ DDRes get_elf_load_segments(int fd, const std::string &filepath,
       }
       if (ph->p_type == PT_LOAD &&
           (!keep_only_executable_segments || (ph->p_flags & PF_X))) {
-        segments.push_back(Segment{ph->p_vaddr, ph->p_offset, ph->p_align,
-                                   elf_flags_to_prot(ph->p_flags)});
+        segments.push_back(
+            Segment{ph->p_vaddr, ph->p_offset, elf_flags_to_prot(ph->p_flags)});
       }
     }
     break;
@@ -85,7 +90,7 @@ DDRes get_elf_load_segments(int fd, const std::string &filepath,
 
 namespace {
 /** Find segment that matches mapping among segments.
- * If several segments match, return {firs_matching_segment, true}
+ * If several segments match, return {first_matching_segment, true}
  * If no segment matches, return {nullptr, false}
  * If one segment matches, return {segment, false}
  */
@@ -95,7 +100,7 @@ find_matching_segment(std::span<const Segment> segments,
   const Segment *matching_segment = nullptr;
 
   for (const Segment &segment : segments) {
-    const auto aligned_offset = segment.offset & ~(segment.alignment - 1);
+    const auto aligned_offset = segment.offset & ~(k_page_size - 1);
     if (mapping.prot == segment.prot && mapping.offset == aligned_offset) {
       if (matching_segment) {
         // multiple matching segments
@@ -115,9 +120,8 @@ DDRes compute_elf_bias(int fd, const std::string &filepath,
   // a way that we receive only executable mmap events).
   // The matching is done by comparing mapping offset with aligned file offset
   // (file offset may not be aligned, in particular with lld, but
-  // when segment is mmapped, mmap offset needs to be page aligned, file offset
-  // is rounded down to satisfy segment p_align alignment) and memory
-  // protection of segment.
+  // when segment is mmapped, mmap offset needs to be page aligned, hence file
+  // offset is rounded down to page alignment) and memory protection of segment.
   // Several segments can have the same aligned offsets and protections though,
   // thus making the matching ambiguous.
   // Any mapping can be used for matching, but some mappings might be missing
@@ -151,7 +155,7 @@ DDRes compute_elf_bias(int fd, const std::string &filepath,
     return ddres_error(DD_WHAT_AMBIGUOUS_LOAD_SEGMENT);
   }
   if (!match_result.load_segment || !match_result.mapping) {
-    LG_WRN("Not matching LOAD segment found in %s", filepath.c_str());
+    LG_WRN("No matching LOAD segment found in %s", filepath.c_str());
     return ddres_error(DD_WHAT_NO_MATCHING_LOAD_SEGMENT);
   }
 
