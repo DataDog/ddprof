@@ -191,6 +191,8 @@ public:
 
   PidMapping &get_pid_mapping(pid_t pid) { return _pid_map[pid]; }
 
+  bool checkInvariants() const;
+
 private:
   // erase range of elements
   static void erase_range(DsoMap &map, DsoRange range, const Dso &new_mapping);

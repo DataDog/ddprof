@@ -228,7 +228,8 @@ void DsoHdr::erase_range(DsoMap &map, DsoRange range, const Dso &new_mapping) {
       auto node_handle = map.extract(last);
       node_handle.mapped().adjust_start(new_mapping._end + 1);
       node_handle.key() = last_mapping._start;
-      map.insert(std::move(node_handle));
+      auto res = map.insert(std::move(node_handle));
+      assert(res.inserted);
       --range.second;
     }
   }
@@ -371,7 +372,9 @@ DsoHdr::DsoFindRes DsoHdr::insert_erase_overlap(PidMapping &pid_mapping,
   _stats.incr_metric(DsoStats::kNewDso, dso._type);
   LG_DBG("[DSO] : Insert %s", dso.to_string().c_str());
   // warning rvalue : do not use dso after this line
-  return map.insert({dso._start, std::move(dso)});
+  auto r = map.insert({dso._start, std::move(dso)});
+  assert(checkInvariants());
+  return r;
 }
 
 DsoHdr::DsoFindRes DsoHdr::insert_erase_overlap(Dso &&dso) {
@@ -573,6 +576,31 @@ void DsoHdr::pid_fork(pid_t pid, pid_t parent_pid) {
   for (const auto &mapping : pid_mapping_it->second._map) {
     new_pid_mapping._map[mapping.first] = Dso{mapping.second, pid};
   }
+}
+
+bool DsoHdr::checkInvariants() const {
+  for (const auto &[pid, pid_mapping] : _pid_map) {
+    ProcessAddress_t previous_end = 0;
+
+    for (const auto &[start, dso] : pid_mapping._map) {
+      if (dso._pid != pid) {
+        LG_ERR("[DSO] Invariant error: dso pid %d != pid %d", dso._pid, pid);
+        return false;
+      }
+      if (start != dso._start) {
+        LG_ERR("[DSO] Invariant error: start %lx != dso start %lx", start,
+               dso._start);
+        return false;
+      }
+      if (previous_end >= dso._start) {
+        LG_ERR("[DSO] Invariant error: previous end %lx >= dso start %lx",
+               previous_end, dso._start);
+        return false;
+      }
+      previous_end = dso._end;
+    }
+  }
+  return true;
 }
 
 } // namespace ddprof
