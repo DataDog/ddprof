@@ -136,8 +136,7 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
 
       if (!IsDDResOK(res)) {
         int nb_elts_added = 0;
-        if (!retry && res._what == DD_WHAT_AMBIGUOUS_LOAD_SEGMENT &&
-            dsoHdr.pid_backpopulate(us->pid, nb_elts_added) &&
+        if (!retry && dsoHdr.pid_backpopulate(us->pid, nb_elts_added) &&
             nb_elts_added > 0) {
           // ambiguous LOAD segments detected, retry after backpopulate
           retry = true;
@@ -259,38 +258,55 @@ DDRes unwind_init_dwfl(UnwindState *us) {
   if (!us->_dwfl_wrapper->_attached) {
     // we need to add at least one module to figure out the architecture (to
     // create the unwinding backend)
-
+    bool backpopulate_attempt = false;
     DsoHdr::DsoMap const &map = us->dso_hdr.get_pid_mapping(us->pid)._map;
     if (map.empty()) {
       int nb_elts;
       us->dso_hdr.pid_backpopulate(us->pid, nb_elts);
+      backpopulate_attempt = true;
     }
-
     bool success = false;
-    // Find an elf file we can load for this PID
-    for (auto it = map.cbegin(); it != map.cend(); ++it) {
-      const Dso &dso = it->second;
-      if (dso.is_executable() && dso._type == DsoType::kStandard) {
-        FileInfoId_t const file_info_id =
-            us->dso_hdr.get_or_insert_file_info(dso);
-        if (file_info_id <= k_file_info_error) {
-          LG_DBG("Unable to find file for DSO %s", dso.to_string().c_str());
-          continue;
-        }
-        const FileInfoValue &file_info_value =
-            us->dso_hdr.get_file_info_value(file_info_id);
+    bool retry = false;
+    do {
+      // Find an elf file we can load for this PID
+      for (auto it = map.cbegin(); it != map.cend(); ++it) {
+        const Dso &dso = it->second;
+        if (dso.is_executable() && dso._type == DsoType::kStandard) {
+          FileInfoId_t const file_info_id =
+              us->dso_hdr.get_or_insert_file_info(dso);
+          if (file_info_id <= k_file_info_error) {
+            LG_DBG("Unable to find file for DSO %s", dso.to_string().c_str());
+            continue;
+          }
+          const FileInfoValue &file_info_value =
+              us->dso_hdr.get_file_info_value(file_info_id);
 
-        DDProfMod *ddprof_mod = nullptr;
-        auto res = us->_dwfl_wrapper->register_mod(
-            us->current_ip, DsoHdr::get_elf_range(map, it), file_info_value,
-            &ddprof_mod);
-        if (IsDDResOK(res)) {
-          // one success is fine
-          success = true;
-          break;
+          DDProfMod *ddprof_mod = nullptr;
+          auto res = us->_dwfl_wrapper->register_mod(
+              us->current_ip, DsoHdr::get_elf_range(map, it), file_info_value,
+              &ddprof_mod);
+          if (IsDDResOK(res)) {
+            // one success is fine
+            success = true;
+            break;
+          } else if (!backpopulate_attempt) {
+            file_info_value.reset_errored();
+            // We could choose to break here to force a backpopulate faster
+          }
         }
       }
-    }
+      // retry after a backpopulate if we failed on the first attempt
+      if (!backpopulate_attempt && !success) {
+        backpopulate_attempt = true;
+        // if we failed to register a module, try to backpopulate
+        int nb_elts_added = 0;
+        if (us->dso_hdr.pid_backpopulate(us->pid, nb_elts_added) &&
+            nb_elts_added > 0) {
+          retry = true;
+        }
+      }
+    } while (retry);
+
     if (!success) {
       LG_DBG("Unable to attach a mod for PID%d", us->pid);
       return ddres_warn(DD_WHAT_UW_ERROR);
