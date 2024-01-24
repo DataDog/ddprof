@@ -9,7 +9,7 @@
 
 namespace ddprof {
 Segment segment(Offset_t offset, uint32_t prot = PROT_EXEC | PROT_READ) {
-  return {.addr = 0, .offset = offset, .alignment = 0x1000, .prot = prot};
+  return {.addr = 0, .offset = offset, .prot = prot};
 }
 
 Mapping mapping(Offset_t offset, uint32_t prot = PROT_EXEC | PROT_READ) {
