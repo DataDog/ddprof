@@ -8,7 +8,9 @@
 #include "ddres_def.hpp"
 #include "ddres_list.hpp"
 #include "logger.hpp"
+#include "unlikely.hpp"
 
+#include <cstdlib>
 #include <cstring>
 #include <system_error>
 
@@ -132,5 +134,44 @@ inline int ddres_sev_to_log_level(int sev) {
       return ddres_error(what);                                                \
     }                                                                          \
   } while (0)
+
+// ccpcheck does not support __VA_OPT__ so we need to use gcc/clang specific
+// workaround ##__VA_ARGS__.
+// cppcheck 2.14 will support __VA_OPT__ (cf.
+// https://github.com/danmar/simplecpp/pull/329) so we can remove this
+// workaround once it is released. \fixme{nsavoire}
+#define DDPROF_CHECK_FATAL_IMPL(condition, condition_text, text, ...)          \
+  do {                                                                         \
+    if (unlikely(!(condition))) {                                              \
+      LG_IF_LVL_OK(LL_CRITICAL, "Check failed: `%s`. " text, condition_text,   \
+                   ##__VA_ARGS__);                                             \
+      std::abort();                                                            \
+    }                                                                          \
+  } while (0)
+
+#ifndef NDEBUG
+#  define DDPROF_DCHECK_FATAL_IMPL(condition, condition_text, text, ...)       \
+    do {                                                                       \
+      if (unlikely(!(condition))) {                                            \
+        LG_IF_LVL_OK(LL_CRITICAL, "Check failed: `%s`. " text, condition_text, \
+                     ##__VA_ARGS__);                                           \
+        std::abort();                                                          \
+      }                                                                        \
+    } while (0)
+#else
+#  define DDPROF_DCHECK_FATAL_IMPL(condition, condition_text, text, ...)       \
+    do {                                                                       \
+    } while (0)
+#endif
+
+// Fatal assertion check that terminates the program with a fatal error if
+// `condition` is not true.
+#define DDPROF_CHECK_FATAL(condition, ...)                                     \
+  DDPROF_CHECK_FATAL_IMPL(condition, #condition, __VA_ARGS__)
+
+// `DDPROF_DCHECK_FATAL` behaves like `DDPROF_CHECK_FATAL` in debug mode but
+// does nothing otherwise (if NDEBUG is defined)
+#define DDPROF_DCHECK_FATAL(condition, ...)                                    \
+  DDPROF_DCHECK_FATAL_IMPL(condition, #condition, __VA_ARGS__)
 
 } // namespace ddprof
