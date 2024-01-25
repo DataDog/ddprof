@@ -28,9 +28,9 @@ void trace_unwinding_end(UnwindState *us) {
   if (LL_DEBUG <= LOG_getlevel()) {
     DsoHdr::DsoFindRes const find_res =
         us->dso_hdr.dso_find_closest(us->pid, us->current_ip);
-    SymbolIdx_t const symIdx =
-        us->output.locs[us->output.locs.size() - 1]._symbol_idx;
-    if (find_res.second) {
+    if (find_res.second && !us->output.locs.empty()) {
+      SymbolIdx_t const symIdx =
+          us->output.locs[us->output.locs.size() - 1]._symbol_idx;
       const std::string &last_func =
           us->symbol_hdr._symbol_table[symIdx]._symname;
       LG_DBG("Stopped at %lx - dso %s - error %s (%s)", us->current_ip,
