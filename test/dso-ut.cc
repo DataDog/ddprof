@@ -557,7 +557,7 @@ TEST(DSOTest, elf_load) {
     ASSERT_EQ(it3->second, dso1_right);
   }
 
-  // map 2rd segment
+  // map 3rd segment
   const Dso dso3{
       5, 0x4000, 0x4fff, 0x2000, "libfoo.so.1", 0, PROT_READ | PROT_WRITE};
   dso_hdr.insert_erase_overlap(Dso{dso3});

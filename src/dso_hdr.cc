@@ -566,4 +566,32 @@ void DsoHdr::pid_fork(pid_t pid, pid_t parent_pid) {
   }
 }
 
+bool DsoHdr::checkInvariants() const {
+  for (const auto &[pid, pid_mapping] : _pid_map) {
+    const Dso *previous_dso = nullptr;
+
+    for (const auto &[start, dso] : pid_mapping._map) {
+      if (dso._pid != pid) {
+        LG_ERR("[DSO] Invariant error: dso pid %d != pid %d for dso: %s",
+               dso._pid, pid, dso.to_string().c_str());
+        return false;
+      }
+      if (start != dso._start) {
+        LG_ERR("[DSO] Invariant error: start %lx != dso start %lx for dso: %s",
+               start, dso._start, dso.to_string().c_str());
+        return false;
+      }
+      if (previous_dso && previous_dso->end() >= dso._start) {
+        LG_ERR("[DSO] Invariant error: previous end %lx >= dso start %lx for "
+               "previous dso: %s and dso: %s",
+               previous_dso->end(), dso._start,
+               previous_dso->to_string().c_str(), dso.to_string().c_str());
+        return false;
+      }
+      previous_dso = &dso;
+    }
+  }
+  return true;
+}
+
 } // namespace ddprof
