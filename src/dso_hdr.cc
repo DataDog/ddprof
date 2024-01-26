@@ -57,6 +57,11 @@ UniqueFile open_proc_maps(int pid, const char *path_to_proc = "") {
   }
   return f;
 }
+
+bool is_intersection_allowed(const Dso &old_so, const Dso &new_dso) {
+  return old_so.is_same_file(new_dso) ||
+      (old_so._type == DsoType::kStandard && new_dso._type == DsoType::kAnon);
+}
 } // namespace
 
 /***************/
@@ -210,10 +215,10 @@ void DsoHdr::erase_range(DsoMap &map, DsoRange range, const Dso &new_mapping) {
   // between memsize and file size and then map an anonymous mapping over the
   // part not in the file.
   if (auto &last_mapping = last->second;
-      (new_mapping.end() < last_mapping.end())) {
+      (new_mapping.end() < last_mapping.end()) &&
+      is_intersection_allowed(last_mapping, new_mapping)) {
 
-    if (new_mapping._start > last_mapping._start &&
-        last_mapping.is_same_file(new_mapping)) {
+    if (new_mapping._start > last_mapping._start) {
       // New mapping fully inside the initial mapping:
       // split the initial mapping in two if mapped file is the same.
       Dso right_part{last_mapping};
@@ -223,9 +228,7 @@ void DsoHdr::erase_range(DsoMap &map, DsoRange range, const Dso &new_mapping) {
       return; // nothing more to do since there is a single overlapping mapping
     }
 
-    if (new_mapping._start <= last_mapping._start &&
-        (last_mapping.is_same_file(new_mapping) ||
-         last_mapping._type == DsoType::kAnon)) {
+    if (new_mapping._start <= last_mapping._start) {
       // New mapping truncates the start of the last mapping:
       // update start of last mapping
 
@@ -252,8 +255,8 @@ void DsoHdr::erase_range(DsoMap &map, DsoRange range, const Dso &new_mapping) {
   }
 
   auto &first_mapping = range.first->second;
-  if (first_mapping.is_same_file(new_mapping) &&
-      new_mapping._start > first_mapping._start) {
+  if ((new_mapping._start > first_mapping._start) &&
+      is_intersection_allowed(first_mapping, new_mapping)) {
     // Truncate first mapping if files match:
     // elf loader / dlopen first map the whole file and then remap segments
     // inside the first mapping
