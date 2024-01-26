@@ -52,7 +52,7 @@ bool is_infinite_loop(UnwindState *us) {
   for (unsigned i = 1; i < nb_frames_to_check; ++i) {
     FunLoc const &n_minus_one_loc = output.locs[nb_locs - i];
     FunLoc const &n_minus_two_loc = output.locs[nb_locs - i - 1];
-    if (n_minus_one_loc.ip != n_minus_two_loc.ip) {
+    if (n_minus_one_loc.elf_addr != n_minus_two_loc.elf_addr) {
       return false;
     }
   }
@@ -220,7 +220,7 @@ DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
           unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso);
   MapInfoIdx_t const map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
       us->pid, us->symbol_hdr._mapinfo_table, dso, ddprof_mod._build_id);
-  return add_frame(symbol_idx, map_idx, pc, us);
+  return add_frame(symbol_idx, map_idx, pc - ddprof_mod._sym_bias, us);
 }
 
 // check for runtime symbols provided in /tmp files

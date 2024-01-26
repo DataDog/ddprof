@@ -17,10 +17,9 @@
 namespace ddprof {
 
 struct FunLoc {
-  uint64_t ip; // Relative to file, not VMA
+  ElfAddress_t elf_addr;
   SymbolIdx_t _symbol_idx;
   MapInfoIdx_t _map_info_idx;
-
   friend auto operator<=>(const FunLoc &, const FunLoc &) = default;
 };
 

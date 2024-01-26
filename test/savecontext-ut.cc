@@ -111,7 +111,7 @@ TEST(getcontext, unwind_from_sighandler) {
   for (size_t iloc = 0; iloc < state.output.locs.size(); ++iloc) {
     auto &symbol = symbol_table[state.output.locs[iloc]._symbol_idx];
     printf("%zu: %s %lx \n", iloc, symbol._demangle_name.c_str(),
-           state.output.locs[iloc].ip);
+           state.output.locs[iloc].elf_addr);
   }
   auto get_symbol = [&](int idx) {
     return symbol_table[state.output.locs[idx]._symbol_idx];
