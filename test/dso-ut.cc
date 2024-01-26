@@ -619,4 +619,29 @@ TEST(DSOTest, elf_load) {
   }
 }
 
+TEST(DSOTest, elf_load_single_segment) {
+  DsoHdr dso_hdr;
+  const Dso dso1{5, 0x1000, 0x5fff, 0, "libfoo.so.1", 0, PROT_READ};
+  // map whole file
+  dso_hdr.insert_erase_overlap(Dso{dso1});
+
+  // anonymous mapping at the end
+  const Dso dso2{5, 0x5000, 0x5fff};
+  dso_hdr.insert_erase_overlap(Dso{dso2});
+
+  ASSERT_EQ(dso_hdr.get_nb_dso(), 2);
+  {
+    auto [it1, found1] = dso_hdr.dso_find_closest(5, 0x4fff);
+    ASSERT_TRUE(found1);
+    ASSERT_EQ(it1->first, 0x1000);
+    ASSERT_TRUE(dso1.is_same_or_smaller(it1->second));
+    ASSERT_EQ(it1->second.end(), 0x4fff);
+
+    auto [it2, found2] = dso_hdr.dso_find_closest(5, 0x5000);
+    ASSERT_TRUE(found2);
+    ASSERT_EQ(it2->first, 0x5000);
+    ASSERT_EQ(it2->second, dso2);
+  }
+}
+
 } // namespace ddprof
