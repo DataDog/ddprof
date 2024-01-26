@@ -262,7 +262,6 @@ if(BUILD_UNIVERSAL_DDPROF)
     target_link_options(
       dd_profiling-embedded PRIVATE
       "-Wl,-f,libpthread.so.0;-Wl,-f,libm.so.6;-Wl,-f,libdl.so.2;-Wl,-f,librt.so.1")
-    target_compile_definitions(dd_profiling-embedded PRIVATE DDPROF_MISSING_FSTAT)
   endif()
 endif()
 
