@@ -247,6 +247,7 @@ target_include_directories(dd_profiling-embedded PUBLIC ${CMAKE_SOURCE_DIR}/incl
                                                         ${CMAKE_SOURCE_DIR}/include)
 set_target_properties(dd_profiling-embedded
                       PROPERTIES PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
+target_compile_definitions(dd_profiling-embedded PRIVATE DDPROF_PROFILING_LIBRARY)
 
 # Link libstdc++/libgcc statically and export only profiler API
 target_static_libcxx(dd_profiling-embedded)
@@ -356,7 +357,8 @@ add_dependencies(ddprof_exe_object generate_ddprof_object)
 
 add_library(dd_profiling-static STATIC ${DD_PROFILING_SOURCES})
 set_target_properties(dd_profiling-static PROPERTIES OUTPUT_NAME dd_profiling)
-target_compile_definitions(dd_profiling-static PRIVATE DDPROF_EMBEDDED_EXE_DATA)
+target_compile_definitions(dd_profiling-static PRIVATE DDPROF_EMBEDDED_EXE_DATA
+                                                       DDPROF_PROFILING_LIBRARY)
 target_include_directories(dd_profiling-static PUBLIC ${CMAKE_SOURCE_DIR}/include/lib
                                                       ${CMAKE_SOURCE_DIR}/include)
 set_target_properties(dd_profiling-static
@@ -371,14 +373,16 @@ if(USE_LOADER)
                                          src/lib/loader.c)
   target_link_libraries(dd_profiling-shared PRIVATE libddprofiling_embedded_object
                                                     ddprof_exe_object)
-  target_compile_definitions(dd_profiling-shared PRIVATE DDPROF_EMBEDDED_LIB_DATA
-                                                         DDPROF_EMBEDDED_EXE_DATA)
+  target_compile_definitions(
+    dd_profiling-shared PRIVATE DDPROF_EMBEDDED_LIB_DATA DDPROF_EMBEDDED_EXE_DATA
+                                DDPROF_PROFILING_LIBRARY)
 else()
   # Without loader, libdd_profiling.so is basically the same as libdd_profiling-embedded.so plus an
   # embedded ddprof executable.
   add_library(dd_profiling-shared SHARED ${DD_PROFILING_SOURCES} src/lib/lib_embedded_data.c)
   target_link_libraries(dd_profiling-shared PRIVATE ddprof_exe_object)
-  target_compile_definitions(dd_profiling-shared PRIVATE DDPROF_EMBEDDED_EXE_DATA)
+  target_compile_definitions(dd_profiling-shared PRIVATE DDPROF_EMBEDDED_EXE_DATA
+                                                         DDPROF_PROFILING_LIBRARY)
 
   # Fix for link error in sanitizeddebug build mode with gcc:
   # ~~~
