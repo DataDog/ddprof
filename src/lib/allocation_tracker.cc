@@ -50,7 +50,8 @@ TrackerThreadLocalState *AllocationTracker::init_tl_state() {
   tl_state->tid = ddprof::gettid();
   tl_state->stack_bounds = retrieve_stack_bounds();
 
-  if (int res = pthread_setspecific(_tl_state_key, tl_state.get()); res != 0) {
+  if (int const res = pthread_setspecific(_tl_state_key, tl_state.get());
+      res != 0) {
     // should return 0
     LG_ERR("Unable to store tl_state. Error %d: %s\n", res, strerror(res));
     tl_state.reset();
@@ -302,6 +303,9 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
   event->header.type = PERF_RECORD_LOST;
   auto now = PerfClock::now();
   event->sample_id.time = now.time_since_epoch().count();
+
+  DDPROF_DCHECK_FATAL(_state.pid != 0 && tl_state.tid != 0,
+                      "pid or tid is not set");
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
 
@@ -335,6 +339,9 @@ DDRes AllocationTracker::push_clear_live_allocation(
   event->hdr.type = PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION;
   auto now = PerfClock::now();
   event->sample_id.time = now.time_since_epoch().count();
+
+  DDPROF_DCHECK_FATAL(_state.pid != 0 && tl_state.tid != 0,
+                      "pid or tid is not set");
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
 
@@ -381,6 +388,9 @@ DDRes AllocationTracker::push_dealloc_sample(
   event->hdr.type = PERF_CUSTOM_EVENT_DEALLOCATION;
   auto now = PerfClock::now();
   event->sample_id.time = now.time_since_epoch().count();
+
+  DDPROF_DCHECK_FATAL(_state.pid != 0 && tl_state.tid != 0,
+                      "pid or tid is not set");
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
 
@@ -461,6 +471,9 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   auto now = PerfClock::now();
   event->sample_id.time = now.time_since_epoch().count();
   event->addr = addr;
+
+  DDPROF_DCHECK_FATAL(_state.pid != 0 && tl_state.tid != 0,
+                      "pid or tid is not set");
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
   event->period = allocated_size;
