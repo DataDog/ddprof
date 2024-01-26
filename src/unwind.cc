@@ -123,16 +123,17 @@ DDRes unwindstate_unwind(UnwindState *us) {
   return res;
 }
 
-void unwind_pid_free(UnwindState *us, pid_t pid,
+bool unwind_pid_free(UnwindState *us, pid_t pid,
                      PerfClock::time_point timestamp) {
   if (!(us->dso_hdr.pid_free(pid, timestamp))) {
     LG_DBG("(PID Free)%d -> avoid free of mappings (%ld)", pid,
            timestamp.time_since_epoch().count());
-  } else {
-    us->dwfl_hdr.clear_pid(pid);
-    us->symbol_hdr.clear(pid);
-    us->process_hdr.clear(pid);
+    return false;
   }
+  us->dwfl_hdr.clear_pid(pid);
+  us->symbol_hdr.clear(pid);
+  us->process_hdr.clear(pid);
+  return true;
 }
 
 void unwind_cycle(UnwindState *us) {

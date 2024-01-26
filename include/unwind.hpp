@@ -28,7 +28,7 @@ DDRes unwindstate_unwind(UnwindState *us);
 void unwind_cycle(UnwindState *us);
 
 // Clear unwinding structures of this pid
-void unwind_pid_free(UnwindState *us, pid_t pid,
+bool unwind_pid_free(UnwindState *us, pid_t pid,
                      PerfClock::time_point timestamp);
 
 } // namespace ddprof
