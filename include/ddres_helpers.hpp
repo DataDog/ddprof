@@ -164,10 +164,17 @@ inline int ddres_sev_to_log_level(int sev) {
     } while (0)
 #endif
 
+#ifndef DDPROF_PROFILING_LIBRARY
 // Fatal assertion check that terminates the program with a fatal error if
 // `condition` is not true.
-#define DDPROF_CHECK_FATAL(condition, ...)                                     \
-  DDPROF_CHECK_FATAL_IMPL(condition, #condition, __VA_ARGS__)
+#  define DDPROF_CHECK_FATAL(condition, ...)                                   \
+    DDPROF_CHECK_FATAL_IMPL(condition, #condition, __VA_ARGS__)
+#else
+// DDPROF_CHECK_FATAL must not be used inside profiling library
+#  define DDPROF_CHECK_FATAL(condition, ...)                                   \
+    static_assert(                                                             \
+        false, "DDPROF_CHECK_FATAL must not be used inside profiling library")
+#endif
 
 // `DDPROF_DCHECK_FATAL` behaves like `DDPROF_CHECK_FATAL` in debug mode but
 // does nothing otherwise (if NDEBUG is defined)
