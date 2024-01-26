@@ -371,7 +371,11 @@ DsoHdr::DsoFindRes DsoHdr::insert_erase_overlap(PidMapping &pid_mapping,
   _stats.incr_metric(DsoStats::kNewDso, dso._type);
   LG_DBG("[DSO] : Insert %s", dso.to_string().c_str());
   // warning rvalue : do not use dso after this line
-  return map.insert({dso._start, std::move(dso)});
+  auto r = map.insert({dso._start, std::move(dso)});
+
+  // only check in debug mode
+  DDPROF_DCHECK_FATAL(checkInvariants(), "DsoHdr invariant violation");
+  return r;
 }
 
 DsoHdr::DsoFindRes DsoHdr::insert_erase_overlap(Dso &&dso) {
