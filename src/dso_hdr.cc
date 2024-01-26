@@ -202,14 +202,15 @@ void DsoHdr::erase_range(DsoMap &map, DsoRange range, const Dso &new_mapping) {
     return;
   }
   auto last = std::prev(range.second);
-  auto &last_mapping = last->second;
+
   // Truncate last mapping if files match or new mapping is anonymous:
   // a LOAD segment can have filesize < memsize as a size optimization when
   // the end of segment is all zeros (eg. bss). In that case elf loader /
   // dlopen will map the whole file + some extra space to cover the difference
   // between memsize and file size and then map an anonymous mapping over the
   // part not in the file.
-  if (new_mapping.end() < last_mapping.end()) {
+  if (auto &last_mapping = last->second;
+      (new_mapping.end() < last_mapping.end())) {
 
     if (new_mapping._start > last_mapping._start &&
         last_mapping.is_same_file(new_mapping)) {
@@ -219,22 +220,35 @@ void DsoHdr::erase_range(DsoMap &map, DsoRange range, const Dso &new_mapping) {
       right_part.adjust_start(new_mapping.end() + 1);
       map[right_part.start()] = std::move(right_part);
       last_mapping.adjust_end(new_mapping._start - 1);
-      --range.second;
-    } else if (new_mapping._start <= last_mapping._start &&
-               (last_mapping.is_same_file(new_mapping) ||
-                last_mapping._type == DsoType::kAnon)) {
-      // New mapping truncates the start of the initial mapping:
-      // update start of initial mapping
+      return; // nothing more to do since there is a single overlapping mapping
+    }
+
+    if (new_mapping._start <= last_mapping._start &&
+        (last_mapping.is_same_file(new_mapping) ||
+         last_mapping._type == DsoType::kAnon)) {
+      // New mapping truncates the start of the last mapping:
+      // update start of last mapping
+
+      const bool only_one_mapping = range.first == last;
       auto node_handle = map.extract(last);
-      node_handle.mapped().adjust_start(new_mapping._end + 1);
-      node_handle.key() = last_mapping._start;
-      map.insert(std::move(node_handle));
+      auto new_start = new_mapping._end + 1;
+      node_handle.mapped().adjust_start(new_start);
+      node_handle.key() = new_start;
+      auto res = map.insert(std::move(node_handle));
+      DDPROF_CHECK_FATAL(res.inserted,
+                         "Invariant violation: overlapping mappings detected. "
+                         "New Dso = %s, existing Dso = %s",
+                         res.node.mapped().to_string().c_str(),
+                         map[res.node.key()].to_string().c_str());
+
+      // map::extract might invalidate range.first if last == first, so we
+      // return early
+      if (only_one_mapping) {
+        return; // nothing more to do
+      }
+      // else skip last mapping that has been updated and continue
       --range.second;
     }
-  }
-
-  if (range.first == range.second) {
-    return;
   }
 
   auto &first_mapping = range.first->second;
