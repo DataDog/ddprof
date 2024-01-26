@@ -247,83 +247,78 @@ DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
 
   return add_frame(symbol_idx, map_idx, pc, us);
 }
+
+bool try_attach_module(UnwindState *us, const DsoHdr::DsoMap &map,
+                       bool backpopulate_done) {
+  bool success = false;
+  for (auto it = map.cbegin(); it != map.cend(); ++it) {
+    const Dso &dso = it->second;
+    if (!dso.is_executable() || dso._type != DsoType::kStandard) {
+      continue;
+    }
+    const FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
+    if (file_info_id <= k_file_info_error) {
+      LG_DBG("Unable to find file for DSO %s", dso.to_string().c_str());
+      continue;
+    }
+    const FileInfoValue &file_info_value =
+        us->dso_hdr.get_file_info_value(file_info_id);
+    DDProfMod *ddprof_mod = nullptr;
+    auto res = us->_dwfl_wrapper->register_mod(us->current_ip,
+                                               DsoHdr::get_elf_range(map, it),
+                                               file_info_value, &ddprof_mod);
+    if (IsDDResOK(res)) {
+      success = true;
+      break;
+    }
+    if (!backpopulate_done) {
+      // we have a chance after the next backpopulate to succeed in registering
+      file_info_value.reset_errored();
+    }
+  }
+  return success;
+}
 } // namespace
 
 DDRes unwind_init_dwfl(UnwindState *us) {
-  // Create or get the dwfl object associated to cache
   us->_dwfl_wrapper = us->dwfl_hdr.get_or_insert(us->pid);
   if (!us->_dwfl_wrapper) {
     return ddres_warn(DD_WHAT_UW_MAX_PIDS);
   }
-  if (!us->_dwfl_wrapper->_attached) {
-    // we need to add at least one module to figure out the architecture (to
-    // create the unwinding backend)
-    bool backpopulate_attempt = false;
-    DsoHdr::DsoMap const &map = us->dso_hdr.get_pid_mapping(us->pid)._map;
-    if (map.empty()) {
-      int nb_elts;
-      us->dso_hdr.pid_backpopulate(us->pid, nb_elts);
-      backpopulate_attempt = true;
-    }
-    bool success = false;
-    bool retry = false;
-    do {
-      // Find an elf file we can load for this PID
-      for (auto it = map.cbegin(); it != map.cend(); ++it) {
-        const Dso &dso = it->second;
-        if (dso.is_executable() && dso._type == DsoType::kStandard) {
-          FileInfoId_t const file_info_id =
-              us->dso_hdr.get_or_insert_file_info(dso);
-          if (file_info_id <= k_file_info_error) {
-            LG_DBG("Unable to find file for DSO %s", dso.to_string().c_str());
-            continue;
-          }
-          const FileInfoValue &file_info_value =
-              us->dso_hdr.get_file_info_value(file_info_id);
-
-          DDProfMod *ddprof_mod = nullptr;
-          auto res = us->_dwfl_wrapper->register_mod(
-              us->current_ip, DsoHdr::get_elf_range(map, it), file_info_value,
-              &ddprof_mod);
-          if (IsDDResOK(res)) {
-            // one success is fine
-            success = true;
-            break;
-          } else if (!backpopulate_attempt) {
-            file_info_value.reset_errored();
-            // We could choose to break here to force a backpopulate faster
-          }
-        }
-      }
-      // retry after a backpopulate if we failed on the first attempt
-      if (!backpopulate_attempt && !success) {
-        backpopulate_attempt = true;
-        // if we failed to register a module, try to backpopulate
-        int nb_elts_added = 0;
-        if (us->dso_hdr.pid_backpopulate(us->pid, nb_elts_added) &&
-            nb_elts_added > 0) {
-          retry = true;
-        }
-      }
-    } while (retry);
-
-    if (!success) {
-      LG_DBG("Unable to attach a mod for PID%d", us->pid);
-      return ddres_warn(DD_WHAT_UW_ERROR);
-    }
-
-    static const Dwfl_Thread_Callbacks dwfl_callbacks = {
-        .next_thread = next_thread,
-        .get_thread = nullptr,
-        .memory_read = memory_read_dwfl,
-        .set_initial_registers = set_initial_registers,
-        .detach = nullptr,
-        .thread_detach = nullptr,
-    };
-    // Creates the dwfl unwinding backend
-    return us->_dwfl_wrapper->attach(us->pid, &dwfl_callbacks, us);
+  if (us->_dwfl_wrapper->_attached) {
+    return {};
   }
-  return {};
+  bool backpopulate_done = false;
+  DsoHdr::DsoMap const &map = us->dso_hdr.get_pid_mapping(us->pid)._map;
+  if (map.empty()) {
+    int nb_elts;
+    us->dso_hdr.pid_backpopulate(us->pid, nb_elts);
+    backpopulate_done = true;
+  }
+
+  bool success = try_attach_module(us, map, backpopulate_done);
+  if (!success && !backpopulate_done) {
+    int nb_elts_added;
+    if (us->dso_hdr.pid_backpopulate(us->pid, nb_elts_added) &&
+        nb_elts_added > 0) {
+      success = try_attach_module(us, map, true);
+    }
+  }
+
+  if (!success) {
+    LG_DBG("Unable to attach a mod for PID%d", us->pid);
+    return ddres_warn(DD_WHAT_UW_ERROR);
+  }
+
+  static const Dwfl_Thread_Callbacks dwfl_callbacks = {
+      .next_thread = next_thread,
+      .get_thread = nullptr,
+      .memory_read = memory_read_dwfl,
+      .set_initial_registers = set_initial_registers,
+      .detach = nullptr,
+      .thread_detach = nullptr,
+  };
+  return us->_dwfl_wrapper->attach(us->pid, &dwfl_callbacks, us);
 }
 
 DDRes unwind_dwfl(UnwindState *us) {
