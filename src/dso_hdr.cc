@@ -555,14 +555,24 @@ void DsoHdr::reset_backpopulate_state(int reset_threshold) {
   }
 }
 
-void DsoHdr::pid_fork(pid_t pid, pid_t parent_pid) {
-  auto pid_mapping_it = _pid_map.find(parent_pid);
-  if (pid_mapping_it == _pid_map.end()) {
+void DsoHdr::pid_fork(pid_t child_pid, pid_t parent_pid) {
+  auto parent_pid_mapping_it = _pid_map.find(parent_pid);
+  if (parent_pid_mapping_it == _pid_map.end()) {
     return;
   }
-  auto &new_pid_mapping = _pid_map[pid];
-  for (const auto &mapping : pid_mapping_it->second._map) {
-    new_pid_mapping._map[mapping.first] = Dso{mapping.second, pid};
+
+  auto pid_map_it = _pid_map.find(child_pid);
+  if (pid_map_it != _pid_map.end()) {
+    LG_WRN("pid_fork called for child pid %d, but pid %d already has mappings",
+           child_pid, child_pid);
+    // pid already exists, do nothing, it may already have been backpopulated
+    return;
+  }
+
+  // copy parent pid mappings, changing only pid
+  auto &new_pid_mapping = _pid_map[child_pid];
+  for (const auto &mapping : parent_pid_mapping_it->second._map) {
+    new_pid_mapping._map[mapping.first] = Dso{mapping.second, child_pid};
   }
 }
 
