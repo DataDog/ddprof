@@ -327,4 +327,84 @@ DDRes unwind_dwfl(UnwindState *us) {
   return res;
 }
 
+std::tuple<bool, DDProfMod*, const Dso*, FileInfoId_t> findAndPopulateDso(DsoHdr &dsoHdr, DsoHdr::PidMapping &pid_mapping, Dwarf_Addr pc, UnwindState *us) {
+  bool retry;
+  DsoHdr::DsoFindRes find_res;
+  DDProfMod *ddprof_mod = nullptr;
+
+  do {
+    retry = false;
+    find_res = dsoHdr.dso_find_or_backpopulate(pid_mapping, us->pid, pc);
+    if (!find_res.second) {
+      return {false, nullptr, nullptr, k_file_info_error}; // DSO not found
+    }
+
+    const Dso &dso = find_res.first->second;
+    FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
+    if (file_info_id <= k_file_info_error) {
+      return {false, nullptr, nullptr, k_file_info_error}; // Unable to access file
+    }
+
+    const FileInfoValue &file_info_value = us->dso_hdr.get_file_info_value(file_info_id);
+    ddprof_mod = us->_dwfl_wrapper->unsafe_get(file_info_id);
+    if (!ddprof_mod) {
+      auto dsoRange = DsoHdr::get_elf_range(pid_mapping._map, find_res.first);
+      auto res = us->_dwfl_wrapper->register_mod(pc, dsoRange, file_info_value, &ddprof_mod);
+
+      if (!IsDDResOK(res)) {
+        int nb_elts_added = 0;
+        if (res._what == DD_WHAT_AMBIGUOUS_LOAD_SEGMENT &&
+            dsoHdr.pid_backpopulate(us->pid, nb_elts_added) &&
+            nb_elts_added > 0) {
+          retry = true;
+          file_info_value.reset_errored();
+        } else {
+          return {false, nullptr, nullptr, k_file_info_error}; // Unwinding error
+        }
+      }
+    }
+  } while (retry);
+
+  return {true, ddprof_mod, &find_res.first->second, k_file_info_error}; // Successfully found DSO and module
+}
+
+DDRes unwind_symbolize_only(UnwindState *us, stacktrace_event &event) {
+  // todo some kind of init
+  us->output.clear();
+  us->pid = event.pid;
+  DDRES_CHECK_FWD(unwind_init_dwfl(us));
+  DsoHdr &dso_hdr = us->dso_hdr;
+  DsoHdr::PidMapping &pid_mapping = dso_hdr.get_pid_mapping(us->pid);
+  for (int i = 0; i < event.ustack_sz; ++i) {
+    ProcessAddress_t pc = event.ustack[i];
+    if (!pc) {
+      break;
+    }
+    auto [found, ddprof_mod, dso, file_info_id] = findAndPopulateDso(dso_hdr, pid_mapping, pc, us);
+    if (!found) {
+      // fp leads to bad uw
+      break;
+    }
+    std::string_view jitdump_path = {};
+    if (has_runtime_symbols(dso->_type)) {
+      if (pid_mapping._jitdump_addr) {
+        DsoHdr::DsoFindRes const find_mapping = DsoHdr::dso_find_closest(
+            pid_mapping._map, pid_mapping._jitdump_addr);
+        if (find_mapping.second) { // jitdump exists
+          jitdump_path = find_mapping.first->second._filename;
+        }
+      }
+      return add_runtime_symbol_frame(us, *dso, pc, jitdump_path);
+    }
+
+    if (IsDDResNotOK(add_dwfl_frame(us, *dso, pc, *ddprof_mod, file_info_id))) {
+      return ddres_warn(DD_WHAT_UW_ERROR);
+    }
+  }
+
+  add_virtual_comm_frame(us,
+                         event.comm);
+  return {};
+}
+
 } // namespace ddprof

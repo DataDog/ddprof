@@ -22,6 +22,7 @@
 #include "unwind.hpp"
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
+#include "unwind_dwfl.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -786,4 +787,37 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
   CatchExcept2DDRes();
   return {};
 }
+
+DDRes ddprof_worker_process_bpf_events(DDProfContext &ctx) {
+
+  // todo think about watcher pos
+  int watcher_pos = 0;
+  PerfWatcher *watcher = &ctx.watchers[watcher_pos];
+
+  stacktrace_event event;
+  UnwindState *us = ctx.worker_ctx.us;
+  while (ctx.worker_ctx._bpf_events._events.pop(event)) {
+    //
+    DDRES_CHECK_FWD(unwind_symbolize_only(ctx.worker_ctx.us, event));
+    uint64_t const sample_val = static_cast<uint64_t>(watcher->sample_period);
+    // in lib mode we don't aggregate (protect to avoid link failures)
+    int const i_export = ctx.worker_ctx.i_current_pprof;
+    DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
+    // We want to emit 0 for the time unless timeline is specified, and if
+    // it is, we also want to adjust the source to be in the system_time
+    // frame
+    uint64_t timestamp = 0;
+    const DDProfValuePack pack{static_cast<int64_t>(sample_val), 1, timestamp};
+    DDRES_CHECK_FWD(pprof_aggregate(&ctx.worker_ctx.us->output,
+                                    ctx.worker_ctx.us->symbol_hdr, pack,
+                                    watcher, kSumPos, pprof));
+    if (ctx.params.show_samples) {
+      ddprof_print_sample(us->output, us->symbol_hdr, sample_val, kSumPos,
+                          *watcher);
+    }
+    ddprof_stats_add(STATS_SAMPLE_COUNT, 1, nullptr);
+  }
+  return {};
+}
+
 } // namespace ddprof

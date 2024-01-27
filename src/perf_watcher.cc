@@ -247,7 +247,7 @@ std::string_view watcher_help_text() {
 "Please note that this documentation is currently under construction. We recommend the use of presets.\n"
 "Not all options may be fully supported within the Datadog UI at present, and the described grammar is subject to change.\n"
 "Exercise caution and double-check your configurations before implementation.\n";
-  // clang-format on
+// clang-format on
   return help_text;
 }
 

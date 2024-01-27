@@ -24,6 +24,43 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
+//#define EBPF_UNWINDING
+#ifdef EBPF_UNWINDING
+extern "C" {
+#  include "bpf/sample_processor.h"
+#  include "sample_processor.skel.h"
+#  include <bpf/bpf.h>
+#  include <bpf/libbpf.h>
+}
+
+// todo move me in relevant place
+/* Receive events from the ring buffer. */
+static int event_handler(void *_ctx, void *data, size_t size) {
+  stacktrace_event *event = reinterpret_cast<stacktrace_event *>(data);
+#ifdef DEBUG
+  fprintf(stderr, "Event[%d] -- COMM:%s, CPU=%d\n",
+          event->pid,
+          event->comm,
+          event->cpu_id);
+#endif
+  if (event->kstack_sz <= 0 && event->ustack_sz <= 0) {
+    fprintf(stderr, "error in bpf handler %d \n", __LINE__);
+    return 1;
+  }
+
+  if (_ctx) {
+    ddprof::BPFEvents *bpf_events = reinterpret_cast<ddprof::BPFEvents*>(_ctx);
+
+    if (bpf_events->_events.try_push(*event)) {
+#ifdef DEBUG
+      fprintf(stderr, "Success pushing bpf event \n");
+#endif
+    }
+  }
+  return 0;
+}
+#endif
+
 namespace ddprof {
 
 namespace {
@@ -37,6 +74,14 @@ DDRes pevent_create(PEventHdr *pevent_hdr, int watcher_idx,
   *pevent_idx = pevent_hdr->size++;
   pevent_hdr->pes[*pevent_idx].watcher_pos = watcher_idx;
   return {};
+}
+
+void pevent_bpf_create(PEventHdr *pevent_hdr,
+                       int watcher_pos,
+                       int fd){
+  pevent_hdr->bpf_pes.push_back({.watcher_pos = watcher_pos,
+                                 .fd = fd, .link = nullptr});
+  return;
 }
 
 void display_system_config() {
@@ -164,6 +209,39 @@ int pevent_compute_min_mmap_order(int min_buffer_size_order,
   return ret_order;
 }
 
+DDRes pevent_open_bpf(DDProfContext &ctx, pid_t pid, int num_cpu,
+                      PEventHdr *pevent_hdr) {
+  assert(pevent_hdr->size == 0); // check for previous init
+  for (unsigned watcher_idx = 0; watcher_idx < ctx.watchers.size();
+       ++watcher_idx) {
+    PerfWatcher *watcher = &ctx.watchers[watcher_idx];
+    if (watcher->type >= kDDPROF_TYPE_CUSTOM
+        || watcher->type == PERF_COUNT_SW_DUMMY) {
+      // dummy or allocation events should not be managed with bpf
+      continue;
+    }
+    perf_event_attr attr = perf_bpf_config(watcher, false,
+                                           ctx.perf_clock_source);
+    // used the fixed attr for the others
+    for (int cpu_idx = 0; cpu_idx < num_cpu; ++cpu_idx) {
+      int const fd = perf_event_open(&attr, pid, cpu_idx, -1, PERF_FLAG_FD_CLOEXEC);
+      LG_DBG("Create BPF perf event with fd = %d", fd);
+      if (fd == -1) {
+        DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
+                               "Error (BPF flow) calling perf_event_open on watcher %u.%d (%s)",
+                               watcher_idx,
+                               cpu_idx,
+                               strerror(errno));
+      }
+      pevent_bpf_create(pevent_hdr, watcher_idx, fd);
+    }
+    // Copy the successful config
+    pevent_hdr->attrs[pevent_hdr->nb_attrs] = attr;
+    ++pevent_hdr->nb_attrs;
+  }
+  return {};
+}
+
 DDRes pevent_open(DDProfContext &ctx, pid_t pid, int num_cpu,
                   PEventHdr *pevent_hdr) {
   assert(pevent_hdr->size == 0); // check for previous init
@@ -208,6 +286,27 @@ DDRes pevent_mmap_event(PEvent *event) {
   return {};
 }
 
+
+DDRes pevent_link_bpf(PEventHdr *pevent_hdr) {
+#ifdef EBPF_UNWINDING
+  // mmaps using ebpf
+  assert(pevent_hdr->sample_processor);
+  auto *skel = pevent_hdr->sample_processor;
+  auto defer_munmap = make_defer([&] { pevent_munmap(pevent_hdr); });
+
+  for (size_t k = 0; k < pevent_hdr->bpf_pes.size(); ++k) {
+    pevent_hdr->bpf_pes[k].link =
+        bpf_program__attach_perf_event(skel->progs.process_sample, pevent_hdr->bpf_pes[k].fd);
+    if (!pevent_hdr->bpf_pes[k].link) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
+                             "Unable to link bpf program (%lu)", k);
+    }
+  }
+  defer_munmap.release();
+#endif
+  return {};
+}
+
 DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
   // Switch user if needed (when root switch to nobody user)
   // Pinned memory is accounted by the kernel by (real) uid across containers
@@ -238,14 +337,63 @@ DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
   return {};
 }
 
+#ifdef EBPF_UNWINDING
+static DDRes pevent_load_bpf(DDProfContext &ctx,
+                             PEventHdr *pevent_hdr) {
+  // we could chose to have separate maps ?
+  sample_processor_bpf *skel = sample_processor_bpf__open_and_load();
+  if (skel) {
+    LG_DBG("Using sample_processor_bpf to capture events");
+    pevent_hdr->sample_processor = skel;
+      pevent_hdr->bpf_ring_buf = ring_buffer__new(bpf_map__fd(skel->maps.events),
+                                              event_handler,
+                                              reinterpret_cast<void *>(&ctx.worker_ctx._bpf_events),
+                                              NULL);
+    if (!pevent_hdr->bpf_ring_buf) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
+                             "error when allocating ring buffer");
+
+    }
+    return {};
+  } else {
+    LG_DBG("Not able to load sample_processor_bpf");
+  }
+  // No error here
+  DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
+                         "error when loading bpf program");
+}
+#endif
+
 DDRes pevent_setup(DDProfContext &ctx, pid_t pid, int num_cpu,
                    PEventHdr *pevent_hdr) {
-  DDRES_CHECK_FWD(pevent_open(ctx, pid, num_cpu, pevent_hdr));
-  if (!IsDDResOK(pevent_mmap(pevent_hdr, true))) {
-    LG_NTC("Retrying attachment without user override");
+#ifdef EBPF_UNWINDING
+  // attempt to load bpf program
+  if(IsDDResOK(pevent_load_bpf(ctx, pevent_hdr))) {
+    LG_DBG("Success loading BPF program");
+    DDRES_CHECK_FWD(pevent_open_bpf(ctx, pid, num_cpu, pevent_hdr));
+    // bpf links first to know which we should mmap
+    DDRES_CHECK_FWD(pevent_link_bpf(pevent_hdr));
+    // slightly hacky addition of dummy
+    // todo fix bug with allocation profiler (reorder watchers earlier)
+    const PerfWatcher *dummy_watcher = ewatcher_from_str("sDUM");
+    ctx.watchers.push_back(*dummy_watcher);
+    DDRES_CHECK_FWD(pevent_open_all_cpus(
+        &(ctx.watchers.back()),
+        static_cast<int>(ctx.watchers.size() - 1),
+        pid, num_cpu,
+        ctx.perf_clock_source, pevent_hdr));
+    // mmap only the relevant configs
     DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, false));
+  } else
+#endif
+  {
+    // non ebpf flow
+    DDRES_CHECK_FWD(pevent_open(ctx, pid, num_cpu, pevent_hdr));
+    if (!IsDDResOK(pevent_mmap(pevent_hdr, true))) {
+      LG_NTC("Retrying attachment without user override");
+      DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, false));
+    }
   }
-
   return {};
 }
 
@@ -287,6 +435,15 @@ DDRes pevent_munmap(PEventHdr *pevent_hdr) {
     }
   }
 
+#ifdef EBPF_UNWINDING
+  for (size_t k = 0; k < pevent_hdr->bpf_pes.size(); ++k) {
+    if (pevent_hdr->bpf_pes[k].link) {
+        bpf_link__destroy(pevent_hdr->bpf_pes[k].link);
+        // TODO: check if this effectively closes the fd ?
+        pes[k].fd = -1;
+    }
+  }
+#endif
   return res;
 }
 
@@ -341,6 +498,14 @@ DDRes pevent_cleanup(PEventHdr *pevent_hdr) {
   if (DDRes const ret_tmp = pevent_close(pevent_hdr); !IsDDResOK((ret_tmp))) {
     ret = ret_tmp;
   }
+#ifdef EBPF_UNWINDING
+  if (pevent_hdr->sample_processor) {
+    sample_processor_bpf__destroy(pevent_hdr->sample_processor);
+  }
+  if (pevent_hdr->bpf_ring_buf) {
+    ring_buffer__free(pevent_hdr->bpf_ring_buf);
+  }
+#endif
   return ret;
 }
-} // namespace ddprof
+}

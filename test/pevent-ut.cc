@@ -16,7 +16,9 @@
 namespace ddprof {
 
 void mock_ddprof_context(DDProfContext *ctx) {
+
   ctx->watchers.push_back(*ewatcher_from_str("sCPU"));
+
 }
 
 TEST(PeventTest, setup_cleanup) {

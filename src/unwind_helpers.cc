@@ -74,6 +74,12 @@ void add_virtual_base_frame(UnwindState *us) {
           us->symbol_hdr._dso_symbol_lookup, us->dso_hdr));
 }
 
+void add_virtual_comm_frame(UnwindState *us, const char *comm) {
+  add_frame_without_mapping(
+      us,
+      us->symbol_hdr._base_frame_symbol_lookup.get_or_insert_comm(comm,us->symbol_hdr._symbol_table));
+}
+
 // read a word from the given stack
 bool memory_read(ProcessAddress_t addr, ElfWord_t *result, int regno,
                  void *arg) {

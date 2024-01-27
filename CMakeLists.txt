@@ -29,6 +29,7 @@ add_link_options("LINKER:--build-id=sha1")
 # Define the include path of cmake scripts
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/util")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/third_party")
 
 include(ExtendBuildTypes)
 
@@ -86,15 +87,48 @@ find_package(absl REQUIRED)
 # libdatadog_profiling
 include(Findlibdatadog)
 
+# ---- Static analysis ----
+include(ClangTidy)
+include(Format)
+
+# Third parties
+add_subdirectory(third_party)
+
+# todo remove hardcode
+set(BPFOBJECT_CLANG_EXE "clang-17")
+
+# Path to the bpftool executable
+set(BPFOBJECT_BPFTOOL_EXE ${CMAKE_CURRENT_BINARY_DIR}/third_party/bpftool/bootstrap/bpftool)
+
+set(LIBBPF_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}/third_party/libbpf)
+set(LIBBPF_LIBRARIES ${CMAKE_CURRENT_BINARY_DIR}/third_party/libbpf/libbpf.a)
+
+# Path where vmlinux.h will be generated
+set(BPFOBJECT_VMLINUX_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/vmlinux/${ARCH})
+set(BPFOBJECT_VMLINUX_H ${BPFOBJECT_VMLINUX_DIR}/vmlinux.h)
+
+# Ensure the target directory exists
+file(MAKE_DIRECTORY ${BPFOBJECT_VMLINUX_DIR})
+
+# Custom command to generate vmlinux.h
+add_custom_command(
+  OUTPUT ${BPFOBJECT_VMLINUX_H}
+  COMMAND ${BPFOBJECT_BPFTOOL_EXE} btf dump file /sys/kernel/btf/vmlinux format c >
+          ${BPFOBJECT_VMLINUX_H}
+  DEPENDS ${BPFOBJECT_BPFTOOL_EXE} ${BPFOBJECT_VMLINUX_DIR}
+  COMMENT "Generating vmlinux.h")
+add_custom_target(generate_vmlinux_h ALL DEPENDS ${BPFOBJECT_VMLINUX_H} bpftool-build libbpf-build)
+
+find_package(BpfObject REQUIRED)
+
+# bpf
+add_subdirectory(src/bpf)
+
 # Event Parser
 add_subdirectory(src/event_parser)
 
 # elfutils
 include(Findelfutils)
-
-# ---- Static analysis ----
-include(ClangTidy)
-include(Format)
 
 # Generated code needs to be available for cppcheck to work
 include(CppcheckConfig)
@@ -112,9 +146,6 @@ endif()
 # Install lib cap to retrieve capabilities
 include(Findlibcap)
 
-# Third parties
-add_subdirectory(third_party)
-
 # ---- Benchmarks ----
 option(BUILD_BENCHMARKS "Enable benchmarks" OFF)
 if(${BUILD_BENCHMARKS})
@@ -124,7 +155,7 @@ endif()
 # ---- Declaration of DDProf ----
 # Compile time definitions
 string(TOLOWER ${CMAKE_PROJECT_NAME} CMAKE_PROJECT_NAME_LC)
-list(APPEND DDPROF_DEFINITION_LIST "MYNAME=\"${CMAKE_PROJECT_NAME_LC}\"")
+list(APPEND DDPROF_DEFINITION_LIST "MYNAME=\"${CMAKE_PROJECT_NAME_LC}\"" "EBPF_UNWINDING")
 
 if("${CMAKE_BUILD_TYPE}" STREQUAL "Release" OR "${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
   list(APPEND DDPROF_DEFINITION_LIST "DDPROF_OPTIM=1")
@@ -136,7 +167,7 @@ include(Version)
 string(APPEND CMAKE_C_FLAGS " ${FRAME_PTR_FLAG}")
 string(APPEND CMAKE_CXX_FLAGS " ${FRAME_PTR_FLAG}")
 
-list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include)
+list(APPEND DDPROF_INCLUDE_LIST ${CMAKE_SOURCE_DIR}/include ${BPFOBJECT_VMLINUX_DIR})
 
 # Find the source files
 aux_source_directory(src COMMON_SRC)
@@ -243,6 +274,7 @@ target_include_directories(dd_profiling-embedded PUBLIC ${CMAKE_SOURCE_DIR}/incl
                                                         ${CMAKE_SOURCE_DIR}/include)
 set_target_properties(dd_profiling-embedded
                       PROPERTIES PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
+# TODO: does EBPF make sense in embedded mode ?
 
 # Link libstdc++/libgcc statically and export only profiler API
 target_static_libcxx(dd_profiling-embedded)
@@ -302,8 +334,10 @@ add_exe(
   ddprof ${DDPROF_GLOBAL_SRC}
   LIBRARIES ${DDPROF_LIBRARY_LIST}
   DEFINITIONS ${DDPROF_DEFINITION_LIST})
+add_dependencies(ddprof sample_processor_skel_build)
 target_link_libraries(ddprof PRIVATE libddprofiling_embedded_object CLI11 absl::base
-                                     absl::str_format)
+                                     absl::str_format sample_processor_skel)
+
 if(USE_LOADER)
   target_compile_definitions(ddprof PRIVATE "DDPROF_USE_LOADER")
   target_link_libraries(ddprof PRIVATE libdd_loader_object)

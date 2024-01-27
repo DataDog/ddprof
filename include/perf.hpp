@@ -25,7 +25,7 @@ inline constexpr int k_default_buffer_size_shift{6};
 inline constexpr int k_mpsc_buffer_size_shift{8};
 
 // sample frequency check
-inline constexpr std::chrono::milliseconds k_sample_default_wakeup{100};
+inline constexpr std::chrono::milliseconds k_sample_default_wakeup{10};
 
 struct read_format {
   uint64_t value;        // The value of the event
@@ -146,6 +146,14 @@ int perfdisown(void *region, size_t size);
 long get_page_size();
 size_t get_mask_from_size(size_t size);
 const char *perf_type_str(int type_id);
+
+std::vector<perf_event_attr> bpf_config_from_watcher(const PerfWatcher *watcher,
+                                                     bool extras,
+                                                     PerfClockSource perf_clock_source);
+
+perf_event_attr perf_bpf_config(const PerfWatcher *watcher,
+                                bool extras,
+                                PerfClockSource perf_clock_source);
 
 std::vector<perf_event_attr>
 all_perf_configs_from_watcher(const PerfWatcher *watcher, bool extras,
