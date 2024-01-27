@@ -20,7 +20,8 @@
 
 namespace ddprof {
 // todo : cut this dependency
-DwflSymbolLookup::DwflSymbolLookup() : _lookup_setting(K_CACHE_ON) {}
+DwflSymbolLookup::DwflSymbolLookup(bool inlining)
+    : _lookup_setting(K_CACHE_ON) {}
 
 // Mock
 int get_nb_hw_thread() { return 2; }

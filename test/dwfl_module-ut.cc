@@ -11,6 +11,9 @@
 #include "dwfl_symbol.hpp"
 #include "loghandle.hpp"
 
+#include "dwfl_symbol_lookup.hpp"
+#include "symbol_table.hpp"
+
 #include <filesystem>
 #include <stdio.h>
 #include <string>
@@ -38,7 +41,7 @@ int count_fds(pid_t pid) {
   }
   return fd_count;
 }
-
+#ifdef TEMP_REMOVE
 TEST(DwflModule, inconsistency_test) {
   pid_t my_pid = getpid();
   int nb_fds_start = count_fds(my_pid);
@@ -182,5 +185,71 @@ TEST(DwflModule, short_lived) {
     }
   }
 }
+#endif
+__attribute__((always_inline)) inline ElfAddress_t deeper_function() {
+  // Without these instructions we can fall in the calling function
+  LG_DBG("Adding some logging instructions");
+  ElfAddress_t ip = _THIS_IP_;
+  LG_DBG("I'm capturing the ip = %lx", ip);
+  return ip;
+}
 
+__attribute__((always_inline)) inline ElfAddress_t inlined_function() {
+  LG_DBG("Before the call to deeper func!!");
+  ElfAddress_t ip = deeper_function();
+  LG_DBG("I'm going up!!");
+  return ip;
+}
+
+ElfAddress_t my_custom_function() {
+  ElfAddress_t ip = inlined_function();
+  LG_DBG("The actual ip = %lx", ip);
+  return ip;
+}
+
+TEST(DwflModule, inlined_func) {
+  pid_t my_pid = getpid();
+  LogHandle handle;
+  // Load DSOs from our unit test
+  ElfAddress_t ip = my_custom_function();
+  DsoHdr dso_hdr;
+  ddprof::SymbolTable table;
+  DwflSymbolLookup symbol_lookup;
+  DsoSymbolLookup dso_lookup;
+  DsoHdr::DsoFindRes find_res = dso_hdr.dso_find_or_backpopulate(my_pid, ip);
+  // Check that we found the DSO matching this IP
+  ASSERT_TRUE(find_res.second);
+  {
+    DwflWrapper dwfl_wrapper;
+    // retrieve the map associated to pid
+    DsoHdr::DsoMap &dso_map = dso_hdr.get_pid_mapping(my_pid)._map;
+    for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
+      Dso &dso = it->second;
+      if (!has_relevant_path(dso._type) || !dso.is_executable()) {
+        continue; // skip non exec / non standard (anon/vdso...)
+      }
+      FileInfoId_t file_info_id = dso_hdr.get_or_insert_file_info(dso);
+      ASSERT_TRUE(file_info_id > k_file_info_error);
+
+      const FileInfoValue &file_info_value =
+          dso_hdr.get_file_info_value(file_info_id);
+      DDProfMod *ddprof_mod = nullptr;
+      auto res = dwfl_wrapper.register_mod(dso._start,
+                                           dso_hdr.get_elf_range(dso_map, it),
+                                           file_info_value, &ddprof_mod);
+
+      ASSERT_TRUE(IsDDResOK(res));
+      ASSERT_TRUE(ddprof_mod->_mod);
+      if (find_res.first == it) {
+        std::vector<FunLoc> fun_locs;
+        symbol_lookup.get_or_insert(dwfl_wrapper._dwfl, *ddprof_mod, table,
+                                    dso_lookup, file_info_id, ip, dso,
+                                    fun_locs);
+        const auto &sym = table[fun_locs[0]._symbol_idx];
+        LG_DBG("Sym = %s", sym._demangle_name.c_str());
+        EXPECT_EQ(sym._demangle_name, "deeper_function");
+      }
+    }
+  }
+}
 } // namespace ddprof

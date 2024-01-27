@@ -39,8 +39,8 @@ struct UnwindRegisters {
 /// Single structure with everything necessary in unwinding. The structure is
 /// given through callbacks
 struct UnwindState {
-  explicit UnwindState(int dd_profiling_fd = -1)
-      : dso_hdr("", dd_profiling_fd) {
+  explicit UnwindState(int dd_profiling_fd = -1, bool inlining = true)
+      : dso_hdr("", dd_profiling_fd), symbol_hdr("", inlining) {
     output.clear();
     output.locs.reserve(kMaxStackDepth);
   }

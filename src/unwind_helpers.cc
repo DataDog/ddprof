@@ -25,6 +25,27 @@ bool is_max_stack_depth_reached(const UnwindState &us) {
   return us.output.locs.size() + 2 >= kMaxStackDepth;
 }
 
+DDRes add_frame(const std::vector<FunLoc> &fun_locs, UnwindState *us) {
+  for (auto const &el : fun_locs) {
+    UnwindOutput *output = &us->output;
+    if (output->locs.size() >= kMaxStackDepth) {
+      DDRES_RETURN_WARN_LOG(DD_WHAT_UW_MAX_DEPTH,
+                            "Max stack depth reached"); // avoid overflow
+    }
+    output->locs.push_back(el);
+  }
+  return {};
+}
+
+DDRes add_frame(std::vector<SymbolIdx_t> symbol_indices, MapInfoIdx_t map_idx,
+                ElfAddress_t pc, UnwindState *us) {
+
+  for (auto const el : symbol_indices) {
+    DDRES_CHECK_FWD(add_frame(el, map_idx, pc, us));
+  }
+  return {};
+}
+
 DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
                 UnwindState *us) {
   UnwindOutput *output = &us->output;
@@ -34,7 +55,7 @@ DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
   }
   FunLoc current;
   current._symbol_idx = symbol_idx;
-  current.ip = pc;
+  current._ip = pc;
   if (map_idx == -1) {
     // just add an empty element for mapping info
     current._map_info_idx = us->symbol_hdr._common_mapinfo_lookup.get_or_insert(
@@ -48,7 +69,6 @@ DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
          us->symbol_hdr._symbol_table[current._symbol_idx]._symname.c_str());
 #endif
   output->locs.push_back(current);
-
   return {};
 }
 

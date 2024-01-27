@@ -47,7 +47,7 @@ Using the build image will guarantee this.
 ```bash
 CXX=clang++-17 CC=clang-17 source ./setup_env.sh
 MkBuildDir ClangDeb
-    DebCMake -DENABLE_CLANG_TIDY=ON ../
+DebCMake -DENABLE_CLANG_TIDY=ON ../
 ```
 
 ### Updating libdatadog

@@ -24,4 +24,5 @@ bool symbol_get_from_dwfl(Dwfl_Module *mod, ProcessAddress_t process_pc,
 
 bool compute_elf_range(ElfAddress_t file_pc, const GElf_Sym &elf_sym,
                        ElfAddress_t &start_sym, ElfAddress_t &end_sym);
+
 } // namespace ddprof

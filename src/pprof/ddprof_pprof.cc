@@ -27,8 +27,7 @@ void write_function(const Symbol &symbol, ddog_prof_Function *ffi_func) {
   ffi_func->name = to_CharSlice(symbol._demangle_name);
   ffi_func->system_name = to_CharSlice(symbol._symname);
   ffi_func->filename = to_CharSlice(symbol._srcpath);
-  // Not filed (can be computed if needed using the start range from elf)
-  ffi_func->start_line = 0;
+  ffi_func->start_line = symbol._func_start_lineno;
 }
 
 void write_mapping(const MapInfo &mapinfo, ddog_prof_Mapping *ffi_mapping) {
@@ -43,8 +42,8 @@ void write_location(const FunLoc *loc, const MapInfo &mapinfo,
                     const Symbol &symbol, ddog_prof_Location *ffi_location) {
   write_mapping(mapinfo, &ffi_location->mapping);
   write_function(symbol, &ffi_location->function);
-  ffi_location->address = loc->ip;
-  ffi_location->line = symbol._lineno;
+  ffi_location->address = loc->_ip;
+  ffi_location->line = loc->_lineno;
 }
 
 constexpr int k_max_value_types =
@@ -394,14 +393,14 @@ void ddprof_print_sample(const UnwindOutput &uw_output,
       buf += ";";
     }
     if (sym._symname.empty()) {
-      if (loc_it->ip == 0) {
+      if (loc_it->_ip == 0) {
         std::string_view const path{sym._srcpath};
         auto pos = path.rfind('/');
         buf += "(";
         buf += path.substr(pos == std::string_view::npos ? 0 : pos + 1);
         buf += ")";
       } else {
-        absl::StrAppendFormat(&buf, "%#x", loc_it->ip);
+        absl::StrAppendFormat(&buf, "%#x", loc_it->_ip);
       }
     } else {
       std::string_view const func{sym._symname};

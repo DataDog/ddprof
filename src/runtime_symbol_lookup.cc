@@ -74,7 +74,7 @@ bool RuntimeSymbolLookup::insert_or_replace(std::string_view symbol,
                               "jit");
   } else {
     // todo managing range erase (we can overal with other syms)
-    SymbolIdx_t const existing = find_res.first->second.get_symbol_idx();
+    SymbolIdx_t const existing = find_res.first->second.get_value();
 #ifdef DEBUG
     LG_DBG("Existyng sym -- %s (%lx-%lx)",
            symbol_table[existing]._demangle_name.c_str(), find_res.first->first,
@@ -194,7 +194,7 @@ RuntimeSymbolLookup::get_or_insert_jitdump(pid_t pid, ProcessAddress_t pc,
   if (!find_res.second) {
     flag_lookup_failure(symbol_info, jitdump_path);
   }
-  return find_res.second ? find_res.first->second.get_symbol_idx() : -1;
+  return find_res.second ? find_res.first->second.get_value() : -1;
 }
 
 SymbolIdx_t RuntimeSymbolLookup::get_or_insert(pid_t pid, ProcessAddress_t pc,
@@ -211,7 +211,7 @@ SymbolIdx_t RuntimeSymbolLookup::get_or_insert(pid_t pid, ProcessAddress_t pc,
   if (!find_res.second) {
     flag_lookup_failure(symbol_info, "perfmap");
   }
-  return find_res.second ? find_res.first->second.get_symbol_idx() : -1;
+  return find_res.second ? find_res.first->second.get_value() : -1;
 }
 
 } // namespace ddprof
