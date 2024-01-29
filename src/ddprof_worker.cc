@@ -543,6 +543,10 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx,
   // Increase the counts of exports
   ctx.worker_ctx.count_worker += 1;
 
+  // In debug mode, check for possible issues in loaded segments
+  DDPROF_DCHECK_FATAL(ctx.worker_ctx.us->dso_hdr.check_invariants(),
+                      "DsoHdr invariant violation");
+
   // allow new backpopulates
   ctx.worker_ctx.us->dso_hdr.reset_backpopulate_state();
 
