@@ -20,7 +20,7 @@ inline void write_location_no_sym(ElfAddress_t ip, const MapInfo &mapinfo,
 
 Symbolizer::Symbolizer() {
   // todo : pass sym options
-  constexpr ddog_prof_blaze_symbolizer_opts opts{
+  constexpr blaze_symbolizer_opts opts{
       .code_info = true,
       .inlined_fns = true,
       .demangle = false,
@@ -37,13 +37,13 @@ DDRes Symbolizer::symbolize(const std::span<ElfAddress_t> addrs,
   }
 
   // Initialize the src_elf structure
-  ddog_prof_blaze_symbolize_src_elf src_elf{
+  blaze_symbolize_src_elf src_elf{
       .path = elf_src.c_str(),
       .debug_syms = true,
   };
 
   // Symbolize the addresses
-  const ddog_prof_blaze_result *blaze_res = blaze_symbolize_elf_file_addrs(
+  const blaze_result *blaze_res = blaze_symbolize_elf_virt_offsets(
       _symbolizer, &src_elf, addrs.data(), addrs.size());
 
   if (blaze_res) {
@@ -52,7 +52,7 @@ DDRes Symbolizer::symbolize(const std::span<ElfAddress_t> addrs,
     // demangling caching based on stability of unordered map
     // This will be moved to the backend
     for (size_t i = 0; i < blaze_res->cnt; ++i) {
-      const ddog_prof_blaze_sym *cur_sym = blaze_res->syms + i;
+      const blaze_sym *cur_sym = blaze_res->syms + i;
       // Update the location
       // minor: address should be a process address
       DDRES_CHECK_FWD(write_location_blaze(addrs[i], _demangled_names, map_info,

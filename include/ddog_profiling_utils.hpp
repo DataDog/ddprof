@@ -5,9 +5,9 @@
 
 #pragma once
 
-extern "C" {
+#include "datadog/blazesym.h"
+#include "datadog/common.h"
 #include "datadog/profiling.h"
-}
 
 #include "ddres.hpp"
 #include "demangler/demangler.hpp"
@@ -76,8 +76,8 @@ inline std::string_view get_or_insert_demangled_sym(
 inline DDRes write_location_blaze(
     ProcessAddress_t ip,
     ddprof::HeterogeneousLookupStringMap<std::string> &demangled_names,
-    const MapInfo &mapinfo, const ddog_prof_blaze_sym *blaze_sym,
-    unsigned &cur_loc, std::span<ddog_prof_Location> locations_buff) {
+    const MapInfo &mapinfo, const blaze_sym *blaze_sym, unsigned &cur_loc,
+    std::span<ddog_prof_Location> locations_buff) {
   if (cur_loc >= locations_buff.size()) {
     return ddres_warn(DD_WHAT_UW_MAX_DEPTH);
   }
@@ -86,8 +86,7 @@ inline DDRes write_location_blaze(
   // #ifdef inlined_func
   for (unsigned i = 0; i < blaze_sym->inlined_cnt && cur_loc < kMaxStackDepth;
        ++i) {
-    const ddog_prof_blaze_symbolize_inlined_fn *inlined_fn =
-        blaze_sym->inlined + i;
+    const blaze_symbolize_inlined_fn *inlined_fn = blaze_sym->inlined + i;
     ddog_prof_Location &ffi_location = locations_buff[cur_loc];
     write_mapping(mapinfo, &ffi_location.mapping);
     std::string_view demangled_name = inlined_fn->name

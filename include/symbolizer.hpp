@@ -1,13 +1,10 @@
 #pragma once
 
+#include "datadog/blazesym.h"
 #include "ddprof_defs.hpp"
 #include "ddres_def.hpp"
 #include "map_utils.hpp"
 #include "mapinfo_table.hpp"
-
-extern "C" {
-#include "datadog/profiling.h"
-}
 
 #include <span>
 #include <string>
@@ -15,6 +12,7 @@ extern "C" {
 #include <vector>
 
 struct blaze_symbolizer;
+struct ddog_prof_Location;
 
 namespace ddprof {
 class Symbolizer {
@@ -24,7 +22,7 @@ public:
   ~Symbolizer();
 
   struct SessionResults {
-    std::vector<const ddog_prof_blaze_result *> blaze_results{};
+    std::vector<const blaze_result *> blaze_results{};
   };
 
   static constexpr int _k_max_stack_depth = kMaxStackDepth;
