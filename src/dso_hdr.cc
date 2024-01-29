@@ -389,9 +389,6 @@ DsoHdr::DsoFindRes DsoHdr::insert_erase_overlap(PidMapping &pid_mapping,
   LG_DBG("[DSO] : Insert %s", dso.to_string().c_str());
   // warning rvalue : do not use dso after this line
   auto r = map.insert({dso._start, std::move(dso)});
-
-  // only check in debug mode
-  DDPROF_DCHECK_FATAL(checkInvariants(), "DsoHdr invariant violation");
   return r;
 }
 
@@ -597,7 +594,7 @@ void DsoHdr::pid_fork(pid_t child_pid, pid_t parent_pid) {
   }
 }
 
-bool DsoHdr::checkInvariants() const {
+bool DsoHdr::check_invariants() const {
   for (const auto &[pid, pid_mapping] : _pid_map) {
     const Dso *previous_dso = nullptr;
 

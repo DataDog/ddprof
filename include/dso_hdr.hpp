@@ -190,7 +190,7 @@ public:
 
   PidMapping &get_pid_mapping(pid_t pid) { return _pid_map[pid]; }
 
-  bool checkInvariants() const;
+  bool check_invariants() const;
 
 private:
   // erase range of elements
