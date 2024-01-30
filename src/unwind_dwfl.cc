@@ -88,13 +88,10 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     return {};
   }
 
-  // When LOAD segments are ambiguous, do a backpopulate and a second attempt at
-  // registering module
-  bool retry = false;
   DsoHdr::DsoFindRes find_res;
   DDProfMod *ddprof_mod = nullptr;
   FileInfoId_t file_info_id;
-  do {
+  for (int attempt = 0; attempt < 2; ++attempt) {
     find_res = dsoHdr.dso_find_or_backpopulate(pid_mapping, us->pid, pc);
     if (!find_res.second) {
       // no matching file was found
@@ -127,27 +124,34 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     const FileInfoValue &file_info_value =
         us->dso_hdr.get_file_info_value(file_info_id);
     ddprof_mod = us->_dwfl_wrapper->unsafe_get(file_info_id);
-    if (!ddprof_mod) {
-      auto dsoRange = DsoHdr::get_elf_range(pid_mapping._map, find_res.first);
-      // ensure unwinding backend has access to this module (and check
-      // consistency)
-      auto res = us->_dwfl_wrapper->register_mod(pc, dsoRange, file_info_value,
-                                                 &ddprof_mod);
-
-      if (!IsDDResOK(res)) {
-        int nb_elts_added = 0;
-        if (!retry && dsoHdr.pid_backpopulate(us->pid, nb_elts_added) &&
-            nb_elts_added > 0) {
-          // ambiguous LOAD segments detected, retry after backpopulate
-          retry = true;
-          // clear errored state to allow retry
-          file_info_value.reset_errored();
-        } else {
-          return ddres_warn(DD_WHAT_UW_ERROR);
-        }
-      }
+    if (ddprof_mod) {
+      break;
     }
-  } while (retry);
+
+    auto dsoRange = DsoHdr::get_elf_range(pid_mapping._map, find_res.first);
+    // ensure unwinding backend has access to this module (and check
+    // consistency)
+    auto res = us->_dwfl_wrapper->register_mod(pc, dsoRange, file_info_value,
+                                               &ddprof_mod);
+
+    if (IsDDResOK(res)) {
+      break;
+    }
+    int nb_elts_added = 0;
+    if (attempt == 0 && dsoHdr.pid_backpopulate(us->pid, nb_elts_added) &&
+        nb_elts_added > 0) {
+      // retry after backpopulate
+      // clear errored state to allow retry
+      file_info_value.reset_errored();
+    } else {
+      break;
+    }
+  }
+
+  if (ddprof_mod == nullptr) {
+    // unable to register module
+    return ddres_warn(DD_WHAT_UW_ERROR);
+  }
 
   const Dso &dso = find_res.first->second;
 
