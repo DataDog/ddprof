@@ -7,6 +7,7 @@
 
 #include "ddprof_module_lib.hpp"
 #include "ddres.hpp"
+#include "defer.hpp"
 #include "logger.hpp"
 #include "unwind_state.hpp"
 
@@ -42,7 +43,6 @@ DDRes DwflWrapper::attach(pid_t pid, const Dwfl_Thread_Callbacks *callbacks,
   }
 
   if (!dwfl_attach_state(_dwfl, us->ref_elf.get(), pid, callbacks, us)) {
-    LG_DBG("Failed attaching dwfl on pid %d (%s)", pid, dwfl_errmsg(-1));
     return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
   }
   _attached = true;
@@ -72,13 +72,12 @@ DDProfMod *DwflWrapper::unsafe_get(FileInfoId_t file_info_id) {
   return &it->second;
 }
 
-DDRes DwflWrapper::register_mod(ProcessAddress_t pc,
-                                const DsoHdr::DsoConstRange &dsoRange,
+DDRes DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
                                 const FileInfoValue &fileInfoValue,
                                 DDProfMod **mod) {
 
   DDProfMod new_mod;
-  DDRes res = report_module(_dwfl, pc, dsoRange, fileInfoValue, new_mod);
+  DDRes res = report_module(_dwfl, pc, dso, fileInfoValue, new_mod);
   _inconsistent = new_mod._status == DDProfMod::kInconsistent;
 
   if (IsDDResNotOK(res)) {
