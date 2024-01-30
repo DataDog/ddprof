@@ -60,6 +60,7 @@ public:
   ProcessAddress_t start() const { return _start; }
   // Beware, end is inclusive !
   ProcessAddress_t end() const { return _end; }
+  Offset_t offset() const { return _offset; }
 
   ProcessAddress_t _start{};
   ProcessAddress_t _end{}; // Beware, end is inclusive !

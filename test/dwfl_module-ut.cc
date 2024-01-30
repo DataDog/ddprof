@@ -67,8 +67,7 @@ TEST(DwflModule, inconsistency_test) {
       const FileInfoValue &file_info_value =
           dso_hdr.get_file_info_value(file_info_id);
       DDProfMod *ddprof_mod = nullptr;
-      auto res = dwfl_wrapper.register_mod(dso._start,
-                                           dso_hdr.get_elf_range(dso_map, it),
+      auto res = dwfl_wrapper.register_mod(dso._start, it->second,
                                            file_info_value, &ddprof_mod);
 
       ASSERT_TRUE(IsDDResOK(res));
@@ -138,8 +137,7 @@ TEST(DwflModule, short_lived) {
       const FileInfoValue &file_info_value =
           dso_hdr.get_file_info_value(file_info_id);
       DDProfMod *ddprof_mod = nullptr;
-      auto res = dwfl_wrapper.register_mod(dso._start,
-                                           dso_hdr.get_elf_range(dso_map, it),
+      auto res = dwfl_wrapper.register_mod(dso._start, it->second,
                                            file_info_value, &ddprof_mod);
       ASSERT_TRUE(IsDDResOK(res));
       ASSERT_TRUE(ddprof_mod->_mod);
@@ -174,8 +172,7 @@ TEST(DwflModule, short_lived) {
       const FileInfoValue &file_info_value =
           dso_hdr.get_file_info_value(file_info_id);
       DDProfMod *ddprof_mod = nullptr;
-      auto res = dwfl_wrapper.register_mod(dso._start,
-                                           dso_hdr.get_elf_range(dso_map, it),
+      auto res = dwfl_wrapper.register_mod(dso._start, it->second,
                                            file_info_value, &ddprof_mod);
       ASSERT_TRUE(IsDDResOK(res));
       ASSERT_TRUE(ddprof_mod->_mod);

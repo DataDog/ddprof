@@ -12,8 +12,11 @@
 #include "logger.hpp"
 #include "runtime_symbol_lookup.hpp"
 #include "symbol_hdr.hpp"
+#include "unique_fd.hpp"
 #include "unwind_helpers.hpp"
 #include "unwind_state.hpp"
+
+#include <fcntl.h>
 
 namespace ddprof {
 
@@ -128,12 +131,10 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
       break;
     }
 
-    auto dsoRange = DsoHdr::get_elf_range(pid_mapping._map, find_res.first);
     // ensure unwinding backend has access to this module (and check
     // consistency)
-    auto res = us->_dwfl_wrapper->register_mod(pc, dsoRange, file_info_value,
-                                               &ddprof_mod);
-
+    auto res = us->_dwfl_wrapper->register_mod(pc, find_res.first->second,
+                                               file_info_value, &ddprof_mod);
     if (IsDDResOK(res)) {
       break;
     }

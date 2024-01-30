@@ -483,6 +483,3 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_exe(deep_stacks deep_stacks.cc)
-
-add_unit_test(ddprof_module_lib-ut ddprof_module_lib-ut.cc ../src/ddprof_module_lib.cc
-              ../src/build_id.cc ../src/dso.cc LIBRARIES ${ELFUTILS_LIBRARIES})

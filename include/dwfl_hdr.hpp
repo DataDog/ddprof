@@ -41,7 +41,7 @@ struct DwflWrapper {
   DDProfMod *unsafe_get(FileInfoId_t file_info_id);
 
   // safe get
-  DDRes register_mod(ProcessAddress_t pc, const DsoHdr::DsoConstRange &dsoRange,
+  DDRes register_mod(ProcessAddress_t pc, const Dso &dso,
                      const FileInfoValue &fileInfoValue, DDProfMod **mod);
 
   ~DwflWrapper();
