@@ -369,6 +369,17 @@ add_unit_test(address_bitset-ut address_bitset-ut.cc ../src/lib/address_bitset.c
 
 add_unit_test(lib_logger-ut ./lib_logger-ut.cc)
 
+add_unit_test(
+  create_elf-ut
+  create_elf-ut.cc
+  ../src/create_elf.cc
+  ../src/dso_hdr.cc
+  ../src/dso.cc
+  ../src/procutils.cc
+  ../src/user_override.cc
+  ../src/signal_helper.cc
+  LIBRARIES ${ELFUTILS_LIBRARIES})
+
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/pthread_fixes.cc
               ../src/lib/savecontext.cc ../src/lib/saveregisters.cc LIBRARIES llvm-demangle)
 
