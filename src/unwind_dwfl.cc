@@ -251,37 +251,6 @@ DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
 
   return add_frame(symbol_idx, map_idx, pc, us);
 }
-
-bool try_attach_module(UnwindState *us, const DsoHdr::DsoMap &map,
-                       bool backpopulate_done) {
-  bool success = false;
-  for (auto it = map.cbegin(); it != map.cend(); ++it) {
-    const Dso &dso = it->second;
-    if (!dso.is_executable() || dso._type != DsoType::kStandard) {
-      continue;
-    }
-    const FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
-    if (file_info_id <= k_file_info_error) {
-      LG_DBG("Unable to find file for DSO %s", dso.to_string().c_str());
-      continue;
-    }
-    const FileInfoValue &file_info_value =
-        us->dso_hdr.get_file_info_value(file_info_id);
-    DDProfMod *ddprof_mod = nullptr;
-    auto res = us->_dwfl_wrapper->register_mod(us->current_ip,
-                                               DsoHdr::get_elf_range(map, it),
-                                               file_info_value, &ddprof_mod);
-    if (IsDDResOK(res)) {
-      success = true;
-      break;
-    }
-    if (!backpopulate_done) {
-      // we have a chance after the next backpopulate to succeed in registering
-      file_info_value.reset_errored();
-    }
-  }
-  return success;
-}
 } // namespace
 
 DDRes unwind_init_dwfl(UnwindState *us) {
@@ -292,27 +261,6 @@ DDRes unwind_init_dwfl(UnwindState *us) {
   if (us->_dwfl_wrapper->_attached) {
     return {};
   }
-  bool backpopulate_done = false;
-  DsoHdr::DsoMap const &map = us->dso_hdr.get_pid_mapping(us->pid)._map;
-  if (map.empty()) {
-    int nb_elts;
-    us->dso_hdr.pid_backpopulate(us->pid, nb_elts);
-    backpopulate_done = true;
-  }
-
-  bool success = try_attach_module(us, map, backpopulate_done);
-  if (!success && !backpopulate_done) {
-    int nb_elts_added;
-    if (us->dso_hdr.pid_backpopulate(us->pid, nb_elts_added) &&
-        nb_elts_added > 0) {
-      success = try_attach_module(us, map, true);
-    }
-  }
-
-  if (!success) {
-    LG_DBG("Unable to attach a mod for PID%d", us->pid);
-    return ddres_warn(DD_WHAT_UW_ERROR);
-  }
 
   static const Dwfl_Thread_Callbacks dwfl_callbacks = {
       .next_thread = next_thread,
@@ -322,6 +270,8 @@ DDRes unwind_init_dwfl(UnwindState *us) {
       .detach = nullptr,
       .thread_detach = nullptr,
   };
+
+  // Creates the dwfl unwinding backend
   return us->_dwfl_wrapper->attach(us->pid, &dwfl_callbacks, us);
 }
 

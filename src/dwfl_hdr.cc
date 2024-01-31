@@ -8,6 +8,7 @@
 #include "ddprof_module_lib.hpp"
 #include "ddres.hpp"
 #include "logger.hpp"
+#include "unwind_state.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -35,11 +36,12 @@ DwflWrapper::DwflWrapper() {
 DwflWrapper::~DwflWrapper() { dwfl_end(_dwfl); }
 
 DDRes DwflWrapper::attach(pid_t pid, const Dwfl_Thread_Callbacks *callbacks,
-                          struct UnwindState *us) {
+                          UnwindState *us) {
   if (_attached) {
     return {};
   }
-  if (!dwfl_attach_state(_dwfl, nullptr, pid, callbacks, us)) {
+
+  if (!dwfl_attach_state(_dwfl, us->ref_elf.get(), pid, callbacks, us)) {
     LG_DBG("Failed attaching dwfl on pid %d (%s)", pid, dwfl_errmsg(-1));
     return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
   }
