@@ -224,6 +224,7 @@ add_unit_test(
   ../src/common_mapinfo_lookup.cc
   ../src/common_symbol_lookup.cc
   ../src/container_id.cc
+  ../src/create_elf.cc
   ../src/ddprof_process.cc
   ../src/ddprof_stats.cc
   ../src/dso.cc
@@ -250,6 +251,7 @@ add_unit_test(
   ../src/unwind_dwfl.cc
   ../src/unwind_helpers.cc
   ../src/unwind_metrics.cc
+  ../src/unwind_state.cc
   ../src/user_override.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
   DEFINITIONS MYNAME="savecontext-ut")
@@ -264,6 +266,7 @@ set(ALLOCATION_TRACKER_UT_SRCS
     ../src/container_id.cc
     ../src/common_mapinfo_lookup.cc
     ../src/common_symbol_lookup.cc
+    ../src/create_elf.cc
     ../src/ddprof_process.cc
     ../src/ddprof_stats.cc
     ../src/dso.cc
@@ -299,7 +302,8 @@ set(ALLOCATION_TRACKER_UT_SRCS
     ../src/unwind.cc
     ../src/unwind_dwfl.cc
     ../src/unwind_helpers.cc
-    ../src/unwind_metrics.cc)
+    ../src/unwind_metrics.cc
+    ../src/unwind_state.cc)
 
 add_unit_test(
   allocation_tracker-ut ${ALLOCATION_TRACKER_UT_SRCS}

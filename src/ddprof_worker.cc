@@ -339,7 +339,13 @@ DDRes worker_library_init(DDProfContext &ctx,
     // Make sure worker index is initialized correctly
     ctx.worker_ctx.i_current_pprof = 0;
     ctx.worker_ctx.exp_tid = {0};
-    ctx.worker_ctx.us = new UnwindState(ctx.params.dd_profiling_fd);
+    auto unwind_state = create_unwind_state(ctx.params.dd_profiling_fd);
+    if (!unwind_state) {
+      LG_ERR("Failed to create unwind state");
+      return ddres_error(DD_WHAT_UW_ERROR);
+    }
+    ctx.worker_ctx.us = new UnwindState{*std::move(unwind_state)};
+
     std::fill(ctx.worker_ctx.lost_events_per_watcher.begin(),
               ctx.worker_ctx.lost_events_per_watcher.end(), 0UL);
 
