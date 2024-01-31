@@ -27,7 +27,7 @@ DDPROF_NOINLINE void funcB();
 std::byte stack[k_default_perf_stack_sample_size];
 
 void funcB() {
-  UnwindState state;
+  UnwindState state = create_unwind_state().value();
   uint64_t regs[k_nb_registers_to_unwind];
   size_t stack_size = save_context(retrieve_stack_bounds(), regs, stack);
 
@@ -101,7 +101,7 @@ TEST(getcontext, unwind_from_sighandler) {
   pthread_kill(t.native_handle(), SIGUSR1);
   t.join();
 
-  UnwindState state;
+  UnwindState state = create_unwind_state().value();
   unwind_init_sample(&state, regs, getpid(), stack_size,
                      reinterpret_cast<char *>(stack));
   unwindstate_unwind(&state);

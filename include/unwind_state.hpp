@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "create_elf.hpp"
 #include "ddprof_defs.hpp"
 #include "ddprof_process.hpp"
 #include "ddres_def.hpp"
@@ -16,6 +17,7 @@
 #include "symbol_hdr.hpp"
 #include "unwind_output.hpp"
 
+#include <optional>
 #include <sys/types.h>
 
 using Dwfl = struct Dwfl;
@@ -39,8 +41,8 @@ struct UnwindRegisters {
 /// Single structure with everything necessary in unwinding. The structure is
 /// given through callbacks
 struct UnwindState {
-  explicit UnwindState(int dd_profiling_fd = -1)
-      : dso_hdr("", dd_profiling_fd) {
+  explicit UnwindState(UniqueElf ref_elf, int dd_profiling_fd = -1)
+      : dso_hdr("", dd_profiling_fd), ref_elf(std::move(ref_elf)) {
     output.clear();
     output.locs.reserve(kMaxStackDepth);
   }
@@ -60,7 +62,10 @@ struct UnwindState {
   ProcessAddress_t current_ip{0};
 
   UnwindOutput output;
+  UniqueElf ref_elf; // reference elf object used to initialize dwfl
 };
+
+std::optional<UnwindState> create_unwind_state(int dd_profiling_fd = -1);
 
 static inline bool unwind_registers_equal(const UnwindRegisters *lhs,
                                           const UnwindRegisters *rhs) {

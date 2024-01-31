@@ -130,7 +130,7 @@ TEST(allocation_tracker, start_stop) {
     // check that the stack was not truncated due to a too small kStackMargin
     ASSERT_LT(sample->dyn_size_stack, hdr->size - sizeof_allocation_event(0));
 
-    UnwindState state;
+    UnwindState state = create_unwind_state().value();
     unwind_init_sample(&state, sample->regs, sample->pid, sample->size_stack,
                        sample->data_stack);
     unwindstate_unwind(&state);
