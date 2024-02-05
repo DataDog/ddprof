@@ -32,6 +32,8 @@ struct DDProfContext {
     UniqueFd pipefd_to_library;
     bool show_samples{false};
     bool timeline{false};
+    bool remote_symbolization{false};
+
     cpu_set_t cpu_affinity{};
     std::string switch_user;
     std::string internal_stats;

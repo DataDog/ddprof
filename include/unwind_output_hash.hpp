@@ -16,6 +16,7 @@ struct UnwindOutputHash {
     hash_combine(seed, uo.tid);
     for (const auto &fl : uo.locs) {
       hash_combine(seed, fl.ip);
+      // no need to hash fl.elf_addr since it's derived from fl.ip
       hash_combine(seed, fl._symbol_idx);
       hash_combine(seed, fl._map_info_idx);
     }

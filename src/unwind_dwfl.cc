@@ -224,7 +224,7 @@ DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
           unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso);
   MapInfoIdx_t const map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
       us->pid, us->symbol_hdr._mapinfo_table, dso, ddprof_mod._build_id);
-  return add_frame(symbol_idx, map_idx, pc, us);
+  return add_frame(symbol_idx, map_idx, pc, pc - ddprof_mod._sym_bias, us);
 }
 
 // check for runtime symbols provided in /tmp files
@@ -250,7 +250,8 @@ DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
   MapInfoIdx_t const map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
       us->pid, us->symbol_hdr._mapinfo_table, dso, {});
 
-  return add_frame(symbol_idx, map_idx, pc, us);
+  return add_frame(symbol_idx, map_idx, pc, pc - dso.start() + dso.offset(),
+                   us);
 }
 } // namespace
 

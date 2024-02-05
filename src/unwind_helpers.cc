@@ -15,7 +15,7 @@ namespace ddprof {
 
 namespace {
 void add_frame_without_mapping(UnwindState *us, SymbolIdx_t symbol_idx) {
-  add_frame(symbol_idx, -1, 0, us);
+  add_frame(symbol_idx, -1, 0, 0, us);
 }
 
 } // namespace
@@ -25,8 +25,8 @@ bool is_max_stack_depth_reached(const UnwindState &us) {
   return us.output.locs.size() + 2 >= kMaxStackDepth;
 }
 
-DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
-                UnwindState *us) {
+DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx,
+                ProcessAddress_t pc, ElfAddress_t elf_addr, UnwindState *us) {
   UnwindOutput *output = &us->output;
   if (output->locs.size() >= kMaxStackDepth) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_UW_MAX_DEPTH,
@@ -35,6 +35,7 @@ DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx, ElfAddress_t pc,
   FunLoc current;
   current._symbol_idx = symbol_idx;
   current.ip = pc;
+  current.elf_addr = elf_addr;
   if (map_idx == -1) {
     // just add an empty element for mapping info
     current._map_info_idx = us->symbol_hdr._common_mapinfo_lookup.get_or_insert(

@@ -40,10 +40,11 @@ void write_mapping(const MapInfo &mapinfo, ddog_prof_Mapping *ffi_mapping) {
 }
 
 void write_location(const FunLoc *loc, const MapInfo &mapinfo,
-                    const Symbol &symbol, ddog_prof_Location *ffi_location) {
+                    const Symbol &symbol, ddog_prof_Location *ffi_location,
+                    bool use_process_adresses) {
   write_mapping(mapinfo, &ffi_location->mapping);
   write_function(symbol, &ffi_location->function);
-  ffi_location->address = loc->ip;
+  ffi_location->address = use_process_adresses ? loc->ip : loc->elf_addr;
   ffi_location->line = symbol._lineno;
 }
 
@@ -255,6 +256,14 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
                               std::string("container_id"));
   }
 
+  if (ctx.params.remote_symbolization) {
+    pprof->_tags.emplace_back(std::string("remote_symbols"),
+                              std::string("yes"));
+    pprof->use_process_adresses = false;
+  } else {
+    pprof->use_process_adresses = true;
+  }
+
   return {};
 }
 
@@ -301,7 +310,8 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   for (const FunLoc &loc : locs) {
     // possibly several lines to handle inlined function (not handled for now)
     write_location(&loc, mapinfo_table[loc._map_info_idx],
-                   symbol_table[loc._symbol_idx], &locations_buff[cur_loc]);
+                   symbol_table[loc._symbol_idx], &locations_buff[cur_loc],
+                   pprof->use_process_adresses);
     ++cur_loc;
   }
 
@@ -401,7 +411,7 @@ void ddprof_print_sample(const UnwindOutput &uw_output,
         buf += path.substr(pos == std::string_view::npos ? 0 : pos + 1);
         buf += ")";
       } else {
-        absl::StrAppendFormat(&buf, "%#x", loc_it->ip);
+        absl::StrAppendFormat(&buf, "%#x/%#x", loc_it->ip, loc_it->elf_addr);
       }
     } else {
       std::string_view const func{sym._symname};
