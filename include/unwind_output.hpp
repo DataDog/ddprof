@@ -17,7 +17,8 @@
 namespace ddprof {
 
 struct FunLoc {
-  uint64_t ip; // Relative to file, not VMA
+  ProcessAddress_t ip;   // process address
+  ElfAddress_t elf_addr; // elf address (in elf file virtual memory space)
   SymbolIdx_t _symbol_idx;
   MapInfoIdx_t _map_info_idx;
 
