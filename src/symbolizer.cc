@@ -21,9 +21,11 @@ inline void write_location_no_sym(ElfAddress_t ip, const MapInfo &mapinfo,
 Symbolizer::Symbolizer() {
   // todo : pass sym options
   constexpr blaze_symbolizer_opts opts{
-      .code_info = true,
-      .inlined_fns = true,
+      .type_size = sizeof(blaze_symbolizer_opts),
+      .code_info = false,
+      .inlined_fns = false,
       .demangle = false,
+      .reserved = {}
   };
   _symbolizer = blaze_symbolizer_new_opts(&opts);
 }
@@ -38,8 +40,10 @@ DDRes Symbolizer::symbolize(const std::span<ElfAddress_t> addrs,
 
   // Initialize the src_elf structure
   blaze_symbolize_src_elf src_elf{
+      .type_size = sizeof(blaze_symbolize_src_elf),
       .path = elf_src.c_str(),
       .debug_syms = true,
+      .reserved = {},
   };
 
   // Symbolize the addresses
