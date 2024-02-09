@@ -12,41 +12,22 @@
 #include "pevent_lib.hpp"
 #include "symbol_hdr.hpp"
 
+#include "symbolizer.hpp"
+
 #include <absl/strings/str_format.h>
 #include <absl/strings/substitute.h>
 #include <cstdio>
 #include <cstring>
 #include <span>
 
+extern "C" {
+#include "datadog/common.h"
+#include "datadog/profiling.h"
+}
 namespace ddprof {
 
 namespace {
 constexpr size_t k_max_pprof_labels{6};
-
-void write_function(const Symbol &symbol, ddog_prof_Function *ffi_func) {
-  ffi_func->name = to_CharSlice(symbol._demangle_name);
-  ffi_func->system_name = to_CharSlice(symbol._symname);
-  ffi_func->filename = to_CharSlice(symbol._srcpath);
-  // Not filed (can be computed if needed using the start range from elf)
-  ffi_func->start_line = 0;
-}
-
-void write_mapping(const MapInfo &mapinfo, ddog_prof_Mapping *ffi_mapping) {
-  ffi_mapping->memory_start = mapinfo._low_addr;
-  ffi_mapping->memory_limit = mapinfo._high_addr;
-  ffi_mapping->file_offset = mapinfo._offset;
-  ffi_mapping->filename = to_CharSlice(mapinfo._sopath);
-  ffi_mapping->build_id = to_CharSlice(mapinfo._build_id);
-}
-
-void write_location(const FunLoc *loc, const MapInfo &mapinfo,
-                    const Symbol &symbol, ddog_prof_Location *ffi_location,
-                    bool use_process_adresses) {
-  write_mapping(mapinfo, &ffi_location->mapping);
-  write_function(symbol, &ffi_location->function);
-  ffi_location->address = use_process_adresses ? loc->ip : loc->elf_addr;
-  ffi_location->line = symbol._lineno;
-}
 
 constexpr int k_max_value_types =
     DDPROF_PWT_LENGTH * static_cast<int>(kNbEventAggregationModes);
@@ -276,8 +257,9 @@ DDRes pprof_free_profile(DDProfPProf *pprof) {
 
 // Assumption of API is that sample is valid in a single type
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
-                      const SymbolHdr &symbol_hdr, const DDProfValuePack &pack,
-                      const PerfWatcher *watcher,
+                      const SymbolHdr &symbol_hdr, Symbolizer *symbolizer,
+                      const DDProfValuePack &pack, const PerfWatcher *watcher,
+                      const FileInfoVector &file_infos,
                       EventAggregationModePos value_pos, DDProfPProf *pprof) {
 
   const ddprof::SymbolTable &symbol_table = symbol_hdr._symbol_table;
@@ -294,6 +276,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   }
 
   ddog_prof_Location locations_buff[kMaxStackDepth];
+  memset(locations_buff, 0, sizeof(locations_buff));
   std::span locs{uw_output->locs};
 
   if (watcher->options.nb_frames_to_skip < locs.size()) {
@@ -306,13 +289,51 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     }
   }
 
-  unsigned cur_loc = 0;
-  for (const FunLoc &loc : locs) {
-    // possibly several lines to handle inlined function (not handled for now)
-    write_location(&loc, mapinfo_table[loc._map_info_idx],
-                   symbol_table[loc._symbol_idx], &locations_buff[cur_loc],
-                   pprof->use_process_adresses);
-    ++cur_loc;
+  Symbolizer::SessionResults session_results;
+  // free all the blaze results after aggregation
+  defer { Symbolizer::free_session_results(session_results); };
+
+  unsigned index = 0;
+  unsigned write_index = 0;
+  while (index < locs.size() && write_index < kMaxStackDepth) {
+    if (locs[index]._symbol_idx != -1) {
+      // already symbolized
+      const FunLoc &loc = locs[index];
+      write_location(&loc, mapinfo_table[loc._map_info_idx],
+                     symbol_table[loc._symbol_idx],
+                     &locations_buff[write_index++],
+                     pprof->use_process_adresses);
+      ++index;
+      continue;
+    }
+
+    if (locs[index]._file_info_id <= k_file_info_error) {
+      // We should either have an index or a file to write the symbol
+      assert(0);
+      ++index;
+      continue;
+    }
+
+    FileInfoId_t file_id = locs[index]._file_info_id;
+    const std::string &currentFilePath = file_infos[file_id].get_path();
+    std::vector<uintptr_t> addresses;
+    // Collect all consecutive locations for the same file
+    unsigned start_index = index;
+    while (index < locs.size() && locs[index]._file_info_id == file_id) {
+      addresses.push_back(locs[index]._elf_addr);
+      ++index;
+      if (locs[index]._symbol_idx != -1) {
+        break;
+      }
+    }
+    // Symbolize all addresses for this file
+    if (IsDDResNotOK(symbolizer->symbolize(
+            addresses, currentFilePath,
+            mapinfo_table[locs[start_index]._map_info_idx],
+            std::span<ddog_prof_Location>{locations_buff, kMaxStackDepth},
+            write_index, session_results))) {
+      break;
+    }
   }
 
   // Create the labels for the sample.  Two samples are the same only when
@@ -359,7 +380,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   assert(labels_num <= k_max_pprof_labels);
 
   ddog_prof_Sample const sample = {
-      .locations = {.ptr = locations_buff, .len = cur_loc},
+      .locations = {.ptr = locations_buff, .len = write_index},
       .values = {.ptr = values, .len = pprof->_nb_values},
       .labels = {.ptr = labels, .len = labels_num},
   };
@@ -411,7 +432,7 @@ void ddprof_print_sample(const UnwindOutput &uw_output,
         buf += path.substr(pos == std::string_view::npos ? 0 : pos + 1);
         buf += ")";
       } else {
-        absl::StrAppendFormat(&buf, "%#x/%#x", loc_it->ip, loc_it->elf_addr);
+        absl::StrAppendFormat(&buf, "%#x/%#x", loc_it->ip, loc_it->_elf_addr);
       }
     } else {
       std::string_view const func{sym._symname};

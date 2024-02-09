@@ -214,17 +214,14 @@ int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
 
 DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
                      const DDProfMod &ddprof_mod, FileInfoId_t file_info_id) {
-
-  SymbolHdr &unwind_symbol_hdr = us->symbol_hdr;
-
   // get or create the dwfl symbol
-  SymbolIdx_t const symbol_idx =
-      unwind_symbol_hdr._dwfl_symbol_lookup.get_or_insert(
-          ddprof_mod, unwind_symbol_hdr._symbol_table,
-          unwind_symbol_hdr._dso_symbol_lookup, file_info_id, pc, dso);
+  constexpr SymbolIdx_t symbol_idx = -1;
   MapInfoIdx_t const map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
       us->pid, us->symbol_hdr._mapinfo_table, dso, ddprof_mod._build_id);
-  return add_frame(symbol_idx, map_idx, pc, pc - ddprof_mod._sym_bias, us);
+
+  // todo: we should also pass the PC
+  return add_frame(symbol_idx, file_info_id, map_idx, pc,
+                   pc - ddprof_mod._sym_bias, us);
 }
 
 // check for runtime symbols provided in /tmp files
@@ -250,8 +247,7 @@ DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
   MapInfoIdx_t const map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
       us->pid, us->symbol_hdr._mapinfo_table, dso, {});
 
-  return add_frame(symbol_idx, map_idx, pc, pc - dso.start() + dso.offset(),
-                   us);
+  return add_frame(symbol_idx, -1, map_idx, pc, pc - dso.start() + dso.offset(), us);
 }
 } // namespace
 
@@ -286,9 +282,7 @@ DDRes unwind_dwfl(UnwindState *us) {
   //
   // Launch the dwarf unwinding (uses frame_cb callback)
   if (dwfl_getthread_frames(us->_dwfl_wrapper->_dwfl, us->pid, frame_cb, us) !=
-      0) {
-    trace_unwinding_end(us);
-  }
+      0) {}
   res = !us->output.locs.empty() ? ddres_init()
                                  : ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
   return res;

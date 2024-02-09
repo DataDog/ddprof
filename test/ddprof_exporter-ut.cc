@@ -151,17 +151,17 @@ TEST(DDProfExporter, simple) {
   { // Aggregate pprofs
     SymbolHdr symbol_hdr;
     UnwindOutput mock_output;
+    FileInfoVector file_infos;
     SymbolTable &table = symbol_hdr._symbol_table;
     MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
-
     fill_unwind_symbols(table, mapinfo_table, mock_output);
-
     DDProfContext ctx = {};
     ctx.watchers.push_back(*ewatcher_from_str("sCPU"));
     res = pprof_create_profile(&pprofs, ctx);
     EXPECT_TRUE(IsDDResOK(res));
-    res = pprof_aggregate(&mock_output, symbol_hdr, {1000, 1, 0},
-                          &ctx.watchers[0], kSumPos, &pprofs);
+    res = pprof_aggregate(&mock_output, symbol_hdr, ctx.worker_ctx.symbolizer,
+                          {1000, 1, 0}, &ctx.watchers[0], file_infos, kSumPos,
+                          &pprofs);
     EXPECT_TRUE(IsDDResOK(res));
   }
   {

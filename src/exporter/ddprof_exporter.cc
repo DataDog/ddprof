@@ -320,8 +320,11 @@ DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
     ddog_prof_Exporter_Request_BuildResult res_request =
         ddog_prof_Exporter_Request_build(exporter->_exporter, start, end,
                                          ddog_prof_Exporter_Slice_File_empty(),
-                                         files, &ffi_additional_tags, nullptr,
-                                         nullptr, k_timeout_ms);
+                                         files, &ffi_additional_tags,
+                                         nullptr, // optional_endpoints_stats
+                                         nullptr, // internal_metadata_json
+                                         nullptr, // optional_info_json
+                                         k_timeout_ms);
 
     if (res_request.tag == DDOG_PROF_EXPORTER_REQUEST_BUILD_RESULT_OK) {
       ddog_prof_Exporter_Request *request = res_request.ok;

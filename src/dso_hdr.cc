@@ -328,11 +328,6 @@ FileInfoId_t DsoHdr::update_id_from_path(const Dso &dso) {
 #endif
   } else { // already exists
     dso._id = it->second;
-    // update with last location
-    // looking up the actual path using mountinfo would prevent this
-    if (file_info._path != _file_info_vector[dso._id].info()._path) {
-      _file_info_vector[dso._id] = FileInfoValue(std::move(file_info), dso._id);
-    }
   }
   return dso._id;
 }
