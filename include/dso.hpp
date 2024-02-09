@@ -74,5 +74,11 @@ public:
   DsoOrigin _origin{DsoOrigin::kPerfMmapEvent};
 };
 
+// some runtimes such as java or .NET can publish maps to populate the symbols
+inline bool has_runtime_symbols(const Dso &dso) {
+  return (dso._type == DsoType::kRuntime || dso._type == DsoType::kAnon) &&
+      (dso._prot & PROT_EXEC);
+}
+
 std::ostream &operator<<(std::ostream &os, const Dso &dso);
 } // namespace ddprof

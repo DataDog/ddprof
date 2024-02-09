@@ -34,11 +34,6 @@ inline bool has_relevant_path(DsoType dso_type) {
   return false;
 }
 
-// some runtimes such as java or .NET can publish maps to populate the symbols
-inline bool has_runtime_symbols(DsoType dso_type) {
-  return dso_type == DsoType::kRuntime || dso_type == DsoType::kAnon;
-}
-
 // todo : find an enum that supports to_str
 inline const char *dso_type_str(DsoType path_type) {
   switch (path_type) {
