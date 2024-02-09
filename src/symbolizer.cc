@@ -22,6 +22,7 @@ Symbolizer::Symbolizer() {
   // todo : pass sym options
   constexpr blaze_symbolizer_opts opts{
       .type_size = sizeof(blaze_symbolizer_opts),
+      .auto_reload = false,
       .code_info = false,
       .inlined_fns = false,
       .demangle = false,
