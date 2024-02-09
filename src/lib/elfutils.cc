@@ -192,7 +192,6 @@ std::optional<DynamicInfo> retrieve_dynamic_info(const dl_phdr_info &info,
     if (phdr->p_type == PT_DYNAMIC) {
       phdr_dynamic = phdr;
     }
-    // Exclude this DSO
     if (exclude_self && phdr->p_type == PT_LOAD && phdr->p_flags & PF_X) {
       ElfW(Addr) local_symbol_addr = reinterpret_cast<ElfW(Addr)>(
           static_cast<std::optional<DynamicInfo> (*)(
@@ -408,7 +407,7 @@ LookupResult lookup_symbol(std::string_view symbol_name,
                            bool accept_null_sized_symbol,
                            uintptr_t not_this_symbol) {
   SymbolLookup lookup{symbol_name, accept_null_sized_symbol, not_this_symbol};
-  iterate_over_loaded_libraries([&](const dl_phdr_info &info) {
+  iterate_over_loaded_libraries([&](const dl_phdr_info &info, bool /*is_exe*/) {
     auto dyn_info = retrieve_dynamic_info(info);
     if (dyn_info) {
       return lookup(info.dlpi_name, *dyn_info)
@@ -424,8 +423,8 @@ void override_symbol(std::string_view symbol_name, uintptr_t new_symbol,
                      uintptr_t do_not_override_this_symbol) {
   SymbolOverride symbol_override{symbol_name, new_symbol,
                                  do_not_override_this_symbol};
-  iterate_over_loaded_libraries([&](const dl_phdr_info &info) {
-    auto dyn_info = retrieve_dynamic_info(info);
+  iterate_over_loaded_libraries([&](const dl_phdr_info &info, bool is_exe) {
+    auto dyn_info = retrieve_dynamic_info(info, !is_exe);
     if (dyn_info) {
       symbol_override(info.dlpi_name, *dyn_info);
     }
@@ -435,7 +434,7 @@ void override_symbol(std::string_view symbol_name, uintptr_t new_symbol,
 
 int count_loaded_libraries() {
   int count = 0;
-  iterate_over_loaded_libraries([&](const dl_phdr_info &info) {
+  iterate_over_loaded_libraries([&](const dl_phdr_info &info, bool) {
     count = info.dlpi_adds;
     return LibraryCallbackStatus::Stop;
   });
@@ -443,12 +442,19 @@ int count_loaded_libraries() {
 }
 
 LibraryCallbackStatus iterate_over_loaded_libraries(LibraryCallback callback) {
+  struct CallbackInfo {
+    LibraryCallback callback;
+    bool is_first{true};
+  };
+  CallbackInfo callback_info{callback};
   return static_cast<LibraryCallbackStatus>(dl_iterate_phdr(
       [](dl_phdr_info *info, size_t /*size*/, void *data) {
-        auto *local_callback = static_cast<LibraryCallback *>(data);
-        return static_cast<int>((*local_callback)(*info));
+        auto *local_callback = static_cast<CallbackInfo *>(data);
+        const bool is_exe = local_callback->is_first;
+        local_callback->is_first = false;
+        return static_cast<int>((local_callback->callback)(*info, is_exe));
       },
-      &callback));
+      &callback_info));
 }
 
 bool SymbolOverrides::register_override(std::string_view symbol_name,
@@ -506,7 +512,7 @@ void SymbolOverrides::apply_overrides() {
 }
 
 void SymbolOverrides::restore_overrides() {
-  iterate_over_loaded_libraries([&](const dl_phdr_info &info) {
+  iterate_over_loaded_libraries([&](const dl_phdr_info &info, bool /*is_exe*/) {
     restore_library_overrides(info.dlpi_name, info.dlpi_addr);
     return LibraryCallbackStatus::Continue;
   });
@@ -541,8 +547,12 @@ void SymbolOverrides::update_overrides() {
     revert_info.processed = false;
   }
 
-  iterate_over_loaded_libraries([this](const dl_phdr_info &info) {
-    auto maybe_dyn_info = retrieve_dynamic_info(info);
+  iterate_over_loaded_libraries([this](const dl_phdr_info &info, bool is_exe) {
+    // Avoid overriding symbols in lib profiling, except if it is statically
+    // linked into the executable.
+    // We cannot rely on `dl_phdr_info.dlpi_name` being an empty string for the
+    // exe, because musl passes the absolute path of the executable instead.
+    auto maybe_dyn_info = retrieve_dynamic_info(info, !is_exe);
     if (maybe_dyn_info) {
       apply_overrides_to_library(*maybe_dyn_info, info.dlpi_name);
     }

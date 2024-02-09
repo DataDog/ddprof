@@ -49,7 +49,7 @@ enum class LibraryCallbackStatus {
 };
 
 using LibraryCallback =
-    absl::FunctionRef<LibraryCallbackStatus(const dl_phdr_info &)>;
+    absl::FunctionRef<LibraryCallbackStatus(const dl_phdr_info &, bool is_exe)>;
 
 LibraryCallbackStatus iterate_over_loaded_libraries(LibraryCallback callback);
 
