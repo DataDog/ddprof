@@ -516,6 +516,7 @@ void SymbolOverrides::restore_overrides() {
     restore_library_overrides(info.dlpi_name, info.dlpi_addr);
     return LibraryCallbackStatus::Continue;
   });
+  _revert_info_per_library.clear();
 }
 
 void SymbolOverrides::restore_library_overrides(std::string_view library_name,
