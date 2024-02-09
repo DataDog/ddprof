@@ -131,13 +131,12 @@ private:
   ddprof::ReentryGuard _guard;
 };
 
-struct HookBase {
-  // static inline bool ref_checked = false;
-};
+struct HookBase {};
 
 struct MallocHook : HookBase {
   static constexpr auto name = "malloc";
-  static inline auto ref = &::malloc;
+  using FuncType = decltype(&::malloc);
+  static inline FuncType ref{};
 
   static void *hook(size_t size) noexcept {
     AllocTrackerHelper helper;
@@ -149,7 +148,8 @@ struct MallocHook : HookBase {
 
 struct NewHook : HookBase {
   static constexpr auto name = "_Znwm";
-  static inline auto ref = static_cast<void *(*)(size_t)>(&::operator new);
+  using FuncType = decltype(static_cast<void *(*)(size_t)>(&::operator new));
+  static inline FuncType ref{};
 
   static void *hook(size_t size) {
     AllocTrackerHelper helper;
@@ -161,9 +161,10 @@ struct NewHook : HookBase {
 
 struct NewNoThrowHook : HookBase {
   static constexpr auto name = "_ZnwmRKSt9nothrow_t";
-  static inline auto ref =
-      static_cast<void *(*)(size_t, const std::nothrow_t &) noexcept>(
-          &::operator new);
+  using FuncType =
+      decltype(static_cast<void *(*)(size_t, const std::nothrow_t &) noexcept>(
+          &::operator new));
+  static inline FuncType ref{};
 
   static void *hook(size_t size, const std::nothrow_t &tag) noexcept {
     AllocTrackerHelper helper;
@@ -175,8 +176,9 @@ struct NewNoThrowHook : HookBase {
 
 struct NewAlignHook : HookBase {
   static constexpr auto name = "_ZnwmSt11align_val_t";
-  static inline auto ref =
-      static_cast<void *(*)(size_t, std::align_val_t)>(&::operator new);
+  using FuncType = decltype(static_cast<void *(*)(size_t, std::align_val_t)>(
+      &::operator new));
+  static inline FuncType ref{};
 
   static void *hook(std::size_t size, std::align_val_t al) {
     AllocTrackerHelper helper;
@@ -188,9 +190,11 @@ struct NewAlignHook : HookBase {
 
 struct NewAlignNoThrowHook : HookBase {
   static constexpr auto name = "_ZnwmSt11align_val_tRKSt9nothrow_t";
-  static inline auto ref =
-      static_cast<void *(*)(size_t, std::align_val_t,
-                            const std::nothrow_t &) noexcept>(&::operator new);
+  using FuncType =
+      decltype(static_cast<void *(*)(size_t, std::align_val_t,
+                                     const std::nothrow_t &) noexcept>(
+          &::operator new));
+  static inline FuncType ref{};
 
   static void *hook(std::size_t size, std::align_val_t al,
                     const std::nothrow_t &tag) noexcept {
@@ -203,7 +207,8 @@ struct NewAlignNoThrowHook : HookBase {
 
 struct NewArrayHook : HookBase {
   static constexpr auto name = "_Znam";
-  static inline auto ref = static_cast<void *(*)(size_t)>(&::operator new[]);
+  using FuncType = decltype(static_cast<void *(*)(size_t)>(&::operator new[]));
+  static inline FuncType ref{};
 
   static void *hook(size_t size) {
     AllocTrackerHelper helper;
@@ -215,9 +220,10 @@ struct NewArrayHook : HookBase {
 
 struct NewArrayNoThrowHook : HookBase {
   static constexpr auto name = "_ZnamRKSt9nothrow_t";
-  static inline auto ref =
-      static_cast<void *(*)(size_t, const std::nothrow_t &) noexcept>(
-          &::operator new[]);
+  using FuncType =
+      decltype(static_cast<void *(*)(size_t, const std::nothrow_t &) noexcept>(
+          &::operator new[]));
+  static inline FuncType ref{};
 
   static void *hook(size_t size, const std::nothrow_t &tag) noexcept {
     AllocTrackerHelper helper;
@@ -229,8 +235,9 @@ struct NewArrayNoThrowHook : HookBase {
 
 struct NewArrayAlignHook : HookBase {
   static constexpr auto name = "_ZnamSt11align_val_t";
-  static inline auto ref =
-      static_cast<void *(*)(size_t, std::align_val_t)>(&::operator new[]);
+  using FuncType = decltype(static_cast<void *(*)(size_t, std::align_val_t)>(
+      &::operator new[]));
+  static inline FuncType ref{};
 
   static void *hook(std::size_t size, std::align_val_t al) {
     AllocTrackerHelper helper;
@@ -242,10 +249,11 @@ struct NewArrayAlignHook : HookBase {
 
 struct NewArrayAlignNoThrowHook : HookBase {
   static constexpr auto name = "_ZnamSt11align_val_tRKSt9nothrow_t";
-  static inline auto ref =
-      static_cast<void *(*)(size_t, std::align_val_t,
-                            const std::nothrow_t &) noexcept>(
-          &::operator new[]);
+  using FuncType =
+      decltype(static_cast<void *(*)(size_t, std::align_val_t,
+                                     const std::nothrow_t &) noexcept>(
+          &::operator new[]));
+  static inline FuncType ref{};
 
   static void *hook(std::size_t size, std::align_val_t al,
                     const std::nothrow_t &tag) noexcept {
@@ -258,7 +266,8 @@ struct NewArrayAlignNoThrowHook : HookBase {
 
 struct FreeHook : HookBase {
   static constexpr auto name = "free";
-  static inline auto ref = &::free;
+  using FuncType = decltype(&::free);
+  static inline FuncType ref{};
 
   static void hook(void *ptr) noexcept {
     DeallocTrackerHelper helper;
@@ -273,7 +282,8 @@ struct FreeHook : HookBase {
 
 struct FreeSizedHook : HookBase {
   static constexpr auto name = "free_sized";
-  static inline auto ref = &::free_sized;
+  using FuncType = decltype(&::free_sized);
+  static inline FuncType ref{};
 
   static void hook(void *ptr, size_t size) noexcept {
     DeallocTrackerHelper helper;
@@ -288,7 +298,8 @@ struct FreeSizedHook : HookBase {
 
 struct FreeAlignedSizedHook : HookBase {
   static constexpr auto name = "free_aligned_sized";
-  static inline auto ref = &::free_aligned_sized;
+  using FuncType = decltype(&::free_aligned_sized);
+  static inline FuncType ref{};
 
   static void hook(void *ptr, size_t alignment, size_t size) noexcept {
     DeallocTrackerHelper helper;
@@ -303,8 +314,8 @@ struct FreeAlignedSizedHook : HookBase {
 
 struct DeleteHook : HookBase {
   static constexpr auto name = "_ZdlPv";
-  static inline auto ref =
-      static_cast<void (*)(void *) noexcept>(&::operator delete);
+  using FuncType = decltype(static_cast<void (*)(void *)>(&::operator delete));
+  static inline FuncType ref{};
 
   static void hook(void *ptr) noexcept {
     DeallocTrackerHelper helper;
@@ -318,8 +329,9 @@ struct DeleteHook : HookBase {
 
 struct DeleteArrayHook : HookBase {
   static constexpr auto name = "_ZdaPv";
-  static inline auto ref =
-      static_cast<void (*)(void *) noexcept>(&::operator delete[]);
+  using FuncType =
+      decltype(static_cast<void (*)(void *)>(&::operator delete[]));
+  static inline FuncType ref{};
 
   static void hook(void *ptr) noexcept {
     DeallocTrackerHelper helper;
@@ -333,9 +345,10 @@ struct DeleteArrayHook : HookBase {
 
 struct DeleteNoThrowHook : HookBase {
   static constexpr auto name = "_ZdlPvRKSt9nothrow_t";
-  static inline auto ref =
-      static_cast<void (*)(void *, const std::nothrow_t &) noexcept>(
-          &::operator delete);
+  using FuncType =
+      decltype(static_cast<void (*)(void *, const std::nothrow_t &) noexcept>(
+          &::operator delete));
+  static inline FuncType ref{};
 
   static void hook(void *ptr, const std::nothrow_t &tag) noexcept {
     DeallocTrackerHelper helper;
@@ -349,9 +362,10 @@ struct DeleteNoThrowHook : HookBase {
 
 struct DeleteArrayNoThrowHook : HookBase {
   static constexpr auto name = "_ZdaPvRKSt9nothrow_t";
-  static inline auto ref =
-      static_cast<void (*)(void *, const std::nothrow_t &) noexcept>(
-          &::operator delete[]);
+  using FuncType =
+      decltype(static_cast<void (*)(void *, const std::nothrow_t &) noexcept>(
+          &::operator delete[]));
+  static inline FuncType ref{};
 
   static void hook(void *ptr, const std::nothrow_t &tag) noexcept {
     DeallocTrackerHelper helper;
@@ -365,9 +379,10 @@ struct DeleteArrayNoThrowHook : HookBase {
 
 struct DeleteAlignHook : HookBase {
   static constexpr auto name = "_ZdlPvSt11align_val_t";
-  static inline auto ref =
-      static_cast<void (*)(void *, std::align_val_t) noexcept>(
-          &::operator delete);
+  using FuncType =
+      decltype(static_cast<void (*)(void *, std::align_val_t) noexcept>(
+          &::operator delete));
+  static inline FuncType ref{};
 
   static void hook(void *ptr, std::align_val_t al) noexcept {
     DeallocTrackerHelper helper;
@@ -381,9 +396,10 @@ struct DeleteAlignHook : HookBase {
 
 struct DeleteArrayAlignHook : HookBase {
   static constexpr auto name = "_ZdaPvSt11align_val_t";
-  static inline auto ref =
-      static_cast<void (*)(void *, std::align_val_t) noexcept>(
-          &::operator delete[]);
+  using FuncType =
+      decltype(static_cast<void (*)(void *, std::align_val_t) noexcept>(
+          &::operator delete[]));
+  static inline FuncType ref{};
 
   static void hook(void *ptr, std::align_val_t al) noexcept {
     DeallocTrackerHelper helper;
@@ -397,9 +413,11 @@ struct DeleteArrayAlignHook : HookBase {
 
 struct DeleteAlignNoThrowHook : HookBase {
   static constexpr auto name = "_ZdlPvSt11align_val_tRKSt9nothrow_t";
-  static inline auto ref = static_cast<void (*)(
-      void *, std::align_val_t, const std::nothrow_t &) noexcept>(
-      &::operator delete);
+  using FuncType =
+      decltype(static_cast<void (*)(void *, std::align_val_t,
+                                    const std::nothrow_t &) noexcept>(
+          &::operator delete));
+  static inline FuncType ref{};
 
   static void hook(void *ptr, std::align_val_t al,
                    const std::nothrow_t &tag) noexcept {
@@ -414,9 +432,11 @@ struct DeleteAlignNoThrowHook : HookBase {
 
 struct DeleteArrayAlignNoThrowHook : HookBase {
   static constexpr auto name = "_ZdaPvSt11align_val_tRKSt9nothrow_t";
-  static inline auto ref = static_cast<void (*)(
-      void *, std::align_val_t, const std::nothrow_t &) noexcept>(
-      &::operator delete[]);
+  using FuncType =
+      decltype(static_cast<void (*)(void *, std::align_val_t,
+                                    const std::nothrow_t &) noexcept>(
+          &::operator delete[]));
+  static inline FuncType ref{};
 
   static void hook(void *ptr, std::align_val_t al,
                    const std::nothrow_t &tag) noexcept {
@@ -431,8 +451,9 @@ struct DeleteArrayAlignNoThrowHook : HookBase {
 
 struct DeleteSizedHook : HookBase {
   static constexpr auto name = "_ZdlPvm";
-  static inline auto ref =
-      static_cast<void (*)(void *, std::size_t) noexcept>(&::operator delete);
+  using FuncType = decltype(static_cast<void (*)(void *, std::size_t) noexcept>(
+      &::operator delete));
+  static inline FuncType ref{};
 
   static void hook(void *ptr, std::size_t size) noexcept {
     DeallocTrackerHelper helper;
@@ -446,8 +467,9 @@ struct DeleteSizedHook : HookBase {
 
 struct DeleteArraySizedHook : HookBase {
   static constexpr auto name = "_ZdaPvm";
-  static inline auto ref =
-      static_cast<void (*)(void *, std::size_t) noexcept>(&::operator delete[]);
+  using FuncType = decltype(static_cast<void (*)(void *, std::size_t) noexcept>(
+      &::operator delete[]));
+  static inline FuncType ref{};
 
   static void hook(void *ptr, std::size_t size) noexcept {
     DeallocTrackerHelper helper;
@@ -461,9 +483,10 @@ struct DeleteArraySizedHook : HookBase {
 
 struct DeleteSizedAlignHook : HookBase {
   static constexpr auto name = "_ZdlPvmSt11align_val_t";
-  static inline auto ref =
-      static_cast<void (*)(void *, std::size_t, std::align_val_t) noexcept>(
-          &::operator delete);
+  using FuncType = decltype(static_cast<void (*)(void *, std::size_t,
+                                                 std::align_val_t) noexcept>(
+      &::operator delete));
+  static inline FuncType ref{};
 
   static void hook(void *ptr, std::size_t size, std::align_val_t al) noexcept {
     DeallocTrackerHelper helper;
@@ -477,9 +500,10 @@ struct DeleteSizedAlignHook : HookBase {
 
 struct DeleteArraySizedAlignHook : HookBase {
   static constexpr auto name = "_ZdaPvmSt11align_val_t";
-  static inline auto ref =
-      static_cast<void (*)(void *, std::size_t, std::align_val_t) noexcept>(
-          &::operator delete[]);
+  using FuncType = decltype(static_cast<void (*)(void *, std::size_t,
+                                                 std::align_val_t) noexcept>(
+      &::operator delete[]));
+  static inline FuncType ref{};
 
   static void hook(void *ptr, std::size_t size, std::align_val_t al) noexcept {
     DeallocTrackerHelper helper;
@@ -493,7 +517,8 @@ struct DeleteArraySizedAlignHook : HookBase {
 
 struct CallocHook : HookBase {
   static constexpr auto name = "calloc";
-  static inline auto ref = &::calloc;
+  using FuncType = decltype(&::calloc);
+  static inline FuncType ref{};
 
   static void *hook(size_t nmemb, size_t size) noexcept {
     AllocTrackerHelper helper;
@@ -505,7 +530,8 @@ struct CallocHook : HookBase {
 
 struct ReallocHook : HookBase {
   static constexpr auto name = "realloc";
-  static inline auto ref = &::realloc;
+  using FuncType = decltype(&::realloc);
+  static inline FuncType ref{};
 
   static void *hook(void *ptr, size_t size) noexcept {
     AllocTrackerHelper helper;
@@ -524,7 +550,8 @@ struct ReallocHook : HookBase {
 
 struct PosixMemalignHook : HookBase {
   static constexpr auto name = "posix_memalign";
-  static inline auto ref = &::posix_memalign;
+  using FuncType = decltype(&::posix_memalign);
+  static inline FuncType ref{};
 
   static int hook(void **memptr, size_t alignment, size_t size) noexcept {
     AllocTrackerHelper helper;
@@ -538,7 +565,8 @@ struct PosixMemalignHook : HookBase {
 
 struct AlignedAllocHook : HookBase {
   static constexpr auto name = "aligned_alloc";
-  static inline auto ref = &::aligned_alloc;
+  using FuncType = decltype(&::aligned_alloc);
+  static inline FuncType ref{};
 
   static void *hook(size_t alignment, size_t size) noexcept {
     AllocTrackerHelper helper;
@@ -552,7 +580,8 @@ struct AlignedAllocHook : HookBase {
 
 struct MemalignHook : HookBase {
   static constexpr auto name = "memalign";
-  static inline auto ref = &::memalign;
+  using FuncType = decltype(&::memalign);
+  static inline FuncType ref{};
 
   static void *hook(size_t alignment, size_t size) noexcept {
     AllocTrackerHelper helper;
@@ -566,7 +595,8 @@ struct MemalignHook : HookBase {
 
 struct PvallocHook : HookBase {
   static constexpr auto name = "pvalloc";
-  static inline auto ref = &::pvalloc;
+  using FuncType = decltype(&::pvalloc);
+  static inline FuncType ref{};
 
   static void *hook(size_t size) noexcept {
     AllocTrackerHelper helper;
@@ -580,7 +610,8 @@ struct PvallocHook : HookBase {
 
 struct VallocHook : HookBase {
   static constexpr auto name = "valloc";
-  static inline auto ref = &::valloc;
+  using FuncType = decltype(&::valloc);
+  static inline FuncType ref{};
 
   static void *hook(size_t size) noexcept {
     AllocTrackerHelper helper;
@@ -594,7 +625,8 @@ struct VallocHook : HookBase {
 
 struct ReallocArrayHook : HookBase {
   static constexpr auto name = "reallocarray";
-  static inline auto ref = &::reallocarray;
+  using FuncType = decltype(&::reallocarray);
+  static inline FuncType ref{};
 
   static void *hook(void *ptr, size_t nmemb, size_t size) noexcept {
     AllocTrackerHelper helper;
@@ -612,7 +644,8 @@ struct ReallocArrayHook : HookBase {
 
 struct DlopenHook : HookBase {
   static constexpr auto name = "dlopen";
-  static inline auto ref = &::dlopen;
+  using FuncType = decltype(&::dlopen);
+  static inline FuncType ref{};
 
   static void *hook(const char *filename, int flags) noexcept {
     void *ret = ref(filename, flags);
@@ -623,7 +656,8 @@ struct DlopenHook : HookBase {
 
 struct MallocxHook : HookBase {
   static constexpr auto name = "mallocx";
-  static inline auto ref = &::mallocx;
+  using FuncType = decltype(&::mallocx);
+  static inline FuncType ref{};
 
   static void *hook(size_t size, int flags) noexcept {
     AllocTrackerHelper helper;
@@ -635,7 +669,8 @@ struct MallocxHook : HookBase {
 
 struct RallocxHook : HookBase {
   static constexpr auto name = "rallocx";
-  static inline auto ref = &::rallocx;
+  using FuncType = decltype(&::rallocx);
+  static inline FuncType ref{};
 
   static void *hook(void *ptr, size_t size, int flags) noexcept {
     AllocTrackerHelper helper;
@@ -654,7 +689,8 @@ struct RallocxHook : HookBase {
 
 struct XallocxHook : HookBase {
   static constexpr auto name = "xallocx";
-  static inline auto ref = &::xallocx;
+  using FuncType = decltype(&::xallocx);
+  static inline FuncType ref{};
 
   static size_t hook(void *ptr, size_t size, size_t extra, int flags) noexcept {
     AllocTrackerHelper helper;
@@ -670,7 +706,8 @@ struct XallocxHook : HookBase {
 
 struct DallocxHook : HookBase {
   static constexpr auto name = "dallocx";
-  static inline auto ref = &::dallocx;
+  using FuncType = decltype(&::dallocx);
+  static inline FuncType ref{};
 
   static void hook(void *ptr, int flags) noexcept {
     DeallocTrackerHelper helper;
@@ -681,7 +718,8 @@ struct DallocxHook : HookBase {
 
 struct SdallocxHook : HookBase {
   static constexpr auto name = "sdallocx";
-  static inline auto ref = &::sdallocx;
+  using FuncType = decltype(&::sdallocx);
+  static inline FuncType ref{};
 
   static void hook(void *ptr, size_t size, int flags) noexcept {
     DeallocTrackerHelper helper;
@@ -717,7 +755,8 @@ void *my_start(void *arg) {
  * */
 struct PthreadCreateHook : HookBase {
   static constexpr auto name = "pthread_create";
-  static inline auto ref = &::pthread_create;
+  using FuncType = decltype(&::pthread_create);
+  static inline FuncType ref{};
 
   static int hook(pthread_t *thread, const pthread_attr_t *attr,
                   void *(*start_routine)(void *), void *arg) noexcept {
@@ -729,7 +768,8 @@ struct PthreadCreateHook : HookBase {
 
 struct MmapHook : HookBase {
   static constexpr auto name = "mmap";
-  static inline auto ref = &::mmap;
+  using FuncType = decltype(&::mmap);
+  static inline FuncType ref{};
 
   static void *hook(void *addr, size_t length, int prot, int flags, int fd,
                     off_t offset) noexcept {
@@ -744,7 +784,8 @@ struct MmapHook : HookBase {
 
 struct Mmap_Hook : HookBase {
   static constexpr auto name = "__mmap";
-  static inline auto ref = &::mmap;
+  using FuncType = decltype(&::mmap);
+  static inline FuncType ref{};
 
   static void *hook(void *addr, size_t length, int prot, int flags, int fd,
                     off_t offset) noexcept {
@@ -759,7 +800,8 @@ struct Mmap_Hook : HookBase {
 
 struct Mmap64Hook : HookBase {
   static constexpr auto name = "mmap64";
-  static inline auto ref = &::mmap64;
+  using FuncType = decltype(&::mmap64);
+  static inline FuncType ref{};
 
   static void *hook(void *addr, size_t length, int prot, int flags, int fd,
                     off_t offset) noexcept {
@@ -774,7 +816,8 @@ struct Mmap64Hook : HookBase {
 
 struct MunmapHook : HookBase {
   static constexpr auto name = "munmap";
-  static inline auto ref = &::munmap;
+  using FuncType = decltype(&::munmap);
+  static inline FuncType ref{};
 
   static int hook(void *addr, size_t length) noexcept {
     DeallocTrackerHelper helper;
@@ -785,7 +828,8 @@ struct MunmapHook : HookBase {
 
 struct Munmap_Hook : HookBase {
   static constexpr auto name = "__munmap";
-  static inline auto ref = &::munmap;
+  using FuncType = decltype(&::munmap);
+  static inline FuncType ref{};
 
   static int hook(void *addr, size_t length) noexcept {
     DeallocTrackerHelper helper;
@@ -795,12 +839,9 @@ struct Munmap_Hook : HookBase {
 };
 
 template <typename T> void register_hook() {
-  // Be careful not to override T::ref (compiler/linker may emit T::ref as a
-  // relocation pointing on malloc/realloc/calloc/...)
   g_symbol_overrides->register_override(T::name,
                                         reinterpret_cast<uintptr_t>(&T::hook),
-                                        reinterpret_cast<uintptr_t *>(&T::ref),
-                                        reinterpret_cast<uintptr_t>(&T::ref));
+                                        reinterpret_cast<uintptr_t *>(&T::ref));
 }
 
 void register_hooks() {
@@ -849,12 +890,8 @@ void register_hooks() {
   register_hook<DallocxHook>();
   register_hook<SdallocxHook>();
 
-  if (ReallocArrayHook::ref) {
-    register_hook<ReallocArrayHook>();
-  }
-  if (PvallocHook::ref) {
-    register_hook<PvallocHook>();
-  }
+  register_hook<ReallocArrayHook>();
+  register_hook<PvallocHook>();
 
   register_hook<PthreadCreateHook>();
   register_hook<DlopenHook>();

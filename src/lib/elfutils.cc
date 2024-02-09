@@ -5,6 +5,8 @@
 
 #include "elfutils.hpp"
 
+#include "logger.hpp"
+
 #include <algorithm>
 #include <climits>
 #include <cstdio>
@@ -453,11 +455,6 @@ bool SymbolOverrides::register_override(std::string_view symbol_name,
                                         uintptr_t new_symbol,
                                         uintptr_t *ref_symbol,
                                         uintptr_t do_not_override_this_symbol) {
-  // refuse to override symbol if ref symbol is not defined
-  if (*ref_symbol == 0) {
-    return false;
-  }
-
   return _overrides
       .try_emplace(std::string{symbol_name}, ref_symbol, new_symbol,
                    do_not_override_this_symbol)
@@ -465,21 +462,43 @@ bool SymbolOverrides::register_override(std::string_view symbol_name,
 }
 
 void SymbolOverrides::apply_overrides() {
+  // Static / global variables bound to an extern function symbol as:
+  // `static decltype(&::malloc) malloc_ref = &::malloc;`
+  // appear as relocations to the extern function in the generated shared
+  // library.
+  // Their value is initialized by the dynamic linker when library is
+  // loaded.
+  // This means that we will override these relocations with our hooks if we are
+  // not careful.
+  // Moreover ld < 3.38 will initialize these relocations with the
+  // local <symbol>@plt address and during relocation processing they will be
+  // replaced with the global <symbol>@plt (eg. from the executable).
+  // That means that if we use these as the reference function to call in our
+  // hooks, we will end up calling <symbol>@plt from exe and incidentally our
+  // hook since we will have overriden <symbol>@plt from exe with our hook,
+  // causing infinite recursion.
+  // Note that ld >= 38 seems to initialize these relocation with null, and
+  // during relocation processing they are replaced with the global <symbol>
+  // address, not the global <symbol>@plt address.
+
+  // To workaround this, we don't initialize `<symbol>Hook::ref` and do an
+  // explicit lookup to determine <symbol> address. We exclude zero-sized
+  // symbols to avoid finding the address of <symbol>@plt instead of <symbol>.
+  // That's also why we don't use dlsym, because it might return <symbol>@plt
+  // address.
+  // Note that we might be able to use dlsym(RTLD_NEXT, <symbol>) to the same
+  // effect.
+
   for (auto &[symbol_name, override] : _overrides) {
-    // On ubuntu 16, some symbols might be bound to <symbol>@plt symbols
-    // in exe and since we override the symbols in the exe, this would cause
-    // infinite recursion. To workaround this, we do an explicit lookup (we
-    // don't use dlsym since it would return the same <symbol>@plt symbol).
+    auto result = ddprof::lookup_symbol(symbol_name, false);
 
-    auto result = ddprof::lookup_symbol(symbol_name, true);
-
-    if (result.symbol.st_size == 0 &&
-        result.symbol.st_value == *override.ref_symbol) {
-      // null sized symbol, look for a non-null sized symbol
-      result = ddprof::lookup_symbol(symbol_name, false);
-      if (result.symbol.st_value && result.symbol.st_size) {
-        *override.ref_symbol = result.symbol.st_value;
-      }
+    if (result.symbol.st_value > 0 && result.symbol.st_size > 0) {
+      *override.ref_symbol = result.symbol.st_value;
+      LG_DBG("Found symbol %s in %s: 0x%lx size=%lu", symbol_name.c_str(),
+             result.object_name.c_str(), result.symbol.st_value,
+             result.symbol.st_size);
+    } else {
+      LG_DBG("Unable to find symbol %s", symbol_name.c_str());
     }
   }
 
@@ -503,6 +522,9 @@ void SymbolOverrides::restore_library_overrides(std::string_view library_name,
 
   auto &revert_info = it->second;
   for (auto &[address, old_value] : revert_info.old_value_per_address) {
+    LG_DBG("Restoring symbol @0x%lx in library %s: old:0x%lx new:0x%lx",
+           address, revert_info.library_name.c_str(), load64(address),
+           old_value);
     write64(address, old_value);
   }
 }
@@ -577,9 +599,20 @@ void SymbolOverrides::process_relocations(const DynamicInfo &dyn_info,
     if (it != end) {
       auto &override = it->second;
       auto addr = reloc.r_offset + dyn_info.base_address;
+      // Override only if :
+      // * the symbol was not previously overridden (might happen because
+      //   different symbol names might point to the same address)
+      // * the symbol address is not equal to the do_not_override_this_symbol
+      //   value (ie. we explicitly don't want to touch this address)
+      // * the ref symbol is not null (ie. we were able to lookup the ref
+      //   symbol)
       if (addr != override.do_not_override_this_symbol &&
-          !revert_info.old_value_per_address.contains(addr)) {
+          !revert_info.old_value_per_address.contains(addr) &&
+          *override.ref_symbol != 0) {
         revert_info.old_value_per_address[addr] = load64(addr);
+        LG_DBG("Overriding symbol %s@0x%lx in library %s: old:0x%lx new:0x%lx",
+               symname, addr, revert_info.library_name.c_str(), load64(addr),
+               override.new_symbol);
         override_entry(addr, override.new_symbol);
       }
     }

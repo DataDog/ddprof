@@ -58,13 +58,12 @@ public:
   // register a symbol override
   // symbol_name: name of the symbol to override
   // new_symbol: new symbol value
-  // ref_symbol: pointer to the initial value of symbol to override (will be
-  //             updated if symbol value is null or match a null sized symbol)
+  // ref_symbol: output filled with the address of the symbol to override
   // do_not_override_this_symbol: if symbol value is equal to this value, do not
   //                              override it
   bool register_override(std::string_view symbol_name, uintptr_t new_symbol,
                          uintptr_t *ref_symbol,
-                         uintptr_t do_not_override_this_symbol);
+                         uintptr_t do_not_override_this_symbol = 0);
 
   // override all registered symbols
   void apply_overrides();
