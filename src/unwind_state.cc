@@ -9,12 +9,13 @@
 #include "logger.hpp"
 
 namespace ddprof {
-std::optional<UnwindState> create_unwind_state(int dd_profiling_fd) {
+std::optional<UnwindState> create_unwind_state(int dd_profiling_fd,
+                                               bool disable_symbolization) {
   auto elf = create_elf_from_self();
   if (!elf) {
     return std::nullopt;
   }
 
-  return UnwindState(std::move(elf), dd_profiling_fd);
+  return UnwindState(std::move(elf), dd_profiling_fd, disable_symbolization);
 }
 } // namespace ddprof

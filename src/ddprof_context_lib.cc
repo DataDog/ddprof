@@ -90,6 +90,7 @@ void copy_cli_values(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
   ctx.params.timeline = ddprof_cli.timeline;
   ctx.params.fault_info = ddprof_cli.fault_info;
   ctx.params.remote_symbolization = ddprof_cli.remote_symbolization;
+  ctx.params.disable_symbolization = ddprof_cli.disable_symbolization;
 
   ctx.params.initial_loaded_libs_check_delay =
       ddprof_cli.initial_loaded_libs_check_delay;
