@@ -93,12 +93,6 @@ check() {
     rm -f "${log_file}"
 }
 
-# Test disabled static lib mode
-check "./test/simple_malloc-static ${opts}" -1
-
-# Test enabled static lib mode
-check "./test/simple_malloc-static --profile ${opts}" 1
-
 # Test disabled shared lib mode
 check "./test/simple_malloc-shared ${opts}" -1
 

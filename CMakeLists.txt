@@ -347,16 +347,6 @@ set_target_properties(
                                                                        "${CMAKE_BINARY_DIR}")
 add_dependencies(ddprof_exe_object generate_ddprof_object)
 
-add_library(dd_profiling-static STATIC ${DD_PROFILING_SOURCES})
-set_target_properties(dd_profiling-static PROPERTIES OUTPUT_NAME dd_profiling)
-target_compile_definitions(dd_profiling-static PRIVATE DDPROF_EMBEDDED_EXE_DATA)
-target_include_directories(dd_profiling-static PUBLIC ${CMAKE_SOURCE_DIR}/include/lib
-                                                      ${CMAKE_SOURCE_DIR}/include)
-set_target_properties(dd_profiling-static
-                      PROPERTIES PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
-target_link_libraries(dd_profiling-static PRIVATE ddprof_exe_object)
-target_link_libraries(dd_profiling-static PUBLIC dl pthread rt absl::base absl::str_format)
-
 if(USE_LOADER)
   # When using a loader, libdd_profiling.so is a loader that embeds both libdd_profiling-embedded.so
   # and ddprof executable.
@@ -410,7 +400,7 @@ if(BUILD_UNIVERSAL_DDPROF)
 endif()
 
 install(
-  TARGETS ddprof dd_profiling-static dd_profiling-shared
+  TARGETS ddprof dd_profiling-shared
   RUNTIME DESTINATION ddprof/bin
   LIBRARY DESTINATION ddprof/lib
   ARCHIVE DESTINATION ddprof/lib

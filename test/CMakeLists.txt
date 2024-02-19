@@ -424,12 +424,6 @@ add_benchmark(
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
   add_exe(
-    simple_malloc-static simple_malloc.cc
-    LIBRARIES Threads::Threads dd_profiling-static CLI11 dl
-    DEFINITIONS USE_DD_PROFILING)
-  target_include_directories(simple_malloc-static PRIVATE ${CMAKE_SOURCE_DIR}/include)
-
-  add_exe(
     simple_malloc-shared simple_malloc.cc
     LIBRARIES dd_profiling-shared Threads::Threads CLI11 dl
     DEFINITIONS USE_DD_PROFILING)
