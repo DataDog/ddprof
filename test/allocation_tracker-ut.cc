@@ -2,6 +2,12 @@
 // under the Apache License Version 2.0. This product includes software
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
+
+#ifdef MUSL_LIBC
+// Required to get mmap64 declaration:
+// https://wiki.musl-libc.org/faq#Q:-Do-I-need-to-define-%3Ccode%3E_LARGEFILE64_SOURCE%3C/code%3E-to-get-64bit-%3Ccode%3Eoff_t%3C/code%3E?
+#  define _LARGEFILE64_SOURCE
+#endif
 #include "allocation_tracker.hpp"
 
 #include "allocation_event.hpp"

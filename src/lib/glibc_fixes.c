@@ -25,9 +25,9 @@
 
 void *dlsym(void *handle, const char *symbol) __attribute__((weak));
 
-// fstat is linked statically on glibc and symbol is not present in libc.so.6
-// Provide a replacement that calls __fxstat is present or fstat resolved with
-// dlsym/RTLD_NEXT
+// fstat is linked statically on glibc < 2.35 and symbol is not present in
+// libc.so.6 Provide a replacement that calls __fxstat if present or fstat
+// resolved with dlsym/RTLD_NEXT
 int __fxstat(int ver, int fd, struct stat *buf) __attribute__((weak));
 int __xstat(int ver, const char *pathname, struct stat *buf)
     __attribute__((weak));
@@ -37,6 +37,9 @@ extern int fstat(int fd, struct stat *buf)
 
 extern int stat(const char *pathname, struct stat *buf)
     __attribute__((weak, alias("__stat")));
+
+extern int lstat(const char *pathname, struct stat *buf)
+    __attribute__((weak, alias("__lstat")));
 
 // NOLINTNEXTLINE(cert-dcl51-cpp)
 __attribute__((unused)) int __fstat(int fd, struct stat *buf) {
@@ -73,6 +76,21 @@ __attribute__((unused)) int __stat(const char *pathname, struct stat *buf) {
   }
   if (s_stat) {
     return s_stat(pathname, buf);
+  }
+
+  // Should not happen
+  assert(0);
+  return -1;
+}
+
+// NOLINTNEXTLINE(cert-dcl51-cpp)
+__attribute__((unused)) int __lstat(const char *pathname, struct stat *buf) {
+  static __typeof(lstat) *s_lstat = NULL;
+  if (s_lstat == NULL && dlsym) {
+    s_lstat = (__typeof(s_lstat))dlsym(RTLD_NEXT, "lstat");
+  }
+  if (s_lstat) {
+    return s_lstat(pathname, buf);
   }
 
   // Should not happen
