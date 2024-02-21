@@ -57,6 +57,10 @@ else()
   option(USE_LOADER "Use an intermediate loader for libdd_profiling" OFF)
   option(USE_AUXILIARY "Use DT_AUXILIARY for libdd_profiling" OFF)
 endif()
+option(DDPROF_ALLOCATOR "Define the type of allocator (STANDARD / JEMALLOC)" STANDARD)
+option(BUILD_BENCHMARKS "Enable benchmarks" OFF)
+option(BUILD_DDPROF_TESTING "Enable tests" ON)
+option(STRIP_DEBUG_INFO "Strip debug info from the final binaries" OFF)
 
 if(USE_LOADER AND USE_AUXILIARY)
   message(FATAL_ERROR "USE_LOADER and USE_AUXILIARY are incompatible")
@@ -102,7 +106,6 @@ add_dependencies(cppcheck DDProf::Parser)
 
 # ---- Libraries (needed by ut) ----
 
-option(DDPROF_ALLOCATOR "Define the type of allocator (STANDARD / JEMALLOC)" STANDARD)
 if("${DDPROF_ALLOCATOR}" STREQUAL "JEMALLOC")
   # jemalloc for debug
   find_package(jemalloc REQUIRED)
@@ -116,7 +119,6 @@ include(Findlibcap)
 add_subdirectory(third_party)
 
 # ---- Benchmarks ----
-option(BUILD_BENCHMARKS "Enable benchmarks" OFF)
 if(${BUILD_BENCHMARKS})
   add_subdirectory(bench/collatz)
 endif()
@@ -176,6 +178,7 @@ if(USE_LOADER)
   target_link_options(dd_loader PRIVATE "LINKER:--version-script=${dd_profiling_linker_script}")
   target_static_libcxx(dd_loader)
   target_static_sanitizer(dd_loader)
+  target_strip_debug_info(dd_loader)
 
   if(BUILD_UNIVERSAL_DDPROF)
     target_link_options(dd_loader PRIVATE "-nolibc")
@@ -250,6 +253,8 @@ target_static_sanitizer(dd_profiling-embedded)
 set_target_properties(dd_profiling-embedded PROPERTIES LINK_DEPENDS "${dd_profiling_linker_script}")
 target_link_options(dd_profiling-embedded PRIVATE
                     "LINKER:--version-script=${dd_profiling_linker_script};LINKER:-Bsymbolic")
+target_strip_debug_info(dd_profiling-embedded)
+
 if(BUILD_UNIVERSAL_DDPROF)
   target_link_options(dd_profiling-embedded PRIVATE "-nolibc")
   if(USE_AUXILIARY)
@@ -304,6 +309,8 @@ add_exe(
   DEFINITIONS ${DDPROF_DEFINITION_LIST})
 target_link_libraries(ddprof PRIVATE libddprofiling_embedded_object CLI11 absl::base
                                      absl::str_format)
+target_strip_debug_info(ddprof)
+
 if(USE_LOADER)
   target_compile_definitions(ddprof PRIVATE "DDPROF_USE_LOADER")
   target_link_libraries(ddprof PRIVATE libdd_loader_object)
@@ -394,6 +401,7 @@ target_static_sanitizer(dd_profiling-shared)
 set_target_properties(dd_profiling-shared PROPERTIES LINK_DEPENDS "${dd_profiling_linker_script}")
 target_link_options(dd_profiling-shared PRIVATE
                     "LINKER:--version-script=${dd_profiling_linker_script};LINKER:-Bsymbolic")
+target_strip_debug_info(dd_profiling-shared)
 
 set_target_properties(dd_profiling-shared PROPERTIES OUTPUT_NAME dd_profiling)
 target_include_directories(dd_profiling-shared PUBLIC ${CMAKE_SOURCE_DIR}/include/lib
@@ -419,7 +427,6 @@ install(
 # ---- Unit tests ----
 
 # Unit tests Add infrastructure for enabling tests
-option(BUILD_DDPROF_TESTING "Enable tests" ON)
 if(${BUILD_DDPROF_TESTING})
   enable_testing()
   add_subdirectory(test)
