@@ -3,6 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
+#include <cstdint>
 #include <fstream>
 #include <sstream>
 #include <string>
