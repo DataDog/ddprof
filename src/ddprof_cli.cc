@@ -347,6 +347,13 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
                                  ->envname("DD_PROFILING_REMOTE_SYMBOLIZATION")
                                  ->group(""));
 
+  extended_options.push_back(app.add_flag("--disable-symbolization",
+                                          disable_symbolization,
+                                          "Disable symbolization")
+                                 ->default_val(false)
+                                 ->envname("DD_PROFILING_DISABLE_SYMBOLIZATION")
+                                 ->group(""));
+
   // Parse
   CLI11_PARSE(app, argc, argv);
 

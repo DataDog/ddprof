@@ -22,7 +22,9 @@
 
 namespace ddprof {
 // todo : cut this dependency
-DwflSymbolLookup::DwflSymbolLookup() : _lookup_setting(K_CACHE_ON) {}
+DwflSymbolLookup::DwflSymbolLookup(bool disable_symbolization)
+    : _lookup_setting(K_CACHE_ON),
+      _disable_symbolization(disable_symbolization) {}
 
 TEST(DDProfPProf, init_profiles) {
   DDProfPProf pprof;

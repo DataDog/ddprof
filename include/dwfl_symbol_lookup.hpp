@@ -43,7 +43,7 @@ struct DwflSymbolLookupStats {
 class DwflSymbolLookup {
 public:
   // build and check env var to know check setting
-  DwflSymbolLookup();
+  explicit DwflSymbolLookup(bool disable_symbolization = false);
 
   // Get symbol from internal cache or fetch through dwarf
   SymbolIdx_t get_or_insert(const DDProfMod &ddprof_mod, SymbolTable &table,
@@ -85,6 +85,7 @@ private:
   // unordered map of DSO elements
   FileInfo2SymbolMap _file_info_map;
   DwflSymbolLookupStats _stats;
+  bool _disable_symbolization{false};
 };
 
 } // namespace ddprof

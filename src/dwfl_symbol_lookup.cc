@@ -18,7 +18,8 @@
 
 namespace ddprof {
 
-DwflSymbolLookup::DwflSymbolLookup() {
+DwflSymbolLookup::DwflSymbolLookup(bool disable_symbolization)
+    : _disable_symbolization(disable_symbolization) {
   if (const char *env_p = std::getenv("DDPROF_CACHE_SETTING")) {
     if (strcmp(env_p, "VALIDATE") == 0) {
       // Allows to compare the accuracy of the cache
@@ -93,7 +94,8 @@ SymbolIdx_t DwflSymbolLookup::insert(const DDProfMod &ddprof_mod,
 
   ElfAddress_t const elf_pc = process_pc - ddprof_mod._sym_bias;
 
-  if (!symbol_get_from_dwfl(ddprof_mod._mod, process_pc, symbol, elf_sym,
+  if (_disable_symbolization ||
+      !symbol_get_from_dwfl(ddprof_mod._mod, process_pc, symbol, elf_sym,
                             lbias)) {
     ++_stats._no_dwfl_symbols;
     // Override with info from dso

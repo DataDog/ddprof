@@ -19,8 +19,10 @@
 
 namespace ddprof {
 struct SymbolHdr {
-  explicit SymbolHdr(std::string_view path_to_proc = "")
-      : _runtime_symbol_lookup(path_to_proc) {}
+  explicit SymbolHdr(bool disable_symbolization = false,
+                     std::string_view path_to_proc = "")
+      : _dwfl_symbol_lookup(disable_symbolization),
+        _runtime_symbol_lookup(path_to_proc) {}
   void display_stats() const {
     _dwfl_symbol_lookup.stats().display(_dwfl_symbol_lookup.size());
     _dso_symbol_lookup.stats_display();

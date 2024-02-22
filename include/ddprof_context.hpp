@@ -33,6 +33,7 @@ struct DDProfContext {
     bool show_samples{false};
     bool timeline{false};
     bool remote_symbolization{false};
+    bool disable_symbolization{false};
 
     cpu_set_t cpu_affinity{};
     std::string switch_user;
