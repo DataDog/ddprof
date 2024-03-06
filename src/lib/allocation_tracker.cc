@@ -50,9 +50,10 @@ TrackerThreadLocalState *AllocationTracker::init_tl_state() {
   tl_state->tid = ddprof::gettid();
   tl_state->stack_bounds = retrieve_stack_bounds();
 
-  if (int res = pthread_setspecific(_tl_state_key, tl_state.get()); res != 0) {
+  if (int const res = pthread_setspecific(_tl_state_key, tl_state.get());
+      res != 0) {
     // should return 0
-    LOG_ONCE("Error: Unable to store tl_state. error %d \n", res);
+    LG_ERR("Unable to store tl_state. Error %d: %s\n", res, strerror(res));
     tl_state.reset();
   }
 
@@ -176,8 +177,7 @@ void AllocationTracker::allocation_tracking_free() {
   }
   TrackerThreadLocalState *tl_state = get_tl_state();
   if (unlikely(!tl_state)) {
-    const char *func_name = __FUNCTION__;
-    LOG_ONCE("Error: Unable to find tl_state during %s\n", func_name);
+    LG_ERR("Unable to get tl_state during allocation_tracking_free\n");
     instance->free();
     return;
   }
@@ -247,9 +247,8 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
           // still set this as we are pushing the allocation to ddprof
           _allocated_address_set.add(addr);
         } else {
-          LOG_ONCE(
-              "Error: %s",
-              "Stop allocation profiling. Unable to clear live allocation \n");
+          LG_ERR("Stopping allocation profiling. Unable to clear live "
+                 "allocation\n");
           free();
         }
       }
@@ -304,6 +303,9 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
   event->header.type = PERF_RECORD_LOST;
   auto now = PerfClock::now();
   event->sample_id.time = now.time_since_epoch().count();
+
+  DDPROF_DCHECK_FATAL(_state.pid != 0 && tl_state.tid != 0,
+                      "pid or tid is not set");
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
 
@@ -337,6 +339,9 @@ DDRes AllocationTracker::push_clear_live_allocation(
   event->hdr.type = PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION;
   auto now = PerfClock::now();
   event->sample_id.time = now.time_since_epoch().count();
+
+  DDPROF_DCHECK_FATAL(_state.pid != 0 && tl_state.tid != 0,
+                      "pid or tid is not set");
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
 
@@ -383,6 +388,9 @@ DDRes AllocationTracker::push_dealloc_sample(
   event->hdr.type = PERF_CUSTOM_EVENT_DEALLOCATION;
   auto now = PerfClock::now();
   event->sample_id.time = now.time_since_epoch().count();
+
+  DDPROF_DCHECK_FATAL(_state.pid != 0 && tl_state.tid != 0,
+                      "pid or tid is not set");
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
 
@@ -463,6 +471,9 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   auto now = PerfClock::now();
   event->sample_id.time = now.time_since_epoch().count();
   event->addr = addr;
+
+  DDPROF_DCHECK_FATAL(_state.pid != 0 && tl_state.tid != 0,
+                      "pid or tid is not set");
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
   event->period = allocated_size;
@@ -539,8 +550,8 @@ void AllocationTracker::notify_thread_start() {
   if (unlikely(!tl_state)) {
     tl_state = init_tl_state();
     if (!tl_state) {
-      LOG_ONCE("Error: Unable to start allocation profiling on thread %d",
-               ddprof::gettid());
+      LG_ERR("Unable to start allocation profiling on thread %d",
+             ddprof::gettid());
       return;
     }
   }
@@ -554,8 +565,8 @@ void AllocationTracker::notify_fork() {
   if (unlikely(!tl_state)) {
     // The state should already exist if we forked.
     // This would mean that we were not able to create the state before forking
-    LOG_ONCE("Error: Unable to retrieve tl state after fork thread %d",
-             ddprof::gettid());
+    LG_ERR("Unable to retrieve tl state after fork thread %d",
+           ddprof::gettid());
     return;
   }
   tl_state->tid = ddprof::gettid();

@@ -5,11 +5,12 @@
 
 #pragma once
 
-#include <chrono>
-#include <stdarg.h>
-
 #include "unlikely.hpp"
 #include "version.hpp"
+
+#include <chrono>
+#include <functional>
+#include <stdarg.h>
 
 namespace ddprof {
 
@@ -99,6 +100,13 @@ void LOG_setfacility(int fac);
 void LOG_setratelimit(uint64_t max_log_per_interval,
                       std::chrono::nanoseconds interval);
 
+bool LOG_is_logging_enabled_for_level(int level);
+
+using LogsAllowedCallback = std::function<bool()>;
+
+// Allow to inject a function used by logger to check if logs are allowed
+void LOG_set_logs_allowed_function(LogsAllowedCallback logs_allowed_function);
+
 /******************************* Logging Macros *******************************/
 #define ABS(__x)                                                               \
   ({                                                                           \
@@ -109,7 +117,7 @@ void LOG_setratelimit(uint64_t max_log_per_interval,
 // Avoid calling arguments (which can have CPU costs unless level is OK)
 #define LG_IF_LVL_OK(level, ...)                                               \
   do {                                                                         \
-    if (unlikely(level <= LOG_getlevel())) {                                   \
+    if (unlikely(LOG_is_logging_enabled_for_level(level))) {                   \
       olprintfln(ABS(level), -1, MYNAME, __VA_ARGS__);                         \
     }                                                                          \
   } while (false)
