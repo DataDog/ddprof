@@ -18,18 +18,107 @@
 #include <libelf.h>
 #include <unistd.h>
 
+using namespace std::literals;
+
 namespace ddprof {
 
 namespace {
 
-DDRes find_elf_segment(int fd, const std::string &filepath,
-                       Offset_t file_offset, Segment &segment) {
-  Elf *elf = elf_begin(fd, ELF_C_READ_MMAP, nullptr);
-  if (elf == nullptr) {
-    LG_WRN("Invalid elf %s", filepath.c_str());
-    return ddres_error(DD_WHAT_INVALID_ELF);
+Elf_Scn *find_note_section(Elf *elf, const char *section_name) {
+  size_t stridx;
+  if (elf_getshdrstrndx(elf, &stridx) != 0) {
+    return nullptr;
   }
-  defer { elf_end(elf); };
+
+  Elf_Scn *section = nullptr;
+  GElf_Shdr section_header;
+  while ((section = elf_nextscn(elf, section)) != nullptr) {
+    if (!gelf_getshdr(section, &section_header) ||
+        section_header.sh_type != SHT_NOTE) {
+      continue;
+    }
+
+    const char *name = elf_strptr(elf, stridx, section_header.sh_name);
+    if (name && !strcmp(name, section_name)) {
+      return section;
+    }
+  }
+
+  return nullptr;
+}
+
+constexpr std::string_view kGoBuildIdNoteName = "Go\0\0"sv;
+constexpr std::string_view kGnuBuildIdNoteName = "GNU\0"sv;
+const char *kGoBuildIdSection = ".note.go.buildid";
+const char *kGnuBuildIdSection = ".note.gnu.build-id";
+const uint64_t kGoBuildIdTag = 4;
+
+std::span<const std::byte> get_elf_note(Elf *elf, const char *section_name,
+                                        Elf64_Word note_type,
+                                        std::string_view note_name) {
+  Elf_Scn *note_section = find_note_section(elf, section_name);
+  if (!note_section) {
+    return {};
+  }
+
+  Elf_Data *data = elf_getdata(note_section, nullptr);
+  if (!data) {
+    return {};
+  }
+
+  size_t pos = 0;
+  GElf_Nhdr note_header;
+  size_t name_pos;
+  size_t desc_pos;
+  while ((pos = gelf_getnote(data, pos, &note_header, &name_pos, &desc_pos)) >
+         0) {
+    const auto *buf = reinterpret_cast<const std::byte *>(data->d_buf);
+    if (note_header.n_type == note_type &&
+        note_header.n_namesz == note_name.size() &&
+        !memcmp(buf + name_pos, note_name.data(), note_name.size())) {
+      return {buf + desc_pos, note_header.n_descsz};
+    }
+  }
+
+  return {};
+}
+
+std::optional<std::string> get_gnu_build_id(Elf *elf) {
+  auto note = get_elf_note(elf, kGnuBuildIdSection, NT_GNU_BUILD_ID,
+                           kGnuBuildIdNoteName);
+  if (note.empty()) {
+    return std::nullopt;
+  }
+
+  return format_build_id(BuildIdSpan{
+      reinterpret_cast<const unsigned char *>(note.data()), note.size()});
+}
+
+std::optional<std::string> get_golang_build_id(Elf *elf) {
+  auto note =
+      get_elf_note(elf, kGoBuildIdSection, kGoBuildIdTag, kGoBuildIdNoteName);
+  if (note.empty()) {
+    return std::nullopt;
+  }
+
+  return std::string{reinterpret_cast<const char *>(note.data()), note.size()};
+}
+
+std::optional<std::string> find_build_id(Elf *elf) {
+  auto maybe_gnu_build_id = get_gnu_build_id(elf);
+  if (maybe_gnu_build_id) {
+    return maybe_gnu_build_id;
+  }
+
+  auto maybe_golang_build_id = get_golang_build_id(elf);
+  if (maybe_golang_build_id) {
+    return maybe_golang_build_id;
+  }
+  return std::nullopt;
+}
+
+DDRes find_elf_segment(Elf *elf, const std::string &filepath,
+                       Offset_t file_offset, Segment &segment) {
   GElf_Ehdr ehdr_mem;
   GElf_Ehdr *ehdr = gelf_getehdr(elf, &ehdr_mem);
   if (ehdr == nullptr) {
@@ -72,13 +161,13 @@ DDRes find_elf_segment(int fd, const std::string &filepath,
   return ddres_error(DD_WHAT_NO_MATCHING_LOAD_SEGMENT);
 }
 
-DDRes compute_elf_bias(int fd, const std::string &filepath, const Dso &dso,
+DDRes compute_elf_bias(Elf *elf, const std::string &filepath, const Dso &dso,
                        ProcessAddress_t pc, Offset_t &bias) {
   // Compute file offset from pc
   Offset_t const file_offset = pc - dso.start() + dso.offset();
 
   Segment segment;
-  auto res = find_elf_segment(fd, filepath, file_offset, segment);
+  auto res = find_elf_segment(elf, filepath, file_offset, segment);
   if (!IsDDResOK(res)) {
     return res;
   }
@@ -124,8 +213,15 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
 
   // Load the file at a matching DSO address
   dwfl_errno(); // erase previous error
+  Elf *elf = elf_begin(fd_holder.get(), ELF_C_READ_MMAP, nullptr);
+  if (elf == nullptr) {
+    LG_WRN("Invalid elf %s", filepath.c_str());
+    return ddres_error(DD_WHAT_INVALID_ELF);
+  }
+  defer { elf_end(elf); };
+
   Offset_t bias = 0;
-  auto res = compute_elf_bias(fd_holder.get(), filepath, dso, pc, bias);
+  auto res = compute_elf_bias(elf, filepath, dso, pc, bias);
   if (!IsDDResOK(res)) {
     fileInfoValue.set_errored();
     LG_WRN("Couldn't retrieve offsets from %s(%s)", module_name,
@@ -133,17 +229,16 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
     return res;
   }
 
+  LG_NFO("Loading module %s for pid %d", fileInfoValue.get_path().c_str(),
+         dso._pid);
   ddprof_mod._mod = dwfl_report_elf(dwfl, module_name, filepath.c_str(),
                                     fd_holder.get(), bias, true);
 
+  auto maybe_build_id = find_build_id(elf);
+
   // Retrieve build id
-  const unsigned char *bits = nullptr;
-  GElf_Addr vaddr;
-  if (int const size = dwfl_module_build_id(ddprof_mod._mod, &bits, &vaddr);
-      size > 0) {
-    // ensure we called dwfl_module_getelf first (or this can fail)
-    // returns the size
-    ddprof_mod.set_build_id(BuildIdSpan{bits, static_cast<unsigned>(size)});
+  if (maybe_build_id) {
+    ddprof_mod.set_build_id(std::move(maybe_build_id.value()));
   }
 
   if (!ddprof_mod._mod) {
@@ -166,6 +261,19 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
 
   ddprof_mod._sym_bias = bias;
   return {};
+}
+
+std::optional<std::string> find_build_id(const char *filepath) {
+  const UniqueFd fd_holder{::open(filepath, O_RDONLY)};
+  if (!fd_holder) {
+    return std::nullopt;
+  }
+  Elf *elf = elf_begin(fd_holder.get(), ELF_C_READ_MMAP, nullptr);
+  if (elf == nullptr) {
+    return std::nullopt;
+  }
+  defer { elf_end(elf); };
+  return find_build_id(elf);
 }
 
 } // namespace ddprof

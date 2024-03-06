@@ -384,6 +384,9 @@ add_unit_test(
   ../src/signal_helper.cc
   LIBRARIES ${ELFUTILS_LIBRARIES})
 
+add_unit_test(ddprof_module_lib-ut ddprof_module_lib-ut.cc ../src/ddprof_module_lib.cc
+              ../src/build_id.cc ../src/dso.cc LIBRARIES ${ELFUTILS_LIBRARIES})
+
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/pthread_fixes.cc
               ../src/lib/savecontext.cc ../src/lib/saveregisters.cc LIBRARIES llvm-demangle)
 

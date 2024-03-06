@@ -12,6 +12,8 @@
 #include "dso_hdr.hpp"
 #include "dwfl_internals.hpp"
 
+#include <optional>
+
 namespace ddprof {
 
 // Convert elf flags to mmap prot flags
@@ -31,5 +33,7 @@ struct Segment {
 // object, return the associated Dwfl_Module
 DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
                     const FileInfoValue &fileInfoValue, DDProfMod &ddprof_mod);
+
+std::optional<std::string> find_build_id(const char *filepath);
 
 } // namespace ddprof
