@@ -27,7 +27,7 @@ struct DDProfMod {
 
   explicit DDProfMod(Status status) : _status(status) {}
 
-  void set_build_id(BuildIdSpan x) { _build_id = format_build_id(x); }
+  void set_build_id(std::string build_id) { _build_id = std::move(build_id); }
 
   // build id (string that displays the hexadecimal value)
   BuildIdStr _build_id;
