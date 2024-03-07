@@ -13,13 +13,24 @@ TEST(ddprof_module_lib, find_build_id) {
   // init elf library
   elf_version(EV_CURRENT);
 
-  auto gnu_build_id = find_build_id(UNIT_TEST_DATA "/gnu_exe");
-  ASSERT_TRUE(gnu_build_id.has_value());
-  ASSERT_EQ(*gnu_build_id, "463bf6f201611ff6bda58b492c39760bdf91c64c");
-  auto go_build_id = find_build_id(UNIT_TEST_DATA "/go_exe.debug");
-  ASSERT_TRUE(go_build_id.has_value());
-  ASSERT_EQ(*go_build_id,
-            "1QJNd3IcsGXYu2DBSgMt/-RUtp0ZCapQufd_qb_Yc/iaqdEc--v2HiCZnsxjI6/"
-            "ljHvxz7xDEEo-TQ3z9Op");
+  {
+    auto build_id = find_build_id(UNIT_TEST_DATA "/gnu_exe");
+    ASSERT_TRUE(build_id.has_value());
+    ASSERT_EQ(*build_id, "463bf6f201611ff6bda58b492c39760bdf91c64c");
+  }
+
+  {
+    auto build_id = find_build_id(UNIT_TEST_DATA "/gnu_exe_without_sections");
+    ASSERT_TRUE(build_id.has_value());
+    ASSERT_EQ(*build_id, "463bf6f201611ff6bda58b492c39760bdf91c64c");
+  }
+
+  {
+    auto build_id = find_build_id(UNIT_TEST_DATA "/go_exe.debug");
+    ASSERT_TRUE(build_id.has_value());
+    ASSERT_EQ(*build_id,
+              "1QJNd3IcsGXYu2DBSgMt/-RUtp0ZCapQufd_qb_Yc/iaqdEc--v2HiCZnsxjI6/"
+              "ljHvxz7xDEEo-TQ3z9Op");
+  }
 }
 } // namespace ddprof
