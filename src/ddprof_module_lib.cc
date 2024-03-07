@@ -24,6 +24,12 @@ namespace ddprof {
 
 namespace {
 
+constexpr std::string_view kGoBuildIdNoteName = "Go\0\0"sv;
+constexpr std::string_view kGnuBuildIdNoteName = "GNU\0"sv;
+const char *kGoBuildIdSection = ".note.go.buildid";
+const char *kGnuBuildIdSection = ".note.gnu.build-id";
+const Elf64_Word kGoBuildIdTag = 4;
+
 Elf_Scn *find_note_section(Elf *elf, const char *section_name) {
   size_t stridx;
   if (elf_getshdrstrndx(elf, &stridx) != 0) {
@@ -47,25 +53,8 @@ Elf_Scn *find_note_section(Elf *elf, const char *section_name) {
   return nullptr;
 }
 
-constexpr std::string_view kGoBuildIdNoteName = "Go\0\0"sv;
-constexpr std::string_view kGnuBuildIdNoteName = "GNU\0"sv;
-const char *kGoBuildIdSection = ".note.go.buildid";
-const char *kGnuBuildIdSection = ".note.gnu.build-id";
-const uint64_t kGoBuildIdTag = 4;
-
-std::span<const std::byte> get_elf_note(Elf *elf, const char *section_name,
-                                        Elf64_Word note_type,
+std::span<const std::byte> process_note(Elf_Data *data, Elf64_Word note_type,
                                         std::string_view note_name) {
-  Elf_Scn *note_section = find_note_section(elf, section_name);
-  if (!note_section) {
-    return {};
-  }
-
-  Elf_Data *data = elf_getdata(note_section, nullptr);
-  if (!data) {
-    return {};
-  }
-
   size_t pos = 0;
   GElf_Nhdr note_header;
   size_t name_pos;
@@ -77,6 +66,50 @@ std::span<const std::byte> get_elf_note(Elf *elf, const char *section_name,
         note_header.n_namesz == note_name.size() &&
         !memcmp(buf + name_pos, note_name.data(), note_name.size())) {
       return {buf + desc_pos, note_header.n_descsz};
+    }
+  }
+  return {};
+}
+
+std::span<const std::byte> get_elf_note(Elf *elf, const char *node_section_name,
+                                        Elf64_Word note_type,
+                                        std::string_view note_name) {
+  Elf_Scn *scn = elf_nextscn(elf, nullptr);
+
+  if (scn) {
+    // there is a section hdr, try it first
+    Elf_Scn *note_section = find_note_section(elf, node_section_name);
+    if (!note_section) {
+      return {};
+    }
+
+    Elf_Data *data = elf_getdata(note_section, nullptr);
+    if (data) {
+      auto result = process_note(data, note_type, note_name);
+      if (!result.empty()) {
+        return result;
+      }
+    }
+  }
+
+  // if we didn't find the note in the sections, try the program headers
+  size_t phnum;
+  if (elf_getphdrnum(elf, &phnum) != 0) {
+    return {};
+  }
+  for (size_t i = 0; i < phnum; ++i) {
+    GElf_Phdr phdr_mem;
+    GElf_Phdr *phdr = gelf_getphdr(elf, i, &phdr_mem);
+    if (phdr != nullptr && phdr->p_type == PT_NOTE) {
+      Elf_Data *data =
+          elf_getdata_rawchunk(elf, phdr->p_offset, phdr->p_filesz,
+                               (phdr->p_align == 8 ? ELF_T_NHDR8 : ELF_T_NHDR));
+      if (data) {
+        auto result = process_note(data, note_type, note_name);
+        if (!result.empty()) {
+          return result;
+        }
+      }
     }
   }
 
