@@ -31,15 +31,12 @@ struct FunLoc {
 struct UnwindOutput {
   void clear() {
     locs.clear();
-    is_incomplete = true;
     container_id = k_container_id_unknown;
   }
   std::vector<FunLoc> locs;
   std::string container_id;
   int pid;
   int tid;
-  bool is_incomplete;
-
   friend auto operator<=>(const UnwindOutput &, const UnwindOutput &) = default;
 };
 // NOLINTEND(misc-non-private-member-variables-in-classes)

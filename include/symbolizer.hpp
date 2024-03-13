@@ -1,3 +1,7 @@
+// Unless explicitly stated otherwise all files in this repository are licensed
+// under the Apache License Version 2.0. This product includes software
+// developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
+// Datadog, Inc.
 #pragma once
 
 #include "datadog/blazesym.h"
@@ -18,7 +22,7 @@ namespace ddprof {
 class Symbolizer {
 
 public:
-  Symbolizer();
+  Symbolizer(bool disable_symbolization);
   ~Symbolizer();
 
   struct SessionResults {
@@ -38,8 +42,11 @@ public:
     }
   }
 
+  bool is_symbolization_disabled() const { return _disable_symbolization; }
+
 private:
   ddprof::HeterogeneousLookupStringMap<std::string> _demangled_names;
   blaze_symbolizer *_symbolizer;
+  bool _disable_symbolization;
 };
 } // namespace ddprof

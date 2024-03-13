@@ -52,8 +52,9 @@ inline void write_mapping(const MapInfo &mapinfo,
 }
 
 inline void write_location(const FunLoc *loc, const MapInfo &mapinfo,
-                    const Symbol &symbol, ddog_prof_Location *ffi_location,
-                    bool use_process_adresses) {
+                           const Symbol &symbol,
+                           ddog_prof_Location *ffi_location,
+                           bool use_process_adresses) {
   write_mapping(mapinfo, &ffi_location->mapping);
   write_function(symbol, &ffi_location->function);
   ffi_location->address = use_process_adresses ? loc->ip : loc->_elf_addr;
@@ -81,9 +82,8 @@ inline DDRes write_location_blaze(
   if (cur_loc >= locations_buff.size()) {
     return ddres_warn(DD_WHAT_UW_MAX_DEPTH);
   }
-  constexpr std::string_view undef{"[undefined]"};
-  constexpr std::string_view undef_inlined{"[undefined(inlined)]"};
-  // #ifdef inlined_func
+  constexpr std::string_view undef{""};
+  constexpr std::string_view undef_inlined = undef;
   for (unsigned i = 0; i < blaze_sym->inlined_cnt && cur_loc < kMaxStackDepth;
        ++i) {
     const blaze_symbolize_inlined_fn *inlined_fn = blaze_sym->inlined + i;
@@ -102,7 +102,6 @@ inline DDRes write_location_blaze(
     ++cur_loc;
   }
 
-  // #endif
   if (cur_loc >= locations_buff.size()) {
     return ddres_warn(DD_WHAT_UW_MAX_DEPTH);
   }

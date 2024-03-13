@@ -7,6 +7,7 @@
 
 #include "ddog_profiling_utils.hpp"
 #include "ddprof_defs.hpp"
+#include "ddprof_stats.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "pevent_lib.hpp"
@@ -19,11 +20,16 @@
 #include <cstdio>
 #include <cstring>
 #include <span>
+#include <string_view>
 
 extern "C" {
 #include "datadog/common.h"
 #include "datadog/profiling.h"
 }
+
+// sv operator
+using namespace std::string_view_literals;
+
 namespace ddprof {
 
 namespace {
@@ -36,6 +42,48 @@ struct ActiveIdsResult {
   EventAggregationMode output_mode[DDPROF_PWT_LENGTH] = {};
   PerfWatcher *default_watcher = nullptr;
 };
+
+bool is_ld(const std::string_view path) {
+  // path is expected to not contain slashes
+  assert(path.rfind('/') == std::string::npos);
+
+  return path.starts_with("ld-");
+}
+
+bool is_stack_complete(std::span<const ddog_prof_Location> locations) {
+  static constexpr std::array s_expected_root_frames{
+      ""sv, // empty is debatable, but what if we have symbols is backend ?
+      "clone"sv,
+      "__clone"sv,
+      "__clone3"sv,
+      "_exit"sv,
+      "gnome-shell"sv,
+      "main"sv,
+      "runtime.goexit.abi0"sv,
+      "runtime.systemstack.abi0"sv,
+      "_start"sv,
+      "start_thread"sv,
+      "start_task"sv};
+
+  if (locations.empty()) {
+    return false;
+  }
+
+  const auto &root_loc = locations[locations.size() - 1];
+  const auto &root_mapping = std::string_view(root_loc.mapping.filename.ptr,
+                                              root_loc.mapping.filename.len);
+
+  // If we are in ld.so (eg. during lib init before main) consider the stack as
+  // complete
+  if (is_ld(root_mapping)) {
+    return true;
+  }
+
+  const auto &root_func =
+      std::string_view(root_loc.function.name.ptr, root_loc.function.name.len);
+  return std::find(s_expected_root_frames.begin(), s_expected_root_frames.end(),
+                   root_func) != s_expected_root_frames.end();
+}
 
 // Figure out which sample_type_ids are used by active watchers
 // We also record the watcher with the lowest valid sample_type id, since that
@@ -282,10 +330,10 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   if (watcher->options.nb_frames_to_skip < locs.size()) {
     locs = locs.subspan(watcher->options.nb_frames_to_skip);
   } else {
-    // Keep the last two frames. In the case of stacks that we could not unwind
-    // We will have the following stack: binary_name; [incomplete]
-    if (locs.size() >= 3) {
-      locs = locs.subspan(locs.size() - 2);
+    // Keep the last frame. In the case of stacks that we could not unwind
+    // We will still have the `binary_name`
+    if (locs.size() >= 2) {
+      locs = locs.subspan(locs.size() - 1);
     }
   }
 
@@ -295,14 +343,18 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
 
   unsigned index = 0;
   unsigned write_index = 0;
-  while (index < locs.size() && write_index < kMaxStackDepth) {
+
+  // -1 is very hacky and due to the fact that the last frame is binary
+  // We wait for the incomplete frame to be added if needed
+  // By removing the incomplete frame and pushing logic to BE
+  // we can simplify this loop
+  while (index < locs.size() - 1 && write_index < kMaxStackDepth) {
     if (locs[index]._symbol_idx != -1) {
       // already symbolized
       const FunLoc &loc = locs[index];
-      write_location(&loc, mapinfo_table[loc._map_info_idx],
-                     symbol_table[loc._symbol_idx],
-                     &locations_buff[write_index++],
-                     pprof->use_process_adresses);
+      write_location(
+          &loc, mapinfo_table[loc._map_info_idx], symbol_table[loc._symbol_idx],
+          &locations_buff[write_index++], pprof->use_process_adresses);
       ++index;
       continue;
     }
@@ -334,6 +386,25 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
             write_index, session_results))) {
       break;
     }
+  }
+
+  // check if unwinding stops on a frame that makes sense
+  if (!is_stack_complete(
+          std::span<ddog_prof_Location>{locations_buff, write_index})) {
+    if (write_index < (kMaxStackDepth - 1) && write_index >= 1) {
+      ++write_index;
+      // incomplete frame to -1
+      write_function("[incomplete]"sv, ""sv,
+                     &locations_buff[write_index - 1].function);
+    }
+  }
+
+  // write binary frame (it should always be a symbol idx)
+  if (write_index < kMaxStackDepth && locs[locs.size() - 1]._symbol_idx != -1) {
+    const FunLoc &loc = locs[locs.size() - 1];
+    write_location(&loc, mapinfo_table[loc._map_info_idx],
+                   symbol_table[loc._symbol_idx],
+                   &locations_buff[write_index++], pprof->use_process_adresses);
   }
 
   // Create the labels for the sample.  Two samples are the same only when

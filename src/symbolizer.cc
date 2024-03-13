@@ -18,16 +18,16 @@ inline void write_location_no_sym(ElfAddress_t ip, const MapInfo &mapinfo,
   ffi_location->address = ip;
 }
 
-Symbolizer::Symbolizer() {
+Symbolizer::Symbolizer(bool disable_symbolization) {
   // todo : pass sym options
-  constexpr blaze_symbolizer_opts opts{
-      .type_size = sizeof(blaze_symbolizer_opts),
-      .auto_reload = false,
-      .code_info = false,
-      .inlined_fns = false,
-      .demangle = false,
-      .reserved = {}
-  };
+  _disable_symbolization = disable_symbolization;
+  constexpr blaze_symbolizer_opts opts{.type_size =
+                                           sizeof(blaze_symbolizer_opts),
+                                       .auto_reload = false,
+                                       .code_info = false,
+                                       .inlined_fns = false,
+                                       .demangle = false,
+                                       .reserved = {}};
   _symbolizer = blaze_symbolizer_new_opts(&opts);
 }
 
@@ -38,34 +38,38 @@ DDRes Symbolizer::symbolize(const std::span<ElfAddress_t> addrs,
   if (addrs.empty() || elf_src.empty()) {
     return ddres_warn(DD_WHAT_PPROF); // or some other error handling
   }
+  const blaze_result *blaze_res = nullptr;
+  if (!_disable_symbolization) {
+    // Initialize the src_elf structure
+    blaze_symbolize_src_elf src_elf{
+        .type_size = sizeof(blaze_symbolize_src_elf),
+        .path = elf_src.c_str(),
+        .debug_syms = true,
+        .reserved = {},
+    };
 
-  // Initialize the src_elf structure
-  blaze_symbolize_src_elf src_elf{
-      .type_size = sizeof(blaze_symbolize_src_elf),
-      .path = elf_src.c_str(),
-      .debug_syms = true,
-      .reserved = {},
-  };
-
-  // Symbolize the addresses
-  const blaze_result *blaze_res = blaze_symbolize_elf_virt_offsets(
-      _symbolizer, &src_elf, addrs.data(), addrs.size());
-
-  if (blaze_res) {
-    assert(blaze_res->cnt == addrs.size());
-    results.blaze_results.push_back(blaze_res);
-    // demangling caching based on stability of unordered map
-    // This will be moved to the backend
-    for (size_t i = 0; i < blaze_res->cnt; ++i) {
-      const blaze_sym *cur_sym = blaze_res->syms + i;
-      // Update the location
-      // minor: address should be a process address
-      DDRES_CHECK_FWD(write_location_blaze(addrs[i], _demangled_names, map_info,
-                                           cur_sym, write_index, locations));
+    // Symbolize the addresses
+    blaze_res = blaze_symbolize_elf_virt_offsets(_symbolizer, &src_elf,
+                                                 addrs.data(), addrs.size());
+    if (blaze_res) {
+      assert(blaze_res->cnt == addrs.size());
+      results.blaze_results.push_back(blaze_res);
+      // demangling caching based on stability of unordered map
+      // This will be moved to the backend
+      for (size_t i = 0; i < blaze_res->cnt; ++i) {
+        const blaze_sym *cur_sym = blaze_res->syms + i;
+        // Update the location
+        // minor: address should be a process address
+        DDRES_CHECK_FWD(write_location_blaze(addrs[i], _demangled_names,
+                                             map_info, cur_sym, write_index,
+                                             locations));
+      }
     }
-  } else {
-    // Handle the case of no blaze result
-    // This can happen when file descriptors are exhausted
+  }
+  // Handle the case of no blaze result
+  // This can happen when file descriptors are exhausted
+  // OR symbolization is disabled
+  if (!blaze_res) {
     LG_DBG("No blaze result for %s", elf_src.data());
     for (size_t i = 0; i < addrs.size(); ++i) {
       // Update the location as is

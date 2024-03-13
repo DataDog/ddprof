@@ -225,8 +225,7 @@ DDRes ddprof_unwind_sample(DDProfContext &ctx, perf_event_sample *sample,
    * detected as incomplete during unwinding.
    */
   if (sample->size_stack ==
-          ctx.watchers[watcher_pos].options.stack_sample_size &&
-      us->output.is_incomplete) {
+      ctx.watchers[watcher_pos].options.stack_sample_size) {
     ddprof_stats_add(STATS_UNWIND_TRUNCATED_INPUT, 1, nullptr);
   }
 
@@ -369,7 +368,8 @@ DDRes worker_library_init(DDProfContext &ctx,
     unwind_init();
     ctx.worker_ctx.user_tags =
         new UserTags(ctx.params.tags, ctx.params.num_cpu);
-    ctx.worker_ctx.symbolizer = new ddprof::Symbolizer();
+    ctx.worker_ctx.symbolizer =
+        new ddprof::Symbolizer(ctx.params.disable_symbolization);
 
     // Zero out pointers to dynamically allocated memory
     ctx.worker_ctx.exp[0] = nullptr;
