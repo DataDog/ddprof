@@ -4,12 +4,14 @@
 // Datadog, Inc.
 #include <gtest/gtest.h>
 
+#include "datadog/blazesym.h"
 #include "ddprof_module.hpp"
+#include "defer.hpp"
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
 #include "dwfl_internals.hpp"
-#include "dwfl_symbol.hpp"
 #include "loghandle.hpp"
+#include "symbolizer.hpp"
 
 #include <filesystem>
 #include <stdio.h>
@@ -40,6 +42,15 @@ int count_fds(pid_t pid) {
 }
 
 TEST(DwflModule, inconsistency_test) {
+  blaze_symbolizer *symbolizer;
+  constexpr blaze_symbolizer_opts opts{.type_size =
+                                           sizeof(blaze_symbolizer_opts),
+                                       .auto_reload = false,
+                                       .code_info = false,
+                                       .inlined_fns = false,
+                                       .demangle = false,
+                                       .reserved = {}};
+  symbolizer = blaze_symbolizer_new_opts(&opts);
   pid_t my_pid = getpid();
   int nb_fds_start = count_fds(my_pid);
   printf("-- Start open file descriptors: %d\n", nb_fds_start);
@@ -54,7 +65,6 @@ TEST(DwflModule, inconsistency_test) {
     DwflWrapper dwfl_wrapper;
     // retrieve the map associated to pid
     DsoHdr::DsoMap &dso_map = dso_hdr.get_pid_mapping(my_pid)._map;
-
     for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
       Dso &dso = it->second;
       if (!has_relevant_path(dso._type) || !dso.is_executable()) {
@@ -73,22 +83,23 @@ TEST(DwflModule, inconsistency_test) {
       ASSERT_TRUE(IsDDResOK(res));
       ASSERT_TRUE(ddprof_mod->_mod);
       if (find_res.first == it) {
-        Symbol symbol;
-        GElf_Sym elf_sym;
-        Offset_t bias;
-        EXPECT_TRUE(
-            symbol_get_from_dwfl(ddprof_mod->_mod, ip, symbol, elf_sym, bias));
-        EXPECT_EQ("ddprof::DwflModule_inconsistency_test_Test::TestBody()",
-                  symbol._demangle_name);
-        EXPECT_EQ(bias, ddprof_mod->_sym_bias);
-        FileAddress_t elf_addr = ip - ddprof_mod->_sym_bias;
-        FileAddress_t start_sym, end_sym = {};
-        EXPECT_TRUE(compute_elf_range(elf_addr, elf_sym, start_sym, end_sym));
-        printf("Start --> 0x%lx - end %lx - bias 0x%lx <--\n", start_sym,
-               end_sym, bias);
-        EXPECT_GE(elf_addr, start_sym);
-        EXPECT_LE(elf_addr, end_sym);
+        std::array<ElfAddress_t, 1> elf_addr{ip - ddprof_mod->_sym_bias};
+        blaze_symbolize_src_elf src_elf{
+            .type_size = sizeof(blaze_symbolize_src_elf),
+            .path = dso._filename.c_str(),
+            .debug_syms = true,
+            .reserved = {},
+        };
+        const blaze_result *blaze_res = blaze_symbolize_elf_virt_offsets(
+            symbolizer, &src_elf, elf_addr.data(), elf_addr.size());
 
+        ASSERT_TRUE(blaze_res);
+        ASSERT_GE(blaze_res->cnt, 1);
+        defer { blaze_result_free(blaze_res); };
+        // we don't have demangling at this step
+        EXPECT_TRUE(
+            strcmp("_ZN6ddprof34DwflModule_inconsistency_test_Test8TestBodyEv",
+                   blaze_res->syms[0].name) == 0);
         // Only expect build-id on this binary (as we can not force it on
         // others)
         EXPECT_FALSE(ddprof_mod->_build_id.empty());
@@ -97,6 +108,7 @@ TEST(DwflModule, inconsistency_test) {
       EXPECT_EQ(ddprof_mod->_status, DDProfMod::kUnknown);
     }
   }
+  blaze_symbolizer_free(symbolizer); //
   int nb_fds_end = count_fds(my_pid);
   printf("-- End open file descriptors: %d\n", nb_fds_end);
   EXPECT_EQ(nb_fds_start, nb_fds_end);

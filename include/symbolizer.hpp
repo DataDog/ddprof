@@ -22,7 +22,7 @@ namespace ddprof {
 class Symbolizer {
 
 public:
-  Symbolizer(bool disable_symbolization);
+  Symbolizer(bool disable_symbolization = false);
   ~Symbolizer();
 
   struct SessionResults {
@@ -41,8 +41,6 @@ public:
       result = nullptr;
     }
   }
-
-  bool is_symbolization_disabled() const { return _disable_symbolization; }
 
 private:
   ddprof::HeterogeneousLookupStringMap<std::string> _demangled_names;

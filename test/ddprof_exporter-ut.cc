@@ -19,11 +19,6 @@
 #include "symbol_hdr.hpp"
 
 namespace ddprof {
-// todo : cut this dependency
-DwflSymbolLookup::DwflSymbolLookup(bool disable_symbolization)
-    : _lookup_setting(K_CACHE_ON),
-      _disable_symbolization(disable_symbolization) {}
-
 // Mock
 int get_nb_hw_thread() { return 2; }
 

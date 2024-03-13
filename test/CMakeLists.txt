@@ -205,17 +205,11 @@ add_unit_test(tags-ut tags-ut.cc ../src/tags.cc ../src/thread_info.cc DEFINITION
 target_include_directories(tags-ut PRIVATE ${DOGFOOD_INCLUDE_DIR})
 
 add_unit_test(
-  dwfl_symbol-ut dwfl_symbol-ut.cc ../src/dwfl_symbol.cc ../src/demangler/demangler.cc
-  LIBRARIES llvm-demangle ${ELFUTILS_LIBRARIES}
-  DEFINITIONS MYNAME="dwfl_symbol-ut")
-
-add_unit_test(
   dwfl_module-ut
   dwfl_module-ut.cc
   ../src/build_id.cc
   ../src/dwfl_hdr.cc
   ../src/ddprof_module_lib.cc
-  ../src/dwfl_symbol.cc
   ../src/demangler/demangler.cc
   ../src/dso.cc
   ../src/dso_hdr.cc
@@ -223,8 +217,8 @@ add_unit_test(
   ../src/procutils.cc
   ../src/signal_helper.cc
   ../src/user_override.cc
-  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
-  DEFINITIONS MYNAME="dwfl_symbol-ut")
+  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle Datadog::Profiling
+  DEFINITIONS MYNAME="dwfl_module-ut")
 add_compile_definitions("DWFL_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 set_property(TARGET dwfl_module-ut PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 
@@ -244,8 +238,6 @@ add_unit_test(
   ../src/dso_symbol_lookup.cc
   ../src/dwfl_hdr.cc
   ../src/ddprof_module_lib.cc
-  ../src/dwfl_symbol.cc
-  ../src/dwfl_symbol_lookup.cc
   ../src/dwfl_thread_callbacks.cc
   ../src/demangler/demangler.cc
   ../src/jit/jitdump.cc
@@ -286,8 +278,6 @@ set(ALLOCATION_TRACKER_UT_SRCS
     ../src/dso_symbol_lookup.cc
     ../src/dwfl_hdr.cc
     ../src/ddprof_module_lib.cc
-    ../src/dwfl_symbol.cc
-    ../src/dwfl_symbol_lookup.cc
     ../src/dwfl_thread_callbacks.cc
     ../src/demangler/demangler.cc
     ../src/jit/jitdump.cc
