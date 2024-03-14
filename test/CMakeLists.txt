@@ -251,13 +251,14 @@ add_unit_test(
   ../src/symbol_map.cc
   ../src/signal_helper.cc
   ../src/statsd.cc
+  ../src/symbolizer.cc
   ../src/unwind.cc
   ../src/unwind_dwfl.cc
   ../src/unwind_helpers.cc
   ../src/unwind_metrics.cc
   ../src/unwind_state.cc
   ../src/user_override.cc
-  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
+  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle Datadog::Profiling
   DEFINITIONS MYNAME="savecontext-ut")
 
 set(ALLOCATION_TRACKER_UT_SRCS

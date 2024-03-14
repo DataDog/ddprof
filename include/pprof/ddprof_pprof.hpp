@@ -49,7 +49,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr &symbol_hdr,
                       ddprof::Symbolizer *symbolizer,
                       const DDProfValuePack &pack, const PerfWatcher *watcher,
-                      const FileInfoVector &vector,
+                      const FileInfoVector &vector, bool show_samples,
                       EventAggregationModePos value_pos, DDProfPProf *pprof);
 
 DDRes pprof_reset(DDProfPProf *pprof);
@@ -57,10 +57,5 @@ DDRes pprof_reset(DDProfPProf *pprof);
 DDRes pprof_write_profile(const DDProfPProf *pprof, int fd);
 
 DDRes pprof_free_profile(DDProfPProf *pprof);
-
-void ddprof_print_sample(const UnwindOutput &uw_output,
-                         const SymbolHdr &symbol_hdr, uint64_t value,
-                         EventAggregationModePos value_mode_pos,
-                         const PerfWatcher &watcher);
 
 } // namespace ddprof

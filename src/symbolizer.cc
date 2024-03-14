@@ -39,11 +39,13 @@ void Symbolizer::mark_unvisited() {
   }
 }
 
-DDRes Symbolizer::symbolize(const std::span<ElfAddress_t> addrs,
-                            FileInfoId_t file_id, const std::string &elf_src,
-                            const MapInfo &map_info,
-                            std::span<ddog_prof_Location> locations,
-                            unsigned &write_index, SessionResults &results) {
+DDRes Symbolizer::symbolize_pprof(const std::span<ElfAddress_t> addrs,
+                                  FileInfoId_t file_id,
+                                  const std::string &elf_src,
+                                  const MapInfo &map_info,
+                                  std::span<ddog_prof_Location> locations,
+                                  unsigned &write_index,
+                                  SessionResults &results) {
   blaze_symbolizer *symbolizer = nullptr;
   if (addrs.empty() || elf_src.empty()) {
     return ddres_warn(DD_WHAT_PPROF); // or some other error handling

@@ -31,10 +31,11 @@ public:
 
   static constexpr int _k_max_stack_depth = kMaxStackDepth;
 
-  DDRes symbolize(const std::span<ElfAddress_t> addrs, FileInfoId_t file_id,
-                  const std::string &elf_src, const MapInfo &map_info,
-                  std::span<ddog_prof_Location> locations,
-                  unsigned &write_index, SessionResults &results);
+  DDRes symbolize_pprof(const std::span<ElfAddress_t> addrs,
+                        FileInfoId_t file_id, const std::string &elf_src,
+                        const MapInfo &map_info,
+                        std::span<ddog_prof_Location> locations,
+                        unsigned &write_index, SessionResults &results);
   static void free_session_results(SessionResults &results) {
     for (auto &result : results.blaze_results) {
       blaze_result_free(result);

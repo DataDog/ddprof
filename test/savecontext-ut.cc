@@ -10,6 +10,7 @@
 #include "loghandle.hpp"
 #include "perf.hpp"
 #include "savecontext.hpp"
+#include "symbol_helper.hpp"
 #include "unwind.hpp"
 #include "unwind_state.hpp"
 
@@ -21,12 +22,21 @@
 
 namespace ddprof {
 
+#include <array>
+#include <cassert>
+#include <cstdio>
+#include <string>
+#include <vector>
+
 DDPROF_NOINLINE void funcA();
 DDPROF_NOINLINE void funcB();
 
 std::byte stack[k_default_perf_stack_sample_size];
 
 void funcB() {
+  blaze_symbolizer *symbolizer = blaze_symbolizer_new();
+  defer { blaze_symbolizer_free(symbolizer); };
+
   UnwindState state = create_unwind_state().value();
   uint64_t regs[k_nb_registers_to_unwind];
   size_t stack_size = save_context(retrieve_stack_bounds(), regs, stack);
@@ -35,20 +45,11 @@ void funcB() {
                      reinterpret_cast<char *>(stack));
   unwindstate_unwind(&state);
 
-  auto &symbol_table = state.symbol_hdr._symbol_table;
-
-  for (size_t iloc = 0; iloc < state.output.locs.size(); ++iloc) {
-    auto &symbol = symbol_table[state.output.locs[iloc]._symbol_idx];
-    printf("%zu: %s\n", iloc, symbol._demangle_name.c_str());
-  }
-
-  EXPECT_GT(state.output.locs.size(), 3);
-  auto &symbol0 = symbol_table[state.output.locs[0]._symbol_idx];
-  EXPECT_TRUE(symbol0._demangle_name.starts_with("ddprof::save_context("));
-  auto &symbol1 = symbol_table[state.output.locs[1]._symbol_idx];
-  EXPECT_EQ(symbol1._demangle_name, "ddprof::funcB()");
-  auto &symbol2 = symbol_table[state.output.locs[2]._symbol_idx];
-  EXPECT_EQ(symbol2._demangle_name, "ddprof::funcA()");
+  auto demangled_syms = collect_symbols(state, symbolizer);
+  EXPECT_GT(demangled_syms.size(), 3);
+  EXPECT_TRUE(demangled_syms[0].starts_with("ddprof::save_context("));
+  EXPECT_EQ(demangled_syms[1], "ddprof::funcB()");
+  EXPECT_EQ(demangled_syms[2], "ddprof::funcA()");
 }
 
 void funcA() {
@@ -94,6 +95,8 @@ DDPROF_NOINLINE void funcC() {
 }
 
 TEST(getcontext, unwind_from_sighandler) {
+  blaze_symbolizer *symbolizer = blaze_symbolizer_new();
+  defer { blaze_symbolizer_free(symbolizer); };
   LogHandle log_handle;
   std::unique_lock lock{mutex};
   std::thread t{funcC};
@@ -105,30 +108,18 @@ TEST(getcontext, unwind_from_sighandler) {
   unwind_init_sample(&state, regs, getpid(), stack_size,
                      reinterpret_cast<char *>(stack));
   unwindstate_unwind(&state);
-
-  auto &symbol_table = state.symbol_hdr._symbol_table;
-
-  for (size_t iloc = 0; iloc < state.output.locs.size(); ++iloc) {
-    auto &symbol = symbol_table[state.output.locs[iloc]._symbol_idx];
-    printf("%zu: %s %lx \n", iloc, symbol._demangle_name.c_str(),
-           state.output.locs[iloc].ip);
-  }
-  auto get_symbol = [&](int idx) {
-    return symbol_table[state.output.locs[idx]._symbol_idx];
-  };
-
-  EXPECT_GT(state.output.locs.size(), 5);
-  EXPECT_LT(state.output.locs.size(), 25);
-  EXPECT_TRUE(
-      get_symbol(0)._demangle_name.starts_with("ddprof::save_context("));
-  EXPECT_EQ(get_symbol(1)._demangle_name, "ddprof::handler(int)");
+  auto demangled_syms = collect_symbols(state, symbolizer);
+  EXPECT_GT(demangled_syms.size(), 5);
+  EXPECT_LT(demangled_syms.size(), 25);
+  EXPECT_TRUE(demangled_syms[0].starts_with("ddprof::save_context("));
+  EXPECT_EQ(demangled_syms[1], "ddprof::handler(int)");
   size_t next_idx = 3;
   while (next_idx < state.output.locs.size() - 1 &&
-         get_symbol(next_idx)._demangle_name != "ddprof::funcD()") {
+         demangled_syms[next_idx] != "ddprof::funcD()") {
     ++next_idx;
   }
-  EXPECT_EQ(get_symbol(next_idx)._demangle_name, "ddprof::funcD()");
-  EXPECT_EQ(get_symbol(next_idx + 1)._demangle_name, "ddprof::funcC()");
+  EXPECT_EQ(demangled_syms[next_idx], "ddprof::funcD()");
+  EXPECT_EQ(demangled_syms[next_idx + 1], "ddprof::funcC()");
 }
 #endif
 

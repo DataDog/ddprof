@@ -85,6 +85,48 @@ bool is_stack_complete(std::span<const ddog_prof_Location> locations) {
                    root_func) != s_expected_root_frames.end();
 }
 
+static void ddprof_print_sample(const std::span<ddog_prof_Location> locations,
+                                uint64_t value, pid_t pid, pid_t tid,
+                                EventAggregationModePos value_mode_pos,
+                                const PerfWatcher &watcher) {
+
+  const char *sample_name =
+      sample_type_name_from_idx(watcher.sample_type_id, value_mode_pos);
+  std::string buf =
+      absl::Substitute("sample[type=$0;pid=$1;tid=$2] ", sample_name, pid, tid);
+
+  for (auto loc_it = locations.rbegin(); loc_it != locations.rend(); ++loc_it) {
+    if (loc_it != locations.rbegin()) {
+      buf += ";";
+    }
+    // Access function name and source file from location
+    std::string_view function_name{loc_it->function.name.ptr,
+                                   loc_it->function.name.len};
+    std::string_view source_file{loc_it->function.filename.ptr,
+                                 loc_it->function.filename.len};
+    if (!function_name.empty()) {
+      // Append the function name, trimming at the first '(' if present.
+      buf += function_name.substr(0, function_name.find('('));
+    } else if (!source_file.empty()) {
+      // Append the file name, showing only the file and not the full path.
+      auto pos = source_file.rfind('/');
+      buf += "(";
+      buf += source_file.substr(pos == std::string_view::npos ? 0 : pos + 1);
+      buf += ")";
+    } else {
+      // If neither function name nor source file is available, show addresses.
+      absl::StrAppendFormat(&buf, "%#x", loc_it->address);
+    }
+
+    // Include line number if available and greater than zero.
+    if (loc_it->line > 0) {
+      absl::StrAppendFormat(&buf, ":%d", loc_it->line);
+    }
+  }
+
+  PRINT_NFO("%s %ld", buf.c_str(), value);
+}
+
 // Figure out which sample_type_ids are used by active watchers
 // We also record the watcher with the lowest valid sample_type id, since that
 // will serve as the default for the pprof
@@ -307,7 +349,7 @@ DDRes pprof_free_profile(DDProfPProf *pprof) {
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr &symbol_hdr, Symbolizer *symbolizer,
                       const DDProfValuePack &pack, const PerfWatcher *watcher,
-                      const FileInfoVector &file_infos,
+                      const FileInfoVector &file_infos, bool show_samples,
                       EventAggregationModePos value_pos, DDProfPProf *pprof) {
 
   const ddprof::SymbolTable &symbol_table = symbol_hdr._symbol_table;
@@ -379,7 +421,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
       }
     }
     // Symbolize all addresses for this file
-    if (IsDDResNotOK(symbolizer->symbolize(
+    if (IsDDResNotOK(symbolizer->symbolize_pprof(
             addresses, file_id, currentFilePath,
             mapinfo_table[locs[start_index]._map_info_idx],
             std::span<ddog_prof_Location>{locations_buff, kMaxStackDepth},
@@ -454,6 +496,10 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
       .labels = {.ptr = labels, .len = labels_num},
   };
 
+  if (show_samples) {
+    ddprof_print_sample(std::span{locations_buff, write_index}, pack.value,
+                        uw_output->pid, uw_output->tid, value_pos, *watcher);
+  }
   auto res = ddog_prof_Profile_add(profile, sample, pack.timestamp);
   if (res.tag != DDOG_PROF_PROFILE_RESULT_OK) {
     defer { ddog_Error_drop(&res.err); };
@@ -473,42 +519,5 @@ DDRes pprof_reset(DDProfPProf *pprof) {
                            static_cast<int>(msg.len), msg.ptr);
   }
   return {};
-}
-
-void ddprof_print_sample(const UnwindOutput &uw_output,
-                         const SymbolHdr &symbol_hdr, uint64_t value,
-                         EventAggregationModePos value_mode_pos,
-                         const PerfWatcher &watcher) {
-
-  const auto &symbol_table = symbol_hdr._symbol_table;
-  std::span const locs{uw_output.locs};
-
-  const char *sample_name =
-      sample_type_name_from_idx(watcher.sample_type_id, value_mode_pos);
-  std::string buf = absl::Substitute("sample[type=$0;pid=$1;tid=$2] ",
-                                     sample_name, uw_output.pid, uw_output.tid);
-
-  for (auto loc_it = locs.rbegin(); loc_it != locs.rend(); ++loc_it) {
-    const auto &sym = symbol_table[loc_it->_symbol_idx];
-    if (loc_it != locs.rbegin()) {
-      buf += ";";
-    }
-    if (sym._symname.empty()) {
-      if (loc_it->ip == 0) {
-        std::string_view const path{sym._srcpath};
-        auto pos = path.rfind('/');
-        buf += "(";
-        buf += path.substr(pos == std::string_view::npos ? 0 : pos + 1);
-        buf += ")";
-      } else {
-        absl::StrAppendFormat(&buf, "%#x/%#x", loc_it->ip, loc_it->_elf_addr);
-      }
-    } else {
-      std::string_view const func{sym._symname};
-      buf += func.substr(0, func.find('('));
-    }
-  }
-
-  PRINT_NFO("%s %ld", buf.c_str(), value);
 }
 } // namespace ddprof
