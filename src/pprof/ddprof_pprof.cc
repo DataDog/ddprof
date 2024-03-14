@@ -72,7 +72,6 @@ bool is_stack_complete(std::span<const ddog_prof_Location> locations) {
   const auto &root_loc = locations[locations.size() - 1];
   const auto &root_mapping = std::string_view(root_loc.mapping.filename.ptr,
                                               root_loc.mapping.filename.len);
-
   // If we are in ld.so (eg. during lib init before main) consider the stack as
   // complete
   if (is_ld(root_mapping)) {

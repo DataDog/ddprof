@@ -19,6 +19,7 @@
 #include "perf_clock.hpp"
 #include "pevent_lib.hpp"
 #include "ringbuffer_holder.hpp"
+#include "symbol_helper.hpp"
 #include "symbol_overrides.hpp"
 #include "syscalls.hpp"
 #include "tsc_clock.hpp"
@@ -100,6 +101,9 @@ DDPROF_NOINLINE void my_func_calling_malloc(size_t size) {
 }
 
 TEST(allocation_tracker, start_stop) {
+  blaze_symbolizer *symbolizer = blaze_symbolizer_new();
+  defer { blaze_symbolizer_free(symbolizer); };
+
   TscClock::init();
   PerfClock::init();
   RingBufferHolder ring_buffer{kBufSizeOrder, RingBufferType::kMPSCRingBuffer};
@@ -140,12 +144,9 @@ TEST(allocation_tracker, start_stop) {
     unwind_init_sample(&state, sample->regs, sample->pid, sample->size_stack,
                        sample->data_stack);
     unwindstate_unwind(&state);
-
-    const auto &symbol_table = state.symbol_hdr._symbol_table;
     ASSERT_GT(state.output.locs.size(), NB_FRAMES_TO_SKIP);
-    const auto &symbol =
-        symbol_table[state.output.locs[NB_FRAMES_TO_SKIP]._symbol_idx];
-    ASSERT_EQ(symbol._symname, "my_func_calling_malloc");
+    const auto demangled_syms = collect_symbols(state, symbolizer);
+    ASSERT_EQ(demangled_syms[NB_FRAMES_TO_SKIP], "my_func_calling_malloc");
   }
   my_free(0xdeadbeef);
   // ensure we get a deallocation event
