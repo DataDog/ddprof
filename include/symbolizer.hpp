@@ -6,10 +6,12 @@
 
 #include "datadog/blazesym.h"
 #include "ddprof_defs.hpp"
+#include "ddprof_file_info-i.hpp"
 #include "ddres_def.hpp"
 #include "map_utils.hpp"
 #include "mapinfo_table.hpp"
 
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -20,10 +22,8 @@ struct ddog_prof_Location;
 
 namespace ddprof {
 class Symbolizer {
-
 public:
   Symbolizer(bool disable_symbolization = false);
-  ~Symbolizer();
 
   struct SessionResults {
     std::vector<const blaze_result *> blaze_results{};
@@ -31,7 +31,7 @@ public:
 
   static constexpr int _k_max_stack_depth = kMaxStackDepth;
 
-  DDRes symbolize(const std::span<ElfAddress_t> addrs,
+  DDRes symbolize(const std::span<ElfAddress_t> addrs, FileInfoId_t file_id,
                   const std::string &elf_src, const MapInfo &map_info,
                   std::span<ddog_prof_Location> locations,
                   unsigned &write_index, SessionResults &results);
@@ -41,10 +41,33 @@ public:
       result = nullptr;
     }
   }
+  int clear_unvisited();
+  void mark_unvisited();
 
 private:
-  ddprof::HeterogeneousLookupStringMap<std::string> _demangled_names;
-  blaze_symbolizer *_symbolizer;
+  struct SymbolizerPack {
+    constexpr static blaze_symbolizer_opts opts{
+        .type_size = sizeof(blaze_symbolizer_opts),
+        .auto_reload = false,
+        .code_info = false,
+        .inlined_fns = false,
+        .demangle = false,
+        .reserved = {}};
+
+    explicit SymbolizerPack(const std::string &elf_src)
+        : _symbolizer(std::unique_ptr<blaze_symbolizer,
+                                      decltype(&blaze_symbolizer_free)>(
+              blaze_symbolizer_new_opts(&opts), &blaze_symbolizer_free)),
+          _elf_src(elf_src), _visited(true) {}
+
+    std::unique_ptr<blaze_symbolizer, decltype(&blaze_symbolizer_free)>
+        _symbolizer;
+    ddprof::HeterogeneousLookupStringMap<std::string> _demangled_names;
+    std::string _elf_src;
+    bool _visited;
+  };
+
+  std::unordered_map<FileInfoId_t, SymbolizerPack> _symbolizer_map;
   bool _disable_symbolization;
 };
 } // namespace ddprof

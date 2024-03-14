@@ -380,7 +380,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     }
     // Symbolize all addresses for this file
     if (IsDDResNotOK(symbolizer->symbolize(
-            addresses, currentFilePath,
+            addresses, file_id, currentFilePath,
             mapinfo_table[locs[start_index]._map_info_idx],
             std::span<ddog_prof_Location>{locations_buff, kMaxStackDepth},
             write_index, session_results))) {
@@ -389,14 +389,12 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   }
 
   // check if unwinding stops on a frame that makes sense
-  if (!is_stack_complete(
+  if (write_index < (kMaxStackDepth - 1) && write_index >= 1 &&
+      !is_stack_complete(
           std::span<ddog_prof_Location>{locations_buff, write_index})) {
-    if (write_index < (kMaxStackDepth - 1) && write_index >= 1) {
-      ++write_index;
-      // incomplete frame to -1
-      write_function("[incomplete]"sv, ""sv,
-                     &locations_buff[write_index - 1].function);
-    }
+    // not writting the mapping is acceptable due to memset at the top
+    write_function("[incomplete]"sv, ""sv,
+                   &locations_buff[write_index++].function);
   }
 
   // write binary frame (it should always be a symbol idx)

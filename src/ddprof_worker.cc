@@ -117,7 +117,8 @@ DDRes symbols_update_stats(const SymbolHdr &symbol_hdr) {
 
 /// Retrieve cpu / memory info
 DDRes worker_update_stats(DDProfWorkerContext &worker_context,
-                          std::chrono::nanoseconds cycle_duration) {
+                          std::chrono::nanoseconds cycle_duration,
+                          int count_symbolizer_cleared) {
   ProcStatus *procstat = &worker_context.proc_status;
   const UnwindState &us = *worker_context.us;
   const DsoHdr &dso_hdr = us.dso_hdr;
@@ -141,6 +142,8 @@ DDRes worker_update_stats(DDProfWorkerContext &worker_context,
       STATS_UNMATCHED_DEALLOCATION_COUNT,
       worker_context.live_allocation.get_nb_unmatched_deallocations());
   // Symbol stats
+  ddprof_stats_set(STATS_UNUSED_SYMBOLS_BINARIES_COUNT,
+                   count_symbolizer_cleared);
   DDRES_CHECK_FWD(symbols_update_stats(us.symbol_hdr));
 
   long target_cpu_nsec;
@@ -542,8 +545,13 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx,
   auto cycle_duration = cycle_now - ctx.worker_ctx.cycle_start_time;
   ctx.worker_ctx.cycle_start_time = cycle_now;
 
+  // Check if we can clear symbol objects
+  int count_symbolizers_cleared = ctx.worker_ctx.symbolizer->clear_unvisited();
+  ctx.worker_ctx.symbolizer->mark_unvisited();
+
   // Scrape procfs for process usage statistics
-  DDRES_CHECK_FWD(worker_update_stats(ctx.worker_ctx, cycle_duration));
+  DDRES_CHECK_FWD(worker_update_stats(ctx.worker_ctx, cycle_duration,
+                                      count_symbolizers_cleared));
 
   // And emit diagnostic output (if it's enabled)
   print_diagnostics(ctx.worker_ctx.us->dso_hdr);
