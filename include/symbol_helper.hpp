@@ -33,6 +33,7 @@ std::vector<std::string> collect_symbols(UnwindState &state,
               file_info_value.get_path().c_str());
       const blaze_result *blaze_res = blaze_symbolize_elf_virt_offsets(
           symbolizer, &src_elf, elf_addr.data(), elf_addr.size());
+      defer { blaze_result_free(blaze_res); };
       if (blaze_res && blaze_res->cnt >= 1 && blaze_res->syms[0].name) {
         demangled_name = blaze_res->syms[0].name;
       } else {
