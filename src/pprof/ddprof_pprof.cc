@@ -385,12 +385,12 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   unsigned index = 0;
   unsigned write_index = 0;
 
-  // -1 is very hacky and due to the fact that the last frame is binary
-  // We wait for the incomplete frame to be added if needed
+  // The -1 on size is because the last frame is binary.
+  // We wait for the incomplete frame to be added if needed.
   // By removing the incomplete frame and pushing logic to BE
   // we can simplify this loop
   while (index < locs.size() - 1 && write_index < kMaxStackDepth) {
-    if (locs[index]._symbol_idx != -1) {
+    if (locs[index]._symbol_idx != k_symbol_idx_null) {
       // already symbolized
       const FunLoc &loc = locs[index];
       write_location(

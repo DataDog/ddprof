@@ -39,6 +39,8 @@ inline constexpr unsigned kMaxProfiledPids{100};
 using inode_t = uint64_t;
 
 using SymbolIdx_t = int32_t;
+inline constexpr SymbolIdx_t k_symbol_idx_null = -1;
+
 using MapInfoIdx_t = int32_t;
 // Elf address (same as the address used with addr2line)
 using ElfAddress_t = uint64_t;

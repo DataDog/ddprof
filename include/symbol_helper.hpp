@@ -11,6 +11,7 @@
 #include <vector>
 
 namespace ddprof {
+// This is a test API. Use the symbolizer to populate pprof structures
 std::vector<std::string> collect_symbols(UnwindState &state,
                                          blaze_symbolizer *symbolizer) {
   std::vector<std::string> demangled_symbols;

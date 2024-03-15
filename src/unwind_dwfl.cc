@@ -24,8 +24,9 @@ namespace {
 
 int frame_cb(Dwfl_Frame * /*dwfl_frame*/, void * /*arg*/);
 
-DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
-                     const DDProfMod &ddprof_mod, FileInfoId_t file_info_id);
+DDRes add_unsymbolized_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
+                             const DDProfMod &ddprof_mod,
+                             FileInfoId_t file_info_id);
 
 void trace_unwinding_end(UnwindState *us) {
   if (LL_DEBUG <= LOG_getlevel()) {
@@ -174,7 +175,8 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   us->current_ip = pc;
 
   // Now we register
-  if (IsDDResNotOK(add_dwfl_frame(us, dso, pc, *ddprof_mod, file_info_id))) {
+  if (IsDDResNotOK(
+          add_unsymbolized_frame(us, dso, pc, *ddprof_mod, file_info_id))) {
     return ddres_warn(DD_WHAT_UW_ERROR);
   }
   return {};
@@ -212,14 +214,12 @@ int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
   return DWARF_CB_OK;
 }
 
-DDRes add_dwfl_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
-                     const DDProfMod &ddprof_mod, FileInfoId_t file_info_id) {
-  // get or create the dwfl symbol
-  constexpr SymbolIdx_t symbol_idx = -1;
+DDRes add_unsymbolized_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
+                             const DDProfMod &ddprof_mod,
+                             FileInfoId_t file_info_id) {
   MapInfoIdx_t const map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
       us->pid, us->symbol_hdr._mapinfo_table, dso, ddprof_mod._build_id);
-
-  return add_frame(symbol_idx, file_info_id, map_idx, pc,
+  return add_frame(k_symbol_idx_null, file_info_id, map_idx, pc,
                    pc - ddprof_mod._sym_bias, us);
 }
 
@@ -230,7 +230,7 @@ DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
   SymbolTable &symbol_table = unwind_symbol_hdr._symbol_table;
   RuntimeSymbolLookup &runtime_symbol_lookup =
       unwind_symbol_hdr._runtime_symbol_lookup;
-  SymbolIdx_t symbol_idx = -1;
+  SymbolIdx_t symbol_idx = k_symbol_idx_null;
   if (jitdump_path.empty()) {
     symbol_idx =
         runtime_symbol_lookup.get_or_insert(dso._pid, pc, symbol_table);
@@ -238,7 +238,7 @@ DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
     symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
         dso._pid, pc, symbol_table, jitdump_path);
   }
-  if (symbol_idx == -1) {
+  if (symbol_idx == k_symbol_idx_null) {
     add_dso_frame(us, dso, pc, "pc");
     return {};
   }
@@ -246,8 +246,8 @@ DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
   MapInfoIdx_t const map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
       us->pid, us->symbol_hdr._mapinfo_table, dso, {});
 
-  return add_frame(symbol_idx, -1, map_idx, pc, pc - dso.start() + dso.offset(),
-                   us);
+  return add_frame(symbol_idx, k_symbol_idx_null, map_idx, pc,
+                   pc - dso.start() + dso.offset(), us);
 }
 } // namespace
 
