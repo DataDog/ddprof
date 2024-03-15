@@ -298,6 +298,10 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
   }
 
   ctx->perf_clock_source = PerfClock::init();
+  if (ctx->perf_clock_source == PerfClockSource::kNoClock) {
+    // If we can't use perf clock, we cannot reorder events
+    ctx->params.reorder_events = false;
+  }
 
   if (CPU_COUNT(&ctx->params.cpu_affinity) > 0) {
     LG_DBG("Setting affinity to 0x%s",

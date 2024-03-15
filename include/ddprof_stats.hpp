@@ -15,6 +15,7 @@ namespace ddprof {
 #define STATS_TABLE(X)                                                         \
   X(EVENT_COUNT, "event.count", STAT_GAUGE)                                    \
   X(EVENT_LOST, "event.lost", STAT_GAUGE)                                      \
+  X(EVENT_OUT_OF_ORDER, "event.out_of_order", STAT_GAUGE)                      \
   X(SAMPLE_COUNT, "sample.count", STAT_GAUGE)                                  \
   X(UNMATCHED_DEALLOCATION_COUNT, "unmatched_deallocation.count", STAT_GAUGE)  \
   X(TARGET_CPU_USAGE, "target_process.cpu_usage.millicores", STAT_GAUGE)       \
