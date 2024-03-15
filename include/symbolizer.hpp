@@ -23,7 +23,8 @@ struct ddog_prof_Location;
 namespace ddprof {
 class Symbolizer {
 public:
-  Symbolizer(bool disable_symbolization = false);
+  explicit Symbolizer(bool disable_symbolization = false)
+      : _disable_symbolization(disable_symbolization) {}
 
   struct SessionResults {
     std::vector<const blaze_result *> blaze_results{};

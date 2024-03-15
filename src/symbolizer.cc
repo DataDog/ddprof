@@ -23,11 +23,6 @@ inline void write_location_no_sym(ElfAddress_t ip, const MapInfo &mapinfo,
   ffi_location->address = ip;
 }
 
-Symbolizer::Symbolizer(bool disable_symbolization) {
-  // todo : pass sym options
-  _disable_symbolization = disable_symbolization;
-}
-
 int Symbolizer::clear_unvisited() {
   // Remove all unvisited SymbolizerPack instances from the map (c++ 20)
   const auto count = std::erase_if(_symbolizer_map, [](const auto &item) {
