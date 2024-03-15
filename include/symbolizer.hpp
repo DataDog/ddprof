@@ -47,7 +47,7 @@ public:
   void mark_unvisited();
 
 private:
-  struct SymbolizerPack {
+  struct SymbolizerWrapper {
     constexpr static blaze_symbolizer_opts opts{
         .type_size = sizeof(blaze_symbolizer_opts),
         .auto_reload = false,
@@ -56,7 +56,7 @@ private:
         .demangle = false,
         .reserved = {}};
 
-    explicit SymbolizerPack(const std::string &elf_src)
+    explicit SymbolizerWrapper(const std::string &elf_src)
         : _symbolizer(std::unique_ptr<blaze_symbolizer,
                                       decltype(&blaze_symbolizer_free)>(
               blaze_symbolizer_new_opts(&opts), &blaze_symbolizer_free)),
@@ -69,7 +69,7 @@ private:
     bool _visited;
   };
 
-  std::unordered_map<FileInfoId_t, SymbolizerPack> _symbolizer_map;
+  std::unordered_map<FileInfoId_t, SymbolizerWrapper> _symbolizer_map;
   bool _disable_symbolization;
 };
 } // namespace ddprof

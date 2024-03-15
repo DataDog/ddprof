@@ -29,8 +29,6 @@ std::vector<std::string> collect_symbols(UnwindState &state,
           .debug_syms = true,
           .reserved = {},
       };
-      fprintf(stderr, "Looking for %lx - %s \n", elf_addr[0],
-              file_info_value.get_path().c_str());
       const blaze_result *blaze_res = blaze_symbolize_elf_virt_offsets(
           symbolizer, &src_elf, elf_addr.data(), elf_addr.size());
       defer { blaze_result_free(blaze_res); };
@@ -45,9 +43,6 @@ std::vector<std::string> collect_symbols(UnwindState &state,
       demangled_name = symbol._demangle_name;
     }
     demangled_symbols.push_back(demangled_name);
-    // For debugging: print the demangled name and instruction pointer.
-    printf("%zu: %s %lx \n", iloc, demangled_name.c_str(),
-           state.output.locs[iloc].ip);
   }
   return demangled_symbols;
 }
