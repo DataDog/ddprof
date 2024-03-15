@@ -4,7 +4,6 @@
 // Datadog, Inc.
 #include <gtest/gtest.h>
 
-
 #include "ddprof_module.hpp"
 #include "defer.hpp"
 #include "dso_hdr.hpp"

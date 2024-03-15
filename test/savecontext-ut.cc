@@ -21,7 +21,6 @@
 
 namespace ddprof {
 
-
 DDPROF_NOINLINE void funcA();
 DDPROF_NOINLINE void funcB();
 

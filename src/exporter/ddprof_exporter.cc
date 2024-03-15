@@ -256,12 +256,12 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
   fill_stable_tags(user_tags, exporter, tags_exporter);
 
   ddog_CharSlice const base_url = to_CharSlice(exporter->_url);
-  ddog_Endpoint endpoint;
+  ddog_prof_Endpoint endpoint;
   if (exporter->_agent) {
-    endpoint = ddog_Endpoint_agent(base_url);
+    endpoint = ddog_prof_Endpoint_agent(base_url);
   } else {
     ddog_CharSlice const api_key = to_CharSlice(exporter->_input.api_key);
-    endpoint = ddog_Endpoint_agentless(base_url, api_key);
+    endpoint = ddog_prof_Endpoint_agentless(base_url, api_key);
   }
 
   ddog_prof_Exporter_NewResult res_exporter = ddog_prof_Exporter_new(
