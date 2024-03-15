@@ -21,8 +21,11 @@ struct RingBuffer {
   std::byte *data;
   void *base;
 
-  uint64_t *writer_pos;
-  uint64_t *reader_pos;
+  uint64_t *writer_pos;             // writer cursor
+  uint64_t *reader_pos;             // reader cursor
+  uint64_t intermediate_reader_pos; // intermediate_reader_pos > reader_pos,
+                                    // part read by reader but not yet reflected
+                                    // to the writer
 
   // only used for MPSCRingBuffer
   SpinLock *spinlock;
