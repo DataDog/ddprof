@@ -12,7 +12,6 @@
 #include "savecontext.hpp"
 #include "symbol_helper.hpp"
 #include "unwind.hpp"
-#include "unwind_state.hpp"
 
 #include <algorithm>
 #include <condition_variable>
@@ -22,11 +21,6 @@
 
 namespace ddprof {
 
-#include <array>
-#include <cassert>
-#include <cstdio>
-#include <string>
-#include <vector>
 
 DDPROF_NOINLINE void funcA();
 DDPROF_NOINLINE void funcB();

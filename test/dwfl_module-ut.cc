@@ -4,15 +4,15 @@
 // Datadog, Inc.
 #include <gtest/gtest.h>
 
-#include "datadog/blazesym.h"
+
 #include "ddprof_module.hpp"
 #include "defer.hpp"
 #include "dso_hdr.hpp"
 #include "dwfl_hdr.hpp"
 #include "dwfl_internals.hpp"
 #include "loghandle.hpp"
-#include "symbolizer.hpp"
 
+#include <datadog/blazesym.h>
 #include <filesystem>
 #include <stdio.h>
 #include <string>

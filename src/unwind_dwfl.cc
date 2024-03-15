@@ -33,13 +33,9 @@ void trace_unwinding_end(UnwindState *us) {
     DsoHdr::DsoFindRes const find_res =
         us->dso_hdr.dso_find_closest(us->pid, us->current_ip);
     if (find_res.second && !us->output.locs.empty()) {
-      SymbolIdx_t const symIdx =
-          us->output.locs[us->output.locs.size() - 1]._symbol_idx;
-      const std::string &last_func =
-          us->symbol_hdr._symbol_table[symIdx]._symname;
-      LG_DBG("Stopped at %lx - dso %s - error %s (%s)", us->current_ip,
+      LG_DBG("Stopped at %lx - dso %s - error %s (0x%lx)", us->current_ip,
              find_res.first->second.to_string().c_str(), dwfl_errmsg(-1),
-             last_func.c_str());
+             us->output.locs[us->output.locs.size() - 1]._elf_addr);
     } else {
       LG_DBG("Unknown DSO %lx - error %s", us->current_ip, dwfl_errmsg(-1));
     }
@@ -282,7 +278,9 @@ DDRes unwind_dwfl(UnwindState *us) {
   //
   // Launch the dwarf unwinding (uses frame_cb callback)
   if (dwfl_getthread_frames(us->_dwfl_wrapper->_dwfl, us->pid, frame_cb, us) !=
-      0) {}
+      0) {
+    trace_unwinding_end(us);
+  }
   res = !us->output.locs.empty() ? ddres_init()
                                  : ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
   return res;
