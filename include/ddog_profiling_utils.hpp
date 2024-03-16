@@ -68,7 +68,7 @@ inline std::string_view get_or_insert_demangled_sym(
     ddprof::HeterogeneousLookupStringMap<std::string> &demangled_names) {
   auto it = demangled_names.find(sym);
   if (it == demangled_names.end()) {
-    std::string demangled_name = ddprof::Demangler::non_microsoft_demangle(sym);
+    const std::string demangled_name = ddprof::Demangler::non_microsoft_demangle(sym);
     it = demangled_names.insert({std::string(sym), demangled_name}).first;
   }
   return it->second;
@@ -82,14 +82,14 @@ inline DDRes write_location_blaze(
   if (cur_loc >= locations_buff.size()) {
     return ddres_warn(DD_WHAT_UW_MAX_DEPTH);
   }
-  constexpr std::string_view undef{""};
+  constexpr std::string_view undef{};
   constexpr std::string_view undef_inlined = undef;
   for (unsigned i = 0; i < blaze_sym->inlined_cnt && cur_loc < kMaxStackDepth;
        ++i) {
     const blaze_symbolize_inlined_fn *inlined_fn = blaze_sym->inlined + i;
     ddog_prof_Location &ffi_location = locations_buff[cur_loc];
     write_mapping(mapinfo, &ffi_location.mapping);
-    std::string_view demangled_name = inlined_fn->name
+    const std::string_view demangled_name = inlined_fn->name
         ? get_or_insert_demangled_sym(inlined_fn->name, demangled_names)
         : undef_inlined;
     write_function(demangled_name,

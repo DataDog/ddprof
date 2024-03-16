@@ -18,10 +18,9 @@ namespace ddprof {
 struct DDProfExporter;
 struct DDProfPProf;
 struct PersistentWorkerState;
-struct StackHandler;
 struct UnwindState;
 struct UserTags;
-struct Symbolizer;
+class Symbolizer;
 
 // Mutable states within a worker
 struct DDProfWorkerContext {
