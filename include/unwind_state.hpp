@@ -42,8 +42,7 @@ struct UnwindRegisters {
 /// given through callbacks
 struct UnwindState {
   explicit UnwindState(UniqueElf ref_elf, int dd_profiling_fd = -1)
-      : dso_hdr("", dd_profiling_fd), symbol_hdr(),
-        ref_elf(std::move(ref_elf)) {
+      : dso_hdr("", dd_profiling_fd), ref_elf(std::move(ref_elf)) {
     output.clear();
     output.locs.reserve(kMaxStackDepth);
   }

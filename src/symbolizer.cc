@@ -39,7 +39,7 @@ void Symbolizer::mark_unvisited() {
   }
 }
 
-DDRes Symbolizer::symbolize_pprof(const std::span<ElfAddress_t> addrs,
+DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> addrs,
                                   FileInfoId_t file_id,
                                   const std::string &elf_src,
                                   const MapInfo &map_info,

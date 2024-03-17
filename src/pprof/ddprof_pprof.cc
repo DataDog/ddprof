@@ -353,9 +353,8 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
 
   const ddprof::SymbolTable &symbol_table = symbol_hdr._symbol_table;
   const ddprof::MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
-
-  ddog_prof_Profile *profile = &pprof->_profile;
   const PProfIndices &pprof_indices = watcher->pprof_indices[value_pos];
+  ddog_prof_Profile *profile = &pprof->_profile;
   int64_t values[k_max_value_types] = {};
   assert(pprof_indices.pprof_index != -1);
   values[pprof_indices.pprof_index] = pack.value;
