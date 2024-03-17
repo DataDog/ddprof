@@ -15,7 +15,7 @@ namespace ddprof {
 
 namespace {
 void add_frame_without_mapping(UnwindState *us, SymbolIdx_t symbol_idx) {
-  add_frame(symbol_idx, -1, -1, 0, 0, us);
+  add_frame(symbol_idx, k_file_info_undef, k_mapinfo_idx_null, 0, 0, us);
 }
 
 } // namespace

@@ -242,7 +242,7 @@ DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
   MapInfoIdx_t const map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
       us->pid, us->symbol_hdr._mapinfo_table, dso, {});
 
-  return add_frame(symbol_idx, k_symbol_idx_null, map_idx, pc,
+  return add_frame(symbol_idx, k_file_info_undef, map_idx, pc,
                    pc - dso.start() + dso.offset(), us);
 }
 } // namespace

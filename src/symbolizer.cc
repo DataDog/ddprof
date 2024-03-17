@@ -73,7 +73,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> addrs,
   const blaze_result *blaze_res = nullptr;
   if (!_disable_symbolization) {
     // Initialize the src_elf structure
-    blaze_symbolize_src_elf src_elf{
+    const blaze_symbolize_src_elf src_elf{
         .type_size = sizeof(blaze_symbolize_src_elf),
         .path = resovled_src,
         .debug_syms = true,
@@ -102,10 +102,8 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> addrs,
   // This can happen when file descriptors are exhausted
   // OR symbolization is disabled
   if (!blaze_res) {
-    LG_DBG("No blaze result for %s", elf_src.data());
-    for (size_t i = 0; i < addrs.size(); ++i) {
-      // Update the location as is
-      write_location_no_sym(addrs[i], map_info, &locations[write_index++]);
+    for (auto el : addrs) {
+      write_location_no_sym(el, map_info, &locations[write_index++]);
     }
   }
   return {};

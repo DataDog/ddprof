@@ -84,7 +84,7 @@ bool is_stack_complete(std::span<const ddog_prof_Location> locations) {
                    root_func) != s_expected_root_frames.end();
 }
 
-static void ddprof_print_sample(const std::span<ddog_prof_Location> locations,
+static void ddprof_print_sample(std::span<const ddog_prof_Location> locations,
                                 uint64_t value, pid_t pid, pid_t tid,
                                 EventAggregationModePos value_mode_pos,
                                 const PerfWatcher &watcher) {
