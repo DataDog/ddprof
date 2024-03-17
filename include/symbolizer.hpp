@@ -56,17 +56,17 @@ private:
         .demangle = false,
         .reserved = {}};
 
-    explicit SymbolizerWrapper(const std::string &elf_src)
+    explicit SymbolizerWrapper(std::string elf_src)
         : _symbolizer(std::unique_ptr<blaze_symbolizer,
                                       decltype(&blaze_symbolizer_free)>(
               blaze_symbolizer_new_opts(&opts), &blaze_symbolizer_free)),
-          _elf_src(elf_src), _visited(true) {}
+          _elf_src(std::move(elf_src)) {}
 
     std::unique_ptr<blaze_symbolizer, decltype(&blaze_symbolizer_free)>
         _symbolizer;
     ddprof::HeterogeneousLookupStringMap<std::string> _demangled_names;
     std::string _elf_src;
-    bool _visited;
+    bool _visited{true};
   };
 
   std::unordered_map<FileInfoId_t, SymbolizerWrapper> _symbolizer_map;

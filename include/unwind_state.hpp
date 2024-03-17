@@ -41,9 +41,8 @@ struct UnwindRegisters {
 /// Single structure with everything necessary in unwinding. The structure is
 /// given through callbacks
 struct UnwindState {
-  explicit UnwindState(UniqueElf ref_elf, int dd_profiling_fd = -1,
-                       bool disable_symbolization = false)
-      : dso_hdr("", dd_profiling_fd), symbol_hdr(disable_symbolization),
+  explicit UnwindState(UniqueElf ref_elf, int dd_profiling_fd = -1)
+      : dso_hdr("", dd_profiling_fd), symbol_hdr(),
         ref_elf(std::move(ref_elf)) {
     output.clear();
     output.locs.reserve(kMaxStackDepth);
@@ -67,9 +66,7 @@ struct UnwindState {
   UniqueElf ref_elf; // reference elf object used to initialize dwfl
 };
 
-std::optional<UnwindState>
-create_unwind_state(int dd_profiling_fd = -1,
-                    bool disable_symbolization = false);
+std::optional<UnwindState> create_unwind_state(int dd_profiling_fd = -1);
 
 static inline bool unwind_registers_equal(const UnwindRegisters *lhs,
                                           const UnwindRegisters *rhs) {

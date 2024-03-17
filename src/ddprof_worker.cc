@@ -341,8 +341,7 @@ DDRes worker_library_init(DDProfContext &ctx,
     // Make sure worker index is initialized correctly
     ctx.worker_ctx.i_current_pprof = 0;
     ctx.worker_ctx.exp_tid = {0};
-    auto unwind_state = create_unwind_state(ctx.params.dd_profiling_fd,
-                                            ctx.params.disable_symbolization);
+    auto unwind_state = create_unwind_state(ctx.params.dd_profiling_fd);
     if (!unwind_state) {
       LG_ERR("Failed to create unwind state");
       return ddres_error(DD_WHAT_UW_ERROR);
@@ -540,7 +539,8 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx,
   ctx.worker_ctx.cycle_start_time = cycle_now;
 
   // Check if we can clear symbol objects
-  int count_symbolizers_cleared = ctx.worker_ctx.symbolizer->clear_unvisited();
+  const int count_symbolizers_cleared =
+      ctx.worker_ctx.symbolizer->clear_unvisited();
   ctx.worker_ctx.symbolizer->mark_unvisited();
 
   // Scrape procfs for process usage statistics

@@ -68,7 +68,8 @@ inline std::string_view get_or_insert_demangled_sym(
     ddprof::HeterogeneousLookupStringMap<std::string> &demangled_names) {
   auto it = demangled_names.find(sym);
   if (it == demangled_names.end()) {
-    const std::string demangled_name = ddprof::Demangler::non_microsoft_demangle(sym);
+    const std::string demangled_name =
+        ddprof::Demangler::non_microsoft_demangle(sym);
     it = demangled_names.insert({std::string(sym), demangled_name}).first;
   }
   return it->second;
@@ -108,14 +109,14 @@ inline DDRes write_location_blaze(
   ddog_prof_Location &ffi_location = locations_buff[cur_loc];
   write_mapping(mapinfo, &ffi_location.mapping);
   // if demangled name is not available, the underlying blaze sym will be null
-  std::string_view demangled_name = blaze_sym->name
+  const std::string_view demangled_name = blaze_sym->name
       ? get_or_insert_demangled_sym(blaze_sym->name, demangled_names)
       : undef;
 
   write_function(demangled_name,
                  blaze_sym->code_info.file
-                     ? std::string_view(blaze_sym->code_info.file)
-                     : std::string_view(mapinfo._sopath),
+                     ? std::string_view{blaze_sym->code_info.file}
+                     : std::string_view{mapinfo._sopath},
                  &ffi_location.function);
   ffi_location.address = ip;
   ffi_location.line = blaze_sym->code_info.line;

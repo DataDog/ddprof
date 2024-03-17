@@ -19,7 +19,7 @@ struct blaze_symbolizer;
 
 namespace ddprof {
 
-struct Symbolizer;
+class Symbolizer;
 struct SymbolHdr;
 
 struct DDProfPProf {
