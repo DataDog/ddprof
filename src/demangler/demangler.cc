@@ -184,7 +184,7 @@ std::string Demangler::non_microsoft_demangle(const char *mangled) {
     }
     return res;
   }
-  return std::string(mangled);
+  return std::string{mangled};
 }
 
 } // namespace ddprof

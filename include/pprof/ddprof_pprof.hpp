@@ -49,7 +49,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr &symbol_hdr,
                       ddprof::Symbolizer *symbolizer,
                       const DDProfValuePack &pack, const PerfWatcher *watcher,
-                      const FileInfoVector &vector, bool show_samples,
+                      const FileInfoVector &file_infos, bool show_samples,
                       EventAggregationModePos value_pos, DDProfPProf *pprof);
 
 DDRes pprof_reset(DDProfPProf *pprof);

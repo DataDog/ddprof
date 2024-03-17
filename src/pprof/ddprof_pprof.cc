@@ -84,10 +84,10 @@ bool is_stack_complete(std::span<const ddog_prof_Location> locations) {
                    root_func) != s_expected_root_frames.end();
 }
 
-static void ddprof_print_sample(std::span<const ddog_prof_Location> locations,
-                                uint64_t value, pid_t pid, pid_t tid,
-                                EventAggregationModePos value_mode_pos,
-                                const PerfWatcher &watcher) {
+void ddprof_print_sample(std::span<const ddog_prof_Location> locations,
+                         uint64_t value, pid_t pid, pid_t tid,
+                         EventAggregationModePos value_mode_pos,
+                         const PerfWatcher &watcher) {
 
   const char *sample_name =
       sample_type_name_from_idx(watcher.sample_type_id, value_mode_pos);
@@ -99,10 +99,10 @@ static void ddprof_print_sample(std::span<const ddog_prof_Location> locations,
       buf += ";";
     }
     // Access function name and source file from location
-    std::string_view function_name{loc_it->function.name.ptr,
-                                   loc_it->function.name.len};
-    std::string_view source_file{loc_it->function.filename.ptr,
-                                 loc_it->function.filename.len};
+    const std::string_view function_name{loc_it->function.name.ptr,
+                                         loc_it->function.name.len};
+    const std::string_view source_file{loc_it->function.filename.ptr,
+                                       loc_it->function.filename.len};
     if (!function_name.empty()) {
       // Append the function name, trimming at the first '(' if present.
       buf += function_name.substr(0, function_name.find('('));
@@ -406,11 +406,11 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
       continue;
     }
 
-    FileInfoId_t file_id = locs[index]._file_info_id;
+    const FileInfoId_t file_id = locs[index]._file_info_id;
     const std::string &currentFilePath = file_infos[file_id].get_path();
     std::vector<uintptr_t> addresses;
     // Collect all consecutive locations for the same file
-    unsigned start_index = index;
+    const unsigned start_index = index;
     while (index < locs.size() && locs[index]._file_info_id == file_id) {
       addresses.push_back(locs[index]._elf_addr);
       ++index;
