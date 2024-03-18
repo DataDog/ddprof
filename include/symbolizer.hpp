@@ -50,7 +50,7 @@ private:
     constexpr static blaze_symbolizer_opts opts{
         .type_size = sizeof(blaze_symbolizer_opts),
         .auto_reload = false,
-        .code_info = false,
+        .code_info = true,
         .inlined_fns = false,
         .demangle = false,
         .reserved = {}};
