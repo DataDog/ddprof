@@ -46,11 +46,11 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx);
  * @param pprof
  */
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
-                      const SymbolHdr &symbol_hdr,
-                      ddprof::Symbolizer *symbolizer,
-                      const DDProfValuePack &pack, const PerfWatcher *watcher,
+                      const SymbolHdr &symbol_hdr, const DDProfValuePack &pack,
+                      const PerfWatcher *watcher,
                       const FileInfoVector &file_infos, bool show_samples,
-                      EventAggregationModePos value_pos, DDProfPProf *pprof);
+                      EventAggregationModePos value_pos, Symbolizer *symbolizer,
+                      DDProfPProf *pprof);
 
 DDRes pprof_reset(DDProfPProf *pprof);
 

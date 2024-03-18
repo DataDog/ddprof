@@ -57,7 +57,7 @@ inline void write_location(const FunLoc *loc, const MapInfo &mapinfo,
                            bool use_process_adresses) {
   write_mapping(mapinfo, &ffi_location->mapping);
   write_function(symbol, &ffi_location->function);
-  ffi_location->address = use_process_adresses ? loc->ip : loc->_elf_addr;
+  ffi_location->address = use_process_adresses ? loc->ip : loc->elf_addr;
   ffi_location->line = symbol._lineno;
 }
 

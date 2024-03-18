@@ -49,8 +49,8 @@ static inline void fill_unwind_output_1(UnwindOutput &uw_output) {
   std::vector<FunLoc> &locs = uw_output.locs;
   for (unsigned i = 0; i < uw_output.locs.size(); ++i) {
     locs[i].ip = 42 + i;
-    locs[i]._symbol_idx = i;
-    locs[i]._map_info_idx = i;
+    locs[i].symbol_idx = i;
+    locs[i].map_info_idx = i;
   }
 }
 

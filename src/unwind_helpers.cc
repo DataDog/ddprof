@@ -40,10 +40,10 @@ DDRes add_frame(SymbolIdx_t symbol_idx, FileInfoId_t file_info_id,
         us->symbol_hdr._mapinfo_table);
   }
   output->locs.emplace_back(FunLoc{.ip = pc,
-                                   ._elf_addr = elf_addr,
-                                   ._file_info_id = file_info_id,
-                                   ._symbol_idx = symbol_idx,
-                                   ._map_info_idx = map_idx});
+                                   .elf_addr = elf_addr,
+                                   .file_info_id = file_info_id,
+                                   .symbol_idx = symbol_idx,
+                                   .map_info_idx = map_idx});
   return {};
 }
 

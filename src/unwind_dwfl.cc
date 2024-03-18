@@ -35,7 +35,7 @@ void trace_unwinding_end(UnwindState *us) {
     if (find_res.second && !us->output.locs.empty()) {
       LG_DBG("Stopped at %lx - dso %s - error %s (0x%lx)", us->current_ip,
              find_res.first->second.to_string().c_str(), dwfl_errmsg(-1),
-             us->output.locs[us->output.locs.size() - 1]._elf_addr);
+             us->output.locs[us->output.locs.size() - 1].elf_addr);
     } else {
       LG_DBG("Unknown DSO %lx - error %s", us->current_ip, dwfl_errmsg(-1));
     }

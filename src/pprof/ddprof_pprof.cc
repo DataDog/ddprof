@@ -7,25 +7,20 @@
 
 #include "ddog_profiling_utils.hpp"
 #include "ddprof_defs.hpp"
-#include "ddprof_stats.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "pevent_lib.hpp"
 #include "symbol_hdr.hpp"
-
 #include "symbolizer.hpp"
 
 #include <absl/strings/str_format.h>
 #include <absl/strings/substitute.h>
 #include <cstdio>
 #include <cstring>
+#include <datadog/common.h>
+#include <datadog/profiling.h>
 #include <span>
 #include <string_view>
-
-extern "C" {
-#include "datadog/common.h"
-#include "datadog/profiling.h"
-}
 
 // sv operator
 using namespace std::string_view_literals;
@@ -346,10 +341,11 @@ DDRes pprof_free_profile(DDProfPProf *pprof) {
 
 // Assumption of API is that sample is valid in a single type
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
-                      const SymbolHdr &symbol_hdr, Symbolizer *symbolizer,
-                      const DDProfValuePack &pack, const PerfWatcher *watcher,
+                      const SymbolHdr &symbol_hdr, const DDProfValuePack &pack,
+                      const PerfWatcher *watcher,
                       const FileInfoVector &file_infos, bool show_samples,
-                      EventAggregationModePos value_pos, DDProfPProf *pprof) {
+                      EventAggregationModePos value_pos, Symbolizer *symbolizer,
+                      DDProfPProf *pprof) {
 
   const ddprof::SymbolTable &symbol_table = symbol_hdr._symbol_table;
   const ddprof::MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
@@ -389,39 +385,40 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   // By removing the incomplete frame and pushing logic to BE
   // we can simplify this loop
   while (index < locs.size() - 1 && write_index < kMaxStackDepth) {
-    if (locs[index]._symbol_idx != k_symbol_idx_null) {
+    if (locs[index].symbol_idx != k_symbol_idx_null) {
       // already symbolized
       const FunLoc &loc = locs[index];
       write_location(
-          &loc, mapinfo_table[loc._map_info_idx], symbol_table[loc._symbol_idx],
+          &loc, mapinfo_table[loc.map_info_idx], symbol_table[loc.symbol_idx],
           &locations_buff[write_index++], pprof->use_process_adresses);
       ++index;
       continue;
     }
 
-    if (locs[index]._file_info_id <= k_file_info_error) {
+    if (locs[index].file_info_id <= k_file_info_error) {
       // We should either have an index or a file to write the symbol
-      assert(0);
+      DDPROF_DCHECK_FATAL(false,
+                          "Error In pprof symbolization(no file provided)");
       ++index;
       continue;
     }
 
-    const FileInfoId_t file_id = locs[index]._file_info_id;
+    const FileInfoId_t file_id = locs[index].file_info_id;
     const std::string &currentFilePath = file_infos[file_id].get_path();
     std::vector<uintptr_t> addresses;
     // Collect all consecutive locations for the same file
     const unsigned start_index = index;
-    while (index < locs.size() && locs[index]._file_info_id == file_id) {
-      addresses.push_back(locs[index]._elf_addr);
+    while (index < locs.size() && locs[index].file_info_id == file_id) {
+      addresses.push_back(locs[index].elf_addr);
       ++index;
-      if (locs[index]._symbol_idx != -1) {
+      if (locs[index].symbol_idx != -1) {
         break;
       }
     }
     // Symbolize all addresses for this file
     if (IsDDResNotOK(symbolizer->symbolize_pprof(
             addresses, file_id, currentFilePath,
-            mapinfo_table[locs[start_index]._map_info_idx],
+            mapinfo_table[locs[start_index].map_info_idx],
             std::span<ddog_prof_Location>{locations_buff, kMaxStackDepth},
             write_index, session_results))) {
       break;
@@ -438,11 +435,11 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   }
 
   // write binary frame (it should always be a symbol idx)
-  if (write_index < kMaxStackDepth && locs[locs.size() - 1]._symbol_idx != -1) {
+  if (write_index < kMaxStackDepth && locs[locs.size() - 1].symbol_idx != -1) {
     const FunLoc &loc = locs[locs.size() - 1];
-    write_location(&loc, mapinfo_table[loc._map_info_idx],
-                   symbol_table[loc._symbol_idx],
-                   &locations_buff[write_index++], pprof->use_process_adresses);
+    write_location(&loc, mapinfo_table[loc.map_info_idx],
+                   symbol_table[loc.symbol_idx], &locations_buff[write_index++],
+                   pprof->use_process_adresses);
   }
 
   // Create the labels for the sample.  Two samples are the same only when

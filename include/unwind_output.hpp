@@ -20,10 +20,10 @@ namespace ddprof {
 
 struct FunLoc {
   ProcessAddress_t ip;
-  ElfAddress_t _elf_addr;
-  FileInfoId_t _file_info_id;
-  SymbolIdx_t _symbol_idx;
-  MapInfoIdx_t _map_info_idx;
+  ElfAddress_t elf_addr;
+  FileInfoId_t file_info_id;
+  SymbolIdx_t symbol_idx;
+  MapInfoIdx_t map_info_idx;
   friend auto operator<=>(const FunLoc &, const FunLoc &) = default;
 };
 

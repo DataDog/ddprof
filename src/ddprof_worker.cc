@@ -79,9 +79,9 @@ DDRes report_lost_events(DDProfContext &ctx) {
              "watcher #%d",
              nb_lost, value, watcher_idx);
       DDRES_CHECK_FWD(pprof_aggregate(
-          &us->output, us->symbol_hdr, ctx.worker_ctx.symbolizer,
-          {value, nb_lost, 0}, watcher,
+          &us->output, us->symbol_hdr, {value, nb_lost, 0}, watcher,
           ctx.worker_ctx.us->dso_hdr.get_file_info_vector(), false, kSumPos,
+          ctx.worker_ctx.symbolizer,
           ctx.worker_ctx.pprof[ctx.worker_ctx.i_current_pprof]));
       ctx.worker_ctx.lost_events_per_watcher[watcher_idx] = 0;
     }
@@ -255,9 +255,9 @@ DDRes aggregate_livealloc_stack(
       static_cast<uint64_t>(std::max<int64_t>(0, alloc_info.second._count)), 0};
 
   DDRES_CHECK_FWD(pprof_aggregate(
-      &alloc_info.first, symbol_hdr, ctx.worker_ctx.symbolizer, pack, watcher,
+      &alloc_info.first, symbol_hdr, pack, watcher,
       ctx.worker_ctx.us->dso_hdr.get_file_info_vector(),
-      ctx.params.show_samples, kLiveSumPos, pprof));
+      ctx.params.show_samples, kLiveSumPos, ctx.worker_ctx.symbolizer, pprof));
   return {};
 }
 
@@ -444,10 +444,10 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
       const DDProfValuePack pack{static_cast<int64_t>(sample_val), 1,
                                  timestamp};
 
-      DDRES_CHECK_FWD(pprof_aggregate(&us->output, us->symbol_hdr,
-                                      ctx.worker_ctx.symbolizer, pack, watcher,
-                                      us->dso_hdr.get_file_info_vector(),
-                                      ctx.params.show_samples, kSumPos, pprof));
+      DDRES_CHECK_FWD(pprof_aggregate(
+          &us->output, us->symbol_hdr, pack, watcher,
+          us->dso_hdr.get_file_info_vector(), ctx.params.show_samples, kSumPos,
+          ctx.worker_ctx.symbolizer, pprof));
     }
   }
 
