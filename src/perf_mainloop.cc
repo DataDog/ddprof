@@ -140,8 +140,8 @@ ReplyMessage create_reply_message(const DDProfContext &ctx) {
       reply.loaded_libs_check_interval_ms =
           ctx.params.loaded_libs_check_interval.count();
 
-      if (ctx.watchers[alloc_watcher_idx].aggregation_mode ==
-          EventAggregationMode::kLiveSum) {
+      if (Any(ctx.watchers[alloc_watcher_idx].aggregation_mode &
+              EventAggregationMode::kLiveSum)) {
         reply.allocation_flags |= ReplyMessage::kLiveSum;
       }
     }
