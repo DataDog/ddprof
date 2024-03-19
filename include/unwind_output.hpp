@@ -14,14 +14,16 @@
 #include "container_id_defs.hpp"
 #include "ddprof_defs.hpp"
 
+#include "ddprof_file_info-i.hpp"
+
 namespace ddprof {
 
 struct FunLoc {
-  ProcessAddress_t ip;   // process address
-  ElfAddress_t elf_addr; // elf address (in elf file virtual memory space)
-  SymbolIdx_t _symbol_idx;
-  MapInfoIdx_t _map_info_idx;
-
+  ProcessAddress_t ip;
+  ElfAddress_t elf_addr;
+  FileInfoId_t file_info_id;
+  SymbolIdx_t symbol_idx;
+  MapInfoIdx_t map_info_idx;
   friend auto operator<=>(const FunLoc &, const FunLoc &) = default;
 };
 
@@ -29,15 +31,12 @@ struct FunLoc {
 struct UnwindOutput {
   void clear() {
     locs.clear();
-    is_incomplete = true;
     container_id = k_container_id_unknown;
   }
   std::vector<FunLoc> locs;
   std::string container_id;
   int pid;
   int tid;
-  bool is_incomplete;
-
   friend auto operator<=>(const UnwindOutput &, const UnwindOutput &) = default;
 };
 // NOLINTEND(misc-non-private-member-variables-in-classes)

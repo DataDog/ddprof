@@ -10,7 +10,6 @@
 #include "common_symbol_lookup.hpp"
 #include "ddres_def.hpp"
 #include "dso_symbol_lookup.hpp"
-#include "dwfl_symbol_lookup.hpp"
 #include "logger.hpp"
 #include "mapinfo_lookup.hpp"
 #include "runtime_symbol_lookup.hpp"
@@ -19,18 +18,10 @@
 
 namespace ddprof {
 struct SymbolHdr {
-  explicit SymbolHdr(bool disable_symbolization = false,
-                     std::string_view path_to_proc = "")
-      : _dwfl_symbol_lookup(disable_symbolization),
-        _runtime_symbol_lookup(path_to_proc) {}
-  void display_stats() const {
-    _dwfl_symbol_lookup.stats().display(_dwfl_symbol_lookup.size());
-    _dso_symbol_lookup.stats_display();
-  }
-  void cycle() {
-    _dwfl_symbol_lookup.stats().reset();
-    _runtime_symbol_lookup.cycle();
-  }
+  explicit SymbolHdr(std::string_view path_to_proc = "")
+      : _runtime_symbol_lookup(path_to_proc) {}
+  void display_stats() const { _dso_symbol_lookup.stats_display(); }
+  void cycle() { _runtime_symbol_lookup.cycle(); }
 
   void clear(pid_t pid) {
     _base_frame_symbol_lookup.erase(pid);
@@ -43,7 +34,6 @@ struct SymbolHdr {
   BaseFrameSymbolLookup _base_frame_symbol_lookup;
   CommonSymbolLookup _common_symbol_lookup;
   DsoSymbolLookup _dso_symbol_lookup;
-  DwflSymbolLookup _dwfl_symbol_lookup;
   RuntimeSymbolLookup _runtime_symbol_lookup;
   // Symbol table (contains the references to strings)
   SymbolTable _symbol_table;
