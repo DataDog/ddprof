@@ -8,13 +8,18 @@
 #include "ddog_profiling_utils.hpp"
 #include "ddprof_context.hpp"
 #include "ddprof_defs.hpp"
+#include "ddprof_file_info.hpp"
 #include "ddres_def.hpp"
 #include "perf_watcher.hpp"
+#include "symbolizer.hpp"
 #include "tags.hpp"
 #include "unwind_output.hpp"
 
+struct blaze_symbolizer;
+
 namespace ddprof {
 
+class Symbolizer;
 struct SymbolHdr;
 
 struct DDProfPProf {
@@ -43,17 +48,14 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx);
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr &symbol_hdr, const DDProfValuePack &pack,
                       const PerfWatcher *watcher,
-                      EventAggregationModePos value_pos, DDProfPProf *pprof);
+                      const FileInfoVector &file_infos, bool show_samples,
+                      EventAggregationModePos value_pos, Symbolizer *symbolizer,
+                      DDProfPProf *pprof);
 
 DDRes pprof_reset(DDProfPProf *pprof);
 
 DDRes pprof_write_profile(const DDProfPProf *pprof, int fd);
 
 DDRes pprof_free_profile(DDProfPProf *pprof);
-
-void ddprof_print_sample(const UnwindOutput &uw_output,
-                         const SymbolHdr &symbol_hdr, uint64_t value,
-                         EventAggregationModePos value_mode_pos,
-                         const PerfWatcher &watcher);
 
 } // namespace ddprof

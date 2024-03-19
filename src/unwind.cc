@@ -20,49 +20,9 @@
 #include <algorithm>
 #include <array>
 
-using namespace std::string_view_literals;
-
 namespace ddprof {
 
 namespace {
-bool is_ld(const std::string &path) {
-  // path is expected to not contain slashes
-  assert(path.rfind('/') == std::string::npos);
-
-  return path.starts_with("ld-");
-}
-
-bool is_stack_complete(UnwindState *us) {
-  static constexpr std::array s_expected_root_frames{
-      "__clone"sv,
-      "__clone3"sv,
-      "_exit"sv,
-      "main"sv,
-      "runtime.goexit.abi0"sv,
-      "runtime.systemstack.abi0"sv,
-      "_start"sv,
-      "start_thread"sv,
-      "start_task"sv};
-
-  if (us->output.locs.empty()) {
-    return false;
-  }
-
-  const auto &root_loc = us->output.locs.back();
-  const auto &root_mapping =
-      us->symbol_hdr._mapinfo_table[root_loc._map_info_idx];
-
-  // If we are in ld.so (eg. during lib init before main) consider the stack as
-  // complete
-  if (is_ld(root_mapping._sopath)) {
-    return true;
-  }
-
-  const auto &root_func =
-      us->symbol_hdr._symbol_table[root_loc._symbol_idx]._symname;
-  return std::find(s_expected_root_frames.begin(), s_expected_root_frames.end(),
-                   root_func) != s_expected_root_frames.end();
-}
 
 void find_dso_add_error_frame(DDRes ddres, UnwindState *us) {
   if (ddres._what == DD_WHAT_UW_MAX_PIDS) {
@@ -104,15 +64,6 @@ DDRes unwindstate_unwind(UnwindState *us) {
   }
   if (IsDDResNotOK(res)) {
     find_dso_add_error_frame(res, us);
-  } else if (!is_stack_complete(us)) {
-    us->output.is_incomplete = true;
-    ddprof_stats_add(STATS_UNWIND_INCOMPLETE_STACK, 1, nullptr);
-    // Only add [incomplete] virtual frame if stack is not already truncated !
-    if (!is_max_stack_depth_reached(*us)) {
-      add_common_frame(us, SymbolErrors::incomplete_stack);
-    }
-  } else {
-    us->output.is_incomplete = false;
   }
   ddprof_stats_add(STATS_UNWIND_AVG_STACK_DEPTH, us->output.locs.size(),
                    nullptr);

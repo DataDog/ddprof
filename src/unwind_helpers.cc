@@ -15,7 +15,7 @@ namespace ddprof {
 
 namespace {
 void add_frame_without_mapping(UnwindState *us, SymbolIdx_t symbol_idx) {
-  add_frame(symbol_idx, -1, 0, 0, us);
+  add_frame(symbol_idx, k_file_info_undef, k_mapinfo_idx_null, 0, 0, us);
 }
 
 } // namespace
@@ -25,31 +25,25 @@ bool is_max_stack_depth_reached(const UnwindState &us) {
   return us.output.locs.size() + 2 >= kMaxStackDepth;
 }
 
-DDRes add_frame(SymbolIdx_t symbol_idx, MapInfoIdx_t map_idx,
-                ProcessAddress_t pc, ElfAddress_t elf_addr, UnwindState *us) {
+DDRes add_frame(SymbolIdx_t symbol_idx, FileInfoId_t file_info_id,
+                MapInfoIdx_t map_idx, ProcessAddress_t pc,
+                ProcessAddress_t elf_addr, UnwindState *us) {
   UnwindOutput *output = &us->output;
   if (output->locs.size() >= kMaxStackDepth) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_UW_MAX_DEPTH,
                           "Max stack depth reached"); // avoid overflow
   }
-  FunLoc current;
-  current._symbol_idx = symbol_idx;
-  current.ip = pc;
-  current.elf_addr = elf_addr;
   if (map_idx == -1) {
     // just add an empty element for mapping info
-    current._map_info_idx = us->symbol_hdr._common_mapinfo_lookup.get_or_insert(
+    map_idx = us->symbol_hdr._common_mapinfo_lookup.get_or_insert(
         CommonMapInfoLookup::MappingErrors::empty,
         us->symbol_hdr._mapinfo_table);
-  } else {
-    current._map_info_idx = map_idx;
   }
-#ifdef DEBUG
-  LG_NTC("Considering frame with IP : %lx / %s ", pc,
-         us->symbol_hdr._symbol_table[current._symbol_idx]._symname.c_str());
-#endif
-  output->locs.push_back(current);
-
+  output->locs.emplace_back(FunLoc{.ip = pc,
+                                   .elf_addr = elf_addr,
+                                   .file_info_id = file_info_id,
+                                   .symbol_idx = symbol_idx,
+                                   .map_info_idx = map_idx});
   return {};
 }
 

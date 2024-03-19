@@ -21,11 +21,6 @@
 #include <unistd.h>
 
 namespace ddprof {
-// todo : cut this dependency
-DwflSymbolLookup::DwflSymbolLookup(bool disable_symbolization)
-    : _lookup_setting(K_CACHE_ON),
-      _disable_symbolization(disable_symbolization) {}
-
 TEST(DDProfPProf, init_profiles) {
   DDProfPProf pprof;
   DDProfContext ctx = {};
@@ -67,7 +62,7 @@ TEST(DDProfPProf, aggregate) {
   UnwindOutput mock_output;
   SymbolTable &table = symbol_hdr._symbol_table;
   MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
-
+  FileInfoVector file_infos;
   fill_unwind_symbols(table, mapinfo_table, mock_output);
   DDProfPProf pprof;
   DDProfContext ctx = {};
@@ -78,7 +73,8 @@ TEST(DDProfPProf, aggregate) {
   EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_index != -1);
   EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_count_index != -1);
   res = pprof_aggregate(&mock_output, symbol_hdr, {1000, 1, 0},
-                        &ctx.watchers[0], kSumPos, &pprof);
+                        &ctx.watchers[0], file_infos, false, kSumPos,
+                        ctx.worker_ctx.symbolizer, &pprof);
 
   EXPECT_TRUE(IsDDResOK(res));
 
@@ -116,8 +112,10 @@ TEST(DDProfPProf, just_live) {
   EXPECT_TRUE(ctx.watchers[1].pprof_indices[kLiveSumPos].pprof_index != -1);
   EXPECT_TRUE(ctx.watchers[1].pprof_indices[kLiveSumPos].pprof_count_index !=
               -1);
+  FileInfoVector file_infos;
   res = pprof_aggregate(&mock_output, symbol_hdr, {1000, 1, 0},
-                        &ctx.watchers[1], kLiveSumPos, &pprof);
+                        &ctx.watchers[1], file_infos, false, kLiveSumPos,
+                        ctx.worker_ctx.symbolizer, &pprof);
   EXPECT_TRUE(IsDDResOK(res));
   test_pprof(&pprof);
   res = pprof_free_profile(&pprof);

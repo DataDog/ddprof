@@ -23,7 +23,7 @@ static const char *s_src_paths[K_MOCK_LOC_SIZE] = {
     "/app/4/bar.c", "/app/5/bar.c", "/app/6/bar.c", "/app/7/bar.c",
     "/app/8/bar.c", "/app/9/bar.c", "/app/10/bar.c"};
 
-static const char *s_so_paths[] = {"/app/lib/bar.0.so"};
+static const char *s_so_paths[] = {"bar.0.so"};
 
 // ddog_Mapping
 
@@ -49,8 +49,8 @@ static inline void fill_unwind_output_1(UnwindOutput &uw_output) {
   std::vector<FunLoc> &locs = uw_output.locs;
   for (unsigned i = 0; i < uw_output.locs.size(); ++i) {
     locs[i].ip = 42 + i;
-    locs[i]._symbol_idx = i;
-    locs[i]._map_info_idx = i;
+    locs[i].symbol_idx = i;
+    locs[i].map_info_idx = i;
   }
 }
 
