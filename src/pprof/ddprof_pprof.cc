@@ -405,11 +405,13 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
 
     const FileInfoId_t file_id = locs[index].file_info_id;
     const std::string &currentFilePath = file_infos[file_id].get_path();
-    std::vector<uintptr_t> addresses;
+    std::vector<uintptr_t> elf_addresses;
+    std::vector<uintptr_t> process_addresses;
     // Collect all consecutive locations for the same file
     const unsigned start_index = index;
     while (index < locs.size() && locs[index].file_info_id == file_id) {
-      addresses.push_back(locs[index].elf_addr);
+      elf_addresses.push_back(locs[index].elf_addr);
+      process_addresses.push_back(locs[index].ip);
       ++index;
       if (locs[index].symbol_idx != -1) {
         break;
@@ -417,7 +419,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     }
     // Symbolize all addresses for this file
     if (IsDDResNotOK(symbolizer->symbolize_pprof(
-            addresses, file_id, currentFilePath,
+            elf_addresses, process_addresses, file_id, currentFilePath,
             mapinfo_table[locs[start_index].map_info_idx],
             std::span<ddog_prof_Location>{locations_buff, kMaxStackDepth},
             write_index, session_results))) {
