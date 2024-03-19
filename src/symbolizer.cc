@@ -39,7 +39,8 @@ void Symbolizer::mark_unvisited() {
   }
 }
 
-DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> addrs,
+DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
+                                  std::span<ProcessAddress_t> process_addrs,
                                   FileInfoId_t file_id,
                                   const std::string &elf_src,
                                   const MapInfo &map_info,
@@ -47,7 +48,11 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> addrs,
                                   unsigned &write_index,
                                   SessionResults &results) {
   blaze_symbolizer *symbolizer = nullptr;
-  if (addrs.empty() || elf_src.empty()) {
+  if (elf_addrs.size() != process_addrs.size()) {
+    LG_WRN("Error in provided addresses when symbolizing pprofs");
+    return ddres_warn(DD_WHAT_PPROF); // or some other error handling
+  }
+  if (elf_addrs.empty() || elf_src.empty()) {
     return ddres_warn(DD_WHAT_PPROF); // or some other error handling
   }
   ddprof::HeterogeneousLookupStringMap<std::string> *demangled_names = nullptr;
@@ -81,20 +86,19 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> addrs,
     };
 
     // Symbolize the addresses
-    blaze_res = blaze_symbolize_elf_virt_offsets(symbolizer, &src_elf,
-                                                 addrs.data(), addrs.size());
+    blaze_res = blaze_symbolize_elf_virt_offsets(
+        symbolizer, &src_elf, elf_addrs.data(), elf_addrs.size());
     if (blaze_res) {
-      assert(blaze_res->cnt == addrs.size());
+      assert(blaze_res->cnt == elf_addrs.size());
       results.blaze_results.push_back(blaze_res);
-      // Demangling caching based on stability of unordered map
+      // Demangling cache based on stability of unordered map
       // This will be moved to the backend
-      for (size_t i = 0; i < blaze_res->cnt; ++i) {
+      for (size_t i = 0; i < blaze_res->cnt && i < elf_addrs.size(); ++i) {
         const blaze_sym *cur_sym = blaze_res->syms + i;
         // Update the location
-        // minor: address should be a process address
-        DDRES_CHECK_FWD(write_location_blaze(addrs[i], (*demangled_names),
-                                             map_info, cur_sym, write_index,
-                                             locations));
+        DDRES_CHECK_FWD(write_location_blaze(
+            _reported_addr_format == k_elf ? elf_addrs[i] : process_addrs[i],
+            (*demangled_names), map_info, cur_sym, write_index, locations));
       }
     }
   }
@@ -102,8 +106,14 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> addrs,
   // This can happen when file descriptors are exhausted
   // OR symbolization is disabled
   if (!blaze_res) {
-    for (auto el : addrs) {
-      write_location_no_sym(el, map_info, &locations[write_index++]);
+    if (_reported_addr_format == k_elf) {
+      for (auto el : elf_addrs) {
+        write_location_no_sym(el, map_info, &locations[write_index++]);
+      }
+    } else {
+      for (auto el : process_addrs) {
+        write_location_no_sym(el, map_info, &locations[write_index++]);
+      }
     }
   }
   return {};

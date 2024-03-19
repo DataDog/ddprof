@@ -367,8 +367,10 @@ DDRes worker_library_init(DDProfContext &ctx,
     unwind_init();
     ctx.worker_ctx.user_tags =
         new UserTags(ctx.params.tags, ctx.params.num_cpu);
-    ctx.worker_ctx.symbolizer =
-        new ddprof::Symbolizer(ctx.params.disable_symbolization);
+    ctx.worker_ctx.symbolizer = new ddprof::Symbolizer(
+        ctx.params.disable_symbolization,
+        ctx.params.remote_symbolization ? Symbolizer::k_elf
+                                        : Symbolizer::k_process);
 
     // Zero out pointers to dynamically allocated memory
     ctx.worker_ctx.exp[0] = nullptr;

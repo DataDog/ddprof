@@ -23,8 +23,15 @@ struct ddog_prof_Location;
 namespace ddprof {
 class Symbolizer {
 public:
-  explicit Symbolizer(bool disable_symbolization = false)
-      : _disable_symbolization(disable_symbolization) {}
+  enum AddrFormat {
+    k_elf,
+    k_process,
+  };
+
+  explicit Symbolizer(bool disable_symbolization = false,
+                      AddrFormat reported_addr_format = k_process)
+      : _disable_symbolization(disable_symbolization),
+        _reported_addr_format(reported_addr_format) {}
 
   struct SessionResults {
     std::vector<const blaze_result *> blaze_results{};
@@ -32,8 +39,10 @@ public:
 
   static constexpr int _k_max_stack_depth = kMaxStackDepth;
 
-  DDRes symbolize_pprof(std::span<ElfAddress_t> addrs, FileInfoId_t file_id,
-                        const std::string &elf_src, const MapInfo &map_info,
+  DDRes symbolize_pprof(std::span<ElfAddress_t> addrs,
+                        std::span<ProcessAddress_t> process_addrs,
+                        FileInfoId_t file_id, const std::string &elf_src,
+                        const MapInfo &map_info,
                         std::span<ddog_prof_Location> locations,
                         unsigned &write_index, SessionResults &results);
   static void free_session_results(SessionResults &results) {
@@ -70,5 +79,6 @@ private:
 
   std::unordered_map<FileInfoId_t, SymbolizerWrapper> _symbolizer_map;
   bool _disable_symbolization;
+  AddrFormat _reported_addr_format;
 };
 } // namespace ddprof
