@@ -636,7 +636,7 @@ void ddprof_pr_exit(DDProfContext &ctx, const perf_event_exit *ext,
 void ddprof_pr_clear_live_allocation(DDProfContext &ctx,
                                      const ClearLiveAllocationEvent *event,
                                      int watcher_pos) {
-  LG_DBG("<%d>(CLEAR LIVE)%d", watcher_pos, event->sample_id.pid);
+  LG_NTC("<%d>(CLEAR LIVE)%d", watcher_pos, event->sample_id.pid);
   ctx.worker_ctx.live_allocation.clear_pid_for_watcher(watcher_pos,
                                                        event->sample_id.pid);
 }

@@ -163,6 +163,13 @@ void pollfd_setup(std::span<PEvent> pes, struct pollfd *pfd) {
   }
 }
 
+// EventWrapper holds a reference to a perf_event_header with its associated
+// timestamp.
+// It is used to order events in a std::priority_queue without copying events.
+// perf_event_header is not owned by EventWrapper, it points on ring buffer
+// memory, and must remain valid during the lifetime of EventWrapper.
+// Consequently, care must be taken to advance reader cursor position in ring
+// buffer only after processing the event.
 struct EventWrapper {
   const perf_event_header *event;
   PerfClock::time_point timestamp;
@@ -179,6 +186,42 @@ using EventQueue = std::priority_queue<EventWrapper, std::vector<EventWrapper>,
 DDRes worker_process_ring_buffers_ordered(std::span<PEvent> pes,
                                           DDProfContext &ctx,
                                           EventQueue &event_queue, bool drain) {
+  // Reorder events from ring buffers before processing them.
+  // Events in each perf ring buffer are already ordered by timestamp.
+  // For MPSC ring buffers, there is no such guarantee.
+  // The strategy is to dequeue events from ring buffers and push them in a
+  // priority queue, ordered by timestamp. And then process this priority queue.
+  // When a ring buffer is empty, we cannot be sure that a new event with a
+  // timestamp less than a previously enqueued event will not be added to the
+  // ring buffer in the future.
+  // That's why we arbitrarily define a maximum latency `kMaxSampleLatency`
+  // between the timestamp of an event and the time it appears in the ring
+  // buffer, and we process events with timestamps up to (now -
+  // kMaxSampleLatency).
+  // For MPSC ring buffers, we dequeue events and push them into the priority
+  // queue until we reach an event with a timestamp greater than (now -
+  // kMaxSampleLatency) or the ring buffer is empty. Note that when an event
+  // with a timestamp greater than (now - kMaxSampleLatency) is dequeued, it is
+  // still pushed in the priority_queue.
+  // For perf ring buffers, we ensure that at anytime at most one event from
+  // each ring buffer is in the priority queue. This ensures that events with
+  // identical timestamps in a ring buffer are processed in the same order as in
+  // the ring buffer (priority queue is not stable, therefore pushing events
+  // with identical timestamps might permute them) and this also makes advancing
+  // the reader cursor position in the ring buffer easier since know that only
+  // one event has been read, we can just bump the reader cursor to the last
+  // read position.
+  // When an event from a perf ring buffer is dequeued fron the priority queue,
+  // we advance the reader cursor position in the ring buffer to free the slot
+  // for the writer, and attempt to read the next event from the ring buffer if
+  // not empty.
+  // When an event from a MPSC ring buffer is dequeued from the priority queue,
+  // we try to advance the reader cursor position in the ring buffer to free the
+  // slot for the writer. Since events might be out of order for this ring
+  // buffer, advancing is done by marking processed events as discarded and
+  // bumping the reader position until empty or we reach the first non-discarded
+  // event.
+
   const std::chrono::microseconds kMaxSampleLatency{100};
 
   auto now = PerfClock::now();
@@ -191,30 +234,35 @@ DDRes worker_process_ring_buffers_ordered(std::span<PEvent> pes,
         drain ? PerfClock::time_point::max() : now - kMaxSampleLatency;
     int new_events = 0;
 
+    // Dequeue events from each ring buffer and push them in the priority queue
     for (int i = 0; i < static_cast<int>(pes.size()); ++i) {
       auto &rb = pes[i].rb;
 
-      while (true) {
-        const perf_event_header *event =
-            (rb.type == RingBufferType::kPerfRingBuffer)
-            ? perf_rb_read_event(rb)
-            : mpsc_rb_read_event(rb);
-
-        if (!event) {
-          break;
+      if (rb.type == RingBufferType::kPerfRingBuffer) {
+        // if perf ring buffer has already events in the priority queue, skip it
+        if (!perf_rb_has_inflight_events(rb)) {
+          const perf_event_header *event = perf_rb_read_event(rb);
+          if (event) {
+            auto timestamp = perf_clock_time_point_from_timestamp(
+                hdr_time(event, ctx.watchers[pes[i].watcher_pos].sample_type));
+            event_queue.push({event, timestamp, i});
+            ++new_events;
+          }
         }
+      } else {
+        while (true) {
+          const perf_event_header *event = mpsc_rb_read_event(rb);
+          if (!event) {
+            break;
+          }
 
-        auto timestamp = perf_clock_time_point_from_timestamp(
-            hdr_time(event, ctx.watchers[pes[i].watcher_pos].sample_type));
-        event_queue.push({event, timestamp, i});
-        ++new_events;
-        if (timestamp > max_timestamp) {
-          break;
-        }
-
-        // Read only a single event from perf ring buffer
-        if (rb.type == RingBufferType::kPerfRingBuffer) {
-          break;
+          auto timestamp = perf_clock_time_point_from_timestamp(
+              hdr_time(event, ctx.watchers[pes[i].watcher_pos].sample_type));
+          event_queue.push({event, timestamp, i});
+          ++new_events;
+          if (timestamp > max_timestamp) {
+            break;
+          }
         }
       }
     }
@@ -234,16 +282,18 @@ DDRes worker_process_ring_buffers_ordered(std::span<PEvent> pes,
 
       auto &rb = pevent.rb;
       if (rb.type == RingBufferType::kPerfRingBuffer) {
+        // advance ring buffer, this frees space for the writer end
         perf_rb_advance(rb);
 
         const perf_event_header *new_event = perf_rb_read_event(rb);
         if (new_event) {
-          // enqueue next event for the same ring buffer
+          // enqueue next event from the same ring buffer
           auto timestamp = perf_clock_time_point_from_timestamp(hdr_time(
               new_event, ctx.watchers[pevent.watcher_pos].sample_type));
           event_queue.push({new_event, timestamp, evt.buffer_idx});
         }
       } else {
+        // advance ring buffer if possible, this frees space for the writer end
         mpsc_rb_advance_if_possible(rb, evt.event);
       }
       event_queue.pop();
