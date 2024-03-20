@@ -163,7 +163,12 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       ->group("Profiling settings")
       ->excludes(pid_opt)
       ->excludes(exec_option);
-
+  app.add_option("--inlined_functions,-I", inlined_functions,
+                 "Report inlined functions in call stacks.\n"
+                 "This is possible if debug sections are available.\n"
+                 "This can have performance impacts for the profiler.")
+      ->group("Profiling settings")
+      ->default_val(false);
   app.add_flag("--timeline,-t", timeline,
                "Enables Timeline view in the Datadog UI.\n"
                "Works by adding timestmaps to certain events.")
@@ -483,6 +488,7 @@ void DDProfCLI::print() const {
   if (!enable) {
     PRINT_NFO("  - enable: %s", enable ? "true" : "false");
   }
+  PRINT_NFO("  - inlined_functions: %s", inlined_functions ? "true" : "false");
   if (!cpu_affinity.empty()) {
     PRINT_NFO("  - cpu_affinity: %s", cpu_affinity.c_str());
   }

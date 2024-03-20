@@ -368,7 +368,7 @@ DDRes worker_library_init(DDProfContext &ctx,
     ctx.worker_ctx.user_tags =
         new UserTags(ctx.params.tags, ctx.params.num_cpu);
     ctx.worker_ctx.symbolizer = new ddprof::Symbolizer(
-        ctx.params.disable_symbolization,
+        ctx.params.inlined_functions, ctx.params.disable_symbolization,
         ctx.params.remote_symbolization ? Symbolizer::k_elf
                                         : Symbolizer::k_process);
 

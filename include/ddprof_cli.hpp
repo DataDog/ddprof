@@ -41,6 +41,7 @@ public:
   // Profiling options
   int pid{0};
   bool global{false};
+  bool inlined_functions{false};
   std::chrono::seconds upload_period;
   unsigned worker_period; // worker_period
   std::vector<std::string> events;

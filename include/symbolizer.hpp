@@ -28,9 +28,11 @@ public:
     k_process,
   };
 
-  explicit Symbolizer(bool disable_symbolization = false,
+  explicit Symbolizer(bool inlined_functions = false,
+                      bool disable_symbolization = false,
                       AddrFormat reported_addr_format = k_process)
-      : _disable_symbolization(disable_symbolization),
+      : inlined_functions(inlined_functions),
+        _disable_symbolization(disable_symbolization),
         _reported_addr_format(reported_addr_format) {}
 
   struct SessionResults {
@@ -56,20 +58,23 @@ public:
 
 private:
   struct SymbolizerWrapper {
-    constexpr static blaze_symbolizer_opts opts{
-        .type_size = sizeof(blaze_symbolizer_opts),
-        .auto_reload = false,
-        .code_info = true,
-        .inlined_fns = false,
-        .demangle = false,
-        .reserved = {}};
+    static blaze_symbolizer_opts create_opts(bool inlined_fns) {
+      return blaze_symbolizer_opts{.type_size = sizeof(blaze_symbolizer_opts),
+                                   .auto_reload = false,
+                                   .code_info = true,
+                                   .inlined_fns = inlined_fns,
+                                   .demangle = false,
+                                   .reserved = {}};
+    }
 
-    explicit SymbolizerWrapper(std::string elf_src)
-        : _symbolizer(std::unique_ptr<blaze_symbolizer,
+    explicit SymbolizerWrapper(std::string elf_src, bool inlined_fns)
+        : opts(create_opts(inlined_fns)),
+          _symbolizer(std::unique_ptr<blaze_symbolizer,
                                       decltype(&blaze_symbolizer_free)>(
               blaze_symbolizer_new_opts(&opts), &blaze_symbolizer_free)),
           _elf_src(std::move(elf_src)) {}
 
+    blaze_symbolizer_opts opts;
     std::unique_ptr<blaze_symbolizer, decltype(&blaze_symbolizer_free)>
         _symbolizer;
     ddprof::HeterogeneousLookupStringMap<std::string> _demangled_names;
@@ -78,6 +83,7 @@ private:
   };
 
   std::unordered_map<FileInfoId_t, SymbolizerWrapper> _symbolizer_map;
+  bool inlined_functions;
   bool _disable_symbolization;
   AddrFormat _reported_addr_format;
 };
