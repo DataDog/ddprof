@@ -11,11 +11,8 @@
 #include "ddprof_file_info.hpp"
 #include "ddres_def.hpp"
 #include "perf_watcher.hpp"
-#include "symbolizer.hpp"
 #include "tags.hpp"
 #include "unwind_output.hpp"
-
-struct blaze_symbolizer;
 
 namespace ddprof {
 

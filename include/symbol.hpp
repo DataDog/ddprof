@@ -18,16 +18,17 @@ public:
   Symbol() : _lineno(0) {}
 
   // Warning : Generates some string copies (these are not rvalues)
-  Symbol(std::string symname, std::string demangle_name, uint32_t lineno,
+  Symbol(std::string symname, std::string demangled_name, uint32_t lineno,
          std::string srcpath)
-      : _symname(std::move(symname)), _demangle_name(std::move(demangle_name)),
-        _lineno(lineno), _srcpath(std::move(srcpath)) {}
+      : _symname(std::move(symname)),
+        _demangled_name(std::move(demangled_name)), _lineno(lineno),
+        _srcpath(std::move(srcpath)) {}
 
   // OUTPUT OF ADDRINFO
   std::string _symname;
 
   // DEMANGLING CACHE
-  std::string _demangle_name;
+  std::string _demangled_name;
 
   // OUTPUT OF LINE INFO
   uint32_t _lineno;

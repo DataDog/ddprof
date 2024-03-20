@@ -73,23 +73,23 @@ bool RuntimeSymbolLookup::insert_or_replace(std::string_view symbol,
     symbol_table.emplace_back(std::string(symbol), std::string(symbol), 0,
                               "jit");
   } else {
-    // todo managing range erase (we can overal with other syms)
+    // todo managing range erase (we can overall with other syms)
     SymbolIdx_t const existing = find_res.first->second.get_symbol_idx();
 #ifdef DEBUG
     LG_DBG("Existyng sym -- %s (%lx-%lx)",
-           symbol_table[existing]._demangle_name.c_str(), find_res.first->first,
-           find_res.first->second.get_end());
+           symbol_table[existing]._demangled_name.c_str(),
+           find_res.first->first, find_res.first->second.get_end());
     LG_DBG("New sym -- %s (%lx-%lx)", code_load.func_name.c_str(),
            code_load.code_addr, code_load.code_size + code_load.code_addr);
 #endif
-    if (symbol_table[existing]._demangle_name == symbol) {
+    if (symbol_table[existing]._demangled_name == symbol) {
       // nothing to do (unlikely size would change ?)
     } else {
       // remove current element (as start can be different)
       symbol_map.erase(find_res.first);
       symbol_map.emplace(
           address, SymbolSpan(address + code_size - 1, symbol_table.size()));
-      symbol_table[existing]._demangle_name = symbol;
+      symbol_table[existing]._demangled_name = symbol;
       symbol_table[existing]._symname = symbol;
     }
   }

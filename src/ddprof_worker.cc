@@ -17,6 +17,7 @@
 #include "pevent_lib.hpp"
 #include "pprof/ddprof_pprof.hpp"
 #include "procutils.hpp"
+#include "symbolizer.hpp"
 #include "tags.hpp"
 #include "tsc_clock.hpp"
 #include "unwind.hpp"

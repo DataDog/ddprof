@@ -12,7 +12,6 @@
 #include <array>
 #include <chrono>
 
-struct blaze_symbolizer;
 namespace ddprof {
 
 struct DDProfExporter;

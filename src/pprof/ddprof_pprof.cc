@@ -47,7 +47,9 @@ bool is_ld(const std::string_view path) {
 
 bool is_stack_complete(std::span<const ddog_prof_Location> locations) {
   static constexpr std::array s_expected_root_frames{
-      ""sv, // empty is debatable, but what if we have symbols is backend ?
+      // Consider empty as OK (to avoid false incomplete frames)
+      // If we have no symbols, we could still retrieve them in the backend.
+      ""sv,
       "clone"sv,
       "__clone"sv,
       "__clone3"sv,
@@ -339,6 +341,8 @@ DDRes pprof_free_profile(DDProfPProf *pprof) {
   return {};
 }
 
+// todo simplify this
+
 // Assumption of API is that sample is valid in a single type
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr &symbol_hdr, const DDProfValuePack &pack,
@@ -373,9 +377,8 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     }
   }
 
-  Symbolizer::SessionResults session_results;
-  // free all the blaze results after aggregation
-  defer { Symbolizer::free_session_results(session_results); };
+  // todo: destructor on these
+  Symbolizer::BlazeResultsWrapper session_results;
 
   unsigned index = 0;
   unsigned write_index = 0;
@@ -389,7 +392,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
       // already symbolized
       const FunLoc &loc = locs[index];
       write_location(
-          &loc, mapinfo_table[loc.map_info_idx], symbol_table[loc.symbol_idx],
+          loc, mapinfo_table[loc.map_info_idx], symbol_table[loc.symbol_idx],
           &locations_buff[write_index++], pprof->use_process_adresses);
       ++index;
       continue;
@@ -439,7 +442,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   // write binary frame (it should always be a symbol idx)
   if (write_index < kMaxStackDepth && locs[locs.size() - 1].symbol_idx != -1) {
     const FunLoc &loc = locs[locs.size() - 1];
-    write_location(&loc, mapinfo_table[loc.map_info_idx],
+    write_location(loc, mapinfo_table[loc.map_info_idx],
                    symbol_table[loc.symbol_idx], &locations_buff[write_index++],
                    pprof->use_process_adresses);
   }

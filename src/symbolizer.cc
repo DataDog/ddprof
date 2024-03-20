@@ -46,7 +46,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
                                   const MapInfo &map_info,
                                   std::span<ddog_prof_Location> locations,
                                   unsigned &write_index,
-                                  SessionResults &results) {
+                                  BlazeResultsWrapper &results) {
   blaze_symbolizer *symbolizer = nullptr;
   if (elf_addrs.size() != process_addrs.size()) {
     LG_WRN("Error in provided addresses when symbolizing pprofs");
@@ -68,11 +68,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
   } else {
     auto pair = _symbolizer_map.emplace(
         file_id, SymbolizerWrapper(elf_src, inlined_functions));
-    assert(pair.second);
-    if (!pair.second) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_SYMBOLIZER,
-                             "Unable to create new symbolizer");
-    }
+    DDPROF_DCHECK_FATAL(pair.second, "Unable to insert symbolizer object");
     symbolizer = pair.first->second._symbolizer.get();
     demangled_names = &(pair.first->second._demangled_names);
   }
@@ -99,7 +95,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
         // Update the location
         DDRES_CHECK_FWD(write_location_blaze(
             _reported_addr_format == k_elf ? elf_addrs[i] : process_addrs[i],
-            (*demangled_names), map_info, cur_sym, write_index, locations));
+            (*demangled_names), map_info, *cur_sym, write_index, locations));
       }
     }
   }

@@ -18,7 +18,7 @@ std::vector<std::string> collect_symbols(UnwindState &state,
   auto &symbol_table = state.symbol_hdr._symbol_table;
   for (size_t iloc = 0; iloc < state.output.locs.size(); ++iloc) {
     std::string demangled_name;
-    if (state.output.locs[iloc].symbol_idx == -1) {
+    if (state.output.locs[iloc].symbol_idx == k_symbol_idx_null) {
       // Symbolize dynamically.
       std::array<ElfAddress_t, 1> elf_addr{state.output.locs[iloc].elf_addr};
       const auto &file_info_value = state.dso_hdr.get_file_info_value(
@@ -40,7 +40,7 @@ std::vector<std::string> collect_symbols(UnwindState &state,
     } else {
       // Lookup the symbol from the symbol table.
       auto &symbol = symbol_table[state.output.locs[iloc].symbol_idx];
-      demangled_name = symbol._demangle_name;
+      demangled_name = symbol._demangled_name;
     }
     demangled_symbols.push_back(demangled_name);
   }

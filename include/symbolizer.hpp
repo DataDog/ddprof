@@ -17,7 +17,6 @@
 #include <string_view>
 #include <vector>
 
-struct blaze_symbolizer;
 struct ddog_prof_Location;
 
 namespace ddprof {
@@ -35,19 +34,24 @@ public:
         _disable_symbolization(disable_symbolization),
         _reported_addr_format(reported_addr_format) {}
 
-  struct SessionResults {
+  struct BlazeResultsWrapper {
+    ~BlazeResultsWrapper() {
+      for (auto &result : blaze_results) {
+        blaze_result_free(result);
+        result = nullptr;
+      }
+    }
+
     std::vector<const blaze_result *> blaze_results{};
   };
-
-  static constexpr int _k_max_stack_depth = kMaxStackDepth;
 
   DDRes symbolize_pprof(std::span<ElfAddress_t> addrs,
                         std::span<ProcessAddress_t> process_addrs,
                         FileInfoId_t file_id, const std::string &elf_src,
                         const MapInfo &map_info,
                         std::span<ddog_prof_Location> locations,
-                        unsigned &write_index, SessionResults &results);
-  static void free_session_results(SessionResults &results) {
+                        unsigned &write_index, BlazeResultsWrapper &results);
+  static void free_session_results(BlazeResultsWrapper &results) {
     for (auto &result : results.blaze_results) {
       blaze_result_free(result);
       result = nullptr;
@@ -57,6 +61,14 @@ public:
   void mark_unvisited();
 
 private:
+  struct BlazeSymbolizerDeleter {
+    void operator()(blaze_symbolizer *ptr) const {
+      if (ptr != nullptr) {
+        blaze_symbolizer_free(ptr);
+      }
+    }
+  };
+
   struct SymbolizerWrapper {
     static blaze_symbolizer_opts create_opts(bool inlined_fns) {
       return blaze_symbolizer_opts{.type_size = sizeof(blaze_symbolizer_opts),
@@ -69,14 +81,10 @@ private:
 
     explicit SymbolizerWrapper(std::string elf_src, bool inlined_fns)
         : opts(create_opts(inlined_fns)),
-          _symbolizer(std::unique_ptr<blaze_symbolizer,
-                                      decltype(&blaze_symbolizer_free)>(
-              blaze_symbolizer_new_opts(&opts), &blaze_symbolizer_free)),
+          _symbolizer(blaze_symbolizer_new_opts(&opts)),
           _elf_src(std::move(elf_src)) {}
-
     blaze_symbolizer_opts opts;
-    std::unique_ptr<blaze_symbolizer, decltype(&blaze_symbolizer_free)>
-        _symbolizer;
+    std::unique_ptr<blaze_symbolizer, BlazeSymbolizerDeleter> _symbolizer;
     ddprof::HeterogeneousLookupStringMap<std::string> _demangled_names;
     std::string _elf_src;
     bool _visited{true};
