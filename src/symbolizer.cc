@@ -66,7 +66,8 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
     it->second._visited = true;
     demangled_names = &(it->second._demangled_names);
   } else {
-    auto pair = _symbolizer_map.emplace(file_id, SymbolizerWrapper(elf_src));
+    auto pair = _symbolizer_map.emplace(
+        file_id, SymbolizerWrapper(elf_src, inlined_functions));
     assert(pair.second);
     if (!pair.second) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_SYMBOLIZER,
