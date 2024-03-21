@@ -38,14 +38,10 @@ namespace ddprof {
 
 namespace {
 
-const DDPROF_STATS s_cycled_stats[] = {STATS_UNWIND_AVG_TIME,
-                                       STATS_AGGREGATION_AVG_TIME,
-                                       STATS_EVENT_COUNT,
-                                       STATS_EVENT_LOST,
-                                       STATS_EVENT_OUT_OF_ORDER,
-                                       STATS_SAMPLE_COUNT,
-                                       STATS_DSO_UNHANDLED_SECTIONS,
-                                       STATS_TARGET_CPU_USAGE};
+const DDPROF_STATS s_cycled_stats[] = {
+    STATS_UNWIND_AVG_TIME, STATS_AGGREGATION_AVG_TIME, STATS_EVENT_COUNT,
+    STATS_EVENT_LOST,      STATS_EVENT_OUT_OF_ORDER,   STATS_SAMPLE_COUNT,
+    STATS_TARGET_CPU_USAGE};
 
 const long k_clock_ticks_per_sec = sysconf(_SC_CLK_TCK);
 
@@ -133,8 +129,6 @@ DDRes worker_update_stats(DDProfWorkerContext &worker_context,
       (k_clock_ticks_per_sec * elapsed_nsec);
   ddprof_stats_set(STATS_PROFILER_RSS, get_page_size() * procstat->rss);
   ddprof_stats_set(STATS_PROFILER_CPU_USAGE, millicores);
-  ddprof_stats_set(STATS_DSO_UNHANDLED_SECTIONS,
-                   dso_hdr.stats().sum_event_metric(DsoStats::kUnhandledDso));
   ddprof_stats_set(STATS_DSO_NEW_DSO,
                    dso_hdr.stats().sum_event_metric(DsoStats::kNewDso));
   ddprof_stats_set(STATS_DSO_SIZE, dso_hdr.get_nb_dso());

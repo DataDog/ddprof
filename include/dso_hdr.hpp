@@ -20,8 +20,6 @@
 namespace ddprof {
 
 #define DSO_EVENT_TABLE(XX)                                                    \
-  XX(kUnhandledDso, "Unhandled")                                               \
-  XX(kUnwindFailure, "Failure")                                                \
   XX(kTargetDso, "Target")                                                     \
   XX(kNewDso, "New")
 

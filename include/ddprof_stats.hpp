@@ -32,7 +32,6 @@ namespace ddprof {
   X(SYMBOLS_JIT_SYMBOL_COUNT, "symbols.jit.symbol_count", STAT_GAUGE)          \
   X(PROFILER_RSS, "profiler.rss", STAT_GAUGE)                                  \
   X(PROFILER_CPU_USAGE, "profiler.cpu_usage.millicores", STAT_GAUGE)           \
-  X(DSO_UNHANDLED_SECTIONS, "dso.unhandled_sections", STAT_GAUGE)              \
   X(DSO_NEW_DSO, "dso.new", STAT_GAUGE)                                        \
   X(DSO_SIZE, "dso.size", STAT_GAUGE)                                          \
   X(PPROF_SIZE, "pprof.size", STAT_GAUGE)                                      \
