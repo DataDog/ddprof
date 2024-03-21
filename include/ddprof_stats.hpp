@@ -36,7 +36,8 @@ namespace ddprof {
   X(DSO_SIZE, "dso.size", STAT_GAUGE)                                          \
   X(PPROF_SIZE, "pprof.size", STAT_GAUGE)                                      \
   X(PROFILE_DURATION, "profile.duration_ms", STAT_GAUGE)                       \
-  X(AGGREGATION_AVG_TIME, "aggregation.avg_time_ns", STAT_GAUGE)
+  X(AGGREGATION_AVG_TIME, "aggregation.avg_time_ns", STAT_GAUGE)               \
+  X(BACKPOPULATE_COUNT, "backpopulate.count", STAT_GAUGE)
 
 // Expand the enum/index for the individual stats
 enum DDPROF_STATS { STATS_TABLE(X_ENUM) STATS_LEN };

@@ -439,6 +439,7 @@ bool DsoHdr::pid_backpopulate(PidMapping &pid_mapping, pid_t pid,
   if (bp_state.perm != kAllowed) { // retry
     return false;
   }
+  _stats.incr_backpopulate_count();
   nb_elts_added = 0;
   LG_DBG("[DSO] Backpopulating PID %d", pid);
   bp_state.last_backpopulate_time = PerfClock::now();

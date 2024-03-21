@@ -132,6 +132,8 @@ DDRes worker_update_stats(DDProfWorkerContext &worker_context,
   ddprof_stats_set(STATS_DSO_NEW_DSO,
                    dso_hdr.stats().sum_event_metric(DsoStats::kNewDso));
   ddprof_stats_set(STATS_DSO_SIZE, dso_hdr.get_nb_dso());
+  ddprof_stats_set(STATS_BACKPOPULATE_COUNT,
+                   dso_hdr.stats().backpopulate_count());
   ddprof_stats_set(
       STATS_UNMATCHED_DEALLOCATION_COUNT,
       worker_context.live_allocation.get_nb_unmatched_deallocations());
