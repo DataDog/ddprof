@@ -222,6 +222,53 @@ ProfValueTypes compute_pprof_values(const ActiveIdsResult &active_ids) {
   }
   return result;
 }
+
+// todo: this function is slow
+size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
+                      const DDProfValuePack &pack,
+                      std::span<ddog_prof_Label> labels) {
+  size_t labels_num = 0;
+  char pid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
+  char tid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
+
+  labels[labels_num].key = to_CharSlice("container_id");
+  labels[labels_num].str = to_CharSlice(uw_output.container_id);
+  ++labels_num;
+
+  // Add any configured labels.  Note that TID alone has the same cardinality as
+  // (TID;PID) tuples, so except for symbol table overhead it doesn't matter
+  // much if TID implies PID for clarity.
+  if (!watcher.suppress_pid || !watcher.suppress_tid) {
+    snprintf(pid_str, sizeof(pid_str), "%d", uw_output.pid);
+    labels[labels_num].key = to_CharSlice("process_id");
+    labels[labels_num].str = to_CharSlice(pid_str);
+    ++labels_num;
+  }
+  if (!watcher.suppress_tid) {
+    snprintf(tid_str, sizeof(tid_str), "%d", uw_output.tid);
+    // This naming has an impact on backend side (hence the inconsistency with
+    // process_id)
+    labels[labels_num].key = to_CharSlice("thread id");
+    labels[labels_num].str = to_CharSlice(tid_str);
+    ++labels_num;
+  }
+  if (watcher_has_tracepoint(&watcher)) {
+    labels[labels_num].key = to_CharSlice("tracepoint_type");
+
+    // If the label is given, use that as the tracepoint type. Otherwise,
+    // default to the event name
+    if (!watcher.tracepoint_label.empty()) {
+      labels[labels_num].str = to_CharSlice(watcher.tracepoint_label);
+    } else {
+      labels[labels_num].str = to_CharSlice(watcher.tracepoint_event);
+    }
+    ++labels_num;
+  }
+  DDPROF_DCHECK_FATAL(labels_num <= labels.size(),
+                      "pprof aggregate - label buffer exceeded");
+  // Fill labels based on logic extracted from original function.
+  return labels_num;
+}
 } // namespace
 
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
@@ -342,8 +389,6 @@ DDRes pprof_free_profile(DDProfPProf *pprof) {
   return {};
 }
 
-// todo simplify this
-
 // Assumption of API is that sample is valid in a single type
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr &symbol_hdr, const DDProfValuePack &pack,
@@ -364,7 +409,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     values[pprof_indices.pprof_count_index] = pack.count;
   }
 
-  ddog_prof_Location locations_buff[kMaxStackDepth];
+  std::array<ddog_prof_Location, kMaxStackDepth> locations_buff;
   std::span locs{uw_output->locs};
 
   if (watcher->options.nb_frames_to_skip < locs.size()) {
@@ -387,7 +432,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   // We wait for the incomplete frame to be added if needed.
   // By removing the incomplete frame and pushing logic to BE
   // we can simplify this loop
-  while (index < locs.size() - 1 && write_index < kMaxStackDepth) {
+  while (index < locs.size() - 1 && write_index < locations_buff.size()) {
     if (locs[index].symbol_idx != k_symbol_idx_null) {
       // already symbolized
       const FunLoc &loc = locs[index];
@@ -424,8 +469,8 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     if (IsDDResNotOK(symbolizer->symbolize_pprof(
             elf_addresses, process_addresses, file_id, currentFilePath,
             mapinfo_table[locs[start_index].map_info_idx],
-            std::span<ddog_prof_Location>{locations_buff, kMaxStackDepth},
-            write_index, session_results))) {
+            std::span<ddog_prof_Location>{locations_buff}, write_index,
+            session_results))) {
       break;
     }
   }
@@ -433,7 +478,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   // check if unwinding stops on a frame that makes sense
   if (write_index < (kMaxStackDepth - 1) && write_index >= 1 &&
       !is_stack_complete(
-          std::span<ddog_prof_Location>{locations_buff, write_index})) {
+          std::span<ddog_prof_Location>{locations_buff.data(), write_index})) {
     // not writting the mapping is acceptable due to memset at the top
     write_function(k_common_frame_names[incomplete_stack], ""sv,
                    &locations_buff[write_index++].function);
@@ -447,59 +492,23 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
                    symbol_table[loc.symbol_idx], &locations_buff[write_index++],
                    pprof->use_process_adresses);
   }
-
+  std::array<ddog_prof_Label, k_max_pprof_labels> labels;
   // Create the labels for the sample.  Two samples are the same only when
   // their locations _and_ all labels are identical, so we admit a very limited
   // number of labels at present
-  ddog_prof_Label labels[k_max_pprof_labels] = {};
-  size_t labels_num = 0;
-  char pid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
-  char tid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
-
-  labels[labels_num].key = to_CharSlice("container_id");
-  labels[labels_num].str = to_CharSlice(uw_output->container_id);
-  ++labels_num;
-
-  // Add any configured labels.  Note that TID alone has the same cardinality as
-  // (TID;PID) tuples, so except for symbol table overhead it doesn't matter
-  // much if TID implies PID for clarity.
-  if (!watcher->suppress_pid || !watcher->suppress_tid) {
-    snprintf(pid_str, sizeof(pid_str), "%d", uw_output->pid);
-    labels[labels_num].key = to_CharSlice("process_id");
-    labels[labels_num].str = to_CharSlice(pid_str);
-    ++labels_num;
-  }
-  if (!watcher->suppress_tid) {
-    snprintf(tid_str, sizeof(tid_str), "%d", uw_output->tid);
-    // This naming has an impact on backend side (hence the inconsistency with
-    // process_id)
-    labels[labels_num].key = to_CharSlice("thread id");
-    labels[labels_num].str = to_CharSlice(tid_str);
-    ++labels_num;
-  }
-  if (watcher_has_tracepoint(watcher)) {
-    labels[labels_num].key = to_CharSlice("tracepoint_type");
-
-    // If the label is given, use that as the tracepoint type. Otherwise,
-    // default to the event name
-    if (!watcher->tracepoint_label.empty()) {
-      labels[labels_num].str = to_CharSlice(watcher->tracepoint_label);
-    } else {
-      labels[labels_num].str = to_CharSlice(watcher->tracepoint_event);
-    }
-    ++labels_num;
-  }
-  assert(labels_num <= k_max_pprof_labels);
+  size_t labels_num =
+      prepare_labels(*uw_output, *watcher, pack, std::span{labels});
 
   ddog_prof_Sample const sample = {
-      .locations = {.ptr = locations_buff, .len = write_index},
+      .locations = {.ptr = locations_buff.data(), .len = write_index},
       .values = {.ptr = values, .len = pprof->_nb_values},
-      .labels = {.ptr = labels, .len = labels_num},
+      .labels = {.ptr = labels.data(), .len = labels_num},
   };
 
   if (show_samples) {
-    ddprof_print_sample(std::span{locations_buff, write_index}, pack.value,
-                        uw_output->pid, uw_output->tid, value_pos, *watcher);
+    ddprof_print_sample(std::span{locations_buff.data(), write_index},
+                        pack.value, uw_output->pid, uw_output->tid, value_pos,
+                        *watcher);
   }
   auto res = ddog_prof_Profile_add(profile, sample, pack.timestamp);
   if (res.tag != DDOG_PROF_PROFILE_RESULT_OK) {
