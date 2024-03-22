@@ -5,13 +5,6 @@
 
 #include "ddprof.hpp"
 
-#include <cerrno>
-
-#include <csignal>
-#include <cstdio>
-#include <sys/resource.h>
-#include <unistd.h>
-
 #include "cap_display.hpp"
 #include "ddprof_cmdline.hpp"
 #include "ddprof_context.hpp"
@@ -28,6 +21,15 @@
 #ifdef __GLIBC__
 #  include <execinfo.h>
 #endif
+
+#include <absl/strings/numbers.h>
+#include <absl/strings/str_format.h>
+#include <cerrno>
+#include <csignal>
+#include <cstdio>
+#include <filesystem>
+#include <sys/resource.h>
+#include <unistd.h>
 
 namespace ddprof {
 namespace {
@@ -65,6 +67,31 @@ void display_system_info() {
     LG_WRN("Unable to access perf_event_paranoid setting");
   }
 }
+
+DDRes get_process_threads(pid_t pid, std::vector<pid_t> &threads) {
+  threads.clear();
+
+  // Open the /proc/pid/task directory
+  const std::string task_dir = absl::StrFormat("/proc/%d/task", pid);
+  std::error_code ec;
+
+  for (auto const &dir_entry :
+       std::filesystem::directory_iterator{task_dir, ec}) {
+    int val;
+    if (!absl::SimpleAtoi(dir_entry.path().filename().string(), &val)) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_PROCSTATE,
+                             "Invalid task number %s in /proc/%d/task",
+                             dir_entry.path().filename().string().c_str(), pid);
+    }
+    threads.push_back(val);
+  }
+  if (ec) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PROCSTATE, "Failed to read /proc/%d/task",
+                           pid);
+  }
+  return {};
+}
+
 } // namespace
 
 DDRes ddprof_setup(DDProfContext &ctx) {
@@ -74,11 +101,17 @@ DDRes ddprof_setup(DDProfContext &ctx) {
 
     display_system_info();
 
+    std::vector<pid_t> threads;
+    if (ctx.params.pid != -1) {
+      DDRES_CHECK_FWD(get_process_threads(ctx.params.pid, threads));
+    } else {
+      threads.push_back(-1);
+    }
+
     // Open perf events and mmap events right now to start receiving events
     // mmaps from perf fds will be lost after fork, that why we mmap them again
     // in worker (but kernel only accounts for the pinned memory once).
-    DDRES_CHECK_FWD(
-        pevent_setup(ctx, ctx.params.pid, ctx.params.num_cpu, pevent_hdr));
+    DDRES_CHECK_FWD(pevent_setup(ctx, threads, ctx.params.num_cpu, pevent_hdr));
 
     // Setup signal handler if defined
     if (ctx.params.fault_info) {

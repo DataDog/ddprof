@@ -9,13 +9,15 @@
 #include "ddres_def.hpp"
 #include "pevent.hpp"
 
+#include <span>
+
 namespace ddprof {
 
 /// Sets initial state for every pevent in the pevent_hdr
 void pevent_init(PEventHdr *pevent_hdr);
 
 /// Setup perf event according to requested watchers.
-DDRes pevent_open(DDProfContext *ctx, pid_t pid, int num_cpu,
+DDRes pevent_open(DDProfContext *ctx, std::span<pid_t> pids, int num_cpu,
                   PEventHdr *pevent_hdr);
 
 /// Setup mmap buffers according to content of peventhdr
@@ -28,7 +30,7 @@ int pevent_compute_min_mmap_order(int min_buffer_size_order,
                                   unsigned min_number_samples);
 
 /// Setup watchers = setup mmap + setup perfevent
-DDRes pevent_setup(DDProfContext &ctx, pid_t pid, int num_cpu,
+DDRes pevent_setup(DDProfContext &ctx, std::span<pid_t> pids, int num_cpu,
                    PEventHdr *pevent_hdr);
 
 /// Call ioctl PERF_EVENT_IOC_ENABLE on available file descriptors

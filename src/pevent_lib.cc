@@ -109,31 +109,52 @@ DDRes pevent_register_cpu_0(const PerfWatcher *watcher, int watcher_idx,
 }
 
 DDRes pevent_open_all_cpus(const PerfWatcher *watcher, int watcher_idx,
-                           pid_t pid, int num_cpu,
+                           std::span<pid_t> pids, int num_cpu,
                            PerfClockSource perf_clock_source,
                            PEventHdr *pevent_hdr) {
   PEvent *pes = pevent_hdr->pes;
 
   size_t template_pevent_idx = -1;
-  DDRES_CHECK_FWD(pevent_register_cpu_0(watcher, watcher_idx, pid,
+  DDRES_CHECK_FWD(pevent_register_cpu_0(watcher, watcher_idx, pids[0],
                                         perf_clock_source, pevent_hdr,
                                         template_pevent_idx));
   int const template_attr_idx = pes[template_pevent_idx].attr_idx;
   perf_event_attr *attr = &pevent_hdr->attrs[template_attr_idx];
 
   // used the fixed attr for the others
-  for (int cpu_idx = 1; cpu_idx < num_cpu; ++cpu_idx) {
-    size_t pevent_idx = -1;
-    DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
-    int const fd =
-        perf_event_open(attr, pid, cpu_idx, -1, PERF_FLAG_FD_CLOEXEC);
-    if (fd == -1) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
-                             "Error calling perfopen on watcher %d.%d (%s)",
-                             watcher_idx, cpu_idx, strerror(errno));
+  for (int cpu_idx = 0; cpu_idx < num_cpu; ++cpu_idx) {
+    PEvent *pevent = nullptr;
+    // skip first cpu, since already done in pevent_register_cpu_0
+    if (cpu_idx > 0) {
+      size_t pevent_idx = -1;
+      DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
+      int const fd =
+          perf_event_open(attr, pids[0], cpu_idx, -1, PERF_FLAG_FD_CLOEXEC);
+      if (fd == -1) {
+        DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
+                               "Error calling perfopen on watcher %d.%d (%s)",
+                               watcher_idx, cpu_idx, strerror(errno));
+      }
+      pevent_set_info(fd, pes[template_pevent_idx].attr_idx, pes[pevent_idx],
+                      watcher->options.stack_sample_size);
+      pevent = &pes[pevent_idx];
+    } else {
+      pevent = &pes[template_pevent_idx];
     }
-    pevent_set_info(fd, pes[template_pevent_idx].attr_idx, pes[pevent_idx],
-                    watcher->options.stack_sample_size);
+    // do perf_event_open for the other tids, but record them as sub fds
+    // attached to the first. These are not mmaped, but their output will
+    // be redirected to the first one.
+    for (auto tid : pids.subspan(1)) {
+      int const fd =
+          perf_event_open(attr, tid, cpu_idx, -1, PERF_FLAG_FD_CLOEXEC);
+      if (fd == -1) {
+        // Ignore failure, thread may have exited
+        LG_WRN("Error calling perf_event_open on watcher %d.%d (%s) for tid %d",
+               watcher_idx, cpu_idx, strerror(errno), tid);
+      } else {
+        pevent->sub_fds.push_back(fd);
+      }
+    }
   }
   return {};
 }
@@ -141,7 +162,7 @@ DDRes pevent_open_all_cpus(const PerfWatcher *watcher, int watcher_idx,
 } // namespace
 
 void pevent_init(PEventHdr *pevent_hdr) {
-  memset(pevent_hdr, 0, sizeof(PEventHdr));
+  *pevent_hdr = {};
   pevent_hdr->max_size = k_max_nb_perf_event_open;
   for (size_t k = 0; k < pevent_hdr->max_size; ++k) {
     pevent_hdr->pes[k].fd = -1;
@@ -164,14 +185,14 @@ int pevent_compute_min_mmap_order(int min_buffer_size_order,
   return ret_order;
 }
 
-DDRes pevent_open(DDProfContext &ctx, pid_t pid, int num_cpu,
+DDRes pevent_open(DDProfContext &ctx, std::span<pid_t> pids, int num_cpu,
                   PEventHdr *pevent_hdr) {
   assert(pevent_hdr->size == 0); // check for previous init
   for (unsigned long watcher_idx = 0; watcher_idx < ctx.watchers.size();
        ++watcher_idx) {
     PerfWatcher *watcher = &ctx.watchers[watcher_idx];
     if (watcher->type < kDDPROF_TYPE_CUSTOM) {
-      DDRES_CHECK_FWD(pevent_open_all_cpus(watcher, watcher_idx, pid, num_cpu,
+      DDRES_CHECK_FWD(pevent_open_all_cpus(watcher, watcher_idx, pids, num_cpu,
                                            ctx.perf_clock_source, pevent_hdr));
     } else {
       // custom event, eg.allocation profiling
@@ -238,9 +259,9 @@ DDRes pevent_mmap(PEventHdr *pevent_hdr, bool use_override) {
   return {};
 }
 
-DDRes pevent_setup(DDProfContext &ctx, pid_t pid, int num_cpu,
+DDRes pevent_setup(DDProfContext &ctx, std::span<pid_t> pids, int num_cpu,
                    PEventHdr *pevent_hdr) {
-  DDRES_CHECK_FWD(pevent_open(ctx, pid, num_cpu, pevent_hdr));
+  DDRES_CHECK_FWD(pevent_open(ctx, pids, num_cpu, pevent_hdr));
   if (!IsDDResOK(pevent_mmap(pevent_hdr, true))) {
     LG_NTC("Retrying attachment without user override");
     DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, false));
@@ -254,6 +275,18 @@ DDRes pevent_enable(PEventHdr *pevent_hdr) {
   // contexts
   for (size_t i = 0; i < pevent_hdr->size; ++i) {
     if (!pevent_hdr->pes[i].custom_event) {
+      for (auto fd : pevent_hdr->pes[i].sub_fds) {
+        // Redirect the output of the sub fds to the main one
+        DDRES_CHECK_INT(
+            ioctl(fd, PERF_EVENT_IOC_SET_OUTPUT, pevent_hdr->pes[i].fd),
+            DD_WHAT_IOCTL,
+            "Error ioctl PERF_EVENT_IOC_SET_OUTPUT fd=%d output_fd=%d "
+            "(idx#%zu)",
+            fd, pevent_hdr->pes[i].fd, i);
+        DDRES_CHECK_INT(ioctl(fd, PERF_EVENT_IOC_ENABLE), DD_WHAT_IOCTL,
+                        "Error ioctl fd=%d (idx#%zu)", fd, i);
+      }
+
       DDRES_CHECK_INT(ioctl(pevent_hdr->pes[i].fd, PERF_EVENT_IOC_ENABLE),
                       DD_WHAT_IOCTL, "Error ioctl fd=%d (idx#%zu)",
                       pevent_hdr->pes[i].fd, i);
@@ -298,6 +331,13 @@ DDRes pevent_close_event(PEvent *event) {
                              event->fd, event->watcher_pos, strerror(errno));
     }
     event->fd = -1;
+    for (auto sub_fd : event->sub_fds) {
+      if (close(sub_fd) == -1) {
+        DDRES_RETURN_ERROR_LOG(
+            DD_WHAT_PERFOPEN, "Error when closing sub_fd=%d (watcher #%d) (%s)",
+            sub_fd, event->watcher_pos, strerror(errno));
+      }
+    }
   }
   if (event->custom_event && event->mapfd != -1) {
     if (close(event->mapfd) == -1) {

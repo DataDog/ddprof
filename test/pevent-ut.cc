@@ -26,7 +26,7 @@ TEST(PeventTest, setup_cleanup) {
   pid_t mypid = getpid();
   mock_ddprof_context(&ctx);
   pevent_init(&pevent_hdr);
-  DDRes res = pevent_setup(ctx, mypid, get_nprocs(), &pevent_hdr);
+  DDRes res = pevent_setup(ctx, {&mypid, 1}, get_nprocs(), &pevent_hdr);
   ASSERT_TRUE(IsDDResOK(res));
   ASSERT_TRUE(pevent_hdr.size == static_cast<unsigned>(get_nprocs()));
   res = pevent_cleanup(&pevent_hdr);
