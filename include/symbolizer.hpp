@@ -45,6 +45,18 @@ public:
     std::vector<const blaze_result *> blaze_results{};
   };
 
+  /// Fills the locations at the write index using address and elf source.
+  /// assumption is that all addresses are from this source file
+  /// Parameters
+  /// addrs - Elf address
+  /// process_addrs - Process address (only used for pprof reporting)
+  /// file_id - a way to identify this file in a unique way
+  /// elf_src - a path to the source file (idealy stable)
+  /// map_info - the mapping information to write to the pprof
+  /// locations - the output pprof strucure
+  /// write_index - input / output parameter updated based on what is written
+  /// results - A handle object for lifetime of strings.
+  ///          Should be kept until interned strings are no longer needed.
   DDRes symbolize_pprof(std::span<ElfAddress_t> addrs,
                         std::span<ProcessAddress_t> process_addrs,
                         FileInfoId_t file_id, const std::string &elf_src,
@@ -57,8 +69,8 @@ public:
       result = nullptr;
     }
   }
-  int clear_unvisited();
-  void mark_unvisited();
+  int remove_unvisited();
+  void reset_unvisited_flag();
 
 private:
   struct BlazeSymbolizerDeleter {
@@ -69,7 +81,7 @@ private:
     }
   };
 
-  struct SymbolizerWrapper {
+  struct BlazeSymbolizerWrapper {
     static blaze_symbolizer_opts create_opts(bool inlined_fns) {
       return blaze_symbolizer_opts{.type_size = sizeof(blaze_symbolizer_opts),
                                    .auto_reload = false,
@@ -79,7 +91,7 @@ private:
                                    .reserved = {}};
     }
 
-    explicit SymbolizerWrapper(std::string elf_src, bool inlined_fns)
+    explicit BlazeSymbolizerWrapper(std::string elf_src, bool inlined_fns)
         : opts(create_opts(inlined_fns)),
           _symbolizer(blaze_symbolizer_new_opts(&opts)),
           _elf_src(std::move(elf_src)) {}
@@ -90,7 +102,7 @@ private:
     bool _visited{true};
   };
 
-  std::unordered_map<FileInfoId_t, SymbolizerWrapper> _symbolizer_map;
+  std::unordered_map<FileInfoId_t, BlazeSymbolizerWrapper> _symbolizer_map;
   bool inlined_functions;
   bool _disable_symbolization;
   AddrFormat _reported_addr_format;

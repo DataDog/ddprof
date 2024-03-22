@@ -8,23 +8,8 @@
 namespace ddprof {
 
 Symbol symbol_from_common(SymbolErrors lookup_case) {
-  switch (lookup_case) {
-  case SymbolErrors::truncated_stack:
-    return {std::string(), std::string("[truncated]"), 0, std::string()};
-  case SymbolErrors::unknown_dso:
-    return {std::string(), std::string("[unknown_dso]"), 0, std::string()};
-  case SymbolErrors::dwfl_frame:
-    return {std::string(), std::string("[dwfl_frame]"), 0, std::string()};
-  case SymbolErrors::incomplete_stack:
-    return {std::string(), std::string("[incomplete]"), 0, std::string()};
-  case SymbolErrors::lost_event:
-    return {std::string(), std::string("[lost]"), 0, std::string()};
-  case SymbolErrors::max_pids:
-    return {std::string(), std::string("[maximum pids]"), 0, std::string()};
-  default:
-    break;
-  }
-  return {};
+  return {std::string(), std::string{k_common_frame_names[lookup_case]}, 0,
+          std::string()};
 }
 
 SymbolIdx_t CommonSymbolLookup::get_or_insert(SymbolErrors lookup_case,

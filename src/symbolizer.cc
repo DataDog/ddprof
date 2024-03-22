@@ -11,28 +11,24 @@
 #include <cassert>
 
 namespace ddprof {
-inline void write_error_function(ddog_prof_Function *ffi_func) {
-  ffi_func->name = to_CharSlice("[no symbol]");
-  ffi_func->start_line = 0;
-}
-
 inline void write_location_no_sym(ElfAddress_t ip, const MapInfo &mapinfo,
                                   ddog_prof_Location *ffi_location) {
   write_mapping(mapinfo, &ffi_location->mapping);
-  write_error_function(&ffi_location->function);
+  // write empty with empty function name, to enable remote symbolization
+  write_function({}, {}, &ffi_location->function);
   ffi_location->address = ip;
 }
 
-int Symbolizer::clear_unvisited() {
+int Symbolizer::remove_unvisited() {
   // Remove all unvisited SymbolizerPack instances from the map (c++ 20)
   const auto count = std::erase_if(_symbolizer_map, [](const auto &item) {
-    auto const &[key, symbolizer_pack] = item;
-    return !symbolizer_pack._visited;
+    auto const &[key, blaze_symbolizer_wrapper] = item;
+    return !blaze_symbolizer_wrapper._visited;
   });
   return count;
 }
 
-void Symbolizer::mark_unvisited() {
+void Symbolizer::reset_unvisited_flag() {
   // Reset visited flag for the remaining entries
   for (auto &item : _symbolizer_map) {
     item.second._visited = false;
@@ -67,7 +63,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
     demangled_names = &(it->second._demangled_names);
   } else {
     auto pair = _symbolizer_map.emplace(
-        file_id, SymbolizerWrapper(elf_src, inlined_functions));
+        file_id, BlazeSymbolizerWrapper(elf_src, inlined_functions));
     DDPROF_DCHECK_FATAL(pair.second, "Unable to insert symbolizer object");
     symbolizer = pair.first->second._symbolizer.get();
     demangled_names = &(pair.first->second._demangled_names);

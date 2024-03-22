@@ -5,6 +5,7 @@
 
 #include "pprof/ddprof_pprof.hpp"
 
+#include "common_symbol_errors.hpp"
 #include "ddog_profiling_utils.hpp"
 #include "ddprof_defs.hpp"
 #include "ddres.hpp"
@@ -66,16 +67,16 @@ bool is_stack_complete(std::span<const ddog_prof_Location> locations) {
     return false;
   }
 
-  const auto &root_loc = locations[locations.size() - 1];
-  const auto &root_mapping = std::string_view(root_loc.mapping.filename.ptr,
-                                              root_loc.mapping.filename.len);
+  const auto &root_loc = locations.back();
+  const std::string_view root_mapping{root_loc.mapping.filename.ptr,
+                                      root_loc.mapping.filename.len};
   // If we are in ld.so (eg. during lib init before main) consider the stack as
   // complete
   if (is_ld(root_mapping)) {
     return true;
   }
 
-  const auto &root_func =
+  const std::string_view root_func =
       std::string_view(root_loc.function.name.ptr, root_loc.function.name.len);
   return std::find(s_expected_root_frames.begin(), s_expected_root_frames.end(),
                    root_func) != s_expected_root_frames.end();
@@ -364,7 +365,6 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   }
 
   ddog_prof_Location locations_buff[kMaxStackDepth];
-  memset(locations_buff, 0, sizeof(locations_buff));
   std::span locs{uw_output->locs};
 
   if (watcher->options.nb_frames_to_skip < locs.size()) {
@@ -416,7 +416,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
       elf_addresses.push_back(locs[index].elf_addr);
       process_addresses.push_back(locs[index].ip);
       ++index;
-      if (locs[index].symbol_idx != -1) {
+      if (locs[index].symbol_idx != k_symbol_idx_null) {
         break;
       }
     }
@@ -435,12 +435,13 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
       !is_stack_complete(
           std::span<ddog_prof_Location>{locations_buff, write_index})) {
     // not writting the mapping is acceptable due to memset at the top
-    write_function("[incomplete]"sv, ""sv,
+    write_function(k_common_frame_names[incomplete_stack], ""sv,
                    &locations_buff[write_index++].function);
   }
 
   // write binary frame (it should always be a symbol idx)
-  if (write_index < kMaxStackDepth && locs[locs.size() - 1].symbol_idx != -1) {
+  if (write_index < kMaxStackDepth &&
+      locs[locs.size() - 1].symbol_idx != k_symbol_idx_null) {
     const FunLoc &loc = locs[locs.size() - 1];
     write_location(loc, mapinfo_table[loc.map_info_idx],
                    symbol_table[loc.symbol_idx], &locations_buff[write_index++],

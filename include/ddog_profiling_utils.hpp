@@ -26,7 +26,9 @@ inline ddog_CharSlice to_CharSlice(std::string_view str) {
 
 inline void write_function(const Symbol &symbol, ddog_prof_Function *ffi_func) {
   ffi_func->name = to_CharSlice(symbol._demangled_name);
-  ffi_func->system_name = to_CharSlice(symbol._symname);
+  // Although we can send symbol._symname
+  // It saves ressources only sending the demangled name
+  ffi_func->system_name = {.ptr = nullptr, .len = 0};
   ffi_func->filename = to_CharSlice(symbol._srcpath);
   // Not filled (Requires an extra location lookup using the symbol start range)
   ffi_func->start_line = 0;

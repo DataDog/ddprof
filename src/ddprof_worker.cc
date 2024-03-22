@@ -542,8 +542,8 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx,
 
   // Check if we can clear symbol objects
   const int count_symbolizers_cleared =
-      ctx.worker_ctx.symbolizer->clear_unvisited();
-  ctx.worker_ctx.symbolizer->mark_unvisited();
+      ctx.worker_ctx.symbolizer->remove_unvisited();
+  ctx.worker_ctx.symbolizer->reset_unvisited_flag();
 
   // Scrape procfs for process usage statistics
   DDRES_CHECK_FWD(worker_update_stats(ctx.worker_ctx, cycle_duration,
