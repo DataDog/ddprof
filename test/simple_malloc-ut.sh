@@ -6,22 +6,33 @@ export DD_PROFILING_NATIVE_USE_EMBEDDED_LIB=1
 export LD_LIBRARY_PATH=$PWD
 export DD_PROFILING_NATIVE_CONFIG="${PWD}/../test/configs/simple_malloc_config.toml"
 
-# Get available cpus
-# ddprof will be allowed to run on those cpus
-# This is necessary since we set a single cpu for the test and ddprof will inherit the taskset
-# (for wrapper mode we could do `ddprof ... taskset <cpu_mask> <my_test>` but this is not possible
-# for library mode).
-ddprof_cpu_mask=$(python3 -c 'import os;print(hex(sum(1 << c for c in os.sched_getaffinity(0))))')
-export DD_PROFILING_NATIVE_CPU_AFFINITY=${ddprof_cpu_mask}
+use_taskset=1
+if [[ "${DD_PROFILING_REORDER_EVENTS:-0}" -eq 1 ]]; then
+    # when reordering events, no workarounds are needed
+    use_taskset=0
+fi
 
-# select a random cpu to run test on
-# the goal is to run test on only one cpu in order to avoid event reordering
-# (seeing cpu event before mmap events because of a cpu migration)
-test_cpu_mask=$(python3 -c 'import random,os;print(hex(1 << random.choice(list(os.sched_getaffinity(0)))))')
+opts="--loop 1000 --spin 100"
+
+if [[ "${use_taskset}" -eq 1 ]]; then
+    # Get available cpus
+    # ddprof will be allowed to run on those cpus
+    # This is necessary since we set a single cpu for the test and ddprof will inherit the taskset
+    # (for wrapper mode we could do `ddprof ... taskset <cpu_mask> <my_test>` but this is not possible
+    # for library mode).
+    ddprof_cpu_mask=$(python3 -c 'import os;print(hex(sum(1 << c for c in os.sched_getaffinity(0))))')
+    export DD_PROFILING_NATIVE_CPU_AFFINITY=${ddprof_cpu_mask}
+
+    # select a random cpu to run test on
+    # the goal is to run test on only one cpu in order to avoid event reordering
+    # (seeing cpu event before mmap events because of a cpu migration)
+    test_cpu_mask=$(python3 -c 'import random,os;print(hex(1 << random.choice(list(os.sched_getaffinity(0)))))')
+
+    # Setting a nice value for simple malloc will help ddprof get scheduled
+    opts="$opts --nice 19"
+fi
 
 timeout_sec=30
-# Setting a nice value for simple malloc will help ddprof get scheduled
-opts="--loop 1000 --spin 100 --nice 19"
 log_file=$(mktemp "${PWD}/log.XXXXXX")
 echo "Logs available in $log_file"
 rm "${log_file}"
@@ -52,10 +63,12 @@ check() {
     expected_tids="${3-$2}"
     # Create a list of profile types with comma as separator
     IFS=',' read -ra list_of_profile_types_to_count <<< "${4-"alloc-space,cpu-time"}"
-    # shellcheck disable=SC2086
+    if [[ "$use_taskset" -eq 1 ]]; then
+        cmd="taskset ${test_cpu_mask} ${cmd}"
+    fi
     echo "Running: ${cmd}"
     # shellcheck disable=SC2086
-    eval taskset "${test_cpu_mask}" ${cmd} || ( echo "Command failed: ${cmd}" && cat "${log_file}" && exit 1 )
+    eval ${cmd} || ( echo "Command failed: ${cmd}" && cat "${log_file}" && exit 1 )
     if [[ "${expected_pids}" -ne -1 ]]; then
         sync "${log_file}"
         # -P requires GNU grep

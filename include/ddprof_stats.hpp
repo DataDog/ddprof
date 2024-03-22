@@ -15,6 +15,7 @@ namespace ddprof {
 #define STATS_TABLE(X)                                                         \
   X(EVENT_COUNT, "event.count", STAT_GAUGE)                                    \
   X(EVENT_LOST, "event.lost", STAT_GAUGE)                                      \
+  X(EVENT_OUT_OF_ORDER, "event.out_of_order", STAT_GAUGE)                      \
   X(SAMPLE_COUNT, "sample.count", STAT_GAUGE)                                  \
   X(UNMATCHED_DEALLOCATION_COUNT, "unmatched_deallocation.count", STAT_GAUGE)  \
   X(TARGET_CPU_USAGE, "target_process.cpu_usage.millicores", STAT_GAUGE)       \
@@ -31,12 +32,12 @@ namespace ddprof {
   X(SYMBOLS_JIT_SYMBOL_COUNT, "symbols.jit.symbol_count", STAT_GAUGE)          \
   X(PROFILER_RSS, "profiler.rss", STAT_GAUGE)                                  \
   X(PROFILER_CPU_USAGE, "profiler.cpu_usage.millicores", STAT_GAUGE)           \
-  X(DSO_UNHANDLED_SECTIONS, "dso.unhandled_sections", STAT_GAUGE)              \
   X(DSO_NEW_DSO, "dso.new", STAT_GAUGE)                                        \
   X(DSO_SIZE, "dso.size", STAT_GAUGE)                                          \
   X(PPROF_SIZE, "pprof.size", STAT_GAUGE)                                      \
   X(PROFILE_DURATION, "profile.duration_ms", STAT_GAUGE)                       \
-  X(AGGREGATION_AVG_TIME, "aggregation.avg_time_ns", STAT_GAUGE)
+  X(AGGREGATION_AVG_TIME, "aggregation.avg_time_ns", STAT_GAUGE)               \
+  X(BACKPOPULATE_COUNT, "backpopulate.count", STAT_GAUGE)
 
 // Expand the enum/index for the individual stats
 enum DDPROF_STATS { STATS_TABLE(X_ENUM) STATS_LEN };

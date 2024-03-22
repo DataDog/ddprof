@@ -69,6 +69,7 @@ public:
   bool help_extended{false};
   bool remote_symbolization{false};
   bool disable_symbolization{false};
+  bool reorder_events{false}; // reorder events by timestamp
 
   std::string socket_path;
   int pipefd_to_library{-1};

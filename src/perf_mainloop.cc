@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <poll.h>
+#include <queue>
 #include <sys/mman.h>
 #include <sys/signalfd.h>
 #include <sys/socket.h>
@@ -31,15 +32,16 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <variant>
 
 namespace ddprof {
 namespace {
 
 pid_t g_child_pid = 0;
-bool g_termination_requested = false;
+std::atomic<bool> g_termination_requested{false};
 
 void handle_signal(int /*unused*/) {
-  g_termination_requested = true;
+  g_termination_requested.store(true, std::memory_order::relaxed);
 
   // forwarding signal to child
   if (g_child_pid) {
@@ -72,31 +74,34 @@ void modify_sigprocmask(int how) {
 
 DDRes spawn_workers(PersistentWorkerState *persistent_worker_state,
                     bool *is_worker) {
-  pid_t child_pid = 0;
   *is_worker = false;
 
   DDRES_CHECK_FWD(install_signal_handler());
 
-  // block signals to avoid a race condition between checking
-  // g_termination_requested flag and fork/waitpid
-  modify_sigprocmask(SIG_BLOCK);
-
   // child immediately exits the while() and returns from this function, whereas
   // the parent stays here forever, spawning workers.
-  while (!g_termination_requested && (child_pid = fork())) {
-    g_child_pid = child_pid;
-    {
-      LG_NTC("Created child %d", child_pid);
-      // unblock signals, we can now forward signals to child
-      modify_sigprocmask(SIG_UNBLOCK);
-      waitpid(g_child_pid, nullptr, 0);
+  while (!g_termination_requested.load(std::memory_order::relaxed)) {
+
+    // block signals to avoid a race condition between checking
+    // g_termination_requested flag and fork/waitpid
+    modify_sigprocmask(SIG_BLOCK);
+    g_child_pid = fork();
+    // unblock signals
+    modify_sigprocmask(SIG_UNBLOCK);
+
+    if (!g_child_pid) {
+      // worker process
+      *is_worker = true;
+      break;
     }
 
+    LG_NTC("Created child %d", g_child_pid);
+    waitpid(g_child_pid, nullptr, 0);
     g_child_pid = 0;
 
     // Harvest the exit state of the child process.  We will always reset it
     // to false so that a child who segfaults or exits erroneously does not
-    // cause a pointless loop of spawning
+    // cause a pointless loop of spawning.
     if (!persistent_worker_state->restart_worker) {
       if (persistent_worker_state->errors) {
         DDRES_RETURN_WARN_LOG(DD_WHAT_MAINLOOP, "Stop profiling");
@@ -107,7 +112,6 @@ DDRes spawn_workers(PersistentWorkerState *persistent_worker_state,
     LG_NFO("Refreshing worker process");
   }
 
-  *is_worker = child_pid == 0;
   return {};
 }
 
@@ -150,49 +154,175 @@ ReplyMessage create_reply_message(const DDProfContext &ctx) {
   return reply;
 }
 
-void pollfd_setup(const PEventHdr *pevent_hdr, struct pollfd *pfd,
-                  int *pfd_len) {
-  *pfd_len = pevent_hdr->size;
-  const PEvent *pes = pevent_hdr->pes;
+void pollfd_setup(std::span<PEvent> pes, struct pollfd *pfd) {
   // Setup poll() to watch perf_event file descriptors
-  for (int i = 0; i < *pfd_len; ++i) {
+  for (size_t i = 0; i < pes.size(); ++i) {
     // NOTE: if fd is negative, it will be ignored
     pfd[i].fd = pes[i].fd;
     pfd[i].events = POLLIN;
   }
 }
 
-DDRes signalfd_setup(pollfd *pfd) {
-  sigset_t mask;
+// EventWrapper holds a reference to a perf_event_header with its associated
+// timestamp.
+// It is used to order events in a std::priority_queue without copying events.
+// perf_event_header is not owned by EventWrapper, it points on ring buffer
+// memory, and must remain valid during the lifetime of EventWrapper.
+// Consequently, care must be taken to advance reader cursor position in ring
+// buffer only after processing the event.
+struct EventWrapper {
+  const perf_event_header *event;
+  PerfClock::time_point timestamp;
+  int buffer_idx;
 
-  sigemptyset(&mask);
-  sigaddset(&mask, SIGINT);
-  sigaddset(&mask, SIGTERM);
+  friend bool operator>(const EventWrapper &lhs, const EventWrapper &rhs) {
+    return lhs.timestamp > rhs.timestamp;
+  }
+};
 
-  // no need to block signal, since we inherited sigprocmask from parent
-  int const sfd = signalfd(-1, &mask, 0);
-  DDRES_CHECK_ERRNO(sfd, DD_WHAT_WORKERLOOP_INIT, "Could not set signalfd");
+using EventQueue = std::priority_queue<EventWrapper, std::vector<EventWrapper>,
+                                       std::greater<EventWrapper>>;
 
-  pfd->fd = sfd;
-  pfd->events = POLLIN;
+DDRes worker_process_ring_buffers_ordered(std::span<PEvent> pes,
+                                          DDProfContext &ctx,
+                                          EventQueue &event_queue, bool drain) {
+  // Reorder events from ring buffers before processing them.
+  // Events in each perf ring buffer are already ordered by timestamp.
+  // For MPSC ring buffers, there is no such guarantee.
+  // The strategy is to dequeue events from ring buffers and push them in a
+  // priority queue, ordered by timestamp. And then process this priority queue.
+  // When a ring buffer is empty, we cannot be sure that a new event with a
+  // timestamp less than a previously enqueued event will not be added to the
+  // ring buffer in the future.
+  // That's why we arbitrarily define a maximum latency `kMaxSampleLatency`
+  // between the timestamp of an event and the time it appears in the ring
+  // buffer, and we process events with timestamps up to (now -
+  // kMaxSampleLatency).
+  // For MPSC ring buffers, we dequeue events and push them into the priority
+  // queue until we reach an event with a timestamp greater than (now -
+  // kMaxSampleLatency) or the ring buffer is empty. Note that when an event
+  // with a timestamp greater than (now - kMaxSampleLatency) is dequeued, it is
+  // still pushed in the priority_queue.
+  // For perf ring buffers, we ensure that at anytime at most one event from
+  // each ring buffer is in the priority queue. This ensures that events with
+  // identical timestamps in a ring buffer are processed in the same order as in
+  // the ring buffer (priority queue is not stable, therefore pushing events
+  // with identical timestamps might permute them) and this also makes advancing
+  // the reader cursor position in the ring buffer easier since know that only
+  // one event has been read, we can just bump the reader cursor to the last
+  // read position.
+  // When an event from a perf ring buffer is dequeued fron the priority queue,
+  // we advance the reader cursor position in the ring buffer to free the slot
+  // for the writer, and attempt to read the next event from the ring buffer if
+  // not empty.
+  // When an event from a MPSC ring buffer is dequeued from the priority queue,
+  // we try to advance the reader cursor position in the ring buffer to free the
+  // slot for the writer. Since events might be out of order for this ring
+  // buffer, advancing is done by marking processed events as discarded and
+  // bumping the reader position until empty or we reach the first non-discarded
+  // event.
+
+  const std::chrono::microseconds kMaxSampleLatency{100};
+
+  auto now = PerfClock::now();
+  auto deadline =
+      drain ? PerfClock::time_point::max() : now + k_sample_default_wakeup;
+
+  while (!g_termination_requested.load(std::memory_order::relaxed) &&
+         now <= deadline) {
+    auto max_timestamp =
+        drain ? PerfClock::time_point::max() : now - kMaxSampleLatency;
+    int new_events = 0;
+
+    // Dequeue events from each ring buffer and push them in the priority queue
+    for (int i = 0; i < static_cast<int>(pes.size()); ++i) {
+      auto &rb = pes[i].rb;
+
+      if (rb.type == RingBufferType::kPerfRingBuffer) {
+        // if perf ring buffer has already events in the priority queue, skip it
+        if (!perf_rb_has_inflight_events(rb)) {
+          const perf_event_header *event = perf_rb_read_event(rb);
+          if (event) {
+            auto timestamp = perf_clock_time_point_from_timestamp(
+                hdr_time(event, ctx.watchers[pes[i].watcher_pos].sample_type));
+            event_queue.push({event, timestamp, i});
+            ++new_events;
+          }
+        }
+      } else {
+        while (true) {
+          const perf_event_header *event = mpsc_rb_read_event(rb);
+          if (!event) {
+            break;
+          }
+
+          auto timestamp = perf_clock_time_point_from_timestamp(
+              hdr_time(event, ctx.watchers[pes[i].watcher_pos].sample_type));
+          event_queue.push({event, timestamp, i});
+          ++new_events;
+          if (timestamp > max_timestamp) {
+            break;
+          }
+        }
+      }
+    }
+
+    while (!event_queue.empty()) {
+      const auto &evt = event_queue.top();
+      if (evt.timestamp > max_timestamp) {
+        // the next event is too recent, stop processing
+        return {};
+      }
+      auto &pevent = pes[evt.buffer_idx];
+      auto res =
+          ddprof_worker_process_event(evt.event, pevent.watcher_pos, ctx);
+      if (!IsDDResOK(res)) {
+        return res;
+      }
+
+      auto &rb = pevent.rb;
+      if (rb.type == RingBufferType::kPerfRingBuffer) {
+        // advance ring buffer, this frees space for the writer end
+        perf_rb_advance(rb);
+
+        const perf_event_header *new_event = perf_rb_read_event(rb);
+        if (new_event) {
+          // enqueue next event from the same ring buffer
+          auto timestamp = perf_clock_time_point_from_timestamp(hdr_time(
+              new_event, ctx.watchers[pevent.watcher_pos].sample_type));
+          event_queue.push({new_event, timestamp, evt.buffer_idx});
+        }
+      } else {
+        // advance ring buffer if possible, this frees space for the writer end
+        mpsc_rb_advance_if_possible(rb, evt.event);
+      }
+      event_queue.pop();
+    }
+
+    if (!new_events) {
+      // no new events were queued, stop processing
+      return {};
+    }
+
+    now = PerfClock::now();
+  }
+
   return {};
 }
 
 inline DDRes
-worker_process_ring_buffers(PEvent *pes, int pe_len, DDProfContext &ctx,
-                            std::chrono::steady_clock::time_point *now,
-                            const int *ring_buffer_start_idx) {
+worker_process_ring_buffers(std::span<PEvent> pes, DDProfContext &ctx,
+                            std::chrono::steady_clock::time_point *now) {
   // While there are events to process, iterate through them
   // while limiting time spent in loop to at most k_sample_default_wakeup
   auto loop_start = std::chrono::steady_clock::now();
   std::chrono::steady_clock::time_point local_now;
 
-  int start_idx = *ring_buffer_start_idx;
   bool events;
   do {
     events = false;
-    for (int i = start_idx; i < pe_len; ++i) {
-      auto &ring_buffer = pes[i].rb;
+    for (auto &pevent : pes) {
+      auto &ring_buffer = pevent.rb;
       if (ring_buffer.type == RingBufferType::kPerfRingBuffer) {
         PerfRingBufferReader reader(&ring_buffer);
 
@@ -200,7 +330,7 @@ worker_process_ring_buffers(PEvent *pes, int pe_len, DDProfContext &ctx,
         while (!buffer.empty()) {
           const auto *hdr =
               reinterpret_cast<const perf_event_header *>(buffer.data());
-          DDRes res = ddprof_worker_process_event(hdr, pes[i].watcher_pos, ctx);
+          DDRes res = ddprof_worker_process_event(hdr, pevent.watcher_pos, ctx);
 
           // Check for processing error
           if (IsDDResNotOK(res)) {
@@ -217,7 +347,7 @@ worker_process_ring_buffers(PEvent *pes, int pe_len, DDProfContext &ctx,
              buffer = reader.read_sample()) {
           const auto *hdr =
               reinterpret_cast<const perf_event_header *>(buffer.data());
-          DDRes res = ddprof_worker_process_event(hdr, pes[i].watcher_pos, ctx);
+          DDRes res = ddprof_worker_process_event(hdr, pevent.watcher_pos, ctx);
 
           // Check for processing error
           if (IsDDResNotOK(res)) {
@@ -232,7 +362,6 @@ worker_process_ring_buffers(PEvent *pes, int pe_len, DDProfContext &ctx,
       // PerfRingBufferReader destructor takes care of advancing ring buffer
       // read position
     }
-    start_idx = 0;
     local_now = std::chrono::steady_clock::now();
   } while (events && (local_now - loop_start) < k_sample_default_wakeup);
 
@@ -244,14 +373,10 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
                   PersistentWorkerState *persistent_worker_state) {
 
   // Setup poll() to watch perf_event file descriptors
-  int const pe_len = ctx.worker_ctx.pevent_hdr.size;
-  // one extra slot in pfd to accommodate for signal fd
-  pollfd poll_fds[k_max_nb_perf_event_open + 1];
-  int pfd_len = 0;
-  pollfd_setup(&ctx.worker_ctx.pevent_hdr, poll_fds, &pfd_len);
-
-  DDRES_CHECK_FWD(signalfd_setup(&poll_fds[pfd_len]));
-  int const signal_pos = pfd_len++;
+  pollfd poll_fds[k_max_nb_perf_event_open];
+  std::span const pevents{ctx.worker_ctx.pevent_hdr.pes,
+                          ctx.worker_ctx.pevent_hdr.size};
+  pollfd_setup(pevents, poll_fds);
 
   WorkerServer const server =
       start_worker_server(ctx.socket_fd.get(), create_reply_message(ctx));
@@ -260,20 +385,11 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
   defer { attr->finish_fun(ctx); };
   DDRES_CHECK_FWD(attr->init_fun(ctx, persistent_worker_state));
 
-  // ring_buffer_start_idx serves to indicate at which ring buffer index
-  // processing loop should restart if it was interrupted in the middle of the
-  // loop by timeout.
-  // Not used yet, because currently we process all ring buffers or none
-  int const ring_buffer_start_idx = 0;
-  bool stop = false;
-
+  EventQueue event_queue;
   // Worker poll loop
-  while (!stop) {
-    // Convenience structs
-    PEvent *pes = ctx.worker_ctx.pevent_hdr.pes;
-
+  while (!g_termination_requested.load(std::memory_order::relaxed)) {
     int const n =
-        poll(poll_fds, pfd_len,
+        poll(poll_fds, pevents.size(),
              std::chrono::milliseconds{k_sample_default_wakeup}.count());
 
     // If there was an issue, return and let the caller check errno
@@ -282,32 +398,38 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
     }
     DDRES_CHECK_ERRNO(n, DD_WHAT_POLLERROR, "poll failed");
 
-    if (poll_fds[signal_pos].revents & POLLIN) {
-      LG_NFO("Received termination signal");
-      break;
-    }
-
-    for (int i = 0; i < pe_len; ++i) {
+    bool stop = false;
+    for (size_t i = 0; i < pevents.size(); ++i) {
       pollfd const &pfd = poll_fds[i];
       if (pfd.revents & POLLHUP) {
         stop = true;
-      } else if (pfd.revents & POLLIN && pes[i].custom_event) {
+      } else if (pfd.revents & POLLIN && pevents[i].custom_event) {
         // for custom ring buffer, need to read from eventfd to flush POLLIN
         // status
         uint64_t count;
-        DDRES_CHECK_ERRNO(read(pes[i].fd, &count, sizeof(count)),
+        DDRES_CHECK_ERRNO(read(pevents[i].fd, &count, sizeof(count)),
                           DD_WHAT_PERFRB, "Failed to read from evenfd");
       }
     }
 
     std::chrono::steady_clock::time_point now;
-    DDRES_CHECK_FWD(worker_process_ring_buffers(pes, pe_len, ctx, &now,
-                                                &ring_buffer_start_idx));
+    if (ctx.params.reorder_events) {
+      DDRES_CHECK_FWD(
+          worker_process_ring_buffers_ordered(pevents, ctx, event_queue, stop));
+      now = std::chrono::steady_clock::now();
+    } else {
+      DDRES_CHECK_FWD(worker_process_ring_buffers(pevents, ctx, &now));
+    }
+
     DDRES_CHECK_FWD(ddprof_worker_maybe_export(ctx, now));
 
     if (ctx.worker_ctx.persistent_worker_state->restart_worker) {
       // return directly no need to do a final export
       return {};
+    }
+
+    if (stop) {
+      break;
     }
   }
 

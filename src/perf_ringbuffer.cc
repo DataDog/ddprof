@@ -47,6 +47,7 @@ bool rb_init(RingBuffer *rb, void *base, size_t size,
     return false;
   }
 
+  rb->intermediate_reader_pos = *rb->reader_pos;
   return true;
 }
 
@@ -302,9 +303,6 @@ uint64_t hdr_time(const perf_event_header *hdr, uint64_t mask) {
     return 0;
   }
 
-  uint64_t sampleid_mask_bits;
-  const uint8_t *buf;
-
   switch (hdr->type) {
 
   // For sample events, there is no sample_id struct at the end of the feed,
@@ -312,11 +310,10 @@ uint64_t hdr_time(const perf_event_header *hdr, uint64_t mask) {
   // full sample2hdr computation, we do an abbreviated lookup from the top of
   // the header
   case PERF_RECORD_SAMPLE: {
-    buf = reinterpret_cast<const uint8_t *>(&hdr[1]);
-    uint64_t mbits = PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_IP | PERF_SAMPLE_TID;
-    mbits &= mask;
-    return *reinterpret_cast<const uint64_t *>(
-        &buf[static_cast<ptrdiff_t>(sizeof(uint64_t) * std::popcount(mbits))]);
+    const auto *first_field_ptr = reinterpret_cast<const uint64_t *>(&hdr[1]);
+    auto nb_fields_before = std::popcount(
+        mask & (PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_IP | PERF_SAMPLE_TID));
+    return first_field_ptr[nb_fields_before];
   }
   // For non-sample type events, the time is in the sample_id struct which is
   // at the very end of the feed.  We seek to the top of the header, which
@@ -329,15 +326,15 @@ uint64_t hdr_time(const perf_event_header *hdr, uint64_t mask) {
   case PERF_RECORD_COMM:
   case PERF_RECORD_EXIT:
   case PERF_RECORD_FORK:
-  case PERF_RECORD_LOST:
-    sampleid_mask_bits = mask;
-    sampleid_mask_bits &= PERF_SAMPLE_TID | PERF_SAMPLE_TIME | PERF_SAMPLE_ID |
-        PERF_SAMPLE_STREAM_ID | PERF_SAMPLE_CPU | PERF_SAMPLE_IDENTIFIER;
-    sampleid_mask_bits = std::popcount(sampleid_mask_bits);
-    buf = (reinterpret_cast<const uint8_t *>(hdr)) + hdr->size -
-        sizeof(uint64_t) * sampleid_mask_bits;
-    return *reinterpret_cast<const uint64_t *>(
-        &buf[(mask & PERF_SAMPLE_TID) ? sizeof(uint64_t) : 0]);
+  case PERF_RECORD_LOST: {
+    auto nb_fields_after = std::popcount(
+        mask &
+        (PERF_SAMPLE_TIME | PERF_SAMPLE_ID | PERF_SAMPLE_STREAM_ID |
+         PERF_SAMPLE_CPU | PERF_SAMPLE_IDENTIFIER));
+    const auto *last_field_ptr = reinterpret_cast<const uint64_t *>(
+        reinterpret_cast<const uint8_t *>(hdr) + hdr->size);
+    return last_field_ptr[-nb_fields_after];
+  }
   default:
     break;
   }

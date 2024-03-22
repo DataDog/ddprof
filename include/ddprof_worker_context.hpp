@@ -42,6 +42,7 @@ struct DDProfWorkerContext {
   std::array<uint64_t, kMaxTypeWatcher> lost_events_per_watcher{};
   LiveAllocation live_allocation;
   int64_t perfclock_offset;
+  PerfClock::time_point last_processed_event_timestamp{};
 };
 
 } // namespace ddprof

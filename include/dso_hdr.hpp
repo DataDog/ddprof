@@ -20,8 +20,6 @@
 namespace ddprof {
 
 #define DSO_EVENT_TABLE(XX)                                                    \
-  XX(kUnhandledDso, "Unhandled")                                               \
-  XX(kUnwindFailure, "Failure")                                                \
   XX(kTargetDso, "Target")                                                     \
   XX(kNewDso, "New")
 
@@ -48,6 +46,13 @@ public:
     for (auto &metric_array : _metrics) {
       reset_event_metric(metric_array);
     }
+    _backpopulate_count = 0;
+  }
+
+  void incr_backpopulate_count() { ++_backpopulate_count; }
+
+  [[nodiscard]] uint64_t backpopulate_count() const {
+    return _backpopulate_count;
   }
 
 private:
@@ -59,6 +64,7 @@ private:
   }
   // log events according to dso types
   std::array<MetricPerDsoType, kNbDsoEventTypes> _metrics;
+  uint64_t _backpopulate_count{0};
 };
 
 /**************

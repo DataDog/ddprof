@@ -113,14 +113,13 @@ class PerfRingBufferReader {
 public:
   explicit PerfRingBufferReader(RingBuffer *rb) : _rb(rb) {
     assert(_rb->type == RingBufferType::kPerfRingBuffer);
-    _tail = *_rb->reader_pos;
-    _initial_tail = _tail;
     update_available();
-    assert(_tail <= _head);
+    assert(rb->intermediate_reader_pos <= _head);
+    assert(_rb->intermediate_reader_pos == *_rb->reader_pos);
   }
 
   ~PerfRingBufferReader() {
-    if (_initial_tail < _tail) {
+    if (_rb && *_rb->reader_pos < _rb->intermediate_reader_pos) {
       advance();
     }
   }
@@ -128,24 +127,31 @@ public:
   PerfRingBufferReader(const PerfRingBufferReader &) = delete;
   PerfRingBufferReader &operator=(const PerfRingBufferReader &) = delete;
 
-  [[nodiscard]] inline size_t available_size() const { return _head - _tail; }
+  [[nodiscard]] inline size_t available_size() const {
+    return _head - _rb->intermediate_reader_pos;
+  }
 
   ConstBuffer read_all_available() {
-    uint64_t const tail_linear = _tail & _rb->mask;
+    auto const current_tail = _rb->intermediate_reader_pos;
+    uint64_t const tail_linear = current_tail & _rb->mask;
     const std::byte *start = _rb->data + tail_linear;
-    size_t const n = _head - _tail;
-    _tail = _head;
+    size_t const n = _head - current_tail;
+    _rb->intermediate_reader_pos = _head;
     return {start, n};
   }
 
+  // Advance initial read cursor by n bytes, this makes the space available for
+  // the writer
   void advance(size_t n) {
     // Need to round up size provided by user to recover actual sample size
     n = align_up(n, kRingBufferAlignment);
-    assert(_initial_tail + n <= _tail);
-    advance_internal(_initial_tail + n);
+    assert(*_rb->reader_pos + n <= _rb->intermediate_reader_pos);
+    advance_internal(*_rb->reader_pos + n);
   }
 
-  void advance() { advance_internal(_tail); }
+  // Advance initial read cursor up to last read byte, this makes the space
+  // available for the writer
+  void advance() { advance_internal(_rb->intermediate_reader_pos); }
 
   size_t update_available() {
     _head = __atomic_load_n(_rb->writer_pos, __ATOMIC_ACQUIRE);
@@ -155,12 +161,9 @@ public:
 private:
   void advance_internal(uint64_t new_pos) {
     __atomic_store_n(_rb->reader_pos, new_pos, __ATOMIC_RELEASE);
-    _initial_tail = new_pos;
   }
 
   RingBuffer *_rb;
-  uint64_t _tail;
-  uint64_t _initial_tail;
   uint64_t _head;
 };
 
@@ -171,6 +174,13 @@ struct MPSCRingBufferHeader {
 
   static bool is_busy(uint64_t size) { return size & k_busy_bit; }
   static bool is_discarded(uint64_t size) { return size & k_discard_bit; }
+
+  [[nodiscard]] size_t get_size() const { return size & ~k_discard_bit; }
+
+  void set_busy() { size |= k_busy_bit; }
+  void set_discarded() { size |= k_discard_bit; }
+  [[nodiscard]] bool is_busy() const { return size & k_busy_bit; }
+  [[nodiscard]] bool is_discarded() const { return size & k_discard_bit; }
 };
 
 class MPSCRingBufferWriter {
@@ -228,7 +238,12 @@ public:
   // Return true if notification to consumer is necessary.
   // Notification is necessary only if consumer has caught up with producer
   // (meaning tail after commit is at or after head before commit).
-  bool commit(Buffer buf, bool discard = false) {
+  bool commit(Buffer buf) { return commit_internal(buf, false); }
+
+  bool discard(Buffer buf) { return commit_internal(buf, true); }
+
+private:
+  bool commit_internal(Buffer buf, bool discard) {
     MPSCRingBufferHeader *hdr =
         reinterpret_cast<MPSCRingBufferHeader *>(buf.data()) - 1;
 
@@ -248,40 +263,19 @@ public:
         static_cast<uint64_t>(reinterpret_cast<std::byte *>(hdr) - _rb->data);
   }
 
-private:
   RingBuffer *_rb;
   uint64_t _tail;
 };
 
-class MPSCRingBufferReader {
-public:
-  explicit MPSCRingBufferReader(RingBuffer *rb) : _rb(rb) {
-    assert(_rb->type == RingBufferType::kMPSCRingBuffer);
-    _tail = *_rb->reader_pos;
-    _initial_tail = _tail;
-    update_available();
-    assert(_tail <= _head);
-  }
-
-  ~MPSCRingBufferReader() {
-    if (_tail != _initial_tail) {
-      advance();
-    }
-  }
-
-  MPSCRingBufferReader(const MPSCRingBufferReader &) = delete;
-  MPSCRingBufferReader &operator=(const MPSCRingBufferReader &) = delete;
-
-  [[nodiscard]] inline size_t available_size() const { return _head - _tail; }
-
-  ConstBuffer read_sample() {
-    size_t const n = available_size();
-    if (n == 0) {
+inline ConstBuffer mpsc_rb_read_sample(RingBuffer &rb, uint64_t head) {
+  while (true) {
+    auto tail = rb.intermediate_reader_pos;
+    if (head == tail) {
       return {};
     }
 
-    uint64_t const tail_linear = _tail & _rb->mask;
-    std::byte *start = _rb->data + tail_linear;
+    uint64_t const tail_linear = tail & rb.mask;
+    std::byte *start = rb.data + tail_linear;
     auto *hdr = reinterpret_cast<MPSCRingBufferHeader *>(start);
     uint64_t const sz = __atomic_load_n(&hdr->size, __ATOMIC_ACQUIRE);
 
@@ -290,21 +284,111 @@ public:
       return {};
     }
 
-    _tail += align_up((sz & ~MPSCRingBufferHeader::k_discard_bit) +
-                          sizeof(MPSCRingBufferHeader),
-                      kRingBufferAlignment);
+    rb.intermediate_reader_pos +=
+        align_up((sz & ~MPSCRingBufferHeader::k_discard_bit) +
+                     sizeof(MPSCRingBufferHeader),
+                 kRingBufferAlignment);
 
     if (MPSCRingBufferHeader::is_discarded(sz)) {
-      return {};
+      continue;
     }
 
     return {reinterpret_cast<std::byte *>(hdr + 1), sz};
   }
+}
 
-  // Update ring buffer reader pos (usually done by destructor)
+inline ConstBuffer mpsc_rb_read_sample(RingBuffer &rb) {
+  auto head = __atomic_load_n(rb.writer_pos, __ATOMIC_ACQUIRE);
+  return mpsc_rb_read_sample(rb, head);
+}
+
+inline const perf_event_header *mpsc_rb_read_event(RingBuffer &rb) {
+  auto buffer = mpsc_rb_read_sample(rb);
+  return reinterpret_cast<const perf_event_header *>(buffer.data());
+}
+
+inline void mpsc_rb_advance_if_possible(RingBuffer &rb, const void *event) {
+  assert(rb.type == RingBufferType::kMPSCRingBuffer);
+
+  // set current event as discarded
+  reinterpret_cast<MPSCRingBufferHeader *>(const_cast<void *>(event))[-1]
+      .set_discarded();
+
+  uint64_t new_tail = *rb.reader_pos;
+  uint64_t const head = __atomic_load_n(rb.writer_pos, __ATOMIC_ACQUIRE);
+  uint64_t const mask = rb.mask;
+
+  // loop until we reach head or find a non-discarded event
+  while (new_tail < head) {
+    uint64_t const tail_linear = new_tail & mask;
+    std::byte *start = rb.data + tail_linear;
+    auto *hdr = reinterpret_cast<MPSCRingBufferHeader *>(start);
+    if (hdr->is_discarded()) {
+      new_tail += align_up((hdr->get_size() + sizeof(MPSCRingBufferHeader)),
+                           kRingBufferAlignment);
+    } else {
+      break;
+    }
+  }
+
+  // update tail
+  __atomic_store_n(rb.reader_pos, new_tail, __ATOMIC_RELEASE);
+}
+
+inline bool perf_rb_has_inflight_events(const RingBuffer &rb) {
+  return rb.intermediate_reader_pos != *rb.reader_pos;
+}
+
+inline const perf_event_header *perf_rb_read_event(RingBuffer &rb) {
+  auto head = __atomic_load_n(rb.writer_pos, __ATOMIC_ACQUIRE);
+  auto tail = rb.intermediate_reader_pos;
+
+  if (tail == head) {
+    return nullptr;
+  }
+
+  uint64_t const tail_linear = tail & rb.mask;
+  auto *hdr = reinterpret_cast<perf_event_header *>(rb.data + tail_linear);
+  size_t const sz_sample = hdr->size;
+
+  // align_up might not be needed since perf events should already be 8-byte
+  // aligned
+  rb.intermediate_reader_pos += align_up(sz_sample, kRingBufferAlignment);
+  return hdr;
+}
+
+inline void perf_rb_advance(RingBuffer &rb) {
+  __atomic_store_n(rb.reader_pos, rb.intermediate_reader_pos, __ATOMIC_RELEASE);
+}
+
+class MPSCRingBufferReader {
+public:
+  explicit MPSCRingBufferReader(RingBuffer *rb) : _rb(rb) {
+    assert(_rb->type == RingBufferType::kMPSCRingBuffer);
+    update_available();
+    assert(rb->intermediate_reader_pos <= _head);
+    assert(_rb->intermediate_reader_pos == *_rb->reader_pos);
+  }
+
+  ~MPSCRingBufferReader() {
+    if (_rb && *_rb->reader_pos < _rb->intermediate_reader_pos) {
+      advance();
+    }
+  }
+
+  MPSCRingBufferReader(const MPSCRingBufferReader &) = delete;
+  MPSCRingBufferReader &operator=(const MPSCRingBufferReader &) = delete;
+
+  [[nodiscard]] inline size_t available_size() const {
+    return _head - _rb->intermediate_reader_pos;
+  }
+
+  ConstBuffer read_sample() { return mpsc_rb_read_sample(*_rb, _head); }
+
+  // Update ring buffer initial reader pos (usually done by destructor)
   void advance() {
-    _initial_tail = _tail;
-    __atomic_store_n(_rb->reader_pos, _initial_tail, __ATOMIC_RELEASE);
+    __atomic_store_n(_rb->reader_pos, _rb->intermediate_reader_pos,
+                     __ATOMIC_RELEASE);
   }
 
   size_t update_available() {
@@ -314,8 +398,6 @@ public:
 
 private:
   RingBuffer *_rb;
-  uint64_t _tail;
-  uint64_t _initial_tail;
   uint64_t _head;
 };
 

@@ -452,6 +452,14 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
   add_test(
+    NAME simple_malloc-with-event-reordering
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/simple_malloc-ut.sh
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+  set_tests_properties(simple_malloc-with-event-reordering
+                       PROPERTIES ENVIRONMENT "DD_PROFILING_REORDER_EVENTS=1")
+
+  add_test(
     NAME check_no_tls
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/check_no_tls-ut.sh
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

@@ -39,9 +39,8 @@ namespace ddprof {
 namespace {
 
 const DDPROF_STATS s_cycled_stats[] = {
-    STATS_UNWIND_AVG_TIME, STATS_AGGREGATION_AVG_TIME,
-    STATS_EVENT_COUNT,     STATS_EVENT_LOST,
-    STATS_SAMPLE_COUNT,    STATS_DSO_UNHANDLED_SECTIONS,
+    STATS_UNWIND_AVG_TIME, STATS_AGGREGATION_AVG_TIME, STATS_EVENT_COUNT,
+    STATS_EVENT_LOST,      STATS_EVENT_OUT_OF_ORDER,   STATS_SAMPLE_COUNT,
     STATS_TARGET_CPU_USAGE};
 
 const long k_clock_ticks_per_sec = sysconf(_SC_CLK_TCK);
@@ -130,11 +129,11 @@ DDRes worker_update_stats(DDProfWorkerContext &worker_context,
       (k_clock_ticks_per_sec * elapsed_nsec);
   ddprof_stats_set(STATS_PROFILER_RSS, get_page_size() * procstat->rss);
   ddprof_stats_set(STATS_PROFILER_CPU_USAGE, millicores);
-  ddprof_stats_set(STATS_DSO_UNHANDLED_SECTIONS,
-                   dso_hdr.stats().sum_event_metric(DsoStats::kUnhandledDso));
   ddprof_stats_set(STATS_DSO_NEW_DSO,
                    dso_hdr.stats().sum_event_metric(DsoStats::kNewDso));
   ddprof_stats_set(STATS_DSO_SIZE, dso_hdr.get_nb_dso());
+  ddprof_stats_set(STATS_BACKPOPULATE_COUNT,
+                   dso_hdr.stats().backpopulate_count());
   ddprof_stats_set(
       STATS_UNMATCHED_DEALLOCATION_COUNT,
       worker_context.live_allocation.get_nb_unmatched_deallocations());
@@ -633,7 +632,7 @@ void ddprof_pr_exit(DDProfContext &ctx, const perf_event_exit *ext,
 void ddprof_pr_clear_live_allocation(DDProfContext &ctx,
                                      const ClearLiveAllocationEvent *event,
                                      int watcher_pos) {
-  LG_DBG("<%d>(CLEAR LIVE)%d", watcher_pos, event->sample_id.pid);
+  LG_NTC("<%d>(CLEAR LIVE)%d", watcher_pos, event->sample_id.pid);
   ctx.worker_ctx.live_allocation.clear_pid_for_watcher(watcher_pos,
                                                        event->sample_id.pid);
 }
@@ -735,6 +734,14 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
     ddprof_stats_add(STATS_EVENT_COUNT, 1, nullptr);
     const auto *wpid = static_cast<const perf_event_hdr_wpid *>(hdr);
     PerfWatcher *watcher = &ctx.watchers[watcher_pos];
+    auto timestamp = perf_clock_time_point_from_timestamp(
+        hdr_time(hdr, watcher->sample_type));
+    if (timestamp < ctx.worker_ctx.last_processed_event_timestamp) {
+      ddprof_stats_add(STATS_EVENT_OUT_OF_ORDER, 1, nullptr);
+    } else {
+      ctx.worker_ctx.last_processed_event_timestamp = timestamp;
+    }
+
     switch (hdr->type) {
     /* Cases where the target type has a PID */
     case PERF_RECORD_SAMPLE:
@@ -748,8 +755,6 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
       break;
     case PERF_RECORD_MMAP2:
       if (wpid->pid) {
-        auto timestamp = perf_clock_time_point_from_timestamp(
-            hdr_time(hdr, watcher->sample_type));
         ddprof_pr_mmap(ctx, reinterpret_cast<const perf_event_mmap2 *>(hdr),
                        watcher_pos, timestamp);
       }
