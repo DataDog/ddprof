@@ -5,6 +5,7 @@
 
 #include "pprof/ddprof_pprof.hpp"
 
+#include "base_frame_symbol_lookup.hpp"
 #include "common_symbol_errors.hpp"
 #include "ddog_profiling_utils.hpp"
 #include "ddprof_defs.hpp"
@@ -38,6 +39,17 @@ struct ActiveIdsResult {
   EventAggregationMode output_mode[DDPROF_PWT_LENGTH] = {};
   PerfWatcher *default_watcher = nullptr;
 };
+
+std::string_view pid_str(pid_t pid,
+                         std::unordered_map<pid_t, std::string> &pid_strs) {
+  auto it = pid_strs.find(pid);
+  if (it != pid_strs.end()) {
+    return it->second;
+  } else {
+    const auto pair = pid_strs.emplace(pid, std::to_string(pid));
+    return pair.first->second;
+  }
+}
 
 bool is_ld(const std::string_view path) {
   // path is expected to not contain slashes
@@ -223,14 +235,11 @@ ProfValueTypes compute_pprof_values(const ActiveIdsResult &active_ids) {
   return result;
 }
 
-// todo: this function is slow
 size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
                       const DDProfValuePack &pack,
+                      std::unordered_map<pid_t, std::string> &pid_strs,
                       std::span<ddog_prof_Label> labels) {
   size_t labels_num = 0;
-  char pid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
-  char tid_str[sizeof("536870912")] = {}; // reserve space up to 2^29 base-10
-
   labels[labels_num].key = to_CharSlice("container_id");
   labels[labels_num].str = to_CharSlice(uw_output.container_id);
   ++labels_num;
@@ -239,22 +248,19 @@ size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
   // (TID;PID) tuples, so except for symbol table overhead it doesn't matter
   // much if TID implies PID for clarity.
   if (!watcher.suppress_pid || !watcher.suppress_tid) {
-    snprintf(pid_str, sizeof(pid_str), "%d", uw_output.pid);
     labels[labels_num].key = to_CharSlice("process_id");
-    labels[labels_num].str = to_CharSlice(pid_str);
+    labels[labels_num].str = to_CharSlice(pid_str(uw_output.pid, pid_strs));
     ++labels_num;
   }
   if (!watcher.suppress_tid) {
-    snprintf(tid_str, sizeof(tid_str), "%d", uw_output.tid);
     // This naming has an impact on backend side (hence the inconsistency with
     // process_id)
     labels[labels_num].key = to_CharSlice("thread id");
-    labels[labels_num].str = to_CharSlice(tid_str);
+    labels[labels_num].str = to_CharSlice(pid_str(uw_output.tid, pid_strs));
     ++labels_num;
   }
   if (watcher_has_tracepoint(&watcher)) {
     labels[labels_num].key = to_CharSlice("tracepoint_type");
-
     // If the label is given, use that as the tracepoint type. Otherwise,
     // default to the event name
     if (!watcher.tracepoint_label.empty()) {
@@ -265,8 +271,7 @@ size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
     ++labels_num;
   }
   DDPROF_DCHECK_FATAL(labels_num <= labels.size(),
-                      "pprof aggregate - label buffer exceeded");
-  // Fill labels based on logic extracted from original function.
+                      "pprof_aggregate - label buffer exceeded");
   return labels_num;
 }
 } // namespace
@@ -422,7 +427,6 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     }
   }
 
-  // todo: destructor on these
   Symbolizer::BlazeResultsWrapper session_results;
 
   unsigned index = 0;
@@ -452,7 +456,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     }
 
     const FileInfoId_t file_id = locs[index].file_info_id;
-    const std::string &currentFilePath = file_infos[file_id].get_path();
+    const std::string &current_file_path = file_infos[file_id].get_path();
     std::vector<uintptr_t> elf_addresses;
     std::vector<uintptr_t> process_addresses;
     // Collect all consecutive locations for the same file
@@ -467,7 +471,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
     }
     // Symbolize all addresses for this file
     if (IsDDResNotOK(symbolizer->symbolize_pprof(
-            elf_addresses, process_addresses, file_id, currentFilePath,
+            elf_addresses, process_addresses, file_id, current_file_path,
             mapinfo_table[locs[start_index].map_info_idx],
             std::span<ddog_prof_Location>{locations_buff}, write_index,
             session_results))) {
@@ -487,17 +491,18 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   // write binary frame (it should always be a symbol idx)
   if (write_index < kMaxStackDepth &&
       locs[locs.size() - 1].symbol_idx != k_symbol_idx_null) {
-    const FunLoc &loc = locs[locs.size() - 1];
+    const FunLoc &loc = locs.back();
     write_location(loc, mapinfo_table[loc.map_info_idx],
                    symbol_table[loc.symbol_idx], &locations_buff[write_index++],
                    pprof->use_process_adresses);
   }
+
   std::array<ddog_prof_Label, k_max_pprof_labels> labels;
   // Create the labels for the sample.  Two samples are the same only when
   // their locations _and_ all labels are identical, so we admit a very limited
   // number of labels at present
-  size_t labels_num =
-      prepare_labels(*uw_output, *watcher, pack, std::span{labels});
+  size_t labels_num = prepare_labels(*uw_output, *watcher, pack,
+                                     pprof->_pid_str, std::span{labels});
 
   ddog_prof_Sample const sample = {
       .locations = {.ptr = locations_buff.data(), .len = write_index},

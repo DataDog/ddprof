@@ -163,6 +163,7 @@ add_unit_test(
 add_unit_test(
   ddprof_pprof-ut
   ddprof_pprof-ut.cc
+  ../src/ddog_profiling_utils.cc
   ../src/ddprof_cmdline_watcher.cc
   ../src/pprof/ddprof_pprof.cc
   ../src/symbolizer.cc
@@ -174,6 +175,7 @@ add_unit_test(
 
 add_unit_test(
   ddprof_exporter-ut
+  ../src/ddog_profiling_utils.cc
   ../src/exporter/ddprof_exporter.cc
   ../src/pprof/ddprof_pprof.cc
   ../src/perf_watcher.cc
@@ -231,6 +233,7 @@ add_unit_test(
   ../src/common_symbol_lookup.cc
   ../src/container_id.cc
   ../src/create_elf.cc
+  ../src/ddog_profiling_utils.cc
   ../src/ddprof_process.cc
   ../src/ddprof_stats.cc
   ../src/dso.cc

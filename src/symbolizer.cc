@@ -6,7 +6,9 @@
 #include "symbolizer.hpp"
 
 #include "ddog_profiling_utils.hpp" // for write_location_blaze
+#include "ddres.hpp"
 #include "demangler/demangler.hpp"
+#include "logger.hpp"
 
 #include <cassert>
 
@@ -20,7 +22,7 @@ inline void write_location_no_sym(ElfAddress_t ip, const MapInfo &mapinfo,
 }
 
 int Symbolizer::remove_unvisited() {
-  // Remove all unvisited SymbolizerPack instances from the map (c++ 20)
+  // Remove all unvisited blaze_symbolizer instances from the map
   const auto count = std::erase_if(_symbolizer_map, [](const auto &item) {
     auto const &[key, blaze_symbolizer_wrapper] = item;
     return !blaze_symbolizer_wrapper._visited;
@@ -82,7 +84,9 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
     blaze_res = blaze_symbolize_elf_virt_offsets(
         symbolizer, &src_elf, elf_addrs.data(), elf_addrs.size());
     if (blaze_res) {
-      assert(blaze_res->cnt == elf_addrs.size());
+      DDPROF_DCHECK_FATAL(blaze_res->cnt == elf_addrs.size(),
+                          "Symbolizer: Mismatch between size of returned "
+                          "symbols and size of given elf addresses");
       results.blaze_results.push_back(blaze_res);
       // Demangling cache based on stability of unordered map
       // This will be moved to the backend

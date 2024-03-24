@@ -35,11 +35,32 @@ public:
         _reported_addr_format(reported_addr_format) {}
 
   struct BlazeResultsWrapper {
+    BlazeResultsWrapper() = default;
     ~BlazeResultsWrapper() {
       for (auto &result : blaze_results) {
         blaze_result_free(result);
-        result = nullptr;
       }
+    }
+
+    // Delete copy constructor and copy assignment operator
+    BlazeResultsWrapper(const BlazeResultsWrapper &) = delete;
+    BlazeResultsWrapper &operator=(const BlazeResultsWrapper &) = delete;
+
+    // Optionally define move constructor and move assignment operator
+    BlazeResultsWrapper(BlazeResultsWrapper &&other) noexcept
+        : blaze_results(std::move(other.blaze_results)) {
+      other.blaze_results.clear();
+    }
+
+    BlazeResultsWrapper &operator=(BlazeResultsWrapper &&other) noexcept {
+      if (this != &other) {
+        for (auto &result : blaze_results) {
+          blaze_result_free(result);
+        }
+        blaze_results = std::move(other.blaze_results);
+        other.blaze_results.clear();
+      }
+      return *this;
     }
 
     std::vector<const blaze_result *> blaze_results{};

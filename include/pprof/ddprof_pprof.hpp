@@ -14,6 +14,8 @@
 #include "tags.hpp"
 #include "unwind_output.hpp"
 
+#include <unordered_map>
+
 namespace ddprof {
 
 class Symbolizer;
@@ -25,6 +27,8 @@ struct DDProfPProf {
   unsigned _nb_values = 0;
   Tags _tags;
   bool use_process_adresses{true};
+  // avoid re-creating strings for all pid numbers
+  std::unordered_map<pid_t, std::string> _pid_str;
 };
 
 struct DDProfValuePack {
