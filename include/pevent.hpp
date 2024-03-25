@@ -26,6 +26,9 @@ struct PEvent {
   bool custom_event; // true if custom event (not handled by perf, eg. memory
                      // allocations)
   RingBuffer rb;     // metadata and buffers for processing perf ringbuffer
+  std::vector<int>
+      sub_fds; // perf FDs of other events outputting to the same ring buffer
+               // (eg. perf events for other process threads in PID mode)
 };
 
 struct PEventHdr {

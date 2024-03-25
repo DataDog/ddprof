@@ -88,6 +88,7 @@ struct Options {
   int nice;
   bool use_shared_library = false;
   bool avoid_dlopen_hook = false;
+  bool stop{false};
 };
 
 // NOLINTBEGIN(clang-analyzer-unix.Malloc)
@@ -320,6 +321,8 @@ int main(int argc, char *argv[]) {
     app.add_option("--nice", opts.nice, "Linux niceness setting")
         ->default_val(0)
         ->check(CLI::Bound(-20, 19)); // NOLINT(readability-magic-numbers)
+    app.add_flag("--stop", opts.stop,
+                 "Stop process just after spawning fork / threads");
 
     if (opts.nice != 0) {
       setpriority(PRIO_PROCESS, 0, opts.nice);
@@ -389,6 +392,11 @@ int main(int argc, char *argv[]) {
     for (unsigned int i = 1; i < nb_threads; ++i) {
       threads.emplace_back(wrapper_func, std::cref(opts), std::ref(stats[i]));
     }
+
+    if (opts.stop) {
+      raise(SIGSTOP);
+    }
+
     wrapper_func(opts, stats[0]);
     for (auto &t : threads) {
       t.join();

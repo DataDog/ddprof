@@ -57,31 +57,12 @@ count() {
     echo "$result"
 }
 
-check() {
+check_logs() {
     cmd="$1"
     expected_pids="$2"
     expected_tids="${3-$2}"
     # Create a list of profile types with comma as separator
     IFS=',' read -ra list_of_profile_types_to_count <<< "${4-"alloc-space,cpu-time"}"
-    if [[ "$use_taskset" -eq 1 ]]; then
-        cmd="taskset ${test_cpu_mask} ${cmd}"
-    fi
-    echo "Running: ${cmd}"
-    # shellcheck disable=SC2086
-    eval ${cmd} || ( echo "Command failed: ${cmd}" && cat "${log_file}" && exit 1 )
-    if [[ "${expected_pids}" -ne -1 ]]; then
-        sync "${log_file}"
-        # -P requires GNU grep
-        ddprof_pid=$(grep -m1 -oP ' ddprof\[\K[0-9]+(?=\]: Starting profiler)' "${log_file}" || true)
-        if [ -z "${ddprof_pid}" ]; then
-            echo "Unable to find profiler pid"
-            cat "${log_file}"
-            exit 1
-        fi
-        # --pid requires GNU tail
-        timeout "$timeout_sec" tail --pid="$ddprof_pid" -f /dev/null
-        sync "${log_file}"
-    fi
     if [[ "${expected_pids}" -ne -1 ]]; then
         for profile_type in "${list_of_profile_types_to_count[@]}"; do
             counted_pids=$(count "${log_file}" "${profile_type}" "pid")
@@ -104,6 +85,32 @@ check() {
         fi
     fi
     rm -f "${log_file}"
+}
+
+check() {
+    cmd="$1"
+    expected_pids="$2"
+    expected_tids="${3-$2}"
+    if [[ "$use_taskset" -eq 1 ]]; then
+        cmd="taskset ${test_cpu_mask} ${cmd}"
+    fi    
+    echo "Running: ${cmd}"
+    # shellcheck disable=SC2086
+    eval ${cmd} || ( echo "Command failed: ${cmd}" && cat "${log_file}" && exit 1 )
+    if [[ "${expected_pids}" -ne -1 ]]; then
+        sync "${log_file}"
+        # -P requires GNU grep
+        ddprof_pid=$(grep -m1 -oP ' ddprof\[\K[0-9]+(?=\]: Starting profiler)' "${log_file}" || true)
+        if [ -z "${ddprof_pid}" ]; then
+            echo "Unable to find profiler pid"
+            cat "${log_file}"
+            exit 1
+        fi
+        # --pid requires GNU tail
+        timeout "$timeout_sec" tail --pid="$ddprof_pid" -f /dev/null
+        sync "${log_file}"
+    fi
+    check_logs "$@"
 }
 
 # Test disabled static lib mode
@@ -155,3 +162,21 @@ check "env DD_PROFILING_NATIVE_ALLOCATION_PROFILING_FOLLOW_EXECS=0 DD_PROFILING_
 if runuser -u ddbuild /usr/bin/true &> /dev/null; then
     check "./ddprof --switch_user ddbuild ./test/simple_malloc ${opts}" 1
 fi
+
+# Test pid mode with multiple threads
+echo "Running: ./test/simple_malloc ${opts} --threads 2 --stop"
+./test/simple_malloc $opts --threads 2 --stop&
+pid=$!
+# wait for simple_malloc to be stopped
+while ! awk '{print $3}' /proc/${pid}/stat | grep -q T; do
+    sleep 0.1
+done
+./ddprof --pid ${pid} -e sCPU &
+ddprof_pid=$!
+# wait for ddprof to be ready
+sleep 0.5
+# resume simple_malloc process
+kill -SIGCONT ${pid}
+# wait for ddprof to finish
+wait ${ddprof_pid}
+check_logs "./test/simple_malloc ${opts} --threads 2 --stop" 1 2 "cpu-time"

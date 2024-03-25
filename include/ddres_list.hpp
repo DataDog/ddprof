@@ -39,7 +39,7 @@ enum { DD_COMMON_START_RANGE = 1000, DD_NATIVE_START_RANGE = 2000 };
   X(POLLTIMEOUT, "timeout when polling perf events")                           \
   X(POLLERROR, "Unknown poll error")                                           \
   X(POLLHANGUP, "perf event file descriptor hang up")                          \
-  X(PROCSTATE, "error when retrieveing procstate")                             \
+  X(PROCSTATE, "error when retrieving process state")                          \
   X(PPROF, "error in pprof manipulations")                                     \
   X(STATSD, "statsd interface")                                                \
   X(DDPROF_STATS, "error in stats module")                                     \
