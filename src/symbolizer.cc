@@ -55,11 +55,11 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
   }
   ddprof::HeterogeneousLookupStringMap<std::string> *demangled_names = nullptr;
   const auto it = _symbolizer_map.find(file_id);
-  const char *resovled_src = elf_src.c_str();
+  const char *resolved_src = elf_src.c_str();
   // This is to avoid we change the path at every call (for different pids)
   // The cache takes into account the first path given
   if (it != _symbolizer_map.end()) {
-    resovled_src = it->second._elf_src.c_str();
+    resolved_src = it->second._elf_src.c_str();
     symbolizer = it->second._symbolizer.get();
     it->second._visited = true;
     demangled_names = &(it->second._demangled_names);
@@ -75,7 +75,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
     // Initialize the src_elf structure
     const blaze_symbolize_src_elf src_elf{
         .type_size = sizeof(blaze_symbolize_src_elf),
-        .path = resovled_src,
+        .path = resolved_src,
         .debug_syms = true,
         .reserved = {},
     };

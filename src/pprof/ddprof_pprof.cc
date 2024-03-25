@@ -276,6 +276,104 @@ size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
                       "pprof_aggregate - label buffer exceeded");
   return labels_num;
 }
+
+std::span<const FunLoc> adjust_locations(const PerfWatcher *watcher,
+                                         std::span<const FunLoc> locs) {
+  if (watcher->options.nb_frames_to_skip < locs.size()) {
+    return locs.subspan(watcher->options.nb_frames_to_skip);
+  }
+  // Keep the last frame. In the case of stacks that we could not unwind
+  // We will still have the `binary_name` frame
+  if (locs.size() >= 2) {
+    return locs.subspan(locs.size() - 1);
+  }
+  return locs;
+}
+
+DDRes process_symbolization(
+    std::span<const FunLoc> locs, const SymbolHdr &symbol_hdr,
+    const FileInfoVector &file_infos, Symbolizer *symbolizer,
+    DDProfPProf *pprof,
+    std::array<ddog_prof_Location, kMaxStackDepth> &locations_buff,
+    Symbolizer::BlazeResultsWrapper &session_results, unsigned &write_index) {
+  unsigned index = 0;
+
+  const ddprof::SymbolTable &symbol_table = symbol_hdr._symbol_table;
+  const ddprof::MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
+
+  // The -1 on size is because the last frame is binary.
+  // We wait for the incomplete frame to be added if needed.
+  // By removing the incomplete frame and pushing logic to BE
+  // we can simplify this loop
+  while (index < locs.size() - 1 && write_index < locations_buff.size()) {
+    if (locs[index].symbol_idx != k_symbol_idx_null) {
+      // Location already symbolized
+      const FunLoc &loc = locs[index];
+      write_location(
+          loc, mapinfo_table[loc.map_info_idx], symbol_table[loc.symbol_idx],
+          &locations_buff[write_index++], pprof->use_process_adresses);
+      ++index;
+      continue;
+    }
+
+    if (locs[index].file_info_id <= k_file_info_error) {
+      // Invalid file info ID, error case
+      DDPROF_DCHECK_FATAL(false,
+                          "Error in pprof symbolization (no file provided)");
+      ++index;
+      continue;
+    }
+
+    const FileInfoId_t file_id = locs[index].file_info_id;
+    const std::string &current_file_path = file_infos[file_id].get_path();
+    std::vector<uintptr_t> elf_addresses;
+    std::vector<uintptr_t> process_addresses;
+
+    // Collect all consecutive locations for the same file
+    const unsigned start_index = index;
+    while (index < locs.size() && locs[index].file_info_id == file_id) {
+      elf_addresses.push_back(locs[index].elf_addr);
+      process_addresses.push_back(locs[index].ip);
+      ++index;
+      if (locs[index].symbol_idx != k_symbol_idx_null) {
+        break; // Stop if we find a symbolized location
+      }
+    }
+    // Perform symbolization for all collected addresses
+    const DDRes res = symbolizer->symbolize_pprof(
+        elf_addresses, process_addresses, file_id, current_file_path,
+        mapinfo_table[locs[start_index].map_info_idx],
+        std::span<ddog_prof_Location>{locations_buff}, write_index,
+        session_results);
+    if (IsDDResNotOK(res)) {
+      if (IsDDResFatal(res)) {
+        DDRES_RETURN_ERROR_LOG(DD_WHAT_SYMBOLIZER, "Failed to symbolize pprof");
+      }
+      // Export the symbol with what we were able to symbolize
+      break;
+    }
+  }
+
+  // check if unwinding stops on a frame that makes sense
+  if (write_index < (kMaxStackDepth - 1) && write_index >= 1 &&
+      !is_stack_complete(
+          std::span<ddog_prof_Location>{locations_buff.data(), write_index})) {
+    // Write a common frame to indicate an incomplete stack
+    write_location(0, k_common_frame_names[incomplete_stack], {}, 0, {},
+                   &locations_buff[write_index++]);
+  }
+
+  // Write the binary frame if it exists and is valid
+  if (write_index < kMaxStackDepth &&
+      locs.back().symbol_idx != k_symbol_idx_null) {
+    const FunLoc &loc = locs.back();
+    write_location(loc, mapinfo_table[loc.map_info_idx],
+                   symbol_table[loc.symbol_idx], &locations_buff[write_index++],
+                   pprof->use_process_adresses);
+  }
+  return {};
+}
+
 } // namespace
 
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
@@ -404,8 +502,6 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       EventAggregationModePos value_pos, Symbolizer *symbolizer,
                       DDProfPProf *pprof) {
 
-  const ddprof::SymbolTable &symbol_table = symbol_hdr._symbol_table;
-  const ddprof::MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
   const PProfIndices &pprof_indices = watcher->pprof_indices[value_pos];
   ddog_prof_Profile *profile = &pprof->_profile;
   int64_t values[k_max_value_types] = {};
@@ -418,85 +514,14 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
 
   std::array<ddog_prof_Location, kMaxStackDepth> locations_buff;
   std::span locs{uw_output->locs};
+  locs = adjust_locations(watcher, locs);
 
-  if (watcher->options.nb_frames_to_skip < locs.size()) {
-    locs = locs.subspan(watcher->options.nb_frames_to_skip);
-  } else {
-    // Keep the last frame. In the case of stacks that we could not unwind
-    // We will still have the `binary_name`
-    if (locs.size() >= 2) {
-      locs = locs.subspan(locs.size() - 1);
-    }
-  }
-
+  // Blaze results should remain alive until we aggregate the pprof data
   Symbolizer::BlazeResultsWrapper session_results;
-
-  unsigned index = 0;
   unsigned write_index = 0;
-
-  // The -1 on size is because the last frame is binary.
-  // We wait for the incomplete frame to be added if needed.
-  // By removing the incomplete frame and pushing logic to BE
-  // we can simplify this loop
-  while (index < locs.size() - 1 && write_index < locations_buff.size()) {
-    if (locs[index].symbol_idx != k_symbol_idx_null) {
-      // already symbolized
-      const FunLoc &loc = locs[index];
-      write_location(
-          loc, mapinfo_table[loc.map_info_idx], symbol_table[loc.symbol_idx],
-          &locations_buff[write_index++], pprof->use_process_adresses);
-      ++index;
-      continue;
-    }
-
-    if (locs[index].file_info_id <= k_file_info_error) {
-      // We should either have an index or a file to write the symbol
-      DDPROF_DCHECK_FATAL(false,
-                          "Error In pprof symbolization(no file provided)");
-      ++index;
-      continue;
-    }
-
-    const FileInfoId_t file_id = locs[index].file_info_id;
-    const std::string &current_file_path = file_infos[file_id].get_path();
-    std::vector<uintptr_t> elf_addresses;
-    std::vector<uintptr_t> process_addresses;
-    // Collect all consecutive locations for the same file
-    const unsigned start_index = index;
-    while (index < locs.size() && locs[index].file_info_id == file_id) {
-      elf_addresses.push_back(locs[index].elf_addr);
-      process_addresses.push_back(locs[index].ip);
-      ++index;
-      if (locs[index].symbol_idx != k_symbol_idx_null) {
-        break;
-      }
-    }
-    // Symbolize all addresses for this file
-    if (IsDDResNotOK(symbolizer->symbolize_pprof(
-            elf_addresses, process_addresses, file_id, current_file_path,
-            mapinfo_table[locs[start_index].map_info_idx],
-            std::span<ddog_prof_Location>{locations_buff}, write_index,
-            session_results))) {
-      break;
-    }
-  }
-  // check if unwinding stops on a frame that makes sense
-  if (write_index < (kMaxStackDepth - 1) && write_index >= 1 &&
-      !is_stack_complete(
-          std::span<ddog_prof_Location>{locations_buff.data(), write_index})) {
-    write_location(0, k_common_frame_names[incomplete_stack], {}, 0, {},
-                   &locations_buff[write_index++]);
-  }
-
-  // write binary frame (it should always be a symbol idx)
-  if (write_index < kMaxStackDepth &&
-      locs.back().symbol_idx != k_symbol_idx_null) {
-    const FunLoc &loc = locs.back();
-    write_location(loc, mapinfo_table[loc.map_info_idx],
-                   symbol_table[loc.symbol_idx], &locations_buff[write_index++],
-                   pprof->use_process_adresses);
-  }
-
+  DDRES_CHECK_FWD(process_symbolization(locs, symbol_hdr, file_infos,
+                                        symbolizer, pprof, locations_buff,
+                                        session_results, write_index));
   std::array<ddog_prof_Label, k_max_pprof_labels> labels{};
   // Create the labels for the sample.  Two samples are the same only when
   // their locations _and_ all labels are identical, so we admit a very limited
