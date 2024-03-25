@@ -349,6 +349,9 @@ int start_profiler_internal(std::unique_ptr<DDProfContext> ctx,
     }
   }
 
+  // Force a backpopulate upon worker startup if we are in PID mode
+  ctx->backpopulate_pid_upon_start = !in_wrapper_mode && ctx->params.pid > 0;
+
   LG_NTC("Starting profiler");
 
   maybe_slowdown_startup();

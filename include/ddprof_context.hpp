@@ -45,6 +45,7 @@ struct DDProfContext {
   } params;
 
   ddprof::UniqueFd socket_fd;
+  bool backpopulate_pid_upon_start{false};
   PerfClockSource perf_clock_source{PerfClockSource::kNoClock};
   std::vector<PerfWatcher> watchers;
   ExporterInput exp_input;
