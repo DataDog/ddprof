@@ -17,6 +17,7 @@
 #include "ringbuffer_utils.hpp"
 #include "unique_fd.hpp"
 #include "unwind.h"
+#include "unwind_state.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -378,12 +379,18 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
                           ctx.worker_ctx.pevent_hdr.size};
   pollfd_setup(pevents, poll_fds);
 
-  WorkerServer const server =
-      start_worker_server(ctx.socket_fd.get(), create_reply_message(ctx));
-
   // Perform user-provided initialization
   defer { attr->finish_fun(ctx); };
   DDRES_CHECK_FWD(attr->init_fun(ctx, persistent_worker_state));
+
+  if (ctx.params.pid > 0 && ctx.backpopulate_pid_upon_start &&
+      persistent_worker_state->profile_seq == 0) {
+    int nb_elems;
+    ctx.worker_ctx.us->dso_hdr.pid_backpopulate(ctx.params.pid, nb_elems);
+  }
+
+  WorkerServer const server =
+      start_worker_server(ctx.socket_fd.get(), create_reply_message(ctx));
 
   EventQueue event_queue;
   // Worker poll loop
