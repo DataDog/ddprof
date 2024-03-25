@@ -33,6 +33,11 @@ void write_location(const FunLoc &loc, const MapInfo &mapinfo,
                     const Symbol &symbol, ddog_prof_Location *ffi_location,
                     bool use_process_adresses);
 
+void write_location(ProcessAddress_t ip_or_elf_addr,
+                    std::string_view demangled_name, std::string_view file_name,
+                    uint32_t lineno, const MapInfo &mapinfo,
+                    ddog_prof_Location *ffi_location);
+
 DDRes write_location_blaze(
     ProcessAddress_t ip_or_elf_addr,
     ddprof::HeterogeneousLookupStringMap<std::string> &demangled_names,

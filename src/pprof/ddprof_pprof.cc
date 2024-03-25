@@ -480,14 +480,12 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
       break;
     }
   }
-
   // check if unwinding stops on a frame that makes sense
   if (write_index < (kMaxStackDepth - 1) && write_index >= 1 &&
       !is_stack_complete(
           std::span<ddog_prof_Location>{locations_buff.data(), write_index})) {
-    // not writting the mapping is acceptable due to memset at the top
-    write_function(k_common_frame_names[incomplete_stack], ""sv,
-                   &locations_buff[write_index++].function);
+    write_location(0, k_common_frame_names[incomplete_stack], {}, 0, {},
+                   &locations_buff[write_index++]);
   }
 
   // write binary frame (it should always be a symbol idx)

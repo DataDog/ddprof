@@ -42,6 +42,16 @@ void write_location(const FunLoc &loc, const MapInfo &mapinfo,
   ffi_location->line = symbol._lineno;
 }
 
+void write_location(ProcessAddress_t ip_or_elf_addr,
+                    std::string_view demangled_name, std::string_view file_name,
+                    uint32_t lineno, const MapInfo &mapinfo,
+                    ddog_prof_Location *ffi_location) {
+  write_mapping(mapinfo, &ffi_location->mapping);
+  write_function(demangled_name, file_name, &ffi_location->function);
+  ffi_location->address = ip_or_elf_addr;
+  ffi_location->line = lineno;
+}
+
 // demangling caching based on stability of unordered map
 // This will be moved to the backend
 std::string_view get_or_insert_demangled_sym(
@@ -70,17 +80,14 @@ DDRes write_location_blaze(
        ++i) {
     const blaze_symbolize_inlined_fn *inlined_fn = blaze_sym.inlined + i;
     ddog_prof_Location &ffi_location = locations_buff[cur_loc];
-    write_mapping(mapinfo, &ffi_location.mapping);
     const std::string_view demangled_name = inlined_fn->name
         ? get_or_insert_demangled_sym(inlined_fn->name, demangled_names)
         : undef_inlined;
-    write_function(demangled_name,
+    write_location(ip_or_elf_addr, demangled_name,
                    inlined_fn->code_info.file
                        ? std::string_view(inlined_fn->code_info.file)
                        : mapinfo._sopath,
-                   &ffi_location.function);
-    ffi_location.address = ip_or_elf_addr;
-    ffi_location.line = inlined_fn->code_info.line;
+                   inlined_fn->code_info.line, mapinfo, &ffi_location);
     ++cur_loc;
   }
 
@@ -88,18 +95,15 @@ DDRes write_location_blaze(
     return ddres_warn(DD_WHAT_UW_MAX_DEPTH);
   }
   ddog_prof_Location &ffi_location = locations_buff[cur_loc];
-  write_mapping(mapinfo, &ffi_location.mapping);
+
   const std::string_view demangled_name = blaze_sym.name
       ? get_or_insert_demangled_sym(blaze_sym.name, demangled_names)
       : undef;
-
-  write_function(demangled_name,
+  write_location(ip_or_elf_addr, demangled_name,
                  blaze_sym.code_info.file
                      ? std::string_view{blaze_sym.code_info.file}
                      : std::string_view{mapinfo._sopath},
-                 &ffi_location.function);
-  ffi_location.address = ip_or_elf_addr;
-  ffi_location.line = blaze_sym.code_info.line;
+                 blaze_sym.code_info.line, mapinfo, &ffi_location);
   ++cur_loc;
   return {};
 }
