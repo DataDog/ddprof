@@ -45,10 +45,9 @@ std::string_view pid_str(pid_t pid,
   auto it = pid_strs.find(pid);
   if (it != pid_strs.end()) {
     return it->second;
-  } else {
-    const auto pair = pid_strs.emplace(pid, std::to_string(pid));
-    return pair.first->second;
   }
+  const auto pair = pid_strs.emplace(pid, std::to_string(pid));
+  return pair.first->second;
 }
 
 bool is_ld(const std::string_view path) {
@@ -236,11 +235,16 @@ ProfValueTypes compute_pprof_values(const ActiveIdsResult &active_ids) {
 }
 
 size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
-                      const DDProfValuePack &pack,
                       std::unordered_map<pid_t, std::string> &pid_strs,
                       std::span<ddog_prof_Label> labels) {
+  constexpr std::string_view k_container_id_label = "container_id"sv;
+  constexpr std::string_view k_process_id_label = "process_id"sv;
+  // This naming has an impact on backend side (hence the inconsistency with
+  // process_id)
+  constexpr std::string_view k_thread_id_label = "thread id"sv;
+  constexpr std::string_view k_tracepoint_label = "tracepoint_type"sv;
   size_t labels_num = 0;
-  labels[labels_num].key = to_CharSlice("container_id");
+  labels[labels_num].key = to_CharSlice(k_container_id_label);
   labels[labels_num].str = to_CharSlice(uw_output.container_id);
   ++labels_num;
 
@@ -248,19 +252,17 @@ size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
   // (TID;PID) tuples, so except for symbol table overhead it doesn't matter
   // much if TID implies PID for clarity.
   if (!watcher.suppress_pid || !watcher.suppress_tid) {
-    labels[labels_num].key = to_CharSlice("process_id");
+    labels[labels_num].key = to_CharSlice(k_process_id_label);
     labels[labels_num].str = to_CharSlice(pid_str(uw_output.pid, pid_strs));
     ++labels_num;
   }
   if (!watcher.suppress_tid) {
-    // This naming has an impact on backend side (hence the inconsistency with
-    // process_id)
-    labels[labels_num].key = to_CharSlice("thread id");
+    labels[labels_num].key = to_CharSlice(k_thread_id_label);
     labels[labels_num].str = to_CharSlice(pid_str(uw_output.tid, pid_strs));
     ++labels_num;
   }
   if (watcher_has_tracepoint(&watcher)) {
-    labels[labels_num].key = to_CharSlice("tracepoint_type");
+    labels[labels_num].key = to_CharSlice(k_tracepoint_label);
     // If the label is given, use that as the tracepoint type. Otherwise,
     // default to the event name
     if (!watcher.tracepoint_label.empty()) {
@@ -490,19 +492,19 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
 
   // write binary frame (it should always be a symbol idx)
   if (write_index < kMaxStackDepth &&
-      locs[locs.size() - 1].symbol_idx != k_symbol_idx_null) {
+      locs.back().symbol_idx != k_symbol_idx_null) {
     const FunLoc &loc = locs.back();
     write_location(loc, mapinfo_table[loc.map_info_idx],
                    symbol_table[loc.symbol_idx], &locations_buff[write_index++],
                    pprof->use_process_adresses);
   }
 
-  std::array<ddog_prof_Label, k_max_pprof_labels> labels;
+  std::array<ddog_prof_Label, k_max_pprof_labels> labels{};
   // Create the labels for the sample.  Two samples are the same only when
   // their locations _and_ all labels are identical, so we admit a very limited
   // number of labels at present
-  size_t labels_num = prepare_labels(*uw_output, *watcher, pack,
-                                     pprof->_pid_str, std::span{labels});
+  const size_t labels_num =
+      prepare_labels(*uw_output, *watcher, pprof->_pid_str, std::span{labels});
 
   ddog_prof_Sample const sample = {
       .locations = {.ptr = locations_buff.data(), .len = write_index},
@@ -533,6 +535,7 @@ DDRes pprof_reset(DDProfPProf *pprof) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to reset profile: %*s",
                            static_cast<int>(msg.len), msg.ptr);
   }
+  pprof->_pid_str.clear();
   return {};
 }
 } // namespace ddprof

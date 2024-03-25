@@ -25,8 +25,6 @@ static const char *s_src_paths[K_MOCK_LOC_SIZE] = {
 
 static const char *s_so_paths[] = {"bar.0.so"};
 
-// ddog_Mapping
-
 static inline void fill_symbol_table_1(SymbolTable &symbol_table) {
   for (unsigned i = 0; i < K_MOCK_LOC_SIZE; ++i) {
     symbol_table.emplace_back(std::string(s_syn_names[i]),

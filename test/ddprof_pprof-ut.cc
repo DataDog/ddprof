@@ -106,6 +106,7 @@ TEST(DDProfPProf, just_live) {
   log_watcher(&(ctx.watchers[1]), 1);
 
   DDRes res = pprof_create_profile(&pprof, ctx);
+  EXPECT_TRUE(IsDDResOK(res));
   EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_index == -1);
   EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_count_index == -1);
 
