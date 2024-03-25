@@ -160,6 +160,19 @@ TEST(DSOTest, erase) {
   }
 }
 
+TEST(DSOTest, avoid_erase) {
+  PerfClock::init(); // init otherwise it returns 0
+  DsoHdr dso_hdr;
+  PerfClock::time_point old_now = PerfClock::now();
+  pid_t my_pid = getpid();
+  usleep(100);
+  int nb_elts = 0;
+  dso_hdr.pid_backpopulate(my_pid, nb_elts);
+  EXPECT_GT(nb_elts, 0);
+  EXPECT_FALSE(dso_hdr.pid_free(my_pid, old_now));
+  EXPECT_GE(dso_hdr.get_nb_dso(), nb_elts);
+}
+
 TEST(DSOTest, find_same) {
   DsoHdr dso_hdr;
   fill_mock_hdr(dso_hdr);
