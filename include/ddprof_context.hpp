@@ -21,6 +21,7 @@ namespace ddprof {
 struct DDProfContext {
   struct {
     bool enable{true};
+    bool inlined_functions{false};
     std::chrono::seconds upload_period{};
     bool fault_info{true};
     int nice{-1};

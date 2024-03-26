@@ -15,7 +15,6 @@ TEST(LiveAllocationTest, simple) {
   UnwindOutput uo;
   uo.pid = 123;
   uo.tid = 456;
-  uo.is_incomplete = false;
   uo.locs.push_back({0x1234, 0x5678, 0x9abc});
   uo.locs.push_back({0x4321, 0x8765, 0xcba9});
 
@@ -76,7 +75,6 @@ TEST(LiveAllocationTest, invalid_inputs) {
   // Register allocation with negative value
   uo.pid = 123;
   uo.tid = 456;
-  uo.is_incomplete = false;
   uo.locs.push_back({0x1234, 0x5678, 0x9abc});
   // We will register them (though probably cause a UI bug...)
   EXPECT_NO_THROW(
@@ -96,7 +94,6 @@ TEST(LiveAllocationTest, overlap_registrations) {
   uintptr_t addr = 0x10;
   uo.pid = 123;
   uo.tid = 456;
-  uo.is_incomplete = false;
   uo.locs.push_back({0x1234, 0x5678, 0x9abc});
 
   // Register the first allocation

@@ -4,14 +4,3 @@
 // Datadog, Inc.
 
 #pragma once
-
-#include <string_view>
-
-namespace ddprof::Demangler {
-
-// Functions
-std::string demangle(const std::string &mangled);
-
-std::string non_microsoft_demangle(const char *mangled);
-
-} // namespace ddprof::Demangler

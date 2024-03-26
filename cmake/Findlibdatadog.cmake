@@ -3,9 +3,9 @@
 # (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
 
 # libdatadog : common profiler imported libraries
-# https://github.com/DataDog/libdatadog/releases/tag/v0.8.0
+# https://github.com/DataDog/libdatadog/releases/tag/v7.0.0
 set(TAG_LIBDATADOG
-    "v5.0.0"
+    "v7.0.0"
     CACHE STRING "libdatadog github tag")
 
 set(Datadog_ROOT ${VENDOR_PATH}/libdatadog-${TAG_LIBDATADOG})

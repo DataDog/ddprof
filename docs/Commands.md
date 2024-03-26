@@ -44,6 +44,10 @@ Profiling settings:
   -g,--global Excludes: command_line --pid
                               Instrument all processes.
                               Requires specific capabilities or a perf_event_paranoid value of less than 1.
+  -I,--inlined_functions BOOLEAN [0] 
+                              Report inlined functions in call stacks.
+                              This is possible if debug sections are available.
+                              This can have performance impacts for the profiler.
   -t,--timeline (Env:DD_PROFILING_TIMELINE_ENABLE)
                               Enables Timeline view in the Datadog UI.
                               Works by adding timestmaps to certain events.

@@ -5,7 +5,17 @@
 
 #pragma once
 
+#include <array>
+#include <string_view>
+
+// sv operator
+using namespace std::string_view_literals;
+
 namespace ddprof {
+
+inline constexpr std::array<std::string_view, 6> k_common_frame_names = {
+    "[truncated]"sv,  "[unknown_dso]"sv, "[dwfl_frame]"sv,
+    "[incomplete]"sv, "[lost]"sv,        "[maximum pids]"sv};
 
 enum SymbolErrors {
   truncated_stack,
@@ -16,4 +26,4 @@ enum SymbolErrors {
   lost_event,
 };
 
-}
+} // namespace ddprof

@@ -67,7 +67,8 @@ TEST(runtime_symbol_lookup, jitdump_simple) {
   SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
       mypid, pc, symbol_table, jit_path);
   ASSERT_NE(symbol_idx, -1);
-  ASSERT_EQ(std::string("julia_b_11"), symbol_table[symbol_idx]._demangle_name);
+  ASSERT_EQ(std::string("julia_b_11"),
+            symbol_table[symbol_idx]._demangled_name);
 }
 
 TEST(runtime_symbol_lookup, double_load) {

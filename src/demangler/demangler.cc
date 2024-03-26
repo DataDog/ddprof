@@ -177,4 +177,15 @@ std::string Demangler::demangle(const std::string &mangled) {
   return demangled;
 }
 
+std::string Demangler::non_microsoft_demangle(const char *mangled) {
+  std::string res;
+  if (llvm::nonMicrosoftDemangle(mangled, res)) {
+    if (is_probably_rust_legacy(res)) {
+      return rust_demangle(res);
+    }
+    return res;
+  }
+  return std::string{mangled};
+}
+
 } // namespace ddprof

@@ -61,6 +61,7 @@ enum { DD_COMMON_START_RANGE = 1000, DD_NATIVE_START_RANGE = 2000 };
   X(TSC, "failed to setup TSC")                                                \
   X(INVALID_ELF, "invalid elf file")                                           \
   X(AMBIGUOUS_LOAD_SEGMENT, "ambiguous executable LOAD segment")               \
+  X(SYMBOLIZER, "symbolizer error")                                            \
   X(NO_MATCHING_LOAD_SEGMENT, "unable to find a LOAD segment matching mapping")
 
 // generic erno errors available from /usr/include/asm-generic/errno.h

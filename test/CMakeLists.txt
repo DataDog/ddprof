@@ -161,15 +161,29 @@ add_unit_test(
   DEFINITIONS MYNAME="pevent-ut")
 
 add_unit_test(
-  ddprof_pprof-ut ddprof_pprof-ut.cc ../src/ddprof_cmdline_watcher.cc ../src/pprof/ddprof_pprof.cc
-  ../src/perf_watcher.cc ../src/tracepoint_config.cc
-  LIBRARIES Datadog::Profiling DDProf::Parser
+  ddprof_pprof-ut
+  ddprof_pprof-ut.cc
+  ../src/ddog_profiling_utils.cc
+  ../src/ddprof_cmdline_watcher.cc
+  ../src/pprof/ddprof_pprof.cc
+  ../src/symbolizer.cc
+  ../src/demangler/demangler.cc
+  ../src/perf_watcher.cc
+  ../src/tracepoint_config.cc
+  LIBRARIES Datadog::Profiling DDProf::Parser llvm-demangle
   DEFINITIONS MYNAME="ddprof_pprof-ut")
 
 add_unit_test(
-  ddprof_exporter-ut ../src/exporter/ddprof_exporter.cc ../src/pprof/ddprof_pprof.cc
-  ../src/perf_watcher.cc ../src/tags.cc ddprof_exporter-ut.cc
-  LIBRARIES Datadog::Profiling DDProf::Parser
+  ddprof_exporter-ut
+  ../src/ddog_profiling_utils.cc
+  ../src/exporter/ddprof_exporter.cc
+  ../src/pprof/ddprof_pprof.cc
+  ../src/perf_watcher.cc
+  ../src/symbolizer.cc
+  ../src/demangler/demangler.cc
+  ../src/tags.cc
+  ddprof_exporter-ut.cc
+  LIBRARIES Datadog::Profiling DDProf::Parser llvm-demangle
   DEFINITIONS MYNAME="ddprof_exporter-ut")
 
 add_unit_test(
@@ -193,17 +207,11 @@ add_unit_test(tags-ut tags-ut.cc ../src/tags.cc ../src/thread_info.cc DEFINITION
 target_include_directories(tags-ut PRIVATE ${DOGFOOD_INCLUDE_DIR})
 
 add_unit_test(
-  dwfl_symbol-ut dwfl_symbol-ut.cc ../src/dwfl_symbol.cc ../src/demangler/demangler.cc
-  LIBRARIES llvm-demangle ${ELFUTILS_LIBRARIES}
-  DEFINITIONS MYNAME="dwfl_symbol-ut")
-
-add_unit_test(
   dwfl_module-ut
   dwfl_module-ut.cc
   ../src/build_id.cc
   ../src/dwfl_hdr.cc
   ../src/ddprof_module_lib.cc
-  ../src/dwfl_symbol.cc
   ../src/demangler/demangler.cc
   ../src/dso.cc
   ../src/dso_hdr.cc
@@ -211,8 +219,8 @@ add_unit_test(
   ../src/procutils.cc
   ../src/signal_helper.cc
   ../src/user_override.cc
-  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
-  DEFINITIONS MYNAME="dwfl_symbol-ut")
+  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle Datadog::Profiling
+  DEFINITIONS MYNAME="dwfl_module-ut")
 add_compile_definitions("DWFL_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 set_property(TARGET dwfl_module-ut PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 
@@ -225,6 +233,7 @@ add_unit_test(
   ../src/common_symbol_lookup.cc
   ../src/container_id.cc
   ../src/create_elf.cc
+  ../src/ddog_profiling_utils.cc
   ../src/ddprof_process.cc
   ../src/ddprof_stats.cc
   ../src/dso.cc
@@ -232,8 +241,6 @@ add_unit_test(
   ../src/dso_symbol_lookup.cc
   ../src/dwfl_hdr.cc
   ../src/ddprof_module_lib.cc
-  ../src/dwfl_symbol.cc
-  ../src/dwfl_symbol_lookup.cc
   ../src/dwfl_thread_callbacks.cc
   ../src/demangler/demangler.cc
   ../src/jit/jitdump.cc
@@ -247,13 +254,14 @@ add_unit_test(
   ../src/symbol_map.cc
   ../src/signal_helper.cc
   ../src/statsd.cc
+  ../src/symbolizer.cc
   ../src/unwind.cc
   ../src/unwind_dwfl.cc
   ../src/unwind_helpers.cc
   ../src/unwind_metrics.cc
   ../src/unwind_state.cc
   ../src/user_override.cc
-  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
+  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle Datadog::Profiling
   DEFINITIONS MYNAME="savecontext-ut")
 
 set(ALLOCATION_TRACKER_UT_SRCS
@@ -274,8 +282,6 @@ set(ALLOCATION_TRACKER_UT_SRCS
     ../src/dso_symbol_lookup.cc
     ../src/dwfl_hdr.cc
     ../src/ddprof_module_lib.cc
-    ../src/dwfl_symbol.cc
-    ../src/dwfl_symbol_lookup.cc
     ../src/dwfl_thread_callbacks.cc
     ../src/demangler/demangler.cc
     ../src/jit/jitdump.cc
@@ -307,13 +313,13 @@ set(ALLOCATION_TRACKER_UT_SRCS
 
 add_unit_test(
   allocation_tracker-ut ${ALLOCATION_TRACKER_UT_SRCS}
-  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle dl rt
+  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle dl rt Datadog::Profiling
   DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384)
 
 if(TARGET jemalloc::jemalloc_shared)
   add_unit_test(
     allocation_tracker_jemalloc-ut ${ALLOCATION_TRACKER_UT_SRCS}
-    LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle dl rt jemalloc::jemalloc_shared
+    LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle dl rt jemalloc::jemalloc_shared Datadog::Profiling
     DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384 USE_JEMALLOC=1)
 endif()
 
