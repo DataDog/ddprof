@@ -531,9 +531,16 @@ Dso DsoHdr::dso_from_proc_line(int pid, const char *line) {
 FileInfo DsoHdr::find_file_info(const Dso &dso) {
   int64_t size;
   inode_t inode;
-  // to ensure we always retrieve the file in the context of our process, we go
-  // through proc maps
-  // Example : /proc/<pid>/root/usr/local/bin/exe_file
+
+  // First, try to find matching file in profiler mount namespace since it will
+  // still be accessible when process exits
+  if (get_file_inode(dso._filename.c_str(), &inode, &size) &&
+      inode == dso._inode) {
+    return {dso._filename, size, inode};
+  }
+
+  // Try to find matching file in the context of our process, we
+  // go through proc maps Example : /proc/<pid>/root/usr/local/bin/exe_file
   //   or      /host/proc/<pid>/root/usr/local/bin/exe_file
   std::string const proc_path = _path_to_proc + "/proc/" +
       std::to_string(dso._pid) + "/root" + dso._filename;
@@ -542,14 +549,6 @@ FileInfo DsoHdr::find_file_info(const Dso &dso) {
       LG_DBG("[DSO] inode mismatch for %s", proc_path.c_str());
     }
     return {proc_path, size, inode};
-  }
-  // Try to find file in profiler mount namespace
-  if (get_file_inode(dso._filename.c_str(), &inode, &size)) {
-    if (inode != dso._inode) {
-      // There are cases where binaries self modify
-      LG_DBG("[DSO] inode mismatch for %s", dso._filename.c_str());
-    }
-    return {dso._filename, size, inode};
   }
 
   LG_DBG("[DSO] Unable to find path to %s", dso._filename.c_str());
