@@ -17,7 +17,7 @@ inline void write_location_no_sym(ElfAddress_t ip, const MapInfo &mapinfo,
                                   ddog_prof_Location *ffi_location) {
   write_mapping(mapinfo, &ffi_location->mapping);
   // write empty with empty function name, to enable remote symbolization
-  write_function({}, {}, &ffi_location->function);
+  write_function({}, mapinfo._sopath, &ffi_location->function);
   ffi_location->address = ip;
 }
 
