@@ -441,10 +441,10 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
   add_exe(
     simple_malloc-shared simple_malloc.cc
     LIBRARIES dd_profiling-shared Threads::Threads CLI11 dl
-    DEFINITIONS USE_DD_PROFILING)
+    DEFINITIONS USE_DD_PROFILING COMPRESS_DEBUG_SECTION)
   target_include_directories(simple_malloc-shared PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
-  add_exe(simple_malloc simple_malloc.cc LIBRARIES Threads::Threads CLI11 dl)
+  add_exe(simple_malloc simple_malloc.cc LIBRARIES Threads::Threads CLI11 dl COMPRESS_DEBUG_SECTION)
   target_include_directories(simple_malloc PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
   add_library(simple_malloc_lib SHARED simple_malloc.cc)
