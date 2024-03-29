@@ -84,12 +84,6 @@ public:
                         const MapInfo &map_info,
                         std::span<ddog_prof_Location> locations,
                         unsigned &write_index, BlazeResultsWrapper &results);
-  static void free_session_results(BlazeResultsWrapper &results) {
-    for (auto &result : results.blaze_results) {
-      blaze_result_free(result);
-      result = nullptr;
-    }
-  }
   int remove_unvisited();
   void reset_unvisited_flag();
 
@@ -114,14 +108,14 @@ private:
     explicit BlazeSymbolizerWrapper(std::string elf_src, bool inlined_fns)
         : opts(create_opts(inlined_fns)),
           symbolizer(blaze_symbolizer_new_opts(&opts)),
-          elf_src(std::move(elf_src)) {}
+          elf_src(std::move(elf_src)), use_debug(inlined_fns) {}
 
     blaze_symbolizer_opts opts;
     std::unique_ptr<blaze_symbolizer, BlazeSymbolizerDeleter> symbolizer;
     ddprof::HeterogeneousLookupStringMap<std::string> demangled_names;
     std::string elf_src;
     bool visited{true};
-    bool use_debug{true};
+    bool use_debug;
   };
 
   BlazeSymbolizerWrapper &get_symbolizer(FileInfoId_t file_id,
