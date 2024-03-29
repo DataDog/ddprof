@@ -123,7 +123,8 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
                  "The name of the environment to use in the Datadog UI.")
       ->envname("DD_ENV");
 
-  app.add_option("--service_version,-V", exporter_input.service_version,
+  app.add_option("--service_version,--service-version,-V",
+                 exporter_input.service_version,
                  "Version of the service being profiled.")
       ->envname("DD_VERSION");
 
@@ -163,7 +164,8 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       ->group("Profiling settings")
       ->excludes(pid_opt)
       ->excludes(exec_option);
-  app.add_option("--inlined_functions,-I", inlined_functions,
+  app.add_option("--inlined_functions,--inlined-functions,-I",
+                 inlined_functions,
                  "Report inlined functions in call stacks.\n"
                  "This is possible if debug sections are available.\n"
                  "This can have performance impacts for the profiler.")
@@ -176,7 +178,7 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       ->envname("DD_PROFILING_TIMELINE_ENABLE");
 
   app.add_option<std::chrono::seconds, unsigned>(
-         "--upload_period,-u", upload_period,
+         "--upload_period,--upload-period,-u", upload_period,
          "Upload period for profiles (in seconds).\n")
       ->default_val(
           static_cast<std::chrono::seconds>(k_default_upload_period).count())
@@ -204,7 +206,7 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       ->envname("DD_PROFILING_NATIVE_PRESET");
 
   // Advanced settings
-  app.add_option("--switch_user", switch_user,
+  app.add_option("--switch_user,--switch-user", switch_user,
                  "Run my application with a different user.\n")
       ->group("Advanced settings");
   app.add_option("--nice", nice,
@@ -219,7 +221,7 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       ->group("Advanced settings");
 
   // Debug
-  app.add_option("--log_level,-l", log_level,
+  app.add_option("--log_level,--log-level,-l", log_level,
                  "One of debug, informational, notice, warn, error.")
       ->default_val("error")
       ->check(
@@ -227,24 +229,25 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       ->group("Debug options")
       ->envname("DD_PROFILING_NATIVE_LOG_LEVEL");
   //
-  app.add_option("--log_mode,-o", log_mode,
-                 "log_level, One of stdout, stderr, syslog, or disabled.")
+  app.add_option("--log_mode,--log-mode,-o", log_mode,
+                 "One of stdout, stderr, syslog, or disabled.")
       ->default_val("stdout")
       ->group("Debug options")
       ->envname("DD_PROFILING_NATIVE_LOG_MODE");
   //
-  app.add_flag("--show_config", show_config, "Display the configuration.")
+  app.add_flag("--show_config,--show-config", show_config,
+               "Display the configuration.")
       ->default_val(false)
       ->group("Debug options");
   //
-  app.add_option("--internal_stats,-b", internal_stats,
+  app.add_option("--internal_stats,--internal-stats,-b", internal_stats,
                  "Enables statsd metrics for " MYNAME ". Value should point "
                  "to a statsd socket.\n"
                  "Example: /var/run/datadog-agent/statsd.sock")
       ->group("Debug options")
       ->envname("DD_PROFILING_INTERNAL_STATS");
 
-  app.add_flag("--show_samples", show_samples,
+  app.add_flag("--show_samples,--show-samples", show_samples,
                "Display captured samples as logs.\n")
       ->group("Debug options");
   app.add_flag("--version,-v", version, "Display the profiler's version.\n")
@@ -255,7 +258,7 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       ->default_val(true)
       ->envname("DD_PROFILING_ENABLED")
       ->group("Debug options");
-  app.add_option("--capture_config", capture_config,
+  app.add_option("--capture_config,--capture-config", capture_config,
                  "Capture the current configuration to a file.\n"
                  "You can then give this configuration through --config.\n")
       ->group("Debug options");
@@ -264,31 +267,32 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
   std::vector<CLI::Option *> extended_options;
   extended_options.push_back(
       app.add_option(
-             "--worker_period", worker_period,
+             "--worker_period,--worker-period", worker_period,
              "Period at which the profiler resets it's internal state.\n"
              "The unit is the number of exports (so default is ~4 hours)")
           ->default_val(k_default_worker_period)
           ->group(""));
 
   extended_options.push_back(
-      app.add_option("--api_key", exporter_input.api_key,
+      app.add_option("--api_key,--api-key", exporter_input.api_key,
                      "A debug option to work without the Datadog agent.\n")
           ->group("")
           ->envname("DD_API_KEY"));
 
   extended_options.push_back(
-      app.add_option("--cpu_affinity", cpu_affinity,
+      app.add_option("--cpu_affinity,--cpu-affinity", cpu_affinity,
                      "Hexadecimal value of the cpu affinity"
                      " eg: 0xa4")
           ->group(""));
 
   extended_options.push_back(
-      app.add_option("--do_export", exporter_input.do_export,
+      app.add_option("--do_export,--do-export", exporter_input.do_export,
                      "Debug flag to prevent exporting the profiles")
           ->default_val(true)
           ->group(""));
   extended_options.push_back(
-      app.add_option("--debug_pprof_prefix", exporter_input.debug_pprof_prefix,
+      app.add_option("--debug_pprof_prefix,--debug-pprof-prefix",
+                     exporter_input.debug_pprof_prefix,
                      "Prefix path to capture pprof files locally")
           ->group("")
           ->envname("DD_PROFILING_PPROF_PREFIX"));
@@ -296,13 +300,15 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       app.add_option("--agentless", exporter_input.agentless,
                      "Allow sending profiles directly to Datadog intake")
           ->group(""));
-  extended_options.push_back(
-      app.add_option("--fault_info", fault_info, "Log segfault information")
-          ->default_val(true)
-          ->group(""));
-  extended_options.push_back(
-      app.add_flag("--help_extended", help_extended, "Show extended options")
-          ->group(""));
+  extended_options.push_back(app.add_option("--fault_info,--fault-info",
+                                            fault_info,
+                                            "Log segfault information")
+                                 ->default_val(true)
+                                 ->group(""));
+  extended_options.push_back(app.add_flag("--help_extended,--help-extended",
+                                          help_extended,
+                                          "Show extended options")
+                                 ->group(""));
   extended_options.push_back(
       app.add_option(
              "--socket", socket_path,
@@ -315,7 +321,8 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
                      "spawned the profiler")
           ->group(""));
   extended_options.push_back(
-      app.add_option("--stack_sample_size", default_stack_sample_size,
+      app.add_option("--stack_sample_size,--stack-sample-size",
+                     default_stack_sample_size,
                      "Sample size for the user's stack."
                      "This setting can help with truncated stack traces."
                      "Maximum value is 65528 (<USHORT_MAX and 8Bytes aligned).")
@@ -325,7 +332,8 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
           ->check(SampleStackSizeValidator()));
   extended_options.push_back(
       app.add_option<std::chrono::milliseconds, unsigned>(
-             "--initial-loaded-libs-check-delay",
+             "--initial-loaded-libs-check-delay,--initial_loaded_libs_check_"
+             "delay",
              initial_loaded_libs_check_delay,
              "Initial delay (ms) before check for newly loaded libs.")
           ->default_val(static_cast<std::chrono::milliseconds>(
@@ -336,7 +344,8 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
           ->group(""));
   extended_options.push_back(
       app.add_option<std::chrono::milliseconds, unsigned>(
-             "--loaded-libs-check-interval", loaded_libs_check_interval,
+             "--loaded-libs-check-interval,--loaded_libs_check_interval",
+             loaded_libs_check_interval,
              "Interval (ms) between checks for newly loaded libs.")
           ->default_val(static_cast<std::chrono::milliseconds>(
                             k_default_loaded_libs_check_interval)
@@ -345,19 +354,19 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
           ->envname("DD_PROFILING_LOADED_LIBS_CHECK_INTERVAL")
           ->group(""));
 
-  extended_options.push_back(app.add_flag("--remote-symbolization",
-                                          remote_symbolization,
-                                          "Enable remote symbolization")
-                                 ->default_val(false)
-                                 ->envname("DD_PROFILING_REMOTE_SYMBOLIZATION")
-                                 ->group(""));
+  extended_options.push_back(
+      app.add_flag("--remote-symbolization,--remote_symbolization",
+                   remote_symbolization, "Enable remote symbolization")
+          ->default_val(false)
+          ->envname("DD_PROFILING_REMOTE_SYMBOLIZATION")
+          ->group(""));
 
-  extended_options.push_back(app.add_flag("--disable-symbolization",
-                                          disable_symbolization,
-                                          "Disable symbolization")
-                                 ->default_val(false)
-                                 ->envname("DD_PROFILING_DISABLE_SYMBOLIZATION")
-                                 ->group(""));
+  extended_options.push_back(
+      app.add_flag("--disable-symbolization,--disable_symbolization",
+                   disable_symbolization, "Disable symbolization")
+          ->default_val(false)
+          ->envname("DD_PROFILING_DISABLE_SYMBOLIZATION")
+          ->group(""));
 
   extended_options.push_back(
       app.add_flag("--reorder-events,!--no-reorder-events", reorder_events,
