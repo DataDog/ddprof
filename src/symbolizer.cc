@@ -25,7 +25,7 @@ int Symbolizer::remove_unvisited() {
   // Remove all unvisited blaze_symbolizer instances from the map
   const auto count = std::erase_if(_symbolizer_map, [](const auto &item) {
     auto const &[key, blaze_symbolizer_wrapper] = item;
-    return !blaze_symbolizer_wrapper._visited;
+    return !blaze_symbolizer_wrapper.visited;
   });
   return count;
 }
@@ -33,8 +33,22 @@ int Symbolizer::remove_unvisited() {
 void Symbolizer::reset_unvisited_flag() {
   // Reset visited flag for the remaining entries
   for (auto &item : _symbolizer_map) {
-    item.second._visited = false;
+    item.second.visited = false;
   }
+}
+
+Symbolizer::BlazeSymbolizerWrapper &
+Symbolizer::get_symbolizer(FileInfoId_t file_id, const std::string &elf_src) {
+  ;
+  if (auto it = _symbolizer_map.find(file_id); it != _symbolizer_map.end()) {
+    return it->second;
+  }
+  auto [it, inserted] = _symbolizer_map.emplace(
+      file_id, BlazeSymbolizerWrapper(elf_src, inlined_functions));
+  DDPROF_DCHECK_FATAL(inserted, "Unable to insert symbolizer object");
+  auto &symbolizer_wrapper = it->second;
+  symbolizer_wrapper.visited = true;
+  return symbolizer_wrapper;
 }
 
 DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
@@ -45,49 +59,38 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
                                   std::span<ddog_prof_Location> locations,
                                   unsigned &write_index,
                                   BlazeResultsWrapper &results) {
-  blaze_symbolizer *symbolizer = nullptr;
-  if (elf_addrs.size() != process_addrs.size()) {
+  if (elf_addrs.size() != process_addrs.size() || elf_addrs.empty() ||
+      elf_src.empty()) {
     LG_WRN("Error in provided addresses when symbolizing pprofs");
     return ddres_warn(DD_WHAT_PPROF); // or some other error handling
   }
-  if (elf_addrs.empty() || elf_src.empty()) {
-    return ddres_warn(DD_WHAT_PPROF); // or some other error handling
-  }
-  ddprof::HeterogeneousLookupStringMap<std::string> *demangled_names = nullptr;
-  bool retry_symbolization = true;
-  bool use_debug = true;
-  const blaze_result *blaze_res = nullptr;
-  while (retry_symbolization && !_disable_symbolization) {
-    const auto it = _symbolizer_map.find(file_id);
-    const char *resolved_src = elf_src.c_str();
-    // This is to avoid we change the path at every call (for different pids)
-    // The cache takes into account the first path given
-    if (it != _symbolizer_map.end()) {
-      resolved_src = it->second._elf_src.c_str();
-      symbolizer = it->second._symbolizer.get();
-      it->second._visited = true;
-      demangled_names = &(it->second._demangled_names);
-      retry_symbolization = false;
-      use_debug = it->second._use_debug;
-    } else {
-      auto pair = _symbolizer_map.emplace(
-          file_id,
-          BlazeSymbolizerWrapper(elf_src, inlined_functions, use_debug));
-      DDPROF_DCHECK_FATAL(pair.second, "Unable to insert symbolizer object");
-      symbolizer = pair.first->second._symbolizer.get();
-      demangled_names = &(pair.first->second._demangled_names);
-    }
-    // Initialize the src_elf structure
-    const blaze_symbolize_src_elf src_elf{
+
+  if (!_disable_symbolization) {
+    auto &symbolizer_wrapper = get_symbolizer(file_id, elf_src);
+
+    blaze_symbolize_src_elf src_elf{
         .type_size = sizeof(blaze_symbolize_src_elf),
-        .path = resolved_src,
-        .debug_syms = use_debug,
+        .path = symbolizer_wrapper.elf_src.c_str(),
+        .debug_syms = symbolizer_wrapper.use_debug,
         .reserved = {},
     };
 
     // Symbolize the addresses
-    blaze_res = blaze_symbolize_elf_virt_offsets(
-        symbolizer, &src_elf, elf_addrs.data(), elf_addrs.size());
+    const auto *blaze_res = blaze_symbolize_elf_virt_offsets(
+        symbolizer_wrapper.symbolizer.get(), &src_elf, elf_addrs.data(),
+        elf_addrs.size());
+    if (!blaze_res && symbolizer_wrapper.use_debug) {
+      // Symbolization failed, retry without using debug symbols
+      // blazesym curently does not support compressed debug sections:
+      // cf. https://github.com/libbpf/blazesym/issues/581
+      LG_NTC("Unable to symbolize with debug symbols, retrying for %s",
+             elf_src.c_str());
+      symbolizer_wrapper.use_debug = false;
+      src_elf.debug_syms = false;
+      blaze_res = blaze_symbolize_elf_virt_offsets(
+          symbolizer_wrapper.symbolizer.get(), &src_elf, elf_addrs.data(),
+          elf_addrs.size());
+    }
     if (blaze_res) {
       DDPROF_DCHECK_FATAL(blaze_res->cnt == elf_addrs.size(),
                           "Symbolizer: Mismatch between size of returned "
@@ -100,31 +103,20 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
         // Update the location
         DDRES_CHECK_FWD(write_location_blaze(
             _reported_addr_format == k_elf ? elf_addrs[i] : process_addrs[i],
-            (*demangled_names), map_info, *cur_sym, write_index, locations));
+            symbolizer_wrapper.demangled_names, map_info, *cur_sym, write_index,
+            locations));
       }
-    } else if (retry_symbolization && use_debug) {
-      LG_NTC("Unable to symbolize with debug symbols, retrying for %s",
-             elf_src.c_str());
-      _symbolizer_map.erase(file_id);
-      use_debug = false;
-      continue;
+      return {};
     }
-    retry_symbolization = false;
   }
+
   // Handle the case of no blaze result
   // This can happen when file descriptors are exhausted
   // OR symbolization is disabled
-  if (!blaze_res) {
-    if (_reported_addr_format == k_elf) {
-      for (auto el : elf_addrs) {
-        write_location_no_sym(el, map_info, &locations[write_index++]);
-      }
-    } else {
-      for (auto el : process_addrs) {
-        write_location_no_sym(el, map_info, &locations[write_index++]);
-      }
-    }
+  for (auto el : (_reported_addr_format == k_elf) ? elf_addrs : process_addrs) {
+    write_location_no_sym(el, map_info, &locations[write_index++]);
   }
+
   return {};
 }
 } // namespace ddprof

@@ -103,7 +103,7 @@ private:
   };
 
   struct BlazeSymbolizerWrapper {
-    static blaze_symbolizer_opts create_opts_with_debug(bool inlined_fns) {
+    static blaze_symbolizer_opts create_opts(bool inlined_fns) {
       return blaze_symbolizer_opts{.type_size = sizeof(blaze_symbolizer_opts),
                                    .auto_reload = false,
                                    .code_info = true,
@@ -111,27 +111,21 @@ private:
                                    .demangle = false,
                                    .reserved = {}};
     }
-    static blaze_symbolizer_opts create_opts_no_debug() {
-      return blaze_symbolizer_opts{.type_size = sizeof(blaze_symbolizer_opts),
-                                   .auto_reload = false,
-                                   .code_info = false,
-                                   .inlined_fns = false,
-                                   .demangle = false,
-                                   .reserved = {}};
-    }
-    explicit BlazeSymbolizerWrapper(std::string elf_src, bool inlined_fns,
-                                    bool use_debug = true)
-        : opts(use_debug ? create_opts_with_debug(inlined_fns)
-                         : create_opts_no_debug()),
-          _symbolizer(blaze_symbolizer_new_opts(&opts)),
-          _elf_src(std::move(elf_src)), _use_debug(use_debug) {}
+    explicit BlazeSymbolizerWrapper(std::string elf_src, bool inlined_fns)
+        : opts(create_opts(inlined_fns)),
+          symbolizer(blaze_symbolizer_new_opts(&opts)),
+          elf_src(std::move(elf_src)) {}
+
     blaze_symbolizer_opts opts;
-    std::unique_ptr<blaze_symbolizer, BlazeSymbolizerDeleter> _symbolizer;
-    ddprof::HeterogeneousLookupStringMap<std::string> _demangled_names;
-    std::string _elf_src;
-    bool _visited{true};
-    bool _use_debug;
+    std::unique_ptr<blaze_symbolizer, BlazeSymbolizerDeleter> symbolizer;
+    ddprof::HeterogeneousLookupStringMap<std::string> demangled_names;
+    std::string elf_src;
+    bool visited{true};
+    bool use_debug{true};
   };
+
+  BlazeSymbolizerWrapper &get_symbolizer(FileInfoId_t file_id,
+                                         const std::string &elf_src);
 
   std::unordered_map<FileInfoId_t, BlazeSymbolizerWrapper> _symbolizer_map;
   bool inlined_functions;
