@@ -19,7 +19,7 @@ Options:
                               The name of the profiled service. Profiles are grouped by service.
   -E,--environment TEXT (Env:DD_ENV)
                               The name of the environment to use in the Datadog UI.
-  -V,--service_version TEXT (Env:DD_VERSION)
+  -V,--service_version,--service-version TEXT (Env:DD_VERSION)
                               Version of the service being profiled.
   -U,--url TEXT (Env:DD_TRACE_AGENT_URL)
                               A <hostname>:<port> URL.  Either <hostname>:<port>, http://<hostname>:<port>
@@ -44,14 +44,14 @@ Profiling settings:
   -g,--global Excludes: command_line --pid
                               Instrument all processes.
                               Requires specific capabilities or a perf_event_paranoid value of less than 1.
-  -I,--inlined_functions BOOLEAN [0] 
+  -I,--inlined_functions,--inlined-functions BOOLEAN [0] 
                               Report inlined functions in call stacks.
                               This is possible if debug sections are available.
                               This can have performance impacts for the profiler.
   -t,--timeline (Env:DD_PROFILING_TIMELINE_ENABLE)
                               Enables Timeline view in the Datadog UI.
                               Works by adding timestmaps to certain events.
-  -u,--upload_period UINT [59]  (Env:DD_PROFILING_UPLOAD_PERIOD)
+  -u,--upload_period,--upload-period UINT [59]  (Env:DD_PROFILING_UPLOAD_PERIOD)
                               Upload period for profiles (in seconds).
                               
   -e,--event TEXT ... (Env:DD_PROFILING_NATIVE_EVENTS)
@@ -67,7 +67,8 @@ Profiling settings:
 
 
 Advanced settings:
-  --switch_user TEXT          Run my application with a different user.
+  --switch_user,--switch-user TEXT
+                              Run my application with a different user.
                               
   --nice INT                  Niceness (priority of process) for the profiler.
                               Higher value means nicer (lower priority).
@@ -77,15 +78,17 @@ Advanced settings:
 
 
 Debug options:
-  -l,--log_level TEXT:{debug,informational,notice,warn,error} [error]  (Env:DD_PROFILING_NATIVE_LOG_LEVEL)
+  -l,--log_level,--log-level TEXT:{debug,informational,notice,warn,error} [error]  (Env:DD_PROFILING_NATIVE_LOG_LEVEL)
                               One of debug, informational, notice, warn, error.
-  -o,--log_mode TEXT [stdout]  (Env:DD_PROFILING_NATIVE_LOG_MODE)
-                              log_level, One of stdout, stderr, syslog, or disabled.
-  --show_config [0]           Display the configuration.
-  -b,--internal_stats TEXT (Env:DD_PROFILING_INTERNAL_STATS)
+  -o,--log_mode,--log-mode TEXT [stdout]  (Env:DD_PROFILING_NATIVE_LOG_MODE)
+                              One of stdout, stderr, syslog, or disabled.
+  --show_config,--show-config [0] 
+                              Display the configuration.
+  -b,--internal_stats,--internal-stats TEXT (Env:DD_PROFILING_INTERNAL_STATS)
                               Enables statsd metrics for ddprof. Value should point to a statsd socket.
                               Example: /var/run/datadog-agent/statsd.sock
-  --show_samples              Display captured samples as logs.
+  --show_samples,--show-samples
+                              Display captured samples as logs.
                               
   -v,--version                Display the profiler's version.
                               
@@ -93,7 +96,8 @@ Debug options:
                               Option to disable the profiler.
                               The profiler then acts as a passthrough.
                               
-  --capture_config TEXT       Capture the current configuration to a file.
+  --capture_config,--capture-config TEXT
+                              Capture the current configuration to a file.
                               You can then give this configuration through --config.
                               
 
