@@ -207,14 +207,12 @@ if(USE_LOADER)
 endif()
 
 set(DD_PROFILING_SOURCES
-    # cmake-format: sortable
     src/daemonize.cc
     src/ddprof_cmdline.cc
     src/ddres_list.cc
     src/ipc.cc
     src/lib/address_bitset.cc
     src/lib/allocation_tracker.cc
-    src/lib/dd_profiling.cc
     src/lib/elfutils.cc
     src/lib/lib_embedded_data.c
     src/lib/pthread_fixes.cc
@@ -234,7 +232,10 @@ set(DD_PROFILING_SOURCES
     src/sys_utils.cc
     src/tracepoint_config.cc
     src/tsc_clock.cc
-    src/user_override.cc)
+    src/user_override.cc
+    # Intentionally put dd_profiling.cc last to avoid leak sanitizer failure complaining that memory
+    # in LoggerContext::name is not freed
+    src/lib/dd_profiling.cc)
 
 if(BUILD_UNIVERSAL_DDPROF)
   # Compiling on different libc, we need to ensure some symbols are available everywhere
