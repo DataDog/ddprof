@@ -213,6 +213,9 @@ DDRes ddprof_exporter_init(const ExporterInput &exporter_input,
       // check if schema is already available
       if (strstr(exporter_input.url.c_str(), "://") != nullptr) {
         exporter->_url = alloc_url_agent("", exporter_input.url, port_str);
+      } else if (exporter_input.url[0] == '/') {
+        // Starts with a '/', assume unix domain socket
+        exporter->_url = alloc_url_agent("unix://", exporter_input.url, {});
       } else {
         // not available, assume http
         exporter->_url =
@@ -273,7 +276,8 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
     exporter->_exporter = res_exporter.ok;
   } else {
     defer { ddog_Error_drop(&res_exporter.err); };
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failure creating exporter - %s",
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failure creating exporter - %.*s",
+                           static_cast<int>(res_exporter.err.message.len),
                            res_exporter.err.message.ptr);
   }
   return {};

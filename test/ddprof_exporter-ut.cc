@@ -123,6 +123,14 @@ TEST(DDProfExporter, url) {
   EXPECT_TRUE(IsDDResOK(res));
   EXPECT_EQ(exporter._url, "unix:///some/uds/socket.sock");
   ddprof_exporter_free(&exporter);
+
+  // UDS --> starts with a '/'
+  fill_mock_exporter_input(exporter_input, url, false);
+  exporter_input.url = "/some/uds/socket.sock";
+  res = ddprof_exporter_init(exporter_input, &exporter);
+  EXPECT_TRUE(IsDDResOK(res));
+  EXPECT_EQ(exporter._url, "unix:///some/uds/socket.sock");
+  ddprof_exporter_free(&exporter);
 }
 
 TEST(DDProfExporter, simple) {
