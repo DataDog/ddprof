@@ -247,30 +247,21 @@ DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
 }
 } // namespace
 
-DDRes unwind_init_dwfl(UnwindState *us) {
-  us->_dwfl_wrapper = us->dwfl_hdr.get_or_insert(us->pid);
-  if (!us->_dwfl_wrapper) {
+DDRes unwind_init_dwfl(Process &process, UnwindState *us) {
+  us->_dwfl_wrapper = process.get_or_insert_dwfl();
+  if (us->_dwfl_wrapper) {
     return ddres_warn(DD_WHAT_UW_MAX_PIDS);
   }
   if (us->_dwfl_wrapper->_attached) {
     return {};
   }
 
-  static const Dwfl_Thread_Callbacks dwfl_callbacks = {
-      .next_thread = next_thread,
-      .get_thread = nullptr,
-      .memory_read = memory_read_dwfl,
-      .set_initial_registers = set_initial_registers,
-      .detach = nullptr,
-      .thread_detach = nullptr,
-  };
-
   // Creates the dwfl unwinding backend
-  return us->_dwfl_wrapper->attach(us->pid, &dwfl_callbacks, us);
+  return us->_dwfl_wrapper->attach(us->pid, us);
 }
 
-DDRes unwind_dwfl(UnwindState *us) {
-  DDRes res = unwind_init_dwfl(us);
+DDRes unwind_dwfl(Process &process, UnwindState *us) {
+  DDRes res = unwind_init_dwfl(process, us);
   if (!IsDDResOK(res)) {
     LOG_ERROR_DETAILS(LG_DBG, res._what);
     return res;

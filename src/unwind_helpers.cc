@@ -221,7 +221,6 @@ bool memory_read(ProcessAddress_t addr, ElfWord_t *result, int regno,
 void add_error_frame(const Dso *dso, UnwindState *us,
                      [[maybe_unused]] ProcessAddress_t pc,
                      SymbolErrors error_case) {
-  ddprof_stats_add(STATS_UNWIND_ERRORS, 1, nullptr);
   if (dso) {
 // #define ADD_ADDR_IN_SYMB // creates more elements (but adds info on
 //  addresses)

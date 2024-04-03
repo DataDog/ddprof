@@ -90,6 +90,24 @@ function(add_benchmark name)
   disable_clangtidy(${name})
 endfunction()
 
+set(UNWINDING_SRC
+    ../src/base_frame_symbol_lookup.cc
+    ../src/common_mapinfo_lookup.cc
+    ../src/common_symbol_lookup.cc
+    ../src/container_id.cc
+    ../src/ddprof_process.cc
+    ../src/ddprof_module_lib.cc
+    ../src/dso.cc
+    ../src/dso_hdr.cc
+    ../src/dso_symbol_lookup.cc
+    ../src/dwfl_hdr.cc
+    ../src/dwfl_thread_callbacks.cc
+    ../src/procutils.cc
+    ../src/signal_helper.cc
+    ../src/unwind_helpers.cc
+    ../src/user_override.cc
+    ../src/build_id.cc)
+
 # Definition of unit tests
 add_compile_definitions("UNIT_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 
@@ -209,15 +227,9 @@ target_include_directories(tags-ut PRIVATE ${DOGFOOD_INCLUDE_DIR})
 add_unit_test(
   dwfl_module-ut
   dwfl_module-ut.cc
-  ../src/build_id.cc
-  ../src/dwfl_hdr.cc
-  ../src/ddprof_module_lib.cc
+  ${UNWINDING_SRC}
   ../src/demangler/demangler.cc
-  ../src/dso.cc
-  ../src/dso_hdr.cc
   ../src/failed_assumption.cc
-  ../src/procutils.cc
-  ../src/signal_helper.cc
   ../src/user_override.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle Datadog::Profiling
   DEFINITIONS MYNAME="dwfl_module-ut")
@@ -355,8 +367,9 @@ add_unit_test(tracepoint_config-ut tracepoint_config-ut.cc ../src/tracepoint_con
 
 add_unit_test(live_allocation-ut live_allocation-ut.cc ../src/live_allocation.cc)
 
-add_unit_test(ddprof_process-ut ddprof_process-ut.cc ../src/container_id.cc
-              ../src/ddprof_process.cc)
+add_unit_test(ddprof_process-ut ddprof_process-ut.cc
+              ${UNWINDING_SRC}
+              LIBRARIES ${ELFUTILS_LIBRARIES})
 
 add_unit_test(glibc_fixes-ut glibc_fixes-ut.cc ../src/lib/glibc_fixes.c LIBRARIES pthread)
 

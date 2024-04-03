@@ -5,14 +5,15 @@
 
 #pragma once
 
+#include "ddprof_process.hpp"
 #include "ddres_def.hpp"
 
 namespace ddprof {
 
 struct UnwindState;
 
-DDRes unwind_init_dwfl(UnwindState *us);
+DDRes unwind_init_dwfl(Process &process, UnwindState *us);
 
-DDRes unwind_dwfl(UnwindState *us);
+DDRes unwind_dwfl(Process &process, UnwindState *us);
 
 } // namespace ddprof

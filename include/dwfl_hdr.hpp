@@ -11,12 +11,14 @@
 #include "ddres.hpp"
 #include "dso.hpp"
 #include "dso_hdr.hpp"
-#include "dwfl_internals.hpp"
 
 #include <sys/types.h>
 #include <unordered_map>
 #include <unordered_set>
 
+extern "C" {
+struct Dwfl;
+}
 namespace ddprof {
 
 struct UnwindState;
@@ -34,8 +36,7 @@ struct DwflWrapper {
   DwflWrapper(const DwflWrapper &other) = delete;            // avoid copy
   DwflWrapper &operator=(const DwflWrapper &other) = delete; // avoid copy
 
-  DDRes attach(pid_t pid, const Dwfl_Thread_Callbacks *callbacks,
-               UnwindState *us);
+  DDRes attach(pid_t pid, UnwindState *us);
 
   // unsafe get don't check ranges
   DDProfMod *unsafe_get(FileInfoId_t file_info_id);
@@ -62,9 +63,6 @@ struct DwflWrapper {
 class DwflHdr {
 public:
   // checks against maximum number of PIDs
-  DwflWrapper *get_or_insert(pid_t pid);
-  std::vector<pid_t> get_unvisited() const;
-  void reset_unvisited();
   void clear_pid(pid_t pid);
 
   // get number of accessed modules
@@ -73,7 +71,6 @@ public:
 
 private:
   std::unordered_map<pid_t, DwflWrapper> _dwfl_map;
-  std::unordered_set<pid_t> _visited_pid;
 };
 
 } // namespace ddprof

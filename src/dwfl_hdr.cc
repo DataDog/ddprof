@@ -10,6 +10,9 @@
 #include "defer.hpp"
 #include "logger.hpp"
 #include "unwind_state.hpp"
+#include "dwfl_internals.hpp"
+#include "dwfl_thread_callbacks.hpp"
+#include "dwfl_internals.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -36,32 +39,24 @@ DwflWrapper::DwflWrapper() {
 
 DwflWrapper::~DwflWrapper() { dwfl_end(_dwfl); }
 
-DDRes DwflWrapper::attach(pid_t pid, const Dwfl_Thread_Callbacks *callbacks,
-                          UnwindState *us) {
+DDRes DwflWrapper::attach(pid_t pid, UnwindState *us) {
   if (_attached) {
     return {};
   }
 
-  if (!dwfl_attach_state(_dwfl, us->ref_elf.get(), pid, callbacks, us)) {
+  static const Dwfl_Thread_Callbacks callbacks = {
+      .next_thread = next_thread,
+      .get_thread = nullptr,
+      .memory_read = memory_read_dwfl,
+      .set_initial_registers = set_initial_registers,
+      .detach = nullptr,
+      .thread_detach = nullptr,
+  };
+  if (!dwfl_attach_state(_dwfl, us->ref_elf.get(), pid, &callbacks, us)) {
     return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
   }
   _attached = true;
   return {};
-}
-
-DwflWrapper *DwflHdr::get_or_insert(pid_t pid) {
-  _visited_pid.insert(pid);
-  auto it = _dwfl_map.find(pid);
-  if (it == _dwfl_map.end()) {
-    if (_dwfl_map.size() >= kMaxProfiledPids) {
-      return nullptr;
-    }
-    // insert new dwfl for this pid
-    auto pair = _dwfl_map.emplace(pid, DwflWrapper());
-    assert(pair.second); // expect insertion to be OK
-    return &pair.first->second;
-  }
-  return &it->second;
 }
 
 DDProfMod *DwflWrapper::unsafe_get(FileInfoId_t file_info_id) {
@@ -87,22 +82,6 @@ DDRes DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
   *mod = &_ddprof_mods.insert_or_assign(fileInfoValue.get_id(), new_mod)
               .first->second;
   return res;
-}
-
-std::vector<pid_t> DwflHdr::get_unvisited() const {
-  std::vector<pid_t> pids_remove;
-  for (const auto &el : _dwfl_map) {
-    if (_visited_pid.find(el.first) == _visited_pid.end()) {
-      // clear this element as it was not visited
-      pids_remove.push_back(el.first);
-    }
-  }
-  return pids_remove;
-}
-
-void DwflHdr::reset_unvisited() {
-  // clear the list of visited for next cycle
-  _visited_pid.clear();
 }
 
 int DwflHdr::get_nb_mod() const {

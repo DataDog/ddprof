@@ -35,8 +35,8 @@ void find_dso_add_error_frame(DDRes ddres, UnwindState *us) {
   }
 }
 
-void add_container_id(UnwindState *us) {
-  auto container_id = us->process_hdr.get_container_id(us->pid);
+void add_container_id(Process &process, UnwindState *us) {
+  auto container_id = process.get_container_id();
   if (container_id) {
     us->output.container_id = *container_id;
   }
@@ -59,10 +59,12 @@ void unwind_init_sample(UnwindState *us, const uint64_t *sample_regs,
 
 DDRes unwindstate_unwind(UnwindState *us) {
   DDRes res = ddres_init();
+  Process &process = us->process_hdr.get(us->pid);
   if (us->pid != 0) { // we can not unwind pid 0
-    res = unwind_dwfl(us);
+    res = unwind_dwfl(process, us);
   }
   if (IsDDResNotOK(res)) {
+    ddprof_stats_add(STATS_UNWIND_ERRORS, 1, nullptr);
     find_dso_add_error_frame(res, us);
   }
   ddprof_stats_add(STATS_UNWIND_AVG_STACK_DEPTH, us->output.locs.size(),
@@ -70,7 +72,7 @@ DDRes unwindstate_unwind(UnwindState *us) {
 
   // Add a frame that identifies executable to which these belong
   add_virtual_base_frame(us);
-  add_container_id(us);
+  add_container_id(process, us);
   return res;
 }
 

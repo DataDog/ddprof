@@ -315,11 +315,11 @@ DDRes worker_pid_free(DDProfContext &ctx, pid_t el) {
 
 DDRes clear_unvisited_pids(DDProfContext &ctx) {
   UnwindState *us = ctx.worker_ctx.us;
-  const std::vector<pid_t> pids_remove = us->dwfl_hdr.get_unvisited();
+  const std::vector<pid_t> pids_remove = us->process_hdr.get_unvisited();
   for (pid_t const el : pids_remove) {
     DDRES_CHECK_FWD(worker_pid_free(ctx, el));
   }
-  us->dwfl_hdr.reset_unvisited();
+  us->process_hdr.reset_unvisited();
   return {};
 }
 
