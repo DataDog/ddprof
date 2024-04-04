@@ -38,10 +38,9 @@ public:
 
   uint64_t increment_counter() { return ++_sample_counter; }
 
-  DwflWrapper *get_or_insert_dwfl();
-  DwflWrapper *get_dwfl();
-  const DwflWrapper *get_dwfl() const;
-
+  [[nodiscard]] DwflWrapper *get_or_insert_dwfl();
+  [[nodiscard]] DwflWrapper *get_dwfl();
+  [[nodiscard]] const DwflWrapper *get_dwfl() const;
 private:
   static std::string format_cgroup_file(pid_t pid,
                                         std::string_view path_to_proc);

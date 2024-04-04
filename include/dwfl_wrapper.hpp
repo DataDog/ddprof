@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "create_elf.hpp"
 #include "ddprof_defs.hpp"
 #include "ddprof_file_info.hpp"
 #include "ddprof_module.hpp"
@@ -34,7 +35,7 @@ struct DwflWrapper {
   DwflWrapper(const DwflWrapper &other) = delete;            // avoid copy
   DwflWrapper &operator=(const DwflWrapper &other) = delete; // avoid copy
 
-  DDRes attach(pid_t pid, UnwindState *us);
+  DDRes attach(pid_t pid, const UniqueElf &ref_elf, UnwindState *us);
 
   // unsafe get don't check ranges
   DDProfMod *unsafe_get(FileInfoId_t file_info_id);

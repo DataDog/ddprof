@@ -249,15 +249,11 @@ DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
 
 DDRes unwind_init_dwfl(Process &process, UnwindState *us) {
   us->_dwfl_wrapper = process.get_or_insert_dwfl();
-  if (us->_dwfl_wrapper) {
-    return ddres_warn(DD_WHAT_UW_MAX_PIDS);
+  if (!us->_dwfl_wrapper) {
+    return ddres_warn(DD_WHAT_UW_ERROR);
   }
-  if (us->_dwfl_wrapper->_attached) {
-    return {};
-  }
-
   // Creates the dwfl unwinding backend
-  return us->_dwfl_wrapper->attach(us->pid, us);
+  return us->_dwfl_wrapper->attach(us->pid, us->ref_elf, us);
 }
 
 DDRes unwind_dwfl(Process &process, UnwindState *us) {

@@ -20,7 +20,15 @@
 
 namespace ddprof {
 
-DwflWrapper::DwflWrapper() {
+DwflWrapper::DwflWrapper() = default;
+
+DwflWrapper::~DwflWrapper() { dwfl_end(_dwfl); }
+
+DDRes DwflWrapper::attach(pid_t pid, const UniqueElf &ref_elf,
+                          UnwindState *us) {
+  if (_attached) {
+    return {};
+  }
   // for split debug, we can fill the debuginfo_path
   static const Dwfl_Callbacks proc_callbacks = {
       .find_elf = dwfl_linux_proc_find_elf,
@@ -31,16 +39,8 @@ DwflWrapper::DwflWrapper() {
 
   _dwfl = dwfl_begin(&proc_callbacks);
   if (!_dwfl) {
-    LG_WRN("dwfl_begin was zero (%s)", dwfl_errmsg(-1));
-    throw DDException(ddres_error(DD_WHAT_DWFL_LIB_ERROR));
-  }
-} // namespace ddprof
-
-DwflWrapper::~DwflWrapper() { dwfl_end(_dwfl); }
-
-DDRes DwflWrapper::attach(pid_t pid, UnwindState *us) {
-  if (_attached) {
-    return {};
+    DDRES_RETURN_WARN_LOG(DD_WHAT_DWFL_LIB_ERROR, "dwfl_begin failure (%s)",
+                          dwfl_errmsg(-1));
   }
 
   static const Dwfl_Thread_Callbacks callbacks = {
@@ -51,7 +51,7 @@ DDRes DwflWrapper::attach(pid_t pid, UnwindState *us) {
       .detach = nullptr,
       .thread_detach = nullptr,
   };
-  if (!dwfl_attach_state(_dwfl, us->ref_elf.get(), pid, &callbacks, us)) {
+  if (!dwfl_attach_state(_dwfl, ref_elf.get(), pid, &callbacks, us)) {
     return ddres_warn(DD_WHAT_DWFL_LIB_ERROR);
   }
   _attached = true;
@@ -69,7 +69,10 @@ DDProfMod *DwflWrapper::unsafe_get(FileInfoId_t file_info_id) {
 DDRes DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
                                 const FileInfoValue &fileInfoValue,
                                 DDProfMod **mod) {
-
+  if (!_attached) {
+    DDRES_RETURN_WARN_LOG(DD_WHAT_DWFL_LIB_ERROR, "dwfl not attached to pid %d",
+                          dso._pid);
+  }
   DDProfMod new_mod;
   DDRes res = report_module(_dwfl, pc, dso, fileInfoValue, new_mod);
   _inconsistent = new_mod._status == DDProfMod::kInconsistent;

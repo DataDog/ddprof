@@ -105,6 +105,7 @@ set(PROCESS_SRC
     ../src/procutils.cc
     ../src/signal_helper.cc
     ../src/stack_helper.cc
+    ../src/create_elf.cc
     ../src/user_override.cc
     ../src/build_id.cc)
 
