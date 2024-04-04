@@ -60,9 +60,12 @@ public:
   explicit ProcessHdr(std::string_view path_to_proc = "")
       : _path_to_proc(path_to_proc) {}
   Process &get(pid_t pid);
-  const ContainerId &get_container_id(pid_t pid, bool force = false);
+  const ContainerId &get_container_id(pid_t pid);
   void clear(pid_t pid) { _process_map.erase(pid); }
   std::vector<pid_t> get_unvisited() const;
+  const std::unordered_set<pid_t> &get_visited() const {
+    return _visited_pid;
+  }
   void reset_unvisited();
   void display_stats() const;
 

@@ -319,6 +319,12 @@ DDRes clear_unvisited_pids(DDProfContext &ctx) {
   for (pid_t const el : pids_remove) {
     DDRES_CHECK_FWD(worker_pid_free(ctx, el));
   }
+  const auto &visited_pids = us->process_hdr.get_visited();
+  // some pids might have been visited but not unwound
+  const int nb_cleared = us->dso_hdr.clear_unvisited(visited_pids);
+  if (nb_cleared) {
+    LG_NTC("Cleared %d PIDs in DSO header", nb_cleared);
+  }
   us->process_hdr.reset_unvisited();
   return {};
 }
@@ -595,6 +601,8 @@ void ddprof_pr_mmap(DDProfContext &ctx, const perf_event_mmap2 *map,
               std::string(map->filename), map->ino, map->prot);
   ctx.worker_ctx.us->dso_hdr.maybe_insert_erase_overlap(std::move(new_dso),
                                                         timestamp);
+  // ensure we access the process (to avoid a premature clear)
+  ctx.worker_ctx.us->process_hdr.get(map->pid);
 }
 
 void ddprof_pr_lost(DDProfContext &ctx, const perf_event_lost *lost,
@@ -620,6 +628,8 @@ DDRes ddprof_pr_fork(DDProfContext &ctx, const perf_event_fork *frk,
     // Clear everything and populate at next error or with coming samples
     DDRES_CHECK_FWD(worker_pid_free(ctx, frk->pid));
     ctx.worker_ctx.us->dso_hdr.pid_fork(frk->pid, frk->ppid);
+    // ensure we access the process (to avoid a premature clear)
+    ctx.worker_ctx.us->process_hdr.get(frk->pid);
   }
   return {};
 }

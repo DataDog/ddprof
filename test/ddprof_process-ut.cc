@@ -40,7 +40,7 @@ TEST(DDProfProcess, container_id) {
 TEST(DDProfProcess, simple_pid_2) {
   LogHandle handle;
   ProcessHdr process_hdr(UNIT_TEST_DATA);
-  std::optional<std::string> opt_string = process_hdr.get_container_id(2, true);
+  std::optional<std::string> opt_string = process_hdr.get_container_id(2);
   ASSERT_TRUE(opt_string);
   if (opt_string) {
     LG_DBG("container id %s", opt_string.value().c_str());

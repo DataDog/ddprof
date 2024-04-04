@@ -90,10 +90,7 @@ function(add_benchmark name)
   disable_clangtidy(${name})
 endfunction()
 
-# Define sources
-set(SYMBOL_SRC ../src/base_frame_symbol_lookup.cc ../src/common_mapinfo_lookup.cc
-               ../src/common_symbol_lookup.cc ../src/dso_symbol_lookup.cc)
-
+# Sources tied to the process object
 set(PROCESS_SRC
     ../src/container_id.cc
     ../src/ddprof_process.cc

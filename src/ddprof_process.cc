@@ -90,7 +90,7 @@ DDRes Process::read_cgroup_ns(pid_t pid, std::string_view path_to_proc,
   return {};
 }
 
-const ContainerId &ProcessHdr::get_container_id(pid_t pid, bool force) {
+const ContainerId &ProcessHdr::get_container_id(pid_t pid) {
   Process &p = get(pid);
   return p.get_container_id(_path_to_proc);
 }

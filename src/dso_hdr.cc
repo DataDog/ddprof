@@ -622,4 +622,14 @@ bool DsoHdr::check_invariants() const {
   return true;
 }
 
+int DsoHdr::clear_unvisited(const std::unordered_set<pid_t> &visited_pids) {
+  int nb_cleared = 0;
+  for (const auto &el : _pid_map) {
+    if (visited_pids.find(el.first) == visited_pids.end()) {
+      pid_free(el.first);
+      ++nb_cleared;
+    }
+  }
+  return nb_cleared;
+}
 } // namespace ddprof
