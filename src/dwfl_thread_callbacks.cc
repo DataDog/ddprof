@@ -6,7 +6,7 @@
 #include "dwfl_thread_callbacks.hpp"
 #include "perf_archmap.hpp"
 
-#include "unwind_helpers.hpp"
+#include "stack_helper.hpp"
 #include "unwind_state.hpp"
 
 namespace ddprof {

@@ -46,10 +46,7 @@ struct UnwindState {
     output.clear();
     output.locs.reserve(kMaxStackDepth);
   }
-
-  DwflHdr dwfl_hdr;
   DwflWrapper *_dwfl_wrapper{nullptr}; // pointer to current dwfl element
-
   DsoHdr dso_hdr;
   SymbolHdr symbol_hdr;
   ProcessHdr process_hdr;

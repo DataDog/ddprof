@@ -13,7 +13,7 @@
 #include "runtime_symbol_lookup.hpp"
 #include "symbol_hdr.hpp"
 #include "unique_fd.hpp"
-#include "unwind_helpers.hpp"
+#include "unwind_helper.hpp"
 #include "unwind_state.hpp"
 
 #include <fcntl.h>

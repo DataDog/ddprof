@@ -8,11 +8,10 @@
 #include "ddprof_module_lib.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
-#include "logger.hpp"
-#include "unwind_state.hpp"
 #include "dwfl_internals.hpp"
 #include "dwfl_thread_callbacks.hpp"
-#include "dwfl_internals.hpp"
+#include "logger.hpp"
+#include "unwind_state.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -83,21 +82,5 @@ DDRes DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
               .first->second;
   return res;
 }
-
-int DwflHdr::get_nb_mod() const {
-  int nb_mods = 0;
-  std::for_each(
-      _dwfl_map.begin(), _dwfl_map.end(),
-      [&](std::unordered_map<pid_t, DwflWrapper>::value_type const &el) {
-        nb_mods += el.second._ddprof_mods.size();
-      });
-  return nb_mods;
-}
-
-void DwflHdr::display_stats() const {
-  LG_NTC("DWFL_HDR  | %10s | %d", "NB MODS", get_nb_mod());
-}
-
-void DwflHdr::clear_pid(pid_t pid) { _dwfl_map.erase(pid); }
 
 } // namespace ddprof

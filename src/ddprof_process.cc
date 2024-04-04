@@ -26,7 +26,14 @@ DwflWrapper *Process::get_or_insert_dwfl() {
   return _dwfl_wrapper.get();
 }
 
-DwflWrapper *Process::get_dwfl() const {
+DwflWrapper *Process::get_dwfl() {
+  if (!_dwfl_wrapper) {
+    return nullptr;
+  }
+  return _dwfl_wrapper.get();
+}
+
+const DwflWrapper *Process::get_dwfl() const {
   if (!_dwfl_wrapper) {
     return nullptr;
   }
@@ -98,7 +105,6 @@ Process &ProcessHdr::get(pid_t pid) {
   return it->second;
 }
 
-
 void ProcessHdr::reset_unvisited() {
   // clear the list of visited for next cycle
   _visited_pid.clear();
@@ -116,16 +122,18 @@ std::vector<pid_t> ProcessHdr::get_unvisited() const {
 
 int ProcessHdr::get_nb_mod() const {
   int nb_mods = 0;
-  std::for_each(
-      _process_map.begin(), _process_map.end(),
-      [&](ProcessMap::value_type const &el) {
-        const auto *dwfl = el.second.get_dwfl();
-        if (dwfl) {
-          nb_mods += dwfl->_ddprof_mods.size();
-        }
-      });
+  std::for_each(_process_map.begin(), _process_map.end(),
+                [&](ProcessMap::value_type const &el) {
+                  const auto *dwfl = el.second.get_dwfl();
+                  if (dwfl) {
+                    nb_mods += dwfl->_ddprof_mods.size();
+                  }
+                });
   return nb_mods;
 }
 
+void ProcessHdr::display_stats() const {
+  LG_NTC("DWFL_HDR  | %10s | %d", "NB MODS", get_nb_mod());
+}
 
 } // namespace ddprof

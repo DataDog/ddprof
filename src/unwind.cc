@@ -13,7 +13,7 @@
 #include "signal_helper.hpp"
 #include "symbol_hdr.hpp"
 #include "unwind_dwfl.hpp"
-#include "unwind_helpers.hpp"
+#include "unwind_helper.hpp"
 #include "unwind_metrics.hpp"
 #include "unwind_state.hpp"
 
@@ -78,7 +78,6 @@ DDRes unwindstate_unwind(UnwindState *us) {
 
 void unwind_pid_free(UnwindState *us, pid_t pid) {
   us->dso_hdr.pid_free(pid);
-  us->dwfl_hdr.clear_pid(pid);
   us->symbol_hdr.clear(pid);
   us->process_hdr.clear(pid);
 }
@@ -86,7 +85,7 @@ void unwind_pid_free(UnwindState *us, pid_t pid) {
 void unwind_cycle(UnwindState *us) {
   us->symbol_hdr.display_stats();
   us->symbol_hdr.cycle();
-  us->dwfl_hdr.display_stats();
+  us->process_hdr.display_stats();
   us->dso_hdr.stats().reset();
   unwind_metrics_reset();
 }

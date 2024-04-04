@@ -38,7 +38,9 @@ public:
   uint64_t increment_counter() { return ++_sample_counter; }
 
   DwflWrapper *get_or_insert_dwfl();
-  DwflWrapper *get_dwfl() const;
+  DwflWrapper *get_dwfl();
+  const DwflWrapper *get_dwfl() const;
+
 private:
   static std::string format_cgroup_file(pid_t pid,
                                         std::string_view path_to_proc);
@@ -61,9 +63,12 @@ public:
   const ContainerId &get_container_id(pid_t pid, bool force = false);
   void clear(pid_t pid) { _process_map.erase(pid); }
   std::vector<pid_t> get_unvisited() const;
-  int get_nb_mod() const;
   void reset_unvisited();
+  void display_stats() const;
+
 private:
+  int get_nb_mod() const;
+
   std::unordered_set<pid_t> _visited_pid;
   constexpr static auto k_nb_samples_container_id_lookup = 100;
   using ProcessMap = std::unordered_map<pid_t, Process>;
