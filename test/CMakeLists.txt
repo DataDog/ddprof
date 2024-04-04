@@ -100,7 +100,7 @@ set(PROCESS_SRC
     ../src/ddprof_module_lib.cc
     ../src/dso.cc
     ../src/dso_hdr.cc
-    ../src/dwfl_hdr.cc
+    ../src/dwfl_wrapper.cc
     ../src/dwfl_thread_callbacks.cc
     ../src/procutils.cc
     ../src/signal_helper.cc
@@ -243,7 +243,7 @@ add_unit_test(
   ../src/ddog_profiling_utils.cc
   ../src/ddprof_stats.cc
   ../src/dso_symbol_lookup.cc
-  ../src/dwfl_hdr.cc
+  ../src/dwfl_wrapper.cc
   ../src/dwfl_thread_callbacks.cc
   ../src/demangler/demangler.cc
   ../src/jit/jitdump.cc
@@ -282,7 +282,7 @@ set(ALLOCATION_TRACKER_UT_SRCS
     ../src/ddprof_process.cc
     ../src/ddprof_stats.cc
     ../src/dso_symbol_lookup.cc
-    ../src/dwfl_hdr.cc
+    ../src/dwfl_wrapper.cc
     ../src/ddprof_module_lib.cc
     ../src/dwfl_thread_callbacks.cc
     ../src/demangler/demangler.cc

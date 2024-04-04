@@ -8,7 +8,7 @@
 #include "ddprof_stats.hpp"
 #include "ddres.hpp"
 #include "dso_hdr.hpp"
-#include "dwfl_hdr.hpp"
+#include "dwfl_wrapper.hpp"
 #include "logger.hpp"
 #include "signal_helper.hpp"
 #include "symbol_hdr.hpp"

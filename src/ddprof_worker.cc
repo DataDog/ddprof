@@ -10,7 +10,7 @@
 #include "ddprof_perf_event.hpp"
 #include "ddprof_stats.hpp"
 #include "dso_hdr.hpp"
-#include "dwfl_hdr.hpp"
+#include "dwfl_wrapper.hpp"
 #include "exporter/ddprof_exporter.hpp"
 #include "logger.hpp"
 #include "perf.hpp"

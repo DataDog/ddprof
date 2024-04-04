@@ -13,8 +13,6 @@
 #include "dso_hdr.hpp"
 
 #include <sys/types.h>
-#include <unordered_map>
-#include <unordered_set>
 
 extern "C" {
 struct Dwfl;

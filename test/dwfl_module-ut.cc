@@ -7,8 +7,8 @@
 #include "ddprof_module.hpp"
 #include "defer.hpp"
 #include "dso_hdr.hpp"
-#include "dwfl_hdr.hpp"
 #include "dwfl_internals.hpp"
+#include "dwfl_wrapper.hpp"
 #include "loghandle.hpp"
 
 #include <datadog/blazesym.h>

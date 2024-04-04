@@ -8,13 +8,14 @@
 #include "container_id.hpp"
 #include "ddprof_defs.hpp"
 #include "ddres_def.hpp"
-#include "dwfl_hdr.hpp"
+#include "dwfl_wrapper.hpp"
 #include "logger.hpp"
 
 #include <limits>
 #include <memory>
 #include <sys/types.h>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace ddprof {
 
@@ -70,7 +71,6 @@ private:
   int get_nb_mod() const;
 
   std::unordered_set<pid_t> _visited_pid;
-  constexpr static auto k_nb_samples_container_id_lookup = 100;
   using ProcessMap = std::unordered_map<pid_t, Process>;
   ProcessMap _process_map;
   std::string _path_to_proc = {};
