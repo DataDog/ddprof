@@ -47,7 +47,8 @@ const DDPROF_STATS s_cycled_stats[] = {
 const long k_clock_ticks_per_sec = sysconf(_SC_CLK_TCK);
 
 /// Remove all structures related to
-DDRes worker_pid_free(DDProfContext &ctx, pid_t el);
+DDRes worker_pid_free(DDProfContext &ctx, pid_t el,
+                      PerfClock::time_point timestamp);
 
 DDRes clear_unvisited_pids(DDProfContext &ctx);
 
@@ -235,7 +236,7 @@ DDRes ddprof_unwind_sample(DDProfContext &ctx, perf_event_sample *sample,
   if (us->_dwfl_wrapper && us->_dwfl_wrapper->_inconsistent) {
     // Loaded modules were inconsistent, assume we should flush everything.
     LG_WRN("(Inconsistent DWFL/DSOs)%d - Free associated objects", us->pid);
-    DDRES_CHECK_FWD(worker_pid_free(ctx, us->pid));
+    DDRES_CHECK_FWD(worker_pid_free(ctx, us->pid, PerfClock::now()));
   }
   return res;
 }
@@ -305,10 +306,11 @@ DDRes aggregate_live_allocations(DDProfContext &ctx) {
   return {};
 }
 
-DDRes worker_pid_free(DDProfContext &ctx, pid_t el) {
+DDRes worker_pid_free(DDProfContext &ctx, pid_t el,
+                      PerfClock::time_point timestamp) {
   DDRES_CHECK_FWD(aggregate_live_allocations_for_pid(ctx, el));
   UnwindState *us = ctx.worker_ctx.us;
-  unwind_pid_free(us, el);
+  unwind_pid_free(us, el, timestamp);
   ctx.worker_ctx.live_allocation.clear_pid(el);
   return {};
 }
@@ -316,8 +318,9 @@ DDRes worker_pid_free(DDProfContext &ctx, pid_t el) {
 DDRes clear_unvisited_pids(DDProfContext &ctx) {
   UnwindState *us = ctx.worker_ctx.us;
   const std::vector<pid_t> pids_remove = us->dwfl_hdr.get_unvisited();
+  const PerfClock::time_point now = PerfClock::now();
   for (pid_t const el : pids_remove) {
-    DDRES_CHECK_FWD(worker_pid_free(ctx, el));
+    DDRES_CHECK_FWD(worker_pid_free(ctx, el, now));
   }
   us->dwfl_hdr.reset_unvisited();
   return {};
@@ -604,21 +607,21 @@ void ddprof_pr_lost(DDProfContext &ctx, const perf_event_lost *lost,
 }
 
 DDRes ddprof_pr_comm(DDProfContext &ctx, const perf_event_comm *comm,
-                     int watcher_pos) {
+                     int watcher_pos, PerfClock::time_point timestamp) {
   // Change in process name (assuming exec) : clear all associated dso
   if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC) {
     LG_DBG("<%d>(COMM)%d -> %s", watcher_pos, comm->pid, comm->comm);
-    DDRES_CHECK_FWD(worker_pid_free(ctx, comm->pid));
+    DDRES_CHECK_FWD(worker_pid_free(ctx, comm->pid, timestamp));
   }
   return {};
 }
 
 DDRes ddprof_pr_fork(DDProfContext &ctx, const perf_event_fork *frk,
-                     int watcher_pos) {
+                     int watcher_pos, PerfClock::time_point timestamp) {
   LG_DBG("<%d>(FORK)%d -> %d/%d", watcher_pos, frk->ppid, frk->pid, frk->tid);
   if (frk->ppid != frk->pid) {
     // Clear everything and populate at next error or with coming samples
-    DDRES_CHECK_FWD(worker_pid_free(ctx, frk->pid));
+    DDRES_CHECK_FWD(worker_pid_free(ctx, frk->pid, timestamp));
     ctx.worker_ctx.us->dso_hdr.pid_fork(frk->pid, frk->ppid);
   }
   return {};
@@ -772,8 +775,11 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
       break;
     case PERF_RECORD_COMM:
       if (wpid->pid) {
-        DDRES_CHECK_FWD(ddprof_pr_comm(
-            ctx, reinterpret_cast<const perf_event_comm *>(hdr), watcher_pos));
+        auto timestamp = perf_clock_time_point_from_timestamp(
+            hdr_time(hdr, watcher->sample_type));
+        DDRES_CHECK_FWD(
+            ddprof_pr_comm(ctx, reinterpret_cast<const perf_event_comm *>(hdr),
+                           watcher_pos, timestamp));
       }
       break;
     case PERF_RECORD_EXIT:
@@ -784,8 +790,11 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
       break;
     case PERF_RECORD_FORK:
       if (wpid->pid) {
-        DDRES_CHECK_FWD(ddprof_pr_fork(
-            ctx, reinterpret_cast<const perf_event_fork *>(hdr), watcher_pos));
+        auto timestamp = perf_clock_time_point_from_timestamp(
+            hdr_time(hdr, watcher->sample_type));
+        DDRES_CHECK_FWD(
+            ddprof_pr_fork(ctx, reinterpret_cast<const perf_event_fork *>(hdr),
+                           watcher_pos, timestamp));
       }
 
       break;
