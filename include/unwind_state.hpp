@@ -41,8 +41,10 @@ struct UnwindRegisters {
 /// Single structure with everything necessary in unwinding. The structure is
 /// given through callbacks
 struct UnwindState {
-  explicit UnwindState(UniqueElf ref_elf, int dd_profiling_fd = -1)
-      : dso_hdr("", dd_profiling_fd), ref_elf(std::move(ref_elf)) {
+  explicit UnwindState(UniqueElf ref_elf, int dd_profiling_fd = -1,
+                       unsigned nb_max_pids = k_max_profiled_pids)
+      : dso_hdr("", dd_profiling_fd), ref_elf(std::move(ref_elf)),
+        max_pids(nb_max_pids) {
     output.clear();
     output.locs.reserve(kMaxStackDepth);
   }
@@ -60,9 +62,12 @@ struct UnwindState {
 
   UnwindOutput output;
   UniqueElf ref_elf; // reference elf object used to initialize dwfl
+  unsigned max_pids;
 };
 
-std::optional<UnwindState> create_unwind_state(int dd_profiling_fd = -1);
+std::optional<UnwindState>
+create_unwind_state(int dd_profiling_fd = -1,
+                    unsigned max_pids = k_max_profiled_pids);
 
 static inline bool unwind_registers_equal(const UnwindRegisters *lhs,
                                           const UnwindRegisters *rhs) {

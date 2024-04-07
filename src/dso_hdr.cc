@@ -623,13 +623,15 @@ bool DsoHdr::check_invariants() const {
 }
 
 int DsoHdr::clear_unvisited(const std::unordered_set<pid_t> &visited_pids) {
-  int nb_cleared = 0;
+  std::vector<pid_t> pids_to_clear;
   for (const auto &el : _pid_map) {
     if (visited_pids.find(el.first) == visited_pids.end()) {
-      pid_free(el.first);
-      ++nb_cleared;
+      pids_to_clear.push_back(el.first);
     }
   }
-  return nb_cleared;
+  for (const auto &pid : pids_to_clear) {
+    _pid_map.erase(pid);
+  }
+  return pids_to_clear.size();
 }
 } // namespace ddprof

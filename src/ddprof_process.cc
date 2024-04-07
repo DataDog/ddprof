@@ -95,6 +95,8 @@ const ContainerId &ProcessHdr::get_container_id(pid_t pid) {
   return p.get_container_id(_path_to_proc);
 }
 
+void ProcessHdr::flag_visited(pid_t pid) { _visited_pid.insert(pid); }
+
 Process &ProcessHdr::get(pid_t pid) {
   _visited_pid.insert(pid);
   auto it = _process_map.find(pid);
@@ -133,7 +135,7 @@ int ProcessHdr::get_nb_mod() const {
 }
 
 void ProcessHdr::display_stats() const {
-  LG_NTC("DWFL_HDR  | %10s | %d", "NB MODS", get_nb_mod());
+  LG_NTC("PROC_HDR  | %10s | %d", "NB MODS", get_nb_mod());
 }
 
 } // namespace ddprof

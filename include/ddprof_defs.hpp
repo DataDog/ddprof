@@ -33,7 +33,7 @@ inline constexpr int k_size_api_key = 32;
 
 // Maximum number of profiled pids
 // Exceeding a number of PIDs overloads file descriptors and memory
-inline constexpr unsigned kMaxProfiledPids{100};
+inline constexpr unsigned k_max_profiled_pids{100};
 
 // Linux Inode type
 using inode_t = uint64_t;

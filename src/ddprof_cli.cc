@@ -14,7 +14,6 @@
 
 #include "CLI/CLI11.hpp"
 #include "constants.hpp"
-#include "ddprof_cmdline.hpp"
 #include "ddprof_cmdline_watcher.hpp"
 #include "ddprof_defs.hpp"
 #include "ddres.hpp"
@@ -374,6 +373,14 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
           ->default_val(false)
           ->envname("DD_PROFILING_REORDER_EVENTS")
           ->group(""));
+
+  extended_options.push_back(app.add_flag("--maximum-pids,--maximum_pids",
+                                          maximum_pids,
+                                          "Maximum number of profiled PIDs")
+                                 ->check(CLI::NonNegativeNumber)
+                                 ->default_val(k_max_profiled_pids)
+                                 ->envname("DD_PROFILING_MAXIMUM_PIDS")
+                                 ->group(""));
   // Parse
   CLI11_PARSE(app, argc, argv);
 

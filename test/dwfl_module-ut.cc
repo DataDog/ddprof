@@ -63,7 +63,7 @@ TEST(DwflModule, inconsistency_test) {
   ASSERT_TRUE(find_res.second);
   {
     DwflWrapper dwfl_wrapper;
-    dwfl_wrapper.attach(my_pid, unique_elf, nullptr);
+    dwfl_wrapper.attach(my_pid, unique_elf, false, nullptr);
     // retrieve the map associated to pid
     DsoHdr::DsoMap &dso_map = dso_hdr.get_pid_mapping(my_pid)._map;
     for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
@@ -136,7 +136,7 @@ TEST(DwflModule, short_lived) {
   {
     UniqueElf unique_elf = create_elf_from_self();
     DwflWrapper dwfl_wrapper;
-    dwfl_wrapper.attach(child_pid, unique_elf, nullptr);
+    dwfl_wrapper.attach(child_pid, unique_elf, false, nullptr);
     // retrieve the map associated to pid
     DsoHdr::DsoMap &dso_map = dso_hdr.get_pid_mapping(child_pid)._map;
 
@@ -173,7 +173,7 @@ TEST(DwflModule, short_lived) {
   {
     UniqueElf unique_elf = create_elf_from_self();
     DwflWrapper dwfl_wrapper;
-    dwfl_wrapper.attach(child_pid, unique_elf, nullptr);
+    dwfl_wrapper.attach(child_pid, unique_elf, false, nullptr);
     // retrieve the map associated to pid
     DsoHdr::DsoMap &dso_map = dso_hdr.get_pid_mapping(second_child_pid)._map;
 

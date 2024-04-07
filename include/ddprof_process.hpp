@@ -41,6 +41,7 @@ public:
   [[nodiscard]] DwflWrapper *get_or_insert_dwfl();
   [[nodiscard]] DwflWrapper *get_dwfl();
   [[nodiscard]] const DwflWrapper *get_dwfl() const;
+
 private:
   static std::string format_cgroup_file(pid_t pid,
                                         std::string_view path_to_proc);
@@ -59,14 +60,16 @@ class ProcessHdr {
 public:
   explicit ProcessHdr(std::string_view path_to_proc = "")
       : _path_to_proc(path_to_proc) {}
+  void flag_visited(pid_t pid);
   Process &get(pid_t pid);
   const ContainerId &get_container_id(pid_t pid);
   void clear(pid_t pid) { _process_map.erase(pid); }
+
   std::vector<pid_t> get_unvisited() const;
-  const std::unordered_set<pid_t> &get_visited() const {
-    return _visited_pid;
-  }
+  const std::unordered_set<pid_t> &get_visited() const { return _visited_pid; }
   void reset_unvisited();
+
+  unsigned process_count() const { return _process_map.size(); }
   void display_stats() const;
 
 private:

@@ -25,9 +25,12 @@ DwflWrapper::DwflWrapper() = default;
 DwflWrapper::~DwflWrapper() { dwfl_end(_dwfl); }
 
 DDRes DwflWrapper::attach(pid_t pid, const UniqueElf &ref_elf,
-                          UnwindState *us) {
+                          bool avoid_new_attach, UnwindState *us) {
   if (_attached) {
     return {};
+  }
+  if (avoid_new_attach) {
+    return ddres_warn(DD_WHAT_UW_MAX_PIDS);
   }
   // for split debug, we can fill the debuginfo_path
   static const Dwfl_Callbacks proc_callbacks = {

@@ -36,6 +36,7 @@ struct DDProfContext {
     bool remote_symbolization{false};
     bool disable_symbolization{false};
     bool reorder_events{false}; // reorder events by timestamp
+    int maximum_pids{0};
 
     cpu_set_t cpu_affinity{};
     std::string switch_user;

@@ -60,12 +60,25 @@ void unwind_init_sample(UnwindState *us, const uint64_t *sample_regs,
 DDRes unwindstate_unwind(UnwindState *us) {
   DDRes res = ddres_init();
   Process &process = us->process_hdr.get(us->pid);
+  bool avoid_new_attach = false;
+  if (us->process_hdr.process_count() > us->max_pids) {
+    // we limit number of pids heavily as we can not guarantee unwinding
+    // does not open new files
+    // There is currently no priority in the processes that we should unwind
+    // So there could be a situation where we are stuck with PIDs that are not
+    // interesting.
+    avoid_new_attach = true;
+  }
   if (us->pid != 0) { // we can not unwind pid 0
-    res = unwind_dwfl(process, us);
+    res = unwind_dwfl(process, avoid_new_attach, us);
   }
   if (IsDDResNotOK(res)) {
-    ddprof_stats_add(STATS_UNWIND_ERRORS, 1, nullptr);
-    find_dso_add_error_frame(res, us);
+    if (res._what == DD_WHAT_UW_MAX_PIDS) {
+      add_common_frame(us, SymbolErrors::max_pids);
+    } else {
+      ddprof_stats_add(STATS_UNWIND_ERRORS, 1, nullptr);
+      find_dso_add_error_frame(res, us);
+    }
   }
   ddprof_stats_add(STATS_UNWIND_AVG_STACK_DEPTH, us->output.locs.size(),
                    nullptr);

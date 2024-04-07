@@ -30,6 +30,6 @@ void add_dso_frame(UnwindState *us, const Dso &dso,
 void add_virtual_base_frame(UnwindState *us);
 
 void add_error_frame(const Dso *dso, UnwindState *us, ProcessAddress_t pc,
-                     SymbolErrors error_case = SymbolErrors::unknown_dso);
+                     SymbolErrors error_case = SymbolErrors::unknown_mapping);
 
 } // namespace ddprof
