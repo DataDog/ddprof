@@ -26,19 +26,9 @@ DwflWrapper *Process::get_or_insert_dwfl() {
   return _dwfl_wrapper.get();
 }
 
-DwflWrapper *Process::get_dwfl() {
-  if (!_dwfl_wrapper) {
-    return nullptr;
-  }
-  return _dwfl_wrapper.get();
-}
+DwflWrapper *Process::get_dwfl() { return _dwfl_wrapper.get(); }
 
-const DwflWrapper *Process::get_dwfl() const {
-  if (!_dwfl_wrapper) {
-    return nullptr;
-  }
-  return _dwfl_wrapper.get();
-}
+const DwflWrapper *Process::get_dwfl() const { return _dwfl_wrapper.get(); }
 
 const ContainerId &Process::get_container_id(std::string_view path_to_proc) {
   if (!_container_id) {

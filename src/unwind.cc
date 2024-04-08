@@ -61,7 +61,9 @@ DDRes unwindstate_unwind(UnwindState *us) {
   DDRes res = ddres_init();
   Process &process = us->process_hdr.get(us->pid);
   bool avoid_new_attach = false;
-  if (us->process_hdr.process_count() > us->max_pids) {
+  if (us->maximum_pids != k_unlimited_max_profiled_pids &&
+      us->process_hdr.process_count() >
+          static_cast<unsigned>(us->maximum_pids)) {
     // we limit number of pids heavily as we can not guarantee unwinding
     // does not open new files
     // There is currently no priority in the processes that we should unwind

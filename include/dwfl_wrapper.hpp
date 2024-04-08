@@ -35,8 +35,7 @@ struct DwflWrapper {
   DwflWrapper(const DwflWrapper &other) = delete;            // avoid copy
   DwflWrapper &operator=(const DwflWrapper &other) = delete; // avoid copy
 
-  DDRes attach(pid_t pid, const UniqueElf &ref_elf, bool avoid_new_attach,
-               UnwindState *us);
+  DDRes attach(pid_t pid, const UniqueElf &ref_elf, UnwindState *us);
 
   // unsafe get don't check ranges
   DDProfMod *unsafe_get(FileInfoId_t file_info_id);

@@ -253,8 +253,11 @@ DDRes unwind_init_dwfl(Process &process, bool avoid_new_attach,
   if (!us->_dwfl_wrapper) {
     return ddres_warn(DD_WHAT_UW_ERROR);
   }
+  if (avoid_new_attach && !us->_dwfl_wrapper->_attached) {
+    return ddres_warn(DD_WHAT_UW_MAX_PIDS);
+  }
   // Creates the dwfl unwinding backend
-  return us->_dwfl_wrapper->attach(us->pid, us->ref_elf, avoid_new_attach, us);
+  return us->_dwfl_wrapper->attach(us->pid, us->ref_elf, us);
 }
 
 DDRes unwind_dwfl(Process &process, bool avoid_new_attach, UnwindState *us) {

@@ -10,11 +10,11 @@
 
 namespace ddprof {
 std::optional<UnwindState> create_unwind_state(int dd_profiling_fd,
-                                               unsigned max_pids) {
+                                               int maximum_pids) {
   auto elf = create_elf_from_self();
   if (!elf) {
     return std::nullopt;
   }
-  return UnwindState(std::move(elf), dd_profiling_fd, max_pids);
+  return UnwindState(std::move(elf), dd_profiling_fd, maximum_pids);
 }
 } // namespace ddprof

@@ -71,7 +71,7 @@ public:
   bool remote_symbolization{false};
   bool disable_symbolization{false};
   bool reorder_events{false}; // reorder events by timestamp
-  unsigned maximum_pids{};
+  int maximum_pids{};
 
   std::string socket_path;
   int pipefd_to_library{-1};
