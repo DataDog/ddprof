@@ -5,12 +5,10 @@
 
 #include "ddprof_worker.hpp"
 
-#include "chrono_utils.hpp"
 #include "ddprof_context.hpp"
 #include "ddprof_perf_event.hpp"
 #include "ddprof_stats.hpp"
 #include "dso_hdr.hpp"
-#include "dwfl_hdr.hpp"
 #include "exporter/ddprof_exporter.hpp"
 #include "logger.hpp"
 #include "perf.hpp"
@@ -21,14 +19,10 @@
 #include "tags.hpp"
 #include "tsc_clock.hpp"
 #include "unwind.hpp"
-#include "unwind_helpers.hpp"
+#include "unwind_helper.hpp"
 #include "unwind_state.hpp"
 
-#include <algorithm>
-#include <cassert>
 #include <chrono>
-#include <cstddef>
-#include <cstdint>
 #include <ctime>
 #include <sys/time.h>
 #include <unistd.h>
@@ -315,11 +309,17 @@ DDRes worker_pid_free(DDProfContext &ctx, pid_t el) {
 
 DDRes clear_unvisited_pids(DDProfContext &ctx) {
   UnwindState *us = ctx.worker_ctx.us;
-  const std::vector<pid_t> pids_remove = us->dwfl_hdr.get_unvisited();
+  const std::vector<pid_t> pids_remove = us->process_hdr.get_unvisited();
   for (pid_t const el : pids_remove) {
     DDRES_CHECK_FWD(worker_pid_free(ctx, el));
   }
-  us->dwfl_hdr.reset_unvisited();
+  const auto &visited_pids = us->process_hdr.get_visited();
+  // some pids might have been visited but not unwound
+  const int nb_cleared = us->dso_hdr.clear_unvisited(visited_pids);
+  if (nb_cleared) {
+    LG_NTC("Clearing %d unvisited PIDs from DSO header", nb_cleared);
+  }
+  us->process_hdr.reset_unvisited();
   return {};
 }
 
@@ -341,7 +341,8 @@ DDRes worker_library_init(DDProfContext &ctx,
     // Make sure worker index is initialized correctly
     ctx.worker_ctx.i_current_pprof = 0;
     ctx.worker_ctx.exp_tid = {0};
-    auto unwind_state = create_unwind_state(ctx.params.dd_profiling_fd);
+    auto unwind_state = create_unwind_state(ctx.params.dd_profiling_fd,
+                                            ctx.params.maximum_pids);
     if (!unwind_state) {
       LG_ERR("Failed to create unwind state");
       return ddres_error(DD_WHAT_UW_ERROR);
@@ -595,6 +596,8 @@ void ddprof_pr_mmap(DDProfContext &ctx, const perf_event_mmap2 *map,
               std::string(map->filename), map->ino, map->prot);
   ctx.worker_ctx.us->dso_hdr.maybe_insert_erase_overlap(std::move(new_dso),
                                                         timestamp);
+  // ensure we access the process (to avoid a premature clear)
+  ctx.worker_ctx.us->process_hdr.flag_visited(map->pid);
 }
 
 void ddprof_pr_lost(DDProfContext &ctx, const perf_event_lost *lost,
@@ -620,6 +623,8 @@ DDRes ddprof_pr_fork(DDProfContext &ctx, const perf_event_fork *frk,
     // Clear everything and populate at next error or with coming samples
     DDRES_CHECK_FWD(worker_pid_free(ctx, frk->pid));
     ctx.worker_ctx.us->dso_hdr.pid_fork(frk->pid, frk->ppid);
+    // ensure we access the process (to avoid a premature clear)
+    ctx.worker_ctx.us->process_hdr.flag_visited(frk->pid);
   }
   return {};
 }

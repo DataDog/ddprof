@@ -14,16 +14,17 @@ using namespace std::string_view_literals;
 namespace ddprof {
 
 inline constexpr std::array<std::string_view, 6> k_common_frame_names = {
-    "[truncated]"sv,  "[unknown_dso]"sv, "[dwfl_frame]"sv,
-    "[incomplete]"sv, "[lost]"sv,        "[maximum pids]"sv};
+    "[truncated]"sv,      "[unknown mapping]"sv,
+    "[unwind failure]"sv, "[incomplete]"sv,
+    "[lost]"sv,           "[maximum pids]"sv};
 
 enum SymbolErrors {
-  truncated_stack,
-  unknown_dso,
-  dwfl_frame,
+  truncated_stack = 0,
+  unknown_mapping,
+  unwind_failure,
   incomplete_stack,
-  max_pids,
   lost_event,
+  max_pids,
 };
 
 } // namespace ddprof

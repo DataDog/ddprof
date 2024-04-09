@@ -13,7 +13,7 @@
 #include "runtime_symbol_lookup.hpp"
 #include "symbol_hdr.hpp"
 #include "unique_fd.hpp"
-#include "unwind_helpers.hpp"
+#include "unwind_helper.hpp"
 #include "unwind_state.hpp"
 
 #include <fcntl.h>
@@ -76,7 +76,7 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   if (!dwfl_frame_pc(dwfl_frame, &pc, nullptr)) {
     LG_DBG("Failure to compute frame PC: %s (depth#%lu)", dwfl_errmsg(-1),
            us->output.locs.size());
-    add_error_frame(nullptr, us, pc, SymbolErrors::dwfl_frame);
+    add_error_frame(nullptr, us, pc, SymbolErrors::unwind_failure);
     return {}; // invalid pc : do not add frame
   }
   us->current_ip = pc;
@@ -97,7 +97,7 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
       // no matching file was found
       LG_DBG("[UW] (PID%d) DSO not found at 0x%lx (depth#%lu)", us->pid, pc,
              us->output.locs.size());
-      add_error_frame(nullptr, us, pc, SymbolErrors::unknown_dso);
+      add_error_frame(nullptr, us, pc, SymbolErrors::unknown_mapping);
       return {};
     }
     const Dso &dso = find_res.first->second;
@@ -162,7 +162,7 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   if (!dwfl_frame_pc(dwfl_frame, &pc, &is_activation)) {
     LG_DBG("Failure to compute frame PC: %s (depth#%lu)", dwfl_errmsg(-1),
            us->output.locs.size());
-    add_error_frame(nullptr, us, pc, SymbolErrors::dwfl_frame);
+    add_error_frame(nullptr, us, pc, SymbolErrors::unwind_failure);
     return {}; // invalid pc : do not add frame
   }
   if (!is_activation) {
@@ -247,30 +247,21 @@ DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
 }
 } // namespace
 
-DDRes unwind_init_dwfl(UnwindState *us) {
-  us->_dwfl_wrapper = us->dwfl_hdr.get_or_insert(us->pid);
+DDRes unwind_init_dwfl(Process &process, bool avoid_new_attach,
+                       UnwindState *us) {
+  us->_dwfl_wrapper = process.get_or_insert_dwfl();
   if (!us->_dwfl_wrapper) {
+    return ddres_warn(DD_WHAT_UW_ERROR);
+  }
+  if (avoid_new_attach && !us->_dwfl_wrapper->_attached) {
     return ddres_warn(DD_WHAT_UW_MAX_PIDS);
   }
-  if (us->_dwfl_wrapper->_attached) {
-    return {};
-  }
-
-  static const Dwfl_Thread_Callbacks dwfl_callbacks = {
-      .next_thread = next_thread,
-      .get_thread = nullptr,
-      .memory_read = memory_read_dwfl,
-      .set_initial_registers = set_initial_registers,
-      .detach = nullptr,
-      .thread_detach = nullptr,
-  };
-
   // Creates the dwfl unwinding backend
-  return us->_dwfl_wrapper->attach(us->pid, &dwfl_callbacks, us);
+  return us->_dwfl_wrapper->attach(us->pid, us->ref_elf, us);
 }
 
-DDRes unwind_dwfl(UnwindState *us) {
-  DDRes res = unwind_init_dwfl(us);
+DDRes unwind_dwfl(Process &process, bool avoid_new_attach, UnwindState *us) {
+  DDRes res = unwind_init_dwfl(process, avoid_new_attach, us);
   if (!IsDDResOK(res)) {
     LOG_ERROR_DETAILS(LG_DBG, res._what);
     return res;

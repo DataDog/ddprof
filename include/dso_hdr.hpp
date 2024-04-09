@@ -10,6 +10,7 @@
 #include <map>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "ddprof_file_info.hpp"
 #include "ddprof_module.hpp"
@@ -200,6 +201,8 @@ public:
   PidMapping &get_pid_mapping(pid_t pid) { return _pid_map[pid]; }
 
   bool check_invariants() const;
+
+  int clear_unvisited(const std::unordered_set<pid_t> &visited_pids);
 
 private:
   // erase range of elements

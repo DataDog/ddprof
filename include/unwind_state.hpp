@@ -10,8 +10,8 @@
 #include "ddprof_process.hpp"
 #include "ddres_def.hpp"
 #include "dso_hdr.hpp"
-#include "dwfl_hdr.hpp"
 #include "dwfl_thread_callbacks.hpp"
+#include "dwfl_wrapper.hpp"
 #include "perf.hpp"
 #include "perf_archmap.hpp"
 #include "symbol_hdr.hpp"
@@ -41,15 +41,14 @@ struct UnwindRegisters {
 /// Single structure with everything necessary in unwinding. The structure is
 /// given through callbacks
 struct UnwindState {
-  explicit UnwindState(UniqueElf ref_elf, int dd_profiling_fd = -1)
-      : dso_hdr("", dd_profiling_fd), ref_elf(std::move(ref_elf)) {
+  explicit UnwindState(UniqueElf ref_elf, int dd_profiling_fd = -1,
+                       int nb_max_pids = k_default_max_profiled_pids)
+      : dso_hdr("", dd_profiling_fd), ref_elf(std::move(ref_elf)),
+        maximum_pids(nb_max_pids) {
     output.clear();
     output.locs.reserve(kMaxStackDepth);
   }
-
-  DwflHdr dwfl_hdr;
   DwflWrapper *_dwfl_wrapper{nullptr}; // pointer to current dwfl element
-
   DsoHdr dso_hdr;
   SymbolHdr symbol_hdr;
   ProcessHdr process_hdr;
@@ -63,9 +62,12 @@ struct UnwindState {
 
   UnwindOutput output;
   UniqueElf ref_elf; // reference elf object used to initialize dwfl
+  int maximum_pids;
 };
 
-std::optional<UnwindState> create_unwind_state(int dd_profiling_fd = -1);
+std::optional<UnwindState>
+create_unwind_state(int dd_profiling_fd = -1,
+                    int maximum_pids = k_default_max_profiled_pids);
 
 static inline bool unwind_registers_equal(const UnwindRegisters *lhs,
                                           const UnwindRegisters *rhs) {

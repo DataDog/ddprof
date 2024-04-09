@@ -8,12 +8,12 @@
 #include "ddprof_stats.hpp"
 #include "ddres.hpp"
 #include "dso_hdr.hpp"
-#include "dwfl_hdr.hpp"
+#include "dwfl_wrapper.hpp"
 #include "logger.hpp"
 #include "signal_helper.hpp"
 #include "symbol_hdr.hpp"
 #include "unwind_dwfl.hpp"
-#include "unwind_helpers.hpp"
+#include "unwind_helper.hpp"
 #include "unwind_metrics.hpp"
 #include "unwind_state.hpp"
 
@@ -35,8 +35,8 @@ void find_dso_add_error_frame(DDRes ddres, UnwindState *us) {
   }
 }
 
-void add_container_id(UnwindState *us) {
-  auto container_id = us->process_hdr.get_container_id(us->pid);
+void add_container_id(Process &process, UnwindState *us) {
+  auto container_id = process.get_container_id();
   if (container_id) {
     us->output.container_id = *container_id;
   }
@@ -59,24 +59,40 @@ void unwind_init_sample(UnwindState *us, const uint64_t *sample_regs,
 
 DDRes unwindstate_unwind(UnwindState *us) {
   DDRes res = ddres_init();
+  Process &process = us->process_hdr.get(us->pid);
+  bool avoid_new_attach = false;
+  if (us->maximum_pids != k_unlimited_max_profiled_pids &&
+      us->process_hdr.process_count() >
+          static_cast<unsigned>(us->maximum_pids)) {
+    // we limit number of pids heavily as we can not guarantee unwinding
+    // does not open new files
+    // There is currently no priority in the processes that we should unwind
+    // So there could be a situation where we are stuck with PIDs that are not
+    // interesting.
+    avoid_new_attach = true;
+  }
   if (us->pid != 0) { // we can not unwind pid 0
-    res = unwind_dwfl(us);
+    res = unwind_dwfl(process, avoid_new_attach, us);
   }
   if (IsDDResNotOK(res)) {
-    find_dso_add_error_frame(res, us);
+    if (res._what == DD_WHAT_UW_MAX_PIDS) {
+      add_common_frame(us, SymbolErrors::max_pids);
+    } else {
+      ddprof_stats_add(STATS_UNWIND_ERRORS, 1, nullptr);
+      find_dso_add_error_frame(res, us);
+    }
   }
   ddprof_stats_add(STATS_UNWIND_AVG_STACK_DEPTH, us->output.locs.size(),
                    nullptr);
 
   // Add a frame that identifies executable to which these belong
   add_virtual_base_frame(us);
-  add_container_id(us);
+  add_container_id(process, us);
   return res;
 }
 
 void unwind_pid_free(UnwindState *us, pid_t pid) {
   us->dso_hdr.pid_free(pid);
-  us->dwfl_hdr.clear_pid(pid);
   us->symbol_hdr.clear(pid);
   us->process_hdr.clear(pid);
 }
@@ -84,7 +100,7 @@ void unwind_pid_free(UnwindState *us, pid_t pid) {
 void unwind_cycle(UnwindState *us) {
   us->symbol_hdr.display_stats();
   us->symbol_hdr.cycle();
-  us->dwfl_hdr.display_stats();
+  us->process_hdr.display_stats();
   us->dso_hdr.stats().reset();
   unwind_metrics_reset();
 }

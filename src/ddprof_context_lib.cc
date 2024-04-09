@@ -93,6 +93,7 @@ void copy_cli_values(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
   ctx.params.remote_symbolization = ddprof_cli.remote_symbolization;
   ctx.params.disable_symbolization = ddprof_cli.disable_symbolization;
   ctx.params.reorder_events = ddprof_cli.reorder_events;
+  ctx.params.maximum_pids = ddprof_cli.maximum_pids;
 
   ctx.params.initial_loaded_libs_check_delay =
       ddprof_cli.initial_loaded_libs_check_delay;

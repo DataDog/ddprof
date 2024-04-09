@@ -7,8 +7,8 @@
 #include "ddprof_module.hpp"
 #include "defer.hpp"
 #include "dso_hdr.hpp"
-#include "dwfl_hdr.hpp"
 #include "dwfl_internals.hpp"
+#include "dwfl_wrapper.hpp"
 #include "loghandle.hpp"
 
 #include <datadog/blazesym.h>
@@ -58,10 +58,12 @@ TEST(DwflModule, inconsistency_test) {
   ElfAddress_t ip = _THIS_IP_;
   DsoHdr dso_hdr;
   DsoHdr::DsoFindRes find_res = dso_hdr.dso_find_or_backpopulate(my_pid, ip);
+  UniqueElf unique_elf = create_elf_from_self();
   // Check that we found the DSO matching this IP
   ASSERT_TRUE(find_res.second);
   {
     DwflWrapper dwfl_wrapper;
+    dwfl_wrapper.attach(my_pid, unique_elf, nullptr);
     // retrieve the map associated to pid
     DsoHdr::DsoMap &dso_map = dso_hdr.get_pid_mapping(my_pid)._map;
     for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
@@ -132,7 +134,9 @@ TEST(DwflModule, short_lived) {
   dso_hdr.dso_find_or_backpopulate(child_pid, ip);
 
   {
+    UniqueElf unique_elf = create_elf_from_self();
     DwflWrapper dwfl_wrapper;
+    dwfl_wrapper.attach(child_pid, unique_elf, nullptr);
     // retrieve the map associated to pid
     DsoHdr::DsoMap &dso_map = dso_hdr.get_pid_mapping(child_pid)._map;
 
@@ -167,7 +171,9 @@ TEST(DwflModule, short_lived) {
   // Parse the second pid
   dso_hdr.dso_find_or_backpopulate(second_child_pid, ip);
   {
+    UniqueElf unique_elf = create_elf_from_self();
     DwflWrapper dwfl_wrapper;
+    dwfl_wrapper.attach(child_pid, unique_elf, nullptr);
     // retrieve the map associated to pid
     DsoHdr::DsoMap &dso_map = dso_hdr.get_pid_mapping(second_child_pid)._map;
 

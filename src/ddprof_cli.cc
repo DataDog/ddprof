@@ -14,7 +14,6 @@
 
 #include "CLI/CLI11.hpp"
 #include "constants.hpp"
-#include "ddprof_cmdline.hpp"
 #include "ddprof_cmdline_watcher.hpp"
 #include "ddprof_defs.hpp"
 #include "ddres.hpp"
@@ -87,6 +86,22 @@ struct SampleStackSizeValidator : public Validator {
             "Invalid k_required_stack_sample_size_alignment "
             "value. Value should be less than " +
             std::to_string(USHRT_MAX) + " and a multiple of 8.");
+      }
+      return std::string();
+    };
+  }
+};
+
+using Validator = CLI::Validator;
+struct MaximumPidsValidator : public Validator {
+  MaximumPidsValidator() {
+    name_ = "MAXIMUM_PIDS";
+    func_ = [](const std::string &str) {
+      int const value = std::stoi(str);
+      if (value <= 0 && value != -1) {
+        return static_cast<std::string>(
+            "Invalid value for maximum pids."
+            "The value should be -1 for unlimited or positive.");
       }
       return std::string();
     };
@@ -374,6 +389,15 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
           ->default_val(false)
           ->envname("DD_PROFILING_REORDER_EVENTS")
           ->group(""));
+
+  extended_options.push_back(app.add_flag("--maximum-pids,--maximum_pids",
+                                          maximum_pids,
+                                          "Maximum number of profiled PIDs."
+                                          "Setting -1 means no limit.")
+                                 ->check(MaximumPidsValidator())
+                                 ->default_val(k_default_max_profiled_pids)
+                                 ->envname("DD_PROFILING_MAXIMUM_PIDS")
+                                 ->group(""));
   // Parse
   CLI11_PARSE(app, argc, argv);
 

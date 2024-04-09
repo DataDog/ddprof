@@ -8,11 +8,14 @@
 #include "container_id.hpp"
 #include "ddprof_defs.hpp"
 #include "ddres_def.hpp"
+#include "dwfl_wrapper.hpp"
 #include "logger.hpp"
 
 #include <limits>
+#include <memory>
 #include <sys/types.h>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace ddprof {
 
@@ -35,6 +38,10 @@ public:
 
   uint64_t increment_counter() { return ++_sample_counter; }
 
+  [[nodiscard]] DwflWrapper *get_or_insert_dwfl();
+  [[nodiscard]] DwflWrapper *get_dwfl();
+  [[nodiscard]] const DwflWrapper *get_dwfl() const;
+
 private:
   static std::string format_cgroup_file(pid_t pid,
                                         std::string_view path_to_proc);
@@ -42,21 +49,33 @@ private:
   static DDRes read_cgroup_ns(pid_t pid, std::string_view path_to_proc,
                               CGroupId_t &cgroup);
 
+  std::unique_ptr<DwflWrapper> _dwfl_wrapper{};
+  ContainerId _container_id;
   pid_t _pid;
   CGroupId_t _cgroup_ns;
-  ContainerId _container_id;
-  uint64_t _sample_counter = {};
+  uint64_t _sample_counter{};
 };
 
 class ProcessHdr {
 public:
   explicit ProcessHdr(std::string_view path_to_proc = "")
       : _path_to_proc(path_to_proc) {}
-  const ContainerId &get_container_id(pid_t pid, bool force = false);
+  void flag_visited(pid_t pid);
+  Process &get(pid_t pid);
+  const ContainerId &get_container_id(pid_t pid);
   void clear(pid_t pid) { _process_map.erase(pid); }
 
+  std::vector<pid_t> get_unvisited() const;
+  const std::unordered_set<pid_t> &get_visited() const { return _visited_pid; }
+  void reset_unvisited();
+
+  unsigned process_count() const { return _process_map.size(); }
+  void display_stats() const;
+
 private:
-  constexpr static auto k_nb_samples_container_id_lookup = 100;
+  int get_nb_mod() const;
+
+  std::unordered_set<pid_t> _visited_pid;
   using ProcessMap = std::unordered_map<pid_t, Process>;
   ProcessMap _process_map;
   std::string _path_to_proc = {};

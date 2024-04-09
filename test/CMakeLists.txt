@@ -90,6 +90,22 @@ function(add_benchmark name)
   disable_clangtidy(${name})
 endfunction()
 
+# Sources tied to the process object
+set(PROCESS_SRC
+    ../src/container_id.cc
+    ../src/ddprof_process.cc
+    ../src/ddprof_module_lib.cc
+    ../src/dso.cc
+    ../src/dso_hdr.cc
+    ../src/dwfl_wrapper.cc
+    ../src/dwfl_thread_callbacks.cc
+    ../src/procutils.cc
+    ../src/signal_helper.cc
+    ../src/stack_helper.cc
+    ../src/create_elf.cc
+    ../src/user_override.cc
+    ../src/build_id.cc)
+
 # Definition of unit tests
 add_compile_definitions("UNIT_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 
@@ -207,18 +223,8 @@ add_unit_test(tags-ut tags-ut.cc ../src/tags.cc ../src/thread_info.cc DEFINITION
 target_include_directories(tags-ut PRIVATE ${DOGFOOD_INCLUDE_DIR})
 
 add_unit_test(
-  dwfl_module-ut
-  dwfl_module-ut.cc
-  ../src/build_id.cc
-  ../src/dwfl_hdr.cc
-  ../src/ddprof_module_lib.cc
-  ../src/demangler/demangler.cc
-  ../src/dso.cc
-  ../src/dso_hdr.cc
-  ../src/failed_assumption.cc
-  ../src/procutils.cc
-  ../src/signal_helper.cc
-  ../src/user_override.cc
+  dwfl_module-ut dwfl_module-ut.cc ${PROCESS_SRC} ../src/demangler/demangler.cc
+  ../src/failed_assumption.cc ../src/user_override.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle Datadog::Profiling
   DEFINITIONS MYNAME="dwfl_module-ut")
 add_compile_definitions("DWFL_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
@@ -227,20 +233,15 @@ set_property(TARGET dwfl_module-ut PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 add_unit_test(
   savecontext-ut
   savecontext-ut.cc
+  ${PROCESS_SRC}
   ../src/base_frame_symbol_lookup.cc
-  ../src/build_id.cc
   ../src/common_mapinfo_lookup.cc
   ../src/common_symbol_lookup.cc
-  ../src/container_id.cc
   ../src/create_elf.cc
   ../src/ddog_profiling_utils.cc
-  ../src/ddprof_process.cc
   ../src/ddprof_stats.cc
-  ../src/dso.cc
-  ../src/dso_hdr.cc
   ../src/dso_symbol_lookup.cc
-  ../src/dwfl_hdr.cc
-  ../src/ddprof_module_lib.cc
+  ../src/dwfl_wrapper.cc
   ../src/dwfl_thread_callbacks.cc
   ../src/demangler/demangler.cc
   ../src/jit/jitdump.cc
@@ -257,7 +258,7 @@ add_unit_test(
   ../src/symbolizer.cc
   ../src/unwind.cc
   ../src/unwind_dwfl.cc
-  ../src/unwind_helpers.cc
+  ../src/unwind_helper.cc
   ../src/unwind_metrics.cc
   ../src/unwind_state.cc
   ../src/user_override.cc
@@ -266,6 +267,7 @@ add_unit_test(
 
 set(ALLOCATION_TRACKER_UT_SRCS
     allocation_tracker-ut.cc
+    ${PROCESS_SRC}
     ../src/lib/allocation_tracker.cc
     ../src/lib/elfutils.cc
     ../src/lib/symbol_overrides.cc
@@ -277,10 +279,8 @@ set(ALLOCATION_TRACKER_UT_SRCS
     ../src/create_elf.cc
     ../src/ddprof_process.cc
     ../src/ddprof_stats.cc
-    ../src/dso.cc
-    ../src/dso_hdr.cc
     ../src/dso_symbol_lookup.cc
-    ../src/dwfl_hdr.cc
+    ../src/dwfl_wrapper.cc
     ../src/ddprof_module_lib.cc
     ../src/dwfl_thread_callbacks.cc
     ../src/demangler/demangler.cc
@@ -307,7 +307,7 @@ set(ALLOCATION_TRACKER_UT_SRCS
     ../src/user_override.cc
     ../src/unwind.cc
     ../src/unwind_dwfl.cc
-    ../src/unwind_helpers.cc
+    ../src/unwind_helper.cc
     ../src/unwind_metrics.cc
     ../src/unwind_state.cc)
 
@@ -355,8 +355,7 @@ add_unit_test(tracepoint_config-ut tracepoint_config-ut.cc ../src/tracepoint_con
 
 add_unit_test(live_allocation-ut live_allocation-ut.cc ../src/live_allocation.cc)
 
-add_unit_test(ddprof_process-ut ddprof_process-ut.cc ../src/container_id.cc
-              ../src/ddprof_process.cc)
+add_unit_test(ddprof_process-ut ddprof_process-ut.cc ${PROCESS_SRC} LIBRARIES ${ELFUTILS_LIBRARIES})
 
 add_unit_test(glibc_fixes-ut glibc_fixes-ut.cc ../src/lib/glibc_fixes.c LIBRARIES pthread)
 

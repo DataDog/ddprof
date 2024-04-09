@@ -19,6 +19,17 @@ std::string Process::format_cgroup_file(pid_t pid,
   return absl::StrCat(path_to_proc, "/proc/", pid, "/cgroup");
 }
 
+DwflWrapper *Process::get_or_insert_dwfl() {
+  if (!_dwfl_wrapper) {
+    _dwfl_wrapper = std::make_unique<DwflWrapper>();
+  }
+  return _dwfl_wrapper.get();
+}
+
+DwflWrapper *Process::get_dwfl() { return _dwfl_wrapper.get(); }
+
+const DwflWrapper *Process::get_dwfl() const { return _dwfl_wrapper.get(); }
+
 const ContainerId &Process::get_container_id(std::string_view path_to_proc) {
   if (!_container_id) {
     extract_container_id(format_cgroup_file(_pid, path_to_proc), _container_id);
@@ -69,29 +80,52 @@ DDRes Process::read_cgroup_ns(pid_t pid, std::string_view path_to_proc,
   return {};
 }
 
-const ContainerId &ProcessHdr::get_container_id(pid_t pid, bool force) {
-  // lookup cgroup
-  static const ContainerId unknown_container_id =
-      ContainerId(k_container_id_unknown);
+const ContainerId &ProcessHdr::get_container_id(pid_t pid) {
+  Process &p = get(pid);
+  return p.get_container_id(_path_to_proc);
+}
+
+void ProcessHdr::flag_visited(pid_t pid) { _visited_pid.insert(pid); }
+
+Process &ProcessHdr::get(pid_t pid) {
+  _visited_pid.insert(pid);
   auto it = _process_map.find(pid);
   if (it == _process_map.end()) {
-    // new process, parse cgroup
-    auto pair = _process_map.try_emplace(pid, pid);
-    if (pair.second) {
-      it = pair.first;
-    } else {
-      LG_WRN("[ProcessHdr] Unable to insert process element");
-      return unknown_container_id;
+    auto pair = _process_map.emplace(pid, pid);
+    return pair.first->second;
+  }
+  return it->second;
+}
+
+void ProcessHdr::reset_unvisited() {
+  // clear the list of visited for next cycle
+  _visited_pid.clear();
+}
+
+std::vector<pid_t> ProcessHdr::get_unvisited() const {
+  std::vector<pid_t> pids_remove;
+  for (const auto &el : _process_map) {
+    if (_visited_pid.find(el.first) == _visited_pid.end()) {
+      pids_remove.push_back(el.first);
     }
   }
-  // uint64 is big enough that overflow is not a concern
-  // also consequence is just miss-labelling container-id
-  if (!force &&
-      (it->second.increment_counter() < k_nb_samples_container_id_lookup)) {
-    // avoid looking up container_id too often for short-lived pids
-    return unknown_container_id;
-  }
-  return it->second.get_container_id(_path_to_proc);
+  return pids_remove;
+}
+
+int ProcessHdr::get_nb_mod() const {
+  int nb_mods = 0;
+  std::for_each(_process_map.begin(), _process_map.end(),
+                [&](ProcessMap::value_type const &el) {
+                  const auto *dwfl = el.second.get_dwfl();
+                  if (dwfl) {
+                    nb_mods += dwfl->_ddprof_mods.size();
+                  }
+                });
+  return nb_mods;
+}
+
+void ProcessHdr::display_stats() const {
+  LG_NTC("PROC_HDR  | %10s | %d", "NB MODS", get_nb_mod());
 }
 
 } // namespace ddprof
