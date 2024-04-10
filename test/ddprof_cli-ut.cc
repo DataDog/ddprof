@@ -100,4 +100,31 @@ TEST(ddprof_cli, show_config) {
   EXPECT_EQ(0, res);
   EXPECT_TRUE(ddprof_cli.continue_exec);
 }
+TEST(ddprof_cli, max_pids) {
+  LogHandle handle;
+  {
+    const char *argv[] = {MYNAME, "--maximum-pids", "1", "prog"};
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    DDProfCLI ddprof_cli;
+    int res = ddprof_cli.parse(argc, argv);
+    EXPECT_EQ(0, res);
+    EXPECT_EQ(ddprof_cli.maximum_pids, 10);
+  }
+  {
+    const char *argv[] = {MYNAME, "--maximum-pids", "-1", "prog"};
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    DDProfCLI ddprof_cli;
+    int res = ddprof_cli.parse(argc, argv);
+    EXPECT_EQ(0, res);
+    EXPECT_EQ(ddprof_cli.maximum_pids, -1);
+  }
+  {
+    const char *argv[] = {MYNAME, "--maximum-pids", "-2", "prog"};
+    int argc = sizeof(argv) / sizeof(argv[0]);
+    DDProfCLI ddprof_cli;
+    int res = ddprof_cli.parse(argc, argv);
+    EXPECT_TRUE(res != 0);
+  }
+}
+
 } // namespace ddprof

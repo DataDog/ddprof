@@ -92,21 +92,6 @@ struct SampleStackSizeValidator : public Validator {
   }
 };
 
-using Validator = CLI::Validator;
-struct MaximumPidsValidator : public Validator {
-  MaximumPidsValidator() {
-    name_ = "MAXIMUM_PIDS";
-    func_ = [](const std::string &str) {
-      int const value = std::stoi(str);
-      if (value <= 0 && value != -1) {
-        return static_cast<std::string>(
-            "Invalid value for maximum pids."
-            "The value should be -1 for unlimited or positive.");
-      }
-      return std::string();
-    };
-  }
-};
 } // namespace
 
 int DDProfCLI::parse(int argc, const char *argv[]) {
@@ -390,14 +375,14 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
           ->envname("DD_PROFILING_REORDER_EVENTS")
           ->group(""));
 
-  extended_options.push_back(app.add_flag("--maximum-pids,--maximum_pids",
-                                          maximum_pids,
-                                          "Maximum number of profiled PIDs."
-                                          "Setting -1 means no limit.")
-                                 ->check(MaximumPidsValidator())
-                                 ->default_val(k_default_max_profiled_pids)
-                                 ->envname("DD_PROFILING_MAXIMUM_PIDS")
-                                 ->group(""));
+  extended_options.push_back(
+      app.add_option("--maximum-pids,--maximum_pids", maximum_pids,
+                     "Maximum number of profiled PIDs."
+                     "Setting -1 means no limit.")
+          ->check(CLI::Bound(-1, std::numeric_limits<int>::max()))
+          ->default_val(k_default_max_profiled_pids)
+          ->envname("DD_PROFILING_MAXIMUM_PIDS")
+          ->group(""));
   // Parse
   CLI11_PARSE(app, argc, argv);
 
@@ -562,4 +547,5 @@ void CommandLineWrapper::free_user_command_line(
     el = nullptr;
   }
 }
+
 } // namespace ddprof
