@@ -83,12 +83,12 @@ bool RuntimeSymbolLookup::insert_or_replace(std::string_view symbol,
            code_load.code_addr, code_load.code_size + code_load.code_addr);
 #endif
     if (symbol_table[existing]._demangled_name == symbol) {
-      // nothing to do (unlikely size would change ?)
+      find_res.first->second.set_end(address + code_size - 1);
     } else {
       // remove current element (as start can be different)
       symbol_map.erase(find_res.first);
-      symbol_map.emplace(
-          address, SymbolSpan(address + code_size - 1, symbol_table.size()));
+      symbol_map.emplace(address,
+                         SymbolSpan(address + code_size - 1, existing));
       symbol_table[existing]._demangled_name = symbol;
       symbol_table[existing]._symname = symbol;
     }
