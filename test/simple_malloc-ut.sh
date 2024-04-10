@@ -100,7 +100,7 @@ check() {
     if [[ "${expected_pids}" -ne -1 ]]; then
         sync "${log_file}"
         # -P requires GNU grep
-        ddprof_pid=$(grep -m1 -oP ' ddprof\[\K[0-9]+(?=\]: Starting profiler)' "${log_file}" || true)
+        ddprof_pid=$(grep -m1 -oP -a ' ddprof\[\K[0-9]+(?=\]: Starting profiler)' "${log_file}" || true)
         if [ -z "${ddprof_pid}" ]; then
             echo "Unable to find profiler pid"
             cat "${log_file}"

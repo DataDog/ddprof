@@ -103,7 +103,7 @@ TEST(ddprof_cli, show_config) {
 TEST(ddprof_cli, max_pids) {
   LogHandle handle;
   {
-    const char *argv[] = {MYNAME, "--maximum-pids", "1", "prog"};
+    const char *argv[] = {MYNAME, "--maximum-pids", "10", "prog"};
     int argc = sizeof(argv) / sizeof(argv[0]);
     DDProfCLI ddprof_cli;
     int res = ddprof_cli.parse(argc, argv);
