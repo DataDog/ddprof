@@ -398,6 +398,10 @@ add_unit_test(
   ../src/lib/savecontext.cc
   ../src/lib/saveregisters.cc
   # ../src/lib/allocation_tracker.cc
+  ../src/dso_hdr.cc
+  ../src/dso.cc
+  ../src/procutils.cc
+  ../src/signal_helper.cc
   ../src/ringbuffer_utils.cc
   ../src/perf_ringbuffer.cc
   ../src/perf.cc

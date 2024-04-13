@@ -118,7 +118,7 @@ void LOG_set_logs_allowed_function(LogsAllowedCallback logs_allowed_function);
 #define LG_IF_LVL_OK(level, ...)                                               \
   do {                                                                         \
     if (unlikely(LOG_is_logging_enabled_for_level(level))) {                   \
-      ddprof::olprintfln(ABS(level), -1, MYNAME, __VA_ARGS__);                         \
+      ddprof::olprintfln(ABS(level), -1, MYNAME, __VA_ARGS__);                 \
     }                                                                          \
   } while (false)
 
