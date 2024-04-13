@@ -20,10 +20,13 @@
 #include "codeCache.h"
 #include "dwarf.h"
 #include "os.h"
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <limits>
+#include <cassert>
 
 char *NativeFunc::create(const char *name, short lib_index) {
   NativeFunc *f = (NativeFunc *)malloc(sizeof(NativeFunc) + 1 + strlen(name));
@@ -216,8 +219,9 @@ void CodeCache::setDwarfTable(FrameDesc *table, int length) {
   _dwarf_table_length = length;
 }
 
-FrameDesc *CodeCache::findFrameDesc(const void *pc) {
-  u32 target_loc = (const char *)pc - _text_base;
+FrameDesc *CodeCache::findFrameDesc(uintptr_t elf_address) {
+  assert(elf_address < std::numeric_limits<u32>::max());
+  const u32 target_loc = (const u32)elf_address;
   int low = 0;
   int high = _dwarf_table_length - 1;
 

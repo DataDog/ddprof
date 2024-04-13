@@ -87,7 +87,7 @@ bool stepStackContext(ap::StackContext &sc, const ap::StackBuffer &buffer,
                       CodeCacheArray *cache) {
   FrameDesc *f;
   CodeCache *cc = findLibraryByAddress(cache, sc.pc);
-  if (cc == NULL || (f = cc->findFrameDesc(sc.pc)) == NULL) {
+  if (cc == NULL || (f = cc->findFrameDesc(static_cast<const char*>(sc.pc) - static_cast<const char*>(cc->getTextBase()))) == NULL) {
     f = &FrameDesc::default_frame;
   }
 //  const char *sym = cc?cc->binarySearch(sc.pc):"unknown";

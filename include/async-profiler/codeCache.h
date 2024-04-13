@@ -17,7 +17,7 @@
 #ifndef _CODECACHE_H
 #define _CODECACHE_H
 
-// #include <jvmti.h>
+#include <stdint.h>
 
 #define NO_MIN_ADDRESS ((const void *)-1)
 #define NO_MAX_ADDRESS ((const void *)0)
@@ -78,7 +78,7 @@ protected:
   short _lib_index;
   const void *_min_address;
   const void *_max_address;
-  const char *_text_base;
+  const void *_text_base;
 
   void **_got_start;
   void **_got_end;
@@ -113,7 +113,7 @@ public:
 
   void setTextBase(const char *text_base) { _text_base = text_base; }
 
-  const char *getTextBase() { return _text_base; }
+  const void *getTextBase() { return _text_base; }
 
   void **gotStart() const { return _got_start; }
 
@@ -136,7 +136,7 @@ public:
   void makeGotPatchable();
 
   void setDwarfTable(FrameDesc *table, int length);
-  FrameDesc *findFrameDesc(const void *pc);
+  FrameDesc *findFrameDesc(uint64_t elf_address);
 };
 
 class CodeCacheArray {

@@ -391,22 +391,22 @@ add_unit_test(
 
 add_unit_test(ddprof_module_lib-ut ddprof_module_lib-ut.cc ../src/ddprof_module_lib.cc
               ../src/build_id.cc ../src/dso.cc LIBRARIES ${ELFUTILS_LIBRARIES})
-#add_unit_test(
-#  dwarf_unwind-ut
-#  dwarf_unwind-ut.cc
-#  ../src/lib/pthread_fixes.cc
-#  ../src/lib/savecontext.cc
-#  ../src/lib/saveregisters.cc
-#  # ../src/lib/allocation_tracker.cc
-#  ../src/ringbuffer_utils.cc
-#  ../src/perf_ringbuffer.cc
-#  ../src/perf.cc
-#  ../src/pevent_lib.cc
-#  ../src/sys_utils.cc
-#  ../src/user_override.cc
-#  ../src/perf_watcher.cc
-#  LIBRARIES ${ELFUTILS_LIBRARIES} DDProf::AsyncProf)
-#target_include_directories(dwarf_unwind-ut PRIVATE ${ASYNC_PROFILER_INCLUDE})
+add_unit_test(
+  dwarf_unwind-ut
+  dwarf_unwind-ut.cc
+  ../src/lib/pthread_fixes.cc
+  ../src/lib/savecontext.cc
+  ../src/lib/saveregisters.cc
+  # ../src/lib/allocation_tracker.cc
+  ../src/ringbuffer_utils.cc
+  ../src/perf_ringbuffer.cc
+  ../src/perf.cc
+  ../src/pevent_lib.cc
+  ../src/sys_utils.cc
+  ../src/user_override.cc
+  ../src/perf_watcher.cc
+  LIBRARIES ${ELFUTILS_LIBRARIES} DDProf::AsyncProf)
+target_include_directories(dwarf_unwind-ut PRIVATE ${ASYNC_PROFILER_INCLUDE})
 
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/pthread_fixes.cc
               ../src/lib/savecontext.cc ../src/lib/saveregisters.cc LIBRARIES llvm-demangle)

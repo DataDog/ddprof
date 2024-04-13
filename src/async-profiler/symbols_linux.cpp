@@ -678,6 +678,9 @@ void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array,
           printf("offset from get_elf_offset: %lx \n", elf_offset);
           printf("last readable: %lx \n", last_readable_base);
         }
+        else {
+          printf("Failed to read elf offsets \n");
+        }
 
         // Do not parse the same executable twice, e.g. on Alpine Linux
         if (parsed_inodes.insert(map.dev() | inode << 16).second) {
