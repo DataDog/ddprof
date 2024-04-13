@@ -118,15 +118,15 @@ void LOG_set_logs_allowed_function(LogsAllowedCallback logs_allowed_function);
 #define LG_IF_LVL_OK(level, ...)                                               \
   do {                                                                         \
     if (unlikely(LOG_is_logging_enabled_for_level(level))) {                   \
-      olprintfln(ABS(level), -1, MYNAME, __VA_ARGS__);                         \
+      ddprof::olprintfln(ABS(level), -1, MYNAME, __VA_ARGS__);                         \
     }                                                                          \
   } while (false)
 
-#define LG_ERR(...) LG_IF_LVL_OK(LL_ERROR, __VA_ARGS__)
-#define LG_WRN(...) LG_IF_LVL_OK(LL_WARNING, __VA_ARGS__)
-#define LG_NTC(...) LG_IF_LVL_OK(LL_NOTICE, __VA_ARGS__)
-#define LG_NFO(...) LG_IF_LVL_OK(LL_INFORMATIONAL, __VA_ARGS__)
-#define LG_DBG(...) LG_IF_LVL_OK(LL_DEBUG, __VA_ARGS__)
+#define LG_ERR(...) LG_IF_LVL_OK(ddprof::LL_ERROR, __VA_ARGS__)
+#define LG_WRN(...) LG_IF_LVL_OK(ddprof::LL_WARNING, __VA_ARGS__)
+#define LG_NTC(...) LG_IF_LVL_OK(ddprof::LL_NOTICE, __VA_ARGS__)
+#define LG_NFO(...) LG_IF_LVL_OK(ddprof::LL_INFORMATIONAL, __VA_ARGS__)
+#define LG_DBG(...) LG_IF_LVL_OK(ddprof::LL_DEBUG, __VA_ARGS__)
 #define PRINT_NFO(...) LG_IF_LVL_OK(-1 * LL_INFORMATIONAL, __VA_ARGS__)
 
 } // namespace ddprof
