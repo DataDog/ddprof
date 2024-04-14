@@ -23,7 +23,7 @@ To install the profiler, check out our [installation-helpers](#Installation-help
 The following command will run `ddprof` with the default settings (CPU and allocations)
 
 ```bash
-ddprof -S service_name_for_my_program ./my_program arg1 arg2
+ddprof -S service-name-for-my-program ./my_program arg1 arg2
 ```
 
 Profiling data shows up in the `/profiling` section of your Datadog UI. Specifying a service name will help you select your profiling data. 
@@ -62,20 +62,42 @@ By default the profiler will target `localhost:8126` (the default trace agent en
 
 ### Ubuntu / Debian
 
-The following commands will download and install `ddprof` on Debian or Ubuntu distributions:
+Install curl and jq.
 
 ```bash
-export ARCH=$(dpkg --print-architecture) # ARCH should hold amd64 or arm64
-# ddprof requires xz-utils to uncompress the archive
 sudo apt-get update && \
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y xz-utils curl jq && \
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y curl jq
+```
+
+Download the latest ddprof version, installing it to /usr/local/bin.
+
+```bash
+# ARCH should hold amd64 or arm64 
+ARCH=$(dpkg --print-architecture) && \
 tag_name=$(curl -s https://api.github.com/repos/DataDog/ddprof/releases/latest | jq -r '.tag_name[1:]') && \
-url_release="https://github.com/DataDog/ddprof/releases/download/v${tag_name}/ddprof-${tag_name}-${ARCH}-linux.tar.xz" && \
-curl -L -o ddprof-${ARCH}-linux.tar.xz ${url_release} && \
-tar xvf ddprof-${ARCH}-linux.tar.xz && \
-sudo mv ddprof/bin/ddprof /usr/local/bin && \
-rm -Rf ddprof-amd64-linux.tar.xz ./ddprof && \
+url_release="https://github.com/DataDog/ddprof/releases/download/v${tag_name}/ddprof-${ARCH}" && \
+curl -L -o ddprof ${url_release} && \
+chmod 755 ddprof && \
+sudo mv ddprof /usr/local/bin && \
 ddprof --version
+```
+
+## Examples
+
+### Memory leaks
+
+If your application runs with the default allocator (or a dynamically linked jemalloc), we will instrument your allocations. Launch this command and checkout the live heap profiles in the UI. You can use the compare tool to understand allocations which are growing over time.
+
+```bash
+ddprof -S my-service-name --preset cpu_live_heap -l warn ./my-application
+```
+
+### Everything running on a host
+
+You can instrument all running applications with the following command. You can use a fake service name to find your profiles.
+
+```bash
+sudo ddprof -S host-123 -g -l warn
 ```
 
 ## Key Features

@@ -69,7 +69,7 @@ DDRes report_lost_events(DDProfContext &ctx) {
           : watcher->sample_period;
 
       const int64_t value = period * nb_lost;
-      LG_WRN("Reporting %lu lost samples (cumulated lost value: %lu) for "
+      LG_NTC("Reporting %lu lost samples (cumulated lost value: %lu) for "
              "watcher #%d",
              nb_lost, value, watcher_idx);
       DDRES_CHECK_FWD(pprof_aggregate(
