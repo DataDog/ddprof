@@ -339,7 +339,7 @@ void ElfParser::parseDynamicSection() {
         break;
       }
     }
-    printf("relent = %d \n", relent);
+    printf("relent = %zu \n", relent);
     if (relent != 0) {
       if (pltrelsz != 0 && got_start != NULL) {
         // The number of entries in .got.plt section matches the number of
@@ -382,7 +382,7 @@ void ElfParser::parseDwarfInfoRemote(const char *eh_frame_data,
                                      Offset_t adjust_eh_frame) {
   printf("Create dwarf with base:%p - eh_frame_hdr:%p\n", _base, eh_frame_data);
   DwarfParser dwarf(_cc->name(), base_remote, eh_frame_data, adjust_eh_frame);
-  _cc->setDwarfTable(dwarf.table(), dwarf.count());
+  _cc->setDwarfTable(std::move(dwarf).table());
   printf("Created a number of dwarf entries = %d \n", dwarf.count());
 }
 
@@ -393,9 +393,9 @@ void ElfParser::parseDwarfInfo() {
   ElfProgramHeader *eh_frame_hdr = findProgramHeader(PT_GNU_EH_FRAME);
 
   if (eh_frame_hdr != NULL) {
-    printf("Create dwarf with %lx - at:%lx \n", _base, at(eh_frame_hdr));
+    printf("Create dwarf with %p - at:%p \n", _base, at(eh_frame_hdr));
     DwarfParser dwarf(_cc->name(), _base, at(eh_frame_hdr));
-    _cc->setDwarfTable(dwarf.table(), dwarf.count());
+    _cc->setDwarfTable(std::move(dwarf).table());
     printf("Created a number of dwarf entries = %d \n", dwarf.count());
   }
 }
@@ -658,11 +658,11 @@ void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array,
           printf("error opening file %s \n", map.file());
           continue;
         }
-        size_t length = (size_t)lseek64(fd, 0, SEEK_END);
+        // size_t length = (size_t)lseek64(fd, 0, SEEK_END);
         // todo : remove the mmap
         Elf *elf = elf_begin(fd, ELF_C_READ_MMAP, NULL);
         if (elf == NULL) {
-          LG_WRN("Invalid elf %s (efl:%p, addr_mmap:%p)\n", map.file(), elf);
+          LG_WRN("Invalid elf %s (elf:%p)\n", map.file(), elf);
           goto continue_loop;
         }
         Offset_t biais_offset;
@@ -676,7 +676,7 @@ void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array,
           printf("biais offset get_elf_offset: %lx \n", biais_offset);
           printf("text base from get_elf_offset: %lx \n", text_base);
           printf("offset from get_elf_offset: %lx \n", elf_offset);
-          printf("last readable: %lx \n", last_readable_base);
+          printf("last readable: %p \n", last_readable_base);
         }
         else {
           printf("Failed to read elf offsets \n");
@@ -696,7 +696,7 @@ void Symbols::parsePidLibraries(pid_t pid, CodeCacheArray *array,
                 eh_frame_info._eh_frame_hdr._offset;
             // this is used during unwinding to offset PC to dwarf instructions
             cc->setTextBase(image_base);
-            printf("image base = %lx \n", image_base);
+            printf("image base = %p \n", image_base);
 
             if (eh_frame_info._eh_frame_hdr._data) {
               // todo: is this always valid ?
@@ -791,7 +791,7 @@ void Symbols::parseLibraries(CodeCacheArray *array, bool kernel_symbols) {
         // Do not parse the same executable twice, e.g. on Alpine Linux
         if (parsed_inodes.insert(map.dev() | inode << 16).second) {
           // Be careful: executable file is not always ELF, e.g. classes.jsa
-          printf("image_base = %p, map.offs() = %p, last_readable_base = %p \n",
+          printf("image_base = %p, map.offs() = %lx, last_readable_base = %p \n",
                  image_base, map.offs(), last_readable_base);
           // todo - read the biais from the vaddr field (open file?)
 

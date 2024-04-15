@@ -26,6 +26,7 @@ enum PERF_ARCHMAP_X86 {
   PAM_X86_RSI,
   PAM_X86_RDI,
   PAM_X86_RBP,
+  PAM_X86_FP = PAM_X86_RBP, // For uniformity
   PAM_X86_RSP,
   PAM_X86_SP = PAM_X86_RSP, // For uniformity
   PAM_X86_RIP,

@@ -149,8 +149,9 @@ DDRes load_dwarf(pid_t pid, DsoHdr::PidMapping &pid_map, DsoHdr &dso_hdr,
   DwarfParser dwarf(dso._filename.c_str(), elf_base,
                     eh_frame_info._eh_frame_hdr._data, adjust_eh_frame);
 
-  LG_DBG("Dwarf table %lu elements", dwarf.count());
-  free(dwarf.table());
+  LG_DBG("Dwarf table %d elements", dwarf.count());
+
+  return {};
 }
 
 TEST(dwarf_unwind, read_dwarf) {

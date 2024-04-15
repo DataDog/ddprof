@@ -18,6 +18,7 @@
 #define _CODECACHE_H
 
 #include <stdint.h>
+#include <vector>
 
 #define NO_MIN_ADDRESS ((const void *)-1)
 #define NO_MAX_ADDRESS ((const void *)0)
@@ -92,8 +93,8 @@ protected:
 
 public:
   // todo fix hacky override for remote
-  FrameDesc *_dwarf_table;
-  int _dwarf_table_length;
+  using FrameDescTable = std::vector<FrameDesc>;
+  FrameDescTable _dwarf_table;
 
   CodeCache(const char *name, short lib_index = -1,
             const void *min_address = NO_MIN_ADDRESS,
@@ -135,7 +136,7 @@ public:
   void **findGlobalOffsetEntry(void *address);
   void makeGotPatchable();
 
-  void setDwarfTable(FrameDesc *table, int length);
+  void setDwarfTable(FrameDescTable &&table);
   FrameDesc *findFrameDesc(uint64_t elf_address);
 };
 

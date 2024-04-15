@@ -49,9 +49,6 @@ CodeCache::CodeCache(const char *name, short lib_index, const void *min_address,
   _got_end = NULL;
   _got_patchable = false;
 
-  _dwarf_table = NULL;
-  _dwarf_table_length = 0;
-
   _capacity = INITIAL_CODE_CACHE_CAPACITY;
   _count = 0;
   _blobs = new CodeBlob[_capacity];
@@ -63,7 +60,6 @@ CodeCache::~CodeCache() {
   }
   NativeFunc::destroy(_name);
   delete[] _blobs;
-  free(_dwarf_table);
 }
 
 void CodeCache::expand() {
@@ -214,16 +210,15 @@ void CodeCache::makeGotPatchable() {
   }
 }
 
-void CodeCache::setDwarfTable(FrameDesc *table, int length) {
-  _dwarf_table = table;
-  _dwarf_table_length = length;
+void CodeCache::setDwarfTable(FrameDescTable &&table) {
+  _dwarf_table = std::move(table);
 }
 
 FrameDesc *CodeCache::findFrameDesc(uintptr_t elf_address) {
   assert(elf_address < std::numeric_limits<u32>::max());
   const u32 target_loc = (const u32)elf_address;
   int low = 0;
-  int high = _dwarf_table_length - 1;
+  int high = _dwarf_table.size() - 1;
 
   while (low <= high) {
     int mid = (unsigned int)(low + high) >> 1;

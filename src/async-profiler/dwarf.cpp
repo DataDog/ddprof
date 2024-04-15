@@ -64,9 +64,7 @@ DwarfParser::DwarfParser(const char* name, const char* image_base,
     _name = name;
     _image_base = image_base;
 
-    _capacity = 128;
-    _count = 0;
-    _table = (FrameDesc*)malloc(_capacity * sizeof(FrameDesc));
+    _table.reserve(128);
     _prev = NULL;
 
     _code_align = sizeof(instruction_t);
@@ -117,7 +115,7 @@ void DwarfParser::parseFde() {
 
     const char* fde_start = _ptr;
     u32 cie_offset = get32();
-    if (_count == 0) {
+    if (_table.empty()) {
         _ptr = fde_start - cie_offset;
         parseCie();
         _ptr = fde_start + 4;
@@ -237,9 +235,9 @@ void DwarfParser::parseInstructions(u32 loc, const char* end) {
                         break;
                     case DW_CFA_val_expression:
                         if (getLeb() == DW_REG_PC) {
-                            int pc_off = parseExpression();
-                            if (pc_off != 0) {
-                                fp_off = DW_PC_OFFSET | (pc_off << 1);
+                            int pc_off2 = parseExpression();
+                            if (pc_off2 != 0) {
+                                fp_off = DW_PC_OFFSET | (pc_off2 << 1);
                             }
                         } else {
                             _ptr += getLeb();
@@ -335,22 +333,18 @@ int DwarfParser::parseExpression() {
 
 void DwarfParser::addRecord(u32 loc, u32 cfa_reg, int cfa_off, int fp_off, int pc_off) {
     int cfa = cfa_reg | cfa_off << 8;
-    if (_prev == NULL || (_prev->loc == loc && --_count >= 0) ||
-            _prev->cfa != cfa || _prev->fp_off != fp_off || _prev->pc_off != pc_off) {
+    if (_prev == NULL || _prev->cfa != cfa || _prev->fp_off != fp_off ||
+            _prev->pc_off != pc_off) {
         _prev = addRecordRaw(loc, cfa, fp_off, pc_off);
     }
 }
 
 FrameDesc* DwarfParser::addRecordRaw(u32 loc, int cfa, int fp_off, int pc_off) {
-    if (_count >= _capacity) {
-        _capacity *= 2;
-        _table = (FrameDesc*)realloc(_table, _capacity * sizeof(FrameDesc));
+    if (_prev != NULL && _prev->loc == loc) {
+        _table.back() = {loc, cfa, fp_off, pc_off};
+    } else {
+        _table.push_back({loc, cfa, fp_off, pc_off});
     }
 
-    FrameDesc* f = &_table[_count++];
-    f->loc = loc;
-    f->cfa = cfa;
-    f->fp_off = fp_off;
-    f->pc_off = pc_off;
-    return f;
+    return &_table.back();
 }

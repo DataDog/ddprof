@@ -10,7 +10,7 @@ StackContext from_regs(std::span<const uint64_t, ddprof::k_perf_register_count> 
   ap::StackContext sc;
   sc.pc = CAST_TO_VOID_STAR(regs[REGNAME(PC)]);
   sc.sp = regs[REGNAME(SP)];
-  sc.fp = regs[REGNAME(RBP)];
+  sc.fp = regs[REGNAME(FP)];
   return sc;
 }
 

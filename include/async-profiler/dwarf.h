@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include "arch.h"
 
+#include <vector>
 
 const int DW_REG_PLT = 128;      // denotes special rule for PLT entries
 const int DW_REG_INVALID = 255;  // denotes unsupported configuration
@@ -84,10 +85,9 @@ class DwarfParser {
     const char* _image_base;
     const char* _ptr;
 
-    int _capacity;
-    int _count;
-    FrameDesc* _table;
-    FrameDesc* _prev;
+    using FrameDescTable = std::vector<FrameDesc>;
+    FrameDescTable _table;
+    FrameDesc *_prev;
 
     u32 _code_align;
     int _data_align;
@@ -157,13 +157,11 @@ class DwarfParser {
     DwarfParser(const char* name, const char* image_base,
                 const char* eh_frame_hdr, u64 adjust_eh_frame = 0);
 
-    FrameDesc* table() const {
-        return _table;
-    }
+  const FrameDescTable &table() const & { return _table; }
 
-    int count() const {
-        return _count;
-    }
+  FrameDescTable &&table() && { return std::move(_table); }
+
+  int count() const { return _table.size(); }
 };
 
 #endif // _DWARF_H

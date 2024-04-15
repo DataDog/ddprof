@@ -10,8 +10,6 @@
 #include <dwarf.h>
 #include <elfutils/libdw.h>
 
-#define LG_WRN(args...) printf(args)
-
 const char *get_section_data(Elf *elf, const char *section_name,
                              Offset_t &elf_offset) {
   // Get the string table index for the section header strings
