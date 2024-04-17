@@ -62,11 +62,11 @@ By default the profiler will target `localhost:8126` (the default trace agent en
 
 ### Ubuntu / Debian
 
-Install curl and jq.
+Install curl.
 
 ```bash
 sudo apt-get update && \
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y curl jq
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y curl
 ```
 
 Download the latest ddprof version, installing it to /usr/local/bin.
@@ -74,8 +74,7 @@ Download the latest ddprof version, installing it to /usr/local/bin.
 ```bash
 # ARCH should hold amd64 or arm64 
 ARCH=$(dpkg --print-architecture) && \
-tag_name=$(curl -s https://api.github.com/repos/DataDog/ddprof/releases/latest | jq -r '.tag_name[1:]') && \
-url_release="https://github.com/DataDog/ddprof/releases/download/v${tag_name}/ddprof-${ARCH}" && \
+url_release="https://github.com/DataDog/ddprof/releases/latest/download/ddprof-${ARCH}" && \
 curl -L -o ddprof ${url_release} && \
 chmod 755 ddprof && \
 sudo mv ddprof /usr/local/bin && \
