@@ -88,8 +88,9 @@ ddprof --version
 If your application runs with the default allocator (or a dynamically linked jemalloc), we will instrument your allocations. Launch this command and checkout the live heap profiles in the UI. You can use the compare tool to understand allocations which are growing over time.
 
 ```bash
-ddprof -S my-service-name --preset cpu_live_heap -l warn ./my-application
+ddprof -S my-service-name --preset cpu_live_heap -l warn --woker-period 15000 ./my-application
 ```
+:warning: The `--worker-period` flag is used to avoid the resets of the heap profile. The default value is 4 hours. This changes to 15000 minutes (10+ days).
 
 ### Everything running on a host
 
