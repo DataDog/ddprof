@@ -88,7 +88,8 @@ enum PERF_ARCHMAP_ARM {
   PAM_ARM_X28,
   PAM_ARM_X29,
   PAM_ARM_FP = PAM_ARM_X29, // For uniformity
-  PAM_ARM_LR,
+  PAM_ARM_X30,
+  PAM_ARM_LR = PAM_ARM_X30, // For uniformity
   PAM_ARM_SP,
   PAM_ARM_PC,
   PAM_ARM_MAX,
