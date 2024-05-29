@@ -51,7 +51,11 @@ bool set_initial_registers(Dwfl_Thread *thread, void *arg) {
 bool memory_read_dwfl(Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
                       int regno, void *arg) {
   (void)dwfl;
-  return memory_read(addr, result, regno, arg);
+  auto *us = static_cast<UnwindState *>(arg);
+  if (us->memory_read_callback) {
+    return us->memory_read_callback(addr, result, regno);
+  }
+  return memory_read(addr, result, regno, us);
 }
 
 } // namespace ddprof
