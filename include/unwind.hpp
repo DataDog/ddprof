@@ -23,7 +23,7 @@ void unwind_init_sample(UnwindState *us, const uint64_t *sample_regs,
 // Main unwind API
 DDRes unwindstate_unwind(UnwindState *us);
 
-// Mark a cycle: garbadge collection, stats
+// Mark a cycle: garbage collection, stats
 void unwind_cycle(UnwindState *us);
 
 // Clear unwinding structures of this pid
