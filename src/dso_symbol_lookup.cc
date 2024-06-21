@@ -11,6 +11,7 @@
 
 #include <absl/strings/str_format.h>
 #include <algorithm>
+#include <filesystem>
 
 namespace ddprof {
 
@@ -25,7 +26,7 @@ Symbol symbol_from_dso(ElfAddress_t normalized_addr, const Dso &dso,
   // address that means something for our user (addr)
   std::string const dso_dbg_str = normalized_addr
       ? absl::StrFormat("[%#x:%s]", normalized_addr, addr_type)
-      : "";
+      : std::filesystem::path(dso.format_filename()).filename().string();
   return {dso_dbg_str, dso_dbg_str, 0, dso.format_filename()};
 }
 } // namespace

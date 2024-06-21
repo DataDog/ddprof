@@ -9,6 +9,7 @@
 #include "logger.hpp"
 
 #include <absl/strings/str_cat.h>
+#include <filesystem>
 
 namespace ddprof {
 
@@ -35,8 +36,10 @@ BaseFrameSymbolLookup::insert_bin_symbol(pid_t pid, SymbolTable &symbol_table,
     std::string exe_name;
     bool const exe_found = dso_hdr.find_exe_name(pid, exe_name);
     if (exe_found) {
+      const std::filesystem::path path(exe_name);
+      const std::string base_name = path.filename().string();
       symbol_idx = symbol_table.size();
-      symbol_table.emplace_back(Symbol({}, {}, 0, exe_name));
+      symbol_table.emplace_back(Symbol({}, base_name, 0, exe_name));
       _bin_map.insert({pid, symbol_idx});
     }
   }
