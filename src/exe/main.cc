@@ -4,6 +4,7 @@
 // Datadog, Inc.
 
 #include "constants.hpp"
+#include "crash_reporter.hpp"
 #include "daemonize.hpp"
 #include "ddprof.hpp"
 #include "ddprof_cli.hpp"
@@ -408,6 +409,11 @@ int main(int argc, char *argv[]) {
                                               // goes out of scope.
 
     } // cli is destroyed here (prevents forks from having an instance of CLI
+
+    if (ctx->params.report_crash) {
+      report_crash(getppid(), ctx->params.pid, ctx->exp_input);
+      return 0;
+    }
 
     // Save switch_user since ctx will be destroyed after call to start_profiler
     std::string const switch_user = ctx->params.switch_user;

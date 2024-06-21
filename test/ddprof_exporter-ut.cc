@@ -5,6 +5,7 @@
 
 #include "exporter/ddprof_exporter.hpp"
 
+#include "defer.hpp"
 #include "loghandle.hpp"
 #include "pevent_lib_mocks.hpp"
 #include "pprof/ddprof_pprof.hpp"
@@ -159,6 +160,9 @@ TEST(DDProfExporter, simple) {
     MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
     fill_unwind_symbols(table, mapinfo_table, mock_output);
     DDProfContext ctx = {};
+    ctx.worker_ctx.symbolizer = new Symbolizer();
+    defer { delete ctx.worker_ctx.symbolizer; };
+
     ctx.watchers.push_back(*ewatcher_from_str("sCPU"));
     res = pprof_create_profile(&pprofs, ctx);
     EXPECT_TRUE(IsDDResOK(res));

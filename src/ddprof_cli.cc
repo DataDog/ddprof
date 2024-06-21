@@ -398,6 +398,12 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
                                  ->default_val(k_default_max_profiled_pids)
                                  ->envname("DD_PROFILING_MAXIMUM_PIDS")
                                  ->group(""));
+
+  extended_options.push_back(
+      app.add_flag("--report-crash", report_crash, "Report crash to Datadog")
+          ->default_val(false)
+          ->group(""));
+
   // Parse
   CLI11_PARSE(app, argc, argv);
 

@@ -6,6 +6,7 @@
 #include "ddprof.hpp"
 
 #include "cap_display.hpp"
+#include "crash_tracker.hpp"
 #include "ddprof_cmdline.hpp"
 #include "ddprof_context.hpp"
 #include "ddprof_context_lib.hpp"
@@ -33,26 +34,6 @@
 
 namespace ddprof {
 namespace {
-/*****************************  SIGSEGV Handler *******************************/
-void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
-  // TODO this really shouldn't call printf-family functions...
-  (void)uc;
-#ifdef __GLIBC__
-  constexpr size_t k_stacktrace_buffer_size = 4096;
-  static void *buf[k_stacktrace_buffer_size] = {};
-  size_t const sz = backtrace(buf, std::size(buf));
-#endif
-  (void)fprintf(
-      stderr, "ddprof[%d]: <%.*s> has encountered an error and will exit\n",
-      getpid(), static_cast<int>(str_version().size()), str_version().data());
-  if (sig == SIGSEGV) {
-    printf("[DDPROF] Fault address: %p\n", si->si_addr);
-  }
-#ifdef __GLIBC__
-  backtrace_symbols_fd(buf, sz, STDERR_FILENO);
-#endif
-  exit(-1);
-}
 
 void display_system_info() {
 
@@ -92,6 +73,25 @@ DDRes get_process_threads(pid_t pid, std::vector<pid_t> &threads) {
   return {};
 }
 
+void configure_crash_tracker(const DDProfContext &ctx) {
+  std::vector<std::string> args = {"--service", ctx.exp_input.service};
+  if (!ctx.exp_input.url.empty()) {
+    args.emplace_back("--url");
+    args.emplace_back(ctx.exp_input.url);
+  }
+  if (!ctx.exp_input.host.empty()) {
+    args.emplace_back("--host");
+    args.emplace_back(ctx.exp_input.host);
+  }
+  if (!ctx.exp_input.port.empty()) {
+    args.emplace_back("--port");
+    args.emplace_back(ctx.exp_input.port);
+  }
+
+  args.emplace_back("--report-crash");
+  install_crash_tracker("/proc/self/exe", args);
+}
+
 } // namespace
 
 DDRes ddprof_setup(DDProfContext &ctx) {
@@ -115,10 +115,7 @@ DDRes ddprof_setup(DDProfContext &ctx) {
 
     // Setup signal handler if defined
     if (ctx.params.fault_info) {
-      struct sigaction sigaction_handlers = {};
-      sigaction_handlers.sa_sigaction = sigsegv_handler;
-      sigaction_handlers.sa_flags = SA_SIGINFO;
-      sigaction(SIGSEGV, &(sigaction_handlers), nullptr);
+      configure_crash_tracker(ctx);
     }
 
     // Set the nice level, but only if it was overridden because 0 is valid

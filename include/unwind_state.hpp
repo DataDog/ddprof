@@ -17,6 +17,7 @@
 #include "symbol_hdr.hpp"
 #include "unwind_output.hpp"
 
+#include <functional>
 #include <optional>
 #include <sys/types.h>
 
@@ -63,6 +64,10 @@ struct UnwindState {
   UnwindOutput output;
   UniqueElf ref_elf; // reference elf object used to initialize dwfl
   int maximum_pids;
+
+  using MemoryReadCallback =
+      std::function<bool(ProcessAddress_t addr, ElfWord_t *result, int regno)>;
+  MemoryReadCallback memory_read_callback; // custom memory read callback
 };
 
 std::optional<UnwindState>

@@ -8,6 +8,7 @@
 #include "ddog_profiling_utils.hpp"
 #include "ddprof_cmdline.hpp"
 #include "ddprof_cmdline_watcher.hpp"
+#include "defer.hpp"
 #include "loghandle.hpp"
 #include "pevent_lib_mocks.hpp"
 #include "symbol_hdr.hpp"
@@ -66,6 +67,8 @@ TEST(DDProfPProf, aggregate) {
   fill_unwind_symbols(table, mapinfo_table, mock_output);
   DDProfPProf pprof;
   DDProfContext ctx = {};
+  ctx.worker_ctx.symbolizer = new Symbolizer();
+  defer { delete ctx.worker_ctx.symbolizer; };
 
   bool ok = watchers_from_str("sCPU", ctx.watchers);
   EXPECT_TRUE(ok);
@@ -94,6 +97,9 @@ TEST(DDProfPProf, just_live) {
   fill_unwind_symbols(table, mapinfo_table, mock_output);
   DDProfPProf pprof;
   DDProfContext ctx = {};
+  ctx.worker_ctx.symbolizer = new Symbolizer();
+  defer { delete ctx.worker_ctx.symbolizer; };
+
   {
     bool ok = watchers_from_str("sDUM", ctx.watchers);
     EXPECT_TRUE(ok);

@@ -8,9 +8,8 @@
 namespace ddprof {
 // read a word from the given stack
 bool memory_read(ProcessAddress_t addr, ElfWord_t *result, int regno,
-                 void *arg) {
+                 UnwindState *us) {
   *result = 0;
-  auto *us = static_cast<UnwindState *>(arg);
 
   constexpr uint64_t k_zero_page_limit = 4096;
   if (addr < k_zero_page_limit) {

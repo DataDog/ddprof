@@ -71,6 +71,8 @@ public:
   bool remote_symbolization{false};
   bool disable_symbolization{false};
   bool reorder_events{false}; // reorder events by timestamp
+  bool report_crash{false};
+  bool track_crashes{false};
   int maximum_pids{-1};
 
   std::string socket_path;

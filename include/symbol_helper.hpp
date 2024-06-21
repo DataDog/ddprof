@@ -3,6 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2024-Present
 // Datadog, Inc.
 
+#include "defer.hpp"
 #include "unwind_state.hpp"
 
 #include <array>
@@ -12,8 +13,8 @@
 
 namespace ddprof {
 // This is a test API. Use the symbolizer to populate pprof structures
-std::vector<std::string> collect_symbols(UnwindState &state,
-                                         blaze_symbolizer *symbolizer) {
+inline std::vector<std::string> collect_symbols(UnwindState &state,
+                                                blaze_symbolizer *symbolizer) {
   std::vector<std::string> demangled_symbols;
   auto &symbol_table = state.symbol_hdr._symbol_table;
   for (size_t iloc = 0; iloc < state.output.locs.size(); ++iloc) {
@@ -23,7 +24,7 @@ std::vector<std::string> collect_symbols(UnwindState &state,
       std::array<ElfAddress_t, 1> elf_addr{state.output.locs[iloc].elf_addr};
       const auto &file_info_value = state.dso_hdr.get_file_info_value(
           state.output.locs[iloc].file_info_id);
-      blaze_symbolize_src_elf src_elf{
+      const blaze_symbolize_src_elf src_elf{
           .type_size = sizeof(blaze_symbolize_src_elf),
           .path = file_info_value.get_path().c_str(),
           .debug_syms = true,

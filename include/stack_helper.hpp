@@ -8,6 +8,7 @@
 #include "ddprof_defs.hpp"
 
 namespace ddprof {
+struct UnwindState;
 bool memory_read(ProcessAddress_t addr, ElfWord_t *result, int regno,
-                 void *arg);
-}
+                 UnwindState *us);
+} // namespace ddprof
