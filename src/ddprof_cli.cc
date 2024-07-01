@@ -185,7 +185,8 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
                  "This is possible if debug sections are available.\n"
                  "This can have performance impacts for the profiler.")
       ->group("Profiling settings")
-      ->default_val(false);
+      ->default_val(false)
+      ->envname("DD_PROFILING_INLINED_FUNCTIONS");
   app.add_flag("--timeline,-t", timeline,
                "Enables Timeline view in the Datadog UI.\n"
                "Works by adding timestmaps to certain events.")

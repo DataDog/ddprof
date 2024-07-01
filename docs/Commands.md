@@ -44,7 +44,7 @@ Profiling settings:
   -g,--global Excludes: command_line --pid
                               Instrument all processes.
                               Requires specific capabilities or a perf_event_paranoid value of less than 1.
-  -I,--inlined_functions,--inlined-functions BOOLEAN [0] 
+  -I,--inlined_functions,--inlined-functions BOOLEAN [0]  (Env:DD_PROFILING_INLINED_FUNCTIONS)
                               Report inlined functions in call stacks.
                               This is possible if debug sections are available.
                               This can have performance impacts for the profiler.
