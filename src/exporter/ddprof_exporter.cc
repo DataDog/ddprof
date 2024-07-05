@@ -132,6 +132,9 @@ DDRes fill_stable_tags(const UserTags *user_tags,
                                    exporter->_input.profiler_version));
   }
 
+  DDRES_CHECK_FWD(
+      add_single_tag(tags_exporter, "runtime-id", exporter->_input.runtime_id));
+
   for (const auto &el : user_tags->_tags) {
     DDRES_CHECK_FWD(add_single_tag(tags_exporter, el.first, el.second));
   }

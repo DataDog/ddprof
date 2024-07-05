@@ -156,6 +156,7 @@ add_unit_test(
   ../src/logger_setup.cc
   ../src/perf_watcher.cc
   ../src/presets.cc
+  ../src/uuid.cc
   ../src/tracepoint_config.cc
   ddprof_context-ut.cc
   LIBRARIES DDProf::Parser CLI11
@@ -370,6 +371,7 @@ add_unit_test(
   ../src/ddprof_cmdline_watcher.cc
   ../src/perf_watcher.cc
   ../src/tracepoint_config.cc
+  ../src/uuid.cc
   LIBRARIES DDProf::Parser CLI11)
 
 add_unit_test(pthread_tls-ut pthread_tls-ut.cc)

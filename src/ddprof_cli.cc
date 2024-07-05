@@ -18,6 +18,7 @@
 #include "ddprof_defs.hpp"
 #include "ddres.hpp"
 #include "logger.hpp"
+#include "uuid.hpp"
 #include "version.hpp"
 
 #include <chrono>
@@ -294,6 +295,17 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
                      "A debug option to work without the Datadog agent.\n")
           ->group("")
           ->envname("DD_API_KEY"));
+  // In theory, the runtime_id should be read from tracing
+  // However the otel-tracers do not seem to provide this type of information
+  // To ensure timelines can be searched, we need to provide this
+  // Disclaimer: In full host, this does not really make sense.
+  //      There should be several runtime_ids
+  extended_options.push_back(
+      app.add_option("--runtime_id,--runtime-id", exporter_input.runtime_id,
+                     "Override the generated runtime_id.\n")
+          ->default_val(Uuid().to_string())
+          ->group("")
+          ->envname("DD_PROFILING_RUNTIME_ID"));
 
   extended_options.push_back(
       app.add_option("--cpu_affinity,--cpu-affinity", cpu_affinity,
@@ -474,6 +486,7 @@ void DDProfCLI::print() const {
   PRINT_NFO("  - host: %s", exporter_input.host.c_str());
   PRINT_NFO("  - port: %s", exporter_input.port.c_str());
   PRINT_NFO("  - do_export: %s", exporter_input.do_export ? "true" : "false");
+  PRINT_NFO("  - runtime_id: %s", exporter_input.runtime_id.c_str());
 
   if (!tags.empty()) {
     PRINT_NFO("Tags: %s", tags.c_str());

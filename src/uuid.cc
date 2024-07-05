@@ -4,50 +4,56 @@
 // Datadog, Inc.
 
 #include <random>
-#include <sstream>
-#include <vector>
 
+#include "absl/strings/str_format.h"
 #include "uuid.hpp"
 
-namespace dd {
+namespace ddprof {
+// NOLINTBEGIN(readability-magic-numbers)
+Uuid::Uuid() {
+  std::random_device rd;
+  std::array<int32_t, 4> seed_data;
+  // Generate seed data
+  // as we only are using 4 integers, we avoid using the mersenne twister
+  std::generate_n(seed_data.data(), seed_data.size(), std::ref(rd));
 
-// Copied from dd-trace-dotnet, and previously
-// copied from https://stackoverflow.com/a/60198074
-// We replace std::mt19937 by std::mt19937_64 so we can generate 64bits numbers instead of 32bits
-std::string GenerateUuidV4()
-{
-  static std::random_device rd;
-  static std::mt19937_64 gen(rd());
-  static std::uniform_int_distribution<> dis(0, 15);
-  static std::uniform_int_distribution<> dis2(8, 11);
+  // fill the data array with the seed data
+  // we do not need to worry about distribution as we limit to 15 with the mask
+  int index = 0;
+  for (const auto &seed : seed_data) {
+    data[index++] = (seed >> 28) & 0x0F;
+    data[index++] = (seed >> 24) & 0x0F;
+    data[index++] = (seed >> 20) & 0x0F;
+    data[index++] = (seed >> 16) & 0x0F;
+    data[index++] = (seed >> 12) & 0x0F;
+    data[index++] = (seed >> 8) & 0x0F;
+    data[index++] = (seed >> 4) & 0x0F;
+    data[index++] = seed & 0x0F;
+  }
 
-  std::stringstream ss;
-  ss << std::hex;
-  for (auto i = 0; i < 8; i++)
-  {
-    ss << dis(gen);
-  }
-  ss << "-";
-  for (auto i = 0; i < 4; i++)
-  {
-    ss << dis(gen);
-  }
-  ss << "-4"; // according to the RFC, '4' is the 4 version
-  for (auto i = 0; i < 3; i++)
-  {
-    ss << dis(gen);
-  }
-  ss << "-";
-  ss << dis2(gen);
-  for (auto i = 0; i < 3; i++)
-  {
-    ss << dis(gen);
-  }
-  ss << "-";
-  for (auto i = 0; i < 12; i++)
-  {
-    ss << dis(gen);
-  }
-  return ss.str();
+  // Set the version to 4 (UUID version 4)
+  data[k_version_position] = k_version;
+
+  // Variant is of the form 10XX
+  // So we set the first bits, then we use the random
+  // This should be random from 8 to 11 (8 to b)
+  data[k_variant_position] = 0x8 | (data[k_variant_position] & 0x03);
 }
+
+// we could loop instead to make things more readable,
+// though that would be worse to understand the format
+std::string Uuid::to_string() const {
+  return absl::StrFormat("%x%x%x%x%x%x%x%x-"
+                         "%x%x%x%x-"
+                         "%x%x%x%x-"
+                         "%x%x%x%x-"
+                         "%x%x%x%x%x%x%x%x%x%x%x%x",
+                         data[0], data[1], data[2], data[3], data[4], data[5],
+                         data[6], data[7], data[8], data[9], data[10], data[11],
+                         data[12], data[13], data[14], data[15], data[16],
+                         data[17], data[18], data[19], data[20], data[21],
+                         data[22], data[23], data[24], data[25], data[26],
+                         data[27], data[28], data[29], data[30], data[31]);
 }
+// NOLINTEND(readability-magic-numbers)
+} // namespace ddprof

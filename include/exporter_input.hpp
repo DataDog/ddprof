@@ -21,7 +21,8 @@ struct ExporterInput {
   std::string url;             // url (can contain port and schema)
   std::string port; // port appended to the host IP (ignored in agentless)
   std::string debug_pprof_prefix; // local pprof prefix (debug)
-  bool do_export{true};           // prevent exports if needed (debug flag)
+  std::string runtime_id;
+  bool do_export{true}; // prevent exports if needed (debug flag)
   std::string_view user_agent{
       "ddprof"}; // ignored for now (override in shared lib)
   std::string_view language{"native"}; // appended to the tags (set to native)
