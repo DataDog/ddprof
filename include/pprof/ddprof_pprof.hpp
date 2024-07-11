@@ -11,6 +11,7 @@
 #include "ddprof_file_info.hpp"
 #include "ddres_def.hpp"
 #include "perf_watcher.hpp"
+#include "symbolizer.hpp"
 #include "tags.hpp"
 #include "unwind_output.hpp"
 
@@ -58,5 +59,11 @@ DDRes pprof_reset(DDProfPProf *pprof);
 DDRes pprof_write_profile(const DDProfPProf *pprof, int fd);
 
 DDRes pprof_free_profile(DDProfPProf *pprof);
+
+DDRes process_symbolization(
+    std::span<const FunLoc> locs, const SymbolHdr &symbol_hdr,
+    const FileInfoVector &file_infos, Symbolizer *symbolizer,
+    std::array<ddog_prof_Location, kMaxStackDepth> &locations_buff,
+    Symbolizer::BlazeResultsWrapper &session_results, unsigned &write_index);
 
 } // namespace ddprof

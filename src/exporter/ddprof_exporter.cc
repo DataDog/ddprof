@@ -189,6 +189,35 @@ DDRes fill_cycle_tags(const Tags &additional_tags, uint32_t profile_seq,
 
 } // namespace
 
+std::string determine_agent_url(const ExporterInput &exporter_input) {
+  std::string port_str = exporter_input.port;
+  std::string agent_url;
+
+  if (!exporter_input.url.empty()) {
+    // uds or already port -> no port
+    if (!strncasecmp(exporter_input.url.c_str(), "unix", 4) ||
+        contains_port(exporter_input.url)) {
+      port_str = {};
+    }
+    // check if schema is already available
+    if (strstr(exporter_input.url.c_str(), "://") != nullptr) {
+      agent_url = alloc_url_agent("", exporter_input.url, port_str);
+    } else if (exporter_input.url[0] == '/') {
+      // Starts with a '/', assume unix domain socket
+      agent_url = alloc_url_agent("unix://", exporter_input.url, {});
+    } else {
+      // not available, assume http
+      agent_url = alloc_url_agent("http://", exporter_input.url, port_str);
+    }
+  } else {
+    // no url, use default host and port settings
+    agent_url =
+        alloc_url_agent("http://", exporter_input.host, exporter_input.port);
+  }
+
+  return agent_url;
+}
+
 DDRes ddprof_exporter_init(const ExporterInput &exporter_input,
                            DDProfExporter *exporter) {
   exporter->_input = exporter_input;
@@ -205,30 +234,7 @@ DDRes ddprof_exporter_init(const ExporterInput &exporter_input,
   }
 
   if (exporter->_agent) {
-    std::string port_str = exporter_input.port;
-
-    if (!exporter_input.url.empty()) {
-      // uds or already port -> no port
-      if (!strncasecmp(exporter_input.url.c_str(), "unix", 4) ||
-          contains_port(exporter_input.url)) {
-        port_str = {};
-      }
-      // check if schema is already available
-      if (strstr(exporter_input.url.c_str(), "://") != nullptr) {
-        exporter->_url = alloc_url_agent("", exporter_input.url, port_str);
-      } else if (exporter_input.url[0] == '/') {
-        // Starts with a '/', assume unix domain socket
-        exporter->_url = alloc_url_agent("unix://", exporter_input.url, {});
-      } else {
-        // not available, assume http
-        exporter->_url =
-            alloc_url_agent("http://", exporter_input.url, port_str);
-      }
-    } else {
-      // no url, use default host and port settings
-      exporter->_url =
-          alloc_url_agent("http://", exporter_input.host, exporter_input.port);
-    }
+    exporter->_url = determine_agent_url(exporter_input);
   } else {
     // agentless mode
     if (!exporter->_input.url.empty()) {

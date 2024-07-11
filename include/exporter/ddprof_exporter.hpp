@@ -39,4 +39,6 @@ DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
 
 DDRes ddprof_exporter_free(DDProfExporter *exporter);
 
+std::string determine_agent_url(const ExporterInput &exporter_input);
+
 } // namespace ddprof

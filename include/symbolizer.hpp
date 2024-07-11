@@ -87,6 +87,8 @@ public:
   int remove_unvisited();
   void reset_unvisited_flag();
 
+  AddrFormat reported_addr_format() const { return _reported_addr_format; }
+
 private:
   struct BlazeSymbolizerDeleter {
     void operator()(blaze_symbolizer *ptr) const {

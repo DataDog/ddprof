@@ -9,13 +9,13 @@
 
 #include "user_override.hpp"
 
+#include "dumpable.hpp"
 #include "logger.hpp"
 
 #include <cerrno>
 #include <cstring>
 #include <grp.h>
 #include <pwd.h>
-#include <sys/prctl.h>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -24,18 +24,6 @@ namespace ddprof {
 namespace {
 constexpr const char *const s_user_nobody = "nobody";
 constexpr uid_t s_root_user = 0;
-
-struct DumpableRestorer {
-public:
-  DumpableRestorer() : _dumpable{prctl(PR_GET_DUMPABLE)} {}
-  ~DumpableRestorer() { prctl(PR_SET_DUMPABLE, _dumpable); }
-
-  DumpableRestorer(const DumpableRestorer &) = delete;
-  DumpableRestorer operator=(const DumpableRestorer &) = delete;
-
-private:
-  int _dumpable;
-};
 
 } // namespace
 
