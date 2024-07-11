@@ -156,6 +156,7 @@ add_unit_test(
   ../src/logger_setup.cc
   ../src/perf_watcher.cc
   ../src/presets.cc
+  ../src/uuid.cc
   ../src/tracepoint_config.cc
   ddprof_context-ut.cc
   LIBRARIES DDProf::Parser CLI11
@@ -370,6 +371,7 @@ add_unit_test(
   ../src/ddprof_cmdline_watcher.cc
   ../src/perf_watcher.cc
   ../src/tracepoint_config.cc
+  ../src/uuid.cc
   LIBRARIES DDProf::Parser CLI11)
 
 add_unit_test(pthread_tls-ut pthread_tls-ut.cc)
@@ -391,6 +393,8 @@ add_unit_test(
 
 add_unit_test(ddprof_module_lib-ut ddprof_module_lib-ut.cc ../src/ddprof_module_lib.cc
               ../src/build_id.cc ../src/dso.cc LIBRARIES ${ELFUTILS_LIBRARIES})
+
+add_unit_test(uuid-ut ../src/uuid.cc ./uuid-ut.cc)
 
 add_benchmark(savecontext-bench savecontext-bench.cc ../src/lib/pthread_fixes.cc
               ../src/lib/savecontext.cc ../src/lib/saveregisters.cc LIBRARIES llvm-demangle)
