@@ -184,14 +184,18 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
                  inlined_functions,
                  "Report inlined functions in call stacks.\n"
                  "This is possible if debug sections are available.\n"
-                 "This can have performance impacts for the profiler.")
+                 "Split debug information will be looked up if available.\n"
+                 "The option has performance impacts for the profiler.")
       ->group("Profiling settings")
       ->default_val(false)
       ->envname("DD_PROFILING_INLINED_FUNCTIONS");
-  app.add_flag("--timeline,-t", timeline,
-               "Enables Timeline view in the Datadog UI.\n"
-               "Works by adding timestmaps to certain events.")
+
+  app.add_flag(
+         "--timeline,!--no-timeline", timeline,
+         "Enables Timeline view in the Datadog UI.\n"
+         "Timestamps are added to CPU samples captured by the profiler.\n")
       ->group("Profiling settings")
+      ->default_val(true)
       ->envname("DD_PROFILING_TIMELINE_ENABLE");
 
   app.add_option<std::chrono::seconds, unsigned>(
@@ -498,6 +502,7 @@ void DDProfCLI::print() const {
   if (global) {
     PRINT_NFO("  - global: %s", global ? "true" : "false");
   }
+  PRINT_NFO("  - timeline: %s", timeline ? "true" : "false");
   if (!command_line.empty()) {
     std::string command_line_str = "[" + command_line[0];
     std::for_each(std::next(command_line.begin()), command_line.end(),
@@ -547,9 +552,6 @@ void DDProfCLI::print() const {
   }
   if (show_samples) {
     PRINT_NFO("  - show_samples: %s", show_samples ? "true" : "false");
-  }
-  if (timeline) {
-    PRINT_NFO("  - timeline: %s", timeline ? "true" : "false");
   }
   PRINT_NFO("  - fault_info: %s", fault_info ? "true" : "false");
 

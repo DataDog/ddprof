@@ -47,10 +47,12 @@ Profiling settings:
   -I,--inlined_functions,--inlined-functions BOOLEAN [0]  (Env:DD_PROFILING_INLINED_FUNCTIONS)
                               Report inlined functions in call stacks.
                               This is possible if debug sections are available.
-                              This can have performance impacts for the profiler.
-  -t,--timeline (Env:DD_PROFILING_TIMELINE_ENABLE)
+                              Split debug information will be looked up if available.
+                              The option has performance impacts for the profiler.
+  --timeline,--no-timeline{false} [1]  (Env:DD_PROFILING_TIMELINE_ENABLE)
                               Enables Timeline view in the Datadog UI.
-                              Works by adding timestmaps to certain events.
+                              Timestamps are added to CPU samples captured by the profiler.
+                              
   -u,--upload_period,--upload-period UINT [59]  (Env:DD_PROFILING_UPLOAD_PERIOD)
                               Upload period for profiles (in seconds).
                               
