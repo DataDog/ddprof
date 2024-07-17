@@ -391,7 +391,10 @@ void WorkerServer::event_loop() {
   poll_fds.push_back({.fd = _socket, .events = POLLIN});
   poll_fds.push_back({.fd = sfd, .events = POLLIN});
 
-  while (true) {
+  bool shutting_down = false;
+
+  // Stop when shutting down is requested and all connections are closed
+  while (!shutting_down || poll_fds.size() > 2) {
     int const ret = poll(poll_fds.data(), poll_fds.size(), -1);
     if (ret < 0) {
       if (errno == EINTR) {
@@ -400,7 +403,7 @@ void WorkerServer::event_loop() {
       return;
     }
     if (poll_fds[1].revents & POLLIN) {
-      break;
+      shutting_down = true;
     }
     auto first = poll_fds.begin() + 2;
     auto last = poll_fds.end();
@@ -421,7 +424,8 @@ void WorkerServer::event_loop() {
       }
     }
     poll_fds.erase(last, poll_fds.end());
-    if (poll_fds[0].revents & POLLIN) {
+    // Do not accept new connections if shutting down
+    if ((poll_fds[0].revents & POLLIN) && !shutting_down) {
       int const new_socket = ::accept(poll_fds[0].fd, nullptr, nullptr);
       if (new_socket != -1) {
         auto tv = duration_to_timeval(kDefaultSocketTimeout);
