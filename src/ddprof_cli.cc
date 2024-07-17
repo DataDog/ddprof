@@ -403,7 +403,7 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
   extended_options.push_back(
       app.add_flag("--reorder-events,!--no-reorder-events", reorder_events,
                    "Reorder perf events by timestamp")
-          ->default_val(false)
+          ->default_val(true)
           ->envname("DD_PROFILING_REORDER_EVENTS")
           ->group(""));
 
