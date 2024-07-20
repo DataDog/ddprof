@@ -17,7 +17,7 @@ namespace ddprof {
 inline constexpr size_t k_perf_register_count = 20;
 inline constexpr uint64_t k_perf_register_mask = 0xff0fff;
 
-#  define REGNAME(x) PAM_X86_##x
+#  define REGNAME(x) ddprof::PAM_X86_##x
 enum PERF_ARCHMAP_X86 {
   PAM_X86_RAX,
   PAM_X86_RBX,
@@ -26,6 +26,7 @@ enum PERF_ARCHMAP_X86 {
   PAM_X86_RSI,
   PAM_X86_RDI,
   PAM_X86_RBP,
+  PAM_X86_FP = PAM_X86_RBP, // For uniformity
   PAM_X86_RSP,
   PAM_X86_SP = PAM_X86_RSP, // For uniformity
   PAM_X86_RIP,
@@ -55,7 +56,7 @@ inline constexpr size_t k_perf_register_count = 33;
 inline constexpr uint64_t k_perf_register_mask =
     ~(~0ULL << k_perf_register_count);
 
-#  define REGNAME(x) PAM_ARM_##x
+#  define REGNAME(x) ddprof::PAM_ARM_##x
 enum PERF_ARCHMAP_ARM {
   PAM_ARM_X0,
   PAM_ARM_X1,
