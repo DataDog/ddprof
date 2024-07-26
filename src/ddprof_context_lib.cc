@@ -143,7 +143,8 @@ DDRes context_add_watchers(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
 } // namespace
 
 DDRes context_set(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
-  setup_logger(ddprof_cli.log_mode.c_str(), ddprof_cli.log_level.c_str());
+  setup_logger(ddprof_cli.log_mode.c_str(), ddprof_cli.log_level.c_str(),
+               MYNAME);
 
   copy_cli_values(ddprof_cli, ctx);
 

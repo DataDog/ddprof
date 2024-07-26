@@ -11,7 +11,7 @@ namespace ddprof {
 inline constexpr auto kMaxLogPerSecForNonDebug = 100;
 
 void setup_logger(
-    const char *log_mode, const char *log_level,
+    const char *log_mode, const char *log_level, const char *name,
     uint64_t max_log_per_sec_for_non_debug = kMaxLogPerSecForNonDebug);
 
 } // namespace ddprof

@@ -78,18 +78,15 @@ bool LOG_open(int mode, const char *opts);
 
 // Formatted print to the ddprof logging facility
 // Log-print-Formatted with Level, Facility, and Name
-printflike(4, 5) void lprintfln(int lvl, int fac, const char *name,
-                                const char *fmt, ...);
+printflike(3, 4) void lprintfln(int lvl, int fac, const char *fmt, ...);
 
 // Same as above, but suppress printing if the level isn't high enough
 // O for optional
-printflike(4, 5) void olprintfln(int lvl, int fac, const char *name,
-                                 const char *fmt, ...);
+printflike(3, 4) void olprintfln(int lvl, int fac, const char *fmt, ...);
 
 // Same as the first, but with a single variadic arg instead of ...
 // V for variadic, as per libc's v*printf() functions
-void vlprintfln(int lvl, int fac, const char *name, const char *format,
-                va_list args);
+void vlprintfln(int lvl, int fac, const char *format, va_list args);
 
 // Setters for global logger context
 void LOG_setname(const char *name);
@@ -118,7 +115,7 @@ void LOG_set_logs_allowed_function(LogsAllowedCallback logs_allowed_function);
 #define LG_IF_LVL_OK(level, ...)                                               \
   do {                                                                         \
     if (unlikely(LOG_is_logging_enabled_for_level(level))) {                   \
-      olprintfln(ABS(level), -1, MYNAME, __VA_ARGS__);                         \
+      olprintfln(ABS(level), -1, __VA_ARGS__);                                 \
     }                                                                          \
   } while (false)
 

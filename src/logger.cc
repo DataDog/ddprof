@@ -142,8 +142,7 @@ void LOG_setratelimit(uint64_t max_log_per_interval,
 // LOG_MSG_CAP compile-time parameter.  The accessible storage amount shall be
 // this region minus room for the following template:
 // `<XXX> MMM DD hh:mm:ss DDPROF[32768]: `  -- let's call this 38 chars
-void vlprintfln(int lvl, int fac, const char *name, const char *format,
-                va_list args) {
+void vlprintfln(int lvl, int fac, const char *format, va_list args) {
 
   char buf[LOG_MSG_CAP];
   ssize_t sz = -1;
@@ -157,9 +156,8 @@ void vlprintfln(int lvl, int fac, const char *name, const char *format,
   if (fac == -1) {
     fac = log_ctx.facility;
   }
-  if (!name || !*name) {
-    name = !log_ctx.name.empty() ? log_ctx.name.c_str() : name_default;
-  }
+  const char *name =
+      !log_ctx.name.empty() ? log_ctx.name.c_str() : name_default;
 
   // Sanity checks
   if (log_ctx.fd < 0) {
@@ -233,18 +231,18 @@ void vlprintfln(int lvl, int fac, const char *name, const char *format,
 }
 
 // NOLINTNEXTLINE(cert-dcl50-cpp)
-void olprintfln(int lvl, int fac, const char *name, const char *fmt, ...) {
+void olprintfln(int lvl, int fac, const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
-  vlprintfln(lvl, fac, name, fmt, args);
+  vlprintfln(lvl, fac, fmt, args);
   va_end(args);
 }
 
 // NOLINTNEXTLINE(cert-dcl50-cpp)
-void lprintfln(int lvl, int fac, const char *name, const char *fmt, ...) {
+void lprintfln(int lvl, int fac, const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
-  vlprintfln(lvl, fac, name, fmt, args);
+  vlprintfln(lvl, fac, fmt, args);
   va_end(args);
 }
 

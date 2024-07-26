@@ -132,9 +132,7 @@ std::string get_log_level() {
 void init_logger() {
   auto log_level = get_log_level();
   auto log_mode = get_log_mode();
-  setup_logger(log_mode.c_str(), log_level.c_str());
-
-  LOG_setname("ddprof-library");
+  setup_logger(log_mode.c_str(), log_level.c_str(), "ddprof-library");
 
   // Disable logging when allocations are not allowed
   LOG_set_logs_allowed_function([]() {
