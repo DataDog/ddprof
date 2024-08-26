@@ -35,7 +35,8 @@ public:
 
   enum AllocationTrackingFlags {
     kTrackDeallocations = 0x1,
-    kDeterministicSampling = 0x2
+    kDeterministicSampling = 0x2,
+    kOtelProfilerMode = 0x4,
   };
 
   struct IntervalTimerCheck {
@@ -101,9 +102,8 @@ private:
 
   uint64_t next_sample_interval(std::minstd_rand &gen) const;
 
-  DDRes init(uint64_t mem_profile_interval, bool deterministic_sampling,
-             bool track_deallocations, uint32_t stack_sample_size,
-             const RingBufferInfo &ring_buffer,
+  DDRes init(uint64_t mem_profile_interval, uint32_t flags,
+             uint32_t stack_sample_size, const RingBufferInfo &ring_buffer,
              const IntervalTimerCheck &timer_check);
   void free();
 
@@ -141,6 +141,7 @@ private:
   uint32_t _stack_sample_size;
   PEvent _pevent;
   bool _deterministic_sampling;
+  bool _otel_profiler_mode;
 
   AddressBitset _allocated_address_set;
   IntervalTimerCheck _interval_timer_check;

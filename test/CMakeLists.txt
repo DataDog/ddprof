@@ -314,13 +314,19 @@ set(ALLOCATION_TRACKER_UT_SRCS
 
 add_unit_test(
   allocation_tracker-ut ${ALLOCATION_TRACKER_UT_SRCS}
-  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle dl rt Datadog::Profiling
+  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle dl rt Datadog::Profiling systemtap
   DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384)
 
 if(TARGET jemalloc::jemalloc_shared)
   add_unit_test(
     allocation_tracker_jemalloc-ut ${ALLOCATION_TRACKER_UT_SRCS}
-    LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle dl rt jemalloc::jemalloc_shared Datadog::Profiling
+    LIBRARIES ${ELFUTILS_LIBRARIES}
+              llvm-demangle
+              dl
+              rt
+              jemalloc::jemalloc_shared
+              Datadog::Profiling
+              systemtap
     DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384 USE_JEMALLOC=1)
 endif()
 
@@ -431,7 +437,7 @@ add_benchmark(
   ../src/tsc_clock.cc
   ../src/user_override.cc
   ../src/sys_utils.cc
-  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
+  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle systemtap
   DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384)
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
