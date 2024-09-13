@@ -39,8 +39,9 @@ TEST(LiveAllocationTest, simple) {
   EXPECT_EQ(pid_stacks._address_map.size(), nb_registered_allocs);
   // though the stack is the same
   ASSERT_EQ(pid_stacks._unique_stacks.size(), 1);
-  const auto &el = pid_stacks._unique_stacks[uo];
-  EXPECT_EQ(el._value, 100);
+  for (const auto &el: pid_stacks._unique_stacks) {
+    EXPECT_EQ(el.second._value, 100);
+  }
 
   { // allocate 10
     uintptr_t addr = 0x10;
@@ -110,9 +111,10 @@ TEST(LiveAllocationTest, overlap_registrations) {
   EXPECT_EQ(pid_stacks._unique_stacks.size(), 1);
 
   // Check that the value and count have the latest value
-  auto &el = pid_stacks._unique_stacks[uo];
-  EXPECT_EQ(el._value, value * 2);
-  EXPECT_EQ(el._count, 1);
+  for (const auto &el: pid_stacks._unique_stacks) {
+    EXPECT_EQ(el.second._value, value * 2);
+    EXPECT_EQ(el.second._count, 1);
+  }
 
   // Deallocate the first allocation
   live_alloc.register_deallocation(addr, watcher_pos, pid);
@@ -133,6 +135,15 @@ TEST(LiveAllocationTest, stats) {
   EXPECT_EQ(live_alloc.get_nb_unmatched_deallocations(), 2);
   live_alloc.cycle();
   EXPECT_EQ(live_alloc.get_nb_unmatched_deallocations(), 0);
+}
+
+TEST(LiveAllocationTest, smaps) {
+  LogHandle handle;
+  pid_t pid = getpid();
+  auto entries = LiveAllocation::parse_smaps(pid);
+  for(auto entry : entries) {
+    LG_DBG("address: %ld, rss_kb: %zu", entry.start, entry.rss_kb);
+  }
 }
 
 } // namespace ddprof
