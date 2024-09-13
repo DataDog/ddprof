@@ -12,12 +12,13 @@
 #include <cstddef>
 #include <sys/types.h>
 #include <unordered_map>
+#include <set>
+#include <vector>
 
 namespace ddprof {
 
 template <typename T>
-T &access_resize(std::vector<T> &v, size_t index,
-                 const T &default_value = T()) {
+T &access_resize(std::vector<T> &v, size_t index, const T &default_value = T()) {
   if (unlikely(index >= v.size())) {
     v.resize(index + 1, default_value);
   }
@@ -26,15 +27,36 @@ T &access_resize(std::vector<T> &v, size_t index,
 
 class LiveAllocation {
 public:
-  // For allocations Value is the size
-  // This is the cumulative value and count for a given stack
+  struct SmapsEntry {
+    ProcessAddress_t start;
+    ProcessAddress_t end;
+    size_t rss_kb;
+  };
+
   struct ValueAndCount {
     int64_t _value = 0;
     int64_t _count = 0;
   };
 
-  using PprofStacks =
-      std::unordered_map<UnwindOutput, ValueAndCount, UnwindOutputHash>;
+  struct StackAndMapping {
+    const UnwindOutput* uw_output_ptr; // Pointer to an UnwindOutput in a set
+    ProcessAddress_t start_mmap;       // Start of associated mapping
+
+    bool operator==(const StackAndMapping &other) const {
+      return uw_output_ptr == other.uw_output_ptr && start_mmap == other.start_mmap;
+    }
+  };
+
+  struct StackAndMappingHash {
+    std::size_t operator()(const StackAndMapping &s) const {
+      size_t seed = std::hash<const UnwindOutput*>{}(s.uw_output_ptr);
+      hash_combine(seed, std::hash<ProcessAddress_t>{}(s.start_mmap));
+      return seed;
+    }
+  };
+
+  using PprofStacks = std::unordered_map<StackAndMapping, ValueAndCount, StackAndMappingHash>;
+  using MappingValuesMap = std::unordered_map<ProcessAddress_t, ValueAndCount>;
 
   struct ValuePerAddress {
     int64_t _value = 0;
@@ -42,32 +64,36 @@ public:
   };
 
   using AddressMap = std::unordered_map<uintptr_t, ValuePerAddress>;
+
   struct PidStacks {
     AddressMap _address_map;
     PprofStacks _unique_stacks;
+    std::set<UnwindOutput> unwind_output_set;  // Set to store all unique UnwindOutput objects
+    std::vector<SmapsEntry> entries;
+    MappingValuesMap mapping_values;           // New map to track memory usage per mapping
   };
 
   using PidMap = std::unordered_map<pid_t, PidStacks>;
   using WatcherVector = std::vector<PidMap>;
-  // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+
   WatcherVector _watcher_vector;
 
-  // Allocation should be aggregated per stack trace
-  // instead of a stack, we would have a total size for this unique stack trace
-  // and a count.
-  void register_allocation(const UnwindOutput &uo, uintptr_t addr, size_t size,
-                           int watcher_pos, pid_t pid) {
+  int64_t upscale_with_mapping(const PprofStacks::value_type &stack,
+                               PidStacks &pid_stacks);
+
+  void register_allocation(const UnwindOutput &uo, uintptr_t addr, size_t size, int watcher_pos, pid_t pid) {
     PidMap &pid_map = access_resize(_watcher_vector, watcher_pos);
     PidStacks &pid_stacks = pid_map[pid];
-    register_allocation(uo, addr, size, pid_stacks._unique_stacks,
-                        pid_stacks._address_map);
+    if (pid_stacks.entries.empty()) {
+      pid_stacks.entries = parse_smaps(pid);
+    }
+    register_allocation_internal(uo, addr, size, pid_stacks);
   }
 
   void register_deallocation(uintptr_t addr, int watcher_pos, pid_t pid) {
     PidMap &pid_map = access_resize(_watcher_vector, watcher_pos);
     PidStacks &pid_stacks = pid_map[pid];
-    if (!register_deallocation(addr, pid_stacks._unique_stacks,
-                               pid_stacks._address_map)) {
+    if (!register_deallocation_internal(addr, pid_stacks)) {
       ++_stats._unmatched_deallocations;
     }
   }
@@ -83,21 +109,19 @@ public:
     }
   }
 
-  [[nodiscard]] [[nodiscard]] unsigned get_nb_unmatched_deallocations() const {
+  [[nodiscard]] unsigned get_nb_unmatched_deallocations() const {
     return _stats._unmatched_deallocations;
   }
+
+  static std::vector<SmapsEntry> parse_smaps(pid_t pid);
 
   void cycle() { _stats = {}; }
 
 private:
-  // returns true if the deallocation was registered
-  static bool register_deallocation(uintptr_t address, PprofStacks &stacks,
-                                    AddressMap &address_map);
+  static bool register_deallocation_internal(uintptr_t address, PidStacks &pid_stacks);
 
-  // returns true if the allocation was registerd
-  static bool register_allocation(const UnwindOutput &uo, uintptr_t address,
-                                  int64_t value, PprofStacks &stacks,
-                                  AddressMap &address_map);
+  static bool register_allocation_internal(const UnwindOutput &uo, uintptr_t address, int64_t value, PidStacks &pid_stacks);
+
   struct {
     unsigned _unmatched_deallocations = {};
   } _stats;

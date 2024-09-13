@@ -243,16 +243,24 @@ void ddprof_reset_worker_stats() {
 
 DDRes aggregate_livealloc_stack(
     const LiveAllocation::PprofStacks::value_type &alloc_info,
+    int64_t upscalled_value,
     DDProfContext &ctx, const PerfWatcher *watcher, DDProfPProf *pprof,
     const SymbolHdr &symbol_hdr) {
+
+  if (upscalled_value)
+    LG_DBG("Upscaling from %ld to %ld", alloc_info.second._value,
+           upscalled_value);
+  // default to the sampled value
   const DDProfValuePack pack{
-      alloc_info.second._value,
-      static_cast<uint64_t>(std::max<int64_t>(0, alloc_info.second._count)), 0};
+      upscalled_value?upscalled_value:alloc_info.second._value,
+      static_cast<uint64_t>(std::max<int64_t>(0, alloc_info.second._count)),
+      0};
 
   DDRES_CHECK_FWD(pprof_aggregate(
-      &alloc_info.first, symbol_hdr, pack, watcher,
+      alloc_info.first.uw_output_ptr, symbol_hdr, pack, watcher,
       ctx.worker_ctx.us->dso_hdr.get_file_info_vector(),
-      ctx.params.show_samples, kLiveSumPos, ctx.worker_ctx.symbolizer, pprof));
+      ctx.params.show_samples, kLiveSumPos, ctx.worker_ctx.symbolizer, pprof,
+      alloc_info.first.start_mmap));
   return {};
 }
 
@@ -262,16 +270,22 @@ DDRes aggregate_live_allocations_for_pid(DDProfContext &ctx, pid_t pid) {
   DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
   const SymbolHdr &symbol_hdr = us->symbol_hdr;
   LiveAllocation &live_allocations = ctx.worker_ctx.live_allocation;
+
   for (unsigned watcher_pos = 0;
        watcher_pos < live_allocations._watcher_vector.size(); ++watcher_pos) {
     auto &pid_map = live_allocations._watcher_vector[watcher_pos];
     const PerfWatcher *watcher = &ctx.watchers[watcher_pos];
     auto &pid_stacks = pid_map[pid];
+    pid_stacks.entries = LiveAllocation::parse_smaps(pid);
     for (const auto &alloc_info : pid_stacks._unique_stacks) {
-      DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info, ctx, watcher, pprof,
+      int64_t upscaled_value = live_allocations.upscale_with_mapping(alloc_info,
+                                                                     pid_stacks);
+      DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info, upscaled_value,
+                                                ctx, watcher, pprof,
                                                 symbol_hdr));
     }
   }
+
   return {};
 }
 
@@ -282,14 +296,19 @@ DDRes aggregate_live_allocations(DDProfContext &ctx) {
   int const i_export = ctx.worker_ctx.i_current_pprof;
   DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
   const SymbolHdr &symbol_hdr = us->symbol_hdr;
-  const LiveAllocation &live_allocations = ctx.worker_ctx.live_allocation;
+  LiveAllocation &live_allocations = ctx.worker_ctx.live_allocation;
   for (unsigned watcher_pos = 0;
        watcher_pos < live_allocations._watcher_vector.size(); ++watcher_pos) {
-    const auto &pid_map = live_allocations._watcher_vector[watcher_pos];
+    auto &pid_map = live_allocations._watcher_vector[watcher_pos];
     const PerfWatcher *watcher = &ctx.watchers[watcher_pos];
-    for (const auto &pid_vt : pid_map) {
+    for (auto &pid_vt : pid_map) {
+      auto &pid_stacks = pid_vt.second;
+      pid_stacks.entries = LiveAllocation::parse_smaps(pid_vt.first);
       for (const auto &alloc_info : pid_vt.second._unique_stacks) {
-        DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info, ctx, watcher,
+        int64_t upscaled_value = live_allocations.upscale_with_mapping(alloc_info,
+                                                                       pid_stacks);
+        DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info, upscaled_value,
+                                                  ctx, watcher,
                                                   pprof, symbol_hdr));
       }
       LG_NTC("<%u> Number of Live allocations for PID%d=%lu, Unique stacks=%lu",

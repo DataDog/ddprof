@@ -41,7 +41,7 @@ struct ActiveIdsResult {
 };
 
 std::string_view pid_str(pid_t pid,
-                         std::unordered_map<pid_t, std::string> &pid_strs) {
+                         NumToStrCache &pid_strs) {
   auto it = pid_strs.find(pid);
   if (it != pid_strs.end()) {
     return it->second;
@@ -234,8 +234,10 @@ ProfValueTypes compute_pprof_values(const ActiveIdsResult &active_ids) {
   return result;
 }
 
-size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
-                      std::unordered_map<pid_t, std::string> &pid_strs,
+size_t prepare_labels(const UnwindOutput &uw_output,
+                      const PerfWatcher &watcher,
+                      NumToStrCache &pid_strs,
+                      ProcessAddress_t mapping_addr,
                       std::span<ddog_prof_Label> labels) {
   constexpr std::string_view k_container_id_label = "container_id"sv;
   constexpr std::string_view k_process_id_label = "process_id"sv;
@@ -245,10 +247,17 @@ size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
   constexpr std::string_view k_thread_id_label = "thread id"sv;
   constexpr std::string_view k_thread_name_label = "thread_name"sv;
   constexpr std::string_view k_tracepoint_label = "tracepoint_type"sv;
+  constexpr std::string_view k_mapping_label = "mapping"sv;
   size_t labels_num = 0;
+<<<<<<< HEAD
   if (!uw_output.container_id.empty()) {
     labels[labels_num].key = to_CharSlice(k_container_id_label);
     labels[labels_num].str = to_CharSlice(uw_output.container_id);
+    ++labels_num;
+  }
+  if (mapping_addr) {
+    labels[labels_num].key = to_CharSlice(k_mapping_label);
+    labels[labels_num].str = to_CharSlice(pid_str(mapping_addr, pid_strs));
     ++labels_num;
   }
 
@@ -488,6 +497,8 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
     // Allow the data to be split by container-id
     pprof->_tags.emplace_back(std::string("ddprof.custom_ctx"),
                               std::string("container_id"));
+    pprof->_tags.emplace_back(std::string("ddprof.custom_ctx"),
+                              std::string("mapping"));
   }
 
   if (ctx.params.remote_symbolization) {
@@ -514,7 +525,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const PerfWatcher *watcher,
                       const FileInfoVector &file_infos, bool show_samples,
                       EventAggregationModePos value_pos, Symbolizer *symbolizer,
-                      DDProfPProf *pprof) {
+                      DDProfPProf *pprof, ProcessAddress_t mapping_addr) {
 
   const PProfIndices &pprof_indices = watcher->pprof_indices[value_pos];
   ddog_prof_Profile *profile = &pprof->_profile;
@@ -541,7 +552,11 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   // their locations _and_ all labels are identical, so we admit a very limited
   // number of labels at present
   const size_t labels_num =
-      prepare_labels(*uw_output, *watcher, pprof->_pid_str, std::span{labels});
+      prepare_labels(*uw_output,
+                     *watcher,
+                     pprof->_pid_str,
+                     mapping_addr,
+                     std::span{labels});
 
   ddog_prof_Sample const sample = {
       .locations = {.ptr = locations_buff.data(), .len = write_index},
@@ -575,4 +590,5 @@ DDRes pprof_reset(DDProfPProf *pprof) {
   pprof->_pid_str.clear();
   return {};
 }
+
 } // namespace ddprof

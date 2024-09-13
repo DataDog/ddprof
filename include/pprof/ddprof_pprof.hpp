@@ -21,6 +21,8 @@ namespace ddprof {
 class Symbolizer;
 struct SymbolHdr;
 
+using NumToStrCache = std::unordered_map<ProcessAddress_t , std::string>;
+
 struct DDProfPProf {
   /* single profile gathering several value types */
   ddog_prof_Profile _profile{};
@@ -28,7 +30,7 @@ struct DDProfPProf {
   Tags _tags;
   bool use_process_adresses{true};
   // avoid re-creating strings for all pid numbers
-  std::unordered_map<pid_t, std::string> _pid_str;
+  NumToStrCache _pid_str;
 };
 
 struct DDProfValuePack {
@@ -51,7 +53,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const PerfWatcher *watcher,
                       const FileInfoVector &file_infos, bool show_samples,
                       EventAggregationModePos value_pos, Symbolizer *symbolizer,
-                      DDProfPProf *pprof);
+                      DDProfPProf *pprof, ProcessAddress_t mapping_addr = 0);
 
 DDRes pprof_reset(DDProfPProf *pprof);
 
