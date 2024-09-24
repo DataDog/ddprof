@@ -40,13 +40,12 @@ struct ActiveIdsResult {
   PerfWatcher *default_watcher = nullptr;
 };
 
-std::string_view pid_str(pid_t pid,
-                         NumToStrCache &pid_strs) {
-  auto it = pid_strs.find(pid);
+std::string_view pid_str(ProcessAddress_t num, NumToStrCache &pid_strs) {
+  auto it = pid_strs.find(num);
   if (it != pid_strs.end()) {
     return it->second;
   }
-  const auto pair = pid_strs.emplace(pid, std::to_string(pid));
+  const auto pair = pid_strs.emplace(num, std::to_string(num));
   return pair.first->second;
 }
 
@@ -234,10 +233,8 @@ ProfValueTypes compute_pprof_values(const ActiveIdsResult &active_ids) {
   return result;
 }
 
-size_t prepare_labels(const UnwindOutput &uw_output,
-                      const PerfWatcher &watcher,
-                      NumToStrCache &pid_strs,
-                      ProcessAddress_t mapping_addr,
+size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
+                      NumToStrCache &pid_strs, ProcessAddress_t mapping_addr,
                       std::span<ddog_prof_Label> labels) {
   constexpr std::string_view k_container_id_label = "container_id"sv;
   constexpr std::string_view k_process_id_label = "process_id"sv;
@@ -551,12 +548,8 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   // Create the labels for the sample.  Two samples are the same only when
   // their locations _and_ all labels are identical, so we admit a very limited
   // number of labels at present
-  const size_t labels_num =
-      prepare_labels(*uw_output,
-                     *watcher,
-                     pprof->_pid_str,
-                     mapping_addr,
-                     std::span{labels});
+  const size_t labels_num = prepare_labels(
+      *uw_output, *watcher, pprof->_pid_str, mapping_addr, std::span{labels});
 
   ddog_prof_Sample const sample = {
       .locations = {.ptr = locations_buff.data(), .len = write_index},

@@ -243,18 +243,16 @@ void ddprof_reset_worker_stats() {
 
 DDRes aggregate_livealloc_stack(
     const LiveAllocation::PprofStacks::value_type &alloc_info,
-    int64_t upscalled_value,
-    DDProfContext &ctx, const PerfWatcher *watcher, DDProfPProf *pprof,
-    const SymbolHdr &symbol_hdr) {
+    int64_t upscalled_value, DDProfContext &ctx, const PerfWatcher *watcher,
+    DDProfPProf *pprof, const SymbolHdr &symbol_hdr) {
 
   if (upscalled_value)
     LG_DBG("Upscaling from %ld to %ld", alloc_info.second._value,
            upscalled_value);
   // default to the sampled value
   const DDProfValuePack pack{
-      upscalled_value?upscalled_value:alloc_info.second._value,
-      static_cast<uint64_t>(std::max<int64_t>(0, alloc_info.second._count)),
-      0};
+      upscalled_value ? upscalled_value : alloc_info.second._value,
+      static_cast<uint64_t>(std::max<int64_t>(0, alloc_info.second._count)), 0};
 
   DDRES_CHECK_FWD(pprof_aggregate(
       alloc_info.first.uw_output_ptr, symbol_hdr, pack, watcher,
@@ -278,11 +276,44 @@ DDRes aggregate_live_allocations_for_pid(DDProfContext &ctx, pid_t pid) {
     auto &pid_stacks = pid_map[pid];
     pid_stacks.entries = LiveAllocation::parse_smaps(pid);
     for (const auto &alloc_info : pid_stacks._unique_stacks) {
-      int64_t upscaled_value = live_allocations.upscale_with_mapping(alloc_info,
-                                                                     pid_stacks);
-      DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info, upscaled_value,
-                                                ctx, watcher, pprof,
-                                                symbol_hdr));
+      int64_t upscaled_value =
+          live_allocations.upscale_with_mapping(alloc_info, pid_stacks);
+      DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info, upscaled_value, ctx,
+                                                watcher, pprof, symbol_hdr));
+    }
+
+    // Step 2: Add fake unwind frames for mappings without samples
+    // Create a fake unwind output to account for unsampled mappings
+    us->output.clear();
+    us->pid = pid;
+    add_common_frame(us, SymbolErrors::unsampled_mapping);
+    add_virtual_base_frame(us);
+    UnwindOutput &uo = us->output;
+
+    // Loop over smaps entries
+    for (const auto &entry : pid_stacks.entries) {
+      // Check if this entry has any allocations within its address range
+      bool has_samples = false;
+      for (const auto &alloc_info : pid_stacks._unique_stacks) {
+        if (alloc_info.first.start_mmap >= entry.start &&
+            alloc_info.first.start_mmap < entry.end) {
+          has_samples = true;
+          break; // If we find samples in this range, skip this mapping
+        }
+      }
+
+      // If no samples are found for this mapping, aggregate a fake stack
+      if (!has_samples) {
+        // Use the RSS value for this mapping as the "unsampled" value
+        int64_t unsampled_value = entry.rss_kb * 1000; // RSS in bytes
+        // Add the frame using the fake UnwindOutput
+        const DDProfValuePack pack{unsampled_value, 1, 0};
+        DDRES_CHECK_FWD(
+            pprof_aggregate(&uo, us->symbol_hdr, pack, watcher,
+                            ctx.worker_ctx.us->dso_hdr.get_file_info_vector(),
+                            ctx.params.show_samples, kLiveSumPos,
+                            ctx.worker_ctx.symbolizer, pprof, entry.start));
+      }
     }
   }
 
@@ -305,11 +336,10 @@ DDRes aggregate_live_allocations(DDProfContext &ctx) {
       auto &pid_stacks = pid_vt.second;
       pid_stacks.entries = LiveAllocation::parse_smaps(pid_vt.first);
       for (const auto &alloc_info : pid_vt.second._unique_stacks) {
-        int64_t upscaled_value = live_allocations.upscale_with_mapping(alloc_info,
-                                                                       pid_stacks);
-        DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info, upscaled_value,
-                                                  ctx, watcher,
-                                                  pprof, symbol_hdr));
+        int64_t upscaled_value =
+            live_allocations.upscale_with_mapping(alloc_info, pid_stacks);
+        DDRES_CHECK_FWD(aggregate_livealloc_stack(
+            alloc_info, upscaled_value, ctx, watcher, pprof, symbol_hdr));
       }
       LG_NTC("<%u> Number of Live allocations for PID%d=%lu, Unique stacks=%lu",
              watcher_pos, pid_vt.first, pid_vt.second._address_map.size(),
