@@ -13,10 +13,14 @@ using namespace std::string_view_literals;
 
 namespace ddprof {
 
-inline constexpr std::array<std::string_view, 6> k_common_frame_names = {
-    "[truncated]"sv,      "[unknown mapping]"sv,
-    "[unwind failure]"sv, "[incomplete]"sv,
-    "[lost]"sv,           "[maximum pids]"sv};
+inline constexpr std::array<std::string_view, 7> k_common_frame_names = {
+    "[truncated]"sv,
+    "[unknown mapping]"sv,
+    "[unwind failure]"sv,
+    "[incomplete]"sv,
+    "[lost]"sv,
+    "[maximum pids]"sv,
+    "[unsampled mapping]"sv};
 
 enum SymbolErrors {
   truncated_stack = 0,
@@ -25,6 +29,7 @@ enum SymbolErrors {
   incomplete_stack,
   lost_event,
   max_pids,
+  unsampled_mapping,
 };
 
 } // namespace ddprof

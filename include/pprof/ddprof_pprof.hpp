@@ -21,7 +21,7 @@ namespace ddprof {
 class Symbolizer;
 struct SymbolHdr;
 
-using NumToStrCache = std::unordered_map<ProcessAddress_t , std::string>;
+using NumToStrCache = std::unordered_map<ProcessAddress_t, std::string>;
 
 struct DDProfPProf {
   /* single profile gathering several value types */
