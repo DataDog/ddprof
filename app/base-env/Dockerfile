@@ -211,9 +211,6 @@ RUN VERSION="5.3.0" \
   && popd \
   && rm -rf "jemalloc-${VERSION}" "${TAR_NAME}"
 
-# Install cmake_format
-RUN pip3 install --break-system-packages cmakelang
-
 # Install sarif-tools only if UBUNTU_VERSION is 22 or greater
 RUN if [ "${UBUNTU_VERSION}" -ge 22 ]; then \
         pip3 install --break-system-packages cmakelang sarif-tools; \

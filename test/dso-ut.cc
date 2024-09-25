@@ -322,7 +322,7 @@ TEST(DSOTest, dso_from_proc_line) {
   ({                                                                           \
     __label__ __here;                                                          \
   __here:                                                                      \
-    (unsigned long)&&__here;                                                   \
+    (unsigned long) && __here;                                                 \
   })
 
 // backpopulate on this unit test making sure we find the associated dso

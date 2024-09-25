@@ -108,13 +108,11 @@ enum DDProfCustomCountId {
 // This depend on the state of configuration (capabilities /
 // perf_event_paranoid) Attempt to activate them and remove them if you fail
 #define IS_FREQ_TRY_KERNEL                                                     \
-  { .use_kernel = PerfWatcherUseKernel::kTry, .is_freq = true }
+  {.use_kernel = PerfWatcherUseKernel::kTry, .is_freq = true}
 
-#define IS_FREQ                                                                \
-  { .is_freq = true }
+#define IS_FREQ {.is_freq = true}
 
-#define USE_KERNEL                                                             \
-  { .use_kernel = PerfWatcherUseKernel::kRequired }
+#define USE_KERNEL {.use_kernel = PerfWatcherUseKernel::kRequired}
 
 #ifdef DDPROF_OPTIM
 #  define NB_FRAMES_TO_SKIP 4
@@ -122,8 +120,7 @@ enum DDProfCustomCountId {
 #  define NB_FRAMES_TO_SKIP 5
 #endif
 
-#define SKIP_FRAMES                                                            \
-  { .nb_frames_to_skip = NB_FRAMES_TO_SKIP }
+#define SKIP_FRAMES {.nb_frames_to_skip = NB_FRAMES_TO_SKIP}
 
 // Whereas tracepoints are dynamically configured and can be checked at runtime,
 // we lack the ability to inspect events of type other than TYPE_TRACEPOINT.
