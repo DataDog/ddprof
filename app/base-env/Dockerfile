@@ -47,7 +47,6 @@ ENV TAR_OPTIONS="--no-same-owner"
 RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y \
   apt-transport-https \
-  awscli \
   binutils-dev \
   bison \
   ca-certificates \
@@ -74,6 +73,24 @@ RUN apt-get update \
   unzip \
   wget \
   zlib1g-dev
+
+# Download and install AWS CLI v2
+# Set up environment variables for architecture
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        AWS_CLI_URL="https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+        AWS_CLI_URL="https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip"; \
+    else \
+        echo "Unsupported architecture: $ARCH"; exit 1; \
+    fi && \
+    curl "$AWS_CLI_URL" -o "awscliv2.zip" && \
+    unzip awscliv2.zip && \
+    ./aws/install && \
+    rm -rf awscliv2.zip aws
+
+# Verify installation
+RUN aws --version
 
 # Codeql : static analysis tooling
 RUN curl -L https://github.com/github/codeql-action/releases/download/codeql-bundle-20230304/codeql-bundle-linux64.tar.gz -o - | tar -xz -C /usr/local
@@ -194,8 +211,15 @@ RUN VERSION="5.3.0" \
   && popd \
   && rm -rf "jemalloc-${VERSION}" "${TAR_NAME}"
 
-# Install cmake_format and sarif-tools (for codeql filtering)
-RUN pip3 install cmake_format && ([ "${UBUNTU_VERSION}" -ge 22 ] && pip3 install sarif-tools || true)
+# Install cmake_format
+RUN pip3 install --break-system-packages cmakelang
+
+# Install sarif-tools only if UBUNTU_VERSION is 22 or greater
+RUN if [ "${UBUNTU_VERSION}" -ge 22 ]; then \
+        pip3 install --break-system-packages cmakelang sarif-tools; \
+    else \
+        pip3 install cmake-format; \
+    fi
 
 # A specific user is required to get access to perf event ressources.
 # This enables unit testing using perf-event ressources
