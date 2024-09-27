@@ -9,9 +9,8 @@
 #include <functional>
 
 namespace ddprof {
-
-template <class T>
-inline constexpr void hash_combine(std::size_t &seed, const T &v) {
+// implicitly inlined
+template <class T> constexpr void hash_combine(std::size_t &seed, const T &v) {
   // NOLINTNEXTLINE(readability-magic-numbers)
   seed ^= std::hash<T>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 }

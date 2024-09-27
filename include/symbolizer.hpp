@@ -22,7 +22,7 @@ struct ddog_prof_Location;
 namespace ddprof {
 class Symbolizer {
 public:
-  enum AddrFormat {
+  enum AddrFormat : uint8_t {
     k_elf,
     k_process,
   };
@@ -63,7 +63,7 @@ public:
       return *this;
     }
 
-    std::vector<const blaze_result *> blaze_results{};
+    std::vector<const blaze_result *> blaze_results;
   };
 
   /// Fills the locations at the write index using address and elf source.

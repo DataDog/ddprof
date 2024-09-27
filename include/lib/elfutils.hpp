@@ -43,7 +43,7 @@ void override_symbol(std::string_view symbol_name, uintptr_t new_symbol,
 
 int count_loaded_libraries();
 
-enum class LibraryCallbackStatus {
+enum class LibraryCallbackStatus : uint8_t {
   Continue,
   Stop,
 };

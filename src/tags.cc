@@ -19,7 +19,7 @@ constexpr size_t k_max_tag_length = 200;
 // From the DogFood repo. Credit goes to Garrett Sickles, who has an awesome
 // DogStatsD C++ library : https://github.com/garrettsickles/DogFood.git
 inline bool ValidateTags(std::string_view tag) {
-  if (tag.length() == 0 || tag.length() > k_max_tag_length) {
+  if (tag.empty() || tag.length() > k_max_tag_length) {
     return false;
   }
 
