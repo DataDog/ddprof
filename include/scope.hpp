@@ -264,9 +264,10 @@ public: // should be private
                  std::is_constructible_v<detail::box<D>, DD,
                                          detail::_empty_scope_exit>
   unique_resource(RR &&r, DD &&d, bool should_run) noexcept(
-      noexcept(detail::box<R>(std::forward<RR>(r), detail::_empty_scope_exit{}))
-          && noexcept(detail::box<D>(std::forward<DD>(d),
-                                     detail::_empty_scope_exit{})))
+      noexcept(detail::box<R>(std::forward<RR>(r),
+                              detail::_empty_scope_exit{})) &&
+      noexcept(detail::box<D>(std::forward<DD>(d),
+                              detail::_empty_scope_exit{})))
       : resource(std::forward<RR>(r), scope_exit([&] {
                    if (should_run)
                      d(r);
@@ -301,17 +302,18 @@ public:
                  std::is_constructible_v<detail::box<D>, DD,
                                          detail::_empty_scope_exit>
   unique_resource(RR &&r, DD &&d) noexcept(
-      noexcept(detail::box<R>(std::forward<RR>(r), detail::_empty_scope_exit{}))
-          && noexcept(detail::box<D>(std::forward<DD>(d),
-                                     detail::_empty_scope_exit{})))
+      noexcept(detail::box<R>(std::forward<RR>(r),
+                              detail::_empty_scope_exit{})) &&
+      noexcept(detail::box<D>(std::forward<DD>(d),
+                              detail::_empty_scope_exit{})))
       : resource(std::forward<RR>(r), scope_exit([&] { d(r); })),
         deleter(std::forward<DD>(d), scope_exit([&, this] { d(get()); })),
         execute_on_destruction{true} {}
   unique_resource(unique_resource &&that) noexcept(
       noexcept(detail::box<R>(that.resource.move(),
-                              detail::_empty_scope_exit{}))
-          && noexcept(detail::box<D>(that.deleter.move(),
-                                     detail::_empty_scope_exit{})))
+                              detail::_empty_scope_exit{})) &&
+      noexcept(detail::box<D>(that.deleter.move(),
+                              detail::_empty_scope_exit{})))
       : resource(that.resource.move(), detail::_empty_scope_exit{}),
         deleter(that.deleter.move(), scope_exit([&, this] {
                   if (that.execute_on_destruction)

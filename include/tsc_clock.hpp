@@ -38,8 +38,8 @@ public:
 
   using Cycles = uint64_t;
 
-  enum class State { kUninitialized, kUnavailable, kOK };
-  enum class CalibrationMethod {
+  enum class State : uint8_t { kUninitialized, kUnavailable, kOK };
+  enum class CalibrationMethod : uint8_t {
     kAuto,
     kPerf,
     kCpuArch,

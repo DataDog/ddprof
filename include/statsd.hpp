@@ -12,7 +12,7 @@
 
 namespace ddprof {
 
-enum STAT_TYPES {
+enum STAT_TYPES : uint8_t {
   STAT_MS_LONG,
   STAT_MS_FLOAT,
   STAT_COUNT,

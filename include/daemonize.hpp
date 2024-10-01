@@ -12,7 +12,12 @@
 namespace ddprof {
 
 struct DaemonizeResult {
-  enum State { Error, InitialProcess, IntermediateProcess, DaemonProcess };
+  enum State : uint8_t {
+    Error,
+    InitialProcess,
+    IntermediateProcess,
+    DaemonProcess
+  };
   State state; // Only InitialProcess can return in a Failure state
   pid_t
       temp_pid; // -1 on failure, 0 for initial process, > 0 for daemon process

@@ -474,7 +474,7 @@ void DDProfCLI::print() const {
   if (!exporter_input.api_key.empty()) {
     std::string const api_key_dbg =
         api_key_to_dbg_string(exporter_input.api_key);
-    PRINT_NFO("  - api key: %s", exporter_input.api_key.c_str());
+    PRINT_NFO("  - api key: %s", api_key_dbg.c_str());
   }
   PRINT_NFO("  - service: %s", exporter_input.service.c_str());
   if (!exporter_input.environment.empty()) {
