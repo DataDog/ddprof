@@ -30,8 +30,8 @@ public:
   void unlock() { _flag.store(false, std::memory_order_release); }
 
 private:
-  static inline constexpr uint32_t k_max_active_spin = 4000;
-  static inline constexpr std::chrono::nanoseconds k_yield_sleep =
+  static constexpr uint32_t k_max_active_spin = 4000;
+  static constexpr std::chrono::nanoseconds k_yield_sleep =
       std::chrono::microseconds(500);
 
   bool lock_fast() {
@@ -79,7 +79,7 @@ private:
     return true;
   }
 
-  std::atomic_bool _flag{};
+  std::atomic_bool _flag;
 };
 
 struct MPSCRingBufferMetaDataPage {

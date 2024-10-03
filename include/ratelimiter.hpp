@@ -54,7 +54,7 @@ private:
   // call to check() will call checkSlow() to initialize timestamp_,
   // but subsequent calls will hit the fast-path and avoid checkSlow()
   std::atomic<uint64_t> _count{std::numeric_limits<uint64_t>::max()};
-  std::atomic<CoarseMonotonicClock::time_point> _interval_end{};
+  std::atomic<CoarseMonotonicClock::time_point> _interval_end;
 };
 
 } // namespace ddprof

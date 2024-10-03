@@ -14,7 +14,7 @@
 
 namespace ddprof {
 
-enum class PerfWatcherUseKernel {
+enum class PerfWatcherUseKernel : uint8_t {
   kOff = 0,  // always off
   kRequired, // always on
   kTry,      // On if possible, default to OFF on failure
@@ -92,15 +92,15 @@ struct PerfWatcher {
 
 // defines enum of profile types
 #define X_ENUM(a, b, c, d, e) DDPROF_PWT_##a,
-enum DDPROF_SAMPLE_TYPES {
+enum DDPROF_SAMPLE_TYPES : uint8_t {
   PROFILE_TYPE_TABLE(X_ENUM) DDPROF_PWT_LENGTH,
 };
 #undef X_ENUM
 
 // Define our own event type on top of perf event types
-enum DDProfTypeId { kDDPROF_TYPE_CUSTOM = PERF_TYPE_MAX + 100 };
+enum DDProfTypeId : uint8_t { kDDPROF_TYPE_CUSTOM = PERF_TYPE_MAX + 100 };
 
-enum DDProfCustomCountId {
+enum DDProfCustomCountId : uint8_t {
   kDDPROF_COUNT_ALLOCATIONS = 0,
 };
 
@@ -108,13 +108,11 @@ enum DDProfCustomCountId {
 // This depend on the state of configuration (capabilities /
 // perf_event_paranoid) Attempt to activate them and remove them if you fail
 #define IS_FREQ_TRY_KERNEL                                                     \
-  { .use_kernel = PerfWatcherUseKernel::kTry, .is_freq = true }
+  {.use_kernel = PerfWatcherUseKernel::kTry, .is_freq = true}
 
-#define IS_FREQ                                                                \
-  { .is_freq = true }
+#define IS_FREQ {.is_freq = true}
 
-#define USE_KERNEL                                                             \
-  { .use_kernel = PerfWatcherUseKernel::kRequired }
+#define USE_KERNEL {.use_kernel = PerfWatcherUseKernel::kRequired}
 
 #ifdef DDPROF_OPTIM
 #  define NB_FRAMES_TO_SKIP 4
@@ -122,8 +120,7 @@ enum DDProfCustomCountId {
 #  define NB_FRAMES_TO_SKIP 5
 #endif
 
-#define SKIP_FRAMES                                                            \
-  { .nb_frames_to_skip = NB_FRAMES_TO_SKIP }
+#define SKIP_FRAMES {.nb_frames_to_skip = NB_FRAMES_TO_SKIP}
 
 // Whereas tracepoints are dynamically configured and can be checked at runtime,
 // we lack the ability to inspect events of type other than TYPE_TRACEPOINT.
@@ -158,7 +155,7 @@ enum DDProfCustomCountId {
 // clang-format on
 
 #define X_ENUM(a, b, c, d, e, f, g) DDPROF_PWE_##a,
-enum DDPROF_EVENT_NAMES {
+enum DDPROF_EVENT_NAMES : int8_t {
   DDPROF_PWE_TRACEPOINT = -1,
   EVENT_CONFIG_TABLE(X_ENUM) DDPROF_PWE_LENGTH,
 };

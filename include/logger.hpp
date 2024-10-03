@@ -14,7 +14,7 @@
 
 namespace ddprof {
 
-enum LOG_OPTS {
+enum LOG_OPTS : uint8_t {
   LOG_DISABLE = 0,
   LOG_SYSLOG = 1,
   LOG_STDOUT = 2,
@@ -22,7 +22,7 @@ enum LOG_OPTS {
   LOG_FILE = 4,
 };
 
-enum LOG_LVL {
+enum LOG_LVL : int8_t {
   LL_FORCE_ALERT = -1,
   LL_FORCE_CRITICAL = -2,
   LL_FORCE_ERROR = -3,
@@ -41,7 +41,7 @@ enum LOG_LVL {
   LL_LENGTH,
 };
 
-enum LOG_FACILITY {
+enum LOG_FACILITY : uint8_t {
   LF_KERNEL = 0,
   LF_USER = 1,
   LF_MAIL = 2,
