@@ -25,7 +25,7 @@ endif()
 set(SAN_FLAGS "-fsanitize=undefined -fsanitize=float-divide-by-zero -fno-sanitize-recover")
 set(ASAN_FLAGS "-fsanitize=address")
 set(TSAN_FLAGS "-fsanitize=thread")
-set(STACK_FLAGS "-fstack-protector-all")
+set(STACK_FLAGS "-fstack-protector-strong")
 
 # Frame pointers
 set(FRAME_PTR_FLAG "-fno-omit-frame-pointer")
