@@ -87,7 +87,7 @@ DDRes Process::read_cgroup_ns(pid_t pid, std::string_view path_to_proc,
 
 UniqueFile open_proc_comm(pid_t pid, pid_t tid, const char *path_to_proc = "") {
   const std::string proc_comm_filename =
-      absl::StrFormat("/proc/%d/task/%d/comm", pid, tid);
+      absl::StrFormat("%s/proc/%d/task/%d/comm", path_to_proc, pid, tid);
   UniqueFile file{fopen(proc_comm_filename.c_str(), "r"), fclose};
   if (!file) {
     // Check if the file exists
@@ -114,7 +114,7 @@ std::string_view Process::get_or_insert_thread_name(pid_t tid) {
   }
 
   // Attempt to open the comm file for the thread
-  UniqueFile comm_file = open_proc_comm(_pid, tid);
+  const UniqueFile comm_file = open_proc_comm(_pid, tid);
   if (!comm_file) {
     // Leave the empty string we just inserted
     return it->second; // This will return the empty string
@@ -127,7 +127,7 @@ std::string_view Process::get_or_insert_thread_name(pid_t tid) {
   }
 
   // Remove the trailing newline character if present
-  size_t len = strlen(thread_name);
+  const size_t len = strlen(thread_name);
   if (len > 0 && thread_name[len - 1] == '\n') {
     thread_name[len - 1] = '\0';
   }

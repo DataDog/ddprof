@@ -41,7 +41,7 @@ void add_container_id(Process &process, UnwindState *us) {
   }
 }
 
-void add_exe_name(Process &process, UnwindState *us) {
+void add_exe_name(UnwindState *us) {
   us->output.exe_name =
       us->symbol_hdr._base_frame_symbol_lookup.get_exe_name(us->pid);
 }
@@ -96,8 +96,12 @@ DDRes unwindstate_unwind(UnwindState *us) {
   // Add a frame that identifies executable to which these belong
   add_virtual_base_frame(us);
   add_container_id(process, us);
-  add_exe_name(process, us);
-  add_thread_name(process, us);
+  if (us->is_timeline) {
+    // the lookup is only useful in timeline view
+    // keep this as a way to remove the possible overhead of opening the files
+    add_exe_name(us);
+    add_thread_name(process, us);
+  }
   return res;
 }
 
