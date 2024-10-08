@@ -179,7 +179,8 @@ DDRes worker_update_stats(DDProfWorkerContext &worker_context,
 }
 
 DDRes ddprof_unwind_sample(DDProfContext &ctx, perf_event_sample *sample,
-                           int watcher_pos) {
+                           int watcher_pos, bool &inconsistent_pid_state) {
+  inconsistent_pid_state = false;
   struct UnwindState *us = ctx.worker_ctx.us;
   PerfWatcher *watcher = &ctx.watchers[watcher_pos];
 
@@ -229,7 +230,7 @@ DDRes ddprof_unwind_sample(DDProfContext &ctx, perf_event_sample *sample,
   if (us->_dwfl_wrapper && us->_dwfl_wrapper->_inconsistent) {
     // Loaded modules were inconsistent, assume we should flush everything.
     LG_WRN("(Inconsistent DWFL/DSOs)%d - Free associated objects", us->pid);
-    DDRES_CHECK_FWD(worker_pid_free(ctx, us->pid));
+    inconsistent_pid_state = true;
   }
   return res;
 }
@@ -413,7 +414,9 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
   }
 
   auto ticks0 = TscClock::cycles_now();
-  DDRes const res = ddprof_unwind_sample(ctx, sample, watcher_pos);
+  bool inconsistent_pid_state = false;
+  DDRes const res =
+      ddprof_unwind_sample(ctx, sample, watcher_pos, inconsistent_pid_state);
   auto unwind_ticks = TscClock::cycles_now();
   ddprof_stats_add(STATS_UNWIND_AVG_TIME, unwind_ticks - ticks0, nullptr);
 
@@ -454,7 +457,10 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
           ctx.worker_ctx.symbolizer, pprof));
     }
   }
-
+  // We need to free the PID only after any aggregation operations
+  if (inconsistent_pid_state) {
+    DDRES_CHECK_FWD(worker_pid_free(ctx, ctx.worker_ctx.us->pid));
+  }
   ddprof_stats_add(STATS_AGGREGATION_AVG_TIME,
                    TscClock::cycles_now() - unwind_ticks, nullptr);
 
