@@ -341,8 +341,9 @@ DDRes worker_library_init(DDProfContext &ctx,
     // Make sure worker index is initialized correctly
     ctx.worker_ctx.i_current_pprof = 0;
     ctx.worker_ctx.exp_tid = {0};
-    auto unwind_state = create_unwind_state(ctx.params.dd_profiling_fd,
-                                            ctx.params.maximum_pids);
+    auto unwind_state =
+        create_unwind_state(ctx.params.dd_profiling_fd, ctx.params.maximum_pids,
+                            ctx.params.timeline);
     if (!unwind_state) {
       LG_ERR("Failed to create unwind state");
       return ddres_error(DD_WHAT_UW_ERROR);

@@ -23,7 +23,6 @@
 namespace ddprof {
 
 namespace {
-
 void find_dso_add_error_frame(DDRes ddres, UnwindState *us) {
   if (ddres._what == DD_WHAT_UW_MAX_PIDS) {
     add_common_frame(us, SymbolErrors::max_pids);
@@ -36,10 +35,19 @@ void find_dso_add_error_frame(DDRes ddres, UnwindState *us) {
 }
 
 void add_container_id(Process &process, UnwindState *us) {
-  auto container_id = process.get_container_id();
+  const auto &container_id = process.get_container_id();
   if (container_id) {
     us->output.container_id = *container_id;
   }
+}
+
+void add_exe_name(UnwindState *us) {
+  us->output.exe_name =
+      us->symbol_hdr._base_frame_symbol_lookup.get_exe_name(us->pid);
+}
+
+void add_thread_name(Process &process, UnwindState *us) {
+  us->output.thread_name = process.get_or_insert_thread_name(us->output.tid);
 }
 } // namespace
 
@@ -88,6 +96,12 @@ DDRes unwindstate_unwind(UnwindState *us) {
   // Add a frame that identifies executable to which these belong
   add_virtual_base_frame(us);
   add_container_id(process, us);
+  if (us->is_timeline) {
+    // the lookup is only useful in timeline view
+    // keep this as a way to remove the possible overhead of opening the files
+    add_exe_name(us);
+    add_thread_name(process, us);
+  }
   return res;
 }
 

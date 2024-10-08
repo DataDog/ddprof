@@ -30,7 +30,7 @@ using namespace std::string_view_literals;
 namespace ddprof {
 
 namespace {
-constexpr size_t k_max_pprof_labels{6};
+constexpr size_t k_max_pprof_labels{8};
 
 constexpr int k_max_value_types =
     DDPROF_PWT_LENGTH * static_cast<int>(kNbEventAggregationModes);
@@ -239,14 +239,18 @@ size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
                       std::span<ddog_prof_Label> labels) {
   constexpr std::string_view k_container_id_label = "container_id"sv;
   constexpr std::string_view k_process_id_label = "process_id"sv;
+  constexpr std::string_view k_process_name_label = "process_name"sv;
   // This naming has an impact on backend side (hence the inconsistency with
   // process_id)
   constexpr std::string_view k_thread_id_label = "thread id"sv;
+  constexpr std::string_view k_thread_name_label = "thread_name"sv;
   constexpr std::string_view k_tracepoint_label = "tracepoint_type"sv;
   size_t labels_num = 0;
-  labels[labels_num].key = to_CharSlice(k_container_id_label);
-  labels[labels_num].str = to_CharSlice(uw_output.container_id);
-  ++labels_num;
+  if (!uw_output.container_id.empty()) {
+    labels[labels_num].key = to_CharSlice(k_container_id_label);
+    labels[labels_num].str = to_CharSlice(uw_output.container_id);
+    ++labels_num;
+  }
 
   // Add any configured labels.  Note that TID alone has the same cardinality as
   // (TID;PID) tuples, so except for symbol table overhead it doesn't matter
@@ -270,6 +274,16 @@ size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
     } else {
       labels[labels_num].str = to_CharSlice(watcher.tracepoint_event);
     }
+    ++labels_num;
+  }
+  if (!uw_output.exe_name.empty()) {
+    labels[labels_num].key = to_CharSlice(k_process_name_label);
+    labels[labels_num].str = to_CharSlice(uw_output.exe_name);
+    ++labels_num;
+  }
+  if (!uw_output.thread_name.empty()) {
+    labels[labels_num].key = to_CharSlice(k_thread_name_label);
+    labels[labels_num].str = to_CharSlice(uw_output.thread_name);
     ++labels_num;
   }
   DDPROF_DCHECK_FATAL(labels_num <= labels.size(),

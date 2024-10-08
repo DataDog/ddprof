@@ -42,9 +42,10 @@ struct UnwindRegisters {
 /// given through callbacks
 struct UnwindState {
   explicit UnwindState(UniqueElf ref_elf, int dd_profiling_fd = -1,
-                       int nb_max_pids = k_default_max_profiled_pids)
+                       int nb_max_pids = k_default_max_profiled_pids,
+                       bool timeline = true)
       : dso_hdr("", dd_profiling_fd), ref_elf(std::move(ref_elf)),
-        maximum_pids(nb_max_pids) {
+        maximum_pids(nb_max_pids), is_timeline(timeline) {
     output.clear();
     output.locs.reserve(kMaxStackDepth);
   }
@@ -63,11 +64,13 @@ struct UnwindState {
   UnwindOutput output;
   UniqueElf ref_elf; // reference elf object used to initialize dwfl
   int maximum_pids;
+  bool is_timeline;
 };
 
 std::optional<UnwindState>
 create_unwind_state(int dd_profiling_fd = -1,
-                    int maximum_pids = k_default_max_profiled_pids);
+                    int maximum_pids = k_default_max_profiled_pids,
+                    bool timeline = true);
 
 static inline bool unwind_registers_equal(const UnwindRegisters *lhs,
                                           const UnwindRegisters *rhs) {

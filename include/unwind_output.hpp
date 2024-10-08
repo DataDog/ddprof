@@ -32,9 +32,13 @@ struct UnwindOutput {
   void clear() {
     locs.clear();
     container_id = k_container_id_unknown;
+    exe_name = {};
+    thread_name = {};
   }
   std::vector<FunLoc> locs;
-  std::string container_id;
+  std::string_view container_id;
+  std::string_view exe_name;
+  std::string_view thread_name;
   int pid;
   int tid;
   friend auto operator<=>(const UnwindOutput &, const UnwindOutput &) = default;
