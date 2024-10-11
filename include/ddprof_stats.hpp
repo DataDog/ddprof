@@ -42,7 +42,7 @@ namespace ddprof {
   X(BACKPOPULATE_COUNT, "backpopulate.count", STAT_GAUGE)
 
 // Expand the enum/index for the individual stats
-enum DDPROF_STATS { STATS_TABLE(X_ENUM) STATS_LEN };
+enum DDPROF_STATS : uint8_t { STATS_TABLE(X_ENUM) STATS_LEN };
 #undef X_ENUM
 
 // Necessary for initializing the backend store for stats.  It's necessary that

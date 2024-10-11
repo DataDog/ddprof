@@ -53,7 +53,7 @@ TrackerThreadLocalState *AllocationTracker::init_tl_state() {
   if (int const res = pthread_setspecific(_tl_state_key, tl_state.get());
       res != 0) {
     // should return 0
-    LG_ERR("Unable to store tl_state. Error %d: %s\n", res, strerror(res));
+    LG_DBG("Unable to store tl_state. Error %d: %s\n", res, strerror(res));
     tl_state.reset();
   }
 
@@ -97,6 +97,7 @@ DDRes AllocationTracker::allocation_tracking_init(
   std::lock_guard const lock{state.mutex};
 
   if (state.track_allocations) {
+    // the log here is acceptable as we assume we are not in a reentrant state
     DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW, "Allocation profiler already started");
   }
 
@@ -177,7 +178,7 @@ void AllocationTracker::allocation_tracking_free() {
   }
   TrackerThreadLocalState *tl_state = get_tl_state();
   if (unlikely(!tl_state)) {
-    LG_ERR("Unable to get tl_state during allocation_tracking_free\n");
+    LG_DBG("Unable to get tl_state during allocation_tracking_free");
     instance->free();
     return;
   }
@@ -247,7 +248,7 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
           // still set this as we are pushing the allocation to ddprof
           _allocated_address_set.add(addr);
         } else {
-          LG_ERR("Stopping allocation profiling. Unable to clear live "
+          LG_DBG("Stopping allocation profiling. Unable to clear live "
                  "allocation\n");
           free();
         }
@@ -329,8 +330,8 @@ DDRes AllocationTracker::push_clear_live_allocation(
   if (buffer.empty()) {
     // unable to push a clear is an error (we don't want to grow too much)
     // No use pushing a lost event. As this is a sync mechanism.
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
-                           "Unable to get write lock on ring buffer");
+    LG_DBG("Unable to get write lock on ring buffer");
+    return DDRes{._what = DD_WHAT_PERFRB, ._sev = DD_SEV_ERROR};
   }
 
   auto *event = reinterpret_cast<ClearLiveAllocationEvent *>(buffer.data());
@@ -348,9 +349,9 @@ DDRes AllocationTracker::push_clear_live_allocation(
   if (writer.commit(buffer)) {
     uint64_t count = 1;
     if (write(_pevent.fd, &count, sizeof(count)) != sizeof(count)) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
-                             "Error writing to memory allocation eventfd (%s)",
-                             strerror(errno));
+      LG_DBG("Error writing to memory allocation eventfd (%s)",
+             strerror(errno));
+      return DDRes{._what = DD_WHAT_PERFRB, ._sev = DD_SEV_ERROR};
     }
   }
 
@@ -375,8 +376,8 @@ DDRes AllocationTracker::push_dealloc_sample(
     _state.lost_count.fetch_add(1, std::memory_order_acq_rel);
 
     if (timeout) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
-                             "Unable to get write lock on ring buffer");
+      LG_DBG("Unable to get write lock on ring buffer");
+      return DDRes{._what = DD_WHAT_PERFRB, ._sev = DD_SEV_ERROR};
     }
     // not an error
     return {};
@@ -400,9 +401,9 @@ DDRes AllocationTracker::push_dealloc_sample(
   if (writer.commit(buffer) || notify_consumer) {
     uint64_t count = 1;
     if (write(_pevent.fd, &count, sizeof(count)) != sizeof(count)) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
-                             "Error writing to memory allocation eventfd (%s)",
-                             strerror(errno));
+      LG_DBG("Error writing to memory allocation eventfd (%s)",
+             strerror(errno));
+      return DDRes{._what = DD_WHAT_PERFRB, ._sev = DD_SEV_ERROR};
     }
   }
 
@@ -447,8 +448,9 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
     _state.lost_count.fetch_add(1, std::memory_order_acq_rel);
 
     if (timeout) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
-                             "Unable to get write lock on ring buffer");
+      // The log here could deadlock (hence we put it behind a debug flag)
+      LG_DBG("Unable to get write lock on ring buffer");
+      return DDRes{._what = DD_WHAT_PERFRB, ._sev = DD_SEV_ERROR};
     }
 
     // not an error
@@ -484,9 +486,10 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   if (writer.commit(buffer) || notify_consumer) {
     uint64_t count = 1;
     if (write(_pevent.fd, &count, sizeof(count)) != sizeof(count)) {
-      DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFRB,
-                             "Error writing to memory allocation eventfd (%s)",
-                             strerror(errno));
+      // Logs can cause deadlock (hence we print it in debug mode only)
+      LG_DBG("Error writing to memory allocation eventfd (%s)",
+             strerror(errno));
+      return DDRes{._what = DD_WHAT_PERFRB, ._sev = DD_SEV_ERROR};
     }
   }
 
@@ -550,7 +553,7 @@ void AllocationTracker::notify_thread_start() {
   if (unlikely(!tl_state)) {
     tl_state = init_tl_state();
     if (!tl_state) {
-      LG_ERR("Unable to start allocation profiling on thread %d",
+      LG_DBG("Unable to start allocation profiling on thread %d",
              ddprof::gettid());
       return;
     }
@@ -565,7 +568,7 @@ void AllocationTracker::notify_fork() {
   if (unlikely(!tl_state)) {
     // The state should already exist if we forked.
     // This would mean that we were not able to create the state before forking
-    LG_ERR("Unable to retrieve tl state after fork thread %d",
+    LG_DBG("Unable to retrieve tl state after fork thread %d",
            ddprof::gettid());
     return;
   }

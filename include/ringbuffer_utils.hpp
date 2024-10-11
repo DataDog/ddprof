@@ -23,14 +23,14 @@ inline constexpr size_t kRingBufferAlignment{8};
 // Return `x` rounded up to next multiple of `pow2`
 // `pow2` must be a power of 2
 // Return 0 for x==0 or x > std::numeric_limits<uint64_t>::max() - pow2 + 1
-constexpr inline uint64_t align_up(uint64_t x, uint64_t pow2) {
+constexpr uint64_t align_up(uint64_t x, uint64_t pow2) {
   assert(pow2 > 0 && (pow2 & (pow2 - 1)) == 0);
   return ((x - 1) | (pow2 - 1)) + 1;
 }
 
 // Return `x` rounded down to previous multiple of `pow2`
 // `pow2` must be a power of 2
-constexpr inline uint64_t align_down(uint64_t x, uint64_t pow2) {
+constexpr uint64_t align_down(uint64_t x, uint64_t pow2) {
   assert(pow2 > 0 && (pow2 & (pow2 - 1)) == 0);
   return x & ~(pow2 - 1);
 }
@@ -58,7 +58,8 @@ public:
     return available_size();
   }
 
-  [[nodiscard]] inline size_t available_size() const {
+  // implicitly inlined
+  [[nodiscard]] size_t available_size() const {
     // Always leave one free char, as a completely full buffer is
     // indistinguishable from an empty one
     return _rb->mask - (_head - _tail);
@@ -126,8 +127,8 @@ public:
 
   PerfRingBufferReader(const PerfRingBufferReader &) = delete;
   PerfRingBufferReader &operator=(const PerfRingBufferReader &) = delete;
-
-  [[nodiscard]] inline size_t available_size() const {
+  // implicitly inlined
+  [[nodiscard]] size_t available_size() const {
     return _head - _rb->intermediate_reader_pos;
   }
 
@@ -185,7 +186,7 @@ struct MPSCRingBufferHeader {
 
 class MPSCRingBufferWriter {
 public:
-  static inline constexpr std::chrono::milliseconds k_lock_timeout{100};
+  static constexpr std::chrono::milliseconds k_lock_timeout{100};
 
   explicit MPSCRingBufferWriter(RingBuffer *rb) : _rb(rb) {
     assert(_rb->type == RingBufferType::kMPSCRingBuffer);
@@ -311,7 +312,8 @@ inline void mpsc_rb_advance_if_possible(RingBuffer &rb, const void *event) {
   assert(rb.type == RingBufferType::kMPSCRingBuffer);
 
   // set current event as discarded
-  reinterpret_cast<MPSCRingBufferHeader *>(const_cast<void *>(event))[-1]
+  const_cast<MPSCRingBufferHeader *>(
+      reinterpret_cast<const MPSCRingBufferHeader *>(event))[-1]
       .set_discarded();
 
   uint64_t new_tail = *rb.reader_pos;
@@ -379,7 +381,7 @@ public:
   MPSCRingBufferReader(const MPSCRingBufferReader &) = delete;
   MPSCRingBufferReader &operator=(const MPSCRingBufferReader &) = delete;
 
-  [[nodiscard]] inline size_t available_size() const {
+  [[nodiscard]] size_t available_size() const {
     return _head - _rb->intermediate_reader_pos;
   }
 

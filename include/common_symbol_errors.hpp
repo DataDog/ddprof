@@ -6,6 +6,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <string_view>
 
 // sv operator
@@ -22,7 +23,7 @@ inline constexpr std::array<std::string_view, 7> k_common_frame_names = {
     "[maximum pids]"sv,
     "[unsampled mapping]"sv};
 
-enum SymbolErrors {
+enum SymbolErrors : std::uint8_t {
   truncated_stack = 0,
   unknown_mapping,
   unwind_failure,

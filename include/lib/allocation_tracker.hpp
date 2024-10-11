@@ -33,7 +33,7 @@ public:
 
   ~AllocationTracker() { free(); }
 
-  enum AllocationTrackingFlags {
+  enum AllocationTrackingFlags : uint8_t {
     kTrackDeallocations = 0x1,
     kDeterministicSampling = 0x2
   };
@@ -48,7 +48,7 @@ public:
     std::chrono::milliseconds interval{0};
   };
 
-  static inline constexpr uint32_t k_max_consecutive_failures{5};
+  static constexpr uint32_t k_max_consecutive_failures{5};
 
   static void notify_thread_start();
   static void notify_fork();

@@ -283,7 +283,7 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
     return ddres_warn(DD_WHAT_MODULE);
   }
   // dwfl now has ownership of the file descriptor
-  (void)fd_holder.release();
+  (void)fd_holder.release(); // NOLINT
   dwfl_module_info(ddprof_mod._mod, nullptr, &ddprof_mod._low_addr,
                    &ddprof_mod._high_addr, nullptr, nullptr, nullptr, nullptr);
   LG_DBG("Loaded mod from file (%s[ID#%d]), (%s) mod[%lx-%lx] bias[%lx], "

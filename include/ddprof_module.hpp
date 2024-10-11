@@ -18,7 +18,7 @@ struct DDProfModRange {
 };
 
 struct DDProfMod {
-  enum Status {
+  enum Status : uint8_t {
     kUnknown,
     kInconsistent,
   };

@@ -6,9 +6,14 @@
 #include "ddprof_process.hpp"
 
 #include "ddres.hpp"
+#include "unique_fd.hpp"
+#include "user_override.hpp"
 
 #include <absl/strings/numbers.h>
 #include <absl/strings/str_cat.h>
+#include <absl/strings/str_format.h>
+
+#include <sys/stat.h>
 #include <unistd.h>
 #include <vector>
 
@@ -78,6 +83,58 @@ DDRes Process::read_cgroup_ns(pid_t pid, std::string_view path_to_proc,
                           pid);
   }
   return {};
+}
+
+UniqueFile open_proc_comm(pid_t pid, pid_t tid, const char *path_to_proc = "") {
+  const std::string proc_comm_filename =
+      absl::StrFormat("%s/proc/%d/task/%d/comm", path_to_proc, pid, tid);
+  UniqueFile file{fopen(proc_comm_filename.c_str(), "r"), fclose};
+  if (!file) {
+    // Check if the file exists
+    struct stat info;
+    UIDInfo old_uids;
+    // warning could user switch create too much overhead ?
+    if (stat(proc_comm_filename.c_str(), &info) == 0 &&
+        IsDDResOK(user_override(info.st_uid, info.st_gid, &old_uids))) {
+      file.reset(fopen(proc_comm_filename.c_str(), "r"));
+      // Switch back to the original user
+      user_override(old_uids.uid, old_uids.gid);
+    }
+  }
+  return file;
+}
+
+std::string_view Process::get_or_insert_thread_name(pid_t tid) {
+  // Try to insert an empty string first, to ensure only one lookup happens
+  auto [it, inserted] = _thread_name_map.emplace(tid, "");
+
+  // If the thread name is already cached (not inserted), return the cached name
+  if (!inserted) {
+    return it->second;
+  }
+
+  // Attempt to open the comm file for the thread
+  const UniqueFile comm_file = open_proc_comm(_pid, tid);
+  if (!comm_file) {
+    // Leave the empty string we just inserted
+    return it->second; // This will return the empty string
+  }
+
+  // Thread names in Linux are limited to 16 bytes, though 256 is fine
+  char thread_name[256];
+  if (fgets(thread_name, sizeof(thread_name), comm_file.get()) == nullptr) {
+    return it->second; // This will return the empty string
+  }
+
+  // Remove the trailing newline character if present
+  const size_t len = strlen(thread_name);
+  if (len > 0 && thread_name[len - 1] == '\n') {
+    thread_name[len - 1] = '\0';
+  }
+
+  // Update the value with the actual thread name
+  it->second = thread_name;
+  return it->second;
 }
 
 const ContainerId &ProcessHdr::get_container_id(pid_t pid) {

@@ -10,7 +10,7 @@
 
 // Extend the perf event types
 // There are <30 different perf events (starting at 1000 seems safe)
-enum : uint32_t {
+enum : uint16_t {
   PERF_CUSTOM_EVENT_DEALLOCATION = 1000,
   PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION
 };

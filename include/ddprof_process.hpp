@@ -38,6 +38,8 @@ public:
 
   uint64_t increment_counter() { return ++_sample_counter; }
 
+  [[nodiscard]] std::string_view get_or_insert_thread_name(pid_t tid);
+
   [[nodiscard]] DwflWrapper *get_or_insert_dwfl();
   [[nodiscard]] DwflWrapper *get_dwfl();
   [[nodiscard]] const DwflWrapper *get_dwfl() const;
@@ -49,7 +51,8 @@ private:
   static DDRes read_cgroup_ns(pid_t pid, std::string_view path_to_proc,
                               CGroupId_t &cgroup);
 
-  std::unique_ptr<DwflWrapper> _dwfl_wrapper{};
+  std::unordered_map<pid_t, std::string> _thread_name_map;
+  std::unique_ptr<DwflWrapper> _dwfl_wrapper;
   ContainerId _container_id;
   pid_t _pid;
   CGroupId_t _cgroup_ns;
@@ -78,7 +81,7 @@ private:
   std::unordered_set<pid_t> _visited_pid;
   using ProcessMap = std::unordered_map<pid_t, Process>;
   ProcessMap _process_map;
-  std::string _path_to_proc = {};
+  std::string _path_to_proc;
 };
 
 }; // namespace ddprof

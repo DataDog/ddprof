@@ -36,14 +36,14 @@ struct DDProfWorkerContext {
   UserTags *user_tags{};
   ProcStatus proc_status{};
   std::chrono::steady_clock::time_point
-      cycle_start_time{}; // time at which current export cycle was started
+      cycle_start_time; // time at which current export cycle was started
   std::chrono::steady_clock::time_point
-      send_time{};          // Last time an export was sent
+      send_time;            // Last time an export was sent
   uint32_t count_worker{0}; // exports since last cache clear
   std::array<uint64_t, kMaxTypeWatcher> lost_events_per_watcher{};
   LiveAllocation live_allocation;
   int64_t perfclock_offset;
-  PerfClock::time_point last_processed_event_timestamp{};
+  PerfClock::time_point last_processed_event_timestamp;
 };
 
 } // namespace ddprof

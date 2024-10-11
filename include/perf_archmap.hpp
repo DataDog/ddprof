@@ -18,7 +18,7 @@ inline constexpr size_t k_perf_register_count = 20;
 inline constexpr uint64_t k_perf_register_mask = 0xff0fff;
 
 #  define REGNAME(x) PAM_X86_##x
-enum PERF_ARCHMAP_X86 {
+enum PERF_ARCHMAP_X86 : uint8_t {
   PAM_X86_RAX,
   PAM_X86_RBX,
   PAM_X86_RCX,
@@ -56,7 +56,7 @@ inline constexpr uint64_t k_perf_register_mask =
     ~(~0ULL << k_perf_register_count);
 
 #  define REGNAME(x) PAM_ARM_##x
-enum PERF_ARCHMAP_ARM {
+enum PERF_ARCHMAP_ARM : uint8_t {
   PAM_ARM_X0,
   PAM_ARM_X1,
   PAM_ARM_X2,
@@ -126,7 +126,7 @@ constexpr unsigned int dwarf_to_perf_regno(unsigned int i) {
   return lookup[i];
 };
 
-inline constexpr unsigned int param_to_perf_regno(unsigned int param_no) {
+constexpr unsigned int param_to_perf_regno(unsigned int param_no) {
 // Populate lookups for converting parameter number (1-indexed) to regno
 #define R(x) REGNAME(x)
 #ifdef __x86_64__

@@ -66,7 +66,7 @@ private:
 
 struct RequestMessage {
   // Request flags
-  enum { kProfilerInfo = 0x1 };
+  enum : uint8_t { kProfilerInfo = 0x1 };
   // request is bit mask of request flags
   uint32_t request = 0;
   pid_t pid = -1;
@@ -80,7 +80,7 @@ struct RingBufferInfo {
 };
 
 struct ReplyMessage {
-  enum { kLiveSum = 0x1 };
+  enum : uint8_t { kLiveSum = 0x1 };
   // reply with the request flags from the request
   uint32_t request = 0;
   // profiler pid

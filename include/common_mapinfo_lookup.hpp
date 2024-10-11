@@ -16,7 +16,7 @@ namespace ddprof {
 // Generates virtual frames for common unhandled cases
 class CommonMapInfoLookup {
 public:
-  enum MappingErrors {
+  enum MappingErrors : uint8_t {
     empty, // when mapping info is not relevant, just put am empty field
   };
 

@@ -41,7 +41,7 @@ static constexpr int k_jit_header_version = 1;
 
 // Looking at LLVM code, only DEBUG and LOAD are emitted
 // https://github.com/llvm/llvm-project/blob/main/llvm/lib/ExecutionEngine/PerfJITEvents/PerfJITEventListener.cpp
-enum JITRecordType {
+enum JITRecordType : uint8_t {
   JIT_CODE_LOAD = 0,           // record describing a jitted function
   JIT_CODE_MOVE = 1,           // already jitted function which is moved
   JIT_CODE_DEBUG_INFO = 2,     // debug information for a jitted function

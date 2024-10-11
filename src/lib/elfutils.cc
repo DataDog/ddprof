@@ -169,10 +169,14 @@ DynamicInfo retrieve_dynamic_info(const ElfW(Dyn) * dyn_begin,
     jmprels_size = 0;
   }
 
-  uint32_t sym_count = gnu_hash
-      ? gnu_hash_symbol_count(gnu_hash)
-      : (elf_hash ? elf_hash_symbol_count(elf_hash) : 0);
-
+  uint32_t sym_count = 0;
+  if (gnu_hash) {
+    sym_count = gnu_hash_symbol_count(gnu_hash);
+  }
+  // Once we fix the issue with DT_HASH, we can use it
+  //  else if (elf_hash) {
+  //    sym_count = elf_hash_symbol_count(elf_hash);
+  //  }
   return {.strtab = {strtab, strtab_size},
           .symtab = {symtab, sym_count},
           .rels = {rels, rels_size / sizeof(ElfW(Rel))},

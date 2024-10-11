@@ -8,7 +8,7 @@
 #include <climits>
 #include <cstdint>
 
-enum { DD_COMMON_START_RANGE = 1000, DD_NATIVE_START_RANGE = 2000 };
+enum : uint16_t { DD_COMMON_START_RANGE = 1000, DD_NATIVE_START_RANGE = 2000 };
 
 #define EXPAND_ENUM(a, b) DD_WHAT_##a,
 #define EXPAND_ERROR_MESSAGE(a, b) #a ": " b,
@@ -66,7 +66,7 @@ enum { DD_COMMON_START_RANGE = 1000, DD_NATIVE_START_RANGE = 2000 };
 
 // generic erno errors available from /usr/include/asm-generic/errno.h
 
-enum DDRes_What {
+enum DDRes_What : uint16_t {
   // errno starts after ELAST 106 as of now
   DD_WHAT_MIN_ERRNO = DD_COMMON_START_RANGE,
   // common errors

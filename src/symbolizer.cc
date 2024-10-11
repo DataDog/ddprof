@@ -82,8 +82,8 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
       // Symbolization failed, retry without using debug symbols
       // blazesym curently does not support compressed debug sections:
       // cf. https://github.com/libbpf/blazesym/issues/581
-      LG_NTC("Unable to symbolize with debug symbols, retrying for %s",
-             elf_src.c_str());
+      LG_NTC("Unable to symbolize with debug symbols, retrying for %s (%s)",
+             elf_src.c_str(), blaze_err_str(blaze_err_last()));
       symbolizer_wrapper.use_debug = false;
       src_elf.debug_syms = false;
       blaze_res = blaze_symbolize_elf_virt_offsets(

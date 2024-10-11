@@ -14,14 +14,14 @@
 
 namespace ddprof {
 
-enum EventAggregationModePos {
+enum EventAggregationModePos : uint8_t {
   kSumPos = 0,
   kLiveSumPos = 1,
   kNbEventAggregationModes
 };
 
 // Defines how a sample is aggregated when it is received
-enum class EventAggregationMode : uint32_t {
+enum class EventAggregationMode : uint8_t {
   kDisabled = 0,
   kSum = 1 << kSumPos,         // Sum of usage (example: overall CPU usage)
   kLiveSum = 1 << kLiveSumPos, // Report live usage (example memory leaks)
@@ -33,21 +33,21 @@ constexpr bool Any(EventAggregationMode arg) {
 }
 
 // Defines how samples are weighted
-enum class EventConfValueSource {
+enum class EventConfValueSource : uint8_t {
   kSample = 0,   // Use sample value (period) from perf events
   kRegister = 1, // Use the register from `register_num`
   kRaw = 2,      // Use the offset/size for raw event
 };
 
 // Defines how the sampling is configured (e.g., with `perf_event_open()`)
-enum class EventConfCadenceType {
+enum class EventConfCadenceType : uint8_t {
   kUndefined = 0,
   kPeriod = 1,
   kFrequency = 2,
 };
 
 // Used by the parser to return which key was detected
-enum class EventConfField {
+enum class EventConfField : uint8_t {
   kNone = 0,
   /*
    *  None is an invalid event type used to fence uninitialized values.
@@ -139,9 +139,9 @@ struct EventConf {
 
   int64_t id{};
 
-  std::string eventname{};
-  std::string groupname{};
-  std::string label{};
+  std::string eventname;
+  std::string groupname;
+  std::string label;
 
   EventConfValueSource value_source{};
   uint8_t register_num{};

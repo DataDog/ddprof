@@ -57,7 +57,7 @@ namespace ddprof {
 
 namespace {
 
-enum class InputResult { kSuccess, kStop, kError };
+enum class InputResult : uint8_t { kSuccess, kStop, kError };
 
 void maybe_slowdown_startup() {
   // Simulate startup slowdown if requested

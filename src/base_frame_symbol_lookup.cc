@@ -32,6 +32,9 @@ BaseFrameSymbolLookup::insert_bin_symbol(pid_t pid, SymbolTable &symbol_table,
     symbol_idx =
         dso_symbol_lookup.get_or_insert(find_res.first->second, symbol_table);
     _bin_map.insert({pid, symbol_idx});
+    const std::filesystem::path path(find_res.first->second._filename);
+    const std::string base_name = path.filename().string();
+    _exe_name_map.insert({pid, base_name});
   } else {
     std::string exe_name;
     bool const exe_found = dso_hdr.find_exe_name(pid, exe_name);
@@ -41,6 +44,7 @@ BaseFrameSymbolLookup::insert_bin_symbol(pid_t pid, SymbolTable &symbol_table,
       symbol_idx = symbol_table.size();
       symbol_table.emplace_back(Symbol({}, base_name, 0, exe_name));
       _bin_map.insert({pid, symbol_idx});
+      _exe_name_map.insert({pid, base_name});
     }
   }
   return symbol_idx;
@@ -75,6 +79,14 @@ BaseFrameSymbolLookup::get_or_insert(pid_t pid, SymbolTable &symbol_table,
     _pid_map.emplace(pid, PidSymbol(symbol_idx));
   }
   return symbol_idx;
+}
+
+std::string_view BaseFrameSymbolLookup::get_exe_name(pid_t pid) const {
+  auto const it = _exe_name_map.find(pid);
+  if (it != _exe_name_map.end()) {
+    return it->second;
+  }
+  return {};
 }
 
 } // namespace ddprof

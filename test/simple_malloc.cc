@@ -214,7 +214,7 @@ void print_stats(pid_t pid, const Stats &stats) {
          stats.cpu_time.count());
 }
 
-enum class WrapperOpts {
+enum class WrapperOpts : uint8_t {
   kNone = 0x0,
   kUseSharedLibrary = 0x1,
   kAvoidDLOpenHook = 0x2

@@ -22,6 +22,8 @@ public:
     _pid_map.erase(pid);
   }
 
+  std::string_view get_exe_name(pid_t pid) const;
+
 private:
   SymbolIdx_t insert_bin_symbol(pid_t pid, SymbolTable &symbol_table,
                                 DsoSymbolLookup &dso_symbol_lookup,
@@ -33,6 +35,8 @@ private:
     int _nb_bin_lookups{1};
   };
   std::unordered_map<pid_t, SymbolIdx_t> _bin_map;
+  std::unordered_map<pid_t, std::string> _exe_name_map;
+
   // holds generic symbol for this pid and a number of lookups to keep track of
   // failures looking for a given binary
   std::unordered_map<pid_t, PidSymbol> _pid_map;

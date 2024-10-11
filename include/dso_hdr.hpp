@@ -31,7 +31,7 @@ class DsoStats {
 public:
   DsoStats() : _metrics{} {}
 
-  enum DsoEventType {
+  enum DsoEventType : uint8_t {
     DSO_EVENT_TABLE(X_DSO_EVENT_ENUM) kNbDsoEventTypes,
   };
 
@@ -82,7 +82,7 @@ public:
   /******* Structures and types **********/
   using DsoMap = std::map<ProcessAddress_t, Dso>;
 
-  enum BackpopulatePermission {
+  enum BackpopulatePermission : uint8_t {
     kForbidden,
     kAllowed,
   };
@@ -90,7 +90,7 @@ public:
   struct BackpopulateState {
     static constexpr int k_nb_requests_between_backpopulates = 10;
     int nb_unfound_dsos{};
-    PerfClock::time_point last_backpopulate_time{};
+    PerfClock::time_point last_backpopulate_time;
     BackpopulatePermission perm{kAllowed};
   };
 
