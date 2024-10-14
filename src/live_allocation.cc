@@ -110,7 +110,7 @@ bool LiveAllocation::register_allocation_internal(const UnwindOutput &uo,
   auto &address_map = pid_stacks._address_map;
   ValuePerAddress &v = address_map[address];
 
-  if (v._value) {
+  if (unlikely(v._value)) { // we should not have double counts
     // Existing allocation: handle cleanup
     LG_DBG("(LIVE_ALLOC) Existing allocation found: %lx (cleaning up)",
            address);
@@ -245,13 +245,14 @@ LiveAllocation::upscale_with_mapping(const PprofStacks::value_type &stack,
     // todo: think about these cases
     LG_DBG("Unable to upscale address for mapping at %lx",
            stack.first.start_mmap);
-    return 0; // or handle as needed
+    return 0;
   }
   if (accounted_value._value == 0) {
     LG_DBG("No accounted memory for mapping at %lx", stack.first.start_mmap);
-    return 0; // or handle as needed
+    return 0;
   }
-
+  // save how much mem we have for this one
+  entry->accounted_size += stack.second._value;
   //
   // Mapping is 10 megs of RSS
   // foo -> 10 samples / 100 kb; 10% of the memory in this mapping

@@ -53,7 +53,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const PerfWatcher *watcher,
                       const FileInfoVector &file_infos, bool show_samples,
                       EventAggregationModePos value_pos, Symbolizer *symbolizer,
-                      DDProfPProf *pprof, ProcessAddress_t mapping_addr = 0);
+                      DDProfPProf *pprof);
 
 DDRes pprof_reset(DDProfPProf *pprof);
 

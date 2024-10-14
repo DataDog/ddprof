@@ -30,7 +30,7 @@ using namespace std::string_view_literals;
 namespace ddprof {
 
 namespace {
-constexpr size_t k_max_pprof_labels{8};
+constexpr size_t k_max_pprof_labels{10};
 
 constexpr int k_max_value_types =
     DDPROF_PWT_LENGTH * static_cast<int>(kNbEventAggregationModes);
@@ -234,7 +234,7 @@ ProfValueTypes compute_pprof_values(const ActiveIdsResult &active_ids) {
 }
 
 size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
-                      NumToStrCache &pid_strs, ProcessAddress_t mapping_addr,
+                      NumToStrCache &pid_strs,
                       std::span<ddog_prof_Label> labels) {
   constexpr std::string_view k_container_id_label = "container_id"sv;
   constexpr std::string_view k_process_id_label = "process_id"sv;
@@ -244,9 +244,8 @@ size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
   constexpr std::string_view k_thread_id_label = "thread id"sv;
   constexpr std::string_view k_thread_name_label = "thread_name"sv;
   constexpr std::string_view k_tracepoint_label = "tracepoint_type"sv;
-  constexpr std::string_view k_mapping_label = "mapping"sv;
   size_t labels_num = 0;
-<<<<<<< HEAD
+
   if (!uw_output.container_id.empty()) {
     labels[labels_num].key = to_CharSlice(k_container_id_label);
     labels[labels_num].str = to_CharSlice(uw_output.container_id);
@@ -266,7 +265,7 @@ size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
     labels[labels_num].str = to_CharSlice(pid_str(uw_output.pid, pid_strs));
     ++labels_num;
   }
-  if (!watcher.suppress_tid) {
+  if (!watcher.suppress_tid && uw_output.tid != 0) {
     labels[labels_num].key = to_CharSlice(k_thread_id_label);
     labels[labels_num].str = to_CharSlice(pid_str(uw_output.tid, pid_strs));
     ++labels_num;
@@ -290,6 +289,15 @@ size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
   if (!uw_output.thread_name.empty()) {
     labels[labels_num].key = to_CharSlice(k_thread_name_label);
     labels[labels_num].str = to_CharSlice(uw_output.thread_name);
+    ++labels_num;
+  }
+  for (const auto &el : uw_output.labels) {
+    if (labels_num >= labels.size()) {
+      LG_WRN("Labels buffer exceeded at %s (%d)", __FUNCTION__, __LINE__);
+      break;
+    }
+    labels[labels_num].key = to_CharSlice(el.first);
+    labels[labels_num].str = to_CharSlice(el.second);
     ++labels_num;
   }
   DDPROF_DCHECK_FATAL(labels_num <= labels.size(),
@@ -522,7 +530,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const PerfWatcher *watcher,
                       const FileInfoVector &file_infos, bool show_samples,
                       EventAggregationModePos value_pos, Symbolizer *symbolizer,
-                      DDProfPProf *pprof, ProcessAddress_t mapping_addr) {
+                      DDProfPProf *pprof) {
 
   const PProfIndices &pprof_indices = watcher->pprof_indices[value_pos];
   ddog_prof_Profile *profile = &pprof->_profile;
@@ -548,8 +556,8 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   // Create the labels for the sample.  Two samples are the same only when
   // their locations _and_ all labels are identical, so we admit a very limited
   // number of labels at present
-  const size_t labels_num = prepare_labels(
-      *uw_output, *watcher, pprof->_pid_str, mapping_addr, std::span{labels});
+  const size_t labels_num =
+      prepare_labels(*uw_output, *watcher, pprof->_pid_str, std::span{labels});
 
   ddog_prof_Sample const sample = {
       .locations = {.ptr = locations_buff.data(), .len = write_index},

@@ -32,6 +32,7 @@ public:
     ProcessAddress_t start;
     ProcessAddress_t end;
     size_t rss_kb;
+    size_t accounted_size{};
   };
 
   struct ValueAndCount {
@@ -123,6 +124,10 @@ public:
 
   void cycle() { _stats = {}; }
 
+  void set_default_unwind_output(const UnwindOutput &uo) {
+    _default_uw_output = uo;
+  }
+
 private:
   static bool register_deallocation_internal(uintptr_t address,
                                              PidStacks &pid_stacks);
@@ -134,6 +139,7 @@ private:
   struct {
     unsigned _unmatched_deallocations = {};
   } _stats;
+  UnwindOutput _default_uw_output;
 };
 
 } // namespace ddprof
