@@ -251,11 +251,6 @@ size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
     labels[labels_num].str = to_CharSlice(uw_output.container_id);
     ++labels_num;
   }
-  if (mapping_addr) {
-    labels[labels_num].key = to_CharSlice(k_mapping_label);
-    labels[labels_num].str = to_CharSlice(pid_str(mapping_addr, pid_strs));
-    ++labels_num;
-  }
 
   // Add any configured labels.  Note that TID alone has the same cardinality as
   // (TID;PID) tuples, so except for symbol table overhead it doesn't matter

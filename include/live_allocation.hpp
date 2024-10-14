@@ -82,11 +82,6 @@ public:
   using PidMap = std::unordered_map<pid_t, PidStacks>;
   using WatcherVector = std::vector<PidMap>;
 
-  WatcherVector _watcher_vector;
-
-  int64_t upscale_with_mapping(const PprofStacks::value_type &stack,
-                               PidStacks &pid_stacks);
-
   void register_allocation(const UnwindOutput &uo, uintptr_t addr, size_t size,
                            int watcher_pos, pid_t pid) {
     PidMap &pid_map = access_resize(_watcher_vector, watcher_pos);
@@ -122,12 +117,13 @@ public:
 
   static std::vector<SmapsEntry> parse_smaps(pid_t pid);
 
+  static int64_t upscale_with_mapping(const PprofStacks::value_type &stack,
+                                      PidStacks &pid_stacks);
+
   void cycle() { _stats = {}; }
 
-  void set_default_unwind_output(const UnwindOutput &uo) {
-    _default_uw_output = uo;
-  }
-
+  // no lint to avoid warning about member being public (should be refactored)
+  WatcherVector _watcher_vector; // NOLINT
 private:
   static bool register_deallocation_internal(uintptr_t address,
                                              PidStacks &pid_stacks);
@@ -139,7 +135,6 @@ private:
   struct {
     unsigned _unmatched_deallocations = {};
   } _stats;
-  UnwindOutput _default_uw_output;
 };
 
 } // namespace ddprof

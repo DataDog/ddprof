@@ -253,9 +253,10 @@ DDRes aggregate_livealloc_stack(
     int64_t upscalled_value, DDProfContext &ctx, const PerfWatcher *watcher,
     DDProfPProf *pprof, const SymbolHdr &symbol_hdr) {
 
-  if (upscalled_value)
+  if (upscalled_value) {
     LG_DBG("Upscaling from %ld to %ld", alloc_info.second._value,
            upscalled_value);
+  }
   // default to the sampled value
   const DDProfValuePack pack{
       upscalled_value ? upscalled_value : alloc_info.second._value,
@@ -269,7 +270,6 @@ DDRes aggregate_livealloc_stack(
 }
 
 DDRes aggregate_live_allocations_common(DDProfContext &ctx,
-                                        LiveAllocation &live_allocations,
                                         unsigned watcher_pos, pid_t pid,
                                         LiveAllocation::PidStacks &pid_stacks) {
   UnwindState *us = ctx.worker_ctx.us;
@@ -289,8 +289,8 @@ DDRes aggregate_live_allocations_common(DDProfContext &ctx,
 
   // Step 1: Process existing samples
   for (const auto &alloc_info : pid_stacks._unique_stacks) {
-    int64_t upscaled_value =
-        live_allocations.upscale_with_mapping(alloc_info, pid_stacks);
+    const int64_t upscaled_value =
+        ddprof::LiveAllocation::upscale_with_mapping(alloc_info, pid_stacks);
     DDRES_CHECK_FWD(aggregate_livealloc_stack(alloc_info, upscaled_value, ctx,
                                               watcher, pprof, symbol_hdr));
   }
@@ -307,7 +307,7 @@ DDRes aggregate_live_allocations_common(DDProfContext &ctx,
   for (const auto &el : pid_stacks.entries) {
     if (el.accounted_size == 0) {
       // Use the RSS value for this mapping as the "unsampled" value
-      int64_t unsampled_value = el.rss_kb * 1000; // RSS in bytes
+      const int64_t unsampled_value = el.rss_kb * 1000; // RSS in bytes
       // Add the frame using the fake UnwindOutput
       const DDProfValuePack pack{unsampled_value, 1, 0};
       DDRES_CHECK_FWD(
@@ -335,8 +335,8 @@ DDRes aggregate_live_allocations_for_pid(DDProfContext &ctx, pid_t pid) {
     auto &pid_map = live_allocations._watcher_vector[watcher_pos];
     auto &pid_stacks = pid_map[pid]; // Get PidStacks for the specific pid
     // Call the common function to handle the aggregation
-    DDRES_CHECK_FWD(aggregate_live_allocations_common(
-        ctx, live_allocations, watcher_pos, pid, pid_stacks));
+    DDRES_CHECK_FWD(
+        aggregate_live_allocations_common(ctx, watcher_pos, pid, pid_stacks));
   }
 
   return {};
@@ -353,7 +353,7 @@ DDRes aggregate_live_allocations(DDProfContext &ctx) {
       auto &pid_stacks = pid_vt.second;
       // Call the common function to handle the aggregation for each PID
       DDRES_CHECK_FWD(aggregate_live_allocations_common(
-          ctx, live_allocations, watcher_pos, pid_vt.first, pid_stacks));
+          ctx, watcher_pos, pid_vt.first, pid_stacks));
     }
   }
 
@@ -440,12 +440,6 @@ DDRes worker_library_init(DDProfContext &ctx,
     ctx.worker_ctx.exp[1] = nullptr;
     ctx.worker_ctx.pprof[0] = nullptr;
     ctx.worker_ctx.pprof[1] = nullptr;
-
-    // live allocation - create default unwind output
-    add_common_frame(ctx.worker_ctx.us, SymbolErrors::unsampled_mapping);
-    ctx.worker_ctx.live_allocation.set_default_unwind_output(
-        ctx.worker_ctx.us->output);
-    ctx.worker_ctx.us->output.clear();
   }
   CatchExcept2DDRes();
   return {};

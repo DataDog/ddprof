@@ -36,7 +36,7 @@ bool LiveAllocation::register_deallocation_internal(uintptr_t address,
   // object
   if (v._unique_stack) {
     // Adjust the mapping values map for the allocation being deallocated
-    ProcessAddress_t mapping_start = v._unique_stack->first.start_mmap;
+    const ProcessAddress_t mapping_start = v._unique_stack->first.start_mmap;
     mapping_values[mapping_start]._value -= v._value;
     if (mapping_values[mapping_start]._count > 0) {
       --mapping_values[mapping_start]._count;
@@ -88,9 +88,6 @@ bool LiveAllocation::register_allocation_internal(const UnwindOutput &uo,
   if (entry == pid_stacks.entries.end() || address < entry->start) {
     // Address not within any known mapping
     LG_DBG("(LIVE_ALLOC) Address not within any known mapping: %lx", address);
-    if (entry != pid_stacks.entries.end())
-      LG_DBG("(LIVE_ALLOC) matched entry start: %lx, end: %lx", entry->start,
-             entry->end);
   } else {
     start_addr = entry->start;
   }
@@ -98,7 +95,7 @@ bool LiveAllocation::register_allocation_internal(const UnwindOutput &uo,
   // Create or find the PprofStacks::value_type object corresponding to the
   // UnwindOutput
   auto &stacks = pid_stacks._unique_stacks;
-  StackAndMapping stack_key{uo_ptr, start_addr};
+  const StackAndMapping stack_key{uo_ptr, start_addr};
   auto iter = stacks.find(stack_key);
   if (iter == stacks.end()) {
     iter = stacks.emplace(stack_key, ValueAndCount{}).first;
@@ -151,7 +148,7 @@ bool LiveAllocation::register_allocation_internal(const UnwindOutput &uo,
 }
 
 std::vector<SmapsEntry> LiveAllocation::parse_smaps(pid_t pid) {
-  std::string smaps_file = absl::StrFormat("%s/%d/smaps", "/proc", pid);
+  const std::string smaps_file = absl::StrFormat("%s/%d/smaps", "/proc", pid);
 
   std::vector<SmapsEntry> entries;
   FILE *file = fopen(smaps_file.c_str(), "r");
@@ -164,7 +161,7 @@ std::vector<SmapsEntry> LiveAllocation::parse_smaps(pid_t pid) {
   SmapsEntry current_entry;
 
   while (fgets(buffer, sizeof(buffer), file)) {
-    std::string_view line(buffer);
+    const std::string_view line(buffer);
 
     if (line.find("Rss:") == 0) {
       // Extract RSS value (take characters after "Rss:    ")
@@ -180,12 +177,12 @@ std::vector<SmapsEntry> LiveAllocation::parse_smaps(pid_t pid) {
       }
       current_entry.rss_kb = rss;
       // push back as we are not parsing other values
-      entries.push_back(std::move(current_entry));
+      entries.push_back(current_entry);
       current_entry = SmapsEntry(); // Reset for next entry
     } else if (line.find('-') != std::string_view::npos) {
       // Extract address
-      std::string_view address = line.substr(0, line.find(' '));
-      size_t dash_position = address.find('-');
+      const std::string_view address = line.substr(0, line.find(' '));
+      const size_t dash_position = address.find('-');
       unsigned long long start;
       unsigned long long end;
       // Convert start address
@@ -268,7 +265,9 @@ LiveAllocation::upscale_with_mapping(const PprofStacks::value_type &stack,
   //
   // What if we have a different profile type to show this?
   //
-  return stack.second._value * entry->rss_kb * 1000 / accounted_value._value;
+  constexpr int KILOBYTES_TO_BYTES = 1000;
+  return stack.second._value * entry->rss_kb * KILOBYTES_TO_BYTES /
+      accounted_value._value;
 }
 
 } // namespace ddprof
