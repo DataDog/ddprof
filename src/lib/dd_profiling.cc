@@ -18,6 +18,7 @@
 #include "symbol_overrides.hpp"
 #include "syscalls.hpp"
 
+#include <absl/strings/numbers.h>
 #include <cassert>
 #include <cerrno>
 #include <charconv>
@@ -46,6 +47,7 @@ struct ProfilerState {
   bool allocation_profiling_started = false;
   bool follow_execs = true;
   pid_t profiler_pid = 0;
+  bool otel_profiler_mode = false;
 
   decltype(&::getenv) getenv = &::getenv;
   decltype(&::putenv) putenv = &::putenv;
@@ -151,6 +153,8 @@ void init_state() {
 
   auto *follow_execs_env = g_state.getenv(k_allocation_profiling_follow_execs);
   g_state.follow_execs = !(follow_execs_env && arg_no(follow_execs_env));
+  g_state.otel_profiler_mode =
+      g_state.getenv("DD_PROFILING_NATIVE_OTEL_MODE") != nullptr;
 
   init_logger();
   g_state.initialized = true;
@@ -323,6 +327,38 @@ int ddprof_start_profiling_internal() {
     return -1;
   }
 
+  if (g_state.otel_profiler_mode) {
+    auto *allocation_profiling_rate_str =
+        g_state.getenv("DD_PROFILING_NATIVE_ALLOCATION_PROFILING_RATE");
+    int64_t allocation_profiling_rate = 524288;
+    if (allocation_profiling_rate_str) {
+      (void)absl::SimpleAtoi(allocation_profiling_rate_str,
+                             &allocation_profiling_rate);
+    }
+    uint32_t flags = AllocationTracker::kOtelProfilerMode;
+    if (allocation_profiling_rate < 0) {
+      flags |= AllocationTracker::kDeterministicSampling;
+      allocation_profiling_rate = -allocation_profiling_rate;
+    }
+    constexpr std::chrono::milliseconds initial_loaded_libs_check_delay{5000};
+    constexpr std::chrono::milliseconds loaded_libs_check_interval{59000};
+
+    try {
+      if (IsDDResOK(AllocationTracker::allocation_tracking_init(
+              allocation_profiling_rate, flags, 0, RingBufferInfo{},
+              {update_overrides, initial_loaded_libs_check_delay,
+               loaded_libs_check_interval}))) {
+        setup_overrides();
+        g_state.allocation_profiling_started = true;
+      } else {
+        LG_ERR("Failed to start allocation profiling\n");
+        return -1;
+      }
+    } catch (const DDException &e) { return -1; }
+
+    return 0;
+  }
+
   auto socket_path = get_ddprof_socket_path();
   pid_t const target_pid = getpid();
 
@@ -398,6 +434,7 @@ int ddprof_start_profiling_internal() {
         g_state.allocation_profiling_started = true;
       } else {
         LG_ERR("Failed to start allocation profiling\n");
+        return -1;
       }
     }
   } catch (const DDException &e) { return -1; }
