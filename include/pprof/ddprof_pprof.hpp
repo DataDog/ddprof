@@ -41,6 +41,11 @@ struct DDProfValuePack {
 
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx);
 
+struct AggregationConfig {
+  EventAggregationModePos value_pos{kSumPos};
+  bool show_samples{false};
+  bool adjust_locations{true};
+};
 /**
  * Aggregate to the existing profile the provided unwinding output.
  * @param uw_output
@@ -51,9 +56,8 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx);
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr &symbol_hdr, const DDProfValuePack &pack,
                       const PerfWatcher *watcher,
-                      const FileInfoVector &file_infos, bool show_samples,
-                      EventAggregationModePos value_pos, Symbolizer *symbolizer,
-                      DDProfPProf *pprof);
+                      const FileInfoVector &file_infos, AggregationConfig conf,
+                      Symbolizer *symbolizer, DDProfPProf *pprof);
 
 DDRes pprof_reset(DDProfPProf *pprof);
 

@@ -523,11 +523,10 @@ DDRes pprof_free_profile(DDProfPProf *pprof) {
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr &symbol_hdr, const DDProfValuePack &pack,
                       const PerfWatcher *watcher,
-                      const FileInfoVector &file_infos, bool show_samples,
-                      EventAggregationModePos value_pos, Symbolizer *symbolizer,
-                      DDProfPProf *pprof) {
+                      const FileInfoVector &file_infos, AggregationConfig conf,
+                      Symbolizer *symbolizer, DDProfPProf *pprof) {
 
-  const PProfIndices &pprof_indices = watcher->pprof_indices[value_pos];
+  const PProfIndices &pprof_indices = watcher->pprof_indices[conf.value_pos];
   ddog_prof_Profile *profile = &pprof->_profile;
   int64_t values[k_max_value_types] = {};
   assert(pprof_indices.pprof_index != -1);
@@ -539,7 +538,9 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
 
   std::array<ddog_prof_Location, kMaxStackDepth> locations_buff;
   std::span locs{uw_output->locs};
-  locs = adjust_locations(watcher, locs);
+  if (conf.adjust_locations) {
+    locs = adjust_locations(watcher, locs);
+  }
 
   // Blaze results should remain alive until we aggregate the pprof data
   Symbolizer::BlazeResultsWrapper session_results;
@@ -560,10 +561,10 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
       .labels = {.ptr = labels.data(), .len = labels_num},
   };
 
-  if (show_samples) {
+  if (conf.show_samples) {
     ddprof_print_sample(std::span{locations_buff.data(), write_index},
-                        pack.value, uw_output->pid, uw_output->tid, value_pos,
-                        *watcher);
+                        pack.value, uw_output->pid, uw_output->tid,
+                        conf.value_pos, *watcher);
   }
   auto res = ddog_prof_Profile_add(profile, sample, pack.timestamp);
   if (res.tag != DDOG_PROF_PROFILE_RESULT_OK) {
