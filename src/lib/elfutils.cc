@@ -583,6 +583,12 @@ void SymbolOverrides::apply_overrides_to_library(
     return;
   }
 
+  // Hack -- Only instrument libc or datadog_profiling.so
+  if (library_name.find("libc.so") == std::string_view::npos &&
+      library_name.find("datadog_profiling.so") == std::string_view::npos) {
+    return;
+  }
+
   auto [it, inserted] =
       _revert_info_per_library.try_emplace(dyn_info.base_address, library_name);
 
