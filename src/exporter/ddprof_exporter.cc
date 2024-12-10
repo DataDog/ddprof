@@ -283,6 +283,14 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
                            static_cast<int>(res_exporter.err.message.len),
                            res_exporter.err.message.ptr);
   }
+  ddog_prof_MaybeError res = ddog_prof_Exporter_set_timeout(exporter->_exporter,
+                                                            k_timeout_ms);
+  if (res.tag == DDOG_PROF_OPTION_ERROR_SOME_ERROR) {
+    defer { ddog_MaybeError_drop(res); };
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failure setting timeout - %.*s",
+                           static_cast<int>(res.some.message.len),
+                           res.some.message.ptr);
+  }
   return {};
 }
 
@@ -331,7 +339,7 @@ DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
                                          nullptr, // optional_endpoints_stats
                                          nullptr, // internal_metadata_json
                                          nullptr, // optional_info_json
-                                         k_timeout_ms);
+                                         );
 
     if (res_request.tag == DDOG_PROF_EXPORTER_REQUEST_BUILD_RESULT_OK) {
       ddog_prof_Exporter_Request *request = res_request.ok;
