@@ -187,20 +187,21 @@ namespace ddprof {
 void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   // TODO this really shouldn't call printf-family functions...
   (void)uc;
-#  ifdef __GLIBC__
+#ifdef __GLIBC__
   constexpr size_t k_stacktrace_buffer_size = 4096;
   static void *buf[k_stacktrace_buffer_size] = {};
-  const size_t sz = backtrace(buf, std::size(buf));
-#  endif
-  fprintf(stderr, "simplemalloc[%d]:has encountered an error and will exit\n",
-          getpid());
+  size_t const sz = backtrace(buf, std::size(buf));
+#endif
+  const char msg[] = "ddprof: encountered an error and will exit\n";
+  write(STDERR_FILENO, msg, sizeof(msg) - 1);
   if (sig == SIGSEGV) {
-    printf("Fault address: %p\n", si->si_addr);
+    const char msg[] = "[DDPROF] Fault address\n";
+    write(STDOUT_FILENO, msg, sizeof(msg) - 1);
   }
-#  ifdef __GLIBC__
+#ifdef __GLIBC__
   backtrace_symbols_fd(buf, sz, STDERR_FILENO);
-#  endif
-  exit(-1);
+#endif
+  _exit(-1);
 }
 
 void print_header() {
