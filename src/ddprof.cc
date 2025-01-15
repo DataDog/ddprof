@@ -42,16 +42,16 @@ void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   static void *buf[k_stacktrace_buffer_size] = {};
   size_t const sz = backtrace(buf, std::size(buf));
 #endif
-  (void)fprintf(
-      stderr, "ddprof[%d]: <%.*s> has encountered an error and will exit\n",
-      getpid(), static_cast<int>(str_version().size()), str_version().data());
+  const char msg[] = "ddprof: encountered an error and will exit\n";
+  write(STDERR_FILENO, msg, sizeof(msg) - 1);
   if (sig == SIGSEGV) {
-    printf("[DDPROF] Fault address: %p\n", si->si_addr);
+    const char msg[] = "[DDPROF] Fault address\n";
+    write(STDOUT_FILENO, msg, sizeof(msg) - 1);
   }
 #ifdef __GLIBC__
   backtrace_symbols_fd(buf, sz, STDERR_FILENO);
 #endif
-  exit(-1);
+  _exit(-1);
 }
 
 void display_system_info() {
