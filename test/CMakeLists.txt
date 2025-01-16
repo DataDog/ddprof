@@ -434,23 +434,26 @@ add_benchmark(
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
   DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384)
 
+set(SIMPLE_MALLOC_SRC simple_malloc.cc ../src/signal_helper.cc)
+
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
   add_exe(
-    simple_malloc-static simple_malloc.cc
+    simple_malloc-static ${SIMPLE_MALLOC_SRC}
     LIBRARIES Threads::Threads dd_profiling-static CLI11 dl
     DEFINITIONS USE_DD_PROFILING)
   target_include_directories(simple_malloc-static PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
   add_exe(
-    simple_malloc-shared simple_malloc.cc
+    simple_malloc-shared ${SIMPLE_MALLOC_SRC}
     LIBRARIES dd_profiling-shared Threads::Threads CLI11 dl
     DEFINITIONS USE_DD_PROFILING COMPRESS_DEBUG_SECTION)
   target_include_directories(simple_malloc-shared PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
-  add_exe(simple_malloc simple_malloc.cc LIBRARIES Threads::Threads CLI11 dl COMPRESS_DEBUG_SECTION)
+  add_exe(simple_malloc ${SIMPLE_MALLOC_SRC} LIBRARIES Threads::Threads CLI11 dl
+                                                       COMPRESS_DEBUG_SECTION)
   target_include_directories(simple_malloc PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
-  add_library(simple_malloc_lib SHARED simple_malloc.cc)
+  add_library(simple_malloc_lib SHARED ${SIMPLE_MALLOC_SRC})
   target_compile_definitions(simple_malloc_lib PRIVATE "SIMPLE_MALLOC_SHARED_LIBRARY")
   set_target_properties(simple_malloc_lib PROPERTIES OUTPUT_NAME "simplemalloc")
   target_include_directories(simple_malloc_lib PRIVATE ${CMAKE_SOURCE_DIR}/include)

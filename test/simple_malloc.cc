@@ -22,6 +22,7 @@
 #include "clocks.hpp"
 #include "ddprof_base.hpp"
 #include "enum_flags.hpp"
+#include "signal_helper.hpp"
 #include "syscalls.hpp"
 
 #ifndef SIMPLE_MALLOC_SHARED_LIBRARY
@@ -182,27 +183,6 @@ using WrapperFuncPtr = decltype(&wrapper);
 
 #ifndef SIMPLE_MALLOC_SHARED_LIBRARY
 namespace ddprof {
-
-/*****************************  SIGSEGV Handler *******************************/
-void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
-  // TODO this really shouldn't call printf-family functions...
-  (void)uc;
-#ifdef __GLIBC__
-  constexpr size_t k_stacktrace_buffer_size = 4096;
-  static void *buf[k_stacktrace_buffer_size] = {};
-  size_t const sz = backtrace(buf, std::size(buf));
-#endif
-  const char msg[] = "ddprof: encountered an error and will exit\n";
-  write(STDERR_FILENO, msg, sizeof(msg) - 1);
-  if (sig == SIGSEGV) {
-    const char msg[] = "[DDPROF] Fault address\n";
-    write(STDOUT_FILENO, msg, sizeof(msg) - 1);
-  }
-#ifdef __GLIBC__
-  backtrace_symbols_fd(buf, sz, STDERR_FILENO);
-#endif
-  _exit(-1);
-}
 
 void print_header() {
   printf("TestHeaders:%-8s,%-8s,%-14s,%-14s,%-14s,%-14s\n", "PID", "TID",
