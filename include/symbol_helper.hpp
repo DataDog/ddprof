@@ -14,7 +14,7 @@ namespace ddprof {
 // This is a test API. Use the symbolizer to populate pprof structures
 std::vector<std::string> collect_symbols(UnwindState &state,
                                          blaze_symbolizer *symbolizer) {
-  std::vector<std::string> demangled_symbols;
+  std::vector<std::string> symbols;
   auto &symbol_table = state.symbol_hdr._symbol_table;
   for (size_t iloc = 0; iloc < state.output.locs.size(); ++iloc) {
     std::string demangled_name;
@@ -29,9 +29,9 @@ std::vector<std::string> collect_symbols(UnwindState &state,
           .debug_syms = true,
           .reserved = {},
       };
-      const blaze_result *blaze_res = blaze_symbolize_elf_virt_offsets(
+      const blaze_syms *blaze_res = blaze_symbolize_elf_virt_offsets(
           symbolizer, &src_elf, elf_addr.data(), elf_addr.size());
-      defer { blaze_result_free(blaze_res); };
+      defer { blaze_syms_free(blaze_res); };
       if (blaze_res && blaze_res->cnt >= 1 && blaze_res->syms[0].name) {
         demangled_name = blaze_res->syms[0].name;
       } else {
@@ -42,9 +42,9 @@ std::vector<std::string> collect_symbols(UnwindState &state,
       auto &symbol = symbol_table[state.output.locs[iloc].symbol_idx];
       demangled_name = symbol._demangled_name;
     }
-    demangled_symbols.push_back(demangled_name);
+    symbols.push_back(demangled_name);
   }
-  return demangled_symbols;
+  return symbols;
 }
 
 } // namespace ddprof

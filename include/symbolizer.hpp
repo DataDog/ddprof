@@ -38,7 +38,7 @@ public:
     BlazeResultsWrapper() = default;
     ~BlazeResultsWrapper() {
       for (auto &result : blaze_results) {
-        blaze_result_free(result);
+        blaze_syms_free(result);
       }
     }
 
@@ -55,7 +55,7 @@ public:
     BlazeResultsWrapper &operator=(BlazeResultsWrapper &&other) noexcept {
       if (this != &other) {
         for (auto &result : blaze_results) {
-          blaze_result_free(result);
+          blaze_syms_free(result);
         }
         blaze_results = std::move(other.blaze_results);
         other.blaze_results.clear();
@@ -63,7 +63,7 @@ public:
       return *this;
     }
 
-    std::vector<const blaze_result *> blaze_results;
+    std::vector<const blaze_syms *> blaze_results;
   };
 
   /// Fills the locations at the write index using address and elf source.

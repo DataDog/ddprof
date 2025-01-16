@@ -283,6 +283,14 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
                            static_cast<int>(res_exporter.err.message.len),
                            res_exporter.err.message.ptr);
   }
+  ddog_prof_MaybeError res =
+      ddog_prof_Exporter_set_timeout(exporter->_exporter, k_timeout_ms);
+  if (res.tag == DDOG_PROF_OPTION_ERROR_SOME_ERROR) {
+    defer { ddog_Error_drop(&res.some); };
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failure setting timeout - %.*s",
+                           static_cast<int>(res.some.message.len),
+                           res.some.message.ptr);
+  }
   return {};
 }
 
@@ -324,14 +332,19 @@ DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
     ddog_prof_Exporter_Slice_File const files = {.ptr = files_,
                                                  .len = std::size(files_)};
 
+    // clang-format off
     ddog_prof_Exporter_Request_BuildResult res_request =
-        ddog_prof_Exporter_Request_build(exporter->_exporter, start, end,
+        ddog_prof_Exporter_Request_build(exporter->_exporter,
+                                         start,
+                                         end,
                                          ddog_prof_Exporter_Slice_File_empty(),
-                                         files, &ffi_additional_tags,
+                                         files, // already compressed
+                                         &ffi_additional_tags,
                                          nullptr, // optional_endpoints_stats
                                          nullptr, // internal_metadata_json
-                                         nullptr, // optional_info_json
-                                         k_timeout_ms);
+                                         nullptr  // optional_info_json
+                                         );
+    // clang-format on
 
     if (res_request.tag == DDOG_PROF_EXPORTER_REQUEST_BUILD_RESULT_OK) {
       ddog_prof_Exporter_Request *request = res_request.ok;
