@@ -15,44 +15,19 @@
 #include "logger.hpp"
 #include "perf_mainloop.hpp"
 #include "pevent_lib.hpp"
+#include "signal_helper.hpp"
 #include "sys_utils.hpp"
 #include "version.hpp"
-
-#ifdef __GLIBC__
-#  include <execinfo.h>
-#endif
 
 #include <absl/strings/numbers.h>
 #include <absl/strings/str_format.h>
 #include <cerrno>
 #include <csignal>
-#include <cstdio>
 #include <filesystem>
 #include <sys/resource.h>
-#include <unistd.h>
 
 namespace ddprof {
 namespace {
-/*****************************  SIGSEGV Handler *******************************/
-void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
-  // TODO this really shouldn't call printf-family functions...
-  (void)uc;
-#ifdef __GLIBC__
-  constexpr size_t k_stacktrace_buffer_size = 4096;
-  static void *buf[k_stacktrace_buffer_size] = {};
-  size_t const sz = backtrace(buf, std::size(buf));
-#endif
-  const char msg[] = "ddprof: encountered an error and will exit\n";
-  write(STDERR_FILENO, msg, sizeof(msg) - 1);
-  if (sig == SIGSEGV) {
-    const char msg[] = "[DDPROF] Fault address\n";
-    write(STDOUT_FILENO, msg, sizeof(msg) - 1);
-  }
-#ifdef __GLIBC__
-  backtrace_symbols_fd(buf, sz, STDERR_FILENO);
-#endif
-  _exit(-1);
-}
 
 void display_system_info() {
 

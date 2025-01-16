@@ -86,6 +86,12 @@ DebCMake() {
     CmakeWithOptions ${BUILD_TYPE} $@
 }
 
+# Requires clang as compiler
+DebTidyCMake() {
+    local BUILD_TYPE=Debug
+    CmakeWithOptions ${BUILD_TYPE} -DENABLE_CLANG_TIDY=ON $@
+}
+
 SanCMake() {
     local BUILD_TYPE=SanitizedDebug
     CmakeWithOptions ${BUILD_TYPE} $@

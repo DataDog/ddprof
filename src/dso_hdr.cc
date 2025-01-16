@@ -446,7 +446,7 @@ bool DsoHdr::pid_backpopulate(PidMapping &pid_mapping, pid_t pid,
   auto proc_map_file_holder = open_proc_maps(pid, _path_to_proc.c_str());
   if (!proc_map_file_holder) {
     LG_DBG("[DSO] Failed to open procfs for %d", pid);
-    if (!process_is_alive(pid)) {
+    if (!ddprof::process_is_alive(pid)) {
       LG_DBG("[DSO] Process nonexistant");
     }
     return false;
