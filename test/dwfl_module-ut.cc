@@ -91,16 +91,16 @@ TEST(DwflModule, inconsistency_test) {
             .debug_syms = true,
             .reserved = {},
         };
-        const blaze_result *blaze_res = blaze_symbolize_elf_virt_offsets(
+        const blaze_syms *blaze_syms = blaze_symbolize_elf_virt_offsets(
             symbolizer, &src_elf, elf_addr.data(), elf_addr.size());
 
-        ASSERT_TRUE(blaze_res);
-        ASSERT_GE(blaze_res->cnt, 1);
-        defer { blaze_result_free(blaze_res); };
+        ASSERT_TRUE(blaze_syms);
+        ASSERT_GE(blaze_syms->cnt, 1);
+        defer { blaze_syms_free(blaze_syms); };
         // we don't have demangling at this step
         EXPECT_TRUE(
             strcmp("_ZN6ddprof34DwflModule_inconsistency_test_Test8TestBodyEv",
-                   blaze_res->syms[0].name) == 0);
+                   blaze_syms->syms[0].name) == 0);
         // Only expect build-id on this binary (as we can not force it on
         // others)
         EXPECT_FALSE(ddprof_mod->_build_id.empty());
