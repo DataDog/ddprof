@@ -76,8 +76,8 @@ DDRes write_location_blaze(
   }
   constexpr std::string_view undef{};
   constexpr std::string_view undef_inlined = undef;
-  for (unsigned i = 0; i < blaze_sym.inlined_cnt && cur_loc < kMaxStackDepth;
-       ++i) {
+  for (int i = blaze_sym.inlined_cnt - 1; i >= 0 && cur_loc < kMaxStackDepth;
+       --i) {
     const blaze_symbolize_inlined_fn *inlined_fn = blaze_sym.inlined + i;
     ddog_prof_Location &ffi_location = locations_buff[cur_loc];
     const std::string_view demangled_name = inlined_fn->name
