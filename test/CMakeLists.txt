@@ -178,6 +178,19 @@ add_unit_test(
   DEFINITIONS MYNAME="pevent-ut")
 
 add_unit_test(
+  presets-ut
+  ../src/presets.cc
+  ../src/ddprof_cli.cc
+  ../src/ddprof_cmdline_watcher.cc
+  ../src/version.cc
+  ../src/uuid.cc
+  ../src/tracepoint_config.cc
+  ../src/perf_watcher.cc
+  presets-ut.cc
+  LIBRARIES DDProf::Parser CLI11
+  DEFINITIONS MYNAME="presets-ut")
+
+add_unit_test(
   ddprof_pprof-ut
   ddprof_pprof-ut.cc
   ../src/ddog_profiling_utils.cc

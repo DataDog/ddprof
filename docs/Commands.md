@@ -64,7 +64,8 @@ Profiling settings:
                                    (profile only CPU when targeting a given PID)
                                 - cpu_only: profile CPU
                                 - alloc_only: profile memory allocations
-                                - cpu_live_heap: profile live allocations and CPU
+                                - alloc_live_heap: profile memory allocations and live heap
+                                - cpu_live_heap: CPU, memory allocations and live heap
                               
 
 

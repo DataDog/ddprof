@@ -23,6 +23,7 @@ DDRes add_preset(std::string_view preset, bool pid_or_global_mode,
       {"default-pid", "sCPU"},
       {"cpu_only", "sCPU"},
       {"alloc_only", "sALLOC"},
+      {"alloc_live_heap", "sALLOC mode=sl"},
       {"cpu_live_heap", "sCPU;sALLOC mode=sl"},
   };
 
