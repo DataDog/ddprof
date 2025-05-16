@@ -215,14 +215,16 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       ->envname(k_events_env_variable)
       ->delimiter(';');
 
-  app.add_option("--preset", preset,
-                 "Select a predefined profiling configuration."
-                 "Available presets:\n"
-                 "  - default: profile CPU and memory allocations\n"
-                 "     (profile only CPU when targeting a given PID)\n"
-                 "  - cpu_only: profile CPU\n"
-                 "  - alloc_only: profile memory allocations\n"
-                 "  - cpu_live_heap: profile live allocations and CPU\n")
+  app.add_option(
+         "--preset", preset,
+         "Select a predefined profiling configuration."
+         "Available presets:\n"
+         "  - default: profile CPU and memory allocations\n"
+         "     (profile only CPU when targeting a given PID)\n"
+         "  - cpu_only: profile CPU\n"
+         "  - alloc_only: profile memory allocations\n"
+         "  - alloc_live_heap: profile memory allocations and live heap\n"
+         "  - cpu_live_heap: CPU, memory allocations and live heap\n")
       ->group("Profiling settings")
       ->envname("DD_PROFILING_NATIVE_PRESET");
 
