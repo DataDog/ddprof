@@ -2,3 +2,96 @@
 
 # Global owners
 * @sanchda @r1viollet @nsavoire
+# Documentation about code owners : https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners#codeowners-file-location
+
+# Global owners
+* @sanchda @r1viollet @nsavoire
+
+Usage: 
+
+ping [-t] [-a] [-n count] [-1 size] [-f] [-1 TTL] [-v TOS] 
+
+[-r count] [-s count] [[-j host-list] | [-k host-list]] 
+
+[-w timeout] [-R] [-S srcaddr] [-c compartment] [-p] 
+
+[-4] [-6] target_name 
+
+Options: 
+
+-t 
+
+Ping the specified host until stopped. 
+
+To see statistics and continue type Control-Break; 
+
+To stop type Control-C. 
+
+-a 
+
+Resolve addresses to hostnames. 
+
+-n count 
+
+Number of echo requests to send. 
+
+-1 size 
+
+Send buffer size. 
+
+-f 
+
+Set Don't Fragment flag in packet (IPv4-only). 
+
+-1 TTL 
+
+Time To Live. 
+
+-v TOS 
+
+Type Of Service (IPv4-only. This setting has been deprecated and has no effect on the type of service field in the IP Header). 
+
+-r count 
+
+Record route for count hops (IPv4-only). 
+
+-s count 
+
+Timestamp for count hops (IPv4-only). 
+
+-j host-list 
+
+Loose source route along host-list (IPv4-only). Strict source route along host-list (IPv4-only). 
+
+-k host-list 
+
+Timeout in milliseconds to wait for each reply. 
+
+-w timeout 
+
+-R 
+
+Use routing header to test reverse route also (IPv6-only). 
+
+Per RFC 5095 the use of this routing header has been deprecated. Some systems may drop echo requests if this header is used. 
+
+-S srcaddr 
+
+Source address to use. 
+
+-c compartment 
+
+Routing compartment identifier. 
+
+-p 
+
+-4 
+
+Ping a Hyper-V Network Virtualization provider address. 
+
+-6 
+
+Force using IPv4. 
+
+Force using IPv6.
+
