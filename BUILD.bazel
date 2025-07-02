@@ -1,0 +1,39 @@
+load("@rules_bison//bison:bison.bzl", "bison")
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_flex//flex:flex.bzl", "flex")
+
+cc_library(
+    name = "hdrs",
+    hdrs = glob(["include/*.hpp"]) + [
+        ":event_parser_lex",
+        ":event_parser_yacc",
+    ],
+    includes = ["include"],
+)
+
+cc_library(
+    name = "ddprof",
+    srcs = glob([
+        "src/*.cc",
+    ]) + [
+        ":event_parser_lex",
+        ":event_parser_yacc",
+    ],
+    copts = ["-fPIC"],
+    deps = [
+        ":hdrs",
+        "@abseil-cpp//absl/strings",
+        "@jemalloc",
+        "@libcap",
+    ],
+)
+
+bison(
+    name = "event_parser_yacc",
+    src = "src/event_parser/event_parser.y",
+)
+
+flex(
+    name = "event_parser_lex",
+    src = "src/event_parser/event_parser.l",
+)

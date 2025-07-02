@@ -1,0 +1,7 @@
+common --announce_rc
+common --verbose_failures
+common --sandbox_debug
+
+common --cxxopt=-std=c++20
+
+test --test_output=streamed
