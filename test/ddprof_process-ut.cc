@@ -34,13 +34,46 @@ TEST(DDProfProcess, no_file) {
 TEST(DDProfProcess, container_id) {
   LogHandle handle;
   std::string path_tests = std::string(UNIT_TEST_DATA) + "/" + "container_id/";
-  ContainerId container_id;
-  auto ddres =
-      extract_container_id(path_tests + "cgroup.kubernetess", container_id);
-  EXPECT_TRUE(IsDDResOK(ddres));
-  EXPECT_TRUE(container_id);
-  if (container_id) {
-    LG_DBG("container id %s", container_id.value().c_str());
+
+  // Test cgroup v1 (existing test)
+  {
+    ContainerId container_id;
+    auto ddres =
+        extract_container_id(path_tests + "cgroup.kubernetess", container_id);
+    EXPECT_TRUE(IsDDResOK(ddres));
+    EXPECT_TRUE(container_id);
+    if (container_id) {
+      LG_DBG("cgroup v1 container id %s", container_id.value().c_str());
+    }
+  }
+
+  // Test cgroup v2 with mountinfo
+  {
+    ContainerId container_id;
+    auto ddres =
+        extract_container_id(path_tests + "proc/123/cgroup", container_id);
+    EXPECT_TRUE(IsDDResOK(ddres));
+    EXPECT_TRUE(container_id);
+    if (container_id) {
+      LG_DBG("cgroup v2 container id %s", container_id.value().c_str());
+      // Expect the container ID from the mountinfo file
+      EXPECT_EQ(
+          container_id.value(),
+          "a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd");
+    }
+  }
+
+  // Test non-container process (cgroup v2 root)
+  {
+    ContainerId container_id;
+    auto ddres =
+        extract_container_id(path_tests + "proc/456/cgroup", container_id);
+    EXPECT_TRUE(IsDDResOK(ddres));
+    EXPECT_TRUE(container_id);
+    if (container_id) {
+      LG_DBG("non-container process result: %s", container_id.value().c_str());
+      EXPECT_EQ(container_id.value(), std::string(k_container_id_none));
+    }
   }
 }
 

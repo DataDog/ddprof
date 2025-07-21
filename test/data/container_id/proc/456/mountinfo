@@ -1,0 +1,7 @@
+23 28 0:4 / /sys rw,nosuid,nodev,noexec,relatime shared:7 - sysfs sysfs rw
+24 28 0:5 / /proc rw,nosuid,nodev,noexec,relatime shared:13 - proc proc rw
+25 28 0:6 / /dev rw,nosuid shared:2 - devtmpfs devtmpfs rw,size=4039276k,nr_inodes=1009819,mode=755
+26 25 0:7 / /dev/shm rw,nosuid,nodev shared:3 - tmpfs tmpfs rw
+27 25 0:8 / /dev/pts rw,nosuid,noexec,relatime shared:4 - devpts devpts rw,gid=5,mode=620,ptmxmode=000
+28 0 8:1 / / rw,relatime shared:1 - ext4 /dev/sda1 rw,data=ordered
+29 23 0:12 / /sys/kernel/security rw,nosuid,nodev,noexec,relatime shared:8 - securityfs securityfs rw

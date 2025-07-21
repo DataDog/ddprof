@@ -1,0 +1,6 @@
+1034 1033 0:2 / /proc rw,nosuid,nodev,noexec,relatime - proc proc rw
+1035 1033 0:3 / /dev rw,nosuid - devtmpfs devtmpfs rw,size=4096k,nr_inodes=1024,mode=755
+1036 1035 0:4 / /dev/pts rw,nosuid,noexec,relatime - devpts devpts rw,gid=5,mode=620,ptmxmode=666
+1037 1033 0:5 / /sys ro,nosuid,nodev,noexec,relatime - sysfs sysfs ro
+1038 1033 0:6 /docker/a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd/hostname /etc/hostname rw,relatime - ext4 /dev/sda1 rw
+1039 1033 0:6 /docker/a1b2c3d4e5f6789012345678901234567890123456789012345678901234abcd/resolv.conf /etc/resolv.conf rw,relatime - ext4 /dev/sda1 rw
