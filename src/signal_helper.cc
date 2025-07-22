@@ -49,18 +49,24 @@ int convert_addr_to_string(uintptr_t ptr, char *buff, size_t buff_size) {
 void sigsegv_handler(int sig, siginfo_t *si, void *uc) {
   (void)uc;
   constexpr char msg1[] = "ddprof: encountered a SIGSEGV and will exit.\n";
-  write(STDERR_FILENO, msg1, sizeof(msg1) - 1);
+  if (write(STDERR_FILENO, msg1, sizeof(msg1) - 1) < 0) {
+    return;
+  }
 
   if (sig == SIGSEGV) {
     constexpr char msg2[] = "Fault address: ";
-    write(STDERR_FILENO, msg2, sizeof(msg2) - 1);
+    if (write(STDERR_FILENO, msg2, sizeof(msg2) - 1) < 0) {
+      return;
+    }
     const auto fault_addr = reinterpret_cast<uintptr_t>(si->si_addr);
     char addr_buf[32]; // Ensure it's large enough for a 64-bit address
     int len = convert_addr_to_string(fault_addr, addr_buf, 32);
     if (len > 0) {
       addr_buf[len++] = '\n';
       addr_buf[len++] = '\0';
-      write(STDERR_FILENO, addr_buf, len);
+      if (write(STDERR_FILENO, addr_buf, len) < 0) {
+        return;
+      }
     }
   }
 

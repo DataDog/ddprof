@@ -35,23 +35,20 @@ void test_pprof(DDProfPProf *pprofs) {
   ddog_prof_Profile *profile = &pprofs->_profile;
 
   struct ddog_prof_Profile_SerializeResult serialized_result =
-      ddog_prof_Profile_serialize(profile, nullptr, nullptr, nullptr);
+      ddog_prof_Profile_serialize(profile, nullptr, nullptr);
 
   ASSERT_EQ(serialized_result.tag, DDOG_PROF_PROFILE_SERIALIZE_RESULT_OK);
 
-  ddog_Timespec start = serialized_result.ok.start;
+  // Get the bytes from the encoded profile using the new API
+  auto bytes_result = ddog_prof_EncodedProfile_bytes(&serialized_result.ok);
+  ASSERT_EQ(bytes_result.tag, DDOG_PROF_RESULT_BYTE_SLICE_OK_BYTE_SLICE);
+  
+  const ddog_ByteSlice *buffer = &bytes_result.ok;
 
-  // Check that encoded time is close to now
-  time_t local_time = time(NULL);
-  EXPECT_TRUE(local_time - start.seconds < 2);
-
-  ddog_Vec_U8 profile_vec = serialized_result.ok.buffer;
-
-  EXPECT_TRUE(profile_vec.ptr);
+  EXPECT_TRUE(buffer->ptr);
 
   // Test that we are generating content
-  EXPECT_TRUE(profile_vec.len > 500);
-  EXPECT_TRUE(profile_vec.capacity >= profile_vec.len);
+  EXPECT_TRUE(buffer->len > 500);
 
   ddog_prof_EncodedProfile_drop(&serialized_result.ok);
 }

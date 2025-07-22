@@ -17,6 +17,7 @@
 
 #include <absl/strings/str_format.h>
 #include <absl/strings/substitute.h>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <datadog/common.h>
@@ -467,7 +468,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
   }
   auto prof_res = ddog_prof_Profile_new(
       sample_types,
-      pprof_values.get_num_sample_type_ids() > 0 ? &period : nullptr, nullptr);
+      pprof_values.get_num_sample_type_ids() > 0 ? &period : nullptr);
 
   if (prof_res.tag != DDOG_PROF_PROFILE_NEW_RESULT_OK) {
     ddog_Error_drop(&prof_res.err);
@@ -497,6 +498,17 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
   } else {
     pprof->use_process_adresses = true;
   }
+
+  // Initialize with current time so profile is ready to use with proper timing
+  auto wall_now = std::chrono::system_clock::now();
+  auto duration = wall_now.time_since_epoch();
+  auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration);
+  auto nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(duration - seconds);
+
+  pprof->_start_time = {
+    .seconds = static_cast<time_t>(seconds.count()),
+    .nanoseconds = static_cast<uint32_t>(nanoseconds.count())
+  };
 
   return {};
 }
@@ -564,8 +576,11 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   return {};
 }
 
-DDRes pprof_reset(DDProfPProf *pprof) {
-  auto res = ddog_prof_Profile_reset(&pprof->_profile, nullptr);
+DDRes pprof_reset(DDProfPProf *pprof, ddog_Timespec start_time) {
+  // Use the passed start time instead of reading it internally
+  pprof->_start_time = start_time;
+  
+  auto res = ddog_prof_Profile_reset(&pprof->_profile);
   if (res.tag != DDOG_PROF_PROFILE_RESULT_OK) {
     defer { ddog_Error_drop(&res.err); };
     auto msg = ddog_Error_message(&res.err);

@@ -39,10 +39,10 @@ std::string alloc_url_agent(std::string_view protocol, std::string_view host,
   return absl::StrCat(protocol, host);
 }
 
-DDRes create_pprof_file(ddog_Timespec start, const char *dbg_pprof_prefix,
-                        int *fd) {
+DDRes create_pprof_file(ddog_Timespec start, const char *dbg_pprof_prefix, int *fd) {
   constexpr size_t k_max_time_length = 128;
   char time_start[k_max_time_length] = {};
+  
   tm tm_storage;
   tm *tm_start = gmtime_r(&start.seconds, &tm_storage);
   strftime(time_start, std::size(time_start), "%Y%m%dT%H%M%SZ", tm_start);
@@ -58,8 +58,14 @@ DDRes create_pprof_file(ddog_Timespec start, const char *dbg_pprof_prefix,
 }
 
 /// Write pprof to a valid file descriptor : allows to use pprof tools
-DDRes write_profile(const ddog_prof_EncodedProfile *encoded_profile, int fd) {
-  const ddog_Vec_U8 *buffer = &encoded_profile->buffer;
+DDRes write_profile(ddog_prof_EncodedProfile *encoded_profile, int fd) {
+  auto result = ddog_prof_EncodedProfile_bytes(encoded_profile);
+  if (result.tag != DDOG_PROF_RESULT_BYTE_SLICE_OK_BYTE_SLICE) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER,
+                           "Failed to get bytes from encoded profile");
+  }
+  
+  const ddog_ByteSlice *buffer = &result.ok;
   if (write(fd, buffer->ptr, buffer->len) == 0) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER,
                            "Failed to write byte buffer to stdout! %s\n",
@@ -68,11 +74,11 @@ DDRes write_profile(const ddog_prof_EncodedProfile *encoded_profile, int fd) {
   return {};
 }
 
-DDRes write_pprof_file(const ddog_prof_EncodedProfile *encoded_profile,
+DDRes write_pprof_file(ddog_prof_EncodedProfile *encoded_profile,
+                       ddog_Timespec start,
                        const char *dbg_pprof_prefix) {
   int fd = -1;
-  DDRES_CHECK_FWD(
-      create_pprof_file(encoded_profile->start, dbg_pprof_prefix, &fd));
+  DDRES_CHECK_FWD(create_pprof_file(start, dbg_pprof_prefix, &fd));
   defer { close(fd); };
   DDRES_CHECK_FWD(write_profile(encoded_profile, fd));
   return {};
@@ -270,12 +276,12 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
     endpoint = ddog_prof_Endpoint_agentless(base_url, api_key);
   }
 
-  ddog_prof_Exporter_NewResult res_exporter = ddog_prof_Exporter_new(
+  ddog_prof_ProfileExporter_Result res_exporter = ddog_prof_Exporter_new(
       to_CharSlice(exporter->_input.user_agent),
       to_CharSlice(exporter->_input.profiler_version),
       to_CharSlice(exporter->_input.family), &tags_exporter, endpoint);
 
-  if (res_exporter.tag == DDOG_PROF_EXPORTER_NEW_RESULT_OK) {
+  if (res_exporter.tag == DDOG_PROF_PROFILE_EXPORTER_RESULT_OK_HANDLE_PROFILE_EXPORTER) {
     exporter->_exporter = res_exporter.ok;
   } else {
     defer { ddog_Error_drop(&res_exporter.err); };
@@ -283,23 +289,24 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
                            static_cast<int>(res_exporter.err.message.len),
                            res_exporter.err.message.ptr);
   }
-  ddog_prof_MaybeError res =
-      ddog_prof_Exporter_set_timeout(exporter->_exporter, k_timeout_ms);
-  if (res.tag == DDOG_PROF_OPTION_ERROR_SOME_ERROR) {
-    defer { ddog_Error_drop(&res.some); };
+  auto result = ddog_prof_Exporter_set_timeout(&exporter->_exporter, k_timeout_ms);
+  if (result.tag == DDOG_VOID_RESULT_ERR) {
+    defer { ddog_Error_drop(&result.err); };
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failure setting timeout - %.*s",
-                           static_cast<int>(res.some.message.len),
-                           res.some.message.ptr);
+                           static_cast<int>(result.err.message.len),
+                           result.err.message.ptr);
   }
   return {};
 }
 
 DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
-                             const Tags &additional_tags, uint32_t profile_seq,
+                             const Tags &additional_tags, 
+                             uint32_t profile_seq,
+                             ddog_Timespec start_time,
                              DDProfExporter *exporter) {
   DDRes res = ddres_init();
   ddog_prof_Profile_SerializeResult serialized_result =
-      ddog_prof_Profile_serialize(profile, nullptr, nullptr, nullptr);
+      ddog_prof_Profile_serialize(profile, &start_time, nullptr);
   if (serialized_result.tag != DDOG_PROF_PROFILE_SERIALIZE_RESULT_OK) {
     defer { ddog_Error_drop(&serialized_result.err); };
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to serialize: %s",
@@ -310,11 +317,8 @@ DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
   defer { ddog_prof_EncodedProfile_drop(encoded_profile); };
 
   if (!exporter->_debug_pprof_prefix.empty()) {
-    write_pprof_file(encoded_profile, exporter->_debug_pprof_prefix.c_str());
+    write_pprof_file(encoded_profile, start_time, exporter->_debug_pprof_prefix.c_str());
   }
-
-  ddog_Timespec const start = encoded_profile->start;
-  ddog_Timespec const end = encoded_profile->end;
 
   if (exporter->_export) {
     ddog_Vec_Tag ffi_additional_tags = ddog_Vec_Tag_new();
@@ -322,42 +326,49 @@ DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
     DDRES_CHECK_FWD(
         fill_cycle_tags(additional_tags, profile_seq, ffi_additional_tags););
 
-    LG_NTC("[EXPORTER] Export buffer of size %lu", encoded_profile->buffer.len);
+    // Get the bytes from the encoded profile
+    auto bytes_result = ddog_prof_EncodedProfile_bytes(encoded_profile);
+    if (bytes_result.tag != DDOG_PROF_RESULT_BYTE_SLICE_OK_BYTE_SLICE) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to get bytes from encoded profile for export");
+    }
+    const ddog_ByteSlice *buffer = &bytes_result.ok;
+
+    LG_NTC("[EXPORTER] Export buffer of size %lu", buffer->len);
 
     // Backend has some logic based on the following naming
     ddog_prof_Exporter_File files_[] = {{
         .name = to_CharSlice("auto.pprof"),
-        .file = ddog_Vec_U8_as_slice(&encoded_profile->buffer),
+        .file = *buffer,
     }};
     ddog_prof_Exporter_Slice_File const files = {.ptr = files_,
                                                  .len = std::size(files_)};
 
     // clang-format off
-    ddog_prof_Exporter_Request_BuildResult res_request =
-        ddog_prof_Exporter_Request_build(exporter->_exporter,
-                                         start,
-                                         end,
+    ddog_prof_Request_Result res_request =
+        ddog_prof_Exporter_Request_build(&exporter->_exporter,
+                                         encoded_profile, // Pass the encoded profile instead of timestamps
                                          ddog_prof_Exporter_Slice_File_empty(),
                                          files, // already compressed
                                          &ffi_additional_tags,
-                                         nullptr, // optional_endpoints_stats
                                          nullptr, // internal_metadata_json
                                          nullptr  // optional_info_json
                                          );
     // clang-format on
 
-    if (res_request.tag == DDOG_PROF_EXPORTER_REQUEST_BUILD_RESULT_OK) {
-      ddog_prof_Exporter_Request *request = res_request.ok;
+    if (res_request.tag == DDOG_PROF_REQUEST_RESULT_OK_HANDLE_REQUEST) {
+      ddog_prof_Request request = res_request.ok;
 
       // dropping the request is not useful if we have a send
       // however the send will replace the request by null when it takes
       // ownership
-      defer { ddog_prof_Exporter_Request_drop(&request); };
+      defer { 
+        ddog_prof_Exporter_Request_drop(&request); 
+      };
 
-      ddog_prof_Exporter_SendResult result =
-          ddog_prof_Exporter_send(exporter->_exporter, &request, nullptr);
+      ddog_prof_Result_HttpStatus result =
+          ddog_prof_Exporter_send(&exporter->_exporter, &request, nullptr);
 
-      if (result.tag == DDOG_PROF_EXPORTER_SEND_RESULT_ERR) {
+      if (result.tag == DDOG_PROF_RESULT_HTTP_STATUS_ERR_HTTP_STATUS) {
         defer { ddog_Error_drop(&result.err); };
         LG_WRN("Failure to establish connection, check url %s",
                exporter->_url.c_str());
@@ -374,7 +385,7 @@ DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
       } else {
         // success establishing connection
         exporter->_nb_consecutive_errors = 0;
-        res = check_send_response_code(result.http_response.code);
+        res = check_send_response_code(result.ok.code);
       }
     } else {
       defer { ddog_Error_drop(&res_request.err); };
@@ -387,10 +398,10 @@ DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
 }
 
 DDRes ddprof_exporter_free(DDProfExporter *exporter) {
-  if (exporter->_exporter) {
-    ddog_prof_Exporter_drop(exporter->_exporter);
+  if (exporter->_exporter.inner) {
+    ddog_prof_Exporter_drop(&exporter->_exporter);
   }
-  exporter->_exporter = nullptr;
+  exporter->_exporter = {};
   return {};
 }
 

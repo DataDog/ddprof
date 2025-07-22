@@ -14,7 +14,6 @@ void write_function(const Symbol &symbol, ddog_prof_Function *ffi_func) {
   // We can also send symbol._symname if useful
   ffi_func->system_name = {.ptr = nullptr, .len = 0};
   ffi_func->filename = to_CharSlice(symbol._srcpath);
-  ffi_func->start_line = 0;
 }
 
 void write_function(std::string_view demangled_name, std::string_view file_name,
@@ -22,7 +21,6 @@ void write_function(std::string_view demangled_name, std::string_view file_name,
   ffi_func->name = to_CharSlice(demangled_name);
   ffi_func->system_name = {.ptr = nullptr, .len = 0};
   ffi_func->filename = to_CharSlice(file_name);
-  ffi_func->start_line = 0;
 }
 
 void write_mapping(const MapInfo &mapinfo, ddog_prof_Mapping *ffi_mapping) {

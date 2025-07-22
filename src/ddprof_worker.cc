@@ -478,6 +478,7 @@ void *ddprof_worker_export_thread(void *arg) {
 
   if (IsDDResFatal(ddprof_exporter_export(&worker->pprof[i]->_profile,
                                           worker->pprof[i]->_tags, profile_seq,
+                                          worker->pprof[i]->_start_time,
                                           worker->exp[i]))) {
     LG_NFO("Failed to export from worker");
     worker->exp_error = true;
@@ -530,10 +531,20 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx,
   // take into account the switch)
   ctx.worker_ctx.i_current_pprof = 1 - ctx.worker_ctx.i_current_pprof;
 
+  auto wall_now = std::chrono::system_clock::now();
+  auto duration = wall_now.time_since_epoch();
+  auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration);
+  auto nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(duration - seconds);
+
+  ddog_Timespec start_time = {
+    .seconds = static_cast<time_t>(seconds.count()),
+    .nanoseconds = static_cast<uint32_t>(nanoseconds.count())
+  };
+
   // Reset the current, ensuring the timestamp starts when we are about to write
   // to it
   DDRES_CHECK_FWD(
-      pprof_reset(ctx.worker_ctx.pprof[ctx.worker_ctx.i_current_pprof]));
+      pprof_reset(ctx.worker_ctx.pprof[ctx.worker_ctx.i_current_pprof], start_time));
 
   if (!synchronous_export) {
     pthread_create(&ctx.worker_ctx.exp_tid, nullptr,
