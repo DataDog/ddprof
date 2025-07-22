@@ -42,7 +42,7 @@ void test_pprof(DDProfPProf *pprofs) {
   // Get the bytes from the encoded profile using the new API
   auto bytes_result = ddog_prof_EncodedProfile_bytes(&serialized_result.ok);
   ASSERT_EQ(bytes_result.tag, DDOG_PROF_RESULT_BYTE_SLICE_OK_BYTE_SLICE);
-  
+
   const ddog_ByteSlice *buffer = &bytes_result.ok;
 
   EXPECT_TRUE(buffer->ptr);
