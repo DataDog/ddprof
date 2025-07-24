@@ -27,7 +27,6 @@ struct DDProfPProf {
   unsigned _nb_values = 0;
   Tags _tags;
   bool use_process_adresses{true};
-  ddog_Timespec _start_time{}; // Capture start time when profile is reset
   // avoid re-creating strings for all pid numbers
   std::unordered_map<pid_t, std::string> _pid_str;
 };
@@ -54,7 +53,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       EventAggregationModePos value_pos, Symbolizer *symbolizer,
                       DDProfPProf *pprof);
 
-DDRes pprof_reset(DDProfPProf *pprof, ddog_Timespec start_time);
+DDRes pprof_reset(DDProfPProf *pprof);
 
 DDRes pprof_write_profile(const DDProfPProf *pprof, int fd);
 

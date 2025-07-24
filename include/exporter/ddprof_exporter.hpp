@@ -37,7 +37,6 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter);
 
 DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
                              const Tags &additional_tags, uint32_t profile_seq,
-                             ddog_Timespec start_time,
                              DDProfExporter *exporter);
 
 DDRes ddprof_exporter_free(DDProfExporter *exporter);

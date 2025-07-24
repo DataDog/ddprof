@@ -296,11 +296,10 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
 
 DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
                              const Tags &additional_tags, uint32_t profile_seq,
-                             ddog_Timespec start_time,
                              DDProfExporter *exporter) {
   DDRes res = ddres_init();
   ddog_prof_Profile_SerializeResult serialized_result =
-      ddog_prof_Profile_serialize(profile, &start_time, nullptr);
+      ddog_prof_Profile_serialize(profile, nullptr, nullptr);
   if (serialized_result.tag != DDOG_PROF_PROFILE_SERIALIZE_RESULT_OK) {
     defer { ddog_Error_drop(&serialized_result.err); };
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failed to serialize: %s",
@@ -320,7 +319,12 @@ DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
   const ddog_ByteSlice *buffer = &bytes_result.ok;
 
   if (!exporter->_debug_pprof_prefix.empty()) {
-    write_pprof_file(buffer, start_time, exporter->_debug_pprof_prefix.c_str());
+    // Create current time for debug file naming since we no longer pass
+    // start_time
+    auto now = std::chrono::system_clock::now();
+    auto now_time_t = std::chrono::system_clock::to_time_t(now);
+    const ddog_Timespec file_time = {.seconds = now_time_t, .nanoseconds = 0};
+    write_pprof_file(buffer, file_time, exporter->_debug_pprof_prefix.c_str());
   }
 
   if (exporter->_export) {

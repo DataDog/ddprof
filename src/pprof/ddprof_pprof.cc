@@ -499,17 +499,6 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
     pprof->use_process_adresses = true;
   }
 
-  // Initialize with current time so profile is ready to use with proper timing
-  auto wall_now = std::chrono::system_clock::now();
-  auto duration = wall_now.time_since_epoch();
-  auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration);
-  auto nanoseconds =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(duration - seconds);
-
-  pprof->_start_time = {.seconds = static_cast<int64_t>(seconds.count()),
-                        .nanoseconds =
-                            static_cast<uint32_t>(nanoseconds.count())};
-
   return {};
 }
 
@@ -576,10 +565,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   return {};
 }
 
-DDRes pprof_reset(DDProfPProf *pprof, ddog_Timespec start_time) {
-  // Use the passed start time instead of reading it internally
-  pprof->_start_time = start_time;
-
+DDRes pprof_reset(DDProfPProf *pprof) {
   auto res = ddog_prof_Profile_reset(&pprof->_profile);
   if (res.tag != DDOG_PROF_PROFILE_RESULT_OK) {
     defer { ddog_Error_drop(&res.err); };
