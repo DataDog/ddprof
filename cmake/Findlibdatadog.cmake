@@ -5,7 +5,7 @@
 # libdatadog : common profiler imported libraries
 # https://github.com/DataDog/libdatadog/releases/tag/v7.0.0
 set(TAG_LIBDATADOG
-    "v14.3.1"
+    "v19.1.0"
     CACHE STRING "libdatadog github tag")
 
 set(Datadog_ROOT ${VENDOR_PATH}/libdatadog-${TAG_LIBDATADOG})

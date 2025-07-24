@@ -17,6 +17,7 @@
 
 #include <absl/strings/str_format.h>
 #include <absl/strings/substitute.h>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <datadog/common.h>
@@ -467,7 +468,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
   }
   auto prof_res = ddog_prof_Profile_new(
       sample_types,
-      pprof_values.get_num_sample_type_ids() > 0 ? &period : nullptr, nullptr);
+      pprof_values.get_num_sample_type_ids() > 0 ? &period : nullptr);
 
   if (prof_res.tag != DDOG_PROF_PROFILE_NEW_RESULT_OK) {
     ddog_Error_drop(&prof_res.err);
@@ -565,7 +566,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
 }
 
 DDRes pprof_reset(DDProfPProf *pprof) {
-  auto res = ddog_prof_Profile_reset(&pprof->_profile, nullptr);
+  auto res = ddog_prof_Profile_reset(&pprof->_profile);
   if (res.tag != DDOG_PROF_PROFILE_RESULT_OK) {
     defer { ddog_Error_drop(&res.err); };
     auto msg = ddog_Error_message(&res.err);

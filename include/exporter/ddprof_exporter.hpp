@@ -11,7 +11,9 @@
 #include "perf_watcher.hpp"
 #include "tags.hpp"
 
-struct ddog_prof_Exporter;
+#include <datadog/common.h>
+
+struct ddog_prof_ProfileExporter;
 struct ddog_prof_Profile;
 
 namespace ddprof {
@@ -22,7 +24,7 @@ struct DDProfExporter {
   ExporterInput _input;
   std::string _url;                // url contains path and port
   std::string _debug_pprof_prefix; // write pprofs to folder
-  ddog_prof_Exporter *_exporter{nullptr};
+  ddog_prof_ProfileExporter _exporter{};
   bool _agent{false};
   bool _export{false}; // debug mode : should we send profiles ?
   int32_t _nb_consecutive_errors{0};

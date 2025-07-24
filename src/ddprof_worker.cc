@@ -531,7 +531,6 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx,
   ctx.worker_ctx.i_current_pprof = 1 - ctx.worker_ctx.i_current_pprof;
 
   // Reset the current, ensuring the timestamp starts when we are about to write
-  // to it
   DDRES_CHECK_FWD(
       pprof_reset(ctx.worker_ctx.pprof[ctx.worker_ctx.i_current_pprof]));
 
