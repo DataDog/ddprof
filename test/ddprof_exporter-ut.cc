@@ -163,7 +163,7 @@ TEST(DDProfExporter, simple) {
     res = pprof_create_profile(&pprofs, ctx);
     EXPECT_TRUE(IsDDResOK(res));
     res = pprof_aggregate(&mock_output, symbol_hdr, {1000, 1, 0},
-                          &ctx.watchers[0], file_infos, false, kSumPos,
+                          &ctx.watchers[0], file_infos, AggregationConfig{},
                           ctx.worker_ctx.symbolizer, &pprofs);
     EXPECT_TRUE(IsDDResOK(res));
   }
