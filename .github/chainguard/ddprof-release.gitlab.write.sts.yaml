@@ -1,0 +1,18 @@
+issuer: https://gitlab.ddbuild.io
+
+# Allow releases from main branch
+subject: "project_path:DataDog/apm-reliability/ddprof-build:ref_type:branch:ref:main"
+
+claim_pattern:
+  project_path: "DataDog/apm-reliability/ddprof-build"
+  ref: "main"
+  ref_type: "branch"
+  ref_path: "refs/heads/main"
+  ref_protected: "true"
+  pipeline_source: "pipeline"
+  ci_config_ref_uri: "gitlab.ddbuild.io/DataDog/apm-reliability/ddprof-build//.gitlab-ci.yml@refs/heads/main"
+
+permissions:
+  actions: write
+  contents: write
+  metadata: read
