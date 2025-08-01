@@ -20,34 +20,62 @@ usage() {
     exit 1;
 }
 
-CURRENT_LLVM_STABLE=18
+CURRENT_LLVM_STABLE=19
 BASE_URL="http://apt.llvm.org"
 
-# Check for required tools
-needed_binaries=(lsb_release wget add-apt-repository gpg)
-missing_binaries=()
-for binary in "${needed_binaries[@]}"; do
-    if ! which $binary &>/dev/null ; then
-        missing_binaries+=($binary)
-    fi
-done
-if [[ ${#missing_binaries[@]} -gt 0 ]] ; then
-    echo "You are missing some tools this script requires: ${missing_binaries[@]}"
-    echo "(hint: apt install lsb-release wget software-properties-common gnupg)"
-    exit 4
-fi
-
+NEW_DEBIAN_DISTROS=("trixie" "unstable")
 # Set default values for commandline arguments
 # We default to the current stable branch of LLVM
 LLVM_VERSION=$CURRENT_LLVM_STABLE
 ALL=0
 DISTRO=$(lsb_release -is)
+VERSION_CODENAME=$(lsb_release -cs)
 VERSION=$(lsb_release -sr)
 UBUNTU_CODENAME=""
 CODENAME_FROM_ARGUMENTS=""
 # Obtain VERSION_CODENAME and UBUNTU_CODENAME (for Ubuntu and its derivatives)
 source /etc/os-release
 DISTRO=${DISTRO,,}
+
+# Check for required tools
+
+# Check if this is a new Debian distro
+is_new_debian=0
+if [[ "${DISTRO}" == "debian" ]]; then
+    for new_distro in "${NEW_DEBIAN_DISTROS[@]}"; do
+        if [[ "${VERSION_CODENAME}" == "${new_distro}" ]]; then
+            is_new_debian=1
+            break
+        fi
+    done
+fi
+
+# Check for required tools
+needed_binaries=(lsb_release wget gpg)
+# add-apt-repository is not needed for newer Debian distros
+if [[ $is_new_debian -eq 0 ]]; then
+    needed_binaries+=(add-apt-repository)
+fi
+
+missing_binaries=()
+using_curl=
+for binary in "${needed_binaries[@]}"; do
+    if ! command -v $binary &>/dev/null ; then
+        if [[ "$binary" == "wget" ]] && command -v curl &>/dev/null; then
+            using_curl=1
+            continue
+        fi
+        missing_binaries+=($binary)
+    fi
+done
+
+if [[ ${#missing_binaries[@]} -gt 0 ]] ; then
+    echo "You are missing some tools this script requires: ${missing_binaries[@]}"
+    echo "(hint: apt install lsb-release wget software-properties-common gnupg)"
+    echo "curl is also supported"
+    exit 4
+fi
+
 case ${DISTRO} in
     debian)
         # Debian Trixie has a workaround because of
@@ -128,7 +156,8 @@ LLVM_VERSION_PATTERNS[16]="-16"
 LLVM_VERSION_PATTERNS[17]="-17"
 LLVM_VERSION_PATTERNS[18]="-18"
 LLVM_VERSION_PATTERNS[19]="-19"
-LLVM_VERSION_PATTERNS[20]=""
+LLVM_VERSION_PATTERNS[20]="-20"
+LLVM_VERSION_PATTERNS[21]=""
 
 if [ ! ${LLVM_VERSION_PATTERNS[$LLVM_VERSION]+_} ]; then
     echo "This script does not support LLVM version $LLVM_VERSION"
@@ -140,9 +169,9 @@ LLVM_VERSION_STRING=${LLVM_VERSION_PATTERNS[$LLVM_VERSION]}
 # join the repository name
 if [[ -n "${CODENAME}" ]]; then
     REPO_NAME="deb ${BASE_URL}/${CODENAME}/  llvm-toolchain${LINKNAME}${LLVM_VERSION_STRING} main"
-
     # check if the repository exists for the distro and version
-    if ! wget -q --method=HEAD ${BASE_URL}/${CODENAME} &> /dev/null; then
+    if ! wget -q --method=HEAD ${BASE_URL}/${CODENAME} &> /dev/null && \
+      ! curl -sSLI -XHEAD ${BASE_URL}/${CODENAME} &> /dev/null; then
         if [[ -n "${CODENAME_FROM_ARGUMENTS}" ]]; then
             echo "Specified codename '${CODENAME}' is not supported by this script."
         else
@@ -157,26 +186,45 @@ fi
 
 if [[ ! -f /etc/apt/trusted.gpg.d/apt.llvm.org.asc ]]; then
     # download GPG key once
-    wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+    if [[ -z "$using_curl" ]]; then
+        wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+    else
+        curl -sSL https://apt.llvm.org/llvm-snapshot.gpg.key | tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+    fi
 fi
 
 if [[ -z "`apt-key list 2> /dev/null | grep -i llvm`" ]]; then
     # Delete the key in the old format
-    apt-key del AF4F7421
+    apt-key del AF4F7421 || true
 fi
+
+
+# Add repository based on distribution
 if [[ "${VERSION_CODENAME}" == "bookworm" ]]; then
     # add it twice to workaround:
     # https://github.com/llvm/llvm-project/issues/62475
     add-apt-repository -y "${REPO_NAME}"
+    add-apt-repository -y "${REPO_NAME}"
+elif [[ $is_new_debian -eq 1 ]]; then
+    # workaround missing add-apt-repository in newer Debian and use new source.list format
+    SOURCES_FILE="/etc/apt/sources.list.d/http_apt_llvm_org_${CODENAME}_-${VERSION_CODENAME}.sources"
+    TEXT_TO_ADD="Types: deb
+Architectures: amd64 arm64
+Signed-By: /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+URIs: ${BASE_URL}/${CODENAME}/
+Suites: llvm-toolchain${LINKNAME}${LLVM_VERSION_STRING}
+Components: main"
+    echo "$TEXT_TO_ADD" | tee -a "$SOURCES_FILE" > /dev/null
+else
+    add-apt-repository -y "${REPO_NAME}"
 fi
 
-add-apt-repository -y "${REPO_NAME}"
 apt-get update
 PKG="clang-$LLVM_VERSION lldb-$LLVM_VERSION lld-$LLVM_VERSION clangd-$LLVM_VERSION"
 if [[ $ALL -eq 1 ]]; then
     # same as in test-install.sh
     # No worries if we have dups
-    PKG="$PKG clang-tidy-$LLVM_VERSION clang-format-$LLVM_VERSION clang-tools-$LLVM_VERSION llvm-$LLVM_VERSION-dev lld-$LLVM_VERSION lldb-$LLVM_VERSION llvm-$LLVM_VERSION-tools libomp-$LLVM_VERSION-dev libc++-$LLVM_VERSION-dev libc++abi-$LLVM_VERSION-dev libclang-common-$LLVM_VERSION-dev libclang-$LLVM_VERSION-dev libclang-cpp$LLVM_VERSION-dev libunwind-$LLVM_VERSION-dev"
+    PKG="$PKG clang-tidy-$LLVM_VERSION clang-format-$LLVM_VERSION clang-tools-$LLVM_VERSION llvm-$LLVM_VERSION-dev lld-$LLVM_VERSION lldb-$LLVM_VERSION llvm-$LLVM_VERSION-tools libomp-$LLVM_VERSION-dev libc++-$LLVM_VERSION-dev libc++abi-$LLVM_VERSION-dev libclang-common-$LLVM_VERSION-dev libclang-$LLVM_VERSION-dev libclang-cpp$LLVM_VERSION-dev liblldb-$LLVM_VERSION-dev libunwind-$LLVM_VERSION-dev"
     if test $LLVM_VERSION -gt 14; then
         PKG="$PKG libclang-rt-$LLVM_VERSION-dev libpolly-$LLVM_VERSION-dev"
     fi

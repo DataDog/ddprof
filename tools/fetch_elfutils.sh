@@ -93,6 +93,12 @@ else # Include the default flags for elfutils
   fi
 fi
 
+# Fix _FORTIFY_SOURCE redefinition issue with newer elfutils on Alpine/musl
+if [[ -n ${MUSL_LIBC-""} ]]; then
+  export CFLAGS="${CFLAGS-""} -Wno-error=builtin-macro-redefined"
+  export CXXFLAGS="${CXXFLAGS-""} -Wno-error=builtin-macro-redefined"
+fi
+
 echo "Compiling elfutils using ${C_COMPILER} / flags=${CFLAGS-""}"
 
 ./configure CC="${C_COMPILER}" --with-zlib --with-bzlib --with-lzma --with-zstd --disable-debuginfod --disable-libdebuginfod --disable-symbol-versioning --prefix "${TARGET_EXTRACT}"
