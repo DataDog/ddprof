@@ -5,6 +5,7 @@
 
 # http://redsymbol.net/articles/unofficial-bash-strict-mode/
 set -euo pipefail
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 IFS=$'\n\t'
 
 usage() {
@@ -41,6 +42,7 @@ fi
 # https://github.com/DataDog/libdatadog/releases/download/v0.7.0-rc.1/libdatadog-aarch64-alpine-linux-musl.tar.gz
 TAR_LIBDATADOG=libdatadog-${MARCH}-${DISTRIBUTION}.tar.gz
 GITHUB_URL_LIBDATADOG=https://github.com/DataDog/libdatadog/releases/download/${TAG_LIBDATADOG}/${TAR_LIBDATADOG}
+THIRD_PARTY_PATH="/tmp/deps/${TAR_LIBDATADOG}"
 
 SHA256_LIBDATADOG=$(grep "${TAR_LIBDATADOG}" "${CHECKSUM_FILE}")
 if echo "${SHA256_LIBDATADOG}" | grep -qE '^[[:xdigit:]]{64}[[:space:]]{2}'; then
@@ -53,7 +55,12 @@ fi
 mkdir -p "$TARGET_EXTRACT" || true
 cd "$TARGET_EXTRACT"
 
-if [[ -e "${TAR_LIBDATADOG}" ]]; then
+if [[ -e "${THIRD_PARTY_PATH}" ]]; then
+    echo "Found ${TAR_LIBDATADOG} in third_party, copying locally"
+    cp "${THIRD_PARTY_PATH}" "${TAR_LIBDATADOG}"
+    already_present=1
+elif [[ -e "${TAR_LIBDATADOG}" ]]; then
+    echo "Found ${TAR_LIBDATADOG} already present locally"
     already_present=1
 else
     already_present=0

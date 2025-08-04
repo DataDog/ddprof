@@ -37,11 +37,23 @@ cd "${TARGET_EXTRACT}"
 
 TAR_ELF="elfutils-${VER_ELF}.tar.bz2"
 URL_ELF="https://sourceware.org/elfutils/ftp/${VER_ELF}/${TAR_ELF}"
+THIRD_PARTY_PATH="/tmp/deps/${TAR_ELF}"
 
-already_present=0
+# Check if already built (highest priority)
+if [ -d "${TARGET_EXTRACT}/lib" ] && [ -d "${TARGET_EXTRACT}/include" ]; then
+    echo "elfutils already built in ${TARGET_EXTRACT}, skipping"
+    exit 0
+fi
+
+# Check if tar already present locally (second priority)
 if [ -e "${TAR_ELF}" ]; then
-    already_present=1
+    echo "Found ${TAR_ELF} already present locally"
+# Check if available in cache (third priority - copy but continue building)
+elif [ -e "${THIRD_PARTY_PATH}" ]; then
+    echo "Found ${TAR_ELF} in deps cache, copying locally"
+    cp "${THIRD_PARTY_PATH}" "${TAR_ELF}"
 else
+    echo "Downloading ${TAR_ELF} from ${URL_ELF}"
     curl -fsSLO "${URL_ELF}"
 fi
 
@@ -52,8 +64,7 @@ if ! echo "${SHA512_ELF}  ${TAR_ELF}" | sha256sum -c ; then
     exit 1
 fi
 
-[ $already_present -eq 1 ] && exit 0
-
+# Continue with extraction and building
 echo "Extracting elfutils"
 mkdir src
 mkdir lib

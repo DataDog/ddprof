@@ -2,6 +2,9 @@
 # We'll implement libc version sanitization in the code itself
 ARG UBUNTU_VERSION=22
 ARG COMPILER="gcc"
+ARG INSTALL_VALGRIND="true"
+ARG VALGRIND_VERSION="3.21.0"
+ARG VALGRIND_SHA1="817d769743d278b5d07526e85115082054e9bf9c"
 
 FROM ubuntu:${UBUNTU_VERSION}.04 as base
 ARG UBUNTU_VERSION
@@ -99,6 +102,7 @@ RUN curl -L https://github.com/github/codeql-action/releases/download/codeql-bun
 ## LLVM/GCC SETUP ##
 ####################
 ADD ./app/base-env/llvm.sh ./app/base-env/gcc.sh /
+ADD ./tools /app/tools
 RUN /llvm.sh ${CLANG_VERSION} all
 RUN /gcc.sh ${GCC_VERSION}
 
@@ -156,6 +160,20 @@ RUN VERSION="2.18.0" \
   && popd \
   && rm -rf "cppcheck-${VERSION}" "${TAR_NAME}"
 
+# jemalloc
+RUN VERSION="5.3.0" \
+  && TAR_NAME="jemalloc-${VERSION}.tar.bz2" \
+  && curl -fsSLO "https://github.com/jemalloc/jemalloc/releases/download/${VERSION}/jemalloc-${VERSION}.tar.bz2" \
+  && SHA256="2db82d1e7119df3e71b7640219b6dfe84789bc0537983c3b7ac4f7189aecfeaa" \
+  && (printf "${SHA256} ${TAR_NAME}" | sha256sum -c) \
+  && tar xf "${TAR_NAME}" \
+  && pushd "jemalloc-${VERSION}" \
+  && ./configure --enable-experimental-smallocx  --disable-doc \
+  && make -j$(nproc) \
+  && make install \
+  && popd \
+  && rm -rf "jemalloc-${VERSION}" "${TAR_NAME}"
+
 # C++ json library (used for test purpose)
 RUN VERSION="3.12.0" \
   && TAR_NAME="json.tar.xz" \
@@ -181,35 +199,6 @@ RUN VERSION="1.9.4" \
   && cmake --build build -t install \
   && popd \
   && rm -rf "benchmark-${VERSION}" "${TAR_NAME}"
-
-# Valgrind with dwarf 5 support
-RUN VERSION="3.21.0" \
-    && TAR_NAME="valgrind-${VERSION}.tar.bz2" \
-    && curl -fsSLO "https://sourceware.org/pub/valgrind/${TAR_NAME}" \
-    && SHA1="817d769743d278b5d07526e85115082054e9bf9c" \
-    && (printf "${SHA1} ${TAR_NAME}" | sha1sum --check --strict --status) \
-    && tar xvf "${TAR_NAME}" \
-    && pushd "valgrind-${VERSION}" \
-    && ./configure --prefix /usr/local \
-    && make -j $(nproc) \
-    && make install \
-    && valgrind --version \
-    && popd \
-    && rm -rf "valgrind-${VERSION}" "${TAR_NAME}"
-
-# jemalloc
-RUN VERSION="5.3.0" \
-  && TAR_NAME="jemalloc-${VERSION}.tar.bz2" \
-  && curl -fsSLO "https://github.com/jemalloc/jemalloc/releases/download/${VERSION}/jemalloc-${VERSION}.tar.bz2" \
-  && SHA256="2db82d1e7119df3e71b7640219b6dfe84789bc0537983c3b7ac4f7189aecfeaa" \
-  && (printf "${SHA256} ${TAR_NAME}" | sha256sum -c) \
-  && tar xf "${TAR_NAME}" \
-  && pushd "jemalloc-${VERSION}" \
-  && ./configure --enable-experimental-smallocx  --disable-doc \
-  && make -j$(nproc) \
-  && make install \
-  && popd \
-  && rm -rf "jemalloc-${VERSION}" "${TAR_NAME}"
 
 # Install sarif-tools only if UBUNTU_VERSION is 22 or greater
 RUN if [ "${UBUNTU_VERSION}" -ge 22 ]; then \
