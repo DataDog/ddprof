@@ -69,7 +69,7 @@ std::string cpu_mask_to_string(const cpu_set_t &cpu_mask) {
 
     if (!one_cpu_set) {
       if (v) {
-        s.reserve(cpu_idx / 4 + 1);
+        s.reserve((cpu_idx / 4) + 1);
         one_cpu_set = true;
       } else {
         continue;

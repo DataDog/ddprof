@@ -9,7 +9,7 @@ ENV OS_IDENTIFIER="UB${UBUNTU_VERSION}"
 
 FROM base AS base-24
 ENV GCC_VERSION=14
-ENV CLANG_VERSION=18
+ENV CLANG_VERSION=20
 
 FROM base AS base-22
 ENV GCC_VERSION=13
@@ -99,6 +99,7 @@ RUN curl -L https://github.com/github/codeql-action/releases/download/codeql-bun
 ## LLVM/GCC SETUP ##
 ####################
 ADD ./app/base-env/llvm.sh ./app/base-env/gcc.sh /
+ADD ./tools /app/tools
 RUN /llvm.sh ${CLANG_VERSION} all
 RUN /gcc.sh ${GCC_VERSION}
 
@@ -106,10 +107,10 @@ RUN /gcc.sh ${GCC_VERSION}
 ENV PATH="/usr/lib/llvm-${CLANG_VERSION}/bin/:$PATH"
 
 # Newer CMake
-RUN VERSION="3.27.5" \
+RUN VERSION="4.0.3" \
   && MARCH=$(uname -m) \
-  && SHA256_ARM="2ffaf176d0f93c332abaffbf3ce82fc8c90e49e0fcee8dc16338bcfbb150ead7" \
-  && SHA256_X86="138c68addae825b16ed78d792dafef5e0960194833f48bd77e7e0429c6bc081c" \
+  && SHA256_ARM="391da1544ef50ac31300841caaf11db4de3976cdc4468643272e44b3f4644713" \
+  && SHA256_X86="585ae9e013107bc8e7c7c9ce872cbdcbdff569e675b07ef57aacfb88c886faac" \
   && if [ "$MARCH" = aarch64 ]; then SHA256=$SHA256_ARM; else SHA256=$SHA256_X86; fi \
   && TAR_NAME="cmake-${VERSION}-Linux-${MARCH}.tar.gz" \
   && curl -fsSLO "https://github.com/Kitware/CMake/releases/download/v${VERSION}/${TAR_NAME}" \
@@ -118,8 +119,8 @@ RUN VERSION="3.27.5" \
   && rm "${TAR_NAME}"
 
 # Ninja build
-RUN VERSION="1.11.1" \
-  && SHA256="31747ae633213f1eda3842686f83c2aa1412e0f5691d1c14dbbcc67fe7400cea" \
+RUN VERSION="1.13.1" \
+  && SHA256="f0055ad0369bf2e372955ba55128d000cfcc21777057806015b45e4accbebf23" \
   && TAR_NAME="v${VERSION}.tar.gz" \
   && curl -fsSLO "https://github.com/ninja-build/ninja/archive/refs/tags/${TAR_NAME}" \
   && (printf "${SHA256} ${TAR_NAME}" | sha256sum --check --strict --status) \
@@ -131,10 +132,10 @@ RUN VERSION="1.11.1" \
   && rm -rf "ninja-${VERSION}" "${TAR_NAME}"
 
 # google test / google mock
-RUN VERSION="1.14.0" \
+RUN VERSION="1.17.0" \
   && TAR_NAME="v${VERSION}.tar.gz" \
   && curl -fsSLO "https://github.com/google/googletest/archive/refs/tags/${TAR_NAME}" \
-  && SHA256="8ad598c73ad796e0d8280b082cebd82a630d73e73cd3c70057938a6501bba5d7" \
+  && SHA256="65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c" \
   && (printf "${SHA256} ${TAR_NAME}" | sha256sum --check --strict --status) \
   && tar xf "${TAR_NAME}" \
   && pushd "googletest-${VERSION}" \
@@ -144,10 +145,10 @@ RUN VERSION="1.14.0" \
   && rm -rf "googletest-${VERSION}" "${TAR_NAME}"
 
 # More recent Cppcheck (ubuntu defaults to a 1.8 version)
-RUN VERSION="2.12.1" \
+RUN VERSION="2.18.0" \
   && TAR_NAME="${VERSION}.tar.gz" \
   && curl -fsSLO "https://github.com/danmar/cppcheck/archive/refs/tags/${TAR_NAME}" \
-  && SHA256="2a3d4ba1179419612183ab3d6aed6d3b18be75e98cd6f138ea8e2020905dced2" \
+  && SHA256="dc74e300ac59f2ef9f9c05c21d48ae4c8dd1ce17f08914dd30c738ff482e748f" \
   && (printf "${SHA256} ${TAR_NAME}" | sha256sum --check --strict --status) \
   && tar xf "${TAR_NAME}" \
   && pushd "cppcheck-${VERSION}" \
@@ -155,47 +156,6 @@ RUN VERSION="2.12.1" \
   && cmake --build build -t install \
   && popd \
   && rm -rf "cppcheck-${VERSION}" "${TAR_NAME}"
-
-# C++ json library (used for test purpose)
-RUN VERSION="3.11.2" \
-  && TAR_NAME="json.tar.xz" \
-  && curl -fsSLO "https://github.com/nlohmann/json/releases/download/v${VERSION}/json.tar.xz" \
-  && SHA256="8c4b26bf4b422252e13f332bc5e388ec0ab5c3443d24399acb675e68278d341f" \
-  && (printf "${SHA256} ${TAR_NAME}" | sha256sum --check --strict --status) \
-  && tar xf "${TAR_NAME}" \
-  && pushd json \
-  && cmake -GNinja -Bbuild -DCMAKE_BUILD_TYPE=Release -DJSON_BuildTests=Off \
-  && cmake --build build -t install \
-  && popd \
-  && rm -rf json "${TAR_NAME}"
-
-# Google benchmark
-RUN VERSION="1.8.3" \
-  && TAR_NAME="v${VERSION}.tar.gz" \
-  && curl -fsSLO "https://github.com/google/benchmark/archive/refs/tags/v${VERSION}.tar.gz" \
-  && SHA256="6bc180a57d23d4d9515519f92b0c83d61b05b5bab188961f36ac7b06b0d9e9ce" \
-  && (printf "${SHA256} ${TAR_NAME}" | sha256sum --check --strict --status) \
-  && tar xf "${TAR_NAME}" \
-  && pushd benchmark-${VERSION} \
-  && cmake -GNinja -Bbuild -DCMAKE_BUILD_TYPE=Release -DBENCHMARK_USE_BUNDLED_GTEST=OFF \
-  && cmake --build build -t install \
-  && popd \
-  && rm -rf "benchmark-${VERSION}" "${TAR_NAME}"
-
-# Valgrind with dwarf 5 support
-RUN VERSION="3.21.0" \
-    && TAR_NAME="valgrind-${VERSION}.tar.bz2" \
-    && curl -fsSLO "https://sourceware.org/pub/valgrind/${TAR_NAME}" \
-    && SHA1="817d769743d278b5d07526e85115082054e9bf9c" \
-    && (printf "${SHA1} ${TAR_NAME}" | sha1sum --check --strict --status) \
-    && tar xvf "${TAR_NAME}" \
-    && pushd "valgrind-${VERSION}" \
-    && ./configure --prefix /usr/local \
-    && make -j $(nproc) \
-    && make install \
-    && valgrind --version \
-    && popd \
-    && rm -rf "valgrind-${VERSION}" "${TAR_NAME}"
 
 # jemalloc
 RUN VERSION="5.3.0" \
@@ -210,6 +170,32 @@ RUN VERSION="5.3.0" \
   && make install \
   && popd \
   && rm -rf "jemalloc-${VERSION}" "${TAR_NAME}"
+
+# C++ json library (used for test purpose)
+RUN VERSION="3.12.0" \
+  && TAR_NAME="json.tar.xz" \
+  && curl -fsSLO "https://github.com/nlohmann/json/releases/download/v${VERSION}/json.tar.xz" \
+  && SHA256="42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa" \
+  && (printf "${SHA256} ${TAR_NAME}" | sha256sum --check --strict --status) \
+  && tar xf "${TAR_NAME}" \
+  && pushd json \
+  && cmake -GNinja -Bbuild -DCMAKE_BUILD_TYPE=Release -DJSON_BuildTests=Off \
+  && cmake --build build -t install \
+  && popd \
+  && rm -rf json "${TAR_NAME}"
+
+# Google benchmark
+RUN VERSION="1.9.4" \
+  && TAR_NAME="v${VERSION}.tar.gz" \
+  && curl -fsSLO "https://github.com/google/benchmark/archive/refs/tags/v${VERSION}.tar.gz" \
+  && SHA256="b334658edd35efcf06a99d9be21e4e93e092bd5f95074c1673d5c8705d95c104" \
+  && (printf "${SHA256} ${TAR_NAME}" | sha256sum --check --strict --status) \
+  && tar xf "${TAR_NAME}" \
+  && pushd benchmark-${VERSION} \
+  && cmake -GNinja -Bbuild -DCMAKE_BUILD_TYPE=Release -DBENCHMARK_USE_BUNDLED_GTEST=OFF \
+  && cmake --build build -t install \
+  && popd \
+  && rm -rf "benchmark-${VERSION}" "${TAR_NAME}"
 
 # Install sarif-tools only if UBUNTU_VERSION is 22 or greater
 RUN if [ "${UBUNTU_VERSION}" -ge 22 ]; then \

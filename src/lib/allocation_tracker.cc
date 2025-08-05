@@ -18,6 +18,7 @@
 #include "syscalls.hpp"
 #include "tsc_clock.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <cassert>
 #include <cstdlib>
@@ -537,15 +538,12 @@ AllocationTracker::next_sample_interval(std::minstd_rand &gen) const {
   double const sampling_rate = 1.0 / static_cast<double>(_sampling_interval);
   std::exponential_distribution<> dist(sampling_rate);
   double value = dist(gen);
-  const size_t max_value = _sampling_interval * 20;
-  const size_t min_value = 8;
-  if (value > max_value) {
-    value = max_value;
-  }
-  if (value < min_value) {
-    value = min_value;
-  }
-  return value;
+  constexpr int kMaxSamplingMultiplier = 20;
+  const double min_value = 8.0;
+  value = std::min(
+      value, static_cast<double>(_sampling_interval * kMaxSamplingMultiplier));
+  value = std::max(value, min_value);
+  return static_cast<size_t>(value);
 }
 
 void AllocationTracker::notify_thread_start() {

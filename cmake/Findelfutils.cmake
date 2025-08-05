@@ -18,15 +18,16 @@ find_package(zstd)
 set(CMAKE_FIND_LIBRARY_SUFFIXES ${ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
 
 set(SHA256_ELF
-    "39bd8f1a338e2b7cd4abc3ff11a0eddc6e690f69578a57478d8179b4148708c8"
+    "616099beae24aba11f9b63d86ca6cc8d566d968b802391334c91df54eab416b4"
     CACHE STRING "SHA256 of the elfutils tar")
 set(VER_ELF
-    "0.189"
+    "0.192"
     CACHE STRING "elfutils version")
 set(ELFUTILS_PATH ${VENDOR_PATH}/elfutils-${VER_ELF})
 
 set(LIBDW_PATH ${ELFUTILS_PATH}/lib/libdw.a)
 set(LIBELF_PATH ${ELFUTILS_PATH}/lib/libelf.a)
+set(LIBEU_PATH ${ELFUTILS_PATH}/src/lib/libeu.a)
 
 set(ELFUTILS_INCLUDE_DIRS ${ELFUTILS_PATH}/include)
 
@@ -47,13 +48,18 @@ execute_process(
           "${ELFUTILS_PATH}" "${CMAKE_C_COMPILER}" "${EXTRA_CFLAGS}"
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND_ERROR_IS_FATAL ANY)
 
+# Define eu library first since others depend on it
+add_library(eu STATIC IMPORTED)
+set_target_properties(eu PROPERTIES IMPORTED_LOCATION ${LIBEU_PATH} INTERFACE_INCLUDE_DIRECTORIES
+                                                                    ${ELFUTILS_INCLUDE_DIRS})
+
 add_library(dw STATIC IMPORTED)
 set_target_properties(
   dw
   PROPERTIES IMPORTED_LOCATION ${LIBDW_PATH}
              INTERFACE_INCLUDE_DIRECTORIES ${ELFUTILS_INCLUDE_DIRS}
              INTERFACE_LINK_LIBRARIES
-             "${BZIP2_LIBRARIES};${LIBLZMA_LIBRARIES};${ZLIB_LIBRARIES};${zstd_LIBRARIES}")
+             "eu;${BZIP2_LIBRARIES};${LIBLZMA_LIBRARIES};${ZLIB_LIBRARIES};${zstd_LIBRARIES}")
 
 add_library(elf STATIC IMPORTED)
 set_target_properties(
@@ -64,4 +70,4 @@ set_target_properties(
              "${BZIP2_LIBRARIES};${LIBLZMA_LIBRARIES};${ZLIB_LIBRARIES};${zstd_LIBRARIES}")
 
 # Elf libraries
-set(ELFUTILS_LIBRARIES dw elf)
+set(ELFUTILS_LIBRARIES dw elf eu)

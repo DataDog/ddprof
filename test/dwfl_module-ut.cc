@@ -26,7 +26,7 @@ namespace ddprof {
   ({                                                                           \
     __label__ __here;                                                          \
   __here:                                                                      \
-    (unsigned long) && __here;                                                 \
+    (unsigned long)&&__here;                                                   \
   })
 
 namespace fs = std::filesystem;

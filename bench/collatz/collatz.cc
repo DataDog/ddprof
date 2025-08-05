@@ -33,8 +33,10 @@
 #  define VER_REV "custom"
 #endif
 
+namespace {
 unsigned long *counter = nullptr;
 unsigned long my_counter = 0;
+}
 
 // Helper for processing input
 #define P(s, d)                                                                \
@@ -47,7 +49,7 @@ unsigned long my_counter = 0;
 // This is the function body for every expanded function in the X-table
 #define FUNBOD                                                                 \
   {                                                                            \
-    const int64_t n = x & 1 ? x * 3 + 1 : x / 2;                               \
+    const int64_t n = x & 1 ? (x * 3) + 1 : x / 2;                               \
     my_counter += 1;                                                           \
     return 1 >= n ? 1 : funs[n % funlen](n);                                   \
   }
@@ -60,6 +62,7 @@ unsigned long my_counter = 0;
 #define C(X,N) N(X,f0) N(X,f1) N(X,f2) N(X,f3) N(X,f4) N(X,f5) N(X,f6) N(X,f7) N(X,f8) N(X,f9)
 // clang-format on
 
+namespace {
 // X-table; use something like gcc -E collatz.c to see how this works :)
 #define COLLATZ(X) C(X, N3)
 #define DECL(f) int64_t f(int64_t);
@@ -75,13 +78,16 @@ const int funlen = std::size(funs);
 
 // Define the functions
 COLLATZ(DEFN)
+}
 
+namespace {
 void print_version() {
   printf(MYNAME " %d.%d.%d", VER_MAJ, VER_MIN, VER_PATCH);
   if (*VER_REV) {
     printf("+%s", VER_REV);
   }
   printf("\n");
+}
 }
 
 constexpr int k_max_procs{1000};
@@ -94,7 +100,7 @@ int main(int c, char **v) {
   int ki = k_default_outer_iterations;
   int kj = k_default_inner_iterations;
   int t = 0;
-  int n = 1 + get_nprocs() / 2;
+  int n = 1 + (get_nprocs() / 2);
   if (c > 1) {
     if (!strcmp(v[1], "-v") || !strcmp(v[1], "--version")) {
       print_version();
@@ -125,9 +131,7 @@ int main(int c, char **v) {
     if (n < 0) {
       n = get_nprocs();
     }
-    if (n > k_max_procs) {
-      n = k_max_procs;
-    }
+    n = std::min(n, k_max_procs);
   }
   if (c > 2) {
     P(v[2], ki);

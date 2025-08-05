@@ -7,6 +7,7 @@
 
 #include "ratelimiter.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <cassert>
 #include <cerrno>
@@ -186,7 +187,7 @@ void vlprintfln(int lvl, int fac, const char *format, va_list args) {
 
   if (log_ctx.mode == LOG_SYSLOG) {
     sz_h = snprintf(buf, LOG_MSG_CAP,
-                    "<%d>%s.%06ld %s[%d]: ", lvl + fac * LL_LENGTH, tm_str,
+                    "<%d>%s.%06ld %s[%d]: ", lvl + (fac * LL_LENGTH), tm_str,
                     d_us.count(), name, pid);
   } else {
     const char *levels[LL_LENGTH] = {
@@ -207,10 +208,7 @@ void vlprintfln(int lvl, int fac, const char *format, va_list args) {
   ssize_t const cap =
       LOG_MSG_CAP - sz_h - 2; // Room for optional newline and \0
   sz = vsnprintf(&buf[sz_h], cap, format, args);
-
-  if (sz > cap) {
-    sz = cap;
-  }
+  sz = std::min(sz, cap); // if size is greater than cap, truncate
   sz += sz_h;
 
   // Some consumers expect newline-delimited logs.

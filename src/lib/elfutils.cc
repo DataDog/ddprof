@@ -233,6 +233,7 @@ public:
 
   bool operator()(std::string_view object_name, const DynamicInfo &dyn_info) {
     const ElfW(Sym) *s = nullptr;
+    // NOLINTBEGIN(bugprone-suspicious-stringview-data-usage)
     if (dyn_info.gnu_hash) {
       s = gnu_hash_lookup(dyn_info.strtab.data(), dyn_info.symtab.data(),
                           dyn_info.gnu_hash, _symname);
@@ -240,6 +241,7 @@ public:
       s = elf_hash_lookup(dyn_info.strtab.data(), dyn_info.symtab.data(),
                           dyn_info.elf_hash, _symname);
     }
+    // NOLINTEND(bugprone-suspicious-stringview-data-usage)
     if (s && (_accept_null_sized_symbol || s->st_size > 0) &&
         (s->st_value + dyn_info.base_address != _not_sym)) {
       _sym = *s;

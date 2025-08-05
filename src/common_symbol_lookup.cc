@@ -6,11 +6,12 @@
 #include "common_symbol_lookup.hpp"
 
 namespace ddprof {
-
+namespace {
 Symbol symbol_from_common(SymbolErrors lookup_case) {
   return {std::string(), std::string{k_common_frame_names[lookup_case]}, 0,
           std::string()};
 }
+} // namespace
 
 SymbolIdx_t CommonSymbolLookup::get_or_insert(SymbolErrors lookup_case,
                                               SymbolTable &symbol_table) {

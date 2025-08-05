@@ -12,6 +12,7 @@
 static constexpr size_t k_work_amount = 3000;
 static constexpr size_t k_work_amount_decrease_per_call = 100;
 
+namespace {
 template <int N> DDPROF_NOINLINE std::string compute() {
   char arr[N];
   constexpr size_t k_nb_letters{26};
@@ -27,6 +28,7 @@ template <int N> DDPROF_NOINLINE std::string compute() {
   }
   return ret_arr;
 }
+} // namespace
 
 int main() {
   using namespace std::chrono;

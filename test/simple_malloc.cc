@@ -36,6 +36,9 @@
 #ifdef __GLIBC__
 #  include <execinfo.h>
 #endif
+
+// NOLINTBEGIN
+
 class Voidify final {
 public:
   // This has to be an operator with a precedence lower than << but higher than
@@ -393,3 +396,5 @@ int main(int argc, char *argv[]) {
 }
 
 #endif
+
+// NOLINTEND

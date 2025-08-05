@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <sys/time.h>
 
+namespace {
 void timer_handler(int /*sig*/) { exit(0); }
 
 DDPROF_NOINLINE __attribute__((naked)) void fun2() {
@@ -31,9 +32,10 @@ DDPROF_NOINLINE void fun1() {
   fun2();
   DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
 }
+} // namespace
 
 int main() {
-  struct sigaction sa {};
+  struct sigaction sa{};
   sa.sa_handler = &timer_handler;
   sigaction(SIGPROF, &sa, nullptr);
 

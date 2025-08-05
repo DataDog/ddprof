@@ -58,12 +58,15 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ERROR_IS_FATAL ANY)
   # In clang static link is the default and lsan is combined with asan. Avoid usage of list to make
   # sure we have spaces (not ;). static ubsan is giving link errors : to be investigated...
-  # compiler-rt is required on aarch64 for __muloti4
+  # compiler-rt is required on aarch64 for __muloti4 Add both the main runtime dir and the linux
+  # subdir to handle different packaging layouts
+  get_filename_component(LLVM_LIB_DIR "${LLVM_RUNTIME_DIR}" DIRECTORY)
+  set(LLVM_LINUX_DIR "${LLVM_LIB_DIR}/linux")
   set(CMAKE_EXE_LINKER_FLAGS_SANITIZEDDEBUG
-      "${CMAKE_EXE_LINKER_FLAGS_SANITIZEDDEBUG} -shared-libsan -Wl,-rpath,${LLVM_RUNTIME_DIR} --rtlib=compiler-rt"
+      "${CMAKE_EXE_LINKER_FLAGS_SANITIZEDDEBUG} -shared-libsan -Wl,-rpath,${LLVM_RUNTIME_DIR} -Wl,-rpath,${LLVM_LINUX_DIR} --rtlib=compiler-rt"
   )
   set(CMAKE_SHARED_LINKER_FLAGS_SANITIZEDDEBUG
-      "${CMAKE_SHARED_LINKER_FLAGS_SANITIZEDDEBUG} -shared-libsan -Wl,-rpath,${LLVM_RUNTIME_DIR} --rtlib=compiler-rt"
+      "${CMAKE_SHARED_LINKER_FLAGS_SANITIZEDDEBUG} -shared-libsan -Wl,-rpath,${LLVM_RUNTIME_DIR} -Wl,-rpath,${LLVM_LINUX_DIR} --rtlib=compiler-rt"
   )
 endif()
 

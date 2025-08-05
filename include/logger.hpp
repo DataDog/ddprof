@@ -22,7 +22,7 @@ enum LOG_OPTS : uint8_t {
   LOG_FILE = 4,
 };
 
-enum LOG_LVL : int8_t {
+enum LOG_LVL : int8_t { // NOLINT(cert-int09-c,readability-enum-initial-value)
   LL_FORCE_ALERT = -1,
   LL_FORCE_CRITICAL = -2,
   LL_FORCE_ERROR = -3,

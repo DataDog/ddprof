@@ -159,6 +159,30 @@ DDRes pevent_open_all_cpus(const PerfWatcher *watcher, int watcher_idx,
   return {};
 }
 
+/// Setup perf event according to requested watchers.
+DDRes pevent_open(DDProfContext &ctx, std::span<pid_t> pids, int num_cpu,
+                  PEventHdr *pevent_hdr) {
+  assert(pevent_hdr->size == 0); // check for previous init
+  for (unsigned long watcher_idx = 0; watcher_idx < ctx.watchers.size();
+       ++watcher_idx) {
+    PerfWatcher *watcher = &ctx.watchers[watcher_idx];
+    if (watcher->type < kDDPROF_TYPE_CUSTOM) {
+      DDRES_CHECK_FWD(pevent_open_all_cpus(watcher, watcher_idx, pids, num_cpu,
+                                           ctx.perf_clock_source, pevent_hdr));
+    } else {
+      // custom event, eg.allocation profiling
+      size_t pevent_idx = 0;
+      DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
+      int const order = pevent_compute_min_mmap_order(
+          k_mpsc_buffer_size_shift, watcher->options.stack_sample_size,
+          k_min_number_samples_per_ring_buffer);
+      DDRES_CHECK_FWD(ring_buffer_create(order, RingBufferType::kMPSCRingBuffer,
+                                         true, &pevent_hdr->pes[pevent_idx]));
+    }
+  }
+  return {};
+}
+
 } // namespace
 
 void pevent_init(PEventHdr *pevent_hdr) {
@@ -183,29 +207,6 @@ int pevent_compute_min_mmap_order(int min_buffer_size_order,
     ++ret_order;
   }
   return ret_order;
-}
-
-DDRes pevent_open(DDProfContext &ctx, std::span<pid_t> pids, int num_cpu,
-                  PEventHdr *pevent_hdr) {
-  assert(pevent_hdr->size == 0); // check for previous init
-  for (unsigned long watcher_idx = 0; watcher_idx < ctx.watchers.size();
-       ++watcher_idx) {
-    PerfWatcher *watcher = &ctx.watchers[watcher_idx];
-    if (watcher->type < kDDPROF_TYPE_CUSTOM) {
-      DDRES_CHECK_FWD(pevent_open_all_cpus(watcher, watcher_idx, pids, num_cpu,
-                                           ctx.perf_clock_source, pevent_hdr));
-    } else {
-      // custom event, eg.allocation profiling
-      size_t pevent_idx = 0;
-      DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
-      int const order = pevent_compute_min_mmap_order(
-          k_mpsc_buffer_size_shift, watcher->options.stack_sample_size,
-          k_min_number_samples_per_ring_buffer);
-      DDRES_CHECK_FWD(ring_buffer_create(order, RingBufferType::kMPSCRingBuffer,
-                                         true, &pevent_hdr->pes[pevent_idx]));
-    }
-  }
-  return {};
 }
 
 DDRes pevent_mmap_event(PEvent *event) {

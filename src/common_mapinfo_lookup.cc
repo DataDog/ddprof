@@ -6,7 +6,7 @@
 #include "common_mapinfo_lookup.hpp"
 
 namespace ddprof {
-
+namespace {
 MapInfo mapinfo_from_common(CommonMapInfoLookup::MappingErrors lookup_case) {
   switch (lookup_case) {
   case CommonMapInfoLookup::MappingErrors::empty:
@@ -16,6 +16,7 @@ MapInfo mapinfo_from_common(CommonMapInfoLookup::MappingErrors lookup_case) {
   }
   return {};
 }
+} // namespace
 
 MapInfoIdx_t CommonMapInfoLookup::get_or_insert(
     CommonMapInfoLookup::MappingErrors lookup_case,

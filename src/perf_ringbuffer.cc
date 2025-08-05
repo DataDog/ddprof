@@ -67,6 +67,7 @@ union flipper {
     }                                                                          \
   } while (0);
 
+// NOLINTBEGIN(bugprone-sizeof-expression,cert-arr39-c)
 bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,
               size_t sz_hdr, uint64_t mask) {
   // There is absolutely no point for this interface except testing
@@ -194,7 +195,9 @@ bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,
   hdr->size = sz;
   return true;
 }
+// NOLINTEND(bugprone-sizeof-expression,cert-arr39-c)
 
+// NOLINTBEGIN(bugprone-sizeof-expression,cert-arr39-c)
 perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
   static perf_event_sample sample = {};
   sample.header = *hdr;
@@ -297,6 +300,7 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
 
   return &sample;
 }
+// NOLINTEND(bugprone-sizeof-expression,cert-arr39-c)
 
 uint64_t hdr_time(const perf_event_header *hdr, uint64_t mask) {
   if (!(mask & PERF_SAMPLE_TIME)) {

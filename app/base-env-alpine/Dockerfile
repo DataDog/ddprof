@@ -1,4 +1,4 @@
-FROM alpine:3.19
+FROM alpine:3.22
 ENV CC=gcc
 ENV CXX=g++
 
@@ -63,11 +63,6 @@ RUN apk update \
 # Tell docker to use bash as the default
 SHELL ["/bin/bash", "-c"]
 
-## Alpine 3.16 has gcc 12 and clang 16
-
-# Provides the llvm-symbolizer (better debug information in case of sanitizer issue)
-ENV PATH="/usr/lib/llvm-${CLANG_VERSION}/bin/:$PATH"
-
 ## Alpine has cmake 3.26.5
 
 ## Alpine has ninja 1.11.1-r2 Ninja build
@@ -77,10 +72,10 @@ ENV PATH="/usr/lib/llvm-${CLANG_VERSION}/bin/:$PATH"
 ## Alpine has cppcheck 2.10.3
 
 # C++ json library (used for test purpose)
-RUN VERSION="3.11.2" \
+RUN VERSION="3.12.0" \
   && TAR_NAME="json.tar.xz" \
   && curl -fsSLO "https://github.com/nlohmann/json/releases/download/v${VERSION}/json.tar.xz" \
-  && SHA256="8c4b26bf4b422252e13f332bc5e388ec0ab5c3443d24399acb675e68278d341f" \
+  && SHA256="42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa" \
   && (printf "${SHA256} ${TAR_NAME}" | sha256sum -c) \
   && tar xf "${TAR_NAME}" \
   && pushd json \
@@ -90,10 +85,10 @@ RUN VERSION="3.11.2" \
   && rm -rf json "${TAR_NAME}"
 
 # Google benchmark
-RUN VERSION="1.8.3" \
+RUN VERSION="1.9.4" \
   && TAR_NAME="v${VERSION}.tar.gz" \
   && curl -fsSLO "https://github.com/google/benchmark/archive/refs/tags/v${VERSION}.tar.gz" \
-  && SHA256="6bc180a57d23d4d9515519f92b0c83d61b05b5bab188961f36ac7b06b0d9e9ce" \
+  && SHA256="b334658edd35efcf06a99d9be21e4e93e092bd5f95074c1673d5c8705d95c104" \
   && (printf "${SHA256} ${TAR_NAME}" | sha256sum -c) \
   && tar xf "${TAR_NAME}" \
   && pushd benchmark-${VERSION} \

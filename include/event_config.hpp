@@ -14,7 +14,7 @@
 
 namespace ddprof {
 
-enum EventAggregationModePos : uint8_t {
+enum EventAggregationModePos : uint8_t { // NOLINT(cert-int09-c,readability-enum-initial-value)
   kSumPos = 0,
   kLiveSumPos = 1,
   kNbEventAggregationModes
