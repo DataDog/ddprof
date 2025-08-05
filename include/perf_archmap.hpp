@@ -56,7 +56,7 @@ inline constexpr uint64_t k_perf_register_mask =
     ~(~0ULL << k_perf_register_count);
 
 #  define REGNAME(x) PAM_ARM_##x
-enum PERF_ARCHMAP_ARM : uint8_t {
+enum PERF_ARCHMAP_ARM : uint8_t { // NOLINT(cert-int09-c,readability-enum-initial-value)
   PAM_ARM_X0,
   PAM_ARM_X1,
   PAM_ARM_X2,

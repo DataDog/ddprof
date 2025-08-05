@@ -374,7 +374,6 @@ TEST(DSOTest, backpopulate_with_perf_clock) {
     ASSERT_TRUE(find_res.second);
 
     auto &my_dso = find_res.first->second;
-    auto current_timestamp = PerfClock::now();
     bool result2 = dso_hdr.maybe_insert_erase_overlap(Dso{my_dso, getpid()},
                                                       old_timestamp);
     EXPECT_FALSE(result2);
