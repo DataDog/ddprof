@@ -171,7 +171,7 @@ void *perfown_sz(int fd, size_t size_of_buffer) {
 int perfdisown(void *region, size_t size) {
   auto *ptr = static_cast<std::byte *>(region);
 
-  return (munmap(ptr + (size - get_page_size()), size) == 0) &&
+  return (munmap(ptr + size - get_page_size(), size) == 0) &&
           (munmap(ptr, size) == 0) &&
           (munmap(ptr, (2 * size) - get_page_size()) == 0)
       ? 0

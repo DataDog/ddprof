@@ -361,8 +361,9 @@ TEST(DSOTest, backpopulate_with_perf_clock) {
     ASSERT_TRUE(find_res.second);
 
     auto &my_dso = find_res.first->second;
-    EXPECT_TRUE(dso_hdr.maybe_insert_erase_overlap(Dso{my_dso, getpid()},
-                                                   old_timestamp));
+    bool result1 = dso_hdr.maybe_insert_erase_overlap(Dso{my_dso, getpid()},
+                                                      old_timestamp);
+    EXPECT_TRUE(result1);
   }
   // Init perf clock
   PerfClock::init();
@@ -373,15 +374,18 @@ TEST(DSOTest, backpopulate_with_perf_clock) {
     ASSERT_TRUE(find_res.second);
 
     auto &my_dso = find_res.first->second;
-    EXPECT_FALSE(dso_hdr.maybe_insert_erase_overlap(Dso{my_dso, getpid()},
-                                                    old_timestamp));
-    EXPECT_TRUE(dso_hdr.maybe_insert_erase_overlap(Dso{my_dso, getpid()},
-                                                   PerfClock::now()));
+    auto current_timestamp = PerfClock::now();
+    bool result2 = dso_hdr.maybe_insert_erase_overlap(Dso{my_dso, getpid()},
+                                                      old_timestamp);
+    EXPECT_FALSE(result2);
+
+    bool result3 = dso_hdr.maybe_insert_erase_overlap(Dso{my_dso, getpid()},
+                                                      PerfClock::now());
+    EXPECT_TRUE(result3);
   }
 }
 
 TEST(DSOTest, missing_dso) {
-  LogHandle loghandle;
   DsoHdr dso_hdr;
   // Build fake dso
   Dso foo_dso = build_dso_5_1500();
@@ -470,7 +474,6 @@ TEST(DSOTest, user_change) {
       pthread_barrier_wait(pb);
       waitpid(child_pid, NULL, 0);
     };
-    LogHandle handle;
     DsoHdr dso_hdr;
     pthread_barrier_wait(pb);
     int nb_elts;
@@ -483,7 +486,6 @@ TEST(DSOTest, user_change) {
 }
 
 TEST(DSOTest, large_backpopulate) {
-  LogHandle handle;
   // This is a test of the same java application one minute apart
   // This can be useful to bench the backpopulate
   std::string path_to_proc = std::string(UNIT_TEST_DATA) + "/dso-ut/step-1";
