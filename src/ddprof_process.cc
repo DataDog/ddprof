@@ -18,6 +18,26 @@
 #include <vector>
 
 namespace ddprof {
+namespace {
+UniqueFile open_proc_comm(pid_t pid, pid_t tid, const char *path_to_proc = "") {
+  const std::string proc_comm_filename =
+      absl::StrFormat("%s/proc/%d/task/%d/comm", path_to_proc, pid, tid);
+  UniqueFile file{fopen(proc_comm_filename.c_str(), "r"), fclose};
+  if (!file) {
+    // Check if the file exists
+    struct stat info;
+    UIDInfo old_uids;
+    // warning could user switch create too much overhead ?
+    if (stat(proc_comm_filename.c_str(), &info) == 0 &&
+        IsDDResOK(user_override(info.st_uid, info.st_gid, &old_uids))) {
+      file.reset(fopen(proc_comm_filename.c_str(), "r"));
+      // Switch back to the original user
+      user_override(old_uids.uid, old_uids.gid);
+    }
+  }
+  return file;
+}
+} // namespace
 
 std::string Process::format_cgroup_file(pid_t pid,
                                         std::string_view path_to_proc) {
@@ -85,25 +105,6 @@ DDRes Process::read_cgroup_ns(pid_t pid, std::string_view path_to_proc,
   return {};
 }
 
-UniqueFile open_proc_comm(pid_t pid, pid_t tid, const char *path_to_proc = "") {
-  const std::string proc_comm_filename =
-      absl::StrFormat("%s/proc/%d/task/%d/comm", path_to_proc, pid, tid);
-  UniqueFile file{fopen(proc_comm_filename.c_str(), "r"), fclose};
-  if (!file) {
-    // Check if the file exists
-    struct stat info;
-    UIDInfo old_uids;
-    // warning could user switch create too much overhead ?
-    if (stat(proc_comm_filename.c_str(), &info) == 0 &&
-        IsDDResOK(user_override(info.st_uid, info.st_gid, &old_uids))) {
-      file.reset(fopen(proc_comm_filename.c_str(), "r"));
-      // Switch back to the original user
-      user_override(old_uids.uid, old_uids.gid);
-    }
-  }
-  return file;
-}
-
 std::string_view Process::get_or_insert_thread_name(pid_t tid) {
   // Try to insert an empty string first, to ensure only one lookup happens
   auto [it, inserted] = _thread_name_map.emplace(tid, "");
@@ -162,7 +163,7 @@ void ProcessHdr::reset_unvisited() {
 std::vector<pid_t> ProcessHdr::get_unvisited() const {
   std::vector<pid_t> pids_remove;
   for (const auto &el : _process_map) {
-    if (_visited_pid.find(el.first) == _visited_pid.end()) {
+    if (!_visited_pid.contains(el.first)) {
       pids_remove.push_back(el.first);
     }
   }

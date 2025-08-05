@@ -7,16 +7,19 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cctype>
 #include <span>
 #include <string_view>
-#include <strings.h>
 
 namespace ddprof {
 
 int arg_which(std::string_view str, std::span<const std::string_view> str_set) {
   auto it = std::ranges::find_if(str_set, [&str](std::string_view s) {
     return s.size() == str.size() &&
-        !strncasecmp(str.data(), s.data(), s.size());
+        std::equal(str.begin(), str.end(), s.begin(), s.end(),
+                   [](char a, char b) {
+                     return std::tolower(a) == std::tolower(b);
+                   });
   });
   return (it == str_set.end()) ? -1 : std::distance(str_set.begin(), it);
 }

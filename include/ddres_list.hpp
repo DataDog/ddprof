@@ -66,7 +66,7 @@ enum : uint16_t { DD_COMMON_START_RANGE = 1000, DD_NATIVE_START_RANGE = 2000 };
 
 // generic erno errors available from /usr/include/asm-generic/errno.h
 
-enum DDRes_What : uint16_t {
+enum DDRes_What : uint16_t { // NOLINT(cert-int09-c,readability-enum-initial-value)
   // errno starts after ELAST 106 as of now
   DD_WHAT_MIN_ERRNO = DD_COMMON_START_RANGE,
   // common errors

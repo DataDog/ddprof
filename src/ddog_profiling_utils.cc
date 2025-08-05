@@ -9,6 +9,22 @@
 #include "demangler/demangler.hpp"
 
 namespace ddprof {
+namespace {
+// demangling caching based on stability of unordered map
+// This will be moved to the backend
+std::string_view get_or_insert_demangled_sym(
+    const char *sym,
+    ddprof::HeterogeneousLookupStringMap<std::string> &demangled_names) {
+  auto it = demangled_names.find(sym);
+  if (it == demangled_names.end()) {
+    std::string demangled_name = ddprof::Demangler::non_microsoft_demangle(sym);
+    it = demangled_names.insert({std::string(sym), std::move(demangled_name)})
+             .first;
+  }
+  return it->second;
+}
+} // namespace
+
 void write_function(const Symbol &symbol, ddog_prof_Function *ffi_func) {
   ffi_func->name = to_CharSlice(symbol._demangled_name);
   // We can also send symbol._symname if useful
@@ -48,20 +64,6 @@ void write_location(ProcessAddress_t ip_or_elf_addr,
   write_function(demangled_name, file_name, &ffi_location->function);
   ffi_location->address = ip_or_elf_addr;
   ffi_location->line = lineno;
-}
-
-// demangling caching based on stability of unordered map
-// This will be moved to the backend
-std::string_view get_or_insert_demangled_sym(
-    const char *sym,
-    ddprof::HeterogeneousLookupStringMap<std::string> &demangled_names) {
-  auto it = demangled_names.find(sym);
-  if (it == demangled_names.end()) {
-    std::string demangled_name = ddprof::Demangler::non_microsoft_demangle(sym);
-    it = demangled_names.insert({std::string(sym), std::move(demangled_name)})
-             .first;
-  }
-  return it->second;
 }
 
 DDRes write_location_blaze(

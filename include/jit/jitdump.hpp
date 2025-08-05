@@ -47,7 +47,7 @@ enum JITRecordType : uint8_t {
   JIT_CODE_DEBUG_INFO = 2,     // debug information for a jitted function
   JIT_CODE_CLOSE = 3,          // end of the jit runtime (optional)
   JIT_CODE_UNWINDING_INFO = 4, // function unwinding information
-  JIT_CODE_MAX,                // maximum record type
+  JIT_CODE_MAX = 5             // maximum record type
 };
 
 /* At the start of every record */
@@ -60,7 +60,7 @@ struct JITRecordPrefix {
 struct JITRecordCodeLoad {
   // minimal size we will read
   static constexpr uint32_t k_size_integers =
-      sizeof(uint32_t) * 2 + sizeof(uint64_t) * 4;
+      (sizeof(uint32_t) * 2) + (sizeof(uint64_t) * 4);
   JITRecordPrefix prefix;
   uint32_t pid;
   uint32_t tid;

@@ -245,7 +245,6 @@ DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
   return add_frame(symbol_idx, k_file_info_undef, map_idx, pc,
                    pc - dso.start() + dso.offset(), us);
 }
-} // namespace
 
 DDRes unwind_init_dwfl(Process &process, bool avoid_new_attach,
                        UnwindState *us) {
@@ -259,6 +258,7 @@ DDRes unwind_init_dwfl(Process &process, bool avoid_new_attach,
   // Creates the dwfl unwinding backend
   return us->_dwfl_wrapper->attach(us->pid, us->ref_elf, us);
 }
+} // namespace
 
 DDRes unwind_dwfl(Process &process, bool avoid_new_attach, UnwindState *us) {
   DDRes res = unwind_init_dwfl(process, avoid_new_attach, us);

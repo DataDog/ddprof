@@ -147,7 +147,7 @@ std::string rust_demangle(const std::string_view &str) {
         int const hi = hex_to_int(str[i + 2]);
         int const lo = hex_to_int(str[i + 3]);
         if (hi != -1 && lo != -1) {
-          ret += static_cast<unsigned char>(lo + hexa_base * hi);
+          ret += static_cast<unsigned char>(lo + (hexa_base * hi));
           i += k_nb_read_chars - 1; // - 1 because iterator inc
         } else {
           // We didn't have valid unicode values, but we should still skip

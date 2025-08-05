@@ -13,6 +13,7 @@
 #include <cassert>
 
 namespace ddprof {
+namespace {
 inline void write_location_no_sym(ElfAddress_t ip, const MapInfo &mapinfo,
                                   ddog_prof_Location *ffi_location) {
   write_mapping(mapinfo, &ffi_location->mapping);
@@ -20,6 +21,7 @@ inline void write_location_no_sym(ElfAddress_t ip, const MapInfo &mapinfo,
   write_function({}, mapinfo._sopath, &ffi_location->function);
   ffi_location->address = ip;
 }
+} // namespace
 
 int Symbolizer::remove_unvisited() {
   // Remove all unvisited blaze_symbolizer instances from the map

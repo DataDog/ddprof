@@ -12,8 +12,6 @@ namespace ddprof {
 
 struct UnwindState;
 
-DDRes unwind_init_dwfl(Process &process, UnwindState *us);
-
 DDRes unwind_dwfl(Process &process, bool avoid_new_attach, UnwindState *us);
 
 } // namespace ddprof

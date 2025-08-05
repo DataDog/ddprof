@@ -11,6 +11,7 @@
 
 namespace ddprof {
 // Returns the ID of the given Linux tracepoint, or -1 if an error occurs.
+// NOLINTBEGIN(misc-use-internal-linkage)
 int64_t tracepoint_get_id(std::string_view global_name,
                           std::string_view tracepoint_name) {
   if (global_name.empty() || tracepoint_name.empty()) {
@@ -45,4 +46,5 @@ int64_t tracepoint_get_id(std::string_view global_name,
   }
   return trace_id;
 }
+// NOLINTEND(misc-use-internal-linkage)
 } // namespace ddprof

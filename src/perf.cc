@@ -33,6 +33,7 @@ void set_perf_clock_source(perf_event_attr &attr,
 }
 } // namespace
 
+namespace {
 struct perf_event_attr g_dd_native_attr = {
     .size = sizeof(struct perf_event_attr),
     .disabled = 1,
@@ -49,6 +50,7 @@ struct perf_event_attr g_dd_native_attr = {
     .sample_id_all = 1,
     .sample_regs_user = k_perf_register_mask,
 };
+} // namespace
 
 long get_page_size() {
   if (!s_page_size) {
@@ -129,7 +131,7 @@ size_t get_mask_from_size(size_t size) {
 void *perfown_sz(int fd, size_t size_of_buffer) {
   // Map in the region representing the ring buffer, map the buffer twice
   // (minus metadata size) to avoid handling boundaries.
-  size_t const total_length = 2 * size_of_buffer - get_page_size();
+  size_t const total_length = (2 * size_of_buffer) - get_page_size();
   // Reserve twice the size of the buffer
   void *region = mmap(nullptr, total_length, PROT_NONE,
                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -169,9 +171,9 @@ void *perfown_sz(int fd, size_t size_of_buffer) {
 int perfdisown(void *region, size_t size) {
   auto *ptr = static_cast<std::byte *>(region);
 
-  return (munmap(ptr + size - get_page_size(), size) == 0) &&
+  return (munmap(ptr + (size - get_page_size()), size) == 0) &&
           (munmap(ptr, size) == 0) &&
-          (munmap(ptr, 2 * size - get_page_size()) == 0)
+          (munmap(ptr, (2 * size) - get_page_size()) == 0)
       ? 0
       : -1;
 }

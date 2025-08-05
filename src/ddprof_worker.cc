@@ -330,77 +330,79 @@ DDRes clear_unvisited_pids(DDProfContext &ctx) {
   return {};
 }
 
-} // namespace
-
-DDRes worker_library_init(DDProfContext &ctx,
-                          PersistentWorkerState *persistent_worker_state) {
-  try {
-    // Set the initial time
-    export_time_set(ctx);
-    // Make sure worker-related counters are reset
-    ctx.worker_ctx.count_worker = 0;
-    // Make sure worker index is initialized correctly
-    ctx.worker_ctx.i_current_pprof = 0;
-    ctx.worker_ctx.exp_tid = {0};
-    auto unwind_state =
-        create_unwind_state(ctx.params.dd_profiling_fd, ctx.params.maximum_pids,
-                            ctx.params.timeline);
-    if (!unwind_state) {
-      LG_ERR("Failed to create unwind state");
-      return ddres_error(DD_WHAT_UW_ERROR);
-    }
-    ctx.worker_ctx.us = new UnwindState{*std::move(unwind_state)};
-
-    std::fill(ctx.worker_ctx.lost_events_per_watcher.begin(),
-              ctx.worker_ctx.lost_events_per_watcher.end(), 0UL);
-
-    // register the existing persistent storage for the state
-    ctx.worker_ctx.persistent_worker_state = persistent_worker_state;
-
-    PEventHdr *pevent_hdr = &ctx.worker_ctx.pevent_hdr;
-
-    // If we're here, then we are a child spawned during the startup operation.
-    // That means we need to iterate through the perf_event_open() handles and
-    // get the mmaps
-    if (!IsDDResOK(pevent_mmap(pevent_hdr, true))) {
-      LG_NTC("Retrying attachment without user override");
-      DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, false));
-    }
-    // Initialize the unwind state and library
-    unwind_init();
-    ctx.worker_ctx.user_tags =
-        new UserTags(ctx.params.tags, ctx.params.num_cpu);
-    ctx.worker_ctx.symbolizer = new ddprof::Symbolizer(
-        ctx.params.inlined_functions, ctx.params.disable_symbolization,
-        ctx.params.remote_symbolization ? Symbolizer::k_elf
-                                        : Symbolizer::k_process);
-
-    // Zero out pointers to dynamically allocated memory
-    ctx.worker_ctx.exp[0] = nullptr;
-    ctx.worker_ctx.exp[1] = nullptr;
-    ctx.worker_ctx.pprof[0] = nullptr;
-    ctx.worker_ctx.pprof[1] = nullptr;
-  }
-  CatchExcept2DDRes();
-  return {};
-}
-
-DDRes worker_library_free(DDProfContext &ctx) {
-  try {
-    delete ctx.worker_ctx.user_tags;
-    ctx.worker_ctx.user_tags = nullptr;
-
-    PEventHdr *pevent_hdr = &ctx.worker_ctx.pevent_hdr;
-    DDRES_CHECK_FWD(pevent_munmap(pevent_hdr));
-
-    delete ctx.worker_ctx.us;
-    ctx.worker_ctx.us = nullptr;
-  }
-  CatchExcept2DDRes();
-  return {};
-}
-
 /************************* perf_event_open() helpers **************************/
+void ddprof_pr_mmap(DDProfContext &ctx, const perf_event_mmap2 *map,
+                    int watcher_pos, PerfClock::time_point timestamp) {
+  LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx) %c%c%c %02u:%02u %lu", watcher_pos,
+         map->pid, map->filename, map->addr, map->len, map->pgoff,
+         map->prot & PROT_READ ? 'r' : '-', map->prot & PROT_WRITE ? 'w' : '-',
+         map->prot & PROT_EXEC ? 'x' : '-', map->maj, map->min, map->ino);
+  Dso new_dso(map->pid, map->addr, map->addr + map->len - 1, map->pgoff,
+              std::string(map->filename), map->ino, map->prot);
+  ctx.worker_ctx.us->dso_hdr.maybe_insert_erase_overlap(std::move(new_dso),
+                                                        timestamp);
+  // ensure we access the process (to avoid a premature clear)
+  ctx.worker_ctx.us->process_hdr.flag_visited(map->pid);
+}
+
+void ddprof_pr_lost(DDProfContext &ctx, const perf_event_lost *lost,
+                    int watcher_pos) {
+  ddprof_stats_add(STATS_EVENT_LOST, lost->lost, nullptr);
+  ctx.worker_ctx.lost_events_per_watcher[watcher_pos] += lost->lost;
+}
+
+DDRes ddprof_pr_comm(DDProfContext &ctx, const perf_event_comm *comm,
+                     int watcher_pos) {
+  // Change in process name (assuming exec) : clear all associated dso
+  if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC) {
+    LG_DBG("<%d>(COMM)%d -> %s", watcher_pos, comm->pid, comm->comm);
+    DDRES_CHECK_FWD(worker_pid_free(ctx, comm->pid));
+  }
+  return {};
+}
+
+DDRes ddprof_pr_fork(DDProfContext &ctx, const perf_event_fork *frk,
+                     int watcher_pos) {
+  LG_DBG("<%d>(FORK)%d -> %d/%d", watcher_pos, frk->ppid, frk->pid, frk->tid);
+  if (frk->ppid != frk->pid) {
+    // Clear everything and populate at next error or with coming samples
+    DDRES_CHECK_FWD(worker_pid_free(ctx, frk->pid));
+    ctx.worker_ctx.us->dso_hdr.pid_fork(frk->pid, frk->ppid);
+    // ensure we access the process (to avoid a premature clear)
+    ctx.worker_ctx.us->process_hdr.flag_visited(frk->pid);
+  }
+  return {};
+}
+
+void ddprof_pr_exit(DDProfContext &ctx, const perf_event_exit *ext,
+                    int watcher_pos) {
+  // On Linux, it seems that the thread group leader is the one whose task ID
+  // matches the process ID of the group.  Moreover, it seems that it is the
+  // overwhelming convention that this thread is closed after the other threads
+  // (upheld by both pthreads and runtimes).
+  // We do not clear the PID at this time because we currently cleanup anyway.
+  (void)ctx;
+  if (ext->pid == ext->tid) {
+    LG_DBG("<%d>(EXIT)%d", watcher_pos, ext->pid);
+  } else {
+    LG_DBG("<%d>(EXIT)%d/%d", watcher_pos, ext->pid, ext->tid);
+  }
+}
+
+void ddprof_pr_clear_live_allocation(DDProfContext &ctx,
+                                     const ClearLiveAllocationEvent *event,
+                                     int watcher_pos) {
+  LG_NTC("<%d>(CLEAR LIVE)%d", watcher_pos, event->sample_id.pid);
+  ctx.worker_ctx.live_allocation.clear_pid_for_watcher(watcher_pos,
+                                                       event->sample_id.pid);
+}
+
+void ddprof_pr_deallocation(DDProfContext &ctx, const DeallocationEvent *event,
+                            int watcher_pos) {
+  ctx.worker_ctx.live_allocation.register_deallocation(event->ptr, watcher_pos,
+                                                       event->sample_id.pid);
+}
+
 /// Entry point for sample aggregation
 DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
                        int watcher_pos) {
@@ -484,6 +486,76 @@ void *ddprof_worker_export_thread(void *arg) {
   }
 
   return nullptr;
+}
+
+} // namespace
+
+DDRes worker_library_init(DDProfContext &ctx,
+                          PersistentWorkerState *persistent_worker_state) {
+  try {
+    // Set the initial time
+    export_time_set(ctx);
+    // Make sure worker-related counters are reset
+    ctx.worker_ctx.count_worker = 0;
+    // Make sure worker index is initialized correctly
+    ctx.worker_ctx.i_current_pprof = 0;
+    ctx.worker_ctx.exp_tid = {0};
+    auto unwind_state =
+        create_unwind_state(ctx.params.dd_profiling_fd, ctx.params.maximum_pids,
+                            ctx.params.timeline);
+    if (!unwind_state) {
+      LG_ERR("Failed to create unwind state");
+      return ddres_error(DD_WHAT_UW_ERROR);
+    }
+    ctx.worker_ctx.us = new UnwindState{*std::move(unwind_state)};
+
+    std::fill(ctx.worker_ctx.lost_events_per_watcher.begin(),
+              ctx.worker_ctx.lost_events_per_watcher.end(), 0UL);
+
+    // register the existing persistent storage for the state
+    ctx.worker_ctx.persistent_worker_state = persistent_worker_state;
+
+    PEventHdr *pevent_hdr = &ctx.worker_ctx.pevent_hdr;
+
+    // If we're here, then we are a child spawned during the startup operation.
+    // That means we need to iterate through the perf_event_open() handles and
+    // get the mmaps
+    if (!IsDDResOK(pevent_mmap(pevent_hdr, true))) {
+      LG_NTC("Retrying attachment without user override");
+      DDRES_CHECK_FWD(pevent_mmap(pevent_hdr, false));
+    }
+    // Initialize the unwind state and library
+    unwind_init();
+    ctx.worker_ctx.user_tags =
+        new UserTags(ctx.params.tags, ctx.params.num_cpu);
+    ctx.worker_ctx.symbolizer = new ddprof::Symbolizer(
+        ctx.params.inlined_functions, ctx.params.disable_symbolization,
+        ctx.params.remote_symbolization ? Symbolizer::k_elf
+                                        : Symbolizer::k_process);
+
+    // Zero out pointers to dynamically allocated memory
+    ctx.worker_ctx.exp[0] = nullptr;
+    ctx.worker_ctx.exp[1] = nullptr;
+    ctx.worker_ctx.pprof[0] = nullptr;
+    ctx.worker_ctx.pprof[1] = nullptr;
+  }
+  CatchExcept2DDRes();
+  return {};
+}
+
+DDRes worker_library_free(DDProfContext &ctx) {
+  try {
+    delete ctx.worker_ctx.user_tags;
+    ctx.worker_ctx.user_tags = nullptr;
+
+    PEventHdr *pevent_hdr = &ctx.worker_ctx.pevent_hdr;
+    DDRES_CHECK_FWD(pevent_munmap(pevent_hdr));
+
+    delete ctx.worker_ctx.us;
+    ctx.worker_ctx.us = nullptr;
+  }
+  CatchExcept2DDRes();
+  return {};
 }
 
 /// Cycle operations : export, sync metrics, update counters
@@ -590,78 +662,6 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx,
   ddprof_reset_worker_stats();
 
   return {};
-}
-
-void ddprof_pr_mmap(DDProfContext &ctx, const perf_event_mmap2 *map,
-                    int watcher_pos, PerfClock::time_point timestamp) {
-  LG_DBG("<%d>(MAP)%d: %s (%lx/%lx/%lx) %c%c%c %02u:%02u %lu", watcher_pos,
-         map->pid, map->filename, map->addr, map->len, map->pgoff,
-         map->prot & PROT_READ ? 'r' : '-', map->prot & PROT_WRITE ? 'w' : '-',
-         map->prot & PROT_EXEC ? 'x' : '-', map->maj, map->min, map->ino);
-  Dso new_dso(map->pid, map->addr, map->addr + map->len - 1, map->pgoff,
-              std::string(map->filename), map->ino, map->prot);
-  ctx.worker_ctx.us->dso_hdr.maybe_insert_erase_overlap(std::move(new_dso),
-                                                        timestamp);
-  // ensure we access the process (to avoid a premature clear)
-  ctx.worker_ctx.us->process_hdr.flag_visited(map->pid);
-}
-
-void ddprof_pr_lost(DDProfContext &ctx, const perf_event_lost *lost,
-                    int watcher_pos) {
-  ddprof_stats_add(STATS_EVENT_LOST, lost->lost, nullptr);
-  ctx.worker_ctx.lost_events_per_watcher[watcher_pos] += lost->lost;
-}
-
-DDRes ddprof_pr_comm(DDProfContext &ctx, const perf_event_comm *comm,
-                     int watcher_pos) {
-  // Change in process name (assuming exec) : clear all associated dso
-  if (comm->header.misc & PERF_RECORD_MISC_COMM_EXEC) {
-    LG_DBG("<%d>(COMM)%d -> %s", watcher_pos, comm->pid, comm->comm);
-    DDRES_CHECK_FWD(worker_pid_free(ctx, comm->pid));
-  }
-  return {};
-}
-
-DDRes ddprof_pr_fork(DDProfContext &ctx, const perf_event_fork *frk,
-                     int watcher_pos) {
-  LG_DBG("<%d>(FORK)%d -> %d/%d", watcher_pos, frk->ppid, frk->pid, frk->tid);
-  if (frk->ppid != frk->pid) {
-    // Clear everything and populate at next error or with coming samples
-    DDRES_CHECK_FWD(worker_pid_free(ctx, frk->pid));
-    ctx.worker_ctx.us->dso_hdr.pid_fork(frk->pid, frk->ppid);
-    // ensure we access the process (to avoid a premature clear)
-    ctx.worker_ctx.us->process_hdr.flag_visited(frk->pid);
-  }
-  return {};
-}
-
-void ddprof_pr_exit(DDProfContext &ctx, const perf_event_exit *ext,
-                    int watcher_pos) {
-  // On Linux, it seems that the thread group leader is the one whose task ID
-  // matches the process ID of the group.  Moreover, it seems that it is the
-  // overwhelming convention that this thread is closed after the other threads
-  // (upheld by both pthreads and runtimes).
-  // We do not clear the PID at this time because we currently cleanup anyway.
-  (void)ctx;
-  if (ext->pid == ext->tid) {
-    LG_DBG("<%d>(EXIT)%d", watcher_pos, ext->pid);
-  } else {
-    LG_DBG("<%d>(EXIT)%d/%d", watcher_pos, ext->pid, ext->tid);
-  }
-}
-
-void ddprof_pr_clear_live_allocation(DDProfContext &ctx,
-                                     const ClearLiveAllocationEvent *event,
-                                     int watcher_pos) {
-  LG_NTC("<%d>(CLEAR LIVE)%d", watcher_pos, event->sample_id.pid);
-  ctx.worker_ctx.live_allocation.clear_pid_for_watcher(watcher_pos,
-                                                       event->sample_id.pid);
-}
-
-void ddprof_pr_deallocation(DDProfContext &ctx, const DeallocationEvent *event,
-                            int watcher_pos) {
-  ctx.worker_ctx.live_allocation.register_deallocation(event->ptr, watcher_pos,
-                                                       event->sample_id.pid);
 }
 
 /********************************** callbacks *********************************/

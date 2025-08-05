@@ -16,11 +16,7 @@ public:
   SymbolSpan(Offset_t end, SymbolIdx_t symbol_idx)
       : _end(end), _symbol_idx(symbol_idx) {}
   // push end further
-  void set_end(Offset_t end) {
-    if (end > _end) {
-      _end = end;
-    }
-  }
+  void set_end(Offset_t end) { _end = std::max(_end, end); }
   [[nodiscard]] Offset_t get_end() const { return _end; }
 
   [[nodiscard]] SymbolIdx_t get_symbol_idx() const { return _symbol_idx; }

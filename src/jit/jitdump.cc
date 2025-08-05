@@ -24,7 +24,6 @@ template <std::integral T> T load(const char **data) {
   *data += sizeof(T);
   return ret;
 }
-} // namespace
 
 DDRes jit_read_header(std::ifstream &file_stream, JITHeader &header) {
   if (!file_stream.read(reinterpret_cast<char *>(&header), sizeof(JITHeader))) {
@@ -192,6 +191,7 @@ DDRes jit_read_records(std::ifstream &file_stream, JITDump &jit_dump) {
   } while (valid_entry);
   return {};
 }
+} // namespace
 
 DDRes jitdump_read(std::string_view file, JITDump &jit_dump) {
   try {
@@ -203,7 +203,8 @@ DDRes jitdump_read(std::string_view file, JITDump &jit_dump) {
       // avoid logging as this can happen in standard path
       return ddres_error(DD_WHAT_NO_JIT_FILE);
     }
-    LG_DBG("JITDump starting parse of %s", file.data());
+    LG_DBG("JITDump starting parse of %s",
+           file.data()); // NOLINT(bugprone-suspicious-stringview-data-usage)
     DDRES_CHECK_FWD_STRICT(jit_read_header(file_stream, jit_dump.header));
     DDRES_CHECK_FWD_STRICT(jit_read_records(file_stream, jit_dump));
   }

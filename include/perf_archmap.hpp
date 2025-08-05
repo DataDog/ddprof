@@ -18,7 +18,7 @@ inline constexpr size_t k_perf_register_count = 20;
 inline constexpr uint64_t k_perf_register_mask = 0xff0fff;
 
 #  define REGNAME(x) PAM_X86_##x
-enum PERF_ARCHMAP_X86 : uint8_t {
+enum PERF_ARCHMAP_X86 : uint8_t { // NOLINT(cert-int09-c,readability-enum-initial-value)
   PAM_X86_RAX,
   PAM_X86_RBX,
   PAM_X86_RCX,

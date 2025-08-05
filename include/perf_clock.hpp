@@ -15,7 +15,7 @@ enum class PerfClockSource : uint8_t {
   kClockMonotonic = CLOCK_MONOTONIC,
   kClockMonotonicRaw = CLOCK_MONOTONIC_RAW,
   kMaxPosixClock = 64,
-  kTSC,
+  kTSC = 65,
   kNoClock = 255
 };
 

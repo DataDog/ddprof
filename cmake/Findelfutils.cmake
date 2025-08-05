@@ -50,10 +50,8 @@ execute_process(
 
 # Define eu library first since others depend on it
 add_library(eu STATIC IMPORTED)
-set_target_properties(
-  eu
-  PROPERTIES IMPORTED_LOCATION ${LIBEU_PATH}
-             INTERFACE_INCLUDE_DIRECTORIES ${ELFUTILS_INCLUDE_DIRS})
+set_target_properties(eu PROPERTIES IMPORTED_LOCATION ${LIBEU_PATH} INTERFACE_INCLUDE_DIRECTORIES
+                                                                    ${ELFUTILS_INCLUDE_DIRS})
 
 add_library(dw STATIC IMPORTED)
 set_target_properties(

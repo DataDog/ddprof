@@ -101,22 +101,6 @@ DDRes ddprof_stats_clear(unsigned int stat) {
   return ddprof_stats_set(stat, 0);
 }
 
-DDRes ddprof_stats_clear_all() {
-  if (!ddprof_stats) {
-    DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Stats backend uninitialized");
-  }
-
-  // Note:  we leave the DDRes returns here uncollected, since the loop bounds
-  //        are strongly within the ddprof_stats bounds and we've already
-  //        verified the presence of the backend store.  These are the only two
-  //        non-success criteria for the individual clear operations.
-  for (int i = 0; i < STATS_LEN; i++) {
-    ddprof_stats_clear(i);
-  }
-
-  return {};
-}
-
 DDRes ddprof_stats_get(unsigned int stat, long *out) {
   if (!ddprof_stats) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_DDPROF_STATS, "Stats backend uninitialized");

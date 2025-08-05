@@ -625,7 +625,7 @@ bool DsoHdr::check_invariants() const {
 int DsoHdr::clear_unvisited(const std::unordered_set<pid_t> &visited_pids) {
   std::vector<pid_t> pids_to_clear;
   for (const auto &el : _pid_map) {
-    if (visited_pids.find(el.first) == visited_pids.end()) {
+    if (!visited_pids.contains(el.first)) {
       pids_to_clear.push_back(el.first);
     }
   }

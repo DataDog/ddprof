@@ -96,6 +96,7 @@ const char *event_type_name_from_idx(int idx) {
 }
 #undef X_STR
 
+namespace {
 int str_to_event_idx(const char *str) {
   if (!str || !*str) {
     return -1;
@@ -110,6 +111,7 @@ int str_to_event_idx(const char *str) {
   }
   return -1;
 }
+} // end anonymous namespace
 
 const PerfWatcher *ewatcher_from_idx(int idx) {
   if (idx < 0 || idx >= DDPROF_PWE_LENGTH) {

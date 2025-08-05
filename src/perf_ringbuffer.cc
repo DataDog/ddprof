@@ -180,8 +180,7 @@ bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,
         return false;
       }
       memcpy(buf, sample->data_stack, sample->size_stack);
-      buf += (sample->size_stack + sizeof(uint64_t) - 1) /
-          sizeof(uint64_t); // align and convert
+      buf += ((sample->size_stack + sizeof(uint64_t) - 1) / sizeof(uint64_t));
       *buf++ = sample->dyn_size_stack;
       SZ_CHECK;
     }
@@ -274,8 +273,7 @@ perf_event_sample *hdr2samp(const perf_event_header *hdr, uint64_t mask) {
     } else {
       uint64_t dynsz_stack = 0;
       sample.data_stack = reinterpret_cast<const char *>(buf);
-      buf += (size_stack + sizeof(uint64_t) - 1) /
-          sizeof(uint64_t); // align (/8 as it is uint64)
+      buf += ((size_stack + sizeof(uint64_t) - 1) / sizeof(uint64_t));
 
       // If the size was specified, we also have a dyn_size
       dynsz_stack = *buf++;
@@ -331,8 +329,8 @@ uint64_t hdr_time(const perf_event_header *hdr, uint64_t mask) {
         mask &
         (PERF_SAMPLE_TIME | PERF_SAMPLE_ID | PERF_SAMPLE_STREAM_ID |
          PERF_SAMPLE_CPU | PERF_SAMPLE_IDENTIFIER));
-    const auto *last_field_ptr = reinterpret_cast<const uint64_t *>(
-        reinterpret_cast<const uint8_t *>(hdr) + hdr->size);
+    const auto *last_field_ptr =
+        reinterpret_cast<const uint8_t *>(hdr) + hdr->size;
     return last_field_ptr[-nb_fields_after];
   }
   default:

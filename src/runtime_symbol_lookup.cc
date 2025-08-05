@@ -152,7 +152,7 @@ DDRes RuntimeSymbolLookup::fill_from_perfmap(int pid, SymbolMap &symbol_map,
   size_t sz_buf = 0;
   char buffer[PATH_MAX];
   while (-1 != getline(&line, &sz_buf, pmf.get())) {
-    constexpr size_t k_uint64_hex_rep_size = 2 * sizeof(uint64_t) + 1;
+    constexpr size_t k_uint64_hex_rep_size = (2 * sizeof(uint64_t)) + 1;
     char address_buff[k_uint64_hex_rep_size]; // max size of 16 (as it should be
                                               // hexa for uint64)
     char size_buff[k_uint64_hex_rep_size];
