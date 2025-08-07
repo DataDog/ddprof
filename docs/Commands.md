@@ -42,7 +42,9 @@ Profiling settings:
   -p,--pid INT Excludes: command_line --global
                               Instrument the given PID rather than launching a new process.
   -g,--global Excludes: command_line --pid
-                              Instrument all processes.
+                              [DEPRECATED] Instrument all processes.
+                              This option is deprecated. Please use dd-otel-host-profiler instead:
+                              https://github.com/DataDog/dd-otel-host-profiler
                               Requires specific capabilities or a perf_event_paranoid value of less than 1.
   -I,--inlined_functions,--inlined-functions BOOLEAN [0]  (Env:DD_PROFILING_INLINED_FUNCTIONS)
                               Report inlined functions in call stacks.

@@ -175,16 +175,23 @@ DDRes check_incompatible_options(const DDProfContext &ctx) {
         DD_WHAT_INPUT_PROCESS,
         "Memory allocation profiling is not supported in PID / global mode");
   }
+
+  if (ctx.params.pid == -1) {
+    LG_WRN(
+        "The --global flag is deprecated and will be removed in a future "
+        "version.\n"
+        "For host-wide profiling, please use dd-otel-host-profiler instead:\n"
+        "https://github.com/DataDog/dd-otel-host-profiler\n"
+        "Continuing execution with current functionality...");
+  }
   return {};
 }
 
 // Parse input and initialize context
 DDRes parse_input(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
-
   // cmdline args have been processed.  Set the ctx
   DDRES_CHECK_FWD(context_set(ddprof_cli, ctx));
   DDRES_CHECK_FWD(check_incompatible_options(ctx));
-
   return {};
 }
 
