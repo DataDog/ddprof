@@ -174,7 +174,10 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
           ->group("Profiling settings")
           ->excludes(exec_option);
   app.add_flag("--global,-g", global,
-               "Instrument all processes.\n"
+               "[DEPRECATED] Instrument all processes.\n"
+               "This option is deprecated. Please use dd-otel-host-profiler "
+               "instead:\n"
+               "https://github.com/DataDog/dd-otel-host-profiler\n"
                "Requires specific capabilities or a perf_event_paranoid "
                "value of less than 1.")
       ->group("Profiling settings")
