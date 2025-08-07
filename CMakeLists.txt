@@ -280,7 +280,8 @@ target_link_libraries(
   PRIVATE
     "$<$<AND:$<C_COMPILER_ID:GNU>,$<CONFIG:SanitizedDebug>>:-Wl,-Bstatic;-lubsan;-lasan;-lstdc++;-Wl,-Bdynamic>"
 )
-target_link_libraries(dd_profiling-embedded PUBLIC dl pthread rt absl::base absl::str_format)
+target_link_libraries(dd_profiling-embedded PUBLIC dl pthread rt absl::base absl::str_format
+                                                   systemtap)
 
 set(LIBDD_PROFILING_EMBEDDED_OBJECT "${CMAKE_BINARY_DIR}/libdd_profiling-embedded.o")
 set(LIBDD_PROFILING_EMBEDDED_HASH_HEADER "${CMAKE_BINARY_DIR}/libdd_profiling-embedded_hash.h")
@@ -365,7 +366,8 @@ target_include_directories(dd_profiling-static PUBLIC ${CMAKE_SOURCE_DIR}/includ
 set_target_properties(dd_profiling-static
                       PROPERTIES PUBLIC_HEADER "${CMAKE_SOURCE_DIR}/include/lib/dd_profiling.h")
 target_link_libraries(dd_profiling-static PRIVATE ddprof_exe_object)
-target_link_libraries(dd_profiling-static PUBLIC dl pthread rt absl::base absl::str_format)
+target_link_libraries(dd_profiling-static PUBLIC dl pthread rt absl::base absl::str_format
+                                                 systemtap)
 
 if(USE_LOADER)
   # When using a loader, libdd_profiling.so is a loader that embeds both libdd_profiling-embedded.so
@@ -398,7 +400,8 @@ else()
     PRIVATE
       "$<$<AND:$<C_COMPILER_ID:GNU>,$<CONFIG:SanitizedDebug>>:-Wl,-Bstatic;-lubsan;-lasan;-lstdc++;-Wl,-Bdynamic>"
   )
-  target_link_libraries(dd_profiling-shared PUBLIC dl pthread rt absl::base absl::str_format)
+  target_link_libraries(dd_profiling-shared PUBLIC dl pthread rt absl::base absl::str_format
+                                                   systemtap)
 endif()
 
 target_static_libcxx(dd_profiling-shared)

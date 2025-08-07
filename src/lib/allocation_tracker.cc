@@ -22,6 +22,7 @@
 #include <atomic>
 #include <cassert>
 #include <cstdlib>
+#include <sys/sdt.h>
 #include <unistd.h>
 
 namespace ddprof {
@@ -102,10 +103,8 @@ DDRes AllocationTracker::allocation_tracking_init(
     DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW, "Allocation profiler already started");
   }
 
-  DDRES_CHECK_FWD(instance->init(allocation_profiling_rate,
-                                 flags & kDeterministicSampling,
-                                 flags & kTrackDeallocations, stack_sample_size,
-                                 ring_buffer, timer_check));
+  DDRES_CHECK_FWD(instance->init(allocation_profiling_rate, flags,
+                                 stack_sample_size, ring_buffer, timer_check));
   _instance = instance;
 
   state.init(true, flags & kTrackDeallocations);
@@ -113,34 +112,40 @@ DDRes AllocationTracker::allocation_tracking_init(
   return {};
 }
 
-DDRes AllocationTracker::init(uint64_t mem_profile_interval,
-                              bool deterministic_sampling,
-                              bool track_deallocations,
+DDRes AllocationTracker::init(uint64_t mem_profile_interval, uint32_t flags,
                               uint32_t stack_sample_size,
                               const RingBufferInfo &ring_buffer,
                               const IntervalTimerCheck &timer_check) {
   _sampling_interval = mem_profile_interval;
-  _deterministic_sampling = deterministic_sampling;
+  _deterministic_sampling = flags & kDeterministicSampling;
   _stack_sample_size = stack_sample_size;
-  if (ring_buffer.ring_buffer_type !=
-      static_cast<int>(RingBufferType::kMPSCRingBuffer)) {
-    return ddres_error(DD_WHAT_PERFRB);
+  _otel_profiler_mode = flags & kOtelProfilerMode;
+
+  if (!_otel_profiler_mode) {
+    if (ring_buffer.ring_buffer_type !=
+        static_cast<int>(RingBufferType::kMPSCRingBuffer)) {
+      return ddres_error(DD_WHAT_PERFRB);
+    }
+
+    DDRES_CHECK_FWD(ddprof::ring_buffer_attach(ring_buffer, &_pevent));
+
+    const auto &rb = _pevent.rb;
+    if (rb.tsc_available) {
+      TscClock::init(TscClock::CalibrationParams{
+          .offset = TscClock::time_point{TscClock::duration{rb.time_zero}},
+          .mult = rb.time_mult,
+          .shift = rb.time_shift});
+    }
+    PerfClock::init(static_cast<PerfClockSource>(rb.perf_clock_source));
+  } else {
+    PerfClock::init(PerfClockSource::kClockMonotonic);
   }
-  if (track_deallocations) {
+
+  if (flags & kTrackDeallocations) {
     // 16 times as we want to probability of collision to be low enough
     _allocated_address_set = AddressBitset(liveallocation::kMaxTracked *
                                            k_ratio_max_elt_to_bitset_size);
   }
-  DDRES_CHECK_FWD(ddprof::ring_buffer_attach(ring_buffer, &_pevent));
-
-  const auto &rb = _pevent.rb;
-  if (rb.tsc_available) {
-    TscClock::init(TscClock::CalibrationParams{
-        .offset = TscClock::time_point{TscClock::duration{rb.time_zero}},
-        .mult = rb.time_mult,
-        .shift = rb.time_shift});
-  }
-  PerfClock::init(static_cast<PerfClockSource>(rb.perf_clock_source));
 
   _interval_timer_check = timer_check;
   if (_interval_timer_check.is_set()) {
@@ -284,6 +289,7 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
 DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
                                           TrackerThreadLocalState &tl_state,
                                           bool &notify_needed) {
+  DDPROF_DCHECK_FATAL(!_otel_profiler_mode);
   auto lost_count = _state.lost_count.exchange(0, std::memory_order_acq_rel);
   if (lost_count == 0) {
     return {};
@@ -324,6 +330,12 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
 // Return true if consumer should be notified
 DDRes AllocationTracker::push_clear_live_allocation(
     TrackerThreadLocalState &tl_state) {
+  if (_otel_profiler_mode) {
+    // NOLINTNEXTLINE
+    DTRACE_PROBE(ddprof, clear_live_allocations);
+    check_timer(PerfClock::now(), tl_state);
+    return {};
+  }
   MPSCRingBufferWriter writer{&_pevent.rb};
   bool timeout = false;
 
@@ -363,6 +375,13 @@ DDRes AllocationTracker::push_clear_live_allocation(
 
 DDRes AllocationTracker::push_dealloc_sample(
     uintptr_t addr, TrackerThreadLocalState &tl_state) {
+  if (_otel_profiler_mode) {
+    // NOLINTNEXTLINE
+    DTRACE_PROBE1(ddprof, deallocation, addr);
+    check_timer(PerfClock::now(), tl_state);
+    return {};
+  }
+
   MPSCRingBufferWriter writer{&_pevent.rb};
   bool notify_consumer{false};
 
@@ -416,6 +435,13 @@ DDRes AllocationTracker::push_dealloc_sample(
 DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
                                            uint64_t allocated_size,
                                            TrackerThreadLocalState &tl_state) {
+  if (_otel_profiler_mode) {
+    // NOLINTNEXTLINE
+    DTRACE_PROBE2(ddprof, allocation, addr, allocated_size);
+    check_timer(PerfClock::now(), tl_state);
+    return {};
+  }
+
   MPSCRingBufferWriter writer{&_pevent.rb};
   bool notify_consumer{false};
 
@@ -429,12 +455,12 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   const auto *stack_base_ptr = reinterpret_cast<const std::byte *>(&p);
   auto stack_size = to_address(tl_state.stack_bounds.end()) - stack_base_ptr;
 
-  // stack will be saved in save_context, add some margin to account for call
+  // stack will be saved in save_context, add some ` to account for call
   // frames
 #ifdef NDEBUG
   constexpr int64_t kStackMargin = 192;
 #else
-  constexpr int64_t kStackMargin = 720;
+  constexpr int64_t kStackMargin = 4000;
 #endif
   uint32_t const sample_stack_size =
       align_up(std::min(std::max(stack_size + kStackMargin, 0L),
