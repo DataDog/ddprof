@@ -69,8 +69,9 @@ TEST(DDProfPProf, aggregate) {
   DDRes res = pprof_create_profile(&pprof, ctx);
   EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_index != -1);
   EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_count_index != -1);
+
   res = pprof_aggregate(&mock_output, symbol_hdr, {1000, 1, 0},
-                        &ctx.watchers[0], file_infos, false, kSumPos,
+                        &ctx.watchers[0], file_infos, AggregationConfig{},
                         ctx.worker_ctx.symbolizer, &pprof);
 
   EXPECT_TRUE(IsDDResOK(res));
@@ -111,9 +112,10 @@ TEST(DDProfPProf, just_live) {
   EXPECT_TRUE(ctx.watchers[1].pprof_indices[kLiveSumPos].pprof_count_index !=
               -1);
   FileInfoVector file_infos;
-  res = pprof_aggregate(&mock_output, symbol_hdr, {1000, 1, 0},
-                        &ctx.watchers[1], file_infos, false, kLiveSumPos,
-                        ctx.worker_ctx.symbolizer, &pprof);
+  res =
+      pprof_aggregate(&mock_output, symbol_hdr, {1000, 1, 0}, &ctx.watchers[1],
+                      file_infos, AggregationConfig{.value_pos = kLiveSumPos},
+                      ctx.worker_ctx.symbolizer, &pprof);
   EXPECT_TRUE(IsDDResOK(res));
   test_pprof(&pprof);
   res = pprof_free_profile(&pprof);

@@ -31,11 +31,13 @@ struct FunLoc {
 struct UnwindOutput {
   void clear() {
     locs.clear();
+    labels.clear();
     container_id = k_container_id_unknown;
     exe_name = {};
     thread_name = {};
   }
   std::vector<FunLoc> locs;
+  std::vector<std::pair<std::string, std::string>> labels;
   std::string_view container_id;
   std::string_view exe_name;
   std::string_view thread_name;

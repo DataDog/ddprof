@@ -31,7 +31,7 @@ using namespace std::string_view_literals;
 namespace ddprof {
 
 namespace {
-constexpr size_t k_max_pprof_labels{8};
+constexpr size_t k_max_pprof_labels{10};
 
 constexpr int k_max_value_types =
     DDPROF_PWT_LENGTH * static_cast<int>(kNbEventAggregationModes);
@@ -41,13 +41,12 @@ struct ActiveIdsResult {
   PerfWatcher *default_watcher = nullptr;
 };
 
-std::string_view pid_str(pid_t pid,
-                         std::unordered_map<pid_t, std::string> &pid_strs) {
-  auto it = pid_strs.find(pid);
+std::string_view pid_str(ProcessAddress_t num, NumToStrCache &pid_strs) {
+  auto it = pid_strs.find(num);
   if (it != pid_strs.end()) {
     return it->second;
   }
-  const auto pair = pid_strs.emplace(pid, std::to_string(pid));
+  const auto pair = pid_strs.emplace(num, std::to_string(num));
   return pair.first->second;
 }
 
@@ -236,7 +235,7 @@ ProfValueTypes compute_pprof_values(const ActiveIdsResult &active_ids) {
 }
 
 size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
-                      std::unordered_map<pid_t, std::string> &pid_strs,
+                      NumToStrCache &pid_strs,
                       std::span<ddog_prof_Label> labels) {
   constexpr std::string_view k_container_id_label = "container_id"sv;
   constexpr std::string_view k_process_id_label = "process_id"sv;
@@ -247,6 +246,7 @@ size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
   constexpr std::string_view k_thread_name_label = "thread_name"sv;
   constexpr std::string_view k_tracepoint_label = "tracepoint_type"sv;
   size_t labels_num = 0;
+
   if (!uw_output.container_id.empty()) {
     labels[labels_num].key = to_CharSlice(k_container_id_label);
     labels[labels_num].str = to_CharSlice(uw_output.container_id);
@@ -261,7 +261,7 @@ size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
     labels[labels_num].str = to_CharSlice(pid_str(uw_output.pid, pid_strs));
     ++labels_num;
   }
-  if (!watcher.suppress_tid) {
+  if (!watcher.suppress_tid && uw_output.tid != 0) {
     labels[labels_num].key = to_CharSlice(k_thread_id_label);
     labels[labels_num].str = to_CharSlice(pid_str(uw_output.tid, pid_strs));
     ++labels_num;
@@ -285,6 +285,15 @@ size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
   if (!uw_output.thread_name.empty()) {
     labels[labels_num].key = to_CharSlice(k_thread_name_label);
     labels[labels_num].str = to_CharSlice(uw_output.thread_name);
+    ++labels_num;
+  }
+  for (const auto &el : uw_output.labels) {
+    if (labels_num >= labels.size()) {
+      LG_WRN("Labels buffer exceeded at %s (%d)", __FUNCTION__, __LINE__);
+      break;
+    }
+    labels[labels_num].key = to_CharSlice(el.first);
+    labels[labels_num].str = to_CharSlice(el.second);
     ++labels_num;
   }
   DDPROF_DCHECK_FATAL(labels_num <= labels.size(),
@@ -489,6 +498,8 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
     // Allow the data to be split by container-id
     pprof->_tags.emplace_back(std::string("ddprof.custom_ctx"),
                               std::string("container_id"));
+    pprof->_tags.emplace_back(std::string("ddprof.custom_ctx"),
+                              std::string("mapping"));
   }
 
   if (ctx.params.remote_symbolization) {
@@ -513,11 +524,10 @@ DDRes pprof_free_profile(DDProfPProf *pprof) {
 DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       const SymbolHdr &symbol_hdr, const DDProfValuePack &pack,
                       const PerfWatcher *watcher,
-                      const FileInfoVector &file_infos, bool show_samples,
-                      EventAggregationModePos value_pos, Symbolizer *symbolizer,
-                      DDProfPProf *pprof) {
+                      const FileInfoVector &file_infos, AggregationConfig conf,
+                      Symbolizer *symbolizer, DDProfPProf *pprof) {
 
-  const PProfIndices &pprof_indices = watcher->pprof_indices[value_pos];
+  const PProfIndices &pprof_indices = watcher->pprof_indices[conf.value_pos];
   ddog_prof_Profile *profile = &pprof->_profile;
   int64_t values[k_max_value_types] = {};
   assert(pprof_indices.pprof_index != -1);
@@ -529,7 +539,9 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
 
   std::array<ddog_prof_Location, kMaxStackDepth> locations_buff;
   std::span locs{uw_output->locs};
-  locs = adjust_locations(watcher, locs);
+  if (conf.adjust_locations) {
+    locs = adjust_locations(watcher, locs);
+  }
 
   // Blaze results should remain alive until we aggregate the pprof data
   Symbolizer::BlazeResultsWrapper session_results;
@@ -550,10 +562,10 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
       .labels = {.ptr = labels.data(), .len = labels_num},
   };
 
-  if (show_samples) {
+  if (conf.show_samples) {
     ddprof_print_sample(std::span{locations_buff.data(), write_index},
-                        pack.value, uw_output->pid, uw_output->tid, value_pos,
-                        *watcher);
+                        pack.value, uw_output->pid, uw_output->tid,
+                        conf.value_pos, *watcher);
   }
   auto res = ddog_prof_Profile_add(profile, sample, pack.timestamp);
   if (res.tag != DDOG_PROF_PROFILE_RESULT_OK) {
@@ -576,4 +588,5 @@ DDRes pprof_reset(DDProfPProf *pprof) {
   pprof->_pid_str.clear();
   return {};
 }
+
 } // namespace ddprof
