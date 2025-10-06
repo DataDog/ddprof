@@ -1,0 +1,13 @@
+# dd-octo-sts trust policy for CodeQL Scan from ddprof-build pipeline
+# https://datadoghq.atlassian.net/wiki/spaces/SECENG/pages/5138645099/User+guide+dd-octo-sts
+issuer: https://gitlab.ddbuild.io
+subject_pattern: "project_path:DataDog/ddprof-build:ref_type:branch:ref:.*"
+claim_pattern:
+  project_path: "DataDog/ddprof-build"
+  ref_type: "branch"
+  ref: ".+"
+  ref_path: "refs/heads/.+"
+  ref_protected: "true"
+  pipeline_source: "(web|schedule)"
+permissions:
+  security_events: write
