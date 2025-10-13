@@ -64,6 +64,7 @@ bool LiveAllocation::register_allocation(const UnwindOutput &uo,
     // unexpected, we already have an allocation here
     // This means we missed a previous free
     LG_DBG("Existing allocation: %lx (cleaning up)", address);
+    ++_stats._already_existing_allocations;
     if (v._unique_stack) {
       // we should decrement count / value
       v._unique_stack->second._value -= v._value;

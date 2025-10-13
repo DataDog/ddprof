@@ -5,6 +5,7 @@
 
 #include "perf_ringbuffer.hpp"
 
+#include "ddprof_perf_event.hpp"
 #include "logger.hpp"
 #include "mpscringbuffer.hpp"
 
@@ -339,6 +340,16 @@ uint64_t hdr_time(const perf_event_header *hdr, uint64_t mask) {
         reinterpret_cast<const uint8_t *>(hdr) + hdr->size);
     return last_field_ptr[-nb_fields_after];
   }
+  case PERF_CUSTOM_EVENT_DEALLOCATION:
+    return reinterpret_cast<const DeallocationEvent *>(hdr)->sample_id.time;
+  case PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION:
+    return reinterpret_cast<const ClearLiveAllocationEvent *>(hdr)
+        ->sample_id.time;
+  case PERF_CUSTOM_EVENT_LOST_ALLOCATION:
+    return reinterpret_cast<const LostAllocationEvent *>(hdr)->sample_id.time;
+  case PERF_CUSTOM_EVENT_ALLOCATION_TRACKER_STATE:
+    return reinterpret_cast<const AllocationTrackerStateEvent *>(hdr)
+        ->sample_id.time;
   default:
     break;
   }

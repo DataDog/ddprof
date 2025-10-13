@@ -6,6 +6,7 @@
 #pragma once
 
 #include "ddprof_defs.hpp"
+#include "logger.hpp"
 #include "unlikely.hpp"
 #include "unwind_output_hash.hpp"
 
@@ -45,12 +46,28 @@ public:
   struct PidStacks {
     AddressMap _address_map;
     PprofStacks _unique_stacks;
+    uint32_t _address_conflict_count = 0;
+    uint32_t _tracked_address_count = 0;
   };
 
   using PidMap = std::unordered_map<pid_t, PidStacks>;
   using WatcherVector = std::vector<PidMap>;
   // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
   WatcherVector _watcher_vector;
+
+  void register_library_state(int watcher_pos, pid_t pid,
+                              uint32_t address_conflict_count,
+                              uint32_t tracked_addresse_count) {
+    PidMap &pid_map = access_resize(_watcher_vector, watcher_pos);
+    PidStacks &pid_stacks = pid_map[pid];
+    pid_stacks._address_conflict_count = address_conflict_count;
+    pid_stacks._tracked_address_count = tracked_addresse_count;
+    LG_NTC("<%u> PID %d: live allocations=%lu, Unique "
+           "stacks=%lu, lib tracked addresses=%u, lib address conflicts=%u",
+           watcher_pos, pid, pid_stacks._address_map.size(),
+           pid_stacks._unique_stacks.size(), pid_stacks._tracked_address_count,
+           pid_stacks._address_conflict_count);
+  }
 
   // Allocation should be aggregated per stack trace
   // instead of a stack, we would have a total size for this unique stack trace
@@ -83,8 +100,12 @@ public:
     }
   }
 
-  [[nodiscard]] [[nodiscard]] unsigned get_nb_unmatched_deallocations() const {
+  [[nodiscard]] unsigned get_nb_unmatched_deallocations() const {
     return _stats._unmatched_deallocations;
+  }
+
+  [[nodiscard]] unsigned get_nb_already_existing_allocations() const {
+    return _stats._already_existing_allocations;
   }
 
   void cycle() { _stats = {}; }
@@ -95,11 +116,12 @@ private:
                                     AddressMap &address_map);
 
   // returns true if the allocation was registerd
-  static bool register_allocation(const UnwindOutput &uo, uintptr_t address,
-                                  int64_t value, PprofStacks &stacks,
-                                  AddressMap &address_map);
+  bool register_allocation(const UnwindOutput &uo, uintptr_t address,
+                           int64_t value, PprofStacks &stacks,
+                           AddressMap &address_map);
   struct {
     unsigned _unmatched_deallocations = {};
+    unsigned _already_existing_allocations = {};
   } _stats;
 };
 

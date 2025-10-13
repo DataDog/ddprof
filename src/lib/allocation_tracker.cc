@@ -245,6 +245,7 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
         // Clear elements if we reach too many
         // todo: should we just stop new live tracking (like java) ?
         if (IsDDResOK(push_clear_live_allocation(tl_state))) {
+          LG_DBG("Clearing live allocations");
           _allocated_address_set.clear();
           // still set this as we are pushing the allocation to ddprof
           _allocated_address_set.add(addr);
@@ -255,6 +256,7 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
         }
       }
     } else {
+      _state.address_conflict_count.fetch_add(1, std::memory_order_acq_rel);
       // null the address to avoid using this for live heap profiling
       // pushing a sample is still good to have a good representation
       // of the allocations.
@@ -284,25 +286,32 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
 DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
                                           TrackerThreadLocalState &tl_state,
                                           bool &notify_needed) {
-  auto lost_count = _state.lost_count.exchange(0, std::memory_order_acq_rel);
-  if (lost_count == 0) {
+  auto lost_alloc_count =
+      _state.lost_alloc_count.exchange(0, std::memory_order_acq_rel);
+  auto lost_dealloc_count =
+      _state.lost_dealloc_count.exchange(0, std::memory_order_acq_rel);
+
+  if (lost_alloc_count == 0 && lost_dealloc_count == 0) {
     return {};
   }
   bool timeout = false;
   auto buffer = writer.reserve(sizeof(perf_event_lost), &timeout);
   if (buffer.empty()) {
     // buffer is full, put back lost samples
-    _state.lost_count.fetch_add(lost_count, std::memory_order_acq_rel);
+    _state.lost_alloc_count.fetch_add(lost_alloc_count,
+                                      std::memory_order_acq_rel);
+    _state.lost_dealloc_count.fetch_add(lost_dealloc_count,
+                                        std::memory_order_acq_rel);
     if (timeout) {
       return ddres_error(DD_WHAT_PERFRB);
     }
     return {};
   }
 
-  auto *event = reinterpret_cast<perf_event_lost *>(buffer.data());
-  event->header.size = sizeof(perf_event_lost);
+  auto *event = reinterpret_cast<LostAllocationEvent *>(buffer.data());
+  event->header.size = sizeof(LostAllocationEvent);
   event->header.misc = 0;
-  event->header.type = PERF_RECORD_LOST;
+  event->header.type = PERF_CUSTOM_EVENT_LOST_ALLOCATION;
   auto now = PerfClock::now();
   event->sample_id.time = now.time_since_epoch().count();
 
@@ -311,13 +320,55 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = tl_state.tid;
 
-  event->id = 0;
-  event->lost = lost_count;
+  event->lost_alloc_count = lost_alloc_count;
+  event->lost_dealloc_count = lost_dealloc_count;
 
   notify_needed = writer.commit(buffer);
 
   check_timer(now, tl_state);
 
+  return {};
+}
+
+DDRes AllocationTracker::push_allocation_tracker_state() {
+  MPSCRingBufferWriter writer{&_pevent.rb};
+
+  bool timeout = false;
+  auto buffer = writer.reserve(sizeof(perf_event_lost), &timeout);
+  if (buffer.empty()) {
+    if (timeout) {
+      return ddres_error(DD_WHAT_PERFRB);
+    }
+    return {};
+  }
+
+  auto *event = reinterpret_cast<AllocationTrackerStateEvent *>(buffer.data());
+  event->header.size = sizeof(AllocationTrackerStateEvent);
+  event->header.misc = 0;
+  event->header.type = PERF_CUSTOM_EVENT_ALLOCATION_TRACKER_STATE;
+  auto now = PerfClock::now();
+  event->sample_id.time = now.time_since_epoch().count();
+
+  DDPROF_DCHECK_FATAL(_state.pid != 0, "pid is not set");
+  event->sample_id.pid = _state.pid;
+  event->sample_id.tid = 0;
+
+  event->tracked_addresse_count = _allocated_address_set.count();
+  event->address_conflict_count =
+      _state.address_conflict_count.load(std::memory_order_relaxed);
+
+  if (writer.commit(buffer)) {
+    uint64_t count = 1;
+    if (write(_pevent.fd, &count, sizeof(count)) != sizeof(count)) {
+      LG_DBG("Error writing to memory allocation eventfd (%s)",
+             strerror(errno));
+      return DDRes{._what = DD_WHAT_PERFRB, ._sev = DD_SEV_ERROR};
+    }
+  }
+  LG_DBG("Tracked address count: %d, address conflict count: %d",
+         _allocated_address_set.count(),
+         _state.address_conflict_count.load(std::memory_order_relaxed));
+  _state.address_conflict_count.store(0, std::memory_order_release);
   return {};
 }
 
@@ -367,15 +418,15 @@ DDRes AllocationTracker::push_dealloc_sample(
   bool notify_consumer{false};
 
   bool timeout = false;
-  if (unlikely(_state.lost_count.load(std::memory_order_relaxed))) {
+  if (unlikely(_state.lost_alloc_count.load(std::memory_order_relaxed) ||
+               _state.lost_dealloc_count.load(std::memory_order_relaxed))) {
     (push_lost_sample(writer, tl_state, notify_consumer));
   }
 
   auto buffer = writer.reserve(sizeof(DeallocationEvent), &timeout);
   if (buffer.empty()) {
     // ring buffer is full, increase lost count
-    _state.lost_count.fetch_add(1, std::memory_order_acq_rel);
-
+    _state.lost_dealloc_count.fetch_add(1, std::memory_order_acq_rel);
     if (timeout) {
       LG_DBG("Unable to get write lock on ring buffer");
       return DDRes{._what = DD_WHAT_PERFRB, ._sev = DD_SEV_ERROR};
@@ -420,7 +471,8 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
   bool notify_consumer{false};
 
   bool timeout = false;
-  if (unlikely(_state.lost_count.load(std::memory_order_relaxed))) {
+  if (unlikely(_state.lost_alloc_count.load(std::memory_order_relaxed) ||
+               _state.lost_dealloc_count.load(std::memory_order_relaxed))) {
     push_lost_sample(writer, tl_state, notify_consumer);
   }
 
@@ -446,7 +498,7 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
 
   if (buffer.empty()) {
     // ring buffer is full, increase lost count
-    _state.lost_count.fetch_add(1, std::memory_order_acq_rel);
+    _state.lost_alloc_count.fetch_add(1, std::memory_order_acq_rel);
 
     if (timeout) {
       // The log here could deadlock (hence we put it behind a debug flag)
@@ -524,6 +576,7 @@ void AllocationTracker::update_timer(PerfClock::time_point now) {
 
   _state.next_check_time.store(now + _interval_timer_check.interval,
                                std::memory_order_release);
+  push_allocation_tracker_state();
   _interval_timer_check.callback();
 }
 
