@@ -83,15 +83,19 @@ private:
     void init(bool track_alloc, bool track_dealloc) {
       track_allocations = track_alloc;
       track_deallocations = track_dealloc;
-      lost_count = 0;
+      lost_alloc_count = 0;
+      lost_dealloc_count = 0;
       failure_count = 0;
+      address_conflict_count = 0;
       pid = getpid();
     }
     std::mutex mutex;
     std::atomic<bool> track_allocations = false;
     std::atomic<bool> track_deallocations = false;
-    std::atomic<uint64_t> lost_count; // count number of lost events
+    std::atomic<uint64_t> lost_alloc_count;   // count number of lost events
+    std::atomic<uint64_t> lost_dealloc_count; // count number of lost events
     std::atomic<uint32_t> failure_count;
+    std::atomic<uint32_t> address_conflict_count;
     std::atomic<pid_t> pid; // lazy cache of pid (0 is un-init value)
     std::atomic<PerfClock::time_point> next_check_time;
   };
@@ -128,6 +132,8 @@ private:
   DDRes push_dealloc_sample(uintptr_t addr, TrackerThreadLocalState &tl_state);
 
   DDRes push_clear_live_allocation(TrackerThreadLocalState &tl_state);
+
+  DDRes push_allocation_tracker_state();
 
   void check_timer(PerfClock::time_point now,
                    TrackerThreadLocalState &tl_state);

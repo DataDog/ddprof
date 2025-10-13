@@ -12,7 +12,9 @@
 // There are <30 different perf events (starting at 1000 seems safe)
 enum : uint16_t {
   PERF_CUSTOM_EVENT_DEALLOCATION = 1000,
-  PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION
+  PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION,
+  PERF_CUSTOM_EVENT_LOST_ALLOCATION,
+  PERF_CUSTOM_EVENT_ALLOCATION_TRACKER_STATE,
 };
 
 static_assert(static_cast<uint32_t>(PERF_CUSTOM_EVENT_DEALLOCATION) >
@@ -32,6 +34,20 @@ struct DeallocationEvent {
 struct ClearLiveAllocationEvent {
   perf_event_header hdr;
   struct sample_id sample_id;
+};
+
+struct LostAllocationEvent {
+  struct perf_event_header header;
+  uint32_t lost_alloc_count;
+  uint32_t lost_dealloc_count;
+  struct sample_id sample_id;
+};
+
+struct AllocationTrackerStateEvent {
+  struct perf_event_header header;
+  struct sample_id sample_id;
+  uint32_t tracked_addresse_count;
+  uint32_t address_conflict_count;
 };
 
 } // namespace ddprof
