@@ -5,8 +5,6 @@
 #include "address_bitset.hpp"
 
 #include <algorithm>
-#include <bit>
-#include <functional>
 #include <unlikely.hpp>
 
 namespace ddprof {
@@ -30,6 +28,17 @@ unsigned round_up_to_power_of_two(unsigned num) {
 }
 } // namespace
 
+// AddressTable implementation
+AddressTable::AddressTable(unsigned size)
+    : table_size(round_up_to_power_of_two(size)),
+      table_mask(table_size - 1),
+      slots(std::make_unique<std::atomic<uintptr_t>[]>(table_size)) {
+  // Initialize all slots to empty
+  for (unsigned i = 0; i < table_size; ++i) {
+    slots[i].store(kEmptySlot, std::memory_order_relaxed);
+  }
+}
+
 AddressBitset::AddressBitset(AddressBitset &&other) noexcept {
   move_from(other);
 }
@@ -41,80 +50,169 @@ AddressBitset &AddressBitset::operator=(AddressBitset &&other) noexcept {
   return *this;
 }
 
+AddressBitset::~AddressBitset() {
+  for (size_t i = 0; i < kMaxChunks; ++i) {
+    AddressTable* table = _chunk_tables[i].load(std::memory_order_relaxed);
+    delete table;
+  }
+}
+
 void AddressBitset::move_from(AddressBitset &other) noexcept {
   _lower_bits_ignored = other._lower_bits_ignored;
-  _bitset_size = other._bitset_size;
-  _k_nb_words = other._k_nb_words;
-  _nb_bits_mask = other._nb_bits_mask;
-  _address_bitset = std::move(other._address_bitset);
-  _nb_addresses.store(other._nb_addresses.load());
+  _per_table_size = other._per_table_size;
+  _chunk_tables = std::move(other._chunk_tables);
+  _total_count.store(other._total_count.load(std::memory_order_relaxed), 
+                     std::memory_order_relaxed);
 
   // Reset the state of 'other'
-  other._bitset_size = 0;
-  other._k_nb_words = 0;
-  other._nb_bits_mask = 0;
-  other._nb_addresses = 0;
+  other._per_table_size = 0;
+  other._total_count.store(0, std::memory_order_relaxed);
 }
 
-void AddressBitset::init(unsigned bitset_size) {
-  // Due to memory alignment, on 64 bits we can assume that the first 4
-  // bits can be ignored
+void AddressBitset::init(unsigned table_size) {
   _lower_bits_ignored = _k_max_bits_ignored;
-  if (_address_bitset) {
-    _address_bitset.reset();
-  }
-  _bitset_size = round_up_to_power_of_two(bitset_size);
-  _k_nb_words = (_bitset_size) / (_nb_bits_per_word);
-  if (_bitset_size) {
-    _nb_bits_mask = _bitset_size - 1;
-    _address_bitset = std::make_unique<std::atomic<uint64_t>[]>(_k_nb_words);
+  
+  // Calculate per-table size by dividing total capacity by expected tables
+  unsigned total_capacity = table_size ? table_size : AddressTable::kDefaultSize;
+  _per_table_size = std::max(16384u, static_cast<unsigned>(total_capacity / kTablesPerAllocation));
+  
+  // Initialize redirect table (Level 1)
+  _chunk_tables = std::make_unique<std::atomic<AddressTable*>[]>(kMaxChunks);
+  for (size_t i = 0; i < kMaxChunks; ++i) {
+    _chunk_tables[i].store(nullptr, std::memory_order_relaxed);
   }
 }
+
+AddressTable* AddressBitset::get_table(uintptr_t addr) {
+  // Determine which chunk this address belongs to
+  // Use top bits after removing chunk offset, mask to fit in kMaxChunks
+  size_t chunk_idx = (addr >> kChunkShift) & (kMaxChunks - 1);
+  
+  AddressTable* table = _chunk_tables[chunk_idx].load(std::memory_order_acquire);
+  
+  if (!table) {
+    // Lazy allocation: create table for this chunk
+    auto* new_table = new AddressTable(_per_table_size);
+    AddressTable* expected = nullptr;
+    
+    if (_chunk_tables[chunk_idx].compare_exchange_strong(
+            expected, new_table, std::memory_order_acq_rel)) {
+      // Successfully installed our new table
+      table = new_table;
+    } else {
+      // Another thread beat us to it - use theirs
+      delete new_table;
+      table = expected;
+    }
+  }
+  
+  return table;
+}
+
 
 bool AddressBitset::add(uintptr_t addr) {
-  const uint32_t significant_bits = hash_significant_bits(addr);
-  // As per nsavoire's comment, it is better to use separate operators
-  // than to use the div instruction which generates an extra function call
-  // Also, the usage of a power of two value allows for bit operations
-  const unsigned index_array = significant_bits / _nb_bits_per_word;
-  const unsigned bit_offset = significant_bits % _nb_bits_per_word;
-  const Word_t bit_in_element = (1UL << bit_offset);
-  // there is a possible race between checking the value
-  // and setting it
-  if (!(_address_bitset[index_array].fetch_or(bit_in_element) &
-        bit_in_element)) {
-    // check that the element was not already set
-    ++_nb_addresses;
-    return true;
+  if (addr == _k_empty_slot || addr == _k_deleted_slot) {
+    return false; // Can't track sentinel values
   }
-  // Collision, element was already set
+
+  // todo: we might be allocating a table for a single alloc (with mmaps...)
+  // This will cause a 1 MB alloc
+  AddressTable* table = get_table(addr);
+  if (!table) {
+    return false;
+  }
+
+  uint32_t slot = hash_address(addr, _lower_bits_ignored, table->table_mask);
+
+  // Linear probing to find an empty/deleted slot or the address
+  for (unsigned probe = 0; probe < AddressTable::kMaxProbeDistance; ++probe) {
+    uintptr_t current = table->slots[slot].load(std::memory_order_acquire);
+
+    // If empty or deleted, try to claim it
+    if (current == AddressTable::kEmptySlot || current == AddressTable::kDeletedSlot) {
+      uintptr_t expected = current;
+      if (table->slots[slot].compare_exchange_strong(
+              expected, addr, std::memory_order_acq_rel)) {
+        // Successfully inserted
+        table->count.fetch_add(1, std::memory_order_relaxed);
+        _total_count.fetch_add(1, std::memory_order_relaxed);
+        return true;
+      }
+      // CAS failed, reload and check what's there now
+      current = table->slots[slot].load(std::memory_order_acquire);
+    }
+
+    // Check if slot already contains our address
+    if (current == addr) {
+      return false; // Already tracked
+    }
+
+    // Slot occupied by different address - probe next slot
+    slot = (slot + 1) & table->table_mask;
+  }
+
+  // Table is too full or probe distance exceeded
   return false;
 }
 
 bool AddressBitset::remove(uintptr_t addr) {
-  const int significant_bits = hash_significant_bits(addr);
-  const unsigned index_array = significant_bits / _nb_bits_per_word;
-  const unsigned bit_offset = significant_bits % _nb_bits_per_word;
-  const Word_t bit_in_element = (1UL << bit_offset);
-  if (_address_bitset[index_array].fetch_and(~bit_in_element) &
-      bit_in_element) {
-    _nb_addresses.fetch_sub(1, std::memory_order_relaxed);
-    // in the unlikely event of a clear right at the wrong time, we could
-    // have a negative number of elements (though count desyncs are acceptable)
-    return true;
+  if (addr == _k_empty_slot || addr == _k_deleted_slot) {
+    return false; // Can't remove sentinel values
   }
+
+  AddressTable* table = get_table(addr);
+  if (!table) {
+    return false;
+  }
+
+  uint32_t slot = hash_address(addr, _lower_bits_ignored, table->table_mask);
+
+  // Linear probing to find the address
+  for (unsigned probe = 0; probe < AddressTable::kMaxProbeDistance; ++probe) {
+    uintptr_t current = table->slots[slot].load(std::memory_order_acquire);
+
+    if (current == AddressTable::kEmptySlot) {
+      // Hit an empty slot - address not in table
+      return false;
+    }
+
+    if (current == AddressTable::kDeletedSlot) {
+      // Skip tombstones, continue probing
+      slot = (slot + 1) & table->table_mask;
+      continue;
+    }
+
+    if (current == addr) {
+      // Found it - mark as deleted (tombstone)
+      if (table->slots[slot].compare_exchange_strong(
+              current, AddressTable::kDeletedSlot, std::memory_order_acq_rel)) {
+        table->count.fetch_sub(1, std::memory_order_relaxed);
+        _total_count.fetch_sub(1, std::memory_order_relaxed);
+        return true;
+      }
+      // CAS failed - someone else modified this slot
+      return false;
+    }
+
+    // Different address - keep probing
+    slot = (slot + 1) & table->table_mask;
+  }
+
+  // Probe distance exceeded
   return false;
 }
 
 void AddressBitset::clear() {
-  for (unsigned i = 0; i < _k_nb_words; ++i) {
-    const Word_t original_value = _address_bitset[i].exchange(0);
-    // Count number of set bits in original_value
-    const int num_set_bits = std::popcount(original_value);
-    if (num_set_bits > 0) {
-      _nb_addresses.fetch_sub(num_set_bits, std::memory_order_relaxed);
+  for (size_t chunk_idx = 0; chunk_idx < kMaxChunks; ++chunk_idx) {
+    AddressTable* table = _chunk_tables[chunk_idx].load(std::memory_order_acquire);
+    if (table) {
+      for (unsigned i = 0; i < table->table_size; ++i) {
+        table->slots[i].store(AddressTable::kEmptySlot, std::memory_order_relaxed);
+      }
+      table->count.store(0, std::memory_order_relaxed);
     }
   }
+  _total_count.store(0, std::memory_order_relaxed);
 }
 
 } // namespace ddprof

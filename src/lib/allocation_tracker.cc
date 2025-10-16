@@ -239,24 +239,8 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
   uint64_t const total_size = nsamples * sampling_interval;
 
   if (_state.track_deallocations) {
-    if (_allocated_address_set.add(addr)) {
-      if (unlikely(_allocated_address_set.count() >
-                   ddprof::liveallocation::kMaxTracked)) {
-        // Check if we reached max number of elements
-        // Clear elements if we reach too many
-        // todo: should we just stop new live tracking (like java) ?
-        if (IsDDResOK(push_clear_live_allocation(tl_state))) {
-          LG_DBG("Clearing live allocations");
-          _allocated_address_set.clear();
-          // still set this as we are pushing the allocation to ddprof
-          _allocated_address_set.add(addr);
-        } else {
-          LG_DBG("Stopping allocation profiling. Unable to clear live "
-                 "allocation\n");
-          free();
-        }
-      }
-    } else {
+    if (!_allocated_address_set.add(addr)) {
+      // add() returned false: either table is full or address already exists
       _state.address_conflict_count.fetch_add(1, std::memory_order_acq_rel);
       // null the address to avoid using this for live heap profiling
       // pushing a sample is still good to have a good representation

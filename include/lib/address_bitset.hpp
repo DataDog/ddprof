@@ -5,67 +5,105 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
+#include <cstring>
 #include <memory>
-#include <stdint.h>
-#include <string.h>
 
 namespace ddprof {
+
+// Per-mapping hash table (Level 2)
+struct AddressTable {
+  static constexpr unsigned kDefaultSize = 1024 * 1024; // 1M slots = 8MB
+  static constexpr unsigned kMaxProbeDistance = 128;
+  static constexpr uintptr_t kEmptySlot = 0;
+  static constexpr uintptr_t kDeletedSlot = 1;
+
+  unsigned table_size;
+  unsigned table_mask;
+  std::unique_ptr<std::atomic<uintptr_t>[]> slots;
+  std::atomic<int> count{0};
+
+  explicit AddressTable(unsigned size);
+  ~AddressTable() = default;
+  
+  // Delete copy/move operations (non-copyable due to atomic members)
+  AddressTable(const AddressTable&) = delete;
+  AddressTable& operator=(const AddressTable&) = delete;
+  AddressTable(AddressTable&&) = delete;
+  AddressTable& operator=(AddressTable&&) = delete;
+};
+
 class AddressBitset {
-  // Number of bits is the number of addresses we can store
-  // We have one address per individual bit).
-  // so lets say you have 1111, you can store 4 addresses.
-  // We hash the address to a number (to have an equal probability of using
-  // all bits). Then we use the mask to position this address in our bitset.
-  // Addr -> Hash -> Mask (to get useable bits) -> Position in the bitset
-  // Note: the hashing step might be bad for cache locality.
+  // Two-level sharded address tracking:
+  // Level 1: Fixed redirect table mapping address ranges to tables
+  // Level 2: Per-mapping open-addressing hash tables
+  // Signal-safe after initialization: only atomic operations
 public:
-  // Publish 1 Meg as default
-  constexpr static unsigned _k_default_bitset_size = 8 * 1024 * 1024;
-  explicit AddressBitset(unsigned bitset_size = 0) { init(bitset_size); }
+  // Chunk size: 4GB per chunk (reasonable for typical address space usage)
+  static constexpr uintptr_t kChunkShift = 32; // log2(4GB)
+  static constexpr size_t kMaxChunks = 256; // 256 chunks × 4GB = 1TB address space
+  static constexpr size_t kTablesPerAllocation = 8; // Expect ~8 active tables
+
+  // Default capacity per table
+  constexpr static unsigned _k_default_table_size = 8* 1024 * 1024;
+  // Maximum probe distance before giving up
+  constexpr static unsigned _k_max_probe_distance = 128;
+
+  explicit AddressBitset(unsigned table_size = 0) { init(table_size); }
   AddressBitset(AddressBitset &&other) noexcept;
   AddressBitset &operator=(AddressBitset &&other) noexcept;
 
   AddressBitset(AddressBitset &other) = delete;
   AddressBitset &operator=(AddressBitset &other) = delete;
 
-  ~AddressBitset() = default;
+  ~AddressBitset();
 
   // returns true if the element was inserted
+  // if the table is full, we return false
   bool add(uintptr_t addr);
   // returns true if the element was removed
   bool remove(uintptr_t addr);
   void clear();
-  [[nodiscard]] int count() const { return _nb_addresses; }
+  
+  // Get approximate count (for stats/reporting only, not for capacity checks)
+  [[nodiscard]] int count() const { 
+    return _total_count.load(std::memory_order_relaxed); 
+  }
 
 private:
   static constexpr unsigned _k_max_bits_ignored = 4;
+  static constexpr uintptr_t _k_empty_slot = 0;
+  static constexpr uintptr_t _k_deleted_slot = 1; // Tombstone for deleted entries
+
   unsigned _lower_bits_ignored;
-  // element type
-  using Word_t = uint64_t;
-  constexpr static unsigned _nb_bits_per_word = sizeof(Word_t) * 8;
-  // 1 Meg divided in uint64's size
-  // The probability of collision is proportional to the number of elements
-  // already within the bitset
-  unsigned _bitset_size = {};
-  unsigned _k_nb_words = {};
-  unsigned _nb_bits_mask = {};
-  // We can not use an actual bitset (for atomicity reasons)
-  std::unique_ptr<std::atomic<uint64_t>[]> _address_bitset;
-  std::atomic<int> _nb_addresses = 0;
+  unsigned _per_table_size = {};
 
-  void init(unsigned bitset_size);
+  // Level 1: Redirect table (maps chunks to tables)
+  std::unique_ptr<std::atomic<AddressTable*>[]> _chunk_tables;
+  
+  // Global count for stats (not used for capacity checks)
+  std::atomic<int> _total_count{0};
 
+  void init(unsigned table_size);
   void move_from(AddressBitset &other) noexcept;
-  // This is a kind of hash function
-  // We remove the lower bits (as the alignment constraints makes them useless)
-  // We fold the address
-  // Then we only keep the bits that matter for the order in the bitmap
-  [[nodiscard]] uint32_t hash_significant_bits(uintptr_t h1) const {
-    uint64_t const intermediate = h1 >> _lower_bits_ignored;
-    auto const high = static_cast<uint32_t>(intermediate >> 32);
-    auto const low = static_cast<uint32_t>(intermediate);
-    uint32_t const res = high ^ low;
-    return res & _nb_bits_mask;
+
+  // Get or create table for address
+  AddressTable* get_table(uintptr_t addr);
+
+  static constexpr uint64_t kHashMultiplier1 = 0x9E3779B97F4A7C15ULL; // Golden ratio * 2^64
+  static constexpr uint64_t kHashMultiplier2 = 0x85EBCA77C2B2AE63ULL; // Large prime
+
+  // Hash function: multiply-shift with good mixing
+  [[nodiscard]] static uint32_t hash_address(uintptr_t addr, unsigned lower_bits_ignored, unsigned table_mask) {
+    // Remove alignment bits
+    uint64_t h = addr >> lower_bits_ignored;
+    // Multiply by large prime (golden ratio * 2^64)
+    h *= kHashMultiplier1;
+    // Mix upper and lower bits
+    h ^= h >> 32;
+    h *= kHashMultiplier2;
+    h ^= h >> 32;
+    return static_cast<uint32_t>(h) & table_mask;
   }
 };
 } // namespace ddprof

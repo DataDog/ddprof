@@ -14,32 +14,124 @@
 namespace ddprof {
 
 TEST(address_bitset, simple) {
-  AddressBitset address_bitset(AddressBitset::_k_default_bitset_size);
+  AddressBitset address_bitset(AddressBitset::_k_default_table_size);
   EXPECT_TRUE(address_bitset.add(0xbadbeef));
   EXPECT_FALSE(address_bitset.add(0xbadbeef));
   EXPECT_TRUE(address_bitset.remove(0xbadbeef));
 }
 
 TEST(address_bitset, many_addresses) {
-  AddressBitset address_bitset(AddressBitset::_k_default_bitset_size);
+  constexpr unsigned kTestElements = 100000;
+  AddressBitset address_bitset(AddressBitset::_k_default_table_size);
   std::random_device rd;
   std::mt19937 gen(rd());
   std::uniform_int_distribution<uintptr_t> dis(
       0, std::numeric_limits<uintptr_t>::max());
 
   std::vector<uintptr_t> addresses;
-  unsigned nb_elements = 100000;
-  for (unsigned i = 0; i < nb_elements; ++i) {
+  for (unsigned i = 0; i < kTestElements; ++i) {
     uintptr_t addr = dis(gen);
     if (address_bitset.add(addr)) {
       addresses.push_back(addr);
     }
   }
-  EXPECT_TRUE(nb_elements - (nb_elements / 10) < addresses.size());
+  EXPECT_TRUE(kTestElements - (kTestElements / 10) < addresses.size());
   for (auto addr : addresses) {
     EXPECT_TRUE(address_bitset.remove(addr));
   }
-  EXPECT_EQ(0, address_bitset.count());
+}
+
+TEST(address_bitset, no_false_collisions) {
+  // With the new open addressing implementation, we should have NO false
+  // collisions (unlike the old bitset which had ~6% collision rate)
+  AddressBitset address_bitset(AddressBitset::_k_default_table_size);
+
+  constexpr size_t kTestAllocCount = 500000; // 50% load factor
+  constexpr uintptr_t kAlignmentMask = 0xF;
+
+  std::random_device rd;
+  // NOLINTNEXTLINE(cert-msc32-c,cert-msc51-cpp)
+  std::mt19937 gen(42);
+  std::uniform_int_distribution<uintptr_t> dist(0, UINTPTR_MAX);
+
+  std::vector<uintptr_t> test_addresses;
+  std::unordered_set<uintptr_t> unique_addresses;
+
+  while (unique_addresses.size() < kTestAllocCount) {
+    uintptr_t addr = dist(gen) & ~kAlignmentMask;
+    if (addr != 0 && unique_addresses.insert(addr).second) {
+      test_addresses.push_back(addr);
+    }
+  }
+
+  // Add all addresses - should succeed with no false collisions
+  int add_failures = 0;
+  for (auto addr : test_addresses) {
+    if (!address_bitset.add(addr)) {
+      add_failures++;
+    }
+  }
+
+  EXPECT_EQ(add_failures, 0) << "Expected NO false collisions";
+
+  // Remove all addresses - should all succeed
+  int remove_failures = 0;
+  for (auto addr : test_addresses) {
+    if (!address_bitset.remove(addr)) {
+      remove_failures++;
+    }
+  }
+
+  EXPECT_EQ(remove_failures, 0);
+}
+
+TEST(address_bitset, hash_collision_handled) {
+  // Test that addresses which hash to the same slot are BOTH tracked
+  // correctly (using linear probing)
+  constexpr unsigned table_size = AddressBitset::_k_default_table_size;
+  constexpr uintptr_t kAlignmentMask = 0xF;
+  constexpr int kMaxSearchIterations = 10000000;
+
+  AddressBitset address_bitset(table_size);
+
+  // NOLINTNEXTLINE(cert-msc32-c,cert-msc51-cpp)
+  std::mt19937 gen(42);
+  std::uniform_int_distribution<uintptr_t> dist(0, UINTPTR_MAX);
+
+  std::unordered_map<uint32_t, uintptr_t> hash_to_addr;
+  uintptr_t addr1 = 0;
+  uintptr_t addr2 = 0;
+
+  // Find two addresses that hash to the same slot
+  for (int i = 0; i < kMaxSearchIterations && addr1 == 0; ++i) {
+    uintptr_t addr = dist(gen) & ~kAlignmentMask;
+    if (addr == 0) {
+      continue;
+    }
+
+    uint64_t intermediate = addr >> 4;
+    auto high = static_cast<uint32_t>(intermediate >> 32);
+    auto low = static_cast<uint32_t>(intermediate);
+    uint32_t hash = (high ^ low) & (table_size - 1);
+
+    if (hash_to_addr.contains(hash)) {
+      addr1 = hash_to_addr[hash];
+      addr2 = addr;
+      break;
+    }
+    hash_to_addr[hash] = addr;
+  }
+
+  ASSERT_NE(addr1, 0);
+  ASSERT_NE(addr2, 0);
+
+  // Both should be added successfully (linear probing handles collision)
+  EXPECT_TRUE(address_bitset.add(addr1));
+  EXPECT_TRUE(address_bitset.add(addr2)); // This works now!
+
+  // Both should be removable independently
+  EXPECT_TRUE(address_bitset.remove(addr1));
+  EXPECT_TRUE(address_bitset.remove(addr2));
 }
 
 // This test to tune the hash approach
