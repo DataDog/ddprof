@@ -138,7 +138,7 @@ private:
   void check_timer(PerfClock::time_point now,
                    TrackerThreadLocalState &tl_state);
 
-  void free_on_consecutive_failures(bool success);
+  void free_on_consecutive_failures(bool failure);
 
   DDPROF_NOINLINE void update_timer(PerfClock::time_point now);
 
