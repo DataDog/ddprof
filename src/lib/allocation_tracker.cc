@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cassert>
+#include <cstdint>
 #include <cstdlib>
 #include <unistd.h>
 
@@ -126,8 +127,18 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
     return ddres_error(DD_WHAT_PERFRB);
   }
   if (track_deallocations) {
+    // 16 times as we want to probability of collision to be low enough
     _allocated_address_set.init(0); // Use default size, fail on add if full
+    constexpr int64_t k_max_high_priority_area_size_ratio = 20;
+    constexpr int64_t k_high_priority_event_count = 200;
+    _high_priority_area_size =
+        std::min(ring_buffer.mem_size / k_max_high_priority_area_size_ratio,
+                 static_cast<int64_t>(k_high_priority_event_count *
+                                      (sizeof(DeallocationEvent) + 8)));
+  } else {
+    _high_priority_area_size = 0;
   }
+
   DDRES_CHECK_FWD(ddprof::ring_buffer_attach(ring_buffer, &_pevent));
 
   const auto &rb = _pevent.rb;
@@ -268,7 +279,7 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
 }
 
 DDRes AllocationTracker::push_allocation_tracker_state() {
-  MPSCRingBufferWriter writer{&_pevent.rb};
+  MPSCRingBufferWriter writer{&_pevent.rb, _high_priority_area_size};
 
   bool timeout = false;
   auto buffer = writer.reserve(sizeof(AllocationTrackerStateEvent), &timeout);
@@ -317,10 +328,11 @@ DDRes AllocationTracker::push_allocation_tracker_state() {
 // Return true if consumer should be notified
 DDRes AllocationTracker::push_clear_live_allocation(
     TrackerThreadLocalState &tl_state) {
-  MPSCRingBufferWriter writer{&_pevent.rb};
+  MPSCRingBufferWriter writer{&_pevent.rb, _high_priority_area_size};
   bool timeout = false;
 
-  auto buffer = writer.reserve(sizeof(ClearLiveAllocationEvent), &timeout);
+  auto buffer =
+      writer.reserve(sizeof(ClearLiveAllocationEvent), &timeout, true);
   if (buffer.empty()) {
     // unable to push a clear is an error (we don't want to grow too much)
     // No use pushing a lost event. As this is a sync mechanism.
@@ -356,7 +368,7 @@ DDRes AllocationTracker::push_clear_live_allocation(
 
 DDRes AllocationTracker::push_dealloc_sample(
     uintptr_t addr, TrackerThreadLocalState &tl_state) {
-  MPSCRingBufferWriter writer{&_pevent.rb};
+  MPSCRingBufferWriter writer{&_pevent.rb, _high_priority_area_size};
 
   bool timeout = false;
   auto buffer = writer.reserve(sizeof(DeallocationEvent), &timeout);
@@ -403,8 +415,7 @@ DDRes AllocationTracker::push_dealloc_sample(
 DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
                                            uint64_t allocated_size,
                                            TrackerThreadLocalState &tl_state) {
-  MPSCRingBufferWriter writer{&_pevent.rb};
-
+  MPSCRingBufferWriter writer{&_pevent.rb, _high_priority_area_size};
   // estimate sample stack size
   void *p;
   const auto *stack_base_ptr = reinterpret_cast<const std::byte *>(&p);
