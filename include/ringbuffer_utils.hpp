@@ -188,7 +188,9 @@ class MPSCRingBufferWriter {
 public:
   static constexpr std::chrono::milliseconds k_lock_timeout{100};
 
-  explicit MPSCRingBufferWriter(RingBuffer *rb) : _rb(rb) {
+  explicit MPSCRingBufferWriter(RingBuffer *rb,
+                                size_t high_priority_area_size = 0)
+      : _rb(rb), _high_priority_area_size(high_priority_area_size) {
     assert(_rb->type == RingBufferType::kMPSCRingBuffer);
     update_tail();
   }
@@ -197,7 +199,8 @@ public:
     _tail = __atomic_load_n(_rb->reader_pos, __ATOMIC_ACQUIRE);
   }
 
-  Buffer reserve(size_t n, bool *timeout = nullptr) const {
+  Buffer reserve(size_t n, bool *timeout = nullptr,
+                 bool high_priority = false) const {
     size_t const n2 =
         align_up(n + sizeof(MPSCRingBufferHeader), kRingBufferAlignment);
     if (n2 == 0) {
@@ -218,8 +221,13 @@ public:
     uint64_t const writer_pos = *_rb->writer_pos;
 
     uint64_t const new_writer_pos = writer_pos + n2;
+    uint64_t adjusted_writer_pos = new_writer_pos;
+    if (!high_priority) {
+      adjusted_writer_pos += _high_priority_area_size;
+    }
+
     // Check that there is enough free space
-    if (_rb->mask < new_writer_pos - _tail) {
+    if (_rb->mask < adjusted_writer_pos - _tail) {
       return {};
     }
 
@@ -266,6 +274,7 @@ private:
 
   RingBuffer *_rb;
   uint64_t _tail;
+  uint64_t _high_priority_area_size;
 };
 
 inline ConstBuffer mpsc_rb_read_sample(RingBuffer &rb, uint64_t head) {
