@@ -12,6 +12,7 @@ FetchContent_Declare(
                                                    # tag#20230802.1
 )
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(ABSL_PROPAGATE_CXX_STD
     ON
     CACHE INTERNAL "")

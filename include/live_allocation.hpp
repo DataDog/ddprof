@@ -46,7 +46,6 @@ public:
   struct PidStacks {
     AddressMap _address_map;
     PprofStacks _unique_stacks;
-    uint32_t _address_conflict_count = 0;
     uint32_t _tracked_address_count = 0;
   };
 
@@ -56,17 +55,17 @@ public:
   WatcherVector _watcher_vector;
 
   void register_library_state(int watcher_pos, pid_t pid,
-                              uint32_t address_conflict_count,
                               uint32_t tracked_addresse_count) {
     PidMap &pid_map = access_resize(_watcher_vector, watcher_pos);
     PidStacks &pid_stacks = pid_map[pid];
-    pid_stacks._address_conflict_count = address_conflict_count;
     pid_stacks._tracked_address_count = tracked_addresse_count;
     LG_NTC("<%u> PID %d: live allocations=%lu, Unique "
-           "stacks=%lu, lib tracked addresses=%u, lib address conflicts=%u",
+           "stacks=%lu, lib tracked addresses=%u, unmatched deallocations=%u, "
+           "already existing allocations=%u",
            watcher_pos, pid, pid_stacks._address_map.size(),
            pid_stacks._unique_stacks.size(), pid_stacks._tracked_address_count,
-           pid_stacks._address_conflict_count);
+           _stats._unmatched_deallocations,
+           _stats._already_existing_allocations);
   }
 
   // Allocation should be aggregated per stack trace
@@ -113,7 +112,7 @@ public:
 private:
   // returns true if the deallocation was registered
   static bool register_deallocation(uintptr_t address, PprofStacks &stacks,
-                                    AddressMap &address_map);
+                             AddressMap &address_map);
 
   // returns true if the allocation was registerd
   bool register_allocation(const UnwindOutput &uo, uintptr_t address,

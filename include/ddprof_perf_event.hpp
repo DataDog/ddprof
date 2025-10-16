@@ -47,7 +47,6 @@ struct AllocationTrackerStateEvent {
   struct perf_event_header header;
   struct sample_id sample_id;
   uint32_t tracked_addresse_count;
-  uint32_t address_conflict_count;
 };
 
 } // namespace ddprof

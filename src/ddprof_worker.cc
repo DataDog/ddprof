@@ -483,8 +483,7 @@ void ddprof_pr_allocation_tracker_state(
     DDProfContext &ctx, const AllocationTrackerStateEvent *event,
     int watcher_pos) {
   ctx.worker_ctx.live_allocation.register_library_state(
-      watcher_pos, event->sample_id.pid, event->address_conflict_count,
-      event->tracked_addresse_count);
+      watcher_pos, event->sample_id.pid, event->tracked_addresse_count);
 }
 
 void *ddprof_worker_export_thread(void *arg) {

@@ -13,12 +13,12 @@
 #include "reentry_guard.hpp"
 #include "unlikely.hpp"
 
+#include <absl/container/flat_hash_set.h>
 #include <atomic>
 #include <cstddef>
 #include <functional>
 #include <mutex>
 #include <pthread.h>
-#include <unordered_set>
 
 namespace ddprof {
 
@@ -76,8 +76,6 @@ public:
   static TrackerThreadLocalState *get_tl_state();
 
 private:
-  static constexpr unsigned k_ratio_max_elt_to_bitset_size = 16;
-
   // NOLINTBEGIN(misc-non-private-member-variables-in-classes)
   struct TrackerState {
     void init(bool track_alloc, bool track_dealloc) {
@@ -86,7 +84,6 @@ private:
       lost_alloc_count = 0;
       lost_dealloc_count = 0;
       failure_count = 0;
-      address_conflict_count = 0;
       pid = getpid();
     }
     std::mutex mutex;
@@ -95,7 +92,6 @@ private:
     std::atomic<uint64_t> lost_alloc_count;   // count number of lost events
     std::atomic<uint64_t> lost_dealloc_count; // count number of lost events
     std::atomic<uint32_t> failure_count;
-    std::atomic<uint32_t> address_conflict_count;
     std::atomic<pid_t> pid; // lazy cache of pid (0 is un-init value)
     std::atomic<PerfClock::time_point> next_check_time;
   };
@@ -148,7 +144,7 @@ private:
   PEvent _pevent;
   bool _deterministic_sampling;
 
-  AddressBitset _allocated_address_set;
+  absl::flat_hash_set<uintptr_t> _allocated_address_set;
   IntervalTimerCheck _interval_timer_check;
 
   // These can not be tied to the internal state of the instance.
