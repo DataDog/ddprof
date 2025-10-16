@@ -8,6 +8,7 @@
 #include "allocation_event.hpp"
 #include "ddprof_perf_event.hpp"
 #include "ddres.hpp"
+#include "ddres_def.hpp"
 #include "ipc.hpp"
 #include "lib_logger.hpp"
 #include "live_allocation-c.hpp"
@@ -188,8 +189,8 @@ void AllocationTracker::allocation_tracking_free() {
   instance->free();
 }
 
-void AllocationTracker::free_on_consecutive_failures(bool success) {
-  if (!success) {
+void AllocationTracker::free_on_consecutive_failures(bool failure) {
+  if (failure) {
     ++_state.failure_count;
     if (_state.failure_count >= k_max_consecutive_failures) {
       // Too many errors during ring buffer operation: stop allocation profiling
@@ -263,9 +264,9 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
       addr = 0;
     }
   }
-  bool const success = IsDDResOK(push_alloc_sample(addr, total_size, tl_state));
-  free_on_consecutive_failures(success);
-  if (unlikely(!success) && _state.track_deallocations && addr) {
+  auto res = push_alloc_sample(addr, total_size, tl_state);
+  free_on_consecutive_failures(IsDDResFatal(res));
+  if (unlikely(!IsDDResOK(res)) && _state.track_deallocations && addr) {
     _allocated_address_set.remove(addr);
   }
 }
@@ -279,8 +280,8 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
     return;
   }
 
-  bool const success = IsDDResOK(push_dealloc_sample(addr, tl_state));
-  free_on_consecutive_failures(success);
+  auto fatal_failure = IsDDResFatal(push_dealloc_sample(addr, tl_state));
+  free_on_consecutive_failures(fatal_failure);
 }
 
 DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
@@ -305,7 +306,7 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
     if (timeout) {
       return ddres_error(DD_WHAT_PERFRB);
     }
-    return {};
+    return ddres_warn(DD_WHAT_PERFRB);
   }
 
   auto *event = reinterpret_cast<LostAllocationEvent *>(buffer.data());
@@ -334,12 +335,12 @@ DDRes AllocationTracker::push_allocation_tracker_state() {
   MPSCRingBufferWriter writer{&_pevent.rb};
 
   bool timeout = false;
-  auto buffer = writer.reserve(sizeof(perf_event_lost), &timeout);
+  auto buffer = writer.reserve(sizeof(AllocationTrackerStateEvent), &timeout);
   if (buffer.empty()) {
     if (timeout) {
       return ddres_error(DD_WHAT_PERFRB);
     }
-    return {};
+    return ddres_warn(DD_WHAT_PERFRB);
   }
 
   auto *event = reinterpret_cast<AllocationTrackerStateEvent *>(buffer.data());
@@ -432,7 +433,7 @@ DDRes AllocationTracker::push_dealloc_sample(
       return DDRes{._what = DD_WHAT_PERFRB, ._sev = DD_SEV_ERROR};
     }
     // not an error
-    return {};
+    return ddres_warn(DD_WHAT_PERFRB);
   }
 
   auto *event = reinterpret_cast<DeallocationEvent *>(buffer.data());
@@ -507,7 +508,7 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
     }
 
     // not an error
-    return {};
+    return ddres_warn(DD_WHAT_PERFRB);
   }
 
   auto *event = reinterpret_cast<AllocationEvent *>(buffer.data());
