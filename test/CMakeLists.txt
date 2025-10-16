@@ -391,6 +391,8 @@ add_unit_test(pthread_tls-ut pthread_tls-ut.cc)
 
 add_unit_test(address_bitset-ut address_bitset-ut.cc ../src/lib/address_bitset.cc)
 
+add_unit_test(address_sampler-ut address_sampler-ut.cc)
+
 add_unit_test(lib_logger-ut ./lib_logger-ut.cc)
 
 add_unit_test(
@@ -446,6 +448,21 @@ add_benchmark(
   ../src/sys_utils.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
   DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384)
+
+add_benchmark(
+  address_bitset-bench
+  address_bitset-bench.cc
+  ../src/lib/address_bitset.cc)
+
+add_benchmark(
+  address_sampler-bench
+  address_sampler-bench.cc)
+
+add_benchmark(
+  address_tracking_comparison-bench
+  address_tracking_comparison-bench.cc
+  ../src/lib/address_bitset.cc
+  LIBRARIES absl::flat_hash_set absl::hash)
 
 set(SIMPLE_MALLOC_SRC simple_malloc.cc ../src/signal_helper.cc)
 
