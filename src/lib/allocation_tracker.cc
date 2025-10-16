@@ -296,7 +296,7 @@ DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
     return {};
   }
   bool timeout = false;
-  auto buffer = writer.reserve(sizeof(perf_event_lost), &timeout);
+  auto buffer = writer.reserve(sizeof(LostAllocationEvent), &timeout);
   if (buffer.empty()) {
     // buffer is full, put back lost samples
     _state.lost_alloc_count.fetch_add(lost_alloc_count,
