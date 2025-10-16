@@ -345,8 +345,6 @@ uint64_t hdr_time(const perf_event_header *hdr, uint64_t mask) {
   case PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION:
     return reinterpret_cast<const ClearLiveAllocationEvent *>(hdr)
         ->sample_id.time;
-  case PERF_CUSTOM_EVENT_LOST_ALLOCATION:
-    return reinterpret_cast<const LostAllocationEvent *>(hdr)->sample_id.time;
   case PERF_CUSTOM_EVENT_ALLOCATION_TRACKER_STATE:
     return reinterpret_cast<const AllocationTrackerStateEvent *>(hdr)
         ->sample_id.time;

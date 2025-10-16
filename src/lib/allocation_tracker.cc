@@ -284,53 +284,6 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
   free_on_consecutive_failures(fatal_failure);
 }
 
-DDRes AllocationTracker::push_lost_sample(MPSCRingBufferWriter &writer,
-                                          TrackerThreadLocalState &tl_state,
-                                          bool &notify_needed) {
-  auto lost_alloc_count =
-      _state.lost_alloc_count.exchange(0, std::memory_order_acq_rel);
-  auto lost_dealloc_count =
-      _state.lost_dealloc_count.exchange(0, std::memory_order_acq_rel);
-
-  if (lost_alloc_count == 0 && lost_dealloc_count == 0) {
-    return {};
-  }
-  bool timeout = false;
-  auto buffer = writer.reserve(sizeof(LostAllocationEvent), &timeout);
-  if (buffer.empty()) {
-    // buffer is full, put back lost samples
-    _state.lost_alloc_count.fetch_add(lost_alloc_count,
-                                      std::memory_order_acq_rel);
-    _state.lost_dealloc_count.fetch_add(lost_dealloc_count,
-                                        std::memory_order_acq_rel);
-    if (timeout) {
-      return ddres_error(DD_WHAT_PERFRB);
-    }
-    return ddres_warn(DD_WHAT_PERFRB);
-  }
-
-  auto *event = reinterpret_cast<LostAllocationEvent *>(buffer.data());
-  event->header.size = sizeof(LostAllocationEvent);
-  event->header.misc = 0;
-  event->header.type = PERF_CUSTOM_EVENT_LOST_ALLOCATION;
-  auto now = PerfClock::now();
-  event->sample_id.time = now.time_since_epoch().count();
-
-  DDPROF_DCHECK_FATAL(_state.pid != 0 && tl_state.tid != 0,
-                      "pid or tid is not set");
-  event->sample_id.pid = _state.pid;
-  event->sample_id.tid = tl_state.tid;
-
-  event->lost_alloc_count = lost_alloc_count;
-  event->lost_dealloc_count = lost_dealloc_count;
-
-  notify_needed = writer.commit(buffer);
-
-  check_timer(now, tl_state);
-
-  return {};
-}
-
 DDRes AllocationTracker::push_allocation_tracker_state() {
   MPSCRingBufferWriter writer{&_pevent.rb};
 
@@ -354,9 +307,13 @@ DDRes AllocationTracker::push_allocation_tracker_state() {
   event->sample_id.pid = _state.pid;
   event->sample_id.tid = 0;
 
-  event->tracked_addresse_count = _allocated_address_set.count();
   event->address_conflict_count =
       _state.address_conflict_count.load(std::memory_order_relaxed);
+  event->tracked_address_count = _allocated_address_set.count();
+  event->lost_alloc_count =
+      _state.lost_alloc_count.exchange(0, std::memory_order_acq_rel);
+  event->lost_dealloc_count =
+      _state.lost_dealloc_count.exchange(0, std::memory_order_acq_rel);
 
   if (writer.commit(buffer)) {
     uint64_t count = 1;
@@ -416,14 +373,8 @@ DDRes AllocationTracker::push_clear_live_allocation(
 DDRes AllocationTracker::push_dealloc_sample(
     uintptr_t addr, TrackerThreadLocalState &tl_state) {
   MPSCRingBufferWriter writer{&_pevent.rb};
-  bool notify_consumer{false};
 
   bool timeout = false;
-  if (unlikely(_state.lost_alloc_count.load(std::memory_order_relaxed) ||
-               _state.lost_dealloc_count.load(std::memory_order_relaxed))) {
-    (push_lost_sample(writer, tl_state, notify_consumer));
-  }
-
   auto buffer = writer.reserve(sizeof(DeallocationEvent), &timeout);
   if (buffer.empty()) {
     // ring buffer is full, increase lost count
@@ -451,7 +402,7 @@ DDRes AllocationTracker::push_dealloc_sample(
   // address of dealloc
   event->ptr = addr;
 
-  if (writer.commit(buffer) || notify_consumer) {
+  if (writer.commit(buffer)) {
     uint64_t count = 1;
     if (write(_pevent.fd, &count, sizeof(count)) != sizeof(count)) {
       LG_DBG("Error writing to memory allocation eventfd (%s)",
@@ -469,13 +420,6 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
                                            uint64_t allocated_size,
                                            TrackerThreadLocalState &tl_state) {
   MPSCRingBufferWriter writer{&_pevent.rb};
-  bool notify_consumer{false};
-
-  bool timeout = false;
-  if (unlikely(_state.lost_alloc_count.load(std::memory_order_relaxed) ||
-               _state.lost_dealloc_count.load(std::memory_order_relaxed))) {
-    push_lost_sample(writer, tl_state, notify_consumer);
-  }
 
   // estimate sample stack size
   void *p;
@@ -495,6 +439,8 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
                sizeof(uint64_t));
 
   auto event_size = sizeof_allocation_event(sample_stack_size);
+
+  bool timeout = false;
   auto buffer = writer.reserve(event_size, &timeout);
 
   if (buffer.empty()) {
@@ -537,7 +483,7 @@ DDRes AllocationTracker::push_alloc_sample(uintptr_t addr,
 
   // Even if dyn_size == 0, we keep the sample
   // This way, the overall accounting is correct (even with empty stacks)
-  if (writer.commit(buffer) || notify_consumer) {
+  if (writer.commit(buffer)) {
     uint64_t count = 1;
     if (write(_pevent.fd, &count, sizeof(count)) != sizeof(count)) {
       // Logs can cause deadlock (hence we print it in debug mode only)
