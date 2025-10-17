@@ -14,7 +14,6 @@
 #include "ddprof_perf_event.hpp"
 #include "defer.hpp"
 #include "ipc.hpp"
-#include "live_allocation-c.hpp"
 #include "loghandle.hpp"
 #include "perf_clock.hpp"
 #include "pevent_lib.hpp"
@@ -197,7 +196,7 @@ TEST(allocation_tracker, stale_lock) {
   ASSERT_FALSE(AllocationTracker::is_active());
 }
 
-TEST(allocation_tracker, max_tracked_allocs) {
+TEST(allocation_tracker, many_tracked_allocs) {
   RingBufferHolder ring_buffer{kBufSizeOrder, RingBufferType::kMPSCRingBuffer};
   AllocationTracker::allocation_tracking_init(
       kSamplingRate,
@@ -207,11 +206,13 @@ TEST(allocation_tracker, max_tracked_allocs) {
   defer { AllocationTracker::allocation_tracking_free(); };
 
   ASSERT_TRUE(ddprof::AllocationTracker::is_active());
-  bool clear_found = false;
+  
+  // Test that we can track a reasonable number of allocations
+  // With sharded hash tables, capacity is dynamic based on address distribution
+  constexpr int kTestAllocations = 10000;
   uint64_t nb_samples = 0;
-  for (int i = 0; i <= ddprof::liveallocation::kMaxTracked +
-           ddprof::liveallocation::kMaxTracked / 10;
-       ++i) {
+  
+  for (int i = 0; i < kTestAllocations; ++i) {
     uintptr_t addr = 0x1000 + (i * 16);
     my_malloc(1, addr);
     ddprof::MPSCRingBufferReader reader{&ring_buffer.get_ring_buffer()};
@@ -228,16 +229,12 @@ TEST(allocation_tracker, max_tracked_allocs) {
         ASSERT_EQ(sample->pid, getpid());
         ASSERT_EQ(sample->tid, ddprof::gettid());
         ASSERT_EQ(sample->addr, addr);
-      } else {
-        if (hdr->type == PERF_CUSTOM_EVENT_CLEAR_LIVE_ALLOCATION) {
-          clear_found = true;
-        }
       }
     }
   }
-  fprintf(stderr, "Number of found samples %lu (vs max = %d) \n", nb_samples,
-          ddprof::liveallocation::kMaxTracked);
-  EXPECT_TRUE(clear_found);
+  
+  // Should have tracked all allocations
+  EXPECT_EQ(nb_samples, kTestAllocations);
 }
 
 class AllocFunctionChecker {

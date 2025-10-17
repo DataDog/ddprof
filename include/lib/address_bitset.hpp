@@ -37,7 +37,8 @@ class AddressBitset {
   // Two-level sharded address tracking:
   // Level 1: Fixed redirect table mapping address ranges to tables
   // Level 2: Per-mapping open-addressing hash tables
-  // Signal-safe after initialization: only atomic operations
+  // This is NOT signal safe.
+  // This should be thread safe.
 public:
   // Chunk size: 4GB per chunk (reasonable for typical address space usage)
   static constexpr uintptr_t kChunkShift = 32; // log2(4GB)
@@ -70,6 +71,9 @@ public:
     return _total_count.load(std::memory_order_relaxed); 
   }
 
+  // Initialize with given table size (can be called on default-constructed object)
+  void init(unsigned table_size);
+
 private:
   static constexpr unsigned _k_max_bits_ignored = 4;
   static constexpr uintptr_t _k_empty_slot = 0;
@@ -84,7 +88,6 @@ private:
   // Global count for stats (not used for capacity checks)
   std::atomic<int> _total_count{0};
 
-  void init(unsigned table_size);
   void move_from(AddressBitset &other) noexcept;
 
   // Get or create table for address

@@ -51,9 +51,11 @@ AddressBitset &AddressBitset::operator=(AddressBitset &&other) noexcept {
 }
 
 AddressBitset::~AddressBitset() {
-  for (size_t i = 0; i < kMaxChunks; ++i) {
-    AddressTable* table = _chunk_tables[i].load(std::memory_order_relaxed);
-    delete table;
+  if (_chunk_tables) {
+    for (size_t i = 0; i < kMaxChunks; ++i) {
+      AddressTable* table = _chunk_tables[i].load(std::memory_order_relaxed);
+      delete table;
+    }
   }
 }
 
@@ -203,13 +205,15 @@ bool AddressBitset::remove(uintptr_t addr) {
 }
 
 void AddressBitset::clear() {
-  for (size_t chunk_idx = 0; chunk_idx < kMaxChunks; ++chunk_idx) {
-    AddressTable* table = _chunk_tables[chunk_idx].load(std::memory_order_acquire);
-    if (table) {
-      for (unsigned i = 0; i < table->table_size; ++i) {
-        table->slots[i].store(AddressTable::kEmptySlot, std::memory_order_relaxed);
+  if (_chunk_tables) {
+    for (size_t chunk_idx = 0; chunk_idx < kMaxChunks; ++chunk_idx) {
+      AddressTable* table = _chunk_tables[chunk_idx].load(std::memory_order_acquire);
+      if (table) {
+        for (unsigned i = 0; i < table->table_size; ++i) {
+          table->slots[i].store(AddressTable::kEmptySlot, std::memory_order_relaxed);
+        }
+        table->count.store(0, std::memory_order_relaxed);
       }
-      table->count.store(0, std::memory_order_relaxed);
     }
   }
   _total_count.store(0, std::memory_order_relaxed);

@@ -154,11 +154,17 @@ BENCHMARK(BM_AbslFlatHashSet_SharedMutex)
     ->Threads(15);
 
 // =============================================================================
-// 5. PER-THREAD ABSL (thread-local, but won't work for cross-thread free)
+// 5. PER-THREAD ABSL with static allocation (no mutex needed)
+// NOTE: Still not signal-safe (can't use in signal handlers)
 // =============================================================================
 
 static void BM_AbslFlatHashSet_PerThread(benchmark::State &state) {
-  thread_local absl::flat_hash_set<uintptr_t> hash_set;
+  // Pre-allocate with reserve to avoid dynamic allocation during benchmark
+  thread_local absl::flat_hash_set<uintptr_t> hash_set = []() {
+    absl::flat_hash_set<uintptr_t> set;
+    set.reserve(1024 * 1024);  // Pre-allocate for 1M entries
+    return set;
+  }();
 
   const int thread_id = state.thread_index();
   // Each thread gets its own 4GB chunk
@@ -266,7 +272,12 @@ BENCHMARK(BM_Summary_AbslMutex)
     ->Name("3_Absl_Mutex_15T_NOT_SignalSafe");
 
 static void BM_Summary_AbslPerThread(benchmark::State &state) {
-  thread_local absl::flat_hash_set<uintptr_t> hash_set;
+  // Pre-allocate with reserve to avoid dynamic allocation
+  thread_local absl::flat_hash_set<uintptr_t> hash_set = []() {
+    absl::flat_hash_set<uintptr_t> set;
+    set.reserve(1024 * 1024);  // Pre-allocate for 1M entries
+    return set;
+  }();
 
   const int thread_id = state.thread_index();
   // Each thread gets its own 4GB chunk
@@ -286,7 +297,7 @@ static void BM_Summary_AbslPerThread(benchmark::State &state) {
 }
 BENCHMARK(BM_Summary_AbslPerThread)
     ->Threads(15)
-    ->Name("4_Absl_PerThread_15T_BrokenCrossThread");
+    ->Name("4_Absl_PerThread_15T_NOT_SignalSafe");
 
 } // namespace ddprof
 

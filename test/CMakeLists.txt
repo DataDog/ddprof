@@ -328,13 +328,13 @@ set(ALLOCATION_TRACKER_UT_SRCS
 add_unit_test(
   allocation_tracker-ut ${ALLOCATION_TRACKER_UT_SRCS}
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle dl rt Datadog::Profiling
-  DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384)
+  DEFINITIONS ${DDPROF_DEFINITION_LIST})
 
 if(TARGET jemalloc::jemalloc_shared)
   add_unit_test(
     allocation_tracker_jemalloc-ut ${ALLOCATION_TRACKER_UT_SRCS}
     LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle dl rt jemalloc::jemalloc_shared Datadog::Profiling
-    DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384 USE_JEMALLOC=1)
+    DEFINITIONS ${DDPROF_DEFINITION_LIST} USE_JEMALLOC=1)
 endif()
 
 add_unit_test(sys_utils-ut sys_utils-ut.cc ../src/sys_utils.cc)

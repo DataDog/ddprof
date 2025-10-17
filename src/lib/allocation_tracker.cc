@@ -11,7 +11,6 @@
 #include "ddres_def.hpp"
 #include "ipc.hpp"
 #include "lib_logger.hpp"
-#include "live_allocation-c.hpp"
 #include "perf_clock.hpp"
 #include "pevent_lib.hpp"
 #include "ringbuffer_utils.hpp"
@@ -128,9 +127,7 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
     return ddres_error(DD_WHAT_PERFRB);
   }
   if (track_deallocations) {
-    // 16 times as we want to probability of collision to be low enough
-    _allocated_address_set = AddressBitset(liveallocation::kMaxTracked *
-                                           k_ratio_max_elt_to_bitset_size);
+    _allocated_address_set.init(0); // Use default size, fail on add if full
   }
   DDRES_CHECK_FWD(ddprof::ring_buffer_attach(ring_buffer, &_pevent));
 
