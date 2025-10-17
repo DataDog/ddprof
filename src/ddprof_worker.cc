@@ -403,16 +403,6 @@ void ddprof_pr_deallocation(DDProfContext &ctx, const DeallocationEvent *event,
                                                        event->sample_id.pid);
 }
 
-void ddprof_pr_lost_allocation(DDProfContext &ctx,
-                               const LostAllocationEvent *event,
-                               int watcher_pos) {
-  ddprof_stats_add(STATS_EVENT_LOST, event->lost_alloc_count, nullptr);
-  ddprof_stats_add(STATS_EVENT_DEALLOC_LOST, event->lost_dealloc_count,
-                   nullptr);
-  ctx.worker_ctx.lost_events_per_watcher[watcher_pos] +=
-      event->lost_alloc_count;
-}
-
 /// Entry point for sample aggregation
 DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
                        int watcher_pos) {
@@ -484,7 +474,13 @@ void ddprof_pr_allocation_tracker_state(
     int watcher_pos) {
   ctx.worker_ctx.live_allocation.register_library_state(
       watcher_pos, event->sample_id.pid, event->address_conflict_count,
-      event->tracked_addresse_count);
+      event->tracked_address_count);
+
+  ddprof_stats_add(STATS_EVENT_LOST, event->lost_alloc_count, nullptr);
+  ddprof_stats_add(STATS_EVENT_DEALLOC_LOST, event->lost_dealloc_count,
+                   nullptr);
+  ctx.worker_ctx.lost_events_per_watcher[watcher_pos] +=
+      event->lost_alloc_count;
 }
 
 void *ddprof_worker_export_thread(void *arg) {
@@ -835,10 +831,6 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
           aggregate_live_allocations_for_pid(ctx, event->sample_id.pid));
       ddprof_pr_clear_live_allocation(ctx, event, watcher_pos);
     } break;
-    case PERF_CUSTOM_EVENT_LOST_ALLOCATION:
-      ddprof_pr_lost_allocation(
-          ctx, reinterpret_cast<const LostAllocationEvent *>(hdr), watcher_pos);
-      break;
     case PERF_CUSTOM_EVENT_ALLOCATION_TRACKER_STATE:
       ddprof_pr_allocation_tracker_state(
           ctx, reinterpret_cast<const AllocationTrackerStateEvent *>(hdr),
