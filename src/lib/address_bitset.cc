@@ -32,6 +32,7 @@ unsigned round_up_to_power_of_two(unsigned num) {
 AddressTable::AddressTable(unsigned size)
     : table_size(round_up_to_power_of_two(size)),
       table_mask(table_size - 1),
+      max_capacity(table_size * kMaxLoadFactorPercent / 100U),
       slots(std::make_unique<std::atomic<uintptr_t>[]>(table_size)) {
   // Initialize all slots to empty
   for (unsigned i = 0; i < table_size; ++i) {
@@ -76,7 +77,7 @@ void AddressBitset::init(unsigned table_size) {
   
   // Calculate per-table size by dividing total capacity by expected tables
   unsigned total_capacity = table_size ? table_size : AddressTable::kDefaultSize;
-  _per_table_size = std::max(16384u, static_cast<unsigned>(total_capacity / kTablesPerAllocation));
+  _per_table_size = std::max(16384U, static_cast<unsigned>(total_capacity / kTablesPerAllocation));
   
   // Initialize redirect table (Level 1)
   _chunk_tables = std::make_unique<std::atomic<AddressTable*>[]>(kMaxChunks);
@@ -122,6 +123,11 @@ bool AddressBitset::add(uintptr_t addr) {
   AddressTable* table = get_table(addr);
   if (!table) {
     return false;
+  }
+  
+  // Check if table is at max capacity (60% load factor)
+  if (table->count.load(std::memory_order_relaxed) >= static_cast<int>(table->max_capacity)) {
+    return false; // Table is full
   }
 
   uint32_t slot = hash_address(addr, _lower_bits_ignored, table->table_mask);
@@ -217,6 +223,20 @@ void AddressBitset::clear() {
     }
   }
   _total_count.store(0, std::memory_order_relaxed);
+}
+
+int AddressBitset::active_shards() const {
+  if (!_chunk_tables) {
+    return 0;
+  }
+  
+  int active = 0;
+  for (size_t i = 0; i < kMaxChunks; ++i) {
+    if (_chunk_tables[i].load(std::memory_order_relaxed) != nullptr) {
+      ++active;
+    }
+  }
+  return active;
 }
 
 } // namespace ddprof

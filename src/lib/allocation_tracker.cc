@@ -291,6 +291,7 @@ DDRes AllocationTracker::push_allocation_tracker_state() {
   event->address_conflict_count =
       _state.address_conflict_count.load(std::memory_order_relaxed);
   event->tracked_address_count = _allocated_address_set.count();
+  event->active_shards = _allocated_address_set.active_shards();
   event->lost_alloc_count =
       _state.lost_alloc_count.exchange(0, std::memory_order_acq_rel);
   event->lost_dealloc_count =

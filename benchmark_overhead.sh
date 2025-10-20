@@ -12,15 +12,16 @@ DDPROF_ABSL="../ddprof_2/${BUILD_DIR}/ddprof"  # Absl hash map version
 DDPROF_GLOBAL="ddprof"  # Assumes global install
 
 # Test parameters
-MALLOC_SIZE=1000
-LOOP_COUNT=10000000
+MALLOC_SIZE=1024 # could be big or small allocs
+LOOP_COUNT=10000000  # Keep high, will hit timeout after 30s
 THREADS=8
-TIMEOUT_MS=30000
+TIMEOUT_MS=120000
 
 # Profiling parameters
 # p=1048576 means sample every 1MB allocated (lower = more samples, higher overhead)
 ALLOC_PERIOD=1048576  # 1MB
-PROFILING_ARGS="-e sALLOC,mode=l,p=${ALLOC_PERIOD}"
+# "-e sALLOC,mode=l,p=${ALLOC_PERIOD}"
+PROFILING_ARGS="--preset cpu_live_heap"
 
 # Output directory
 RESULTS_DIR="benchmark_results_$(date +%Y%m%d_%H%M%S)"
@@ -69,6 +70,7 @@ run_test() {
     
     # Run with perf stat (--inherit tracks child processes)
     # but in this case we mostly care about overhead of parent
+    DD_SERVICE="benchmark_${test_name}" \
     perf stat  \
         -e cycles,instructions,cache-misses,context-switches,cpu-clock \
         -o "$RESULTS_DIR/${test_name}_perf.txt" \
@@ -128,7 +130,7 @@ if [ -f "$DDPROF_ABSL" ]; then
     echo "=========================================="
     run_test "absl_hashmap" "$DDPROF_ABSL"
 else
-    echo "⚠ Absl ddprof not found at $DDPROF_ABSL, skipping"
+    echo " Absl ddprof not found at $DDPROF_ABSL, skipping"
 fi
 
 # Test 4: Global ddprof (original implementation)
@@ -138,7 +140,7 @@ if command -v $DDPROF_GLOBAL &> /dev/null; then
     echo "=========================================="
     run_test "global_original" "$DDPROF_GLOBAL"
 else
-    echo "⚠ Global ddprof not found, skipping comparison"
+    echo " Global ddprof not found, skipping comparison"
 fi
 
 # Parse and summarize results

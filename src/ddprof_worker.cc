@@ -474,7 +474,7 @@ void ddprof_pr_allocation_tracker_state(
     int watcher_pos) {
   ctx.worker_ctx.live_allocation.register_library_state(
       watcher_pos, event->sample_id.pid, event->address_conflict_count,
-      event->tracked_address_count);
+      event->tracked_address_count, event->active_shards);
 
   ddprof_stats_add(STATS_EVENT_LOST, event->lost_alloc_count, nullptr);
   ddprof_stats_add(STATS_EVENT_DEALLOC_LOST, event->lost_dealloc_count,

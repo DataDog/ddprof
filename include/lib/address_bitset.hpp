@@ -13,13 +13,15 @@ namespace ddprof {
 
 // Per-mapping hash table (Level 2)
 struct AddressTable {
-  static constexpr unsigned kDefaultSize = 1024 * 1024; // 1M slots = 8MB
+  static constexpr unsigned kDefaultSize = 512 * 1024; // 512K slots = 4MB
   static constexpr unsigned kMaxProbeDistance = 128;
+  static constexpr unsigned kMaxLoadFactorPercent = 60; // 60% load factor
   static constexpr uintptr_t kEmptySlot = 0;
   static constexpr uintptr_t kDeletedSlot = 1;
 
   unsigned table_size;
   unsigned table_mask;
+  unsigned max_capacity; // max_capacity = table_size * kMaxLoadFactorPercent / 100
   std::unique_ptr<std::atomic<uintptr_t>[]> slots;
   std::atomic<int> count{0};
 
@@ -40,9 +42,9 @@ class AddressBitset {
   // This is NOT signal safe.
   // This should be thread safe.
 public:
-  // Chunk size: 4GB per chunk (reasonable for typical address space usage)
-  static constexpr uintptr_t kChunkShift = 32; // log2(4GB)
-  static constexpr size_t kMaxChunks = 256; // 256 chunks × 4GB = 1TB address space
+  // Chunk size: 128MB per chunk (matches typical glibc arena spacing)
+  static constexpr uintptr_t kChunkShift = 27; // log2(128MB)
+  static constexpr size_t kMaxChunks = 8192; // 8192 chunks × 128MB = 1TB address space
   static constexpr size_t kTablesPerAllocation = 8; // Expect ~8 active tables
 
   // Default capacity per table
@@ -70,6 +72,9 @@ public:
   [[nodiscard]] int count() const { 
     return _total_count.load(std::memory_order_relaxed); 
   }
+  
+  // Get number of active shards (for stats/reporting)
+  [[nodiscard]] int active_shards() const;
 
   // Initialize with given table size (can be called on default-constructed object)
   void init(unsigned table_size);

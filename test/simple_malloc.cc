@@ -19,6 +19,10 @@
 #include <thread>
 #include <unistd.h>
 
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif
+
 #include "clocks.hpp"
 #include "ddprof_base.hpp"
 #include "enum_flags.hpp"
@@ -395,6 +399,15 @@ int main(int argc, char *argv[]) {
     for (auto &stat : stats) {
       print_stats(pid, stat);
     }
+    
+    // Print malloc arena statistics
+    fprintf(stderr, "\n=== Malloc Arena Statistics ===\n");
+#ifdef __GLIBC__
+    malloc_stats();
+#else
+    fprintf(stderr, "malloc_stats() not available (not glibc)\n");
+#endif
+    fprintf(stderr, "===============================\n");
   } catch (const std::exception &e) {
     fprintf(stderr, "Caught exception: %s\n", e.what());
   }
