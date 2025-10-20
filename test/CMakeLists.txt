@@ -458,12 +458,6 @@ add_benchmark(
   address_sampler-bench
   address_sampler-bench.cc)
 
-add_benchmark(
-  address_tracking_comparison-bench
-  address_tracking_comparison-bench.cc
-  ../src/lib/address_bitset.cc
-  LIBRARIES absl::flat_hash_set absl::hash)
-
 set(SIMPLE_MALLOC_SRC simple_malloc.cc ../src/signal_helper.cc)
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")

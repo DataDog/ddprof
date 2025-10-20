@@ -16,8 +16,7 @@ _bitset[bit_index / 64] |= (1ULL << (bit_index % 64));
 - Result: Inaccurate leak detection, missed deallocations
 
 Tests showed significant impact:
-- 500K unique addresses → ~30K collisions (6% loss rate)
-- Production workloads → unreliable live heap tracking
+ - 6% loss rate
 
 ## Solution Requirements
 
@@ -62,7 +61,7 @@ void tracked_free(void* ptr) {
 - **Boundary safety** - reading header can segfault at memory boundaries
 - **Allocator interference** - system `realloc()` doesn't know about our headers
 
-Could work with custom allocator support, but too invasive for general use.
+Could work with custom allocator support.
 
 ### 2. Stateless Sampling (Alternative Mode)
 
@@ -102,10 +101,11 @@ AddressTable* table = _chunk_tables[chunk_idx];
 
 ### Why This Works
 
-**Key insight**: Real allocators use per-thread arenas with clustered addresses:
+**Key insight**: You would often have a per-thread arenas with clustered addresses:
 - Thread 1 allocates from `0x7f00'0000'0000` - `0x7f00'ffff'ffff` (chunk 0x7f00)
 - Thread 2 allocates from `0x7f01'0000'0000` - `0x7f01'ffff'ffff` (chunk 0x7f01)
-- **Different threads → different chunks → different hash tables → no contention!**
+This is not absolutely true.
+
 
 ### Benefits
 

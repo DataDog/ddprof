@@ -76,6 +76,7 @@ struct Stats {
   std::chrono::nanoseconds wall_time;
   std::chrono::nanoseconds cpu_time;
   pid_t tid;
+  long max_rss_kb;
 };
 
 struct Options {
@@ -153,8 +154,12 @@ extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
   }
   auto end_cpu = ThreadCpuClock::now();
   auto end_time = std::chrono::steady_clock::now();
+  
+  struct rusage usage;
+  getrusage(RUSAGE_SELF, &usage);
+  
   stats = {nb_alloc, alloc_bytes, end_time - start_time, end_cpu - start_cpu,
-           ddprof::gettid()};
+           ddprof::gettid(), usage.ru_maxrss};
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)
@@ -188,14 +193,14 @@ using WrapperFuncPtr = decltype(&wrapper);
 namespace ddprof {
 
 void print_header() {
-  printf("TestHeaders:%-8s,%-8s,%-14s,%-14s,%-14s,%-14s\n", "PID", "TID",
-         "alloc_samples", "alloc_bytes", "wall_time", "cpu_time");
+  printf("TestHeaders:%-8s,%-8s,%-14s,%-14s,%-14s,%-14s,%-14s\n", "PID", "TID",
+         "alloc_samples", "alloc_bytes", "wall_time", "cpu_time", "max_rss_kb");
 }
 
 void print_stats(pid_t pid, const Stats &stats) {
-  printf("TestStats  :%-8d,%-8d,%-14lu,%-14lu,%-14lu,%-14lu\n", pid, stats.tid,
+  printf("TestStats  :%-8d,%-8d,%-14lu,%-14lu,%-14lu,%-14lu,%-14ld\n", pid, stats.tid,
          stats.nb_allocations, stats.allocated_bytes, stats.wall_time.count(),
-         stats.cpu_time.count());
+         stats.cpu_time.count(), stats.max_rss_kb);
 }
 
 enum class WrapperOpts : uint8_t {
