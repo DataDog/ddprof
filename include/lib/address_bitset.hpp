@@ -45,6 +45,8 @@ class AddressBitset {
   // Level 2: Per-mapping open-addressing hash tables
   // This is NOT signal safe.
   // This should be thread safe.
+  // todo@r1viollet: this is no longer a bitset. Rename the class.
+  // Not doing so for now to keep the PR readable.
 public:
   // Chunk size: 128MB per chunk (matches typical glibc arena spacing)
   static constexpr uintptr_t kChunkShift = 27; // log2(128MB)
@@ -83,7 +85,7 @@ public:
 
   // Get shard index for address (for testing/diagnostics)
   [[nodiscard]] static size_t get_shard_index(uintptr_t addr) {
-    uint64_t hash = compute_full_hash(addr);
+    const uint64_t hash = compute_full_hash(addr);
     return (hash >> 32) % kMaxChunks;
   }
 

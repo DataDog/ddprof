@@ -377,6 +377,29 @@ BENCHMARK(BM_AddressBitset_FreeLookupMiss<ContentionMode::kLowContention>)
     ->Threads(4)
     ->Threads(8);
 
+void BM_AddressBitset_FreeLookupMiss_HighLoad(benchmark::State &state) {
+  AddressBitset bitset(kSmallTableSize);
+
+  static std::vector<uintptr_t> tracked =
+      capture_real_malloc_addresses(kVeryLargeAddressPool, kDefaultAllocSize);
+  static std::vector<uintptr_t> untracked =
+      capture_real_malloc_addresses(kLargeAddressPool, kDefaultAllocSize);
+
+  for (size_t i = 0; i < tracked.size() / 2; ++i) {
+    bitset.add(tracked[i]);
+  }
+
+  size_t idx = 0;
+  for (auto _ : state) {
+    uintptr_t addr = untracked[idx % untracked.size()];
+    benchmark::DoNotOptimize(bitset.remove(addr));
+    ++idx;
+  }
+
+  state.SetItemsProcessed(state.iterations());
+}
+BENCHMARK(BM_AddressBitset_FreeLookupMiss_HighLoad);
+
 #ifdef ENABLE_ABSL_BENCHMARKS
 template <ContentionMode Mode>
 void BM_Absl_FreeLookupMiss(benchmark::State &state) {
