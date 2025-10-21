@@ -61,7 +61,7 @@ function(add_unit_test name)
     PROPERTIES
       ENVIRONMENT
       "UBSAN_OPTIONS=halt_on_error=1 abort_on_error=1 print_stacktrace=1;\
-LSAN_OPTIONS=detect_leaks=$<BOOL:${DDPROF_DETECT_LEAK}> malloc_context_size=2 print_suppressions=0;\
+LSAN_OPTIONS=detect_leaks=$<BOOL:${DDPROF_DETECT_LEAK}> malloc_context_size=2 print_suppressions=0 suppressions=${CMAKE_SOURCE_DIR}/cmake/lsan.supp;\
 ASAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/cmake/asan.supp detect_stack_use_after_return=$<NOT:$<STREQUAL:${CMAKE_SYSTEM_PROCESSOR},aarch64>>"
   )
   disable_clangtidy(${name})

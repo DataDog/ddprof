@@ -225,6 +225,21 @@ void AddressBitset::clear() {
   }
 }
 
+int AddressBitset::count() const {
+  if (!_chunk_tables) {
+    return 0;
+  }
+
+  int total = 0;
+  for (size_t i = 0; i < kMaxChunks; ++i) {
+    AddressTable *table = _chunk_tables[i].load(std::memory_order_relaxed);
+    if (table) {
+      total += table->count.load(std::memory_order_relaxed);
+    }
+  }
+  return total;
+}
+
 int AddressBitset::active_shards() const {
   if (!_chunk_tables) {
     return 0;

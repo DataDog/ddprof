@@ -101,9 +101,6 @@ private:
   // Level 1: Redirect table (maps chunks to tables)
   std::unique_ptr<std::atomic<AddressTable *>[]> _chunk_tables;
 
-  // Global count for stats (not used for capacity checks)
-  std::atomic<int> _total_count{0};
-
   void move_from(AddressBitset &other) noexcept;
 
   // Get or create table for address
