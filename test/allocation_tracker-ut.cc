@@ -206,12 +206,12 @@ TEST(allocation_tracker, many_tracked_allocs) {
   defer { AllocationTracker::allocation_tracking_free(); };
 
   ASSERT_TRUE(ddprof::AllocationTracker::is_active());
-  
+
   // Test that we can track a reasonable number of allocations
   // With sharded hash tables, capacity is dynamic based on address distribution
   constexpr int kTestAllocations = 10000;
   uint64_t nb_samples = 0;
-  
+
   for (int i = 0; i < kTestAllocations; ++i) {
     uintptr_t addr = 0x1000 + (i * 16);
     my_malloc(1, addr);
@@ -232,7 +232,7 @@ TEST(allocation_tracker, many_tracked_allocs) {
       }
     }
   }
-  
+
   // Should have tracked all allocations
   EXPECT_EQ(nb_samples, kTestAllocations);
 }

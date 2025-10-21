@@ -41,8 +41,8 @@ static void BM_AddressSampler_MultiThreaded(benchmark::State &state) {
   AddressSampler sampler(AddressSampler::SamplingRate::EVERY_16);
 
   const int thread_id = state.thread_index();
-  const uintptr_t base_addr = 0x7f0000000000ULL +
-                               (static_cast<uintptr_t>(thread_id) << 32);
+  const uintptr_t base_addr =
+      0x7f0000000000ULL + (static_cast<uintptr_t>(thread_id) << 32);
 
   std::mt19937_64 gen(42 + thread_id);
   std::uniform_int_distribution<uint32_t> offset_dist(0, 0x3FFFFFFF);
@@ -75,8 +75,8 @@ static void BM_AddressSampler_Sequential(benchmark::State &state) {
   AddressSampler sampler(AddressSampler::SamplingRate::EVERY_32);
 
   const int thread_id = state.thread_index();
-  const uintptr_t base = 0x7f0000000000ULL +
-                          (static_cast<uintptr_t>(thread_id) << 28);
+  const uintptr_t base =
+      0x7f0000000000ULL + (static_cast<uintptr_t>(thread_id) << 28);
 
   uintptr_t addr = base;
   constexpr uintptr_t kAllocSize = 64;
@@ -122,4 +122,3 @@ BENCHMARK(BM_Comparison_Sampling)
 } // namespace ddprof
 
 BENCHMARK_MAIN();
-

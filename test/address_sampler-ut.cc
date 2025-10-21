@@ -158,4 +158,3 @@ TEST(address_sampler, realistic_malloc_pattern) {
 }
 
 } // namespace ddprof
-

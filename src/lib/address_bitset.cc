@@ -30,8 +30,7 @@ unsigned round_up_to_power_of_two(unsigned num) {
 
 // AddressTable implementation
 AddressTable::AddressTable(unsigned size)
-    : table_size(round_up_to_power_of_two(size)),
-      table_mask(table_size - 1),
+    : table_size(round_up_to_power_of_two(size)), table_mask(table_size - 1),
       max_capacity(table_size * kMaxLoadFactorPercent / 100U),
       slots(std::make_unique<std::atomic<uintptr_t>[]>(table_size)) {
   // Initialize all slots to empty
@@ -54,7 +53,7 @@ AddressBitset &AddressBitset::operator=(AddressBitset &&other) noexcept {
 AddressBitset::~AddressBitset() {
   if (_chunk_tables) {
     for (size_t i = 0; i < kMaxChunks; ++i) {
-      AddressTable* table = _chunk_tables[i].load(std::memory_order_relaxed);
+      AddressTable *table = _chunk_tables[i].load(std::memory_order_relaxed);
       delete table;
     }
   }
@@ -64,7 +63,7 @@ void AddressBitset::move_from(AddressBitset &other) noexcept {
   _lower_bits_ignored = other._lower_bits_ignored;
   _per_table_size = other._per_table_size;
   _chunk_tables = std::move(other._chunk_tables);
-  _total_count.store(other._total_count.load(std::memory_order_relaxed), 
+  _total_count.store(other._total_count.load(std::memory_order_relaxed),
                      std::memory_order_relaxed);
 
   // Reset the state of 'other'
@@ -74,30 +73,33 @@ void AddressBitset::move_from(AddressBitset &other) noexcept {
 
 void AddressBitset::init(unsigned table_size) {
   _lower_bits_ignored = _k_max_bits_ignored;
-  
+
   // Calculate per-table size by dividing total capacity by expected tables
-  unsigned total_capacity = table_size ? table_size : AddressTable::kDefaultSize;
-  _per_table_size = std::max(16384U, static_cast<unsigned>(total_capacity / kTablesPerAllocation));
-  
+  unsigned total_capacity =
+      table_size ? table_size : AddressTable::kDefaultSize;
+  _per_table_size = std::max(
+      16384U, static_cast<unsigned>(total_capacity / kTablesPerAllocation));
+
   // Initialize redirect table (Level 1)
-  _chunk_tables = std::make_unique<std::atomic<AddressTable*>[]>(kMaxChunks);
+  _chunk_tables = std::make_unique<std::atomic<AddressTable *>[]>(kMaxChunks);
   for (size_t i = 0; i < kMaxChunks; ++i) {
     _chunk_tables[i].store(nullptr, std::memory_order_relaxed);
   }
 }
 
-AddressTable* AddressBitset::get_table(uintptr_t addr) {
+AddressTable *AddressBitset::get_table(uintptr_t addr) {
   // Determine which chunk this address belongs to
   // Use top bits after removing chunk offset, mask to fit in kMaxChunks
   size_t chunk_idx = (addr >> kChunkShift) & (kMaxChunks - 1);
-  
-  AddressTable* table = _chunk_tables[chunk_idx].load(std::memory_order_acquire);
-  
+
+  AddressTable *table =
+      _chunk_tables[chunk_idx].load(std::memory_order_acquire);
+
   if (!table) {
     // Lazy allocation: create table for this chunk
-    auto* new_table = new AddressTable(_per_table_size);
-    AddressTable* expected = nullptr;
-    
+    auto *new_table = new AddressTable(_per_table_size);
+    AddressTable *expected = nullptr;
+
     if (_chunk_tables[chunk_idx].compare_exchange_strong(
             expected, new_table, std::memory_order_acq_rel)) {
       // Successfully installed our new table
@@ -108,10 +110,9 @@ AddressTable* AddressBitset::get_table(uintptr_t addr) {
       table = expected;
     }
   }
-  
+
   return table;
 }
-
 
 bool AddressBitset::add(uintptr_t addr) {
   if (addr == _k_empty_slot || addr == _k_deleted_slot) {
@@ -120,13 +121,14 @@ bool AddressBitset::add(uintptr_t addr) {
 
   // todo: we might be allocating a table for a single alloc (with mmaps...)
   // This will cause a 1 MB alloc
-  AddressTable* table = get_table(addr);
+  AddressTable *table = get_table(addr);
   if (!table) {
     return false;
   }
-  
+
   // Check if table is at max capacity (60% load factor)
-  if (table->count.load(std::memory_order_relaxed) >= static_cast<int>(table->max_capacity)) {
+  if (table->count.load(std::memory_order_relaxed) >=
+      static_cast<int>(table->max_capacity)) {
     return false; // Table is full
   }
 
@@ -137,7 +139,8 @@ bool AddressBitset::add(uintptr_t addr) {
     uintptr_t current = table->slots[slot].load(std::memory_order_acquire);
 
     // If empty or deleted, try to claim it
-    if (current == AddressTable::kEmptySlot || current == AddressTable::kDeletedSlot) {
+    if (current == AddressTable::kEmptySlot ||
+        current == AddressTable::kDeletedSlot) {
       uintptr_t expected = current;
       if (table->slots[slot].compare_exchange_strong(
               expected, addr, std::memory_order_acq_rel)) {
@@ -168,7 +171,7 @@ bool AddressBitset::remove(uintptr_t addr) {
     return false; // Can't remove sentinel values
   }
 
-  AddressTable* table = get_table(addr);
+  AddressTable *table = get_table(addr);
   if (!table) {
     return false;
   }
@@ -213,10 +216,12 @@ bool AddressBitset::remove(uintptr_t addr) {
 void AddressBitset::clear() {
   if (_chunk_tables) {
     for (size_t chunk_idx = 0; chunk_idx < kMaxChunks; ++chunk_idx) {
-      AddressTable* table = _chunk_tables[chunk_idx].load(std::memory_order_acquire);
+      AddressTable *table =
+          _chunk_tables[chunk_idx].load(std::memory_order_acquire);
       if (table) {
         for (unsigned i = 0; i < table->table_size; ++i) {
-          table->slots[i].store(AddressTable::kEmptySlot, std::memory_order_relaxed);
+          table->slots[i].store(AddressTable::kEmptySlot,
+                                std::memory_order_relaxed);
         }
         table->count.store(0, std::memory_order_relaxed);
       }
@@ -229,7 +234,7 @@ int AddressBitset::active_shards() const {
   if (!_chunk_tables) {
     return 0;
   }
-  
+
   int active = 0;
   for (size_t i = 0; i < kMaxChunks; ++i) {
     if (_chunk_tables[i].load(std::memory_order_relaxed) != nullptr) {

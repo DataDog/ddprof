@@ -64,7 +64,8 @@ public:
     pid_stacks._address_conflict_count = address_conflict_count;
     pid_stacks._tracked_address_count = tracked_addresse_count;
     LG_NTC("<%u> PID %d: live allocations=%lu, Unique "
-           "stacks=%lu, lib tracked addresses=%u, lib active shards=%u, lib address conflicts=%u",
+           "stacks=%lu, lib tracked addresses=%u, lib active shards=%u, lib "
+           "address conflicts=%u",
            watcher_pos, pid, pid_stacks._address_map.size(),
            pid_stacks._unique_stacks.size(), pid_stacks._tracked_address_count,
            active_shards, pid_stacks._address_conflict_count);

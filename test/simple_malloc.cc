@@ -19,10 +19,6 @@
 #include <thread>
 #include <unistd.h>
 
-#ifdef __GLIBC__
-#include <malloc.h>
-#endif
-
 #include "clocks.hpp"
 #include "ddprof_base.hpp"
 #include "enum_flags.hpp"
@@ -158,12 +154,16 @@ extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
   }
   auto end_cpu = ThreadCpuClock::now();
   auto end_time = std::chrono::steady_clock::now();
-  
+
   struct rusage usage;
   getrusage(RUSAGE_SELF, &usage);
-  
-  stats = {nb_alloc, alloc_bytes, end_time - start_time, end_cpu - start_cpu,
-           ddprof::gettid(), usage.ru_maxrss};
+
+  stats = {nb_alloc,
+           alloc_bytes,
+           end_time - start_time,
+           end_cpu - start_cpu,
+           ddprof::gettid(),
+           usage.ru_maxrss};
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)
@@ -202,9 +202,9 @@ void print_header() {
 }
 
 void print_stats(pid_t pid, const Stats &stats) {
-  printf("TestStats  :%-8d,%-8d,%-14lu,%-14lu,%-14lu,%-14lu,%-14ld\n", pid, stats.tid,
-         stats.nb_allocations, stats.allocated_bytes, stats.wall_time.count(),
-         stats.cpu_time.count(), stats.max_rss_kb);
+  printf("TestStats  :%-8d,%-8d,%-14lu,%-14lu,%-14lu,%-14lu,%-14ld\n", pid,
+         stats.tid, stats.nb_allocations, stats.allocated_bytes,
+         stats.wall_time.count(), stats.cpu_time.count(), stats.max_rss_kb);
 }
 
 enum class WrapperOpts : uint8_t {
@@ -399,15 +399,6 @@ int main(int argc, char *argv[]) {
     for (auto &stat : stats) {
       print_stats(pid, stat);
     }
-    
-    // Print malloc arena statistics
-    fprintf(stderr, "\n=== Malloc Arena Statistics ===\n");
-#ifdef __GLIBC__
-    malloc_stats();
-#else
-    fprintf(stderr, "malloc_stats() not available (not glibc)\n");
-#endif
-    fprintf(stderr, "===============================\n");
   } catch (const std::exception &e) {
     fprintf(stderr, "Caught exception: %s\n", e.what());
   }

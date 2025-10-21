@@ -18,16 +18,16 @@ class AddressSampler {
 public:
   // Sampling rates: 1 in N addresses will be tracked
   enum class SamplingRate {
-    EVERY_1 = 0,      // Track all (mask = 0b0)
-    EVERY_2 = 1,      // Track 1/2 (mask = 0b1)
-    EVERY_4 = 3,      // Track 1/4 (mask = 0b11)
-    EVERY_8 = 7,      // Track 1/8 (mask = 0b111)
-    EVERY_16 = 15,    // Track 1/16
-    EVERY_32 = 31,    // Track 1/32
-    EVERY_64 = 63,    // Track 1/64
-    EVERY_128 = 127,  // Track 1/128
-    EVERY_256 = 255,  // Track 1/256
-    EVERY_512 = 511,  // Track 1/512
+    EVERY_1 = 0,     // Track all (mask = 0b0)
+    EVERY_2 = 1,     // Track 1/2 (mask = 0b1)
+    EVERY_4 = 3,     // Track 1/4 (mask = 0b11)
+    EVERY_8 = 7,     // Track 1/8 (mask = 0b111)
+    EVERY_16 = 15,   // Track 1/16
+    EVERY_32 = 31,   // Track 1/32
+    EVERY_64 = 63,   // Track 1/64
+    EVERY_128 = 127, // Track 1/128
+    EVERY_256 = 255, // Track 1/256
+    EVERY_512 = 511, // Track 1/512
   };
 
   explicit AddressSampler(SamplingRate rate = SamplingRate::EVERY_1)
@@ -39,7 +39,7 @@ public:
     if (_sampling_mask == 0) {
       return true; // Track everything
     }
-    
+
     uint32_t hash = hash_address(addr);
     return (hash & _sampling_mask) == 0;
   }
@@ -52,7 +52,7 @@ public:
     // Page-aligned = lower 12 bits are zero
     constexpr uintptr_t kPageMask = 0xFFF;
     if ((addr & kPageMask) == 0) {
-      return true;  // 100% track page-aligned
+      return true; // 100% track page-aligned
     }
 
     // For non-page-aligned, use normal sampling
@@ -75,7 +75,7 @@ public:
     // Page-aligned (4KB): 12 bits
     // 64-byte aligned: 6 bits
     // 16-byte aligned: 4 bits
-    int alignment_bits = __builtin_ctzl(addr | 1);  // |1 prevents inf loop on 0
+    int alignment_bits = __builtin_ctzl(addr | 1); // |1 prevents inf loop on 0
 
     uint32_t hash = hash_address(addr);
 
@@ -89,7 +89,7 @@ public:
       uint32_t adjusted_mask = _sampling_mask >> 2;
       return (hash & adjusted_mask) == 0;
     } else if (alignment_bits >= 8) {
-      // 256-byte aligned: 2× more likely  
+      // 256-byte aligned: 2× more likely
       uint32_t adjusted_mask = _sampling_mask >> 1;
       return (hash & adjusted_mask) == 0;
     } else {
@@ -99,8 +99,8 @@ public:
   }
 
   // Get current sampling rate (for diagnostics)
-  [[nodiscard]] uint32_t get_sampling_rate() const { 
-    return _sampling_mask + 1; 
+  [[nodiscard]] uint32_t get_sampling_rate() const {
+    return _sampling_mask + 1;
   }
 
 private:
@@ -112,16 +112,15 @@ private:
   [[nodiscard]] static uint32_t hash_address(uintptr_t addr) {
     // Remove lower alignment bits (always 0 for aligned allocations)
     uint64_t h = addr >> 4;
-    
+
     // MurmurHash3-style mixing for good avalanche
     h *= 0x9E3779B97F4A7C15ULL;
     h ^= h >> 32;
     h *= 0x85EBCA77C2B2AE63ULL;
     h ^= h >> 32;
-    
+
     return static_cast<uint32_t>(h);
   }
 };
 
 } // namespace ddprof
-

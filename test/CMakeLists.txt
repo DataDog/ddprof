@@ -449,14 +449,10 @@ add_benchmark(
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
   DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384)
 
-add_benchmark(
-  address_bitset-bench
-  address_bitset-bench.cc
-  ../src/lib/address_bitset.cc)
+add_benchmark(address_bitset-bench address_bitset-bench.cc ../src/lib/address_bitset.cc
+              LIBRARIES absl::flat_hash_map absl::hash)
 
-add_benchmark(
-  address_sampler-bench
-  address_sampler-bench.cc)
+add_benchmark(address_sampler-bench address_sampler-bench.cc)
 
 set(SIMPLE_MALLOC_SRC simple_malloc.cc ../src/signal_helper.cc)
 
