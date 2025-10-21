@@ -14,8 +14,8 @@ namespace ddprof {
 // Per-mapping hash table (Level 2)
 struct AddressTable {
   static constexpr unsigned kDefaultSize = 512 * 1024; // 512K slots = 4MB
-  static constexpr unsigned kMaxProbeDistance = 128;
-  static constexpr unsigned kMaxLoadFactorPercent = 60; // 60% load factor
+  static constexpr unsigned kMaxProbeDistance = 64; // not adding an address is OK (though we need to remove)
+  static constexpr unsigned kMaxLoadFactorPercent = 60; // 60% load factor 307200 max addresses (per chunk)
   static constexpr uintptr_t kEmptySlot = 0;
   static constexpr uintptr_t kDeletedSlot = 1;
 
@@ -47,10 +47,11 @@ public:
   static constexpr uintptr_t kChunkShift = 27; // log2(128MB)
   static constexpr size_t kMaxChunks =
       8192; // 8192 chunks × 128MB = 1TB address space
-  static constexpr size_t kTablesPerAllocation = 8; // Expect ~8 active tables
-
-  // Default capacity per table
-  constexpr static unsigned _k_default_table_size = 8 * 1024 * 1024;
+  
+  // Per-chunk table sizing: 128MB / ~4KB avg allocation = ~32K allocations
+  // At 60% load factor, need ~54K slots. Use 64K for headroom.
+  constexpr static unsigned _k_default_table_size = 65536;
+  
   // Maximum probe distance before giving up
   constexpr static unsigned _k_max_probe_distance = 128;
 

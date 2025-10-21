@@ -50,7 +50,10 @@ AddressBitset &AddressBitset::operator=(AddressBitset &&other) noexcept {
   return *this;
 }
 
+
 AddressBitset::~AddressBitset() {
+  // This should not run unless we are sure that we are no longer running the 
+  // allocation tracking. This is not enough of a synchronization
   if (_chunk_tables) {
     for (size_t i = 0; i < kMaxChunks; ++i) {
       AddressTable *table = _chunk_tables[i].load(std::memory_order_relaxed);
@@ -74,16 +77,12 @@ void AddressBitset::move_from(AddressBitset &other) noexcept {
 void AddressBitset::init(unsigned table_size) {
   _lower_bits_ignored = _k_max_bits_ignored;
 
-  // Calculate per-table size by dividing total capacity by expected tables
-  unsigned total_capacity =
-      table_size ? table_size : AddressTable::kDefaultSize;
-  _per_table_size = std::max(
-      16384U, static_cast<unsigned>(total_capacity / kTablesPerAllocation));
+  _per_table_size = table_size ? table_size : _k_default_table_size;
 
   // Initialize redirect table (Level 1)
   _chunk_tables = std::make_unique<std::atomic<AddressTable *>[]>(kMaxChunks);
   for (size_t i = 0; i < kMaxChunks; ++i) {
-    _chunk_tables[i].store(nullptr, std::memory_order_relaxed);
+    _chunk_tables[i].store(nullptr, std::memory_order_release);
   }
 }
 
@@ -100,8 +99,11 @@ AddressTable *AddressBitset::get_table(uintptr_t addr) {
     auto *new_table = new AddressTable(_per_table_size);
     AddressTable *expected = nullptr;
 
+    // Use acq_rel: release ensures table construction is visible to other threads,
+    // acquire synchronizes with competing allocations
     if (_chunk_tables[chunk_idx].compare_exchange_strong(
-            expected, new_table, std::memory_order_acq_rel)) {
+            expected, new_table, std::memory_order_acq_rel,
+            std::memory_order_acquire)) {
       // Successfully installed our new table
       table = new_table;
     } else {

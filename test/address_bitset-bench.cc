@@ -15,6 +15,11 @@
 #  include "absl/container/flat_hash_set.h"
 #endif
 
+
+// Benchmarks support two contention modes:
+// - kHighContention: All threads share same addresses (worst-case, static pool)
+// - kLowContention: Each thread has unique addresses (realistic, thread_local pool)
+
 namespace ddprof {
 
 namespace {
@@ -33,6 +38,11 @@ constexpr size_t kSmallTableSize = 65536;
 constexpr size_t kMaxTracked = 524288;
 constexpr size_t kMaxTrackedTest = 16384;
 #endif
+
+enum class ContentionMode : std::uint8_t {
+  kHighContention,   // All threads share same addresses (worst-case)
+  kLowContention     // Each thread has unique addresses (realistic)
+};
 
 std::vector<uintptr_t> capture_real_malloc_addresses(size_t count,
                                                      size_t alloc_size) {
@@ -56,6 +66,19 @@ std::vector<uintptr_t> capture_real_malloc_addresses(size_t count,
   return addresses;
 }
 
+template <ContentionMode Mode>
+const std::vector<uintptr_t> &get_address_pool(size_t pool_size, size_t alloc_size) {
+  if constexpr (Mode == ContentionMode::kHighContention) {
+    static std::vector<uintptr_t> addresses = 
+        capture_real_malloc_addresses(pool_size, alloc_size);
+    return addresses;
+  } else {
+    thread_local std::vector<uintptr_t> addresses = 
+        capture_real_malloc_addresses(pool_size, alloc_size);
+    return addresses;
+  }
+}
+
 void BM_AddressBitset_RealAddresses(benchmark::State &state) {
   AddressBitset bitset(AddressBitset::_k_default_table_size);
 
@@ -74,11 +97,11 @@ void BM_AddressBitset_RealAddresses(benchmark::State &state) {
 }
 BENCHMARK(BM_AddressBitset_RealAddresses);
 
+template <ContentionMode Mode>
 void BM_AddressBitset_RealAddresses_MT(benchmark::State &state) {
   static AddressBitset bitset(AddressBitset::_k_default_table_size);
 
-  thread_local static std::vector<uintptr_t> addresses =
-      capture_real_malloc_addresses(kLargeAddressPool, kDefaultAllocSize);
+  const auto &addresses = get_address_pool<Mode>(kLargeAddressPool, kDefaultAllocSize);
 
   size_t idx = 0;
   for (auto _ : state) {
@@ -90,7 +113,11 @@ void BM_AddressBitset_RealAddresses_MT(benchmark::State &state) {
 
   state.SetItemsProcessed(state.iterations() * 2);
 }
-BENCHMARK(BM_AddressBitset_RealAddresses_MT)
+BENCHMARK(BM_AddressBitset_RealAddresses_MT<ContentionMode::kHighContention>)
+    ->Threads(1)
+    ->Threads(4)
+    ->Threads(8);
+BENCHMARK(BM_AddressBitset_RealAddresses_MT<ContentionMode::kLowContention>)
     ->Threads(1)
     ->Threads(4)
     ->Threads(8);
@@ -170,6 +197,7 @@ BENCHMARK(BM_Absl_RealAddresses);
 #endif // ENABLE_ABSL_BENCHMARKS
 
 #ifdef ENABLE_ABSL_BENCHMARKS
+template <ContentionMode Mode>
 void BM_Absl_RealAddresses_MT(benchmark::State &state) {
   static absl::flat_hash_set<uintptr_t> set(kMaxTrackedTest);
 
@@ -177,8 +205,7 @@ void BM_Absl_RealAddresses_MT(benchmark::State &state) {
     set.clear();
   }
 
-  thread_local static std::vector<uintptr_t> addresses =
-      capture_real_malloc_addresses(kLargeAddressPool, kDefaultAllocSize);
+  const auto &addresses = get_address_pool<Mode>(kLargeAddressPool, kDefaultAllocSize);
 
   size_t idx = 0;
   for (auto _ : state) {
@@ -190,14 +217,15 @@ void BM_Absl_RealAddresses_MT(benchmark::State &state) {
 
   state.SetItemsProcessed(state.iterations() * 2);
 }
-BENCHMARK(BM_Absl_RealAddresses_MT)->Threads(1)->Threads(4)->Threads(8);
+BENCHMARK(BM_Absl_RealAddresses_MT<ContentionMode::kHighContention>)->Threads(1)->Threads(4)->Threads(8);
+BENCHMARK(BM_Absl_RealAddresses_MT<ContentionMode::kLowContention>)->Threads(1)->Threads(4)->Threads(8);
 #endif // ENABLE_ABSL_BENCHMARKS
 
+template <ContentionMode Mode>
 void BM_AddressBitset_LiveTracking(benchmark::State &state) {
   static AddressBitset bitset(AddressBitset::_k_default_table_size);
 
-  thread_local static std::vector<uintptr_t> addresses =
-      capture_real_malloc_addresses(kVeryLargeAddressPool, kDefaultAllocSize);
+  const auto &addresses = get_address_pool<Mode>(kVeryLargeAddressPool, kDefaultAllocSize);
 
   thread_local std::vector<uintptr_t> live_addresses;
   live_addresses.reserve(kMediumAddressPool);
@@ -228,9 +256,11 @@ void BM_AddressBitset_LiveTracking(benchmark::State &state) {
 
   state.SetItemsProcessed(state.iterations());
 }
-BENCHMARK(BM_AddressBitset_LiveTracking)->Threads(1)->Threads(4)->Threads(8);
+BENCHMARK(BM_AddressBitset_LiveTracking<ContentionMode::kHighContention>)->Threads(1)->Threads(4)->Threads(8);
+BENCHMARK(BM_AddressBitset_LiveTracking<ContentionMode::kLowContention>)->Threads(1)->Threads(4)->Threads(8);
 
 #ifdef ENABLE_ABSL_BENCHMARKS
+template <ContentionMode Mode>
 void BM_Absl_LiveTracking(benchmark::State &state) {
   static absl::flat_hash_set<uintptr_t> set(kMaxTracked);
 
@@ -238,8 +268,7 @@ void BM_Absl_LiveTracking(benchmark::State &state) {
     set.clear();
   }
 
-  thread_local static std::vector<uintptr_t> addresses =
-      capture_real_malloc_addresses(kVeryLargeAddressPool, kDefaultAllocSize);
+  const auto &addresses = get_address_pool<Mode>(kVeryLargeAddressPool, kDefaultAllocSize);
 
   thread_local std::vector<uintptr_t> live_addresses;
   live_addresses.reserve(kMediumAddressPool);
@@ -270,16 +299,16 @@ void BM_Absl_LiveTracking(benchmark::State &state) {
 
   state.SetItemsProcessed(state.iterations());
 }
-BENCHMARK(BM_Absl_LiveTracking)->Threads(1)->Threads(4)->Threads(8);
+BENCHMARK(BM_Absl_LiveTracking<ContentionMode::kHighContention>)->Threads(1)->Threads(4)->Threads(8);
+BENCHMARK(BM_Absl_LiveTracking<ContentionMode::kLowContention>)->Threads(1)->Threads(4)->Threads(8);
 #endif // ENABLE_ABSL_BENCHMARKS
 
+template <ContentionMode Mode>
 void BM_AddressBitset_FreeLookupMiss(benchmark::State &state) {
   static AddressBitset bitset(AddressBitset::_k_default_table_size);
 
-  thread_local static std::vector<uintptr_t> tracked =
-      capture_real_malloc_addresses(kSmallAddressPool, kDefaultAllocSize);
-  thread_local static std::vector<uintptr_t> untracked =
-      capture_real_malloc_addresses(kLargeAddressPool, kDefaultAllocSize);
+  const auto &tracked = get_address_pool<Mode>(kSmallAddressPool, kDefaultAllocSize);
+  const auto &untracked = get_address_pool<Mode>(kLargeAddressPool, kDefaultAllocSize);
 
   if (state.thread_index() == 0 && state.iterations() == 0) {
     for (auto addr : tracked) {
@@ -296,16 +325,16 @@ void BM_AddressBitset_FreeLookupMiss(benchmark::State &state) {
 
   state.SetItemsProcessed(state.iterations());
 }
-BENCHMARK(BM_AddressBitset_FreeLookupMiss)->Threads(1)->Threads(4)->Threads(8);
+BENCHMARK(BM_AddressBitset_FreeLookupMiss<ContentionMode::kHighContention>)->Threads(1)->Threads(4)->Threads(8);
+BENCHMARK(BM_AddressBitset_FreeLookupMiss<ContentionMode::kLowContention>)->Threads(1)->Threads(4)->Threads(8);
 
 #ifdef ENABLE_ABSL_BENCHMARKS
+template <ContentionMode Mode>
 void BM_Absl_FreeLookupMiss(benchmark::State &state) {
   static absl::flat_hash_set<uintptr_t> set(kMaxTrackedTest);
 
-  thread_local static std::vector<uintptr_t> tracked =
-      capture_real_malloc_addresses(kSmallAddressPool, kDefaultAllocSize);
-  thread_local static std::vector<uintptr_t> untracked =
-      capture_real_malloc_addresses(kLargeAddressPool, kDefaultAllocSize);
+  const auto &tracked = get_address_pool<Mode>(kSmallAddressPool, kDefaultAllocSize);
+  const auto &untracked = get_address_pool<Mode>(kLargeAddressPool, kDefaultAllocSize);
 
   if (state.thread_index() == 0) {
     set.clear();
@@ -323,7 +352,8 @@ void BM_Absl_FreeLookupMiss(benchmark::State &state) {
 
   state.SetItemsProcessed(state.iterations());
 }
-BENCHMARK(BM_Absl_FreeLookupMiss)->Threads(1)->Threads(4)->Threads(8);
+BENCHMARK(BM_Absl_FreeLookupMiss<ContentionMode::kHighContention>)->Threads(1)->Threads(4)->Threads(8);
+BENCHMARK(BM_Absl_FreeLookupMiss<ContentionMode::kLowContention>)->Threads(1)->Threads(4)->Threads(8);
 #endif // ENABLE_ABSL_BENCHMARKS
 
 } // namespace
