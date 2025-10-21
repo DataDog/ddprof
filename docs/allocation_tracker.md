@@ -104,21 +104,20 @@ AddressTable* table = _chunk_tables[chunk_idx];
 
 ### Why This Works
 
-**Key insight**: Glibc malloc spaces thread arenas ~128MB apart:
+Glibc malloc spaces thread arenas
 - Thread 1 allocates from `0x78e3'b800'0000` - `0x78e3'bfff'ffff` (128MB chunk)
 - Thread 2 allocates from `0x78e3'c000'0000` - `0x78e3'c7ff'ffff` (different chunk)
 - 128MB chunks align with typical allocator arena spacing for natural per-thread sharding
 
-
 ### Benefits
 
 **No collisions** - stores actual addresses with linear probing  
-**Thread separation** - different threads use different tables (not always :()
+**Thread separation** - different threads use different tables (not totally true...)
 **Lazy allocation** - only allocate tables for active chunks  
-**Bounded memory** - max 8192 chunks × 4MB = 32GB (but only allocate what's used)
+**Bounded memory** - max 128 chunks × 32K slots × 8 bytes = 32 MB worst case (typically much less)
 **Fast lookups** - O(1) with minimal probing
 **Signal-safe** - atomic operations only after initialization
-**Arena-aligned sharding** - 128MB chunks match glibc arena spacing for natural per-thread distribution
+**Hash-based sharding** - distributes addresses across 128 shards using hash function
 
 ### Performance
 
@@ -193,39 +192,6 @@ Test configuration:
 | Absl flat_hash_set | 6.4 MB | 469,659 | 75 | 0 | N/A |
 | Global original | 5.9 MB | 521,311 | 39 | 36,509 | N/A |
 
-*Note: Values shown are from first profiling period. Lost events drop to near-zero in subsequent periods.*
-
-*With old event prioritization; new prioritization eliminates unmatched deallocations
-
-### Detailed Metrics
-
-#### Event Quality (from ddprof diagnostics, first profiling period)
-
-**Sharded Implementation (128MB chunks):**
-```
-event.lost: 63 (initial period), 0 (subsequent)
-event.out_of_order: 469,930 
-unmatched_deallocation: 0
-already_existing_allocation: 0
-tracked addresses: 1 (at reporting time)
-active_shards: 6 (out of 8 threads)
-```
-
-**Absl flat_hash_set (fixed-size, no resize):**
-```
-event.lost: 75 (initial period), 0 (subsequent)
-event.out_of_order: 469,659 (comparable to sharded)
-unmatched_deallocation: 0
-already_existing_allocation: 0
-tracked addresses: 4 (at reporting time)
-```
-
-**Global Original (bitset-based):**
-```
-event.lost: 39 (initial period), 4 (subsequent)
-event.out_of_order: 521,311 (10% worse)
-unmatched_deallocation: 36,509 (persistent due to hash collisions)
-```
 
 #### Throughput Analysis
 
@@ -236,7 +202,7 @@ Allocations per thread over 102 seconds (8 threads total, 1KB allocations):
 | Baseline | 20,000,000 | 195,115/s | 100% |
 | Sharded | 20,000,000 | 194,216/s | 99.5% |
 | Absl | 20,000,000 | 193,614/s | 99.2% |
-| Global | 20,000,000 | 194,754/s | 99.8% |
+| Previous | 20,000,000 | 194,754/s | 99.8% |
 
 **Observations:**
 - All implementations show <1% throughput difference from baseline
@@ -248,22 +214,6 @@ Cache misses are dominated by profiling infrastructure (unwinding, ring buffer):
 - All profiled versions: ~176-201M cache misses (25× increase from profiling overhead, not tracking structure)
 
 ### Analysis: Absl flat_hash_set vs Sharded Implementation
-
-**Absl flat_hash_set observations:**
-- Lower memory usage (6.4 MB vs 8.3 MB)
-- Comparable out-of-order event count (469,659 vs 469,930)
-- Comparable lost events (75 vs 63)
-- Fixed size pre-allocated to avoid resize operations
-- Thread safety of concurrent operations on fixed-size flat_hash_set requires further investigation
-- Standard Absl flat_hash_set is not thread-safe for concurrent writes, but with fixed size (no resizing), the correctness of concurrent inserts/erases needs detailed study
-
-**Sharded implementation observations (128MB chunks):**
-- Slightly higher memory usage due to lazy chunk allocation (8.3 MB)
-- Comparable out-of-order events (469,930 vs 469,659)
-- Comparable lost events (63 vs 75)
-- **Successful sharding**: 6 active shards out of 8 threads (128MB chunks align with glibc arena spacing)
-- Designed explicitly for thread safety using atomic operations
-- Per-chunk tables naturally distribute load when threads use different address ranges
 
 **Key findings**:
 - With proper chunk sizing (128MB), the sharded implementation achieves good thread distribution
@@ -281,17 +231,6 @@ The sharded implementation uses 8.3 MB (4.3 MB overhead vs baseline) with 128MB 
 - **Total**: 64 KB + (6 × 4 MB) = ~24 MB allocated, 8.3 MB RSS
 - **Lazy allocation**: Only allocates for chunks with active allocations
 
-Memory footprint comparison:
-- **Global original**: 5.9 MB (uses bitset, but has hash collision issues)
-- **Absl flat_hash_set**: 6.4 MB (fixed pre-allocation, ~2× hash table size for good load factor)
-- **Sharded**: 8.3 MB (per-thread tables, best thread safety guarantees)
-
-Both the sharded implementation and Absl flat_hash_set eliminate the hash collision problem:
-- Sharded: 10% better out-of-order events vs global (469,930 vs 521,311)
-- Absl: 10% better out-of-order events vs global (469,659 vs 521,311)
-- Both eliminate unmatched deallocations (0 vs 36,509 for global)
-- Memory overhead is acceptable for correctness guarantees
-- Sharded provides explicit thread safety with modest memory cost
 
 ### Unmatched Deallocation Note
 

@@ -4,7 +4,6 @@
 // Datadog, Inc.
 #include "address_bitset.hpp"
 
-#include <algorithm>
 #include <unlikely.hpp>
 
 namespace ddprof {
@@ -31,7 +30,7 @@ unsigned round_up_to_power_of_two(unsigned num) {
 // AddressTable implementation
 AddressTable::AddressTable(unsigned size)
     : table_size(round_up_to_power_of_two(size)), table_mask(table_size - 1),
-      max_capacity(table_size * kMaxLoadFactorPercent / 100U),
+      max_capacity(table_size * kMaxLoadFactorPercent / kPercentDivisor),
       slots(std::make_unique<std::atomic<uintptr_t>[]>(table_size)) {
   // Initialize all slots to empty
   for (unsigned i = 0; i < table_size; ++i) {
@@ -82,10 +81,12 @@ void AddressBitset::init(unsigned table_size) {
   }
 }
 
-AddressTable *AddressBitset::get_table(uintptr_t addr) {
-  // Determine which chunk this address belongs to
-  // Use top bits after removing chunk offset, mask to fit in kMaxChunks
-  size_t chunk_idx = (addr >> kChunkShift) & (kMaxChunks - 1);
+AddressTable *AddressBitset::get_table(uintptr_t addr, uint64_t &out_hash) {
+  // Hash once for both chunk selection and slot lookup
+  out_hash = compute_full_hash(addr);
+  
+  // Use upper 32 bits for chunk selection
+  const size_t chunk_idx = (out_hash >> 32) % kMaxChunks;
 
   AddressTable *table =
       _chunk_tables[chunk_idx].load(std::memory_order_acquire);
@@ -117,9 +118,9 @@ bool AddressBitset::add(uintptr_t addr) {
     return false; // Can't track sentinel values
   }
 
-  // todo: we might be allocating a table for a single alloc (with mmaps...)
-  // This will cause a 1 MB alloc
-  AddressTable *table = get_table(addr);
+  // Hash once for both chunk and slot lookup
+  uint64_t hash;
+  AddressTable *table = get_table(addr, hash);
   if (!table) {
     return false;
   }
@@ -130,7 +131,7 @@ bool AddressBitset::add(uintptr_t addr) {
     return false; // Table is full
   }
 
-  uint32_t slot = hash_address(addr, _lower_bits_ignored, table->table_mask);
+  uint32_t slot = hash_to_slot(hash, table->table_mask);
 
   // Linear probing to find an empty/deleted slot or the address
   for (unsigned probe = 0; probe < AddressTable::kMaxProbeDistance; ++probe) {
@@ -168,12 +169,14 @@ bool AddressBitset::remove(uintptr_t addr) {
     return false; // Can't remove sentinel values
   }
 
-  AddressTable *table = get_table(addr);
+  // Hash once for both chunk and slot lookup
+  uint64_t hash;
+  AddressTable *table = get_table(addr, hash);
   if (!table) {
     return false;
   }
 
-  uint32_t slot = hash_address(addr, _lower_bits_ignored, table->table_mask);
+  uint32_t slot = hash_to_slot(hash, table->table_mask);
 
   // Linear probing to find the address
   for (unsigned probe = 0; probe < AddressTable::kMaxProbeDistance; ++probe) {

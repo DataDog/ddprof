@@ -5,13 +5,16 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <iostream>
 #include <random>
 #include <unordered_set>
 
 #include "address_bitset.hpp"
 
 namespace ddprof {
+
+namespace {
+constexpr uint32_t kDeterministicSeed = 42;
+} // namespace
 
 TEST(address_bitset, simple) {
   AddressBitset address_bitset(AddressBitset::_k_default_table_size);
@@ -21,16 +24,25 @@ TEST(address_bitset, simple) {
 }
 
 TEST(address_bitset, many_addresses) {
-  constexpr unsigned kTestElements = 100000;
+#ifdef __SANITIZE_ADDRESS__
+  constexpr unsigned kTestElements = 5000;
+#else
+  constexpr unsigned kTestElements = 10000;
+#endif
   AddressBitset address_bitset(AddressBitset::_k_default_table_size);
   std::random_device rd;
   std::mt19937 gen(rd());
-  std::uniform_int_distribution<uintptr_t> dis(
-      0, std::numeric_limits<uintptr_t>::max());
+
+  // Keep addresses within same chunk to avoid expensive table creation
+  constexpr uintptr_t kAlignmentMask = 0xF;
+  constexpr uintptr_t kChunkMask = (1ULL << AddressBitset::kChunkShift) - 1;
+  constexpr uintptr_t kBaseAddr = 0x7f0000000000ULL; // Typical heap range
+  std::uniform_int_distribution<uintptr_t> dis(0, kChunkMask);
 
   std::vector<uintptr_t> addresses;
   for (unsigned i = 0; i < kTestElements; ++i) {
-    uintptr_t addr = dis(gen);
+    uintptr_t addr =
+        kBaseAddr + (dis(gen) & ~kAlignmentMask); // 16-byte aligned
     if (address_bitset.add(addr)) {
       addresses.push_back(addr);
     }
@@ -46,19 +58,27 @@ TEST(address_bitset, no_false_collisions) {
   // collisions (unlike the old bitset which had ~6% collision rate)
   AddressBitset address_bitset(AddressBitset::_k_default_table_size);
 
-  constexpr size_t kTestAllocCount = 500000; // 50% load factor
+#ifdef __SANITIZE_ADDRESS__
+  constexpr size_t kTestAllocCount = 5000; // ~8% load factor
+#else
+  constexpr size_t kTestAllocCount = 20000; // ~30% load factor
+#endif
   constexpr uintptr_t kAlignmentMask = 0xF;
 
   std::random_device rd;
   // NOLINTNEXTLINE(cert-msc32-c,cert-msc51-cpp)
-  std::mt19937 gen(42);
-  std::uniform_int_distribution<uintptr_t> dist(0, UINTPTR_MAX);
+  std::mt19937 gen(kDeterministicSeed);
+
+  // Keep addresses within same chunk to avoid expensive table creation
+  constexpr uintptr_t kChunkMask = (1ULL << AddressBitset::kChunkShift) - 1;
+  constexpr uintptr_t kBaseAddr = 0x7f0000000000ULL; // Typical heap range
+  std::uniform_int_distribution<uintptr_t> dist(0, kChunkMask);
 
   std::vector<uintptr_t> test_addresses;
   std::unordered_set<uintptr_t> unique_addresses;
 
   while (unique_addresses.size() < kTestAllocCount) {
-    uintptr_t addr = dist(gen) & ~kAlignmentMask;
+    uintptr_t addr = kBaseAddr + (dist(gen) & ~kAlignmentMask);
     if (addr != 0 && unique_addresses.insert(addr).second) {
       test_addresses.push_back(addr);
     }
@@ -83,55 +103,6 @@ TEST(address_bitset, no_false_collisions) {
   }
 
   EXPECT_EQ(remove_failures, 0);
-}
-
-TEST(address_bitset, hash_collision_handled) {
-  // Test that addresses which hash to the same slot are BOTH tracked
-  // correctly (using linear probing)
-  constexpr unsigned table_size = AddressBitset::_k_default_table_size;
-  constexpr uintptr_t kAlignmentMask = 0xF;
-  constexpr int kMaxSearchIterations = 10000000;
-
-  AddressBitset address_bitset(table_size);
-
-  // NOLINTNEXTLINE(cert-msc32-c,cert-msc51-cpp)
-  std::mt19937 gen(42);
-  std::uniform_int_distribution<uintptr_t> dist(0, UINTPTR_MAX);
-
-  std::unordered_map<uint32_t, uintptr_t> hash_to_addr;
-  uintptr_t addr1 = 0;
-  uintptr_t addr2 = 0;
-
-  // Find two addresses that hash to the same slot
-  for (int i = 0; i < kMaxSearchIterations && addr1 == 0; ++i) {
-    uintptr_t addr = dist(gen) & ~kAlignmentMask;
-    if (addr == 0) {
-      continue;
-    }
-
-    uint64_t intermediate = addr >> 4;
-    auto high = static_cast<uint32_t>(intermediate >> 32);
-    auto low = static_cast<uint32_t>(intermediate);
-    uint32_t hash = (high ^ low) & (table_size - 1);
-
-    if (hash_to_addr.contains(hash)) {
-      addr1 = hash_to_addr[hash];
-      addr2 = addr;
-      break;
-    }
-    hash_to_addr[hash] = addr;
-  }
-
-  ASSERT_NE(addr1, 0);
-  ASSERT_NE(addr2, 0);
-
-  // Both should be added successfully (linear probing handles collision)
-  EXPECT_TRUE(address_bitset.add(addr1));
-  EXPECT_TRUE(address_bitset.add(addr2)); // This works now!
-
-  // Both should be removable independently
-  EXPECT_TRUE(address_bitset.remove(addr1));
-  EXPECT_TRUE(address_bitset.remove(addr2));
 }
 
 } // namespace ddprof

@@ -15,9 +15,10 @@ namespace ddprof {
 struct AddressTable {
   static constexpr unsigned kDefaultSize = 512 * 1024; // 512K slots = 4MB
   static constexpr unsigned kMaxProbeDistance =
-      64; // not adding an address is OK (though we need to remove)
+      64;
   static constexpr unsigned kMaxLoadFactorPercent =
       60; // 60% load factor 307200 max addresses (per chunk)
+  static constexpr unsigned kPercentDivisor = 100;
   static constexpr uintptr_t kEmptySlot = 0;
   static constexpr uintptr_t kDeletedSlot = 1;
 
@@ -47,15 +48,15 @@ class AddressBitset {
 public:
   // Chunk size: 128MB per chunk (matches typical glibc arena spacing)
   static constexpr uintptr_t kChunkShift = 27; // log2(128MB)
-  static constexpr size_t kMaxChunks =
-      8192; // 8192 chunks × 128MB = 1TB address space
-
+  static constexpr size_t kMaxChunks = 128; // 128 shards for load distribution
+  
   // Per-chunk table sizing: 128MB / ~4KB avg allocation = ~32K allocations
-  // At 60% load factor, need ~54K slots. Use 64K for headroom.
-  constexpr static unsigned _k_default_table_size = 65536;
+  // At 60% load factor, need ~27K slots. Use 32K for headroom.
+  // Max memory: 128 chunks × 32K slots × 8 bytes = 32 MB
+  constexpr static unsigned _k_default_table_size = 32768;
 
   // Maximum probe distance before giving up
-  constexpr static unsigned _k_max_probe_distance = 32;
+  constexpr static unsigned _k_max_probe_distance = 64;
 
   explicit AddressBitset(unsigned table_size = 0) { init(table_size); }
   AddressBitset(AddressBitset &&other) noexcept;
@@ -82,7 +83,8 @@ public:
 
   // Get shard index for address (for testing/diagnostics)
   [[nodiscard]] static size_t get_shard_index(uintptr_t addr) {
-    return (addr >> kChunkShift) & (kMaxChunks - 1);
+    uint64_t hash = compute_full_hash(addr);
+    return (hash >> 32) % kMaxChunks;
   }
 
   // Initialize with given table size (can be called on default-constructed
@@ -103,27 +105,28 @@ private:
 
   void move_from(AddressBitset &other) noexcept;
 
-  // Get or create table for address
-  AddressTable *get_table(uintptr_t addr);
+  // Get or create table for address, returns table and hash for slot lookup
+  AddressTable *get_table(uintptr_t addr, uint64_t &out_hash);
 
   static constexpr uint64_t kHashMultiplier1 =
       0x9E3779B97F4A7C15ULL; // Golden ratio * 2^64
   static constexpr uint64_t kHashMultiplier2 =
       0x85EBCA77C2B2AE63ULL; // Large prime
 
-  // Hash function: multiply-shift with good mixing
-  [[nodiscard]] static uint32_t hash_address(uintptr_t addr,
-                                             unsigned lower_bits_ignored,
-                                             unsigned table_mask) {
-    // Remove alignment bits
-    uint64_t h = addr >> lower_bits_ignored;
-    // Multiply by large prime (golden ratio * 2^64)
+  // Compute full hash for address (hash once, use for both chunk and slot)
+  [[nodiscard]] static uint64_t compute_full_hash(uintptr_t addr) {
+    uint64_t h = addr >> _k_max_bits_ignored;
     h *= kHashMultiplier1;
-    // Mix upper and lower bits
     h ^= h >> 32;
     h *= kHashMultiplier2;
     h ^= h >> 32;
-    return static_cast<uint32_t>(h) & table_mask;
+    return h;
+  }
+
+  // Extract slot from precomputed hash
+  [[nodiscard]] static uint32_t hash_to_slot(uint64_t hash,
+                                              unsigned table_mask) {
+    return static_cast<uint32_t>(hash) & table_mask;
   }
 };
 } // namespace ddprof
