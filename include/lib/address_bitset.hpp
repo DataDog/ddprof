@@ -14,8 +14,10 @@ namespace ddprof {
 // Per-mapping hash table (Level 2)
 struct AddressTable {
   static constexpr unsigned kDefaultSize = 512 * 1024; // 512K slots = 4MB
-  static constexpr unsigned kMaxProbeDistance = 64; // not adding an address is OK (though we need to remove)
-  static constexpr unsigned kMaxLoadFactorPercent = 60; // 60% load factor 307200 max addresses (per chunk)
+  static constexpr unsigned kMaxProbeDistance =
+      64; // not adding an address is OK (though we need to remove)
+  static constexpr unsigned kMaxLoadFactorPercent =
+      60; // 60% load factor 307200 max addresses (per chunk)
   static constexpr uintptr_t kEmptySlot = 0;
   static constexpr uintptr_t kDeletedSlot = 1;
 
@@ -47,13 +49,13 @@ public:
   static constexpr uintptr_t kChunkShift = 27; // log2(128MB)
   static constexpr size_t kMaxChunks =
       8192; // 8192 chunks × 128MB = 1TB address space
-  
+
   // Per-chunk table sizing: 128MB / ~4KB avg allocation = ~32K allocations
   // At 60% load factor, need ~54K slots. Use 64K for headroom.
   constexpr static unsigned _k_default_table_size = 65536;
-  
+
   // Maximum probe distance before giving up
-  constexpr static unsigned _k_max_probe_distance = 128;
+  constexpr static unsigned _k_max_probe_distance = 32;
 
   explicit AddressBitset(unsigned table_size = 0) { init(table_size); }
   AddressBitset(AddressBitset &&other) noexcept;
@@ -72,12 +74,16 @@ public:
   void clear();
 
   // Get approximate count (for stats/reporting only, not for capacity checks)
-  [[nodiscard]] int count() const {
-    return _total_count.load(std::memory_order_relaxed);
-  }
+  // Aggregates counts from all active tables
+  [[nodiscard]] int count() const;
 
   // Get number of active shards (for stats/reporting)
   [[nodiscard]] int active_shards() const;
+
+  // Get shard index for address (for testing/diagnostics)
+  [[nodiscard]] static size_t get_shard_index(uintptr_t addr) {
+    return (addr >> kChunkShift) & (kMaxChunks - 1);
+  }
 
   // Initialize with given table size (can be called on default-constructed
   // object)

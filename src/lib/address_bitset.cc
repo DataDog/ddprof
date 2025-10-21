@@ -50,9 +50,8 @@ AddressBitset &AddressBitset::operator=(AddressBitset &&other) noexcept {
   return *this;
 }
 
-
 AddressBitset::~AddressBitset() {
-  // This should not run unless we are sure that we are no longer running the 
+  // This should not run unless we are sure that we are no longer running the
   // allocation tracking. This is not enough of a synchronization
   if (_chunk_tables) {
     for (size_t i = 0; i < kMaxChunks; ++i) {
@@ -66,12 +65,9 @@ void AddressBitset::move_from(AddressBitset &other) noexcept {
   _lower_bits_ignored = other._lower_bits_ignored;
   _per_table_size = other._per_table_size;
   _chunk_tables = std::move(other._chunk_tables);
-  _total_count.store(other._total_count.load(std::memory_order_relaxed),
-                     std::memory_order_relaxed);
 
   // Reset the state of 'other'
   other._per_table_size = 0;
-  other._total_count.store(0, std::memory_order_relaxed);
 }
 
 void AddressBitset::init(unsigned table_size) {
@@ -99,8 +95,8 @@ AddressTable *AddressBitset::get_table(uintptr_t addr) {
     auto *new_table = new AddressTable(_per_table_size);
     AddressTable *expected = nullptr;
 
-    // Use acq_rel: release ensures table construction is visible to other threads,
-    // acquire synchronizes with competing allocations
+    // Use acq_rel: release ensures table construction is visible to other
+    // threads, acquire synchronizes with competing allocations
     if (_chunk_tables[chunk_idx].compare_exchange_strong(
             expected, new_table, std::memory_order_acq_rel,
             std::memory_order_acquire)) {
@@ -148,7 +144,6 @@ bool AddressBitset::add(uintptr_t addr) {
               expected, addr, std::memory_order_acq_rel)) {
         // Successfully inserted
         table->count.fetch_add(1, std::memory_order_relaxed);
-        _total_count.fetch_add(1, std::memory_order_relaxed);
         return true;
       }
       // CAS failed, reload and check what's there now
@@ -200,7 +195,6 @@ bool AddressBitset::remove(uintptr_t addr) {
       if (table->slots[slot].compare_exchange_strong(
               current, AddressTable::kDeletedSlot, std::memory_order_acq_rel)) {
         table->count.fetch_sub(1, std::memory_order_relaxed);
-        _total_count.fetch_sub(1, std::memory_order_relaxed);
         return true;
       }
       // CAS failed - someone else modified this slot
@@ -229,7 +223,6 @@ void AddressBitset::clear() {
       }
     }
   }
-  _total_count.store(0, std::memory_order_relaxed);
 }
 
 int AddressBitset::active_shards() const {

@@ -31,7 +31,7 @@ We need a data structure that:
 
 ## Explored Alternatives
 
-### 1. Header-Based Tracking (Rejected)
+### 1. Header-Based Tracking
 
 Store metadata in a header before each tracked allocation:
 
@@ -58,10 +58,11 @@ void tracked_free(void* ptr) {
 }
 ```
 
-**Why rejected**:
-- **Requires allocator cooperation** - it is not easy to know if you can read before the pointer
+**Why difficult to implement**:
+- **Requires allocator cooperation** - hard to know if you can read before the pointer
 - **Boundary safety** - reading header can segfault at memory boundaries
 - **Allocator interference** - system `realloc()` doesn't know about our headers
+- **Alignment issues** - if user asks for aligned mem, we need to respect the request
 
 Could work with custom allocator support.
 
@@ -112,12 +113,12 @@ AddressTable* table = _chunk_tables[chunk_idx];
 ### Benefits
 
 **No collisions** - stores actual addresses with linear probing  
-**Thread separation** - different threads use different tables  
+**Thread separation** - different threads use different tables (not always :()
 **Lazy allocation** - only allocate tables for active chunks  
-**Bounded memory** - max 8192 chunks × 4MB = 32GB (but only allocate what's used)  
-**Fast lookups** - O(1) with minimal probing  
-**Signal-safe** - atomic operations only after initialization  
-**Arena-aligned sharding** - 128MB chunks match glibc arena spacing for natural per-thread distribution  
+**Bounded memory** - max 8192 chunks × 4MB = 32GB (but only allocate what's used)
+**Fast lookups** - O(1) with minimal probing
+**Signal-safe** - atomic operations only after initialization
+**Arena-aligned sharding** - 128MB chunks match glibc arena spacing for natural per-thread distribution
 
 ### Performance
 
@@ -299,16 +300,13 @@ The new implementations (sharded and Absl) eliminate unmatched deallocations by 
 ## Conclusion
 
 **Implementation Status**:
-We are trying to define what is better between the sharded hashmap / absl strategy.
+Absl seems to crash (within the benchmark in this branch).
+So we have to go for our own implementation.
 
 **Open questions**:
-- Thread safety of fixed-size Absl flat_hash_set under concurrent writes needs investigation
-- Root cause of higher lost events with Absl (14,058 vs 1,663) requires study. Is this good or bad ?
 - Memory vs accuracy trade-offs in production environments with diverse workloads
 
 **Future work**:
-- Investigate Absl flat_hash_set thread safety with fixed size (no resize)
-- Study lost event attribution (data structure vs profiling overhead)
 - Add stateless sampling as alternative "low-overhead" mode
 - Consider header-based approach if custom allocator integration becomes available
 - Monitor memory usage in production environments with diverse allocation patterns
