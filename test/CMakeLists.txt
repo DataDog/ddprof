@@ -391,8 +391,6 @@ add_unit_test(pthread_tls-ut pthread_tls-ut.cc)
 
 add_unit_test(address_bitset-ut address_bitset-ut.cc ../src/lib/address_bitset.cc)
 
-add_unit_test(address_sampler-ut address_sampler-ut.cc)
-
 add_unit_test(lib_logger-ut ./lib_logger-ut.cc)
 
 add_unit_test(
@@ -451,8 +449,6 @@ add_benchmark(
 
 add_benchmark(address_bitset-bench address_bitset-bench.cc ../src/lib/address_bitset.cc
               LIBRARIES absl::flat_hash_map absl::hash)
-
-add_benchmark(address_sampler-bench address_sampler-bench.cc)
 
 set(SIMPLE_MALLOC_SRC simple_malloc.cc ../src/signal_helper.cc)
 

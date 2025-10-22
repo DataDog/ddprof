@@ -86,7 +86,7 @@ bool should_track(uintptr_t addr) {
 
 **However**: Excellent candidate as an **optional low-overhead mode** for high-frequency profiling or quick leak scans.
 
-## Sharded Open-Addressing Hash Tables (in this branch)
+## Sharded Open-Addressing Hash Tables (current solution)
 
 ### Architecture
 
@@ -112,12 +112,11 @@ Glibc malloc spaces thread arenas
 ### Benefits
 
 **No collisions** - stores actual addresses with linear probing  
-**Thread separation** - different threads use different tables (not always true...)
+**Thread separation** - different threads use different tables (not always true...)  
 **Lazy allocation** - only allocate tables for active chunks  
-**Bounded memory** - max 128 chunks × 32K slots × 8 bytes = 32 MB worst case (typically much less)
-**Fast lookups** - O(1) with minimal probing
-**Signal-safe** - atomic operations only after initialization
-**Hash-based sharding** - distributes addresses across 128 shards using hash function
+**Bounded memory** - max 128 chunks × 32K slots × 8 bytes = 32 MB worst case (typically much less)  
+**Fast lookups** - O(1) with minimal probing  
+**Hash-based sharding** - distributes addresses across 128 shards using hash function  
 
 ## Future: Stateless Sampling as Alternative Mode
 
@@ -167,23 +166,11 @@ TODO: can we have meaningful numbers with this strategy ?
 
 ### Benchmark Setup
 
-Test configuration:
+Test configuration with SimpleMalloc:
 - Workload: 8 threads doing malloc/free operations for 30 seconds
 - Allocation size: 1000 bytes per allocation
 - Sampling rate: Every 1MB allocated (p=1048576)
 - Test includes 10µs spin between allocations to simulate real work
-
-### Results Summary
-
-**Test Configuration**: 1024-byte allocations, 8 threads, 120s runtime, 128MB chunk size
-
-| Implementation | Memory Overhead | Out-of-Order Events | Lost Events | Unmatched Deallocations | Active Shards |
-|----------------|-----------------|---------------------|-------------|-------------------------|---------------|
-| Baseline (no profiling) | 4.0 MB | - | - | - | - |
-| Sharded (128MB chunks) | 8.3 MB | 469,930 | 63 | 0 | 6 |
-| Absl flat_hash_set | 6.4 MB | 469,659 | 75 | 0 | N/A |
-| Global original | 5.9 MB | 521,311 | 39 | 36,509 | N/A |
-
 
 #### Throughput Analysis
 
@@ -200,7 +187,7 @@ Global (original)              0,96%
 - Performance differences are within measurement noise
 - Allocation tracking overhead is minimal for all implementations
 
-Cache misses are dominated by profiling infrastructure (unwinding, ring buffer):
+Cache misses are dominated by profiling infrastructure:
 - Baseline: ~7M cache misses
 - All profiled versions: ~176-201M cache misses (25× increase from profiling overhead, not tracking structure)
 
@@ -208,41 +195,15 @@ Cache misses are dominated by profiling infrastructure (unwinding, ring buffer):
 
 ~18 MB of overhead on simple malloc (in process).
 
-### Current bench results
+### Local benchmarks
 
-```
----------------------------------------------------------------------------------------------------------------------------------------
-Benchmark                                                                             Time             CPU   Iterations UserCounters...
----------------------------------------------------------------------------------------------------------------------------------------
-BM_AddressBitset_RealAddresses                                                     38.0 ns         37.9 ns     18771471 items_per_second=52.7248M/s
-BM_AddressBitset_RealAddresses_MT<ContentionMode::kHighContention>/threads:1       37.4 ns         37.4 ns     18050112 items_per_second=53.4826M/s
-BM_AddressBitset_RealAddresses_MT<ContentionMode::kHighContention>/threads:4       23.4 ns         93.6 ns      8318084 items_per_second=21.3648M/s
-BM_AddressBitset_RealAddresses_MT<ContentionMode::kHighContention>/threads:8       17.2 ns          138 ns      5189760 items_per_second=14.5383M/s
-BM_AddressBitset_RealAddresses_MT<ContentionMode::kLowContention>/threads:1        36.7 ns         36.7 ns     19634620 items_per_second=54.5395M/s
-BM_AddressBitset_RealAddresses_MT<ContentionMode::kLowContention>/threads:4        29.2 ns          116 ns      9871880 items_per_second=17.17M/s
-BM_AddressBitset_RealAddresses_MT<ContentionMode::kLowContention>/threads:8        16.5 ns          132 ns      4187944 items_per_second=15.1239M/s
-BM_AddressBitset_HighLoadFactor                                                    66.3 ns         66.3 ns      8040949 items_per_second=15.0838M/s
-BM_AddressBitset_LiveTracking<ContentionMode::kHighContention>/threads:1           41.7 ns         41.7 ns     17390221 items_per_second=23.9959M/s
-BM_AddressBitset_LiveTracking<ContentionMode::kHighContention>/threads:4           3.09 ns         12.4 ns     64748460 items_per_second=80.9149M/s
-BM_AddressBitset_LiveTracking<ContentionMode::kHighContention>/threads:8           1.75 ns         14.0 ns     48877848 items_per_second=71.5288M/s
-BM_AddressBitset_LiveTracking<ContentionMode::kLowContention>/threads:1            39.0 ns         39.0 ns     17565617 items_per_second=25.6674M/s
-BM_AddressBitset_LiveTracking<ContentionMode::kLowContention>/threads:4            30.6 ns          122 ns      4992880 items_per_second=8.17822M/s
-BM_AddressBitset_LiveTracking<ContentionMode::kLowContention>/threads:8            24.3 ns          195 ns      3670720 items_per_second=5.14027M/s
-BM_AddressBitset_FreeLookupMiss<ContentionMode::kHighContention>/threads:1         10.3 ns         10.2 ns     69208211 items_per_second=97.6305M/s
-BM_AddressBitset_FreeLookupMiss<ContentionMode::kHighContention>/threads:4         3.21 ns         12.9 ns     55299296 items_per_second=77.8015M/s
-BM_AddressBitset_FreeLookupMiss<ContentionMode::kHighContention>/threads:8         2.05 ns         16.4 ns     34074824 items_per_second=60.9842M/s
-BM_AddressBitset_FreeLookupMiss<ContentionMode::kLowContention>/threads:1          10.4 ns         10.4 ns     68615918 items_per_second=96.3036M/s
-BM_AddressBitset_FreeLookupMiss<ContentionMode::kLowContention>/threads:4          2.15 ns         8.60 ns     68968204 items_per_second=116.28M/s
-BM_AddressBitset_FreeLookupMiss<ContentionMode::kLowContention>/threads:8          1.34 ns         10.7 ns     74355952 items_per_second=93.2849M/s
-BM_AddressBitset_FreeLookupMiss_HighLoad                                           11.5 ns         11.4 ns     66347069 items_per_second=87.3973M/s
-```
-
+The local benchmarks show less than 100ns for inserts and <10 ns for lookups (under thread contention).
 
 ## Conclusion
 
 **Implementation Status**:
-Absl seems to crash (within the benchmark in this branch). This is expected considering it is not thread safe.
-The sharded fixed hashmap solution seems to have acceptable overhead.
+Absl seems to crash (within the benchmark, there is a flag to reproduce this). This is expected considering it is not thread safe.
+The sharded fixed hashmap solution seems to have acceptable overhead O(100ns).
 
 **Open questions**:
 - Memory vs accuracy trade-offs in production environments with diverse workloads
@@ -250,5 +211,3 @@ The sharded fixed hashmap solution seems to have acceptable overhead.
 **Future work**:
 - Add stateless sampling as alternative "low-overhead" mode
 - Consider header-based approach if custom allocator integration becomes available
-- Monitor memory usage in production environments with diverse allocation patterns
-- Bench under heavier load (with many tracked addresses).

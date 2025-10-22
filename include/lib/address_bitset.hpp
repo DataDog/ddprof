@@ -13,19 +13,18 @@ namespace ddprof {
 
 // Per-mapping hash table (Level 2)
 struct AddressTable {
-  static constexpr unsigned kDefaultSize = 512 * 1024; // 512K slots = 4MB
-  static constexpr unsigned kMaxProbeDistance =
-      64;
-  static constexpr unsigned kMaxLoadFactorPercent =
+  static constexpr unsigned _default_size = 512 * 1024; // 512K slots = 4MB
+  static constexpr unsigned _max_probe_distance = 64;
+  static constexpr unsigned _max_load_factor_percent =
       60; // 60% load factor 307200 max addresses (per chunk)
-  static constexpr unsigned kPercentDivisor = 100;
-  static constexpr uintptr_t kEmptySlot = 0;
-  static constexpr uintptr_t kDeletedSlot = 1;
+  static constexpr unsigned _percent_divisor = 100;
+  static constexpr uintptr_t _empty_slot = 0;
+  static constexpr uintptr_t _deleted_slot = 1;
 
   unsigned table_size;
   unsigned table_mask;
-  unsigned
-      max_capacity; // max_capacity = table_size * kMaxLoadFactorPercent / 100
+  unsigned max_capacity; // max_capacity = table_size * _max_load_factor_percent
+                         // / 100
   std::unique_ptr<std::atomic<uintptr_t>[]> slots;
   std::atomic<int> count{0};
 
@@ -49,9 +48,10 @@ class AddressBitset {
   // Not doing so for now to keep the PR readable.
 public:
   // Chunk size: 128MB per chunk (matches typical glibc arena spacing)
-  static constexpr uintptr_t kChunkShift = 27; // log2(128MB)
-  static constexpr size_t kMaxChunks = 128; // 128 shards for load distribution
-  
+  static constexpr uintptr_t _k_chunk_shift = 27; // log2(128MB)
+  static constexpr size_t _k_max_chunks =
+      128; // 128 shards for load distribution
+
   // Per-chunk table sizing: 128MB / ~4KB avg allocation = ~32K allocations
   // At 60% load factor, need ~27K slots. Use 32K for headroom.
   // Max memory: 128 chunks × 32K slots × 8 bytes = 32 MB
@@ -86,7 +86,7 @@ public:
   // Get shard index for address (for testing/diagnostics)
   [[nodiscard]] static size_t get_shard_index(uintptr_t addr) {
     const uint64_t hash = compute_full_hash(addr);
-    return (hash >> 32) % kMaxChunks;
+    return (hash >> 32) % _k_max_chunks;
   }
 
   // Initialize with given table size (can be called on default-constructed
@@ -110,24 +110,24 @@ private:
   // Get or create table for address, returns table and hash for slot lookup
   AddressTable *get_table(uintptr_t addr, uint64_t &out_hash);
 
-  static constexpr uint64_t kHashMultiplier1 =
+  static constexpr uint64_t _k_hash_multiplier_1 =
       0x9E3779B97F4A7C15ULL; // Golden ratio * 2^64
-  static constexpr uint64_t kHashMultiplier2 =
+  static constexpr uint64_t _k_hash_multiplier_2 =
       0x85EBCA77C2B2AE63ULL; // Large prime
 
   // Compute full hash for address (hash once, use for both chunk and slot)
   [[nodiscard]] static uint64_t compute_full_hash(uintptr_t addr) {
     uint64_t h = addr >> _k_max_bits_ignored;
-    h *= kHashMultiplier1;
+    h *= _k_hash_multiplier_1;
     h ^= h >> 32;
-    h *= kHashMultiplier2;
+    h *= _k_hash_multiplier_2;
     h ^= h >> 32;
     return h;
   }
 
   // Extract slot from precomputed hash
   [[nodiscard]] static uint32_t hash_to_slot(uint64_t hash,
-                                              unsigned table_mask) {
+                                             unsigned table_mask) {
     return static_cast<uint32_t>(hash) & table_mask;
   }
 };

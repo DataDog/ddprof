@@ -35,7 +35,7 @@ TEST(address_bitset, many_addresses) {
 
   // Keep addresses within same chunk to avoid expensive table creation
   constexpr uintptr_t kAlignmentMask = 0xF;
-  constexpr uintptr_t kChunkMask = (1ULL << AddressBitset::kChunkShift) - 1;
+  constexpr uintptr_t kChunkMask = (1ULL << AddressBitset::_k_chunk_shift) - 1;
   constexpr uintptr_t kBaseAddr = 0x7f0000000000ULL; // Typical heap range
   std::uniform_int_distribution<uintptr_t> dis(0, kChunkMask);
 
@@ -70,7 +70,7 @@ TEST(address_bitset, no_false_collisions) {
   std::mt19937 gen(kDeterministicSeed);
 
   // Keep addresses within same chunk to avoid expensive table creation
-  constexpr uintptr_t kChunkMask = (1ULL << AddressBitset::kChunkShift) - 1;
+  constexpr uintptr_t kChunkMask = (1ULL << AddressBitset::_k_chunk_shift) - 1;
   constexpr uintptr_t kBaseAddr = 0x7f0000000000ULL; // Typical heap range
   std::uniform_int_distribution<uintptr_t> dist(0, kChunkMask);
 
