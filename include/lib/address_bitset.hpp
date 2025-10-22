@@ -13,7 +13,6 @@ namespace ddprof {
 
 // Per-mapping hash table (Level 2)
 struct AddressTable {
-  static constexpr size_t _max_probe_distance = 64;
   static constexpr size_t _max_load_factor_percent = 60; // 60% load factor
   static constexpr size_t _percent_divisor = 100;
   static constexpr uintptr_t _empty_slot = 0;

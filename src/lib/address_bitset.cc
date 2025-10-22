@@ -155,7 +155,7 @@ bool AddressBitset::add(uintptr_t addr, bool is_large_alloc) {
   uint32_t slot = hash_to_slot(hash, table->table_mask);
 
   // Linear probing to find an empty/deleted slot or the address
-  for (size_t probe = 0; probe < AddressTable::_max_probe_distance; ++probe) {
+  for (size_t probe = 0; probe < _k_max_probe_distance; ++probe) {
     uintptr_t current = table->slots[slot].load(std::memory_order_acquire);
 
     // If empty or deleted, try to claim it
@@ -199,7 +199,7 @@ bool AddressBitset::remove(uintptr_t addr, bool is_large_alloc) {
   uint32_t slot = hash_to_slot(hash, table->table_mask);
 
   // Linear probing to find the address
-  for (size_t probe = 0; probe < AddressTable::_max_probe_distance; ++probe) {
+  for (size_t probe = 0; probe < _k_max_probe_distance; ++probe) {
     uintptr_t current = table->slots[slot].load(std::memory_order_acquire);
 
     if (current == AddressTable::_empty_slot) {

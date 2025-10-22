@@ -1,6 +1,7 @@
 # AddressBitset Evolution: Sharded Hash Tables
 
-This document chronicles the evolution of the `AddressBitset` data structure used for live allocation tracking in ddprof, from a collision-prone bitset to a sharded hash table. It includes production benchmark results comparing the final implementation against alternatives.
+The aim is to have bookkeeping on the in-use addresses for live heap profiling.
+This document talks about how we landed on a sharded hash map and alternatives that we could be exploring.
 
 ## The Problem: Bitset Collisions
 
@@ -16,18 +17,6 @@ _bitset[bit_index / 64] |= (1ULL << (bit_index % 64));
 - Two different addresses hash to same bit: collision
 - When freeing, we can't distinguish which address the bit represents
 - Result: Inaccurate leak detection, missed deallocations
-
-Tests showed significant impact:
- - 6% loss rate
-
-## Solution Requirements
-
-We need a data structure that:
-1. **No collisions** - track actual addresses, not just bits
-2. **Thread-safe** - signal-safe, atomic operations only
-3. **Fast lookups** - 100× more reads (free) than writes (malloc)
-4. **Bounded memory** - fixed size or minimal growth
-5. **Production-ready** - handle millions of allocations
 
 ## Explored Alternatives
 
@@ -122,11 +111,6 @@ Glibc malloc spaces thread arenas
 
 While not suitable as the primary solution due to sampling bias, stateless sampling could be offered as an **optional high-performance mode**:
 
-**Use cases for sampling mode**:
-- **Cheap leak detection** - quick scan for memory leaks with minimal overhead
-- **High-frequency profiling** - when sampling overhead must be minimal
-- **Complementary tool** - run alongside full tracking for different insights
-
 **Benchmark results** (stateless sampling):
 ```
 BM_AddressSampler_SingleThreaded                 7.11 ns    items_per_second=140.669M/s
@@ -167,33 +151,32 @@ TODO: can we have meaningful numbers with this strategy ?
 ### Benchmark Setup
 
 Test configuration with SimpleMalloc:
-- Workload: 8 threads doing malloc/free operations for 30 seconds
-- Allocation size: 1000 bytes per allocation
-- Sampling rate: Every 1MB allocated (p=1048576)
-- Test includes 10µs spin between allocations to simulate real work
+- Workload: 8 threads doing malloc/free operations for 30 seconds  
+- Allocation size: 1000 bytes per allocation  
+- Sampling rate: Every 1MB allocated (p=1048576)  
+- Test includes 10µs spin between allocations to simulate real work 
+
+```bash
+./ddprof -l informational --preset cpu_live_heap --debug_pprof_prefix ./temp \
+  ./test/simple_malloc \
+    --malloc 1000 \
+    --loop 10000000 \
+    --threads 8 --spin 10 \
+    --timeout 30000
+```
 
 #### Throughput Analysis
 
-Configuration               Overhead
-------------------------- ----------
-Baseline (no profiling)        0.00%
-Local (sharded)                1,01%
-Absl (hashmap)                 0,84%
-Global (original)              0,96%
-
-
-**Observations:**
-- All implementations show <1% throughput difference from baseline
-- Performance differences are within measurement noise
-- Allocation tracking overhead is minimal for all implementations
+The throughput was impacted by <1%.
 
 Cache misses are dominated by profiling infrastructure:
-- Baseline: ~7M cache misses
-- All profiled versions: ~176-201M cache misses (25× increase from profiling overhead, not tracking structure)
+- Baseline: ~7M cache misses  
+- All profiled versions: ~176-201M cache misses (25× increase from profiling overhead, not tracking structure)  
 
 ### Memory Usage Analysis
 
-~18 MB of overhead on simple malloc (in process).
+On simple malloc: from 4MB to 6.5.
+This was similar to the results I had with absl.
 
 ### Local benchmarks
 
