@@ -6,8 +6,6 @@
 #include <benchmark/benchmark.h>
 
 #include <cstdlib>
-#include <iostream>
-#include <unordered_map>
 #include <vector>
 
 #include "address_bitset.hpp"
@@ -82,6 +80,23 @@ const std::vector<uintptr_t> &get_address_pool(size_t pool_size,
   }
 }
 
+// Helper to partition addresses among threads
+struct ThreadAddressRange {
+  size_t start;
+  size_t end;
+  [[nodiscard]] size_t size() const { return end - start; }
+};
+
+ThreadAddressRange get_thread_address_range(size_t total_addresses,
+                                            size_t thread_id,
+                                            size_t num_threads) {
+  const size_t addrs_per_thread = total_addresses / num_threads;
+  const size_t start = thread_id * addrs_per_thread;
+  const size_t end = (thread_id == num_threads - 1) ? total_addresses
+                                                    : start + addrs_per_thread;
+  return {start, end};
+}
+
 void BM_AddressBitset_RealAddresses(benchmark::State &state) {
   AddressBitset bitset(AddressBitset::_k_default_table_size);
 
@@ -107,15 +122,33 @@ void BM_AddressBitset_RealAddresses_MT(benchmark::State &state) {
   const auto &addresses =
       get_address_pool<Mode>(kLargeAddressPool, kDefaultAllocSize);
 
-  size_t idx = 0;
+  // Each thread gets its own range of addresses to avoid false contention
+  const auto range = get_thread_address_range(
+      addresses.size(), state.thread_index(), state.threads());
+
+  size_t idx = range.start;
+  size_t add_failure = 0;
+  size_t remove_failure = 0;
+
   for (auto _ : state) {
-    uintptr_t addr = addresses[idx % addresses.size()];
-    bitset.add(addr);
-    benchmark::DoNotOptimize(bitset.remove(addr));
+    uintptr_t addr = addresses[idx];
+    if (!bitset.add(addr)) {
+      ++add_failure;
+    }
+    if (!bitset.remove(addr)) {
+      ++remove_failure;
+    }
     ++idx;
+    if (idx >= range.end) {
+      idx = range.start;
+    }
   }
 
   state.SetItemsProcessed(state.iterations() * 2);
+  state.counters["add_fail"] = benchmark::Counter(
+      static_cast<double>(add_failure), benchmark::Counter::kAvgThreads);
+  state.counters["remove_fail"] = benchmark::Counter(
+      static_cast<double>(remove_failure), benchmark::Counter::kAvgThreads);
 }
 BENCHMARK(BM_AddressBitset_RealAddresses_MT<ContentionMode::kHighContention>)
     ->Threads(1)
@@ -137,10 +170,12 @@ void BM_AddressBitset_HighLoadFactor(benchmark::State &state) {
   }
 
   size_t idx = addresses.size() / 2;
+  size_t add_failure = 0;
   for (auto _ : state) {
     uintptr_t addr = addresses[idx % addresses.size()];
 
     if (!bitset.add(addr)) {
+      ++add_failure;
       bitset.remove(addresses[(idx - kRemoveLookback) % addresses.size()]);
       bitset.add(addr);
     }
@@ -149,6 +184,8 @@ void BM_AddressBitset_HighLoadFactor(benchmark::State &state) {
   }
 
   state.SetItemsProcessed(state.iterations());
+  state.counters["add_fail"] =
+      benchmark::Counter(static_cast<double>(add_failure));
 }
 BENCHMARK(BM_AddressBitset_HighLoadFactor);
 
@@ -239,34 +276,70 @@ void BM_AddressBitset_LiveTracking(benchmark::State &state) {
   const auto &addresses =
       get_address_pool<Mode>(kVeryLargeAddressPool, kDefaultAllocSize);
 
+  // Each thread gets its own range of addresses to avoid interference
+  const auto range = get_thread_address_range(
+      addresses.size(), state.thread_index(), state.threads());
+
   thread_local std::vector<uintptr_t> live_addresses;
   live_addresses.reserve(kMediumAddressPool);
+  live_addresses.clear(); // Clear from previous runs
 
-  size_t idx = 0;
+  // Track removed addresses so we can re-add them (cycling through range)
+  thread_local std::vector<uintptr_t> removed_addresses;
+  removed_addresses.reserve(kMediumAddressPool);
+  removed_addresses.clear();
+
+  size_t next_new_idx = range.start;
+  size_t add_failure = 0;
+  size_t remove_failure = 0;
+
   for (auto _ : state) {
-    uintptr_t new_addr = addresses[idx % addresses.size()];
-    if (bitset.add(new_addr)) {
-      live_addresses.push_back(new_addr);
+    // Try to add a new address (from unused pool or recycled)
+    uintptr_t addr_to_add = 0;
+    if (next_new_idx < range.end) {
+      // Still have fresh addresses to add
+      addr_to_add = addresses[next_new_idx++];
+    } else if (!removed_addresses.empty()) {
+      // Recycle a previously removed address
+      addr_to_add = removed_addresses.back();
+      removed_addresses.pop_back();
     }
 
+    if (addr_to_add != 0) {
+      if (bitset.add(addr_to_add)) {
+        live_addresses.push_back(addr_to_add);
+      } else {
+        ++add_failure;
+      }
+    }
+
+    // Maintain live set size by removing oldest
     if (live_addresses.size() > kMaxLiveAddresses) {
       size_t to_remove = live_addresses.size() / kRemoveBatchDivisor;
       for (size_t i = 0; i < to_remove; ++i) {
-        bitset.remove(live_addresses[i]);
+        if (bitset.remove(live_addresses[i])) {
+          removed_addresses.push_back(live_addresses[i]);
+        } else {
+          ++remove_failure;
+        }
       }
       live_addresses.erase(live_addresses.begin(),
                            live_addresses.begin() + to_remove);
     }
 
-    ++idx;
     benchmark::DoNotOptimize(live_addresses.size());
   }
 
+  // Cleanup
   for (auto addr : live_addresses) {
     bitset.remove(addr);
   }
 
   state.SetItemsProcessed(state.iterations());
+  state.counters["add_fail"] = benchmark::Counter(
+      static_cast<double>(add_failure), benchmark::Counter::kAvgThreads);
+  state.counters["remove_fail"] = benchmark::Counter(
+      static_cast<double>(remove_failure), benchmark::Counter::kAvgThreads);
 }
 BENCHMARK(BM_AddressBitset_LiveTracking<ContentionMode::kHighContention>)
     ->Threads(1)
@@ -419,7 +492,6 @@ BENCHMARK(BM_Absl_FreeLookupMiss<ContentionMode::kLowContention>)
     ->Threads(4)
     ->Threads(8);
 #endif // ENABLE_ABSL_BENCHMARKS
-
 } // namespace
 
 } // namespace ddprof

@@ -14,16 +14,15 @@ namespace ddprof {
 // Per-mapping hash table (Level 2)
 struct AddressTable {
   static constexpr size_t _max_probe_distance = 64;
-  static constexpr size_t _max_load_factor_percent =
-      60; // 60% load factor 307200 max addresses (per chunk)
+  static constexpr size_t _max_load_factor_percent = 60; // 60% load factor
   static constexpr size_t _percent_divisor = 100;
   static constexpr uintptr_t _empty_slot = 0;
   static constexpr uintptr_t _deleted_slot = 1;
 
   size_t table_size;
   size_t table_mask;
-  size_t max_capacity; // max_capacity = table_size * _max_load_factor_percent
-                       // / 100
+  size_t max_capacity;
+
   std::unique_ptr<std::atomic<uintptr_t>[]> slots;
   std::atomic<size_t> count{0};
 
@@ -48,16 +47,12 @@ class AddressBitset {
 public:
   // Chunk size: 128MB per chunk (matches typical glibc arena spacing)
   static constexpr uintptr_t _k_chunk_shift = 27; // log2(128MB)
-  static constexpr size_t _k_max_chunks =
-      128; // 128 shards for load distribution
-
-  // Per-chunk table sizing: 128MB / ~4KB avg allocation = ~32K allocations
-  // At 60% load factor, need ~27K slots. Use 32K for headroom.
+  static constexpr size_t _k_max_chunks = 128;
   // Max memory: 128 chunks × 32K slots × 8 bytes = 32 MB
   constexpr static size_t _k_default_table_size = 32768;
 
   // Maximum probe distance before giving up
-  constexpr static size_t _k_max_probe_distance = 64;
+  constexpr static size_t _k_max_probe_distance = 32;
 
   explicit AddressBitset(size_t table_size = 0) { init(table_size); }
   AddressBitset(AddressBitset &&other) noexcept;
@@ -89,8 +84,7 @@ public:
 private:
   static constexpr size_t _k_max_bits_ignored = 4;
   static constexpr uintptr_t _k_empty_slot = 0;
-  static constexpr uintptr_t _k_deleted_slot =
-      1; // Tombstone value
+  static constexpr uintptr_t _k_deleted_slot = 1; // Tombstone value
 
   size_t _lower_bits_ignored;
   size_t _per_table_size = {};
