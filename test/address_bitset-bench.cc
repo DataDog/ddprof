@@ -82,22 +82,6 @@ const std::vector<uintptr_t> &get_address_pool(size_t pool_size,
   }
 }
 
-void print_shard_distribution(const std::string &label,
-                              const std::vector<uintptr_t> &addresses) {
-  constexpr size_t kMaxShardsToDisplay = 10;
-  std::unordered_map<size_t, size_t> shard_counts;
-  for (auto addr : addresses) {
-    shard_counts[AddressBitset::get_shard_index(addr)]++;
-  }
-  std::cout << label << " - Shard distribution: " << shard_counts.size()
-            << " unique shards used\n";
-  if (shard_counts.size() <= kMaxShardsToDisplay) {
-    for (const auto &[shard, count] : shard_counts) {
-      std::cout << "  Shard " << shard << ": " << count << " addresses\n";
-    }
-  }
-}
-
 void BM_AddressBitset_RealAddresses(benchmark::State &state) {
   AddressBitset bitset(AddressBitset::_k_default_table_size);
 
@@ -442,15 +426,6 @@ BENCHMARK(BM_Absl_FreeLookupMiss<ContentionMode::kLowContention>)
 
 int main(int argc, char **argv) {
   using namespace ddprof;
-
-  std::cout << "\n=== Shard Distribution Analysis ===\n";
-
-  auto addresses =
-      capture_real_malloc_addresses(kLargeAddressPool, kDefaultAllocSize);
-  print_shard_distribution("10K malloc addresses (1KB)", addresses);
-
-  std::cout << "===================================\n\n";
-
   benchmark::Initialize(&argc, argv);
   if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
     return 1;

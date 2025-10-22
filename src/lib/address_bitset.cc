@@ -4,12 +4,14 @@
 // Datadog, Inc.
 #include "address_bitset.hpp"
 
+#include <cassert>
+
 #include <unlikely.hpp>
 
 namespace ddprof {
 
 namespace {
-unsigned round_up_to_power_of_two(unsigned num) {
+size_t round_up_to_power_of_two(size_t num) {
   if (num == 0) {
     return num;
   }
@@ -18,22 +20,22 @@ unsigned round_up_to_power_of_two(unsigned num) {
     return num;
   }
   // not a power of two
-  unsigned count = 0;
+  size_t count = 0;
   while (num) {
     num >>= 1;
     count++;
   }
-  return 1 << count;
+  return size_t{1} << count;
 }
 } // namespace
 
 // AddressTable implementation
-AddressTable::AddressTable(unsigned size)
+AddressTable::AddressTable(size_t size)
     : table_size(round_up_to_power_of_two(size)), table_mask(table_size - 1),
       max_capacity(table_size * _max_load_factor_percent / _percent_divisor),
       slots(std::make_unique<std::atomic<uintptr_t>[]>(table_size)) {
   // Initialize all slots to empty
-  for (unsigned i = 0; i < table_size; ++i) {
+  for (size_t i = 0; i < table_size; ++i) {
     slots[i].store(_empty_slot, std::memory_order_relaxed);
   }
 }
@@ -69,10 +71,14 @@ void AddressBitset::move_from(AddressBitset &other) noexcept {
   other._per_table_size = 0;
 }
 
-void AddressBitset::init(unsigned table_size) {
+void AddressBitset::init(size_t table_size) {
   _lower_bits_ignored = _k_max_bits_ignored;
 
   _per_table_size = table_size ? table_size : _k_default_table_size;
+
+  // Verify _k_max_chunks is a power of 2 (for bitwise modulo optimization)
+  static_assert((_k_max_chunks & (_k_max_chunks - 1)) == 0,
+                "_k_max_chunks must be a power of 2");
 
   // Initialize redirect table (Level 1)
   _chunk_tables =
@@ -87,7 +93,7 @@ AddressTable *AddressBitset::get_table(uintptr_t addr, uint64_t &out_hash) {
   out_hash = compute_full_hash(addr);
 
   // Use upper 32 bits for chunk selection
-  const size_t chunk_idx = (out_hash >> 32) % _k_max_chunks;
+  const size_t chunk_idx = (out_hash >> 32) & (_k_max_chunks - 1);
 
   AddressTable *table =
       _chunk_tables[chunk_idx].load(std::memory_order_acquire);
@@ -115,9 +121,7 @@ AddressTable *AddressBitset::get_table(uintptr_t addr, uint64_t &out_hash) {
 }
 
 bool AddressBitset::add(uintptr_t addr) {
-  if (addr == _k_empty_slot || addr == _k_deleted_slot) {
-    return false; // Can't track sentinel values
-  }
+  assert(addr != _k_empty_slot && addr != _k_deleted_slot);
 
   // Hash once for both chunk and slot lookup
   uint64_t hash;
@@ -127,15 +131,14 @@ bool AddressBitset::add(uintptr_t addr) {
   }
 
   // Check if table is at max capacity (60% load factor)
-  if (table->count.load(std::memory_order_relaxed) >=
-      static_cast<int>(table->max_capacity)) {
+  if (table->count.load(std::memory_order_relaxed) >= table->max_capacity) {
     return false; // Table is full
   }
 
   uint32_t slot = hash_to_slot(hash, table->table_mask);
 
   // Linear probing to find an empty/deleted slot or the address
-  for (unsigned probe = 0; probe < AddressTable::_max_probe_distance; ++probe) {
+  for (size_t probe = 0; probe < AddressTable::_max_probe_distance; ++probe) {
     uintptr_t current = table->slots[slot].load(std::memory_order_acquire);
 
     // If empty or deleted, try to claim it
@@ -166,9 +169,7 @@ bool AddressBitset::add(uintptr_t addr) {
 }
 
 bool AddressBitset::remove(uintptr_t addr) {
-  if (addr == _k_empty_slot || addr == _k_deleted_slot) {
-    return false; // Can't remove sentinel values
-  }
+  assert(addr != _k_empty_slot && addr != _k_deleted_slot);
 
   // Hash once for both chunk and slot lookup
   uint64_t hash;
@@ -180,7 +181,7 @@ bool AddressBitset::remove(uintptr_t addr) {
   uint32_t slot = hash_to_slot(hash, table->table_mask);
 
   // Linear probing to find the address
-  for (unsigned probe = 0; probe < AddressTable::_max_probe_distance; ++probe) {
+  for (size_t probe = 0; probe < AddressTable::_max_probe_distance; ++probe) {
     uintptr_t current = table->slots[slot].load(std::memory_order_acquire);
 
     if (current == AddressTable::_empty_slot) {
@@ -220,7 +221,7 @@ void AddressBitset::clear() {
       AddressTable *table =
           _chunk_tables[chunk_idx].load(std::memory_order_acquire);
       if (table) {
-        for (unsigned i = 0; i < table->table_size; ++i) {
+        for (size_t i = 0; i < table->table_size; ++i) {
           table->slots[i].store(AddressTable::_empty_slot,
                                 std::memory_order_relaxed);
         }

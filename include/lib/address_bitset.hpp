@@ -13,22 +13,21 @@ namespace ddprof {
 
 // Per-mapping hash table (Level 2)
 struct AddressTable {
-  static constexpr unsigned _default_size = 512 * 1024; // 512K slots = 4MB
-  static constexpr unsigned _max_probe_distance = 64;
-  static constexpr unsigned _max_load_factor_percent =
+  static constexpr size_t _max_probe_distance = 64;
+  static constexpr size_t _max_load_factor_percent =
       60; // 60% load factor 307200 max addresses (per chunk)
-  static constexpr unsigned _percent_divisor = 100;
+  static constexpr size_t _percent_divisor = 100;
   static constexpr uintptr_t _empty_slot = 0;
   static constexpr uintptr_t _deleted_slot = 1;
 
-  unsigned table_size;
-  unsigned table_mask;
-  unsigned max_capacity; // max_capacity = table_size * _max_load_factor_percent
-                         // / 100
+  size_t table_size;
+  size_t table_mask;
+  size_t max_capacity; // max_capacity = table_size * _max_load_factor_percent
+                       // / 100
   std::unique_ptr<std::atomic<uintptr_t>[]> slots;
-  std::atomic<int> count{0};
+  std::atomic<size_t> count{0};
 
-  explicit AddressTable(unsigned size);
+  explicit AddressTable(size_t size);
   ~AddressTable() = default;
 
   // Delete copy/move operations (non-copyable due to atomic members)
@@ -55,12 +54,12 @@ public:
   // Per-chunk table sizing: 128MB / ~4KB avg allocation = ~32K allocations
   // At 60% load factor, need ~27K slots. Use 32K for headroom.
   // Max memory: 128 chunks × 32K slots × 8 bytes = 32 MB
-  constexpr static unsigned _k_default_table_size = 32768;
+  constexpr static size_t _k_default_table_size = 32768;
 
   // Maximum probe distance before giving up
-  constexpr static unsigned _k_max_probe_distance = 64;
+  constexpr static size_t _k_max_probe_distance = 64;
 
-  explicit AddressBitset(unsigned table_size = 0) { init(table_size); }
+  explicit AddressBitset(size_t table_size = 0) { init(table_size); }
   AddressBitset(AddressBitset &&other) noexcept;
   AddressBitset &operator=(AddressBitset &&other) noexcept;
 
@@ -83,24 +82,18 @@ public:
   // Get number of active shards (for stats/reporting)
   [[nodiscard]] int active_shards() const;
 
-  // Get shard index for address (for testing/diagnostics)
-  [[nodiscard]] static size_t get_shard_index(uintptr_t addr) {
-    const uint64_t hash = compute_full_hash(addr);
-    return (hash >> 32) % _k_max_chunks;
-  }
-
   // Initialize with given table size (can be called on default-constructed
   // object)
-  void init(unsigned table_size);
+  void init(size_t table_size);
 
 private:
-  static constexpr unsigned _k_max_bits_ignored = 4;
+  static constexpr size_t _k_max_bits_ignored = 4;
   static constexpr uintptr_t _k_empty_slot = 0;
   static constexpr uintptr_t _k_deleted_slot =
-      1; // Tombstone for deleted entries
+      1; // Tombstone value
 
-  unsigned _lower_bits_ignored;
-  unsigned _per_table_size = {};
+  size_t _lower_bits_ignored;
+  size_t _per_table_size = {};
 
   // Level 1: Redirect table (maps chunks to tables)
   std::unique_ptr<std::atomic<AddressTable *>[]> _chunk_tables;
@@ -126,8 +119,7 @@ private:
   }
 
   // Extract slot from precomputed hash
-  [[nodiscard]] static uint32_t hash_to_slot(uint64_t hash,
-                                             unsigned table_mask) {
+  [[nodiscard]] static uint32_t hash_to_slot(uint64_t hash, size_t table_mask) {
     return static_cast<uint32_t>(hash) & table_mask;
   }
 };
