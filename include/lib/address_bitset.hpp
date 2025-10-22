@@ -65,9 +65,12 @@ public:
 
   // returns true if the element was inserted
   // if the table is full, we return false
-  bool add(uintptr_t addr);
+  // is_large_alloc: if true, uses dedicated table for large allocations (mmap)
+  //                 if false, uses sharded tables for small allocations
+  //                 (malloc/new)
+  bool add(uintptr_t addr, bool is_large_alloc = false);
   // returns true if the element was removed
-  bool remove(uintptr_t addr);
+  bool remove(uintptr_t addr, bool is_large_alloc = false);
   void clear();
 
   // Get approximate count (for stats/reporting only, not for capacity checks)
@@ -92,10 +95,19 @@ private:
   // Level 1: Redirect table (maps chunks to tables)
   std::unique_ptr<std::atomic<AddressTable *>[]> _chunk_tables;
 
+  // Dedicated table for large allocations (mmap/munmap)
+  // Avoids excessive sharding for large, scattered allocations
+  std::unique_ptr<std::atomic<AddressTable *>> _large_alloc_table;
+
   void move_from(AddressBitset &other) noexcept;
 
   // Get or create table for address, returns table and hash for slot lookup
-  AddressTable *get_table(uintptr_t addr, uint64_t &out_hash);
+  // is_large_alloc: if true, returns the dedicated large allocation table
+  // create_if_missing: if true, creates table if it doesn't exist (for add)
+  //                    if false, returns nullptr if table doesn't exist (for
+  //                    remove)
+  AddressTable *get_table(uintptr_t addr, uint64_t &out_hash,
+                          bool is_large_alloc, bool create_if_missing);
 
   static constexpr uint64_t _k_hash_multiplier_1 =
       0x9E3779B97F4A7C15ULL; // Golden ratio * 2^64

@@ -201,7 +201,8 @@ void AllocationTracker::free_on_consecutive_failures(bool failure) {
 }
 
 void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
-                                         TrackerThreadLocalState &tl_state) {
+                                         TrackerThreadLocalState &tl_state,
+                                         bool is_large_alloc) {
   // Reentrancy should be prevented by caller (by using ReentryGuard on
   // TrackerThreadLocalState::reentry_guard).
 
@@ -236,7 +237,7 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
   uint64_t const total_size = nsamples * sampling_interval;
 
   if (_state.track_deallocations) {
-    if (!_allocated_address_set.add(addr)) {
+    if (!_allocated_address_set.add(addr, is_large_alloc)) {
       // add() returned false: either table is full or address already exists
       _state.address_conflict_count.fetch_add(1, std::memory_order_acq_rel);
       // null the address to avoid using this for live heap profiling
@@ -248,16 +249,18 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
   auto res = push_alloc_sample(addr, total_size, tl_state);
   free_on_consecutive_failures(IsDDResFatal(res));
   if (unlikely(!IsDDResOK(res)) && _state.track_deallocations && addr) {
-    _allocated_address_set.remove(addr);
+    _allocated_address_set.remove(addr, is_large_alloc);
   }
 }
 
 void AllocationTracker::track_deallocation(uintptr_t addr,
-                                           TrackerThreadLocalState &tl_state) {
+                                           TrackerThreadLocalState &tl_state,
+                                           bool is_large_alloc) {
   // Reentrancy should be prevented by caller (by using ReentryGuard on
   // TrackerThreadLocalState::reentry_guard).
 
-  if (!_state.track_deallocations || !_allocated_address_set.remove(addr)) {
+  if (!_state.track_deallocations ||
+      !_allocated_address_set.remove(addr, is_large_alloc)) {
     return;
   }
 

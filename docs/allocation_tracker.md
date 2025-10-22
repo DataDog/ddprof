@@ -1,4 +1,4 @@
-# AddressBitset Evolution: From Collisions to Sharded Hash Tables
+# AddressBitset Evolution: Sharded Hash Tables
 
 This document chronicles the evolution of the `AddressBitset` data structure used for live allocation tracking in ddprof, from a collision-prone bitset to a sharded hash table. It includes production benchmark results comparing the final implementation against alternatives.
 

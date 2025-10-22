@@ -60,12 +60,17 @@ AddressBitset::~AddressBitset() {
       delete table;
     }
   }
+  if (_large_alloc_table) {
+    AddressTable *table = _large_alloc_table->load(std::memory_order_relaxed);
+    delete table;
+  }
 }
 
 void AddressBitset::move_from(AddressBitset &other) noexcept {
   _lower_bits_ignored = other._lower_bits_ignored;
   _per_table_size = other._per_table_size;
   _chunk_tables = std::move(other._chunk_tables);
+  _large_alloc_table = std::move(other._large_alloc_table);
 
   // Reset the state of 'other'
   other._per_table_size = 0;
@@ -86,28 +91,40 @@ void AddressBitset::init(size_t table_size) {
   for (size_t i = 0; i < _k_max_chunks; ++i) {
     _chunk_tables[i].store(nullptr, std::memory_order_release);
   }
+
+  // Initialize large allocation table
+  _large_alloc_table = std::make_unique<std::atomic<AddressTable *>>();
+  _large_alloc_table->store(nullptr, std::memory_order_release);
 }
 
-AddressTable *AddressBitset::get_table(uintptr_t addr, uint64_t &out_hash) {
+AddressTable *AddressBitset::get_table(uintptr_t addr, uint64_t &out_hash,
+                                       bool is_large_alloc,
+                                       bool create_if_missing) {
   // Hash once for both chunk selection and slot lookup
   out_hash = compute_full_hash(addr);
 
-  // Use upper 32 bits for chunk selection
-  const size_t chunk_idx = (out_hash >> 32) & (_k_max_chunks - 1);
+  // For large allocations (mmap), use dedicated table to avoid sharding
+  std::atomic<AddressTable *> *table_ptr;
+  if (is_large_alloc) {
+    table_ptr = _large_alloc_table.get();
+  } else {
+    // Use upper 32 bits for chunk selection (small allocations)
+    const size_t chunk_idx = (out_hash >> 32) & (_k_max_chunks - 1);
+    table_ptr = &_chunk_tables[chunk_idx];
+  }
 
-  AddressTable *table =
-      _chunk_tables[chunk_idx].load(std::memory_order_acquire);
+  AddressTable *table = table_ptr->load(std::memory_order_acquire);
 
-  if (!table) {
-    // Lazy allocation: create table for this chunk
+  if (!table && create_if_missing) {
+    // Lazy allocation: create table (only for add operations)
     auto *new_table = new AddressTable(_per_table_size);
     AddressTable *expected = nullptr;
 
     // Use acq_rel: release ensures table construction is visible to other
     // threads, acquire synchronizes with competing allocations
-    if (_chunk_tables[chunk_idx].compare_exchange_strong(
-            expected, new_table, std::memory_order_acq_rel,
-            std::memory_order_acquire)) {
+    if (table_ptr->compare_exchange_strong(expected, new_table,
+                                           std::memory_order_acq_rel,
+                                           std::memory_order_acquire)) {
       // Successfully installed our new table
       table = new_table;
     } else {
@@ -120,12 +137,12 @@ AddressTable *AddressBitset::get_table(uintptr_t addr, uint64_t &out_hash) {
   return table;
 }
 
-bool AddressBitset::add(uintptr_t addr) {
+bool AddressBitset::add(uintptr_t addr, bool is_large_alloc) {
   assert(addr != _k_empty_slot && addr != _k_deleted_slot);
 
   // Hash once for both chunk and slot lookup
   uint64_t hash;
-  AddressTable *table = get_table(addr, hash);
+  AddressTable *table = get_table(addr, hash, is_large_alloc, true);
   if (!table) {
     return false;
   }
@@ -168,14 +185,15 @@ bool AddressBitset::add(uintptr_t addr) {
   return false;
 }
 
-bool AddressBitset::remove(uintptr_t addr) {
+bool AddressBitset::remove(uintptr_t addr, bool is_large_alloc) {
   assert(addr != _k_empty_slot && addr != _k_deleted_slot);
 
   // Hash once for both chunk and slot lookup
   uint64_t hash;
-  AddressTable *table = get_table(addr, hash);
+  // Don't create table if it doesn't exist - address was never added
+  AddressTable *table = get_table(addr, hash, is_large_alloc, false);
   if (!table) {
-    return false;
+    return false; // Table doesn't exist, so address was never added
   }
 
   uint32_t slot = hash_to_slot(hash, table->table_mask);
@@ -229,6 +247,18 @@ void AddressBitset::clear() {
       }
     }
   }
+
+  // Clear large allocation table
+  if (_large_alloc_table) {
+    AddressTable *table = _large_alloc_table->load(std::memory_order_acquire);
+    if (table) {
+      for (size_t i = 0; i < table->table_size; ++i) {
+        table->slots[i].store(AddressTable::_empty_slot,
+                              std::memory_order_relaxed);
+      }
+      table->count.store(0, std::memory_order_relaxed);
+    }
+  }
 }
 
 int AddressBitset::count() const {
@@ -243,6 +273,15 @@ int AddressBitset::count() const {
       total += table->count.load(std::memory_order_relaxed);
     }
   }
+
+  // Add count from large allocation table
+  if (_large_alloc_table) {
+    AddressTable *table = _large_alloc_table->load(std::memory_order_relaxed);
+    if (table) {
+      total += table->count.load(std::memory_order_relaxed);
+    }
+  }
+
   return total;
 }
 
@@ -257,6 +296,13 @@ int AddressBitset::active_shards() const {
       ++active;
     }
   }
+
+  // Count large allocation table as a shard if active
+  if (_large_alloc_table &&
+      _large_alloc_table->load(std::memory_order_relaxed) != nullptr) {
+    ++active;
+  }
+
   return active;
 }
 

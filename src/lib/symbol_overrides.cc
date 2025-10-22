@@ -86,11 +86,11 @@ public:
   }
 
   // disallow allocation during tracking
-  void track_no_alloc(void *ptr, size_t size) {
+  void track_no_alloc(void *ptr, size_t size, bool is_large_alloc = false) {
     if (_guard) {
       tl_state()->allocation_allowed = false;
       ddprof::AllocationTracker::track_allocation_s(
-          reinterpret_cast<uintptr_t>(ptr), size, *_tl_state);
+          reinterpret_cast<uintptr_t>(ptr), size, *_tl_state, is_large_alloc);
       tl_state()->allocation_allowed = true;
     }
   }
@@ -119,11 +119,11 @@ public:
   }
 
   // disallow allocation during tracking
-  void track_no_alloc(void *ptr) {
+  void track_no_alloc(void *ptr, bool is_large_alloc = false) {
     if (_guard) {
       tl_state()->allocation_allowed = false;
       ddprof::AllocationTracker::track_deallocation_s(
-          reinterpret_cast<uintptr_t>(ptr), *_tl_state);
+          reinterpret_cast<uintptr_t>(ptr), *_tl_state, is_large_alloc);
       tl_state()->allocation_allowed = true;
     }
   }
@@ -781,7 +781,7 @@ struct MmapHook : HookBase {
     AllocTrackerHelper helper;
     void *ptr = ref(addr, length, prot, flags, fd, offset);
     if (addr == nullptr && fd == -1 && ptr != nullptr) {
-      helper.track_no_alloc(ptr, length);
+      helper.track_no_alloc(ptr, length, true); // is_large_alloc=true for mmap
     }
     return ptr;
   }
@@ -797,7 +797,8 @@ struct Mmap_Hook : HookBase {
     AllocTrackerHelper helper;
     void *ptr = ref(addr, length, prot, flags, fd, offset);
     if (addr == nullptr && fd == -1 && ptr != nullptr) {
-      helper.track_no_alloc(ptr, length);
+      helper.track_no_alloc(ptr, length,
+                            true); // is_large_alloc=true for __mmap
     }
     return ptr;
   }
@@ -813,7 +814,8 @@ struct Mmap64Hook : HookBase {
     AllocTrackerHelper helper;
     void *ptr = ref(addr, length, prot, flags, fd, offset);
     if (addr == nullptr && fd == -1 && ptr != nullptr) {
-      helper.track_no_alloc(ptr, length);
+      helper.track_no_alloc(ptr, length,
+                            true); // is_large_alloc=true for mmap64
     }
     return ptr;
   }
@@ -826,7 +828,7 @@ struct MunmapHook : HookBase {
 
   static int hook(void *addr, size_t length) noexcept {
     DeallocTrackerHelper helper;
-    helper.track_no_alloc(addr);
+    helper.track_no_alloc(addr, true);
     return ref(addr, length);
   }
 };
@@ -838,7 +840,7 @@ struct Munmap_Hook : HookBase {
 
   static int hook(void *addr, size_t length) noexcept {
     DeallocTrackerHelper helper;
-    helper.track_no_alloc(addr);
+    helper.track_no_alloc(addr, true);
     return ref(addr, length);
   }
 };
