@@ -14,7 +14,6 @@
 #include "tsc_clock.hpp"
 #include "unique_fd.hpp"
 
-#include <chrono>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <unistd.h>

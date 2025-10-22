@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "perf_archmap.hpp"
+
 #include <linux/perf_event.h>
 
 namespace ddprof {

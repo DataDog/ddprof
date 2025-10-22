@@ -7,7 +7,7 @@
 
 #include "unlikely.hpp"
 
-#include <stdint.h>
+#include <cstdint>
 // although we keep it in a int16, we only need a uint8 for the enum
 enum DD_RES_SEV : uint8_t {
   DD_SEV_OK = 0,

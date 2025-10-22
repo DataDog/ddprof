@@ -10,9 +10,9 @@
 %parse-param {void *scanner} // actually yyscan_t
 
 %{
+#include <cstdint>
 #include <optional>
 #include <stdio.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <string>
 #include <vector>

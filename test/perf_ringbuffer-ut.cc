@@ -3,6 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
+#include "perf_archmap.hpp"
 #include "perf_ringbuffer.hpp"
 #include "perf_watcher.hpp" // for default sample type used in ddprof
 

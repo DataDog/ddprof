@@ -10,7 +10,6 @@
 #include "ddprof_base.hpp"
 #include "ddres_def.hpp"
 #include "pevent.hpp"
-#include "reentry_guard.hpp"
 #include "unlikely.hpp"
 
 #include <atomic>
@@ -18,7 +17,6 @@
 #include <functional>
 #include <mutex>
 #include <pthread.h>
-#include <unordered_set>
 
 namespace ddprof {
 

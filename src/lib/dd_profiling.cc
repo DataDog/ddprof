@@ -12,7 +12,6 @@
 #include "defer.hpp"
 #include "ipc.hpp"
 #include "lib_embedded_data.h"
-#include "lib_logger.hpp"
 #include "logger_setup.hpp"
 #include "signal_helper.hpp"
 #include "symbol_overrides.hpp"
@@ -20,7 +19,6 @@
 
 #include <cassert>
 #include <cerrno>
-#include <charconv>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>

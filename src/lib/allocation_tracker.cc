@@ -7,12 +7,11 @@
 
 #include "allocation_event.hpp"
 #include "ddprof_perf_event.hpp"
-#include "ddres.hpp"
 #include "ddres_def.hpp"
 #include "ipc.hpp"
-#include "lib_logger.hpp"
 #include "perf_clock.hpp"
 #include "pevent_lib.hpp"
+#include "reentry_guard.hpp"
 #include "ringbuffer_utils.hpp"
 #include "savecontext.hpp"
 #include "syscalls.hpp"

@@ -8,7 +8,7 @@
 #include "ddprof_defs.hpp"
 #include "enum_flags.hpp"
 
-#include <stdint.h>
+#include <cstdint>
 #include <string>
 #include <vector>
 

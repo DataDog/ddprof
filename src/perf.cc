@@ -7,6 +7,7 @@
 
 #include "defer.hpp"
 #include "logger.hpp"
+#include "perf_archmap.hpp"
 
 #include <cassert>
 #include <cstring>

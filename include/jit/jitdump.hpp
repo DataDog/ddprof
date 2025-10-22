@@ -20,8 +20,10 @@
 
 #include "ddres.hpp"
 
+#include <cstdint>
 #include <ctime>
-#include <stdint.h>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace ddprof {

@@ -6,6 +6,7 @@
 #pragma once
 
 #include "ddprof_buffer.hpp"
+#include "ddres.hpp"
 #include "mpscringbuffer.hpp"
 #include "perf_ringbuffer.hpp"
 
