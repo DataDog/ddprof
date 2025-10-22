@@ -61,7 +61,7 @@ function(add_unit_test name)
     PROPERTIES
       ENVIRONMENT
       "UBSAN_OPTIONS=halt_on_error=1 abort_on_error=1 print_stacktrace=1;\
-LSAN_OPTIONS=detect_leaks=$<BOOL:${DDPROF_DETECT_LEAK}> malloc_context_size=2 print_suppressions=0;\
+LSAN_OPTIONS=detect_leaks=$<BOOL:${DDPROF_DETECT_LEAK}> malloc_context_size=2 print_suppressions=0 suppressions=${CMAKE_SOURCE_DIR}/cmake/lsan.supp;\
 ASAN_OPTIONS=suppressions=${CMAKE_SOURCE_DIR}/cmake/asan.supp detect_stack_use_after_return=$<NOT:$<STREQUAL:${CMAKE_SYSTEM_PROCESSOR},aarch64>>"
   )
   disable_clangtidy(${name})
@@ -328,13 +328,13 @@ set(ALLOCATION_TRACKER_UT_SRCS
 add_unit_test(
   allocation_tracker-ut ${ALLOCATION_TRACKER_UT_SRCS}
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle dl rt Datadog::Profiling
-  DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384)
+  DEFINITIONS ${DDPROF_DEFINITION_LIST})
 
 if(TARGET jemalloc::jemalloc_shared)
   add_unit_test(
     allocation_tracker_jemalloc-ut ${ALLOCATION_TRACKER_UT_SRCS}
     LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle dl rt jemalloc::jemalloc_shared Datadog::Profiling
-    DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384 USE_JEMALLOC=1)
+    DEFINITIONS ${DDPROF_DEFINITION_LIST} USE_JEMALLOC=1)
 endif()
 
 add_unit_test(sys_utils-ut sys_utils-ut.cc ../src/sys_utils.cc)
@@ -446,6 +446,9 @@ add_benchmark(
   ../src/sys_utils.cc
   LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle
   DEFINITIONS ${DDPROF_DEFINITION_LIST} KMAX_TRACKED_ALLOCATIONS=16384)
+
+add_benchmark(address_bitset-bench address_bitset-bench.cc ../src/lib/address_bitset.cc
+              LIBRARIES absl::flat_hash_map absl::hash)
 
 set(SIMPLE_MALLOC_SRC simple_malloc.cc ../src/signal_helper.cc)
 

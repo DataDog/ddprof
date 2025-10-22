@@ -40,6 +40,7 @@ struct AllocationTrackerStateEvent {
   struct sample_id sample_id;
   uint32_t tracked_address_count;
   uint32_t address_conflict_count;
+  uint32_t active_shards;
   uint32_t lost_alloc_count;
   uint32_t lost_dealloc_count;
 };

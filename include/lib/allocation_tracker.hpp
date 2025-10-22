@@ -62,10 +62,12 @@ public:
 
   static inline DDPROF_NO_SANITIZER_ADDRESS void
   track_allocation_s(uintptr_t addr, size_t size,
-                     TrackerThreadLocalState &tl_state);
+                     TrackerThreadLocalState &tl_state,
+                     bool is_large_alloc = false);
 
   static inline void track_deallocation_s(uintptr_t addr,
-                                          TrackerThreadLocalState &tl_state);
+                                          TrackerThreadLocalState &tl_state,
+                                          bool is_large_alloc = false);
 
   static inline bool is_active();
 
@@ -118,8 +120,9 @@ private:
   static void make_key();
 
   void track_allocation(uintptr_t addr, size_t size,
-                        TrackerThreadLocalState &tl_state);
-  void track_deallocation(uintptr_t addr, TrackerThreadLocalState &tl_state);
+                        TrackerThreadLocalState &tl_state, bool is_large_alloc);
+  void track_deallocation(uintptr_t addr, TrackerThreadLocalState &tl_state,
+                          bool is_large_alloc);
 
   DDRes push_alloc_sample(uintptr_t addr, uint64_t allocated_size,
                           TrackerThreadLocalState &tl_state);
@@ -160,7 +163,8 @@ private:
 };
 
 void AllocationTracker::track_allocation_s(uintptr_t addr, size_t size,
-                                           TrackerThreadLocalState &tl_state) {
+                                           TrackerThreadLocalState &tl_state,
+                                           bool is_large_alloc) {
   AllocationTracker *instance = _instance;
 
   // Be safe, if allocation tracker has not been initialized, just bail out
@@ -179,7 +183,7 @@ void AllocationTracker::track_allocation_s(uintptr_t addr, size_t size,
 
   if (likely(
           instance->_state.track_allocations.load(std::memory_order_relaxed))) {
-    instance->track_allocation(addr, size, tl_state);
+    instance->track_allocation(addr, size, tl_state, is_large_alloc);
   } else {
     // allocation tracking is disabled, reset state
     tl_state.remaining_bytes_initialized = false;
@@ -187,15 +191,16 @@ void AllocationTracker::track_allocation_s(uintptr_t addr, size_t size,
   }
 }
 
-void AllocationTracker::track_deallocation_s(
-    uintptr_t addr, TrackerThreadLocalState &tl_state) {
+void AllocationTracker::track_deallocation_s(uintptr_t addr,
+                                             TrackerThreadLocalState &tl_state,
+                                             bool is_large_alloc) {
   // same pattern as track_allocation
   AllocationTracker *instance = _instance;
   if (!instance) {
     return;
   }
   if (instance->_state.track_deallocations.load(std::memory_order_relaxed)) {
-    instance->track_deallocation(addr, tl_state);
+    instance->track_deallocation(addr, tl_state, is_large_alloc);
   }
 }
 

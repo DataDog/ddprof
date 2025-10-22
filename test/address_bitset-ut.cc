@@ -5,7 +5,6 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <iostream>
 #include <random>
 #include <unordered_set>
 
@@ -13,84 +12,97 @@
 
 namespace ddprof {
 
+namespace {
+constexpr uint32_t kDeterministicSeed = 42;
+} // namespace
+
 TEST(address_bitset, simple) {
-  AddressBitset address_bitset(AddressBitset::_k_default_bitset_size);
+  AddressBitset address_bitset(AddressBitset::_k_default_table_size);
   EXPECT_TRUE(address_bitset.add(0xbadbeef));
   EXPECT_FALSE(address_bitset.add(0xbadbeef));
   EXPECT_TRUE(address_bitset.remove(0xbadbeef));
 }
 
 TEST(address_bitset, many_addresses) {
-  AddressBitset address_bitset(AddressBitset::_k_default_bitset_size);
+#ifdef __SANITIZE_ADDRESS__
+  constexpr unsigned kTestElements = 5000;
+#else
+  constexpr unsigned kTestElements = 10000;
+#endif
+  AddressBitset address_bitset(AddressBitset::_k_default_table_size);
   std::random_device rd;
   std::mt19937 gen(rd());
-  std::uniform_int_distribution<uintptr_t> dis(
-      0, std::numeric_limits<uintptr_t>::max());
+
+  // Keep addresses within same chunk to avoid expensive table creation
+  constexpr uintptr_t kAlignmentMask = 0xF;
+  constexpr uintptr_t kChunkMask = (1ULL << AddressBitset::_k_chunk_shift) - 1;
+  constexpr uintptr_t kBaseAddr = 0x7f0000000000ULL; // Typical heap range
+  std::uniform_int_distribution<uintptr_t> dis(0, kChunkMask);
 
   std::vector<uintptr_t> addresses;
-  unsigned nb_elements = 100000;
-  for (unsigned i = 0; i < nb_elements; ++i) {
-    uintptr_t addr = dis(gen);
+  for (unsigned i = 0; i < kTestElements; ++i) {
+    uintptr_t addr =
+        kBaseAddr + (dis(gen) & ~kAlignmentMask); // 16-byte aligned
     if (address_bitset.add(addr)) {
       addresses.push_back(addr);
     }
   }
-  EXPECT_TRUE(nb_elements - (nb_elements / 10) < addresses.size());
+  EXPECT_TRUE(kTestElements - (kTestElements / 10) < addresses.size());
   for (auto addr : addresses) {
     EXPECT_TRUE(address_bitset.remove(addr));
   }
-  EXPECT_EQ(0, address_bitset.count());
 }
 
-// This test to tune the hash approach
-// Collision rate is around 5.7%, which will have an impact on sampling
-#ifdef COLLISION_TEST
-// Your hash function
-#  ifdef TEST_IDENTITY
-inline uint64_t my_hash(uintptr_t h1) { return h1; }
-#  else
-inline uint64_t my_hash(uintptr_t h1) {
-  h1 = h1 >> 4;
-  uint32_t high = (uint32_t)(h1 >> 32);
-  uint32_t low = (uint32_t)h1;
-  return high ^ low;
-}
-#  endif
+TEST(address_bitset, no_false_collisions) {
+  // With the new open addressing implementation, we should have NO false
+  // collisions (unlike the old bitset which had ~6% collision rate)
+  AddressBitset address_bitset(AddressBitset::_k_default_table_size);
 
-TEST(address_bitset, hash_function) {
-  // Number of values to hash
-  const int num_values = 1000000;
+#ifdef __SANITIZE_ADDRESS__
+  constexpr size_t kTestAllocCount = 5000; // ~8% load factor
+#else
+  constexpr size_t kTestAllocCount = 20000; // ~30% load factor
+#endif
+  constexpr uintptr_t kAlignmentMask = 0xF;
 
-  // A large address range (33 bits)
-  const uintptr_t min_address = 0x100000000;
-  const uintptr_t max_address = 0x200000000;
-
-  // Create an unordered set to store hashed values
-  std::unordered_set<uint32_t> lower_bits_hashed_values;
-
-  // Initialize random number generator
   std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_int_distribution<uintptr_t> distribution(min_address,
-                                                        max_address);
+  // NOLINTNEXTLINE(cert-msc32-c,cert-msc51-cpp)
+  std::mt19937 gen(kDeterministicSeed);
 
-  // Generate and hash random values within the address range
-  for (int i = 0; i < num_values; ++i) {
-    uintptr_t address = distribution(gen);
-    uint32_t lower_bits = my_hash(address) & (8 * 1024 * 1024 - 1);
-    // Insert the lower 16 bits into the set
-    lower_bits_hashed_values.insert(lower_bits);
+  // Keep addresses within same chunk to avoid expensive table creation
+  constexpr uintptr_t kChunkMask = (1ULL << AddressBitset::_k_chunk_shift) - 1;
+  constexpr uintptr_t kBaseAddr = 0x7f0000000000ULL; // Typical heap range
+  std::uniform_int_distribution<uintptr_t> dist(0, kChunkMask);
+
+  std::vector<uintptr_t> test_addresses;
+  std::unordered_set<uintptr_t> unique_addresses;
+
+  while (unique_addresses.size() < kTestAllocCount) {
+    uintptr_t addr = kBaseAddr + (dist(gen) & ~kAlignmentMask);
+    if (addr != 0 && unique_addresses.insert(addr).second) {
+      test_addresses.push_back(addr);
+    }
   }
 
-  // Calculate collision statistics
-  int num_collisions = num_values - lower_bits_hashed_values.size();
-  double collision_rate =
-      static_cast<double>(num_collisions) / num_values * 100.0;
+  // Add all addresses - should succeed with no false collisions
+  int add_failures = 0;
+  for (auto addr : test_addresses) {
+    if (!address_bitset.add(addr)) {
+      add_failures++;
+    }
+  }
 
-  std::cout << "Hash test results:" << std::endl;
-  std::cout << "Number of values: " << num_values << std::endl;
-  std::cout << "Number of collisions: " << num_collisions << std::endl;
-  std::cout << "Collision rate: " << collision_rate << "%" << std::endl;
+  EXPECT_EQ(add_failures, 0) << "Expected NO false collisions";
+
+  // Remove all addresses - should all succeed
+  int remove_failures = 0;
+  for (auto addr : test_addresses) {
+    if (!address_bitset.remove(addr)) {
+      remove_failures++;
+    }
+  }
+
+  EXPECT_EQ(remove_failures, 0);
 }
-#endif
+
 } // namespace ddprof

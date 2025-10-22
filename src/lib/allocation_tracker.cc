@@ -11,7 +11,6 @@
 #include "ddres_def.hpp"
 #include "ipc.hpp"
 #include "lib_logger.hpp"
-#include "live_allocation-c.hpp"
 #include "perf_clock.hpp"
 #include "pevent_lib.hpp"
 #include "ringbuffer_utils.hpp"
@@ -128,9 +127,7 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
     return ddres_error(DD_WHAT_PERFRB);
   }
   if (track_deallocations) {
-    // 16 times as we want to probability of collision to be low enough
-    _allocated_address_set = AddressBitset(liveallocation::kMaxTracked *
-                                           k_ratio_max_elt_to_bitset_size);
+    _allocated_address_set.init(0); // Use default size, fail on add if full
   }
   DDRES_CHECK_FWD(ddprof::ring_buffer_attach(ring_buffer, &_pevent));
 
@@ -204,7 +201,8 @@ void AllocationTracker::free_on_consecutive_failures(bool failure) {
 }
 
 void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
-                                         TrackerThreadLocalState &tl_state) {
+                                         TrackerThreadLocalState &tl_state,
+                                         bool is_large_alloc) {
   // Reentrancy should be prevented by caller (by using ReentryGuard on
   // TrackerThreadLocalState::reentry_guard).
 
@@ -239,24 +237,8 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
   uint64_t const total_size = nsamples * sampling_interval;
 
   if (_state.track_deallocations) {
-    if (_allocated_address_set.add(addr)) {
-      if (unlikely(_allocated_address_set.count() >
-                   ddprof::liveallocation::kMaxTracked)) {
-        // Check if we reached max number of elements
-        // Clear elements if we reach too many
-        // todo: should we just stop new live tracking (like java) ?
-        if (IsDDResOK(push_clear_live_allocation(tl_state))) {
-          LG_DBG("Clearing live allocations");
-          _allocated_address_set.clear();
-          // still set this as we are pushing the allocation to ddprof
-          _allocated_address_set.add(addr);
-        } else {
-          LG_DBG("Stopping allocation profiling. Unable to clear live "
-                 "allocation\n");
-          free();
-        }
-      }
-    } else {
+    if (!_allocated_address_set.add(addr, is_large_alloc)) {
+      // add() returned false: either table is full or address already exists
       _state.address_conflict_count.fetch_add(1, std::memory_order_acq_rel);
       // null the address to avoid using this for live heap profiling
       // pushing a sample is still good to have a good representation
@@ -267,16 +249,18 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
   auto res = push_alloc_sample(addr, total_size, tl_state);
   free_on_consecutive_failures(IsDDResFatal(res));
   if (unlikely(!IsDDResOK(res)) && _state.track_deallocations && addr) {
-    _allocated_address_set.remove(addr);
+    _allocated_address_set.remove(addr, is_large_alloc);
   }
 }
 
 void AllocationTracker::track_deallocation(uintptr_t addr,
-                                           TrackerThreadLocalState &tl_state) {
+                                           TrackerThreadLocalState &tl_state,
+                                           bool is_large_alloc) {
   // Reentrancy should be prevented by caller (by using ReentryGuard on
   // TrackerThreadLocalState::reentry_guard).
 
-  if (!_state.track_deallocations || !_allocated_address_set.remove(addr)) {
+  if (!_state.track_deallocations ||
+      !_allocated_address_set.remove(addr, is_large_alloc)) {
     return;
   }
 
@@ -310,6 +294,7 @@ DDRes AllocationTracker::push_allocation_tracker_state() {
   event->address_conflict_count =
       _state.address_conflict_count.load(std::memory_order_relaxed);
   event->tracked_address_count = _allocated_address_set.count();
+  event->active_shards = _allocated_address_set.active_shards();
   event->lost_alloc_count =
       _state.lost_alloc_count.exchange(0, std::memory_order_acq_rel);
   event->lost_dealloc_count =
