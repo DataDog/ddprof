@@ -371,7 +371,7 @@ DDRes AllocationTracker::push_dealloc_sample(
   MPSCRingBufferWriter writer{&_pevent.rb, _high_priority_area_size};
 
   bool timeout = false;
-  auto buffer = writer.reserve(sizeof(DeallocationEvent), &timeout);
+  auto buffer = writer.reserve(sizeof(DeallocationEvent), &timeout, true);
   if (buffer.empty()) {
     // ring buffer is full, increase lost count
     _state.lost_dealloc_count.fetch_add(1, std::memory_order_acq_rel);
