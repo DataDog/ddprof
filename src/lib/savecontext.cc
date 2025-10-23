@@ -9,7 +9,6 @@
 #include "defer.hpp"
 #include "pthread_fixes.hpp"
 #include "saveregisters.hpp"
-#include "unlikely.hpp"
 
 #include <algorithm>
 #include <cstring>

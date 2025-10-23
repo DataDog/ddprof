@@ -5,15 +5,13 @@
 
 #pragma once
 
-#include "ddres_def.hpp"
-#include "perf_archmap.hpp"
 #include "perf_clock.hpp"
 #include "perf_watcher.hpp"
 
 #include <chrono>
 #include <csignal>
+#include <cstdint>
 #include <linux/perf_event.h>
-#include <stdint.h>
 #include <vector>
 
 namespace ddprof {

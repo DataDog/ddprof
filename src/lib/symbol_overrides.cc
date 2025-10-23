@@ -11,7 +11,6 @@
 #include "symbol_overrides.hpp"
 
 #include "allocation_tracker.hpp"
-#include "chrono_utils.hpp"
 #include "ddprof_base.hpp"
 #include "elfutils.hpp"
 #include "reentry_guard.hpp"
@@ -23,7 +22,6 @@
 #include <dlfcn.h>
 #include <malloc.h>
 #include <sys/mman.h>
-#include <unordered_map>
 
 #if defined(__GNUC__) && !defined(__clang__)
 #  define NOEXCEPT noexcept

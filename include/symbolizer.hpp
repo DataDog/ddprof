@@ -14,8 +14,7 @@
 #include <memory>
 #include <span>
 #include <string>
-#include <string_view>
-#include <vector>
+#include <unordered_map>
 
 struct ddog_prof_Location;
 

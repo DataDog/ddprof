@@ -9,8 +9,8 @@
 #include "event_config.hpp"
 #include <string>
 
+#include <cstdint>
 #include <linux/perf_event.h>
-#include <stdint.h>
 
 namespace ddprof {
 

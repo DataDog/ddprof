@@ -17,6 +17,7 @@
 #include "loghandle.hpp"
 #include "perf_clock.hpp"
 #include "pevent_lib.hpp"
+#include "reentry_guard.hpp"
 #include "ringbuffer_holder.hpp"
 #include "symbol_helper.hpp"
 #include "symbol_overrides.hpp"

@@ -16,7 +16,7 @@
 #include "constants.hpp"
 #include "ddprof_cmdline_watcher.hpp"
 #include "ddprof_defs.hpp"
-#include "ddres.hpp"
+#include "ddres_helpers.hpp"
 #include "logger.hpp"
 #include "uuid.hpp"
 #include "version.hpp"
@@ -24,7 +24,6 @@
 #include <chrono>
 #include <cstring>
 #include <fstream>
-#include <optional>
 
 namespace ddprof {
 

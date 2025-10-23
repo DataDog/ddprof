@@ -6,8 +6,8 @@
 #include "perf_ringbuffer.hpp"
 
 #include "ddprof_perf_event.hpp"
-#include "logger.hpp"
 #include "mpscringbuffer.hpp"
+#include "perf_archmap.hpp"
 
 #include <bit>
 #include <cstdlib>
