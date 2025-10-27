@@ -29,7 +29,12 @@ public:
   AllocationTracker(const AllocationTracker &) = delete;
   AllocationTracker &operator=(const AllocationTracker &) = delete;
 
-  ~AllocationTracker() { free(); }
+  ~AllocationTracker() {
+    if (_instance) {
+      _instance->push_allocation_tracker_state();
+    }
+    free();
+  }
 
   enum AllocationTrackingFlags : uint8_t {
     kTrackDeallocations = 0x1,
