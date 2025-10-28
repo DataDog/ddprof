@@ -153,6 +153,7 @@ private:
   uint32_t _stack_sample_size;
   PEvent _pevent;
   bool _deterministic_sampling;
+  size_t _high_priority_area_size;
 
   AddressBitset _allocated_address_set;
   IntervalTimerCheck _interval_timer_check;
