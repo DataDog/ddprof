@@ -223,7 +223,7 @@ DDRes worker_process_ring_buffers_ordered(std::span<PEvent> pes,
   // bumping the reader position until empty or we reach the first non-discarded
   // event.
 
-  const std::chrono::microseconds kMaxSampleLatency{100};
+  const std::chrono::microseconds kMaxSampleLatency{50};
 
   auto now = PerfClock::now();
   auto deadline =
@@ -313,13 +313,14 @@ DDRes worker_process_ring_buffers_ordered(std::span<PEvent> pes,
 
 inline DDRes
 worker_process_ring_buffers(std::span<PEvent> pes, DDProfContext &ctx,
-                            std::chrono::steady_clock::time_point *now) {
+                            std::chrono::steady_clock::time_point *now,
+                            bool *timeout) {
   // While there are events to process, iterate through them
   // while limiting time spent in loop to at most k_sample_default_wakeup
   auto loop_start = std::chrono::steady_clock::now();
   std::chrono::steady_clock::time_point local_now;
 
-  bool events;
+  bool events = false;
   do {
     events = false;
     for (auto &pevent : pes) {
@@ -329,6 +330,7 @@ worker_process_ring_buffers(std::span<PEvent> pes, DDProfContext &ctx,
 
         ConstBuffer buffer = reader.read_all_available();
         while (!buffer.empty()) {
+          events = true;
           const auto *hdr =
               reinterpret_cast<const perf_event_header *>(buffer.data());
           DDRes res = ddprof_worker_process_event(hdr, pevent.watcher_pos, ctx);
@@ -346,6 +348,7 @@ worker_process_ring_buffers(std::span<PEvent> pes, DDProfContext &ctx,
         MPSCRingBufferReader reader{&ring_buffer};
         for (ConstBuffer buffer{reader.read_sample()}; !buffer.empty();
              buffer = reader.read_sample()) {
+          events = true;
           const auto *hdr =
               reinterpret_cast<const perf_event_header *>(buffer.data());
           DDRes res = ddprof_worker_process_event(hdr, pevent.watcher_pos, ctx);
@@ -367,6 +370,7 @@ worker_process_ring_buffers(std::span<PEvent> pes, DDProfContext &ctx,
   } while (events && (local_now - loop_start) < k_sample_default_wakeup);
 
   *now = local_now;
+  *timeout = events && (local_now - loop_start) >= k_sample_default_wakeup;
   return {};
 }
 
@@ -393,24 +397,31 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
       start_worker_server(ctx.socket_fd.get(), create_reply_message(ctx));
 
   EventQueue event_queue;
+  bool skip_poll = false;
+  const auto reorder_poll_timeout = std::chrono::milliseconds{10};
+  const auto poll_timeout = ctx.params.reorder_events ? reorder_poll_timeout
+                                                      : k_sample_default_wakeup;
+
   // Worker poll loop
   while (!g_termination_requested.load(std::memory_order::relaxed)) {
-    int const n =
-        poll(poll_fds, pevents.size(),
-             std::chrono::milliseconds{k_sample_default_wakeup}.count());
 
-    // If there was an issue, return and let the caller check errno
-    if (-1 == n && errno == EINTR) {
-      continue;
+    if (!skip_poll) {
+      int const n = poll(poll_fds, pevents.size(), poll_timeout.count());
+
+      // If there was an issue, return and let the caller check errno
+      if (-1 == n && errno == EINTR) {
+        continue;
+      }
+      DDRES_CHECK_ERRNO(n, DD_WHAT_POLLERROR, "poll failed");
     }
-    DDRES_CHECK_ERRNO(n, DD_WHAT_POLLERROR, "poll failed");
 
     bool stop = false;
     for (size_t i = 0; i < pevents.size(); ++i) {
       pollfd const &pfd = poll_fds[i];
       if (pfd.revents & POLLHUP) {
         stop = true;
-      } else if (pfd.revents & POLLIN && pevents[i].custom_event) {
+      } else if (!skip_poll && (pfd.revents & POLLIN) &&
+                 pevents[i].custom_event) {
         // for custom ring buffer, need to read from eventfd to flush POLLIN
         // status
         uint64_t count;
@@ -425,7 +436,8 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
           worker_process_ring_buffers_ordered(pevents, ctx, event_queue, stop));
       now = std::chrono::steady_clock::now();
     } else {
-      DDRES_CHECK_FWD(worker_process_ring_buffers(pevents, ctx, &now));
+      DDRES_CHECK_FWD(
+          worker_process_ring_buffers(pevents, ctx, &now, &skip_poll));
     }
 
     DDRES_CHECK_FWD(ddprof_worker_maybe_export(ctx, now));

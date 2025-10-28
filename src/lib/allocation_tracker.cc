@@ -291,13 +291,18 @@ DDRes AllocationTracker::push_allocation_tracker_state() {
   event->sample_id.tid = 0;
 
   event->address_conflict_count =
-      _state.address_conflict_count.load(std::memory_order_relaxed);
+      _state.address_conflict_count.exchange(0, std::memory_order_acq_rel);
   event->tracked_address_count = _allocated_address_set.count();
   event->active_shards = _allocated_address_set.active_shards();
   event->lost_alloc_count =
       _state.lost_alloc_count.exchange(0, std::memory_order_acq_rel);
   event->lost_dealloc_count =
       _state.lost_dealloc_count.exchange(0, std::memory_order_acq_rel);
+
+  LG_DBG("Tracked address count: %d, address conflict count: %d, lost alloc "
+         "count: %d, lost dealloc count: %d",
+         event->tracked_address_count, event->address_conflict_count,
+         event->lost_alloc_count, event->lost_dealloc_count);
 
   if (writer.commit(buffer)) {
     uint64_t count = 1;
@@ -307,10 +312,7 @@ DDRes AllocationTracker::push_allocation_tracker_state() {
       return DDRes{._what = DD_WHAT_PERFRB, ._sev = DD_SEV_ERROR};
     }
   }
-  LG_DBG("Tracked address count: %d, address conflict count: %d",
-         _allocated_address_set.count(),
-         _state.address_conflict_count.load(std::memory_order_relaxed));
-  _state.address_conflict_count.store(0, std::memory_order_release);
+
   return {};
 }
 
