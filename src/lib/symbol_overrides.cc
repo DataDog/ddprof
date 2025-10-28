@@ -13,6 +13,7 @@
 #include "allocation_tracker.hpp"
 #include "ddprof_base.hpp"
 #include "elfutils.hpp"
+#include "logger.hpp"
 #include "reentry_guard.hpp"
 #include "unlikely.hpp"
 
@@ -850,6 +851,24 @@ template <typename T> void register_hook() {
 }
 
 void register_hooks() {
+  auto malloc_lookup_result = ddprof::lookup_symbol("malloc", false);
+  auto new_lookup_result = ddprof::lookup_symbol(NewHook::name, false);
+
+  // c++ allocators from libstdc++/libc++ calls malloc internally, so we don't
+  // need to instrument them. Only instrument them if malloc is not present or
+  // if new and malloc are defined in the same library (as what is done in
+  // tcmalloc/jemmaloc/mimalloc).
+  bool instrument_cxx_allocators = false;
+  if (malloc_lookup_result.symbol.st_value == 0 ||
+      malloc_lookup_result.symbol.st_size == 0 ||
+      (new_lookup_result.symbol.st_value > 0 &&
+       new_lookup_result.symbol.st_size > 0 &&
+       new_lookup_result.object_name == malloc_lookup_result.object_name)) {
+    instrument_cxx_allocators = true;
+  }
+
+  LG_DBG("Instrumentation of c++ allocators %s",
+         instrument_cxx_allocators ? "enabled" : "disabled");
   register_hook<MallocHook>();
   register_hook<FreeHook>();
   register_hook<FreeSizedHook>();
@@ -861,27 +880,29 @@ void register_hooks() {
   register_hook<MemalignHook>();
   register_hook<VallocHook>();
 
-  register_hook<NewHook>();
-  register_hook<NewArrayHook>();
-  register_hook<NewNoThrowHook>();
-  register_hook<NewArrayNoThrowHook>();
-  register_hook<NewAlignHook>();
-  register_hook<NewArrayAlignHook>();
-  register_hook<NewAlignNoThrowHook>();
-  register_hook<NewArrayAlignNoThrowHook>();
+  if (instrument_cxx_allocators) {
+    register_hook<NewHook>();
+    register_hook<NewArrayHook>();
+    register_hook<NewNoThrowHook>();
+    register_hook<NewArrayNoThrowHook>();
+    register_hook<NewAlignHook>();
+    register_hook<NewArrayAlignHook>();
+    register_hook<NewAlignNoThrowHook>();
+    register_hook<NewArrayAlignNoThrowHook>();
 
-  register_hook<DeleteHook>();
-  register_hook<DeleteArrayHook>();
-  register_hook<DeleteNoThrowHook>();
-  register_hook<DeleteArrayNoThrowHook>();
-  register_hook<DeleteAlignHook>();
-  register_hook<DeleteArrayAlignHook>();
-  register_hook<DeleteAlignNoThrowHook>();
-  register_hook<DeleteArrayAlignNoThrowHook>();
-  register_hook<DeleteSizedHook>();
-  register_hook<DeleteArraySizedHook>();
-  register_hook<DeleteSizedAlignHook>();
-  register_hook<DeleteArraySizedAlignHook>();
+    register_hook<DeleteHook>();
+    register_hook<DeleteArrayHook>();
+    register_hook<DeleteNoThrowHook>();
+    register_hook<DeleteArrayNoThrowHook>();
+    register_hook<DeleteAlignHook>();
+    register_hook<DeleteArrayAlignHook>();
+    register_hook<DeleteAlignNoThrowHook>();
+    register_hook<DeleteArrayAlignNoThrowHook>();
+    register_hook<DeleteSizedHook>();
+    register_hook<DeleteArraySizedHook>();
+    register_hook<DeleteSizedAlignHook>();
+    register_hook<DeleteArraySizedAlignHook>();
+  }
 
   register_hook<MmapHook>();
   register_hook<Mmap64Hook>();
