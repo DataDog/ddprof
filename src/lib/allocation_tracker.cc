@@ -127,7 +127,6 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
     return ddres_error(DD_WHAT_PERFRB);
   }
   if (track_deallocations) {
-    // 16 times as we want to probability of collision to be low enough
     _allocated_address_set.init(0); // Use default size, fail on add if full
     constexpr int64_t k_max_high_priority_area_size_ratio = 20;
     constexpr int64_t k_high_priority_event_count = 200;
