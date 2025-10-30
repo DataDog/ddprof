@@ -281,7 +281,8 @@ DDRes AllocationTracker::push_allocation_tracker_state() {
   MPSCRingBufferWriter writer{&_pevent.rb, _high_priority_area_size};
 
   bool timeout = false;
-  auto buffer = writer.reserve(sizeof(AllocationTrackerStateEvent), &timeout);
+  auto buffer =
+      writer.reserve(sizeof(AllocationTrackerStateEvent), &timeout, true);
   if (buffer.empty()) {
     if (timeout) {
       return ddres_error(DD_WHAT_PERFRB);
