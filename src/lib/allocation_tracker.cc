@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cassert>
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <unistd.h>
@@ -32,6 +33,24 @@ pthread_once_t AllocationTracker::_key_once = PTHREAD_ONCE_INIT;
 pthread_key_t AllocationTracker::_tl_state_key;
 
 AllocationTracker *AllocationTracker::_instance;
+
+namespace {
+DDPROF_NOINLINE auto sleep_and_retry_reserve(MPSCRingBufferWriter &writer,
+                                             size_t size, bool &timeout) {
+  constexpr std::chrono::nanoseconds k_sleep_duration =
+      std::chrono::microseconds(500);
+  constexpr int k_max_sleep_attempts = 5;
+
+  for (int i = 0; i < k_max_sleep_attempts; i++) {
+    std::this_thread::sleep_for(k_sleep_duration);
+    auto buffer = writer.reserve(size, &timeout, true);
+    if (!buffer.empty() || timeout) {
+      return buffer;
+    }
+  }
+  return Buffer{};
+}
+} // namespace
 
 TrackerThreadLocalState *AllocationTracker::get_tl_state() {
   // In shared libraries, TLS access requires a call to tls_get_addr,
@@ -129,7 +148,7 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
   if (track_deallocations) {
     _allocated_address_set.init(0); // Use default size, fail on add if full
     constexpr double k_max_high_priority_area_size_fraction = 0.05;
-    constexpr int64_t k_high_priority_event_count = 2000;
+    constexpr int64_t k_high_priority_event_count = 5000;
     _high_priority_area_size =
         std::min(static_cast<size_t>(ring_buffer.mem_size *
                                      k_max_high_priority_area_size_fraction),
@@ -374,6 +393,10 @@ DDRes AllocationTracker::push_dealloc_sample(
 
   bool timeout = false;
   auto buffer = writer.reserve(sizeof(DeallocationEvent), &timeout, true);
+  if (buffer.empty()) {
+    buffer =
+        sleep_and_retry_reserve(writer, sizeof(DeallocationEvent), timeout);
+  }
   if (buffer.empty()) {
     // ring buffer is full, increase lost count
     _state.lost_dealloc_count.fetch_add(1, std::memory_order_acq_rel);
