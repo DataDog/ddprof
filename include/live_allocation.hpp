@@ -57,18 +57,23 @@ public:
 
   void register_library_state(int watcher_pos, pid_t pid,
                               uint32_t address_conflict_count,
-                              uint32_t tracked_addresse_count,
+                              uint32_t tracked_address_count,
                               uint32_t active_shards) {
     PidMap &pid_map = access_resize(_watcher_vector, watcher_pos);
     PidStacks &pid_stacks = pid_map[pid];
     pid_stacks._address_conflict_count = address_conflict_count;
-    pid_stacks._tracked_address_count = tracked_addresse_count;
+    pid_stacks._tracked_address_count = tracked_address_count;
     LG_NTC("<%u> PID %d: live allocations=%lu, Unique "
            "stacks=%lu, lib tracked addresses=%u, lib active shards=%u, lib "
            "address conflicts=%u",
            watcher_pos, pid, pid_stacks._address_map.size(),
            pid_stacks._unique_stacks.size(), pid_stacks._tracked_address_count,
            active_shards, pid_stacks._address_conflict_count);
+    if (pid_stacks._tracked_address_count != tracked_address_count) {
+      LG_WRN("Tracked address count mismatch between library and profiler for "
+             "PID %d: %u != %u",
+             pid, pid_stacks._tracked_address_count, tracked_address_count);
+    }
   }
 
   // Allocation should be aggregated per stack trace
