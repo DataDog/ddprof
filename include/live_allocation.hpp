@@ -69,10 +69,10 @@ public:
            watcher_pos, pid, pid_stacks._address_map.size(),
            pid_stacks._unique_stacks.size(), pid_stacks._tracked_address_count,
            active_shards, pid_stacks._address_conflict_count);
-    if (pid_stacks._tracked_address_count != tracked_address_count) {
+    if (pid_stacks._address_map.size() != tracked_address_count) {
       LG_WRN("Tracked address count mismatch between library and profiler for "
-             "PID %d: %u != %u",
-             pid, pid_stacks._tracked_address_count, tracked_address_count);
+             "PID %d: %u != %lu",
+             pid, tracked_address_count, pid_stacks._address_map.size());
     }
   }
 
