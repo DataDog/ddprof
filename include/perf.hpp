@@ -20,7 +20,7 @@ namespace ddprof {
 inline constexpr int k_default_buffer_size_shift{6};
 
 // this does not count as pinned memory, use a larger size
-inline constexpr int k_mpsc_buffer_size_shift{8};
+inline constexpr int k_mpsc_buffer_size_shift{10};
 
 // sample frequency check
 inline constexpr std::chrono::milliseconds k_sample_default_wakeup{100};
