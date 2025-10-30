@@ -499,6 +499,12 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
     pprof->use_process_adresses = true;
   }
 
+#ifdef __x86_64__
+  pprof->_tags.emplace_back(std::string("cpu_arch"), std::string("amd64"));
+#elif defined(__aarch64__)
+  pprof->_tags.emplace_back(std::string("cpu_arch"), std::string("arm64"));
+#endif
+
   return {};
 }
 
