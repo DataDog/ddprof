@@ -147,8 +147,8 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
   }
   if (track_deallocations) {
     _allocated_address_set.init(0); // Use default size, fail on add if full
-    constexpr double k_max_high_priority_area_size_fraction = 0.05;
-    constexpr int64_t k_high_priority_event_count = 5000;
+    constexpr double k_max_high_priority_area_size_fraction = 0.1;
+    constexpr int64_t k_high_priority_event_count = 10000;
     _high_priority_area_size =
         std::min(static_cast<size_t>(ring_buffer.mem_size *
                                      k_max_high_priority_area_size_fraction),
