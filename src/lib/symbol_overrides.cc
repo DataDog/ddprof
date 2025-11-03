@@ -144,9 +144,12 @@ struct MallocHook : HookBase {
 
   static void *hook(size_t size) noexcept {
     AllocTrackerHelper helper;
-    auto *ptr = ref(size);
+    auto *ptr = ref(size + 16);
     helper.track(ptr, size);
-    return ptr;
+    if (ptr == nullptr) {
+      return nullptr;
+    }
+    return reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(ptr) + 16);
   }
 };
 
@@ -279,6 +282,7 @@ struct FreeHook : HookBase {
       return;
     }
 
+    ptr = reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(ptr) - 16);
     helper.track(ptr);
     ref(ptr);
   }
@@ -526,9 +530,12 @@ struct CallocHook : HookBase {
 
   static void *hook(size_t nmemb, size_t size) noexcept {
     AllocTrackerHelper helper;
-    auto *ptr = ref(nmemb, size);
+    auto *ptr = ref(nmemb, size + 16);
     helper.track(ptr, size * nmemb);
-    return ptr;
+    if (ptr == nullptr) {
+      return nullptr;
+    }
+    return reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(ptr) + 16);
   }
 };
 
@@ -540,15 +547,18 @@ struct ReallocHook : HookBase {
   static void *hook(void *ptr, size_t size) noexcept {
     AllocTrackerHelper helper;
     if (likely(ptr) && helper) {
+      ptr = reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(ptr) - 16);
       ddprof::AllocationTracker::track_deallocation_s(
           reinterpret_cast<uintptr_t>(ptr), *helper.tl_state());
     }
-    auto *newptr = ref(ptr, size);
+    auto *newptr = ref(ptr, size + 16);
     if (likely(size)) {
       helper.track(newptr, size);
     }
-
-    return newptr;
+    if (newptr == nullptr) {
+      return nullptr;
+    }
+    return reinterpret_cast<void *>(reinterpret_cast<uintptr_t>(newptr) + 16);
   }
 };
 
@@ -871,14 +881,14 @@ void register_hooks() {
          instrument_cxx_allocators ? "enabled" : "disabled");
   register_hook<MallocHook>();
   register_hook<FreeHook>();
-  register_hook<FreeSizedHook>();
-  register_hook<FreeAlignedSizedHook>();
+  // register_hook<FreeSizedHook>();
+  // register_hook<FreeAlignedSizedHook>();
   register_hook<CallocHook>();
   register_hook<ReallocHook>();
-  register_hook<PosixMemalignHook>();
-  register_hook<AlignedAllocHook>();
-  register_hook<MemalignHook>();
-  register_hook<VallocHook>();
+  // register_hook<PosixMemalignHook>();
+  // register_hook<AlignedAllocHook>();
+  // register_hook<MemalignHook>();
+  // register_hook<VallocHook>();
 
   if (instrument_cxx_allocators) {
     register_hook<NewHook>();
@@ -904,20 +914,20 @@ void register_hooks() {
     register_hook<DeleteArraySizedAlignHook>();
   }
 
-  register_hook<MmapHook>();
-  register_hook<Mmap64Hook>();
-  register_hook<MunmapHook>();
-  register_hook<Mmap_Hook>();
-  register_hook<Munmap_Hook>();
+  // register_hook<MmapHook>();
+  // register_hook<Mmap64Hook>();
+  // register_hook<MunmapHook>();
+  // register_hook<Mmap_Hook>();
+  // register_hook<Munmap_Hook>();
 
-  register_hook<MallocxHook>();
-  register_hook<RallocxHook>();
-  register_hook<XallocxHook>();
-  register_hook<DallocxHook>();
-  register_hook<SdallocxHook>();
+  // register_hook<MallocxHook>();
+  // register_hook<RallocxHook>();
+  // register_hook<XallocxHook>();
+  // register_hook<DallocxHook>();
+  // register_hook<SdallocxHook>();
 
-  register_hook<ReallocArrayHook>();
-  register_hook<PvallocHook>();
+  // register_hook<ReallocArrayHook>();
+  // register_hook<PvallocHook>();
 
   register_hook<PthreadCreateHook>();
   register_hook<DlopenHook>();

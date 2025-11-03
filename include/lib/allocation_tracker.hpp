@@ -155,7 +155,7 @@ private:
   bool _deterministic_sampling;
   size_t _high_priority_area_size;
 
-  AddressBitset _allocated_address_set;
+  // AddressBitset _allocated_address_set;
   IntervalTimerCheck _interval_timer_check;
 
   // These can not be tied to the internal state of the instance.

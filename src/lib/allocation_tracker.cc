@@ -35,6 +35,8 @@ pthread_key_t AllocationTracker::_tl_state_key;
 AllocationTracker *AllocationTracker::_instance;
 
 namespace {
+constexpr uint64_t k_header_magic = 0x4044726f70667264; // ascii "@ddprof$";
+
 DDPROF_NOINLINE auto sleep_and_retry_reserve(MPSCRingBufferWriter &writer,
                                              size_t size, bool &timeout) {
   constexpr std::chrono::nanoseconds k_sleep_duration =
@@ -146,7 +148,7 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
     return ddres_error(DD_WHAT_PERFRB);
   }
   if (track_deallocations) {
-    _allocated_address_set.init(0); // Use default size, fail on add if full
+    // _allocated_address_set.init(0); // Use default size, fail on add if full
     constexpr double k_max_high_priority_area_size_fraction = 0.1;
     constexpr int64_t k_high_priority_event_count = 10000;
     _high_priority_area_size =
@@ -265,19 +267,23 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
   uint64_t const total_size = nsamples * sampling_interval;
 
   if (_state.track_deallocations) {
-    if (!_allocated_address_set.add(addr, is_large_alloc)) {
-      // add() returned false: either table is full or address already exists
-      _state.address_conflict_count.fetch_add(1, std::memory_order_acq_rel);
-      // null the address to avoid using this for live heap profiling
-      // pushing a sample is still good to have a good representation
-      // of the allocations.
-      addr = 0;
-    }
+    uint64_t* addr_ptr = reinterpret_cast<uint64_t*>(addr);
+    *addr_ptr = k_header_magic;
+    // if (!_allocated_address_set.add(addr, is_large_alloc)) {
+    //   // add() returned false: either table is full or address already exists
+    //   _state.address_conflict_count.fetch_add(1, std::memory_order_acq_rel);
+    //   // null the address to avoid using this for live heap profiling
+    //   // pushing a sample is still good to have a good representation
+    //   // of the allocations.
+    //   addr = 0;
+    // }
   }
   auto res = push_alloc_sample(addr, total_size, tl_state);
   free_on_consecutive_failures(IsDDResFatal(res));
   if (unlikely(!IsDDResOK(res)) && _state.track_deallocations && addr) {
-    _allocated_address_set.remove(addr, is_large_alloc);
+    uint64_t* addr_ptr = reinterpret_cast<uint64_t*>(addr);
+    *addr_ptr = 0;
+    // _allocated_address_set.remove(addr, is_large_alloc);
   }
 }
 
@@ -287,11 +293,13 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
   // Reentrancy should be prevented by caller (by using ReentryGuard on
   // TrackerThreadLocalState::reentry_guard).
 
-  if (!_state.track_deallocations ||
-      !_allocated_address_set.remove(addr, is_large_alloc)) {
+  uint64_t* addr_ptr = reinterpret_cast<uint64_t*>(addr);
+
+  if (!_state.track_deallocations || *addr_ptr != k_header_magic) {
+    // if (!_state.track_deallocations || !_allocated_address_set.remove(addr)) {
     return;
   }
-
+  *addr_ptr = 0;
   auto fatal_failure = IsDDResFatal(push_dealloc_sample(addr, tl_state));
   free_on_consecutive_failures(fatal_failure);
 }
@@ -322,8 +330,8 @@ DDRes AllocationTracker::push_allocation_tracker_state() {
 
   event->address_conflict_count =
       _state.address_conflict_count.exchange(0, std::memory_order_acq_rel);
-  event->tracked_address_count = _allocated_address_set.count();
-  event->active_shards = _allocated_address_set.active_shards();
+  event->tracked_address_count = 0; //_allocated_address_set.count();
+  event->active_shards = 0; //_allocated_address_set.active_shards();
   event->lost_alloc_count =
       _state.lost_alloc_count.exchange(0, std::memory_order_acq_rel);
   event->lost_dealloc_count =
