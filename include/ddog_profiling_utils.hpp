@@ -30,8 +30,7 @@ void write_function(std::string_view demangled_name, std::string_view file_name,
 void write_mapping(const MapInfo &mapinfo, ddog_prof_Mapping *ffi_mapping);
 
 void write_location(const FunLoc &loc, const MapInfo &mapinfo,
-                    const Symbol &symbol, ddog_prof_Location *ffi_location,
-                    bool use_process_adresses);
+                    const Symbol &symbol, ddog_prof_Location *ffi_location);
 
 void write_location(ProcessAddress_t ip_or_elf_addr,
                     std::string_view demangled_name, std::string_view file_name,
@@ -39,8 +38,8 @@ void write_location(ProcessAddress_t ip_or_elf_addr,
                     ddog_prof_Location *ffi_location);
 
 DDRes write_location_blaze(
-    ProcessAddress_t ip_or_elf_addr,
+    ElfAddress_t elf_addr,
     ddprof::HeterogeneousLookupStringMap<std::string> &demangled_names,
     const MapInfo &mapinfo, const blaze_sym &blaze_sym, unsigned &cur_loc,
-    std::span<ddog_prof_Location> locations_buff);
+    std::span<ddog_prof_Location> locations_buff, bool inlined_functions);
 } // namespace ddprof

@@ -48,11 +48,10 @@ void write_mapping(const MapInfo &mapinfo, ddog_prof_Mapping *ffi_mapping) {
 }
 
 void write_location(const FunLoc &loc, const MapInfo &mapinfo,
-                    const Symbol &symbol, ddog_prof_Location *ffi_location,
-                    bool use_process_adresses) {
+                    const Symbol &symbol, ddog_prof_Location *ffi_location) {
   write_mapping(mapinfo, &ffi_location->mapping);
   write_function(symbol, &ffi_location->function);
-  ffi_location->address = use_process_adresses ? loc.ip : loc.elf_addr;
+  ffi_location->address = loc.elf_addr;
   ffi_location->line = symbol._lineno;
 }
 
@@ -67,15 +66,21 @@ void write_location(ProcessAddress_t ip_or_elf_addr,
 }
 
 DDRes write_location_blaze(
-    ProcessAddress_t ip_or_elf_addr,
+    ElfAddress_t elf_addr,
     ddprof::HeterogeneousLookupStringMap<std::string> &demangled_names,
     const MapInfo &mapinfo, const blaze_sym &blaze_sym, unsigned &cur_loc,
-    std::span<ddog_prof_Location> locations_buff) {
+    std::span<ddog_prof_Location> locations_buff, bool inlined_functions) {
   if (cur_loc >= locations_buff.size()) {
     return ddres_warn(DD_WHAT_UW_MAX_DEPTH);
   }
   constexpr std::string_view undef{};
   constexpr std::string_view undef_inlined = undef;
+
+  // by using the start of the function as address, we make it easier to group
+  // locations
+  const ElfAddress_t addr_to_report =
+      inlined_functions ? elf_addr : blaze_sym.addr;
+
   for (int i = blaze_sym.inlined_cnt - 1; i >= 0 && cur_loc < kMaxStackDepth;
        --i) {
     const blaze_symbolize_inlined_fn *inlined_fn = blaze_sym.inlined + i;
@@ -83,7 +88,7 @@ DDRes write_location_blaze(
     const std::string_view demangled_name = inlined_fn->name
         ? get_or_insert_demangled_sym(inlined_fn->name, demangled_names)
         : undef_inlined;
-    write_location(ip_or_elf_addr, demangled_name,
+    write_location(addr_to_report, demangled_name,
                    inlined_fn->code_info.file
                        ? std::string_view(inlined_fn->code_info.file)
                        : mapinfo._sopath,
@@ -99,7 +104,7 @@ DDRes write_location_blaze(
   const std::string_view demangled_name = blaze_sym.name
       ? get_or_insert_demangled_sym(blaze_sym.name, demangled_names)
       : undef;
-  write_location(ip_or_elf_addr, demangled_name,
+  write_location(addr_to_report, demangled_name,
                  blaze_sym.code_info.file
                      ? std::string_view{blaze_sym.code_info.file}
                      : std::string_view{mapinfo._sopath},

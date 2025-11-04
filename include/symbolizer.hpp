@@ -21,17 +21,10 @@ struct ddog_prof_Location;
 namespace ddprof {
 class Symbolizer {
 public:
-  enum AddrFormat : uint8_t {
-    k_elf,
-    k_process,
-  };
-
   explicit Symbolizer(bool inlined_functions = false,
-                      bool disable_symbolization = false,
-                      AddrFormat reported_addr_format = k_process)
+                      bool disable_symbolization = false)
       : inlined_functions(inlined_functions),
-        _disable_symbolization(disable_symbolization),
-        _reported_addr_format(reported_addr_format) {}
+        _disable_symbolization(disable_symbolization) {}
 
   struct BlazeResultsWrapper {
     BlazeResultsWrapper() = default;
@@ -66,21 +59,19 @@ public:
   };
 
   /// Fills the locations at the write index using address and elf source.
-  /// assumption is that all addresses are from this source file
-  /// Parameters
-  /// addrs - Elf address
-  /// process_addrs - Process address (only used for pprof reporting)
+  /// Assumption is that all addresses are from this source file.
+  /// Addresses are always reported as ELF relative addresses.
+  /// Parameters:
+  /// addrs - ELF addresses
   /// file_id - a way to identify this file in a unique way
-  /// elf_src - a path to the source file (idealy stable)
+  /// elf_src - a path to the source file (ideally stable)
   /// map_info - the mapping information to write to the pprof
-  /// locations - the output pprof strucure
+  /// locations - the output pprof structure
   /// write_index - input / output parameter updated based on what is written
   /// results - A handle object for lifetime of strings.
   ///          Should be kept until interned strings are no longer needed.
-  DDRes symbolize_pprof(std::span<ElfAddress_t> addrs,
-                        std::span<ProcessAddress_t> process_addrs,
-                        FileInfoId_t file_id, const std::string &elf_src,
-                        const MapInfo &map_info,
+  DDRes symbolize_pprof(std::span<ElfAddress_t> addrs, FileInfoId_t file_id,
+                        const std::string &elf_src, const MapInfo &map_info,
                         std::span<ddog_prof_Location> locations,
                         unsigned &write_index, BlazeResultsWrapper &results);
   int remove_unvisited();
@@ -123,6 +114,5 @@ private:
   std::unordered_map<FileInfoId_t, BlazeSymbolizerWrapper> _symbolizer_map;
   bool inlined_functions;
   bool _disable_symbolization;
-  AddrFormat _reported_addr_format;
 };
 } // namespace ddprof

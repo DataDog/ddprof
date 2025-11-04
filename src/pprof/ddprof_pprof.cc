@@ -324,9 +324,9 @@ DDRes process_symbolization(
     if (locs[index].symbol_idx != k_symbol_idx_null) {
       // Location already symbolized
       const FunLoc &loc = locs[index];
-      write_location(
-          loc, mapinfo_table[loc.map_info_idx], symbol_table[loc.symbol_idx],
-          &locations_buff[write_index++], pprof->use_process_adresses);
+      write_location(loc, mapinfo_table[loc.map_info_idx],
+                     symbol_table[loc.symbol_idx],
+                     &locations_buff[write_index++]);
       ++index;
       continue;
     }
@@ -342,13 +342,11 @@ DDRes process_symbolization(
     const FileInfoId_t file_id = locs[index].file_info_id;
     const std::string &current_file_path = file_infos[file_id].get_path();
     std::vector<uintptr_t> elf_addresses;
-    std::vector<uintptr_t> process_addresses;
 
     // Collect all consecutive locations for the same file
     const unsigned start_index = index;
     while (index < locs.size() && locs[index].file_info_id == file_id) {
       elf_addresses.push_back(locs[index].elf_addr);
-      process_addresses.push_back(locs[index].ip);
       ++index;
       if (locs[index].symbol_idx != k_symbol_idx_null) {
         break; // Stop if we find a symbolized location
@@ -356,7 +354,7 @@ DDRes process_symbolization(
     }
     // Perform symbolization for all collected addresses
     const DDRes res = symbolizer->symbolize_pprof(
-        elf_addresses, process_addresses, file_id, current_file_path,
+        elf_addresses, file_id, current_file_path,
         mapinfo_table[locs[start_index].map_info_idx],
         std::span<ddog_prof_Location>{locations_buff}, write_index,
         session_results);
@@ -383,8 +381,8 @@ DDRes process_symbolization(
       locs.back().symbol_idx != k_symbol_idx_null) {
     const FunLoc &loc = locs.back();
     write_location(loc, mapinfo_table[loc.map_info_idx],
-                   symbol_table[loc.symbol_idx], &locations_buff[write_index++],
-                   pprof->use_process_adresses);
+                   symbol_table[loc.symbol_idx],
+                   &locations_buff[write_index++]);
   }
   return {};
 }
@@ -494,9 +492,6 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
   if (ctx.params.remote_symbolization) {
     pprof->_tags.emplace_back(std::string("remote_symbols"),
                               std::string("yes"));
-    pprof->use_process_adresses = false;
-  } else {
-    pprof->use_process_adresses = true;
   }
 
 #ifdef __x86_64__
