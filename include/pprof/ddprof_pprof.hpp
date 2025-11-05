@@ -26,7 +26,6 @@ struct DDProfPProf {
   ddog_prof_Profile _profile{};
   unsigned _nb_values = 0;
   Tags _tags;
-  bool use_process_adresses{true};
   // avoid re-creating strings for all pid numbers
   std::unordered_map<pid_t, std::string> _pid_str;
 };
