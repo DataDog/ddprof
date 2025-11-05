@@ -8,7 +8,13 @@
 
 #include <unlikely.hpp>
 
+
 namespace ddprof {
+
+namespace {
+constexpr uintptr_t kEmptySlot = AddressTable::_empty_slot;
+constexpr uintptr_t kDeletedSlot = AddressTable::_deleted_slot;
+} // namespace
 
 namespace {
 size_t round_up_to_power_of_two(size_t num) {
@@ -67,7 +73,6 @@ AddressBitset::~AddressBitset() {
 }
 
 void AddressBitset::move_from(AddressBitset &other) noexcept {
-  _lower_bits_ignored = other._lower_bits_ignored;
   _per_table_size = other._per_table_size;
   _chunk_tables = std::move(other._chunk_tables);
   _large_alloc_table = std::move(other._large_alloc_table);
@@ -77,8 +82,6 @@ void AddressBitset::move_from(AddressBitset &other) noexcept {
 }
 
 void AddressBitset::init(size_t table_size) {
-  _lower_bits_ignored = _k_max_bits_ignored;
-
   _per_table_size = table_size ? table_size : _k_default_table_size;
 
   // Verify _k_max_chunks is a power of 2 (for bitwise modulo optimization)
@@ -92,24 +95,22 @@ void AddressBitset::init(size_t table_size) {
     _chunk_tables[i].store(nullptr, std::memory_order_release);
   }
 
-  // Initialize large allocation table
+  // Initialize large allocation table eagerly so it is always available
   _large_alloc_table = std::make_unique<std::atomic<AddressTable *>>();
-  _large_alloc_table->store(nullptr, std::memory_order_release);
+  auto *large_table = new AddressTable(_per_table_size);
+  _large_alloc_table->store(large_table, std::memory_order_release);
 }
 
-AddressTable *AddressBitset::get_table(uintptr_t addr, uint64_t &out_hash,
-                                       bool is_large_alloc,
+AddressTable *AddressBitset::get_table(uintptr_t addr, bool is_large_alloc,
                                        bool create_if_missing) {
-  // Hash once for both chunk selection and slot lookup
-  out_hash = compute_full_hash(addr);
-
   // For large allocations (mmap), use dedicated table to avoid sharding
   std::atomic<AddressTable *> *table_ptr;
   if (is_large_alloc) {
     table_ptr = _large_alloc_table.get();
   } else {
-    // Use upper 32 bits for chunk selection (small allocations)
-    const size_t chunk_idx = (out_hash >> 32) & (_k_max_chunks - 1);
+    // Use address bits for chunk selection to preserve locality
+    // Nearby addresses will map to the same chunk
+    const size_t chunk_idx = (addr >> _k_chunk_shift) & (_k_max_chunks - 1);
     table_ptr = &_chunk_tables[chunk_idx];
   }
 
@@ -138,11 +139,9 @@ AddressTable *AddressBitset::get_table(uintptr_t addr, uint64_t &out_hash,
 }
 
 bool AddressBitset::add(uintptr_t addr, bool is_large_alloc) {
-  assert(addr != _k_empty_slot && addr != _k_deleted_slot);
+  assert(addr != kEmptySlot && addr != kDeletedSlot);
 
-  // Hash once for both chunk and slot lookup
-  uint64_t hash;
-  AddressTable *table = get_table(addr, hash, is_large_alloc, true);
+  AddressTable *table = get_table(addr, is_large_alloc, true);
   if (!table) {
     return false;
   }
@@ -152,6 +151,7 @@ bool AddressBitset::add(uintptr_t addr, bool is_large_alloc) {
     return false; // Table is full
   }
 
+  uint64_t hash = compute_full_hash(addr);
   uint32_t slot = hash_to_slot(hash, table->table_mask);
 
   // Linear probing to find an empty/deleted slot or the address
@@ -159,8 +159,7 @@ bool AddressBitset::add(uintptr_t addr, bool is_large_alloc) {
     uintptr_t current = table->slots[slot].load(std::memory_order_acquire);
 
     // If empty or deleted, try to claim it
-    if (current == AddressTable::_empty_slot ||
-        current == AddressTable::_deleted_slot) {
+    if (current == kEmptySlot || current == kDeletedSlot) {
       uintptr_t expected = current;
       if (table->slots[slot].compare_exchange_strong(
               expected, addr, std::memory_order_acq_rel)) {
@@ -186,28 +185,27 @@ bool AddressBitset::add(uintptr_t addr, bool is_large_alloc) {
 }
 
 bool AddressBitset::remove(uintptr_t addr, bool is_large_alloc) {
-  assert(addr != _k_empty_slot && addr != _k_deleted_slot);
+  assert(addr != kEmptySlot && addr != kDeletedSlot);
 
-  // Hash once for both chunk and slot lookup
-  uint64_t hash;
   // Don't create table if it doesn't exist - address was never added
-  AddressTable *table = get_table(addr, hash, is_large_alloc, false);
+  AddressTable *table = get_table(addr, is_large_alloc, false);
   if (!table) {
     return false; // Table doesn't exist, so address was never added
   }
 
+  uint64_t hash = compute_full_hash(addr);
   uint32_t slot = hash_to_slot(hash, table->table_mask);
 
   // Linear probing to find the address
   for (size_t probe = 0; probe < _k_max_probe_distance; ++probe) {
     uintptr_t current = table->slots[slot].load(std::memory_order_acquire);
 
-    if (current == AddressTable::_empty_slot) {
+    if (current == kEmptySlot) {
       // Hit an empty slot - address not in table
       return false;
     }
 
-    if (current == AddressTable::_deleted_slot) {
+    if (current == kDeletedSlot) {
       // Skip tombstones, continue probing
       slot = (slot + 1) & table->table_mask;
       continue;
@@ -216,7 +214,7 @@ bool AddressBitset::remove(uintptr_t addr, bool is_large_alloc) {
     if (current == addr) {
       // Found it - mark as deleted (tombstone)
       if (table->slots[slot].compare_exchange_strong(
-              current, AddressTable::_deleted_slot,
+              current, kDeletedSlot,
               std::memory_order_acq_rel)) {
         table->count.fetch_sub(1, std::memory_order_relaxed);
         return true;
@@ -240,7 +238,7 @@ void AddressBitset::clear() {
           _chunk_tables[chunk_idx].load(std::memory_order_acquire);
       if (table) {
         for (size_t i = 0; i < table->table_size; ++i) {
-          table->slots[i].store(AddressTable::_empty_slot,
+          table->slots[i].store(kEmptySlot,
                                 std::memory_order_relaxed);
         }
         table->count.store(0, std::memory_order_relaxed);
@@ -253,7 +251,7 @@ void AddressBitset::clear() {
     AddressTable *table = _large_alloc_table->load(std::memory_order_acquire);
     if (table) {
       for (size_t i = 0; i < table->table_size; ++i) {
-        table->slots[i].store(AddressTable::_empty_slot,
+        table->slots[i].store(kEmptySlot,
                               std::memory_order_relaxed);
       }
       table->count.store(0, std::memory_order_relaxed);
