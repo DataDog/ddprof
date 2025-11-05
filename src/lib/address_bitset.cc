@@ -8,7 +8,6 @@
 
 #include <unlikely.hpp>
 
-
 namespace ddprof {
 
 namespace {
@@ -151,7 +150,7 @@ bool AddressBitset::add(uintptr_t addr, bool is_large_alloc) {
     return false; // Table is full
   }
 
-  uint64_t hash = compute_full_hash(addr);
+  const uint64_t hash = compute_full_hash(addr);
   uint32_t slot = hash_to_slot(hash, table->table_mask);
 
   // Linear probing to find an empty/deleted slot or the address
@@ -193,7 +192,7 @@ bool AddressBitset::remove(uintptr_t addr, bool is_large_alloc) {
     return false; // Table doesn't exist, so address was never added
   }
 
-  uint64_t hash = compute_full_hash(addr);
+  const uint64_t hash = compute_full_hash(addr);
   uint32_t slot = hash_to_slot(hash, table->table_mask);
 
   // Linear probing to find the address
@@ -214,8 +213,7 @@ bool AddressBitset::remove(uintptr_t addr, bool is_large_alloc) {
     if (current == addr) {
       // Found it - mark as deleted (tombstone)
       if (table->slots[slot].compare_exchange_strong(
-              current, kDeletedSlot,
-              std::memory_order_acq_rel)) {
+              current, kDeletedSlot, std::memory_order_acq_rel)) {
         table->count.fetch_sub(1, std::memory_order_relaxed);
         return true;
       }
@@ -238,8 +236,7 @@ void AddressBitset::clear() {
           _chunk_tables[chunk_idx].load(std::memory_order_acquire);
       if (table) {
         for (size_t i = 0; i < table->table_size; ++i) {
-          table->slots[i].store(kEmptySlot,
-                                std::memory_order_relaxed);
+          table->slots[i].store(kEmptySlot, std::memory_order_relaxed);
         }
         table->count.store(0, std::memory_order_relaxed);
       }
@@ -251,8 +248,7 @@ void AddressBitset::clear() {
     AddressTable *table = _large_alloc_table->load(std::memory_order_acquire);
     if (table) {
       for (size_t i = 0; i < table->table_size; ++i) {
-        table->slots[i].store(kEmptySlot,
-                              std::memory_order_relaxed);
+        table->slots[i].store(kEmptySlot, std::memory_order_relaxed);
       }
       table->count.store(0, std::memory_order_relaxed);
     }

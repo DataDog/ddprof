@@ -11,10 +11,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <deque>
 #include <dlfcn.h>
 #include <functional>
 #include <iostream>
-#include <sstream>
 #include <sys/resource.h>
 #include <thread>
 #include <unistd.h>
@@ -90,6 +90,7 @@ struct Options {
   uint32_t callstack_depth;
   uint32_t frame_size;
   uint32_t skip_free;
+  uint64_t keep_live_allocations;
   int nice;
   bool use_shared_library = false;
   bool avoid_dlopen_hook = false;
@@ -106,6 +107,7 @@ extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
   auto deadline_time = start_time + options.timeout_duration;
   auto start_cpu = ThreadCpuClock::now();
   unsigned skip_free = 0;
+  std::deque<void *> live_allocations;
   for (uint64_t i = 0; i < options.loop_count; ++i) {
     void *p = nullptr;
     if (options.malloc_size) {
@@ -126,9 +128,19 @@ extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
     // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
     DoNotOptimize(p2);
 
-    if (skip_free++ >= options.skip_free) {
-      free(p2);
-      skip_free = 0;
+    if (options.keep_live_allocations > 0) {
+      if (p2 != nullptr) {
+        live_allocations.push_back(p2);
+        while (live_allocations.size() > options.keep_live_allocations) {
+          free(live_allocations.front());
+          live_allocations.pop_front();
+        }
+      }
+    } else {
+      if (skip_free++ >= options.skip_free) {
+        free(p2);
+        skip_free = 0;
+      }
     }
 
     if (options.sleep_duration_per_loop.count()) {
@@ -164,6 +176,11 @@ extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
            end_cpu - start_cpu,
            ddprof::gettid(),
            usage.ru_maxrss};
+
+  while (!live_allocations.empty()) {
+    free(live_allocations.front());
+    live_allocations.pop_front();
+  }
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)
@@ -289,6 +306,11 @@ int main(int argc, char *argv[]) {
     app.add_option("--skip-free", opts.skip_free,
                    "Only free every N allocations (default is 0)")
         ->default_val(0);
+    app.add_option("--keep-live", opts.keep_live_allocations,
+                   "Keep the most recent N allocations alive to stabilize the "
+                   "live heap size")
+        ->default_val(0)
+        ->check(CLI::NonNegativeNumber);
 
     app.add_option<std::chrono::milliseconds, int64_t>(
            "--timeout", opts.timeout_duration, "Timeout after N milliseconds")
