@@ -53,17 +53,15 @@ Symbolizer::get_symbolizer(FileInfoId_t file_id, const std::string &elf_src) {
 }
 
 DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
-                                  std::span<ProcessAddress_t> process_addrs,
                                   FileInfoId_t file_id,
                                   const std::string &elf_src,
                                   const MapInfo &map_info,
                                   std::span<ddog_prof_Location> locations,
                                   unsigned &write_index,
                                   BlazeResultsWrapper &results) {
-  if (elf_addrs.size() != process_addrs.size() || elf_addrs.empty() ||
-      elf_src.empty()) {
+  if (elf_addrs.empty() || elf_src.empty()) {
     LG_WRN("Error in provided addresses when symbolizing pprofs");
-    return ddres_warn(DD_WHAT_PPROF); // or some other error handling
+    return ddres_warn(DD_WHAT_PPROF);
   }
 
   if (!_disable_symbolization) {
@@ -101,11 +99,9 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
       // This will be moved to the backend
       for (size_t i = 0; i < blaze_res->cnt && i < elf_addrs.size(); ++i) {
         const blaze_sym *cur_sym = blaze_res->syms + i;
-        // Update the location
         DDRES_CHECK_FWD(write_location_blaze(
-            _reported_addr_format == k_elf ? elf_addrs[i] : process_addrs[i],
-            symbolizer_wrapper.demangled_names, map_info, *cur_sym, write_index,
-            locations));
+            elf_addrs[i], symbolizer_wrapper.demangled_names, map_info,
+            *cur_sym, write_index, locations));
       }
       return {};
     }
@@ -114,7 +110,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
   // Handle the case of no blaze result
   // This can happen when file descriptors are exhausted
   // OR symbolization is disabled
-  for (auto el : (_reported_addr_format == k_elf) ? elf_addrs : process_addrs) {
+  for (auto el : elf_addrs) {
     write_location_no_sym(el, map_info, &locations[write_index++]);
   }
 
