@@ -13,7 +13,7 @@ namespace ddprof {
 
 // Per-mapping hash table (Level 2)
 struct AddressTable {
-  static constexpr size_t _max_load_factor_percent = 60; // 60% load factor
+  static constexpr size_t _max_load_factor_percent = 80;
   static constexpr size_t _percent_divisor = 100;
   static constexpr uintptr_t _empty_slot = 0;
   static constexpr uintptr_t _deleted_slot = 1;
@@ -51,7 +51,7 @@ public:
   constexpr static size_t _k_default_table_size = 32768;
 
   // Maximum probe distance before giving up
-  constexpr static size_t _k_max_probe_distance = 32;
+  constexpr static size_t _k_max_probe_distance = 64;
 
   explicit AddressBitset(size_t table_size = 0) { init(table_size); }
   AddressBitset(AddressBitset &&other) noexcept;
@@ -85,10 +85,6 @@ public:
 
 private:
   static constexpr size_t _k_max_bits_ignored = 4;
-  static constexpr uintptr_t _k_empty_slot = 0;
-  static constexpr uintptr_t _k_deleted_slot = 1; // Tombstone value
-
-  size_t _lower_bits_ignored;
   size_t _per_table_size = {};
 
   // Level 1: Redirect table (maps chunks to tables)
@@ -100,20 +96,21 @@ private:
 
   void move_from(AddressBitset &other) noexcept;
 
-  // Get or create table for address, returns table and hash for slot lookup
+  // Get or create table for address. Chunk selection uses the address directly
+  // to keep nearby addresses in the same shard.
   // is_large_alloc: if true, returns the dedicated large allocation table
   // create_if_missing: if true, creates table if it doesn't exist (for add)
   //                    if false, returns nullptr if table doesn't exist (for
   //                    remove)
-  AddressTable *get_table(uintptr_t addr, uint64_t &out_hash,
-                          bool is_large_alloc, bool create_if_missing);
+  AddressTable *get_table(uintptr_t addr, bool is_large_alloc,
+                          bool create_if_missing);
 
   static constexpr uint64_t _k_hash_multiplier_1 =
       0x9E3779B97F4A7C15ULL; // Golden ratio * 2^64
   static constexpr uint64_t _k_hash_multiplier_2 =
       0x85EBCA77C2B2AE63ULL; // Large prime
 
-  // Compute full hash for address (hash once, use for both chunk and slot)
+  // Compute full hash for address (used for slot lookup)
   [[nodiscard]] static uint64_t compute_full_hash(uintptr_t addr) {
     uint64_t h = addr >> _k_max_bits_ignored;
     h *= _k_hash_multiplier_1;
