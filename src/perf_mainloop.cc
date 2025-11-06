@@ -339,9 +339,8 @@ worker_process_ring_buffers(std::span<PEvent> pes, DDProfContext &ctx,
           if (IsDDResNotOK(res)) {
             return res;
           }
-          // \fixme{nsavoire} free slot as soon as possible ?
-          // reader.advance(hdr->size);
 
+          reader.advance(hdr->size);
           buffer = remaining(buffer, hdr->size);
         }
       } else {
@@ -358,8 +357,7 @@ worker_process_ring_buffers(std::span<PEvent> pes, DDProfContext &ctx,
             return res;
           }
 
-          // \fixme{nsavoire} free slot as soon as possible ?
-          // reader.advance();
+          reader.advance();
         }
       }
 
@@ -398,15 +396,13 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
 
   EventQueue event_queue;
   bool skip_poll = false;
-  const auto reorder_poll_timeout = std::chrono::milliseconds{10};
-  const auto poll_timeout = ctx.params.reorder_events ? reorder_poll_timeout
-                                                      : k_sample_default_wakeup;
+  const auto k_poll_timeout = std::chrono::milliseconds{10};
 
   // Worker poll loop
   while (!g_termination_requested.load(std::memory_order::relaxed)) {
 
     if (!skip_poll) {
-      int const n = poll(poll_fds, pevents.size(), poll_timeout.count());
+      int const n = poll(poll_fds, pevents.size(), k_poll_timeout.count());
 
       // If there was an issue, return and let the caller check errno
       if (-1 == n && errno == EINTR) {
