@@ -339,9 +339,8 @@ worker_process_ring_buffers(std::span<PEvent> pes, DDProfContext &ctx,
           if (IsDDResNotOK(res)) {
             return res;
           }
-          // \fixme{nsavoire} free slot as soon as possible ?
-          // reader.advance(hdr->size);
 
+          reader.advance(hdr->size);
           buffer = remaining(buffer, hdr->size);
         }
       } else {
@@ -358,8 +357,7 @@ worker_process_ring_buffers(std::span<PEvent> pes, DDProfContext &ctx,
             return res;
           }
 
-          // \fixme{nsavoire} free slot as soon as possible ?
-          // reader.advance();
+          reader.advance();
         }
       }
 
