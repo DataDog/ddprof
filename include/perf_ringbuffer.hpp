@@ -20,6 +20,7 @@ struct RingBuffer {
   size_t data_size; // size of data
   std::byte *data;
   void *base;
+  bool mirrored_mapping;
 
   uint64_t *writer_pos;             // writer cursor
   uint64_t *reader_pos;             // reader cursor
@@ -34,9 +35,12 @@ struct RingBuffer {
   uint16_t time_shift;
   uint8_t perf_clock_source;
   bool tsc_available;
+  std::byte *wrap_copy;
+  size_t wrap_copy_capacity;
 };
 
-bool rb_init(RingBuffer *rb, void *base, size_t size, RingBufferType type);
+bool rb_init(RingBuffer *rb, void *base, size_t size, RingBufferType type,
+             bool mirrored_mapping);
 void rb_free(RingBuffer *rb);
 
 bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,

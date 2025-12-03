@@ -61,27 +61,27 @@ TEST(MMapTest, PerfOpen) {
     }
     // default perfown is 4k * (64 + 1)
     size_t mmap_size = 0;
-    void *region = NULL;
+    PerfMmapRegion region{};
     int buf_size_shift = 10;
-    while (region == nullptr && --buf_size_shift > 0) {
+    while (!region.addr && --buf_size_shift > 0) {
       mmap_size = perf_mmap_size(buf_size_shift);
       std::cerr << "mmap size attempt --> " << mmap_size << "("
                 << buf_size_shift << ")";
 
-      region = perfown_sz(perf_fd, mmap_size);
+      region = perfown_sz(perf_fd, mmap_size, true);
 
-      if (!region) {
+      if (!region.addr) {
         std::cerr << " = FAILURE !!!" << std::endl;
         continue;
       }
       std::cerr << " = SUCCESS !!!" << std::endl;
       break;
     }
-    if (region) {
+    if (region.addr) {
       std::cerr << "FULL SUCCESS (size=" << mmap_size << ")" << std::endl;
     }
-    ASSERT_TRUE(region);
-    ASSERT_EQ(perfdisown(region, mmap_size), 0);
+    ASSERT_TRUE(region.addr);
+    ASSERT_EQ(perfdisown(region.addr, mmap_size, region.mirrored), 0);
     close(perf_fd);
   }
 }
@@ -94,8 +94,11 @@ TEST(MMapTest, Mirroring) {
   ASSERT_NE(fd, -1);
   ASSERT_EQ(ftruncate(fd, mmap_size), 0);
 
-  std::byte *region = static_cast<std::byte *>(perfown_sz(fd, mmap_size));
-  ASSERT_TRUE(region);
+  PerfMmapRegion mapping = perfown_sz(fd, mmap_size, false);
+  ASSERT_TRUE(mapping.addr);
+  ASSERT_TRUE(mapping.mirrored);
+
+  std::byte *region = static_cast<std::byte *>(mapping.addr);
 
   size_t usable_size = mmap_size - get_page_size();
   std::byte *start = region + get_page_size();
@@ -106,7 +109,7 @@ TEST(MMapTest, Mirroring) {
   EXPECT_EQ(*end, std::byte{0xff});
 
   close(fd);
-  ASSERT_EQ(perfdisown(region, mmap_size), 0);
+  ASSERT_EQ(perfdisown(mapping.addr, mmap_size, mapping.mirrored), 0);
 }
 
 } // namespace ddprof

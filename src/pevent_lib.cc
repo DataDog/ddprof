@@ -211,8 +211,11 @@ int pevent_compute_min_mmap_order(int min_buffer_size_order,
 
 DDRes pevent_mmap_event(PEvent *event) {
   if (event->mapfd != -1) {
-    void *region = perfown_sz(event->mapfd, event->ring_buffer_size);
-    if (!region) {
+    bool const allow_single_mapping =
+        (event->ring_buffer_type == RingBufferType::kPerfRingBuffer);
+    const PerfMmapRegion mapping =
+        perfown_sz(event->mapfd, event->ring_buffer_size, allow_single_mapping);
+    if (!mapping.addr) {
       DDRES_RETURN_ERROR_LOG(
           DD_WHAT_PERFMMAP,
           "Could not mmap memory for watcher #%d: %s. "
@@ -220,8 +223,8 @@ DDRes pevent_mmap_event(PEvent *event) {
           "OR associate the IPC_LOCK capability to this process.",
           event->watcher_pos, strerror(errno));
     }
-    if (!rb_init(&event->rb, region, event->ring_buffer_size,
-                 event->ring_buffer_type)) {
+    if (!rb_init(&event->rb, mapping.addr, event->ring_buffer_size,
+                 event->ring_buffer_type, mapping.mirrored)) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
                              "Could not initialize ring buffer for watcher #%d",
                              event->watcher_pos);
@@ -298,7 +301,8 @@ DDRes pevent_enable(PEventHdr *pevent_hdr) {
 
 DDRes pevent_munmap_event(PEvent *event) {
   if (event->rb.base) {
-    if (perfdisown(event->rb.base, event->ring_buffer_size) != 0) {
+    if (perfdisown(event->rb.base, event->ring_buffer_size,
+                   event->rb.mirrored_mapping) != 0) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFMMAP,
                              "Error when using perfdisown for watcher #%d",
                              event->watcher_pos);

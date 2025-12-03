@@ -10,7 +10,9 @@
 #include "mpscringbuffer.hpp"
 #include "perf_ringbuffer.hpp"
 
+#include <algorithm>
 #include <cassert>
+#include <cstdlib>
 #include <cstring>
 #include <mutex>
 
@@ -34,6 +36,28 @@ constexpr uint64_t align_up(uint64_t x, uint64_t pow2) {
 constexpr uint64_t align_down(uint64_t x, uint64_t pow2) {
   assert(pow2 > 0 && (pow2 & (pow2 - 1)) == 0);
   return x & ~(pow2 - 1);
+}
+
+inline std::byte *ensure_wrap_copy_buffer(RingBuffer &rb,
+                                          size_t required_size) {
+  if (required_size == 0) {
+    return rb.wrap_copy;
+  }
+  size_t const aligned_size = align_up(required_size, kRingBufferAlignment);
+  if (!rb.wrap_copy || rb.wrap_copy_capacity < aligned_size) {
+    if (rb.wrap_copy) {
+      std::free(rb.wrap_copy);
+      rb.wrap_copy = nullptr;
+      rb.wrap_copy_capacity = 0;
+    }
+    void *ptr = nullptr;
+    if (posix_memalign(&ptr, kRingBufferAlignment, aligned_size) != 0) {
+      return nullptr;
+    }
+    rb.wrap_copy = static_cast<std::byte *>(ptr);
+    rb.wrap_copy_capacity = aligned_size;
+  }
+  return rb.wrap_copy;
 }
 
 class PerfRingBufferWriter {
@@ -136,10 +160,23 @@ public:
   ConstBuffer read_all_available() {
     auto const current_tail = _rb->intermediate_reader_pos;
     uint64_t const tail_linear = current_tail & _rb->mask;
-    const std::byte *start = _rb->data + tail_linear;
     size_t const n = _head - current_tail;
+    const std::byte *start = _rb->data + tail_linear;
+
+    if (_rb->mirrored_mapping || tail_linear + n <= _rb->data_size) {
+      _rb->intermediate_reader_pos = _head;
+      return {start, n};
+    }
+
+    auto *dest = ensure_wrap_copy_buffer(*_rb, n);
+    if (!dest) {
+      return {};
+    }
+    size_t const first_chunk = _rb->data_size - tail_linear;
+    memcpy(dest, start, first_chunk);
+    memcpy(dest + first_chunk, _rb->data, n - first_chunk);
     _rb->intermediate_reader_pos = _head;
-    return {start, n};
+    return {dest, n};
   }
 
   // Advance initial read cursor by n bytes, this makes the space available for
@@ -360,13 +397,43 @@ inline const perf_event_header *perf_rb_read_event(RingBuffer &rb) {
   }
 
   uint64_t const tail_linear = tail & rb.mask;
-  auto *hdr = reinterpret_cast<perf_event_header *>(rb.data + tail_linear);
-  size_t const sz_sample = hdr->size;
+  auto *data_ptr = rb.data + tail_linear;
 
-  // align_up might not be needed since perf events should already be 8-byte
-  // aligned
+  perf_event_header hdr_storage{};
+  perf_event_header *hdr_ptr = nullptr;
+  if (!rb.mirrored_mapping &&
+      tail_linear + sizeof(perf_event_header) > rb.data_size) {
+    size_t const first_chunk = rb.data_size - tail_linear;
+    memcpy(&hdr_storage, data_ptr, first_chunk);
+    memcpy(reinterpret_cast<std::byte *>(&hdr_storage) + first_chunk, rb.data,
+           sizeof(perf_event_header) - first_chunk);
+    hdr_ptr = &hdr_storage;
+  } else {
+    hdr_ptr = reinterpret_cast<perf_event_header *>(data_ptr);
+  }
+
+  size_t const sz_sample = hdr_ptr->size;
+  bool const needs_copy = hdr_ptr == &hdr_storage ||
+      (!rb.mirrored_mapping && (tail_linear + sz_sample > rb.data_size));
+
+  const perf_event_header *result = nullptr;
+  if (!needs_copy) {
+    result = reinterpret_cast<perf_event_header *>(data_ptr);
+  } else {
+    auto *dest = ensure_wrap_copy_buffer(rb, sz_sample);
+    if (!dest) {
+      return nullptr;
+    }
+    size_t const first_chunk = std::min(sz_sample, rb.data_size - tail_linear);
+    memcpy(dest, data_ptr, first_chunk);
+    if (first_chunk < sz_sample) {
+      memcpy(dest + first_chunk, rb.data, sz_sample - first_chunk);
+    }
+    result = reinterpret_cast<perf_event_header *>(dest);
+  }
+
   rb.intermediate_reader_pos += align_up(sz_sample, kRingBufferAlignment);
-  return hdr;
+  return result;
 }
 
 inline void perf_rb_advance(RingBuffer &rb) {
