@@ -1,7 +1,7 @@
-diff -ur elfutils-0.186/libdwfl/frame_unwind.c elfutils-0.186_patched/libdwfl/frame_unwind.c
---- elfutils-0.186/libdwfl/frame_unwind.c	2021-11-10 22:21:41.000000000 +0000
-+++ elfutils-0.186_patched/libdwfl/frame_unwind.c	2022-07-08 14:22:12.760891930 +0000
-@@ -145,7 +145,7 @@
+diff -urN --exclude=GPG-KEY --exclude=tests/debuginfod-ima/koji/fedora-38-ima.pem elfutils-0.194/libdwfl/frame_unwind.c elfutils-0.194_patched/libdwfl/frame_unwind.c
+--- elfutils-0.194/libdwfl/frame_unwind.c	2025-10-25 03:33:14
++++ elfutils-0.194_patched/libdwfl/frame_unwind.c	2025-12-03 11:47:14
+@@ -134,7 +134,7 @@
  
  static bool
  expr_eval (Dwfl_Frame *state, Dwarf_Frame *frame, const Dwarf_Op *ops,
@@ -10,16 +10,16 @@ diff -ur elfutils-0.186/libdwfl/frame_unwind.c elfutils-0.186_patched/libdwfl/fr
  {
    Dwfl_Process *process = state->thread->process;
    if (nops == 0)
-@@ -314,7 +314,7 @@
+@@ -303,7 +303,7 @@
  	    }
  	  if (! pop (&val1)
  	      || ! process->callbacks->memory_read (process->dwfl, val1, &val1,
 -						    process->callbacks_arg))
-+						    -1, process->callbacks_arg))
++						    regno, process->callbacks_arg))
  	    {
  	      free (stack.addrs);
  	      return false;
-@@ -467,7 +467,7 @@
+@@ -456,7 +456,7 @@
  	  Dwarf_Addr cfa;
  	  if (frame == NULL
  	      || dwarf_frame_cfa (frame, &cfa_ops, &cfa_nops) != 0
@@ -28,25 +28,25 @@ diff -ur elfutils-0.186/libdwfl/frame_unwind.c elfutils-0.186_patched/libdwfl/fr
  	      || ! push (cfa))
  	    {
  	      __libdwfl_seterrno (DWFL_E_LIBDW);
-@@ -498,7 +498,7 @@
- 	  __libdwfl_seterrno (DWFL_E_INVALID_ARGUMENT);
+@@ -488,6 +488,7 @@
  	  return false;
  	}
--      if (! process->callbacks->memory_read (process->dwfl, *result, result,
-+      if (! process->callbacks->memory_read (process->dwfl, *result, result, regno,
+       if (! process->callbacks->memory_read (process->dwfl, *result, result,
++					     regno,
  					     process->callbacks_arg))
  	return false;
      }
-@@ -600,7 +600,7 @@
+@@ -590,7 +591,8 @@
  	      continue;
  	    }
  	}
 -      else if (! expr_eval (state, frame, reg_ops, reg_nops, &regval, bias))
-+      else if (! expr_eval (state, frame, reg_ops, reg_nops, &regval, bias, regno))
++      else if (! expr_eval (state, frame, reg_ops, reg_nops, &regval, bias,
++			    regno))
  	{
  	  /* PPC32 vDSO has various invalid operations, ignore them.  The
  	     register will look as unset causing an error later, if used.
-@@ -709,7 +711,7 @@
+@@ -712,7 +714,7 @@
    Dwfl_Frame *state = arg;
    Dwfl_Thread *thread = state->thread;
    Dwfl_Process *process = thread->process;
@@ -55,23 +55,21 @@ diff -ur elfutils-0.186/libdwfl/frame_unwind.c elfutils-0.186_patched/libdwfl/fr
  					  process->callbacks_arg);
  }
  
-diff -ur elfutils-0.186/libdwfl/libdwfl.h elfutils-0.186_patched/libdwfl/libdwfl.h
---- elfutils-0.186/libdwfl/libdwfl.h	2021-11-10 22:21:41.000000000 +0000
-+++ elfutils-0.186_patched/libdwfl/libdwfl.h	2022-07-08 14:20:27.340893360 +0000
-@@ -664,8 +664,8 @@
-      successfully read *RESULT or false and sets dwfl_errno () on failure.
+diff -urN --exclude=GPG-KEY --exclude=tests/debuginfod-ima/koji/fedora-38-ima.pem elfutils-0.194/libdwfl/libdwfl.h elfutils-0.194_patched/libdwfl/libdwfl.h
+--- elfutils-0.194/libdwfl/libdwfl.h	2025-10-25 03:33:14
++++ elfutils-0.194_patched/libdwfl/libdwfl.h	2025-12-03 11:45:56
+@@ -688,7 +688,7 @@
       This method may be NULL - in such case dwfl_thread_getframes will return
       only the initial frame.  */
--  bool (*memory_read) (Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
+   bool (*memory_read) (Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
 -                       void *dwfl_arg)
-+  bool (*memory_read) (Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, 
 +                       int regno, void *dwfl_arg)
      __nonnull_attribute__ (1, 3);
  
    /* Called on initial unwind to get the initial register state of the first
-diff -ur elfutils-0.186/libdwfl/linux-core-attach.c elfutils-0.186_patched/libdwfl/linux-core-attach.c
---- elfutils-0.186/libdwfl/linux-core-attach.c	2021-11-10 22:21:41.000000000 +0000
-+++ elfutils-0.186_patched/libdwfl/linux-core-attach.c	2022-07-08 14:24:00.932890463 +0000
+diff -urN --exclude=GPG-KEY --exclude=tests/debuginfod-ima/koji/fedora-38-ima.pem elfutils-0.194/libdwfl/linux-core-attach.c elfutils-0.194_patched/libdwfl/linux-core-attach.c
+--- elfutils-0.194/libdwfl/linux-core-attach.c	2025-10-25 03:33:14
++++ elfutils-0.194_patched/libdwfl/linux-core-attach.c	2025-12-03 11:46:14
 @@ -51,7 +51,7 @@
  };
  
@@ -89,23 +87,66 @@ diff -ur elfutils-0.186/libdwfl/linux-core-attach.c elfutils-0.186_patched/libdw
    if (elf_getphdrnum (core, &phnum) < 0)
      {
        __libdwfl_seterrno (DWFL_E_LIBELF);
-diff -ur elfutils-0.186/libdwfl/linux-pid-attach.c elfutils-0.186_patched/libdwfl/linux-pid-attach.c
---- elfutils-0.186/libdwfl/linux-pid-attach.c	2021-11-10 22:21:41.000000000 +0000
-+++ elfutils-0.186_patched/libdwfl/linux-pid-attach.c	2022-07-08 14:23:28.596890901 +0000
-@@ -191,13 +191,14 @@
+diff -urN --exclude=GPG-KEY --exclude=tests/debuginfod-ima/koji/fedora-38-ima.pem elfutils-0.194/libdwfl/linux-pid-attach.c elfutils-0.194_patched/libdwfl/linux-pid-attach.c
+--- elfutils-0.194/libdwfl/linux-pid-attach.c	2025-10-25 03:33:14
++++ elfutils-0.194_patched/libdwfl/linux-pid-attach.c	2025-12-03 11:46:25
+@@ -190,12 +190,14 @@
  /* Note that the result word size depends on the architecture word size.
     That is sizeof long. */
  static bool
 -pid_memory_read (Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg)
-+pid_memory_read (Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, int regno, void *arg)
++pid_memory_read (Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, int regno,
++		 void *arg)
  {
    struct __libdwfl_pid_arg *pid_arg = arg;
    pid_t tid = pid_arg->tid_attached;
    Dwfl_Process *process = dwfl->process;
    assert (tid > 0);
--
 +  (void) regno;
-+  
+ 
  #ifdef HAVE_PROCESS_VM_READV
    if (read_cached_memory (pid_arg, addr, result))
-     {
+diff -urN --exclude=GPG-KEY --exclude=tests/debuginfod-ima/koji/fedora-38-ima.pem elfutils-0.194/libdwfl_stacktrace/dwflst_sample_frame.c elfutils-0.194_patched/libdwfl_stacktrace/dwflst_sample_frame.c
+--- elfutils-0.194/libdwfl_stacktrace/dwflst_sample_frame.c	2025-10-25 03:33:14
++++ elfutils-0.194_patched/libdwfl_stacktrace/dwflst_sample_frame.c	2025-12-03 11:46:32
+@@ -126,8 +126,10 @@
+     *(result) = 0;
+ 
+ static bool
+-elf_memory_read (Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg)
++elf_memory_read (Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, int regno,
++		 void *arg)
+ {
++  (void) regno;
+   struct sample_info *sample_arg =
+     (struct sample_info *)arg;
+   Dwfl_Module *mod = INTUSE(dwfl_addrmodule) (dwfl, addr);
+@@ -151,14 +153,15 @@
+ }
+ 
+ static bool
+-sample_memory_read (Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, void *arg)
++sample_memory_read (Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result, int regno,
++		    void *arg)
+ {
+   struct sample_info *sample_arg =
+     (struct sample_info *)arg;
+   /* Imitate read_cached_memory() with the stack sample data as the cache. */
+   if (addr < sample_arg->base_addr ||
+       addr - sample_arg->base_addr >= sample_arg->stack_size)
+-    return elf_memory_read(dwfl, addr, result, arg);
++    return elf_memory_read(dwfl, addr, result, regno, arg);
+   const uint8_t *d = &sample_arg->stack[addr - sample_arg->base_addr];
+   copy_word(result, d, sample_arg->elfclass);
+   return true;
+diff -urN --exclude=GPG-KEY --exclude=tests/debuginfod-ima/koji/fedora-38-ima.pem elfutils-0.194/tests/backtrace-data.c elfutils-0.194_patched/tests/backtrace-data.c
+--- elfutils-0.194/tests/backtrace-data.c	2025-10-25 03:33:14
++++ elfutils-0.194_patched/tests/backtrace-data.c	2025-12-03 11:47:02
+@@ -70,6 +70,7 @@
+ 
+ static bool
+ memory_read (Dwfl *dwfl, Dwarf_Addr addr, Dwarf_Word *result,
++	     int regno __attribute__ ((unused)),
+ 	     void *dwfl_arg __attribute__ ((unused)))
+ {
+   pid_t child = dwfl_pid (dwfl);
