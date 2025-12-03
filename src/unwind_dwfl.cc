@@ -79,6 +79,7 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     add_error_frame(nullptr, us, pc, SymbolErrors::unwind_failure);
     return {}; // invalid pc : do not add frame
   }
+  pc = canonicalize_user_address(pc);
   us->current_ip = pc;
   DsoHdr &dsoHdr = us->dso_hdr;
   DsoHdr::PidMapping &pid_mapping = dsoHdr.get_pid_mapping(us->pid);
@@ -168,6 +169,7 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
   if (!is_activation) {
     --pc;
   }
+  pc = canonicalize_user_address(pc);
   us->current_ip = pc;
 
   // Now we register

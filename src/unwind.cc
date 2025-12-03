@@ -46,6 +46,36 @@ void add_exe_name(UnwindState *us) {
       us->symbol_hdr._base_frame_symbol_lookup.get_exe_name(us->pid);
 }
 
+#if defined(__aarch64__)
+void skip_vdso_frame_if_needed(UnwindState *us) {
+  uint64_t const pc =
+      canonicalize_user_address(us->initial_regs.regs[REGNAME(PC)]);
+  if (!pc) {
+    return;
+  }
+  DsoHdr::DsoFindRes const pc_res = us->dso_hdr.dso_find_closest(us->pid, pc);
+  if (!pc_res.second || pc_res.first->second._type != DsoType::kVdso) {
+    return;
+  }
+
+  uint64_t const lr = us->initial_regs.regs[REGNAME(LR)];
+  if (!lr) {
+    return;
+  }
+
+  uint64_t const canonical_lr = canonicalize_user_address(lr);
+  DsoHdr::DsoFindRes const lr_res =
+      us->dso_hdr.dso_find_closest(us->pid, canonical_lr);
+  if (lr_res.second && lr_res.first->second._type == DsoType::kVdso) {
+    return;
+  }
+
+  us->initial_regs.regs[REGNAME(PC)] = canonical_lr;
+  us->current_ip = canonical_lr;
+  LG_DBG("Skipping VDSO frame (pc=0x%lx -> lr=0x%lx)", pc, canonical_lr);
+}
+#endif
+
 void add_thread_name(Process &process, UnwindState *us) {
   us->output.thread_name = process.get_or_insert_thread_name(us->output.tid);
 }
@@ -59,7 +89,15 @@ void unwind_init_sample(UnwindState *us, const uint64_t *sample_regs,
   us->output.clear();
   memcpy(&us->initial_regs.regs[0], sample_regs,
          k_nb_registers_to_unwind * sizeof(uint64_t));
+  us->initial_regs.regs[REGNAME(PC)] =
+      canonicalize_user_address(us->initial_regs.regs[REGNAME(PC)]);
   us->current_ip = us->initial_regs.regs[REGNAME(PC)];
+#if defined(__aarch64__)
+  // this allows us to get out of the VDSO frame on aarch64
+  // todo: we should keep this frame as part of the unwind output
+  // This would give us things like `__kernel_clock_gettime`
+  skip_vdso_frame_if_needed(us);
+#endif
   us->pid = sample_pid;
   us->stack_sz = sample_size_stack;
   us->stack = sample_data_stack;
