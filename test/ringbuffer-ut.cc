@@ -3,11 +3,15 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
+#include "loghandle.hpp"
 #include "pevent_lib.hpp"
 #include "ringbuffer_holder.hpp"
 #include "ringbuffer_utils.hpp"
 
+#include <cstdlib>
+#include <cstring>
 #include <gtest/gtest.h>
+#include <memory>
 #include <thread>
 
 using namespace ddprof;
@@ -195,6 +199,60 @@ TEST(ringbuffer, full) {
   EXPECT_EQ(reader.available_size(), 0);
   EXPECT_TRUE(
       std::equal(buffer.begin(), buffer.end(), buffer2.begin(), buffer2.end()));
+}
+
+TEST(ringbuffer, perf_reader_wrap_copy) {
+  LogHandle log_handle;
+  constexpr int kBufSizeOrder = 0;
+  size_t const buffer_size = perf_mmap_size(kBufSizeOrder);
+  void *raw = nullptr;
+  ASSERT_EQ(posix_memalign(&raw, get_page_size(), buffer_size), 0);
+  auto free_mem = std::unique_ptr<void, decltype(&std::free)>(raw, &std::free);
+  memset(raw, 0, buffer_size);
+
+  RingBuffer rb{};
+  ASSERT_TRUE(
+      rb_init(&rb, raw, buffer_size, RingBufferType::kPerfRingBuffer, false));
+
+  auto *meta = reinterpret_cast<perf_event_mmap_page *>(raw);
+  constexpr size_t sample_size = 32;
+  size_t const tail_linear = rb.data_size - 8;
+  uint64_t const tail = tail_linear;
+  meta->data_tail = tail;
+  meta->data_head = tail + sample_size;
+  rb.intermediate_reader_pos = tail;
+
+  for (size_t i = 0; i < sample_size; ++i) {
+    size_t const offset = (tail_linear + i) & rb.mask;
+    rb.data[offset] = std::byte{static_cast<unsigned char>(i)};
+  }
+
+  PerfRingBufferReader reader{&rb};
+  reader.update_available();
+  auto buf = reader.read_all_available();
+  ASSERT_EQ(buf.size(), sample_size);
+  ASSERT_EQ(buf.data(), rb.wrap_copy);
+
+  size_t const first_chunk = rb.data_size - tail_linear;
+  size_t const second_chunk = sample_size - first_chunk;
+  const std::byte *start_ptr = rb.data + tail_linear;
+
+  LG_NFO("[perf_reader_wrap_copy] tail_linear=%zu first_chunk=%zu "
+         "second_chunk=%zu wrap_copy_capacity=%zu",
+         tail_linear, first_chunk, second_chunk, rb.wrap_copy_capacity);
+  LG_NFO("[perf_reader_wrap_copy] wrap_copy=%p rb.data=%p start_ptr=%p",
+         static_cast<void *>(rb.wrap_copy), static_cast<void *>(rb.data),
+         static_cast<const void *>(start_ptr));
+
+  EXPECT_EQ(memcmp(buf.data(), start_ptr, first_chunk), 0);
+  EXPECT_EQ(memcmp(buf.data() + first_chunk, rb.data, second_chunk), 0);
+
+  for (size_t i = 0; i < sample_size; ++i) {
+    EXPECT_EQ(buf[i], std::byte{static_cast<unsigned char>(i)});
+  }
+
+  reader.advance(sample_size);
+  rb_free(&rb);
 }
 
 void mpsc_reader_fun(RingBuffer *rb, size_t nb_elements, size_t nb_producers,
