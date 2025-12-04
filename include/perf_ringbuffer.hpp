@@ -45,6 +45,8 @@ struct RingBuffer {
   bool tsc_available;
   std::unique_ptr<std::byte, FreeDeleter> wrap_copy;
   size_t wrap_copy_capacity;
+
+  std::byte *ensure_wrap_copy_buffer(size_t required_size);
 };
 
 bool rb_init(RingBuffer *rb, void *base, size_t size, RingBufferType type,

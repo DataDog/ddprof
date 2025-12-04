@@ -38,23 +38,22 @@ constexpr uint64_t align_down(uint64_t x, uint64_t pow2) {
   return x & ~(pow2 - 1);
 }
 
-inline std::byte *ensure_wrap_copy_buffer(RingBuffer &rb,
-                                          size_t required_size) {
+inline std::byte *RingBuffer::ensure_wrap_copy_buffer(size_t required_size) {
   if (required_size == 0) {
-    return rb.wrap_copy.get();
+    return wrap_copy.get();
   }
   size_t const aligned_size = align_up(required_size, kRingBufferAlignment);
-  if (!rb.wrap_copy || rb.wrap_copy_capacity < aligned_size) {
-    rb.wrap_copy.reset();
-    rb.wrap_copy_capacity = 0;
+  if (!wrap_copy || wrap_copy_capacity < aligned_size) {
+    wrap_copy.reset();
+    wrap_copy_capacity = 0;
     void *ptr = nullptr;
     if (posix_memalign(&ptr, kRingBufferAlignment, aligned_size) != 0) {
       return nullptr;
     }
-    rb.wrap_copy.reset(static_cast<std::byte *>(ptr));
-    rb.wrap_copy_capacity = aligned_size;
+    wrap_copy.reset(static_cast<std::byte *>(ptr));
+    wrap_copy_capacity = aligned_size;
   }
-  return rb.wrap_copy.get();
+  return wrap_copy.get();
 }
 
 class PerfRingBufferWriter {
@@ -165,7 +164,7 @@ public:
       return {start, n};
     }
 
-    auto *dest = ensure_wrap_copy_buffer(*_rb, n);
+    auto *dest = _rb->ensure_wrap_copy_buffer(n);
     if (!dest) {
       return {};
     }
@@ -418,7 +417,7 @@ inline const perf_event_header *perf_rb_read_event(RingBuffer &rb) {
   if (!needs_copy) {
     result = reinterpret_cast<perf_event_header *>(data_ptr);
   } else {
-    auto *dest = ensure_wrap_copy_buffer(rb, bytes_to_copy);
+    auto *dest = rb.ensure_wrap_copy_buffer(bytes_to_copy);
     if (!dest) {
       return nullptr;
     }
