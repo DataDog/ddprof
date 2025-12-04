@@ -41,23 +41,20 @@ constexpr uint64_t align_down(uint64_t x, uint64_t pow2) {
 inline std::byte *ensure_wrap_copy_buffer(RingBuffer &rb,
                                           size_t required_size) {
   if (required_size == 0) {
-    return rb.wrap_copy;
+    return rb.wrap_copy.get();
   }
   size_t const aligned_size = align_up(required_size, kRingBufferAlignment);
   if (!rb.wrap_copy || rb.wrap_copy_capacity < aligned_size) {
-    if (rb.wrap_copy) {
-      std::free(rb.wrap_copy);
-      rb.wrap_copy = nullptr;
-      rb.wrap_copy_capacity = 0;
-    }
+    rb.wrap_copy.reset();
+    rb.wrap_copy_capacity = 0;
     void *ptr = nullptr;
     if (posix_memalign(&ptr, kRingBufferAlignment, aligned_size) != 0) {
       return nullptr;
     }
-    rb.wrap_copy = static_cast<std::byte *>(ptr);
+    rb.wrap_copy.reset(static_cast<std::byte *>(ptr));
     rb.wrap_copy_capacity = aligned_size;
   }
-  return rb.wrap_copy;
+  return rb.wrap_copy.get();
 }
 
 class PerfRingBufferWriter {
@@ -413,22 +410,21 @@ inline const perf_event_header *perf_rb_read_event(RingBuffer &rb) {
   }
 
   size_t const sz_sample = hdr_ptr->size;
+  size_t const bytes_to_copy = std::max(sz_sample, sizeof(perf_event_header));
   bool const needs_copy = hdr_ptr == &hdr_storage ||
-      (!rb.mirrored_mapping && (tail_linear + sz_sample > rb.data_size));
+      (!rb.mirrored_mapping && (tail_linear + bytes_to_copy > rb.data_size));
 
   const perf_event_header *result = nullptr;
   if (!needs_copy) {
     result = reinterpret_cast<perf_event_header *>(data_ptr);
   } else {
-    auto *dest = ensure_wrap_copy_buffer(rb, sz_sample);
+    auto *dest = ensure_wrap_copy_buffer(rb, bytes_to_copy);
     if (!dest) {
       return nullptr;
     }
-    size_t const first_chunk = std::min(sz_sample, rb.data_size - tail_linear);
+    size_t const first_chunk = rb.data_size - tail_linear;
     memcpy(dest, data_ptr, first_chunk);
-    if (first_chunk < sz_sample) {
-      memcpy(dest + first_chunk, rb.data, sz_sample - first_chunk);
-    }
+    memcpy(dest + first_chunk, rb.data, bytes_to_copy - first_chunk);
     result = reinterpret_cast<perf_event_header *>(dest);
   }
 

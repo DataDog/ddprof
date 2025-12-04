@@ -7,11 +7,19 @@
 
 #include "perf.hpp"
 
+#include <cstdlib>
+#include <memory>
+
 namespace ddprof {
 
 enum class RingBufferType : uint8_t { kPerfRingBuffer, kMPSCRingBuffer };
 
 class SpinLock;
+
+struct FreeDeleter {
+  // we call free because we allocate with posix_memalign
+  void operator()(std::byte *ptr) const noexcept { std::free(ptr); }
+};
 
 struct RingBuffer {
   RingBufferType type;
@@ -35,7 +43,7 @@ struct RingBuffer {
   uint16_t time_shift;
   uint8_t perf_clock_source;
   bool tsc_available;
-  std::byte *wrap_copy;
+  std::unique_ptr<std::byte, FreeDeleter> wrap_copy;
   size_t wrap_copy_capacity;
 };
 

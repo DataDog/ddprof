@@ -231,7 +231,7 @@ TEST(ringbuffer, perf_reader_wrap_copy) {
   reader.update_available();
   auto buf = reader.read_all_available();
   ASSERT_EQ(buf.size(), sample_size);
-  ASSERT_EQ(buf.data(), rb.wrap_copy);
+  ASSERT_EQ(buf.data(), rb.wrap_copy.get());
 
   size_t const first_chunk = rb.data_size - tail_linear;
   size_t const second_chunk = sample_size - first_chunk;
@@ -241,7 +241,7 @@ TEST(ringbuffer, perf_reader_wrap_copy) {
          "second_chunk=%zu wrap_copy_capacity=%zu",
          tail_linear, first_chunk, second_chunk, rb.wrap_copy_capacity);
   LG_NFO("[perf_reader_wrap_copy] wrap_copy=%p rb.data=%p start_ptr=%p",
-         static_cast<void *>(rb.wrap_copy), static_cast<void *>(rb.data),
+         static_cast<void *>(rb.wrap_copy.get()), static_cast<void *>(rb.data),
          static_cast<const void *>(start_ptr));
 
   EXPECT_EQ(memcmp(buf.data(), start_ptr, first_chunk), 0);

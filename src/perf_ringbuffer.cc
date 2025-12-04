@@ -25,7 +25,7 @@ bool rb_init(RingBuffer *rb, void *base, size_t size,
   rb->type = ring_buffer_type;
   rb->spinlock = nullptr;
   rb->mirrored_mapping = mirrored_mapping;
-  rb->wrap_copy = nullptr;
+  rb->wrap_copy.reset();
   rb->wrap_copy_capacity = 0;
 
   switch (ring_buffer_type) {
@@ -56,10 +56,7 @@ bool rb_init(RingBuffer *rb, void *base, size_t size,
 }
 
 void rb_free(RingBuffer *rb) {
-  if (rb->wrap_copy) {
-    std::free(rb->wrap_copy);
-    rb->wrap_copy = nullptr;
-  }
+  rb->wrap_copy.reset();
   rb->wrap_copy_capacity = 0;
 }
 
