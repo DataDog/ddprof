@@ -73,19 +73,20 @@ bool test_clock(PerfClockSource perf_clock_source, int current_cpu) {
   }
 
   auto ring_buffer_size = perf_mmap_size(1);
-  void *region = perfown_sz(fd.get(), ring_buffer_size);
-  if (!region) {
+  PerfMmapRegion mapping = perfown_sz(fd.get(), ring_buffer_size, true);
+  if (!mapping.addr) {
     LG_WRN("perfown_sz failed: %s", strerror(errno));
     return false;
   }
-  defer { perfdisown(region, ring_buffer_size); };
+  defer { perfdisown(mapping.addr, ring_buffer_size, mapping.mirrored); };
 
   if (ioctl(fd.get(), PERF_EVENT_IOC_ENABLE) == -1) {
     LG_WRN("ioctl failed: %s", strerror(errno));
     return false;
   }
   RingBuffer rb;
-  rb_init(&rb, region, ring_buffer_size, RingBufferType::kPerfRingBuffer);
+  rb_init(&rb, mapping.addr, ring_buffer_size, RingBufferType::kPerfRingBuffer,
+          mapping.mirrored);
 
   PerfRingBufferReader reader(&rb);
 

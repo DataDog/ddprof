@@ -16,7 +16,7 @@
 namespace ddprof {
 
 bool rb_init(RingBuffer *rb, void *base, size_t size,
-             RingBufferType ring_buffer_type) {
+             RingBufferType ring_buffer_type, bool mirrored_mapping) {
   rb->meta_size = get_page_size();
   rb->base = base;
   rb->data = reinterpret_cast<std::byte *>(base) + rb->meta_size;
@@ -24,6 +24,9 @@ bool rb_init(RingBuffer *rb, void *base, size_t size,
   rb->mask = get_mask_from_size(size);
   rb->type = ring_buffer_type;
   rb->spinlock = nullptr;
+  rb->mirrored_mapping = mirrored_mapping;
+  rb->wrap_copy.reset();
+  rb->wrap_copy_capacity = 0;
 
   switch (ring_buffer_type) {
   case RingBufferType::kPerfRingBuffer: {
@@ -52,7 +55,10 @@ bool rb_init(RingBuffer *rb, void *base, size_t size,
   return true;
 }
 
-void rb_free(RingBuffer *rb) {}
+void rb_free(RingBuffer *rb) {
+  rb->wrap_copy.reset();
+  rb->wrap_copy_capacity = 0;
+}
 
 // aligned block into two 4-byte blocks easier
 union flipper {

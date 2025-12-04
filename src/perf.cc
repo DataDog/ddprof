@@ -9,6 +9,7 @@
 #include "logger.hpp"
 #include "perf_archmap.hpp"
 
+#include <atomic>
 #include <cassert>
 #include <cstring>
 #include <fcntl.h>
@@ -129,54 +130,81 @@ size_t get_mask_from_size(size_t size) {
   return (size - get_page_size() - 1);
 }
 
-void *perfown_sz(int fd, size_t size_of_buffer) {
-  // Map in the region representing the ring buffer, map the buffer twice
-  // (minus metadata size) to avoid handling boundaries.
+PerfMmapRegion perfown_sz(int fd, size_t size_of_buffer,
+                          bool allow_single_mapping) {
+  PerfMmapRegion mapping{nullptr, false};
+
   size_t const total_length = (2 * size_of_buffer) - get_page_size();
-  // Reserve twice the size of the buffer
-  void *region = mmap(nullptr, total_length, PROT_NONE,
-                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  if (MAP_FAILED == region || !region) {
-    return nullptr;
+  void *reserved = mmap(nullptr, total_length, PROT_NONE,
+                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+  if (reserved != MAP_FAILED && reserved) {
+    auto cleanup_reserved =
+        make_defer([&]() { munmap(reserved, total_length); });
+    auto *ptr = static_cast<std::byte *>(reserved);
+    bool const first_map_ok = mmap(ptr + size_of_buffer - get_page_size(),
+                                   size_of_buffer, PROT_READ | PROT_WRITE,
+                                   MAP_SHARED | MAP_FIXED, fd, 0) != MAP_FAILED;
+    bool const second_map_ok = first_map_ok &&
+        mmap(ptr, size_of_buffer, PROT_READ | PROT_WRITE,
+             MAP_SHARED | MAP_FIXED, fd, 0) != MAP_FAILED;
+
+    if (second_map_ok) {
+      cleanup_reserved.release();
+      mapping.addr = reserved;
+      mapping.mirrored = true;
+    } else {
+      if (!allow_single_mapping) {
+        return mapping;
+      }
+      exec_defer(std::move(cleanup_reserved));
+    }
+  } else if (!allow_single_mapping) {
+    return mapping;
   }
 
-  auto defer_munmap = make_defer([&]() { perfdisown(region, size_of_buffer); });
-
-  auto *ptr = static_cast<std::byte *>(region);
-
-  // Each mapping of fd must have a size of 2^n+1 pages
-  // That's why starts by mapping buffer on the second half of reserved
-  // space and ensure that metadata page overlaps on the first part
-  if (mmap(ptr + size_of_buffer - get_page_size(), size_of_buffer,
-           PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd,
-           0) == MAP_FAILED) {
-    return nullptr;
+  if (!mapping.addr && allow_single_mapping) {
+    void *single = mmap(nullptr, size_of_buffer, PROT_READ | PROT_WRITE,
+                        MAP_SHARED, fd, 0);
+    if (single == MAP_FAILED || !single) {
+      return mapping;
+    }
+    static std::atomic<bool> warned{false};
+    if (!warned.exchange(true)) {
+      LG_WRN("Unable to create mirrored perf ring buffer mapping, "
+             "falling back to single mapping with wrap-around copies.");
+    }
+    mapping.addr = single;
+    mapping.mirrored = false;
   }
 
-  // Map buffer a second time on the first half of reserved space
-  // It will overlap the metadata page of the previous mapping.
-  if (mmap(ptr, size_of_buffer, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED,
-           fd, 0) == MAP_FAILED) {
-    return nullptr;
-  }
-
-  defer_munmap.release();
-
-  if (fcntl(fd, F_SETFL, O_RDWR | O_NONBLOCK) == -1) {
+  if (mapping.addr && fcntl(fd, F_SETFL, O_RDWR | O_NONBLOCK) == -1) {
     LG_WRN("Unable to run fcntl on %d", fd);
   }
 
-  return region;
+  return mapping;
 }
 
-int perfdisown(void *region, size_t size) {
+int perfdisown(void *region, size_t size, bool mirrored) {
+  if (!region) {
+    return 0;
+  }
   auto *ptr = static_cast<std::byte *>(region);
+  if (!mirrored) {
+    return munmap(ptr, size);
+  }
 
-  return (munmap(ptr + size - get_page_size(), size) == 0) &&
-          (munmap(ptr, size) == 0) &&
-          (munmap(ptr, (2 * size) - get_page_size()) == 0)
-      ? 0
-      : -1;
+  int ret = 0;
+  if (munmap(ptr + size - get_page_size(), size) != 0) {
+    ret = -1;
+  }
+  if (munmap(ptr, size) != 0) {
+    ret = -1;
+  }
+  if (munmap(ptr, (2 * size) - get_page_size()) != 0) {
+    ret = -1;
+  }
+  return ret;
 }
 
 // return attr sorted by priority
