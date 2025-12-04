@@ -70,6 +70,32 @@ private:
 };
 
 /**************
+ * vDSO file  *
+ **************/
+
+class VdsoSnapshot {
+public:
+  VdsoSnapshot();
+  ~VdsoSnapshot();
+
+  VdsoSnapshot(const VdsoSnapshot &other) = delete;
+  VdsoSnapshot &operator=(const VdsoSnapshot &other) = delete;
+  VdsoSnapshot(VdsoSnapshot &&other) noexcept;
+  VdsoSnapshot &operator=(VdsoSnapshot &&other) noexcept;
+
+  void set(FileInfo info);
+
+  [[nodiscard]] bool ready() const;
+  [[nodiscard]] const FileInfo &info() const;
+
+private:
+  void reset();
+
+  FileInfo _info;
+  bool _ready{false};
+};
+
+/**************
  * DSO Header *
  **************/
 /// Keep track of binaries and associate them to address ranges
@@ -113,7 +139,12 @@ public:
 
   /******* MAIN APIS **********/
   explicit DsoHdr(std::string_view path_to_proc = "", int dd_profiling_fd = -1);
-  ~DsoHdr();
+  ~DsoHdr() = default;
+
+  DsoHdr(const DsoHdr &other) = delete;
+  DsoHdr &operator=(const DsoHdr &other) = delete;
+  DsoHdr(DsoHdr &&other) noexcept = default;
+  DsoHdr &operator=(DsoHdr &&other) noexcept = default;
 
   // Add the element check for overlap and remove them
   DsoFindRes insert_erase_overlap(Dso &&dso);
@@ -238,8 +269,7 @@ private:
   // Assumption is that we have a single version of the dd_profiling library
   // across all PIDs.
   FileInfoId_t _dd_profiling_file_info = k_file_info_undef;
-  FileInfo _vdso_snapshot_info;
-  bool _vdso_snapshot_ready{false};
+  VdsoSnapshot _vdso_snapshot;
   FileInfoId_t _vdso_file_info = k_file_info_undef;
 };
 

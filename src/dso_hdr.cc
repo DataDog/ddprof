@@ -74,7 +74,7 @@ struct VdsoBounds {
 };
 
 std::optional<VdsoBounds> find_self_vdso_bounds() {
-  UniqueFile maps{fopen("/proc/self/maps", "r")};
+  const UniqueFile maps{fopen("/proc/self/maps", "r")};
   if (!maps) {
     return std::nullopt;
   }
@@ -85,6 +85,7 @@ std::optional<VdsoBounds> find_self_vdso_bounds() {
     if (line != nullptr && strstr(line, "[vdso]") != nullptr) {
       uintptr_t start = 0;
       uintptr_t end = 0;
+      // NOLINTNEXTLINE(cert-err34-c)
       if (sscanf(line, "%lx-%lx", &start, &end) == 2 && end > start) {
         return VdsoBounds{start, static_cast<size_t>(end - start)};
       }
@@ -97,7 +98,7 @@ std::optional<VdsoBounds> find_self_vdso_bounds() {
 bool write_all(int fd, const uint8_t *data, size_t size) {
   size_t written = 0;
   while (written < size) {
-    ssize_t rc = ::write(fd, data + written, size - written);
+    const ssize_t rc = ::write(fd, data + written, size - written);
     if (rc < 0) {
       if (errno == EINTR) {
         continue;
@@ -112,6 +113,45 @@ bool write_all(int fd, const uint8_t *data, size_t size) {
   return true;
 }
 } // namespace
+
+VdsoSnapshot::VdsoSnapshot() = default;
+
+VdsoSnapshot::~VdsoSnapshot() { reset(); }
+
+VdsoSnapshot::VdsoSnapshot(VdsoSnapshot &&other) noexcept
+    : _info(std::move(other._info)), _ready(other._ready) {
+  other._ready = false;
+  other._info = {};
+}
+
+VdsoSnapshot &VdsoSnapshot::operator=(VdsoSnapshot &&other) noexcept {
+  if (this != &other) {
+    reset();
+    _info = std::move(other._info);
+    _ready = other._ready;
+    other._ready = false;
+    other._info = {};
+  }
+  return *this;
+}
+
+void VdsoSnapshot::set(FileInfo info) {
+  reset();
+  _info = std::move(info);
+  _ready = true;
+}
+
+bool VdsoSnapshot::ready() const { return _ready; }
+
+const FileInfo &VdsoSnapshot::info() const { return _info; }
+
+void VdsoSnapshot::reset() {
+  if (_ready && !_info._path.empty()) {
+    ::unlink(_info._path.c_str());
+  }
+  _ready = false;
+  _info = {};
+}
 
 /***************/
 /*    STATS    */
@@ -161,12 +201,6 @@ DsoHdr::DsoHdr(std::string_view path_to_proc, int dd_profiling_fd)
   init_workspace_remap();
   // 0 element is error element
   _file_info_vector.emplace_back(FileInfo(), 0);
-}
-
-DsoHdr::~DsoHdr() {
-  if (_vdso_snapshot_ready && !_vdso_snapshot_info._path.empty()) {
-    ::unlink(_vdso_snapshot_info._path.c_str());
-  }
 }
 
 namespace {
@@ -618,7 +652,7 @@ void DsoHdr::init_workspace_remap() {
   _workspace_container_root.clear();
   if (const char *workspace_env = std::getenv("DDPROF_WORKSPACE_ROOT");
       workspace_env && workspace_env[0] != '\0') {
-    std::string mapping = workspace_env;
+    const std::string mapping = workspace_env;
     auto const sep = mapping.find('|');
     if (sep != std::string::npos) {
       _workspace_host_prefix = mapping.substr(0, sep);
@@ -734,7 +768,7 @@ FileInfo DsoHdr::find_vdso_file_info() {
   if (!ensure_vdso_snapshot()) {
     return {};
   }
-  return _vdso_snapshot_info;
+  return _vdso_snapshot.info();
 }
 
 int DsoHdr::get_nb_dso() const {
@@ -818,17 +852,17 @@ int DsoHdr::clear_unvisited(const std::unordered_set<pid_t> &visited_pids) {
 }
 
 bool DsoHdr::ensure_vdso_snapshot() {
-  if (_vdso_snapshot_ready) {
+  if (_vdso_snapshot.ready()) {
     return true;
   }
 
-  auto bounds_opt = find_self_vdso_bounds();
+  const auto bounds_opt = find_self_vdso_bounds();
   if (!bounds_opt) {
     LG_WRN("[DSO] Unable to locate local vDSO mapping");
     return false;
   }
 
-  UniqueFd mem_fd{::open("/proc/self/mem", O_RDONLY)};
+  const UniqueFd mem_fd{::open("/proc/self/mem", O_RDONLY)};
   if (!mem_fd) {
     LG_WRN("[DSO] Unable to open /proc/self/mem: %s", strerror(errno));
     return false;
@@ -837,7 +871,7 @@ bool DsoHdr::ensure_vdso_snapshot() {
   std::vector<uint8_t> buffer(bounds_opt->length);
   size_t copied = 0;
   while (copied < buffer.size()) {
-    ssize_t rd =
+    const ssize_t rd =
         pread(mem_fd.get(), buffer.data() + copied, buffer.size() - copied,
               static_cast<off_t>(bounds_opt->start + copied));
     if (rd < 0) {
@@ -874,8 +908,7 @@ bool DsoHdr::ensure_vdso_snapshot() {
     return false;
   }
 
-  _vdso_snapshot_info = FileInfo(path_template, st.st_size, st.st_ino);
-  _vdso_snapshot_ready = true;
+  _vdso_snapshot.set(FileInfo(path_template, st.st_size, st.st_ino));
   return true;
 }
 } // namespace ddprof
