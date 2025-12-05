@@ -16,12 +16,17 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cerrno>
+#include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
+#include <filesystem>
 #include <memory>
 #include <numeric>
 #include <optional>
+#include <sys/stat.h>
 #include <unistd.h>
+#include <vector>
 
 namespace ddprof {
 
@@ -62,7 +67,91 @@ bool is_intersection_allowed(const Dso &old_so, const Dso &new_dso) {
   return old_so.is_same_file(new_dso) ||
       (old_so._type == DsoType::kStandard && new_dso._type == DsoType::kAnon);
 }
+
+struct VdsoBounds {
+  uintptr_t start;
+  size_t length;
+};
+
+std::optional<VdsoBounds> find_self_vdso_bounds() {
+  const UniqueFile maps{fopen("/proc/self/maps", "r")};
+  if (!maps) {
+    return std::nullopt;
+  }
+  char *line = nullptr;
+  size_t cap = 0;
+  auto cleanup = make_defer([&]() { free(line); });
+  while (getline(&line, &cap, maps.get()) != -1) {
+    if (line != nullptr && strstr(line, "[vdso]") != nullptr) {
+      uintptr_t start = 0;
+      uintptr_t end = 0;
+      // NOLINTNEXTLINE(cert-err34-c)
+      if (sscanf(line, "%lx-%lx", &start, &end) == 2 && end > start) {
+        return VdsoBounds{start, static_cast<size_t>(end - start)};
+      }
+      break;
+    }
+  }
+  return std::nullopt;
+}
+
+bool write_all(int fd, const uint8_t *data, size_t size) {
+  size_t written = 0;
+  while (written < size) {
+    const ssize_t rc = ::write(fd, data + written, size - written);
+    if (rc < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      return false;
+    }
+    if (rc == 0) {
+      return false;
+    }
+    written += static_cast<size_t>(rc);
+  }
+  return true;
+}
 } // namespace
+
+VdsoSnapshot::VdsoSnapshot() = default;
+
+VdsoSnapshot::~VdsoSnapshot() { reset(); }
+
+VdsoSnapshot::VdsoSnapshot(VdsoSnapshot &&other) noexcept
+    : _info(std::move(other._info)), _ready(other._ready) {
+  other._ready = false;
+  other._info = {};
+}
+
+VdsoSnapshot &VdsoSnapshot::operator=(VdsoSnapshot &&other) noexcept {
+  if (this != &other) {
+    reset();
+    _info = std::move(other._info);
+    _ready = other._ready;
+    other._ready = false;
+    other._info = {};
+  }
+  return *this;
+}
+
+void VdsoSnapshot::set(FileInfo info) {
+  reset();
+  _info = std::move(info);
+  _ready = true;
+}
+
+bool VdsoSnapshot::ready() const { return _ready; }
+
+const FileInfo &VdsoSnapshot::info() const { return _info; }
+
+void VdsoSnapshot::reset() {
+  if (_ready && !_info._path.empty()) {
+    ::unlink(_info._path.c_str());
+  }
+  _ready = false;
+  _info = {};
+}
 
 /***************/
 /*    STATS    */
@@ -109,6 +198,7 @@ DsoHdr::DsoHdr(std::string_view path_to_proc, int dd_profiling_fd)
   } else {
     _path_to_proc = path_to_proc;
   }
+  init_workspace_remap();
   // 0 element is error element
   _file_info_vector.emplace_back(FileInfo(), 0);
 }
@@ -307,6 +397,48 @@ FileInfoId_t DsoHdr::update_id_dd_profiling(const Dso &dso) {
   return _dd_profiling_file_info;
 }
 
+FileInfoId_t DsoHdr::update_id_from_dso(const Dso &dso) {
+  if (dso._type == DsoType::kVdso) {
+    return update_id_vdso(dso);
+  }
+
+  if (!has_relevant_path(dso._type)) {
+    dso._id = k_file_info_error; // no file associated
+    return dso._id;
+  }
+
+  if (dso._type == DsoType::kDDProfiling) {
+    return update_id_dd_profiling(dso);
+  }
+
+  return update_id_from_path(dso);
+}
+
+FileInfoId_t DsoHdr::update_id_vdso(const Dso &dso) {
+  if (_vdso_file_info != k_file_info_undef) {
+    dso._id = _vdso_file_info;
+    return dso._id;
+  }
+
+  FileInfo file_info = find_vdso_file_info();
+  if (!file_info._inode) {
+    dso._id = k_file_info_error;
+    return dso._id;
+  }
+
+  const FileInfoInodeKey key(file_info._inode, file_info._size);
+  auto [it, inserted] =
+      _file_info_inode_map.emplace(key, _file_info_vector.size());
+  if (inserted) {
+    dso._id = it->second;
+    _file_info_vector.emplace_back(std::move(file_info), dso._id);
+  } else {
+    dso._id = it->second;
+  }
+  _vdso_file_info = dso._id;
+  return dso._id;
+}
+
 FileInfoId_t DsoHdr::update_id_from_path(const Dso &dso) {
 
   FileInfo file_info = find_file_info(dso);
@@ -335,19 +467,6 @@ FileInfoId_t DsoHdr::update_id_from_path(const Dso &dso) {
     }
   }
   return dso._id;
-}
-
-FileInfoId_t DsoHdr::update_id_from_dso(const Dso &dso) {
-  if (!has_relevant_path(dso._type)) {
-    dso._id = k_file_info_error; // no file associated
-    return dso._id;
-  }
-
-  if (dso._type == DsoType::kDDProfiling) {
-    return update_id_dd_profiling(dso);
-  }
-
-  return update_id_from_path(dso);
 }
 
 bool DsoHdr::maybe_insert_erase_overlap(Dso &&dso,
@@ -528,9 +647,91 @@ Dso DsoHdr::dso_from_proc_line(int pid, const char *line) {
           DsoOrigin::kProcMaps};
 }
 
+void DsoHdr::init_workspace_remap() {
+  _workspace_host_prefix.clear();
+  _workspace_container_root.clear();
+  if (const char *workspace_env = std::getenv("DDPROF_WORKSPACE_ROOT");
+      workspace_env && workspace_env[0] != '\0') {
+    const std::string mapping = workspace_env;
+    auto const sep = mapping.find('|');
+    if (sep != std::string::npos) {
+      _workspace_host_prefix = mapping.substr(0, sep);
+      _workspace_container_root = mapping.substr(sep + 1);
+    } else {
+      LG_WRN("DDPROF_WORKSPACE_ROOT is expected to be "
+             "'<host_prefix>|<container_root>'");
+    }
+  }
+  auto trim_trailing_slash = [](std::string &path) {
+    while (path.size() > 1 && !path.empty() && path.back() == '/') {
+      path.pop_back();
+    }
+  };
+  trim_trailing_slash(_workspace_host_prefix);
+  trim_trailing_slash(_workspace_container_root);
+  if (_workspace_host_prefix.empty() || _workspace_container_root.empty()) {
+    _workspace_host_prefix.clear();
+    _workspace_container_root.clear();
+  } else {
+    LG_NTC("DDPROF_WORKSPACE_ROOT is set to %s|%s",
+           _workspace_host_prefix.c_str(), _workspace_container_root.c_str());
+  }
+}
+
+// Best-effort remapping for local macOS development. When the environment
+// variable DDPROF_WORKSPACE_ROOT is set to "<host_prefix>|<container_root>",
+// file paths backed by the host (for example /run/host_virtiofs/...) can be
+// converted to the in-container path so that libdwfl can locate the ELF.
+// Example when using the launch_local_build.sh script:
+// /run/host_virtiofs/Users/foo/dd/ddprof/build/... -> /app/build/...
+std::optional<std::string>
+DsoHdr::remap_host_workspace_path(std::string_view original) const {
+  if (_workspace_host_prefix.empty() || _workspace_container_root.empty()) {
+    return std::nullopt;
+  }
+
+  namespace fs = std::filesystem;
+
+  fs::path prefix_path(_workspace_host_prefix);
+  fs::path container_path(_workspace_container_root);
+  fs::path original_path(original);
+
+  prefix_path = prefix_path.lexically_normal();
+  container_path = container_path.lexically_normal();
+  original_path = original_path.lexically_normal();
+
+  if (prefix_path.empty() || container_path.empty()) {
+    return std::nullopt;
+  }
+
+  auto it_orig = original_path.begin();
+  auto it_prefix = prefix_path.begin();
+  for (; it_prefix != prefix_path.end(); ++it_prefix, ++it_orig) {
+    if (it_orig == original_path.end() || *it_prefix != *it_orig) {
+      return std::nullopt;
+    }
+  }
+
+  fs::path suffix;
+  for (; it_orig != original_path.end(); ++it_orig) {
+    suffix /= *it_orig;
+  }
+
+  fs::path remapped = container_path;
+  if (!suffix.empty()) {
+    remapped /= suffix;
+  }
+  remapped = remapped.lexically_normal();
+  return remapped.string();
+}
+
 FileInfo DsoHdr::find_file_info(const Dso &dso) {
   int64_t size;
   inode_t inode;
+
+  if (dso._type == DsoType::kVdso) {
+    return find_vdso_file_info();
+  }
 
   // First, try to find matching file in profiler mount namespace since it will
   // still be accessible when process exits
@@ -551,8 +752,23 @@ FileInfo DsoHdr::find_file_info(const Dso &dso) {
     return {proc_path, size, inode};
   }
 
+  if (auto remapped = remap_host_workspace_path(dso._filename)) {
+    if (get_file_inode(remapped->c_str(), &inode, &size)) {
+      LG_DBG("[DSO] Remapped %s -> %s", dso._filename.c_str(),
+             remapped->c_str());
+      return {*remapped, size, inode};
+    }
+  }
+
   LG_DBG("[DSO] Unable to find path to %s", dso._filename.c_str());
   return {};
+}
+
+FileInfo DsoHdr::find_vdso_file_info() {
+  if (!ensure_vdso_snapshot()) {
+    return {};
+  }
+  return _vdso_snapshot.info();
 }
 
 int DsoHdr::get_nb_dso() const {
@@ -633,5 +849,66 @@ int DsoHdr::clear_unvisited(const std::unordered_set<pid_t> &visited_pids) {
     _pid_map.erase(pid);
   }
   return pids_to_clear.size();
+}
+
+bool DsoHdr::ensure_vdso_snapshot() {
+  if (_vdso_snapshot.ready()) {
+    return true;
+  }
+
+  const auto bounds_opt = find_self_vdso_bounds();
+  if (!bounds_opt) {
+    LG_WRN("[DSO] Unable to locate local vDSO mapping");
+    return false;
+  }
+
+  const UniqueFd mem_fd{::open("/proc/self/mem", O_RDONLY)};
+  if (!mem_fd) {
+    LG_WRN("[DSO] Unable to open /proc/self/mem: %s", strerror(errno));
+    return false;
+  }
+
+  std::vector<uint8_t> buffer(bounds_opt->length);
+  size_t copied = 0;
+  while (copied < buffer.size()) {
+    const ssize_t rd =
+        pread(mem_fd.get(), buffer.data() + copied, buffer.size() - copied,
+              static_cast<off_t>(bounds_opt->start + copied));
+    if (rd < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      LG_WRN("[DSO] Failed to copy vDSO bytes: %s", strerror(errno));
+      return false;
+    }
+    if (rd == 0) {
+      LG_WRN("[DSO] Failed to copy vDSO bytes: %s", strerror(errno));
+      return false;
+    }
+    copied += static_cast<size_t>(rd);
+  }
+
+  char path_template[] = "/tmp/ddprof-vdsoXXXXXX";
+  int fd = mkstemp(path_template);
+  if (fd == -1) {
+    LG_WRN("[DSO] Unable to create vDSO snapshot file: %s", strerror(errno));
+    return false;
+  }
+  auto fd_cleanup = make_defer([&]() { ::close(fd); });
+  if (!write_all(fd, buffer.data(), buffer.size())) {
+    LG_WRN("[DSO] Unable to write vDSO snapshot file: %s", strerror(errno));
+    ::unlink(path_template);
+    return false;
+  }
+
+  struct stat st{};
+  if (fstat(fd, &st) != 0) {
+    LG_WRN("[DSO] Unable to stat vDSO snapshot file: %s", strerror(errno));
+    ::unlink(path_template);
+    return false;
+  }
+
+  _vdso_snapshot.set(FileInfo(path_template, st.st_size, st.st_ino));
+  return true;
 }
 } // namespace ddprof

@@ -33,5 +33,5 @@ declare -a arr_folders=("src" "test" "include")
 FILES_TO_FORMAT=".*[.]\(cpp\|cc\|c\|cxx\|h\|hpp\)"
 find "${arr_folders[@]}" -regex "${FILES_TO_FORMAT}" -print0 | xargs -0 "${CLANG_FORMAT}" ${CLANG_OPTION}
 
-find . -maxdepth 1 -\( -name CMakeLists.txt -or -name '*.cmake' -\) -print0 | xargs -0 cmake-format ${CMAKE_FORMAT_OPTIONS}
-find cmake src test -\( -name CMakeLists.txt -or -name '*.cmake' -\) -print0 | xargs -0 cmake-format ${CMAKE_FORMAT_OPTIONS}
+find . -maxdepth 1 \( -name CMakeLists.txt -or -name '*.cmake' \) -print0 | xargs -0 cmake-format ${CMAKE_FORMAT_OPTIONS}
+find cmake src test \( -name CMakeLists.txt -or -name '*.cmake' \) -print0 | xargs -0 cmake-format ${CMAKE_FORMAT_OPTIONS}
