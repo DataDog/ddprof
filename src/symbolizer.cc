@@ -99,6 +99,14 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
       // This will be moved to the backend
       for (size_t i = 0; i < blaze_res->cnt && i < elf_addrs.size(); ++i) {
         const blaze_sym *cur_sym = blaze_res->syms + i;
+        if (cur_sym->addr == 0) {
+          // Some binaries expose a single symbol at address 0 (ex:
+          // DD_AGENT_V1). Avoid emitting it so the backend still attempts
+          // symbolication.
+          write_location_no_sym(elf_addrs[i], map_info,
+                                &locations[write_index++]);
+          continue;
+        }
         DDRES_CHECK_FWD(write_location_blaze(
             elf_addrs[i], symbolizer_wrapper.demangled_names, map_info,
             *cur_sym, write_index, locations));
