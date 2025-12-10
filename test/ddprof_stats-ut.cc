@@ -81,7 +81,7 @@ TEST(ddprof_statsTest, ConnectAndSet) {
 }
 
 TEST(ddprof_statsTest, Arithmetic) {
-  const char path_listen[] = UNIT_TEST_DATA "/my_statsd_listener.sock";
+  const char path_listen[] = "/tmp/my_statsd_listener_arithmetic";
   unlink(path_listen); // make sure node is available, OK if this fails
 
   // Initiate "server"

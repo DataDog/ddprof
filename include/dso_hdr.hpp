@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cassert>
+#include <filesystem>
 #include <map>
 #include <string>
 #include <unordered_map>
@@ -69,6 +70,32 @@ private:
 };
 
 /**************
+ * vDSO file  *
+ **************/
+
+class VdsoSnapshot {
+public:
+  VdsoSnapshot();
+  ~VdsoSnapshot();
+
+  VdsoSnapshot(const VdsoSnapshot &other) = delete;
+  VdsoSnapshot &operator=(const VdsoSnapshot &other) = delete;
+  VdsoSnapshot(VdsoSnapshot &&other) noexcept;
+  VdsoSnapshot &operator=(VdsoSnapshot &&other) noexcept;
+
+  void set(FileInfo info);
+
+  [[nodiscard]] bool ready() const;
+  [[nodiscard]] const FileInfo &info() const;
+
+private:
+  void reset();
+
+  FileInfo _info;
+  bool _ready{false};
+};
+
+/**************
  * DSO Header *
  **************/
 /// Keep track of binaries and associate them to address ranges
@@ -112,6 +139,12 @@ public:
 
   /******* MAIN APIS **********/
   explicit DsoHdr(std::string_view path_to_proc = "", int dd_profiling_fd = -1);
+  ~DsoHdr() = default;
+
+  DsoHdr(const DsoHdr &other) = delete;
+  DsoHdr &operator=(const DsoHdr &other) = delete;
+  DsoHdr(DsoHdr &&other) noexcept = default;
+  DsoHdr &operator=(DsoHdr &&other) noexcept = default;
 
   // Add the element check for overlap and remove them
   DsoFindRes insert_erase_overlap(Dso &&dso);
@@ -214,8 +247,14 @@ private:
   FileInfoId_t update_id_from_dso(const Dso &dso);
 
   FileInfoId_t update_id_dd_profiling(const Dso &dso);
+  FileInfoId_t update_id_vdso(const Dso &dso);
 
   FileInfoId_t update_id_from_path(const Dso &dso);
+  FileInfo find_vdso_file_info();
+  bool ensure_vdso_snapshot();
+  std::optional<std::string>
+  remap_host_workspace_path(std::string_view original) const;
+  void init_workspace_remap();
 
   // Unordered map (by pid) of sorted DSOs
   DsoPidMap _pid_map;
@@ -224,10 +263,14 @@ private:
   FileInfoVector _file_info_vector;
   std::string _path_to_proc; // /proc files can be mounted at various places
                              // (whole host profiling)
+  std::string _workspace_host_prefix;
+  std::string _workspace_container_root;
   int _dd_profiling_fd;
   // Assumption is that we have a single version of the dd_profiling library
   // across all PIDs.
   FileInfoId_t _dd_profiling_file_info = k_file_info_undef;
+  VdsoSnapshot _vdso_snapshot;
+  FileInfoId_t _vdso_file_info = k_file_info_undef;
 };
 
 } // namespace ddprof
