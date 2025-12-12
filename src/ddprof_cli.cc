@@ -233,11 +233,13 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
   // Advanced settings
   app.add_option("--switch_user,--switch-user", switch_user,
                  "Run my application with a different user.\n")
-      ->group("Advanced settings");
+      ->group("Advanced settings")
+      ->envname("DD_PROFILING_SWITCH_USER");
   app.add_option("--nice", nice,
                  "Niceness (priority of process) for the profiler.\n"
                  "Higher value means nicer (lower priority).\n")
-      ->group("Advanced settings");
+      ->group("Advanced settings")
+      ->envname("DD_PROFILING_NICE");
 
   // allow configuration files - default is local toml file
   app.set_config("--config", get_default_config_file(),
@@ -263,7 +265,8 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
   app.add_flag("--show_config,--show-config", show_config,
                "Display the configuration.")
       ->default_val(false)
-      ->group("Debug options");
+      ->group("Debug options")
+      ->envname("DD_PROFILING_SHOW_CONFIG");
   //
   app.add_option("--internal_stats,--internal-stats,-b", internal_stats,
                  "Enables statsd metrics for " MYNAME ". Value should point "
@@ -274,7 +277,8 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
 
   app.add_flag("--show_samples,--show-samples", show_samples,
                "Display captured samples as logs.\n")
-      ->group("Debug options");
+      ->group("Debug options")
+      ->envname("DD_PROFILING_SHOW_SAMPLES");
   app.add_flag("--version,-v", version, "Display the profiler's version.\n")
       ->group("Debug options");
   app.add_option("--enable", enable,
@@ -296,6 +300,7 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
              "Period at which the profiler resets it's internal state.\n"
              "The unit is the number of exports (so default is ~4 hours)")
           ->default_val(k_default_worker_period)
+          ->envname("DD_PROFILING_WORKER_PERIOD")
           ->group(""));
 
   extended_options.push_back(
@@ -319,12 +324,14 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       app.add_option("--cpu_affinity,--cpu-affinity", cpu_affinity,
                      "Hexadecimal value of the cpu affinity"
                      " eg: 0xa4")
+          ->envname("DD_PROFILING_CPU_AFFINITY")
           ->group(""));
 
   extended_options.push_back(
       app.add_option("--do_export,--do-export", exporter_input.do_export,
                      "Debug flag to prevent exporting the profiles")
           ->default_val(true)
+          ->envname("DD_PROFILING_DO_EXPORT")
           ->group(""));
   extended_options.push_back(
       app.add_option("--debug_pprof_prefix,--debug-pprof-prefix",
@@ -335,11 +342,13 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
   extended_options.push_back(
       app.add_option("--agentless", exporter_input.agentless,
                      "Allow sending profiles directly to Datadog intake")
+          ->envname("DD_PROFILING_AGENTLESS")
           ->group(""));
   extended_options.push_back(app.add_option("--fault_info,--fault-info",
                                             fault_info,
                                             "Log segfault information")
                                  ->default_val(true)
+                                 ->envname("DD_PROFILING_FAULT_INFO")
                                  ->group(""));
   extended_options.push_back(app.add_flag("--help_extended,--help-extended",
                                           help_extended,
@@ -355,6 +364,7 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
       app.add_option("--pipefd", pipefd_to_library,
                      "Pipe file descriptor to communicate with library that "
                      "spawned the profiler")
+          ->envname("DD_PROFILING_PIPEFD")
           ->group(""));
   extended_options.push_back(
       app.add_option("--stack_sample_size,--stack-sample-size",
@@ -494,7 +504,12 @@ void DDProfCLI::print() const {
   PRINT_NFO("  - host: %s", exporter_input.host.c_str());
   PRINT_NFO("  - port: %s", exporter_input.port.c_str());
   PRINT_NFO("  - do_export: %s", exporter_input.do_export ? "true" : "false");
+  PRINT_NFO("  - agentless: %s", exporter_input.agentless ? "true" : "false");
   PRINT_NFO("  - runtime_id: %s", exporter_input.runtime_id.c_str());
+  if (!exporter_input.debug_pprof_prefix.empty()) {
+    PRINT_NFO("  - debug_pprof_prefix: %s",
+              exporter_input.debug_pprof_prefix.c_str());
+  }
 
   if (!tags.empty()) {
     PRINT_NFO("Tags: %s", tags.c_str());
@@ -530,12 +545,19 @@ void DDProfCLI::print() const {
   if (!preset.empty()) {
     PRINT_NFO("  - preset: %s", preset.c_str());
   }
+  PRINT_NFO("  - inlined_functions: %s", inlined_functions ? "true" : "false");
   PRINT_NFO("Advanced settings:");
   if (!switch_user.empty()) {
     PRINT_NFO("  - switch_user: %s", switch_user.c_str());
   }
   if (nice != -1) {
     PRINT_NFO("  - nice: %d", nice);
+  }
+  if (!socket_path.empty()) {
+    PRINT_NFO("  - socket_path: %s", socket_path.c_str());
+  }
+  if (pipefd_to_library != -1) {
+    PRINT_NFO("  - pipefd_to_library: %d", pipefd_to_library);
   }
   PRINT_NFO("Debug:");
   PRINT_NFO("  - log_level: %s", log_level.c_str());
@@ -550,7 +572,6 @@ void DDProfCLI::print() const {
   if (!enable) {
     PRINT_NFO("  - enable: %s", enable ? "true" : "false");
   }
-  PRINT_NFO("  - inlined_functions: %s", inlined_functions ? "true" : "false");
   if (!cpu_affinity.empty()) {
     PRINT_NFO("  - cpu_affinity: %s", cpu_affinity.c_str());
   }
@@ -559,10 +580,21 @@ void DDProfCLI::print() const {
   }
   PRINT_NFO("  - fault_info: %s", fault_info ? "true" : "false");
 
+  PRINT_NFO("Extended:");
   if (default_stack_sample_size != k_default_perf_stack_sample_size) {
-    PRINT_NFO("Extended:");
     PRINT_NFO("  - stack_sample_size: %u", default_stack_sample_size);
   }
+  PRINT_NFO(
+      "  - initial_loaded_libs_check_delay: %lums",
+      static_cast<unsigned long>(initial_loaded_libs_check_delay.count()));
+  PRINT_NFO("  - loaded_libs_check_interval: %lums",
+            static_cast<unsigned long>(loaded_libs_check_interval.count()));
+  PRINT_NFO("  - remote_symbolization: %s",
+            remote_symbolization ? "true" : "false");
+  PRINT_NFO("  - disable_symbolization: %s",
+            disable_symbolization ? "true" : "false");
+  PRINT_NFO("  - reorder_events: %s", reorder_events ? "true" : "false");
+  PRINT_NFO("  - maximum_pids: %d", maximum_pids);
 }
 
 CommandLineWrapper DDProfCLI::get_user_command_line() const {
