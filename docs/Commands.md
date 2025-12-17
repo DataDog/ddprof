@@ -72,10 +72,11 @@ Profiling settings:
 
 
 Advanced settings:
-  --switch_user,--switch-user TEXT
+  --switch_user,--switch-user TEXT (Env:DD_PROFILING_SWITCH_USER)
                               Run my application with a different user.
                               
-  --nice INT                  Niceness (priority of process) for the profiler.
+  --nice INT (Env:DD_PROFILING_NICE)
+                              Niceness (priority of process) for the profiler.
                               Higher value means nicer (lower priority).
                               
   --config [./ddprof.toml]    A configuration file
@@ -87,12 +88,12 @@ Debug options:
                               One of debug, informational, notice, warn, error.
   -o,--log_mode,--log-mode TEXT [stdout]  (Env:DD_PROFILING_NATIVE_LOG_MODE)
                               One of stdout, stderr, syslog, or disabled.
-  --show_config,--show-config [0] 
+  --show_config,--show-config [0]  (Env:DD_PROFILING_SHOW_CONFIG)
                               Display the configuration.
   -b,--internal_stats,--internal-stats TEXT (Env:DD_PROFILING_INTERNAL_STATS)
                               Enables statsd metrics for ddprof. Value should point to a statsd socket.
                               Example: /var/run/datadog-agent/statsd.sock
-  --show_samples,--show-samples
+  --show_samples,--show-samples (Env:DD_PROFILING_SHOW_SAMPLES)
                               Display captured samples as logs.
                               
   -v,--version                Display the profiler's version.
