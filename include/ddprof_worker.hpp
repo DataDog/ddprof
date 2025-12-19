@@ -11,6 +11,7 @@
 #include "ddres.hpp"
 #include "persistent_worker_state.hpp"
 #include "pevent.hpp"
+#include "sdt_probe.hpp"
 
 namespace ddprof {
 struct DDProfContext;
@@ -24,7 +25,8 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx,
                           std::chrono::steady_clock::time_point now,
                           bool synchronous_export);
 DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
-                                  DDProfContext &ctx);
+                                  DDProfContext &ctx,
+                                  SDTProbeType sdt_probe_type = SDTProbeType::kUnknown);
 
 // Only init unwinding elements
 DDRes worker_library_init(DDProfContext &ctx,

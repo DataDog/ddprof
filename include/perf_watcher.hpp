@@ -98,10 +98,14 @@ enum DDPROF_SAMPLE_TYPES : uint8_t {
 #undef X_ENUM
 
 // Define our own event type on top of perf event types
-enum DDProfTypeId : uint8_t { kDDPROF_TYPE_CUSTOM = PERF_TYPE_MAX + 100 };
+enum DDProfTypeId : uint8_t {
+  kDDPROF_TYPE_CUSTOM = PERF_TYPE_MAX + 100,
+  kDDPROF_TYPE_SDT_UPROBE = PERF_TYPE_MAX + 101,
+};
 
 enum DDProfCustomCountId : uint8_t {
   kDDPROF_COUNT_ALLOCATIONS = 0,
+  kDDPROF_COUNT_ALLOCATIONS_SDT = 1,
 };
 
 // Kernel events are necessary to get a full accounting of CPU
@@ -121,6 +125,9 @@ enum DDProfCustomCountId : uint8_t {
 #endif
 
 #define SKIP_FRAMES {.nb_frames_to_skip = NB_FRAMES_TO_SKIP}
+
+// SDT probes don't add frames to the stack (uprobe fires at probe location)
+#define SDT_NO_SKIP {.nb_frames_to_skip = 0}
 
 // Whereas tracepoints are dynamically configured and can be checked at runtime,
 // we lack the ability to inspect events of type other than TYPE_TRACEPOINT.
@@ -150,7 +157,8 @@ enum DDProfCustomCountId : uint8_t {
   X(sALGN,      "Align. Faults",      PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_ALIGNMENT_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(sEMU,       "Emu. Faults",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_EMULATION_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
   X(sDUM,       "Dummy",              PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_DUMMY,                   1,            DDPROF_PWT_NOCOUNT,     {})                      \
-  X(sALLOC,     "Allocations",        kDDPROF_TYPE_CUSTOM,  kDDPROF_COUNT_ALLOCATIONS,             524288,       DDPROF_PWT_ALLOC_SPACE, SKIP_FRAMES)
+  X(sALLOC,     "Allocations",        kDDPROF_TYPE_CUSTOM,  kDDPROF_COUNT_ALLOCATIONS,             524288,       DDPROF_PWT_ALLOC_SPACE, SKIP_FRAMES)             \
+  X(sALLOC_SDT, "SDT Allocations",   kDDPROF_TYPE_SDT_UPROBE, kDDPROF_COUNT_ALLOCATIONS_SDT,      524288,       DDPROF_PWT_ALLOC_SPACE, SDT_NO_SKIP)
 
 // clang-format on
 

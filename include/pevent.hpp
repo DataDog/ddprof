@@ -7,6 +7,7 @@
 
 #include "ddprof_defs.hpp"
 #include "perf_ringbuffer.hpp"
+#include "sdt_probe.hpp"
 
 #include <sys/types.h>
 
@@ -29,6 +30,8 @@ struct PEvent {
   std::vector<int>
       sub_fds; // perf FDs of other events outputting to the same ring buffer
                // (eg. perf events for other process threads in PID mode)
+  SDTProbeType sdt_probe_type{
+      SDTProbeType::kUnknown}; // Type of SDT probe (for uprobe events)
 };
 
 struct PEventHdr {
