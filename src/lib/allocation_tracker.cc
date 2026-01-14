@@ -3,7 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2021-Present
 // Datadog, Inc.
 
-#include "allocation_tracker.hpp"
+#include "lib/allocation_tracker.hpp"
 
 #include "allocation_event.hpp"
 #include "ddprof_perf_event.hpp"
@@ -23,12 +23,20 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
+#include <thread>
 #include <unistd.h>
 
 namespace ddprof {
 
+namespace {
+// TLS key initialization states
+constexpr int kKeyNotInitialized = 0;
+constexpr int kKeyInitializing = 1;
+constexpr int kKeyInitialized = 2;
+} // namespace
+
 // Static declarations
-pthread_once_t AllocationTracker::_key_once = PTHREAD_ONCE_INIT;
+std::atomic<int> AllocationTracker::_key_init_state{kKeyNotInitialized};
 
 pthread_key_t AllocationTracker::_tl_state_key;
 
@@ -56,7 +64,35 @@ TrackerThreadLocalState *AllocationTracker::get_tl_state() {
   // In shared libraries, TLS access requires a call to tls_get_addr,
   // tls_get_addr can call into malloc, which can create a recursive loop
   // instead we call pthread APIs to control the creation of TLS objects
-  pthread_once(&_key_once, make_key);
+
+  // Thread-safe initialization using atomics (avoids pthread_once ABI issues)
+
+  // Fast path: relaxed load is sufficient since we only care if it's
+  // initialized Once initialized, this value never changes, so no
+  // synchronization needed
+  if (_key_init_state.load(std::memory_order_relaxed) != kKeyInitialized) {
+    // Slow path: need proper synchronization for initialization
+    int expected = kKeyNotInitialized;
+    if (_key_init_state.compare_exchange_strong(expected, kKeyInitializing,
+                                                std::memory_order_acq_rel)) {
+      // We won the race, do the initialization
+      make_key();
+      _key_init_state.store(kKeyInitialized, std::memory_order_release);
+    } else {
+      // Another thread is initializing or already done, wait until complete
+      constexpr int k_max_init_wait_attempts = 100;
+      int attempts = 0;
+      while (_key_init_state.load(std::memory_order_acquire) !=
+             kKeyInitialized) {
+        if (++attempts >= k_max_init_wait_attempts) {
+          return nullptr;
+        }
+        std::this_thread::yield();
+        std::this_thread::sleep_for(std::chrono::microseconds(1));
+      }
+    }
+  }
+
   auto *tl_state = static_cast<TrackerThreadLocalState *>(
       pthread_getspecific(_tl_state_key));
   return tl_state;

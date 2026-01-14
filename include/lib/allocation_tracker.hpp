@@ -160,7 +160,7 @@ private:
 
   // These can not be tied to the internal state of the instance.
   // The creation of the instance depends on this
-  static pthread_once_t _key_once; // ensures we call key creation a single time
+  static std::atomic<int> _key_init_state;
   static pthread_key_t _tl_state_key;
 
   static AllocationTracker *_instance;
