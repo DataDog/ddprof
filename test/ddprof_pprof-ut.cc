@@ -25,10 +25,13 @@ TEST(DDProfPProf, init_profiles) {
   DDProfPProf pprof;
   DDProfContext ctx = {};
   ctx.watchers.push_back(*ewatcher_from_str("sCPU"));
-  DDRes res = pprof_create_profile(&pprof, ctx);
+  ddog_prof_ProfilesDictionaryHandle dict;
+  ddog_prof_ProfilesDictionary_new(&dict);
+  DDRes res = pprof_create_profile(&pprof, ctx, &dict);
   EXPECT_TRUE(IsDDResOK(res));
   res = pprof_free_profile(&pprof);
   EXPECT_TRUE(IsDDResOK(res));
+  ddog_prof_ProfilesDictionary_drop(&dict);
 }
 
 void test_pprof(DDProfPProf *pprofs) {
@@ -65,7 +68,8 @@ TEST(DDProfPProf, aggregate) {
 
   bool ok = watchers_from_str("sCPU", ctx.watchers);
   EXPECT_TRUE(ok);
-  DDRes res = pprof_create_profile(&pprof, ctx);
+  DDRes res = pprof_create_profile(&pprof, ctx,
+                                   symbol_hdr._profiles_dictionary.get());
   EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_index != -1);
   EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_count_index != -1);
   res = pprof_aggregate(&mock_output, symbol_hdr, {1000, 1, 0},
@@ -101,7 +105,8 @@ TEST(DDProfPProf, just_live) {
   log_watcher(&(ctx.watchers[0]), 0);
   log_watcher(&(ctx.watchers[1]), 1);
 
-  DDRes res = pprof_create_profile(&pprof, ctx);
+  DDRes res = pprof_create_profile(&pprof, ctx,
+                                   symbol_hdr._profiles_dictionary.get());
   EXPECT_TRUE(IsDDResOK(res));
   EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_index == -1);
   EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_count_index == -1);

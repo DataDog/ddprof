@@ -17,7 +17,6 @@ class Symbol {
 public:
   Symbol() : _lineno(0) {}
 
-  // Warning : Generates some string copies (these are not rvalues)
   Symbol(std::string symname, std::string demangled_name, uint32_t lineno,
          std::string srcpath)
       : _symname(std::move(symname)),

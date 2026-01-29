@@ -160,7 +160,8 @@ TEST(DDProfExporter, simple) {
     fill_unwind_symbols(table, mapinfo_table, mock_output);
     DDProfContext ctx = {};
     ctx.watchers.push_back(*ewatcher_from_str("sCPU"));
-    res = pprof_create_profile(&pprofs, ctx);
+    res = pprof_create_profile(&pprofs, ctx,
+                                symbol_hdr._profiles_dictionary.get());
     EXPECT_TRUE(IsDDResOK(res));
     res = pprof_aggregate(&mock_output, symbol_hdr, {1000, 1, 0},
                           &ctx.watchers[0], file_infos, false, kSumPos,

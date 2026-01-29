@@ -36,7 +36,8 @@ struct DDProfValuePack {
   uint64_t timestamp;
 };
 
-DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx);
+DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx,
+                           const ddog_prof_ProfilesDictionaryHandle *dict);
 
 /**
  * Aggregate to the existing profile the provided unwinding output.
