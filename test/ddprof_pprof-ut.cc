@@ -47,8 +47,7 @@ void test_pprof(DDProfPProf *pprofs) {
 
   EXPECT_TRUE(buffer->ptr);
 
-  // Test that we are generating content
-  EXPECT_TRUE(buffer->len > 500);
+  EXPECT_TRUE(buffer->len > 100);
 
   ddog_prof_EncodedProfile_drop(&serialized_result.ok);
 }

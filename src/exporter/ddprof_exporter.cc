@@ -263,10 +263,10 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
   ddog_CharSlice const base_url = to_CharSlice(exporter->_url);
   ddog_prof_Endpoint endpoint;
   if (exporter->_agent) {
-    endpoint = ddog_prof_Endpoint_agent(base_url);
+    endpoint = ddog_prof_Endpoint_agent(base_url, k_timeout_ms);
   } else {
     ddog_CharSlice const api_key = to_CharSlice(exporter->_input.api_key);
-    endpoint = ddog_prof_Endpoint_agentless(base_url, api_key);
+    endpoint = ddog_prof_Endpoint_agentless(base_url, api_key, k_timeout_ms);
   }
 
   ddog_prof_ProfileExporter_Result res_exporter = ddog_prof_Exporter_new(
@@ -282,14 +282,6 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failure creating exporter - %.*s",
                            static_cast<int>(res_exporter.err.message.len),
                            res_exporter.err.message.ptr);
-  }
-  auto result =
-      ddog_prof_Exporter_set_timeout(&exporter->_exporter, k_timeout_ms);
-  if (result.tag == DDOG_VOID_RESULT_ERR) {
-    defer { ddog_Error_drop(&result.err); };
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER, "Failure setting timeout - %.*s",
-                           static_cast<int>(result.err.message.len),
-                           result.err.message.ptr);
   }
   return {};
 }
@@ -335,53 +327,34 @@ DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
 
     LG_NTC("[EXPORTER] Export buffer of size %lu", buffer->len);
 
-    // clang-format off
-    ddog_prof_Request_Result res_request =
-        ddog_prof_Exporter_Request_build(&exporter->_exporter,
-                                         encoded_profile,
-                                         ddog_prof_Exporter_Slice_File_empty(), // files_to_compress_and_export
-                                         ddog_prof_Exporter_Slice_File_empty(), // already compressed
-                                         &ffi_additional_tags,                  // optional tags
-                                         nullptr, // internal_metadata_json
-                                         nullptr  // optional_info_json
-                                         );
-    // clang-format on
+    ddog_prof_Result_HttpStatus result = ddog_prof_Exporter_send_blocking(
+        &exporter->_exporter, encoded_profile,
+        ddog_prof_Exporter_Slice_File_empty(), // files_to_compress_and_export
+        &ffi_additional_tags,                  // optional_additional_tags
+        nullptr,                               // optional_process_tags
+        nullptr, // optional_internal_metadata_json
+        nullptr, // optional_info_json
+        nullptr  // cancellation_token
+    );
 
-    if (res_request.tag == DDOG_PROF_REQUEST_RESULT_OK_HANDLE_REQUEST) {
-      ddog_prof_Request request = res_request.ok;
-
-      // dropping the request is not useful if we have a send
-      // however the send will replace the request by null when it takes
-      // ownership
-      defer { ddog_prof_Exporter_Request_drop(&request); };
-
-      ddog_prof_Result_HttpStatus result =
-          ddog_prof_Exporter_send(&exporter->_exporter, &request, nullptr);
-
-      if (result.tag == DDOG_PROF_RESULT_HTTP_STATUS_ERR_HTTP_STATUS) {
-        defer { ddog_Error_drop(&result.err); };
-        LG_WRN("Failure to establish connection, check url %s",
-               exporter->_url.c_str());
-        LG_WRN("Failure to send profiles (%.*s)", (int)result.err.message.len,
-               result.err.message.ptr);
-        // Free error buffer (prefer this API to the free API)
-        if (exporter->_nb_consecutive_errors++ >=
-            k_max_nb_consecutive_errors_allowed) {
-          // this will shut down profiler
-          res = ddres_error(DD_WHAT_EXPORTER);
-        } else {
-          res = ddres_warn(DD_WHAT_EXPORTER);
-        }
+    if (result.tag == DDOG_PROF_RESULT_HTTP_STATUS_ERR_HTTP_STATUS) {
+      defer { ddog_Error_drop(&result.err); };
+      LG_WRN("Failure to establish connection, check url %s",
+             exporter->_url.c_str());
+      LG_WRN("Failure to send profiles (%.*s)", (int)result.err.message.len,
+             result.err.message.ptr);
+      // Free error buffer (prefer this API to the free API)
+      if (exporter->_nb_consecutive_errors++ >=
+          k_max_nb_consecutive_errors_allowed) {
+        // this will shut down profiler
+        res = ddres_error(DD_WHAT_EXPORTER);
       } else {
-        // success establishing connection
-        exporter->_nb_consecutive_errors = 0;
-        res = check_send_response_code(result.ok.code);
+        res = ddres_warn(DD_WHAT_EXPORTER);
       }
     } else {
-      defer { ddog_Error_drop(&res_request.err); };
-      LG_ERR("[EXPORTER] Failure to build request: %s",
-             res_request.err.message.ptr);
-      res = ddres_error(DD_WHAT_EXPORTER);
+      // success establishing connection
+      exporter->_nb_consecutive_errors = 0;
+      res = check_send_response_code(result.ok.code);
     }
   }
   return res;

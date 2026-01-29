@@ -2,10 +2,9 @@
 # License Version 2.0. This product includes software developed at Datadog
 # (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
 
-# libdatadog : common profiler imported libraries
-# https://github.com/DataDog/libdatadog/releases/tag/v7.0.0
+# libdatadog : common profiler imported libraries https://github.com/DataDog/libdatadog/releases
 set(TAG_LIBDATADOG
-    "v19.1.0"
+    "v26.0.0"
     CACHE STRING "libdatadog github tag")
 
 set(Datadog_ROOT ${VENDOR_PATH}/libdatadog-${TAG_LIBDATADOG})
