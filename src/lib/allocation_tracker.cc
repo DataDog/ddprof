@@ -48,6 +48,12 @@ DDPROF_NOINLINE auto sleep_and_retry_reserve(MPSCRingBufferWriter &writer,
   }
   return Buffer{};
 }
+
+void child_after_fork_handler() {
+  // After fork in child, verify the pthread key is still valid.
+  // The key itself survives fork, but we want to ensure it's properly set.
+  AllocationTracker::ensure_key_initialized();
+}
 } // namespace
 
 TrackerThreadLocalState *AllocationTracker::get_tl_state() {
@@ -57,7 +63,7 @@ TrackerThreadLocalState *AllocationTracker::get_tl_state() {
 
   // The pthread key is initialized during allocation_tracking_init() and
   // maintained by the fork handler, so we can directly use it here (hot path)
-  pthread_key_t key = _tl_state_key.load(std::memory_order_relaxed);
+  const pthread_key_t key = _tl_state_key.load(std::memory_order_relaxed);
 
   // In debug builds, verify our assumption
   assert(key != kInvalidKey && "pthread key should be initialized before use");
@@ -98,7 +104,7 @@ void AllocationTracker::delete_tl_state(void *tl_state) {
 
 void AllocationTracker::ensure_key_initialized() {
   // Ensure pthread key is initialized (idempotent)
-  pthread_key_t key = _tl_state_key.load(std::memory_order_acquire);
+  const pthread_key_t key = _tl_state_key.load(std::memory_order_acquire);
 
   if (key == kInvalidKey) {
     pthread_key_t new_key;
@@ -113,12 +119,6 @@ void AllocationTracker::ensure_key_initialized() {
       pthread_key_delete(new_key);
     }
   }
-}
-
-static void child_after_fork_handler() {
-  // After fork in child, verify the pthread key is still valid.
-  // The key itself survives fork, but we want to ensure it's properly set.
-  AllocationTracker::ensure_key_initialized();
 }
 
 void AllocationTracker::register_fork_handler() {
