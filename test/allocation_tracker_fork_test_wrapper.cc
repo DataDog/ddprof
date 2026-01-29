@@ -13,6 +13,10 @@ void *AllocationTracker_get_tl_state(void) {
   return ddprof::AllocationTracker::get_tl_state();
 }
 
+void AllocationTracker_ensure_key_initialized(void) {
+  ddprof::AllocationTracker::ensure_key_initialized();
+}
+
 void *AllocationTracker_init_tl_state(void) {
   return ddprof::AllocationTracker::init_tl_state();
 }

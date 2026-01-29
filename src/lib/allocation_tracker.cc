@@ -28,19 +28,9 @@
 
 namespace ddprof {
 
-namespace {
-// TLS key initialization states
-constexpr int kKeyNotInitialized = 0;
-constexpr int kKeyInitializing = 1;
-constexpr int kKeyInitialized = 2;
-} // namespace
-
-// Static declarations
-std::atomic<int> AllocationTracker::_key_init_state{kKeyNotInitialized};
-
-pthread_key_t AllocationTracker::_tl_state_key;
-
-AllocationTracker *AllocationTracker::_instance;
+AllocationTracker *AllocationTracker::_instance = nullptr;
+std::atomic<pthread_key_t> AllocationTracker::_tl_state_key{
+    AllocationTracker::kInvalidKey};
 
 namespace {
 DDPROF_NOINLINE auto sleep_and_retry_reserve(MPSCRingBufferWriter &writer,
@@ -65,36 +55,15 @@ TrackerThreadLocalState *AllocationTracker::get_tl_state() {
   // tls_get_addr can call into malloc, which can create a recursive loop
   // instead we call pthread APIs to control the creation of TLS objects
 
-  // Thread-safe initialization using atomics (avoids pthread_once ABI issues)
+  // The pthread key is initialized during allocation_tracking_init() and
+  // maintained by the fork handler, so we can directly use it here (hot path)
+  pthread_key_t key = _tl_state_key.load(std::memory_order_relaxed);
 
-  // Fast path: relaxed load is sufficient since we only care if it's
-  // initialized Once initialized, this value never changes, so no
-  // synchronization needed
-  if (_key_init_state.load(std::memory_order_relaxed) != kKeyInitialized) {
-    // Slow path: need proper synchronization for initialization
-    int expected = kKeyNotInitialized;
-    if (_key_init_state.compare_exchange_strong(expected, kKeyInitializing,
-                                                std::memory_order_acq_rel)) {
-      // We won the race, do the initialization
-      make_key();
-      _key_init_state.store(kKeyInitialized, std::memory_order_release);
-    } else {
-      // Another thread is initializing or already done, wait until complete
-      constexpr int k_max_init_wait_attempts = 100;
-      int attempts = 0;
-      while (_key_init_state.load(std::memory_order_acquire) !=
-             kKeyInitialized) {
-        if (++attempts >= k_max_init_wait_attempts) {
-          return nullptr;
-        }
-        std::this_thread::yield();
-        std::this_thread::sleep_for(std::chrono::microseconds(1));
-      }
-    }
-  }
+  // In debug builds, verify our assumption
+  assert(key != kInvalidKey && "pthread key should be initialized before use");
 
-  auto *tl_state = static_cast<TrackerThreadLocalState *>(
-      pthread_getspecific(_tl_state_key));
+  auto *tl_state =
+      static_cast<TrackerThreadLocalState *>(pthread_getspecific(key));
   return tl_state;
 }
 
@@ -127,15 +96,49 @@ void AllocationTracker::delete_tl_state(void *tl_state) {
   delete static_cast<TrackerThreadLocalState *>(tl_state);
 }
 
-void AllocationTracker::make_key() {
-  // delete is called on all key objects
-  pthread_key_create(&_tl_state_key, delete_tl_state);
+void AllocationTracker::ensure_key_initialized() {
+  // Ensure pthread key is initialized (idempotent)
+  pthread_key_t key = _tl_state_key.load(std::memory_order_acquire);
+
+  if (key == kInvalidKey) {
+    pthread_key_t new_key;
+    if (pthread_key_create(&new_key, delete_tl_state) != 0) {
+      return; // Failed, will be retried later
+    }
+
+    pthread_key_t expected = kInvalidKey;
+    if (!_tl_state_key.compare_exchange_strong(expected, new_key,
+                                               std::memory_order_release)) {
+      // Another thread beat us, clean up our key
+      pthread_key_delete(new_key);
+    }
+  }
+}
+
+static void child_after_fork_handler() {
+  // After fork in child, verify the pthread key is still valid.
+  // The key itself survives fork, but we want to ensure it's properly set.
+  AllocationTracker::ensure_key_initialized();
+}
+
+void AllocationTracker::register_fork_handler() {
+  static bool registered = false;
+  if (!registered) {
+    pthread_atfork(nullptr, nullptr, child_after_fork_handler);
+    registered = true;
+  }
 }
 
 DDRes AllocationTracker::allocation_tracking_init(
     uint64_t allocation_profiling_rate, uint32_t flags,
     uint32_t stack_sample_size, const RingBufferInfo &ring_buffer,
     const IntervalTimerCheck &timer_check) {
+  // Register fork handler to ensure key is valid after fork
+  register_fork_handler();
+
+  // Ensure pthread key is initialized before we try to use it
+  ensure_key_initialized();
+
   TrackerThreadLocalState *tl_state = get_tl_state();
   if (!tl_state) {
     // This is the time at which the init_tl_state should not fail

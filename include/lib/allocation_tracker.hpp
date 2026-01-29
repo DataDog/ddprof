@@ -80,6 +80,11 @@ public:
   // can return null (does not init)
   static TrackerThreadLocalState *get_tl_state();
 
+  // Initialize pthread key for TLS (idempotent, fork-safe)
+  static void ensure_key_initialized();
+  // Register pthread_atfork handler (called during init)
+  static void register_fork_handler();
+
 private:
   static constexpr unsigned k_ratio_max_elt_to_bitset_size = 16;
 
@@ -120,8 +125,6 @@ private:
 
   static void delete_tl_state(void *tl_state);
 
-  static void make_key();
-
   void track_allocation(uintptr_t addr, size_t size,
                         TrackerThreadLocalState &tl_state, bool is_large_alloc);
   void track_deallocation(uintptr_t addr, TrackerThreadLocalState &tl_state,
@@ -160,8 +163,8 @@ private:
 
   // These can not be tied to the internal state of the instance.
   // The creation of the instance depends on this
-  static std::atomic<int> _key_init_state;
-  static pthread_key_t _tl_state_key;
+  static constexpr pthread_key_t kInvalidKey = static_cast<pthread_key_t>(-1);
+  static std::atomic<pthread_key_t> _tl_state_key;
 
   static AllocationTracker *_instance;
 };

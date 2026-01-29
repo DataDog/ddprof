@@ -20,6 +20,7 @@ extern "C" {
 
 void *AllocationTracker_get_tl_state(void);
 void *AllocationTracker_init_tl_state(void);
+void AllocationTracker_ensure_key_initialized(void);
 
 #ifdef __cplusplus
 }
@@ -43,9 +44,10 @@ static void *thread_test_func(void *arg) {
 }
 
 int main(void) {
-  // Initialize pthread key and create TLS data in parent
-  void *state_before = AllocationTracker_get_tl_state();
+  // Initialize pthread key before using it
+  AllocationTracker_ensure_key_initialized();
 
+  // Initialize pthread key and create TLS data in parent
   void *parent_state = AllocationTracker_init_tl_state();
   if (parent_state == NULL) {
     fprintf(stderr, "FAIL: Parent init_tl_state() returned NULL\n");
@@ -70,8 +72,6 @@ int main(void) {
 
   if (pid == 0) {
     // Child process - test pthread key works after fork
-    void *child_inherited = AllocationTracker_get_tl_state();
-
     void *child_state = AllocationTracker_init_tl_state();
     if (child_state == NULL) {
       fprintf(stderr, "FAIL: Child init_tl_state() returned NULL\n");
@@ -94,6 +94,7 @@ int main(void) {
 
     pthread_join(thread, NULL);
     if (thread_result != 0) {
+      fprintf(stderr, "FAIL: Thread test failed - new thread TLS not NULL\n");
       _exit(4);
     }
 
@@ -121,11 +122,11 @@ int main(void) {
     if (exit_code == 1)
       reason = "init_tl_state failed";
     else if (exit_code == 2)
-      reason = "pthread key broken";
+      reason = "pthread key broken after fork";
     else if (exit_code == 3)
       reason = "pthread_create failed";
     else if (exit_code == 4)
-      reason = "thread test failed";
+      reason = "new thread TLS not NULL";
     fprintf(stderr, "FAIL: Child exited with code %d (%s)\n", exit_code,
             reason);
     return 1;
