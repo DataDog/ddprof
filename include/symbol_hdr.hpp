@@ -15,11 +15,30 @@
 #include "runtime_symbol_lookup.hpp"
 
 #include <cstdlib>
+#include <memory>
+
+// Forward declarations for libdatadog types (must be at global scope)
+struct ddog_prof_ProfilesDictionary;
+using ddog_prof_ProfilesDictionaryHandle = ddog_prof_ProfilesDictionary *;
 
 namespace ddprof {
+
+struct ProfilesDictionaryDeleter {
+  void operator()(ddog_prof_ProfilesDictionaryHandle *handle) const;
+};
+
+using ProfilesDictionaryPtr =
+    std::unique_ptr<ddog_prof_ProfilesDictionaryHandle,
+                    ProfilesDictionaryDeleter>;
+
 struct SymbolHdr {
-  explicit SymbolHdr(std::string_view path_to_proc = "")
-      : _runtime_symbol_lookup(path_to_proc) {}
+  explicit SymbolHdr(std::string_view path_to_proc = "");
+  ~SymbolHdr() = default;
+
+  SymbolHdr(const SymbolHdr &) = delete;
+  SymbolHdr &operator=(const SymbolHdr &) = delete;
+  SymbolHdr(SymbolHdr &&) noexcept = default;
+  SymbolHdr &operator=(SymbolHdr &&) noexcept = default;
   void display_stats() const { _dso_symbol_lookup.stats_display(); }
   void cycle() { _runtime_symbol_lookup.cycle(); }
 
@@ -44,6 +63,9 @@ struct SymbolHdr {
 
   // The mapping table
   MapInfoTable _mapinfo_table;
+
+  // String interning dictionary (persists across profile exports)
+  ProfilesDictionaryPtr _profiles_dictionary;
 };
 
 } // namespace ddprof

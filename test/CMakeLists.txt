@@ -196,6 +196,7 @@ add_unit_test(
   ../src/ddog_profiling_utils.cc
   ../src/ddprof_cmdline_watcher.cc
   ../src/pprof/ddprof_pprof.cc
+  ../src/symbol_hdr.cc
   ../src/symbolizer.cc
   ../src/demangler/demangler.cc
   ../src/perf_watcher.cc
@@ -209,6 +210,7 @@ add_unit_test(
   ../src/exporter/ddprof_exporter.cc
   ../src/pprof/ddprof_pprof.cc
   ../src/perf_watcher.cc
+  ../src/symbol_hdr.cc
   ../src/symbolizer.cc
   ../src/demangler/demangler.cc
   ../src/tags.cc
@@ -266,6 +268,7 @@ add_unit_test(
   ../src/mapinfo_lookup.cc
   ../src/procutils.cc
   ../src/runtime_symbol_lookup.cc
+  ../src/symbol_hdr.cc
   ../src/symbol_map.cc
   ../src/signal_helper.cc
   ../src/statsd.cc
@@ -313,6 +316,7 @@ set(ALLOCATION_TRACKER_UT_SRCS
     ../src/mapinfo_lookup.cc
     ../src/procutils.cc
     ../src/runtime_symbol_lookup.cc
+    ../src/symbol_hdr.cc
     ../src/symbol_map.cc
     ../src/signal_helper.cc
     ../src/statsd.cc

@@ -388,7 +388,8 @@ DDRes process_symbolization(
 
 } // namespace
 
-DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
+DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx,
+                           const ddog_prof_ProfilesDictionaryHandle *dict) {
   size_t const num_watchers = ctx.watchers.size();
 
   ActiveIdsResult active_ids = {};
@@ -463,15 +464,16 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
         .value = default_period,
     };
   }
-  auto prof_res = ddog_prof_Profile_new(
-      sample_types,
+
+  ddog_prof_Status status = ddog_prof_Profile_with_dictionary(
+      &pprof->_profile, dict, sample_types,
       pprof_values.get_num_sample_type_ids() > 0 ? &period : nullptr);
 
-  if (prof_res.tag != DDOG_PROF_PROFILE_NEW_RESULT_OK) {
-    ddog_Error_drop(&prof_res.err);
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to create new profile");
+  if (status.err != nullptr) {
+    defer { ddog_prof_Status_drop(&status); };
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to create new profile: %s",
+                           status.err);
   }
-  pprof->_profile = prof_res.ok;
 
   // Add relevant tags
   {

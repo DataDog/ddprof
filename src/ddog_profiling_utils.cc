@@ -27,7 +27,6 @@ std::string_view get_or_insert_demangled_sym(
 
 void write_function(const Symbol &symbol, ddog_prof_Function *ffi_func) {
   ffi_func->name = to_CharSlice(symbol._demangled_name);
-  // We can also send symbol._symname if useful
   ffi_func->system_name = {.ptr = nullptr, .len = 0};
   ffi_func->filename = to_CharSlice(symbol._srcpath);
 }

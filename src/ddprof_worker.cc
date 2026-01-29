@@ -710,8 +710,12 @@ DDRes ddprof_worker_init(DDProfContext &ctx,
     DDRES_CHECK_FWD(
         ddprof_exporter_new(ctx.worker_ctx.user_tags, ctx.worker_ctx.exp[1]));
 
-    DDRES_CHECK_FWD(pprof_create_profile(ctx.worker_ctx.pprof[0], ctx));
-    DDRES_CHECK_FWD(pprof_create_profile(ctx.worker_ctx.pprof[1], ctx));
+    DDRES_CHECK_FWD(pprof_create_profile(
+        ctx.worker_ctx.pprof[0], ctx,
+        ctx.worker_ctx.us->symbol_hdr._profiles_dictionary.get()));
+    DDRES_CHECK_FWD(pprof_create_profile(
+        ctx.worker_ctx.pprof[1], ctx,
+        ctx.worker_ctx.us->symbol_hdr._profiles_dictionary.get()));
     DDRES_CHECK_FWD(worker_init_stats(&ctx.worker_ctx));
   }
   CatchExcept2DDRes();
