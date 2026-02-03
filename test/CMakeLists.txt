@@ -359,11 +359,16 @@ add_unit_test(timer-ut timer-ut.cc ../src/tsc_clock.cc ../src/perf.cc)
 
 add_unit_test(ddprof_file_info-ut ddprof_file_info-ut.cc)
 
-add_unit_test(runtime_symbol_lookup-ut runtime_symbol_lookup-ut.cc ../src/runtime_symbol_lookup.cc
-              ../src/ddog_profiling_utils.cc ../src/symbol_hdr.cc
-              ../src/demangler/demangler.cc ../src/symbol_map.cc
-              ../src/jit/jitdump.cc
-              LIBRARIES Datadog::Profiling llvm-demangle)
+add_unit_test(
+  runtime_symbol_lookup-ut
+  runtime_symbol_lookup-ut.cc
+  ../src/runtime_symbol_lookup.cc
+  ../src/ddog_profiling_utils.cc
+  ../src/symbol_hdr.cc
+  ../src/demangler/demangler.cc
+  ../src/symbol_map.cc
+  ../src/jit/jitdump.cc
+  LIBRARIES Datadog::Profiling llvm-demangle)
 
 add_unit_test(ddprof_cpumask-ut ddprof_cpumask-ut.cc ../src/ddprof_cpumask.cc)
 

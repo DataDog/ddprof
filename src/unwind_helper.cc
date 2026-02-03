@@ -53,8 +53,9 @@ void add_common_frame(UnwindState *us, SymbolErrors lookup_case) {
   const ddog_prof_ProfilesDictionary *dict =
       us->symbol_hdr.profiles_dictionary();
   add_frame_without_mapping(
-      us, us->symbol_hdr._common_symbol_lookup.get_or_insert(
-              lookup_case, us->symbol_hdr._symbol_table, dict));
+      us,
+      us->symbol_hdr._common_symbol_lookup.get_or_insert(
+          lookup_case, us->symbol_hdr._symbol_table, dict));
 }
 
 void add_dso_frame(UnwindState *us, const Dso &dso,

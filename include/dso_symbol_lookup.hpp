@@ -31,9 +31,9 @@ public:
 private:
   size_t get_size() const;
 
-  SymbolIdx_t get_or_insert_unhandled_type(
-      const Dso &dso, SymbolTable &symbol_table,
-      const ddog_prof_ProfilesDictionary *dict);
+  SymbolIdx_t
+  get_or_insert_unhandled_type(const Dso &dso, SymbolTable &symbol_table,
+                               const ddog_prof_ProfilesDictionary *dict);
   // map of maps --> the aim is to monitor usage of some maps and clear them
   // together
   // TODO : find efficient clear on symbol table before we do this

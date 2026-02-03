@@ -15,8 +15,7 @@ namespace ddprof {
 class BaseFrameSymbolLookup {
 public:
   SymbolIdx_t get_or_insert(pid_t pid, SymbolTable &symbol_table,
-                            DsoSymbolLookup &dso_symbol_lookup,
-                            DsoHdr &dso_hdr,
+                            DsoSymbolLookup &dso_symbol_lookup, DsoHdr &dso_hdr,
                             const ddog_prof_ProfilesDictionary *dict);
 
   // Erase symbol lookup for this pid (warning symbols still exist)

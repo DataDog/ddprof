@@ -20,8 +20,8 @@ namespace {
 
 Symbol symbol_from_unhandled_dso(const Dso &dso,
                                  const ddog_prof_ProfilesDictionary *dict) {
-  return make_symbol(std::string(), std::string(), 0,
-                     dso_type_str(dso._type), dict);
+  return make_symbol(std::string(), std::string(), 0, dso_type_str(dso._type),
+                     dict);
 }
 
 Symbol symbol_from_dso(ElfAddress_t normalized_addr, const Dso &dso,

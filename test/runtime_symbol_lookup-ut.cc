@@ -38,9 +38,8 @@ TEST(runtime_symbol_lookup, no_map) {
   RuntimeSymbolLookup runtime_symbol_lookup(UNIT_TEST_DATA);
   ProcessAddress_t pc = 0x7FB0614BB980;
   // no pid 43
-  SymbolIdx_t symbol_idx =
-      runtime_symbol_lookup.get_or_insert(43, pc, symbol_table,
-                                          symbol_hdr.profiles_dictionary());
+  SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert(
+      43, pc, symbol_table, symbol_hdr.profiles_dictionary());
   // We expect no symbols to be found for this pid
   ASSERT_EQ(symbol_idx, -1);
 }
@@ -51,12 +50,12 @@ TEST(runtime_symbol_lookup, parse_map) {
   RuntimeSymbolLookup runtime_symbol_lookup(UNIT_TEST_DATA);
   // reads a file with symbols generated from .NET
   ProcessAddress_t pc = 0x7FB0614BB980;
-  SymbolIdx_t symbol_idx =
-      runtime_symbol_lookup.get_or_insert(42, pc, symbol_table,
-                                          symbol_hdr.profiles_dictionary());
+  SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert(
+      42, pc, symbol_table, symbol_hdr.profiles_dictionary());
   ASSERT_NE(symbol_idx, -1);
-  const std::string sym_name = dict_string(symbol_hdr.profiles_dictionary(),
-                                           symbol_table[symbol_idx]._name_id);
+  const std::string sym_name =
+      dict_string(symbol_hdr.profiles_dictionary(),
+                  symbol_table[symbol_idx]._function_id->name);
   ASSERT_TRUE(sym_name.find("RuntimeEnvironmentInfo::get_OsPlatform") !=
               std::string::npos);
 }
@@ -68,20 +67,19 @@ TEST(runtime_symbol_lookup, overflow) {
   // reads a file with symbols generated from .NET
   {
     ProcessAddress_t pc = 0x00007FB06149E6A0;
-    SymbolIdx_t symbol_idx =
-        runtime_symbol_lookup.get_or_insert(1, pc, symbol_table,
-                                            symbol_hdr.profiles_dictionary());
+    SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert(
+        1, pc, symbol_table, symbol_hdr.profiles_dictionary());
     ASSERT_NE(symbol_idx, -1);
-    const std::string sym_name = dict_string(symbol_hdr.profiles_dictionary(),
-                                             symbol_table[symbol_idx]._name_id);
+    const std::string sym_name =
+        dict_string(symbol_hdr.profiles_dictionary(),
+                    symbol_table[symbol_idx]._function_id->name);
     LG_NFO("%s", sym_name.c_str());
     ASSERT_TRUE(sym_name.size() <= 300);
   }
   {
     ProcessAddress_t pc = 0xFFFFFFFFFFFFFFFE;
-    SymbolIdx_t symbol_idx =
-        runtime_symbol_lookup.get_or_insert(1, pc, symbol_table,
-                                            symbol_hdr.profiles_dictionary());
+    SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert(
+        1, pc, symbol_table, symbol_hdr.profiles_dictionary());
     ASSERT_EQ(symbol_idx, -1);
   }
 }
@@ -97,8 +95,9 @@ TEST(runtime_symbol_lookup, jitdump_simple) {
   SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
       mypid, pc, symbol_table, symbol_hdr.profiles_dictionary(), jit_path);
   ASSERT_NE(symbol_idx, -1);
-  const std::string sym_name = dict_string(symbol_hdr.profiles_dictionary(),
-                                           symbol_table[symbol_idx]._name_id);
+  const std::string sym_name =
+      dict_string(symbol_hdr.profiles_dictionary(),
+                  symbol_table[symbol_idx]._function_id->name);
   ASSERT_EQ(std::string("julia_b_11"), sym_name);
 }
 
@@ -174,8 +173,9 @@ TEST(runtime_symbol_lookup, relative_path) {
   SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
       42, pc, symbol_table, symbol_hdr.profiles_dictionary(), jit_path);
   ASSERT_NE(symbol_idx, -1);
-  const std::string sym_name = dict_string(symbol_hdr.profiles_dictionary(),
-                                           symbol_table[symbol_idx]._name_id);
+  const std::string sym_name =
+      dict_string(symbol_hdr.profiles_dictionary(),
+                  symbol_table[symbol_idx]._function_id->name);
   EXPECT_EQ(sym_name, "julia_b_11");
   {
     RuntimeSymbolLookup::Stats stats = runtime_symbol_lookup.get_stats();
@@ -203,8 +203,9 @@ TEST(runtime_symbol_lookup, jitdump_vs_perfmap) {
   SymbolIdx_t symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
       mypid, pc, symbol_table, symbol_hdr.profiles_dictionary(), jit_path);
   ASSERT_NE(symbol_idx, -1);
-  const std::string sym_name = dict_string(symbol_hdr.profiles_dictionary(),
-                                           symbol_table[symbol_idx]._name_id);
+  const std::string sym_name =
+      dict_string(symbol_hdr.profiles_dictionary(),
+                  symbol_table[symbol_idx]._function_id->name);
   EXPECT_EQ(sym_name, expected_sym);
   {
     RuntimeSymbolLookup::Stats stats = runtime_symbol_lookup.get_stats();
@@ -219,7 +220,7 @@ TEST(runtime_symbol_lookup, jitdump_vs_perfmap) {
   ASSERT_NE(symbol_idx, -1);
   const std::string sym_name_perfmap =
       dict_string(symbol_hdr.profiles_dictionary(),
-                  symbol_table_perfmap[symbol_idx]._name_id);
+                  symbol_table_perfmap[symbol_idx]._function_id->name);
   EXPECT_EQ(sym_name_perfmap, expected_sym);
   {
     RuntimeSymbolLookup::Stats stats =

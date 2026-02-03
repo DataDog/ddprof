@@ -30,9 +30,9 @@ static inline void
 fill_symbol_table_1(SymbolTable &symbol_table,
                     const ddog_prof_ProfilesDictionary *dict) {
   for (unsigned i = 0; i < K_MOCK_LOC_SIZE; ++i) {
-    symbol_table.emplace_back(make_symbol(
-        std::string(s_syn_names[i]), std::string(s_func_names[i]), 10 * i,
-        std::string(s_src_paths[i]), dict));
+    symbol_table.emplace_back(make_symbol(std::string(s_syn_names[i]),
+                                          std::string(s_func_names[i]), 10 * i,
+                                          std::string(s_src_paths[i]), dict));
   }
 }
 
@@ -42,7 +42,8 @@ fill_mapinfo_table_1(MapInfoTable &mapinfo_table,
   for (unsigned i = 0; i < K_MOCK_LOC_SIZE; ++i) {
     mapinfo_table.emplace_back(100 + i, 200 + i, 10 + i,
                                std::string{s_so_paths[0]}, BuildIdStr{});
-    mapinfo_table.back()._mapping_id = intern_mapping(dict, mapinfo_table.back());
+    mapinfo_table.back()._mapping_id =
+        intern_mapping(dict, mapinfo_table.back());
   }
 }
 
@@ -58,10 +59,10 @@ static inline void fill_unwind_output_1(UnwindOutput &uw_output) {
   }
 }
 
-static inline void fill_unwind_symbols(SymbolTable &symbol_table,
-                                       MapInfoTable &mapinfo_table,
-                                       UnwindOutput &uw_output,
-                                       const ddog_prof_ProfilesDictionary *dict) {
+static inline void
+fill_unwind_symbols(SymbolTable &symbol_table, MapInfoTable &mapinfo_table,
+                    UnwindOutput &uw_output,
+                    const ddog_prof_ProfilesDictionary *dict) {
   fill_symbol_table_1(symbol_table, dict);
   fill_mapinfo_table_1(mapinfo_table, dict);
   fill_unwind_output_1(uw_output);

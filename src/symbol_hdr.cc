@@ -32,4 +32,3 @@ SymbolHdr::SymbolHdr(std::string_view path_to_proc)
 }
 
 } // namespace ddprof
-
