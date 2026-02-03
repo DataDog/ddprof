@@ -11,7 +11,6 @@
 #include "ddprof_defs.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
-#include "hash_helper.hpp"
 #include "pevent_lib.hpp"
 #include "symbol_hdr.hpp"
 #include "symbolizer.hpp"
@@ -30,16 +29,6 @@
 using namespace std::string_view_literals;
 
 namespace ddprof {
-
-size_t DDProfPProf::LabelKeyPairHash::operator()(
-    const DDProfPProf::LabelKeyPair &pair) const noexcept {
-  size_t seed = 0;
-  hash_combine(seed, pair.key.generation.id);
-  hash_combine(seed, pair.key.id.offset);
-  hash_combine(seed, pair.value.generation.id);
-  hash_combine(seed, pair.value.id.offset);
-  return seed;
-}
 
 namespace {
 constexpr size_t k_max_pprof_labels{8};
@@ -62,214 +51,58 @@ struct ActiveIdsResult {
 std::string_view pid_str(pid_t pid,
                          std::unordered_map<pid_t, std::string> &pid_strs);
 
-std::string_view to_string_view(ddog_CharSlice slice) {
-  if (!slice.ptr || slice.len == 0) {
-    return {};
-  }
-  return {slice.ptr, slice.len};
+void init_dict_label_key_ids(DDProfPProf::DictLabelKeyIds &label_keys,
+                             const ddog_prof_ProfilesDictionary *dict) {
+  label_keys.container_id = intern_string(dict, k_container_id_label);
+  label_keys.process_id = intern_string(dict, k_process_id_label);
+  label_keys.process_name = intern_string(dict, k_process_name_label);
+  label_keys.thread_id = intern_string(dict, k_thread_id_label);
+  label_keys.thread_name = intern_string(dict, k_thread_name_label);
+  label_keys.tracepoint_type = intern_string(dict, k_tracepoint_label);
 }
 
-ddog_prof_StringId intern_profile_string(ddog_prof_Profile *profile,
-                                         std::string_view value) {
-  if (value.empty()) {
-    return ddog_prof_Profile_interned_empty_string();
-  }
-  ddog_prof_StringId_Result res =
-      ddog_prof_Profile_intern_string(profile, to_CharSlice(value));
-  if (res.tag != DDOG_PROF_STRING_ID_RESULT_OK_GENERATIONAL_ID_STRING_ID) {
-    ddog_Error_drop(&res.err);
-    return ddog_prof_Profile_interned_empty_string();
-  }
-  return res.ok;
-}
-
-void reset_label_caches(DDProfPProf *pprof) {
-  pprof->_pid_string_ids.clear();
-  pprof->_label_value_ids.clear();
-  pprof->_label_id_cache.clear();
-  pprof->_label_key_ids = {};
-}
-
-void init_label_key_ids(DDProfPProf *pprof) {
-  if (pprof->_label_key_ids.initialized) {
-    return;
-  }
-  ddog_prof_Profile *profile = &pprof->_profile;
-  pprof->_label_key_ids.container_id =
-      intern_profile_string(profile, k_container_id_label);
-  pprof->_label_key_ids.process_id =
-      intern_profile_string(profile, k_process_id_label);
-  pprof->_label_key_ids.process_name =
-      intern_profile_string(profile, k_process_name_label);
-  pprof->_label_key_ids.thread_id =
-      intern_profile_string(profile, k_thread_id_label);
-  pprof->_label_key_ids.thread_name =
-      intern_profile_string(profile, k_thread_name_label);
-  pprof->_label_key_ids.tracepoint_type =
-      intern_profile_string(profile, k_tracepoint_label);
-  pprof->_label_key_ids.initialized = true;
-}
-
-ddog_prof_StringId cached_label_value_id(DDProfPProf *pprof,
-                                         ddog_prof_Profile *profile,
-                                         std::string_view value) {
-  if (value.empty()) {
-    return ddog_prof_Profile_interned_empty_string();
-  }
-  auto it = pprof->_label_value_ids.find(value);
-  if (it != pprof->_label_value_ids.end()) {
-    return it->second;
-  }
-  ddog_prof_StringId id = intern_profile_string(profile, value);
-  pprof->_label_value_ids.emplace(std::string(value), id);
-  return id;
-}
-
-ddog_prof_StringId cached_pid_string_id(DDProfPProf *pprof,
-                                        ddog_prof_Profile *profile, pid_t pid) {
-  auto it = pprof->_pid_string_ids.find(pid);
-  if (it != pprof->_pid_string_ids.end()) {
-    return it->second;
-  }
-  const std::string_view pid_value = pid_str(pid, pprof->_pid_str);
-  ddog_prof_StringId id = intern_profile_string(profile, pid_value);
-  pprof->_pid_string_ids.emplace(pid, id);
-  return id;
-}
-
-DDRes get_label_id(DDProfPProf *pprof, ddog_prof_Profile *profile,
-                   ddog_prof_StringId key_id, ddog_prof_StringId value_id,
-                   ddog_prof_LabelId *label_id) {
-  const DDProfPProf::LabelKeyPair pair{key_id, value_id};
-  auto it = pprof->_label_id_cache.find(pair);
-  if (it != pprof->_label_id_cache.end()) {
-    *label_id = it->second;
-    return {};
-  }
-  ddog_prof_LabelId_Result label_res =
-      ddog_prof_Profile_intern_label_str(profile, key_id, value_id);
-  if (label_res.tag != DDOG_PROF_LABEL_ID_RESULT_OK_GENERATIONAL_ID_LABEL_ID) {
-    ddog_Error_drop(&label_res.err);
-    return ddres_error(DD_WHAT_PPROF);
-  }
-  *label_id = label_res.ok;
-  pprof->_label_id_cache.emplace(pair, label_res.ok);
-  return {};
-}
-
-DDRes intern_profile_labelset(
-    ddog_prof_Profile *profile, DDProfPProf *pprof,
-    const UnwindOutput &uw_output, const PerfWatcher &watcher,
-    ddog_prof_LabelSetId *labelset_id) {
-  std::array<ddog_prof_LabelId, k_max_pprof_labels> labels{};
+size_t prepare_labels2(const UnwindOutput &uw_output, const PerfWatcher &watcher,
+                       std::unordered_map<pid_t, std::string> &pid_strs,
+                       const DDProfPProf::DictLabelKeyIds &label_keys,
+                       std::span<ddog_prof_Label2> labels) {
   size_t labels_num = 0;
 
-  auto push_label_ids = [&](ddog_prof_StringId key_id,
-                            ddog_prof_StringId value_id) -> DDRes {
-    ddog_prof_LabelId label_id{};
-    DDRES_CHECK_FWD(get_label_id(pprof, profile, key_id, value_id, &label_id));
-    labels[labels_num++] = label_id;
-    return {};
+  auto push_label = [&](ddog_prof_StringId2 key_id, std::string_view value) {
+    labels[labels_num++] = {
+        .key = key_id,
+        .str = to_CharSlice(value),
+        .num = 0,
+        .num_unit = {.ptr = nullptr, .len = 0},
+    };
   };
 
   if (!uw_output.container_id.empty()) {
-    DDRES_CHECK_FWD(
-        push_label_ids(pprof->_label_key_ids.container_id,
-                       cached_label_value_id(pprof, profile,
-                                            uw_output.container_id)));
+    push_label(label_keys.container_id, uw_output.container_id);
   }
 
   if (!watcher.suppress_pid || !watcher.suppress_tid) {
-    DDRES_CHECK_FWD(
-        push_label_ids(pprof->_label_key_ids.process_id,
-                       cached_pid_string_id(pprof, profile, uw_output.pid)));
+    push_label(label_keys.process_id, pid_str(uw_output.pid, pid_strs));
   }
   if (!watcher.suppress_tid) {
-    DDRES_CHECK_FWD(
-        push_label_ids(pprof->_label_key_ids.thread_id,
-                       cached_pid_string_id(pprof, profile, uw_output.tid)));
+    push_label(label_keys.thread_id, pid_str(uw_output.tid, pid_strs));
   }
   if (watcher_has_tracepoint(&watcher)) {
     if (!watcher.tracepoint_label.empty()) {
-      DDRES_CHECK_FWD(
-          push_label_ids(pprof->_label_key_ids.tracepoint_type,
-                         cached_label_value_id(pprof, profile,
-                                               watcher.tracepoint_label)));
+      push_label(label_keys.tracepoint_type, watcher.tracepoint_label);
     } else {
-      DDRES_CHECK_FWD(
-          push_label_ids(pprof->_label_key_ids.tracepoint_type,
-                         cached_label_value_id(pprof, profile,
-                                               watcher.tracepoint_event)));
+      push_label(label_keys.tracepoint_type, watcher.tracepoint_event);
     }
   }
   if (!uw_output.exe_name.empty()) {
-    DDRES_CHECK_FWD(
-        push_label_ids(pprof->_label_key_ids.process_name,
-                       cached_label_value_id(pprof, profile,
-                                            uw_output.exe_name)));
+    push_label(label_keys.process_name, uw_output.exe_name);
   }
   if (!uw_output.thread_name.empty()) {
-    DDRES_CHECK_FWD(
-        push_label_ids(pprof->_label_key_ids.thread_name,
-                       cached_label_value_id(pprof, profile,
-                                            uw_output.thread_name)));
+    push_label(label_keys.thread_name, uw_output.thread_name);
   }
 
   DDPROF_DCHECK_FATAL(labels_num <= labels.size(),
                       "pprof_aggregate - label buffer exceeded");
-  ddog_prof_LabelSetId_Result labelset_res = ddog_prof_Profile_intern_labelset(
-      profile,
-      {.ptr = labels.data(), .len = static_cast<uintptr_t>(labels_num)});
-  if (labelset_res.tag !=
-      DDOG_PROF_LABEL_SET_ID_RESULT_OK_GENERATIONAL_ID_LABEL_SET_ID) {
-    ddog_Error_drop(&labelset_res.err);
-    return ddres_error(DD_WHAT_PPROF);
-  }
-  *labelset_id = labelset_res.ok;
-  return {};
-}
-
-DDRes intern_profile_location_id(ddog_prof_Profile *profile,
-                                 const ddog_prof_Location &location,
-                                 ddog_prof_LocationId *location_id) {
-  ddog_prof_StringId fn_name =
-      intern_profile_string(profile, to_string_view(location.function.name));
-  ddog_prof_StringId fn_system = intern_profile_string(
-      profile, to_string_view(location.function.system_name));
-  ddog_prof_StringId fn_file =
-      intern_profile_string(profile, to_string_view(location.function.filename));
-  ddog_prof_FunctionId_Result function_res =
-      ddog_prof_Profile_intern_function(profile, fn_name, fn_system, fn_file);
-  if (function_res.tag !=
-      DDOG_PROF_FUNCTION_ID_RESULT_OK_GENERATIONAL_ID_FUNCTION_ID) {
-    ddog_Error_drop(&function_res.err);
-    return ddres_error(DD_WHAT_PPROF);
-  }
-
-  ddog_prof_StringId map_filename =
-      intern_profile_string(profile, to_string_view(location.mapping.filename));
-  ddog_prof_StringId map_build_id =
-      intern_profile_string(profile, to_string_view(location.mapping.build_id));
-  ddog_prof_MappingId_Result mapping_res = ddog_prof_Profile_intern_mapping(
-      profile, location.mapping.memory_start, location.mapping.memory_limit,
-      location.mapping.file_offset, map_filename, map_build_id);
-  if (mapping_res.tag !=
-      DDOG_PROF_MAPPING_ID_RESULT_OK_GENERATIONAL_ID_MAPPING_ID) {
-    ddog_Error_drop(&mapping_res.err);
-    return ddres_error(DD_WHAT_PPROF);
-  }
-
-  ddog_prof_LocationId_Result loc_res =
-      ddog_prof_Profile_intern_location_with_mapping_id(
-          profile, mapping_res.ok, function_res.ok, location.address,
-          location.line);
-  if (loc_res.tag !=
-      DDOG_PROF_LOCATION_ID_RESULT_OK_GENERATIONAL_ID_LOCATION_ID) {
-    ddog_Error_drop(&loc_res.err);
-    return ddres_error(DD_WHAT_PPROF);
-  }
-  *location_id = loc_res.ok;
-  return {};
+  return labels_num;
 }
 
 std::string_view pid_str(pid_t pid,
@@ -671,8 +504,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx,
                            status.err);
   }
 
-  reset_label_caches(pprof);
-  init_label_key_ids(pprof);
+  init_dict_label_key_ids(pprof->_dict_label_key_ids, *dict);
 
   // Add relevant tags
   {
@@ -708,11 +540,9 @@ DDRes pprof_free_profile(DDProfPProf *pprof) {
   pprof->_profile = {};
   pprof->_nb_values = 0;
   pprof->_pid_str.clear();
-  reset_label_caches(pprof);
   return {};
 }
 
-// Assumption of API is that sample is valid in a single type
 DDRes pprof_reset(DDProfPProf *pprof) {
   auto res = ddog_prof_Profile_reset(&pprof->_profile);
   if (res.tag != DDOG_PROF_PROFILE_RESULT_OK) {
@@ -722,8 +552,6 @@ DDRes pprof_reset(DDProfPProf *pprof) {
                            static_cast<int>(msg.len), msg.ptr);
   }
   pprof->_pid_str.clear();
-  reset_label_caches(pprof);
-  init_label_key_ids(pprof);
   return {};
 }
 
@@ -755,24 +583,10 @@ DDRes pprof_aggregate_interned_sample(
       symbol_hdr.profiles_dictionary(), locations_buff, locations2_buff,
       session_results, write_index));
 
-  ddog_prof_LabelSetId labelset_id{};
-  DDRES_CHECK_FWD(intern_profile_labelset(profile, pprof, *uw_output, *watcher,
-                                          &labelset_id));
-
-  std::array<ddog_prof_LocationId, kMaxStackDepth> location_ids{};
-  for (unsigned i = 0; i < write_index; ++i) {
-    DDRES_CHECK_FWD(
-        intern_profile_location_id(profile, locations_buff[i],
-                                   &location_ids[i]));
-  }
-  ddog_prof_StackTraceId_Result stacktrace_res =
-      ddog_prof_Profile_intern_stacktrace(
-          profile, {.ptr = location_ids.data(), .len = write_index});
-  if (stacktrace_res.tag !=
-      DDOG_PROF_STACK_TRACE_ID_RESULT_OK_GENERATIONAL_ID_STACK_TRACE_ID) {
-    ddog_Error_drop(&stacktrace_res.err);
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to intern stacktrace");
-  }
+  std::array<ddog_prof_Label2, k_max_pprof_labels> labels{};
+  const size_t labels_num =
+      prepare_labels2(*uw_output, *watcher, pprof->_pid_str,
+                      pprof->_dict_label_key_ids, std::span{labels});
 
   if (show_samples) {
     ddprof_print_sample(std::span{locations_buff.data(), write_index},
@@ -780,12 +594,16 @@ DDRes pprof_aggregate_interned_sample(
                         *watcher);
   }
 
-  ddog_VoidResult res = ddog_prof_Profile_intern_sample(
-      profile, stacktrace_res.ok, {.ptr = values, .len = pprof->_nb_values},
-      labelset_id, pack.timestamp);
-  if (res.tag != DDOG_VOID_RESULT_OK) {
-    ddog_Error_drop(&res.err);
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile");
+  ddog_prof_Sample2 const sample = {
+      .locations = {.ptr = locations2_buff.data(), .len = write_index},
+      .values = {.ptr = values, .len = pprof->_nb_values},
+      .labels = {.ptr = labels.data(), .len = labels_num},
+  };
+
+  ddog_prof_Status res = ddog_prof_Profile_add2(profile, sample, pack.timestamp);
+  if (res.err != nullptr) {
+    defer { ddog_prof_Status_drop(&res); };
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile: %s", res.err);
   }
   return {};
 }

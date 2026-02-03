@@ -53,6 +53,11 @@ struct SymbolHdr {
     _runtime_symbol_lookup.erase(pid);
   }
 
+  // String interning dictionary (persists across profile exports)
+  // MUST be declared first so it is destroyed last - Symbol and MapInfo
+  // objects store pointers into this dictionary.
+  ProfilesDictionaryPtr _profiles_dictionary;
+
   // Cache symbol associations
   BaseFrameSymbolLookup _base_frame_symbol_lookup;
   CommonSymbolLookup _common_symbol_lookup;
@@ -67,9 +72,6 @@ struct SymbolHdr {
 
   // The mapping table
   MapInfoTable _mapinfo_table;
-
-  // String interning dictionary (persists across profile exports)
-  ProfilesDictionaryPtr _profiles_dictionary;
 };
 
 } // namespace ddprof

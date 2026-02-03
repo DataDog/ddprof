@@ -22,23 +22,15 @@ class Symbolizer;
 struct SymbolHdr;
 
 struct DDProfPProf {
-  struct LabelKeyIds {
-    ddog_prof_StringId container_id{};
-    ddog_prof_StringId process_id{};
-    ddog_prof_StringId process_name{};
-    ddog_prof_StringId thread_id{};
-    ddog_prof_StringId thread_name{};
-    ddog_prof_StringId tracepoint_type{};
-    bool initialized{false};
-  };
-
-  struct LabelKeyPair {
-    ddog_prof_StringId key{};
-    ddog_prof_StringId value{};
-  };
-
-  struct LabelKeyPairHash {
-    size_t operator()(const LabelKeyPair &pair) const noexcept;
+  // Label key IDs are stored in the dictionary (process-scoped)
+  // They are initialized once when SymbolHdr is created
+  struct DictLabelKeyIds {
+    ddog_prof_StringId2 container_id{};
+    ddog_prof_StringId2 process_id{};
+    ddog_prof_StringId2 process_name{};
+    ddog_prof_StringId2 thread_id{};
+    ddog_prof_StringId2 thread_name{};
+    ddog_prof_StringId2 tracepoint_type{};
   };
 
   /* single profile gathering several value types */
@@ -47,20 +39,9 @@ struct DDProfPProf {
   Tags _tags;
   // avoid re-creating strings for all pid numbers
   std::unordered_map<pid_t, std::string> _pid_str;
-  std::unordered_map<pid_t, ddog_prof_StringId> _pid_string_ids;
-  HeterogeneousLookupStringMap<ddog_prof_StringId> _label_value_ids;
-  std::unordered_map<LabelKeyPair, ddog_prof_LabelId, LabelKeyPairHash>
-      _label_id_cache;
-  LabelKeyIds _label_key_ids;
+  // Dictionary label key IDs (set from SymbolHdr)
+  DictLabelKeyIds _dict_label_key_ids;
 };
-
-inline bool operator==(const DDProfPProf::LabelKeyPair &lhs,
-                       const DDProfPProf::LabelKeyPair &rhs) {
-  return lhs.key.generation.id == rhs.key.generation.id &&
-         lhs.key.id.offset == rhs.key.id.offset &&
-         lhs.value.generation.id == rhs.value.generation.id &&
-         lhs.value.id.offset == rhs.value.id.offset;
-}
 
 struct DDProfValuePack {
   int64_t value;
