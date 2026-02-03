@@ -164,9 +164,9 @@ TEST(DDProfExporter, simple) {
     res = pprof_create_profile(&pprofs, ctx,
                                 symbol_hdr._profiles_dictionary.get());
     EXPECT_TRUE(IsDDResOK(res));
-    res = pprof_aggregate(&mock_output, symbol_hdr, {1000, 1, 0},
-                          &ctx.watchers[0], file_infos, false, kSumPos,
-                          ctx.worker_ctx.symbolizer, &pprofs);
+    res = pprof_aggregate_interned_sample(
+        &mock_output, symbol_hdr, {1000, 1, 0}, &ctx.watchers[0], file_infos,
+        false, kSumPos, ctx.worker_ctx.symbolizer, &pprofs);
     EXPECT_TRUE(IsDDResOK(res));
   }
   {
