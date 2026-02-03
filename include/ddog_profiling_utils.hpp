@@ -50,8 +50,8 @@ ddog_prof_FunctionId2 intern_function(const ddog_prof_ProfilesDictionary *dict,
 ddog_prof_MappingId2 intern_mapping(const ddog_prof_ProfilesDictionary *dict,
                                     const MapInfo &mapinfo);
 
-Symbol make_symbol(std::string symname, std::string demangled_name,
-                   uint32_t lineno, std::string srcpath,
+Symbol make_symbol(std::string symname, const std::string &demangled_name,
+                   uint32_t lineno, const std::string &srcpath,
                    const ddog_prof_ProfilesDictionary *dict);
 
 void write_location2(const FunLoc &loc, const MapInfo &mapinfo,

@@ -87,7 +87,7 @@ intern_function_ids(const ddog_prof_ProfilesDictionary *dict,
   if (!dict) {
     return nullptr;
   }
-  ddog_prof_Function2 function = {
+  const ddog_prof_Function2 function = {
       .name = name_id,
       .system_name = system_name_id,
       .file_name = file_id,
@@ -118,7 +118,7 @@ ddog_prof_MappingId2 intern_mapping(const ddog_prof_ProfilesDictionary *dict,
   if (!dict) {
     return nullptr;
   }
-  ddog_prof_Mapping2 mapping = {
+  const ddog_prof_Mapping2 mapping = {
       .memory_start = mapinfo._low_addr,
       .memory_limit = mapinfo._high_addr,
       .file_offset = mapinfo._offset,
@@ -136,13 +136,13 @@ ddog_prof_MappingId2 intern_mapping(const ddog_prof_ProfilesDictionary *dict,
   return mapping_id;
 }
 
-Symbol make_symbol(std::string symname, std::string demangled_name,
-                   uint32_t lineno, std::string srcpath,
+Symbol make_symbol(std::string symname, const std::string &demangled_name,
+                   uint32_t lineno, const std::string &srcpath,
                    const ddog_prof_ProfilesDictionary *dict) {
-  [[maybe_unused]] std::string ignored_symname = std::move(symname);
+  [[maybe_unused]] const std::string ignored_symname = std::move(symname);
   ddog_prof_FunctionId2 function_id =
       intern_function(dict, demangled_name, srcpath);
-  return Symbol(lineno, function_id);
+  return {lineno, function_id};
 }
 
 void write_location2(const FunLoc &loc, const MapInfo &mapinfo,
