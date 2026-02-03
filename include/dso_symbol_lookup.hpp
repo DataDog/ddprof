@@ -11,24 +11,29 @@
 
 #include <unordered_map>
 
+struct ddog_prof_ProfilesDictionary;
+
 namespace ddprof {
 
 class DsoSymbolLookup {
 public:
   SymbolIdx_t get_or_insert(FileAddress_t normalized_addr, const Dso &dso,
                             SymbolTable &symbol_table,
+                            const ddog_prof_ProfilesDictionary *dict,
                             std::string_view addr_type = "elf");
 
   // only binary info
-  SymbolIdx_t get_or_insert(const Dso &dso, SymbolTable &symbol_table);
+  SymbolIdx_t get_or_insert(const Dso &dso, SymbolTable &symbol_table,
+                            const ddog_prof_ProfilesDictionary *dict);
 
   void stats_display() const;
 
 private:
   size_t get_size() const;
 
-  SymbolIdx_t get_or_insert_unhandled_type(const Dso &dso,
-                                           SymbolTable &symbol_table);
+  SymbolIdx_t get_or_insert_unhandled_type(
+      const Dso &dso, SymbolTable &symbol_table,
+      const ddog_prof_ProfilesDictionary *dict);
   // map of maps --> the aim is to monitor usage of some maps and clear them
   // together
   // TODO : find efficient clear on symbol table before we do this

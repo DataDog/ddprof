@@ -5,6 +5,7 @@
 
 #include "runtime_symbol_lookup.hpp"
 
+#include "ddog_profiling_utils.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "jit/jitdump.hpp"
@@ -45,11 +46,10 @@ RuntimeSymbolLookup::perfmaps_open(int pid, const char *path_to_perfmap = "") {
   return UniqueFile{fopen(buf, "r")};
 }
 
-bool RuntimeSymbolLookup::insert_or_replace(std::string_view symbol,
-                                            ProcessAddress_t address,
-                                            Offset_t code_size,
-                                            SymbolMap &symbol_map,
-                                            SymbolTable &symbol_table) {
+bool RuntimeSymbolLookup::insert_or_replace(
+    std::string_view symbol, ProcessAddress_t address, Offset_t code_size,
+    SymbolMap &symbol_map, SymbolTable &symbol_table,
+    const ddog_prof_ProfilesDictionary *dict) {
   if (should_skip_symbol(symbol)) {
     return false;
   }
@@ -70,27 +70,26 @@ bool RuntimeSymbolLookup::insert_or_replace(std::string_view symbol,
     symbol_map.emplace_hint(
         find_res.first, address,
         SymbolSpan(address + code_size - 1, symbol_table.size()));
-    symbol_table.emplace_back(std::string(symbol), std::string(symbol), 0,
-                              "jit");
+    symbol_table.emplace_back(make_symbol(std::string(symbol),
+                                          std::string(symbol), 0, "jit",
+                                          dict));
   } else {
     // todo managing range erase (we can overall with other syms)
     SymbolIdx_t const existing = find_res.first->second.get_symbol_idx();
-#ifdef DEBUG
-    LG_DBG("Existyng sym -- %s (%lx-%lx)",
-           symbol_table[existing]._demangled_name.c_str(),
-           find_res.first->first, find_res.first->second.get_end());
-    LG_DBG("New sym -- %s (%lx-%lx)", code_load.func_name.c_str(),
-           code_load.code_addr, code_load.code_size + code_load.code_addr);
-#endif
-    if (symbol_table[existing]._demangled_name == symbol) {
+    ddog_prof_StringId2 name_id = intern_string(dict, symbol);
+    if (symbol_table[existing]._name_id == name_id) {
       find_res.first->second.set_end(address + code_size - 1);
     } else {
       // remove current element (as start can be different)
       symbol_map.erase(find_res.first);
       symbol_map.emplace(address,
                          SymbolSpan(address + code_size - 1, existing));
-      symbol_table[existing]._demangled_name = symbol;
-      symbol_table[existing]._symname = symbol;
+      Symbol &existing_symbol = symbol_table[existing];
+      existing_symbol._name_id = name_id;
+      existing_symbol._file_id = intern_string(dict, "jit");
+      existing_symbol._function_id = intern_function_ids(
+          dict, existing_symbol._name_id, existing_symbol._file_id,
+          DDOG_PROF_STRINGID2_EMPTY);
     }
   }
 
@@ -100,9 +99,9 @@ namespace {
 bool is_absolute_path(std::string_view path) { return path.front() == '/'; }
 } // namespace
 
-DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
-                                             pid_t pid, SymbolMap &symbol_map,
-                                             SymbolTable &symbol_table) {
+DDRes RuntimeSymbolLookup::fill_from_jitdump(
+    std::string_view jitdump_path, pid_t pid, SymbolMap &symbol_map,
+    SymbolTable &symbol_table, const ddog_prof_ProfilesDictionary *dict) {
   const std::string path = is_absolute_path(jitdump_path)
       ? absl::Substitute("$0/proc/$1/root$2", _path_to_proc, pid,
                          jitdump_path)
@@ -126,7 +125,7 @@ DDRes RuntimeSymbolLookup::fill_from_jitdump(std::string_view jitdump_path,
 
   for (const JITRecordCodeLoad &code_load : jitdump.code_load) {
     insert_or_replace(code_load.func_name, code_load.code_addr,
-                      code_load.code_size, symbol_map, symbol_table);
+                      code_load.code_size, symbol_map, symbol_table, dict);
   }
   // todo we can add file and inlined functions with debug info
   return {};
@@ -139,8 +138,9 @@ bool RuntimeSymbolLookup::should_skip_symbol(std::string_view symbol) {
   });
 }
 
-DDRes RuntimeSymbolLookup::fill_from_perfmap(int pid, SymbolMap &symbol_map,
-                                             SymbolTable &symbol_table) {
+DDRes RuntimeSymbolLookup::fill_from_perfmap(
+    int pid, SymbolMap &symbol_map, SymbolTable &symbol_table,
+    const ddog_prof_ProfilesDictionary *dict) {
   auto pmf{perfmaps_open(pid, "/tmp")};
   if (!pmf) {
     LG_DBG("Unable to read perfmap file (PID%d)", pid);
@@ -166,7 +166,8 @@ DDRes RuntimeSymbolLookup::fill_from_perfmap(int pid, SymbolMap &symbol_map,
         std::strtoul(address_buff, nullptr, hexadecimal_base);
     Offset_t const code_size =
         std::strtoul(size_buff, nullptr, hexadecimal_base);
-    insert_or_replace(buffer, address, code_size, symbol_map, symbol_table);
+    insert_or_replace(buffer, address, code_size, symbol_map, symbol_table,
+                      dict);
   }
   free(line);
   return {};
@@ -175,6 +176,7 @@ DDRes RuntimeSymbolLookup::fill_from_perfmap(int pid, SymbolMap &symbol_map,
 SymbolIdx_t
 RuntimeSymbolLookup::get_or_insert_jitdump(pid_t pid, ProcessAddress_t pc,
                                            SymbolTable &symbol_table,
+                                           const ddog_prof_ProfilesDictionary *dict,
                                            std::string_view jitdump_path) {
   SymbolInfo &symbol_info = _pid_map[pid];
   SymbolMap::FindRes find_res = symbol_info._map.find_closest(pc);
@@ -182,7 +184,7 @@ RuntimeSymbolLookup::get_or_insert_jitdump(pid_t pid, ProcessAddress_t pc,
     // refresh as we expect there to be new symbols
     ++_stats._nb_jit_reads;
     if (IsDDResFatal(fill_from_jitdump(jitdump_path, pid, symbol_info._map,
-                                       symbol_table))) {
+                                       symbol_table, dict))) {
       // Some warnings can be expected with incomplete files
       flag_lookup_failure(symbol_info, jitdump_path);
       return -1;
@@ -198,14 +200,15 @@ RuntimeSymbolLookup::get_or_insert_jitdump(pid_t pid, ProcessAddress_t pc,
 }
 
 SymbolIdx_t RuntimeSymbolLookup::get_or_insert(pid_t pid, ProcessAddress_t pc,
-                                               SymbolTable &symbol_table) {
+                                               SymbolTable &symbol_table,
+                                               const ddog_prof_ProfilesDictionary *dict) {
   SymbolInfo &symbol_info = _pid_map[pid];
   SymbolMap::FindRes find_res = symbol_info._map.find_closest(pc);
 
   // Only check the file if we did not get failures in this cycle (for this pid)
   if (!find_res.second && !has_lookup_failure(symbol_info, "perfmap")) {
     ++_stats._nb_jit_reads;
-    fill_from_perfmap(pid, symbol_info._map, symbol_table);
+    fill_from_perfmap(pid, symbol_info._map, symbol_table, dict);
     find_res = symbol_info._map.find_closest(pc);
   }
   if (!find_res.second) {

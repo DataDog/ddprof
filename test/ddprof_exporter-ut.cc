@@ -157,7 +157,8 @@ TEST(DDProfExporter, simple) {
     FileInfoVector file_infos;
     SymbolTable &table = symbol_hdr._symbol_table;
     MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
-    fill_unwind_symbols(table, mapinfo_table, mock_output);
+    fill_unwind_symbols(table, mapinfo_table, mock_output,
+                        symbol_hdr.profiles_dictionary());
     DDProfContext ctx = {};
     ctx.watchers.push_back(*ewatcher_from_str("sCPU"));
     res = pprof_create_profile(&pprofs, ctx,

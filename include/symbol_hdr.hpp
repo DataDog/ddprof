@@ -42,6 +42,10 @@ struct SymbolHdr {
   void display_stats() const { _dso_symbol_lookup.stats_display(); }
   void cycle() { _runtime_symbol_lookup.cycle(); }
 
+  const ddog_prof_ProfilesDictionary *profiles_dictionary() const {
+    return _profiles_dictionary ? *_profiles_dictionary : nullptr;
+  }
+
   void clear(pid_t pid) {
     _base_frame_symbol_lookup.erase(pid);
     // mappings are only relevant in the context of a given pid.

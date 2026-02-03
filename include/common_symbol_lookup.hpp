@@ -11,12 +11,14 @@
 
 #include <unordered_map>
 
+struct ddog_prof_ProfilesDictionary;
+
 namespace ddprof {
 // Generates virtual frames for common unhandled cases
 class CommonSymbolLookup {
 public:
-  SymbolIdx_t get_or_insert(SymbolErrors lookup_case,
-                            SymbolTable &symbol_table);
+  SymbolIdx_t get_or_insert(SymbolErrors lookup_case, SymbolTable &symbol_table,
+                            const ddog_prof_ProfilesDictionary *dict);
 
 private:
   std::unordered_map<SymbolErrors, SymbolIdx_t> _map;

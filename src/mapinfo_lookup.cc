@@ -5,14 +5,16 @@
 
 #include "mapinfo_lookup.hpp"
 
+#include "ddog_profiling_utils.hpp"
 #include "ddres.hpp"
 
 namespace ddprof {
 
-MapInfoIdx_t MapInfoLookup::get_or_insert(pid_t pid,
-                                          MapInfoTable &mapinfo_table,
-                                          const Dso &dso,
-                                          std::optional<BuildIdStr> build_id) {
+MapInfoIdx_t
+MapInfoLookup::get_or_insert(pid_t pid, MapInfoTable &mapinfo_table,
+                             const Dso &dso,
+                             std::optional<BuildIdStr> build_id,
+                             const ddog_prof_ProfilesDictionary *dict) {
   MapInfoAddrMap &addr_map = _mapinfo_pidmap[pid];
   auto it = addr_map.find(dso._start);
 
@@ -25,6 +27,7 @@ MapInfoIdx_t MapInfoLookup::get_or_insert(pid_t pid,
     mapinfo_table.emplace_back(dso._start, dso._end, dso._offset,
                                std::move(sname_str),
                                build_id ? *build_id : BuildIdStr{});
+    mapinfo_table.back()._mapping_id = intern_mapping(dict, mapinfo_table.back());
     addr_map.emplace(dso._start, map_info_idx);
     return map_info_idx;
   }
