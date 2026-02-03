@@ -252,7 +252,7 @@ DDRes aggregate_livealloc_stack(
       alloc_info.second._value,
       static_cast<uint64_t>(std::max<int64_t>(0, alloc_info.second._count)), 0};
 
-  DDRES_CHECK_FWD(pprof_aggregate(
+  DDRES_CHECK_FWD(pprof_aggregate_interned_sample(
       &alloc_info.first, symbol_hdr, pack, watcher,
       ctx.worker_ctx.us->dso_hdr.get_file_info_vector(),
       ctx.params.show_samples, kLiveSumPos, ctx.worker_ctx.symbolizer, pprof));

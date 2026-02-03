@@ -62,7 +62,8 @@ TEST(DDProfPProf, aggregate) {
   SymbolTable &table = symbol_hdr._symbol_table;
   MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
   FileInfoVector file_infos;
-  fill_unwind_symbols(table, mapinfo_table, mock_output);
+  fill_unwind_symbols(table, mapinfo_table, mock_output,
+                      symbol_hdr.profiles_dictionary());
   DDProfPProf pprof;
   DDProfContext ctx = {};
 
@@ -91,7 +92,8 @@ TEST(DDProfPProf, just_live) {
   SymbolTable &table = symbol_hdr._symbol_table;
   MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
 
-  fill_unwind_symbols(table, mapinfo_table, mock_output);
+  fill_unwind_symbols(table, mapinfo_table, mock_output,
+                      symbol_hdr.profiles_dictionary());
   DDProfPProf pprof;
   DDProfContext ctx = {};
   {

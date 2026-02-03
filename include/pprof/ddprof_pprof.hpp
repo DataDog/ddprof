@@ -53,6 +53,13 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
                       EventAggregationModePos value_pos, Symbolizer *symbolizer,
                       DDProfPProf *pprof);
 
+DDRes pprof_aggregate_interned_sample(
+    const UnwindOutput *uw_output, const SymbolHdr &symbol_hdr,
+    const DDProfValuePack &pack, const PerfWatcher *watcher,
+    const FileInfoVector &file_infos, bool show_samples,
+    EventAggregationModePos value_pos, Symbolizer *symbolizer,
+    DDProfPProf *pprof);
+
 DDRes pprof_reset(DDProfPProf *pprof);
 
 DDRes pprof_write_profile(const DDProfPProf *pprof, int fd);

@@ -5,6 +5,8 @@
 
 #include "common_mapinfo_lookup.hpp"
 
+#include "ddog_profiling_utils.hpp"
+
 namespace ddprof {
 namespace {
 MapInfo mapinfo_from_common(CommonMapInfoLookup::MappingErrors lookup_case) {
@@ -20,7 +22,7 @@ MapInfo mapinfo_from_common(CommonMapInfoLookup::MappingErrors lookup_case) {
 
 MapInfoIdx_t CommonMapInfoLookup::get_or_insert(
     CommonMapInfoLookup::MappingErrors lookup_case,
-    MapInfoTable &mapinfo_table) {
+    MapInfoTable &mapinfo_table, const ddog_prof_ProfilesDictionary *dict) {
   auto const it = _map.find(lookup_case);
   MapInfoIdx_t res;
   if (it != _map.end()) {
@@ -28,6 +30,7 @@ MapInfoIdx_t CommonMapInfoLookup::get_or_insert(
   } else { // insert things
     res = mapinfo_table.size();
     mapinfo_table.push_back(mapinfo_from_common(lookup_case));
+    mapinfo_table.back()._mapping_id = intern_mapping(dict, mapinfo_table.back());
     _map.insert({lookup_case, res});
   }
   return res;

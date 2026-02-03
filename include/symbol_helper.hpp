@@ -6,6 +6,7 @@
 #include "unwind_state.hpp"
 
 #include <array>
+#include <datadog/profiling.h>
 #include <datadog/blazesym.h>
 #include <unistd.h>
 #include <vector>
@@ -16,6 +17,8 @@ std::vector<std::string> collect_symbols(UnwindState &state,
                                          blaze_symbolizer *symbolizer) {
   std::vector<std::string> symbols;
   auto &symbol_table = state.symbol_hdr._symbol_table;
+  const ddog_prof_ProfilesDictionary *dict =
+      state.symbol_hdr.profiles_dictionary();
   for (size_t iloc = 0; iloc < state.output.locs.size(); ++iloc) {
     std::string demangled_name;
     if (state.output.locs[iloc].symbol_idx == k_symbol_idx_null) {
@@ -40,7 +43,19 @@ std::vector<std::string> collect_symbols(UnwindState &state,
     } else {
       // Lookup the symbol from the symbol table.
       auto &symbol = symbol_table[state.output.locs[iloc].symbol_idx];
-      demangled_name = symbol._demangled_name;
+      if (!dict || !symbol._name_id) {
+        demangled_name = "unknown";
+      } else {
+        ddog_CharSlice slice{nullptr, 0};
+        ddog_prof_Status status =
+            ddog_prof_ProfilesDictionary_get_str(&slice, dict, symbol._name_id);
+        if (status.err != nullptr) {
+          ddog_prof_Status_drop(&status);
+          demangled_name = "unknown";
+        } else {
+          demangled_name = std::string(slice.ptr, slice.len);
+        }
+      }
     }
     symbols.push_back(demangled_name);
   }

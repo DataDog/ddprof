@@ -33,6 +33,13 @@ namespace ddprof {
 namespace {
 constexpr size_t k_max_pprof_labels{8};
 
+constexpr std::string_view k_container_id_label = "container_id"sv;
+constexpr std::string_view k_process_id_label = "process_id"sv;
+constexpr std::string_view k_process_name_label = "process_name"sv;
+constexpr std::string_view k_thread_id_label = "thread id"sv;
+constexpr std::string_view k_thread_name_label = "thread_name"sv;
+constexpr std::string_view k_tracepoint_label = "tracepoint_type"sv;
+
 constexpr int k_max_value_types =
     DDPROF_PWT_LENGTH * static_cast<int>(kNbEventAggregationModes);
 
@@ -40,6 +47,163 @@ struct ActiveIdsResult {
   EventAggregationMode output_mode[DDPROF_PWT_LENGTH] = {};
   PerfWatcher *default_watcher = nullptr;
 };
+
+struct LabelKeyIds {
+  const ddog_prof_ProfilesDictionary *dict = nullptr;
+  ddog_prof_StringId2 container_id = DDOG_PROF_STRINGID2_EMPTY;
+  ddog_prof_StringId2 process_id = DDOG_PROF_STRINGID2_EMPTY;
+  ddog_prof_StringId2 process_name = DDOG_PROF_STRINGID2_EMPTY;
+  ddog_prof_StringId2 thread_id = DDOG_PROF_STRINGID2_EMPTY;
+  ddog_prof_StringId2 thread_name = DDOG_PROF_STRINGID2_EMPTY;
+  ddog_prof_StringId2 tracepoint_type = DDOG_PROF_STRINGID2_EMPTY;
+};
+
+const LabelKeyIds &
+get_label_key_ids(const ddog_prof_ProfilesDictionary *dict) {
+  static LabelKeyIds ids{};
+  if (ids.dict != dict) {
+    ids = {};
+    ids.dict = dict;
+    ids.container_id = intern_string(dict, k_container_id_label);
+    ids.process_id = intern_string(dict, k_process_id_label);
+    ids.process_name = intern_string(dict, k_process_name_label);
+    ids.thread_id = intern_string(dict, k_thread_id_label);
+    ids.thread_name = intern_string(dict, k_thread_name_label);
+    ids.tracepoint_type = intern_string(dict, k_tracepoint_label);
+  }
+  return ids;
+}
+
+std::string_view pid_str(pid_t pid,
+                         std::unordered_map<pid_t, std::string> &pid_strs);
+
+std::string_view to_string_view(ddog_CharSlice slice) {
+  if (!slice.ptr || slice.len == 0) {
+    return {};
+  }
+  return {slice.ptr, slice.len};
+}
+
+ddog_prof_StringId intern_profile_string(ddog_prof_Profile *profile,
+                                         std::string_view value) {
+  if (value.empty()) {
+    return ddog_prof_Profile_interned_empty_string();
+  }
+  ddog_prof_StringId_Result res =
+      ddog_prof_Profile_intern_string(profile, to_CharSlice(value));
+  if (res.tag != DDOG_PROF_STRING_ID_RESULT_OK_GENERATIONAL_ID_STRING_ID) {
+    ddog_Error_drop(&res.err);
+    return ddog_prof_Profile_interned_empty_string();
+  }
+  return res.ok;
+}
+
+DDRes intern_profile_labelset(
+    ddog_prof_Profile *profile, const UnwindOutput &uw_output,
+    const PerfWatcher &watcher,
+    std::unordered_map<pid_t, std::string> &pid_strs,
+    ddog_prof_LabelSetId *labelset_id) {
+  std::array<ddog_prof_LabelId, k_max_pprof_labels> labels{};
+  size_t labels_num = 0;
+
+  auto push_label = [&](std::string_view key, std::string_view value) -> DDRes {
+    ddog_prof_StringId key_id = intern_profile_string(profile, key);
+    ddog_prof_StringId value_id = intern_profile_string(profile, value);
+    ddog_prof_LabelId_Result label_res =
+        ddog_prof_Profile_intern_label_str(profile, key_id, value_id);
+    if (label_res.tag != DDOG_PROF_LABEL_ID_RESULT_OK_GENERATIONAL_ID_LABEL_ID) {
+      ddog_Error_drop(&label_res.err);
+      return ddres_error(DD_WHAT_PPROF);
+    }
+    labels[labels_num++] = label_res.ok;
+    return {};
+  };
+
+  if (!uw_output.container_id.empty()) {
+    DDRES_CHECK_FWD(
+        push_label(k_container_id_label, uw_output.container_id));
+  }
+
+  if (!watcher.suppress_pid || !watcher.suppress_tid) {
+    DDRES_CHECK_FWD(push_label(k_process_id_label,
+                               pid_str(uw_output.pid, pid_strs)));
+  }
+  if (!watcher.suppress_tid) {
+    DDRES_CHECK_FWD(push_label(k_thread_id_label,
+                               pid_str(uw_output.tid, pid_strs)));
+  }
+  if (watcher_has_tracepoint(&watcher)) {
+    if (!watcher.tracepoint_label.empty()) {
+      DDRES_CHECK_FWD(
+          push_label(k_tracepoint_label, watcher.tracepoint_label));
+    } else {
+      DDRES_CHECK_FWD(
+          push_label(k_tracepoint_label, watcher.tracepoint_event));
+    }
+  }
+  if (!uw_output.exe_name.empty()) {
+    DDRES_CHECK_FWD(push_label(k_process_name_label, uw_output.exe_name));
+  }
+  if (!uw_output.thread_name.empty()) {
+    DDRES_CHECK_FWD(push_label(k_thread_name_label, uw_output.thread_name));
+  }
+
+  DDPROF_DCHECK_FATAL(labels_num <= labels.size(),
+                      "pprof_aggregate - label buffer exceeded");
+  ddog_prof_LabelSetId_Result labelset_res = ddog_prof_Profile_intern_labelset(
+      profile,
+      {.ptr = labels.data(), .len = static_cast<uintptr_t>(labels_num)});
+  if (labelset_res.tag !=
+      DDOG_PROF_LABEL_SET_ID_RESULT_OK_GENERATIONAL_ID_LABEL_SET_ID) {
+    ddog_Error_drop(&labelset_res.err);
+    return ddres_error(DD_WHAT_PPROF);
+  }
+  *labelset_id = labelset_res.ok;
+  return {};
+}
+
+DDRes intern_profile_location_id(ddog_prof_Profile *profile,
+                                 const ddog_prof_Location &location,
+                                 ddog_prof_LocationId *location_id) {
+  ddog_prof_StringId fn_name =
+      intern_profile_string(profile, to_string_view(location.function.name));
+  ddog_prof_StringId fn_system = intern_profile_string(
+      profile, to_string_view(location.function.system_name));
+  ddog_prof_StringId fn_file =
+      intern_profile_string(profile, to_string_view(location.function.filename));
+  ddog_prof_FunctionId_Result function_res =
+      ddog_prof_Profile_intern_function(profile, fn_name, fn_system, fn_file);
+  if (function_res.tag !=
+      DDOG_PROF_FUNCTION_ID_RESULT_OK_GENERATIONAL_ID_FUNCTION_ID) {
+    ddog_Error_drop(&function_res.err);
+    return ddres_error(DD_WHAT_PPROF);
+  }
+
+  ddog_prof_StringId map_filename =
+      intern_profile_string(profile, to_string_view(location.mapping.filename));
+  ddog_prof_StringId map_build_id =
+      intern_profile_string(profile, to_string_view(location.mapping.build_id));
+  ddog_prof_MappingId_Result mapping_res = ddog_prof_Profile_intern_mapping(
+      profile, location.mapping.memory_start, location.mapping.memory_limit,
+      location.mapping.file_offset, map_filename, map_build_id);
+  if (mapping_res.tag !=
+      DDOG_PROF_MAPPING_ID_RESULT_OK_GENERATIONAL_ID_MAPPING_ID) {
+    ddog_Error_drop(&mapping_res.err);
+    return ddres_error(DD_WHAT_PPROF);
+  }
+
+  ddog_prof_LocationId_Result loc_res =
+      ddog_prof_Profile_intern_location_with_mapping_id(
+          profile, mapping_res.ok, function_res.ok, location.address,
+          location.line);
+  if (loc_res.tag !=
+      DDOG_PROF_LOCATION_ID_RESULT_OK_GENERATIONAL_ID_LOCATION_ID) {
+    ddog_Error_drop(&loc_res.err);
+    return ddres_error(DD_WHAT_PPROF);
+  }
+  *location_id = loc_res.ok;
+  return {};
+}
 
 std::string_view pid_str(pid_t pid,
                          std::unordered_map<pid_t, std::string> &pid_strs) {
@@ -236,19 +400,13 @@ ProfValueTypes compute_pprof_values(const ActiveIdsResult &active_ids) {
 }
 
 size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
+                      const ddog_prof_ProfilesDictionary *dict,
                       std::unordered_map<pid_t, std::string> &pid_strs,
-                      std::span<ddog_prof_Label> labels) {
-  constexpr std::string_view k_container_id_label = "container_id"sv;
-  constexpr std::string_view k_process_id_label = "process_id"sv;
-  constexpr std::string_view k_process_name_label = "process_name"sv;
-  // This naming has an impact on backend side (hence the inconsistency with
-  // process_id)
-  constexpr std::string_view k_thread_id_label = "thread id"sv;
-  constexpr std::string_view k_thread_name_label = "thread_name"sv;
-  constexpr std::string_view k_tracepoint_label = "tracepoint_type"sv;
+                      std::span<ddog_prof_Label2> labels) {
+  const LabelKeyIds &label_ids = get_label_key_ids(dict);
   size_t labels_num = 0;
   if (!uw_output.container_id.empty()) {
-    labels[labels_num].key = to_CharSlice(k_container_id_label);
+    labels[labels_num].key = label_ids.container_id;
     labels[labels_num].str = to_CharSlice(uw_output.container_id);
     ++labels_num;
   }
@@ -257,17 +415,17 @@ size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
   // (TID;PID) tuples, so except for symbol table overhead it doesn't matter
   // much if TID implies PID for clarity.
   if (!watcher.suppress_pid || !watcher.suppress_tid) {
-    labels[labels_num].key = to_CharSlice(k_process_id_label);
+    labels[labels_num].key = label_ids.process_id;
     labels[labels_num].str = to_CharSlice(pid_str(uw_output.pid, pid_strs));
     ++labels_num;
   }
   if (!watcher.suppress_tid) {
-    labels[labels_num].key = to_CharSlice(k_thread_id_label);
+    labels[labels_num].key = label_ids.thread_id;
     labels[labels_num].str = to_CharSlice(pid_str(uw_output.tid, pid_strs));
     ++labels_num;
   }
   if (watcher_has_tracepoint(&watcher)) {
-    labels[labels_num].key = to_CharSlice(k_tracepoint_label);
+    labels[labels_num].key = label_ids.tracepoint_type;
     // If the label is given, use that as the tracepoint type. Otherwise,
     // default to the event name
     if (!watcher.tracepoint_label.empty()) {
@@ -278,12 +436,12 @@ size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
     ++labels_num;
   }
   if (!uw_output.exe_name.empty()) {
-    labels[labels_num].key = to_CharSlice(k_process_name_label);
+    labels[labels_num].key = label_ids.process_name;
     labels[labels_num].str = to_CharSlice(uw_output.exe_name);
     ++labels_num;
   }
   if (!uw_output.thread_name.empty()) {
-    labels[labels_num].key = to_CharSlice(k_thread_name_label);
+    labels[labels_num].key = label_ids.thread_name;
     labels[labels_num].str = to_CharSlice(uw_output.thread_name);
     ++labels_num;
   }
@@ -308,7 +466,9 @@ std::span<const FunLoc> adjust_locations(const PerfWatcher *watcher,
 DDRes process_symbolization(
     std::span<const FunLoc> locs, const SymbolHdr &symbol_hdr,
     const FileInfoVector &file_infos, Symbolizer *symbolizer,
+    const ddog_prof_ProfilesDictionary *dict,
     std::array<ddog_prof_Location, kMaxStackDepth> &locations_buff,
+    std::array<ddog_prof_Location2, kMaxStackDepth> &locations2_buff,
     Symbolizer::BlazeResultsWrapper &session_results, unsigned &write_index) {
   unsigned index = 0;
 
@@ -325,7 +485,12 @@ DDRes process_symbolization(
       const FunLoc &loc = locs[index];
       write_location(loc, mapinfo_table[loc.map_info_idx],
                      symbol_table[loc.symbol_idx],
-                     &locations_buff[write_index++]);
+                     symbol_hdr.profiles_dictionary(),
+                     &locations_buff[write_index]);
+      write_location2(loc, mapinfo_table[loc.map_info_idx],
+                      symbol_table[loc.symbol_idx],
+                      &locations2_buff[write_index]);
+      ++write_index;
       ++index;
       continue;
     }
@@ -352,11 +517,17 @@ DDRes process_symbolization(
       }
     }
     // Perform symbolization for all collected addresses
+    const unsigned start_write_index = write_index;
     const DDRes res = symbolizer->symbolize_pprof(
         elf_addresses, file_id, current_file_path,
         mapinfo_table[locs[start_index].map_info_idx],
         std::span<ddog_prof_Location>{locations_buff}, write_index,
         session_results);
+    for (unsigned i = start_write_index; i < write_index; ++i) {
+      DDRES_CHECK_FWD(
+          write_location2_from_location(dict, locations_buff[i],
+                                        &locations2_buff[i]));
+    }
     if (IsDDResNotOK(res)) {
       if (IsDDResFatal(res)) {
         DDRES_RETURN_ERROR_LOG(DD_WHAT_SYMBOLIZER, "Failed to symbolize pprof");
@@ -372,7 +543,11 @@ DDRes process_symbolization(
           std::span<ddog_prof_Location>{locations_buff.data(), write_index})) {
     // Write a common frame to indicate an incomplete stack
     write_location(0, k_common_frame_names[incomplete_stack], {}, 0, {},
-                   &locations_buff[write_index++]);
+                   &locations_buff[write_index]);
+    DDRES_CHECK_FWD(
+        write_location2_from_location(dict, locations_buff[write_index],
+                                      &locations2_buff[write_index]));
+    ++write_index;
   }
 
   // Write the binary frame if it exists and is valid
@@ -381,7 +556,12 @@ DDRes process_symbolization(
     const FunLoc &loc = locs.back();
     write_location(loc, mapinfo_table[loc.map_info_idx],
                    symbol_table[loc.symbol_idx],
-                   &locations_buff[write_index++]);
+                   symbol_hdr.profiles_dictionary(),
+                   &locations_buff[write_index]);
+    write_location2(loc, mapinfo_table[loc.map_info_idx],
+                    symbol_table[loc.symbol_idx],
+                    &locations2_buff[write_index]);
+    ++write_index;
   }
   return {};
 }
@@ -530,24 +710,27 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   }
 
   std::array<ddog_prof_Location, kMaxStackDepth> locations_buff;
+  std::array<ddog_prof_Location2, kMaxStackDepth> locations2_buff;
   std::span locs{uw_output->locs};
   locs = adjust_locations(watcher, locs);
 
   // Blaze results should remain alive until we aggregate the pprof data
   Symbolizer::BlazeResultsWrapper session_results;
   unsigned write_index = 0;
-  DDRES_CHECK_FWD(process_symbolization(locs, symbol_hdr, file_infos,
-                                        symbolizer, locations_buff,
-                                        session_results, write_index));
-  std::array<ddog_prof_Label, k_max_pprof_labels> labels{};
+  DDRES_CHECK_FWD(process_symbolization(
+      locs, symbol_hdr, file_infos, symbolizer,
+      symbol_hdr.profiles_dictionary(), locations_buff, locations2_buff,
+      session_results, write_index));
+  std::array<ddog_prof_Label2, k_max_pprof_labels> labels{};
   // Create the labels for the sample.  Two samples are the same only when
   // their locations _and_ all labels are identical, so we admit a very limited
   // number of labels at present
-  const size_t labels_num =
-      prepare_labels(*uw_output, *watcher, pprof->_pid_str, std::span{labels});
+  const size_t labels_num = prepare_labels(
+      *uw_output, *watcher, symbol_hdr.profiles_dictionary(), pprof->_pid_str,
+      std::span{labels});
 
-  ddog_prof_Sample const sample = {
-      .locations = {.ptr = locations_buff.data(), .len = write_index},
+  ddog_prof_Sample2 const sample = {
+      .locations = {.ptr = locations2_buff.data(), .len = write_index},
       .values = {.ptr = values, .len = pprof->_nb_values},
       .labels = {.ptr = labels.data(), .len = labels_num},
   };
@@ -557,12 +740,11 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
                         pack.value, uw_output->pid, uw_output->tid, value_pos,
                         *watcher);
   }
-  auto res = ddog_prof_Profile_add(profile, sample, pack.timestamp);
-  if (res.tag != DDOG_PROF_PROFILE_RESULT_OK) {
-    defer { ddog_Error_drop(&res.err); };
-    auto msg = ddog_Error_message(&res.err);
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile: %*s",
-                           static_cast<int>(msg.len), msg.ptr);
+  auto res = ddog_prof_Profile_add2(profile, sample, pack.timestamp);
+  if (res.err != nullptr) {
+    defer { ddog_prof_Status_drop(&res); };
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile: %s",
+                           res.err);
   }
   return {};
 }
@@ -576,6 +758,69 @@ DDRes pprof_reset(DDProfPProf *pprof) {
                            static_cast<int>(msg.len), msg.ptr);
   }
   pprof->_pid_str.clear();
+  return {};
+}
+
+DDRes pprof_aggregate_interned_sample(
+    const UnwindOutput *uw_output, const SymbolHdr &symbol_hdr,
+    const DDProfValuePack &pack, const PerfWatcher *watcher,
+    const FileInfoVector &file_infos, bool show_samples,
+    EventAggregationModePos value_pos, Symbolizer *symbolizer,
+    DDProfPProf *pprof) {
+  const PProfIndices &pprof_indices = watcher->pprof_indices[value_pos];
+  ddog_prof_Profile *profile = &pprof->_profile;
+  int64_t values[k_max_value_types] = {};
+  assert(pprof_indices.pprof_index != -1);
+  values[pprof_indices.pprof_index] = pack.value;
+  if (watcher_has_countable_sample_type(watcher)) {
+    assert(pprof_indices.pprof_count_index != -1);
+    values[pprof_indices.pprof_count_index] = pack.count;
+  }
+
+  std::array<ddog_prof_Location, kMaxStackDepth> locations_buff;
+  std::array<ddog_prof_Location2, kMaxStackDepth> locations2_buff;
+  std::span locs{uw_output->locs};
+  locs = adjust_locations(watcher, locs);
+
+  Symbolizer::BlazeResultsWrapper session_results;
+  unsigned write_index = 0;
+  DDRES_CHECK_FWD(process_symbolization(
+      locs, symbol_hdr, file_infos, symbolizer,
+      symbol_hdr.profiles_dictionary(), locations_buff, locations2_buff,
+      session_results, write_index));
+
+  ddog_prof_LabelSetId labelset_id{};
+  DDRES_CHECK_FWD(intern_profile_labelset(profile, *uw_output, *watcher,
+                                          pprof->_pid_str, &labelset_id));
+
+  std::array<ddog_prof_LocationId, kMaxStackDepth> location_ids{};
+  for (unsigned i = 0; i < write_index; ++i) {
+    DDRES_CHECK_FWD(
+        intern_profile_location_id(profile, locations_buff[i],
+                                   &location_ids[i]));
+  }
+  ddog_prof_StackTraceId_Result stacktrace_res =
+      ddog_prof_Profile_intern_stacktrace(
+          profile, {.ptr = location_ids.data(), .len = write_index});
+  if (stacktrace_res.tag !=
+      DDOG_PROF_STACK_TRACE_ID_RESULT_OK_GENERATIONAL_ID_STACK_TRACE_ID) {
+    ddog_Error_drop(&stacktrace_res.err);
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to intern stacktrace");
+  }
+
+  if (show_samples) {
+    ddprof_print_sample(std::span{locations_buff.data(), write_index},
+                        pack.value, uw_output->pid, uw_output->tid, value_pos,
+                        *watcher);
+  }
+
+  ddog_VoidResult res = ddog_prof_Profile_intern_sample(
+      profile, stacktrace_res.ok, {.ptr = values, .len = pprof->_nb_values},
+      labelset_id, pack.timestamp);
+  if (res.tag != DDOG_VOID_RESULT_OK) {
+    ddog_Error_drop(&res.err);
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile");
+  }
   return {};
 }
 } // namespace ddprof
