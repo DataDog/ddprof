@@ -52,35 +52,17 @@ Symbol make_symbol(std::string symname, std::string demangled_name,
                    uint32_t lineno, std::string srcpath,
                    const ddog_prof_ProfilesDictionary *dict);
 
-void write_function(const Symbol &symbol,
-                    const ddog_prof_ProfilesDictionary *dict,
-                    ddog_prof_Function *ffi_func);
-
-void write_function(std::string_view demangled_name, std::string_view file_name,
-                    ddog_prof_Function *ffi_func);
-
-void write_mapping(const MapInfo &mapinfo, ddog_prof_Mapping *ffi_mapping);
-
-void write_location(const FunLoc &loc, const MapInfo &mapinfo,
-                    const Symbol &symbol,
-                    const ddog_prof_ProfilesDictionary *dict,
-                    ddog_prof_Location *ffi_location);
-
-void write_location(ProcessAddress_t ip_or_elf_addr,
-                    std::string_view demangled_name, std::string_view file_name,
-                    uint32_t lineno, const MapInfo &mapinfo,
-                    ddog_prof_Location *ffi_location);
-
 void write_location2(const FunLoc &loc, const MapInfo &mapinfo,
                      const Symbol &symbol, ddog_prof_Location2 *ffi_location);
 
-DDRes write_location2_from_location(const ddog_prof_ProfilesDictionary *dict,
-                                    const ddog_prof_Location &src,
-                                    ddog_prof_Location2 *dst);
-
-DDRes write_location_blaze(
+DDRes write_location2_blaze(
     ElfAddress_t elf_addr,
     ddprof::HeterogeneousLookupStringMap<std::string> &demangled_names,
     const MapInfo &mapinfo, const blaze_sym &blaze_sym, unsigned &cur_loc,
-    std::span<ddog_prof_Location> locations_buff);
+    const ddog_prof_ProfilesDictionary *dict,
+    std::span<ddog_prof_Location2> locations_buff);
+
+void write_location2_no_sym(ElfAddress_t ip, const MapInfo &mapinfo,
+                            const ddog_prof_ProfilesDictionary *dict,
+                            ddog_prof_Location2 *ffi_location);
 } // namespace ddprof

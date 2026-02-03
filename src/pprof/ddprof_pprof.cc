@@ -318,7 +318,6 @@ DDRes process_symbolization(
     std::span<const FunLoc> locs, const SymbolHdr &symbol_hdr,
     const FileInfoVector &file_infos, Symbolizer *symbolizer,
     const ddog_prof_ProfilesDictionary *dict,
-    std::array<ddog_prof_Location, kMaxStackDepth> &locations_buff,
     std::array<ddog_prof_Location2, kMaxStackDepth> &locations2_buff,
     Symbolizer::BlazeResultsWrapper &session_results, unsigned &write_index) {
   unsigned index = 0;
@@ -330,14 +329,10 @@ DDRes process_symbolization(
   // We wait for the incomplete frame to be added if needed.
   // By removing the incomplete frame and pushing logic to BE
   // we can simplify this loop
-  while (index < locs.size() - 1 && write_index < locations_buff.size()) {
+  while (index < locs.size() - 1 && write_index < locations2_buff.size()) {
     if (locs[index].symbol_idx != k_symbol_idx_null) {
       // Location already symbolized
       const FunLoc &loc = locs[index];
-      write_location(loc, mapinfo_table[loc.map_info_idx],
-                     symbol_table[loc.symbol_idx],
-                     symbol_hdr.profiles_dictionary(),
-                     &locations_buff[write_index]);
       write_location2(loc, mapinfo_table[loc.map_info_idx],
                       symbol_table[loc.symbol_idx],
                       &locations2_buff[write_index]);
@@ -368,17 +363,11 @@ DDRes process_symbolization(
       }
     }
     // Perform symbolization for all collected addresses
-    const unsigned start_write_index = write_index;
     const DDRes res = symbolizer->symbolize_pprof(
         elf_addresses, file_id, current_file_path,
-        mapinfo_table[locs[start_index].map_info_idx],
-        std::span<ddog_prof_Location>{locations_buff}, write_index,
+        mapinfo_table[locs[start_index].map_info_idx], dict,
+        std::span<ddog_prof_Location2>{locations2_buff}, write_index,
         session_results);
-    for (unsigned i = start_write_index; i < write_index; ++i) {
-      DDRES_CHECK_FWD(
-          write_location2_from_location(dict, locations_buff[i],
-                                        &locations2_buff[i]));
-    }
     if (IsDDResNotOK(res)) {
       if (IsDDResFatal(res)) {
         DDRES_RETURN_ERROR_LOG(DD_WHAT_SYMBOLIZER, "Failed to symbolize pprof");
@@ -394,11 +383,12 @@ DDRes process_symbolization(
           std::span<ddog_prof_Location2>{locations2_buff.data(), write_index},
           dict)) {
     // Write a common frame to indicate an incomplete stack
-    write_location(0, k_common_frame_names[incomplete_stack], {}, 0, {},
-                   &locations_buff[write_index]);
-    DDRES_CHECK_FWD(
-        write_location2_from_location(dict, locations_buff[write_index],
-                                      &locations2_buff[write_index]));
+    ddog_prof_Location2 &incomplete_loc = locations2_buff[write_index];
+    incomplete_loc.mapping = nullptr;
+    incomplete_loc.function =
+        intern_function(dict, k_common_frame_names[incomplete_stack], {});
+    incomplete_loc.address = 0;
+    incomplete_loc.line = 0;
     ++write_index;
   }
 
@@ -406,10 +396,6 @@ DDRes process_symbolization(
   if (write_index < kMaxStackDepth &&
       locs.back().symbol_idx != k_symbol_idx_null) {
     const FunLoc &loc = locs.back();
-    write_location(loc, mapinfo_table[loc.map_info_idx],
-                   symbol_table[loc.symbol_idx],
-                   symbol_hdr.profiles_dictionary(),
-                   &locations_buff[write_index]);
     write_location2(loc, mapinfo_table[loc.map_info_idx],
                     symbol_table[loc.symbol_idx],
                     &locations2_buff[write_index]);
@@ -574,7 +560,6 @@ DDRes pprof_aggregate_interned_sample(
     values[pprof_indices.pprof_count_index] = pack.count;
   }
 
-  std::array<ddog_prof_Location, kMaxStackDepth> locations_buff;
   std::array<ddog_prof_Location2, kMaxStackDepth> locations2_buff;
   std::span locs{uw_output->locs};
   locs = adjust_locations(watcher, locs);
@@ -583,8 +568,8 @@ DDRes pprof_aggregate_interned_sample(
   unsigned write_index = 0;
   DDRES_CHECK_FWD(process_symbolization(
       locs, symbol_hdr, file_infos, symbolizer,
-      symbol_hdr.profiles_dictionary(), locations_buff, locations2_buff,
-      session_results, write_index));
+      symbol_hdr.profiles_dictionary(), locations2_buff, session_results,
+      write_index));
 
   std::array<ddog_prof_Label2, k_max_pprof_labels> labels{};
   const size_t labels_num =
