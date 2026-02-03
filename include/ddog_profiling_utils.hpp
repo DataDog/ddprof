@@ -26,6 +26,15 @@ inline ddog_CharSlice to_CharSlice(std::string_view str) {
 ddog_prof_StringId2 intern_string(const ddog_prof_ProfilesDictionary *dict,
                                   std::string_view str);
 
+std::string_view get_string(const ddog_prof_ProfilesDictionary *dict,
+                            ddog_prof_StringId2 string_id);
+
+std::string_view get_location2_function_name(
+    const ddog_prof_ProfilesDictionary *dict, const ddog_prof_Location2 &loc);
+
+std::string_view get_location2_mapping_filename(
+    const ddog_prof_ProfilesDictionary *dict, const ddog_prof_Location2 &loc);
+
 ddog_prof_FunctionId2
 intern_function_ids(const ddog_prof_ProfilesDictionary *dict,
                     ddog_prof_StringId2 name_id, ddog_prof_StringId2 file_id,

@@ -44,6 +44,40 @@ ddog_prof_StringId2 intern_string(const ddog_prof_ProfilesDictionary *dict,
   return string_id;
 }
 
+std::string_view get_string(const ddog_prof_ProfilesDictionary *dict,
+                            ddog_prof_StringId2 string_id) {
+  if (!dict || !string_id) {
+    return {};
+  }
+  ddog_CharSlice result{nullptr, 0};
+  ddog_prof_Status status =
+      ddog_prof_ProfilesDictionary_get_str(&result, dict, string_id);
+  if (status.err != nullptr) {
+    ddog_prof_Status_drop(&status);
+    return {};
+  }
+  if (!result.ptr || result.len == 0) {
+    return {};
+  }
+  return {result.ptr, result.len};
+}
+
+std::string_view get_location2_function_name(
+    const ddog_prof_ProfilesDictionary *dict, const ddog_prof_Location2 &loc) {
+  if (!loc.function) {
+    return {};
+  }
+  return get_string(dict, loc.function->name);
+}
+
+std::string_view get_location2_mapping_filename(
+    const ddog_prof_ProfilesDictionary *dict, const ddog_prof_Location2 &loc) {
+  if (!loc.mapping) {
+    return {};
+  }
+  return get_string(dict, loc.mapping->filename);
+}
+
 ddog_prof_FunctionId2
 intern_function_ids(const ddog_prof_ProfilesDictionary *dict,
                     ddog_prof_StringId2 name_id, ddog_prof_StringId2 file_id,

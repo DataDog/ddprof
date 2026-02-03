@@ -122,7 +122,8 @@ bool is_ld(const std::string_view path) {
   return path.starts_with("ld-");
 }
 
-bool is_stack_complete(std::span<const ddog_prof_Location> locations) {
+bool is_stack_complete(std::span<const ddog_prof_Location2> locations,
+                       const ddog_prof_ProfilesDictionary *dict) {
   static constexpr std::array s_expected_root_frames{
       // Consider empty as OK (to avoid false incomplete frames)
       // If we have no symbols, we could still retrieve them in the backend.
@@ -144,21 +145,21 @@ bool is_stack_complete(std::span<const ddog_prof_Location> locations) {
   }
 
   const auto &root_loc = locations.back();
-  const std::string_view root_mapping{root_loc.mapping.filename.ptr,
-                                      root_loc.mapping.filename.len};
+  const std::string_view root_mapping =
+      get_location2_mapping_filename(dict, root_loc);
   // If we are in ld.so (eg. during lib init before main) consider the stack as
   // complete
   if (is_ld(root_mapping)) {
     return true;
   }
 
-  const std::string_view root_func =
-      std::string_view(root_loc.function.name.ptr, root_loc.function.name.len);
+  const std::string_view root_func = get_location2_function_name(dict, root_loc);
   return std::find(s_expected_root_frames.begin(), s_expected_root_frames.end(),
                    root_func) != s_expected_root_frames.end();
 }
 
-void ddprof_print_sample(std::span<const ddog_prof_Location> locations,
+void ddprof_print_sample(std::span<const ddog_prof_Location2> locations,
+                         const ddog_prof_ProfilesDictionary *dict,
                          uint64_t value, pid_t pid, pid_t tid,
                          EventAggregationModePos value_mode_pos,
                          const PerfWatcher &watcher) {
@@ -172,11 +173,12 @@ void ddprof_print_sample(std::span<const ddog_prof_Location> locations,
     if (loc_it != locations.rbegin()) {
       buf += ";";
     }
-    // Access function name and source file from location
-    const std::string_view function_name{loc_it->function.name.ptr,
-                                         loc_it->function.name.len};
-    const std::string_view source_file{loc_it->function.filename.ptr,
-                                       loc_it->function.filename.len};
+    const std::string_view function_name =
+        get_location2_function_name(dict, *loc_it);
+    std::string_view source_file;
+    if (loc_it->function) {
+      source_file = get_string(dict, loc_it->function->file_name);
+    }
     if (!function_name.empty()) {
       // Append the function name, trimming at the first '(' if present.
       buf += function_name.substr(0, function_name.find('('));
@@ -389,7 +391,8 @@ DDRes process_symbolization(
   // check if unwinding stops on a frame that makes sense
   if (write_index < (kMaxStackDepth - 1) && write_index >= 1 &&
       !is_stack_complete(
-          std::span<ddog_prof_Location>{locations_buff.data(), write_index})) {
+          std::span<ddog_prof_Location2>{locations2_buff.data(), write_index},
+          dict)) {
     // Write a common frame to indicate an incomplete stack
     write_location(0, k_common_frame_names[incomplete_stack], {}, 0, {},
                    &locations_buff[write_index]);
@@ -589,7 +592,8 @@ DDRes pprof_aggregate_interned_sample(
                       pprof->_dict_label_key_ids, std::span{labels});
 
   if (show_samples) {
-    ddprof_print_sample(std::span{locations_buff.data(), write_index},
+    ddprof_print_sample(std::span{locations2_buff.data(), write_index},
+                        symbol_hdr.profiles_dictionary(),
                         pack.value, uw_output->pid, uw_output->tid, value_pos,
                         *watcher);
   }
