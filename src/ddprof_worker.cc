@@ -72,7 +72,7 @@ DDRes report_lost_events(DDProfContext &ctx) {
       LG_NTC("Reporting %lu lost samples (cumulated lost value: %lu) for "
              "watcher #%d",
              nb_lost, value, watcher_idx);
-      DDRES_CHECK_FWD(pprof_aggregate(
+      DDRES_CHECK_FWD(pprof_aggregate_interned_sample(
           &us->output, us->symbol_hdr, {value, nb_lost, 0}, watcher,
           ctx.worker_ctx.us->dso_hdr.get_file_info_vector(), false, kSumPos,
           ctx.worker_ctx.symbolizer,
@@ -453,7 +453,7 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
       const DDProfValuePack pack{static_cast<int64_t>(sample_val), 1,
                                  timestamp};
 
-      DDRES_CHECK_FWD(pprof_aggregate(
+      DDRES_CHECK_FWD(pprof_aggregate_interned_sample(
           &us->output, us->symbol_hdr, pack, watcher,
           us->dso_hdr.get_file_info_vector(), ctx.params.show_samples, kSumPos,
           ctx.worker_ctx.symbolizer, pprof));
