@@ -70,14 +70,14 @@ bool RuntimeSymbolLookup::insert_or_replace(
     symbol_map.emplace_hint(
         find_res.first, address,
         SymbolSpan(address + code_size - 1, symbol_table.size()));
-    symbol_table.emplace_back(make_symbol(std::string(symbol),
-                                          std::string(symbol), 0, "jit",
-                                          dict));
+    symbol_table.emplace_back(
+        make_symbol(std::string(symbol), std::string(symbol), 0, "jit", dict));
   } else {
     // todo managing range erase (we can overall with other syms)
     SymbolIdx_t const existing = find_res.first->second.get_symbol_idx();
     ddog_prof_StringId2 name_id = intern_string(dict, symbol);
-    if (symbol_table[existing]._name_id == name_id) {
+    if (symbol_table[existing]._function_id &&
+        symbol_table[existing]._function_id->name == name_id) {
       find_res.first->second.set_end(address + code_size - 1);
     } else {
       // remove current element (as start can be different)
@@ -85,11 +85,7 @@ bool RuntimeSymbolLookup::insert_or_replace(
       symbol_map.emplace(address,
                          SymbolSpan(address + code_size - 1, existing));
       Symbol &existing_symbol = symbol_table[existing];
-      existing_symbol._name_id = name_id;
-      existing_symbol._file_id = intern_string(dict, "jit");
-      existing_symbol._function_id = intern_function_ids(
-          dict, existing_symbol._name_id, existing_symbol._file_id,
-          DDOG_PROF_STRINGID2_EMPTY);
+      existing_symbol._function_id = intern_function(dict, symbol, "jit");
     }
   }
 
@@ -173,11 +169,9 @@ DDRes RuntimeSymbolLookup::fill_from_perfmap(
   return {};
 }
 
-SymbolIdx_t
-RuntimeSymbolLookup::get_or_insert_jitdump(pid_t pid, ProcessAddress_t pc,
-                                           SymbolTable &symbol_table,
-                                           const ddog_prof_ProfilesDictionary *dict,
-                                           std::string_view jitdump_path) {
+SymbolIdx_t RuntimeSymbolLookup::get_or_insert_jitdump(
+    pid_t pid, ProcessAddress_t pc, SymbolTable &symbol_table,
+    const ddog_prof_ProfilesDictionary *dict, std::string_view jitdump_path) {
   SymbolInfo &symbol_info = _pid_map[pid];
   SymbolMap::FindRes find_res = symbol_info._map.find_closest(pc);
   if (!find_res.second && !has_lookup_failure(symbol_info, jitdump_path)) {
@@ -199,9 +193,10 @@ RuntimeSymbolLookup::get_or_insert_jitdump(pid_t pid, ProcessAddress_t pc,
   return find_res.second ? find_res.first->second.get_symbol_idx() : -1;
 }
 
-SymbolIdx_t RuntimeSymbolLookup::get_or_insert(pid_t pid, ProcessAddress_t pc,
-                                               SymbolTable &symbol_table,
-                                               const ddog_prof_ProfilesDictionary *dict) {
+SymbolIdx_t
+RuntimeSymbolLookup::get_or_insert(pid_t pid, ProcessAddress_t pc,
+                                   SymbolTable &symbol_table,
+                                   const ddog_prof_ProfilesDictionary *dict) {
   SymbolInfo &symbol_info = _pid_map[pid];
   SymbolMap::FindRes find_res = symbol_info._map.find_closest(pc);
 

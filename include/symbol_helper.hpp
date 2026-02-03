@@ -6,8 +6,8 @@
 #include "unwind_state.hpp"
 
 #include <array>
-#include <datadog/profiling.h>
 #include <datadog/blazesym.h>
+#include <datadog/profiling.h>
 #include <unistd.h>
 #include <vector>
 
@@ -43,12 +43,12 @@ std::vector<std::string> collect_symbols(UnwindState &state,
     } else {
       // Lookup the symbol from the symbol table.
       auto &symbol = symbol_table[state.output.locs[iloc].symbol_idx];
-      if (!dict || !symbol._name_id) {
+      if (!dict || !symbol._function_id) {
         demangled_name = "unknown";
       } else {
         ddog_CharSlice slice{nullptr, 0};
-        ddog_prof_Status status =
-            ddog_prof_ProfilesDictionary_get_str(&slice, dict, symbol._name_id);
+        ddog_prof_Status status = ddog_prof_ProfilesDictionary_get_str(
+            &slice, dict, symbol._function_id->name);
         if (status.err != nullptr) {
           ddog_prof_Status_drop(&status);
           demangled_name = "unknown";

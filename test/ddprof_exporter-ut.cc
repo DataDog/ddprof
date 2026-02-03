@@ -162,7 +162,7 @@ TEST(DDProfExporter, simple) {
     DDProfContext ctx = {};
     ctx.watchers.push_back(*ewatcher_from_str("sCPU"));
     res = pprof_create_profile(&pprofs, ctx,
-                                symbol_hdr._profiles_dictionary.get());
+                               symbol_hdr._profiles_dictionary.get());
     EXPECT_TRUE(IsDDResOK(res));
     res = pprof_aggregate_interned_sample(
         &mock_output, symbol_hdr, {1000, 1, 0}, &ctx.watchers[0], file_infos,

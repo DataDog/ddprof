@@ -61,7 +61,8 @@ void init_dict_label_key_ids(DDProfPProf::DictLabelKeyIds &label_keys,
   label_keys.tracepoint_type = intern_string(dict, k_tracepoint_label);
 }
 
-size_t prepare_labels2(const UnwindOutput &uw_output, const PerfWatcher &watcher,
+size_t prepare_labels2(const UnwindOutput &uw_output,
+                       const PerfWatcher &watcher,
                        std::unordered_map<pid_t, std::string> &pid_strs,
                        const DDProfPProf::DictLabelKeyIds &label_keys,
                        std::span<ddog_prof_Label2> labels) {
@@ -153,7 +154,8 @@ bool is_stack_complete(std::span<const ddog_prof_Location2> locations,
     return true;
   }
 
-  const std::string_view root_func = get_location2_function_name(dict, root_loc);
+  const std::string_view root_func =
+      get_location2_function_name(dict, root_loc);
   return std::find(s_expected_root_frames.begin(), s_expected_root_frames.end(),
                    root_func) != s_expected_root_frames.end();
 }
@@ -566,10 +568,10 @@ DDRes pprof_aggregate_interned_sample(
 
   Symbolizer::BlazeResultsWrapper session_results;
   unsigned write_index = 0;
-  DDRES_CHECK_FWD(process_symbolization(
-      locs, symbol_hdr, file_infos, symbolizer,
-      symbol_hdr.profiles_dictionary(), locations2_buff, session_results,
-      write_index));
+  DDRES_CHECK_FWD(
+      process_symbolization(locs, symbol_hdr, file_infos, symbolizer,
+                            symbol_hdr.profiles_dictionary(), locations2_buff,
+                            session_results, write_index));
 
   std::array<ddog_prof_Label2, k_max_pprof_labels> labels{};
   const size_t labels_num =
@@ -578,9 +580,8 @@ DDRes pprof_aggregate_interned_sample(
 
   if (show_samples) {
     ddprof_print_sample(std::span{locations2_buff.data(), write_index},
-                        symbol_hdr.profiles_dictionary(),
-                        pack.value, uw_output->pid, uw_output->tid, value_pos,
-                        *watcher);
+                        symbol_hdr.profiles_dictionary(), pack.value,
+                        uw_output->pid, uw_output->tid, value_pos, *watcher);
   }
 
   ddog_prof_Sample2 const sample = {
@@ -589,7 +590,8 @@ DDRes pprof_aggregate_interned_sample(
       .labels = {.ptr = labels.data(), .len = labels_num},
   };
 
-  ddog_prof_Status res = ddog_prof_Profile_add2(profile, sample, pack.timestamp);
+  ddog_prof_Status res =
+      ddog_prof_Profile_add2(profile, sample, pack.timestamp);
   if (res.err != nullptr) {
     defer { ddog_prof_Status_drop(&res); };
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile: %s", res.err);

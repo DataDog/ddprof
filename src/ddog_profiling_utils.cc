@@ -62,16 +62,18 @@ std::string_view get_string(const ddog_prof_ProfilesDictionary *dict,
   return {result.ptr, result.len};
 }
 
-std::string_view get_location2_function_name(
-    const ddog_prof_ProfilesDictionary *dict, const ddog_prof_Location2 &loc) {
+std::string_view
+get_location2_function_name(const ddog_prof_ProfilesDictionary *dict,
+                            const ddog_prof_Location2 &loc) {
   if (!loc.function) {
     return {};
   }
   return get_string(dict, loc.function->name);
 }
 
-std::string_view get_location2_mapping_filename(
-    const ddog_prof_ProfilesDictionary *dict, const ddog_prof_Location2 &loc) {
+std::string_view
+get_location2_mapping_filename(const ddog_prof_ProfilesDictionary *dict,
+                               const ddog_prof_Location2 &loc) {
   if (!loc.mapping) {
     return {};
   }
@@ -91,9 +93,8 @@ intern_function_ids(const ddog_prof_ProfilesDictionary *dict,
       .file_name = file_id,
   };
   ddog_prof_FunctionId2 function_id = nullptr;
-  ddog_prof_Status status =
-      ddog_prof_ProfilesDictionary_insert_function(&function_id, dict,
-                                                   &function);
+  ddog_prof_Status status = ddog_prof_ProfilesDictionary_insert_function(
+      &function_id, dict, &function);
   if (status.err != nullptr) {
     LG_WRN("Failed to intern function: %s", status.err);
     ddog_prof_Status_drop(&status);
@@ -139,11 +140,9 @@ Symbol make_symbol(std::string symname, std::string demangled_name,
                    uint32_t lineno, std::string srcpath,
                    const ddog_prof_ProfilesDictionary *dict) {
   [[maybe_unused]] std::string ignored_symname = std::move(symname);
-  ddog_prof_StringId2 name_id = intern_string(dict, demangled_name);
-  ddog_prof_StringId2 file_id = intern_string(dict, srcpath);
   ddog_prof_FunctionId2 function_id =
-      intern_function_ids(dict, name_id, file_id, DDOG_PROF_STRINGID2_EMPTY);
-  return Symbol(name_id, file_id, lineno, function_id);
+      intern_function(dict, demangled_name, srcpath);
+  return Symbol(lineno, function_id);
 }
 
 void write_location2(const FunLoc &loc, const MapInfo &mapinfo,
