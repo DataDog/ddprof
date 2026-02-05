@@ -35,6 +35,14 @@ pthread_key_t AllocationTracker::_tl_state_key;
 AllocationTracker *AllocationTracker::_instance;
 
 namespace {
+
+#ifdef DDPROF_USE_LOADER
+extern "C"
+    __attribute((tls_model("initial-exec"))) __thread void *ddprof_lib_state;
+#else
+__attribute((tls_model("initial-exec"))) __thread void *ddprof_lib_state;
+#endif
+
 DDPROF_NOINLINE auto sleep_and_retry_reserve(MPSCRingBufferWriter &writer,
                                              size_t size, bool &timeout) {
   constexpr std::chrono::nanoseconds k_sleep_duration =
@@ -53,13 +61,7 @@ DDPROF_NOINLINE auto sleep_and_retry_reserve(MPSCRingBufferWriter &writer,
 } // namespace
 
 TrackerThreadLocalState *AllocationTracker::get_tl_state() {
-  // In shared libraries, TLS access requires a call to tls_get_addr,
-  // tls_get_addr can call into malloc, which can create a recursive loop
-  // instead we call pthread APIs to control the creation of TLS objects
-  pthread_once(&_key_once, make_key);
-  auto *tl_state = static_cast<TrackerThreadLocalState *>(
-      pthread_getspecific(_tl_state_key));
-  return tl_state;
+  return static_cast<TrackerThreadLocalState *>(ddprof_lib_state);
 }
 
 TrackerThreadLocalState *AllocationTracker::init_tl_state() {
@@ -69,13 +71,7 @@ TrackerThreadLocalState *AllocationTracker::init_tl_state() {
   auto tl_state = std::make_unique<TrackerThreadLocalState>();
   tl_state->tid = ddprof::gettid();
   tl_state->stack_bounds = retrieve_stack_bounds();
-
-  if (int const res = pthread_setspecific(_tl_state_key, tl_state.get());
-      res != 0) {
-    // should return 0
-    LG_DBG("Unable to store tl_state. Error %d: %s\n", res, strerror(res));
-    tl_state.reset();
-  }
+  ddprof_lib_state = tl_state.get();
 
   return tl_state.release();
 }
@@ -89,11 +85,6 @@ AllocationTracker *AllocationTracker::create_instance() {
 
 void AllocationTracker::delete_tl_state(void *tl_state) {
   delete static_cast<TrackerThreadLocalState *>(tl_state);
-}
-
-void AllocationTracker::make_key() {
-  // delete is called on all key objects
-  pthread_key_create(&_tl_state_key, delete_tl_state);
 }
 
 DDRes AllocationTracker::allocation_tracking_init(

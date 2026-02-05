@@ -18,6 +18,9 @@
 #include <time.h>
 #include <unistd.h>
 
+__attribute__((__visibility__("default")))
+__attribute__((tls_model("initial-exec"))) __thread void *ddprof_lib_state;
+
 /* Role of loader is to ensure that all dependencies (libdl/lim/libpthread) of
  * libdd_profiling-embedded.so are satisfied before dlopen'ing it.
  * On musl, all libc features are in libc.so and hence are available once libc
