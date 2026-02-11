@@ -92,7 +92,7 @@ DDRes ddprof_setup(DDProfContext &ctx) {
     if (ctx.params.fault_info) {
       struct sigaction sigaction_handlers = {};
       sigaction_handlers.sa_sigaction = sigsegv_handler;
-      sigaction_handlers.sa_flags = SA_SIGINFO;
+      sigaction_handlers.sa_flags = SA_SIGINFO | SA_RESETHAND;
       sigaction(SIGSEGV, &(sigaction_handlers), nullptr);
     }
 

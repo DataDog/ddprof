@@ -271,7 +271,7 @@ int main(int argc, char *argv[]) {
   try {
     struct sigaction sigaction_handlers = {};
     sigaction_handlers.sa_sigaction = sigsegv_handler;
-    sigaction_handlers.sa_flags = SA_SIGINFO;
+    sigaction_handlers.sa_flags = SA_SIGINFO | SA_RESETHAND;
     sigaction(SIGSEGV, &(sigaction_handlers), nullptr);
 
     CLI::App app{"Simple allocation test"};
