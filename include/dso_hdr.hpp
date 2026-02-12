@@ -8,7 +8,9 @@
 #include <array>
 #include <cassert>
 #include <map>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -216,6 +218,9 @@ private:
   FileInfoId_t update_id_dd_profiling(const Dso &dso);
 
   FileInfoId_t update_id_from_path(const Dso &dso);
+  std::optional<std::string>
+  remap_host_workspace_path(std::string_view original) const;
+  void init_workspace_remap();
 
   // Unordered map (by pid) of sorted DSOs
   DsoPidMap _pid_map;
@@ -224,6 +229,8 @@ private:
   FileInfoVector _file_info_vector;
   std::string _path_to_proc; // /proc files can be mounted at various places
                              // (whole host profiling)
+  std::string _workspace_host_prefix;
+  std::string _workspace_container_root;
   int _dd_profiling_fd;
   // Assumption is that we have a single version of the dd_profiling library
   // across all PIDs.
