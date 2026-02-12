@@ -25,6 +25,10 @@ struct TrackerThreadLocalState {
                                  // should not allocate because we might already
                                  // be inside an allocation)
 
+  // Set to true by placement new in init_tl_state().
+  // Zero-initialized (false) in a fresh thread's TLS before init.
+  bool initialized{true};
+
   // In the choice of random generators, this one is smaller
   // - smaller than mt19937 (8 vs 5K)
   std::minstd_rand gen{std::random_device{}()};
