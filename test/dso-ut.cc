@@ -5,10 +5,15 @@
 
 #include "dso_hdr.hpp"
 
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <gtest/gtest.h>
 #include <pthread.h>
 #include <string>
 #include <sys/mman.h>
+#include <unistd.h>
+#include <vector>
 
 #include "defer.hpp"
 #include "loghandle.hpp"
@@ -391,6 +396,41 @@ TEST(DSOTest, missing_dso) {
   FileInfo file_info = dso_hdr.find_file_info(foo_dso);
   EXPECT_TRUE(file_info._path.empty());
   EXPECT_FALSE(file_info._inode);
+}
+
+TEST(DSOTest, WorkspaceRemapping) {
+  // Create temporary directory that will represent the in-container root.
+  std::string base_template =
+      std::filesystem::temp_directory_path() / "ddprof-workspace-remapXXXXXX";
+  std::vector<char> tmpl(base_template.begin(), base_template.end());
+  tmpl.push_back('\0');
+  char *tmp_dir = mkdtemp(tmpl.data());
+  ASSERT_NE(tmp_dir, nullptr);
+  auto cleanup_dir =
+      make_defer([&]() { std::filesystem::remove_all(tmp_dir); });
+
+  std::string container_root = tmp_dir;
+  std::string relative_path = "/subdir/test_binary";
+  std::filesystem::create_directories(container_root + "/subdir");
+
+  std::string container_file = container_root + relative_path;
+  {
+    std::ofstream ofs(container_file);
+    ofs << "test";
+  }
+
+  std::string host_prefix = "/run/host_virtiofs/Users/test/ddprof";
+  std::string host_path = host_prefix + relative_path;
+  std::string env_value = host_prefix + "|" + container_root;
+  setenv("DDPROF_WORKSPACE_ROOT", env_value.c_str(), 1);
+  auto cleanup_env = make_defer([]() { unsetenv("DDPROF_WORKSPACE_ROOT"); });
+
+  DsoHdr dso_hdr;
+  Dso remap_dso(getpid(), 0x1000, 0x2000, 0, std::move(host_path));
+  FileInfo file_info = dso_hdr.find_file_info(remap_dso);
+
+  EXPECT_EQ(file_info._path, container_file);
+  EXPECT_NE(file_info._inode, 0);
 }
 
 // clang-format off

@@ -49,7 +49,7 @@ struct LoggerContext {
   LogsAllowedCallback logs_allowed_function;
 };
 
-LoggerContext log_ctx{.fd = -1, .mode = LOG_STDERR, .level = LL_ERROR};
+LoggerContext log_ctx{};
 } // namespace
 
 void LOG_setlevel(int lvl) {
@@ -190,17 +190,13 @@ void vlprintfln(int lvl, int fac, const char *format, va_list args) {
                     "<%d>%s.%06ld %s[%d]: ", lvl + (fac * LL_LENGTH), tm_str,
                     d_us.count(), name, pid);
   } else {
+    // LL_EMERGENCY is 0
     const char *levels[LL_LENGTH] = {
-        [LL_EMERGENCY] = "EMERGENCY",
-        [LL_ALERT] = "ALERT",
-        [LL_CRITICAL] = "CRITICAL",
-        [LL_ERROR] = "ERROR",
-        [LL_WARNING] = "WARNING",
-        [LL_NOTICE] = "NOTICE",
-        [LL_INFORMATIONAL] = "INFORMATIONAL",
-        [LL_DEBUG] = "DEBUG",
+        "EMERGENCY", "ALERT",  "CRITICAL",      "ERROR",
+        "WARNING",   "NOTICE", "INFORMATIONAL", "DEBUG",
     };
-    sz_h = snprintf(buf, LOG_MSG_CAP, "<%s>%s.%06lu %s[%d]: ", levels[lvl],
+    sz_h = snprintf(buf, LOG_MSG_CAP, "<%s>%s.%06lu %s[%d]: ",
+                    (lvl >= 0 && lvl < LL_LENGTH ? levels[lvl] : "UNKNOWN"),
                     tm_str, d_us.count(), name, pid);
   }
 
