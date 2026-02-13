@@ -120,8 +120,6 @@ private:
 
   static void delete_tl_state(void *tl_state);
 
-  static void make_key();
-
   void track_allocation(uintptr_t addr, size_t size,
                         TrackerThreadLocalState &tl_state, bool is_large_alloc);
   void track_deallocation(uintptr_t addr, TrackerThreadLocalState &tl_state,
