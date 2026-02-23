@@ -14,6 +14,7 @@
 #include <unistd.h>
 
 namespace ddprof {
+namespace {
 
 #define CHECK_OR_RETURN(cond, ...)                                             \
   do {                                                                         \
@@ -72,11 +73,12 @@ int run_child(void *parent_state) {
   _exit(0);
 }
 
+} // namespace
 } // namespace ddprof
 
 int main() {
   using namespace ddprof;
-  LogHandle log_handle(LL_NOTICE);
+  const LogHandle log_handle(LL_NOTICE);
   LG_NTC("allocation_tracker_fork_test starting");
 
   // Before any init, main thread's TLS must be zero-initialized by libc,
@@ -109,7 +111,7 @@ int main() {
   fflush(stdout);
   fflush(stderr);
 
-  pid_t pid = fork();
+  const pid_t pid = fork();
   CHECK_OR_RETURN(pid != -1, "fork failed: %s", strerror(errno));
 
   if (pid == 0) {
@@ -130,7 +132,7 @@ int main() {
     return 1;
   }
 
-  int exit_code = WEXITSTATUS(status);
+  const int exit_code = WEXITSTATUS(status);
   CHECK_OR_RETURN(exit_code == 0, "child exited with code %d", exit_code);
 
   // Parent TLS should be unaffected by the fork

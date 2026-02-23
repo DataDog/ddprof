@@ -9,7 +9,11 @@
 // TrackerThreadLocalState. Used by loader.c (C) and allocation_tracker.cc
 // (C++). Correctness enforced at compile time via static_assert in
 // allocation_tracker.cc.
+#ifdef __cplusplus
+enum : unsigned char {
+#else
 enum {
+#endif
   DDPROF_TLS_STATE_SIZE = 48,
   DDPROF_TLS_STATE_ALIGN = 8,
 };
