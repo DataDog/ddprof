@@ -263,10 +263,11 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
   ddog_CharSlice const base_url = to_CharSlice(exporter->_url);
   ddog_prof_Endpoint endpoint;
   if (exporter->_agent) {
-    endpoint = ddog_prof_Endpoint_agent(base_url, k_timeout_ms);
+    endpoint = ddog_prof_Endpoint_agent(base_url, k_timeout_ms, false);
   } else {
     ddog_CharSlice const api_key = to_CharSlice(exporter->_input.api_key);
-    endpoint = ddog_prof_Endpoint_agentless(base_url, api_key, k_timeout_ms);
+    endpoint =
+        ddog_prof_Endpoint_agentless(base_url, api_key, k_timeout_ms, false);
   }
 
   ddog_prof_ProfileExporter_Result res_exporter = ddog_prof_Exporter_new(
