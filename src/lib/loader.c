@@ -6,6 +6,7 @@
 #include "constants.hpp"
 #include "dd_profiling.h"
 #include "lib_embedded_data.h"
+#include "tls_state_storage.h"
 
 #include <dlfcn.h>
 #include <fcntl.h>
@@ -17,6 +18,11 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+
+__attribute__((__visibility__("default")))
+__attribute__((tls_model("initial-exec")))
+__attribute__((aligned(DDPROF_TLS_STATE_ALIGN))) __thread char
+    ddprof_lib_state[DDPROF_TLS_STATE_SIZE];
 
 /* Role of loader is to ensure that all dependencies (libdl/lim/libpthread) of
  * libdd_profiling-embedded.so are satisfied before dlopen'ing it.

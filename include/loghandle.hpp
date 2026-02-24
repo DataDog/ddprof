@@ -15,5 +15,9 @@ public:
     LOG_setlevel(lvl);
   }
   ~LogHandle() { LOG_close(); }
+  LogHandle(const LogHandle &) = delete;
+  LogHandle &operator=(const LogHandle &) = delete;
+  LogHandle(LogHandle &&) = delete;
+  LogHandle &operator=(LogHandle &&) = delete;
 };
 } // namespace ddprof

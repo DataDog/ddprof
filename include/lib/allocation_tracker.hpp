@@ -16,7 +16,6 @@
 #include <cstddef>
 #include <functional>
 #include <mutex>
-#include <pthread.h>
 
 namespace ddprof {
 
@@ -118,10 +117,6 @@ private:
 
   static AllocationTracker *create_instance();
 
-  static void delete_tl_state(void *tl_state);
-
-  static void make_key();
-
   void track_allocation(uintptr_t addr, size_t size,
                         TrackerThreadLocalState &tl_state, bool is_large_alloc);
   void track_deallocation(uintptr_t addr, TrackerThreadLocalState &tl_state,
@@ -157,11 +152,6 @@ private:
 
   AddressBitset _allocated_address_set;
   IntervalTimerCheck _interval_timer_check;
-
-  // These can not be tied to the internal state of the instance.
-  // The creation of the instance depends on this
-  static pthread_once_t _key_once; // ensures we call key creation a single time
-  static pthread_key_t _tl_state_key;
 
   static AllocationTracker *_instance;
 };
