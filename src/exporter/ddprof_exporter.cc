@@ -60,10 +60,17 @@ DDRes create_pprof_file(ddog_Timespec start, const char *dbg_pprof_prefix,
 
 /// Write pprof to a valid file descriptor : allows to use pprof tools
 DDRes write_profile(const ddog_ByteSlice *buffer, int fd) {
-  if (write(fd, buffer->ptr, buffer->len) == 0) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER,
-                           "Failed to write byte buffer to stdout! %s\n",
-                           strerror(errno));
+  auto remaining = buffer->len;
+  auto ptr = buffer->ptr;
+  while (remaining > 0) {
+    ssize_t const written = write(fd, ptr, remaining);
+    if (written < 0) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER,
+                             "Failed to write profile data: %s\n",
+                             strerror(errno));
+    }
+    remaining -= written;
+    ptr += written;
   }
   return {};
 }
