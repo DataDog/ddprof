@@ -43,7 +43,12 @@ UniqueFile open_proc_maps(int pid, const char *path_to_proc = "") {
   }
 
   UniqueFile f{fopen(proc_map_filename, "r")};
-  if (!f) {
+  if (!f && is_root()) {
+    // UID elevation only helps when running as root.
+    // For non-root users with file capabilities, the UID round-trip
+    // (e.g. 1000->0->1000) triggers the kernel's capability clearing rule:
+    // when all UIDs become nonzero, all capabilities are permanently lost.
+    // This destroys IPC_LOCK and PERFMON needed for profiling.
     // Check if the file exists
     struct stat info;
     UIDInfo old_uids;
