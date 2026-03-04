@@ -210,8 +210,8 @@ static char *get_or_create_temp_file(const char *prefix, EmbeddedData data,
   }
 
   // +3 for '/' separator, '-' separator, and NUL terminator
-  char *path =
-      malloc(strlen(tmp_dir) + 1 + strlen(prefix) + 1 + strlen(data.digest) + 1);
+  char *path = malloc(strlen(tmp_dir) + 1 + strlen(prefix) + 1 +
+                      strlen(data.digest) + 1);
   if (path == NULL) {
     return NULL;
   }
