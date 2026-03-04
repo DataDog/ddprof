@@ -268,9 +268,9 @@ int exec_ddprof(pid_t target_pid, pid_t parent_pid,
                 int pipefd_to_library) noexcept {
   char ddprof_str[] = "ddprof";
 
-  char pid_buf[std::numeric_limits<pid_t>::digits10 + 1];
+  char pid_buf[std::numeric_limits<pid_t>::digits10 + 2];
   (void)snprintf(pid_buf, sizeof(pid_buf), "%d", target_pid);
-  char pipefd_buf[std::numeric_limits<int>::digits10 + 1];
+  char pipefd_buf[std::numeric_limits<int>::digits10 + 2];
   (void)snprintf(pipefd_buf, sizeof(pipefd_buf), "%d", pipefd_to_library);
 
   char pid_opt_str[] = "-p";
