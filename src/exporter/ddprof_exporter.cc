@@ -261,12 +261,17 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
   fill_stable_tags(user_tags, exporter, tags_exporter);
 
   ddog_CharSlice const base_url = to_CharSlice(exporter->_url);
+  // ddprof is an out-of-process profiler and does not fork during export,
+  // so the system DNS resolver (/etc/resolv.conf) is safe and preferred.
+  constexpr bool k_use_system_resolver = true;
   ddog_prof_Endpoint endpoint;
   if (exporter->_agent) {
-    endpoint = ddog_prof_Endpoint_agent(base_url, k_timeout_ms);
+    endpoint =
+        ddog_prof_Endpoint_agent(base_url, k_timeout_ms, k_use_system_resolver);
   } else {
     ddog_CharSlice const api_key = to_CharSlice(exporter->_input.api_key);
-    endpoint = ddog_prof_Endpoint_agentless(base_url, api_key, k_timeout_ms);
+    endpoint = ddog_prof_Endpoint_agentless(base_url, api_key, k_timeout_ms,
+                                            k_use_system_resolver);
   }
 
   ddog_prof_ProfileExporter_Result res_exporter = ddog_prof_Exporter_new(
