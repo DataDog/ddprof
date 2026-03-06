@@ -65,6 +65,9 @@ DDRes write_profile(const ddog_ByteSlice *buffer, int fd) {
   while (remaining > 0) {
     ssize_t const written = write(fd, ptr, remaining);
     if (written < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
       DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER,
                              "Failed to write profile data: %s\n",
                              strerror(errno));
