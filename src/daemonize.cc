@@ -25,7 +25,10 @@ DaemonizeResult daemonize_error() {
 
 DaemonizeResult daemonize() {
   int pipefd[2];
-  if (pipe2(pipefd, O_CLOEXEC) == -1) {
+  // No O_CLOEXEC: the write end is passed to ddprof via --pipefd and must
+  // survive the execve() in exec_ddprof() so ddprof can write back the socket
+  // path to the library.
+  if (pipe2(pipefd, 0) == -1) {
     return daemonize_error();
   }
 
