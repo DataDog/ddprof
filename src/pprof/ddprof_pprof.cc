@@ -34,6 +34,7 @@ namespace ddprof {
 // libdatadog enum values. If any of these fail, update the k_stype_val_*
 // constants in watcher_sample_types.hpp to match the new libdatadog version.
 static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_SAMPLE) == 37);
+static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_TRACEPOINT) == 38);
 static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_CPU_TIME) == 4);
 static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_CPU_SAMPLES) == 5);
 static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_ALLOC_SPACE) == 3);
@@ -48,24 +49,46 @@ constexpr size_t k_max_pprof_labels{8};
 // debug log output (must match what simple_malloc-ut.sh greps for).
 constexpr const char *sample_type_name(uint32_t raw_type) {
   switch (raw_type) {
-  case 4:
-    return "cpu-time"; // DDOG_PROF_SAMPLE_TYPE_CPU_TIME
-  case 5:
-    return "cpu-samples"; // DDOG_PROF_SAMPLE_TYPE_CPU_SAMPLES
-  case 3:
-    return "alloc-space"; // DDOG_PROF_SAMPLE_TYPE_ALLOC_SPACE
-  case 0:
-    return "alloc-samples"; // DDOG_PROF_SAMPLE_TYPE_ALLOC_SAMPLES
-  case 28:
-    return "inuse-space"; // DDOG_PROF_SAMPLE_TYPE_INUSE_SPACE
-  case 27:
-    return "inuse-objects"; // DDOG_PROF_SAMPLE_TYPE_INUSE_OBJECTS
-  case 37:
-    return "sample"; // DDOG_PROF_SAMPLE_TYPE_SAMPLE
+  case k_stype_val_cpu_time:
+    return "cpu-time";
+  case k_stype_val_cpu_samples:
+    return "cpu-samples";
+  case k_stype_val_alloc_space:
+    return "alloc-space";
+  case k_stype_val_alloc_samples:
+    return "alloc-samples";
+  case k_stype_val_inuse_space:
+    return "inuse-space";
+  case k_stype_val_inuse_objects:
+    return "inuse-objects";
+  case k_stype_val_sample:
+    return "sample";
+  case k_stype_val_tracepoint:
+    return "tracepoint";
   default:
     return "unknown";
   }
 }
+
+// Verify that sample_type_name() returns the strings the backend expects.
+// These must match what libdatadog writes into the pprof string table for each
+// ddog_prof_SampleType enum value.
+static_assert(std::string_view(sample_type_name(k_stype_val_cpu_time)) ==
+              "cpu-time");
+static_assert(std::string_view(sample_type_name(k_stype_val_cpu_samples)) ==
+              "cpu-samples");
+static_assert(std::string_view(sample_type_name(k_stype_val_alloc_space)) ==
+              "alloc-space");
+static_assert(std::string_view(sample_type_name(k_stype_val_alloc_samples)) ==
+              "alloc-samples");
+static_assert(std::string_view(sample_type_name(k_stype_val_inuse_space)) ==
+              "inuse-space");
+static_assert(std::string_view(sample_type_name(k_stype_val_inuse_objects)) ==
+              "inuse-objects");
+static_assert(std::string_view(sample_type_name(k_stype_val_tracepoint)) ==
+              "tracepoint");
+static_assert(std::string_view(sample_type_name(k_stype_val_sample)) ==
+              "sample");
 
 // Upper bound on distinct ddog_prof_SampleType slots (sum + live types +
 // their count companions across all watcher kinds).

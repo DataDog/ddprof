@@ -25,19 +25,22 @@ struct WatcherSampleTypes {
 // ddog_prof_SampleType integer values for libdatadog v28.
 // Stored as uint32_t to avoid including <datadog/common.h> here.
 // Static asserts in ddprof_pprof.cc verify these against the actual enum.
-inline constexpr uint32_t k_stype_val_sample = 37;       // SAMPLE
-inline constexpr uint32_t k_stype_val_cpu_time = 4;      // CPU_TIME
-inline constexpr uint32_t k_stype_val_cpu_samples = 5;   // CPU_SAMPLES
-inline constexpr uint32_t k_stype_val_alloc_space = 3;   // ALLOC_SPACE
-inline constexpr uint32_t k_stype_val_alloc_samples = 0; // ALLOC_SAMPLES
-inline constexpr uint32_t k_stype_val_inuse_space = 28;  // INUSE_SPACE
+inline constexpr uint32_t k_stype_val_sample = 37;        // SAMPLE
+inline constexpr uint32_t k_stype_val_tracepoint = 38;    // TRACEPOINT
+inline constexpr uint32_t k_stype_val_cpu_time = 4;       // CPU_TIME
+inline constexpr uint32_t k_stype_val_cpu_samples = 5;    // CPU_SAMPLES
+inline constexpr uint32_t k_stype_val_alloc_space = 3;    // ALLOC_SPACE
+inline constexpr uint32_t k_stype_val_alloc_samples = 0;  // ALLOC_SAMPLES
+inline constexpr uint32_t k_stype_val_inuse_space = 28;   // INUSE_SPACE
 inline constexpr uint32_t k_stype_val_inuse_objects = 27; // INUSE_OBJECTS
 
 // Generic sample counting (hardware events, misc software events).
+// count_types use the sentinel (k_stype_val_sample) because tracepoints
+// have no count companion — each sample represents one event occurrence.
 // clang-format off
 inline constexpr WatcherSampleTypes k_stype_tracepoint = {
-    {k_stype_val_sample,      k_stype_val_sample},
-    {k_stype_val_sample,      k_stype_val_sample}};
+    {k_stype_val_tracepoint, k_stype_val_tracepoint},
+    {k_stype_val_sample,     k_stype_val_sample}};
 
 // CPU: wall/cpu nanoseconds in sum mode, sample count in live mode.
 inline constexpr WatcherSampleTypes k_stype_cpu = {
