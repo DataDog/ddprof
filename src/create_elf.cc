@@ -16,7 +16,7 @@ namespace ddprof {
 UniqueElf create_elf_from_self() {
   elf_version(EV_CURRENT);
 
-  UniqueFd exe_fd{::open("/proc/self/exe", O_RDONLY | O_CLOEXEC)};
+  const UniqueFd exe_fd{::open("/proc/self/exe", O_RDONLY | O_CLOEXEC)};
   if (!exe_fd) {
     LG_WRN("Failed to open /proc/self/exe");
     return {};

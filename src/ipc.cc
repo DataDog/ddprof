@@ -426,7 +426,8 @@ void WorkerServer::event_loop() {
     poll_fds.erase(last, poll_fds.end());
     // Do not accept new connections if shutting down
     if ((poll_fds[0].revents & POLLIN) && !shutting_down) {
-      int const new_socket = ::accept4(poll_fds[0].fd, nullptr, nullptr, SOCK_CLOEXEC);
+      int const new_socket =
+          ::accept4(poll_fds[0].fd, nullptr, nullptr, SOCK_CLOEXEC);
       if (new_socket != -1) {
         auto tv = duration_to_timeval(kDefaultSocketTimeout);
         ::setsockopt(new_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
