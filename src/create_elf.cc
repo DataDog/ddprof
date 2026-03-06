@@ -7,6 +7,7 @@
 
 #include "dso_hdr.hpp"
 #include "logger.hpp"
+#include "unique_fd.hpp"
 
 #include <fcntl.h>
 
@@ -15,13 +16,13 @@ namespace ddprof {
 UniqueElf create_elf_from_self() {
   elf_version(EV_CURRENT);
 
-  const int exe_fd = ::open("/proc/self/exe", O_RDONLY);
-  if (exe_fd == -1) {
-    LG_WRN("Failed to open /prox/self/exe");
+  const UniqueFd exe_fd{::open("/proc/self/exe", O_RDONLY | O_CLOEXEC)};
+  if (!exe_fd) {
+    LG_WRN("Failed to open /proc/self/exe");
     return {};
   }
 
-  UniqueElf elf{elf_begin(exe_fd, ELF_C_READ_MMAP, nullptr)};
+  UniqueElf elf{elf_begin(exe_fd.get(), ELF_C_READ_MMAP, nullptr)};
   if (!elf) {
     LG_WRN("Failed to create elf from memory: %s", elf_errmsg(-1));
     return {};
@@ -32,7 +33,6 @@ UniqueElf create_elf_from_self() {
     return {};
   }
 
-  ::close(exe_fd);
   return elf;
 }
 } // namespace ddprof
