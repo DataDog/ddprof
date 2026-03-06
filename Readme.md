@@ -122,7 +122,7 @@ Architectural showpieces and such will always be available in the `docs/` folder
 
 - [Build](./docs/Build.md)
 - [Design](./docs/Design.md)
-- [Automatically updated list of commads](./docs/Commands.md)
+- [Automatically updated list of commands](./docs/Commands.md)
 - [Troubleshooting](./docs/Troubleshooting.md)
 
 ## Reaching-out
