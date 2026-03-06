@@ -30,16 +30,69 @@ using namespace std::string_view_literals;
 
 namespace ddprof {
 
+// Verify that the uint32_t constants in watcher_sample_types.hpp match the
+// libdatadog enum values. If any of these fail, update the k_stype_val_*
+// constants in watcher_sample_types.hpp to match the new libdatadog version.
+static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_SAMPLE) == 37);
+static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_TRACEPOINT) == 38);
+static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_CPU_TIME) == 4);
+static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_CPU_SAMPLES) == 5);
+static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_ALLOC_SPACE) == 3);
+static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_ALLOC_SAMPLES) == 0);
+static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_INUSE_SPACE) == 28);
+static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_INUSE_OBJECTS) == 27);
+
 namespace {
 constexpr size_t k_max_pprof_labels{8};
 
-constexpr int k_max_value_types =
-    DDPROF_PWT_LENGTH * static_cast<int>(kNbEventAggregationModes);
+// Maps a ddog_prof_SampleType integer value to the kebab-case name used in
+// debug log output (must match what simple_malloc-ut.sh greps for).
+constexpr const char *sample_type_name(uint32_t raw_type) {
+  switch (raw_type) {
+  case k_stype_val_sample:
+    return "sample";
+  case k_stype_val_tracepoint:
+    return "tracepoint";
+  case k_stype_val_cpu_time:
+    return "cpu-time";
+  case k_stype_val_cpu_samples:
+    return "cpu-samples";
+  case k_stype_val_alloc_space:
+    return "alloc-space";
+  case k_stype_val_alloc_samples:
+    return "alloc-samples";
+  case k_stype_val_inuse_space:
+    return "inuse-space";
+  case k_stype_val_inuse_objects:
+    return "inuse-objects";
+  default:
+    return "unknown";
+  }
+}
 
-struct ActiveIdsResult {
-  EventAggregationMode output_mode[DDPROF_PWT_LENGTH] = {};
-  PerfWatcher *default_watcher = nullptr;
-};
+// Verify that sample_type_name() returns the strings the backend expects.
+// These must match what libdatadog writes into the pprof string table for each
+// ddog_prof_SampleType enum value.
+static_assert(std::string_view(sample_type_name(k_stype_val_cpu_time)) ==
+              "cpu-time");
+static_assert(std::string_view(sample_type_name(k_stype_val_cpu_samples)) ==
+              "cpu-samples");
+static_assert(std::string_view(sample_type_name(k_stype_val_alloc_space)) ==
+              "alloc-space");
+static_assert(std::string_view(sample_type_name(k_stype_val_alloc_samples)) ==
+              "alloc-samples");
+static_assert(std::string_view(sample_type_name(k_stype_val_inuse_space)) ==
+              "inuse-space");
+static_assert(std::string_view(sample_type_name(k_stype_val_inuse_objects)) ==
+              "inuse-objects");
+static_assert(std::string_view(sample_type_name(k_stype_val_tracepoint)) ==
+              "tracepoint");
+static_assert(std::string_view(sample_type_name(k_stype_val_sample)) ==
+              "sample");
+
+// Upper bound on distinct ddog_prof_SampleType slots (sum + live types +
+// their count companions across all watcher kinds).
+constexpr int k_max_value_types = 16;
 
 std::string_view pid_str(pid_t pid,
                          std::unordered_map<pid_t, std::string> &pid_strs) {
@@ -99,10 +152,10 @@ void ddprof_print_sample(std::span<const ddog_prof_Location> locations,
                          EventAggregationModePos value_mode_pos,
                          const PerfWatcher &watcher) {
 
-  const char *sample_name =
-      sample_type_name_from_idx(watcher.sample_type_id, value_mode_pos);
+  const char *const type_name =
+      sample_type_name(watcher.sample_type_info.sample_types[value_mode_pos]);
   std::string buf =
-      absl::Substitute("sample[type=$0;pid=$1;tid=$2] ", sample_name, pid, tid);
+      absl::Substitute("sample[type=$0;pid=$1;tid=$2] ", type_name, pid, tid);
 
   for (auto loc_it = locations.rbegin(); loc_it != locations.rend(); ++loc_it) {
     if (loc_it != locations.rbegin()) {
@@ -136,104 +189,28 @@ void ddprof_print_sample(std::span<const ddog_prof_Location> locations,
   PRINT_NFO("%s %ld", buf.c_str(), value);
 }
 
-// Figure out which sample_type_ids are used by active watchers
-// We also record the watcher with the lowest valid sample_type id, since that
-// will serve as the default for the pprof
-DDRes get_active_ids(std::span<PerfWatcher> watchers, ActiveIdsResult &result) {
+// Slot registry: maps ddog_prof_SampleType values to pprof value-array indices.
+// Uses linear search — at most k_max_value_types unique types in practice.
+struct SlotRegistry {
+  ddog_prof_SampleType types[k_max_value_types] = {};
+  int count = 0;
 
-  for (unsigned i = 0; i < watchers.size(); ++i) {
-    const int sample_type_id = watchers[i].sample_type_id;
-    const int count_id = sample_type_id_to_count_sample_type_id(sample_type_id);
-    if (sample_type_id < 0 || sample_type_id == DDPROF_PWT_NOCOUNT ||
-        sample_type_id >= DDPROF_PWT_LENGTH) {
-      if (sample_type_id != DDPROF_PWT_NOCOUNT) {
-        DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF,
-                               "Watcher %s (%d) has invalid sample_type_id %d",
-                               watchers[i].desc.c_str(), i, sample_type_id);
-      }
-      continue;
-    }
-
-    if (!result.default_watcher ||
-        sample_type_id <= result.default_watcher->sample_type_id) {
-      result.default_watcher = &watchers[i]; // update default
-    }
-    result.output_mode[sample_type_id] |= watchers[i].aggregation_mode;
-    if (count_id != DDPROF_PWT_NOCOUNT) {
-      // if the count is valid, update mask for it
-      result.output_mode[count_id] |= watchers[i].aggregation_mode;
-    }
-  }
-  return {};
-}
-
-class ProfValueTypes {
-private:
-  int watcher_type_to_pprof_indices[DDPROF_PWT_LENGTH]
-                                   [kNbEventAggregationModes];
-  ddog_prof_ValueType perf_value_type[k_max_value_types] = {};
-  int num_sample_type_ids = 0;
-
-public:
-  ProfValueTypes() {
-    for (auto &indices : watcher_type_to_pprof_indices) {
-      for (auto &index : indices) {
-        index = -1;
+  int ensure(uint32_t raw_type) {
+    const auto t = static_cast<ddog_prof_SampleType>(raw_type);
+    for (int i = 0; i < count; ++i) {
+      if (types[i] == t) {
+        return i;
       }
     }
+    assert(count < k_max_value_types);
+    types[count] = t;
+    return count++;
   }
 
-  void set_index(int watcher_type, EventAggregationModePos pos, int value) {
-    watcher_type_to_pprof_indices[watcher_type][pos] = value;
-  }
-
-  void add_value_type(const char *name, const char *unit, int watcher_type,
-                      EventAggregationModePos pos) {
-    perf_value_type[num_sample_type_ids].type_ = to_CharSlice(name);
-    perf_value_type[num_sample_type_ids].unit = to_CharSlice(unit);
-    set_index(watcher_type, pos, num_sample_type_ids);
-    ++num_sample_type_ids;
-  }
-
-  [[nodiscard]] int get_index(int watcher_type,
-                              EventAggregationModePos pos) const {
-    return watcher_type_to_pprof_indices[watcher_type][pos];
-  }
-
-  [[nodiscard]] int get_num_sample_type_ids() const {
-    return num_sample_type_ids;
-  }
-
-  [[nodiscard]] ddog_prof_Slice_ValueType get_sample_types_slice() const {
-    return {.ptr = perf_value_type,
-            .len = static_cast<uintptr_t>(num_sample_type_ids)};
+  [[nodiscard]] ddog_prof_Slice_SampleType slice() const {
+    return {.ptr = types, .len = static_cast<uintptr_t>(count)};
   }
 };
-
-ProfValueTypes compute_pprof_values(const ActiveIdsResult &active_ids) {
-  ProfValueTypes result{};
-  for (int i = 0; i < DDPROF_PWT_LENGTH; ++i) {
-    if (active_ids.output_mode[i] == EventAggregationMode::kDisabled) {
-      continue;
-    }
-    assert(i != DDPROF_PWT_NOCOUNT);
-    for (int value_pos = 0; value_pos < kNbEventAggregationModes; ++value_pos) {
-      if (Any(active_ids.output_mode[i] &
-              static_cast<EventAggregationMode>(1 << value_pos))) {
-        const char *value_name = sample_type_name_from_idx(
-            i, static_cast<EventAggregationModePos>(value_pos));
-        const char *value_unit = sample_type_unit_from_idx(i);
-        if (!value_name || !value_unit) {
-          LG_WRN("Malformed sample type (%d), ignoring", i);
-          continue;
-        }
-        result.add_value_type(value_name, value_unit, i,
-                              static_cast<EventAggregationModePos>(value_pos));
-      }
-    }
-  }
-  return result;
-}
 
 size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
                       std::unordered_map<pid_t, std::string> &pid_strs,
@@ -389,83 +366,69 @@ DDRes process_symbolization(
 } // namespace
 
 DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
-  size_t const num_watchers = ctx.watchers.size();
+  SlotRegistry slots;
+  PerfWatcher *default_watcher = nullptr;
 
-  ActiveIdsResult active_ids = {};
-  DDRES_CHECK_FWD(get_active_ids(std::span(ctx.watchers), active_ids));
-#ifdef DEBUG
-  LG_DBG("Active IDs :");
-  for (int i = 0; i < DDPROF_PWT_LENGTH; ++i) {
-    LG_DBG("%s --> %d ", sample_type_name_from_idx(i, kOccurrencePos),
-           static_cast<int>(active_ids.output_mode[i]));
-  }
-#endif
-  // Based on active IDs, prepare the list pf pprof values
-  // pprof_values should stay alive while we create the pprof
-  const ProfValueTypes pprof_values = compute_pprof_values(active_ids);
+  for (auto &w : ctx.watchers) {
+    // Reset indices from any previous profile creation
+    for (auto &pi : w.pprof_indices) {
+      pi = {};
+    }
 
-  // Update each watcher with matching types
-  for (unsigned i = 0; i < num_watchers; ++i) {
-    int const this_id = ctx.watchers[i].sample_type_id;
-    if (this_id < 0 || this_id == DDPROF_PWT_NOCOUNT ||
-        this_id >= DDPROF_PWT_LENGTH) {
+    if (!w.pprof_active) {
       continue;
     }
-    for (int value_pos = 0; value_pos < kNbEventAggregationModes; ++value_pos) {
-      ctx.watchers[i].pprof_indices[value_pos].pprof_index =
-          pprof_values.get_index(
-              ctx.watchers[i].sample_type_id,
-              static_cast<EventAggregationModePos>(value_pos));
-      const int count_id = sample_type_id_to_count_sample_type_id(
-          ctx.watchers[i].sample_type_id);
-      if (count_id != DDPROF_PWT_NOCOUNT) {
-        ctx.watchers[i].pprof_indices[value_pos].pprof_count_index =
-            pprof_values.get_index(
-                count_id, static_cast<EventAggregationModePos>(value_pos));
+
+    if (!default_watcher) {
+      default_watcher = &w;
+    }
+
+    for (int m = 0; m < kNbEventAggregationModes; ++m) {
+      if (!Any(w.aggregation_mode &
+               static_cast<EventAggregationMode>(1 << m))) {
+        continue;
+      }
+      w.pprof_indices[m].pprof_index =
+          slots.ensure(w.sample_type_info.sample_types[m]);
+      const uint32_t count_t = w.sample_type_info.count_types[m];
+      if (count_t != static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_SAMPLE)) {
+        w.pprof_indices[m].pprof_count_index = slots.ensure(count_t);
       }
     }
   }
 
-  pprof->_nb_values = pprof_values.get_num_sample_type_ids();
-  const ddog_prof_Slice_ValueType sample_types =
-      pprof_values.get_sample_types_slice();
-  ddog_prof_Period period;
+  pprof->_nb_values = slots.count;
+  const ddog_prof_Slice_SampleType sample_types = slots.slice();
+  ddog_prof_Period period{};
   if (pprof->_nb_values > 0) {
-    if (!active_ids.default_watcher) {
+    if (!default_watcher) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to find default watcher");
     }
     // Populate the default.  If we have a frequency, assume it is given in
     // hertz and convert to a period in nanoseconds.  This is broken for many
     // event-based types (but providing frequency would also be broken in those
     // cases)
-    int64_t default_period = active_ids.default_watcher->sample_period;
-    if (active_ids.default_watcher->options.is_freq) {
-      // convert to period (nano seconds)
+    int64_t default_period = default_watcher->sample_period;
+    if (default_watcher->options.is_freq) {
       default_period =
           std::chrono::nanoseconds(std::chrono::seconds{1}).count() /
           default_period;
     }
     int default_index = -1;
-    int value_pos = 0;
-    while (default_index == -1 &&
-           value_pos < EventAggregationModePos::kNbEventAggregationModes) {
-      default_index =
-          active_ids.default_watcher->pprof_indices[value_pos].pprof_index;
-      ++value_pos;
+    for (int m = 0; m < kNbEventAggregationModes && default_index == -1; ++m) {
+      default_index = default_watcher->pprof_indices[m].pprof_index;
     }
     if (default_index == -1) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF,
                              "Unable to find default watcher's value");
     }
-    // period is the default watcher's type.
     period = {
-        .type_ = sample_types.ptr[default_index],
+        .sample_type = sample_types.ptr[default_index],
         .value = default_period,
     };
   }
-  auto prof_res = ddog_prof_Profile_new(
-      sample_types,
-      pprof_values.get_num_sample_type_ids() > 0 ? &period : nullptr);
+  auto prof_res =
+      ddog_prof_Profile_new(sample_types, slots.count > 0 ? &period : nullptr);
 
   if (prof_res.tag != DDOG_PROF_PROFILE_NEW_RESULT_OK) {
     ddog_Error_drop(&prof_res.err);
@@ -522,8 +485,7 @@ DDRes pprof_aggregate(const UnwindOutput *uw_output,
   int64_t values[k_max_value_types] = {};
   assert(pprof_indices.pprof_index != -1);
   values[pprof_indices.pprof_index] = pack.value;
-  if (watcher_has_countable_sample_type(watcher)) {
-    assert(pprof_indices.pprof_count_index != -1);
+  if (pprof_indices.pprof_count_index != -1) {
     values[pprof_indices.pprof_count_index] = pack.count;
   }
 
