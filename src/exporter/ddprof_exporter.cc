@@ -61,7 +61,7 @@ DDRes create_pprof_file(ddog_Timespec start, const char *dbg_pprof_prefix,
 /// Write pprof to a valid file descriptor : allows to use pprof tools
 DDRes write_profile(const ddog_ByteSlice *buffer, int fd) {
   auto remaining = buffer->len;
-  auto ptr = buffer->ptr;
+  const auto *ptr = buffer->ptr;
   while (remaining > 0) {
     ssize_t const written = write(fd, ptr, remaining);
     if (written < 0) {
