@@ -49,6 +49,10 @@ constexpr size_t k_max_pprof_labels{8};
 // debug log output (must match what simple_malloc-ut.sh greps for).
 constexpr const char *sample_type_name(uint32_t raw_type) {
   switch (raw_type) {
+  case k_stype_val_sample:
+    return "sample";
+  case k_stype_val_tracepoint:
+    return "tracepoint";
   case k_stype_val_cpu_time:
     return "cpu-time";
   case k_stype_val_cpu_samples:
@@ -61,10 +65,6 @@ constexpr const char *sample_type_name(uint32_t raw_type) {
     return "inuse-space";
   case k_stype_val_inuse_objects:
     return "inuse-objects";
-  case k_stype_val_sample:
-    return "sample";
-  case k_stype_val_tracepoint:
-    return "tracepoint";
   default:
     return "unknown";
   }
