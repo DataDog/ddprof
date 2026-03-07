@@ -11,9 +11,11 @@
 #include "lib/allocation_event.hpp"
 #include "perf.hpp"
 #include "ringbuffer_utils.hpp"
+#include "sdt_probe.hpp"
 #include "sys_utils.hpp"
 #include "syscalls.hpp"
 #include "tracepoint_config.hpp"
+#include "uprobe_attacher.hpp"
 #include "user_override.hpp"
 
 #include <cassert>
@@ -169,8 +171,39 @@ DDRes pevent_open(DDProfContext &ctx, std::span<pid_t> pids, int num_cpu,
     if (watcher->type < kDDPROF_TYPE_CUSTOM) {
       DDRES_CHECK_FWD(pevent_open_all_cpus(watcher, watcher_idx, pids, num_cpu,
                                            ctx.perf_clock_source, pevent_hdr));
+    } else if (watcher->type == kDDPROF_TYPE_SDT_UPROBE) {
+      // SDT uprobe-based allocation profiling
+      // This is handled separately - the uprobe fds are stored in the context
+      // and we create PEvent entries for them here
+      if (ctx.sdt_attachments.empty()) {
+        LG_WRN("SDT uprobe watcher requested but no uprobes attached, "
+               "falling back to MPSC ring buffer");
+        // Fall back to custom MPSC ring buffer (hook-based)
+        size_t pevent_idx = 0;
+        DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
+        int const order = pevent_compute_min_mmap_order(
+            k_mpsc_buffer_size_shift, watcher->options.stack_sample_size,
+            k_min_number_samples_per_ring_buffer);
+        DDRES_CHECK_FWD(ring_buffer_create(
+            order, RingBufferType::kMPSCRingBuffer, true,
+            &pevent_hdr->pes[pevent_idx]));
+        // Mark as custom event for the fallback case
+        pevent_hdr->pes[pevent_idx].custom_event = true;
+      } else {
+        // Create a PEvent entry for each attached uprobe
+        for (const auto &att : ctx.sdt_attachments) {
+          size_t pevent_idx = 0;
+          DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
+          pevent_set_info(att.fd, -1, pevent_hdr->pes[pevent_idx],
+                          watcher->options.stack_sample_size);
+          // Store the probe type in the PEvent for later identification
+          pevent_hdr->pes[pevent_idx].sdt_probe_type = att.probe_type;
+        }
+        LG_NTC("Created %zu PEvent entries for SDT uprobes",
+               ctx.sdt_attachments.size());
+      }
     } else {
-      // custom event, eg.allocation profiling
+      // custom event, eg.allocation profiling (hook-based)
       size_t pevent_idx = 0;
       DDRES_CHECK_FWD(pevent_create(pevent_hdr, watcher_idx, &pevent_idx));
       int const order = pevent_compute_min_mmap_order(

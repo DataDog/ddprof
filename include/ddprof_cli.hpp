@@ -78,6 +78,10 @@ public:
   bool continue_exec{false};
   bool timeline{true};
 
+  // SDT probe options
+  std::string sdt_mode{"auto"}; // auto, only, off
+  std::string target_binary;    // Path for SDT probe discovery
+
   // args
   std::vector<std::string> command_line;
 

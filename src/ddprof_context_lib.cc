@@ -15,6 +15,8 @@
 #include "logger_setup.hpp"
 #include "presets.hpp"
 #include "prng.hpp"
+#include "sdt_probe.hpp"
+#include "uprobe_attacher.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -100,6 +102,10 @@ void copy_cli_values(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
   ctx.params.loaded_libs_check_interval = ddprof_cli.loaded_libs_check_interval;
   ctx.params.socket_path = ddprof_cli.socket_path;
   ctx.params.pipefd_to_library = UniqueFd{ddprof_cli.pipefd_to_library};
+
+  // SDT probe options
+  ctx.params.sdt_mode = ddprof_cli.sdt_mode;
+  ctx.params.target_binary = ddprof_cli.target_binary;
 }
 
 DDRes context_add_watchers(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
@@ -152,6 +158,9 @@ DDRes context_set(const DDProfCLI &ddprof_cli, DDProfContext &ctx) {
 
   DDRES_CHECK_FWD(context_add_watchers(ddprof_cli, ctx));
 
+  // Setup SDT probes if applicable
+  DDRES_CHECK_FWD(context_setup_sdt_probes(ddprof_cli, ctx));
+
   if (ctx.params.socket_path.empty()) {
     ctx.params.socket_path = generate_socket_path();
   }
@@ -179,6 +188,106 @@ int context_allocation_profiling_watcher_idx(const DDProfContext &ctx) {
     return it - watchers.begin();
   }
   return -1;
+}
+
+int context_sdt_allocation_profiling_watcher_idx(const DDProfContext &ctx) {
+  const std::span watchers{ctx.watchers};
+  auto it =
+      std::find_if(watchers.begin(), watchers.end(), [](const auto &watcher) {
+        return watcher.type == kDDPROF_TYPE_SDT_UPROBE &&
+            watcher.config == kDDPROF_COUNT_ALLOCATIONS_SDT;
+      });
+
+  if (it != watchers.end()) {
+    return it - watchers.begin();
+  }
+  return -1;
+}
+
+DDRes context_setup_sdt_probes(const DDProfCLI &ddprof_cli,
+                               DDProfContext &ctx) {
+  // Check if SDT mode is off
+  if (ddprof_cli.sdt_mode == "off") {
+    LG_DBG("SDT probe mode is off, skipping SDT setup");
+    return {};
+  }
+
+  // Check if we have an SDT allocation watcher
+  int sdt_watcher_idx = context_sdt_allocation_profiling_watcher_idx(ctx);
+  if (sdt_watcher_idx < 0) {
+    // No SDT watcher, nothing to do
+    LG_DBG("No SDT allocation watcher found, skipping SDT setup");
+    return {};
+  }
+
+  // Determine target binary path
+  std::string target_binary = ddprof_cli.target_binary;
+  if (target_binary.empty() && !ddprof_cli.command_line.empty()) {
+    target_binary = ddprof_cli.command_line[0];
+    LG_DBG("Using command line first element as target binary: %s",
+           target_binary.c_str());
+  }
+
+  if (target_binary.empty()) {
+    if (ddprof_cli.sdt_mode == "only") {
+      DDRES_RETURN_ERROR_LOG(
+          DD_WHAT_INPUT_PROCESS,
+          "SDT probe mode is 'only' but no target binary specified");
+    }
+    LG_DBG("No target binary specified, SDT probes will not be used");
+    return {};
+  }
+
+  // Try to discover SDT probes
+  LG_NTC("Attempting to discover SDT probes in %s", target_binary.c_str());
+  auto probes = parse_sdt_probes(target_binary.c_str());
+
+  if (!probes) {
+    if (ddprof_cli.sdt_mode == "only") {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_INPUT_PROCESS,
+                             "SDT probe mode is 'only' but no SDT probes found "
+                             "in %s",
+                             target_binary.c_str());
+    }
+    LG_NTC("No SDT probes found in %s, will use hook-based allocation tracking",
+           target_binary.c_str());
+    return {};
+  }
+
+  // Check if we have the required allocation probes
+  if (!probes->has_allocation_probes()) {
+    if (ddprof_cli.sdt_mode == "only") {
+      DDRES_RETURN_ERROR_LOG(
+          DD_WHAT_INPUT_PROCESS,
+          "SDT probe mode is 'only' but required allocation probes not found "
+          "in %s (need %.*s:entry/exit and %.*s:entry)",
+          target_binary.c_str(), static_cast<int>(kMallocProvider.size()),
+          kMallocProvider.data(), static_cast<int>(kFreeProvider.size()),
+          kFreeProvider.data());
+    }
+    LG_NTC("Required allocation SDT probes not found in %s, will use "
+           "hook-based tracking",
+           target_binary.c_str());
+    return {};
+  }
+
+  LG_NTC("Found %zu SDT probes in %s", probes->probes.size(),
+         target_binary.c_str());
+
+  // Get the watcher to get stack sample size
+  const PerfWatcher &watcher = ctx.watchers[sdt_watcher_idx];
+
+  // Note: We can't attach uprobes yet because we don't have the PID.
+  // The uprobes will be attached later when we know the target PID.
+  // For now, we just store the probe info and mark that SDT is available.
+
+  // Store the probe set in context for later attachment
+  // We'll need to attach when we know the PID (in ddprof_setup or similar)
+  ctx.sdt_probes_active = true;
+
+  LG_NTC("SDT probes discovered successfully, will attach uprobes at runtime");
+
+  return {};
 }
 
 } // namespace ddprof

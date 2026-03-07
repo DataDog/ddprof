@@ -275,8 +275,8 @@ DDRes worker_process_ring_buffers_ordered(std::span<PEvent> pes,
         return {};
       }
       auto &pevent = pes[evt.buffer_idx];
-      auto res =
-          ddprof_worker_process_event(evt.event, pevent.watcher_pos, ctx);
+      auto res = ddprof_worker_process_event(evt.event, pevent.watcher_pos, ctx,
+                                             pevent.sdt_probe_type);
       if (!IsDDResOK(res)) {
         return res;
       }
@@ -333,7 +333,8 @@ worker_process_ring_buffers(std::span<PEvent> pes, DDProfContext &ctx,
           events = true;
           const auto *hdr =
               reinterpret_cast<const perf_event_header *>(buffer.data());
-          DDRes res = ddprof_worker_process_event(hdr, pevent.watcher_pos, ctx);
+          DDRes res = ddprof_worker_process_event(hdr, pevent.watcher_pos, ctx,
+                                                  pevent.sdt_probe_type);
 
           // Check for processing error
           if (IsDDResNotOK(res)) {
@@ -350,7 +351,8 @@ worker_process_ring_buffers(std::span<PEvent> pes, DDProfContext &ctx,
           events = true;
           const auto *hdr =
               reinterpret_cast<const perf_event_header *>(buffer.data());
-          DDRes res = ddprof_worker_process_event(hdr, pevent.watcher_pos, ctx);
+          DDRes res = ddprof_worker_process_event(hdr, pevent.watcher_pos, ctx,
+                                                  pevent.sdt_probe_type);
 
           // Check for processing error
           if (IsDDResNotOK(res)) {

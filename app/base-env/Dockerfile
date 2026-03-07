@@ -70,6 +70,7 @@ RUN apt-get update \
   software-properties-common \
   ssh-client \
   subversion \
+  systemtap-sdt-dev \
   unzip \
   wget \
   zlib1g-dev
@@ -145,14 +146,23 @@ RUN VERSION="1.17.0" \
   && rm -rf "googletest-${VERSION}" "${TAR_NAME}"
 
 # More recent Cppcheck (ubuntu defaults to a 1.8 version)
-RUN VERSION="2.18.0" \
+# cppcheck 2.18.0 requires Python 3.7+, so use older version for Ubuntu 18
+# Older cppcheck needs CMAKE_POLICY_VERSION_MINIMUM for CMake 4.x compatibility
+RUN if [ "${UBUNTU_VERSION}" -ge 20 ]; then \
+      VERSION="2.18.0"; \
+      SHA256="dc74e300ac59f2ef9f9c05c21d48ae4c8dd1ce17f08914dd30c738ff482e748f"; \
+      CMAKE_COMPAT_FLAG=""; \
+    else \
+      VERSION="2.13.0"; \
+      SHA256="8229afe1dddc3ed893248b8a723b428dc221ea014fbc76e6289840857c03d450"; \
+      CMAKE_COMPAT_FLAG="-DCMAKE_POLICY_VERSION_MINIMUM=3.5"; \
+    fi \
   && TAR_NAME="${VERSION}.tar.gz" \
   && curl -fsSLO "https://github.com/danmar/cppcheck/archive/refs/tags/${TAR_NAME}" \
-  && SHA256="dc74e300ac59f2ef9f9c05c21d48ae4c8dd1ce17f08914dd30c738ff482e748f" \
   && (printf "${SHA256} ${TAR_NAME}" | sha256sum --check --strict --status) \
   && tar xf "${TAR_NAME}" \
   && pushd "cppcheck-${VERSION}" \
-  && cmake -GNinja -Bbuild -DCMAKE_BUILD_TYPE=Release \
+  && cmake -GNinja -Bbuild -DCMAKE_BUILD_TYPE=Release ${CMAKE_COMPAT_FLAG} \
   && cmake --build build -t install \
   && popd \
   && rm -rf "cppcheck-${VERSION}" "${TAR_NAME}"
