@@ -88,6 +88,15 @@ if [ -e "${CURRENTDIR}/.env" ]; then
 fi
 
 MOUNT_CMD="-v ${DEFAULT_DEV_WORKSPACE:-${CURRENTDIR}}:/app"
+# avoid symlinks
+HOST_SHARE_PATH=$(python3 - <<'PY'
+import os, sys
+path = os.environ.get("DEFAULT_DEV_WORKSPACE", os.environ.get("CURRENTDIR"))
+if not path:
+    path = os.getcwd()
+print(os.path.realpath(path), end="")
+PY
+)
 
 # Support docker sync : Improves compilation speed 
 # Example of config (to be pasted in the docker-sync.yml file)
@@ -102,6 +111,7 @@ if [ -e "${CURRENTDIR}/docker-sync.yml" ]; then
     VOLUME_SYNC=$(grep -A 1 "syncs:" "${CURRENTDIR}/docker-sync.yml" | tail -n 1 | awk -F ':' '{print $1}' | sed "s/ //g")
     echo "$VOLUME_SYNC"
     MOUNT_CMD="--mount source=${VOLUME_SYNC},target=/app"
+    HOST_SHARE_PATH=""
     if ! docker-sync list | grep -q "$VOLUME_SYNC"; then
         echo "Please generate a volume: $VOLUME_SYNC"
         echo "Suggested commands:"
@@ -130,13 +140,15 @@ if [ $PERFORM_CLEAN -eq 1 ]; then
 fi
 
 # Check if base image exists
-if [ ! ${CUSTOM_ID:-,,} == "yes" ] && ! docker images | awk '{print $1}'| grep -qE "^${DOCKER_NAME}$"; then
-    echo "Building image"
-    BUILD_CMD="docker build $CACHE_OPTION -t ${DOCKER_NAME} --build-arg COMPILER=$COMPILER --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} -f $BASE_DOCKERFILE ."
-    #echo "${BUILD_CMD}"
-    eval "${BUILD_CMD}"
-else 
-    echo "Base image found, not rebuilding. Remove it to force rebuild."
+if [ ! ${CUSTOM_ID:-,,} == "yes" ]; then
+    if ! docker image inspect "${DOCKER_NAME}" >/dev/null 2>&1; then
+        echo "Building image"
+        BUILD_CMD="docker build $CACHE_OPTION -t ${DOCKER_NAME} --build-arg COMPILER=$COMPILER --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} -f $BASE_DOCKERFILE ."
+        #echo "${BUILD_CMD}"
+        eval "${BUILD_CMD}"
+    else 
+        echo "Base image found, not rebuilding. Remove it to force rebuild."
+    fi
 fi
 
 if [[ $OSTYPE == darwin* ]]; then
@@ -162,6 +174,15 @@ else
   MOUNT_TOOLS_DIR=""
 fi
 
-CMD="docker run -it --rm -u $(id -u):$(id -g) --network=host -w /app ${MOUNT_SSH_AGENT} ${MOUNT_TOOLS_DIR} --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} \"${DOCKER_NAME}${DOCKER_TAG}\" /bin/bash"
+WORKSPACE_ENV=""
+if [[ $OSTYPE == darwin* ]] && [ -n "${HOST_SHARE_PATH}" ]; then
+  HOST_PREFIX="/run/host_virtiofs${HOST_SHARE_PATH}"
+  CONTAINER_ROOT="/app"
+  WORKSPACE_ENV="-e DDPROF_WORKSPACE_ROOT=${HOST_PREFIX}|${CONTAINER_ROOT}"
+fi
 
-eval "$CMD"
+# shellcheck disable=SC2086
+docker run -it --rm -u "$(id -u):$(id -g)" --network=host -w /app \
+  ${MOUNT_SSH_AGENT} ${MOUNT_TOOLS_DIR} ${WORKSPACE_ENV} \
+  --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} \
+  "${DOCKER_NAME}${DOCKER_TAG}" /bin/bash
