@@ -23,7 +23,11 @@ UniqueFile open_proc_comm(pid_t pid, pid_t tid, const char *path_to_proc = "") {
   const std::string proc_comm_filename =
       absl::StrFormat("%s/proc/%d/task/%d/comm", path_to_proc, pid, tid);
   UniqueFile file{fopen(proc_comm_filename.c_str(), "r"), fclose};
-  if (!file) {
+  if (!file && is_root()) {
+    // UID elevation only helps when running as root.
+    // For non-root users with file capabilities, the UID round-trip
+    // triggers the kernel's capability clearing rule, permanently
+    // destroying all capabilities needed for profiling.
     // Check if the file exists
     struct stat info;
     UIDInfo old_uids;

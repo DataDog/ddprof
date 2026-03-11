@@ -144,6 +144,12 @@ target_include_directories(cap-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
 
 add_unit_test(user_id-ut user_id-ut.cc ../src/user_override.cc DEFINITIONS MYNAME="userid-ut")
 
+add_unit_test(
+  user_override_caps-ut user_override_caps-ut.cc ../src/user_override.cc
+  LIBRARIES libcap
+  DEFINITIONS MYNAME="user_override_caps-ut")
+target_include_directories(user_override_caps-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
+
 add_unit_test(procutils-ut ../src/procutils.cc procutils-ut.cc DEFINITIONS MYNAME="procutils-ut")
 
 add_unit_test(
