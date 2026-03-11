@@ -62,14 +62,18 @@ DDRes ring_buffer_create(size_t buffer_size_page_order,
                            pevent->watcher_pos, strerror(errno));
   }
   if (ftruncate(pevent->mapfd, buffer_size) == -1) {
+    ::close(pevent->mapfd);
+    pevent->mapfd = -1;
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
                            "Error calling ftruncate on watcher %d (%s)",
                            pevent->watcher_pos, strerror(errno));
   }
-  pevent->fd = eventfd(0, 0);
+  pevent->fd = eventfd(0, EFD_CLOEXEC);
   if (pevent->fd == -1) {
+    ::close(pevent->mapfd);
+    pevent->mapfd = -1;
     DDRES_RETURN_ERROR_LOG(DD_WHAT_PERFOPEN,
-                           "Error calling evenfd on watcher %d (%s)",
+                           "Error calling eventfd on watcher %d (%s)",
                            pevent->watcher_pos, strerror(errno));
   }
   pevent->custom_event = custom_event;
