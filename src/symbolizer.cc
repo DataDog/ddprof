@@ -13,15 +13,6 @@
 #include <cassert>
 
 namespace ddprof {
-namespace {
-inline void write_location_no_sym(ElfAddress_t ip, const MapInfo &mapinfo,
-                                  ddog_prof_Location *ffi_location) {
-  write_mapping(mapinfo, &ffi_location->mapping);
-  // write empty with empty function name, to enable remote symbolization
-  write_function({}, mapinfo._sopath, &ffi_location->function);
-  ffi_location->address = ip;
-}
-} // namespace
 
 int Symbolizer::remove_unvisited() {
   // Remove all unvisited blaze_symbolizer instances from the map
@@ -56,7 +47,8 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
                                   FileInfoId_t file_id,
                                   const std::string &elf_src,
                                   const MapInfo &map_info,
-                                  std::span<ddog_prof_Location> locations,
+                                  const ddog_prof_ProfilesDictionary *dict,
+                                  std::span<ddog_prof_Location2> locations,
                                   unsigned &write_index,
                                   BlazeResultsWrapper &results) {
   if (elf_addrs.empty() || elf_src.empty()) {
@@ -95,21 +87,19 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
                           "Symbolizer: Mismatch between size of returned "
                           "symbols and size of given elf addresses");
       results.blaze_results.push_back(blaze_res);
-      // Demangling cache based on stability of unordered map
-      // This will be moved to the backend
       for (size_t i = 0; i < blaze_res->cnt && i < elf_addrs.size(); ++i) {
         const blaze_sym *cur_sym = blaze_res->syms + i;
         if (cur_sym->addr == 0) {
           // Some binaries expose a single symbol at address 0 (ex:
           // DD_AGENT_V1). Avoid emitting it so the backend still attempts
           // symbolication.
-          write_location_no_sym(elf_addrs[i], map_info,
-                                &locations[write_index++]);
+          write_location2_no_sym(elf_addrs[i], map_info, dict,
+                                 &locations[write_index++]);
           continue;
         }
-        DDRES_CHECK_FWD(write_location_blaze(
+        DDRES_CHECK_FWD(write_location2_blaze(
             elf_addrs[i], symbolizer_wrapper.demangled_names, map_info,
-            *cur_sym, write_index, locations));
+            *cur_sym, write_index, dict, locations));
       }
       return {};
     }
@@ -119,7 +109,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
   // This can happen when file descriptors are exhausted
   // OR symbolization is disabled
   for (auto el : elf_addrs) {
-    write_location_no_sym(el, map_info, &locations[write_index++]);
+    write_location2_no_sym(el, map_info, dict, &locations[write_index++]);
   }
 
   return {};

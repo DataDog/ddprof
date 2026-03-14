@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+struct ddog_prof_Mapping2;
+
 namespace ddprof {
 class MapInfo {
 public:
@@ -26,6 +28,7 @@ public:
   Offset_t _offset{0};
   std::string _sopath;
   BuildIdStr _build_id;
+  ddog_prof_Mapping2 *_mapping_id{nullptr};
 };
 
 using MapInfoTable = std::vector<MapInfo>;

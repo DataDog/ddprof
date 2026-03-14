@@ -35,9 +35,11 @@ DDRes add_frame(SymbolIdx_t symbol_idx, FileInfoId_t file_info_id,
   }
   if (map_idx == -1) {
     // just add an empty element for mapping info
+    const ddog_prof_ProfilesDictionary *dict =
+        us->symbol_hdr.profiles_dictionary();
     map_idx = us->symbol_hdr._common_mapinfo_lookup.get_or_insert(
         CommonMapInfoLookup::MappingErrors::empty,
-        us->symbol_hdr._mapinfo_table);
+        us->symbol_hdr._mapinfo_table, dict);
   }
   output->locs.emplace_back(FunLoc{.ip = pc,
                                    .elf_addr = elf_addr,
@@ -48,25 +50,32 @@ DDRes add_frame(SymbolIdx_t symbol_idx, FileInfoId_t file_info_id,
 }
 
 void add_common_frame(UnwindState *us, SymbolErrors lookup_case) {
-  add_frame_without_mapping(us,
-                            us->symbol_hdr._common_symbol_lookup.get_or_insert(
-                                lookup_case, us->symbol_hdr._symbol_table));
+  const ddog_prof_ProfilesDictionary *dict =
+      us->symbol_hdr.profiles_dictionary();
+  add_frame_without_mapping(
+      us,
+      us->symbol_hdr._common_symbol_lookup.get_or_insert(
+          lookup_case, us->symbol_hdr._symbol_table, dict));
 }
 
 void add_dso_frame(UnwindState *us, const Dso &dso,
                    ElfAddress_t normalized_addr, std::string_view addr_type) {
+  const ddog_prof_ProfilesDictionary *dict =
+      us->symbol_hdr.profiles_dictionary();
   add_frame_without_mapping(
       us,
       us->symbol_hdr._dso_symbol_lookup.get_or_insert(
-          normalized_addr, dso, us->symbol_hdr._symbol_table, addr_type));
+          normalized_addr, dso, us->symbol_hdr._symbol_table, dict, addr_type));
 }
 
 void add_virtual_base_frame(UnwindState *us) {
+  const ddog_prof_ProfilesDictionary *dict =
+      us->symbol_hdr.profiles_dictionary();
   add_frame_without_mapping(
       us,
       us->symbol_hdr._base_frame_symbol_lookup.get_or_insert(
           us->pid, us->symbol_hdr._symbol_table,
-          us->symbol_hdr._dso_symbol_lookup, us->dso_hdr));
+          us->symbol_hdr._dso_symbol_lookup, us->dso_hdr, dict));
 }
 
 void add_error_frame(const Dso *dso, UnwindState *us,

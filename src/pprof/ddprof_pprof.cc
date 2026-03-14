@@ -33,6 +33,13 @@ namespace ddprof {
 namespace {
 constexpr size_t k_max_pprof_labels{8};
 
+constexpr std::string_view k_container_id_label = "container_id"sv;
+constexpr std::string_view k_process_id_label = "process_id"sv;
+constexpr std::string_view k_process_name_label = "process_name"sv;
+constexpr std::string_view k_thread_id_label = "thread id"sv;
+constexpr std::string_view k_thread_name_label = "thread_name"sv;
+constexpr std::string_view k_tracepoint_label = "tracepoint_type"sv;
+
 constexpr int k_max_value_types =
     DDPROF_PWT_LENGTH * static_cast<int>(kNbEventAggregationModes);
 
@@ -40,6 +47,64 @@ struct ActiveIdsResult {
   EventAggregationMode output_mode[DDPROF_PWT_LENGTH] = {};
   PerfWatcher *default_watcher = nullptr;
 };
+
+std::string_view pid_str(pid_t pid,
+                         std::unordered_map<pid_t, std::string> &pid_strs);
+
+void init_dict_label_key_ids(DDProfPProf::DictLabelKeyIds &label_keys,
+                             const ddog_prof_ProfilesDictionary *dict) {
+  label_keys.container_id = intern_string(dict, k_container_id_label);
+  label_keys.process_id = intern_string(dict, k_process_id_label);
+  label_keys.process_name = intern_string(dict, k_process_name_label);
+  label_keys.thread_id = intern_string(dict, k_thread_id_label);
+  label_keys.thread_name = intern_string(dict, k_thread_name_label);
+  label_keys.tracepoint_type = intern_string(dict, k_tracepoint_label);
+}
+
+size_t prepare_labels2(const UnwindOutput &uw_output,
+                       const PerfWatcher &watcher,
+                       std::unordered_map<pid_t, std::string> &pid_strs,
+                       const DDProfPProf::DictLabelKeyIds &label_keys,
+                       std::span<ddog_prof_Label2> labels) {
+  size_t labels_num = 0;
+
+  auto push_label = [&](ddog_prof_StringId2 key_id, std::string_view value) {
+    labels[labels_num++] = {
+        .key = key_id,
+        .str = to_CharSlice(value),
+        .num = 0,
+        .num_unit = {.ptr = nullptr, .len = 0},
+    };
+  };
+
+  if (!uw_output.container_id.empty()) {
+    push_label(label_keys.container_id, uw_output.container_id);
+  }
+
+  if (!watcher.suppress_pid || !watcher.suppress_tid) {
+    push_label(label_keys.process_id, pid_str(uw_output.pid, pid_strs));
+  }
+  if (!watcher.suppress_tid) {
+    push_label(label_keys.thread_id, pid_str(uw_output.tid, pid_strs));
+  }
+  if (watcher_has_tracepoint(&watcher)) {
+    if (!watcher.tracepoint_label.empty()) {
+      push_label(label_keys.tracepoint_type, watcher.tracepoint_label);
+    } else {
+      push_label(label_keys.tracepoint_type, watcher.tracepoint_event);
+    }
+  }
+  if (!uw_output.exe_name.empty()) {
+    push_label(label_keys.process_name, uw_output.exe_name);
+  }
+  if (!uw_output.thread_name.empty()) {
+    push_label(label_keys.thread_name, uw_output.thread_name);
+  }
+
+  DDPROF_DCHECK_FATAL(labels_num <= labels.size(),
+                      "pprof_aggregate - label buffer exceeded");
+  return labels_num;
+}
 
 std::string_view pid_str(pid_t pid,
                          std::unordered_map<pid_t, std::string> &pid_strs) {
@@ -58,7 +123,8 @@ bool is_ld(const std::string_view path) {
   return path.starts_with("ld-");
 }
 
-bool is_stack_complete(std::span<const ddog_prof_Location> locations) {
+bool is_stack_complete(std::span<const ddog_prof_Location2> locations,
+                       const ddog_prof_ProfilesDictionary *dict) {
   static constexpr std::array s_expected_root_frames{
       // Consider empty as OK (to avoid false incomplete frames)
       // If we have no symbols, we could still retrieve them in the backend.
@@ -80,8 +146,8 @@ bool is_stack_complete(std::span<const ddog_prof_Location> locations) {
   }
 
   const auto &root_loc = locations.back();
-  const std::string_view root_mapping{root_loc.mapping.filename.ptr,
-                                      root_loc.mapping.filename.len};
+  const std::string_view root_mapping =
+      get_location2_mapping_filename(dict, root_loc);
   // If we are in ld.so (eg. during lib init before main) consider the stack as
   // complete
   if (is_ld(root_mapping)) {
@@ -89,12 +155,13 @@ bool is_stack_complete(std::span<const ddog_prof_Location> locations) {
   }
 
   const std::string_view root_func =
-      std::string_view(root_loc.function.name.ptr, root_loc.function.name.len);
+      get_location2_function_name(dict, root_loc);
   return std::find(s_expected_root_frames.begin(), s_expected_root_frames.end(),
                    root_func) != s_expected_root_frames.end();
 }
 
-void ddprof_print_sample(std::span<const ddog_prof_Location> locations,
+void ddprof_print_sample(std::span<const ddog_prof_Location2> locations,
+                         const ddog_prof_ProfilesDictionary *dict,
                          uint64_t value, pid_t pid, pid_t tid,
                          EventAggregationModePos value_mode_pos,
                          const PerfWatcher &watcher) {
@@ -108,11 +175,12 @@ void ddprof_print_sample(std::span<const ddog_prof_Location> locations,
     if (loc_it != locations.rbegin()) {
       buf += ";";
     }
-    // Access function name and source file from location
-    const std::string_view function_name{loc_it->function.name.ptr,
-                                         loc_it->function.name.len};
-    const std::string_view source_file{loc_it->function.filename.ptr,
-                                       loc_it->function.filename.len};
+    const std::string_view function_name =
+        get_location2_function_name(dict, *loc_it);
+    std::string_view source_file;
+    if (loc_it->function) {
+      source_file = get_string(dict, loc_it->function->file_name);
+    }
     if (!function_name.empty()) {
       // Append the function name, trimming at the first '(' if present.
       buf += function_name.substr(0, function_name.find('('));
@@ -235,63 +303,6 @@ ProfValueTypes compute_pprof_values(const ActiveIdsResult &active_ids) {
   return result;
 }
 
-size_t prepare_labels(const UnwindOutput &uw_output, const PerfWatcher &watcher,
-                      std::unordered_map<pid_t, std::string> &pid_strs,
-                      std::span<ddog_prof_Label> labels) {
-  constexpr std::string_view k_container_id_label = "container_id"sv;
-  constexpr std::string_view k_process_id_label = "process_id"sv;
-  constexpr std::string_view k_process_name_label = "process_name"sv;
-  // This naming has an impact on backend side (hence the inconsistency with
-  // process_id)
-  constexpr std::string_view k_thread_id_label = "thread id"sv;
-  constexpr std::string_view k_thread_name_label = "thread_name"sv;
-  constexpr std::string_view k_tracepoint_label = "tracepoint_type"sv;
-  size_t labels_num = 0;
-  if (!uw_output.container_id.empty()) {
-    labels[labels_num].key = to_CharSlice(k_container_id_label);
-    labels[labels_num].str = to_CharSlice(uw_output.container_id);
-    ++labels_num;
-  }
-
-  // Add any configured labels.  Note that TID alone has the same cardinality as
-  // (TID;PID) tuples, so except for symbol table overhead it doesn't matter
-  // much if TID implies PID for clarity.
-  if (!watcher.suppress_pid || !watcher.suppress_tid) {
-    labels[labels_num].key = to_CharSlice(k_process_id_label);
-    labels[labels_num].str = to_CharSlice(pid_str(uw_output.pid, pid_strs));
-    ++labels_num;
-  }
-  if (!watcher.suppress_tid) {
-    labels[labels_num].key = to_CharSlice(k_thread_id_label);
-    labels[labels_num].str = to_CharSlice(pid_str(uw_output.tid, pid_strs));
-    ++labels_num;
-  }
-  if (watcher_has_tracepoint(&watcher)) {
-    labels[labels_num].key = to_CharSlice(k_tracepoint_label);
-    // If the label is given, use that as the tracepoint type. Otherwise,
-    // default to the event name
-    if (!watcher.tracepoint_label.empty()) {
-      labels[labels_num].str = to_CharSlice(watcher.tracepoint_label);
-    } else {
-      labels[labels_num].str = to_CharSlice(watcher.tracepoint_event);
-    }
-    ++labels_num;
-  }
-  if (!uw_output.exe_name.empty()) {
-    labels[labels_num].key = to_CharSlice(k_process_name_label);
-    labels[labels_num].str = to_CharSlice(uw_output.exe_name);
-    ++labels_num;
-  }
-  if (!uw_output.thread_name.empty()) {
-    labels[labels_num].key = to_CharSlice(k_thread_name_label);
-    labels[labels_num].str = to_CharSlice(uw_output.thread_name);
-    ++labels_num;
-  }
-  DDPROF_DCHECK_FATAL(labels_num <= labels.size(),
-                      "pprof_aggregate - label buffer exceeded");
-  return labels_num;
-}
-
 std::span<const FunLoc> adjust_locations(const PerfWatcher *watcher,
                                          std::span<const FunLoc> locs) {
   if (watcher->options.nb_frames_to_skip < locs.size()) {
@@ -308,7 +319,8 @@ std::span<const FunLoc> adjust_locations(const PerfWatcher *watcher,
 DDRes process_symbolization(
     std::span<const FunLoc> locs, const SymbolHdr &symbol_hdr,
     const FileInfoVector &file_infos, Symbolizer *symbolizer,
-    std::array<ddog_prof_Location, kMaxStackDepth> &locations_buff,
+    const ddog_prof_ProfilesDictionary *dict,
+    std::array<ddog_prof_Location2, kMaxStackDepth> &locations2_buff,
     Symbolizer::BlazeResultsWrapper &session_results, unsigned &write_index) {
   unsigned index = 0;
 
@@ -319,13 +331,14 @@ DDRes process_symbolization(
   // We wait for the incomplete frame to be added if needed.
   // By removing the incomplete frame and pushing logic to BE
   // we can simplify this loop
-  while (index < locs.size() - 1 && write_index < locations_buff.size()) {
+  while (index < locs.size() - 1 && write_index < locations2_buff.size()) {
     if (locs[index].symbol_idx != k_symbol_idx_null) {
       // Location already symbolized
       const FunLoc &loc = locs[index];
-      write_location(loc, mapinfo_table[loc.map_info_idx],
-                     symbol_table[loc.symbol_idx],
-                     &locations_buff[write_index++]);
+      write_location2(loc, mapinfo_table[loc.map_info_idx],
+                      symbol_table[loc.symbol_idx],
+                      &locations2_buff[write_index]);
+      ++write_index;
       ++index;
       continue;
     }
@@ -354,8 +367,8 @@ DDRes process_symbolization(
     // Perform symbolization for all collected addresses
     const DDRes res = symbolizer->symbolize_pprof(
         elf_addresses, file_id, current_file_path,
-        mapinfo_table[locs[start_index].map_info_idx],
-        std::span<ddog_prof_Location>{locations_buff}, write_index,
+        mapinfo_table[locs[start_index].map_info_idx], dict,
+        std::span<ddog_prof_Location2>{locations2_buff}, write_index,
         session_results);
     if (IsDDResNotOK(res)) {
       if (IsDDResFatal(res)) {
@@ -369,26 +382,34 @@ DDRes process_symbolization(
   // check if unwinding stops on a frame that makes sense
   if (write_index < (kMaxStackDepth - 1) && write_index >= 1 &&
       !is_stack_complete(
-          std::span<ddog_prof_Location>{locations_buff.data(), write_index})) {
+          std::span<ddog_prof_Location2>{locations2_buff.data(), write_index},
+          dict)) {
     // Write a common frame to indicate an incomplete stack
-    write_location(0, k_common_frame_names[incomplete_stack], {}, 0, {},
-                   &locations_buff[write_index++]);
+    ddog_prof_Location2 &incomplete_loc = locations2_buff[write_index];
+    incomplete_loc.mapping = nullptr;
+    incomplete_loc.function =
+        intern_function(dict, k_common_frame_names[incomplete_stack], {});
+    incomplete_loc.address = 0;
+    incomplete_loc.line = 0;
+    ++write_index;
   }
 
   // Write the binary frame if it exists and is valid
   if (write_index < kMaxStackDepth &&
       locs.back().symbol_idx != k_symbol_idx_null) {
     const FunLoc &loc = locs.back();
-    write_location(loc, mapinfo_table[loc.map_info_idx],
-                   symbol_table[loc.symbol_idx],
-                   &locations_buff[write_index++]);
+    write_location2(loc, mapinfo_table[loc.map_info_idx],
+                    symbol_table[loc.symbol_idx],
+                    &locations2_buff[write_index]);
+    ++write_index;
   }
   return {};
 }
 
 } // namespace
 
-DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
+DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx,
+                           const ddog_prof_ProfilesDictionaryHandle *dict) {
   size_t const num_watchers = ctx.watchers.size();
 
   ActiveIdsResult active_ids = {};
@@ -463,15 +484,18 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
         .value = default_period,
     };
   }
-  auto prof_res = ddog_prof_Profile_new(
-      sample_types,
+
+  ddog_prof_Status status = ddog_prof_Profile_with_dictionary(
+      &pprof->_profile, dict, sample_types,
       pprof_values.get_num_sample_type_ids() > 0 ? &period : nullptr);
 
-  if (prof_res.tag != DDOG_PROF_PROFILE_NEW_RESULT_OK) {
-    ddog_Error_drop(&prof_res.err);
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to create new profile");
+  if (status.err != nullptr) {
+    defer { ddog_prof_Status_drop(&status); };
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to create new profile: %s",
+                           status.err);
   }
-  pprof->_profile = prof_res.ok;
+
+  init_dict_label_key_ids(pprof->_dict_label_key_ids, *dict);
 
   // Add relevant tags
   {
@@ -506,62 +530,7 @@ DDRes pprof_free_profile(DDProfPProf *pprof) {
   ddog_prof_Profile_drop(&pprof->_profile);
   pprof->_profile = {};
   pprof->_nb_values = 0;
-  return {};
-}
-
-// Assumption of API is that sample is valid in a single type
-DDRes pprof_aggregate(const UnwindOutput *uw_output,
-                      const SymbolHdr &symbol_hdr, const DDProfValuePack &pack,
-                      const PerfWatcher *watcher,
-                      const FileInfoVector &file_infos, bool show_samples,
-                      EventAggregationModePos value_pos, Symbolizer *symbolizer,
-                      DDProfPProf *pprof) {
-
-  const PProfIndices &pprof_indices = watcher->pprof_indices[value_pos];
-  ddog_prof_Profile *profile = &pprof->_profile;
-  int64_t values[k_max_value_types] = {};
-  assert(pprof_indices.pprof_index != -1);
-  values[pprof_indices.pprof_index] = pack.value;
-  if (watcher_has_countable_sample_type(watcher)) {
-    assert(pprof_indices.pprof_count_index != -1);
-    values[pprof_indices.pprof_count_index] = pack.count;
-  }
-
-  std::array<ddog_prof_Location, kMaxStackDepth> locations_buff;
-  std::span locs{uw_output->locs};
-  locs = adjust_locations(watcher, locs);
-
-  // Blaze results should remain alive until we aggregate the pprof data
-  Symbolizer::BlazeResultsWrapper session_results;
-  unsigned write_index = 0;
-  DDRES_CHECK_FWD(process_symbolization(locs, symbol_hdr, file_infos,
-                                        symbolizer, locations_buff,
-                                        session_results, write_index));
-  std::array<ddog_prof_Label, k_max_pprof_labels> labels{};
-  // Create the labels for the sample.  Two samples are the same only when
-  // their locations _and_ all labels are identical, so we admit a very limited
-  // number of labels at present
-  const size_t labels_num =
-      prepare_labels(*uw_output, *watcher, pprof->_pid_str, std::span{labels});
-
-  ddog_prof_Sample const sample = {
-      .locations = {.ptr = locations_buff.data(), .len = write_index},
-      .values = {.ptr = values, .len = pprof->_nb_values},
-      .labels = {.ptr = labels.data(), .len = labels_num},
-  };
-
-  if (show_samples) {
-    ddprof_print_sample(std::span{locations_buff.data(), write_index},
-                        pack.value, uw_output->pid, uw_output->tid, value_pos,
-                        *watcher);
-  }
-  auto res = ddog_prof_Profile_add(profile, sample, pack.timestamp);
-  if (res.tag != DDOG_PROF_PROFILE_RESULT_OK) {
-    defer { ddog_Error_drop(&res.err); };
-    auto msg = ddog_Error_message(&res.err);
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile: %*s",
-                           static_cast<int>(msg.len), msg.ptr);
-  }
+  pprof->_pid_str.clear();
   return {};
 }
 
@@ -574,6 +543,59 @@ DDRes pprof_reset(DDProfPProf *pprof) {
                            static_cast<int>(msg.len), msg.ptr);
   }
   pprof->_pid_str.clear();
+  return {};
+}
+
+DDRes pprof_aggregate_interned_sample(
+    const UnwindOutput *uw_output, const SymbolHdr &symbol_hdr,
+    const DDProfValuePack &pack, const PerfWatcher *watcher,
+    const FileInfoVector &file_infos, bool show_samples,
+    EventAggregationModePos value_pos, Symbolizer *symbolizer,
+    DDProfPProf *pprof) {
+  const PProfIndices &pprof_indices = watcher->pprof_indices[value_pos];
+  ddog_prof_Profile *profile = &pprof->_profile;
+  int64_t values[k_max_value_types] = {};
+  assert(pprof_indices.pprof_index != -1);
+  values[pprof_indices.pprof_index] = pack.value;
+  if (watcher_has_countable_sample_type(watcher)) {
+    assert(pprof_indices.pprof_count_index != -1);
+    values[pprof_indices.pprof_count_index] = pack.count;
+  }
+
+  std::array<ddog_prof_Location2, kMaxStackDepth> locations2_buff;
+  std::span locs{uw_output->locs};
+  locs = adjust_locations(watcher, locs);
+
+  Symbolizer::BlazeResultsWrapper session_results;
+  unsigned write_index = 0;
+  DDRES_CHECK_FWD(
+      process_symbolization(locs, symbol_hdr, file_infos, symbolizer,
+                            symbol_hdr.profiles_dictionary(), locations2_buff,
+                            session_results, write_index));
+
+  std::array<ddog_prof_Label2, k_max_pprof_labels> labels{};
+  const size_t labels_num =
+      prepare_labels2(*uw_output, *watcher, pprof->_pid_str,
+                      pprof->_dict_label_key_ids, std::span{labels});
+
+  if (show_samples) {
+    ddprof_print_sample(std::span{locations2_buff.data(), write_index},
+                        symbol_hdr.profiles_dictionary(), pack.value,
+                        uw_output->pid, uw_output->tid, value_pos, *watcher);
+  }
+
+  ddog_prof_Sample2 const sample = {
+      .locations = {.ptr = locations2_buff.data(), .len = write_index},
+      .values = {.ptr = values, .len = pprof->_nb_values},
+      .labels = {.ptr = labels.data(), .len = labels_num},
+  };
+
+  ddog_prof_Status res =
+      ddog_prof_Profile_add2(profile, sample, pack.timestamp);
+  if (res.err != nullptr) {
+    defer { ddog_prof_Status_drop(&res); };
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PPROF, "Unable to add profile: %s", res.err);
+  }
   return {};
 }
 } // namespace ddprof

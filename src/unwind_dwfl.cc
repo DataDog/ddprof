@@ -213,8 +213,10 @@ int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
 DDRes add_unsymbolized_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
                              const DDProfMod &ddprof_mod,
                              FileInfoId_t file_info_id) {
+  const ddog_prof_ProfilesDictionary *dict =
+      us->symbol_hdr.profiles_dictionary();
   MapInfoIdx_t const map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
-      us->pid, us->symbol_hdr._mapinfo_table, dso, ddprof_mod._build_id);
+      us->pid, us->symbol_hdr._mapinfo_table, dso, ddprof_mod._build_id, dict);
   return add_frame(k_symbol_idx_null, file_info_id, map_idx, pc,
                    pc - ddprof_mod._sym_bias, us);
 }
@@ -226,13 +228,15 @@ DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
   SymbolTable &symbol_table = unwind_symbol_hdr._symbol_table;
   RuntimeSymbolLookup &runtime_symbol_lookup =
       unwind_symbol_hdr._runtime_symbol_lookup;
+  const ddog_prof_ProfilesDictionary *dict =
+      unwind_symbol_hdr.profiles_dictionary();
   SymbolIdx_t symbol_idx = k_symbol_idx_null;
   if (jitdump_path.empty()) {
     symbol_idx =
-        runtime_symbol_lookup.get_or_insert(dso._pid, pc, symbol_table);
+        runtime_symbol_lookup.get_or_insert(dso._pid, pc, symbol_table, dict);
   } else {
     symbol_idx = runtime_symbol_lookup.get_or_insert_jitdump(
-        dso._pid, pc, symbol_table, jitdump_path);
+        dso._pid, pc, symbol_table, dict, jitdump_path);
   }
   if (symbol_idx == k_symbol_idx_null) {
     add_dso_frame(us, dso, pc, "pc");
@@ -240,7 +244,7 @@ DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
   }
 
   MapInfoIdx_t const map_idx = us->symbol_hdr._mapinfo_lookup.get_or_insert(
-      us->pid, us->symbol_hdr._mapinfo_table, dso, {});
+      us->pid, us->symbol_hdr._mapinfo_table, dso, {}, dict);
 
   return add_frame(symbol_idx, k_file_info_undef, map_idx, pc,
                    pc - dso.start() + dso.offset(), us);
