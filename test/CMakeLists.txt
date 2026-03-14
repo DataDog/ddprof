@@ -369,6 +369,11 @@ add_unit_test(tracepoint_config-ut tracepoint_config-ut.cc ../src/tracepoint_con
 
 add_unit_test(live_allocation-ut live_allocation-ut.cc ../src/live_allocation.cc)
 
+add_unit_test(sdt_allocation_correlator-ut sdt_allocation_correlator-ut.cc
+              ../src/sdt_allocation_correlator.cc)
+
+add_unit_test(sdt_probe-ut sdt_probe-ut.cc ../src/sdt_probe.cc LIBRARIES ${ELFUTILS_LIBRARIES})
+
 add_unit_test(ddprof_process-ut ddprof_process-ut.cc ${PROCESS_SRC} LIBRARIES ${ELFUTILS_LIBRARIES})
 
 add_unit_test(glibc_fixes-ut glibc_fixes-ut.cc ../src/lib/glibc_fixes.c LIBRARIES pthread)
@@ -553,3 +558,6 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_exe(deep_stacks deep_stacks.cc)
+
+# SDT test binary - requires systemtap-sdt-dev
+add_exe(sdt_test_binary sdt_test_binary.cc LIBRARIES Threads::Threads)

@@ -6,15 +6,19 @@
 #include "ddprof_worker.hpp"
 
 #include "ddprof_context.hpp"
+#include "ddprof_context_lib.hpp"
 #include "ddprof_perf_event.hpp"
 #include "ddprof_stats.hpp"
 #include "dso_hdr.hpp"
 #include "exporter/ddprof_exporter.hpp"
 #include "logger.hpp"
 #include "perf.hpp"
+#include "perf_archmap.hpp"
 #include "pevent_lib.hpp"
 #include "pprof/ddprof_pprof.hpp"
 #include "procutils.hpp"
+#include "sdt_allocation_correlator.hpp"
+#include "sdt_probe.hpp"
 #include "symbolizer.hpp"
 #include "tags.hpp"
 #include "tsc_clock.hpp"
@@ -327,6 +331,169 @@ DDRes clear_unvisited_pids(DDProfContext &ctx) {
 [[maybe_unused]] DDRes worker_init_stats(DDProfWorkerContext *worker_ctx) {
   DDRES_CHECK_FWD(proc_read(&worker_ctx->proc_status));
   worker_ctx->cycle_start_time = std::chrono::steady_clock::now();
+  return {};
+}
+
+/************************* SDT uprobe helpers *********************************/
+
+/// Extract a register value from a perf sample's register array
+/// The perf register mask determines which registers are present in the array
+/// @param sample The perf event sample
+/// @param perf_reg_num The perf register number (e.g., PAM_X86_RDI)
+/// @return The register value, or 0 if the register is not available
+uint64_t extract_register_value(const perf_event_sample *sample,
+                                unsigned int perf_reg_num) {
+  if (!sample->regs || sample->abi == 0) {
+    return 0;
+  }
+
+  // Check if this register is in the mask
+  if (!(k_perf_register_mask & (1ULL << perf_reg_num))) {
+    return 0;
+  }
+
+  // Count how many bits are set before this register in the mask
+  // This gives us the index into the regs array
+  uint64_t mask_below = (1ULL << perf_reg_num) - 1;
+  unsigned int index = __builtin_popcountll(k_perf_register_mask & mask_below);
+
+  return sample->regs[index];
+}
+
+/// Get the first argument value from an SDT probe sample
+/// For malloc entry, this is the size; for free entry, this is the pointer
+uint64_t get_sdt_arg1(const perf_event_sample *sample) {
+  // First argument is passed in RDI (x86-64) or X0 (aarch64)
+  return extract_register_value(sample, param_to_perf_regno(1));
+}
+
+/// Get the return value from a function (for malloc exit)
+uint64_t get_sdt_return_value(const perf_event_sample *sample) {
+  // Return value is in RAX (x86-64) or X0 (aarch64)
+#ifdef __x86_64__
+  return extract_register_value(sample, PAM_X86_RAX);
+#elif __aarch64__
+  return extract_register_value(sample, PAM_ARM_X0);
+#else
+#error Architecture not supported
+#endif
+}
+
+/// Unwind a sample and populate the output
+DDRes unwind_sdt_sample(DDProfContext &ctx, perf_event_sample *sample,
+                        int watcher_pos, UnwindOutput &output) {
+  struct UnwindState *us = ctx.worker_ctx.us;
+
+  ddprof_stats_add(STATS_SAMPLE_COUNT, 1, nullptr);
+  ddprof_stats_add(STATS_UNWIND_AVG_STACK_SIZE, sample->size_stack, nullptr);
+
+  // copy the sample context into the unwind structure
+  unwind_init_sample(us, sample->regs, sample->pid, sample->size_stack,
+                     sample->data_stack);
+
+  us->output.pid = sample->pid;
+  us->output.tid = sample->tid;
+
+  DDRes res = unwindstate_unwind(us);
+  if (!IsDDResFatal(res)) {
+    output = us->output;
+  }
+  return res;
+}
+
+/// Process an SDT uprobe sample for memory allocation tracking
+DDRes ddprof_pr_sdt_sample(DDProfContext &ctx, perf_event_sample *sample,
+                           int watcher_pos, SDTProbeType probe_type) {
+  if (!sample) {
+    return ddres_warn(DD_WHAT_PERFSAMP);
+  }
+
+  auto ticks0 = TscClock::cycles_now();
+  PerfWatcher *watcher = &ctx.watchers[watcher_pos];
+  struct UnwindState *us = ctx.worker_ctx.us;
+  SDTAllocationCorrelator &correlator = ctx.sdt_correlator;
+
+  switch (probe_type) {
+  case SDTProbeType::kMallocEntry: {
+    // Extract allocation size from first argument
+    uint64_t size = get_sdt_arg1(sample);
+    LG_DBG("SDT malloc entry: pid=%d tid=%d size=%lu", sample->pid, sample->tid,
+           size);
+
+    // Unwind and capture stack trace at entry
+    UnwindOutput stack;
+    DDRes res = unwind_sdt_sample(ctx, sample, watcher_pos, stack);
+    if (!IsDDResFatal(res)) {
+      correlator.on_malloc_entry(sample->pid, sample->tid, size, sample->time,
+                                 std::move(stack));
+    }
+    break;
+  }
+
+  case SDTProbeType::kMallocExit: {
+    // Extract returned pointer
+    uintptr_t ptr = get_sdt_return_value(sample);
+    LG_DBG("SDT malloc exit: pid=%d tid=%d ptr=%p", sample->pid, sample->tid,
+           reinterpret_cast<void *>(ptr));
+
+    // Try to correlate with entry
+    auto result =
+        correlator.on_malloc_exit(sample->pid, sample->tid, ptr, sample->time);
+    if (result && ptr != 0) {
+      // Successfully correlated - aggregate the allocation
+      int const i_export = ctx.worker_ctx.i_current_pprof;
+      DDProfPProf *pprof = ctx.worker_ctx.pprof[i_export];
+
+      // Register live allocation for tracking
+      if (Any(EventAggregationMode::kLiveSum & watcher->aggregation_mode)) {
+        ctx.worker_ctx.live_allocation.register_allocation(
+            result->stack, ptr, result->size, watcher_pos, sample->pid);
+      }
+
+      // Aggregate the sample
+      if (Any(EventAggregationMode::kSum & watcher->aggregation_mode)) {
+        uint64_t timestamp = 0;
+        if (ctx.params.timeline && result->timestamp != 0) {
+          timestamp = result->timestamp + ctx.worker_ctx.perfclock_offset;
+        }
+        const DDProfValuePack pack{static_cast<int64_t>(result->size), 1,
+                                   timestamp};
+
+        DDRES_CHECK_FWD(pprof_aggregate(
+            &result->stack, us->symbol_hdr, pack, watcher,
+            us->dso_hdr.get_file_info_vector(), ctx.params.show_samples,
+            kSumPos, ctx.worker_ctx.symbolizer, pprof));
+      }
+    }
+    break;
+  }
+
+  case SDTProbeType::kFreeEntry: {
+    // Extract pointer being freed
+    uintptr_t ptr = get_sdt_arg1(sample);
+    LG_DBG("SDT free entry: pid=%d tid=%d ptr=%p", sample->pid, sample->tid,
+           reinterpret_cast<void *>(ptr));
+
+    if (ptr != 0) {
+      // Register deallocation for live allocation tracking
+      ctx.worker_ctx.live_allocation.register_deallocation(ptr, watcher_pos,
+                                                           sample->pid);
+      correlator.on_free_entry(sample->pid, sample->tid, ptr, sample->time);
+    }
+    break;
+  }
+
+  case SDTProbeType::kFreeExit:
+    // We don't need to do anything for free exit
+    break;
+
+  default:
+    LG_WRN("Unknown SDT probe type: %d", static_cast<int>(probe_type));
+    break;
+  }
+
+  ddprof_stats_add(STATS_AGGREGATION_AVG_TIME,
+                   TscClock::cycles_now() - ticks0, nullptr);
   return {};
 }
 
@@ -762,7 +929,8 @@ struct perf_event_hdr_wpid : perf_event_header {
 };
 
 DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
-                                  DDProfContext &ctx) {
+                                  DDProfContext &ctx,
+                                  SDTProbeType sdt_probe_type) {
   // global try catch to avoid leaking exceptions to main loop
   try {
     ddprof_stats_add(STATS_EVENT_COUNT, 1, nullptr);
@@ -783,7 +951,13 @@ DDRes ddprof_worker_process_event(const perf_event_header *hdr, int watcher_pos,
         uint64_t const mask = watcher->sample_type;
         perf_event_sample *sample = hdr2samp(hdr, mask);
         if (sample) {
-          DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, watcher_pos));
+          // Check if this is an SDT uprobe sample
+          if (sdt_probe_type != SDTProbeType::kUnknown) {
+            DDRES_CHECK_FWD(
+                ddprof_pr_sdt_sample(ctx, sample, watcher_pos, sdt_probe_type));
+          } else {
+            DDRES_CHECK_FWD(ddprof_pr_sample(ctx, sample, watcher_pos));
+          }
         }
       }
       break;

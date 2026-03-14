@@ -12,7 +12,9 @@
 #include "exporter_input.hpp"
 #include "perf_clock.hpp"
 #include "perf_watcher.hpp"
+#include "sdt_allocation_correlator.hpp"
 #include "unique_fd.hpp"
+#include "uprobe_attacher.hpp"
 
 #include <sched.h>
 #include <unistd.h>
@@ -44,6 +46,10 @@ struct DDProfContext {
     std::string tags;
     std::chrono::milliseconds initial_loaded_libs_check_delay{0};
     std::chrono::milliseconds loaded_libs_check_interval{0};
+
+    // SDT probe options
+    std::string sdt_mode{"auto"};
+    std::string target_binary;
   } params;
 
   ddprof::UniqueFd socket_fd;
@@ -52,5 +58,10 @@ struct DDProfContext {
   std::vector<PerfWatcher> watchers;
   ExporterInput exp_input;
   DDProfWorkerContext worker_ctx;
+
+  // SDT probe support
+  std::vector<UprobeAttachment> sdt_attachments; // Attached uprobes for SDT
+  SDTAllocationCorrelator sdt_correlator;        // Entry/exit correlation
+  bool sdt_probes_active{false}; // True if SDT probes are being used
 };
 } // namespace ddprof

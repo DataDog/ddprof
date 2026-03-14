@@ -18,4 +18,9 @@ DDRes context_set(const DDProfCLI &ddprof_cli, DDProfContext &ctx);
 
 int context_allocation_profiling_watcher_idx(const DDProfContext &ctx);
 
+int context_sdt_allocation_profiling_watcher_idx(const DDProfContext &ctx);
+
+DDRes context_setup_sdt_probes(const DDProfCLI &ddprof_cli,
+                               DDProfContext &ctx);
+
 } // namespace ddprof

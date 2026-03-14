@@ -429,6 +429,29 @@ int DDProfCLI::parse(int argc, const char *argv[]) {
                                  ->default_val(k_default_max_profiled_pids)
                                  ->envname("DD_PROFILING_MAXIMUM_PIDS")
                                  ->group(""));
+
+  // SDT probe options
+  extended_options.push_back(
+      app.add_option("--sdt-probes,--sdt_probes", sdt_mode,
+                     "SDT probe mode for memory profiling:\n"
+                     "  auto: Use SDT probes if found, fallback to hooks\n"
+                     "  only: Only use SDT probes, fail if not found\n"
+                     "  off: Never use SDT probes (hook-based only)")
+          ->default_val("auto")
+          ->check(CLI::IsMember({"auto", "only", "off"}))
+          ->envname("DD_PROFILING_SDT_PROBES")
+          ->group(""));
+
+  extended_options.push_back(
+      app.add_option("--target-binary,--target_binary", target_binary,
+                     "Path to target binary for SDT probe discovery.\n"
+                     "Required for SDT probe mode with statically linked "
+                     "binaries.\n"
+                     "If not specified, uses the first element of the command "
+                     "line.")
+          ->envname("DD_PROFILING_TARGET_BINARY")
+          ->group(""));
+
   // Parse
   CLI11_PARSE(app, argc, argv);
 
@@ -595,6 +618,10 @@ void DDProfCLI::print() const {
             disable_symbolization ? "true" : "false");
   PRINT_NFO("  - reorder_events: %s", reorder_events ? "true" : "false");
   PRINT_NFO("  - maximum_pids: %d", maximum_pids);
+  PRINT_NFO("  - sdt_mode: %s", sdt_mode.c_str());
+  if (!target_binary.empty()) {
+    PRINT_NFO("  - target_binary: %s", target_binary.c_str());
+  }
 }
 
 CommandLineWrapper DDProfCLI::get_user_command_line() const {
