@@ -43,15 +43,16 @@ UniqueFile open_proc_maps(int pid, const char *path_to_proc = "") {
   }
 
   UniqueFile f{fopen(proc_map_filename, "r")};
-  if (!f) {
-    // Check if the file exists
+  if (!f && is_root()) {
+    // UID elevation is only safe when running as root (saved-set-user-ID
+    // stays 0, so the round-trip preserves capabilities).  For non-root
+    // users the UID transition back to nonzero clears all capabilities
+    // (see capabilities(7), "Effect of user ID changes on capabilities").
     struct stat info;
     UIDInfo old_uids;
     if (stat(proc_map_filename, &info) == 0 &&
-        // try to switch to file user
         IsDDResOK(user_override(info.st_uid, info.st_gid, &old_uids))) {
       f.reset(fopen(proc_map_filename, "r"));
-      // switch back to initial user
       user_override(old_uids.uid, old_uids.gid);
     }
   }

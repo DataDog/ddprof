@@ -23,15 +23,14 @@ UniqueFile open_proc_comm(pid_t pid, pid_t tid, const char *path_to_proc = "") {
   const std::string proc_comm_filename =
       absl::StrFormat("%s/proc/%d/task/%d/comm", path_to_proc, pid, tid);
   UniqueFile file{fopen(proc_comm_filename.c_str(), "r"), fclose};
-  if (!file) {
-    // Check if the file exists
+  if (!file && is_root()) {
+    // Same rationale as open_proc_maps: UID elevation destroys
+    // capabilities for non-root users (capabilities(7)).
     struct stat info;
     UIDInfo old_uids;
-    // warning could user switch create too much overhead ?
     if (stat(proc_comm_filename.c_str(), &info) == 0 &&
         IsDDResOK(user_override(info.st_uid, info.st_gid, &old_uids))) {
       file.reset(fopen(proc_comm_filename.c_str(), "r"));
-      // Switch back to the original user
       user_override(old_uids.uid, old_uids.gid);
     }
   }
