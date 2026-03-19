@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
 #include <memory>
@@ -109,6 +110,7 @@ DsoHdr::DsoHdr(std::string_view path_to_proc, int dd_profiling_fd)
   } else {
     _path_to_proc = path_to_proc;
   }
+  init_workspace_remap();
   // 0 element is error element
   _file_info_vector.emplace_back(FileInfo(), 0);
 }
@@ -528,6 +530,57 @@ Dso DsoHdr::dso_from_proc_line(int pid, const char *line) {
           DsoOrigin::kProcMaps};
 }
 
+void DsoHdr::init_workspace_remap() {
+  _workspace_host_prefix.clear();
+  _workspace_container_root.clear();
+  if (const char *workspace_env = std::getenv("DDPROF_WORKSPACE_ROOT");
+      workspace_env && workspace_env[0] != '\0') {
+    const std::string mapping = workspace_env;
+    auto const sep = mapping.find('|');
+    if (sep != std::string::npos) {
+      _workspace_host_prefix = mapping.substr(0, sep);
+      _workspace_container_root = mapping.substr(sep + 1);
+    } else {
+      LG_WRN("DDPROF_WORKSPACE_ROOT is expected to be "
+             "'<host_prefix>|<container_root>'");
+    }
+  }
+  auto trim_trailing_slash = [](std::string &path) {
+    while (path.size() > 1 && path.back() == '/') {
+      path.pop_back();
+    }
+  };
+  trim_trailing_slash(_workspace_host_prefix);
+  trim_trailing_slash(_workspace_container_root);
+  if (_workspace_host_prefix.empty() || _workspace_container_root.empty()) {
+    _workspace_host_prefix.clear();
+    _workspace_container_root.clear();
+  } else {
+    LG_NTC("DDPROF_WORKSPACE_ROOT is set to %s|%s",
+           _workspace_host_prefix.c_str(), _workspace_container_root.c_str());
+  }
+}
+
+// On macOS with Docker / virtiofs, /proc/pid/maps exposes host-backed paths
+// (e.g. /run/host_virtiofs/Users/foo/ddprof/build/...) instead of the
+// in-container path (/app/build/...).  When DDPROF_WORKSPACE_ROOT is set,
+// strip the host prefix and replace it with the container root so that
+// libdwfl can locate the ELF file.
+std::optional<std::string>
+DsoHdr::remap_host_workspace_path(std::string_view original) const {
+  if (_workspace_host_prefix.empty()) {
+    return std::nullopt;
+  }
+  if (!original.starts_with(_workspace_host_prefix)) {
+    return std::nullopt;
+  }
+  auto suffix = original.substr(_workspace_host_prefix.size());
+  if (!suffix.empty() && suffix[0] != '/') {
+    return std::nullopt;
+  }
+  return _workspace_container_root + std::string(suffix);
+}
+
 FileInfo DsoHdr::find_file_info(const Dso &dso) {
   int64_t size;
   inode_t inode;
@@ -549,6 +602,14 @@ FileInfo DsoHdr::find_file_info(const Dso &dso) {
       LG_DBG("[DSO] inode mismatch for %s", proc_path.c_str());
     }
     return {proc_path, size, inode};
+  }
+
+  if (auto remapped = remap_host_workspace_path(dso._filename)) {
+    if (get_file_inode(remapped->c_str(), &inode, &size)) {
+      LG_DBG("[DSO] Remapped %s -> %s", dso._filename.c_str(),
+             remapped->c_str());
+      return {*remapped, size, inode};
+    }
   }
 
   LG_DBG("[DSO] Unable to find path to %s", dso._filename.c_str());
