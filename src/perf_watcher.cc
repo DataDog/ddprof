@@ -117,7 +117,8 @@ const PerfWatcher *tracepoint_default_watcher() {
 
 bool watcher_has_tracepoint(const PerfWatcher *watcher) {
   return watcher->pprof_active &&
-      watcher->sample_type_info.sample_types[kSumPos] == k_stype_val_tracepoint;
+      watcher->sample_type_info.sample_types[kSumPos] ==
+      DDOG_PROF_SAMPLE_TYPE_TRACEPOINT;
 }
 
 void log_watcher(const PerfWatcher *w, int idx) {

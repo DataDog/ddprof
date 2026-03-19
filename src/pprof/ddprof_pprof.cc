@@ -30,40 +30,28 @@ using namespace std::string_view_literals;
 
 namespace ddprof {
 
-// Verify that the uint32_t constants in watcher_sample_types.hpp match the
-// libdatadog enum values. If any of these fail, update the k_stype_val_*
-// constants in watcher_sample_types.hpp to match the new libdatadog version.
-static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_SAMPLE) == 37);
-static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_TRACEPOINT) == 38);
-static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_CPU_TIME) == 4);
-static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_CPU_SAMPLES) == 5);
-static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_ALLOC_SPACE) == 3);
-static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_ALLOC_SAMPLES) == 0);
-static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_INUSE_SPACE) == 28);
-static_assert(static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_INUSE_OBJECTS) == 27);
-
 namespace {
 constexpr size_t k_max_pprof_labels{8};
 
-// Maps a ddog_prof_SampleType integer value to the kebab-case name used in
-// debug log output (must match what simple_malloc-ut.sh greps for).
+// Maps a ddog_prof_SampleType to the kebab-case name used in debug log output
+// (must match what simple_malloc-ut.sh greps for).
 constexpr const char *sample_type_name(uint32_t raw_type) {
   switch (raw_type) {
-  case k_stype_val_sample:
+  case DDOG_PROF_SAMPLE_TYPE_SAMPLE:
     return "sample";
-  case k_stype_val_tracepoint:
+  case DDOG_PROF_SAMPLE_TYPE_TRACEPOINT:
     return "tracepoint";
-  case k_stype_val_cpu_time:
+  case DDOG_PROF_SAMPLE_TYPE_CPU_TIME:
     return "cpu-time";
-  case k_stype_val_cpu_samples:
+  case DDOG_PROF_SAMPLE_TYPE_CPU_SAMPLES:
     return "cpu-samples";
-  case k_stype_val_alloc_space:
+  case DDOG_PROF_SAMPLE_TYPE_ALLOC_SPACE:
     return "alloc-space";
-  case k_stype_val_alloc_samples:
+  case DDOG_PROF_SAMPLE_TYPE_ALLOC_SAMPLES:
     return "alloc-samples";
-  case k_stype_val_inuse_space:
+  case DDOG_PROF_SAMPLE_TYPE_INUSE_SPACE:
     return "inuse-space";
-  case k_stype_val_inuse_objects:
+  case DDOG_PROF_SAMPLE_TYPE_INUSE_OBJECTS:
     return "inuse-objects";
   default:
     return "unknown";
@@ -71,24 +59,22 @@ constexpr const char *sample_type_name(uint32_t raw_type) {
 }
 
 // Verify that sample_type_name() returns the strings the backend expects.
-// These must match what libdatadog writes into the pprof string table for each
-// ddog_prof_SampleType enum value.
-static_assert(std::string_view(sample_type_name(k_stype_val_cpu_time)) ==
-              "cpu-time");
-static_assert(std::string_view(sample_type_name(k_stype_val_cpu_samples)) ==
-              "cpu-samples");
-static_assert(std::string_view(sample_type_name(k_stype_val_alloc_space)) ==
-              "alloc-space");
-static_assert(std::string_view(sample_type_name(k_stype_val_alloc_samples)) ==
-              "alloc-samples");
-static_assert(std::string_view(sample_type_name(k_stype_val_inuse_space)) ==
-              "inuse-space");
-static_assert(std::string_view(sample_type_name(k_stype_val_inuse_objects)) ==
-              "inuse-objects");
-static_assert(std::string_view(sample_type_name(k_stype_val_tracepoint)) ==
-              "tracepoint");
-static_assert(std::string_view(sample_type_name(k_stype_val_sample)) ==
-              "sample");
+static_assert(std::string_view(sample_type_name(
+                  DDOG_PROF_SAMPLE_TYPE_CPU_TIME)) == "cpu-time");
+static_assert(std::string_view(sample_type_name(
+                  DDOG_PROF_SAMPLE_TYPE_CPU_SAMPLES)) == "cpu-samples");
+static_assert(std::string_view(sample_type_name(
+                  DDOG_PROF_SAMPLE_TYPE_ALLOC_SPACE)) == "alloc-space");
+static_assert(std::string_view(sample_type_name(
+                  DDOG_PROF_SAMPLE_TYPE_ALLOC_SAMPLES)) == "alloc-samples");
+static_assert(std::string_view(sample_type_name(
+                  DDOG_PROF_SAMPLE_TYPE_INUSE_SPACE)) == "inuse-space");
+static_assert(std::string_view(sample_type_name(
+                  DDOG_PROF_SAMPLE_TYPE_INUSE_OBJECTS)) == "inuse-objects");
+static_assert(std::string_view(sample_type_name(
+                  DDOG_PROF_SAMPLE_TYPE_TRACEPOINT)) == "tracepoint");
+static_assert(std::string_view(
+                  sample_type_name(DDOG_PROF_SAMPLE_TYPE_SAMPLE)) == "sample");
 
 // Upper bound on distinct ddog_prof_SampleType slots (sum + live types +
 // their count companions across all watcher kinds).
@@ -389,12 +375,12 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
         continue;
       }
       const uint32_t sample_t = w.sample_type_info.sample_types[m];
-      if (sample_t == k_stype_val_none) {
+      if (sample_t == k_stype_none) {
         continue;
       }
       w.pprof_indices[m].pprof_index = slots.ensure(sample_t);
       const uint32_t count_t = w.sample_type_info.count_types[m];
-      if (count_t != k_stype_val_none) {
+      if (count_t != k_stype_none) {
         w.pprof_indices[m].pprof_count_index = slots.ensure(count_t);
       }
     }

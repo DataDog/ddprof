@@ -8,7 +8,7 @@ pprof profiles. Each pprof profile has a fixed set of **value columns**
 Datadog backend uses to interpret the data (e.g. `cpu-time/nanoseconds`,
 `alloc-space/bytes`).
 
-libdatadog v28+ represents these as a `ddog_prof_SampleType` enum rather than
+libdatadog v29+ represents these as a `ddog_prof_SampleType` enum rather than
 free-form strings. ddprof maps each watcher to the appropriate enum values via
 the `WatcherSampleTypes` struct defined in `include/watcher_sample_types.hpp`.
 
@@ -27,7 +27,8 @@ Most profiling events are reported as a pair of columns:
 
 When no count companion applies (tracepoints, plain sample counts), the count
 slot is left empty. In `WatcherSampleTypes`, the sentinel value
-`k_stype_val_sample` in `count_types[]` signals "no count companion".
+`k_stype_val_none` (`UINT32_MAX`) in either `sample_types[]` or `count_types[]`
+signals "no type for this mode".
 
 ### Aggregation mode
 
@@ -52,11 +53,11 @@ what is still alive (useful for leak detection).
 | Mode | Primary column | Count companion |
 |---|---|---|
 | Sum (`kSumPos`) | `cpu-time / nanoseconds` | `cpu-samples / count` |
-| Live (`kLiveSumPos`) | `cpu-samples / count` | *(none)* |
+| Live (`kLiveSumPos`) | *(none)* | *(none)* |
 
-CPU profiling is almost always used in sum mode. Live mode is not a meaningful
-concept for CPU time; the live slot exists for completeness but is unused in
-practice.
+CPU profiling is sum-mode only. Live mode is not a meaningful concept for CPU
+time; both live slots are set to `k_stype_val_none` and no columns are
+registered for that mode.
 
 ### `k_stype_alloc` — Allocation profiling (`sALLOC`)
 
@@ -76,15 +77,15 @@ The same `sALLOC` watcher produces different columns depending on the mode:
 | Mode | Primary column | Count companion |
 |---|---|---|
 | Sum (`kSumPos`) | `tracepoint / events` | *(none)* |
-| Live (`kLiveSumPos`) | `tracepoint / events` | *(none)* |
+| Live (`kLiveSumPos`) | *(none)* | *(none)* |
 
 Used by hardware performance counters (`hCPU`, `hREF`, `hINST`, …), software
 events (`sPF`, `sCS`, …), and named kernel tracepoints (e.g.
 `event=tlb:tlb_flush`). Each sample represents one event occurrence; there is
-no meaningful count companion.
+no count companion and no live mode.
 
-> **Backend note**: prior to libdatadog v28, the `(tracepoint, events)` strings
-> were passed as free-form values. In v28+, `DDOG_PROF_SAMPLE_TYPE_TRACEPOINT`
+> **Backend note**: prior to libdatadog v29, the `(tracepoint, events)` strings
+> were passed as free-form values. In v29+, `DDOG_PROF_SAMPLE_TYPE_TRACEPOINT`
 > is the canonical enum value. The integer value of this enum is verified at
 > compile time in `ddprof_pprof.cc` via `static_assert`.
 
@@ -92,13 +93,20 @@ no meaningful count companion.
 
 ## Sentinel and Safety
 
-`k_stype_val_sample` (the enum integer for `DDOG_PROF_SAMPLE_TYPE_SAMPLE`) is
-used as a sentinel in `count_types[]` to mean "no count companion". The profile
-creation code in `pprof_create_profile()` skips registering a count column when
-it sees this value:
+`k_stype_val_none` (`UINT32_MAX`) is the sentinel for "no type for this
+aggregation mode". It appears in both `sample_types[]` and `count_types[]`.
+The profile creation code in `pprof_create_profile()` skips the entire mode
+when `sample_types[m]` is the sentinel, and skips registering a count column
+when `count_types[m]` is the sentinel:
 
 ```cpp
-if (count_t != static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_SAMPLE)) {
+const uint32_t sample_t = w.sample_type_info.sample_types[m];
+if (sample_t == k_stype_val_none) {
+    continue;
+}
+w.pprof_indices[m].pprof_index = slots.ensure(sample_t);
+const uint32_t count_t = w.sample_type_info.count_types[m];
+if (count_t != k_stype_val_none) {
     w.pprof_indices[m].pprof_count_index = slots.ensure(count_t);
 }
 ```

@@ -6,14 +6,14 @@
 #pragma once
 
 // Maps a watcher's event to pprof sample types for each aggregation mode.
-// Values are ddog_prof_SampleType stored as uint32_t to avoid including
-// <datadog/common.h> in this header. Static asserts in ddprof_pprof.cc
-// verify the values match the libdatadog enum.
-// k_stype_val_none (UINT32_MAX) signals "no sample/count type for this mode".
+// k_stype_none signals "no sample/count type for this aggregation mode".
+// Fields are uint32_t (not the enum) to allow k_stype_none = UINT32_MAX,
+// which lies outside the valid enum range.
 
 #include "event_config.hpp"
 
 #include <cstdint>
+#include <datadog/common.h>
 
 namespace ddprof {
 
@@ -23,35 +23,23 @@ struct WatcherSampleTypes {
 };
 
 // Sentinel: slot is unused for this aggregation mode.
-inline constexpr uint32_t k_stype_val_none = UINT32_MAX;
-
-// ddog_prof_SampleType integer values for libdatadog v29.
-// Stored as uint32_t to avoid including <datadog/common.h> here.
-// Static asserts in ddprof_pprof.cc verify these against the actual enum.
-inline constexpr uint32_t k_stype_val_sample = 37;        // SAMPLE
-inline constexpr uint32_t k_stype_val_tracepoint = 38;    // TRACEPOINT
-inline constexpr uint32_t k_stype_val_cpu_time = 4;       // CPU_TIME
-inline constexpr uint32_t k_stype_val_cpu_samples = 5;    // CPU_SAMPLES
-inline constexpr uint32_t k_stype_val_alloc_space = 3;    // ALLOC_SPACE
-inline constexpr uint32_t k_stype_val_alloc_samples = 0;  // ALLOC_SAMPLES
-inline constexpr uint32_t k_stype_val_inuse_space = 28;   // INUSE_SPACE
-inline constexpr uint32_t k_stype_val_inuse_objects = 27; // INUSE_OBJECTS
+inline constexpr uint32_t k_stype_none = UINT32_MAX;
 
 // Tracepoints: one event = one sample, no count companion, no live mode.
 // clang-format off
 inline constexpr WatcherSampleTypes k_stype_tracepoint = {
-    {k_stype_val_tracepoint, k_stype_val_none},
-    {k_stype_val_none,       k_stype_val_none}};
+    {DDOG_PROF_SAMPLE_TYPE_TRACEPOINT, k_stype_none},
+    {k_stype_none,                     k_stype_none}};
 
 // CPU: nanoseconds in sum mode only — no live profile for CPU.
 inline constexpr WatcherSampleTypes k_stype_cpu = {
-    {k_stype_val_cpu_time,    k_stype_val_none},
-    {k_stype_val_cpu_samples, k_stype_val_none}};
+    {DDOG_PROF_SAMPLE_TYPE_CPU_TIME,    k_stype_none},
+    {DDOG_PROF_SAMPLE_TYPE_CPU_SAMPLES, k_stype_none}};
 
 // Allocation: bytes allocated / live bytes, with object-count companions.
 inline constexpr WatcherSampleTypes k_stype_alloc = {
-    {k_stype_val_alloc_space,   k_stype_val_inuse_space},
-    {k_stype_val_alloc_samples, k_stype_val_inuse_objects}};
+    {DDOG_PROF_SAMPLE_TYPE_ALLOC_SPACE,   DDOG_PROF_SAMPLE_TYPE_INUSE_SPACE},
+    {DDOG_PROF_SAMPLE_TYPE_ALLOC_SAMPLES, DDOG_PROF_SAMPLE_TYPE_INUSE_OBJECTS}};
 // clang-format on
 
 } // namespace ddprof
