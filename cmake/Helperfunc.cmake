@@ -2,6 +2,20 @@
 # License Version 2.0. This product includes software developed at Datadog
 # (https://www.datadoghq.com/). Copyright 2021-Present Datadog, Inc.
 
+# Set C/C++ standard on a ddprof target.
+# Per-target properties override any global or toolchain-injected standard,
+# so ddprof builds correctly even when embedded in a parent project that
+# uses a different C++ standard (e.g. Conan with C++23).
+function(ddprof_set_standard target)
+  set_target_properties(${target} PROPERTIES
+    C_STANDARD 11
+    C_STANDARD_REQUIRED ON
+    C_EXTENSIONS ON
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS ON)
+endfunction()
+
 #[[ Create an executable
 Syntax:
 add_exe(<name> src1 [src2 ...] [LIBRARIES lib1 lib2 ...] [DEFINITIONS def1 def2])
@@ -40,6 +54,7 @@ function(add_exe name)
   endforeach()
 
   add_executable(${name} ${exe_sources})
+  ddprof_set_standard(${name})
   set_target_properties(${name} PROPERTIES COMPILE_DEFINITIONS "${exe_definitions}")
   target_link_libraries(${name} PRIVATE ${exe_libraries})
   list(REMOVE_DUPLICATES exe_include_dirs)
