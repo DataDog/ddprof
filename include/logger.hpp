@@ -105,17 +105,13 @@ using LogsAllowedCallback = std::function<bool()>;
 void LOG_set_logs_allowed_function(LogsAllowedCallback logs_allowed_function);
 
 /******************************* Logging Macros *******************************/
-#define ABS(__x)                                                               \
-  ({                                                                           \
-    const typeof(__x) _x = (__x);                                              \
-    _x < 0 ? -1 * _x : _x;                                                     \
-  })
+constexpr int ddprof_abs(int x) { return x < 0 ? -x : x; }
 
 // Avoid calling arguments (which can have CPU costs unless level is OK)
 #define LG_IF_LVL_OK(level, ...)                                               \
   do {                                                                         \
     if (unlikely(LOG_is_logging_enabled_for_level(level))) {                   \
-      olprintfln(ABS(level), -1, __VA_ARGS__);                                 \
+      olprintfln(ddprof_abs(level), -1, __VA_ARGS__);                          \
     }                                                                          \
   } while (false)
 
