@@ -9,12 +9,17 @@ set(TAG_LIBDATADOG
 
 set(Datadog_ROOT ${VENDOR_PATH}/libdatadog-${TAG_LIBDATADOG})
 
-message(STATUS "${CMAKE_SOURCE_DIR}/tools/fetch_libddprof.sh ${TAG_LIBDATADOG} ${LIBDATADOG_ROOT}")
-execute_process(
-  COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_libdatadog.sh" ${TAG_LIBDATADOG} ${Datadog_ROOT}
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND_ERROR_IS_FATAL ANY)
+if(DDPROF_FETCH_LIBDATADOG)
+  message(STATUS "${CMAKE_SOURCE_DIR}/tools/fetch_libddprof.sh ${TAG_LIBDATADOG} ${LIBDATADOG_ROOT}")
+  execute_process(
+    COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_libdatadog.sh" ${TAG_LIBDATADOG} ${Datadog_ROOT}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND_ERROR_IS_FATAL ANY)
 
-set(DataDog_DIR "${Datadog_ROOT}/cmake")
+  set(DataDog_DIR "${Datadog_ROOT}/cmake")
+endif()
+
+# When DDPROF_FETCH_LIBDATADOG=OFF, the consumer must provide Datadog through
+# CMAKE_PREFIX_PATH or a CMake config generator (e.g. Conan CMakeDeps).
 
 # Prefer static library to shared library
 set(CMAKE_FIND_LIBRARY_SUFFIXES_BACKUP ${CMAKE_FIND_LIBRARY_SUFFIXES})

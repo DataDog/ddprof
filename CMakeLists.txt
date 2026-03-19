@@ -61,6 +61,7 @@ option(DDPROF_ALLOCATOR "Define the type of allocator (STANDARD / JEMALLOC)" STA
 option(BUILD_BENCHMARKS "Enable benchmarks" OFF)
 option(BUILD_DDPROF_TESTING "Enable tests" ON)
 option(STRIP_DEBUG_INFO "Strip debug info from the final binaries" OFF)
+option(DDPROF_FETCH_LIBDATADOG "Download libdatadog from GitHub releases" ON)
 
 if(USE_LOADER AND USE_AUXILIARY)
   message(FATAL_ERROR "USE_LOADER and USE_AUXILIARY are incompatible")
