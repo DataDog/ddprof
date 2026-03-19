@@ -20,7 +20,3 @@ if(ENABLE_CLANG_TIDY)
     APPEND
     PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/.clang-tidy)
 endif()
-
-function(disable_clangtidy target)
-  set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY "" C_CLANG_TIDY "")
-endfunction()

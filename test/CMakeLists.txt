@@ -500,7 +500,7 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
                                                        COMPRESS_DEBUG_SECTION)
   target_include_directories(simple_malloc PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
-  add_library(simple_malloc_lib SHARED ${SIMPLE_MALLOC_SRC})
+  ddprof_add_library(simple_malloc_lib SHARED ${SIMPLE_MALLOC_SRC})
   target_compile_definitions(simple_malloc_lib PRIVATE "SIMPLE_MALLOC_SHARED_LIBRARY")
   set_target_properties(simple_malloc_lib PROPERTIES OUTPUT_NAME "simplemalloc")
   target_include_directories(simple_malloc_lib PRIVATE ${CMAKE_SOURCE_DIR}/include)
