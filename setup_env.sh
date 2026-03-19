@@ -28,7 +28,7 @@ done
 
 
 SCRIPTDIR="$(cd -- $( dirname -- "${BASH_SOURCE[0]}" ) && pwd)" # no "$0" when sourcing
-DDPROF_INSTALL_PREFIX="../deliverables"
+DDPROF_INSTALL_PREFIX="../deliverables/ddprof"
 DDPROF_BUILD_BENCH="ON"
 COMPILER_SETTING="-DCMAKE_CXX_COMPILER=\"${CXX:-${DDPROF_CXX_DEFAULT}}\" -DCMAKE_C_COMPILER=\"${CC:-${DDPROF_CC_DEFAULT}}\""
 

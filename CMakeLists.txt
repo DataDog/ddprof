@@ -335,7 +335,7 @@ if(LTO_SUPPORTED AND "${CMAKE_BUILD_TYPE}" STREQUAL "Release")
 endif()
 
 message(STATUS "Install destination " ${CMAKE_INSTALL_PREFIX})
-install(FILES LICENSE LICENSE-3rdparty.csv LICENSE.LGPLV3 NOTICE DESTINATION ddprof)
+install(FILES LICENSE LICENSE-3rdparty.csv LICENSE.LGPLV3 NOTICE DESTINATION licenses)
 
 set(DDPROF_EXE_OBJECT "${CMAKE_BINARY_DIR}/ddprof.o")
 set(DDPROF_EXE_HASH_HEADER "${CMAKE_BINARY_DIR}/ddprof_exe_hash.h")
@@ -428,10 +428,10 @@ endif()
 
 install(
   TARGETS ddprof dd_profiling-static dd_profiling-shared
-  RUNTIME DESTINATION ddprof/bin
-  LIBRARY DESTINATION ddprof/lib
-  ARCHIVE DESTINATION ddprof/lib
-  PUBLIC_HEADER DESTINATION ddprof/include)
+  RUNTIME DESTINATION bin
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  PUBLIC_HEADER DESTINATION include)
 
 # ---- Unit tests ----
 
