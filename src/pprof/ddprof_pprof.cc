@@ -388,10 +388,13 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
                static_cast<EventAggregationMode>(1 << m))) {
         continue;
       }
-      w.pprof_indices[m].pprof_index =
-          slots.ensure(w.sample_type_info.sample_types[m]);
+      const uint32_t sample_t = w.sample_type_info.sample_types[m];
+      if (sample_t == k_stype_val_none) {
+        continue;
+      }
+      w.pprof_indices[m].pprof_index = slots.ensure(sample_t);
       const uint32_t count_t = w.sample_type_info.count_types[m];
-      if (count_t != static_cast<uint32_t>(DDOG_PROF_SAMPLE_TYPE_SAMPLE)) {
+      if (count_t != k_stype_val_none) {
         w.pprof_indices[m].pprof_count_index = slots.ensure(count_t);
       }
     }
