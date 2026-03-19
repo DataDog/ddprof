@@ -97,12 +97,18 @@ add_subdirectory(src/event_parser)
 include(Findelfutils)
 
 # ---- Static analysis ----
-include(ClangTidy)
-include(Format)
+option(DDPROF_ENABLE_STATIC_ANALYSIS "Enable cppcheck, clang-tidy, and format targets" ON)
 
-# Generated code needs to be available for cppcheck to work
-include(CppcheckConfig)
-add_dependencies(cppcheck DDProf::Parser)
+if(DDPROF_ENABLE_STATIC_ANALYSIS)
+  include(ClangTidy)
+  include(Format)
+
+  # Generated code needs to be available for cppcheck to work
+  include(CppcheckConfig)
+  if(TARGET cppcheck)
+    add_dependencies(cppcheck DDProf::Parser)
+  endif()
+endif()
 
 # ---- Libraries (needed by ut) ----
 
