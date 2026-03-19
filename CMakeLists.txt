@@ -171,8 +171,8 @@ set(dd_profiling_linker_script "${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")
 
 if(USE_LOADER)
   # Build small loader lib that is in charge of dlopening libdd_profiling-embedded.so
-  add_library(dd_loader SHARED src/lib/glibc_fixes.c src/lib/lib_embedded_data.c src/lib/loader.c)
-  ddprof_set_standard(dd_loader)
+  ddprof_add_library(dd_loader SHARED src/lib/glibc_fixes.c src/lib/lib_embedded_data.c
+                     src/lib/loader.c)
   target_include_directories(dd_loader PRIVATE ${CMAKE_SOURCE_DIR}/include
                                                ${CMAKE_SOURCE_DIR}/include/lib)
   set_target_properties(dd_loader PROPERTIES LINK_DEPENDS "${dd_profiling_linker_script}")
@@ -244,8 +244,7 @@ if(BUILD_UNIVERSAL_DDPROF)
 endif()
 
 # libddprofiling_embeded.so is the actual profiling library
-add_library(dd_profiling-embedded SHARED ${DD_PROFILING_SOURCES})
-ddprof_set_standard(dd_profiling-embedded)
+ddprof_add_library(dd_profiling-embedded SHARED ${DD_PROFILING_SOURCES})
 target_include_directories(dd_profiling-embedded PUBLIC ${CMAKE_SOURCE_DIR}/include/lib
                                                         ${CMAKE_SOURCE_DIR}/include)
 set_target_properties(dd_profiling-embedded
@@ -315,7 +314,6 @@ add_exe(
   ddprof ${DDPROF_GLOBAL_SRC}
   LIBRARIES ${DDPROF_LIBRARY_LIST}
   DEFINITIONS ${DDPROF_DEFINITION_LIST})
-ddprof_set_standard(ddprof)
 target_link_libraries(ddprof PRIVATE libddprofiling_embedded_object CLI11 absl::base
                                      absl::str_format)
 target_strip_debug_info(ddprof)
@@ -363,8 +361,7 @@ set_target_properties(
                                                                        "${CMAKE_BINARY_DIR}")
 add_dependencies(ddprof_exe_object generate_ddprof_object)
 
-add_library(dd_profiling-static STATIC ${DD_PROFILING_SOURCES})
-ddprof_set_standard(dd_profiling-static)
+ddprof_add_library(dd_profiling-static STATIC ${DD_PROFILING_SOURCES})
 set_target_properties(dd_profiling-static PROPERTIES OUTPUT_NAME dd_profiling)
 target_compile_definitions(dd_profiling-static PRIVATE DDPROF_EMBEDDED_EXE_DATA
                                                        DDPROF_PROFILING_LIBRARY)
@@ -378,8 +375,8 @@ target_link_libraries(dd_profiling-static PUBLIC dl pthread rt absl::base absl::
 if(USE_LOADER)
   # When using a loader, libdd_profiling.so is a loader that embeds both libdd_profiling-embedded.so
   # and ddprof executable.
-  add_library(dd_profiling-shared SHARED src/lib/glibc_fixes.c src/lib/lib_embedded_data.c
-                                         src/lib/loader.c)
+  ddprof_add_library(dd_profiling-shared SHARED src/lib/glibc_fixes.c src/lib/lib_embedded_data.c
+                     src/lib/loader.c)
   target_link_libraries(dd_profiling-shared PRIVATE libddprofiling_embedded_object
                                                     ddprof_exe_object)
   target_compile_definitions(
@@ -388,7 +385,7 @@ if(USE_LOADER)
 else()
   # Without loader, libdd_profiling.so is basically the same as libdd_profiling-embedded.so plus an
   # embedded ddprof executable.
-  add_library(dd_profiling-shared SHARED ${DD_PROFILING_SOURCES} src/lib/lib_embedded_data.c)
+  ddprof_add_library(dd_profiling-shared SHARED ${DD_PROFILING_SOURCES} src/lib/lib_embedded_data.c)
   target_link_libraries(dd_profiling-shared PRIVATE ddprof_exe_object)
   target_compile_definitions(dd_profiling-shared PRIVATE DDPROF_EMBEDDED_EXE_DATA
                                                          DDPROF_PROFILING_LIBRARY)
@@ -409,7 +406,6 @@ else()
   target_link_libraries(dd_profiling-shared PUBLIC dl pthread rt absl::base absl::str_format)
 endif()
 
-ddprof_set_standard(dd_profiling-shared)
 target_static_libcxx(dd_profiling-shared)
 target_static_sanitizer(dd_profiling-shared)
 set_target_properties(dd_profiling-shared PROPERTIES LINK_DEPENDS "${dd_profiling_linker_script}")
