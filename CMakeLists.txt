@@ -102,7 +102,9 @@ include(Format)
 
 # Generated code needs to be available for cppcheck to work
 include(CppcheckConfig)
-add_dependencies(cppcheck DDProf::Parser)
+if(TARGET cppcheck)
+  add_dependencies(cppcheck DDProf::Parser)
+endif()
 
 # ---- Libraries (needed by ut) ----
 
