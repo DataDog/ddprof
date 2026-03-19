@@ -34,7 +34,8 @@ usage() {
     echo "    --clean/-c : rebuild the image before creating it."
     echo "    --ubuntu_version/-u : specify ubuntu version (expected values: 16 / 18 / 20)"
     echo "    --image_id/-i : use a specified docker ID, conflicts with -u."
-    echo "    --clang : use clang instead of gcc."
+    echo "    --clang : use clang instead of gcc.
+    --cap-test : add CAP_SETUID/SETGID/IPC_LOCK/SETFCAP for capability unit tests."
 }
 
 if [ $# != 0 ] && [ "$1" == "-h" ]; then
@@ -46,6 +47,8 @@ PERFORM_CLEAN=0
 # This default is to ensure that users that compile from source are likely to have a compatible libc
 UBUNTU_VERSION=18
 COMPILER="gcc"
+EXTRA_CAPS=""
+USER_OPTION="-u $(id -u):$(id -g)"
 
 while [ $# != 0 ]; do 
     case $1 in
@@ -74,6 +77,14 @@ while [ $# != 0 ]; do
             ;;
         --clang)
             COMPILER="clang"
+            shift
+            ;;
+        --cap-test)
+            # setcap requires CAP_SETFCAP in the effective set, which only root
+            # has by default. Start as root so setcap works; use 'su <user>' to
+            # run the test as non-root (needed to exercise the cap-loss path).
+            EXTRA_CAPS="--cap-add CAP_SETUID --cap-add CAP_SETGID --cap-add CAP_IPC_LOCK --cap-add CAP_SETFCAP"
+            USER_OPTION=""
             shift
             ;;
         *)
@@ -162,6 +173,6 @@ else
   MOUNT_TOOLS_DIR=""
 fi
 
-CMD="docker run -it --rm -u $(id -u):$(id -g) --network=host -w /app ${MOUNT_SSH_AGENT} ${MOUNT_TOOLS_DIR} --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${MOUNT_CMD} \"${DOCKER_NAME}${DOCKER_TAG}\" /bin/bash"
+CMD="docker run -it --rm ${USER_OPTION} --network=host -w /app ${MOUNT_SSH_AGENT} ${MOUNT_TOOLS_DIR} --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN ${EXTRA_CAPS} ${MOUNT_CMD} \"${DOCKER_NAME}${DOCKER_TAG}\" /bin/bash"
 
 eval "$CMD"
