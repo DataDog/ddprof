@@ -89,6 +89,8 @@ find_package(absl REQUIRED)
 
 # libdatadog_profiling
 include(Findlibdatadog)
+# watcher_sample_types.hpp includes <datadog/common.h>, so all targets need this.
+include_directories(${Datadog_INCLUDE_DIR})
 
 # Event Parser
 add_subdirectory(src/event_parser)

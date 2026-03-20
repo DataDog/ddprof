@@ -19,64 +19,25 @@ namespace ddprof {
 
 uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
 
-#define X_STR(a, b, c, d, e) std::array{b, d},
-const char *sample_type_name_from_idx(int idx, EventAggregationModePos pos) {
-  static constexpr std::array<
-      std::array<const char *, kNbEventAggregationModes>, DDPROF_PWT_LENGTH + 1>
-      sample_names = {PROFILE_TYPE_TABLE(X_STR){nullptr, nullptr}};
-  if (idx < 0 || idx >= DDPROF_PWT_LENGTH) {
-    return nullptr;
-  }
-  return sample_names[idx][pos];
-}
-#undef X_STR
-#define X_STR(a, b, c, d, e) #c,
-const char *sample_type_unit_from_idx(int idx) {
-  static const char *sample_units[] = {PROFILE_TYPE_TABLE(X_STR)};
-  if (idx < 0 || idx >= DDPROF_PWT_LENGTH) {
-    return nullptr;
-  }
-  return sample_units[idx];
-}
-#undef X_STR
-#define X_DEP(a, b, c, d, e) DDPROF_PWT_##e,
-int sample_type_id_to_count_sample_type_id(int idx) {
-  static const int count_ids[] = {PROFILE_TYPE_TABLE(X_DEP)};
-  if (idx < 0 || idx >= DDPROF_PWT_LENGTH) {
-    return DDPROF_PWT_NOCOUNT;
-  }
-  return count_ids[idx];
-}
-#undef X_DEP
-
-int watcher_to_count_sample_type_id(const PerfWatcher *watcher) {
-  int const idx = watcher->sample_type_id;
-  return sample_type_id_to_count_sample_type_id(idx);
-}
-
-bool watcher_has_countable_sample_type(const PerfWatcher *watcher) {
-  return DDPROF_PWT_NOCOUNT != watcher_to_count_sample_type_id(watcher);
-}
-
-// putting parentheses around "g" param breaks compilation
+// putting parentheses around "h" param breaks compilation
 // NOLINTBEGIN(bugprone-macro-parentheses)
 #define X_EVENTS(a, b, c, d, e, f, g)                                          \
   {                                                                            \
       .sample_type = BASE_STYPES,                                              \
       .config = (d),                                                           \
       .value_scale = 0,                                                        \
+      .sample_frequency = (e),                                                 \
       .desc = (b),                                                             \
       .tracepoint_event = "",                                                  \
       .tracepoint_group = "",                                                  \
       .tracepoint_label = "",                                                  \
       .ddprof_event_type = DDPROF_PWE_##a,                                     \
       .type = (c),                                                             \
-      .sample_frequency = (e),                                                 \
-      .sample_type_id = (f),                                                   \
+      .options = g,                                                            \
+      .sample_type_info = (f),                                                 \
+      .pprof_indices = {},                                                     \
       .value_source = EventConfValueSource::kSample,                           \
       .aggregation_mode = EventAggregationMode::kSum,                          \
-      .options = g,                                                            \
-      .pprof_indices = {},                                                     \
       .regno = 0,                                                              \
       .raw_off = 0,                                                            \
       .raw_sz = 0,                                                             \
@@ -130,18 +91,18 @@ const PerfWatcher *tracepoint_default_watcher() {
       .sample_type = BASE_STYPES,
       .config = 0,
       .value_scale = 1.0,
+      .sample_period = 1,
       .desc = "Tracepoint",
       .tracepoint_event = {},
       .tracepoint_group = {},
       .tracepoint_label = {},
       .ddprof_event_type = DDPROF_PWE_TRACEPOINT,
       .type = PERF_TYPE_TRACEPOINT,
-      .sample_period = 1,
-      .sample_type_id = DDPROF_PWT_TRACEPOINT,
+      .options = {.use_kernel = PerfWatcherUseKernel::kRequired},
+      .sample_type_info = k_stype_tracepoint,
+      .pprof_indices = {},
       .value_source = EventConfValueSource::kSample,
       .aggregation_mode = EventAggregationMode::kSum,
-      .options = {.use_kernel = PerfWatcherUseKernel::kRequired},
-      .pprof_indices = {},
       .regno = 0,
       .raw_off = 0,
       .raw_sz = 0,
@@ -153,7 +114,9 @@ const PerfWatcher *tracepoint_default_watcher() {
 }
 
 bool watcher_has_tracepoint(const PerfWatcher *watcher) {
-  return DDPROF_PWT_TRACEPOINT == watcher->sample_type_id;
+  return is_pprof_active(watcher->sample_type_info) &&
+      watcher->sample_type_info.sample_types[kSumPos] ==
+      DDOG_PROF_SAMPLE_TYPE_TRACEPOINT;
 }
 
 void log_watcher(const PerfWatcher *w, int idx) {
@@ -175,17 +138,19 @@ void log_watcher(const PerfWatcher *w, int idx) {
   }
 
   // check all associated reported values
-  std::string sample_types;
-  for (int i = 0; i < kNbEventAggregationModes; ++i) {
-    if (Any(static_cast<EventAggregationMode>(1 << i) & w->aggregation_mode)) {
-      if (!sample_types.empty()) {
-        sample_types += ",";
+  if (!is_pprof_active(w->sample_type_info)) {
+    PRINT_NFO("    SampleTypes: (none — excluded from pprof)");
+  } else {
+    static constexpr const char *k_mode_names[] = {"sum", "live"};
+    for (int i = 0; i < kNbEventAggregationModes; ++i) {
+      if (Any(static_cast<EventAggregationMode>(1 << i) &
+              w->aggregation_mode)) {
+        PRINT_NFO("    SampleType[%s]: primary=%d count=%d", k_mode_names[i],
+                  static_cast<int>(w->sample_type_info.sample_types[i]),
+                  static_cast<int>(w->sample_type_info.count_types[i]));
       }
-      sample_types += std::string(sample_type_name_from_idx(
-          w->sample_type_id, static_cast<EventAggregationModePos>(i)));
     }
   }
-  PRINT_NFO("    SampleTypes: %s", sample_types.c_str());
   PRINT_NFO("    EventName: %s, GroupName: %s, Label: %s",
             w->tracepoint_event.c_str(), w->tracepoint_group.c_str(),
             w->tracepoint_label.c_str());

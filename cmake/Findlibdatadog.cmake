@@ -4,15 +4,24 @@
 
 # libdatadog : common profiler imported libraries https://github.com/DataDog/libdatadog/releases
 set(TAG_LIBDATADOG
-    "v26.0.0"
+    "v29.0.0"
     CACHE STRING "libdatadog github tag")
 
-set(Datadog_ROOT ${VENDOR_PATH}/libdatadog-${TAG_LIBDATADOG})
+# Override with a local build by passing -DDatadog_LOCAL_ROOT=/path/to/libdatadog
+set(Datadog_LOCAL_ROOT
+    ""
+    CACHE PATH "Path to a local libdatadog build (skips GitHub download)")
 
-message(STATUS "${CMAKE_SOURCE_DIR}/tools/fetch_libddprof.sh ${TAG_LIBDATADOG} ${LIBDATADOG_ROOT}")
-execute_process(
-  COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_libdatadog.sh" ${TAG_LIBDATADOG} ${Datadog_ROOT}
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND_ERROR_IS_FATAL ANY)
+if(Datadog_LOCAL_ROOT)
+  message(STATUS "Using local libdatadog override: ${Datadog_LOCAL_ROOT}")
+  set(Datadog_ROOT ${Datadog_LOCAL_ROOT})
+else()
+  set(Datadog_ROOT ${VENDOR_PATH}/libdatadog-${TAG_LIBDATADOG})
+  message(STATUS "${CMAKE_SOURCE_DIR}/tools/fetch_libdatadog.sh ${TAG_LIBDATADOG} ${Datadog_ROOT}")
+  execute_process(
+    COMMAND "${CMAKE_SOURCE_DIR}/tools/fetch_libdatadog.sh" ${TAG_LIBDATADOG} ${Datadog_ROOT}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} COMMAND_ERROR_IS_FATAL ANY)
+endif()
 
 set(DataDog_DIR "${Datadog_ROOT}/cmake")
 
