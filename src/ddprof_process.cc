@@ -24,11 +24,13 @@ UniqueFile open_proc_comm(pid_t pid, pid_t tid, const char *path_to_proc = "") {
       absl::StrFormat("%s/proc/%d/task/%d/comm", path_to_proc, pid, tid);
   UniqueFile file{fopen(proc_comm_filename.c_str(), "r"), fclose};
   if (!file) {
-    // Check if the file exists
     struct stat info;
     UIDInfo old_uids;
-    // warning could user switch create too much overhead ?
     if (stat(proc_comm_filename.c_str(), &info) == 0 &&
+        // Non-root callers must not switch through UID 0 because switching
+        // back clears their capabilities. Switching between non-zero UIDs is
+        // still a useful retry for procfs entries owned by another user.
+        (is_root() || info.st_uid != 0) &&
         IsDDResOK(user_override(info.st_uid, info.st_gid, &old_uids))) {
       file.reset(fopen(proc_comm_filename.c_str(), "r"));
       // Switch back to the original user

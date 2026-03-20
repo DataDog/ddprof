@@ -7,10 +7,11 @@
 
 #include "ddprof_defs.hpp"
 #include "event_config.hpp"
-#include <string>
+#include "watcher_sample_types.hpp"
 
 #include <cstdint>
 #include <linux/perf_event.h>
+#include <string>
 
 namespace ddprof {
 
@@ -39,6 +40,10 @@ struct PerfWatcher {
   uint64_t sample_type; // perf sample type: specifies values included in sample
   unsigned long config; // specifies which perf event is requested
   double value_scale;
+  union {
+    int64_t sample_period;
+    uint64_t sample_frequency;
+  };
   std::string desc;
 
   // tracepoint configuration
@@ -51,19 +56,15 @@ struct PerfWatcher {
   int type; // perf event type (software / hardware / tracepoint / ... or custom
             // for non-perf events)
 
-  union {
-    int64_t sample_period;
-    uint64_t sample_frequency;
-  };
-  int sample_type_id; // index into the sample types defined in this header
-
-  EventConfValueSource value_source; // how to normalize the sample value
-  EventAggregationMode aggregation_mode;
-
   // perf_event_open configs
   struct PerfWatcherOptions options;
 
+  WatcherSampleTypes sample_type_info; // pprof types for each aggregation mode
+
   PProfIndices pprof_indices[kNbEventAggregationModes]; // std and live
+
+  EventConfValueSource value_source; // how to normalize the sample value
+  EventAggregationMode aggregation_mode;
 
   uint8_t regno;
   uint8_t raw_off;
@@ -75,27 +76,6 @@ struct PerfWatcher {
 
   bool instrument_self; // do my own perf_event_open, etc
 };
-
-// The Datadog backend only understands pre-configured event types.  Those
-// types are defined here, and then referenced in the watcher
-// The last column is a dependent type which is always aggregated as a count
-// whenever the main type is aggregated.
-//  type,    pprof,     unit, live-pprof,  sample_type,
-//     a,        b,        c,          d,            e,
-#define PROFILE_TYPE_TABLE(X)                                                  \
-  X(NOCOUNT, "nocount", nocount, "undef", NOCOUNT)                             \
-  X(TRACEPOINT, "tracepoint", events, "undef", NOCOUNT)                        \
-  X(CPU_NANOS, "cpu-time", nanoseconds, "undef", CPU_SAMPLE)                   \
-  X(CPU_SAMPLE, "cpu-samples", count, "undef", NOCOUNT)                        \
-  X(ALLOC_SAMPLE, "alloc-samples", count, "inuse-objects", NOCOUNT)            \
-  X(ALLOC_SPACE, "alloc-space", bytes, "inuse-space", ALLOC_SAMPLE)
-
-// defines enum of profile types
-#define X_ENUM(a, b, c, d, e) DDPROF_PWT_##a,
-enum DDPROF_SAMPLE_TYPES : uint8_t {
-  PROFILE_TYPE_TABLE(X_ENUM) DDPROF_PWT_LENGTH,
-};
-#undef X_ENUM
 
 // Define our own event type on top of perf event types
 enum DDProfTypeId : uint8_t { kDDPROF_TYPE_CUSTOM = PERF_TYPE_MAX + 100 };
@@ -128,29 +108,29 @@ enum DDProfCustomCountId : uint8_t {
 // events are marked as tracepoint unless they represent a well-known profiling
 // type!
 // clang-format off
-//  short       desc                  perf event type       perf event count type                  period/freq   profile sample type     addtl. configs
+//  short       desc                  perf event type       perf event count type                  period/freq   sample types           addtl. configs
 // cppcheck-suppress preprocessorErrorDirective
 #define EVENT_CONFIG_TABLE(X) \
-  X(hCPU,       "CPU Cycles",         PERF_TYPE_HARDWARE,   PERF_COUNT_HW_CPU_CYCLES,              99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(hREF,       "Ref. CPU Cycles",    PERF_TYPE_HARDWARE,   PERF_COUNT_HW_REF_CPU_CYCLES,          1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(hINST,      "Instr. Count",       PERF_TYPE_HARDWARE,   PERF_COUNT_HW_INSTRUCTIONS,            1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(hCREF,      "Cache Ref.",         PERF_TYPE_HARDWARE,   PERF_COUNT_HW_CACHE_REFERENCES,        999,          DDPROF_PWT_TRACEPOINT,  {})                      \
-  X(hCMISS,     "Cache Miss",         PERF_TYPE_HARDWARE,   PERF_COUNT_HW_CACHE_MISSES,            999,          DDPROF_PWT_TRACEPOINT,  {})                      \
-  X(hBRANCH,    "Branche Instr.",     PERF_TYPE_HARDWARE,   PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     999,          DDPROF_PWT_TRACEPOINT,  {})                      \
-  X(hBMISS,     "Branch Miss",        PERF_TYPE_HARDWARE,   PERF_COUNT_HW_BRANCH_MISSES,           999,          DDPROF_PWT_TRACEPOINT,  {})                      \
-  X(hBUS,       "Bus Cycles",         PERF_TYPE_HARDWARE,   PERF_COUNT_HW_BUS_CYCLES,              1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(hBSTF,      "Bus Stalls(F)",      PERF_TYPE_HARDWARE,   PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(hBSTB,      "Bus Stalls(B)",      PERF_TYPE_HARDWARE,   PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1000,         DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(sCPU,       "CPU Time",           PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_TASK_CLOCK,              99,           DDPROF_PWT_CPU_NANOS,   IS_FREQ_TRY_KERNEL)      \
-  X(sPF,        "Page Faults",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS,             1,            DDPROF_PWT_TRACEPOINT,  USE_KERNEL)              \
-  X(sCS,        "Con. Switch",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_CONTEXT_SWITCHES,        1,            DDPROF_PWT_TRACEPOINT,  USE_KERNEL)              \
-  X(sMig,       "CPU Migrations",     PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_CPU_MIGRATIONS,          99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(sPFMAJ,     "Major Faults",       PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS_MAJ,         99,           DDPROF_PWT_TRACEPOINT,  USE_KERNEL)              \
-  X(sPFMIN,     "Minor Faults",       PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS_MIN,         99,           DDPROF_PWT_TRACEPOINT,  USE_KERNEL)              \
-  X(sALGN,      "Align. Faults",      PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_ALIGNMENT_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(sEMU,       "Emu. Faults",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_EMULATION_FAULTS,        99,           DDPROF_PWT_TRACEPOINT,  IS_FREQ)                 \
-  X(sDUM,       "Dummy",              PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_DUMMY,                   1,            DDPROF_PWT_NOCOUNT,     {})                      \
-  X(sALLOC,     "Allocations",        kDDPROF_TYPE_CUSTOM,  kDDPROF_COUNT_ALLOCATIONS,             524288,       DDPROF_PWT_ALLOC_SPACE, SKIP_FRAMES)
+  X(hCPU,       "CPU Cycles",         PERF_TYPE_HARDWARE,   PERF_COUNT_HW_CPU_CYCLES,              99,           k_stype_tracepoint,    IS_FREQ)     \
+  X(hREF,       "Ref. CPU Cycles",    PERF_TYPE_HARDWARE,   PERF_COUNT_HW_REF_CPU_CYCLES,          1000,         k_stype_tracepoint,    IS_FREQ)     \
+  X(hINST,      "Instr. Count",       PERF_TYPE_HARDWARE,   PERF_COUNT_HW_INSTRUCTIONS,            1000,         k_stype_tracepoint,    IS_FREQ)     \
+  X(hCREF,      "Cache Ref.",         PERF_TYPE_HARDWARE,   PERF_COUNT_HW_CACHE_REFERENCES,        999,          k_stype_tracepoint,    {})          \
+  X(hCMISS,     "Cache Miss",         PERF_TYPE_HARDWARE,   PERF_COUNT_HW_CACHE_MISSES,            999,          k_stype_tracepoint,    {})          \
+  X(hBRANCH,    "Branche Instr.",     PERF_TYPE_HARDWARE,   PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     999,          k_stype_tracepoint,    {})          \
+  X(hBMISS,     "Branch Miss",        PERF_TYPE_HARDWARE,   PERF_COUNT_HW_BRANCH_MISSES,           999,          k_stype_tracepoint,    {})          \
+  X(hBUS,       "Bus Cycles",         PERF_TYPE_HARDWARE,   PERF_COUNT_HW_BUS_CYCLES,              1000,         k_stype_tracepoint,    IS_FREQ)     \
+  X(hBSTF,      "Bus Stalls(F)",      PERF_TYPE_HARDWARE,   PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1000,         k_stype_tracepoint,    IS_FREQ)     \
+  X(hBSTB,      "Bus Stalls(B)",      PERF_TYPE_HARDWARE,   PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1000,         k_stype_tracepoint,    IS_FREQ)     \
+  X(sCPU,       "CPU Time",           PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_TASK_CLOCK,              99,           k_stype_cpu,           IS_FREQ_TRY_KERNEL) \
+  X(sPF,        "Page Faults",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS,             1,            k_stype_tracepoint,    USE_KERNEL)  \
+  X(sCS,        "Con. Switch",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_CONTEXT_SWITCHES,        1,            k_stype_tracepoint,    USE_KERNEL)  \
+  X(sMig,       "CPU Migrations",     PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_CPU_MIGRATIONS,          99,           k_stype_tracepoint,    IS_FREQ)     \
+  X(sPFMAJ,     "Major Faults",       PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS_MAJ,         99,           k_stype_tracepoint,    USE_KERNEL)  \
+  X(sPFMIN,     "Minor Faults",       PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS_MIN,         99,           k_stype_tracepoint,    USE_KERNEL)  \
+  X(sALGN,      "Align. Faults",      PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_ALIGNMENT_FAULTS,        99,           k_stype_tracepoint,    IS_FREQ)     \
+  X(sEMU,       "Emu. Faults",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_EMULATION_FAULTS,        99,           k_stype_tracepoint,    IS_FREQ)     \
+  X(sDUM,       "Dummy",              PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_DUMMY,                   1,            k_stype_dummy,         {})          \
+  X(sALLOC,     "Allocations",        kDDPROF_TYPE_CUSTOM,  kDDPROF_COUNT_ALLOCATIONS,             524288,       k_stype_alloc,         SKIP_FRAMES)
 
 // clang-format on
 
@@ -165,15 +145,8 @@ enum DDPROF_EVENT_NAMES : int8_t {
 const PerfWatcher *ewatcher_from_idx(int idx);
 const PerfWatcher *ewatcher_from_str(const char *str);
 const PerfWatcher *tracepoint_default_watcher();
-bool watcher_has_countable_sample_type(const PerfWatcher *watcher);
 bool watcher_has_tracepoint(const PerfWatcher *watcher);
-int watcher_to_count_sample_type_id(const PerfWatcher *watcher);
 const char *event_type_name_from_idx(int idx);
-
-// Helper functions for sample types
-const char *sample_type_name_from_idx(int idx, EventAggregationModePos pos);
-const char *sample_type_unit_from_idx(int idx);
-int sample_type_id_to_count_sample_type_id(int idx);
 
 // Helper functions, mostly for tests
 uint64_t perf_event_default_sample_type();

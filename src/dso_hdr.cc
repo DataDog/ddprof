@@ -44,14 +44,16 @@ UniqueFile open_proc_maps(int pid, const char *path_to_proc = "") {
 
   UniqueFile f{fopen(proc_map_filename, "r")};
   if (!f) {
-    // Check if the file exists
     struct stat info;
     UIDInfo old_uids;
     if (stat(proc_map_filename, &info) == 0 &&
-        // try to switch to file user
+        // Non-root callers must not switch through UID 0 because switching
+        // back clears their capabilities. Switching between non-zero UIDs is
+        // still a useful retry for procfs entries owned by another user.
+        (is_root() || info.st_uid != 0) &&
         IsDDResOK(user_override(info.st_uid, info.st_gid, &old_uids))) {
       f.reset(fopen(proc_map_filename, "r"));
-      // switch back to initial user
+      // Switch back to the initial user
       user_override(old_uids.uid, old_uids.gid);
     }
   }

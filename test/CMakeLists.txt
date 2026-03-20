@@ -144,6 +144,12 @@ target_include_directories(cap-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
 
 add_unit_test(user_id-ut user_id-ut.cc ../src/user_override.cc DEFINITIONS MYNAME="userid-ut")
 
+add_unit_test(
+  user_override_caps-ut user_override_caps-ut.cc ../src/user_override.cc
+  LIBRARIES libcap
+  DEFINITIONS MYNAME="user_override_caps-ut")
+target_include_directories(user_override_caps-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
+
 add_unit_test(procutils-ut ../src/procutils.cc procutils-ut.cc DEFINITIONS MYNAME="procutils-ut")
 
 add_unit_test(
@@ -513,7 +519,7 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
                                                        COMPRESS_DEBUG_SECTION)
   target_include_directories(simple_malloc PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
-  add_library(simple_malloc_lib SHARED ${SIMPLE_MALLOC_SRC})
+  ddprof_add_library(simple_malloc_lib SHARED ${SIMPLE_MALLOC_SRC})
   target_compile_definitions(simple_malloc_lib PRIVATE "SIMPLE_MALLOC_SHARED_LIBRARY")
   set_target_properties(simple_malloc_lib PROPERTIES OUTPUT_NAME "simplemalloc")
   target_include_directories(simple_malloc_lib PRIVATE ${CMAKE_SOURCE_DIR}/include)

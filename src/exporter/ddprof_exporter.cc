@@ -49,7 +49,7 @@ DDRes create_pprof_file(ddog_Timespec start, const char *dbg_pprof_prefix,
   strftime(time_start, std::size(time_start), "%Y%m%dT%H%M%SZ", tm_start);
 
   char filename[PATH_MAX];
-  snprintf(filename, std::size(filename), "%s%s.pprof.lz4", dbg_pprof_prefix,
+  snprintf(filename, std::size(filename), "%s%s.pprof.zst", dbg_pprof_prefix,
            time_start);
   LG_NTC("[EXPORTER] Writing pprof to file %s", filename);
   constexpr int read_write_user_only = 0600;
@@ -60,10 +60,20 @@ DDRes create_pprof_file(ddog_Timespec start, const char *dbg_pprof_prefix,
 
 /// Write pprof to a valid file descriptor : allows to use pprof tools
 DDRes write_profile(const ddog_ByteSlice *buffer, int fd) {
-  if (write(fd, buffer->ptr, buffer->len) == 0) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER,
-                           "Failed to write byte buffer to stdout! %s\n",
-                           strerror(errno));
+  auto remaining = buffer->len;
+  const auto *ptr = buffer->ptr;
+  while (remaining > 0) {
+    ssize_t const written = write(fd, ptr, remaining);
+    if (written < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_EXPORTER,
+                             "Failed to write profile data: %s\n",
+                             strerror(errno));
+    }
+    remaining -= written;
+    ptr += written;
   }
   return {};
 }
@@ -261,12 +271,17 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
   fill_stable_tags(user_tags, exporter, tags_exporter);
 
   ddog_CharSlice const base_url = to_CharSlice(exporter->_url);
+  // ddprof is an out-of-process profiler and does not fork during export,
+  // so the system DNS resolver (/etc/resolv.conf) is safe and preferred.
+  constexpr bool k_use_system_resolver = true;
   ddog_prof_Endpoint endpoint;
   if (exporter->_agent) {
-    endpoint = ddog_prof_Endpoint_agent(base_url, k_timeout_ms);
+    endpoint =
+        ddog_prof_Endpoint_agent(base_url, k_timeout_ms, k_use_system_resolver);
   } else {
     ddog_CharSlice const api_key = to_CharSlice(exporter->_input.api_key);
-    endpoint = ddog_prof_Endpoint_agentless(base_url, api_key, k_timeout_ms);
+    endpoint = ddog_prof_Endpoint_agentless(base_url, api_key, k_timeout_ms,
+                                            k_use_system_resolver);
   }
 
   ddog_prof_ProfileExporter_Result res_exporter = ddog_prof_Exporter_new(

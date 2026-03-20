@@ -237,7 +237,7 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
     return ddres_warn(DD_WHAT_MODULE);
   }
 
-  UniqueFd fd_holder{::open(filepath.c_str(), O_RDONLY)};
+  UniqueFd fd_holder{::open(filepath.c_str(), O_RDONLY | O_CLOEXEC)};
   if (!fd_holder) {
     LG_WRN("[Mod] Couldn't open fd to module (%s)", filepath.c_str());
     return ddres_warn(DD_WHAT_MODULE);
@@ -297,7 +297,7 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
 }
 
 std::optional<std::string> find_build_id(const char *filepath) {
-  const UniqueFd fd_holder{::open(filepath, O_RDONLY)};
+  const UniqueFd fd_holder{::open(filepath, O_RDONLY | O_CLOEXEC)};
   if (!fd_holder) {
     return std::nullopt;
   }
