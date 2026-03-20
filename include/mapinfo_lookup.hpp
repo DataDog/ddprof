@@ -15,14 +15,15 @@
 #include <unordered_map>
 
 struct Dwfl_Module;
+struct ddog_prof_ProfilesDictionary;
 
 namespace ddprof {
 
 class MapInfoLookup {
 public:
   MapInfoIdx_t get_or_insert(pid_t pid, MapInfoTable &mapinfo_table,
-                             const Dso &dso,
-                             std::optional<BuildIdStr> build_id);
+                             const Dso &dso, std::optional<BuildIdStr> build_id,
+                             const ddog_prof_ProfilesDictionary *dict);
   void erase(pid_t pid) {
     // table elements are not removed (TODO to gain memory usage)
     _mapinfo_pidmap.erase(pid);

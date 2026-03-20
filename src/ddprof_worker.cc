@@ -72,7 +72,7 @@ DDRes report_lost_events(DDProfContext &ctx) {
       LG_NTC("Reporting %lu lost samples (cumulated lost value: %lu) for "
              "watcher #%d",
              nb_lost, value, watcher_idx);
-      DDRES_CHECK_FWD(pprof_aggregate(
+      DDRES_CHECK_FWD(pprof_aggregate_interned_sample(
           &us->output, us->symbol_hdr, {value, nb_lost, 0}, watcher,
           ctx.worker_ctx.us->dso_hdr.get_file_info_vector(), false, kSumPos,
           ctx.worker_ctx.symbolizer,
@@ -252,7 +252,7 @@ DDRes aggregate_livealloc_stack(
       alloc_info.second._value,
       static_cast<uint64_t>(std::max<int64_t>(0, alloc_info.second._count)), 0};
 
-  DDRES_CHECK_FWD(pprof_aggregate(
+  DDRES_CHECK_FWD(pprof_aggregate_interned_sample(
       &alloc_info.first, symbol_hdr, pack, watcher,
       ctx.worker_ctx.us->dso_hdr.get_file_info_vector(),
       ctx.params.show_samples, kLiveSumPos, ctx.worker_ctx.symbolizer, pprof));
@@ -453,7 +453,7 @@ DDRes ddprof_pr_sample(DDProfContext &ctx, perf_event_sample *sample,
       const DDProfValuePack pack{static_cast<int64_t>(sample_val), 1,
                                  timestamp};
 
-      DDRES_CHECK_FWD(pprof_aggregate(
+      DDRES_CHECK_FWD(pprof_aggregate_interned_sample(
           &us->output, us->symbol_hdr, pack, watcher,
           us->dso_hdr.get_file_info_vector(), ctx.params.show_samples, kSumPos,
           ctx.worker_ctx.symbolizer, pprof));
@@ -710,8 +710,12 @@ DDRes ddprof_worker_init(DDProfContext &ctx,
     DDRES_CHECK_FWD(
         ddprof_exporter_new(ctx.worker_ctx.user_tags, ctx.worker_ctx.exp[1]));
 
-    DDRES_CHECK_FWD(pprof_create_profile(ctx.worker_ctx.pprof[0], ctx));
-    DDRES_CHECK_FWD(pprof_create_profile(ctx.worker_ctx.pprof[1], ctx));
+    DDRES_CHECK_FWD(pprof_create_profile(
+        ctx.worker_ctx.pprof[0], ctx,
+        ctx.worker_ctx.us->symbol_hdr._profiles_dictionary.get()));
+    DDRES_CHECK_FWD(pprof_create_profile(
+        ctx.worker_ctx.pprof[1], ctx,
+        ctx.worker_ctx.us->symbol_hdr._profiles_dictionary.get()));
     DDRES_CHECK_FWD(worker_init_stats(&ctx.worker_ctx));
   }
   CatchExcept2DDRes();
