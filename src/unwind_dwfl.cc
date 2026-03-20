@@ -42,23 +42,6 @@ void trace_unwinding_end(UnwindState *us) {
   }
 }
 
-bool is_infinite_loop(UnwindState *us) {
-  UnwindOutput &output = us->output;
-  uint64_t const nb_locs = output.locs.size();
-  unsigned const nb_frames_to_check = 3;
-  if (nb_locs <= nb_frames_to_check) {
-    return false;
-  }
-  for (unsigned i = 1; i < nb_frames_to_check; ++i) {
-    FunLoc const &n_minus_one_loc = output.locs[nb_locs - i];
-    FunLoc const &n_minus_two_loc = output.locs[nb_locs - i - 1];
-    if (n_minus_one_loc.ip != n_minus_two_loc.ip) {
-      return false;
-    }
-  }
-  return true;
-}
-
 // check for runtime symbols provided in /tmp files
 DDRes add_runtime_symbol_frame(UnwindState *us, const Dso &dso, ElfAddress_t pc,
                                std::string_view jitdump_path);
@@ -184,16 +167,9 @@ int frame_cb(Dwfl_Frame *dwfl_frame, void *arg) {
 #ifdef DEBUG
   LG_NFO("Begin depth %lu", us->output.locs.size());
 #endif
-  int const dwfl_error_value = dwfl_errno();
-  if (dwfl_error_value) {
-    // Check if dwarf unwinding was a failure we can get stuck in infinite loops
-    if (is_infinite_loop(us)) {
-      LG_DBG("Break out of unwinding (possible infinite loop)");
-      return DWARF_CB_ABORT;
-    }
-  }
 #ifdef DEBUG
   // We often fallback to frame pointer unwinding (which logs an error)
+  int const dwfl_error_value = dwfl_errno();
   if (dwfl_error_value) {
     LG_DBG("Error flagged at depth = %lu -- %d Error:%s ",
            us->output.locs.size(), dwfl_error_value,
