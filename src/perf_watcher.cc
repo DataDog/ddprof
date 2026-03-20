@@ -21,7 +21,7 @@ uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
 
 // putting parentheses around "h" param breaks compilation
 // NOLINTBEGIN(bugprone-macro-parentheses)
-#define X_EVENTS(a, b, c, d, e, f, g, h)                                       \
+#define X_EVENTS(a, b, c, d, e, f, g)                                          \
   {                                                                            \
       .sample_type = BASE_STYPES,                                              \
       .config = (d),                                                           \
@@ -34,10 +34,9 @@ uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
       .type = (c),                                                             \
       .sample_frequency = (e),                                                 \
       .sample_type_info = (f),                                                 \
-      .pprof_active = (g),                                                     \
       .value_source = EventConfValueSource::kSample,                           \
       .aggregation_mode = EventAggregationMode::kSum,                          \
-      .options = h,                                                            \
+      .options = g,                                                            \
       .pprof_indices = {},                                                     \
       .regno = 0,                                                              \
       .raw_off = 0,                                                            \
@@ -48,7 +47,7 @@ uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
   },
 // NOLINTEND(bugprone-macro-parentheses)
 
-#define X_STR(a, b, c, d, e, f, g, h) #a,
+#define X_STR(a, b, c, d, e, f, g) #a,
 const char *event_type_name_from_idx(int idx) {
   static const char *event_names[] = {EVENT_CONFIG_TABLE(X_STR)}; // NOLINT
   if (idx < 0 || idx >= DDPROF_PWE_LENGTH) {
@@ -100,7 +99,6 @@ const PerfWatcher *tracepoint_default_watcher() {
       .type = PERF_TYPE_TRACEPOINT,
       .sample_period = 1,
       .sample_type_info = k_stype_tracepoint,
-      .pprof_active = true,
       .value_source = EventConfValueSource::kSample,
       .aggregation_mode = EventAggregationMode::kSum,
       .options = {.use_kernel = PerfWatcherUseKernel::kRequired},
@@ -116,7 +114,7 @@ const PerfWatcher *tracepoint_default_watcher() {
 }
 
 bool watcher_has_tracepoint(const PerfWatcher *watcher) {
-  return watcher->pprof_active &&
+  return is_pprof_active(watcher->sample_type_info) &&
       watcher->sample_type_info.sample_types[kSumPos] ==
       DDOG_PROF_SAMPLE_TYPE_TRACEPOINT;
 }
@@ -140,7 +138,7 @@ void log_watcher(const PerfWatcher *w, int idx) {
   }
 
   // check all associated reported values
-  if (!w->pprof_active) {
+  if (!is_pprof_active(w->sample_type_info)) {
     PRINT_NFO("    SampleTypes: (none — excluded from pprof)");
   } else {
     static constexpr const char *k_mode_names[] = {"sum", "live"};

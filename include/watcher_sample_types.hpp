@@ -40,6 +40,15 @@ inline constexpr WatcherSampleTypes k_stype_cpu = {
 inline constexpr WatcherSampleTypes k_stype_alloc = {
     {DDOG_PROF_SAMPLE_TYPE_ALLOC_SPACE,   DDOG_PROF_SAMPLE_TYPE_INUSE_SPACE},
     {DDOG_PROF_SAMPLE_TYPE_ALLOC_SAMPLES, DDOG_PROF_SAMPLE_TYPE_INUSE_OBJECTS}};
+
+// Dummy: watcher does not contribute to pprof (e.g., sDUM).
+inline constexpr WatcherSampleTypes k_stype_dummy = {
+    {k_stype_none, k_stype_none},
+    {k_stype_none, k_stype_none}};
 // clang-format on
+
+constexpr bool is_pprof_active(const WatcherSampleTypes &st) {
+  return st.sample_types[0] != k_stype_none;
+}
 
 } // namespace ddprof

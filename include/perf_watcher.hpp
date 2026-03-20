@@ -57,8 +57,6 @@ struct PerfWatcher {
     uint64_t sample_frequency;
   };
   WatcherSampleTypes sample_type_info; // pprof types for each aggregation mode
-  bool
-      pprof_active; // false = watcher does not contribute to pprof (e.g., sDUM)
 
   EventConfValueSource value_source; // how to normalize the sample value
   EventAggregationMode aggregation_mode;
@@ -110,33 +108,33 @@ enum DDProfCustomCountId : uint8_t {
 // events are marked as tracepoint unless they represent a well-known profiling
 // type!
 // clang-format off
-//  short       desc                  perf event type       perf event count type                  period/freq   sample types           pprof_active  addtl. configs
+//  short       desc                  perf event type       perf event count type                  period/freq   sample types           addtl. configs
 // cppcheck-suppress preprocessorErrorDirective
 #define EVENT_CONFIG_TABLE(X) \
-  X(hCPU,       "CPU Cycles",         PERF_TYPE_HARDWARE,   PERF_COUNT_HW_CPU_CYCLES,              99,           k_stype_tracepoint,    true,         IS_FREQ)     \
-  X(hREF,       "Ref. CPU Cycles",    PERF_TYPE_HARDWARE,   PERF_COUNT_HW_REF_CPU_CYCLES,          1000,         k_stype_tracepoint,    true,         IS_FREQ)     \
-  X(hINST,      "Instr. Count",       PERF_TYPE_HARDWARE,   PERF_COUNT_HW_INSTRUCTIONS,            1000,         k_stype_tracepoint,    true,         IS_FREQ)     \
-  X(hCREF,      "Cache Ref.",         PERF_TYPE_HARDWARE,   PERF_COUNT_HW_CACHE_REFERENCES,        999,          k_stype_tracepoint,    true,         {})          \
-  X(hCMISS,     "Cache Miss",         PERF_TYPE_HARDWARE,   PERF_COUNT_HW_CACHE_MISSES,            999,          k_stype_tracepoint,    true,         {})          \
-  X(hBRANCH,    "Branche Instr.",     PERF_TYPE_HARDWARE,   PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     999,          k_stype_tracepoint,    true,         {})          \
-  X(hBMISS,     "Branch Miss",        PERF_TYPE_HARDWARE,   PERF_COUNT_HW_BRANCH_MISSES,           999,          k_stype_tracepoint,    true,         {})          \
-  X(hBUS,       "Bus Cycles",         PERF_TYPE_HARDWARE,   PERF_COUNT_HW_BUS_CYCLES,              1000,         k_stype_tracepoint,    true,         IS_FREQ)     \
-  X(hBSTF,      "Bus Stalls(F)",      PERF_TYPE_HARDWARE,   PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1000,         k_stype_tracepoint,    true,         IS_FREQ)     \
-  X(hBSTB,      "Bus Stalls(B)",      PERF_TYPE_HARDWARE,   PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1000,         k_stype_tracepoint,    true,         IS_FREQ)     \
-  X(sCPU,       "CPU Time",           PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_TASK_CLOCK,              99,           k_stype_cpu,           true,         IS_FREQ_TRY_KERNEL) \
-  X(sPF,        "Page Faults",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS,             1,            k_stype_tracepoint,    true,         USE_KERNEL)  \
-  X(sCS,        "Con. Switch",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_CONTEXT_SWITCHES,        1,            k_stype_tracepoint,    true,         USE_KERNEL)  \
-  X(sMig,       "CPU Migrations",     PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_CPU_MIGRATIONS,          99,           k_stype_tracepoint,    true,         IS_FREQ)     \
-  X(sPFMAJ,     "Major Faults",       PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS_MAJ,         99,           k_stype_tracepoint,    true,         USE_KERNEL)  \
-  X(sPFMIN,     "Minor Faults",       PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS_MIN,         99,           k_stype_tracepoint,    true,         USE_KERNEL)  \
-  X(sALGN,      "Align. Faults",      PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_ALIGNMENT_FAULTS,        99,           k_stype_tracepoint,    true,         IS_FREQ)     \
-  X(sEMU,       "Emu. Faults",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_EMULATION_FAULTS,        99,           k_stype_tracepoint,    true,         IS_FREQ)     \
-  X(sDUM,       "Dummy",              PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_DUMMY,                   1,            k_stype_tracepoint,    false,        {})          \
-  X(sALLOC,     "Allocations",        kDDPROF_TYPE_CUSTOM,  kDDPROF_COUNT_ALLOCATIONS,             524288,       k_stype_alloc,         true,         SKIP_FRAMES)
+  X(hCPU,       "CPU Cycles",         PERF_TYPE_HARDWARE,   PERF_COUNT_HW_CPU_CYCLES,              99,           k_stype_tracepoint,    IS_FREQ)     \
+  X(hREF,       "Ref. CPU Cycles",    PERF_TYPE_HARDWARE,   PERF_COUNT_HW_REF_CPU_CYCLES,          1000,         k_stype_tracepoint,    IS_FREQ)     \
+  X(hINST,      "Instr. Count",       PERF_TYPE_HARDWARE,   PERF_COUNT_HW_INSTRUCTIONS,            1000,         k_stype_tracepoint,    IS_FREQ)     \
+  X(hCREF,      "Cache Ref.",         PERF_TYPE_HARDWARE,   PERF_COUNT_HW_CACHE_REFERENCES,        999,          k_stype_tracepoint,    {})          \
+  X(hCMISS,     "Cache Miss",         PERF_TYPE_HARDWARE,   PERF_COUNT_HW_CACHE_MISSES,            999,          k_stype_tracepoint,    {})          \
+  X(hBRANCH,    "Branche Instr.",     PERF_TYPE_HARDWARE,   PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     999,          k_stype_tracepoint,    {})          \
+  X(hBMISS,     "Branch Miss",        PERF_TYPE_HARDWARE,   PERF_COUNT_HW_BRANCH_MISSES,           999,          k_stype_tracepoint,    {})          \
+  X(hBUS,       "Bus Cycles",         PERF_TYPE_HARDWARE,   PERF_COUNT_HW_BUS_CYCLES,              1000,         k_stype_tracepoint,    IS_FREQ)     \
+  X(hBSTF,      "Bus Stalls(F)",      PERF_TYPE_HARDWARE,   PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, 1000,         k_stype_tracepoint,    IS_FREQ)     \
+  X(hBSTB,      "Bus Stalls(B)",      PERF_TYPE_HARDWARE,   PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  1000,         k_stype_tracepoint,    IS_FREQ)     \
+  X(sCPU,       "CPU Time",           PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_TASK_CLOCK,              99,           k_stype_cpu,           IS_FREQ_TRY_KERNEL) \
+  X(sPF,        "Page Faults",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS,             1,            k_stype_tracepoint,    USE_KERNEL)  \
+  X(sCS,        "Con. Switch",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_CONTEXT_SWITCHES,        1,            k_stype_tracepoint,    USE_KERNEL)  \
+  X(sMig,       "CPU Migrations",     PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_CPU_MIGRATIONS,          99,           k_stype_tracepoint,    IS_FREQ)     \
+  X(sPFMAJ,     "Major Faults",       PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS_MAJ,         99,           k_stype_tracepoint,    USE_KERNEL)  \
+  X(sPFMIN,     "Minor Faults",       PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_PAGE_FAULTS_MIN,         99,           k_stype_tracepoint,    USE_KERNEL)  \
+  X(sALGN,      "Align. Faults",      PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_ALIGNMENT_FAULTS,        99,           k_stype_tracepoint,    IS_FREQ)     \
+  X(sEMU,       "Emu. Faults",        PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_EMULATION_FAULTS,        99,           k_stype_tracepoint,    IS_FREQ)     \
+  X(sDUM,       "Dummy",              PERF_TYPE_SOFTWARE,   PERF_COUNT_SW_DUMMY,                   1,            k_stype_dummy,         {})          \
+  X(sALLOC,     "Allocations",        kDDPROF_TYPE_CUSTOM,  kDDPROF_COUNT_ALLOCATIONS,             524288,       k_stype_alloc,         SKIP_FRAMES)
 
 // clang-format on
 
-#define X_ENUM(a, b, c, d, e, f, g, h) DDPROF_PWE_##a,
+#define X_ENUM(a, b, c, d, e, f, g) DDPROF_PWE_##a,
 enum DDPROF_EVENT_NAMES : int8_t {
   DDPROF_PWE_TRACEPOINT = -1,
   EVENT_CONFIG_TABLE(X_ENUM) DDPROF_PWE_LENGTH,

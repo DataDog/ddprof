@@ -361,7 +361,7 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx) {
       pi = {};
     }
 
-    if (!w.pprof_active) {
+    if (!is_pprof_active(w.sample_type_info)) {
       continue;
     }
 
