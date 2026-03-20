@@ -40,6 +40,10 @@ struct PerfWatcher {
   uint64_t sample_type; // perf sample type: specifies values included in sample
   unsigned long config; // specifies which perf event is requested
   double value_scale;
+  union {
+    int64_t sample_period;
+    uint64_t sample_frequency;
+  };
   std::string desc;
 
   // tracepoint configuration
@@ -52,19 +56,15 @@ struct PerfWatcher {
   int type; // perf event type (software / hardware / tracepoint / ... or custom
             // for non-perf events)
 
-  union {
-    int64_t sample_period;
-    uint64_t sample_frequency;
-  };
-  WatcherSampleTypes sample_type_info; // pprof types for each aggregation mode
-
-  EventConfValueSource value_source; // how to normalize the sample value
-  EventAggregationMode aggregation_mode;
-
   // perf_event_open configs
   struct PerfWatcherOptions options;
 
+  WatcherSampleTypes sample_type_info; // pprof types for each aggregation mode
+
   PProfIndices pprof_indices[kNbEventAggregationModes]; // std and live
+
+  EventConfValueSource value_source; // how to normalize the sample value
+  EventAggregationMode aggregation_mode;
 
   uint8_t regno;
   uint8_t raw_off;

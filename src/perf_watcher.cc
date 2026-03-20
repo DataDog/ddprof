@@ -26,18 +26,18 @@ uint64_t perf_event_default_sample_type() { return BASE_STYPES; }
       .sample_type = BASE_STYPES,                                              \
       .config = (d),                                                           \
       .value_scale = 0,                                                        \
+      .sample_frequency = (e),                                                 \
       .desc = (b),                                                             \
       .tracepoint_event = "",                                                  \
       .tracepoint_group = "",                                                  \
       .tracepoint_label = "",                                                  \
       .ddprof_event_type = DDPROF_PWE_##a,                                     \
       .type = (c),                                                             \
-      .sample_frequency = (e),                                                 \
+      .options = g,                                                            \
       .sample_type_info = (f),                                                 \
+      .pprof_indices = {},                                                     \
       .value_source = EventConfValueSource::kSample,                           \
       .aggregation_mode = EventAggregationMode::kSum,                          \
-      .options = g,                                                            \
-      .pprof_indices = {},                                                     \
       .regno = 0,                                                              \
       .raw_off = 0,                                                            \
       .raw_sz = 0,                                                             \
@@ -91,18 +91,18 @@ const PerfWatcher *tracepoint_default_watcher() {
       .sample_type = BASE_STYPES,
       .config = 0,
       .value_scale = 1.0,
+      .sample_period = 1,
       .desc = "Tracepoint",
       .tracepoint_event = {},
       .tracepoint_group = {},
       .tracepoint_label = {},
       .ddprof_event_type = DDPROF_PWE_TRACEPOINT,
       .type = PERF_TYPE_TRACEPOINT,
-      .sample_period = 1,
+      .options = {.use_kernel = PerfWatcherUseKernel::kRequired},
       .sample_type_info = k_stype_tracepoint,
+      .pprof_indices = {},
       .value_source = EventConfValueSource::kSample,
       .aggregation_mode = EventAggregationMode::kSum,
-      .options = {.use_kernel = PerfWatcherUseKernel::kRequired},
-      .pprof_indices = {},
       .regno = 0,
       .raw_off = 0,
       .raw_sz = 0,
