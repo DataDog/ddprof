@@ -21,6 +21,13 @@ add_exe(
   DEFINITIONS ${COLLATZ_DEFINITION_LIST} USE_DD_PROFILING)
 target_include_directories(collatz-profiling-static PRIVATE ${STATSD_INCLUDE_DIR})
 
-install(TARGETS collatz DESTINATION collatz)
-install(TARGETS collatz-profiling-shared DESTINATION collatz)
-install(TARGETS collatz-profiling-static DESTINATION collatz)
+set(COLLATZ_INSTALL_PREFIX
+    ""
+    CACHE PATH "Override install prefix for collatz (defaults to CMAKE_INSTALL_PREFIX)")
+set(_collatz_dest "${COLLATZ_INSTALL_PREFIX}")
+if(NOT _collatz_dest)
+  set(_collatz_dest "${CMAKE_INSTALL_PREFIX}")
+endif()
+install(TARGETS collatz DESTINATION "${_collatz_dest}/collatz")
+install(TARGETS collatz-profiling-shared DESTINATION "${_collatz_dest}/collatz")
+install(TARGETS collatz-profiling-static DESTINATION "${_collatz_dest}/collatz")
