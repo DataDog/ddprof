@@ -336,6 +336,7 @@ endif()
 
 message(STATUS "Install destination " ${CMAKE_INSTALL_PREFIX})
 install(FILES LICENSE LICENSE-3rdparty.csv LICENSE.LGPLV3 NOTICE DESTINATION licenses)
+install(FILES ${CMAKE_BINARY_DIR}/version.txt DESTINATION ".")
 
 set(DDPROF_EXE_OBJECT "${CMAKE_BINARY_DIR}/ddprof.o")
 set(DDPROF_EXE_HASH_HEADER "${CMAKE_BINARY_DIR}/ddprof_exe_hash.h")
