@@ -280,6 +280,15 @@ static void __attribute__((constructor)) loader() {
   ensure_libpthread_is_loaded();
   ensure_librt_is_loaded();
 
+  // When the loader is dlopen'd with RTLD_GLOBAL, glibc does not promote its
+  // symbols to global scope until dlopen returns. The embedded .so references
+  // ddprof_lib_state (defined here in the loader) as an undefined symbol, so
+  // loading it with RTLD_NOW during our constructor fails with
+  // "undefined symbol: ddprof_lib_state".
+  // Fix: re-open ourselves with RTLD_NOLOAD | RTLD_GLOBAL to promote our
+  // symbols before loading the embedded .so.
+  my_dlopen("libdd_profiling.so", RTLD_GLOBAL | RTLD_NOLOAD | RTLD_NOW);
+
   s_profiling_lib_handle = my_dlopen(lib_profiling_path, RTLD_LOCAL | RTLD_NOW);
   free(lib_profiling_path);
   if (s_profiling_lib_handle) {
