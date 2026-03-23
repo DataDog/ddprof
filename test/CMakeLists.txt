@@ -534,6 +534,19 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
              COMMAND ${CMAKE_SOURCE_DIR}/tools/check_for_unsafe_libc_functions.py
                      $<TARGET_FILE:dd_profiling-embedded>)
   endif()
+
+  # Test that the loader works when dlopen'd with RTLD_GLOBAL (the pattern used by applications that
+  # load libdd_profiling.so at runtime).
+  add_executable(loader_rtld_global_test loader_rtld_global_test.c)
+  target_link_libraries(loader_rtld_global_test PRIVATE dl)
+  add_dependencies(loader_rtld_global_test dd_profiling-shared)
+  add_test(
+    NAME loader_rtld_global
+    COMMAND loader_rtld_global_test
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+  set_tests_properties(
+    loader_rtld_global PROPERTIES ENVIRONMENT
+                                  "TEST_DD_PROFILING_LIB=$<TARGET_FILE:dd_profiling-shared>")
 endif()
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")

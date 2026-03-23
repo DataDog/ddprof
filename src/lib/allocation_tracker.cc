@@ -15,7 +15,6 @@
 #include "ringbuffer_utils.hpp"
 #include "savecontext.hpp"
 #include "syscalls.hpp"
-#include "tls_state_storage.h"
 #include "tsc_clock.hpp"
 
 #include <algorithm>
@@ -25,27 +24,16 @@
 #include <cstdint>
 #include <cstdlib>
 #include <new>
+#include <pthread.h>
 #include <unistd.h>
 
 namespace ddprof {
 
 AllocationTracker *AllocationTracker::_instance;
-
-static_assert(sizeof(TrackerThreadLocalState) == DDPROF_TLS_STATE_SIZE,
-              "Update DDPROF_TLS_STATE_SIZE in tls_state_storage.h");
-static_assert(alignof(TrackerThreadLocalState) <= DDPROF_TLS_STATE_ALIGN,
-              "Update DDPROF_TLS_STATE_ALIGN in tls_state_storage.h");
+std::atomic<pthread_key_t> AllocationTracker::_tl_state_key{
+    AllocationTracker::kInvalidKey};
 
 namespace {
-
-#ifdef DDPROF_USE_LOADER
-extern "C" __attribute((tls_model(
-    "initial-exec"))) __thread char ddprof_lib_state[DDPROF_TLS_STATE_SIZE];
-#else
-__attribute((tls_model("initial-exec")))
-__attribute((aligned(DDPROF_TLS_STATE_ALIGN))) __thread char
-    ddprof_lib_state[sizeof(TrackerThreadLocalState)];
-#endif
 
 DDPROF_NOINLINE auto sleep_and_retry_reserve(MPSCRingBufferWriter &writer,
                                              size_t size, bool &timeout) {
@@ -64,19 +52,46 @@ DDPROF_NOINLINE auto sleep_and_retry_reserve(MPSCRingBufferWriter &writer,
 }
 } // namespace
 
+void AllocationTracker::delete_tl_state(void *tl_state) {
+  delete static_cast<TrackerThreadLocalState *>(tl_state);
+}
+
+void AllocationTracker::ensure_key_initialized() {
+  if (_tl_state_key.load(std::memory_order_acquire) != kInvalidKey) {
+    return;
+  }
+  pthread_key_t new_key;
+  if (pthread_key_create(&new_key, delete_tl_state) != 0) {
+    return;
+  }
+  pthread_key_t expected = kInvalidKey;
+  if (!_tl_state_key.compare_exchange_strong(expected, new_key,
+                                             std::memory_order_release)) {
+    // Another thread beat us, discard our key
+    pthread_key_delete(new_key);
+  }
+}
+
 TrackerThreadLocalState *AllocationTracker::get_tl_state() {
-  // ddprof_lib_state is zero-initialized by libc for each new thread.
-  // After placement new (init_tl_state), initialized is set to true.
-  auto *state = reinterpret_cast<TrackerThreadLocalState *>(ddprof_lib_state);
-  return state->initialized ? state : nullptr;
+  const pthread_key_t key = _tl_state_key.load(std::memory_order_relaxed);
+  if (key == kInvalidKey) {
+    return nullptr;
+  }
+  return static_cast<TrackerThreadLocalState *>(pthread_getspecific(key));
 }
 
 TrackerThreadLocalState *AllocationTracker::init_tl_state() {
-  // Placement new into TLS -- no heap allocation, no cleanup needed on thread
-  // exit. Safe to call after fork (TLS memory is inherited by child).
-  auto *state = new (ddprof_lib_state) TrackerThreadLocalState{};
+  const pthread_key_t key = _tl_state_key.load(std::memory_order_relaxed);
+  if (key == kInvalidKey) {
+    return nullptr;
+  }
+  auto *state = new (std::nothrow) TrackerThreadLocalState{};
+  if (!state) {
+    return nullptr;
+  }
   state->tid = ddprof::gettid();
   state->stack_bounds = retrieve_stack_bounds();
+  pthread_setspecific(key, state);
   return state;
 }
 
@@ -91,6 +106,7 @@ DDRes AllocationTracker::allocation_tracking_init(
     uint64_t allocation_profiling_rate, uint32_t flags,
     uint32_t stack_sample_size, const RingBufferInfo &ring_buffer,
     const IntervalTimerCheck &timer_check) {
+  ensure_key_initialized();
   TrackerThreadLocalState *tl_state = get_tl_state();
   if (!tl_state) {
     // This is the time at which the init_tl_state should not fail

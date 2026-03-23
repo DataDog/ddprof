@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <functional>
 #include <mutex>
+#include <pthread.h>
 
 namespace ddprof {
 
@@ -79,7 +80,14 @@ public:
   // can return null (does not init)
   static TrackerThreadLocalState *get_tl_state();
 
+  // Initialize pthread key for TLS (idempotent, thread-safe)
+  static void ensure_key_initialized();
+
 private:
+  static void delete_tl_state(void *tl_state);
+
+  static constexpr pthread_key_t kInvalidKey = static_cast<pthread_key_t>(-1);
+  static std::atomic<pthread_key_t> _tl_state_key;
   static constexpr unsigned k_ratio_max_elt_to_bitset_size = 16;
 
   // NOLINTBEGIN(misc-non-private-member-variables-in-classes)

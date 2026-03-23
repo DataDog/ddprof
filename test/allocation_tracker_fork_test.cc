@@ -45,8 +45,8 @@ void *thread_check_null_tls(void *arg) {
 }
 
 int run_child(void *parent_state) {
-  // After fork, the __thread buffer is inherited: the child's main thread
-  // sees the initialized state at the same virtual address.
+  // After fork, pthread thread-specific data is inherited by the child's main
+  // thread: get_tl_state() returns the same pointer as the parent had.
   auto *child_inherited = AllocationTracker::get_tl_state();
   CHECK_OR_EXIT(child_inherited == parent_state,
                 "expected inherited TLS %p, got %p", parent_state,
@@ -81,14 +81,15 @@ int main() {
   const LogHandle log_handle(LL_NOTICE);
   LG_NTC("allocation_tracker_fork_test starting");
 
-  // Before any init, main thread's TLS must be zero-initialized by libc,
-  // so get_tl_state() should return NULL (initialized == false).
+  // Before key initialization, get_tl_state() must return NULL.
   auto *pre_init = AllocationTracker::get_tl_state();
-  CHECK_OR_RETURN(pre_init == nullptr,
-                  "main thread TLS not zero-initialized before init (got %p)",
+  CHECK_OR_RETURN(pre_init == nullptr, "expected NULL before key init (got %p)",
                   static_cast<void *>(pre_init));
 
-  // Verify the same zero-initialization contract on a new thread
+  // Initialize the pthread key so TLS operations work.
+  AllocationTracker::ensure_key_initialized();
+
+  // After key init but before init_tl_state(), all threads return NULL.
   {
     pthread_t thread;
     int thread_result = -1;
@@ -97,10 +98,10 @@ int main() {
                     "pthread_create failed (pre-fork thread)");
     pthread_join(thread, nullptr);
     CHECK_OR_RETURN(thread_result == 0,
-                    "pre-fork thread TLS was not zero-initialized");
+                    "pre-fork thread TLS was not NULL before init");
   }
 
-  // Create TLS in parent
+  // Create TLS state in parent.
   auto *parent_state = AllocationTracker::init_tl_state();
   CHECK_OR_RETURN(parent_state != nullptr,
                   "parent init_tl_state() returned NULL");
