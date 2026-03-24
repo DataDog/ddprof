@@ -81,7 +81,10 @@ TrackerThreadLocalState *AllocationTracker::get_tl_state() {
 }
 
 TrackerThreadLocalState *AllocationTracker::init_tl_state() {
-  const pthread_key_t key = _tl_state_key.load(std::memory_order_relaxed);
+  // acquire pairs with the release in ensure_key_initialized(): guarantees
+  // that if we see a valid key the pthread key is fully published and we won't
+  // silently return nullptr and drop the thread's initial allocations.
+  const pthread_key_t key = _tl_state_key.load(std::memory_order_acquire);
   if (key == kInvalidKey) {
     return nullptr;
   }
