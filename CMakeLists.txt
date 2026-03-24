@@ -276,10 +276,6 @@ if(BUILD_UNIVERSAL_DDPROF)
   endif()
 endif()
 
-if(USE_LOADER)
-  target_compile_definitions(dd_profiling-embedded PRIVATE "DDPROF_USE_LOADER")
-endif()
-
 # Fix for link error in sanitizeddebug build mode with gcc:
 # ~~~
 # /usr/bin/ld: ./libdd_profiling.so: undefined reference to `__dynamic_cast'
