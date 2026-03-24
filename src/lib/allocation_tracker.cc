@@ -196,6 +196,13 @@ void AllocationTracker::free() {
 
   pevent_munmap_event(&_pevent);
 
+  // The pthread key (_tl_state_key) is intentionally not deleted here.
+  // pthread_key_delete would race with concurrent get_tl_state() calls that
+  // already loaded the key value but haven't called pthread_getspecific yet.
+  // The cost is one leaked key per dlclose/reload cycle, which is acceptable:
+  // POSIX guarantees at least PTHREAD_KEYS_MAX (128) keys per process, and
+  // library reload is not a supported use case.
+
   // Do not destroy the object:
   // there is an inherent race condition between checking
   // `_state.track_allocations ` and calling `_instance->track_allocation`.

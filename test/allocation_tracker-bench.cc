@@ -314,6 +314,77 @@ static void BM_LongLived_Tracking(benchmark::State &state) {
   perform_memory_operations_2(true, state);
 }
 
+// Microbenchmark: raw TLS access (get_tl_state) on persistent threads.
+// This isolates the cost of TLS lookup from allocation tracking overhead.
+// Compare initial-exec __thread (main branch) vs pthread_getspecific (this
+// branch) by building against each branch and diffing the results.
+static void BM_GetTlState(benchmark::State &state) {
+  LogHandle handle;
+  const size_t buf_size_order = 8;
+  const uint32_t flags = ddprof::AllocationTracker::kDeterministicSampling;
+  ddprof::RingBufferHolder ring_buffer{buf_size_order,
+                                       RingBufferType::kMPSCRingBuffer};
+  ddprof::AllocationTracker::allocation_tracking_init(
+      k_rate, flags, k_default_perf_stack_sample_size,
+      ring_buffer.get_buffer_info(), {});
+
+  const int nb_threads = 4;
+  static constexpr int k_ops_per_iter = 10000;
+
+  // Barrier to synchronize worker threads at the start of each iteration
+  std::atomic<int> ready_count{0};
+  std::atomic<bool> go{false};
+  std::atomic<bool> done{false};
+  std::atomic<int64_t> total_ops{0};
+
+  std::vector<std::thread> workers;
+  workers.reserve(nb_threads);
+  for (int i = 0; i < nb_threads; ++i) {
+    workers.emplace_back([&] {
+      ddprof::AllocationTracker::init_tl_state();
+      while (!done.load(std::memory_order_relaxed)) {
+        // Wait for the benchmark loop to signal go
+        ready_count.fetch_add(1, std::memory_order_release);
+        while (!go.load(std::memory_order_acquire) &&
+               !done.load(std::memory_order_relaxed)) {}
+        if (done.load(std::memory_order_relaxed)) {
+          break;
+        }
+        // Hot loop: pure TLS access
+        int64_t ops = 0;
+        for (int j = 0; j < k_ops_per_iter; ++j) {
+          auto *tl = ddprof::AllocationTracker::get_tl_state();
+          benchmark::DoNotOptimize(tl);
+          ++ops;
+        }
+        total_ops.fetch_add(ops, std::memory_order_relaxed);
+        ready_count.fetch_sub(1, std::memory_order_release);
+        // wait for go to be lowered before looping back
+        while (go.load(std::memory_order_acquire) &&
+               !done.load(std::memory_order_relaxed)) {}
+      }
+    });
+  }
+
+  for (auto _ : state) {
+    total_ops.store(0, std::memory_order_relaxed);
+    // Wait for all workers to be ready
+    while (ready_count.load(std::memory_order_acquire) != nb_threads) {}
+    go.store(true, std::memory_order_release);
+    // Wait for all workers to finish the hot loop
+    while (ready_count.load(std::memory_order_acquire) != 0) {}
+    go.store(false, std::memory_order_release);
+    state.SetItemsProcessed(total_ops.load(std::memory_order_relaxed));
+  }
+
+  done.store(true, std::memory_order_release);
+  go.store(true, std::memory_order_release); // unblock workers
+  for (auto &t : workers) {
+    t.join();
+  }
+  ddprof::AllocationTracker::allocation_tracking_free();
+}
+
 // short lived threads
 BENCHMARK(BM_ShortLived_NoTracking)->MeasureProcessCPUTime()->UseRealTime();
 BENCHMARK(BM_ShortLived_Tracking)->MeasureProcessCPUTime()->UseRealTime();
@@ -321,5 +392,8 @@ BENCHMARK(BM_ShortLived_Tracking)->MeasureProcessCPUTime()->UseRealTime();
 // longer lived threads (worker threads)
 BENCHMARK(BM_LongLived_NoTracking)->MeasureProcessCPUTime();
 BENCHMARK(BM_LongLived_Tracking)->MeasureProcessCPUTime();
+
+// raw TLS access: pthread_getspecific vs __thread initial-exec
+BENCHMARK(BM_GetTlState)->MeasureProcessCPUTime()->UseRealTime();
 
 } // namespace ddprof

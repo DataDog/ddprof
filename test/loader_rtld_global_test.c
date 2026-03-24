@@ -8,11 +8,16 @@
 //
 // This reproduces the pattern used by applications that dlopen the profiling
 // library at startup (e.g., after reading a config flag).
-// The loader's constructor extracts and dlopen's the embedded .so, which
-// references ddprof_lib_state as an extern symbol defined in the loader.
-// On glibc, RTLD_GLOBAL only takes effect after dlopen returns, so without
-// the self-promotion fix the embedded library fails with:
-//   "undefined symbol: ddprof_lib_state"
+//
+// Historical bug: the embedded .so used initial-exec TLS referencing a symbol
+// defined in the loader. Two failure modes:
+//   - glibc: RTLD_GLOBAL only takes effect after the outer dlopen returns, so
+//     the inner dlopen (loader -> embedded .so) saw the loader's symbols as
+//     local, causing "undefined symbol" failures.
+//   - musl: rejects initial-exec TLS cross-library relocations for dlopen'd
+//     libraries entirely (regardless of flags).
+// Fix: the embedded .so now uses pthread_key_t for TLS, removing any
+// cross-library symbol dependency between the embedded .so and the loader.
 
 #include <dlfcn.h>
 #include <stdio.h>

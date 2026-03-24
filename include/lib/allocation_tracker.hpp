@@ -80,12 +80,16 @@ public:
   // can return null (does not init)
   static TrackerThreadLocalState *get_tl_state();
 
-  // Initialize pthread key for TLS (idempotent, thread-safe)
+  // Initialize pthread key for TLS (idempotent, thread-safe).
+  // Public so that tests exercising fork() can call it directly without going
+  // through allocation_tracking_init() (which requires a ring buffer).
   static void ensure_key_initialized();
 
 private:
   static void delete_tl_state(void *tl_state);
 
+  // POSIX does not define an invalid pthread_key_t value, but implementations
+  // allocate keys starting from 0, so -1 (all bits set) is a safe sentinel.
   static constexpr pthread_key_t kInvalidKey = static_cast<pthread_key_t>(-1);
   static std::atomic<pthread_key_t> _tl_state_key;
   static constexpr unsigned k_ratio_max_elt_to_bitset_size = 16;
