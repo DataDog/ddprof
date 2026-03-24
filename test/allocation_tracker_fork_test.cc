@@ -81,7 +81,9 @@ int main() {
   const LogHandle log_handle(LL_NOTICE);
   LG_NTC("allocation_tracker_fork_test starting");
 
-  // Before key initialization, get_tl_state() must return NULL.
+  // Before ensure_key_initialized(), get_tl_state() returns NULL because
+  // pthread_getspecific on the zero-initialized (uncreated) key returns NULL
+  // on both glibc and musl.
   auto *pre_init = AllocationTracker::get_tl_state();
   CHECK_OR_RETURN(pre_init == nullptr, "expected NULL before key init (got %p)",
                   static_cast<void *>(pre_init));

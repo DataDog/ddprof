@@ -12,7 +12,6 @@
 #include "pevent.hpp"
 #include "unlikely.hpp"
 
-#include <atomic>
 #include <cstddef>
 #include <functional>
 #include <mutex>
@@ -86,12 +85,11 @@ public:
   static void ensure_key_initialized();
 
 private:
+  static void create_key();
   static void delete_tl_state(void *tl_state);
 
-  // POSIX does not define an invalid pthread_key_t value, but implementations
-  // allocate keys starting from 0, so -1 (all bits set) is a safe sentinel.
-  static constexpr pthread_key_t kInvalidKey = static_cast<pthread_key_t>(-1);
-  static std::atomic<pthread_key_t> _tl_state_key;
+  static pthread_once_t _tl_key_once;
+  static pthread_key_t _tl_state_key;
   static constexpr unsigned k_ratio_max_elt_to_bitset_size = 16;
 
   // NOLINTBEGIN(misc-non-private-member-variables-in-classes)

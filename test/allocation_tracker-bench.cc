@@ -335,7 +335,6 @@ static void BM_GetTlState(benchmark::State &state) {
   std::atomic<int> ready_count{0};
   std::atomic<bool> go{false};
   std::atomic<bool> done{false};
-  std::atomic<int64_t> total_ops{0};
 
   std::vector<std::thread> workers;
   workers.reserve(nb_threads);
@@ -351,13 +350,10 @@ static void BM_GetTlState(benchmark::State &state) {
           break;
         }
         // Hot loop: pure TLS access
-        int64_t ops = 0;
         for (int j = 0; j < k_ops_per_iter; ++j) {
           auto *tl = ddprof::AllocationTracker::get_tl_state();
           benchmark::DoNotOptimize(tl);
-          ++ops;
         }
-        total_ops.fetch_add(ops, std::memory_order_relaxed);
         ready_count.fetch_sub(1, std::memory_order_release);
         // wait for go to be lowered before looping back
         while (go.load(std::memory_order_acquire) &&
@@ -367,15 +363,14 @@ static void BM_GetTlState(benchmark::State &state) {
   }
 
   for (auto _ : state) {
-    total_ops.store(0, std::memory_order_relaxed);
     // Wait for all workers to be ready
     while (ready_count.load(std::memory_order_acquire) != nb_threads) {}
     go.store(true, std::memory_order_release);
     // Wait for all workers to finish the hot loop
     while (ready_count.load(std::memory_order_acquire) != 0) {}
     go.store(false, std::memory_order_release);
-    state.SetItemsProcessed(total_ops.load(std::memory_order_relaxed));
   }
+  state.SetItemsProcessed(state.iterations() * nb_threads * k_ops_per_iter);
 
   done.store(true, std::memory_order_release);
   go.store(true, std::memory_order_release); // unblock workers

@@ -18,11 +18,12 @@
 #include "tsc_clock.hpp"
 
 #include <algorithm>
-#include <atomic>
 #include <cassert>
 #include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <new>
 #include <pthread.h>
 #include <unistd.h>
@@ -30,8 +31,8 @@
 namespace ddprof {
 
 AllocationTracker *AllocationTracker::_instance;
-std::atomic<pthread_key_t> AllocationTracker::_tl_state_key{
-    AllocationTracker::kInvalidKey};
+pthread_once_t AllocationTracker::_tl_key_once = PTHREAD_ONCE_INIT;
+pthread_key_t AllocationTracker::_tl_state_key;
 
 namespace {
 
@@ -50,51 +51,49 @@ DDPROF_NOINLINE auto sleep_and_retry_reserve(MPSCRingBufferWriter &writer,
   }
   return Buffer{};
 }
+// Abort with a diagnostic if a pthread call returns an error.
+// pthread functions return the error code directly (they do not set errno),
+// so perror() would print the wrong message.
+#define PTHREAD_CHECK(call)                                                    \
+  do {                                                                         \
+    int err_ = (call);                                                         \
+    if (err_ != 0) {                                                           \
+      fprintf(stderr, "ddprof: %s failed: %s\n", #call, strerror(err_));       \
+      std::abort();                                                            \
+    }                                                                          \
+  } while (0)
+
 } // namespace
 
 void AllocationTracker::delete_tl_state(void *tl_state) {
   delete static_cast<TrackerThreadLocalState *>(tl_state);
 }
 
+void AllocationTracker::create_key() {
+  PTHREAD_CHECK(pthread_key_create(&_tl_state_key, delete_tl_state));
+}
+
 void AllocationTracker::ensure_key_initialized() {
-  if (_tl_state_key.load(std::memory_order_acquire) != kInvalidKey) {
-    return;
-  }
-  pthread_key_t new_key;
-  if (pthread_key_create(&new_key, delete_tl_state) != 0) {
-    return;
-  }
-  pthread_key_t expected = kInvalidKey;
-  if (!_tl_state_key.compare_exchange_strong(expected, new_key,
-                                             std::memory_order_release)) {
-    // Another thread beat us, discard our key
-    pthread_key_delete(new_key);
-  }
+  PTHREAD_CHECK(pthread_once(&_tl_key_once, create_key));
 }
 
 TrackerThreadLocalState *AllocationTracker::get_tl_state() {
-  const pthread_key_t key = _tl_state_key.load(std::memory_order_relaxed);
-  if (key == kInvalidKey) {
-    return nullptr;
-  }
-  return static_cast<TrackerThreadLocalState *>(pthread_getspecific(key));
+  return static_cast<TrackerThreadLocalState *>(
+      pthread_getspecific(_tl_state_key));
 }
 
 TrackerThreadLocalState *AllocationTracker::init_tl_state() {
-  // acquire pairs with the release in ensure_key_initialized(): guarantees
-  // that if we see a valid key the pthread key is fully published and we won't
-  // silently return nullptr and drop the thread's initial allocations.
-  const pthread_key_t key = _tl_state_key.load(std::memory_order_acquire);
-  if (key == kInvalidKey) {
-    return nullptr;
-  }
+  // Free any previously set state (e.g. inherited across fork).
+  delete static_cast<TrackerThreadLocalState *>(
+      pthread_getspecific(_tl_state_key));
+
   auto *state = new (std::nothrow) TrackerThreadLocalState{};
   if (!state) {
     return nullptr;
   }
   state->tid = ddprof::gettid();
   state->stack_bounds = retrieve_stack_bounds();
-  pthread_setspecific(key, state);
+  PTHREAD_CHECK(pthread_setspecific(_tl_state_key, state));
   return state;
 }
 
@@ -200,11 +199,9 @@ void AllocationTracker::free() {
   pevent_munmap_event(&_pevent);
 
   // The pthread key (_tl_state_key) is intentionally not deleted here.
-  // pthread_key_delete would race with concurrent get_tl_state() calls that
-  // already loaded the key value but haven't called pthread_getspecific yet.
-  // The cost is one leaked key per dlclose/reload cycle, which is acceptable:
-  // POSIX guarantees at least PTHREAD_KEYS_MAX (128) keys per process, and
-  // library reload is not a supported use case.
+  // pthread_key_delete would race with concurrent get_tl_state() calls.
+  // The cost is one leaked key per dlclose/reload cycle, acceptable given
+  // POSIX guarantees at least PTHREAD_KEYS_MAX (128) keys per process.
 
   // Do not destroy the object:
   // there is an inherent race condition between checking

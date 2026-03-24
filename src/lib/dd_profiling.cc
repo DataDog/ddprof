@@ -236,6 +236,10 @@ struct ProfilerAutoStart {
 
   ProfilerAutoStart() noexcept {
     init_state();
+    // Create the pthread key early, before any thread can fork.
+    // This avoids a deadlock on musl if fork() races with pthread_once
+    // (musl has no fork-generation mechanism to recover in-progress state).
+    AllocationTracker::ensure_key_initialized();
 
     // Note that library needs to be linked with `--no-as-needed` when using
     // autostart, otherwise linker will completely remove library from DT_NEEDED
