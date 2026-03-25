@@ -83,6 +83,25 @@ example:
 MALLOC_CONF=stats_print:true ./ddprof -S test-service service_cmd
 ```
 
+### Loading libdd_profiling.so via dlopen
+
+The recommended way to use `libdd_profiling.so` is to link against it directly
+or use `LD_PRELOAD`. If `dlopen` is required (e.g. conditional profiling based
+on a config flag), use `RTLD_GLOBAL`:
+
+```c
+dlopen("libdd_profiling.so", RTLD_LAZY | RTLD_GLOBAL);
+```
+
+**`RTLD_GLOBAL` is required** so that the loader's symbols are visible to the
+embedded library it loads internally. `dlopen` with `RTLD_GLOBAL` is supported
+on glibc systems.
+
+**musl limitation:** loading `libdd_profiling.so` with `dlopen` is not supported
+on musl-based systems (e.g. Alpine Linux). musl rejects initial-exec TLS
+cross-library relocations for `dlopen`'d libraries, which causes the embedded
+library to fail to load. Use `LD_PRELOAD` instead on musl systems.
+
 ### Library issues (LD_PRELOAD or allocation profiling)
 
 You will want to instrument the loader function (loader.c) to figure out what is going on.
