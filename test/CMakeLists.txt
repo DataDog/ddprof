@@ -534,6 +534,7 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
              COMMAND ${CMAKE_SOURCE_DIR}/tools/check_for_unsafe_libc_functions.py
                      $<TARGET_FILE:dd_profiling-embedded>)
   endif()
+
 endif()
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")

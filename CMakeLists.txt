@@ -389,8 +389,9 @@ if(USE_LOADER)
   target_link_libraries(dd_profiling-shared PRIVATE libddprofiling_embedded_object
                                                     ddprof_exe_object)
   target_compile_definitions(
-    dd_profiling-shared PRIVATE DDPROF_EMBEDDED_LIB_DATA DDPROF_EMBEDDED_EXE_DATA
-                                DDPROF_PROFILING_LIBRARY)
+    dd_profiling-shared
+    PRIVATE DDPROF_EMBEDDED_LIB_DATA DDPROF_EMBEDDED_EXE_DATA DDPROF_PROFILING_LIBRARY
+            DDPROF_LOADER_SONAME="lib$<TARGET_PROPERTY:dd_profiling-shared,OUTPUT_NAME>.so")
 else()
   # Without loader, libdd_profiling.so is basically the same as libdd_profiling-embedded.so plus an
   # embedded ddprof executable.
