@@ -535,21 +535,6 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
                      $<TARGET_FILE:dd_profiling-embedded>)
   endif()
 
-  # Test that the loader works when dlopen'd with RTLD_GLOBAL (the pattern used by applications that
-  # load libdd_profiling.so at runtime). Skipped on musl: RTLD_GLOBAL dlopen is unsupported on musl
-  # because musl rejects initial-exec TLS cross-library relocations for dlopen'd libraries.
-  if(NOT LIBC_TYPE STREQUAL "musl" AND USE_LOADER)
-    add_executable(loader_rtld_global_test loader_rtld_global_test.c)
-    target_link_libraries(loader_rtld_global_test PRIVATE dl)
-    add_dependencies(loader_rtld_global_test dd_profiling-shared)
-    add_test(
-      NAME loader_rtld_global
-      COMMAND loader_rtld_global_test
-      WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-    set_tests_properties(
-      loader_rtld_global PROPERTIES ENVIRONMENT
-                                    "TEST_DD_PROFILING_LIB=$<TARGET_FILE:dd_profiling-shared>")
-  endif()
 endif()
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")

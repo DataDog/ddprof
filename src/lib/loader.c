@@ -152,8 +152,8 @@ static void ensure_librt_is_loaded() {
 // "undefined symbol: ddprof_lib_state".
 //
 // Fix: re-open ourselves with RTLD_NOLOAD | RTLD_GLOBAL to promote our
-// symbols before loading the embedded .so. RTLD_NOLOAD is a no-op when the
-// loader was opened with RTLD_LOCAL (the common LD_PRELOAD case).
+// symbols before loading the embedded .so. When loaded via LD_PRELOAD,
+// symbols are already in global scope so this is a harmless no-op.
 //
 // Note: on musl, dlopen with RTLD_GLOBAL is not supported for this library
 // because musl rejects initial-exec TLS cross-library relocations for

@@ -87,15 +87,14 @@ MALLOC_CONF=stats_print:true ./ddprof -S test-service service_cmd
 
 The recommended way to use `libdd_profiling.so` is to link against it directly
 or use `LD_PRELOAD`. If `dlopen` is required (e.g. conditional profiling based
-on a config flag), use `RTLD_GLOBAL`:
+on a config flag):
 
 ```c
-dlopen("libdd_profiling.so", RTLD_LAZY | RTLD_GLOBAL);
+dlopen("libdd_profiling.so", RTLD_NOW);
 ```
 
-**`RTLD_GLOBAL` is required** so that the loader's symbols are visible to the
-embedded library it loads internally. `dlopen` with `RTLD_GLOBAL` is supported
-on glibc systems.
+The loader internally promotes its own symbols to global scope so that the
+embedded library it loads can resolve them.
 
 **musl limitation:** loading `libdd_profiling.so` with `dlopen` is not supported
 on musl-based systems (e.g. Alpine Linux). musl rejects initial-exec TLS
