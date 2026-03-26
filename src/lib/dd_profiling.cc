@@ -289,8 +289,16 @@ int exec_ddprof(pid_t target_pid, pid_t parent_pid,
   if (const char *ddprof_exe =
           g_state.getenv(k_profiler_ddprof_exe_env_variable);
       ddprof_exe) {
+    // Explicit path set (e.g. by loader after /tmp extraction).
     execve(ddprof_exe, argv, environ);
-  } else {
+  }
+
+  // Try to find ddprof in PATH (covers the installed-package case without
+  // needing /tmp extraction or an explicit env var).
+  execvp(ddprof_str, argv);
+
+  // PATH lookup failed: fall back to executing the embedded binary via memfd.
+  {
     auto exe_data = profiler_exe_data();
     if (exe_data.size == 0) {
       return -1;
