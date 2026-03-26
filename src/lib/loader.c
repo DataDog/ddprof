@@ -279,30 +279,6 @@ __typeof(ddprof_stop_profiling) *s_stop_profiling_func = NULL;
 
 static void __attribute__((constructor)) loader() {
   char *lib_profiling_path = getenv(k_profiler_lib_env_variable);
-  if (!lib_profiling_path) {
-    EmbeddedData lib_data = profiling_lib_data();
-    EmbeddedData exe_data = profiler_exe_data();
-    if (lib_data.size == 0 || exe_data.size == 0) {
-      // nothing to do
-      return;
-    }
-    lib_profiling_path = get_or_create_temp_file(
-        k_libdd_profiling_embedded_name, lib_data, 0644);
-    char *profiler_exe_path =
-        get_or_create_temp_file(k_profiler_exe_name, exe_data, 0755);
-    if (!lib_profiling_path || !profiler_exe_path) {
-      free(lib_profiling_path);
-      free(profiler_exe_path);
-      return;
-    }
-    setenv(k_profiler_ddprof_exe_env_variable, profiler_exe_path, 1);
-    free(profiler_exe_path);
-  } else {
-    lib_profiling_path = strdup(lib_profiling_path);
-    if (!lib_profiling_path) {
-      return;
-    }
-  }
 
   ensure_libdl_is_loaded();
   ensure_libm_is_loaded();
@@ -310,8 +286,46 @@ static void __attribute__((constructor)) loader() {
   ensure_librt_is_loaded();
   ensure_loader_symbols_promoted();
 
-  s_profiling_lib_handle = my_dlopen(lib_profiling_path, RTLD_LOCAL | RTLD_NOW);
+  if (!lib_profiling_path) {
+    // Try the bare library name first. If the .so is installed in a standard
+    // search path (or anywhere in LD_LIBRARY_PATH / DT_RPATH / ldconfig
+    // cache), dlopen finds it without extracting anything to /tmp.
+    s_profiling_lib_handle =
+        my_dlopen(k_libdd_profiling_embedded_name, RTLD_LOCAL | RTLD_NOW);
+
+    if (!s_profiling_lib_handle) {
+      // Bare name not found: fall back to extracting embedded data to /tmp.
+      EmbeddedData lib_data = profiling_lib_data();
+      EmbeddedData exe_data = profiler_exe_data();
+      if (lib_data.size == 0 || exe_data.size == 0) {
+        // nothing to do
+        return;
+      }
+      lib_profiling_path = get_or_create_temp_file(
+          k_libdd_profiling_embedded_name, lib_data, 0644);
+      char *profiler_exe_path =
+          get_or_create_temp_file(k_profiler_exe_name, exe_data, 0755);
+      if (!lib_profiling_path || !profiler_exe_path) {
+        free(lib_profiling_path);
+        free(profiler_exe_path);
+        return;
+      }
+      setenv(k_profiler_ddprof_exe_env_variable, profiler_exe_path, 1);
+      free(profiler_exe_path);
+      s_profiling_lib_handle =
+          my_dlopen(lib_profiling_path, RTLD_LOCAL | RTLD_NOW);
+    }
+  } else {
+    lib_profiling_path = strdup(lib_profiling_path);
+    if (!lib_profiling_path) {
+      return;
+    }
+    s_profiling_lib_handle =
+        my_dlopen(lib_profiling_path, RTLD_LOCAL | RTLD_NOW);
+  }
+
   free(lib_profiling_path);
+
   if (s_profiling_lib_handle) {
     s_start_profiling_func = (__typeof(s_start_profiling_func))my_dlsym(
         s_profiling_lib_handle, "ddprof_start_profiling");
