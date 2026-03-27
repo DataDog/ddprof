@@ -212,7 +212,8 @@ DDRes compute_elf_bias(Elf *elf, const std::string &filepath, const Dso &dso,
 } // namespace
 
 DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
-                    const FileInfoValue &fileInfoValue, DDProfMod &ddprof_mod) {
+                    const FileInfoValue &fileInfoValue, DDProfMod &ddprof_mod,
+                    std::unordered_map<FileInfoId_t, UniqueFd> &fd_cache) {
   const std::string &filepath = fileInfoValue.get_path();
   const char *module_name = strrchr(filepath.c_str(), '/') + 1;
   if (fileInfoValue.errored()) { // avoid bouncing on errors
@@ -237,9 +238,20 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
     return ddres_warn(DD_WHAT_MODULE);
   }
 
-  UniqueFd fd_holder{::open(filepath.c_str(), O_RDONLY | O_CLOEXEC)};
-  if (!fd_holder) {
+  // Get or populate the per-file cached fd (shared across all processes).
+  auto &cached_fd = fd_cache[fileInfoValue.get_id()];
+  if (!cached_fd) {
+    cached_fd = UniqueFd{::open(filepath.c_str(), O_RDONLY | O_CLOEXEC)};
+    LG_DBG("[Mod] Opened and cached fd for %s", filepath.c_str());
+  }
+  if (!cached_fd) {
     LG_WRN("[Mod] Couldn't open fd to module (%s)", filepath.c_str());
+    return ddres_warn(DD_WHAT_MODULE);
+  }
+  // dup so dwfl can take ownership while the cache retains the original
+  UniqueFd fd_holder{::dup(cached_fd.get())};
+  if (!fd_holder) {
+    LG_WRN("[Mod] Couldn't dup fd to module (%s)", filepath.c_str());
     return ddres_warn(DD_WHAT_MODULE);
   }
   LG_DBG("[Mod] Success opening %s, ", filepath.c_str());
