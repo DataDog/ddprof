@@ -131,7 +131,8 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     // ensure unwinding backend has access to this module (and check
     // consistency)
     auto res = us->_dwfl_wrapper->register_mod(pc, find_res.first->second,
-                                               file_info_value, &ddprof_mod);
+                                               file_info_value, &ddprof_mod,
+                                               us->dso_hdr.get_fd_cache());
     if (IsDDResOK(res)) {
       break;
     }

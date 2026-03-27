@@ -12,8 +12,10 @@
 #include "ddres.hpp"
 #include "dso.hpp"
 #include "dso_hdr.hpp"
+#include "unique_fd.hpp"
 
 #include <sys/types.h>
+#include <unordered_map>
 
 extern "C" {
 struct Dwfl;
@@ -42,7 +44,8 @@ struct DwflWrapper {
 
   // safe get
   DDRes register_mod(ProcessAddress_t pc, const Dso &dso,
-                     const FileInfoValue &fileInfoValue, DDProfMod **mod);
+                     const FileInfoValue &fileInfoValue, DDProfMod **mod,
+                     std::unordered_map<FileInfoId_t, UniqueFd> &fd_cache);
 
   ~DwflWrapper();
 

@@ -17,6 +17,7 @@
 #include "ddres_def.hpp"
 #include "dso.hpp"
 #include "perf_clock.hpp"
+#include "unique_fd.hpp"
 
 namespace ddprof {
 
@@ -204,6 +205,15 @@ public:
 
   int clear_unvisited(const std::unordered_set<pid_t> &visited_pids);
 
+  // Cache of open file descriptors keyed by FileInfoId_t (one fd per unique
+  // ELF file, shared across all processes). Callers must dup() before
+  // transferring ownership (e.g. to dwfl).
+  std::unordered_map<FileInfoId_t, UniqueFd> &get_fd_cache() {
+    return _fd_cache;
+  }
+
+  size_t get_fd_cache_size() const { return _fd_cache.size(); }
+
 private:
   // erase range of elements
   static void erase_range(DsoMap &map, DsoRange range, const Dso &new_mapping);
@@ -222,6 +232,9 @@ private:
   DsoStats _stats;
   FileInfoInodeMap _file_info_inode_map;
   FileInfoVector _file_info_vector;
+  // One open fd per unique ELF file (keyed by FileInfoId_t). Avoids reopening
+  // the same file for every profiled process (forked or not).
+  std::unordered_map<FileInfoId_t, UniqueFd> _fd_cache;
   std::string _path_to_proc; // /proc files can be mounted at various places
                              // (whole host profiling)
   int _dd_profiling_fd;
