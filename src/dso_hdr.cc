@@ -634,6 +634,28 @@ int DsoHdr::clear_unvisited(const std::unordered_set<pid_t> &visited_pids) {
   for (const auto &pid : pids_to_clear) {
     _pid_map.erase(pid);
   }
+
+  // Prune _fd_cache: close fds for files no longer referenced by any live
+  // mapping, preventing unbounded growth when short-lived binaries/containers
+  // are observed over the profiler lifetime.
+  if (!_fd_cache.empty() && !pids_to_clear.empty()) {
+    std::unordered_set<FileInfoId_t> live_ids;
+    for (const auto &[pid, pid_mapping] : _pid_map) {
+      for (const auto &[addr, dso] : pid_mapping._map) {
+        if (dso._id > k_file_info_error) {
+          live_ids.insert(dso._id);
+        }
+      }
+    }
+    for (auto it = _fd_cache.begin(); it != _fd_cache.end();) {
+      if (!live_ids.contains(it->first)) {
+        it = _fd_cache.erase(it);
+      } else {
+        ++it;
+      }
+    }
+  }
+
   return pids_to_clear.size();
 }
 } // namespace ddprof
