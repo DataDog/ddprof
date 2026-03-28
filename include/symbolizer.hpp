@@ -16,7 +16,8 @@
 #include <string>
 #include <unordered_map>
 
-struct ddog_prof_Location;
+struct ddog_prof_Location2;
+struct ddog_prof_ProfilesDictionary;
 
 namespace ddprof {
 class Symbolizer {
@@ -62,17 +63,18 @@ public:
   /// assumption is that all addresses are from this source file
   /// Parameters
   /// addrs - Elf address
-  /// process_addrs - Process address (only used for pprof reporting)
   /// file_id - a way to identify this file in a unique way
   /// elf_src - a path to the source file (idealy stable)
   /// map_info - the mapping information to write to the pprof
-  /// locations - the output pprof strucure
+  /// dict - the profiling dictionary for string interning
+  /// locations - the output pprof structure (Location2 with interned IDs)
   /// write_index - input / output parameter updated based on what is written
   /// results - A handle object for lifetime of strings.
   ///          Should be kept until interned strings are no longer needed.
   DDRes symbolize_pprof(std::span<ElfAddress_t> addrs, FileInfoId_t file_id,
                         const std::string &elf_src, const MapInfo &map_info,
-                        std::span<ddog_prof_Location> locations,
+                        const ddog_prof_ProfilesDictionary *dict,
+                        std::span<ddog_prof_Location2> locations,
                         unsigned &write_index, BlazeResultsWrapper &results);
   int remove_unvisited();
   void reset_unvisited_flag();

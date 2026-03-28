@@ -7,7 +7,7 @@
 
 #include "ddprof_defs.hpp"
 
-#include <string>
+struct ddog_prof_Function2;
 
 // Symbol
 // Information relating to a given location
@@ -17,21 +17,10 @@ class Symbol {
 public:
   Symbol() : _lineno(0) {}
 
-  // Warning : Generates some string copies (these are not rvalues)
-  Symbol(std::string symname, std::string demangled_name, uint32_t lineno,
-         std::string srcpath)
-      : _symname(std::move(symname)),
-        _demangled_name(std::move(demangled_name)), _lineno(lineno),
-        _srcpath(std::move(srcpath)) {}
+  Symbol(uint32_t lineno, ddog_prof_Function2 *function_id)
+      : _lineno(lineno), _function_id(function_id) {}
 
-  // OUTPUT OF ADDRINFO
-  std::string _symname;
-
-  // DEMANGLING CACHE
-  std::string _demangled_name;
-
-  // OUTPUT OF LINE INFO
   uint32_t _lineno;
-  std::string _srcpath;
+  ddog_prof_Function2 *_function_id{nullptr};
 };
 } // namespace ddprof

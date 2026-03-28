@@ -12,6 +12,8 @@
 #include <string>
 #include <unordered_map>
 
+struct ddog_prof_ProfilesDictionary;
+
 namespace ddprof {
 // Generates virtual frames for common unhandled cases
 class CommonMapInfoLookup {
@@ -21,7 +23,8 @@ public:
   };
 
   SymbolIdx_t get_or_insert(MappingErrors lookup_case,
-                            MapInfoTable &mapinfo_table);
+                            MapInfoTable &mapinfo_table,
+                            const ddog_prof_ProfilesDictionary *dict);
 
 private:
   std::unordered_map<MappingErrors, MapInfoIdx_t> _map;

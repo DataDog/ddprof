@@ -15,6 +15,8 @@
 #include <array>
 #include <unordered_map>
 
+struct ddog_prof_ProfilesDictionary;
+
 namespace ddprof {
 
 class RuntimeSymbolLookup {
@@ -30,10 +32,12 @@ public:
 
   SymbolIdx_t get_or_insert_jitdump(pid_t pid, ProcessAddress_t pc,
                                     SymbolTable &symbol_table,
+                                    const ddog_prof_ProfilesDictionary *dict,
                                     std::string_view jitdump_path);
 
   SymbolIdx_t get_or_insert(pid_t pid, ProcessAddress_t pc,
-                            SymbolTable &symbol_table);
+                            SymbolTable &symbol_table,
+                            const ddog_prof_ProfilesDictionary *dict);
 
   void erase(pid_t pid) { _pid_map.erase(pid); }
 
@@ -77,10 +81,12 @@ private:
   // Symbols are cached with the process's address.
   //
   DDRes fill_from_jitdump(std::string_view jitdump_path, pid_t pid,
-                          SymbolMap &symbol_map, SymbolTable &symbol_table);
+                          SymbolMap &symbol_map, SymbolTable &symbol_table,
+                          const ddog_prof_ProfilesDictionary *dict);
 
   DDRes fill_from_perfmap(int pid, SymbolMap &symbol_map,
-                          SymbolTable &symbol_table);
+                          SymbolTable &symbol_table,
+                          const ddog_prof_ProfilesDictionary *dict);
 
   UniqueFile perfmaps_open(int pid, const char *path_to_perfmap);
 
@@ -111,7 +117,8 @@ private:
   static bool insert_or_replace(std::string_view symbol,
                                 ProcessAddress_t address, Offset_t code_size,
                                 SymbolMap &symbol_map,
-                                SymbolTable &symbol_table);
+                                SymbolTable &symbol_table,
+                                const ddog_prof_ProfilesDictionary *dict);
 
   static constexpr std::array<const std::string_view, 1>
       _ignored_symbols_start = {{
