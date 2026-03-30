@@ -366,7 +366,6 @@ DsoHdr::get_or_create_cached_elf_file(FileInfoId_t file_info_id) {
   auto cached_elf_file = weak_entry.lock();
   if (!cached_elf_file) {
     cached_elf_file = std::make_shared<CachedElfFile>();
-    cached_elf_file->_id = file_info_id;
     weak_entry = cached_elf_file;
   }
   return cached_elf_file;

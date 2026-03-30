@@ -24,7 +24,6 @@ namespace ddprof {
 enum class DsoOrigin : uint8_t { kPerfMmapEvent, kProcMaps };
 
 struct CachedElfFile {
-  FileInfoId_t _id{k_file_info_error};
   UniqueFd _fd;
 };
 
