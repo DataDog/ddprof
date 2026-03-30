@@ -283,21 +283,25 @@ DsoHdr::DsoFindRes DsoHdr::dso_find_adjust_same(DsoMap &map, const Dso &dso) {
 }
 
 FileInfoId_t DsoHdr::get_or_insert_file_info(const Dso &dso) {
-  if (dso._id != k_file_info_undef) {
-    if (dso._id > k_file_info_error && !dso.get_cached_elf_file()) {
+  if (dso._id == k_file_info_undef) {
+    _stats.incr_metric(DsoStats::kTargetDso, dso._type);
+    update_id_from_dso(dso);
+  }
+
+  if (dso._id > k_file_info_error) {
+    if (!dso.get_cached_elf_file()) {
       dso.set_cached_elf_file(get_or_create_cached_elf_file(dso._id));
     }
-    // already looked up this dso
-    return dso._id;
+  } else {
+    dso.set_cached_elf_file(nullptr);
   }
-  _stats.incr_metric(DsoStats::kTargetDso, dso._type);
-  return update_id_from_dso(dso);
+
+  return dso._id;
 }
 
 FileInfoId_t DsoHdr::update_id_dd_profiling(const Dso &dso) {
   if (_dd_profiling_file_info != k_file_info_undef) {
     dso._id = _dd_profiling_file_info;
-    dso.set_cached_elf_file(get_or_create_cached_elf_file(dso._id));
     return dso._id;
   }
 
@@ -307,7 +311,6 @@ FileInfoId_t DsoHdr::update_id_dd_profiling(const Dso &dso) {
     dso._id = _file_info_vector.size();
     _dd_profiling_file_info = dso._id;
     _file_info_vector.emplace_back(FileInfo(dso._filename, 0, 0), dso._id);
-    dso.set_cached_elf_file(get_or_create_cached_elf_file(dso._id));
     return _dd_profiling_file_info;
   }
   _dd_profiling_file_info = update_id_from_path(dso);
@@ -319,7 +322,6 @@ FileInfoId_t DsoHdr::update_id_from_path(const Dso &dso) {
   FileInfo file_info = find_file_info(dso);
   if (!file_info._inode) {
     dso._id = k_file_info_error;
-    dso.set_cached_elf_file(nullptr);
     return dso._id;
   }
 
@@ -342,14 +344,12 @@ FileInfoId_t DsoHdr::update_id_from_path(const Dso &dso) {
       _file_info_vector[dso._id] = FileInfoValue(std::move(file_info), dso._id);
     }
   }
-  dso.set_cached_elf_file(get_or_create_cached_elf_file(dso._id));
   return dso._id;
 }
 
 FileInfoId_t DsoHdr::update_id_from_dso(const Dso &dso) {
   if (!has_relevant_path(dso._type)) {
     dso._id = k_file_info_error; // no file associated
-    dso.set_cached_elf_file(nullptr);
     return dso._id;
   }
 
