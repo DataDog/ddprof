@@ -5,18 +5,11 @@
 
 #include "version.hpp"
 
-#include <absl/strings/substitute.h>
 #include <cstdio>
 
 namespace ddprof {
 
-std::string_view str_version() {
-  static std::string const version_str = *VER_REV
-      ? absl::Substitute("$0.$1.$2+$3", VER_MAJ, VER_MIN, VER_PATCH, VER_REV)
-      : absl::Substitute("$0.$1.$2", VER_MAJ, VER_MIN, VER_PATCH);
-
-  return std::string_view{version_str};
-}
+std::string_view str_version() { return DDPROF_VERSION_STR; }
 
 void print_version() {
   printf(MYNAME " %.*s\n", static_cast<int>(str_version().size()),

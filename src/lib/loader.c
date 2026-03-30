@@ -7,6 +7,7 @@
 #include "dd_profiling.h"
 #include "lib_embedded_data.h"
 #include "tls_state_storage.h"
+#include "version.hpp"
 
 #include <dlfcn.h>
 #include <fcntl.h>
@@ -50,6 +51,7 @@ __attribute__((aligned(DDPROF_TLS_STATE_ALIGN))) __thread char
  */
 char *dlerror(void) __attribute__((weak));
 void *dlopen(const char *filename, int flags) __attribute__((weak));
+int dlclose(void *handle) __attribute__((weak));
 void *dlsym(void *handle, const char *symbol) __attribute__((weak));
 // NOLINTNEXTLINE(cert-dcl51-cpp)
 void *__libc_dlopen_mode(const char *filename, int flag) __attribute__((weak));
@@ -66,20 +68,34 @@ static __typeof(dlopen) *s_dlopen = &dlopen;
 
 static void ensure_libdl_is_loaded();
 
-static void *my_dlopen(const char *filename, int flags) {
+static void *my_dlopen_impl(const char *filename, int flags, int silent) {
   if (!s_dlopen) {
     // if libdl.so is not loaded, use __libc_dlopen_mode
     s_dlopen = __libc_dlopen_mode;
   }
   if (s_dlopen) {
     void *ret = s_dlopen(filename, flags);
-    if (!ret && s_dlerror) {
+    if (!ret && !silent && s_dlerror) {
       fprintf(stderr, "Failed to dlopen %s (%s)\n", filename, s_dlerror());
     }
     return ret;
   }
   // Should not happen
   return NULL;
+}
+
+static void *my_dlopen(const char *filename, int flags) {
+  return my_dlopen_impl(filename, flags, 0);
+}
+
+static void *my_dlopen_silent(const char *filename, int flags) {
+  return my_dlopen_impl(filename, flags, 1);
+}
+
+static void my_dlclose(void *handle) {
+  if (dlclose) {
+    dlclose(handle);
+  }
 }
 
 static void *my_dlsym(void *handle, const char *symbol) {
@@ -273,36 +289,14 @@ static char *get_or_create_temp_file(const char *prefix, EmbeddedData data,
   return path;
 }
 
+static const char *k_expected_version = DDPROF_VERSION_STR;
+
 static void *s_profiling_lib_handle = NULL;
 __typeof(ddprof_start_profiling) *s_start_profiling_func = NULL;
 __typeof(ddprof_stop_profiling) *s_stop_profiling_func = NULL;
 
 static void __attribute__((constructor)) loader() {
   char *lib_profiling_path = getenv(k_profiler_lib_env_variable);
-  if (!lib_profiling_path) {
-    EmbeddedData lib_data = profiling_lib_data();
-    EmbeddedData exe_data = profiler_exe_data();
-    if (lib_data.size == 0 || exe_data.size == 0) {
-      // nothing to do
-      return;
-    }
-    lib_profiling_path = get_or_create_temp_file(
-        k_libdd_profiling_embedded_name, lib_data, 0644);
-    char *profiler_exe_path =
-        get_or_create_temp_file(k_profiler_exe_name, exe_data, 0755);
-    if (!lib_profiling_path || !profiler_exe_path) {
-      free(lib_profiling_path);
-      free(profiler_exe_path);
-      return;
-    }
-    setenv(k_profiler_ddprof_exe_env_variable, profiler_exe_path, 1);
-    free(profiler_exe_path);
-  } else {
-    lib_profiling_path = strdup(lib_profiling_path);
-    if (!lib_profiling_path) {
-      return;
-    }
-  }
 
   ensure_libdl_is_loaded();
   ensure_libm_is_loaded();
@@ -310,8 +304,68 @@ static void __attribute__((constructor)) loader() {
   ensure_librt_is_loaded();
   ensure_loader_symbols_promoted();
 
-  s_profiling_lib_handle = my_dlopen(lib_profiling_path, RTLD_LOCAL | RTLD_NOW);
-  free(lib_profiling_path);
+  if (!lib_profiling_path) {
+    // Try the bare library name first. If the .so is installed in a standard
+    // search path (or anywhere in LD_LIBRARY_PATH / DT_RPATH / ldconfig
+    // cache), dlopen finds it without extracting anything to /tmp.
+    // Use silent dlopen since failure is the common case (not installed).
+    s_profiling_lib_handle = my_dlopen_silent(k_libdd_profiling_embedded_name,
+                                              RTLD_LOCAL | RTLD_NOW);
+
+    if (s_profiling_lib_handle) {
+      // Verify the loaded library matches our build version to avoid
+      // running a mismatched .so (e.g. stale package install).
+      const char *(*version_func)() = (const char *(*)())my_dlsym(
+          s_profiling_lib_handle, "ddprof_profiling_version");
+      if (!version_func) {
+        fprintf(stderr,
+                "ddprof: installed %s does not export "
+                "ddprof_profiling_version; falling back to embedded "
+                "library. Remove or upgrade the installed package to "
+                "avoid this warning.\n",
+                k_libdd_profiling_embedded_name);
+        my_dlclose(s_profiling_lib_handle);
+        s_profiling_lib_handle = NULL;
+      } else if (strcmp(version_func(), k_expected_version) != 0) {
+        fprintf(stderr,
+                "ddprof: version mismatch: installed %s is %s, "
+                "expected %s; falling back to embedded library. "
+                "Remove or upgrade the installed package to match "
+                "the injected library version.\n",
+                k_libdd_profiling_embedded_name, version_func(),
+                k_expected_version);
+        my_dlclose(s_profiling_lib_handle);
+        s_profiling_lib_handle = NULL;
+      }
+    }
+
+    if (!s_profiling_lib_handle) {
+      // Bare name not found: fall back to extracting embedded data to /tmp.
+      EmbeddedData lib_data = profiling_lib_data();
+      EmbeddedData exe_data = profiler_exe_data();
+      if (lib_data.size == 0 || exe_data.size == 0) {
+        // nothing to do
+        return;
+      }
+      char *lib_path = get_or_create_temp_file(k_libdd_profiling_embedded_name,
+                                               lib_data, 0644);
+      char *profiler_exe_path =
+          get_or_create_temp_file(k_profiler_exe_name, exe_data, 0755);
+      if (!lib_path || !profiler_exe_path) {
+        free(lib_path);
+        free(profiler_exe_path);
+        return;
+      }
+      setenv(k_profiler_ddprof_exe_env_variable, profiler_exe_path, 1);
+      free(profiler_exe_path);
+      s_profiling_lib_handle = my_dlopen(lib_path, RTLD_LOCAL | RTLD_NOW);
+      free(lib_path);
+    }
+  } else {
+    s_profiling_lib_handle =
+        my_dlopen(lib_profiling_path, RTLD_LOCAL | RTLD_NOW);
+  }
+
   if (s_profiling_lib_handle) {
     s_start_profiling_func = (__typeof(s_start_profiling_func))my_dlsym(
         s_profiling_lib_handle, "ddprof_start_profiling");

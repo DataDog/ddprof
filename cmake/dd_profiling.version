@@ -1,4 +1,4 @@
 {
-  global: ddprof_start_profiling; ddprof_stop_profiling; ddprof_lib_state;
+  global: ddprof_start_profiling; ddprof_stop_profiling; ddprof_lib_state; ddprof_profiling_version;
   local: *;
 };
