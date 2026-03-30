@@ -81,9 +81,8 @@ TEST(DwflModule, inconsistency_test) {
         const FileInfoValue &file_info_value =
             dso_hdr.get_file_info_value(file_info_id);
         DDProfMod *ddprof_mod = nullptr;
-        auto res =
-            dwfl_wrapper.register_mod(dso._start, it->second, file_info_value,
-                                      &ddprof_mod, dso_hdr.get_fd_cache());
+        auto res = dwfl_wrapper.register_mod(dso._start, it->second,
+                                             file_info_value, &ddprof_mod);
 
         ASSERT_TRUE(IsDDResOK(res));
         ASSERT_TRUE(ddprof_mod->_mod);
@@ -158,15 +157,16 @@ TEST(DwflModule, short_lived) {
       const FileInfoValue &file_info_value =
           dso_hdr.get_file_info_value(file_info_id);
       DDProfMod *ddprof_mod = nullptr;
-      auto res =
-          dwfl_wrapper.register_mod(dso._start, it->second, file_info_value,
-                                    &ddprof_mod, dso_hdr.get_fd_cache());
+      auto res = dwfl_wrapper.register_mod(dso._start, it->second,
+                                           file_info_value, &ddprof_mod);
       ASSERT_TRUE(IsDDResOK(res));
       ASSERT_TRUE(ddprof_mod->_mod);
     }
   }
   // Wait for the first PID to die
   waitpid(child_pid, nullptr, 0);
+  dso_hdr.pid_free(child_pid);
+  EXPECT_EQ(dso_hdr.get_fd_cache_size(), 0);
 
   pid_t second_child_pid = fork();
   if (second_child_pid == 0) {
@@ -180,7 +180,7 @@ TEST(DwflModule, short_lived) {
   {
     UniqueElf unique_elf = create_elf_from_self();
     DwflWrapper dwfl_wrapper;
-    dwfl_wrapper.attach(child_pid, unique_elf, nullptr);
+    dwfl_wrapper.attach(second_child_pid, unique_elf, nullptr);
     // retrieve the map associated to pid
     DsoHdr::DsoMap &dso_map = dso_hdr.get_pid_mapping(second_child_pid)._map;
 
@@ -196,9 +196,8 @@ TEST(DwflModule, short_lived) {
       const FileInfoValue &file_info_value =
           dso_hdr.get_file_info_value(file_info_id);
       DDProfMod *ddprof_mod = nullptr;
-      auto res =
-          dwfl_wrapper.register_mod(dso._start, it->second, file_info_value,
-                                    &ddprof_mod, dso_hdr.get_fd_cache());
+      auto res = dwfl_wrapper.register_mod(dso._start, it->second,
+                                           file_info_value, &ddprof_mod);
       ASSERT_TRUE(IsDDResOK(res));
       ASSERT_TRUE(ddprof_mod->_mod);
     }

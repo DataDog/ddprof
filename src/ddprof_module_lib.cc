@@ -212,8 +212,7 @@ DDRes compute_elf_bias(Elf *elf, const std::string &filepath, const Dso &dso,
 } // namespace
 
 DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
-                    const FileInfoValue &fileInfoValue, DDProfMod &ddprof_mod,
-                    std::unordered_map<FileInfoId_t, UniqueFd> &fd_cache) {
+                    const FileInfoValue &fileInfoValue, DDProfMod &ddprof_mod) {
   const std::string &filepath = fileInfoValue.get_path();
   const char *module_name = strrchr(filepath.c_str(), '/') + 1;
   if (fileInfoValue.errored()) { // avoid bouncing on errors
@@ -238,8 +237,15 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
     return ddres_warn(DD_WHAT_MODULE);
   }
 
-  // Get or populate the per-file cached fd (shared across all processes).
-  auto &cached_fd = fd_cache[fileInfoValue.get_id()];
+  auto cached_elf_file = dso.get_cached_elf_file();
+  if (!cached_elf_file) {
+    LG_WRN("[Mod] Missing cached file state for module (%s)", filepath.c_str());
+    return ddres_warn(DD_WHAT_MODULE);
+  }
+
+  // Open lazily; the shared cache entry keeps the fd alive as long as some DSO
+  // mapping still references this file.
+  auto &cached_fd = cached_elf_file->_fd;
   if (!cached_fd) {
     cached_fd = UniqueFd{::open(filepath.c_str(), O_RDONLY | O_CLOEXEC)};
     LG_DBG("[Mod] Opened and cached fd for %s", filepath.c_str());

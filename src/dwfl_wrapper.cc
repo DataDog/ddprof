@@ -66,15 +66,15 @@ DDProfMod *DwflWrapper::unsafe_get(FileInfoId_t file_info_id) {
   return &it->second;
 }
 
-DDRes DwflWrapper::register_mod(
-    ProcessAddress_t pc, const Dso &dso, const FileInfoValue &fileInfoValue,
-    DDProfMod **mod, std::unordered_map<FileInfoId_t, UniqueFd> &fd_cache) {
+DDRes DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
+                                const FileInfoValue &fileInfoValue,
+                                DDProfMod **mod) {
   if (!_attached) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_DWFL_LIB_ERROR, "dwfl not attached to pid %d",
                           dso._pid);
   }
   DDProfMod new_mod;
-  DDRes res = report_module(_dwfl, pc, dso, fileInfoValue, new_mod, fd_cache);
+  DDRes res = report_module(_dwfl, pc, dso, fileInfoValue, new_mod);
   _inconsistent = new_mod._status == DDProfMod::kInconsistent;
 
   if (IsDDResNotOK(res)) {

@@ -9,8 +9,10 @@
 
 #include "ddprof_file_info-i.hpp"
 #include "dso_type.hpp"
+#include "unique_fd.hpp"
 
 #include <iostream>
+#include <memory>
 #include <string>
 #include <sys/mman.h>
 #include <utility>
@@ -20,6 +22,11 @@
 namespace ddprof {
 
 enum class DsoOrigin : uint8_t { kPerfMmapEvent, kProcMaps };
+
+struct CachedElfFile {
+  FileInfoId_t _id{k_file_info_error};
+  UniqueFd _fd;
+};
 
 // DSO definition
 class Dso {
@@ -38,7 +45,13 @@ public:
   bool is_within(ProcessAddress_t addr) const;
 
   // strict comparison
-  friend bool operator==(const Dso &, const Dso &) = default;
+  friend bool operator==(const Dso &lhs, const Dso &rhs) {
+    return lhs._start == rhs._start && lhs._end == rhs._end &&
+        lhs._offset == rhs._offset && lhs._filename == rhs._filename &&
+        lhs._inode == rhs._inode && lhs._pid == rhs._pid &&
+        lhs._prot == rhs._prot && lhs._id == rhs._id &&
+        lhs._type == rhs._type && lhs._origin == rhs._origin;
+  }
 
   bool intersects(const Dso &o) const;
 
@@ -61,6 +74,13 @@ public:
   // Beware, end is inclusive !
   ProcessAddress_t end() const { return _end; }
   Offset_t offset() const { return _offset; }
+  std::shared_ptr<CachedElfFile> get_cached_elf_file() const {
+    return _cached_elf_file;
+  }
+  void
+  set_cached_elf_file(std::shared_ptr<CachedElfFile> cached_elf_file) const {
+    _cached_elf_file = std::move(cached_elf_file);
+  }
 
   ProcessAddress_t _start{};
   ProcessAddress_t _end{}; // Beware, end is inclusive !
@@ -70,6 +90,7 @@ public:
   pid_t _pid{-1};
   uint32_t _prot{};
   mutable FileInfoId_t _id{k_file_info_error};
+  mutable std::shared_ptr<CachedElfFile> _cached_elf_file;
   DsoType _type{DsoType::kUndef};
   DsoOrigin _origin{DsoOrigin::kPerfMmapEvent};
 };

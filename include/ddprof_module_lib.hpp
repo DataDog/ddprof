@@ -11,10 +11,8 @@
 #include "dso.hpp"
 #include "dso_hdr.hpp"
 #include "dwfl_internals.hpp"
-#include "unique_fd.hpp"
 
 #include <optional>
-#include <unordered_map>
 
 namespace ddprof {
 
@@ -33,12 +31,8 @@ struct Segment {
 
 // From a dso object (and the matching file), attach the module to the dwfl
 // object, return the associated Dwfl_Module.
-// fd_cache is keyed by FileInfoId_t; the first call for a given file opens it
-// and caches the fd, subsequent calls dup() it — avoiding redundant opens
-// across processes that share the same ELF file.
 DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
-                    const FileInfoValue &fileInfoValue, DDProfMod &ddprof_mod,
-                    std::unordered_map<FileInfoId_t, UniqueFd> &fd_cache);
+                    const FileInfoValue &fileInfoValue, DDProfMod &ddprof_mod);
 
 std::optional<std::string> find_build_id(const char *filepath);
 

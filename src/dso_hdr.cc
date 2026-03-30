@@ -284,6 +284,9 @@ DsoHdr::DsoFindRes DsoHdr::dso_find_adjust_same(DsoMap &map, const Dso &dso) {
 
 FileInfoId_t DsoHdr::get_or_insert_file_info(const Dso &dso) {
   if (dso._id != k_file_info_undef) {
+    if (dso._id > k_file_info_error && !dso.get_cached_elf_file()) {
+      dso.set_cached_elf_file(get_or_create_cached_elf_file(dso._id));
+    }
     // already looked up this dso
     return dso._id;
   }
@@ -294,6 +297,7 @@ FileInfoId_t DsoHdr::get_or_insert_file_info(const Dso &dso) {
 FileInfoId_t DsoHdr::update_id_dd_profiling(const Dso &dso) {
   if (_dd_profiling_file_info != k_file_info_undef) {
     dso._id = _dd_profiling_file_info;
+    dso.set_cached_elf_file(get_or_create_cached_elf_file(dso._id));
     return dso._id;
   }
 
@@ -303,6 +307,7 @@ FileInfoId_t DsoHdr::update_id_dd_profiling(const Dso &dso) {
     dso._id = _file_info_vector.size();
     _dd_profiling_file_info = dso._id;
     _file_info_vector.emplace_back(FileInfo(dso._filename, 0, 0), dso._id);
+    dso.set_cached_elf_file(get_or_create_cached_elf_file(dso._id));
     return _dd_profiling_file_info;
   }
   _dd_profiling_file_info = update_id_from_path(dso);
@@ -314,6 +319,7 @@ FileInfoId_t DsoHdr::update_id_from_path(const Dso &dso) {
   FileInfo file_info = find_file_info(dso);
   if (!file_info._inode) {
     dso._id = k_file_info_error;
+    dso.set_cached_elf_file(nullptr);
     return dso._id;
   }
 
@@ -336,12 +342,14 @@ FileInfoId_t DsoHdr::update_id_from_path(const Dso &dso) {
       _file_info_vector[dso._id] = FileInfoValue(std::move(file_info), dso._id);
     }
   }
+  dso.set_cached_elf_file(get_or_create_cached_elf_file(dso._id));
   return dso._id;
 }
 
 FileInfoId_t DsoHdr::update_id_from_dso(const Dso &dso) {
   if (!has_relevant_path(dso._type)) {
     dso._id = k_file_info_error; // no file associated
+    dso.set_cached_elf_file(nullptr);
     return dso._id;
   }
 
@@ -350,6 +358,28 @@ FileInfoId_t DsoHdr::update_id_from_dso(const Dso &dso) {
   }
 
   return update_id_from_path(dso);
+}
+
+std::shared_ptr<CachedElfFile>
+DsoHdr::get_or_create_cached_elf_file(FileInfoId_t file_info_id) {
+  auto &weak_entry = _fd_cache[file_info_id];
+  auto cached_elf_file = weak_entry.lock();
+  if (!cached_elf_file) {
+    cached_elf_file = std::make_shared<CachedElfFile>();
+    cached_elf_file->_id = file_info_id;
+    weak_entry = cached_elf_file;
+  }
+  return cached_elf_file;
+}
+
+void DsoHdr::cleanup_expired_fd_cache_entries() {
+  for (auto it = _fd_cache.begin(); it != _fd_cache.end();) {
+    if (it->second.expired()) {
+      it = _fd_cache.erase(it);
+    } else {
+      ++it;
+    }
+  }
 }
 
 bool DsoHdr::maybe_insert_erase_overlap(Dso &&dso,
@@ -424,7 +454,10 @@ DsoHdr::DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid,
   return dso_find_or_backpopulate(pid_mapping, pid, addr);
 }
 
-void DsoHdr::pid_free(int pid) { _pid_map.erase(pid); }
+void DsoHdr::pid_free(int pid) {
+  _pid_map.erase(pid);
+  cleanup_expired_fd_cache_entries();
+}
 
 bool DsoHdr::pid_backpopulate(pid_t pid, int &nb_elts_added) {
   return pid_backpopulate(_pid_map[pid], pid, nb_elts_added);
@@ -566,6 +599,17 @@ int DsoHdr::get_nb_dso() const {
   return total_nb_elts;
 }
 
+size_t DsoHdr::get_fd_cache_size() const {
+  size_t nb_open_fds = 0;
+  for (const auto &[_, weak_cached_elf_file] : _fd_cache) {
+    if (auto cached_elf_file = weak_cached_elf_file.lock();
+        cached_elf_file && cached_elf_file->_fd) {
+      ++nb_open_fds;
+    }
+  }
+  return nb_open_fds;
+}
+
 void DsoHdr::reset_backpopulate_state(int reset_threshold) {
   for (auto &[_, pid_mapping] : _pid_map) {
     auto &backpopulate_state = pid_mapping._backpopulate_state;
@@ -632,28 +676,7 @@ int DsoHdr::clear_unvisited(const std::unordered_set<pid_t> &visited_pids) {
     }
   }
   for (const auto &pid : pids_to_clear) {
-    _pid_map.erase(pid);
-  }
-
-  // Prune _fd_cache: close fds for files no longer referenced by any live
-  // mapping, preventing unbounded growth when short-lived binaries/containers
-  // are observed over the profiler lifetime.
-  if (!_fd_cache.empty() && !pids_to_clear.empty()) {
-    std::unordered_set<FileInfoId_t> live_ids;
-    for (const auto &[pid, pid_mapping] : _pid_map) {
-      for (const auto &[addr, dso] : pid_mapping._map) {
-        if (dso._id > k_file_info_error) {
-          live_ids.insert(dso._id);
-        }
-      }
-    }
-    for (auto it = _fd_cache.begin(); it != _fd_cache.end();) {
-      if (!live_ids.contains(it->first)) {
-        it = _fd_cache.erase(it);
-      } else {
-        ++it;
-      }
-    }
+    pid_free(pid);
   }
 
   return pids_to_clear.size();
