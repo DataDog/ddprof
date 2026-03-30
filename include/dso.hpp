@@ -45,15 +45,15 @@ public:
   bool is_within(ProcessAddress_t addr) const;
 
   // strict comparison
-  friend bool operator==(const Dso &lhs, const Dso &rhs) {
-    return lhs._start == rhs._start && lhs._end == rhs._end &&
-        lhs._offset == rhs._offset && lhs._filename == rhs._filename &&
-        lhs._inode == rhs._inode && lhs._pid == rhs._pid &&
-        lhs._prot == rhs._prot && lhs._id == rhs._id &&
-        lhs._type == rhs._type && lhs._origin == rhs._origin;
-  }
+  friend bool operator==(const Dso &, const Dso &) = default;
 
   bool intersects(const Dso &o) const;
+  bool same_mapping(const Dso &o) const {
+    return _start == o._start && _end == o._end && _offset == o._offset &&
+        _filename == o._filename && _inode == o._inode && _pid == o._pid &&
+        _prot == o._prot && _id == o._id && _type == o._type &&
+        _origin == o._origin;
+  }
 
   std::string to_string() const;
   std::string format_filename() const;
