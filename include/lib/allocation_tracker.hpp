@@ -54,6 +54,8 @@ public:
 
   static void notify_thread_start();
   static void notify_fork();
+  static void notify_pthread_getattr_np();
+  static void notify_pthread_getattr_np_end();
 
   static DDRes allocation_tracking_init(uint64_t allocation_profiling_rate,
                                         uint32_t flags,
@@ -76,8 +78,13 @@ public:
   static inline bool is_deallocation_tracking_active();
 
   static TrackerThreadLocalState *init_tl_state();
-  // can return null (does not init)
-  static TrackerThreadLocalState *get_tl_state();
+
+  // can return null if initialization failed/is not possible
+  static TrackerThreadLocalState *
+  get_tl_state(bool init_if_not_initialized = true);
+
+  // does not init
+  static TrackerThreadLocalState &get_tl_state_no_init();
 
 private:
   static constexpr unsigned k_ratio_max_elt_to_bitset_size = 16;

@@ -64,11 +64,23 @@ DDPROF_NOINLINE auto sleep_and_retry_reserve(MPSCRingBufferWriter &writer,
 }
 } // namespace
 
-TrackerThreadLocalState *AllocationTracker::get_tl_state() {
+TrackerThreadLocalState &AllocationTracker::get_tl_state_no_init() {
+  return *reinterpret_cast<TrackerThreadLocalState *>(ddprof_lib_state);
+}
+
+TrackerThreadLocalState *
+AllocationTracker::get_tl_state(bool init_if_not_initialized) {
   // ddprof_lib_state is zero-initialized by libc for each new thread.
   // After placement new (init_tl_state), initialized is set to true.
-  auto *state = reinterpret_cast<TrackerThreadLocalState *>(ddprof_lib_state);
-  return state->initialized ? state : nullptr;
+  auto &state = get_tl_state_no_init();
+  if (state.initialized) {
+    return &state;
+  }
+  if (init_if_not_initialized && !state.reentry_guard) {
+    // We are not inside pthread_getattr_np, so we can initialize the state
+    return init_tl_state();
+  }
+  return nullptr;
 }
 
 TrackerThreadLocalState *AllocationTracker::init_tl_state() {
@@ -560,12 +572,8 @@ AllocationTracker::next_sample_interval(std::minstd_rand &gen) const {
 void AllocationTracker::notify_thread_start() {
   TrackerThreadLocalState *tl_state = get_tl_state();
   if (unlikely(!tl_state)) {
-    tl_state = init_tl_state();
-    if (!tl_state) {
-      LG_DBG("Unable to start allocation profiling on thread %d",
-             ddprof::gettid());
-      return;
-    }
+    LG_DBG("Unable to start allocation profiling on thread %d",
+           ddprof::gettid());
   }
 }
 
@@ -582,6 +590,20 @@ void AllocationTracker::notify_fork() {
     return;
   }
   tl_state->tid = ddprof::gettid();
+}
+
+void AllocationTracker::notify_pthread_getattr_np() {
+  auto &state = get_tl_state_no_init();
+  if (!state.initialized) {
+    state.reentry_guard = true;
+  }
+}
+
+void AllocationTracker::notify_pthread_getattr_np_end() {
+  auto &state = get_tl_state_no_init();
+  if (!state.initialized) {
+    state.reentry_guard = false;
+  }
 }
 
 } // namespace ddprof

@@ -34,7 +34,7 @@ namespace {
 
 void *thread_check_null_tls(void *arg) {
   auto *result = static_cast<int *>(arg);
-  auto *state = AllocationTracker::get_tl_state();
+  auto *state = AllocationTracker::get_tl_state(false);
   if (state != nullptr) {
     LG_ERR("new thread expected NULL TLS, got %p", static_cast<void *>(state));
     *result = 1;
@@ -83,7 +83,7 @@ int main() {
 
   // Before any init, main thread's TLS must be zero-initialized by libc,
   // so get_tl_state() should return NULL (initialized == false).
-  auto *pre_init = AllocationTracker::get_tl_state();
+  auto *pre_init = AllocationTracker::get_tl_state(false);
   CHECK_OR_RETURN(pre_init == nullptr,
                   "main thread TLS not zero-initialized before init (got %p)",
                   static_cast<void *>(pre_init));
