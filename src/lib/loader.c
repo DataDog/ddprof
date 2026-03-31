@@ -92,10 +92,16 @@ static void *my_dlopen_silent(const char *filename, int flags) {
   return my_dlopen_impl(filename, flags, 1);
 }
 
-static void my_dlclose(void *handle) {
+// Returns 0 on success, -1 if dlclose is not available.
+static int my_dlclose(void *handle) {
   if (dlclose) {
     dlclose(handle);
+    return 0;
   }
+  fprintf(stderr,
+          "ddprof: dlclose is not available; cannot unload mismatched "
+          "library. Profiling disabled.\n");
+  return -1;
 }
 
 static void *my_dlsym(void *handle, const char *symbol) {
@@ -315,8 +321,12 @@ static void __attribute__((constructor)) loader() {
     if (s_profiling_lib_handle) {
       // Verify the loaded library matches our build version to avoid
       // running a mismatched .so (e.g. stale package install).
+      // Note: the DSO's C++ static initializers have already run by this
+      // point. On mismatch we dlclose and fall back to the embedded copy;
+      // profiling is blocked because s_start_profiling_func stays NULL.
       const char *(*version_func)() = (const char *(*)())my_dlsym(
           s_profiling_lib_handle, "ddprof_profiling_version");
+      int mismatch = 0;
       if (!version_func) {
         fprintf(stderr,
                 "ddprof: installed %s does not export "
@@ -324,8 +334,7 @@ static void __attribute__((constructor)) loader() {
                 "library. Remove or upgrade the installed package to "
                 "avoid this warning.\n",
                 k_libdd_profiling_embedded_name);
-        my_dlclose(s_profiling_lib_handle);
-        s_profiling_lib_handle = NULL;
+        mismatch = 1;
       } else if (strcmp(version_func(), k_expected_version) != 0) {
         fprintf(stderr,
                 "ddprof: version mismatch: installed %s is %s, "
@@ -334,7 +343,14 @@ static void __attribute__((constructor)) loader() {
                 "the injected library version.\n",
                 k_libdd_profiling_embedded_name, version_func(),
                 k_expected_version);
-        my_dlclose(s_profiling_lib_handle);
+        mismatch = 1;
+      }
+      if (mismatch) {
+        if (my_dlclose(s_profiling_lib_handle) != 0) {
+          // Cannot unload the stale DSO — its symbols would conflict
+          // with the embedded copy. Disable profiling entirely.
+          return;
+        }
         s_profiling_lib_handle = NULL;
       }
     }
