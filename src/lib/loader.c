@@ -66,6 +66,8 @@ int timer_create(clockid_t clockid, struct sigevent *sevp, timer_t *timerid)
 static void *s_libdl_handle = NULL;
 static __typeof(dlerror) *s_dlerror = &dlerror;
 static __typeof(dlopen) *s_dlopen = &dlopen;
+static __typeof(dlclose) *s_dlclose = &dlclose;
+static __typeof(dladdr) *s_dladdr = &dladdr;
 
 static void ensure_libdl_is_loaded();
 
@@ -95,8 +97,8 @@ static void *my_dlopen_silent(const char *filename, int flags) {
 
 // Returns 0 on success, -1 if dlclose is not available.
 static int my_dlclose(void *handle) {
-  if (dlclose) {
-    return dlclose(handle);
+  if (s_dlclose) {
+    return s_dlclose(handle);
   }
   fprintf(stderr,
           "ddprof: dlclose is not available; cannot unload mismatched "
@@ -146,6 +148,12 @@ static void ensure_libdl_is_loaded() {
     if (!s_dlerror) {
       s_dlerror = (__typeof(dlerror) *)my_dlsym(s_libdl_handle, "dlerror");
     }
+    if (!s_dlclose) {
+      s_dlclose = (__typeof(dlclose) *)my_dlsym(s_libdl_handle, "dlclose");
+    }
+    if (!s_dladdr) {
+      s_dladdr = (__typeof(dladdr) *)my_dlsym(s_libdl_handle, "dladdr");
+    }
   }
 }
 
@@ -186,7 +194,7 @@ static void ensure_loader_symbols_promoted() {
   // This is necessary on musl, where RTLD_NOLOAD with a bare SONAME fails
   // because musl tracks loaded libraries by their full path, not their SONAME.
   Dl_info info;
-  if (dladdr && dladdr((void *)ddprof_start_profiling, &info) &&
+  if (s_dladdr && s_dladdr((void *)ddprof_start_profiling, &info) &&
       info.dli_fname) {
     void *self =
         my_dlopen_silent(info.dli_fname, RTLD_GLOBAL | RTLD_NOLOAD | RTLD_NOW);
@@ -367,7 +375,7 @@ static void *try_load_installed_profiling_lib() {
 // Returns 0 on success, -1 if the exe could not be found or extracted.
 static int setup_ddprof_exe_for_installed_lib() {
   Dl_info loader_info;
-  if (dladdr && dladdr((void *)ddprof_start_profiling, &loader_info) &&
+  if (s_dladdr && s_dladdr((void *)ddprof_start_profiling, &loader_info) &&
       loader_info.dli_fname) {
     const char *last_slash = strrchr(loader_info.dli_fname, '/');
     if (last_slash) {
