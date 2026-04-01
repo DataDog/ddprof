@@ -96,8 +96,7 @@ static void *my_dlopen_silent(const char *filename, int flags) {
 // Returns 0 on success, -1 if dlclose is not available.
 static int my_dlclose(void *handle) {
   if (dlclose) {
-    dlclose(handle);
-    return 0;
+    return dlclose(handle);
   }
   fprintf(stderr,
           "ddprof: dlclose is not available; cannot unload mismatched "
@@ -182,6 +181,7 @@ static void ensure_librt_is_loaded() {
 // libraries by their actual path, not their SONAME. Use dladdr() to find
 // the loader's actual path first, which works on both musl and glibc.
 static void ensure_loader_symbols_promoted() {
+#ifdef DDPROF_LOADER_SONAME
   // Use dladdr() to find the actual path of this library at runtime.
   // This is necessary on musl, where RTLD_NOLOAD with a bare SONAME fails
   // because musl tracks loaded libraries by their full path, not their SONAME.
@@ -194,7 +194,6 @@ static void ensure_loader_symbols_promoted() {
       return;
     }
   }
-#ifdef DDPROF_LOADER_SONAME
   // Fallback: try by SONAME (works on glibc when dladdr is unavailable or
   // returns a different path than what the dynamic linker tracks).
   void *self = my_dlopen_silent(DDPROF_LOADER_SONAME,
@@ -306,8 +305,6 @@ static char *get_or_create_temp_file(const char *prefix, EmbeddedData data,
   return path;
 }
 
-static const char *k_expected_version = DDPROF_VERSION_STR;
-
 static void *s_profiling_lib_handle = NULL;
 __typeof(ddprof_start_profiling) *s_start_profiling_func = NULL;
 __typeof(ddprof_stop_profiling) *s_stop_profiling_func = NULL;
@@ -338,13 +335,13 @@ static void *try_load_installed_profiling_lib() {
             "package to avoid this warning.\n",
             k_libdd_profiling_embedded_name);
     mismatch = 1;
-  } else if (strcmp(version_func(), k_expected_version) != 0) {
+  } else if (strcmp(version_func(), DDPROF_VERSION_STR) != 0) {
     fprintf(stderr,
             "ddprof: version mismatch: installed %s is %s, expected %s; "
             "falling back to embedded library. Remove or upgrade the installed "
             "package to match the injected library version.\n",
             k_libdd_profiling_embedded_name, version_func(),
-            k_expected_version);
+            DDPROF_VERSION_STR);
     mismatch = 1;
   }
 
