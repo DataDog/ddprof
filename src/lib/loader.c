@@ -364,7 +364,8 @@ static void *try_load_installed_profiling_lib() {
 //   1. <loader_dir>/../bin/ddprof  — standard install layout
 //   2. <loader_dir>/ddprof         — flat build/dev layout
 // Falls back to extracting the binary from the loader's embedded data to /tmp.
-static void setup_ddprof_exe_for_installed_lib() {
+// Returns 0 on success, -1 if the exe could not be found or extracted.
+static int setup_ddprof_exe_for_installed_lib() {
   Dl_info loader_info;
   if (dladdr && dladdr((void *)ddprof_start_profiling, &loader_info) &&
       loader_info.dli_fname) {
@@ -387,7 +388,7 @@ static void setup_ddprof_exe_for_installed_lib() {
         if (access(exe_path, X_OK) == 0) {
           setenv(k_profiler_ddprof_exe_env_variable, exe_path, 1);
           free(exe_path);
-          return;
+          return 0;
         }
         free(exe_path);
       }
@@ -402,8 +403,10 @@ static void setup_ddprof_exe_for_installed_lib() {
     if (profiler_exe_path) {
       setenv(k_profiler_ddprof_exe_env_variable, profiler_exe_path, 1);
       free(profiler_exe_path);
+      return 0;
     }
   }
+  return -1;
 }
 
 // Extract both the profiling library and the ddprof binary from embedded data
@@ -445,10 +448,15 @@ static void __attribute__((constructor)) loader() {
     if (installed == (void *)-1) {
       return; // unrecoverable: stale DSO could not be unloaded
     }
-    if (installed) {
+    if (installed && setup_ddprof_exe_for_installed_lib() == 0) {
       s_profiling_lib_handle = installed;
-      setup_ddprof_exe_for_installed_lib();
     } else {
+      // Either the installed lib was not found, or the exe could not be
+      // located alongside it. Close the installed handle if we opened one
+      // and fall back to the fully self-contained embedded copy.
+      if (installed && my_dlclose(installed) != 0) {
+        return; // unrecoverable: cannot unload, symbols would conflict
+      }
       s_profiling_lib_handle = load_embedded_profiling_lib();
     }
   }
