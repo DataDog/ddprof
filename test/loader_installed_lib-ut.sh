@@ -19,7 +19,6 @@ set -euo pipefail
 BUILDDIR="${PWD}"
 EMBEDDED_LIB="${BUILDDIR}/libdd_profiling-embedded.so"
 SHARED_LIB="${BUILDDIR}/libdd_profiling.so"
-DDPROF_EXE="${BUILDDIR}/ddprof"
 
 # Only meaningful for loader builds
 if nm -D "${SHARED_LIB}" | grep -q ddprof_profiling_version 2>/dev/null; then
@@ -28,16 +27,16 @@ if nm -D "${SHARED_LIB}" | grep -q ddprof_profiling_version 2>/dev/null; then
     exit 0
 fi
 
-if [[ ! -x "${DDPROF_EXE}" ]]; then
-    echo "INFO: ddprof executable not found — skipping loader exe-lookup test"
-    echo "PASS: all checks passed"
-    exit 0
-fi
-
 echo "INFO: loader build — testing exe path discovery"
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT
+
+# Use a tiny stub executable as the fake ddprof — any executable satisfies
+# access(path, X_OK). This avoids copying the real 71 MB ddprof binary.
+FAKE_DDPROF="${tmpdir}/fake_ddprof"
+printf '#!/bin/sh\nexit 0\n' > "${FAKE_DDPROF}"
+chmod +x "${FAKE_DDPROF}"
 
 # ---------------------------------------------------------------------------
 # Helper: inject the loader from LOADER_DIR via LD_PRELOAD, put the embedded
@@ -65,9 +64,9 @@ get_resolved_exe() {
 echo "--- Test 1: flat layout ---"
 flat_dir="${tmpdir}/flat"
 mkdir -p "${flat_dir}"
-cp "${EMBEDDED_LIB}" "${flat_dir}/libdd_profiling-embedded.so"
-cp "${SHARED_LIB}"   "${flat_dir}/libdd_profiling.so"
-cp "${DDPROF_EXE}"   "${flat_dir}/ddprof"
+cp "${EMBEDDED_LIB}"  "${flat_dir}/libdd_profiling-embedded.so"
+cp "${SHARED_LIB}"    "${flat_dir}/libdd_profiling.so"
+cp "${FAKE_DDPROF}"   "${flat_dir}/ddprof"
 
 resolved="$(get_resolved_exe "${flat_dir}/libdd_profiling.so" "${flat_dir}")"
 if [[ "${resolved}" == "${flat_dir}/ddprof" ]]; then
@@ -83,9 +82,9 @@ fi
 echo "--- Test 2: install layout ---"
 install_dir="${tmpdir}/install"
 mkdir -p "${install_dir}/lib" "${install_dir}/bin"
-cp "${EMBEDDED_LIB}" "${install_dir}/lib/libdd_profiling-embedded.so"
-cp "${SHARED_LIB}"   "${install_dir}/lib/libdd_profiling.so"
-cp "${DDPROF_EXE}"   "${install_dir}/bin/ddprof"
+cp "${EMBEDDED_LIB}"  "${install_dir}/lib/libdd_profiling-embedded.so"
+cp "${SHARED_LIB}"    "${install_dir}/lib/libdd_profiling.so"
+cp "${FAKE_DDPROF}"   "${install_dir}/bin/ddprof"
 
 resolved="$(get_resolved_exe "${install_dir}/lib/libdd_profiling.so" \
                               "${install_dir}/lib")"
