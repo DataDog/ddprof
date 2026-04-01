@@ -310,7 +310,7 @@ DDRes process_symbolization(
     while (index < locs.size() && locs[index].file_info_id == file_id) {
       elf_addresses.push_back(locs[index].elf_addr);
       ++index;
-      if (locs[index].symbol_idx != k_symbol_idx_null) {
+      if (index < locs.size() && locs[index].symbol_idx != k_symbol_idx_null) {
         break; // Stop if we find a symbolized location
       }
     }
