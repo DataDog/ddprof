@@ -53,6 +53,7 @@ char *dlerror(void) __attribute__((weak));
 void *dlopen(const char *filename, int flags) __attribute__((weak));
 int dlclose(void *handle) __attribute__((weak));
 void *dlsym(void *handle, const char *symbol) __attribute__((weak));
+int dladdr(const void *addr, Dl_info *info) __attribute__((weak));
 // NOLINTNEXTLINE(cert-dcl51-cpp)
 void *__libc_dlopen_mode(const char *filename, int flag) __attribute__((weak));
 // NOLINTNEXTLINE(cert-dcl51-cpp)
@@ -185,7 +186,8 @@ static void ensure_loader_symbols_promoted() {
   // This is necessary on musl, where RTLD_NOLOAD with a bare SONAME fails
   // because musl tracks loaded libraries by their full path, not their SONAME.
   Dl_info info;
-  if (dladdr((void *)ddprof_start_profiling, &info) && info.dli_fname) {
+  if (dladdr && dladdr((void *)ddprof_start_profiling, &info) &&
+      info.dli_fname) {
     void *self =
         my_dlopen_silent(info.dli_fname, RTLD_GLOBAL | RTLD_NOLOAD | RTLD_NOW);
     if (self) {
@@ -367,7 +369,7 @@ static void *try_load_installed_profiling_lib() {
 // Falls back to extracting the binary from the loader's embedded data to /tmp.
 static void setup_ddprof_exe_for_installed_lib() {
   Dl_info loader_info;
-  if (dladdr((void *)ddprof_start_profiling, &loader_info) &&
+  if (dladdr && dladdr((void *)ddprof_start_profiling, &loader_info) &&
       loader_info.dli_fname) {
     const char *last_slash = strrchr(loader_info.dli_fname, '/');
     if (last_slash) {
