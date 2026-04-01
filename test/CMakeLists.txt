@@ -542,8 +542,20 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
   target_include_directories(pthread_deadlock PRIVATE ${CMAKE_SOURCE_DIR}/include)
   add_test(
     NAME pthread_deadlock
-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/pthread_deadlock-ut.sh
+    COMMAND pthread_deadlock
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+  set_tests_properties(pthread_deadlock PROPERTIES TIMEOUT 5)
+
+  if(TARGET jemalloc::jemalloc_static)
+    add_exe(pthread_deadlock_mmap pthread_deadlock_mmap.cc
+            LIBRARIES dd_profiling-shared jemalloc::jemalloc_static Threads::Threads dl)
+    target_include_directories(pthread_deadlock_mmap PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    add_test(
+      NAME pthread_deadlock_mmap
+      COMMAND pthread_deadlock_mmap
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+    set_tests_properties(pthread_deadlock_mmap PROPERTIES TIMEOUT 5)
+  endif()
 endif()
 
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")

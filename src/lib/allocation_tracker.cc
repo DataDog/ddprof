@@ -105,12 +105,8 @@ DDRes AllocationTracker::allocation_tracking_init(
     const IntervalTimerCheck &timer_check) {
   TrackerThreadLocalState *tl_state = get_tl_state();
   if (!tl_state) {
-    // This is the time at which the init_tl_state should not fail
-    // We will not attempt to re-create it in other code paths
-    tl_state = init_tl_state();
-    if (!tl_state) {
-      return ddres_error(DD_WHAT_DWFL_LIB_ERROR);
-    }
+    // This is the time at which the tl_state should be initialized
+    return ddres_error(DD_WHAT_DWFL_LIB_ERROR);
   }
 
   ReentryGuard const guard(&tl_state->reentry_guard);

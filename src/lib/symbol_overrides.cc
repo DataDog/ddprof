@@ -78,7 +78,7 @@ public:
   // malloc implementation and cause a deadlock when pthread_getattr_np (which
   // can call malloc) is called by tls state initialization.
   AllocTrackerHelperImpl()
-      : _tl_state{ddprof::AllocationTracker::get_tl_state(mmap_alloc)},
+      : _tl_state{ddprof::AllocationTracker::get_tl_state(!mmap_alloc)},
         _guard{_tl_state ? &(_tl_state->reentry_guard) : nullptr} {}
 
   void track(void *ptr, size_t size) {
@@ -106,7 +106,7 @@ template <bool mmap_alloc = false> class DeallocTrackerHelperImpl {
 public:
   DeallocTrackerHelperImpl()
       : _tl_state{ddprof::AllocationTracker::is_deallocation_tracking_active()
-                      ? ddprof::AllocationTracker::get_tl_state(mmap_alloc)
+                      ? ddprof::AllocationTracker::get_tl_state(!mmap_alloc)
                       : nullptr},
         _guard{_tl_state ? &(_tl_state->reentry_guard) : nullptr} {}
 
