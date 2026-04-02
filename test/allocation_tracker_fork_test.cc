@@ -47,7 +47,7 @@ void *thread_check_null_tls(void *arg) {
 int run_child(void *parent_state) {
   // After fork, the __thread buffer is inherited: the child's main thread
   // sees the initialized state at the same virtual address.
-  auto *child_inherited = AllocationTracker::get_tl_state();
+  auto *child_inherited = AllocationTracker::get_tl_state(false);
   CHECK_OR_EXIT(child_inherited == parent_state,
                 "expected inherited TLS %p, got %p", parent_state,
                 static_cast<void *>(child_inherited));
@@ -56,7 +56,7 @@ int run_child(void *parent_state) {
   auto *child_state = AllocationTracker::init_tl_state();
   CHECK_OR_EXIT(child_state != nullptr, "init_tl_state() returned NULL");
 
-  auto *retrieved = AllocationTracker::get_tl_state();
+  auto *retrieved = AllocationTracker::get_tl_state(false);
   CHECK_OR_EXIT(retrieved == child_state, "get/init mismatch: %p vs %p",
                 static_cast<void *>(retrieved),
                 static_cast<void *>(child_state));
@@ -105,7 +105,7 @@ int main() {
   CHECK_OR_RETURN(parent_state != nullptr,
                   "parent init_tl_state() returned NULL");
 
-  auto *retrieved = AllocationTracker::get_tl_state();
+  auto *retrieved = AllocationTracker::get_tl_state(false);
   CHECK_OR_RETURN(retrieved == parent_state, "parent get/init mismatch");
 
   fflush(stdout);
@@ -136,7 +136,7 @@ int main() {
   CHECK_OR_RETURN(exit_code == 0, "child exited with code %d", exit_code);
 
   // Parent TLS should be unaffected by the fork
-  auto *parent_after = AllocationTracker::get_tl_state();
+  auto *parent_after = AllocationTracker::get_tl_state(false);
   CHECK_OR_RETURN(parent_after == parent_state,
                   "parent TLS corrupted after fork (%p vs %p)",
                   static_cast<void *>(parent_after),
