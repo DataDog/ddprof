@@ -529,6 +529,8 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/check_no_tls-ut.sh
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+  add_unit_test(sha256-ut sha256-ut.cc ../src/lib/sha256.c)
+
   if(USE_LOADER)
     add_test(
       NAME hash_mismatch

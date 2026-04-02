@@ -450,10 +450,9 @@ endif()
 
 set(_install_targets ddprof dd_profiling-static dd_profiling-shared)
 if(USE_LOADER)
-  # Install the embedded profiling library so the loader can dlopen it from a
-  # standard path instead of extracting the copy baked into the loader to /tmp.
-  # The /tmp fallback loses file capabilities (CAP_PERFMON) on the ddprof
-  # binary, which breaks perf_event_open.
+  # Install the embedded profiling library so the loader can dlopen it from a standard path instead
+  # of extracting the copy baked into the loader to /tmp. The /tmp fallback loses file capabilities
+  # (CAP_PERFMON) on the ddprof binary, which breaks perf_event_open.
   list(APPEND _install_targets dd_profiling-embedded)
 endif()
 
