@@ -529,6 +529,25 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/check_no_tls-ut.sh
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+  # Fake libdd_profiling-embedded.so with wrong version for mismatch test
+  add_library(fake_profiling_version SHARED fake_profiling_version.c)
+  set_target_properties(fake_profiling_version PROPERTIES OUTPUT_NAME "dd_profiling-embedded")
+  target_compile_options(fake_profiling_version PRIVATE -fvisibility=default)
+  # Put it in test/ so it doesn't shadow the real one in the build root
+  set_target_properties(fake_profiling_version PROPERTIES LIBRARY_OUTPUT_DIRECTORY
+                                                          "${CMAKE_BINARY_DIR}/test")
+
+  # Depends on simple_malloc-static and fake_profiling_version at runtime
+  add_test(
+    NAME version_mismatch
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/version_mismatch-ut.sh
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+  add_test(
+    NAME loader_installed_lib
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/loader_installed_lib-ut.sh
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
   if(BUILD_UNIVERSAL_DDPROF)
     add_test(NAME check-injected-lib
              COMMAND ${CMAKE_SOURCE_DIR}/tools/check_for_unsafe_libc_functions.py
