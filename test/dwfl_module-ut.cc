@@ -54,61 +54,66 @@ TEST(DwflModule, inconsistency_test) {
   int nb_fds_start = count_fds(my_pid);
   printf("-- Start open file descriptors: %d\n", nb_fds_start);
   LogHandle handle;
-  // Load DSOs from our unit test
-  ElfAddress_t ip = _THIS_IP_;
-  DsoHdr dso_hdr;
-  DsoHdr::DsoFindRes find_res = dso_hdr.dso_find_or_backpopulate(my_pid, ip);
-  UniqueElf unique_elf = create_elf_from_self();
-  // Check that we found the DSO matching this IP
-  ASSERT_TRUE(find_res.second);
+  // Scope dso_hdr and dwfl_wrapper together so the fd cache (_fd_cache inside
+  // dso_hdr) is released before the fd count check below.
   {
-    DwflWrapper dwfl_wrapper;
-    dwfl_wrapper.attach(my_pid, unique_elf, nullptr);
-    // retrieve the map associated to pid
-    DsoHdr::DsoMap &dso_map = dso_hdr.get_pid_mapping(my_pid)._map;
-    for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
-      Dso &dso = it->second;
-      if (!has_relevant_path(dso._type) || !dso.is_executable()) {
-        continue; // skip non exec / non standard (anon/vdso...)
+    // Load DSOs from our unit test
+    ElfAddress_t ip = _THIS_IP_;
+    DsoHdr dso_hdr;
+    DsoHdr::DsoFindRes find_res = dso_hdr.dso_find_or_backpopulate(my_pid, ip);
+    UniqueElf unique_elf = create_elf_from_self();
+    // Check that we found the DSO matching this IP
+    ASSERT_TRUE(find_res.second);
+    {
+      DwflWrapper dwfl_wrapper;
+      dwfl_wrapper.attach(my_pid, unique_elf, nullptr);
+      // retrieve the map associated to pid
+      DsoHdr::DsoMap &dso_map = dso_hdr.get_pid_mapping(my_pid)._map;
+      for (auto it = dso_map.begin(); it != dso_map.end(); ++it) {
+        Dso &dso = it->second;
+        if (!has_relevant_path(dso._type) || !dso.is_executable()) {
+          continue; // skip non exec / non standard (anon/vdso...)
+        }
+
+        FileInfoId_t file_info_id = dso_hdr.get_or_insert_file_info(dso);
+        ASSERT_TRUE(file_info_id > k_file_info_error);
+
+        const FileInfoValue &file_info_value =
+            dso_hdr.get_file_info_value(file_info_id);
+        DDProfMod *ddprof_mod = nullptr;
+        auto res = dwfl_wrapper.register_mod(dso._start, it->second,
+                                             file_info_value, &ddprof_mod);
+
+        ASSERT_TRUE(IsDDResOK(res));
+        ASSERT_TRUE(ddprof_mod->_mod);
+        if (find_res.first == it) {
+          std::array<ElfAddress_t, 1> elf_addr{ip - ddprof_mod->_sym_bias};
+          blaze_symbolize_src_elf src_elf{
+              .type_size = sizeof(blaze_symbolize_src_elf),
+              .path = dso._filename.c_str(),
+              .debug_syms = true,
+              .reserved = {},
+          };
+          const blaze_syms *blaze_syms = blaze_symbolize_elf_virt_offsets(
+              symbolizer, &src_elf, elf_addr.data(), elf_addr.size());
+
+          ASSERT_TRUE(blaze_syms);
+          ASSERT_GE(blaze_syms->cnt, 1);
+          defer { blaze_syms_free(blaze_syms); };
+          // we don't have demangling at this step
+          EXPECT_TRUE(
+              strcmp(
+                  "_ZN6ddprof34DwflModule_inconsistency_test_Test8TestBodyEv",
+                  blaze_syms->syms[0].name) == 0);
+          // Only expect build-id on this binary (as we can not force it on
+          // others)
+          EXPECT_FALSE(ddprof_mod->_build_id.empty());
+        }
+        // check that we loaded all mods matching the DSOs
+        EXPECT_EQ(ddprof_mod->_status, DDProfMod::kUnknown);
       }
-
-      FileInfoId_t file_info_id = dso_hdr.get_or_insert_file_info(dso);
-      ASSERT_TRUE(file_info_id > k_file_info_error);
-
-      const FileInfoValue &file_info_value =
-          dso_hdr.get_file_info_value(file_info_id);
-      DDProfMod *ddprof_mod = nullptr;
-      auto res = dwfl_wrapper.register_mod(dso._start, it->second,
-                                           file_info_value, &ddprof_mod);
-
-      ASSERT_TRUE(IsDDResOK(res));
-      ASSERT_TRUE(ddprof_mod->_mod);
-      if (find_res.first == it) {
-        std::array<ElfAddress_t, 1> elf_addr{ip - ddprof_mod->_sym_bias};
-        blaze_symbolize_src_elf src_elf{
-            .type_size = sizeof(blaze_symbolize_src_elf),
-            .path = dso._filename.c_str(),
-            .debug_syms = true,
-            .reserved = {},
-        };
-        const blaze_syms *blaze_syms = blaze_symbolize_elf_virt_offsets(
-            symbolizer, &src_elf, elf_addr.data(), elf_addr.size());
-
-        ASSERT_TRUE(blaze_syms);
-        ASSERT_GE(blaze_syms->cnt, 1);
-        defer { blaze_syms_free(blaze_syms); };
-        // we don't have demangling at this step
-        EXPECT_TRUE(
-            strcmp("_ZN6ddprof34DwflModule_inconsistency_test_Test8TestBodyEv",
-                   blaze_syms->syms[0].name) == 0);
-        // Only expect build-id on this binary (as we can not force it on
-        // others)
-        EXPECT_FALSE(ddprof_mod->_build_id.empty());
-      }
-      // check that we loaded all mods matching the DSOs
-      EXPECT_EQ(ddprof_mod->_status, DDProfMod::kUnknown);
-    }
-  }
+    } // dwfl_wrapper destroyed: dup'd fds closed
+  } // dso_hdr destroyed: fd_cache fds closed
   blaze_symbolizer_free(symbolizer); //
   int nb_fds_end = count_fds(my_pid);
   printf("-- End open file descriptors: %d\n", nb_fds_end);
@@ -160,6 +165,8 @@ TEST(DwflModule, short_lived) {
   }
   // Wait for the first PID to die
   waitpid(child_pid, nullptr, 0);
+  dso_hdr.pid_free(child_pid);
+  EXPECT_EQ(dso_hdr.get_fd_cache_size(), 0);
 
   pid_t second_child_pid = fork();
   if (second_child_pid == 0) {
@@ -173,7 +180,7 @@ TEST(DwflModule, short_lived) {
   {
     UniqueElf unique_elf = create_elf_from_self();
     DwflWrapper dwfl_wrapper;
-    dwfl_wrapper.attach(child_pid, unique_elf, nullptr);
+    dwfl_wrapper.attach(second_child_pid, unique_elf, nullptr);
     // retrieve the map associated to pid
     DsoHdr::DsoMap &dso_map = dso_hdr.get_pid_mapping(second_child_pid)._map;
 

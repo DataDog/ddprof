@@ -8,6 +8,7 @@
 #include <array>
 #include <cassert>
 #include <map>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -204,6 +205,8 @@ public:
 
   int clear_unvisited(const std::unordered_set<pid_t> &visited_pids);
 
+  size_t get_fd_cache_size() const;
+
 private:
   // erase range of elements
   static void erase_range(DsoMap &map, DsoRange range, const Dso &new_mapping);
@@ -217,11 +220,19 @@ private:
 
   FileInfoId_t update_id_from_path(const Dso &dso);
 
+  std::shared_ptr<CachedElfFile>
+  get_or_create_cached_elf_file(FileInfoId_t file_info_id);
+
+  void cleanup_expired_fd_cache_entries();
+
   // Unordered map (by pid) of sorted DSOs
   DsoPidMap _pid_map;
   DsoStats _stats;
   FileInfoInodeMap _file_info_inode_map;
   FileInfoVector _file_info_vector;
+  // Weak references let live DSOs own the cached fd through shared_ptr copies
+  // while this map is only used to find or recreate the shared entry by id.
+  std::unordered_map<FileInfoId_t, std::weak_ptr<CachedElfFile>> _fd_cache;
   std::string _path_to_proc; // /proc files can be mounted at various places
                              // (whole host profiling)
   int _dd_profiling_fd;
