@@ -180,15 +180,17 @@ set(dd_profiling_linker_script "${CMAKE_SOURCE_DIR}/cmake/dd_profiling.version")
 if(USE_LOADER)
   # Build small loader lib that is in charge of dlopening libdd_profiling-embedded.so
   ddprof_add_library(dd_loader SHARED src/lib/glibc_fixes.c src/lib/lib_embedded_data.c
-                     src/lib/loader.c)
+                     src/lib/loader.c src/lib/sha256.c)
   target_include_directories(dd_loader PRIVATE ${CMAKE_SOURCE_DIR}/include
-                                               ${CMAKE_SOURCE_DIR}/include/lib)
+                                               ${CMAKE_SOURCE_DIR}/include/lib
+                                               ${CMAKE_BINARY_DIR})
   target_compile_definitions(dd_loader PRIVATE ${DDPROF_DEFINITION_LIST})
   set_target_properties(dd_loader PROPERTIES LINK_DEPENDS "${dd_profiling_linker_script}")
   target_link_options(dd_loader PRIVATE "LINKER:--version-script=${dd_profiling_linker_script}")
   target_static_libcxx(dd_loader)
   target_static_sanitizer(dd_loader)
   target_strip_debug_info(dd_loader)
+  add_dependencies(dd_loader generate_libddprofiling_embedded_object)
 
   if(BUILD_UNIVERSAL_DDPROF)
     target_link_options(dd_loader PRIVATE "-nolibc")
@@ -297,17 +299,25 @@ target_link_libraries(
 )
 target_link_libraries(dd_profiling-embedded PUBLIC dl pthread rt absl::base absl::str_format)
 
-set(LIBDD_PROFILING_EMBEDDED_OBJECT "${CMAKE_BINARY_DIR}/libdd_profiling-embedded.o")
+# Hash the .so directly (not the .o wrapper) so the same hash can serve as
+# both the temp-file cache key and the verification hash for installed copies.
 set(LIBDD_PROFILING_EMBEDDED_HASH_HEADER "${CMAKE_BINARY_DIR}/libdd_profiling-embedded_hash.h")
 add_custom_command(
-  OUTPUT ${LIBDD_PROFILING_EMBEDDED_OBJECT} ${LIBDD_PROFILING_EMBEDDED_HASH_HEADER}
+  OUTPUT ${LIBDD_PROFILING_EMBEDDED_HASH_HEADER}
+  COMMAND ${CMAKE_SOURCE_DIR}/tools/generate_hash_header.sh
+          $<TARGET_FILE:dd_profiling-embedded>
+          libdd_profiling_embedded_hash
+          ${LIBDD_PROFILING_EMBEDDED_HASH_HEADER}
+  DEPENDS dd_profiling-embedded)
+
+set(LIBDD_PROFILING_EMBEDDED_OBJECT "${CMAKE_BINARY_DIR}/libdd_profiling-embedded.o")
+add_custom_command(
+  OUTPUT ${LIBDD_PROFILING_EMBEDDED_OBJECT}
   # taken from https://dvdhrm.wordpress.com/2013/03/08/linking-binary-data/
   COMMAND ld -r -o ${LIBDD_PROFILING_EMBEDDED_OBJECT} -z noexecstack --format=binary
           $<TARGET_FILE_NAME:dd_profiling-embedded>
   COMMAND objcopy --rename-section .data=.rodata,alloc,load,readonly,data,contents
           ${LIBDD_PROFILING_EMBEDDED_OBJECT}
-  COMMAND ${CMAKE_SOURCE_DIR}/tools/generate_hash_header.sh ${LIBDD_PROFILING_EMBEDDED_OBJECT}
-          libdd_profiling_embedded_hash ${LIBDD_PROFILING_EMBEDDED_HASH_HEADER}
   DEPENDS dd_profiling-embedded)
 
 add_custom_target(
@@ -387,7 +397,7 @@ if(USE_LOADER)
   # When using a loader, libdd_profiling.so is a loader that embeds both libdd_profiling-embedded.so
   # and ddprof executable.
   ddprof_add_library(dd_profiling-shared SHARED src/lib/glibc_fixes.c src/lib/lib_embedded_data.c
-                     src/lib/loader.c)
+                     src/lib/loader.c src/lib/sha256.c)
   target_link_libraries(dd_profiling-shared PRIVATE libddprofiling_embedded_object
                                                     ddprof_exe_object)
   target_compile_definitions(

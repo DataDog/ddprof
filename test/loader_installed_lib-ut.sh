@@ -20,8 +20,9 @@ BUILDDIR="${PWD}"
 EMBEDDED_LIB="${BUILDDIR}/libdd_profiling-embedded.so"
 SHARED_LIB="${BUILDDIR}/libdd_profiling.so"
 
-# Only meaningful for loader builds
-if nm -D "${SHARED_LIB}" | grep -q ddprof_profiling_version 2>/dev/null; then
+# Only meaningful for loader builds.  In loader builds the shared lib contains
+# the string "libdd_profiling-embedded.so" (the bare name used for dlopen).
+if ! strings "${SHARED_LIB}" | grep -q "libdd_profiling-embedded.so" 2>/dev/null; then
     echo "INFO: non-loader build — skipping loader exe-lookup test"
     echo "PASS: all checks passed"
     exit 0
