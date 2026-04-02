@@ -71,26 +71,26 @@ private:
   ddprof::ReentryGuard _guard;
 };
 
-class AllocTrackerHelper {
+template <bool mmap_alloc> class AllocTrackerHelperImpl {
 public:
-  AllocTrackerHelper()
-      : _tl_state{ddprof::AllocationTracker::get_tl_state()},
+  // Do not try to initialize the TLS state when intercepting
+  // mmap/mmap64/munmap/munmap_ because those functions might be called from
+  // malloc implementation and cause a deadlock when pthread_getattr_np (which
+  // can call malloc) is called by tls state initialization.
+  AllocTrackerHelperImpl()
+      : _tl_state{ddprof::AllocationTracker::get_tl_state(!mmap_alloc)},
         _guard{_tl_state ? &(_tl_state->reentry_guard) : nullptr} {}
 
   void track(void *ptr, size_t size) {
     if (_guard) {
+      if constexpr (mmap_alloc) {
+        _tl_state->allocation_allowed = false;
+      }
       ddprof::AllocationTracker::track_allocation_s(
-          reinterpret_cast<uintptr_t>(ptr), size, *_tl_state);
-    }
-  }
-
-  // disallow allocation during tracking
-  void track_no_alloc(void *ptr, size_t size, bool is_large_alloc = false) {
-    if (_guard) {
-      tl_state()->allocation_allowed = false;
-      ddprof::AllocationTracker::track_allocation_s(
-          reinterpret_cast<uintptr_t>(ptr), size, *_tl_state, is_large_alloc);
-      tl_state()->allocation_allowed = true;
+          reinterpret_cast<uintptr_t>(ptr), size, *_tl_state, mmap_alloc);
+      if constexpr (mmap_alloc) {
+        _tl_state->allocation_allowed = true;
+      }
     }
   }
 
@@ -102,28 +102,24 @@ private:
   ddprof::ReentryGuard _guard;
 };
 
-class DeallocTrackerHelper {
+template <bool mmap_alloc = false> class DeallocTrackerHelperImpl {
 public:
-  DeallocTrackerHelper()
+  DeallocTrackerHelperImpl()
       : _tl_state{ddprof::AllocationTracker::is_deallocation_tracking_active()
-                      ? ddprof::AllocationTracker::get_tl_state()
+                      ? ddprof::AllocationTracker::get_tl_state(!mmap_alloc)
                       : nullptr},
         _guard{_tl_state ? &(_tl_state->reentry_guard) : nullptr} {}
 
   void track(void *ptr) {
     if (_guard) {
+      if constexpr (mmap_alloc) {
+        _tl_state->allocation_allowed = false;
+      }
       ddprof::AllocationTracker::track_deallocation_s(
-          reinterpret_cast<uintptr_t>(ptr), *_tl_state);
-    }
-  }
-
-  // disallow allocation during tracking
-  void track_no_alloc(void *ptr, bool is_large_alloc = false) {
-    if (_guard) {
-      tl_state()->allocation_allowed = false;
-      ddprof::AllocationTracker::track_deallocation_s(
-          reinterpret_cast<uintptr_t>(ptr), *_tl_state, is_large_alloc);
-      tl_state()->allocation_allowed = true;
+          reinterpret_cast<uintptr_t>(ptr), *_tl_state, mmap_alloc);
+      if constexpr (mmap_alloc) {
+        _tl_state->allocation_allowed = true;
+      }
     }
   }
 
@@ -134,6 +130,12 @@ private:
   ddprof::TrackerThreadLocalState *_tl_state;
   ddprof::ReentryGuard _guard;
 };
+
+using AllocTrackerHelper = AllocTrackerHelperImpl<false>;
+using DeallocTrackerHelper = DeallocTrackerHelperImpl<false>;
+
+using AllocTrackerHelperMmap = AllocTrackerHelperImpl<true>;
+using DeallocTrackerHelperMmap = DeallocTrackerHelperImpl<true>;
 
 struct HookBase {};
 
@@ -770,6 +772,19 @@ struct PthreadCreateHook : HookBase {
   }
 };
 
+struct PthreadGetattrHook : HookBase {
+  static constexpr auto name = "pthread_getattr_np";
+  using FuncType = decltype(&::pthread_getattr_np);
+  static inline FuncType ref{};
+
+  static int hook(pthread_t thread, pthread_attr_t *attr) noexcept {
+    ddprof::AllocationTracker::notify_pthread_getattr_np();
+    auto ret = ref(thread, attr);
+    ddprof::AllocationTracker::notify_pthread_getattr_np_end();
+    return ret;
+  }
+};
+
 struct MmapHook : HookBase {
   static constexpr auto name = "mmap";
   using FuncType = decltype(&::mmap);
@@ -777,10 +792,10 @@ struct MmapHook : HookBase {
 
   static void *hook(void *addr, size_t length, int prot, int flags, int fd,
                     off_t offset) noexcept {
-    AllocTrackerHelper helper;
+    AllocTrackerHelperMmap helper;
     void *ptr = ref(addr, length, prot, flags, fd, offset);
     if (addr == nullptr && fd == -1 && ptr != nullptr) {
-      helper.track_no_alloc(ptr, length, true); // is_large_alloc=true for mmap
+      helper.track(ptr, length);
     }
     return ptr;
   }
@@ -793,11 +808,10 @@ struct Mmap_Hook : HookBase {
 
   static void *hook(void *addr, size_t length, int prot, int flags, int fd,
                     off_t offset) noexcept {
-    AllocTrackerHelper helper;
+    AllocTrackerHelperMmap helper;
     void *ptr = ref(addr, length, prot, flags, fd, offset);
     if (addr == nullptr && fd == -1 && ptr != nullptr) {
-      helper.track_no_alloc(ptr, length,
-                            true); // is_large_alloc=true for __mmap
+      helper.track(ptr, length);
     }
     return ptr;
   }
@@ -810,11 +824,10 @@ struct Mmap64Hook : HookBase {
 
   static void *hook(void *addr, size_t length, int prot, int flags, int fd,
                     off_t offset) noexcept {
-    AllocTrackerHelper helper;
+    AllocTrackerHelperMmap helper;
     void *ptr = ref(addr, length, prot, flags, fd, offset);
     if (addr == nullptr && fd == -1 && ptr != nullptr) {
-      helper.track_no_alloc(ptr, length,
-                            true); // is_large_alloc=true for mmap64
+      helper.track(ptr, length);
     }
     return ptr;
   }
@@ -826,8 +839,8 @@ struct MunmapHook : HookBase {
   static inline FuncType ref{};
 
   static int hook(void *addr, size_t length) noexcept {
-    DeallocTrackerHelper helper;
-    helper.track_no_alloc(addr, true);
+    DeallocTrackerHelperMmap helper;
+    helper.track(addr);
     return ref(addr, length);
   }
 };
@@ -838,8 +851,8 @@ struct Munmap_Hook : HookBase {
   static inline FuncType ref{};
 
   static int hook(void *addr, size_t length) noexcept {
-    DeallocTrackerHelper helper;
-    helper.track_no_alloc(addr, true);
+    DeallocTrackerHelperMmap helper;
+    helper.track(addr);
     return ref(addr, length);
   }
 };
@@ -921,6 +934,7 @@ void register_hooks() {
 
   register_hook<PthreadCreateHook>();
   register_hook<DlopenHook>();
+  register_hook<PthreadGetattrHook>();
 }
 
 } // namespace

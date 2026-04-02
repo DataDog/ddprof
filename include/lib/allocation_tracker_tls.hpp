@@ -18,7 +18,14 @@ struct TrackerThreadLocalState {
   bool reentry_guard{false}; // prevent reentry in AllocationTracker (eg. when
                              // allocation are done inside AllocationTracker)
                              // and double counting of allocations (eg. when new
-                             // calls malloc, or malloc calls mmap internally)
+                             // calls malloc, or malloc calls mmap internally).
+                             // Also used on uninitialized TLS (before placement
+                             // new) to indicate we are inside a hooked
+                             // pthread_getattr_np call, preventing get_tl_state
+                             // from calling init_tl_state which would deadlock
+                             // (init_tl_state -> save_context ->
+                             // pthread_getattr_np). Safe because placement new
+                             // in init_tl_state resets this field to false.
 
   bool allocation_allowed{true}; // Indicate if allocation is allowed or not
                                  // (eg. when we are in mmap hook, we
