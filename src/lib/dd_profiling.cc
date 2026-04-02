@@ -16,8 +16,6 @@
 #include "signal_helper.hpp"
 #include "symbol_overrides.hpp"
 #include "syscalls.hpp"
-#include "version.hpp"
-
 #include <cassert>
 #include <cerrno>
 #include <chrono>
@@ -415,8 +413,6 @@ int ddprof_start_profiling_internal() {
 
 } // namespace
 } // namespace ddprof
-
-const char *ddprof_profiling_version() { return DDPROF_VERSION_STR; }
 
 int ddprof_start_profiling() {
   try {

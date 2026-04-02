@@ -20,13 +20,6 @@ BUILDDIR="${PWD}"
 EMBEDDED_LIB="${BUILDDIR}/libdd_profiling-embedded.so"
 SHARED_LIB="${BUILDDIR}/libdd_profiling.so"
 
-# Only meaningful for loader builds
-if nm -D "${SHARED_LIB}" | grep -q ddprof_profiling_version 2>/dev/null; then
-    echo "INFO: non-loader build — skipping loader exe-lookup test"
-    echo "PASS: all checks passed"
-    exit 0
-fi
-
 echo "INFO: loader build — testing exe path discovery"
 
 tmpdir="$(mktemp -d)"

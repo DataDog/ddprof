@@ -12,8 +12,6 @@ extern "C" {
 __attribute__((__visibility__("default"))) int ddprof_start_profiling();
 __attribute__((__visibility__("default"))) void
 ddprof_stop_profiling(int timeout_ms);
-__attribute__((__visibility__("default"))) const char *
-ddprof_profiling_version();
 
 #ifdef __cplusplus
 }
