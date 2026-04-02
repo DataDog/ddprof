@@ -51,7 +51,6 @@ __attribute__((aligned(DDPROF_TLS_STATE_ALIGN))) __thread char
  */
 char *dlerror(void) __attribute__((weak));
 void *dlopen(const char *filename, int flags) __attribute__((weak));
-int dlclose(void *handle) __attribute__((weak));
 void *dlsym(void *handle, const char *symbol) __attribute__((weak));
 int dladdr(const void *addr, Dl_info *info) __attribute__((weak));
 // NOLINTNEXTLINE(cert-dcl51-cpp)
@@ -66,7 +65,6 @@ int timer_create(clockid_t clockid, struct sigevent *sevp, timer_t *timerid)
 static void *s_libdl_handle = NULL;
 static __typeof(dlerror) *s_dlerror = &dlerror;
 static __typeof(dlopen) *s_dlopen = &dlopen;
-static __typeof(dlclose) *s_dlclose = &dlclose;
 static __typeof(dladdr) *s_dladdr = &dladdr;
 
 static void ensure_libdl_is_loaded();
@@ -93,17 +91,6 @@ static void *my_dlopen(const char *filename, int flags) {
 
 static void *my_dlopen_silent(const char *filename, int flags) {
   return my_dlopen_impl(filename, flags, 1);
-}
-
-// Returns 0 on success, -1 if dlclose is not available.
-static int my_dlclose(void *handle) {
-  if (s_dlclose) {
-    return s_dlclose(handle);
-  }
-  fprintf(stderr,
-          "ddprof: dlclose is not available; cannot unload mismatched "
-          "library. Profiling disabled.\n");
-  return -1;
 }
 
 static void *my_dlsym(void *handle, const char *symbol) {
@@ -147,9 +134,6 @@ static void ensure_libdl_is_loaded() {
     }
     if (!s_dlerror) {
       s_dlerror = (__typeof(dlerror) *)my_dlsym(s_libdl_handle, "dlerror");
-    }
-    if (!s_dlclose) {
-      s_dlclose = (__typeof(dlclose) *)my_dlsym(s_libdl_handle, "dlclose");
     }
     if (!s_dladdr) {
       s_dladdr = (__typeof(dladdr) *)my_dlsym(s_libdl_handle, "dladdr");
@@ -320,10 +304,9 @@ __typeof(ddprof_stop_profiling) *s_stop_profiling_func = NULL;
 // Try to load the installed libdd_profiling-embedded.so from the dynamic
 // linker search path (LD_LIBRARY_PATH, rpath, ldconfig cache).
 //
-// Returns:
-//   non-NULL handle  — installed library found and version matches
-//   NULL             — library not found or version mismatch (fell back OK)
-//   (void *)-1       — version mismatch but dlclose failed; caller must abort
+// Returns a dlopen handle on success, NULL if the library was not found.
+// On version mismatch the library is still used (dlclose in a constructor is
+// risky and hard to get right), but a warning is printed so the user knows.
 static void *try_load_installed_profiling_lib() {
   void *handle =
       my_dlopen_silent(k_libdd_profiling_embedded_name, RTLD_LOCAL | RTLD_NOW);
@@ -331,90 +314,63 @@ static void *try_load_installed_profiling_lib() {
     return NULL;
   }
 
-  // Verify the version before using it to avoid running a mismatched .so
-  // (e.g. stale package install).
+  // Warn on version mismatch so the user can upgrade / remove the stale
+  // package.  We still use the installed library rather than attempting
+  // dlclose (which is unsafe this early and may leave partial state).
   const char *(*version_func)() =
       (const char *(*)())my_dlsym(handle, "ddprof_profiling_version");
-  int mismatch = 0;
-  if (!version_func) {
+  const char *installed_version = version_func ? version_func() : NULL;
+  if (!installed_version ||
+      strcmp(installed_version, DDPROF_VERSION_STR) != 0) {
     fprintf(stderr,
-            "ddprof: installed %s does not export ddprof_profiling_version; "
-            "falling back to embedded library. Remove or upgrade the installed "
-            "package to avoid this warning.\n",
-            k_libdd_profiling_embedded_name);
-    mismatch = 1;
-  } else if (strcmp(version_func(), DDPROF_VERSION_STR) != 0) {
-    fprintf(stderr,
-            "ddprof: version mismatch: installed %s is %s, expected %s; "
-            "falling back to embedded library. Remove or upgrade the installed "
+            "ddprof: version mismatch for installed %s (got %s, expected %s); "
+            "using installed library anyway. Remove or upgrade the installed "
             "package to match the injected library version.\n",
-            k_libdd_profiling_embedded_name, version_func(),
+            k_libdd_profiling_embedded_name,
+            installed_version ? installed_version : "<unknown>",
             DDPROF_VERSION_STR);
-    mismatch = 1;
   }
 
-  if (!mismatch) {
-    return handle;
-  }
-
-  if (my_dlclose(handle) != 0) {
-    // Cannot unload the stale DSO — its symbols would conflict with the
-    // embedded copy. Signal the caller to abort profiling entirely.
-    return (void *)-1;
-  }
-  return NULL;
+  return handle;
 }
 
-// Set the ddprof executable path for use with an installed profiling library.
-//
-// The standalone libdd_profiling-embedded.so does not embed the ddprof binary.
-// We look for it relative to the loader's own path:
+// Find the ddprof executable relative to the loader's own on-disk location.
+// The loader, the installed embedded lib, and the ddprof exe are all part of
+// the same package, so they share a common install prefix.
+// Checks:
 //   1. <loader_dir>/../bin/ddprof  — standard install layout
 //   2. <loader_dir>/ddprof         — flat build/dev layout
-// Falls back to extracting the binary from the loader's embedded data to /tmp.
-// Returns 0 on success, -1 if the exe could not be found or extracted.
-static int setup_ddprof_exe_for_installed_lib() {
-  Dl_info loader_info;
-  if (s_dladdr && s_dladdr((void *)ddprof_start_profiling, &loader_info) &&
-      loader_info.dli_fname) {
-    const char *last_slash = strrchr(loader_info.dli_fname, '/');
-    if (last_slash) {
-      size_t dir_len = last_slash - loader_info.dli_fname;
-      static const char *const candidates[] = {
-          "/../bin/ddprof", // standard install: <prefix>/ddprof/{lib,bin}/
-          "/ddprof",        // flat build/dev layout
-          NULL,
-      };
-      for (const char *const *rel = candidates; *rel; ++rel) {
-        size_t rel_len = strlen(*rel);
-        char *exe_path = malloc(dir_len + rel_len + 1);
-        if (!exe_path) {
-          continue;
-        }
-        memcpy(exe_path, loader_info.dli_fname, dir_len);
-        memcpy(exe_path + dir_len, *rel, rel_len + 1);
-        if (access(exe_path, X_OK) == 0) {
-          setenv(k_profiler_ddprof_exe_env_variable, exe_path, 1);
-          free(exe_path);
-          return 0;
-        }
-        free(exe_path);
-      }
-    }
+// Returns a malloc'd path on success, NULL if not found.  Caller must free().
+static char *find_ddprof_exe() {
+  Dl_info info;
+  if (!s_dladdr || !s_dladdr((void *)ddprof_start_profiling, &info) ||
+      !info.dli_fname) {
+    return NULL;
   }
-
-  // Fall back to extracting the ddprof binary from the loader's embedded data.
-  EmbeddedData exe_data = profiler_exe_data();
-  if (exe_data.size > 0) {
-    char *profiler_exe_path =
-        get_or_create_temp_file(k_profiler_exe_name, exe_data, 0755);
-    if (profiler_exe_path) {
-      setenv(k_profiler_ddprof_exe_env_variable, profiler_exe_path, 1);
-      free(profiler_exe_path);
-      return 0;
-    }
+  const char *last_slash = strrchr(info.dli_fname, '/');
+  if (!last_slash) {
+    return NULL;
   }
-  return -1;
+  size_t dir_len = last_slash - info.dli_fname;
+  static const char *const candidates[] = {
+      "/../bin/ddprof", // standard install: <prefix>/ddprof/{lib,bin}/
+      "/ddprof",        // flat build/dev layout
+      NULL,
+  };
+  for (const char *const *rel = candidates; *rel; ++rel) {
+    size_t rel_len = strlen(*rel);
+    char *exe_path = malloc(dir_len + rel_len + 1);
+    if (!exe_path) {
+      continue;
+    }
+    memcpy(exe_path, info.dli_fname, dir_len);
+    memcpy(exe_path + dir_len, *rel, rel_len + 1);
+    if (access(exe_path, X_OK) == 0) {
+      return exe_path;
+    }
+    free(exe_path);
+  }
+  return NULL;
 }
 
 // Extract both the profiling library and the ddprof binary from embedded data
@@ -452,19 +408,19 @@ static void __attribute__((constructor)) loader() {
     s_profiling_lib_handle =
         my_dlopen(lib_profiling_path, RTLD_LOCAL | RTLD_NOW);
   } else {
-    void *installed = try_load_installed_profiling_lib();
-    if (installed == (void *)-1) {
-      return; // unrecoverable: stale DSO could not be unloaded
-    }
-    if (installed && setup_ddprof_exe_for_installed_lib() == 0) {
-      s_profiling_lib_handle = installed;
-    } else {
-      // Either the installed lib was not found, or the exe could not be
-      // located alongside it. Close the installed handle if we opened one
-      // and fall back to the fully self-contained embedded copy.
-      if (installed && my_dlclose(installed) != 0) {
-        return; // unrecoverable: cannot unload, symbols would conflict
+    // Check for the ddprof exe (relative to the loader) before loading the
+    // installed lib.  If the exe is missing there is no point loading it,
+    // and we avoid a dlopen we cannot safely undo.
+    char *exe_path = find_ddprof_exe();
+    if (exe_path) {
+      void *installed = try_load_installed_profiling_lib();
+      if (installed) {
+        setenv(k_profiler_ddprof_exe_env_variable, exe_path, 1);
+        s_profiling_lib_handle = installed;
       }
+      free(exe_path);
+    }
+    if (!s_profiling_lib_handle) {
       s_profiling_lib_handle = load_embedded_profiling_lib();
     }
   }

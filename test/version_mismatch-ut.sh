@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-# Test that the loader rejects a system-installed libdd_profiling-embedded.so
-# when its version does not match (USE_LOADER=ON only).
+# Test that the loader warns when a system-installed libdd_profiling-embedded.so
+# has a version mismatch (USE_LOADER=ON only).  The mismatched library is still
+# used (dlclose in a constructor is unsafe), but a warning must be printed.
 
 set -euo pipefail
 
