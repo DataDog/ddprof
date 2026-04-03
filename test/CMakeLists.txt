@@ -533,6 +533,11 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
 
   if(USE_LOADER)
     add_test(
+      NAME verify_embedded_hash
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/verify_embedded_hash-ut.sh
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+    add_test(
       NAME hash_mismatch
       COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/hash_mismatch-ut.sh
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

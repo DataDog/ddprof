@@ -270,6 +270,13 @@ target_link_options(dd_profiling-embedded PRIVATE
                     "LINKER:--version-script=${dd_profiling_linker_script};LINKER:-Bsymbolic")
 target_strip_debug_info(dd_profiling-embedded)
 
+# Strip the .so to its final form before hashing/embedding.  Otherwise
+# cmake --install --strip re-strips it, changing the SHA-256 and making the
+# loader reject the installed copy.
+add_custom_command(TARGET dd_profiling-embedded POST_BUILD
+  COMMAND ${CMAKE_STRIP} $<TARGET_FILE:dd_profiling-embedded>
+  COMMENT "Stripping dd_profiling-embedded.so to canonical form")
+
 if(BUILD_UNIVERSAL_DDPROF)
   target_link_options(dd_profiling-embedded PRIVATE "-nolibc")
   if(USE_AUXILIARY)
