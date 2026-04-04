@@ -5,6 +5,7 @@
 
 #include "base_frame_symbol_lookup.hpp"
 
+#include "ddog_profiling_utils.hpp"
 #include "dso_type.hpp"
 #include "logger.hpp"
 
@@ -14,23 +15,23 @@
 namespace ddprof {
 
 namespace {
-Symbol symbol_from_pid(pid_t pid) {
-  return {{}, {}, 0, absl::StrCat("pid_", pid)};
+Symbol symbol_from_pid(pid_t pid, const ddog_prof_ProfilesDictionary *dict) {
+  return make_symbol(std::string(), std::string(), 0, absl::StrCat("pid_", pid),
+                     dict);
 }
 } // namespace
 
-SymbolIdx_t
-BaseFrameSymbolLookup::insert_bin_symbol(pid_t pid, SymbolTable &symbol_table,
-                                         DsoSymbolLookup &dso_symbol_lookup,
-                                         DsoHdr &dso_hdr) {
+SymbolIdx_t BaseFrameSymbolLookup::insert_bin_symbol(
+    pid_t pid, SymbolTable &symbol_table, DsoSymbolLookup &dso_symbol_lookup,
+    DsoHdr &dso_hdr, const ddog_prof_ProfilesDictionary *dict) {
   SymbolIdx_t symbol_idx = -1;
 
   DsoHdr::DsoFindRes const find_res =
       dso_hdr.dso_find_first_std_executable(pid);
   if (find_res.second && has_relevant_path(find_res.first->second._type)) {
     // todo : how to tie lifetime of DSO to this ?
-    symbol_idx =
-        dso_symbol_lookup.get_or_insert(find_res.first->second, symbol_table);
+    symbol_idx = dso_symbol_lookup.get_or_insert(find_res.first->second,
+                                                 symbol_table, dict);
     _bin_map.insert({pid, symbol_idx});
     const std::filesystem::path path(find_res.first->second._filename);
     const std::string base_name = path.filename().string();
@@ -42,7 +43,8 @@ BaseFrameSymbolLookup::insert_bin_symbol(pid_t pid, SymbolTable &symbol_table,
       const std::filesystem::path path(exe_name);
       const std::string base_name = path.filename().string();
       symbol_idx = symbol_table.size();
-      symbol_table.emplace_back(Symbol({}, base_name, 0, exe_name));
+      symbol_table.emplace_back(
+          make_symbol(std::string(), base_name, 0, exe_name, dict));
       _bin_map.insert({pid, symbol_idx});
       _exe_name_map.insert({pid, base_name});
     }
@@ -50,10 +52,9 @@ BaseFrameSymbolLookup::insert_bin_symbol(pid_t pid, SymbolTable &symbol_table,
   return symbol_idx;
 }
 
-SymbolIdx_t
-BaseFrameSymbolLookup::get_or_insert(pid_t pid, SymbolTable &symbol_table,
-                                     DsoSymbolLookup &dso_symbol_lookup,
-                                     DsoHdr &dso_hdr) {
+SymbolIdx_t BaseFrameSymbolLookup::get_or_insert(
+    pid_t pid, SymbolTable &symbol_table, DsoSymbolLookup &dso_symbol_lookup,
+    DsoHdr &dso_hdr, const ddog_prof_ProfilesDictionary *dict) {
   auto const it_bin = _bin_map.find(pid);
   auto const it_pid = _pid_map.find(pid);
 
@@ -64,8 +65,8 @@ BaseFrameSymbolLookup::get_or_insert(pid_t pid, SymbolTable &symbol_table,
     // attempt k nb times to look for binary info
     if (it_pid == _pid_map.end() ||
         ++it_pid->second._nb_bin_lookups < k_nb_bin_lookups) {
-      symbol_idx =
-          insert_bin_symbol(pid, symbol_table, dso_symbol_lookup, dso_hdr);
+      symbol_idx = insert_bin_symbol(pid, symbol_table, dso_symbol_lookup,
+                                     dso_hdr, dict);
     }
   }
   if (symbol_idx == -1 && it_pid != _pid_map.end()) {
@@ -75,7 +76,7 @@ BaseFrameSymbolLookup::get_or_insert(pid_t pid, SymbolTable &symbol_table,
   // First time we fail on this pid : insert a pid info in symbol table
   if (symbol_idx == -1) {
     symbol_idx = symbol_table.size();
-    symbol_table.push_back(symbol_from_pid(pid));
+    symbol_table.push_back(symbol_from_pid(pid, dict));
     _pid_map.emplace(pid, PidSymbol(symbol_idx));
   }
   return symbol_idx;
