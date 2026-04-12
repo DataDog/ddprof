@@ -199,6 +199,10 @@ void vlprintfln(int lvl, int fac, const char *format, va_list args) {
   }
 
   // Write the body into the buffer
+  // Ensure that the header is not too long
+  assert(sz_h >= 0 && sz_h < LOG_MSG_CAP - 2);
+  if (sz_h < 0 || sz_h >= LOG_MSG_CAP - 2) { return; }
+
   ssize_t const cap =
       LOG_MSG_CAP - sz_h - 2; // Room for optional newline and \0
   sz = vsnprintf(&buf[sz_h], cap, format, args);
