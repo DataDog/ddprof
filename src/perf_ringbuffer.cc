@@ -153,7 +153,7 @@ bool samp2hdr(perf_event_header *hdr, const perf_event_sample *sample,
     if (sz >= sz_hdr) {
       return false;
     }
-    memcpy(buf, sample->ips, sample->nr);
+    memcpy(buf, sample->ips, sample->nr * sizeof(*buf));
     buf += sample->nr;
   }
   if (PERF_SAMPLE_RAW & mask) {
