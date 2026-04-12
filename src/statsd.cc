@@ -137,12 +137,11 @@ DDRes statsd_send(int fd_sock, const char *key, const void *val, int type) {
   }
 
   // Nothing to do if the write fails
-  while (static_cast<ssize_t>(sz) != write(fd_sock, buf, sz) &&
-         errno == EINTR) {
+  while (static_cast<ssize_t>(sz) != write(fd_sock, buf, sz)) {
     // Don't consider this as fatal.
     if (errno == EWOULDBLOCK || errno == EAGAIN) {
       DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Write failed (sys buffer full)");
-    } else {
+    } else if (errno == EINTR) {
       DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Write failed");
     }
   }
