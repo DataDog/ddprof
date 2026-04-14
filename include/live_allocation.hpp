@@ -48,6 +48,7 @@ public:
     PprofStacks _unique_stacks;
     uint32_t _address_conflict_count = 0;
     uint32_t _tracked_address_count = 0;
+    uint32_t _active_shards = 0;
   };
 
   using PidMap = std::unordered_map<pid_t, PidStacks>;
@@ -63,6 +64,7 @@ public:
     PidStacks &pid_stacks = pid_map[pid];
     pid_stacks._address_conflict_count = address_conflict_count;
     pid_stacks._tracked_address_count = tracked_address_count;
+    pid_stacks._active_shards = active_shards;
     LG_NTC("<%u> PID %d: live allocations=%lu, Unique "
            "stacks=%lu, lib tracked addresses=%u, lib active shards=%u, lib "
            "address conflicts=%u",
