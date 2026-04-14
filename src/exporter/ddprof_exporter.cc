@@ -303,6 +303,7 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter) {
 
 DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
                              const Tags &additional_tags, uint32_t profile_seq,
+                             const std::string &metrics_json,
                              DDProfExporter *exporter) {
   DDRes res = ddres_init();
   ddog_prof_Profile_SerializeResult serialized_result =
@@ -342,14 +343,28 @@ DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
 
     LG_NTC("[EXPORTER] Export buffer of size %lu", buffer->len);
 
+    // Build metrics.json file to send alongside the profile
+    ddog_prof_Exporter_Slice_File files_slice =
+        ddog_prof_Exporter_Slice_File_empty();
+    ddog_prof_Exporter_File metrics_file{};
+    if (!metrics_json.empty()) {
+      metrics_file.name = to_CharSlice("metrics.json");
+      metrics_file.file = {
+          .ptr = reinterpret_cast<const uint8_t *>(metrics_json.data()),
+          .len = metrics_json.size()};
+      files_slice = {.ptr = &metrics_file, .len = 1};
+      LG_NTC("[EXPORTER] Attaching metrics.json (%zu bytes)",
+             metrics_json.size());
+    }
+
     ddog_prof_Result_HttpStatus result = ddog_prof_Exporter_send_blocking(
         &exporter->_exporter, encoded_profile,
-        ddog_prof_Exporter_Slice_File_empty(), // files_to_compress_and_export
-        &ffi_additional_tags,                  // optional_additional_tags
-        nullptr,                               // optional_process_tags
-        nullptr, // optional_internal_metadata_json
-        nullptr, // optional_info_json
-        nullptr  // cancellation_token
+        files_slice,          // files_to_compress_and_export
+        &ffi_additional_tags, // optional_additional_tags
+        nullptr,              // optional_process_tags
+        nullptr,              // optional_internal_metadata_json
+        nullptr,              // optional_info_json
+        nullptr               // cancellation_token
     );
 
     if (result.tag == DDOG_PROF_RESULT_HTTP_STATUS_ERR_HTTP_STATUS) {

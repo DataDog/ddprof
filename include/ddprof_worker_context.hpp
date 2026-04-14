@@ -11,6 +11,7 @@
 
 #include <array>
 #include <chrono>
+#include <string>
 
 namespace ddprof {
 
@@ -42,6 +43,7 @@ struct DDProfWorkerContext {
   uint32_t count_worker{0}; // exports since last cache clear
   std::array<uint64_t, kMaxTypeWatcher> lost_events_per_watcher{};
   LiveAllocation live_allocation;
+  std::string metrics_json[2]; // double-buffered alongside pprof
   int64_t perfclock_offset;
   PerfClock::time_point last_processed_event_timestamp;
 };

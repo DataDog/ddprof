@@ -14,6 +14,9 @@
 
 namespace ddprof {
 
+// Get internal stats from /proc/<pid>/stat
+DDRes proc_read_pid(pid_t pid, ProcStatus *procstat);
+
 // Get internal stats from /proc/self/stat
 DDRes proc_read(ProcStatus *procstat);
 

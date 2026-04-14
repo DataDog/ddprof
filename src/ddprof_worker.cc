@@ -23,7 +23,11 @@
 #include "unwind_state.hpp"
 
 #include <chrono>
+#include <cinttypes>
+#include <cstdio>
 #include <ctime>
+#include <set>
+#include <string>
 #include <sys/time.h>
 #include <unistd.h>
 
@@ -492,9 +496,9 @@ void *ddprof_worker_export_thread(void *arg) {
   // gets joined forcefully, we should not resume on same value
   uint32_t const profile_seq = (worker->persistent_worker_state->profile_seq)++;
 
-  if (IsDDResFatal(ddprof_exporter_export(&worker->pprof[i]->_profile,
-                                          worker->pprof[i]->_tags, profile_seq,
-                                          worker->exp[i]))) {
+  if (IsDDResFatal(ddprof_exporter_export(
+          &worker->pprof[i]->_profile, worker->pprof[i]->_tags, profile_seq,
+          worker->metrics_json[i], worker->exp[i]))) {
     LG_NFO("Failed to export from worker");
     worker->exp_error = true;
   }
@@ -570,6 +574,59 @@ DDRes worker_library_free(DDProfContext &ctx) {
   return {};
 }
 
+std::string build_metrics_json(const LiveAllocation &live_allocations) {
+  int64_t total_rss = 0;
+  int64_t total_vsize = 0;
+  unsigned long total_minflt = 0;
+  unsigned long total_majflt = 0;
+  uint64_t total_arena_count = 0;
+  uint64_t total_tracked_addresses = 0;
+  uint64_t total_unique_stacks = 0;
+
+  const long page_size = get_page_size();
+
+  // Collect unique PIDs across all watchers (a PID may appear in multiple
+  // watcher positions) to avoid double-counting procfs stats.
+  std::set<pid_t> seen_pids;
+
+  for (const auto &pid_map : live_allocations._watcher_vector) {
+    for (const auto &[pid, pid_stacks] : pid_map) {
+      // Read procfs only once per PID
+      if (seen_pids.insert(pid).second) {
+        ProcStatus proc_status{};
+        if (IsDDResOK(proc_read_pid(pid, &proc_status))) {
+          total_rss += static_cast<int64_t>(proc_status.rss) * page_size;
+          total_vsize += static_cast<int64_t>(proc_status.vsize);
+          total_minflt += proc_status.minflt;
+          total_majflt += proc_status.majflt;
+        } else {
+          LG_DBG("Failed to read /proc/%d/stat for metrics (process may be "
+                 "starting or exiting)",
+                 pid);
+        }
+      }
+      // Allocation tracker stats are per watcher, so always accumulate
+      total_arena_count += pid_stacks._active_shards;
+      total_tracked_addresses += pid_stacks._tracked_address_count;
+      total_unique_stacks += pid_stacks._unique_stacks.size();
+    }
+  }
+
+  char buf[512];
+  snprintf(buf, sizeof(buf),
+           "[[\"native_rss\",%" PRId64 "],"
+           "[\"native_vsize\",%" PRId64 "],"
+           "[\"native_minor_faults\",%lu],"
+           "[\"native_major_faults\",%lu],"
+           "[\"native_arena_count\",%" PRIu64 "],"
+           "[\"native_tracked_addresses\",%" PRIu64 "],"
+           "[\"native_unique_stacks\",%" PRIu64 "]]",
+           total_rss, total_vsize, total_minflt, total_majflt,
+           total_arena_count, total_tracked_addresses, total_unique_stacks);
+  LG_DBG("metrics.json: %s", buf);
+  return buf;
+}
+
 /// Cycle operations : export, sync metrics, update counters
 DDRes ddprof_worker_cycle(DDProfContext &ctx,
                           std::chrono::steady_clock::time_point now,
@@ -578,6 +635,10 @@ DDRes ddprof_worker_cycle(DDProfContext &ctx,
   // Clearing unused PIDs will ensure we don't report them at next cycle
   DDRES_CHECK_FWD(clear_unvisited_pids(ctx));
   DDRES_CHECK_FWD(aggregate_live_allocations(ctx));
+
+  // Build metrics.json for this cycle (before buffer swap)
+  ctx.worker_ctx.metrics_json[ctx.worker_ctx.i_current_pprof] =
+      build_metrics_json(ctx.worker_ctx.live_allocation);
 
   // Take the current pprof contents and ship them to the backend.  This also
   // clears the pprof for reuse
