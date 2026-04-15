@@ -130,7 +130,8 @@ bool string_readlink(const char *path, std::string &link_name) {
 
 bool DsoHdr::find_exe_name(pid_t pid, std::string &exe_name) {
   char exe_link[PATH_MAX];
-  sprintf(exe_link, "%s/proc/%d/exe", _path_to_proc.c_str(), pid);
+  snprintf(exe_link, sizeof(exe_link), "%s/proc/%d/exe", _path_to_proc.c_str(),
+           pid);
   return string_readlink(exe_link, exe_name);
 }
 
