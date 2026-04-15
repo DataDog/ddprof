@@ -76,7 +76,9 @@ DDPROF_NOINLINE void my_free(uintptr_t addr) {
   ddprof::TrackerThreadLocalState *tl_state =
       ddprof::AllocationTracker::get_tl_state();
   if (tl_state) {
-    ddprof::AllocationTracker::track_deallocation_s(addr, *tl_state);
+    // Use track_deallocation_direct_s: the direct benchmark API doesn't go
+    // through hooks (no prefix/tag marker), so bypass the bitset check.
+    ddprof::AllocationTracker::track_deallocation_direct_s(addr, *tl_state);
     DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
   }
 }

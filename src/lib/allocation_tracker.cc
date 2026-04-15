@@ -145,7 +145,9 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
     return ddres_error(DD_WHAT_PERFRB);
   }
   if (track_deallocations) {
+#ifdef __x86_64__
     _allocated_address_set.init(0); // Use default size, fail on add if full
+#endif
     constexpr double k_max_high_priority_area_size_fraction = 0.1;
     constexpr int64_t k_high_priority_event_count = 10000;
     _high_priority_area_size =
@@ -263,21 +265,24 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
   tl_state.remaining_bytes = remaining_bytes;
   uint64_t const total_size = nsamples * sampling_interval;
 
-  if (_state.track_deallocations) {
-    if (!_allocated_address_set.add(addr, is_large_alloc)) {
-      // add() returned false: either table is full or address already exists
+#ifdef __x86_64__
+  // On AMD64, only mmap allocations use the bitset.
+  // Non-mmap allocations are tracked via the prefix marker.
+  if (_state.track_deallocations && is_large_alloc) {
+    if (!_allocated_address_set.add(addr, true)) {
       _state.address_conflict_count.fetch_add(1, std::memory_order_acq_rel);
-      // null the address to avoid using this for live heap profiling
-      // pushing a sample is still good to have a good representation
-      // of the allocations.
       addr = 0;
     }
   }
+#endif
   auto res = push_alloc_sample(addr, total_size, tl_state);
   free_on_consecutive_failures(IsDDResFatal(res));
-  if (unlikely(!IsDDResOK(res)) && _state.track_deallocations && addr) {
-    _allocated_address_set.remove(addr, is_large_alloc);
+#ifdef __x86_64__
+  if (unlikely(!IsDDResOK(res)) && _state.track_deallocations &&
+      is_large_alloc && addr) {
+    _allocated_address_set.remove(addr, true);
   }
+#endif
 }
 
 void AllocationTracker::track_deallocation(uintptr_t addr,
@@ -286,11 +291,27 @@ void AllocationTracker::track_deallocation(uintptr_t addr,
   // Reentrancy should be prevented by caller (by using ReentryGuard on
   // TrackerThreadLocalState::reentry_guard).
 
+#ifdef __x86_64__
+  // On AMD64, only mmap deallocations use the bitset.
   if (!_state.track_deallocations ||
       !_allocated_address_set.remove(addr, is_large_alloc)) {
     return;
   }
+  auto fatal_failure = IsDDResFatal(push_dealloc_sample(addr, tl_state));
+  free_on_consecutive_failures(fatal_failure);
+#elif defined(__aarch64__)
+  // On ARM64, all deallocs go through track_deallocation_direct
+  (void)addr;
+  (void)tl_state;
+  (void)is_large_alloc;
+#endif
+}
 
+void AllocationTracker::track_deallocation_direct(
+    uintptr_t addr, TrackerThreadLocalState &tl_state) {
+  if (!_state.track_deallocations) {
+    return;
+  }
   auto fatal_failure = IsDDResFatal(push_dealloc_sample(addr, tl_state));
   free_on_consecutive_failures(fatal_failure);
 }
@@ -321,8 +342,13 @@ DDRes AllocationTracker::push_allocation_tracker_state() {
 
   event->address_conflict_count =
       _state.address_conflict_count.exchange(0, std::memory_order_acq_rel);
+#ifdef __x86_64__
   event->tracked_address_count = _allocated_address_set.count();
   event->active_shards = _allocated_address_set.active_shards();
+#else
+  event->tracked_address_count = 0;
+  event->active_shards = 0;
+#endif
   event->lost_alloc_count =
       _state.lost_alloc_count.exchange(0, std::memory_order_acq_rel);
   event->lost_dealloc_count =

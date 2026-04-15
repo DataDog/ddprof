@@ -12,6 +12,7 @@
 
 #include "allocation_tracker.hpp"
 #include "ddprof_base.hpp"
+#include "sampled_allocation_marker.hpp"
 #include "elfutils.hpp"
 #include "logger.hpp"
 #include "reentry_guard.hpp"
@@ -94,6 +95,32 @@ public:
     }
   }
 
+#if defined(__aarch64__)
+  // ARM64: track and return whether the allocation was sampled.
+  bool track_sampled(void *ptr, size_t size) {
+    if (_guard) {
+      if constexpr (mmap_alloc) {
+        _tl_state->allocation_allowed = false;
+      }
+      bool sampled = ddprof::AllocationTracker::track_allocation_s_sampled(
+          reinterpret_cast<uintptr_t>(ptr), size, *_tl_state, mmap_alloc);
+      if constexpr (mmap_alloc) {
+        _tl_state->allocation_allowed = true;
+      }
+      return sampled;
+    }
+    return false;
+  }
+#elif defined(__x86_64__)
+  // AMD64: pre-check whether the next allocation will be sampled (non-mmap).
+  bool will_sample(size_t size) {
+    if (_guard) {
+      return ddprof::AllocationTracker::will_sample(size, *_tl_state);
+    }
+    return false;
+  }
+#endif
+
   explicit operator bool() const { return static_cast<bool>(_guard); }
   ddprof::TrackerThreadLocalState *tl_state() { return _tl_state; }
 
@@ -123,6 +150,20 @@ public:
     }
   }
 
+  // Bypass bitset -- called when marker already confirmed this was sampled.
+  void track_direct(void *ptr) {
+    if (_guard) {
+      if constexpr (mmap_alloc) {
+        _tl_state->allocation_allowed = false;
+      }
+      ddprof::AllocationTracker::track_deallocation_direct_s(
+          reinterpret_cast<uintptr_t>(ptr), *_tl_state);
+      if constexpr (mmap_alloc) {
+        _tl_state->allocation_allowed = true;
+      }
+    }
+  }
+
   explicit operator bool() const { return static_cast<bool>(_guard); }
   ddprof::TrackerThreadLocalState *tl_state() { return _tl_state; }
 
@@ -137,6 +178,28 @@ using DeallocTrackerHelper = DeallocTrackerHelperImpl<false>;
 using AllocTrackerHelperMmap = AllocTrackerHelperImpl<true>;
 using DeallocTrackerHelperMmap = DeallocTrackerHelperImpl<true>;
 
+#if defined(__x86_64__)
+// Helper for AMD64 free/delete paths: check for prefix marker and handle
+// deallocation tracking. Returns true if the pointer was prefixed (caller
+// should NOT call the original free -- it was already freed via orig_free).
+// Page-aligned pointers are skipped to avoid reading before unmapped pages
+// (e.g. large mmap'd allocations). Page-aligned allocations (pvalloc/valloc)
+// use the bitset path instead of the prefix approach.
+template <typename FreeFn>
+bool free_with_prefix_check(void *ptr, FreeFn orig_free) {
+  if (!ddprof::marker::is_page_aligned(ptr)) {
+    auto [found, original] = ddprof::marker::read_prefix(ptr);
+    if (found) {
+      DeallocTrackerHelper helper;
+      helper.track_direct(ptr);
+      orig_free(original);
+      return true;
+    }
+  }
+  return false;
+}
+#endif
+
 struct HookBase {};
 
 struct MallocHook : HookBase {
@@ -146,9 +209,26 @@ struct MallocHook : HookBase {
 
   static void *hook(size_t size) noexcept {
     AllocTrackerHelper helper;
+#if defined(__aarch64__)
     auto *ptr = ref(size);
+    if (helper.track_sampled(ptr, size)) {
+      ptr = ddprof::marker::tag(ptr);
+    }
+    return ptr;
+#elif defined(__x86_64__)
+    bool ws = helper.will_sample(size);
+    void *ptr;
+    if (ws) {
+      ptr = ref(size + ddprof::marker::kMinPrefixSize);
+      if (ptr) {
+        ptr = ddprof::marker::write_prefix(ptr, 16);
+      }
+    } else {
+      ptr = ref(size);
+    }
     helper.track(ptr, size);
     return ptr;
+#endif
   }
 };
 
@@ -159,9 +239,26 @@ struct NewHook : HookBase {
 
   static void *hook(size_t size) {
     AllocTrackerHelper helper;
+#if defined(__aarch64__)
     auto *ptr = ref(size);
+    if (helper.track_sampled(ptr, size)) {
+      ptr = ddprof::marker::tag(ptr);
+    }
+    return ptr;
+#elif defined(__x86_64__)
+    bool ws = helper.will_sample(size);
+    void *ptr;
+    if (ws) {
+      ptr = ref(size + ddprof::marker::kMinPrefixSize);
+      if (ptr) {
+        ptr = ddprof::marker::write_prefix(ptr, 16);
+      }
+    } else {
+      ptr = ref(size);
+    }
     helper.track(ptr, size);
     return ptr;
+#endif
   }
 };
 
@@ -174,9 +271,26 @@ struct NewNoThrowHook : HookBase {
 
   static void *hook(size_t size, const std::nothrow_t &tag) noexcept {
     AllocTrackerHelper helper;
+#if defined(__aarch64__)
     auto *ptr = ref(size, tag);
+    if (helper.track_sampled(ptr, size)) {
+      ptr = ddprof::marker::tag(ptr);
+    }
+    return ptr;
+#elif defined(__x86_64__)
+    bool ws = helper.will_sample(size);
+    void *ptr;
+    if (ws) {
+      ptr = ref(size + ddprof::marker::kMinPrefixSize, tag);
+      if (ptr) {
+        ptr = ddprof::marker::write_prefix(ptr, 16);
+      }
+    } else {
+      ptr = ref(size, tag);
+    }
     helper.track(ptr, size);
     return ptr;
+#endif
   }
 };
 
@@ -188,9 +302,28 @@ struct NewAlignHook : HookBase {
 
   static void *hook(std::size_t size, std::align_val_t al) {
     AllocTrackerHelper helper;
+#if defined(__aarch64__)
     auto *ptr = ref(size, al);
+    if (helper.track_sampled(ptr, size)) {
+      ptr = ddprof::marker::tag(ptr);
+    }
+    return ptr;
+#elif defined(__x86_64__)
+    auto alignment = static_cast<size_t>(al);
+    bool ws = helper.will_sample(size);
+    void *ptr;
+    if (ws) {
+      size_t psize = ddprof::marker::prefix_size_for_alignment(alignment);
+      ptr = ref(size + psize, al);
+      if (ptr) {
+        ptr = ddprof::marker::write_prefix(ptr, alignment);
+      }
+    } else {
+      ptr = ref(size, al);
+    }
     helper.track(ptr, size);
     return ptr;
+#endif
   }
 };
 
@@ -205,9 +338,28 @@ struct NewAlignNoThrowHook : HookBase {
   static void *hook(std::size_t size, std::align_val_t al,
                     const std::nothrow_t &tag) noexcept {
     AllocTrackerHelper helper;
+#if defined(__aarch64__)
     auto *ptr = ref(size, al, tag);
+    if (helper.track_sampled(ptr, size)) {
+      ptr = ddprof::marker::tag(ptr);
+    }
+    return ptr;
+#elif defined(__x86_64__)
+    auto alignment = static_cast<size_t>(al);
+    bool ws = helper.will_sample(size);
+    void *ptr;
+    if (ws) {
+      size_t psize = ddprof::marker::prefix_size_for_alignment(alignment);
+      ptr = ref(size + psize, al, tag);
+      if (ptr) {
+        ptr = ddprof::marker::write_prefix(ptr, alignment);
+      }
+    } else {
+      ptr = ref(size, al, tag);
+    }
     helper.track(ptr, size);
     return ptr;
+#endif
   }
 };
 
@@ -218,9 +370,26 @@ struct NewArrayHook : HookBase {
 
   static void *hook(size_t size) {
     AllocTrackerHelper helper;
+#if defined(__aarch64__)
     auto *ptr = ref(size);
+    if (helper.track_sampled(ptr, size)) {
+      ptr = ddprof::marker::tag(ptr);
+    }
+    return ptr;
+#elif defined(__x86_64__)
+    bool ws = helper.will_sample(size);
+    void *ptr;
+    if (ws) {
+      ptr = ref(size + ddprof::marker::kMinPrefixSize);
+      if (ptr) {
+        ptr = ddprof::marker::write_prefix(ptr, 16);
+      }
+    } else {
+      ptr = ref(size);
+    }
     helper.track(ptr, size);
     return ptr;
+#endif
   }
 };
 
@@ -233,9 +402,26 @@ struct NewArrayNoThrowHook : HookBase {
 
   static void *hook(size_t size, const std::nothrow_t &tag) noexcept {
     AllocTrackerHelper helper;
+#if defined(__aarch64__)
     auto *ptr = ref(size, tag);
+    if (helper.track_sampled(ptr, size)) {
+      ptr = ddprof::marker::tag(ptr);
+    }
+    return ptr;
+#elif defined(__x86_64__)
+    bool ws = helper.will_sample(size);
+    void *ptr;
+    if (ws) {
+      ptr = ref(size + ddprof::marker::kMinPrefixSize, tag);
+      if (ptr) {
+        ptr = ddprof::marker::write_prefix(ptr, 16);
+      }
+    } else {
+      ptr = ref(size, tag);
+    }
     helper.track(ptr, size);
     return ptr;
+#endif
   }
 };
 
@@ -247,9 +433,28 @@ struct NewArrayAlignHook : HookBase {
 
   static void *hook(std::size_t size, std::align_val_t al) {
     AllocTrackerHelper helper;
+#if defined(__aarch64__)
     auto *ptr = ref(size, al);
+    if (helper.track_sampled(ptr, size)) {
+      ptr = ddprof::marker::tag(ptr);
+    }
+    return ptr;
+#elif defined(__x86_64__)
+    auto alignment = static_cast<size_t>(al);
+    bool ws = helper.will_sample(size);
+    void *ptr;
+    if (ws) {
+      size_t psize = ddprof::marker::prefix_size_for_alignment(alignment);
+      ptr = ref(size + psize, al);
+      if (ptr) {
+        ptr = ddprof::marker::write_prefix(ptr, alignment);
+      }
+    } else {
+      ptr = ref(size, al);
+    }
     helper.track(ptr, size);
     return ptr;
+#endif
   }
 };
 
@@ -264,9 +469,28 @@ struct NewArrayAlignNoThrowHook : HookBase {
   static void *hook(std::size_t size, std::align_val_t al,
                     const std::nothrow_t &tag) noexcept {
     AllocTrackerHelper helper;
+#if defined(__aarch64__)
     auto *ptr = ref(size, al, tag);
+    if (helper.track_sampled(ptr, size)) {
+      ptr = ddprof::marker::tag(ptr);
+    }
+    return ptr;
+#elif defined(__x86_64__)
+    auto alignment = static_cast<size_t>(al);
+    bool ws = helper.will_sample(size);
+    void *ptr;
+    if (ws) {
+      size_t psize = ddprof::marker::prefix_size_for_alignment(alignment);
+      ptr = ref(size + psize, al, tag);
+      if (ptr) {
+        ptr = ddprof::marker::write_prefix(ptr, alignment);
+      }
+    } else {
+      ptr = ref(size, al, tag);
+    }
     helper.track(ptr, size);
     return ptr;
+#endif
   }
 };
 
@@ -276,13 +500,32 @@ struct FreeHook : HookBase {
   static inline FuncType ref{};
 
   static void hook(void *ptr) noexcept {
-    DeallocTrackerHelper helper;
     if (ptr == nullptr) {
       return;
     }
-
-    helper.track(ptr);
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(ptr)) {
+      ptr = ddprof::marker::untag(ptr);
+      DeallocTrackerHelper helper;
+      helper.track_direct(ptr);
+    }
     ref(ptr);
+#elif defined(__x86_64__)
+    if (free_with_prefix_check(ptr, ref)) {
+      return;
+    }
+    // Page-aligned pointers may be from pvalloc/valloc (tracked via bitset
+    // with is_large_alloc=true) or mmap (also is_large_alloc=true).
+    // Non-page-aligned non-prefixed pointers were not sampled.
+    if (ddprof::marker::is_page_aligned(ptr)) {
+      DeallocTrackerHelperMmap helper;
+      helper.track(ptr);
+    } else {
+      DeallocTrackerHelper helper;
+      helper.track(ptr);
+    }
+    ref(ptr);
+#endif
   }
 };
 
@@ -292,13 +535,25 @@ struct FreeSizedHook : HookBase {
   static inline FuncType ref{};
 
   static void hook(void *ptr, size_t size) noexcept {
-    DeallocTrackerHelper helper;
     if (ptr == nullptr) {
       return;
     }
-
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(ptr)) {
+      ptr = ddprof::marker::untag(ptr);
+      DeallocTrackerHelper helper;
+      helper.track_direct(ptr);
+    }
+    ref(ptr, size);
+#elif defined(__x86_64__)
+    // For prefixed allocs, fall back to regular free (exact size unknown)
+    if (free_with_prefix_check(ptr, FreeHook::ref)) {
+      return;
+    }
+    DeallocTrackerHelper helper;
     helper.track(ptr);
     ref(ptr, size);
+#endif
   }
 };
 
@@ -308,13 +563,24 @@ struct FreeAlignedSizedHook : HookBase {
   static inline FuncType ref{};
 
   static void hook(void *ptr, size_t alignment, size_t size) noexcept {
-    DeallocTrackerHelper helper;
     if (ptr == nullptr) {
       return;
     }
-
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(ptr)) {
+      ptr = ddprof::marker::untag(ptr);
+      DeallocTrackerHelper helper;
+      helper.track_direct(ptr);
+    }
+    ref(ptr, alignment, size);
+#elif defined(__x86_64__)
+    if (free_with_prefix_check(ptr, FreeHook::ref)) {
+      return;
+    }
+    DeallocTrackerHelper helper;
     helper.track(ptr);
     ref(ptr, alignment, size);
+#endif
   }
 };
 
@@ -324,12 +590,24 @@ struct DeleteHook : HookBase {
   static inline FuncType ref{};
 
   static void hook(void *ptr) noexcept {
-    DeallocTrackerHelper helper;
     if (ptr == nullptr) {
       return;
     }
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(ptr)) {
+      ptr = ddprof::marker::untag(ptr);
+      DeallocTrackerHelper helper;
+      helper.track_direct(ptr);
+    }
+    ref(ptr);
+#elif defined(__x86_64__)
+    if (free_with_prefix_check(ptr, FreeHook::ref)) {
+      return;
+    }
+    DeallocTrackerHelper helper;
     helper.track(ptr);
     ref(ptr);
+#endif
   }
 };
 
@@ -340,12 +618,24 @@ struct DeleteArrayHook : HookBase {
   static inline FuncType ref{};
 
   static void hook(void *ptr) noexcept {
-    DeallocTrackerHelper helper;
     if (ptr == nullptr) {
       return;
     }
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(ptr)) {
+      ptr = ddprof::marker::untag(ptr);
+      DeallocTrackerHelper helper;
+      helper.track_direct(ptr);
+    }
+    ref(ptr);
+#elif defined(__x86_64__)
+    if (free_with_prefix_check(ptr, FreeHook::ref)) {
+      return;
+    }
+    DeallocTrackerHelper helper;
     helper.track(ptr);
     ref(ptr);
+#endif
   }
 };
 
@@ -357,12 +647,24 @@ struct DeleteNoThrowHook : HookBase {
   static inline FuncType ref{};
 
   static void hook(void *ptr, const std::nothrow_t &tag) noexcept {
-    DeallocTrackerHelper helper;
     if (ptr == nullptr) {
       return;
     }
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(ptr)) {
+      ptr = ddprof::marker::untag(ptr);
+      DeallocTrackerHelper helper;
+      helper.track_direct(ptr);
+    }
+    ref(ptr, tag);
+#elif defined(__x86_64__)
+    if (free_with_prefix_check(ptr, FreeHook::ref)) {
+      return;
+    }
+    DeallocTrackerHelper helper;
     helper.track(ptr);
     ref(ptr, tag);
+#endif
   }
 };
 
@@ -374,12 +676,24 @@ struct DeleteArrayNoThrowHook : HookBase {
   static inline FuncType ref{};
 
   static void hook(void *ptr, const std::nothrow_t &tag) noexcept {
-    DeallocTrackerHelper helper;
     if (ptr == nullptr) {
       return;
     }
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(ptr)) {
+      ptr = ddprof::marker::untag(ptr);
+      DeallocTrackerHelper helper;
+      helper.track_direct(ptr);
+    }
+    ref(ptr, tag);
+#elif defined(__x86_64__)
+    if (free_with_prefix_check(ptr, FreeHook::ref)) {
+      return;
+    }
+    DeallocTrackerHelper helper;
     helper.track(ptr);
     ref(ptr, tag);
+#endif
   }
 };
 
@@ -391,12 +705,24 @@ struct DeleteAlignHook : HookBase {
   static inline FuncType ref{};
 
   static void hook(void *ptr, std::align_val_t al) noexcept {
-    DeallocTrackerHelper helper;
     if (ptr == nullptr) {
       return;
     }
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(ptr)) {
+      ptr = ddprof::marker::untag(ptr);
+      DeallocTrackerHelper helper;
+      helper.track_direct(ptr);
+    }
+    ref(ptr, al);
+#elif defined(__x86_64__)
+    if (free_with_prefix_check(ptr, FreeHook::ref)) {
+      return;
+    }
+    DeallocTrackerHelper helper;
     helper.track(ptr);
     ref(ptr, al);
+#endif
   }
 };
 
@@ -408,12 +734,24 @@ struct DeleteArrayAlignHook : HookBase {
   static inline FuncType ref{};
 
   static void hook(void *ptr, std::align_val_t al) noexcept {
-    DeallocTrackerHelper helper;
     if (ptr == nullptr) {
       return;
     }
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(ptr)) {
+      ptr = ddprof::marker::untag(ptr);
+      DeallocTrackerHelper helper;
+      helper.track_direct(ptr);
+    }
+    ref(ptr, al);
+#elif defined(__x86_64__)
+    if (free_with_prefix_check(ptr, FreeHook::ref)) {
+      return;
+    }
+    DeallocTrackerHelper helper;
     helper.track(ptr);
     ref(ptr, al);
+#endif
   }
 };
 
@@ -427,12 +765,24 @@ struct DeleteAlignNoThrowHook : HookBase {
 
   static void hook(void *ptr, std::align_val_t al,
                    const std::nothrow_t &tag) noexcept {
-    DeallocTrackerHelper helper;
     if (ptr == nullptr) {
       return;
     }
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(ptr)) {
+      ptr = ddprof::marker::untag(ptr);
+      DeallocTrackerHelper helper;
+      helper.track_direct(ptr);
+    }
+    ref(ptr, al, tag);
+#elif defined(__x86_64__)
+    if (free_with_prefix_check(ptr, FreeHook::ref)) {
+      return;
+    }
+    DeallocTrackerHelper helper;
     helper.track(ptr);
     ref(ptr, al, tag);
+#endif
   }
 };
 
@@ -446,12 +796,24 @@ struct DeleteArrayAlignNoThrowHook : HookBase {
 
   static void hook(void *ptr, std::align_val_t al,
                    const std::nothrow_t &tag) noexcept {
-    DeallocTrackerHelper helper;
     if (ptr == nullptr) {
       return;
     }
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(ptr)) {
+      ptr = ddprof::marker::untag(ptr);
+      DeallocTrackerHelper helper;
+      helper.track_direct(ptr);
+    }
+    ref(ptr, al, tag);
+#elif defined(__x86_64__)
+    if (free_with_prefix_check(ptr, FreeHook::ref)) {
+      return;
+    }
+    DeallocTrackerHelper helper;
     helper.track(ptr);
     ref(ptr, al, tag);
+#endif
   }
 };
 
@@ -462,12 +824,24 @@ struct DeleteSizedHook : HookBase {
   static inline FuncType ref{};
 
   static void hook(void *ptr, std::size_t size) noexcept {
-    DeallocTrackerHelper helper;
     if (ptr == nullptr) {
       return;
     }
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(ptr)) {
+      ptr = ddprof::marker::untag(ptr);
+      DeallocTrackerHelper helper;
+      helper.track_direct(ptr);
+    }
+    ref(ptr, size);
+#elif defined(__x86_64__)
+    if (free_with_prefix_check(ptr, FreeHook::ref)) {
+      return;
+    }
+    DeallocTrackerHelper helper;
     helper.track(ptr);
     ref(ptr, size);
+#endif
   }
 };
 
@@ -478,12 +852,24 @@ struct DeleteArraySizedHook : HookBase {
   static inline FuncType ref{};
 
   static void hook(void *ptr, std::size_t size) noexcept {
-    DeallocTrackerHelper helper;
     if (ptr == nullptr) {
       return;
     }
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(ptr)) {
+      ptr = ddprof::marker::untag(ptr);
+      DeallocTrackerHelper helper;
+      helper.track_direct(ptr);
+    }
+    ref(ptr, size);
+#elif defined(__x86_64__)
+    if (free_with_prefix_check(ptr, FreeHook::ref)) {
+      return;
+    }
+    DeallocTrackerHelper helper;
     helper.track(ptr);
     ref(ptr, size);
+#endif
   }
 };
 
@@ -495,12 +881,24 @@ struct DeleteSizedAlignHook : HookBase {
   static inline FuncType ref{};
 
   static void hook(void *ptr, std::size_t size, std::align_val_t al) noexcept {
-    DeallocTrackerHelper helper;
     if (ptr == nullptr) {
       return;
     }
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(ptr)) {
+      ptr = ddprof::marker::untag(ptr);
+      DeallocTrackerHelper helper;
+      helper.track_direct(ptr);
+    }
+    ref(ptr, size, al);
+#elif defined(__x86_64__)
+    if (free_with_prefix_check(ptr, FreeHook::ref)) {
+      return;
+    }
+    DeallocTrackerHelper helper;
     helper.track(ptr);
     ref(ptr, size, al);
+#endif
   }
 };
 
@@ -512,12 +910,24 @@ struct DeleteArraySizedAlignHook : HookBase {
   static inline FuncType ref{};
 
   static void hook(void *ptr, std::size_t size, std::align_val_t al) noexcept {
-    DeallocTrackerHelper helper;
     if (ptr == nullptr) {
       return;
     }
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(ptr)) {
+      ptr = ddprof::marker::untag(ptr);
+      DeallocTrackerHelper helper;
+      helper.track_direct(ptr);
+    }
+    ref(ptr, size, al);
+#elif defined(__x86_64__)
+    if (free_with_prefix_check(ptr, FreeHook::ref)) {
+      return;
+    }
+    DeallocTrackerHelper helper;
     helper.track(ptr);
     ref(ptr, size, al);
+#endif
   }
 };
 
@@ -528,9 +938,29 @@ struct CallocHook : HookBase {
 
   static void *hook(size_t nmemb, size_t size) noexcept {
     AllocTrackerHelper helper;
+    size_t total = size * nmemb;
+#if defined(__aarch64__)
     auto *ptr = ref(nmemb, size);
-    helper.track(ptr, size * nmemb);
+    if (helper.track_sampled(ptr, total)) {
+      ptr = ddprof::marker::tag(ptr);
+    }
     return ptr;
+#elif defined(__x86_64__)
+    bool ws = helper.will_sample(total);
+    void *ptr;
+    if (ws) {
+      // calloc zeroes memory; call with adjusted size, then write prefix
+      // over the zeroed prefix area. User data area remains properly zeroed.
+      ptr = ref(1, total + ddprof::marker::kMinPrefixSize);
+      if (ptr) {
+        ptr = ddprof::marker::write_prefix(ptr, 16);
+      }
+    } else {
+      ptr = ref(nmemb, size);
+    }
+    helper.track(ptr, total);
+    return ptr;
+#endif
   }
 };
 
@@ -541,16 +971,56 @@ struct ReallocHook : HookBase {
 
   static void *hook(void *ptr, size_t size) noexcept {
     AllocTrackerHelper helper;
-    if (likely(ptr) && helper) {
+#if defined(__aarch64__)
+    void *real_ptr = ptr;
+    if (ptr && ddprof::marker::is_tagged(ptr)) {
+      real_ptr = ddprof::marker::untag(ptr);
+      if (helper) {
+        ddprof::AllocationTracker::track_deallocation_direct_s(
+            reinterpret_cast<uintptr_t>(real_ptr), *helper.tl_state());
+      }
+    } else if (likely(ptr) && helper) {
       ddprof::AllocationTracker::track_deallocation_s(
           reinterpret_cast<uintptr_t>(ptr), *helper.tl_state());
     }
-    auto *newptr = ref(ptr, size);
+    auto *newptr = ref(real_ptr, size);
+    if (likely(size) && helper.track_sampled(newptr, size)) {
+      newptr = ddprof::marker::tag(newptr);
+    }
+    return newptr;
+#elif defined(__x86_64__)
+    void *real_ptr = ptr;
+    bool was_prefixed = false;
+    if (ptr && !ddprof::marker::is_page_aligned(ptr)) {
+      auto [found, original] = ddprof::marker::read_prefix(ptr);
+      if (found) {
+        was_prefixed = true;
+        real_ptr = original;
+        if (helper) {
+          ddprof::AllocationTracker::track_deallocation_direct_s(
+              reinterpret_cast<uintptr_t>(ptr), *helper.tl_state());
+        }
+      }
+    }
+    if (!was_prefixed && likely(ptr) && helper) {
+      ddprof::AllocationTracker::track_deallocation_s(
+          reinterpret_cast<uintptr_t>(ptr), *helper.tl_state());
+    }
+    bool ws = helper.will_sample(size);
+    void *newptr;
+    if (ws) {
+      newptr = ref(real_ptr, size + ddprof::marker::kMinPrefixSize);
+      if (newptr) {
+        newptr = ddprof::marker::write_prefix(newptr, 16);
+      }
+    } else {
+      newptr = ref(real_ptr, size);
+    }
     if (likely(size)) {
       helper.track(newptr, size);
     }
-
     return newptr;
+#endif
   }
 };
 
@@ -561,11 +1031,33 @@ struct PosixMemalignHook : HookBase {
 
   static int hook(void **memptr, size_t alignment, size_t size) noexcept {
     AllocTrackerHelper helper;
+#if defined(__aarch64__)
+    auto ret = ref(memptr, alignment, size);
+    if (likely(!ret)) {
+      if (helper.track_sampled(*memptr, size)) {
+        *memptr = ddprof::marker::tag(*memptr);
+      }
+    }
+    return ret;
+#elif defined(__x86_64__)
+    bool ws = helper.will_sample(size);
+    if (ws) {
+      size_t psize = ddprof::marker::prefix_size_for_alignment(alignment);
+      auto ret = ref(memptr, alignment, size + psize);
+      if (likely(!ret) && *memptr) {
+        *memptr = ddprof::marker::write_prefix(*memptr, alignment);
+      }
+      if (likely(!ret)) {
+        helper.track(*memptr, size);
+      }
+      return ret;
+    }
     auto ret = ref(memptr, alignment, size);
     if (likely(!ret)) {
       helper.track(*memptr, size);
     }
     return ret;
+#endif
   }
 };
 
@@ -576,11 +1068,29 @@ struct AlignedAllocHook : HookBase {
 
   static void *hook(size_t alignment, size_t size) noexcept {
     AllocTrackerHelper helper;
+#if defined(__aarch64__)
     auto *ptr = ref(alignment, size);
+    if (ptr && helper.track_sampled(ptr, size)) {
+      ptr = ddprof::marker::tag(ptr);
+    }
+    return ptr;
+#elif defined(__x86_64__)
+    bool ws = helper.will_sample(size);
+    void *ptr;
+    if (ws) {
+      size_t psize = ddprof::marker::prefix_size_for_alignment(alignment);
+      ptr = ref(alignment, size + psize);
+      if (ptr) {
+        ptr = ddprof::marker::write_prefix(ptr, alignment);
+      }
+    } else {
+      ptr = ref(alignment, size);
+    }
     if (ptr) {
       helper.track(ptr, size);
     }
     return ptr;
+#endif
   }
 };
 
@@ -591,11 +1101,29 @@ struct MemalignHook : HookBase {
 
   static void *hook(size_t alignment, size_t size) noexcept {
     AllocTrackerHelper helper;
+#if defined(__aarch64__)
     auto *ptr = ref(alignment, size);
+    if (ptr && helper.track_sampled(ptr, size)) {
+      ptr = ddprof::marker::tag(ptr);
+    }
+    return ptr;
+#elif defined(__x86_64__)
+    bool ws = helper.will_sample(size);
+    void *ptr;
+    if (ws) {
+      size_t psize = ddprof::marker::prefix_size_for_alignment(alignment);
+      ptr = ref(alignment, size + psize);
+      if (ptr) {
+        ptr = ddprof::marker::write_prefix(ptr, alignment);
+      }
+    } else {
+      ptr = ref(alignment, size);
+    }
     if (ptr) {
       helper.track(ptr, size);
     }
     return ptr;
+#endif
   }
 };
 
@@ -605,12 +1133,24 @@ struct PvallocHook : HookBase {
   static inline FuncType ref{};
 
   static void *hook(size_t size) noexcept {
+    // pvalloc returns page-aligned memory. On AMD64, page-aligned pointers
+    // cannot use the prefix approach (the is_page_aligned check in free would
+    // skip them). Use the mmap/bitset tracking path instead.
+#if defined(__aarch64__)
     AllocTrackerHelper helper;
+    auto *ptr = ref(size);
+    if (ptr && helper.track_sampled(ptr, size)) {
+      ptr = ddprof::marker::tag(ptr);
+    }
+    return ptr;
+#elif defined(__x86_64__)
+    AllocTrackerHelperMmap helper;
     auto *ptr = ref(size);
     if (ptr) {
       helper.track(ptr, size);
     }
     return ptr;
+#endif
   }
 };
 
@@ -620,12 +1160,22 @@ struct VallocHook : HookBase {
   static inline FuncType ref{};
 
   static void *hook(size_t size) noexcept {
+    // valloc returns page-aligned memory. Same approach as pvalloc.
+#if defined(__aarch64__)
     AllocTrackerHelper helper;
+    auto *ptr = ref(size);
+    if (ptr && helper.track_sampled(ptr, size)) {
+      ptr = ddprof::marker::tag(ptr);
+    }
+    return ptr;
+#elif defined(__x86_64__)
+    AllocTrackerHelperMmap helper;
     auto *ptr = ref(size);
     if (ptr) {
       helper.track(ptr, size);
     }
     return ptr;
+#endif
   }
 };
 
@@ -636,15 +1186,57 @@ struct ReallocArrayHook : HookBase {
 
   static void *hook(void *ptr, size_t nmemb, size_t size) noexcept {
     AllocTrackerHelper helper;
-    if (ptr && helper) {
+    size_t total = size * nmemb;
+#if defined(__aarch64__)
+    void *real_ptr = ptr;
+    if (ptr && ddprof::marker::is_tagged(ptr)) {
+      real_ptr = ddprof::marker::untag(ptr);
+      if (helper) {
+        ddprof::AllocationTracker::track_deallocation_direct_s(
+            reinterpret_cast<uintptr_t>(real_ptr), *helper.tl_state());
+      }
+    } else if (ptr && helper) {
       ddprof::AllocationTracker::track_deallocation_s(
           reinterpret_cast<uintptr_t>(ptr), *helper.tl_state());
     }
-    auto *newptr = ref(ptr, nmemb, size);
-    if (newptr) {
-      helper.track(newptr, size * nmemb);
+    auto *newptr = ref(real_ptr, nmemb, size);
+    if (newptr && helper.track_sampled(newptr, total)) {
+      newptr = ddprof::marker::tag(newptr);
     }
     return newptr;
+#elif defined(__x86_64__)
+    void *real_ptr = ptr;
+    bool was_prefixed = false;
+    if (ptr && !ddprof::marker::is_page_aligned(ptr)) {
+      auto [found, original] = ddprof::marker::read_prefix(ptr);
+      if (found) {
+        was_prefixed = true;
+        real_ptr = original;
+        if (helper) {
+          ddprof::AllocationTracker::track_deallocation_direct_s(
+              reinterpret_cast<uintptr_t>(ptr), *helper.tl_state());
+        }
+      }
+    }
+    if (!was_prefixed && ptr && helper) {
+      ddprof::AllocationTracker::track_deallocation_s(
+          reinterpret_cast<uintptr_t>(ptr), *helper.tl_state());
+    }
+    bool ws = helper.will_sample(total);
+    void *newptr;
+    if (ws) {
+      newptr = ref(real_ptr, 1, total + ddprof::marker::kMinPrefixSize);
+      if (newptr) {
+        newptr = ddprof::marker::write_prefix(newptr, 16);
+      }
+    } else {
+      newptr = ref(real_ptr, nmemb, size);
+    }
+    if (newptr) {
+      helper.track(newptr, total);
+    }
+    return newptr;
+#endif
   }
 };
 
@@ -667,9 +1259,33 @@ struct MallocxHook : HookBase {
 
   static void *hook(size_t size, int flags) noexcept {
     AllocTrackerHelper helper;
+#if defined(__aarch64__)
     auto *ptr = ref(size, flags);
+    if (helper.track_sampled(ptr, size)) {
+      ptr = ddprof::marker::tag(ptr);
+    }
+    return ptr;
+#elif defined(__x86_64__)
+    bool ws = helper.will_sample(size);
+    void *ptr;
+    if (ws) {
+      // Extract alignment from jemalloc flags (MALLOCX_LG_ALIGN_MASK = 0x3f)
+      size_t alignment = 16;
+      if (flags & 0x3f) {
+        alignment =
+            std::max(alignment, static_cast<size_t>(1) << (flags & 0x3f));
+      }
+      size_t psize = ddprof::marker::prefix_size_for_alignment(alignment);
+      ptr = ref(size + psize, flags);
+      if (ptr) {
+        ptr = ddprof::marker::write_prefix(ptr, alignment);
+      }
+    } else {
+      ptr = ref(size, flags);
+    }
     helper.track(ptr, size);
     return ptr;
+#endif
   }
 };
 
@@ -680,16 +1296,62 @@ struct RallocxHook : HookBase {
 
   static void *hook(void *ptr, size_t size, int flags) noexcept {
     AllocTrackerHelper helper;
-    if (likely(ptr) && helper) {
+#if defined(__aarch64__)
+    void *real_ptr = ptr;
+    if (ptr && ddprof::marker::is_tagged(ptr)) {
+      real_ptr = ddprof::marker::untag(ptr);
+      if (helper) {
+        ddprof::AllocationTracker::track_deallocation_direct_s(
+            reinterpret_cast<uintptr_t>(real_ptr), *helper.tl_state());
+      }
+    } else if (likely(ptr) && helper) {
       ddprof::AllocationTracker::track_deallocation_s(
           reinterpret_cast<uintptr_t>(ptr), *helper.tl_state());
     }
-    auto *newptr = ref(ptr, size, flags);
+    auto *newptr = ref(real_ptr, size, flags);
+    if (likely(size) && helper.track_sampled(newptr, size)) {
+      newptr = ddprof::marker::tag(newptr);
+    }
+    return newptr;
+#elif defined(__x86_64__)
+    void *real_ptr = ptr;
+    bool was_prefixed = false;
+    if (likely(ptr) && !ddprof::marker::is_page_aligned(ptr)) {
+      auto [found, original] = ddprof::marker::read_prefix(ptr);
+      if (found) {
+        was_prefixed = true;
+        real_ptr = original;
+        if (helper) {
+          ddprof::AllocationTracker::track_deallocation_direct_s(
+              reinterpret_cast<uintptr_t>(ptr), *helper.tl_state());
+        }
+      }
+    }
+    if (!was_prefixed && likely(ptr) && helper) {
+      ddprof::AllocationTracker::track_deallocation_s(
+          reinterpret_cast<uintptr_t>(ptr), *helper.tl_state());
+    }
+    bool ws = helper.will_sample(size);
+    size_t alignment = 16;
+    if (flags & 0x3f) {
+      alignment =
+          std::max(alignment, static_cast<size_t>(1) << (flags & 0x3f));
+    }
+    void *newptr;
+    if (ws) {
+      size_t psize = ddprof::marker::prefix_size_for_alignment(alignment);
+      newptr = ref(real_ptr, size + psize, flags);
+      if (newptr) {
+        newptr = ddprof::marker::write_prefix(newptr, alignment);
+      }
+    } else {
+      newptr = ref(real_ptr, size, flags);
+    }
     if (likely(size)) {
       helper.track(newptr, size);
     }
-
     return newptr;
+#endif
   }
 };
 
@@ -700,13 +1362,44 @@ struct XallocxHook : HookBase {
 
   static size_t hook(void *ptr, size_t size, size_t extra, int flags) noexcept {
     AllocTrackerHelper helper;
-    if (helper) {
-      ddprof::AllocationTracker::track_deallocation_s(
-          reinterpret_cast<uintptr_t>(ptr), *helper.tl_state());
+#if defined(__aarch64__)
+    void *real_ptr = ptr;
+    if (ddprof::marker::is_tagged(ptr)) {
+      real_ptr = ddprof::marker::untag(ptr);
     }
-    auto newsize = ref(ptr, size, extra, flags);
-    helper.track(ptr, newsize);
+    if (helper) {
+      ddprof::AllocationTracker::track_deallocation_direct_s(
+          reinterpret_cast<uintptr_t>(real_ptr), *helper.tl_state());
+    }
+    auto newsize = ref(real_ptr, size, extra, flags);
+    helper.track(real_ptr, newsize);
     return newsize;
+#elif defined(__x86_64__)
+    void *real_ptr = ptr;
+    size_t psize = 0;
+    bool was_prefixed = false;
+    if (!ddprof::marker::is_page_aligned(ptr)) {
+      auto [found, original] = ddprof::marker::read_prefix(ptr);
+      if (found) {
+        was_prefixed = true;
+        real_ptr = original;
+        psize = ddprof::marker::kMinPrefixSize;
+      }
+    }
+    if (helper) {
+      if (was_prefixed) {
+        ddprof::AllocationTracker::track_deallocation_direct_s(
+            reinterpret_cast<uintptr_t>(ptr), *helper.tl_state());
+      } else {
+        ddprof::AllocationTracker::track_deallocation_s(
+            reinterpret_cast<uintptr_t>(ptr), *helper.tl_state());
+      }
+    }
+    auto newsize = ref(real_ptr, size + psize, extra, flags);
+    auto effective_size = psize ? newsize - psize : newsize;
+    helper.track(ptr, effective_size);
+    return effective_size;
+#endif
   }
 };
 
@@ -716,9 +1409,27 @@ struct DallocxHook : HookBase {
   static inline FuncType ref{};
 
   static void hook(void *ptr, int flags) noexcept {
-    DeallocTrackerHelper helper;
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(ptr)) {
+      ptr = ddprof::marker::untag(ptr);
+      DeallocTrackerHelper helper;
+      helper.track_direct(ptr);
+    }
     ref(ptr, flags);
+#elif defined(__x86_64__)
+    if (!ddprof::marker::is_page_aligned(ptr)) {
+      auto [found, original] = ddprof::marker::read_prefix(ptr);
+      if (found) {
+        DeallocTrackerHelper helper;
+        helper.track_direct(ptr);
+        ref(original, flags);
+        return;
+      }
+    }
+    DeallocTrackerHelper helper;
     helper.track(ptr);
+    ref(ptr, flags);
+#endif
   }
 };
 
@@ -728,9 +1439,28 @@ struct SdallocxHook : HookBase {
   static inline FuncType ref{};
 
   static void hook(void *ptr, size_t size, int flags) noexcept {
-    DeallocTrackerHelper helper;
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(ptr)) {
+      ptr = ddprof::marker::untag(ptr);
+      DeallocTrackerHelper helper;
+      helper.track_direct(ptr);
+    }
     ref(ptr, size, flags);
+#elif defined(__x86_64__)
+    if (!ddprof::marker::is_page_aligned(ptr)) {
+      auto [found, original] = ddprof::marker::read_prefix(ptr);
+      if (found) {
+        DeallocTrackerHelper helper;
+        helper.track_direct(ptr);
+        // Use dallocx since we don't know the real size
+        DallocxHook::ref(original, flags);
+        return;
+      }
+    }
+    DeallocTrackerHelper helper;
     helper.track(ptr);
+    ref(ptr, size, flags);
+#endif
   }
 };
 
@@ -795,7 +1525,13 @@ struct MmapHook : HookBase {
     AllocTrackerHelperMmap helper;
     void *ptr = ref(addr, length, prot, flags, fd, offset);
     if (addr == nullptr && fd == -1 && ptr != nullptr) {
+#if defined(__aarch64__)
+      if (helper.track_sampled(ptr, length)) {
+        ptr = ddprof::marker::tag(ptr);
+      }
+#else
       helper.track(ptr, length);
+#endif
     }
     return ptr;
   }
@@ -811,7 +1547,13 @@ struct Mmap_Hook : HookBase {
     AllocTrackerHelperMmap helper;
     void *ptr = ref(addr, length, prot, flags, fd, offset);
     if (addr == nullptr && fd == -1 && ptr != nullptr) {
+#if defined(__aarch64__)
+      if (helper.track_sampled(ptr, length)) {
+        ptr = ddprof::marker::tag(ptr);
+      }
+#else
       helper.track(ptr, length);
+#endif
     }
     return ptr;
   }
@@ -827,7 +1569,13 @@ struct Mmap64Hook : HookBase {
     AllocTrackerHelperMmap helper;
     void *ptr = ref(addr, length, prot, flags, fd, offset);
     if (addr == nullptr && fd == -1 && ptr != nullptr) {
+#if defined(__aarch64__)
+      if (helper.track_sampled(ptr, length)) {
+        ptr = ddprof::marker::tag(ptr);
+      }
+#else
       helper.track(ptr, length);
+#endif
     }
     return ptr;
   }
@@ -839,9 +1587,18 @@ struct MunmapHook : HookBase {
   static inline FuncType ref{};
 
   static int hook(void *addr, size_t length) noexcept {
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(addr)) {
+      addr = ddprof::marker::untag(addr);
+      DeallocTrackerHelperMmap helper;
+      helper.track_direct(addr);
+    }
+    return ref(addr, length);
+#else
     DeallocTrackerHelperMmap helper;
     helper.track(addr);
     return ref(addr, length);
+#endif
   }
 };
 
@@ -851,9 +1608,18 @@ struct Munmap_Hook : HookBase {
   static inline FuncType ref{};
 
   static int hook(void *addr, size_t length) noexcept {
+#if defined(__aarch64__)
+    if (ddprof::marker::is_tagged(addr)) {
+      addr = ddprof::marker::untag(addr);
+      DeallocTrackerHelperMmap helper;
+      helper.track_direct(addr);
+    }
+    return ref(addr, length);
+#else
     DeallocTrackerHelperMmap helper;
     helper.track(addr);
     return ref(addr, length);
+#endif
   }
 };
 

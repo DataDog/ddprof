@@ -5,7 +5,9 @@
 
 #pragma once
 
-#include "address_bitset.hpp"
+#ifdef __x86_64__
+#  include "address_bitset.hpp"
+#endif
 #include "allocation_tracker_tls.hpp"
 #include "ddprof_base.hpp"
 #include "ddres_def.hpp"
@@ -73,6 +75,27 @@ public:
                                           TrackerThreadLocalState &tl_state,
                                           bool is_large_alloc = false);
 
+  // Same as track_allocation_s but returns true if the allocation was sampled.
+  // Used by ARM64 tag strategy to know whether to tag the pointer.
+  static inline DDPROF_NO_SANITIZER_ADDRESS bool
+  track_allocation_s_sampled(uintptr_t addr, size_t size,
+                             TrackerThreadLocalState &tl_state,
+                             bool is_large_alloc = false);
+
+  // Push a deallocation event without consulting the bitset.
+  // Called when the marker mechanism (tag or prefix) already confirmed
+  // this was a sampled allocation.
+  static inline void
+  track_deallocation_direct_s(uintptr_t addr,
+                              TrackerThreadLocalState &tl_state);
+
+  // Pre-check whether the next allocation of `size` bytes will be sampled
+  // AND deallocation tracking is active. Used by AMD64 prefix strategy to
+  // decide whether to over-allocate.
+  // Returns false when tl_state is uninitialized (conservative miss).
+  static inline bool will_sample(size_t size,
+                                 TrackerThreadLocalState &tl_state);
+
   static inline bool is_active();
 
   static inline bool is_deallocation_tracking_active();
@@ -128,6 +151,8 @@ private:
                         TrackerThreadLocalState &tl_state, bool is_large_alloc);
   void track_deallocation(uintptr_t addr, TrackerThreadLocalState &tl_state,
                           bool is_large_alloc);
+  void track_deallocation_direct(uintptr_t addr,
+                                 TrackerThreadLocalState &tl_state);
 
   DDRes push_alloc_sample(uintptr_t addr, uint64_t allocated_size,
                           TrackerThreadLocalState &tl_state);
@@ -157,7 +182,9 @@ private:
   bool _deterministic_sampling;
   size_t _high_priority_area_size;
 
+#ifdef __x86_64__
   AddressBitset _allocated_address_set;
+#endif
   IntervalTimerCheck _interval_timer_check;
 
   static AllocationTracker *_instance;
@@ -203,6 +230,53 @@ void AllocationTracker::track_deallocation_s(uintptr_t addr,
   if (instance->_state.track_deallocations.load(std::memory_order_relaxed)) {
     instance->track_deallocation(addr, tl_state, is_large_alloc);
   }
+}
+
+bool AllocationTracker::track_allocation_s_sampled(
+    uintptr_t addr, size_t size, TrackerThreadLocalState &tl_state,
+    bool is_large_alloc) {
+  AllocationTracker *instance = _instance;
+  if (!instance) {
+    return false;
+  }
+  tl_state.remaining_bytes += size;
+  if (likely(tl_state.remaining_bytes < 0)) {
+    return false;
+  }
+  if (likely(
+          instance->_state.track_allocations.load(std::memory_order_relaxed))) {
+    instance->track_allocation(addr, size, tl_state, is_large_alloc);
+    return true;
+  }
+  tl_state.remaining_bytes_initialized = false;
+  tl_state.remaining_bytes = 0;
+  return false;
+}
+
+void AllocationTracker::track_deallocation_direct_s(
+    uintptr_t addr, TrackerThreadLocalState &tl_state) {
+  AllocationTracker *instance = _instance;
+  if (!instance) {
+    return;
+  }
+  if (instance->_state.track_deallocations.load(std::memory_order_relaxed)) {
+    instance->track_deallocation_direct(addr, tl_state);
+  }
+}
+
+bool AllocationTracker::will_sample(size_t size,
+                                    TrackerThreadLocalState &tl_state) {
+  AllocationTracker *instance = _instance;
+  if (!instance) {
+    return false;
+  }
+  if (!instance->_state.track_deallocations.load(std::memory_order_relaxed)) {
+    return false;
+  }
+  if (!tl_state.remaining_bytes_initialized) {
+    return false;
+  }
+  return (tl_state.remaining_bytes + static_cast<int64_t>(size)) >= 0;
 }
 
 bool AllocationTracker::is_active() {

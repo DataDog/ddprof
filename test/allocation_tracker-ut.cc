@@ -86,7 +86,9 @@ DDPROF_NOINLINE void my_free(uintptr_t addr) {
   TrackerThreadLocalState *tl_state = AllocationTracker::get_tl_state();
   ReentryGuard guard(tl_state ? &(tl_state->reentry_guard) : nullptr);
   if (guard) {
-    AllocationTracker::track_deallocation_s(addr, *tl_state);
+    // Use track_deallocation_direct_s: the direct test API doesn't go through
+    // hooks (no prefix/tag marker), so we bypass the bitset check.
+    AllocationTracker::track_deallocation_direct_s(addr, *tl_state);
   }
   // prevent tail call optimization
   DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
@@ -163,11 +165,9 @@ TEST(allocation_tracker, start_stop) {
         reinterpret_cast<const DeallocationEvent *>(hdr);
     ASSERT_EQ(sample->ptr, 0xdeadbeef);
   }
-  my_free(0xcafebabe);
-  {
-    MPSCRingBufferReader reader{&ring_buffer.get_ring_buffer()};
-    ASSERT_EQ(reader.available_size(), 0);
-  }
+  // Note: with marker-based deallocation tracking, the direct API
+  // (track_deallocation_direct_s) always pushes events. The "not tracked"
+  // filtering is done at the hook level via prefix/tag checks.
   AllocationTracker::allocation_tracking_free();
   ASSERT_FALSE(AllocationTracker::is_active());
 }
@@ -653,7 +653,6 @@ TEST(allocation_tracker, test_allocation_functions) {
       AllocationTracker::kDeterministicSampling |
           AllocationTracker::kTrackDeallocations,
       k_default_perf_stack_sample_size, ring_buffer.get_buffer_info(), {});
-  defer { AllocationTracker::allocation_tracking_free(); };
 
   ASSERT_TRUE(AllocationTracker::is_active());
   setup_overrides();
@@ -665,7 +664,13 @@ TEST(allocation_tracker, test_allocation_functions) {
   // compiler barrier did not prevent the compiler to reorder the computation of
   // these addresses before `setup_overrides`.
   test_allocation_functions(ring_buffer.get_ring_buffer());
-  restore_overrides();
+  // Disable tracker (will_sample returns false → no new prefixes).
+  // Do NOT call restore_overrides() here: with the prefix marker approach on
+  // AMD64, any allocation that was prefixed during the test must be freed
+  // through the hooks (which detect the prefix and free the original pointer).
+  // After allocation_tracking_free(), hooks become harmless pass-throughs:
+  // no tracking, no prefixing, but prefix detection in free still works.
+  AllocationTracker::allocation_tracking_free();
 }
 
 } // namespace ddprof
