@@ -16,16 +16,16 @@ namespace ddprof {
 inline constexpr size_t k_max_nb_perf_event_open{450};
 
 struct PEvent {
-  int watcher_pos; // Index to the watcher (containing perf event config)
-  int fd; // Underlying perf event FD for perf_events, otherwise an eventfd that
-          // signals data is available in ring buffer
-  int mapfd;               // FD for ring buffer, same as `fd` for perf events
-  int attr_idx;            // matching perf_event_attr
-  size_t ring_buffer_size; // size of the ring buffer
-  RingBufferType ring_buffer_type;
-  bool custom_event; // true if custom event (not handled by perf, eg. memory
-                     // allocations)
-  RingBuffer rb;     // metadata and buffers for processing perf ringbuffer
+  int watcher_pos = -1; // Index to the watcher (containing perf event config)
+  int fd = -1; // Underlying perf event FD for perf_events, otherwise an eventfd
+               // that signals data is available in ring buffer
+  int mapfd = -1;    // FD for ring buffer, same as `fd` for perf events
+  int attr_idx = -1; // matching perf_event_attr
+  size_t ring_buffer_size = 0; // size of the ring buffer
+  RingBufferType ring_buffer_type = RingBufferType::kMPSCRingBuffer;
+  bool custom_event = false; // true if custom event (not handled by perf, eg.
+                             // memory allocations)
+  RingBuffer rb; // metadata and buffers for processing perf ringbuffer
   std::vector<int>
       sub_fds; // perf FDs of other events outputting to the same ring buffer
                // (eg. perf events for other process threads in PID mode)

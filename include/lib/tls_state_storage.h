@@ -14,6 +14,6 @@ enum : unsigned char {
 #else
 enum {
 #endif
-  DDPROF_TLS_STATE_SIZE = 48,
+  DDPROF_TLS_STATE_SIZE = 40,
   DDPROF_TLS_STATE_ALIGN = 8,
 };

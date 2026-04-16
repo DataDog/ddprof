@@ -9,8 +9,6 @@ namespace ddprof {
 
 struct TrackerThreadLocalState {
   int64_t remaining_bytes{0}; // remaining allocation bytes until next sample
-  bool remaining_bytes_initialized{false}; // false if remaining_bytes is not
-                                           // initialized
   std::span<const std::byte> stack_bounds;
 
   pid_t tid{-1}; // cache of tid

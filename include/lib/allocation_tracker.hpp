@@ -28,12 +28,7 @@ public:
   AllocationTracker(const AllocationTracker &) = delete;
   AllocationTracker &operator=(const AllocationTracker &) = delete;
 
-  ~AllocationTracker() {
-    if (_instance) {
-      _instance->push_allocation_tracker_state();
-    }
-    free();
-  }
+  ~AllocationTracker();
 
   enum AllocationTrackingFlags : uint8_t {
     kTrackDeallocations = 0x1,
@@ -88,11 +83,14 @@ public:
 
 private:
   static constexpr unsigned k_ratio_max_elt_to_bitset_size = 16;
+  TrackerThreadLocalState *init_tl_state_internal();
+  static AllocationTracker *get_instance() {
+    return _instance.load(std::memory_order_acquire);
+  }
 
   // NOLINTBEGIN(misc-non-private-member-variables-in-classes)
   struct TrackerState {
-    void init(bool track_alloc, bool track_dealloc) {
-      track_allocations = track_alloc;
+    void init(bool track_dealloc) {
       track_deallocations = track_dealloc;
       lost_alloc_count = 0;
       lost_dealloc_count = 0;
@@ -101,7 +99,6 @@ private:
       pid = getpid();
     }
     std::mutex mutex;
-    std::atomic<bool> track_allocations = false;
     std::atomic<bool> track_deallocations = false;
     std::atomic<uint64_t> lost_alloc_count;   // count number of lost events
     std::atomic<uint64_t> lost_dealloc_count; // count number of lost events
@@ -160,13 +157,13 @@ private:
   AddressBitset _allocated_address_set;
   IntervalTimerCheck _interval_timer_check;
 
-  static AllocationTracker *_instance;
+  static std::atomic<AllocationTracker *> _instance;
 };
 
 void AllocationTracker::track_allocation_s(uintptr_t addr, size_t size,
                                            TrackerThreadLocalState &tl_state,
                                            bool is_large_alloc) {
-  AllocationTracker *instance = _instance;
+  AllocationTracker *instance = get_instance();
 
   // Be safe, if allocation tracker has not been initialized, just bail out
   // Also this avoids accessing TLS during startup which causes segfaults
@@ -182,21 +179,14 @@ void AllocationTracker::track_allocation_s(uintptr_t addr, size_t size,
     return;
   }
 
-  if (likely(
-          instance->_state.track_allocations.load(std::memory_order_relaxed))) {
-    instance->track_allocation(addr, size, tl_state, is_large_alloc);
-  } else {
-    // allocation tracking is disabled, reset state
-    tl_state.remaining_bytes_initialized = false;
-    tl_state.remaining_bytes = 0;
-  }
+  instance->track_allocation(addr, size, tl_state, is_large_alloc);
 }
 
 void AllocationTracker::track_deallocation_s(uintptr_t addr,
                                              TrackerThreadLocalState &tl_state,
                                              bool is_large_alloc) {
   // same pattern as track_allocation
-  AllocationTracker *instance = _instance;
+  AllocationTracker *instance = get_instance();
   if (!instance) {
     return;
   }
@@ -205,13 +195,10 @@ void AllocationTracker::track_deallocation_s(uintptr_t addr,
   }
 }
 
-bool AllocationTracker::is_active() {
-  auto *instance = _instance;
-  return instance && instance->_state.track_allocations;
-}
+bool AllocationTracker::is_active() { return get_instance() != nullptr; }
 
 bool AllocationTracker::is_deallocation_tracking_active() {
-  auto *instance = _instance;
+  auto *instance = get_instance();
   return instance && instance->_state.track_deallocations;
 }
 
