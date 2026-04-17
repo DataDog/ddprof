@@ -18,21 +18,26 @@ void getattr_loop(bool loop) {
 } // namespace
 
 int main() {
+  using namespace std::chrono_literals;
+  constexpr auto kStartupDelay = 10ms;
+  constexpr auto kRaceWindow = 100ms;
+  constexpr uint32_t kStopTimeoutMs = 1000;
+
   // Start a thread that calls pthread_getattr_np in a tight loop
   std::thread t(getattr_loop, true);
 
   // Give the thread time to start running
-  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  std::this_thread::sleep_for(kStartupDelay);
 
   // Start profiling while the thread is actively calling pthread_getattr_np
-  int ret = ddprof_start_profiling();
+  int const ret = ddprof_start_profiling();
   if (ret != 0) {
     fprintf(stderr, "Failed to start profiling (ret=%d)\n", ret);
     return 1;
   }
 
   // Let it run for a bit to exercise the race
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  std::this_thread::sleep_for(kRaceWindow);
 
   // Stop the thread
   g_stop.store(true, std::memory_order_relaxed);
@@ -42,9 +47,7 @@ int main() {
   std::thread t2(getattr_loop, false);
   t2.join();
 
-  if (ret == 0) {
-    ddprof_stop_profiling(1000);
-  }
+  ddprof_stop_profiling(kStopTimeoutMs);
 
   return 0;
 }

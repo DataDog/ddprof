@@ -8,15 +8,18 @@
 // (without malloc hook being called because statically linked)
 // the TLS state is not initialized (otherwise it would deadlock).
 int main() {
+  constexpr size_t kLargeAllocBytes = size_t{1024} * 1024 * 16;
+  constexpr uint32_t kStopTimeoutMs = 1000;
+
   std::latch l(1);
   std::thread t([&] {
     l.wait();
     // large allocation to exercise the mmap hooks path.
-    void *p = malloc(1024 * 1024 * 16);
+    void *p = malloc(kLargeAllocBytes);
     free(p);
   });
 
-  int ret = ddprof_start_profiling();
+  int const ret = ddprof_start_profiling();
   if (ret != 0) {
     fprintf(stderr, "Failed to start profiling (ret=%d)\n", ret);
     return 1;
@@ -25,9 +28,7 @@ int main() {
   l.count_down();
   t.join();
 
-  if (ret == 0) {
-    ddprof_stop_profiling(1000);
-  }
+  ddprof_stop_profiling(kStopTimeoutMs);
 
   return 0;
 }
