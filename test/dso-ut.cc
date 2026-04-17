@@ -522,7 +522,7 @@ TEST(DSOTest, elf_load_simple) {
   auto [it2, found2] = dso_hdr.dso_find_closest(5, 0x2000);
   ASSERT_TRUE(found2);
   ASSERT_EQ(it2->first, 0x2000);
-  ASSERT_EQ(it2->second, dso2);
+  ASSERT_TRUE(it2->second.same_mapping(dso2));
 }
 
 TEST(DSOTest, elf_load) {
@@ -548,14 +548,14 @@ TEST(DSOTest, elf_load) {
     auto [it2, found2] = dso_hdr.dso_find_closest(5, 0x2000);
     ASSERT_TRUE(found2);
     ASSERT_EQ(it2->first, 0x2000);
-    ASSERT_EQ(it2->second, dso2);
+    ASSERT_TRUE(it2->second.same_mapping(dso2));
 
     Dso dso1_right{dso1};
     dso1_right.adjust_start(0x4000);
     auto [it3, found3] = dso_hdr.dso_find_closest(5, 0x4000);
     ASSERT_TRUE(found3);
     ASSERT_EQ(it3->first, 0x4000);
-    ASSERT_EQ(it3->second, dso1_right);
+    ASSERT_TRUE(it3->second.same_mapping(dso1_right));
   }
 
   // map 3rd segment
@@ -575,19 +575,19 @@ TEST(DSOTest, elf_load) {
     auto [it2, found2] = dso_hdr.dso_find_closest(5, 0x2000);
     ASSERT_TRUE(found2);
     ASSERT_EQ(it2->first, 0x2000);
-    ASSERT_EQ(it2->second, dso2);
+    ASSERT_TRUE(it2->second.same_mapping(dso2));
 
     auto [it3, found3] = dso_hdr.dso_find_closest(5, 0x4000);
     ASSERT_TRUE(found3);
     ASSERT_EQ(it3->first, 0x4000);
-    ASSERT_EQ(it3->second, dso3);
+    ASSERT_TRUE(it3->second.same_mapping(dso3));
 
     Dso dso1_right{dso1};
     dso1_right.adjust_start(0x5000);
     auto [it4, found4] = dso_hdr.dso_find_closest(5, 0x5000);
     ASSERT_TRUE(found3);
     ASSERT_EQ(it4->first, 0x5000);
-    ASSERT_EQ(it4->second, dso1_right);
+    ASSERT_TRUE(it4->second.same_mapping(dso1_right));
   }
 
   // anonymous mapping at the end
@@ -606,17 +606,17 @@ TEST(DSOTest, elf_load) {
     auto [it2, found2] = dso_hdr.dso_find_closest(5, 0x2000);
     ASSERT_TRUE(found2);
     ASSERT_EQ(it2->first, 0x2000);
-    ASSERT_EQ(it2->second, dso2);
+    ASSERT_TRUE(it2->second.same_mapping(dso2));
 
     auto [it3, found3] = dso_hdr.dso_find_closest(5, 0x4000);
     ASSERT_TRUE(found3);
     ASSERT_EQ(it3->first, 0x4000);
-    ASSERT_EQ(it3->second, dso3);
+    ASSERT_TRUE(it3->second.same_mapping(dso3));
 
     auto [it4, found4] = dso_hdr.dso_find_closest(5, 0x5000);
     ASSERT_TRUE(found3);
     ASSERT_EQ(it4->first, 0x5000);
-    ASSERT_EQ(it4->second, dso4);
+    ASSERT_TRUE(it4->second.same_mapping(dso4));
   }
 }
 
@@ -641,7 +641,7 @@ TEST(DSOTest, elf_load_single_segment) {
     auto [it2, found2] = dso_hdr.dso_find_closest(5, 0x5000);
     ASSERT_TRUE(found2);
     ASSERT_EQ(it2->first, 0x5000);
-    ASSERT_EQ(it2->second, dso2);
+    ASSERT_TRUE(it2->second.same_mapping(dso2));
   }
 }
 

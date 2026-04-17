@@ -284,12 +284,20 @@ DsoHdr::DsoFindRes DsoHdr::dso_find_adjust_same(DsoMap &map, const Dso &dso) {
 }
 
 FileInfoId_t DsoHdr::get_or_insert_file_info(const Dso &dso) {
-  if (dso._id != k_file_info_undef) {
-    // already looked up this dso
-    return dso._id;
+  if (dso._id == k_file_info_undef) {
+    _stats.incr_metric(DsoStats::kTargetDso, dso._type);
+    update_id_from_dso(dso);
   }
-  _stats.incr_metric(DsoStats::kTargetDso, dso._type);
-  return update_id_from_dso(dso);
+
+  if (dso._id > k_file_info_error) {
+    if (!dso.get_cached_elf_file()) {
+      dso.set_cached_elf_file(get_or_create_cached_elf_file(dso._id));
+    }
+  } else {
+    dso.set_cached_elf_file(nullptr);
+  }
+
+  return dso._id;
 }
 
 FileInfoId_t DsoHdr::update_id_dd_profiling(const Dso &dso) {
@@ -351,6 +359,27 @@ FileInfoId_t DsoHdr::update_id_from_dso(const Dso &dso) {
   }
 
   return update_id_from_path(dso);
+}
+
+std::shared_ptr<CachedElfFile>
+DsoHdr::get_or_create_cached_elf_file(FileInfoId_t file_info_id) {
+  auto &weak_entry = _fd_cache[file_info_id];
+  auto cached_elf_file = weak_entry.lock();
+  if (!cached_elf_file) {
+    cached_elf_file = std::make_shared<CachedElfFile>();
+    weak_entry = cached_elf_file;
+  }
+  return cached_elf_file;
+}
+
+void DsoHdr::cleanup_expired_fd_cache_entries() {
+  for (auto it = _fd_cache.begin(); it != _fd_cache.end();) {
+    if (it->second.expired()) {
+      it = _fd_cache.erase(it);
+    } else {
+      ++it;
+    }
+  }
 }
 
 bool DsoHdr::maybe_insert_erase_overlap(Dso &&dso,
@@ -425,7 +454,10 @@ DsoHdr::DsoFindRes DsoHdr::dso_find_or_backpopulate(pid_t pid,
   return dso_find_or_backpopulate(pid_mapping, pid, addr);
 }
 
-void DsoHdr::pid_free(int pid) { _pid_map.erase(pid); }
+void DsoHdr::pid_free(int pid) {
+  _pid_map.erase(pid);
+  cleanup_expired_fd_cache_entries();
+}
 
 bool DsoHdr::pid_backpopulate(pid_t pid, int &nb_elts_added) {
   return pid_backpopulate(_pid_map[pid], pid, nb_elts_added);
@@ -567,6 +599,17 @@ int DsoHdr::get_nb_dso() const {
   return total_nb_elts;
 }
 
+size_t DsoHdr::get_fd_cache_size() const {
+  size_t nb_open_fds = 0;
+  for (const auto &[_, weak_cached_elf_file] : _fd_cache) {
+    if (auto cached_elf_file = weak_cached_elf_file.lock();
+        cached_elf_file && cached_elf_file->_fd) {
+      ++nb_open_fds;
+    }
+  }
+  return nb_open_fds;
+}
+
 void DsoHdr::reset_backpopulate_state(int reset_threshold) {
   for (auto &[_, pid_mapping] : _pid_map) {
     auto &backpopulate_state = pid_mapping._backpopulate_state;
@@ -633,8 +676,9 @@ int DsoHdr::clear_unvisited(const std::unordered_set<pid_t> &visited_pids) {
     }
   }
   for (const auto &pid : pids_to_clear) {
-    _pid_map.erase(pid);
+    pid_free(pid);
   }
+
   return pids_to_clear.size();
 }
 } // namespace ddprof

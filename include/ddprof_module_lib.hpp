@@ -30,7 +30,7 @@ struct Segment {
 };
 
 // From a dso object (and the matching file), attach the module to the dwfl
-// object, return the associated Dwfl_Module
+// object, return the associated Dwfl_Module.
 DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
                     const FileInfoValue &fileInfoValue, DDProfMod &ddprof_mod);
 
