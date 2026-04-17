@@ -29,7 +29,7 @@
 
 namespace ddprof {
 
-AllocationTracker *AllocationTracker::_instance;
+std::atomic<AllocationTracker *> AllocationTracker::_instance{nullptr};
 
 static_assert(sizeof(TrackerThreadLocalState) == DDPROF_TLS_STATE_SIZE,
               "Update DDPROF_TLS_STATE_SIZE in tls_state_storage.h");
@@ -62,6 +62,16 @@ DDPROF_NOINLINE auto sleep_and_retry_reserve(MPSCRingBufferWriter &writer,
   }
   return Buffer{};
 }
+
+// munmap of previous ring buffer is deferred here (not on free()) so in-flight
+// hooks cannot race with teardown.
+void reset_pevent(PEvent &pevent) {
+  if (pevent.mapfd != -1) {
+    pevent_munmap_event(&pevent);
+    pevent.fd = -1;
+    pevent.mapfd = -1;
+  }
+}
 } // namespace
 
 TrackerThreadLocalState &AllocationTracker::get_tl_state_no_init() {
@@ -83,50 +93,49 @@ AllocationTracker::get_tl_state(bool init_if_not_initialized) {
   return nullptr;
 }
 
-TrackerThreadLocalState *AllocationTracker::init_tl_state() {
+TrackerThreadLocalState *AllocationTracker::init_tl_state_internal() {
   // Placement new into TLS -- no heap allocation, no cleanup needed on thread
   // exit. Safe to call after fork (TLS memory is inherited by child).
   auto *state = new (ddprof_lib_state) TrackerThreadLocalState{};
   state->tid = ddprof::gettid();
   state->stack_bounds = retrieve_stack_bounds();
+  state->remaining_bytes -= next_sample_interval(state->gen);
   return state;
+}
+
+TrackerThreadLocalState *AllocationTracker::init_tl_state() {
+  AllocationTracker *instance = get_instance();
+  if (!instance) {
+    return nullptr;
+  }
+
+  return instance->init_tl_state_internal();
 }
 
 AllocationTracker::AllocationTracker() = default;
 
-AllocationTracker *AllocationTracker::create_instance() {
-  static AllocationTracker tracker;
-  return &tracker;
+AllocationTracker::~AllocationTracker() {
+  if (is_active()) {
+    push_allocation_tracker_state();
+    free();
+  }
 }
 
 DDRes AllocationTracker::allocation_tracking_init(
     uint64_t allocation_profiling_rate, uint32_t flags,
     uint32_t stack_sample_size, const RingBufferInfo &ring_buffer,
     const IntervalTimerCheck &timer_check) {
-  TrackerThreadLocalState *tl_state = get_tl_state();
-  if (!tl_state) {
-    // This is the time at which the tl_state should be initialized
-    return ddres_error(DD_WHAT_DWFL_LIB_ERROR);
-  }
-
-  ReentryGuard const guard(&tl_state->reentry_guard);
-
-  AllocationTracker *instance = create_instance();
-  auto &state = instance->_state;
-  std::lock_guard const lock{state.mutex};
-
-  if (state.track_allocations) {
+  if (_instance) {
     // the log here is acceptable as we assume we are not in a reentrant state
     DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW, "Allocation profiler already started");
   }
 
-  DDRES_CHECK_FWD(instance->init(allocation_profiling_rate,
-                                 flags & kDeterministicSampling,
-                                 flags & kTrackDeallocations, stack_sample_size,
-                                 ring_buffer, timer_check));
-  _instance = instance;
-
-  state.init(true, flags & kTrackDeallocations);
+  static AllocationTracker tracker;
+  DDRES_CHECK_FWD(tracker.init(allocation_profiling_rate,
+                               flags & kDeterministicSampling,
+                               flags & kTrackDeallocations, stack_sample_size,
+                               ring_buffer, timer_check));
+  _instance.store(&tracker, std::memory_order_release);
 
   return {};
 }
@@ -137,13 +146,17 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
                               uint32_t stack_sample_size,
                               const RingBufferInfo &ring_buffer,
                               const IntervalTimerCheck &timer_check) {
-  _sampling_interval = mem_profile_interval;
-  _deterministic_sampling = deterministic_sampling;
-  _stack_sample_size = stack_sample_size;
   if (ring_buffer.ring_buffer_type !=
       static_cast<int>(RingBufferType::kMPSCRingBuffer)) {
     return ddres_error(DD_WHAT_PERFRB);
   }
+
+  reset_pevent(_pevent);
+
+  _sampling_interval = mem_profile_interval;
+  _deterministic_sampling = deterministic_sampling;
+  _stack_sample_size = stack_sample_size;
+  _high_priority_area_size = 0;
   if (track_deallocations) {
     _allocated_address_set.init(0); // Use default size, fail on add if full
     constexpr double k_max_high_priority_area_size_fraction = 0.1;
@@ -152,8 +165,6 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
         std::min(static_cast<size_t>(ring_buffer.mem_size *
                                      k_max_high_priority_area_size_fraction),
                  k_high_priority_event_count * (sizeof(DeallocationEvent) + 8));
-  } else {
-    _high_priority_area_size = 0;
   }
 
   DDRES_CHECK_FWD(ddprof::ring_buffer_attach(ring_buffer, &_pevent));
@@ -169,36 +180,38 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
 
   _interval_timer_check = timer_check;
   if (_interval_timer_check.is_set()) {
-    _state.next_check_time.store(
-        _interval_timer_check.initial_delay.count()
-            ? PerfClock::now() + _interval_timer_check.initial_delay
-            : PerfClock::now() + _interval_timer_check.interval,
-        std::memory_order_release);
+    auto delay = _interval_timer_check.initial_delay.count()
+        ? _interval_timer_check.initial_delay
+        : _interval_timer_check.interval;
+    _state.next_check_time.store(PerfClock::now() + delay,
+                                 std::memory_order_release);
   } else {
     _state.next_check_time.store(PerfClock::time_point::max(),
                                  std::memory_order_release);
   }
 
+  _state.track_deallocations = track_deallocations;
+  _state.lost_alloc_count = 0;
+  _state.lost_dealloc_count = 0;
+  _state.failure_count = 0;
+  _state.address_conflict_count = 0;
+  _state.pid = getpid();
+
+  init_tl_state_internal();
+
   return {};
 }
 
 void AllocationTracker::free() {
-  _state.track_allocations = false;
   _state.track_deallocations = false;
 
-  pevent_munmap_event(&_pevent);
-
-  // Do not destroy the object:
-  // there is an inherent race condition between checking
-  // `_state.track_allocations ` and calling `_instance->track_allocation`.
-  // That's why AllocationTracker is kept in a usable state and
-  // `_track_allocation` is checked again in `_instance->track_allocation` while
-  // taking the mutex lock.
-  _instance = nullptr;
+  // Do not destroy the object as it could still be used by other threads.
+  // Keep it in a usable state until the end of the program.
+  _instance.store(nullptr, std::memory_order_release);
 }
 
 void AllocationTracker::allocation_tracking_free() {
-  AllocationTracker *instance = _instance;
+  AllocationTracker *instance = get_instance();
   if (!instance) {
     return;
   }
@@ -233,22 +246,7 @@ void AllocationTracker::track_allocation(uintptr_t addr, size_t /*size*/,
   // Reentrancy should be prevented by caller (by using ReentryGuard on
   // TrackerThreadLocalState::reentry_guard).
 
-  // recheck if profiling is enabled
-  if (!_state.track_allocations) {
-    return;
-  }
-
   int64_t remaining_bytes = tl_state.remaining_bytes;
-
-  if (unlikely(!tl_state.remaining_bytes_initialized)) {
-    // tl_state.remaining bytes was not initialized yet for this thread
-    remaining_bytes -= next_sample_interval(tl_state.gen);
-    tl_state.remaining_bytes_initialized = true;
-    if (remaining_bytes < 0) {
-      tl_state.remaining_bytes = remaining_bytes;
-      return;
-    }
-  }
 
   // compute number of samples this allocation should be accounted for
   auto sampling_interval = _sampling_interval;
@@ -574,8 +572,9 @@ void AllocationTracker::notify_thread_start() {
 }
 
 void AllocationTracker::notify_fork() {
-  if (_instance) {
-    _instance->_state.pid = getpid();
+  AllocationTracker *instance = get_instance();
+  if (instance) {
+    instance->_state.pid = getpid();
   }
   TrackerThreadLocalState *tl_state = get_tl_state();
   if (unlikely(!tl_state)) {

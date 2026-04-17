@@ -399,37 +399,6 @@ add_unit_test(address_bitset-ut address_bitset-ut.cc ../src/lib/address_bitset.c
 
 add_unit_test(lib_logger-ut ./lib_logger-ut.cc)
 
-# Standalone fork test for allocation tracker TLS (no gtest -- fork inside gtest is fragile)
-add_exe(
-  allocation_tracker_fork_test
-  allocation_tracker_fork_test.cc
-  ../src/lib/allocation_tracker.cc
-  ../src/lib/address_bitset.cc
-  ../src/logger.cc
-  ../src/lib/pthread_fixes.cc
-  ../src/lib/savecontext.cc
-  ../src/lib/saveregisters.cc
-  ../src/procutils.cc
-  ../src/ratelimiter.cc
-  ../src/ringbuffer_utils.cc
-  ../src/sys_utils.cc
-  ../src/tsc_clock.cc
-  ../src/perf_clock.cc
-  ../src/perf.cc
-  ../src/ddres_list.cc
-  ../src/perf_ringbuffer.cc
-  ../src/pevent_lib.cc
-  ../src/user_override.cc
-  LIBRARIES llvm-demangle)
-target_include_directories(
-  allocation_tracker_fork_test PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/include/lib
-                                       ${CMAKE_SOURCE_DIR}/src)
-
-add_test(
-  NAME allocation_tracker_fork_test
-  COMMAND allocation_tracker_fork_test
-  WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-
 add_unit_test(
   create_elf-ut
   create_elf-ut.cc

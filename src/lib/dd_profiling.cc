@@ -180,6 +180,7 @@ void set_profiler_library_inactive() {
 
 void allocation_profiling_stop() {
   if (g_state.allocation_profiling_started) {
+    restore_overrides();
     AllocationTracker::allocation_tracking_free();
     g_state.allocation_profiling_started = false;
   }

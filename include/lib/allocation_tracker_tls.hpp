@@ -9,9 +9,10 @@ namespace ddprof {
 
 struct TrackerThreadLocalState {
   int64_t remaining_bytes{0}; // remaining allocation bytes until next sample
-  bool remaining_bytes_initialized{false}; // false if remaining_bytes is not
-                                           // initialized
   std::span<const std::byte> stack_bounds;
+  // In the choice of random generators, this one is smaller
+  // - smaller than mt19937 (8 vs 5K)
+  std::minstd_rand gen{std::random_device{}()};
 
   pid_t tid{-1}; // cache of tid
 
@@ -35,10 +36,6 @@ struct TrackerThreadLocalState {
   // Set to true by placement new in init_tl_state().
   // Zero-initialized (false) in a fresh thread's TLS before init.
   bool initialized{true};
-
-  // In the choice of random generators, this one is smaller
-  // - smaller than mt19937 (8 vs 5K)
-  std::minstd_rand gen{std::random_device{}()};
 };
 
 } // namespace ddprof
