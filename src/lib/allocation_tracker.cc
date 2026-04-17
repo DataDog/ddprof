@@ -115,9 +115,8 @@ TrackerThreadLocalState *AllocationTracker::init_tl_state() {
 AllocationTracker::AllocationTracker() = default;
 
 AllocationTracker::~AllocationTracker() {
-  AllocationTracker *instance = get_instance();
-  if (instance) {
-    instance->push_allocation_tracker_state();
+  if (is_active()) {
+    push_allocation_tracker_state();
     free();
   }
 }
