@@ -62,6 +62,16 @@ DDPROF_NOINLINE auto sleep_and_retry_reserve(MPSCRingBufferWriter &writer,
   }
   return Buffer{};
 }
+
+// munmap of previous ring buffer is deferred here (not on free()) so in-flight
+// hooks cannot race with teardown.
+void reset_pevent(PEvent &pevent) {
+  if (pevent.mapfd != -1) {
+    pevent_munmap_event(&pevent);
+    pevent.fd = -1;
+    pevent.mapfd = -1;
+  }
+}
 } // namespace
 
 TrackerThreadLocalState &AllocationTracker::get_tl_state_no_init() {
@@ -103,6 +113,7 @@ TrackerThreadLocalState *AllocationTracker::init_tl_state() {
 }
 
 AllocationTracker::AllocationTracker() = default;
+
 AllocationTracker::~AllocationTracker() {
   AllocationTracker *instance = get_instance();
   if (instance) {
@@ -111,36 +122,21 @@ AllocationTracker::~AllocationTracker() {
   }
 }
 
-AllocationTracker *AllocationTracker::create_instance() {
-  static AllocationTracker tracker;
-  return &tracker;
-}
-
 DDRes AllocationTracker::allocation_tracking_init(
     uint64_t allocation_profiling_rate, uint32_t flags,
     uint32_t stack_sample_size, const RingBufferInfo &ring_buffer,
     const IntervalTimerCheck &timer_check) {
-
   if (_instance) {
     // the log here is acceptable as we assume we are not in a reentrant state
     DDRES_RETURN_ERROR_LOG(DD_WHAT_UKNW, "Allocation profiler already started");
   }
-  AllocationTracker *instance = create_instance();
 
-  if (instance->_pevent.mapfd != -1) {
-    // unmap previous ring buffer if it exists
-    pevent_munmap_event(&instance->_pevent);
-    instance->_pevent.fd = -1;
-    instance->_pevent.mapfd = -1;
-  }
-
-  DDRES_CHECK_FWD(instance->init(allocation_profiling_rate,
-                                 flags & kDeterministicSampling,
-                                 flags & kTrackDeallocations, stack_sample_size,
-                                 ring_buffer, timer_check));
-  instance->_state.init(flags & kTrackDeallocations);
-  instance->init_tl_state_internal();
-  _instance.store(instance, std::memory_order_release);
+  static AllocationTracker tracker;
+  DDRES_CHECK_FWD(tracker.init(allocation_profiling_rate,
+                               flags & kDeterministicSampling,
+                               flags & kTrackDeallocations, stack_sample_size,
+                               ring_buffer, timer_check));
+  _instance.store(&tracker, std::memory_order_release);
 
   return {};
 }
@@ -151,13 +147,17 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
                               uint32_t stack_sample_size,
                               const RingBufferInfo &ring_buffer,
                               const IntervalTimerCheck &timer_check) {
-  _sampling_interval = mem_profile_interval;
-  _deterministic_sampling = deterministic_sampling;
-  _stack_sample_size = stack_sample_size;
   if (ring_buffer.ring_buffer_type !=
       static_cast<int>(RingBufferType::kMPSCRingBuffer)) {
     return ddres_error(DD_WHAT_PERFRB);
   }
+
+  reset_pevent(_pevent);
+
+  _sampling_interval = mem_profile_interval;
+  _deterministic_sampling = deterministic_sampling;
+  _stack_sample_size = stack_sample_size;
+  _high_priority_area_size = 0;
   if (track_deallocations) {
     _allocated_address_set.init(0); // Use default size, fail on add if full
     constexpr double k_max_high_priority_area_size_fraction = 0.1;
@@ -166,8 +166,6 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
         std::min(static_cast<size_t>(ring_buffer.mem_size *
                                      k_max_high_priority_area_size_fraction),
                  k_high_priority_event_count * (sizeof(DeallocationEvent) + 8));
-  } else {
-    _high_priority_area_size = 0;
   }
 
   DDRES_CHECK_FWD(ddprof::ring_buffer_attach(ring_buffer, &_pevent));
@@ -183,15 +181,24 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
 
   _interval_timer_check = timer_check;
   if (_interval_timer_check.is_set()) {
-    _state.next_check_time.store(
-        _interval_timer_check.initial_delay.count()
-            ? PerfClock::now() + _interval_timer_check.initial_delay
-            : PerfClock::now() + _interval_timer_check.interval,
-        std::memory_order_release);
+    auto delay = _interval_timer_check.initial_delay.count()
+        ? _interval_timer_check.initial_delay
+        : _interval_timer_check.interval;
+    _state.next_check_time.store(PerfClock::now() + delay,
+                                 std::memory_order_release);
   } else {
     _state.next_check_time.store(PerfClock::time_point::max(),
                                  std::memory_order_release);
   }
+
+  _state.track_deallocations = track_deallocations;
+  _state.lost_alloc_count = 0;
+  _state.lost_dealloc_count = 0;
+  _state.failure_count = 0;
+  _state.address_conflict_count = 0;
+  _state.pid = getpid();
+
+  init_tl_state_internal();
 
   return {};
 }

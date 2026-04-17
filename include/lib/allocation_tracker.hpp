@@ -90,14 +90,6 @@ private:
 
   // NOLINTBEGIN(misc-non-private-member-variables-in-classes)
   struct TrackerState {
-    void init(bool track_dealloc) {
-      track_deallocations = track_dealloc;
-      lost_alloc_count = 0;
-      lost_dealloc_count = 0;
-      failure_count = 0;
-      address_conflict_count = 0;
-      pid = getpid();
-    }
     std::mutex mutex;
     std::atomic<bool> track_deallocations = false;
     std::atomic<uint64_t> lost_alloc_count;   // count number of lost events
@@ -118,8 +110,6 @@ private:
              const RingBufferInfo &ring_buffer,
              const IntervalTimerCheck &timer_check);
   void free();
-
-  static AllocationTracker *create_instance();
 
   void track_allocation(uintptr_t addr, size_t size,
                         TrackerThreadLocalState &tl_state, bool is_large_alloc);
