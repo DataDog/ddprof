@@ -9,16 +9,24 @@ namespace ddprof {
 
 struct TrackerThreadLocalState {
   int64_t remaining_bytes{0}; // remaining allocation bytes until next sample
-  bool remaining_bytes_initialized{false}; // false if remaining_bytes is not
-                                           // initialized
   std::span<const std::byte> stack_bounds;
+  // In the choice of random generators, this one is smaller
+  // - smaller than mt19937 (8 vs 5K)
+  std::minstd_rand gen{std::random_device{}()};
 
   pid_t tid{-1}; // cache of tid
 
   bool reentry_guard{false}; // prevent reentry in AllocationTracker (eg. when
                              // allocation are done inside AllocationTracker)
                              // and double counting of allocations (eg. when new
-                             // calls malloc, or malloc calls mmap internally)
+                             // calls malloc, or malloc calls mmap internally).
+                             // Also used on uninitialized TLS (before placement
+                             // new) to indicate we are inside a hooked
+                             // pthread_getattr_np call, preventing get_tl_state
+                             // from calling init_tl_state which would deadlock
+                             // (init_tl_state -> save_context ->
+                             // pthread_getattr_np). Safe because placement new
+                             // in init_tl_state resets this field to false.
 
   bool allocation_allowed{true}; // Indicate if allocation is allowed or not
                                  // (eg. when we are in mmap hook, we
@@ -28,10 +36,6 @@ struct TrackerThreadLocalState {
   // Set to true by placement new in init_tl_state().
   // Zero-initialized (false) in a fresh thread's TLS before init.
   bool initialized{true};
-
-  // In the choice of random generators, this one is smaller
-  // - smaller than mt19937 (8 vs 5K)
-  std::minstd_rand gen{std::random_device{}()};
 };
 
 } // namespace ddprof

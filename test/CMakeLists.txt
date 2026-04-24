@@ -412,37 +412,6 @@ add_unit_test(address_bitset-ut address_bitset-ut.cc ../src/lib/address_bitset.c
 
 add_unit_test(lib_logger-ut ./lib_logger-ut.cc)
 
-# Standalone fork test for allocation tracker TLS (no gtest -- fork inside gtest is fragile)
-add_exe(
-  allocation_tracker_fork_test
-  allocation_tracker_fork_test.cc
-  ../src/lib/allocation_tracker.cc
-  ../src/lib/address_bitset.cc
-  ../src/logger.cc
-  ../src/lib/pthread_fixes.cc
-  ../src/lib/savecontext.cc
-  ../src/lib/saveregisters.cc
-  ../src/procutils.cc
-  ../src/ratelimiter.cc
-  ../src/ringbuffer_utils.cc
-  ../src/sys_utils.cc
-  ../src/tsc_clock.cc
-  ../src/perf_clock.cc
-  ../src/perf.cc
-  ../src/ddres_list.cc
-  ../src/perf_ringbuffer.cc
-  ../src/pevent_lib.cc
-  ../src/user_override.cc
-  LIBRARIES llvm-demangle)
-target_include_directories(
-  allocation_tracker_fork_test PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/include/lib
-                                       ${CMAKE_SOURCE_DIR}/src)
-
-add_test(
-  NAME allocation_tracker_fork_test
-  COMMAND allocation_tracker_fork_test
-  WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-
 add_unit_test(
   create_elf-ut
   create_elf-ut.cc
@@ -542,19 +511,47 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/check_no_tls-ut.sh
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
+  add_unit_test(sha256-ut sha256-ut.cc ../src/lib/sha256.c)
+
+  if(USE_LOADER)
+    add_test(
+      NAME hash_mismatch
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/hash_mismatch-ut.sh
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+    add_test(
+      NAME loader_installed_lib
+      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/loader_installed_lib-ut.sh
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+  endif()
+
   if(BUILD_UNIVERSAL_DDPROF)
     add_test(NAME check-injected-lib
              COMMAND ${CMAKE_SOURCE_DIR}/tools/check_for_unsafe_libc_functions.py
                      $<TARGET_FILE:dd_profiling-embedded>)
   endif()
+
 endif()
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
-  add_exe(pthread_deadlock pthread_deadlock.cc LIBRARIES Threads::Threads)
+  add_exe(pthread_deadlock pthread_deadlock.cc LIBRARIES dd_profiling-shared Threads::Threads dl)
+  target_include_directories(pthread_deadlock PRIVATE ${CMAKE_SOURCE_DIR}/include)
   add_test(
     NAME pthread_deadlock
-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/pthread_deadlock-ut.sh
+    COMMAND pthread_deadlock
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+  set_tests_properties(pthread_deadlock PROPERTIES TIMEOUT 5)
+
+  if(TARGET jemalloc::jemalloc_static)
+    add_exe(pthread_deadlock_mmap pthread_deadlock_mmap.cc
+            LIBRARIES dd_profiling-shared jemalloc::jemalloc_static Threads::Threads dl)
+    target_include_directories(pthread_deadlock_mmap PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    add_test(
+      NAME pthread_deadlock_mmap
+      COMMAND pthread_deadlock_mmap
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+    set_tests_properties(pthread_deadlock_mmap PROPERTIES TIMEOUT 5)
+  endif()
 endif()
 
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")

@@ -4,7 +4,7 @@
 
 # libdatadog : common profiler imported libraries https://github.com/DataDog/libdatadog/releases
 set(TAG_LIBDATADOG
-    "v29.0.0"
+    "v30.0.0"
     CACHE STRING "libdatadog github tag")
 
 # Override with a local build by passing -DDatadog_LOCAL_ROOT=/path/to/libdatadog

@@ -16,7 +16,6 @@
 #include "signal_helper.hpp"
 #include "symbol_overrides.hpp"
 #include "syscalls.hpp"
-
 #include <cassert>
 #include <cerrno>
 #include <chrono>
@@ -181,6 +180,7 @@ void set_profiler_library_inactive() {
 
 void allocation_profiling_stop() {
   if (g_state.allocation_profiling_started) {
+    restore_overrides();
     AllocationTracker::allocation_tracking_free();
     g_state.allocation_profiling_started = false;
   }

@@ -6,6 +6,8 @@
 #include "constants.hpp"
 #include "dd_profiling.h"
 #include "lib_embedded_data.h"
+#include "libdd_profiling-embedded_hash.h"
+#include "sha256.h"
 #include "tls_state_storage.h"
 
 #include <dlfcn.h>
@@ -14,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
@@ -51,6 +54,7 @@ __attribute__((aligned(DDPROF_TLS_STATE_ALIGN))) __thread char
 char *dlerror(void) __attribute__((weak));
 void *dlopen(const char *filename, int flags) __attribute__((weak));
 void *dlsym(void *handle, const char *symbol) __attribute__((weak));
+int dladdr(const void *addr, Dl_info *info) __attribute__((weak));
 // NOLINTNEXTLINE(cert-dcl51-cpp)
 void *__libc_dlopen_mode(const char *filename, int flag) __attribute__((weak));
 // NOLINTNEXTLINE(cert-dcl51-cpp)
@@ -63,23 +67,32 @@ int timer_create(clockid_t clockid, struct sigevent *sevp, timer_t *timerid)
 static void *s_libdl_handle = NULL;
 static __typeof(dlerror) *s_dlerror = &dlerror;
 static __typeof(dlopen) *s_dlopen = &dlopen;
+static __typeof(dladdr) *s_dladdr = &dladdr;
 
 static void ensure_libdl_is_loaded();
 
-static void *my_dlopen(const char *filename, int flags) {
+static void *my_dlopen_impl(const char *filename, int flags, int silent) {
   if (!s_dlopen) {
     // if libdl.so is not loaded, use __libc_dlopen_mode
     s_dlopen = __libc_dlopen_mode;
   }
   if (s_dlopen) {
     void *ret = s_dlopen(filename, flags);
-    if (!ret && s_dlerror) {
+    if (!ret && !silent && s_dlerror) {
       fprintf(stderr, "Failed to dlopen %s (%s)\n", filename, s_dlerror());
     }
     return ret;
   }
   // Should not happen
   return NULL;
+}
+
+static void *my_dlopen(const char *filename, int flags) {
+  return my_dlopen_impl(filename, flags, 0);
+}
+
+static void *my_dlopen_silent(const char *filename, int flags) {
+  return my_dlopen_impl(filename, flags, 1);
 }
 
 static void *my_dlsym(void *handle, const char *symbol) {
@@ -124,6 +137,9 @@ static void ensure_libdl_is_loaded() {
     if (!s_dlerror) {
       s_dlerror = (__typeof(dlerror) *)my_dlsym(s_libdl_handle, "dlerror");
     }
+    if (!s_dladdr) {
+      s_dladdr = (__typeof(dladdr) *)my_dlsym(s_libdl_handle, "dladdr");
+    }
   }
 }
 
@@ -143,6 +159,45 @@ static void ensure_librt_is_loaded() {
   if (!timer_create) {
     my_dlopen("librt.so.1", RTLD_GLOBAL | RTLD_NOW);
   }
+}
+
+// When the loader is dlopen'd with RTLD_GLOBAL, glibc does not promote its
+// symbols to global scope until dlopen returns. The embedded .so references
+// ddprof_lib_state (defined here in the loader) as an undefined symbol, so
+// loading it with RTLD_NOW during our constructor fails with
+// "undefined symbol: ddprof_lib_state".
+//
+// Fix: re-open ourselves with RTLD_NOLOAD | RTLD_GLOBAL to promote our
+// symbols before loading the embedded .so. When loaded via LD_PRELOAD,
+// symbols are already in global scope so this is a harmless no-op.
+//
+// On musl, RTLD_NOLOAD with a bare SONAME fails because musl tracks loaded
+// libraries by their actual path, not their SONAME. Use dladdr() to find
+// the loader's actual path first, which works on both musl and glibc.
+static void ensure_loader_symbols_promoted() {
+#ifdef DDPROF_LOADER_SONAME
+  // Use dladdr() to find the actual path of this library at runtime.
+  // This is necessary on musl, where RTLD_NOLOAD with a bare SONAME fails
+  // because musl tracks loaded libraries by their full path, not their SONAME.
+  Dl_info info;
+  if (s_dladdr && s_dladdr((void *)ddprof_start_profiling, &info) &&
+      info.dli_fname) {
+    void *self =
+        my_dlopen_silent(info.dli_fname, RTLD_GLOBAL | RTLD_NOLOAD | RTLD_NOW);
+    if (self) {
+      return;
+    }
+  }
+  // Fallback: try by SONAME (works on glibc when dladdr is unavailable or
+  // returns a different path than what the dynamic linker tracks).
+  void *self = my_dlopen_silent(DDPROF_LOADER_SONAME,
+                                RTLD_GLOBAL | RTLD_NOLOAD | RTLD_NOW);
+  if (!self) {
+    fprintf(stderr,
+            "ddprof loader: failed to promote symbols to global scope "
+            "-- embedded library may fail to load\n");
+  }
+#endif
 }
 
 static const char *temp_directory_path() {
@@ -248,40 +303,173 @@ static void *s_profiling_lib_handle = NULL;
 __typeof(ddprof_start_profiling) *s_start_profiling_func = NULL;
 __typeof(ddprof_stop_profiling) *s_stop_profiling_func = NULL;
 
-static void __attribute__((constructor)) loader() {
-  char *lib_profiling_path = getenv(k_profiler_lib_env_variable);
-  if (!lib_profiling_path) {
-    EmbeddedData lib_data = profiling_lib_data();
-    EmbeddedData exe_data = profiler_exe_data();
-    if (lib_data.size == 0 || exe_data.size == 0) {
-      // nothing to do
-      return;
-    }
-    lib_profiling_path = get_or_create_temp_file(
-        k_libdd_profiling_embedded_name, lib_data, 0644);
-    char *profiler_exe_path =
-        get_or_create_temp_file(k_profiler_exe_name, exe_data, 0755);
-    if (!lib_profiling_path || !profiler_exe_path) {
-      free(lib_profiling_path);
-      free(profiler_exe_path);
-      return;
-    }
-    setenv(k_profiler_ddprof_exe_env_variable, profiler_exe_path, 1);
-    free(profiler_exe_path);
-  } else {
-    lib_profiling_path = strdup(lib_profiling_path);
-    if (!lib_profiling_path) {
-      return;
-    }
+// ---------------------------------------------------------------------------
+// Find the installed libdd_profiling-embedded.so next to the loader and verify
+// its SHA-256 matches the build-time hash before dlopen'ing it.
+// Returns a malloc'd path on success, NULL if not found or hash mismatch.
+// Caller must free().
+// ---------------------------------------------------------------------------
+static char *find_installed_profiling_lib() {
+  Dl_info info;
+  if (!s_dladdr || !s_dladdr((void *)ddprof_start_profiling, &info) ||
+      !info.dli_fname) {
+    return NULL;
+  }
+  const char *last_slash = strrchr(info.dli_fname, '/');
+  if (!last_slash) {
+    return NULL;
+  }
+  size_t dir_len = last_slash - info.dli_fname;
+  size_t name_len = strlen(k_libdd_profiling_embedded_name);
+  char *lib_path = malloc(dir_len + 1 + name_len + 1);
+  if (!lib_path) {
+    return NULL;
+  }
+  memcpy(lib_path, info.dli_fname, dir_len);
+  lib_path[dir_len] = '/';
+  memcpy(lib_path + dir_len + 1, k_libdd_profiling_embedded_name, name_len + 1);
+
+  int fd = open(lib_path, O_RDONLY | O_CLOEXEC);
+  if (fd == -1) {
+    free(lib_path);
+    return NULL;
   }
 
+  struct stat st;
+  if (fstat(fd, &st) != 0 || st.st_size == 0) {
+    close(fd);
+    free(lib_path);
+    return NULL;
+  }
+
+  void *mapped = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+  close(fd);
+  if (mapped == MAP_FAILED) {
+    free(lib_path);
+    return NULL;
+  }
+
+  unsigned char hash[32];
+  sha256((const unsigned char *)mapped, st.st_size, hash);
+  munmap(mapped, st.st_size);
+
+  char hex[65];
+  sha256_hex(hash, hex);
+
+  if (strcmp(hex, libdd_profiling_embedded_hash) != 0) {
+    fprintf(stderr,
+            "ddprof: hash mismatch for installed %s "
+            "(got %.16s..., expected %.16s...); "
+            "falling back to embedded library.\n",
+            k_libdd_profiling_embedded_name, hex,
+            libdd_profiling_embedded_hash);
+    free(lib_path);
+    return NULL;
+  }
+
+  return lib_path;
+}
+
+// Find the ddprof executable relative to the loader's own on-disk location.
+// The loader, the installed embedded lib, and the ddprof exe are all part of
+// the same package, so they share a common install prefix.
+// Checks:
+//   1. <loader_dir>/../bin/ddprof  — standard install layout
+//   2. <loader_dir>/ddprof         — flat build/dev layout
+// Returns a malloc'd path on success, NULL if not found.  Caller must free().
+static char *find_ddprof_exe() {
+  Dl_info info;
+  if (!s_dladdr || !s_dladdr((void *)ddprof_start_profiling, &info) ||
+      !info.dli_fname) {
+    return NULL;
+  }
+  const char *last_slash = strrchr(info.dli_fname, '/');
+  if (!last_slash) {
+    return NULL;
+  }
+  size_t dir_len = last_slash - info.dli_fname;
+  static const char *const candidates[] = {
+      "/../bin/ddprof", // standard install: <prefix>/ddprof/{lib,bin}/
+      "/ddprof",        // flat build/dev layout
+      NULL,
+  };
+  for (const char *const *rel = candidates; *rel; ++rel) {
+    size_t rel_len = strlen(*rel);
+    char *exe_path = malloc(dir_len + rel_len + 1);
+    if (!exe_path) {
+      continue;
+    }
+    memcpy(exe_path, info.dli_fname, dir_len);
+    memcpy(exe_path + dir_len, *rel, rel_len + 1);
+    if (access(exe_path, X_OK) == 0) {
+      return exe_path;
+    }
+    free(exe_path);
+  }
+  return NULL;
+}
+
+// Extract both the profiling library and the ddprof binary from embedded data
+// to /tmp and load the library.  Returns the dlopen handle or NULL on failure.
+static void *load_embedded_profiling_lib() {
+  EmbeddedData lib_data = profiling_lib_data();
+  EmbeddedData exe_data = profiler_exe_data();
+  if (lib_data.size == 0 || exe_data.size == 0) {
+    return NULL;
+  }
+  char *lib_path =
+      get_or_create_temp_file(k_libdd_profiling_embedded_name, lib_data, 0644);
+  char *exe_path = get_or_create_temp_file(k_profiler_exe_name, exe_data, 0755);
+  if (!lib_path || !exe_path) {
+    free(lib_path);
+    free(exe_path);
+    return NULL;
+  }
+  setenv(k_profiler_ddprof_exe_env_variable, exe_path, 1);
+  free(exe_path);
+  void *handle = my_dlopen(lib_path, RTLD_LOCAL | RTLD_NOW);
+  free(lib_path);
+  return handle;
+}
+
+static void __attribute__((constructor)) loader() {
   ensure_libdl_is_loaded();
   ensure_libm_is_loaded();
   ensure_libpthread_is_loaded();
   ensure_librt_is_loaded();
+  ensure_loader_symbols_promoted();
 
-  s_profiling_lib_handle = my_dlopen(lib_profiling_path, RTLD_LOCAL | RTLD_NOW);
-  free(lib_profiling_path);
+  const char *lib_profiling_path = getenv(k_profiler_lib_env_variable);
+  if (lib_profiling_path) {
+    s_profiling_lib_handle =
+        my_dlopen(lib_profiling_path, RTLD_LOCAL | RTLD_NOW);
+  } else {
+    // Check for the exe and an installed lib (with matching hash) before
+    // dlopen.  Both must exist; otherwise fall back to embedded extraction.
+    char *exe_path = find_ddprof_exe();
+    if (exe_path) {
+      char *lib_path = find_installed_profiling_lib();
+      if (lib_path) {
+        setenv(k_profiler_ddprof_exe_env_variable, exe_path, 1);
+        void *handle = my_dlopen(lib_path, RTLD_LOCAL | RTLD_NOW);
+        if (handle) {
+          s_profiling_lib_handle = handle;
+        } else {
+          fprintf(stderr,
+                  "ddprof: failed to dlopen installed %s, falling back to "
+                  "embedded library\n",
+                  lib_path);
+          unsetenv(k_profiler_ddprof_exe_env_variable);
+        }
+        free(lib_path);
+      }
+      free(exe_path);
+    }
+    if (!s_profiling_lib_handle) {
+      s_profiling_lib_handle = load_embedded_profiling_lib();
+    }
+  }
+
   if (s_profiling_lib_handle) {
     s_start_profiling_func = (__typeof(s_start_profiling_func))my_dlsym(
         s_profiling_lib_handle, "ddprof_start_profiling");

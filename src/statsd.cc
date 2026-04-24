@@ -136,15 +136,21 @@ DDRes statsd_send(int fd_sock, const char *key, const void *val, int type) {
     DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Serialization failed");
   }
 
-  // Nothing to do if the write fails
-  while (static_cast<ssize_t>(sz) != write(fd_sock, buf, sz) &&
-         errno == EINTR) {
-    // Don't consider this as fatal.
-    if (errno == EWOULDBLOCK || errno == EAGAIN) {
-      DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Write failed (sys buffer full)");
-    } else {
+  size_t written = 0;
+  int eintr_retries = 0;
+  while (written < sz) {
+    const ssize_t ret = write(fd_sock, buf + written, sz - written);
+    if (ret == -1) {
+      constexpr int k_max_eintr_retries = 10;
+      if (errno == EINTR && ++eintr_retries < k_max_eintr_retries) {
+        continue;
+      }
+      if (errno == EWOULDBLOCK || errno == EAGAIN) {
+        DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Write failed (sys buffer full)");
+      }
       DDRES_RETURN_WARN_LOG(DD_WHAT_STATSD, "Write failed");
     }
+    written += static_cast<size_t>(ret);
   }
   return {};
 }
