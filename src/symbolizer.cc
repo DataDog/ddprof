@@ -42,6 +42,7 @@ void Symbolizer::reset_unvisited_flag() {
 Symbolizer::BlazeSymbolizerWrapper &
 Symbolizer::get_symbolizer(FileInfoId_t file_id, const std::string &elf_src) {
   if (auto it = _symbolizer_map.find(file_id); it != _symbolizer_map.end()) {
+    it->second.visited = true;
     return it->second;
   }
   auto [it, inserted] = _symbolizer_map.emplace(
