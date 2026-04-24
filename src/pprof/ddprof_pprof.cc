@@ -87,8 +87,6 @@ static_assert(std::string_view(
 // their count companions across all watcher kinds).
 constexpr int k_max_value_types = 16;
 
-
-
 std::string_view pid_str(pid_t pid,
                          std::unordered_map<pid_t, std::string> &pid_strs);
 
@@ -268,7 +266,6 @@ struct SlotRegistry {
   }
 };
 
-
 std::span<const FunLoc> adjust_locations(const PerfWatcher *watcher,
                                          std::span<const FunLoc> locs) {
   if (watcher->options.nb_frames_to_skip < locs.size()) {
@@ -441,9 +438,9 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx,
     };
   }
 
-  ddog_prof_Status status = ddog_prof_Profile_with_dictionary(
-      &pprof->_profile, dict, sample_types,
-      slots.count > 0 ? &period : nullptr);
+  ddog_prof_Status status =
+      ddog_prof_Profile_with_dictionary(&pprof->_profile, dict, sample_types,
+                                        slots.count > 0 ? &period : nullptr);
 
   if (status.err != nullptr) {
     defer { ddog_prof_Status_drop(&status); };

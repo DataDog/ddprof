@@ -469,6 +469,20 @@ add_benchmark(
 add_benchmark(address_bitset-bench address_bitset-bench.cc ../src/lib/address_bitset.cc
               LIBRARIES absl::flat_hash_map absl::hash)
 
+add_benchmark(
+  pprof_aggregate-bench
+  pprof_aggregate-bench.cc
+  ../src/ddog_profiling_utils.cc
+  ../src/ddprof_cmdline_watcher.cc
+  ../src/pprof/ddprof_pprof.cc
+  ../src/symbol_hdr.cc
+  ../src/symbolizer.cc
+  ../src/demangler/demangler.cc
+  ../src/perf_watcher.cc
+  ../src/tracepoint_config.cc
+  LIBRARIES Datadog::Profiling DDProf::Parser llvm-demangle
+  DEFINITIONS MYNAME="pprof_aggregate-bench")
+
 set(SIMPLE_MALLOC_SRC simple_malloc.cc ../src/signal_helper.cc)
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
