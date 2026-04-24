@@ -15,7 +15,7 @@
 #include "runtime_symbol_lookup.hpp"
 
 #include <cstdlib>
-#include <memory>
+#include <utility>
 
 // Forward declarations for libdatadog types (must be at global scope)
 struct ddog_prof_ProfilesDictionary;
@@ -23,13 +23,44 @@ using ddog_prof_ProfilesDictionaryHandle = ddog_prof_ProfilesDictionary *;
 
 namespace ddprof {
 
-struct ProfilesDictionaryDeleter {
-  void operator()(ddog_prof_ProfilesDictionaryHandle *handle) const;
-};
+// RAII wrapper around a libdatadog ProfilesDictionary handle.
+// The libdatadog typedef `ProfilesDictionaryHandle` is already a pointer
+// (`ProfilesDictionary *`), and the C API takes it by pointer-to-handle so
+// it can write/zero the slot. We hold the handle inline — callers that need
+// the pointer-to-handle the C API wants just call `get()`.
+class ProfilesDictionary {
+public:
+  ProfilesDictionary();
+  ~ProfilesDictionary();
 
-using ProfilesDictionaryPtr =
-    std::unique_ptr<ddog_prof_ProfilesDictionaryHandle,
-                    ProfilesDictionaryDeleter>;
+  ProfilesDictionary(const ProfilesDictionary &) = delete;
+  ProfilesDictionary &operator=(const ProfilesDictionary &) = delete;
+
+  ProfilesDictionary(ProfilesDictionary &&o) noexcept
+      : _handle(std::exchange(o._handle, nullptr)) {}
+  ProfilesDictionary &operator=(ProfilesDictionary &&o) noexcept {
+    if (this != &o) {
+      reset();
+      _handle = std::exchange(o._handle, nullptr);
+    }
+    return *this;
+  }
+
+  explicit operator bool() const { return _handle != nullptr; }
+
+  // The C API expects a pointer-to-handle (so it can mutate the slot).
+  [[nodiscard]] const ddog_prof_ProfilesDictionaryHandle *get() const {
+    return &_handle;
+  }
+  [[nodiscard]] const ddog_prof_ProfilesDictionary *dict() const {
+    return _handle;
+  }
+
+private:
+  void reset();
+
+  ddog_prof_ProfilesDictionaryHandle _handle{};
+};
 
 struct SymbolHdr {
   explicit SymbolHdr(std::string_view path_to_proc = "");
@@ -42,8 +73,9 @@ struct SymbolHdr {
   void display_stats() const { _dso_symbol_lookup.stats_display(); }
   void cycle() { _runtime_symbol_lookup.cycle(); }
 
-  const ddog_prof_ProfilesDictionary *profiles_dictionary() const {
-    return _profiles_dictionary ? *_profiles_dictionary : nullptr;
+  [[nodiscard]] const ddog_prof_ProfilesDictionary *
+  profiles_dictionary() const {
+    return _profiles_dictionary.dict();
   }
 
   void clear(pid_t pid) {
@@ -56,7 +88,7 @@ struct SymbolHdr {
   // String interning dictionary (persists across profile exports)
   // MUST be declared first so it is destroyed last - Symbol and MapInfo
   // objects store pointers into this dictionary.
-  ProfilesDictionaryPtr _profiles_dictionary;
+  ProfilesDictionary _profiles_dictionary;
 
   // Cache symbol associations
   BaseFrameSymbolLookup _base_frame_symbol_lookup;

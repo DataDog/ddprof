@@ -9,26 +9,26 @@
 
 namespace ddprof {
 
-void ProfilesDictionaryDeleter::operator()(
-    ::ddog_prof_ProfilesDictionaryHandle *handle) const {
-  if (handle) {
-    ::ddog_prof_ProfilesDictionary_drop(handle);
-    delete handle;
-  }
-}
-
-SymbolHdr::SymbolHdr(std::string_view path_to_proc)
-    : _runtime_symbol_lookup(path_to_proc) {
-  auto *handle = new ::ddog_prof_ProfilesDictionaryHandle();
-  ::ddog_prof_Status status = ::ddog_prof_ProfilesDictionary_new(handle);
+ProfilesDictionary::ProfilesDictionary() {
+  ::ddog_prof_Status status = ::ddog_prof_ProfilesDictionary_new(&_handle);
   if (status.err != nullptr) {
     LG_WRN("Failed to create ProfilesDictionary for string interning: %s",
            status.err);
     ::ddog_prof_Status_drop(&status);
-    delete handle;
-  } else {
-    _profiles_dictionary.reset(handle);
+    _handle = nullptr;
   }
 }
+
+ProfilesDictionary::~ProfilesDictionary() { reset(); }
+
+void ProfilesDictionary::reset() {
+  if (_handle) {
+    ::ddog_prof_ProfilesDictionary_drop(&_handle);
+    _handle = nullptr;
+  }
+}
+
+SymbolHdr::SymbolHdr(std::string_view path_to_proc)
+    : _runtime_symbol_lookup(path_to_proc) {}
 
 } // namespace ddprof
