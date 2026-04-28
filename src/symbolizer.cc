@@ -45,11 +45,11 @@ Symbolizer::get_symbolizer(FileInfoId_t file_id, const std::string &elf_src) {
     it->second.visited = true;
     return it->second;
   }
+  // visited is set on BlazeSymbolizerWrapper construction
   auto [it, inserted] = _symbolizer_map.emplace(
       file_id, BlazeSymbolizerWrapper(elf_src, inlined_functions));
   DDPROF_DCHECK_FATAL(inserted, "Unable to insert symbolizer object");
   auto &symbolizer_wrapper = it->second;
-  symbolizer_wrapper.visited = true;
   return symbolizer_wrapper;
 }
 
