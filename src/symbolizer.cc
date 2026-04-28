@@ -42,13 +42,14 @@ void Symbolizer::reset_unvisited_flag() {
 Symbolizer::BlazeSymbolizerWrapper &
 Symbolizer::get_symbolizer(FileInfoId_t file_id, const std::string &elf_src) {
   if (auto it = _symbolizer_map.find(file_id); it != _symbolizer_map.end()) {
+    it->second.visited = true;
     return it->second;
   }
+  // visited is set on BlazeSymbolizerWrapper construction
   auto [it, inserted] = _symbolizer_map.emplace(
       file_id, BlazeSymbolizerWrapper(elf_src, inlined_functions));
   DDPROF_DCHECK_FATAL(inserted, "Unable to insert symbolizer object");
   auto &symbolizer_wrapper = it->second;
-  symbolizer_wrapper.visited = true;
   return symbolizer_wrapper;
 }
 
