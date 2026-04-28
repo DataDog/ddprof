@@ -24,19 +24,20 @@ the user wants something else.
 
 Match `args` case-insensitively. If the user's natural-language request
 implies a mode (e.g. "do a release build", "run with sanitizers"), prefer
-that over the default. Only `DebTidy` requires `CC=clang CXX=clang++`; for
-the others leave `CC`/`CXX` unset so the container's gcc is used.
+that over the default. Do not set `CC`/`CXX` — `DebTidyCMake` passes the
+clang compiler flags to cmake directly; all other modes use the container's
+default gcc.
 
 ## Step 1 — Find a running container
 
 ```bash
-CID=$(docker ps \
+docker ps \
   --filter ancestor=base_ddprof_24_gcc \
   --filter ancestor=base_ddprof_24_clang \
-  --format '{{.ID}}' | head -1)
+  --format '{{.ID}}' | head -1
 ```
 
-If `CID` is non-empty → skip to Step 3.
+Capture the output as `CID`. If non-empty → skip to Step 3.
 
 ## Step 2 — Start one in the background (only if nothing is running)
 
@@ -81,7 +82,8 @@ docker exec "$CID" bash -lc '
   source ./setup_env.sh
   MkBuildDir Deb
   DebCMake ../
-  make -j10
+  ninja
+'
 ```
 
 Example for `DebTidy`:
@@ -90,11 +92,10 @@ Example for `DebTidy`:
 docker exec "$CID" bash -lc '
   set -euo pipefail
   cd /app
-  export CC=clang CXX=clang++
   source ./setup_env.sh
   MkBuildDir DebTidy
   DebTidyCMake ../
-  make -j10
+  ninja
 '
 ```
 
@@ -102,7 +103,7 @@ docker exec "$CID" bash -lc '
 
 Long builds should run via `Bash` with `run_in_background: true` so the user
 isn't blocked. **Do not pipe to `tee`** when backgrounding — `tee` swallows
-the failing exit code from `make` and the build looks like it succeeded. If
+the failing exit code from `ninja` and the build looks like it succeeded. If
 you need the log on disk, redirect with `> /tmp/ddprof_compile.log 2>&1`
 instead, or set `set -o pipefail` and check `${PIPESTATUS[0]}` explicitly.
 
@@ -122,6 +123,6 @@ log.
   libc/compiler triple, e.g. `build_gcc_unknown-linux-2.39_Deb`,
   `build_clang_unknown-linux-2.39_DebTidy`. Each mode has its own dir, so
   switching modes does not clobber the previous build.
-- `-j10` matches the user's typical workflow. Bump if the box has many cores.
+- `ninja` auto-detects core count; no `-j` flag needed.
 - For Alpine/release builds, this skill is the wrong tool — see
   `CLAUDE.md` § "Alpine (release) builds".

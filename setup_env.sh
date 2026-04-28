@@ -71,7 +71,7 @@ CmakeWithOptions() {
   shift
   local VENDOR_EXTENSION=$(GetDirectoryExtention ${BUILD_TYPE})
   # shellcheck disable=SC2086
-  cmake_cmd="cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DVENDOR_EXTENSION=${VENDOR_EXTENSION} $@"
+  cmake_cmd="cmake -GNinja ${COMMON_OPT} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DVENDOR_EXTENSION=${VENDOR_EXTENSION} $@"
   echoerr "-------------- cmake command -------------- "
   echoerr ${cmake_cmd}
   eval ${cmake_cmd}
@@ -87,10 +87,10 @@ DebCMake() {
     CmakeWithOptions ${BUILD_TYPE} $@
 }
 
-# Requires clang as compiler
 DebTidyCMake() {
     local BUILD_TYPE=Debug
-    CmakeWithOptions ${BUILD_TYPE} -DENABLE_CLANG_TIDY=ON $@
+    local DDPROF_EXTENSION_CC=clang
+    CmakeWithOptions ${BUILD_TYPE} -DENABLE_CLANG_TIDY=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ $@
 }
 
 SanCMake() {
