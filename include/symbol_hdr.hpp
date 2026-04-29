@@ -24,10 +24,6 @@ using ddog_prof_ProfilesDictionaryHandle = ddog_prof_ProfilesDictionary *;
 namespace ddprof {
 
 // RAII wrapper around a libdatadog ProfilesDictionary handle.
-// The libdatadog typedef `ProfilesDictionaryHandle` is already a pointer
-// (`ProfilesDictionary *`), and the C API takes it by pointer-to-handle so
-// it can write/zero the slot. We hold the handle inline — callers that need
-// the pointer-to-handle the C API wants just call `get()`.
 class ProfilesDictionary {
 public:
   ProfilesDictionary();
@@ -48,10 +44,6 @@ public:
 
   explicit operator bool() const { return _handle != nullptr; }
 
-  // Returns a pointer to the handle, as required by
-  // ddog_prof_Profile_with_dictionary (which takes `const
-  // ProfilesDictionaryHandle *`). The API is const — it does not zero or
-  // replace the slot.
   [[nodiscard]] const ddog_prof_ProfilesDictionaryHandle *get() const {
     return &_handle;
   }
