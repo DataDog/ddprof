@@ -12,10 +12,6 @@
 
 namespace ddprof {
 #define K_MOCK_LOC_SIZE 11
-static const char *s_syn_names[K_MOCK_LOC_SIZE] = {
-    "xd_foo0", "xd_foo1", "xd_foo2", "xd_foo3", "xd_foo4", "xd_foo5",
-    "xd_foo6", "xd_foo7", "xd_foo8", "xd_foo9", "xd_foo10"};
-
 static const char *s_func_names[K_MOCK_LOC_SIZE] = {
     "foo0", "foo1", "foo2", "foo3", "foo4", "foo5",
     "foo6", "foo7", "foo8", "foo9", "foo10"};

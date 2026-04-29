@@ -9,6 +9,7 @@
 #include "ddprof_file_info-i.hpp"
 #include "ddres_def.hpp"
 #include "map_utils.hpp"
+#include "mapinfo_table.hpp"
 #include <memory>
 #include <span>
 #include <string>
@@ -16,7 +17,6 @@
 #include <vector>
 
 struct ddog_prof_Location2;
-struct ddog_prof_Mapping2;
 struct ddog_prof_ProfilesDictionary;
 
 namespace ddprof {
@@ -65,7 +65,7 @@ public:
   /// addrs - Elf address
   /// file_id - a way to identify this file in a unique way
   /// elf_src - a path to the source file (idealy stable)
-  /// map_info - the mapping information to write to the pprof
+  /// mapping_id - interned mapping handle for this ELF file
   /// dict - the profiling dictionary for string interning
   /// locations - the output pprof structure (Location2 with interned IDs)
   /// write_index - input / output parameter updated based on what is written
@@ -73,7 +73,7 @@ public:
   ///          Should be kept until interned strings are no longer needed.
   DDRes symbolize_pprof(std::span<ElfAddress_t> addrs, FileInfoId_t file_id,
                         const std::string &elf_src,
-                        ddog_prof_Mapping2 *mapping_id,
+                        ddog_prof_MappingId2 mapping_id,
                         const ddog_prof_ProfilesDictionary *dict,
                         std::span<ddog_prof_Location2> locations,
                         unsigned &write_index, BlazeResultsWrapper &results);

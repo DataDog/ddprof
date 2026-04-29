@@ -46,7 +46,7 @@ Symbolizer::get_symbolizer(FileInfoId_t file_id, const std::string &elf_src) {
 DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
                                   FileInfoId_t file_id,
                                   const std::string &elf_src,
-                                  ddog_prof_Mapping2 *mapping_id,
+                                  ddog_prof_MappingId2 mapping_id,
                                   const ddog_prof_ProfilesDictionary *dict,
                                   std::span<ddog_prof_Location2> locations,
                                   unsigned &write_index,
