@@ -20,8 +20,7 @@ namespace {
 
 Symbol symbol_from_unhandled_dso(const Dso &dso,
                                  const ddog_prof_ProfilesDictionary *dict) {
-  return make_symbol(std::string(), std::string(), 0, dso_type_str(dso._type),
-                     dict);
+  return make_symbol(std::string(), 0, dso_type_str(dso._type), dict);
 }
 
 Symbol symbol_from_dso(ElfAddress_t normalized_addr, const Dso &dso,
@@ -31,7 +30,7 @@ Symbol symbol_from_dso(ElfAddress_t normalized_addr, const Dso &dso,
   std::string const dso_dbg_str = normalized_addr
       ? absl::StrFormat("[%#x:%s]", normalized_addr, addr_type)
       : std::filesystem::path(dso.format_filename()).filename().string();
-  return make_symbol(dso_dbg_str, dso_dbg_str, 0, dso.format_filename(), dict);
+  return make_symbol(dso_dbg_str, 0, dso.format_filename(), dict);
 }
 } // namespace
 

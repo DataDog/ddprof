@@ -48,7 +48,10 @@ public:
 
   explicit operator bool() const { return _handle != nullptr; }
 
-  // The C API expects a pointer-to-handle (so it can mutate the slot).
+  // Returns a pointer to the handle, as required by
+  // ddog_prof_Profile_with_dictionary (which takes `const
+  // ProfilesDictionaryHandle *`). The API is const — it does not zero or
+  // replace the slot.
   [[nodiscard]] const ddog_prof_ProfilesDictionaryHandle *get() const {
     return &_handle;
   }
@@ -85,9 +88,9 @@ struct SymbolHdr {
     _runtime_symbol_lookup.erase(pid);
   }
 
-  // String interning dictionary (persists across profile exports)
-  // MUST be declared first so it is destroyed last - Symbol and MapInfo
-  // objects store pointers into this dictionary.
+  // String interning dictionary (persists across profile exports).
+  // MUST be declared first so it is destroyed last — Symbol and MapInfoTable
+  // entries hold pointers into this dictionary.
   ProfilesDictionary _profiles_dictionary;
 
   // Cache symbol associations

@@ -19,9 +19,9 @@ const Symbol &get_symbol(const DDProfContext *ctx,
   return symbol_table[unwind_output->locs[loc_idx]._symbol_idx];
 }
 
-const MapInfo &get_mapinfo(const DDProfContext *ctx,
-                           const UnwindOutput *unwind_output,
-                           unsigned loc_idx) {
+ddog_prof_Mapping2 *get_mapinfo(const DDProfContext *ctx,
+                                const UnwindOutput *unwind_output,
+                                unsigned loc_idx) {
   const MapInfoTable &mapinfo_table =
       ctx->worker_ctx.us->symbol_hdr._mapinfo_table;
   return mapinfo_table[unwind_output->locs[loc_idx]._map_info_idx];

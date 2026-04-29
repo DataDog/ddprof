@@ -5,16 +5,15 @@
 
 #pragma once
 
+#include "build_id.hpp"
 #include "ddprof_defs.hpp"
-#include "mapinfo_table.hpp"
-
 #include "dso.hpp"
+#include "mapinfo_table.hpp"
 
 #include <optional>
 #include <string>
 #include <unordered_map>
 
-struct Dwfl_Module;
 struct ddog_prof_ProfilesDictionary;
 
 namespace ddprof {
@@ -22,10 +21,11 @@ namespace ddprof {
 class MapInfoLookup {
 public:
   MapInfoIdx_t get_or_insert(pid_t pid, MapInfoTable &mapinfo_table,
-                             const Dso &dso, std::optional<BuildIdStr> build_id,
+                             const Dso &dso,
+                             const std::optional<BuildIdStr> &build_id,
                              const ddog_prof_ProfilesDictionary *dict);
   void erase(pid_t pid) {
-    // table elements are not removed (TODO to gain memory usage)
+    // table elements are not removed so prior MapInfoIdx_t values stay valid.
     _mapinfo_pidmap.erase(pid);
   }
 

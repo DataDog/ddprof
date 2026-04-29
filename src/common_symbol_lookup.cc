@@ -11,8 +11,7 @@ namespace ddprof {
 namespace {
 Symbol symbol_from_common(SymbolErrors lookup_case,
                           const ddog_prof_ProfilesDictionary *dict) {
-  return make_symbol(std::string(),
-                     std::string{k_common_frame_names[lookup_case]}, 0,
+  return make_symbol(std::string{k_common_frame_names[lookup_case]}, 0,
                      std::string(), dict);
 }
 } // namespace

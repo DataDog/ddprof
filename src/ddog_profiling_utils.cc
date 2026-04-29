@@ -35,7 +35,7 @@ ddog_prof_StringId2 intern_string(const ddog_prof_ProfilesDictionary *dict,
   }
   ddog_prof_StringId2 string_id = nullptr;
   ddog_prof_Status status = ddog_prof_ProfilesDictionary_insert_str(
-      &string_id, dict, to_CharSlice(str), DDOG_PROF_UTF8_OPTION_ASSUME);
+      &string_id, dict, to_CharSlice(str), DDOG_PROF_UTF8_OPTION_CONVERT_LOSSY);
   if (status.err != nullptr) {
     LG_WRN("Failed to intern string: %s", status.err);
     ddog_prof_Status_drop(&status);
@@ -114,16 +114,19 @@ ddog_prof_FunctionId2 intern_function(const ddog_prof_ProfilesDictionary *dict,
 }
 
 ddog_prof_MappingId2 intern_mapping(const ddog_prof_ProfilesDictionary *dict,
-                                    const MapInfo &mapinfo) {
+                                    ElfAddress_t low_addr,
+                                    ElfAddress_t high_addr, Offset_t offset,
+                                    std::string_view sopath,
+                                    std::string_view build_id) {
   if (!dict) {
     return nullptr;
   }
   const ddog_prof_Mapping2 mapping = {
-      .memory_start = mapinfo._low_addr,
-      .memory_limit = mapinfo._high_addr,
-      .file_offset = mapinfo._offset,
-      .filename = intern_string(dict, mapinfo._sopath),
-      .build_id = intern_string(dict, mapinfo._build_id),
+      .memory_start = low_addr,
+      .memory_limit = high_addr,
+      .file_offset = offset,
+      .filename = intern_string(dict, sopath),
+      .build_id = intern_string(dict, build_id),
   };
   ddog_prof_MappingId2 mapping_id = nullptr;
   ddog_prof_Status status =
@@ -136,28 +139,30 @@ ddog_prof_MappingId2 intern_mapping(const ddog_prof_ProfilesDictionary *dict,
   return mapping_id;
 }
 
-Symbol make_symbol(std::string symname, const std::string &demangled_name,
-                   uint32_t lineno, const std::string &srcpath,
+Symbol make_symbol(const std::string &demangled_name, uint32_t lineno,
+                   const std::string &srcpath,
                    const ddog_prof_ProfilesDictionary *dict) {
-  [[maybe_unused]] const std::string ignored_symname = std::move(symname);
   ddog_prof_FunctionId2 function_id =
       intern_function(dict, demangled_name, srcpath);
   return {lineno, function_id};
 }
 
-void write_location2(const FunLoc &loc, const MapInfo &mapinfo,
+void write_location2(const FunLoc &loc, ddog_prof_MappingId2 mapping_id,
                      const Symbol &symbol, ddog_prof_Location2 *ffi_location) {
-  ffi_location->mapping = mapinfo._mapping_id;
+  ffi_location->mapping = mapping_id;
   ffi_location->function = symbol._function_id;
   ffi_location->address = loc.elf_addr;
   ffi_location->line = symbol._lineno;
 }
 
-void write_location2_no_sym(ElfAddress_t ip, const MapInfo &mapinfo,
+void write_location2_no_sym(ElfAddress_t ip, ddog_prof_MappingId2 mapping_id,
                             const ddog_prof_ProfilesDictionary *dict,
                             ddog_prof_Location2 *ffi_location) {
-  ffi_location->mapping = mapinfo._mapping_id;
-  ffi_location->function = intern_function(dict, {}, mapinfo._sopath);
+  ffi_location->mapping = mapping_id;
+  const auto sopath = (mapping_id && dict)
+      ? get_string(dict, mapping_id->filename)
+      : std::string_view{};
+  ffi_location->function = intern_function(dict, {}, sopath);
   ffi_location->address = ip;
   ffi_location->line = 0;
 }
@@ -165,12 +170,15 @@ void write_location2_no_sym(ElfAddress_t ip, const MapInfo &mapinfo,
 DDRes write_location2_blaze(
     ElfAddress_t elf_addr,
     ddprof::HeterogeneousLookupStringMap<std::string> &demangled_names,
-    const MapInfo &mapinfo, const blaze_sym &blaze_sym, unsigned &cur_loc,
-    const ddog_prof_ProfilesDictionary *dict,
+    ddog_prof_MappingId2 mapping_id, const blaze_sym &blaze_sym,
+    unsigned &cur_loc, const ddog_prof_ProfilesDictionary *dict,
     std::span<ddog_prof_Location2> locations_buff) {
   if (cur_loc >= locations_buff.size()) {
     return ddres_warn(DD_WHAT_UW_MAX_DEPTH);
   }
+  const auto sopath = (mapping_id && dict)
+      ? get_string(dict, mapping_id->filename)
+      : std::string_view{};
   constexpr std::string_view undef{};
   constexpr std::string_view undef_inlined = undef;
   for (int i = blaze_sym.inlined_cnt - 1; i >= 0 && cur_loc < kMaxStackDepth;
@@ -182,8 +190,8 @@ DDRes write_location2_blaze(
         : undef_inlined;
     const std::string_view file_name = inlined_fn->code_info.file
         ? std::string_view(inlined_fn->code_info.file)
-        : mapinfo._sopath;
-    ffi_location.mapping = mapinfo._mapping_id;
+        : sopath;
+    ffi_location.mapping = mapping_id;
     ffi_location.function = intern_function(dict, demangled_name, file_name);
     ffi_location.address = elf_addr;
     ffi_location.line = inlined_fn->code_info.line;
@@ -200,8 +208,8 @@ DDRes write_location2_blaze(
       : undef;
   const std::string_view file_name = blaze_sym.code_info.file
       ? std::string_view{blaze_sym.code_info.file}
-      : std::string_view{mapinfo._sopath};
-  ffi_location.mapping = mapinfo._mapping_id;
+      : sopath;
+  ffi_location.mapping = mapping_id;
   ffi_location.function = intern_function(dict, demangled_name, file_name);
   ffi_location.address = elf_addr;
   ffi_location.line = blaze_sym.code_info.line;

@@ -46,7 +46,7 @@ Symbolizer::get_symbolizer(FileInfoId_t file_id, const std::string &elf_src) {
 DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
                                   FileInfoId_t file_id,
                                   const std::string &elf_src,
-                                  const MapInfo &map_info,
+                                  ddog_prof_Mapping2 *mapping_id,
                                   const ddog_prof_ProfilesDictionary *dict,
                                   std::span<ddog_prof_Location2> locations,
                                   unsigned &write_index,
@@ -93,12 +93,12 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
           // Some binaries expose a single symbol at address 0 (ex:
           // DD_AGENT_V1). Avoid emitting it so the backend still attempts
           // symbolication.
-          write_location2_no_sym(elf_addrs[i], map_info, dict,
+          write_location2_no_sym(elf_addrs[i], mapping_id, dict,
                                  &locations[write_index++]);
           continue;
         }
         DDRES_CHECK_FWD(write_location2_blaze(
-            elf_addrs[i], symbolizer_wrapper.demangled_names, map_info,
+            elf_addrs[i], symbolizer_wrapper.demangled_names, mapping_id,
             *cur_sym, write_index, dict, locations));
       }
       return {};
@@ -109,7 +109,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
   // This can happen when file descriptors are exhausted
   // OR symbolization is disabled
   for (auto el : elf_addrs) {
-    write_location2_no_sym(el, map_info, dict, &locations[write_index++]);
+    write_location2_no_sym(el, mapping_id, dict, &locations[write_index++]);
   }
 
   return {};

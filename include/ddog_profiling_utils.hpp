@@ -7,13 +7,13 @@
 
 #include "ddres_def.hpp"
 #include "map_utils.hpp"
-#include "mapinfo_table.hpp"
 #include "symbol.hpp"
 #include "unwind_output.hpp"
 
 #include "datadog/common.h"
 #include "datadog/profiling.h"
 
+#include <span>
 #include <string_view>
 
 struct blaze_sym;
@@ -47,24 +47,29 @@ ddog_prof_FunctionId2 intern_function(const ddog_prof_ProfilesDictionary *dict,
                                       std::string_view file_name,
                                       std::string_view system_name = {});
 
+// Intern a mapping given its raw fields. Interns the filename and build_id
+// strings internally before inserting into the dictionary.
 ddog_prof_MappingId2 intern_mapping(const ddog_prof_ProfilesDictionary *dict,
-                                    const MapInfo &mapinfo);
+                                    ElfAddress_t low_addr,
+                                    ElfAddress_t high_addr, Offset_t offset,
+                                    std::string_view sopath,
+                                    std::string_view build_id = {});
 
-Symbol make_symbol(std::string symname, const std::string &demangled_name,
-                   uint32_t lineno, const std::string &srcpath,
+Symbol make_symbol(const std::string &demangled_name, uint32_t lineno,
+                   const std::string &srcpath,
                    const ddog_prof_ProfilesDictionary *dict);
 
-void write_location2(const FunLoc &loc, const MapInfo &mapinfo,
+void write_location2(const FunLoc &loc, ddog_prof_MappingId2 mapping_id,
                      const Symbol &symbol, ddog_prof_Location2 *ffi_location);
 
 DDRes write_location2_blaze(
     ElfAddress_t elf_addr,
     ddprof::HeterogeneousLookupStringMap<std::string> &demangled_names,
-    const MapInfo &mapinfo, const blaze_sym &blaze_sym, unsigned &cur_loc,
-    const ddog_prof_ProfilesDictionary *dict,
+    ddog_prof_MappingId2 mapping_id, const blaze_sym &blaze_sym,
+    unsigned &cur_loc, const ddog_prof_ProfilesDictionary *dict,
     std::span<ddog_prof_Location2> locations_buff);
 
-void write_location2_no_sym(ElfAddress_t ip, const MapInfo &mapinfo,
+void write_location2_no_sym(ElfAddress_t ip, ddog_prof_MappingId2 mapping_id,
                             const ddog_prof_ProfilesDictionary *dict,
                             ddog_prof_Location2 *ffi_location);
 } // namespace ddprof

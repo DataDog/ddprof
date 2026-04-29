@@ -382,6 +382,16 @@ add_unit_test(symbol_map-ut symbol_map-ut.cc ../src/symbol_map.cc)
 
 add_unit_test(build_id-ut build_id-ut.cc ../src/build_id.cc)
 
+add_unit_test(
+  mapinfo_lookup-ut
+  mapinfo_lookup-ut.cc
+  ../src/build_id.cc
+  ../src/ddog_profiling_utils.cc
+  ../src/demangler/demangler.cc
+  ../src/dso.cc
+  ../src/mapinfo_lookup.cc
+  LIBRARIES Datadog::Profiling llvm-demangle)
+
 add_unit_test(jitdump-ut jitdump-ut.cc ../src/jit/jitdump.cc)
 
 add_unit_test(tracepoint_config-ut tracepoint_config-ut.cc ../src/tracepoint_config.cc)

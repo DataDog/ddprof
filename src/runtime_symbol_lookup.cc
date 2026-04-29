@@ -70,8 +70,7 @@ bool RuntimeSymbolLookup::insert_or_replace(
     symbol_map.emplace_hint(
         find_res.first, address,
         SymbolSpan(address + code_size - 1, symbol_table.size()));
-    symbol_table.emplace_back(
-        make_symbol(std::string(symbol), std::string(symbol), 0, "jit", dict));
+    symbol_table.emplace_back(make_symbol(std::string(symbol), 0, "jit", dict));
   } else {
     // todo managing range erase (we can overall with other syms)
     SymbolIdx_t const existing = find_res.first->second.get_symbol_idx();

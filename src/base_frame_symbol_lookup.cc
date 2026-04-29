@@ -16,8 +16,7 @@ namespace ddprof {
 
 namespace {
 Symbol symbol_from_pid(pid_t pid, const ddog_prof_ProfilesDictionary *dict) {
-  return make_symbol(std::string(), std::string(), 0, absl::StrCat("pid_", pid),
-                     dict);
+  return make_symbol(std::string(), 0, absl::StrCat("pid_", pid), dict);
 }
 } // namespace
 
@@ -43,8 +42,7 @@ SymbolIdx_t BaseFrameSymbolLookup::insert_bin_symbol(
       const std::filesystem::path path(exe_name);
       const std::string base_name = path.filename().string();
       symbol_idx = symbol_table.size();
-      symbol_table.emplace_back(
-          make_symbol(std::string(), base_name, 0, exe_name, dict));
+      symbol_table.emplace_back(make_symbol(base_name, 0, exe_name, dict));
       _bin_map.insert({pid, symbol_idx});
       _exe_name_map.insert({pid, base_name});
     }
