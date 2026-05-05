@@ -34,9 +34,6 @@ All development happens inside Docker containers. The source tree is mounted at
 # Alpine (musl — matches the release binary environment)
 ./tools/launch_local_build.sh -f ./app/base-env-alpine/Dockerfile
 
-# Clang instead of GCC
-./tools/launch_local_build.sh --clang
-
 # Force rebuild the Docker image
 ./tools/launch_local_build.sh --clean
 ```
@@ -52,7 +49,7 @@ Day-to-day iteration uses the Ubuntu 24 container. Execute commands inside it:
 ```bash
 docker exec -it <container_name> bash
 # or run a single command
-docker exec <container_name> bash -c "cd /app/build_gcc_unknown-linux-2.39_Rel && make -j$(nproc) ddprof"
+docker exec <container_name> bash -c "cd /app/build_gcc_unknown-linux-2.39_Rel && ninja ddprof"
 ```
 
 ## Build system
@@ -90,22 +87,22 @@ source setup_env.sh
 # Release build (fast, optimised, LTO)
 MkBuildDir Rel
 RelCMake ../
-make -j$(nproc) ddprof
+ninja ddprof
 
 # Debug build (symbols, no optimisation)
 MkBuildDir Deb
 DebCMake ../
-make -j$(nproc)
+ninja
 
 # Sanitized build (ASan + UBSan — catches memory bugs)
 MkBuildDir San
 SanCMake ../
-make -j$(nproc)
+ninja
 
 # Thread sanitizer
 MkBuildDir TSan
 TSanCMake ../
-make -j$(nproc)
+ninja
 ```
 
 ### Build modes at a glance
@@ -114,8 +111,10 @@ make -j$(nproc)
 |---|---|---|---|
 | `Rel` | `RelCMake` | Release | Performance testing, pre-release checks |
 | `Deb` | `DebCMake` | Debug | Day-to-day debugging, step-through |
+| `DebTidy` | `DebTidyCMake` | Debug + clang-tidy | Lint gate (clang only, slowest) |
 | `San` | `SanCMake` | SanitizedDebug | Catching memory/UB errors |
 | `TSan` | `TSanCMake` | ThreadSanitizedDebug | Catching data races |
+| `Cov` | `CovCMake` | Coverage | Coverage instrumentation |
 | `AlpRel` | `RelCMake` | Release (Alpine) | **Release binary** — what ships to users |
 
 ### Alpine (release) builds
@@ -129,7 +128,7 @@ musl binary that runs everywhere. Use the Alpine container:
 source setup_env.sh
 MkBuildDir AlpRel
 RelCMake -DDDPROF_STATIC=ON ../
-make -j$(nproc) ddprof
+ninja ddprof
 ```
 
 The resulting `ddprof` binary is fully static, compatible with both glibc and

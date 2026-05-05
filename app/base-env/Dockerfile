@@ -1,7 +1,6 @@
 # Using a recent compiler version and recent OS (better tooling)
 # We'll implement libc version sanitization in the code itself
 ARG UBUNTU_VERSION=22
-ARG COMPILER="gcc"
 
 FROM ubuntu:${UBUNTU_VERSION}.04 as base
 ARG UBUNTU_VERSION
@@ -31,11 +30,7 @@ FROM base-${UBUNTU_VERSION} AS base-gcc
 ENV CC=gcc-${GCC_VERSION}
 ENV CXX=g++-${GCC_VERSION}
 
-FROM base-${UBUNTU_VERSION} AS base-clang
-ENV CC=clang-${CLANG_VERSION}
-ENV CXX=clang++-${CLANG_VERSION}
-
-FROM base-${COMPILER} AS final
+FROM base-gcc AS final
 
 # Tell docker to use bash as the default
 SHELL ["/bin/bash", "-c"]

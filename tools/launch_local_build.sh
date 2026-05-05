@@ -32,10 +32,9 @@ usage() {
     echo " Optional parameters "
     echo "    --dockerfile/-f : use a custom docker file."
     echo "    --clean/-c : rebuild the image before creating it."
-    echo "    --ubuntu_version/-u : specify ubuntu version (expected values: 16 / 18 / 20)"
+    echo "    --ubuntu_version/-u : specify ubuntu version (expected values: 16 / 18 / 20 / 22 / 24)"
     echo "    --image_id/-i : use a specified docker ID, conflicts with -u."
-    echo "    --clang : use clang instead of gcc.
-    --cap-test : add CAP_SETUID/SETGID/IPC_LOCK/SETFCAP for capability unit tests."
+    echo "    --cap-test : add CAP_SETUID/SETGID/IPC_LOCK/SETFCAP for capability unit tests."
 }
 
 if [ $# != 0 ] && [ "$1" == "-h" ]; then
@@ -46,7 +45,6 @@ fi
 PERFORM_CLEAN=0
 # This default is to ensure that users that compile from source are likely to have a compatible libc
 UBUNTU_VERSION=18
-COMPILER="gcc"
 EXTRA_CAPS=""
 USER_OPTION="-u $(id -u):$(id -g)"
 
@@ -73,10 +71,6 @@ while [ $# != 0 ]; do
             DOCKER_TAG=""
             CUSTOM_ID="yes"
             shift
-            shift
-            ;;
-        --clang)
-            COMPILER="clang"
             shift
             ;;
         --cap-test)
@@ -124,7 +118,7 @@ fi
 
 # If we didn't pass a custom ID, then focus on Ubuntu
 if [ ! ${CUSTOM_ID:-,,} == "yes" ]; then
-    DOCKER_NAME=${DEFAULT_BASE_NAME}_${UBUNTU_VERSION}_${COMPILER}
+    DOCKER_NAME=${DEFAULT_BASE_NAME}_${UBUNTU_VERSION}
     DOCKER_TAG=":latest"
 fi
 
@@ -143,7 +137,7 @@ fi
 # Check if base image exists
 if [ ! ${CUSTOM_ID:-,,} == "yes" ] && ! docker images | awk '{print $1}'| grep -qE "^${DOCKER_NAME}$"; then
     echo "Building image"
-    BUILD_CMD="docker build $CACHE_OPTION -t ${DOCKER_NAME} --build-arg COMPILER=$COMPILER --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} -f $BASE_DOCKERFILE ."
+    BUILD_CMD="docker build $CACHE_OPTION -t ${DOCKER_NAME} --build-arg UBUNTU_VERSION=${UBUNTU_VERSION} -f $BASE_DOCKERFILE ."
     #echo "${BUILD_CMD}"
     eval "${BUILD_CMD}"
 else 
