@@ -32,8 +32,7 @@ default gcc.
 
 ```bash
 docker ps \
-  --filter ancestor=base_ddprof_24_gcc \
-  --filter ancestor=base_ddprof_24_clang \
+  --filter ancestor=base_ddprof_24 \
   --format '{{.ID}}' | head -1
 ```
 
@@ -44,8 +43,7 @@ Capture the output as `CID`. If non-empty → skip to Step 3.
 Confirm an image exists:
 
 ```bash
-IMG=$(docker image ls --format '{{.Repository}}' \
-  | grep -E '^base_ddprof_24_(gcc|clang)$' | head -1)
+docker image ls -f reference=base_ddprof_24 -q
 ```
 
 If no image is present, stop and ask the user to run
@@ -61,7 +59,7 @@ CID=$(docker run -d --rm \
   --network=host -w /app \
   --cap-add CAP_SYS_PTRACE --cap-add SYS_ADMIN \
   -v "$PWD:/app" \
-  "$IMG" \
+  base_ddprof_24 \
   sleep infinity)
 ```
 
@@ -102,20 +100,34 @@ docker exec "$CID" bash -lc '
 ### Backgrounding & exit codes
 
 Long builds should run via `Bash` with `run_in_background: true` so the user
-isn't blocked. **Do not pipe to `tee`** when backgrounding — `tee` swallows
-the failing exit code from `ninja` and the build looks like it succeeded. If
-you need the log on disk, redirect with `> /tmp/ddprof_compile.log 2>&1`
-instead, or set `set -o pipefail` and check `${PIPESTATUS[0]}` explicitly.
+isn't blocked. The Step-3 heredoc already runs under `set -euo pipefail`, so
+both forms below correctly propagate ninja's exit code:
 
-After completion, check the exit code reported by the task notification.
-On failure, extract the first compiler/clang-tidy errors:
+- `ninja > /tmp/ddprof_compile.log 2>&1` — simplest, log only
+- `ninja 2>&1 | tee /tmp/ddprof_compile.log` — live output + log
+
+(Outside a `pipefail` shell, `tee` would swallow ninja's failure — redirect
+instead in that case.)
+
+After completion, **check the exit code reported by the task notification
+first.** Only inspect the log if it's non-zero. Use the pattern below to find
+errors, and fall back to `tail` if nothing matches so a real failure can never look
+like success:
 
 ```bash
-grep -E "error:" /tmp/ddprof_compile.log | head -20
+errs=$(grep -nE "FAILED:|ninja: build stopped|error:|fatal error:|undefined reference|CMake Error|No space left|Killed" \
+       /tmp/ddprof_compile.log | head -40)
+if [ -n "$errs" ]; then
+  printf '%s\n' "$errs"
+else
+  # Nothing matched a known marker — dump the tail so the agent never
+  # silently reports success on a non-zero exit.
+  tail -60 /tmp/ddprof_compile.log
+fi
 ```
 
-Surface those (path:line + diagnostic) to the user — do not dump the whole
-log.
+Surface the result (path:line + diagnostic) to the user — do not dump the
+whole log on success.
 
 ## Notes
 
