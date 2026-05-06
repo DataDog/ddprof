@@ -738,17 +738,21 @@ DDRes ddprof_worker_free(DDProfContext &ctx) {
       ctx.worker_ctx.exp_tid = 0;
     }
 
-    DDRES_CHECK_FWD(worker_library_free(ctx));
-    for (int i = 0; i < 2; i++) {
-      if (ctx.worker_ctx.exp[i]) {
-        DDRES_CHECK_FWD(ddprof_exporter_free(ctx.worker_ctx.exp[i]));
-        delete ctx.worker_ctx.exp[i];
-        ctx.worker_ctx.exp[i] = nullptr;
+    // Free profiles before worker_library_free: profiles hold MappingId2 /
+    // FunctionId2 pointers into the ProfilesDictionary owned by SymbolHdr.
+    for (auto *&pprof : ctx.worker_ctx.pprof) {
+      if (pprof) {
+        DDRES_CHECK_FWD(pprof_free_profile(pprof));
+        delete pprof;
+        pprof = nullptr;
       }
-      if (ctx.worker_ctx.pprof[i]) {
-        DDRES_CHECK_FWD(pprof_free_profile(ctx.worker_ctx.pprof[i]));
-        delete ctx.worker_ctx.pprof[i];
-        ctx.worker_ctx.pprof[i] = nullptr;
+    }
+    DDRES_CHECK_FWD(worker_library_free(ctx));
+    for (auto *&exp : ctx.worker_ctx.exp) {
+      if (exp) {
+        DDRES_CHECK_FWD(ddprof_exporter_free(exp));
+        delete exp;
+        exp = nullptr;
       }
     }
     delete ctx.worker_ctx.symbolizer;

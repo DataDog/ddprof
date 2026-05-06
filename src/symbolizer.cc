@@ -93,8 +93,8 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
           // Some binaries expose a single symbol at address 0 (ex:
           // DD_AGENT_V1). Avoid emitting it so the backend still attempts
           // symbolication.
-          write_location2_no_sym(elf_addrs[i], mapping_id, dict,
-                                 &locations[write_index++]);
+          DDRES_CHECK_FWD(write_location2_no_sym(elf_addrs[i], mapping_id, dict,
+                                                 &locations[write_index++]));
           continue;
         }
         DDRES_CHECK_FWD(write_location2_blaze(
@@ -109,7 +109,8 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
   // This can happen when file descriptors are exhausted
   // OR symbolization is disabled
   for (auto el : elf_addrs) {
-    write_location2_no_sym(el, mapping_id, dict, &locations[write_index++]);
+    DDRES_CHECK_FWD(write_location2_no_sym(el, mapping_id, dict,
+                                           &locations[write_index++]));
   }
 
   return {};

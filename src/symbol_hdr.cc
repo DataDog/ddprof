@@ -5,17 +5,19 @@
 
 #include "symbol_hdr.hpp"
 
+#include "logger.hpp"
+
 #include <datadog/profiling.h>
+#include <new>
 
 namespace ddprof {
 
 ProfilesDictionary::ProfilesDictionary() {
   ::ddog_prof_Status status = ::ddog_prof_ProfilesDictionary_new(&_handle);
   if (status.err != nullptr) {
-    LG_WRN("Failed to create ProfilesDictionary for string interning: %s",
-           status.err);
+    LG_ERR("Failed to create ProfilesDictionary (OOM): %s", status.err);
     ::ddog_prof_Status_drop(&status);
-    _handle = nullptr;
+    throw std::bad_alloc{};
   }
 }
 

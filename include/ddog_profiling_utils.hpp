@@ -69,7 +69,7 @@ DDRes write_location2_blaze(
     unsigned &cur_loc, const ddog_prof_ProfilesDictionary *dict,
     std::span<ddog_prof_Location2> locations_buff);
 
-void write_location2_no_sym(ElfAddress_t ip, ddog_prof_MappingId2 mapping_id,
-                            const ddog_prof_ProfilesDictionary *dict,
-                            ddog_prof_Location2 *ffi_location);
+DDRes write_location2_no_sym(ElfAddress_t ip, ddog_prof_MappingId2 mapping_id,
+                             const ddog_prof_ProfilesDictionary *dict,
+                             ddog_prof_Location2 *ffi_location);
 } // namespace ddprof

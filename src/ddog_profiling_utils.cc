@@ -37,7 +37,7 @@ ddog_prof_StringId2 intern_string(const ddog_prof_ProfilesDictionary *dict,
   ddog_prof_Status status = ddog_prof_ProfilesDictionary_insert_str(
       &string_id, dict, to_CharSlice(str), DDOG_PROF_UTF8_OPTION_CONVERT_LOSSY);
   if (status.err != nullptr) {
-    LG_WRN("Failed to intern string: %s", status.err);
+    LG_ERR("Failed to intern string (OOM): %s", status.err);
     ddog_prof_Status_drop(&status);
     return DDOG_PROF_STRINGID2_EMPTY;
   }
@@ -96,7 +96,7 @@ intern_function_ids(const ddog_prof_ProfilesDictionary *dict,
   ddog_prof_Status status = ddog_prof_ProfilesDictionary_insert_function(
       &function_id, dict, &function);
   if (status.err != nullptr) {
-    LG_WRN("Failed to intern function: %s", status.err);
+    LG_ERR("Failed to intern function (OOM): %s", status.err);
     ddog_prof_Status_drop(&status);
     return nullptr;
   }
@@ -132,7 +132,7 @@ ddog_prof_MappingId2 intern_mapping(const ddog_prof_ProfilesDictionary *dict,
   ddog_prof_Status status =
       ddog_prof_ProfilesDictionary_insert_mapping(&mapping_id, dict, &mapping);
   if (status.err != nullptr) {
-    LG_WRN("Failed to intern mapping: %s", status.err);
+    LG_ERR("Failed to intern mapping (OOM): %s", status.err);
     ddog_prof_Status_drop(&status);
     return nullptr;
   }
@@ -155,16 +155,22 @@ void write_location2(const FunLoc &loc, ddog_prof_MappingId2 mapping_id,
   ffi_location->line = symbol._lineno;
 }
 
-void write_location2_no_sym(ElfAddress_t ip, ddog_prof_MappingId2 mapping_id,
-                            const ddog_prof_ProfilesDictionary *dict,
-                            ddog_prof_Location2 *ffi_location) {
+DDRes write_location2_no_sym(ElfAddress_t ip, ddog_prof_MappingId2 mapping_id,
+                             const ddog_prof_ProfilesDictionary *dict,
+                             ddog_prof_Location2 *ffi_location) {
   ffi_location->mapping = mapping_id;
   const auto sopath = (mapping_id && dict)
       ? get_string(dict, mapping_id->filename)
       : std::string_view{};
   ffi_location->function = intern_function(dict, {}, sopath);
+  if (dict && !ffi_location->function) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
+                           "OOM interning no-sym function for %.*s",
+                           static_cast<int>(sopath.size()), sopath.data());
+  }
   ffi_location->address = ip;
   ffi_location->line = 0;
+  return {};
 }
 
 DDRes write_location2_blaze(
@@ -193,6 +199,10 @@ DDRes write_location2_blaze(
         : sopath;
     ffi_location.mapping = mapping_id;
     ffi_location.function = intern_function(dict, demangled_name, file_name);
+    if (dict && !ffi_location.function) {
+      DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
+                             "OOM interning inlined function");
+    }
     ffi_location.address = elf_addr;
     ffi_location.line = inlined_fn->code_info.line;
     ++cur_loc;
@@ -211,6 +221,9 @@ DDRes write_location2_blaze(
       : sopath;
   ffi_location.mapping = mapping_id;
   ffi_location.function = intern_function(dict, demangled_name, file_name);
+  if (dict && !ffi_location.function) {
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "OOM interning function");
+  }
   ffi_location.address = elf_addr;
   ffi_location.line = blaze_sym.code_info.line;
   ++cur_loc;

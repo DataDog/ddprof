@@ -36,6 +36,8 @@ constexpr size_t k_max_pprof_labels{8};
 constexpr std::string_view k_container_id_label = "container_id"sv;
 constexpr std::string_view k_process_id_label = "process_id"sv;
 constexpr std::string_view k_process_name_label = "process_name"sv;
+// This naming has an impact on backend side (hence the inconsistency with
+// process_id)
 constexpr std::string_view k_thread_id_label = "thread id"sv;
 constexpr std::string_view k_thread_name_label = "thread_name"sv;
 constexpr std::string_view k_tracepoint_label = "tracepoint_type"sv;
