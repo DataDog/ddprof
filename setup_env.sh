@@ -57,7 +57,14 @@ GetDefaultAllocatorOptions() {
 }
 
 GetDirectoryExtention() {
-  echo "_${DDPROF_EXTENSION_CC}_${DDPROF_EXTENSION_OS}_${1}"
+  # DebTidy is clang-only by design — force the clang segment of the build-dir
+  # name regardless of CC. The vendor extension is forced separately in
+  # DebTidyCMake (because CmakeWithOptions calls this with BUILD_TYPE=Debug).
+  local CC_SUFFIX=${DDPROF_EXTENSION_CC}
+  if [[ "$1" == "DebTidy" ]]; then
+    CC_SUFFIX=clang
+  fi
+  echo "_${CC_SUFFIX}_${DDPROF_EXTENSION_OS}_${1}"
 }
 
 COMMON_OPT="${COMPILER_SETTING} ${DEFAULT_ALLOCATOR_OPT} -DCMAKE_INSTALL_PREFIX=${DDPROF_INSTALL_PREFIX} -DCOLLATZ_INSTALL_PREFIX=${DDPROF_COLLATZ_INSTALL_PREFIX} -DBUILD_BENCHMARKS=${DDPROF_BUILD_BENCH}"
@@ -71,7 +78,7 @@ CmakeWithOptions() {
   shift
   local VENDOR_EXTENSION=$(GetDirectoryExtention ${BUILD_TYPE})
   # shellcheck disable=SC2086
-  cmake_cmd="cmake ${COMMON_OPT} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DVENDOR_EXTENSION=${VENDOR_EXTENSION} $@"
+  cmake_cmd="cmake -GNinja ${COMMON_OPT} -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DVENDOR_EXTENSION=${VENDOR_EXTENSION} $@"
   echoerr "-------------- cmake command -------------- "
   echoerr ${cmake_cmd}
   eval ${cmake_cmd}
@@ -87,10 +94,17 @@ DebCMake() {
     CmakeWithOptions ${BUILD_TYPE} $@
 }
 
-# Requires clang as compiler
 DebTidyCMake() {
     local BUILD_TYPE=Debug
-    CmakeWithOptions ${BUILD_TYPE} -DENABLE_CLANG_TIDY=ON $@
+    # VENDOR_EXTENSION uses BUILD_TYPE (Debug), so the DebTidy special-case in
+    # GetDirectoryExtention does not fire here — override locally so vendored
+    # deps land in _clang_*_Debug and are shared with CC=clang DebCMake builds
+    # rather than rebuilt for clang-tidy specifically.
+    local DDPROF_EXTENSION_CC=clang
+    if [[ ( -n "${CC:-}" && "${CC%-*}" != "clang" ) || ( -n "${CXX:-}" && "${CXX%-*}" != "clang++" ) ]]; then
+        echoerr "DebTidyCMake: forcing clang/clang++ (ignoring CC=${CC:-} CXX=${CXX:-} — clang-tidy requires clang)."
+    fi
+    CmakeWithOptions ${BUILD_TYPE} -DENABLE_CLANG_TIDY=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ $@
 }
 
 SanCMake() {
@@ -109,7 +123,7 @@ CovCMake() {
 }
 
 ## Build a directory with a naming that reflects the OS / compiler we are using
-## Example : mkBuildDir Rel --> build_UB18_clang_Rel
+## Example: MkBuildDir Rel --> build_gcc_unknown-linux-2.39_Rel
 MkBuildDir() {
     local BUILD_DIR_EXTENSION=$(GetDirectoryExtention ${1})
     echo ${BUILD_DIR_EXTENSION}
